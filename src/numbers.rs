@@ -16,35 +16,26 @@ pub fn digits_per_u128(modulus: u8) -> usize {
 
 pub fn base_q_add(xs: &mut [u8], ys: &[u8], q: u8) {
     assert!(xs.len() >= ys.len());
-    let qp = q as u16;
+
     let mut c = 0;
-    let mut tmp;
+
     for i in 0..ys.len() {
-        tmp = xs[i] as u16 + ys[i] as u16 + c;
-        if tmp >= qp {
-            while tmp >= qp {
-                tmp -= qp;
-            }
+        xs[i] += ys[i] + c;
+        c = 0;
+        if xs[i] >= q {
+            xs[i] -= q;
             c = 1;
-        } else {
-            c = 0;
         }
-        xs[i] = tmp as u8;
     }
 
     // continue the carrying if possible
     for i in ys.len()..xs.len() {
-        tmp = xs[i] as u16 + c;
-        if tmp >= qp {
-            while tmp >= qp {
-                tmp -= qp;
-            }
-            c = 1;
+        xs[i] += c;
+        if xs[i] >= q {
+            xs[i] -= q;
         } else {
-            xs[i] = tmp as u8;
             break;
         }
-        xs[i] = tmp as u8;
     }
 }
 
