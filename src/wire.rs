@@ -26,45 +26,43 @@ impl Wire {
     pub fn from_u128(inp: u128, q: u8) -> Self {
         if q == 2 {
             Wire::Mod2 { val: inp }
-
-        } else if lookup_defined_for_mod(q) {
-            // println!("inp = 0x{:032x}", inp);
-            let ref old_base = numbers::as_base_q(1<<16, q);
-            let base_16_digits = unsafe { std::mem::transmute::<u128, [u16;8]>(inp) };
-
-            // println!("base_16_digits = {:?}", base_16_digits);
-
-            let mut ds = vec![0; numbers::ndigits_per_u128(q)];
-            for &b in base_16_digits.iter().rev() {
-                let ref base_q_digits = lookup_digits_mod(b,q);
-                // println!("b={} base_q_digits={:?}", b, base_q_digits);
-                numbers::base_q_mul(&mut ds, old_base, q);
-                numbers::base_q_add(&mut ds, base_q_digits, q);
-            }
-
-            assert!(ds.iter().all(|&d| d < q), "q={}, ds={:?}", q, ds);
-            Wire::ModN { q, ds }
-
         } else {
-            Wire::ModN { q, ds: numbers::as_base_q(inp, q) }
+            let bytes = unsafe { std::mem::transmute::<u128, [u8;16]>(inp) };
+            let mut ds = vec![0; numbers::digits_per_u128(q)];
+            for (i,&b) in bytes.into_iter().enumerate().rev() {
+                let c = numbers::as_base_q((b as u128) << (8*i), q); //TODO: turn this into a lookup table
+                numbers::base_q_add(&mut ds, &c, q);
+            }
+            Wire::ModN { q, ds }
         }
+
+        // } else if lookup_defined_for_mod(q) {
+        //     // println!("inp = 0x{:032x}", inp);
+        //     let ref old_base = numbers::padded_base_q(1<<16, q);
+        //     let base_16_digits = unsafe { std::mem::transmute::<u128, [u16;8]>(inp) };
+
+        //     // println!("base_16_digits = {:?}", base_16_digits);
+
+        //     let mut ds = vec![0; numbers::digits_per_u128(q)];
+        //     for &b in base_16_digits.iter().rev() {
+        //         let ref base_q_digits = lookup_digits_mod(b,q);
+        //         // println!("b={} base_q_digits={:?}", b, base_q_digits);
+        //         numbers::base_q_mul(&mut ds, old_base, q);
+        //         numbers::base_q_add(&mut ds, base_q_digits, q);
+        //     }
+
+        //     assert!(ds.iter().all(|&d| d < q), "q={}, ds={:?}", q, ds);
+        //     Wire::ModN { q, ds }
+
+        // } else {
+        //     Wire::ModN { q, ds: numbers::padded_base_q(inp, q) }
+        // }
     }
 
     pub fn to_u128(&self) -> u128 {
         match self {
             &Wire::Mod2 { val } => val,
-
-            &Wire::ModN { q, ref ds } => {
-                // println!("q={} ds={:?}", q, ds);
-                let q = q as u128;
-                let mut x: u128 = 0;
-                for &d in ds.iter().rev() {
-                    // x = (x * q) + d as u128;
-                    let (xp,_) = x.overflowing_mul(q);
-                    x = xp + d as u128;
-                }
-                x
-            }
+            &Wire::ModN { q, ref ds } => numbers::from_base_q(ds, q),
         }
     }
 
@@ -179,7 +177,7 @@ mod tests {
     #[test]
     fn simple_packing() {
         let ref mut rng = Rng::new();
-        for _ in 0..1 {
+        for _ in 0..100 {
             let q = 2 + (rng.gen_byte() % 110);
 
             for i in 0..127 {
@@ -191,19 +189,29 @@ mod tests {
         }
     }
 
-    // XXX: this test fails because our packing/unpacking method is not a bijection
     #[test]
     fn packing() {
         let ref mut rng = Rng::new();
-        for _ in 0..16 {
-            let q = 2 + (rng.gen_byte() % 110);
-            println!("Wire::rand");
-            let x = Wire::rand(rng, q);
-            println!("Wire::to_u128");
+        for _ in 0..100 {
+            let q = 2 + (rng.gen_byte() % 111);
+            let w = rng.gen_u128();
+            let x = Wire::from_u128(w, q);
             let y = x.to_u128();
-            println!("Wire::from_u128");
+            assert_eq!(w, y);
             let z = Wire::from_u128(y, q);
             assert_eq!(x, z);
+        }
+    }
+
+    #[test]
+    fn base_conversion_lookup_method() {
+        let ref mut rng = Rng::new();
+        for _ in 0..1000 {
+            let q = 3 + (rng.gen_byte() % 110);
+            let x = rng.gen_u128();
+            let w = Wire::from_u128(x, q);
+            let should_be = numbers::padded_base_q(x,q);
+            assert_eq!(w.digits(), should_be, "x={} q={}", x, q);
         }
     }
 
@@ -251,9 +259,7 @@ mod tests {
         let mut rng = Rng::new();
         for _ in 0..1000 {
             let q = 2 + (rng.gen_byte() % 110);
-            println!("Wire::rand");
             let x = Wire::rand(&mut rng, q);
-            println!("Wire::zero");
             let z = Wire::zero(q);
             assert_eq!(x.minus(&x), z);
         }

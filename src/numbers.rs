@@ -1,16 +1,16 @@
 use gmp::mpz::Mpz;
 
-pub fn ndigits_per_u128(modulus: u8) -> usize {
+pub fn digits_per_u128(modulus: u8) -> usize {
     // XXX might need to be floor
     (128.0 / (modulus as f64).log(2.0)).ceil() as usize
 }
 
-// fn ndigits_per_u16(modulus: u8) -> usize {
+// fn digits_per_u16(modulus: u8) -> usize {
 //     (16.0 / (modulus as f64).log(2.0)).floor() as usize
 // }
 
 // fn nbits_used_per_u16(modulus: u8) -> usize {
-//     let n = ndigits_per_u16(modulus);
+//     let n = digits_per_u16(modulus);
 //     (((modulus as f64).powi(n as i32)).log(2.0)).ceil() as usize
 // }
 
@@ -31,24 +31,27 @@ pub fn base_q_add(xs: &mut [u8], ys: &[u8], q: u8) {
         }
         xs[i] = tmp as u8;
     }
-    if xs.len() > ys.len() {
-        let end = ys.len()+1;
-        tmp = xs[end] as u16 + c;
-        while tmp >= qp  {
-            tmp -= qp;
+
+    // continue the carrying if possible
+    for i in ys.len()..xs.len() {
+        tmp = xs[i] as u16 + c;
+        if tmp >= qp {
+            while tmp >= qp {
+                tmp -= qp;
+            }
+            c = 1;
+        } else {
+            c = 0;
         }
-        xs[end] = tmp as u8;
+        xs[i] = tmp as u8;
     }
 }
 
-pub fn base_q_mul(xs: &mut [u8], ys: &[u8], q: u8) {
-    unimplemented!();
-}
-
 pub fn as_base_q(x: u128, q: u8) -> Vec<u8> {
-    let n = ndigits_per_u128(q);
+    let n = digits_per_u128(q);
     let mut ds = Vec::with_capacity(n);
     let mut x = x;
+
     for _ in 0..n {
         if x >= q as u128 {
             let d = x % q as u128;
@@ -59,13 +62,28 @@ pub fn as_base_q(x: u128, q: u8) -> Vec<u8> {
             break;
         }
     }
-    while ds.len() < n {
-        ds.push(0);
-    }
     assert!(ds.iter().all(|&d| d < q));
     ds
 }
 
+pub fn from_base_q(ds: &[u8], q: u8) -> u128 {
+    let q = q as u128;
+    let mut x: u128 = 0;
+    for &d in ds.iter().rev() {
+        let (xp,_) = x.overflowing_mul(q);
+        x = xp + d as u128;
+    }
+    x
+}
+
+pub fn padded_base_q(x: u128, q: u8) -> Vec<u8> {
+    let mut ds = as_base_q(x,q);
+    let n = digits_per_u128(q);
+    while ds.len() < n {
+        ds.push(0);
+    }
+    ds
+}
 
 pub fn u128_to_bits(x: u128, n: usize) -> Vec<u8> {
     let mut bits = Vec::with_capacity(n);
@@ -571,6 +589,26 @@ mod tests {
         ys = vec![1,2];
         base_q_add(&mut xs, &ys, 7);
         assert_eq!(xs, [4,3]);
+    }
+
+    #[test]
+    fn base_q_conversion() {
+        let mut rng = Rng::new();
+        for _ in 0..1000 {
+            let q = 2 + (rng.gen_byte() % 111);
+            let x = rng.gen_u128();
+            let y = as_base_q(x, q);
+            let z = from_base_q(&y, q);
+            assert_eq!(x, z);
+        }
+    }
+
+    #[test]
+    fn base_q_plus_one_mod3() {
+        let mut ds = [ 2, 2, 2, 0, 0, 2 ];
+        let ref one = [ 1 ];
+        base_q_add(&mut ds, one, 3);
+        assert_eq!(ds, [0,0,0,1,0,2]);
     }
 }
 
