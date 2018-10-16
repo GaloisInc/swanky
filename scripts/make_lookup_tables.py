@@ -2,6 +2,8 @@
 
 import sys
 
+bits_per_chunk = 8
+
 ndigits_dict = {}
 names_dict = {}
 
@@ -17,8 +19,8 @@ def digits(x, base):
 def digits_for_pos(pos, base):
     max_ndigits = 0;
     ds = []
-    for x in range(256):
-        d = digits(x << (8*pos), base)
+    for x in range(1<<bits_per_chunk):
+        d = digits(x << (bits_per_chunk * pos), base)
         ds.append(d)
         max_ndigits = max(len(d), max_ndigits)
 
@@ -32,7 +34,7 @@ def digits_for_pos(pos, base):
 def write_tables_for_base(base, f):
     ndigits_dict[base] = []
     names_dict[base] = []
-    for pos in range(16):
+    for pos in range(128//bits_per_chunk):
         (n, ds) = digits_for_pos(pos, base)
         name = f"BASE{base}_POS{pos}"
         ndigits_dict[base].append(n)
@@ -48,7 +50,6 @@ def write_tables_for_base(base, f):
         if len(line) > 0:
             print("    " + line, file=f)
         print("};\n", file=f)
-
 
 def write_header(f):
     print("#include <stdint.h>", file=f);

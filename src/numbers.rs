@@ -18,24 +18,27 @@ pub fn base_q_add(xs: &mut [u8], ys: &[u8], q: u8) {
     assert!(xs.len() >= ys.len());
 
     let mut c = 0;
+    let mut i = 0;
 
-    for i in 0..ys.len() {
+    while i < ys.len() {
         xs[i] += ys[i] + c;
         c = 0;
         if xs[i] >= q {
             xs[i] -= q;
             c = 1;
         }
+        i += 1;
     }
 
     // continue the carrying if possible
-    for i in ys.len()..xs.len() {
+    while i < xs.len() {
         xs[i] += c;
         if xs[i] >= q {
             xs[i] -= q;
         } else {
             break;
         }
+        i += 1;
     }
 }
 
