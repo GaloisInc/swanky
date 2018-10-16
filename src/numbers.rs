@@ -41,7 +41,8 @@ pub fn base_q_add(xs: &mut [u8], ys: &[u8], q: u8) {
             }
             c = 1;
         } else {
-            c = 0;
+            xs[i] = tmp as u8;
+            break;
         }
         xs[i] = tmp as u8;
     }

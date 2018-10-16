@@ -56,29 +56,41 @@ def write_header(f):
     print("#include <stdbool.h>\n", file=f);
 
 def write_get_table_function(f):
-    print("uint8_t* c_get_table(uint8_t base, size_t pos) {", file=f)
+    for base, names in names_dict.items():
+        names_arr = ", ".join(map(lambda n: "(const uint8_t **)" + n, names))
+        print(f"const uint8_t** BASE{base} [] = {{{names_arr}}};", file=f)
+
+    print(file=f)
+
+    print("const uint8_t** c_get_table(uint8_t base, size_t pos) {", file=f)
     print("    switch (base) {", file=f)
 
     for base, names in names_dict.items():
         names_arr = ", ".join(names)
-        print(f"        case {base}: return {names_arr}[pos];", file=f)
+        print(f"        case {base}: return BASE{base}[pos];", file=f)
 
     print("        default: return NULL;", file=f)
     print("    }", file=f)
     print("}\n", file=f)
 
 def write_num_digits_function(f):
-    print("uint8_t* c_num_digits(uint8_t base, size_t pos) {", file=f)
+    for base, ndigits in ndigits_dict.items():
+        ndigits_arr = ", ".join(map(str,ndigits))
+        print(f"const size_t NDIGITS_BASE{base} [] = {{{ndigits_arr}}};", file=f)
+
+    print(file=f)
+
+    print("uint8_t c_num_digits(uint8_t base, size_t pos) {", file=f)
     print("    switch (base) {", file=f)
 
-    for base, ndigits in ndigits_dict.items():
-        print(f"        case {base}: return {{" + ", ".join(map(str,ndigits)) + "}[pos];", file=f)
+    for base in ndigits_dict:
+        print(f"        case {base}: return NDIGITS_BASE{base}[pos];", file=f)
 
     print("        default: return 0;", file=f)
     print("    }", file=f)
     print("}\n", file=f)
 
-with open('base_conversion/cbits/base_conversion_tables.c', 'w') as f:
+with open('base_conversion/cbits/lookup_tables.c', 'w') as f:
     write_header(f)
 
     for base in range(3,114):

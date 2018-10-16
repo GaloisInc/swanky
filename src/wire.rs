@@ -1,5 +1,5 @@
 use rand::{AES, Rng};
-use base_conversion::{lookup_digits_mod, lookup_defined_for_mod};
+use base_conversion;
 use numbers;
 
 #[derive(Debug, PartialEq, PartialOrd, Clone)]
@@ -26,37 +26,19 @@ impl Wire {
     pub fn from_u128(inp: u128, q: u8) -> Self {
         if q == 2 {
             Wire::Mod2 { val: inp }
-        } else {
+
+        } else if base_conversion::lookup_defined_for_mod(q) {
             let bytes = unsafe { std::mem::transmute::<u128, [u8;16]>(inp) };
             let mut ds = vec![0; numbers::digits_per_u128(q)];
             for (i,&b) in bytes.into_iter().enumerate().rev() {
-                let c = numbers::as_base_q((b as u128) << (8*i), q); //TODO: turn this into a lookup table
+                let c = base_conversion::lookup_digits_mod_at_position(b, q, i);
                 numbers::base_q_add(&mut ds, &c, q);
             }
             Wire::ModN { q, ds }
+
+        } else {
+            Wire::ModN { q, ds: numbers::padded_base_q(inp, q) }
         }
-
-        // } else if lookup_defined_for_mod(q) {
-        //     // println!("inp = 0x{:032x}", inp);
-        //     let ref old_base = numbers::padded_base_q(1<<16, q);
-        //     let base_16_digits = unsafe { std::mem::transmute::<u128, [u16;8]>(inp) };
-
-        //     // println!("base_16_digits = {:?}", base_16_digits);
-
-        //     let mut ds = vec![0; numbers::digits_per_u128(q)];
-        //     for &b in base_16_digits.iter().rev() {
-        //         let ref base_q_digits = lookup_digits_mod(b,q);
-        //         // println!("b={} base_q_digits={:?}", b, base_q_digits);
-        //         numbers::base_q_mul(&mut ds, old_base, q);
-        //         numbers::base_q_add(&mut ds, base_q_digits, q);
-        //     }
-
-        //     assert!(ds.iter().all(|&d| d < q), "q={}, ds={:?}", q, ds);
-        //     Wire::ModN { q, ds }
-
-        // } else {
-        //     Wire::ModN { q, ds: numbers::padded_base_q(inp, q) }
-        // }
     }
 
     pub fn to_u128(&self) -> u128 {
