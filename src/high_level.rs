@@ -379,7 +379,7 @@ mod tests {
     use numbers::{u128_to_bits, factor, inv_u8, modulus_with_width};
     use rand::Rng;
 
-    const NTESTS: usize = 4;
+    const NTESTS: usize = 1;
 
     // test harnesses {{{
     fn test_garbling(b: &mut Bundler, inp: &[u128], should_be: &[u128]) {
