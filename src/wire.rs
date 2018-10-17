@@ -30,10 +30,12 @@ impl Wire {
         } else if base_conversion::lookup_defined_for_mod(q) {
             let bytes = unsafe { std::mem::transmute::<u128, [u8;16]>(inp) };
             let mut ds = vec![0; numbers::digits_per_u128(q)];
+
             for i in 0..16 {
                 let ref c = base_conversion::lookup_digits_mod_at_position(bytes[i], q, i);
                 numbers::base_q_add(&mut ds, c, q);
             }
+
             Wire::ModN { q, ds }
 
         } else {

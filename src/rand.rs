@@ -54,6 +54,10 @@ impl Rng {
         PRIMES[self.gen_byte() as usize % NPRIMES]
     }
 
+    pub fn gen_modulus(&mut self) -> u8 {
+        2 + (self.gen_byte() % 111)
+    }
+
     pub fn gen_usable_composite_modulus(&mut self) -> u128 {
         self._gen_usable_composite_modulus().iter().fold(1, |acc, &x| {
             acc * x as u128

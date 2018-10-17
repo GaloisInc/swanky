@@ -211,13 +211,13 @@ impl Garbler {
         (X.plus(&Y), gate) // output zero wire
     }
 
-    pub fn encode(&mut self, inputs: &[u8]) -> Vec<Wire> {
+    pub fn encode(&self, inputs: &[u8]) -> Vec<Wire> {
         assert_eq!(inputs.len(), self.inputs.len());
         let mut xs = Vec::new();
         for i in 0..inputs.len() {
             let x = inputs[i];
             let X = self.inputs[i].clone();
-            let D = self.delta(X.modulus()).clone();
+            let D = self.deltas[&X.modulus()].clone();
             xs.push(X.plus(&D.cmul(x)));
         }
         xs
@@ -260,21 +260,11 @@ impl Evaluator {
         for i in 0..c.gates.len() {
             let q = c.moduli[i];
             let w = match c.gates[i] {
-                Gate::Input { id } => {
-                    inputs[id].clone()
-                }
 
-                Gate::Add { xref, yref } => {
-                    wires[xref].plus(&wires[yref])
-                }
-
-                Gate::Sub { xref, yref } => {
-                    wires[xref].minus(&wires[yref])
-                }
-
-                Gate::Cmul { xref, c } => {
-                    wires[xref].cmul(c)
-                }
+                Gate::Input { id }       => inputs[id].clone(),
+                Gate::Add { xref, yref } => wires[xref].plus(&wires[yref]),
+                Gate::Sub { xref, yref } => wires[xref].minus(&wires[yref]),
+                Gate::Cmul { xref, c }   => wires[xref].cmul(c),
 
                 Gate::Proj { xref, id, .. } => {
                     let ref x = wires[xref];
@@ -430,7 +420,7 @@ mod tests {
         let mut rng = Rng::new();
         let q = rng.gen_prime();
         let c = f(q);
-        let (mut gb, ev) = garble(&c);
+        let (gb, ev) = garble(&c);
         for _ in 0..16 {
             let x = rng.gen_byte() % q;
             let y = rng.gen_byte() % q;
@@ -488,7 +478,7 @@ mod tests {
         let z = b.ands(&inps);
         b.output(z);
         let c = b.finish();
-        let (mut gb, ev) = garble(&c);
+        let (gb, ev) = garble(&c);
 
         for _ in 0..16 {
             let mut inps: Vec<u8> = Vec::new();

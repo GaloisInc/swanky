@@ -155,7 +155,7 @@ fn test_mul_high_level(input: u128, modulus: u128, niter: usize) {
 #[allow(non_snake_case)]
 fn test_circuit(input: &[u8], c: &Circuit) {
     let mut start = SystemTime::now();
-    let (mut gb, ev) = garble(&c);
+    let (gb, ev) = garble(&c);
     println!("\tGarble:\t{}", elapsed_since(&start));
     start = SystemTime::now();
     let X = gb.encode(input);

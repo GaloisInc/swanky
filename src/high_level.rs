@@ -384,7 +384,7 @@ mod tests {
     // test harnesses {{{
     fn test_garbling(b: &mut Bundler, inp: &[u128], should_be: &[u128]) {
         let c = b.take_builder().finish();
-        let (mut gb, ev) = garble(&c);
+        let (gb, ev) = garble(&c);
         let enc_inp = b.encode(inp);
         assert_eq!(b.decode(&c.eval(&enc_inp)), should_be);
         let xs = gb.encode(&enc_inp);
@@ -394,7 +394,7 @@ mod tests {
 
     fn test_garbling_high_to_low(b: &mut Bundler, inp: &[u128], should_be: &[u8]) {
         let c = b.take_builder().finish();
-        let (mut gb, ev) = garble(&c);
+        let (gb, ev) = garble(&c);
         // panic!("{}", ev.size());
         let enc_inp = b.encode(inp);
         let pt_outs: Vec<u8> = c.eval(&enc_inp);

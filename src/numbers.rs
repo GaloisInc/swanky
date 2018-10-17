@@ -1,7 +1,6 @@
 use gmp::mpz::Mpz;
 
 pub fn digits_per_u128(modulus: u8) -> usize {
-    // XXX might need to be floor
     (128.0 / (modulus as f64).log(2.0)).ceil() as usize
 }
 
