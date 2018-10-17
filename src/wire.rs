@@ -43,7 +43,7 @@ impl Wire {
         }
     }
 
-    pub fn to_u128(&self) -> u128 {
+    pub fn as_u128(&self) -> u128 {
         match self {
             &Wire::Mod2 { val } => val,
             &Wire::ModN { q, ref ds } => numbers::from_base_q(ds, q),
@@ -144,12 +144,21 @@ impl Wire {
         Self::from_u128(rng.gen_u128(), modulus)
     }
 
-    pub fn hash(&self, tweak: u128, new_modulus: u8) -> Self {
-        Self::from_u128(AES.hash(tweak, self.to_u128()), new_modulus)
+    pub fn hash(&self, tweak: u128) -> u128 {
+        AES.hash(tweak, self.as_u128())
     }
 
-    pub fn hash2(&self, other: &Wire, tweak: u128, new_modulus: u8) -> Self {
-        Self::from_u128(AES.hash2(tweak, self.to_u128(), other.to_u128()), new_modulus)
+    // hash to u128 and back to Wire
+    pub fn hashback(&self, tweak: u128, new_mod: u8) -> Self {
+        Self::from_u128(self.hash(tweak), new_mod)
+    }
+
+    pub fn hash2(&self, other: &Wire, tweak: u128) -> u128 {
+        AES.hash2(tweak, self.as_u128(), other.as_u128())
+    }
+
+    pub fn hashback2(&self, other: &Wire, tweak: u128, new_modulus: u8) -> Self {
+        Self::from_u128(self.hash2(other, tweak), new_modulus)
     }
 }
 
@@ -167,7 +176,7 @@ mod tests {
             for i in 0..127 {
                 let x = 1 << i;
                 let w = Wire::from_u128(x, q);
-                let z = w.to_u128();
+                let z = w.as_u128();
                 assert_eq!(z, x, "q={}, 2^{}", q, i);
             }
         }
@@ -180,7 +189,7 @@ mod tests {
             let q = 2 + (rng.gen_byte() % 111);
             let w = rng.gen_u128();
             let x = Wire::from_u128(w, q);
-            let y = x.to_u128();
+            let y = x.as_u128();
             assert_eq!(w, y);
             let z = Wire::from_u128(y, q);
             assert_eq!(x, z);
@@ -205,7 +214,7 @@ mod tests {
         for _ in 0..100 {
             let q = 2 + (rng.gen_byte() % 110);
             let x = Wire::rand(&mut rng, q);
-            let y = x.hash(1, q);
+            let y = x.hashback(1, q);
             assert!(x != y);
             match y {
                 Wire::Mod2 { val }    => assert!(val > 0),

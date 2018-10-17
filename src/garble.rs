@@ -9,7 +9,7 @@ type GarbledGate = Vec<Wire>;
 pub struct Garbler {
     deltas     : HashMap<u8, Wire>,
     inputs     : Vec<Wire>,
-    outputs    : Vec<Vec<Wire>>,
+    outputs    : Vec<Vec<u128>>,
     rng        : Rng,
 }
 
@@ -22,7 +22,7 @@ pub fn garble(c: &Circuit) -> (Garbler, Evaluator) {
     let mut gb = Garbler::new();
 
     let mut wires: Vec<Wire> = Vec::new();
-    let mut gates: Vec<Vec<Wire>> = Vec::new();
+    let mut gates: Vec<GarbledGate> = Vec::new();
     for i in 0..c.gates.len() {
         let q = c.moduli[i];
         let w = match c.gates[i] {
@@ -97,7 +97,7 @@ impl Garbler {
         let ref D = self.delta(q);
         for k in 0..q {
             let t = output_tweak(output_num, k);
-            cts.push(X.plus(&D.cmul(k)).hash(t, q));
+            cts.push(X.plus(&D.cmul(k)).hash(t));
         }
         self.outputs.push(cts);
     }
@@ -110,24 +110,26 @@ impl Garbler {
         // color bits. Since some of the values in gate will be void
         // temporarily, we use Vec<Option<..>>
         let mut gate = vec![None; q_in as usize - 1];
-        // input zero-wire
-        let tao = A.color();
-        // gate tweak
-        let g = tweak(gate_num);
+
+        let tao = A.color();        // input zero-wire
+        let g = tweak(gate_num);    // gate tweak
+
         // output zero-wire
         // W_g^0 <- -H(g, W_{a_1}^0 - \tao\Delta_m) - \phi(-\tao)\Delta_n
         let C = A.minus(&self.delta(q_in).cmul(tao))
-                 .hash(g, q_out)
+                 .hashback(g, q_out)
                  .negate()
                  .minus(&self.delta(q_out).cmul(tt[((q_in - tao) % q_in) as usize]));
+
         for x in 0..q_in {
             let ix = (tao as usize + x as usize) % q_in as usize;
             if ix == 0 { continue }
             let A_ = A.plus(&self.delta(q_in).cmul(x));
             let C_ = C.plus(&self.delta(q_out).cmul(tt[x as usize]));
-            let ct = A_.hash(g, q_out).plus(&C_);
+            let ct = A_.hashback(g, q_out).plus(&C_);
             gate[ix-1] = Some(ct);
         }
+
         // unwrap the Option elems inside the Vec
         let gate = gate.into_iter().map(Option::unwrap).collect();
         (C, gate)
@@ -147,7 +149,7 @@ impl Garbler {
         // we use the row reduction trick here
         let ref B_delta = self.delta(ymod as u8);
         let C = A.minus(&self.delta(xmod as u8).cmul(A.color()))
-                 .hash2(&B.minus(&B_delta.cmul(B.color())), g, q)
+                 .hashback2(&B.minus(&B_delta.cmul(B.color())), g, q)
                  .negate()
                  .minus(&self.delta(q).cmul(sigma));
         for x in 0..xmod {
@@ -159,7 +161,7 @@ impl Garbler {
                 assert_eq!(gate[ix-1], None);
                 let B_ = B.plus(&self.delta(ymod as u8).cmul(y as u8));
                 let C_ = C.plus(&self.delta(q).cmul(tt[x][y]));
-                let ct = A_.hash2(&B_, g, q).plus(&C_);
+                let ct = A_.hashback2(&B_,g, q).plus(&C_);
                 gate[ix-1] = Some(ct);
             }
         }
@@ -179,12 +181,12 @@ impl Garbler {
 
         // X = -H(A+aD) - arD such that a + A.color == 0
         let alpha = q - A.color(); // alpha = -A.color
-        let X = A.plus(&D.cmul(alpha)).hash(g,q).negate()
+        let X = A.plus(&D.cmul(alpha)).hashback(g,q).negate()
                  .plus(&D.cmul((alpha as u16 * r as u16 % q as u16) as u8));
 
         // Y = -H(B + bD) + brA
         let beta = q - B.color();
-        let Y = B.plus(&D.cmul(beta)).hash(g,q).negate()
+        let Y = B.plus(&D.cmul(beta)).hashback(g,q).negate()
                  .plus(&A.cmul((beta + r) % q));
 
         for i in 0..q {
@@ -194,7 +196,7 @@ impl Garbler {
             let A_ = A.plus(&self.delta(q).cmul(a));
             if A_.color() != 0 {
                 let tao = (a as u16 * (q - r) as u16 % q as u16) as u8;
-                let G = A_.hash(g,q).plus(&X.plus(&D.cmul(tao)));
+                let G = A_.hashback(g,q).plus(&X.plus(&D.cmul(tao)));
                 gate[A_.color() as usize - 1] = Some(G);
             }
 
@@ -203,7 +205,7 @@ impl Garbler {
             let b = i; // b: truth value of wire A
             let B_ = B.plus(&D.cmul(b));
             if B_.color() != 0 {
-                let G = B_.hash(g,q).plus(&Y.minus(&A.cmul((b+r)%q)));
+                let G = B_.hashback(g,q).plus(&Y.minus(&A.cmul((b+r)%q)));
                 gate[(q + B_.color()) as usize - 2] = Some(G);
             }
         }
@@ -229,7 +231,7 @@ impl Garbler {
         for i in 0..ws.len() {
             let q = ws[i].modulus();
             for k in 0..q {
-                let h = ws[i].hash(output_tweak(i,k), q);
+                let h = ws[i].hash(output_tweak(i,k));
                 if h == self.outputs[i][k as usize] {
                     outs.push(k);
                     break;
@@ -269,10 +271,10 @@ impl Evaluator {
                 Gate::Proj { xref, id, .. } => {
                     let ref x = wires[xref];
                     if x.color() == 0 {
-                        x.hash(i as u128, q).negate()
+                        x.hashback(i as u128, q).negate()
                     } else {
                         let ref ct = self.gates[id][x.color() as usize - 1];
-                        ct.minus(&x.hash(i as u128, q))
+                        ct.minus(&x.hashback(i as u128, q))
                     }
                 }
 
@@ -281,11 +283,11 @@ impl Evaluator {
                     let ref b = wires[yref];
                     let g = tweak(i);
                     if a.color() == 0 && b.color() == 0 {
-                        a.hash2(&b, g, q).negate()
+                        a.hashback2(&b, g, q).negate()
                     } else {
                         let ix = a.color() as usize * c.moduli[yref] as usize + b.color() as usize;
                         let ref ct = self.gates[id][ix - 1];
-                        ct.minus(&a.hash2(&b, g, q))
+                        ct.minus(&a.hashback2(&b, g, q))
                     }
                 }
 
@@ -295,19 +297,19 @@ impl Evaluator {
                     // garbler's half gate
                     let ref A = wires[xref];
                     let L = if A.color() == 0 {
-                        A.hash(g,q).negate()
+                        A.hashback(g,q).negate()
                     } else {
                         let ref ct_left = self.gates[id][A.color() as usize - 1];
-                        ct_left.minus(&A.hash(g,q))
+                        ct_left.minus(&A.hashback(g,q))
                     };
 
                     // evaluator's half gate
                     let ref B = wires[yref];
                     let R = if B.color() == 0 {
-                        B.hash(g,q).negate()
+                        B.hashback(g,q).negate()
                     } else {
                         let ref ct_right = self.gates[id][(q + B.color()) as usize - 2];
-                        ct_right.minus(&B.hash(g,q))
+                        ct_right.minus(&B.hashback(g,q))
 
                     };
                     L.plus(&R.plus(&A.cmul(B.color())))
@@ -338,156 +340,213 @@ mod tests {
     use garble::garble;
     use rand::Rng;
 
-    fn add_circ(modulus: u8) -> Circuit {
-        let mut b = Builder::new();
-        let x = b.input(modulus);
-        let y = b.input(modulus);
-        let z = b.add(x,y);
-        b.output(z);
-        b.finish()
-    }
-
-    fn sub_circ(modulus: u8) -> Circuit {
-        let mut b = Builder::new();
-        let x = b.input(modulus);
-        let y = b.input(modulus);
-        let z = b.sub(x,y);
-        b.output(z);
-        b.finish()
-    }
-
-    fn cmul_circ(modulus: u8) -> Circuit {
-        let mut b = Builder::new();
-        let x = b.input(modulus);
-        let _ = b.input(modulus);
-        let z = b.cmul(x, 2);
-        b.output(z);
-        b.finish()
-    }
-
-    fn proj_circ(modulus: u8) -> Circuit {
-        let mut tab = Vec::new();
-        for i in 0..modulus {
-            tab.push((i + 1) % modulus);
-        }
-        let mut b = Builder::new();
-        let x = b.input(modulus);
-        let _ = b.input(modulus);
-        let z = b.proj(x, modulus, tab);
-        b.output(z);
-        b.finish()
-    }
-
-    fn yao_circ(q: u8) -> Circuit {
-        let mut b = Builder::new();
-        let x = b.input(q);
-        let y = b.input(q);
-        let mut tt = Vec::new();
-        for a in 0..q {
-            let mut tt_ = Vec::new();
-            for b in 0..q {
-                tt_.push((a as u16 * b as u16 % q as u16) as u8);
-            }
-            tt.push(tt_);
-        }
-        let z = b.yao(x, y, q, tt);
-        b.output(z);
-        b.finish()
-    }
-
-    fn mul_dlog_circ(modulus: u8) -> Circuit {
-        let mut b = Builder::new();
-        let x = b.input(modulus);
-        let y = b.input(modulus);
-        let z = b.mul_dlog(&[x,y]);
-        b.output(z);
-        b.finish()
-    }
-
-    fn half_gate_circ(modulus: u8) -> Circuit {
-        let mut b = Builder::new();
-        let x = b.input(modulus);
-        let y = b.input(modulus);
-        let z = b.half_gate(x,y);
-        b.output(z);
-        b.finish()
-    }
-
-    fn test_garble_helper<F,G>(f: F, g: G)
-        where F: Fn(u8) -> Circuit,
-              G: Fn(u8, u8, u8) -> u8
+    fn garble_test_helper<F>(f: F)
+        where F: Fn(u8) -> Circuit
     {
         let mut rng = Rng::new();
-        let q = rng.gen_prime();
-        let c = f(q);
-        let (gb, ev) = garble(&c);
         for _ in 0..16 {
-            let x = rng.gen_byte() % q;
-            let y = rng.gen_byte() % q;
-            let xs = gb.encode(&[x,y]);
-            let ys = ev.eval(&c, &xs);
-            println!("x={} y={} g(x,y)={} %{} ", x, y, g(x,y,q), q);
-            assert_eq!(gb.decode(&ys)[0], g(x,y,q));
+            let q = rng.gen_prime();
+            let ref c = f(q);
+            let (gb, ev) = garble(&c);
+            for _ in 0..64 {
+                let ref inps = (0..c.ninputs()).map(|i| {
+                    rng.gen_byte() % c.input_mod(i)
+                }).collect::<Vec<u8>>();
+                let ref xs = gb.encode(inps);
+                let ref ys = ev.eval(c, xs);
+                assert_eq!(gb.decode(ys)[0], c.eval(inps)[0], "q={}", q);
+            }
         }
     }
 
     #[test]
     fn add() {
-        test_garble_helper(add_circ, |x,y,q| (x+y)%q);
+        garble_test_helper(|q| {
+            let mut b = Builder::new();
+            let x = b.input(q);
+            let y = b.input(q);
+            let z = b.add(x,y);
+            b.output(z);
+            b.finish()
+        });
+    }
+
+    #[test]
+    fn add_many() {
+        garble_test_helper(|q| {
+            let mut b = Builder::new();
+            let xs = b.inputs(16, q);
+            let z = b.add_many(&xs);
+            b.output(z);
+            b.finish()
+        });
+    }
+
+    #[test]
+    fn or_many() {
+        garble_test_helper(|_| {
+            let mut b = Builder::new();
+            let xs = b.inputs(16, 2);
+            let z = b.or_many(&xs);
+            b.output(z);
+            b.finish()
+        });
+    }
+
+    #[test]
+    fn and_many() {
+        garble_test_helper(|_| {
+            let mut b = Builder::new();
+            let xs = b.inputs(16, 2);
+            let z = b.and_many(&xs);
+            b.output(z);
+            b.finish()
+        });
     }
 
     #[test]
     fn sub() {
-        test_garble_helper(sub_circ, |x,y,q| (x + q - y)%q);
+        garble_test_helper(|q| {
+            let mut b = Builder::new();
+            let x = b.input(q);
+            let y = b.input(q);
+            let z = b.sub(x,y);
+            b.output(z);
+            b.finish()
+        });
     }
 
     #[test]
     fn cmul() {
-        test_garble_helper(cmul_circ, |x,_,q| 2*x%q);
+        garble_test_helper(|q| {
+            let mut b = Builder::new();
+            let x = b.input(q);
+            let _ = b.input(q);
+            let z = b.cmul(x, 2);
+            b.output(z);
+            b.finish()
+        });
+    }
+
+
+    #[test]
+    fn proj_cycle() {
+        garble_test_helper(|q| {
+            let mut tab = Vec::new();
+            for i in 0..q {
+                tab.push((i + 1) % q);
+            }
+            let mut b = Builder::new();
+            let x = b.input(q);
+            let _ = b.input(q);
+            let z = b.proj(x, q, tab);
+            b.output(z);
+            b.finish()
+        });
     }
 
     #[test]
-    fn proj() {
-        test_garble_helper(proj_circ, |x,_,q| (x+1) % q);
+    fn proj_rand() {
+        garble_test_helper(|q| {
+            let mut rng = Rng::new();
+            let mut tab = Vec::new();
+            for _ in 0..q {
+                tab.push(rng.gen_byte() % q);
+            }
+            let mut b = Builder::new();
+            let x = b.input(q);
+            let _ = b.input(q);
+            let z = b.proj(x, q, tab);
+            b.output(z);
+            b.finish()
+        });
+    }
+
+    #[test]
+    fn mod_change() {
+        garble_test_helper(|q| {
+            let mut b = Builder::new();
+            let x = b.input(q);
+            let z = b.mod_change(x,q*2);
+            b.output(z);
+            b.finish()
+        });
     }
 
     #[test]
     fn yao() {
-        test_garble_helper(yao_circ, |x,y,q| ((x as usize * y as usize) % q as usize) as u8);
+        garble_test_helper(|q| {
+            let mut b = Builder::new();
+            let x = b.input(q);
+            let y = b.input(q);
+            let mut tt = Vec::new();
+            for a in 0..q {
+                let mut tt_ = Vec::new();
+                for b in 0..q {
+                    tt_.push((a as u16 * b as u16 % q as u16) as u8);
+                }
+                tt.push(tt_);
+            }
+            let z = b.yao(x, y, q, tt);
+            b.output(z);
+            b.finish()
+        });
     }
 
     #[test]
     fn mul_dlog() {
-        test_garble_helper(mul_dlog_circ, |x,y,q| (x as usize * y as usize % q as usize) as u8);
+        garble_test_helper(|q| {
+            let mut b = Builder::new();
+            let x = b.input(q);
+            let y = b.input(q);
+            let z = b.mul_dlog(&[x,y]);
+            b.output(z);
+            b.finish()
+        });
     }
 
     #[test]
     fn half_gate() {
-        test_garble_helper(half_gate_circ, |x,y,q| (x as usize * y as usize % q as usize) as u8);
+        garble_test_helper(|q| {
+            let mut b = Builder::new();
+            let x = b.input(q);
+            let y = b.input(q);
+            let z = b.half_gate(x,y);
+            b.output(z);
+            b.finish()
+        });
     }
 
     #[test]
-    fn and_gate_fan_n() {
-        let mut rng = Rng::new();
+    fn debug_and_many() {
         let mut b = Builder::new();
-        let mut inps = Vec::new();
-        let n = 2 + rng.gen_byte() % 127;
-        for _ in 0..n {
-            inps.push(b.input(2));
-        }
-        let z = b.ands(&inps);
-        b.output(z);
-        let c = b.finish();
-        let (gb, ev) = garble(&c);
+        let n = 16;
+        let args = b.inputs(n, 2);
+        let wires: Vec<_> = args.iter().map(|&x| {
+            b.mod_change(x, n as u8 + 1)
+        }).collect();
+        let s = b.add_many(&wires);
+        // let mut tab = vec![0;n+1];
+        // tab[b] = 1;
+        // let z = self.proj(s, 2, tab);
+        b.output(s);
+        let ref c = b.finish();
 
-        for _ in 0..16 {
-            let mut inps: Vec<u8> = Vec::new();
-            for _ in 0..n {
-                inps.push(rng.gen_bool() as u8);
-            }
-            let xs = gb.encode(&inps);
-            let ys = ev.eval(&c, &xs);
-            assert_eq!(gb.decode(&ys)[0], c.eval(&inps)[0])
+        let (gb, ev) = garble(c);
+
+        let mut rng = Rng::new();
+        for _ in 0..64 {
+            let ref inps: Vec<u8> = (0..c.ninputs()).map(|i| {
+                rng.gen_byte() % c.input_mod(i)
+            }).collect();
+
+            let s: u8 = inps.iter().sum();
+            println!("{:?}, sum={}", inps, s);
+
+            let ref xs = gb.encode(inps);
+            let ref ys = ev.eval(c, xs);
+
+            assert_eq!(gb.decode(ys)[0], c.eval(inps)[0]);
         }
     }
 }

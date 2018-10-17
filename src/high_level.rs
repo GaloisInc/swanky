@@ -39,7 +39,7 @@ impl Bundler {
     fn bundle_from_ref(&mut self, x: Ref, primes: Rc<Vec<u8>>) -> BundleRef {
         let mut wires = Vec::with_capacity(primes.len());
         for &p in primes.iter() {
-            wires.push(self.borrow_builder().change_modulus(x, p));
+            wires.push(self.borrow_builder().mod_change(x, p));
         }
         self.add_bundle(wires, primes)
     }
@@ -187,7 +187,7 @@ impl Bundler {
             // zwires = Vec::with_capacity(xbun.wires.len());
             let b = self.builder.as_mut().expect("need a builder!");
             zwires = xbun.primes.iter().map(|&q| {
-                b.change_modulus(x, q)
+                b.mod_change(x, q)
             }).collect();
         }
         let ps = self.bundles[xref.0].primes.clone();
@@ -238,7 +238,7 @@ impl Bundler {
             eq_zero_tab[0] = 1;
             zs.push(b.proj(z, xbun.wires.len() as u8 + 1, eq_zero_tab));
         }
-        b._ands(&zs)
+        b._and_many(&zs)
     }
 
     pub fn to_pmr(&mut self, xref: BundleRef) -> BundleRef {
@@ -267,8 +267,8 @@ impl Bundler {
         let gadget = |b: &mut Builder, x: Ref, y: Ref| -> Ref {
             let p  = b.circ.moduli[x];
             let q  = b.circ.moduli[y];
-            let x_ = b.change_modulus(x, p+q-1);
-            let y_ = b.change_modulus(y, p+q-1);
+            let x_ = b.mod_change(x, p+q-1);
+            let y_ = b.mod_change(y, p+q-1);
             let z  = b.sub(x_, y_);
             b.proj(z, q, gadget_projection_tt(p,q))
         };

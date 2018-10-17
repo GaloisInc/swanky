@@ -31,6 +31,8 @@ pub enum Gate {
 
 impl Circuit {
     pub fn eval(&self, inputs: &[u8]) -> Vec<u8> {
+        assert_eq!(inputs.len(), self.ninputs());
+
         let mut cache = vec![0;self.gates.len()];
         for zref in 0..self.gates.len() {
             let q = self.moduli[zref];
@@ -59,6 +61,15 @@ impl Circuit {
             cache[zref] = val;
         }
         self.output_refs.iter().map(|outref| cache[*outref]).collect()
+    }
+
+    pub fn ninputs(&self) -> usize {
+        self.input_refs.len()
+    }
+
+    pub fn input_mod(&self, id: Id) -> u8 {
+        let r = self.input_refs[id];
+        self.moduli[r]
     }
 }
 
@@ -219,18 +230,18 @@ impl Builder {
         self.half_gate(x,y)
     }
 
-    pub fn ands(&mut self, args: &[Ref]) -> Ref {
+    pub fn and_many(&mut self, args: &[Ref]) -> Ref {
         assert!(args.iter().all(|&x| self.circ.moduli[x] == 2));
         // convert all the wires to base b+1
-        let b = args.len();
+        let b = args.len() as u8;
         let wires: Vec<Ref> = args.iter().map(|&x| {
-            self.proj(x, b as u8 + 1, vec![0,1])
+            self.mod_change(x, b+1)
         }).collect();
-        self._ands(&wires)
+        self._and_many(&wires)
     }
 
     // assumes wires already are in base b+1
-    pub fn _ands(&mut self, args: &[Ref]) -> Ref {
+    pub fn _and_many(&mut self, args: &[Ref]) -> Ref {
         let b = args.len();
         assert!(args.iter().all(|&x| self.circ.moduli[x] == (b + 1) as u8));
         // add them together
@@ -241,7 +252,7 @@ impl Builder {
         self.proj(z, 2, tab)
     }
 
-    pub fn or(&mut self, args: &[Ref]) -> Ref {
+    pub fn or_many(&mut self, args: &[Ref]) -> Ref {
         assert!(args.iter().all(|&x| self.circ.moduli[x] == 2));
         // convert all the wires to base b+1
         let b = args.len();
@@ -265,7 +276,7 @@ impl Builder {
         let q = self.circ.moduli[args[0]];
         if q == 2 {
             // we can't use the dlog trick on mod 2 since we must add in mod p-1
-            return self.ands(args)
+            return self.and_many(args)
         }
 
         assert!(args.iter().all(|&x| self.circ.moduli[x] == q));
@@ -276,7 +287,7 @@ impl Builder {
         let bs: Vec<Ref> = args.iter().map(|&x| {
             self.proj(x, 2, eq_zero_tab.clone())
         }).collect();
-        let b = self.or(&bs);
+        let b = self.or_many(&bs);
 
         // multiply using the discrete log trick- first project each argument to
         // [dlog_g(x)]_{p-1}
@@ -295,7 +306,7 @@ impl Builder {
         self.yao(b, z, q, f_tt)
     }
 
-    pub fn change_modulus(&mut self, xref: Ref, to_modulus: u8) -> Ref {
+    pub fn mod_change(&mut self, xref: Ref, to_modulus: u8) -> Ref {
         let from_modulus = self.circ.moduli[xref];
         if from_modulus == to_modulus {
             return xref;
@@ -331,7 +342,7 @@ impl Builder {
         let z2 = self.xor(z1,c);
         let c1 = self.and(z1,c);
         let c2 = self.and(x,y);
-        let c3 = self.or(&[c1,c2]);
+        let c3 = self.or_many(&[c1,c2]);
         (z2, c3)
     }
 
@@ -396,7 +407,7 @@ mod tests {
         for _ in 0..n {
             inps.push(b.input(2));
         }
-        let z = b.ands(&inps);
+        let z = b.and_many(&inps);
         b.output(z);
         let c = b.finish();
 
@@ -419,7 +430,7 @@ mod tests {
         for _ in 0..n {
             inps.push(b.input(2));
         }
-        let z = b.or(&inps);
+        let z = b.or_many(&inps);
         b.output(z);
         let c = b.finish();
 
@@ -472,14 +483,14 @@ mod tests {
     }
 
     #[test]
-    fn change_modulus() {
+    fn mod_change() {
         let mut rng = Rng::new();
         let mut b = Builder::new();
         let p = rng.gen_prime();
         let q = rng.gen_prime();
         let x = b.input(p);
-        let y = b.change_modulus(x, q);
-        let z = b.change_modulus(y, p);
+        let y = b.mod_change(x, q);
+        let z = b.mod_change(y, p);
         b.output(z);
         let c = b.finish();
         for _ in 0..16 {
@@ -529,6 +540,29 @@ mod tests {
             let (z, carry) = x.overflowing_sub(y);
             assert_eq!(u128_from_bits(&res[0..128]), z);
             assert_eq!(res[128], carry as u8);
+        }
+    }
+
+    #[test]
+    fn add_many_mod_change() {
+        let mut b = Builder::new();
+        let n = 113;
+        let args = b.inputs(n, 2);
+        let wires: Vec<_> = args.iter().map(|&x| {
+            b.mod_change(x, n as u8 + 1)
+        }).collect();
+        let s = b.add_many(&wires);
+        b.output(s);
+        let ref c = b.finish();
+
+        let mut rng = Rng::new();
+        for _ in 0..64 {
+            let ref inps: Vec<u8> = (0..c.ninputs()).map(|i| {
+                rng.gen_byte() % c.input_mod(i)
+            }).collect();
+            let s: u8 = inps.iter().sum();
+            println!("{:?}, sum={}", inps, s);
+            assert_eq!(c.eval(inps)[0], s);
         }
     }
 }

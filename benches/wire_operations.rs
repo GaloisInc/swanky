@@ -24,7 +24,7 @@ fn bench_pack(c: &mut Criterion, p: u8) {
         let rng = &mut Rng::new();
         let w = Wire::rand(rng,p);
         b.iter(|| {
-            let x = w.to_u128();
+            let x = w.as_u128();
             criterion::black_box(x);
         });
     });
@@ -70,7 +70,7 @@ fn bench_hash(c: &mut Criterion, p: u8) {
         let rng = &mut Rng::new();
         let x = Wire::rand(rng,p);
         b.iter(|| {
-            let z = x.hash(42, p);
+            let z = x.hash(42);
             criterion::black_box(z);
         });
     });
