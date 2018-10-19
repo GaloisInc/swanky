@@ -32,8 +32,8 @@ impl Wire {
             let mut ds = vec![0; numbers::digits_per_u128(q)];
 
             for i in 0..16 {
-                let ref c = base_conversion::lookup_digits_mod_at_position(bytes[i], q, i);
-                numbers::base_q_add(&mut ds, c, q);
+                let c = base_conversion::lookup_digits_mod_at_position(bytes[i], q, i);
+                numbers::base_q_add(&mut ds, &c, q);
             }
 
             Wire::ModN { q, ds }
@@ -44,9 +44,9 @@ impl Wire {
     }
 
     pub fn as_u128(&self) -> u128 {
-        match self {
-            &Wire::Mod2 { val } => val,
-            &Wire::ModN { q, ref ds } => numbers::from_base_q(ds, q),
+        match *self {
+            Wire::Mod2 { val } => val,
+            Wire::ModN { q, ref ds } => numbers::from_base_q(ds, q),
         }
     }
 
@@ -68,9 +68,9 @@ impl Wire {
     }
 
     pub fn color(&self) -> u8 {
-        match self {
-            &Wire::Mod2 { val }        => (val & 1) as u8,
-            &Wire::ModN { ref ds, .. } => ds[0],
+        match *self {
+            Wire::Mod2 { val }        => (val & 1) as u8,
+            Wire::ModN { ref ds, .. } => ds[0],
         }
     }
 
@@ -115,7 +115,7 @@ impl Wire {
                 for i in 0..n {
                     zs[i] = ((ds[i] as u16 * c as u16) % q as u16) as u8;
                 }
-                Wire::ModN { q: q, ds: zs }
+                Wire::ModN { q, ds: zs }
             }
         }
     }
@@ -131,7 +131,7 @@ impl Wire {
                         zs[i] = q - ds[i];
                     }
                 }
-                Wire::ModN { q: q, ds: zs }
+                Wire::ModN { q, ds: zs }
             }
         }
     }

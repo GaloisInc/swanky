@@ -105,6 +105,10 @@ impl Builder {
         &self.circ
     }
 
+    pub fn get_mod(&self, x:Ref) -> u8 {
+        self.circ.moduli[x]
+    }
+
     fn get_next_input_id(&mut self) -> Id {
         let id = self.next_input_id;
         self.next_input_id += 1;
@@ -156,7 +160,7 @@ impl Builder {
         let xmod = self.circ.moduli[xref];
         let ymod = self.circ.moduli[yref];
         assert!(xmod == ymod);
-        let gate = Gate::Add { xref: xref, yref: yref };
+        let gate = Gate::Add { xref, yref };
         self.gate(gate, xmod)
     }
 
@@ -166,13 +170,13 @@ impl Builder {
         let xmod = self.circ.moduli[xref];
         let ymod = self.circ.moduli[yref];
         assert!(xmod == ymod);
-        let gate = Gate::Sub { xref: xref, yref: yref };
+        let gate = Gate::Sub { xref, yref };
         self.gate(gate, xmod)
     }
 
     pub fn cmul(&mut self, xref: Ref, c: u8) -> Ref {
         let modulus = self.circ.moduli[xref];
-        self.gate(Gate::Cmul { xref: xref, c: c }, modulus)
+        self.gate(Gate::Cmul { xref, c }, modulus)
     }
 
     pub fn add_many(&mut self, args: &[Ref]) -> Ref {
@@ -188,11 +192,7 @@ impl Builder {
         assert_eq!(tt.len(), self.circ.moduli[xref] as usize);
         assert!(tt.iter().all(|&x| x < output_modulus));
         let q = output_modulus;
-        let gate = Gate::Proj {
-            xref: xref,
-            tt: tt,
-            id: self.get_next_ciphertext_id(),
-        };
+        let gate = Gate::Proj { xref, tt, id: self.get_next_ciphertext_id() };
         self.gate(gate, q)
     }
 
@@ -200,9 +200,9 @@ impl Builder {
     pub fn yao(&mut self, xref: Ref, yref: Ref, output_modulus: u8, tt: Vec<Vec<u8>>) -> Ref {
         assert!(tt.iter().all(|ref inner| { inner.iter().all(|&x| x < output_modulus) }));
         let gate = Gate::Yao {
-            xref: xref,
-            yref: yref,
-            tt: tt.clone(),
+            xref,
+            yref,
+            tt,
             id: self.get_next_ciphertext_id()
         };
         self.gate(gate, output_modulus)
@@ -211,8 +211,8 @@ impl Builder {
     pub fn half_gate(&mut self, xref: Ref, yref: Ref) -> Ref {
         assert_eq!(self.circ.moduli[xref], self.circ.moduli[yref]);
         let gate = Gate::HalfGate {
-            xref: xref,
-            yref: yref,
+            xref,
+            yref,
             id: self.get_next_ciphertext_id(),
         };
         let q = self.circ.moduli[xref];
@@ -557,16 +557,16 @@ mod tests {
         }).collect();
         let s = b.add_many(&wires);
         b.output(s);
-        let ref c = b.finish();
+        let c = &b.finish();
 
         let mut rng = Rng::new();
         for _ in 0..64 {
-            let ref inps: Vec<u8> = (0..c.ninputs()).map(|i| {
+            let inps: Vec<u8> = (0..c.ninputs()).map(|i| {
                 rng.gen_byte() % c.input_mod(i)
             }).collect();
             let s: u8 = inps.iter().sum();
             println!("{:?}, sum={}", inps, s);
-            assert_eq!(c.eval(inps)[0], s);
+            assert_eq!(c.eval(&inps)[0], s);
         }
     }
 }

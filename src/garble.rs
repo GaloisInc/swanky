@@ -94,7 +94,7 @@ impl Garbler {
     pub fn output(&mut self, X: &Wire, output_num: usize) {
         let mut cts = Vec::new();
         let q = X.modulus();
-        let ref D = self.delta(q);
+        let D = &self.delta(q);
         for k in 0..q {
             let t = output_tweak(output_num, k);
             cts.push(X.plus(&D.cmul(k)).hash(t));
@@ -102,7 +102,7 @@ impl Garbler {
         self.outputs.push(cts);
     }
 
-    pub fn proj(&mut self, A: &Wire, q_out: u8, tt: &Vec<u8>, gate_num: usize)
+    pub fn proj(&mut self, A: &Wire, q_out: u8, tt: &[u8], gate_num: usize)
         -> (Wire, GarbledGate)
     {
         let q_in = A.modulus();
@@ -135,7 +135,7 @@ impl Garbler {
         (C, gate)
     }
 
-    fn yao(&mut self, A: &Wire, B: &Wire, q: u8, tt: &Vec<Vec<u8>>, gate_num: usize)
+    fn yao(&mut self, A: &Wire, B: &Wire, q: u8, tt: &[Vec<u8>], gate_num: usize)
         -> (Wire, GarbledGate)
     {
         let xmod = A.modulus() as usize;
@@ -147,7 +147,7 @@ impl Garbler {
         let sigma = tt[((xmod - A.color() as usize) % xmod) as usize]
                       [((ymod - B.color() as usize) % ymod) as usize];
         // we use the row reduction trick here
-        let ref B_delta = self.delta(ymod as u8);
+        let B_delta = self.delta(ymod as u8);
         let C = A.minus(&self.delta(xmod as u8).cmul(A.color()))
                  .hashback2(&B.minus(&B_delta.cmul(B.color())), g, q)
                  .negate()
@@ -202,10 +202,9 @@ impl Garbler {
 
             // evaluator's half-gate: outputs Y+a(r+b)D
             // G = H(B+bD) + Y-(b+r)A
-            let b = i; // b: truth value of wire A
-            let B_ = B.plus(&D.cmul(b));
+            let B_ = B.plus(&D.cmul(i));
             if B_.color() != 0 {
-                let G = B_.hashback(g,q).plus(&Y.minus(&A.cmul((b+r)%q)));
+                let G = B_.hashback(g,q).plus(&Y.minus(&A.cmul((i+r)%q)));
                 gate[(q + B_.color()) as usize - 2] = Some(G);
             }
         }
@@ -246,7 +245,7 @@ impl Garbler {
 #[allow(non_snake_case)]
 impl Evaluator {
     pub fn new(gates: Vec<GarbledGate>) -> Self {
-        Evaluator { gates: gates }
+        Evaluator { gates }
     }
 
     pub fn size(&self) -> usize {
@@ -269,25 +268,24 @@ impl Evaluator {
                 Gate::Cmul { xref, c }   => wires[xref].cmul(c),
 
                 Gate::Proj { xref, id, .. } => {
-                    let ref x = wires[xref];
+                    let x = &wires[xref];
                     if x.color() == 0 {
                         x.hashback(i as u128, q).negate()
                     } else {
-                        let ref ct = self.gates[id][x.color() as usize - 1];
+                        let ct = &self.gates[id][x.color() as usize - 1];
                         ct.minus(&x.hashback(i as u128, q))
                     }
                 }
 
                 Gate::Yao { xref, yref, id, .. } => {
-                    let ref a = wires[xref];
-                    let ref b = wires[yref];
-                    let g = tweak(i);
+                    let a = &wires[xref];
+                    let b = &wires[yref];
                     if a.color() == 0 && b.color() == 0 {
-                        a.hashback2(&b, g, q).negate()
+                        a.hashback2(&b, tweak(i), q).negate()
                     } else {
                         let ix = a.color() as usize * c.moduli[yref] as usize + b.color() as usize;
-                        let ref ct = self.gates[id][ix - 1];
-                        ct.minus(&a.hashback2(&b, g, q))
+                        let ct = &self.gates[id][ix - 1];
+                        ct.minus(&a.hashback2(&b, tweak(i), q))
                     }
                 }
 
@@ -295,20 +293,20 @@ impl Evaluator {
                     let g = tweak(i);
 
                     // garbler's half gate
-                    let ref A = wires[xref];
+                    let A = &wires[xref];
                     let L = if A.color() == 0 {
                         A.hashback(g,q).negate()
                     } else {
-                        let ref ct_left = self.gates[id][A.color() as usize - 1];
+                        let ct_left = &self.gates[id][A.color() as usize - 1];
                         ct_left.minus(&A.hashback(g,q))
                     };
 
                     // evaluator's half gate
-                    let ref B = wires[yref];
+                    let B = &wires[yref];
                     let R = if B.color() == 0 {
                         B.hashback(g,q).negate()
                     } else {
-                        let ref ct_right = self.gates[id][(q + B.color()) as usize - 2];
+                        let ct_right = &self.gates[id][(q + B.color()) as usize - 2];
                         ct_right.minus(&B.hashback(g,q))
 
                     };
@@ -346,15 +344,15 @@ mod tests {
         let mut rng = Rng::new();
         for _ in 0..16 {
             let q = rng.gen_prime();
-            let ref c = f(q);
+            let c = &f(q);
             let (gb, ev) = garble(&c);
             println!("number of ciphertexts for mod {}: {}", q, ev.size());
             for _ in 0..64 {
-                let ref inps = (0..c.ninputs()).map(|i| {
+                let inps = &(0..c.ninputs()).map(|i| {
                     rng.gen_byte() % c.input_mod(i)
                 }).collect::<Vec<u8>>();
-                let ref xs = gb.encode(inps);
-                let ref ys = ev.eval(c, xs);
+                let xs = &gb.encode(inps);
+                let ys = &ev.eval(c, xs);
                 assert_eq!(gb.decode(ys)[0], c.eval(inps)[0], "q={}", q);
             }
         }
@@ -531,23 +529,23 @@ mod tests {
         // tab[b] = 1;
         // let z = self.proj(s, 2, tab);
         b.output(s);
-        let ref c = b.finish();
+        let c = &b.finish();
 
         let (gb, ev) = garble(c);
 
         let mut rng = Rng::new();
         for _ in 0..64 {
-            let ref inps: Vec<u8> = (0..c.ninputs()).map(|i| {
+            let inps: Vec<u8> = (0..c.ninputs()).map(|i| {
                 rng.gen_byte() % c.input_mod(i)
             }).collect();
 
             let s: u8 = inps.iter().sum();
-            println!("{:?}, sum={}", inps, s);
+            println!("{:?}, sum={}", &inps, s);
 
-            let ref xs = gb.encode(inps);
+            let ref xs = gb.encode(&inps);
             let ref ys = ev.eval(c, xs);
 
-            assert_eq!(gb.decode(ys)[0], c.eval(inps)[0]);
+            assert_eq!(gb.decode(ys)[0], c.eval(&inps)[0]);
         }
     }
 }

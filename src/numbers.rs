@@ -85,8 +85,8 @@ pub fn u128_to_bits(x: u128, n: usize) -> Vec<u8> {
     for _ in 0..n {
         let b = y % 2;
         bits.push(b as u8);
-        y = y - b;
-        y = y / 2;
+        y -= b;
+        y /= 2;
     }
     bits
 }
@@ -110,7 +110,7 @@ pub fn factor(inp: u128) -> Vec<u8> {
         let q = p as u128;
         if x % q == 0 {
             fs.push(p);
-            x = x / q;
+            x /= q;
         }
     }
     if x != 1 {
@@ -149,8 +149,8 @@ pub fn crt_inv(ps: &[u8], xs: &[u8]) -> u128 {
     for (&p, &a) in ps.iter().zip(xs.iter()) {
         let p = mpz_from_u8(p);
         let q = &m / &p;
-        x = x + mpz_from_u8(a) * q.invert(&p).expect("need prime factors") * q;
-        x = x % &m;
+        x += mpz_from_u8(a) * q.invert(&p).expect("need prime factors") * q;
+        x %= &m;
     }
     mpz_to_u128(&x)
 }
@@ -167,13 +167,14 @@ pub const PRIMES: [u8;29] = [
 
 pub fn modulus_with_width(nbits: u32) -> u128 {
     let mut res = 1;
-    let mut ps: Vec<u8> = PRIMES.iter().cloned().collect();
+    let mut i = 0;
     loop {
-        let p = ps.remove(0);
-        res *= p as u128;
+        res *= u128::from(PRIMES[i]);
         if (res >> nbits) > 0 {
             break;
         }
+        i += 1;
+        assert!(i < NPRIMES);
     }
     res
 }
@@ -340,10 +341,10 @@ pub fn powm(inp: u8, pow: u8, modulus: u8) -> u8 {
     while n > 0 {
         if n % 2 == 0 {
             x = x.pow(2) % modulus as u16;
-            n = n/2;
+            n /= 2;
         } else {
             z = x * z % modulus as u16;
-            n = n - 1;
+            n -= 1;
         }
     }
     z as u8

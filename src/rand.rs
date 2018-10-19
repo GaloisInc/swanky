@@ -87,9 +87,7 @@ pub struct Aes {
 impl Clone for Aes {
     fn clone(&self) -> Self {
         let mut new = Aes { round_keys: [0; 176] };
-        for i in 0..176 {
-            new.round_keys[i] = self.round_keys[i];
-        }
+        new.round_keys[..176].clone_from_slice(&self.round_keys[..176]);
         new
     }
 }
@@ -130,7 +128,7 @@ impl Aes {
         unsafe {
             aesni_setup_round_key_128(key_bytes.as_ptr(), round_keys.as_mut_ptr());
         }
-        Aes { round_keys: round_keys }
+        Aes { round_keys }
     }
 
     pub fn hash(&self, t: u128, x: u128) -> u128 {
