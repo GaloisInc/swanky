@@ -413,6 +413,7 @@ mod tests {
     fn test_garbling(b: &Bundler, inp: &[u128], should_be: &[u128]) {
         let c = b.builder_ref().borrow_circ();
         let (gb, ev) = garble(&c);
+        println!("number of ciphertexts: {}", ev.size());
         let enc_inp = b.encode(inp);
         assert_eq!(b.decode(&c.eval(&enc_inp)), should_be);
         let xs = gb.encode(&enc_inp);
@@ -423,6 +424,7 @@ mod tests {
     fn test_garbling_high_to_low(b: &Bundler, inp: &[u128], should_be: &[u8]) {
         let c = b.builder_ref().borrow_circ();
         let (gb, ev) = garble(&c);
+        println!("number of ciphertexts: {}", ev.size());
         let enc_inp = b.encode(inp);
         let pt_outs: Vec<u8> = c.eval(&enc_inp);
         assert_eq!(pt_outs, should_be);
@@ -544,7 +546,7 @@ mod tests {
     #[test] // dlog_multiplication {{{
     fn dlog_multiplication() {
         let mut rng = Rng::new();
-        let q = rng.gen_usable_composite_modulus();
+        let q = modulus_with_width(32);
 
         let mut b = Bundler::new();
         let x = b.input(q);
@@ -563,7 +565,7 @@ mod tests {
     #[test] // half_gate_multiplication {{{
     fn half_gate_multiplication() {
         let mut rng = Rng::new();
-        let q = rng.gen_usable_composite_modulus();
+        let q = modulus_with_width(32);
 
         let mut b = Bundler::new();
         let x = b.input(q);

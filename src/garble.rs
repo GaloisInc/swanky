@@ -348,6 +348,7 @@ mod tests {
             let q = rng.gen_prime();
             let ref c = f(q);
             let (gb, ev) = garble(&c);
+            println!("number of ciphertexts for mod {}: {}", q, ev.size());
             for _ in 0..64 {
                 let ref inps = (0..c.ninputs()).map(|i| {
                     rng.gen_byte() % c.input_mod(i)
