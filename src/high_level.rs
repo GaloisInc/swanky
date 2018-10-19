@@ -1,4 +1,4 @@
-use circuit::{Builder, Ref};
+use circuit::{Builder, Circuit, Ref};
 use numbers::{inv_u8, crt, crt_inv, factor, product};
 use std::rc::Rc;
 
@@ -19,7 +19,15 @@ pub struct Bundler {
 
 #[allow(non_snake_case)]
 impl Bundler {
-    pub fn new(b: Builder) -> Self {
+    pub fn new() -> Self {
+        Self::from_builder(Builder::new())
+    }
+
+    pub fn ninputs(&self) -> usize {
+        self.inputs.len()
+    }
+
+    pub fn from_builder(b: Builder) -> Self {
         Bundler {
             builder: Some(b),
             bundles: Vec::new(),
@@ -39,7 +47,7 @@ impl Bundler {
     fn bundle_from_ref(&mut self, x: Ref, primes: Rc<Vec<u8>>) -> BundleRef {
         let mut wires = Vec::with_capacity(primes.len());
         for &p in primes.iter() {
-            wires.push(self.borrow_builder().mod_change(x, p));
+            wires.push(self.builder_mut().mod_change(x, p));
         }
         self.add_bundle(wires, primes)
     }
@@ -64,7 +72,15 @@ impl Bundler {
         self.outputs.push(xref);
     }
 
-    pub fn encode(&mut self, xs: &[u128]) -> Vec<u8> {
+    pub fn output_ref(&mut self, xref: Ref) {
+        self.builder_mut().output(xref);
+    }
+
+    pub fn output_refs(&mut self, xs: &[Ref]) {
+        self.builder_mut().outputs(xs);
+    }
+
+    pub fn encode(&self, xs: &[u128]) -> Vec<u8> {
         let mut inps = Vec::new();
         for (&x, &xref) in xs.iter().zip(self.inputs.iter()) {
             inps.append(&mut crt(&self.bundles[xref.0].primes, x));
@@ -72,7 +88,7 @@ impl Bundler {
         inps
     }
 
-    pub fn decode(&mut self, outs: &[u8]) -> Vec<u128> {
+    pub fn decode(&self, outs: &[u8]) -> Vec<u128> {
         let mut outs = outs.to_vec();
         let mut res = Vec::with_capacity(self.outputs.len());
         for &zref in self.outputs.iter() {
@@ -92,9 +108,22 @@ impl Bundler {
         self.builder = Some(b);
     }
 
-    pub fn borrow_builder(&mut self) -> &mut Builder {
+    pub fn builder_mut(&mut self) -> &mut Builder {
         self.builder.as_mut().expect("need to own a builder!")
     }
+
+    pub fn builder_ref(&self) -> &Builder {
+        self.builder.as_ref().expect("need to own a builder!")
+    }
+
+    pub fn finish(&mut self) -> Circuit {
+        self.take_builder().finish()
+    }
+
+    pub fn borrow_circ(&self) -> &Circuit {
+        self.builder_ref().borrow_circ()
+    }
+
     pub fn add(&mut self, xref: BundleRef, yref: BundleRef) -> BundleRef {
         assert_eq!(self.bundles[xref.0].wires.len(), self.bundles[yref.0].wires.len());
         let mut zwires;
@@ -304,7 +333,7 @@ impl Bundler {
         let q_in = self.bundles[pmr.0].primes[n-1];
         let mut tab = vec![1; q_in as usize];
         tab[0] = 0;
-        self.borrow_builder().proj(w, 2, tab)
+        self.builder_mut().proj(w, 2, tab)
     }
 
     pub fn parity(&mut self, xref: BundleRef) -> Ref {
@@ -367,43 +396,42 @@ impl Bundler {
     {
         let xbits = self.bits(xref, nbits);
         let ybits = self.bits(yref, nbits);
-        self.borrow_builder().binary_subtraction(&xbits, &ybits).1
+        self.builder_mut().binary_subtraction(&xbits, &ybits).1
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use circuit::Builder;
     use garble::garble;
     use high_level::Bundler;
     use numbers::{u128_to_bits, factor, inv_u8, modulus_with_width};
     use rand::Rng;
 
-    const NTESTS: usize = 1;
+    const NTESTS: usize = 2;
 
     // test harnesses {{{
-    fn test_garbling(b: &mut Bundler, inp: &[u128], should_be: &[u128]) {
-        let c = b.take_builder().finish();
+    fn test_garbling(b: &Bundler, inp: &[u128], should_be: &[u128]) {
+        let c = b.builder_ref().borrow_circ();
         let (gb, ev) = garble(&c);
         let enc_inp = b.encode(inp);
         assert_eq!(b.decode(&c.eval(&enc_inp)), should_be);
         let xs = gb.encode(&enc_inp);
-        let ys = ev.eval(&c, &xs);
+        let ys = ev.eval(c, &xs);
         assert_eq!(b.decode(&gb.decode(&ys)), should_be);
     }
 
-    fn test_garbling_high_to_low(b: &mut Bundler, inp: &[u128], should_be: &[u8]) {
-        let c = b.take_builder().finish();
+    fn test_garbling_high_to_low(b: &Bundler, inp: &[u128], should_be: &[u8]) {
+        let c = b.builder_ref().borrow_circ();
         let (gb, ev) = garble(&c);
-        // panic!("{}", ev.size());
         let enc_inp = b.encode(inp);
         let pt_outs: Vec<u8> = c.eval(&enc_inp);
         assert_eq!(pt_outs, should_be);
         let xs = gb.encode(&enc_inp);
-        let ys = ev.eval(&c, &xs);
+        let ys = ev.eval(c, &xs);
         let gb_outs: Vec<u8> = gb.decode(&ys);
         assert_eq!(gb_outs, should_be);
     }
+
     //}}}
     #[test] //input_output_equal {{{
     fn input_output_equal() {
@@ -411,7 +439,7 @@ mod tests {
         for _ in 0..NTESTS {
             let q = rng.gen_usable_composite_modulus();
 
-            let mut b = Bundler::new(Builder::new());
+            let mut b = Bundler::new();
             let inp = b.input(q);
             b.output(inp);
 
@@ -419,22 +447,22 @@ mod tests {
             test_garbling(&mut b, &[x], &[x]);
         }
     }
+
     //}}}
     #[test] // addition {{{
     fn addition() {
         let mut rng = Rng::new();
+        let q = rng.gen_usable_composite_modulus();
+
+        let mut b = Bundler::new();
+        let x = b.input(q);
+        let y = b.input(q);
+        let z = b.add(x,y);
+        b.output(z);
+
         for _ in 0..NTESTS {
-            let q = rng.gen_usable_composite_modulus();
-
-            let mut b = Bundler::new(Builder::new());
-            let x = b.input(q);
-            let y = b.input(q);
-            let z = b.add(x,y);
-            b.output(z);
-
             let x = rng.gen_u128() % q;
             let y = rng.gen_u128() % q;
-
             test_garbling(&mut b, &[x,y], &[(x+y)%q]);
         }
     }
@@ -442,18 +470,18 @@ mod tests {
     #[test] // subtraction {{{
     fn subtraction() {
         let mut rng = Rng::new();
-        for _ in 0..NTESTS {
+
             let q = rng.gen_usable_composite_modulus();
 
-            let mut b = Bundler::new(Builder::new());
+            let mut b = Bundler::new();
             let x = b.input(q);
             let y = b.input(q);
             let z = b.sub(x,y);
             b.output(z);
 
+        for _ in 0..NTESTS {
             let x = rng.gen_u128() % q;
             let y = rng.gen_u128() % q;
-
             test_garbling(&mut b, &[x,y], &[(x+q-y)%q]);
         }
     }
@@ -461,18 +489,17 @@ mod tests {
     #[test] // scalar_multiplication {{{
     fn scalar_multiplication() {
         let mut rng = Rng::new();
+        let q = rng.gen_usable_composite_modulus();
+        let y = rng.gen_u64() as u128 % q;
+
+        let mut b = Bundler::new();
+        let x = b.input(q);
+        let z = b.cmul(x,y);
+        b.output(z);
+
         for _ in 0..NTESTS {
-            let q = rng.gen_usable_composite_modulus();
-            let y = rng.gen_u64() as u128 % q;
-
-            let mut b = Bundler::new(Builder::new());
-            let x = b.input(q);
-            let z = b.cmul(x,y);
-            b.output(z);
-
             let x = rng.gen_u64() as u128 % q;
             let should_be = x * y % q;
-
             test_garbling(&mut b, &[x], &[should_be]);
         }
     }
@@ -480,18 +507,17 @@ mod tests {
     #[test] // scalar_exponentiation {{{
     fn scalar_exponentiation() {
         let mut rng = Rng::new();
+        let q = rng.gen_usable_composite_modulus();
+        let y = rng.gen_byte() % 10;
+
+        let mut b = Bundler::new();
+        let x = b.input(q);
+        let z = b.cexp(x,y);
+        b.output(z);
+
         for _ in 0..NTESTS {
-            let q = rng.gen_usable_composite_modulus();
-            let y = rng.gen_byte() % 10;
-
-            let mut b = Bundler::new(Builder::new());
-            let x = b.input(q);
-            let z = b.cexp(x,y);
-            b.output(z);
-
             let x = rng.gen_byte() as u128 % q;
             let should_be = x.pow(y as u32) % q;
-
             test_garbling(&mut b, &[x], &[should_be]);
         }
     }
@@ -499,19 +525,18 @@ mod tests {
     #[test] // remainder {{{
     fn remainder() {
         let mut rng = Rng::new();
+        let ps = rng._gen_usable_composite_modulus();
+        let q = ps.iter().fold(1, |acc, &x| (x as u128) * acc);
+        let p = ps[rng.gen_byte() as usize % ps.len()];
+
+        let mut b = Bundler::new();
+        let x = b.input(q);
+        let z = b.rem(x,p);
+        b.output(z);
+
         for _ in 0..NTESTS {
-            let ps = rng._gen_usable_composite_modulus();
-            let q = ps.iter().fold(1, |acc, &x| (x as u128) * acc);
-            let p = ps[rng.gen_byte() as usize % ps.len()];
-
-            let mut b = Bundler::new(Builder::new());
-            let x = b.input(q);
-            let z = b.rem(x,p);
-            b.output(z);
-
             let x = rng.gen_u128() % q;
             let should_be = x % p as u128;
-
             test_garbling(&mut b, &[x], &[should_be]);
         }
     }
@@ -519,20 +544,18 @@ mod tests {
     #[test] // dlog_multiplication {{{
     fn dlog_multiplication() {
         let mut rng = Rng::new();
+        let q = rng.gen_usable_composite_modulus();
+
+        let mut b = Bundler::new();
+        let x = b.input(q);
+        let y = b.input(q);
+        let z = b.mul_dlog(&[x,y]);
+        b.output(z);
+
         for _ in 0..NTESTS {
-            let q = rng.gen_usable_composite_modulus();
-
-            let mut b = Bundler::new(Builder::new());
-            let x = b.input(q);
-            let y = b.input(q);
-            let z = b.mul_dlog(&[x,y]);
-            b.output(z);
-
             let x = rng.gen_u64() as u128 % q;
             let y = rng.gen_u64() as u128 % q;
-
             let should_be = x * y % q;
-
             test_garbling(&mut b, &[x,y], &[should_be]);
         }
     }
@@ -540,20 +563,18 @@ mod tests {
     #[test] // half_gate_multiplication {{{
     fn half_gate_multiplication() {
         let mut rng = Rng::new();
+        let q = rng.gen_usable_composite_modulus();
+
+        let mut b = Bundler::new();
+        let x = b.input(q);
+        let y = b.input(q);
+        let z = b.mul(x,y);
+        b.output(z);
+
         for _ in 0..NTESTS {
-            let q = rng.gen_usable_composite_modulus();
-
-            let mut b = Bundler::new(Builder::new());
-            let x = b.input(q);
-            let y = b.input(q);
-            let z = b.mul(x,y);
-            b.output(z);
-
             let x = rng.gen_u64() as u128 % q;
             let y = rng.gen_u64() as u128 % q;
-
             let should_be = x * y % q;
-
             test_garbling(&mut b, &[x,y], &[should_be]);
         }
     }
@@ -561,20 +582,18 @@ mod tests {
     #[test] // equality {{{
     fn equality() {
         let mut rng = Rng::new();
+        let q = rng.gen_usable_composite_modulus();
+
+        let mut b = Bundler::new();
+        let x = b.input(q);
+        let y = b.input(q);
+        let z = b.eq(x,y);
+        b.output_ref(z);
+
         for _ in 0..NTESTS {
-            let q = rng.gen_usable_composite_modulus();
-
-            let mut b = Bundler::new(Builder::new());
-            let x = b.input(q);
-            let y = b.input(q);
-            let z = b.eq(x,y);
-            b.borrow_builder().output(z);
-
             let x = rng.gen_u128() % q;
             let y = rng.gen_u128() % q;
-
             let should_be = (x == y) as u8;
-
             test_garbling_high_to_low(&mut b, &[x,y], &[should_be]);
         }
     }
@@ -582,23 +601,21 @@ mod tests {
     #[test] // less_than_pmr {{{
     fn less_than_pmr() {
         let mut rng = Rng::new();
+        let q = modulus_with_width(32);
+        let ps = factor(q);
+        let n = ps.len();
+        let p = q / ps[n-1] as u128;
+
+        let mut b = Bundler::new();
+        let x = b.input(q);
+        let y = b.input(q);
+        let z = b.less_than_pmr(x,y);
+        b.output_ref(z);
+
         for _ in 0..NTESTS {
-            let q = modulus_with_width(32);
-            let ps = factor(q);
-            let n = ps.len();
-            let p = q / ps[n-1] as u128;
-
-            let mut b = Bundler::new(Builder::new());
-            let x = b.input(q);
-            let y = b.input(q);
-            let z = b.less_than_pmr(x,y);
-            b.borrow_builder().output(z);
-
             let x = rng.gen_u128() % p;
             let y = rng.gen_u128() % p;
-
             let should_be = (x < y) as u8;
-
             test_garbling_high_to_low(&mut b, &[x,y], &[should_be]);
         }
     }
@@ -606,19 +623,15 @@ mod tests {
     #[test] // parity {{{
     fn parity() {
         let mut rng = Rng::new();
+        let q = modulus_with_width(32);
+        let mut b = Bundler::new();
+        let x = b.input(q);
+        let z = b.parity(x);
+        b.output_ref(z);
+
         for _ in 0..NTESTS {
-            let q = modulus_with_width(32);
-            // let ps = rng._gen_usable_composite_modulus();
-            // let q = ps.iter().fold(u128::one(), |acc, &x| u128::new(x as u64) * acc);
-
-            let mut b = Bundler::new(Builder::new());
-            let x = b.input(q);
-            let z = b.parity(x);
-            b.borrow_builder().output(z);
-
             let pt = rng.gen_u128() % (q/2);
             let should_be = (pt % 2) as u8;
-
             test_garbling_high_to_low(&mut b, &[pt], &[should_be]);
         }
     }
@@ -626,20 +639,16 @@ mod tests {
     #[test] // cdiv {{{
     fn cdiv() {
         let mut rng = Rng::new();
+        let q = modulus_with_width(32);
+        let mut b = Bundler::new();
+        let x = b.input(q);
+        let z = b.cdiv(x,2);
+        b.output(z);
+
         for _ in 0..NTESTS {
-            let q = modulus_with_width(32);
-            // let ps = rng._gen_usable_composite_modulus();
-            // let q = ps.iter().fold(u128::one(), |acc, &x| u128::new(x as u64) * acc);
-
-            let mut b = Bundler::new(Builder::new());
-            let x = b.input(q);
-            let z = b.cdiv(x,2);
-            b.output(z);
-
             let mut pt = rng.gen_u128() % (q/2);
             pt += pt % 2;
             let should_be = pt / 2;
-
             test_garbling(&mut b, &[pt], &[should_be]);
         }
     }
@@ -647,16 +656,15 @@ mod tests {
     #[test] // bits {{{
     fn bits() {
         let mut rng = Rng::new();
-        for _ in 0..NTESTS {
-            let q = modulus_with_width(32);
-            let mut b = Bundler::new(Builder::new());
-            let x = b.input(q);
-            let zs = b.bits(x, 32);
-            b.borrow_builder().outputs(&zs);
+        let q = modulus_with_width(32);
+        let mut b = Bundler::new();
+        let x = b.input(q);
+        let zs = b.bits(x, 32);
+        b.output_refs(&zs);
 
+        for _ in 0..NTESTS {
             let pt = rng.gen_u128() % (q/2);
             let should_be = u128_to_bits(pt, 32);
-
             test_garbling_high_to_low(&mut b, &[pt], &should_be);
         }
     }
@@ -664,20 +672,19 @@ mod tests {
     #[test] // less_than_bits {{{
     fn less_than_bits() {
         let mut rng = Rng::new();
-        for _ in 0..NTESTS {
-            let q = modulus_with_width(32);
-            let mut b = Bundler::new(Builder::new());
-            let x = b.input(q);
-            let y = b.input(q);
-            let z = b.less_than_bits(x, y, 32);
-            b.borrow_builder().output(z);
+        let q = modulus_with_width(32);
+        let mut b = Bundler::new();
+        let x = b.input(q);
+        let y = b.input(q);
+        let z = b.less_than_bits(x, y, 32);
+        b.output_ref(z);
 
+        for _ in 0..NTESTS {
             let pt_x = rng.gen_u32() as u128;
             let pt_y = rng.gen_u32() as u128;
             let should_be = (pt_x < pt_y) as u8;
             println!("q={}", q);
             println!("{} {}", pt_x, pt_y);
-
             test_garbling_high_to_low(&mut b, &[pt_x, pt_y], &[should_be]);
         }
     }
@@ -689,7 +696,7 @@ mod tests {
             let ps = rng._gen_usable_composite_modulus();
             let q = ps.iter().fold(1, |acc, &x| x as u128 * acc);
 
-            let mut b = Bundler::new(Builder::new());
+            let mut b = Bundler::new();
             let x = b.input(q);
             let z = b.to_pmr(x);
             b.output(z);

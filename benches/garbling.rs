@@ -10,7 +10,7 @@ use fancy_garbling::garble::garble;
 use fancy_garbling::circuit::Builder;
 
 fn bench_projection_garble(c: &mut Criterion, q: u8) {
-    c.bench_function(&format!("proj{}_gb", q), move |bench| {
+    c.bench_function(&format!("garbling::proj{}_gb", q), move |bench| {
         let mut tab = Vec::new();
         for i in 0..q {
             tab.push((i + 1) % q);
@@ -30,7 +30,7 @@ fn bench_projection_garble(c: &mut Criterion, q: u8) {
 }
 
 fn bench_projection_eval(c: &mut Criterion, q: u8) {
-    c.bench_function(&format!("proj{}_ev", q), move |bench| {
+    c.bench_function(&format!("garbling::proj{}_ev", q), move |bench| {
         let ref mut rng = Rng::new();
 
         let mut tab = Vec::new();
@@ -45,10 +45,11 @@ fn bench_projection_eval(c: &mut Criterion, q: u8) {
         let c = b.finish();
 
         let (gb, ev) = garble(&c);
+        let x = rng.gen_byte() % q;
+        let y = rng.gen_byte() % q;
+        let xs = gb.encode(&[x,y]);
+
         bench.iter(|| {
-            let x = rng.gen_byte() % q;
-            let y = rng.gen_byte() % q;
-            let xs = gb.encode(&[x,y]);
             let ys = ev.eval(&c, &xs);
             criterion::black_box(ys);
         });
@@ -60,7 +61,7 @@ fn proj17_ev(c: &mut Criterion) { bench_projection_eval(c,17) }
 
 criterion_group!{
     name = garbling;
-    config = Criterion::default().sample_size(100).warm_up_time(Duration::from_millis(100));
+    config = Criterion::default().warm_up_time(Duration::from_millis(100));
     targets = proj17_gb, proj17_ev
 }
 

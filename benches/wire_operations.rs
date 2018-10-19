@@ -9,7 +9,7 @@ use fancy_garbling::wire::Wire;
 use fancy_garbling::rand::Rng;
 
 fn bench_unpack(c: &mut Criterion, p: u8) {
-    c.bench_function(&format!("unpack{}", p), move |b| {
+    c.bench_function(&format!("wire::unpack{}", p), move |b| {
         let rng = &mut Rng::new();
         let x = rng.gen_u128();
         b.iter(|| {
@@ -20,7 +20,7 @@ fn bench_unpack(c: &mut Criterion, p: u8) {
 }
 
 fn bench_pack(c: &mut Criterion, p: u8) {
-    c.bench_function(&format!("pack{}", p), move |b| {
+    c.bench_function(&format!("wire::pack{}", p), move |b| {
         let rng = &mut Rng::new();
         let w = Wire::rand(rng,p);
         b.iter(|| {
@@ -31,7 +31,7 @@ fn bench_pack(c: &mut Criterion, p: u8) {
 }
 
 fn bench_plus(c: &mut Criterion, p: u8) {
-    c.bench_function(&format!("plus{}", p), move |b| {
+    c.bench_function(&format!("wire::plus{}", p), move |b| {
         let rng = &mut Rng::new();
         let x = Wire::rand(rng,p);
         let y = Wire::rand(rng,p);
@@ -43,7 +43,7 @@ fn bench_plus(c: &mut Criterion, p: u8) {
 }
 
 fn bench_cmul(c: &mut Criterion, p: u8) {
-    c.bench_function(&format!("cmul{}", p), move |b| {
+    c.bench_function(&format!("wire::cmul{}", p), move |b| {
         let rng = &mut Rng::new();
         let x = Wire::rand(rng,p);
         let c = rng.gen_byte();
@@ -55,7 +55,7 @@ fn bench_cmul(c: &mut Criterion, p: u8) {
 }
 
 fn bench_negate(c: &mut Criterion, p: u8) {
-    c.bench_function(&format!("negate{}", p), move |b| {
+    c.bench_function(&format!("wire::negate{}", p), move |b| {
         let rng = &mut Rng::new();
         let x = Wire::rand(rng,p);
         b.iter(|| {
@@ -66,7 +66,7 @@ fn bench_negate(c: &mut Criterion, p: u8) {
 }
 
 fn bench_hash(c: &mut Criterion, p: u8) {
-    c.bench_function(&format!("hash{}", p), move |b| {
+    c.bench_function(&format!("wire::hash{}", p), move |b| {
         let rng = &mut Rng::new();
         let x = Wire::rand(rng,p);
         b.iter(|| {
@@ -85,7 +85,7 @@ fn hash17(c: &mut Criterion) { bench_hash(c,17) }
 
 criterion_group!{
     name = wire_conversion;
-    config = Criterion::default().sample_size(100).warm_up_time(Duration::from_millis(100));
+    config = Criterion::default().warm_up_time(Duration::from_millis(100));
     targets = unpack17, pack17, plus17, cmul17, negate17, hash17
 }
 

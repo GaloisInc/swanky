@@ -101,6 +101,10 @@ impl Builder {
         self.circ
     }
 
+    pub fn borrow_circ(&self) -> &Circuit {
+        &self.circ
+    }
+
     fn get_next_input_id(&mut self) -> Id {
         let id = self.next_input_id;
         self.next_input_id += 1;
