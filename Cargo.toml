@@ -14,6 +14,7 @@ libc = "^0.2.0"
 rust-gmp = "^0.5.0"
 getopts = "^0.2"
 base_conversion = { path = "base_conversion" }
+num = "^0.2"
 
 [dev-dependencies]
 criterion = "0.2"

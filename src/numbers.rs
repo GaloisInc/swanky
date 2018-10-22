@@ -13,18 +13,20 @@ pub fn digits_per_u128(modulus: u8) -> usize {
 //     (((modulus as f64).powi(n as i32)).log(2.0)).ceil() as usize
 // }
 
-pub fn base_q_add(xs: &mut [u8], ys: &[u8], q: u8) {
+pub fn base_q_add<N>(xs: &mut [N], ys: &[N], q: N)
+    where N: num::PrimInt + std::ops::AddAssign + std::ops::SubAssign
+{
     assert!(xs.len() >= ys.len());
 
-    let mut c = 0;
+    let mut c = N::zero();
     let mut i = 0;
 
     while i < ys.len() {
         xs[i] += ys[i] + c;
-        c = 0;
+        c = N::zero();
         if xs[i] >= q {
             xs[i] -= q;
-            c = 1;
+            c = N::one();
         }
         i += 1;
     }
