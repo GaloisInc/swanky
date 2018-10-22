@@ -335,6 +335,21 @@ impl Builder {
         (bs, c)
     }
 
+    pub fn binary_addition_no_carry(&mut self, xs: &[Ref], ys: &[Ref]) -> Vec<Ref> {
+        assert_eq!(xs.len(), ys.len());
+        let (mut z, mut c) = self.half_adder(xs[0], ys[0]);
+        let mut bs = vec![z];
+        for i in 1..xs.len()-1 {
+            let res = self.full_adder(xs[i], ys[i], c);
+            z = res.0;
+            c = res.1;
+            bs.push(z);
+        }
+        z = self.full_adder_no_carry(*xs.last().unwrap(), *ys.last().unwrap(), c);
+        bs.push(z);
+        bs
+    }
+
     fn half_adder(&mut self, x: Ref, y: Ref) -> (Ref, Ref) {
         let z = self.xor(x,y);
         let c = self.and(x,y);
@@ -344,10 +359,15 @@ impl Builder {
     fn full_adder(&mut self, x: Ref, y: Ref, c: Ref) -> (Ref, Ref) {
         let z1 = self.xor(x,y);
         let z2 = self.xor(z1,c);
-        let c1 = self.and(z1,c);
-        let c2 = self.and(x,y);
-        let c3 = self.or_many(&[c1,c2]);
-        (z2, c3)
+        let z3 = self.xor(x,c);
+        let z4 = self.and(z1,z3);
+        let z5 = self.xor(z4,x);
+        (z2, z5)
+    }
+
+    fn full_adder_no_carry(&mut self, x: Ref, y: Ref, c: Ref) -> Ref {
+        let z1 = self.xor(x,y);
+        self.xor(z1,c)
     }
 
     pub fn twos_complement(&mut self, xs: &[Ref]) -> Vec<Ref> {

@@ -331,19 +331,27 @@ impl Bundler {
     pub fn parity(&mut self, xref: BundleRef) -> Ref {
         let q = product(&self.bundles[xref.0].primes);
         let M = 2*q;
+
+        // number of bits to keep in the projection
         let nbits = 5;
+
+        // used to round
         let new_mod = (2 as u8).pow(nbits as u32);
 
         let project = |x: Ref, c: u8, b: &mut Builder| -> Ref {
             let p = b.circ.moduli[x];
             let Mi = M / p as u128;
+
+            // crt coef
             let h = inv_u8((Mi % p as u128) as u8, p);
+
             let mut tab = Vec::with_capacity(p as usize);
             for x in 0..p {
                 let y = ((x+c)%p) as f32 * h as f32 / p as f32;
                 let truncated_y = (new_mod as f32 * y.fract()).round() as u8;
                 tab.push(truncated_y);
             }
+
             b.proj(x, new_mod, tab)
         };
 
@@ -392,6 +400,46 @@ impl Bundler {
         let xbits = self.bits(xref, nbits);
         let ybits = self.bits(yref, nbits);
         self.borrow_mut_builder().binary_subtraction(&xbits, &ybits).1
+    }
+
+    pub fn sgn(&mut self, xref: BundleRef, nbits: usize) -> Ref {
+        let q = product(&self.bundles[xref.0].primes);
+
+        // number of bits to keep in the projection
+        let M = 1_u32 << nbits;
+
+        // gets the nbits of round(M*x*alpha/P) mod M
+        let project = |x: Ref, b: &mut Builder| -> Vec<Ref> {
+            let p = b.circ.moduli[x];
+            let crt_coef = inv_u8(((q / p as u128) % p as u128) as u8, p);
+
+            let mut tabs = vec![Vec::with_capacity(p as usize); nbits];
+
+            for x in 0..p {
+                let y = (M as f32 * x as f32 * crt_coef as f32 / p as f32).round() as u32 % M;
+
+                for i in 0..nbits {
+                    tabs[i].push(((y >> i) & 1) as u8);
+                }
+            }
+
+            tabs.into_iter().map(|tt| b.proj(x, 2, tt)).collect()
+        };
+
+        let mut b = self.take_builder();
+
+        let xs: Vec<Ref> = self.bundles[xref.0].wires.to_vec();
+
+        let init = project(xs[0], &mut b);
+
+        let bits: Vec<Ref> = xs.into_iter().skip(1).fold(init, |acc, x| {
+            let bs = project(x, &mut b);
+            b.binary_addition_no_carry(&bs, &acc)
+        });
+
+        self.put_builder(b);
+
+        *bits.last().unwrap()
     }
 }
 
@@ -683,6 +731,22 @@ mod tests {
             println!("q={}", q);
             println!("{} {}", pt_x, pt_y);
             test_garbling_high_to_low(&mut b, &[pt_x, pt_y], &[should_be]);
+        }
+    }
+    //}}}
+    #[test] // sgn {{{
+    fn sgn() {
+        let mut rng = Rng::new();
+        let q = modulus_with_width(32);
+        let mut b = Bundler::new();
+        let x = b.input(q);
+        let z = b.sgn(x,16);
+        b.output_ref(z);
+
+        for _ in 0..NTESTS {
+            let pt = rng.gen_u128() % q;
+            let should_be = (pt > q/2) as u8;
+            test_garbling_high_to_low(&mut b, &[pt], &[should_be]);
         }
     }
     //}}}
