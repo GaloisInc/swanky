@@ -1,17 +1,10 @@
-use gmp::mpz::Mpz;
+use num::integer::Integer;
+use num::bigint::BigInt;
+use num::{ToPrimitive, Zero, One, Signed};
 
 pub fn digits_per_u128(modulus: u8) -> usize {
     (128.0 / (modulus as f64).log(2.0)).ceil() as usize
 }
-
-// fn digits_per_u16(modulus: u8) -> usize {
-//     (16.0 / (modulus as f64).log(2.0)).floor() as usize
-// }
-
-// fn nbits_used_per_u16(modulus: u8) -> usize {
-//     let n = digits_per_u16(modulus);
-//     (((modulus as f64).powi(n as i32)).log(2.0)).ceil() as usize
-// }
 
 pub fn base_q_add<N>(xs: &mut [N], ys: &[N], q: N)
     where N: num::PrimInt + std::ops::AddAssign + std::ops::SubAssign
@@ -130,38 +123,55 @@ pub fn crt(ps: &[u8], x: u128) -> Vec<u8> {
     }).collect()
 }
 
-pub fn mpz_from_u8(x: u8) -> Mpz {
-    Mpz::from_str_radix(&format!("{:x}", x), 16).unwrap()
-}
-
-pub fn mpz_to_u8(x: &Mpz) -> u8 {
-    x.to_str_radix(10).parse().unwrap()
-}
-
-pub fn mpz_to_u128(x: &Mpz) -> u128 {
-    x.to_str_radix(10).parse().unwrap()
-}
-
-pub fn mpz_from_u128(x: u128) -> Mpz {
-    Mpz::from_str_radix(&format!("{:x}", x), 16).unwrap()
-}
-
 pub fn crt_inv(ps: &[u8], xs: &[u8]) -> u128 {
-    let mut x = Mpz::zero();
-    let m = ps.iter().fold(Mpz::one(), |acc, &x| {
-        mpz_from_u8(x) * acc
-    });
+    let mut ret = BigInt::zero();
+
+    let M = ps.iter().fold(BigInt::one(), |acc, &x| BigInt::from(x) * acc );
+
     for (&p, &a) in ps.iter().zip(xs.iter()) {
-        let p = mpz_from_u8(p);
-        let q = &m / &p;
-        x += mpz_from_u8(a) * q.invert(&p).expect("need prime factors") * q;
-        x %= &m;
+        let p = BigInt::from(p);
+        let q = &M / &p;
+        ret += BigInt::from(a) * inv_ref(&q,&p) * q;
+        ret %= &M;
     }
-    mpz_to_u128(&x)
+
+    ret.to_u128().unwrap()
 }
 
-pub fn inv_u8(x: u8, q: u8) -> u8 {
-    mpz_to_u8(&mpz_from_u8(x).invert(&mpz_from_u8(q)).unwrap())
+pub fn inv_ref<T: Clone + Integer + Signed>(inp_a: &T, inp_b: &T) -> T {
+    let mut a = inp_a.clone();
+    let mut b = inp_b.clone();
+    let mut q;
+    let mut tmp;
+
+    let (mut x0, mut x1) = (T::zero(), T::one());
+
+    if b == T::one() {
+        return T::one();
+    }
+
+    while a > T::one() {
+        q = a.clone() / b.clone();
+
+        // a, b = b, a%b
+        tmp = b.clone();
+        b = a.clone() % b.clone();
+        a = tmp;
+
+        tmp = x0.clone();
+        x0 = x1.clone() - q.clone() * x0.clone();
+        x1 = tmp.clone();
+    }
+
+    if x1 < T::zero() {
+        x1 = x1 + inp_b.clone();
+    }
+
+    x1
+}
+
+pub fn inv<T: Copy + Integer + Signed>(a: T, m: T) -> T {
+    inv_ref(&a, &m)
 }
 
 pub const NPRIMES: usize = 29;
@@ -509,15 +519,6 @@ pub fn exp_truth_table(modulus: u8) -> Vec<u8> {
 mod tests {
     use super::*;
     use rand::Rng;
-
-    #[test]
-    fn mpz_conversion() {
-        let mut rng = Rng::new();
-        for _ in 0..16 {
-            let x = rng.gen_byte();
-            assert_eq!(mpz_to_u8(&mpz_from_u8(x)), x);
-        }
-    }
 
     #[test]
     fn crt_conversion() {

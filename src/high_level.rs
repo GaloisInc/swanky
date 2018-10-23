@@ -1,5 +1,5 @@
 use circuit::{Builder, Circuit, Ref};
-use numbers::{self, inv_u8, crt, crt_inv, factor, product};
+use numbers::{self, crt, inv, crt_inv, factor, product};
 use std::rc::Rc;
 
 #[derive(Clone, Copy)]
@@ -171,7 +171,7 @@ impl Bundler {
                 if c % p == 0 {
                     zwires.push(self.builder.as_mut().expect("need a builder!").cmul(x,0));
                 } else {
-                    let d = inv_u8(c, p);
+                    let d = inv(c as i16, p as i16) as u8;
                     zwires.push(self.builder.as_mut().expect("need a builder!").cmul(x,d));
                 }
             }
@@ -279,8 +279,8 @@ impl Bundler {
                     }
                 }
                 assert_eq!((x + pq - y) % pq, z);
-                tab.push((((x * q as u32 * inv_u8(q,p) as u32 +
-                            y * p as u32 * inv_u8(p,q) as u32) / p as u32) % q as u32) as u8);
+                tab.push((((x * q as u32 * inv(q as i16, p as i16) as u32 +
+                            y * p as u32 * inv(p as i16, q as i16) as u32) / p as u32) % q as u32) as u8);
             }
             tab
         };
@@ -343,11 +343,11 @@ impl Bundler {
             let Mi = M / p as u128;
 
             // crt coef
-            let h = inv_u8((Mi % p as u128) as u8, p);
+            let h = inv((Mi % p as u128) as i16, p as i16) as f32;
 
             let mut tab = Vec::with_capacity(p as usize);
             for x in 0..p {
-                let y = ((x+c)%p) as f32 * h as f32 / p as f32;
+                let y = ((x+c)%p) as f32 * h / p as f32;
                 let truncated_y = (new_mod as f32 * y.fract()).round() as u8;
                 tab.push(truncated_y);
             }
@@ -411,7 +411,7 @@ impl Bundler {
         // gets the nbits of round(M*x*alpha/P) mod M
         let project = |x: Ref, b: &mut Builder| -> Vec<Ref> {
             let p = b.circ.moduli[x];
-            let crt_coef = inv_u8(((q / p as u128) % p as u128) as u8, p);
+            let crt_coef = inv(((q / p as u128) % p as u128) as i32, p as i32);
 
             let mut tabs = vec![Vec::with_capacity(p as usize); ndigits];
 
@@ -453,7 +453,7 @@ impl Bundler {
 mod tests {
     use garble::garble;
     use high_level::Bundler;
-    use numbers::{u128_to_bits, factor, inv_u8, modulus_with_width};
+    use numbers::{u128_to_bits, inv, factor, modulus_with_width};
     use rand::Rng;
 
     const NTESTS: usize = 1;
@@ -812,8 +812,8 @@ mod tests {
                 }
             }
             assert_eq!((x + pq - y) % pq, z);
-            tab.push((((x * q as u32 * inv_u8(q,p) as u32 +
-                        y * p as u32 * inv_u8(p,q) as u32) / p as u32) % q as u32) as u8);
+            tab.push((((x * q as u32 * inv(q as i16, p as i16) as u32 +
+                        y * p as u32 * inv(p as i16, q as i16) as u32) / p as u32) % q as u32) as u8);
         }
         tab
     }
