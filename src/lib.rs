@@ -9,6 +9,7 @@
 )]
 
 #![feature(reverse_bits)]
+#![allow(non_snake_case)]
 
 extern crate gmp;
 extern crate libc;

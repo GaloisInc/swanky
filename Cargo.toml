@@ -5,6 +5,9 @@ authors = ["Brent Carmer <carmerb@eecs.oregonstate.edu>"]
 build = "build.rs"
 autobenches = false
 
+[lib]
+doctest = false
+
 [build-dependencies]
 cc = "^1.0"
 

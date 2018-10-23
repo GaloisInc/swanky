@@ -72,13 +72,16 @@ pub fn from_base_q(ds: &[u8], q: u8) -> u128 {
     x
 }
 
-pub fn padded_base_q(x: u128, q: u8) -> Vec<u8> {
+pub fn padded_base_q(x: u128, q: u8, n: usize) -> Vec<u8> {
     let mut ds = as_base_q(x,q);
-    let n = digits_per_u128(q);
     while ds.len() < n {
         ds.push(0);
     }
     ds
+}
+
+pub fn padded_base_q_128(x: u128, q: u8) -> Vec<u8> {
+    padded_base_q(x, q, digits_per_u128(q))
 }
 
 pub fn u128_to_bits(x: u128, n: usize) -> Vec<u8> {

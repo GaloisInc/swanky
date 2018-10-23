@@ -338,6 +338,7 @@ mod tests {
     use garble::garble;
     use rand::Rng;
 
+    // helper {{{
     fn garble_test_helper<F>(f: F)
         where F: Fn(u8) -> Circuit
     {
@@ -357,8 +358,8 @@ mod tests {
             }
         }
     }
-
-    #[test]
+//}}}
+    #[test] // add {{{
     fn add() {
         garble_test_helper(|q| {
             let mut b = Builder::new();
@@ -369,8 +370,8 @@ mod tests {
             b.finish()
         });
     }
-
-    #[test]
+//}}}
+    #[test] // add_many {{{
     fn add_many() {
         garble_test_helper(|q| {
             let mut b = Builder::new();
@@ -380,8 +381,8 @@ mod tests {
             b.finish()
         });
     }
-
-    #[test]
+//}}}
+    #[test] // or_many {{{
     fn or_many() {
         garble_test_helper(|_| {
             let mut b = Builder::new();
@@ -391,8 +392,8 @@ mod tests {
             b.finish()
         });
     }
-
-    #[test]
+//}}}
+    #[test] // and_many {{{
     fn and_many() {
         garble_test_helper(|_| {
             let mut b = Builder::new();
@@ -402,8 +403,8 @@ mod tests {
             b.finish()
         });
     }
-
-    #[test]
+//}}}
+    #[test] // sub {{{
     fn sub() {
         garble_test_helper(|q| {
             let mut b = Builder::new();
@@ -414,8 +415,8 @@ mod tests {
             b.finish()
         });
     }
-
-    #[test]
+//}}}
+    #[test] // cmul {{{
     fn cmul() {
         garble_test_helper(|q| {
             let mut b = Builder::new();
@@ -426,9 +427,8 @@ mod tests {
             b.finish()
         });
     }
-
-
-    #[test]
+//}}}
+    #[test] // proj_cycle {{{
     fn proj_cycle() {
         garble_test_helper(|q| {
             let mut tab = Vec::new();
@@ -443,8 +443,8 @@ mod tests {
             b.finish()
         });
     }
-
-    #[test]
+//}}}
+    #[test] // proj_rand {{{
     fn proj_rand() {
         garble_test_helper(|q| {
             let mut rng = Rng::new();
@@ -460,8 +460,8 @@ mod tests {
             b.finish()
         });
     }
-
-    #[test]
+//}}}
+    #[test] // mod_change {{{
     fn mod_change() {
         garble_test_helper(|q| {
             let mut b = Builder::new();
@@ -471,8 +471,8 @@ mod tests {
             b.finish()
         });
     }
-
-    #[test]
+//}}}
+    #[test] // yao {{{
     fn yao() {
         garble_test_helper(|q| {
             let mut b = Builder::new();
@@ -491,8 +491,8 @@ mod tests {
             b.finish()
         });
     }
-
-    #[test]
+//}}}
+    #[test] // mul_dlog {{{
     fn mul_dlog() {
         garble_test_helper(|q| {
             let mut b = Builder::new();
@@ -503,8 +503,8 @@ mod tests {
             b.finish()
         });
     }
-
-    #[test]
+//}}}
+    #[test] // half_gate {{{
     fn half_gate() {
         garble_test_helper(|q| {
             let mut b = Builder::new();
@@ -515,37 +515,18 @@ mod tests {
             b.finish()
         });
     }
-
-    #[test]
-    fn debug_and_many() {
-        let mut b = Builder::new();
-        let n = 16;
-        let args = b.inputs(n, 2);
-        let wires: Vec<_> = args.iter().map(|&x| {
-            b.mod_change(x, n as u8 + 1)
-        }).collect();
-        let s = b.add_many(&wires);
-        // let mut tab = vec![0;n+1];
-        // tab[b] = 1;
-        // let z = self.proj(s, 2, tab);
-        b.output(s);
-        let c = &b.finish();
-
-        let (gb, ev) = garble(c);
-
-        let mut rng = Rng::new();
-        for _ in 0..64 {
-            let inps: Vec<u8> = (0..c.ninputs()).map(|i| {
-                rng.gen_byte() % c.input_mod(i)
-            }).collect();
-
-            let s: u8 = inps.iter().sum();
-            println!("{:?}, sum={}", &inps, s);
-
-            let ref xs = gb.encode(&inps);
-            let ref ys = ev.eval(c, xs);
-
-            assert_eq!(gb.decode(ys)[0], c.eval(&inps)[0]);
-        }
+//}}}
+    #[test] // base_4_addition_no_carry {{{
+    fn base_q_addition_no_carry() {
+        garble_test_helper(|q| {
+            let mut b = Builder::new();
+            let n = 16;
+            let xs = b.inputs(n,q);
+            let ys = b.inputs(n,q);
+            let zs = b.base_q_addition_no_carry(&xs, &ys);
+            b.outputs(&zs);
+            b.finish()
+        });
     }
+//}}}
 }

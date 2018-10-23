@@ -39,7 +39,7 @@ impl Wire {
             Wire::ModN { q, ds }
 
         } else {
-            Wire::ModN { q, ds: numbers::padded_base_q(inp, q) }
+            Wire::ModN { q, ds: numbers::padded_base_q_128(inp, q) }
         }
     }
 
@@ -203,7 +203,7 @@ mod tests {
             let q = 3 + (rng.gen_byte() % 110);
             let x = rng.gen_u128();
             let w = Wire::from_u128(x, q);
-            let should_be = numbers::padded_base_q(x,q);
+            let should_be = numbers::padded_base_q_128(x,q);
             assert_eq!(w.digits(), should_be, "x={} q={}", x, q);
         }
     }

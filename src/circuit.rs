@@ -105,7 +105,7 @@ impl Builder {
         &self.circ
     }
 
-    pub fn get_mod(&self, x:Ref) -> u8 {
+    pub fn modulus(&self, x:Ref) -> u8 {
         self.circ.moduli[x]
     }
 
@@ -345,7 +345,7 @@ impl Builder {
             c = res.1;
             bs.push(z);
         }
-        z = self.full_adder_no_carry(*xs.last().unwrap(), *ys.last().unwrap(), c);
+        z = self.add_many(&[*xs.last().unwrap(), *ys.last().unwrap(), c]);
         bs.push(z);
         bs
     }
@@ -365,9 +365,46 @@ impl Builder {
         (z2, z5)
     }
 
-    fn full_adder_no_carry(&mut self, x: Ref, y: Ref, c: Ref) -> Ref {
-        let z1 = self.xor(x,y);
-        self.xor(z1,c)
+    pub fn base_q_addition_no_carry(&mut self, xs: &[Ref], ys: &[Ref]) -> Vec<Ref> {
+        assert_eq!(xs.len(), ys.len());
+        let (mut z, mut c) = self.base_q_full_adder(xs[0], ys[0], None);
+        let mut bs = vec![z];
+        for i in 1..xs.len()-1 {
+            let res = self.base_q_full_adder(xs[i], ys[i], Some(c));
+            z = res.0;
+            c = res.1;
+            bs.push(z);
+        }
+        z = self.add_many(&[*xs.last().unwrap(), *ys.last().unwrap(), c]);
+        bs.push(z);
+        bs
+    }
+
+    fn base_q_full_adder(&mut self, x: Ref, y: Ref, opt_c: Option<Ref>) -> (Ref, Ref) {
+        let q = self.modulus(x);
+        let (sum, qp, zp);
+
+        if let Some(c) = opt_c {
+            sum = self.add_many(&[x,y,c]);
+            qp = 2*q + 1;
+        } else {
+            sum = self.add(x,y);
+            qp = 2*q;
+        }
+
+        let xp = self.mod_change(x, qp);
+        let yp = self.mod_change(y, qp);
+
+        if let Some(c) = opt_c {
+            let cp = self.mod_change(c, qp);
+            zp = self.add_many(&[xp, yp, cp]);
+        } else {
+            zp = self.add(xp, yp);
+        }
+
+        let tt = (0..qp).map(|x| u8::from(x >= q)).collect();
+        let carry = self.proj(zp, q, tt);
+        (sum, carry)
     }
 
     pub fn twos_complement(&mut self, xs: &[Ref]) -> Vec<Ref> {
@@ -407,22 +444,9 @@ impl Builder {
 mod tests {
     use circuit::Builder;
     use rand::Rng;
-    use numbers::{u128_to_bits, u128_from_bits};
+    use numbers;
 
-    #[test]
-    fn make_a_circuit() {
-        let mut b = Builder::new();
-        let x = b.input(3);
-        let y = b.input(3);
-        let z = b.add(x,y);
-        let z = b.cmul(z, 2);
-        let z = b.proj(z, 3, vec![1,2,0]); // cyclic shift
-        b.output(z);
-        let c = b.finish();
-        assert_eq!(c.eval(&vec![1,1])[0], 2);
-    }
-
-    #[test]
+    #[test] // {{{ and_gate_fan_n
     fn and_gate_fan_n() {
         let mut rng = Rng::new();
         let mut b = Builder::new();
@@ -444,8 +468,8 @@ mod tests {
             assert_eq!(c.eval(&inps)[0], res);
         }
     }
-
-    #[test]
+//}}}
+    #[test] // {{{ or_gate_fan_n
     fn or_gate_fan_n() {
         let mut rng = Rng::new();
         let mut b = Builder::new();
@@ -471,8 +495,8 @@ mod tests {
             }
         }
     }
-
-    #[test]
+//}}}
+    #[test] // {{{ mul_dlog
     fn mul_dlog() {
         let mut rng = Rng::new();
         let mut b = Builder::new();
@@ -488,8 +512,8 @@ mod tests {
             assert_eq!(c.eval(&vec![x,y])[0], (x as u16 * y as u16 % q as u16) as u8);
         }
     }
-
-    #[test]
+//}}}
+    #[test] // {{{ half_gate
     fn half_gate() {
         let mut rng = Rng::new();
         let mut b = Builder::new();
@@ -505,8 +529,8 @@ mod tests {
             assert_eq!(c.eval(&vec![x,y])[0], (x as u16 * y as u16 % q as u16) as u8);
         }
     }
-
-    #[test]
+//}}}
+    #[test] // mod_change {{{
     fn mod_change() {
         let mut rng = Rng::new();
         let mut b = Builder::new();
@@ -522,8 +546,8 @@ mod tests {
             assert_eq!(c.eval(&vec![x])[0], x % q);
         }
     }
-
-    #[test]
+//}}}
+    #[test] // binary_addition {{{
     fn binary_addition() {
         let mut b = Builder::new();
         let xs = b.inputs(128, 2);
@@ -536,16 +560,37 @@ mod tests {
         for _ in 0..16 {
             let x = rng.gen_u128();
             let y = rng.gen_u128();
-            let mut bits = u128_to_bits(x, 128);
-            bits.extend(u128_to_bits(y, 128).iter());
+            let mut bits = numbers::u128_to_bits(x, 128);
+            bits.extend(numbers::u128_to_bits(y, 128).iter());
             let res = c.eval(&bits);
             let (z, carry) = x.overflowing_add(y);
-            assert_eq!(u128_from_bits(&res[0..128]), z);
+            assert_eq!(numbers::u128_from_bits(&res[0..128]), z);
             assert_eq!(res[128], carry as u8);
         }
     }
+//}}}
+    #[test] // binary_addition_no_carry {{{
+    fn binary_addition_no_carry() {
+        let mut b = Builder::new();
+        let xs = b.inputs(128, 2);
+        let ys = b.inputs(128, 2);
+        let zs = b.binary_addition_no_carry(&xs, &ys);
+        b.outputs(&zs);
+        let c = b.finish();
+        let mut rng = Rng::new();
+        for _ in 0..16 {
+            let x = rng.gen_u128();
+            let y = rng.gen_u128();
+            let mut bits = numbers::u128_to_bits(x, 128);
+            bits.extend(numbers::u128_to_bits(y, 128).iter());
+            let res = c.eval(&bits);
+            let (z, _carry) = x.overflowing_add(y);
+            assert_eq!(numbers::u128_from_bits(&res[0..128]), z);
+        }
+    }
 
-    #[test]
+//}}}
+    #[test] // binary_subtraction {{{
     fn binary_subtraction() {
         let mut b = Builder::new();
         let xs = b.inputs(128, 2);
@@ -558,16 +603,16 @@ mod tests {
         for _ in 0..16 {
             let x = rng.gen_u128();
             let y = rng.gen_u128();
-            let mut bits = u128_to_bits(x, 128);
-            bits.extend(u128_to_bits(y, 128).iter());
+            let mut bits = numbers::u128_to_bits(x, 128);
+            bits.extend(numbers::u128_to_bits(y, 128).iter());
             let res = c.eval(&bits);
             let (z, carry) = x.overflowing_sub(y);
-            assert_eq!(u128_from_bits(&res[0..128]), z);
+            assert_eq!(numbers::u128_from_bits(&res[0..128]), z);
             assert_eq!(res[128], carry as u8);
         }
     }
-
-    #[test]
+//}}}
+    #[test] // add_many_mod_change {{{
     fn add_many_mod_change() {
         let mut b = Builder::new();
         let n = 113;
@@ -589,4 +634,31 @@ mod tests {
             assert_eq!(c.eval(&inps)[0], s);
         }
     }
+// }}}
+    #[test] // base_4_addition_no_carry {{{
+    fn base_q_addition_no_carry() {
+        let mut b = Builder::new();
+        let mut rng = Rng::new();
+
+        let q = rng.gen_modulus();
+        let n = 16;
+        let xs = b.inputs(n,q);
+        let ys = b.inputs(n,q);
+        let zs = b.base_q_addition_no_carry(&xs, &ys);
+        b.outputs(&zs);
+        let c = b.finish();
+
+        for _ in 0..16 {
+            let Q = (q as u128).pow(n as u32);
+            let x = rng.gen_u128() % Q;
+            let y = rng.gen_u128() % Q;
+            let mut ds = numbers::padded_base_q(x,q,n);
+            ds.extend(numbers::padded_base_q(y,q,n).iter());
+            let res = c.eval(&ds);
+            let (z, _carry) = x.overflowing_add(y);
+            assert_eq!(numbers::from_base_q(&res, q), z % Q);
+        }
+    }
+//}}}
+
 }
