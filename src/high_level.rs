@@ -1,5 +1,5 @@
 use circuit::{Builder, Circuit, Ref};
-use numbers::{inv_u8, crt, crt_inv, factor, product};
+use numbers::{self, inv_u8, crt, crt_inv, factor, product};
 use std::rc::Rc;
 
 #[derive(Clone, Copy)]
@@ -402,28 +402,29 @@ impl Bundler {
         self.borrow_mut_builder().binary_subtraction(&xbits, &ybits).1
     }
 
-    pub fn sgn(&mut self, xref: BundleRef, nbits: usize) -> Ref {
+    pub fn sgn(&mut self, xref: BundleRef, ndigits: usize) -> Ref {
         let q = product(&self.bundles[xref.0].primes);
 
-        // number of bits to keep in the projection
-        let M = 1_u32 << nbits;
+        let base = 4; // base of the addition in the gadget
+        let M = (base as u128).pow(ndigits as u32);
 
         // gets the nbits of round(M*x*alpha/P) mod M
         let project = |x: Ref, b: &mut Builder| -> Vec<Ref> {
             let p = b.circ.moduli[x];
             let crt_coef = inv_u8(((q / p as u128) % p as u128) as u8, p);
 
-            let mut tabs = vec![Vec::with_capacity(p as usize); nbits];
+            let mut tabs = vec![Vec::with_capacity(p as usize); ndigits];
 
             for x in 0..p {
-                let y = (M as f32 * x as f32 * crt_coef as f32 / p as f32).round() as u32 % M;
+                let y = (M as f32 * x as f32 * crt_coef as f32 / p as f32).round() as u128 % M;
+                let ds = numbers::padded_base_q(y, base, ndigits);
 
-                for i in 0..nbits {
-                    tabs[i].push(((y >> i) & 1) as u8);
+                for i in 0..ndigits {
+                    tabs[i].push(ds[i]);
                 }
             }
 
-            tabs.into_iter().map(|tt| b.proj(x, 2, tt)).collect()
+            tabs.into_iter().map(|tt| b.proj(x, base, tt)).collect()
         };
 
         let mut b = self.take_builder();
@@ -432,14 +433,19 @@ impl Bundler {
 
         let init = project(xs[0], &mut b);
 
-        let bits: Vec<Ref> = xs.into_iter().skip(1).fold(init, |acc, x| {
+        let ds: Vec<Ref> = xs.into_iter().skip(1).fold(init, |acc, x| {
             let bs = project(x, &mut b);
-            b.binary_addition_no_carry(&bs, &acc)
+            // b.binary_addition_no_carry(&bs, &acc)
+            b.base_q_addition_no_carry(&bs, &acc)
         });
 
-        self.put_builder(b);
+        // let z = *ds.last().unwrap();
 
-        *bits.last().unwrap()
+        let tt = (0..base).map(|x| (x > base/2) as u8).collect();
+        let z = b.proj(*ds.last().unwrap(), 2, tt);
+
+        self.put_builder(b);
+        z
     }
 }
 
@@ -740,7 +746,7 @@ mod tests {
         let q = modulus_with_width(32);
         let mut b = Bundler::new();
         let x = b.input(q);
-        let z = b.sgn(x,16);
+        let z = b.sgn(x,7);
         b.output_ref(z);
 
         for _ in 0..NTESTS {
