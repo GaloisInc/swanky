@@ -428,20 +428,15 @@ impl Bundler {
         };
 
         let mut b = self.take_builder();
-
         let xs: Vec<Ref> = self.bundles[xref.0].wires.to_vec();
-
         let init = project(xs[0], &mut b);
 
         let ds: Vec<Ref> = xs.into_iter().skip(1).fold(init, |acc, x| {
-            let bs = project(x, &mut b);
-            // b.binary_addition_no_carry(&bs, &acc)
-            b.base_q_addition_no_carry(&bs, &acc)
+            let ds = project(x, &mut b);
+            b.base_q_addition_no_carry(&ds, &acc)
         });
 
-        // let z = *ds.last().unwrap();
-
-        let tt = (0..base).map(|x| (x > base/2) as u8).collect();
+        let tt = (0..base).map(|x| (x >= base/2) as u8).collect();
         let z = b.proj(*ds.last().unwrap(), 2, tt);
 
         self.put_builder(b);
@@ -746,10 +741,10 @@ mod tests {
         let q = modulus_with_width(32);
         let mut b = Bundler::new();
         let x = b.input(q);
-        let z = b.sgn(x,7);
+        let z = b.sgn(x,6);
         b.output_ref(z);
 
-        for _ in 0..NTESTS {
+        for _ in 0..16 {
             let pt = rng.gen_u128() % q;
             let should_be = (pt > q/2) as u8;
             test_garbling_high_to_low(&mut b, &[pt], &[should_be]);

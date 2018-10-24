@@ -516,7 +516,7 @@ mod tests {
         });
     }
 //}}}
-    #[test] // base_4_addition_no_carry {{{
+    #[test] // base_q_addition_no_carry {{{
     fn base_q_addition_no_carry() {
         garble_test_helper(|q| {
             let mut b = Builder::new();
