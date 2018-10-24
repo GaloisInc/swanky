@@ -579,25 +579,6 @@ mod tests {
     }
 
     #[test]
-    fn test_base_q_add() {
-        let mut xs = vec![0,1,0,1];
-        let mut ys = vec![1,1,1,1];
-        base_q_add(&mut xs, &ys, 2);
-        assert_eq!(xs, [1,0,0,1]);
-
-
-        xs = vec![1,0,1];
-        ys = vec![0,2,1];
-        base_q_add(&mut xs, &ys, 3);
-        assert_eq!(xs, [1,2,2]);
-
-        xs = vec![3,1];
-        ys = vec![1,2];
-        base_q_add(&mut xs, &ys, 7);
-        assert_eq!(xs, [4,3]);
-    }
-
-    #[test]
     fn base_q_conversion() {
         let mut rng = Rng::new();
         for _ in 0..1000 {
@@ -610,11 +591,37 @@ mod tests {
     }
 
     #[test]
-    fn base_q_plus_one_mod3() {
-        let mut ds = [ 2, 2, 2, 0, 0, 2 ];
-        let ref one = [ 1 ];
-        base_q_add(&mut ds, one, 3);
-        assert_eq!(ds, [0,0,0,1,0,2]);
+    fn padded_base_q_conversion() {
+        let mut rng = Rng::new();
+        for _ in 0..1000 {
+            let q = 2 + (rng.gen_byte() % 111);
+            let x = rng.gen_u128();
+            let y = padded_base_q_128(x, q);
+            let z = from_base_q(&y, q);
+            assert_eq!(x, z);
+        }
+    }
+
+    #[test]
+    fn base_q_addition() {
+        let mut rng = Rng::new();
+        for _ in 0..1000 {
+            let q = 2 + (rng.gen_byte() % 111);
+            let n = digits_per_u128(q) - 2;
+            let Q = (q as u128).pow(n as u32);
+
+            let x = rng.gen_u128() % Q;
+            let y = rng.gen_u128() % Q;
+
+            let mut xp = padded_base_q(x,q,n);
+            let yp = as_base_q(y,q);
+
+            base_q_add(&mut xp, &yp, q);
+
+            let z = from_base_q(&xp, q);
+
+            assert_eq!((x+y) % Q, z);
+        }
     }
 }
 
