@@ -75,6 +75,14 @@ fn parity_bundler(q: u128) -> Bundler {
     b
 }
 
+fn sgn_bundler(q: u128) -> Bundler {
+    let mut b = Bundler::new();
+    let x = b.input(q);
+    let z = b.sgn(x,5);
+    b.output_ref(z);
+    b
+}
+
 fn add(cr: &mut Criterion) {
     bench_gb(cr, "high_level::add_gb", add_bundler);
     bench_ev(cr, "high_level::add_ev", add_bundler);
@@ -95,10 +103,15 @@ fn parity(cr: &mut Criterion) {
     bench_ev(cr, "high_level::parity_ev", parity_bundler);
 }
 
+fn sgn(cr: &mut Criterion) {
+    bench_gb(cr, "high_level::sgn_gb", sgn_bundler);
+    bench_ev(cr, "high_level::sgn_ev", sgn_bundler);
+}
+
 criterion_group!{
     name = high_level;
     config = Criterion::default().warm_up_time(Duration::from_millis(100));
-    targets = add, mul, mul_dlog, parity
+    targets = add, mul, mul_dlog, parity, sgn
 }
 
 criterion_main!(high_level);
