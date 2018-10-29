@@ -122,7 +122,7 @@ impl Wire {
 
     pub fn negate(&self) -> Self {
         match *self {
-            Wire::Mod2 { .. } => self.clone(),
+            Wire::Mod2 { val } => Wire::Mod2 { val: !val },
             Wire::ModN { q, ref ds }  => {
                 let n = ds.len();
                 let mut zs = vec![0;n];
@@ -137,7 +137,10 @@ impl Wire {
     }
 
     pub fn minus(&self, other: &Self) -> Self {
-        self.plus(&other.negate())
+        match *self {
+            Wire::Mod2 { .. } => self.plus(&other),
+            Wire::ModN { .. } => self.plus(&other.negate()),
+        }
     }
 
     pub fn rand(rng: &mut Rng, modulus: u8) -> Self {
@@ -227,10 +230,12 @@ mod tests {
     fn negation() {
         let ref mut rng = Rng::new();
         for _ in 0..1000 {
-            let q = rng.gen_byte();
+            let q = rng.gen_modulus();
+            // let q = 2;
             let x = Wire::rand(rng, q);
             let xneg = x.negate();
             println!("{:?}", xneg);
+            assert!(x != xneg);
             let y = xneg.negate();
             assert_eq!(x, y);
         }
@@ -251,7 +256,7 @@ mod tests {
     fn subzero() {
         let mut rng = Rng::new();
         for _ in 0..1000 {
-            let q = 2 + (rng.gen_byte() % 110);
+            let q = rng.gen_modulus();
             let x = Wire::rand(&mut rng, q);
             let z = Wire::zero(q);
             assert_eq!(x.minus(&x), z);
