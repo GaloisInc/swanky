@@ -441,7 +441,7 @@ impl Bundler {
             let p = b.circ.moduli[x];
             let crt_coef = inv(((q / p as u128) % p as u128) as i32, p as i32);
 
-            let mut tabs = vec![Vec::with_capacity(p as usize); ndigits];
+           let mut tabs = vec![Vec::with_capacity(p as usize); ndigits];
 
             for x in 0..p {
                 let y = (M as f32 * x as f32 * crt_coef as f32 / p as f32).round() as u128 % M;
@@ -461,7 +461,7 @@ impl Bundler {
 
         let ds: Vec<Ref> = xs.into_iter().skip(1).fold(init, |acc, x| {
             let ds = project(x, &mut b);
-            b.base_q_addition_no_carry(&ds, &acc)
+            b.addition_no_carry(&ds, &acc)
         });
 
         let tt = (0..base).map(|x| (x >= base/2) as u8).collect();

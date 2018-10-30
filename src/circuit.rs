@@ -322,12 +322,14 @@ impl Builder {
     ////////////////////////////////////////////////////////////////////////////////
     // binary stuff
 
-    pub fn binary_addition(&mut self, xs: &[Ref], ys: &[Ref]) -> (Vec<Ref>, Ref) {
+    pub fn addition(&mut self, xs: &[Ref], ys: &[Ref]) -> (Vec<Ref>, Ref) {
         assert_eq!(xs.len(), ys.len());
-        let (mut z, mut c) = self.half_adder(xs[0], ys[0]);
+        let cmod = self.modulus(xs[1]);
+        let (mut z, mut c) = self.adder(xs[0], ys[0], None, cmod);
         let mut bs = vec![z];
-        for (&x, &y) in xs.iter().skip(1).zip(ys.iter().skip(1)) {
-            let res = self.full_adder(x, y, c);
+        for i in 1..xs.len() {
+            let cmod = self.modulus(*xs.get(i+1).unwrap_or(&xs[i]));
+            let res = self.adder(xs[i], ys[i], Some(c), cmod);
             z = res.0;
             c = res.1;
             bs.push(z);
@@ -335,12 +337,15 @@ impl Builder {
         (bs, c)
     }
 
-    pub fn binary_addition_no_carry(&mut self, xs: &[Ref], ys: &[Ref]) -> Vec<Ref> {
+    // avoids creating extra gates for the final carry
+    pub fn addition_no_carry(&mut self, xs: &[Ref], ys: &[Ref]) -> Vec<Ref> {
         assert_eq!(xs.len(), ys.len());
-        let (mut z, mut c) = self.half_adder(xs[0], ys[0]);
+        let cmod = self.modulus(xs[1]);
+        let (mut z, mut c) = self.adder(xs[0], ys[0], None, cmod);
         let mut bs = vec![z];
         for i in 1..xs.len()-1 {
-            let res = self.full_adder(xs[i], ys[i], c);
+            let cmod = self.modulus(*xs.get(i+1).unwrap_or(&xs[i]));
+            let res = self.adder(xs[i], ys[i], Some(c), cmod);
             z = res.0;
             c = res.1;
             bs.push(z);
@@ -350,61 +355,47 @@ impl Builder {
         bs
     }
 
-    fn half_adder(&mut self, x: Ref, y: Ref) -> (Ref, Ref) {
-        let z = self.xor(x,y);
-        let c = self.and(x,y);
-        (z, c)
-    }
-
-    fn full_adder(&mut self, x: Ref, y: Ref, c: Ref) -> (Ref, Ref) {
-        let z1 = self.xor(x,y);
-        let z2 = self.xor(z1,c);
-        let z3 = self.xor(x,c);
-        let z4 = self.and(z1,z3);
-        let z5 = self.xor(z4,x);
-        (z2, z5)
-    }
-
-    pub fn base_q_addition_no_carry(&mut self, xs: &[Ref], ys: &[Ref]) -> Vec<Ref> {
-        assert_eq!(xs.len(), ys.len());
-        let (mut z, mut c) = self.base_q_full_adder(xs[0], ys[0], None);
-        let mut bs = vec![z];
-        for i in 1..xs.len()-1 {
-            let res = self.base_q_full_adder(xs[i], ys[i], Some(c));
-            z = res.0;
-            c = res.1;
-            bs.push(z);
-        }
-        z = self.add_many(&[*xs.last().unwrap(), *ys.last().unwrap(), c]);
-        bs.push(z);
-        bs
-    }
-
-    fn base_q_full_adder(&mut self, x: Ref, y: Ref, opt_c: Option<Ref>) -> (Ref, Ref) {
+    fn adder(&mut self, x: Ref, y: Ref, opt_c: Option<Ref>, carry_modulus: u8) -> (Ref, Ref) {
         let q = self.modulus(x);
-        let (sum, qp, zp);
-
-        if let Some(c) = opt_c {
-            sum = self.add_many(&[x,y,c]);
-            qp = 2*q;
+        assert_eq!(q, self.modulus(y));
+        if q == 2 {
+            if let Some(c) = opt_c {
+                let z1 = self.xor(x,y);
+                let z2 = self.xor(z1,c);
+                let z3 = self.xor(x,c);
+                let z4 = self.and(z1,z3);
+                let z5 = self.xor(z4,x);
+                (z2, z5)
+            } else {
+                let z = self.xor(x,y);
+                let c = self.and(x,y);
+                (z, c)
+            }
         } else {
-            sum = self.add(x,y);
-            qp = 2*q-1;
+            let (sum, qp, zp);
+
+            if let Some(c) = opt_c {
+                sum = self.add_many(&[x,y,c]);
+                qp = 2*q;
+            } else {
+                sum = self.add(x,y);
+                qp = 2*q-1;
+            }
+
+            let xp = self.mod_change(x, qp);
+            let yp = self.mod_change(y, qp);
+
+            if let Some(c) = opt_c {
+                let cp = self.mod_change(c, qp);
+                zp = self.add_many(&[xp, yp, cp]);
+            } else {
+                zp = self.add(xp, yp);
+            }
+
+            let tt = (0..qp).map(|x| u8::from(x >= q)).collect();
+            let carry = self.proj(zp, carry_modulus, tt);
+            (sum, carry)
         }
-
-        let xp = self.mod_change(x, qp);
-        let yp = self.mod_change(y, qp);
-
-        if let Some(c) = opt_c {
-            let cp = self.mod_change(c, qp);
-            zp = self.add_many(&[xp, yp, cp]);
-        } else {
-            zp = self.add(xp, yp);
-        }
-
-        let tt = (0..qp).map(|x| u8::from(x >= q)).collect();
-        let carry = self.proj(zp, q, tt);
-        (sum, carry)
     }
 
     pub fn twos_complement(&mut self, xs: &[Ref]) -> Vec<Ref> {
@@ -420,7 +411,7 @@ impl Builder {
         let z = self.negate(xs[0]);
         let mut zs = vec![z];
         for &x in xs.iter().skip(1) {
-            let res = self.half_adder(x, c);
+            let res = self.adder(x, c, None, 2);
             zs.push(res.0);
             c = res.1;
         }
@@ -434,7 +425,7 @@ impl Builder {
     // pub fn binary_subtraction_twos_complement(&mut self, xs: &[Ref], ys: &[Ref]) -> (Vec<Ref>, Ref) {
     pub fn binary_subtraction(&mut self, xs: &[Ref], ys: &[Ref]) -> (Vec<Ref>, Ref) {
         let neg_ys = self.twos_complement(&ys);
-        let (zs, c) = self.binary_addition(&xs, &neg_ys);
+        let (zs, c) = self.addition(&xs, &neg_ys);
         (zs, self.negate(c))
     }
 }
@@ -552,7 +543,7 @@ mod tests {
         let mut b = Builder::new();
         let xs = b.inputs(128, 2);
         let ys = b.inputs(128, 2);
-        let (zs, c) = b.binary_addition(&xs, &ys);
+        let (zs, c) = b.addition(&xs, &ys);
         b.outputs(&zs);
         b.output(c);
         let c = b.finish();
@@ -574,7 +565,7 @@ mod tests {
         let mut b = Builder::new();
         let xs = b.inputs(128, 2);
         let ys = b.inputs(128, 2);
-        let zs = b.binary_addition_no_carry(&xs, &ys);
+        let zs = b.addition_no_carry(&xs, &ys);
         b.outputs(&zs);
         let c = b.finish();
         let mut rng = Rng::new();
@@ -644,7 +635,7 @@ mod tests {
         let n = 16;
         let xs = b.inputs(n,q);
         let ys = b.inputs(n,q);
-        let zs = b.base_q_addition_no_carry(&xs, &ys);
+        let zs = b.addition_no_carry(&xs, &ys);
         b.outputs(&zs);
         let c = b.finish();
 

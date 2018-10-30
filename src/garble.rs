@@ -523,7 +523,7 @@ mod tests {
             let n = 16;
             let xs = b.inputs(n,q);
             let ys = b.inputs(n,q);
-            let zs = b.base_q_addition_no_carry(&xs, &ys);
+            let zs = b.addition_no_carry(&xs, &ys);
             b.outputs(&zs);
             b.finish()
         });
