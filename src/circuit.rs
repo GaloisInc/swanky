@@ -386,10 +386,10 @@ impl Builder {
 
         if let Some(c) = opt_c {
             sum = self.add_many(&[x,y,c]);
-            qp = 2*q + 1;
+            qp = 2*q;
         } else {
             sum = self.add(x,y);
-            qp = 2*q;
+            qp = 2*q-1;
         }
 
         let xp = self.mod_change(x, qp);
@@ -648,7 +648,18 @@ mod tests {
         b.outputs(&zs);
         let c = b.finish();
 
-        for _ in 0..16 {
+        // test maximum overflow
+        let Q = (q as u128).pow(n as u32);
+        let x = Q - 1;
+        let y = Q - 1;
+        let mut ds = numbers::padded_base_q(x,q,n);
+        ds.extend(numbers::padded_base_q(y,q,n).iter());
+        let res = c.eval(&ds);
+        let (z, _carry) = x.overflowing_add(y);
+        assert_eq!(numbers::from_base_q(&res, q), z % Q);
+
+        // test random values
+        for _ in 0..64 {
             let Q = (q as u128).pow(n as u32);
             let x = rng.gen_u128() % Q;
             let y = rng.gen_u128() % Q;

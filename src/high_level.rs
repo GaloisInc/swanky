@@ -55,6 +55,34 @@ impl Bundler {
         bun_ref
     }
 
+    pub fn inputs(&mut self, modulus: u128, n: usize) -> Vec<BundleRef> {
+        (0..n).map(|_| self.input(modulus)).collect()
+    }
+
+    pub fn bundle_from_ref(&mut self, x: Ref, q: u128) -> BundleRef {
+        let ps = factor(q);
+        let mut ws = Vec::with_capacity(ps.len());
+        let input_mod = self.borrow_builder().modulus(x);
+        for &output_mod in &ps {
+            let tt = (0..input_mod).map(|y| y % output_mod).collect();
+            let w = self.borrow_mut_builder().proj(x, output_mod, tt);
+            ws.push(w);
+        }
+        self.add_bundle(ws, Rc::new(ps))
+    }
+
+    pub fn zero_one_to_one_negative_one(&mut self, x: Ref, q: u128) -> BundleRef {
+        let ps = factor(q);
+        let mut ws = Vec::with_capacity(ps.len());
+        assert_eq!(self.borrow_builder().modulus(x), 2);
+        for &p in &ps {
+            let tt = vec![ 1, ((q-1) % p as u128) as u8 ];
+            let w = self.borrow_mut_builder().proj(x, p, tt);
+            ws.push(w);
+        }
+        self.add_bundle(ws, Rc::new(ps))
+    }
+
     pub fn output(&mut self, xref: BundleRef) {
         let b = self.builder.as_mut().expect("need a builder!");
         let ws = &self.bundles[xref.0].wires;
@@ -448,7 +476,7 @@ impl Bundler {
 mod tests {
     use garble::garble;
     use high_level::Bundler;
-    use numbers::{u128_to_bits, inv, factor, modulus_with_width};
+    use numbers::{self, u128_to_bits, inv, factor, modulus_with_width};
     use rand::Rng;
 
     const NTESTS: usize = 1;
@@ -459,7 +487,8 @@ mod tests {
         let (gb, ev) = garble(&c);
         println!("number of ciphertexts: {}", ev.size());
         let enc_inp = b.encode(inp);
-        assert_eq!(b.decode(&c.eval(&enc_inp)), should_be);
+        let res = c.eval(&enc_inp);
+        assert_eq!(b.decode(&res), should_be);
         let xs = gb.encode(&enc_inp);
         let ys = ev.eval(c, &xs);
         assert_eq!(b.decode(&gb.decode(&ys)), should_be);
@@ -491,6 +520,35 @@ mod tests {
 
             let x = rng.gen_u128() % q;
             test_garbling(&mut b, &[x], &[x]);
+        }
+    }
+
+    //}}}
+    #[test] // bundle_from_ref {{{
+    fn bundle_from_ref() {
+        let mut rng = Rng::new();
+        for _ in 0..16 {
+            let p = rng.gen_prime();
+            let q = rng.gen_usable_composite_modulus();
+
+            println!("p={} q={}", p, q);
+
+            let mut b = Bundler::new();
+            let inp = b.borrow_mut_builder().input(p);
+            let bun = b.bundle_from_ref(inp, q);
+            b.output(bun);
+
+            let x = rng.gen_byte() % p;
+            println!("x={}", x);
+
+            let c = b.finish();
+            let (gb, ev) = garble(&c);
+
+            let res = c.eval(&[x]);
+            assert_eq!(b.decode(&res), &[x as u128]);
+            let xs = gb.encode(&[x]);
+            let ys = ev.eval(&c, &xs);
+            assert_eq!(b.decode(&gb.decode(&ys)), &[x as u128]);
         }
     }
 
@@ -647,7 +705,7 @@ mod tests {
     #[test] // parity {{{
     fn parity() {
         let mut rng = Rng::new();
-        let q = modulus_with_width(32);
+        let q = numbers::modulus_with_width_skip2(32);
         let mut b = Bundler::new();
         let x = b.input(q);
         let z = b.parity(x);
@@ -663,13 +721,13 @@ mod tests {
     #[test] // cdiv {{{
     fn cdiv() {
         let mut rng = Rng::new();
-        let q = modulus_with_width(32);
+        let q = numbers::modulus_with_width_skip2(32);
         let mut b = Bundler::new();
         let x = b.input(q);
         let z = b.cdiv(x,2);
         b.output(z);
 
-        for _ in 0..NTESTS {
+        for _ in 0..128 {
             let mut pt = rng.gen_u128() % (q/2);
             pt += pt % 2;
             let should_be = pt / 2;
@@ -680,7 +738,7 @@ mod tests {
     #[test] // bits {{{
     fn bits() {
         let mut rng = Rng::new();
-        let q = modulus_with_width(32);
+        let q = numbers::modulus_with_width_skip2(32);
         let mut b = Bundler::new();
         let x = b.input(q);
         let zs = b.bits(x, 32);
@@ -718,7 +776,7 @@ mod tests {
     #[test] // less_than_bits {{{
     fn less_than_bits() {
         let mut rng = Rng::new();
-        let q = modulus_with_width(32);
+        let q = numbers::modulus_with_width_skip2(32);
         let mut b = Bundler::new();
         let x = b.input(q);
         let y = b.input(q);

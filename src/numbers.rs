@@ -29,7 +29,9 @@ pub fn base_q_add<N>(xs: &mut [N], ys: &[N], q: N)
         xs[i] += c;
         if xs[i] >= q {
             xs[i] -= q;
+            // c = 1
         } else {
+            // c = 0
             break;
         }
         i += 1;
@@ -175,29 +177,39 @@ pub fn inv<T: Copy + Integer + Signed>(a: T, m: T) -> T {
 }
 
 pub const NPRIMES: usize = 29;
+
 pub const PRIMES: [u8;29] = [
+    2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47, 53, 59, 61, 67, 71,
+    73, 79, 83, 89, 97, 101, 103, 107, 109
+];
+
+pub const PRIMES_SKIP_2: [u8;29] = [
     3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47, 53, 59, 61, 67, 71,
     73, 79, 83, 89, 97, 101, 103, 107, 109, 113
 ];
 
-// pub const PRIMES: [u8;29] = [
-    // 2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47, 53, 59, 61, 67, 71,
-    // 73, 79, 83, 89, 97, 101, 103, 107, 109
-// ];
-
 pub fn modulus_with_width(nbits: u32) -> u128 {
+    base_modulus_with_width(nbits, &PRIMES)
+}
+
+pub fn modulus_with_width_skip2(nbits: u32) -> u128 {
+    base_modulus_with_width(nbits, &PRIMES_SKIP_2)
+}
+
+pub fn base_modulus_with_width(nbits: u32, ps: &[u8]) -> u128 {
     let mut res = 1;
     let mut i = 0;
     loop {
-        res *= u128::from(PRIMES[i]);
+        res *= u128::from(ps[i]);
         if (res >> nbits) > 0 {
             break;
         }
         i += 1;
-        assert!(i < NPRIMES);
+        assert!(i < ps.len());
     }
     res
 }
+
 
 pub fn product(xs: &[u8]) -> u128 {
     xs.iter().fold(1, |acc, &x| acc * x as u128)
@@ -556,7 +568,7 @@ mod tests {
         let mut rng = Rng::new();
         for _ in 0..128 {
             let i = rng.gen_byte() as usize % NPRIMES;
-            let q = PRIMES[i];
+            let q = PRIMES_SKIP_2[i];
             let tt = dlog_truth_table(q);
             let g = PRIMITIVE_ROOTS[i];
             let x = rng.gen_byte() % q;
