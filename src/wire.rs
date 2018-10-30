@@ -276,7 +276,7 @@ mod tests {
     #[test]
     fn arithmetic() {
         let mut rng = Rng::new();
-        for _ in 0..16 {
+        for _ in 0..1024 {
             let q = rng.gen_modulus();
             let x = Wire::rand(&mut rng, q);
             let y = Wire::rand(&mut rng, q);
@@ -285,8 +285,12 @@ mod tests {
             assert_eq!(x.plus(&x), x.cmul(2));
             assert_eq!(x.plus(&x).plus(&x), x.cmul(3));
             assert_eq!(x.negate().negate(), x);
-            assert_eq!(x.plus(&x.negate()), Wire::zero(q));
-            assert_eq!(x.minus(&y), x.plus(&y.negate()));
+            if q == 2 {
+                assert_eq!(x.plus(&y), x.minus(&y));
+            } else {
+                assert_eq!(x.plus(&x.negate()), Wire::zero(q), "q={}", q);
+                assert_eq!(x.minus(&y), x.plus(&y.negate()));
+            }
         }
     }
 
