@@ -3,7 +3,7 @@ use num::bigint::BigInt;
 use num::{ToPrimitive, Zero, One, Signed};
 
 pub fn digits_per_u128(modulus: u8) -> usize {
-    (128.0 / (modulus as f64).log(2.0)).ceil() as usize
+    (128.0 * 2_f64.log(modulus as f64)).ceil() as usize
 }
 
 pub fn base_q_add<N>(xs: &mut [N], ys: &[N], q: N)
@@ -624,4 +624,3 @@ mod tests {
         }
     }
 }
-

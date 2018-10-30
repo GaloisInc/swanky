@@ -76,17 +76,28 @@ fn bench_hash(c: &mut Criterion, p: u8) {
     });
 }
 
+fn bench_zero(c: &mut Criterion, p: u8) {
+    c.bench_function(&format!("wire::zero{}", p), move |b| {
+        b.iter(|| {
+            let z = Wire::zero(p);
+            criterion::black_box(z);
+        });
+    });
+}
+
+
 fn unpack17(c: &mut Criterion) { bench_unpack(c,17) }
 fn pack17(c: &mut Criterion) { bench_pack(c,17) }
 fn plus17(c: &mut Criterion) { bench_plus(c,17) }
 fn cmul17(c: &mut Criterion) { bench_cmul(c,17) }
 fn negate17(c: &mut Criterion) { bench_negate(c,17) }
 fn hash17(c: &mut Criterion) { bench_hash(c,17) }
+fn zero17(c: &mut Criterion) { bench_zero(c,17) }
 
 criterion_group!{
     name = wire_conversion;
     config = Criterion::default().warm_up_time(Duration::from_millis(100));
-    targets = unpack17, pack17, plus17, cmul17, negate17, hash17
+    targets = unpack17, pack17, plus17, cmul17, negate17, hash17, zero17
 }
 
 criterion_main!(wire_conversion);

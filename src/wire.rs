@@ -11,7 +11,7 @@ pub enum Wire {
 impl Wire {
     pub fn digits(&self) -> Vec<u8> {
         match self {
-            Wire::Mod2 { .. } => unimplemented!(),
+            Wire::Mod2 { val } => (0..128).map(|i| ((val >> i) as u8) & 1).collect(),
             Wire::ModN { ds, .. } => ds.clone(),
         }
     }
@@ -54,7 +54,7 @@ impl Wire {
         match modulus {
             1 => panic!("[wire::zero] mod 1 not allowed!"),
             2 => Wire::Mod2 { val: 0 },
-            _ => Wire::from_u128(0, modulus),
+            _ => Wire::ModN { q: modulus, ds: vec![0; numbers::digits_per_u128(modulus)] },
         }
     }
 
@@ -267,7 +267,7 @@ mod tests {
     fn pluszero() {
         let mut rng = Rng::new();
         for _ in 0..1000 {
-            let q = 2 + (rng.gen_byte() % 110);
+            let q = rng.gen_modulus();
             let x = Wire::rand(&mut rng, q);
             assert_eq!(x.plus(&Wire::zero(q)), x);
         }
@@ -277,7 +277,7 @@ mod tests {
     fn arithmetic() {
         let mut rng = Rng::new();
         for _ in 0..16 {
-            let q = 2 + (rng.gen_byte() % 110);
+            let q = rng.gen_modulus();
             let x = Wire::rand(&mut rng, q);
             let y = Wire::rand(&mut rng, q);
             assert_eq!(x.cmul(0), Wire::zero(q));
@@ -287,6 +287,16 @@ mod tests {
             assert_eq!(x.negate().negate(), x);
             assert_eq!(x.plus(&x.negate()), Wire::zero(q));
             assert_eq!(x.minus(&y), x.plus(&y.negate()));
+        }
+    }
+
+    #[test]
+    fn ndigits_correct() {
+        let mut rng = Rng::new();
+        for _ in 0..1024 {
+            let q = rng.gen_modulus();
+            let x = Wire::rand(&mut rng, q);
+            assert_eq!(x.digits().len(), numbers::digits_per_u128(q));
         }
     }
 }
