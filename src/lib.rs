@@ -22,3 +22,4 @@ pub mod high_level;
 pub mod numbers;
 pub mod rand;
 pub mod wire;
+pub mod util;
