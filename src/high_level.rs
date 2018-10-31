@@ -631,8 +631,8 @@ mod tests {
         let z = b.cexp(x,y);
         b.output(z);
 
-        for _ in 0..NTESTS {
-            let x = rng.gen_u16() as u128 % q;
+        for _ in 0..16 {
+            let x = rng.gen_u16() as u128 % (q/2);
             let should_be = x.pow(y as u32) % q;
             test_garbling(&mut b, &[x], &[should_be]);
         }
