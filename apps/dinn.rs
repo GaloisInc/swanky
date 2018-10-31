@@ -9,7 +9,6 @@ use std::fs::File;
 use std::io::prelude::*;
 use std::io::{BufReader, Lines};
 
-use fancy_garbling::circuit::Builder;
 use fancy_garbling::high_level::Bundler;
 use fancy_garbling::numbers;
 use fancy_garbling::garble::garble;
@@ -20,11 +19,22 @@ const IMAGES_FILE   : &str = "../dinn/weights-and-biases/txt_img_test.txt";
 const LABELS_FILE   : &str = "../dinn/weights-and-biases/txt_labels.txt";
 
 const TOPOLOGY: [usize; 3] = [256, 30, 10];
-// const NIMAGES: usize = 10000;
-const NIMAGES: usize = 1000;
+const NIMAGES: usize = 10000;
+// const NIMAGES: usize = 1000;
 const NLAYERS: usize = 2;
 
 pub fn main() {
+    let mut run_benches = false;
+    let mut run_tests = false;
+
+    for arg in std::env::args().skip(1) {
+        match arg.as_str() {
+            "bench" => run_benches = true,
+            "test" => run_tests = true,
+            _ => panic!("unknown arg {}", arg),
+        }
+    }
+
     let q = numbers::modulus_with_width(10);
     println!("q={}", q);
 
@@ -38,8 +48,9 @@ pub fn main() {
     let inp_biases0 = bun.encode(&biases[0]);
     let inp_biases1 = bun.encode(&biases[1]);
 
-    // benchmarks
-    {
+    if run_benches {
+        println!("running garble/eval benchmark");
+
         let mut garble_time = Duration::new(0,0);
         let ntests = 16;
         for _ in 0..ntests {
@@ -66,43 +77,49 @@ pub fn main() {
         }
         eval_time /= ntests;
 
-        println!("garbling took {} ns", garble_time.as_nanos());
-        println!("eval took {} ns", eval_time.as_nanos());
+        println!("garbling took {} ms", garble_time.as_millis());
+        println!("eval took {} ms", eval_time.as_millis());
         println!("size: {} ciphertexts", ev.size());
 
-        return;
     }
 
-    // plaintext eval
-    let mut errors = 0;
+    if run_tests {
+        println!("running plaintext accuracy evaluation");
 
-    for (img_num, img) in images.iter().enumerate() {
-        let inp_img = bun.encode(img);
+        let mut errors = 0;
 
-        let mut inp = inp_biases0.clone();
-        inp.extend(&inp_biases1);
-        inp.extend(inp_img);
+        for (img_num, img) in images.iter().enumerate() {
+            if img_num % 100 == 0 {
+                println!("{}/{} {} errors ({}%)", img_num, NIMAGES, errors, 100.0 * (1.0 - errors as f32 / NIMAGES as f32));
+            }
 
-        let raw = bun.borrow_circ().eval(&inp);
-        let res = bun.decode(&raw);
+            let inp_img = bun.encode(img);
 
-        let res: Vec<i32> = res.into_iter().map(|x| from_mod_q(q,x)).collect();
+            let mut inp = inp_biases0.clone();
+            inp.extend(&inp_biases1);
+            inp.extend(inp_img);
 
-        let mut max_val = i32::min_value();
-        let mut winner = 0;
-        for i in 0..res.len() {
-            if res[i] > max_val {
-                max_val = res[i];
-                winner = i;
+            let raw = bun.borrow_circ().eval(&inp);
+            let res = bun.decode(&raw);
+
+            let res: Vec<i32> = res.into_iter().map(|x| from_mod_q(q,x)).collect();
+
+            let mut max_val = i32::min_value();
+            let mut winner = 0;
+            for i in 0..res.len() {
+                if res[i] > max_val {
+                    max_val = res[i];
+                    winner = i;
+                }
+            }
+
+            if winner != labels[img_num] {
+                errors += 1;
             }
         }
 
-        if (winner != labels[img_num]) {
-            errors += 1;
-        }
+        println!("errors: {}/{}. accuracy: {}%", errors, NIMAGES, 100.0 * (1.0 - errors as f32 / NIMAGES as f32));
     }
-
-    println!("errors: {}/{}. accuracy: {}%", errors, NIMAGES, 1.0 - errors as f32 / NIMAGES as f32);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -139,7 +156,8 @@ fn build_circuit(q: u128, weights: Vec<Vec<Vec<u128>>>) -> Bundler {
 
         if layer == 0 {
             layer_outputs = layer_outputs.into_iter().map(|x| {
-                let r = b.sgn(x, 5);
+                let ms = vec![128];
+                let r = b.sgn(x, &ms);
                 b.zero_one_to_one_negative_one(r, q)
             }).collect();
         }

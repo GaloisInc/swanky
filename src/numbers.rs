@@ -2,7 +2,7 @@ use num::integer::Integer;
 use num::bigint::BigInt;
 use num::{ToPrimitive, Zero, One, Signed};
 
-pub fn digits_per_u128(modulus: u8) -> usize {
+pub fn digits_per_u128(modulus: u16) -> usize {
     (128.0 * 2_f64.log(modulus as f64)).ceil() as usize
 }
 
@@ -38,26 +38,38 @@ pub fn base_q_add<N>(xs: &mut [N], ys: &[N], q: N)
     }
 }
 
-pub fn as_base_q(x: u128, q: u8) -> Vec<u8> {
-    let n = digits_per_u128(q);
-    let mut ds = Vec::with_capacity(n);
+pub fn as_base_q(x: u128, q: u16) -> Vec<u16> {
+    let n  = digits_per_u128(q);
+    let ms = std::iter::repeat(q).take(n).collect::<Vec<_>>();
+    as_mixed_radix(x, &ms)
+}
+
+pub fn as_mixed_radix(x: u128, ms: &[u16]) -> Vec<u16> {
+    let mut ds = Vec::with_capacity(ms.len());
     let mut x = x;
 
-    for _ in 0..n {
-        if x >= q as u128 {
-            let d = x % q as u128;
-            x = (x - d) / q as u128;
-            ds.push(d as u8);
+    for i in 0..ms.len() {
+        if x >= ms[i] as u128 {
+            let d = x % ms[i] as u128;
+            x = (x - d) / ms[i] as u128;
+            ds.push(d as u16);
         } else {
-            ds.push(x as u8);
+            ds.push(x as u16);
             break;
         }
     }
-    assert!(ds.iter().all(|&d| d < q));
     ds
 }
 
-pub fn from_base_q(ds: &[u8], q: u8) -> u128 {
+pub fn padded_mixed_radix(x: u128, ms: &[u16]) -> Vec<u16> {
+    let mut ds = as_mixed_radix(x,ms);
+    while ds.len() < ms.len() {
+        ds.push(0);
+    }
+    ds
+}
+
+pub fn from_base_q(ds: &[u16], q: u16) -> u128 {
     let q = q as u128;
     let mut x: u128 = 0;
     for &d in ds.iter().rev() {
@@ -67,31 +79,30 @@ pub fn from_base_q(ds: &[u8], q: u8) -> u128 {
     x
 }
 
-pub fn padded_base_q(x: u128, q: u8, n: usize) -> Vec<u8> {
-    let mut ds = as_base_q(x,q);
-    while ds.len() < n {
-        ds.push(0);
-    }
-    ds
+pub fn padded_base_q(x: u128, q: u16, n: usize) -> Vec<u16> {
+    let ms = std::iter::repeat(q).take(n).collect::<Vec<_>>();
+    padded_mixed_radix(x, &ms)
 }
 
-pub fn padded_base_q_128(x: u128, q: u8) -> Vec<u8> {
-    padded_base_q(x, q, digits_per_u128(q))
+pub fn padded_base_q_128(x: u128, q: u16) -> Vec<u16> {
+    let n  = digits_per_u128(q);
+    let ms = std::iter::repeat(q).take(n).collect::<Vec<_>>();
+    padded_mixed_radix(x, &ms)
 }
 
-pub fn u128_to_bits(x: u128, n: usize) -> Vec<u8> {
+pub fn u128_to_bits(x: u128, n: usize) -> Vec<u16> {
     let mut bits = Vec::with_capacity(n);
     let mut y = x;
     for _ in 0..n {
         let b = y % 2;
-        bits.push(b as u8);
+        bits.push(b as u16);
         y -= b;
         y /= 2;
     }
     bits
 }
 
-pub fn u128_from_bits(bs: &[u8]) -> u128 {
+pub fn u128_from_bits(bs: &[u16]) -> u128 {
     let mut x = 0;
     for &b in bs.iter().skip(1).rev() {
         x += b as u128;
@@ -103,7 +114,7 @@ pub fn u128_from_bits(bs: &[u8]) -> u128 {
 
 // only factor using the above primes- we only support composites with small
 // prime factors in the high-level circuit representation
-pub fn factor(inp: u128) -> Vec<u8> {
+pub fn factor(inp: u128) -> Vec<u16> {
     let mut x = inp;
     let mut fs = Vec::new();
     for &p in PRIMES.iter() {
@@ -119,13 +130,13 @@ pub fn factor(inp: u128) -> Vec<u8> {
     fs
 }
 
-pub fn crt(ps: &[u8], x: u128) -> Vec<u8> {
+pub fn crt(ps: &[u16], x: u128) -> Vec<u16> {
     ps.iter().map(|&p| {
-        (x % p as u128) as u8
+        (x % p as u128) as u16
     }).collect()
 }
 
-pub fn crt_inv(ps: &[u8], xs: &[u8]) -> u128 {
+pub fn crt_inv(ps: &[u16], xs: &[u16]) -> u128 {
     let mut ret = BigInt::zero();
 
     let M = ps.iter().fold(BigInt::one(), |acc, &x| BigInt::from(x) * acc );
@@ -178,12 +189,12 @@ pub fn inv<T: Copy + Integer + Signed>(a: T, m: T) -> T {
 
 pub const NPRIMES: usize = 29;
 
-pub const PRIMES: [u8;29] = [
+pub const PRIMES: [u16;29] = [
     2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47, 53, 59, 61, 67, 71,
     73, 79, 83, 89, 97, 101, 103, 107, 109
 ];
 
-pub const PRIMES_SKIP_2: [u8;29] = [
+pub const PRIMES_SKIP_2: [u16;29] = [
     3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47, 53, 59, 61, 67, 71,
     73, 79, 83, 89, 97, 101, 103, 107, 109, 113
 ];
@@ -196,7 +207,7 @@ pub fn modulus_with_width_skip2(nbits: u32) -> u128 {
     base_modulus_with_width(nbits, &PRIMES_SKIP_2)
 }
 
-pub fn base_modulus_with_width(nbits: u32, ps: &[u8]) -> u128 {
+pub fn base_modulus_with_width(nbits: u32, ps: &[u16]) -> u128 {
     let mut res = 1;
     let mut i = 0;
     loop {
@@ -211,17 +222,17 @@ pub fn base_modulus_with_width(nbits: u32, ps: &[u8]) -> u128 {
 }
 
 
-pub fn product(xs: &[u8]) -> u128 {
+pub fn product(xs: &[u16]) -> u128 {
     xs.iter().fold(1, |acc, &x| acc * x as u128)
 }
 
-pub const PRIMITIVE_ROOTS: [u8;29] = [
+pub const PRIMITIVE_ROOTS: [u16;29] = [
     2, 2, 3, 2, 2, 3, 2, 5, 2, 3, 2, 6, 3, 5, 2, 2, 2, 2, 7, 5, 3, 2, 3, 5, 2,
     5, 2, 6, 3
 ];
 
 // note that the first element is meaningless since dlog(0) is undefined
-pub fn dlog_truth_table(modulus: u8) -> Vec<u8> {
+pub fn dlog_truth_table(modulus: u16) -> Vec<u16> {
     match modulus {
         2 => vec![0, 0],
 
@@ -366,7 +377,7 @@ pub fn dlog_truth_table(modulus: u8) -> Vec<u8> {
     }
 }
 
-pub fn powm(inp: u8, pow: u8, modulus: u8) -> u8 {
+pub fn powm(inp: u16, pow: u16, modulus: u16) -> u16 {
     let mut x = inp as u16;
     let mut z = 1;
     let mut n = pow;
@@ -379,10 +390,10 @@ pub fn powm(inp: u8, pow: u8, modulus: u8) -> u8 {
             n -= 1;
         }
     }
-    z as u8
+    z as u16
 }
 
-pub fn exp_truth_table(modulus: u8) -> Vec<u8> {
+pub fn exp_truth_table(modulus: u16) -> Vec<u16> {
     match modulus {
         2 => vec![1, 1],
 
@@ -567,11 +578,11 @@ mod tests {
     fn discrete_log() {
         let mut rng = Rng::new();
         for _ in 0..128 {
-            let i = rng.gen_byte() as usize % NPRIMES;
+            let i = rng.gen_u16() as usize % NPRIMES;
             let q = PRIMES_SKIP_2[i];
             let tt = dlog_truth_table(q);
             let g = PRIMITIVE_ROOTS[i];
-            let x = rng.gen_byte() % q;
+            let x = rng.gen_u16() % q;
             if x == 0 {
                 continue;
             }
@@ -594,7 +605,7 @@ mod tests {
     fn base_q_conversion() {
         let mut rng = Rng::new();
         for _ in 0..1000 {
-            let q = 2 + (rng.gen_byte() % 111);
+            let q = 2 + (rng.gen_u16() % 111);
             let x = rng.gen_u128();
             let y = as_base_q(x, q);
             let z = from_base_q(&y, q);
@@ -606,7 +617,7 @@ mod tests {
     fn padded_base_q_conversion() {
         let mut rng = Rng::new();
         for _ in 0..1000 {
-            let q = 2 + (rng.gen_byte() % 111);
+            let q = 2 + (rng.gen_u16() % 111);
             let x = rng.gen_u128();
             let y = padded_base_q_128(x, q);
             let z = from_base_q(&y, q);
@@ -618,7 +629,7 @@ mod tests {
     fn base_q_addition() {
         let mut rng = Rng::new();
         for _ in 0..1000 {
-            let q = 2 + (rng.gen_byte() % 111);
+            let q = 2 + (rng.gen_u16() % 111);
             let n = digits_per_u128(q) - 2;
             let Q = (q as u128).pow(n as u32);
 

@@ -27,6 +27,10 @@ impl Rng {
         Rand::rand(&mut self.0)
     }
 
+    pub fn gen_u16(&mut self) -> u16 {
+        Rand::rand(&mut self.0)
+    }
+
     pub fn gen_u32(&mut self) -> u32 {
         Rand::rand(&mut self.0)
     }
@@ -50,12 +54,12 @@ impl Rng {
         Rand::rand(&mut self.0)
     }
 
-    pub fn gen_prime(&mut self) -> u8 {
+    pub fn gen_prime(&mut self) -> u16 {
         PRIMES[self.gen_byte() as usize % NPRIMES]
     }
 
-    pub fn gen_modulus(&mut self) -> u8 {
-        2 + (self.gen_byte() % 111)
+    pub fn gen_modulus(&mut self) -> u16 {
+        2 + (self.gen_u16() % 111)
     }
 
     pub fn gen_usable_composite_modulus(&mut self) -> u128 {
@@ -64,7 +68,7 @@ impl Rng {
         })
     }
 
-    pub fn _gen_usable_composite_modulus(&mut self) -> Vec<u8> {
+    pub fn _gen_usable_composite_modulus(&mut self) -> Vec<u16> {
         let mut x: u128 = 1;
         PRIMES.into_iter().cloned()
             .filter(|_| self.gen_bool()) // randomly take this prime

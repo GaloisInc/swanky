@@ -78,7 +78,8 @@ fn parity_bundler(q: u128) -> Bundler {
 fn sgn_bundler(q: u128) -> Bundler {
     let mut b = Bundler::new();
     let x = b.input(q);
-    let z = b.sgn(x,5);
+    let ms = std::iter::repeat(4).take(5).collect::<Vec<_>>();
+    let z = b.sgn(x,&ms);
     b.output_ref(z);
     b
 }

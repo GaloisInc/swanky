@@ -13,7 +13,7 @@ pub type Id = usize;
 #[derive(Debug)]
 pub struct Circuit {
     pub gates: Vec<Gate>,
-    pub moduli: Vec<u8>,
+    pub moduli: Vec<u16>,
     pub input_refs: Vec<Ref>,
     pub output_refs: Vec<Ref>,
 }
@@ -23,20 +23,21 @@ pub enum Gate {
     Input { id: Id },                                       // id is the input id
     Add { xref: Ref, yref: Ref },
     Sub { xref: Ref, yref: Ref },
-    Cmul { xref: Ref, c: u8 },
-    Proj { xref: Ref, tt: Vec<u8>, id: Id },             // id is the gate number
-    Yao { xref: Ref, yref: Ref, tt: Vec<Vec<u8>>, id: Id }, // id is the gate number
+    Cmul { xref: Ref, c: u16 },
+    Proj { xref: Ref, tt: Vec<u16>, id: Id },             // id is the gate number
+    Yao { xref: Ref, yref: Ref, tt: Vec<Vec<u16>>, id: Id }, // id is the gate number
     HalfGate { xref: Ref, yref: Ref, id: Id },              // id is the gate number
 }
 
 impl Circuit {
-    pub fn eval(&self, inputs: &[u8]) -> Vec<u8> {
+    pub fn eval(&self, inputs: &[u16]) -> Vec<u16> {
         assert_eq!(inputs.len(), self.ninputs());
 
         let mut cache = vec![0;self.gates.len()];
         for zref in 0..self.gates.len() {
             let q = self.moduli[zref];
             let val = match self.gates[zref] {
+
                 Gate::Input { id } =>
                     inputs[id],
 
@@ -44,10 +45,10 @@ impl Circuit {
                     (cache[xref] + cache[yref]) % q,
 
                 Gate::Sub { xref, yref } =>
-                    ((cache[xref] as u16 + q as u16 - cache[yref] as u16 ) % q as u16) as u8,
+                    (cache[xref] + q - cache[yref]) % q,
 
                 Gate::Cmul { xref, c } =>
-                    (cache[xref] as u16 * c as u16 % q as u16) as u8,
+                    cache[xref] * c % q,
 
                 Gate::Proj { xref, ref tt, .. } =>
                     tt[cache[xref] as usize],
@@ -56,7 +57,7 @@ impl Circuit {
                     tt[cache[xref] as usize][cache[yref] as usize],
 
                 Gate::HalfGate { xref, yref, .. } =>
-                    (cache[xref] as u16 * cache[yref] as u16 % q as u16) as u8,
+                    (cache[xref] * cache[yref] % q),
             };
             cache[zref] = val;
         }
@@ -67,7 +68,7 @@ impl Circuit {
         self.input_refs.len()
     }
 
-    pub fn input_mod(&self, id: Id) -> u8 {
+    pub fn input_mod(&self, id: Id) -> u16 {
         let r = self.input_refs[id];
         self.moduli[r]
     }
@@ -105,7 +106,7 @@ impl Builder {
         &self.circ
     }
 
-    pub fn modulus(&self, x:Ref) -> u8 {
+    pub fn modulus(&self, x:Ref) -> u16 {
         self.circ.moduli[x]
     }
 
@@ -127,20 +128,20 @@ impl Builder {
         x
     }
 
-    fn gate(&mut self, gate: Gate, modulus: u8) -> Ref {
+    fn gate(&mut self, gate: Gate, modulus: u16) -> Ref {
         self.circ.gates.push(gate);
         self.circ.moduli.push(modulus);
         self.get_next_ref()
     }
 
-    pub fn input(&mut self, modulus: u8) -> Ref {
+    pub fn input(&mut self, modulus: u16) -> Ref {
         let gate = Gate::Input { id: self.get_next_input_id() };
         let r = self.gate(gate, modulus);
         self.circ.input_refs.push(r);
         r
     }
 
-    pub fn inputs(&mut self, n: usize, modulus: u8) -> Vec<Ref> {
+    pub fn inputs(&mut self, n: usize, modulus: u16) -> Vec<Ref> {
         (0..n).map(|_| self.input(modulus)).collect()
     }
 
@@ -159,7 +160,7 @@ impl Builder {
         assert!(yref < self.next_ref);
         let xmod = self.circ.moduli[xref];
         let ymod = self.circ.moduli[yref];
-        assert!(xmod == ymod);
+        assert!(xmod == ymod, "xmod={} ymod={}", xmod, ymod);
         let gate = Gate::Add { xref, yref };
         self.gate(gate, xmod)
     }
@@ -174,7 +175,7 @@ impl Builder {
         self.gate(gate, xmod)
     }
 
-    pub fn cmul(&mut self, xref: Ref, c: u8) -> Ref {
+    pub fn cmul(&mut self, xref: Ref, c: u16) -> Ref {
         let modulus = self.circ.moduli[xref];
         self.gate(Gate::Cmul { xref, c }, modulus)
     }
@@ -188,16 +189,17 @@ impl Builder {
         z
     }
 
-    pub fn proj(&mut self, xref: Ref, output_modulus: u8, tt: Vec<u8>) -> Ref {
+    pub fn proj(&mut self, xref: Ref, output_modulus: u16, tt: Vec<u16>) -> Ref {
         assert_eq!(tt.len(), self.circ.moduli[xref] as usize);
-        assert!(tt.iter().all(|&x| x < output_modulus));
+        assert!(tt.iter().all(|&x| x < output_modulus),
+            "circuit.proj: tt={:?}, output_modulus={}", tt, output_modulus);
         let q = output_modulus;
         let gate = Gate::Proj { xref, tt, id: self.get_next_ciphertext_id() };
         self.gate(gate, q)
     }
 
     // the classic yao binary gate, over mixed moduli!
-    pub fn yao(&mut self, xref: Ref, yref: Ref, output_modulus: u8, tt: Vec<Vec<u8>>) -> Ref {
+    pub fn yao(&mut self, xref: Ref, yref: Ref, output_modulus: u16, tt: Vec<Vec<u16>>) -> Ref {
         assert!(tt.iter().all(|ref inner| { inner.iter().all(|&x| x < output_modulus) }));
         let gate = Gate::Yao {
             xref,
@@ -237,7 +239,7 @@ impl Builder {
     pub fn and_many(&mut self, args: &[Ref]) -> Ref {
         assert!(args.iter().all(|&x| self.circ.moduli[x] == 2));
         // convert all the wires to base b+1
-        let b = args.len() as u8;
+        let b = args.len() as u16;
         let wires: Vec<Ref> = args.iter().map(|&x| {
             self.mod_change(x, b+1)
         }).collect();
@@ -247,7 +249,7 @@ impl Builder {
     // assumes wires already are in base b+1
     pub fn _and_many(&mut self, args: &[Ref]) -> Ref {
         let b = args.len();
-        assert!(args.iter().all(|&x| self.circ.moduli[x] == (b + 1) as u8));
+        assert!(args.iter().all(|&x| self.circ.moduli[x] == (b + 1) as u16));
         // add them together
         let z = self.add_many(&args);
         // decode the result in base 2
@@ -261,7 +263,7 @@ impl Builder {
         // convert all the wires to base b+1
         let b = args.len();
         let wires: Vec<Ref> = args.iter().map(|&x| {
-            self.proj(x, b as u8 + 1, vec![0,1])
+            self.proj(x, b as u16 + 1, vec![0,1])
         }).collect();
 
         // add them together
@@ -310,7 +312,7 @@ impl Builder {
         self.yao(b, z, q, f_tt)
     }
 
-    pub fn mod_change(&mut self, xref: Ref, to_modulus: u8) -> Ref {
+    pub fn mod_change(&mut self, xref: Ref, to_modulus: u16) -> Ref {
         let from_modulus = self.circ.moduli[xref];
         if from_modulus == to_modulus {
             return xref;
@@ -340,8 +342,10 @@ impl Builder {
     // avoids creating extra gates for the final carry
     pub fn addition_no_carry(&mut self, xs: &[Ref], ys: &[Ref]) -> Vec<Ref> {
         assert_eq!(xs.len(), ys.len());
-        let cmod = self.modulus(xs[1]);
+
+        let cmod = self.modulus(*xs.get(1).unwrap_or(&xs[0]));
         let (mut z, mut c) = self.adder(xs[0], ys[0], None, cmod);
+
         let mut bs = vec![z];
         for i in 1..xs.len()-1 {
             let cmod = self.modulus(*xs.get(i+1).unwrap_or(&xs[i]));
@@ -355,7 +359,7 @@ impl Builder {
         bs
     }
 
-    fn adder(&mut self, x: Ref, y: Ref, opt_c: Option<Ref>, carry_modulus: u8) -> (Ref, Ref) {
+    fn adder(&mut self, x: Ref, y: Ref, opt_c: Option<Ref>, carry_modulus: u16) -> (Ref, Ref) {
         let q = self.modulus(x);
         assert_eq!(q, self.modulus(y));
         if q == 2 {
@@ -364,11 +368,17 @@ impl Builder {
                 let z2 = self.xor(z1,c);
                 let z3 = self.xor(x,c);
                 let z4 = self.and(z1,z3);
-                let z5 = self.xor(z4,x);
-                (z2, z5)
+                let mut c = self.xor(z4,x);
+                if carry_modulus != 2 {
+                    c = self.mod_change(c, carry_modulus);
+                }
+                (z2, c)
             } else {
                 let z = self.xor(x,y);
-                let c = self.and(x,y);
+                let mut c = self.and(x,y);
+                if carry_modulus != 2 {
+                    c = self.mod_change(c, carry_modulus);
+                }
                 (z, c)
             }
         } else {
@@ -392,7 +402,7 @@ impl Builder {
                 zp = self.add(xp, yp);
             }
 
-            let tt = (0..qp).map(|x| u8::from(x >= q)).collect();
+            let tt = (0..qp).map(|x| u16::from(x >= q)).collect();
             let carry = self.proj(zp, carry_modulus, tt);
             (sum, carry)
         }
@@ -451,9 +461,9 @@ mod tests {
         let c = b.finish();
 
         for _ in 0..16 {
-            let mut inps: Vec<u8> = Vec::new();
+            let mut inps: Vec<u16> = Vec::new();
             for _ in 0..n {
-                inps.push(rng.gen_bool() as u8);
+                inps.push(rng.gen_bool() as u16);
             }
             let res = inps.iter().fold(1, |acc, &x| x & acc);
             assert_eq!(c.eval(&inps)[0], res);
@@ -474,9 +484,9 @@ mod tests {
         let c = b.finish();
 
         for _ in 0..16 {
-            let mut inps: Vec<u8> = Vec::new();
+            let mut inps: Vec<u16> = Vec::new();
             for _ in 0..n {
-                inps.push(rng.gen_bool() as u8);
+                inps.push(rng.gen_bool() as u16);
             }
             let res = inps.iter().fold(0, |acc, &x| x | acc);
             let out = c.eval(&inps)[0];
@@ -498,9 +508,9 @@ mod tests {
         b.output(z);
         let c = b.finish();
         for _ in 0..16 {
-            let x = rng.gen_byte() % q;
-            let y = rng.gen_byte() % q;
-            assert_eq!(c.eval(&vec![x,y])[0], (x as u16 * y as u16 % q as u16) as u8);
+            let x = rng.gen_byte() as u16 % q;
+            let y = rng.gen_byte() as u16 % q;
+            assert_eq!(c.eval(&vec![x,y])[0], x * y % q);
         }
     }
 //}}}
@@ -515,9 +525,9 @@ mod tests {
         b.output(z);
         let c = b.finish();
         for _ in 0..16 {
-            let x = rng.gen_byte() % q;
-            let y = rng.gen_byte() % q;
-            assert_eq!(c.eval(&vec![x,y])[0], (x as u16 * y as u16 % q as u16) as u8);
+            let x = rng.gen_u16() % q;
+            let y = rng.gen_u16() % q;
+            assert_eq!(c.eval(&vec![x,y])[0], x * y % q);
         }
     }
 //}}}
@@ -533,7 +543,7 @@ mod tests {
         b.output(z);
         let c = b.finish();
         for _ in 0..16 {
-            let x = rng.gen_byte() % p;
+            let x = rng.gen_u16() % p;
             assert_eq!(c.eval(&vec![x])[0], x % q);
         }
     }
@@ -556,7 +566,7 @@ mod tests {
             let res = c.eval(&bits);
             let (z, carry) = x.overflowing_add(y);
             assert_eq!(numbers::u128_from_bits(&res[0..128]), z);
-            assert_eq!(res[128], carry as u8);
+            assert_eq!(res[128], carry as u16);
         }
     }
 //}}}
@@ -599,7 +609,7 @@ mod tests {
             let res = c.eval(&bits);
             let (z, carry) = x.overflowing_sub(y);
             assert_eq!(numbers::u128_from_bits(&res[0..128]), z);
-            assert_eq!(res[128], carry as u8);
+            assert_eq!(res[128], carry as u16);
         }
     }
 //}}}
@@ -609,7 +619,7 @@ mod tests {
         let n = 113;
         let args = b.inputs(n, 2);
         let wires: Vec<_> = args.iter().map(|&x| {
-            b.mod_change(x, n as u8 + 1)
+            b.mod_change(x, n as u16 + 1)
         }).collect();
         let s = b.add_many(&wires);
         b.output(s);
@@ -617,10 +627,10 @@ mod tests {
 
         let mut rng = Rng::new();
         for _ in 0..64 {
-            let inps: Vec<u8> = (0..c.ninputs()).map(|i| {
-                rng.gen_byte() % c.input_mod(i)
+            let inps: Vec<u16> = (0..c.ninputs()).map(|i| {
+                rng.gen_u16() % c.input_mod(i)
             }).collect();
-            let s: u8 = inps.iter().sum();
+            let s: u16 = inps.iter().sum();
             println!("{:?}, sum={}", inps, s);
             assert_eq!(c.eval(&inps)[0], s);
         }

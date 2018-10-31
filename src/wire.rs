@@ -5,36 +5,38 @@ use numbers;
 #[derive(Debug, PartialEq, PartialOrd, Clone)]
 pub enum Wire {
     Mod2 { val: u128 },
-    ModN { q: u8, ds: Vec<u8> },
+    ModN { q: u16, ds: Vec<u16> },
 }
 
 impl Wire {
-    pub fn digits(&self) -> Vec<u8> {
+    pub fn digits(&self) -> Vec<u16> {
         match self {
-            Wire::Mod2 { val } => (0..128).map(|i| ((val >> i) as u8) & 1).collect(),
+            Wire::Mod2 { val } => (0..128).map(|i| ((val >> i) as u16) & 1).collect(),
             Wire::ModN { ds, .. } => ds.clone(),
         }
     }
 
-    pub fn modulus(&self) -> u8 {
+    pub fn modulus(&self) -> u16 {
         match *self {
             Wire::Mod2 { .. } => 2,
             Wire::ModN { q, .. } => q,
         }
     }
 
-    pub fn from_u128(inp: u128, q: u8) -> Self {
+    pub fn from_u128(inp: u128, q: u16) -> Self {
         if q == 2 {
             Wire::Mod2 { val: inp }
 
-        } else if base_conversion::lookup_defined_for_mod(q) {
+        } else if q < 256 && base_conversion::lookup_defined_for_mod(q as u8) {
             let bytes = unsafe { std::mem::transmute::<u128, [u8;16]>(inp) };
             let mut ds = vec![0; numbers::digits_per_u128(q)];
 
             for i in 0..16 {
-                let c = base_conversion::lookup_digits_mod_at_position(bytes[i], q, i);
-                numbers::base_q_add(&mut ds, &c, q);
+                let c = base_conversion::lookup_digits_mod_at_position(bytes[i], q as u8, i);
+                numbers::base_q_add(&mut ds, &c, q as u8);
             }
+
+            let ds = ds.into_iter().map(|d| d as u16).collect();
 
             Wire::ModN { q, ds }
 
@@ -50,7 +52,7 @@ impl Wire {
         }
     }
 
-    pub fn zero(modulus: u8) -> Self {
+    pub fn zero(modulus: u16) -> Self {
         match modulus {
             1 => panic!("[wire::zero] mod 1 not allowed!"),
             2 => Wire::Mod2 { val: 0 },
@@ -58,7 +60,7 @@ impl Wire {
         }
     }
 
-    pub fn rand_delta(rng: &mut Rng, modulus: u8) -> Self {
+    pub fn rand_delta(rng: &mut Rng, modulus: u16) -> Self {
         let mut w = Self::rand(rng, modulus);
         match w {
             Wire::Mod2 { ref mut val }    => *val |= 1,
@@ -67,9 +69,9 @@ impl Wire {
         w
     }
 
-    pub fn color(&self) -> u8 {
+    pub fn color(&self) -> u16 {
         match *self {
-            Wire::Mod2 { val }        => (val & 1) as u8,
+            Wire::Mod2 { val }        => (val & 1) as u16,
             Wire::ModN { ref ds, .. } => ds[0],
         }
     }
@@ -86,11 +88,11 @@ impl Wire {
                 let n = xs.len();
                 let mut zs = vec![0;n];
                 for i in 0..n {
-                    let mut z = xs[i] as u16 + ys[i] as u16;
-                    if z >= xmod as u16 {
-                        z -= xmod as u16;
+                    let mut z = xs[i] + ys[i];
+                    if z >= xmod {
+                        z -= xmod;
                     }
-                    zs[i] = z as u8;
+                    zs[i] = z;
                 }
                 Wire::ModN { q: xmod, ds: zs }
             }
@@ -99,7 +101,7 @@ impl Wire {
         }
     }
 
-    pub fn cmul(&self, c: u8) -> Self {
+    pub fn cmul(&self, c: u16) -> Self {
         match *self {
             Wire::Mod2 { .. } => {
                 if c % 2 == 0 {
@@ -113,7 +115,7 @@ impl Wire {
                 let n = ds.len();
                 let mut zs = vec![0;n];
                 for i in 0..n {
-                    zs[i] = ((ds[i] as u16 * c as u16) % q as u16) as u8;
+                    zs[i] = (ds[i] * c) % q;
                 }
                 Wire::ModN { q, ds: zs }
             }
@@ -143,7 +145,7 @@ impl Wire {
         }
     }
 
-    pub fn rand(rng: &mut Rng, modulus: u8) -> Self {
+    pub fn rand(rng: &mut Rng, modulus: u16) -> Self {
         Self::from_u128(rng.gen_u128(), modulus)
     }
 
@@ -152,7 +154,7 @@ impl Wire {
     }
 
     // hash to u128 and back to Wire
-    pub fn hashback(&self, tweak: u128, new_mod: u8) -> Self {
+    pub fn hashback(&self, tweak: u128, new_mod: u16) -> Self {
         Self::from_u128(self.hash(tweak), new_mod)
     }
 
@@ -160,7 +162,7 @@ impl Wire {
         AES.hash2(tweak, self.as_u128(), other.as_u128())
     }
 
-    pub fn hashback2(&self, other: &Wire, tweak: u128, new_modulus: u8) -> Self {
+    pub fn hashback2(&self, other: &Wire, tweak: u128, new_modulus: u16) -> Self {
         Self::from_u128(self.hash2(other, tweak), new_modulus)
     }
 }
@@ -174,7 +176,7 @@ mod tests {
     fn simple_packing() {
         let ref mut rng = Rng::new();
         for _ in 0..100 {
-            let q = 2 + (rng.gen_byte() % 110);
+            let q = 2 + (rng.gen_u16() % 110);
 
             for i in 0..127 {
                 let x = 1 << i;
@@ -189,7 +191,7 @@ mod tests {
     fn packing() {
         let ref mut rng = Rng::new();
         for _ in 0..100 {
-            let q = 2 + (rng.gen_byte() % 111);
+            let q = 2 + (rng.gen_u16() % 111);
             let w = rng.gen_u128();
             let x = Wire::from_u128(w, q);
             let y = x.as_u128();
@@ -203,7 +205,7 @@ mod tests {
     fn base_conversion_lookup_method() {
         let ref mut rng = Rng::new();
         for _ in 0..1000 {
-            let q = 3 + (rng.gen_byte() % 110);
+            let q = 3 + (rng.gen_u16() % 110);
             let x = rng.gen_u128();
             let w = Wire::from_u128(x, q);
             let should_be = numbers::padded_base_q_128(x,q);
@@ -215,7 +217,7 @@ mod tests {
     fn hash() {
         let mut rng = Rng::new();
         for _ in 0..100 {
-            let q = 2 + (rng.gen_byte() % 110);
+            let q = 2 + (rng.gen_u16() % 110);
             let x = Wire::rand(&mut rng, q);
             let y = x.hashback(1, q);
             assert!(x != y);
@@ -245,7 +247,7 @@ mod tests {
     fn zero() {
         let mut rng = Rng::new();
         for _ in 0..1000 {
-            let q = 3 + (rng.gen_byte() % 110);
+            let q = 3 + (rng.gen_u16() % 110);
             let z = Wire::zero(q);
             let ds = z.digits();
             assert_eq!(ds, vec![0;ds.len()], "q={}", q);

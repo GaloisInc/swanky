@@ -7,7 +7,7 @@ pub struct BundleRef(usize);
 
 pub struct WireBundle {
     wires: Vec<Ref>,
-    primes: Rc<Vec<u8>>,
+    primes: Rc<Vec<u16>>,
 }
 
 pub struct Bundler {
@@ -23,6 +23,14 @@ impl Bundler {
         Self::from_builder(Builder::new())
     }
 
+    pub fn primes(&self, x: BundleRef) -> Vec<u16> {
+        self.bundles[x.0].primes.to_vec()
+    }
+
+    pub fn wires(&self, x: BundleRef) -> Vec<Ref> {
+        self.bundles[x.0].wires.to_vec()
+    }
+
     pub fn ninputs(&self) -> usize {
         self.inputs.len()
     }
@@ -36,7 +44,7 @@ impl Bundler {
         }
     }
 
-    fn add_bundle(&mut self, wires: Vec<Ref>, primes: Rc<Vec<u8>>) -> BundleRef {
+    fn add_bundle(&mut self, wires: Vec<Ref>, primes: Rc<Vec<u16>>) -> BundleRef {
         assert_eq!(wires.len(), primes.len());
         let bun_ref = self.bundles.len();
         let bun = WireBundle { wires, primes };
@@ -76,7 +84,7 @@ impl Bundler {
         let mut ws = Vec::with_capacity(ps.len());
         assert_eq!(self.borrow_builder().modulus(x), 2);
         for &p in &ps {
-            let tt = vec![ 1, ((q-1) % p as u128) as u8 ];
+            let tt = vec![ 1, ((q-1) % p as u128) as u16 ];
             let w = self.borrow_mut_builder().proj(x, p, tt);
             ws.push(w);
         }
@@ -100,7 +108,7 @@ impl Bundler {
         self.borrow_mut_builder().outputs(xs);
     }
 
-    pub fn encode(&self, xs: &[u128]) -> Vec<u8> {
+    pub fn encode(&self, xs: &[u128]) -> Vec<u16> {
         let mut inps = Vec::new();
         for (&x, &xref) in xs.iter().zip(self.inputs.iter()) {
             inps.append(&mut crt(&self.bundles[xref.0].primes, x));
@@ -108,7 +116,7 @@ impl Bundler {
         inps
     }
 
-    pub fn decode(&self, outs: &[u8]) -> Vec<u128> {
+    pub fn decode(&self, outs: &[u16]) -> Vec<u128> {
         let mut outs = outs.to_vec();
         let mut res = Vec::with_capacity(self.outputs.len());
         for &zref in self.outputs.iter() {
@@ -190,7 +198,7 @@ impl Bundler {
         self.add_bundle(zwires, ps)
     }
 
-    pub fn cdiv(&mut self, xref: BundleRef, c: u8) -> BundleRef {
+    pub fn cdiv(&mut self, xref: BundleRef, c: u16) -> BundleRef {
         let mut zwires;
         {
             let xbun = &self.bundles[xref.0];
@@ -199,7 +207,7 @@ impl Bundler {
                 if c % p == 0 {
                     zwires.push(self.builder.as_mut().expect("need a builder!").cmul(x,0));
                 } else {
-                    let d = inv(c as i16, p as i16) as u8;
+                    let d = inv(c as i16, p as i16) as u16;
                     zwires.push(self.builder.as_mut().expect("need a builder!").cmul(x,d));
                 }
             }
@@ -208,7 +216,7 @@ impl Bundler {
         self.add_bundle(zwires, ps)
     }
 
-    pub fn cexp(&mut self, xref: BundleRef, c: u8) -> BundleRef {
+    pub fn cexp(&mut self, xref: BundleRef, c: u16) -> BundleRef {
         assert!(c < 10); // to prevent overfolows
         let mut zwires;
         {
@@ -217,7 +225,7 @@ impl Bundler {
             let b = self.builder.as_mut().expect("need a builder!");
             for (&x, &p) in xbun.wires.iter().zip(xbun.primes.iter()) {
                 let tab = (0..p).map(|x| {
-                    ((x as u64).pow(c as u32) % p as u64) as u8
+                    ((x as u64).pow(c as u32) % p as u64) as u16
                 }).collect();
                 zwires.push(b.proj(x, p, tab));
             }
@@ -226,7 +234,7 @@ impl Bundler {
         self.add_bundle(zwires, ps)
     }
 
-    pub fn rem(&mut self, xref: BundleRef, p: u8) -> BundleRef {
+    pub fn rem(&mut self, xref: BundleRef, p: u16) -> BundleRef {
         let i = self.bundles[xref.0].primes.iter().position(|&q| p == q)
                     .expect("p is not one of the primes in this bundle!");
         let zwires;
@@ -285,13 +293,13 @@ impl Bundler {
             let z = b.sub(xbun.wires[i], ybun.wires[i]);
             let mut eq_zero_tab = vec![0; xbun.primes[i] as usize];
             eq_zero_tab[0] = 1;
-            zs.push(b.proj(z, xbun.wires.len() as u8 + 1, eq_zero_tab));
+            zs.push(b.proj(z, xbun.wires.len() as u16 + 1, eq_zero_tab));
         }
         b._and_many(&zs)
     }
 
     pub fn crt_to_pmr(&mut self, xref: BundleRef) -> BundleRef {
-        let gadget_projection_tt = |p, q| -> Vec<u8> {
+        let gadget_projection_tt = |p, q| -> Vec<u16> {
             let pq = p as u32 + q as u32 - 1;
             let mut tab = Vec::with_capacity(pq as usize);
             for z in 0 .. pq {
@@ -308,7 +316,7 @@ impl Bundler {
                 }
                 assert_eq!((x + pq - y) % pq, z);
                 tab.push((((x * q as u32 * inv(q as i16, p as i16) as u32 +
-                            y * p as u32 * inv(p as i16, q as i16) as u32) / p as u32) % q as u32) as u8);
+                            y * p as u32 * inv(p as i16, q as i16) as u32) / p as u32) % q as u32) as u16);
             }
             tab
         };
@@ -364,9 +372,9 @@ impl Bundler {
         let nbits = 5;
 
         // used to round
-        let new_mod = (2 as u8).pow(nbits as u32);
+        let new_mod = 1_u16 << nbits;
 
-        let project = |x: Ref, c: u8, b: &mut Builder| -> Ref {
+        let project = |x: Ref, c: u16, b: &mut Builder| -> Ref {
             let p = b.circ.moduli[x];
             let Mi = M / p as u128;
 
@@ -376,7 +384,7 @@ impl Bundler {
             let mut tab = Vec::with_capacity(p as usize);
             for x in 0..p {
                 let y = ((x+c)%p) as f32 * h / p as f32;
-                let truncated_y = (new_mod as f32 * y.fract()).round() as u8;
+                let truncated_y = (new_mod as f32 * y.fract()).round() as u16;
                 tab.push(truncated_y);
             }
 
@@ -400,7 +408,7 @@ impl Bundler {
             }
         }
 
-        let tab = (0..new_mod).map(|x| (x >= new_mod/2) as u8).collect();
+        let tab = (0..new_mod).map(|x| (x >= new_mod/2) as u16).collect();
         let out = b.proj(z.unwrap(), 2, tab);
         self.put_builder(b);
         out
@@ -430,42 +438,46 @@ impl Bundler {
         self.borrow_mut_builder().binary_subtraction(&xbits, &ybits).1
     }
 
-    pub fn sgn(&mut self, xref: BundleRef, ndigits: usize) -> Ref {
-        let q = product(&self.bundles[xref.0].primes);
+    pub fn sgn(&mut self, xbun: BundleRef, factors_of_m: &[u16]) -> Ref {
+        let ndigits = factors_of_m.len();
+        let q = product(&self.primes(xbun));
+        let M = numbers::product(factors_of_m);
 
-        let base = 4; // base of the addition in the gadget
-        let M = (base as u128).pow(ndigits as u32);
+        let mut old_ds = Vec::new(); // accumulator
 
-        // gets the nbits of round(M*x*alpha/P) mod M
-        let project = |x: Ref, b: &mut Builder| -> Vec<Ref> {
-            let p = b.circ.moduli[x];
-            let crt_coef = inv(((q / p as u128) % p as u128) as i32, p as i32);
+        let xs = self.wires(xbun);
+        let ps = self.primes(xbun);
+        let mut b = self.take_builder();
 
-           let mut tabs = vec![Vec::with_capacity(p as usize); ndigits];
+        for (xref, p) in xs.into_iter().zip(ps.into_iter()) {
+
+            let mut tabs = vec![Vec::with_capacity(p as usize); ndigits];
 
             for x in 0..p {
-                let y = (M as f32 * x as f32 * crt_coef as f32 / p as f32).round() as u128 % M;
-                let ds = numbers::padded_base_q(y, base, ndigits);
-
+                let crt_coef = inv(((q / p as u128) % p as u128) as i64, p as i64);
+                let y = (M as f64 * x as f64 * crt_coef as f64 / p as f64).round() as u128 % M;
+                let digits = numbers::padded_mixed_radix(y, factors_of_m);
                 for i in 0..ndigits {
-                    tabs[i].push(ds[i]);
+                    tabs[i].push(digits[i]);
                 }
             }
 
-            tabs.into_iter().map(|tt| b.proj(x, base, tt)).collect()
-        };
+            let new_ds = tabs.into_iter().enumerate()
+                .map(|(i,tt)| b.proj(xref, factors_of_m[i], tt))
+                .collect::<Vec<Ref>>();
 
-        let mut b = self.take_builder();
-        let xs: Vec<Ref> = self.bundles[xref.0].wires.to_vec();
-        let init = project(xs[0], &mut b);
+            if old_ds.is_empty() {
+                old_ds = new_ds;
+            } else if old_ds.len() == 1 {
+                old_ds[0] = b.add(old_ds[0], new_ds[0]);
+            } else {
+                old_ds = b.addition_no_carry(&old_ds, &new_ds);
+            }
+        }
 
-        let ds: Vec<Ref> = xs.into_iter().skip(1).fold(init, |acc, x| {
-            let ds = project(x, &mut b);
-            b.addition_no_carry(&ds, &acc)
-        });
-
-        let tt = (0..base).map(|x| (x >= base/2) as u8).collect();
-        let z = b.proj(*ds.last().unwrap(), 2, tt);
+        let p = *factors_of_m.last().unwrap();
+        let tt = (0..p).map(|x| (x >= p/2) as u16).collect();
+        let z = b.proj(*old_ds.last().unwrap(), 2, tt);
 
         self.put_builder(b);
         z
@@ -494,16 +506,16 @@ mod tests {
         assert_eq!(b.decode(&gb.decode(&ys)), should_be);
     }
 
-    fn test_garbling_high_to_low(b: &Bundler, inp: &[u128], should_be: &[u8]) {
+    fn test_garbling_high_to_low(b: &Bundler, inp: &[u128], should_be: &[u16]) {
         let c = b.borrow_builder().borrow_circ();
         let (gb, ev) = garble(&c);
         println!("number of ciphertexts: {}", ev.size());
         let enc_inp = b.encode(inp);
-        let pt_outs: Vec<u8> = c.eval(&enc_inp);
+        let pt_outs: Vec<u16> = c.eval(&enc_inp);
         assert_eq!(pt_outs, should_be);
         let xs = gb.encode(&enc_inp);
         let ys = ev.eval(c, &xs);
-        let gb_outs: Vec<u8> = gb.decode(&ys);
+        let gb_outs: Vec<u16> = gb.decode(&ys);
         assert_eq!(gb_outs, should_be);
     }
 
@@ -538,7 +550,7 @@ mod tests {
             let bun = b.bundle_from_ref(inp, q);
             b.output(bun);
 
-            let x = rng.gen_byte() % p;
+            let x = rng.gen_u16() % p;
             println!("x={}", x);
 
             let c = b.finish();
@@ -612,7 +624,7 @@ mod tests {
     fn scalar_exponentiation() {
         let mut rng = Rng::new();
         let q = rng.gen_usable_composite_modulus();
-        let y = rng.gen_byte() % 10;
+        let y = rng.gen_u16() % 10;
 
         let mut b = Bundler::new();
         let x = b.input(q);
@@ -620,7 +632,7 @@ mod tests {
         b.output(z);
 
         for _ in 0..NTESTS {
-            let x = rng.gen_byte() as u128 % q;
+            let x = rng.gen_u16() as u128 % q;
             let should_be = x.pow(y as u32) % q;
             test_garbling(&mut b, &[x], &[should_be]);
         }
@@ -631,7 +643,7 @@ mod tests {
         let mut rng = Rng::new();
         let ps = rng._gen_usable_composite_modulus();
         let q = ps.iter().fold(1, |acc, &x| (x as u128) * acc);
-        let p = ps[rng.gen_byte() as usize % ps.len()];
+        let p = ps[rng.gen_u16() as usize % ps.len()];
 
         let mut b = Bundler::new();
         let x = b.input(q);
@@ -697,7 +709,7 @@ mod tests {
         for _ in 0..NTESTS {
             let x = rng.gen_u128() % q;
             let y = rng.gen_u128() % q;
-            let should_be = (x == y) as u8;
+            let should_be = (x == y) as u16;
             test_garbling_high_to_low(&mut b, &[x,y], &[should_be]);
         }
     }
@@ -713,7 +725,7 @@ mod tests {
 
         for _ in 0..NTESTS {
             let pt = rng.gen_u128() % (q/2);
-            let should_be = (pt % 2) as u8;
+            let should_be = (pt % 2) as u16;
             test_garbling_high_to_low(&mut b, &[pt], &[should_be]);
         }
     }
@@ -768,7 +780,7 @@ mod tests {
         for _ in 0..NTESTS {
             let x = rng.gen_u128() % p;
             let y = rng.gen_u128() % p;
-            let should_be = (x < y) as u8;
+            let should_be = (x < y) as u16;
             test_garbling_high_to_low(&mut b, &[x,y], &[should_be]);
         }
     }
@@ -786,7 +798,7 @@ mod tests {
         for _ in 0..NTESTS {
             let pt_x = rng.gen_u32() as u128;
             let pt_y = rng.gen_u32() as u128;
-            let should_be = (pt_x < pt_y) as u8;
+            let should_be = (pt_x < pt_y) as u16;
             println!("q={}", q);
             println!("{} {}", pt_x, pt_y);
             test_garbling_high_to_low(&mut b, &[pt_x, pt_y], &[should_be]);
@@ -796,15 +808,17 @@ mod tests {
     #[test] // sgn {{{
     fn sgn() {
         let mut rng = Rng::new();
-        let q = modulus_with_width(32);
+        let q = modulus_with_width(10);
         let mut b = Bundler::new();
         let x = b.input(q);
-        let z = b.sgn(x,6);
+        let ms = [2,2,128];
+        // let ms = [4,4,4,4,4];
+        let z = b.sgn(x,&ms);
         b.output_ref(z);
 
         for _ in 0..16 {
             let pt = rng.gen_u128() % q;
-            let should_be = (pt > q/2) as u8;
+            let should_be = (pt > q/2) as u16;
             test_garbling_high_to_low(&mut b, &[pt], &[should_be]);
         }
     }
@@ -828,18 +842,18 @@ mod tests {
             test_garbling_high_to_low(&mut b, &[pt], &should_be)
         }
     }
-    fn to_pmr_pt(x: u128, ps: &[u8]) -> Vec<u8> {
+    fn to_pmr_pt(x: u128, ps: &[u16]) -> Vec<u16> {
         let mut ds = vec![0;ps.len()];
         let mut q = 1;
         for i in 0..ps.len() {
             let p = ps[i] as u128;
-            ds[i] = ((x / q) % p) as u8;
+            ds[i] = ((x / q) % p) as u16;
             q *= p;
         }
         ds
     }
 
-    fn from_pmr_pt(xs: &[u8], ps: &[u8]) -> u128 {
+    fn from_pmr_pt(xs: &[u16], ps: &[u16]) -> u128 {
         let mut x = 0;
         let mut q = 1;
         for (&d,&p) in xs.iter().zip(ps.iter()) {
@@ -849,7 +863,7 @@ mod tests {
         x
     }
 
-    fn gadget_projection_tt(p: u8, q: u8) -> Vec<u8> {
+    fn gadget_projection_tt(p: u16, q: u16) -> Vec<u16> {
         let pq = p as u32 + q as u32 - 1;
         let mut tab = Vec::with_capacity(pq as usize);
         for z in 0 .. pq {
@@ -866,25 +880,25 @@ mod tests {
             }
             assert_eq!((x + pq - y) % pq, z);
             tab.push((((x * q as u32 * inv(q as i16, p as i16) as u32 +
-                        y * p as u32 * inv(p as i16, q as i16) as u32) / p as u32) % q as u32) as u8);
+                        y * p as u32 * inv(p as i16, q as i16) as u32) / p as u32) % q as u32) as u16);
         }
         tab
     }
 
-    pub fn to_pmr_alg(inp:u128, ps: &[u8]) -> (Vec<u8>, Vec<u8>) {
-        let gadget = |x: u8, p: u8, y: u8, q: u8| {
+    pub fn to_pmr_alg(inp:u128, ps: &[u16]) -> (Vec<u16>, Vec<u16>) {
+        let gadget = |x: u16, p: u16, y: u16, q: u16| {
             let pq = p as u16 + q as u16 - 1;
             let x_ = x as u16 % pq;
             let y_ = y as u16 % pq;
             let z  = (x_ + pq - y_) % pq;
             (gadget_projection_tt(p,q)[z as usize], q)
-                // ((z % q as u16) as u8, q)
+                // ((z % q as u16) as u16, q)
         };
 
         let n = ps.len();
         let mut x = vec![vec![None; n+1]; n+1];
 
-        let reduce = |x: u128, p: u8| { (x % p as u128) as u8 };
+        let reduce = |x: u128, p: u16| { (x % p as u128) as u16 };
 
         for j in 0..n {
             x[0][j+1] = Some( (reduce(inp, ps[j]), ps[j]) );

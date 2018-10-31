@@ -7,7 +7,7 @@ use std::collections::HashMap;
 type GarbledGate = Vec<Wire>;
 
 pub struct Garbler {
-    deltas     : HashMap<u8, Wire>,
+    deltas     : HashMap<u16, Wire>,
     inputs     : Vec<Wire>,
     outputs    : Vec<Vec<u128>>,
     rng        : Rng,
@@ -75,7 +75,7 @@ impl Garbler {
         }
     }
 
-    fn delta(&mut self, q: u8) -> Wire {
+    fn delta(&mut self, q: u16) -> Wire {
         if !self.deltas.contains_key(&q) {
             let w = Wire::rand_delta(&mut self.rng, q);
             self.deltas.insert(q, w.clone());
@@ -85,7 +85,7 @@ impl Garbler {
         }
     }
 
-    pub fn input(&mut self, q: u8) -> Wire {
+    pub fn input(&mut self, q: u16) -> Wire {
         let w = Wire::rand(&mut self.rng, q);
         self.inputs.push(w.clone());
         w
@@ -102,7 +102,7 @@ impl Garbler {
         self.outputs.push(cts);
     }
 
-    pub fn proj(&mut self, A: &Wire, q_out: u8, tt: &[u8], gate_num: usize)
+    pub fn proj(&mut self, A: &Wire, q_out: u16, tt: &[u16], gate_num: usize)
         -> (Wire, GarbledGate)
     {
         let q_in = A.modulus();
@@ -135,7 +135,7 @@ impl Garbler {
         (C, gate)
     }
 
-    fn yao(&mut self, A: &Wire, B: &Wire, q: u8, tt: &[Vec<u8>], gate_num: usize)
+    fn yao(&mut self, A: &Wire, B: &Wire, q: u16, tt: &[Vec<u16>], gate_num: usize)
         -> (Wire, GarbledGate)
     {
         let xmod = A.modulus() as usize;
@@ -147,19 +147,19 @@ impl Garbler {
         let sigma = tt[((xmod - A.color() as usize) % xmod) as usize]
                       [((ymod - B.color() as usize) % ymod) as usize];
         // we use the row reduction trick here
-        let B_delta = self.delta(ymod as u8);
-        let C = A.minus(&self.delta(xmod as u8).cmul(A.color()))
+        let B_delta = self.delta(ymod as u16);
+        let C = A.minus(&self.delta(xmod as u16).cmul(A.color()))
                  .hashback2(&B.minus(&B_delta.cmul(B.color())), g, q)
                  .negate()
                  .minus(&self.delta(q).cmul(sigma));
         for x in 0..xmod {
-            let A_ = A.plus(&self.delta(xmod as u8).cmul(x as u8));
+            let A_ = A.plus(&self.delta(xmod as u16).cmul(x as u16));
             for y in 0..ymod {
                 let ix = ((A.color() as usize + x) % xmod) * ymod +
                          ((B.color() as usize + y) % ymod);
                 if ix == 0 { continue }
                 assert_eq!(gate[ix-1], None);
-                let B_ = B.plus(&self.delta(ymod as u8).cmul(y as u8));
+                let B_ = B.plus(&self.delta(ymod as u16).cmul(y as u16));
                 let C_ = C.plus(&self.delta(q).cmul(tt[x][y]));
                 let ct = A_.hashback2(&B_,g, q).plus(&C_);
                 gate[ix-1] = Some(ct);
@@ -169,7 +169,7 @@ impl Garbler {
         (C, gate)
     }
 
-    pub fn half_gate(&mut self, A: &Wire, B: &Wire, q: u8, gate_num: usize)
+    pub fn half_gate(&mut self, A: &Wire, B: &Wire, q: u16, gate_num: usize)
         -> (Wire, GarbledGate)
     {
         let mut gate = vec![None; 2 * q as usize - 2];
@@ -182,7 +182,7 @@ impl Garbler {
         // X = -H(A+aD) - arD such that a + A.color == 0
         let alpha = q - A.color(); // alpha = -A.color
         let X = A.plus(&D.cmul(alpha)).hashback(g,q).negate()
-                 .plus(&D.cmul((alpha as u16 * r as u16 % q as u16) as u8));
+                 .plus(&D.cmul(alpha * r % q));
 
         // Y = -H(B + bD) + brA
         let beta = q - B.color();
@@ -195,7 +195,7 @@ impl Garbler {
             let a = i; // a: truth value of wire X
             let A_ = A.plus(&self.delta(q).cmul(a));
             if A_.color() != 0 {
-                let tao = (a as u16 * (q - r) as u16 % q as u16) as u8;
+                let tao = a * (q - r) % q;
                 let G = A_.hashback(g,q).plus(&X.plus(&D.cmul(tao)));
                 gate[A_.color() as usize - 1] = Some(G);
             }
@@ -212,7 +212,7 @@ impl Garbler {
         (X.plus(&Y), gate) // output zero wire
     }
 
-    pub fn encode(&self, inputs: &[u8]) -> Vec<Wire> {
+    pub fn encode(&self, inputs: &[u16]) -> Vec<Wire> {
         assert_eq!(inputs.len(), self.inputs.len());
         let mut xs = Vec::new();
         for i in 0..inputs.len() {
@@ -224,7 +224,7 @@ impl Garbler {
         xs
     }
 
-    pub fn decode(&self, ws: &[Wire]) -> Vec<u8> {
+    pub fn decode(&self, ws: &[Wire]) -> Vec<u16> {
         assert_eq!(ws.len(), self.outputs.len());
         let mut outs = Vec::new();
         for i in 0..ws.len() {
@@ -326,7 +326,7 @@ fn tweak(i: usize) -> u128 {
     i as u128
 }
 
-fn output_tweak(i: usize, k: u8) -> u128 {
+fn output_tweak(i: usize, k: u16) -> u128 {
     let (left, _) = (i as u128).overflowing_shl(64);
     left + k as u128
 }
@@ -340,7 +340,7 @@ mod tests {
 
     // helper {{{
     fn garble_test_helper<F>(f: F)
-        where F: Fn(u8) -> Circuit
+        where F: Fn(u16) -> Circuit
     {
         let mut rng = Rng::new();
         for _ in 0..16 {
@@ -350,8 +350,8 @@ mod tests {
             println!("number of ciphertexts for mod {}: {}", q, ev.size());
             for _ in 0..64 {
                 let inps = &(0..c.ninputs()).map(|i| {
-                    rng.gen_byte() % c.input_mod(i)
-                }).collect::<Vec<u8>>();
+                    rng.gen_u16() % c.input_mod(i)
+                }).collect::<Vec<u16>>();
                 let xs = &gb.encode(inps);
                 let ys = &ev.eval(c, xs);
                 assert_eq!(gb.decode(ys)[0], c.eval(inps)[0], "q={}", q);
@@ -450,7 +450,7 @@ mod tests {
             let mut rng = Rng::new();
             let mut tab = Vec::new();
             for _ in 0..q {
-                tab.push(rng.gen_byte() % q);
+                tab.push(rng.gen_u16() % q);
             }
             let mut b = Builder::new();
             let x = b.input(q);
@@ -482,7 +482,7 @@ mod tests {
             for a in 0..q {
                 let mut tt_ = Vec::new();
                 for b in 0..q {
-                    tt_.push((a as u16 * b as u16 % q as u16) as u8);
+                    tt_.push(a * b % q);
                 }
                 tt.push(tt_);
             }

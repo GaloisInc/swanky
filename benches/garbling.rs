@@ -9,7 +9,7 @@ use fancy_garbling::rand::Rng;
 use fancy_garbling::garble::garble;
 use fancy_garbling::circuit::Builder;
 
-fn bench_projection_garble(c: &mut Criterion, q: u8) {
+fn bench_projection_garble(c: &mut Criterion, q: u16) {
     c.bench_function(&format!("garbling::proj{}_gb", q), move |bench| {
         let mut tab = Vec::new();
         for i in 0..q {
@@ -29,7 +29,7 @@ fn bench_projection_garble(c: &mut Criterion, q: u8) {
     });
 }
 
-fn bench_projection_eval(c: &mut Criterion, q: u8) {
+fn bench_projection_eval(c: &mut Criterion, q: u16) {
     c.bench_function(&format!("garbling::proj{}_ev", q), move |bench| {
         let ref mut rng = Rng::new();
 
@@ -45,8 +45,8 @@ fn bench_projection_eval(c: &mut Criterion, q: u8) {
         let c = b.finish();
 
         let (gb, ev) = garble(&c);
-        let x = rng.gen_byte() % q;
-        let y = rng.gen_byte() % q;
+        let x = rng.gen_u16() % q;
+        let y = rng.gen_u16() % q;
         let xs = gb.encode(&[x,y]);
 
         bench.iter(|| {
