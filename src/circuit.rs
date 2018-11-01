@@ -1,5 +1,7 @@
 use numbers::{dlog_truth_table, exp_truth_table};
 
+use std::collections::HashMap;
+
 // the lowest-level circuit description in Fancy Garbling
 // consists of 4 gate types:
 //     * input
@@ -20,17 +22,22 @@ pub struct Circuit {
 
 #[derive(Debug)]
 pub enum Gate {
-    Input { id: Id },                                       // id is the input id
+    Input { id: Id },                                           // id is the input id
+    Const { id: Id },                                           // id is the const id
     Add { xref: Ref, yref: Ref },
     Sub { xref: Ref, yref: Ref },
     Cmul { xref: Ref, c: u16 },
-    Proj { xref: Ref, tt: Vec<u16>, id: Id },             // id is the gate number
-    Yao { xref: Ref, yref: Ref, tt: Vec<Vec<u16>>, id: Id }, // id is the gate number
-    HalfGate { xref: Ref, yref: Ref, id: Id },              // id is the gate number
+    Proj { xref: Ref, tt: Vec<u16>, id: Id },                   // id is the gate number
+    Yao { xref: Ref, yref: Ref, tt: Vec<Vec<u16>>, id: Id },    // id is the gate number
+    HalfGate { xref: Ref, yref: Ref, id: Id },                  // id is the gate number
 }
 
 impl Circuit {
     pub fn eval(&self, inputs: &[u16]) -> Vec<u16> {
+        self.eval_full(inputs, &[])
+    }
+
+    pub fn eval_full(&self, inputs: &[u16], consts: &[u16]) -> Vec<u16> {
         assert_eq!(inputs.len(), self.ninputs());
 
         let mut cache = vec![0;self.gates.len()];
@@ -38,20 +45,15 @@ impl Circuit {
             let q = self.moduli[zref];
             let val = match self.gates[zref] {
 
-                Gate::Input { id } =>
-                    inputs[id],
+                Gate::Input { id } => inputs[id],
+                Gate::Const { id } => consts[id],
 
-                Gate::Add { xref, yref } =>
-                    (cache[xref] + cache[yref]) % q,
+                Gate::Add { xref, yref } => (cache[xref] + cache[yref]) % q,
+                Gate::Sub { xref, yref } => (cache[xref] + q - cache[yref]) % q,
 
-                Gate::Sub { xref, yref } =>
-                    (cache[xref] + q - cache[yref]) % q,
+                Gate::Cmul { xref, c } => cache[xref] * c % q,
 
-                Gate::Cmul { xref, c } =>
-                    cache[xref] * c % q,
-
-                Gate::Proj { xref, ref tt, .. } =>
-                    tt[cache[xref] as usize],
+                Gate::Proj { xref, ref tt, .. } => tt[cache[xref] as usize],
 
                 Gate::Yao { xref, yref, ref tt, .. } =>
                     tt[cache[xref] as usize][cache[yref] as usize],
@@ -79,6 +81,8 @@ pub struct Builder {
     next_ref: Ref,
     next_input_id: Id,
     next_ciphertext_id: Id,
+    const_vals: Vec<u16>,
+    const_map: HashMap<(u16,u16), Ref>,
     pub circ: Circuit,
 }
 
@@ -94,12 +98,18 @@ impl Builder {
             next_ref: 0,
             next_input_id: 0,
             next_ciphertext_id: 0,
+            const_vals: Vec::new(),
+            const_map: HashMap::new(),
             circ: c
         }
     }
 
     pub fn finish(self) -> Circuit {
         self.circ
+    }
+
+    pub fn finish_full(self) -> (Circuit, Vec<u16>) {
+        (self.circ, self.const_vals)
     }
 
     pub fn borrow_circ(&self) -> &Circuit {
@@ -143,6 +153,20 @@ impl Builder {
 
     pub fn inputs(&mut self, n: usize, modulus: u16) -> Vec<Ref> {
         (0..n).map(|_| self.input(modulus)).collect()
+    }
+
+    pub fn constant(&mut self, val: u16, q: u16) -> Ref {
+        match self.const_map.get(&(val,q)) {
+            Some(&r) => r,
+            None => {
+                let id = self.const_vals.len();
+                self.const_vals.push(val);
+                let gate = Gate::Const { id };
+                let r = self.gate(gate, q);
+                self.const_map.insert((val,q), r);
+                r
+            }
+        }
     }
 
     pub fn output(&mut self, xref: Ref) {
@@ -368,18 +392,18 @@ impl Builder {
                 let z2 = self.xor(z1,c);
                 let z3 = self.xor(x,c);
                 let z4 = self.and(z1,z3);
-                let mut c = self.xor(z4,x);
+                let mut carry = self.xor(z4,x);
                 if carry_modulus != 2 {
-                    c = self.mod_change(c, carry_modulus);
+                    carry = self.mod_change(carry, carry_modulus);
                 }
-                (z2, c)
+                (z2, carry)
             } else {
                 let z = self.xor(x,y);
-                let mut c = self.and(x,y);
+                let mut carry = self.and(x,y);
                 if carry_modulus != 2 {
-                    c = self.mod_change(c, carry_modulus);
+                    carry = self.mod_change(carry, carry_modulus);
                 }
-                (z, c)
+                (z, carry)
             }
         } else {
             let (sum, qp, zp);
@@ -432,7 +456,6 @@ impl Builder {
         self.proj(x, 2, vec![1,0])
     }
 
-    // pub fn binary_subtraction_twos_complement(&mut self, xs: &[Ref], ys: &[Ref]) -> (Vec<Ref>, Ref) {
     pub fn binary_subtraction(&mut self, xs: &[Ref], ys: &[Ref]) -> (Vec<Ref>, Ref) {
         let neg_ys = self.twos_complement(&ys);
         let (zs, c) = self.addition(&xs, &neg_ys);
@@ -669,6 +692,28 @@ mod tests {
             let res = c.eval(&ds);
             let (z, _carry) = x.overflowing_add(y);
             assert_eq!(numbers::from_base_q(&res, q), z % Q);
+        }
+    }
+//}}}
+    #[test] // constants {{{
+    fn constants() {
+        let mut b = Builder::new();
+        let mut rng = Rng::new();
+
+        let q = rng.gen_modulus();
+        let c = rng.gen_u16() % q;
+
+        let x = b.input(q);
+        let y = b.constant(c,q);
+        let z = b.add(x,y);
+        b.output(z);
+
+        let circ = b.finish();
+
+        for _ in 0..64 {
+            let x = rng.gen_u16() % q;
+            let z = circ.eval_full(&[x], &[c]);
+            assert_eq!(z[0], (x+c)%q);
         }
     }
 //}}}

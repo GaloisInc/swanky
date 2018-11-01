@@ -623,7 +623,7 @@ mod tests {
     #[test] // scalar_exponentiation {{{
     fn scalar_exponentiation() {
         let mut rng = Rng::new();
-        let q = rng.gen_usable_composite_modulus();
+        let q = numbers::modulus_with_width(10);
         let y = rng.gen_u16() % 10;
 
         let mut b = Bundler::new();
@@ -631,8 +631,8 @@ mod tests {
         let z = b.cexp(x,y);
         b.output(z);
 
-        for _ in 0..16 {
-            let x = rng.gen_u16() as u128 % (q/2);
+        for _ in 0..64 {
+            let x = rng.gen_u16() as u128 % q;
             let should_be = x.pow(y as u32) % q;
             test_garbling(&mut b, &[x], &[should_be]);
         }

@@ -9,24 +9,31 @@ type GarbledGate = Vec<Wire>;
 pub struct Garbler {
     deltas     : HashMap<u16, Wire>,
     inputs     : Vec<Wire>,
+    consts     : Vec<Wire>,
     outputs    : Vec<Vec<u128>>,
     rng        : Rng,
 }
 
 pub struct Evaluator {
-    gates : Vec<GarbledGate>,
+    gates  : Vec<GarbledGate>,
+    consts : Vec<Wire>,
 }
 
-#[allow(non_snake_case)]
 pub fn garble(c: &Circuit) -> (Garbler, Evaluator) {
+    garble_full(c, &[])
+}
+
+pub fn garble_full(c: &Circuit, const_vals: &[u16]) -> (Garbler, Evaluator) {
     let mut gb = Garbler::new();
 
     let mut wires: Vec<Wire> = Vec::new();
     let mut gates: Vec<GarbledGate> = Vec::new();
+
     for i in 0..c.gates.len() {
         let q = c.moduli[i];
         let w = match c.gates[i] {
             Gate::Input { .. } => gb.input(q),
+            Gate::Const { .. } => gb.constant(q),
 
             Gate::Add { xref, yref } => wires[xref].plus(&wires[yref]),
             Gate::Sub { xref, yref } => wires[xref].minus(&wires[yref]),
@@ -46,6 +53,7 @@ pub fn garble(c: &Circuit) -> (Garbler, Evaluator) {
                 gates.push(g);
                 w
             }
+
             Gate::HalfGate { xref, yref, .. }  => {
                 let X = wires[xref].clone();
                 let Y = wires[yref].clone();
@@ -61,7 +69,9 @@ pub fn garble(c: &Circuit) -> (Garbler, Evaluator) {
         gb.output(&X, i);
     }
 
-    (gb, Evaluator::new(gates))
+
+    let ev = Evaluator::new(gates, gb.encode_consts(const_vals));
+    (gb, ev)
 }
 
 #[allow(non_snake_case)]
@@ -70,6 +80,7 @@ impl Garbler {
         Garbler {
             deltas: HashMap::new(),
             inputs: Vec::new(),
+            consts: Vec::new(),
             outputs: Vec::new(),
             rng: Rng::new(),
         }
@@ -88,6 +99,12 @@ impl Garbler {
     pub fn input(&mut self, q: u16) -> Wire {
         let w = Wire::rand(&mut self.rng, q);
         self.inputs.push(w.clone());
+        w
+    }
+
+    pub fn constant(&mut self, q: u16) -> Wire {
+        let w = Wire::rand(&mut self.rng, q);
+        self.consts.push(w.clone());
         w
     }
 
@@ -212,6 +229,18 @@ impl Garbler {
         (X.plus(&Y), gate) // output zero wire
     }
 
+    pub fn encode_consts(&self, consts: &[u16]) -> Vec<Wire> {
+        assert_eq!(consts.len(), self.consts.len());
+        let mut xs = Vec::new();
+        for i in 0..consts.len() {
+            let x = consts[i];
+            let X = self.consts[i].clone();
+            let D = self.deltas[&X.modulus()].clone();
+            xs.push(X.plus(&D.cmul(x)));
+        }
+        xs
+    }
+
     pub fn encode(&self, inputs: &[u16]) -> Vec<Wire> {
         assert_eq!(inputs.len(), self.inputs.len());
         let mut xs = Vec::new();
@@ -244,8 +273,8 @@ impl Garbler {
 
 #[allow(non_snake_case)]
 impl Evaluator {
-    pub fn new(gates: Vec<GarbledGate>) -> Self {
-        Evaluator { gates }
+    pub fn new(gates: Vec<GarbledGate>, consts: Vec<Wire>) -> Self {
+        Evaluator { gates, consts }
     }
 
     pub fn size(&self) -> usize {
@@ -263,6 +292,7 @@ impl Evaluator {
             let w = match c.gates[i] {
 
                 Gate::Input { id }       => inputs[id].clone(),
+                Gate::Const { id, .. }   => self.consts[id].clone(),
                 Gate::Add { xref, yref } => wires[xref].plus(&wires[yref]),
                 Gate::Sub { xref, yref } => wires[xref].minus(&wires[yref]),
                 Gate::Cmul { xref, c }   => wires[xref].cmul(c),
@@ -334,8 +364,8 @@ fn output_tweak(i: usize, k: u16) -> u128 {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
     use circuit::{Circuit, Builder};
-    use garble::garble;
     use rand::Rng;
 
     // helper {{{
@@ -527,6 +557,33 @@ mod tests {
             b.outputs(&zs);
             b.finish()
         });
+    }
+//}}}
+    #[test] // constants {{{
+    fn constants() {
+        let mut b = Builder::new();
+        let mut rng = Rng::new();
+
+        let q = rng.gen_modulus();
+        let c = rng.gen_u16() % q;
+
+        let x = b.input(q);
+        let y = b.constant(c,q);
+        let z = b.add(x,y);
+        b.output(z);
+
+        let (circ, consts) = b.finish_full();
+        let (gb, ev) = garble_full(&circ, &consts);
+
+        for _ in 0..64 {
+            let x = rng.gen_u16() % q;
+
+            assert_eq!(circ.eval_full(&[x], &consts)[0], (x+c)%q, "plaintext");
+
+            let X = gb.encode(&[x]);
+            let Y = ev.eval(&circ, &X);
+            assert_eq!(gb.decode(&Y)[0], (x+c)%q, "garbled");
+        }
     }
 //}}}
 }
