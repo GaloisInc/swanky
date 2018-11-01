@@ -832,7 +832,7 @@ mod tests {
     //}}}
     #[test] // sgn {{{
     fn sgn() {
-        // let mut rng = Rng::new();
+        let mut rng = Rng::new();
         let q = modulus_with_width(10);
         println!("q={}", q);
 
@@ -842,9 +842,9 @@ mod tests {
         let z = b.sgn(x,&ms);
         b.output_ref(z);
 
-        for pt in 0..q {
-            // let pt = rng.gen_u128() % q;
-            let should_be = (pt > q/2) as u16;
+        for pt in 0..128 {
+            let pt = rng.gen_u128() % q;
+            let should_be = (pt >= q/2) as u16;
             test_garbling_high_to_low(&mut b, &[pt], &[should_be]);
         }
     }
