@@ -11,7 +11,9 @@ use std::io::{BufReader, Lines};
 
 use fancy_garbling::high_level::Bundler;
 use fancy_garbling::numbers;
+use fancy_garbling::circuit::{Builder, Circuit};
 use fancy_garbling::garble::garble;
+use fancy_garbling::util::IterToVec;
 
 const WEIGHTS_FILE  : &str = "../dinn/weights-and-biases/txt_weights.txt";
 const BIASES_FILE   : &str = "../dinn/weights-and-biases/txt_biases.txt";
@@ -126,7 +128,6 @@ pub fn main() {
 // circuit creation
 
 fn build_circuit(q: u128, weights: Vec<Vec<Vec<u128>>>) -> Bundler {
-
     let mut b = Bundler::new();
     let nn_biases = vec![b.inputs(q, TOPOLOGY[1]), b.inputs(q, TOPOLOGY[2])];
     let nn_inputs = b.inputs(q, TOPOLOGY[0]);
@@ -156,7 +157,7 @@ fn build_circuit(q: u128, weights: Vec<Vec<Vec<u128>>>) -> Bundler {
 
         if layer == 0 {
             layer_outputs = layer_outputs.into_iter().map(|x| {
-                let ms = vec![128];
+                let ms = vec![5,205];
                 let r = b.sgn(x, &ms);
                 b.zero_one_to_one_negative_one(r, q)
             }).collect();
@@ -168,6 +169,75 @@ fn build_circuit(q: u128, weights: Vec<Vec<Vec<u128>>>) -> Bundler {
     }
     b
 }
+
+// for comparison
+fn build_boolean_circuit(weights: Vec<Vec<Vec<u128>>>) -> Circuit {
+    // let mut b = Builder::new();
+    // let nbits = 10;
+
+    // let nn_biases = vec![
+    //     (0..TOPOLOGY[1]).map(|_| b.inputs(2,nbits)).to_vec(),
+    //     (0..TOPOLOGY[2]).map(|_| b.inputs(2,nbits)).to_vec(),
+    // ];
+
+    // let nn_inputs = (0..TOPOLOGY[0]).map(|_| b.inputs(2,nbits));
+
+    // let mut layer_outputs = Vec::new();
+    // let mut layer_inputs;
+
+    // for layer in 0..TOPOLOGY.len()-1 {
+    //     if layer == 0 {
+    //         layer_inputs = nn_inputs.to_vec();
+    //     } else {
+    //         layer_inputs  = layer_outputs;
+    //         layer_outputs = Vec::new();
+    //     }
+
+    //     let nin  = TOPOLOGY[layer];
+    //     let nout = TOPOLOGY[layer+1];
+
+    //     for j in 0..nout {
+    //         let mut x = nn_biases[layer][j];
+    //         for i in 0..nin {
+    //             let y = b.cmul(layer_inputs[i], weights[layer][i][j]);
+    //             x = b.add(x, y);
+    //         }
+    //         layer_outputs.push(x);
+    //     }
+
+    //     if layer == 0 {
+    //         layer_outputs = layer_outputs.into_iter().map(|x| {
+    //             let ms = vec![5,205];
+    //             let r = b.sgn(x, &ms);
+    //             b.zero_one_to_one_negative_one(r, q)
+    //         }).collect();
+    //     }
+    // }
+
+    // for out in layer_outputs.into_iter() {
+    //     b.output(out);
+    // }
+    // b.finish()
+    unimplemented!()
+}
+
+// fn multiplex_constants(b: &mut Builder, x: Ref, c1: u128, c2: u128) {
+//     let c1_bs = u128_to_bits(c1);
+//     let c2_bs = u129_to_bits(c2);
+
+// }
+
+// fn mux_const_bits(b: &mut Builder, x: Ref, c1: bool, c2: bool) -> Ref {
+//     if !c1 && c2 {
+//         x
+//     } else if c1 && !c2 {
+//         b.negate(x)
+//     } else if !c1 && !c2 {
+//         b.cmul(0)
+//     } else {
+//         b.project
+//     }
+// }
 
 ////////////////////////////////////////////////////////////////////////////////
 // boilerplate io stuff

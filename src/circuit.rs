@@ -1,4 +1,5 @@
 use numbers::{dlog_truth_table, exp_truth_table};
+use util::IterToVec;
 
 use std::collections::HashMap;
 
@@ -8,6 +9,8 @@ use std::collections::HashMap;
 //     * addition
 //     * scalar multiplication
 //     * projection gates
+//
+// TODO: this is a lie! we have many new kinds of gates...
 
 pub type Ref = usize;
 pub type Id = usize;
@@ -46,7 +49,11 @@ impl Circuit {
             let val = match self.gates[zref] {
 
                 Gate::Input { id } => inputs[id],
-                Gate::Const { id } => consts[id],
+
+                Gate::Const { id } => {
+                    assert!(id < consts.len(), "[eval_full] not enough constants provided");
+                    consts[id]
+                }
 
                 Gate::Add { xref, yref } => (cache[xref] + cache[yref]) % q,
                 Gate::Sub { xref, yref } => (cache[xref] + q - cache[yref]) % q,
@@ -114,6 +121,10 @@ impl Builder {
 
     pub fn borrow_circ(&self) -> &Circuit {
         &self.circ
+    }
+
+    pub fn borrow_consts(&self) -> &[u16] {
+        &self.const_vals
     }
 
     pub fn modulus(&self, x:Ref) -> u16 {
@@ -433,26 +444,15 @@ impl Builder {
     }
 
     pub fn twos_complement(&mut self, xs: &[Ref]) -> Vec<Ref> {
-        let zs: Vec<Ref> = xs.iter().map(|&x| {
-            self.proj(x, 2, vec![1,0])
-        }).collect();
-        self.add_by_const_1(&zs)
-    }
-
-    // helper for twos_complement
-    fn add_by_const_1(&mut self, xs: &[Ref]) -> Vec<Ref> {
-        let mut c = self.proj(xs[0], 2, vec![0,1]);
-        let z = self.negate(xs[0]);
-        let mut zs = vec![z];
-        for &x in xs.iter().skip(1) {
-            let res = self.adder(x, c, None, 2);
-            zs.push(res.0);
-            c = res.1;
-        }
-        zs
+        let not_xs = xs.iter().map(|&x| self.negate(x)).to_vec();
+        let zero = self.constant(0,2);
+        let mut const1 = vec![zero; xs.len()];
+        const1[0] = self.constant(1,2);
+        self.addition_no_carry(&not_xs, &const1)
     }
 
     pub fn negate(&mut self, x: Ref) -> Ref {
+        assert_eq!(self.modulus(x), 2);
         self.proj(x, 2, vec![1,0])
     }
 
@@ -622,14 +622,14 @@ mod tests {
         let (zs, c) = b.binary_subtraction(&xs, &ys);
         b.outputs(&zs);
         b.output(c);
-        let c = b.finish();
+        let (circ, consts) = b.finish_full();
         let mut rng = Rng::new();
         for _ in 0..16 {
             let x = rng.gen_u128();
             let y = rng.gen_u128();
             let mut bits = numbers::u128_to_bits(x, 128);
             bits.extend(numbers::u128_to_bits(y, 128).iter());
-            let res = c.eval(&bits);
+            let res = circ.eval_full(&bits, &consts);
             let (z, carry) = x.overflowing_sub(y);
             assert_eq!(numbers::u128_from_bits(&res[0..128]), z);
             assert_eq!(res[128], carry as u16);

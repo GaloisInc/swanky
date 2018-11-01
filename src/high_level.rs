@@ -17,7 +17,6 @@ pub struct Bundler {
     outputs: Vec<BundleRef>,
 }
 
-#[allow(non_snake_case)]
 impl Bundler {
     pub fn new() -> Self {
         Self::from_builder(Builder::new())
@@ -486,7 +485,7 @@ impl Bundler {
 
 #[cfg(test)]
 mod tests {
-    use garble::garble;
+    use garble::{garble, garble_full};
     use high_level::Bundler;
     use numbers::{self, u128_to_bits, inv, factor, modulus_with_width};
     use rand::Rng;
@@ -495,26 +494,34 @@ mod tests {
 
     // test harnesses {{{
     fn test_garbling(b: &Bundler, inp: &[u128], should_be: &[u128]) {
-        let c = b.borrow_builder().borrow_circ();
-        let (gb, ev) = garble(&c);
+        let circ = b.borrow_builder().borrow_circ();
+        let consts = b.borrow_builder().borrow_consts();
+        let (gb, ev) = garble_full(&circ, &consts);
+
         println!("number of ciphertexts: {}", ev.size());
+
         let enc_inp = b.encode(inp);
-        let res = c.eval(&enc_inp);
+        let res = circ.eval_full(&enc_inp, &consts);
         assert_eq!(b.decode(&res), should_be);
+
         let xs = gb.encode(&enc_inp);
-        let ys = ev.eval(c, &xs);
+        let ys = ev.eval(circ, &xs);
         assert_eq!(b.decode(&gb.decode(&ys)), should_be);
     }
 
     fn test_garbling_high_to_low(b: &Bundler, inp: &[u128], should_be: &[u16]) {
-        let c = b.borrow_builder().borrow_circ();
-        let (gb, ev) = garble(&c);
+        let circ = b.borrow_builder().borrow_circ();
+        let consts = b.borrow_builder().borrow_consts();
+        let (gb, ev) = garble_full(&circ, &consts);
+
         println!("number of ciphertexts: {}", ev.size());
+
         let enc_inp = b.encode(inp);
-        let pt_outs: Vec<u16> = c.eval(&enc_inp);
+        let pt_outs: Vec<u16> = circ.eval_full(&enc_inp, &consts);
         assert_eq!(pt_outs, should_be);
+
         let xs = gb.encode(&enc_inp);
-        let ys = ev.eval(c, &xs);
+        let ys = ev.eval(&circ, &xs);
         let gb_outs: Vec<u16> = gb.decode(&ys);
         assert_eq!(gb_outs, should_be);
     }

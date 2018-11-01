@@ -230,7 +230,7 @@ impl Garbler {
     }
 
     pub fn encode_consts(&self, consts: &[u16]) -> Vec<Wire> {
-        assert_eq!(consts.len(), self.consts.len());
+        assert_eq!(consts.len(), self.consts.len(), "[encode_consts] not enough consts!");
         let mut xs = Vec::new();
         for i in 0..consts.len() {
             let x = consts[i];
