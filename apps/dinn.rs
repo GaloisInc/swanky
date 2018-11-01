@@ -11,8 +11,8 @@ use std::io::{BufReader, Lines};
 
 use fancy_garbling::high_level::Bundler;
 use fancy_garbling::numbers;
-use fancy_garbling::circuit::{Builder, Circuit};
-use fancy_garbling::garble::garble;
+use fancy_garbling::circuit::{Builder, Ref};
+use fancy_garbling::garble::garble_full;
 use fancy_garbling::util::IterToVec;
 
 const WEIGHTS_FILE  : &str = "../dinn/weights-and-biases/txt_weights.txt";
@@ -45,10 +45,7 @@ pub fn main() {
     let images:  Vec<Vec<u128>>      = read_images(q);
     let labels:  Vec<usize>          = read_labels();
 
-    let bun = build_circuit(q, weights);
-
-    let inp_biases0 = bun.encode(&biases[0]);
-    let inp_biases1 = bun.encode(&biases[1]);
+    let bun = build_circuit(q, &weights, &biases);
 
     if run_benches {
         println!("running garble/eval benchmark");
@@ -57,23 +54,22 @@ pub fn main() {
         let ntests = 16;
         for _ in 0..ntests {
             let start = SystemTime::now();
-            let (gb,_) = garble(bun.borrow_circ());
+            let (circ, consts) = bun.borrow();
+            let (gb,_) = garble_full(circ, consts);
             test::black_box(gb);
             garble_time += SystemTime::now().duration_since(start).unwrap();
         }
         garble_time /= ntests;
 
-        let (gb,ev) = garble(bun.borrow_circ());
+        let (circ, consts) = bun.borrow();
+        let (gb,ev) = garble_full(circ, consts);
 
-        let inp_img = bun.encode(&images[0]);
-        let mut inp = inp_biases0.clone();
-        inp.extend(&inp_biases1);
-        inp.extend(inp_img);
+        let inp = gb.encode(&bun.encode(&images[0]));
 
         let mut eval_time = Duration::new(0,0);
         for _ in 0..ntests {
             let start = SystemTime::now();
-            let res = ev.eval(bun.borrow_circ(), &gb.encode(&inp));
+            let res = ev.eval(bun.borrow_circ(), &inp);
             test::black_box(res);
             eval_time += SystemTime::now().duration_since(start).unwrap();
         }
@@ -95,13 +91,10 @@ pub fn main() {
                 println!("{}/{} {} errors ({}%)", img_num, NIMAGES, errors, 100.0 * (1.0 - errors as f32 / NIMAGES as f32));
             }
 
-            let inp_img = bun.encode(img);
+            let inp = bun.encode(img);
 
-            let mut inp = inp_biases0.clone();
-            inp.extend(&inp_biases1);
-            inp.extend(inp_img);
-
-            let raw = bun.borrow_circ().eval(&inp);
+            let (circ, consts) = bun.borrow();
+            let raw = circ.eval_full(&inp, consts);
             let res = bun.decode(&raw);
 
             let res: Vec<i32> = res.into_iter().map(|x| from_mod_q(q,x)).collect();
@@ -127,9 +120,9 @@ pub fn main() {
 ////////////////////////////////////////////////////////////////////////////////
 // circuit creation
 
-fn build_circuit(q: u128, weights: Vec<Vec<Vec<u128>>>) -> Bundler {
+fn build_circuit(q: u128, weights: &Vec<Vec<Vec<u128>>>, biases: &Vec<Vec<u128>>) -> Bundler {
     let mut b = Bundler::new();
-    let nn_biases = vec![b.inputs(q, TOPOLOGY[1]), b.inputs(q, TOPOLOGY[2])];
+    // let nn_biases = vec![b.inputs(q, TOPOLOGY[1]), b.inputs(q, TOPOLOGY[2])];
     let nn_inputs = b.inputs(q, TOPOLOGY[0]);
 
     let mut layer_outputs = Vec::new();
@@ -147,7 +140,7 @@ fn build_circuit(q: u128, weights: Vec<Vec<Vec<u128>>>) -> Bundler {
         let nout = TOPOLOGY[layer+1];
 
         for j in 0..nout {
-            let mut x = nn_biases[layer][j];
+            let mut x = b.constant(biases[layer][j], q);
             for i in 0..nin {
                 let y = b.cmul(layer_inputs[i], weights[layer][i][j]);
                 x = b.add(x, y);
@@ -157,7 +150,7 @@ fn build_circuit(q: u128, weights: Vec<Vec<Vec<u128>>>) -> Bundler {
 
         if layer == 0 {
             layer_outputs = layer_outputs.into_iter().map(|x| {
-                let ms = vec![5,205];
+                let ms = vec![2,2,2,42];
                 let r = b.sgn(x, &ms);
                 b.zero_one_to_one_negative_one(r, q)
             }).collect();
@@ -171,39 +164,39 @@ fn build_circuit(q: u128, weights: Vec<Vec<Vec<u128>>>) -> Bundler {
 }
 
 // for comparison
-fn build_boolean_circuit(weights: Vec<Vec<Vec<u128>>>) -> Circuit {
-    // let mut b = Builder::new();
-    // let nbits = 10;
+fn build_boolean_circuit(weights: &Vec<Vec<Vec<u128>>>, biases: &Vec<Vec<u128>>) -> Builder {
+    let mut b = Builder::new();
+    let nbits = 10;
 
-    // let nn_biases = vec![
-    //     (0..TOPOLOGY[1]).map(|_| b.inputs(2,nbits)).to_vec(),
-    //     (0..TOPOLOGY[2]).map(|_| b.inputs(2,nbits)).to_vec(),
-    // ];
+    let nn_biases = vec![
+        (0..TOPOLOGY[1]).map(|_| b.inputs(2,nbits)).to_vec(),
+        (0..TOPOLOGY[2]).map(|_| b.inputs(2,nbits)).to_vec(),
+    ];
 
-    // let nn_inputs = (0..TOPOLOGY[0]).map(|_| b.inputs(2,nbits));
+    let nn_inputs = (0..TOPOLOGY[0]).map(|_| b.inputs(2,nbits)).to_vec();
 
-    // let mut layer_outputs = Vec::new();
-    // let mut layer_inputs;
+    let mut layer_outputs = Vec::new();
+    let mut layer_inputs;
 
-    // for layer in 0..TOPOLOGY.len()-1 {
-    //     if layer == 0 {
-    //         layer_inputs = nn_inputs.to_vec();
-    //     } else {
-    //         layer_inputs  = layer_outputs;
-    //         layer_outputs = Vec::new();
-    //     }
+    for layer in 0..TOPOLOGY.len()-1 {
+        if layer == 0 {
+            layer_inputs = nn_inputs.clone();
+        } else {
+            layer_inputs  = layer_outputs;
+            layer_outputs = Vec::new();
+        }
 
-    //     let nin  = TOPOLOGY[layer];
-    //     let nout = TOPOLOGY[layer+1];
+        let nin  = TOPOLOGY[layer];
+        let nout = TOPOLOGY[layer+1];
 
-    //     for j in 0..nout {
-    //         let mut x = nn_biases[layer][j];
-    //         for i in 0..nin {
-    //             let y = b.cmul(layer_inputs[i], weights[layer][i][j]);
-    //             x = b.add(x, y);
-    //         }
-    //         layer_outputs.push(x);
-    //     }
+        for j in 0..nout {
+            let mut x = to_bit_consts(&mut b, biases[layer][j]);
+            for i in 0..nin {
+                // let y = b.cmul(layer_inputs[i], weights[layer][i][j]);
+                // x = b.add(x, y);
+            }
+            layer_outputs.push(x);
+        }
 
     //     if layer == 0 {
     //         layer_outputs = layer_outputs.into_iter().map(|x| {
@@ -212,12 +205,15 @@ fn build_boolean_circuit(weights: Vec<Vec<Vec<u128>>>) -> Circuit {
     //             b.zero_one_to_one_negative_one(r, q)
     //         }).collect();
     //     }
-    // }
+    }
 
-    // for out in layer_outputs.into_iter() {
-    //     b.output(out);
-    // }
-    // b.finish()
+    for out in &layer_outputs {
+        b.outputs(out);
+    }
+    b
+}
+
+fn to_bit_consts(b: &mut Builder, x: u128) -> Vec<Ref> {
     unimplemented!()
 }
 

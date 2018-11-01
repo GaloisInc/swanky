@@ -115,7 +115,7 @@ impl Wire {
                 let n = ds.len();
                 let mut zs = vec![0;n];
                 for i in 0..n {
-                    zs[i] = (ds[i] * c) % q;
+                    zs[i] = ((ds[i] as u32 * c as u32) % q as u32) as u16;
                 }
                 Wire::ModN { q, ds: zs }
             }

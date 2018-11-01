@@ -62,6 +62,18 @@ impl Bundler {
         bun_ref
     }
 
+    pub fn constant(&mut self, val: u128, modulus: u128) -> BundleRef {
+        let ps = factor(modulus);
+        let mut ws = Vec::with_capacity(ps.len());
+        for &p in &ps {
+            let x = (val % p as u128) as u16;
+            let w = self.builder.as_mut().expect("need to own a builder!").constant(x, p);
+            ws.push(w);
+        }
+        let bun_ref = self.add_bundle(ws, Rc::new(ps));
+        bun_ref
+    }
+
     pub fn inputs(&mut self, modulus: u128, n: usize) -> Vec<BundleRef> {
         (0..n).map(|_| self.input(modulus)).collect()
     }
@@ -145,6 +157,12 @@ impl Bundler {
 
     pub fn finish(&mut self) -> Circuit {
         self.take_builder().finish()
+    }
+
+    pub fn borrow(&self) -> (&Circuit, &[u16]) {
+        let circ   = self.borrow_builder().borrow_circ();
+        let consts = self.borrow_builder().borrow_consts();
+        (circ, consts)
     }
 
     pub fn borrow_circ(&self) -> &Circuit {
@@ -498,7 +516,7 @@ mod tests {
         let consts = b.borrow_builder().borrow_consts();
         let (gb, ev) = garble_full(&circ, &consts);
 
-        println!("number of ciphertexts: {}", ev.size());
+        // println!("number of ciphertexts: {}", ev.size());
 
         let enc_inp = b.encode(inp);
         let res = circ.eval_full(&enc_inp, &consts);
@@ -514,11 +532,11 @@ mod tests {
         let consts = b.borrow_builder().borrow_consts();
         let (gb, ev) = garble_full(&circ, &consts);
 
-        println!("number of ciphertexts: {}", ev.size());
+        // println!("number of ciphertexts: {}", ev.size());
 
         let enc_inp = b.encode(inp);
         let pt_outs: Vec<u16> = circ.eval_full(&enc_inp, &consts);
-        assert_eq!(pt_outs, should_be);
+        assert_eq!(pt_outs, should_be, "inp={:?}", inp);
 
         let xs = gb.encode(&enc_inp);
         let ys = ev.eval(&circ, &xs);
@@ -814,17 +832,18 @@ mod tests {
     //}}}
     #[test] // sgn {{{
     fn sgn() {
-        let mut rng = Rng::new();
+        // let mut rng = Rng::new();
         let q = modulus_with_width(10);
+        println!("q={}", q);
+
         let mut b = Bundler::new();
         let x = b.input(q);
-        let ms = [2,2,128];
-        // let ms = [4,4,4,4,4];
+        let ms = [2,2,3,54];
         let z = b.sgn(x,&ms);
         b.output_ref(z);
 
-        for _ in 0..16 {
-            let pt = rng.gen_u128() % q;
+        for pt in 0..q {
+            // let pt = rng.gen_u128() % q;
             let should_be = (pt > q/2) as u16;
             test_garbling_high_to_low(&mut b, &[pt], &[should_be]);
         }
