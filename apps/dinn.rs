@@ -21,8 +21,8 @@ const IMAGES_FILE   : &str = "../dinn/weights-and-biases/txt_img_test.txt";
 const LABELS_FILE   : &str = "../dinn/weights-and-biases/txt_labels.txt";
 
 const TOPOLOGY: [usize; 3] = [256, 30, 10];
-const NIMAGES: usize = 10000;
-// const NIMAGES: usize = 1000;
+// const NIMAGES: usize = 10000;
+const NIMAGES: usize = 1000;
 const NLAYERS: usize = 2;
 
 pub fn main() {
@@ -45,7 +45,7 @@ pub fn main() {
     let images:  Vec<Vec<u128>>      = read_images(q);
     let labels:  Vec<usize>          = read_labels();
 
-    let bun = build_circuit(q, &weights, &biases);
+    let bun = build_circuit(q, &weights, &biases, false);
 
     if run_benches {
         println!("running garble/eval benchmark");
@@ -120,7 +120,7 @@ pub fn main() {
 ////////////////////////////////////////////////////////////////////////////////
 // circuit creation
 
-fn build_circuit(q: u128, weights: &Vec<Vec<Vec<u128>>>, biases: &Vec<Vec<u128>>) -> Bundler {
+fn build_circuit(q: u128, weights: &Vec<Vec<Vec<u128>>>, biases: &Vec<Vec<u128>>, secret_weights: bool) -> Bundler {
     let mut b = Bundler::new();
     // let nn_biases = vec![b.inputs(q, TOPOLOGY[1]), b.inputs(q, TOPOLOGY[2])];
     let nn_inputs = b.inputs(q, TOPOLOGY[0]);
@@ -142,7 +142,12 @@ fn build_circuit(q: u128, weights: &Vec<Vec<Vec<u128>>>, biases: &Vec<Vec<u128>>
         for j in 0..nout {
             let mut x = b.constant(biases[layer][j], q);
             for i in 0..nin {
-                let y = b.cmul(layer_inputs[i], weights[layer][i][j]);
+                let y;
+                if secret_weights {
+                    y = b.secret_cmul(layer_inputs[i], weights[layer][i][j]);
+                } else {
+                    y = b.cmul(layer_inputs[i], weights[layer][i][j]);
+                }
                 x = b.add(x, y);
             }
             layer_outputs.push(x);

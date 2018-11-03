@@ -1,6 +1,7 @@
 use circuit::{Builder, Circuit, Ref};
 use numbers::{self, crt, inv, crt_inv, factor, product};
 use std::rc::Rc;
+use util::IterToVec;
 
 #[derive(Clone, Copy)]
 pub struct BundleRef(usize);
@@ -22,8 +23,8 @@ impl Bundler {
         Self::from_builder(Builder::new())
     }
 
-    pub fn primes(&self, x: BundleRef) -> Vec<u16> {
-        self.bundles[x.0].primes.to_vec()
+    pub fn primes(&self, x: BundleRef) -> Rc<Vec<u16>> {
+        self.bundles[x.0].primes.clone()
     }
 
     pub fn wires(&self, x: BundleRef) -> Vec<Ref> {
@@ -34,6 +35,29 @@ impl Bundler {
         self.inputs.len()
     }
 
+    fn add_bundle(&mut self, wires: Vec<Ref>, primes: Rc<Vec<u16>>) -> BundleRef {
+        assert_eq!(wires.len(), primes.len());
+        let bun_ref = self.bundles.len();
+        let bun = WireBundle { wires, primes };
+        self.bundles.push(bun);
+        BundleRef(bun_ref)
+    }
+
+    pub fn bundle_from_ref(&mut self, x: Ref, q: u128) -> BundleRef {
+        let ps = factor(q);
+        let mut ws = Vec::with_capacity(ps.len());
+        let input_mod = self.borrow_builder().modulus(x);
+        for &output_mod in &ps {
+            let tt = (0..input_mod).map(|y| y % output_mod).collect();
+            let w = self.borrow_mut_builder().proj(x, output_mod, tt);
+            ws.push(w);
+        }
+        self.add_bundle(ws, Rc::new(ps))
+    }
+
+    ////////////////////////////////////////////////////////////////////////////////
+    // builder management
+
     pub fn from_builder(b: Builder) -> Self {
         Bundler {
             builder: Some(b),
@@ -43,12 +67,41 @@ impl Bundler {
         }
     }
 
-    fn add_bundle(&mut self, wires: Vec<Ref>, primes: Rc<Vec<u16>>) -> BundleRef {
-        assert_eq!(wires.len(), primes.len());
-        let bun_ref = self.bundles.len();
-        let bun = WireBundle { wires, primes };
-        self.bundles.push(bun);
-        BundleRef(bun_ref)
+    pub fn take_builder(&mut self) -> Builder {
+        self.builder.take().expect("need to own a builder!")
+    }
+
+    pub fn put_builder(&mut self, b: Builder) {
+        self.builder = Some(b);
+    }
+
+    pub fn borrow_mut_builder(&mut self) -> &mut Builder {
+        self.builder.as_mut().expect("need to own a builder!")
+    }
+
+    pub fn borrow_builder(&self) -> &Builder {
+        self.builder.as_ref().expect("need to own a builder!")
+    }
+
+    pub fn finish(&mut self) -> Circuit {
+        self.take_builder().finish()
+    }
+
+    pub fn borrow_circ(&self) -> &Circuit {
+        self.borrow_builder().borrow_circ()
+    }
+
+    pub fn borrow(&self) -> (&Circuit, &[u16]) {
+        let circ   = self.borrow_builder().borrow_circ();
+        let consts = self.borrow_builder().borrow_consts();
+        (circ, consts)
+    }
+
+    ////////////////////////////////////////////////////////////////////////////////
+    // basic methods
+
+    pub fn inputs(&mut self, modulus: u128, n: usize) -> Vec<BundleRef> {
+        (0..n).map(|_| self.input(modulus)).collect()
     }
 
     pub fn input(&mut self, modulus: u128) -> BundleRef {
@@ -72,34 +125,6 @@ impl Bundler {
         }
         let bun_ref = self.add_bundle(ws, Rc::new(ps));
         bun_ref
-    }
-
-    pub fn inputs(&mut self, modulus: u128, n: usize) -> Vec<BundleRef> {
-        (0..n).map(|_| self.input(modulus)).collect()
-    }
-
-    pub fn bundle_from_ref(&mut self, x: Ref, q: u128) -> BundleRef {
-        let ps = factor(q);
-        let mut ws = Vec::with_capacity(ps.len());
-        let input_mod = self.borrow_builder().modulus(x);
-        for &output_mod in &ps {
-            let tt = (0..input_mod).map(|y| y % output_mod).collect();
-            let w = self.borrow_mut_builder().proj(x, output_mod, tt);
-            ws.push(w);
-        }
-        self.add_bundle(ws, Rc::new(ps))
-    }
-
-    pub fn zero_one_to_one_negative_one(&mut self, x: Ref, q: u128) -> BundleRef {
-        let ps = factor(q);
-        let mut ws = Vec::with_capacity(ps.len());
-        assert_eq!(self.borrow_builder().modulus(x), 2);
-        for &p in &ps {
-            let tt = vec![ 1, ((q-1) % p as u128) as u16 ];
-            let w = self.borrow_mut_builder().proj(x, p, tt);
-            ws.push(w);
-        }
-        self.add_bundle(ws, Rc::new(ps))
     }
 
     pub fn output(&mut self, xref: BundleRef) {
@@ -139,180 +164,130 @@ impl Bundler {
         res
     }
 
-    pub fn take_builder(&mut self) -> Builder {
-        self.builder.take().expect("need to own a builder!")
-    }
-
-    pub fn put_builder(&mut self, b: Builder) {
-        self.builder = Some(b);
-    }
-
-    pub fn borrow_mut_builder(&mut self) -> &mut Builder {
-        self.builder.as_mut().expect("need to own a builder!")
-    }
-
-    pub fn borrow_builder(&self) -> &Builder {
-        self.builder.as_ref().expect("need to own a builder!")
-    }
-
-    pub fn finish(&mut self) -> Circuit {
-        self.take_builder().finish()
-    }
-
-    pub fn borrow(&self) -> (&Circuit, &[u16]) {
-        let circ   = self.borrow_builder().borrow_circ();
-        let consts = self.borrow_builder().borrow_consts();
-        (circ, consts)
-    }
-
-    pub fn borrow_circ(&self) -> &Circuit {
-        self.borrow_builder().borrow_circ()
-    }
+    ////////////////////////////////////////////////////////////////////////////////
+    // general circuit construction functions
 
     pub fn add(&mut self, xref: BundleRef, yref: BundleRef) -> BundleRef {
-        assert_eq!(self.bundles[xref.0].wires.len(), self.bundles[yref.0].wires.len());
-        let mut zwires;
-        {
-            let xbun = &self.bundles[xref.0];
-            let ybun = &self.bundles[yref.0];
-            zwires = Vec::with_capacity(xbun.wires.len());
-            let b = self.builder.as_mut().expect("need to own a builder!");
-            for (&x, &y) in xbun.wires.iter().zip(ybun.wires.iter()) {
-                zwires.push(b.add(x,y));
-            }
-        }
-        let ps = self.bundles[xref.0].primes.clone();
-        self.add_bundle(zwires, ps)
+        let xwires = self.wires(xref);
+        let ywires = self.wires(yref);
+        assert_eq!(xwires.len(), ywires.len());
+        let zwires = xwires.into_iter().zip(ywires.into_iter()).map(|(x,y)|
+            self.borrow_mut_builder().add(x,y)
+        ).collect();
+        let primes = self.primes(xref);
+        self.add_bundle(zwires, primes)
     }
 
     pub fn sub(&mut self, xref: BundleRef, yref: BundleRef) -> BundleRef {
-        assert_eq!(self.bundles[xref.0].wires.len(), self.bundles[yref.0].wires.len());
-        let mut zwires;
-        {
-            let xbun = &self.bundles[xref.0];
-            let ybun = &self.bundles[yref.0];
-            zwires = Vec::with_capacity(xbun.wires.len());
-            let b = self.builder.as_mut().expect("need to own a builder!");
-            for (&x, &y) in xbun.wires.iter().zip(ybun.wires.iter()) {
-                zwires.push(b.sub(x,y));
-            }
-        }
-        let ps = self.bundles[xref.0].primes.clone();
-        self.add_bundle(zwires, ps)
+        let xwires = self.wires(xref);
+        let ywires = self.wires(yref);
+        assert_eq!(xwires.len(), ywires.len());
+        let zwires = xwires.into_iter().zip(ywires.into_iter()).map(|(x,y)|
+            self.borrow_mut_builder().sub(x,y)
+        ).collect();
+        let primes = self.primes(xref);
+        self.add_bundle(zwires, primes)
     }
 
     pub fn cmul(&mut self, xref: BundleRef, c: u128) -> BundleRef {
-        let mut zwires;
-        {
-            let xbun = &self.bundles[xref.0];
-            zwires = Vec::with_capacity(xbun.wires.len());
-            let cs = crt(&xbun.primes, c);
-            for (&x, &c) in xbun.wires.iter().zip(cs.iter()) {
-                zwires.push(self.builder.as_mut().expect("need a builder!").cmul(x,c));
-            }
+        let xwires = self.wires(xref);
+        let primes = self.primes(xref);
+        let cs = crt(&primes, c);
+        let zwires = xwires.iter().zip(&cs).map(|(&x, &c)|
+            self.borrow_mut_builder().cmul(x,c)
+        ).collect();
+        self.add_bundle(zwires, primes)
+    }
+
+    pub fn secret_cmul(&mut self, xbun: BundleRef, c: u128) -> BundleRef {
+        let xwires = self.wires(xbun);
+        let primes = self.primes(xbun);
+        let cs = crt(&primes, c);
+        let mut zwires = Vec::with_capacity(xwires.len());
+        for i in 0..xwires.len() {
+            let tt = (0..primes[i]).map(|x| (x * cs[i]) % primes[i]).collect();
+            let z = self.borrow_mut_builder().proj(xwires[i], primes[i], tt);
+            zwires.push(z);
         }
-        let ps = self.bundles[xref.0].primes.clone();
-        self.add_bundle(zwires, ps)
+        self.add_bundle(zwires, primes)
     }
 
     pub fn cdiv(&mut self, xref: BundleRef, c: u16) -> BundleRef {
-        let mut zwires;
-        {
-            let xbun = &self.bundles[xref.0];
-            zwires = Vec::with_capacity(xbun.wires.len());
-            for (&x, &p) in xbun.wires.iter().zip(xbun.primes.iter()) {
-                if c % p == 0 {
-                    zwires.push(self.builder.as_mut().expect("need a builder!").cmul(x,0));
-                } else {
-                    let d = inv(c as i16, p as i16) as u16;
-                    zwires.push(self.builder.as_mut().expect("need a builder!").cmul(x,d));
-                }
+        let xwires = self.wires(xref);
+        let primes = self.primes(xref);
+        let zwires = xwires.into_iter().zip(primes.iter()).map(|(x,&p)|
+            if c % p == 0 {
+                self.borrow_mut_builder().cmul(x,0)
+            } else {
+                let d = inv(c as i16, p as i16) as u16;
+                self.borrow_mut_builder().cmul(x,d)
             }
-        }
-        let ps = self.bundles[xref.0].primes.clone();
-        self.add_bundle(zwires, ps)
+        ).collect();
+        self.add_bundle(zwires, primes)
     }
 
     pub fn cexp(&mut self, xref: BundleRef, c: u16) -> BundleRef {
-        assert!(c < 10); // to prevent overfolows
-        let mut zwires;
-        {
-            let xbun = &self.bundles[xref.0];
-            zwires = Vec::with_capacity(xbun.wires.len());
-            let b = self.builder.as_mut().expect("need a builder!");
-            for (&x, &p) in xbun.wires.iter().zip(xbun.primes.iter()) {
-                let tab = (0..p).map(|x| {
-                    ((x as u64).pow(c as u32) % p as u64) as u16
-                }).collect();
-                zwires.push(b.proj(x, p, tab));
-            }
-        }
-        let ps = self.bundles[xref.0].primes.clone();
-        self.add_bundle(zwires, ps)
+        let xwires = self.wires(xref);
+        let primes = self.primes(xref);
+        let zwires = xwires.into_iter().zip(primes.iter()).map(|(x, &p)| {
+            let tab = (0..p).map(|x| {
+                ((x as u64).pow(c as u32) % p as u64) as u16
+            }).collect();
+            self.borrow_mut_builder().proj(x, p, tab)
+        }).collect();
+        self.add_bundle(zwires, primes)
     }
 
     pub fn rem(&mut self, xref: BundleRef, p: u16) -> BundleRef {
-        let i = self.bundles[xref.0].primes.iter().position(|&q| p == q)
-                    .expect("p is not one of the primes in this bundle!");
-        let zwires;
-        {
-            let xbun = &self.bundles[xref.0];
-            let x = xbun.wires[i];
-            // zwires = Vec::with_capacity(xbun.wires.len());
-            let b = self.builder.as_mut().expect("need a builder!");
-            zwires = xbun.primes.iter().map(|&q| {
-                b.mod_change(x, q)
-            }).collect();
-        }
-        let ps = self.bundles[xref.0].primes.clone();
-        self.add_bundle(zwires, ps)
+        let xwires = self.wires(xref);
+        let primes = self.primes(xref);
+        let i = primes.iter().position(|&q| p == q).expect("p is not one of the primes in this bundle!");
+        let x = xwires[i];
+        let zwires = primes.iter().map(|&q| self.borrow_mut_builder().mod_change(x, q)).collect();
+        self.add_bundle(zwires, primes)
     }
 
     pub fn mul_dlog(&mut self, args: &[BundleRef]) -> BundleRef {
         assert!(!args.is_empty());
         let nwires = self.bundles[args[0].0].wires.len();
         assert!(args.iter().all(|&a| self.bundles[a.0].wires.len() == nwires));
-        let mut zwires;
+        let mut zwires = Vec::with_capacity(self.bundles[args[0].0].wires.len());
         {
-            zwires = Vec::with_capacity(self.bundles[args[0].0].wires.len());
             for i in 0..nwires {
-                let ith_wires: Vec<Ref> = args.iter().map(|&x| {
+                let ith_wires = args.iter().map(|&x| {
                     self.bundles[x.0].wires[i]
-                }).collect();
-                let b = self.builder.as_mut().expect("need a builder!");
-                zwires.push(b.mul_dlog(&ith_wires));
+                }).to_vec();
+                let z = self.borrow_mut_builder().mul_dlog(&ith_wires);
+                zwires.push(z);
             }
         }
-        let ps = self.bundles[args[0].0].primes.clone();
-        self.add_bundle(zwires, ps)
+        let primes = self.primes(args[0]);
+        self.add_bundle(zwires, primes)
     }
 
     pub fn mul(&mut self, xref: BundleRef, yref: BundleRef) -> BundleRef {
-        let zwires;
-        {
-            let xbun = &self.bundles[xref.0];
-            let ybun = &self.bundles[yref.0];
-            let b = self.builder.as_mut().expect("need a builder!");
-            zwires = xbun.wires.iter().zip(ybun.wires.iter()).map(|(&x,&y)| {
-                b.half_gate(x,y)
-            }).collect();
-        }
-        let ps = self.bundles[xref.0].primes.clone();
-        self.add_bundle(zwires, ps)
+        let xwires = self.wires(xref);
+        let ywires = self.wires(yref);
+        let primes = self.primes(xref);
+        let zwires = xwires.into_iter().zip(ywires.into_iter()).map(|(x,y)|
+            self.borrow_mut_builder().half_gate(x,y)
+        ).collect();
+        self.add_bundle(zwires, primes)
     }
 
     pub fn eq(&mut self, xref: BundleRef, yref: BundleRef) -> Ref {
-        let xbun = &self.bundles[xref.0];
-        let ybun = &self.bundles[yref.0];
-        let mut zs = Vec::with_capacity(xbun.wires.len());
-        let b = self.builder.as_mut().expect("need a builder!");
-        for i in 0..xbun.wires.len() {
-            let z = b.sub(xbun.wires[i], ybun.wires[i]);
-            let mut eq_zero_tab = vec![0; xbun.primes[i] as usize];
+        let xwires = self.wires(xref);
+        let ywires = self.wires(yref);
+        let primes = self.primes(xref);
+        let mut zs = Vec::with_capacity(xwires.len());
+        for i in 0..xwires.len() {
+            let subbed = self.borrow_mut_builder().sub(xwires[i], ywires[i]);
+            let mut eq_zero_tab = vec![0; primes[i] as usize];
             eq_zero_tab[0] = 1;
-            zs.push(b.proj(z, xbun.wires.len() as u16 + 1, eq_zero_tab));
+            let z = self.borrow_mut_builder().proj(subbed, xwires.len() as u16 + 1, eq_zero_tab);
+            zs.push(z);
         }
-        b._and_many(&zs)
+        self.borrow_mut_builder()._and_many(&zs)
     }
 
     pub fn crt_to_pmr(&mut self, xref: BundleRef) -> BundleRef {
@@ -466,7 +441,7 @@ impl Bundler {
         let ps = self.primes(xbun);
         let mut b = self.take_builder();
 
-        for (xref, p) in xs.into_iter().zip(ps.into_iter()) {
+        for (xref, &p) in xs.into_iter().zip(ps.iter()) {
 
             let mut tabs = vec![Vec::with_capacity(p as usize); ndigits];
 
@@ -498,6 +473,18 @@ impl Bundler {
 
         self.put_builder(b);
         z
+    }
+
+    pub fn zero_one_to_one_negative_one(&mut self, x: Ref, q: u128) -> BundleRef {
+        let ps = factor(q);
+        let mut ws = Vec::with_capacity(ps.len());
+        assert_eq!(self.borrow_builder().modulus(x), 2);
+        for &p in &ps {
+            let tt = vec![ 1, ((q-1) % p as u128) as u16 ];
+            let w = self.borrow_mut_builder().proj(x, p, tt);
+            ws.push(w);
+        }
+        self.add_bundle(ws, Rc::new(ps))
     }
 }
 
@@ -636,6 +623,24 @@ mod tests {
         let mut b = Bundler::new();
         let x = b.input(q);
         let z = b.cmul(x,y);
+        b.output(z);
+
+        for _ in 0..NTESTS {
+            let x = rng.gen_u64() as u128 % q;
+            let should_be = x * y % q;
+            test_garbling(&mut b, &[x], &[should_be]);
+        }
+    }
+    //}}}
+    #[test] // secret scalar_multiplication {{{
+    fn secret_scalar_multiplication() {
+        let mut rng = Rng::new();
+        let q = rng.gen_usable_composite_modulus();
+        let y = rng.gen_u64() as u128 % q;
+
+        let mut b = Bundler::new();
+        let x = b.input(q);
+        let z = b.secret_cmul(x,y);
         b.output(z);
 
         for _ in 0..NTESTS {
@@ -839,10 +844,11 @@ mod tests {
         let mut b = Bundler::new();
         let x = b.input(q);
         let ms = [2,2,3,54];
+        // let ms = [8192];
         let z = b.sgn(x,&ms);
         b.output_ref(z);
 
-        for pt in 0..128 {
+        for _ in 0..128 {
             let pt = rng.gen_u128() % q;
             let should_be = (pt >= q/2) as u16;
             test_garbling_high_to_low(&mut b, &[pt], &[should_be]);
