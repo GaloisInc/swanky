@@ -205,7 +205,6 @@ impl Builder {
 
     pub fn cmul(&mut self, xref: Ref, c: u16) -> Ref {
         let q = self.modulus(xref);
-        assert!(c > 0 && c < q, "c={}, q={}", c, q);
         self.gate(Gate::Cmul { xref, c }, q)
     }
 
