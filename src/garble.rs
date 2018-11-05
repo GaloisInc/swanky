@@ -448,7 +448,12 @@ mod tests {
             let mut b = Builder::new();
             let x = b.input(q);
             let _ = b.input(q);
-            let z = b.cmul(x, 2);
+            let z;
+            if q > 2 {
+                z = b.cmul(x, 2);
+            } else {
+                z = b.cmul(x, 1);
+            }
             b.output(z);
             b.finish()
         });

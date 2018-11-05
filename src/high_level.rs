@@ -186,7 +186,11 @@ impl Bundler {
     pub fn cmul(&mut self, xref: BundleRef, c: u128) -> BundleRef {
         let xwires = self.wires(xref);
         let primes = self.primes(xref);
+
         let cs = crt(&primes, c);
+        assert!(cs.iter().all(|&c| c > 0),
+            "all residues must be nonzero for scalar multiplication! cs={:?}", cs);
+
         let zwires = xwires.iter().zip(&cs).map(|(&x, &c)|
             self.borrow_mut_builder().cmul(x,c)
         ).collect();
@@ -488,6 +492,7 @@ mod tests {
     use high_level::Bundler;
     use numbers::{self, u128_to_bits, inv, factor, modulus_with_width};
     use rand::Rng;
+    use util::IterToVec;
 
     const NTESTS: usize = 1;
 
@@ -609,18 +614,30 @@ mod tests {
     #[test] // scalar_multiplication {{{
     fn scalar_multiplication() {
         let mut rng = Rng::new();
-        let q = rng.gen_usable_composite_modulus();
-        let y = rng.gen_u64() as u128 % q;
+        for _ in 0..16 {
+            let q = modulus_with_width(10);
+            let ps = factor(q);
 
-        let mut b = Bundler::new();
-        let x = b.input(q);
-        let z = b.cmul(x,y);
-        b.output(z);
+            // go out of our way to avoid residues of 0, which are not supported by BMR16
+            let ys = ps.iter().map(|&p| {
+                if p == 2 {
+                    1
+                } else {
+                    (1 + (rng.gen_u16() % (p-2)))
+                }
+            }).to_vec();
+            let y = numbers::crt_inv(&ps, &ys);
 
-        for _ in 0..NTESTS {
-            let x = rng.gen_u64() as u128 % q;
-            let should_be = x * y % q;
-            test_garbling(&mut b, &[x], &[should_be]);
+            let mut b = Bundler::new();
+            let x = b.input(q);
+            let z = b.cmul(x,y);
+            b.output(z);
+
+            for _ in 0..NTESTS {
+                let x = rng.gen_u64() as u128 % q;
+                let should_be = x * y % q;
+                test_garbling(&mut b, &[x], &[should_be]);
+            }
         }
     }
     //}}}
