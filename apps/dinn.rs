@@ -12,7 +12,7 @@ use std::io::{BufReader, Lines};
 use fancy_garbling::high_level::Bundler;
 use fancy_garbling::numbers;
 use fancy_garbling::circuit::{Builder, Ref};
-use fancy_garbling::garble::garble_full;
+use fancy_garbling::garble::garble;
 use fancy_garbling::util::IterToVec;
 
 const WEIGHTS_FILE  : &str = "../dinn/weights-and-biases/txt_weights.txt";
@@ -45,7 +45,7 @@ pub fn main() {
     let images:  Vec<Vec<u128>>      = read_images(q);
     let labels:  Vec<usize>          = read_labels();
 
-    let bun = build_circuit(q, &weights, &biases, false);
+    let mut bun = build_circuit(q, &weights, &biases, false);
 
     if run_benches {
         println!("running garble/eval benchmark");
@@ -54,22 +54,22 @@ pub fn main() {
         let ntests = 16;
         for _ in 0..ntests {
             let start = SystemTime::now();
-            let (circ, consts) = bun.borrow();
-            let (gb,_) = garble_full(circ, consts);
+            let circ = bun.borrow_circ();
+            let (gb,_) = garble(circ);
             test::black_box(gb);
             garble_time += SystemTime::now().duration_since(start).unwrap();
         }
         garble_time /= ntests;
 
-        let (circ, consts) = bun.borrow();
-        let (gb,ev) = garble_full(circ, consts);
+        let circ = bun.finish();
+        let (gb,ev) = garble(&circ);
 
         let inp = gb.encode(&bun.encode(&images[0]));
 
         let mut eval_time = Duration::new(0,0);
         for _ in 0..ntests {
             let start = SystemTime::now();
-            let res = ev.eval(bun.borrow_circ(), &inp);
+            let res = ev.eval(&circ, &inp);
             test::black_box(res);
             eval_time += SystemTime::now().duration_since(start).unwrap();
         }
@@ -93,8 +93,8 @@ pub fn main() {
 
             let inp = bun.encode(img);
 
-            let (circ, consts) = bun.borrow();
-            let raw = circ.eval_full(&inp, consts);
+            let circ = bun.borrow_circ();
+            let raw = circ.eval(&inp);
             let res = bun.decode(&raw);
 
             let res: Vec<i32> = res.into_iter().map(|x| from_mod_q(q,x)).collect();
