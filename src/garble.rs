@@ -20,10 +20,6 @@ pub struct Evaluator {
 }
 
 pub fn garble(c: &Circuit) -> (Garbler, Evaluator) {
-    garble_full(c, &[])
-}
-
-pub fn garble_full(c: &Circuit, const_vals: &[u16]) -> (Garbler, Evaluator) {
     let mut gb = Garbler::new();
 
     let mut wires: Vec<Wire> = Vec::new();
@@ -69,8 +65,8 @@ pub fn garble_full(c: &Circuit, const_vals: &[u16]) -> (Garbler, Evaluator) {
         gb.output(&X, i);
     }
 
-
-    let ev = Evaluator::new(gates, gb.encode_consts(const_vals));
+    let cs = c.const_vals.as_ref().expect("constants needed!");
+    let ev = Evaluator::new(gates, gb.encode_consts(cs));
     (gb, ev)
 }
 
@@ -572,13 +568,13 @@ mod tests {
         let z = b.add(x,y);
         b.output(z);
 
-        let (circ, consts) = b.finish_full();
-        let (gb, ev) = garble_full(&circ, &consts);
+        let circ = b.finish();
+        let (gb, ev) = garble(&circ);
 
         for _ in 0..64 {
             let x = rng.gen_u16() % q;
 
-            assert_eq!(circ.eval_full(&[x], &consts)[0], (x+c)%q, "plaintext");
+            assert_eq!(circ.eval(&[x])[0], (x+c)%q, "plaintext");
 
             let X = gb.encode(&[x]);
             let Y = ev.eval(&circ, &X);

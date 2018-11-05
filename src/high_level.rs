@@ -91,12 +91,6 @@ impl Bundler {
         self.borrow_builder().borrow_circ()
     }
 
-    pub fn borrow(&self) -> (&Circuit, &[u16]) {
-        let circ   = self.borrow_builder().borrow_circ();
-        let consts = self.borrow_builder().borrow_consts();
-        (circ, consts)
-    }
-
     ////////////////////////////////////////////////////////////////////////////////
     // basic methods
 
@@ -490,7 +484,7 @@ impl Bundler {
 
 #[cfg(test)]
 mod tests {
-    use garble::{garble, garble_full};
+    use garble::garble;
     use high_level::Bundler;
     use numbers::{self, u128_to_bits, inv, factor, modulus_with_width};
     use rand::Rng;
@@ -500,13 +494,12 @@ mod tests {
     // test harnesses {{{
     fn test_garbling(b: &Bundler, inp: &[u128], should_be: &[u128]) {
         let circ = b.borrow_builder().borrow_circ();
-        let consts = b.borrow_builder().borrow_consts();
-        let (gb, ev) = garble_full(&circ, &consts);
+        let (gb, ev) = garble(&circ);
 
         // println!("number of ciphertexts: {}", ev.size());
 
         let enc_inp = b.encode(inp);
-        let res = circ.eval_full(&enc_inp, &consts);
+        let res = circ.eval(&enc_inp);
         assert_eq!(b.decode(&res), should_be);
 
         let xs = gb.encode(&enc_inp);
@@ -516,13 +509,12 @@ mod tests {
 
     fn test_garbling_high_to_low(b: &Bundler, inp: &[u128], should_be: &[u16]) {
         let circ = b.borrow_builder().borrow_circ();
-        let consts = b.borrow_builder().borrow_consts();
-        let (gb, ev) = garble_full(&circ, &consts);
+        let (gb, ev) = garble(&circ);
 
         // println!("number of ciphertexts: {}", ev.size());
 
         let enc_inp = b.encode(inp);
-        let pt_outs: Vec<u16> = circ.eval_full(&enc_inp, &consts);
+        let pt_outs: Vec<u16> = circ.eval(&enc_inp);
         assert_eq!(pt_outs, should_be, "inp={:?}", inp);
 
         let xs = gb.encode(&enc_inp);

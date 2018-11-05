@@ -21,6 +21,7 @@ pub struct Circuit {
     pub moduli: Vec<u16>,
     pub input_refs: Vec<Ref>,
     pub output_refs: Vec<Ref>,
+    pub const_vals: Option<Vec<u16>>,
 }
 
 #[derive(Debug)]
@@ -37,10 +38,6 @@ pub enum Gate {
 
 impl Circuit {
     pub fn eval(&self, inputs: &[u16]) -> Vec<u16> {
-        self.eval_full(inputs, &[])
-    }
-
-    pub fn eval_full(&self, inputs: &[u16], consts: &[u16]) -> Vec<u16> {
         assert_eq!(inputs.len(), self.ninputs());
 
         let mut cache = vec![0;self.gates.len()];
@@ -51,8 +48,9 @@ impl Circuit {
                 Gate::Input { id } => inputs[id],
 
                 Gate::Const { id } => {
-                    assert!(id < consts.len(), "[eval_full] not enough constants provided");
-                    consts[id]
+                    assert!(id < self.const_vals.as_ref().map_or(0, |cs| cs.len()),
+                            "[eval_full] not enough constants provided");
+                    self.const_vals.as_ref().expect("no consts provided")[id]
                 }
 
                 Gate::Add { xref, yref } => (cache[xref] + cache[yref]) % q,
@@ -81,6 +79,10 @@ impl Circuit {
         let r = self.input_refs[id];
         self.moduli[r]
     }
+
+    pub fn clear_consts(&mut self) {
+        self.const_vals = None;
+    }
 }
 
 // Use a Builder to conveniently make a Circuit
@@ -88,7 +90,6 @@ pub struct Builder {
     next_ref: Ref,
     next_input_id: Id,
     next_ciphertext_id: Id,
-    const_vals: Vec<u16>,
     const_map: HashMap<(u16,u16), Ref>,
     pub circ: Circuit,
 }
@@ -100,12 +101,12 @@ impl Builder {
             input_refs: Vec::new(),
             output_refs: Vec::new(),
             moduli: Vec::new(),
+            const_vals: Some(Vec::new()),
         };
         Builder {
             next_ref: 0,
             next_input_id: 0,
             next_ciphertext_id: 0,
-            const_vals: Vec::new(),
             const_map: HashMap::new(),
             circ: c
         }
@@ -115,16 +116,8 @@ impl Builder {
         self.circ
     }
 
-    pub fn finish_full(self) -> (Circuit, Vec<u16>) {
-        (self.circ, self.const_vals)
-    }
-
     pub fn borrow_circ(&self) -> &Circuit {
         &self.circ
-    }
-
-    pub fn borrow_consts(&self) -> &[u16] {
-        &self.const_vals
     }
 
     pub fn modulus(&self, x:Ref) -> u16 {
@@ -170,8 +163,8 @@ impl Builder {
         match self.const_map.get(&(val,q)) {
             Some(&r) => r,
             None => {
-                let id = self.const_vals.len();
-                self.const_vals.push(val);
+                let id = self.circ.const_vals.as_ref().map_or(0, |cs| cs.len());
+                self.circ.const_vals.as_mut().map(|cs| cs.push(val));
                 let gate = Gate::Const { id };
                 let r = self.gate(gate, q);
                 self.const_map.insert((val,q), r);
@@ -622,14 +615,14 @@ mod tests {
         let (zs, c) = b.binary_subtraction(&xs, &ys);
         b.outputs(&zs);
         b.output(c);
-        let (circ, consts) = b.finish_full();
+        let circ = b.finish();
         let mut rng = Rng::new();
         for _ in 0..16 {
             let x = rng.gen_u128();
             let y = rng.gen_u128();
             let mut bits = numbers::u128_to_bits(x, 128);
             bits.extend(numbers::u128_to_bits(y, 128).iter());
-            let res = circ.eval_full(&bits, &consts);
+            let res = circ.eval(&bits);
             let (z, carry) = x.overflowing_sub(y);
             assert_eq!(numbers::u128_from_bits(&res[0..128]), z);
             assert_eq!(res[128], carry as u16);
@@ -712,7 +705,7 @@ mod tests {
 
         for _ in 0..64 {
             let x = rng.gen_u16() % q;
-            let z = circ.eval_full(&[x], &[c]);
+            let z = circ.eval(&[x]);
             assert_eq!(z[0], (x+c)%q);
         }
     }
