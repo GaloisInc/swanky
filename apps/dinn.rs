@@ -31,19 +31,23 @@ const NLAYERS: usize = 2;
 
 const BIT_WIDTH: usize = 10;
 
+const NTESTS: u32 = 1; // number of iterations of bench
+
 pub fn main() {
-    let mut run_benches = false;
+    let mut boolean = false;
+
+    let mut run_bench = false;
     let mut run_tests = false;
-    let mut run_bool_tests = false;
-    let mut run_bool_benches = false;
+
+    let mut secret_weights = false;
 
     for arg in std::env::args().skip(1) {
         match arg.as_str() {
-            "bench" => run_benches = true,
-            "test" => run_tests = true,
-            "bool_test" => run_bool_tests = true,
-            "bool_bench" => run_bool_benches = true,
-            _ => panic!("unknown arg {}! allowed commands: bench, test, bool_test, bool_bench", arg),
+            "bench"     => run_bench = true,
+            "test"      => run_tests = true,
+            "boolean"   => boolean = true,
+            "secret"    => secret_weights = true,
+            _ => panic!("unknown arg {}! allowed commands: bench test boolean secret", arg),
         }
     }
 
@@ -52,21 +56,33 @@ pub fn main() {
     let images = read_images(IMAGES_FILE);
     let labels = read_labels(LABELS_FILE);
 
-    if run_benches      { bench_arith_garbling(&nn, &images[0]); }
-    if run_tests        { test_arith_circuit(&nn, &images, &labels); }
-    if run_bool_tests   { test_bool_circuit(&nn, &images, &labels); }
-    if run_bool_benches { bench_bool_garbling(&nn, &images[0]); }
+    if run_bench {
+        if boolean {
+            bench_bool_garbling(&nn, &images[0], secret_weights);
+        } else {
+            bench_arith_garbling(&nn, &images[0], secret_weights);
+        }
+    }
+
+    if run_tests {
+        if boolean {
+            test_bool_circuit(&nn, &images, &labels, secret_weights);
+        } else {
+            test_arith_circuit(&nn, &images, &labels, secret_weights);
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 // tests
 
-fn test_arith_circuit(nn: &NeuralNet, images: &Vec<Vec<i32>>, labels: &[usize]) {
+fn test_arith_circuit(nn: &NeuralNet, images: &Vec<Vec<i32>>, labels: &[usize], secret_weights: bool) {
     println!("running plaintext accuracy evaluation");
+    println!("secret weights={}", secret_weights);
 
     let q = numbers::modulus_with_width(BIT_WIDTH as u32);
     println!("q={}", q);
-    let bun = build_circuit(q, nn, false);
+    let bun = build_circuit(q, nn, secret_weights);
 
     let mut errors = 0;
 
@@ -99,23 +115,23 @@ fn test_arith_circuit(nn: &NeuralNet, images: &Vec<Vec<i32>>, labels: &[usize]) 
     println!("errors: {}/{}. accuracy: {}%", errors, NIMAGES, 100.0 * (1.0 - errors as f32 / NIMAGES as f32));
 }
 
-fn bench_arith_garbling(nn: &NeuralNet, image: &[i32]) {
+fn bench_arith_garbling(nn: &NeuralNet, image: &[i32], secret_weights: bool) {
     println!("running garble/eval benchmark");
+    println!("secret weights={}", secret_weights);
 
     let q = numbers::modulus_with_width(BIT_WIDTH as u32);
     println!("q={}", q);
-    let mut bun = build_circuit(q, nn, false);
+    let mut bun = build_circuit(q, nn, secret_weights);
 
     let mut garble_time = Duration::new(0,0);
-    let ntests = 16;
-    for _ in 0..ntests {
+    for _ in 0..NTESTS {
         let start = SystemTime::now();
         let circ = bun.borrow_circ();
         let (gb,_) = garble(circ);
         test::black_box(gb);
         garble_time += SystemTime::now().duration_since(start).unwrap();
     }
-    garble_time /= ntests;
+    garble_time /= NTESTS;
 
     let circ = bun.finish();
     let (gb,ev) = garble(&circ);
@@ -124,25 +140,26 @@ fn bench_arith_garbling(nn: &NeuralNet, image: &[i32]) {
     let inp = gb.encode(&bun.encode(&img));
 
     let mut eval_time = Duration::new(0,0);
-    for _ in 0..ntests {
+    for _ in 0..NTESTS {
         let start = SystemTime::now();
         let res = ev.eval(&circ, &inp);
         test::black_box(res);
         eval_time += SystemTime::now().duration_since(start).unwrap();
     }
-    eval_time /= ntests;
+    eval_time /= NTESTS;
 
     println!("garbling took {} ms", garble_time.as_millis());
     println!("eval took {} ms", eval_time.as_millis());
     println!("size: {} ciphertexts", ev.size());
 }
 
-fn test_bool_circuit(nn: &NeuralNet, images: &Vec<Vec<i32>>, labels: &[usize]) {
+fn test_bool_circuit(nn: &NeuralNet, images: &Vec<Vec<i32>>, labels: &[usize], secret_weights: bool) {
     let nbits = BIT_WIDTH;
-    let circ = build_boolean_circuit(nbits, nn);
+    let circ = build_boolean_circuit(nbits, nn, secret_weights);
 
     println!("noutputs={}", circ.noutputs());
     println!("running plaintext accuracy evaluation for boolean circuit");
+    println!("secret weights={}", secret_weights);
 
     let mut errors = 0;
     for (img_num, img) in images.iter().enumerate() {
@@ -174,21 +191,21 @@ fn test_bool_circuit(nn: &NeuralNet, images: &Vec<Vec<i32>>, labels: &[usize]) {
     println!("errors: {}/{}. accuracy: {}%", errors, NIMAGES, 100.0 * (1.0 - errors as f32 / NIMAGES as f32));
 }
 
-fn bench_bool_garbling(nn: &NeuralNet, image: &[i32]) {
+fn bench_bool_garbling(nn: &NeuralNet, image: &[i32], secret_weights: bool) {
     println!("running garble/eval benchmark for boolean circuit");
+    println!("secret weights={}", secret_weights);
 
     let nbits = BIT_WIDTH;
-    let circ = build_boolean_circuit(nbits, nn);
+    let circ = build_boolean_circuit(nbits, nn, secret_weights);
 
     let mut garble_time = Duration::new(0,0);
-    let ntests = 16;
-    for _ in 0..ntests {
+    for _ in 0..NTESTS {
         let start = SystemTime::now();
         let (gb,_) = garble(&circ);
         test::black_box(gb);
         garble_time += SystemTime::now().duration_since(start).unwrap();
     }
-    garble_time /= ntests;
+    garble_time /= NTESTS;
 
     let (gb,ev) = garble(&circ);
 
@@ -196,13 +213,13 @@ fn bench_bool_garbling(nn: &NeuralNet, image: &[i32]) {
     let inp = gb.encode(&img);
 
     let mut eval_time = Duration::new(0,0);
-    for _ in 0..ntests {
+    for _ in 0..NTESTS {
         let start = SystemTime::now();
         let res = ev.eval(&circ, &inp);
         test::black_box(res);
         eval_time += SystemTime::now().duration_since(start).unwrap();
     }
-    eval_time /= ntests;
+    eval_time /= NTESTS;
 
     println!("garbling took {} ms", garble_time.as_millis());
     println!("eval took {} ms", eval_time.as_millis());
@@ -262,7 +279,7 @@ fn build_circuit(q: u128, nn: &NeuralNet, secret_weights: bool) -> Bundler {
     b
 }
 
-fn build_boolean_circuit(nbits: usize, nn: &NeuralNet) -> Circuit {
+fn build_boolean_circuit(nbits: usize, nn: &NeuralNet, secret_weights: bool) -> Circuit {
     let mut b = Builder::new();
 
     // binary inputs with 0 representing -1
@@ -292,7 +309,13 @@ fn build_boolean_circuit(nbits: usize, nn: &NeuralNet) -> Circuit {
                 // hardcode the weights into the circuit
                 let w = nn.weight(layer,i,j) as u128;
                 let negw = twos_complement_negate(nn.weight(layer,i,j) as u128, nbits);
-                let y = multiplex_constants(&mut b, layer_inputs[i], w, negw, nbits);
+
+                let y;
+                if secret_weights {
+                    y = multiplex_secret_constants(&mut b, layer_inputs[i], w, negw, nbits);
+                } else {
+                    y = multiplex_constants(&mut b, layer_inputs[i], w, negw, nbits);
+                }
                 x = b.addition_no_carry(&x, &y);
             }
             acc.push(x);
@@ -311,15 +334,12 @@ fn build_boolean_circuit(nbits: usize, nn: &NeuralNet) -> Circuit {
 }
 
 fn multiplex_constants(b: &mut Builder, x: Ref, c1: u128, c2: u128, n: usize) -> Vec<Ref> {
-    let c1_bs = numbers::to_bits(c1, n);
-    let c2_bs = numbers::to_bits(c2, n);
-    c1_bs.into_iter().zip(c2_bs.into_iter()).map(|(c1,c2)| mux_const_bits(b, x, c1, c2)).collect()
+    let c1_bs = numbers::to_bits(c1, n).into_iter().map(|x:u16| x > 0).to_vec();
+    let c2_bs = numbers::to_bits(c2, n).into_iter().map(|x:u16| x > 0).to_vec();
+    c1_bs.into_iter().zip(c2_bs.into_iter()).map(|(b1,b2)| mux_const_bits(b,x,b1,b2)).collect()
 }
 
-fn mux_const_bits(b: &mut Builder, x: Ref, c1: u16, c2: u16) -> Ref {
-    let b1 = c1 > 0;
-    let b2 = c2 > 0;
-
+fn mux_const_bits(b: &mut Builder, x: Ref, b1: bool, b2: bool) -> Ref {
     if !b1 && b2 {
         x
     } else if b1 && !b2 {
@@ -329,6 +349,21 @@ fn mux_const_bits(b: &mut Builder, x: Ref, c1: u16, c2: u16) -> Ref {
     } else {
         b.constant(1,2)
     }
+}
+
+fn multiplex_secret_constants(b: &mut Builder, x: Ref, c1: u128, c2: u128, n: usize) -> Vec<Ref> {
+    let c1_bs = numbers::to_bits(c1, n).into_iter().map(|x:u16| x > 0).to_vec();
+    let c2_bs = numbers::to_bits(c2, n).into_iter().map(|x:u16| x > 0).to_vec();
+    c1_bs.into_iter().zip(c2_bs.into_iter()).map(|(b1,b2)| mux_secret_const_bits(b,x,b1,b2)).collect()
+}
+
+fn mux_secret_const_bits(b: &mut Builder, x: Ref, b1: bool, b2: bool) -> Ref {
+    let s1 = b.secret_constant(b1 as u16, 2);
+    let s2 = b.secret_constant(b2 as u16, 2);
+    let nx = b.negate(x);
+    let z1 = b.and(nx, s1);
+    let z2 = b.and(x, s2);
+    b.add(z1, z2)
 }
 
 ////////////////////////////////////////////////////////////////////////////////

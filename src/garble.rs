@@ -274,7 +274,7 @@ impl Evaluator {
     }
 
     pub fn size(&self) -> usize {
-        let mut c = 0;
+        let mut c = self.consts.len();
         for g in self.gates.iter() {
             c += g.len();
         }

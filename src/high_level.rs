@@ -510,7 +510,7 @@ mod tests {
         let circ = b.borrow_builder().borrow_circ();
         let (gb, ev) = garble(&circ);
 
-        // println!("number of ciphertexts: {}", ev.size());
+        println!("number of ciphertexts: {}", ev.size());
 
         let enc_inp = b.encode(inp);
         let res = circ.eval(&enc_inp);
@@ -525,7 +525,7 @@ mod tests {
         let circ = b.borrow_builder().borrow_circ();
         let (gb, ev) = garble(&circ);
 
-        // println!("number of ciphertexts: {}", ev.size());
+        println!("number of ciphertexts: {}", ev.size());
 
         let enc_inp = b.encode(inp);
         let pt_outs: Vec<u16> = circ.eval(&enc_inp);
