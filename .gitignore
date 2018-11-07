@@ -3,4 +3,4 @@ Cargo.lock
 deps
 build
 libOTe
-.tags
+.tags*
