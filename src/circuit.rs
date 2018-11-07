@@ -71,9 +71,8 @@ impl Circuit {
         self.output_refs.iter().map(|outref| cache[*outref]).collect()
     }
 
-    pub fn ninputs(&self) -> usize {
-        self.input_refs.len()
-    }
+    pub fn ninputs(&self) -> usize { self.input_refs.len() }
+    pub fn noutputs(&self) -> usize { self.output_refs.len() }
 
     pub fn input_mod(&self, id: Id) -> u16 {
         let r = self.input_refs[id];
@@ -159,15 +158,22 @@ impl Builder {
         (0..n).map(|_| self.input(modulus)).collect()
     }
 
-    pub fn constant(&mut self, val: u16, q: u16) -> Ref {
-        match self.const_map.get(&(val,q)) {
+    pub fn secret_constant(&mut self, val: u16, modulus: u16) -> Ref {
+        let id = self.circ.const_vals.as_ref().map_or(0, |cs| cs.len());
+        self.circ.const_vals.as_mut().map(|cs| cs.push(val));
+        let gate = Gate::Const { id };
+        self.gate(gate, modulus)
+    }
+
+    pub fn constant(&mut self, val: u16, modulus: u16) -> Ref {
+        match self.const_map.get(&(val, modulus)) {
             Some(&r) => r,
             None => {
                 let id = self.circ.const_vals.as_ref().map_or(0, |cs| cs.len());
                 self.circ.const_vals.as_mut().map(|cs| cs.push(val));
                 let gate = Gate::Const { id };
-                let r = self.gate(gate, q);
-                self.const_map.insert((val,q), r);
+                let r = self.gate(gate, modulus);
+                self.const_map.insert((val,modulus), r);
                 r
             }
         }
@@ -577,8 +583,8 @@ mod tests {
         for _ in 0..16 {
             let x = rng.gen_u128();
             let y = rng.gen_u128();
-            let mut bits = numbers::u128_to_bits(x, 128);
-            bits.extend(numbers::u128_to_bits(y, 128).iter());
+            let mut bits = numbers::to_bits(x, 128);
+            bits.extend(numbers::to_bits(y, 128).iter());
             let res = c.eval(&bits);
             let (z, carry) = x.overflowing_add(y);
             assert_eq!(numbers::u128_from_bits(&res[0..128]), z);
@@ -598,8 +604,8 @@ mod tests {
         for _ in 0..16 {
             let x = rng.gen_u128();
             let y = rng.gen_u128();
-            let mut bits = numbers::u128_to_bits(x, 128);
-            bits.extend(numbers::u128_to_bits(y, 128).iter());
+            let mut bits = numbers::to_bits(x, 128);
+            bits.extend(numbers::to_bits(y, 128).iter());
             let res = c.eval(&bits);
             let (z, _carry) = x.overflowing_add(y);
             assert_eq!(numbers::u128_from_bits(&res[0..128]), z);
@@ -620,8 +626,8 @@ mod tests {
         for _ in 0..16 {
             let x = rng.gen_u128();
             let y = rng.gen_u128();
-            let mut bits = numbers::u128_to_bits(x, 128);
-            bits.extend(numbers::u128_to_bits(y, 128).iter());
+            let mut bits = numbers::to_bits(x, 128);
+            bits.extend(numbers::to_bits(y, 128).iter());
             let res = circ.eval(&bits);
             let (z, carry) = x.overflowing_sub(y);
             assert_eq!(numbers::u128_from_bits(&res[0..128]), z);

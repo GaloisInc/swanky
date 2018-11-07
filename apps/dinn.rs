@@ -11,7 +11,7 @@ use std::io::{BufReader, Lines};
 
 use fancy_garbling::high_level::Bundler;
 use fancy_garbling::numbers;
-use fancy_garbling::circuit::{Builder, Ref};
+use fancy_garbling::circuit::{Builder, Ref, Circuit};
 use fancy_garbling::garble::garble;
 use fancy_garbling::util::IterToVec;
 
@@ -28,11 +28,15 @@ const NLAYERS: usize = 2;
 pub fn main() {
     let mut run_benches = false;
     let mut run_tests = false;
+    let mut run_bool_tests = false;
+    let mut run_bool_benches = false;
 
     for arg in std::env::args().skip(1) {
         match arg.as_str() {
             "bench" => run_benches = true,
             "test" => run_tests = true,
+            "bool_test" => run_bool_tests = true,
+            "bool_bench" => run_bool_benches = true,
             _ => panic!("unknown arg {}", arg),
         }
     }
@@ -40,10 +44,10 @@ pub fn main() {
     let q = numbers::modulus_with_width(10);
     println!("q={}", q);
 
-    let weights: Vec<Vec<Vec<u128>>> = read_weights(q);
-    let biases:  Vec<Vec<u128>>      = read_biases(q);
-    let images:  Vec<Vec<u128>>      = read_images(q);
-    let labels:  Vec<usize>          = read_labels();
+    let weights: Vec<Vec<Vec<i32>>> = read_weights();
+    let biases:  Vec<Vec<i32>>      = read_biases();
+    let images:  Vec<Vec<i32>>      = read_images();
+    let labels:  Vec<usize>         = read_labels();
 
     let mut bun = build_circuit(q, &weights, &biases, false);
 
@@ -64,7 +68,8 @@ pub fn main() {
         let circ = bun.finish();
         let (gb,ev) = garble(&circ);
 
-        let inp = gb.encode(&bun.encode(&images[0]));
+        let img0 = images[0].iter().map(|&i| to_mod_q(q,i)).to_vec();
+        let inp = gb.encode(&bun.encode(&img0));
 
         let mut eval_time = Duration::new(0,0);
         for _ in 0..ntests {
@@ -78,7 +83,6 @@ pub fn main() {
         println!("garbling took {} ms", garble_time.as_millis());
         println!("eval took {} ms", eval_time.as_millis());
         println!("size: {} ciphertexts", ev.size());
-
     }
 
     if run_tests {
@@ -91,9 +95,9 @@ pub fn main() {
                 println!("{}/{} {} errors ({}%)", img_num, NIMAGES, errors, 100.0 * (1.0 - errors as f32 / NIMAGES as f32));
             }
 
-            let inp = bun.encode(img);
-
             let circ = bun.borrow_circ();
+            let modq_img = img.iter().map(|&i| to_mod_q(q,i)).to_vec();
+            let inp = bun.encode(&modq_img);
             let raw = circ.eval(&inp);
             let res = bun.decode(&raw);
 
@@ -115,12 +119,87 @@ pub fn main() {
 
         println!("errors: {}/{}. accuracy: {}%", errors, NIMAGES, 100.0 * (1.0 - errors as f32 / NIMAGES as f32));
     }
+
+    if run_bool_tests {
+        let nbits = 12;
+        let circ = build_boolean_circuit(nbits, &weights, &biases);
+
+        println!("noutputs={}", circ.noutputs());
+
+        println!("running plaintext accuracy evaluation for boolean circuit");
+
+        let mut errors = 0;
+
+        for (img_num, img) in images.iter().enumerate() {
+            if img_num % 20 == 0 {
+                println!("{}/{} {} errors ({}% accuracy)", img_num, NIMAGES, errors, 100.0 * (1.0 - errors as f32 / img_num as f32));
+            }
+
+            let inp = img.iter().map(|&x| if x == -1 { 1 } else if x == 1 { 0 } else { panic!("unknown input {}", x) } ).to_vec();
+            let out = circ.eval(&inp);
+
+            let res = out.chunks(nbits).map(|bs| {
+                let x = numbers::u128_from_bits(bs);
+                from_mod_q(1<<nbits, x)
+            }).to_vec();
+
+            let mut max_val = i32::min_value();
+            let mut winner = 0;
+            for i in 0..res.len() {
+                if res[i] > max_val {
+                    max_val = res[i];
+                    winner = i;
+                }
+            }
+
+            if winner != labels[img_num] {
+                errors += 1;
+            }
+        }
+
+        println!("errors: {}/{}. accuracy: {}%", errors, NIMAGES, 100.0 * (1.0 - errors as f32 / NIMAGES as f32));
+    }
+
+    if run_bool_benches {
+        println!("running garble/eval benchmark for boolean circuit");
+
+        let nbits = 12;
+        let circ = build_boolean_circuit(nbits, &weights, &biases);
+
+        let mut garble_time = Duration::new(0,0);
+        let ntests = 16;
+        for _ in 0..ntests {
+            let start = SystemTime::now();
+            let (gb,_) = garble(&circ);
+            test::black_box(gb);
+            garble_time += SystemTime::now().duration_since(start).unwrap();
+        }
+        garble_time /= ntests;
+
+        let (gb,ev) = garble(&circ);
+
+        let img0 = images[0].iter().map(|&x| if x == -1 { 1 } else if x == 1 { 0 } else { panic!("unknown input {}", x) } ).to_vec();
+        let inp = gb.encode(&img0);
+
+        let mut eval_time = Duration::new(0,0);
+        for _ in 0..ntests {
+            let start = SystemTime::now();
+            let res = ev.eval(&circ, &inp);
+            test::black_box(res);
+            eval_time += SystemTime::now().duration_since(start).unwrap();
+        }
+        eval_time /= ntests;
+
+        println!("garbling took {} ms", garble_time.as_millis());
+        println!("eval took {} ms", eval_time.as_millis());
+        println!("size: {} ciphertexts", ev.size());
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 // circuit creation
-
-fn build_circuit(q: u128, weights: &Vec<Vec<Vec<u128>>>, biases: &Vec<Vec<u128>>, secret_weights: bool) -> Bundler {
+//{{{ build_circuit: build arithmetic circuit
+fn build_circuit(q: u128, weights: &Vec<Vec<Vec<i32>>>, biases: &Vec<Vec<i32>>, secret_weights: bool) -> Bundler {
     let mut b = Bundler::new();
     // let nn_biases = vec![b.inputs(q, TOPOLOGY[1]), b.inputs(q, TOPOLOGY[2])];
     let nn_inputs = b.inputs(q, TOPOLOGY[0]);
@@ -140,13 +219,15 @@ fn build_circuit(q: u128, weights: &Vec<Vec<Vec<u128>>>, biases: &Vec<Vec<u128>>
         let nout = TOPOLOGY[layer+1];
 
         for j in 0..nout {
-            let mut x = b.constant(biases[layer][j], q);
+            let bias = to_mod_q(q, biases[layer][j]);
+            let mut x = b.secret_constant(bias, q);
             for i in 0..nin {
                 let y;
+                let weight = to_mod_q(q, weights[layer][i][j]);
                 if secret_weights {
-                    y = b.secret_cmul(layer_inputs[i], weights[layer][i][j]);
+                    y = b.secret_cmul(layer_inputs[i], weight);
                 } else {
-                    y = b.cmul(layer_inputs[i], weights[layer][i][j]);
+                    y = b.cmul(layer_inputs[i], weight);
                 }
                 x = b.add(x, y);
             }
@@ -167,18 +248,14 @@ fn build_circuit(q: u128, weights: &Vec<Vec<Vec<u128>>>, biases: &Vec<Vec<u128>>
     }
     b
 }
+//}}}
 
-// for comparison
-fn build_boolean_circuit(weights: &Vec<Vec<Vec<u128>>>, biases: &Vec<Vec<u128>>) -> Builder {
+// build_boolean_circuit for comparison{{{
+fn build_boolean_circuit(nbits: usize, weights: &Vec<Vec<Vec<i32>>>, biases: &Vec<Vec<i32>>) -> Circuit {
     let mut b = Builder::new();
-    let nbits = 10;
 
-    let nn_biases = vec![
-        (0..TOPOLOGY[1]).map(|_| b.inputs(2,nbits)).to_vec(),
-        (0..TOPOLOGY[2]).map(|_| b.inputs(2,nbits)).to_vec(),
-    ];
-
-    let nn_inputs = (0..TOPOLOGY[0]).map(|_| b.inputs(2,nbits)).to_vec();
+    // binary inputs with 0 representing -1
+    let nn_inputs = (0..TOPOLOGY[0]).map(|_| b.input(2)).to_vec();
 
     let mut layer_outputs = Vec::new();
     let mut layer_inputs;
@@ -194,54 +271,58 @@ fn build_boolean_circuit(weights: &Vec<Vec<Vec<u128>>>, biases: &Vec<Vec<u128>>)
         let nin  = TOPOLOGY[layer];
         let nout = TOPOLOGY[layer+1];
 
+        let mut acc = Vec::new();
+
         for j in 0..nout {
-            let mut x = to_bit_consts(&mut b, biases[layer][j]);
+            // map the bias values to binary consts
+            let bias = i32_to_twos_complement(biases[layer][j], nbits);
+            let mut x = numbers::u128_to_bits(bias, nbits).into_iter().map(|bit| b.constant(bit,2)).to_vec();
             for i in 0..nin {
-                // let y = b.cmul(layer_inputs[i], weights[layer][i][j]);
-                // x = b.add(x, y);
+                // hardcode the weights into the circuit
+                let w = weights[layer][i][j] as u128;
+                let negw = twos_complement_negate(weights[layer][i][j] as u128, nbits);
+                let y = multiplex_constants(&mut b, layer_inputs[i], w, negw, nbits);
+                x = b.addition_no_carry(&x, &y);
             }
-            layer_outputs.push(x);
+            acc.push(x);
         }
 
-    //     if layer == 0 {
-    //         layer_outputs = layer_outputs.into_iter().map(|x| {
-    //             let ms = vec![5,205];
-    //             let r = b.sgn(x, &ms);
-    //             b.zero_one_to_one_negative_one(r, q)
-    //         }).collect();
-    //     }
+        if layer < TOPOLOGY.len()-2 {
+            layer_outputs = acc.into_iter().map(|x| x[nbits-1] ).collect();
+        } else {
+            for x in acc {
+                b.outputs(&x);
+            }
+        }
     }
 
-    for out in &layer_outputs {
-        b.outputs(out);
+    b.finish()
+}
+
+fn multiplex_constants(b: &mut Builder, x: Ref, c1: u128, c2: u128, n: usize) -> Vec<Ref> {
+    let c1_bs = numbers::to_bits(c1, n);
+    let c2_bs = numbers::to_bits(c2, n);
+    c1_bs.into_iter().zip(c2_bs.into_iter()).map(|(c1,c2)| mux_const_bits(b, x, c1, c2)).collect()
+}
+
+fn mux_const_bits(b: &mut Builder, x: Ref, c1: u16, c2: u16) -> Ref {
+    let b1 = c1 > 0;
+    let b2 = c2 > 0;
+
+    if !b1 && b2 {
+        x
+    } else if b1 && !b2 {
+        b.negate(x)
+    } else if !b1 && !b2 {
+        b.constant(0,2)
+    } else {
+        b.constant(1,2)
     }
-    b
 }
-
-fn to_bit_consts(b: &mut Builder, x: u128) -> Vec<Ref> {
-    unimplemented!()
-}
-
-// fn multiplex_constants(b: &mut Builder, x: Ref, c1: u128, c2: u128) {
-//     let c1_bs = u128_to_bits(c1);
-//     let c2_bs = u129_to_bits(c2);
-
-// }
-
-// fn mux_const_bits(b: &mut Builder, x: Ref, c1: bool, c2: bool) -> Ref {
-//     if !c1 && c2 {
-//         x
-//     } else if c1 && !c2 {
-//         b.negate(x)
-//     } else if !c1 && !c2 {
-//         b.cmul(0)
-//     } else {
-//         b.project
-//     }
-// }
+//}}}
 
 ////////////////////////////////////////////////////////////////////////////////
-// boilerplate io stuff
+// boilerplate io stuff {{{
 
 fn get_lines(file: &str) -> Lines<BufReader<File>> {
     let f = File::open(file).expect("file not found");
@@ -249,7 +330,7 @@ fn get_lines(file: &str) -> Lines<BufReader<File>> {
     r.lines()
 }
 
-fn read_weights(q: u128) -> Vec<Vec<Vec<u128>>> {
+fn read_weights() -> Vec<Vec<Vec<i32>>> {
     let mut lines = get_lines(WEIGHTS_FILE);
     let mut weights = Vec::with_capacity(NLAYERS);
     for layer in 0..NLAYERS {
@@ -261,14 +342,14 @@ fn read_weights(q: u128) -> Vec<Vec<Vec<u128>>> {
             for _ in 0..nout {
                 let l = lines.next().expect("no more lines").expect("couldnt read a line");
                 let w = l.parse().expect("couldnt parse");
-                weights[layer][i].push(to_mod_q(q, w));
+                weights[layer][i].push(w);
             }
         }
     }
     weights
 }
 
-fn read_biases(q: u128) -> Vec<Vec<u128>> {
+fn read_biases() -> Vec<Vec<i32>> {
     let mut lines = get_lines(BIASES_FILE);
     let mut biases = Vec::with_capacity(NLAYERS);
     for layer in 0..NLAYERS {
@@ -277,13 +358,13 @@ fn read_biases(q: u128) -> Vec<Vec<u128>> {
         for _ in 0..nout {
             let l = lines.next().expect("no more lines").expect("couldnt read a line");
             let w = l.parse().expect("couldnt parse");
-            biases[layer].push(to_mod_q(q,w));
+            biases[layer].push(w);
         }
     }
     biases
 }
 
-fn read_images(q: u128) -> Vec<Vec<u128>> {
+fn read_images() -> Vec<Vec<i32>> {
     let mut lines = get_lines(IMAGES_FILE);
     let mut images = Vec::with_capacity(NIMAGES);
     for i in 0..NIMAGES {
@@ -291,7 +372,7 @@ fn read_images(q: u128) -> Vec<Vec<u128>> {
         for _ in 0..TOPOLOGY[0] {
             let l = lines.next().expect("no more lines").expect("couldnt read a line");
             let w = l.parse().expect("couldnt parse");
-            images[i].push(to_mod_q(q,w));
+            images[i].push(w);
         }
     }
     images
@@ -303,7 +384,9 @@ fn read_labels() -> Vec<usize> {
         .collect()
 }
 
-fn to_mod_q(q: u128, x: i16) -> u128 {
+//}}}
+
+fn to_mod_q(q: u128, x: i32) -> u128 {
     ((q as i128 + x as i128) % q as i128) as u128
 }
 
@@ -312,5 +395,49 @@ fn from_mod_q(q: u128, x: u128) -> i32 {
         (q as i128 / 2 - x as i128) as i32
     } else {
         x as i32
+    }
+}
+
+fn twos_complement_negate(x: u128, nbits: usize) -> u128 {
+    let mask = (1<<nbits)-1;
+    ((!x) & mask) + 1
+}
+
+fn i32_to_twos_complement(x: i32, nbits: usize) -> u128 {
+    if x >= 0 {
+        x as u128
+    } else {
+        twos_complement_negate((-x) as u128, nbits)
+    }
+}
+
+#[cfg(test)]
+mod dinn {
+    use super::*;
+    use fancy_garbling::rand::Rng;
+    use fancy_garbling::circuit::Builder;
+    use fancy_garbling::numbers;
+
+    #[test]
+    fn multiplex() {
+        let mut rng = Rng::new();
+
+        let nbits = 16;
+        let mask = (1 << nbits) - 1;
+
+        let c1 = rng.gen_u128() & mask;
+        let c2 = rng.gen_u128() & mask;
+
+        let mut b = Builder::new();
+        let x = b.input(2);
+        let ys = multiplex_constants(&mut b, x, c1, c2, nbits);
+        b.outputs(&ys);
+        let circ = b.finish();
+
+        let c1_bits = numbers::to_bits(c1, nbits);
+        let c2_bits = numbers::to_bits(c2, nbits);
+
+        assert_eq!(circ.eval(&[0]), c1_bits);
+        assert_eq!(circ.eval(&[1]), c2_bits);
     }
 }

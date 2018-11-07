@@ -91,13 +91,24 @@ pub fn padded_base_q_128(x: u128, q: u16) -> Vec<u16> {
 }
 
 pub fn u128_to_bits(x: u128, n: usize) -> Vec<u16> {
+    to_bits(x,n)
+}
+
+pub fn to_bits<I,B>(x: I, n: usize) -> Vec<B>
+    where I: Clone + std::ops::Rem + std::ops::SubAssign + std::ops::DivAssign + One +
+             std::ops::BitAnd<Output=I> + std::convert::From<u16>,
+          B: std::convert::TryFrom<I>
+{
     let mut bits = Vec::with_capacity(n);
     let mut y = x;
     for _ in 0..n {
-        let b = y % 2;
-        bits.push(b as u16);
+        let b = y.clone() & I::one();
+        match B::try_from(b.clone()) {
+            Ok(b) => bits.push(b),
+            _ => panic!(),
+        }
         y -= b;
-        y /= 2;
+        y /= I::from(2);
     }
     bits
 }
@@ -597,7 +608,7 @@ mod tests {
         let mut rng = Rng::new();
         for _ in 0..128 {
             let x = rng.gen_u128();
-            assert_eq!(u128_from_bits(&u128_to_bits(x, 128)), x);
+            assert_eq!(u128_from_bits(&to_bits(x, 128)), x);
         }
     }
 

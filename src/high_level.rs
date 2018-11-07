@@ -109,6 +109,18 @@ impl Bundler {
         bun_ref
     }
 
+    pub fn secret_constant(&mut self, val: u128, modulus: u128) -> BundleRef {
+        let ps = factor(modulus);
+        let mut ws = Vec::with_capacity(ps.len());
+        for &p in &ps {
+            let x = (val % p as u128) as u16;
+            let w = self.builder.as_mut().expect("need to own a builder!").secret_constant(x, p);
+            ws.push(w);
+        }
+        let bun_ref = self.add_bundle(ws, Rc::new(ps));
+        bun_ref
+    }
+
     pub fn constant(&mut self, val: u128, modulus: u128) -> BundleRef {
         let ps = factor(modulus);
         let mut ws = Vec::with_capacity(ps.len());
@@ -188,8 +200,6 @@ impl Bundler {
         let primes = self.primes(xref);
 
         let cs = crt(&primes, c);
-        // assert!(cs.iter().all(|&c| c > 0),
-        //     "all residues must be nonzero for scalar multiplication! cs={:?}", cs);
 
         let zwires = xwires.iter().zip(&cs).map(|(&x, &c)|
             self.borrow_mut_builder().cmul(x,c)
@@ -490,7 +500,7 @@ impl Bundler {
 mod tests {
     use garble::garble;
     use high_level::Bundler;
-    use numbers::{self, u128_to_bits, inv, factor, modulus_with_width};
+    use numbers::{self, inv, factor, modulus_with_width};
     use rand::Rng;
 
     const NTESTS: usize = 1;
@@ -785,7 +795,7 @@ mod tests {
 
         for _ in 0..NTESTS {
             let pt = rng.gen_u128() % (q/2);
-            let should_be = u128_to_bits(pt, 32);
+            let should_be = numbers::to_bits(pt, 32);
             test_garbling_high_to_low(&mut b, &[pt], &should_be);
         }
     }
