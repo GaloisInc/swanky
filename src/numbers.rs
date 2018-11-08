@@ -1,9 +1,10 @@
 use num::integer::Integer;
 use num::bigint::BigInt;
 use num::{ToPrimitive, Zero, One, Signed};
+use util::IterToVec;
 
 pub fn digits_per_u128(modulus: u16) -> usize {
-    (128.0 * 2_f64.log(modulus as f64)).ceil() as usize
+    (128.0 / (modulus as f64).log2().ceil()).floor() as usize
 }
 
 pub fn base_q_add<N>(xs: &mut [N], ys: &[N], q: N)
@@ -39,8 +40,10 @@ pub fn base_q_add<N>(xs: &mut [N], ys: &[N], q: N)
 }
 
 pub fn as_base_q(x: u128, q: u16) -> Vec<u16> {
-    let n  = digits_per_u128(q);
-    let ms = std::iter::repeat(q).take(n).collect::<Vec<_>>();
+    let n = digits_per_u128(q);
+    println!("q={} n={}", q, n);
+    assert!(x < (q as u128).pow(n as u32), "q={}", q);
+    let ms = std::iter::repeat(q).take(n).to_vec();
     as_mixed_radix(x, &ms)
 }
 
@@ -73,7 +76,9 @@ pub fn from_base_q(ds: &[u16], q: u16) -> u128 {
     let q = q as u128;
     let mut x: u128 = 0;
     for &d in ds.iter().rev() {
-        let (xp,_) = x.overflowing_mul(q);
+        let (xp,overflow) = x.overflowing_mul(q);
+        assert_eq!(overflow, false, "overflow!!!! x={}", x);
+        // x = x * q + d as u128;
         x = xp + d as u128;
     }
     x
@@ -549,6 +554,13 @@ pub fn exp_truth_table(modulus: u16) -> Vec<u16> {
     }
 }
 
+pub fn is_power_of_2<I>(x: I) -> bool
+    where I: std::ops::Sub<Output=I> + std::ops::BitAnd<Output=I> +
+             num::Zero + num::One + std::cmp::PartialEq + Clone
+{
+    (x.clone() & (x - I::one())) == I::zero()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -617,7 +629,7 @@ mod tests {
         let mut rng = Rng::new();
         for _ in 0..1000 {
             let q = 2 + (rng.gen_u16() % 111);
-            let x = rng.gen_u128();
+            let x = rng.gen_usable_u128(q);
             let y = as_base_q(x, q);
             let z = from_base_q(&y, q);
             assert_eq!(x, z);
@@ -642,6 +654,7 @@ mod tests {
         for _ in 0..1000 {
             let q = 2 + (rng.gen_u16() % 111);
             let n = digits_per_u128(q) - 2;
+            println!("q={} n={}", q, n);
             let Q = (q as u128).pow(n as u32);
 
             let x = rng.gen_u128() % Q;

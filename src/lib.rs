@@ -8,7 +8,7 @@
     clippy::needless_range_loop
 )]
 
-#![feature(reverse_bits, try_from)]
+#![feature(reverse_bits, try_from, no_panic_pow)]
 #![allow(non_snake_case)]
 
 extern crate libc;

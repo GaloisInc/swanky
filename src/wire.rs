@@ -202,6 +202,14 @@ mod tests {
     }
 
     #[test]
+    fn packing_special_cases() {
+        let x =  Wire::ModN { q: 7, ds: vec![1, 2, 4, 2, 1, 6, 5, 3, 5, 1, 3, 6, 5, 1, 4,
+        4, 2, 4, 6, 5, 6, 3, 6, 1, 2, 4, 4, 0, 1, 1, 5, 2, 6, 0, 3, 4, 6, 3, 4, 2, 6, 3,
+        1, 1, 1, 4] };
+        assert_eq!(x, Wire::from_u128(x.as_u128(), 7));
+    }
+
+    #[test]
     fn base_conversion_lookup_method() {
         let ref mut rng = Rng::new();
         for _ in 0..1000 {

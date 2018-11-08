@@ -4,7 +4,7 @@ use wire::Wire;
 
 use std::collections::HashMap;
 
-type GarbledGate = Vec<Wire>;
+type GarbledGate = Vec<u128>;
 
 pub struct Garbler {
     deltas     : HashMap<u16, Wire>,
@@ -139,8 +139,8 @@ impl Garbler {
             if ix == 0 { continue }
             let A_ = A.plus(&self.delta(q_in).cmul(x));
             let C_ = C.plus(&self.delta(q_out).cmul(tt[x as usize]));
-            let ct = A_.hashback(g, q_out).plus(&C_);
-            gate[ix-1] = Some(ct);
+            let ct = A_.hash(g) ^ C_.as_u128();
+            gate[ix - 1] = Some(ct);
         }
 
         // unwrap the Option elems inside the Vec
@@ -154,17 +154,21 @@ impl Garbler {
         let xmod = A.modulus() as usize;
         let ymod = B.modulus() as usize;
         let mut gate = vec![None; xmod * ymod - 1];
+
         // gate tweak
         let g = tweak(gate_num);
+
         // sigma is the output truth value of the 0,0-colored wirelabels
         let sigma = tt[((xmod - A.color() as usize) % xmod) as usize]
                       [((ymod - B.color() as usize) % ymod) as usize];
+
         // we use the row reduction trick here
         let B_delta = self.delta(ymod as u16);
         let C = A.minus(&self.delta(xmod as u16).cmul(A.color()))
                  .hashback2(&B.minus(&B_delta.cmul(B.color())), g, q)
                  .negate()
                  .minus(&self.delta(q).cmul(sigma));
+
         for x in 0..xmod {
             let A_ = A.plus(&self.delta(xmod as u16).cmul(x as u16));
             for y in 0..ymod {
@@ -174,7 +178,7 @@ impl Garbler {
                 assert_eq!(gate[ix-1], None);
                 let B_ = B.plus(&self.delta(ymod as u16).cmul(y as u16));
                 let C_ = C.plus(&self.delta(q).cmul(tt[x][y]));
-                let ct = A_.hashback2(&B_,g, q).plus(&C_);
+                let ct = A_.hash2(&B_,g) ^ C_.as_u128();
                 gate[ix-1] = Some(ct);
             }
         }
@@ -210,7 +214,8 @@ impl Garbler {
             if A_.color() != 0 {
                 let tao = a * (q - r) % q;
                 let G = A_.hashback(g,q).plus(&X.plus(&D.cmul(tao)));
-                gate[A_.color() as usize - 1] = Some(G);
+                assert_eq!(Wire::from_u128(G.as_u128(), q), G);
+                gate[A_.color() as usize - 1] = Some(G.as_u128());
             }
 
             // evaluator's half-gate: outputs Y+a(r+b)D
@@ -218,7 +223,8 @@ impl Garbler {
             let B_ = B.plus(&D.cmul(i));
             if B_.color() != 0 {
                 let G = B_.hashback(g,q).plus(&Y.minus(&A.cmul((i+r)%q)));
-                gate[(q + B_.color()) as usize - 2] = Some(G);
+                assert_eq!(Wire::from_u128(G.as_u128(), q), G);
+                gate[(q + B_.color()) as usize - 2] = Some(G.as_u128());
             }
         }
         let gate = gate.into_iter().map(Option::unwrap).collect();
@@ -298,8 +304,8 @@ impl Evaluator {
                     if x.color() == 0 {
                         x.hashback(i as u128, q).negate()
                     } else {
-                        let ct = &self.gates[id][x.color() as usize - 1];
-                        ct.minus(&x.hashback(i as u128, q))
+                        let ct = self.gates[id][x.color() as usize - 1];
+                        Wire::from_u128(ct ^ x.hash(i as u128), q)
                     }
                 }
 
@@ -310,8 +316,8 @@ impl Evaluator {
                         a.hashback2(&b, tweak(i), q).negate()
                     } else {
                         let ix = a.color() as usize * c.moduli[yref] as usize + b.color() as usize;
-                        let ct = &self.gates[id][ix - 1];
-                        ct.minus(&a.hashback2(&b, tweak(i), q))
+                        let ct = self.gates[id][ix - 1];
+                        Wire::from_u128(ct ^ a.hash2(&b, tweak(i)), q)
                     }
                 }
 
@@ -323,8 +329,8 @@ impl Evaluator {
                     let L = if A.color() == 0 {
                         A.hashback(g,q).negate()
                     } else {
-                        let ct_left = &self.gates[id][A.color() as usize - 1];
-                        ct_left.minus(&A.hashback(g,q))
+                        let ct_left = self.gates[id][A.color() as usize - 1];
+                        Wire::from_u128(ct_left, q).minus(&A.hashback(g,q))
                     };
 
                     // evaluator's half gate
@@ -332,8 +338,8 @@ impl Evaluator {
                     let R = if B.color() == 0 {
                         B.hashback(g,q).negate()
                     } else {
-                        let ct_right = &self.gates[id][(q + B.color()) as usize - 2];
-                        ct_right.minus(&B.hashback(g,q))
+                        let ct_right = self.gates[id][(q + B.color()) as usize - 2];
+                        Wire::from_u128(ct_right, q).minus(&B.hashback(g,q))
 
                     };
                     L.plus(&R.plus(&A.cmul(B.color())))
