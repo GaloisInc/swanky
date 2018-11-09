@@ -29,16 +29,18 @@ impl Wire {
 
         } else if q < 256 && base_conversion::lookup_defined_for_mod(q) {
             let bytes = unsafe { std::mem::transmute::<u128, [u8;16]>(inp) };
-            let mut ds = vec![0; numbers::digits_per_u128(q)];
-            let n = numbers::digits_per_u128(q);
 
-            for i in 0..16 {
-                let c = base_conversion::lookup_digits_mod_at_position(bytes[i], q, i);
-                numbers::base_q_add(&mut ds, &c, q);
+            // the digits in position 15 will be the longest, so we can use stateful
+            // (fast) base_q_addition
+            let mut ds = base_conversion::lookup_digits_mod_at_position(bytes[15], q, 15).to_vec();
+            for i in 0..15 {
+                let cs = base_conversion::lookup_digits_mod_at_position(bytes[i], q, i);
+                numbers::base_q_add_eq(&mut ds, &cs, q);
             }
 
-            let ds = ds.into_iter().map(|d| d as u16).collect();
-
+            // drop the digits we won't be able to pack back in again, especially if
+            // they get multiplied
+            let ds = ds[..numbers::digits_per_u128(q)].to_vec();
             Wire::ModN { q, ds }
 
         } else {

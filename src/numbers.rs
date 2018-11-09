@@ -8,9 +8,18 @@ pub fn digits_per_u128(modulus: u16) -> usize {
     (128.0 / (modulus as f64).log2().ceil()).floor() as usize
 }
 
-pub fn base_q_add(xs: &mut [u16], ys: &[u16], q: u16)
+pub fn base_q_add(xs: &[u16], ys: &[u16], q: u16) -> Vec<u16> {
+    if ys.len() > xs.len() {
+        return base_q_add(ys, xs, q);
+    }
+    let mut ret = xs.to_vec();
+    base_q_add_eq(&mut ret, ys, q);
+    ret
+}
+
+pub fn base_q_add_eq(xs: &mut [u16], ys: &[u16], q: u16)
 {
-    assert!(xs.len() >= ys.len(), "xs.len()={} ys.len()={} xs={:?} ys={:?}", xs.len(), ys.len(), xs, ys);
+    debug_assert!(xs.len() >= ys.len(), "q={} xs.len()={} ys.len()={} xs={:?} ys={:?}", q, xs.len(), ys.len(), xs, ys);
 
     let mut c = 0;
     let mut i = 0;
@@ -663,9 +672,9 @@ mod tests {
             let mut xp = padded_base_q(x,q,n);
             let yp = as_base_q(y,q);
 
-            base_q_add(&mut xp, &yp, q);
+            let zp = base_q_add(&xp, &yp, q);
 
-            let z = from_base_q(&xp, q);
+            let z = from_base_q(&zp, q);
 
             assert_eq!((x+y) % Q, z);
         }
