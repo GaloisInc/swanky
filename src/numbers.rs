@@ -19,7 +19,11 @@ pub fn base_q_add(xs: &[u16], ys: &[u16], q: u16) -> Vec<u16> {
 
 pub fn base_q_add_eq(xs: &mut [u16], ys: &[u16], q: u16)
 {
-    debug_assert!(xs.len() >= ys.len(), "q={} xs.len()={} ys.len()={} xs={:?} ys={:?}", q, xs.len(), ys.len(), xs, ys);
+    debug_assert!(
+        xs.len() >= ys.len(),
+        "q={} xs.len()={} ys.len()={} xs={:?} ys={:?}",
+        q, xs.len(), ys.len(), xs, ys
+    );
 
     let mut c = 0;
     let mut i = 0;
@@ -570,6 +574,12 @@ pub fn is_power_of_2<I>(x: I) -> bool
     (x.clone() & (x - I::one())) == I::zero()
 }
 
+// function that computes the number of carry digits you need to add n base-q digits
+// together
+pub fn num_carry_digits_to_add_n_digits(q: u16, n: usize) -> usize {
+    ((n * (q as usize - 1)) as f64).log(q as f64).ceil() as usize
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -677,6 +687,20 @@ mod tests {
             let z = from_base_q(&zp, q);
 
             assert_eq!((x+y) % Q, z);
+        }
+    }
+
+
+    #[test]
+    fn max_carry_digits() {
+        let mut rng = Rng::new();
+        for _ in 0..1000 {
+            let q = 2 + (rng.gen_u16() % 254);
+            let n = 2 + (rng.gen_usize() % 1000);
+            let xs = vec![BigInt::from(q-1); n];
+            let p: BigInt = xs.iter().sum();
+            let (_, ds) = p.to_radix_le(q as u32);
+            assert_eq!(ds.len(), num_carry_digits_to_add_n_digits(q,n));
         }
     }
 }
