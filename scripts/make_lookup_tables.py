@@ -39,7 +39,7 @@ def write_tables_for_base(base, f):
         name = f"BASE{base}_POS{pos}"
         ndigits_dict[base].append(n)
         names_dict[base].append(name)
-        print(f"const uint8_t {name} [][{n}] = {{", file=f)
+        print(f"const uint16_t {name} [][{n}] = {{", file=f)
 
         line = ""
         for d in ds:
@@ -58,12 +58,12 @@ def write_header(f):
 
 def write_get_table_function(f):
     for base, names in names_dict.items():
-        names_arr = ", ".join(map(lambda n: "(const uint8_t **)" + n, names))
-        print(f"const uint8_t** BASE{base} [] = {{{names_arr}}};", file=f)
+        names_arr = ", ".join(map(lambda n: "(const uint16_t **)" + n, names))
+        print(f"const uint16_t** BASE{base} [] = {{{names_arr}}};\n", file=f)
 
     print(file=f)
 
-    print("const uint8_t** c_get_table(uint8_t base, size_t pos) {", file=f)
+    print("const uint16_t** c_get_table(uint16_t base, size_t pos) {", file=f)
     print("    switch (base) {", file=f)
 
     for base, names in names_dict.items():
@@ -81,7 +81,7 @@ def write_num_digits_function(f):
 
     print(file=f)
 
-    print("uint8_t c_num_digits(uint8_t base, size_t pos) {", file=f)
+    print("uint16_t c_num_digits(uint16_t base, size_t pos) {", file=f)
     print("    switch (base) {", file=f)
 
     for base in ndigits_dict:

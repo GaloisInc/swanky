@@ -13,6 +13,7 @@
 
 extern crate libc;
 extern crate num;
+extern crate num_traits;
 extern crate rand as extern_rand;
 extern crate base_conversion; // local dependency
 

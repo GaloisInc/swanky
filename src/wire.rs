@@ -27,13 +27,14 @@ impl Wire {
         if q == 2 {
             Wire::Mod2 { val: inp }
 
-        } else if q < 256 && base_conversion::lookup_defined_for_mod(q as u8) {
+        } else if q < 256 && base_conversion::lookup_defined_for_mod(q) {
             let bytes = unsafe { std::mem::transmute::<u128, [u8;16]>(inp) };
             let mut ds = vec![0; numbers::digits_per_u128(q)];
+            let n = numbers::digits_per_u128(q);
 
             for i in 0..16 {
-                let c = base_conversion::lookup_digits_mod_at_position(bytes[i], q as u8, i);
-                numbers::base_q_add(&mut ds, &c, q as u8);
+                let c = base_conversion::lookup_digits_mod_at_position(bytes[i], q, i);
+                numbers::base_q_add(&mut ds, &c, q);
             }
 
             let ds = ds.into_iter().map(|d| d as u16).collect();
@@ -173,40 +174,17 @@ mod tests {
     use super::*;
 
     #[test]
-    fn simple_packing() {
-        let ref mut rng = Rng::new();
-        for _ in 0..100 {
-            let q = 2 + (rng.gen_u16() % 110);
-
-            for i in 0..127 {
-                let x = 1 << i;
-                let w = Wire::from_u128(x, q);
-                let z = w.as_u128();
-                assert_eq!(z, x, "q={}, 2^{}", q, i);
-            }
-        }
-    }
-
-    #[test]
     fn packing() {
         let ref mut rng = Rng::new();
         for _ in 0..100 {
             let q = 2 + (rng.gen_u16() % 111);
-            let w = rng.gen_u128();
+            let w = rng.gen_usable_u128(q);
             let x = Wire::from_u128(w, q);
             let y = x.as_u128();
             assert_eq!(w, y);
             let z = Wire::from_u128(y, q);
             assert_eq!(x, z);
         }
-    }
-
-    #[test]
-    fn packing_special_cases() {
-        let x =  Wire::ModN { q: 7, ds: vec![1, 2, 4, 2, 1, 6, 5, 3, 5, 1, 3, 6, 5, 1, 4,
-        4, 2, 4, 6, 5, 6, 3, 6, 1, 2, 4, 4, 0, 1, 1, 5, 2, 6, 0, 3, 4, 6, 3, 4, 2, 6, 3,
-        1, 1, 1, 4] };
-        assert_eq!(x, Wire::from_u128(x.as_u128(), 7));
     }
 
     #[test]

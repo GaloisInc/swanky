@@ -1,6 +1,6 @@
 #![deny(clippy::all)]
 
-pub fn lookup_digits_mod_at_position(x: u8, q: u8, pos: usize) -> &'static [u8] {
+pub fn lookup_digits_mod_at_position(x: u8, q: u16, pos: usize) -> &'static [u16] {
     unsafe {
         let tab = c_get_table(q, pos);
         let len = c_num_digits(q, pos);
@@ -8,15 +8,15 @@ pub fn lookup_digits_mod_at_position(x: u8, q: u8, pos: usize) -> &'static [u8] 
     }
 }
 
-pub fn lookup_defined_for_mod(q: u8) -> bool {
+pub fn lookup_defined_for_mod(q: u16) -> bool {
     unsafe {
         c_num_digits(q, 0) > 0
     }
 }
 
 extern {
-    fn c_get_table(q: u8, pos: usize) -> *const u8;
-    fn c_num_digits(q: u8, pos: usize) -> usize;
+    fn c_get_table(q: u16, pos: usize) -> *const u16;
+    fn c_num_digits(q: u16, pos: usize) -> usize;
 }
 
 #[cfg(test)]

@@ -1,26 +1,26 @@
 use num::integer::Integer;
 use num::bigint::BigInt;
 use num::{ToPrimitive, Zero, One, Signed};
+use num_traits::pow::pow;
 use util::IterToVec;
 
 pub fn digits_per_u128(modulus: u16) -> usize {
     (128.0 / (modulus as f64).log2().ceil()).floor() as usize
 }
 
-pub fn base_q_add<N>(xs: &mut [N], ys: &[N], q: N)
-    where N: num::PrimInt + std::ops::AddAssign + std::ops::SubAssign
+pub fn base_q_add(xs: &mut [u16], ys: &[u16], q: u16)
 {
-    assert!(xs.len() >= ys.len());
+    assert!(xs.len() >= ys.len(), "xs.len()={} ys.len()={} xs={:?} ys={:?}", xs.len(), ys.len(), xs, ys);
 
-    let mut c = N::zero();
+    let mut c = 0;
     let mut i = 0;
 
     while i < ys.len() {
         xs[i] += ys[i] + c;
-        c = N::zero();
+        c = 0;
         if xs[i] >= q {
             xs[i] -= q;
-            c = N::one();
+            c = 1;
         }
         i += 1;
     }
@@ -42,7 +42,7 @@ pub fn base_q_add<N>(xs: &mut [N], ys: &[N], q: N)
 pub fn as_base_q(x: u128, q: u16) -> Vec<u16> {
     let n = digits_per_u128(q);
     println!("q={} n={}", q, n);
-    assert!(x < (q as u128).pow(n as u32), "q={}", q);
+    assert!(BigInt::from(x) < pow(BigInt::from(q), n), "q={}", q);
     let ms = std::iter::repeat(q).take(n).to_vec();
     as_mixed_radix(x, &ms)
 }
@@ -641,7 +641,7 @@ mod tests {
         let mut rng = Rng::new();
         for _ in 0..1000 {
             let q = 2 + (rng.gen_u16() % 111);
-            let x = rng.gen_u128();
+            let x = rng.gen_usable_u128(q);
             let y = padded_base_q_128(x, q);
             let z = from_base_q(&y, q);
             assert_eq!(x, z);
