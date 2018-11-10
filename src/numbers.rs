@@ -85,6 +85,40 @@ pub fn padded_mixed_radix(x: u128, ms: &[u16]) -> Vec<u16> {
     ds
 }
 
+fn u16_from_bigint(bi: &BigInt) -> u16 {
+    let (_,bs) = bi.to_bytes_le();
+    let mut x = 0;
+    x += bs[0] as u16;
+    x += (bs[1] as u16) << 16;
+    x
+}
+
+pub fn as_mixed_radix_bigint(x: &BigInt, ms: &[u16]) -> Vec<u16> {
+    let mut ds = Vec::with_capacity(ms.len());
+    let mut x = x.clone();
+
+    for i in 0..ms.len() {
+        let m = BigInt::from(ms[i]);
+        if &x >= &m {
+            let d = &x % &m;
+            x = (&x - &d) / &m;
+            ds.push(u16_from_bigint(&d));
+        } else {
+            ds.push(u16_from_bigint(&x));
+            break;
+        }
+    }
+    ds
+}
+
+pub fn padded_mixed_radix_bigint(x: &BigInt, ms: &[u16]) -> Vec<u16> {
+    let mut ds = as_mixed_radix_bigint(x,ms);
+    while ds.len() < ms.len() {
+        ds.push(0);
+    }
+    ds
+}
+
 pub fn from_base_q(ds: &[u16], q: u16) -> u128 {
     let q = q as u128;
     let mut x: u128 = 0;

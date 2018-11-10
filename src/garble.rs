@@ -566,6 +566,19 @@ mod tests {
         });
     }
 //}}}
+    #[test] // fancy_addition {{{
+    fn fancy_addition() {
+        garble_test_helper(|q| {
+            let mut b = Builder::new();
+            let n = 2;
+            let xs = b.inputs(n,q);
+            let ys = b.inputs(n,q);
+            let zs = b.fancy_addition(&[&xs, &ys]);
+            b.outputs(&zs);
+            b.finish()
+        });
+    }
+//}}}
     #[test] // constants {{{
     fn constants() {
         let mut b = Builder::new();

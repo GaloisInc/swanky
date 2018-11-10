@@ -215,7 +215,7 @@ impl Builder {
     }
 
     pub fn add_many(&mut self, args: &[Ref]) -> Ref {
-        assert!(args.len() > 1);
+        debug_assert!(args.len() > 1);
         let mut z = args[0];
         for &x in args.iter().skip(1) {
             z = self.add(z, x);
@@ -224,9 +224,10 @@ impl Builder {
     }
 
     pub fn proj(&mut self, xref: Ref, output_modulus: u16, tt: Vec<u16>) -> Ref {
-        assert_eq!(tt.len(), self.circ.moduli[xref] as usize);
-        assert!(tt.iter().all(|&x| x < output_modulus),
-            "circuit.proj: tt={:?}, output_modulus={}", tt, output_modulus);
+        debug_assert_eq!(tt.len(), self.circ.moduli[xref] as usize);
+        debug_assert!(tt.iter().all(|&x| x < output_modulus),
+            "not all xs were less than the output modulus! circuit.proj: tt={:?},
+            output_modulus={}", tt, output_modulus);
         let q = output_modulus;
         let gate = Gate::Proj { xref, tt, id: self.get_next_ciphertext_id() };
         self.gate(gate, q)
@@ -347,7 +348,7 @@ impl Builder {
     }
 
     pub fn mod_change(&mut self, xref: Ref, to_modulus: u16) -> Ref {
-        let from_modulus = self.circ.moduli[xref];
+        let from_modulus = self.modulus(xref);
         if from_modulus == to_modulus {
             return xref;
         }
@@ -358,8 +359,59 @@ impl Builder {
     ////////////////////////////////////////////////////////////////////////////////
     // binary stuff
 
+    pub fn fancy_addition(&mut self, xs: &[&[Ref]]) -> Vec<Ref> {
+        let nargs = xs.len();
+        let n = xs[0].len();
+        debug_assert!(xs.iter().all(|x| x.len() == n));
+
+        let mut digit_carry = None;
+        let mut carry_carry = None;
+
+        let mut prev_max_carry = 0;
+
+        let mut res = Vec::with_capacity(n);
+
+        for i in 0..n {
+            // all the ith digits, in one vec
+            let ds = xs.iter().map(|x| x[i]).to_vec();
+
+            // compute the digit -- easy
+            let digit_sum = self.add_many(&ds);
+            let digit = digit_carry.map_or(digit_sum, |d| self.add(digit_sum, d));
+
+            if i < n-1 {
+                // compute the carrys
+                let q = self.modulus(xs[0][i]);
+                let max_val = nargs as u16 * (q-1) + prev_max_carry;
+                let max_carry = max_val / q;
+                prev_max_carry = max_carry;
+
+                let modded_ds = ds.iter().map(|&d| self.mod_change(d, max_val+1)).to_vec();
+                let carry_sum = self.add_many(&modded_ds);
+                let carry = carry_carry.map_or(carry_sum, |c| self.add(carry_sum, c));
+
+                let next_mod = self.modulus(xs[0][i+1]);
+                let tt = (0..=max_val).map(|i| if i < q { 0 } else { (i / q) % next_mod }).to_vec();
+                digit_carry = Some(self.proj(carry, next_mod, tt));
+
+                let next_max_val = nargs as u16 * (next_mod - 1) + max_carry;
+                let tt = (0..=max_val).map(|i| if i < q { 0 } else { i / q }).to_vec();
+                carry_carry = Some(self.proj(carry, next_max_val + 1, tt));
+
+            } else {
+                digit_carry = None;
+                carry_carry = None;
+            }
+
+            res.push(digit);
+        }
+
+        res
+    }
+
+
     pub fn addition(&mut self, xs: &[Ref], ys: &[Ref]) -> (Vec<Ref>, Ref) {
-        assert_eq!(xs.len(), ys.len());
+        debug_assert_eq!(xs.len(), ys.len());
         let cmod = self.modulus(xs[1]);
         let (mut z, mut c) = self.adder(xs[0], ys[0], None, cmod);
         let mut bs = vec![z];
@@ -375,7 +427,7 @@ impl Builder {
 
     // avoids creating extra gates for the final carry
     pub fn addition_no_carry(&mut self, xs: &[Ref], ys: &[Ref]) -> Vec<Ref> {
-        assert_eq!(xs.len(), ys.len());
+        debug_assert_eq!(xs.len(), ys.len());
 
         let cmod = self.modulus(*xs.get(1).unwrap_or(&xs[0]));
         let (mut z, mut c) = self.adder(xs[0], ys[0], None, cmod);
@@ -395,7 +447,7 @@ impl Builder {
 
     fn adder(&mut self, x: Ref, y: Ref, opt_c: Option<Ref>, carry_modulus: u16) -> (Ref, Ref) {
         let q = self.modulus(x);
-        assert_eq!(q, self.modulus(y));
+        debug_assert_eq!(q, self.modulus(y));
         if q == 2 {
             if let Some(c) = opt_c {
                 let z1 = self.xor(x,y);
@@ -468,6 +520,8 @@ mod tests {
     use circuit::Builder;
     use rand::Rng;
     use numbers;
+    use num::bigint::BigInt;
+    use util::IterToVec;
 
     #[test] // {{{ and_gate_fan_n
     fn and_gate_fan_n() {
@@ -692,6 +746,47 @@ mod tests {
             let (z, _carry) = x.overflowing_add(y);
             assert_eq!(numbers::from_base_q(&res, q), z % Q);
         }
+    }
+//}}}
+    #[test] // fancy_addition {{{
+    fn fancy_addition() {
+        let mut rng = Rng::new();
+
+        let ndigits = 2 + rng.gen_usize() % 7;
+        let nargs = 2 + rng.gen_usize() % 100;
+        let mods = (0..ndigits).map(|_| rng.gen_modulus()).to_vec();
+
+        let mut b = Builder::new();
+        let xs = (0..nargs).map(|_| {
+            mods.iter().map(|&q| b.input(q)).to_vec()
+        }).to_vec();
+        let zs = b.fancy_addition(&xs.iter().map(|x| x.as_slice()).to_vec());
+        b.outputs(&zs);
+        let circ = b.finish();
+
+        let Q: BigInt = mods.iter().map(|&q| BigInt::from(q)).product();
+
+        // // test maximum overflow
+        // let Q = (q as u128).pow(ndigits as u32);
+        // let x = Q - 1;
+        // let y = Q - 1;
+        // let mut ds = numbers::padded_base_q(x,q,ndigits);
+        // ds.extend(numbers::padded_base_q(y,q,ndigits).iter());
+        // let res = circ.eval(&ds);
+        // let (z, _carry) = x.overflowing_add(y);
+        // assert_eq!(numbers::from_base_q(&res, q), z % Q);
+
+        // // test random values
+        // for _ in 0..64 {
+        //     let Q = (q as u128).pow(ndigits as u32);
+        //     let x = rng.gen_u128() % Q;
+        //     let y = rng.gen_u128() % Q;
+        //     let mut ds = numbers::padded_base_q(x,q,ndigits);
+        //     ds.extend(numbers::padded_base_q(y,q,ndigits).iter());
+        //     let res = circ.eval(&ds);
+        //     let (z, _carry) = x.overflowing_add(y);
+        //     assert_eq!(numbers::from_base_q(&res, q), z % Q);
+        // }
     }
 //}}}
     #[test] // constants {{{
