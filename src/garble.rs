@@ -369,6 +369,8 @@ mod tests {
     use super::*;
     use circuit::{Circuit, Builder};
     use rand::Rng;
+    use numbers;
+    use util::IterToVec;
 
     // helper {{{
     fn garble_test_helper<F>(f: F)
@@ -568,15 +570,38 @@ mod tests {
 //}}}
     #[test] // fancy_addition {{{
     fn fancy_addition() {
-        garble_test_helper(|q| {
-            let mut b = Builder::new();
-            let n = 2;
-            let xs = b.inputs(n,q);
-            let ys = b.inputs(n,q);
-            let zs = b.fancy_addition(&[&xs, &ys]);
-            b.outputs(&zs);
-            b.finish()
-        });
+        let mut rng = Rng::new();
+
+        let nargs = 2 + rng.gen_usize() % 100;
+        let mods = (0..7).map(|_| rng.gen_modulus()).to_vec();
+
+        let mut b = Builder::new();
+        let xs = (0..nargs).map(|_| {
+            mods.iter().map(|&q| b.input(q)).to_vec()
+        }).to_vec();
+        let zs = b.fancy_addition(&xs.iter().map(|x| x.as_slice()).to_vec());
+        b.outputs(&zs);
+        let circ = b.finish();
+
+        let (gb, ev) = garble(&circ);
+        println!("mods={:?} nargs={} size={}", mods, nargs, ev.size());
+
+        let Q: u128 = mods.iter().map(|&q| q as u128).product();
+
+        // test random values
+        for _ in 0..64 {
+            let mut should_be = 0;
+            let mut ds = Vec::new();
+            for _ in 0..nargs {
+                let x = rng.gen_u128() % Q;
+                should_be = (should_be + x) % Q;
+                ds.extend(numbers::as_mixed_radix(x, &mods).iter());
+            }
+            let X = gb.encode(&ds);
+            let Y = ev.eval(&circ, &X);
+            let res = gb.decode(&Y);
+            assert_eq!(numbers::from_mixed_radix(&res,&mods), should_be);
+        }
     }
 //}}}
     #[test] // constants {{{

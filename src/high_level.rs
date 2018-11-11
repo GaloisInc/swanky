@@ -456,7 +456,7 @@ impl Bundler {
             for x in 0..p {
                 let crt_coef = inv(((q / p as u128) % p as u128) as i64, p as i64);
                 let y = (M as f64 * x as f64 * crt_coef as f64 / p as f64).round() as u128 % M;
-                let digits = numbers::padded_mixed_radix(y, factors_of_m);
+                let digits = numbers::as_mixed_radix(y, factors_of_m);
                 for i in 0..ndigits {
                     tabs[i].push(digits[i]);
                 }

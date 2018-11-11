@@ -38,7 +38,10 @@ pub enum Gate {
 
 impl Circuit {
     pub fn eval(&self, inputs: &[u16]) -> Vec<u16> {
-        assert_eq!(inputs.len(), self.ninputs());
+        debug_assert_eq!(inputs.len(), self.ninputs(),
+            "[circuit.eval] needed {} inputs but got {}!",
+            self.ninputs(), inputs.len()
+        );
 
         let mut cache = vec![0;self.gates.len()];
         for zref in 0..self.gates.len() {
@@ -520,7 +523,6 @@ mod tests {
     use circuit::Builder;
     use rand::Rng;
     use numbers;
-    use num::bigint::BigInt;
     use util::IterToVec;
 
     #[test] // {{{ and_gate_fan_n
@@ -729,8 +731,8 @@ mod tests {
         let Q = (q as u128).pow(n as u32);
         let x = Q - 1;
         let y = Q - 1;
-        let mut ds = numbers::padded_base_q(x,q,n);
-        ds.extend(numbers::padded_base_q(y,q,n).iter());
+        let mut ds = numbers::as_base_q(x,q,n);
+        ds.extend(numbers::as_base_q(y,q,n).iter());
         let res = c.eval(&ds);
         let (z, _carry) = x.overflowing_add(y);
         assert_eq!(numbers::from_base_q(&res, q), z % Q);
@@ -740,8 +742,8 @@ mod tests {
             let Q = (q as u128).pow(n as u32);
             let x = rng.gen_u128() % Q;
             let y = rng.gen_u128() % Q;
-            let mut ds = numbers::padded_base_q(x,q,n);
-            ds.extend(numbers::padded_base_q(y,q,n).iter());
+            let mut ds = numbers::as_base_q(x,q,n);
+            ds.extend(numbers::as_base_q(y,q,n).iter());
             let res = c.eval(&ds);
             let (z, _carry) = x.overflowing_add(y);
             assert_eq!(numbers::from_base_q(&res, q), z % Q);
@@ -752,9 +754,8 @@ mod tests {
     fn fancy_addition() {
         let mut rng = Rng::new();
 
-        let ndigits = 2 + rng.gen_usize() % 7;
         let nargs = 2 + rng.gen_usize() % 100;
-        let mods = (0..ndigits).map(|_| rng.gen_modulus()).to_vec();
+        let mods = (0..7).map(|_| rng.gen_modulus()).to_vec();
 
         let mut b = Builder::new();
         let xs = (0..nargs).map(|_| {
@@ -764,29 +765,28 @@ mod tests {
         b.outputs(&zs);
         let circ = b.finish();
 
-        let Q: BigInt = mods.iter().map(|&q| BigInt::from(q)).product();
+        let Q: u128 = mods.iter().map(|&q| q as u128).product();
 
-        // // test maximum overflow
-        // let Q = (q as u128).pow(ndigits as u32);
-        // let x = Q - 1;
-        // let y = Q - 1;
-        // let mut ds = numbers::padded_base_q(x,q,ndigits);
-        // ds.extend(numbers::padded_base_q(y,q,ndigits).iter());
-        // let res = circ.eval(&ds);
-        // let (z, _carry) = x.overflowing_add(y);
-        // assert_eq!(numbers::from_base_q(&res, q), z % Q);
+        // test maximum overflow
+        let mut ds = Vec::new();
+        for _ in 0..nargs {
+            ds.extend(numbers::as_mixed_radix(Q-1, &mods).iter());
+        }
+        let res = circ.eval(&ds);
+        assert_eq!(numbers::from_mixed_radix(&res,&mods), (Q-1)*(nargs as u128) % Q);
 
-        // // test random values
-        // for _ in 0..64 {
-        //     let Q = (q as u128).pow(ndigits as u32);
-        //     let x = rng.gen_u128() % Q;
-        //     let y = rng.gen_u128() % Q;
-        //     let mut ds = numbers::padded_base_q(x,q,ndigits);
-        //     ds.extend(numbers::padded_base_q(y,q,ndigits).iter());
-        //     let res = circ.eval(&ds);
-        //     let (z, _carry) = x.overflowing_add(y);
-        //     assert_eq!(numbers::from_base_q(&res, q), z % Q);
-        // }
+        // test random values
+        for _ in 0..64 {
+            let mut should_be = 0;
+            let mut ds = Vec::new();
+            for _ in 0..nargs {
+                let x = rng.gen_u128() % Q;
+                should_be = (should_be + x) % Q;
+                ds.extend(numbers::as_mixed_radix(x, &mods).iter());
+            }
+            let res = circ.eval(&ds);
+            assert_eq!(numbers::from_mixed_radix(&res,&mods), should_be);
+        }
     }
 //}}}
     #[test] // constants {{{

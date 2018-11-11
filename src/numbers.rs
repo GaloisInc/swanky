@@ -1,12 +1,10 @@
 use num::integer::Integer;
 use num::bigint::BigInt;
 use num::{ToPrimitive, Zero, One, Signed};
-use num_traits::pow::pow;
 use util::IterToVec;
 
-pub fn digits_per_u128(modulus: u16) -> usize {
-    (128.0 / (modulus as f64).log2().ceil()).floor() as usize
-}
+////////////////////////////////////////////////////////////////////////////////
+// mixed radix stuff
 
 pub fn base_q_add(xs: &[u16], ys: &[u16], q: u16) -> Vec<u16> {
     if ys.len() > xs.len() {
@@ -52,12 +50,17 @@ pub fn base_q_add_eq(xs: &mut [u16], ys: &[u16], q: u16)
     }
 }
 
-pub fn as_base_q(x: u128, q: u16) -> Vec<u16> {
-    let n = digits_per_u128(q);
-    println!("q={} n={}", q, n);
-    assert!(BigInt::from(x) < pow(BigInt::from(q), n), "q={}", q);
+pub fn as_base_q(x: u128, q: u16, n: usize) -> Vec<u16> {
     let ms = std::iter::repeat(q).take(n).to_vec();
     as_mixed_radix(x, &ms)
+}
+
+pub fn digits_per_u128(modulus: u16) -> usize {
+    (128.0 / (modulus as f64).log2().ceil()).floor() as usize
+}
+
+pub fn as_base_q_u128(x: u128, q: u16) -> Vec<u16> {
+    as_base_q(x, q, digits_per_u128(q))
 }
 
 pub fn as_mixed_radix(x: u128, ms: &[u16]) -> Vec<u16> {
@@ -71,76 +74,29 @@ pub fn as_mixed_radix(x: u128, ms: &[u16]) -> Vec<u16> {
             ds.push(d as u16);
         } else {
             ds.push(x as u16);
-            break;
+            x = 0;
         }
-    }
-    ds
-}
-
-pub fn padded_mixed_radix(x: u128, ms: &[u16]) -> Vec<u16> {
-    let mut ds = as_mixed_radix(x,ms);
-    while ds.len() < ms.len() {
-        ds.push(0);
-    }
-    ds
-}
-
-fn u16_from_bigint(bi: &BigInt) -> u16 {
-    let (_,bs) = bi.to_bytes_le();
-    let mut x = 0;
-    x += bs[0] as u16;
-    x += (bs[1] as u16) << 16;
-    x
-}
-
-pub fn as_mixed_radix_bigint(x: &BigInt, ms: &[u16]) -> Vec<u16> {
-    let mut ds = Vec::with_capacity(ms.len());
-    let mut x = x.clone();
-
-    for i in 0..ms.len() {
-        let m = BigInt::from(ms[i]);
-        if &x >= &m {
-            let d = &x % &m;
-            x = (&x - &d) / &m;
-            ds.push(u16_from_bigint(&d));
-        } else {
-            ds.push(u16_from_bigint(&x));
-            break;
-        }
-    }
-    ds
-}
-
-pub fn padded_mixed_radix_bigint(x: &BigInt, ms: &[u16]) -> Vec<u16> {
-    let mut ds = as_mixed_radix_bigint(x,ms);
-    while ds.len() < ms.len() {
-        ds.push(0);
     }
     ds
 }
 
 pub fn from_base_q(ds: &[u16], q: u16) -> u128 {
-    let q = q as u128;
+    let qs = std::iter::repeat(q).take(ds.len()).to_vec();
+    from_mixed_radix(ds, &qs)
+}
+
+pub fn from_mixed_radix(ds: &[u16], qs: &[u16]) -> u128 {
     let mut x: u128 = 0;
-    for &d in ds.iter().rev() {
-        let (xp,overflow) = x.overflowing_mul(q);
+    for (&d,&q) in ds.iter().zip(qs.iter()).rev() {
+        let (xp,overflow) = x.overflowing_mul(q as u128);
         assert_eq!(overflow, false, "overflow!!!! x={}", x);
-        // x = x * q + d as u128;
         x = xp + d as u128;
     }
     x
 }
 
-pub fn padded_base_q(x: u128, q: u16, n: usize) -> Vec<u16> {
-    let ms = std::iter::repeat(q).take(n).collect::<Vec<_>>();
-    padded_mixed_radix(x, &ms)
-}
-
-pub fn padded_base_q_128(x: u128, q: u16) -> Vec<u16> {
-    let n  = digits_per_u128(q);
-    let ms = std::iter::repeat(q).take(n).collect::<Vec<_>>();
-    padded_mixed_radix(x, &ms)
-}
+////////////////////////////////////////////////////////////////////////////////
+// bits
 
 pub fn u128_to_bits(x: u128, n: usize) -> Vec<u16> {
     to_bits(x,n)
@@ -174,6 +130,9 @@ pub fn u128_from_bits(bs: &[u16]) -> u128 {
     x += bs[0] as u128;
     x
 }
+
+////////////////////////////////////////////////////////////////////////////////
+// primes & crt
 
 // only factor using the above primes- we only support composites with small
 // prime factors in the high-level circuit representation
@@ -288,6 +247,9 @@ pub fn base_modulus_with_width(nbits: u32, ps: &[u16]) -> u128 {
 pub fn product(xs: &[u16]) -> u128 {
     xs.iter().fold(1, |acc, &x| acc * x as u128)
 }
+
+////////////////////////////////////////////////////////////////////////////////
+// dlog
 
 pub const PRIMITIVE_ROOTS: [u16;29] = [
     2, 2, 3, 2, 2, 3, 2, 5, 2, 3, 2, 6, 3, 5, 2, 2, 2, 2, 7, 5, 3, 2, 3, 5, 2,
@@ -608,12 +570,6 @@ pub fn is_power_of_2<I>(x: I) -> bool
     (x.clone() & (x - I::one())) == I::zero()
 }
 
-// function that computes the number of carry digits you need to add n base-q digits
-// together
-pub fn num_carry_digits_to_add_n_digits(q: u16, n: usize) -> usize {
-    ((n * (q as usize - 1)) as f64).log(q as f64).ceil() as usize
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -683,19 +639,7 @@ mod tests {
         for _ in 0..1000 {
             let q = 2 + (rng.gen_u16() % 111);
             let x = rng.gen_usable_u128(q);
-            let y = as_base_q(x, q);
-            let z = from_base_q(&y, q);
-            assert_eq!(x, z);
-        }
-    }
-
-    #[test]
-    fn padded_base_q_conversion() {
-        let mut rng = Rng::new();
-        for _ in 0..1000 {
-            let q = 2 + (rng.gen_u16() % 111);
-            let x = rng.gen_usable_u128(q);
-            let y = padded_base_q_128(x, q);
+            let y = as_base_q(x, q, digits_per_u128(q));
             let z = from_base_q(&y, q);
             assert_eq!(x, z);
         }
@@ -713,28 +657,14 @@ mod tests {
             let x = rng.gen_u128() % Q;
             let y = rng.gen_u128() % Q;
 
-            let mut xp = padded_base_q(x,q,n);
-            let yp = as_base_q(y,q);
+            let mut xp = as_base_q(x,q,n);
+            let yp = as_base_q(y,q,n);
 
             let zp = base_q_add(&xp, &yp, q);
 
             let z = from_base_q(&zp, q);
 
             assert_eq!((x+y) % Q, z);
-        }
-    }
-
-
-    #[test]
-    fn max_carry_digits() {
-        let mut rng = Rng::new();
-        for _ in 0..1000 {
-            let q = 2 + (rng.gen_u16() % 254);
-            let n = 2 + (rng.gen_usize() % 1000);
-            let xs = vec![BigInt::from(q-1); n];
-            let p: BigInt = xs.iter().sum();
-            let (_, ds) = p.to_radix_le(q as u32);
-            assert_eq!(ds.len(), num_carry_digits_to_add_n_digits(q,n));
         }
     }
 }
