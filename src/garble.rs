@@ -175,7 +175,7 @@ impl Garbler {
                 let ix = ((A.color() as usize + x) % xmod) * ymod +
                          ((B.color() as usize + y) % ymod);
                 if ix == 0 { continue }
-                assert_eq!(gate[ix-1], None);
+                debug_assert_eq!(gate[ix-1], None);
                 let B_ = B.plus(&self.delta(ymod as u16).cmul(y as u16));
                 let C_ = C.plus(&self.delta(q).cmul(tt[x][y]));
                 let ct = A_.hash2(&B_,g) ^ C_.as_u128();
@@ -213,18 +213,16 @@ impl Garbler {
             let A_ = A.plus(&self.delta(q).cmul(a));
             if A_.color() != 0 {
                 let tao = a * (q - r) % q;
-                let G = A_.hashback(g,q).plus(&X.plus(&D.cmul(tao)));
-                assert_eq!(Wire::from_u128(G.as_u128(), q), G);
-                gate[A_.color() as usize - 1] = Some(G.as_u128());
+                let G = A_.hash(g) ^ X.plus(&D.cmul(tao)).as_u128();
+                gate[A_.color() as usize - 1] = Some(G);
             }
 
             // evaluator's half-gate: outputs Y+a(r+b)D
             // G = H(B+bD) + Y-(b+r)A
             let B_ = B.plus(&D.cmul(i));
             if B_.color() != 0 {
-                let G = B_.hashback(g,q).plus(&Y.minus(&A.cmul((i+r)%q)));
-                assert_eq!(Wire::from_u128(G.as_u128(), q), G);
-                gate[(q + B_.color()) as usize - 2] = Some(G.as_u128());
+                let G = B_.hash(g) ^ Y.minus(&A.cmul((i+r)%q)).as_u128();
+                gate[(q + B_.color()) as usize - 2] = Some(G);
             }
         }
         let gate = gate.into_iter().map(Option::unwrap).collect();
@@ -232,7 +230,7 @@ impl Garbler {
     }
 
     pub fn encode_consts(&self, consts: &[u16]) -> Vec<Wire> {
-        assert_eq!(consts.len(), self.consts.len(), "[encode_consts] not enough consts!");
+        debug_assert_eq!(consts.len(), self.consts.len(), "[encode_consts] not enough consts!");
         let mut xs = Vec::new();
         for i in 0..consts.len() {
             let x = consts[i];
@@ -244,7 +242,7 @@ impl Garbler {
     }
 
     pub fn encode(&self, inputs: &[u16]) -> Vec<Wire> {
-        assert_eq!(inputs.len(), self.inputs.len());
+        debug_assert_eq!(inputs.len(), self.inputs.len());
         let mut xs = Vec::new();
         for i in 0..inputs.len() {
             let x = inputs[i];
@@ -256,7 +254,7 @@ impl Garbler {
     }
 
     pub fn decode(&self, ws: &[Wire]) -> Vec<u16> {
-        assert_eq!(ws.len(), self.outputs.len());
+        debug_assert_eq!(ws.len(), self.outputs.len());
         let mut outs = Vec::new();
         for i in 0..ws.len() {
             let q = ws[i].modulus();
@@ -268,7 +266,7 @@ impl Garbler {
                 }
             }
         }
-        assert_eq!(ws.len(), outs.len());
+        debug_assert_eq!(ws.len(), outs.len());
         outs
     }
 }
@@ -330,7 +328,7 @@ impl Evaluator {
                         A.hashback(g,q).negate()
                     } else {
                         let ct_left = self.gates[id][A.color() as usize - 1];
-                        Wire::from_u128(ct_left, q).minus(&A.hashback(g,q))
+                        Wire::from_u128(ct_left ^ A.hash(g), q)
                     };
 
                     // evaluator's half gate
@@ -339,7 +337,7 @@ impl Evaluator {
                         B.hashback(g,q).negate()
                     } else {
                         let ct_right = self.gates[id][(q + B.color()) as usize - 2];
-                        Wire::from_u128(ct_right, q).minus(&B.hashback(g,q))
+                        Wire::from_u128(ct_right ^ B.hash(g), q)
 
                     };
                     L.plus(&R.plus(&A.cmul(B.color())))
