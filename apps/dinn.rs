@@ -76,7 +76,7 @@ pub fn main() {
 ////////////////////////////////////////////////////////////////////////////////
 // tests
 
-fn test_arith_circuit(nn: &NeuralNet, images: &Vec<Vec<i32>>, labels: &[usize], secret_weights: bool) {
+fn test_arith_circuit(nn: &NeuralNet, images: &Vec<Vec<i32>>, labels: &[usize], secret_weights: bool) {{{{
     println!("running plaintext accuracy evaluation");
     println!("secret weights={}", secret_weights);
 
@@ -114,8 +114,8 @@ fn test_arith_circuit(nn: &NeuralNet, images: &Vec<Vec<i32>>, labels: &[usize], 
     }
     println!("errors: {}/{}. accuracy: {}%", errors, NIMAGES, 100.0 * (1.0 - errors as f32 / NIMAGES as f32));
 }
-
-fn bench_arith_garbling(nn: &NeuralNet, image: &[i32], secret_weights: bool) {
+//}}}
+fn bench_arith_garbling(nn: &NeuralNet, image: &[i32], secret_weights: bool) {{{{
     println!("running garble/eval benchmark");
     println!("secret weights={}", secret_weights);
 
@@ -152,8 +152,8 @@ fn bench_arith_garbling(nn: &NeuralNet, image: &[i32], secret_weights: bool) {
     println!("eval took {} ms", eval_time.as_millis());
     println!("size: {} ciphertexts", ev.size());
 }
-
-fn test_bool_circuit(nn: &NeuralNet, images: &Vec<Vec<i32>>, labels: &[usize], secret_weights: bool) {
+//}}}
+fn test_bool_circuit(nn: &NeuralNet, images: &Vec<Vec<i32>>, labels: &[usize], secret_weights: bool) {{{{
     let nbits = BIT_WIDTH;
     let circ = build_boolean_circuit(nbits, nn, secret_weights);
 
@@ -190,8 +190,8 @@ fn test_bool_circuit(nn: &NeuralNet, images: &Vec<Vec<i32>>, labels: &[usize], s
 
     println!("errors: {}/{}. accuracy: {}%", errors, NIMAGES, 100.0 * (1.0 - errors as f32 / NIMAGES as f32));
 }
-
-fn bench_bool_garbling(nn: &NeuralNet, image: &[i32], secret_weights: bool) {
+//}}}
+fn bench_bool_garbling(nn: &NeuralNet, image: &[i32], secret_weights: bool) {{{{
     println!("running garble/eval benchmark for boolean circuit");
     println!("secret weights={}", secret_weights);
 
@@ -225,11 +225,12 @@ fn bench_bool_garbling(nn: &NeuralNet, image: &[i32], secret_weights: bool) {
     println!("eval took {} ms", eval_time.as_millis());
     println!("size: {} ciphertexts", ev.size());
 }
+//}}}
 
 ////////////////////////////////////////////////////////////////////////////////
 // circuit creation
 
-fn build_circuit(q: u128, nn: &NeuralNet, secret_weights: bool) -> Bundler {
+fn build_circuit(q: u128, nn: &NeuralNet, secret_weights: bool) -> Bundler {{{{
     let mut b = Bundler::new();
     let nn_inputs = b.inputs(q, TOPOLOGY[0]);
 
@@ -265,7 +266,8 @@ fn build_circuit(q: u128, nn: &NeuralNet, secret_weights: bool) -> Bundler {
 
         if layer == 0 {
             layer_outputs = layer_outputs.into_iter().map(|x| {
-                let ms = vec![3,4,54]; // exact
+                let ms = vec![3,4,54]; // exact for 5 primes
+                // let ms = vec![5,5,6,50];  // exact for 6 primes
                 let r = b.sgn(x, &ms);
                 b.zero_one_to_one_negative_one(r, q)
             }).collect();
@@ -277,8 +279,8 @@ fn build_circuit(q: u128, nn: &NeuralNet, secret_weights: bool) -> Bundler {
     }
     b
 }
-
-fn build_boolean_circuit(nbits: usize, nn: &NeuralNet, secret_weights: bool) -> Circuit {
+//}}}
+fn build_boolean_circuit(nbits: usize, nn: &NeuralNet, secret_weights: bool) -> Circuit {{{{
     let mut b = Builder::new();
 
     // binary inputs with 0 representing -1
@@ -364,6 +366,7 @@ fn mux_secret_const_bits(b: &mut Builder, x: Ref, b1: bool, b2: bool) -> Ref {
     let z2 = b.and(x, s2);
     b.add(z1, z2)
 }
+//}}}
 
 ////////////////////////////////////////////////////////////////////////////////
 // NeuralNet methods
