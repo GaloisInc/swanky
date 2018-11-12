@@ -370,7 +370,7 @@ impl Builder {
         let mut digit_carry = None;
         let mut carry_carry = None;
 
-        let mut prev_max_carry = 0;
+        let mut max_carry = 0;
 
         let mut res = Vec::with_capacity(n);
 
@@ -383,28 +383,38 @@ impl Builder {
             let digit = digit_carry.map_or(digit_sum, |d| self.add(digit_sum, d));
 
             if i < n-1 {
-                // compute the carrys
+                // compute the carries
                 let q = self.modulus(xs[0][i]);
-                let max_val = nargs as u16 * (q-1) + prev_max_carry;
-                let max_carry = max_val / q;
-                prev_max_carry = max_carry;
+                // max_carry currently contains the max carry from the previous iteration
+                let max_val = nargs as u16 * (q-1) + max_carry;
+                // now it is the max carry of this iteration
+                max_carry = max_val / q;
 
-                let modded_ds = ds.iter().map(|&d| self.mod_change(d, max_val+1)).to_vec();
+                let modded_ds = ds.iter().map(|&d| {
+                    self.mod_change(d, max_val+1)
+                }).to_vec();
                 let carry_sum = self.add_many(&modded_ds);
+                // add in the carry from the previous iteration
                 let carry = carry_carry.map_or(carry_sum, |c| self.add(carry_sum, c));
 
+                // carry now contains the carry information, we just have to project it to
+                // the correct moduli for the next iteration
                 let next_mod = self.modulus(xs[0][i+1]);
-                let tt = (0..=max_val).map(|i| if i < q { 0 } else { (i / q) % next_mod }).to_vec();
+                let tt = (0..=max_val).map(|i| (i / q) % next_mod).to_vec();
                 digit_carry = Some(self.proj(carry, next_mod, tt));
 
                 let next_max_val = nargs as u16 * (next_mod - 1) + max_carry;
 
-                if max_carry < next_mod {
-                // if false {
-                    carry_carry = Some(self.mod_change(digit_carry.unwrap(), next_max_val + 1));
+                if i < n-2 {
+                    if max_carry < next_mod {
+                        carry_carry = Some(self.mod_change(digit_carry.unwrap(), next_max_val + 1));
+                    } else {
+                        let tt = (0..=max_val).map(|i| if i < q { 0 } else { i / q }).to_vec();
+                        carry_carry = Some(self.proj(carry, next_max_val + 1, tt));
+                    }
                 } else {
-                    let tt = (0..=max_val).map(|i| if i < q { 0 } else { i / q }).to_vec();
-                    carry_carry = Some(self.proj(carry, next_max_val + 1, tt));
+                    // next digit is MSB so we dont need carry_carry
+                    carry_carry = None;
                 }
 
             } else {

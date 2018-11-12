@@ -265,8 +265,7 @@ fn build_circuit(q: u128, nn: &NeuralNet, secret_weights: bool) -> Bundler {
 
         if layer == 0 {
             layer_outputs = layer_outputs.into_iter().map(|x| {
-                // let ms = vec![2,2,2,42]; // aprox?
-                let ms = vec![2,2,3,54]; // exact?!
+                let ms = vec![3,4,54]; // exact
                 let r = b.sgn(x, &ms);
                 b.zero_one_to_one_negative_one(r, q)
             }).collect();

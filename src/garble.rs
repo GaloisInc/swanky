@@ -573,7 +573,7 @@ mod tests {
         let nargs = 2 + rng.gen_usize() % 100;
         let mods = (0..7).map(|_| rng.gen_modulus()).to_vec();
         // let nargs = 97;
-        // let mods = [37, 10, 10, 54, 100, 51, 17];
+        // let mods = [37,10,10,54,100,51,17];
 
         let mut b = Builder::new();
         let xs = (0..nargs).map(|_| {
