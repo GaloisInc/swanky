@@ -81,7 +81,7 @@ fn test_arith_circuit(nn: &NeuralNet, images: &Vec<Vec<i32>>, labels: &[usize], 
     println!("secret weights={}", secret_weights);
 
     let q = numbers::modulus_with_width(BIT_WIDTH as u32);
-    println!("q={}", q);
+    println!("q={} primes={:?}", q, numbers::factor(q));
     let bun = build_circuit(q, nn, secret_weights);
 
     let mut errors = 0;
@@ -120,7 +120,7 @@ fn bench_arith_garbling(nn: &NeuralNet, image: &[i32], secret_weights: bool) {
     println!("secret weights={}", secret_weights);
 
     let q = numbers::modulus_with_width(BIT_WIDTH as u32);
-    println!("q={}", q);
+    println!("q={} primes={:?}", q, numbers::factor(q));
     let mut bun = build_circuit(q, nn, secret_weights);
 
     let mut garble_time = Duration::new(0,0);

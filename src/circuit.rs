@@ -51,7 +51,7 @@ impl Circuit {
                 Gate::Input { id } => inputs[id],
 
                 Gate::Const { id } => {
-                    assert!(id < self.const_vals.as_ref().map_or(0, |cs| cs.len()),
+                    debug_assert!(id < self.const_vals.as_ref().map_or(0, |cs| cs.len()),
                             "[eval_full] not enough constants provided");
                     self.const_vals.as_ref().expect("no consts provided")[id]
                 }
@@ -193,21 +193,21 @@ impl Builder {
     }
 
     pub fn add(&mut self, xref: Ref, yref: Ref) -> Ref {
-        assert!(xref < self.next_ref);
-        assert!(yref < self.next_ref);
+        debug_assert!(xref < self.next_ref);
+        debug_assert!(yref < self.next_ref);
         let xmod = self.circ.moduli[xref];
         let ymod = self.circ.moduli[yref];
-        assert!(xmod == ymod, "xmod={} ymod={}", xmod, ymod);
+        debug_assert!(xmod == ymod, "xmod={} ymod={}", xmod, ymod);
         let gate = Gate::Add { xref, yref };
         self.gate(gate, xmod)
     }
 
     pub fn sub(&mut self, xref: Ref, yref: Ref) -> Ref {
-        assert!(xref < self.next_ref);
-        assert!(yref < self.next_ref);
+        debug_assert!(xref < self.next_ref);
+        debug_assert!(yref < self.next_ref);
         let xmod = self.circ.moduli[xref];
         let ymod = self.circ.moduli[yref];
-        assert!(xmod == ymod);
+        debug_assert!(xmod == ymod);
         let gate = Gate::Sub { xref, yref };
         self.gate(gate, xmod)
     }
@@ -238,7 +238,7 @@ impl Builder {
 
     // the classic yao binary gate, over mixed moduli!
     pub fn yao(&mut self, xref: Ref, yref: Ref, output_modulus: u16, tt: Vec<Vec<u16>>) -> Ref {
-        assert!(tt.iter().all(|ref inner| { inner.iter().all(|&x| x < output_modulus) }));
+        debug_assert!(tt.iter().all(|ref inner| { inner.iter().all(|&x| x < output_modulus) }));
         let gate = Gate::Yao {
             xref,
             yref,
@@ -249,7 +249,7 @@ impl Builder {
     }
 
     pub fn half_gate(&mut self, xref: Ref, yref: Ref) -> Ref {
-        assert_eq!(self.circ.moduli[xref], self.circ.moduli[yref]);
+        debug_assert_eq!(self.circ.moduli[xref], self.circ.moduli[yref]);
         let gate = Gate::HalfGate {
             xref,
             yref,
@@ -263,19 +263,19 @@ impl Builder {
     // higher level circuit constructions
 
     pub fn xor(&mut self, x: Ref, y: Ref) -> Ref {
-        assert!(self.circ.moduli[x] == 2);
-        assert!(self.circ.moduli[y] == 2);
+        debug_assert!(self.circ.moduli[x] == 2);
+        debug_assert!(self.circ.moduli[y] == 2);
         self.add(x,y)
     }
 
     pub fn and(&mut self, x: Ref, y: Ref) -> Ref {
-        assert!(self.circ.moduli[x] == 2);
-        assert!(self.circ.moduli[y] == 2);
+        debug_assert!(self.circ.moduli[x] == 2);
+        debug_assert!(self.circ.moduli[y] == 2);
         self.half_gate(x,y)
     }
 
     pub fn and_many(&mut self, args: &[Ref]) -> Ref {
-        assert!(args.iter().all(|&x| self.circ.moduli[x] == 2));
+        debug_assert!(args.iter().all(|&x| self.circ.moduli[x] == 2));
         // convert all the wires to base b+1
         let b = args.len() as u16;
         let wires: Vec<Ref> = args.iter().map(|&x| {
@@ -287,7 +287,7 @@ impl Builder {
     // assumes wires already are in base b+1
     pub fn _and_many(&mut self, args: &[Ref]) -> Ref {
         let b = args.len();
-        assert!(args.iter().all(|&x| self.circ.moduli[x] == (b + 1) as u16));
+        debug_assert!(args.iter().all(|&x| self.circ.moduli[x] == (b + 1) as u16));
         // add them together
         let z = self.add_many(&args);
         // decode the result in base 2
@@ -297,7 +297,7 @@ impl Builder {
     }
 
     pub fn or_many(&mut self, args: &[Ref]) -> Ref {
-        assert!(args.iter().all(|&x| self.circ.moduli[x] == 2));
+        debug_assert!(args.iter().all(|&x| self.circ.moduli[x] == 2));
         // convert all the wires to base b+1
         let b = args.len();
         let wires: Vec<Ref> = args.iter().map(|&x| {
@@ -314,7 +314,7 @@ impl Builder {
     }
 
     pub fn mul_dlog(&mut self, args: &[Ref]) -> Ref {
-        assert!(args.len() > 1);
+        debug_assert!(args.len() > 1);
 
         // ensure the aguments are compatible
         let q = self.circ.moduli[args[0]];
@@ -323,7 +323,7 @@ impl Builder {
             return self.and_many(args)
         }
 
-        assert!(args.iter().all(|&x| self.circ.moduli[x] == q));
+        debug_assert!(args.iter().all(|&x| self.circ.moduli[x] == q));
 
         // check if any argument is zero
         let mut eq_zero_tab = vec![0; q as usize];
@@ -362,7 +362,7 @@ impl Builder {
     ////////////////////////////////////////////////////////////////////////////////
     // binary stuff
 
-    pub fn fancy_addition(&mut self, xs: &[&[Ref]]) -> Vec<Ref> {
+    pub fn fancy_addition(&mut self, xs: &[Vec<Ref>]) -> Vec<Ref> {
         let nargs = xs.len();
         let n = xs[0].len();
         debug_assert!(xs.iter().all(|x| x.len() == n));
@@ -398,8 +398,14 @@ impl Builder {
                 digit_carry = Some(self.proj(carry, next_mod, tt));
 
                 let next_max_val = nargs as u16 * (next_mod - 1) + max_carry;
-                let tt = (0..=max_val).map(|i| if i < q { 0 } else { i / q }).to_vec();
-                carry_carry = Some(self.proj(carry, next_max_val + 1, tt));
+
+                if max_carry < next_mod {
+                // if false {
+                    carry_carry = Some(self.mod_change(digit_carry.unwrap(), next_max_val + 1));
+                } else {
+                    let tt = (0..=max_val).map(|i| if i < q { 0 } else { i / q }).to_vec();
+                    carry_carry = Some(self.proj(carry, next_max_val + 1, tt));
+                }
 
             } else {
                 digit_carry = None;
@@ -506,7 +512,7 @@ impl Builder {
     }
 
     pub fn negate(&mut self, x: Ref) -> Ref {
-        assert_eq!(self.modulus(x), 2);
+        debug_assert_eq!(self.modulus(x), 2);
         self.proj(x, 2, vec![1,0])
     }
 
@@ -761,7 +767,7 @@ mod tests {
         let xs = (0..nargs).map(|_| {
             mods.iter().map(|&q| b.input(q)).to_vec()
         }).to_vec();
-        let zs = b.fancy_addition(&xs.iter().map(|x| x.as_slice()).to_vec());
+        let zs = b.fancy_addition(&xs);
         b.outputs(&zs);
         let circ = b.finish();
 

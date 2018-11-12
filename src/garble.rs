@@ -572,12 +572,14 @@ mod tests {
 
         let nargs = 2 + rng.gen_usize() % 100;
         let mods = (0..7).map(|_| rng.gen_modulus()).to_vec();
+        // let nargs = 97;
+        // let mods = [37, 10, 10, 54, 100, 51, 17];
 
         let mut b = Builder::new();
         let xs = (0..nargs).map(|_| {
             mods.iter().map(|&q| b.input(q)).to_vec()
         }).to_vec();
-        let zs = b.fancy_addition(&xs.iter().map(|x| x.as_slice()).to_vec());
+        let zs = b.fancy_addition(&xs);
         b.outputs(&zs);
         let circ = b.finish();
 

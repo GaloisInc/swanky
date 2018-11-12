@@ -443,7 +443,7 @@ impl Bundler {
         let q = product(&self.primes(xbun));
         let M = numbers::product(factors_of_m);
 
-        let mut old_ds = Vec::new(); // accumulator
+        let mut ds = Vec::new();
 
         let xs = self.wires(xbun);
         let ps = self.primes(xbun);
@@ -464,20 +464,17 @@ impl Bundler {
 
             let new_ds = tabs.into_iter().enumerate()
                 .map(|(i,tt)| b.proj(xref, factors_of_m[i], tt))
-                .collect::<Vec<Ref>>();
+                .to_vec();
 
-            if old_ds.is_empty() {
-                old_ds = new_ds;
-            } else if old_ds.len() == 1 {
-                old_ds[0] = b.add(old_ds[0], new_ds[0]);
-            } else {
-                old_ds = b.addition_no_carry(&old_ds, &new_ds);
-            }
+            ds.push(new_ds);
         }
+
+        let res = b.fancy_addition(&ds);
+        // let res = ds.iter().skip(1).fold(ds[0].clone(), |acc, d| b.addition_no_carry(&acc, d));
 
         let p = *factors_of_m.last().unwrap();
         let tt = (0..p).map(|x| (x >= p/2) as u16).collect();
-        let z = b.proj(*old_ds.last().unwrap(), 2, tt);
+        let z = b.proj(*res.last().unwrap(), 2, tt);
 
         self.put_builder(b);
         z
@@ -851,6 +848,7 @@ mod tests {
         let mut b = Bundler::new();
         let x = b.input(q);
         let ms = [2,2,3,54];
+        // let ms = [3,4,5,54];
         // let ms = [8192];
         let z = b.sgn(x,&ms);
         b.output_ref(z);
