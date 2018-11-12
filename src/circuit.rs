@@ -409,7 +409,7 @@ impl Builder {
                     if max_carry < next_mod {
                         carry_carry = Some(self.mod_change(digit_carry.unwrap(), next_max_val + 1));
                     } else {
-                        let tt = (0..=max_val).map(|i| if i < q { 0 } else { i / q }).to_vec();
+                        let tt = (0..=max_val).map(|i| i / q).to_vec();
                         carry_carry = Some(self.proj(carry, next_max_val + 1, tt));
                     }
                 } else {
