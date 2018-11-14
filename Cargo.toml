@@ -16,6 +16,7 @@ rand = "^0.3.14"
 libc = "^0.2.0"
 num = "^0.2"
 num-traits = "^0.2.6"
+itertools = "^0.7.8"
 base_conversion = { path = "base_conversion" }
 
 [dev-dependencies]

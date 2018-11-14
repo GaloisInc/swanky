@@ -58,15 +58,6 @@ fn mul_bundler(q: u128) -> Bundler {
     b
 }
 
-fn mul_dlog_bundler(q: u128) -> Bundler {
-    let mut b = Bundler::new();
-    let x = b.input(q);
-    let y = b.input(q);
-    let z = b.mul_dlog(&[x,y]);
-    b.output(z);
-    b
-}
-
 fn parity_bundler(q: u128) -> Bundler {
     let mut b = Bundler::new();
     let x = b.input(q);
@@ -94,11 +85,6 @@ fn mul(cr: &mut Criterion) {
     bench_ev(cr, "high_level::mul_ev", mul_bundler);
 }
 
-fn mul_dlog(cr: &mut Criterion) {
-    bench_gb(cr, "high_level::mul_dlog_gb", mul_dlog_bundler);
-    bench_ev(cr, "high_level::mul_dlog_ev", mul_dlog_bundler);
-}
-
 fn parity(cr: &mut Criterion) {
     bench_gb(cr, "high_level::parity_gb", parity_bundler);
     bench_ev(cr, "high_level::parity_ev", parity_bundler);
@@ -112,7 +98,7 @@ fn sgn(cr: &mut Criterion) {
 criterion_group!{
     name = high_level;
     config = Criterion::default().warm_up_time(Duration::from_millis(100));
-    targets = add, mul, mul_dlog, parity, sgn
+    targets = add, mul, parity, sgn
 }
 
 criterion_main!(high_level);

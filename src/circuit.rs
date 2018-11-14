@@ -1,4 +1,3 @@
-use numbers::{dlog_truth_table, exp_truth_table};
 use util::IterToVec;
 
 use std::collections::HashMap;
@@ -18,10 +17,11 @@ pub type Id = usize;
 #[derive(Debug)]
 pub struct Circuit {
     pub gates: Vec<Gate>,
-    pub moduli: Vec<u16>,
+    pub gate_moduli: Vec<u16>,
     pub input_refs: Vec<Ref>,
     pub output_refs: Vec<Ref>,
     pub const_vals: Option<Vec<u16>>,
+    pub num_nonfree_gates: usize,
 }
 
 #[derive(Debug)]
@@ -45,7 +45,7 @@ impl Circuit {
 
         let mut cache = vec![0;self.gates.len()];
         for zref in 0..self.gates.len() {
-            let q = self.moduli[zref];
+            let q = self.gate_moduli[zref];
             let val = match self.gates[zref] {
 
                 Gate::Input { id } => inputs[id],
@@ -76,10 +76,11 @@ impl Circuit {
 
     pub fn ninputs(&self) -> usize { self.input_refs.len() }
     pub fn noutputs(&self) -> usize { self.output_refs.len() }
+    pub fn modulus(&self, x: Ref) -> u16 { self.gate_moduli[x] }
 
     pub fn input_mod(&self, id: Id) -> u16 {
         let r = self.input_refs[id];
-        self.moduli[r]
+        self.gate_moduli[r]
     }
 
     pub fn clear_consts(&mut self) {
@@ -91,7 +92,6 @@ impl Circuit {
 pub struct Builder {
     next_ref: Ref,
     next_input_id: Id,
-    next_ciphertext_id: Id,
     const_map: HashMap<(u16,u16), Ref>,
     pub circ: Circuit,
 }
@@ -102,13 +102,13 @@ impl Builder {
             gates: Vec::new(),
             input_refs: Vec::new(),
             output_refs: Vec::new(),
-            moduli: Vec::new(),
+            gate_moduli: Vec::new(),
             const_vals: Some(Vec::new()),
+            num_nonfree_gates: 0,
         };
         Builder {
             next_ref: 0,
             next_input_id: 0,
-            next_ciphertext_id: 0,
             const_map: HashMap::new(),
             circ: c
         }
@@ -123,7 +123,7 @@ impl Builder {
     }
 
     pub fn modulus(&self, x:Ref) -> u16 {
-        self.circ.moduli[x]
+        self.circ.modulus(x)
     }
 
     fn get_next_input_id(&mut self) -> Id {
@@ -133,8 +133,8 @@ impl Builder {
     }
 
     fn get_next_ciphertext_id(&mut self) -> Id {
-        let id = self.next_ciphertext_id;
-        self.next_ciphertext_id += 1;
+        let id = self.circ.num_nonfree_gates;
+        self.circ.num_nonfree_gates += 1;
         id
     }
 
@@ -146,7 +146,7 @@ impl Builder {
 
     fn gate(&mut self, gate: Gate, modulus: u16) -> Ref {
         self.circ.gates.push(gate);
-        self.circ.moduli.push(modulus);
+        self.circ.gate_moduli.push(modulus);
         self.get_next_ref()
     }
 
@@ -195,8 +195,8 @@ impl Builder {
     pub fn add(&mut self, xref: Ref, yref: Ref) -> Ref {
         debug_assert!(xref < self.next_ref);
         debug_assert!(yref < self.next_ref);
-        let xmod = self.circ.moduli[xref];
-        let ymod = self.circ.moduli[yref];
+        let xmod = self.circ.gate_moduli[xref];
+        let ymod = self.circ.gate_moduli[yref];
         debug_assert!(xmod == ymod, "xmod={} ymod={}", xmod, ymod);
         let gate = Gate::Add { xref, yref };
         self.gate(gate, xmod)
@@ -205,8 +205,8 @@ impl Builder {
     pub fn sub(&mut self, xref: Ref, yref: Ref) -> Ref {
         debug_assert!(xref < self.next_ref);
         debug_assert!(yref < self.next_ref);
-        let xmod = self.circ.moduli[xref];
-        let ymod = self.circ.moduli[yref];
+        let xmod = self.circ.gate_moduli[xref];
+        let ymod = self.circ.gate_moduli[yref];
         debug_assert!(xmod == ymod);
         let gate = Gate::Sub { xref, yref };
         self.gate(gate, xmod)
@@ -227,7 +227,7 @@ impl Builder {
     }
 
     pub fn proj(&mut self, xref: Ref, output_modulus: u16, tt: Vec<u16>) -> Ref {
-        debug_assert_eq!(tt.len(), self.circ.moduli[xref] as usize);
+        debug_assert_eq!(tt.len(), self.circ.gate_moduli[xref] as usize);
         debug_assert!(tt.iter().all(|&x| x < output_modulus),
             "not all xs were less than the output modulus! circuit.proj: tt={:?},
             output_modulus={}", tt, output_modulus);
@@ -249,13 +249,13 @@ impl Builder {
     }
 
     pub fn half_gate(&mut self, xref: Ref, yref: Ref) -> Ref {
-        debug_assert_eq!(self.circ.moduli[xref], self.circ.moduli[yref]);
+        debug_assert_eq!(self.modulus(xref), self.modulus(yref));
         let gate = Gate::HalfGate {
             xref,
             yref,
             id: self.get_next_ciphertext_id(),
         };
-        let q = self.circ.moduli[xref];
+        let q = self.modulus(xref);
         self.gate(gate, q)
     }
 
@@ -263,19 +263,19 @@ impl Builder {
     // higher level circuit constructions
 
     pub fn xor(&mut self, x: Ref, y: Ref) -> Ref {
-        debug_assert!(self.circ.moduli[x] == 2);
-        debug_assert!(self.circ.moduli[y] == 2);
+        debug_assert!(self.modulus(x) == 2);
+        debug_assert!(self.modulus(y) == 2);
         self.add(x,y)
     }
 
     pub fn and(&mut self, x: Ref, y: Ref) -> Ref {
-        debug_assert!(self.circ.moduli[x] == 2);
-        debug_assert!(self.circ.moduli[y] == 2);
+        debug_assert!(self.modulus(x) == 2);
+        debug_assert!(self.modulus(y) == 2);
         self.half_gate(x,y)
     }
 
     pub fn and_many(&mut self, args: &[Ref]) -> Ref {
-        debug_assert!(args.iter().all(|&x| self.circ.moduli[x] == 2));
+        debug_assert!(args.iter().all(|&x| self.modulus(x) == 2));
         // convert all the wires to base b+1
         let b = args.len() as u16;
         let wires: Vec<Ref> = args.iter().map(|&x| {
@@ -287,7 +287,7 @@ impl Builder {
     // assumes wires already are in base b+1
     pub fn _and_many(&mut self, args: &[Ref]) -> Ref {
         let b = args.len();
-        debug_assert!(args.iter().all(|&x| self.circ.moduli[x] == (b + 1) as u16));
+        debug_assert!(args.iter().all(|&x| self.modulus(x) == (b + 1) as u16));
         // add them together
         let z = self.add_many(&args);
         // decode the result in base 2
@@ -297,7 +297,7 @@ impl Builder {
     }
 
     pub fn or_many(&mut self, args: &[Ref]) -> Ref {
-        debug_assert!(args.iter().all(|&x| self.circ.moduli[x] == 2));
+        debug_assert!(args.iter().all(|&x| self.modulus(x) == 2));
         // convert all the wires to base b+1
         let b = args.len();
         let wires: Vec<Ref> = args.iter().map(|&x| {
@@ -311,43 +311,6 @@ impl Builder {
         let mut tab = vec![1;b+1];
         tab[0] = 0;
         self.proj(z, 2, tab)
-    }
-
-    pub fn mul_dlog(&mut self, args: &[Ref]) -> Ref {
-        debug_assert!(args.len() > 1);
-
-        // ensure the aguments are compatible
-        let q = self.circ.moduli[args[0]];
-        if q == 2 {
-            // we can't use the dlog trick on mod 2 since we must add in mod p-1
-            return self.and_many(args)
-        }
-
-        debug_assert!(args.iter().all(|&x| self.circ.moduli[x] == q));
-
-        // check if any argument is zero
-        let mut eq_zero_tab = vec![0; q as usize];
-        eq_zero_tab[0] = 1;
-        let bs: Vec<Ref> = args.iter().map(|&x| {
-            self.proj(x, 2, eq_zero_tab.clone())
-        }).collect();
-        let b = self.or_many(&bs);
-
-        // multiply using the discrete log trick- first project each argument to
-        // [dlog_g(x)]_{p-1}
-        let tab = dlog_truth_table(q);
-        let zs: Vec<Ref> = args.iter().map(|&x| {
-            self.proj(x, q-1, tab.clone())
-        }).collect();
-        let z = self.add_many(&zs);
-
-        // make the truth table for f(b,z) - we flip the arguments for
-        // convenience with exp_truth_table.
-        let mut f_tt = Vec::with_capacity(2);
-        f_tt.push(exp_truth_table(q));
-        f_tt.push(vec![0; q as usize]);
-
-        self.yao(b, z, q, f_tt)
     }
 
     pub fn mod_change(&mut self, xref: Ref, to_modulus: u16) -> Ref {
@@ -588,23 +551,6 @@ mod tests {
                 println!("{:?} {} {}", inps, out, res);
                 panic!();
             }
-        }
-    }
-//}}}
-    #[test] // {{{ mul_dlog
-    fn mul_dlog() {
-        let mut rng = Rng::new();
-        let mut b = Builder::new();
-        let q = rng.gen_prime();
-        let x = b.input(q);
-        let y = b.input(q);
-        let z = b.mul_dlog(&[x,y]);
-        b.output(z);
-        let c = b.finish();
-        for _ in 0..16 {
-            let x = rng.gen_byte() as u16 % q;
-            let y = rng.gen_byte() as u16 % q;
-            assert_eq!(c.eval(&vec![x,y])[0], x * y % q);
         }
     }
 //}}}

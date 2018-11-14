@@ -255,24 +255,6 @@ impl Bundler {
         self.add_bundle(zwires, primes)
     }
 
-    pub fn mul_dlog(&mut self, args: &[BundleRef]) -> BundleRef {
-        assert!(!args.is_empty());
-        let nwires = self.bundles[args[0].0].wires.len();
-        assert!(args.iter().all(|&a| self.bundles[a.0].wires.len() == nwires));
-        let mut zwires = Vec::with_capacity(self.bundles[args[0].0].wires.len());
-        {
-            for i in 0..nwires {
-                let ith_wires = args.iter().map(|&x| {
-                    self.bundles[x.0].wires[i]
-                }).to_vec();
-                let z = self.borrow_mut_builder().mul_dlog(&ith_wires);
-                zwires.push(z);
-            }
-        }
-        let primes = self.primes(args[0]);
-        self.add_bundle(zwires, primes)
-    }
-
     pub fn mul(&mut self, xref: BundleRef, yref: BundleRef) -> BundleRef {
         let xwires = self.wires(xref);
         let ywires = self.wires(yref);
@@ -322,8 +304,8 @@ impl Bundler {
         };
 
         let gadget = |b: &mut Builder, x: Ref, y: Ref| -> Ref {
-            let p  = b.circ.moduli[x];
-            let q  = b.circ.moduli[y];
+            let p  = b.circ.modulus(x);
+            let q  = b.circ.modulus(y);
             let x_ = b.mod_change(x, p+q-1);
             let y_ = b.mod_change(y, p+q-1);
             let z  = b.sub(x_, y_);
@@ -375,7 +357,7 @@ impl Bundler {
         let new_mod = 1_u16 << nbits;
 
         let project = |x: Ref, c: u16, b: &mut Builder| -> Ref {
-            let p = b.circ.moduli[x];
+            let p = b.circ.modulus(x);
             let Mi = M / p as u128;
 
             // crt coef
@@ -688,25 +670,6 @@ mod tests {
             let x = rng.gen_u128() % q;
             let should_be = x % p as u128;
             test_garbling(&mut b, &[x], &[should_be]);
-        }
-    }
-    //}}}
-    #[test] // dlog_multiplication {{{
-    fn dlog_multiplication() {
-        let mut rng = Rng::new();
-        let q = modulus_with_width(32);
-
-        let mut b = Bundler::new();
-        let x = b.input(q);
-        let y = b.input(q);
-        let z = b.mul_dlog(&[x,y]);
-        b.output(z);
-
-        for _ in 0..NTESTS {
-            let x = rng.gen_u64() as u128 % q;
-            let y = rng.gen_u64() as u128 % q;
-            let should_be = x * y % q;
-            test_garbling(&mut b, &[x,y], &[should_be]);
         }
     }
     //}}}
