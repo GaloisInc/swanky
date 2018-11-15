@@ -22,9 +22,6 @@ base_conversion = { path = "base_conversion" }
 [dev-dependencies]
 criterion = "0.2"
 
-# [profile.release]
-# debug = true
-
 [[bin]]
 name = "dinn"
 path = "apps/dinn.rs"
@@ -43,5 +40,5 @@ name = "garbling"
 harness = false
 
 [[bench]]
-name = "high_level"
+name = "crt"
 harness = false

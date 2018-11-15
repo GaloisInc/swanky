@@ -11,14 +11,14 @@ pub struct WireBundle {
     primes: Rc<Vec<u16>>,
 }
 
-pub struct Bundler {
+pub struct CrtBundler {
     builder: Option<Builder>,
     bundles: Vec<WireBundle>,
     inputs: Vec<BundleRef>,
     outputs: Vec<BundleRef>,
 }
 
-impl Bundler {
+impl CrtBundler {
     pub fn new() -> Self {
         Self::from_builder(Builder::new())
     }
@@ -59,7 +59,7 @@ impl Bundler {
     // builder management
 
     pub fn from_builder(b: Builder) -> Self {
-        Bundler {
+        CrtBundler {
             builder: Some(b),
             bundles: Vec::new(),
             inputs: Vec::new(),
@@ -477,15 +477,15 @@ impl Bundler {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
     use garble::garble;
-    use high_level::Bundler;
     use numbers::{self, inv, factor, modulus_with_width};
     use rand::Rng;
 
     const NTESTS: usize = 1;
 
     // test harnesses {{{
-    fn test_garbling(b: &Bundler, inp: &[u128], should_be: &[u128]) {
+    fn test_garbling(b: &CrtBundler, inp: &[u128], should_be: &[u128]) {
         let circ = b.borrow_builder().borrow_circ();
         let (gb, ev) = garble(&circ);
 
@@ -500,7 +500,7 @@ mod tests {
         assert_eq!(b.decode(&gb.decode(&ys)), should_be);
     }
 
-    fn test_garbling_high_to_low(b: &Bundler, inp: &[u128], should_be: &[u16]) {
+    fn test_garbling_high_to_low(b: &CrtBundler, inp: &[u128], should_be: &[u16]) {
         let circ = b.borrow_builder().borrow_circ();
         let (gb, ev) = garble(&circ);
 
@@ -523,7 +523,7 @@ mod tests {
         for _ in 0..NTESTS {
             let q = rng.gen_usable_composite_modulus();
 
-            let mut b = Bundler::new();
+            let mut b = CrtBundler::new();
             let inp = b.input(q);
             b.output(inp);
 
@@ -542,7 +542,7 @@ mod tests {
 
             println!("p={} q={}", p, q);
 
-            let mut b = Bundler::new();
+            let mut b = CrtBundler::new();
             let inp = b.borrow_mut_builder().input(p);
             let bun = b.bundle_from_ref(inp, q);
             b.output(bun);
@@ -567,7 +567,7 @@ mod tests {
         let mut rng = Rng::new();
         let q = rng.gen_usable_composite_modulus();
 
-        let mut b = Bundler::new();
+        let mut b = CrtBundler::new();
         let x = b.input(q);
         let y = b.input(q);
         let z = b.add(x,y);
@@ -586,7 +586,7 @@ mod tests {
 
             let q = rng.gen_usable_composite_modulus();
 
-            let mut b = Bundler::new();
+            let mut b = CrtBundler::new();
             let x = b.input(q);
             let y = b.input(q);
             let z = b.sub(x,y);
@@ -605,7 +605,7 @@ mod tests {
         for _ in 0..16 {
             let q = modulus_with_width(10);
             let y = rng.gen_u128() % q;
-            let mut b = Bundler::new();
+            let mut b = CrtBundler::new();
             let x = b.input(q);
             let z = b.cmul(x,y);
             b.output(z);
@@ -624,7 +624,7 @@ mod tests {
         let q = rng.gen_usable_composite_modulus();
         let y = rng.gen_u64() as u128 % q;
 
-        let mut b = Bundler::new();
+        let mut b = CrtBundler::new();
         let x = b.input(q);
         let z = b.secret_cmul(x,y);
         b.output(z);
@@ -642,7 +642,7 @@ mod tests {
         let q = numbers::modulus_with_width(10);
         let y = rng.gen_u16() % 10;
 
-        let mut b = Bundler::new();
+        let mut b = CrtBundler::new();
         let x = b.input(q);
         let z = b.cexp(x,y);
         b.output(z);
@@ -661,7 +661,7 @@ mod tests {
         let q = ps.iter().fold(1, |acc, &x| (x as u128) * acc);
         let p = ps[rng.gen_u16() as usize % ps.len()];
 
-        let mut b = Bundler::new();
+        let mut b = CrtBundler::new();
         let x = b.input(q);
         let z = b.rem(x,p);
         b.output(z);
@@ -678,7 +678,7 @@ mod tests {
         let mut rng = Rng::new();
         let q = modulus_with_width(32);
 
-        let mut b = Bundler::new();
+        let mut b = CrtBundler::new();
         let x = b.input(q);
         let y = b.input(q);
         let z = b.mul(x,y);
@@ -697,7 +697,7 @@ mod tests {
         let mut rng = Rng::new();
         let q = rng.gen_usable_composite_modulus();
 
-        let mut b = Bundler::new();
+        let mut b = CrtBundler::new();
         let x = b.input(q);
         let y = b.input(q);
         let z = b.eq(x,y);
@@ -715,7 +715,7 @@ mod tests {
     fn parity() {
         let mut rng = Rng::new();
         let q = numbers::modulus_with_width_skip2(32);
-        let mut b = Bundler::new();
+        let mut b = CrtBundler::new();
         let x = b.input(q);
         let z = b.parity(x);
         b.output_ref(z);
@@ -731,7 +731,7 @@ mod tests {
     fn cdiv() {
         let mut rng = Rng::new();
         let q = numbers::modulus_with_width_skip2(32);
-        let mut b = Bundler::new();
+        let mut b = CrtBundler::new();
         let x = b.input(q);
         let z = b.cdiv(x,2);
         b.output(z);
@@ -748,7 +748,7 @@ mod tests {
     fn bits() {
         let mut rng = Rng::new();
         let q = numbers::modulus_with_width_skip2(32);
-        let mut b = Bundler::new();
+        let mut b = CrtBundler::new();
         let x = b.input(q);
         let zs = b.bits(x, 32);
         b.output_refs(&zs);
@@ -768,7 +768,7 @@ mod tests {
         let n = ps.len();
         let p = q / ps[n-1] as u128;
 
-        let mut b = Bundler::new();
+        let mut b = CrtBundler::new();
         let x = b.input(q);
         let y = b.input(q);
         let z = b.less_than_pmr(x,y);
@@ -786,7 +786,7 @@ mod tests {
     fn less_than_bits() {
         let mut rng = Rng::new();
         let q = numbers::modulus_with_width_skip2(32);
-        let mut b = Bundler::new();
+        let mut b = CrtBundler::new();
         let x = b.input(q);
         let y = b.input(q);
         let z = b.less_than_bits(x, y, 32);
@@ -808,7 +808,7 @@ mod tests {
         let q = modulus_with_width(10);
         println!("q={}", q);
 
-        let mut b = Bundler::new();
+        let mut b = CrtBundler::new();
         let x = b.input(q);
         let ms = [2,2,3,54];
         // let ms = [3,4,5,54];
@@ -830,7 +830,7 @@ mod tests {
             let ps = rng._gen_usable_composite_modulus();
             let q = ps.iter().fold(1, |acc, &x| x as u128 * acc);
 
-            let mut b = Bundler::new();
+            let mut b = CrtBundler::new();
             let x = b.input(q);
             let z = b.crt_to_pmr(x);
             b.output(z);

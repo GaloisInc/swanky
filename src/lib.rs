@@ -21,7 +21,6 @@ extern crate itertools;
 
 pub mod circuit;
 pub mod garble;
-pub mod high_level;
 pub mod numbers;
 pub mod rand;
 pub mod wire;

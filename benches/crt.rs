@@ -7,10 +7,10 @@ use std::time::Duration;
 
 use fancy_garbling::rand::Rng;
 use fancy_garbling::garble::garble;
-use fancy_garbling::high_level::Bundler;
+use fancy_garbling::circuit::crt::CrtBundler;
 use fancy_garbling::numbers::modulus_with_width;
 
-fn bench_gb<F:'static>(cr: &mut Criterion, name: &str, gen_bundler: F) where F: Fn(u128) -> Bundler {
+fn bench_gb<F:'static>(cr: &mut Criterion, name: &str, gen_bundler: F) where F: Fn(u128) -> CrtBundler {
     cr.bench_function(name, move |bench| {
         let q = modulus_with_width(32);
         let c = gen_bundler(q).finish();
@@ -21,7 +21,7 @@ fn bench_gb<F:'static>(cr: &mut Criterion, name: &str, gen_bundler: F) where F: 
     });
 }
 
-fn bench_ev<F:'static>(cr: &mut Criterion, name: &str, gen_bundler: F) where F: Fn(u128) -> Bundler{
+fn bench_ev<F:'static>(cr: &mut Criterion, name: &str, gen_bundler: F) where F: Fn(u128) -> CrtBundler{
     cr.bench_function(name, move |bench| {
         let q = modulus_with_width(32);
         let mut b = gen_bundler(q);
@@ -40,8 +40,8 @@ fn bench_ev<F:'static>(cr: &mut Criterion, name: &str, gen_bundler: F) where F: 
     });
 }
 
-fn add_bundler(q: u128) -> Bundler {
-    let mut b = Bundler::new();
+fn add_bundler(q: u128) -> CrtBundler {
+    let mut b = CrtBundler::new();
     let x = b.input(q);
     let y = b.input(q);
     let z = b.add(x,y);
@@ -49,8 +49,8 @@ fn add_bundler(q: u128) -> Bundler {
     b
 }
 
-fn mul_bundler(q: u128) -> Bundler {
-    let mut b = Bundler::new();
+fn mul_bundler(q: u128) -> CrtBundler {
+    let mut b = CrtBundler::new();
     let x = b.input(q);
     let y = b.input(q);
     let z = b.mul(x,y);
@@ -58,16 +58,16 @@ fn mul_bundler(q: u128) -> Bundler {
     b
 }
 
-fn parity_bundler(q: u128) -> Bundler {
-    let mut b = Bundler::new();
+fn parity_bundler(q: u128) -> CrtBundler {
+    let mut b = CrtBundler::new();
     let x = b.input(q);
     let z = b.parity(x);
     b.output_ref(z);
     b
 }
 
-fn sgn_bundler(q: u128) -> Bundler {
-    let mut b = Bundler::new();
+fn sgn_bundler(q: u128) -> CrtBundler {
+    let mut b = CrtBundler::new();
     let x = b.input(q);
     let ms = std::iter::repeat(4).take(5).collect::<Vec<_>>();
     let z = b.sgn(x,&ms);
@@ -76,29 +76,29 @@ fn sgn_bundler(q: u128) -> Bundler {
 }
 
 fn add(cr: &mut Criterion) {
-    bench_gb(cr, "high_level::add_gb", add_bundler);
-    bench_ev(cr, "high_level::add_ev", add_bundler);
+    bench_gb(cr, "crt::add_gb", add_bundler);
+    bench_ev(cr, "crt::add_ev", add_bundler);
 }
 
 fn mul(cr: &mut Criterion) {
-    bench_gb(cr, "high_level::mul_gb", mul_bundler);
-    bench_ev(cr, "high_level::mul_ev", mul_bundler);
+    bench_gb(cr, "crt::mul_gb", mul_bundler);
+    bench_ev(cr, "crt::mul_ev", mul_bundler);
 }
 
 fn parity(cr: &mut Criterion) {
-    bench_gb(cr, "high_level::parity_gb", parity_bundler);
-    bench_ev(cr, "high_level::parity_ev", parity_bundler);
+    bench_gb(cr, "crt::parity_gb", parity_bundler);
+    bench_ev(cr, "crt::parity_ev", parity_bundler);
 }
 
 fn sgn(cr: &mut Criterion) {
-    bench_gb(cr, "high_level::sgn_gb", sgn_bundler);
-    bench_ev(cr, "high_level::sgn_ev", sgn_bundler);
+    bench_gb(cr, "crt::sgn_gb", sgn_bundler);
+    bench_ev(cr, "crt::sgn_ev", sgn_bundler);
 }
 
 criterion_group!{
-    name = high_level;
+    name = crt;
     config = Criterion::default().warm_up_time(Duration::from_millis(100));
     targets = add, mul, parity, sgn
 }
 
-criterion_main!(high_level);
+criterion_main!(crt);

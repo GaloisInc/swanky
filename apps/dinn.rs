@@ -8,7 +8,7 @@ use std::fs::File;
 use std::io::prelude::*;
 use std::io::{BufReader, Lines};
 
-use fancy_garbling::high_level::Bundler;
+use fancy_garbling::circuit::crt::CrtBundler;
 use fancy_garbling::numbers;
 use fancy_garbling::circuit::{Builder, Ref, Circuit};
 use fancy_garbling::garble::garble;
@@ -230,8 +230,8 @@ fn bench_bool_garbling(nn: &NeuralNet, image: &[i32], secret_weights: bool) { //
 ////////////////////////////////////////////////////////////////////////////////
 // circuit creation
 
-fn build_circuit(q: u128, nn: &NeuralNet, secret_weights: bool) -> Bundler { //{{{
-    let mut b = Bundler::new();
+fn build_circuit(q: u128, nn: &NeuralNet, secret_weights: bool) -> CrtBundler { //{{{
+    let mut b = CrtBundler::new();
     let nn_inputs = b.inputs(q, TOPOLOGY[0]);
 
     let mut layer_outputs = Vec::new();
