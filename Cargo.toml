@@ -29,6 +29,11 @@ criterion = "0.2"
 name = "dinn"
 path = "apps/dinn.rs"
 
+[[bin]]
+name = "profile"
+path = "apps/profile.rs"
+debug = true
+
 [[bench]]
 name = "wire_operations"
 harness = false

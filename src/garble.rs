@@ -99,7 +99,7 @@ impl Garbler {
     }
 
     fn delta(&self, q:u16) -> &Wire {
-        &self.deltas.get(&q).expect(&format!("garbler has not generated delta for {}!", q))
+        &self.deltas.get(&q).expect("garbler has not generated delta!")
     }
 
     pub fn input(&mut self, q: u16) -> Wire {
