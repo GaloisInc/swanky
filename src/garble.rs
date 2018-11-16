@@ -278,7 +278,7 @@ impl Garbler {
                 }
             }
         }
-        debug_assert_eq!(ws.len(), outs.len());
+        debug_assert_eq!(ws.len(), outs.len(), "decoding failed");
         outs
     }
 }
@@ -393,12 +393,10 @@ mod tests {
             let (gb, ev) = garble(&c);
             println!("number of ciphertexts for mod {}: {}", q, ev.size());
             for _ in 0..64 {
-                let inps = &(0..c.ninputs()).map(|i| {
-                    rng.gen_u16() % c.input_mod(i)
-                }).collect::<Vec<u16>>();
-                let xs = &gb.encode(inps);
+                let inps = (0..c.ninputs()).map(|i| { rng.gen_u16() % c.input_mod(i) }).to_vec();
+                let xs = &gb.encode(&inps);
                 let ys = &ev.eval(c, xs);
-                assert_eq!(gb.decode(ys)[0], c.eval(inps)[0], "q={}", q);
+                assert_eq!(gb.decode(ys)[0], c.eval(&inps)[0], "q={}", q);
             }
         }
     }

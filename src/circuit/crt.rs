@@ -420,7 +420,7 @@ impl CrtBundler {
         self.borrow_mut_builder().binary_subtraction(&xbits, &ybits).1
     }
 
-    pub fn sgn(&mut self, xbun: BundleRef, factors_of_m: &[u16]) -> Ref {
+    fn fractional_mixed_radix(&mut self, xbun: BundleRef, factors_of_m: &[u16]) -> Vec<Ref> {
         let ndigits = factors_of_m.len();
         let q = product(&self.primes(xbun));
         let M = numbers::product(factors_of_m);
@@ -450,28 +450,48 @@ impl CrtBundler {
 
             ds.push(new_ds);
         }
-
         let res = b.fancy_addition(&ds);
-        // let res = ds.iter().skip(1).fold(ds[0].clone(), |acc, d| b.addition_no_carry(&acc, d));
-
-        let p = *factors_of_m.last().unwrap();
-        let tt = (0..p).map(|x| (x >= p/2) as u16).collect();
-        let z = b.proj(*res.last().unwrap(), 2, tt);
-
         self.put_builder(b);
-        z
+        res
     }
 
-    pub fn zero_one_to_one_negative_one(&mut self, x: Ref, q: u128) -> BundleRef {
-        let ps = factor(q);
+    pub fn relu(&mut self, xbun: BundleRef, factors_of_m: &[u16]) -> BundleRef {
+        let res = self.fractional_mixed_radix(xbun, factors_of_m);
+
+        // project the MSB to 0/1, whether or not it is less than p/2
+        let p = *factors_of_m.last().unwrap();
+        let mask_tt = (0..p).map(|x| (x < p/2) as u16).collect();
+        let mask = self.borrow_mut_builder().proj(*res.last().unwrap(), 2, mask_tt);
+
+        // use the mask to either output x or 0
+        let xwires = self.wires(xbun);
+        let primes = self.primes(xbun);
+        let mut zwires = Vec::with_capacity(xwires.len());
+        for (x,&p) in xwires.into_iter().zip(primes.iter()) {
+            let y = self.borrow_mut_builder().mod_change(mask, p);
+            let z = self.borrow_mut_builder().half_gate(x,y);
+            zwires.push(z);
+        }
+
+        self.add_bundle(zwires, primes)
+    }
+
+    pub fn sgn(&mut self, xbun: BundleRef, factors_of_m: &[u16]) -> BundleRef {
+        let res = self.fractional_mixed_radix(xbun, factors_of_m);
+        let p = *factors_of_m.last().unwrap();
+        let tt = (0..p).map(|x| (x >= p/2) as u16).collect();
+        let sign = self.borrow_mut_builder().proj(*res.last().unwrap(), 2, tt);
+
+        let ps = self.primes(xbun);
+        let q = numbers::product(&ps);
         let mut ws = Vec::with_capacity(ps.len());
-        assert_eq!(self.borrow_builder().modulus(x), 2);
-        for &p in &ps {
+
+        for &p in ps.iter() {
             let tt = vec![ 1, ((q-1) % p as u128) as u16 ];
-            let w = self.borrow_mut_builder().proj(x, p, tt);
+            let w = self.borrow_mut_builder().proj(sign, p, tt);
             ws.push(w);
         }
-        self.add_bundle(ws, Rc::new(ps))
+        self.add_bundle(ws, ps)
     }
 }
 
@@ -814,12 +834,12 @@ mod tests {
         // let ms = [3,4,5,54];
         // let ms = [8192];
         let z = b.sgn(x,&ms);
-        b.output_ref(z);
+        b.output(z);
 
         for _ in 0..128 {
             let pt = rng.gen_u128() % q;
-            let should_be = (pt >= q/2) as u16;
-            test_garbling_high_to_low(&mut b, &[pt], &[should_be]);
+            let should_be = if pt < q/2 { 1 } else { q-1 };
+            test_garbling(&mut b, &[pt], &[should_be]);
         }
     }
     //}}}

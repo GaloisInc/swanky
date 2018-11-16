@@ -71,7 +71,7 @@ fn sgn_bundler(q: u128) -> CrtBundler {
     let x = b.input(q);
     let ms = std::iter::repeat(4).take(5).collect::<Vec<_>>();
     let z = b.sgn(x,&ms);
-    b.output_ref(z);
+    b.output(z);
     b
 }
 

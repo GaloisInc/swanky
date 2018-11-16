@@ -268,8 +268,7 @@ fn build_circuit(q: u128, nn: &NeuralNet, secret_weights: bool) -> CrtBundler { 
             layer_outputs = layer_outputs.into_iter().map(|x| {
                 let ms = vec![3,4,54]; // exact for 5 primes
                 // let ms = vec![5,5,6,50];  // exact for 6 primes
-                let r = b.sgn(x, &ms);
-                b.zero_one_to_one_negative_one(r, q)
+                b.sgn(x, &ms)
             }).collect();
         }
     }
