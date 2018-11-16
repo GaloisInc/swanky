@@ -251,13 +251,14 @@ impl Builder {
     }
 
     pub fn half_gate(&mut self, xref: Ref, yref: Ref) -> Ref {
-        debug_assert_eq!(self.modulus(xref), self.modulus(yref));
         let gate = Gate::HalfGate {
             xref,
             yref,
             id: self.get_next_ciphertext_id(),
         };
-        let q = self.modulus(xref);
+        let xmod = self.modulus(xref);
+        let ymod = self.modulus(yref);
+        let q = std::cmp::max(xmod, ymod);
         self.gate(gate, q)
     }
 

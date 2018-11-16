@@ -464,15 +464,11 @@ impl CrtBundler {
         let mask = self.borrow_mut_builder().proj(*res.last().unwrap(), 2, mask_tt);
 
         // use the mask to either output x or 0
-        let xwires = self.wires(xbun);
-        let primes = self.primes(xbun);
-        let mut zwires = Vec::with_capacity(xwires.len());
-        for (x,&p) in xwires.into_iter().zip(primes.iter()) {
-            let y = self.borrow_mut_builder().mod_change(mask, p);
-            let z = self.borrow_mut_builder().half_gate(x,y);
-            zwires.push(z);
-        }
+        let zwires = self.wires(xbun).into_iter().map(|x| {
+            self.borrow_mut_builder().half_gate(x,mask)
+        }).to_vec();
 
+        let primes = self.primes(xbun);
         self.add_bundle(zwires, primes)
     }
 
@@ -830,9 +826,7 @@ mod tests {
 
         let mut b = CrtBundler::new();
         let x = b.input(q);
-        let ms = [2,2,3,54];
-        // let ms = [3,4,5,54];
-        // let ms = [8192];
+        let ms = [3,4,54];
         let z = b.sgn(x,&ms);
         b.output(z);
 
@@ -851,7 +845,7 @@ mod tests {
 
         let mut b = CrtBundler::new();
         let x = b.input(q);
-        let ms = [2,2,3,54];
+        let ms = [3,4,54];
         let z = b.relu(x,&ms);
         b.output(z);
 
