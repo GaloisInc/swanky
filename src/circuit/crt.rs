@@ -823,7 +823,7 @@ mod tests {
     }
     //}}}
     #[test] // sgn {{{
-    fn sgn() {
+    fn test_sgn() {
         let mut rng = Rng::new();
         let q = modulus_with_width(10);
         println!("q={}", q);
@@ -839,6 +839,25 @@ mod tests {
         for _ in 0..128 {
             let pt = rng.gen_u128() % q;
             let should_be = if pt < q/2 { 1 } else { q-1 };
+            test_garbling(&mut b, &[pt], &[should_be]);
+        }
+    }
+    //}}}
+    #[test] // relu {{{
+    fn test_relu() {
+        let mut rng = Rng::new();
+        let q = modulus_with_width(10);
+        println!("q={}", q);
+
+        let mut b = CrtBundler::new();
+        let x = b.input(q);
+        let ms = [2,2,3,54];
+        let z = b.relu(x,&ms);
+        b.output(z);
+
+        for _ in 0..128 {
+            let pt = rng.gen_u128() % q;
+            let should_be = if pt < q/2 { pt } else { 0 };
             test_garbling(&mut b, &[pt], &[should_be]);
         }
     }
