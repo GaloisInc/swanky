@@ -434,7 +434,7 @@ mod tests {
             let c = &f(q);
             let (gb, ev) = garble(&c);
             println!("number of ciphertexts for mod {}: {}", q, ev.size());
-            for _ in 0..64 {
+            for _ in 0..16 {
                 let inps = (0..c.ninputs()).map(|i| { rng.gen_u16() % c.input_mod(i) }).to_vec();
                 let xs = &gb.encode(&inps);
                 let ys = &ev.eval(c, xs);

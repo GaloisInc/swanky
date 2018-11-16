@@ -256,9 +256,8 @@ impl Builder {
             yref,
             id: self.get_next_ciphertext_id(),
         };
-        let xmod = self.modulus(xref);
-        let ymod = self.modulus(yref);
-        let q = std::cmp::max(xmod, ymod);
+        let q = self.modulus(xref);
+        debug_assert!(q >= self.modulus(yref)); // required for current implementation
         self.gate(gate, q)
     }
 
