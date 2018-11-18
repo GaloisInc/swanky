@@ -64,32 +64,35 @@ pub fn as_base_q_u128(x: u128, q: u16) -> Vec<u16> {
 }
 
 pub fn as_mixed_radix(x: u128, ms: &[u16]) -> Vec<u16> {
-    let mut ds = Vec::with_capacity(ms.len());
     let mut x = x;
-
-    for i in 0..ms.len() {
-        if x >= ms[i] as u128 {
-            let d = x % ms[i] as u128;
-            x = (x - d) / ms[i] as u128;
-            ds.push(d as u16);
+    ms.iter().map(|&m| {
+        if x >= m as u128 {
+            let d = x % m as u128;
+            x = (x - d) / m as u128;
+            d as u16
         } else {
-            ds.push(x as u16);
+            let d = x as u16;
             x = 0;
+            d
         }
-    }
-    ds
+    }).collect()
 }
 
 pub fn from_base_q(ds: &[u16], q: u16) -> u128 {
-    let qs = std::iter::repeat(q).take(ds.len()).to_vec();
-    from_mixed_radix(ds, &qs)
+    let mut x: u128 = 0;
+    for &d in ds.iter().rev() {
+        let (xp,overflow) = x.overflowing_mul(q as u128);
+        debug_assert_eq!(overflow, false, "overflow!!!! x={}", x);
+        x = xp + d as u128;
+    }
+    x
 }
 
 pub fn from_mixed_radix(ds: &[u16], qs: &[u16]) -> u128 {
     let mut x: u128 = 0;
     for (&d,&q) in ds.iter().zip(qs.iter()).rev() {
         let (xp,overflow) = x.overflowing_mul(q as u128);
-        assert_eq!(overflow, false, "overflow!!!! x={}", x);
+        debug_assert_eq!(overflow, false, "overflow!!!! x={}", x);
         x = xp + d as u128;
     }
     x
@@ -238,7 +241,7 @@ pub fn base_modulus_with_width(nbits: u32, ps: &[u16]) -> u128 {
             break;
         }
         i += 1;
-        assert!(i < ps.len());
+        debug_assert!(i < ps.len());
     }
     res
 }

@@ -86,17 +86,15 @@ impl Wire {
             }
 
             (&Wire::ModN { q: xmod, ds: ref xs }, &Wire::ModN { q: ymod, ds: ref ys }) => {
-                assert_eq!(xmod, ymod);
-                assert_eq!(xs.len(), ys.len());
-                let n = xs.len();
-                let mut zs = vec![0;n];
-                for i in 0..n {
-                    let mut z = xs[i] + ys[i];
+                debug_assert_eq!(xmod, ymod);
+                debug_assert_eq!(xs.len(), ys.len());
+                let zs = xs.iter().zip(ys.iter()).map(|(&x,&y)| {
+                    let mut z = x + y;
                     if z >= xmod {
                         z -= xmod;
                     }
-                    zs[i] = z;
-                }
+                    z
+                }).collect();
                 Wire::ModN { q: xmod, ds: zs }
             }
 
@@ -115,11 +113,9 @@ impl Wire {
             }
 
             Wire::ModN { q, ref ds } => {
-                let n = ds.len();
-                let mut zs = vec![0;n];
-                for i in 0..n {
-                    zs[i] = ((ds[i] as u32 * c as u32) % q as u32) as u16;
-                }
+                let zs = ds.iter().map(|&d| {
+                    (d as u32 * c as u32 % q as u32) as u16
+                }).collect();
                 Wire::ModN { q, ds: zs }
             }
         }
@@ -129,13 +125,13 @@ impl Wire {
         match *self {
             Wire::Mod2 { val } => Wire::Mod2 { val: !val },
             Wire::ModN { q, ref ds }  => {
-                let n = ds.len();
-                let mut zs = vec![0;n];
-                for i in 0..n {
-                    if ds[i] > 0 {
-                        zs[i] = q - ds[i];
+                let zs = ds.iter().map(|&d| {
+                    if d > 0 {
+                        q - d
+                    } else {
+                        0
                     }
-                }
+                }).collect();
                 Wire::ModN { q, ds: zs }
             }
         }

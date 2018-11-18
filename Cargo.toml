@@ -22,6 +22,9 @@ base_conversion = { path = "base_conversion" }
 [dev-dependencies]
 criterion = "0.2"
 
+[profile.release]
+debug = true
+
 [[bin]]
 name = "dinn"
 path = "apps/dinn.rs"
@@ -40,4 +43,8 @@ harness = false
 
 [[bench]]
 name = "crt"
+harness = false
+
+[[bench]]
+name = "threads"
 harness = false
