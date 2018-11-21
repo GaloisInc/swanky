@@ -2,6 +2,7 @@ use rand::Rng;
 use aes::AES;
 use base_conversion;
 use numbers;
+use util;
 
 #[derive(Debug, PartialEq, PartialOrd, Clone)]
 pub enum Wire {
@@ -29,7 +30,7 @@ impl Wire {
             Wire::Mod2 { val: inp }
 
         } else if q < 256 && base_conversion::lookup_defined_for_mod(q) {
-            let bytes = unsafe { std::mem::transmute::<u128, [u8;16]>(inp) };
+            let bytes = util::u128_to_bytes(inp);
 
             // the digits in position 15 will be the longest, so we can use stateful
             // (fast) base_q_addition
