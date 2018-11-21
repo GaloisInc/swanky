@@ -15,14 +15,13 @@
 extern crate libc;
 extern crate num;
 extern crate num_traits;
-extern crate rand as extern_rand;
+extern crate rand;
 extern crate base_conversion; // local dependency
 extern crate itertools;
 
 pub mod circuit;
 pub mod garble;
 pub mod numbers;
-pub mod rand;
 pub mod wire;
 pub mod util;
 pub mod aes;

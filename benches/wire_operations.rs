@@ -1,16 +1,17 @@
 #[macro_use]
 extern crate criterion;
 extern crate fancy_garbling;
+extern crate rand;
 
 use criterion::Criterion;
 use std::time::Duration;
 
 use fancy_garbling::wire::Wire;
-use fancy_garbling::rand::Rng;
+use fancy_garbling::util::RngExt;
 
 fn bench_unpack(c: &mut Criterion, p: u16) {
     c.bench_function(&format!("wire::unpack{}", p), move |b| {
-        let rng = &mut Rng::new();
+        let rng = &mut rand::thread_rng();
         let x = rng.gen_u128();
         b.iter(|| {
             let w = Wire::from_u128(x, p);
@@ -21,7 +22,7 @@ fn bench_unpack(c: &mut Criterion, p: u16) {
 
 fn bench_pack(c: &mut Criterion, p: u16) {
     c.bench_function(&format!("wire::pack{}", p), move |b| {
-        let rng = &mut Rng::new();
+        let rng = &mut rand::thread_rng();
         let w = Wire::rand(rng,p);
         b.iter(|| {
             let x = w.as_u128();
@@ -32,7 +33,7 @@ fn bench_pack(c: &mut Criterion, p: u16) {
 
 fn bench_plus(c: &mut Criterion, p: u16) {
     c.bench_function(&format!("wire::plus{}", p), move |b| {
-        let rng = &mut Rng::new();
+        let rng = &mut rand::thread_rng();
         let x = Wire::rand(rng,p);
         let y = Wire::rand(rng,p);
         b.iter(|| {
@@ -44,7 +45,7 @@ fn bench_plus(c: &mut Criterion, p: u16) {
 
 fn bench_cmul(c: &mut Criterion, p: u16) {
     c.bench_function(&format!("wire::cmul{}", p), move |b| {
-        let rng = &mut Rng::new();
+        let rng = &mut rand::thread_rng();
         let x = Wire::rand(rng,p);
         let c = rng.gen_u16();
         b.iter(|| {
@@ -56,7 +57,7 @@ fn bench_cmul(c: &mut Criterion, p: u16) {
 
 fn bench_negate(c: &mut Criterion, p: u16) {
     c.bench_function(&format!("wire::negate{}", p), move |b| {
-        let rng = &mut Rng::new();
+        let rng = &mut rand::thread_rng();
         let x = Wire::rand(rng,p);
         b.iter(|| {
             let z = x.negate();
@@ -67,7 +68,7 @@ fn bench_negate(c: &mut Criterion, p: u16) {
 
 fn bench_hash(c: &mut Criterion, p: u16) {
     c.bench_function(&format!("wire::hash{}", p), move |b| {
-        let rng = &mut Rng::new();
+        let rng = &mut rand::thread_rng();
         let x = Wire::rand(rng,p);
         b.iter(|| {
             let z = x.hash(42);

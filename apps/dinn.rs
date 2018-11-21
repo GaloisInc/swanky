@@ -1,10 +1,10 @@
 #![feature(test, duration_as_u128)]
 extern crate fancy_garbling;
 extern crate itertools;
-
+extern crate rand;
 extern crate test;
-use std::time::{Duration, SystemTime};
 
+use std::time::{Duration, SystemTime};
 use std::fs::File;
 use std::io::prelude::*;
 use std::io::{BufReader, Lines};
@@ -13,7 +13,6 @@ use fancy_garbling::circuit::crt::CrtBundler;
 use fancy_garbling::numbers;
 use fancy_garbling::circuit::{Builder, Ref, Circuit};
 use fancy_garbling::garble::garble;
-use fancy_garbling::rand::Rng;
 
 use itertools::Itertools;
 
@@ -130,14 +129,14 @@ fn bench_arith_garbling(nn: &NeuralNet, image: &[i32], secret_weights: bool) { /
     for _ in 0..NTESTS {
         let start = SystemTime::now();
         let circ = bun.borrow_circ();
-        let gb = garble(circ, &mut Rng::new());
+        let gb = garble(circ, &mut rand::thread_rng());
         test::black_box(gb);
         garble_time += SystemTime::now().duration_since(start).unwrap();
     }
     garble_time /= NTESTS;
 
     let circ = bun.finish();
-    let (en,_de,ev) = garble(&circ, &mut Rng::new());
+    let (en,_de,ev) = garble(&circ, &mut rand::thread_rng());
 
     let img = image.iter().map(|&i| to_mod_q(q,i)).collect_vec();
     let inp = en.encode(&bun.encode(&img));
@@ -204,13 +203,13 @@ fn bench_bool_garbling(nn: &NeuralNet, image: &[i32], secret_weights: bool) { //
     let mut garble_time = Duration::new(0,0);
     for _ in 0..NTESTS {
         let start = SystemTime::now();
-        let gb = garble(&circ, &mut Rng::new());
+        let gb = garble(&circ, &mut rand::thread_rng());
         test::black_box(gb);
         garble_time += SystemTime::now().duration_since(start).unwrap();
     }
     garble_time /= NTESTS;
 
-    let (en,_de,ev) = garble(&circ, &mut Rng::new());
+    let (en,_de,ev) = garble(&circ, &mut rand::thread_rng());
 
     let img = image.iter().map(|&x| if x == -1 { 1 } else if x == 1 { 0 } else { panic!("unknown input {}", x) } ).collect_vec();
     let inp = en.encode(&img);
@@ -474,13 +473,14 @@ fn i32_to_twos_complement(x: i32, nbits: usize) -> u128 {
 #[cfg(test)]
 mod dinn {
     use super::*;
-    use fancy_garbling::rand::Rng;
     use fancy_garbling::circuit::Builder;
     use fancy_garbling::numbers;
+    use fancy_garbling::util::RngExt;
+    use rand;
 
     #[test]
     fn multiplex() {
-        let mut rng = Rng::new();
+        let mut rng = rand::thread_rng();
 
         let nbits = 16;
         let mask = (1 << nbits) - 1;

@@ -1,11 +1,12 @@
 #[macro_use]
 extern crate criterion;
 extern crate fancy_garbling;
+extern crate rand;
 
 use criterion::Criterion;
 use std::time::Duration;
 
-use fancy_garbling::rand::Rng;
+use fancy_garbling::util::RngExt;
 use fancy_garbling::garble::garble;
 use fancy_garbling::circuit::crt::CrtBundler;
 use fancy_garbling::numbers::modulus_with_width;
@@ -14,7 +15,7 @@ fn bench_gb<F:'static>(cr: &mut Criterion, name: &str, gen_bundler: F) where F: 
     cr.bench_function(name, move |bench| {
         let q = modulus_with_width(32);
         let c = gen_bundler(q).finish();
-        let mut rng = Rng::new();
+        let mut rng = rand::thread_rng();
         bench.iter(|| {
             let gb = garble(&c, &mut rng);
             criterion::black_box(gb);
@@ -28,7 +29,7 @@ fn bench_ev<F:'static>(cr: &mut Criterion, name: &str, gen_bundler: F) where F: 
         let mut b = gen_bundler(q);
         let c = b.finish();
 
-        let mut rng = Rng::new();
+        let mut rng = rand::thread_rng();
         let inps = (0..b.ninputs()).map(|_| rng.gen_u128() % q).collect::<Vec<_>>();
         let (en, _, ev) = garble(&c, &mut rng);
         let enc_inp = b.encode(&inps);

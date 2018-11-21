@@ -496,14 +496,15 @@ mod tests {
     use super::*;
     use garble::garble;
     use numbers::{self, inv, factor, modulus_with_width};
-    use rand::Rng;
+    use rand::thread_rng;
+    use util::RngExt;
 
     const NTESTS: usize = 1;
 
     // test harnesses {{{
     fn test_garbling(b: &CrtBundler, inp: &[u128], should_be: &[u128]) {
         let circ = b.borrow_builder().borrow_circ();
-        let (en, de, ev) = garble(&circ, &mut Rng::new());
+        let (en, de, ev) = garble(&circ, &mut thread_rng());
 
         println!("number of ciphertexts: {}", ev.size());
 
@@ -518,7 +519,7 @@ mod tests {
 
     fn test_garbling_high_to_low(b: &CrtBundler, inp: &[u128], should_be: &[u16]) {
         let circ = b.borrow_builder().borrow_circ();
-        let (en, de, ev) = garble(&circ, &mut Rng::new());
+        let (en, de, ev) = garble(&circ, &mut thread_rng());
 
         println!("number of ciphertexts: {}", ev.size());
 
@@ -535,7 +536,7 @@ mod tests {
     //}}}
     #[test] //input_output_equal {{{
     fn input_output_equal() {
-        let mut rng = Rng::new();
+        let mut rng = thread_rng();
         for _ in 0..NTESTS {
             let q = rng.gen_usable_composite_modulus();
 
@@ -551,7 +552,7 @@ mod tests {
     //}}}
     #[test] // bundle_from_ref {{{
     fn bundle_from_ref() {
-        let mut rng = Rng::new();
+        let mut rng = thread_rng();
         for _ in 0..16 {
             let p = rng.gen_prime();
             let q = rng.gen_usable_composite_modulus();
@@ -567,7 +568,7 @@ mod tests {
             println!("x={}", x);
 
             let c = b.finish();
-            let (en, de, ev) = garble(&c, &mut Rng::new());
+            let (en, de, ev) = garble(&c, &mut thread_rng());
 
             let res = c.eval(&[x]);
             assert_eq!(b.decode(&res), &[x as u128]);
@@ -580,7 +581,7 @@ mod tests {
     //}}}
     #[test] // addition {{{
     fn addition() {
-        let mut rng = Rng::new();
+        let mut rng = thread_rng();
         let q = rng.gen_usable_composite_modulus();
 
         let mut b = CrtBundler::new();
@@ -598,15 +599,15 @@ mod tests {
     //}}}
     #[test] // subtraction {{{
     fn subtraction() {
-        let mut rng = Rng::new();
+        let mut rng = thread_rng();
 
-            let q = rng.gen_usable_composite_modulus();
+        let q = rng.gen_usable_composite_modulus();
 
-            let mut b = CrtBundler::new();
-            let x = b.input(q);
-            let y = b.input(q);
-            let z = b.sub(x,y);
-            b.output(z);
+        let mut b = CrtBundler::new();
+        let x = b.input(q);
+        let y = b.input(q);
+        let z = b.sub(x,y);
+        b.output(z);
 
         for _ in 0..NTESTS {
             let x = rng.gen_u128() % q;
@@ -617,7 +618,7 @@ mod tests {
     //}}}
     #[test] // scalar_multiplication {{{
     fn scalar_multiplication() {
-        let mut rng = Rng::new();
+        let mut rng = thread_rng();
         for _ in 0..16 {
             let q = modulus_with_width(10);
             let y = rng.gen_u128() % q;
@@ -636,7 +637,7 @@ mod tests {
     //}}}
     #[test] // secret scalar_multiplication {{{
     fn secret_scalar_multiplication() {
-        let mut rng = Rng::new();
+        let mut rng = thread_rng();
         let q = rng.gen_usable_composite_modulus();
         let y = rng.gen_u64() as u128 % q;
 
@@ -654,7 +655,7 @@ mod tests {
     //}}}
     #[test] // scalar_exponentiation {{{
     fn scalar_exponentiation() {
-        let mut rng = Rng::new();
+        let mut rng = thread_rng();
         let q = numbers::modulus_with_width(10);
         let y = rng.gen_u16() % 10;
 
@@ -672,8 +673,8 @@ mod tests {
     // }}}
     #[test] // remainder {{{
     fn remainder() {
-        let mut rng = Rng::new();
-        let ps = rng._gen_usable_composite_modulus();
+        let mut rng = thread_rng();
+        let ps = rng.gen_usable_factors();
         let q = ps.iter().fold(1, |acc, &x| (x as u128) * acc);
         let p = ps[rng.gen_u16() as usize % ps.len()];
 
@@ -691,7 +692,7 @@ mod tests {
     //}}}
     #[test] // half_gate_multiplication {{{
     fn half_gate_multiplication() {
-        let mut rng = Rng::new();
+        let mut rng = thread_rng();
         let q = modulus_with_width(32);
 
         let mut b = CrtBundler::new();
@@ -710,7 +711,7 @@ mod tests {
     //}}}
     #[test] // equality {{{
     fn equality() {
-        let mut rng = Rng::new();
+        let mut rng = thread_rng();
         let q = rng.gen_usable_composite_modulus();
 
         let mut b = CrtBundler::new();
@@ -729,7 +730,7 @@ mod tests {
     //}}}
     #[test] // parity {{{
     fn parity() {
-        let mut rng = Rng::new();
+        let mut rng = thread_rng();
         let q = numbers::modulus_with_width_skip2(32);
         let mut b = CrtBundler::new();
         let x = b.input(q);
@@ -745,7 +746,7 @@ mod tests {
     //}}}
     #[test] // cdiv {{{
     fn cdiv() {
-        let mut rng = Rng::new();
+        let mut rng = thread_rng();
         let q = numbers::modulus_with_width_skip2(32);
         let mut b = CrtBundler::new();
         let x = b.input(q);
@@ -762,7 +763,7 @@ mod tests {
     //}}}
     #[test] // bits {{{
     fn bits() {
-        let mut rng = Rng::new();
+        let mut rng = thread_rng();
         let q = numbers::modulus_with_width_skip2(32);
         let mut b = CrtBundler::new();
         let x = b.input(q);
@@ -778,7 +779,7 @@ mod tests {
     //}}}
     #[test] // less_than_pmr {{{
     fn less_than_pmr() {
-        let mut rng = Rng::new();
+        let mut rng = thread_rng();
         let q = modulus_with_width(32);
         let ps = factor(q);
         let n = ps.len();
@@ -800,7 +801,7 @@ mod tests {
     //}}}
     #[test] // less_than_bits {{{
     fn less_than_bits() {
-        let mut rng = Rng::new();
+        let mut rng = thread_rng();
         let q = numbers::modulus_with_width_skip2(32);
         let mut b = CrtBundler::new();
         let x = b.input(q);
@@ -820,7 +821,7 @@ mod tests {
     //}}}
     #[test] // sgn {{{
     fn test_sgn() {
-        let mut rng = Rng::new();
+        let mut rng = thread_rng();
         let q = modulus_with_width(10);
         println!("q={}", q);
 
@@ -839,7 +840,7 @@ mod tests {
     //}}}
     #[test] // relu {{{
     fn test_relu() {
-        let mut rng = Rng::new();
+        let mut rng = thread_rng();
         let q = modulus_with_width(10);
         println!("q={}", q);
 
@@ -858,9 +859,9 @@ mod tests {
     //}}}
     #[test] // pmr {{{
     fn pmr() {
-        let mut rng = Rng::new();
+        let mut rng = thread_rng();
         for _ in 0..NTESTS {
-            let ps = rng._gen_usable_composite_modulus();
+            let ps = rng.gen_usable_factors();
             let q = ps.iter().fold(1, |acc, &x| x as u128 * acc);
 
             let mut b = CrtBundler::new();
@@ -956,9 +957,9 @@ mod tests {
 
     #[test]
     fn pmr_plaintext() {
-        let mut rng = Rng::new();
+        let mut rng = thread_rng();
         for _ in 0..NTESTS {
-            let ps = rng._gen_usable_composite_modulus();
+            let ps = rng.gen_usable_factors();
             let q = ps.iter().fold(1, |acc, &x| x as u128 * acc);
             let x = rng.gen_u128() % q;
             assert_eq!(x, from_pmr_pt(&to_pmr_pt(x, &ps), &ps));

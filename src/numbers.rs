@@ -273,15 +273,18 @@ pub fn is_power_of_2<I>(x: I) -> bool
     (x.clone() & (x - I::one())) == I::zero()
 }
 
+////////////////////////////////////////////////////////////////////////////////
+// tests
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use rand::Rng;
+    use rand::thread_rng;
+    use util::RngExt;
 
     #[test]
     fn crt_conversion() {
-        let mut rng = Rng::new();
+        let mut rng = thread_rng();
         let ps = &PRIMES[..25];
         let modulus = product(ps);
 
@@ -293,7 +296,7 @@ mod tests {
 
     #[test]
     fn factoring() {
-        let mut rng = Rng::new();
+        let mut rng = thread_rng();
         for _ in 0..16 {
             let mut ps = Vec::new();
             let mut q: u128 = 1;
@@ -312,7 +315,7 @@ mod tests {
 
     #[test]
     fn bits() {
-        let mut rng = Rng::new();
+        let mut rng = thread_rng();
         for _ in 0..128 {
             let x = rng.gen_u128();
             assert_eq!(u128_from_bits(&to_bits(x, 128)), x);
@@ -321,7 +324,7 @@ mod tests {
 
     #[test]
     fn base_q_conversion() {
-        let mut rng = Rng::new();
+        let mut rng = thread_rng();
         for _ in 0..1000 {
             let q = 2 + (rng.gen_u16() % 111);
             let x = rng.gen_usable_u128(q);
@@ -333,7 +336,7 @@ mod tests {
 
     #[test]
     fn base_q_addition() {
-        let mut rng = Rng::new();
+        let mut rng = thread_rng();
         for _ in 0..1000 {
             let q = 2 + (rng.gen_u16() % 111);
             let n = digits_per_u128(q) - 2;

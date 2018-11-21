@@ -21,7 +21,7 @@ pub struct Evaluator {
     consts : Vec<Wire>,
 }
 
-pub fn garble(c: &Circuit, rng: &mut Rng) -> (Encoder, Decoder, Evaluator) {
+pub fn garble<R:Rng>(c: &Circuit, rng: &mut R) -> (Encoder, Decoder, Evaluator) {
     let mut deltas  = HashMap::new();
     let mut inputs  = Vec::new();
     let mut consts  = Vec::new();
@@ -63,7 +63,7 @@ pub fn garble(c: &Circuit, rng: &mut Rng) -> (Encoder, Decoder, Evaluator) {
     (en, de, ev)
 }
 
-fn garble_input(q: u16, rng: &mut Rng, inputs: &mut Vec<Wire>)
+fn garble_input<R:Rng>(q: u16, rng: &mut R, inputs: &mut Vec<Wire>)
     -> (Wire, Option<GarbledGate>)
 {
     let w = Wire::rand(rng, q);
@@ -71,7 +71,7 @@ fn garble_input(q: u16, rng: &mut Rng, inputs: &mut Vec<Wire>)
     (w, None)
 }
 
-fn garble_constant(q: u16, rng: &mut Rng, consts: &mut Vec<Wire>)
+fn garble_constant<R:Rng>(q: u16, rng: &mut R, consts: &mut Vec<Wire>)
     -> (Wire, Option<GarbledGate>)
 {
     let w = Wire::rand(rng, q);
@@ -161,7 +161,7 @@ fn garble_yao(A: &Wire, B: &Wire, q: u16, tt: &[Vec<u16>], gate_num: usize, delt
     (C, Some(gate))
 }
 
-fn garble_half_gate(A: &Wire, B: &Wire, gate_num: usize, deltas: &HashMap<u16,Wire>, rng: &mut Rng)
+fn garble_half_gate<R: Rng>(A: &Wire, B: &Wire, gate_num: usize, deltas: &HashMap<u16,Wire>, rng: &mut R)
     -> (Wire, Option<GarbledGate>)
 {
     let q = A.modulus();
@@ -180,7 +180,7 @@ fn garble_half_gate(A: &Wire, B: &Wire, gate_num: usize, deltas: &HashMap<u16,Wi
         // would need to pack minitable into more than one u128 to support qb > 8
         debug_assert!(qb <= 8, "qb capped at 8 for now!");
 
-        r = rng.gen_u16() % q;
+        r = rng.gen::<u16>() % q;
         let t = tweak2(gate_num as u64, 1);
 
         let mut minitable = vec![None; qb as usize];
@@ -397,15 +397,16 @@ fn output_tweak(i: usize, k: u16) -> u128 {
 mod tests {
     use super::*;
     use circuit::{Circuit, Builder};
-    use rand::Rng;
+    use rand::thread_rng;
     use itertools::Itertools;
     use numbers;
+    use util::RngExt;
 
     // helper {{{
     fn garble_test_helper<F>(f: F)
         where F: Fn(u16) -> Circuit
     {
-        let mut rng = Rng::new();
+        let mut rng = thread_rng();
         for _ in 0..16 {
             let q = rng.gen_prime();
             let c = &f(q);
@@ -518,7 +519,7 @@ mod tests {
     #[test] // proj_rand {{{
     fn proj_rand() {
         garble_test_helper(|q| {
-            let mut rng = Rng::new();
+            let mut rng = thread_rng();
             let mut tab = Vec::new();
             for _ in 0..q {
                 tab.push(rng.gen_u16() % q);
@@ -578,7 +579,7 @@ mod tests {
     #[test] // half_gate_unequal_mods {{{
     fn half_gate_unequal_mods() {
         for q in 3..16 {
-            let ymod = 2 + Rng::new().gen_u16() % 6; // lower mod is capped at 8 for now
+            let ymod = 2 + thread_rng().gen_u16() % 6; // lower mod is capped at 8 for now
             println!("\nTESTING MOD q={} ymod={}", q, ymod);
 
             let mut b = Builder::new();
@@ -588,7 +589,7 @@ mod tests {
             b.output(z);
             let c = b.finish();
 
-            let (en, de, ev) = garble(&c, &mut Rng::new());
+            let (en, de, ev) = garble(&c, &mut thread_rng());
 
             let mut fail = false;
             for x in 0..q {
@@ -627,7 +628,7 @@ mod tests {
 //}}}
     #[test] // fancy_addition {{{
     fn fancy_addition() {
-        let mut rng = Rng::new();
+        let mut rng = thread_rng();
 
         let nargs = 2 + rng.gen_usize() % 100;
         let mods = (0..7).map(|_| rng.gen_modulus()).collect_vec();
@@ -666,7 +667,7 @@ mod tests {
     #[test] // constants {{{
     fn constants() {
         let mut b = Builder::new();
-        let mut rng = Rng::new();
+        let mut rng = thread_rng();
 
         let q = rng.gen_modulus();
         let c = rng.gen_u16() % q;

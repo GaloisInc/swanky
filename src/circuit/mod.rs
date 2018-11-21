@@ -504,17 +504,18 @@ impl Builder {
 
 #[cfg(test)]
 mod tests {
-    use circuit::Builder;
-    use rand::Rng;
+    use super::*;
+    use util::RngExt;
     use numbers;
+    use rand;
     use itertools::Itertools;
 
     #[test] // {{{ and_gate_fan_n
     fn and_gate_fan_n() {
-        let mut rng = Rng::new();
+        let mut rng = rand::thread_rng();
         let mut b = Builder::new();
         let mut inps = Vec::new();
-        let n = 2 + (rng.gen_byte() % 200);
+        let n = 2 + (rng.gen_usize() % 200);
         for _ in 0..n {
             inps.push(b.input(2));
         }
@@ -534,10 +535,10 @@ mod tests {
 //}}}
     #[test] // {{{ or_gate_fan_n
     fn or_gate_fan_n() {
-        let mut rng = Rng::new();
+        let mut rng = rand::thread_rng();
         let mut b = Builder::new();
         let mut inps = Vec::new();
-        let n = 2 + (rng.gen_byte() % 200);
+        let n = 2 + (rng.gen_usize() % 200);
         for _ in 0..n {
             inps.push(b.input(2));
         }
@@ -561,7 +562,7 @@ mod tests {
 //}}}
     #[test] // {{{ half_gate
     fn half_gate() {
-        let mut rng = Rng::new();
+        let mut rng = rand::thread_rng();
         let mut b = Builder::new();
         let q = rng.gen_prime();
         let x = b.input(q);
@@ -578,7 +579,7 @@ mod tests {
 //}}}
     #[test] // mod_change {{{
     fn mod_change() {
-        let mut rng = Rng::new();
+        let mut rng = rand::thread_rng();
         let mut b = Builder::new();
         let p = rng.gen_prime();
         let q = rng.gen_prime();
@@ -602,7 +603,7 @@ mod tests {
         b.outputs(&zs);
         b.output(c);
         let c = b.finish();
-        let mut rng = Rng::new();
+        let mut rng = rand::thread_rng();
         for _ in 0..16 {
             let x = rng.gen_u128();
             let y = rng.gen_u128();
@@ -623,7 +624,7 @@ mod tests {
         let zs = b.addition_no_carry(&xs, &ys);
         b.outputs(&zs);
         let c = b.finish();
-        let mut rng = Rng::new();
+        let mut rng = rand::thread_rng();
         for _ in 0..16 {
             let x = rng.gen_u128();
             let y = rng.gen_u128();
@@ -645,7 +646,7 @@ mod tests {
         b.outputs(&zs);
         b.output(c);
         let circ = b.finish();
-        let mut rng = Rng::new();
+        let mut rng = rand::thread_rng();
         for _ in 0..16 {
             let x = rng.gen_u128();
             let y = rng.gen_u128();
@@ -670,7 +671,7 @@ mod tests {
         b.output(s);
         let c = &b.finish();
 
-        let mut rng = Rng::new();
+        let mut rng = rand::thread_rng();
         for _ in 0..64 {
             let inps: Vec<u16> = (0..c.ninputs()).map(|i| {
                 rng.gen_u16() % c.input_mod(i)
@@ -684,7 +685,7 @@ mod tests {
     #[test] // base_4_addition_no_carry {{{
     fn base_q_addition_no_carry() {
         let mut b = Builder::new();
-        let mut rng = Rng::new();
+        let mut rng = rand::thread_rng();
 
         let q = rng.gen_modulus();
         let n = 16;
@@ -719,7 +720,7 @@ mod tests {
 //}}}
     #[test] // fancy_addition {{{
     fn fancy_addition() {
-        let mut rng = Rng::new();
+        let mut rng = rand::thread_rng();
 
         let nargs = 2 + rng.gen_usize() % 100;
         let mods = (0..7).map(|_| rng.gen_modulus()).collect_vec();
@@ -759,7 +760,7 @@ mod tests {
     #[test] // constants {{{
     fn constants() {
         let mut b = Builder::new();
-        let mut rng = Rng::new();
+        let mut rng = rand::thread_rng();
 
         let q = rng.gen_modulus();
         let c = rng.gen_u16() % q;

@@ -2,7 +2,7 @@ use rand::Rng;
 use aes::AES;
 use base_conversion;
 use numbers;
-use util;
+use util::{self, RngExt};
 
 #[derive(Debug, PartialEq, PartialOrd, Clone)]
 pub enum Wire {
@@ -65,7 +65,7 @@ impl Wire {
         }
     }
 
-    pub fn rand_delta(rng: &mut Rng, modulus: u16) -> Self {
+    pub fn rand_delta<R:Rng>(rng: &mut R, modulus: u16) -> Self {
         let mut w = Self::rand(rng, modulus);
         match w {
             Wire::Mod2 { ref mut val }    => *val |= 1,
@@ -146,7 +146,7 @@ impl Wire {
         }
     }
 
-    pub fn rand(rng: &mut Rng, modulus: u16) -> Self {
+    pub fn rand<R:Rng>(rng: &mut R, modulus: u16) -> Self {
         Self::from_u128(rng.gen_u128(), modulus)
     }
 
@@ -170,12 +170,13 @@ impl Wire {
 
 #[cfg(test)]
 mod tests {
-    use rand::Rng;
     use super::*;
+    use rand::thread_rng;
+    use util::RngExt;
 
     #[test]
     fn packing() {
-        let ref mut rng = Rng::new();
+        let ref mut rng = thread_rng();
         for _ in 0..100 {
             let q = 2 + (rng.gen_u16() % 111);
             let w = rng.gen_usable_u128(q);
@@ -189,7 +190,7 @@ mod tests {
 
     #[test]
     fn base_conversion_lookup_method() {
-        let ref mut rng = Rng::new();
+        let ref mut rng = thread_rng();
         for _ in 0..1000 {
             let q = 3 + (rng.gen_u16() % 110);
             let x = rng.gen_u128();
@@ -201,7 +202,7 @@ mod tests {
 
     #[test]
     fn hash() {
-        let mut rng = Rng::new();
+        let mut rng = thread_rng();
         for _ in 0..100 {
             let q = 2 + (rng.gen_u16() % 110);
             let x = Wire::rand(&mut rng, q);
@@ -216,7 +217,7 @@ mod tests {
 
     #[test]
     fn negation() {
-        let ref mut rng = Rng::new();
+        let ref mut rng = thread_rng();
         for _ in 0..1000 {
             let q = rng.gen_modulus();
             // let q = 2;
@@ -231,7 +232,7 @@ mod tests {
 
     #[test]
     fn zero() {
-        let mut rng = Rng::new();
+        let mut rng = thread_rng();
         for _ in 0..1000 {
             let q = 3 + (rng.gen_u16() % 110);
             let z = Wire::zero(q);
@@ -242,7 +243,7 @@ mod tests {
 
     #[test]
     fn subzero() {
-        let mut rng = Rng::new();
+        let mut rng = thread_rng();
         for _ in 0..1000 {
             let q = rng.gen_modulus();
             let x = Wire::rand(&mut rng, q);
@@ -253,7 +254,7 @@ mod tests {
 
     #[test]
     fn pluszero() {
-        let mut rng = Rng::new();
+        let mut rng = thread_rng();
         for _ in 0..1000 {
             let q = rng.gen_modulus();
             let x = Wire::rand(&mut rng, q);
@@ -263,7 +264,7 @@ mod tests {
 
     #[test]
     fn arithmetic() {
-        let mut rng = Rng::new();
+        let mut rng = thread_rng();
         for _ in 0..1024 {
             let q = rng.gen_modulus();
             let x = Wire::rand(&mut rng, q);
@@ -284,7 +285,7 @@ mod tests {
 
     #[test]
     fn ndigits_correct() {
-        let mut rng = Rng::new();
+        let mut rng = thread_rng();
         for _ in 0..1024 {
             let q = rng.gen_modulus();
             let x = Wire::rand(&mut rng, q);
