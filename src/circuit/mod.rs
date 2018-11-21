@@ -40,7 +40,7 @@ pub enum Gate {
 
 impl Circuit {
     pub fn eval(&self, inputs: &[u16]) -> Vec<u16> {
-        debug_assert_eq!(inputs.len(), self.ninputs(),
+        assert_eq!(inputs.len(), self.ninputs(),
             "[circuit.eval] needed {} inputs but got {}!",
             self.ninputs(), inputs.len()
         );
@@ -53,7 +53,7 @@ impl Circuit {
                 Gate::Input { id } => inputs[id],
 
                 Gate::Const { id } => {
-                    debug_assert!(id < self.const_vals.as_ref().map_or(0, |cs| cs.len()),
+                    assert!(id < self.const_vals.as_ref().map_or(0, |cs| cs.len()),
                             "[eval_full] not enough constants provided");
                     self.const_vals.as_ref().expect("no consts provided")[id]
                 }
@@ -195,21 +195,21 @@ impl Builder {
     }
 
     pub fn add(&mut self, xref: Ref, yref: Ref) -> Ref {
-        debug_assert!(xref < self.next_ref);
-        debug_assert!(yref < self.next_ref);
+        assert!(xref < self.next_ref);
+        assert!(yref < self.next_ref);
         let xmod = self.circ.gate_moduli[xref];
         let ymod = self.circ.gate_moduli[yref];
-        debug_assert!(xmod == ymod, "xmod={} ymod={}", xmod, ymod);
+        assert!(xmod == ymod, "xmod={} ymod={}", xmod, ymod);
         let gate = Gate::Add { xref, yref };
         self.gate(gate, xmod)
     }
 
     pub fn sub(&mut self, xref: Ref, yref: Ref) -> Ref {
-        debug_assert!(xref < self.next_ref);
-        debug_assert!(yref < self.next_ref);
+        assert!(xref < self.next_ref);
+        assert!(yref < self.next_ref);
         let xmod = self.circ.gate_moduli[xref];
         let ymod = self.circ.gate_moduli[yref];
-        debug_assert!(xmod == ymod);
+        assert!(xmod == ymod);
         let gate = Gate::Sub { xref, yref };
         self.gate(gate, xmod)
     }
@@ -220,7 +220,7 @@ impl Builder {
     }
 
     pub fn add_many(&mut self, args: &[Ref]) -> Ref {
-        debug_assert!(args.len() > 1);
+        assert!(args.len() > 1);
         let mut z = args[0];
         for &x in args.iter().skip(1) {
             z = self.add(z, x);
@@ -229,8 +229,8 @@ impl Builder {
     }
 
     pub fn proj(&mut self, xref: Ref, output_modulus: u16, tt: Vec<u16>) -> Ref {
-        debug_assert_eq!(tt.len(), self.circ.gate_moduli[xref] as usize);
-        debug_assert!(tt.iter().all(|&x| x < output_modulus),
+        assert_eq!(tt.len(), self.circ.gate_moduli[xref] as usize);
+        assert!(tt.iter().all(|&x| x < output_modulus),
             "not all xs were less than the output modulus! circuit.proj: tt={:?},
             output_modulus={}", tt, output_modulus);
         let q = output_modulus;
@@ -240,7 +240,7 @@ impl Builder {
 
     // the classic yao binary gate, over mixed moduli!
     pub fn yao(&mut self, xref: Ref, yref: Ref, output_modulus: u16, tt: Vec<Vec<u16>>) -> Ref {
-        debug_assert!(tt.iter().all(|ref inner| { inner.iter().all(|&x| x < output_modulus) }));
+        assert!(tt.iter().all(|ref inner| { inner.iter().all(|&x| x < output_modulus) }));
         let gate = Gate::Yao {
             xref,
             yref,
@@ -251,13 +251,17 @@ impl Builder {
     }
 
     pub fn half_gate(&mut self, xref: Ref, yref: Ref) -> Ref {
+        if self.modulus(xref) < self.modulus(yref) {
+            return self.half_gate(yref, xref);
+        }
+
         let gate = Gate::HalfGate {
             xref,
             yref,
             id: self.get_next_ciphertext_id(),
         };
+
         let q = self.modulus(xref);
-        debug_assert!(q >= self.modulus(yref)); // required for current implementation
         self.gate(gate, q)
     }
 
@@ -265,19 +269,19 @@ impl Builder {
     // higher level circuit constructions
 
     pub fn xor(&mut self, x: Ref, y: Ref) -> Ref {
-        debug_assert!(self.modulus(x) == 2);
-        debug_assert!(self.modulus(y) == 2);
+        assert!(self.modulus(x) == 2);
+        assert!(self.modulus(y) == 2);
         self.add(x,y)
     }
 
     pub fn and(&mut self, x: Ref, y: Ref) -> Ref {
-        debug_assert!(self.modulus(x) == 2);
-        debug_assert!(self.modulus(y) == 2);
+        assert!(self.modulus(x) == 2);
+        assert!(self.modulus(y) == 2);
         self.half_gate(x,y)
     }
 
     pub fn and_many(&mut self, args: &[Ref]) -> Ref {
-        debug_assert!(args.iter().all(|&x| self.modulus(x) == 2));
+        assert!(args.iter().all(|&x| self.modulus(x) == 2));
         // convert all the wires to base b+1
         let b = args.len() as u16;
         let wires: Vec<Ref> = args.iter().map(|&x| {
@@ -289,7 +293,7 @@ impl Builder {
     // assumes wires already are in base b+1
     pub fn _and_many(&mut self, args: &[Ref]) -> Ref {
         let b = args.len();
-        debug_assert!(args.iter().all(|&x| self.modulus(x) == (b + 1) as u16));
+        assert!(args.iter().all(|&x| self.modulus(x) == (b + 1) as u16));
         // add them together
         let z = self.add_many(&args);
         // decode the result in base 2
@@ -299,7 +303,7 @@ impl Builder {
     }
 
     pub fn or_many(&mut self, args: &[Ref]) -> Ref {
-        debug_assert!(args.iter().all(|&x| self.modulus(x) == 2));
+        assert!(args.iter().all(|&x| self.modulus(x) == 2));
         // convert all the wires to base b+1
         let b = args.len();
         let wires: Vec<Ref> = args.iter().map(|&x| {
@@ -330,7 +334,7 @@ impl Builder {
     pub fn fancy_addition(&mut self, xs: &[Vec<Ref>]) -> Vec<Ref> {
         let nargs = xs.len();
         let n = xs[0].len();
-        debug_assert!(xs.iter().all(|x| x.len() == n));
+        assert!(xs.iter().all(|x| x.len() == n));
 
         let mut digit_carry = None;
         let mut carry_carry = None;
@@ -395,7 +399,7 @@ impl Builder {
 
 
     pub fn addition(&mut self, xs: &[Ref], ys: &[Ref]) -> (Vec<Ref>, Ref) {
-        debug_assert_eq!(xs.len(), ys.len());
+        assert_eq!(xs.len(), ys.len());
         let cmod = self.modulus(xs[1]);
         let (mut z, mut c) = self.adder(xs[0], ys[0], None, cmod);
         let mut bs = vec![z];
@@ -411,7 +415,7 @@ impl Builder {
 
     // avoids creating extra gates for the final carry
     pub fn addition_no_carry(&mut self, xs: &[Ref], ys: &[Ref]) -> Vec<Ref> {
-        debug_assert_eq!(xs.len(), ys.len());
+        assert_eq!(xs.len(), ys.len());
 
         let cmod = self.modulus(*xs.get(1).unwrap_or(&xs[0]));
         let (mut z, mut c) = self.adder(xs[0], ys[0], None, cmod);
@@ -431,7 +435,7 @@ impl Builder {
 
     fn adder(&mut self, x: Ref, y: Ref, opt_c: Option<Ref>, carry_modulus: u16) -> (Ref, Ref) {
         let q = self.modulus(x);
-        debug_assert_eq!(q, self.modulus(y));
+        assert_eq!(q, self.modulus(y));
         if q == 2 {
             if let Some(c) = opt_c {
                 let z1 = self.xor(x,y);
@@ -487,7 +491,7 @@ impl Builder {
     }
 
     pub fn negate(&mut self, x: Ref) -> Ref {
-        debug_assert_eq!(self.modulus(x), 2);
+        assert_eq!(self.modulus(x), 2);
         self.proj(x, 2, vec![1,0])
     }
 

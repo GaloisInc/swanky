@@ -177,7 +177,8 @@ fn garble_half_gate(A: &Wire, B: &Wire, gate_num: usize, deltas: &HashMap<u16,Wi
 
     // hack for unequal moduli
     if q != qb {
-        debug_assert!(qb < 8);
+        // would need to pack minitable into more than one u128 to support qb > 8
+        debug_assert!(qb <= 8, "qb capped at 8 for now!");
 
         r = rng.gen_u16() % q;
         let t = tweak2(gate_num as u64, 1);
@@ -577,8 +578,8 @@ mod tests {
     #[test] // half_gate_unequal_mods {{{
     fn half_gate_unequal_mods() {
         for q in 3..16 {
-            println!("\nTESTING MOD q={}", q);
-            let ymod = 2;
+            let ymod = 2 + Rng::new().gen_u16() % 6; // lower mod is capped at 8 for now
+            println!("\nTESTING MOD q={} ymod={}", q, ymod);
 
             let mut b = Builder::new();
             let x = b.input(q);
