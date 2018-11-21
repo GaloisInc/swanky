@@ -1,7 +1,7 @@
 use num::integer::Integer;
 use num::bigint::BigInt;
 use num::{ToPrimitive, Zero, One, Signed};
-use util::IterToVec;
+use itertools::Itertools;
 
 ////////////////////////////////////////////////////////////////////////////////
 // mixed radix stuff
@@ -51,7 +51,7 @@ pub fn base_q_add_eq(xs: &mut [u16], ys: &[u16], q: u16)
 }
 
 pub fn as_base_q(x: u128, q: u16, n: usize) -> Vec<u16> {
-    let ms = std::iter::repeat(q).take(n).to_vec();
+    let ms = std::iter::repeat(q).take(n).collect_vec();
     as_mixed_radix(x, &ms)
 }
 
@@ -246,7 +246,6 @@ pub fn base_modulus_with_width(nbits: u32, ps: &[u16]) -> u128 {
     res
 }
 
-
 pub fn product(xs: &[u16]) -> u128 {
     xs.iter().fold(1, |acc, &x| acc * x as u128)
 }
@@ -273,6 +272,7 @@ pub fn is_power_of_2<I>(x: I) -> bool
 {
     (x.clone() & (x - I::one())) == I::zero()
 }
+
 
 #[cfg(test)]
 mod tests {

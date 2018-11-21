@@ -1,4 +1,5 @@
-use rand::{AES, Rng};
+use rand::Rng;
+use aes::AES;
 use base_conversion;
 use numbers;
 

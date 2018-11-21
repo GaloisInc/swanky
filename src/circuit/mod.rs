@@ -1,7 +1,6 @@
 pub mod crt;
 
-use util::IterToVec;
-
+use itertools::Itertools;
 use std::collections::HashMap;
 
 // the lowest-level circuit description in Fancy Garbling
@@ -345,7 +344,7 @@ impl Builder {
 
         for i in 0..n {
             // all the ith digits, in one vec
-            let ds = xs.iter().map(|x| x[i]).to_vec();
+            let ds = xs.iter().map(|x| x[i]).collect_vec();
 
             // compute the digit -- easy
             let digit_sum = self.add_many(&ds);
@@ -361,7 +360,7 @@ impl Builder {
 
                 let modded_ds = ds.iter().map(|&d| {
                     self.mod_change(d, max_val+1)
-                }).to_vec();
+                }).collect_vec();
                 let carry_sum = self.add_many(&modded_ds);
                 // add in the carry from the previous iteration
                 let carry = carry_carry.map_or(carry_sum, |c| self.add(carry_sum, c));
@@ -369,7 +368,7 @@ impl Builder {
                 // carry now contains the carry information, we just have to project it to
                 // the correct moduli for the next iteration
                 let next_mod = self.modulus(xs[0][i+1]);
-                let tt = (0..=max_val).map(|i| (i / q) % next_mod).to_vec();
+                let tt = (0..=max_val).map(|i| (i / q) % next_mod).collect_vec();
                 digit_carry = Some(self.proj(carry, next_mod, tt));
 
                 let next_max_val = nargs as u16 * (next_mod - 1) + max_carry;
@@ -378,7 +377,7 @@ impl Builder {
                     if max_carry < next_mod {
                         carry_carry = Some(self.mod_change(digit_carry.unwrap(), next_max_val + 1));
                     } else {
-                        let tt = (0..=max_val).map(|i| i / q).to_vec();
+                        let tt = (0..=max_val).map(|i| i / q).collect_vec();
                         carry_carry = Some(self.proj(carry, next_max_val + 1, tt));
                     }
                 } else {
@@ -483,7 +482,7 @@ impl Builder {
     }
 
     pub fn twos_complement(&mut self, xs: &[Ref]) -> Vec<Ref> {
-        let not_xs = xs.iter().map(|&x| self.negate(x)).to_vec();
+        let not_xs = xs.iter().map(|&x| self.negate(x)).collect_vec();
         let zero = self.constant(0,2);
         let mut const1 = vec![zero; xs.len()];
         const1[0] = self.constant(1,2);
@@ -508,7 +507,7 @@ mod tests {
     use circuit::Builder;
     use rand::Rng;
     use numbers;
-    use util::IterToVec;
+    use itertools::Itertools;
 
     #[test] // {{{ and_gate_fan_n
     fn and_gate_fan_n() {
@@ -723,12 +722,12 @@ mod tests {
         let mut rng = Rng::new();
 
         let nargs = 2 + rng.gen_usize() % 100;
-        let mods = (0..7).map(|_| rng.gen_modulus()).to_vec();
+        let mods = (0..7).map(|_| rng.gen_modulus()).collect_vec();
 
         let mut b = Builder::new();
         let xs = (0..nargs).map(|_| {
-            mods.iter().map(|&q| b.input(q)).to_vec()
-        }).to_vec();
+            mods.iter().map(|&q| b.input(q)).collect_vec()
+        }).collect_vec();
         let zs = b.fancy_addition(&xs);
         b.outputs(&zs);
         let circ = b.finish();

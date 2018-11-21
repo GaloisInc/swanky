@@ -1,5 +1,6 @@
 #[macro_use]
 extern crate criterion;
+extern crate itertools;
 extern crate fancy_garbling;
 
 use criterion::Criterion;
@@ -8,7 +9,8 @@ use std::time::Duration;
 use fancy_garbling::rand::Rng;
 use fancy_garbling::garble::garble;
 use fancy_garbling::circuit::{Builder, Circuit};
-use fancy_garbling::util::IterToVec;
+
+use itertools::Itertools;
 
 fn bench_garble<F:'static>(c: &mut Criterion, name: &str, make_circuit: F, q: u16)
     where F: Fn(u16) -> Circuit
@@ -30,7 +32,7 @@ fn bench_eval<F:'static>(c: &mut Criterion, name: &str, make_circuit: F, q: u16)
         let ref mut rng = Rng::new();
         let c = make_circuit(q);
         let (en, _, ev) = garble(&c, rng);
-        let inps = (0..c.ninputs()).map(|i| rng.gen_u16() % c.input_mod(i)).to_vec();
+        let inps = (0..c.ninputs()).map(|i| rng.gen_u16() % c.input_mod(i)).collect_vec();
         let xs = en.encode(&inps);
         bench.iter(|| {
             let ys = ev.eval(&c, &xs);

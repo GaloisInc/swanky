@@ -1,7 +1,7 @@
 use circuit::{Builder, Circuit, Ref};
 use numbers::{self, crt, inv, crt_inv, factor, product};
 use std::rc::Rc;
-use util::IterToVec;
+use itertools::Itertools;
 
 #[derive(Clone, Copy)]
 pub struct BundleRef(usize);
@@ -377,7 +377,7 @@ impl CrtBundler {
         C += C % 2;
         let C_crt = crt(&self.bundles[xref.0].primes, C);
 
-        let xs: Vec<Ref> = self.bundles[xref.0].wires.to_vec();
+        let xs = self.bundles[xref.0].wires.to_vec();
 
         let mut b = self.take_builder();
         let mut z = None;
@@ -446,7 +446,7 @@ impl CrtBundler {
 
             let new_ds = tabs.into_iter().enumerate()
                 .map(|(i,tt)| b.proj(xref, factors_of_m[i], tt))
-                .to_vec();
+                .collect_vec();
 
             ds.push(new_ds);
         }
@@ -466,7 +466,7 @@ impl CrtBundler {
         // use the mask to either output x or 0
         let zwires = self.wires(xbun).into_iter().map(|x| {
             self.borrow_mut_builder().half_gate(x,mask)
-        }).to_vec();
+        }).collect_vec();
 
         let primes = self.primes(xbun);
         self.add_bundle(zwires, primes)

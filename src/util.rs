@@ -1,11 +1,11 @@
-pub trait IterToVec<T> {
-    fn to_vec(self) -> Vec<T>;
+pub fn u128_to_bytes(x: u128) -> [u8;16] {
+    unsafe {
+        std::mem::transmute(x)
+    }
 }
 
-impl <T,I> IterToVec<T> for I where
-    I: Iterator<Item=T>
-{
-    fn to_vec(self) -> Vec<T> {
-        self.collect()
+pub fn bytes_to_u128(bytes: [u8;16]) -> u128 {
+    unsafe {
+        std::mem::transmute(bytes)
     }
 }

@@ -398,8 +398,8 @@ mod tests {
     use super::*;
     use circuit::{Circuit, Builder};
     use rand::Rng;
+    use itertools::Itertools;
     use numbers;
-    use util::IterToVec;
 
     // helper {{{
     fn garble_test_helper<F>(f: F)
@@ -412,7 +412,7 @@ mod tests {
             let (en, de, ev) = garble(&c, &mut rng);
             println!("number of ciphertexts for mod {}: {}", q, ev.size());
             for _ in 0..16 {
-                let inps = (0..c.ninputs()).map(|i| { rng.gen_u16() % c.input_mod(i) }).to_vec();
+                let inps = (0..c.ninputs()).map(|i| { rng.gen_u16() % c.input_mod(i) }).collect_vec();
                 let xs = &en.encode(&inps);
                 let ys = &ev.eval(c, xs);
                 let decoded = de.decode(ys)[0];
@@ -630,14 +630,14 @@ mod tests {
         let mut rng = Rng::new();
 
         let nargs = 2 + rng.gen_usize() % 100;
-        let mods = (0..7).map(|_| rng.gen_modulus()).to_vec();
+        let mods = (0..7).map(|_| rng.gen_modulus()).collect_vec();
         // let nargs = 97;
         // let mods = [37,10,10,54,100,51,17];
 
         let mut b = Builder::new();
         let xs = (0..nargs).map(|_| {
-            mods.iter().map(|&q| b.input(q)).to_vec()
-        }).to_vec();
+            mods.iter().map(|&q| b.input(q)).collect_vec()
+        }).collect_vec();
         let zs = b.fancy_addition(&xs);
         b.outputs(&zs);
         let circ = b.finish();

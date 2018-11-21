@@ -25,3 +25,4 @@ pub mod numbers;
 pub mod rand;
 pub mod wire;
 pub mod util;
+pub mod aes;

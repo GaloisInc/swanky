@@ -1,5 +1,6 @@
 #![feature(test, duration_as_u128)]
 extern crate fancy_garbling;
+extern crate itertools;
 
 extern crate test;
 use std::time::{Duration, SystemTime};
@@ -12,8 +13,9 @@ use fancy_garbling::circuit::crt::CrtBundler;
 use fancy_garbling::numbers;
 use fancy_garbling::circuit::{Builder, Ref, Circuit};
 use fancy_garbling::garble::garble;
-use fancy_garbling::util::IterToVec;
 use fancy_garbling::rand::Rng;
+
+use itertools::Itertools;
 
 struct NeuralNet {
     weights: Vec<Vec<Vec<i32>>>,
@@ -93,7 +95,7 @@ fn test_arith_circuit(nn: &NeuralNet, images: &Vec<Vec<i32>>, labels: &[usize], 
         }
 
         let circ = bun.borrow_circ();
-        let modq_img = img.iter().map(|&i| to_mod_q(q,i)).to_vec();
+        let modq_img = img.iter().map(|&i| to_mod_q(q,i)).collect_vec();
         let inp = bun.encode(&modq_img);
         let raw = circ.eval(&inp);
         let res = bun.decode(&raw);
@@ -137,7 +139,7 @@ fn bench_arith_garbling(nn: &NeuralNet, image: &[i32], secret_weights: bool) { /
     let circ = bun.finish();
     let (en,_de,ev) = garble(&circ, &mut Rng::new());
 
-    let img = image.iter().map(|&i| to_mod_q(q,i)).to_vec();
+    let img = image.iter().map(|&i| to_mod_q(q,i)).collect_vec();
     let inp = en.encode(&bun.encode(&img));
 
     let mut eval_time = Duration::new(0,0);
@@ -168,13 +170,13 @@ fn test_bool_circuit(nn: &NeuralNet, images: &Vec<Vec<i32>>, labels: &[usize], s
             println!("{}/{} {} errors ({}% accuracy)", img_num, NIMAGES, errors, 100.0 * (1.0 - errors as f32 / img_num as f32));
         }
 
-        let inp = img.iter().map(|&x| if x == -1 { 1 } else if x == 1 { 0 } else { panic!("unknown input {}", x) } ).to_vec();
+        let inp = img.iter().map(|&x| if x == -1 { 1 } else if x == 1 { 0 } else { panic!("unknown input {}", x) } ).collect_vec();
         let out = circ.eval(&inp);
 
         let res = out.chunks(nbits).map(|bs| {
             let x = numbers::u128_from_bits(bs);
             from_mod_q(1<<nbits, x)
-        }).to_vec();
+        }).collect_vec();
 
         let mut max_val = i32::min_value();
         let mut winner = 0;
@@ -210,7 +212,7 @@ fn bench_bool_garbling(nn: &NeuralNet, image: &[i32], secret_weights: bool) { //
 
     let (en,_de,ev) = garble(&circ, &mut Rng::new());
 
-    let img = image.iter().map(|&x| if x == -1 { 1 } else if x == 1 { 0 } else { panic!("unknown input {}", x) } ).to_vec();
+    let img = image.iter().map(|&x| if x == -1 { 1 } else if x == 1 { 0 } else { panic!("unknown input {}", x) } ).collect_vec();
     let inp = en.encode(&img);
 
     let mut eval_time = Duration::new(0,0);
@@ -284,7 +286,7 @@ fn build_boolean_circuit(nbits: usize, nn: &NeuralNet, secret_weights: bool) -> 
     let mut b = Builder::new();
 
     // binary inputs with 0 representing -1
-    let nn_inputs = (0..TOPOLOGY[0]).map(|_| b.input(2)).to_vec();
+    let nn_inputs = (0..TOPOLOGY[0]).map(|_| b.input(2)).collect_vec();
 
     let mut layer_outputs = Vec::new();
     let mut layer_inputs;
@@ -305,7 +307,7 @@ fn build_boolean_circuit(nbits: usize, nn: &NeuralNet, secret_weights: bool) -> 
         for j in 0..nout {
             // map the bias values to binary consts
             let bias = i32_to_twos_complement(nn.bias(layer,j), nbits);
-            let mut x = numbers::u128_to_bits(bias, nbits).into_iter().map(|bit| b.constant(bit,2)).to_vec();
+            let mut x = numbers::u128_to_bits(bias, nbits).into_iter().map(|bit| b.constant(bit,2)).collect_vec();
             for i in 0..nin {
                 // hardcode the weights into the circuit
                 let w = nn.weight(layer,i,j) as u128;
@@ -335,8 +337,8 @@ fn build_boolean_circuit(nbits: usize, nn: &NeuralNet, secret_weights: bool) -> 
 }
 
 fn multiplex_constants(b: &mut Builder, x: Ref, c1: u128, c2: u128, n: usize) -> Vec<Ref> {
-    let c1_bs = numbers::to_bits(c1, n).into_iter().map(|x:u16| x > 0).to_vec();
-    let c2_bs = numbers::to_bits(c2, n).into_iter().map(|x:u16| x > 0).to_vec();
+    let c1_bs = numbers::to_bits(c1, n).into_iter().map(|x:u16| x > 0).collect_vec();
+    let c2_bs = numbers::to_bits(c2, n).into_iter().map(|x:u16| x > 0).collect_vec();
     c1_bs.into_iter().zip(c2_bs.into_iter()).map(|(b1,b2)| mux_const_bits(b,x,b1,b2)).collect()
 }
 
@@ -353,8 +355,8 @@ fn mux_const_bits(b: &mut Builder, x: Ref, b1: bool, b2: bool) -> Ref {
 }
 
 fn multiplex_secret_constants(b: &mut Builder, x: Ref, c1: u128, c2: u128, n: usize) -> Vec<Ref> {
-    let c1_bs = numbers::to_bits(c1, n).into_iter().map(|x:u16| x > 0).to_vec();
-    let c2_bs = numbers::to_bits(c2, n).into_iter().map(|x:u16| x > 0).to_vec();
+    let c1_bs = numbers::to_bits(c1, n).into_iter().map(|x:u16| x > 0).collect_vec();
+    let c2_bs = numbers::to_bits(c2, n).into_iter().map(|x:u16| x > 0).collect_vec();
     c1_bs.into_iter().zip(c2_bs.into_iter()).map(|(b1,b2)| mux_secret_const_bits(b,x,b1,b2)).collect()
 }
 
