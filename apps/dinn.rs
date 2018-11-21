@@ -13,6 +13,7 @@ use fancy_garbling::numbers;
 use fancy_garbling::circuit::{Builder, Ref, Circuit};
 use fancy_garbling::garble::garble;
 use fancy_garbling::util::IterToVec;
+use fancy_garbling::rand::Rng;
 
 struct NeuralNet {
     weights: Vec<Vec<Vec<i32>>>,
@@ -127,17 +128,17 @@ fn bench_arith_garbling(nn: &NeuralNet, image: &[i32], secret_weights: bool) { /
     for _ in 0..NTESTS {
         let start = SystemTime::now();
         let circ = bun.borrow_circ();
-        let (gb,_) = garble(circ);
+        let gb = garble(circ, &mut Rng::new());
         test::black_box(gb);
         garble_time += SystemTime::now().duration_since(start).unwrap();
     }
     garble_time /= NTESTS;
 
     let circ = bun.finish();
-    let (gb,ev) = garble(&circ);
+    let (en,_de,ev) = garble(&circ, &mut Rng::new());
 
     let img = image.iter().map(|&i| to_mod_q(q,i)).to_vec();
-    let inp = gb.encode(&bun.encode(&img));
+    let inp = en.encode(&bun.encode(&img));
 
     let mut eval_time = Duration::new(0,0);
     for _ in 0..NTESTS {
@@ -201,16 +202,16 @@ fn bench_bool_garbling(nn: &NeuralNet, image: &[i32], secret_weights: bool) { //
     let mut garble_time = Duration::new(0,0);
     for _ in 0..NTESTS {
         let start = SystemTime::now();
-        let (gb,_) = garble(&circ);
+        let gb = garble(&circ, &mut Rng::new());
         test::black_box(gb);
         garble_time += SystemTime::now().duration_since(start).unwrap();
     }
     garble_time /= NTESTS;
 
-    let (gb,ev) = garble(&circ);
+    let (en,_de,ev) = garble(&circ, &mut Rng::new());
 
     let img = image.iter().map(|&x| if x == -1 { 1 } else if x == 1 { 0 } else { panic!("unknown input {}", x) } ).to_vec();
-    let inp = gb.encode(&img);
+    let inp = en.encode(&img);
 
     let mut eval_time = Duration::new(0,0);
     for _ in 0..NTESTS {

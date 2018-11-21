@@ -503,7 +503,7 @@ mod tests {
     // test harnesses {{{
     fn test_garbling(b: &CrtBundler, inp: &[u128], should_be: &[u128]) {
         let circ = b.borrow_builder().borrow_circ();
-        let (gb, ev) = garble(&circ);
+        let (en, de, ev) = garble(&circ, &mut Rng::new());
 
         println!("number of ciphertexts: {}", ev.size());
 
@@ -511,14 +511,14 @@ mod tests {
         let res = circ.eval(&enc_inp);
         assert_eq!(b.decode(&res), should_be);
 
-        let xs = gb.encode(&enc_inp);
+        let xs = en.encode(&enc_inp);
         let ys = ev.eval(circ, &xs);
-        assert_eq!(b.decode(&gb.decode(&ys)), should_be);
+        assert_eq!(b.decode(&de.decode(&ys)), should_be);
     }
 
     fn test_garbling_high_to_low(b: &CrtBundler, inp: &[u128], should_be: &[u16]) {
         let circ = b.borrow_builder().borrow_circ();
-        let (gb, ev) = garble(&circ);
+        let (en, de, ev) = garble(&circ, &mut Rng::new());
 
         println!("number of ciphertexts: {}", ev.size());
 
@@ -526,9 +526,9 @@ mod tests {
         let pt_outs: Vec<u16> = circ.eval(&enc_inp);
         assert_eq!(pt_outs, should_be, "inp={:?}", inp);
 
-        let xs = gb.encode(&enc_inp);
+        let xs = en.encode(&enc_inp);
         let ys = ev.eval(&circ, &xs);
-        let gb_outs: Vec<u16> = gb.decode(&ys);
+        let gb_outs: Vec<u16> = de.decode(&ys);
         assert_eq!(gb_outs, should_be);
     }
 
@@ -567,13 +567,13 @@ mod tests {
             println!("x={}", x);
 
             let c = b.finish();
-            let (gb, ev) = garble(&c);
+            let (en, de, ev) = garble(&c, &mut Rng::new());
 
             let res = c.eval(&[x]);
             assert_eq!(b.decode(&res), &[x as u128]);
-            let xs = gb.encode(&[x]);
+            let xs = en.encode(&[x]);
             let ys = ev.eval(&c, &xs);
-            assert_eq!(b.decode(&gb.decode(&ys)), &[x as u128]);
+            assert_eq!(b.decode(&de.decode(&ys)), &[x as u128]);
         }
     }
 

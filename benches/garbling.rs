@@ -15,8 +15,9 @@ fn bench_garble<F:'static>(c: &mut Criterion, name: &str, make_circuit: F, q: u1
 {
     c.bench_function(&format!("garbling::{}{}_gb", name, q), move |bench| {
         let c = make_circuit(q);
+        let mut rng = Rng::new();
         bench.iter(|| {
-            let (gb, _ev) = garble(&c);
+            let gb = garble(&c, &mut rng);
             criterion::black_box(gb);
         });
     });
@@ -28,9 +29,9 @@ fn bench_eval<F:'static>(c: &mut Criterion, name: &str, make_circuit: F, q: u16)
     c.bench_function(&format!("garbling::{}{}_ev", name, q), move |bench| {
         let ref mut rng = Rng::new();
         let c = make_circuit(q);
-        let (gb, ev) = garble(&c);
+        let (en, _, ev) = garble(&c, rng);
         let inps = (0..c.ninputs()).map(|i| rng.gen_u16() % c.input_mod(i)).to_vec();
-        let xs = gb.encode(&inps);
+        let xs = en.encode(&inps);
         bench.iter(|| {
             let ys = ev.eval(&c, &xs);
             criterion::black_box(ys);
