@@ -49,7 +49,7 @@ pub fn garble<R:Rng>(c: &Circuit, rng: &mut R) -> (Encoder, Decoder, Evaluator) 
             Gate::HalfGate { xref, yref, .. }    => garble_half_gate(&wires[xref], &wires[yref], i, &deltas, rng),
         };
         wires.push(w);
-        g.map(|g| gates.push(g));
+        if let Some(g) = g { gates.push(g) }
     }
 
     let outputs = c.output_refs.iter().enumerate().map(|(i, &r)| {
@@ -358,15 +358,14 @@ impl Evaluator {
                     };
 
                     // hack for unequal mods
-                    let new_b_color;
-                    if c.modulus(xref) != c.modulus(yref) {
-                        let minitable = self.gates[id].last().unwrap().clone();
+                    let new_b_color = if c.modulus(xref) != c.modulus(yref) {
+                        let minitable = *self.gates[id].last().unwrap();
                         let ct = minitable >> (B.color() * 16);
                         let pt = B.hash(tweak2(i as u64, 1)) ^ ct;
-                        new_b_color = pt as u16;
+                        pt as u16
                     } else {
-                        new_b_color = B.color();
-                    }
+                        B.color()
+                    };
 
                     L.plus(&R.plus(&A.cmul(new_b_color)))
                 }
@@ -384,7 +383,7 @@ fn tweak(i: usize) -> u128 {
     i as u128
 }
 fn tweak2(i: u64, j: u64) -> u128 {
-    (i as u128) << 64 + j as u128
+    ((i as u128) << 64) + j as u128
 }
 
 fn output_tweak(i: usize, k: u16) -> u128 {

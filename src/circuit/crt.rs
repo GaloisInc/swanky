@@ -117,8 +117,7 @@ impl CrtBundler {
             let w = self.builder.as_mut().expect("need to own a builder!").secret_constant(x, p);
             ws.push(w);
         }
-        let bun_ref = self.add_bundle(ws, Rc::new(ps));
-        bun_ref
+        self.add_bundle(ws, Rc::new(ps))
     }
 
     pub fn constant(&mut self, val: u128, modulus: u128) -> BundleRef {
@@ -129,8 +128,7 @@ impl CrtBundler {
             let w = self.builder.as_mut().expect("need to own a builder!").constant(x, p);
             ws.push(w);
         }
-        let bun_ref = self.add_bundle(ws, Rc::new(ps));
-        bun_ref
+        self.add_bundle(ws, Rc::new(ps))
     }
 
     pub fn output(&mut self, xref: BundleRef) {

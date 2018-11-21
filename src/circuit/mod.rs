@@ -164,7 +164,7 @@ impl Builder {
 
     pub fn secret_constant(&mut self, val: u16, modulus: u16) -> Ref {
         let id = self.circ.const_vals.as_ref().map_or(0, |cs| cs.len());
-        self.circ.const_vals.as_mut().map(|cs| cs.push(val));
+        if let Some(cs) = self.circ.const_vals.as_mut() { cs.push(val) }
         let gate = Gate::Const { id };
         self.gate(gate, modulus)
     }
@@ -174,7 +174,7 @@ impl Builder {
             Some(&r) => r,
             None => {
                 let id = self.circ.const_vals.as_ref().map_or(0, |cs| cs.len());
-                self.circ.const_vals.as_mut().map(|cs| cs.push(val));
+                if let Some(cs) = self.circ.const_vals.as_mut() { cs.push(val) }
                 let gate = Gate::Const { id };
                 let r = self.gate(gate, modulus);
                 self.const_map.insert((val,modulus), r);

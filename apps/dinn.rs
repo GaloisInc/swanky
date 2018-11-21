@@ -103,9 +103,9 @@ fn test_arith_circuit(nn: &NeuralNet, images: &Vec<Vec<i32>>, labels: &[usize], 
 
         let mut max_val = i32::min_value();
         let mut winner = 0;
-        for i in 0..res.len() {
-            if res[i] > max_val {
-                max_val = res[i];
+        for (i, item) in res.into_iter().enumerate() {
+            if item > max_val {
+                max_val = item;
                 winner = i;
             }
         }
@@ -312,12 +312,11 @@ fn build_boolean_circuit(nbits: usize, nn: &NeuralNet, secret_weights: bool) -> 
                 let w = nn.weight(layer,i,j) as u128;
                 let negw = twos_complement_negate(nn.weight(layer,i,j) as u128, nbits);
 
-                let y;
-                if secret_weights {
-                    y = multiplex_secret_constants(&mut b, layer_inputs[i], w, negw, nbits);
+                let y = if secret_weights {
+                    multiplex_secret_constants(&mut b, layer_inputs[i], w, negw, nbits)
                 } else {
-                    y = multiplex_constants(&mut b, layer_inputs[i], w, negw, nbits);
-                }
+                    multiplex_constants(&mut b, layer_inputs[i], w, negw, nbits)
+                };
                 x = b.addition_no_carry(&x, &y);
             }
             acc.push(x);

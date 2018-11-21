@@ -16,10 +16,10 @@ pub fn main() {
     let ms = std::iter::repeat(4).take(5).collect::<Vec<_>>();
     let z = b.sgn(x,&ms);
     b.output(z);
-    let c = b.finish();
+    let circ = b.finish();
 
     for _ in 0..16 {
-        let gb = garble(&c, &mut rand::thread_rng());
+        let gb = garble(&circ, &mut rand::thread_rng());
         test::black_box(gb);
     }
 }

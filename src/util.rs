@@ -38,8 +38,7 @@ pub trait RngExt : Rng + Sized {
             }
         }
         let n = numbers::digits_per_u128(modulus);
-        let max = (modulus as u128).checked_pow(n as u32)
-            .expect(&format!("overflow with q={} n={}", modulus, n));
+        let max = (modulus as u128).checked_pow(n as u32).expect("overflow in gen_usable_u128");
         self.gen_u128() % max
     }
 
@@ -57,7 +56,7 @@ pub trait RngExt : Rng + Sized {
 
     fn gen_usable_factors(&mut self) -> Vec<u16> {
         let mut x: u128 = 1;
-        numbers::PRIMES.into_iter().cloned()
+        numbers::PRIMES.iter().cloned()
             .filter(|_| self.gen()) // randomly take this prime
             .take_while(|&q| { // make sure that we don't overflow!
                 match x.checked_mul(q as u128) {
