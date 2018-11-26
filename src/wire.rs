@@ -91,11 +91,8 @@ impl Wire {
                 debug_assert_eq!(xmod, ymod);
                 debug_assert_eq!(xs.len(), ys.len());
                 let zs = xs.iter().zip(ys.iter()).map(|(&x,&y)| {
-                    let mut z = x + y;
-                    if z >= xmod {
-                        z -= xmod;
-                    }
-                    z
+                    let (zp,overflow) = (x+y).overflowing_sub(xmod);
+                    if overflow { x+y } else { zp }
                 }).collect();
                 Wire::ModN { q: xmod, ds: zs }
             }

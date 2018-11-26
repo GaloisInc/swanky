@@ -27,7 +27,7 @@ debug = true
 
 [[bin]]
 name = "dinn"
-path = "apps/dinn.rs"
+path = "apps/nn/dinn.rs"
 
 [[bin]]
 name = "profile"
