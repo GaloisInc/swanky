@@ -4,13 +4,13 @@ use itertools::Itertools;
 use std::collections::HashMap;
 
 // the lowest-level circuit description in Fancy Garbling
-// consists of 4 gate types:
+// consists of 6 gate types:
 //     * input
 //     * addition
 //     * scalar multiplication
 //     * projection gates
-//
-// TODO: this is a lie! we have many new kinds of gates...
+//     * yao gates - essentially 2 input lookup tables
+//     * generalized half-gate multiplication
 
 pub type Ref = usize;
 pub type Id = usize;
@@ -328,7 +328,7 @@ impl Builder {
     }
 
     ////////////////////////////////////////////////////////////////////////////////
-    // binary stuff
+    // mixed radix stuff
 
     pub fn fancy_addition(&mut self, xs: &[Vec<Ref>]) -> Vec<Ref> {
         let nargs = xs.len();
@@ -499,6 +499,7 @@ impl Builder {
         let (zs, c) = self.addition(&xs, &neg_ys);
         (zs, self.negate(c))
     }
+
 }
 
 

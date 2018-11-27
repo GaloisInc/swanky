@@ -22,8 +22,8 @@ const IMAGES_FILE   : &str = "../dinn/weights-and-biases/txt_img_test.txt";
 const LABELS_FILE   : &str = "../dinn/weights-and-biases/txt_labels.txt";
 
 const TOPOLOGY: [usize; 3] = [256, 30, 10];
-// const NIMAGES: usize = 10000;
-const NIMAGES: usize = 1000;
+const NIMAGES: usize = 10000;
+// const NIMAGES: usize = 1000;
 
 const BIT_WIDTH: usize = 10;
 
@@ -78,7 +78,7 @@ fn test_arith_circuit(nn: &NeuralNet, images: &Vec<Vec<i32>>, labels: &[usize], 
 
     let q = numbers::modulus_with_width(BIT_WIDTH as u32);
     println!("q={} primes={:?}", q, numbers::factor(q));
-    let bun = neural_net::build_circuit(q, nn, secret_weights);
+    let bun = nn.as_crt_circuit(q, secret_weights);
 
     let mut errors = 0;
 
@@ -117,7 +117,7 @@ fn bench_arith_garbling(nn: &NeuralNet, image: &[i32], secret_weights: bool) { /
 
     let q = numbers::modulus_with_width(BIT_WIDTH as u32);
     println!("q={} primes={:?}", q, numbers::factor(q));
-    let mut bun = neural_net::build_circuit(q, nn, secret_weights);
+    let mut bun = nn.as_crt_circuit(q, secret_weights);
 
     let mut garble_time = Duration::new(0,0);
     for _ in 0..NTESTS {
@@ -151,7 +151,7 @@ fn bench_arith_garbling(nn: &NeuralNet, image: &[i32], secret_weights: bool) { /
 
 fn test_bool_circuit(nn: &NeuralNet, images: &Vec<Vec<i32>>, labels: &[usize], secret_weights: bool) {
     let nbits = BIT_WIDTH;
-    let circ = neural_net::build_boolean_circuit(nbits, nn, secret_weights);
+    let circ = nn.as_boolean_circuit(nbits, secret_weights);
 
     println!("noutputs={}", circ.noutputs());
     println!("running plaintext accuracy evaluation for boolean circuit");
@@ -192,7 +192,7 @@ fn bench_bool_garbling(nn: &NeuralNet, image: &[i32], secret_weights: bool) {
     println!("secret weights={}", secret_weights);
 
     let nbits = BIT_WIDTH;
-    let circ = neural_net::build_boolean_circuit(nbits, nn, secret_weights);
+    let circ = nn.as_boolean_circuit(nbits, secret_weights);
 
     let mut garble_time = Duration::new(0,0);
     for _ in 0..NTESTS {
