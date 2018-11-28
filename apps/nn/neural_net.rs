@@ -1,4 +1,6 @@
 use itertools::Itertools;
+use std::fs::File;
+use serde_json::{self, Value};
 
 use fancy_garbling::circuit::crt::CrtBundler;
 use fancy_garbling::circuit::{Builder, Ref, Circuit};
@@ -7,49 +9,18 @@ use fancy_garbling::numbers;
 use util;
 
 pub struct NeuralNet {
-    weights: Vec<Vec<Vec<i32>>>,
-    biases: Vec<Vec<i32>>,
+    weights: Vec<Vec<Vec<i64>>>,
+    biases: Vec<Vec<i64>>,
     topology: Vec<usize>,
 }
 
 impl NeuralNet {
-    pub fn weight(&self, layer: usize, i: usize, j: usize) -> i32 {
+    pub fn weight(&self, layer: usize, i: usize, j: usize) -> i64 {
         self.weights[layer][i][j]
     }
 
-    pub fn bias(&self, layer: usize, j: usize) -> i32 {
+    pub fn bias(&self, layer: usize, j: usize) -> i64 {
         self.biases[layer][j]
-    }
-
-    pub fn from_dinn_file(weights_file: &str, biases_file: &str, topology: &[usize]) -> Self {
-        let mut lines = util::get_lines(weights_file);
-        let mut weights = Vec::with_capacity(topology.len()-1);
-        for layer in 0..topology.len()-1 {
-            let nin  = topology[layer];
-            let nout = topology[layer+1];
-            weights.push(Vec::with_capacity(nin));
-            for i in 0..nin {
-                weights[layer].push(Vec::with_capacity(nout));
-                for _ in 0..nout {
-                    let l = lines.next().expect("no more lines").expect("couldnt read a line");
-                    let w = l.parse().expect("couldnt parse");
-                    weights[layer][i].push(w);
-                }
-            }
-        }
-
-        let mut lines = util::get_lines(biases_file);
-        let mut biases = Vec::with_capacity(topology.len()-1);
-        for layer in 0..topology.len()-1 {
-            let nout = topology[layer+1];
-            biases.push(Vec::with_capacity(nout));
-            for _ in 0..nout {
-                let l = lines.next().expect("no more lines").expect("couldnt read a line");
-                let w = l.parse().expect("couldnt parse");
-                biases[layer].push(w);
-            }
-        }
-        Self { weights, biases, topology: topology.to_vec() }
     }
 
     ////////////////////////////////////////////////////////////////////////////////
@@ -128,7 +99,7 @@ impl NeuralNet {
 
             for j in 0..nout {
                 // map the bias values to binary consts
-                let bias = util::i32_to_twos_complement(self.bias(layer,j), nbits);
+                let bias = util::i64_to_twos_complement(self.bias(layer,j), nbits);
                 let mut x = numbers::u128_to_bits(bias, nbits).into_iter().map(|bit| b.constant(bit,2)).collect_vec();
                 for i in 0..nin {
                     // hardcode the weights into the circuit
@@ -156,18 +127,83 @@ impl NeuralNet {
 
         b.finish()
     }
+
+    ////////////////////////////////////////////////////////////////////////////////
+    // io
+
+    pub fn from_dinn_file(weights_file: &str, biases_file: &str, topology: &[usize]) -> Self {
+        let mut lines = util::get_lines(weights_file);
+        let mut weights = Vec::with_capacity(topology.len()-1);
+        for layer in 0..topology.len()-1 {
+            let nin  = topology[layer];
+            let nout = topology[layer+1];
+            weights.push(Vec::with_capacity(nin));
+            for i in 0..nin {
+                weights[layer].push(Vec::with_capacity(nout));
+                for _ in 0..nout {
+                    let l = lines.next().expect("no more lines").expect("couldnt read a line");
+                    let w = l.parse().expect("couldnt parse");
+                    weights[layer][i].push(w);
+                }
+            }
+        }
+
+        let mut lines = util::get_lines(biases_file);
+        let mut biases = Vec::with_capacity(topology.len()-1);
+        for layer in 0..topology.len()-1 {
+            let nout = topology[layer+1];
+            biases.push(Vec::with_capacity(nout));
+            for _ in 0..nout {
+                let l = lines.next().expect("no more lines").expect("couldnt read a line");
+                let w = l.parse().expect("couldnt parse");
+                biases[layer].push(w);
+            }
+        }
+        Self { weights, biases, topology: topology.to_vec() }
+    }
+
+    pub fn from_json(file: &str) -> Self {
+        let mut weights = Vec::new();
+        let mut biases = Vec::new();
+
+        let file = File::open(file).expect("couldn't open file!");
+        let obj: Value = serde_json::from_reader(file).expect("couldn't parse json!");
+        let map = obj.as_object().unwrap();
+
+        for (k,v) in map.iter() {
+            if k.ends_with("biases") {
+                let data = v.as_array().expect("expected an array of numbers!").into_iter().map(|x| {
+                    x.as_i64().expect("expected an integer!")
+                }).collect_vec();
+                biases.push(data);
+            } else if k.ends_with("weights") {
+                let data = v.as_array().expect("expected an array of arrays!").into_iter()
+                            .map(|a| a.as_array().expect("expected an array of integers!").into_iter()
+                                      .map(|x| x.as_i64().expect("expected an integer!"))
+                                      .collect_vec()
+                                ).collect_vec();
+                weights.push(data);
+            } else {
+                panic!("unknown key: {}", k);
+            }
+        }
+
+        let topology = biases.iter().map(Vec::len).collect();
+
+        Self { weights, biases, topology }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 // boolean circuit helper functions for creating the boolean neural nets
 
-pub fn multiplex_constants(b: &mut Builder, x: Ref, c1: u128, c2: u128, n: usize) -> Vec<Ref> {
+fn multiplex_constants(b: &mut Builder, x: Ref, c1: u128, c2: u128, n: usize) -> Vec<Ref> {
     let c1_bs = numbers::to_bits(c1, n).into_iter().map(|x:u16| x > 0).collect_vec();
     let c2_bs = numbers::to_bits(c2, n).into_iter().map(|x:u16| x > 0).collect_vec();
     c1_bs.into_iter().zip(c2_bs.into_iter()).map(|(b1,b2)| mux_const_bits(b,x,b1,b2)).collect()
 }
 
-pub fn mux_const_bits(b: &mut Builder, x: Ref, b1: bool, b2: bool) -> Ref {
+fn mux_const_bits(b: &mut Builder, x: Ref, b1: bool, b2: bool) -> Ref {
     if !b1 && b2 {
         x
     } else if b1 && !b2 {

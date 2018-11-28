@@ -245,7 +245,3 @@ fn read_labels(labels_file: &str) -> Vec<usize> {
         .map(|line| line.expect("couldnt read").parse().expect("couldnt parse"))
         .collect()
 }
-
-////////////////////////////////////////////////////////////////////////////////
-// math stuff
-

@@ -8,15 +8,15 @@ pub fn get_lines(file: &str) -> Lines<BufReader<File>> {
     r.lines()
 }
 
-pub fn to_mod_q(q: u128, x: i32) -> u128 {
+pub fn to_mod_q(q: u128, x: i64) -> u128 {
     ((q as i128 + x as i128) % q as i128) as u128
 }
 
-pub fn from_mod_q(q: u128, x: u128) -> i32 {
+pub fn from_mod_q(q: u128, x: u128) -> i64 {
     if x > q/2 {
-        (q as i128 / 2 - x as i128) as i32
+        (q as i128 / 2 - x as i128) as i64
     } else {
-        x as i32
+        x as i64
     }
 }
 
@@ -25,7 +25,7 @@ pub fn twos_complement_negate(x: u128, nbits: usize) -> u128 {
     ((!x) & mask) + 1
 }
 
-pub fn i32_to_twos_complement(x: i32, nbits: usize) -> u128 {
+pub fn i64_to_twos_complement(x: i64, nbits: usize) -> u128 {
     if x >= 0 {
         x as u128
     } else {
