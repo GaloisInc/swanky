@@ -254,8 +254,8 @@ mod test {
         b.outputs(&ys);
         let circ = b.finish();
 
-        let c1_bits = numbers::to_bits(c1, nbits);
-        let c2_bits = numbers::to_bits(c2, nbits);
+        let c1_bits: Vec<u16> = numbers::to_bits(c1, nbits);
+        let c2_bits: Vec<u16> = numbers::to_bits(c2, nbits);
 
         assert_eq!(circ.eval(&[0]), c1_bits);
         assert_eq!(circ.eval(&[1]), c2_bits);
