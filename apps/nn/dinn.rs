@@ -29,14 +29,16 @@ pub fn main() {
     let mut run_bench = false;
     let mut run_tests = false;
     let mut secret_weights = false;
+    let mut direct_eval = false;
 
     for arg in std::env::args().skip(1) {
         match arg.as_str() {
-            "bench"     => run_bench = true,
-            "test"      => run_tests = true,
-            "boolean"   => boolean = true,
-            "secret"    => secret_weights = true,
-            _ => panic!("unknown arg {}! allowed commands: bench test boolean secret", arg),
+            "-bench"     => run_bench = true,
+            "-test"      => run_tests = true,
+            "-boolean"   => boolean = true,
+            "-secret"    => secret_weights = true,
+            "-eval"      => direct_eval = true,
+            _ => panic!("unknown arg {}! allowed commands: -bench -test -boolean -secret -eval", arg),
         }
     }
 
@@ -44,6 +46,10 @@ pub fn main() {
 
     let images = read_images(IMAGES_FILE);
     let labels = read_labels(LABELS_FILE);
+
+    if direct_eval {
+        nn.test(&images, &labels);
+    }
 
     if run_bench {
         if boolean {

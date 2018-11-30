@@ -23,6 +23,69 @@ impl NeuralNet {
         self.biases[layer][j]
     }
 
+    pub fn eval(&self, nn_inputs: &[i64]) -> Vec<i64> {
+        let mut layer_outputs = Vec::new();
+        let mut layer_inputs;
+
+        for layer in 0..self.topology.len()-1 {
+            if layer == 0 {
+                layer_inputs = nn_inputs.to_vec();
+            } else {
+                layer_inputs  = layer_outputs;
+                layer_outputs = Vec::new();
+            }
+
+            let nin  = self.topology[layer];
+            let nout = self.topology[layer+1];
+
+            for j in 0..nout {
+                let mut x = self.bias(layer,j);
+                for i in 0..nin {
+                    x += layer_inputs[i] * self.weight(layer,i,j);
+                }
+                layer_outputs.push(x);
+            }
+
+            if layer < self.topology.len()-2 {
+                layer_outputs = layer_outputs.into_iter().map(|x| {
+                    if x >= 0 { 1 } else { -1 } // sign
+                }).collect_vec();
+            }
+        }
+
+        layer_outputs
+    }
+
+    pub fn test(&self, images: &Vec<Vec<i64>>, labels: &[usize]) {
+        println!("running direct accuracy evaluation");
+        let mut errors = 0;
+
+        for (img_num, img) in images.iter().enumerate() {
+            if img_num % 1000 == 0 {
+                println!("{}/{} {} errors ({}%)",
+                        img_num, images.len(), errors,
+                        100.0 * (1.0 - errors as f32 / img_num as f32));
+            }
+
+            let res = self.eval(img);
+
+            let mut max_val = i64::min_value();
+            let mut winner = 0;
+            for (i, item) in res.into_iter().enumerate() {
+                if item > max_val {
+                    max_val = item;
+                    winner = i;
+                }
+            }
+
+            if winner != labels[img_num] {
+                errors += 1;
+            }
+        }
+        println!("errors: {}/{}. accuracy: {}%",
+                errors, images.len(), 100.0 * (1.0 - errors as f32 / images.len() as f32));
+    }
+
     ////////////////////////////////////////////////////////////////////////////////
     // circuit creation
 
@@ -60,7 +123,7 @@ impl NeuralNet {
                 layer_outputs.push(x);
             }
 
-            if layer == 0 {
+            if layer < self.topology.len() - 2 {
                 layer_outputs = layer_outputs.into_iter().map(|x| {
                     let ms = vec![3,4,54]; // exact for 5 primes
                     // let ms = vec![5,5,6,50];  // exact for 6 primes
@@ -192,6 +255,7 @@ impl NeuralNet {
 
         Self { weights, biases, topology }
     }
+
 }
 
 ////////////////////////////////////////////////////////////////////////////////

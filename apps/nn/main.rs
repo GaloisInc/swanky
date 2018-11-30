@@ -37,6 +37,7 @@ pub fn main() {
     let mut run_bench = false;
     let mut run_tests = false;
     let mut secret_weights = false;
+    let mut direct_eval = false;
 
     for arg in args.iter().skip(1) {
         match arg.as_str() {
@@ -44,13 +45,18 @@ pub fn main() {
             "-test"      => run_tests = true,
             "-boolean"   => boolean = true,
             "-secret"    => secret_weights = true,
-            _ => panic!("unknown arg {}! allowed flags: -bench -test -boolean -secret", arg),
+            "-eval"      => direct_eval = true,
+            _ => panic!("unknown arg {}! allowed flags: -bench -test -boolean -secret -eval", arg),
         }
     }
 
     let nn = NeuralNet::from_json(nn_path.to_str().unwrap());
     let tests = read_tests(tests_path.to_str().unwrap());
     let labels = read_labels(labels_path.to_str().unwrap());
+
+    if direct_eval {
+        nn.test(&tests, &labels);
+    }
 
     if run_bench {
         if boolean {
