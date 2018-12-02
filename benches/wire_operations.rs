@@ -43,6 +43,17 @@ fn bench_plus(c: &mut Criterion, p: u16) {
     });
 }
 
+fn bench_plus_eq(c: &mut Criterion, p: u16) {
+    c.bench_function(&format!("wire::plus_eq{}", p), move |b| {
+        let rng = &mut rand::thread_rng();
+        let mut x = Wire::rand(rng,p);
+        let y = Wire::rand(rng,p);
+        b.iter(|| {
+            x.plus_eq(&y);
+        });
+    });
+}
+
 fn bench_cmul(c: &mut Criterion, p: u16) {
     c.bench_function(&format!("wire::cmul{}", p), move |b| {
         let rng = &mut rand::thread_rng();
@@ -51,6 +62,18 @@ fn bench_cmul(c: &mut Criterion, p: u16) {
         b.iter(|| {
             let z = x.cmul(c);
             criterion::black_box(z);
+        });
+    });
+}
+
+fn bench_cmul_eq(c: &mut Criterion, p: u16) {
+    c.bench_function(&format!("wire::cmul_eq{}", p), move |b| {
+        let rng = &mut rand::thread_rng();
+        let mut x = Wire::rand(rng,p);
+        let c = rng.gen_u16();
+        b.iter(|| {
+            x.cmul_eq(c);
+            // criterion::black_box(x);
         });
     });
 }
@@ -90,7 +113,9 @@ fn bench_zero(c: &mut Criterion, p: u16) {
 fn unpack17(c: &mut Criterion) { bench_unpack(c,17) }
 fn pack17(c: &mut Criterion) { bench_pack(c,17) }
 fn plus17(c: &mut Criterion) { bench_plus(c,17) }
+fn pluseq17(c: &mut Criterion) { bench_plus_eq(c,17) }
 fn cmul17(c: &mut Criterion) { bench_cmul(c,17) }
+fn cmuleq17(c: &mut Criterion) { bench_cmul_eq(c,17) }
 fn negate17(c: &mut Criterion) { bench_negate(c,17) }
 fn hash17(c: &mut Criterion) { bench_hash(c,17) }
 fn zero17(c: &mut Criterion) { bench_zero(c,17) }
@@ -98,7 +123,7 @@ fn zero17(c: &mut Criterion) { bench_zero(c,17) }
 criterion_group!{
     name = wire_conversion;
     config = Criterion::default().warm_up_time(Duration::from_millis(100));
-    targets = unpack17, pack17, plus17, cmul17, negate17, hash17, zero17
+    targets = unpack17, pack17, plus17, pluseq17, cmul17, cmuleq17, negate17, hash17, zero17
 }
 
 criterion_main!(wire_conversion);

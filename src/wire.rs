@@ -65,6 +65,31 @@ impl Wire {
         }
     }
 
+    pub fn set(&mut self, other: &Wire) {
+        match (self, other) {
+            (Wire::Mod2 { val: x }, Wire::Mod2 { val: y }) => {
+                *x = *y;
+            }
+
+            (Wire::ModN { q: xmod, ds: xs }, Wire::ModN { q: ymod, ds: ref ys }) => {
+                debug_assert_eq!(xmod, ymod);
+                debug_assert_eq!(xs.len(), ys.len());
+                xs.iter_mut().zip(ys.iter()).for_each(|(x,&y)| {
+                    *x = y;
+                });
+            }
+
+            _ => panic!("[wire::set] unequal moduli!"),
+        }
+    }
+
+    pub fn set_zero(&mut self) {
+        match self {
+            Wire::Mod2 { val }    => *val = 0,
+            Wire::ModN { ds, .. } => ds.iter_mut().for_each(|d| *d = 0),
+        }
+    }
+
     pub fn rand_delta<R:Rng>(rng: &mut R, modulus: u16) -> Self {
         let mut w = Self::rand(rng, modulus);
         match w {
@@ -101,6 +126,25 @@ impl Wire {
         }
     }
 
+    pub fn plus_eq(&mut self, other: &Wire) {
+        match (self, other) {
+            (Wire::Mod2 { val: x }, Wire::Mod2 { val: y }) => {
+                *x ^= y;
+            }
+
+            (Wire::ModN { q: xmod, ds: xs }, Wire::ModN { q: ymod, ds: ref ys }) => {
+                debug_assert_eq!(xmod, ymod);
+                debug_assert_eq!(xs.len(), ys.len());
+                xs.iter_mut().zip(ys.iter()).for_each(|(x,&y)| {
+                    let (zp,overflow) = (*x+y).overflowing_sub(*xmod);
+                    *x = if overflow { *x+y } else { zp }
+                });
+            }
+
+            _ => panic!("[wire::plus_eq] unequal moduli!"),
+        }
+    }
+
     pub fn cmul(&self, c: u16) -> Self {
         match *self {
             Wire::Mod2 { .. } => {
@@ -116,6 +160,23 @@ impl Wire {
                     (d as u32 * c as u32 % q as u32) as u16
                 }).collect();
                 Wire::ModN { q, ds: zs }
+            }
+        }
+    }
+
+    pub fn cmul_eq(&mut self, c: u16) {
+        match self {
+            Wire::Mod2 { val } => {
+                if c & 1 == 0 {
+                    *val = 0;
+                }
+            }
+
+            Wire::ModN { q, ds } => {
+
+                ds.iter_mut().for_each(|d| {
+                    *d = (*d as u32 * c as u32 % *q as u32) as u16
+                });
             }
         }
     }
@@ -136,14 +197,36 @@ impl Wire {
         }
     }
 
-    pub fn minus(&self, other: &Self) -> Self {
+    pub fn negate_eq(&mut self) {
+        match self {
+            Wire::Mod2 { val } => *val = !*val,
+            Wire::ModN { q, ds }  => {
+                ds.iter_mut().for_each(|d| {
+                    if *d > 0 {
+                        *d = *q - *d;
+                    } else {
+                        *d = 0;
+                    }
+                });
+            }
+        }
+    }
+
+    pub fn minus(&self, other: &Wire) -> Wire {
         match *self {
             Wire::Mod2 { .. } => self.plus(&other),
             Wire::ModN { .. } => self.plus(&other.negate()),
         }
     }
 
-    pub fn rand<R:Rng>(rng: &mut R, modulus: u16) -> Self {
+    pub fn minus_eq(&mut self, other: &Wire) {
+        match *self {
+            Wire::Mod2 { .. } => self.plus_eq(&other),
+            Wire::ModN { .. } => self.plus_eq(&other.negate()),
+        }
+    }
+
+    pub fn rand<R:Rng>(rng: &mut R, modulus: u16) -> Wire {
         Self::from_u128(rng.gen_u128(), modulus)
     }
 
@@ -152,7 +235,7 @@ impl Wire {
     }
 
     // hash to u128 and back to Wire
-    pub fn hashback(&self, tweak: u128, new_mod: u16) -> Self {
+    pub fn hashback(&self, tweak: u128, new_mod: u16) -> Wire {
         Self::from_u128(self.hash(tweak), new_mod)
     }
 
@@ -160,7 +243,7 @@ impl Wire {
         AES.hash2(tweak, self.as_u128(), other.as_u128())
     }
 
-    pub fn hashback2(&self, other: &Wire, tweak: u128, new_modulus: u16) -> Self {
+    pub fn hashback2(&self, other: &Wire, tweak: u128, new_modulus: u16) -> Wire {
         Self::from_u128(self.hash2(other, tweak), new_modulus)
     }
 }
@@ -277,6 +360,18 @@ mod tests {
                 assert_eq!(x.plus(&x.negate()), Wire::zero(q), "q={}", q);
                 assert_eq!(x.minus(&y), x.plus(&y.negate()));
             }
+            let mut w = x.clone();
+            let z = w.plus(&y);
+            w.plus_eq(&y);
+            assert_eq!(w, z);
+
+            w = x.clone();
+            w.cmul_eq(2);
+            assert_eq!(x.plus(&x), w);
+
+            w = x.clone();
+            w.negate_eq();
+            assert_eq!(x.negate(), w);
         }
     }
 

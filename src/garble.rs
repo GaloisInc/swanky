@@ -104,18 +104,34 @@ fn garble_projection(A: &Wire, q_out: u16, tt: &[u16], gate_num: usize, deltas: 
     let tao = A.color();        // input zero-wire
     let g = tweak(gate_num);    // gate tweak
 
+    let Din  = &deltas[&q_in];
+    let Dout = &deltas[&q_out];
+
     // output zero-wire
     // W_g^0 <- -H(g, W_{a_1}^0 - \tao\Delta_m) - \phi(-\tao)\Delta_n
-    let C = A.minus(&deltas[&q_in].cmul(tao))
+    let C = A.minus(&Din.cmul(tao))
                 .hashback(g, q_out)
-                .minus(&deltas[&q_out].cmul(tt[((q_in - tao) % q_in) as usize]));
+                .minus(&Dout.cmul(tt[((q_in - tao) % q_in) as usize]));
 
+    // precompute `let C_ = C.plus(&Dout.cmul(tt[x as usize]))`
+    let mut C_ = C.clone();
+    let C_precomputed = (0..q_out).map(|x| {
+        if x > 0 {
+            C_.plus_eq(&Dout);
+        }
+        C_.as_u128()
+    }).collect_vec();
+
+    let mut A_ = A.clone();
     for x in 0..q_in {
         let ix = (tao as usize + x as usize) % q_in as usize;
+        if x > 0 {
+            A_.plus_eq(&Din); // avoiding expensive cmul for `A_ = A.plus(&Din.cmul(x))`
+        }
         if ix == 0 { continue }
-        let A_ = A.plus(&deltas[&q_in].cmul(x));
-        let C_ = C.plus(&deltas[&q_out].cmul(tt[x as usize]));
-        let ct = A_.hash(g) ^ C_.as_u128();
+
+        let C_ = &C_precomputed[tt[x as usize] as usize];
+        let ct = A_.hash(g) ^ C_;
         gate[ix - 1] = Some(ct);
     }
 
