@@ -109,18 +109,24 @@ fn garble_projection(A: &Wire, q_out: u16, tt: &[u16], gate_num: usize, deltas: 
 
     // output zero-wire
     // W_g^0 <- -H(g, W_{a_1}^0 - \tao\Delta_m) - \phi(-\tao)\Delta_n
-    let C = A.minus(&Din.cmul(tao))
-                .hashback(g, q_out)
-                .minus(&Dout.cmul(tt[((q_in - tao) % q_in) as usize]));
+    // let C = A.minus(&Din.cmul(tao))
+    //             .hashback(g, q_out)
+    //             .minus(&Dout.cmul(tt[((q_in - tao) % q_in) as usize]));
+    let mut C = A.clone();
+    C.plus_eq(&Din.cmul((q_in-tao) % q_in));
+    C = C.hashback(g, q_out);
+    C.plus_eq(&Dout.cmul((q_out - tt[((q_in - tao) % q_in) as usize]) % q_out));
 
     // precompute `let C_ = C.plus(&Dout.cmul(tt[x as usize]))`
-    let mut C_ = C.clone();
-    let C_precomputed = (0..q_out).map(|x| {
-        if x > 0 {
-            C_.plus_eq(&Dout);
-        }
-        C_.as_u128()
-    }).collect_vec();
+    let C_precomputed = {
+        let mut C_ = C.clone();
+        (0..q_out).map(|x| {
+            if x > 0 {
+                C_.plus_eq(&Dout);
+            }
+            C_.as_u128()
+        }).collect_vec()
+    };
 
     let mut A_ = A.clone();
     for x in 0..q_in {
