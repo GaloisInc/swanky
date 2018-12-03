@@ -124,14 +124,14 @@ fn garble_projection(A: &Wire, q_out: u16, tt: &[u16], gate_num: usize, deltas: 
 
     let mut A_ = A.clone();
     for x in 0..q_in {
-        let ix = (tao as usize + x as usize) % q_in as usize;
         if x > 0 {
             A_.plus_eq(&Din); // avoiding expensive cmul for `A_ = A.plus(&Din.cmul(x))`
         }
+
+        let ix = (tao as usize + x as usize) % q_in as usize;
         if ix == 0 { continue }
 
-        let C_ = &C_precomputed[tt[x as usize] as usize];
-        let ct = A_.hash(g) ^ C_;
+        let ct = A_.hash(g) ^ C_precomputed[tt[x as usize] as usize];
         gate[ix - 1] = Some(ct);
     }
 
@@ -200,8 +200,11 @@ fn garble_half_gate<R: Rng>(A: &Wire, B: &Wire, gate_num: usize, deltas: &HashMa
         let t = tweak2(gate_num as u64, 1);
 
         let mut minitable = vec![None; qb as usize];
+        let mut B_ = B.clone();
         for b in 0..qb {
-            let B_ = B.plus(&Db.cmul(b));
+            if b > 0 {
+                B_.plus_eq(&Db);
+            }
             let new_color = (r+b) % q;
             let ct = (B_.hash(t) & 0xFFFF) ^ new_color as u128;
             minitable[B_.color() as usize] = Some(ct);
@@ -221,28 +224,64 @@ fn garble_half_gate<R: Rng>(A: &Wire, B: &Wire, gate_num: usize, deltas: &HashMa
 
     // X = H(A+aD) + arD such that a + A.color == 0
     let alpha = (q - A.color()) % q; // alpha = -A.color
-    let X = A.plus(&D.cmul(alpha)).hashback(g,q).plus(&D.cmul((alpha * r) % q));
+    let X = A.plus(&D.cmul(alpha))
+             .hashback(g,q)
+             .plus(&D.cmul((alpha * r) % q));
 
     // Y = H(B + bD) + (b + r)A such that b + B.color == 0
     let beta = (qb - B.color()) % qb;
-    let Y = B.plus(&Db.cmul(beta)).hashback(g,q).plus(&A.cmul((beta + r) % q));
+    let Y = B.plus(&Db.cmul(beta))
+             .hashback(g,q)
+             .plus(&A.cmul((beta + r) % q));
 
+    // precompute a lookup table of X.minus(&D_cmul[(a * r % q) as usize]).as_u128();
+    //                            = X.plus(&D_cmul[((q - (a * r % q)) % q) as usize]).as_u128();
+    let X_cmul = {
+        let mut X_ = X.clone();
+        (0..q).map(|x| {
+            if x > 0 {
+                X_.plus_eq(&D);
+            }
+            X_.as_u128()
+        }).collect_vec()
+    };
+
+    let mut A_ = A.clone();
     for a in 0..q {
+        if a > 0 {
+            A_.plus_eq(&D);
+        }
         // garbler's half-gate: outputs X-arD
         // G = H(A+aD) ^ X+a(-r)D = H(A+aD) ^ X-arD
-        let A_ = A.plus(&D.cmul(a)); // = H(A+aD)
         if A_.color() != 0 {
-            let G = A_.hash(g) ^ X.minus(&D.cmul(a * r % q)).as_u128();
+            // let G = A_.hash(g) ^ X.minus(&D_cmul[(a * r % q) as usize]).as_u128();
+            let G = A_.hash(g) ^ X_cmul[((q - (a * r % q)) % q) as usize];
             gate[A_.color() as usize - 1] = Some(G);
         }
     }
 
+    // precompute a lookup table of Y.minus(&A_cmul[((b+r) % q) as usize]).as_u128();
+    //                            = Y.plus(&A_cmul[((q - ((b+r) % q)) % q) as usize]).as_u128();
+    let Y_cmul = {
+        let mut Y_ = Y.clone();
+        (0..q).map(|x| {
+            if x > 0 {
+                Y_.plus_eq(&A);
+            }
+            Y_.as_u128()
+        }).collect_vec()
+    };
+
+    let mut B_ = B.clone();
     for b in 0..qb {
+        if b > 0 {
+            B_.plus_eq(&Db)
+        }
         // evaluator's half-gate: outputs Y-(b+r)D
         // G = H(B+bD) + Y-(b+r)A
-        let B_ = B.plus(&Db.cmul(b));
         if B_.color() != 0 {
-            let G = B_.hash(g) ^ Y.minus(&A.cmul((b+r) % q)).as_u128();
+            // let G = B_.hash(g) ^ Y.minus(&A_cmul[((b+r) % q) as usize]).as_u128();
+            let G = B_.hash(g) ^ Y_cmul[((q - ((b+r) % q)) % q) as usize];
             gate[q as usize - 1 + B_.color() as usize - 1] = Some(G);
         }
     }
