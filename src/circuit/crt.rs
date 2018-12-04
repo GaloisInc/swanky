@@ -487,6 +487,29 @@ impl CrtBundler {
         }
         self.add_bundle(ws, ps)
     }
+
+    fn exact_ms(&self, xbun: BundleRef) -> Vec<u16> {
+        match self.primes(xbun).len() {
+            3 => vec![2;5],
+            4 => vec![3,26],
+            5 => vec![3,4,54],
+            6 => vec![5,5,6,50],
+            7 => vec![6,6,7,7,74],
+            8 => vec![5,7,8,8,9,98],
+            9 => vec![4,7,10,10,10,10,134],
+            n => panic!("unknown exact Ms for {} primes!", n),
+        }
+    }
+
+    pub fn exact_sgn(&mut self, xbun: BundleRef) -> BundleRef {
+        let ms = self.exact_ms(xbun);
+        self.sgn(xbun, &ms)
+    }
+
+    pub fn exact_relu(&mut self, xbun: BundleRef) -> BundleRef {
+        let ms = self.exact_ms(xbun);
+        self.relu(xbun, &ms)
+    }
 }
 
 #[cfg(test)]

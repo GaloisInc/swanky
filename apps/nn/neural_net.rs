@@ -58,6 +58,9 @@ impl NeuralNet {
 
     pub fn test(&self, images: &Vec<Vec<i64>>, labels: &[usize]) {
         println!("running direct accuracy evaluation");
+
+        println!("{:?}", self.topology);
+
         let mut errors = 0;
 
         for (img_num, img) in images.iter().enumerate() {
@@ -125,9 +128,7 @@ impl NeuralNet {
 
             if layer < self.topology.len() - 2 {
                 layer_outputs = layer_outputs.into_iter().map(|x| {
-                    let ms = vec![3,4,54]; // exact for 5 primes
-                    // let ms = vec![5,5,6,50];  // exact for 6 primes
-                    b.sgn(x, &ms)
+                    b.exact_sgn(x)
                 }).collect();
             }
         }
@@ -251,7 +252,8 @@ impl NeuralNet {
             }
         }
 
-        let topology = biases.iter().map(Vec::len).collect();
+        let mut topology = biases.iter().map(Vec::len).collect_vec();
+        topology.insert(0, weights[0].len());
 
         Self { weights, biases, topology }
     }

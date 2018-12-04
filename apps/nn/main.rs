@@ -15,7 +15,7 @@ use std::path::Path;
 use neural_net::NeuralNet;
 use itertools::Itertools;
 
-const BIT_WIDTH: usize = 10;
+const BIT_WIDTH: usize = 20;
 const NTESTS: usize = 16; // number of iterations of bench
 
 pub fn main() {
