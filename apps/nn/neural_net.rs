@@ -11,7 +11,7 @@ use util;
 pub struct NeuralNet {
     weights: Vec<Vec<Vec<i64>>>,
     biases: Vec<Vec<i64>>,
-    topology: Vec<usize>,
+    pub topology: Vec<usize>,
 }
 
 impl NeuralNet {

@@ -15,7 +15,7 @@ use std::path::Path;
 use neural_net::NeuralNet;
 use itertools::Itertools;
 
-const BIT_WIDTH: usize = 20;
+const BIT_WIDTH: usize = 15;
 const NTESTS: usize = 16; // number of iterations of bench
 
 pub fn main() {
@@ -51,6 +51,8 @@ pub fn main() {
     }
 
     let nn = NeuralNet::from_json(nn_path.to_str().unwrap());
+    println!("neural net topology: {:?}", nn.topology);
+
     let tests = read_tests(tests_path.to_str().unwrap());
     let labels = read_labels(labels_path.to_str().unwrap());
 

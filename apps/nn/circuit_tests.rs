@@ -16,6 +16,7 @@ pub fn test_arith_circuit(
     let q = numbers::modulus_with_width(bit_width as u32);
     println!("q={} primes={:?}", q, numbers::factor(q));
     let bun = nn.as_crt_circuit(q, secret_weights);
+    bun.borrow_circ().print_info();
 
     let mut errors = 0;
 
@@ -27,6 +28,7 @@ pub fn test_arith_circuit(
         }
 
         let circ = bun.borrow_circ();
+
         let modq_img = img.iter().map(|&i| util::to_mod_q(q,i)).collect_vec();
         let inp = bun.encode(&modq_img);
         let raw = circ.eval(&inp);
@@ -59,6 +61,7 @@ pub fn test_bool_circuit(
     secret_weights: bool,
 ) {
     let circ = nn.as_boolean_circuit(nbits, secret_weights);
+    circ.print_info();
 
     println!("noutputs={}", circ.noutputs());
     println!("running plaintext accuracy evaluation for boolean circuit");

@@ -21,7 +21,7 @@ const TOPOLOGY: [usize; 3] = [256, 30, 10];
 const NIMAGES: usize = 10000;
 // const NIMAGES: usize = 1000;
 
-const BIT_WIDTH: usize = 10;
+const BIT_WIDTH: usize = 15;
 const NTESTS: usize = 16; // number of iterations of bench
 
 pub fn main() {
@@ -43,6 +43,7 @@ pub fn main() {
     }
 
     let nn = NeuralNet::from_dinn_file(WEIGHTS_FILE, BIASES_FILE, &TOPOLOGY);
+    println!("neural net topology: {:?}", nn.topology);
 
     let images = read_images(IMAGES_FILE);
     let labels = read_labels(LABELS_FILE);

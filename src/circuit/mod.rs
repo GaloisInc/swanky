@@ -87,6 +87,44 @@ impl Circuit {
     pub fn clear_consts(&mut self) {
         self.const_vals = None;
     }
+
+    pub fn print_info(&self) {
+        let mut nconst = 0;
+        let mut nadd = 0;
+        let mut nsub = 0;
+        let mut ncmul = 0;
+        let mut nproj = 0;
+        let mut nyao = 0;
+        let mut nhalfgate = 0;
+
+        for g in self.gates.iter() {
+            match g {
+                Gate::Input    { .. } => (),
+                Gate::Const    { .. } => nconst    += 1,
+                Gate::Add      { .. } => nadd      += 1,
+                Gate::Sub      { .. } => nsub      += 1,
+                Gate::Cmul     { .. } => ncmul     += 1,
+                Gate::Proj     { .. } => nproj     += 1,
+                Gate::Yao      { .. } => nyao      += 1,
+                Gate::HalfGate { .. } => nhalfgate += 1,
+            }
+        }
+
+        println!("circuit info:");
+        println!("  ninputs:      {}", self.ninputs());
+        println!("  noutputs:     {}", self.noutputs());
+        println!("  nconsts:      {}", nconst);
+        println!("");
+        println!("  additions:    {}", nadd);
+        println!("  subtractions: {}", nsub);
+        println!("  cmuls:        {}", ncmul);
+        println!("  projections:  {}", nproj);
+        println!("  yaos:         {}", nyao);
+        println!("  halfgates:    {}", nhalfgate);
+        println!("");
+        println!("  total non-free gates: {}", self.num_nonfree_gates);
+        println!("");
+    }
 }
 
 // Use a Builder to conveniently make a Circuit
