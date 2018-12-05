@@ -278,145 +278,8 @@ impl CrtBundler {
         self.borrow_mut_builder()._and_many(&zs)
     }
 
-    pub fn crt_to_pmr(&mut self, xref: BundleRef) -> BundleRef {
-        let gadget_projection_tt = |p, q| -> Vec<u16> {
-            let pq = p as u32 + q as u32 - 1;
-            let mut tab = Vec::with_capacity(pq as usize);
-            for z in 0 .. pq {
-                let mut x = 0;
-                let mut y = 0;
-                'outer: for i in 0..p as u32 {
-                    for j in 0..q as u32 {
-                        if (i + pq - j) % pq == z {
-                            x = i;
-                            y = j;
-                            break 'outer;
-                        }
-                    }
-                }
-                assert_eq!((x + pq - y) % pq, z);
-                tab.push((((x * q as u32 * inv(q as i16, p as i16) as u32 +
-                            y * p as u32 * inv(p as i16, q as i16) as u32) / p as u32) % q as u32) as u16);
-            }
-            tab
-        };
-
-        let gadget = |b: &mut Builder, x: Ref, y: Ref| -> Ref {
-            let p  = b.circ.modulus(x);
-            let q  = b.circ.modulus(y);
-            let x_ = b.mod_change(x, p+q-1);
-            let y_ = b.mod_change(y, p+q-1);
-            let z  = b.sub(x_, y_);
-            b.proj(z, q, gadget_projection_tt(p,q))
-        };
-
-        let n = self.bundles[xref.0].primes.len();
-        let mut x = vec![vec![None; n+1]; n+1];
-
-        for j in 0..n {
-            x[0][j+1] = Some(self.bundles[xref.0].wires[j]);
-        }
-
-        for i in 1..=n {
-            for j in i+1..=n {
-                let b = self.builder.as_mut().expect("need a builder!");
-                let z = gadget(b, x[i-1][i].unwrap(), x[i-1][j].unwrap());
-                x[i][j] = Some(z);
-            }
-        }
-
-        let mut zwires = Vec::with_capacity(n);
-        for i in 0..n {
-            zwires.push(x[i][i+1].unwrap());
-        }
-        let ps = self.bundles[xref.0].primes.clone();
-        self.add_bundle(zwires, ps)
-    }
-
-    pub fn less_than_pmr(&mut self, xref: BundleRef, yref: BundleRef) -> Ref {
-        let z = self.sub(xref, yref);
-        let pmr = self.crt_to_pmr(z);
-        let n = self.bundles[pmr.0].wires.len();
-        let w = self.bundles[pmr.0].wires[n-1];
-        let q_in = self.bundles[pmr.0].primes[n-1];
-        let mut tab = vec![1; q_in as usize];
-        tab[0] = 0;
-        self.borrow_mut_builder().proj(w, 2, tab)
-    }
-
-    pub fn parity(&mut self, xref: BundleRef) -> Ref {
-        let q = product(&self.bundles[xref.0].primes);
-        let M = 2*q;
-
-        // number of bits to keep in the projection
-        let nbits = 5;
-
-        // used to round
-        let new_mod = 1_u16 << nbits;
-
-        let project = |x: Ref, c: u16, b: &mut Builder| -> Ref {
-            let p = b.circ.modulus(x);
-            let Mi = M / p as u128;
-
-            // crt coef
-            let h = inv((Mi % p as u128) as i16, p as i16) as f32;
-
-            let mut tab = Vec::with_capacity(p as usize);
-            for x in 0..p {
-                let y = ((x+c)%p) as f32 * h / p as f32;
-                let truncated_y = (new_mod as f32 * y.fract()).round() as u16;
-                tab.push(truncated_y);
-            }
-
-            b.proj(x, new_mod, tab)
-        };
-
-        let mut C = q/4;
-        C += C % 2;
-        let C_crt = crt(&self.bundles[xref.0].primes, C);
-
-        let xs = self.bundles[xref.0].wires.to_vec();
-
-        let mut b = self.take_builder();
-        let mut z = None;
-
-        for (&x, &c) in xs.iter().zip(C_crt.iter()) {
-            let y = project(x, c, &mut b);
-            match z {
-                None       => z = Some(y),
-                Some(prev) => z = Some(b.add(prev,y)),
-            }
-        }
-
-        let tab = (0..new_mod).map(|x| (x >= new_mod/2) as u16).collect();
-        let out = b.proj(z.unwrap(), 2, tab);
-        self.put_builder(b);
-        out
-    }
-
-    pub fn bits(&mut self, xref: BundleRef, nbits: usize) -> Vec<Ref> {
-        let mut bits = Vec::with_capacity(nbits as usize);
-        let ps = self.bundles[xref.0].primes.clone();
-        let mut x = xref;
-        for _ in 0..nbits {
-            let b = self.parity(x);
-            bits.push(b);
-
-            let wires = ps.iter().map(|&p| self.borrow_mut_builder().mod_change(b,p)).collect();
-            let bs = self.add_bundle(wires, ps.clone());
-
-            x = self.sub(x, bs);
-            x = self.cdiv(x, 2);
-        }
-        bits
-    }
-
-    pub fn less_than_bits(&mut self, xref: BundleRef, yref: BundleRef, nbits: usize) -> Ref
-    {
-        let xbits = self.bits(xref, nbits);
-        let ybits = self.bits(yref, nbits);
-        self.borrow_mut_builder().binary_subtraction(&xbits, &ybits).1
-    }
+    ////////////////////////////////////////////////////////////////////////////////
+    // fancy methods based on mike's fractional mixed radix trick
 
     fn fractional_mixed_radix(&mut self, xbun: BundleRef, factors_of_m: &[u16]) -> Vec<Ref> {
         let ndigits = factors_of_m.len();
@@ -470,11 +333,17 @@ impl CrtBundler {
         self.add_bundle(zwires, primes)
     }
 
-    pub fn sgn(&mut self, xbun: BundleRef, factors_of_m: &[u16]) -> BundleRef {
+    // outputs 0/1
+    pub fn sign(&mut self, xbun: BundleRef, factors_of_m: &[u16]) -> Ref {
         let res = self.fractional_mixed_radix(xbun, factors_of_m);
         let p = *factors_of_m.last().unwrap();
         let tt = (0..p).map(|x| (x >= p/2) as u16).collect();
-        let sign = self.borrow_mut_builder().proj(*res.last().unwrap(), 2, tt);
+        self.borrow_mut_builder().proj(*res.last().unwrap(), 2, tt)
+    }
+
+    // outputs 1/-1
+    pub fn sgn(&mut self, xbun: BundleRef, factors_of_m: &[u16]) -> BundleRef {
+        let sign = self.sign(xbun, factors_of_m);
 
         let ps = self.primes(xbun);
         let q = numbers::product(&ps);
@@ -510,13 +379,40 @@ impl CrtBundler {
         let ms = self.exact_ms(xbun);
         self.relu(xbun, &ms)
     }
+
+    pub fn exact_leq(&mut self, xbun: BundleRef, ybun: BundleRef) -> Ref {
+        let ms = self.exact_ms(xbun);
+        let zbun = self.sub(xbun, ybun);
+        self.sign(zbun, &ms)
+    }
+
+    pub fn max(&mut self, buns: &[BundleRef]) -> BundleRef {
+        debug_assert!(buns.len() > 1);
+
+        buns.iter().skip(1).fold(buns[0], |xbun, &ybun| {
+            let pos = self.exact_leq(xbun,ybun);
+            let neg = self.borrow_mut_builder().negate(pos);
+
+            let x_wires = self.wires(xbun);
+            let y_wires = self.wires(ybun);
+
+            let z_wires = x_wires.iter().zip(y_wires.iter()).map(|(&x,&y)| {
+                let xp = self.borrow_mut_builder().half_gate(x,neg);
+                let yp = self.borrow_mut_builder().half_gate(y,pos);
+                self.borrow_mut_builder().add(xp,yp)
+            }).collect();
+
+            let primes = self.primes(xbun);
+            self.add_bundle(z_wires, primes)
+        })
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use garble::garble;
-    use numbers::{self, inv, factor, modulus_with_width};
+    use numbers::{self, modulus_with_width};
     use rand::thread_rng;
     use util::RngExt;
 
@@ -749,22 +645,6 @@ mod tests {
         }
     }
     //}}}
-    #[test] // parity {{{
-    fn parity() {
-        let mut rng = thread_rng();
-        let q = numbers::modulus_with_width_skip2(32);
-        let mut b = CrtBundler::new();
-        let x = b.input(q);
-        let z = b.parity(x);
-        b.output_ref(z);
-
-        for _ in 0..NTESTS {
-            let pt = rng.gen_u128() % (q/2);
-            let should_be = (pt % 2) as u16;
-            test_garbling_high_to_low(&mut b, &[pt], &[should_be]);
-        }
-    }
-    //}}}
     #[test] // cdiv {{{
     fn cdiv() {
         let mut rng = thread_rng();
@@ -779,64 +659,6 @@ mod tests {
             pt += pt % 2;
             let should_be = pt / 2;
             test_garbling(&mut b, &[pt], &[should_be]);
-        }
-    }
-    //}}}
-    #[test] // bits {{{
-    fn bits() {
-        let mut rng = thread_rng();
-        let q = numbers::modulus_with_width_skip2(32);
-        let mut b = CrtBundler::new();
-        let x = b.input(q);
-        let zs = b.bits(x, 32);
-        b.output_refs(&zs);
-
-        for _ in 0..NTESTS {
-            let pt = rng.gen_u128() % (q/2);
-            let should_be = numbers::to_bits(pt, 32);
-            test_garbling_high_to_low(&mut b, &[pt], &should_be);
-        }
-    }
-    //}}}
-    #[test] // less_than_pmr {{{
-    fn less_than_pmr() {
-        let mut rng = thread_rng();
-        let q = modulus_with_width(32);
-        let ps = factor(q);
-        let n = ps.len();
-        let p = q / ps[n-1] as u128;
-
-        let mut b = CrtBundler::new();
-        let x = b.input(q);
-        let y = b.input(q);
-        let z = b.less_than_pmr(x,y);
-        b.output_ref(z);
-
-        for _ in 0..NTESTS {
-            let x = rng.gen_u128() % p;
-            let y = rng.gen_u128() % p;
-            let should_be = (x < y) as u16;
-            test_garbling_high_to_low(&mut b, &[x,y], &[should_be]);
-        }
-    }
-    //}}}
-    #[test] // less_than_bits {{{
-    fn less_than_bits() {
-        let mut rng = thread_rng();
-        let q = numbers::modulus_with_width_skip2(32);
-        let mut b = CrtBundler::new();
-        let x = b.input(q);
-        let y = b.input(q);
-        let z = b.less_than_bits(x, y, 32);
-        b.output_ref(z);
-
-        for _ in 0..NTESTS {
-            let pt_x = rng.gen_u32() as u128;
-            let pt_y = rng.gen_u32() as u128;
-            let should_be = (pt_x < pt_y) as u16;
-            println!("q={}", q);
-            println!("{} {}", pt_x, pt_y);
-            test_garbling_high_to_low(&mut b, &[pt_x, pt_y], &[should_be]);
         }
     }
     //}}}
@@ -878,119 +700,25 @@ mod tests {
         }
     }
     //}}}
-    #[test] // pmr {{{
-    fn pmr() {
+    #[test] // max {{{
+    fn test_max() {
         let mut rng = thread_rng();
-        for _ in 0..NTESTS {
-            let ps = rng.gen_usable_factors();
-            let q = ps.iter().fold(1, |acc, &x| x as u128 * acc);
+        let q = modulus_with_width(10);
+        let n = 10;
+        println!("n={} q={}", n, q);
 
-            let mut b = CrtBundler::new();
-            let x = b.input(q);
-            let z = b.crt_to_pmr(x);
-            b.output(z);
+        let mut b = CrtBundler::new();
+        let xs = b.inputs(q, n);
+        let z = b.max(&xs);
+        b.output(z);
 
-            let pt = rng.gen_u128() % q;
-
-            let should_be = to_pmr_pt(pt, &ps);
-
-            test_garbling_high_to_low(&mut b, &[pt], &should_be)
+        for _ in 0..16 {
+            let inps = (0..n).map(|_| rng.gen_u128() % (q/2)).collect_vec();
+            println!("{:?}", inps);
+            let should_be = *inps.iter().max().unwrap();
+            test_garbling(&mut b, &inps, &[should_be]);
         }
     }
-    fn to_pmr_pt(x: u128, ps: &[u16]) -> Vec<u16> {
-        let mut ds = vec![0;ps.len()];
-        let mut q = 1;
-        for i in 0..ps.len() {
-            let p = ps[i] as u128;
-            ds[i] = ((x / q) % p) as u16;
-            q *= p;
-        }
-        ds
-    }
-
-    fn from_pmr_pt(xs: &[u16], ps: &[u16]) -> u128 {
-        let mut x = 0;
-        let mut q = 1;
-        for (&d,&p) in xs.iter().zip(ps.iter()) {
-            x += d as u128 * q;
-            q *= p as u128;
-        }
-        x
-    }
-
-    fn gadget_projection_tt(p: u16, q: u16) -> Vec<u16> {
-        let pq = p as u32 + q as u32 - 1;
-        let mut tab = Vec::with_capacity(pq as usize);
-        for z in 0 .. pq {
-            let mut x = 0;
-            let mut y = 0;
-            'outer: for i in 0..p as u32 {
-                for j in 0..q as u32 {
-                    if (i + pq - j) % pq == z {
-                        x = i;
-                        y = j;
-                        break 'outer;
-                    }
-                }
-            }
-            assert_eq!((x + pq - y) % pq, z);
-            tab.push((((x * q as u32 * inv(q as i16, p as i16) as u32 +
-                        y * p as u32 * inv(p as i16, q as i16) as u32) / p as u32) % q as u32) as u16);
-        }
-        tab
-    }
-
-    pub fn to_pmr_alg(inp:u128, ps: &[u16]) -> (Vec<u16>, Vec<u16>) {
-        let gadget = |x: u16, p: u16, y: u16, q: u16| {
-            let pq = p as u16 + q as u16 - 1;
-            let x_ = x as u16 % pq;
-            let y_ = y as u16 % pq;
-            let z  = (x_ + pq - y_) % pq;
-            (gadget_projection_tt(p,q)[z as usize], q)
-                // ((z % q as u16) as u16, q)
-        };
-
-        let n = ps.len();
-        let mut x = vec![vec![None; n+1]; n+1];
-
-        let reduce = |x: u128, p: u16| { (x % p as u128) as u16 };
-
-        for j in 0..n {
-            x[0][j+1] = Some( (reduce(inp, ps[j]), ps[j]) );
-        }
-
-        for i in 1..n+1 {
-            for j in i+1..n+1 {
-                let (z,q) = gadget(x[i-1][i].unwrap().0, x[i-1][i].unwrap().1,
-                                   x[i-1][j].unwrap().0, x[i-1][j].unwrap().1);
-                x[i][j] = Some((z,q));
-            }
-        }
-
-        let mut zs = Vec::with_capacity(n);
-        let mut ps = Vec::with_capacity(n);
-        for i in 0..n {
-            zs.push(x[i][i+1].unwrap().0);
-            ps.push(x[i][i+1].unwrap().1);
-        }
-        (zs, ps)
-    }
-
-    #[test]
-    fn pmr_plaintext() {
-        let mut rng = thread_rng();
-        for _ in 0..NTESTS {
-            let ps = rng.gen_usable_factors();
-            let q = ps.iter().fold(1, |acc, &x| x as u128 * acc);
-            let x = rng.gen_u128() % q;
-            assert_eq!(x, from_pmr_pt(&to_pmr_pt(x, &ps), &ps));
-            let (pmr, ps_) = to_pmr_alg(x, &ps);
-
-            assert_eq!(ps, ps_);
-            assert_eq!(to_pmr_pt(x, &ps), pmr);
-        }
-    }
-
     //}}}
 
 }

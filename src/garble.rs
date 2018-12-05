@@ -709,7 +709,7 @@ mod tests {
         let Q: u128 = mods.iter().map(|&q| q as u128).product();
 
         // test random values
-        for _ in 0..64 {
+        for _ in 0..16 {
             let mut should_be = 0;
             let mut ds = Vec::new();
             for _ in 0..nargs {

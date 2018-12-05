@@ -8,8 +8,7 @@
     clippy::needless_range_loop
 )]
 
-#![feature(reverse_bits, try_from, no_panic_pow)]
-#![feature(async_await, await_macro, futures_api)]
+#![feature(try_from, no_panic_pow)]
 #![allow(non_snake_case)]
 
 extern crate libc;
