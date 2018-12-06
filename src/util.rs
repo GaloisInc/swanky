@@ -38,7 +38,7 @@ pub trait RngExt : Rng + Sized {
             }
         }
         let n = numbers::digits_per_u128(modulus);
-        let max = (modulus as u128).checked_pow(n as u32).expect("overflow in gen_usable_u128");
+        let max = (modulus as u128).pow(n as u32);
         self.gen_u128() % max
     }
 

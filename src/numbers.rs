@@ -102,24 +102,13 @@ pub fn from_mixed_radix(ds: &[u16], qs: &[u16]) -> u128 {
 // bits
 
 pub fn u128_to_bits(x: u128, n: usize) -> Vec<u16> {
-    to_bits(x,n)
-}
-
-pub fn to_bits<I,B>(x: I, n: usize) -> Vec<B>
-    where I: Clone + std::ops::Rem + std::ops::SubAssign + std::ops::DivAssign + One +
-             std::ops::BitAnd<Output=I> + std::convert::From<u16>,
-          B: std::convert::TryFrom<I>
-{
     let mut bits = Vec::with_capacity(n);
     let mut y = x;
     for _ in 0..n {
-        let b = y.clone() & I::one();
-        match B::try_from(b.clone()) {
-            Ok(b) => bits.push(b),
-            _ => panic!(),
-        }
+        let b = y & 1;
+        bits.push(b as u16);
         y -= b;
-        y /= I::from(2);
+        y /= 2;
     }
     bits
 }
@@ -318,7 +307,7 @@ mod tests {
         let mut rng = thread_rng();
         for _ in 0..128 {
             let x = rng.gen_u128();
-            assert_eq!(u128_from_bits(&to_bits(x, 128)), x);
+            assert_eq!(u128_from_bits(&u128_to_bits(x, 128)), x);
         }
     }
 

@@ -8,7 +8,6 @@
     clippy::needless_range_loop
 )]
 
-#![feature(try_from, no_panic_pow)]
 #![allow(non_snake_case)]
 
 pub mod circuit;

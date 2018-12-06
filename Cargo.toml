@@ -10,15 +10,15 @@ edition = "2018"
 doctest = false
 
 [build-dependencies]
-cc = "^1.0"
+cc = "1.0.25"
 
 [dependencies]
 base_conversion = { path = "base_conversion" }
-rand = "^0.3.14"
-libc = "^0.2.0"
-num = "^0.2"
-num-traits = "^0.2.6"
-itertools = "^0.7.8"
+rand = "0.6.1"
+libc = "0.2.44"
+num = "0.2.0"
+num-traits = "0.2.6"
+itertools = "0.7.11"
 
 [dev-dependencies]
 criterion = "0.2.5"

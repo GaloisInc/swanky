@@ -1,9 +1,3 @@
-#![feature(test)]
-
-extern crate fancy_garbling;
-extern crate test;
-extern crate rand;
-
 use fancy_garbling::circuit::crt::CrtBundler;
 use fancy_garbling::numbers;
 use fancy_garbling::garble::garble;
@@ -19,7 +13,6 @@ pub fn main() {
     let circ = b.finish();
 
     for _ in 0..16 {
-        let gb = garble(&circ, &mut rand::thread_rng());
-        test::black_box(gb);
+        let _gb = garble(&circ, &mut rand::thread_rng());
     }
 }
