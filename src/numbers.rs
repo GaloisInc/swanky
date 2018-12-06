@@ -1,7 +1,7 @@
-use num::integer::Integer;
-use num::bigint::BigInt;
-use num::{ToPrimitive, Zero, One, Signed};
 use itertools::Itertools;
+use num::bigint::BigInt;
+use num::integer::Integer;
+use num::{ToPrimitive, Zero, One, Signed};
 
 ////////////////////////////////////////////////////////////////////////////////
 // mixed radix stuff
@@ -279,8 +279,8 @@ pub fn is_power_of_2<I>(x: I) -> bool
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::util::RngExt;
     use rand::thread_rng;
-    use util::RngExt;
 
     #[test]
     fn crt_conversion() {
@@ -346,7 +346,7 @@ mod tests {
             let x = rng.gen_u128() % Q;
             let y = rng.gen_u128() % Q;
 
-            let mut xp = as_base_q(x,q,n);
+            let xp = as_base_q(x,q,n);
             let yp = as_base_q(y,q,n);
 
             let zp = base_q_add(&xp, &yp, q);

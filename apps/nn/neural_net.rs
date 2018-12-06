@@ -6,7 +6,7 @@ use fancy_garbling::circuit::crt::CrtBundler;
 use fancy_garbling::circuit::{Builder, Ref, Circuit};
 use fancy_garbling::numbers;
 
-use util;
+use crate::util;
 
 pub struct NeuralNet {
     weights: Vec<Vec<Vec<i64>>>,

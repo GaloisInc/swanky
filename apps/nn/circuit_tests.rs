@@ -1,7 +1,7 @@
 use itertools::Itertools;
 use fancy_garbling::numbers;
-use util;
-use neural_net::NeuralNet;
+use crate::neural_net::NeuralNet;
+use crate::util;
 
 pub fn test_arith_circuit(
     nn: &NeuralNet,

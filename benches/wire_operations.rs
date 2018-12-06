@@ -1,13 +1,7 @@
-#[macro_use]
-extern crate criterion;
-extern crate fancy_garbling;
-extern crate rand;
-
-use criterion::Criterion;
 use std::time::Duration;
-
-use fancy_garbling::wire::Wire;
+use criterion::{criterion_main, criterion_group, Criterion};
 use fancy_garbling::util::RngExt;
+use fancy_garbling::wire::Wire;
 
 fn bench_unpack(c: &mut Criterion, p: u16) {
     c.bench_function(&format!("wire::unpack{}", p), move |b| {

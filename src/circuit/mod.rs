@@ -1,7 +1,7 @@
 pub mod crt;
 
-use itertools::Itertools;
 use std::collections::HashMap;
+use itertools::Itertools;
 
 // the lowest-level circuit description in Fancy Garbling
 // consists of 6 gate types:
@@ -544,8 +544,8 @@ impl Builder {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use util::RngExt;
-    use numbers;
+    use crate::util::RngExt;
+    use crate::numbers;
     use rand;
     use itertools::Itertools;
 

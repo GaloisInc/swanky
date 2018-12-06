@@ -1,5 +1,5 @@
-use numbers;
 use rand::Rng;
+use crate::numbers;
 
 pub fn u128_to_bytes(x: u128) -> [u8;16] {
     unsafe {

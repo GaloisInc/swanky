@@ -1,10 +1,6 @@
 #![feature(test, duration_as_u128)]
-extern crate fancy_garbling;
-extern crate itertools;
-extern crate rand;
+
 extern crate test;
-extern crate serde;
-extern crate serde_json;
 
 pub mod neural_net;
 pub mod util;
@@ -12,8 +8,8 @@ pub mod circuit_tests;
 pub mod garbling_benches;
 
 use std::path::Path;
-use neural_net::NeuralNet;
 use itertools::Itertools;
+use crate::neural_net::NeuralNet;
 
 const BIT_WIDTH: usize = 15;
 const NTESTS: usize = 16; // number of iterations of bench

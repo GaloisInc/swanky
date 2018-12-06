@@ -1,16 +1,13 @@
 #![feature(test, duration_as_u128)]
-extern crate fancy_garbling;
-extern crate itertools;
-extern crate rand;
+
 extern crate test;
-extern crate serde_json;
 
 pub mod neural_net;
 pub mod util;
 pub mod circuit_tests;
 pub mod garbling_benches;
 
-use neural_net::NeuralNet;
+use crate::neural_net::NeuralNet;
 
 const WEIGHTS_FILE  : &str = "../dinn/weights-and-biases/txt_weights.txt";
 const BIASES_FILE   : &str = "../dinn/weights-and-biases/txt_biases.txt";

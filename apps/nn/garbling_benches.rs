@@ -1,10 +1,10 @@
 use std::time::{Duration, SystemTime};
-use test;
 use itertools::Itertools;
-use fancy_garbling::numbers;
+use test::black_box;
 use fancy_garbling::garble::garble;
-use util;
-use neural_net::NeuralNet;
+use fancy_garbling::numbers;
+use crate::neural_net::NeuralNet;
+use crate::util;
 
 pub fn bench_arith_garbling(
     nn: &NeuralNet,
@@ -25,7 +25,7 @@ pub fn bench_arith_garbling(
         let start = SystemTime::now();
         let circ = bun.borrow_circ();
         let gb = garble(circ, &mut rand::thread_rng());
-        test::black_box(gb);
+        black_box(gb);
         garble_time += SystemTime::now().duration_since(start).unwrap();
     }
     garble_time /= ntests as u32;
@@ -40,7 +40,7 @@ pub fn bench_arith_garbling(
     for _ in 0..ntests {
         let start = SystemTime::now();
         let res = ev.eval(&circ, &inp);
-        test::black_box(res);
+        black_box(res);
         eval_time += SystemTime::now().duration_since(start).unwrap();
     }
     eval_time /= ntests as u32;
@@ -66,7 +66,7 @@ pub fn bench_bool_garbling(
     for _ in 0..ntests {
         let start = SystemTime::now();
         let gb = garble(&circ, &mut rand::thread_rng());
-        test::black_box(gb);
+        black_box(gb);
         garble_time += SystemTime::now().duration_since(start).unwrap();
     }
     garble_time /= ntests as u32;
@@ -80,7 +80,7 @@ pub fn bench_bool_garbling(
     for _ in 0..ntests {
         let start = SystemTime::now();
         let res = ev.eval(&circ, &inp);
-        test::black_box(res);
+        black_box(res);
         eval_time += SystemTime::now().duration_since(start).unwrap();
     }
     eval_time /= ntests as u32;

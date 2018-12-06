@@ -11,13 +11,6 @@
 #![feature(try_from, no_panic_pow)]
 #![allow(non_snake_case)]
 
-extern crate libc;
-extern crate num;
-extern crate num_traits;
-extern crate rand;
-extern crate base_conversion; // local dependency
-extern crate itertools;
-
 pub mod circuit;
 pub mod garble;
 pub mod numbers;

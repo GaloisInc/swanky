@@ -1,9 +1,8 @@
-use circuit::{Circuit, Gate, Id};
-use wire::Wire;
-
+use std::collections::HashMap;
 use itertools::Itertools;
 use rand::Rng;
-use std::collections::HashMap;
+use crate::circuit::{Circuit, Gate, Id};
+use crate::wire::Wire;
 
 type GarbledGate = Vec<u128>;
 
@@ -456,11 +455,11 @@ fn output_tweak(i: usize, k: u16) -> u128 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use circuit::{Circuit, Builder};
+    use crate::circuit::{Circuit, Builder};
+    use crate::numbers;
+    use crate::util::RngExt;
     use rand::thread_rng;
     use itertools::Itertools;
-    use numbers;
-    use util::RngExt;
 
     // helper {{{
     fn garble_test_helper<F>(f: F)

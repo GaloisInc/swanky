@@ -1,12 +1,5 @@
-#[macro_use]
-extern crate criterion;
-extern crate itertools;
-extern crate fancy_garbling;
-extern crate rand;
-
-use criterion::Criterion;
 use std::time::Duration;
-
+use criterion::{criterion_main, criterion_group, Criterion};
 use fancy_garbling::util::RngExt;
 use fancy_garbling::garble::garble;
 use fancy_garbling::circuit::{Builder, Circuit};

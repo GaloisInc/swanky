@@ -1,8 +1,8 @@
-use rand::Rng;
-use aes::AES;
 use base_conversion;
-use numbers;
-use util::{self, RngExt};
+use rand::Rng;
+use crate::aes::AES;
+use crate::numbers;
+use crate::util::{self, RngExt};
 
 #[derive(Debug, PartialEq, PartialOrd, Clone)]
 pub enum Wire {
@@ -251,8 +251,8 @@ impl Wire {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::util::RngExt;
     use rand::thread_rng;
-    use util::RngExt;
 
     #[test]
     fn packing() {

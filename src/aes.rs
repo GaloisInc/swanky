@@ -1,4 +1,4 @@
-use util;
+use crate::util;
 
 pub struct Aes {
     round_keys: [u8; 176],
@@ -90,7 +90,7 @@ fn poly_double(x: u128) -> u128 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use util;
+    use crate::util;
 
     #[test]
     fn aes_zero_correct() {

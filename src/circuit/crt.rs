@@ -1,7 +1,7 @@
-use circuit::{Builder, Circuit, Ref};
-use numbers::{self, crt, inv, crt_inv, factor, product};
 use std::rc::Rc;
 use itertools::Itertools;
+use crate::circuit::{Builder, Circuit, Ref};
+use crate::numbers::{self, crt, inv, crt_inv, factor, product};
 
 #[derive(Clone, Copy)]
 pub struct BundleRef(usize);
@@ -411,10 +411,10 @@ impl CrtBundler {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use garble::garble;
-    use numbers::{self, modulus_with_width};
+    use crate::garble::garble;
+    use crate::numbers::{self, modulus_with_width};
+    use crate::util::RngExt;
     use rand::thread_rng;
-    use util::RngExt;
 
     const NTESTS: usize = 1;
 
