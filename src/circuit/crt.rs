@@ -4,7 +4,7 @@ use crate::circuit::{Builder, Circuit, Ref};
 use crate::numbers::{self, crt, inv, crt_inv, factor, product};
 
 #[derive(Clone, Copy)]
-pub struct BundleRef(usize);
+pub struct BundleRef(pub usize);
 
 pub struct WireBundle {
     wires: Vec<Ref>,
