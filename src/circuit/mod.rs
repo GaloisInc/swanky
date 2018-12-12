@@ -3,7 +3,6 @@ pub mod crt;
 use itertools::Itertools;
 use serde_derive::{Serialize, Deserialize};
 use std::collections::HashMap;
-use std::error::Error;
 
 // the lowest-level circuit description in Fancy Garbling
 // consists of 6 gate types:
@@ -128,22 +127,19 @@ impl Circuit {
         println!("");
     }
 
-    pub  fn to_file(&self, filename: &str) {
-        let f = match std::fs::File::create(filename) {
-            Err(why) => panic!("couldn't create {}: {}", filename, why.description()),
-            Ok(file) => file,
-        };
-        serde_json::to_writer(f, self).expect("couldn't serialize circuit");
+    pub  fn to_file(&self, filename: &str) -> Result<(), failure::Error> {
+        let f = std::fs::File::create(filename)?;
+        match serde_json::to_writer(f, self) {
+            Err(_) => Err(failure::err_msg("error writing json into file")),
+            Ok(()) => Ok(()),
+        }
     }
 
-    pub fn from_file(filename: &str) -> Circuit {
-        let f = match std::fs::File::open(filename) {
-            Err(why) => panic!("couldn't open {}: {}", filename, why.description()),
-            Ok(file) => file,
-        };
+    pub fn from_file(filename: &str) -> Result<Circuit, failure::Error> {
+        let f = std::fs::File::open(filename)?;
         match serde_json::from_reader(f) {
-            Err(why) => panic!("failed to parse json: line {} column {}", why.line(), why.column()),
-            Ok(circ) => circ,
+            Err(why) => Err(failure::format_err!("failed to parse json: line {} column {}", why.line(), why.column())),
+            Ok(circ) => Ok(circ),
         }
     }
 
@@ -151,10 +147,10 @@ impl Circuit {
         serde_json::to_string(self).expect("couldn't serialize circuit")
     }
 
-    pub fn from_str(s: &str) -> Circuit {
+    pub fn from_str(s: &str) -> Result<Circuit, failure::Error> {
         match serde_json::from_str(s) {
-            Err(why) => panic!("failed to parse json: line {} column {}", why.line(), why.column()),
-            Ok(circ) => circ,
+            Err(why) => Err(failure::format_err!("failed to parse json: line {} column {}", why.line(), why.column())),
+            Ok(circ) => Ok(circ),
         }
     }
 }
@@ -867,7 +863,7 @@ mod tests {
 
         println!("{}", circ.to_string());
 
-        assert_eq!(circ, Circuit::from_str(&circ.to_string()));
+        assert_eq!(circ, Circuit::from_str(&circ.to_string()).unwrap());
     }
 //}}}
 
