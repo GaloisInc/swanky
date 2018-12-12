@@ -18,7 +18,7 @@ pub struct Decoder {
     outputs : Vec<Vec<u128>>
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, PartialEq, Debug)]
 pub struct Evaluator {
     gates  : Vec<GarbledGate>,
     consts : Vec<Wire>,
@@ -442,11 +442,8 @@ impl Evaluator {
         }).collect()
     }
 
-    pub fn to_bytes(&self) -> Result<Vec<u8>, failure::Error> {
-        match bincode::serialize(self) {
-            Err(_) => Err(failure::err_msg("error encoding Evaluator as bytes")),
-            Ok(v) => Ok(v)
-        }
+    pub fn to_bytes(&self) -> Vec<u8> {
+        bincode::serialize(self).unwrap()
     }
 
     pub fn from_bytes(bs: &[u8]) -> Result<Evaluator, failure::Error> {
@@ -766,6 +763,28 @@ mod tests {
             let Y = ev.eval(&circ, &X);
             assert_eq!(de.decode(&Y)[0], (x+c)%q, "garbled");
         }
+    }
+//}}}
+    #[test] // serialize_evaluator {{{
+    fn serialize_evaluator() {
+        let mut rng = thread_rng();
+
+        let nargs = 2 + rng.gen_usize() % 100;
+        let mods = (0..7).map(|_| rng.gen_modulus()).collect_vec();
+        // let nargs = 97;
+        // let mods = [37,10,10,54,100,51,17];
+
+        let mut b = Builder::new();
+        let xs = (0..nargs).map(|_| {
+            mods.iter().map(|&q| b.input(q)).collect_vec()
+        }).collect_vec();
+        let zs = b.fancy_addition(&xs);
+        b.outputs(&zs);
+        let circ = b.finish();
+
+        let (_, _, ev) = garble(&circ, &mut rng);
+
+        assert_eq!(ev, Evaluator::from_bytes(&ev.to_bytes()).unwrap());
     }
 //}}}
 }
