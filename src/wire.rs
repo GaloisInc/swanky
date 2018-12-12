@@ -1,10 +1,10 @@
-use base_conversion;
-use rand::Rng;
 use crate::aes::AES;
 use crate::numbers;
 use crate::util::{self, RngExt};
+use rand::Rng;
+use serde_derive::{Serialize, Deserialize};
 
-#[derive(Debug, PartialEq, PartialOrd, Clone)]
+#[derive(Debug, PartialEq, PartialOrd, Clone, Serialize, Deserialize)]
 pub enum Wire {
     Mod2 { val: u128 },
     ModN { q: u16, ds: Vec<u16> },

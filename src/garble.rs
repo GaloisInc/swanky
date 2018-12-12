@@ -1,20 +1,24 @@
-use std::collections::HashMap;
-use itertools::Itertools;
-use rand::Rng;
 use crate::circuit::{Circuit, Gate, Id};
 use crate::wire::Wire;
+use itertools::Itertools;
+use rand::Rng;
+use serde_derive::{Serialize, Deserialize};
+use std::collections::HashMap;
 
 type GarbledGate = Vec<u128>;
 
+#[derive(Serialize, Deserialize)]
 pub struct Encoder {
     inputs : Vec<Wire>,
     deltas : HashMap<u16,Wire>,
 }
 
+#[derive(Serialize, Deserialize)]
 pub struct Decoder {
     outputs : Vec<Vec<u128>>
 }
 
+#[derive(Serialize, Deserialize)]
 pub struct Evaluator {
     gates  : Vec<GarbledGate>,
     consts : Vec<Wire>,
@@ -436,6 +440,20 @@ impl Evaluator {
         c.output_refs.iter().map(|&r| {
             wires[r].clone()
         }).collect()
+    }
+
+    pub fn to_bytes(&self) -> Result<Vec<u8>, failure::Error> {
+        match bincode::serialize(self) {
+            Err(_) => Err(failure::err_msg("error encoding Evaluator as bytes")),
+            Ok(v) => Ok(v)
+        }
+    }
+
+    pub fn from_bytes(bs: &[u8]) -> Result<Evaluator, failure::Error> {
+        match bincode::deserialize(bs) {
+            Err(_) => Err(failure::err_msg("error decoding Evaluator from bytes")),
+            Ok(ev) => Ok(ev)
+        }
     }
 }
 
