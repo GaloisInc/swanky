@@ -133,7 +133,7 @@ impl Circuit {
             Err(why) => panic!("couldn't create {}: {}", filename, why.description()),
             Ok(file) => file,
         };
-        serde_json::to_writer_pretty(f, self).expect("couldn't serialize circuit");
+        serde_json::to_writer(f, self).expect("couldn't serialize circuit");
     }
 
     pub fn from_file(filename: &str) -> Circuit {
@@ -148,7 +148,7 @@ impl Circuit {
     }
 
     pub fn to_string(&self) -> String {
-        serde_json::to_string_pretty(self).expect("couldn't serialize circuit")
+        serde_json::to_string(self).expect("couldn't serialize circuit")
     }
 
     pub fn from_str(s: &str) -> Circuit {
@@ -864,6 +864,8 @@ mod tests {
         let zs = b.fancy_addition(&xs);
         b.outputs(&zs);
         let circ = b.finish();
+
+        println!("{}", circ.to_string());
 
         assert_eq!(circ, Circuit::from_str(&circ.to_string()));
     }
