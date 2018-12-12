@@ -1,7 +1,9 @@
 pub mod crt;
 
-use std::collections::HashMap;
 use itertools::Itertools;
+use serde_derive::{Serialize, Deserialize};
+use std::collections::HashMap;
+use std::error::Error;
 
 // the lowest-level circuit description in Fancy Garbling
 // consists of 6 gate types:
@@ -15,7 +17,7 @@ use itertools::Itertools;
 pub type Ref = usize;
 pub type Id = usize;
 
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize, PartialEq)]
 pub struct Circuit {
     pub gates: Vec<Gate>,
     pub gate_moduli: Vec<u16>,
@@ -25,7 +27,7 @@ pub struct Circuit {
     pub num_nonfree_gates: usize,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize, PartialEq)]
 pub enum Gate {
     Input { id: Id },                                           // id is the input id
     Const { id: Id },                                           // id is the const id
@@ -124,6 +126,36 @@ impl Circuit {
         println!("");
         println!("  total non-free gates: {}", self.num_nonfree_gates);
         println!("");
+    }
+
+    pub  fn to_file(&self, filename: &str) {
+        let f = match std::fs::File::create(filename) {
+            Err(why) => panic!("couldn't create {}: {}", filename, why.description()),
+            Ok(file) => file,
+        };
+        serde_json::to_writer_pretty(f, self).expect("couldn't serialize circuit");
+    }
+
+    pub fn from_file(filename: &str) -> Circuit {
+        let f = match std::fs::File::open(filename) {
+            Err(why) => panic!("couldn't open {}: {}", filename, why.description()),
+            Ok(file) => file,
+        };
+        match serde_json::from_reader(f) {
+            Err(why) => panic!("failed to parse json: line {} column {}", why.line(), why.column()),
+            Ok(circ) => circ,
+        }
+    }
+
+    pub fn to_string(&self) -> String {
+        serde_json::to_string_pretty(self).expect("couldn't serialize circuit")
+    }
+
+    pub fn from_str(s: &str) -> Circuit {
+        match serde_json::from_str(s) {
+            Err(why) => panic!("failed to parse json: line {} column {}", why.line(), why.column()),
+            Ok(circ) => circ,
+        }
     }
 }
 
@@ -816,6 +848,24 @@ mod tests {
             let z = circ.eval(&[x]);
             assert_eq!(z[0], (x+c)%q);
         }
+    }
+//}}}
+    #[test] // serialization {{{
+    fn serialization() {
+        let mut rng = rand::thread_rng();
+
+        let nargs = 2 + rng.gen_usize() % 100;
+        let mods = (0..7).map(|_| rng.gen_modulus()).collect_vec();
+
+        let mut b = Builder::new();
+        let xs = (0..nargs).map(|_| {
+            mods.iter().map(|&q| b.input(q)).collect_vec()
+        }).collect_vec();
+        let zs = b.fancy_addition(&xs);
+        b.outputs(&zs);
+        let circ = b.finish();
+
+        assert_eq!(circ, Circuit::from_str(&circ.to_string()));
     }
 //}}}
 
