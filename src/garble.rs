@@ -443,14 +443,12 @@ impl Evaluator {
     }
 
     pub fn to_bytes(&self) -> Vec<u8> {
-        bincode::serialize(self).unwrap()
+        bincode::serialize(self).expect("couldn't serialize Evaluator")
     }
 
     pub fn from_bytes(bs: &[u8]) -> Result<Evaluator, failure::Error> {
-        match bincode::deserialize(bs) {
-            Err(_) => Err(failure::err_msg("error decoding Evaluator from bytes")),
-            Ok(ev) => Ok(ev)
-        }
+        bincode::deserialize(bs)
+            .map_err(|_| failure::err_msg("error decoding Evaluator from bytes"))
     }
 }
 

@@ -129,18 +129,15 @@ impl Circuit {
 
     pub  fn to_file(&self, filename: &str) -> Result<(), failure::Error> {
         let f = std::fs::File::create(filename)?;
-        match serde_json::to_writer(f, self) {
-            Err(_) => Err(failure::err_msg("error writing json into file")),
-            Ok(()) => Ok(()),
-        }
+        serde_json::to_writer(f, self)
+            .map_err(|_| failure::err_msg("error writing json into file"))
     }
 
     pub fn from_file(filename: &str) -> Result<Circuit, failure::Error> {
         let f = std::fs::File::open(filename)?;
-        match serde_json::from_reader(f) {
-            Err(why) => Err(failure::format_err!("failed to parse json: line {} column {}", why.line(), why.column())),
-            Ok(circ) => Ok(circ),
-        }
+        serde_json::from_reader(f).map_err(|why| {
+            failure::format_err!("failed to parse json: line {} column {}", why.line(), why.column())
+        })
     }
 
     pub fn to_string(&self) -> String {
@@ -148,10 +145,9 @@ impl Circuit {
     }
 
     pub fn from_str(s: &str) -> Result<Circuit, failure::Error> {
-        match serde_json::from_str(s) {
-            Err(why) => Err(failure::format_err!("failed to parse json: line {} column {}", why.line(), why.column())),
-            Ok(circ) => Ok(circ),
-        }
+        serde_json::from_str(s).map_err(|why| {
+            failure::format_err!("failed to parse json: line {} column {}", why.line(), why.column())
+        })
     }
 }
 
