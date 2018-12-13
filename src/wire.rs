@@ -248,6 +248,21 @@ impl Wire {
     }
 }
 
+////////////////////////////////////////////////////////////////////////////////
+// serialization
+
+pub fn wires_to_bytes(ws: &[Wire]) -> Vec<u8> {
+    bincode::serialize(ws).expect("couldn't serialize slice of wires")
+}
+
+pub fn wires_from_bytes(bs: &[u8]) -> Result<Vec<Wire>, failure::Error> {
+    bincode::deserialize(bs)
+        .map_err(|_| failure::err_msg("error decoding wires from bytes"))
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// tests
+
 #[cfg(test)]
 mod tests {
     use super::*;
