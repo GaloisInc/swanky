@@ -7,13 +7,13 @@ use std::collections::HashMap;
 
 type GarbledGate = Vec<u128>;
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, PartialEq, Debug)]
 pub struct Encoder {
     inputs : Vec<Wire>,
     deltas : HashMap<u16,Wire>,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, PartialEq, Debug)]
 pub struct Decoder {
     outputs : Vec<Vec<u128>>
 }
@@ -811,6 +811,50 @@ mod tests {
         let (_, _, ev) = garble(&circ, &mut rng);
 
         assert_eq!(ev, Evaluator::from_bytes(&ev.to_bytes()).unwrap());
+    }
+//}}}
+    #[test] // serialize_encoder {{{
+    fn serialize_encoder() {
+        let mut rng = thread_rng();
+
+        let nargs = 2 + rng.gen_usize() % 100;
+        let mods = (0..7).map(|_| rng.gen_modulus()).collect_vec();
+        // let nargs = 97;
+        // let mods = [37,10,10,54,100,51,17];
+
+        let mut b = Builder::new();
+        let xs = (0..nargs).map(|_| {
+            mods.iter().map(|&q| b.input(q)).collect_vec()
+        }).collect_vec();
+        let zs = b.fancy_addition(&xs);
+        b.outputs(&zs);
+        let circ = b.finish();
+
+        let (en, _, _) = garble(&circ, &mut rng);
+
+        assert_eq!(en, Encoder::from_bytes(&en.to_bytes()).unwrap());
+    }
+//}}}
+    #[test] // serialize_decoder {{{
+    fn serialize_decoder() {
+        let mut rng = thread_rng();
+
+        let nargs = 2 + rng.gen_usize() % 100;
+        let mods = (0..7).map(|_| rng.gen_modulus()).collect_vec();
+        // let nargs = 97;
+        // let mods = [37,10,10,54,100,51,17];
+
+        let mut b = Builder::new();
+        let xs = (0..nargs).map(|_| {
+            mods.iter().map(|&q| b.input(q)).collect_vec()
+        }).collect_vec();
+        let zs = b.fancy_addition(&xs);
+        b.outputs(&zs);
+        let circ = b.finish();
+
+        let (_, de, _) = garble(&circ, &mut rng);
+
+        assert_eq!(de, Decoder::from_bytes(&de.to_bytes()).unwrap());
     }
 //}}}
 }
