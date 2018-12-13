@@ -441,16 +441,8 @@ impl Evaluator {
             wires[r].clone()
         }).collect()
     }
-
-    pub fn to_bytes(&self) -> Vec<u8> {
-        bincode::serialize(self).expect("couldn't serialize Evaluator")
-    }
-
-    pub fn from_bytes(bs: &[u8]) -> Result<Evaluator, failure::Error> {
-        bincode::deserialize(bs)
-            .map_err(|_| failure::err_msg("error decoding Evaluator from bytes"))
-    }
 }
+
 
 fn tweak(i: usize) -> u128 {
     i as u128
@@ -464,6 +456,42 @@ fn output_tweak(i: usize, k: u16) -> u128 {
     left + k as u128
 }
 
+////////////////////////////////////////////////////////////////////////////////
+// serialization
+
+impl Encoder {
+    pub fn to_bytes(&self) -> Vec<u8> {
+        bincode::serialize(self).expect("couldn't serialize Encoder")
+    }
+    pub fn from_bytes(bs: &[u8]) -> Result<Self, failure::Error> {
+        bincode::deserialize(bs)
+            .map_err(|_| failure::err_msg("error decoding Encoder from bytes"))
+    }
+}
+
+impl Decoder {
+    pub fn to_bytes(&self) -> Vec<u8> {
+        bincode::serialize(self).expect("couldn't serialize Decoder")
+    }
+    pub fn from_bytes(bs: &[u8]) -> Result<Self, failure::Error> {
+        bincode::deserialize(bs)
+            .map_err(|_| failure::err_msg("error decoding Decoder from bytes"))
+    }
+}
+
+impl Evaluator {
+    pub fn to_bytes(&self) -> Vec<u8> {
+        bincode::serialize(self).expect("couldn't serialize Evaluator")
+    }
+    pub fn from_bytes(bs: &[u8]) -> Result<Self, failure::Error> {
+        bincode::deserialize(bs)
+            .map_err(|_| failure::err_msg("error decoding Evaluator from bytes"))
+    }
+}
+
+
+////////////////////////////////////////////////////////////////////////////////
+// tests
 
 #[cfg(test)]
 mod tests {
