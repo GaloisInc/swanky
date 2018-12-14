@@ -316,6 +316,10 @@ impl Encoder {
         Encoder { inputs, deltas }
     }
 
+    pub fn ninputs(&self) -> usize {
+        self.inputs.len()
+    }
+
     pub fn encode_input(&self, x: u16, id: Id) -> Wire {
         let X = &self.inputs[id];
         let q = X.modulus();
