@@ -8,3 +8,4 @@ Requires at least `rustc 1.31.0`
 
 * `cargo test` run the tests
 * `cargo bench` run the benchmarks
+* `cargo doc --open` view the documentation (such as it is)
