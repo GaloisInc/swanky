@@ -16,17 +16,18 @@ use std::collections::HashMap;
 pub type Ref = usize;
 pub type Id = usize;
 
-#[derive(Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct Circuit {
     pub gates: Vec<Gate>,
     pub gate_moduli: Vec<u16>,
     pub input_refs: Vec<Ref>,
+    pub const_refs: Vec<Ref>,
     pub output_refs: Vec<Ref>,
     pub const_vals: Option<Vec<u16>>,
     pub num_nonfree_gates: usize,
 }
 
-#[derive(Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub enum Gate {
     Input { id: Id },                                           // id is the input id
     Const { id: Id },                                           // id is the const id
@@ -164,6 +165,7 @@ impl Builder {
         let c = Circuit {
             gates: Vec::new(),
             input_refs: Vec::new(),
+            const_refs: Vec::new(),
             output_refs: Vec::new(),
             gate_moduli: Vec::new(),
             const_vals: Some(Vec::new()),
@@ -224,13 +226,17 @@ impl Builder {
         (0..n).map(|_| self.input(modulus)).collect()
     }
 
+    /// creates a new, secret, constant for each call
     pub fn secret_constant(&mut self, val: u16, modulus: u16) -> Ref {
         let id = self.circ.const_vals.as_ref().map_or(0, |cs| cs.len());
         if let Some(cs) = self.circ.const_vals.as_mut() { cs.push(val) }
         let gate = Gate::Const { id };
-        self.gate(gate, modulus)
+        let r = self.gate(gate, modulus);
+        self.circ.const_refs.push(r);
+        r
     }
 
+    /// reuses constants if they already exist in the circuit
     pub fn constant(&mut self, val: u16, modulus: u16) -> Ref {
         match self.const_map.get(&(val, modulus)) {
             Some(&r) => r,
@@ -240,6 +246,7 @@ impl Builder {
                 let gate = Gate::Const { id };
                 let r = self.gate(gate, modulus);
                 self.const_map.insert((val,modulus), r);
+                self.circ.const_refs.push(r);
                 r
             }
         }
