@@ -1,12 +1,16 @@
+//! Structs and functions for creating, and evaluating garbled circuits.
+
 use crate::circuit::{Circuit, Ref, Gate, Id};
 use crate::wire::Wire;
 use itertools::Itertools;
-use rand::Rng;
 use rand::rngs::ThreadRng;
 use serde_derive::{Serialize, Deserialize};
 use std::collections::HashMap;
 
-type GarbledGate = Vec<u128>;
+pub mod operations;
+
+/// The ciphertext created by a garbled gate.
+pub type GarbledGate = Vec<u128>;
 
 #[derive(Serialize, Deserialize, PartialEq, Debug)]
 pub struct Encoder {
@@ -25,8 +29,12 @@ pub struct Evaluator {
     consts : Vec<Wire>,
 }
 
-pub struct Garbler {
-    circuit: Circuit,
+/// Garbler is an iterator for streaming `GarbledGate`s, and producing constant wires,
+/// `Encoder` and `Decoder`. It is intended to be used via its `Iterator` instance, during
+/// which it produces wirelabels for all internal wires while creating `GarbledGate` for
+/// each gate which requires ciphertexts.
+pub struct Garbler<'a> {
+    circuit: &'a Circuit,
     wires: Vec<Wire>,
     inputs: Vec<Wire>,
     consts: Vec<Wire>,
@@ -35,8 +43,18 @@ pub struct Garbler {
     rng: ThreadRng,
 }
 
-impl Garbler {
-    pub fn new(circuit: Circuit) -> Garbler {
+/// Convenience function to garble directly with no streaming.
+pub fn garble(c: &Circuit) -> (Encoder, Decoder, Evaluator) {
+    let mut garbler = Garbler::new(c);
+    let en     = garbler.encoder();
+    let gates  = garbler.by_ref().collect();
+    let ev     = Evaluator::new(gates, garbler.consts());
+    let de     = garbler.decoder().unwrap();
+    (en, de, ev)
+}
+
+impl <'a> Garbler<'a> {
+    pub fn new(circuit: &'a Circuit) -> Garbler {
         let mut rng = rand::thread_rng();
 
         let mut deltas  = HashMap::new();
@@ -53,14 +71,14 @@ impl Garbler {
         for &i in circuit.input_refs.iter() {
             let q = circuit.modulus(i);
             let w = Wire::rand(&mut rng, q);
-            inputs.push(w.clone());
+            inputs.push(w);
         }
 
         // initialize consts
         for &i in circuit.const_refs.iter() {
             let q = circuit.modulus(i);
             let w = Wire::rand(&mut rng, q);
-            consts.push(w.clone());
+            consts.push(w);
         }
 
         let wires = Vec::with_capacity(circuit.gates.len());
@@ -68,28 +86,33 @@ impl Garbler {
         Garbler { circuit, wires, inputs, consts, deltas, current_wire: 0, rng }
     }
 
+    /// Extract the const wires from the `Garbler`.
     pub fn consts(&self) -> Vec<Wire> {
         let cs = self.circuit.const_vals.as_ref().expect("constants needed!");
-        encode_consts(cs, &self.consts, &self.deltas)
+        operations::encode_consts(cs, &self.consts, &self.deltas)
     }
 
+    /// Extract an `Encoder` from the `Garbler`.
     pub fn encoder(&self) -> Encoder {
         Encoder::new(self.inputs.clone(), self.deltas.clone())
     }
 
+    /// Extract a `Decoder` from the `Garbler`. Fails if called before all wires have been
+    /// generated using the iterator interface.
     pub fn decoder(&self) -> Result<Decoder, failure::Error> {
         if self.current_wire < self.circuit.gates.len() {
             return Err(failure::err_msg("Garbler::decoder called before all wires were generated"));
         }
         let outs = self.circuit.output_refs.iter().enumerate().map(|(i, &r)| {
-            garble_output(&self.wires[r], i, &self.deltas)
+            operations::garble_output(&self.wires[r], i, &self.deltas)
         }).collect();
         Ok(Decoder::new(outs))
     }
 }
 
-impl Iterator for Garbler {
+impl <'a> Iterator for Garbler<'a> {
     type Item = GarbledGate;
+
     fn next(&mut self) -> Option<GarbledGate> {
         if self.current_wire >= self.circuit.gates.len() {
             return None;
@@ -104,300 +127,31 @@ impl Iterator for Garbler {
 
             let q = self.circuit.modulus(self.current_wire);
 
-            let w = match self.circuit.gates[self.current_wire] {
-                Gate::Input { id } => self.inputs[id].clone(),
-                Gate::Const { id } => self.consts[id].clone(),
+            let (w,g) = match self.circuit.gates[self.current_wire] {
+                Gate::Input { id } => (self.inputs[id].clone(), None),
+                Gate::Const { id } => (self.consts[id].clone(), None),
 
-                Gate::Add { xref, yref } => {
-                    println!("{} {}", xref, yref);
-                    self.wires[xref].plus(&self.wires[yref])
-                },
-                Gate::Sub { xref, yref } => self.wires[xref].minus(&self.wires[yref]),
-                Gate::Cmul { xref, c }   => self.wires[xref].cmul(c),
+                Gate::Add { xref, yref } => (self.wires[xref].plus(&self.wires[yref]),  None),
+                Gate::Sub { xref, yref } => (self.wires[xref].minus(&self.wires[yref]), None),
+                Gate::Cmul { xref, c }   => (self.wires[xref].cmul(c),                  None),
 
-                Gate::Proj { xref, ref tt, .. } => {
-                    let (w,g) = garble_projection(
-                        &self.wires[xref],
-                        q,
-                        tt,
-                        self.current_wire,
-                        &self.deltas
-                    );
-                    gate = g;
-                    w
-                }
+                Gate::Proj { xref, ref tt, .. } =>
+                    operations::garble_projection(&self.wires[xref], q, tt, self.current_wire, &self.deltas),
 
-                Gate::Yao { xref, yref, ref tt, .. } => {
-                    let (w,g) = garble_yao(
-                        &self.wires[xref],
-                        &self.wires[yref],
-                        q,
-                        tt,
-                        self.current_wire,
-                        &self.deltas
-                    );
-                    gate = g;
-                    w
-                }
+                Gate::Yao { xref, yref, ref tt, .. } =>
+                    operations::garble_yao(&self.wires[xref], &self.wires[yref], q, tt, self.current_wire, &self.deltas),
 
-                Gate::HalfGate { xref, yref, .. } => {
-                    let (w,g) = garble_half_gate(
-                        &self.wires[xref],
-                        &self.wires[yref],
-                        self.current_wire,
-                        &self.deltas,
-                        &mut self.rng
-                    );
-                    gate = g;
-                    w
-                }
+                Gate::HalfGate { xref, yref, .. } =>
+                    operations::garble_half_gate(&self.wires[xref], &self.wires[yref], self.current_wire, &self.deltas, &mut self.rng),
             };
 
             self.wires.push(w);
+            gate = g;
             self.current_wire += 1;
         }
 
         gate
     }
-}
-
-pub fn garble<R:Rng>(c: &Circuit, _rng: &mut R) -> (Encoder, Decoder, Evaluator) {
-    let mut garbler = Garbler::new(c.clone());
-    let consts = garbler.consts();
-    let en     = garbler.encoder();
-    let gates  = garbler.by_ref().collect();
-    let de     = garbler.decoder().unwrap();
-    let ev     = Evaluator::new(gates, consts);
-    (en, de, ev)
-}
-
-fn garble_output(X: &Wire, output_num: usize, deltas: &HashMap<u16,Wire>)
-    -> Vec<u128>
-{
-    let mut cts = Vec::new();
-    let q = X.modulus();
-    let D = &deltas[&q];
-    for k in 0..q {
-        let t = output_tweak(output_num, k);
-        cts.push(X.plus(&D.cmul(k)).hash(t));
-    }
-    cts
-}
-
-fn garble_projection(A: &Wire, q_out: u16, tt: &[u16], gate_num: usize, deltas: &HashMap<u16,Wire>)
-    -> (Wire, Option<GarbledGate>)
-{
-    let q_in = A.modulus();
-    // we have to fill in the vector in an unkonwn order because of the
-    // color bits. Since some of the values in gate will be void
-    // temporarily, we use Vec<Option<..>>
-    let mut gate = vec![None; q_in as usize - 1];
-
-    let tao = A.color();        // input zero-wire
-    let g = tweak(gate_num);    // gate tweak
-
-    let Din  = &deltas[&q_in];
-    let Dout = &deltas[&q_out];
-
-    // output zero-wire
-    // W_g^0 <- -H(g, W_{a_1}^0 - \tao\Delta_m) - \phi(-\tao)\Delta_n
-    // let C = A.minus(&Din.cmul(tao))
-    //             .hashback(g, q_out)
-    //             .minus(&Dout.cmul(tt[((q_in - tao) % q_in) as usize]));
-    let mut C = A.clone();
-    C.plus_eq(&Din.cmul((q_in-tao) % q_in));
-    C = C.hashback(g, q_out);
-    C.plus_eq(&Dout.cmul((q_out - tt[((q_in - tao) % q_in) as usize]) % q_out));
-
-    // precompute `let C_ = C.plus(&Dout.cmul(tt[x as usize]))`
-    let C_precomputed = {
-        let mut C_ = C.clone();
-        (0..q_out).map(|x| {
-            if x > 0 {
-                C_.plus_eq(&Dout);
-            }
-            C_.as_u128()
-        }).collect_vec()
-    };
-
-    let mut A_ = A.clone();
-    for x in 0..q_in {
-        if x > 0 {
-            A_.plus_eq(&Din); // avoiding expensive cmul for `A_ = A.plus(&Din.cmul(x))`
-        }
-
-        let ix = (tao as usize + x as usize) % q_in as usize;
-        if ix == 0 { continue }
-
-        let ct = A_.hash(g) ^ C_precomputed[tt[x as usize] as usize];
-        gate[ix - 1] = Some(ct);
-    }
-
-    // unwrap the Option elems inside the Vec
-    let gate = gate.into_iter().map(Option::unwrap).collect();
-    (C, Some(gate))
-}
-
-fn garble_yao(A: &Wire, B: &Wire, q: u16, tt: &[Vec<u16>], gate_num: usize, deltas: &HashMap<u16,Wire>)
-    -> (Wire, Option<GarbledGate>)
-{
-    let xmod = A.modulus() as usize;
-    let ymod = B.modulus() as usize;
-    let mut gate = vec![None; xmod * ymod - 1];
-
-    // gate tweak
-    let g = tweak(gate_num);
-
-    // sigma is the output truth value of the 0,0-colored wirelabels
-    let sigma = tt[((xmod - A.color() as usize) % xmod) as usize]
-                  [((ymod - B.color() as usize) % ymod) as usize];
-
-    // we use the row reduction trick here
-    let B_delta = &deltas[&(ymod as u16)];
-    let C = A.minus(&deltas[&(xmod as u16)].cmul(A.color()))
-                .hashback2(&B.minus(&B_delta.cmul(B.color())), g, q)
-                .minus(&deltas[&q].cmul(sigma));
-
-    for x in 0..xmod {
-        let A_ = A.plus(&deltas[&(xmod as u16)].cmul(x as u16));
-        for y in 0..ymod {
-            let ix = ((A.color() as usize + x) % xmod) * ymod +
-                     ((B.color() as usize + y) % ymod);
-            if ix == 0 { continue }
-            debug_assert_eq!(gate[ix-1], None);
-            let B_ = B.plus(&deltas[&(ymod as u16)].cmul(y as u16));
-            let C_ = C.plus(&deltas[&q].cmul(tt[x][y]));
-            let ct = A_.hash2(&B_,g) ^ C_.as_u128();
-            gate[ix-1] = Some(ct);
-        }
-    }
-    let gate = gate.into_iter().map(Option::unwrap).collect();
-    (C, Some(gate))
-}
-
-fn garble_half_gate<R: Rng>(A: &Wire, B: &Wire, gate_num: usize, deltas: &HashMap<u16,Wire>, rng: &mut R)
-    -> (Wire, Option<GarbledGate>)
-{
-    let q = A.modulus();
-    let qb = B.modulus();
-
-    debug_assert!(q >= qb);
-
-    let D = deltas[&q].clone();
-    let Db = deltas[&qb].clone();
-
-    let r;
-    let mut gate = vec![None; q as usize + qb as usize - 2];
-
-    // hack for unequal moduli
-    if q != qb {
-        // would need to pack minitable into more than one u128 to support qb > 8
-        debug_assert!(qb <= 8, "qb capped at 8 for now!");
-
-        r = rng.gen::<u16>() % q;
-        let t = tweak2(gate_num as u64, 1);
-
-        let mut minitable = vec![None; qb as usize];
-        let mut B_ = B.clone();
-        for b in 0..qb {
-            if b > 0 {
-                B_.plus_eq(&Db);
-            }
-            let new_color = (r+b) % q;
-            let ct = (B_.hash(t) & 0xFFFF) ^ new_color as u128;
-            minitable[B_.color() as usize] = Some(ct);
-        }
-
-        let mut packed = 0;
-        for i in 0..qb as usize {
-            packed += minitable[i].unwrap() << (16 * i);
-        }
-        gate.push(Some(packed));
-
-    } else {
-        r = B.color(); // secret value known only to the garbler (ev knows r+b)
-    }
-
-    let g = tweak2(gate_num as u64, 0);
-
-    // X = H(A+aD) + arD such that a + A.color == 0
-    let alpha = (q - A.color()) % q; // alpha = -A.color
-    let X = A.plus(&D.cmul(alpha))
-             .hashback(g,q)
-             .plus(&D.cmul((alpha * r) % q));
-
-    // Y = H(B + bD) + (b + r)A such that b + B.color == 0
-    let beta = (qb - B.color()) % qb;
-    let Y = B.plus(&Db.cmul(beta))
-             .hashback(g,q)
-             .plus(&A.cmul((beta + r) % q));
-
-    // precompute a lookup table of X.minus(&D_cmul[(a * r % q) as usize]).as_u128();
-    //                            = X.plus(&D_cmul[((q - (a * r % q)) % q) as usize]).as_u128();
-    let X_cmul = {
-        let mut X_ = X.clone();
-        (0..q).map(|x| {
-            if x > 0 {
-                X_.plus_eq(&D);
-            }
-            X_.as_u128()
-        }).collect_vec()
-    };
-
-    let mut A_ = A.clone();
-    for a in 0..q {
-        if a > 0 {
-            A_.plus_eq(&D);
-        }
-        // garbler's half-gate: outputs X-arD
-        // G = H(A+aD) ^ X+a(-r)D = H(A+aD) ^ X-arD
-        if A_.color() != 0 {
-            // let G = A_.hash(g) ^ X.minus(&D_cmul[(a * r % q) as usize]).as_u128();
-            let G = A_.hash(g) ^ X_cmul[((q - (a * r % q)) % q) as usize];
-            gate[A_.color() as usize - 1] = Some(G);
-        }
-    }
-
-    // precompute a lookup table of Y.minus(&A_cmul[((b+r) % q) as usize]).as_u128();
-    //                            = Y.plus(&A_cmul[((q - ((b+r) % q)) % q) as usize]).as_u128();
-    let Y_cmul = {
-        let mut Y_ = Y.clone();
-        (0..q).map(|x| {
-            if x > 0 {
-                Y_.plus_eq(&A);
-            }
-            Y_.as_u128()
-        }).collect_vec()
-    };
-
-    let mut B_ = B.clone();
-    for b in 0..qb {
-        if b > 0 {
-            B_.plus_eq(&Db)
-        }
-        // evaluator's half-gate: outputs Y-(b+r)D
-        // G = H(B+bD) + Y-(b+r)A
-        if B_.color() != 0 {
-            // let G = B_.hash(g) ^ Y.minus(&A_cmul[((b+r) % q) as usize]).as_u128();
-            let G = B_.hash(g) ^ Y_cmul[((q - ((b+r) % q)) % q) as usize];
-            gate[q as usize - 1 + B_.color() as usize - 1] = Some(G);
-        }
-    }
-
-    let gate = gate.into_iter().map(Option::unwrap).collect();
-    (X.plus(&Y), Some(gate)) // output zero wire
-}
-
-fn encode_consts(consts: &[u16], const_wires: &[Wire], deltas: &HashMap<u16,Wire>) -> Vec<Wire> {
-    debug_assert_eq!(consts.len(), const_wires.len(), "[encode_consts] not enough consts!");
-    let mut xs = Vec::new();
-    for i in 0..consts.len() {
-        let x = consts[i];
-        let X = &const_wires[i];
-        let D = &deltas[&X.modulus()];
-        xs.push(X.plus(&D.cmul(x)));
-    }
-    xs
 }
 
 impl Encoder {
@@ -421,6 +175,15 @@ impl Encoder {
             self.encode_input(x,id)
         }).collect()
     }
+
+    pub fn to_bytes(&self) -> Vec<u8> {
+        bincode::serialize(self).expect("couldn't serialize Encoder")
+    }
+
+    pub fn from_bytes(bs: &[u8]) -> Result<Self, failure::Error> {
+        bincode::deserialize(bs)
+            .map_err(|_| failure::err_msg("error decoding Encoder from bytes"))
+    }
 }
 
 impl Decoder {
@@ -434,7 +197,7 @@ impl Decoder {
         for i in 0..ws.len() {
             let q = ws[i].modulus();
             for k in 0..q {
-                let h = ws[i].hash(output_tweak(i,k));
+                let h = ws[i].hash(operations::output_tweak(i,k));
                 if h == self.outputs[i][k as usize] {
                     outs.push(k);
                     break;
@@ -443,6 +206,15 @@ impl Decoder {
         }
         debug_assert_eq!(ws.len(), outs.len(), "decoding failed");
         outs
+    }
+
+    pub fn to_bytes(&self) -> Vec<u8> {
+        bincode::serialize(self).expect("couldn't serialize Decoder")
+    }
+
+    pub fn from_bytes(bs: &[u8]) -> Result<Self, failure::Error> {
+        bincode::deserialize(bs)
+            .map_err(|_| failure::err_msg("error decoding Decoder from bytes"))
     }
 }
 
@@ -485,16 +257,16 @@ impl Evaluator {
                     let a = &wires[xref];
                     let b = &wires[yref];
                     if a.color() == 0 && b.color() == 0 {
-                        a.hashback2(&b, tweak(i), q)
+                        a.hashback2(&b, operations::tweak(i), q)
                     } else {
                         let ix = a.color() as usize * c.modulus(yref) as usize + b.color() as usize;
                         let ct = self.gates[id][ix - 1];
-                        Wire::from_u128(ct ^ a.hash2(&b, tweak(i)), q)
+                        Wire::from_u128(ct ^ a.hash2(&b, operations::tweak(i)), q)
                     }
                 }
 
                 Gate::HalfGate { xref, yref, id } => {
-                    let g = tweak2(i as u64, 0);
+                    let g = operations::tweak2(i as u64, 0);
 
                     // garbler's half gate
                     let A = &wires[xref];
@@ -518,7 +290,7 @@ impl Evaluator {
                     let new_b_color = if c.modulus(xref) != c.modulus(yref) {
                         let minitable = *self.gates[id].last().unwrap();
                         let ct = minitable >> (B.color() * 16);
-                        let pt = B.hash(tweak2(i as u64, 1)) ^ ct;
+                        let pt = B.hash(operations::tweak2(i as u64, 1)) ^ ct;
                         pt as u16
                     } else {
                         B.color()
@@ -534,57 +306,17 @@ impl Evaluator {
             wires[r].clone()
         }).collect()
     }
-}
 
-
-fn tweak(i: usize) -> u128 {
-    i as u128
-}
-fn tweak2(i: u64, j: u64) -> u128 {
-    ((i as u128) << 64) + j as u128
-}
-
-fn output_tweak(i: usize, k: u16) -> u128 {
-    let (left, _) = (i as u128).overflowing_shl(64);
-    left + k as u128
-}
-
-////////////////////////////////////////////////////////////////////////////////
-// serialization
-
-impl Encoder {
-    pub fn to_bytes(&self) -> Vec<u8> {
-        bincode::serialize(self).expect("couldn't serialize Encoder")
-    }
-    pub fn from_bytes(bs: &[u8]) -> Result<Self, failure::Error> {
-        bincode::deserialize(bs)
-            .map_err(|_| failure::err_msg("error decoding Encoder from bytes"))
-    }
-}
-
-impl Decoder {
-    pub fn to_bytes(&self) -> Vec<u8> {
-        bincode::serialize(self).expect("couldn't serialize Decoder")
-    }
-    pub fn from_bytes(bs: &[u8]) -> Result<Self, failure::Error> {
-        bincode::deserialize(bs)
-            .map_err(|_| failure::err_msg("error decoding Decoder from bytes"))
-    }
-}
-
-impl Evaluator {
     pub fn to_bytes(&self) -> Vec<u8> {
         bincode::serialize(self).expect("couldn't serialize Evaluator")
     }
+
     pub fn from_bytes(bs: &[u8]) -> Result<Self, failure::Error> {
         bincode::deserialize(bs)
             .map_err(|_| failure::err_msg("error decoding Evaluator from bytes"))
     }
 }
 
-
-////////////////////////////////////////////////////////////////////////////////
-// tests
 
 #[cfg(test)]
 mod tests {
@@ -603,7 +335,7 @@ mod tests {
         for _ in 0..16 {
             let q = rng.gen_prime();
             let c = &f(q);
-            let (en, de, ev) = garble(&c, &mut rng);
+            let (en, de, ev) = garble(c);
             println!("number of ciphertexts for mod {}: {}", q, ev.size());
             for _ in 0..16 {
                 let inps = (0..c.ninputs()).map(|i| { rng.gen_u16() % c.input_mod(i) }).collect_vec();
@@ -782,7 +514,7 @@ mod tests {
             b.output(z);
             let c = b.finish();
 
-            let (en, de, ev) = garble(&c, &mut thread_rng());
+            let (en, de, ev) = garble(&c);
 
             let mut fail = false;
             for x in 0..q {
@@ -836,7 +568,7 @@ mod tests {
         b.outputs(&zs);
         let circ = b.finish();
 
-        let (en, de, ev) = garble(&circ, &mut rng);
+        let (en, de, ev) = garble(&circ);
         println!("mods={:?} nargs={} size={}", mods, nargs, ev.size());
 
         let Q: u128 = mods.iter().map(|&q| q as u128).product();
@@ -871,7 +603,7 @@ mod tests {
         b.output(z);
 
         let circ = b.finish();
-        let (en, de, ev) = garble(&circ, &mut rng);
+        let (en, de, ev) = garble(&circ);
 
         for _ in 0..64 {
             let x = rng.gen_u16() % q;
@@ -901,7 +633,7 @@ mod tests {
         b.outputs(&zs);
         let circ = b.finish();
 
-        let (_, _, ev) = garble(&circ, &mut rng);
+        let (_, _, ev) = garble(&circ);
 
         assert_eq!(ev, Evaluator::from_bytes(&ev.to_bytes()).unwrap());
     }
@@ -923,7 +655,7 @@ mod tests {
         b.outputs(&zs);
         let circ = b.finish();
 
-        let (en, _, _) = garble(&circ, &mut rng);
+        let (en, _, _) = garble(&circ);
 
         assert_eq!(en, Encoder::from_bytes(&en.to_bytes()).unwrap());
     }
@@ -945,7 +677,7 @@ mod tests {
         b.outputs(&zs);
         let circ = b.finish();
 
-        let (_, de, _) = garble(&circ, &mut rng);
+        let (_, de, _) = garble(&circ);
 
         assert_eq!(de, Decoder::from_bytes(&de.to_bytes()).unwrap());
     }

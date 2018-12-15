@@ -9,9 +9,8 @@ fn bench_gb<F:'static>(cr: &mut Criterion, name: &str, gen_bundler: F) where F: 
     cr.bench_function(name, move |bench| {
         let q = modulus_with_width(32);
         let c = gen_bundler(q).finish();
-        let mut rng = rand::thread_rng();
         bench.iter(|| {
-            let gb = garble(&c, &mut rng);
+            let gb = garble(&c);
             criterion::black_box(gb);
         });
     });
@@ -25,7 +24,7 @@ fn bench_ev<F:'static>(cr: &mut Criterion, name: &str, gen_bundler: F) where F: 
 
         let mut rng = rand::thread_rng();
         let inps = (0..b.ninputs()).map(|_| rng.gen_u128() % q).collect::<Vec<_>>();
-        let (en, _, ev) = garble(&c, &mut rng);
+        let (en, _, ev) = garble(&c);
         let enc_inp = b.encode(&inps);
         let xs = en.encode(&enc_inp);
 

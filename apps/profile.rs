@@ -13,6 +13,6 @@ pub fn main() {
     let circ = b.finish();
 
     for _ in 0..16 {
-        let _gb = garble(&circ, &mut rand::thread_rng());
+        let _gb = garble(&circ);
     }
 }

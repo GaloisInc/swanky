@@ -1,3 +1,5 @@
+//! Higher-level DSL for creating circuits which use bundles of lower-level `Wire`s.
+
 use std::rc::Rc;
 use itertools::Itertools;
 use crate::circuit::{Builder, Circuit, Ref};
@@ -421,7 +423,7 @@ mod tests {
     // test harnesses {{{
     fn test_garbling(b: &CrtBundler, inp: &[u128], should_be: &[u128]) {
         let circ = b.borrow_builder().borrow_circ();
-        let (en, de, ev) = garble(&circ, &mut thread_rng());
+        let (en, de, ev) = garble(circ);
 
         println!("number of ciphertexts: {}", ev.size());
 
@@ -436,7 +438,7 @@ mod tests {
 
     fn test_garbling_high_to_low(b: &CrtBundler, inp: &[u128], should_be: &[u16]) {
         let circ = b.borrow_builder().borrow_circ();
-        let (en, de, ev) = garble(&circ, &mut thread_rng());
+        let (en, de, ev) = garble(circ);
 
         println!("number of ciphertexts: {}", ev.size());
 
@@ -485,7 +487,7 @@ mod tests {
             println!("x={}", x);
 
             let c = b.finish();
-            let (en, de, ev) = garble(&c, &mut thread_rng());
+            let (en, de, ev) = garble(&c);
 
             let res = c.eval(&[x]);
             assert_eq!(b.decode(&res), &[x as u128]);

@@ -1,3 +1,5 @@
+//! DSL for creating circuits compatible with fancy-garbling.
+
 pub mod crt;
 
 use itertools::Itertools;
