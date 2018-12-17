@@ -1,5 +1,6 @@
+//! Low-level operations on wirelabels, the basic building block of garbled circuits.
+
 use crate::aes::AES;
-use crate::numbers;
 use crate::util::{self, RngExt};
 use rand::Rng;
 use serde_derive::{Serialize, Deserialize};
@@ -37,23 +38,23 @@ impl Wire {
             let mut ds = base_conversion::lookup_digits_mod_at_position(bytes[15], q, 15).to_vec();
             for i in 0..15 {
                 let cs = base_conversion::lookup_digits_mod_at_position(bytes[i], q, i);
-                numbers::base_q_add_eq(&mut ds, &cs, q);
+                util::base_q_add_eq(&mut ds, &cs, q);
             }
 
             // drop the digits we won't be able to pack back in again, especially if
             // they get multiplied
-            let ds = ds[..numbers::digits_per_u128(q)].to_vec();
+            let ds = ds[..util::digits_per_u128(q)].to_vec();
             Wire::ModN { q, ds }
 
         } else {
-            Wire::ModN { q, ds: numbers::as_base_q_u128(inp, q) }
+            Wire::ModN { q, ds: util::as_base_q_u128(inp, q) }
         }
     }
 
     pub fn as_u128(&self) -> u128 {
         match *self {
             Wire::Mod2 { val } => val,
-            Wire::ModN { q, ref ds } => numbers::from_base_q(ds, q),
+            Wire::ModN { q, ref ds } => util::from_base_q(ds, q),
         }
     }
 
@@ -61,7 +62,7 @@ impl Wire {
         match modulus {
             1 => panic!("[wire::zero] mod 1 not allowed!"),
             2 => Wire::Mod2 { val: 0 },
-            _ => Wire::ModN { q: modulus, ds: vec![0; numbers::digits_per_u128(modulus)] },
+            _ => Wire::ModN { q: modulus, ds: vec![0; util::digits_per_u128(modulus)] },
         }
     }
 
@@ -290,7 +291,7 @@ mod tests {
             let q = 3 + (rng.gen_u16() % 110);
             let x = rng.gen_u128();
             let w = Wire::from_u128(x, q);
-            let should_be = numbers::as_base_q_u128(x,q);
+            let should_be = util::as_base_q_u128(x,q);
             assert_eq!(w.digits(), should_be, "x={} q={}", x, q);
         }
     }
@@ -396,7 +397,7 @@ mod tests {
         for _ in 0..1024 {
             let q = rng.gen_modulus();
             let x = Wire::rand(&mut rng, q);
-            assert_eq!(x.digits().len(), numbers::digits_per_u128(q));
+            assert_eq!(x.digits().len(), util::digits_per_u128(q));
         }
     }
 }

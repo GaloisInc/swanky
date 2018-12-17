@@ -6,16 +6,10 @@ use itertools::Itertools;
 use serde_derive::{Serialize, Deserialize};
 use std::collections::HashMap;
 
-// the lowest-level circuit description in Fancy Garbling
-// consists of 6 gate types:
-//     * input
-//     * addition
-//     * scalar multiplication
-//     * projection gates
-//     * yao gates - essentially 2 input lookup tables
-//     * generalized half-gate multiplication
-
+/// The index of a `Gate` in a `Circuit`.
 pub type Ref = usize;
+
+/// The index of an input, const, or garbled gate.
 pub type Id = usize;
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
@@ -29,6 +23,14 @@ pub struct Circuit {
     pub num_nonfree_gates: usize,
 }
 
+/// the lowest-level circuit description in Fancy Garbling
+/// consists of 6 gate types:
+///     * input
+///     * addition
+///     * scalar multiplication
+///     * projection gates
+///     * yao gates - essentially 2 input lookup tables
+///     * generalized half-gate multiplication
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub enum Gate {
     Input { id: Id },                                           // id is the input id
@@ -154,7 +156,7 @@ impl Circuit {
     }
 }
 
-// Use a Builder to conveniently make a Circuit
+/// The `Builder` is a DSL to conveniently make a `Circuit`.
 pub struct Builder {
     next_ref: Ref,
     next_input_id: Id,
@@ -577,8 +579,7 @@ impl Builder {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::util::RngExt;
-    use crate::numbers;
+    use crate::util::{self, RngExt};
     use rand;
     use itertools::Itertools;
 
@@ -679,11 +680,11 @@ mod tests {
         for _ in 0..16 {
             let x = rng.gen_u128();
             let y = rng.gen_u128();
-            let mut bits = numbers::u128_to_bits(x, 128);
-            bits.extend(numbers::u128_to_bits(y, 128).iter());
+            let mut bits = util::u128_to_bits(x, 128);
+            bits.extend(util::u128_to_bits(y, 128).iter());
             let res = c.eval(&bits);
             let (z, carry) = x.overflowing_add(y);
-            assert_eq!(numbers::u128_from_bits(&res[0..128]), z);
+            assert_eq!(util::u128_from_bits(&res[0..128]), z);
             assert_eq!(res[128], carry as u16);
         }
     }
@@ -700,11 +701,11 @@ mod tests {
         for _ in 0..16 {
             let x = rng.gen_u128();
             let y = rng.gen_u128();
-            let mut bits = numbers::u128_to_bits(x, 128);
-            bits.extend(numbers::u128_to_bits(y, 128).iter());
+            let mut bits = util::u128_to_bits(x, 128);
+            bits.extend(util::u128_to_bits(y, 128).iter());
             let res = c.eval(&bits);
             let (z, _carry) = x.overflowing_add(y);
-            assert_eq!(numbers::u128_from_bits(&res[0..128]), z);
+            assert_eq!(util::u128_from_bits(&res[0..128]), z);
         }
     }
 
@@ -722,11 +723,11 @@ mod tests {
         for _ in 0..16 {
             let x = rng.gen_u128();
             let y = rng.gen_u128();
-            let mut bits = numbers::u128_to_bits(x, 128);
-            bits.extend(numbers::u128_to_bits(y, 128).iter());
+            let mut bits = util::u128_to_bits(x, 128);
+            bits.extend(util::u128_to_bits(y, 128).iter());
             let res = circ.eval(&bits);
             let (z, carry) = x.overflowing_sub(y);
-            assert_eq!(numbers::u128_from_bits(&res[0..128]), z);
+            assert_eq!(util::u128_from_bits(&res[0..128]), z);
             assert_eq!(res[128], carry as u16);
         }
     }
@@ -771,22 +772,22 @@ mod tests {
         let Q = (q as u128).pow(n as u32);
         let x = Q - 1;
         let y = Q - 1;
-        let mut ds = numbers::as_base_q(x,q,n);
-        ds.extend(numbers::as_base_q(y,q,n).iter());
+        let mut ds = util::as_base_q(x,q,n);
+        ds.extend(util::as_base_q(y,q,n).iter());
         let res = c.eval(&ds);
         let (z, _carry) = x.overflowing_add(y);
-        assert_eq!(numbers::from_base_q(&res, q), z % Q);
+        assert_eq!(util::from_base_q(&res, q), z % Q);
 
         // test random values
         for _ in 0..64 {
             let Q = (q as u128).pow(n as u32);
             let x = rng.gen_u128() % Q;
             let y = rng.gen_u128() % Q;
-            let mut ds = numbers::as_base_q(x,q,n);
-            ds.extend(numbers::as_base_q(y,q,n).iter());
+            let mut ds = util::as_base_q(x,q,n);
+            ds.extend(util::as_base_q(y,q,n).iter());
             let res = c.eval(&ds);
             let (z, _carry) = x.overflowing_add(y);
-            assert_eq!(numbers::from_base_q(&res, q), z % Q);
+            assert_eq!(util::from_base_q(&res, q), z % Q);
         }
     }
 //}}}
@@ -810,10 +811,10 @@ mod tests {
         // test maximum overflow
         let mut ds = Vec::new();
         for _ in 0..nargs {
-            ds.extend(numbers::as_mixed_radix(Q-1, &mods).iter());
+            ds.extend(util::as_mixed_radix(Q-1, &mods).iter());
         }
         let res = circ.eval(&ds);
-        assert_eq!(numbers::from_mixed_radix(&res,&mods), (Q-1)*(nargs as u128) % Q);
+        assert_eq!(util::from_mixed_radix(&res,&mods), (Q-1)*(nargs as u128) % Q);
 
         // test random values
         for _ in 0..64 {
@@ -822,10 +823,10 @@ mod tests {
             for _ in 0..nargs {
                 let x = rng.gen_u128() % Q;
                 should_be = (should_be + x) % Q;
-                ds.extend(numbers::as_mixed_radix(x, &mods).iter());
+                ds.extend(util::as_mixed_radix(x, &mods).iter());
             }
             let res = circ.eval(&ds);
-            assert_eq!(numbers::from_mixed_radix(&res,&mods), should_be);
+            assert_eq!(util::from_mixed_radix(&res,&mods), should_be);
         }
     }
 //}}}

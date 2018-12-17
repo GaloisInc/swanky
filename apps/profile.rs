@@ -1,9 +1,9 @@
 use fancy_garbling::circuit::crt::CrtBundler;
-use fancy_garbling::numbers;
+use fancy_garbling::util;
 use fancy_garbling::garble::garble;
 
 pub fn main() {
-    let q = numbers::modulus_with_width(32);
+    let q = util::modulus_with_width(32);
 
     let mut b = CrtBundler::new();
     let x = b.input(q);

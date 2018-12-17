@@ -322,8 +322,7 @@ impl Evaluator {
 mod tests {
     use super::*;
     use crate::circuit::{Circuit, Builder};
-    use crate::numbers;
-    use crate::util::RngExt;
+    use crate::util::{self, RngExt};
     use rand::thread_rng;
     use itertools::Itertools;
 
@@ -580,12 +579,12 @@ mod tests {
             for _ in 0..nargs {
                 let x = rng.gen_u128() % Q;
                 should_be = (should_be + x) % Q;
-                ds.extend(numbers::as_mixed_radix(x, &mods).iter());
+                ds.extend(util::as_mixed_radix(x, &mods).iter());
             }
             let X = en.encode(&ds);
             let Y = ev.eval(&circ, &X);
             let res = de.decode(&Y);
-            assert_eq!(numbers::from_mixed_radix(&res,&mods), should_be);
+            assert_eq!(util::from_mixed_radix(&res,&mods), should_be);
         }
     }
 //}}}
@@ -616,14 +615,12 @@ mod tests {
         }
     }
 //}}}
-    #[test] // serialize_evaluator {{{
-    fn serialize_evaluator() {
+    #[test] // serialization {{{
+    fn serialization() {
         let mut rng = thread_rng();
 
-        let nargs = 2 + rng.gen_usize() % 100;
+        let nargs = 2 + rng.gen_usize() % 10;
         let mods = (0..7).map(|_| rng.gen_modulus()).collect_vec();
-        // let nargs = 97;
-        // let mods = [37,10,10,54,100,51,17];
 
         let mut b = Builder::new();
         let xs = (0..nargs).map(|_| {
@@ -633,52 +630,10 @@ mod tests {
         b.outputs(&zs);
         let circ = b.finish();
 
-        let (_, _, ev) = garble(&circ);
+        let (en, de, ev) = garble(&circ);
 
         assert_eq!(ev, Evaluator::from_bytes(&ev.to_bytes()).unwrap());
-    }
-//}}}
-    #[test] // serialize_encoder {{{
-    fn serialize_encoder() {
-        let mut rng = thread_rng();
-
-        let nargs = 2 + rng.gen_usize() % 100;
-        let mods = (0..7).map(|_| rng.gen_modulus()).collect_vec();
-        // let nargs = 97;
-        // let mods = [37,10,10,54,100,51,17];
-
-        let mut b = Builder::new();
-        let xs = (0..nargs).map(|_| {
-            mods.iter().map(|&q| b.input(q)).collect_vec()
-        }).collect_vec();
-        let zs = b.fancy_addition(&xs);
-        b.outputs(&zs);
-        let circ = b.finish();
-
-        let (en, _, _) = garble(&circ);
-
         assert_eq!(en, Encoder::from_bytes(&en.to_bytes()).unwrap());
-    }
-//}}}
-    #[test] // serialize_decoder {{{
-    fn serialize_decoder() {
-        let mut rng = thread_rng();
-
-        let nargs = 2 + rng.gen_usize() % 100;
-        let mods = (0..7).map(|_| rng.gen_modulus()).collect_vec();
-        // let nargs = 97;
-        // let mods = [37,10,10,54,100,51,17];
-
-        let mut b = Builder::new();
-        let xs = (0..nargs).map(|_| {
-            mods.iter().map(|&q| b.input(q)).collect_vec()
-        }).collect_vec();
-        let zs = b.fancy_addition(&xs);
-        b.outputs(&zs);
-        let circ = b.finish();
-
-        let (_, de, _) = garble(&circ);
-
         assert_eq!(de, Decoder::from_bytes(&de.to_bytes()).unwrap());
     }
 //}}}

@@ -12,7 +12,6 @@
 
 pub mod circuit;
 pub mod garble;
-pub mod numbers;
 pub mod wire;
 pub mod util;
 pub mod aes;

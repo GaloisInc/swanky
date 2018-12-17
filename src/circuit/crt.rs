@@ -3,7 +3,7 @@
 use std::rc::Rc;
 use itertools::Itertools;
 use crate::circuit::{Builder, Circuit, Ref};
-use crate::numbers::{self, crt, inv, crt_inv, factor, product};
+use crate::util::{self, crt, inv, crt_inv, factor, product};
 
 #[derive(Clone, Copy)]
 pub struct BundleRef(pub usize);
@@ -286,7 +286,7 @@ impl CrtBundler {
     fn fractional_mixed_radix(&mut self, xbun: BundleRef, factors_of_m: &[u16]) -> Vec<Ref> {
         let ndigits = factors_of_m.len();
         let q = product(&self.primes(xbun));
-        let M = numbers::product(factors_of_m);
+        let M = util::product(factors_of_m);
 
         let mut ds = Vec::new();
 
@@ -301,7 +301,7 @@ impl CrtBundler {
             for x in 0..p {
                 let crt_coef = inv(((q / p as u128) % p as u128) as i64, p as i64);
                 let y = (M as f64 * x as f64 * crt_coef as f64 / p as f64).round() as u128 % M;
-                let digits = numbers::as_mixed_radix(y, factors_of_m);
+                let digits = util::as_mixed_radix(y, factors_of_m);
                 for i in 0..ndigits {
                     tabs[i].push(digits[i]);
                 }
@@ -348,7 +348,7 @@ impl CrtBundler {
         let sign = self.sign(xbun, factors_of_m);
 
         let ps = self.primes(xbun);
-        let q = numbers::product(&ps);
+        let q = util::product(&ps);
         let mut ws = Vec::with_capacity(ps.len());
 
         for &p in ps.iter() {
@@ -414,8 +414,7 @@ impl CrtBundler {
 mod tests {
     use super::*;
     use crate::garble::garble;
-    use crate::numbers::{self, modulus_with_width};
-    use crate::util::RngExt;
+    use crate::util::{self, RngExt, modulus_with_width};
     use rand::thread_rng;
 
     const NTESTS: usize = 1;
@@ -575,7 +574,7 @@ mod tests {
     #[test] // scalar_exponentiation {{{
     fn scalar_exponentiation() {
         let mut rng = thread_rng();
-        let q = numbers::modulus_with_width(10);
+        let q = util::modulus_with_width(10);
         let y = rng.gen_u16() % 10;
 
         let mut b = CrtBundler::new();
@@ -650,7 +649,7 @@ mod tests {
     #[test] // cdiv {{{
     fn cdiv() {
         let mut rng = thread_rng();
-        let q = numbers::modulus_with_width_skip2(32);
+        let q = util::modulus_with_width_skip2(32);
         let mut b = CrtBundler::new();
         let x = b.input(q);
         let z = b.cdiv(x,2);

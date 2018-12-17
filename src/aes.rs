@@ -1,3 +1,5 @@
+//! Wrapper for `aesni` with constant key for use as a hash function.
+
 use crate::util;
 
 pub struct Aes {
