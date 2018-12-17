@@ -1,7 +1,9 @@
 ![fancy garbling logo](logo.png)
 
 # fancy-garbling
-An implementation of the [BMR16](https://eprint.iacr.org/2016/969) arithmetic garbling scheme. Extremely unstable, under current development.
+An implementation of the [BMR16](https://eprint.iacr.org/2016/969) arithmetic garbling scheme.
+
+Extremely unstable, under active development (and research!).
 
 # compiling
 Requires at least `rustc 1.31.0` 
