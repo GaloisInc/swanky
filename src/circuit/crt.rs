@@ -26,6 +26,7 @@ impl CrtBundler {
     }
 
     pub fn primes(&self, x: BundleRef) -> Rc<Vec<u16>> {
+        debug_assert!(x.0 < self.bundles.len(), "unknown BundleRef: {}", x.0);
         self.bundles[x.0].primes.clone()
     }
 
@@ -318,6 +319,7 @@ impl CrtBundler {
         res
     }
 
+    /// Outputs `max(x,0)`.
     pub fn relu(&mut self, xbun: BundleRef, factors_of_m: &[u16]) -> BundleRef {
         let res = self.fractional_mixed_radix(xbun, factors_of_m);
 
@@ -335,7 +337,7 @@ impl CrtBundler {
         self.add_bundle(zwires, primes)
     }
 
-    // outputs 0/1
+    /// Outputs whether the input is greater than `Q/2`.
     pub fn sign(&mut self, xbun: BundleRef, factors_of_m: &[u16]) -> Ref {
         let res = self.fractional_mixed_radix(xbun, factors_of_m);
         let p = *factors_of_m.last().unwrap();
@@ -343,7 +345,7 @@ impl CrtBundler {
         self.borrow_mut_builder().proj(*res.last().unwrap(), 2, tt)
     }
 
-    // outputs 1/-1
+    /// Outputs 1/-1 whether the input is positive or negative.
     pub fn sgn(&mut self, xbun: BundleRef, factors_of_m: &[u16]) -> BundleRef {
         let sign = self.sign(xbun, factors_of_m);
 
