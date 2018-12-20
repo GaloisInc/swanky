@@ -4,6 +4,7 @@ use std::rc::Rc;
 use itertools::Itertools;
 use crate::circuit::{Builder, Circuit, Ref};
 use crate::util::{self, crt, inv, crt_inv, factor, product};
+use crate::fancy::Fancy;
 
 #[derive(Clone, Copy)]
 pub struct BundleRef(pub usize);
@@ -251,7 +252,7 @@ impl CrtBundler {
         let primes = self.primes(xref);
         let i = primes.iter().position(|&q| p == q).expect("p is not one of the primes in this bundle!");
         let x = xwires[i];
-        let zwires = primes.iter().map(|&q| self.borrow_mut_builder().mod_change(x, q)).collect();
+        let zwires = primes.iter().map(|&q| self.borrow_mut_builder().mod_change(&x, q)).collect();
         self.add_bundle(zwires, primes)
     }
 
@@ -318,7 +319,7 @@ impl CrtBundler {
 
             ds.push(new_ds);
         }
-        let res = b.fancy_addition(&ds);
+        let res = b.mixed_radix_addition(&ds);
         self.put_builder(b);
         res
     }
@@ -398,7 +399,7 @@ impl CrtBundler {
 
         buns.iter().skip(1).fold(buns[0], |xbun, &ybun| {
             let pos = self.exact_leq(xbun,ybun);
-            let neg = self.borrow_mut_builder().negate(pos);
+            let neg = self.borrow_mut_builder().negate(&pos);
 
             let x_wires = self.wires(xbun);
             let y_wires = self.wires(ybun);

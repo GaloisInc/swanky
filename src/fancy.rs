@@ -2,9 +2,9 @@ use itertools::Itertools;
 
 /// A struct is `Fancy` if it implements the basic fancy-garbling functions.
 pub trait Fancy {
-    type Item;
+    type Item: Clone;
 
-    fn constant(&mut self, id: usize, val_and_mod: Option<(u16,u16)>) -> Self::Item;
+    fn constant(&mut self, x: u16, q: u16) -> Self::Item;
     fn add(&mut self, x: &Self::Item, y: &Self::Item) -> Self::Item;
     fn sub(&mut self, x: &Self::Item, y: &Self::Item) -> Self::Item;
     fn mul(&mut self, x: &Self::Item, y: &Self::Item) -> Self::Item;
@@ -20,7 +20,7 @@ pub trait Fancy {
         assert!(args.len() > 1);
         let mut z = args[0].clone();
         for x in args.iter().skip(1) {
-            z = self.add(z,x);
+            z = self.add(&z,&x);
         }
         z
     }
@@ -60,7 +60,7 @@ pub trait Fancy {
         // decode the result in base 2
         let mut tab = vec![1;b+1];
         tab[0] = 0;
-        self.proj(z, 2, tab)
+        self.proj(&z,2,tab)
     }
 
     /// Change the modulus of `x` to `to_modulus` using a projection gate.
@@ -76,55 +76,53 @@ pub trait Fancy {
     ////////////////////////////////////////////////////////////////////////////////
     // mixed radix stuff
 
-    pub fn fancy_addition(&mut self, xs: &[Vec<Ref>]) -> Vec<Ref> {
+    fn mixed_radix_addition(&mut self, xs: &[Vec<Self::Item>]) -> Vec<Self::Item> {
         let nargs = xs.len();
         let n = xs[0].len();
         assert!(xs.iter().all(|x| x.len() == n));
 
         let mut digit_carry = None;
         let mut carry_carry = None;
-
         let mut max_carry = 0;
 
         let mut res = Vec::with_capacity(n);
 
         for i in 0..n {
             // all the ith digits, in one vec
-            let ds = xs.iter().map(|x| x[i]).collect_vec();
+            let ds = xs.iter().map(|x| x[i].clone()).collect_vec();
 
             // compute the digit -- easy
             let digit_sum = self.add_many(&ds);
-            let digit = digit_carry.map_or(digit_sum, |d| self.add(digit_sum, d));
+            let digit = digit_carry.map_or(digit_sum.clone(), |d| self.add(&digit_sum, &d));
 
             if i < n-1 {
                 // compute the carries
-                let q = self.modulus(xs[0][i]);
+                let q = self.modulus(&xs[0][i]);
                 // max_carry currently contains the max carry from the previous iteration
                 let max_val = nargs as u16 * (q-1) + max_carry;
                 // now it is the max carry of this iteration
                 max_carry = max_val / q;
 
-                let modded_ds = ds.iter().map(|&d| {
-                    self.mod_change(d, max_val+1)
-                }).collect_vec();
+                let modded_ds = ds.iter().map(|d| self.mod_change(d, max_val+1)).collect_vec();
+
                 let carry_sum = self.add_many(&modded_ds);
                 // add in the carry from the previous iteration
-                let carry = carry_carry.map_or(carry_sum, |c| self.add(carry_sum, c));
+                let carry = carry_carry.map_or(carry_sum.clone(), |c| self.add(&carry_sum, &c));
 
                 // carry now contains the carry information, we just have to project it to
                 // the correct moduli for the next iteration
-                let next_mod = self.modulus(xs[0][i+1]);
+                let next_mod = self.modulus(&xs[0][i+1]);
                 let tt = (0..=max_val).map(|i| (i / q) % next_mod).collect_vec();
-                digit_carry = Some(self.proj(carry, next_mod, tt));
+                digit_carry = Some(self.proj(&carry, next_mod, tt));
 
                 let next_max_val = nargs as u16 * (next_mod - 1) + max_carry;
 
                 if i < n-2 {
                     if max_carry < next_mod {
-                        carry_carry = Some(self.mod_change(digit_carry.unwrap(), next_max_val + 1));
+                        carry_carry = Some(self.mod_change(digit_carry.as_ref().unwrap(), next_max_val + 1));
                     } else {
                         let tt = (0..=max_val).map(|i| i / q).collect_vec();
-                        carry_carry = Some(self.proj(carry, next_max_val + 1, tt));
+                        carry_carry = Some(self.proj(&carry, next_max_val + 1, tt));
                     }
                 } else {
                     // next digit is MSB so we dont need carry_carry
@@ -143,101 +141,110 @@ pub trait Fancy {
     }
 
 
-    pub fn addition(&mut self, xs: &[Ref], ys: &[Ref]) -> (Vec<Ref>, Ref) {
-        assert_eq!(xs.len(), ys.len());
-        let cmod = self.modulus(xs[1]);
-        let (mut z, mut c) = self.adder(xs[0], ys[0], None, cmod);
-        let mut bs = vec![z];
-        for i in 1..xs.len() {
-            let cmod = self.modulus(*xs.get(i+1).unwrap_or(&xs[i]));
-            let res = self.adder(xs[i], ys[i], Some(c), cmod);
-            z = res.0;
-            c = res.1;
-            bs.push(z);
-        }
-        (bs, c)
-    }
+    // fn addition(&mut self, xs: &[Self::Item], ys: &[Self::Item]) -> (Vec<Self::Item>, Self::Item) {
+    //     assert_eq!(xs.len(), ys.len());
+    //     let cmod = self.modulus(&xs[1]);
+    //     let (mut z, mut c) = self.adder(&xs[0], &ys[0], None, cmod);
+    //     let mut bs = vec![z];
+    //     for i in 1..xs.len() {
+    //         let cmod = self.modulus(xs.get(i+1).unwrap_or(&xs[i]));
+    //         let res = self.adder(&xs[i], &ys[i], Some(&c), cmod);
+    //         z = res.0;
+    //         c = res.1;
+    //         bs.push(z);
+    //     }
+    //     (bs, c)
+    // }
 
-    // avoids creating extra gates for the final carry
-    pub fn addition_no_carry(&mut self, xs: &[Ref], ys: &[Ref]) -> Vec<Ref> {
-        assert_eq!(xs.len(), ys.len());
+    // // avoids creating extra gates for the final carry
+    // fn addition_no_carry(&mut self, xs: &[Self::Item], ys: &[Self::Item]) -> Vec<Self::Item> {
+    //     assert_eq!(xs.len(), ys.len());
 
-        let cmod = self.modulus(*xs.get(1).unwrap_or(&xs[0]));
-        let (mut z, mut c) = self.adder(xs[0], ys[0], None, cmod);
+    //     let cmod = self.modulus(xs.get(1).unwrap_or(&xs[0]));
+    //     let (mut z, mut c) = self.adder(&xs[0], &ys[0], None, cmod);
 
-        let mut bs = vec![z];
-        for i in 1..xs.len()-1 {
-            let cmod = self.modulus(*xs.get(i+1).unwrap_or(&xs[i]));
-            let res = self.adder(xs[i], ys[i], Some(c), cmod);
-            z = res.0;
-            c = res.1;
-            bs.push(z);
-        }
-        z = self.add_many(&[*xs.last().unwrap(), *ys.last().unwrap(), c]);
-        bs.push(z);
-        bs
-    }
+    //     let mut bs = vec![z];
+    //     for i in 1..xs.len()-1 {
+    //         let cmod = self.modulus(xs.get(i+1).unwrap_or(&xs[i]));
+    //         let res = self.adder(&xs[i], &ys[i], Some(&c), cmod);
+    //         z = res.0;
+    //         c = res.1;
+    //         bs.push(z);
+    //     }
+    //     z = self.add_many(&[xs.last().unwrap().clone(), ys.last().unwrap().clone(), c]);
+    //     bs.push(z);
+    //     bs
+    // }
 
-    fn adder(&mut self, x: Ref, y: Ref, opt_c: Option<Ref>, carry_modulus: u16) -> (Ref, Ref) {
-        let q = self.modulus(x);
-        assert_eq!(q, self.modulus(y));
-        if q == 2 {
-            if let Some(c) = opt_c {
-                let z1 = self.xor(x,y);
-                let z2 = self.xor(z1,c);
-                let z3 = self.xor(x,c);
-                let z4 = self.and(z1,z3);
-                let mut carry = self.xor(z4,x);
-                if carry_modulus != 2 {
-                    carry = self.mod_change(carry, carry_modulus);
-                }
-                (z2, carry)
-            } else {
-                let z = self.xor(x,y);
-                let mut carry = self.and(x,y);
-                if carry_modulus != 2 {
-                    carry = self.mod_change(carry, carry_modulus);
-                }
-                (z, carry)
-            }
-        } else {
-            let (sum, qp, zp);
+    // fn adder(
+    //     &mut self,
+    //     x: &Self::Item,
+    //     y: &Self::Item,
+    //     opt_c: Option<&Self::Item>,
+    //     carry_modulus: u16) -> (Self::Item, Self::Item)
+    // {
+    //     let q = self.modulus(x);
+    //     assert_eq!(q, self.modulus(y));
+    //     if q == 2 {
+    //         if let Some(c) = opt_c {
+    //             let z1 = self.xor(x,y);
+    //             let z2 = self.xor(&z1,c);
+    //             let z3 = self.xor(x,c);
+    //             let z4 = self.and(&z1,&z3);
+    //             let mut carry = self.xor(&z4,x);
+    //             if carry_modulus != 2 {
+    //                 carry = self.mod_change(&carry, carry_modulus);
+    //             }
+    //             (z2, carry)
+    //         } else {
+    //             let z = self.xor(x,y);
+    //             let mut carry = self.and(x,y);
+    //             if carry_modulus != 2 {
+    //                 carry = self.mod_change(&carry, carry_modulus);
+    //             }
+    //             (z, carry)
+    //         }
+    //     } else {
+    //         let (sum, qp, zp);
 
-            if let Some(c) = opt_c {
-                sum = self.add_many(&[x,y,c]);
-                qp = 2*q;
-            } else {
-                sum = self.add(x,y);
-                qp = 2*q-1;
-            }
+    //         if let Some(c) = opt_c {
+    //             let z = self.add(x,y);
+    //             sum = self.add(&z, c);
+    //             qp = 2*q;
+    //         } else {
+    //             sum = self.add(x,y);
+    //             qp = 2*q-1;
+    //         }
 
-            let xp = self.mod_change(x, qp);
-            let yp = self.mod_change(y, qp);
+    //         let xp = self.mod_change(x, qp);
+    //         let yp = self.mod_change(y, qp);
 
-            if let Some(c) = opt_c {
-                let cp = self.mod_change(c, qp);
-                zp = self.add_many(&[xp, yp, cp]);
-            } else {
-                zp = self.add(xp, yp);
-            }
+    //         if let Some(c) = opt_c {
+    //             let cp = self.mod_change(c, qp);
+    //             zp = self.add_many(&[xp, yp, cp]);
+    //         } else {
+    //             zp = self.add(&xp, &yp);
+    //         }
 
-            let tt = (0..qp).map(|x| u16::from(x >= q)).collect();
-            let carry = self.proj(zp, carry_modulus, tt);
-            (sum, carry)
-        }
-    }
+    //         let tt = (0..qp).map(|x| u16::from(x >= q)).collect();
+    //         let carry = self.proj(&zp, carry_modulus, tt);
+    //         (sum, carry)
+    //     }
+    // }
 
-    pub fn twos_complement(&mut self, xs: &[Ref]) -> Vec<Ref> {
-        let not_xs = xs.iter().map(|&x| self.negate(x)).collect_vec();
-        let zero = self.constant(0,2);
-        let mut const1 = vec![zero; xs.len()];
-        const1[0] = self.constant(1,2);
-        self.addition_no_carry(&not_xs, &const1)
-    }
+    // fn twos_complement(&mut self, xs: &[Self::Item]) -> Vec<Self::Item> {
+    //     let not_xs = xs.iter().map(|x| self.negate(x)).collect_vec();
+    //     let zero = self.constant(0,2);
+    //     let mut const1 = vec![zero; xs.len()];
+    //     const1[0] = self.constant(1,2);
+    //     self.addition_no_carry(&not_xs, &const1)
+    // }
 
-    pub fn binary_subtraction(&mut self, xs: &[Ref], ys: &[Ref]) -> (Vec<Ref>, Ref) {
-        let neg_ys = self.twos_complement(&ys);
-        let (zs, c) = self.addition(&xs, &neg_ys);
-        (zs, self.negate(c))
-    }
+    // fn binary_subtraction(
+    //     &mut self, xs: &[Self::Item], ys: &[Self::Item]
+    // ) -> (Vec<Self::Item>, Self::Item) {
+    //     let neg_ys = self.twos_complement(&ys);
+    //     let (zs, c) = self.addition(&xs, &neg_ys);
+    //     (zs, self.negate(&c))
+    // }
 }

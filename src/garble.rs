@@ -250,18 +250,6 @@ impl Evaluator {
                     }
                 }
 
-                Gate::Yao { xref, yref, id, .. } => {
-                    let a = &wires[xref];
-                    let b = &wires[yref];
-                    if a.color() == 0 && b.color() == 0 {
-                        a.hashback2(&b, operations::tweak(i), q)
-                    } else {
-                        let ix = a.color() as usize * c.modulus(yref) as usize + b.color() as usize;
-                        let ct = self.gates[id][ix - 1];
-                        Wire::from_u128(ct ^ a.hash2(&b, operations::tweak(i)), q)
-                    }
-                }
-
                 Gate::HalfGate { xref, yref, id } => {
                     let g = operations::tweak2(i as u64, 0);
 
@@ -319,9 +307,10 @@ impl Evaluator {
 mod tests {
     use super::*;
     use crate::circuit::{Circuit, Builder};
+    use crate::fancy::Fancy;
     use crate::util::{self, RngExt};
-    use rand::thread_rng;
     use itertools::Itertools;
+    use rand::thread_rng;
 
     // helper {{{
     fn garble_test_helper<F>(f: F)
@@ -376,17 +365,6 @@ mod tests {
             let mut b = Builder::new();
             let xs = b.inputs(16, 2);
             let z = b.or_many(&xs);
-            b.output(z);
-            b.finish()
-        });
-    }
-//}}}
-    #[test] // and_many {{{
-    fn and_many() {
-        garble_test_helper(|_| {
-            let mut b = Builder::new();
-            let xs = b.inputs(16, 2);
-            let z = b.and_many(&xs);
             b.output(z);
             b.finish()
         });
@@ -459,7 +437,7 @@ mod tests {
         garble_test_helper(|q| {
             let mut b = Builder::new();
             let x = b.input(q);
-            let z = b.mod_change(x,q*2);
+            let z = b.mod_change(&x,q*2);
             b.output(z);
             b.finish()
         });
@@ -514,21 +492,8 @@ mod tests {
         }
     }
 //}}}
-    #[test] // base_q_addition_no_carry {{{
-    fn base_q_addition_no_carry() {
-        garble_test_helper(|q| {
-            let mut b = Builder::new();
-            let n = 16;
-            let xs = b.inputs(n,q);
-            let ys = b.inputs(n,q);
-            let zs = b.addition_no_carry(&xs, &ys);
-            b.outputs(&zs);
-            b.finish()
-        });
-    }
-//}}}
-    #[test] // fancy_addition {{{
-    fn fancy_addition() {
+    #[test] // mixed_radix_addition {{{
+    fn mixed_radix_addition() {
         let mut rng = thread_rng();
 
         let nargs = 2 + rng.gen_usize() % 100;
@@ -540,7 +505,7 @@ mod tests {
         let xs = (0..nargs).map(|_| {
             mods.iter().map(|&q| b.input(q)).collect_vec()
         }).collect_vec();
-        let zs = b.fancy_addition(&xs);
+        let zs = b.mixed_radix_addition(&xs);
         b.outputs(&zs);
         let circ = b.finish();
 
@@ -603,7 +568,7 @@ mod tests {
         let xs = (0..nargs).map(|_| {
             mods.iter().map(|&q| b.input(q)).collect_vec()
         }).collect_vec();
-        let zs = b.fancy_addition(&xs);
+        let zs = b.mixed_radix_addition(&xs);
         b.outputs(&zs);
         let circ = b.finish();
 

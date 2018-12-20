@@ -2,7 +2,6 @@
 
 pub mod crt;
 
-use itertools::Itertools;
 use serde_derive::{Serialize, Deserialize};
 use std::collections::HashMap;
 use crate::fancy::Fancy;
@@ -150,7 +149,7 @@ impl Circuit {
     }
 }
 
-/// The `Builder` is a DSL to conveniently make a `Circuit`.
+/// The `Builder` struct is used to make a `Circuit`.
 pub struct Builder {
     next_ref: Ref,
     next_input_id: Id,
@@ -315,16 +314,12 @@ impl Builder {
 impl Fancy for Builder {
     type Item = Ref;
 
-    fn constant(&mut self, id: usize, val_and_mod: Option<(u16,u16)>) -> Ref {
-        unimplemented!()
-    }
-
+    fn constant(&mut self, x: u16, q: u16) -> Ref { self.constant(x,q) }
     fn add(&mut self, x: &Ref, y: &Ref) -> Ref { self.add(*x, *y) }
     fn sub(&mut self, x: &Ref, y: &Ref) -> Ref { self.sub(*x, *y) }
     fn mul(&mut self, x: &Ref, y: &Ref) -> Ref { self.half_gate(*x, *y) }
     fn cmul(&mut self, x: &Ref, c: u16) -> Ref { self.cmul(*x, c) }
     fn proj(&mut self, x: &Ref, q: u16, tt: Vec<u16>) -> Ref { self.proj(*x, q, tt) }
-
     fn modulus(&self, x: &Ref) -> u16 { self.modulus(*x) }
 }
 
@@ -332,32 +327,9 @@ impl Fancy for Builder {
 mod tests {
     use super::*;
     use crate::util::{self, RngExt};
-    use rand;
     use itertools::Itertools;
+    use rand;
 
-    #[test] // {{{ and_gate_fan_n
-    fn and_gate_fan_n() {
-        let mut rng = rand::thread_rng();
-        let mut b = Builder::new();
-        let mut inps = Vec::new();
-        let n = 2 + (rng.gen_usize() % 200);
-        for _ in 0..n {
-            inps.push(b.input(2));
-        }
-        let z = b.and_many(&inps);
-        b.output(z);
-        let c = b.finish();
-
-        for _ in 0..16 {
-            let mut inps: Vec<u16> = Vec::new();
-            for _ in 0..n {
-                inps.push(rng.gen_bool() as u16);
-            }
-            let res = inps.iter().fold(1, |acc, &x| x & acc);
-            assert_eq!(c.eval(&inps)[0], res);
-        }
-    }
-//}}}
     #[test] // {{{ or_gate_fan_n
     fn or_gate_fan_n() {
         let mut rng = rand::thread_rng();
@@ -409,78 +381,13 @@ mod tests {
         let p = rng.gen_prime();
         let q = rng.gen_prime();
         let x = b.input(p);
-        let y = b.mod_change(x, q);
-        let z = b.mod_change(y, p);
+        let y = b.mod_change(&x, q);
+        let z = b.mod_change(&y, p);
         b.output(z);
         let c = b.finish();
         for _ in 0..16 {
             let x = rng.gen_u16() % p;
             assert_eq!(c.eval(&vec![x])[0], x % q);
-        }
-    }
-//}}}
-    #[test] // binary_addition {{{
-    fn binary_addition() {
-        let mut b = Builder::new();
-        let xs = b.inputs(128, 2);
-        let ys = b.inputs(128, 2);
-        let (zs, c) = b.addition(&xs, &ys);
-        b.outputs(&zs);
-        b.output(c);
-        let c = b.finish();
-        let mut rng = rand::thread_rng();
-        for _ in 0..16 {
-            let x = rng.gen_u128();
-            let y = rng.gen_u128();
-            let mut bits = util::u128_to_bits(x, 128);
-            bits.extend(util::u128_to_bits(y, 128).iter());
-            let res = c.eval(&bits);
-            let (z, carry) = x.overflowing_add(y);
-            assert_eq!(util::u128_from_bits(&res[0..128]), z);
-            assert_eq!(res[128], carry as u16);
-        }
-    }
-//}}}
-    #[test] // binary_addition_no_carry {{{
-    fn binary_addition_no_carry() {
-        let mut b = Builder::new();
-        let xs = b.inputs(128, 2);
-        let ys = b.inputs(128, 2);
-        let zs = b.addition_no_carry(&xs, &ys);
-        b.outputs(&zs);
-        let c = b.finish();
-        let mut rng = rand::thread_rng();
-        for _ in 0..16 {
-            let x = rng.gen_u128();
-            let y = rng.gen_u128();
-            let mut bits = util::u128_to_bits(x, 128);
-            bits.extend(util::u128_to_bits(y, 128).iter());
-            let res = c.eval(&bits);
-            let (z, _carry) = x.overflowing_add(y);
-            assert_eq!(util::u128_from_bits(&res[0..128]), z);
-        }
-    }
-
-//}}}
-    #[test] // binary_subtraction {{{
-    fn binary_subtraction() {
-        let mut b = Builder::new();
-        let xs = b.inputs(128, 2);
-        let ys = b.inputs(128, 2);
-        let (zs, c) = b.binary_subtraction(&xs, &ys);
-        b.outputs(&zs);
-        b.output(c);
-        let circ = b.finish();
-        let mut rng = rand::thread_rng();
-        for _ in 0..16 {
-            let x = rng.gen_u128();
-            let y = rng.gen_u128();
-            let mut bits = util::u128_to_bits(x, 128);
-            bits.extend(util::u128_to_bits(y, 128).iter());
-            let res = circ.eval(&bits);
-            let (z, carry) = x.overflowing_sub(y);
-            assert_eq!(util::u128_from_bits(&res[0..128]), z);
-            assert_eq!(res[128], carry as u16);
         }
     }
 //}}}
@@ -490,7 +397,7 @@ mod tests {
         let n = 113;
         let args = b.inputs(n, 2);
         let wires: Vec<_> = args.iter().map(|&x| {
-            b.mod_change(x, n as u16 + 1)
+            b.mod_change(&x, n as u16 + 1)
         }).collect();
         let s = b.add_many(&wires);
         b.output(s);
@@ -507,44 +414,8 @@ mod tests {
         }
     }
 // }}}
-    #[test] // base_4_addition_no_carry {{{
-    fn base_q_addition_no_carry() {
-        let mut b = Builder::new();
-        let mut rng = rand::thread_rng();
-
-        let q = rng.gen_modulus();
-        let n = 16;
-        let xs = b.inputs(n,q);
-        let ys = b.inputs(n,q);
-        let zs = b.addition_no_carry(&xs, &ys);
-        b.outputs(&zs);
-        let c = b.finish();
-
-        // test maximum overflow
-        let Q = (q as u128).pow(n as u32);
-        let x = Q - 1;
-        let y = Q - 1;
-        let mut ds = util::as_base_q(x,q,n);
-        ds.extend(util::as_base_q(y,q,n).iter());
-        let res = c.eval(&ds);
-        let (z, _carry) = x.overflowing_add(y);
-        assert_eq!(util::from_base_q(&res, q), z % Q);
-
-        // test random values
-        for _ in 0..64 {
-            let Q = (q as u128).pow(n as u32);
-            let x = rng.gen_u128() % Q;
-            let y = rng.gen_u128() % Q;
-            let mut ds = util::as_base_q(x,q,n);
-            ds.extend(util::as_base_q(y,q,n).iter());
-            let res = c.eval(&ds);
-            let (z, _carry) = x.overflowing_add(y);
-            assert_eq!(util::from_base_q(&res, q), z % Q);
-        }
-    }
-//}}}
-    #[test] // fancy_addition {{{
-    fn fancy_addition() {
+    #[test] // mixed_radix_addition {{{
+    fn mixed_radix_addition() {
         let mut rng = rand::thread_rng();
 
         let nargs = 2 + rng.gen_usize() % 100;
@@ -554,7 +425,7 @@ mod tests {
         let xs = (0..nargs).map(|_| {
             mods.iter().map(|&q| b.input(q)).collect_vec()
         }).collect_vec();
-        let zs = b.fancy_addition(&xs);
+        let zs = b.mixed_radix_addition(&xs);
         b.outputs(&zs);
         let circ = b.finish();
 
@@ -615,7 +486,7 @@ mod tests {
         let xs = (0..nargs).map(|_| {
             mods.iter().map(|&q| b.input(q)).collect_vec()
         }).collect_vec();
-        let zs = b.fancy_addition(&xs);
+        let zs = b.mixed_radix_addition(&xs);
         b.outputs(&zs);
         let circ = b.finish();
 
