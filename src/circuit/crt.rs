@@ -277,7 +277,12 @@ impl CrtBundler {
             let z = self.borrow_mut_builder().proj(subbed, xwires.len() as u16 + 1, eq_zero_tab);
             zs.push(z);
         }
-        self.borrow_mut_builder()._and_many(&zs)
+        // self.borrow_mut_builder()._and_many(&zs)
+        let z = self.borrow_mut_builder().add_many(&zs);
+        let b = zs.len();
+        let mut tab = vec![0;b+1];
+        tab[b] = 1;
+        self.borrow_mut_builder().proj(z, 2, tab)
     }
 
     ////////////////////////////////////////////////////////////////////////////////

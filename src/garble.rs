@@ -138,9 +138,6 @@ impl <'a> Iterator for Garbler<'a> {
                 Gate::Proj { xref, ref tt, .. } =>
                     operations::garble_projection(&self.wires[xref], q, tt, self.current_wire, &self.deltas),
 
-                Gate::Yao { xref, yref, ref tt, .. } =>
-                    operations::garble_yao(&self.wires[xref], &self.wires[yref], q, tt, self.current_wire, &self.deltas),
-
                 Gate::HalfGate { xref, yref, .. } =>
                     operations::garble_half_gate(&self.wires[xref], &self.wires[yref], self.current_wire, &self.deltas, &mut self.rng),
             };
@@ -463,26 +460,6 @@ mod tests {
             let mut b = Builder::new();
             let x = b.input(q);
             let z = b.mod_change(x,q*2);
-            b.output(z);
-            b.finish()
-        });
-    }
-//}}}
-    #[test] // yao {{{
-    fn yao() {
-        garble_test_helper(|q| {
-            let mut b = Builder::new();
-            let x = b.input(q);
-            let y = b.input(q);
-            let mut tt = Vec::new();
-            for a in 0..q {
-                let mut tt_ = Vec::new();
-                for b in 0..q {
-                    tt_.push(a * b % q);
-                }
-                tt.push(tt_);
-            }
-            let z = b.yao(x, y, q, tt);
             b.output(z);
             b.finish()
         });

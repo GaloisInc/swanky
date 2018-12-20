@@ -76,43 +76,6 @@ pub fn garble_projection(A: &Wire, q_out: u16, tt: &[u16], gate_num: usize, delt
     (C, Some(gate))
 }
 
-pub fn garble_yao(A: &Wire, B: &Wire, q: u16, tt: &[Vec<u16>], gate_num: usize, deltas: &HashMap<u16,Wire>)
-    -> (Wire, Option<GarbledGate>)
-{
-    let xmod = A.modulus() as usize;
-    let ymod = B.modulus() as usize;
-    let mut gate = vec![None; xmod * ymod - 1];
-
-    // gate tweak
-    let g = tweak(gate_num);
-
-    // sigma is the output truth value of the 0,0-colored wirelabels
-    let sigma = tt[((xmod - A.color() as usize) % xmod) as usize]
-                  [((ymod - B.color() as usize) % ymod) as usize];
-
-    // we use the row reduction trick here
-    let B_delta = &deltas[&(ymod as u16)];
-    let C = A.minus(&deltas[&(xmod as u16)].cmul(A.color()))
-                .hashback2(&B.minus(&B_delta.cmul(B.color())), g, q)
-                .minus(&deltas[&q].cmul(sigma));
-
-    for x in 0..xmod {
-        let A_ = A.plus(&deltas[&(xmod as u16)].cmul(x as u16));
-        for y in 0..ymod {
-            let ix = ((A.color() as usize + x) % xmod) * ymod +
-                     ((B.color() as usize + y) % ymod);
-            if ix == 0 { continue }
-            debug_assert_eq!(gate[ix-1], None);
-            let B_ = B.plus(&deltas[&(ymod as u16)].cmul(y as u16));
-            let C_ = C.plus(&deltas[&q].cmul(tt[x][y]));
-            let ct = A_.hash2(&B_,g) ^ C_.as_u128();
-            gate[ix-1] = Some(ct);
-        }
-    }
-    let gate = gate.into_iter().map(Option::unwrap).collect();
-    (C, Some(gate))
-}
-
 pub fn garble_half_gate<R: Rng>(A: &Wire, B: &Wire, gate_num: usize, deltas: &HashMap<u16,Wire>, rng: &mut R)
     -> (Wire, Option<GarbledGate>)
 {
