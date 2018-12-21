@@ -1,22 +1,30 @@
 use itertools::Itertools;
 
+pub trait KnowsModulus {
+    fn modulus(&self) -> u16;
+}
+
+pub struct Bundle<W>(Vec<W>);
+
 /// A struct is `Fancy` if it implements the basic fancy-garbling functions.
 pub trait Fancy {
-    type Item: Clone;
+    type Wire: Clone + KnowsModulus;
 
-    fn constant(&mut self, x: u16, q: u16) -> Self::Item;
-    fn add(&mut self, x: &Self::Item, y: &Self::Item) -> Self::Item;
-    fn sub(&mut self, x: &Self::Item, y: &Self::Item) -> Self::Item;
-    fn mul(&mut self, x: &Self::Item, y: &Self::Item) -> Self::Item;
-    fn cmul(&mut self, x: &Self::Item, c: u16) -> Self::Item;
-    fn proj(&mut self, x: &Self::Item, q: u16, tt: Vec<u16>) -> Self::Item;
-    fn modulus(&self, x: &Self::Item) -> u16;
+    fn garbler_input(&mut self, q: u16) -> Self::Wire;
+    fn evaluator_input(&mut self, q: u16) -> Self::Wire;
+    fn constant(&mut self, x: u16, q: u16) -> Self::Wire;
+
+    fn add(&mut self, x: &Self::Wire, y: &Self::Wire) -> Self::Wire;
+    fn sub(&mut self, x: &Self::Wire, y: &Self::Wire) -> Self::Wire;
+    fn mul(&mut self, x: &Self::Wire, y: &Self::Wire) -> Self::Wire;
+    fn cmul(&mut self, x: &Self::Wire, c: u16) -> Self::Wire;
+    fn proj(&mut self, x: &Self::Wire, q: u16, tt: Vec<u16>) -> Self::Wire;
 
     ////////////////////////////////////////////////////////////////////////////////
     // bonus functions built on top of basic fancy operations
 
-    /// Sum up a slice of `Self::Item`.
-    fn add_many(&mut self, args: &[Self::Item]) -> Self::Item {
+    /// Sum up a slice of `Self::Wire`.
+    fn add_many(&mut self, args: &[Self::Wire]) -> Self::Wire {
         assert!(args.len() > 1);
         let mut z = args[0].clone();
         for x in args.iter().skip(1) {
@@ -27,32 +35,32 @@ pub trait Fancy {
 
     // TODO: work out free negation
     /// Negate using a projection.
-    fn negate(&mut self, x: &Self::Item) -> Self::Item {
-        assert_eq!(self.modulus(x), 2);
+    fn negate(&mut self, x: &Self::Wire) -> Self::Wire {
+        assert_eq!(x.modulus(), 2);
         self.proj(x, 2, vec![1,0])
     }
 
     /// Xor is just addition, with the requirement that `x` and `y` are mod 2.
-    fn xor(&mut self, x: &Self::Item, y: &Self::Item) -> Self::Item {
-        assert!(self.modulus(x) == 2 && self.modulus(y) == 2);
+    fn xor(&mut self, x: &Self::Wire, y: &Self::Wire) -> Self::Wire {
+        assert!(x.modulus() == 2 && y.modulus() == 2);
         self.add(x,y)
     }
 
     /// And is just multiplication, with the requirement that `x` and `y` are mod 2.
-    fn and(&mut self, x: &Self::Item, y: &Self::Item) -> Self::Item {
-        assert!(self.modulus(x) == 2 && self.modulus(y) == 2);
+    fn and(&mut self, x: &Self::Wire, y: &Self::Wire) -> Self::Wire {
+        assert!(x.modulus() == 2 && y.modulus() == 2);
         self.mul(x,y)
     }
 
-    /// Returns 1 if all `Self::Item` equal 1.
-    fn and_many(&mut self, args: &[Self::Item]) -> Self::Item {
+    /// Returns 1 if all `Self::Wire` equal 1.
+    fn and_many(&mut self, args: &[Self::Wire]) -> Self::Wire {
         args.iter().skip(1).fold(args[0].clone(), |acc, x| self.and(&acc, x))
     }
 
     // TODO: with free negation, use demorgans and AND
-    /// Returns 1 if any `Self::Item` equals 1 in `args`.
-    fn or_many(&mut self, args: &[Self::Item]) -> Self::Item {
-        assert!(args.iter().all(|x| self.modulus(x) == 2));
+    /// Returns 1 if any `Self::Wire` equals 1 in `args`.
+    fn or_many(&mut self, args: &[Self::Wire]) -> Self::Wire {
+        assert!(args.iter().all(|x| x.modulus() == 2));
         // convert all the wires to base b+1
         let b = args.len();
         let wires = args.iter().map(|x| {
@@ -69,8 +77,8 @@ pub trait Fancy {
     }
 
     /// Change the modulus of `x` to `to_modulus` using a projection gate.
-    fn mod_change(&mut self, x: &Self::Item, to_modulus: u16) -> Self::Item {
-        let from_modulus = self.modulus(x);
+    fn mod_change(&mut self, x: &Self::Wire, to_modulus: u16) -> Self::Wire {
+        let from_modulus = x.modulus();
         if from_modulus == to_modulus {
             return x.clone();
         }
@@ -78,13 +86,11 @@ pub trait Fancy {
         self.proj(x, to_modulus, tab)
     }
 
-    ////////////////////////////////////////////////////////////////////////////////
-    // mixed radix stuff
-
-    fn mixed_radix_addition(&mut self, xs: &[Vec<Self::Item>]) -> Vec<Self::Item> {
+    /// Mixed radix addition of potentially many values.
+    fn mixed_radix_addition(&mut self, xs: &[Vec<Self::Wire>]) -> Vec<Self::Wire> {
         let nargs = xs.len();
         let n = xs[0].len();
-        assert!(xs.iter().all(|x| x.len() == n));
+        assert!(xs.len() > 1 && xs.iter().all(|x| x.len() == n));
 
         let mut digit_carry = None;
         let mut carry_carry = None;
@@ -102,7 +108,7 @@ pub trait Fancy {
 
             if i < n-1 {
                 // compute the carries
-                let q = self.modulus(&xs[0][i]);
+                let q = xs[0][i].modulus();
                 // max_carry currently contains the max carry from the previous iteration
                 let max_val = nargs as u16 * (q-1) + max_carry;
                 // now it is the max carry of this iteration
@@ -116,7 +122,7 @@ pub trait Fancy {
 
                 // carry now contains the carry information, we just have to project it to
                 // the correct moduli for the next iteration
-                let next_mod = self.modulus(&xs[0][i+1]);
+                let next_mod = xs[0][i+1].modulus();
                 let tt = (0..=max_val).map(|i| (i / q) % next_mod).collect_vec();
                 digit_carry = Some(self.proj(&carry, next_mod, tt));
 
@@ -133,123 +139,24 @@ pub trait Fancy {
                     // next digit is MSB so we dont need carry_carry
                     carry_carry = None;
                 }
-
             } else {
                 digit_carry = None;
                 carry_carry = None;
             }
-
             res.push(digit);
         }
-
         res
     }
 
+    ////////////////////////////////////////////////////////////////////////////////
+    // higher level stuff
 
-    // fn addition(&mut self, xs: &[Self::Item], ys: &[Self::Item]) -> (Vec<Self::Item>, Self::Item) {
-    //     assert_eq!(xs.len(), ys.len());
-    //     let cmod = self.modulus(&xs[1]);
-    //     let (mut z, mut c) = self.adder(&xs[0], &ys[0], None, cmod);
-    //     let mut bs = vec![z];
-    //     for i in 1..xs.len() {
-    //         let cmod = self.modulus(xs.get(i+1).unwrap_or(&xs[i]));
-    //         let res = self.adder(&xs[i], &ys[i], Some(&c), cmod);
-    //         z = res.0;
-    //         c = res.1;
-    //         bs.push(z);
-    //     }
-    //     (bs, c)
-    // }
+    fn add_bundles(&mut self, x: Bundle<Self::Wire>, y: Bundle<Self::Wire>) -> Bundle<Self::Wire> {
+        assert_eq!(x.0.len(), y.0.len());
+        let res = x.0.iter().zip(y.0.iter()).map(|(x,y)| self.add(x,y)).collect();
+        Bundle(res)
+    }
 
-    // // avoids creating extra gates for the final carry
-    // fn addition_no_carry(&mut self, xs: &[Self::Item], ys: &[Self::Item]) -> Vec<Self::Item> {
-    //     assert_eq!(xs.len(), ys.len());
-
-    //     let cmod = self.modulus(xs.get(1).unwrap_or(&xs[0]));
-    //     let (mut z, mut c) = self.adder(&xs[0], &ys[0], None, cmod);
-
-    //     let mut bs = vec![z];
-    //     for i in 1..xs.len()-1 {
-    //         let cmod = self.modulus(xs.get(i+1).unwrap_or(&xs[i]));
-    //         let res = self.adder(&xs[i], &ys[i], Some(&c), cmod);
-    //         z = res.0;
-    //         c = res.1;
-    //         bs.push(z);
-    //     }
-    //     z = self.add_many(&[xs.last().unwrap().clone(), ys.last().unwrap().clone(), c]);
-    //     bs.push(z);
-    //     bs
-    // }
-
-    // fn adder(
-    //     &mut self,
-    //     x: &Self::Item,
-    //     y: &Self::Item,
-    //     opt_c: Option<&Self::Item>,
-    //     carry_modulus: u16) -> (Self::Item, Self::Item)
-    // {
-    //     let q = self.modulus(x);
-    //     assert_eq!(q, self.modulus(y));
-    //     if q == 2 {
-    //         if let Some(c) = opt_c {
-    //             let z1 = self.xor(x,y);
-    //             let z2 = self.xor(&z1,c);
-    //             let z3 = self.xor(x,c);
-    //             let z4 = self.and(&z1,&z3);
-    //             let mut carry = self.xor(&z4,x);
-    //             if carry_modulus != 2 {
-    //                 carry = self.mod_change(&carry, carry_modulus);
-    //             }
-    //             (z2, carry)
-    //         } else {
-    //             let z = self.xor(x,y);
-    //             let mut carry = self.and(x,y);
-    //             if carry_modulus != 2 {
-    //                 carry = self.mod_change(&carry, carry_modulus);
-    //             }
-    //             (z, carry)
-    //         }
-    //     } else {
-    //         let (sum, qp, zp);
-
-    //         if let Some(c) = opt_c {
-    //             let z = self.add(x,y);
-    //             sum = self.add(&z, c);
-    //             qp = 2*q;
-    //         } else {
-    //             sum = self.add(x,y);
-    //             qp = 2*q-1;
-    //         }
-
-    //         let xp = self.mod_change(x, qp);
-    //         let yp = self.mod_change(y, qp);
-
-    //         if let Some(c) = opt_c {
-    //             let cp = self.mod_change(c, qp);
-    //             zp = self.add_many(&[xp, yp, cp]);
-    //         } else {
-    //             zp = self.add(&xp, &yp);
-    //         }
-
-    //         let tt = (0..qp).map(|x| u16::from(x >= q)).collect();
-    //         let carry = self.proj(&zp, carry_modulus, tt);
-    //         (sum, carry)
-    //     }
-    // }
-
-    // fn twos_complement(&mut self, xs: &[Self::Item]) -> Vec<Self::Item> {
-    //     let not_xs = xs.iter().map(|x| self.negate(x)).collect_vec();
-    //     let zero = self.constant(0,2);
-    //     let mut const1 = vec![zero; xs.len()];
-    //     const1[0] = self.constant(1,2);
-    //     self.addition_no_carry(&not_xs, &const1)
-    // }
-
-    // fn binary_subtraction(
-    //     &mut self, xs: &[Self::Item], ys: &[Self::Item]
-    // ) -> (Vec<Self::Item>, Self::Item) {
-    //     let neg_ys = self.twos_complement(&ys);
-    //     let (zs, c) = self.addition(&xs, &neg_ys);
-    //     (zs, self.negate(&c))
-    // }
 }
+
+

@@ -1,11 +1,12 @@
 //! Structs and functions for creating, and evaluating garbled circuits.
 
-use crate::circuit::{Circuit, Ref, Gate, Id};
+use crate::circuit::{Circuit, Gate, Id};
 use crate::wire::Wire;
 use itertools::Itertools;
 use rand::rngs::ThreadRng;
 use serde_derive::{Serialize, Deserialize};
 use std::collections::HashMap;
+use crate::fancy::KnowsModulus;
 
 pub mod operations;
 
@@ -39,7 +40,7 @@ pub struct Garbler<'a> {
     inputs: Vec<Wire>,
     consts: Vec<Wire>,
     deltas: HashMap<u16, Wire>,
-    current_wire: Ref,
+    current_wire: usize,
     rng: ThreadRng,
 }
 
@@ -69,14 +70,14 @@ impl <'a> Garbler<'a> {
 
         // initialize inputs
         for &i in circuit.input_refs.iter() {
-            let q = circuit.modulus(i);
+            let q = i.modulus();
             let w = Wire::rand(&mut rng, q);
             inputs.push(w);
         }
 
         // initialize consts
         for &i in circuit.const_refs.iter() {
-            let q = circuit.modulus(i);
+            let q = i.modulus();
             let w = Wire::rand(&mut rng, q);
             consts.push(w);
         }
@@ -104,7 +105,7 @@ impl <'a> Garbler<'a> {
             return Err(failure::err_msg("Garbler::decoder called before all wires were generated"));
         }
         let outs = self.circuit.output_refs.iter().enumerate().map(|(i, &r)| {
-            operations::garble_output(&self.wires[r], i, &self.deltas)
+            operations::garble_output(&self.wires[r.ix], i, &self.deltas)
         }).collect();
         Ok(Decoder::new(outs))
     }
@@ -131,15 +132,15 @@ impl <'a> Iterator for Garbler<'a> {
                 Gate::Input { id } => (self.inputs[id].clone(), None),
                 Gate::Const { id } => (self.consts[id].clone(), None),
 
-                Gate::Add { xref, yref } => (self.wires[xref].plus(&self.wires[yref]),  None),
-                Gate::Sub { xref, yref } => (self.wires[xref].minus(&self.wires[yref]), None),
-                Gate::Cmul { xref, c }   => (self.wires[xref].cmul(c),                  None),
+                Gate::Add { xref, yref } => (self.wires[xref.ix].plus(&self.wires[yref.ix]),  None),
+                Gate::Sub { xref, yref } => (self.wires[xref.ix].minus(&self.wires[yref.ix]), None),
+                Gate::Cmul { xref, c }   => (self.wires[xref.ix].cmul(c),                  None),
 
                 Gate::Proj { xref, ref tt, .. } =>
-                    operations::garble_projection(&self.wires[xref], q, tt, self.current_wire, &self.deltas),
+                    operations::garble_projection(&self.wires[xref.ix], q, tt, self.current_wire, &self.deltas),
 
                 Gate::HalfGate { xref, yref, .. } =>
-                    operations::garble_half_gate(&self.wires[xref], &self.wires[yref], self.current_wire, &self.deltas, &mut self.rng),
+                    operations::garble_half_gate(&self.wires[xref.ix], &self.wires[yref.ix], self.current_wire, &self.deltas, &mut self.rng),
             };
 
             self.wires.push(w);
@@ -236,12 +237,12 @@ impl Evaluator {
 
                 Gate::Input { id }       => inputs[id].clone(),
                 Gate::Const { id, .. }   => self.consts[id].clone(),
-                Gate::Add { xref, yref } => wires[xref].plus(&wires[yref]),
-                Gate::Sub { xref, yref } => wires[xref].minus(&wires[yref]),
-                Gate::Cmul { xref, c }   => wires[xref].cmul(c),
+                Gate::Add { xref, yref } => wires[xref.ix].plus(&wires[yref.ix]),
+                Gate::Sub { xref, yref } => wires[xref.ix].minus(&wires[yref.ix]),
+                Gate::Cmul { xref, c }   => wires[xref.ix].cmul(c),
 
                 Gate::Proj { xref, id, .. } => {
-                    let x = &wires[xref];
+                    let x = &wires[xref.ix];
                     if x.color() == 0 {
                         x.hashback(i as u128, q)
                     } else {
@@ -254,7 +255,7 @@ impl Evaluator {
                     let g = operations::tweak2(i as u64, 0);
 
                     // garbler's half gate
-                    let A = &wires[xref];
+                    let A = &wires[xref.ix];
                     let L = if A.color() == 0 {
                         A.hashback(g,q)
                     } else {
@@ -263,7 +264,7 @@ impl Evaluator {
                     };
 
                     // evaluator's half gate
-                    let B = &wires[yref];
+                    let B = &wires[yref.ix];
                     let R = if B.color() == 0 {
                         B.hashback(g,q)
                     } else {
@@ -272,7 +273,7 @@ impl Evaluator {
                     };
 
                     // hack for unequal mods
-                    let new_b_color = if c.modulus(xref) != c.modulus(yref) {
+                    let new_b_color = if xref.modulus() != yref.modulus() {
                         let minitable = *self.gates[id].last().unwrap();
                         let ct = minitable >> (B.color() * 16);
                         let pt = B.hash(operations::tweak2(i as u64, 1)) ^ ct;
@@ -288,7 +289,7 @@ impl Evaluator {
         }
 
         c.output_refs.iter().map(|&r| {
-            wires[r].clone()
+            wires[r.ix].clone()
         }).collect()
     }
 

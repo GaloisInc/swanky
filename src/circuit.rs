@@ -4,10 +4,18 @@ pub mod crt;
 
 use serde_derive::{Serialize, Deserialize};
 use std::collections::HashMap;
-use crate::fancy::Fancy;
+use crate::fancy::{Fancy, KnowsModulus};
 
-/// The index of a `Gate` in a `Circuit`.
-pub type Ref = usize;
+/// The index and modulus of a `Gate` in a `Circuit`.
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+pub struct Ref {
+    pub ix: usize,
+    modulus: u16,
+}
+
+impl KnowsModulus for Ref {
+    fn modulus(&self) -> u16 { self.modulus }
+}
 
 /// The index of an input, const, or garbled gate.
 pub type Id = usize;
@@ -42,6 +50,16 @@ pub enum Gate {
     HalfGate { xref: Ref, yref: Ref, id: Id },                  // id is the gate number
 }
 
+impl Fancy for Builder {
+    type Wire = Ref;
+    fn constant(&mut self, x: u16, q: u16) -> Ref { self.constant(x,q) }
+    fn add(&mut self, x: &Ref, y: &Ref) -> Ref { self.add(*x, *y) }
+    fn sub(&mut self, x: &Ref, y: &Ref) -> Ref { self.sub(*x, *y) }
+    fn mul(&mut self, x: &Ref, y: &Ref) -> Ref { self.half_gate(*x, *y) }
+    fn cmul(&mut self, x: &Ref, c: u16) -> Ref { self.cmul(*x, c) }
+    fn proj(&mut self, x: &Ref, q: u16, tt: Vec<u16>) -> Ref { self.proj(*x, q, tt) }
+}
+
 impl Circuit {
     pub fn eval(&self, inputs: &[u16]) -> Vec<u16> {
         assert_eq!(inputs.len(), self.ninputs(),
@@ -62,28 +80,31 @@ impl Circuit {
                     self.const_vals.as_ref().expect("no consts provided")[id]
                 }
 
-                Gate::Add { xref, yref } => (cache[xref] + cache[yref]) % q,
-                Gate::Sub { xref, yref } => (cache[xref] + q - cache[yref]) % q,
+                Gate::Add { xref, yref } => (cache[xref.ix] + cache[yref.ix]) % q,
+                Gate::Sub { xref, yref } => (cache[xref.ix] + q - cache[yref.ix]) % q,
 
-                Gate::Cmul { xref, c } => cache[xref] * c % q,
+                Gate::Cmul { xref, c } => cache[xref.ix] * c % q,
 
-                Gate::Proj { xref, ref tt, .. } => tt[cache[xref] as usize],
+                Gate::Proj { xref, ref tt, .. } => tt[cache[xref.ix] as usize],
 
                 Gate::HalfGate { xref, yref, .. } =>
-                    (cache[xref] * cache[yref] % q),
+                    (cache[xref.ix] * cache[yref.ix] % q),
             };
             cache[zref] = val;
         }
-        self.output_refs.iter().map(|outref| cache[*outref]).collect()
+        self.output_refs.iter().map(|outref| cache[outref.ix]).collect()
     }
 
     pub fn ninputs(&self) -> usize { self.input_refs.len() }
     pub fn noutputs(&self) -> usize { self.output_refs.len() }
-    pub fn modulus(&self, x: Ref) -> u16 { self.gate_moduli[x] }
+
+    pub fn modulus(&self, gate_num: usize) -> u16 {
+        self.gate_moduli[gate_num]
+    }
 
     pub fn input_mod(&self, id: Id) -> u16 {
         let r = self.input_refs[id];
-        self.gate_moduli[r]
+        r.modulus()
     }
 
     pub fn clear_consts(&mut self) {
@@ -151,7 +172,7 @@ impl Circuit {
 
 /// The `Builder` struct is used to make a `Circuit`.
 pub struct Builder {
-    next_ref: Ref,
+    next_ref_ix: usize,
     next_input_id: Id,
     const_map: HashMap<(u16,u16), Ref>,
     pub circ: Circuit,
@@ -169,11 +190,15 @@ impl Builder {
             num_nonfree_gates: 0,
         };
         Builder {
-            next_ref: 0,
+            next_ref_ix: 0,
             next_input_id: 0,
             const_map: HashMap::new(),
             circ: c
         }
+    }
+
+    pub fn modulus(&self, x: Ref) -> u16 {
+        x.modulus()
     }
 
     pub fn finish(self) -> Circuit {
@@ -182,10 +207,6 @@ impl Builder {
 
     pub fn borrow_circ(&self) -> &Circuit {
         &self.circ
-    }
-
-    pub fn modulus(&self, x:Ref) -> u16 {
-        self.circ.modulus(x)
     }
 
     fn get_next_input_id(&mut self) -> Id {
@@ -200,16 +221,17 @@ impl Builder {
         id
     }
 
-    fn get_next_ref(&mut self) -> Ref {
-        let x = self.next_ref;
-        self.next_ref += 1;
+    fn get_next_ref_ix(&mut self) -> usize {
+        let x = self.next_ref_ix;
+        self.next_ref_ix += 1;
         x
     }
 
     fn gate(&mut self, gate: Gate, modulus: u16) -> Ref {
         self.circ.gates.push(gate);
         self.circ.gate_moduli.push(modulus);
-        self.get_next_ref()
+        let ix = self.get_next_ref_ix();
+        Ref { ix, modulus }
     }
 
     pub fn input(&mut self, modulus: u16) -> Ref {
@@ -260,42 +282,32 @@ impl Builder {
     }
 
     pub fn add(&mut self, xref: Ref, yref: Ref) -> Ref {
-        assert!(xref < self.next_ref);
-        assert!(yref < self.next_ref);
-        let xmod = self.circ.gate_moduli[xref];
-        let ymod = self.circ.gate_moduli[yref];
-        assert!(xmod == ymod, "xmod={} ymod={}", xmod, ymod);
+        assert!(xref.modulus() == yref.modulus(), "xmod={} ymod={}", xref.modulus(), yref.modulus());
         let gate = Gate::Add { xref, yref };
-        self.gate(gate, xmod)
+        self.gate(gate, xref.modulus())
     }
 
     pub fn sub(&mut self, xref: Ref, yref: Ref) -> Ref {
-        assert!(xref < self.next_ref);
-        assert!(yref < self.next_ref);
-        let xmod = self.circ.gate_moduli[xref];
-        let ymod = self.circ.gate_moduli[yref];
-        assert!(xmod == ymod);
+        assert!(xref.modulus() == yref.modulus(), "xmod={} ymod={}", xref.modulus(), yref.modulus());
         let gate = Gate::Sub { xref, yref };
-        self.gate(gate, xmod)
+        self.gate(gate, xref.modulus())
     }
 
     pub fn cmul(&mut self, xref: Ref, c: u16) -> Ref {
-        let q = self.modulus(xref);
-        self.gate(Gate::Cmul { xref, c }, q)
+        self.gate(Gate::Cmul { xref, c }, xref.modulus())
     }
 
     pub fn proj(&mut self, xref: Ref, output_modulus: u16, tt: Vec<u16>) -> Ref {
-        assert_eq!(tt.len(), self.circ.gate_moduli[xref] as usize);
+        assert_eq!(tt.len(), xref.modulus() as usize);
         assert!(tt.iter().all(|&x| x < output_modulus),
             "not all xs were less than the output modulus! circuit.proj: tt={:?},
             output_modulus={}", tt, output_modulus);
-        let q = output_modulus;
         let gate = Gate::Proj { xref, tt, id: self.get_next_ciphertext_id() };
-        self.gate(gate, q)
+        self.gate(gate, output_modulus)
     }
 
     pub fn half_gate(&mut self, xref: Ref, yref: Ref) -> Ref {
-        if self.modulus(xref) < self.modulus(yref) {
+        if xref.modulus() < yref.modulus() {
             return self.half_gate(yref, xref);
         }
 
@@ -305,22 +317,9 @@ impl Builder {
             id: self.get_next_ciphertext_id(),
         };
 
-        let q = self.modulus(xref);
-        self.gate(gate, q)
+        self.gate(gate, xref.modulus())
     }
 
-}
-
-impl Fancy for Builder {
-    type Item = Ref;
-
-    fn constant(&mut self, x: u16, q: u16) -> Ref { self.constant(x,q) }
-    fn add(&mut self, x: &Ref, y: &Ref) -> Ref { self.add(*x, *y) }
-    fn sub(&mut self, x: &Ref, y: &Ref) -> Ref { self.sub(*x, *y) }
-    fn mul(&mut self, x: &Ref, y: &Ref) -> Ref { self.half_gate(*x, *y) }
-    fn cmul(&mut self, x: &Ref, c: u16) -> Ref { self.cmul(*x, c) }
-    fn proj(&mut self, x: &Ref, q: u16, tt: Vec<u16>) -> Ref { self.proj(*x, q, tt) }
-    fn modulus(&self, x: &Ref) -> u16 { self.modulus(*x) }
 }
 
 #[cfg(test)]
@@ -522,5 +521,4 @@ mod tests {
         assert_eq!(circ, Circuit::from_str(&circ.to_string()).unwrap());
     }
 //}}}
-
 }
