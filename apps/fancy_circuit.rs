@@ -1,5 +1,6 @@
 use fancy_garbling::circuit::Builder;
 use fancy_garbling::util::RngExt;
+use fancy_garbling::fancy::Fancy;
 
 fn main() {
     let mut rng = rand::thread_rng();

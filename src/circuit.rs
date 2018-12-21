@@ -330,6 +330,33 @@ mod tests {
     use itertools::Itertools;
     use rand;
 
+    #[test] // {{{ and_gate_fan_n
+    fn and_gate_fan_n() {
+        let mut rng = rand::thread_rng();
+        let mut b = Builder::new();
+        let mut inps = Vec::new();
+        let n = 2 + (rng.gen_usize() % 200);
+        for _ in 0..n {
+            inps.push(b.input(2));
+        }
+        let z = b.and_many(&inps);
+        b.output(z);
+        let c = b.finish();
+
+        for _ in 0..16 {
+            let mut inps: Vec<u16> = Vec::new();
+            for _ in 0..n {
+                inps.push(rng.gen_bool() as u16);
+            }
+            let res = inps.iter().fold(0, |acc, &x| x & acc);
+            let out = c.eval(&inps)[0];
+            if !(out == res) {
+                println!("{:?} {} {}", inps, out, res);
+                panic!();
+            }
+        }
+    }
+//}}}
     #[test] // {{{ or_gate_fan_n
     fn or_gate_fan_n() {
         let mut rng = rand::thread_rng();

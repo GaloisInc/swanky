@@ -44,6 +44,11 @@ pub trait Fancy {
         self.mul(x,y)
     }
 
+    /// Returns 1 if all `Self::Item` equal 1.
+    fn and_many(&mut self, args: &[Self::Item]) -> Self::Item {
+        args.iter().skip(1).fold(args[0].clone(), |acc, x| self.and(&acc, x))
+    }
+
     // TODO: with free negation, use demorgans and AND
     /// Returns 1 if any `Self::Item` equals 1 in `args`.
     fn or_many(&mut self, args: &[Self::Item]) -> Self::Item {
