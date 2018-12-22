@@ -17,17 +17,15 @@ impl KnowsModulus for Ref {
     fn modulus(&self) -> u16 { self.modulus }
 }
 
-/// The index of an input, const, or garbled gate.
-pub type Id = usize;
-
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct Circuit {
     pub gates: Vec<Gate>,
     pub gate_moduli: Vec<u16>,
-    pub input_refs: Vec<Ref>,
+    pub garbler_input_refs: Vec<Ref>,
+    pub evaluator_input_refs: Vec<Ref>,
     pub const_refs: Vec<Ref>,
     pub output_refs: Vec<Ref>,
-    pub const_vals: Option<Vec<u16>>,
+    pub const_vals: Vec<u16>,
     pub num_nonfree_gates: usize,
 }
 
@@ -41,17 +39,20 @@ pub struct Circuit {
 /// * generalized half-gate multiplication
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub enum Gate {
-    Input { id: Id },                                           // id is the input id
-    Const { id: Id },                                           // id is the const id
+    GarblerInput { id: usize },
+    EvaluatorInput { id: usize },
+    Const { id: usize },
     Add { xref: Ref, yref: Ref },
     Sub { xref: Ref, yref: Ref },
     Cmul { xref: Ref, c: u16 },
-    Proj { xref: Ref, tt: Vec<u16>, id: Id },                   // id is the gate number
-    HalfGate { xref: Ref, yref: Ref, id: Id },                  // id is the gate number
+    Proj { xref: Ref, tt: Vec<u16>, id: usize },  // id is the gate number
+    HalfGate { xref: Ref, yref: Ref, id: usize }, // id is the gate number
 }
 
 impl Fancy for Builder {
     type Wire = Ref;
+    fn garbler_input(&mut self, q: u16) -> Ref { self.garbler_input(q) }
+    fn evaluator_input(&mut self, q: u16) -> Ref { self.evaluator_input(q) }
     fn constant(&mut self, x: u16, q: u16) -> Ref { self.constant(x,q) }
     fn add(&mut self, x: &Ref, y: &Ref) -> Ref { self.add(*x, *y) }
     fn sub(&mut self, x: &Ref, y: &Ref) -> Ref { self.sub(*x, *y) }
@@ -61,10 +62,15 @@ impl Fancy for Builder {
 }
 
 impl Circuit {
-    pub fn eval(&self, inputs: &[u16]) -> Vec<u16> {
-        assert_eq!(inputs.len(), self.ninputs(),
-            "[circuit.eval] needed {} inputs but got {}!",
-            self.ninputs(), inputs.len()
+    pub fn eval(&self, garbler_inputs: &[u16], evaluator_inputs: &[u16]) -> Vec<u16> {
+        assert_eq!(garbler_inputs.len(), self.num_garbler_inputs(),
+            "[circuit.eval] needed {} garbler inputs but got {}!",
+            self.num_garbler_inputs(), garbler_inputs.len()
+        );
+
+        assert_eq!(evaluator_inputs.len(), self.num_evaluator_inputs(),
+            "[circuit.eval] needed {} garbler inputs but got {}!",
+            self.num_evaluator_inputs(), evaluator_inputs.len()
         );
 
         let mut cache = vec![0;self.gates.len()];
@@ -72,13 +78,10 @@ impl Circuit {
             let q = self.gate_moduli[zref];
             let val = match self.gates[zref] {
 
-                Gate::Input { id } => inputs[id],
+                Gate::GarblerInput   { id } => garbler_inputs[id],
+                Gate::EvaluatorInput { id } => evaluator_inputs[id],
 
-                Gate::Const { id } => {
-                    assert!(id < self.const_vals.as_ref().map_or(0, |cs| cs.len()),
-                            "[eval_full] not enough constants provided");
-                    self.const_vals.as_ref().expect("no consts provided")[id]
-                }
+                Gate::Const { id } => self.const_vals[id],
 
                 Gate::Add { xref, yref } => (cache[xref.ix] + cache[yref.ix]) % q,
                 Gate::Sub { xref, yref } => (cache[xref.ix] + q - cache[yref.ix]) % q,
@@ -95,20 +98,24 @@ impl Circuit {
         self.output_refs.iter().map(|outref| cache[outref.ix]).collect()
     }
 
-    pub fn ninputs(&self) -> usize { self.input_refs.len() }
+    pub fn num_garbler_inputs(&self) -> usize { self.garbler_input_refs.len() }
+
+    pub fn num_evaluator_inputs(&self) -> usize { self.evaluator_input_refs.len() }
+
     pub fn noutputs(&self) -> usize { self.output_refs.len() }
 
     pub fn modulus(&self, gate_num: usize) -> u16 {
         self.gate_moduli[gate_num]
     }
 
-    pub fn input_mod(&self, id: Id) -> u16 {
-        let r = self.input_refs[id];
+    pub fn garbler_input_mod(&self, id: usize) -> u16 {
+        let r = self.garbler_input_refs[id];
         r.modulus()
     }
 
-    pub fn clear_consts(&mut self) {
-        self.const_vals = None;
+    pub fn evaluator_input_mod(&self, id: usize) -> u16 {
+        let r = self.evaluator_input_refs[id];
+        r.modulus()
     }
 
     pub fn print_info(&self) {
@@ -121,26 +128,28 @@ impl Circuit {
 
         for g in self.gates.iter() {
             match g {
-                Gate::Input    { .. } => (),
-                Gate::Const    { .. } => nconst    += 1,
-                Gate::Add      { .. } => nadd      += 1,
-                Gate::Sub      { .. } => nsub      += 1,
-                Gate::Cmul     { .. } => ncmul     += 1,
-                Gate::Proj     { .. } => nproj     += 1,
-                Gate::HalfGate { .. } => nhalfgate += 1,
+                Gate::GarblerInput   { .. } => (),
+                Gate::EvaluatorInput { .. } => (),
+                Gate::Const          { .. } => nconst    += 1,
+                Gate::Add            { .. } => nadd      += 1,
+                Gate::Sub            { .. } => nsub      += 1,
+                Gate::Cmul           { .. } => ncmul     += 1,
+                Gate::Proj           { .. } => nproj     += 1,
+                Gate::HalfGate       { .. } => nhalfgate += 1,
             }
         }
 
         println!("circuit info:");
-        println!("  ninputs:      {}", self.ninputs());
-        println!("  noutputs:     {}", self.noutputs());
-        println!("  nconsts:      {}", nconst);
+        println!("  garbler inputs:   {}", self.num_garbler_inputs());
+        println!("  evaluator inputs: {}", self.num_evaluator_inputs());
+        println!("  noutputs:         {}", self.noutputs());
+        println!("  nconsts:          {}", nconst);
         println!("");
-        println!("  additions:    {}", nadd);
-        println!("  subtractions: {}", nsub);
-        println!("  cmuls:        {}", ncmul);
-        println!("  projections:  {}", nproj);
-        println!("  halfgates:    {}", nhalfgate);
+        println!("  additions:        {}", nadd);
+        println!("  subtractions:     {}", nsub);
+        println!("  cmuls:            {}", ncmul);
+        println!("  projections:      {}", nproj);
+        println!("  halfgates:        {}", nhalfgate);
         println!("");
         println!("  total non-free gates: {}", self.num_nonfree_gates);
         println!("");
@@ -173,7 +182,8 @@ impl Circuit {
 /// The `Builder` struct is used to make a `Circuit`.
 pub struct Builder {
     next_ref_ix: usize,
-    next_input_id: Id,
+    next_garbler_input_id: usize,
+    next_evaluator_input_id: usize,
     const_map: HashMap<(u16,u16), Ref>,
     pub circ: Circuit,
 }
@@ -182,16 +192,18 @@ impl Builder {
     pub fn new() -> Self {
         let c = Circuit {
             gates: Vec::new(),
-            input_refs: Vec::new(),
+            garbler_input_refs: Vec::new(),
+            evaluator_input_refs: Vec::new(),
             const_refs: Vec::new(),
             output_refs: Vec::new(),
             gate_moduli: Vec::new(),
-            const_vals: Some(Vec::new()),
+            const_vals: Vec::new(),
             num_nonfree_gates: 0,
         };
         Builder {
             next_ref_ix: 0,
-            next_input_id: 0,
+            next_garbler_input_id: 0,
+            next_evaluator_input_id: 0,
             const_map: HashMap::new(),
             circ: c
         }
@@ -209,13 +221,19 @@ impl Builder {
         &self.circ
     }
 
-    fn get_next_input_id(&mut self) -> Id {
-        let id = self.next_input_id;
-        self.next_input_id += 1;
+    fn get_next_garbler_input_id(&mut self) -> usize {
+        let id = self.next_garbler_input_id;
+        self.next_garbler_input_id += 1;
         id
     }
 
-    fn get_next_ciphertext_id(&mut self) -> Id {
+    fn get_next_evaluator_input_id(&mut self) -> usize {
+        let id = self.next_evaluator_input_id;
+        self.next_evaluator_input_id += 1;
+        id
+    }
+
+    fn get_next_ciphertext_id(&mut self) -> usize {
         let id = self.circ.num_nonfree_gates;
         self.circ.num_nonfree_gates += 1;
         id
@@ -234,34 +252,27 @@ impl Builder {
         Ref { ix, modulus }
     }
 
-    pub fn input(&mut self, modulus: u16) -> Ref {
-        let gate = Gate::Input { id: self.get_next_input_id() };
+    pub fn garbler_input(&mut self, modulus: u16) -> Ref {
+        let gate = Gate::GarblerInput { id: self.get_next_garbler_input_id() };
         let r = self.gate(gate, modulus);
-        self.circ.input_refs.push(r);
+        self.circ.garbler_input_refs.push(r);
         r
     }
 
-    pub fn inputs(&mut self, n: usize, modulus: u16) -> Vec<Ref> {
-        (0..n).map(|_| self.input(modulus)).collect()
-    }
-
-    /// creates a new, secret, constant for each call
-    pub fn secret_constant(&mut self, val: u16, modulus: u16) -> Ref {
-        let id = self.circ.const_vals.as_ref().map_or(0, |cs| cs.len());
-        if let Some(cs) = self.circ.const_vals.as_mut() { cs.push(val) }
-        let gate = Gate::Const { id };
+    pub fn evaluator_input(&mut self, modulus: u16) -> Ref {
+        let gate = Gate::EvaluatorInput { id: self.get_next_evaluator_input_id() };
         let r = self.gate(gate, modulus);
-        self.circ.const_refs.push(r);
+        self.circ.evaluator_input_refs.push(r);
         r
     }
 
-    /// reuses constants if they already exist in the circuit
+    /// Reuse constants if they already exist in the circuit.
     pub fn constant(&mut self, val: u16, modulus: u16) -> Ref {
         match self.const_map.get(&(val, modulus)) {
             Some(&r) => r,
             None => {
-                let id = self.circ.const_vals.as_ref().map_or(0, |cs| cs.len());
-                if let Some(cs) = self.circ.const_vals.as_mut() { cs.push(val) }
+                let id = self.circ.const_vals.len();
+                self.circ.const_vals.push(val);
                 let gate = Gate::Const { id };
                 let r = self.gate(gate, modulus);
                 self.const_map.insert((val,modulus), r);
@@ -271,10 +282,12 @@ impl Builder {
         }
     }
 
+    /// Mark `xref` as an output of the circuit.
     pub fn output(&mut self, xref: Ref) {
         self.circ.output_refs.push(xref);
     }
 
+    /// Mark each `Ref` in `xs` as an output of the circuit.
     pub fn outputs(&mut self, xs: &[Ref]) {
         for &x in xs.iter() {
             self.output(x);
@@ -333,11 +346,8 @@ mod tests {
     fn and_gate_fan_n() {
         let mut rng = rand::thread_rng();
         let mut b = Builder::new();
-        let mut inps = Vec::new();
         let n = 2 + (rng.gen_usize() % 200);
-        for _ in 0..n {
-            inps.push(b.input(2));
-        }
+        let inps = b.evaluator_inputs(n,2);
         let z = b.and_many(&inps);
         b.output(z);
         let c = b.finish();
@@ -348,7 +358,7 @@ mod tests {
                 inps.push(rng.gen_bool() as u16);
             }
             let res = inps.iter().fold(0, |acc, &x| x & acc);
-            let out = c.eval(&inps)[0];
+            let out = c.eval(&[],&inps)[0];
             if !(out == res) {
                 println!("{:?} {} {}", inps, out, res);
                 panic!();
@@ -360,11 +370,8 @@ mod tests {
     fn or_gate_fan_n() {
         let mut rng = rand::thread_rng();
         let mut b = Builder::new();
-        let mut inps = Vec::new();
         let n = 2 + (rng.gen_usize() % 200);
-        for _ in 0..n {
-            inps.push(b.input(2));
-        }
+        let inps = b.evaluator_inputs(n,2);
         let z = b.or_many(&inps);
         b.output(z);
         let c = b.finish();
@@ -375,7 +382,7 @@ mod tests {
                 inps.push(rng.gen_bool() as u16);
             }
             let res = inps.iter().fold(0, |acc, &x| x | acc);
-            let out = c.eval(&inps)[0];
+            let out = c.eval(&[],&inps)[0];
             if !(out == res) {
                 println!("{:?} {} {}", inps, out, res);
                 panic!();
@@ -388,15 +395,15 @@ mod tests {
         let mut rng = rand::thread_rng();
         let mut b = Builder::new();
         let q = rng.gen_prime();
-        let x = b.input(q);
-        let y = b.input(q);
+        let x = b.garbler_input(q);
+        let y = b.evaluator_input(q);
         let z = b.half_gate(x,y);
         b.output(z);
         let c = b.finish();
         for _ in 0..16 {
             let x = rng.gen_u16() % q;
             let y = rng.gen_u16() % q;
-            assert_eq!(c.eval(&vec![x,y])[0], x * y % q);
+            assert_eq!(c.eval(&[x],&[y])[0], x * y % q);
         }
     }
 //}}}
@@ -406,14 +413,14 @@ mod tests {
         let mut b = Builder::new();
         let p = rng.gen_prime();
         let q = rng.gen_prime();
-        let x = b.input(p);
+        let x = b.garbler_input(p);
         let y = b.mod_change(&x, q);
         let z = b.mod_change(&y, p);
         b.output(z);
         let c = b.finish();
         for _ in 0..16 {
             let x = rng.gen_u16() % p;
-            assert_eq!(c.eval(&vec![x])[0], x % q);
+            assert_eq!(c.eval(&[x],&[])[0], x % q);
         }
     }
 //}}}
@@ -421,22 +428,20 @@ mod tests {
     fn add_many_mod_change() {
         let mut b = Builder::new();
         let n = 113;
-        let args = b.inputs(n, 2);
-        let wires: Vec<_> = args.iter().map(|&x| {
-            b.mod_change(&x, n as u16 + 1)
-        }).collect();
+        let args = b.garbler_inputs(n, 2);
+        let wires = args.iter().map(|x| b.mod_change(x, n as u16 + 1)).collect_vec();
         let s = b.add_many(&wires);
         b.output(s);
-        let c = &b.finish();
+        let c = b.finish();
 
         let mut rng = rand::thread_rng();
         for _ in 0..64 {
-            let inps: Vec<u16> = (0..c.ninputs()).map(|i| {
-                rng.gen_u16() % c.input_mod(i)
-            }).collect();
+            let inps = (0..c.num_garbler_inputs()).map(|i| {
+                rng.gen_u16() % c.garbler_input_mod(i)
+            }).collect_vec();
             let s: u16 = inps.iter().sum();
             println!("{:?}, sum={}", inps, s);
-            assert_eq!(c.eval(&inps)[0], s);
+            assert_eq!(c.eval(&inps, &[])[0], s);
         }
     }
 // }}}
@@ -449,7 +454,7 @@ mod tests {
 
         let mut b = Builder::new();
         let xs = (0..nargs).map(|_| {
-            mods.iter().map(|&q| b.input(q)).collect_vec()
+            mods.iter().map(|&q| b.evaluator_input(q)).collect_vec()
         }).collect_vec();
         let zs = b.mixed_radix_addition(&xs);
         b.outputs(&zs);
@@ -462,7 +467,7 @@ mod tests {
         for _ in 0..nargs {
             ds.extend(util::as_mixed_radix(Q-1, &mods).iter());
         }
-        let res = circ.eval(&ds);
+        let res = circ.eval(&[], &ds);
         assert_eq!(util::from_mixed_radix(&res,&mods), (Q-1)*(nargs as u128) % Q);
 
         // test random values
@@ -474,7 +479,7 @@ mod tests {
                 should_be = (should_be + x) % Q;
                 ds.extend(util::as_mixed_radix(x, &mods).iter());
             }
-            let res = circ.eval(&ds);
+            let res = circ.eval(&[],&ds);
             assert_eq!(util::from_mixed_radix(&res,&mods), should_be);
         }
     }
@@ -487,7 +492,7 @@ mod tests {
         let q = rng.gen_modulus();
         let c = rng.gen_u16() % q;
 
-        let x = b.input(q);
+        let x = b.evaluator_input(q);
         let y = b.constant(c,q);
         let z = b.add(x,y);
         b.output(z);
@@ -496,7 +501,7 @@ mod tests {
 
         for _ in 0..64 {
             let x = rng.gen_u16() % q;
-            let z = circ.eval(&[x]);
+            let z = circ.eval(&[],&[x]);
             assert_eq!(z[0], (x+c)%q);
         }
     }
@@ -510,7 +515,7 @@ mod tests {
 
         let mut b = Builder::new();
         let xs = (0..nargs).map(|_| {
-            mods.iter().map(|&q| b.input(q)).collect_vec()
+            mods.iter().map(|&q| b.evaluator_input(q)).collect_vec()
         }).collect_vec();
         let zs = b.mixed_radix_addition(&xs);
         b.outputs(&zs);

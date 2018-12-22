@@ -1,6 +1,6 @@
 //! Structs and functions for creating, and evaluating garbled circuits.
 
-use crate::circuit::{Circuit, Gate, Id};
+use crate::circuit::{Circuit, Gate};
 use crate::wire::Wire;
 use itertools::Itertools;
 use rand::rngs::ThreadRng;
@@ -161,7 +161,7 @@ impl Encoder {
         self.inputs.len()
     }
 
-    pub fn encode_input(&self, x: u16, id: Id) -> Wire {
+    pub fn encode_input(&self, x: u16, id: usize) -> Wire {
         let X = &self.inputs[id];
         let q = X.modulus();
         X.plus(&self.deltas[&q].cmul(x))

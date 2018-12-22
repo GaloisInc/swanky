@@ -23,6 +23,16 @@ pub trait Fancy {
     ////////////////////////////////////////////////////////////////////////////////
     // bonus functions built on top of basic fancy operations
 
+    /// Create `n` garbler inputs with modulus `q`.
+    fn garbler_inputs(&mut self, n: usize, q: u16) -> Vec<Self::Wire> {
+        (0..n).map(|_| self.garbler_input(q)).collect()
+    }
+
+    /// Create `n` evaluator inputs with modulus `q`.
+    fn evaluator_inputs(&mut self, n: usize, q: u16) -> Vec<Self::Wire> {
+        (0..n).map(|_| self.evaluator_input(q)).collect()
+    }
+
     /// Sum up a slice of `Self::Wire`.
     fn add_many(&mut self, args: &[Self::Wire]) -> Self::Wire {
         assert!(args.len() > 1);
@@ -33,17 +43,17 @@ pub trait Fancy {
         z
     }
 
-    // TODO: work out free negation
-    /// Negate using a projection.
-    fn negate(&mut self, x: &Self::Wire) -> Self::Wire {
-        assert_eq!(x.modulus(), 2);
-        self.proj(x, 2, vec![1,0])
-    }
-
     /// Xor is just addition, with the requirement that `x` and `y` are mod 2.
     fn xor(&mut self, x: &Self::Wire, y: &Self::Wire) -> Self::Wire {
         assert!(x.modulus() == 2 && y.modulus() == 2);
         self.add(x,y)
+    }
+
+    /// Negate by xoring `x` with `1`.
+    fn negate(&mut self, x: &Self::Wire) -> Self::Wire {
+        assert_eq!(x.modulus(), 2);
+        let one = self.constant(1,2);
+        self.xor(x, &one)
     }
 
     /// And is just multiplication, with the requirement that `x` and `y` are mod 2.
