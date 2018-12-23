@@ -584,6 +584,27 @@ mod tests {
         }
     }
     //}}}
+    #[test] // bundle multiplication {{{
+    fn bundle_multiplication() {
+        let mut rng = thread_rng();
+        let q = rng.gen_usable_composite_modulus();
+
+        let mut b = Builder::new();
+        let x = b.garbler_input_bundle(q);
+        let y = b.evaluator_input_bundle(q);
+        let z = b.mul_bundles(&x,&y);
+        b.output_bundle(&z);
+        let c = b.finish();
+
+        for _ in 0..16 {
+            let x = rng.gen_u64() as u128 % q;
+            let y = rng.gen_u64() as u128 % q;
+            let res = c.eval(&crt_factor(x,q),&crt_factor(y,q));
+            let z = crt_inv_factor(&res, q);
+            assert_eq!(z, (x*y)%q);
+        }
+    }
+    //}}}
     #[test] // bundle cdiv {{{
     fn bundle_cdiv() {
         let mut rng = thread_rng();
@@ -625,5 +646,51 @@ mod tests {
         }
     }
     // }}}
+    #[test] // bundle remainder {{{
+    fn bundle_remainder() {
+        let mut rng = thread_rng();
+        let ps = rng.gen_usable_factors();
+        let q = ps.iter().fold(1, |acc, &x| (x as u128) * acc);
+        let p = ps[rng.gen_u16() as usize % ps.len()];
 
+        let mut b = Builder::new();
+        let x = b.garbler_input_bundle(q);
+        let z = b.rem_bundle(&x,p);
+        b.output_bundle(&z);
+        let c = b.finish();
+
+        for _ in 0..64 {
+            let x = rng.gen_u128() % q;
+            let should_be = x % p as u128;
+            let res = c.eval(&crt_factor(x,q),&[]);
+            let z = crt_inv_factor(&res, q);
+            assert_eq!(z, should_be);
+        }
+    }
+    //}}}
+    #[test] // bundle equality {{{
+    fn bundle_equality() {
+        let mut rng = thread_rng();
+        let q = rng.gen_usable_composite_modulus();
+
+        let mut b = Builder::new();
+        let x = b.garbler_input_bundle(q);
+        let y = b.evaluator_input_bundle(q);
+        let z = b.eq_bundles(&x,&y);
+        b.output(z);
+        let c = b.finish();
+
+        // lets have at least one test where they are surely equal
+        let x = rng.gen_u128() % q;
+        let res = c.eval(&crt_factor(x,q),&crt_factor(x,q));
+        assert_eq!(res, &[(x==x) as u16]);
+
+        for _ in 0..64 {
+            let x = rng.gen_u128() % q;
+            let y = rng.gen_u128() % q;
+            let res = c.eval(&crt_factor(x,q),&crt_factor(y,q));
+            assert_eq!(res, &[(x==y) as u16]);
+        }
+    }
+    //}}}
 }

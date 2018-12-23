@@ -97,28 +97,23 @@ pub trait Fancy {
         self.mul(x,y)
     }
 
+    /// Or uses Demorgan's Rule implemented with multiplication and negation.
+    fn or(&mut self, x: &Self::Wire, y: &Self::Wire) -> Self::Wire {
+        assert!(x.modulus() == 2 && y.modulus() == 2);
+        let notx = self.negate(x);
+        let noty = self.negate(y);
+        let z = self.and(&notx, &noty);
+        self.negate(&z)
+    }
+
     /// Returns 1 if all wires equal 1.
     fn and_many(&mut self, args: &[Self::Wire]) -> Self::Wire {
         args.iter().skip(1).fold(args[0].clone(), |acc, x| self.and(&acc, x))
     }
 
-    // TODO: with free negation, use demorgans and AND
     /// Returns 1 if any wire equals 1.
     fn or_many(&mut self, args: &[Self::Wire]) -> Self::Wire {
-        assert!(args.iter().all(|x| x.modulus() == 2));
-        // convert all the wires to base b+1
-        let b = args.len();
-        let wires = args.iter().map(|x| {
-            self.proj(x, b as u16 + 1, vec![0,1])
-        }).collect_vec();
-
-        // add them together
-        let z = self.add_many(&wires);
-
-        // decode the result in base 2
-        let mut tab = vec![1;b+1];
-        tab[0] = 0;
-        self.proj(&z,2,tab)
+        args.iter().skip(1).fold(args[0].clone(), |acc, x| self.or(&acc, x))
     }
 
     /// Change the modulus of `x` to `to_modulus` using a projection gate.
@@ -196,9 +191,6 @@ pub trait Fancy {
     ////////////////////////////////////////////////////////////////////////////////
     // High level computations dealing with bundles
 
-    // TODO: I think it would be more consistent and efficient if these took a slice of
-    // moduli isntead of factoring
-
     /// Crate an input bundle for the garbler using composite modulus `q`.
     fn garbler_input_bundle(&mut self, q: u128) -> Bundle<Self::Wire> {
         let ps = crate::util::factor(q);
@@ -252,10 +244,14 @@ pub trait Fancy {
 
     /// Multiplies each wire in `x` by the corresponding residue of `c`.
     fn cmul_bundle(&mut self, x: &Bundle<Self::Wire>, c: u128) -> Bundle<Self::Wire> {
-        let primes = x.moduli();
-        let cs = crate::util::crt(&primes, c);
+        let cs = crate::util::crt(&x.moduli(), c);
         let ws = x.wires().iter().zip(cs.into_iter()).map(|(x,c)| self.cmul(x,c)).collect();
         Bundle(ws)
+    }
+
+    /// Multiply `x` with `y`.
+    fn mul_bundles(&mut self, x: &Bundle<Self::Wire>, y: &Bundle<Self::Wire>) -> Bundle<Self::Wire> {
+        Bundle(x.wires().iter().zip(y.wires().iter()).map(|(x,y)| self.mul(x,y)).collect())
     }
 
     /// Divide `x` by the constant `c`. Somewhat finicky, please test. I believe that it
@@ -283,43 +279,158 @@ pub trait Fancy {
         }).collect())
     }
 
-    // pub fn rem(&mut self, xref: BundleRef, p: u16) -> BundleRef {
-    //     let xwires = self.wires(xref);
-    //     let primes = self.primes(xref);
-    //     let i = primes.iter().position(|&q| p == q).expect("p is not one of the primes in this bundle!");
-    //     let x = xwires[i];
-    //     let zwires = primes.iter().map(|&q| self.borrow_mut_builder().mod_change(&x, q)).collect();
-    //     self.add_bundle(zwires, primes)
-    // }
+    /// Compute the remainder with respect to modulus `p`.
+    fn rem_bundle(&mut self, x: &Bundle<Self::Wire>, p: u16) -> Bundle<Self::Wire> {
+        let i = x.moduli().iter().position(|&q| p == q).expect("p is not a moduli in this bundle!");
+        let w = &x.wires()[i];
+        Bundle(x.moduli().iter().map(|&q| self.mod_change(w,q)).collect())
+    }
 
-    // pub fn mul(&mut self, xref: BundleRef, yref: BundleRef) -> BundleRef {
-    //     let xwires = self.wires(xref);
-    //     let ywires = self.wires(yref);
-    //     let primes = self.primes(xref);
-    //     let zwires = xwires.into_iter().zip(ywires.into_iter()).map(|(x,y)|
-    //         self.borrow_mut_builder().half_gate(x,y)
-    //     ).collect();
-    //     self.add_bundle(zwires, primes)
-    // }
+    /// Compute `x == y`. Returns a wire encoding the result mod 2.
+    fn eq_bundles(&mut self, x: &Bundle<Self::Wire>, y: &Bundle<Self::Wire>) -> Self::Wire {
+        assert_eq!(x.moduli(), y.moduli());
+        let wlen = x.wires().len() as u16;
+        let zs = x.wires().iter().zip_eq(y.wires().iter()).map(|(x,y)| {
+            // compute (x-y == 0) for each residue
+            let z = self.sub(x,y);
+            let mut eq_zero_tab = vec![0; x.modulus() as usize];
+            eq_zero_tab[0] = 1;
+            self.proj(&z, wlen + 1, eq_zero_tab)
+        }).collect_vec();
+        // add up the results, and output whether they equal zero or not, mod 2
+        let z = self.add_many(&zs);
+        let b = zs.len();
+        let mut tab = vec![0;b+1];
+        tab[b] = 1;
+        self.proj(&z, 2, tab)
+    }
 
-    // pub fn eq(&mut self, xref: BundleRef, yref: BundleRef) -> Ref {
-    //     let xwires = self.wires(xref);
-    //     let ywires = self.wires(yref);
-    //     let primes = self.primes(xref);
-    //     let mut zs = Vec::with_capacity(xwires.len());
-    //     for i in 0..xwires.len() {
-    //         let subbed = self.borrow_mut_builder().sub(xwires[i], ywires[i]);
-    //         let mut eq_zero_tab = vec![0; primes[i] as usize];
-    //         eq_zero_tab[0] = 1;
-    //         let z = self.borrow_mut_builder().proj(subbed, xwires.len() as u16 + 1, eq_zero_tab);
-    //         zs.push(z);
+    ////////////////////////////////////////////////////////////////////////////////
+    // fancy methods based on mike's fractional mixed radix trick
+
+    // fn fractional_mixed_radix(&mut self, xbun: BundleRef, factors_of_m: &[u16]) -> Vec<Ref> {
+    //     let ndigits = factors_of_m.len();
+    //     let q = product(&self.primes(xbun));
+    //     let M = util::product(factors_of_m);
+
+    //     let mut ds = Vec::new();
+
+    //     let xs = self.wires(xbun);
+    //     let ps = self.primes(xbun);
+    //     let mut b = self.take_builder();
+
+    //     for (xref, &p) in xs.into_iter().zip(ps.iter()) {
+
+    //         let mut tabs = vec![Vec::with_capacity(p as usize); ndigits];
+
+    //         for x in 0..p {
+    //             let crt_coef = inv(((q / p as u128) % p as u128) as i64, p as i64);
+    //             let y = (M as f64 * x as f64 * crt_coef as f64 / p as f64).round() as u128 % M;
+    //             let digits = util::as_mixed_radix(y, factors_of_m);
+    //             for i in 0..ndigits {
+    //                 tabs[i].push(digits[i]);
+    //             }
+    //         }
+
+    //         let new_ds = tabs.into_iter().enumerate()
+    //             .map(|(i,tt)| b.proj(xref, factors_of_m[i], tt))
+    //             .collect_vec();
+
+    //         ds.push(new_ds);
     //     }
-    //     // self.borrow_mut_builder()._and_many(&zs)
-    //     let z = self.borrow_mut_builder().add_many(&zs);
-    //     let b = zs.len();
-    //     let mut tab = vec![0;b+1];
-    //     tab[b] = 1;
-    //     self.borrow_mut_builder().proj(z, 2, tab)
+    //     let res = b.mixed_radix_addition(&ds);
+    //     self.put_builder(b);
+    //     res
     // }
 
+    // pub fn relu(&mut self, xbun: BundleRef, factors_of_m: &[u16]) -> BundleRef {
+    //     let res = self.fractional_mixed_radix(xbun, factors_of_m);
+
+    //     // project the MSB to 0/1, whether or not it is less than p/2
+    //     let p = *factors_of_m.last().unwrap();
+    //     let mask_tt = (0..p).map(|x| (x < p/2) as u16).collect();
+    //     let mask = self.borrow_mut_builder().proj(*res.last().unwrap(), 2, mask_tt);
+
+    //     // use the mask to either output x or 0
+    //     let zwires = self.wires(xbun).into_iter().map(|x| {
+    //         self.borrow_mut_builder().half_gate(x,mask)
+    //     }).collect_vec();
+
+    //     let primes = self.primes(xbun);
+    //     self.add_bundle(zwires, primes)
+    // }
+
+    // // outputs 0/1
+    // pub fn sign(&mut self, xbun: BundleRef, factors_of_m: &[u16]) -> Ref {
+    //     let res = self.fractional_mixed_radix(xbun, factors_of_m);
+    //     let p = *factors_of_m.last().unwrap();
+    //     let tt = (0..p).map(|x| (x >= p/2) as u16).collect();
+    //     self.borrow_mut_builder().proj(*res.last().unwrap(), 2, tt)
+    // }
+
+    // // outputs 1/-1
+    // pub fn sgn(&mut self, xbun: BundleRef, factors_of_m: &[u16]) -> BundleRef {
+    //     let sign = self.sign(xbun, factors_of_m);
+
+    //     let ps = self.primes(xbun);
+    //     let q = util::product(&ps);
+    //     let mut ws = Vec::with_capacity(ps.len());
+
+    //     for &p in ps.iter() {
+    //         let tt = vec![ 1, ((q-1) % p as u128) as u16 ];
+    //         let w = self.borrow_mut_builder().proj(sign, p, tt);
+    //         ws.push(w);
+    //     }
+    //     self.add_bundle(ws, ps)
+    // }
+
+    // fn exact_ms(&self, xbun: BundleRef) -> Vec<u16> {
+    //     match self.primes(xbun).len() {
+    //         3 => vec![2;5],
+    //         4 => vec![3,26],
+    //         5 => vec![3,4,54],
+    //         6 => vec![5,5,6,50],
+    //         7 => vec![6,6,7,7,74],
+    //         8 => vec![5,7,8,8,9,98],
+    //         9 => vec![4,7,10,10,10,10,134],
+    //         n => panic!("unknown exact Ms for {} primes!", n),
+    //     }
+    // }
+
+    // pub fn exact_sgn(&mut self, xbun: BundleRef) -> BundleRef {
+    //     let ms = self.exact_ms(xbun);
+    //     self.sgn(xbun, &ms)
+    // }
+
+    // pub fn exact_relu(&mut self, xbun: BundleRef) -> BundleRef {
+    //     let ms = self.exact_ms(xbun);
+    //     self.relu(xbun, &ms)
+    // }
+
+    // pub fn exact_leq(&mut self, xbun: BundleRef, ybun: BundleRef) -> Ref {
+    //     let ms = self.exact_ms(xbun);
+    //     let zbun = self.sub(xbun, ybun);
+    //     self.sign(zbun, &ms)
+    // }
+
+    // pub fn max(&mut self, buns: &[BundleRef]) -> BundleRef {
+    //     debug_assert!(buns.len() > 1);
+
+    //     buns.iter().skip(1).fold(buns[0], |xbun, &ybun| {
+    //         let pos = self.exact_leq(xbun,ybun);
+    //         let neg = self.borrow_mut_builder().negate(&pos);
+
+    //         let x_wires = self.wires(xbun);
+    //         let y_wires = self.wires(ybun);
+
+    //         let z_wires = x_wires.iter().zip(y_wires.iter()).map(|(&x,&y)| {
+    //             let xp = self.borrow_mut_builder().half_gate(x,neg);
+    //             let yp = self.borrow_mut_builder().half_gate(y,pos);
+    //             self.borrow_mut_builder().add(xp,yp)
+    //         }).collect();
+
+    //         let primes = self.primes(xbun);
+    //         self.add_bundle(z_wires, primes)
+    //     })
+    // }
 }
