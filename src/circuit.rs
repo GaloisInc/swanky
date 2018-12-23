@@ -4,7 +4,7 @@
 
 use serde_derive::{Serialize, Deserialize};
 use std::collections::HashMap;
-use crate::fancy::{FancyBuilder, KnowsModulus};
+use crate::fancy::{FancyBuilder, KnowsModulus, FancyBundle};
 
 /// The index and modulus of a `Gate` in a `Circuit`.
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
@@ -325,18 +325,23 @@ impl Builder {
         }
     }
 
+    pub fn output_bundle(&mut self, x: FancyBundle<Ref>) {
+        for &w in x.wires() {
+            self.output(w);
+        }
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::util::{self, RngExt};
+    use crate::util::{self, RngExt, crt_factor, crt_inv_factor};
     use itertools::Itertools;
-    use rand;
+    use rand::thread_rng;
 
     #[test] // {{{ and_gate_fan_n
     fn and_gate_fan_n() {
-        let mut rng = rand::thread_rng();
+        let mut rng = thread_rng();
         let mut b = Builder::new();
         let n = 2 + (rng.gen_usize() % 200);
         let inps = b.evaluator_inputs(n,2);
@@ -360,7 +365,7 @@ mod tests {
 //}}}
     #[test] // {{{ or_gate_fan_n
     fn or_gate_fan_n() {
-        let mut rng = rand::thread_rng();
+        let mut rng = thread_rng();
         let mut b = Builder::new();
         let n = 2 + (rng.gen_usize() % 200);
         let inps = b.evaluator_inputs(n,2);
@@ -384,7 +389,7 @@ mod tests {
 //}}}
     #[test] // {{{ half_gate
     fn half_gate() {
-        let mut rng = rand::thread_rng();
+        let mut rng = thread_rng();
         let mut b = Builder::new();
         let q = rng.gen_prime();
         let x = b.garbler_input(q);
@@ -401,7 +406,7 @@ mod tests {
 //}}}
     #[test] // mod_change {{{
     fn mod_change() {
-        let mut rng = rand::thread_rng();
+        let mut rng = thread_rng();
         let mut b = Builder::new();
         let p = rng.gen_prime();
         let q = rng.gen_prime();
@@ -426,7 +431,7 @@ mod tests {
         b.output(s);
         let c = b.finish();
 
-        let mut rng = rand::thread_rng();
+        let mut rng = thread_rng();
         for _ in 0..64 {
             let inps = (0..c.num_garbler_inputs()).map(|i| {
                 rng.gen_u16() % c.garbler_input_mod(i)
@@ -439,7 +444,7 @@ mod tests {
 // }}}
     #[test] // mixed_radix_addition {{{
     fn mixed_radix_addition() {
-        let mut rng = rand::thread_rng();
+        let mut rng = thread_rng();
 
         let nargs = 2 + rng.gen_usize() % 100;
         let mods = (0..7).map(|_| rng.gen_modulus()).collect_vec();
@@ -479,7 +484,7 @@ mod tests {
     #[test] // constants {{{
     fn constants() {
         let mut b = Builder::new();
-        let mut rng = rand::thread_rng();
+        let mut rng = thread_rng();
 
         let q = rng.gen_modulus();
         let c = rng.gen_u16() % q;
@@ -500,7 +505,7 @@ mod tests {
 //}}}
     #[test] // serialization {{{
     fn serialization() {
-        let mut rng = rand::thread_rng();
+        let mut rng = thread_rng();
 
         let nargs = 2 + rng.gen_usize() % 100;
         let mods = (0..7).map(|_| rng.gen_modulus()).collect_vec();
@@ -518,5 +523,67 @@ mod tests {
         assert_eq!(circ, Circuit::from_str(&circ.to_string()).unwrap());
     }
 //}}}
+    #[test] // bundle addition {{{
+    fn bundle_addition() {
+        let mut rng = thread_rng();
+        let q = rng.gen_usable_composite_modulus();
+
+        let mut b = Builder::new();
+        let x = b.garbler_input_bundle(q);
+        let y = b.evaluator_input_bundle(q);
+        let z = b.add_bundles(&x,&y);
+        b.output_bundle(z);
+        let c = b.finish();
+
+        for _ in 0..16 {
+            let x = rng.gen_u128() % q;
+            let y = rng.gen_u128() % q;
+            let res = c.eval(&crt_factor(x,q),&crt_factor(y,q));
+            let z = crt_inv_factor(&res, q);
+            assert_eq!(z, (x+y)%q);
+        }
+    }
+    //}}}
+    #[test] // bundle subtraction {{{
+    fn bundle_subtraction() {
+        let mut rng = thread_rng();
+        let q = rng.gen_usable_composite_modulus();
+
+        let mut b = Builder::new();
+        let x = b.garbler_input_bundle(q);
+        let y = b.evaluator_input_bundle(q);
+        let z = b.sub_bundles(&x,&y);
+        b.output_bundle(z);
+        let c = b.finish();
+
+        for _ in 0..16 {
+            let x = rng.gen_u128() % q;
+            let y = rng.gen_u128() % q;
+            let res = c.eval(&crt_factor(x,q),&crt_factor(y,q));
+            let z = crt_inv_factor(&res, q);
+            assert_eq!(z, (x+q-y)%q);
+        }
+    }
+    //}}}
+    #[test] // bundle cmul {{{
+    fn bundle_cmul() {
+        let mut rng = thread_rng();
+        let q = util::modulus_with_width(16);
+
+        let mut b = Builder::new();
+        let x = b.garbler_input_bundle(q);
+        let y = rng.gen_u128() % q;
+        let z = b.cmul_bundle(&x,y);
+        b.output_bundle(z);
+        let c = b.finish();
+
+        for _ in 0..16 {
+            let x = rng.gen_u128() % q;
+            let res = c.eval(&crt_factor(x,q),&[]);
+            let z = crt_inv_factor(&res, q);
+            assert_eq!(z, (x*y)%q);
+        }
+    }
+    //}}}
 
 }

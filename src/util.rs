@@ -167,20 +167,26 @@ pub fn crt(ps: &[u16], x: u128) -> Vec<u16> {
     }).collect()
 }
 
+/// Compute the CRT representation of `x` with respect to the factorization of `q`.
+pub fn crt_factor(x: u128, q: u128) -> Vec<u16> {
+    crt(&factor(q), x)
+}
+
 /// Compute the value `x` given a list of CRT primes and residues.
 pub fn crt_inv(ps: &[u16], xs: &[u16]) -> u128 {
     let mut ret = BigInt::zero();
-
     let M = ps.iter().fold(BigInt::one(), |acc, &x| BigInt::from(x) * acc );
-
     for (&p, &a) in ps.iter().zip(xs.iter()) {
         let p = BigInt::from(p);
         let q = &M / &p;
         ret += BigInt::from(a) * inv_ref(&q,&p) * q;
         ret %= &M;
     }
-
     ret.to_u128().unwrap()
+}
+
+pub fn crt_inv_factor(xs: &[u16], q: u128) -> u128 {
+    crt_inv(&factor(q), xs)
 }
 
 /// Generic algorithm to invert `inp_a` mod `inp_b`. As ref so as to support `BigInt`

@@ -7,7 +7,17 @@ pub trait KnowsModulus {
 
 /// Collection of `FancyWire`, which could be used for Chinese Remainder Theorem or Mixed
 /// Radix number representations.
-pub struct FancyBundle<W>(Vec<W>);
+pub struct FancyBundle<W: KnowsModulus>(Vec<W>);
+
+impl <W: KnowsModulus> FancyBundle<W> {
+    pub fn moduli(&self) -> Vec<u16> {
+        self.0.iter().map(|w| w.modulus()).collect()
+    }
+
+    pub fn wires(&self) -> &[W] {
+        &self.0
+    }
+}
 
 /// `FancyBuilder` implements the basic fancy-garbling functions, either to create a
 /// circuit or a streaming protocol.
@@ -164,15 +174,66 @@ pub trait FancyBuilder {
     }
 
     ////////////////////////////////////////////////////////////////////////////////
-    // higher level stuff
+    // Things dealing with bundles
 
-    fn add_bundles(&mut self, x: FancyBundle<Self::FancyWire>, y: FancyBundle<Self::FancyWire>)
+    /// Crate an input bundle for the garbler using composite modulus `q`.
+    fn garbler_input_bundle(&mut self, q: u128) -> FancyBundle<Self::FancyWire> {
+        let ps = crate::util::factor(q);
+        let ws = ps.into_iter().map(|p| self.garbler_input(p)).collect();
+        FancyBundle(ws)
+    }
+
+    /// Crate an input bundle for the evaluator using composite modulus `q`.
+    fn evaluator_input_bundle(&mut self, q: u128) -> FancyBundle<Self::FancyWire> {
+        let ps = crate::util::factor(q);
+        let ws = ps.into_iter().map(|p| self.evaluator_input(p)).collect();
+        FancyBundle(ws)
+    }
+
+    /// Creates a bundle of constant wires for the CRT representation of `x` under
+    /// composite modulus `q`.
+    fn constant_bundle(&mut self, x: u128, q: u128) -> FancyBundle<Self::FancyWire> {
+        let ps = crate::util::factor(q);
+        let ws = ps.into_iter().map(|p| {
+            let c = (x % p as u128) as u16;
+            self.constant(c,p)
+        }).collect();
+        FancyBundle(ws)
+    }
+
+    /// Create `n` garbler input wires, under composite modulus `q`.
+    fn garbler_input_bundles(&mut self, q: u128, n: usize) -> Vec<FancyBundle<Self::FancyWire>> {
+        (0..n).map(|_| self.garbler_input_bundle(q)).collect()
+    }
+
+    /// Create `n` evaluator input wires, under composite modulus `q`.
+    fn evaluator_input_bundles(&mut self, q: u128, n: usize) -> Vec<FancyBundle<Self::FancyWire>> {
+        (0..n).map(|_| self.evaluator_input_bundle(q)).collect()
+    }
+
+    /// Add two wire bundles, residue by residue.
+    fn add_bundles(&mut self, x: &FancyBundle<Self::FancyWire>, y: &FancyBundle<Self::FancyWire>)
         -> FancyBundle<Self::FancyWire> {
         assert_eq!(x.0.len(), y.0.len());
         let res = x.0.iter().zip(y.0.iter()).map(|(x,y)| self.add(x,y)).collect();
         FancyBundle(res)
     }
 
+    /// Subtract two wire bundles, residue by residue.
+    fn sub_bundles(&mut self, x: &FancyBundle<Self::FancyWire>, y: &FancyBundle<Self::FancyWire>)
+        -> FancyBundle<Self::FancyWire> {
+        assert_eq!(x.0.len(), y.0.len());
+        let res = x.0.iter().zip(y.0.iter()).map(|(x,y)| self.sub(x,y)).collect();
+        FancyBundle(res)
+    }
+
+    /// Multiplies each wire in `x` by the corresponding residue of `c`.
+    fn cmul_bundle(&mut self, x: &FancyBundle<Self::FancyWire>, c: u128) -> FancyBundle<Self::FancyWire> {
+        let primes = x.moduli();
+        let cs = crate::util::crt(&primes, c);
+        let ws = x.0.iter().zip(cs.into_iter()).map(|(x,c)| self.cmul(x,c)).collect();
+        FancyBundle(ws)
+    }
 }
 
 
