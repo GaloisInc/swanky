@@ -1,40 +1,45 @@
 use itertools::Itertools;
 
+/// We require `FancyWire` to know its own modulus.
 pub trait KnowsModulus {
     fn modulus(&self) -> u16;
 }
 
-pub struct Bundle<W>(Vec<W>);
+/// Collection of `FancyWire`, which could be used for Chinese Remainder Theorem or Mixed
+/// Radix number representations.
+pub struct FancyBundle<W>(Vec<W>);
 
-/// A struct is `Fancy` if it implements the basic fancy-garbling functions.
-pub trait Fancy {
-    type Wire: Clone + KnowsModulus;
+/// `FancyBuilder` implements the basic fancy-garbling functions, either to create a
+/// circuit or a streaming protocol.
+pub trait FancyBuilder {
+    /// The underlying datatype created by a `FancyBuilder`.
+    type FancyWire: Clone + KnowsModulus;
 
-    fn garbler_input(&mut self, q: u16) -> Self::Wire;
-    fn evaluator_input(&mut self, q: u16) -> Self::Wire;
-    fn constant(&mut self, x: u16, q: u16) -> Self::Wire;
+    fn garbler_input(&mut self, q: u16) -> Self::FancyWire;
+    fn evaluator_input(&mut self, q: u16) -> Self::FancyWire;
+    fn constant(&mut self, x: u16, q: u16) -> Self::FancyWire;
 
-    fn add(&mut self, x: &Self::Wire, y: &Self::Wire) -> Self::Wire;
-    fn sub(&mut self, x: &Self::Wire, y: &Self::Wire) -> Self::Wire;
-    fn mul(&mut self, x: &Self::Wire, y: &Self::Wire) -> Self::Wire;
-    fn cmul(&mut self, x: &Self::Wire, c: u16) -> Self::Wire;
-    fn proj(&mut self, x: &Self::Wire, q: u16, tt: Vec<u16>) -> Self::Wire;
+    fn add(&mut self, x: &Self::FancyWire, y: &Self::FancyWire) -> Self::FancyWire;
+    fn sub(&mut self, x: &Self::FancyWire, y: &Self::FancyWire) -> Self::FancyWire;
+    fn mul(&mut self, x: &Self::FancyWire, y: &Self::FancyWire) -> Self::FancyWire;
+    fn cmul(&mut self, x: &Self::FancyWire, c: u16) -> Self::FancyWire;
+    fn proj(&mut self, x: &Self::FancyWire, q: u16, tt: Vec<u16>) -> Self::FancyWire;
 
     ////////////////////////////////////////////////////////////////////////////////
     // bonus functions built on top of basic fancy operations
 
     /// Create `n` garbler inputs with modulus `q`.
-    fn garbler_inputs(&mut self, n: usize, q: u16) -> Vec<Self::Wire> {
+    fn garbler_inputs(&mut self, n: usize, q: u16) -> Vec<Self::FancyWire> {
         (0..n).map(|_| self.garbler_input(q)).collect()
     }
 
     /// Create `n` evaluator inputs with modulus `q`.
-    fn evaluator_inputs(&mut self, n: usize, q: u16) -> Vec<Self::Wire> {
+    fn evaluator_inputs(&mut self, n: usize, q: u16) -> Vec<Self::FancyWire> {
         (0..n).map(|_| self.evaluator_input(q)).collect()
     }
 
-    /// Sum up a slice of `Self::Wire`.
-    fn add_many(&mut self, args: &[Self::Wire]) -> Self::Wire {
+    /// Sum up a slice of `Self::FancyWire`.
+    fn add_many(&mut self, args: &[Self::FancyWire]) -> Self::FancyWire {
         assert!(args.len() > 1);
         let mut z = args[0].clone();
         for x in args.iter().skip(1) {
@@ -44,32 +49,32 @@ pub trait Fancy {
     }
 
     /// Xor is just addition, with the requirement that `x` and `y` are mod 2.
-    fn xor(&mut self, x: &Self::Wire, y: &Self::Wire) -> Self::Wire {
+    fn xor(&mut self, x: &Self::FancyWire, y: &Self::FancyWire) -> Self::FancyWire {
         assert!(x.modulus() == 2 && y.modulus() == 2);
         self.add(x,y)
     }
 
     /// Negate by xoring `x` with `1`.
-    fn negate(&mut self, x: &Self::Wire) -> Self::Wire {
+    fn negate(&mut self, x: &Self::FancyWire) -> Self::FancyWire {
         assert_eq!(x.modulus(), 2);
         let one = self.constant(1,2);
         self.xor(x, &one)
     }
 
     /// And is just multiplication, with the requirement that `x` and `y` are mod 2.
-    fn and(&mut self, x: &Self::Wire, y: &Self::Wire) -> Self::Wire {
+    fn and(&mut self, x: &Self::FancyWire, y: &Self::FancyWire) -> Self::FancyWire {
         assert!(x.modulus() == 2 && y.modulus() == 2);
         self.mul(x,y)
     }
 
-    /// Returns 1 if all `Self::Wire` equal 1.
-    fn and_many(&mut self, args: &[Self::Wire]) -> Self::Wire {
+    /// Returns 1 if all `Self::FancyWire` equal 1.
+    fn and_many(&mut self, args: &[Self::FancyWire]) -> Self::FancyWire {
         args.iter().skip(1).fold(args[0].clone(), |acc, x| self.and(&acc, x))
     }
 
     // TODO: with free negation, use demorgans and AND
-    /// Returns 1 if any `Self::Wire` equals 1 in `args`.
-    fn or_many(&mut self, args: &[Self::Wire]) -> Self::Wire {
+    /// Returns 1 if any `Self::FancyWire` equals 1 in `args`.
+    fn or_many(&mut self, args: &[Self::FancyWire]) -> Self::FancyWire {
         assert!(args.iter().all(|x| x.modulus() == 2));
         // convert all the wires to base b+1
         let b = args.len();
@@ -87,7 +92,7 @@ pub trait Fancy {
     }
 
     /// Change the modulus of `x` to `to_modulus` using a projection gate.
-    fn mod_change(&mut self, x: &Self::Wire, to_modulus: u16) -> Self::Wire {
+    fn mod_change(&mut self, x: &Self::FancyWire, to_modulus: u16) -> Self::FancyWire {
         let from_modulus = x.modulus();
         if from_modulus == to_modulus {
             return x.clone();
@@ -97,7 +102,7 @@ pub trait Fancy {
     }
 
     /// Mixed radix addition of potentially many values.
-    fn mixed_radix_addition(&mut self, xs: &[Vec<Self::Wire>]) -> Vec<Self::Wire> {
+    fn mixed_radix_addition(&mut self, xs: &[Vec<Self::FancyWire>]) -> Vec<Self::FancyWire> {
         let nargs = xs.len();
         let n = xs[0].len();
         assert!(xs.len() > 1 && xs.iter().all(|x| x.len() == n));
@@ -161,10 +166,11 @@ pub trait Fancy {
     ////////////////////////////////////////////////////////////////////////////////
     // higher level stuff
 
-    fn add_bundles(&mut self, x: Bundle<Self::Wire>, y: Bundle<Self::Wire>) -> Bundle<Self::Wire> {
+    fn add_bundles(&mut self, x: FancyBundle<Self::FancyWire>, y: FancyBundle<Self::FancyWire>)
+        -> FancyBundle<Self::FancyWire> {
         assert_eq!(x.0.len(), y.0.len());
         let res = x.0.iter().zip(y.0.iter()).map(|(x,y)| self.add(x,y)).collect();
-        Bundle(res)
+        FancyBundle(res)
     }
 
 }

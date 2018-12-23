@@ -1,10 +1,10 @@
 //! DSL for creating circuits compatible with fancy-garbling.  `Builder` implements the
-//! typeclass `Fancy`, which contains all of the types of computations supported by
+//! typeclass `FancyBuilder`, which contains all of the types of computations supported by
 //! fancy-garbling.
 
 use serde_derive::{Serialize, Deserialize};
 use std::collections::HashMap;
-use crate::fancy::{Fancy, KnowsModulus};
+use crate::fancy::{FancyBuilder, KnowsModulus};
 
 /// The index and modulus of a `Gate` in a `Circuit`.
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
@@ -176,8 +176,8 @@ pub struct Builder {
     pub circ: Circuit,
 }
 
-impl Fancy for Builder {
-    type Wire = Ref;
+impl FancyBuilder for Builder {
+    type FancyWire = Ref;
 
     fn garbler_input(&mut self, modulus: u16) -> Ref {
         let gate = Gate::GarblerInput { id: self.get_next_garbler_input_id() };
@@ -518,3 +518,5 @@ mod tests {
         assert_eq!(circ, Circuit::from_str(&circ.to_string()).unwrap());
     }
 //}}}
+
+}

@@ -334,7 +334,7 @@ impl Evaluator {
 mod tests {
     use super::*;
     use crate::circuit::{Circuit, Builder};
-    use crate::fancy::Fancy;
+    use crate::fancy::FancyBuilder;
     use crate::util::{self, RngExt};
     use itertools::Itertools;
     use rand::thread_rng;
