@@ -6,7 +6,7 @@ use itertools::Itertools;
 use rand::rngs::ThreadRng;
 use serde_derive::{Serialize, Deserialize};
 use std::collections::HashMap;
-use crate::fancy::KnowsModulus;
+use crate::fancy::HasModulus;
 
 pub mod operations;
 
@@ -334,7 +334,7 @@ impl Evaluator {
 mod tests {
     use super::*;
     use crate::circuit::{Circuit, Builder};
-    use crate::fancy::FancyBuilder;
+    use crate::fancy::Fancy;
     use crate::util::{self, RngExt};
     use itertools::Itertools;
     use rand::thread_rng;

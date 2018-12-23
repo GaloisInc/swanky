@@ -1,55 +1,75 @@
+//! The `Fancy` trait represents the kinds of computations possible in `fancy-garbling`.
+//!
+//! An implementer must be able to create inputs, constants, do modular arithmetic, and
+//! create projections.
+
 use itertools::Itertools;
 
-/// We require `FancyWire` to know its own modulus.
-pub trait KnowsModulus {
+/// A wire that has a modulus.
+pub trait HasModulus {
+    /// The modulus of the wire.
     fn modulus(&self) -> u16;
 }
 
-/// Collection of `FancyWire`, which could be used for Chinese Remainder Theorem or Mixed
-/// Radix number representations.
-pub struct FancyBundle<W: KnowsModulus>(Vec<W>);
+/// Collection of wires, used in advanced garbled gadgets.
+pub struct Bundle<W: HasModulus>(Vec<W>);
 
-impl <W: KnowsModulus> FancyBundle<W> {
+impl <W: HasModulus> Bundle<W> {
+    /// Return the moduli of all the wires in the bundle.
     pub fn moduli(&self) -> Vec<u16> {
         self.0.iter().map(|w| w.modulus()).collect()
     }
 
+    /// Extract the wires from this bundle.
     pub fn wires(&self) -> &[W] {
         &self.0
     }
 }
 
-/// `FancyBuilder` implements the basic fancy-garbling functions, either to create a
-/// circuit or a streaming protocol.
-pub trait FancyBuilder {
-    /// The underlying datatype created by a `FancyBuilder`.
-    type FancyWire: Clone + KnowsModulus;
+/// The computations supported in fancy-garbling.
+pub trait Fancy {
+    /// The underlying wire datatype created by an object implementing `Fancy`.
+    type Wire: Clone + HasModulus;
 
-    fn garbler_input(&mut self, q: u16) -> Self::FancyWire;
-    fn evaluator_input(&mut self, q: u16) -> Self::FancyWire;
-    fn constant(&mut self, x: u16, q: u16) -> Self::FancyWire;
+    /// Create an input for the garbler with modulus `q`.
+    fn garbler_input(&mut self, q: u16) -> Self::Wire;
 
-    fn add(&mut self, x: &Self::FancyWire, y: &Self::FancyWire) -> Self::FancyWire;
-    fn sub(&mut self, x: &Self::FancyWire, y: &Self::FancyWire) -> Self::FancyWire;
-    fn mul(&mut self, x: &Self::FancyWire, y: &Self::FancyWire) -> Self::FancyWire;
-    fn cmul(&mut self, x: &Self::FancyWire, c: u16) -> Self::FancyWire;
-    fn proj(&mut self, x: &Self::FancyWire, q: u16, tt: Vec<u16>) -> Self::FancyWire;
+    /// Create an input for the evaluator with modulus `q`.
+    fn evaluator_input(&mut self, q: u16) -> Self::Wire;
+
+    /// Create a constant `x` with modulus `q`.
+    fn constant(&mut self, x: u16, q: u16) -> Self::Wire;
+
+    /// Add `x` and `y`.
+    fn add(&mut self, x: &Self::Wire, y: &Self::Wire) -> Self::Wire;
+
+    /// Subtract `x` and `y`.
+    fn sub(&mut self, x: &Self::Wire, y: &Self::Wire) -> Self::Wire;
+
+    /// Multiply `x` and `y`.
+    fn mul(&mut self, x: &Self::Wire, y: &Self::Wire) -> Self::Wire;
+
+    /// Multiply `x` times the constant `c`.
+    fn cmul(&mut self, x: &Self::Wire, c: u16) -> Self::Wire;
+
+    /// Project `x` according to the truth table `tt`. Resulting wire has modulus `q`.
+    fn proj(&mut self, x: &Self::Wire, q: u16, tt: Vec<u16>) -> Self::Wire;
 
     ////////////////////////////////////////////////////////////////////////////////
     // bonus functions built on top of basic fancy operations
 
     /// Create `n` garbler inputs with modulus `q`.
-    fn garbler_inputs(&mut self, n: usize, q: u16) -> Vec<Self::FancyWire> {
+    fn garbler_inputs(&mut self, n: usize, q: u16) -> Vec<Self::Wire> {
         (0..n).map(|_| self.garbler_input(q)).collect()
     }
 
     /// Create `n` evaluator inputs with modulus `q`.
-    fn evaluator_inputs(&mut self, n: usize, q: u16) -> Vec<Self::FancyWire> {
+    fn evaluator_inputs(&mut self, n: usize, q: u16) -> Vec<Self::Wire> {
         (0..n).map(|_| self.evaluator_input(q)).collect()
     }
 
-    /// Sum up a slice of `Self::FancyWire`.
-    fn add_many(&mut self, args: &[Self::FancyWire]) -> Self::FancyWire {
+    /// Sum up a slice of wires.
+    fn add_many(&mut self, args: &[Self::Wire]) -> Self::Wire {
         assert!(args.len() > 1);
         let mut z = args[0].clone();
         for x in args.iter().skip(1) {
@@ -59,32 +79,32 @@ pub trait FancyBuilder {
     }
 
     /// Xor is just addition, with the requirement that `x` and `y` are mod 2.
-    fn xor(&mut self, x: &Self::FancyWire, y: &Self::FancyWire) -> Self::FancyWire {
+    fn xor(&mut self, x: &Self::Wire, y: &Self::Wire) -> Self::Wire {
         assert!(x.modulus() == 2 && y.modulus() == 2);
         self.add(x,y)
     }
 
     /// Negate by xoring `x` with `1`.
-    fn negate(&mut self, x: &Self::FancyWire) -> Self::FancyWire {
+    fn negate(&mut self, x: &Self::Wire) -> Self::Wire {
         assert_eq!(x.modulus(), 2);
         let one = self.constant(1,2);
         self.xor(x, &one)
     }
 
     /// And is just multiplication, with the requirement that `x` and `y` are mod 2.
-    fn and(&mut self, x: &Self::FancyWire, y: &Self::FancyWire) -> Self::FancyWire {
+    fn and(&mut self, x: &Self::Wire, y: &Self::Wire) -> Self::Wire {
         assert!(x.modulus() == 2 && y.modulus() == 2);
         self.mul(x,y)
     }
 
-    /// Returns 1 if all `Self::FancyWire` equal 1.
-    fn and_many(&mut self, args: &[Self::FancyWire]) -> Self::FancyWire {
+    /// Returns 1 if all wires equal 1.
+    fn and_many(&mut self, args: &[Self::Wire]) -> Self::Wire {
         args.iter().skip(1).fold(args[0].clone(), |acc, x| self.and(&acc, x))
     }
 
     // TODO: with free negation, use demorgans and AND
-    /// Returns 1 if any `Self::FancyWire` equals 1 in `args`.
-    fn or_many(&mut self, args: &[Self::FancyWire]) -> Self::FancyWire {
+    /// Returns 1 if any wire equals 1.
+    fn or_many(&mut self, args: &[Self::Wire]) -> Self::Wire {
         assert!(args.iter().all(|x| x.modulus() == 2));
         // convert all the wires to base b+1
         let b = args.len();
@@ -102,7 +122,7 @@ pub trait FancyBuilder {
     }
 
     /// Change the modulus of `x` to `to_modulus` using a projection gate.
-    fn mod_change(&mut self, x: &Self::FancyWire, to_modulus: u16) -> Self::FancyWire {
+    fn mod_change(&mut self, x: &Self::Wire, to_modulus: u16) -> Self::Wire {
         let from_modulus = x.modulus();
         if from_modulus == to_modulus {
             return x.clone();
@@ -112,7 +132,7 @@ pub trait FancyBuilder {
     }
 
     /// Mixed radix addition of potentially many values.
-    fn mixed_radix_addition(&mut self, xs: &[Vec<Self::FancyWire>]) -> Vec<Self::FancyWire> {
+    fn mixed_radix_addition(&mut self, xs: &[Vec<Self::Wire>]) -> Vec<Self::Wire> {
         let nargs = xs.len();
         let n = xs[0].len();
         assert!(xs.len() > 1 && xs.iter().all(|x| x.len() == n));
@@ -174,66 +194,132 @@ pub trait FancyBuilder {
     }
 
     ////////////////////////////////////////////////////////////////////////////////
-    // Things dealing with bundles
+    // High level computations dealing with bundles
+
+    // TODO: I think it would be more consistent and efficient if these took a slice of
+    // moduli isntead of factoring
 
     /// Crate an input bundle for the garbler using composite modulus `q`.
-    fn garbler_input_bundle(&mut self, q: u128) -> FancyBundle<Self::FancyWire> {
+    fn garbler_input_bundle(&mut self, q: u128) -> Bundle<Self::Wire> {
         let ps = crate::util::factor(q);
         let ws = ps.into_iter().map(|p| self.garbler_input(p)).collect();
-        FancyBundle(ws)
+        Bundle(ws)
     }
 
     /// Crate an input bundle for the evaluator using composite modulus `q`.
-    fn evaluator_input_bundle(&mut self, q: u128) -> FancyBundle<Self::FancyWire> {
+    fn evaluator_input_bundle(&mut self, q: u128) -> Bundle<Self::Wire> {
         let ps = crate::util::factor(q);
         let ws = ps.into_iter().map(|p| self.evaluator_input(p)).collect();
-        FancyBundle(ws)
+        Bundle(ws)
     }
 
     /// Creates a bundle of constant wires for the CRT representation of `x` under
     /// composite modulus `q`.
-    fn constant_bundle(&mut self, x: u128, q: u128) -> FancyBundle<Self::FancyWire> {
+    fn constant_bundle(&mut self, x: u128, q: u128) -> Bundle<Self::Wire> {
         let ps = crate::util::factor(q);
         let ws = ps.into_iter().map(|p| {
             let c = (x % p as u128) as u16;
             self.constant(c,p)
         }).collect();
-        FancyBundle(ws)
+        Bundle(ws)
     }
 
     /// Create `n` garbler input wires, under composite modulus `q`.
-    fn garbler_input_bundles(&mut self, q: u128, n: usize) -> Vec<FancyBundle<Self::FancyWire>> {
+    fn garbler_input_bundles(&mut self, q: u128, n: usize) -> Vec<Bundle<Self::Wire>> {
         (0..n).map(|_| self.garbler_input_bundle(q)).collect()
     }
 
     /// Create `n` evaluator input wires, under composite modulus `q`.
-    fn evaluator_input_bundles(&mut self, q: u128, n: usize) -> Vec<FancyBundle<Self::FancyWire>> {
+    fn evaluator_input_bundles(&mut self, q: u128, n: usize) -> Vec<Bundle<Self::Wire>> {
         (0..n).map(|_| self.evaluator_input_bundle(q)).collect()
     }
 
     /// Add two wire bundles, residue by residue.
-    fn add_bundles(&mut self, x: &FancyBundle<Self::FancyWire>, y: &FancyBundle<Self::FancyWire>)
-        -> FancyBundle<Self::FancyWire> {
-        assert_eq!(x.0.len(), y.0.len());
-        let res = x.0.iter().zip(y.0.iter()).map(|(x,y)| self.add(x,y)).collect();
-        FancyBundle(res)
+    fn add_bundles(&mut self, x: &Bundle<Self::Wire>, y: &Bundle<Self::Wire>)
+        -> Bundle<Self::Wire> {
+        assert_eq!(x.wires().len(), y.wires().len());
+        let res = x.wires().iter().zip(y.wires().iter()).map(|(x,y)| self.add(x,y)).collect();
+        Bundle(res)
     }
 
     /// Subtract two wire bundles, residue by residue.
-    fn sub_bundles(&mut self, x: &FancyBundle<Self::FancyWire>, y: &FancyBundle<Self::FancyWire>)
-        -> FancyBundle<Self::FancyWire> {
-        assert_eq!(x.0.len(), y.0.len());
-        let res = x.0.iter().zip(y.0.iter()).map(|(x,y)| self.sub(x,y)).collect();
-        FancyBundle(res)
+    fn sub_bundles(&mut self, x: &Bundle<Self::Wire>, y: &Bundle<Self::Wire>)
+        -> Bundle<Self::Wire> {
+        assert_eq!(x.wires().len(), y.wires().len());
+        let res = x.wires().iter().zip(y.wires().iter()).map(|(x,y)| self.sub(x,y)).collect();
+        Bundle(res)
     }
 
     /// Multiplies each wire in `x` by the corresponding residue of `c`.
-    fn cmul_bundle(&mut self, x: &FancyBundle<Self::FancyWire>, c: u128) -> FancyBundle<Self::FancyWire> {
+    fn cmul_bundle(&mut self, x: &Bundle<Self::Wire>, c: u128) -> Bundle<Self::Wire> {
         let primes = x.moduli();
         let cs = crate::util::crt(&primes, c);
-        let ws = x.0.iter().zip(cs.into_iter()).map(|(x,c)| self.cmul(x,c)).collect();
-        FancyBundle(ws)
+        let ws = x.wires().iter().zip(cs.into_iter()).map(|(x,c)| self.cmul(x,c)).collect();
+        Bundle(ws)
     }
+
+    /// Divide `x` by the constant `c`. Somewhat finicky, please test. I believe that it
+    /// requires that `c` is coprime with all moduli.
+    fn cdiv_bundle(&mut self, x: &Bundle<Self::Wire>, c: u16) -> Bundle<Self::Wire> {
+        Bundle(x.wires().iter().map(|x| {
+            let p = x.modulus();
+            if c % p == 0 {
+                self.cmul(x,0)
+            } else {
+                let d = crate::util::inv(c as i16, p as i16) as u16;
+                self.cmul(x,d)
+            }
+        }).collect())
+    }
+
+    /// Exponentiate `x` by the constant `c`.
+    fn cexp_bundle(&mut self, x: &Bundle<Self::Wire>, c: u16) -> Bundle<Self::Wire> {
+        Bundle(x.wires().iter().map(|x| {
+            let p = x.modulus();
+            let tab = (0..p).map(|x| {
+                ((x as u64).pow(c as u32) % p as u64) as u16
+            }).collect();
+            self.proj(x, p, tab)
+        }).collect())
+    }
+
+    // pub fn rem(&mut self, xref: BundleRef, p: u16) -> BundleRef {
+    //     let xwires = self.wires(xref);
+    //     let primes = self.primes(xref);
+    //     let i = primes.iter().position(|&q| p == q).expect("p is not one of the primes in this bundle!");
+    //     let x = xwires[i];
+    //     let zwires = primes.iter().map(|&q| self.borrow_mut_builder().mod_change(&x, q)).collect();
+    //     self.add_bundle(zwires, primes)
+    // }
+
+    // pub fn mul(&mut self, xref: BundleRef, yref: BundleRef) -> BundleRef {
+    //     let xwires = self.wires(xref);
+    //     let ywires = self.wires(yref);
+    //     let primes = self.primes(xref);
+    //     let zwires = xwires.into_iter().zip(ywires.into_iter()).map(|(x,y)|
+    //         self.borrow_mut_builder().half_gate(x,y)
+    //     ).collect();
+    //     self.add_bundle(zwires, primes)
+    // }
+
+    // pub fn eq(&mut self, xref: BundleRef, yref: BundleRef) -> Ref {
+    //     let xwires = self.wires(xref);
+    //     let ywires = self.wires(yref);
+    //     let primes = self.primes(xref);
+    //     let mut zs = Vec::with_capacity(xwires.len());
+    //     for i in 0..xwires.len() {
+    //         let subbed = self.borrow_mut_builder().sub(xwires[i], ywires[i]);
+    //         let mut eq_zero_tab = vec![0; primes[i] as usize];
+    //         eq_zero_tab[0] = 1;
+    //         let z = self.borrow_mut_builder().proj(subbed, xwires.len() as u16 + 1, eq_zero_tab);
+    //         zs.push(z);
+    //     }
+    //     // self.borrow_mut_builder()._and_many(&zs)
+    //     let z = self.borrow_mut_builder().add_many(&zs);
+    //     let b = zs.len();
+    //     let mut tab = vec![0;b+1];
+    //     tab[b] = 1;
+    //     self.borrow_mut_builder().proj(z, 2, tab)
+    // }
+
 }
-
-

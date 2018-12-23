@@ -1,10 +1,9 @@
-//! DSL for creating circuits compatible with fancy-garbling.  `Builder` implements the
-//! typeclass `FancyBuilder`, which contains all of the types of computations supported by
-//! fancy-garbling.
+//! DSL for creating circuits compatible with fancy-garbling in the old-fashioned way,
+//! where you create a circuit for a computation then garble it.
 
 use serde_derive::{Serialize, Deserialize};
 use std::collections::HashMap;
-use crate::fancy::{FancyBuilder, KnowsModulus, FancyBundle};
+use crate::fancy::{Fancy, HasModulus, Bundle};
 
 /// The index and modulus of a `Gate` in a `Circuit`.
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
@@ -13,7 +12,7 @@ pub struct Ref {
     modulus: u16,
 }
 
-impl KnowsModulus for Ref {
+impl HasModulus for Ref {
     fn modulus(&self) -> u16 { self.modulus }
 }
 
@@ -176,8 +175,8 @@ pub struct Builder {
     pub circ: Circuit,
 }
 
-impl FancyBuilder for Builder {
-    type FancyWire = Ref;
+impl Fancy for Builder {
+    type Wire = Ref;
 
     fn garbler_input(&mut self, modulus: u16) -> Ref {
         let gate = Gate::GarblerInput { id: self.get_next_garbler_input_id() };
@@ -325,7 +324,7 @@ impl Builder {
         }
     }
 
-    pub fn output_bundle(&mut self, x: FancyBundle<Ref>) {
+    pub fn output_bundle(&mut self, x: &Bundle<Ref>) {
         for &w in x.wires() {
             self.output(w);
         }
@@ -468,7 +467,7 @@ mod tests {
         assert_eq!(util::from_mixed_radix(&res,&mods), (Q-1)*(nargs as u128) % Q);
 
         // test random values
-        for _ in 0..64 {
+        for _ in 0..4 {
             let mut should_be = 0;
             let mut ds = Vec::new();
             for _ in 0..nargs {
@@ -532,7 +531,7 @@ mod tests {
         let x = b.garbler_input_bundle(q);
         let y = b.evaluator_input_bundle(q);
         let z = b.add_bundles(&x,&y);
-        b.output_bundle(z);
+        b.output_bundle(&z);
         let c = b.finish();
 
         for _ in 0..16 {
@@ -553,7 +552,7 @@ mod tests {
         let x = b.garbler_input_bundle(q);
         let y = b.evaluator_input_bundle(q);
         let z = b.sub_bundles(&x,&y);
-        b.output_bundle(z);
+        b.output_bundle(&z);
         let c = b.finish();
 
         for _ in 0..16 {
@@ -574,7 +573,7 @@ mod tests {
         let x = b.garbler_input_bundle(q);
         let y = rng.gen_u128() % q;
         let z = b.cmul_bundle(&x,y);
-        b.output_bundle(z);
+        b.output_bundle(&z);
         let c = b.finish();
 
         for _ in 0..16 {
@@ -585,5 +584,46 @@ mod tests {
         }
     }
     //}}}
+    #[test] // bundle cdiv {{{
+    fn bundle_cdiv() {
+        let mut rng = thread_rng();
+        let q = util::modulus_with_width_skip2(32);
+
+        let mut b = Builder::new();
+        let x = b.garbler_input_bundle(q);
+        let z = b.cdiv_bundle(&x,2);
+        b.output_bundle(&z);
+        let c = b.finish();
+
+        for _ in 0..64 {
+            let mut pt = rng.gen_u128() % (q/2);
+            pt += pt % 2;
+            let res = c.eval(&crt_factor(pt,q),&[]);
+            let z = crt_inv_factor(&res, q);
+            assert_eq!(z, pt/2);
+        }
+    }
+    //}}}
+    #[test] // bundle cexp {{{
+    fn bundle_cexp() {
+        let mut rng = thread_rng();
+        let q = util::modulus_with_width(10);
+        let y = rng.gen_u16() % 10;
+
+        let mut b = Builder::new();
+        let x = b.garbler_input_bundle(q);
+        let z = b.cexp_bundle(&x,y);
+        b.output_bundle(&z);
+        let c = b.finish();
+
+        for _ in 0..64 {
+            let x = rng.gen_u16() as u128 % q;
+            let should_be = x.pow(y as u32) % q;
+            let res = c.eval(&crt_factor(x,q),&[]);
+            let z = crt_inv_factor(&res, q);
+            assert_eq!(z, should_be);
+        }
+    }
+    // }}}
 
 }
