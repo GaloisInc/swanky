@@ -15,7 +15,8 @@ pub type GarbledGate = Vec<u128>;
 
 #[derive(Serialize, Deserialize, PartialEq, Debug)]
 pub struct Encoder {
-    inputs : Vec<Wire>,
+    garbler_inputs : Vec<Wire>,
+    evaluator_inputs : Vec<Wire>,
     deltas : HashMap<u16,Wire>,
 }
 
@@ -37,7 +38,8 @@ pub struct Evaluator {
 pub struct Garbler<'a> {
     circuit: &'a Circuit,
     wires: Vec<Wire>,
-    inputs: Vec<Wire>,
+    garbler_inputs: Vec<Wire>,
+    evaluator_inputs: Vec<Wire>,
     consts: Vec<Wire>,
     deltas: HashMap<u16, Wire>,
     current_wire: usize,
@@ -58,44 +60,49 @@ impl <'a> Garbler<'a> {
     pub fn new(circuit: &'a Circuit) -> Garbler {
         let mut rng = rand::thread_rng();
 
-        let mut deltas  = HashMap::new();
-        let mut inputs  = Vec::new();
-        let mut consts  = Vec::new();
-
         // initialize deltas
+        let mut deltas = HashMap::new();
         for &m in circuit.gate_moduli.iter().unique() {
             let w = Wire::rand_delta(&mut rng, m);
             deltas.insert(m, w);
         }
 
         // initialize inputs
-        for &i in circuit.input_refs.iter() {
-            let q = i.modulus();
-            let w = Wire::rand(&mut rng, q);
-            inputs.push(w);
-        }
+        let garbler_inputs = circuit.garbler_input_refs.iter().map(|r| {
+            Wire::rand(&mut rng, r.modulus())
+        }).collect();
+
+        let evaluator_inputs = circuit.evaluator_input_refs.iter().map(|r| {
+            Wire::rand(&mut rng, r.modulus())
+        }).collect();
 
         // initialize consts
-        for &i in circuit.const_refs.iter() {
-            let q = i.modulus();
-            let w = Wire::rand(&mut rng, q);
-            consts.push(w);
-        }
+        let consts = circuit.const_refs.iter().map(|r| {
+            Wire::rand(&mut rng, r.modulus())
+        }).collect();
 
         let wires = Vec::with_capacity(circuit.gates.len());
 
-        Garbler { circuit, wires, inputs, consts, deltas, current_wire: 0, rng }
+        Garbler {
+            circuit,
+            wires,
+            garbler_inputs,
+            evaluator_inputs,
+            consts,
+            deltas,
+            current_wire: 0,
+            rng
+        }
     }
 
     /// Extract the const wires from the `Garbler`.
     pub fn consts(&self) -> Vec<Wire> {
-        let cs = self.circuit.const_vals.as_ref().expect("constants needed!");
-        operations::encode_consts(cs, &self.consts, &self.deltas)
+        operations::encode_consts(&self.circuit.const_vals, &self.consts, &self.deltas)
     }
 
     /// Extract an `Encoder` from the `Garbler`.
     pub fn encoder(&self) -> Encoder {
-        Encoder::new(self.inputs.clone(), self.deltas.clone())
+        Encoder::new(self.garbler_inputs.clone(), self.evaluator_inputs.clone(), self.deltas.clone())
     }
 
     /// Extract a `Decoder` from the `Garbler`. Fails if called before all wires have been
@@ -129,7 +136,8 @@ impl <'a> Iterator for Garbler<'a> {
             let q = self.circuit.modulus(self.current_wire);
 
             let (w,g) = match self.circuit.gates[self.current_wire] {
-                Gate::Input { id } => (self.inputs[id].clone(), None),
+                Gate::GarblerInput { id }   => (self.garbler_inputs[id].clone(), None),
+                Gate::EvaluatorInput { id } => (self.evaluator_inputs[id].clone(), None),
                 Gate::Const { id } => (self.consts[id].clone(), None),
 
                 Gate::Add { xref, yref } => (self.wires[xref.ix].plus(&self.wires[yref.ix]),  None),
@@ -153,24 +161,41 @@ impl <'a> Iterator for Garbler<'a> {
 }
 
 impl Encoder {
-    pub fn new(inputs: Vec<Wire>, deltas: HashMap<u16,Wire>) -> Self {
-        Encoder { inputs, deltas }
+    pub fn new(garbler_inputs: Vec<Wire>, evaluator_inputs: Vec<Wire>, deltas: HashMap<u16,Wire>) -> Self {
+        Encoder { garbler_inputs, evaluator_inputs, deltas }
     }
 
-    pub fn ninputs(&self) -> usize {
-        self.inputs.len()
+    pub fn num_garbler_inputs(&self) -> usize {
+        self.garbler_inputs.len()
     }
 
-    pub fn encode_input(&self, x: u16, id: usize) -> Wire {
-        let X = &self.inputs[id];
+    pub fn num_evaluator_inputs(&self) -> usize {
+        self.evaluator_inputs.len()
+    }
+
+    pub fn encode_garbler_input(&self, x: u16, id: usize) -> Wire {
+        let X = &self.garbler_inputs[id];
         let q = X.modulus();
         X.plus(&self.deltas[&q].cmul(x))
     }
 
-    pub fn encode(&self, inputs: &[u16]) -> Vec<Wire> {
-        debug_assert_eq!(inputs.len(), self.inputs.len());
-        (0..inputs.len()).zip(inputs.iter()).map(|(id,&x)| {
-            self.encode_input(x,id)
+    pub fn encode_evaluator_input(&self, x: u16, id: usize) -> Wire {
+        let X = &self.evaluator_inputs[id];
+        let q = X.modulus();
+        X.plus(&self.deltas[&q].cmul(x))
+    }
+
+    pub fn encode_garbler_inputs(&self, inputs: &[u16]) -> Vec<Wire> {
+        debug_assert_eq!(inputs.len(), self.garbler_inputs.len());
+        (0..inputs.len()).zip(inputs).map(|(id,&x)| {
+            self.encode_garbler_input(x,id)
+        }).collect()
+    }
+
+    pub fn encode_evaluator_inputs(&self, inputs: &[u16]) -> Vec<Wire> {
+        debug_assert_eq!(inputs.len(), self.evaluator_inputs.len());
+        (0..inputs.len()).zip(inputs).map(|(id,&x)| {
+            self.encode_evaluator_input(x,id)
         }).collect()
     }
 
@@ -229,13 +254,14 @@ impl Evaluator {
         c
     }
 
-    pub fn eval(&self, c: &Circuit, inputs: &[Wire]) -> Vec<Wire> {
+    pub fn eval(&self, c: &Circuit, garbler_inputs: &[Wire], evaluator_inputs: &[Wire]) -> Vec<Wire> {
         let mut wires: Vec<Wire> = Vec::new();
         for i in 0..c.gates.len() {
             let q = c.modulus(i);
             let w = match c.gates[i] {
 
-                Gate::Input { id }       => inputs[id].clone(),
+                Gate::GarblerInput { id } => garbler_inputs[id].clone(),
+                Gate::EvaluatorInput { id } => evaluator_inputs[id].clone(),
                 Gate::Const { id, .. }   => self.consts[id].clone(),
                 Gate::Add { xref, yref } => wires[xref.ix].plus(&wires[yref.ix]),
                 Gate::Sub { xref, yref } => wires[xref.ix].minus(&wires[yref.ix]),
@@ -324,11 +350,11 @@ mod tests {
             let (en, de, ev) = garble(c);
             println!("number of ciphertexts for mod {}: {}", q, ev.size());
             for _ in 0..16 {
-                let inps = (0..c.ninputs()).map(|i| { rng.gen_u16() % c.input_mod(i) }).collect_vec();
-                let xs = &en.encode(&inps);
-                let ys = &ev.eval(c, xs);
+                let inps = (0..c.num_evaluator_inputs()).map(|i| { rng.gen_u16() % c.evaluator_input_mod(i) }).collect_vec();
+                let xs = &en.encode_evaluator_inputs(&inps);
+                let ys = &ev.eval(c, &[], xs);
                 let decoded = de.decode(ys)[0];
-                let should_be = c.eval(&inps)[0];
+                let should_be = c.eval(&[], &inps)[0];
                 if decoded != should_be {
                     println!("inp={:?} q={} got={} should_be={}", inps, q, decoded, should_be);
                     panic!("failed test!");
@@ -341,9 +367,9 @@ mod tests {
     fn add() {
         garble_test_helper(|q| {
             let mut b = Builder::new();
-            let x = b.input(q);
-            let y = b.input(q);
-            let z = b.add(x,y);
+            let x = b.evaluator_input(q);
+            let y = b.evaluator_input(q);
+            let z = b.add(&x,&y);
             b.output(z);
             b.finish()
         });
@@ -353,7 +379,7 @@ mod tests {
     fn add_many() {
         garble_test_helper(|q| {
             let mut b = Builder::new();
-            let xs = b.inputs(16, q);
+            let xs = b.evaluator_inputs(16, q);
             let z = b.add_many(&xs);
             b.output(z);
             b.finish()
@@ -364,7 +390,7 @@ mod tests {
     fn or_many() {
         garble_test_helper(|_| {
             let mut b = Builder::new();
-            let xs = b.inputs(16, 2);
+            let xs = b.evaluator_inputs(16, 2);
             let z = b.or_many(&xs);
             b.output(z);
             b.finish()
@@ -375,9 +401,9 @@ mod tests {
     fn sub() {
         garble_test_helper(|q| {
             let mut b = Builder::new();
-            let x = b.input(q);
-            let y = b.input(q);
-            let z = b.sub(x,y);
+            let x = b.evaluator_input(q);
+            let y = b.evaluator_input(q);
+            let z = b.sub(&x,&y);
             b.output(z);
             b.finish()
         });
@@ -387,13 +413,13 @@ mod tests {
     fn cmul() {
         garble_test_helper(|q| {
             let mut b = Builder::new();
-            let x = b.input(q);
-            let _ = b.input(q);
+            let x = b.evaluator_input(q);
+            let _ = b.evaluator_input(q);
             let z;
             if q > 2 {
-                z = b.cmul(x, 2);
+                z = b.cmul(&x, 2);
             } else {
-                z = b.cmul(x, 1);
+                z = b.cmul(&x, 1);
             }
             b.output(z);
             b.finish()
@@ -408,9 +434,9 @@ mod tests {
                 tab.push((i + 1) % q);
             }
             let mut b = Builder::new();
-            let x = b.input(q);
-            let _ = b.input(q);
-            let z = b.proj(x, q, tab);
+            let x = b.evaluator_input(q);
+            let _ = b.evaluator_input(q);
+            let z = b.proj(&x, q, tab);
             b.output(z);
             b.finish()
         });
@@ -425,9 +451,9 @@ mod tests {
                 tab.push(rng.gen_u16() % q);
             }
             let mut b = Builder::new();
-            let x = b.input(q);
-            let _ = b.input(q);
-            let z = b.proj(x, q, tab);
+            let x = b.evaluator_input(q);
+            let _ = b.evaluator_input(q);
+            let z = b.proj(&x, q, tab);
             b.output(z);
             b.finish()
         });
@@ -437,7 +463,7 @@ mod tests {
     fn mod_change() {
         garble_test_helper(|q| {
             let mut b = Builder::new();
-            let x = b.input(q);
+            let x = b.evaluator_input(q);
             let z = b.mod_change(&x,q*2);
             b.output(z);
             b.finish()
@@ -448,9 +474,9 @@ mod tests {
     fn half_gate() {
         garble_test_helper(|q| {
             let mut b = Builder::new();
-            let x = b.input(q);
-            let y = b.input(q);
-            let z = b.half_gate(x,y);
+            let x = b.evaluator_input(q);
+            let y = b.evaluator_input(q);
+            let z = b.mul(&x,&y);
             b.output(z);
             b.finish()
         });
@@ -463,9 +489,9 @@ mod tests {
             println!("\nTESTING MOD q={} ymod={}", q, ymod);
 
             let mut b = Builder::new();
-            let x = b.input(q);
-            let y = b.input(ymod);
-            let z = b.half_gate(x,y);
+            let x = b.evaluator_input(q);
+            let y = b.evaluator_input(ymod);
+            let z = b.mul(&x,&y);
             b.output(z);
             let c = b.finish();
 
@@ -475,10 +501,10 @@ mod tests {
             for x in 0..q {
                 for y in 0..ymod {
                     println!("TEST x={} y={}", x,y);
-                    let xs = &en.encode(&[x,y]);
-                    let ys = &ev.eval(&c, xs);
+                    let xs = &en.encode_evaluator_inputs(&[x,y]);
+                    let ys = &ev.eval(&c, &[], xs);
                     let decoded = de.decode(ys)[0];
-                    let should_be = c.eval(&[x,y])[0];
+                    let should_be = c.eval(&[], &[x,y])[0];
                     if decoded != should_be {
                         println!("FAILED inp={:?} q={} got={} should_be={}", [x,y], q, decoded, should_be);
                         fail = true;
@@ -504,7 +530,7 @@ mod tests {
 
         let mut b = Builder::new();
         let xs = (0..nargs).map(|_| {
-            mods.iter().map(|&q| b.input(q)).collect_vec()
+            mods.iter().map(|&q| b.evaluator_input(q)).collect_vec()
         }).collect_vec();
         let zs = b.mixed_radix_addition(&xs);
         b.outputs(&zs);
@@ -524,8 +550,8 @@ mod tests {
                 should_be = (should_be + x) % Q;
                 ds.extend(util::as_mixed_radix(x, &mods).iter());
             }
-            let X = en.encode(&ds);
-            let Y = ev.eval(&circ, &X);
+            let X = en.encode_evaluator_inputs(&ds);
+            let Y = ev.eval(&circ, &[], &X);
             let res = de.decode(&Y);
             assert_eq!(util::from_mixed_radix(&res,&mods), should_be);
         }
@@ -539,9 +565,9 @@ mod tests {
         let q = rng.gen_modulus();
         let c = rng.gen_u16() % q;
 
-        let x = b.input(q);
+        let x = b.evaluator_input(q);
         let y = b.constant(c,q);
-        let z = b.add(x,y);
+        let z = b.add(&x,&y);
         b.output(z);
 
         let circ = b.finish();
@@ -550,10 +576,10 @@ mod tests {
         for _ in 0..64 {
             let x = rng.gen_u16() % q;
 
-            assert_eq!(circ.eval(&[x])[0], (x+c)%q, "plaintext");
+            assert_eq!(circ.eval(&[],&[x])[0], (x+c)%q, "plaintext");
 
-            let X = en.encode(&[x]);
-            let Y = ev.eval(&circ, &X);
+            let X = en.encode_evaluator_inputs(&[x]);
+            let Y = ev.eval(&circ, &[], &X);
             assert_eq!(de.decode(&Y)[0], (x+c)%q, "garbled");
         }
     }
@@ -567,7 +593,7 @@ mod tests {
 
         let mut b = Builder::new();
         let xs = (0..nargs).map(|_| {
-            mods.iter().map(|&q| b.input(q)).collect_vec()
+            mods.iter().map(|&q| b.evaluator_input(q)).collect_vec()
         }).collect_vec();
         let zs = b.mixed_radix_addition(&xs);
         b.outputs(&zs);

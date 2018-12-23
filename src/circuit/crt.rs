@@ -97,30 +97,34 @@ impl CrtBundler {
     ////////////////////////////////////////////////////////////////////////////////
     // basic methods
 
-    pub fn inputs(&mut self, modulus: u128, n: usize) -> Vec<BundleRef> {
-        (0..n).map(|_| self.input(modulus)).collect()
-    }
-
-    pub fn input(&mut self, modulus: u128) -> BundleRef {
+    pub fn garbler_input(&mut self, modulus: u128) -> BundleRef {
         let ps = factor(modulus);
         let mut ws = Vec::with_capacity(ps.len());
         for &p in &ps {
-            ws.push(self.builder.as_mut().expect("need to own a builder!").input(p));
+            ws.push(self.builder.as_mut().expect("need to own a builder!").garbler_input(p));
         }
         let bun_ref = self.add_bundle(ws, Rc::new(ps));
         self.inputs.push(bun_ref);
         bun_ref
     }
 
-    pub fn secret_constant(&mut self, val: u128, modulus: u128) -> BundleRef {
+    pub fn garbler_inputs(&mut self, modulus: u128, n: usize) -> Vec<BundleRef> {
+        (0..n).map(|_| self.garbler_input(modulus)).collect()
+    }
+
+    pub fn evaluator_input(&mut self, modulus: u128) -> BundleRef {
         let ps = factor(modulus);
         let mut ws = Vec::with_capacity(ps.len());
         for &p in &ps {
-            let x = (val % p as u128) as u16;
-            let w = self.builder.as_mut().expect("need to own a builder!").secret_constant(x, p);
-            ws.push(w);
+            ws.push(self.builder.as_mut().expect("need to own a builder!").evaluator_input(p));
         }
-        self.add_bundle(ws, Rc::new(ps))
+        let bun_ref = self.add_bundle(ws, Rc::new(ps));
+        self.inputs.push(bun_ref);
+        bun_ref
+    }
+
+    pub fn evaluator_inputs(&mut self, modulus: u128, n: usize) -> Vec<BundleRef> {
+        (0..n).map(|_| self.evaluator_input(modulus)).collect()
     }
 
     pub fn constant(&mut self, val: u128, modulus: u128) -> BundleRef {
@@ -433,7 +437,7 @@ mod tests {
         println!("number of ciphertexts: {}", ev.size());
 
         let enc_inp = b.encode(inp);
-        let res = circ.eval(&enc_inp);
+        let res = circ.eval(&[], &enc_inp);
         assert_eq!(b.decode(&res), should_be);
 
         let xs = en.encode(&enc_inp);
@@ -448,7 +452,7 @@ mod tests {
         println!("number of ciphertexts: {}", ev.size());
 
         let enc_inp = b.encode(inp);
-        let pt_outs: Vec<u16> = circ.eval(&enc_inp);
+        let pt_outs: Vec<u16> = circ.eval(&[], &enc_inp);
         assert_eq!(pt_outs, should_be, "inp={:?}", inp);
 
         let xs = en.encode(&enc_inp);

@@ -1,6 +1,6 @@
-//! DSL for creating circuits compatible with fancy-garbling.
-
-pub mod crt;
+//! DSL for creating circuits compatible with fancy-garbling.  `Builder` implements the
+//! typeclass `Fancy`, which contains all of the types of computations supported by
+//! fancy-garbling.
 
 use serde_derive::{Serialize, Deserialize};
 use std::collections::HashMap;
@@ -47,18 +47,6 @@ pub enum Gate {
     Cmul { xref: Ref, c: u16 },
     Proj { xref: Ref, tt: Vec<u16>, id: usize },  // id is the gate number
     HalfGate { xref: Ref, yref: Ref, id: usize }, // id is the gate number
-}
-
-impl Fancy for Builder {
-    type Wire = Ref;
-    fn garbler_input(&mut self, q: u16) -> Ref { self.garbler_input(q) }
-    fn evaluator_input(&mut self, q: u16) -> Ref { self.evaluator_input(q) }
-    fn constant(&mut self, x: u16, q: u16) -> Ref { self.constant(x,q) }
-    fn add(&mut self, x: &Ref, y: &Ref) -> Ref { self.add(*x, *y) }
-    fn sub(&mut self, x: &Ref, y: &Ref) -> Ref { self.sub(*x, *y) }
-    fn mul(&mut self, x: &Ref, y: &Ref) -> Ref { self.half_gate(*x, *y) }
-    fn cmul(&mut self, x: &Ref, c: u16) -> Ref { self.cmul(*x, c) }
-    fn proj(&mut self, x: &Ref, q: u16, tt: Vec<u16>) -> Ref { self.proj(*x, q, tt) }
 }
 
 impl Circuit {
@@ -188,6 +176,79 @@ pub struct Builder {
     pub circ: Circuit,
 }
 
+impl Fancy for Builder {
+    type Wire = Ref;
+
+    fn garbler_input(&mut self, modulus: u16) -> Ref {
+        let gate = Gate::GarblerInput { id: self.get_next_garbler_input_id() };
+        let r = self.gate(gate, modulus);
+        self.circ.garbler_input_refs.push(r);
+        r
+    }
+
+    fn evaluator_input(&mut self, modulus: u16) -> Ref {
+        let gate = Gate::EvaluatorInput { id: self.get_next_evaluator_input_id() };
+        let r = self.gate(gate, modulus);
+        self.circ.evaluator_input_refs.push(r);
+        r
+    }
+
+    fn constant(&mut self, val: u16, modulus: u16) -> Ref {
+        match self.const_map.get(&(val, modulus)) {
+            Some(&r) => r,
+            None => {
+                let id = self.circ.const_vals.len();
+                self.circ.const_vals.push(val);
+                let gate = Gate::Const { id };
+                let r = self.gate(gate, modulus);
+                self.const_map.insert((val,modulus), r);
+                self.circ.const_refs.push(r);
+                r
+            }
+        }
+    }
+
+    fn add(&mut self, xref: &Ref, yref: &Ref) -> Ref {
+        assert!(xref.modulus() == yref.modulus(), "xmod={} ymod={}", xref.modulus(), yref.modulus());
+        let gate = Gate::Add { xref: *xref, yref: *yref };
+        self.gate(gate, xref.modulus())
+    }
+
+    fn sub(&mut self, xref: &Ref, yref: &Ref) -> Ref {
+        assert!(xref.modulus() == yref.modulus(), "xmod={} ymod={}", xref.modulus(), yref.modulus());
+        let gate = Gate::Sub { xref: *xref, yref: *yref };
+        self.gate(gate, xref.modulus())
+    }
+
+    fn cmul(&mut self, xref: &Ref, c: u16) -> Ref {
+        self.gate(Gate::Cmul { xref: *xref, c }, xref.modulus())
+    }
+
+    fn proj(&mut self, xref: &Ref, output_modulus: u16, tt: Vec<u16>) -> Ref {
+        assert_eq!(tt.len(), xref.modulus() as usize);
+        assert!(tt.iter().all(|&x| x < output_modulus),
+            "not all xs were less than the output modulus! circuit.proj: tt={:?},
+            output_modulus={}", tt, output_modulus);
+        let gate = Gate::Proj { xref: *xref, tt, id: self.get_next_ciphertext_id() };
+        self.gate(gate, output_modulus)
+    }
+
+    fn mul(&mut self, xref: &Ref, yref: &Ref) -> Ref {
+        if xref.modulus() < yref.modulus() {
+            return self.mul(yref, xref);
+        }
+
+        let gate = Gate::HalfGate {
+            xref: *xref,
+            yref: *yref,
+            id: self.get_next_ciphertext_id(),
+        };
+
+        self.gate(gate, xref.modulus())
+    }
+
+}
+
 impl Builder {
     pub fn new() -> Self {
         let c = Circuit {
@@ -252,36 +313,6 @@ impl Builder {
         Ref { ix, modulus }
     }
 
-    pub fn garbler_input(&mut self, modulus: u16) -> Ref {
-        let gate = Gate::GarblerInput { id: self.get_next_garbler_input_id() };
-        let r = self.gate(gate, modulus);
-        self.circ.garbler_input_refs.push(r);
-        r
-    }
-
-    pub fn evaluator_input(&mut self, modulus: u16) -> Ref {
-        let gate = Gate::EvaluatorInput { id: self.get_next_evaluator_input_id() };
-        let r = self.gate(gate, modulus);
-        self.circ.evaluator_input_refs.push(r);
-        r
-    }
-
-    /// Reuse constants if they already exist in the circuit.
-    pub fn constant(&mut self, val: u16, modulus: u16) -> Ref {
-        match self.const_map.get(&(val, modulus)) {
-            Some(&r) => r,
-            None => {
-                let id = self.circ.const_vals.len();
-                self.circ.const_vals.push(val);
-                let gate = Gate::Const { id };
-                let r = self.gate(gate, modulus);
-                self.const_map.insert((val,modulus), r);
-                self.circ.const_refs.push(r);
-                r
-            }
-        }
-    }
-
     /// Mark `xref` as an output of the circuit.
     pub fn output(&mut self, xref: Ref) {
         self.circ.output_refs.push(xref);
@@ -292,45 +323,6 @@ impl Builder {
         for &x in xs.iter() {
             self.output(x);
         }
-    }
-
-    pub fn add(&mut self, xref: Ref, yref: Ref) -> Ref {
-        assert!(xref.modulus() == yref.modulus(), "xmod={} ymod={}", xref.modulus(), yref.modulus());
-        let gate = Gate::Add { xref, yref };
-        self.gate(gate, xref.modulus())
-    }
-
-    pub fn sub(&mut self, xref: Ref, yref: Ref) -> Ref {
-        assert!(xref.modulus() == yref.modulus(), "xmod={} ymod={}", xref.modulus(), yref.modulus());
-        let gate = Gate::Sub { xref, yref };
-        self.gate(gate, xref.modulus())
-    }
-
-    pub fn cmul(&mut self, xref: Ref, c: u16) -> Ref {
-        self.gate(Gate::Cmul { xref, c }, xref.modulus())
-    }
-
-    pub fn proj(&mut self, xref: Ref, output_modulus: u16, tt: Vec<u16>) -> Ref {
-        assert_eq!(tt.len(), xref.modulus() as usize);
-        assert!(tt.iter().all(|&x| x < output_modulus),
-            "not all xs were less than the output modulus! circuit.proj: tt={:?},
-            output_modulus={}", tt, output_modulus);
-        let gate = Gate::Proj { xref, tt, id: self.get_next_ciphertext_id() };
-        self.gate(gate, output_modulus)
-    }
-
-    pub fn half_gate(&mut self, xref: Ref, yref: Ref) -> Ref {
-        if xref.modulus() < yref.modulus() {
-            return self.half_gate(yref, xref);
-        }
-
-        let gate = Gate::HalfGate {
-            xref,
-            yref,
-            id: self.get_next_ciphertext_id(),
-        };
-
-        self.gate(gate, xref.modulus())
     }
 
 }
@@ -397,7 +389,7 @@ mod tests {
         let q = rng.gen_prime();
         let x = b.garbler_input(q);
         let y = b.evaluator_input(q);
-        let z = b.half_gate(x,y);
+        let z = b.mul(&x,&y);
         b.output(z);
         let c = b.finish();
         for _ in 0..16 {
@@ -494,7 +486,7 @@ mod tests {
 
         let x = b.evaluator_input(q);
         let y = b.constant(c,q);
-        let z = b.add(x,y);
+        let z = b.add(&x,&y);
         b.output(z);
 
         let circ = b.finish();
@@ -526,4 +518,3 @@ mod tests {
         assert_eq!(circ, Circuit::from_str(&circ.to_string()).unwrap());
     }
 //}}}
-}

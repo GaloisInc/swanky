@@ -31,14 +31,6 @@ criterion = "0.2.5"
 [profile.release]
 debug = true
 
-[[bin]]
-name = "profile"
-path = "apps/profile.rs"
-
-[[bin]]
-name = "fancy_circuit"
-path = "apps/fancy_circuit.rs"
-
 [[bench]]
 name = "wire_operations"
 harness = false
