@@ -4,14 +4,15 @@
 //! create projections.
 
 use itertools::Itertools;
+use crate::util;
 
-/// A wire that has a modulus.
+/// An object that knows its own modulus.
 pub trait HasModulus {
     /// The modulus of the wire.
     fn modulus(&self) -> u16;
 }
 
-/// Collection of wires, used in advanced garbled gadgets.
+/// A collection of wires, useful for the garbled gadgets defined by `BundleGadgets`.
 pub struct Bundle<W: HasModulus>(Vec<W>);
 
 impl <W: HasModulus> Bundle<W> {
@@ -26,7 +27,7 @@ impl <W: HasModulus> Bundle<W> {
     }
 }
 
-/// The computations supported in fancy-garbling.
+/// DSL for the basic computations supported by fancy-garbling.
 pub trait Fancy {
     /// The underlying wire datatype created by an object implementing `Fancy`.
     type Wire: Clone + HasModulus;
@@ -56,15 +57,15 @@ pub trait Fancy {
     fn proj(&mut self, x: &Self::Wire, q: u16, tt: Vec<u16>) -> Self::Wire;
 
     ////////////////////////////////////////////////////////////////////////////////
-    // bonus functions built on top of basic fancy operations
+    // Functions built on top of basic fancy operations.
 
     /// Create `n` garbler inputs with modulus `q`.
-    fn garbler_inputs(&mut self, n: usize, q: u16) -> Vec<Self::Wire> {
+    fn garbler_inputs(&mut self, q: u16, n: usize) -> Vec<Self::Wire> {
         (0..n).map(|_| self.garbler_input(q)).collect()
     }
 
     /// Create `n` evaluator inputs with modulus `q`.
-    fn evaluator_inputs(&mut self, n: usize, q: u16) -> Vec<Self::Wire> {
+    fn evaluator_inputs(&mut self, q: u16, n: usize) -> Vec<Self::Wire> {
         (0..n).map(|_| self.evaluator_input(q)).collect()
     }
 
@@ -125,106 +126,68 @@ pub trait Fancy {
         let tab = (0..from_modulus).map(|x| x % to_modulus).collect();
         self.proj(x, to_modulus, tab)
     }
+}
 
-    /// Mixed radix addition of potentially many values.
-    fn mixed_radix_addition(&mut self, xs: &[Vec<Self::Wire>]) -> Vec<Self::Wire> {
-        let nargs = xs.len();
-        let n = xs[0].len();
-        assert!(xs.len() > 1 && xs.iter().all(|x| x.len() == n));
-
-        let mut digit_carry = None;
-        let mut carry_carry = None;
-        let mut max_carry = 0;
-
-        let mut res = Vec::with_capacity(n);
-
-        for i in 0..n {
-            // all the ith digits, in one vec
-            let ds = xs.iter().map(|x| x[i].clone()).collect_vec();
-
-            // compute the digit -- easy
-            let digit_sum = self.add_many(&ds);
-            let digit = digit_carry.map_or(digit_sum.clone(), |d| self.add(&digit_sum, &d));
-
-            if i < n-1 {
-                // compute the carries
-                let q = xs[0][i].modulus();
-                // max_carry currently contains the max carry from the previous iteration
-                let max_val = nargs as u16 * (q-1) + max_carry;
-                // now it is the max carry of this iteration
-                max_carry = max_val / q;
-
-                let modded_ds = ds.iter().map(|d| self.mod_change(d, max_val+1)).collect_vec();
-
-                let carry_sum = self.add_many(&modded_ds);
-                // add in the carry from the previous iteration
-                let carry = carry_carry.map_or(carry_sum.clone(), |c| self.add(&carry_sum, &c));
-
-                // carry now contains the carry information, we just have to project it to
-                // the correct moduli for the next iteration
-                let next_mod = xs[0][i+1].modulus();
-                let tt = (0..=max_val).map(|i| (i / q) % next_mod).collect_vec();
-                digit_carry = Some(self.proj(&carry, next_mod, tt));
-
-                let next_max_val = nargs as u16 * (next_mod - 1) + max_carry;
-
-                if i < n-2 {
-                    if max_carry < next_mod {
-                        carry_carry = Some(self.mod_change(digit_carry.as_ref().unwrap(), next_max_val + 1));
-                    } else {
-                        let tt = (0..=max_val).map(|i| i / q).collect_vec();
-                        carry_carry = Some(self.proj(&carry, next_max_val + 1, tt));
-                    }
-                } else {
-                    // next digit is MSB so we dont need carry_carry
-                    carry_carry = None;
-                }
-            } else {
-                digit_carry = None;
-                carry_carry = None;
-            }
-            res.push(digit);
-        }
-        res
-    }
-
+/// Extension trait for `Fancy` providing advanced gadgets based on bundles of wires.
+pub trait BundleGadgets: Fancy {
     ////////////////////////////////////////////////////////////////////////////////
-    // High level computations dealing with bundles
+    // Bundle creation
 
-    /// Crate an input bundle for the garbler using composite modulus `q`.
-    fn garbler_input_bundle(&mut self, q: u128) -> Bundle<Self::Wire> {
-        let ps = crate::util::factor(q);
-        let ws = ps.into_iter().map(|p| self.garbler_input(p)).collect();
-        Bundle(ws)
+    /// Crate an input bundle for the garbler using moduli `ps`.
+    fn garbler_input_bundle(&mut self, ps: &[u16]) -> Bundle<Self::Wire> {
+        Bundle(ps.iter().map(|&p| self.garbler_input(p)).collect())
     }
 
-    /// Crate an input bundle for the evaluator using composite modulus `q`.
-    fn evaluator_input_bundle(&mut self, q: u128) -> Bundle<Self::Wire> {
-        let ps = crate::util::factor(q);
-        let ws = ps.into_iter().map(|p| self.evaluator_input(p)).collect();
-        Bundle(ws)
+    /// Crate an input bundle for the evaluator using moduli `ps`.
+    fn evaluator_input_bundle(&mut self, ps: &[u16]) -> Bundle<Self::Wire> {
+        Bundle(ps.iter().map(|&p| self.evaluator_input(p)).collect())
+    }
+
+    /// Crate an input bundle for the garbler using composite CRT modulus `q`.
+    fn garbler_input_bundle_crt(&mut self, q: u128) -> Bundle<Self::Wire> {
+        self.garbler_input_bundle(&util::factor(q))
+    }
+
+    /// Crate an input bundle for the evaluator using composite CRT modulus `q`.
+    fn evaluator_input_bundle_crt(&mut self, q: u128) -> Bundle<Self::Wire> {
+        self.evaluator_input_bundle(&util::factor(q))
+    }
+
+    /// Creates a bundle of constant wires using moduli `ps`.
+    fn constant_bundle(&mut self, xs: &[u16], ps: &[u16]) -> Bundle<Self::Wire> {
+        Bundle(xs.iter().zip(ps.iter()).map(|(&x,&p)| self.constant(x,p)).collect())
     }
 
     /// Creates a bundle of constant wires for the CRT representation of `x` under
     /// composite modulus `q`.
-    fn constant_bundle(&mut self, x: u128, q: u128) -> Bundle<Self::Wire> {
-        let ps = crate::util::factor(q);
-        let ws = ps.into_iter().map(|p| {
-            let c = (x % p as u128) as u16;
-            self.constant(c,p)
-        }).collect();
-        Bundle(ws)
+    fn constant_bundle_crt(&mut self, x: u128, q: u128) -> Bundle<Self::Wire> {
+        let ps = util::factor(q);
+        let xs = ps.iter().map(|&p| (x % p as u128) as u16).collect_vec();
+        self.constant_bundle(&xs,&ps)
     }
 
-    /// Create `n` garbler input wires, under composite modulus `q`.
-    fn garbler_input_bundles(&mut self, q: u128, n: usize) -> Vec<Bundle<Self::Wire>> {
-        (0..n).map(|_| self.garbler_input_bundle(q)).collect()
+    /// Create `n` garbler input bundles, using moduli `ps`.
+    fn garbler_input_bundles(&mut self, ps: &[u16], n: usize) -> Vec<Bundle<Self::Wire>> {
+        (0..n).map(|_| self.garbler_input_bundle(ps)).collect()
     }
 
-    /// Create `n` evaluator input wires, under composite modulus `q`.
-    fn evaluator_input_bundles(&mut self, q: u128, n: usize) -> Vec<Bundle<Self::Wire>> {
-        (0..n).map(|_| self.evaluator_input_bundle(q)).collect()
+    /// Create `n` evaluator input bundles, using moduli `ps`.
+    fn evaluator_input_bundles(&mut self, ps: &[u16], n: usize) -> Vec<Bundle<Self::Wire>> {
+        (0..n).map(|_| self.evaluator_input_bundle(ps)).collect()
     }
+
+    /// Create `n` garbler input bundles, under composite CRT modulus `q`.
+    fn garbler_input_bundles_crt(&mut self, q: u128, n: usize) -> Vec<Bundle<Self::Wire>> {
+        (0..n).map(|_| self.garbler_input_bundle_crt(q)).collect()
+    }
+
+    /// Create `n` evaluator input bundles, under composite CRT modulus `q`.
+    fn evaluator_input_bundles_crt(&mut self, q: u128, n: usize) -> Vec<Bundle<Self::Wire>> {
+        (0..n).map(|_| self.evaluator_input_bundle_crt(q)).collect()
+    }
+
+    ////////////////////////////////////////////////////////////////////////////////
+    // High-level computations dealing with bundles.
 
     /// Add two wire bundles, residue by residue.
     fn add_bundles(&mut self, x: &Bundle<Self::Wire>, y: &Bundle<Self::Wire>)
@@ -244,7 +207,7 @@ pub trait Fancy {
 
     /// Multiplies each wire in `x` by the corresponding residue of `c`.
     fn cmul_bundle(&mut self, x: &Bundle<Self::Wire>, c: u128) -> Bundle<Self::Wire> {
-        let cs = crate::util::crt(&x.moduli(), c);
+        let cs = util::crt(&x.moduli(), c);
         let ws = x.wires().iter().zip(cs.into_iter()).map(|(x,c)| self.cmul(x,c)).collect();
         Bundle(ws)
     }
@@ -262,7 +225,7 @@ pub trait Fancy {
             if c % p == 0 {
                 self.cmul(x,0)
             } else {
-                let d = crate::util::inv(c as i16, p as i16) as u16;
+                let d = util::inv(c as i16, p as i16) as u16;
                 self.cmul(x,d)
             }
         }).collect())
@@ -305,43 +268,102 @@ pub trait Fancy {
         self.proj(&z, 2, tab)
     }
 
+    /// Mixed radix addition.
+    fn mixed_radix_addition(&mut self, xs: &[Bundle<Self::Wire>]) -> Bundle<Self::Wire> {
+        let nargs = xs.len();
+        let n = xs[0].wires().len();
+        assert!(xs.len() > 1 && xs.iter().all(|x| x.wires().len() == n));
+
+        let mut digit_carry = None;
+        let mut carry_carry = None;
+        let mut max_carry = 0;
+
+        let mut res = Vec::with_capacity(n);
+
+        for i in 0..n {
+            // all the ith digits, in one vec
+            let ds = xs.iter().map(|x| x.wires()[i].clone()).collect_vec();
+
+            // compute the digit -- easy
+            let digit_sum = self.add_many(&ds);
+            let digit = digit_carry.map_or(digit_sum.clone(), |d| self.add(&digit_sum, &d));
+
+            if i < n-1 {
+                // compute the carries
+                let q = xs[0].wires()[i].modulus();
+                // max_carry currently contains the max carry from the previous iteration
+                let max_val = nargs as u16 * (q-1) + max_carry;
+                // now it is the max carry of this iteration
+                max_carry = max_val / q;
+
+                let modded_ds = ds.iter().map(|d| self.mod_change(d, max_val+1)).collect_vec();
+
+                let carry_sum = self.add_many(&modded_ds);
+                // add in the carry from the previous iteration
+                let carry = carry_carry.map_or(carry_sum.clone(), |c| self.add(&carry_sum, &c));
+
+                // carry now contains the carry information, we just have to project it to
+                // the correct moduli for the next iteration
+                let next_mod = xs[0].wires()[i+1].modulus();
+                let tt = (0..=max_val).map(|i| (i / q) % next_mod).collect_vec();
+                digit_carry = Some(self.proj(&carry, next_mod, tt));
+
+                let next_max_val = nargs as u16 * (next_mod - 1) + max_carry;
+
+                if i < n-2 {
+                    if max_carry < next_mod {
+                        carry_carry = Some(self.mod_change(digit_carry.as_ref().unwrap(), next_max_val + 1));
+                    } else {
+                        let tt = (0..=max_val).map(|i| i / q).collect_vec();
+                        carry_carry = Some(self.proj(&carry, next_max_val + 1, tt));
+                    }
+                } else {
+                    // next digit is MSB so we dont need carry_carry
+                    carry_carry = None;
+                }
+            } else {
+                digit_carry = None;
+                carry_carry = None;
+            }
+            res.push(digit);
+        }
+        Bundle(res)
+    }
+
     ////////////////////////////////////////////////////////////////////////////////
-    // fancy methods based on mike's fractional mixed radix trick
+    // Fancy functions based on Mike's fractional mixed radix trick.
 
-    // fn fractional_mixed_radix(&mut self, xbun: BundleRef, factors_of_m: &[u16]) -> Vec<Ref> {
-    //     let ndigits = factors_of_m.len();
-    //     let q = product(&self.primes(xbun));
-    //     let M = util::product(factors_of_m);
+    fn fractional_mixed_radix(&mut self, bun: &Bundle<Self::Wire>, factors_of_m: &[u16]) -> Bundle<Self::Wire> {
+        let ndigits = factors_of_m.len();
 
-    //     let mut ds = Vec::new();
+        let q = util::product(&bun.moduli());
+        let M = util::product(factors_of_m);
 
-    //     let xs = self.wires(xbun);
-    //     let ps = self.primes(xbun);
-    //     let mut b = self.take_builder();
+        let mut ds = Vec::new();
 
-    //     for (xref, &p) in xs.into_iter().zip(ps.iter()) {
+        for wire in bun.wires().iter() {
+            let p = wire.modulus();
 
-    //         let mut tabs = vec![Vec::with_capacity(p as usize); ndigits];
+            let mut tabs = vec![Vec::with_capacity(p as usize); ndigits];
 
-    //         for x in 0..p {
-    //             let crt_coef = inv(((q / p as u128) % p as u128) as i64, p as i64);
-    //             let y = (M as f64 * x as f64 * crt_coef as f64 / p as f64).round() as u128 % M;
-    //             let digits = util::as_mixed_radix(y, factors_of_m);
-    //             for i in 0..ndigits {
-    //                 tabs[i].push(digits[i]);
-    //             }
-    //         }
+            for x in 0..p {
+                let crt_coef = util::inv(((q / p as u128) % p as u128) as i64, p as i64);
+                let y = (M as f64 * x as f64 * crt_coef as f64 / p as f64).round() as u128 % M;
+                let digits = util::as_mixed_radix(y, factors_of_m);
+                for i in 0..ndigits {
+                    tabs[i].push(digits[i]);
+                }
+            }
 
-    //         let new_ds = tabs.into_iter().enumerate()
-    //             .map(|(i,tt)| b.proj(xref, factors_of_m[i], tt))
-    //             .collect_vec();
+            let new_ds = tabs.into_iter().enumerate()
+                .map(|(i,tt)| self.proj(wire, factors_of_m[i], tt))
+                .collect_vec();
 
-    //         ds.push(new_ds);
-    //     }
-    //     let res = b.mixed_radix_addition(&ds);
-    //     self.put_builder(b);
-    //     res
-    // }
+            ds.push(Bundle(new_ds));
+        }
+
+        self.mixed_radix_addition(&ds)
+    }
 
     // pub fn relu(&mut self, xbun: BundleRef, factors_of_m: &[u16]) -> BundleRef {
     //     let res = self.fractional_mixed_radix(xbun, factors_of_m);

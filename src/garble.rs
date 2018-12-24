@@ -334,7 +334,7 @@ impl Evaluator {
 mod tests {
     use super::*;
     use crate::circuit::{Circuit, Builder};
-    use crate::fancy::Fancy;
+    use crate::fancy::{Fancy, BundleGadgets};
     use crate::util::{self, RngExt};
     use itertools::Itertools;
     use rand::thread_rng;
@@ -379,7 +379,7 @@ mod tests {
     fn add_many() {
         garble_test_helper(|q| {
             let mut b = Builder::new();
-            let xs = b.evaluator_inputs(16, q);
+            let xs = b.evaluator_inputs(q,16);
             let z = b.add_many(&xs);
             b.output(z);
             b.finish()
@@ -390,7 +390,7 @@ mod tests {
     fn or_many() {
         garble_test_helper(|_| {
             let mut b = Builder::new();
-            let xs = b.evaluator_inputs(16, 2);
+            let xs = b.evaluator_inputs(2,16);
             let z = b.or_many(&xs);
             b.output(z);
             b.finish()
@@ -529,11 +529,9 @@ mod tests {
         // let mods = [37,10,10,54,100,51,17];
 
         let mut b = Builder::new();
-        let xs = (0..nargs).map(|_| {
-            mods.iter().map(|&q| b.evaluator_input(q)).collect_vec()
-        }).collect_vec();
-        let zs = b.mixed_radix_addition(&xs);
-        b.outputs(&zs);
+        let xs = b.evaluator_input_bundles(&mods, nargs);
+        let z = b.mixed_radix_addition(&xs);
+        b.output_bundle(&z);
         let circ = b.finish();
 
         let (en, de, ev) = garble(&circ);
@@ -592,11 +590,9 @@ mod tests {
         let mods = (0..7).map(|_| rng.gen_modulus()).collect_vec();
 
         let mut b = Builder::new();
-        let xs = (0..nargs).map(|_| {
-            mods.iter().map(|&q| b.evaluator_input(q)).collect_vec()
-        }).collect_vec();
-        let zs = b.mixed_radix_addition(&xs);
-        b.outputs(&zs);
+        let xs = b.evaluator_input_bundles(&mods, nargs);
+        let z = b.mixed_radix_addition(&xs);
+        b.output_bundle(&z);
         let circ = b.finish();
 
         let (en, de, ev) = garble(&circ);

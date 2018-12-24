@@ -3,7 +3,7 @@
 
 use serde_derive::{Serialize, Deserialize};
 use std::collections::HashMap;
-use crate::fancy::{Fancy, HasModulus, Bundle};
+use crate::fancy::{Fancy, BundleGadgets, HasModulus, Bundle};
 
 /// The index and modulus of a `Gate` in a `Circuit`.
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
@@ -248,6 +248,8 @@ impl Fancy for Builder {
 
 }
 
+impl BundleGadgets for Builder { }
+
 impl Builder {
     pub fn new() -> Self {
         let c = Circuit {
@@ -343,7 +345,7 @@ mod tests {
         let mut rng = thread_rng();
         let mut b = Builder::new();
         let n = 2 + (rng.gen_usize() % 200);
-        let inps = b.evaluator_inputs(n,2);
+        let inps = b.evaluator_inputs(2,n);
         let z = b.and_many(&inps);
         b.output(z);
         let c = b.finish();
@@ -367,7 +369,7 @@ mod tests {
         let mut rng = thread_rng();
         let mut b = Builder::new();
         let n = 2 + (rng.gen_usize() % 200);
-        let inps = b.evaluator_inputs(n,2);
+        let inps = b.evaluator_inputs(2,n);
         let z = b.or_many(&inps);
         b.output(z);
         let c = b.finish();
@@ -424,7 +426,7 @@ mod tests {
     fn add_many_mod_change() {
         let mut b = Builder::new();
         let n = 113;
-        let args = b.garbler_inputs(n, 2);
+        let args = b.garbler_inputs(2,n);
         let wires = args.iter().map(|x| b.mod_change(x, n as u16 + 1)).collect_vec();
         let s = b.add_many(&wires);
         b.output(s);
@@ -441,45 +443,6 @@ mod tests {
         }
     }
 // }}}
-    #[test] // mixed_radix_addition {{{
-    fn mixed_radix_addition() {
-        let mut rng = thread_rng();
-
-        let nargs = 2 + rng.gen_usize() % 100;
-        let mods = (0..7).map(|_| rng.gen_modulus()).collect_vec();
-
-        let mut b = Builder::new();
-        let xs = (0..nargs).map(|_| {
-            mods.iter().map(|&q| b.evaluator_input(q)).collect_vec()
-        }).collect_vec();
-        let zs = b.mixed_radix_addition(&xs);
-        b.outputs(&zs);
-        let circ = b.finish();
-
-        let Q: u128 = mods.iter().map(|&q| q as u128).product();
-
-        // test maximum overflow
-        let mut ds = Vec::new();
-        for _ in 0..nargs {
-            ds.extend(util::as_mixed_radix(Q-1, &mods).iter());
-        }
-        let res = circ.eval(&[], &ds);
-        assert_eq!(util::from_mixed_radix(&res,&mods), (Q-1)*(nargs as u128) % Q);
-
-        // test random values
-        for _ in 0..4 {
-            let mut should_be = 0;
-            let mut ds = Vec::new();
-            for _ in 0..nargs {
-                let x = rng.gen_u128() % Q;
-                should_be = (should_be + x) % Q;
-                ds.extend(util::as_mixed_radix(x, &mods).iter());
-            }
-            let res = circ.eval(&[],&ds);
-            assert_eq!(util::from_mixed_radix(&res,&mods), should_be);
-        }
-    }
-//}}}
     #[test] // constants {{{
     fn constants() {
         let mut b = Builder::new();
@@ -510,11 +473,9 @@ mod tests {
         let mods = (0..7).map(|_| rng.gen_modulus()).collect_vec();
 
         let mut b = Builder::new();
-        let xs = (0..nargs).map(|_| {
-            mods.iter().map(|&q| b.evaluator_input(q)).collect_vec()
-        }).collect_vec();
-        let zs = b.mixed_radix_addition(&xs);
-        b.outputs(&zs);
+        let xs = b.evaluator_input_bundles(&mods, nargs);
+        let z = b.mixed_radix_addition(&xs);
+        b.output_bundle(&z);
         let circ = b.finish();
 
         println!("{}", circ.to_string());
@@ -528,8 +489,8 @@ mod tests {
         let q = rng.gen_usable_composite_modulus();
 
         let mut b = Builder::new();
-        let x = b.garbler_input_bundle(q);
-        let y = b.evaluator_input_bundle(q);
+        let x = b.garbler_input_bundle_crt(q);
+        let y = b.evaluator_input_bundle_crt(q);
         let z = b.add_bundles(&x,&y);
         b.output_bundle(&z);
         let c = b.finish();
@@ -549,8 +510,8 @@ mod tests {
         let q = rng.gen_usable_composite_modulus();
 
         let mut b = Builder::new();
-        let x = b.garbler_input_bundle(q);
-        let y = b.evaluator_input_bundle(q);
+        let x = b.garbler_input_bundle_crt(q);
+        let y = b.evaluator_input_bundle_crt(q);
         let z = b.sub_bundles(&x,&y);
         b.output_bundle(&z);
         let c = b.finish();
@@ -570,7 +531,7 @@ mod tests {
         let q = util::modulus_with_width(16);
 
         let mut b = Builder::new();
-        let x = b.garbler_input_bundle(q);
+        let x = b.garbler_input_bundle_crt(q);
         let y = rng.gen_u128() % q;
         let z = b.cmul_bundle(&x,y);
         b.output_bundle(&z);
@@ -590,8 +551,8 @@ mod tests {
         let q = rng.gen_usable_composite_modulus();
 
         let mut b = Builder::new();
-        let x = b.garbler_input_bundle(q);
-        let y = b.evaluator_input_bundle(q);
+        let x = b.garbler_input_bundle_crt(q);
+        let y = b.evaluator_input_bundle_crt(q);
         let z = b.mul_bundles(&x,&y);
         b.output_bundle(&z);
         let c = b.finish();
@@ -611,7 +572,7 @@ mod tests {
         let q = util::modulus_with_width_skip2(32);
 
         let mut b = Builder::new();
-        let x = b.garbler_input_bundle(q);
+        let x = b.garbler_input_bundle_crt(q);
         let z = b.cdiv_bundle(&x,2);
         b.output_bundle(&z);
         let c = b.finish();
@@ -632,7 +593,7 @@ mod tests {
         let y = rng.gen_u16() % 10;
 
         let mut b = Builder::new();
-        let x = b.garbler_input_bundle(q);
+        let x = b.garbler_input_bundle_crt(q);
         let z = b.cexp_bundle(&x,y);
         b.output_bundle(&z);
         let c = b.finish();
@@ -654,7 +615,7 @@ mod tests {
         let p = ps[rng.gen_u16() as usize % ps.len()];
 
         let mut b = Builder::new();
-        let x = b.garbler_input_bundle(q);
+        let x = b.garbler_input_bundle_crt(q);
         let z = b.rem_bundle(&x,p);
         b.output_bundle(&z);
         let c = b.finish();
@@ -674,8 +635,8 @@ mod tests {
         let q = rng.gen_usable_composite_modulus();
 
         let mut b = Builder::new();
-        let x = b.garbler_input_bundle(q);
-        let y = b.evaluator_input_bundle(q);
+        let x = b.garbler_input_bundle_crt(q);
+        let y = b.evaluator_input_bundle_crt(q);
         let z = b.eq_bundles(&x,&y);
         b.output(z);
         let c = b.finish();
@@ -693,4 +654,42 @@ mod tests {
         }
     }
     //}}}
+    #[test] // mixed_radix_addition {{{
+    fn mixed_radix_addition() {
+        let mut rng = thread_rng();
+
+        let nargs = 2 + rng.gen_usize() % 100;
+        let mods = (0..7).map(|_| rng.gen_modulus()).collect_vec();
+
+        let mut b = Builder::new();
+        let xs = b.evaluator_input_bundles(&mods, nargs);
+        let z = b.mixed_radix_addition(&xs);
+        b.output_bundle(&z);
+        let circ = b.finish();
+
+        let Q: u128 = mods.iter().map(|&q| q as u128).product();
+
+        // test maximum overflow
+        let mut ds = Vec::new();
+        for _ in 0..nargs {
+            ds.extend(util::as_mixed_radix(Q-1, &mods).iter());
+        }
+        let res = circ.eval(&[], &ds);
+        assert_eq!(util::from_mixed_radix(&res,&mods), (Q-1)*(nargs as u128) % Q);
+
+        // test random values
+        for _ in 0..4 {
+            let mut should_be = 0;
+            let mut ds = Vec::new();
+            for _ in 0..nargs {
+                let x = rng.gen_u128() % Q;
+                should_be = (should_be + x) % Q;
+                ds.extend(util::as_mixed_radix(x, &mods).iter());
+            }
+            let res = circ.eval(&[],&ds);
+            assert_eq!(util::from_mixed_radix(&res,&mods), should_be);
+        }
+    }
+//}}}
+
 }
