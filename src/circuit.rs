@@ -691,5 +691,26 @@ mod tests {
         }
     }
 //}}}
+    #[test] // relu {{{
+    fn test_relu() {
+        let mut rng = thread_rng();
+        let q = util::modulus_with_width(10);
+        println!("q={}", q);
+
+        let mut b = Builder::new();
+        let x = b.garbler_input_bundle_crt(q);
+        let z = b.exact_relu(&x);
+        b.output_bundle(&z);
+        let c = b.finish();
+
+        for _ in 0..128 {
+            let pt = rng.gen_u128() % q;
+            let should_be = if pt < q/2 { pt } else { 0 };
+            let res = c.eval(&crt_factor(pt,q),&[]);
+            let z = crt_inv_factor(&res, q);
+            assert_eq!(z, should_be);
+        }
+    }
+    //}}}
 
 }

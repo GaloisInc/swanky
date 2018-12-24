@@ -28,7 +28,7 @@ impl <W: HasModulus> Bundle<W> {
 }
 
 /// DSL for the basic computations supported by fancy-garbling.
-pub trait Fancy {
+pub trait Fancy: Sized {
     /// The underlying wire datatype created by an object implementing `Fancy`.
     type Wire: Clone + HasModulus;
 
@@ -333,56 +333,28 @@ pub trait BundleGadgets: Fancy {
     ////////////////////////////////////////////////////////////////////////////////
     // Fancy functions based on Mike's fractional mixed radix trick.
 
-    fn fractional_mixed_radix(&mut self, bun: &Bundle<Self::Wire>, factors_of_m: &[u16]) -> Bundle<Self::Wire> {
-        let ndigits = factors_of_m.len();
+    /// Compute `max(x,0)`, using potentially approximate factors of `M`.
+    fn relu(&mut self, x: &Bundle<Self::Wire>, factors_of_m: &[u16]) -> Bundle<Self::Wire>
+    {
+        let res = fractional_mixed_radix(self, x, factors_of_m);
 
-        let q = util::product(&bun.moduli());
-        let M = util::product(factors_of_m);
+        // project the MSB to 0/1, whether or not it is less than p/2
+        let p = *factors_of_m.last().unwrap();
+        let mask_tt = (0..p).map(|x| (x < p/2) as u16).collect();
+        let mask = self.proj(res.wires().last().unwrap(), 2, mask_tt);
 
-        let mut ds = Vec::new();
-
-        for wire in bun.wires().iter() {
-            let p = wire.modulus();
-
-            let mut tabs = vec![Vec::with_capacity(p as usize); ndigits];
-
-            for x in 0..p {
-                let crt_coef = util::inv(((q / p as u128) % p as u128) as i64, p as i64);
-                let y = (M as f64 * x as f64 * crt_coef as f64 / p as f64).round() as u128 % M;
-                let digits = util::as_mixed_radix(y, factors_of_m);
-                for i in 0..ndigits {
-                    tabs[i].push(digits[i]);
-                }
-            }
-
-            let new_ds = tabs.into_iter().enumerate()
-                .map(|(i,tt)| self.proj(wire, factors_of_m[i], tt))
-                .collect_vec();
-
-            ds.push(Bundle(new_ds));
-        }
-
-        self.mixed_radix_addition(&ds)
+        // use the mask to either output x or 0
+        let z = x.wires().iter().map(|x| self.mul(x,&mask)).collect_vec();
+        Bundle(z)
     }
 
-    // pub fn relu(&mut self, xbun: BundleRef, factors_of_m: &[u16]) -> BundleRef {
-    //     let res = self.fractional_mixed_radix(xbun, factors_of_m);
+    /// Compute `max(x,0)`.
+    fn exact_relu(&mut self, x: &Bundle<Self::Wire>) -> Bundle<Self::Wire>
+    {
+        self.relu(x, &exact_ms(x))
+    }
 
-    //     // project the MSB to 0/1, whether or not it is less than p/2
-    //     let p = *factors_of_m.last().unwrap();
-    //     let mask_tt = (0..p).map(|x| (x < p/2) as u16).collect();
-    //     let mask = self.borrow_mut_builder().proj(*res.last().unwrap(), 2, mask_tt);
-
-    //     // use the mask to either output x or 0
-    //     let zwires = self.wires(xbun).into_iter().map(|x| {
-    //         self.borrow_mut_builder().half_gate(x,mask)
-    //     }).collect_vec();
-
-    //     let primes = self.primes(xbun);
-    //     self.add_bundle(zwires, primes)
-    // }
-
-    // // outputs 0/1
+    // /// Return 0 if `x` is positive and 1 if `x` is negative.
     // pub fn sign(&mut self, xbun: BundleRef, factors_of_m: &[u16]) -> Ref {
     //     let res = self.fractional_mixed_radix(xbun, factors_of_m);
     //     let p = *factors_of_m.last().unwrap();
@@ -390,7 +362,7 @@ pub trait BundleGadgets: Fancy {
     //     self.borrow_mut_builder().proj(*res.last().unwrap(), 2, tt)
     // }
 
-    // // outputs 1/-1
+    // /// Return `if x >= 0 then 1 else -1`, where `-1` is interpreted as `Q-1`.
     // pub fn sgn(&mut self, xbun: BundleRef, factors_of_m: &[u16]) -> BundleRef {
     //     let sign = self.sign(xbun, factors_of_m);
 
@@ -406,27 +378,9 @@ pub trait BundleGadgets: Fancy {
     //     self.add_bundle(ws, ps)
     // }
 
-    // fn exact_ms(&self, xbun: BundleRef) -> Vec<u16> {
-    //     match self.primes(xbun).len() {
-    //         3 => vec![2;5],
-    //         4 => vec![3,26],
-    //         5 => vec![3,4,54],
-    //         6 => vec![5,5,6,50],
-    //         7 => vec![6,6,7,7,74],
-    //         8 => vec![5,7,8,8,9,98],
-    //         9 => vec![4,7,10,10,10,10,134],
-    //         n => panic!("unknown exact Ms for {} primes!", n),
-    //     }
-    // }
-
     // pub fn exact_sgn(&mut self, xbun: BundleRef) -> BundleRef {
     //     let ms = self.exact_ms(xbun);
     //     self.sgn(xbun, &ms)
-    // }
-
-    // pub fn exact_relu(&mut self, xbun: BundleRef) -> BundleRef {
-    //     let ms = self.exact_ms(xbun);
-    //     self.relu(xbun, &ms)
     // }
 
     // pub fn exact_leq(&mut self, xbun: BundleRef, ybun: BundleRef) -> Ref {
@@ -455,4 +409,55 @@ pub trait BundleGadgets: Fancy {
     //         self.add_bundle(z_wires, primes)
     //     })
     // }
+}
+
+// Helper function for advanced gadgets, returns the fractional part of `X/M` where
+// `M=product(ms)`.
+fn fractional_mixed_radix<F,W>(f: &mut F, bun: &Bundle<W>, ms: &[u16]) -> Bundle<W>
+    where F: BundleGadgets<Wire=W>,
+          W: Clone + HasModulus
+{
+    let ndigits = ms.len();
+
+    let q = util::product(&bun.moduli());
+    let M = util::product(ms);
+
+    let mut ds = Vec::new();
+
+    for wire in bun.wires().iter() {
+        let p = wire.modulus();
+
+        let mut tabs = vec![Vec::with_capacity(p as usize); ndigits];
+
+        for x in 0..p {
+            let crt_coef = util::inv(((q / p as u128) % p as u128) as i64, p as i64);
+            let y = (M as f64 * x as f64 * crt_coef as f64 / p as f64).round() as u128 % M;
+            let digits = util::as_mixed_radix(y, ms);
+            for i in 0..ndigits {
+                tabs[i].push(digits[i]);
+            }
+        }
+
+        let new_ds = tabs.into_iter().enumerate()
+            .map(|(i,tt)| f.proj(wire, ms[i], tt))
+            .collect_vec();
+
+        ds.push(Bundle(new_ds));
+    }
+
+    f.mixed_radix_addition(&ds)
+}
+
+// Compute the exact ms needed for the number of CRT primes in `x`.
+fn exact_ms<W: HasModulus>(x: &Bundle<W>) -> Vec<u16> {
+    match x.moduli().len() {
+        3 => vec![2;5],
+        4 => vec![3,26],
+        5 => vec![3,4,54],
+        6 => vec![5,5,6,50],
+        7 => vec![6,6,7,7,74],
+        8 => vec![5,7,8,8,9,98],
+        9 => vec![4,7,10,10,10,10,134],
+        n => panic!("unknown exact Ms for {} primes!", n),
+    }
 }
