@@ -483,6 +483,7 @@ mod tests {
         assert_eq!(circ, Circuit::from_str(&circ.to_string()).unwrap());
     }
 //}}}
+
     #[test] // bundle addition {{{
     fn bundle_addition() {
         let mut rng = thread_rng();
@@ -654,8 +655,8 @@ mod tests {
         }
     }
     //}}}
-    #[test] // mixed_radix_addition {{{
-    fn mixed_radix_addition() {
+    #[test] // bundle mixed_radix_addition {{{
+    fn bundle_mixed_radix_addition() {
         let mut rng = thread_rng();
 
         let nargs = 2 + rng.gen_usize() % 100;
@@ -691,8 +692,8 @@ mod tests {
         }
     }
 //}}}
-    #[test] // relu {{{
-    fn test_relu() {
+    #[test] // bundle relu {{{
+    fn bundle_relu() {
         let mut rng = thread_rng();
         let q = util::modulus_with_width(10);
         println!("q={}", q);
@@ -707,6 +708,77 @@ mod tests {
             let pt = rng.gen_u128() % q;
             let should_be = if pt < q/2 { pt } else { 0 };
             let res = c.eval(&crt_factor(pt,q),&[]);
+            let z = crt_inv_factor(&res, q);
+            assert_eq!(z, should_be);
+        }
+    }
+    //}}}
+    #[test] // bundle sgn {{{
+    fn bundle_sgn() {
+        let mut rng = thread_rng();
+        let q = util::modulus_with_width(10);
+        println!("q={}", q);
+
+        let mut b = Builder::new();
+        let x = b.garbler_input_bundle_crt(q);
+        let z = b.exact_sgn(&x);
+        b.output_bundle(&z);
+        let c = b.finish();
+
+        for _ in 0..128 {
+            let pt = rng.gen_u128() % q;
+            let should_be = if pt < q/2 { 1 } else { q-1 };
+            let res = c.eval(&crt_factor(pt,q),&[]);
+            let z = crt_inv_factor(&res, q);
+            assert_eq!(z, should_be);
+        }
+    }
+    //}}}
+    #[test] // bundle leq {{{
+    fn bundle_leq() {
+        let mut rng = thread_rng();
+        let q = util::modulus_with_width(10);
+
+        let mut b = Builder::new();
+        let x = b.garbler_input_bundle_crt(q);
+        let y = b.evaluator_input_bundle_crt(q);
+        let z = b.exact_lt(&x,&y);
+        b.output(z);
+        let c = b.finish();
+
+        // lets have at least one test where they are surely equal
+        let x = rng.gen_u128() % q/2;
+        let res = c.eval(&crt_factor(x,q),&crt_factor(x,q));
+        assert_eq!(res, &[(x<x) as u16], "x={}", x);
+
+        for _ in 0..64 {
+            let x = rng.gen_u128() % q/2;
+            let y = rng.gen_u128() % q/2;
+            let res = c.eval(&crt_factor(x,q),&crt_factor(y,q));
+            assert_eq!(res, &[(x<y) as u16], "x={} y={}", x, y);
+        }
+    }
+    //}}}
+    #[test] // bundle max {{{
+    fn bundle_max() {
+        let mut rng = thread_rng();
+        let q = util::modulus_with_width(10);
+        let n = 10;
+        println!("n={} q={}", n, q);
+
+        let mut b = Builder::new();
+        let xs = b.garbler_input_bundles_crt(q,n);
+        let z = b.max(&xs);
+        b.output_bundle(&z);
+        let c = b.finish();
+
+        for _ in 0..16 {
+            let inps = (0..n).map(|_| rng.gen_u128() % (q/2)).collect_vec();
+            println!("{:?}", inps);
+            let should_be = *inps.iter().max().unwrap();
+
+            let enc_inps = inps.into_iter().flat_map(|x| crt_factor(x,q)).collect_vec();
+            let res = c.eval(&enc_inps,&[]);
             let z = crt_inv_factor(&res, q);
             assert_eq!(z, should_be);
         }

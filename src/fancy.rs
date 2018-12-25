@@ -13,9 +13,10 @@ pub trait HasModulus {
 }
 
 /// A collection of wires, useful for the garbled gadgets defined by `BundleGadgets`.
-pub struct Bundle<W: HasModulus>(Vec<W>);
+#[derive(Clone)]
+pub struct Bundle<W: Clone + HasModulus>(Vec<W>);
 
-impl <W: HasModulus> Bundle<W> {
+impl <W: Clone + HasModulus> Bundle<W> {
     /// Return the moduli of all the wires in the bundle.
     pub fn moduli(&self) -> Vec<u16> {
         self.0.iter().map(|w| w.modulus()).collect()
@@ -334,8 +335,7 @@ pub trait BundleGadgets: Fancy {
     // Fancy functions based on Mike's fractional mixed radix trick.
 
     /// Compute `max(x,0)`, using potentially approximate factors of `M`.
-    fn relu(&mut self, x: &Bundle<Self::Wire>, factors_of_m: &[u16]) -> Bundle<Self::Wire>
-    {
+    fn relu(&mut self, x: &Bundle<Self::Wire>, factors_of_m: &[u16]) -> Bundle<Self::Wire> {
         let res = fractional_mixed_radix(self, x, factors_of_m);
 
         // project the MSB to 0/1, whether or not it is less than p/2
@@ -349,66 +349,61 @@ pub trait BundleGadgets: Fancy {
     }
 
     /// Compute `max(x,0)`.
-    fn exact_relu(&mut self, x: &Bundle<Self::Wire>) -> Bundle<Self::Wire>
-    {
+    fn exact_relu(&mut self, x: &Bundle<Self::Wire>) -> Bundle<Self::Wire> {
         self.relu(x, &exact_ms(x))
     }
 
-    // /// Return 0 if `x` is positive and 1 if `x` is negative.
-    // pub fn sign(&mut self, xbun: BundleRef, factors_of_m: &[u16]) -> Ref {
-    //     let res = self.fractional_mixed_radix(xbun, factors_of_m);
-    //     let p = *factors_of_m.last().unwrap();
-    //     let tt = (0..p).map(|x| (x >= p/2) as u16).collect();
-    //     self.borrow_mut_builder().proj(*res.last().unwrap(), 2, tt)
-    // }
+    /// Return 0 if `x` is positive and 1 if `x` is negative. Potentially approximate
+    /// depending on `factors_of_m`.
+    fn sign(&mut self, x: &Bundle<Self::Wire>, factors_of_m: &[u16]) -> Self::Wire {
+        let res = fractional_mixed_radix(self, x, factors_of_m);
+        let p = *factors_of_m.last().unwrap();
+        let tt = (0..p).map(|x| (x >= p/2) as u16).collect();
+        self.proj(res.wires().last().unwrap(), 2, tt)
+    }
 
-    // /// Return `if x >= 0 then 1 else -1`, where `-1` is interpreted as `Q-1`.
-    // pub fn sgn(&mut self, xbun: BundleRef, factors_of_m: &[u16]) -> BundleRef {
-    //     let sign = self.sign(xbun, factors_of_m);
+    /// Return 0 if `x` is positive and 1 if `x` is negative.
+    fn exact_sign(&mut self, x: &Bundle<Self::Wire>) -> Self::Wire {
+        self.sign(x, &exact_ms(x))
+    }
 
-    //     let ps = self.primes(xbun);
-    //     let q = util::product(&ps);
-    //     let mut ws = Vec::with_capacity(ps.len());
+    /// Return `if x >= 0 then 1 else -1`, where `-1` is interpreted as `Q-1`. Potentially
+    /// approximate depending on `factors_of_m`.
+    fn sgn(&mut self, x: &Bundle<Self::Wire>, factors_of_m: &[u16]) -> Bundle<Self::Wire> {
+        let sign = self.sign(x,factors_of_m);
+        let q = util::product(&x.moduli());
+        let z = x.moduli().into_iter().map(|p| {
+            let tt = vec![ 1, ((q-1) % p as u128) as u16 ];
+            self.proj(&sign, p, tt)
+        }).collect();
+        Bundle(z)
+    }
 
-    //     for &p in ps.iter() {
-    //         let tt = vec![ 1, ((q-1) % p as u128) as u16 ];
-    //         let w = self.borrow_mut_builder().proj(sign, p, tt);
-    //         ws.push(w);
-    //     }
-    //     self.add_bundle(ws, ps)
-    // }
+    /// Return `if x >= 0 then 1 else -1`, where `-1` is interpreted as `Q-1`.
+    fn exact_sgn(&mut self, x: &Bundle<Self::Wire>) -> Bundle<Self::Wire> {
+        self.sgn(x, &exact_ms(x))
+    }
 
-    // pub fn exact_sgn(&mut self, xbun: BundleRef) -> BundleRef {
-    //     let ms = self.exact_ms(xbun);
-    //     self.sgn(xbun, &ms)
-    // }
+    /// Returns 1 if `x < y`
+    fn exact_lt(&mut self, x: &Bundle<Self::Wire>, y: &Bundle<Self::Wire>) -> Self::Wire {
+        let z = self.sub_bundles(x,y);
+        self.exact_sign(&z)
+    }
 
-    // pub fn exact_leq(&mut self, xbun: BundleRef, ybun: BundleRef) -> Ref {
-    //     let ms = self.exact_ms(xbun);
-    //     let zbun = self.sub(xbun, ybun);
-    //     self.sign(zbun, &ms)
-    // }
-
-    // pub fn max(&mut self, buns: &[BundleRef]) -> BundleRef {
-    //     debug_assert!(buns.len() > 1);
-
-    //     buns.iter().skip(1).fold(buns[0], |xbun, &ybun| {
-    //         let pos = self.exact_leq(xbun,ybun);
-    //         let neg = self.borrow_mut_builder().negate(&pos);
-
-    //         let x_wires = self.wires(xbun);
-    //         let y_wires = self.wires(ybun);
-
-    //         let z_wires = x_wires.iter().zip(y_wires.iter()).map(|(&x,&y)| {
-    //             let xp = self.borrow_mut_builder().half_gate(x,neg);
-    //             let yp = self.borrow_mut_builder().half_gate(y,pos);
-    //             self.borrow_mut_builder().add(xp,yp)
-    //         }).collect();
-
-    //         let primes = self.primes(xbun);
-    //         self.add_bundle(z_wires, primes)
-    //     })
-    // }
+    /// Compute the maximum bundle in `xs`.
+    fn max(&mut self, xs: &[Bundle<Self::Wire>]) -> Bundle<Self::Wire> {
+        assert!(xs.len() > 1);
+        xs.iter().skip(1).fold(xs[0].clone(), |x,y| {
+            let pos = self.exact_lt(&x,y);
+            let neg = self.negate(&pos);
+            let z = x.wires().iter().zip(y.wires().iter()).map(|(x,y)| {
+                let xp = self.mul(x,&neg);
+                let yp = self.mul(y,&pos);
+                self.add(&xp,&yp)
+            }).collect();
+            Bundle(z)
+        })
+    }
 }
 
 // Helper function for advanced gadgets, returns the fractional part of `X/M` where
@@ -449,7 +444,7 @@ fn fractional_mixed_radix<F,W>(f: &mut F, bun: &Bundle<W>, ms: &[u16]) -> Bundle
 }
 
 // Compute the exact ms needed for the number of CRT primes in `x`.
-fn exact_ms<W: HasModulus>(x: &Bundle<W>) -> Vec<u16> {
+fn exact_ms<W: Clone + HasModulus>(x: &Bundle<W>) -> Vec<u16> {
     match x.moduli().len() {
         3 => vec![2;5],
         4 => vec![3,26],
