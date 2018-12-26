@@ -10,73 +10,6 @@ use crate::fancy::HasModulus;
 ////////////////////////////////////////////////////////////////////////////////
 // garbler helper functions
 
-pub fn garble_output(X: &Wire, output_num: usize, deltas: &HashMap<u16,Wire>)
-    -> Vec<u128>
-{
-    let mut cts = Vec::new();
-    let q = X.modulus();
-    let D = &deltas[&q];
-    for k in 0..q {
-        let t = output_tweak(output_num, k);
-        cts.push(X.plus(&D.cmul(k)).hash(t));
-    }
-    cts
-}
-
-pub fn garble_projection(A: &Wire, q_out: u16, tt: &[u16], gate_num: usize, deltas: &HashMap<u16,Wire>)
-    -> (Wire, Option<GarbledGate>)
-{
-    let q_in = A.modulus();
-    // we have to fill in the vector in an unkonwn order because of the
-    // color bits. Since some of the values in gate will be void
-    // temporarily, we use Vec<Option<..>>
-    let mut gate = vec![None; q_in as usize - 1];
-
-    let tao = A.color();        // input zero-wire
-    let g = tweak(gate_num);    // gate tweak
-
-    let Din  = &deltas[&q_in];
-    let Dout = &deltas[&q_out];
-
-    // output zero-wire
-    // W_g^0 <- -H(g, W_{a_1}^0 - \tao\Delta_m) - \phi(-\tao)\Delta_n
-    // let C = A.minus(&Din.cmul(tao))
-    //             .hashback(g, q_out)
-    //             .minus(&Dout.cmul(tt[((q_in - tao) % q_in) as usize]));
-    let mut C = A.clone();
-    C.plus_eq(&Din.cmul((q_in-tao) % q_in));
-    C = C.hashback(g, q_out);
-    C.plus_eq(&Dout.cmul((q_out - tt[((q_in - tao) % q_in) as usize]) % q_out));
-
-    // precompute `let C_ = C.plus(&Dout.cmul(tt[x as usize]))`
-    let C_precomputed = {
-        let mut C_ = C.clone();
-        (0..q_out).map(|x| {
-            if x > 0 {
-                C_.plus_eq(&Dout);
-            }
-            C_.as_u128()
-        }).collect_vec()
-    };
-
-    let mut A_ = A.clone();
-    for x in 0..q_in {
-        if x > 0 {
-            A_.plus_eq(&Din); // avoiding expensive cmul for `A_ = A.plus(&Din.cmul(x))`
-        }
-
-        let ix = (tao as usize + x as usize) % q_in as usize;
-        if ix == 0 { continue }
-
-        let ct = A_.hash(g) ^ C_precomputed[tt[x as usize] as usize];
-        gate[ix - 1] = Some(ct);
-    }
-
-    // unwrap the Option elems inside the Vec
-    let gate = gate.into_iter().map(Option::unwrap).collect();
-    (C, Some(gate))
-}
-
 pub fn garble_half_gate<R: Rng>(A: &Wire, B: &Wire, gate_num: usize, deltas: &HashMap<u16,Wire>, rng: &mut R)
     -> (Wire, Option<GarbledGate>)
 {
@@ -202,16 +135,7 @@ pub fn encode_consts(consts: &[u16], const_wires: &[Wire], deltas: &HashMap<u16,
     xs
 }
 
-pub fn tweak(i: usize) -> u128 {
-    i as u128
-}
-
 pub fn tweak2(i: u64, j: u64) -> u128 {
     ((i as u128) << 64) + j as u128
-}
-
-pub fn output_tweak(i: usize, k: u16) -> u128 {
-    let (left, _) = (i as u128).overflowing_shl(64);
-    left + k as u128
 }
 

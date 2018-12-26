@@ -338,6 +338,7 @@ mod tests {
     #[test] // {{{ and_gate_fan_n
     fn and_gate_fan_n() {
         let mut rng = thread_rng();
+
         let mut b = Builder::new();
         let n = 2 + (rng.gen_usize() % 200);
         let inps = b.evaluator_inputs(2,n);
@@ -350,11 +351,11 @@ mod tests {
             for _ in 0..n {
                 inps.push(rng.gen_bool() as u16);
             }
-            let res = inps.iter().fold(0, |acc, &x| x & acc);
+            let res = inps.iter().fold(1, |acc, &x| x & acc);
             let out = c.eval(&[],&inps)[0];
             if !(out == res) {
                 println!("{:?} {} {}", inps, out, res);
-                panic!();
+                panic!("incorrect output n={}", n);
             }
         }
     }

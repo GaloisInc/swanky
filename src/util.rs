@@ -299,13 +299,7 @@ pub trait RngExt : rand::Rng + Sized {
     fn gen_u32(&mut self) -> u32 { self.gen() }
     fn gen_u64(&mut self) -> u16 { self.gen() }
     fn gen_usize(&mut self) -> usize { self.gen() }
-
-    fn gen_u128(&mut self) -> u128 {
-        let low64  = self.gen_u64();
-        let high64 = self.gen_u64();
-        let (high128, _) = (high64 as u128).overflowing_shl(64) ;
-        high128 + low64 as u128
-    }
+    fn gen_u128(&mut self) -> u128 { self.gen() }
 
     fn gen_usable_u128(&mut self, modulus: u16) -> u128 {
         if is_power_of_2(modulus) {
