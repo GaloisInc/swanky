@@ -48,14 +48,14 @@ pub trait Fancy: Sized {
     /// Subtract `x` and `y`.
     fn sub(&mut self, x: &Self::Wire, y: &Self::Wire) -> Self::Wire;
 
-    /// Multiply `x` and `y`.
-    fn mul(&mut self, x: &Self::Wire, y: &Self::Wire) -> Self::Wire;
-
     /// Multiply `x` times the constant `c`.
     fn cmul(&mut self, x: &Self::Wire, c: u16) -> Self::Wire;
 
+    /// Multiply `x` and `y`.
+    fn mul(&mut self, x: &Self::Wire, y: &Self::Wire) -> Self::Wire;
+
     /// Project `x` according to the truth table `tt`. Resulting wire has modulus `q`.
-    fn proj(&mut self, x: &Self::Wire, q: u16, tt: Vec<u16>) -> Self::Wire;
+    fn proj(&mut self, x: &Self::Wire, q: u16, tt: &[u16]) -> Self::Wire;
 
     ////////////////////////////////////////////////////////////////////////////////
     // Functions built on top of basic fancy operations.
@@ -124,8 +124,8 @@ pub trait Fancy: Sized {
         if from_modulus == to_modulus {
             return x.clone();
         }
-        let tab = (0..from_modulus).map(|x| x % to_modulus).collect();
-        self.proj(x, to_modulus, tab)
+        let tab = (0..from_modulus).map(|x| x % to_modulus).collect_vec();
+        self.proj(x, to_modulus, &tab)
     }
 }
 
@@ -238,8 +238,8 @@ pub trait BundleGadgets: Fancy {
             let p = x.modulus();
             let tab = (0..p).map(|x| {
                 ((x as u64).pow(c as u32) % p as u64) as u16
-            }).collect();
-            self.proj(x, p, tab)
+            }).collect_vec();
+            self.proj(x, p, &tab)
         }).collect())
     }
 
@@ -259,14 +259,14 @@ pub trait BundleGadgets: Fancy {
             let z = self.sub(x,y);
             let mut eq_zero_tab = vec![0; x.modulus() as usize];
             eq_zero_tab[0] = 1;
-            self.proj(&z, wlen + 1, eq_zero_tab)
+            self.proj(&z, wlen + 1, &eq_zero_tab)
         }).collect_vec();
         // add up the results, and output whether they equal zero or not, mod 2
         let z = self.add_many(&zs);
         let b = zs.len();
         let mut tab = vec![0;b+1];
         tab[b] = 1;
-        self.proj(&z, 2, tab)
+        self.proj(&z, 2, &tab)
     }
 
     /// Mixed radix addition.
@@ -307,7 +307,7 @@ pub trait BundleGadgets: Fancy {
                 // the correct moduli for the next iteration
                 let next_mod = xs[0].wires()[i+1].modulus();
                 let tt = (0..=max_val).map(|i| (i / q) % next_mod).collect_vec();
-                digit_carry = Some(self.proj(&carry, next_mod, tt));
+                digit_carry = Some(self.proj(&carry, next_mod, &tt));
 
                 let next_max_val = nargs as u16 * (next_mod - 1) + max_carry;
 
@@ -316,7 +316,7 @@ pub trait BundleGadgets: Fancy {
                         carry_carry = Some(self.mod_change(digit_carry.as_ref().unwrap(), next_max_val + 1));
                     } else {
                         let tt = (0..=max_val).map(|i| i / q).collect_vec();
-                        carry_carry = Some(self.proj(&carry, next_max_val + 1, tt));
+                        carry_carry = Some(self.proj(&carry, next_max_val + 1, &tt));
                     }
                 } else {
                     // next digit is MSB so we dont need carry_carry
@@ -340,8 +340,8 @@ pub trait BundleGadgets: Fancy {
 
         // project the MSB to 0/1, whether or not it is less than p/2
         let p = *factors_of_m.last().unwrap();
-        let mask_tt = (0..p).map(|x| (x < p/2) as u16).collect();
-        let mask = self.proj(res.wires().last().unwrap(), 2, mask_tt);
+        let mask_tt = (0..p).map(|x| (x < p/2) as u16).collect_vec();
+        let mask = self.proj(res.wires().last().unwrap(), 2, &mask_tt);
 
         // use the mask to either output x or 0
         let z = x.wires().iter().map(|x| self.mul(x,&mask)).collect_vec();
@@ -358,8 +358,8 @@ pub trait BundleGadgets: Fancy {
     fn sign(&mut self, x: &Bundle<Self::Wire>, factors_of_m: &[u16]) -> Self::Wire {
         let res = fractional_mixed_radix(self, x, factors_of_m);
         let p = *factors_of_m.last().unwrap();
-        let tt = (0..p).map(|x| (x >= p/2) as u16).collect();
-        self.proj(res.wires().last().unwrap(), 2, tt)
+        let tt = (0..p).map(|x| (x >= p/2) as u16).collect_vec();
+        self.proj(res.wires().last().unwrap(), 2, &tt)
     }
 
     /// Return 0 if `x` is positive and 1 if `x` is negative.
@@ -374,7 +374,7 @@ pub trait BundleGadgets: Fancy {
         let q = util::product(&x.moduli());
         let z = x.moduli().into_iter().map(|p| {
             let tt = vec![ 1, ((q-1) % p as u128) as u16 ];
-            self.proj(&sign, p, tt)
+            self.proj(&sign, p, &tt)
         }).collect();
         Bundle(z)
     }
@@ -434,7 +434,7 @@ fn fractional_mixed_radix<F,W>(f: &mut F, bun: &Bundle<W>, ms: &[u16]) -> Bundle
         }
 
         let new_ds = tabs.into_iter().enumerate()
-            .map(|(i,tt)| f.proj(wire, ms[i], tt))
+            .map(|(i,tt)| f.proj(wire, ms[i], &tt))
             .collect_vec();
 
         ds.push(Bundle(new_ds));

@@ -2,11 +2,10 @@
 
 use crate::circuit::{Circuit, Gate};
 use crate::wire::Wire;
-use itertools::Itertools;
 use rand::rngs::ThreadRng;
 use serde_derive::{Serialize, Deserialize};
 use std::collections::HashMap;
-use crate::fancy::HasModulus;
+use crate::fancy::{Fancy, HasModulus};
 
 pub mod operations;
 
@@ -28,7 +27,7 @@ pub struct Decoder {
 #[derive(Serialize, Deserialize, PartialEq, Debug)]
 pub struct Evaluator {
     gates  : Vec<GarbledGate>,
-    consts : Vec<Wire>,
+    consts : HashMap<(u16,u16),Wire>,
 }
 
 /// Garbler is an iterator for streaming `GarbledGate`s, and producing constant wires,
@@ -36,128 +35,176 @@ pub struct Evaluator {
 /// which it produces wirelabels for all internal wires while creating `GarbledGate` for
 /// each gate which requires ciphertexts.
 pub struct Garbler<'a> {
-    circuit: &'a Circuit,
-    wires: Vec<Wire>,
-    garbler_inputs: Vec<Wire>,
-    evaluator_inputs: Vec<Wire>,
-    consts: Vec<Wire>,
+    constants: HashMap<(u16,u16),Wire>,
     deltas: HashMap<u16, Wire>,
     current_wire: usize,
     rng: ThreadRng,
+    send: &'a mut FnMut(Message),
 }
 
-/// Convenience function to garble directly with no streaming.
-pub fn garble(c: &Circuit) -> (Encoder, Decoder, Evaluator) {
-    let mut garbler = Garbler::new(c);
-    let en     = garbler.encoder();
-    let gates  = garbler.by_ref().collect();
-    let ev     = Evaluator::new(gates, garbler.consts());
-    let de     = garbler.decoder().unwrap();
-    (en, de, ev)
+pub enum Message {
+    GarblerInput(Wire),
+    EvaluatorInput(Wire),
+    Constant { val: u16, wire: Wire },
+    GarbledGate(GarbledGate),
+}
+
+impl <'a> Fancy for Garbler<'a> {
+    type Wire = Wire;
+
+    fn garbler_input(&mut self, q: u16) -> Wire {
+        let w = Wire::rand(&mut self.rng, q);
+        self.send(Message::GarblerInput(w.clone()));
+        w
+    }
+
+    fn evaluator_input(&mut self, q: u16) -> Wire {
+        let w = Wire::rand(&mut self.rng, q);
+        self.send(Message::EvaluatorInput(w.clone()));
+        w
+    }
+
+    fn constant(&mut self, x: u16, q: u16) -> Wire {
+        if self.constants.contains_key(&(x,q)) {
+            return self.constants[&(x,q)].clone();
+        }
+        let w = Wire::rand(&mut self.rng, q);
+        let d = self.delta(q);
+        let r = w.plus(&d.cmul(x));
+        self.constants.insert((x,q), r.clone());
+        r
+    }
+
+    fn add(&mut self, x: &Wire, y: &Wire) -> Wire {
+        x.plus(y)
+    }
+
+    fn sub(&mut self, x: &Wire, y: &Wire) -> Wire {
+        x.minus(y)
+    }
+
+    fn cmul(&mut self, x: &Wire, c: u16)  -> Wire {
+        x.cmul(c)
+    }
+
+    fn mul(&mut self, x: &Wire, y: &Wire) -> Wire {
+        let (w,g) = operations::garble_half_gate(
+            x, y, self.current_wire, &self.deltas, &mut self.rng
+        );
+        self.current_wire += 1;
+        self.send(Message::GarbledGate(g.unwrap()));
+        w
+    }
+
+    fn proj(&mut self, x: &Wire, q: u16, tt: &[u16]) -> Wire {
+        let (w,g) = operations::garble_projection(
+            x, q, tt, self.current_wire, &self.deltas
+        );
+        self.current_wire += 1;
+        self.send(Message::GarbledGate(g.unwrap()));
+        w
+    }
 }
 
 impl <'a> Garbler<'a> {
-    pub fn new(circuit: &'a Circuit) -> Garbler {
-        let mut rng = rand::thread_rng();
-
-        // initialize deltas
-        let mut deltas = HashMap::new();
-        for &m in circuit.gate_moduli.iter().unique() {
-            let w = Wire::rand_delta(&mut rng, m);
-            deltas.insert(m, w);
-        }
-
-        // initialize inputs
-        let garbler_inputs = circuit.garbler_input_refs.iter().map(|r| {
-            Wire::rand(&mut rng, r.modulus())
-        }).collect();
-
-        let evaluator_inputs = circuit.evaluator_input_refs.iter().map(|r| {
-            Wire::rand(&mut rng, r.modulus())
-        }).collect();
-
-        // initialize consts
-        let consts = circuit.const_refs.iter().map(|r| {
-            Wire::rand(&mut rng, r.modulus())
-        }).collect();
-
-        let wires = Vec::with_capacity(circuit.gates.len());
-
+    pub fn new(send_func: &mut FnMut(Message)) -> Garbler {
         Garbler {
-            circuit,
-            wires,
-            garbler_inputs,
-            evaluator_inputs,
-            consts,
-            deltas,
+            constants: HashMap::new(),
+            deltas: HashMap::new(),
             current_wire: 0,
-            rng
+            rng: rand::thread_rng(),
+            send: send_func,
         }
+    }
+
+    fn send(&mut self, m: Message) {
+        (self.send)(m);
+    }
+
+    /// Create a delta if it has not been created yet for this modulus, otherwise just
+    /// return the existing one.
+    fn delta(&mut self, q: u16) -> &Wire {
+        if self.deltas.contains_key(&q) {
+            return &self.deltas[&q];
+        }
+        let w = Wire::rand_delta(&mut self.rng, q);
+        self.deltas.insert(q,w);
+        &self.deltas[&q]
     }
 
     /// Extract the const wires from the `Garbler`.
     pub fn consts(&self) -> Vec<Wire> {
-        operations::encode_consts(&self.circuit.const_vals, &self.consts, &self.deltas)
+        unimplemented!()
+        // operations::encode_consts(&self.circuit.const_vals, &self.consts, &self.deltas)
     }
 
     /// Extract an `Encoder` from the `Garbler`.
     pub fn encoder(&self) -> Encoder {
-        Encoder::new(self.garbler_inputs.clone(), self.evaluator_inputs.clone(), self.deltas.clone())
+        unimplemented!()
+        // Encoder::new(self.garbler_inputs.clone(), self.evaluator_inputs.clone(), self.deltas.clone())
     }
 
     /// Extract a `Decoder` from the `Garbler`. Fails if called before all wires have been
     /// generated using the iterator interface.
     pub fn decoder(&self) -> Result<Decoder, failure::Error> {
-        if self.current_wire < self.circuit.gates.len() {
-            return Err(failure::err_msg("Garbler::decoder called before all wires were generated"));
-        }
-        let outs = self.circuit.output_refs.iter().enumerate().map(|(i, &r)| {
-            operations::garble_output(&self.wires[r.ix], i, &self.deltas)
-        }).collect();
-        Ok(Decoder::new(outs))
+        unimplemented!()
+        // if self.current_wire < self.circuit.gates.len() {
+        //     return Err(failure::err_msg("Garbler::decoder called before all wires were generated"));
+        // }
+        // let outs = self.circuit.output_refs.iter().enumerate().map(|(i, &r)| {
+        //     operations::garble_output(&self.wires[r.ix], i, &self.deltas)
+        // }).collect();
+        // Ok(Decoder::new(outs))
     }
 }
 
-impl <'a> Iterator for Garbler<'a> {
-    type Item = GarbledGate;
+/// Garble from a circuit without streaming.
+pub fn garble(c: &Circuit) -> (Encoder, Decoder, Evaluator) {
+    let mut garbler_inputs   = Vec::new();
+    let mut evaluator_inputs = Vec::new();
+    let mut garbled_gates    = Vec::new();
+    let mut constants : HashMap<(u16,u16),Wire>       = HashMap::new();
+    let deltas;
 
-    fn next(&mut self) -> Option<GarbledGate> {
-        if self.current_wire >= self.circuit.gates.len() {
-            return None;
-        }
-
-        let mut gate = None;
-
-        while gate.is_none() {
-            if self.current_wire >= self.circuit.gates.len() {
-                return None;
+    let mut send_func = |m| {
+        match m {
+            Message::GarblerInput(w)   => garbler_inputs.push(w),
+            Message::EvaluatorInput(w) => evaluator_inputs.push(w),
+            Message::GarbledGate(w)    => garbled_gates.push(w),
+            Message::Constant { val, wire } => {
+                let q = wire.modulus();
+                constants.insert((val,q), wire);
             }
+        }
+    };
 
-            let q = self.circuit.modulus(self.current_wire);
+    {
+        let mut garbler = Garbler::new(&mut send_func);
 
-            let (w,g) = match self.circuit.gates[self.current_wire] {
-                Gate::GarblerInput { id }   => (self.garbler_inputs[id].clone(), None),
-                Gate::EvaluatorInput { id } => (self.evaluator_inputs[id].clone(), None),
-                Gate::Const { id } => (self.consts[id].clone(), None),
-
-                Gate::Add { xref, yref } => (self.wires[xref.ix].plus(&self.wires[yref.ix]),  None),
-                Gate::Sub { xref, yref } => (self.wires[xref.ix].minus(&self.wires[yref.ix]), None),
-                Gate::Cmul { xref, c }   => (self.wires[xref.ix].cmul(c),                  None),
-
-                Gate::Proj { xref, ref tt, .. } =>
-                    operations::garble_projection(&self.wires[xref.ix], q, tt, self.current_wire, &self.deltas),
-
-                Gate::HalfGate { xref, yref, .. } =>
-                    operations::garble_half_gate(&self.wires[xref.ix], &self.wires[yref.ix], self.current_wire, &self.deltas, &mut self.rng),
+        let mut wires = Vec::new();
+        for (i, gate) in c.gates.iter().enumerate() {
+            let q = c.modulus(i);
+            let w = match gate {
+                Gate::GarblerInput { .. }    => garbler.garbler_input(q),
+                Gate::EvaluatorInput { .. }  => garbler.evaluator_input(q),
+                Gate::Constant { val }       => garbler.constant(*val,q),
+                Gate::Add { xref, yref }     => garbler.add(&wires[xref.ix], &wires[yref.ix]),
+                Gate::Sub { xref, yref }     => garbler.sub(&wires[xref.ix], &wires[yref.ix]),
+                Gate::Cmul { xref, c }       => garbler.cmul(&wires[xref.ix], *c),
+                Gate::Mul { xref, yref, .. } => garbler.mul(&wires[xref.ix], &wires[yref.ix]),
+                Gate::Proj { xref, tt, .. }  => garbler.proj(&wires[xref.ix], q, tt),
             };
-
-            self.wires.push(w);
-            gate = g;
-            self.current_wire += 1;
+            wires.push(w);
         }
 
-        gate
+        deltas = garbler.deltas;
     }
+
+    let en = Encoder::new(garbler_inputs, evaluator_inputs, deltas);
+    let ev = Evaluator::new(garbled_gates, constants);
+    // let de     = garbler.decoder().unwrap();
+    // (en, de, ev)
+    unimplemented!()
 }
 
 impl Encoder {
@@ -242,7 +289,7 @@ impl Decoder {
 }
 
 impl Evaluator {
-    pub fn new(gates: Vec<GarbledGate>, consts: Vec<Wire>) -> Self {
+    pub fn new(gates: Vec<GarbledGate>, consts: HashMap<(u16,u16),Wire>) -> Self {
         Evaluator { gates, consts }
     }
 
@@ -262,7 +309,7 @@ impl Evaluator {
 
                 Gate::GarblerInput { id } => garbler_inputs[id].clone(),
                 Gate::EvaluatorInput { id } => evaluator_inputs[id].clone(),
-                Gate::Const { id, .. }   => self.consts[id].clone(),
+                Gate::Constant { val }   => self.consts[&(val,q)].clone(),
                 Gate::Add { xref, yref } => wires[xref.ix].plus(&wires[yref.ix]),
                 Gate::Sub { xref, yref } => wires[xref.ix].minus(&wires[yref.ix]),
                 Gate::Cmul { xref, c }   => wires[xref.ix].cmul(c),
@@ -277,7 +324,7 @@ impl Evaluator {
                     }
                 }
 
-                Gate::HalfGate { xref, yref, id } => {
+                Gate::Mul { xref, yref, id } => {
                     let g = operations::tweak2(i as u64, 0);
 
                     // garbler's half gate
@@ -436,7 +483,7 @@ mod tests {
             let mut b = Builder::new();
             let x = b.evaluator_input(q);
             let _ = b.evaluator_input(q);
-            let z = b.proj(&x, q, tab);
+            let z = b.proj(&x, q, &tab);
             b.output(z);
             b.finish()
         });
@@ -453,7 +500,7 @@ mod tests {
             let mut b = Builder::new();
             let x = b.evaluator_input(q);
             let _ = b.evaluator_input(q);
-            let z = b.proj(&x, q, tab);
+            let z = b.proj(&x, q, &tab);
             b.output(z);
             b.finish()
         });

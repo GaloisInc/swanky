@@ -4,12 +4,22 @@ use crate::aes::AES;
 use crate::util::{self, RngExt};
 use rand::Rng;
 use serde_derive::{Serialize, Deserialize};
+use crate::fancy::HasModulus;
 
 #[derive(Debug, PartialEq, PartialOrd, Clone, Serialize, Deserialize)]
 pub enum Wire {
     Mod2 { val: u128 },
     // Mod7 { ds: [u8;45] },
     ModN { q: u16, ds: Vec<u16> },
+}
+
+impl HasModulus for Wire {
+    fn modulus(&self) -> u16 {
+        match *self {
+            Wire::Mod2 { .. } => 2,
+            Wire::ModN { q, .. } => q,
+        }
+    }
 }
 
 // impl std::fmt::Debug for Wire {
@@ -68,13 +78,6 @@ impl Wire {
         match self {
             Wire::Mod2 { val } => (0..128).map(|i| ((val >> i) as u16) & 1).collect(),
             Wire::ModN { ds, .. } => ds.clone(),
-        }
-    }
-
-    pub fn modulus(&self) -> u16 {
-        match *self {
-            Wire::Mod2 { .. } => 2,
-            Wire::ModN { q, .. } => q,
         }
     }
 

@@ -5,6 +5,7 @@ use crate::wire::Wire;
 use itertools::Itertools;
 use rand::Rng;
 use std::collections::HashMap;
+use crate::fancy::HasModulus;
 
 ////////////////////////////////////////////////////////////////////////////////
 // garbler helper functions

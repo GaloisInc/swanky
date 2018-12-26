@@ -24,7 +24,6 @@ pub struct Circuit {
     pub evaluator_input_refs: Vec<Ref>,
     pub const_refs: Vec<Ref>,
     pub output_refs: Vec<Ref>,
-    pub const_vals: Vec<u16>,
     pub num_nonfree_gates: usize,
 }
 
@@ -40,12 +39,12 @@ pub struct Circuit {
 pub enum Gate {
     GarblerInput { id: usize },
     EvaluatorInput { id: usize },
-    Const { id: usize },
+    Constant { val: u16 },
     Add { xref: Ref, yref: Ref },
     Sub { xref: Ref, yref: Ref },
     Cmul { xref: Ref, c: u16 },
+    Mul { xref: Ref, yref: Ref, id: usize }, // id is the gate number
     Proj { xref: Ref, tt: Vec<u16>, id: usize },  // id is the gate number
-    HalfGate { xref: Ref, yref: Ref, id: usize }, // id is the gate number
 }
 
 impl Circuit {
@@ -68,7 +67,7 @@ impl Circuit {
                 Gate::GarblerInput   { id } => garbler_inputs[id],
                 Gate::EvaluatorInput { id } => evaluator_inputs[id],
 
-                Gate::Const { id } => self.const_vals[id],
+                Gate::Constant { val } => val,
 
                 Gate::Add { xref, yref } => (cache[xref.ix] + cache[yref.ix]) % q,
                 Gate::Sub { xref, yref } => (cache[xref.ix] + q - cache[yref.ix]) % q,
@@ -77,8 +76,7 @@ impl Circuit {
 
                 Gate::Proj { xref, ref tt, .. } => tt[cache[xref.ix] as usize],
 
-                Gate::HalfGate { xref, yref, .. } =>
-                    (cache[xref.ix] * cache[yref.ix] % q),
+                Gate::Mul { xref, yref, .. } => (cache[xref.ix] * cache[yref.ix] % q),
             };
             cache[zref] = val;
         }
@@ -117,12 +115,12 @@ impl Circuit {
             match g {
                 Gate::GarblerInput   { .. } => (),
                 Gate::EvaluatorInput { .. } => (),
-                Gate::Const          { .. } => nconst    += 1,
+                Gate::Constant       { .. } => nconst    += 1,
                 Gate::Add            { .. } => nadd      += 1,
                 Gate::Sub            { .. } => nsub      += 1,
                 Gate::Cmul           { .. } => ncmul     += 1,
                 Gate::Proj           { .. } => nproj     += 1,
-                Gate::HalfGate       { .. } => nhalfgate += 1,
+                Gate::Mul            { .. } => nhalfgate += 1,
             }
         }
 
@@ -196,9 +194,7 @@ impl Fancy for Builder {
         match self.const_map.get(&(val, modulus)) {
             Some(&r) => r,
             None => {
-                let id = self.circ.const_vals.len();
-                self.circ.const_vals.push(val);
-                let gate = Gate::Const { id };
+                let gate = Gate::Constant { val };
                 let r = self.gate(gate, modulus);
                 self.const_map.insert((val,modulus), r);
                 self.circ.const_refs.push(r);
@@ -223,12 +219,12 @@ impl Fancy for Builder {
         self.gate(Gate::Cmul { xref: *xref, c }, xref.modulus())
     }
 
-    fn proj(&mut self, xref: &Ref, output_modulus: u16, tt: Vec<u16>) -> Ref {
+    fn proj(&mut self, xref: &Ref, output_modulus: u16, tt: &[u16]) -> Ref {
         assert_eq!(tt.len(), xref.modulus() as usize);
         assert!(tt.iter().all(|&x| x < output_modulus),
             "not all xs were less than the output modulus! circuit.proj: tt={:?},
             output_modulus={}", tt, output_modulus);
-        let gate = Gate::Proj { xref: *xref, tt, id: self.get_next_ciphertext_id() };
+        let gate = Gate::Proj { xref: *xref, tt: tt.to_vec(), id: self.get_next_ciphertext_id() };
         self.gate(gate, output_modulus)
     }
 
@@ -237,7 +233,7 @@ impl Fancy for Builder {
             return self.mul(yref, xref);
         }
 
-        let gate = Gate::HalfGate {
+        let gate = Gate::Mul {
             xref: *xref,
             yref: *yref,
             id: self.get_next_ciphertext_id(),
@@ -259,7 +255,6 @@ impl Builder {
             const_refs: Vec::new(),
             output_refs: Vec::new(),
             gate_moduli: Vec::new(),
-            const_vals: Vec::new(),
             num_nonfree_gates: 0,
         };
         Builder {
