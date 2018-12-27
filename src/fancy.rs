@@ -57,6 +57,9 @@ pub trait Fancy: Sized {
     /// Project `x` according to the truth table `tt`. Resulting wire has modulus `q`.
     fn proj(&mut self, x: &Self::Wire, q: u16, tt: &[u16]) -> Self::Wire;
 
+    /// Process this wire as output.
+    fn output(&mut self, x: &Self::Wire);
+
     ////////////////////////////////////////////////////////////////////////////////
     // Functions built on top of basic fancy operations.
 
@@ -127,6 +130,12 @@ pub trait Fancy: Sized {
         let tab = (0..from_modulus).map(|x| x % to_modulus).collect_vec();
         self.proj(x, to_modulus, &tab)
     }
+
+    fn outputs(&mut self, xs: &[Self::Wire]) {
+        for x in xs.iter() {
+            self.output(x);
+        }
+    }
 }
 
 /// Extension trait for `Fancy` providing advanced gadgets based on bundles of wires.
@@ -185,6 +194,13 @@ pub trait BundleGadgets: Fancy {
     /// Create `n` evaluator input bundles, under composite CRT modulus `q`.
     fn evaluator_input_bundles_crt(&mut self, q: u128, n: usize) -> Vec<Bundle<Self::Wire>> {
         (0..n).map(|_| self.evaluator_input_bundle_crt(q)).collect()
+    }
+
+    /// Output the wires that make up a bundle.
+    fn output_bundle(&mut self, x: &Bundle<Self::Wire>) {
+        for w in x.wires() {
+            self.output(w);
+        }
     }
 
     ////////////////////////////////////////////////////////////////////////////////

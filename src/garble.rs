@@ -28,6 +28,9 @@ pub enum Message {
 
     /// Garbled gate emitted by a projection or multiplication.
     GarbledGate(GarbledGate),
+
+    /// Output decoding information.
+    OutputCiphertext(OutputCiphertext),
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -248,6 +251,18 @@ impl <'a> Fancy for Garbler<'a> {
         C
     }
     // }}}
+    fn output(&mut self, X: &Wire) { // {{{
+        let mut cts = Vec::new();
+        let q = X.modulus();
+        let i = self.current_output();
+        let D = self.delta(q);
+        for k in 0..q {
+            let t = output_tweak(i, k);
+            cts.push(X.plus(&D.cmul(k)).hash(t));
+        }
+        self.send(Message::OutputCiphertext(cts));
+    }
+    // }}}
 }
 
 impl <'a> Garbler<'a> {
@@ -282,19 +297,6 @@ impl <'a> Garbler<'a> {
         w
     }
 
-    /// Produce an output ciphertext for a wire.
-    fn garble_output(&mut self, X: &Wire) -> OutputCiphertext {
-        let mut cts = Vec::new();
-        let q = X.modulus();
-        let i = self.current_output();
-        let D = self.delta(q);
-        for k in 0..q {
-            let t = output_tweak(i, k);
-            cts.push(X.plus(&D.cmul(k)).hash(t));
-        }
-        cts
-    }
-
     /// The current nonfree gate index of the garbling computation.
     fn current_gate(&mut self) -> usize {
         let c = self.current_gate;
@@ -317,15 +319,16 @@ pub fn garble(c: &Circuit) -> (Encoder, Decoder, Evaluator) {
     let mut evaluator_inputs = Vec::new();
     let mut garbled_gates    = Vec::new();
     let mut constants        = HashMap::new();
+    let mut garbled_outputs  = Vec::new();
     let deltas;
-    let garbled_outputs;
 
     let mut send_func = |m| {
         match m {
-            Message::GarblerInput(w)   => garbler_inputs.push(w),
-            Message::EvaluatorInput(w) => evaluator_inputs.push(w),
-            Message::GarbledGate(w)    => garbled_gates.push(w),
-            Message::Constant(val,wire) => {
+            Message::GarblerInput(w)     => garbler_inputs.push(w),
+            Message::EvaluatorInput(w)   => evaluator_inputs.push(w),
+            Message::GarbledGate(w)      => garbled_gates.push(w),
+            Message::OutputCiphertext(c) => garbled_outputs.push(c),
+            Message::Constant(val,wire)  => {
                 let q = wire.modulus();
                 constants.insert((val,q), wire);
             }
@@ -351,9 +354,9 @@ pub fn garble(c: &Circuit) -> (Encoder, Decoder, Evaluator) {
             wires.push(w);
         }
 
-        garbled_outputs = c.output_refs.iter().map(|&r| {
-            garbler.garble_output(&wires[r.ix])
-        }).collect();
+        for r in c.output_refs.iter() {
+            garbler.output(&wires[r.ix]);
+        }
 
         deltas = garbler.deltas;
     }
@@ -626,7 +629,7 @@ mod tests {
             let x = b.evaluator_input(q);
             let y = b.evaluator_input(q);
             let z = b.add(&x,&y);
-            b.output(z);
+            b.output(&z);
             b.finish()
         });
     }
@@ -637,7 +640,7 @@ mod tests {
             let mut b = Builder::new();
             let xs = b.evaluator_inputs(q,16);
             let z = b.add_many(&xs);
-            b.output(z);
+            b.output(&z);
             b.finish()
         });
     }
@@ -648,7 +651,7 @@ mod tests {
             let mut b = Builder::new();
             let xs = b.evaluator_inputs(2,16);
             let z = b.or_many(&xs);
-            b.output(z);
+            b.output(&z);
             b.finish()
         });
     }
@@ -660,7 +663,7 @@ mod tests {
             let x = b.evaluator_input(q);
             let y = b.evaluator_input(q);
             let z = b.sub(&x,&y);
-            b.output(z);
+            b.output(&z);
             b.finish()
         });
     }
@@ -677,7 +680,7 @@ mod tests {
             } else {
                 z = b.cmul(&x, 1);
             }
-            b.output(z);
+            b.output(&z);
             b.finish()
         });
     }
@@ -693,7 +696,7 @@ mod tests {
             let x = b.evaluator_input(q);
             let _ = b.evaluator_input(q);
             let z = b.proj(&x, q, &tab);
-            b.output(z);
+            b.output(&z);
             b.finish()
         });
     }
@@ -710,7 +713,7 @@ mod tests {
             let x = b.evaluator_input(q);
             let _ = b.evaluator_input(q);
             let z = b.proj(&x, q, &tab);
-            b.output(z);
+            b.output(&z);
             b.finish()
         });
     }
@@ -721,7 +724,7 @@ mod tests {
             let mut b = Builder::new();
             let x = b.evaluator_input(q);
             let z = b.mod_change(&x,q*2);
-            b.output(z);
+            b.output(&z);
             b.finish()
         });
     }
@@ -733,7 +736,7 @@ mod tests {
             let x = b.evaluator_input(q);
             let y = b.evaluator_input(q);
             let z = b.mul(&x,&y);
-            b.output(z);
+            b.output(&z);
             b.finish()
         });
     }
@@ -748,7 +751,7 @@ mod tests {
             let x = b.evaluator_input(q);
             let y = b.evaluator_input(ymod);
             let z = b.mul(&x,&y);
-            b.output(z);
+            b.output(&z);
             let c = b.finish();
 
             let (en, de, ev) = garble(&c);
@@ -819,7 +822,7 @@ mod tests {
         let c = rng.gen_u16() % q;
 
         let y = b.constant(c,q);
-        b.output(y);
+        b.output(&y);
 
         let circ = b.finish();
         let (_, de, ev) = garble(&circ);
@@ -842,7 +845,7 @@ mod tests {
         let x = b.evaluator_input(q);
         let y = b.constant(c,q);
         let z = b.add(&x,&y);
-        b.output(z);
+        b.output(&z);
 
         let circ = b.finish();
         let (en, de, ev) = garble(&circ);

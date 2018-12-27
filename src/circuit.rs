@@ -3,7 +3,7 @@
 
 use serde_derive::{Serialize, Deserialize};
 use std::collections::HashMap;
-use crate::fancy::{Fancy, BundleGadgets, HasModulus, Bundle};
+use crate::fancy::{Fancy, BundleGadgets, HasModulus};
 
 /// The index and modulus of a `Gate` in a `Circuit`.
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
@@ -242,6 +242,9 @@ impl Fancy for Builder {
         self.gate(gate, xref.modulus())
     }
 
+    fn output(&mut self, xref: &Ref) {
+        self.circ.output_refs.push(xref.clone());
+    }
 }
 
 impl BundleGadgets for Builder { }
@@ -308,24 +311,6 @@ impl Builder {
         let ix = self.get_next_ref_ix();
         Ref { ix, modulus }
     }
-
-    /// Mark `xref` as an output of the circuit.
-    pub fn output(&mut self, xref: Ref) {
-        self.circ.output_refs.push(xref);
-    }
-
-    /// Mark each `Ref` in `xs` as an output of the circuit.
-    pub fn outputs(&mut self, xs: &[Ref]) {
-        for &x in xs.iter() {
-            self.output(x);
-        }
-    }
-
-    pub fn output_bundle(&mut self, x: &Bundle<Ref>) {
-        for &w in x.wires() {
-            self.output(w);
-        }
-    }
 }
 
 #[cfg(test)]
@@ -343,7 +328,7 @@ mod tests {
         let n = 2 + (rng.gen_usize() % 200);
         let inps = b.evaluator_inputs(2,n);
         let z = b.and_many(&inps);
-        b.output(z);
+        b.output(&z);
         let c = b.finish();
 
         for _ in 0..16 {
@@ -367,7 +352,7 @@ mod tests {
         let n = 2 + (rng.gen_usize() % 200);
         let inps = b.evaluator_inputs(2,n);
         let z = b.or_many(&inps);
-        b.output(z);
+        b.output(&z);
         let c = b.finish();
 
         for _ in 0..16 {
@@ -392,7 +377,7 @@ mod tests {
         let x = b.garbler_input(q);
         let y = b.evaluator_input(q);
         let z = b.mul(&x,&y);
-        b.output(z);
+        b.output(&z);
         let c = b.finish();
         for _ in 0..16 {
             let x = rng.gen_u16() % q;
@@ -410,7 +395,7 @@ mod tests {
         let x = b.garbler_input(p);
         let y = b.mod_change(&x, q);
         let z = b.mod_change(&y, p);
-        b.output(z);
+        b.output(&z);
         let c = b.finish();
         for _ in 0..16 {
             let x = rng.gen_u16() % p;
@@ -425,7 +410,7 @@ mod tests {
         let args = b.garbler_inputs(2,n);
         let wires = args.iter().map(|x| b.mod_change(x, n as u16 + 1)).collect_vec();
         let s = b.add_many(&wires);
-        b.output(s);
+        b.output(&s);
         let c = b.finish();
 
         let mut rng = thread_rng();
@@ -450,7 +435,7 @@ mod tests {
         let x = b.evaluator_input(q);
         let y = b.constant(c,q);
         let z = b.add(&x,&y);
-        b.output(z);
+        b.output(&z);
 
         let circ = b.finish();
 
@@ -635,7 +620,7 @@ mod tests {
         let x = b.garbler_input_bundle_crt(q);
         let y = b.evaluator_input_bundle_crt(q);
         let z = b.eq_bundles(&x,&y);
-        b.output(z);
+        b.output(&z);
         let c = b.finish();
 
         // lets have at least one test where they are surely equal
@@ -739,7 +724,7 @@ mod tests {
         let x = b.garbler_input_bundle_crt(q);
         let y = b.evaluator_input_bundle_crt(q);
         let z = b.exact_lt(&x,&y);
-        b.output(z);
+        b.output(&z);
         let c = b.finish();
 
         // lets have at least one test where they are surely equal
