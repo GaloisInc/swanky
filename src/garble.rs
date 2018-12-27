@@ -7,8 +7,7 @@ use serde_derive::{Serialize, Deserialize};
 use std::collections::HashMap;
 use crate::fancy::{Fancy, HasModulus};
 use itertools::Itertools;
-
-pub mod operations;
+use crate::util::RngExt;
 
 /// The ciphertext created by a garbled gate.
 pub type GarbledGate = Vec<u128>;
@@ -89,12 +88,119 @@ impl <'a> Fancy for Garbler<'a> {
         x.cmul(c)
     }
 
-    fn mul(&mut self, x: &Wire, y: &Wire) -> Wire {
-        let (w,g) = operations::garble_half_gate(
-            x, y, self.current_gate(), &self.deltas, &mut self.rng
-        );
-        self.send(Message::GarbledGate(g.unwrap()));
-        w
+    fn mul(&mut self, A: &Wire, B: &Wire) -> Wire {
+        let q = A.modulus();
+        let qb = B.modulus();
+
+        let gate_num = self.current_gate();
+
+        debug_assert!(q >= qb); // XXX: for now
+
+        let D = self.delta(q);
+        let Db = self.delta(qb);
+
+        let r;
+        let mut gate = vec![None; q as usize + qb as usize - 2];
+
+        // hack for unequal moduli
+        if q != qb {
+            // would need to pack minitable into more than one u128 to support qb > 8
+            debug_assert!(qb <= 8, "qb capped at 8 for now, for assymmetric moduli");
+
+            r = self.rng.gen_u16() % q;
+            let t = tweak2(gate_num as u64, 1);
+
+            let mut minitable = vec![None; qb as usize];
+            let mut B_ = B.clone();
+            for b in 0..qb {
+                if b > 0 {
+                    B_.plus_eq(&Db);
+                }
+                let new_color = (r+b) % q;
+                let ct = (B_.hash(t) & 0xFFFF) ^ new_color as u128;
+                minitable[B_.color() as usize] = Some(ct);
+            }
+
+            let mut packed = 0;
+            for i in 0..qb as usize {
+                packed += minitable[i].unwrap() << (16 * i);
+            }
+            gate.push(Some(packed));
+
+        } else {
+            r = B.color(); // secret value known only to the garbler (ev knows r+b)
+        }
+
+        let g = tweak2(gate_num as u64, 0);
+
+        // X = H(A+aD) + arD such that a + A.color == 0
+        let alpha = (q - A.color()) % q; // alpha = -A.color
+        let X = A.plus(&D.cmul(alpha))
+                .hashback(g,q)
+                .plus(&D.cmul((alpha * r) % q));
+
+        // Y = H(B + bD) + (b + r)A such that b + B.color == 0
+        let beta = (qb - B.color()) % qb;
+        let Y = B.plus(&Db.cmul(beta))
+                .hashback(g,q)
+                .plus(&A.cmul((beta + r) % q));
+
+        // precompute a lookup table of X.minus(&D_cmul[(a * r % q) as usize]).as_u128();
+        //                            = X.plus(&D_cmul[((q - (a * r % q)) % q) as usize]).as_u128();
+        let X_cmul = {
+            let mut X_ = X.clone();
+            (0..q).map(|x| {
+                if x > 0 {
+                    X_.plus_eq(&D);
+                }
+                X_.as_u128()
+            }).collect_vec()
+        };
+
+        let mut A_ = A.clone();
+        for a in 0..q {
+            if a > 0 {
+                A_.plus_eq(&D);
+            }
+            // garbler's half-gate: outputs X-arD
+            // G = H(A+aD) ^ X+a(-r)D = H(A+aD) ^ X-arD
+            if A_.color() != 0 {
+                // let G = A_.hash(g) ^ X.minus(&D_cmul[(a * r % q) as usize]).as_u128();
+                let G = A_.hash(g) ^ X_cmul[((q - (a * r % q)) % q) as usize];
+                gate[A_.color() as usize - 1] = Some(G);
+            }
+        }
+
+        // precompute a lookup table of Y.minus(&A_cmul[((b+r) % q) as usize]).as_u128();
+        //                            = Y.plus(&A_cmul[((q - ((b+r) % q)) % q) as usize]).as_u128();
+        let Y_cmul = {
+            let mut Y_ = Y.clone();
+            (0..q).map(|x| {
+                if x > 0 {
+                    Y_.plus_eq(&A);
+                }
+                Y_.as_u128()
+            }).collect_vec()
+        };
+
+        let mut B_ = B.clone();
+        for b in 0..qb {
+            if b > 0 {
+                B_.plus_eq(&Db)
+            }
+            // evaluator's half-gate: outputs Y-(b+r)D
+            // G = H(B+bD) + Y-(b+r)A
+            if B_.color() != 0 {
+                // let G = B_.hash(g) ^ Y.minus(&A_cmul[((b+r) % q) as usize]).as_u128();
+                let G = B_.hash(g) ^ Y_cmul[((q - ((b+r) % q)) % q) as usize];
+                gate[q as usize - 1 + B_.color() as usize - 1] = Some(G);
+            }
+        }
+
+        let gate = gate.into_iter().map(Option::unwrap).collect();
+        self.send(Message::GarbledGate(gate));
+
+        X.plus(&Y)
     }
 
     fn proj(&mut self, A: &Wire, q_out: u16, tt: &[u16]) -> Wire {
@@ -207,6 +313,10 @@ impl <'a> Garbler<'a> {
 
 pub fn tweak(i: usize) -> u128 {
     i as u128
+}
+
+pub fn tweak2(i: u64, j: u64) -> u128 {
+    ((i as u128) << 64) + j as u128
 }
 
 fn output_tweak(i: usize, k: u16) -> u128 {
@@ -390,7 +500,7 @@ impl Evaluator {
                 }
 
                 Gate::Mul { xref, yref, id } => {
-                    let g = operations::tweak2(gate_num as u64, 0);
+                    let g = tweak2(gate_num as u64, 0);
 
                     // garbler's half gate
                     let A = &wires[xref.ix];
@@ -414,7 +524,7 @@ impl Evaluator {
                     let new_b_color = if xref.modulus() != yref.modulus() {
                         let minitable = *self.gates[id].last().unwrap();
                         let ct = minitable >> (B.color() * 16);
-                        let pt = B.hash(operations::tweak2(gate_num as u64, 1)) ^ ct;
+                        let pt = B.hash(tweak2(gate_num as u64, 1)) ^ ct;
                         pt as u16
                     } else {
                         B.color()
