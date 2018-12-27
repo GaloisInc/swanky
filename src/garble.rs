@@ -33,6 +33,18 @@ pub enum Message {
     OutputCiphertext(OutputCiphertext),
 }
 
+impl std::fmt::Display for Message {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        f.write_str(match self {
+            Message::GarblerInput(_)     => "GarblerInput",
+            Message::EvaluatorInput(_)   => "EvaluatorInput",
+            Message::Constant(_,_)       => "Constant",
+            Message::GarbledGate(_)      => "GarbledGate",
+            Message::OutputCiphertext(_) => "OutputCiphertext",
+        })
+    }
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 // Garbler
 
@@ -469,6 +481,151 @@ impl Decoder {
 ////////////////////////////////////////////////////////////////////////////////
 // Evaluator
 
+/// Streaming evaluator.
+pub struct Eval<'a> {
+    recv_function: &'a mut FnMut() -> Option<Message>,
+    constants: HashMap<(u16,u16),Wire>,
+    current_gate: usize,
+    output_ciphertexts: Vec<OutputCiphertext>,
+    output_wires: Vec<Wire>,
+}
+
+impl <'a> Eval<'a> {
+    /// Create a new Evaluator.
+    ///
+    /// `recv_function` enables streaming by producing messages during the `Fancy`
+    /// computation, which contain ciphertexts and wirelabels and constants and outputs.
+    fn new(recv_function: &mut FnMut() -> Option<Message>) -> Eval {
+        Eval {
+            recv_function,
+            constants: HashMap::new(),
+            current_gate: 0,
+            output_ciphertexts: Vec::new(),
+            output_wires: Vec::new(),
+        }
+    }
+
+    /// Recieve the next message.
+    fn recv(&mut self) -> Message {
+        match (self.recv_function)() {
+            Some(m) => m,
+            None => panic!("no more messages!"),
+        }
+    }
+
+    /// The current nonfree gate index of the garbling computation.
+    fn current_gate(&mut self) -> usize {
+        let c = self.current_gate;
+        self.current_gate += 1;
+        c
+    }
+}
+
+impl <'a> Fancy for Eval<'a> {
+    type Wire = Wire;
+
+    fn garbler_input(&mut self, _q: u16) -> Self::Wire {
+        match self.recv() {
+            Message::GarblerInput(w) => w,
+            m => panic!("unexpected message: {}", m),
+        }
+    }
+
+    fn evaluator_input(&mut self, _q: u16) -> Self::Wire {
+        match self.recv() {
+            Message::EvaluatorInput(w) => w,
+            m => panic!("unexpected message: {}", m),
+        }
+    }
+
+    fn constant(&mut self, x: u16, q: u16) -> Self::Wire {
+        if self.constants.contains_key(&(x,q)) {
+            return self.constants[&(x,q)].clone();
+        }
+        let w = match self.recv() {
+            Message::Constant(_,w) => w,
+            m => panic!("unexpected message: {}", m),
+        };
+        self.constants.insert((x,q),w.clone());
+        w
+    }
+
+    fn add(&mut self, x: &Self::Wire, y: &Self::Wire) -> Self::Wire {
+        x.plus(y)
+    }
+
+    fn sub(&mut self, x: &Self::Wire, y: &Self::Wire) -> Self::Wire {
+        x.minus(y)
+    }
+
+    fn cmul(&mut self, x: &Self::Wire, c: u16) -> Self::Wire {
+        x.cmul(c)
+    }
+
+    fn mul(&mut self, A: &Self::Wire, B: &Self::Wire) -> Self::Wire {
+        let gate = match self.recv() {
+            Message::GarbledGate(g) => g,
+            m => panic!("unexpected message: {}", m),
+        };
+        let gate_num = self.current_gate();
+        let g = tweak2(gate_num as u64, 0);
+        let q = A.modulus();
+
+        // garbler's half gate
+        let L = if A.color() == 0 {
+            A.hashback(g,q)
+        } else {
+            let ct_left = gate[A.color() as usize - 1];
+            Wire::from_u128(ct_left ^ A.hash(g), q)
+        };
+
+        // evaluator's half gate
+        let R = if B.color() == 0 {
+            B.hashback(g,q)
+        } else {
+            let ct_right = gate[(q + B.color()) as usize - 2];
+            Wire::from_u128(ct_right ^ B.hash(g), q)
+        };
+
+        // hack for unequal mods
+        let new_b_color = if A.modulus() != B.modulus() {
+            let minitable = *gate.last().unwrap();
+            let ct = minitable >> (B.color() * 16);
+            let pt = B.hash(tweak2(gate_num as u64, 1)) ^ ct;
+            pt as u16
+        } else {
+            B.color()
+        };
+
+        L.plus(&R.plus(&A.cmul(new_b_color)))
+    }
+
+    fn proj(&mut self, x: &Self::Wire, q: u16, _tt: &[u16]) -> Self::Wire {
+        let gate = match self.recv() {
+            Message::GarbledGate(g) => g,
+            m => panic!("unexpected message: {}", m),
+        };
+        let gate_num = self.current_gate();
+        let w = if x.color() == 0 {
+            x.hashback(gate_num as u128, q)
+        } else {
+            let ct = gate[x.color() as usize - 1];
+            Wire::from_u128(ct ^ x.hash(gate_num as u128), q)
+        };
+        w
+    }
+
+    fn output(&mut self, x: &Self::Wire) {
+        match self.recv() {
+            Message::OutputCiphertext(c) => self.output_ciphertexts.push(c),
+            m => panic!("unexpected message: {}", m),
+        }
+        self.output_wires.push(x.clone());
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
 #[derive(Serialize, Deserialize, PartialEq, Debug)]
 pub struct Evaluator {
     gates  : Vec<GarbledGate>,
@@ -489,67 +646,35 @@ impl Evaluator {
     }
 
     pub fn eval(&self, c: &Circuit, garbler_inputs: &[Wire], evaluator_inputs: &[Wire]) -> Vec<Wire> {
-        let mut wires: Vec<Wire> = Vec::new();
-        let mut gate_num = 0;
-
-        for i in 0..c.gates.len() {
+        // create list of messages
+        let mut msgs = c.gates.iter().enumerate().filter_map(|(i,gate)| {
             let q = c.modulus(i);
-            let w = match c.gates[i] {
+            match *gate {
+                Gate::GarblerInput { id }   => Some(Message::GarblerInput(garbler_inputs[id].clone())),
+                Gate::EvaluatorInput { id } => Some(Message::EvaluatorInput(evaluator_inputs[id].clone())),
+                Gate::Constant { val }      => Some(Message::Constant(val, self.consts[&(val,q)].clone())),
+                Gate::Mul { id, .. }        => Some(Message::GarbledGate(self.gates[id].clone())),
+                Gate::Proj { id, .. }       => Some(Message::GarbledGate(self.gates[id].clone())),
+                _ => None,
+            }
+        });
 
-                Gate::GarblerInput { id } => garbler_inputs[id].clone(),
-                Gate::EvaluatorInput { id } => evaluator_inputs[id].clone(),
-                Gate::Constant { val }   => self.consts[&(val,q)].clone(),
-                Gate::Add { xref, yref } => wires[xref.ix].plus(&wires[yref.ix]),
-                Gate::Sub { xref, yref } => wires[xref.ix].minus(&wires[yref.ix]),
-                Gate::Cmul { xref, c }   => wires[xref.ix].cmul(c),
+        let mut recv_function = || msgs.next();
 
-                Gate::Proj { xref, id, .. } => {
-                    let x = &wires[xref.ix];
-                    let w = if x.color() == 0 {
-                        x.hashback(gate_num as u128, q)
-                    } else {
-                        let ct = self.gates[id][x.color() as usize - 1];
-                        Wire::from_u128(ct ^ x.hash(gate_num as u128), q)
-                    };
-                    gate_num += 1;
-                    w
-                }
+        let mut e = Eval::new(&mut recv_function);
 
-                Gate::Mul { xref, yref, id } => {
-                    let g = tweak2(gate_num as u64, 0);
-
-                    // garbler's half gate
-                    let A = &wires[xref.ix];
-                    let L = if A.color() == 0 {
-                        A.hashback(g,q)
-                    } else {
-                        let ct_left = self.gates[id][A.color() as usize - 1];
-                        Wire::from_u128(ct_left ^ A.hash(g), q)
-                    };
-
-                    // evaluator's half gate
-                    let B = &wires[yref.ix];
-                    let R = if B.color() == 0 {
-                        B.hashback(g,q)
-                    } else {
-                        let ct_right = self.gates[id][(q + B.color()) as usize - 2];
-                        Wire::from_u128(ct_right ^ B.hash(g), q)
-                    };
-
-                    // hack for unequal mods
-                    let new_b_color = if xref.modulus() != yref.modulus() {
-                        let minitable = *self.gates[id].last().unwrap();
-                        let ct = minitable >> (B.color() * 16);
-                        let pt = B.hash(tweak2(gate_num as u64, 1)) ^ ct;
-                        pt as u16
-                    } else {
-                        B.color()
-                    };
-
-                    gate_num += 1;
-
-                    L.plus(&R.plus(&A.cmul(new_b_color)))
-                }
+        let mut wires: Vec<Wire> = Vec::new();
+        for (i,gate) in c.gates.iter().enumerate() {
+            let q = c.modulus(i);
+            let w = match *gate {
+                Gate::GarblerInput { .. }    => e.garbler_input(q),
+                Gate::EvaluatorInput { .. }  => e.evaluator_input(q),
+                Gate::Constant { val }       => e.constant(val, q),
+                Gate::Add { xref, yref }     => wires[xref.ix].plus(&wires[yref.ix]),
+                Gate::Sub { xref, yref }     => wires[xref.ix].minus(&wires[yref.ix]),
+                Gate::Cmul { xref, c }       => wires[xref.ix].cmul(c),
+                Gate::Proj { xref, .. }      => e.proj(&wires[xref.ix], q, &[]),
+                Gate::Mul { xref, yref, .. } => e.mul(&wires[xref.ix], &wires[yref.ix]),
             };
             wires.push(w);
         }
