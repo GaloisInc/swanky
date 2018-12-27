@@ -519,6 +519,11 @@ impl <'a> Eval<'a> {
         self.current_gate += 1;
         c
     }
+
+    /// Decode the output recieved during the Fancy computation.
+    fn decode_output(self) -> Vec<u16> {
+        Decoder::new(self.output_ciphertexts).decode(&self.output_wires)
+    }
 }
 
 impl <'a> Fancy for Eval<'a> {
