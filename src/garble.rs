@@ -1,39 +1,39 @@
-//! Structs and functions for creating, and evaluating garbled circuits.
+//! Structs and functions for creating, streaming, and evaluating garbled circuits.
 
 use crate::circuit::{Circuit, Gate};
+use crate::fancy::{Fancy, HasModulus};
+use crate::util::RngExt;
 use crate::wire::Wire;
+use itertools::Itertools;
 use rand::rngs::ThreadRng;
 use serde_derive::{Serialize, Deserialize};
 use std::collections::HashMap;
-use crate::fancy::{Fancy, HasModulus};
-use itertools::Itertools;
-use crate::util::RngExt;
 
 /// The ciphertext created by a garbled gate.
 pub type GarbledGate = Vec<u128>;
 
-#[derive(Serialize, Deserialize, PartialEq, Debug)]
-pub struct Encoder {
-    garbler_inputs : Vec<Wire>,
-    evaluator_inputs : Vec<Wire>,
-    deltas : HashMap<u16,Wire>,
+/// Ciphertext created by the garbler for output gates.
+pub type OutputCiphertext = Vec<u128>;
+
+/// The outputs that can be emitted during streaming of a garbling.
+pub enum Message {
+    /// Zero wire for one of the garbler's inputs.
+    GarblerInput(Wire),
+
+    /// Zero wire for one of the evaluator's inputs.
+    EvaluatorInput(Wire),
+
+    /// Constant wire carrying the value.
+    Constant(u16,Wire),
+
+    /// Garbled gate emitted by a projection or multiplication.
+    GarbledGate(GarbledGate),
 }
 
-#[derive(Serialize, Deserialize, PartialEq, Debug)]
-pub struct Decoder {
-    outputs : Vec<Vec<u128>>
-}
+////////////////////////////////////////////////////////////////////////////////
+// Garbler
 
-#[derive(Serialize, Deserialize, PartialEq, Debug)]
-pub struct Evaluator {
-    gates  : Vec<GarbledGate>,
-    consts : HashMap<(u16,u16),Wire>,
-}
-
-/// Garbler is an iterator for streaming `GarbledGate`s, and producing constant wires,
-/// `Encoder` and `Decoder`. It is intended to be used via its `Iterator` instance, during
-/// which it produces wirelabels for all internal wires while creating `GarbledGate` for
-/// each gate which requires ciphertexts.
+/// Streams garbled circuit ciphertexts through a callback.
 pub struct Garbler<'a> {
     rng: ThreadRng,
     send_function: &'a mut FnMut(Message),
@@ -43,29 +43,22 @@ pub struct Garbler<'a> {
     current_gate: usize,
 }
 
-pub enum Message {
-    GarblerInput(Wire),
-    EvaluatorInput(Wire),
-    Constant(u16,Wire),
-    GarbledGate(GarbledGate),
-}
-
 impl <'a> Fancy for Garbler<'a> {
     type Wire = Wire;
 
-    fn garbler_input(&mut self, q: u16) -> Wire {
+    fn garbler_input(&mut self, q: u16) -> Wire { // {{{
         let w = Wire::rand(&mut self.rng, q);
         self.send(Message::GarblerInput(w.clone()));
         w
     }
-
-    fn evaluator_input(&mut self, q: u16) -> Wire {
+    //}}}
+    fn evaluator_input(&mut self, q: u16) -> Wire { // {{{
         let w = Wire::rand(&mut self.rng, q);
         self.send(Message::EvaluatorInput(w.clone()));
         w
     }
-
-    fn constant(&mut self, x: u16, q: u16) -> Wire {
+    //}}}
+    fn constant(&mut self, x: u16, q: u16) -> Wire { // {{{
         if self.constants.contains_key(&(x,q)) {
             return self.constants[&(x,q)].clone();
         }
@@ -75,23 +68,22 @@ impl <'a> Fancy for Garbler<'a> {
         self.send(Message::Constant(x, wire.clone()));
         zero
     }
-
-    fn add(&mut self, x: &Wire, y: &Wire) -> Wire {
+    //}}}
+    fn add(&mut self, x: &Wire, y: &Wire) -> Wire { // {{{
         x.plus(y)
     }
-
-    fn sub(&mut self, x: &Wire, y: &Wire) -> Wire {
+    //}}}
+    fn sub(&mut self, x: &Wire, y: &Wire) -> Wire { // {{{
         x.minus(y)
     }
-
-    fn cmul(&mut self, x: &Wire, c: u16)  -> Wire {
+    //}}}
+    fn cmul(&mut self, x: &Wire, c: u16)  -> Wire { // {{{
         x.cmul(c)
     }
-
-    fn mul(&mut self, A: &Wire, B: &Wire) -> Wire {
+    //}}}
+    fn mul(&mut self, A: &Wire, B: &Wire) -> Wire { // {{{
         let q = A.modulus();
         let qb = B.modulus();
-
         let gate_num = self.current_gate();
 
         debug_assert!(q >= qb); // XXX: for now
@@ -202,8 +194,8 @@ impl <'a> Fancy for Garbler<'a> {
 
         X.plus(&Y)
     }
-
-    fn proj(&mut self, A: &Wire, q_out: u16, tt: &[u16]) -> Wire {
+    // }}}
+    fn proj(&mut self, A: &Wire, q_out: u16, tt: &[u16]) -> Wire { // {{{
         let q_in = A.modulus();
         // we have to fill in the vector in an unkonwn order because of the color bits.
         // Since some of the values in gate will be void temporarily, we use Vec<Option<..>>
@@ -255,9 +247,14 @@ impl <'a> Fancy for Garbler<'a> {
 
         C
     }
+    // }}}
 }
 
 impl <'a> Garbler<'a> {
+    /// Create a new garbler.
+    ///
+    /// `send_func` is a callback that enables streaming. It gets called as the garbler
+    /// generates ciphertext information such as garbled gates or input wirelabels.
     pub fn new(send_func: &mut FnMut(Message)) -> Garbler {
         Garbler {
             rng: rand::thread_rng(),
@@ -269,6 +266,7 @@ impl <'a> Garbler<'a> {
         }
     }
 
+    /// Output some information from the garbling.
     fn send(&mut self, m: Message) {
         (self.send_function)(m);
     }
@@ -284,8 +282,8 @@ impl <'a> Garbler<'a> {
         w
     }
 
-    fn garble_output(&mut self, X: &Wire) -> Vec<u128>
-    {
+    /// Produce an output ciphertext for a wire.
+    fn garble_output(&mut self, X: &Wire) -> OutputCiphertext {
         let mut cts = Vec::new();
         let q = X.modulus();
         let i = self.current_output();
@@ -297,12 +295,14 @@ impl <'a> Garbler<'a> {
         cts
     }
 
+    /// The current nonfree gate index of the garbling computation.
     fn current_gate(&mut self) -> usize {
         let c = self.current_gate;
         self.current_gate += 1;
         c
     }
 
+    /// The current output index of the garbling computation.
     fn current_output(&mut self) -> usize {
         let c = self.current_output;
         self.current_output += 1;
@@ -311,25 +311,12 @@ impl <'a> Garbler<'a> {
 
 }
 
-pub fn tweak(i: usize) -> u128 {
-    i as u128
-}
-
-pub fn tweak2(i: u64, j: u64) -> u128 {
-    ((i as u128) << 64) + j as u128
-}
-
-fn output_tweak(i: usize, k: u16) -> u128 {
-    let (left, _) = (i as u128).overflowing_shl(64);
-    left + k as u128
-}
-
-/// Garble from a circuit without streaming.
+/// Garble circuit without streaming.
 pub fn garble(c: &Circuit) -> (Encoder, Decoder, Evaluator) {
     let mut garbler_inputs   = Vec::new();
     let mut evaluator_inputs = Vec::new();
     let mut garbled_gates    = Vec::new();
-    let mut constants : HashMap<(u16,u16),Wire>       = HashMap::new();
+    let mut constants        = HashMap::new();
     let deltas;
     let garbled_outputs;
 
@@ -369,13 +356,22 @@ pub fn garble(c: &Circuit) -> (Encoder, Decoder, Evaluator) {
         }).collect();
 
         deltas = garbler.deltas;
-
     }
 
     let en = Encoder::new(garbler_inputs, evaluator_inputs, deltas);
     let ev = Evaluator::new(garbled_gates, constants);
     let de = Decoder::new(garbled_outputs);
     (en, de, ev)
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// Encoder
+
+#[derive(Serialize, Deserialize, PartialEq, Debug)]
+pub struct Encoder {
+    garbler_inputs : Vec<Wire>,
+    evaluator_inputs : Vec<Wire>,
+    deltas : HashMap<u16,Wire>,
 }
 
 impl Encoder {
@@ -427,6 +423,14 @@ impl Encoder {
     }
 }
 
+////////////////////////////////////////////////////////////////////////////////
+// Decoder
+
+#[derive(Serialize, Deserialize, PartialEq, Debug)]
+pub struct Decoder {
+    outputs : Vec<Vec<u128>>
+}
+
 impl Decoder {
     pub fn new(outputs: Vec<Vec<u128>>) -> Self {
         Decoder { outputs }
@@ -457,6 +461,15 @@ impl Decoder {
         bincode::deserialize(bs)
             .map_err(|_| failure::err_msg("error decoding Decoder from bytes"))
     }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// Evaluator
+
+#[derive(Serialize, Deserialize, PartialEq, Debug)]
+pub struct Evaluator {
+    gates  : Vec<GarbledGate>,
+    consts : HashMap<(u16,u16),Wire>,
 }
 
 impl Evaluator {
@@ -553,6 +566,25 @@ impl Evaluator {
     }
 }
 
+////////////////////////////////////////////////////////////////////////////////
+// helper tweak functions
+
+fn tweak(i: usize) -> u128 {
+    i as u128
+}
+
+fn tweak2(i: u64, j: u64) -> u128 {
+    ((i as u128) << 64) + j as u128
+}
+
+fn output_tweak(i: usize, k: u16) -> u128 {
+    let (left, _) = (i as u128).overflowing_shl(64);
+    left + k as u128
+}
+
+
+////////////////////////////////////////////////////////////////////////////////
+// tests
 
 #[cfg(test)]
 mod tests {
@@ -748,9 +780,8 @@ mod tests {
         let mut rng = thread_rng();
 
         let nargs = 2 + rng.gen_usize() % 100;
-        let mods = (0..7).map(|_| rng.gen_modulus()).collect_vec();
-        // let nargs = 97;
-        // let mods = [37,10,10,54,100,51,17];
+        // let mods = (0..7).map(|_| rng.gen_modulus()).collect_vec(); // slow
+        let mods = [3,7,10,2,13]; // fast
 
         let mut b = Builder::new();
         let xs = b.evaluator_input_bundles(&mods, nargs);
