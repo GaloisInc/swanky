@@ -16,6 +16,7 @@ pub type GarbledGate = Vec<u128>;
 pub type OutputCiphertext = Vec<u128>;
 
 /// The outputs that can be emitted during streaming of a garbling.
+#[derive(Serialize, Deserialize)]
 pub enum Message {
     /// Zero wire and delta for one of the garbler's inputs.
     GarblerInputZero { zero: Wire, delta: Wire },
@@ -30,7 +31,7 @@ pub enum Message {
     EvaluatorInput(Wire),
 
     /// Constant wire carrying the value.
-    Constant(u16,Wire),
+    Constant { value: u16, wire: Wire },
 
     /// Garbled gate emitted by a projection or multiplication.
     GarbledGate(GarbledGate),
@@ -46,10 +47,21 @@ impl std::fmt::Display for Message {
             Message::EvaluatorInputZero {..} => "EvaluatorInputZero",
             Message::GarblerInput(_)         => "GarblerInput",
             Message::EvaluatorInput(_)       => "EvaluatorInput",
-            Message::Constant(_,_)           => "Constant",
+            Message::Constant {..}           => "Constant",
             Message::GarbledGate(_)          => "GarbledGate",
             Message::OutputCiphertext(_)     => "OutputCiphertext",
         })
+    }
+}
+
+impl Message {
+    pub fn to_bytes(&self) -> Vec<u8> {
+        bincode::serialize(self).expect("couldn't serialize Message")
+    }
+
+    pub fn from_bytes(bs: &[u8]) -> Result<Self, failure::Error> {
+        bincode::deserialize(bs)
+            .map_err(|_| failure::err_msg("error decoding Message from bytes"))
     }
 }
 
@@ -96,7 +108,10 @@ impl <'a> Fancy for Garbler<'a> {
         let zero = Wire::rand(&mut self.rng, q);
         let wire = zero.plus(&self.delta(q).cmul(x));
         self.constants.insert((x,q), wire.clone());
-        self.send(Message::Constant(x, wire.clone()));
+        self.send(Message::Constant {
+            value: x,
+            wire: wire.clone()
+        });
         zero
     }
     //}}}
@@ -372,9 +387,9 @@ pub fn garble(c: &Circuit) -> (Encoder, Decoder, GarbledCircuit) {
             Message::EvaluatorInputZero { zero, .. } => evaluator_inputs.push(zero),
             Message::GarbledGate(w)      => garbled_gates.push(w),
             Message::OutputCiphertext(c) => garbled_outputs.push(c),
-            Message::Constant(val,wire)  => {
+            Message::Constant { value, wire } => {
                 let q = wire.modulus();
-                constants.insert((val,q), wire);
+                constants.insert((value,q), wire);
             }
             m => panic!("unexpected message: {}", m),
         }
@@ -415,7 +430,7 @@ pub fn garble(c: &Circuit) -> (Encoder, Decoder, GarbledCircuit) {
 ////////////////////////////////////////////////////////////////////////////////
 // Evaluator
 
-/// Streaming evaluator which implements the `Fancy` typeclass.
+/// Streaming evaluator using a callback to recieve ciphertexts as needed.
 ///
 /// Evaluates a garbled circuit on the fly, using messages containing ciphertexts and
 /// wires.
@@ -483,7 +498,7 @@ impl <'a> Fancy for Evaluator<'a> {
             return self.constants[&(x,q)].clone();
         }
         let w = match self.recv() {
-            Message::Constant(_,w) => w,
+            Message::Constant { wire, .. } => wire,
             m => panic!("unexpected message: {}", m),
         };
         self.constants.insert((x,q),w.clone());
@@ -596,7 +611,7 @@ impl GarbledCircuit {
             match *gate {
                 Gate::GarblerInput { id }   => Some(Message::GarblerInput(garbler_inputs[id].clone())),
                 Gate::EvaluatorInput { id } => Some(Message::EvaluatorInput(evaluator_inputs[id].clone())),
-                Gate::Constant { val }      => Some(Message::Constant(val, self.consts[&(val,q)].clone())),
+                Gate::Constant { val }      => Some(Message::Constant { value: val, wire: self.consts[&(val,q)].clone() }),
                 Gate::Mul { id, .. }        => Some(Message::GarbledGate(self.gates[id].clone())),
                 Gate::Proj { id, .. }       => Some(Message::GarbledGate(self.gates[id].clone())),
                 _ => None,
@@ -1061,13 +1076,15 @@ mod streaming {
     use super::*;
     use crate::util::RngExt;
     use rand::thread_rng;
-    fn streaming_test( // helper {{{
-        fancy_compuation: fn(&mut dyn Fancy<Wire=Wire>),
+
+    // helper {{{
+    fn streaming_test(
+        fancy_computation: fn(&mut dyn Fancy<Wire=Wire>),
         garbler_input: &[u16],
         evaluator_input: &[u16],
         should_be: &[u16]
     ) {
-        let mut gb_iter = garble_iter(fancy_compuation);
+        let mut gb_iter = garble_iter(fancy_computation);
 
         let mut gb_inp_iter = garbler_input.iter();
         let mut ev_inp_iter = evaluator_input.iter();
@@ -1092,7 +1109,7 @@ mod streaming {
         };
 
         let mut ev = Evaluator::new(&mut recv_func);
-        fancy_compuation(&mut ev);
+        fancy_computation(&mut ev);
 
         let result = ev.decode_output();
         println!("gb_inp={:?} ev_inp={:?}", garbler_input, evaluator_input);
