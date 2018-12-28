@@ -10,7 +10,7 @@ edition = "2018"
 doctest = false
 
 [build-dependencies]
-cc = "1.0.26"
+cc = "1.0.28"
 
 [dependencies]
 base_conversion = { path = "base_conversion" }

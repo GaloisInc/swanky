@@ -322,11 +322,27 @@ impl <'a> Garbler<'a> {
         self.current_output += 1;
         c
     }
-
 }
 
-/// Garble circuit without streaming.
-pub fn garble(c: &Circuit) -> (Encoder, Decoder, Evaluator) {
+/// Create an iterator over the messages produced by fancy garbling.
+///
+/// This creates a new thread for the garbler, which passes messages back through a
+/// channel one by one.
+pub fn garble_iter(fancy_computation: fn(&mut Garbler)) -> impl Iterator<Item=Message>
+{
+    let (sender, receiver) = std::sync::mpsc::sync_channel(1);
+
+    std::thread::spawn(move || {
+        let mut send_func = |m| sender.send(m).unwrap();
+        let mut garbler   = Garbler::new(&mut send_func);
+        fancy_computation(&mut garbler);
+    });
+
+    receiver.into_iter()
+}
+
+/// Garble a circuit without streaming.
+pub fn garble(c: &Circuit) -> (Encoder, Decoder, GarbledCircuit) {
     let mut garbler_inputs   = Vec::new();
     let mut evaluator_inputs = Vec::new();
     let mut garbled_gates    = Vec::new();
@@ -374,129 +390,33 @@ pub fn garble(c: &Circuit) -> (Encoder, Decoder, Evaluator) {
     }
 
     let en = Encoder::new(garbler_inputs, evaluator_inputs, deltas);
-    let ev = Evaluator::new(garbled_gates, constants);
+    let ev = GarbledCircuit::new(garbled_gates, constants);
     let de = Decoder::new(garbled_outputs);
     (en, de, ev)
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-// Encoder
-
-#[derive(Serialize, Deserialize, PartialEq, Debug)]
-pub struct Encoder {
-    garbler_inputs : Vec<Wire>,
-    evaluator_inputs : Vec<Wire>,
-    deltas : HashMap<u16,Wire>,
-}
-
-impl Encoder {
-    pub fn new(garbler_inputs: Vec<Wire>, evaluator_inputs: Vec<Wire>, deltas: HashMap<u16,Wire>) -> Self {
-        Encoder { garbler_inputs, evaluator_inputs, deltas }
-    }
-
-    pub fn num_garbler_inputs(&self) -> usize {
-        self.garbler_inputs.len()
-    }
-
-    pub fn num_evaluator_inputs(&self) -> usize {
-        self.evaluator_inputs.len()
-    }
-
-    pub fn encode_garbler_input(&self, x: u16, id: usize) -> Wire {
-        let X = &self.garbler_inputs[id];
-        let q = X.modulus();
-        X.plus(&self.deltas[&q].cmul(x))
-    }
-
-    pub fn encode_evaluator_input(&self, x: u16, id: usize) -> Wire {
-        let X = &self.evaluator_inputs[id];
-        let q = X.modulus();
-        X.plus(&self.deltas[&q].cmul(x))
-    }
-
-    pub fn encode_garbler_inputs(&self, inputs: &[u16]) -> Vec<Wire> {
-        debug_assert_eq!(inputs.len(), self.garbler_inputs.len());
-        (0..inputs.len()).zip(inputs).map(|(id,&x)| {
-            self.encode_garbler_input(x,id)
-        }).collect()
-    }
-
-    pub fn encode_evaluator_inputs(&self, inputs: &[u16]) -> Vec<Wire> {
-        debug_assert_eq!(inputs.len(), self.evaluator_inputs.len());
-        (0..inputs.len()).zip(inputs).map(|(id,&x)| {
-            self.encode_evaluator_input(x,id)
-        }).collect()
-    }
-
-    pub fn to_bytes(&self) -> Vec<u8> {
-        bincode::serialize(self).expect("couldn't serialize Encoder")
-    }
-
-    pub fn from_bytes(bs: &[u8]) -> Result<Self, failure::Error> {
-        bincode::deserialize(bs)
-            .map_err(|_| failure::err_msg("error decoding Encoder from bytes"))
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////
-// Decoder
-
-#[derive(Serialize, Deserialize, PartialEq, Debug)]
-pub struct Decoder {
-    outputs : Vec<Vec<u128>>
-}
-
-impl Decoder {
-    pub fn new(outputs: Vec<Vec<u128>>) -> Self {
-        Decoder { outputs }
-    }
-
-    pub fn decode(&self, ws: &[Wire]) -> Vec<u16> {
-        debug_assert_eq!(ws.len(), self.outputs.len());
-        let mut outs = Vec::new();
-        for i in 0..ws.len() {
-            let q = ws[i].modulus();
-            for k in 0..q {
-                let h = ws[i].hash(output_tweak(i,k));
-                if h == self.outputs[i][k as usize] {
-                    outs.push(k);
-                    break;
-                }
-            }
-        }
-        debug_assert_eq!(ws.len(), outs.len(), "decoding failed");
-        outs
-    }
-
-    pub fn to_bytes(&self) -> Vec<u8> {
-        bincode::serialize(self).expect("couldn't serialize Decoder")
-    }
-
-    pub fn from_bytes(bs: &[u8]) -> Result<Self, failure::Error> {
-        bincode::deserialize(bs)
-            .map_err(|_| failure::err_msg("error decoding Decoder from bytes"))
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////
 // Evaluator
 
-/// Streaming evaluator.
-pub struct Eval<'a> {
-    recv_function: &'a mut FnMut() -> Option<Message>,
+/// Streaming evaluator which implements the `Fancy` typeclass.
+///
+/// Evaluates a garbled circuit on the fly, using messages containing ciphertexts and
+/// wires.
+pub struct Evaluator<'a> {
+    recv_function: &'a mut FnMut() -> Message,
     constants: HashMap<(u16,u16),Wire>,
     current_gate: usize,
     output_ciphertexts: Vec<OutputCiphertext>,
     output_wires: Vec<Wire>,
 }
 
-impl <'a> Eval<'a> {
+impl <'a> Evaluator<'a> {
     /// Create a new Evaluator.
     ///
     /// `recv_function` enables streaming by producing messages during the `Fancy`
-    /// computation, which contain ciphertexts and wirelabels and constants and outputs.
-    fn new(recv_function: &mut FnMut() -> Option<Message>) -> Eval {
-        Eval {
+    /// computation, which contain ciphertexts and wirelabels.
+    pub fn new(recv_function: &mut FnMut() -> Message) -> Evaluator {
+        Evaluator {
             recv_function,
             constants: HashMap::new(),
             current_gate: 0,
@@ -507,10 +427,7 @@ impl <'a> Eval<'a> {
 
     /// Recieve the next message.
     fn recv(&mut self) -> Message {
-        match (self.recv_function)() {
-            Some(m) => m,
-            None => panic!("no more messages!"),
-        }
+        (self.recv_function)()
     }
 
     /// The current nonfree gate index of the garbling computation.
@@ -521,12 +438,13 @@ impl <'a> Eval<'a> {
     }
 
     /// Decode the output recieved during the Fancy computation.
-    fn decode_output(self) -> Vec<u16> {
+    pub fn decode_output(self) -> Vec<u16> {
         Decoder::new(self.output_ciphertexts).decode(&self.output_wires)
     }
 }
 
-impl <'a> Fancy for Eval<'a> {
+// TODO: error handling here, by changing `type Wire = Result<Error, Wire>`?
+impl <'a> Fancy for Evaluator<'a> {
     type Wire = Wire;
 
     fn garbler_input(&mut self, _q: u16) -> Self::Wire {
@@ -630,16 +548,20 @@ impl <'a> Fancy for Eval<'a> {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+// static evaluator
 
+/// Static evaluator for a circuit, created by the `garble` function.
+///
+/// Uses `Evaluator` under the hood to actually implement the evaluation.
 #[derive(Serialize, Deserialize, PartialEq, Debug)]
-pub struct Evaluator {
+pub struct GarbledCircuit {
     gates  : Vec<GarbledGate>,
     consts : HashMap<(u16,u16),Wire>,
 }
 
-impl Evaluator {
-    pub fn new(gates: Vec<GarbledGate>, consts: HashMap<(u16,u16),Wire>) -> Self {
-        Evaluator { gates, consts }
+impl GarbledCircuit {
+    fn new(gates: Vec<GarbledGate>, consts: HashMap<(u16,u16),Wire>) -> Self {
+        GarbledCircuit { gates, consts }
     }
 
     pub fn size(&self) -> usize {
@@ -651,7 +573,7 @@ impl Evaluator {
     }
 
     pub fn eval(&self, c: &Circuit, garbler_inputs: &[Wire], evaluator_inputs: &[Wire]) -> Vec<Wire> {
-        // create list of messages
+        // create a message iterator to pass as the Evaluator recv function
         let mut msgs = c.gates.iter().enumerate().filter_map(|(i,gate)| {
             let q = c.modulus(i);
             match *gate {
@@ -664,22 +586,21 @@ impl Evaluator {
             }
         });
 
-        let mut recv_function = || msgs.next();
-
-        let mut e = Eval::new(&mut recv_function);
+        let mut recv_function = || msgs.next().unwrap();
+        let mut eval = Evaluator::new(&mut recv_function);
 
         let mut wires: Vec<Wire> = Vec::new();
         for (i,gate) in c.gates.iter().enumerate() {
             let q = c.modulus(i);
             let w = match *gate {
-                Gate::GarblerInput { .. }    => e.garbler_input(q),
-                Gate::EvaluatorInput { .. }  => e.evaluator_input(q),
-                Gate::Constant { val }       => e.constant(val, q),
+                Gate::GarblerInput { .. }    => eval.garbler_input(q),
+                Gate::EvaluatorInput { .. }  => eval.evaluator_input(q),
+                Gate::Constant { val }       => eval.constant(val, q),
                 Gate::Add { xref, yref }     => wires[xref.ix].plus(&wires[yref.ix]),
                 Gate::Sub { xref, yref }     => wires[xref.ix].minus(&wires[yref.ix]),
                 Gate::Cmul { xref, c }       => wires[xref.ix].cmul(c),
-                Gate::Proj { xref, .. }      => e.proj(&wires[xref.ix], q, &[]),
-                Gate::Mul { xref, yref, .. } => e.mul(&wires[xref.ix], &wires[yref.ix]),
+                Gate::Proj { xref, .. }      => eval.proj(&wires[xref.ix], q, &[]),
+                Gate::Mul { xref, yref, .. } => eval.mul(&wires[xref.ix], &wires[yref.ix]),
             };
             wires.push(w);
         }
@@ -696,6 +617,111 @@ impl Evaluator {
     pub fn from_bytes(bs: &[u8]) -> Result<Self, failure::Error> {
         bincode::deserialize(bs)
             .map_err(|_| failure::err_msg("error decoding Evaluator from bytes"))
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// Encoder
+
+/// Encode inputs statically.
+///
+/// Created by the `garble` function.
+#[derive(Serialize, Deserialize, PartialEq, Debug)]
+pub struct Encoder {
+    garbler_inputs : Vec<Wire>,
+    evaluator_inputs : Vec<Wire>,
+    deltas : HashMap<u16,Wire>,
+}
+
+impl Encoder {
+    fn new(garbler_inputs: Vec<Wire>, evaluator_inputs: Vec<Wire>, deltas: HashMap<u16,Wire>) -> Self {
+        Encoder { garbler_inputs, evaluator_inputs, deltas }
+    }
+
+    pub fn num_garbler_inputs(&self) -> usize {
+        self.garbler_inputs.len()
+    }
+
+    pub fn num_evaluator_inputs(&self) -> usize {
+        self.evaluator_inputs.len()
+    }
+
+    pub fn encode_garbler_input(&self, x: u16, id: usize) -> Wire {
+        let X = &self.garbler_inputs[id];
+        let q = X.modulus();
+        X.plus(&self.deltas[&q].cmul(x))
+    }
+
+    pub fn encode_evaluator_input(&self, x: u16, id: usize) -> Wire {
+        let X = &self.evaluator_inputs[id];
+        let q = X.modulus();
+        X.plus(&self.deltas[&q].cmul(x))
+    }
+
+    pub fn encode_garbler_inputs(&self, inputs: &[u16]) -> Vec<Wire> {
+        debug_assert_eq!(inputs.len(), self.garbler_inputs.len());
+        (0..inputs.len()).zip(inputs).map(|(id,&x)| {
+            self.encode_garbler_input(x,id)
+        }).collect()
+    }
+
+    pub fn encode_evaluator_inputs(&self, inputs: &[u16]) -> Vec<Wire> {
+        debug_assert_eq!(inputs.len(), self.evaluator_inputs.len());
+        (0..inputs.len()).zip(inputs).map(|(id,&x)| {
+            self.encode_evaluator_input(x,id)
+        }).collect()
+    }
+
+    pub fn to_bytes(&self) -> Vec<u8> {
+        bincode::serialize(self).expect("couldn't serialize Encoder")
+    }
+
+    pub fn from_bytes(bs: &[u8]) -> Result<Self, failure::Error> {
+        bincode::deserialize(bs)
+            .map_err(|_| failure::err_msg("error decoding Encoder from bytes"))
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// Decoder
+
+/// Decode outputs.
+///
+/// Created by the `garble` function.
+#[derive(Serialize, Deserialize, PartialEq, Debug)]
+pub struct Decoder {
+    outputs : Vec<OutputCiphertext>,
+}
+
+impl Decoder {
+    pub fn new(outputs: Vec<Vec<u128>>) -> Self {
+        Decoder { outputs }
+    }
+
+    pub fn decode(&self, ws: &[Wire]) -> Vec<u16> {
+        debug_assert_eq!(ws.len(), self.outputs.len());
+        let mut outs = Vec::new();
+        for i in 0..ws.len() {
+            let q = ws[i].modulus();
+            for k in 0..q {
+                let h = ws[i].hash(output_tweak(i,k));
+                if h == self.outputs[i][k as usize] {
+                    outs.push(k);
+                    break;
+                }
+            }
+        }
+        debug_assert_eq!(ws.len(), outs.len(), "decoding failed");
+        outs
+    }
+
+    pub fn to_bytes(&self) -> Vec<u8> {
+        bincode::serialize(self).expect("couldn't serialize Decoder")
+    }
+
+    pub fn from_bytes(bs: &[u8]) -> Result<Self, failure::Error> {
+        bincode::deserialize(bs)
+            .map_err(|_| failure::err_msg("error decoding Decoder from bytes"))
     }
 }
 
@@ -1006,9 +1032,61 @@ mod tests {
 
         let (en, de, ev) = garble(&circ);
 
-        assert_eq!(ev, Evaluator::from_bytes(&ev.to_bytes()).unwrap());
+        assert_eq!(ev, GarbledCircuit::from_bytes(&ev.to_bytes()).unwrap());
         assert_eq!(en, Encoder::from_bytes(&en.to_bytes()).unwrap());
         assert_eq!(de, Decoder::from_bytes(&de.to_bytes()).unwrap());
     }
 //}}}
+}
+
+#[cfg(test)]
+mod streaming {
+    use super::*;
+    use crate::util::RngExt;
+    use rand::thread_rng;
+
+    fn streaming_test<G>(
+        garbler_computation: fn(&mut Garbler),
+        evaluator_computation: &'static G,
+        garbler_input: &[u16],
+        evaluator_input: &[u16],
+        should_be: &[u16]
+    )
+        where G: Fn(&mut Evaluator),
+    {
+        let mut gb_iter = garble_iter(garbler_computation);
+        let mut recv_func = || gb_iter.next().unwrap();
+        let mut ev = Evaluator::new(&mut recv_func);
+        evaluator_computation(&mut ev);
+        let result = ev.decode_output();
+        assert_eq!(result, should_be)
+    }
+
+    fn fancy_addition<W,F>(b: &mut F)
+        where W: Clone + HasModulus, F:Fancy<Wire=W>
+    {
+        let x = b.garbler_input(17);
+        let y = b.evaluator_input(17);
+        let z = b.add(&x,&y);
+        b.output(&z);
+    }
+
+    fn fancy_addition_gb(b: &mut Garbler) {
+        let x = b.garbler_input(17);
+        let y = b.evaluator_input(17);
+        let z = b.add(&x,&y);
+        b.output(&z);
+    }
+
+    #[test]
+    fn addition() {
+        let mut rng = thread_rng();
+        let q = 17;
+        for _ in 0..16 {
+            let x = rng.gen_u16() % q;
+            let y = rng.gen_u16() % q;
+            let z = garble_iter(fancy_addition).collect_vec();
+            // streaming_test(&fancy_addition, &fancy_addition, &[x], &[y], &[(x+y)%q]);
+        }
+    }
 }
