@@ -10,7 +10,7 @@ edition = "2018"
 doctest = false
 
 [build-dependencies]
-cc = "1.0.27"
+cc = "1.0.28"
 
 [dependencies]
 base_conversion = { path = "base_conversion" }
@@ -29,14 +29,6 @@ criterion = "0.2.5"
 
 [profile.release]
 debug = true
-
-[[bin]]
-name = "profile"
-path = "apps/profile.rs"
-
-[[bin]]
-name = "fancy_circuit"
-path = "apps/fancy_circuit.rs"
 
 [[bench]]
 name = "wire_operations"

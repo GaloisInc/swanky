@@ -167,20 +167,26 @@ pub fn crt(ps: &[u16], x: u128) -> Vec<u16> {
     }).collect()
 }
 
+/// Compute the CRT representation of `x` with respect to the factorization of `q`.
+pub fn crt_factor(x: u128, q: u128) -> Vec<u16> {
+    crt(&factor(q), x)
+}
+
 /// Compute the value `x` given a list of CRT primes and residues.
 pub fn crt_inv(ps: &[u16], xs: &[u16]) -> u128 {
     let mut ret = BigInt::zero();
-
     let M = ps.iter().fold(BigInt::one(), |acc, &x| BigInt::from(x) * acc );
-
     for (&p, &a) in ps.iter().zip(xs.iter()) {
         let p = BigInt::from(p);
         let q = &M / &p;
         ret += BigInt::from(a) * inv_ref(&q,&p) * q;
         ret %= &M;
     }
-
     ret.to_u128().unwrap()
+}
+
+pub fn crt_inv_factor(xs: &[u16], q: u128) -> u128 {
+    crt_inv(&factor(q), xs)
 }
 
 /// Generic algorithm to invert `inp_a` mod `inp_b`. As ref so as to support `BigInt`
@@ -293,13 +299,7 @@ pub trait RngExt : rand::Rng + Sized {
     fn gen_u32(&mut self) -> u32 { self.gen() }
     fn gen_u64(&mut self) -> u16 { self.gen() }
     fn gen_usize(&mut self) -> usize { self.gen() }
-
-    fn gen_u128(&mut self) -> u128 {
-        let low64  = self.gen_u64();
-        let high64 = self.gen_u64();
-        let (high128, _) = (high64 as u128).overflowing_shl(64) ;
-        high128 + low64 as u128
-    }
+    fn gen_u128(&mut self) -> u128 { self.gen() }
 
     fn gen_usable_u128(&mut self, modulus: u16) -> u128 {
         if is_power_of_2(modulus) {

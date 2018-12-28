@@ -1,9 +1,8 @@
 use std::time::Duration;
 use criterion::{criterion_main, criterion_group, Criterion};
-use fancy_garbling::util::RngExt;
+use fancy_garbling::util::{RngExt, modulus_with_width};
 use fancy_garbling::garble::garble;
 use fancy_garbling::circuit::crt::CrtBundler;
-use fancy_garbling::numbers::modulus_with_width;
 
 fn bench_gb<F:'static>(cr: &mut Criterion, name: &str, gen_bundler: F) where F: Fn(u128) -> CrtBundler {
     cr.bench_function(name, move |bench| {

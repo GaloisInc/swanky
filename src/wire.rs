@@ -4,25 +4,80 @@ use crate::aes::AES;
 use crate::util::{self, RngExt};
 use rand::Rng;
 use serde_derive::{Serialize, Deserialize};
+use crate::fancy::HasModulus;
 
 #[derive(Debug, PartialEq, PartialOrd, Clone, Serialize, Deserialize)]
 pub enum Wire {
     Mod2 { val: u128 },
+    // Mod7 { ds: [u8;45] },
     ModN { q: u16, ds: Vec<u16> },
 }
+
+impl HasModulus for Wire {
+    fn modulus(&self) -> u16 {
+        match *self {
+            Wire::Mod2 { .. } => 2,
+            Wire::ModN { q, .. } => q,
+        }
+    }
+}
+
+// impl std::fmt::Debug for Wire {
+//     fn fmt(&self, f: &mut std::fmt::Formatter) -> Result<(), std::fmt::Error> {
+//         f.write_str("Wire ");
+//         match self {
+//             Wire::Mod2 { val } => write!(f, "[2] {:0128b}", val),
+//             Wire::Mod7 { ds } => {
+//                 f.write_str("[7] ");
+//                 for d in ds.iter() {
+//                     write!(f, "{}", d);
+//                 }
+//             }
+//             Wire::ModN { q, ds } => {
+//                 write!(f, "[{}] ", q);
+//                 for d in ds.iter() {
+//                     write!(f, "{}", d);
+//                 }
+//             }
+//         }
+//     }
+// }
+
+// impl std::cmp::PartialEq for Wire {
+//     fn eq(&self, other: &Wire) -> bool {
+//         match self {
+//             Wire::Mod2 { val } => {
+//                 if let Wire::Mod2 { val: other_val } = other {
+//                     val = other_val
+//                 } else {
+//                     false
+//                 }
+//             }
+
+//             Wire::Mod7 { ds } => {
+//                 if let Wire::Mod7 { ds: other_ds } = other {
+//                     ds.iter().zip(other_ds.iter()).all(|(x,y)| x == y)
+//                 } else {
+//                     false
+//                 }
+//             }
+
+//             Wire::ModN { q, ds } => {
+//                 if let Wire::ModN { q: other_q, ds: other_ds } = other {
+//                     q == other_q && ds.iter().zip(other_ds.iter()).all(|(x,y)| x == y)
+//                 } else {
+//                     false
+//                 }
+//             }
+//         }
+//     }
+// }
 
 impl Wire {
     pub fn digits(&self) -> Vec<u16> {
         match self {
             Wire::Mod2 { val } => (0..128).map(|i| ((val >> i) as u16) & 1).collect(),
             Wire::ModN { ds, .. } => ds.clone(),
-        }
-    }
-
-    pub fn modulus(&self) -> u16 {
-        match *self {
-            Wire::Mod2 { .. } => 2,
-            Wire::ModN { q, .. } => q,
         }
     }
 

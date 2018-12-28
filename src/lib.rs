@@ -15,3 +15,4 @@ pub mod garble;
 pub mod wire;
 pub mod util;
 pub mod aes;
+pub mod fancy;
