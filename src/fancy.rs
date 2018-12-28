@@ -29,7 +29,7 @@ impl <W: Clone + HasModulus> Bundle<W> {
 }
 
 /// DSL for the basic computations supported by fancy-garbling.
-pub trait Fancy: Sized {
+pub trait Fancy {
     /// The underlying wire datatype created by an object implementing `Fancy`.
     type Wire: Clone + HasModulus;
 
@@ -350,9 +350,43 @@ pub trait BundleGadgets: Fancy {
     ////////////////////////////////////////////////////////////////////////////////
     // Fancy functions based on Mike's fractional mixed radix trick.
 
+    /// Helper function for advanced gadgets, returns the fractional part of `X/M` where
+    /// `M=product(ms)`.
+    fn fractional_mixed_radix(&mut self, bun: &Bundle<Self::Wire>, ms: &[u16]) -> Bundle<Self::Wire> {
+        let ndigits = ms.len();
+
+        let q = util::product(&bun.moduli());
+        let M = util::product(ms);
+
+        let mut ds = Vec::new();
+
+        for wire in bun.wires().iter() {
+            let p = wire.modulus();
+
+            let mut tabs = vec![Vec::with_capacity(p as usize); ndigits];
+
+            for x in 0..p {
+                let crt_coef = util::inv(((q / p as u128) % p as u128) as i64, p as i64);
+                let y = (M as f64 * x as f64 * crt_coef as f64 / p as f64).round() as u128 % M;
+                let digits = util::as_mixed_radix(y, ms);
+                for i in 0..ndigits {
+                    tabs[i].push(digits[i]);
+                }
+            }
+
+            let new_ds = tabs.into_iter().enumerate()
+                .map(|(i,tt)| self.proj(wire, ms[i], &tt))
+                .collect_vec();
+
+            ds.push(Bundle(new_ds));
+        }
+
+        self.mixed_radix_addition(&ds)
+    }
+
     /// Compute `max(x,0)`, using potentially approximate factors of `M`.
     fn relu(&mut self, x: &Bundle<Self::Wire>, factors_of_m: &[u16]) -> Bundle<Self::Wire> {
-        let res = fractional_mixed_radix(self, x, factors_of_m);
+        let res = self.fractional_mixed_radix(x, factors_of_m);
 
         // project the MSB to 0/1, whether or not it is less than p/2
         let p = *factors_of_m.last().unwrap();
@@ -372,7 +406,7 @@ pub trait BundleGadgets: Fancy {
     /// Return 0 if `x` is positive and 1 if `x` is negative. Potentially approximate
     /// depending on `factors_of_m`.
     fn sign(&mut self, x: &Bundle<Self::Wire>, factors_of_m: &[u16]) -> Self::Wire {
-        let res = fractional_mixed_radix(self, x, factors_of_m);
+        let res = self.fractional_mixed_radix(x, factors_of_m);
         let p = *factors_of_m.last().unwrap();
         let tt = (0..p).map(|x| (x >= p/2) as u16).collect_vec();
         self.proj(res.wires().last().unwrap(), 2, &tt)
@@ -420,43 +454,6 @@ pub trait BundleGadgets: Fancy {
             Bundle(z)
         })
     }
-}
-
-// Helper function for advanced gadgets, returns the fractional part of `X/M` where
-// `M=product(ms)`.
-fn fractional_mixed_radix<F,W>(f: &mut F, bun: &Bundle<W>, ms: &[u16]) -> Bundle<W>
-    where F: BundleGadgets<Wire=W>,
-          W: Clone + HasModulus
-{
-    let ndigits = ms.len();
-
-    let q = util::product(&bun.moduli());
-    let M = util::product(ms);
-
-    let mut ds = Vec::new();
-
-    for wire in bun.wires().iter() {
-        let p = wire.modulus();
-
-        let mut tabs = vec![Vec::with_capacity(p as usize); ndigits];
-
-        for x in 0..p {
-            let crt_coef = util::inv(((q / p as u128) % p as u128) as i64, p as i64);
-            let y = (M as f64 * x as f64 * crt_coef as f64 / p as f64).round() as u128 % M;
-            let digits = util::as_mixed_radix(y, ms);
-            for i in 0..ndigits {
-                tabs[i].push(digits[i]);
-            }
-        }
-
-        let new_ds = tabs.into_iter().enumerate()
-            .map(|(i,tt)| f.proj(wire, ms[i], &tt))
-            .collect_vec();
-
-        ds.push(Bundle(new_ds));
-    }
-
-    f.mixed_radix_addition(&ds)
 }
 
 // Compute the exact ms needed for the number of CRT primes in `x`.

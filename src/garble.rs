@@ -17,10 +17,16 @@ pub type OutputCiphertext = Vec<u128>;
 
 /// The outputs that can be emitted during streaming of a garbling.
 pub enum Message {
-    /// Zero wire for one of the garbler's inputs.
+    /// Zero wire and delta for one of the garbler's inputs.
+    GarblerInputZero { zero: Wire, delta: Wire },
+
+    /// Zero wire and delta for one of the evaluator's inputs.
+    EvaluatorInputZero { zero: Wire, delta: Wire},
+
+    /// Encoded input for one of the garbler's inputs.
     GarblerInput(Wire),
 
-    /// Zero wire for one of the evaluator's inputs.
+    /// Encoded input for one of the evaluator's inputs.
     EvaluatorInput(Wire),
 
     /// Constant wire carrying the value.
@@ -36,11 +42,13 @@ pub enum Message {
 impl std::fmt::Display for Message {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         f.write_str(match self {
-            Message::GarblerInput(_)     => "GarblerInput",
-            Message::EvaluatorInput(_)   => "EvaluatorInput",
-            Message::Constant(_,_)       => "Constant",
-            Message::GarbledGate(_)      => "GarbledGate",
-            Message::OutputCiphertext(_) => "OutputCiphertext",
+            Message::GarblerInputZero {..}   => "GarblerInputZero",
+            Message::EvaluatorInputZero {..} => "EvaluatorInputZero",
+            Message::GarblerInput(_)         => "GarblerInput",
+            Message::EvaluatorInput(_)       => "EvaluatorInput",
+            Message::Constant(_,_)           => "Constant",
+            Message::GarbledGate(_)          => "GarbledGate",
+            Message::OutputCiphertext(_)     => "OutputCiphertext",
         })
     }
 }
@@ -63,13 +71,21 @@ impl <'a> Fancy for Garbler<'a> {
 
     fn garbler_input(&mut self, q: u16) -> Wire { // {{{
         let w = Wire::rand(&mut self.rng, q);
-        self.send(Message::GarblerInput(w.clone()));
+        let d = self.delta(q);
+        self.send(Message::GarblerInputZero {
+            zero: w.clone(),
+            delta: d,
+        });
         w
     }
     //}}}
     fn evaluator_input(&mut self, q: u16) -> Wire { // {{{
         let w = Wire::rand(&mut self.rng, q);
-        self.send(Message::EvaluatorInput(w.clone()));
+        let d = self.delta(q);
+        self.send(Message::EvaluatorInputZero {
+            zero: w.clone(),
+            delta: d,
+        });
         w
     }
     //}}}
@@ -328,7 +344,7 @@ impl <'a> Garbler<'a> {
 ///
 /// This creates a new thread for the garbler, which passes messages back through a
 /// channel one by one.
-pub fn garble_iter(fancy_computation: fn(&mut Garbler)) -> impl Iterator<Item=Message>
+pub fn garble_iter(fancy_computation: fn(&mut dyn Fancy<Wire=Wire>)) -> impl Iterator<Item=Message>
 {
     let (sender, receiver) = std::sync::mpsc::sync_channel(1);
 
@@ -352,14 +368,15 @@ pub fn garble(c: &Circuit) -> (Encoder, Decoder, GarbledCircuit) {
 
     let mut send_func = |m| {
         match m {
-            Message::GarblerInput(w)     => garbler_inputs.push(w),
-            Message::EvaluatorInput(w)   => evaluator_inputs.push(w),
+            Message::GarblerInputZero { zero, .. }   => garbler_inputs.push(zero),
+            Message::EvaluatorInputZero { zero, .. } => evaluator_inputs.push(zero),
             Message::GarbledGate(w)      => garbled_gates.push(w),
             Message::OutputCiphertext(c) => garbled_outputs.push(c),
             Message::Constant(val,wire)  => {
                 let q = wire.modulus();
                 constants.insert((val,q), wire);
             }
+            m => panic!("unexpected message: {}", m),
         }
     };
 
@@ -746,7 +763,7 @@ fn output_tweak(i: usize, k: u16) -> u128 {
 // tests
 
 #[cfg(test)]
-mod tests {
+mod classic {
     use super::*;
     use crate::circuit::{Circuit, Builder};
     use crate::fancy::{Fancy, BundleGadgets};
@@ -1045,33 +1062,46 @@ mod streaming {
     use crate::util::RngExt;
     use rand::thread_rng;
 
-    fn streaming_test<G>(
-        garbler_computation: fn(&mut Garbler),
-        evaluator_computation: &'static G,
+    fn streaming_test(
+        fancy_compuation: fn(&mut dyn Fancy<Wire=Wire>),
         garbler_input: &[u16],
         evaluator_input: &[u16],
         should_be: &[u16]
-    )
-        where G: Fn(&mut Evaluator),
-    {
-        let mut gb_iter = garble_iter(garbler_computation);
-        let mut recv_func = || gb_iter.next().unwrap();
+    ) {
+        let mut gb_iter = garble_iter(fancy_compuation);
+
+        let mut gb_inp_iter = garbler_input.iter();
+        let mut ev_inp_iter = evaluator_input.iter();
+
+        // the evaluator's recv_function gets the next message from the garble iterator,
+        // encodes the appropriate inputs, and sends it along
+        let mut recv_func = || {
+            match gb_iter.next().unwrap() {
+                Message::GarblerInputZero { zero, delta } => {
+                    // Encode the garbler's next input
+                    let x = gb_inp_iter.next().expect("not enough garbler inputs!");
+                    Message::GarblerInput( zero.plus(&delta.cmul(*x)) )
+                }
+
+                Message::EvaluatorInputZero { zero, delta } => {
+                    // Encode the garbler's next input
+                    let x = ev_inp_iter.next().expect("not enough evaluator inputs!");
+                    Message::EvaluatorInput( zero.plus(&delta.cmul(*x)) )
+                }
+                m => m,
+            }
+        };
+
         let mut ev = Evaluator::new(&mut recv_func);
-        evaluator_computation(&mut ev);
+        fancy_compuation(&mut ev);
+
         let result = ev.decode_output();
+        println!("gb_inp={:?} ev_inp={:?}", garbler_input, evaluator_input);
         assert_eq!(result, should_be)
     }
 
-    fn fancy_addition<W,F>(b: &mut F)
-        where W: Clone + HasModulus, F:Fancy<Wire=W>
+    fn fancy_addition<W: Clone + HasModulus>(b: &mut dyn Fancy<Wire=W>)
     {
-        let x = b.garbler_input(17);
-        let y = b.evaluator_input(17);
-        let z = b.add(&x,&y);
-        b.output(&z);
-    }
-
-    fn fancy_addition_gb(b: &mut Garbler) {
         let x = b.garbler_input(17);
         let y = b.evaluator_input(17);
         let z = b.add(&x,&y);
@@ -1085,8 +1115,7 @@ mod streaming {
         for _ in 0..16 {
             let x = rng.gen_u16() % q;
             let y = rng.gen_u16() % q;
-            let z = garble_iter(fancy_addition).collect_vec();
-            // streaming_test(&fancy_addition, &fancy_addition, &[x], &[y], &[(x+y)%q]);
+            streaming_test(fancy_addition, &[x], &[y], &[(x+y)%q]);
         }
     }
 }
