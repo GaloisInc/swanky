@@ -79,7 +79,7 @@ pub struct Garbler<'a> {
 }
 
 impl <'a> Fancy for Garbler<'a> {
-    type Wire = Wire;
+    type Item = Wire;
 
     fn garbler_input(&mut self, q: u16) -> Wire { // {{{
         let w = Wire::rand(&mut self.rng, q);
@@ -359,7 +359,7 @@ impl <'a> Garbler<'a> {
 ///
 /// This creates a new thread for the garbler, which passes messages back through a
 /// channel one by one.
-pub fn garble_iter(fancy_computation: fn(&mut dyn Fancy<Wire=Wire>)) -> impl Iterator<Item=Message>
+pub fn garble_iter(fancy_computation: fn(&mut dyn Fancy<Item=Wire>)) -> impl Iterator<Item=Message>
 {
     let (sender, receiver) = std::sync::mpsc::sync_channel(1);
 
@@ -477,23 +477,23 @@ impl <'a> Evaluator<'a> {
 
 // TODO: error handling here, by changing `type Wire = Result<Error, Wire>`?
 impl <'a> Fancy for Evaluator<'a> {
-    type Wire = Wire;
+    type Item = Wire;
 
-    fn garbler_input(&mut self, _q: u16) -> Self::Wire {
+    fn garbler_input(&mut self, _q: u16) -> Wire {
         match self.recv() {
             Message::GarblerInput(w) => w,
             m => panic!("unexpected message: {}", m),
         }
     }
 
-    fn evaluator_input(&mut self, _q: u16) -> Self::Wire {
+    fn evaluator_input(&mut self, _q: u16) -> Wire {
         match self.recv() {
             Message::EvaluatorInput(w) => w,
             m => panic!("unexpected message: {}", m),
         }
     }
 
-    fn constant(&mut self, x: u16, q: u16) -> Self::Wire {
+    fn constant(&mut self, x: u16, q: u16) -> Wire {
         if self.constants.contains_key(&(x,q)) {
             return self.constants[&(x,q)].clone();
         }
@@ -505,19 +505,19 @@ impl <'a> Fancy for Evaluator<'a> {
         w
     }
 
-    fn add(&mut self, x: &Self::Wire, y: &Self::Wire) -> Self::Wire {
+    fn add(&mut self, x: &Wire, y: &Wire) -> Wire {
         x.plus(y)
     }
 
-    fn sub(&mut self, x: &Self::Wire, y: &Self::Wire) -> Self::Wire {
+    fn sub(&mut self, x: &Wire, y: &Wire) -> Wire {
         x.minus(y)
     }
 
-    fn cmul(&mut self, x: &Self::Wire, c: u16) -> Self::Wire {
+    fn cmul(&mut self, x: &Wire, c: u16) -> Wire {
         x.cmul(c)
     }
 
-    fn mul(&mut self, A: &Self::Wire, B: &Self::Wire) -> Self::Wire {
+    fn mul(&mut self, A: &Wire, B: &Wire) -> Wire {
         let gate = match self.recv() {
             Message::GarbledGate(g) => g,
             m => panic!("unexpected message: {}", m),
@@ -555,7 +555,7 @@ impl <'a> Fancy for Evaluator<'a> {
         L.plus(&R.plus(&A.cmul(new_b_color)))
     }
 
-    fn proj(&mut self, x: &Self::Wire, q: u16, _tt: &[u16]) -> Self::Wire {
+    fn proj(&mut self, x: &Wire, q: u16, _tt: &[u16]) -> Wire {
         let gate = match self.recv() {
             Message::GarbledGate(g) => g,
             m => panic!("unexpected message: {}", m),
@@ -570,7 +570,7 @@ impl <'a> Fancy for Evaluator<'a> {
         w
     }
 
-    fn output(&mut self, x: &Self::Wire) {
+    fn output(&mut self, x: &Wire) {
         match self.recv() {
             Message::OutputCiphertext(c) => self.output_ciphertexts.push(c),
             m => panic!("unexpected message: {}", m),
@@ -1079,7 +1079,7 @@ mod streaming {
 
     // helper {{{
     fn streaming_test(
-        fancy_computation: fn(&mut dyn Fancy<Wire=Wire>),
+        fancy_computation: fn(&mut dyn Fancy<Item=Wire>),
         garbler_input: &[u16],
         evaluator_input: &[u16],
         should_be: &[u16]
@@ -1116,7 +1116,7 @@ mod streaming {
         assert_eq!(result, should_be)
     }
 //}}}
-    fn fancy_addition<W: Clone + HasModulus>(b: &mut dyn Fancy<Wire=W>) //{{{
+    fn fancy_addition<W: Clone + HasModulus>(b: &mut dyn Fancy<Item=W>) //{{{
     {
         let x = b.garbler_input(17);
         let y = b.evaluator_input(17);
@@ -1135,7 +1135,7 @@ mod streaming {
         }
     }
 //}}}
-    fn fancy_subtraction<W: Clone + HasModulus>(b: &mut dyn Fancy<Wire=W>) //{{{
+    fn fancy_subtraction<W: Clone + HasModulus>(b: &mut dyn Fancy<Item=W>) //{{{
     {
         let x = b.garbler_input(17);
         let y = b.evaluator_input(17);
@@ -1154,7 +1154,7 @@ mod streaming {
         }
     }
 //}}}
-    fn fancy_multiplication<W: Clone + HasModulus>(b: &mut dyn Fancy<Wire=W>) // {{{
+    fn fancy_multiplication<W: Clone + HasModulus>(b: &mut dyn Fancy<Item=W>) // {{{
     {
         let x = b.garbler_input(17);
         let y = b.evaluator_input(17);
@@ -1173,7 +1173,7 @@ mod streaming {
         }
     }
 //}}}
-    fn fancy_cmul<W: Clone + HasModulus>(b: &mut dyn Fancy<Wire=W>) // {{{
+    fn fancy_cmul<W: Clone + HasModulus>(b: &mut dyn Fancy<Item=W>) // {{{
     {
         let x = b.garbler_input(17);
         let z = b.cmul(&x,5);
@@ -1190,7 +1190,7 @@ mod streaming {
         }
     }
 //}}}
-    fn fancy_projection<W: Clone + HasModulus>(b: &mut dyn Fancy<Wire=W>) // {{{
+    fn fancy_projection<W: Clone + HasModulus>(b: &mut dyn Fancy<Item=W>) // {{{
     {
         let q = 17;
         let x = b.garbler_input(q);

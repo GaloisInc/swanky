@@ -1,9 +1,9 @@
 //! DSL for creating circuits compatible with fancy-garbling in the old-fashioned way,
 //! where you create a circuit for a computation then garble it.
 
+use crate::fancy::{Fancy, HasModulus};
 use serde_derive::{Serialize, Deserialize};
 use std::collections::HashMap;
-use crate::fancy::{Fancy, BundleGadgets, HasModulus};
 
 /// The index and modulus of a `Gate` in a `Circuit`.
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
@@ -174,7 +174,7 @@ pub struct Builder {
 }
 
 impl Fancy for Builder {
-    type Wire = Ref;
+    type Item = Ref;
 
     fn garbler_input(&mut self, modulus: u16) -> Ref {
         let gate = Gate::GarblerInput { id: self.get_next_garbler_input_id() };
@@ -247,8 +247,6 @@ impl Fancy for Builder {
     }
 }
 
-impl BundleGadgets for Builder { }
-
 impl Builder {
     pub fn new() -> Self {
         let c = Circuit {
@@ -314,9 +312,9 @@ impl Builder {
 }
 
 #[cfg(test)]
-mod tests {
+mod basic {
     use super::*;
-    use crate::util::{self, RngExt, crt_factor, crt_inv_factor};
+    use crate::util::RngExt;
     use itertools::Itertools;
     use rand::thread_rng;
 
@@ -446,27 +444,18 @@ mod tests {
         }
     }
 //}}}
-    #[test] // serialization {{{
-    fn serialization() {
-        let mut rng = thread_rng();
+}
 
-        let nargs = 2 + rng.gen_usize() % 100;
-        let mods = (0..7).map(|_| rng.gen_modulus()).collect_vec();
-
-        let mut b = Builder::new();
-        let xs = b.evaluator_input_bundles(&mods, nargs);
-        let z = b.mixed_radix_addition(&xs);
-        b.output_bundle(&z);
-        let circ = b.finish();
-
-        println!("{}", circ.to_string());
-
-        assert_eq!(circ, Circuit::from_str(&circ.to_string()).unwrap());
-    }
-//}}}
+#[cfg(test)]
+mod bundle {
+    use super::*;
+    use crate::fancy::BundleGadgets;
+    use crate::util::{self, RngExt, crt_factor, crt_inv_factor};
+    use itertools::Itertools;
+    use rand::thread_rng;
 
     #[test] // bundle addition {{{
-    fn bundle_addition() {
+    fn addition() {
         let mut rng = thread_rng();
         let q = rng.gen_usable_composite_modulus();
 
@@ -487,7 +476,7 @@ mod tests {
     }
     //}}}
     #[test] // bundle subtraction {{{
-    fn bundle_subtraction() {
+    fn subtraction() {
         let mut rng = thread_rng();
         let q = rng.gen_usable_composite_modulus();
 
@@ -508,7 +497,7 @@ mod tests {
     }
     //}}}
     #[test] // bundle cmul {{{
-    fn bundle_cmul() {
+    fn cmul() {
         let mut rng = thread_rng();
         let q = util::modulus_with_width(16);
 
@@ -528,7 +517,7 @@ mod tests {
     }
     //}}}
     #[test] // bundle multiplication {{{
-    fn bundle_multiplication() {
+    fn multiplication() {
         let mut rng = thread_rng();
         let q = rng.gen_usable_composite_modulus();
 
@@ -549,7 +538,7 @@ mod tests {
     }
     //}}}
     #[test] // bundle cdiv {{{
-    fn bundle_cdiv() {
+    fn cdiv() {
         let mut rng = thread_rng();
         let q = util::modulus_with_width_skip2(32);
 
@@ -569,7 +558,7 @@ mod tests {
     }
     //}}}
     #[test] // bundle cexp {{{
-    fn bundle_cexp() {
+    fn cexp() {
         let mut rng = thread_rng();
         let q = util::modulus_with_width(10);
         let y = rng.gen_u16() % 10;
@@ -590,7 +579,7 @@ mod tests {
     }
     // }}}
     #[test] // bundle remainder {{{
-    fn bundle_remainder() {
+    fn remainder() {
         let mut rng = thread_rng();
         let ps = rng.gen_usable_factors();
         let q = ps.iter().fold(1, |acc, &x| (x as u128) * acc);
@@ -612,7 +601,7 @@ mod tests {
     }
     //}}}
     #[test] // bundle equality {{{
-    fn bundle_equality() {
+    fn equality() {
         let mut rng = thread_rng();
         let q = rng.gen_usable_composite_modulus();
 
@@ -637,7 +626,7 @@ mod tests {
     }
     //}}}
     #[test] // bundle mixed_radix_addition {{{
-    fn bundle_mixed_radix_addition() {
+    fn mixed_radix_addition() {
         let mut rng = thread_rng();
 
         let nargs = 2 + rng.gen_usize() % 100;
@@ -674,7 +663,7 @@ mod tests {
     }
 //}}}
     #[test] // bundle relu {{{
-    fn bundle_relu() {
+    fn relu() {
         let mut rng = thread_rng();
         let q = util::modulus_with_width(10);
         println!("q={}", q);
@@ -695,7 +684,7 @@ mod tests {
     }
     //}}}
     #[test] // bundle sgn {{{
-    fn bundle_sgn() {
+    fn sgn() {
         let mut rng = thread_rng();
         let q = util::modulus_with_width(10);
         println!("q={}", q);
@@ -716,7 +705,7 @@ mod tests {
     }
     //}}}
     #[test] // bundle leq {{{
-    fn bundle_leq() {
+    fn leq() {
         let mut rng = thread_rng();
         let q = util::modulus_with_width(10);
 
@@ -741,7 +730,7 @@ mod tests {
     }
     //}}}
     #[test] // bundle max {{{
-    fn bundle_max() {
+    fn max() {
         let mut rng = thread_rng();
         let q = util::modulus_with_width(10);
         let n = 10;
@@ -765,5 +754,22 @@ mod tests {
         }
     }
     //}}}
+    #[test] // serialization {{{
+    fn serialization() {
+        let mut rng = thread_rng();
 
+        let nargs = 2 + rng.gen_usize() % 100;
+        let mods = (0..7).map(|_| rng.gen_modulus()).collect_vec();
+
+        let mut b = Builder::new();
+        let xs = b.evaluator_input_bundles(&mods, nargs);
+        let z = b.mixed_radix_addition(&xs);
+        b.output_bundle(&z);
+        let circ = b.finish();
+
+        println!("{}", circ.to_string());
+
+        assert_eq!(circ, Circuit::from_str(&circ.to_string()).unwrap());
+    }
+//}}}
 }
