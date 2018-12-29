@@ -358,8 +358,9 @@ impl <'a> Garbler<'a> {
 /// Create an iterator over the messages produced by fancy garbling.
 ///
 /// This creates a new thread for the garbler, which passes messages back through a
-/// channel one by one.
-pub fn garble_iter(fancy_computation: fn(&mut dyn Fancy<Item=Wire>)) -> impl Iterator<Item=Message>
+/// channel one by one. This function has restricitve input types because
+/// `fancy_computation` is sent to the new thread.
+pub fn garble_iter(fancy_computation: fn(&mut Garbler)) -> impl Iterator<Item=Message>
 {
     let (sender, receiver) = std::sync::mpsc::sync_channel(1);
 
@@ -1077,14 +1078,17 @@ mod streaming {
     use crate::util::RngExt;
     use rand::thread_rng;
 
+    const Q: u16 = 103;
+
     // helper {{{
     fn streaming_test(
-        fancy_computation: fn(&mut dyn Fancy<Item=Wire>),
+        garbler_computation: fn(&mut Garbler),
+        evaluator_computation: fn(&mut Evaluator),
         garbler_input: &[u16],
         evaluator_input: &[u16],
         should_be: &[u16]
     ) {
-        let mut gb_iter = garble_iter(fancy_computation);
+        let mut gb_iter = garble_iter(garbler_computation);
 
         let mut gb_inp_iter = garbler_input.iter();
         let mut ev_inp_iter = evaluator_input.iter();
@@ -1109,7 +1113,7 @@ mod streaming {
         };
 
         let mut ev = Evaluator::new(&mut recv_func);
-        fancy_computation(&mut ev);
+        evaluator_computation(&mut ev);
 
         let result = ev.decode_output();
         println!("gb_inp={:?} ev_inp={:?}", garbler_input, evaluator_input);
@@ -1118,8 +1122,8 @@ mod streaming {
 //}}}
     fn fancy_addition<W: Clone + HasModulus>(b: &mut dyn Fancy<Item=W>) //{{{
     {
-        let x = b.garbler_input(17);
-        let y = b.evaluator_input(17);
+        let x = b.garbler_input(Q);
+        let y = b.evaluator_input(Q);
         let z = b.add(&x,&y);
         b.output(&z);
     }
@@ -1127,18 +1131,17 @@ mod streaming {
     #[test]
     fn addition() {
         let mut rng = thread_rng();
-        let q = 17;
         for _ in 0..16 {
-            let x = rng.gen_u16() % q;
-            let y = rng.gen_u16() % q;
-            streaming_test(fancy_addition, &[x], &[y], &[(x+y)%q]);
+            let x = rng.gen_u16() % Q;
+            let y = rng.gen_u16() % Q;
+            streaming_test(|b| fancy_addition(b), |b| fancy_addition(b), &[x], &[y], &[(x+y)%Q]);
         }
     }
 //}}}
     fn fancy_subtraction<W: Clone + HasModulus>(b: &mut dyn Fancy<Item=W>) //{{{
     {
-        let x = b.garbler_input(17);
-        let y = b.evaluator_input(17);
+        let x = b.garbler_input(Q);
+        let y = b.evaluator_input(Q);
         let z = b.sub(&x,&y);
         b.output(&z);
     }
@@ -1146,18 +1149,17 @@ mod streaming {
     #[test]
     fn subtraction() {
         let mut rng = thread_rng();
-        let q = 17;
         for _ in 0..16 {
-            let x = rng.gen_u16() % q;
-            let y = rng.gen_u16() % q;
-            streaming_test(fancy_subtraction, &[x], &[y], &[(q+x-y)%q]);
+            let x = rng.gen_u16() % Q;
+            let y = rng.gen_u16() % Q;
+            streaming_test(|b| fancy_subtraction(b), |b| fancy_subtraction(b), &[x], &[y], &[(Q+x-y)%Q]);
         }
     }
 //}}}
     fn fancy_multiplication<W: Clone + HasModulus>(b: &mut dyn Fancy<Item=W>) // {{{
     {
-        let x = b.garbler_input(17);
-        let y = b.evaluator_input(17);
+        let x = b.garbler_input(Q);
+        let y = b.evaluator_input(Q);
         let z = b.mul(&x,&y);
         b.output(&z);
     }
@@ -1165,17 +1167,16 @@ mod streaming {
     #[test]
     fn multiplication() {
         let mut rng = thread_rng();
-        let q = 17;
         for _ in 0..16 {
-            let x = rng.gen_u16() % q;
-            let y = rng.gen_u16() % q;
-            streaming_test(fancy_multiplication, &[x], &[y], &[(x*y)%q]);
+            let x = rng.gen_u16() % Q;
+            let y = rng.gen_u16() % Q;
+            streaming_test(|b| fancy_multiplication(b), |b| fancy_multiplication(b), &[x], &[y], &[(x*y)%Q]);
         }
     }
 //}}}
     fn fancy_cmul<W: Clone + HasModulus>(b: &mut dyn Fancy<Item=W>) // {{{
     {
-        let x = b.garbler_input(17);
+        let x = b.garbler_input(Q);
         let z = b.cmul(&x,5);
         b.output(&z);
     }
@@ -1183,29 +1184,26 @@ mod streaming {
     #[test]
     fn cmul() {
         let mut rng = thread_rng();
-        let q = 17;
         for _ in 0..16 {
-            let x = rng.gen_u16() % q;
-            streaming_test(fancy_cmul, &[x], &[], &[(x*5)%q]);
+            let x = rng.gen_u16() % Q;
+            streaming_test(|b| fancy_cmul(b), |b|fancy_cmul(b), &[x], &[], &[(x*5)%Q]);
         }
     }
 //}}}
     fn fancy_projection<W: Clone + HasModulus>(b: &mut dyn Fancy<Item=W>) // {{{
     {
-        let q = 17;
-        let x = b.garbler_input(q);
-        let tab = (0..q).map(|i| (i + 1) % q).collect_vec();
-        let z = b.proj(&x,q,&tab);
+        let x = b.garbler_input(Q);
+        let tab = (0..Q).map(|i| (i + 1) % Q).collect_vec();
+        let z = b.proj(&x,Q,&tab);
         b.output(&z);
     }
 
     #[test]
     fn proj() {
         let mut rng = thread_rng();
-        let q = 17;
         for _ in 0..16 {
-            let x = rng.gen_u16() % q;
-            streaming_test(fancy_projection, &[x], &[], &[(x+1)%q]);
+            let x = rng.gen_u16() % Q;
+            streaming_test(|b|fancy_projection(b), |b|fancy_projection(b), &[x], &[], &[(x+1)%Q]);
         }
     }
 //}}}
