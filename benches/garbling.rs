@@ -3,6 +3,7 @@ use criterion::{criterion_main, criterion_group, Criterion};
 use fancy_garbling::util::RngExt;
 use fancy_garbling::garble::garble;
 use fancy_garbling::circuit::{Builder, Circuit};
+use fancy_garbling::fancy::Fancy;
 
 use itertools::Itertools;
 
@@ -22,36 +23,39 @@ fn bench_eval<F:'static>(c: &mut Criterion, name: &str, make_circuit: F, q: u16)
     where F: Fn(u16) -> Circuit
 {
     c.bench_function(&format!("garbling::{}{}_ev", name, q), move |bench| {
+        let mut rng = rand::thread_rng();
+
         let c = make_circuit(q);
         let (en, _, ev) = garble(&c);
-        let mut rng = rand::thread_rng();
-        let inps = (0..c.ninputs()).map(|i| rng.gen_u16() % c.input_mod(i)).collect_vec();
-        let xs = en.encode(&inps);
+
+        let inps = (0..c.num_garbler_inputs()).map(|i| {
+            rng.gen_u16() % c.garbler_input_mod(i)
+        }).collect_vec();
+
+        let xs = en.encode_garbler_inputs(&inps);
+
         bench.iter(|| {
-            let ys = ev.eval(&c, &xs);
+            let ys = ev.eval(&c, &xs, &[]);
             criterion::black_box(ys);
         });
     });
 }
 
 fn proj(q: u16) -> Circuit {
-    let mut tab = Vec::new();
-    for i in 0..q {
-        tab.push((i + 1) % q);
-    }
     let mut b = Builder::new();
-    let x = b.input(q);
-    let z = b.proj(x, q, tab);
-    b.output(z);
+    let x = b.garbler_input(q);
+    let tab = (0..q).map(|i| (i + 1) % q).collect_vec();
+    let z = b.proj(&x, q, &tab);
+    b.output(&z);
     b.finish()
 }
 
 fn half_gate(q: u16) -> Circuit {
     let mut b = Builder::new();
-    let x = b.input(q);
-    let y = b.input(q);
-    let z = b.half_gate(x,y);
-    b.output(z);
+    let x = b.garbler_input(q);
+    let y = b.garbler_input(q);
+    let z = b.mul(&x,&y);
+    b.output(&z);
     b.finish()
 }
 

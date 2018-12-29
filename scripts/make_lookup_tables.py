@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
 
+##################################################################################
+# this script is used to generate the file base_conversion/cbits/lookup_tables.c #
+##################################################################################
+
 import sys
 
 bits_per_chunk = 8
