@@ -340,7 +340,7 @@ impl <'a> Garbler<'a> {
         w
     }
 
-    /// The current nonfree gate index of the garbling computation.
+    /// The current non-free gate index of the garbling computation.
     fn current_gate(&mut self) -> usize {
         let c = self.current_gate;
         self.current_gate += 1;
@@ -358,15 +358,17 @@ impl <'a> Garbler<'a> {
 /// Create an iterator over the messages produced by fancy garbling.
 ///
 /// This creates a new thread for the garbler, which passes messages back through a
-/// channel one by one. This function has restricitve input types because
+/// channel one by one. This function has a restrictive input type because
 /// `fancy_computation` is sent to the new thread.
-pub fn garble_iter(fancy_computation: fn(&mut Garbler)) -> impl Iterator<Item=Message>
+pub fn garble_iter(fancy_computation: Box<dyn Fn(&mut Garbler) + Send>)
+    -> impl Iterator<Item=Message>
 {
     let (sender, receiver) = std::sync::mpsc::sync_channel(1);
 
     std::thread::spawn(move || {
-        let mut send_func = |m| sender.send(m).unwrap();
-        let mut garbler   = Garbler::new(&mut send_func);
+        let mut send_func = |m| sender.send(m)
+            .expect("garble_iter thread could not send message to iterator");
+        let mut garbler = Garbler::new(&mut send_func);
         fancy_computation(&mut garbler);
     });
 
@@ -480,48 +482,48 @@ impl <'a> Evaluator<'a> {
 impl <'a> Fancy for Evaluator<'a> {
     type Item = Wire;
 
-    fn garbler_input(&mut self, _q: u16) -> Wire {
+    fn garbler_input(&mut self, _q: u16) -> Wire { //{{{
         match self.recv() {
             Message::GarblerInput(w) => w,
-            m => panic!("unexpected message: {}", m),
+            m => panic!("Expected message GarblerInput but got {}", m),
         }
     }
-
-    fn evaluator_input(&mut self, _q: u16) -> Wire {
+    //}}}
+    fn evaluator_input(&mut self, _q: u16) -> Wire { //{{{
         match self.recv() {
             Message::EvaluatorInput(w) => w,
-            m => panic!("unexpected message: {}", m),
+            m => panic!("Expected message EvaluatorInput but got {}", m),
         }
     }
-
-    fn constant(&mut self, x: u16, q: u16) -> Wire {
+    //}}}
+    fn constant(&mut self, x: u16, q: u16) -> Wire { //{{{
         if self.constants.contains_key(&(x,q)) {
             return self.constants[&(x,q)].clone();
         }
         let w = match self.recv() {
             Message::Constant { wire, .. } => wire,
-            m => panic!("unexpected message: {}", m),
+            m => panic!("Expected message Constant but got {}", m),
         };
         self.constants.insert((x,q),w.clone());
         w
     }
-
-    fn add(&mut self, x: &Wire, y: &Wire) -> Wire {
+    //}}}
+    fn add(&mut self, x: &Wire, y: &Wire) -> Wire { //{{{
         x.plus(y)
     }
-
-    fn sub(&mut self, x: &Wire, y: &Wire) -> Wire {
+    //}}}
+    fn sub(&mut self, x: &Wire, y: &Wire) -> Wire { //{{{
         x.minus(y)
     }
-
-    fn cmul(&mut self, x: &Wire, c: u16) -> Wire {
+    //}}}
+    fn cmul(&mut self, x: &Wire, c: u16) -> Wire { //{{{
         x.cmul(c)
     }
-
-    fn mul(&mut self, A: &Wire, B: &Wire) -> Wire {
+    //}}}
+    fn mul(&mut self, A: &Wire, B: &Wire) -> Wire { //{{{
         let gate = match self.recv() {
             Message::GarbledGate(g) => g,
-            m => panic!("unexpected message: {}", m),
+            m => panic!("Expected message GarbledGate but got {}", m),
         };
         let gate_num = self.current_gate();
         let g = tweak2(gate_num as u64, 0);
@@ -555,11 +557,11 @@ impl <'a> Fancy for Evaluator<'a> {
 
         L.plus(&R.plus(&A.cmul(new_b_color)))
     }
-
-    fn proj(&mut self, x: &Wire, q: u16, _tt: &[u16]) -> Wire {
+    //}}}
+    fn proj(&mut self, x: &Wire, q: u16, _tt: &[u16]) -> Wire { //{{{
         let gate = match self.recv() {
             Message::GarbledGate(g) => g,
-            m => panic!("unexpected message: {}", m),
+            m => panic!("Expected message GarbledGate but got {}", m),
         };
         let gate_num = self.current_gate();
         let w = if x.color() == 0 {
@@ -570,16 +572,16 @@ impl <'a> Fancy for Evaluator<'a> {
         };
         w
     }
-
-    fn output(&mut self, x: &Wire) {
+    //}}}
+    fn output(&mut self, x: &Wire) { //{{{
         match self.recv() {
             Message::OutputCiphertext(c) => self.output_ciphertexts.push(c),
-            m => panic!("unexpected message: {}", m),
+            m => panic!("Expected message OutputCiphertext but got {}", m),
         }
         self.output_wires.push(x.clone());
     }
+    //}}}
 }
-
 ////////////////////////////////////////////////////////////////////////////////
 // static evaluator
 
@@ -1088,7 +1090,7 @@ mod streaming {
         evaluator_input: &[u16],
         should_be: &[u16]
     ) {
-        let mut gb_iter = garble_iter(garbler_computation);
+        let mut gb_iter = garble_iter(Box::new(garbler_computation));
 
         let mut gb_inp_iter = garbler_input.iter();
         let mut ev_inp_iter = evaluator_input.iter();
