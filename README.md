@@ -19,3 +19,9 @@ To use fancy-garbling in your project, add the following line to the `[dependenc
 ```
 fancy_garbling = { git = "https://github.com/spaceships/fancy-garbling" }
 ```
+
+# license
+
+MIT License
+
+Copyright 2018 Brent Carmer
