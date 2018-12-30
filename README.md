@@ -13,7 +13,7 @@ Requires at least `rustc 1.31.0`
 * `cargo test`: run the tests
 * `cargo bench`: run the benchmarks
 
-# using fancy garbling in your project
+# using it in your project
 To use fancy-garbling in your project, add the following line to the `[dependencies]` entry in `Cargo.toml`:
 
 ```
