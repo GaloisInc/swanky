@@ -5,7 +5,7 @@ An implementation of the [BMR16](https://eprint.iacr.org/2016/969) arithmetic ga
 
 Extremely unstable, under active development (and research!).
 
-[Documentation](https://spaceships.github.io/fancy-garbling/fancy_garbling/index.html) is a work in progress.
+[Documentation is here.](https://spaceships.github.io/fancy-garbling/fancy_garbling/index.html)
 
 # compiling
 Requires at least `rustc 1.31.0` 
