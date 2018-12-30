@@ -1,4 +1,6 @@
 //! Tools useful for interacting with `fancy-garbling`.
+//!
+//! Note: all number representations in this library are little-endian.
 
 use itertools::Itertools;
 use num::bigint::BigInt;
@@ -8,6 +10,7 @@ use num::{ToPrimitive, Zero, One, Signed};
 ////////////////////////////////////////////////////////////////////////////////
 // mixed radix stuff
 
+/// Add two base q numbers together.
 pub fn base_q_add(xs: &[u16], ys: &[u16], q: u16) -> Vec<u16> {
     if ys.len() > xs.len() {
         return base_q_add(ys, xs, q);
@@ -17,6 +20,7 @@ pub fn base_q_add(xs: &[u16], ys: &[u16], q: u16) -> Vec<u16> {
     ret
 }
 
+/// Add a base q number into the first one.
 pub fn base_q_add_eq(xs: &mut [u16], ys: &[u16], q: u16)
 {
     debug_assert!(
@@ -52,22 +56,26 @@ pub fn base_q_add_eq(xs: &mut [u16], ys: &[u16], q: u16)
     }
 }
 
+/// Convert a u128 into base q.
 pub fn as_base_q(x: u128, q: u16, n: usize) -> Vec<u16> {
     let ms = std::iter::repeat(q).take(n).collect_vec();
     as_mixed_radix(x, &ms)
 }
 
+/// Determine how many mod q digits fit into a u128.
 pub fn digits_per_u128(modulus: u16) -> usize {
     (128.0 / (modulus as f64).log2().ceil()).floor() as usize
 }
 
+/// Convert a u128 into base q.
 pub fn as_base_q_u128(x: u128, q: u16) -> Vec<u16> {
     as_base_q(x, q, digits_per_u128(q))
 }
 
-pub fn as_mixed_radix(x: u128, ms: &[u16]) -> Vec<u16> {
+/// Convert a u128 into mixed radix form with the provided radii.
+pub fn as_mixed_radix(x: u128, radii: &[u16]) -> Vec<u16> {
     let mut x = x;
-    ms.iter().map(|&m| {
+    radii.iter().map(|&m| {
         if x >= m as u128 {
             let d = x % m as u128;
             x = (x - d) / m as u128;
@@ -80,6 +88,7 @@ pub fn as_mixed_radix(x: u128, ms: &[u16]) -> Vec<u16> {
     }).collect()
 }
 
+/// Convert little-endian base q digits into u128.
 pub fn from_base_q(ds: &[u16], q: u16) -> u128 {
     let mut x: u128 = 0;
     for &d in ds.iter().rev() {
@@ -90,9 +99,10 @@ pub fn from_base_q(ds: &[u16], q: u16) -> u128 {
     x
 }
 
-pub fn from_mixed_radix(ds: &[u16], qs: &[u16]) -> u128 {
+/// Convert little-endian mixed radix digits into u128.
+pub fn from_mixed_radix(digits: &[u16], radii: &[u16]) -> u128 {
     let mut x: u128 = 0;
-    for (&d,&q) in ds.iter().zip(qs.iter()).rev() {
+    for (&d,&q) in digits.iter().zip(radii.iter()).rev() {
         let (xp,overflow) = x.overflowing_mul(q as u128);
         debug_assert_eq!(overflow, false, "overflow!!!! x={}", x);
         x = xp + d as u128;
@@ -103,8 +113,8 @@ pub fn from_mixed_radix(ds: &[u16], qs: &[u16]) -> u128 {
 ////////////////////////////////////////////////////////////////////////////////
 // bits
 
-/// Get the bits of a `u128` encoded in 128 `u16`s, which is convenient for the rest of
-/// the library, which uses `u16` as the base digit type in `Wire`.
+/// Get the bits of a u128 encoded in 128 u16s, which is convenient for the rest of
+/// the library, which uses u16 as the base digit type in Wire.
 pub fn u128_to_bits(x: u128, n: usize) -> Vec<u16> {
     let mut bits = Vec::with_capacity(n);
     let mut y = x;
@@ -117,6 +127,7 @@ pub fn u128_to_bits(x: u128, n: usize) -> Vec<u16> {
     bits
 }
 
+/// Convert into a u128 from the "bits" as u16. Assumes each "bit" is 0 or 1.
 pub fn u128_from_bits(bs: &[u16]) -> u128 {
     let mut x = 0;
     for &b in bs.iter().skip(1).rev() {
@@ -127,12 +138,14 @@ pub fn u128_from_bits(bs: &[u16]) -> u128 {
     x
 }
 
+/// Convert a u128 into bytes.
 pub fn u128_to_bytes(x: u128) -> [u8;16] {
     unsafe {
         std::mem::transmute(x)
     }
 }
 
+/// Convert bytes to u128.
 pub fn bytes_to_u128(bytes: [u8;16]) -> u128 {
     unsafe {
         std::mem::transmute(bytes)
@@ -142,8 +155,11 @@ pub fn bytes_to_u128(bytes: [u8;16]) -> u128 {
 ////////////////////////////////////////////////////////////////////////////////
 // primes & crt
 
-/// Factor using the primes in the global `PRIMES` array. We only support composites with
-/// small prime factors in the high-level circuit representation.
+/// Factor using the primes in the global `PRIMES` array. Fancy garbling only supports
+/// composites with small prime factors.
+///
+/// We are limited by the size of the digits in Wire, and besides, if need large moduli,
+/// you should use BundleGadgets and save.
 pub fn factor(inp: u128) -> Vec<u16> {
     let mut x = inp;
     let mut fs = Vec::new();
@@ -160,19 +176,19 @@ pub fn factor(inp: u128) -> Vec<u16> {
     fs
 }
 
-/// Compute the CRT representation of `x` with respect to the primes `ps`.
+/// Compute the CRT representation of x with respect to the primes ps.
 pub fn crt(ps: &[u16], x: u128) -> Vec<u16> {
     ps.iter().map(|&p| {
         (x % p as u128) as u16
     }).collect()
 }
 
-/// Compute the CRT representation of `x` with respect to the factorization of `q`.
+/// Compute the CRT representation of x with respect to the factorization of q.
 pub fn crt_factor(x: u128, q: u128) -> Vec<u16> {
     crt(&factor(q), x)
 }
 
-/// Compute the value `x` given a list of CRT primes and residues.
+/// Compute the value x given a list of CRT primes and residues.
 pub fn crt_inv(ps: &[u16], xs: &[u16]) -> u128 {
     let mut ret = BigInt::zero();
     let M = ps.iter().fold(BigInt::one(), |acc, &x| BigInt::from(x) * acc );
@@ -185,12 +201,13 @@ pub fn crt_inv(ps: &[u16], xs: &[u16]) -> u128 {
     ret.to_u128().unwrap()
 }
 
+/// Compute the value x given a composite CRT modulus.
 pub fn crt_inv_factor(xs: &[u16], q: u128) -> u128 {
     crt_inv(&factor(q), xs)
 }
 
-/// Generic algorithm to invert `inp_a` mod `inp_b`. As ref so as to support `BigInt`
-/// without copying.
+/// Generic algorithm to invert inp_a mod inp_b. As ref so as to support BigInts without
+/// copying.
 pub fn inv_ref<T: Clone + Integer + Signed>(inp_a: &T, inp_b: &T) -> T {
     let mut a = inp_a.clone();
     let mut b = inp_b.clone();
@@ -223,7 +240,7 @@ pub fn inv_ref<T: Clone + Integer + Signed>(inp_a: &T, inp_b: &T) -> T {
     x1
 }
 
-/// Invert `a` mod `m`.
+/// Invert a mod m.
 pub fn inv<T: Copy + Integer + Signed>(a: T, m: T) -> T {
     inv_ref(&a, &m)
 }
@@ -231,44 +248,51 @@ pub fn inv<T: Copy + Integer + Signed>(a: T, m: T) -> T {
 /// Number of primes supported by our library.
 pub const NPRIMES: usize = 29;
 
-/// Primes used by `fancy-garbling`.
+/// Primes used in fancy garbling.
 pub const PRIMES: [u16;29] = [
     2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47, 53, 59, 61, 67, 71,
     73, 79, 83, 89, 97, 101, 103, 107, 109
 ];
 
-/// Primes skipping the modulus 2, which allows certain gadgets in `circuit::crt`.
+/// Primes skipping the modulus 2, which allows certain gadgets.
 pub const PRIMES_SKIP_2: [u16;29] = [
     3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47, 53, 59, 61, 67, 71,
     73, 79, 83, 89, 97, 101, 103, 107, 109, 113
 ];
 
-pub fn modulus_with_width(nbits: u32) -> u128 {
-    base_modulus_with_width(nbits, &PRIMES)
+/// Generate a CRT modulus that support at least n-bit integers, using the built-in
+/// PRIMES.
+pub fn modulus_with_width(n: u32) -> u128 {
+    base_modulus_with_width(n, &PRIMES)
 }
 
-pub fn base_modulus_with_width(nbits: u32, ps: &[u16]) -> u128 {
+/// Generate a CRT modulus that support at least n-bit integers, using provided primes.
+pub fn base_modulus_with_width(nbits: u32, primes: &[u16]) -> u128 {
     let mut res = 1;
     let mut i = 0;
     loop {
-        res *= u128::from(ps[i]);
+        res *= u128::from(primes[i]);
         if (res >> nbits) > 0 {
             break;
         }
         i += 1;
-        debug_assert!(i < ps.len());
+        debug_assert!(i < primes.len());
     }
     res
 }
 
+/// Generate a CRT modulus that support at least n-bit integers, using the built-in
+/// PRIMES_SKIP_2 (does not include 2 as a factor).
 pub fn modulus_with_width_skip2(nbits: u32) -> u128 {
     base_modulus_with_width(nbits, &PRIMES_SKIP_2)
 }
 
+/// Compute the product of some u16s as a u128.
 pub fn product(xs: &[u16]) -> u128 {
     xs.iter().fold(1, |acc, &x| acc * x as u128)
 }
 
+/// Raise a u16 to a power mod some value.
 pub fn powm(inp: u16, pow: u16, modulus: u16) -> u16 {
     let mut x = inp as u16;
     let mut z = 1;
@@ -285,6 +309,7 @@ pub fn powm(inp: u16, pow: u16, modulus: u16) -> u16 {
     z as u16
 }
 
+/// Returns true if x is a power of 2. Delightfully generic.
 pub fn is_power_of_2<I>(x: I) -> bool
     where I: std::ops::Sub<Output=I> + std::ops::BitAnd<Output=I> +
              num::Zero + num::One + std::cmp::PartialEq + Clone
