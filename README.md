@@ -6,7 +6,7 @@ Implementation of the [BMR16](https://eprint.iacr.org/2016/969) arithmetic garbl
 Extremely unstable, under active development (and research!).
 
 [Documentation is here](https://spaceships.github.io/fancy-garbling/fancy_garbling/index.html).
-Currently, the best usage examples are the tests in [garble.rs](blob/master/src/garble.rs).
+Currently, the best usage examples are the tests in [garble.rs](src/garble.rs).
 
 # compiling
 Requires at least `rustc 1.31.0` 
