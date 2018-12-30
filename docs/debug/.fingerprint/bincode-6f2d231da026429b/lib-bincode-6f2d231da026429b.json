@@ -1,0 +1,1 @@
+{"rustc":5539919311170048216,"features":"[\"byteorder\", \"i128\"]","target":143374021774707048,"profile":13846881912122723292,"path":5611285072950304451,"deps":[["byteorder v1.2.7","byteorder",3491011802311411261],["serde v1.0.82","serde",7669568033662896211]],"local":[{"Precalculated":"1.0.1"}],"rustflags":[],"edition":"Edition2015"}

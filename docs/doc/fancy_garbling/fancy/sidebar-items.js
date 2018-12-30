@@ -1,0 +1,1 @@
+initSidebarItems({"struct":[["Bundle","A collection of wires, useful for the garbled gadgets defined by `BundleGadgets`."]],"trait":[["BundleGadgets","Extension trait for `Fancy` providing advanced gadgets based on bundles of wires."],["Fancy","DSL for the basic computations supported by fancy-garbling."],["HasModulus","An object that knows its own modulus."]]});

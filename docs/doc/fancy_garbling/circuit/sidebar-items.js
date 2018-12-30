@@ -1,0 +1,1 @@
+initSidebarItems({"enum":[["Gate","The most basic types of computation supported by fancy garbling."]],"struct":[["Circuit","Static representation of the type of computation supported by fancy garbling."],["CircuitBuilder","CircuitBuilder is used to build circuits."],["Ref","The index and modulus of a gate in a circuit."]]});
