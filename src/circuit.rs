@@ -6,7 +6,7 @@ use serde_derive::{Serialize, Deserialize};
 use std::collections::HashMap;
 
 /// The index and modulus of a gate in a circuit.
-#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Deserialize)]
 pub struct Ref {
     pub ix: usize,
     modulus: u16,

@@ -13,10 +13,10 @@ pub trait HasModulus {
 }
 
 /// A collection of wires, useful for the garbled gadgets defined by `BundleGadgets`.
-#[derive(Clone)]
-pub struct Bundle<W: Clone + HasModulus>(Vec<W>);
+#[derive(Clone, Default)]
+pub struct Bundle<W: Clone + Default + HasModulus>(Vec<W>);
 
-impl <W: Clone + HasModulus> Bundle<W> {
+impl <W: Clone + Default + HasModulus> Bundle<W> {
     /// Return the moduli of all the wires in the bundle.
     pub fn moduli(&self) -> Vec<u16> {
         self.0.iter().map(|w| w.modulus()).collect()
@@ -31,7 +31,7 @@ impl <W: Clone + HasModulus> Bundle<W> {
 /// DSL for the basic computations supported by fancy-garbling.
 pub trait Fancy {
     /// The underlying wire datatype created by an object implementing `Fancy`.
-    type Item: Clone + HasModulus;
+    type Item: Clone + Default + HasModulus;
 
     /// Create an input for the garbler with modulus `q`.
     fn garbler_input(&mut self, q: u16) -> Self::Item;
@@ -459,7 +459,7 @@ pub trait BundleGadgets: Fancy {
 impl<F: Fancy> BundleGadgets for F { }
 
 // Compute the exact ms needed for the number of CRT primes in `x`.
-fn exact_ms<W: Clone + HasModulus>(x: &Bundle<W>) -> Vec<u16> {
+fn exact_ms<W: Clone + Default + HasModulus>(x: &Bundle<W>) -> Vec<u16> {
     match x.moduli().len() {
         3 => vec![2;5],
         4 => vec![3,26],

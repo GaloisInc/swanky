@@ -13,6 +13,10 @@ pub enum Wire {
     ModN { q: u16, ds: Vec<u16> },
 }
 
+impl Default for Wire {
+    fn default() -> Wire { Wire::Mod2 { val: 0 } }
+}
+
 impl HasModulus for Wire {
     fn modulus(&self) -> u16 {
         match *self {

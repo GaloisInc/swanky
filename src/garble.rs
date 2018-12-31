@@ -1122,7 +1122,7 @@ mod streaming {
         assert_eq!(result, should_be)
     }
 //}}}
-    fn fancy_addition<W: Clone + HasModulus>(b: &mut dyn Fancy<Item=W>) //{{{
+    fn fancy_addition<W: Clone + Default + HasModulus>(b: &mut dyn Fancy<Item=W>) //{{{
     {
         let x = b.garbler_input(Q);
         let y = b.evaluator_input(Q);
@@ -1140,7 +1140,7 @@ mod streaming {
         }
     }
 //}}}
-    fn fancy_subtraction<W: Clone + HasModulus>(b: &mut dyn Fancy<Item=W>) //{{{
+    fn fancy_subtraction<W: Clone + Default + HasModulus>(b: &mut dyn Fancy<Item=W>) //{{{
     {
         let x = b.garbler_input(Q);
         let y = b.evaluator_input(Q);
@@ -1158,7 +1158,7 @@ mod streaming {
         }
     }
 //}}}
-    fn fancy_multiplication<W: Clone + HasModulus>(b: &mut dyn Fancy<Item=W>) // {{{
+    fn fancy_multiplication<W: Clone + Default + HasModulus>(b: &mut dyn Fancy<Item=W>) // {{{
     {
         let x = b.garbler_input(Q);
         let y = b.evaluator_input(Q);
@@ -1176,7 +1176,7 @@ mod streaming {
         }
     }
 //}}}
-    fn fancy_cmul<W: Clone + HasModulus>(b: &mut dyn Fancy<Item=W>) // {{{
+    fn fancy_cmul<W: Clone + Default + HasModulus>(b: &mut dyn Fancy<Item=W>) // {{{
     {
         let x = b.garbler_input(Q);
         let z = b.cmul(&x,5);
@@ -1192,7 +1192,7 @@ mod streaming {
         }
     }
 //}}}
-    fn fancy_projection<W: Clone + HasModulus>(b: &mut dyn Fancy<Item=W>) // {{{
+    fn fancy_projection<W: Clone + Default + HasModulus>(b: &mut dyn Fancy<Item=W>) // {{{
     {
         let x = b.garbler_input(Q);
         let tab = (0..Q).map(|i| (i + 1) % Q).collect_vec();
