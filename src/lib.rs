@@ -16,3 +16,4 @@ pub mod wire;
 pub mod util;
 pub mod aes;
 pub mod fancy;
+pub mod dummy;

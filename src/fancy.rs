@@ -224,7 +224,7 @@ pub trait BundleGadgets: Fancy {
 
     /// Multiplies each wire in `x` by the corresponding residue of `c`.
     fn cmul_bundle(&mut self, x: &Bundle<Self::Item>, c: u128) -> Bundle<Self::Item> {
-        let cs = util::crt(&x.moduli(), c);
+        let cs = util::crt(c, &x.moduli());
         let ws = x.wires().iter().zip(cs.into_iter()).map(|(x,c)| self.cmul(x,c)).collect();
         Bundle(ws)
     }

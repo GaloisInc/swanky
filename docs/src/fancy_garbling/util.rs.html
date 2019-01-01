@@ -452,6 +452,17 @@
 <span id="452">452</span>
 <span id="453">453</span>
 <span id="454">454</span>
+<span id="455">455</span>
+<span id="456">456</span>
+<span id="457">457</span>
+<span id="458">458</span>
+<span id="459">459</span>
+<span id="460">460</span>
+<span id="461">461</span>
+<span id="462">462</span>
+<span id="463">463</span>
+<span id="464">464</span>
+<span id="465">465</span>
 </pre><pre class="rust ">
 <span class="doccomment">//! Tools useful for interacting with `fancy-garbling`.</span>
 <span class="doccomment">//!</span>
@@ -632,7 +643,7 @@
 }
 
 <span class="doccomment">/// Compute the CRT representation of x with respect to the primes ps.</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">crt</span>(<span class="ident">ps</span>: <span class="kw-2">&amp;</span>[<span class="ident">u16</span>], <span class="ident">x</span>: <span class="ident">u128</span>) <span class="op">-&gt;</span> <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u16</span><span class="op">&gt;</span> {
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">crt</span>(<span class="ident">x</span>: <span class="ident">u128</span>, <span class="ident">ps</span>: <span class="kw-2">&amp;</span>[<span class="ident">u16</span>]) <span class="op">-&gt;</span> <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u16</span><span class="op">&gt;</span> {
     <span class="ident">ps</span>.<span class="ident">iter</span>().<span class="ident">map</span>(<span class="op">|</span><span class="kw-2">&amp;</span><span class="ident">p</span><span class="op">|</span> {
         (<span class="ident">x</span> <span class="op">%</span> <span class="ident">p</span> <span class="kw">as</span> <span class="ident">u128</span>) <span class="kw">as</span> <span class="ident">u16</span>
     }).<span class="ident">collect</span>()
@@ -640,11 +651,11 @@
 
 <span class="doccomment">/// Compute the CRT representation of x with respect to the factorization of q.</span>
 <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">crt_factor</span>(<span class="ident">x</span>: <span class="ident">u128</span>, <span class="ident">q</span>: <span class="ident">u128</span>) <span class="op">-&gt;</span> <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u16</span><span class="op">&gt;</span> {
-    <span class="ident">crt</span>(<span class="kw-2">&amp;</span><span class="ident">factor</span>(<span class="ident">q</span>), <span class="ident">x</span>)
+    <span class="ident">crt</span>(<span class="ident">x</span>, <span class="kw-2">&amp;</span><span class="ident">factor</span>(<span class="ident">q</span>))
 }
 
 <span class="doccomment">/// Compute the value x given a list of CRT primes and residues.</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">crt_inv</span>(<span class="ident">ps</span>: <span class="kw-2">&amp;</span>[<span class="ident">u16</span>], <span class="ident">xs</span>: <span class="kw-2">&amp;</span>[<span class="ident">u16</span>]) <span class="op">-&gt;</span> <span class="ident">u128</span> {
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">crt_inv</span>(<span class="ident">xs</span>: <span class="kw-2">&amp;</span>[<span class="ident">u16</span>], <span class="ident">ps</span>: <span class="kw-2">&amp;</span>[<span class="ident">u16</span>]) <span class="op">-&gt;</span> <span class="ident">u128</span> {
     <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">ret</span> <span class="op">=</span> <span class="ident">BigInt</span>::<span class="ident">zero</span>();
     <span class="kw">let</span> <span class="ident">M</span> <span class="op">=</span> <span class="ident">ps</span>.<span class="ident">iter</span>().<span class="ident">fold</span>(<span class="ident">BigInt</span>::<span class="ident">one</span>(), <span class="op">|</span><span class="ident">acc</span>, <span class="kw-2">&amp;</span><span class="ident">x</span><span class="op">|</span> <span class="ident">BigInt</span>::<span class="ident">from</span>(<span class="ident">x</span>) <span class="op">*</span> <span class="ident">acc</span> );
     <span class="kw">for</span> (<span class="kw-2">&amp;</span><span class="ident">p</span>, <span class="kw-2">&amp;</span><span class="ident">a</span>) <span class="kw">in</span> <span class="ident">ps</span>.<span class="ident">iter</span>().<span class="ident">zip</span>(<span class="ident">xs</span>.<span class="ident">iter</span>()) {
@@ -658,7 +669,7 @@
 
 <span class="doccomment">/// Compute the value x given a composite CRT modulus.</span>
 <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">crt_inv_factor</span>(<span class="ident">xs</span>: <span class="kw-2">&amp;</span>[<span class="ident">u16</span>], <span class="ident">q</span>: <span class="ident">u128</span>) <span class="op">-&gt;</span> <span class="ident">u128</span> {
-    <span class="ident">crt_inv</span>(<span class="kw-2">&amp;</span><span class="ident">factor</span>(<span class="ident">q</span>), <span class="ident">xs</span>)
+    <span class="ident">crt_inv</span>(<span class="ident">xs</span>, <span class="kw-2">&amp;</span><span class="ident">factor</span>(<span class="ident">q</span>))
 }
 
 <span class="doccomment">/// Generic algorithm to invert inp_a mod inp_b. As ref so as to support BigInts without</span>
@@ -721,19 +732,30 @@
     <span class="ident">base_modulus_with_width</span>(<span class="ident">n</span>, <span class="kw-2">&amp;</span><span class="ident">PRIMES</span>)
 }
 
+<span class="doccomment">/// Generate the factors of a CRT modulus that support at least n-bit integers, using the</span>
+<span class="doccomment">/// built-in PRIMES.</span>
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">primes_with_width</span>(<span class="ident">n</span>: <span class="ident">u32</span>) <span class="op">-&gt;</span> <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u16</span><span class="op">&gt;</span> {
+    <span class="ident">base_primes_with_width</span>(<span class="ident">n</span>, <span class="kw-2">&amp;</span><span class="ident">PRIMES</span>)
+}
+
 <span class="doccomment">/// Generate a CRT modulus that support at least n-bit integers, using provided primes.</span>
 <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">base_modulus_with_width</span>(<span class="ident">nbits</span>: <span class="ident">u32</span>, <span class="ident">primes</span>: <span class="kw-2">&amp;</span>[<span class="ident">u16</span>]) <span class="op">-&gt;</span> <span class="ident">u128</span> {
+    <span class="ident">product</span>(<span class="kw-2">&amp;</span><span class="ident">base_primes_with_width</span>(<span class="ident">nbits</span>, <span class="ident">primes</span>))
+}
+
+<span class="doccomment">/// Generate the factors of a CRT modulus that support at least n-bit integers, using provided primes.</span>
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">base_primes_with_width</span>(<span class="ident">nbits</span>: <span class="ident">u32</span>, <span class="ident">primes</span>: <span class="kw-2">&amp;</span>[<span class="ident">u16</span>]) <span class="op">-&gt;</span> <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u16</span><span class="op">&gt;</span> {
     <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">res</span> <span class="op">=</span> <span class="number">1</span>;
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">i</span> <span class="op">=</span> <span class="number">0</span>;
-    <span class="kw">loop</span> {
-        <span class="ident">res</span> <span class="op">*=</span> <span class="ident">u128</span>::<span class="ident">from</span>(<span class="ident">primes</span>[<span class="ident">i</span>]);
+    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">ps</span> <span class="op">=</span> <span class="ident">Vec</span>::<span class="ident">new</span>();
+    <span class="kw">for</span> <span class="kw-2">&amp;</span><span class="ident">p</span> <span class="kw">in</span> <span class="ident">primes</span>.<span class="ident">iter</span>() {
+        <span class="ident">res</span> <span class="op">*=</span> <span class="ident">u128</span>::<span class="ident">from</span>(<span class="ident">p</span>);
+        <span class="ident">ps</span>.<span class="ident">push</span>(<span class="ident">p</span>);
         <span class="kw">if</span> (<span class="ident">res</span> <span class="op">&gt;&gt;</span> <span class="ident">nbits</span>) <span class="op">&gt;</span> <span class="number">0</span> {
-            <span class="kw">break</span>;
+            <span class="kw">break</span>
         }
-        <span class="ident">i</span> <span class="op">+=</span> <span class="number">1</span>;
-        <span class="macro">debug_assert</span><span class="macro">!</span>(<span class="ident">i</span> <span class="op">&lt;</span> <span class="ident">primes</span>.<span class="ident">len</span>());
     }
-    <span class="ident">res</span>
+    <span class="macro">assert</span><span class="macro">!</span>((<span class="ident">res</span> <span class="op">&gt;&gt;</span> <span class="ident">nbits</span>) <span class="op">&gt;</span> <span class="number">0</span>, <span class="string">&quot;not enough primes!&quot;</span>);
+    <span class="ident">ps</span>
 }
 
 <span class="doccomment">/// Generate a CRT modulus that support at least n-bit integers, using the built-in</span>
@@ -840,7 +862,7 @@
 
         <span class="kw">for</span> <span class="kw">_</span> <span class="kw">in</span> <span class="number">0</span>..<span class="number">128</span> {
             <span class="kw">let</span> <span class="ident">x</span> <span class="op">=</span> <span class="ident">rng</span>.<span class="ident">gen_u128</span>() <span class="op">%</span> <span class="ident">modulus</span>;
-            <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">crt_inv</span>(<span class="ident">ps</span>, <span class="kw-2">&amp;</span><span class="ident">crt</span>(<span class="ident">ps</span>, <span class="ident">x</span>)), <span class="ident">x</span>);
+            <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">crt_inv</span>(<span class="kw-2">&amp;</span><span class="ident">crt</span>(<span class="ident">x</span>, <span class="ident">ps</span>), <span class="ident">ps</span>), <span class="ident">x</span>);
         }
     }
 

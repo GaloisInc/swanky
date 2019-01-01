@@ -177,7 +177,7 @@ pub fn factor(inp: u128) -> Vec<u16> {
 }
 
 /// Compute the CRT representation of x with respect to the primes ps.
-pub fn crt(ps: &[u16], x: u128) -> Vec<u16> {
+pub fn crt(x: u128, ps: &[u16]) -> Vec<u16> {
     ps.iter().map(|&p| {
         (x % p as u128) as u16
     }).collect()
@@ -185,11 +185,11 @@ pub fn crt(ps: &[u16], x: u128) -> Vec<u16> {
 
 /// Compute the CRT representation of x with respect to the factorization of q.
 pub fn crt_factor(x: u128, q: u128) -> Vec<u16> {
-    crt(&factor(q), x)
+    crt(x, &factor(q))
 }
 
 /// Compute the value x given a list of CRT primes and residues.
-pub fn crt_inv(ps: &[u16], xs: &[u16]) -> u128 {
+pub fn crt_inv(xs: &[u16], ps: &[u16]) -> u128 {
     let mut ret = BigInt::zero();
     let M = ps.iter().fold(BigInt::one(), |acc, &x| BigInt::from(x) * acc );
     for (&p, &a) in ps.iter().zip(xs.iter()) {
@@ -203,7 +203,7 @@ pub fn crt_inv(ps: &[u16], xs: &[u16]) -> u128 {
 
 /// Compute the value x given a composite CRT modulus.
 pub fn crt_inv_factor(xs: &[u16], q: u128) -> u128 {
-    crt_inv(&factor(q), xs)
+    crt_inv(xs, &factor(q))
 }
 
 /// Generic algorithm to invert inp_a mod inp_b. As ref so as to support BigInts without
@@ -266,19 +266,30 @@ pub fn modulus_with_width(n: u32) -> u128 {
     base_modulus_with_width(n, &PRIMES)
 }
 
+/// Generate the factors of a CRT modulus that support at least n-bit integers, using the
+/// built-in PRIMES.
+pub fn primes_with_width(n: u32) -> Vec<u16> {
+    base_primes_with_width(n, &PRIMES)
+}
+
 /// Generate a CRT modulus that support at least n-bit integers, using provided primes.
 pub fn base_modulus_with_width(nbits: u32, primes: &[u16]) -> u128 {
+    product(&base_primes_with_width(nbits, primes))
+}
+
+/// Generate the factors of a CRT modulus that support at least n-bit integers, using provided primes.
+pub fn base_primes_with_width(nbits: u32, primes: &[u16]) -> Vec<u16> {
     let mut res = 1;
-    let mut i = 0;
-    loop {
-        res *= u128::from(primes[i]);
+    let mut ps = Vec::new();
+    for &p in primes.iter() {
+        res *= u128::from(p);
+        ps.push(p);
         if (res >> nbits) > 0 {
-            break;
+            break
         }
-        i += 1;
-        debug_assert!(i < primes.len());
     }
-    res
+    assert!((res >> nbits) > 0, "not enough primes!");
+    ps
 }
 
 /// Generate a CRT modulus that support at least n-bit integers, using the built-in
@@ -385,7 +396,7 @@ mod tests {
 
         for _ in 0..128 {
             let x = rng.gen_u128() % modulus;
-            assert_eq!(crt_inv(ps, &crt(ps, x)), x);
+            assert_eq!(crt_inv(&crt(x, ps), ps), x);
         }
     }
 

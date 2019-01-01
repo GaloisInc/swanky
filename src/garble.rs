@@ -128,6 +128,10 @@ impl <'a> Fancy for Garbler<'a> {
     }
     //}}}
     fn mul(&mut self, A: &Wire, B: &Wire) -> Wire { // {{{
+        if A.modulus() < A.modulus() {
+            return self.mul(B,A);
+        }
+
         let q = A.modulus();
         let qb = B.modulus();
         let gate_num = self.current_gate();
@@ -521,6 +525,10 @@ impl <'a> Fancy for Evaluator<'a> {
     }
     //}}}
     fn mul(&mut self, A: &Wire, B: &Wire) -> Wire { //{{{
+        if A.modulus() < A.modulus() {
+            return self.mul(B,A);
+        }
+
         let gate = match self.recv() {
             Message::GarbledGate(g) => g,
             m => panic!("Expected message GarbledGate but got {}", m),

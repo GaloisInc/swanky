@@ -456,6 +456,10 @@
 <span id="456">456</span>
 <span id="457">457</span>
 <span id="458">458</span>
+<span id="459">459</span>
+<span id="460">460</span>
+<span id="461">461</span>
+<span id="462">462</span>
 </pre><pre class="rust ">
 <span class="doccomment">//! Low-level operations on wirelabels, the basic building block of garbled circuits.</span>
 
@@ -470,6 +474,10 @@
     <span class="ident">Mod2</span> { <span class="ident">val</span>: <span class="ident">u128</span> },
     <span class="comment">// Mod7 { ds: [u8;45] },</span>
     <span class="ident">ModN</span> { <span class="ident">q</span>: <span class="ident">u16</span>, <span class="ident">ds</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u16</span><span class="op">&gt;</span> },
+}
+
+<span class="kw">impl</span> <span class="ident">Default</span> <span class="kw">for</span> <span class="ident">Wire</span> {
+    <span class="kw">fn</span> <span class="ident">default</span>() <span class="op">-&gt;</span> <span class="ident">Wire</span> { <span class="ident">Wire</span>::<span class="ident">Mod2</span> { <span class="ident">val</span>: <span class="number">0</span> } }
 }
 
 <span class="kw">impl</span> <span class="ident">HasModulus</span> <span class="kw">for</span> <span class="ident">Wire</span> {
