@@ -2,7 +2,7 @@ use std::time::Duration;
 use criterion::{criterion_main, criterion_group, Criterion};
 use fancy_garbling::util::RngExt;
 use fancy_garbling::garble::garble;
-use fancy_garbling::circuit::{Builder, Circuit};
+use fancy_garbling::circuit::{CircuitBuilder, Circuit};
 use fancy_garbling::fancy::Fancy;
 
 use itertools::Itertools;
@@ -42,7 +42,7 @@ fn bench_eval<F:'static>(c: &mut Criterion, name: &str, make_circuit: F, q: u16)
 }
 
 fn proj(q: u16) -> Circuit {
-    let mut b = Builder::new();
+    let mut b = CircuitBuilder::new();
     let x = b.garbler_input(q);
     let tab = (0..q).map(|i| (i + 1) % q).collect_vec();
     let z = b.proj(&x, q, &tab);
@@ -51,7 +51,7 @@ fn proj(q: u16) -> Circuit {
 }
 
 fn half_gate(q: u16) -> Circuit {
-    let mut b = Builder::new();
+    let mut b = CircuitBuilder::new();
     let x = b.garbler_input(q);
     let y = b.garbler_input(q);
     let z = b.mul(&x,&y);
