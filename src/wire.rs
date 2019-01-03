@@ -26,57 +26,6 @@ impl HasModulus for Wire {
     }
 }
 
-// impl std::fmt::Debug for Wire {
-//     fn fmt(&self, f: &mut std::fmt::Formatter) -> Result<(), std::fmt::Error> {
-//         f.write_str("Wire ");
-//         match self {
-//             Wire::Mod2 { val } => write!(f, "[2] {:0128b}", val),
-//             Wire::Mod7 { ds } => {
-//                 f.write_str("[7] ");
-//                 for d in ds.iter() {
-//                     write!(f, "{}", d);
-//                 }
-//             }
-//             Wire::ModN { q, ds } => {
-//                 write!(f, "[{}] ", q);
-//                 for d in ds.iter() {
-//                     write!(f, "{}", d);
-//                 }
-//             }
-//         }
-//     }
-// }
-
-// impl std::cmp::PartialEq for Wire {
-//     fn eq(&self, other: &Wire) -> bool {
-//         match self {
-//             Wire::Mod2 { val } => {
-//                 if let Wire::Mod2 { val: other_val } = other {
-//                     val = other_val
-//                 } else {
-//                     false
-//                 }
-//             }
-
-//             Wire::Mod7 { ds } => {
-//                 if let Wire::Mod7 { ds: other_ds } = other {
-//                     ds.iter().zip(other_ds.iter()).all(|(x,y)| x == y)
-//                 } else {
-//                     false
-//                 }
-//             }
-
-//             Wire::ModN { q, ds } => {
-//                 if let Wire::ModN { q: other_q, ds: other_ds } = other {
-//                     q == other_q && ds.iter().zip(other_ds.iter()).all(|(x,y)| x == y)
-//                 } else {
-//                     false
-//                 }
-//             }
-//         }
-//     }
-// }
-
 impl Wire {
     pub fn digits(&self) -> Vec<u16> {
         match self {
@@ -102,7 +51,7 @@ impl Wire {
 
             // drop the digits we won't be able to pack back in again, especially if
             // they get multiplied
-            let ds = ds[..util::digits_per_u128(q)].to_vec();
+            ds.truncate(util::digits_per_u128(q));
             Wire::ModN { q, ds }
 
         } else {
