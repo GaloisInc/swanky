@@ -748,6 +748,35 @@ mod bundle {
         }
     }
     //}}}
+    #[test] // binary addition {{{
+    fn binary_addition() {
+        let mut rng = thread_rng();
+        let n = 2 + (rng.gen_usize() % 10);
+        let q = 2;
+        let Q = util::product(&vec![q;n]);
+        println!("n={} q={} Q={}", n, q, Q);
+
+        let mut b = CircuitBuilder::new();
+        let xs = b.garbler_input_bundle(&vec![q;n]);
+        let ys = b.evaluator_input_bundle(&vec![q;n]);
+        let (zs,carry) = b.binary_addition(&xs, &ys);
+        b.output(&carry);
+        b.output_bundle(&zs);
+        let c = b.finish();
+
+        for _ in 0..16 {
+            let x = rng.gen_u128() % Q;
+            let y = rng.gen_u128() % Q;
+            println!("x={} y={}", x, y);
+            let res_should_be = (x + y) % Q;
+            let carry_should_be = (x + y >= Q) as u16;
+
+            let res = c.eval(&util::u128_to_bits(x,n), &util::u128_to_bits(y,n));
+            assert_eq!(util::u128_from_bits(&res[1..]), res_should_be);
+            assert_eq!(res[0], carry_should_be);
+        }
+    }
+    //}}}
     #[test] // serialization {{{
     fn serialization() {
         let mut rng = thread_rng();

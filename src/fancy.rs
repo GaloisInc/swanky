@@ -26,6 +26,11 @@ impl <W: Clone + Default + HasModulus> Bundle<W> {
     pub fn wires(&self) -> &[W] {
         &self.0
     }
+
+    /// Get the number of wires in this bundle.
+    pub fn size(&self) -> usize {
+        self.0.len()
+    }
 }
 
 /// DSL for the basic computations supported by fancy-garbling.
@@ -78,7 +83,7 @@ pub trait Fancy {
         assert!(args.len() > 1);
         let mut z = args[0].clone();
         for x in args.iter().skip(1) {
-            z = self.add(&z,&x);
+            z = self.add(&z,x);
         }
         z
     }
@@ -131,6 +136,26 @@ pub trait Fancy {
         self.proj(x, to_modulus, &tab)
     }
 
+    /// Binary adder. Returns the result and the carry.
+    fn adder(&mut self, x: &Self::Item, y: &Self::Item, carry_in: Option<&Self::Item>)
+        -> (Self::Item, Self::Item)
+    {
+        assert!(x.modulus() == 2 && y.modulus() == 2);
+        if let Some(c) = carry_in {
+            let z1 = self.xor(x,y);
+            let z2 = self.xor(&z1,c);
+            let z3 = self.xor(x,c);
+            let z4 = self.and(&z1,&z3);
+            let carry = self.xor(&z4,x);
+            (z2, carry)
+        } else {
+            let z = self.xor(x,y);
+            let carry = self.and(x,y);
+            (z, carry)
+        }
+    }
+
+    /// Output a slice of wires.
     fn outputs(&mut self, xs: &[Self::Item]) {
         for x in xs.iter() {
             self.output(x);
@@ -453,6 +478,65 @@ pub trait BundleGadgets: Fancy {
             }).collect();
             Bundle(z)
         })
+    }
+
+    ////////////////////////////////////////////////////////////////////////////////
+    // other gadgets
+
+    /// Binary addition. Returns the result and the carry.
+    fn binary_addition(&mut self, xs: &Bundle<Self::Item>, ys: &Bundle<Self::Item>)
+        -> (Bundle<Self::Item>, Self::Item)
+    {
+        assert_eq!(xs.moduli(), ys.moduli());
+        let xwires = xs.wires();
+        let ywires = ys.wires();
+        let (mut z, mut c) = self.adder(&xwires[0], &ywires[0], None);
+        let mut bs = vec![z];
+        for i in 1..xwires.len() {
+            let res = self.adder(&xwires[i], &ywires[i], Some(&c));
+            z = res.0;
+            c = res.1;
+            bs.push(z);
+        }
+        (Bundle(bs), c)
+    }
+
+    /// Binary addition. Avoids creating extra gates for the final carry.
+    fn binary_addition_no_carry(&mut self, xs: &Bundle<Self::Item>, ys: &Bundle<Self::Item>)
+        -> Bundle<Self::Item>
+    {
+        assert_eq!(xs.moduli(), ys.moduli());
+        let xwires = xs.wires();
+        let ywires = ys.wires();
+        let (mut z, mut c) = self.adder(&xwires[0], &ywires[0], None);
+        let mut bs = vec![z];
+        for i in 1..xwires.len()-1 {
+            let res = self.adder(&xwires[i], &ywires[i], Some(&c));
+            z = res.0;
+            c = res.1;
+            bs.push(z);
+        }
+        z = self.add_many(&[xwires.last().unwrap().clone(), ywires.last().unwrap().clone(), c]);
+        bs.push(z);
+        Bundle(bs)
+    }
+
+    /// Compute the twos complement of the input bundle (which must be base 2).
+    fn twos_complement(&mut self, xs: &Bundle<Self::Item>) -> Bundle<Self::Item> {
+        let not_xs = xs.wires().iter().map(|x| self.negate(x)).collect_vec();
+        let zero = self.constant(0,2);
+        let mut const1 = vec![zero; xs.size()];
+        const1[0] = self.constant(1,2);
+        self.binary_addition_no_carry(&Bundle(not_xs), &Bundle(const1))
+    }
+
+    /// Subtract two binary bundles. Returns the result and whether it overflowed.
+    fn binary_subtraction(&mut self, xs: &Bundle<Self::Item>, ys: &Bundle<Self::Item>)
+        -> (Bundle<Self::Item>, Self::Item)
+    {
+        let neg_ys = self.twos_complement(&ys);
+        let (zs, c) = self.binary_addition(&xs, &neg_ys);
+        (zs, self.negate(&c))
     }
 }
 
