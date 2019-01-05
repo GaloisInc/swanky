@@ -31,6 +31,11 @@ impl <W: Clone + Default + HasModulus> Bundle<W> {
     pub fn size(&self) -> usize {
         self.0.len()
     }
+
+    /// Whether this bundle only contains residues in mod 2.
+    pub fn is_boolean(&self) -> bool {
+        self.moduli().iter().all(|m| *m == 2)
+    }
 }
 
 /// DSL for the basic computations supported by fancy-garbling.
@@ -152,6 +157,19 @@ pub trait Fancy {
             let z = self.xor(x,y);
             let carry = self.and(x,y);
             (z, carry)
+        }
+    }
+
+    /// If `x=0` return the constant `b1` else return `b2`. Folds constants if possible.
+    fn mux(&mut self, x: &Self::Item, b1: bool, b2: bool) -> Self::Item {
+        if !b1 && b2 {
+            x.clone()
+        } else if b1 && !b2 {
+            self.negate(x)
+        } else if !b1 && !b2 {
+            self.constant(0,2)
+        } else {
+            self.constant(1,2)
         }
     }
 
@@ -465,19 +483,24 @@ pub trait BundleGadgets: Fancy {
         self.exact_sign(&z)
     }
 
-    /// Compute the maximum bundle in `xs`.
+    /// Compute the maximum bundle in `xs`. Works on both CRT and boolean bundles.
     fn max(&mut self, xs: &[Bundle<Self::Item>]) -> Bundle<Self::Item> {
-        assert!(xs.len() > 1);
-        xs.iter().skip(1).fold(xs[0].clone(), |x,y| {
-            let pos = self.exact_lt(&x,y);
-            let neg = self.negate(&pos);
-            let z = x.wires().iter().zip(y.wires().iter()).map(|(x,y)| {
-                let xp = self.mul(x,&neg);
-                let yp = self.mul(y,&pos);
-                self.add(&xp,&yp)
-            }).collect();
-            Bundle(z)
-        })
+        if xs.iter().all(|bun| bun.is_boolean()) {
+            // TODO use subtract and compare msb
+            unimplemented!()
+        } else {
+            assert!(xs.len() > 1);
+            xs.iter().skip(1).fold(xs[0].clone(), |x,y| {
+                let pos = self.exact_lt(&x,y);
+                let neg = self.negate(&pos);
+                let z = x.wires().iter().zip(y.wires().iter()).map(|(x,y)| {
+                    let xp = self.mul(x,&neg);
+                    let yp = self.mul(y,&pos);
+                    self.add(&xp,&yp)
+                }).collect();
+                Bundle(z)
+            })
+        }
     }
 
     ////////////////////////////////////////////////////////////////////////////////
@@ -521,6 +544,13 @@ pub trait BundleGadgets: Fancy {
         Bundle(bs)
     }
 
+    /// Binary multiplication.
+    fn binary_multiplication(&mut self, xs: &Bundle<Self::Item>, ys: &Bundle<Self::Item>)
+        -> Bundle<Self::Item>
+    {
+        unimplemented!()
+    }
+
     /// Compute the twos complement of the input bundle (which must be base 2).
     fn twos_complement(&mut self, xs: &Bundle<Self::Item>) -> Bundle<Self::Item> {
         let not_xs = xs.wires().iter().map(|x| self.negate(x)).collect_vec();
@@ -537,6 +567,18 @@ pub trait BundleGadgets: Fancy {
         let neg_ys = self.twos_complement(&ys);
         let (zs, c) = self.binary_addition(&xs, &neg_ys);
         (zs, self.negate(&c))
+    }
+
+    /// If `x=0` return `c1` as a bundle of constant bits, else return `c2`.
+    fn multiplex_constant_bits(&mut self, x: &Self::Item, c1: u128, c2: u128, nbits: usize)
+        -> Bundle<Self::Item>
+    {
+        let c1_bs = util::u128_to_bits(c1, nbits).into_iter().map(|x:u16| x > 0).collect_vec();
+        let c2_bs = util::u128_to_bits(c2, nbits).into_iter().map(|x:u16| x > 0).collect_vec();
+        let ws = c1_bs.into_iter().zip(c2_bs.into_iter()).map(|(b1,b2)| {
+            self.mux(x,b1,b2)
+        }).collect();
+        Bundle(ws)
     }
 }
 
