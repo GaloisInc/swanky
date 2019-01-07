@@ -471,7 +471,163 @@
 <span id="471">471</span>
 <span id="472">472</span>
 <span id="473">473</span>
-</pre><pre class="rust ">
+<span id="474">474</span>
+<span id="475">475</span>
+<span id="476">476</span>
+<span id="477">477</span>
+<span id="478">478</span>
+<span id="479">479</span>
+<span id="480">480</span>
+<span id="481">481</span>
+<span id="482">482</span>
+<span id="483">483</span>
+<span id="484">484</span>
+<span id="485">485</span>
+<span id="486">486</span>
+<span id="487">487</span>
+<span id="488">488</span>
+<span id="489">489</span>
+<span id="490">490</span>
+<span id="491">491</span>
+<span id="492">492</span>
+<span id="493">493</span>
+<span id="494">494</span>
+<span id="495">495</span>
+<span id="496">496</span>
+<span id="497">497</span>
+<span id="498">498</span>
+<span id="499">499</span>
+<span id="500">500</span>
+<span id="501">501</span>
+<span id="502">502</span>
+<span id="503">503</span>
+<span id="504">504</span>
+<span id="505">505</span>
+<span id="506">506</span>
+<span id="507">507</span>
+<span id="508">508</span>
+<span id="509">509</span>
+<span id="510">510</span>
+<span id="511">511</span>
+<span id="512">512</span>
+<span id="513">513</span>
+<span id="514">514</span>
+<span id="515">515</span>
+<span id="516">516</span>
+<span id="517">517</span>
+<span id="518">518</span>
+<span id="519">519</span>
+<span id="520">520</span>
+<span id="521">521</span>
+<span id="522">522</span>
+<span id="523">523</span>
+<span id="524">524</span>
+<span id="525">525</span>
+<span id="526">526</span>
+<span id="527">527</span>
+<span id="528">528</span>
+<span id="529">529</span>
+<span id="530">530</span>
+<span id="531">531</span>
+<span id="532">532</span>
+<span id="533">533</span>
+<span id="534">534</span>
+<span id="535">535</span>
+<span id="536">536</span>
+<span id="537">537</span>
+<span id="538">538</span>
+<span id="539">539</span>
+<span id="540">540</span>
+<span id="541">541</span>
+<span id="542">542</span>
+<span id="543">543</span>
+<span id="544">544</span>
+<span id="545">545</span>
+<span id="546">546</span>
+<span id="547">547</span>
+<span id="548">548</span>
+<span id="549">549</span>
+<span id="550">550</span>
+<span id="551">551</span>
+<span id="552">552</span>
+<span id="553">553</span>
+<span id="554">554</span>
+<span id="555">555</span>
+<span id="556">556</span>
+<span id="557">557</span>
+<span id="558">558</span>
+<span id="559">559</span>
+<span id="560">560</span>
+<span id="561">561</span>
+<span id="562">562</span>
+<span id="563">563</span>
+<span id="564">564</span>
+<span id="565">565</span>
+<span id="566">566</span>
+<span id="567">567</span>
+<span id="568">568</span>
+<span id="569">569</span>
+<span id="570">570</span>
+<span id="571">571</span>
+<span id="572">572</span>
+<span id="573">573</span>
+<span id="574">574</span>
+<span id="575">575</span>
+<span id="576">576</span>
+<span id="577">577</span>
+<span id="578">578</span>
+<span id="579">579</span>
+<span id="580">580</span>
+<span id="581">581</span>
+<span id="582">582</span>
+<span id="583">583</span>
+<span id="584">584</span>
+<span id="585">585</span>
+<span id="586">586</span>
+<span id="587">587</span>
+<span id="588">588</span>
+<span id="589">589</span>
+<span id="590">590</span>
+<span id="591">591</span>
+<span id="592">592</span>
+<span id="593">593</span>
+<span id="594">594</span>
+<span id="595">595</span>
+<span id="596">596</span>
+<span id="597">597</span>
+<span id="598">598</span>
+<span id="599">599</span>
+<span id="600">600</span>
+<span id="601">601</span>
+<span id="602">602</span>
+<span id="603">603</span>
+<span id="604">604</span>
+<span id="605">605</span>
+<span id="606">606</span>
+<span id="607">607</span>
+<span id="608">608</span>
+<span id="609">609</span>
+<span id="610">610</span>
+<span id="611">611</span>
+<span id="612">612</span>
+<span id="613">613</span>
+<span id="614">614</span>
+<span id="615">615</span>
+<span id="616">616</span>
+<span id="617">617</span>
+<span id="618">618</span>
+<span id="619">619</span>
+<span id="620">620</span>
+<span id="621">621</span>
+<span id="622">622</span>
+<span id="623">623</span>
+<span id="624">624</span>
+<span id="625">625</span>
+<span id="626">626</span>
+<span id="627">627</span>
+<span id="628">628</span>
+<span id="629">629</span>
+</pre><div class="example-wrap"><pre class="rust ">
 <span class="doccomment">//! The `Fancy` trait represents the kinds of computations possible in `fancy-garbling`.</span>
 <span class="doccomment">//!</span>
 <span class="doccomment">//! An implementer must be able to create inputs, constants, do modular arithmetic, and</span>
@@ -486,6 +642,8 @@
     <span class="kw">fn</span> <span class="ident">modulus</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-&gt;</span> <span class="ident">u16</span>;
 }
 
+<span class="comment">// TODO: change to enum in order to sanity check the gadgets</span>
+<span class="comment">// enum Bundle { CRT(..), Boolean(..), MixedRadix(..) }</span>
 <span class="doccomment">/// A collection of wires, useful for the garbled gadgets defined by `BundleGadgets`.</span>
 <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Clone</span>, <span class="ident">Default</span>)]</span>
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Bundle</span><span class="op">&lt;</span><span class="ident">W</span>: <span class="ident">Clone</span> <span class="op">+</span> <span class="ident">Default</span> <span class="op">+</span> <span class="ident">HasModulus</span><span class="op">&gt;</span>(<span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">W</span><span class="op">&gt;</span>);
@@ -499,6 +657,16 @@
     <span class="doccomment">/// Extract the wires from this bundle.</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">wires</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-&gt;</span> <span class="kw-2">&amp;</span>[<span class="ident">W</span>] {
         <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="number">0</span>
+    }
+
+    <span class="doccomment">/// Get the number of wires in this bundle.</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">size</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-&gt;</span> <span class="ident">usize</span> {
+        <span class="self">self</span>.<span class="number">0</span>.<span class="ident">len</span>()
+    }
+
+    <span class="doccomment">/// Whether this bundle only contains residues in mod 2.</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">is_binary</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-&gt;</span> <span class="ident">bool</span> {
+        <span class="self">self</span>.<span class="ident">moduli</span>().<span class="ident">iter</span>().<span class="ident">all</span>(<span class="op">|</span><span class="ident">m</span><span class="op">|</span> <span class="kw-2">*</span><span class="ident">m</span> <span class="op">==</span> <span class="number">2</span>)
     }
 }
 
@@ -552,7 +720,7 @@
         <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">args</span>.<span class="ident">len</span>() <span class="op">&gt;</span> <span class="number">1</span>);
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">z</span> <span class="op">=</span> <span class="ident">args</span>[<span class="number">0</span>].<span class="ident">clone</span>();
         <span class="kw">for</span> <span class="ident">x</span> <span class="kw">in</span> <span class="ident">args</span>.<span class="ident">iter</span>().<span class="ident">skip</span>(<span class="number">1</span>) {
-            <span class="ident">z</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">add</span>(<span class="kw-2">&amp;</span><span class="ident">z</span>,<span class="kw-2">&amp;</span><span class="ident">x</span>);
+            <span class="ident">z</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">add</span>(<span class="kw-2">&amp;</span><span class="ident">z</span>,<span class="ident">x</span>);
         }
         <span class="ident">z</span>
     }
@@ -605,6 +773,39 @@
         <span class="self">self</span>.<span class="ident">proj</span>(<span class="ident">x</span>, <span class="ident">to_modulus</span>, <span class="kw-2">&amp;</span><span class="ident">tab</span>)
     }
 
+    <span class="doccomment">/// Binary adder. Returns the result and the carry.</span>
+    <span class="kw">fn</span> <span class="ident">adder</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">x</span>: <span class="kw-2">&amp;</span><span class="self">Self</span>::<span class="ident">Item</span>, <span class="ident">y</span>: <span class="kw-2">&amp;</span><span class="self">Self</span>::<span class="ident">Item</span>, <span class="ident">carry_in</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="self">Self</span>::<span class="ident">Item</span><span class="op">&gt;</span>)
+        <span class="op">-&gt;</span> (<span class="self">Self</span>::<span class="ident">Item</span>, <span class="self">Self</span>::<span class="ident">Item</span>)
+    {
+        <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">x</span>.<span class="ident">modulus</span>() <span class="op">==</span> <span class="number">2</span> <span class="op">&amp;&amp;</span> <span class="ident">y</span>.<span class="ident">modulus</span>() <span class="op">==</span> <span class="number">2</span>);
+        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">c</span>) <span class="op">=</span> <span class="ident">carry_in</span> {
+            <span class="kw">let</span> <span class="ident">z1</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">xor</span>(<span class="ident">x</span>,<span class="ident">y</span>);
+            <span class="kw">let</span> <span class="ident">z2</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">xor</span>(<span class="kw-2">&amp;</span><span class="ident">z1</span>,<span class="ident">c</span>);
+            <span class="kw">let</span> <span class="ident">z3</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">xor</span>(<span class="ident">x</span>,<span class="ident">c</span>);
+            <span class="kw">let</span> <span class="ident">z4</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">and</span>(<span class="kw-2">&amp;</span><span class="ident">z1</span>,<span class="kw-2">&amp;</span><span class="ident">z3</span>);
+            <span class="kw">let</span> <span class="ident">carry</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">xor</span>(<span class="kw-2">&amp;</span><span class="ident">z4</span>,<span class="ident">x</span>);
+            (<span class="ident">z2</span>, <span class="ident">carry</span>)
+        } <span class="kw">else</span> {
+            <span class="kw">let</span> <span class="ident">z</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">xor</span>(<span class="ident">x</span>,<span class="ident">y</span>);
+            <span class="kw">let</span> <span class="ident">carry</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">and</span>(<span class="ident">x</span>,<span class="ident">y</span>);
+            (<span class="ident">z</span>, <span class="ident">carry</span>)
+        }
+    }
+
+    <span class="doccomment">/// If `x=0` return the constant `b1` else return `b2`. Folds constants if possible.</span>
+    <span class="kw">fn</span> <span class="ident">mux</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">x</span>: <span class="kw-2">&amp;</span><span class="self">Self</span>::<span class="ident">Item</span>, <span class="ident">b1</span>: <span class="ident">bool</span>, <span class="ident">b2</span>: <span class="ident">bool</span>) <span class="op">-&gt;</span> <span class="self">Self</span>::<span class="ident">Item</span> {
+        <span class="kw">if</span> <span class="op">!</span><span class="ident">b1</span> <span class="op">&amp;&amp;</span> <span class="ident">b2</span> {
+            <span class="ident">x</span>.<span class="ident">clone</span>()
+        } <span class="kw">else</span> <span class="kw">if</span> <span class="ident">b1</span> <span class="op">&amp;&amp;</span> <span class="op">!</span><span class="ident">b2</span> {
+            <span class="self">self</span>.<span class="ident">negate</span>(<span class="ident">x</span>)
+        } <span class="kw">else</span> <span class="kw">if</span> <span class="op">!</span><span class="ident">b1</span> <span class="op">&amp;&amp;</span> <span class="op">!</span><span class="ident">b2</span> {
+            <span class="self">self</span>.<span class="ident">constant</span>(<span class="number">0</span>,<span class="number">2</span>)
+        } <span class="kw">else</span> {
+            <span class="self">self</span>.<span class="ident">constant</span>(<span class="number">1</span>,<span class="number">2</span>)
+        }
+    }
+
+    <span class="doccomment">/// Output a slice of wires.</span>
     <span class="kw">fn</span> <span class="ident">outputs</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">xs</span>: <span class="kw-2">&amp;</span>[<span class="self">Self</span>::<span class="ident">Item</span>]) {
         <span class="kw">for</span> <span class="ident">x</span> <span class="kw">in</span> <span class="ident">xs</span>.<span class="ident">iter</span>() {
             <span class="self">self</span>.<span class="ident">output</span>(<span class="ident">x</span>);
@@ -908,13 +1109,18 @@
         <span class="self">self</span>.<span class="ident">sgn</span>(<span class="ident">x</span>, <span class="kw-2">&amp;</span><span class="ident">exact_ms</span>(<span class="ident">x</span>))
     }
 
-    <span class="doccomment">/// Returns 1 if `x &lt; y`</span>
+    <span class="doccomment">/// Returns 1 if `x &lt; y`. Works on both CRT and binary bundles.</span>
     <span class="kw">fn</span> <span class="ident">exact_lt</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">x</span>: <span class="kw-2">&amp;</span><span class="ident">Bundle</span><span class="op">&lt;</span><span class="self">Self</span>::<span class="ident">Item</span><span class="op">&gt;</span>, <span class="ident">y</span>: <span class="kw-2">&amp;</span><span class="ident">Bundle</span><span class="op">&lt;</span><span class="self">Self</span>::<span class="ident">Item</span><span class="op">&gt;</span>) <span class="op">-&gt;</span> <span class="self">Self</span>::<span class="ident">Item</span> {
-        <span class="kw">let</span> <span class="ident">z</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">sub_bundles</span>(<span class="ident">x</span>,<span class="ident">y</span>);
-        <span class="self">self</span>.<span class="ident">exact_sign</span>(<span class="kw-2">&amp;</span><span class="ident">z</span>)
+        <span class="kw">if</span> <span class="ident">x</span>.<span class="ident">is_binary</span>() {
+            <span class="kw">let</span> (<span class="kw">_</span>,<span class="ident">z</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">binary_subtraction</span>(<span class="ident">x</span>,<span class="ident">y</span>);
+            <span class="ident">z</span>
+        } <span class="kw">else</span> {
+            <span class="kw">let</span> <span class="ident">z</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">sub_bundles</span>(<span class="ident">x</span>,<span class="ident">y</span>);
+            <span class="self">self</span>.<span class="ident">exact_sign</span>(<span class="kw-2">&amp;</span><span class="ident">z</span>)
+        }
     }
 
-    <span class="doccomment">/// Compute the maximum bundle in `xs`.</span>
+    <span class="doccomment">/// Compute the maximum bundle in `xs`. Works on both CRT and binary bundles.</span>
     <span class="kw">fn</span> <span class="ident">max</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">xs</span>: <span class="kw-2">&amp;</span>[<span class="ident">Bundle</span><span class="op">&lt;</span><span class="self">Self</span>::<span class="ident">Item</span><span class="op">&gt;</span>]) <span class="op">-&gt;</span> <span class="ident">Bundle</span><span class="op">&lt;</span><span class="self">Self</span>::<span class="ident">Item</span><span class="op">&gt;</span> {
         <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">xs</span>.<span class="ident">len</span>() <span class="op">&gt;</span> <span class="number">1</span>);
         <span class="ident">xs</span>.<span class="ident">iter</span>().<span class="ident">skip</span>(<span class="number">1</span>).<span class="ident">fold</span>(<span class="ident">xs</span>[<span class="number">0</span>].<span class="ident">clone</span>(), <span class="op">|</span><span class="ident">x</span>,<span class="ident">y</span><span class="op">|</span> {
@@ -926,6 +1132,112 @@
                 <span class="self">self</span>.<span class="ident">add</span>(<span class="kw-2">&amp;</span><span class="ident">xp</span>,<span class="kw-2">&amp;</span><span class="ident">yp</span>)
             }).<span class="ident">collect</span>();
             <span class="ident">Bundle</span>(<span class="ident">z</span>)
+        })
+    }
+
+    <span class="comment">////////////////////////////////////////////////////////////////////////////////</span>
+    <span class="comment">// other gadgets</span>
+
+    <span class="doccomment">/// Binary addition. Returns the result and the carry.</span>
+    <span class="kw">fn</span> <span class="ident">binary_addition</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">xs</span>: <span class="kw-2">&amp;</span><span class="ident">Bundle</span><span class="op">&lt;</span><span class="self">Self</span>::<span class="ident">Item</span><span class="op">&gt;</span>, <span class="ident">ys</span>: <span class="kw-2">&amp;</span><span class="ident">Bundle</span><span class="op">&lt;</span><span class="self">Self</span>::<span class="ident">Item</span><span class="op">&gt;</span>)
+        <span class="op">-&gt;</span> (<span class="ident">Bundle</span><span class="op">&lt;</span><span class="self">Self</span>::<span class="ident">Item</span><span class="op">&gt;</span>, <span class="self">Self</span>::<span class="ident">Item</span>)
+    {
+        <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">xs</span>.<span class="ident">moduli</span>(), <span class="ident">ys</span>.<span class="ident">moduli</span>());
+        <span class="kw">let</span> <span class="ident">xwires</span> <span class="op">=</span> <span class="ident">xs</span>.<span class="ident">wires</span>();
+        <span class="kw">let</span> <span class="ident">ywires</span> <span class="op">=</span> <span class="ident">ys</span>.<span class="ident">wires</span>();
+        <span class="kw">let</span> (<span class="kw-2">mut</span> <span class="ident">z</span>, <span class="kw-2">mut</span> <span class="ident">c</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">adder</span>(<span class="kw-2">&amp;</span><span class="ident">xwires</span>[<span class="number">0</span>], <span class="kw-2">&amp;</span><span class="ident">ywires</span>[<span class="number">0</span>], <span class="prelude-val">None</span>);
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">bs</span> <span class="op">=</span> <span class="macro">vec</span><span class="macro">!</span>[<span class="ident">z</span>];
+        <span class="kw">for</span> <span class="ident">i</span> <span class="kw">in</span> <span class="number">1</span>..<span class="ident">xwires</span>.<span class="ident">len</span>() {
+            <span class="kw">let</span> <span class="ident">res</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">adder</span>(<span class="kw-2">&amp;</span><span class="ident">xwires</span>[<span class="ident">i</span>], <span class="kw-2">&amp;</span><span class="ident">ywires</span>[<span class="ident">i</span>], <span class="prelude-val">Some</span>(<span class="kw-2">&amp;</span><span class="ident">c</span>));
+            <span class="ident">z</span> <span class="op">=</span> <span class="ident">res</span>.<span class="number">0</span>;
+            <span class="ident">c</span> <span class="op">=</span> <span class="ident">res</span>.<span class="number">1</span>;
+            <span class="ident">bs</span>.<span class="ident">push</span>(<span class="ident">z</span>);
+        }
+        (<span class="ident">Bundle</span>(<span class="ident">bs</span>), <span class="ident">c</span>)
+    }
+
+    <span class="doccomment">/// Binary addition. Avoids creating extra gates for the final carry.</span>
+    <span class="kw">fn</span> <span class="ident">binary_addition_no_carry</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">xs</span>: <span class="kw-2">&amp;</span><span class="ident">Bundle</span><span class="op">&lt;</span><span class="self">Self</span>::<span class="ident">Item</span><span class="op">&gt;</span>, <span class="ident">ys</span>: <span class="kw-2">&amp;</span><span class="ident">Bundle</span><span class="op">&lt;</span><span class="self">Self</span>::<span class="ident">Item</span><span class="op">&gt;</span>)
+        <span class="op">-&gt;</span> <span class="ident">Bundle</span><span class="op">&lt;</span><span class="self">Self</span>::<span class="ident">Item</span><span class="op">&gt;</span>
+    {
+        <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">xs</span>.<span class="ident">moduli</span>(), <span class="ident">ys</span>.<span class="ident">moduli</span>());
+        <span class="kw">let</span> <span class="ident">xwires</span> <span class="op">=</span> <span class="ident">xs</span>.<span class="ident">wires</span>();
+        <span class="kw">let</span> <span class="ident">ywires</span> <span class="op">=</span> <span class="ident">ys</span>.<span class="ident">wires</span>();
+        <span class="kw">let</span> (<span class="kw-2">mut</span> <span class="ident">z</span>, <span class="kw-2">mut</span> <span class="ident">c</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">adder</span>(<span class="kw-2">&amp;</span><span class="ident">xwires</span>[<span class="number">0</span>], <span class="kw-2">&amp;</span><span class="ident">ywires</span>[<span class="number">0</span>], <span class="prelude-val">None</span>);
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">bs</span> <span class="op">=</span> <span class="macro">vec</span><span class="macro">!</span>[<span class="ident">z</span>];
+        <span class="kw">for</span> <span class="ident">i</span> <span class="kw">in</span> <span class="number">1</span>..<span class="ident">xwires</span>.<span class="ident">len</span>()<span class="op">-</span><span class="number">1</span> {
+            <span class="kw">let</span> <span class="ident">res</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">adder</span>(<span class="kw-2">&amp;</span><span class="ident">xwires</span>[<span class="ident">i</span>], <span class="kw-2">&amp;</span><span class="ident">ywires</span>[<span class="ident">i</span>], <span class="prelude-val">Some</span>(<span class="kw-2">&amp;</span><span class="ident">c</span>));
+            <span class="ident">z</span> <span class="op">=</span> <span class="ident">res</span>.<span class="number">0</span>;
+            <span class="ident">c</span> <span class="op">=</span> <span class="ident">res</span>.<span class="number">1</span>;
+            <span class="ident">bs</span>.<span class="ident">push</span>(<span class="ident">z</span>);
+        }
+        <span class="ident">z</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">add_many</span>(<span class="kw-2">&amp;</span>[<span class="ident">xwires</span>.<span class="ident">last</span>().<span class="ident">unwrap</span>().<span class="ident">clone</span>(), <span class="ident">ywires</span>.<span class="ident">last</span>().<span class="ident">unwrap</span>().<span class="ident">clone</span>(), <span class="ident">c</span>]);
+        <span class="ident">bs</span>.<span class="ident">push</span>(<span class="ident">z</span>);
+        <span class="ident">Bundle</span>(<span class="ident">bs</span>)
+    }
+
+    <span class="comment">// /// Binary multiplication.</span>
+    <span class="comment">// fn binary_multiplication(&amp;mut self, xs: &amp;Bundle&lt;Self::Item&gt;, ys: &amp;Bundle&lt;Self::Item&gt;)</span>
+    <span class="comment">//     -&gt; Bundle&lt;Self::Item&gt;</span>
+    <span class="comment">// {</span>
+    <span class="comment">//     unimplemented!()</span>
+    <span class="comment">// }</span>
+
+    <span class="doccomment">/// Compute the twos complement of the input bundle (which must be base 2).</span>
+    <span class="kw">fn</span> <span class="ident">twos_complement</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">xs</span>: <span class="kw-2">&amp;</span><span class="ident">Bundle</span><span class="op">&lt;</span><span class="self">Self</span>::<span class="ident">Item</span><span class="op">&gt;</span>) <span class="op">-&gt;</span> <span class="ident">Bundle</span><span class="op">&lt;</span><span class="self">Self</span>::<span class="ident">Item</span><span class="op">&gt;</span> {
+        <span class="kw">let</span> <span class="ident">not_xs</span> <span class="op">=</span> <span class="ident">xs</span>.<span class="ident">wires</span>().<span class="ident">iter</span>().<span class="ident">map</span>(<span class="op">|</span><span class="ident">x</span><span class="op">|</span> <span class="self">self</span>.<span class="ident">negate</span>(<span class="ident">x</span>)).<span class="ident">collect_vec</span>();
+        <span class="kw">let</span> <span class="ident">zero</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">constant</span>(<span class="number">0</span>,<span class="number">2</span>);
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">const1</span> <span class="op">=</span> <span class="macro">vec</span><span class="macro">!</span>[<span class="ident">zero</span>; <span class="ident">xs</span>.<span class="ident">size</span>()];
+        <span class="ident">const1</span>[<span class="number">0</span>] <span class="op">=</span> <span class="self">self</span>.<span class="ident">constant</span>(<span class="number">1</span>,<span class="number">2</span>);
+        <span class="self">self</span>.<span class="ident">binary_addition_no_carry</span>(<span class="kw-2">&amp;</span><span class="ident">Bundle</span>(<span class="ident">not_xs</span>), <span class="kw-2">&amp;</span><span class="ident">Bundle</span>(<span class="ident">const1</span>))
+    }
+
+    <span class="doccomment">/// Subtract two binary bundles. Returns the result and whether it overflowed.</span>
+    <span class="kw">fn</span> <span class="ident">binary_subtraction</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">xs</span>: <span class="kw-2">&amp;</span><span class="ident">Bundle</span><span class="op">&lt;</span><span class="self">Self</span>::<span class="ident">Item</span><span class="op">&gt;</span>, <span class="ident">ys</span>: <span class="kw-2">&amp;</span><span class="ident">Bundle</span><span class="op">&lt;</span><span class="self">Self</span>::<span class="ident">Item</span><span class="op">&gt;</span>)
+        <span class="op">-&gt;</span> (<span class="ident">Bundle</span><span class="op">&lt;</span><span class="self">Self</span>::<span class="ident">Item</span><span class="op">&gt;</span>, <span class="self">Self</span>::<span class="ident">Item</span>)
+    {
+        <span class="kw">let</span> <span class="ident">neg_ys</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">twos_complement</span>(<span class="kw-2">&amp;</span><span class="ident">ys</span>);
+        <span class="kw">let</span> (<span class="ident">zs</span>, <span class="ident">c</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">binary_addition</span>(<span class="kw-2">&amp;</span><span class="ident">xs</span>, <span class="kw-2">&amp;</span><span class="ident">neg_ys</span>);
+        (<span class="ident">zs</span>, <span class="self">self</span>.<span class="ident">negate</span>(<span class="kw-2">&amp;</span><span class="ident">c</span>))
+    }
+
+    <span class="doccomment">/// If `x=0` return `c1` as a bundle of constant bits, else return `c2`.</span>
+    <span class="kw">fn</span> <span class="ident">multiplex_constant_bits</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">x</span>: <span class="kw-2">&amp;</span><span class="self">Self</span>::<span class="ident">Item</span>, <span class="ident">c1</span>: <span class="ident">u128</span>, <span class="ident">c2</span>: <span class="ident">u128</span>, <span class="ident">nbits</span>: <span class="ident">usize</span>)
+        <span class="op">-&gt;</span> <span class="ident">Bundle</span><span class="op">&lt;</span><span class="self">Self</span>::<span class="ident">Item</span><span class="op">&gt;</span>
+    {
+        <span class="kw">let</span> <span class="ident">c1_bs</span> <span class="op">=</span> <span class="ident">util</span>::<span class="ident">u128_to_bits</span>(<span class="ident">c1</span>, <span class="ident">nbits</span>).<span class="ident">into_iter</span>().<span class="ident">map</span>(<span class="op">|</span><span class="ident">x</span>:<span class="ident">u16</span><span class="op">|</span> <span class="ident">x</span> <span class="op">&gt;</span> <span class="number">0</span>).<span class="ident">collect_vec</span>();
+        <span class="kw">let</span> <span class="ident">c2_bs</span> <span class="op">=</span> <span class="ident">util</span>::<span class="ident">u128_to_bits</span>(<span class="ident">c2</span>, <span class="ident">nbits</span>).<span class="ident">into_iter</span>().<span class="ident">map</span>(<span class="op">|</span><span class="ident">x</span>:<span class="ident">u16</span><span class="op">|</span> <span class="ident">x</span> <span class="op">&gt;</span> <span class="number">0</span>).<span class="ident">collect_vec</span>();
+        <span class="kw">let</span> <span class="ident">ws</span> <span class="op">=</span> <span class="ident">c1_bs</span>.<span class="ident">into_iter</span>().<span class="ident">zip</span>(<span class="ident">c2_bs</span>.<span class="ident">into_iter</span>()).<span class="ident">map</span>(<span class="op">|</span>(<span class="ident">b1</span>,<span class="ident">b2</span>)<span class="op">|</span> {
+            <span class="self">self</span>.<span class="ident">mux</span>(<span class="ident">x</span>,<span class="ident">b1</span>,<span class="ident">b2</span>)
+        }).<span class="ident">collect</span>();
+        <span class="ident">Bundle</span>(<span class="ident">ws</span>)
+    }
+
+    <span class="doccomment">/// Shift residues, replacing them with zeros in the modulus of the last residue.</span>
+    <span class="kw">fn</span> <span class="ident">shift</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">x</span>: <span class="kw-2">&amp;</span><span class="ident">Bundle</span><span class="op">&lt;</span><span class="self">Self</span>::<span class="ident">Item</span><span class="op">&gt;</span>, <span class="ident">n</span>: <span class="ident">usize</span>) <span class="op">-&gt;</span> <span class="ident">Bundle</span><span class="op">&lt;</span><span class="self">Self</span>::<span class="ident">Item</span><span class="op">&gt;</span> {
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">ws</span> <span class="op">=</span> <span class="ident">x</span>.<span class="ident">wires</span>().<span class="ident">to_vec</span>();
+        <span class="kw">let</span> <span class="ident">zero</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">constant</span>(<span class="number">0</span>, <span class="ident">ws</span>.<span class="ident">last</span>().<span class="ident">unwrap</span>().<span class="ident">modulus</span>());
+        <span class="kw">for</span> <span class="kw">_</span> <span class="kw">in</span> <span class="number">0</span>..<span class="ident">n</span> {
+            <span class="ident">ws</span>.<span class="ident">pop</span>();
+            <span class="ident">ws</span>.<span class="ident">insert</span>(<span class="number">0</span>, <span class="ident">zero</span>.<span class="ident">clone</span>());
+        }
+        <span class="ident">Bundle</span>(<span class="ident">ws</span>)
+    }
+
+    <span class="doccomment">/// Write the constant in binary and that gives you the shift amounts, Eg.. 7x is 4x+2x+x.</span>
+    <span class="kw">fn</span> <span class="ident">binary_cmul</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">x</span>: <span class="kw-2">&amp;</span><span class="ident">Bundle</span><span class="op">&lt;</span><span class="self">Self</span>::<span class="ident">Item</span><span class="op">&gt;</span>, <span class="ident">c</span>: <span class="ident">u128</span>, <span class="ident">nbits</span>: <span class="ident">usize</span>) <span class="op">-&gt;</span> <span class="ident">Bundle</span><span class="op">&lt;</span><span class="self">Self</span>::<span class="ident">Item</span><span class="op">&gt;</span> {
+        <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">x</span>.<span class="ident">is_binary</span>());
+        <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">c</span> <span class="op">&gt;</span> <span class="number">0</span>);
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">shifts</span> <span class="op">=</span> <span class="ident">util</span>::<span class="ident">u128_to_bits</span>(<span class="ident">c</span>,<span class="ident">nbits</span>).<span class="ident">into_iter</span>().<span class="ident">enumerate</span>()
+            .<span class="ident">filter_map</span>(<span class="op">|</span>(<span class="ident">i</span>,<span class="ident">b</span>)<span class="op">|</span> <span class="kw">if</span> <span class="ident">b</span> <span class="op">&gt;</span> <span class="number">0</span> { <span class="prelude-val">Some</span>(<span class="ident">i</span>) } <span class="kw">else</span> { <span class="prelude-val">None</span> });
+
+        <span class="kw">let</span> <span class="ident">first_shift</span> <span class="op">=</span> <span class="ident">shifts</span>.<span class="ident">next</span>().<span class="ident">unwrap</span>();
+
+        <span class="kw">let</span> <span class="ident">z</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">shift</span>(<span class="ident">x</span>,<span class="ident">first_shift</span>);
+
+        <span class="ident">shifts</span>.<span class="ident">fold</span>(<span class="ident">z</span>, <span class="op">|</span><span class="ident">z</span>, <span class="ident">shift_amt</span><span class="op">|</span> {
+            <span class="kw">let</span> <span class="ident">s</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">shift</span>(<span class="ident">x</span>, <span class="ident">shift_amt</span>);
+            <span class="self">self</span>.<span class="ident">binary_addition_no_carry</span>(<span class="kw-2">&amp;</span><span class="ident">z</span>,<span class="kw-2">&amp;</span><span class="ident">s</span>)
         })
     }
 }
@@ -945,5 +1257,5 @@
         <span class="ident">n</span> <span class="op">=&gt;</span> <span class="macro">panic</span><span class="macro">!</span>(<span class="string">&quot;unknown exact Ms for {} primes!&quot;</span>, <span class="ident">n</span>),
     }
 }
-</pre>
-</section><section id="search" class="content hidden"></section><section class="footer"></section><aside id="help" class="hidden"><div><h1 class="hidden">Help</h1><div class="shortcuts"><h2>Keyboard Shortcuts</h2><dl><dt><kbd>?</kbd></dt><dd>Show this help dialog</dd><dt><kbd>S</kbd></dt><dd>Focus the search field</dd><dt><kbd>↑</kbd></dt><dd>Move up in search results</dd><dt><kbd>↓</kbd></dt><dd>Move down in search results</dd><dt><kbd>↹</kbd></dt><dd>Switch tab</dd><dt><kbd>&#9166;</kbd></dt><dd>Go to active search result</dd><dt><kbd>+</kbd></dt><dd>Expand all sections</dd><dt><kbd>-</kbd></dt><dd>Collapse all sections</dd></dl></div><div class="infos"><h2>Search Tricks</h2><p>Prefix searches with a type followed by a colon (e.g. <code>fn:</code>) to restrict the search to a given type.</p><p>Accepted types are: <code>fn</code>, <code>mod</code>, <code>struct</code>, <code>enum</code>, <code>trait</code>, <code>type</code>, <code>macro</code>, and <code>const</code>.</p><p>Search functions by type signature (e.g. <code>vec -> usize</code> or <code>* -> vec</code>)</p><p>Search multiple things at once by splitting your query with comma (e.g. <code>str,u8</code> or <code>String,struct:Vec,test</code>)</p></div></div></aside><script>window.rootPath = "../../";window.currentCrate = "fancy_garbling";</script><script src="../../aliases.js"></script><script src="../../main.js"></script><script defer src="../../search-index.js"></script></body></html>
+</pre></div>
+</section><section id="search" class="content hidden"></section><section class="footer"></section><aside id="help" class="hidden"><div><h1 class="hidden">Help</h1><div class="shortcuts"><h2>Keyboard Shortcuts</h2><dl><dt><kbd>?</kbd></dt><dd>Show this help dialog</dd><dt><kbd>S</kbd></dt><dd>Focus the search field</dd><dt><kbd>↑</kbd></dt><dd>Move up in search results</dd><dt><kbd>↓</kbd></dt><dd>Move down in search results</dd><dt><kbd>↹</kbd></dt><dd>Switch tab</dd><dt><kbd>&#9166;</kbd></dt><dd>Go to active search result</dd><dt><kbd>+</kbd></dt><dd>Expand all sections</dd><dt><kbd>-</kbd></dt><dd>Collapse all sections</dd></dl></div><div class="infos"><h2>Search Tricks</h2><p>Prefix searches with a type followed by a colon (e.g. <code>fn:</code>) to restrict the search to a given type.</p><p>Accepted types are: <code>fn</code>, <code>mod</code>, <code>struct</code>, <code>enum</code>, <code>trait</code>, <code>type</code>, <code>macro</code>, and <code>const</code>.</p><p>Search functions by type signature (e.g. <code>vec -> usize</code> or <code>* -> vec</code>)</p><p>Search multiple things at once by splitting your query with comma (e.g. <code>str,u8</code> or <code>String,struct:Vec,test</code>)</p></div></div></aside><script>window.rootPath = "../../";window.currentCrate = "fancy_garbling";</script><script src="../../aliases.js"></script><script src="../../main.js"></script><script src="../../source-files.js"></script><script src="../../source-script.js"></script><script defer src="../../search-index.js"></script></body></html>

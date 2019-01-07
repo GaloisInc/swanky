@@ -17,3 +17,4 @@ pub mod util;
 pub mod aes;
 pub mod fancy;
 pub mod dummy;
+pub mod informer;

@@ -409,58 +409,7 @@
 <span id="409">409</span>
 <span id="410">410</span>
 <span id="411">411</span>
-<span id="412">412</span>
-<span id="413">413</span>
-<span id="414">414</span>
-<span id="415">415</span>
-<span id="416">416</span>
-<span id="417">417</span>
-<span id="418">418</span>
-<span id="419">419</span>
-<span id="420">420</span>
-<span id="421">421</span>
-<span id="422">422</span>
-<span id="423">423</span>
-<span id="424">424</span>
-<span id="425">425</span>
-<span id="426">426</span>
-<span id="427">427</span>
-<span id="428">428</span>
-<span id="429">429</span>
-<span id="430">430</span>
-<span id="431">431</span>
-<span id="432">432</span>
-<span id="433">433</span>
-<span id="434">434</span>
-<span id="435">435</span>
-<span id="436">436</span>
-<span id="437">437</span>
-<span id="438">438</span>
-<span id="439">439</span>
-<span id="440">440</span>
-<span id="441">441</span>
-<span id="442">442</span>
-<span id="443">443</span>
-<span id="444">444</span>
-<span id="445">445</span>
-<span id="446">446</span>
-<span id="447">447</span>
-<span id="448">448</span>
-<span id="449">449</span>
-<span id="450">450</span>
-<span id="451">451</span>
-<span id="452">452</span>
-<span id="453">453</span>
-<span id="454">454</span>
-<span id="455">455</span>
-<span id="456">456</span>
-<span id="457">457</span>
-<span id="458">458</span>
-<span id="459">459</span>
-<span id="460">460</span>
-<span id="461">461</span>
-<span id="462">462</span>
-</pre><pre class="rust ">
+</pre><div class="example-wrap"><pre class="rust ">
 <span class="doccomment">//! Low-level operations on wirelabels, the basic building block of garbled circuits.</span>
 
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">aes</span>::<span class="ident">AES</span>;
@@ -489,57 +438,6 @@
     }
 }
 
-<span class="comment">// impl std::fmt::Debug for Wire {</span>
-<span class="comment">//     fn fmt(&amp;self, f: &amp;mut std::fmt::Formatter) -&gt; Result&lt;(), std::fmt::Error&gt; {</span>
-<span class="comment">//         f.write_str(&quot;Wire &quot;);</span>
-<span class="comment">//         match self {</span>
-<span class="comment">//             Wire::Mod2 { val } =&gt; write!(f, &quot;[2] {:0128b}&quot;, val),</span>
-<span class="comment">//             Wire::Mod7 { ds } =&gt; {</span>
-<span class="comment">//                 f.write_str(&quot;[7] &quot;);</span>
-<span class="comment">//                 for d in ds.iter() {</span>
-<span class="comment">//                     write!(f, &quot;{}&quot;, d);</span>
-<span class="comment">//                 }</span>
-<span class="comment">//             }</span>
-<span class="comment">//             Wire::ModN { q, ds } =&gt; {</span>
-<span class="comment">//                 write!(f, &quot;[{}] &quot;, q);</span>
-<span class="comment">//                 for d in ds.iter() {</span>
-<span class="comment">//                     write!(f, &quot;{}&quot;, d);</span>
-<span class="comment">//                 }</span>
-<span class="comment">//             }</span>
-<span class="comment">//         }</span>
-<span class="comment">//     }</span>
-<span class="comment">// }</span>
-
-<span class="comment">// impl std::cmp::PartialEq for Wire {</span>
-<span class="comment">//     fn eq(&amp;self, other: &amp;Wire) -&gt; bool {</span>
-<span class="comment">//         match self {</span>
-<span class="comment">//             Wire::Mod2 { val } =&gt; {</span>
-<span class="comment">//                 if let Wire::Mod2 { val: other_val } = other {</span>
-<span class="comment">//                     val = other_val</span>
-<span class="comment">//                 } else {</span>
-<span class="comment">//                     false</span>
-<span class="comment">//                 }</span>
-<span class="comment">//             }</span>
-
-<span class="comment">//             Wire::Mod7 { ds } =&gt; {</span>
-<span class="comment">//                 if let Wire::Mod7 { ds: other_ds } = other {</span>
-<span class="comment">//                     ds.iter().zip(other_ds.iter()).all(|(x,y)| x == y)</span>
-<span class="comment">//                 } else {</span>
-<span class="comment">//                     false</span>
-<span class="comment">//                 }</span>
-<span class="comment">//             }</span>
-
-<span class="comment">//             Wire::ModN { q, ds } =&gt; {</span>
-<span class="comment">//                 if let Wire::ModN { q: other_q, ds: other_ds } = other {</span>
-<span class="comment">//                     q == other_q &amp;&amp; ds.iter().zip(other_ds.iter()).all(|(x,y)| x == y)</span>
-<span class="comment">//                 } else {</span>
-<span class="comment">//                     false</span>
-<span class="comment">//                 }</span>
-<span class="comment">//             }</span>
-<span class="comment">//         }</span>
-<span class="comment">//     }</span>
-<span class="comment">// }</span>
-
 <span class="kw">impl</span> <span class="ident">Wire</span> {
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">digits</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-&gt;</span> <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u16</span><span class="op">&gt;</span> {
         <span class="kw">match</span> <span class="self">self</span> {
@@ -565,7 +463,7 @@
 
             <span class="comment">// drop the digits we won&#39;t be able to pack back in again, especially if</span>
             <span class="comment">// they get multiplied</span>
-            <span class="kw">let</span> <span class="ident">ds</span> <span class="op">=</span> <span class="ident">ds</span>[..<span class="ident">util</span>::<span class="ident">digits_per_u128</span>(<span class="ident">q</span>)].<span class="ident">to_vec</span>();
+            <span class="ident">ds</span>.<span class="ident">truncate</span>(<span class="ident">util</span>::<span class="ident">digits_per_u128</span>(<span class="ident">q</span>));
             <span class="ident">Wire</span>::<span class="ident">ModN</span> { <span class="ident">q</span>, <span class="ident">ds</span> }
 
         } <span class="kw">else</span> {
@@ -923,5 +821,5 @@
         }
     }
 }
-</pre>
-</section><section id="search" class="content hidden"></section><section class="footer"></section><aside id="help" class="hidden"><div><h1 class="hidden">Help</h1><div class="shortcuts"><h2>Keyboard Shortcuts</h2><dl><dt><kbd>?</kbd></dt><dd>Show this help dialog</dd><dt><kbd>S</kbd></dt><dd>Focus the search field</dd><dt><kbd>↑</kbd></dt><dd>Move up in search results</dd><dt><kbd>↓</kbd></dt><dd>Move down in search results</dd><dt><kbd>↹</kbd></dt><dd>Switch tab</dd><dt><kbd>&#9166;</kbd></dt><dd>Go to active search result</dd><dt><kbd>+</kbd></dt><dd>Expand all sections</dd><dt><kbd>-</kbd></dt><dd>Collapse all sections</dd></dl></div><div class="infos"><h2>Search Tricks</h2><p>Prefix searches with a type followed by a colon (e.g. <code>fn:</code>) to restrict the search to a given type.</p><p>Accepted types are: <code>fn</code>, <code>mod</code>, <code>struct</code>, <code>enum</code>, <code>trait</code>, <code>type</code>, <code>macro</code>, and <code>const</code>.</p><p>Search functions by type signature (e.g. <code>vec -> usize</code> or <code>* -> vec</code>)</p><p>Search multiple things at once by splitting your query with comma (e.g. <code>str,u8</code> or <code>String,struct:Vec,test</code>)</p></div></div></aside><script>window.rootPath = "../../";window.currentCrate = "fancy_garbling";</script><script src="../../aliases.js"></script><script src="../../main.js"></script><script defer src="../../search-index.js"></script></body></html>
+</pre></div>
+</section><section id="search" class="content hidden"></section><section class="footer"></section><aside id="help" class="hidden"><div><h1 class="hidden">Help</h1><div class="shortcuts"><h2>Keyboard Shortcuts</h2><dl><dt><kbd>?</kbd></dt><dd>Show this help dialog</dd><dt><kbd>S</kbd></dt><dd>Focus the search field</dd><dt><kbd>↑</kbd></dt><dd>Move up in search results</dd><dt><kbd>↓</kbd></dt><dd>Move down in search results</dd><dt><kbd>↹</kbd></dt><dd>Switch tab</dd><dt><kbd>&#9166;</kbd></dt><dd>Go to active search result</dd><dt><kbd>+</kbd></dt><dd>Expand all sections</dd><dt><kbd>-</kbd></dt><dd>Collapse all sections</dd></dl></div><div class="infos"><h2>Search Tricks</h2><p>Prefix searches with a type followed by a colon (e.g. <code>fn:</code>) to restrict the search to a given type.</p><p>Accepted types are: <code>fn</code>, <code>mod</code>, <code>struct</code>, <code>enum</code>, <code>trait</code>, <code>type</code>, <code>macro</code>, and <code>const</code>.</p><p>Search functions by type signature (e.g. <code>vec -> usize</code> or <code>* -> vec</code>)</p><p>Search multiple things at once by splitting your query with comma (e.g. <code>str,u8</code> or <code>String,struct:Vec,test</code>)</p></div></div></aside><script>window.rootPath = "../../";window.currentCrate = "fancy_garbling";</script><script src="../../aliases.js"></script><script src="../../main.js"></script><script src="../../source-files.js"></script><script src="../../source-script.js"></script><script defer src="../../search-index.js"></script></body></html>

@@ -767,7 +767,36 @@
 <span id="767">767</span>
 <span id="768">768</span>
 <span id="769">769</span>
-</pre><pre class="rust ">
+<span id="770">770</span>
+<span id="771">771</span>
+<span id="772">772</span>
+<span id="773">773</span>
+<span id="774">774</span>
+<span id="775">775</span>
+<span id="776">776</span>
+<span id="777">777</span>
+<span id="778">778</span>
+<span id="779">779</span>
+<span id="780">780</span>
+<span id="781">781</span>
+<span id="782">782</span>
+<span id="783">783</span>
+<span id="784">784</span>
+<span id="785">785</span>
+<span id="786">786</span>
+<span id="787">787</span>
+<span id="788">788</span>
+<span id="789">789</span>
+<span id="790">790</span>
+<span id="791">791</span>
+<span id="792">792</span>
+<span id="793">793</span>
+<span id="794">794</span>
+<span id="795">795</span>
+<span id="796">796</span>
+<span id="797">797</span>
+<span id="798">798</span>
+</pre><div class="example-wrap"><pre class="rust ">
 <span class="doccomment">//! DSL for creating circuits compatible with fancy-garbling in the old-fashioned way,</span>
 <span class="doccomment">//! where you create a circuit for a computation then garble it.</span>
 
@@ -1518,6 +1547,35 @@
         }
     }
     <span class="comment">//}}}</span>
+    <span class="attribute">#[<span class="ident">test</span>]</span> <span class="comment">// binary addition {{{</span>
+    <span class="kw">fn</span> <span class="ident">binary_addition</span>() {
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">rng</span> <span class="op">=</span> <span class="ident">thread_rng</span>();
+        <span class="kw">let</span> <span class="ident">n</span> <span class="op">=</span> <span class="number">2</span> <span class="op">+</span> (<span class="ident">rng</span>.<span class="ident">gen_usize</span>() <span class="op">%</span> <span class="number">10</span>);
+        <span class="kw">let</span> <span class="ident">q</span> <span class="op">=</span> <span class="number">2</span>;
+        <span class="kw">let</span> <span class="ident">Q</span> <span class="op">=</span> <span class="ident">util</span>::<span class="ident">product</span>(<span class="kw-2">&amp;</span><span class="macro">vec</span><span class="macro">!</span>[<span class="ident">q</span>;<span class="ident">n</span>]);
+        <span class="macro">println</span><span class="macro">!</span>(<span class="string">&quot;n={} q={} Q={}&quot;</span>, <span class="ident">n</span>, <span class="ident">q</span>, <span class="ident">Q</span>);
+
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">b</span> <span class="op">=</span> <span class="ident">CircuitBuilder</span>::<span class="ident">new</span>();
+        <span class="kw">let</span> <span class="ident">xs</span> <span class="op">=</span> <span class="ident">b</span>.<span class="ident">garbler_input_bundle</span>(<span class="kw-2">&amp;</span><span class="macro">vec</span><span class="macro">!</span>[<span class="ident">q</span>;<span class="ident">n</span>]);
+        <span class="kw">let</span> <span class="ident">ys</span> <span class="op">=</span> <span class="ident">b</span>.<span class="ident">evaluator_input_bundle</span>(<span class="kw-2">&amp;</span><span class="macro">vec</span><span class="macro">!</span>[<span class="ident">q</span>;<span class="ident">n</span>]);
+        <span class="kw">let</span> (<span class="ident">zs</span>,<span class="ident">carry</span>) <span class="op">=</span> <span class="ident">b</span>.<span class="ident">binary_addition</span>(<span class="kw-2">&amp;</span><span class="ident">xs</span>, <span class="kw-2">&amp;</span><span class="ident">ys</span>);
+        <span class="ident">b</span>.<span class="ident">output</span>(<span class="kw-2">&amp;</span><span class="ident">carry</span>);
+        <span class="ident">b</span>.<span class="ident">output_bundle</span>(<span class="kw-2">&amp;</span><span class="ident">zs</span>);
+        <span class="kw">let</span> <span class="ident">c</span> <span class="op">=</span> <span class="ident">b</span>.<span class="ident">finish</span>();
+
+        <span class="kw">for</span> <span class="kw">_</span> <span class="kw">in</span> <span class="number">0</span>..<span class="number">16</span> {
+            <span class="kw">let</span> <span class="ident">x</span> <span class="op">=</span> <span class="ident">rng</span>.<span class="ident">gen_u128</span>() <span class="op">%</span> <span class="ident">Q</span>;
+            <span class="kw">let</span> <span class="ident">y</span> <span class="op">=</span> <span class="ident">rng</span>.<span class="ident">gen_u128</span>() <span class="op">%</span> <span class="ident">Q</span>;
+            <span class="macro">println</span><span class="macro">!</span>(<span class="string">&quot;x={} y={}&quot;</span>, <span class="ident">x</span>, <span class="ident">y</span>);
+            <span class="kw">let</span> <span class="ident">res_should_be</span> <span class="op">=</span> (<span class="ident">x</span> <span class="op">+</span> <span class="ident">y</span>) <span class="op">%</span> <span class="ident">Q</span>;
+            <span class="kw">let</span> <span class="ident">carry_should_be</span> <span class="op">=</span> (<span class="ident">x</span> <span class="op">+</span> <span class="ident">y</span> <span class="op">&gt;=</span> <span class="ident">Q</span>) <span class="kw">as</span> <span class="ident">u16</span>;
+
+            <span class="kw">let</span> <span class="ident">res</span> <span class="op">=</span> <span class="ident">c</span>.<span class="ident">eval</span>(<span class="kw-2">&amp;</span><span class="ident">util</span>::<span class="ident">u128_to_bits</span>(<span class="ident">x</span>,<span class="ident">n</span>), <span class="kw-2">&amp;</span><span class="ident">util</span>::<span class="ident">u128_to_bits</span>(<span class="ident">y</span>,<span class="ident">n</span>));
+            <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">util</span>::<span class="ident">u128_from_bits</span>(<span class="kw-2">&amp;</span><span class="ident">res</span>[<span class="number">1</span>..]), <span class="ident">res_should_be</span>);
+            <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">res</span>[<span class="number">0</span>], <span class="ident">carry_should_be</span>);
+        }
+    }
+    <span class="comment">//}}}</span>
     <span class="attribute">#[<span class="ident">test</span>]</span> <span class="comment">// serialization {{{</span>
     <span class="kw">fn</span> <span class="ident">serialization</span>() {
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">rng</span> <span class="op">=</span> <span class="ident">thread_rng</span>();
@@ -1537,5 +1595,5 @@
     }
 <span class="comment">//}}}</span>
 }
-</pre>
-</section><section id="search" class="content hidden"></section><section class="footer"></section><aside id="help" class="hidden"><div><h1 class="hidden">Help</h1><div class="shortcuts"><h2>Keyboard Shortcuts</h2><dl><dt><kbd>?</kbd></dt><dd>Show this help dialog</dd><dt><kbd>S</kbd></dt><dd>Focus the search field</dd><dt><kbd>↑</kbd></dt><dd>Move up in search results</dd><dt><kbd>↓</kbd></dt><dd>Move down in search results</dd><dt><kbd>↹</kbd></dt><dd>Switch tab</dd><dt><kbd>&#9166;</kbd></dt><dd>Go to active search result</dd><dt><kbd>+</kbd></dt><dd>Expand all sections</dd><dt><kbd>-</kbd></dt><dd>Collapse all sections</dd></dl></div><div class="infos"><h2>Search Tricks</h2><p>Prefix searches with a type followed by a colon (e.g. <code>fn:</code>) to restrict the search to a given type.</p><p>Accepted types are: <code>fn</code>, <code>mod</code>, <code>struct</code>, <code>enum</code>, <code>trait</code>, <code>type</code>, <code>macro</code>, and <code>const</code>.</p><p>Search functions by type signature (e.g. <code>vec -> usize</code> or <code>* -> vec</code>)</p><p>Search multiple things at once by splitting your query with comma (e.g. <code>str,u8</code> or <code>String,struct:Vec,test</code>)</p></div></div></aside><script>window.rootPath = "../../";window.currentCrate = "fancy_garbling";</script><script src="../../aliases.js"></script><script src="../../main.js"></script><script defer src="../../search-index.js"></script></body></html>
+</pre></div>
+</section><section id="search" class="content hidden"></section><section class="footer"></section><aside id="help" class="hidden"><div><h1 class="hidden">Help</h1><div class="shortcuts"><h2>Keyboard Shortcuts</h2><dl><dt><kbd>?</kbd></dt><dd>Show this help dialog</dd><dt><kbd>S</kbd></dt><dd>Focus the search field</dd><dt><kbd>↑</kbd></dt><dd>Move up in search results</dd><dt><kbd>↓</kbd></dt><dd>Move down in search results</dd><dt><kbd>↹</kbd></dt><dd>Switch tab</dd><dt><kbd>&#9166;</kbd></dt><dd>Go to active search result</dd><dt><kbd>+</kbd></dt><dd>Expand all sections</dd><dt><kbd>-</kbd></dt><dd>Collapse all sections</dd></dl></div><div class="infos"><h2>Search Tricks</h2><p>Prefix searches with a type followed by a colon (e.g. <code>fn:</code>) to restrict the search to a given type.</p><p>Accepted types are: <code>fn</code>, <code>mod</code>, <code>struct</code>, <code>enum</code>, <code>trait</code>, <code>type</code>, <code>macro</code>, and <code>const</code>.</p><p>Search functions by type signature (e.g. <code>vec -> usize</code> or <code>* -> vec</code>)</p><p>Search multiple things at once by splitting your query with comma (e.g. <code>str,u8</code> or <code>String,struct:Vec,test</code>)</p></div></div></aside><script>window.rootPath = "../../";window.currentCrate = "fancy_garbling";</script><script src="../../aliases.js"></script><script src="../../main.js"></script><script src="../../source-files.js"></script><script src="../../source-script.js"></script><script defer src="../../search-index.js"></script></body></html>

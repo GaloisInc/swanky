@@ -1,59 +1,12 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="API documentation for the Rust `fancy_garbling` crate."><meta name="keywords" content="rust, rustlang, rust-lang, fancy_garbling"><title>fancy_garbling - Rust</title><link rel="stylesheet" type="text/css" href="../normalize.css"><link rel="stylesheet" type="text/css" href="../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../dark.css"><link rel="stylesheet" type="text/css" href="../light.css" id="themeStyle"><script src="../storage.js"></script></head><body class="rustdoc mod"><!--[if lte IE 8]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu">&#9776;</div><p class='location'>Crate fancy_garbling</p><div class="sidebar-elems"><a id='all-types' href='all.html'><p>See all fancy_garbling's items</p></a><div class="block items"><ul><li><a href="#modules">Modules</a></li></ul></div><p class='location'></p><script>window.sidebarCurrent = {name: 'fancy_garbling', ty: 'mod', relpath: '../'};</script></div></nav><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!"><img src="../brush.svg" width="18" alt="Pick another theme!"></button><div id="theme-choices"></div></div><script src="../theme.js"></script><nav class="sub"><form class="search-form js-only"><div class="search-container"><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><a id="settings-menu" href="../settings.html"><img src="../wheel.svg" width="18" alt="Change settings"></a></div></form></nav><section id="main" class="content"><h1 class='fqn'><span class='out-of-band'><span id='render-detail'><a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">[<span class='inner'>&#x2212;</span>]</a></span><a class='srclink' href='../src/fancy_garbling/lib.rs.html#1-19' title='goto source code'>[src]</a></span><span class='in-band'>Crate <a class="mod" href=''>fancy_garbling</a></span></h1><h2 id='modules' class='section-header'><a href="#modules">Modules</a></h2>
-<table>
-                       <tr class=' module-item'>
-                           <td><a class="mod" href="aes/index.html"
-                                  title='mod fancy_garbling::aes'>aes</a></td>
-                           <td class='docblock-short'>
-                                <p>Wrapper for <code>aesni</code> with constant key for use as a hash function.</p>
-
-                           </td>
-                       </tr>
-                       <tr class=' module-item'>
-                           <td><a class="mod" href="circuit/index.html"
-                                  title='mod fancy_garbling::circuit'>circuit</a></td>
-                           <td class='docblock-short'>
-                                <p>DSL for creating circuits compatible with fancy-garbling in the old-fashioned way,
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="API documentation for the Rust `fancy_garbling` crate."><meta name="keywords" content="rust, rustlang, rust-lang, fancy_garbling"><title>fancy_garbling - Rust</title><link rel="stylesheet" type="text/css" href="../normalize.css"><link rel="stylesheet" type="text/css" href="../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../dark.css"><link rel="stylesheet" type="text/css" href="../light.css" id="themeStyle"><script src="../storage.js"></script></head><body class="rustdoc mod"><!--[if lte IE 8]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu">&#9776;</div><p class='location'>Crate fancy_garbling</p><div class="sidebar-elems"><a id='all-types' href='all.html'><p>See all fancy_garbling's items</p></a><div class="block items"><ul><li><a href="#modules">Modules</a></li></ul></div><p class='location'></p><script>window.sidebarCurrent = {name: 'fancy_garbling', ty: 'mod', relpath: '../'};</script></div></nav><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!"><img src="../brush.svg" width="18" alt="Pick another theme!"></button><div id="theme-choices"></div></div><script src="../theme.js"></script><nav class="sub"><form class="search-form js-only"><div class="search-container"><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><a id="settings-menu" href="../settings.html"><img src="../wheel.svg" width="18" alt="Change settings"></a></div></form></nav><section id="main" class="content"><h1 class='fqn'><span class='out-of-band'><span id='render-detail'><a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">[<span class='inner'>&#x2212;</span>]</a></span><a class='srclink' href='../src/fancy_garbling/lib.rs.html#1-20' title='goto source code'>[src]</a></span><span class='in-band'>Crate <a class="mod" href=''>fancy_garbling</a></span></h1><h2 id='modules' class='section-header'><a href="#modules">Modules</a></h2>
+<table><tr class='module-item'><td><a class="mod" href="aes/index.html" title='fancy_garbling::aes mod'>aes</a></td><td class='docblock-short'><p>Wrapper for <code>aesni</code> with constant key for use as a hash function.</p>
+</td></tr><tr class='module-item'><td><a class="mod" href="circuit/index.html" title='fancy_garbling::circuit mod'>circuit</a></td><td class='docblock-short'><p>DSL for creating circuits compatible with fancy-garbling in the old-fashioned way,
 where you create a circuit for a computation then garble it.</p>
-
-                           </td>
-                       </tr>
-                       <tr class=' module-item'>
-                           <td><a class="mod" href="dummy/index.html"
-                                  title='mod fancy_garbling::dummy'>dummy</a></td>
-                           <td class='docblock-short'>
-                                <p>Dummy implementation of Fancy.</p>
-
-                           </td>
-                       </tr>
-                       <tr class=' module-item'>
-                           <td><a class="mod" href="fancy/index.html"
-                                  title='mod fancy_garbling::fancy'>fancy</a></td>
-                           <td class='docblock-short'>
-                                <p>The <code>Fancy</code> trait represents the kinds of computations possible in <code>fancy-garbling</code>.</p>
-
-                           </td>
-                       </tr>
-                       <tr class=' module-item'>
-                           <td><a class="mod" href="garble/index.html"
-                                  title='mod fancy_garbling::garble'>garble</a></td>
-                           <td class='docblock-short'>
-                                <p>Structs and functions for creating, streaming, and evaluating garbled circuits.</p>
-
-                           </td>
-                       </tr>
-                       <tr class=' module-item'>
-                           <td><a class="mod" href="util/index.html"
-                                  title='mod fancy_garbling::util'>util</a></td>
-                           <td class='docblock-short'>
-                                <p>Tools useful for interacting with <code>fancy-garbling</code>.</p>
-
-                           </td>
-                       </tr>
-                       <tr class=' module-item'>
-                           <td><a class="mod" href="wire/index.html"
-                                  title='mod fancy_garbling::wire'>wire</a></td>
-                           <td class='docblock-short'>
-                                <p>Low-level operations on wirelabels, the basic building block of garbled circuits.</p>
-
-                           </td>
-                       </tr></table></section><section id="search" class="content hidden"></section><section class="footer"></section><aside id="help" class="hidden"><div><h1 class="hidden">Help</h1><div class="shortcuts"><h2>Keyboard Shortcuts</h2><dl><dt><kbd>?</kbd></dt><dd>Show this help dialog</dd><dt><kbd>S</kbd></dt><dd>Focus the search field</dd><dt><kbd>↑</kbd></dt><dd>Move up in search results</dd><dt><kbd>↓</kbd></dt><dd>Move down in search results</dd><dt><kbd>↹</kbd></dt><dd>Switch tab</dd><dt><kbd>&#9166;</kbd></dt><dd>Go to active search result</dd><dt><kbd>+</kbd></dt><dd>Expand all sections</dd><dt><kbd>-</kbd></dt><dd>Collapse all sections</dd></dl></div><div class="infos"><h2>Search Tricks</h2><p>Prefix searches with a type followed by a colon (e.g. <code>fn:</code>) to restrict the search to a given type.</p><p>Accepted types are: <code>fn</code>, <code>mod</code>, <code>struct</code>, <code>enum</code>, <code>trait</code>, <code>type</code>, <code>macro</code>, and <code>const</code>.</p><p>Search functions by type signature (e.g. <code>vec -> usize</code> or <code>* -> vec</code>)</p><p>Search multiple things at once by splitting your query with comma (e.g. <code>str,u8</code> or <code>String,struct:Vec,test</code>)</p></div></div></aside><script>window.rootPath = "../";window.currentCrate = "fancy_garbling";</script><script src="../aliases.js"></script><script src="../main.js"></script><script defer src="../search-index.js"></script></body></html>
+</td></tr><tr class='module-item'><td><a class="mod" href="dummy/index.html" title='fancy_garbling::dummy mod'>dummy</a></td><td class='docblock-short'><p>Dummy implementation of Fancy.</p>
+</td></tr><tr class='module-item'><td><a class="mod" href="fancy/index.html" title='fancy_garbling::fancy mod'>fancy</a></td><td class='docblock-short'><p>The <code>Fancy</code> trait represents the kinds of computations possible in <code>fancy-garbling</code>.</p>
+</td></tr><tr class='module-item'><td><a class="mod" href="garble/index.html" title='fancy_garbling::garble mod'>garble</a></td><td class='docblock-short'><p>Structs and functions for creating, streaming, and evaluating garbled circuits.</p>
+</td></tr><tr class='module-item'><td><a class="mod" href="informer/index.html" title='fancy_garbling::informer mod'>informer</a></td><td class='docblock-short'><p>Informer runs a fancy computation and learns information from it, like how many of
+what kind of inputs there are.</p>
+</td></tr><tr class='module-item'><td><a class="mod" href="util/index.html" title='fancy_garbling::util mod'>util</a></td><td class='docblock-short'><p>Tools useful for interacting with <code>fancy-garbling</code>.</p>
+</td></tr><tr class='module-item'><td><a class="mod" href="wire/index.html" title='fancy_garbling::wire mod'>wire</a></td><td class='docblock-short'><p>Low-level operations on wirelabels, the basic building block of garbled circuits.</p>
+</td></tr></table></section><section id="search" class="content hidden"></section><section class="footer"></section><aside id="help" class="hidden"><div><h1 class="hidden">Help</h1><div class="shortcuts"><h2>Keyboard Shortcuts</h2><dl><dt><kbd>?</kbd></dt><dd>Show this help dialog</dd><dt><kbd>S</kbd></dt><dd>Focus the search field</dd><dt><kbd>↑</kbd></dt><dd>Move up in search results</dd><dt><kbd>↓</kbd></dt><dd>Move down in search results</dd><dt><kbd>↹</kbd></dt><dd>Switch tab</dd><dt><kbd>&#9166;</kbd></dt><dd>Go to active search result</dd><dt><kbd>+</kbd></dt><dd>Expand all sections</dd><dt><kbd>-</kbd></dt><dd>Collapse all sections</dd></dl></div><div class="infos"><h2>Search Tricks</h2><p>Prefix searches with a type followed by a colon (e.g. <code>fn:</code>) to restrict the search to a given type.</p><p>Accepted types are: <code>fn</code>, <code>mod</code>, <code>struct</code>, <code>enum</code>, <code>trait</code>, <code>type</code>, <code>macro</code>, and <code>const</code>.</p><p>Search functions by type signature (e.g. <code>vec -> usize</code> or <code>* -> vec</code>)</p><p>Search multiple things at once by splitting your query with comma (e.g. <code>str,u8</code> or <code>String,struct:Vec,test</code>)</p></div></div></aside><script>window.rootPath = "../";window.currentCrate = "fancy_garbling";</script><script src="../aliases.js"></script><script src="../main.js"></script><script defer src="../search-index.js"></script></body></html>
