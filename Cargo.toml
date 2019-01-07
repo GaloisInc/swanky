@@ -1,0 +1,12 @@
+[package]
+name = "fancy-twopc"
+version = "0.1.0"
+edition = "2018"
+authors = ["Alex J. Malozemoff <amaloz@galois.com>"]
+
+[dependencies]
+clap = "2.32.0"
+failure = "0.1.3"
+fancy_garbling = { git = "https://github.com/spaceships/fancy-garbling" }
+log = "0.4.6"
+rand = "0.6.1"
