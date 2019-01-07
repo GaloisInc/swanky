@@ -12,6 +12,8 @@ pub trait HasModulus {
     fn modulus(&self) -> u16;
 }
 
+// TODO: change to enum in order to sanity check the gadgets
+// enum Bundle { CRT(..), Boolean(..), MixedRadix(..) }
 /// A collection of wires, useful for the garbled gadgets defined by `BundleGadgets`.
 #[derive(Clone, Default)]
 pub struct Bundle<W: Clone + Default + HasModulus>(Vec<W>);
@@ -33,7 +35,7 @@ impl <W: Clone + Default + HasModulus> Bundle<W> {
     }
 
     /// Whether this bundle only contains residues in mod 2.
-    pub fn is_boolean(&self) -> bool {
+    pub fn is_binary(&self) -> bool {
         self.moduli().iter().all(|m| *m == 2)
     }
 }
@@ -477,30 +479,30 @@ pub trait BundleGadgets: Fancy {
         self.sgn(x, &exact_ms(x))
     }
 
-    /// Returns 1 if `x < y`
+    /// Returns 1 if `x < y`. Works on both CRT and binary bundles.
     fn exact_lt(&mut self, x: &Bundle<Self::Item>, y: &Bundle<Self::Item>) -> Self::Item {
-        let z = self.sub_bundles(x,y);
-        self.exact_sign(&z)
+        if x.is_binary() {
+            let (_,z) = self.binary_subtraction(x,y);
+            z
+        } else {
+            let z = self.sub_bundles(x,y);
+            self.exact_sign(&z)
+        }
     }
 
-    /// Compute the maximum bundle in `xs`. Works on both CRT and boolean bundles.
+    /// Compute the maximum bundle in `xs`. Works on both CRT and binary bundles.
     fn max(&mut self, xs: &[Bundle<Self::Item>]) -> Bundle<Self::Item> {
-        if xs.iter().all(|bun| bun.is_boolean()) {
-            // TODO use subtract and compare msb
-            unimplemented!()
-        } else {
-            assert!(xs.len() > 1);
-            xs.iter().skip(1).fold(xs[0].clone(), |x,y| {
-                let pos = self.exact_lt(&x,y);
-                let neg = self.negate(&pos);
-                let z = x.wires().iter().zip(y.wires().iter()).map(|(x,y)| {
-                    let xp = self.mul(x,&neg);
-                    let yp = self.mul(y,&pos);
-                    self.add(&xp,&yp)
-                }).collect();
-                Bundle(z)
-            })
-        }
+        assert!(xs.len() > 1);
+        xs.iter().skip(1).fold(xs[0].clone(), |x,y| {
+            let pos = self.exact_lt(&x,y);
+            let neg = self.negate(&pos);
+            let z = x.wires().iter().zip(y.wires().iter()).map(|(x,y)| {
+                let xp = self.mul(x,&neg);
+                let yp = self.mul(y,&pos);
+                self.add(&xp,&yp)
+            }).collect();
+            Bundle(z)
+        })
     }
 
     ////////////////////////////////////////////////////////////////////////////////
@@ -544,12 +546,12 @@ pub trait BundleGadgets: Fancy {
         Bundle(bs)
     }
 
-    /// Binary multiplication.
-    fn binary_multiplication(&mut self, xs: &Bundle<Self::Item>, ys: &Bundle<Self::Item>)
-        -> Bundle<Self::Item>
-    {
-        unimplemented!()
-    }
+    // /// Binary multiplication.
+    // fn binary_multiplication(&mut self, xs: &Bundle<Self::Item>, ys: &Bundle<Self::Item>)
+    //     -> Bundle<Self::Item>
+    // {
+    //     unimplemented!()
+    // }
 
     /// Compute the twos complement of the input bundle (which must be base 2).
     fn twos_complement(&mut self, xs: &Bundle<Self::Item>) -> Bundle<Self::Item> {
@@ -579,6 +581,34 @@ pub trait BundleGadgets: Fancy {
             self.mux(x,b1,b2)
         }).collect();
         Bundle(ws)
+    }
+
+    /// Shift residues, replacing them with zeros in the modulus of the last residue.
+    fn shift(&mut self, x: &Bundle<Self::Item>, n: usize) -> Bundle<Self::Item> {
+        let mut ws = x.wires().to_vec();
+        let zero = self.constant(0, ws.last().unwrap().modulus());
+        for _ in 0..n {
+            ws.pop();
+            ws.insert(0, zero.clone());
+        }
+        Bundle(ws)
+    }
+
+    /// Write the constant in binary and that gives you the shift amounts, Eg.. 7x is 4x+2x+x.
+    fn binary_cmul(&mut self, x: &Bundle<Self::Item>, c: u128, nbits: usize) -> Bundle<Self::Item> {
+        assert!(x.is_binary());
+        assert!(c > 0);
+        let mut shifts = util::u128_to_bits(c,nbits).into_iter().enumerate()
+            .filter_map(|(i,b)| if b > 0 { Some(i) } else { None });
+
+        let first_shift = shifts.next().unwrap();
+
+        let z = self.shift(x,first_shift);
+
+        shifts.fold(z, |z, shift_amt| {
+            let s = self.shift(x, shift_amt);
+            self.binary_addition_no_carry(&z,&s)
+        })
     }
 }
 

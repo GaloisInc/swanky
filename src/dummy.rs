@@ -95,3 +95,111 @@ impl Fancy for Dummy {
         self.outputs.push(x.val);
     }
 }
+
+#[cfg(test)]
+mod bundle {
+    use super::*;
+    use crate::fancy::BundleGadgets;
+    use crate::util::{self, RngExt, crt_factor, crt_inv_factor};
+    use itertools::Itertools;
+    use rand::thread_rng;
+
+    #[test] // bundle addition {{{
+    fn addition() {
+        let mut rng = thread_rng();
+        for _ in 0..16 {
+            let q = rng.gen_usable_composite_modulus();
+            let x = rng.gen_u128() % q;
+            let y = rng.gen_u128() % q;
+            let mut d = Dummy::new(&crt_factor(x,q), &crt_factor(y,q));
+            {
+                let x = d.garbler_input_bundle_crt(q);
+                let y = d.evaluator_input_bundle_crt(q);
+                let z = d.add_bundles(&x,&y);
+                d.output_bundle(&z);
+            }
+            let z = crt_inv_factor(&d.get_output(),q);
+            assert_eq!(z, (x+y)%q);
+        }
+    }
+    //}}}
+    #[test] // bundle subtraction {{{
+    fn subtraction() {
+        let mut rng = thread_rng();
+        for _ in 0..16 {
+            let q = rng.gen_usable_composite_modulus();
+            let x = rng.gen_u128() % q;
+            let y = rng.gen_u128() % q;
+            let mut d = Dummy::new(&crt_factor(x,q), &crt_factor(y,q));
+            {
+                let x = d.garbler_input_bundle_crt(q);
+                let y = d.evaluator_input_bundle_crt(q);
+                let z = d.sub_bundles(&x,&y);
+                d.output_bundle(&z);
+            }
+            let z = crt_inv_factor(&d.get_output(),q);
+            assert_eq!(z, (x+q-y)%q);
+        }
+    }
+    //}}}
+    #[test] // binary cmul {{{
+    fn binary_cmul() {
+        let mut rng = thread_rng();
+        for _ in 0..16 {
+            let nbits = 64;
+            let q = 1<<nbits;
+            let x = rng.gen_u128() % q;
+            let c = 1 + rng.gen_u128() % q;
+            let mut d = Dummy::new(&util::u128_to_bits(x,nbits), &[]);
+            {
+                let x = d.garbler_input_bundle(&vec![2;nbits]);
+                let z = d.binary_cmul(&x,c,nbits);
+                d.output_bundle(&z);
+            }
+            let z = util::u128_from_bits(&d.get_output());
+            assert_eq!(z, (x*c)%q);
+        }
+    }
+    //}}}
+    #[test] // bundle max {{{
+    fn max() {
+        let mut rng = thread_rng();
+        let q = util::modulus_with_width(10);
+        let n = 10;
+        for _ in 0..16 {
+            let inps = (0..n).map(|_| rng.gen_u128() % (q/2)).collect_vec();
+            let should_be = *inps.iter().max().unwrap();
+            let enc_inps = inps.into_iter().flat_map(|x| crt_factor(x,q)).collect_vec();
+            let mut d = Dummy::new(&enc_inps, &[]);
+            {
+                let xs = d.garbler_input_bundles_crt(q,n);
+                let z = d.max(&xs);
+                d.output_bundle(&z);
+            }
+            let z = crt_inv_factor(&d.get_output(),q);
+            assert_eq!(z, should_be);
+        }
+    }
+    //}}}
+    #[test] // binary max {{{
+    fn binary_max() {
+        let mut rng = thread_rng();
+        let n = 10;
+        let nbits = 16;
+        let q = 1<<nbits;
+        for _ in 0..16 {
+            let inps = (0..n).map(|_| rng.gen_u128() % q).collect_vec();
+            let should_be = *inps.iter().max().unwrap();
+            let enc_inps = inps.into_iter().flat_map(|x| util::u128_to_bits(x,nbits)).collect_vec();
+            let mut d = Dummy::new(&enc_inps, &[]);
+            {
+                let xs = d.garbler_input_bundles(&vec![2;nbits], n);
+                let z = d.max(&xs);
+                d.output_bundle(&z);
+            }
+            let z = util::u128_from_bits(&d.get_output());
+            assert_eq!(z, should_be);
+        }
+    }
+    //}}}
+}
