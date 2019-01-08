@@ -39,6 +39,20 @@ impl Informer {
         }
     }
 
+    /// Print information about the fancy computation.
+    pub fn print_info(&self) {
+        println!("computation info:");
+        println!("  garbler inputs:   {}", self.num_garbler_inputs());
+        println!("  evaluator inputs: {}", self.num_evaluator_inputs());
+        println!("  noutputs:         {}", self.num_outputs());
+        println!("  nconsts:          {} // does not reflect constant reuse", self.num_consts());
+        println!("  additions:        {}", self.num_adds());
+        println!("  subtractions:     {}", self.num_subs());
+        println!("  cmuls:            {}", self.num_cmuls());
+        println!("  projections:      {}", self.num_projs());
+        println!("  multiplications:  {}", self.num_muls());
+    }
+
     /// Number of garbler inputs in the fancy computation.
     pub fn num_garbler_inputs(&self) -> usize {
         self.garbler_input_moduli.len()
@@ -57,6 +71,12 @@ impl Informer {
     /// Moduli of evaluator inputs in the fancy computation.
     pub fn evaluator_input_moduli(&self) -> Vec<u16> {
         self.evaluator_input_moduli.clone()
+    }
+
+    /// Number of constants in the fancy computation. NOTE: does not reflect that
+    /// constants will be reused by most implementors of Fancy.
+    pub fn num_consts(&self) -> usize {
+        self.nconstants
     }
 
     /// Number of outputs in the fancy computation.
