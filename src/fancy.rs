@@ -19,6 +19,11 @@ pub trait HasModulus {
 pub struct Bundle<W: Clone + Default + HasModulus>(Vec<W>);
 
 impl <W: Clone + Default + HasModulus> Bundle<W> {
+    /// Create a new bundle from some wires.
+    pub fn new(ws: Vec<W>) -> Bundle<W> {
+        Bundle(ws)
+    }
+
     /// Return the moduli of all the wires in the bundle.
     pub fn moduli(&self) -> Vec<u16> {
         self.0.iter().map(|w| w.modulus()).collect()
@@ -597,15 +602,10 @@ pub trait BundleGadgets: Fancy {
     /// Write the constant in binary and that gives you the shift amounts, Eg.. 7x is 4x+2x+x.
     fn binary_cmul(&mut self, x: &Bundle<Self::Item>, c: u128, nbits: usize) -> Bundle<Self::Item> {
         assert!(x.is_binary());
-        assert!(c > 0);
-        let mut shifts = util::u128_to_bits(c,nbits).into_iter().enumerate()
-            .filter_map(|(i,b)| if b > 0 { Some(i) } else { None });
-
-        let first_shift = shifts.next().unwrap();
-
-        let z = self.shift(x,first_shift);
-
-        shifts.fold(z, |z, shift_amt| {
+        let zero = self.constant_bundle(&vec![0;nbits], &vec![2;nbits]);
+        util::u128_to_bits(c,nbits).into_iter().enumerate()
+            .filter_map(|(i,b)| if b > 0 { Some(i) } else { None })
+            .fold(zero, |z, shift_amt| {
             let s = self.shift(x, shift_amt);
             self.binary_addition_no_carry(&z,&s)
         })
