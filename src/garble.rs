@@ -8,6 +8,10 @@ use itertools::Itertools;
 use rand::rngs::ThreadRng;
 use serde_derive::{Serialize, Deserialize};
 use std::collections::HashMap;
+use std::ops::DerefMut;
+use std::sync::{Arc, Mutex};
+use std::rc::Rc;
+use std::cell::RefCell;
 
 /// The ciphertext created by a garbled gate.
 pub type GarbledGate = Vec<u128>;
@@ -69,20 +73,70 @@ impl Message {
 // Garbler
 
 /// Streams garbled circuit ciphertexts through a callback.
-pub struct Garbler<'a> {
-    rng: ThreadRng,
-    send_function: &'a mut FnMut(Message),
-    constants: HashMap<(u16,u16),Wire>,
-    deltas: HashMap<u16, Wire>,
-    current_output: usize,
-    current_gate: usize,
+pub struct Garbler {
+    rng:            Arc<Mutex<ThreadRng>>,
+    send_function:  Arc<Mutex<Box<FnMut(Message)>>>,
+    constants:      Arc<Mutex<HashMap<(u16,u16),Wire>>>,
+    deltas:         Arc<Mutex<HashMap<u16, Wire>>>,
+    current_output: Arc<Mutex<usize>>,
+    current_gate:   Arc<Mutex<usize>>,
 }
 
-impl <'a> Fancy for Garbler<'a> {
+impl Garbler {
+    /// Create a new garbler.
+    ///
+    /// `send_func` is a callback that enables streaming. It gets called as the garbler
+    /// generates ciphertext information such as garbled gates or input wirelabels.
+    pub fn new(send_func: Box<FnMut(Message)>) -> Garbler {
+        Garbler {
+            rng:            Arc::new(Mutex::new(rand::thread_rng())),
+            send_function:  Arc::new(Mutex::new(send_func)),
+            constants:      Arc::new(Mutex::new(HashMap::new())),
+            deltas:         Arc::new(Mutex::new(HashMap::new())),
+            current_gate:   Arc::new(Mutex::new(0)),
+            current_output: Arc::new(Mutex::new(0)),
+        }
+    }
+
+    /// Output some information from the garbling.
+    fn send(&mut self, m: Message) {
+        (self.send_function.lock().unwrap().deref_mut())(m);
+    }
+
+    /// Create a delta if it has not been created yet for this modulus, otherwise just
+    /// return the existing one.
+    fn delta(&self, q: u16) -> Wire {
+        let mut deltas = self.deltas.lock().unwrap();
+        if deltas.contains_key(&q) {
+            return deltas[&q].clone();
+        }
+        let w = Wire::rand_delta(&mut *self.rng.lock().unwrap(), q);
+        deltas.insert(q,w.clone());
+        w
+    }
+
+    /// The current non-free gate index of the garbling computation.
+    fn current_gate(&self) -> usize {
+        let mut c = self.current_gate.lock().unwrap();
+        let old = *c;
+        *c += 1;
+        old
+    }
+
+    /// The current output index of the garbling computation.
+    fn current_output(&self) -> usize {
+        let mut c = self.current_output.lock().unwrap();
+        let old = *c;
+        *c += 1;
+        old
+    }
+}
+
+impl Fancy for Garbler {
     type Item = Wire;
 
     fn garbler_input(&mut self, q: u16) -> Wire { // {{{
-        let w = Wire::rand(&mut self.rng, q);
+        let w = Wire::rand(&mut *self.rng.lock().unwrap(), q);
         let d = self.delta(q);
         self.send(Message::GarblerInputZero {
             zero: w.clone(),
@@ -92,7 +146,7 @@ impl <'a> Fancy for Garbler<'a> {
     }
     //}}}
     fn evaluator_input(&mut self, q: u16) -> Wire { // {{{
-        let w = Wire::rand(&mut self.rng, q);
+        let w = Wire::rand(&mut *self.rng.lock().unwrap(), q);
         let d = self.delta(q);
         self.send(Message::EvaluatorInputZero {
             zero: w.clone(),
@@ -102,12 +156,17 @@ impl <'a> Fancy for Garbler<'a> {
     }
     //}}}
     fn constant(&mut self, x: u16, q: u16) -> Wire { // {{{
-        if self.constants.contains_key(&(x,q)) {
-            return self.constants[&(x,q)].clone();
+        let wire;
+        let zero;
+        {
+            let mut constants = self.constants.lock().unwrap();
+            if constants.contains_key(&(x,q)) {
+                return constants[&(x,q)].clone();
+            }
+            zero = Wire::rand(&mut *self.rng.lock().unwrap(), q);
+            wire = zero.plus(&self.delta(q).cmul(x));
+            constants.insert((x,q), wire.clone());
         }
-        let zero = Wire::rand(&mut self.rng, q);
-        let wire = zero.plus(&self.delta(q).cmul(x));
-        self.constants.insert((x,q), wire.clone());
         self.send(Message::Constant {
             value: x,
             wire: wire.clone()
@@ -149,7 +208,7 @@ impl <'a> Fancy for Garbler<'a> {
             // would need to pack minitable into more than one u128 to support qb > 8
             debug_assert!(qb <= 8, "qb capped at 8 for now, for assymmetric moduli");
 
-            r = self.rng.gen_u16() % q;
+            r = self.rng.lock().unwrap().gen_u16() % q;
             let t = tweak2(gate_num as u64, 1);
 
             let mut minitable = vec![None; qb as usize];
@@ -312,67 +371,20 @@ impl <'a> Fancy for Garbler<'a> {
     // }}}
 }
 
-impl <'a> Garbler<'a> {
-    /// Create a new garbler.
-    ///
-    /// `send_func` is a callback that enables streaming. It gets called as the garbler
-    /// generates ciphertext information such as garbled gates or input wirelabels.
-    pub fn new(send_func: &mut FnMut(Message)) -> Garbler {
-        Garbler {
-            rng: rand::thread_rng(),
-            send_function: send_func,
-            constants: HashMap::new(),
-            deltas: HashMap::new(),
-            current_gate: 0,
-            current_output: 0,
-        }
-    }
-
-    /// Output some information from the garbling.
-    fn send(&mut self, m: Message) {
-        (self.send_function)(m);
-    }
-
-    /// Create a delta if it has not been created yet for this modulus, otherwise just
-    /// return the existing one.
-    fn delta(&mut self, q: u16) -> Wire {
-        if self.deltas.contains_key(&q) {
-            return self.deltas[&q].clone();
-        }
-        let w = Wire::rand_delta(&mut self.rng, q);
-        self.deltas.insert(q,w.clone());
-        w
-    }
-
-    /// The current non-free gate index of the garbling computation.
-    fn current_gate(&mut self) -> usize {
-        let c = self.current_gate;
-        self.current_gate += 1;
-        c
-    }
-
-    /// The current output index of the garbling computation.
-    fn current_output(&mut self) -> usize {
-        let c = self.current_output;
-        self.current_output += 1;
-        c
-    }
-}
-
 /// Create an iterator over the messages produced by fancy garbling.
 ///
 /// This creates a new thread for the garbler, which passes messages back through a
 /// channel one by one. This function has a restrictive input type because
 /// `fancy_computation` is sent to the new thread.
-pub fn garble_iter(fancy_computation: Box<dyn Fn(&mut Garbler) + Send>)
+pub fn garble_iter(mut fancy_computation: Box<FnMut(&mut Garbler) + Send>)
     -> impl Iterator<Item=Message>
 {
     let (sender, receiver) = std::sync::mpsc::sync_channel(1);
 
     std::thread::spawn(move || {
-        let mut send_func = |m| sender.send(m)
+        let send_func = move |m| sender.send(m)
             .expect("garble_iter thread could not send message to iterator");
-        let mut garbler = Garbler::new(&mut send_func);
+        let mut garbler = Garbler::new(Box::new(send_func));
         fancy_computation(&mut garbler);
     });
 
@@ -381,29 +393,37 @@ pub fn garble_iter(fancy_computation: Box<dyn Fn(&mut Garbler) + Send>)
 
 /// Garble a circuit without streaming.
 pub fn garble(c: &Circuit) -> (Encoder, Decoder, GarbledCircuit) {
-    let mut garbler_inputs   = Vec::new();
-    let mut evaluator_inputs = Vec::new();
-    let mut garbled_gates    = Vec::new();
-    let mut constants        = HashMap::new();
-    let mut garbled_outputs  = Vec::new();
+    let garbler_inputs   = Rc::new(RefCell::new(Vec::new()));
+    let evaluator_inputs = Rc::new(RefCell::new(Vec::new()));
+    let garbled_gates    = Rc::new(RefCell::new(Vec::new()));
+    let constants        = Rc::new(RefCell::new(HashMap::new()));
+    let garbled_outputs  = Rc::new(RefCell::new(Vec::new()));
     let deltas;
 
-    let mut send_func = |m| {
-        match m {
-            Message::GarblerInputZero { zero, .. }   => garbler_inputs.push(zero),
-            Message::EvaluatorInputZero { zero, .. } => evaluator_inputs.push(zero),
-            Message::GarbledGate(w)      => garbled_gates.push(w),
-            Message::OutputCiphertext(c) => garbled_outputs.push(c),
-            Message::Constant { value, wire } => {
-                let q = wire.modulus();
-                constants.insert((value,q), wire);
+    let send_func;
+    {
+        let garbler_inputs   = garbler_inputs.clone();
+        let evaluator_inputs = evaluator_inputs.clone();
+        let garbled_gates    = garbled_gates.clone();
+        let constants        = constants.clone();
+        let garbled_outputs  = garbled_outputs.clone();
+        send_func = move |m| {
+            match m {
+                Message::GarblerInputZero { zero, .. }   => garbler_inputs.borrow_mut().push(zero),
+                Message::EvaluatorInputZero { zero, .. } => evaluator_inputs.borrow_mut().push(zero),
+                Message::GarbledGate(w)      => garbled_gates.borrow_mut().push(w),
+                Message::OutputCiphertext(c) => garbled_outputs.borrow_mut().push(c),
+                Message::Constant { value, wire } => {
+                    let q = wire.modulus();
+                    constants.borrow_mut().insert((value,q), wire);
+                }
+                m => panic!("unexpected message: {}", m),
             }
-            m => panic!("unexpected message: {}", m),
-        }
-    };
+        };
+    }
 
     {
-        let mut garbler = Garbler::new(&mut send_func);
+        let mut garbler = Garbler::new(Box::new(send_func));
 
         let mut wires = Vec::new();
         for (i, gate) in c.gates.iter().enumerate() {
@@ -425,12 +445,24 @@ pub fn garble(c: &Circuit) -> (Encoder, Decoder, GarbledCircuit) {
             garbler.output(&wires[r.ix]);
         }
 
-        deltas = garbler.deltas;
+        deltas = Arc::try_unwrap(garbler.deltas).unwrap().into_inner().unwrap();
     }
 
-    let en = Encoder::new(garbler_inputs, evaluator_inputs, deltas);
-    let ev = GarbledCircuit::new(garbled_gates, constants);
-    let de = Decoder::new(garbled_outputs);
+    let en = Encoder::new(
+        Rc::try_unwrap(garbler_inputs).unwrap().into_inner(),
+        Rc::try_unwrap(evaluator_inputs).unwrap().into_inner(),
+        deltas
+    );
+
+    let ev = GarbledCircuit::new(
+        Rc::try_unwrap(garbled_gates).unwrap().into_inner(),
+        Rc::try_unwrap(constants).unwrap().into_inner(),
+    );
+
+    let de = Decoder::new(
+        Rc::try_unwrap(garbled_outputs).unwrap().into_inner()
+    );
+
     (en, de, ev)
 }
 
