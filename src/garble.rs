@@ -24,10 +24,16 @@ pub type OutputCiphertext = Vec<u128>;
 #[derive(Serialize, Deserialize)]
 pub enum Message {
     /// Zero wire and delta for one of the garbler's inputs.
-    GarblerInputZero { zero: Wire, delta: Wire },
+    ///
+    /// This is produced by the Garbler, and must be transformed into GarblerInput before
+    /// being sent to the Evaluator.
+    UnencodedGarblerInput { zero: Wire, delta: Wire },
 
     /// Zero wire and delta for one of the evaluator's inputs.
-    EvaluatorInputZero { zero: Wire, delta: Wire},
+    ///
+    /// This is produced by the Garbler, and must be transformed into EvaluatorInput
+    /// before being sent to the Evaluator.
+    UnencodedEvaluatorInput { zero: Wire, delta: Wire},
 
     /// Encoded input for one of the garbler's inputs.
     GarblerInput(Wire),
@@ -48,13 +54,13 @@ pub enum Message {
 impl std::fmt::Display for Message {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         f.write_str(match self {
-            Message::GarblerInputZero {..}   => "GarblerInputZero",
-            Message::EvaluatorInputZero {..} => "EvaluatorInputZero",
-            Message::GarblerInput(_)         => "GarblerInput",
-            Message::EvaluatorInput(_)       => "EvaluatorInput",
-            Message::Constant {..}           => "Constant",
-            Message::GarbledGate(_)          => "GarbledGate",
-            Message::OutputCiphertext(_)     => "OutputCiphertext",
+            Message::UnencodedGarblerInput   {..} => "UnencodedGarblerInput",
+            Message::UnencodedEvaluatorInput {..} => "UnencodedEvaluatorInput",
+            Message::GarblerInput(_)              => "GarblerInput",
+            Message::EvaluatorInput(_)            => "EvaluatorInput",
+            Message::Constant {..}                => "Constant",
+            Message::GarbledGate(_)               => "GarbledGate",
+            Message::OutputCiphertext(_)          => "OutputCiphertext",
         })
     }
 }
@@ -139,7 +145,7 @@ impl Fancy for Garbler {
     fn garbler_input(&mut self, q: u16) -> Wire { // {{{
         let w = Wire::rand(&mut *self.rng.lock().unwrap(), q);
         let d = self.delta(q);
-        self.send(Message::GarblerInputZero {
+        self.send(Message::UnencodedGarblerInput {
             zero: w.clone(),
             delta: d,
         });
@@ -149,7 +155,7 @@ impl Fancy for Garbler {
     fn evaluator_input(&mut self, q: u16) -> Wire { // {{{
         let w = Wire::rand(&mut *self.rng.lock().unwrap(), q);
         let d = self.delta(q);
-        self.send(Message::EvaluatorInputZero {
+        self.send(Message::UnencodedEvaluatorInput {
             zero: w.clone(),
             delta: d,
         });
@@ -410,8 +416,8 @@ pub fn garble(c: &Circuit) -> (Encoder, Decoder, GarbledCircuit) {
         let garbled_outputs  = garbled_outputs.clone();
         send_func = move |m| {
             match m {
-                Message::GarblerInputZero { zero, .. }   => garbler_inputs.borrow_mut().push(zero),
-                Message::EvaluatorInputZero { zero, .. } => evaluator_inputs.borrow_mut().push(zero),
+                Message::UnencodedGarblerInput   { zero, .. } => garbler_inputs.borrow_mut().push(zero),
+                Message::UnencodedEvaluatorInput { zero, .. } => evaluator_inputs.borrow_mut().push(zero),
                 Message::GarbledGate(w)      => garbled_gates.borrow_mut().push(w),
                 Message::OutputCiphertext(c) => garbled_outputs.borrow_mut().push(c),
                 Message::Constant { value, wire } => {
@@ -856,10 +862,10 @@ pub fn bench(
         let count = move |mesg| {
             if i == 0 {
                 match mesg {
-                    Message::GarblerInputZero {..}   => *gb_inputs.borrow_mut() += 1,
-                    Message::EvaluatorInputZero {..} => *ev_inputs.borrow_mut() += 1,
-                    Message::Constant {..}           => *consts   .borrow_mut() += 1,
-                    Message::OutputCiphertext(_)     => *outputs  .borrow_mut() += 1,
+                    Message::UnencodedGarblerInput   {..} => *gb_inputs.borrow_mut() += 1,
+                    Message::UnencodedEvaluatorInput {..} => *ev_inputs.borrow_mut() += 1,
+                    Message::Constant {..}           => *consts.borrow_mut()  += 1,
+                    Message::OutputCiphertext(_)     => *outputs.borrow_mut() += 1,
                     Message::GarbledGate(ref g) => {
                         *gb_gates.borrow_mut() += 1;
                         *ciphertexts.borrow_mut() += g.len();
@@ -908,8 +914,8 @@ pub fn bench(
             // set up garbler
             let callback = move |msg| {
                 let m = match msg {
-                    Message::EvaluatorInputZero { zero, .. } => Message::EvaluatorInput(zero),
-                    Message::GarblerInputZero   { zero, .. } => Message::GarblerInput(zero),
+                    Message::UnencodedGarblerInput   { zero, .. } => Message::GarblerInput(zero),
+                    Message::UnencodedEvaluatorInput { zero, .. } => Message::EvaluatorInput(zero),
                     m => m,
                 };
                 sender.send(m).expect("failed to send message");
@@ -1255,13 +1261,13 @@ mod streaming {
         // encodes the appropriate inputs, and sends it along
         let mut recv_func = || {
             match gb_iter.next().unwrap() {
-                Message::GarblerInputZero { zero, delta } => {
+                Message::UnencodedGarblerInput { zero, delta } => {
                     // Encode the garbler's next input
                     let x = gb_inp_iter.next().expect("not enough garbler inputs!");
                     Message::GarblerInput( zero.plus(&delta.cmul(*x)) )
                 }
 
-                Message::EvaluatorInputZero { zero, delta } => {
+                Message::UnencodedEvaluatorInput { zero, delta } => {
                     // Encode the garbler's next input
                     let x = ev_inp_iter.next().expect("not enough evaluator inputs!");
                     Message::EvaluatorInput( zero.plus(&delta.cmul(*x)) )
