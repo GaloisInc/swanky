@@ -2,13 +2,14 @@
 //! what kind of inputs there are.
 
 use crate::fancy::{Fancy, HasModulus};
+use std::collections::HashSet;
 
 /// Implements Fancy. Use to learn information about a fancy computation in a lightweight
 /// way.
 pub struct Informer {
     garbler_input_moduli: Vec<u16>,
     evaluator_input_moduli: Vec<u16>,
-    nconstants: usize,
+    constants: HashSet<(u16,u16)>,
     noutputs: usize,
     nadds: usize,
     nsubs: usize,
@@ -30,7 +31,7 @@ impl Informer {
         Informer {
             garbler_input_moduli: Vec::new(),
             evaluator_input_moduli: Vec::new(),
-            nconstants: 0,
+            constants: HashSet::new(),
             noutputs: 0,
             nadds: 0,
             nsubs: 0,
@@ -46,15 +47,17 @@ impl Informer {
         println!("computation info:");
         println!("  garbler inputs:   {}", self.num_garbler_inputs());
         println!("  evaluator inputs: {}", self.num_evaluator_inputs());
-        println!("  noutputs:         {}", self.num_outputs());
-        println!("  nconsts:          {} // does not reflect constant reuse", self.num_consts());
+        println!("  outputs:          {}", self.num_outputs());
+        println!("  constants:        {}", self.num_consts());
         println!("  additions:        {}", self.num_adds());
         println!("  subtractions:     {}", self.num_subs());
         println!("  cmuls:            {}", self.num_cmuls());
         println!("  projections:      {}", self.num_projs());
         println!("  multiplications:  {}", self.num_muls());
-        println!("  ciphertexts:      {}", self.num_ciphertexts());
-        println!("  ciphertext size:  {}kb", self.num_ciphertexts() * 128 / 8 / 1024);
+        let cs = self.num_ciphertexts();
+        let kb = cs * 128 / 8 / 1024;
+        let mb = kb / 1024;
+        println!("  ciphertexts:      {} // {}mb and {}kb", cs, mb, kb - mb * 1024);
     }
 
     /// Number of garbler inputs in the fancy computation.
@@ -80,7 +83,7 @@ impl Informer {
     /// Number of constants in the fancy computation. NOTE: does not reflect that
     /// constants will be reused by most implementors of Fancy.
     pub fn num_consts(&self) -> usize {
-        self.nconstants
+        self.constants.len()
     }
 
     /// Number of outputs in the fancy computation.
@@ -118,8 +121,13 @@ impl Fancy for Informer {
         InformerVal(modulus)
     }
 
-    fn constant(&mut self, _val: u16, modulus: u16) -> InformerVal {
-        self.nconstants += 1;
+    fn constant(&mut self, val: u16, modulus: u16) -> InformerVal {
+        match self.constants.get(&(val,modulus)) {
+            None => {
+                self.constants.insert((val,modulus));
+            }
+            _ => (),
+        }
         InformerVal(modulus)
     }
 
