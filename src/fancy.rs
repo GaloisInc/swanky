@@ -213,6 +213,16 @@ pub trait BundleGadgets: Fancy {
         self.evaluator_input_bundle(&util::factor(q))
     }
 
+    /// Create an input bundle for the garbler using n base 2 inputs.
+    fn garbler_input_bundle_binary(&mut self, n: usize) -> Bundle<Self::Item> {
+        self.garbler_input_bundle(&vec![2;n])
+    }
+
+    /// Create an input bundle for the evaluator using n base 2 inputs.
+    fn evaluator_input_bundle_binary(&mut self, n: usize) -> Bundle<Self::Item> {
+        self.evaluator_input_bundle(&vec![2;n])
+    }
+
     /// Creates a bundle of constant wires using moduli `ps`.
     fn constant_bundle(&mut self, xs: &[u16], ps: &[u16]) -> Bundle<Self::Item> {
         Bundle(xs.iter().zip(ps.iter()).map(|(&x,&p)| self.constant(x,p)).collect())
@@ -493,6 +503,12 @@ pub trait BundleGadgets: Fancy {
             let z = self.sub_bundles(x,y);
             self.exact_sign(&z)
         }
+    }
+
+    /// Returns 1 if `x >= y`. Works on both CRT and binary bundles.
+    fn exact_geq(&mut self, x: &Bundle<Self::Item>, y: &Bundle<Self::Item>) -> Self::Item {
+        let z = self.exact_lt(x,y);
+        self.negate(&z)
     }
 
     /// Compute the maximum bundle in `xs`. Works on both CRT and binary bundles.
