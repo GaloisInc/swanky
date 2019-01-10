@@ -15,6 +15,7 @@ pub struct Informer {
     ncmuls: usize,
     nmuls: usize,
     nprojs: usize,
+    nciphertexts: usize,
 }
 
 #[derive(Clone, Default, Debug)]
@@ -36,6 +37,7 @@ impl Informer {
             ncmuls: 0,
             nmuls: 0,
             nprojs: 0,
+            nciphertexts: 0,
         }
     }
 
@@ -51,6 +53,8 @@ impl Informer {
         println!("  cmuls:            {}", self.num_cmuls());
         println!("  projections:      {}", self.num_projs());
         println!("  multiplications:  {}", self.num_muls());
+        println!("  ciphertexts:      {}", self.num_ciphertexts());
+        println!("  ciphertext size:  {}kb", self.num_ciphertexts() * 128 / 8 / 1024);
     }
 
     /// Number of garbler inputs in the fancy computation.
@@ -96,6 +100,9 @@ impl Informer {
 
     /// Number of projections in the fancy computation.
     pub fn num_projs(&self) -> usize { self.nprojs }
+
+    /// Number of ciphertexts in the fancy computation.
+    pub fn num_ciphertexts(&self) -> usize { self.nciphertexts }
 }
 
 impl Fancy for Informer {
@@ -138,6 +145,11 @@ impl Fancy for Informer {
             return self.mul(y,x);
         }
         self.nmuls += 1;
+        self.nciphertexts += x.modulus() as usize + y.modulus() as usize - 2;
+        if x.modulus() != y.modulus() {
+            // there is an extra ciphertext to support nonequal inputs
+            self.nciphertexts += 1;
+        }
         InformerVal(x.modulus())
     }
 
@@ -145,6 +157,7 @@ impl Fancy for Informer {
         assert_eq!(tt.len(), x.modulus() as usize);
         assert!(tt.iter().all(|&x| x < modulus));
         self.nprojs += 1;
+        self.nciphertexts += x.modulus() as usize - 1;
         InformerVal(modulus)
     }
 
