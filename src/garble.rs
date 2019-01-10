@@ -837,45 +837,13 @@ pub fn bench(
 
     let mut total_time = Duration::zero();
 
-    // benchmark the garbler by itself
-    let gb_inputs   = Rc::new(RefCell::new(0));
-    let ev_inputs   = Rc::new(RefCell::new(0));
-    let consts      = Rc::new(RefCell::new(0));
-    let gb_gates    = Rc::new(RefCell::new(0));
-    let outputs     = Rc::new(RefCell::new(0));
-    let ciphertexts = Rc::new(RefCell::new(0));
-
-    println!("Benchmarking garbler");
+    println!("benchmarking garbler");
     let mut pb = pbr::ProgressBar::new(niters as u64);
-    pb.message("Test ");
+    pb.message("test ");
 
-    for i in 0..niters {
+    for _ in 0..niters {
         pb.inc();
-
-        let gb_inputs   = gb_inputs.clone();
-        let ev_inputs   = ev_inputs.clone();
-        let consts      = consts.clone();
-        let gb_gates    = gb_gates.clone();
-        let outputs     = outputs.clone();
-        let ciphertexts = ciphertexts.clone();
-
-        let count = move |mesg| {
-            if i == 0 {
-                match mesg {
-                    Message::UnencodedGarblerInput   {..} => *gb_inputs.borrow_mut() += 1,
-                    Message::UnencodedEvaluatorInput {..} => *ev_inputs.borrow_mut() += 1,
-                    Message::Constant {..}           => *consts.borrow_mut()  += 1,
-                    Message::OutputCiphertext(_)     => *outputs.borrow_mut() += 1,
-                    Message::GarbledGate(ref g) => {
-                        *gb_gates.borrow_mut() += 1;
-                        *ciphertexts.borrow_mut() += g.len();
-                    }
-                    _ => (),
-                }
-            }
-        };
-        // evaluate the neural net
-        let mut garbler = Garbler::new(Box::new(count));
+        let mut garbler = Garbler::new(Box::new(|_|()));
         let start = PreciseTime::now();
         fancy_gb(&mut garbler);
         let end = PreciseTime::now();
@@ -885,19 +853,11 @@ pub fn bench(
 
     total_time = total_time / niters as i32;
     println!("garbling took {} ms", total_time.num_milliseconds());
-    println!("info:");
-    println!("  gb_inputs:         {}", gb_inputs.borrow());
-    println!("  ev_inputs:         {}", ev_inputs.borrow());
-    println!("  consts:            {}", consts.borrow());
-    println!("  nonfree gates:     {}", gb_gates.borrow());
-    println!("  total ciphertexts: {}   // not including garbler inputs or consts", ciphertexts.borrow());
-    println!("  ciphertext size:   {}kb", *ciphertexts.borrow() * 128 / 8 / 1024);
-    println!("");
 
     // benchmark the garbler and the evaluator together
-    println!("Benchmarking garbler streaming to evaluator");
+    println!("benchmarking garbler streaming to evaluator");
     let mut pb = pbr::ProgressBar::new(niters as u64);
-    pb.message("Test ");
+    pb.message("test ");
 
     total_time = Duration::zero();
     for _ in 0..niters {
@@ -1371,4 +1331,10 @@ mod streaming {
         }
     }
 //}}}
+    #[test]
+    fn garbler_has_send_and_sync() {
+        fn check_send(_: impl Send) { }
+        fn check_sync(_: impl Sync) { }
+        Garbler::new(Box::new(|_| ()));
+    }
 }

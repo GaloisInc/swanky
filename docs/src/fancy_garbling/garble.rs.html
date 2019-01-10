@@ -1338,35 +1338,7 @@
 <span id="1338">1338</span>
 <span id="1339">1339</span>
 <span id="1340">1340</span>
-<span id="1341">1341</span>
-<span id="1342">1342</span>
-<span id="1343">1343</span>
-<span id="1344">1344</span>
-<span id="1345">1345</span>
-<span id="1346">1346</span>
-<span id="1347">1347</span>
-<span id="1348">1348</span>
-<span id="1349">1349</span>
-<span id="1350">1350</span>
-<span id="1351">1351</span>
-<span id="1352">1352</span>
-<span id="1353">1353</span>
-<span id="1354">1354</span>
-<span id="1355">1355</span>
-<span id="1356">1356</span>
-<span id="1357">1357</span>
-<span id="1358">1358</span>
-<span id="1359">1359</span>
-<span id="1360">1360</span>
-<span id="1361">1361</span>
-<span id="1362">1362</span>
-<span id="1363">1363</span>
-<span id="1364">1364</span>
-<span id="1365">1365</span>
-<span id="1366">1366</span>
-<span id="1367">1367</span>
-<span id="1368">1368</span>
-</pre><pre class="rust ">
+</pre><div class="example-wrap"><pre class="rust ">
 <span class="doccomment">//! Structs and functions for creating, streaming, and evaluating garbled circuits.</span>
 
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">circuit</span>::{<span class="ident">Circuit</span>, <span class="ident">Gate</span>};
@@ -1393,10 +1365,16 @@
 <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Serialize</span>, <span class="ident">Deserialize</span>)]</span>
 <span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">Message</span> {
     <span class="doccomment">/// Zero wire and delta for one of the garbler&#39;s inputs.</span>
-    <span class="ident">GarblerInputZero</span> { <span class="ident">zero</span>: <span class="ident">Wire</span>, <span class="ident">delta</span>: <span class="ident">Wire</span> },
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// This is produced by the Garbler, and must be transformed into GarblerInput before</span>
+    <span class="doccomment">/// being sent to the Evaluator.</span>
+    <span class="ident">UnencodedGarblerInput</span> { <span class="ident">zero</span>: <span class="ident">Wire</span>, <span class="ident">delta</span>: <span class="ident">Wire</span> },
 
     <span class="doccomment">/// Zero wire and delta for one of the evaluator&#39;s inputs.</span>
-    <span class="ident">EvaluatorInputZero</span> { <span class="ident">zero</span>: <span class="ident">Wire</span>, <span class="ident">delta</span>: <span class="ident">Wire</span>},
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// This is produced by the Garbler, and must be transformed into EvaluatorInput</span>
+    <span class="doccomment">/// before being sent to the Evaluator.</span>
+    <span class="ident">UnencodedEvaluatorInput</span> { <span class="ident">zero</span>: <span class="ident">Wire</span>, <span class="ident">delta</span>: <span class="ident">Wire</span>},
 
     <span class="doccomment">/// Encoded input for one of the garbler&#39;s inputs.</span>
     <span class="ident">GarblerInput</span>(<span class="ident">Wire</span>),
@@ -1417,13 +1395,13 @@
 <span class="kw">impl</span> <span class="ident">std</span>::<span class="ident">fmt</span>::<span class="ident">Display</span> <span class="kw">for</span> <span class="ident">Message</span> {
     <span class="kw">fn</span> <span class="ident">fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">f</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">std</span>::<span class="ident">fmt</span>::<span class="ident">Formatter</span>) <span class="op">-&gt;</span> <span class="ident">std</span>::<span class="ident">fmt</span>::<span class="prelude-ty">Result</span> {
         <span class="ident">f</span>.<span class="ident">write_str</span>(<span class="kw">match</span> <span class="self">self</span> {
-            <span class="ident">Message</span>::<span class="ident">GarblerInputZero</span> {..}   <span class="op">=&gt;</span> <span class="string">&quot;GarblerInputZero&quot;</span>,
-            <span class="ident">Message</span>::<span class="ident">EvaluatorInputZero</span> {..} <span class="op">=&gt;</span> <span class="string">&quot;EvaluatorInputZero&quot;</span>,
-            <span class="ident">Message</span>::<span class="ident">GarblerInput</span>(<span class="kw">_</span>)         <span class="op">=&gt;</span> <span class="string">&quot;GarblerInput&quot;</span>,
-            <span class="ident">Message</span>::<span class="ident">EvaluatorInput</span>(<span class="kw">_</span>)       <span class="op">=&gt;</span> <span class="string">&quot;EvaluatorInput&quot;</span>,
-            <span class="ident">Message</span>::<span class="ident">Constant</span> {..}           <span class="op">=&gt;</span> <span class="string">&quot;Constant&quot;</span>,
-            <span class="ident">Message</span>::<span class="ident">GarbledGate</span>(<span class="kw">_</span>)          <span class="op">=&gt;</span> <span class="string">&quot;GarbledGate&quot;</span>,
-            <span class="ident">Message</span>::<span class="ident">OutputCiphertext</span>(<span class="kw">_</span>)     <span class="op">=&gt;</span> <span class="string">&quot;OutputCiphertext&quot;</span>,
+            <span class="ident">Message</span>::<span class="ident">UnencodedGarblerInput</span>   {..} <span class="op">=&gt;</span> <span class="string">&quot;UnencodedGarblerInput&quot;</span>,
+            <span class="ident">Message</span>::<span class="ident">UnencodedEvaluatorInput</span> {..} <span class="op">=&gt;</span> <span class="string">&quot;UnencodedEvaluatorInput&quot;</span>,
+            <span class="ident">Message</span>::<span class="ident">GarblerInput</span>(<span class="kw">_</span>)              <span class="op">=&gt;</span> <span class="string">&quot;GarblerInput&quot;</span>,
+            <span class="ident">Message</span>::<span class="ident">EvaluatorInput</span>(<span class="kw">_</span>)            <span class="op">=&gt;</span> <span class="string">&quot;EvaluatorInput&quot;</span>,
+            <span class="ident">Message</span>::<span class="ident">Constant</span> {..}                <span class="op">=&gt;</span> <span class="string">&quot;Constant&quot;</span>,
+            <span class="ident">Message</span>::<span class="ident">GarbledGate</span>(<span class="kw">_</span>)               <span class="op">=&gt;</span> <span class="string">&quot;GarbledGate&quot;</span>,
+            <span class="ident">Message</span>::<span class="ident">OutputCiphertext</span>(<span class="kw">_</span>)          <span class="op">=&gt;</span> <span class="string">&quot;OutputCiphertext&quot;</span>,
         })
     }
 }
@@ -1508,7 +1486,7 @@
     <span class="kw">fn</span> <span class="ident">garbler_input</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">q</span>: <span class="ident">u16</span>) <span class="op">-&gt;</span> <span class="ident">Wire</span> { <span class="comment">// {{{</span>
         <span class="kw">let</span> <span class="ident">w</span> <span class="op">=</span> <span class="ident">Wire</span>::<span class="ident">rand</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="kw-2">*</span><span class="self">self</span>.<span class="ident">rng</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>(), <span class="ident">q</span>);
         <span class="kw">let</span> <span class="ident">d</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">delta</span>(<span class="ident">q</span>);
-        <span class="self">self</span>.<span class="ident">send</span>(<span class="ident">Message</span>::<span class="ident">GarblerInputZero</span> {
+        <span class="self">self</span>.<span class="ident">send</span>(<span class="ident">Message</span>::<span class="ident">UnencodedGarblerInput</span> {
             <span class="ident">zero</span>: <span class="ident">w</span>.<span class="ident">clone</span>(),
             <span class="ident">delta</span>: <span class="ident">d</span>,
         });
@@ -1518,7 +1496,7 @@
     <span class="kw">fn</span> <span class="ident">evaluator_input</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">q</span>: <span class="ident">u16</span>) <span class="op">-&gt;</span> <span class="ident">Wire</span> { <span class="comment">// {{{</span>
         <span class="kw">let</span> <span class="ident">w</span> <span class="op">=</span> <span class="ident">Wire</span>::<span class="ident">rand</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="kw-2">*</span><span class="self">self</span>.<span class="ident">rng</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>(), <span class="ident">q</span>);
         <span class="kw">let</span> <span class="ident">d</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">delta</span>(<span class="ident">q</span>);
-        <span class="self">self</span>.<span class="ident">send</span>(<span class="ident">Message</span>::<span class="ident">EvaluatorInputZero</span> {
+        <span class="self">self</span>.<span class="ident">send</span>(<span class="ident">Message</span>::<span class="ident">UnencodedEvaluatorInput</span> {
             <span class="ident">zero</span>: <span class="ident">w</span>.<span class="ident">clone</span>(),
             <span class="ident">delta</span>: <span class="ident">d</span>,
         });
@@ -1779,8 +1757,8 @@
         <span class="kw">let</span> <span class="ident">garbled_outputs</span>  <span class="op">=</span> <span class="ident">garbled_outputs</span>.<span class="ident">clone</span>();
         <span class="ident">send_func</span> <span class="op">=</span> <span class="kw">move</span> <span class="op">|</span><span class="ident">m</span><span class="op">|</span> {
             <span class="kw">match</span> <span class="ident">m</span> {
-                <span class="ident">Message</span>::<span class="ident">GarblerInputZero</span> { <span class="ident">zero</span>, .. }   <span class="op">=&gt;</span> <span class="ident">garbler_inputs</span>.<span class="ident">borrow_mut</span>().<span class="ident">push</span>(<span class="ident">zero</span>),
-                <span class="ident">Message</span>::<span class="ident">EvaluatorInputZero</span> { <span class="ident">zero</span>, .. } <span class="op">=&gt;</span> <span class="ident">evaluator_inputs</span>.<span class="ident">borrow_mut</span>().<span class="ident">push</span>(<span class="ident">zero</span>),
+                <span class="ident">Message</span>::<span class="ident">UnencodedGarblerInput</span>   { <span class="ident">zero</span>, .. } <span class="op">=&gt;</span> <span class="ident">garbler_inputs</span>.<span class="ident">borrow_mut</span>().<span class="ident">push</span>(<span class="ident">zero</span>),
+                <span class="ident">Message</span>::<span class="ident">UnencodedEvaluatorInput</span> { <span class="ident">zero</span>, .. } <span class="op">=&gt;</span> <span class="ident">evaluator_inputs</span>.<span class="ident">borrow_mut</span>().<span class="ident">push</span>(<span class="ident">zero</span>),
                 <span class="ident">Message</span>::<span class="ident">GarbledGate</span>(<span class="ident">w</span>)      <span class="op">=&gt;</span> <span class="ident">garbled_gates</span>.<span class="ident">borrow_mut</span>().<span class="ident">push</span>(<span class="ident">w</span>),
                 <span class="ident">Message</span>::<span class="ident">OutputCiphertext</span>(<span class="ident">c</span>) <span class="op">=&gt;</span> <span class="ident">garbled_outputs</span>.<span class="ident">borrow_mut</span>().<span class="ident">push</span>(<span class="ident">c</span>),
                 <span class="ident">Message</span>::<span class="ident">Constant</span> { <span class="ident">value</span>, <span class="ident">wire</span> } <span class="op">=&gt;</span> {
@@ -2200,45 +2178,13 @@
 
     <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">total_time</span> <span class="op">=</span> <span class="ident">Duration</span>::<span class="ident">zero</span>();
 
-    <span class="comment">// benchmark the garbler by itself</span>
-    <span class="kw">let</span> <span class="ident">gb_inputs</span>   <span class="op">=</span> <span class="ident">Rc</span>::<span class="ident">new</span>(<span class="ident">RefCell</span>::<span class="ident">new</span>(<span class="number">0</span>));
-    <span class="kw">let</span> <span class="ident">ev_inputs</span>   <span class="op">=</span> <span class="ident">Rc</span>::<span class="ident">new</span>(<span class="ident">RefCell</span>::<span class="ident">new</span>(<span class="number">0</span>));
-    <span class="kw">let</span> <span class="ident">consts</span>      <span class="op">=</span> <span class="ident">Rc</span>::<span class="ident">new</span>(<span class="ident">RefCell</span>::<span class="ident">new</span>(<span class="number">0</span>));
-    <span class="kw">let</span> <span class="ident">gb_gates</span>    <span class="op">=</span> <span class="ident">Rc</span>::<span class="ident">new</span>(<span class="ident">RefCell</span>::<span class="ident">new</span>(<span class="number">0</span>));
-    <span class="kw">let</span> <span class="ident">outputs</span>     <span class="op">=</span> <span class="ident">Rc</span>::<span class="ident">new</span>(<span class="ident">RefCell</span>::<span class="ident">new</span>(<span class="number">0</span>));
-    <span class="kw">let</span> <span class="ident">ciphertexts</span> <span class="op">=</span> <span class="ident">Rc</span>::<span class="ident">new</span>(<span class="ident">RefCell</span>::<span class="ident">new</span>(<span class="number">0</span>));
-
-    <span class="macro">println</span><span class="macro">!</span>(<span class="string">&quot;Benchmarking garbler&quot;</span>);
+    <span class="macro">println</span><span class="macro">!</span>(<span class="string">&quot;benchmarking garbler&quot;</span>);
     <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">pb</span> <span class="op">=</span> <span class="ident">pbr</span>::<span class="ident">ProgressBar</span>::<span class="ident">new</span>(<span class="ident">niters</span> <span class="kw">as</span> <span class="ident">u64</span>);
-    <span class="ident">pb</span>.<span class="ident">message</span>(<span class="string">&quot;Test &quot;</span>);
+    <span class="ident">pb</span>.<span class="ident">message</span>(<span class="string">&quot;test &quot;</span>);
 
-    <span class="kw">for</span> <span class="ident">i</span> <span class="kw">in</span> <span class="number">0</span>..<span class="ident">niters</span> {
+    <span class="kw">for</span> <span class="kw">_</span> <span class="kw">in</span> <span class="number">0</span>..<span class="ident">niters</span> {
         <span class="ident">pb</span>.<span class="ident">inc</span>();
-
-        <span class="kw">let</span> <span class="ident">gb_inputs</span>   <span class="op">=</span> <span class="ident">gb_inputs</span>.<span class="ident">clone</span>();
-        <span class="kw">let</span> <span class="ident">ev_inputs</span>   <span class="op">=</span> <span class="ident">ev_inputs</span>.<span class="ident">clone</span>();
-        <span class="kw">let</span> <span class="ident">consts</span>      <span class="op">=</span> <span class="ident">consts</span>.<span class="ident">clone</span>();
-        <span class="kw">let</span> <span class="ident">gb_gates</span>    <span class="op">=</span> <span class="ident">gb_gates</span>.<span class="ident">clone</span>();
-        <span class="kw">let</span> <span class="ident">outputs</span>     <span class="op">=</span> <span class="ident">outputs</span>.<span class="ident">clone</span>();
-        <span class="kw">let</span> <span class="ident">ciphertexts</span> <span class="op">=</span> <span class="ident">ciphertexts</span>.<span class="ident">clone</span>();
-
-        <span class="kw">let</span> <span class="ident">count</span> <span class="op">=</span> <span class="kw">move</span> <span class="op">|</span><span class="ident">mesg</span><span class="op">|</span> {
-            <span class="kw">if</span> <span class="ident">i</span> <span class="op">==</span> <span class="number">0</span> {
-                <span class="kw">match</span> <span class="ident">mesg</span> {
-                    <span class="ident">Message</span>::<span class="ident">GarblerInputZero</span> {..}   <span class="op">=&gt;</span> <span class="kw-2">*</span><span class="ident">gb_inputs</span>.<span class="ident">borrow_mut</span>() <span class="op">+=</span> <span class="number">1</span>,
-                    <span class="ident">Message</span>::<span class="ident">EvaluatorInputZero</span> {..} <span class="op">=&gt;</span> <span class="kw-2">*</span><span class="ident">ev_inputs</span>.<span class="ident">borrow_mut</span>() <span class="op">+=</span> <span class="number">1</span>,
-                    <span class="ident">Message</span>::<span class="ident">Constant</span> {..}           <span class="op">=&gt;</span> <span class="kw-2">*</span><span class="ident">consts</span>   .<span class="ident">borrow_mut</span>() <span class="op">+=</span> <span class="number">1</span>,
-                    <span class="ident">Message</span>::<span class="ident">OutputCiphertext</span>(<span class="kw">_</span>)     <span class="op">=&gt;</span> <span class="kw-2">*</span><span class="ident">outputs</span>  .<span class="ident">borrow_mut</span>() <span class="op">+=</span> <span class="number">1</span>,
-                    <span class="ident">Message</span>::<span class="ident">GarbledGate</span>(<span class="kw-2">ref</span> <span class="ident">g</span>) <span class="op">=&gt;</span> {
-                        <span class="kw-2">*</span><span class="ident">gb_gates</span>.<span class="ident">borrow_mut</span>() <span class="op">+=</span> <span class="number">1</span>;
-                        <span class="kw-2">*</span><span class="ident">ciphertexts</span>.<span class="ident">borrow_mut</span>() <span class="op">+=</span> <span class="ident">g</span>.<span class="ident">len</span>();
-                    }
-                    <span class="kw">_</span> <span class="op">=&gt;</span> (),
-                }
-            }
-        };
-        <span class="comment">// evaluate the neural net</span>
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">garbler</span> <span class="op">=</span> <span class="ident">Garbler</span>::<span class="ident">new</span>(<span class="ident">Box</span>::<span class="ident">new</span>(<span class="ident">count</span>));
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">garbler</span> <span class="op">=</span> <span class="ident">Garbler</span>::<span class="ident">new</span>(<span class="ident">Box</span>::<span class="ident">new</span>(<span class="op">|</span><span class="kw">_</span><span class="op">|</span>()));
         <span class="kw">let</span> <span class="ident">start</span> <span class="op">=</span> <span class="ident">PreciseTime</span>::<span class="ident">now</span>();
         <span class="ident">fancy_gb</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">garbler</span>);
         <span class="kw">let</span> <span class="ident">end</span> <span class="op">=</span> <span class="ident">PreciseTime</span>::<span class="ident">now</span>();
@@ -2248,19 +2194,11 @@
 
     <span class="ident">total_time</span> <span class="op">=</span> <span class="ident">total_time</span> <span class="op">/</span> <span class="ident">niters</span> <span class="kw">as</span> <span class="ident">i32</span>;
     <span class="macro">println</span><span class="macro">!</span>(<span class="string">&quot;garbling took {} ms&quot;</span>, <span class="ident">total_time</span>.<span class="ident">num_milliseconds</span>());
-    <span class="macro">println</span><span class="macro">!</span>(<span class="string">&quot;info:&quot;</span>);
-    <span class="macro">println</span><span class="macro">!</span>(<span class="string">&quot;  gb_inputs:         {}&quot;</span>, <span class="ident">gb_inputs</span>.<span class="ident">borrow</span>());
-    <span class="macro">println</span><span class="macro">!</span>(<span class="string">&quot;  ev_inputs:         {}&quot;</span>, <span class="ident">ev_inputs</span>.<span class="ident">borrow</span>());
-    <span class="macro">println</span><span class="macro">!</span>(<span class="string">&quot;  consts:            {}&quot;</span>, <span class="ident">consts</span>.<span class="ident">borrow</span>());
-    <span class="macro">println</span><span class="macro">!</span>(<span class="string">&quot;  nonfree gates:     {}&quot;</span>, <span class="ident">gb_gates</span>.<span class="ident">borrow</span>());
-    <span class="macro">println</span><span class="macro">!</span>(<span class="string">&quot;  total ciphertexts: {}   // not including garbler inputs or consts&quot;</span>, <span class="ident">ciphertexts</span>.<span class="ident">borrow</span>());
-    <span class="macro">println</span><span class="macro">!</span>(<span class="string">&quot;  ciphertext size:   {}kb&quot;</span>, <span class="kw-2">*</span><span class="ident">ciphertexts</span>.<span class="ident">borrow</span>() <span class="op">*</span> <span class="number">128</span> <span class="op">/</span> <span class="number">8</span> <span class="op">/</span> <span class="number">1024</span>);
-    <span class="macro">println</span><span class="macro">!</span>(<span class="string">&quot;&quot;</span>);
 
     <span class="comment">// benchmark the garbler and the evaluator together</span>
-    <span class="macro">println</span><span class="macro">!</span>(<span class="string">&quot;Benchmarking garbler streaming to evaluator&quot;</span>);
+    <span class="macro">println</span><span class="macro">!</span>(<span class="string">&quot;benchmarking garbler streaming to evaluator&quot;</span>);
     <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">pb</span> <span class="op">=</span> <span class="ident">pbr</span>::<span class="ident">ProgressBar</span>::<span class="ident">new</span>(<span class="ident">niters</span> <span class="kw">as</span> <span class="ident">u64</span>);
-    <span class="ident">pb</span>.<span class="ident">message</span>(<span class="string">&quot;Test &quot;</span>);
+    <span class="ident">pb</span>.<span class="ident">message</span>(<span class="string">&quot;test &quot;</span>);
 
     <span class="ident">total_time</span> <span class="op">=</span> <span class="ident">Duration</span>::<span class="ident">zero</span>();
     <span class="kw">for</span> <span class="kw">_</span> <span class="kw">in</span> <span class="number">0</span>..<span class="ident">niters</span> {
@@ -2277,8 +2215,8 @@
             <span class="comment">// set up garbler</span>
             <span class="kw">let</span> <span class="ident">callback</span> <span class="op">=</span> <span class="kw">move</span> <span class="op">|</span><span class="ident">msg</span><span class="op">|</span> {
                 <span class="kw">let</span> <span class="ident">m</span> <span class="op">=</span> <span class="kw">match</span> <span class="ident">msg</span> {
-                    <span class="ident">Message</span>::<span class="ident">EvaluatorInputZero</span> { <span class="ident">zero</span>, .. } <span class="op">=&gt;</span> <span class="ident">Message</span>::<span class="ident">EvaluatorInput</span>(<span class="ident">zero</span>),
-                    <span class="ident">Message</span>::<span class="ident">GarblerInputZero</span>   { <span class="ident">zero</span>, .. } <span class="op">=&gt;</span> <span class="ident">Message</span>::<span class="ident">GarblerInput</span>(<span class="ident">zero</span>),
+                    <span class="ident">Message</span>::<span class="ident">UnencodedGarblerInput</span>   { <span class="ident">zero</span>, .. } <span class="op">=&gt;</span> <span class="ident">Message</span>::<span class="ident">GarblerInput</span>(<span class="ident">zero</span>),
+                    <span class="ident">Message</span>::<span class="ident">UnencodedEvaluatorInput</span> { <span class="ident">zero</span>, .. } <span class="op">=&gt;</span> <span class="ident">Message</span>::<span class="ident">EvaluatorInput</span>(<span class="ident">zero</span>),
                     <span class="ident">m</span> <span class="op">=&gt;</span> <span class="ident">m</span>,
                 };
                 <span class="ident">sender</span>.<span class="ident">send</span>(<span class="ident">m</span>).<span class="ident">expect</span>(<span class="string">&quot;failed to send message&quot;</span>);
@@ -2624,13 +2562,13 @@
         <span class="comment">// encodes the appropriate inputs, and sends it along</span>
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">recv_func</span> <span class="op">=</span> <span class="op">||</span> {
             <span class="kw">match</span> <span class="ident">gb_iter</span>.<span class="ident">next</span>().<span class="ident">unwrap</span>() {
-                <span class="ident">Message</span>::<span class="ident">GarblerInputZero</span> { <span class="ident">zero</span>, <span class="ident">delta</span> } <span class="op">=&gt;</span> {
+                <span class="ident">Message</span>::<span class="ident">UnencodedGarblerInput</span> { <span class="ident">zero</span>, <span class="ident">delta</span> } <span class="op">=&gt;</span> {
                     <span class="comment">// Encode the garbler&#39;s next input</span>
                     <span class="kw">let</span> <span class="ident">x</span> <span class="op">=</span> <span class="ident">gb_inp_iter</span>.<span class="ident">next</span>().<span class="ident">expect</span>(<span class="string">&quot;not enough garbler inputs!&quot;</span>);
                     <span class="ident">Message</span>::<span class="ident">GarblerInput</span>( <span class="ident">zero</span>.<span class="ident">plus</span>(<span class="kw-2">&amp;</span><span class="ident">delta</span>.<span class="ident">cmul</span>(<span class="kw-2">*</span><span class="ident">x</span>)) )
                 }
 
-                <span class="ident">Message</span>::<span class="ident">EvaluatorInputZero</span> { <span class="ident">zero</span>, <span class="ident">delta</span> } <span class="op">=&gt;</span> {
+                <span class="ident">Message</span>::<span class="ident">UnencodedEvaluatorInput</span> { <span class="ident">zero</span>, <span class="ident">delta</span> } <span class="op">=&gt;</span> {
                     <span class="comment">// Encode the garbler&#39;s next input</span>
                     <span class="kw">let</span> <span class="ident">x</span> <span class="op">=</span> <span class="ident">ev_inp_iter</span>.<span class="ident">next</span>().<span class="ident">expect</span>(<span class="string">&quot;not enough evaluator inputs!&quot;</span>);
                     <span class="ident">Message</span>::<span class="ident">EvaluatorInput</span>( <span class="ident">zero</span>.<span class="ident">plus</span>(<span class="kw-2">&amp;</span><span class="ident">delta</span>.<span class="ident">cmul</span>(<span class="kw-2">*</span><span class="ident">x</span>)) )
@@ -2734,6 +2672,12 @@
         }
     }
 <span class="comment">//}}}</span>
+    <span class="attribute">#[<span class="ident">test</span>]</span>
+    <span class="kw">fn</span> <span class="ident">garbler_has_send_and_sync</span>() {
+        <span class="kw">fn</span> <span class="ident">check_send</span>(<span class="kw">_</span>: <span class="kw">impl</span> <span class="ident">Send</span>) { }
+        <span class="kw">fn</span> <span class="ident">check_sync</span>(<span class="kw">_</span>: <span class="kw">impl</span> <span class="ident">Sync</span>) { }
+        <span class="ident">Garbler</span>::<span class="ident">new</span>(<span class="ident">Box</span>::<span class="ident">new</span>(<span class="op">|</span><span class="kw">_</span><span class="op">|</span> ()));
+    }
 }
-</pre>
-</section><section id="search" class="content hidden"></section><section class="footer"></section><aside id="help" class="hidden"><div><h1 class="hidden">Help</h1><div class="shortcuts"><h2>Keyboard Shortcuts</h2><dl><dt><kbd>?</kbd></dt><dd>Show this help dialog</dd><dt><kbd>S</kbd></dt><dd>Focus the search field</dd><dt><kbd>↑</kbd></dt><dd>Move up in search results</dd><dt><kbd>↓</kbd></dt><dd>Move down in search results</dd><dt><kbd>↹</kbd></dt><dd>Switch tab</dd><dt><kbd>&#9166;</kbd></dt><dd>Go to active search result</dd><dt><kbd>+</kbd></dt><dd>Expand all sections</dd><dt><kbd>-</kbd></dt><dd>Collapse all sections</dd></dl></div><div class="infos"><h2>Search Tricks</h2><p>Prefix searches with a type followed by a colon (e.g. <code>fn:</code>) to restrict the search to a given type.</p><p>Accepted types are: <code>fn</code>, <code>mod</code>, <code>struct</code>, <code>enum</code>, <code>trait</code>, <code>type</code>, <code>macro</code>, and <code>const</code>.</p><p>Search functions by type signature (e.g. <code>vec -> usize</code> or <code>* -> vec</code>)</p><p>Search multiple things at once by splitting your query with comma (e.g. <code>str,u8</code> or <code>String,struct:Vec,test</code>)</p></div></div></aside><script>window.rootPath = "../../";window.currentCrate = "fancy_garbling";</script><script src="../../aliases.js"></script><script src="../../main.js"></script><script defer src="../../search-index.js"></script></body></html>
+</pre></div>
+</section><section id="search" class="content hidden"></section><section class="footer"></section><aside id="help" class="hidden"><div><h1 class="hidden">Help</h1><div class="shortcuts"><h2>Keyboard Shortcuts</h2><dl><dt><kbd>?</kbd></dt><dd>Show this help dialog</dd><dt><kbd>S</kbd></dt><dd>Focus the search field</dd><dt><kbd>↑</kbd></dt><dd>Move up in search results</dd><dt><kbd>↓</kbd></dt><dd>Move down in search results</dd><dt><kbd>↹</kbd></dt><dd>Switch tab</dd><dt><kbd>&#9166;</kbd></dt><dd>Go to active search result</dd><dt><kbd>+</kbd></dt><dd>Expand all sections</dd><dt><kbd>-</kbd></dt><dd>Collapse all sections</dd></dl></div><div class="infos"><h2>Search Tricks</h2><p>Prefix searches with a type followed by a colon (e.g. <code>fn:</code>) to restrict the search to a given type.</p><p>Accepted types are: <code>fn</code>, <code>mod</code>, <code>struct</code>, <code>enum</code>, <code>trait</code>, <code>type</code>, <code>macro</code>, and <code>const</code>.</p><p>Search functions by type signature (e.g. <code>vec -> usize</code> or <code>* -> vec</code>)</p><p>Search multiple things at once by splitting your query with comma (e.g. <code>str,u8</code> or <code>String,struct:Vec,test</code>)</p></div></div></aside><script>window.rootPath = "../../";window.currentCrate = "fancy_garbling";</script><script src="../../aliases.js"></script><script src="../../main.js"></script><script src="../../source-files.js"></script><script src="../../source-script.js"></script><script defer src="../../search-index.js"></script></body></html>

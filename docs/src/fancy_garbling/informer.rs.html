@@ -188,7 +188,43 @@
 <span id="188">188</span>
 <span id="189">189</span>
 <span id="190">190</span>
-</pre><pre class="rust ">
+<span id="191">191</span>
+<span id="192">192</span>
+<span id="193">193</span>
+<span id="194">194</span>
+<span id="195">195</span>
+<span id="196">196</span>
+<span id="197">197</span>
+<span id="198">198</span>
+<span id="199">199</span>
+<span id="200">200</span>
+<span id="201">201</span>
+<span id="202">202</span>
+<span id="203">203</span>
+<span id="204">204</span>
+<span id="205">205</span>
+<span id="206">206</span>
+<span id="207">207</span>
+<span id="208">208</span>
+<span id="209">209</span>
+<span id="210">210</span>
+<span id="211">211</span>
+<span id="212">212</span>
+<span id="213">213</span>
+<span id="214">214</span>
+<span id="215">215</span>
+<span id="216">216</span>
+<span id="217">217</span>
+<span id="218">218</span>
+<span id="219">219</span>
+<span id="220">220</span>
+<span id="221">221</span>
+<span id="222">222</span>
+<span id="223">223</span>
+<span id="224">224</span>
+<span id="225">225</span>
+<span id="226">226</span>
+</pre><div class="example-wrap"><pre class="rust ">
 <span class="doccomment">//! Informer runs a fancy computation and learns information from it, like how many of</span>
 <span class="doccomment">//! what kind of inputs there are.</span>
 
@@ -201,7 +237,7 @@
     <span class="ident">garbler_input_moduli</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u16</span><span class="op">&gt;</span>,
     <span class="ident">evaluator_input_moduli</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u16</span><span class="op">&gt;</span>,
     <span class="ident">constants</span>: <span class="ident">HashSet</span><span class="op">&lt;</span>(<span class="ident">u16</span>,<span class="ident">u16</span>)<span class="op">&gt;</span>,
-    <span class="ident">noutputs</span>: <span class="ident">usize</span>,
+    <span class="ident">outputs</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u16</span><span class="op">&gt;</span>,
     <span class="ident">nadds</span>: <span class="ident">usize</span>,
     <span class="ident">nsubs</span>: <span class="ident">usize</span>,
     <span class="ident">ncmuls</span>: <span class="ident">usize</span>,
@@ -223,7 +259,7 @@
             <span class="ident">garbler_input_moduli</span>: <span class="ident">Vec</span>::<span class="ident">new</span>(),
             <span class="ident">evaluator_input_moduli</span>: <span class="ident">Vec</span>::<span class="ident">new</span>(),
             <span class="ident">constants</span>: <span class="ident">HashSet</span>::<span class="ident">new</span>(),
-            <span class="ident">noutputs</span>: <span class="number">0</span>,
+            <span class="ident">outputs</span>: <span class="ident">Vec</span>::<span class="ident">new</span>(),
             <span class="ident">nadds</span>: <span class="number">0</span>,
             <span class="ident">nsubs</span>: <span class="number">0</span>,
             <span class="ident">ncmuls</span>: <span class="number">0</span>,
@@ -238,32 +274,63 @@
     <span class="doccomment">/// For example:</span>
     <span class="doccomment">/// ```</span>
     <span class="doccomment">/// computation info:</span>
-    <span class="doccomment">///   garbler inputs:   8</span>
-    <span class="doccomment">///   evaluator inputs: 8</span>
-    <span class="doccomment">///   outputs:          1</span>
-    <span class="doccomment">///   constants:        0</span>
-    <span class="doccomment">///   additions:        86</span>
-    <span class="doccomment">///   subtractions:     8</span>
-    <span class="doccomment">///   cmuls:            0</span>
-    <span class="doccomment">///   projections:      98</span>
-    <span class="doccomment">///   multiplications:  0</span>
-    <span class="doccomment">///   ciphertexts:      1078 // 0mb and 16kb</span>
+    <span class="doccomment">///   garbler inputs:             345600 // comms cost: 5400kb</span>
+    <span class="doccomment">///   evaluator inputs:           345600 // OT cost: 10800kb</span>
+    <span class="doccomment">///   outputs:                         1 // comms cost: ??kb</span>
+    <span class="doccomment">///   constants:                       2 // comms cost: 0kb</span>
+    <span class="doccomment">///   additions:                 9169197</span>
+    <span class="doccomment">///   subtractions:                    0</span>
+    <span class="doccomment">///   cmuls:                           0</span>
+    <span class="doccomment">///   projections:                     0</span>
+    <span class="doccomment">///   multiplications:           2073599</span>
+    <span class="doccomment">///   ciphertexts:               4147198 // comms cost: 63.28mb (64799.97kb)</span>
+    <span class="doccomment">///   total comms cost:          79.10mb // 81000.00kb</span>
     <span class="doccomment">/// ```</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">print_info</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) {
         <span class="macro">println</span><span class="macro">!</span>(<span class="string">&quot;computation info:&quot;</span>);
-        <span class="macro">println</span><span class="macro">!</span>(<span class="string">&quot;  garbler inputs:   {}&quot;</span>, <span class="self">self</span>.<span class="ident">num_garbler_inputs</span>());
-        <span class="macro">println</span><span class="macro">!</span>(<span class="string">&quot;  evaluator inputs: {}&quot;</span>, <span class="self">self</span>.<span class="ident">num_evaluator_inputs</span>());
-        <span class="macro">println</span><span class="macro">!</span>(<span class="string">&quot;  outputs:          {}&quot;</span>, <span class="self">self</span>.<span class="ident">num_outputs</span>());
-        <span class="macro">println</span><span class="macro">!</span>(<span class="string">&quot;  constants:        {}&quot;</span>, <span class="self">self</span>.<span class="ident">num_consts</span>());
-        <span class="macro">println</span><span class="macro">!</span>(<span class="string">&quot;  additions:        {}&quot;</span>, <span class="self">self</span>.<span class="ident">num_adds</span>());
-        <span class="macro">println</span><span class="macro">!</span>(<span class="string">&quot;  subtractions:     {}&quot;</span>, <span class="self">self</span>.<span class="ident">num_subs</span>());
-        <span class="macro">println</span><span class="macro">!</span>(<span class="string">&quot;  cmuls:            {}&quot;</span>, <span class="self">self</span>.<span class="ident">num_cmuls</span>());
-        <span class="macro">println</span><span class="macro">!</span>(<span class="string">&quot;  projections:      {}&quot;</span>, <span class="self">self</span>.<span class="ident">num_projs</span>());
-        <span class="macro">println</span><span class="macro">!</span>(<span class="string">&quot;  multiplications:  {}&quot;</span>, <span class="self">self</span>.<span class="ident">num_muls</span>());
+
+        <span class="macro">println</span><span class="macro">!</span>(<span class="string">&quot;  garbler inputs:     {:16} // comms cost: {}kb&quot;</span>,
+            <span class="self">self</span>.<span class="ident">num_garbler_inputs</span>(),
+            <span class="self">self</span>.<span class="ident">num_garbler_inputs</span>() <span class="op">*</span> <span class="number">128</span> <span class="op">/</span> <span class="number">8</span> <span class="op">/</span> <span class="number">1024</span>
+        );
+
+        <span class="macro">println</span><span class="macro">!</span>(<span class="string">&quot;  evaluator inputs:   {:16} // OT cost: {}kb&quot;</span>,
+            <span class="self">self</span>.<span class="ident">num_evaluator_inputs</span>(),
+            <span class="comment">// cost of IKNP is 256 for 1 random and 1 128 bit string dependent on the random one</span>
+            <span class="self">self</span>.<span class="ident">num_evaluator_inputs</span>() <span class="op">*</span> <span class="number">256</span> <span class="op">/</span> <span class="number">8</span> <span class="op">/</span> <span class="number">1024</span>
+        );
+
+        <span class="macro">println</span><span class="macro">!</span>(<span class="string">&quot;  outputs:            {:16}&quot;</span>, <span class="self">self</span>.<span class="ident">num_outputs</span>());
+        <span class="macro">println</span><span class="macro">!</span>(<span class="string">&quot;  output ciphertexts: {:16} // comms cost: {}kb&quot;</span>,
+            <span class="self">self</span>.<span class="ident">num_output_ciphertexts</span>(),
+            <span class="self">self</span>.<span class="ident">num_output_ciphertexts</span>() <span class="op">*</span> <span class="number">128</span> <span class="op">/</span> <span class="number">8</span> <span class="op">/</span> <span class="number">1024</span>
+        );
+
+        <span class="macro">println</span><span class="macro">!</span>(<span class="string">&quot;  constants:          {:16} // comms cost: {}kb&quot;</span>,
+            <span class="self">self</span>.<span class="ident">num_consts</span>(),
+            <span class="self">self</span>.<span class="ident">num_consts</span>() <span class="op">*</span> <span class="number">128</span> <span class="op">/</span> <span class="number">8</span> <span class="op">/</span> <span class="number">1024</span>
+        );
+
+        <span class="macro">println</span><span class="macro">!</span>(<span class="string">&quot;  additions:          {:16}&quot;</span>, <span class="self">self</span>.<span class="ident">num_adds</span>());
+        <span class="macro">println</span><span class="macro">!</span>(<span class="string">&quot;  subtractions:       {:16}&quot;</span>, <span class="self">self</span>.<span class="ident">num_subs</span>());
+        <span class="macro">println</span><span class="macro">!</span>(<span class="string">&quot;  cmuls:              {:16}&quot;</span>, <span class="self">self</span>.<span class="ident">num_cmuls</span>());
+        <span class="macro">println</span><span class="macro">!</span>(<span class="string">&quot;  projections:        {:16}&quot;</span>, <span class="self">self</span>.<span class="ident">num_projs</span>());
+        <span class="macro">println</span><span class="macro">!</span>(<span class="string">&quot;  multiplications:    {:16}&quot;</span>, <span class="self">self</span>.<span class="ident">num_muls</span>());
         <span class="kw">let</span> <span class="ident">cs</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">num_ciphertexts</span>();
-        <span class="kw">let</span> <span class="ident">kb</span> <span class="op">=</span> <span class="ident">cs</span> <span class="op">*</span> <span class="number">128</span> <span class="op">/</span> <span class="number">8</span> <span class="op">/</span> <span class="number">1024</span>;
-        <span class="kw">let</span> <span class="ident">mb</span> <span class="op">=</span> <span class="ident">kb</span> <span class="op">/</span> <span class="number">1024</span>;
-        <span class="macro">println</span><span class="macro">!</span>(<span class="string">&quot;  ciphertexts:      {} // {}mb and {}kb&quot;</span>, <span class="ident">cs</span>, <span class="ident">mb</span>, <span class="ident">kb</span> <span class="op">-</span> <span class="ident">mb</span> <span class="op">*</span> <span class="number">1024</span>);
+        <span class="kw">let</span> <span class="ident">kb</span> <span class="op">=</span> <span class="ident">cs</span> <span class="kw">as</span> <span class="ident">f64</span> <span class="op">*</span> <span class="number">128.0</span> <span class="op">/</span> <span class="number">8.0</span> <span class="op">/</span> <span class="number">1024.0</span>;
+        <span class="kw">let</span> <span class="ident">mb</span> <span class="op">=</span> <span class="ident">kb</span> <span class="op">/</span> <span class="number">1024.0</span>;
+        <span class="macro">println</span><span class="macro">!</span>(<span class="string">&quot;  ciphertexts:        {:16} // comms cost: {:.2}mb ({:.2}kb)&quot;</span>, <span class="ident">cs</span>, <span class="ident">mb</span>, <span class="ident">kb</span>);
+
+        <span class="comment">// compute total comms cost</span>
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">comms_bits</span> <span class="op">=</span> <span class="number">0</span>;
+        <span class="ident">comms_bits</span> <span class="op">+=</span> <span class="self">self</span>.<span class="ident">num_garbler_inputs</span>() <span class="op">*</span> <span class="number">128</span>;
+        <span class="ident">comms_bits</span> <span class="op">+=</span> <span class="self">self</span>.<span class="ident">num_evaluator_inputs</span>() <span class="op">*</span> <span class="number">256</span>;
+        <span class="ident">comms_bits</span> <span class="op">+=</span> <span class="self">self</span>.<span class="ident">num_consts</span>() <span class="op">*</span> <span class="number">128</span>;
+        <span class="ident">comms_bits</span> <span class="op">+=</span> <span class="self">self</span>.<span class="ident">num_ciphertexts</span>() <span class="op">*</span> <span class="number">128</span>;
+        <span class="ident">comms_bits</span> <span class="op">+=</span> <span class="self">self</span>.<span class="ident">num_output_ciphertexts</span>() <span class="op">*</span> <span class="number">128</span>;
+        <span class="kw">let</span> <span class="ident">kb</span> <span class="op">=</span> <span class="ident">comms_bits</span> <span class="kw">as</span> <span class="ident">f64</span> <span class="op">/</span> <span class="number">8.0</span> <span class="op">/</span> <span class="number">1024.0</span>;
+        <span class="kw">let</span> <span class="ident">mb</span> <span class="op">=</span> <span class="ident">kb</span> <span class="op">/</span> <span class="number">1024.0</span>;
+        <span class="macro">println</span><span class="macro">!</span>(<span class="string">&quot;  total comms cost:   {:14.2}mb // {:.2}kb&quot;</span>, <span class="ident">mb</span>, <span class="ident">kb</span>);
     }
 
     <span class="doccomment">/// Number of garbler inputs in the fancy computation.</span>
@@ -293,7 +360,12 @@
     }
 
     <span class="doccomment">/// Number of outputs in the fancy computation.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">num_outputs</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-&gt;</span> <span class="ident">usize</span> { <span class="self">self</span>.<span class="ident">noutputs</span> }
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">num_outputs</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-&gt;</span> <span class="ident">usize</span> { <span class="self">self</span>.<span class="ident">outputs</span>.<span class="ident">len</span>() }
+
+    <span class="doccomment">/// Number of output ciphertexts.</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">num_output_ciphertexts</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-&gt;</span> <span class="ident">usize</span> {
+        <span class="self">self</span>.<span class="ident">outputs</span>.<span class="ident">iter</span>().<span class="ident">map</span>(<span class="op">|</span><span class="kw-2">&amp;</span><span class="ident">m</span><span class="op">|</span> <span class="ident">m</span> <span class="kw">as</span> <span class="ident">usize</span>).<span class="ident">sum</span>()
+    }
 
     <span class="doccomment">/// Number of additions in the fancy computation.</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">num_adds</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-&gt;</span> <span class="ident">usize</span> { <span class="self">self</span>.<span class="ident">nadds</span> }
@@ -375,9 +447,9 @@
         <span class="ident">InformerVal</span>(<span class="ident">modulus</span>)
     }
 
-    <span class="kw">fn</span> <span class="ident">output</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">_x</span>: <span class="kw-2">&amp;</span><span class="ident">InformerVal</span>) {
-        <span class="self">self</span>.<span class="ident">noutputs</span> <span class="op">+=</span> <span class="number">1</span>;
+    <span class="kw">fn</span> <span class="ident">output</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">x</span>: <span class="kw-2">&amp;</span><span class="ident">InformerVal</span>) {
+        <span class="self">self</span>.<span class="ident">outputs</span>.<span class="ident">push</span>(<span class="ident">x</span>.<span class="ident">modulus</span>());
     }
 }
-</pre>
-</section><section id="search" class="content hidden"></section><section class="footer"></section><aside id="help" class="hidden"><div><h1 class="hidden">Help</h1><div class="shortcuts"><h2>Keyboard Shortcuts</h2><dl><dt><kbd>?</kbd></dt><dd>Show this help dialog</dd><dt><kbd>S</kbd></dt><dd>Focus the search field</dd><dt><kbd>↑</kbd></dt><dd>Move up in search results</dd><dt><kbd>↓</kbd></dt><dd>Move down in search results</dd><dt><kbd>↹</kbd></dt><dd>Switch tab</dd><dt><kbd>&#9166;</kbd></dt><dd>Go to active search result</dd><dt><kbd>+</kbd></dt><dd>Expand all sections</dd><dt><kbd>-</kbd></dt><dd>Collapse all sections</dd></dl></div><div class="infos"><h2>Search Tricks</h2><p>Prefix searches with a type followed by a colon (e.g. <code>fn:</code>) to restrict the search to a given type.</p><p>Accepted types are: <code>fn</code>, <code>mod</code>, <code>struct</code>, <code>enum</code>, <code>trait</code>, <code>type</code>, <code>macro</code>, and <code>const</code>.</p><p>Search functions by type signature (e.g. <code>vec -> usize</code> or <code>* -> vec</code>)</p><p>Search multiple things at once by splitting your query with comma (e.g. <code>str,u8</code> or <code>String,struct:Vec,test</code>)</p></div></div></aside><script>window.rootPath = "../../";window.currentCrate = "fancy_garbling";</script><script src="../../aliases.js"></script><script src="../../main.js"></script><script defer src="../../search-index.js"></script></body></html>
+</pre></div>
+</section><section id="search" class="content hidden"></section><section class="footer"></section><aside id="help" class="hidden"><div><h1 class="hidden">Help</h1><div class="shortcuts"><h2>Keyboard Shortcuts</h2><dl><dt><kbd>?</kbd></dt><dd>Show this help dialog</dd><dt><kbd>S</kbd></dt><dd>Focus the search field</dd><dt><kbd>↑</kbd></dt><dd>Move up in search results</dd><dt><kbd>↓</kbd></dt><dd>Move down in search results</dd><dt><kbd>↹</kbd></dt><dd>Switch tab</dd><dt><kbd>&#9166;</kbd></dt><dd>Go to active search result</dd><dt><kbd>+</kbd></dt><dd>Expand all sections</dd><dt><kbd>-</kbd></dt><dd>Collapse all sections</dd></dl></div><div class="infos"><h2>Search Tricks</h2><p>Prefix searches with a type followed by a colon (e.g. <code>fn:</code>) to restrict the search to a given type.</p><p>Accepted types are: <code>fn</code>, <code>mod</code>, <code>struct</code>, <code>enum</code>, <code>trait</code>, <code>type</code>, <code>macro</code>, and <code>const</code>.</p><p>Search functions by type signature (e.g. <code>vec -> usize</code> or <code>* -> vec</code>)</p><p>Search multiple things at once by splitting your query with comma (e.g. <code>str,u8</code> or <code>String,struct:Vec,test</code>)</p></div></div></aside><script>window.rootPath = "../../";window.currentCrate = "fancy_garbling";</script><script src="../../aliases.js"></script><script src="../../main.js"></script><script src="../../source-files.js"></script><script src="../../source-script.js"></script><script defer src="../../search-index.js"></script></body></html>

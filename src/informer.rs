@@ -10,7 +10,7 @@ pub struct Informer {
     garbler_input_moduli: Vec<u16>,
     evaluator_input_moduli: Vec<u16>,
     constants: HashSet<(u16,u16)>,
-    noutputs: usize,
+    outputs: Vec<u16>,
     nadds: usize,
     nsubs: usize,
     ncmuls: usize,
@@ -32,7 +32,7 @@ impl Informer {
             garbler_input_moduli: Vec::new(),
             evaluator_input_moduli: Vec::new(),
             constants: HashSet::new(),
-            noutputs: 0,
+            outputs: Vec::new(),
             nadds: 0,
             nsubs: 0,
             ncmuls: 0,
@@ -47,32 +47,63 @@ impl Informer {
     /// For example:
     /// ```
     /// computation info:
-    ///   garbler inputs:   8
-    ///   evaluator inputs: 8
-    ///   outputs:          1
-    ///   constants:        0
-    ///   additions:        86
-    ///   subtractions:     8
-    ///   cmuls:            0
-    ///   projections:      98
-    ///   multiplications:  0
-    ///   ciphertexts:      1078 // 0mb and 16kb
+    ///   garbler inputs:             345600 // comms cost: 5400kb
+    ///   evaluator inputs:           345600 // OT cost: 10800kb
+    ///   outputs:                         1 // comms cost: ??kb
+    ///   constants:                       2 // comms cost: 0kb
+    ///   additions:                 9169197
+    ///   subtractions:                    0
+    ///   cmuls:                           0
+    ///   projections:                     0
+    ///   multiplications:           2073599
+    ///   ciphertexts:               4147198 // comms cost: 63.28mb (64799.97kb)
+    ///   total comms cost:          79.10mb // 81000.00kb
     /// ```
     pub fn print_info(&self) {
         println!("computation info:");
-        println!("  garbler inputs:   {}", self.num_garbler_inputs());
-        println!("  evaluator inputs: {}", self.num_evaluator_inputs());
-        println!("  outputs:          {}", self.num_outputs());
-        println!("  constants:        {}", self.num_consts());
-        println!("  additions:        {}", self.num_adds());
-        println!("  subtractions:     {}", self.num_subs());
-        println!("  cmuls:            {}", self.num_cmuls());
-        println!("  projections:      {}", self.num_projs());
-        println!("  multiplications:  {}", self.num_muls());
+
+        println!("  garbler inputs:     {:16} // comms cost: {}kb",
+            self.num_garbler_inputs(),
+            self.num_garbler_inputs() * 128 / 8 / 1024
+        );
+
+        println!("  evaluator inputs:   {:16} // OT cost: {}kb",
+            self.num_evaluator_inputs(),
+            // cost of IKNP is 256 for 1 random and 1 128 bit string dependent on the random one
+            self.num_evaluator_inputs() * 256 / 8 / 1024
+        );
+
+        println!("  outputs:            {:16}", self.num_outputs());
+        println!("  output ciphertexts: {:16} // comms cost: {}kb",
+            self.num_output_ciphertexts(),
+            self.num_output_ciphertexts() * 128 / 8 / 1024
+        );
+
+        println!("  constants:          {:16} // comms cost: {}kb",
+            self.num_consts(),
+            self.num_consts() * 128 / 8 / 1024
+        );
+
+        println!("  additions:          {:16}", self.num_adds());
+        println!("  subtractions:       {:16}", self.num_subs());
+        println!("  cmuls:              {:16}", self.num_cmuls());
+        println!("  projections:        {:16}", self.num_projs());
+        println!("  multiplications:    {:16}", self.num_muls());
         let cs = self.num_ciphertexts();
-        let kb = cs * 128 / 8 / 1024;
-        let mb = kb / 1024;
-        println!("  ciphertexts:      {} // {}mb and {}kb", cs, mb, kb - mb * 1024);
+        let kb = cs as f64 * 128.0 / 8.0 / 1024.0;
+        let mb = kb / 1024.0;
+        println!("  ciphertexts:        {:16} // comms cost: {:.2}mb ({:.2}kb)", cs, mb, kb);
+
+        // compute total comms cost
+        let mut comms_bits = 0;
+        comms_bits += self.num_garbler_inputs() * 128;
+        comms_bits += self.num_evaluator_inputs() * 256;
+        comms_bits += self.num_consts() * 128;
+        comms_bits += self.num_ciphertexts() * 128;
+        comms_bits += self.num_output_ciphertexts() * 128;
+        let kb = comms_bits as f64 / 8.0 / 1024.0;
+        let mb = kb / 1024.0;
+        println!("  total comms cost:   {:14.2}mb // {:.2}kb", mb, kb);
     }
 
     /// Number of garbler inputs in the fancy computation.
@@ -102,7 +133,12 @@ impl Informer {
     }
 
     /// Number of outputs in the fancy computation.
-    pub fn num_outputs(&self) -> usize { self.noutputs }
+    pub fn num_outputs(&self) -> usize { self.outputs.len() }
+
+    /// Number of output ciphertexts.
+    pub fn num_output_ciphertexts(&self) -> usize {
+        self.outputs.iter().map(|&m| m as usize).sum()
+    }
 
     /// Number of additions in the fancy computation.
     pub fn num_adds(&self) -> usize { self.nadds }
@@ -184,7 +220,7 @@ impl Fancy for Informer {
         InformerVal(modulus)
     }
 
-    fn output(&mut self, _x: &InformerVal) {
-        self.noutputs += 1;
+    fn output(&mut self, x: &InformerVal) {
+        self.outputs.push(x.modulus());
     }
 }
