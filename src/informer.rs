@@ -126,8 +126,7 @@ impl Informer {
         self.evaluator_input_moduli.clone()
     }
 
-    /// Number of constants in the fancy computation. NOTE: does not reflect that
-    /// constants will be reused by most implementors of Fancy.
+    /// Number of constants in the fancy computation.
     pub fn num_consts(&self) -> usize {
         self.constants.len()
     }
