@@ -1,1 +1,1 @@
-initSidebarItems({"struct":[["Informer",""],["InformerVal",""]]});
+initSidebarItems({"struct":[["Informer","Implements Fancy. Use to learn information about a fancy computation in a lightweight way."],["InformerVal",""]]});

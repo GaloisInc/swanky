@@ -1,43 +1,260 @@
 <!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="API documentation for the Rust `util` mod in crate `fancy_garbling`."><meta name="keywords" content="rust, rustlang, rust-lang, util"><title>fancy_garbling::util - Rust</title><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../dark.css"><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script src="../../storage.js"></script></head><body class="rustdoc mod"><!--[if lte IE 8]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu">&#9776;</div><p class='location'>Module util</p><div class="sidebar-elems"><div class="block items"><ul><li><a href="#constants">Constants</a></li><li><a href="#traits">Traits</a></li><li><a href="#functions">Functions</a></li></ul></div><p class='location'><a href='../index.html'>fancy_garbling</a></p><script>window.sidebarCurrent = {name: 'util', ty: 'mod', relpath: '../'};</script><script defer src="../sidebar-items.js"></script></div></nav><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!"><img src="../../brush.svg" width="18" alt="Pick another theme!"></button><div id="theme-choices"></div></div><script src="../../theme.js"></script><nav class="sub"><form class="search-form js-only"><div class="search-container"><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><a id="settings-menu" href="../../settings.html"><img src="../../wheel.svg" width="18" alt="Change settings"></a></div></form></nav><section id="main" class="content"><h1 class='fqn'><span class='out-of-band'><span id='render-detail'><a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">[<span class='inner'>&#x2212;</span>]</a></span><a class='srclink' href='../../src/fancy_garbling/util.rs.html#1-465' title='goto source code'>[src]</a></span><span class='in-band'>Module <a href='../index.html'>fancy_garbling</a>::<wbr><a class="mod" href=''>util</a></span></h1><div class='docblock'><p>Tools useful for interacting with <code>fancy-garbling</code>.</p>
 <p>Note: all number representations in this library are little-endian.</p>
 </div><h2 id='constants' class='section-header'><a href="#constants">Constants</a></h2>
-<table><tr class='module-item'><td><a class="constant" href="constant.NPRIMES.html" title='fancy_garbling::util::NPRIMES constant'>NPRIMES</a></td><td class='docblock-short'><p>Number of primes supported by our library.</p>
-</td></tr><tr class='module-item'><td><a class="constant" href="constant.PRIMES.html" title='fancy_garbling::util::PRIMES constant'>PRIMES</a></td><td class='docblock-short'><p>Primes used in fancy garbling.</p>
-</td></tr><tr class='module-item'><td><a class="constant" href="constant.PRIMES_SKIP_2.html" title='fancy_garbling::util::PRIMES_SKIP_2 constant'>PRIMES_SKIP_2</a></td><td class='docblock-short'><p>Primes skipping the modulus 2, which allows certain gadgets.</p>
-</td></tr></table><h2 id='traits' class='section-header'><a href="#traits">Traits</a></h2>
-<table><tr class='module-item'><td><a class="trait" href="trait.RngExt.html" title='fancy_garbling::util::RngExt trait'>RngExt</a></td><td class='docblock-short'><p>Extra Rng functionality, useful for <code>fancy-garbling</code>.</p>
-</td></tr></table><h2 id='functions' class='section-header'><a href="#functions">Functions</a></h2>
-<table><tr class='module-item'><td><a class="fn" href="fn.as_base_q.html" title='fancy_garbling::util::as_base_q fn'>as_base_q</a></td><td class='docblock-short'><p>Convert a u128 into base q.</p>
-</td></tr><tr class='module-item'><td><a class="fn" href="fn.as_base_q_u128.html" title='fancy_garbling::util::as_base_q_u128 fn'>as_base_q_u128</a></td><td class='docblock-short'><p>Convert a u128 into base q.</p>
-</td></tr><tr class='module-item'><td><a class="fn" href="fn.as_mixed_radix.html" title='fancy_garbling::util::as_mixed_radix fn'>as_mixed_radix</a></td><td class='docblock-short'><p>Convert a u128 into mixed radix form with the provided radii.</p>
-</td></tr><tr class='module-item'><td><a class="fn" href="fn.base_modulus_with_width.html" title='fancy_garbling::util::base_modulus_with_width fn'>base_modulus_with_width</a></td><td class='docblock-short'><p>Generate a CRT modulus that support at least n-bit integers, using provided primes.</p>
-</td></tr><tr class='module-item'><td><a class="fn" href="fn.base_primes_with_width.html" title='fancy_garbling::util::base_primes_with_width fn'>base_primes_with_width</a></td><td class='docblock-short'><p>Generate the factors of a CRT modulus that support at least n-bit integers, using provided primes.</p>
-</td></tr><tr class='module-item'><td><a class="fn" href="fn.base_q_add.html" title='fancy_garbling::util::base_q_add fn'>base_q_add</a></td><td class='docblock-short'><p>Add two base q numbers together.</p>
-</td></tr><tr class='module-item'><td><a class="fn" href="fn.base_q_add_eq.html" title='fancy_garbling::util::base_q_add_eq fn'>base_q_add_eq</a></td><td class='docblock-short'><p>Add a base q number into the first one.</p>
-</td></tr><tr class='module-item'><td><a class="fn" href="fn.bytes_to_u128.html" title='fancy_garbling::util::bytes_to_u128 fn'>bytes_to_u128</a></td><td class='docblock-short'><p>Convert bytes to u128.</p>
-</td></tr><tr class='module-item'><td><a class="fn" href="fn.crt.html" title='fancy_garbling::util::crt fn'>crt</a></td><td class='docblock-short'><p>Compute the CRT representation of x with respect to the primes ps.</p>
-</td></tr><tr class='module-item'><td><a class="fn" href="fn.crt_factor.html" title='fancy_garbling::util::crt_factor fn'>crt_factor</a></td><td class='docblock-short'><p>Compute the CRT representation of x with respect to the factorization of q.</p>
-</td></tr><tr class='module-item'><td><a class="fn" href="fn.crt_inv.html" title='fancy_garbling::util::crt_inv fn'>crt_inv</a></td><td class='docblock-short'><p>Compute the value x given a list of CRT primes and residues.</p>
-</td></tr><tr class='module-item'><td><a class="fn" href="fn.crt_inv_factor.html" title='fancy_garbling::util::crt_inv_factor fn'>crt_inv_factor</a></td><td class='docblock-short'><p>Compute the value x given a composite CRT modulus.</p>
-</td></tr><tr class='module-item'><td><a class="fn" href="fn.digits_per_u128.html" title='fancy_garbling::util::digits_per_u128 fn'>digits_per_u128</a></td><td class='docblock-short'><p>Determine how many mod q digits fit into a u128.</p>
-</td></tr><tr class='module-item'><td><a class="fn" href="fn.factor.html" title='fancy_garbling::util::factor fn'>factor</a></td><td class='docblock-short'><p>Factor using the primes in the global <code>PRIMES</code> array. Fancy garbling only supports
+<table>
+                       <tr class=' module-item'>
+                           <td><a class="constant" href="constant.NPRIMES.html"
+                                  title='constant fancy_garbling::util::NPRIMES'>NPRIMES</a></td>
+                           <td class='docblock-short'>
+                                <p>Number of primes supported by our library.</p>
+
+                           </td>
+                       </tr>
+                       <tr class=' module-item'>
+                           <td><a class="constant" href="constant.PRIMES.html"
+                                  title='constant fancy_garbling::util::PRIMES'>PRIMES</a></td>
+                           <td class='docblock-short'>
+                                <p>Primes used in fancy garbling.</p>
+
+                           </td>
+                       </tr>
+                       <tr class=' module-item'>
+                           <td><a class="constant" href="constant.PRIMES_SKIP_2.html"
+                                  title='constant fancy_garbling::util::PRIMES_SKIP_2'>PRIMES_SKIP_2</a></td>
+                           <td class='docblock-short'>
+                                <p>Primes skipping the modulus 2, which allows certain gadgets.</p>
+
+                           </td>
+                       </tr></table><h2 id='traits' class='section-header'><a href="#traits">Traits</a></h2>
+<table>
+                       <tr class=' module-item'>
+                           <td><a class="trait" href="trait.RngExt.html"
+                                  title='trait fancy_garbling::util::RngExt'>RngExt</a></td>
+                           <td class='docblock-short'>
+                                <p>Extra Rng functionality, useful for <code>fancy-garbling</code>.</p>
+
+                           </td>
+                       </tr></table><h2 id='functions' class='section-header'><a href="#functions">Functions</a></h2>
+<table>
+                       <tr class=' module-item'>
+                           <td><a class="fn" href="fn.as_base_q.html"
+                                  title='fn fancy_garbling::util::as_base_q'>as_base_q</a></td>
+                           <td class='docblock-short'>
+                                <p>Convert a u128 into base q.</p>
+
+                           </td>
+                       </tr>
+                       <tr class=' module-item'>
+                           <td><a class="fn" href="fn.as_base_q_u128.html"
+                                  title='fn fancy_garbling::util::as_base_q_u128'>as_base_q_u128</a></td>
+                           <td class='docblock-short'>
+                                <p>Convert a u128 into base q.</p>
+
+                           </td>
+                       </tr>
+                       <tr class=' module-item'>
+                           <td><a class="fn" href="fn.as_mixed_radix.html"
+                                  title='fn fancy_garbling::util::as_mixed_radix'>as_mixed_radix</a></td>
+                           <td class='docblock-short'>
+                                <p>Convert a u128 into mixed radix form with the provided radii.</p>
+
+                           </td>
+                       </tr>
+                       <tr class=' module-item'>
+                           <td><a class="fn" href="fn.base_modulus_with_width.html"
+                                  title='fn fancy_garbling::util::base_modulus_with_width'>base_modulus_with_width</a></td>
+                           <td class='docblock-short'>
+                                <p>Generate a CRT modulus that support at least n-bit integers, using provided primes.</p>
+
+                           </td>
+                       </tr>
+                       <tr class=' module-item'>
+                           <td><a class="fn" href="fn.base_primes_with_width.html"
+                                  title='fn fancy_garbling::util::base_primes_with_width'>base_primes_with_width</a></td>
+                           <td class='docblock-short'>
+                                <p>Generate the factors of a CRT modulus that support at least n-bit integers, using provided primes.</p>
+
+                           </td>
+                       </tr>
+                       <tr class=' module-item'>
+                           <td><a class="fn" href="fn.base_q_add.html"
+                                  title='fn fancy_garbling::util::base_q_add'>base_q_add</a></td>
+                           <td class='docblock-short'>
+                                <p>Add two base q numbers together.</p>
+
+                           </td>
+                       </tr>
+                       <tr class=' module-item'>
+                           <td><a class="fn" href="fn.base_q_add_eq.html"
+                                  title='fn fancy_garbling::util::base_q_add_eq'>base_q_add_eq</a></td>
+                           <td class='docblock-short'>
+                                <p>Add a base q number into the first one.</p>
+
+                           </td>
+                       </tr>
+                       <tr class=' module-item'>
+                           <td><a class="fn" href="fn.bytes_to_u128.html"
+                                  title='fn fancy_garbling::util::bytes_to_u128'>bytes_to_u128</a></td>
+                           <td class='docblock-short'>
+                                <p>Convert bytes to u128.</p>
+
+                           </td>
+                       </tr>
+                       <tr class=' module-item'>
+                           <td><a class="fn" href="fn.crt.html"
+                                  title='fn fancy_garbling::util::crt'>crt</a></td>
+                           <td class='docblock-short'>
+                                <p>Compute the CRT representation of x with respect to the primes ps.</p>
+
+                           </td>
+                       </tr>
+                       <tr class=' module-item'>
+                           <td><a class="fn" href="fn.crt_factor.html"
+                                  title='fn fancy_garbling::util::crt_factor'>crt_factor</a></td>
+                           <td class='docblock-short'>
+                                <p>Compute the CRT representation of x with respect to the factorization of q.</p>
+
+                           </td>
+                       </tr>
+                       <tr class=' module-item'>
+                           <td><a class="fn" href="fn.crt_inv.html"
+                                  title='fn fancy_garbling::util::crt_inv'>crt_inv</a></td>
+                           <td class='docblock-short'>
+                                <p>Compute the value x given a list of CRT primes and residues.</p>
+
+                           </td>
+                       </tr>
+                       <tr class=' module-item'>
+                           <td><a class="fn" href="fn.crt_inv_factor.html"
+                                  title='fn fancy_garbling::util::crt_inv_factor'>crt_inv_factor</a></td>
+                           <td class='docblock-short'>
+                                <p>Compute the value x given a composite CRT modulus.</p>
+
+                           </td>
+                       </tr>
+                       <tr class=' module-item'>
+                           <td><a class="fn" href="fn.digits_per_u128.html"
+                                  title='fn fancy_garbling::util::digits_per_u128'>digits_per_u128</a></td>
+                           <td class='docblock-short'>
+                                <p>Determine how many mod q digits fit into a u128.</p>
+
+                           </td>
+                       </tr>
+                       <tr class=' module-item'>
+                           <td><a class="fn" href="fn.factor.html"
+                                  title='fn fancy_garbling::util::factor'>factor</a></td>
+                           <td class='docblock-short'>
+                                <p>Factor using the primes in the global <code>PRIMES</code> array. Fancy garbling only supports
 composites with small prime factors.</p>
-</td></tr><tr class='module-item'><td><a class="fn" href="fn.from_base_q.html" title='fancy_garbling::util::from_base_q fn'>from_base_q</a></td><td class='docblock-short'><p>Convert little-endian base q digits into u128.</p>
-</td></tr><tr class='module-item'><td><a class="fn" href="fn.from_mixed_radix.html" title='fancy_garbling::util::from_mixed_radix fn'>from_mixed_radix</a></td><td class='docblock-short'><p>Convert little-endian mixed radix digits into u128.</p>
-</td></tr><tr class='module-item'><td><a class="fn" href="fn.inv.html" title='fancy_garbling::util::inv fn'>inv</a></td><td class='docblock-short'><p>Invert a mod m.</p>
-</td></tr><tr class='module-item'><td><a class="fn" href="fn.inv_ref.html" title='fancy_garbling::util::inv_ref fn'>inv_ref</a></td><td class='docblock-short'><p>Generic algorithm to invert inp_a mod inp_b. As ref so as to support BigInts without
+
+                           </td>
+                       </tr>
+                       <tr class=' module-item'>
+                           <td><a class="fn" href="fn.from_base_q.html"
+                                  title='fn fancy_garbling::util::from_base_q'>from_base_q</a></td>
+                           <td class='docblock-short'>
+                                <p>Convert little-endian base q digits into u128.</p>
+
+                           </td>
+                       </tr>
+                       <tr class=' module-item'>
+                           <td><a class="fn" href="fn.from_mixed_radix.html"
+                                  title='fn fancy_garbling::util::from_mixed_radix'>from_mixed_radix</a></td>
+                           <td class='docblock-short'>
+                                <p>Convert little-endian mixed radix digits into u128.</p>
+
+                           </td>
+                       </tr>
+                       <tr class=' module-item'>
+                           <td><a class="fn" href="fn.inv.html"
+                                  title='fn fancy_garbling::util::inv'>inv</a></td>
+                           <td class='docblock-short'>
+                                <p>Invert a mod m.</p>
+
+                           </td>
+                       </tr>
+                       <tr class=' module-item'>
+                           <td><a class="fn" href="fn.inv_ref.html"
+                                  title='fn fancy_garbling::util::inv_ref'>inv_ref</a></td>
+                           <td class='docblock-short'>
+                                <p>Generic algorithm to invert inp_a mod inp_b. As ref so as to support BigInts without
 copying.</p>
-</td></tr><tr class='module-item'><td><a class="fn" href="fn.is_power_of_2.html" title='fancy_garbling::util::is_power_of_2 fn'>is_power_of_2</a></td><td class='docblock-short'><p>Returns true if x is a power of 2. Delightfully generic.</p>
-</td></tr><tr class='module-item'><td><a class="fn" href="fn.modulus_with_width.html" title='fancy_garbling::util::modulus_with_width fn'>modulus_with_width</a></td><td class='docblock-short'><p>Generate a CRT modulus that support at least n-bit integers, using the built-in
+
+                           </td>
+                       </tr>
+                       <tr class=' module-item'>
+                           <td><a class="fn" href="fn.is_power_of_2.html"
+                                  title='fn fancy_garbling::util::is_power_of_2'>is_power_of_2</a></td>
+                           <td class='docblock-short'>
+                                <p>Returns true if x is a power of 2. Delightfully generic.</p>
+
+                           </td>
+                       </tr>
+                       <tr class=' module-item'>
+                           <td><a class="fn" href="fn.modulus_with_width.html"
+                                  title='fn fancy_garbling::util::modulus_with_width'>modulus_with_width</a></td>
+                           <td class='docblock-short'>
+                                <p>Generate a CRT modulus that support at least n-bit integers, using the built-in
 PRIMES.</p>
-</td></tr><tr class='module-item'><td><a class="fn" href="fn.modulus_with_width_skip2.html" title='fancy_garbling::util::modulus_with_width_skip2 fn'>modulus_with_width_skip2</a></td><td class='docblock-short'><p>Generate a CRT modulus that support at least n-bit integers, using the built-in
+
+                           </td>
+                       </tr>
+                       <tr class=' module-item'>
+                           <td><a class="fn" href="fn.modulus_with_width_skip2.html"
+                                  title='fn fancy_garbling::util::modulus_with_width_skip2'>modulus_with_width_skip2</a></td>
+                           <td class='docblock-short'>
+                                <p>Generate a CRT modulus that support at least n-bit integers, using the built-in
 PRIMES_SKIP_2 (does not include 2 as a factor).</p>
-</td></tr><tr class='module-item'><td><a class="fn" href="fn.powm.html" title='fancy_garbling::util::powm fn'>powm</a></td><td class='docblock-short'><p>Raise a u16 to a power mod some value.</p>
-</td></tr><tr class='module-item'><td><a class="fn" href="fn.primes_with_width.html" title='fancy_garbling::util::primes_with_width fn'>primes_with_width</a></td><td class='docblock-short'><p>Generate the factors of a CRT modulus that support at least n-bit integers, using the
+
+                           </td>
+                       </tr>
+                       <tr class=' module-item'>
+                           <td><a class="fn" href="fn.powm.html"
+                                  title='fn fancy_garbling::util::powm'>powm</a></td>
+                           <td class='docblock-short'>
+                                <p>Raise a u16 to a power mod some value.</p>
+
+                           </td>
+                       </tr>
+                       <tr class=' module-item'>
+                           <td><a class="fn" href="fn.primes_with_width.html"
+                                  title='fn fancy_garbling::util::primes_with_width'>primes_with_width</a></td>
+                           <td class='docblock-short'>
+                                <p>Generate the factors of a CRT modulus that support at least n-bit integers, using the
 built-in PRIMES.</p>
-</td></tr><tr class='module-item'><td><a class="fn" href="fn.product.html" title='fancy_garbling::util::product fn'>product</a></td><td class='docblock-short'><p>Compute the product of some u16s as a u128.</p>
-</td></tr><tr class='module-item'><td><a class="fn" href="fn.u128_to_bits.html" title='fancy_garbling::util::u128_to_bits fn'>u128_to_bits</a></td><td class='docblock-short'><p>Get the bits of a u128 encoded in 128 u16s, which is convenient for the rest of
+
+                           </td>
+                       </tr>
+                       <tr class=' module-item'>
+                           <td><a class="fn" href="fn.product.html"
+                                  title='fn fancy_garbling::util::product'>product</a></td>
+                           <td class='docblock-short'>
+                                <p>Compute the product of some u16s as a u128.</p>
+
+                           </td>
+                       </tr>
+                       <tr class=' module-item'>
+                           <td><a class="fn" href="fn.u128_to_bits.html"
+                                  title='fn fancy_garbling::util::u128_to_bits'>u128_to_bits</a></td>
+                           <td class='docblock-short'>
+                                <p>Get the bits of a u128 encoded in 128 u16s, which is convenient for the rest of
 the library, which uses u16 as the base digit type in Wire.</p>
-</td></tr><tr class='module-item'><td><a class="fn" href="fn.u128_from_bits.html" title='fancy_garbling::util::u128_from_bits fn'>u128_from_bits</a></td><td class='docblock-short'><p>Convert into a u128 from the &quot;bits&quot; as u16. Assumes each &quot;bit&quot; is 0 or 1.</p>
-</td></tr><tr class='module-item'><td><a class="fn" href="fn.u128_to_bytes.html" title='fancy_garbling::util::u128_to_bytes fn'>u128_to_bytes</a></td><td class='docblock-short'><p>Convert a u128 into bytes.</p>
-</td></tr></table></section><section id="search" class="content hidden"></section><section class="footer"></section><aside id="help" class="hidden"><div><h1 class="hidden">Help</h1><div class="shortcuts"><h2>Keyboard Shortcuts</h2><dl><dt><kbd>?</kbd></dt><dd>Show this help dialog</dd><dt><kbd>S</kbd></dt><dd>Focus the search field</dd><dt><kbd>↑</kbd></dt><dd>Move up in search results</dd><dt><kbd>↓</kbd></dt><dd>Move down in search results</dd><dt><kbd>↹</kbd></dt><dd>Switch tab</dd><dt><kbd>&#9166;</kbd></dt><dd>Go to active search result</dd><dt><kbd>+</kbd></dt><dd>Expand all sections</dd><dt><kbd>-</kbd></dt><dd>Collapse all sections</dd></dl></div><div class="infos"><h2>Search Tricks</h2><p>Prefix searches with a type followed by a colon (e.g. <code>fn:</code>) to restrict the search to a given type.</p><p>Accepted types are: <code>fn</code>, <code>mod</code>, <code>struct</code>, <code>enum</code>, <code>trait</code>, <code>type</code>, <code>macro</code>, and <code>const</code>.</p><p>Search functions by type signature (e.g. <code>vec -> usize</code> or <code>* -> vec</code>)</p><p>Search multiple things at once by splitting your query with comma (e.g. <code>str,u8</code> or <code>String,struct:Vec,test</code>)</p></div></div></aside><script>window.rootPath = "../../";window.currentCrate = "fancy_garbling";</script><script src="../../aliases.js"></script><script src="../../main.js"></script><script defer src="../../search-index.js"></script></body></html>
+
+                           </td>
+                       </tr>
+                       <tr class=' module-item'>
+                           <td><a class="fn" href="fn.u128_from_bits.html"
+                                  title='fn fancy_garbling::util::u128_from_bits'>u128_from_bits</a></td>
+                           <td class='docblock-short'>
+                                <p>Convert into a u128 from the &quot;bits&quot; as u16. Assumes each &quot;bit&quot; is 0 or 1.</p>
+
+                           </td>
+                       </tr>
+                       <tr class=' module-item'>
+                           <td><a class="fn" href="fn.u128_to_bytes.html"
+                                  title='fn fancy_garbling::util::u128_to_bytes'>u128_to_bytes</a></td>
+                           <td class='docblock-short'>
+                                <p>Convert a u128 into bytes.</p>
+
+                           </td>
+                       </tr></table></section><section id="search" class="content hidden"></section><section class="footer"></section><aside id="help" class="hidden"><div><h1 class="hidden">Help</h1><div class="shortcuts"><h2>Keyboard Shortcuts</h2><dl><dt><kbd>?</kbd></dt><dd>Show this help dialog</dd><dt><kbd>S</kbd></dt><dd>Focus the search field</dd><dt><kbd>↑</kbd></dt><dd>Move up in search results</dd><dt><kbd>↓</kbd></dt><dd>Move down in search results</dd><dt><kbd>↹</kbd></dt><dd>Switch tab</dd><dt><kbd>&#9166;</kbd></dt><dd>Go to active search result</dd><dt><kbd>+</kbd></dt><dd>Expand all sections</dd><dt><kbd>-</kbd></dt><dd>Collapse all sections</dd></dl></div><div class="infos"><h2>Search Tricks</h2><p>Prefix searches with a type followed by a colon (e.g. <code>fn:</code>) to restrict the search to a given type.</p><p>Accepted types are: <code>fn</code>, <code>mod</code>, <code>struct</code>, <code>enum</code>, <code>trait</code>, <code>type</code>, <code>macro</code>, and <code>const</code>.</p><p>Search functions by type signature (e.g. <code>vec -> usize</code> or <code>* -> vec</code>)</p><p>Search multiple things at once by splitting your query with comma (e.g. <code>str,u8</code> or <code>String,struct:Vec,test</code>)</p></div></div></aside><script>window.rootPath = "../../";window.currentCrate = "fancy_garbling";</script><script src="../../aliases.js"></script><script src="../../main.js"></script><script defer src="../../search-index.js"></script></body></html>
