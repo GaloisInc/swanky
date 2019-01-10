@@ -43,6 +43,21 @@ impl Informer {
     }
 
     /// Print information about the fancy computation.
+    ///
+    /// For example:
+    /// ```
+    /// computation info:
+    ///   garbler inputs:   8
+    ///   evaluator inputs: 8
+    ///   outputs:          1
+    ///   constants:        0
+    ///   additions:        86
+    ///   subtractions:     8
+    ///   cmuls:            0
+    ///   projections:      98
+    ///   multiplications:  0
+    ///   ciphertexts:      1078 // 0mb and 16kb
+    /// ```
     pub fn print_info(&self) {
         println!("computation info:");
         println!("  garbler inputs:   {}", self.num_garbler_inputs());

@@ -173,6 +173,21 @@
 <span id="173">173</span>
 <span id="174">174</span>
 <span id="175">175</span>
+<span id="176">176</span>
+<span id="177">177</span>
+<span id="178">178</span>
+<span id="179">179</span>
+<span id="180">180</span>
+<span id="181">181</span>
+<span id="182">182</span>
+<span id="183">183</span>
+<span id="184">184</span>
+<span id="185">185</span>
+<span id="186">186</span>
+<span id="187">187</span>
+<span id="188">188</span>
+<span id="189">189</span>
+<span id="190">190</span>
 </pre><pre class="rust ">
 <span class="doccomment">//! Informer runs a fancy computation and learns information from it, like how many of</span>
 <span class="doccomment">//! what kind of inputs there are.</span>
@@ -219,6 +234,21 @@
     }
 
     <span class="doccomment">/// Print information about the fancy computation.</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// For example:</span>
+    <span class="doccomment">/// ```</span>
+    <span class="doccomment">/// computation info:</span>
+    <span class="doccomment">///   garbler inputs:   8</span>
+    <span class="doccomment">///   evaluator inputs: 8</span>
+    <span class="doccomment">///   outputs:          1</span>
+    <span class="doccomment">///   constants:        0</span>
+    <span class="doccomment">///   additions:        86</span>
+    <span class="doccomment">///   subtractions:     8</span>
+    <span class="doccomment">///   cmuls:            0</span>
+    <span class="doccomment">///   projections:      98</span>
+    <span class="doccomment">///   multiplications:  0</span>
+    <span class="doccomment">///   ciphertexts:      1078 // 0mb and 16kb</span>
+    <span class="doccomment">/// ```</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">print_info</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) {
         <span class="macro">println</span><span class="macro">!</span>(<span class="string">&quot;computation info:&quot;</span>);
         <span class="macro">println</span><span class="macro">!</span>(<span class="string">&quot;  garbler inputs:   {}&quot;</span>, <span class="self">self</span>.<span class="ident">num_garbler_inputs</span>());
