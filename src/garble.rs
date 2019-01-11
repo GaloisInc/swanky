@@ -5,13 +5,10 @@ use crate::fancy::{Fancy, HasModulus};
 use crate::util::RngExt;
 use crate::wire::Wire;
 use itertools::Itertools;
-use rand::rngs::ThreadRng;
 use serde_derive::{Serialize, Deserialize};
 use std::collections::HashMap;
 use std::ops::DerefMut;
 use std::sync::{Arc, Mutex};
-use std::rc::Rc;
-use std::cell::RefCell;
 use time::{Duration, PreciseTime};
 
 /// The ciphertext created by a garbled gate.
@@ -81,8 +78,7 @@ impl Message {
 
 /// Streams garbled circuit ciphertexts through a callback.
 pub struct Garbler {
-    rng:            Arc<Mutex<ThreadRng>>,
-    send_function:  Arc<Mutex<Box<FnMut(Message)>>>,
+    send_function:  Arc<Mutex<Box<FnMut(Message) + Send>>>,
     constants:      Arc<Mutex<HashMap<(u16,u16),Wire>>>,
     deltas:         Arc<Mutex<HashMap<u16, Wire>>>,
     current_output: Arc<Mutex<usize>>,
@@ -94,9 +90,8 @@ impl Garbler {
     ///
     /// `send_func` is a callback that enables streaming. It gets called as the garbler
     /// generates ciphertext information such as garbled gates or input wirelabels.
-    pub fn new(send_func: Box<FnMut(Message)>) -> Garbler {
+    pub fn new(send_func: Box<FnMut(Message) + Send>) -> Garbler {
         Garbler {
-            rng:            Arc::new(Mutex::new(rand::thread_rng())),
             send_function:  Arc::new(Mutex::new(send_func)),
             constants:      Arc::new(Mutex::new(HashMap::new())),
             deltas:         Arc::new(Mutex::new(HashMap::new())),
@@ -117,7 +112,7 @@ impl Garbler {
         if deltas.contains_key(&q) {
             return deltas[&q].clone();
         }
-        let w = Wire::rand_delta(&mut *self.rng.lock().unwrap(), q);
+        let w = Wire::rand_delta(&mut rand::thread_rng(), q);
         deltas.insert(q,w.clone());
         w
     }
@@ -143,7 +138,7 @@ impl Fancy for Garbler {
     type Item = Wire;
 
     fn garbler_input(&mut self, q: u16) -> Wire { // {{{
-        let w = Wire::rand(&mut *self.rng.lock().unwrap(), q);
+        let w = Wire::rand(&mut rand::thread_rng(), q);
         let d = self.delta(q);
         self.send(Message::UnencodedGarblerInput {
             zero: w.clone(),
@@ -153,7 +148,7 @@ impl Fancy for Garbler {
     }
     //}}}
     fn evaluator_input(&mut self, q: u16) -> Wire { // {{{
-        let w = Wire::rand(&mut *self.rng.lock().unwrap(), q);
+        let w = Wire::rand(&mut rand::thread_rng(), q);
         let d = self.delta(q);
         self.send(Message::UnencodedEvaluatorInput {
             zero: w.clone(),
@@ -170,7 +165,7 @@ impl Fancy for Garbler {
             if constants.contains_key(&(x,q)) {
                 return constants[&(x,q)].clone();
             }
-            zero = Wire::rand(&mut *self.rng.lock().unwrap(), q);
+            zero = Wire::rand(&mut rand::thread_rng(), q);
             wire = zero.plus(&self.delta(q).cmul(x));
             constants.insert((x,q), wire.clone());
         }
@@ -215,7 +210,7 @@ impl Fancy for Garbler {
             // would need to pack minitable into more than one u128 to support qb > 8
             debug_assert!(qb <= 8, "qb capped at 8 for now, for assymmetric moduli");
 
-            r = self.rng.lock().unwrap().gen_u16() % q;
+            r = rand::thread_rng().gen_u16() % q;
             let t = tweak2(gate_num as u64, 1);
 
             let mut minitable = vec![None; qb as usize];
@@ -400,11 +395,11 @@ pub fn garble_iter(mut fancy_computation: Box<FnMut(&mut Garbler) + Send>)
 
 /// Garble a circuit without streaming.
 pub fn garble(c: &Circuit) -> (Encoder, Decoder, GarbledCircuit) {
-    let garbler_inputs   = Rc::new(RefCell::new(Vec::new()));
-    let evaluator_inputs = Rc::new(RefCell::new(Vec::new()));
-    let garbled_gates    = Rc::new(RefCell::new(Vec::new()));
-    let constants        = Rc::new(RefCell::new(HashMap::new()));
-    let garbled_outputs  = Rc::new(RefCell::new(Vec::new()));
+    let garbler_inputs   = Arc::new(Mutex::new(Vec::new()));
+    let evaluator_inputs = Arc::new(Mutex::new(Vec::new()));
+    let garbled_gates    = Arc::new(Mutex::new(Vec::new()));
+    let constants        = Arc::new(Mutex::new(HashMap::new()));
+    let garbled_outputs  = Arc::new(Mutex::new(Vec::new()));
     let deltas;
 
     let send_func;
@@ -416,13 +411,13 @@ pub fn garble(c: &Circuit) -> (Encoder, Decoder, GarbledCircuit) {
         let garbled_outputs  = garbled_outputs.clone();
         send_func = move |m| {
             match m {
-                Message::UnencodedGarblerInput   { zero, .. } => garbler_inputs.borrow_mut().push(zero),
-                Message::UnencodedEvaluatorInput { zero, .. } => evaluator_inputs.borrow_mut().push(zero),
-                Message::GarbledGate(w)      => garbled_gates.borrow_mut().push(w),
-                Message::OutputCiphertext(c) => garbled_outputs.borrow_mut().push(c),
+                Message::UnencodedGarblerInput   { zero, .. } => garbler_inputs.lock().unwrap().push(zero),
+                Message::UnencodedEvaluatorInput { zero, .. } => evaluator_inputs.lock().unwrap().push(zero),
+                Message::GarbledGate(w)      => garbled_gates.lock().unwrap().push(w),
+                Message::OutputCiphertext(c) => garbled_outputs.lock().unwrap().push(c),
                 Message::Constant { value, wire } => {
                     let q = wire.modulus();
-                    constants.borrow_mut().insert((value,q), wire);
+                    constants.lock().unwrap().insert((value,q), wire);
                 }
                 m => panic!("unexpected message: {}", m),
             }
@@ -456,18 +451,18 @@ pub fn garble(c: &Circuit) -> (Encoder, Decoder, GarbledCircuit) {
     }
 
     let en = Encoder::new(
-        Rc::try_unwrap(garbler_inputs).unwrap().into_inner(),
-        Rc::try_unwrap(evaluator_inputs).unwrap().into_inner(),
+        Arc::try_unwrap(garbler_inputs).unwrap().into_inner().unwrap(),
+        Arc::try_unwrap(evaluator_inputs).unwrap().into_inner().unwrap(),
         deltas
     );
 
     let ev = GarbledCircuit::new(
-        Rc::try_unwrap(garbled_gates).unwrap().into_inner(),
-        Rc::try_unwrap(constants).unwrap().into_inner(),
+        Arc::try_unwrap(garbled_gates).unwrap().into_inner().unwrap(),
+        Arc::try_unwrap(constants).unwrap().into_inner().unwrap(),
     );
 
     let de = Decoder::new(
-        Rc::try_unwrap(garbled_outputs).unwrap().into_inner()
+        Arc::try_unwrap(garbled_outputs).unwrap().into_inner().unwrap()
     );
 
     (en, de, ev)
@@ -825,6 +820,12 @@ fn output_tweak(i: usize, k: u16) -> u128 {
 
 ////////////////////////////////////////////////////////////////////////////////
 // benchmarking function
+
+pub fn bench_dyn(niters: usize, fancy: Box<Fn(&mut dyn Fancy<Item=Wire>) + Send + Sync>) {
+    let f1 = Arc::new(fancy);
+    let f2 = f1.clone();
+    bench(niters, Box::new(move |b| f1(b)), Box::new(move |b| f2(b)));
+}
 
 /// Run benchmark garbling and streaming on the function. Funky function arguments to work
 /// around the pesky borrow checker.
@@ -1194,6 +1195,13 @@ mod classic {
         assert_eq!(de, Decoder::from_bytes(&de.to_bytes()).unwrap());
     }
 //}}}
+    #[test] // garbler has send and sync {{{
+    fn garbler_has_send_and_sync() {
+        fn check_send(_: impl Send) { }
+        check_send(Garbler::new(Box::new(|_| ())));
+        fn check_sync(_: impl Sync) { }
+        check_sync(Garbler::new(Box::new(|_| ())));
+    } // }}}
 }
 
 #[cfg(test)]
@@ -1331,10 +1339,4 @@ mod streaming {
         }
     }
 //}}}
-    #[test]
-    fn garbler_has_send_and_sync() {
-        fn check_send(_: impl Send) { }
-        fn check_sync(_: impl Sync) { }
-        Garbler::new(Box::new(|_| ()));
-    }
 }
