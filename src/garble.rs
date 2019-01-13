@@ -8,7 +8,7 @@ use itertools::Itertools;
 use serde_derive::{Serialize, Deserialize};
 use std::collections::HashMap;
 use std::ops::DerefMut;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, RwLock, Mutex};
 use time::{Duration, PreciseTime};
 
 /// The ciphertext created by a garbled gate.
@@ -79,8 +79,8 @@ impl Message {
 /// Streams garbled circuit ciphertexts through a callback.
 pub struct Garbler {
     send_function:  Arc<Mutex<Box<FnMut(Message) + Send>>>,
-    constants:      Arc<Mutex<HashMap<(u16,u16),Wire>>>,
-    deltas:         Arc<Mutex<HashMap<u16, Wire>>>,
+    constants:      Arc<RwLock<HashMap<(u16,u16),Wire>>>,
+    deltas:         Arc<RwLock<HashMap<u16, Wire>>>,
     current_output: Arc<Mutex<usize>>,
     current_gate:   Arc<Mutex<usize>>,
 }
@@ -93,24 +93,29 @@ impl Garbler {
     pub fn new(send_func: Box<FnMut(Message) + Send>) -> Garbler {
         Garbler {
             send_function:  Arc::new(Mutex::new(send_func)),
-            constants:      Arc::new(Mutex::new(HashMap::new())),
-            deltas:         Arc::new(Mutex::new(HashMap::new())),
+            constants:      Arc::new(RwLock::new(HashMap::new())),
+            deltas:         Arc::new(RwLock::new(HashMap::new())),
             current_gate:   Arc::new(Mutex::new(0)),
             current_output: Arc::new(Mutex::new(0)),
         }
     }
 
     /// Output some information from the garbling.
-    fn send(&mut self, m: Message) {
+    fn send(&self, m: Message) {
         (self.send_function.lock().unwrap().deref_mut())(m);
     }
 
     /// Create a delta if it has not been created yet for this modulus, otherwise just
     /// return the existing one.
     fn delta(&self, q: u16) -> Wire {
-        let mut deltas = self.deltas.lock().unwrap();
-        if deltas.contains_key(&q) {
-            return deltas[&q].clone();
+        match self.deltas.read().unwrap().get(&q) {
+            Some(delta) => return delta.clone(),
+            None => (),
+        }
+        let mut deltas = self.deltas.write().unwrap();
+        match deltas.get(&q) {
+            Some(delta) => return delta.clone(),
+            None => (),
         }
         let w = Wire::rand_delta(&mut rand::thread_rng(), q);
         deltas.insert(q,w.clone());
@@ -158,17 +163,18 @@ impl Fancy for Garbler {
     }
     //}}}
     fn constant(&mut self, x: u16, q: u16) -> Wire { // {{{
-        let wire;
-        let zero;
-        {
-            let mut constants = self.constants.lock().unwrap();
-            if constants.contains_key(&(x,q)) {
-                return constants[&(x,q)].clone();
-            }
-            zero = Wire::rand(&mut rand::thread_rng(), q);
-            wire = zero.plus(&self.delta(q).cmul(x));
-            constants.insert((x,q), wire.clone());
+        match self.constants.read().unwrap().get(&(x,q)) {
+            Some(c) => return c.clone(),
+            None => (),
         }
+        let mut constants = self.constants.write().unwrap();
+        match constants.get(&(x,q)) {
+            Some(c) => return c.clone(),
+            None => (),
+        }
+        let zero = Wire::rand(&mut rand::thread_rng(), q);
+        let wire = zero.plus(&self.delta(q).cmul(x));
+        constants.insert((x,q), wire.clone());
         self.send(Message::Constant {
             value: x,
             wire: wire.clone()
