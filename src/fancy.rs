@@ -294,20 +294,6 @@ pub trait BundleGadgets: Fancy {
         Bundle(x.wires().iter().zip(y.wires().iter()).map(|(x,y)| self.mul(x,y)).collect())
     }
 
-    /// Divide `x` by the constant `c`. Somewhat finicky, please test. I believe that it
-    /// requires that `c` is coprime with all moduli.
-    fn cdiv_bundle(&mut self, x: &Bundle<Self::Item>, c: u16) -> Bundle<Self::Item> {
-        Bundle(x.wires().iter().map(|x| {
-            let p = x.modulus();
-            if c % p == 0 {
-                self.cmul(x,0)
-            } else {
-                let d = util::inv(c as i16, p as i16) as u16;
-                self.cmul(x,d)
-            }
-        }).collect())
-    }
-
     /// Exponentiate `x` by the constant `c`.
     fn cexp_bundle(&mut self, x: &Bundle<Self::Item>, c: u16) -> Bundle<Self::Item> {
         Bundle(x.wires().iter().map(|x| {

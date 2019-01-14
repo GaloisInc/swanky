@@ -8,6 +8,25 @@ use num::integer::Integer;
 use num::{ToPrimitive, Zero, One, Signed};
 
 ////////////////////////////////////////////////////////////////////////////////
+// tweak functions for garbling
+
+/// Tweak function for a single item.
+pub fn tweak(i: usize) -> u128 {
+    i as u128
+}
+
+/// Tweak function for two items.
+pub fn tweak2(i: u64, j: u64) -> u128 {
+    ((i as u128) << 64) + j as u128
+}
+
+/// Compute the output tweak for a garbled gate where i is the gate id and k is the value.
+pub fn output_tweak(i: usize, k: u16) -> u128 {
+    let (left, _) = (i as u128).overflowing_shl(64);
+    left + k as u128
+}
+
+////////////////////////////////////////////////////////////////////////////////
 // mixed radix stuff
 
 /// Add two base q numbers together.
