@@ -3,20 +3,21 @@
 
 use crate::fancy::{Fancy, HasModulus};
 use std::collections::HashSet;
+use std::sync::{Arc, Mutex};
 
 /// Implements Fancy. Use to learn information about a fancy computation in a lightweight
 /// way.
 pub struct Informer {
-    garbler_input_moduli: Vec<u16>,
-    evaluator_input_moduli: Vec<u16>,
-    constants: HashSet<(u16,u16)>,
-    outputs: Vec<u16>,
-    nadds: usize,
-    nsubs: usize,
-    ncmuls: usize,
-    nmuls: usize,
-    nprojs: usize,
-    nciphertexts: usize,
+    garbler_input_moduli:   Arc<Mutex<Vec<u16>>>,
+    evaluator_input_moduli: Arc<Mutex<Vec<u16>>>,
+    constants:              Arc<Mutex<HashSet<(u16,u16)>>>,
+    outputs:                Arc<Mutex<Vec<u16>>>,
+    nadds:                  Arc<Mutex<usize>>,
+    nsubs:                  Arc<Mutex<usize>>,
+    ncmuls:                 Arc<Mutex<usize>>,
+    nmuls:                  Arc<Mutex<usize>>,
+    nprojs:                 Arc<Mutex<usize>>,
+    nciphertexts:           Arc<Mutex<usize>>,
 }
 
 #[derive(Clone, Default, Debug)]
@@ -29,16 +30,16 @@ impl HasModulus for InformerVal {
 impl Informer {
     pub fn new() -> Informer {
         Informer {
-            garbler_input_moduli: Vec::new(),
-            evaluator_input_moduli: Vec::new(),
-            constants: HashSet::new(),
-            outputs: Vec::new(),
-            nadds: 0,
-            nsubs: 0,
-            ncmuls: 0,
-            nmuls: 0,
-            nprojs: 0,
-            nciphertexts: 0,
+            garbler_input_moduli:   Arc::new(Mutex::new(Vec::new())),
+            evaluator_input_moduli: Arc::new(Mutex::new(Vec::new())),
+            constants:              Arc::new(Mutex::new(HashSet::new())),
+            outputs:                Arc::new(Mutex::new(Vec::new())),
+            nadds:                  Arc::new(Mutex::new(0)),
+            nsubs:                  Arc::new(Mutex::new(0)),
+            ncmuls:                 Arc::new(Mutex::new(0)),
+            nmuls:                  Arc::new(Mutex::new(0)),
+            nprojs:                 Arc::new(Mutex::new(0)),
+            nciphertexts:           Arc::new(Mutex::new(0)),
         }
     }
 
@@ -108,93 +109,102 @@ impl Informer {
 
     /// Number of garbler inputs in the fancy computation.
     pub fn num_garbler_inputs(&self) -> usize {
-        self.garbler_input_moduli.len()
+        self.garbler_input_moduli.lock().unwrap().len()
     }
 
     /// Moduli of garbler inputs in the fancy computation.
     pub fn garbler_input_moduli(&self) -> Vec<u16> {
-        self.garbler_input_moduli.clone()
+        self.garbler_input_moduli.lock().unwrap().clone()
     }
 
     /// Number of evaluator inputs in the fancy computation.
     pub fn num_evaluator_inputs(&self) -> usize {
-        self.evaluator_input_moduli.len()
+        self.evaluator_input_moduli.lock().unwrap().len()
     }
 
     /// Moduli of evaluator inputs in the fancy computation.
     pub fn evaluator_input_moduli(&self) -> Vec<u16> {
-        self.evaluator_input_moduli.clone()
+        self.evaluator_input_moduli.lock().unwrap().clone()
     }
 
     /// Number of constants in the fancy computation.
     pub fn num_consts(&self) -> usize {
-        self.constants.len()
+        self.constants.lock().unwrap().len()
     }
 
     /// Number of outputs in the fancy computation.
-    pub fn num_outputs(&self) -> usize { self.outputs.len() }
+    pub fn num_outputs(&self) -> usize {
+        self.outputs.lock().unwrap().len()
+    }
 
     /// Number of output ciphertexts.
     pub fn num_output_ciphertexts(&self) -> usize {
-        self.outputs.iter().map(|&m| m as usize).sum()
+        self.outputs.lock().unwrap().iter().map(|&m| m as usize).sum()
     }
 
     /// Number of additions in the fancy computation.
-    pub fn num_adds(&self) -> usize { self.nadds }
+    pub fn num_adds(&self) -> usize {
+        *self.nadds.lock().unwrap()
+    }
 
     /// Number of subtractions in the fancy computation.
-    pub fn num_subs(&self) -> usize { self.nsubs }
+    pub fn num_subs(&self) -> usize {
+        *self.nsubs.lock().unwrap()
+    }
 
     /// Number of scalar multiplications in the fancy computation.
-    pub fn num_cmuls(&self) -> usize { self.ncmuls }
+    pub fn num_cmuls(&self) -> usize {
+        *self.ncmuls.lock().unwrap()
+    }
 
     /// Number of multiplications in the fancy computation.
-    pub fn num_muls(&self) -> usize { self.nmuls }
+    pub fn num_muls(&self) -> usize {
+        *self.nmuls.lock().unwrap()
+    }
 
     /// Number of projections in the fancy computation.
-    pub fn num_projs(&self) -> usize { self.nprojs }
+    pub fn num_projs(&self) -> usize {
+        *self.nprojs.lock().unwrap()
+    }
 
     /// Number of ciphertexts in the fancy computation.
-    pub fn num_ciphertexts(&self) -> usize { self.nciphertexts }
+    pub fn num_ciphertexts(&self) -> usize {
+        *self.nciphertexts.lock().unwrap()
+    }
 }
 
 impl Fancy for Informer {
     type Item = InformerVal;
 
     fn garbler_input(&mut self, modulus: u16) -> InformerVal {
-        self.garbler_input_moduli.push(modulus);
+        self.garbler_input_moduli.lock().unwrap().push(modulus);
         InformerVal(modulus)
     }
 
     fn evaluator_input(&mut self, modulus: u16) -> InformerVal {
-        self.evaluator_input_moduli.push(modulus);
+        self.evaluator_input_moduli.lock().unwrap().push(modulus);
         InformerVal(modulus)
     }
 
     fn constant(&mut self, val: u16, modulus: u16) -> InformerVal {
-        match self.constants.get(&(val,modulus)) {
-            None => {
-                self.constants.insert((val,modulus));
-            }
-            _ => (),
-        }
+        self.constants.lock().unwrap().insert((val,modulus));
         InformerVal(modulus)
     }
 
     fn add(&mut self, x: &InformerVal, y: &InformerVal) -> InformerVal {
         assert!(x.modulus() == y.modulus());
-        self.nadds += 1;
+        *self.nadds.lock().unwrap() += 1;
         InformerVal(x.modulus())
     }
 
     fn sub(&mut self, x: &InformerVal, y: &InformerVal) -> InformerVal {
         assert!(x.modulus() == y.modulus());
-        self.nsubs += 1;
+        *self.nsubs.lock().unwrap() += 1;
         InformerVal(x.modulus())
     }
 
     fn cmul(&mut self, x: &InformerVal, _c: u16) -> InformerVal {
-        self.ncmuls += 1;
+        *self.ncmuls.lock().unwrap() += 1;
         InformerVal(x.modulus())
     }
 
@@ -202,11 +212,11 @@ impl Fancy for Informer {
         if x.modulus() < y.modulus() {
             return self.mul(y,x);
         }
-        self.nmuls += 1;
-        self.nciphertexts += x.modulus() as usize + y.modulus() as usize - 2;
+        *self.nmuls.lock().unwrap() += 1;
+        *self.nciphertexts.lock().unwrap() += x.modulus() as usize + y.modulus() as usize - 2;
         if x.modulus() != y.modulus() {
             // there is an extra ciphertext to support nonequal inputs
-            self.nciphertexts += 1;
+            *self.nciphertexts.lock().unwrap() += 1;
         }
         InformerVal(x.modulus())
     }
@@ -214,12 +224,24 @@ impl Fancy for Informer {
     fn proj(&mut self, x: &InformerVal, modulus: u16, tt: &[u16]) -> InformerVal {
         assert_eq!(tt.len(), x.modulus() as usize);
         assert!(tt.iter().all(|&x| x < modulus));
-        self.nprojs += 1;
-        self.nciphertexts += x.modulus() as usize - 1;
+        *self.nprojs.lock().unwrap() += 1;
+        *self.nciphertexts.lock().unwrap() += x.modulus() as usize - 1;
         InformerVal(modulus)
     }
 
     fn output(&mut self, x: &InformerVal) {
-        self.outputs.push(x.modulus());
+        self.outputs.lock().unwrap().push(x.modulus());
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn informer_has_send_and_sync() {
+        fn check_send(_: impl Send) { }
+        fn check_sync(_: impl Sync) { }
+        check_send(Informer::new());
+        check_sync(Informer::new());
     }
 }
