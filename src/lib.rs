@@ -10,11 +10,11 @@
 
 #![allow(non_snake_case)]
 
-pub mod circuit;
+mod aes;
 pub mod garble;
 pub mod wire;
-pub mod util;
-pub mod aes;
 pub mod fancy;
 pub mod dummy;
 pub mod informer;
+pub mod circuit;
+pub mod util;

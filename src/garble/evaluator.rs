@@ -6,7 +6,7 @@ use itertools::Itertools;
 use serde_derive::{Serialize, Deserialize};
 use std::collections::HashMap;
 use std::ops::DerefMut;
-use std::sync::{Arc, RwLock, Mutex};
+use std::sync::{Arc, Mutex};
 
 use super::{Message, GarbledGate, OutputCiphertext};
 

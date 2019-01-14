@@ -36,6 +36,8 @@ pub const AES: Aes = Aes {
 };
 
 impl Aes {
+    #[allow(dead_code)]
+
     pub fn new(key: u128) -> Self {
         let key_bytes = util::u128_to_bytes(key);
         Self::from_bytes(key_bytes)

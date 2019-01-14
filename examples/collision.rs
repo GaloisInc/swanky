@@ -1,7 +1,7 @@
 use fancy_garbling::fancy::{Fancy, BundleGadgets, HasModulus};
-use itertools::Itertools;
-use fancy_garbling::garble::bench;
+use fancy_garbling::garble::bench_garbling;
 use fancy_garbling::informer::Informer;
+use itertools::Itertools;
 
 fn collision<W,F>(f: &mut F, nbits: usize, time_slices: usize)
     where F: Fancy<Item=W>, W: Clone + Default + HasModulus
@@ -52,7 +52,7 @@ fn main() {
     informer.print_info();
     println!("");
 
-    bench(10,
+    bench_garbling(10,
         Box::new(move |f| collision(f, nbits, time_slices)),
         Box::new(move |f| collision(f, nbits, time_slices))
     );
