@@ -4,6 +4,7 @@
 use crate::fancy::{Fancy, HasModulus};
 use serde_derive::{Serialize, Deserialize};
 use std::collections::HashMap;
+use std::sync::{Arc, Mutex};
 
 /// The index and modulus of a gate in a circuit.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Deserialize)]
@@ -42,6 +43,18 @@ pub enum Gate {
 }
 
 impl Circuit {
+    fn new() -> Circuit {
+        Circuit {
+            gates: Vec::new(),
+            garbler_input_refs: Vec::new(),
+            evaluator_input_refs: Vec::new(),
+            const_refs: Vec::new(),
+            output_refs: Vec::new(),
+            gate_moduli: Vec::new(),
+            num_nonfree_gates: 0,
+        }
+    }
+
     pub fn eval(&self, garbler_inputs: &[u16], evaluator_inputs: &[u16]) -> Vec<u16> {
         assert_eq!(garbler_inputs.len(), self.num_garbler_inputs(),
             "[circuit.eval] needed {} garbler inputs but got {}!",
@@ -160,11 +173,11 @@ impl Circuit {
 
 /// CircuitBuilder is used to build circuits.
 pub struct CircuitBuilder {
-    next_ref_ix: usize,
-    next_garbler_input_id: usize,
-    next_evaluator_input_id: usize,
-    const_map: HashMap<(u16,u16), CircuitRef>,
-    pub circ: Circuit,
+    next_ref_ix:             Arc<Mutex<usize>>,
+    next_garbler_input_id:   Arc<Mutex<usize>>,
+    next_evaluator_input_id: Arc<Mutex<usize>>,
+    const_map:               Arc<Mutex<HashMap<(u16,u16), CircuitRef>>>,
+    circ:                    Arc<Mutex<Circuit>>,
 }
 
 impl Fancy for CircuitBuilder {
@@ -173,25 +186,26 @@ impl Fancy for CircuitBuilder {
     fn garbler_input(&mut self, modulus: u16) -> CircuitRef {
         let gate = Gate::GarblerInput { id: self.get_next_garbler_input_id() };
         let r = self.gate(gate, modulus);
-        self.circ.garbler_input_refs.push(r);
+        self.circ.lock().unwrap().garbler_input_refs.push(r);
         r
     }
 
     fn evaluator_input(&mut self, modulus: u16) -> CircuitRef {
         let gate = Gate::EvaluatorInput { id: self.get_next_evaluator_input_id() };
         let r = self.gate(gate, modulus);
-        self.circ.evaluator_input_refs.push(r);
+        self.circ.lock().unwrap().evaluator_input_refs.push(r);
         r
     }
 
     fn constant(&mut self, val: u16, modulus: u16) -> CircuitRef {
-        match self.const_map.get(&(val, modulus)) {
+        let mut map = self.const_map.lock().unwrap();
+        match map.get(&(val, modulus)) {
             Some(&r) => r,
             None => {
                 let gate = Gate::Constant { val };
                 let r = self.gate(gate, modulus);
-                self.const_map.insert((val,modulus), r);
-                self.circ.const_refs.push(r);
+                map.insert((val,modulus), r);
+                self.circ.lock().unwrap().const_refs.push(r);
                 r
             }
         }
@@ -237,69 +251,57 @@ impl Fancy for CircuitBuilder {
     }
 
     fn output(&mut self, xref: &CircuitRef) {
-        self.circ.output_refs.push(xref.clone());
+        self.circ.lock().unwrap().output_refs.push(xref.clone());
     }
 }
 
 impl CircuitBuilder {
     pub fn new() -> Self {
-        let c = Circuit {
-            gates: Vec::new(),
-            garbler_input_refs: Vec::new(),
-            evaluator_input_refs: Vec::new(),
-            const_refs: Vec::new(),
-            output_refs: Vec::new(),
-            gate_moduli: Vec::new(),
-            num_nonfree_gates: 0,
-        };
         CircuitBuilder {
-            next_ref_ix: 0,
-            next_garbler_input_id: 0,
-            next_evaluator_input_id: 0,
-            const_map: HashMap::new(),
-            circ: c
+            next_ref_ix:             Arc::new(Mutex::new(0)),
+            next_garbler_input_id:   Arc::new(Mutex::new(0)),
+            next_evaluator_input_id: Arc::new(Mutex::new(0)),
+            const_map:               Arc::new(Mutex::new(HashMap::new())),
+            circ:                    Arc::new(Mutex::new(Circuit::new())),
         }
     }
 
-    pub fn modulus(&self, x: CircuitRef) -> u16 {
-        x.modulus()
-    }
-
     pub fn finish(self) -> Circuit {
-        self.circ
+        Arc::try_unwrap(self.circ).unwrap().into_inner().unwrap()
     }
 
-    pub fn borrow_circ(&self) -> &Circuit {
-        &self.circ
+    fn get_next_garbler_input_id(&self) -> usize {
+        let mut id = self.next_garbler_input_id.lock().unwrap();
+        let out = *id;
+        *id += 1;
+        out
     }
 
-    fn get_next_garbler_input_id(&mut self) -> usize {
-        let id = self.next_garbler_input_id;
-        self.next_garbler_input_id += 1;
+    fn get_next_evaluator_input_id(&self) -> usize {
+        let mut id = self.next_evaluator_input_id.lock().unwrap();
+        let out = *id;
+        *id += 1;
+        out
+    }
+
+    fn get_next_ciphertext_id(&self) -> usize {
+        let mut c = self.circ.lock().unwrap();
+        let id = c.num_nonfree_gates;
+        c.num_nonfree_gates += 1;
         id
     }
 
-    fn get_next_evaluator_input_id(&mut self) -> usize {
-        let id = self.next_evaluator_input_id;
-        self.next_evaluator_input_id += 1;
-        id
-    }
-
-    fn get_next_ciphertext_id(&mut self) -> usize {
-        let id = self.circ.num_nonfree_gates;
-        self.circ.num_nonfree_gates += 1;
-        id
-    }
-
-    fn get_next_ref_ix(&mut self) -> usize {
-        let x = self.next_ref_ix;
-        self.next_ref_ix += 1;
+    fn get_next_ref_ix(&self) -> usize {
+        let mut ix = self.next_ref_ix.lock().unwrap();
+        let x = *ix;
+        *ix += 1;
         x
     }
 
-    fn gate(&mut self, gate: Gate, modulus: u16) -> CircuitRef {
-        self.circ.gates.push(gate);
-        self.circ.gate_moduli.push(modulus);
+    fn gate(&self, gate: Gate, modulus: u16) -> CircuitRef {
+        let mut c = self.circ.lock().unwrap();
+        c.gates.push(gate);
+        c.gate_moduli.push(modulus);
         let ix = self.get_next_ref_ix();
         CircuitRef { ix, modulus }
     }
@@ -775,4 +777,11 @@ mod bundle {
         assert_eq!(circ, Circuit::from_str(&circ.to_string()).unwrap());
     }
 //}}}
+    #[test] // builder has send and sync {{{
+    fn builder_has_send_and_sync() {
+        fn check_send(_: impl Send) { }
+        fn check_sync(_: impl Sync) { }
+        check_send(CircuitBuilder::new());
+        check_sync(CircuitBuilder::new());
+    } // }}}
 }

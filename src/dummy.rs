@@ -4,12 +4,13 @@
 //! circuits.
 
 use crate::fancy::{Fancy, HasModulus};
+use std::sync::{Arc, Mutex};
 
 /// Simple struct that performs the fancy computation over u16.
 pub struct Dummy {
-    outputs: Vec<u16>,
-    garbler_inputs: Vec<u16>,
-    evaluator_inputs: Vec<u16>,
+    outputs:          Arc<Mutex<Vec<u16>>>,
+    garbler_inputs:   Arc<Mutex<Vec<u16>>>,
+    evaluator_inputs: Arc<Mutex<Vec<u16>>>,
 }
 
 /// Wrapper around u16.
@@ -27,15 +28,15 @@ impl Dummy {
     /// Create a new Dummy.
     pub fn new(garbler_inputs: &[u16], evaluator_inputs: &[u16]) -> Dummy {
         Dummy {
-            garbler_inputs: garbler_inputs.to_vec(),
-            evaluator_inputs: evaluator_inputs.to_vec(),
-            outputs: Vec::new(),
+            garbler_inputs:   Arc::new(Mutex::new(garbler_inputs.to_vec())),
+            evaluator_inputs: Arc::new(Mutex::new(evaluator_inputs.to_vec())),
+            outputs:          Arc::new(Mutex::new(Vec::new())),
         }
     }
 
-    /// Get the output from the fancy computation.
-    pub fn get_output(&self) -> Vec<u16> {
-        self.outputs.clone()
+    /// Get the output from the fancy computation, consuming the Dummy.
+    pub fn get_output(self) -> Vec<u16> {
+        Arc::try_unwrap(self.outputs).unwrap().into_inner().unwrap()
     }
 }
 
@@ -43,14 +44,16 @@ impl Fancy for Dummy {
     type Item = DummyVal;
 
     fn garbler_input(&mut self, modulus: u16) -> DummyVal {
-        assert!(self.garbler_inputs.len() > 0, "not enough garbler inputs");
-        let val = self.garbler_inputs.remove(0);
+        let mut inps = self.garbler_inputs.lock().unwrap();
+        assert!(inps.len() > 0, "not enough garbler inputs");
+        let val = inps.remove(0);
         DummyVal { val, modulus }
     }
 
     fn evaluator_input(&mut self, modulus: u16) -> DummyVal {
-        assert!(self.evaluator_inputs.len() > 0, "not enough evaluator inputs");
-        let val = self.evaluator_inputs.remove(0);
+        let mut inps = self.evaluator_inputs.lock().unwrap();
+        assert!(inps.len() > 0, "not enough evaluator inputs");
+        let val = inps.remove(0);
         DummyVal { val, modulus }
     }
 
@@ -92,7 +95,7 @@ impl Fancy for Dummy {
     }
 
     fn output(&mut self, x: &DummyVal) {
-        self.outputs.push(x.val);
+        self.outputs.lock().unwrap().push(x.val);
     }
 }
 
@@ -202,4 +205,11 @@ mod bundle {
         }
     }
     //}}}
+    #[test] // dummy has send and sync {{{
+    fn dummy_has_send_and_sync() {
+        fn check_send(_: impl Send) { }
+        fn check_sync(_: impl Sync) { }
+        check_send(Dummy::new(&[], &[]));
+        check_sync(Dummy::new(&[], &[]));
+    } // }}}
 }
