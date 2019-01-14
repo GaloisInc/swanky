@@ -541,13 +541,6 @@ mod classic {
         assert_eq!(de, Decoder::from_bytes(&de.to_bytes()).unwrap());
     }
 //}}}
-    #[test] // garbler has send and sync {{{
-    fn garbler_has_send_and_sync() {
-        fn check_send(_: impl Send) { }
-        check_send(Garbler::new(Box::new(|_| ())));
-        fn check_sync(_: impl Sync) { }
-        check_sync(Garbler::new(Box::new(|_| ())));
-    } // }}}
 }
 
 #[cfg(test)]

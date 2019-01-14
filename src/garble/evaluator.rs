@@ -6,20 +6,20 @@ use itertools::Itertools;
 use serde_derive::{Serialize, Deserialize};
 use std::collections::HashMap;
 use std::ops::DerefMut;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, RwLock, Mutex};
 
 use super::{Message, GarbledGate, OutputCiphertext};
 
-/// Streaming evaluator using a callback to recieve ciphertexts as needed.
+/// Streaming evaluator using a callback to receive ciphertexts as needed.
 ///
 /// Evaluates a garbled circuit on the fly, using messages containing ciphertexts and
 /// wires.
 pub struct Evaluator {
-    recv_function:  Arc<Mutex<Box<FnMut() -> Message + Send>>>,
-    constants: HashMap<(u16,u16),Wire>,
-    current_gate: usize,
-    output_ciphertexts: Vec<OutputCiphertext>,
-    output_wires: Vec<Wire>,
+    recv_function: Arc<Mutex<Box<FnMut() -> Message + Send>>>,
+    constants:     Arc<RwLock<HashMap<(u16,u16),Wire>>>,
+    current_gate:  Arc<Mutex<usize>>,
+    output_cts:    Arc<Mutex<Vec<OutputCiphertext>>>,
+    output_wires:  Arc<Mutex<Vec<Wire>>>,
 }
 
 impl Evaluator {
@@ -30,28 +30,31 @@ impl Evaluator {
     pub fn new(recv_function: Box<FnMut() -> Message + Send>) -> Evaluator {
         Evaluator {
             recv_function: Arc::new(Mutex::new(recv_function)),
-            constants: HashMap::new(),
-            current_gate: 0,
-            output_ciphertexts: Vec::new(),
-            output_wires: Vec::new(),
+            constants: Arc::new(RwLock::new(HashMap::new())),
+            current_gate: Arc::new(Mutex::new(0)),
+            output_cts:   Arc::new(Mutex::new(Vec::new())),
+            output_wires: Arc::new(Mutex::new(Vec::new())),
         }
     }
 
-    /// Recieve the next message.
+    /// Receive the next message.
     fn recv(&self) -> Message {
         (self.recv_function.lock().unwrap().deref_mut())()
     }
 
-    /// The current nonfree gate index of the garbling computation.
-    fn current_gate(&mut self) -> usize {
-        let c = self.current_gate;
-        self.current_gate += 1;
-        c
+    /// The current non-free gate index of the garbling computation.
+    fn current_gate(&self) -> usize {
+        let mut c = self.current_gate.lock().unwrap();
+        let old = *c;
+        *c += 1;
+        old
     }
 
-    /// Decode the output recieved during the Fancy computation.
+    /// Decode the output received during the Fancy computation.
     pub fn decode_output(self) -> Vec<u16> {
-        Decoder::new(self.output_ciphertexts).decode(&self.output_wires)
+        let cts  = Arc::try_unwrap(self.output_cts).unwrap().into_inner().unwrap();
+        let outs = Arc::try_unwrap(self.output_wires).unwrap().into_inner().unwrap();
+        Decoder::new(cts).decode(&outs)
     }
 }
 
@@ -74,14 +77,20 @@ impl Fancy for Evaluator {
     }
     //}}}
     fn constant(&mut self, x: u16, q: u16) -> Wire { //{{{
-        if self.constants.contains_key(&(x,q)) {
-            return self.constants[&(x,q)].clone();
+        match self.constants.read().unwrap().get(&(x,q)) {
+            Some(c) => return c.clone(),
+            None => (),
+        }
+        let mut constants = self.constants.write().unwrap();
+        match constants.get(&(x,q)) {
+            Some(c) => return c.clone(),
+            None => (),
         }
         let w = match self.recv() {
             Message::Constant { wire, .. } => wire,
             m => panic!("Expected message Constant but got {}", m),
         };
-        self.constants.insert((x,q),w.clone());
+        constants.insert((x,q),w.clone());
         w
     }
     //}}}
@@ -156,10 +165,12 @@ impl Fancy for Evaluator {
     //}}}
     fn output(&mut self, x: &Wire) { //{{{
         match self.recv() {
-            Message::OutputCiphertext(c) => self.output_ciphertexts.push(c),
+            Message::OutputCiphertext(c) => {
+                self.output_cts.lock().unwrap().push(c);
+            }
             m => panic!("Expected message OutputCiphertext but got {}", m),
         }
-        self.output_wires.push(x.clone());
+        self.output_wires.lock().unwrap().push(x.clone());
     }
     //}}}
 }
@@ -343,3 +354,14 @@ impl Decoder {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn evaluator_has_send_and_sync() {
+        fn check_send(_: impl Send) { }
+        fn check_sync(_: impl Sync) { }
+        check_send(Evaluator::new(Box::new(|| unimplemented!())));
+        check_sync(Evaluator::new(Box::new(|| unimplemented!())));
+    }
+}

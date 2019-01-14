@@ -315,3 +315,15 @@ impl Fancy for Garbler {
     }
     // }}}
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn garbler_has_send_and_sync() {
+        fn check_send(_: impl Send) { }
+        fn check_sync(_: impl Sync) { }
+        check_send(Garbler::new(Box::new(|_| ())));
+        check_sync(Garbler::new(Box::new(|_| ())));
+    }
+}
