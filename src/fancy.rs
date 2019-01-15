@@ -167,8 +167,17 @@ pub trait Fancy {
         }
     }
 
+    /// If `b=0` returns `x` else `y`.
+    fn mux(&mut self, b: &Self::Item, x: &Self::Item, y: &Self::Item) -> Self::Item {
+        let notb = self.negate(b);
+        let xsel = self.and(&notb,x);
+        let ysel = self.and(b,y);
+        self.add(&xsel, &ysel)
+    }
+
     /// If `x=0` return the constant `b1` else return `b2`. Folds constants if possible.
-    fn mux(&mut self, x: &Self::Item, b1: bool, b2: bool) -> Self::Item {
+    fn mux_constant_bits(&mut self, x: &Self::Item, b1: bool, b2: bool) -> Self::Item {
+        assert!(x.modulus() == 2);
         if !b1 && b2 {
             x.clone()
         } else if b1 && !b2 {
@@ -234,6 +243,11 @@ pub trait BundleGadgets: Fancy {
         let ps = util::factor(q);
         let xs = ps.iter().map(|&p| (x % p as u128) as u16).collect_vec();
         self.constant_bundle(&xs,&ps)
+    }
+
+    /// Create a constant bundle using base 2 inputs.
+    fn constant_bundle_binary(&mut self, bits: &[u16]) -> Bundle<Self::Item> {
+        self.constant_bundle(bits, &vec![2;bits.len()])
     }
 
     /// Create `n` garbler input bundles, using moduli `ps`.
@@ -578,6 +592,15 @@ pub trait BundleGadgets: Fancy {
         (zs, self.negate(&c))
     }
 
+    fn multiplex(&mut self, b: &Self::Item, x: &Bundle<Self::Item>, y: &Bundle<Self::Item>)
+        -> Bundle<Self::Item>
+    {
+        let ws = x.wires().iter().zip(y.wires().iter()).map(|(xwire,ywire)| {
+            self.mux(b,xwire,ywire)
+        }).collect();
+        Bundle(ws)
+    }
+
     /// If `x=0` return `c1` as a bundle of constant bits, else return `c2`.
     fn multiplex_constant_bits(&mut self, x: &Self::Item, c1: u128, c2: u128, nbits: usize)
         -> Bundle<Self::Item>
@@ -585,7 +608,7 @@ pub trait BundleGadgets: Fancy {
         let c1_bs = util::u128_to_bits(c1, nbits).into_iter().map(|x:u16| x > 0).collect_vec();
         let c2_bs = util::u128_to_bits(c2, nbits).into_iter().map(|x:u16| x > 0).collect_vec();
         let ws = c1_bs.into_iter().zip(c2_bs.into_iter()).map(|(b1,b2)| {
-            self.mux(x,b1,b2)
+            self.mux_constant_bits(x,b1,b2)
         }).collect();
         Bundle(ws)
     }
@@ -611,6 +634,14 @@ pub trait BundleGadgets: Fancy {
             let s = self.shift(x, shift_amt);
             self.binary_addition_no_carry(&z,&s)
         })
+    }
+
+    /// Compute the absolute value of a binary bundle.
+    fn abs(&mut self, x: &Bundle<Self::Item>) -> Bundle<Self::Item> {
+        assert!(x.is_binary());
+        let sign = x.wires().last().unwrap();
+        let negated = self.twos_complement(x);
+        self.multiplex(&sign, x, &negated)
     }
 }
 

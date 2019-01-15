@@ -205,6 +205,29 @@ mod bundle {
         }
     }
     //}}}
+    #[test] // abs {{{
+    fn binary_abs() {
+        let mut rng = thread_rng();
+        for _ in 0..16 {
+            let nbits = 64;
+            let q = 1<<nbits;
+            let x = rng.gen_u128() % q;
+            let mut d = Dummy::new(&util::u128_to_bits(x,nbits), &[]);
+            {
+                let x = d.garbler_input_bundle_binary(nbits);
+                let z = d.abs(&x);
+                d.output_bundle(&z);
+            }
+            let z = util::u128_from_bits(&d.get_output());
+            let should_be = if x >> (nbits-1) > 0 {
+                ((!x) + 1) & ((1<<nbits) - 1)
+            } else {
+                x
+            };
+            assert_eq!(z, should_be);
+        }
+    }
+    //}}}
     #[test] // dummy has send and sync {{{
     fn dummy_has_send_and_sync() {
         fn check_send(_: impl Send) { }
