@@ -89,7 +89,7 @@ pub fn garble_iter(mut fancy_computation: Box<FnMut(&mut Garbler) + Send>)
     std::thread::spawn(move || {
         let send_func = move |m| sender.send(m)
             .expect("garble_iter thread could not send message to iterator");
-        let mut garbler = Garbler::new(Box::new(send_func));
+        let mut garbler = Garbler::new(send_func);
         fancy_computation(&mut garbler);
     });
 
@@ -128,7 +128,7 @@ pub fn garble(c: &Circuit) -> (Encoder, Decoder, GarbledCircuit) {
     }
 
     {
-        let mut garbler = Garbler::new(Box::new(send_func));
+        let mut garbler = Garbler::new(send_func);
 
         let mut wires = Vec::new();
         for (i, gate) in c.gates.iter().enumerate() {
@@ -191,7 +191,7 @@ pub fn bench_garbling(
 
     for _ in 0..niters {
         pb.inc();
-        let mut garbler = Garbler::new(Box::new(|_|()));
+        let mut garbler = Garbler::new(|_|());
         let start = PreciseTime::now();
         fancy_gb(&mut garbler);
         let end = PreciseTime::now();
@@ -229,12 +229,12 @@ pub fn bench_garbling(
                 sender.send(m).expect("failed to send message");
             };
             // evaluate garbler
-            let mut gb = Garbler::new(Box::new(callback));
+            let mut gb = Garbler::new(callback);
             fancy_gb(&mut gb);
         });
 
         // evaluate the evaluator
-        let mut ev = Evaluator::new(Box::new(move || receiver.recv().unwrap()));
+        let mut ev = Evaluator::new(move || receiver.recv().unwrap());
         fancy_ev(&mut ev);
 
         let end = PreciseTime::now();
@@ -584,7 +584,7 @@ mod streaming {
             }
         };
 
-        let mut ev = Evaluator::new(Box::new(recv_func));
+        let mut ev = Evaluator::new(recv_func);
         evaluator_computation(&mut ev);
 
         let result = ev.decode_output();

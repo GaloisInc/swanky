@@ -15,8 +15,8 @@ use super::{Message, GarbledGate, OutputCiphertext};
 /// Evaluates a garbled circuit on the fly, using messages containing ciphertexts and
 /// wires.
 pub struct Evaluator {
-    recv_function: Arc<Mutex<Box<FnMut() -> Message + Send>>>,
-    constants:     Arc<RwLock<HashMap<(u16,u16),Wire>>>,
+    recv_function: Arc<Mutex<FnMut() -> Message + Send>>,
+    constants:     Arc<RwLock<HashMap<(u16,u16), Wire>>>,
     current_gate:  Arc<Mutex<usize>>,
     output_cts:    Arc<Mutex<Vec<OutputCiphertext>>>,
     output_wires:  Arc<Mutex<Vec<Wire>>>,
@@ -27,13 +27,15 @@ impl Evaluator {
     ///
     /// `recv_function` enables streaming by producing messages during the `Fancy`
     /// computation, which contain ciphertexts and wirelabels.
-    pub fn new(recv_function: Box<FnMut() -> Message + Send>) -> Evaluator {
+    pub fn new<F>(recv_function: F) -> Evaluator
+      where F: FnMut() -> Message + Send + 'static
+    {
         Evaluator {
             recv_function: Arc::new(Mutex::new(recv_function)),
-            constants: Arc::new(RwLock::new(HashMap::new())),
-            current_gate: Arc::new(Mutex::new(0)),
-            output_cts:   Arc::new(Mutex::new(Vec::new())),
-            output_wires: Arc::new(Mutex::new(Vec::new())),
+            constants:     Arc::new(RwLock::new(HashMap::new())),
+            current_gate:  Arc::new(Mutex::new(0)),
+            output_cts:    Arc::new(Mutex::new(Vec::new())),
+            output_wires:  Arc::new(Mutex::new(Vec::new())),
         }
     }
 
@@ -58,7 +60,6 @@ impl Evaluator {
     }
 }
 
-// TODO: error handling here, by changing `type Wire = Result<Error, Wire>`?
 impl Fancy for Evaluator {
     type Item = Wire;
 
@@ -216,7 +217,7 @@ impl GarbledCircuit {
             }
         }).collect_vec().into_iter();
 
-        let mut eval = Evaluator::new(Box::new(move || msgs.next().unwrap()));
+        let mut eval = Evaluator::new(move || msgs.next().unwrap());
 
         let mut wires: Vec<Wire> = Vec::new();
         for (i,gate) in c.gates.iter().enumerate() {
@@ -361,7 +362,7 @@ mod tests {
     fn evaluator_has_send_and_sync() {
         fn check_send(_: impl Send) { }
         fn check_sync(_: impl Sync) { }
-        check_send(Evaluator::new(Box::new(|| unimplemented!())));
-        check_sync(Evaluator::new(Box::new(|| unimplemented!())));
+        check_send(Evaluator::new(|| unimplemented!()));
+        check_sync(Evaluator::new(|| unimplemented!()));
     }
 }

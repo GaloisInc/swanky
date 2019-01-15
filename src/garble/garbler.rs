@@ -10,7 +10,7 @@ use super::Message;
 
 /// Streams garbled circuit ciphertexts through a callback.
 pub struct Garbler {
-    send_function:  Arc<Mutex<Box<FnMut(Message) + Send>>>,
+    send_function:  Arc<Mutex<FnMut(Message) + Send>>,
     constants:      Arc<RwLock<HashMap<(u16,u16),Wire>>>,
     deltas:         Arc<RwLock<HashMap<u16, Wire>>>,
     current_output: Arc<Mutex<usize>>,
@@ -22,7 +22,9 @@ impl Garbler {
     ///
     /// `send_func` is a callback that enables streaming. It gets called as the garbler
     /// generates ciphertext information such as garbled gates or input wirelabels.
-    pub fn new(send_func: Box<FnMut(Message) + Send>) -> Garbler {
+    pub fn new<F>(send_func: F) -> Garbler
+      where F: FnMut(Message) + Send + 'static
+    {
         Garbler {
             send_function:  Arc::new(Mutex::new(send_func)),
             constants:      Arc::new(RwLock::new(HashMap::new())),
@@ -323,7 +325,7 @@ mod tests {
     fn garbler_has_send_and_sync() {
         fn check_send(_: impl Send) { }
         fn check_sync(_: impl Sync) { }
-        check_send(Garbler::new(Box::new(|_| ())));
-        check_sync(Garbler::new(Box::new(|_| ())));
+        check_send(Garbler::new(|_| ()));
+        check_sync(Garbler::new(|_| ()));
     }
 }
