@@ -79,7 +79,7 @@ fn main() {
     println!("");
 
     bench_garbling(10,
-        Box::new(move |f| collision(f, nbits, time_slices, check_for_cheaters)),
-        Box::new(move |f| collision(f, nbits, time_slices, check_for_cheaters))
+        move |f| collision(f, nbits, time_slices, check_for_cheaters),
+        move |f| collision(f, nbits, time_slices, check_for_cheaters)
     );
 }

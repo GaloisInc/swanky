@@ -174,13 +174,12 @@ pub fn garble(c: &Circuit) -> (Encoder, Decoder, GarbledCircuit) {
 ////////////////////////////////////////////////////////////////////////////////
 // benchmarking function
 
-/// Run benchmark garbling and streaming on the function. Funky function arguments to work
-/// around the pesky borrow checker.
-pub fn bench_garbling(
-    niters: usize,
-    fancy_gb: Box<Fn(&mut Garbler) + Send + Sync>,
-    fancy_ev: Box<Fn(&mut Evaluator)>
-){
+/// Run benchmark garbling and streaming on the function. Garbling function is evaluated
+/// on another thread.
+pub fn bench_garbling<GbF, EvF>(niters: usize, fancy_gb: GbF, fancy_ev: EvF)
+  where GbF: Fn(&mut Garbler) + Send + Sync + 'static,
+        EvF: Fn(&mut Evaluator)
+{
     let fancy_gb = Arc::new(fancy_gb);
 
     let mut total_time = Duration::zero();
