@@ -7,15 +7,14 @@ use serde_derive::{Serialize, Deserialize};
 use std::collections::HashMap;
 use std::ops::DerefMut;
 use std::sync::{Arc, RwLock, Mutex};
-
-use super::{Message, GarbledGate, OutputCiphertext};
+use super::{Message, GarbledGate, OutputCiphertext, GateType};
 
 /// Streaming evaluator using a callback to receive ciphertexts as needed.
 ///
 /// Evaluates a garbled circuit on the fly, using messages containing ciphertexts and
 /// wires.
 pub struct Evaluator {
-    recv_function: Arc<Mutex<FnMut() -> Message + Send>>,
+    recv_function: Arc<Mutex<FnMut(GateType) -> Message + Send>>,
     constants:     Arc<RwLock<HashMap<(u16,u16), Wire>>>,
     current_gate:  Arc<Mutex<usize>>,
     output_cts:    Arc<Mutex<Vec<OutputCiphertext>>>,
@@ -28,7 +27,7 @@ impl Evaluator {
     /// `recv_function` enables streaming by producing messages during the `Fancy`
     /// computation, which contain ciphertexts and wirelabels.
     pub fn new<F>(recv_function: F) -> Evaluator
-      where F: FnMut() -> Message + Send + 'static
+      where F: FnMut(GateType) -> Message + Send + 'static
     {
         Evaluator {
             recv_function: Arc::new(Mutex::new(recv_function)),
@@ -40,8 +39,8 @@ impl Evaluator {
     }
 
     /// Receive the next message.
-    fn recv(&self) -> Message {
-        (self.recv_function.lock().unwrap().deref_mut())()
+    fn recv(&self, ty: GateType) -> Message {
+        (self.recv_function.lock().unwrap().deref_mut())(ty)
     }
 
     /// The current non-free gate index of the garbling computation.
@@ -64,14 +63,14 @@ impl Fancy for Evaluator {
     type Item = Wire;
 
     fn garbler_input(&self, _q: u16) -> Wire { //{{{
-        match self.recv() {
+        match self.recv(GateType::Other) {
             Message::GarblerInput(w) => w,
             m => panic!("Expected message GarblerInput but got {}", m),
         }
     }
     //}}}
-    fn evaluator_input(&self, _q: u16) -> Wire { //{{{
-        match self.recv() {
+    fn evaluator_input(&self, q: u16) -> Wire { //{{{
+        match self.recv(GateType::EvaluatorInput { modulus: q }) {
             Message::EvaluatorInput(w) => w,
             m => panic!("Expected message EvaluatorInput but got {}", m),
         }
@@ -87,7 +86,7 @@ impl Fancy for Evaluator {
             Some(c) => return c.clone(),
             None => (),
         }
-        let w = match self.recv() {
+        let w = match self.recv(GateType::Other) {
             Message::Constant { wire, .. } => wire,
             m => panic!("Expected message Constant but got {}", m),
         };
@@ -112,7 +111,7 @@ impl Fancy for Evaluator {
             return self.mul(B,A);
         }
 
-        let gate = match self.recv() {
+        let gate = match self.recv(GateType::Other) {
             Message::GarbledGate(g) => g,
             m => panic!("Expected message GarbledGate but got {}", m),
         };
@@ -150,7 +149,7 @@ impl Fancy for Evaluator {
     }
     //}}}
     fn proj(&self, x: &Wire, q: u16, _tt: &[u16]) -> Wire { //{{{
-        let gate = match self.recv() {
+        let gate = match self.recv(GateType::Other) {
             Message::GarbledGate(g) => g,
             m => panic!("Expected message GarbledGate but got {}", m),
         };
@@ -165,7 +164,7 @@ impl Fancy for Evaluator {
     }
     //}}}
     fn output(&self, x: &Wire) { //{{{
-        match self.recv() {
+        match self.recv(GateType::Other) {
             Message::OutputCiphertext(c) => {
                 self.output_cts.lock().unwrap().push(c);
             }
@@ -217,7 +216,7 @@ impl GarbledCircuit {
             }
         }).collect_vec().into_iter();
 
-        let eval = Evaluator::new(move || msgs.next().unwrap());
+        let eval = Evaluator::new(move |_| msgs.next().unwrap());
 
         let mut wires: Vec<Wire> = Vec::new();
         for (i,gate) in c.gates.iter().enumerate() {
@@ -365,7 +364,7 @@ mod tests {
     fn evaluator_has_send_and_sync() {
         fn check_send(_: impl Send) { }
         fn check_sync(_: impl Sync) { }
-        check_send(Evaluator::new(|| unimplemented!()));
-        check_sync(Evaluator::new(|| unimplemented!()));
+        check_send(Evaluator::new(|_| unimplemented!()));
+        check_sync(Evaluator::new(|_| unimplemented!()));
     }
 }

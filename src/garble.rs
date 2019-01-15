@@ -20,7 +20,7 @@ pub type GarbledGate = Vec<u128>;
 /// Ciphertext created by the garbler for output gates.
 pub type OutputCiphertext = Vec<u128>;
 
-/// The outputs that can be emitted during streaming of a garbling.
+/// The outputs that can be emitted by a Garbler and consumed by an Evaluator.
 #[derive(Serialize, Deserialize)]
 pub enum Message {
     /// Zero wire and delta for one of the garbler's inputs.
@@ -49,6 +49,15 @@ pub enum Message {
 
     /// Output decoding information.
     OutputCiphertext(OutputCiphertext),
+}
+
+/// Type of a gate, input to the Evaluator's recv function.
+pub enum GateType {
+    /// The Evaluator in 2PC needs to know to do OT for their own inputs. This as input to
+    /// the recv function means the current gate is an evaluator input.
+    EvaluatorInput { modulus: u16 },
+    /// Some other kind of gate that does not require special OT.
+    Other,
 }
 
 impl std::fmt::Display for Message {
@@ -233,7 +242,7 @@ pub fn bench_garbling<GbF, EvF>(niters: usize, fancy_gb: GbF, fancy_ev: EvF)
         });
 
         // evaluate the evaluator
-        let mut ev = Evaluator::new(move || receiver.recv().unwrap());
+        let mut ev = Evaluator::new(move |_| receiver.recv().unwrap());
         fancy_ev(&mut ev);
 
         let end = PreciseTime::now();
@@ -566,7 +575,7 @@ mod streaming {
 
         // the evaluator's recv_function gets the next message from the garble iterator,
         // encodes the appropriate inputs, and sends it along
-        let recv_func = move || {
+        let recv_func = move |_| {
             match gb_iter.next().unwrap() {
                 Message::UnencodedGarblerInput { zero, delta } => {
                     // Encode the garbler's next input
