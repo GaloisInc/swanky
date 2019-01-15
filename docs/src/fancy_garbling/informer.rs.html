@@ -223,26 +223,49 @@
 <span id="223">223</span>
 <span id="224">224</span>
 <span id="225">225</span>
+<span id="226">226</span>
+<span id="227">227</span>
+<span id="228">228</span>
+<span id="229">229</span>
+<span id="230">230</span>
+<span id="231">231</span>
+<span id="232">232</span>
+<span id="233">233</span>
+<span id="234">234</span>
+<span id="235">235</span>
+<span id="236">236</span>
+<span id="237">237</span>
+<span id="238">238</span>
+<span id="239">239</span>
+<span id="240">240</span>
+<span id="241">241</span>
+<span id="242">242</span>
+<span id="243">243</span>
+<span id="244">244</span>
+<span id="245">245</span>
+<span id="246">246</span>
+<span id="247">247</span>
 </pre><pre class="rust ">
 <span class="doccomment">//! Informer runs a fancy computation and learns information from it, like how many of</span>
 <span class="doccomment">//! what kind of inputs there are.</span>
 
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">fancy</span>::{<span class="ident">Fancy</span>, <span class="ident">HasModulus</span>};
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">collections</span>::<span class="ident">HashSet</span>;
+<span class="kw">use</span> <span class="ident">std</span>::<span class="ident">sync</span>::{<span class="ident">Arc</span>, <span class="ident">Mutex</span>};
 
 <span class="doccomment">/// Implements Fancy. Use to learn information about a fancy computation in a lightweight</span>
 <span class="doccomment">/// way.</span>
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Informer</span> {
-    <span class="ident">garbler_input_moduli</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u16</span><span class="op">&gt;</span>,
-    <span class="ident">evaluator_input_moduli</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u16</span><span class="op">&gt;</span>,
-    <span class="ident">constants</span>: <span class="ident">HashSet</span><span class="op">&lt;</span>(<span class="ident">u16</span>,<span class="ident">u16</span>)<span class="op">&gt;</span>,
-    <span class="ident">outputs</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u16</span><span class="op">&gt;</span>,
-    <span class="ident">nadds</span>: <span class="ident">usize</span>,
-    <span class="ident">nsubs</span>: <span class="ident">usize</span>,
-    <span class="ident">ncmuls</span>: <span class="ident">usize</span>,
-    <span class="ident">nmuls</span>: <span class="ident">usize</span>,
-    <span class="ident">nprojs</span>: <span class="ident">usize</span>,
-    <span class="ident">nciphertexts</span>: <span class="ident">usize</span>,
+    <span class="ident">garbler_input_moduli</span>:   <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u16</span><span class="op">&gt;&gt;</span><span class="op">&gt;</span>,
+    <span class="ident">evaluator_input_moduli</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u16</span><span class="op">&gt;&gt;</span><span class="op">&gt;</span>,
+    <span class="ident">constants</span>:              <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">HashSet</span><span class="op">&lt;</span>(<span class="ident">u16</span>,<span class="ident">u16</span>)<span class="op">&gt;&gt;</span><span class="op">&gt;</span>,
+    <span class="ident">outputs</span>:                <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u16</span><span class="op">&gt;&gt;</span><span class="op">&gt;</span>,
+    <span class="ident">nadds</span>:                  <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;&gt;</span>,
+    <span class="ident">nsubs</span>:                  <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;&gt;</span>,
+    <span class="ident">ncmuls</span>:                 <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;&gt;</span>,
+    <span class="ident">nmuls</span>:                  <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;&gt;</span>,
+    <span class="ident">nprojs</span>:                 <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;&gt;</span>,
+    <span class="ident">nciphertexts</span>:           <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;&gt;</span>,
 }
 
 <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Clone</span>, <span class="ident">Default</span>, <span class="ident">Debug</span>)]</span>
@@ -255,16 +278,16 @@
 <span class="kw">impl</span> <span class="ident">Informer</span> {
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>() <span class="op">-&gt;</span> <span class="ident">Informer</span> {
         <span class="ident">Informer</span> {
-            <span class="ident">garbler_input_moduli</span>: <span class="ident">Vec</span>::<span class="ident">new</span>(),
-            <span class="ident">evaluator_input_moduli</span>: <span class="ident">Vec</span>::<span class="ident">new</span>(),
-            <span class="ident">constants</span>: <span class="ident">HashSet</span>::<span class="ident">new</span>(),
-            <span class="ident">outputs</span>: <span class="ident">Vec</span>::<span class="ident">new</span>(),
-            <span class="ident">nadds</span>: <span class="number">0</span>,
-            <span class="ident">nsubs</span>: <span class="number">0</span>,
-            <span class="ident">ncmuls</span>: <span class="number">0</span>,
-            <span class="ident">nmuls</span>: <span class="number">0</span>,
-            <span class="ident">nprojs</span>: <span class="number">0</span>,
-            <span class="ident">nciphertexts</span>: <span class="number">0</span>,
+            <span class="ident">garbler_input_moduli</span>:   <span class="ident">Arc</span>::<span class="ident">new</span>(<span class="ident">Mutex</span>::<span class="ident">new</span>(<span class="ident">Vec</span>::<span class="ident">new</span>())),
+            <span class="ident">evaluator_input_moduli</span>: <span class="ident">Arc</span>::<span class="ident">new</span>(<span class="ident">Mutex</span>::<span class="ident">new</span>(<span class="ident">Vec</span>::<span class="ident">new</span>())),
+            <span class="ident">constants</span>:              <span class="ident">Arc</span>::<span class="ident">new</span>(<span class="ident">Mutex</span>::<span class="ident">new</span>(<span class="ident">HashSet</span>::<span class="ident">new</span>())),
+            <span class="ident">outputs</span>:                <span class="ident">Arc</span>::<span class="ident">new</span>(<span class="ident">Mutex</span>::<span class="ident">new</span>(<span class="ident">Vec</span>::<span class="ident">new</span>())),
+            <span class="ident">nadds</span>:                  <span class="ident">Arc</span>::<span class="ident">new</span>(<span class="ident">Mutex</span>::<span class="ident">new</span>(<span class="number">0</span>)),
+            <span class="ident">nsubs</span>:                  <span class="ident">Arc</span>::<span class="ident">new</span>(<span class="ident">Mutex</span>::<span class="ident">new</span>(<span class="number">0</span>)),
+            <span class="ident">ncmuls</span>:                 <span class="ident">Arc</span>::<span class="ident">new</span>(<span class="ident">Mutex</span>::<span class="ident">new</span>(<span class="number">0</span>)),
+            <span class="ident">nmuls</span>:                  <span class="ident">Arc</span>::<span class="ident">new</span>(<span class="ident">Mutex</span>::<span class="ident">new</span>(<span class="number">0</span>)),
+            <span class="ident">nprojs</span>:                 <span class="ident">Arc</span>::<span class="ident">new</span>(<span class="ident">Mutex</span>::<span class="ident">new</span>(<span class="number">0</span>)),
+            <span class="ident">nciphertexts</span>:           <span class="ident">Arc</span>::<span class="ident">new</span>(<span class="ident">Mutex</span>::<span class="ident">new</span>(<span class="number">0</span>)),
         }
     }
 
@@ -334,93 +357,102 @@
 
     <span class="doccomment">/// Number of garbler inputs in the fancy computation.</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">num_garbler_inputs</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-&gt;</span> <span class="ident">usize</span> {
-        <span class="self">self</span>.<span class="ident">garbler_input_moduli</span>.<span class="ident">len</span>()
+        <span class="self">self</span>.<span class="ident">garbler_input_moduli</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>().<span class="ident">len</span>()
     }
 
     <span class="doccomment">/// Moduli of garbler inputs in the fancy computation.</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">garbler_input_moduli</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-&gt;</span> <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u16</span><span class="op">&gt;</span> {
-        <span class="self">self</span>.<span class="ident">garbler_input_moduli</span>.<span class="ident">clone</span>()
+        <span class="self">self</span>.<span class="ident">garbler_input_moduli</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>().<span class="ident">clone</span>()
     }
 
     <span class="doccomment">/// Number of evaluator inputs in the fancy computation.</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">num_evaluator_inputs</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-&gt;</span> <span class="ident">usize</span> {
-        <span class="self">self</span>.<span class="ident">evaluator_input_moduli</span>.<span class="ident">len</span>()
+        <span class="self">self</span>.<span class="ident">evaluator_input_moduli</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>().<span class="ident">len</span>()
     }
 
     <span class="doccomment">/// Moduli of evaluator inputs in the fancy computation.</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">evaluator_input_moduli</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-&gt;</span> <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u16</span><span class="op">&gt;</span> {
-        <span class="self">self</span>.<span class="ident">evaluator_input_moduli</span>.<span class="ident">clone</span>()
+        <span class="self">self</span>.<span class="ident">evaluator_input_moduli</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>().<span class="ident">clone</span>()
     }
 
     <span class="doccomment">/// Number of constants in the fancy computation.</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">num_consts</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-&gt;</span> <span class="ident">usize</span> {
-        <span class="self">self</span>.<span class="ident">constants</span>.<span class="ident">len</span>()
+        <span class="self">self</span>.<span class="ident">constants</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>().<span class="ident">len</span>()
     }
 
     <span class="doccomment">/// Number of outputs in the fancy computation.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">num_outputs</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-&gt;</span> <span class="ident">usize</span> { <span class="self">self</span>.<span class="ident">outputs</span>.<span class="ident">len</span>() }
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">num_outputs</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-&gt;</span> <span class="ident">usize</span> {
+        <span class="self">self</span>.<span class="ident">outputs</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>().<span class="ident">len</span>()
+    }
 
     <span class="doccomment">/// Number of output ciphertexts.</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">num_output_ciphertexts</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-&gt;</span> <span class="ident">usize</span> {
-        <span class="self">self</span>.<span class="ident">outputs</span>.<span class="ident">iter</span>().<span class="ident">map</span>(<span class="op">|</span><span class="kw-2">&amp;</span><span class="ident">m</span><span class="op">|</span> <span class="ident">m</span> <span class="kw">as</span> <span class="ident">usize</span>).<span class="ident">sum</span>()
+        <span class="self">self</span>.<span class="ident">outputs</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>().<span class="ident">iter</span>().<span class="ident">map</span>(<span class="op">|</span><span class="kw-2">&amp;</span><span class="ident">m</span><span class="op">|</span> <span class="ident">m</span> <span class="kw">as</span> <span class="ident">usize</span>).<span class="ident">sum</span>()
     }
 
     <span class="doccomment">/// Number of additions in the fancy computation.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">num_adds</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-&gt;</span> <span class="ident">usize</span> { <span class="self">self</span>.<span class="ident">nadds</span> }
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">num_adds</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-&gt;</span> <span class="ident">usize</span> {
+        <span class="kw-2">*</span><span class="self">self</span>.<span class="ident">nadds</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>()
+    }
 
     <span class="doccomment">/// Number of subtractions in the fancy computation.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">num_subs</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-&gt;</span> <span class="ident">usize</span> { <span class="self">self</span>.<span class="ident">nsubs</span> }
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">num_subs</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-&gt;</span> <span class="ident">usize</span> {
+        <span class="kw-2">*</span><span class="self">self</span>.<span class="ident">nsubs</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>()
+    }
 
     <span class="doccomment">/// Number of scalar multiplications in the fancy computation.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">num_cmuls</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-&gt;</span> <span class="ident">usize</span> { <span class="self">self</span>.<span class="ident">ncmuls</span> }
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">num_cmuls</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-&gt;</span> <span class="ident">usize</span> {
+        <span class="kw-2">*</span><span class="self">self</span>.<span class="ident">ncmuls</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>()
+    }
 
     <span class="doccomment">/// Number of multiplications in the fancy computation.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">num_muls</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-&gt;</span> <span class="ident">usize</span> { <span class="self">self</span>.<span class="ident">nmuls</span> }
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">num_muls</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-&gt;</span> <span class="ident">usize</span> {
+        <span class="kw-2">*</span><span class="self">self</span>.<span class="ident">nmuls</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>()
+    }
 
     <span class="doccomment">/// Number of projections in the fancy computation.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">num_projs</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-&gt;</span> <span class="ident">usize</span> { <span class="self">self</span>.<span class="ident">nprojs</span> }
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">num_projs</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-&gt;</span> <span class="ident">usize</span> {
+        <span class="kw-2">*</span><span class="self">self</span>.<span class="ident">nprojs</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>()
+    }
 
     <span class="doccomment">/// Number of ciphertexts in the fancy computation.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">num_ciphertexts</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-&gt;</span> <span class="ident">usize</span> { <span class="self">self</span>.<span class="ident">nciphertexts</span> }
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">num_ciphertexts</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-&gt;</span> <span class="ident">usize</span> {
+        <span class="kw-2">*</span><span class="self">self</span>.<span class="ident">nciphertexts</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>()
+    }
 }
 
 <span class="kw">impl</span> <span class="ident">Fancy</span> <span class="kw">for</span> <span class="ident">Informer</span> {
     <span class="kw">type</span> <span class="ident">Item</span> <span class="op">=</span> <span class="ident">InformerVal</span>;
 
     <span class="kw">fn</span> <span class="ident">garbler_input</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">modulus</span>: <span class="ident">u16</span>) <span class="op">-&gt;</span> <span class="ident">InformerVal</span> {
-        <span class="self">self</span>.<span class="ident">garbler_input_moduli</span>.<span class="ident">push</span>(<span class="ident">modulus</span>);
+        <span class="self">self</span>.<span class="ident">garbler_input_moduli</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>().<span class="ident">push</span>(<span class="ident">modulus</span>);
         <span class="ident">InformerVal</span>(<span class="ident">modulus</span>)
     }
 
     <span class="kw">fn</span> <span class="ident">evaluator_input</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">modulus</span>: <span class="ident">u16</span>) <span class="op">-&gt;</span> <span class="ident">InformerVal</span> {
-        <span class="self">self</span>.<span class="ident">evaluator_input_moduli</span>.<span class="ident">push</span>(<span class="ident">modulus</span>);
+        <span class="self">self</span>.<span class="ident">evaluator_input_moduli</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>().<span class="ident">push</span>(<span class="ident">modulus</span>);
         <span class="ident">InformerVal</span>(<span class="ident">modulus</span>)
     }
 
     <span class="kw">fn</span> <span class="ident">constant</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">val</span>: <span class="ident">u16</span>, <span class="ident">modulus</span>: <span class="ident">u16</span>) <span class="op">-&gt;</span> <span class="ident">InformerVal</span> {
-        <span class="kw">match</span> <span class="self">self</span>.<span class="ident">constants</span>.<span class="ident">get</span>(<span class="kw-2">&amp;</span>(<span class="ident">val</span>,<span class="ident">modulus</span>)) {
-            <span class="prelude-val">None</span> <span class="op">=&gt;</span> {
-                <span class="self">self</span>.<span class="ident">constants</span>.<span class="ident">insert</span>((<span class="ident">val</span>,<span class="ident">modulus</span>));
-            }
-            <span class="kw">_</span> <span class="op">=&gt;</span> (),
-        }
+        <span class="self">self</span>.<span class="ident">constants</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>().<span class="ident">insert</span>((<span class="ident">val</span>,<span class="ident">modulus</span>));
         <span class="ident">InformerVal</span>(<span class="ident">modulus</span>)
     }
 
     <span class="kw">fn</span> <span class="ident">add</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">x</span>: <span class="kw-2">&amp;</span><span class="ident">InformerVal</span>, <span class="ident">y</span>: <span class="kw-2">&amp;</span><span class="ident">InformerVal</span>) <span class="op">-&gt;</span> <span class="ident">InformerVal</span> {
         <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">x</span>.<span class="ident">modulus</span>() <span class="op">==</span> <span class="ident">y</span>.<span class="ident">modulus</span>());
-        <span class="self">self</span>.<span class="ident">nadds</span> <span class="op">+=</span> <span class="number">1</span>;
+        <span class="kw-2">*</span><span class="self">self</span>.<span class="ident">nadds</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>() <span class="op">+=</span> <span class="number">1</span>;
         <span class="ident">InformerVal</span>(<span class="ident">x</span>.<span class="ident">modulus</span>())
     }
 
     <span class="kw">fn</span> <span class="ident">sub</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">x</span>: <span class="kw-2">&amp;</span><span class="ident">InformerVal</span>, <span class="ident">y</span>: <span class="kw-2">&amp;</span><span class="ident">InformerVal</span>) <span class="op">-&gt;</span> <span class="ident">InformerVal</span> {
         <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">x</span>.<span class="ident">modulus</span>() <span class="op">==</span> <span class="ident">y</span>.<span class="ident">modulus</span>());
-        <span class="self">self</span>.<span class="ident">nsubs</span> <span class="op">+=</span> <span class="number">1</span>;
+        <span class="kw-2">*</span><span class="self">self</span>.<span class="ident">nsubs</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>() <span class="op">+=</span> <span class="number">1</span>;
         <span class="ident">InformerVal</span>(<span class="ident">x</span>.<span class="ident">modulus</span>())
     }
 
     <span class="kw">fn</span> <span class="ident">cmul</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">x</span>: <span class="kw-2">&amp;</span><span class="ident">InformerVal</span>, <span class="ident">_c</span>: <span class="ident">u16</span>) <span class="op">-&gt;</span> <span class="ident">InformerVal</span> {
-        <span class="self">self</span>.<span class="ident">ncmuls</span> <span class="op">+=</span> <span class="number">1</span>;
+        <span class="kw-2">*</span><span class="self">self</span>.<span class="ident">ncmuls</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>() <span class="op">+=</span> <span class="number">1</span>;
         <span class="ident">InformerVal</span>(<span class="ident">x</span>.<span class="ident">modulus</span>())
     }
 
@@ -428,11 +460,11 @@
         <span class="kw">if</span> <span class="ident">x</span>.<span class="ident">modulus</span>() <span class="op">&lt;</span> <span class="ident">y</span>.<span class="ident">modulus</span>() {
             <span class="kw">return</span> <span class="self">self</span>.<span class="ident">mul</span>(<span class="ident">y</span>,<span class="ident">x</span>);
         }
-        <span class="self">self</span>.<span class="ident">nmuls</span> <span class="op">+=</span> <span class="number">1</span>;
-        <span class="self">self</span>.<span class="ident">nciphertexts</span> <span class="op">+=</span> <span class="ident">x</span>.<span class="ident">modulus</span>() <span class="kw">as</span> <span class="ident">usize</span> <span class="op">+</span> <span class="ident">y</span>.<span class="ident">modulus</span>() <span class="kw">as</span> <span class="ident">usize</span> <span class="op">-</span> <span class="number">2</span>;
+        <span class="kw-2">*</span><span class="self">self</span>.<span class="ident">nmuls</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>() <span class="op">+=</span> <span class="number">1</span>;
+        <span class="kw-2">*</span><span class="self">self</span>.<span class="ident">nciphertexts</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>() <span class="op">+=</span> <span class="ident">x</span>.<span class="ident">modulus</span>() <span class="kw">as</span> <span class="ident">usize</span> <span class="op">+</span> <span class="ident">y</span>.<span class="ident">modulus</span>() <span class="kw">as</span> <span class="ident">usize</span> <span class="op">-</span> <span class="number">2</span>;
         <span class="kw">if</span> <span class="ident">x</span>.<span class="ident">modulus</span>() <span class="op">!=</span> <span class="ident">y</span>.<span class="ident">modulus</span>() {
             <span class="comment">// there is an extra ciphertext to support nonequal inputs</span>
-            <span class="self">self</span>.<span class="ident">nciphertexts</span> <span class="op">+=</span> <span class="number">1</span>;
+            <span class="kw-2">*</span><span class="self">self</span>.<span class="ident">nciphertexts</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>() <span class="op">+=</span> <span class="number">1</span>;
         }
         <span class="ident">InformerVal</span>(<span class="ident">x</span>.<span class="ident">modulus</span>())
     }
@@ -440,13 +472,25 @@
     <span class="kw">fn</span> <span class="ident">proj</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">x</span>: <span class="kw-2">&amp;</span><span class="ident">InformerVal</span>, <span class="ident">modulus</span>: <span class="ident">u16</span>, <span class="ident">tt</span>: <span class="kw-2">&amp;</span>[<span class="ident">u16</span>]) <span class="op">-&gt;</span> <span class="ident">InformerVal</span> {
         <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">tt</span>.<span class="ident">len</span>(), <span class="ident">x</span>.<span class="ident">modulus</span>() <span class="kw">as</span> <span class="ident">usize</span>);
         <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">tt</span>.<span class="ident">iter</span>().<span class="ident">all</span>(<span class="op">|</span><span class="kw-2">&amp;</span><span class="ident">x</span><span class="op">|</span> <span class="ident">x</span> <span class="op">&lt;</span> <span class="ident">modulus</span>));
-        <span class="self">self</span>.<span class="ident">nprojs</span> <span class="op">+=</span> <span class="number">1</span>;
-        <span class="self">self</span>.<span class="ident">nciphertexts</span> <span class="op">+=</span> <span class="ident">x</span>.<span class="ident">modulus</span>() <span class="kw">as</span> <span class="ident">usize</span> <span class="op">-</span> <span class="number">1</span>;
+        <span class="kw-2">*</span><span class="self">self</span>.<span class="ident">nprojs</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>() <span class="op">+=</span> <span class="number">1</span>;
+        <span class="kw-2">*</span><span class="self">self</span>.<span class="ident">nciphertexts</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>() <span class="op">+=</span> <span class="ident">x</span>.<span class="ident">modulus</span>() <span class="kw">as</span> <span class="ident">usize</span> <span class="op">-</span> <span class="number">1</span>;
         <span class="ident">InformerVal</span>(<span class="ident">modulus</span>)
     }
 
     <span class="kw">fn</span> <span class="ident">output</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">x</span>: <span class="kw-2">&amp;</span><span class="ident">InformerVal</span>) {
-        <span class="self">self</span>.<span class="ident">outputs</span>.<span class="ident">push</span>(<span class="ident">x</span>.<span class="ident">modulus</span>());
+        <span class="self">self</span>.<span class="ident">outputs</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>().<span class="ident">push</span>(<span class="ident">x</span>.<span class="ident">modulus</span>());
+    }
+}
+
+<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">test</span>)]</span>
+<span class="kw">mod</span> <span class="ident">tests</span> {
+    <span class="kw">use</span> <span class="kw">super</span>::<span class="kw-2">*</span>;
+    <span class="attribute">#[<span class="ident">test</span>]</span>
+    <span class="kw">fn</span> <span class="ident">informer_has_send_and_sync</span>() {
+        <span class="kw">fn</span> <span class="ident">check_send</span>(<span class="kw">_</span>: <span class="kw">impl</span> <span class="ident">Send</span>) { }
+        <span class="kw">fn</span> <span class="ident">check_sync</span>(<span class="kw">_</span>: <span class="kw">impl</span> <span class="ident">Sync</span>) { }
+        <span class="ident">check_send</span>(<span class="ident">Informer</span>::<span class="ident">new</span>());
+        <span class="ident">check_sync</span>(<span class="ident">Informer</span>::<span class="ident">new</span>());
     }
 }
 </pre>

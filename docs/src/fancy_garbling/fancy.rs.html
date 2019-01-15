@@ -629,6 +629,37 @@
 <span id="629">629</span>
 <span id="630">630</span>
 <span id="631">631</span>
+<span id="632">632</span>
+<span id="633">633</span>
+<span id="634">634</span>
+<span id="635">635</span>
+<span id="636">636</span>
+<span id="637">637</span>
+<span id="638">638</span>
+<span id="639">639</span>
+<span id="640">640</span>
+<span id="641">641</span>
+<span id="642">642</span>
+<span id="643">643</span>
+<span id="644">644</span>
+<span id="645">645</span>
+<span id="646">646</span>
+<span id="647">647</span>
+<span id="648">648</span>
+<span id="649">649</span>
+<span id="650">650</span>
+<span id="651">651</span>
+<span id="652">652</span>
+<span id="653">653</span>
+<span id="654">654</span>
+<span id="655">655</span>
+<span id="656">656</span>
+<span id="657">657</span>
+<span id="658">658</span>
+<span id="659">659</span>
+<span id="660">660</span>
+<span id="661">661</span>
+<span id="662">662</span>
 </pre><pre class="rust ">
 <span class="doccomment">//! The `Fancy` trait represents the kinds of computations possible in `fancy-garbling`.</span>
 <span class="doccomment">//!</span>
@@ -799,8 +830,17 @@
         }
     }
 
+    <span class="doccomment">/// If `b=0` returns `x` else `y`.</span>
+    <span class="kw">fn</span> <span class="ident">mux</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">b</span>: <span class="kw-2">&amp;</span><span class="self">Self</span>::<span class="ident">Item</span>, <span class="ident">x</span>: <span class="kw-2">&amp;</span><span class="self">Self</span>::<span class="ident">Item</span>, <span class="ident">y</span>: <span class="kw-2">&amp;</span><span class="self">Self</span>::<span class="ident">Item</span>) <span class="op">-&gt;</span> <span class="self">Self</span>::<span class="ident">Item</span> {
+        <span class="kw">let</span> <span class="ident">notb</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">negate</span>(<span class="ident">b</span>);
+        <span class="kw">let</span> <span class="ident">xsel</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">and</span>(<span class="kw-2">&amp;</span><span class="ident">notb</span>,<span class="ident">x</span>);
+        <span class="kw">let</span> <span class="ident">ysel</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">and</span>(<span class="ident">b</span>,<span class="ident">y</span>);
+        <span class="self">self</span>.<span class="ident">add</span>(<span class="kw-2">&amp;</span><span class="ident">xsel</span>, <span class="kw-2">&amp;</span><span class="ident">ysel</span>)
+    }
+
     <span class="doccomment">/// If `x=0` return the constant `b1` else return `b2`. Folds constants if possible.</span>
-    <span class="kw">fn</span> <span class="ident">mux</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">x</span>: <span class="kw-2">&amp;</span><span class="self">Self</span>::<span class="ident">Item</span>, <span class="ident">b1</span>: <span class="ident">bool</span>, <span class="ident">b2</span>: <span class="ident">bool</span>) <span class="op">-&gt;</span> <span class="self">Self</span>::<span class="ident">Item</span> {
+    <span class="kw">fn</span> <span class="ident">mux_constant_bits</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">x</span>: <span class="kw-2">&amp;</span><span class="self">Self</span>::<span class="ident">Item</span>, <span class="ident">b1</span>: <span class="ident">bool</span>, <span class="ident">b2</span>: <span class="ident">bool</span>) <span class="op">-&gt;</span> <span class="self">Self</span>::<span class="ident">Item</span> {
+        <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">x</span>.<span class="ident">modulus</span>() <span class="op">==</span> <span class="number">2</span>);
         <span class="kw">if</span> <span class="op">!</span><span class="ident">b1</span> <span class="op">&amp;&amp;</span> <span class="ident">b2</span> {
             <span class="ident">x</span>.<span class="ident">clone</span>()
         } <span class="kw">else</span> <span class="kw">if</span> <span class="ident">b1</span> <span class="op">&amp;&amp;</span> <span class="op">!</span><span class="ident">b2</span> {
@@ -866,6 +906,11 @@
         <span class="kw">let</span> <span class="ident">ps</span> <span class="op">=</span> <span class="ident">util</span>::<span class="ident">factor</span>(<span class="ident">q</span>);
         <span class="kw">let</span> <span class="ident">xs</span> <span class="op">=</span> <span class="ident">ps</span>.<span class="ident">iter</span>().<span class="ident">map</span>(<span class="op">|</span><span class="kw-2">&amp;</span><span class="ident">p</span><span class="op">|</span> (<span class="ident">x</span> <span class="op">%</span> <span class="ident">p</span> <span class="kw">as</span> <span class="ident">u128</span>) <span class="kw">as</span> <span class="ident">u16</span>).<span class="ident">collect_vec</span>();
         <span class="self">self</span>.<span class="ident">constant_bundle</span>(<span class="kw-2">&amp;</span><span class="ident">xs</span>,<span class="kw-2">&amp;</span><span class="ident">ps</span>)
+    }
+
+    <span class="doccomment">/// Create a constant bundle using base 2 inputs.</span>
+    <span class="kw">fn</span> <span class="ident">constant_bundle_binary</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">bits</span>: <span class="kw-2">&amp;</span>[<span class="ident">u16</span>]) <span class="op">-&gt;</span> <span class="ident">Bundle</span><span class="op">&lt;</span><span class="self">Self</span>::<span class="ident">Item</span><span class="op">&gt;</span> {
+        <span class="self">self</span>.<span class="ident">constant_bundle</span>(<span class="ident">bits</span>, <span class="kw-2">&amp;</span><span class="macro">vec</span><span class="macro">!</span>[<span class="number">2</span>;<span class="ident">bits</span>.<span class="ident">len</span>()])
     }
 
     <span class="doccomment">/// Create `n` garbler input bundles, using moduli `ps`.</span>
@@ -1210,6 +1255,15 @@
         (<span class="ident">zs</span>, <span class="self">self</span>.<span class="ident">negate</span>(<span class="kw-2">&amp;</span><span class="ident">c</span>))
     }
 
+    <span class="kw">fn</span> <span class="ident">multiplex</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">b</span>: <span class="kw-2">&amp;</span><span class="self">Self</span>::<span class="ident">Item</span>, <span class="ident">x</span>: <span class="kw-2">&amp;</span><span class="ident">Bundle</span><span class="op">&lt;</span><span class="self">Self</span>::<span class="ident">Item</span><span class="op">&gt;</span>, <span class="ident">y</span>: <span class="kw-2">&amp;</span><span class="ident">Bundle</span><span class="op">&lt;</span><span class="self">Self</span>::<span class="ident">Item</span><span class="op">&gt;</span>)
+        <span class="op">-&gt;</span> <span class="ident">Bundle</span><span class="op">&lt;</span><span class="self">Self</span>::<span class="ident">Item</span><span class="op">&gt;</span>
+    {
+        <span class="kw">let</span> <span class="ident">ws</span> <span class="op">=</span> <span class="ident">x</span>.<span class="ident">wires</span>().<span class="ident">iter</span>().<span class="ident">zip</span>(<span class="ident">y</span>.<span class="ident">wires</span>().<span class="ident">iter</span>()).<span class="ident">map</span>(<span class="op">|</span>(<span class="ident">xwire</span>,<span class="ident">ywire</span>)<span class="op">|</span> {
+            <span class="self">self</span>.<span class="ident">mux</span>(<span class="ident">b</span>,<span class="ident">xwire</span>,<span class="ident">ywire</span>)
+        }).<span class="ident">collect</span>();
+        <span class="ident">Bundle</span>(<span class="ident">ws</span>)
+    }
+
     <span class="doccomment">/// If `x=0` return `c1` as a bundle of constant bits, else return `c2`.</span>
     <span class="kw">fn</span> <span class="ident">multiplex_constant_bits</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">x</span>: <span class="kw-2">&amp;</span><span class="self">Self</span>::<span class="ident">Item</span>, <span class="ident">c1</span>: <span class="ident">u128</span>, <span class="ident">c2</span>: <span class="ident">u128</span>, <span class="ident">nbits</span>: <span class="ident">usize</span>)
         <span class="op">-&gt;</span> <span class="ident">Bundle</span><span class="op">&lt;</span><span class="self">Self</span>::<span class="ident">Item</span><span class="op">&gt;</span>
@@ -1217,7 +1271,7 @@
         <span class="kw">let</span> <span class="ident">c1_bs</span> <span class="op">=</span> <span class="ident">util</span>::<span class="ident">u128_to_bits</span>(<span class="ident">c1</span>, <span class="ident">nbits</span>).<span class="ident">into_iter</span>().<span class="ident">map</span>(<span class="op">|</span><span class="ident">x</span>:<span class="ident">u16</span><span class="op">|</span> <span class="ident">x</span> <span class="op">&gt;</span> <span class="number">0</span>).<span class="ident">collect_vec</span>();
         <span class="kw">let</span> <span class="ident">c2_bs</span> <span class="op">=</span> <span class="ident">util</span>::<span class="ident">u128_to_bits</span>(<span class="ident">c2</span>, <span class="ident">nbits</span>).<span class="ident">into_iter</span>().<span class="ident">map</span>(<span class="op">|</span><span class="ident">x</span>:<span class="ident">u16</span><span class="op">|</span> <span class="ident">x</span> <span class="op">&gt;</span> <span class="number">0</span>).<span class="ident">collect_vec</span>();
         <span class="kw">let</span> <span class="ident">ws</span> <span class="op">=</span> <span class="ident">c1_bs</span>.<span class="ident">into_iter</span>().<span class="ident">zip</span>(<span class="ident">c2_bs</span>.<span class="ident">into_iter</span>()).<span class="ident">map</span>(<span class="op">|</span>(<span class="ident">b1</span>,<span class="ident">b2</span>)<span class="op">|</span> {
-            <span class="self">self</span>.<span class="ident">mux</span>(<span class="ident">x</span>,<span class="ident">b1</span>,<span class="ident">b2</span>)
+            <span class="self">self</span>.<span class="ident">mux_constant_bits</span>(<span class="ident">x</span>,<span class="ident">b1</span>,<span class="ident">b2</span>)
         }).<span class="ident">collect</span>();
         <span class="ident">Bundle</span>(<span class="ident">ws</span>)
     }
@@ -1243,6 +1297,14 @@
             <span class="kw">let</span> <span class="ident">s</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">shift</span>(<span class="ident">x</span>, <span class="ident">shift_amt</span>);
             <span class="self">self</span>.<span class="ident">binary_addition_no_carry</span>(<span class="kw-2">&amp;</span><span class="ident">z</span>,<span class="kw-2">&amp;</span><span class="ident">s</span>)
         })
+    }
+
+    <span class="doccomment">/// Compute the absolute value of a binary bundle.</span>
+    <span class="kw">fn</span> <span class="ident">abs</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">x</span>: <span class="kw-2">&amp;</span><span class="ident">Bundle</span><span class="op">&lt;</span><span class="self">Self</span>::<span class="ident">Item</span><span class="op">&gt;</span>) <span class="op">-&gt;</span> <span class="ident">Bundle</span><span class="op">&lt;</span><span class="self">Self</span>::<span class="ident">Item</span><span class="op">&gt;</span> {
+        <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">x</span>.<span class="ident">is_binary</span>());
+        <span class="kw">let</span> <span class="ident">sign</span> <span class="op">=</span> <span class="ident">x</span>.<span class="ident">wires</span>().<span class="ident">last</span>().<span class="ident">unwrap</span>();
+        <span class="kw">let</span> <span class="ident">negated</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">twos_complement</span>(<span class="ident">x</span>);
+        <span class="self">self</span>.<span class="ident">multiplex</span>(<span class="kw-2">&amp;</span><span class="ident">sign</span>, <span class="ident">x</span>, <span class="kw-2">&amp;</span><span class="ident">negated</span>)
     }
 }
 
