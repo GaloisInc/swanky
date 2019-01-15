@@ -176,39 +176,39 @@ impl Informer {
 impl Fancy for Informer {
     type Item = InformerVal;
 
-    fn garbler_input(&mut self, modulus: u16) -> InformerVal {
+    fn garbler_input(&self, modulus: u16) -> InformerVal {
         self.garbler_input_moduli.lock().unwrap().push(modulus);
         InformerVal(modulus)
     }
 
-    fn evaluator_input(&mut self, modulus: u16) -> InformerVal {
+    fn evaluator_input(&self, modulus: u16) -> InformerVal {
         self.evaluator_input_moduli.lock().unwrap().push(modulus);
         InformerVal(modulus)
     }
 
-    fn constant(&mut self, val: u16, modulus: u16) -> InformerVal {
+    fn constant(&self, val: u16, modulus: u16) -> InformerVal {
         self.constants.lock().unwrap().insert((val,modulus));
         InformerVal(modulus)
     }
 
-    fn add(&mut self, x: &InformerVal, y: &InformerVal) -> InformerVal {
+    fn add(&self, x: &InformerVal, y: &InformerVal) -> InformerVal {
         assert!(x.modulus() == y.modulus());
         *self.nadds.lock().unwrap() += 1;
         InformerVal(x.modulus())
     }
 
-    fn sub(&mut self, x: &InformerVal, y: &InformerVal) -> InformerVal {
+    fn sub(&self, x: &InformerVal, y: &InformerVal) -> InformerVal {
         assert!(x.modulus() == y.modulus());
         *self.nsubs.lock().unwrap() += 1;
         InformerVal(x.modulus())
     }
 
-    fn cmul(&mut self, x: &InformerVal, _c: u16) -> InformerVal {
+    fn cmul(&self, x: &InformerVal, _c: u16) -> InformerVal {
         *self.ncmuls.lock().unwrap() += 1;
         InformerVal(x.modulus())
     }
 
-    fn mul(&mut self, x: &InformerVal, y: &InformerVal) -> InformerVal {
+    fn mul(&self, x: &InformerVal, y: &InformerVal) -> InformerVal {
         if x.modulus() < y.modulus() {
             return self.mul(y,x);
         }
@@ -221,7 +221,7 @@ impl Fancy for Informer {
         InformerVal(x.modulus())
     }
 
-    fn proj(&mut self, x: &InformerVal, modulus: u16, tt: &[u16]) -> InformerVal {
+    fn proj(&self, x: &InformerVal, modulus: u16, tt: &[u16]) -> InformerVal {
         assert_eq!(tt.len(), x.modulus() as usize);
         assert!(tt.iter().all(|&x| x < modulus));
         *self.nprojs.lock().unwrap() += 1;
@@ -229,7 +229,7 @@ impl Fancy for Informer {
         InformerVal(modulus)
     }
 
-    fn output(&mut self, x: &InformerVal) {
+    fn output(&self, x: &InformerVal) {
         self.outputs.lock().unwrap().push(x.modulus());
     }
 }

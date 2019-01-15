@@ -8,7 +8,7 @@ fn main() {
     let mut rng = rand::thread_rng();
 
     // half-gate
-    let mut b = CircuitBuilder::new();
+    let b = CircuitBuilder::new();
     let q = rng.gen_prime();
     let x = b.garbler_input(q);
     let y = b.evaluator_input(q);
@@ -18,7 +18,7 @@ fn main() {
     c.to_file("half_gate.json").unwrap();
 
     // and-gate-fan-n
-    let mut b = CircuitBuilder::new();
+    let b = CircuitBuilder::new();
     let mut inps = Vec::new();
     let n = 2 + (rng.gen_usize() % 200);
     for _ in 0..n {

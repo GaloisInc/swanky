@@ -4,7 +4,7 @@ use fancy_garbling::informer::Informer;
 use itertools::Itertools;
 use fancy_garbling::util;
 
-fn collision<W,F>(f: &mut F, nbits: usize, time_slices: usize, check_for_cheaters: bool)
+fn collision<W,F>(f: &F, nbits: usize, time_slices: usize, check_for_cheaters: bool)
     where F: Fancy<Item=W>, W: Clone + Default + HasModulus
 {
     // obtain inputs into a vec of vecs of arrays of 4
@@ -73,8 +73,8 @@ fn main() {
     let time_slices = 1800;
     let check_for_cheaters = false;
 
-    let mut informer = Informer::new();
-    collision(&mut informer, nbits, time_slices, check_for_cheaters);
+    let informer = Informer::new();
+    collision(&informer, nbits, time_slices, check_for_cheaters);
     informer.print_info();
     println!("");
 

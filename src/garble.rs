@@ -81,8 +81,8 @@ impl Message {
 /// This creates a new thread for the garbler, which passes messages back through a
 /// channel one by one. This function has a restrictive input type because
 /// `fancy_computation` is sent to the new thread.
-pub fn garble_iter(mut fancy_computation: Box<FnMut(&mut Garbler) + Send>)
-    -> impl Iterator<Item=Message>
+pub fn garble_iter<F>(mut fancy_computation: F) -> impl Iterator<Item=Message>
+  where F: FnMut(&Garbler) + Send + 'static
 {
     let (sender, receiver) = std::sync::mpsc::sync_channel(20);
 
@@ -128,7 +128,7 @@ pub fn garble(c: &Circuit) -> (Encoder, Decoder, GarbledCircuit) {
     }
 
     {
-        let mut garbler = Garbler::new(send_func);
+        let garbler = Garbler::new(send_func);
 
         let mut wires = Vec::new();
         for (i, gate) in c.gates.iter().enumerate() {
@@ -284,7 +284,7 @@ mod classic {
     #[test] // add {{{
     fn add() {
         garble_test_helper(|q| {
-            let mut b = CircuitBuilder::new();
+            let b = CircuitBuilder::new();
             let x = b.evaluator_input(q);
             let y = b.evaluator_input(q);
             let z = b.add(&x,&y);
@@ -296,7 +296,7 @@ mod classic {
     #[test] // add_many {{{
     fn add_many() {
         garble_test_helper(|q| {
-            let mut b = CircuitBuilder::new();
+            let b = CircuitBuilder::new();
             let xs = b.evaluator_inputs(q,16);
             let z = b.add_many(&xs);
             b.output(&z);
@@ -307,7 +307,7 @@ mod classic {
     #[test] // or_many {{{
     fn or_many() {
         garble_test_helper(|_| {
-            let mut b = CircuitBuilder::new();
+            let b = CircuitBuilder::new();
             let xs = b.evaluator_inputs(2,16);
             let z = b.or_many(&xs);
             b.output(&z);
@@ -318,7 +318,7 @@ mod classic {
     #[test] // sub {{{
     fn sub() {
         garble_test_helper(|q| {
-            let mut b = CircuitBuilder::new();
+            let b = CircuitBuilder::new();
             let x = b.evaluator_input(q);
             let y = b.evaluator_input(q);
             let z = b.sub(&x,&y);
@@ -330,7 +330,7 @@ mod classic {
     #[test] // cmul {{{
     fn cmul() {
         garble_test_helper(|q| {
-            let mut b = CircuitBuilder::new();
+            let b = CircuitBuilder::new();
             let x = b.evaluator_input(q);
             let _ = b.evaluator_input(q);
             let z;
@@ -351,7 +351,7 @@ mod classic {
             for i in 0..q {
                 tab.push((i + 1) % q);
             }
-            let mut b = CircuitBuilder::new();
+            let b = CircuitBuilder::new();
             let x = b.evaluator_input(q);
             let _ = b.evaluator_input(q);
             let z = b.proj(&x, q, &tab);
@@ -368,7 +368,7 @@ mod classic {
             for _ in 0..q {
                 tab.push(rng.gen_u16() % q);
             }
-            let mut b = CircuitBuilder::new();
+            let b = CircuitBuilder::new();
             let x = b.evaluator_input(q);
             let _ = b.evaluator_input(q);
             let z = b.proj(&x, q, &tab);
@@ -380,7 +380,7 @@ mod classic {
     #[test] // mod_change {{{
     fn mod_change() {
         garble_test_helper(|q| {
-            let mut b = CircuitBuilder::new();
+            let b = CircuitBuilder::new();
             let x = b.evaluator_input(q);
             let z = b.mod_change(&x,q*2);
             b.output(&z);
@@ -391,7 +391,7 @@ mod classic {
     #[test] // half_gate {{{
     fn half_gate() {
         garble_test_helper(|q| {
-            let mut b = CircuitBuilder::new();
+            let b = CircuitBuilder::new();
             let x = b.evaluator_input(q);
             let y = b.evaluator_input(q);
             let z = b.mul(&x,&y);
@@ -406,7 +406,7 @@ mod classic {
             let ymod = 2 + thread_rng().gen_u16() % 6; // lower mod is capped at 8 for now
             println!("\nTESTING MOD q={} ymod={}", q, ymod);
 
-            let mut b = CircuitBuilder::new();
+            let b = CircuitBuilder::new();
             let x = b.evaluator_input(q);
             let y = b.evaluator_input(ymod);
             let z = b.mul(&x,&y);
@@ -445,7 +445,7 @@ mod classic {
         // let mods = (0..7).map(|_| rng.gen_modulus()).collect_vec(); // slow
         let mods = [3,7,10,2,13]; // fast
 
-        let mut b = CircuitBuilder::new();
+        let b = CircuitBuilder::new();
         let xs = b.evaluator_input_bundles(&mods, nargs);
         let z = b.mixed_radix_addition(&xs);
         b.output_bundle(&z);
@@ -474,7 +474,7 @@ mod classic {
 //}}}
     #[test] // basic constants {{{
     fn basic_constant() {
-        let mut b = CircuitBuilder::new();
+        let b = CircuitBuilder::new();
         let mut rng = thread_rng();
 
         let q = rng.gen_modulus();
@@ -495,7 +495,7 @@ mod classic {
 //}}}
     #[test] // constants {{{
     fn constants() {
-        let mut b = CircuitBuilder::new();
+        let b = CircuitBuilder::new();
         let mut rng = thread_rng();
 
         let q = rng.gen_modulus();
@@ -527,7 +527,7 @@ mod classic {
         let nargs = 2 + rng.gen_usize() % 10;
         let mods = (0..7).map(|_| rng.gen_modulus()).collect_vec();
 
-        let mut b = CircuitBuilder::new();
+        let b = CircuitBuilder::new();
         let xs = b.evaluator_input_bundles(&mods, nargs);
         let z = b.mixed_radix_addition(&xs);
         b.output_bundle(&z);
@@ -553,13 +553,13 @@ mod streaming {
 
     // helper {{{
     fn streaming_test(
-        garbler_computation: fn(&mut Garbler),
-        evaluator_computation: fn(&mut Evaluator),
+        garbler_computation: fn(&Garbler),
+        evaluator_computation: fn(&Evaluator),
         garbler_input: &[u16],
         evaluator_input: &[u16],
         should_be: &[u16]
     ) {
-        let mut gb_iter = garble_iter(Box::new(garbler_computation));
+        let mut gb_iter = garble_iter(garbler_computation);
 
         let mut gb_inp_iter = garbler_input.to_vec().into_iter();
         let mut ev_inp_iter = evaluator_input.to_vec().into_iter();
@@ -591,7 +591,7 @@ mod streaming {
         assert_eq!(result, should_be)
     }
 //}}}
-    fn fancy_addition<W: Clone + Default + HasModulus>(b: &mut dyn Fancy<Item=W>) //{{{
+    fn fancy_addition<W: Clone + Default + HasModulus>(b: &dyn Fancy<Item=W>) //{{{
     {
         let x = b.garbler_input(Q);
         let y = b.evaluator_input(Q);
@@ -609,7 +609,7 @@ mod streaming {
         }
     }
 //}}}
-    fn fancy_subtraction<W: Clone + Default + HasModulus>(b: &mut dyn Fancy<Item=W>) //{{{
+    fn fancy_subtraction<W: Clone + Default + HasModulus>(b: &dyn Fancy<Item=W>) //{{{
     {
         let x = b.garbler_input(Q);
         let y = b.evaluator_input(Q);
@@ -627,7 +627,7 @@ mod streaming {
         }
     }
 //}}}
-    fn fancy_multiplication<W: Clone + Default + HasModulus>(b: &mut dyn Fancy<Item=W>) // {{{
+    fn fancy_multiplication<W: Clone + Default + HasModulus>(b: &dyn Fancy<Item=W>) // {{{
     {
         let x = b.garbler_input(Q);
         let y = b.evaluator_input(Q);
@@ -645,7 +645,7 @@ mod streaming {
         }
     }
 //}}}
-    fn fancy_cmul<W: Clone + Default + HasModulus>(b: &mut dyn Fancy<Item=W>) // {{{
+    fn fancy_cmul<W: Clone + Default + HasModulus>(b: &dyn Fancy<Item=W>) // {{{
     {
         let x = b.garbler_input(Q);
         let z = b.cmul(&x,5);
@@ -661,7 +661,7 @@ mod streaming {
         }
     }
 //}}}
-    fn fancy_projection<W: Clone + Default + HasModulus>(b: &mut dyn Fancy<Item=W>) // {{{
+    fn fancy_projection<W: Clone + Default + HasModulus>(b: &dyn Fancy<Item=W>) // {{{
     {
         let x = b.garbler_input(Q);
         let tab = (0..Q).map(|i| (i + 1) % Q).collect_vec();

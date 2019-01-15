@@ -63,21 +63,21 @@ impl Evaluator {
 impl Fancy for Evaluator {
     type Item = Wire;
 
-    fn garbler_input(&mut self, _q: u16) -> Wire { //{{{
+    fn garbler_input(&self, _q: u16) -> Wire { //{{{
         match self.recv() {
             Message::GarblerInput(w) => w,
             m => panic!("Expected message GarblerInput but got {}", m),
         }
     }
     //}}}
-    fn evaluator_input(&mut self, _q: u16) -> Wire { //{{{
+    fn evaluator_input(&self, _q: u16) -> Wire { //{{{
         match self.recv() {
             Message::EvaluatorInput(w) => w,
             m => panic!("Expected message EvaluatorInput but got {}", m),
         }
     }
     //}}}
-    fn constant(&mut self, x: u16, q: u16) -> Wire { //{{{
+    fn constant(&self, x: u16, q: u16) -> Wire { //{{{
         match self.constants.read().unwrap().get(&(x,q)) {
             Some(c) => return c.clone(),
             None => (),
@@ -95,19 +95,19 @@ impl Fancy for Evaluator {
         w
     }
     //}}}
-    fn add(&mut self, x: &Wire, y: &Wire) -> Wire { //{{{
+    fn add(&self, x: &Wire, y: &Wire) -> Wire { //{{{
         x.plus(y)
     }
     //}}}
-    fn sub(&mut self, x: &Wire, y: &Wire) -> Wire { //{{{
+    fn sub(&self, x: &Wire, y: &Wire) -> Wire { //{{{
         x.minus(y)
     }
     //}}}
-    fn cmul(&mut self, x: &Wire, c: u16) -> Wire { //{{{
+    fn cmul(&self, x: &Wire, c: u16) -> Wire { //{{{
         x.cmul(c)
     }
     //}}}
-    fn mul(&mut self, A: &Wire, B: &Wire) -> Wire { //{{{
+    fn mul(&self, A: &Wire, B: &Wire) -> Wire { //{{{
         if A.modulus() < A.modulus() {
             return self.mul(B,A);
         }
@@ -149,7 +149,7 @@ impl Fancy for Evaluator {
         L.plus(&R.plus(&A.cmul(new_b_color)))
     }
     //}}}
-    fn proj(&mut self, x: &Wire, q: u16, _tt: &[u16]) -> Wire { //{{{
+    fn proj(&self, x: &Wire, q: u16, _tt: &[u16]) -> Wire { //{{{
         let gate = match self.recv() {
             Message::GarbledGate(g) => g,
             m => panic!("Expected message GarbledGate but got {}", m),
@@ -164,7 +164,7 @@ impl Fancy for Evaluator {
         w
     }
     //}}}
-    fn output(&mut self, x: &Wire) { //{{{
+    fn output(&self, x: &Wire) { //{{{
         match self.recv() {
             Message::OutputCiphertext(c) => {
                 self.output_cts.lock().unwrap().push(c);
@@ -172,9 +172,9 @@ impl Fancy for Evaluator {
             m => panic!("Expected message OutputCiphertext but got {}", m),
         }
         self.output_wires.lock().unwrap().push(x.clone());
-    }
-    //}}}
+    } //}}}
 }
+
 ////////////////////////////////////////////////////////////////////////////////
 // static evaluator
 
@@ -217,7 +217,7 @@ impl GarbledCircuit {
             }
         }).collect_vec().into_iter();
 
-        let mut eval = Evaluator::new(move || msgs.next().unwrap());
+        let eval = Evaluator::new(move || msgs.next().unwrap());
 
         let mut wires: Vec<Wire> = Vec::new();
         for (i,gate) in c.gates.iter().enumerate() {
@@ -354,6 +354,9 @@ impl Decoder {
             .map_err(|_| failure::err_msg("error decoding Decoder from bytes"))
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////
+// tests
 
 #[cfg(test)]
 mod tests {
