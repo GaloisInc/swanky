@@ -12,8 +12,6 @@ pub trait HasModulus {
     fn modulus(&self) -> u16;
 }
 
-// TODO: possibly change to enum in order to sanity check the gadgets
-// enum Bundle { CRT(..), Boolean(..), MixedRadix(..) }
 /// A collection of wires, useful for the garbled gadgets defined by `BundleGadgets`.
 #[derive(Clone, Default)]
 pub struct Bundle<W: Clone + Default + HasModulus>(Vec<W>);
@@ -51,13 +49,13 @@ pub trait Fancy {
     type Item: Clone + Default + HasModulus;
 
     /// Create an input for the garbler with modulus `q`.
-    fn garbler_input(&self, q: u16) -> Self::Item;
+    fn garbler_input(&self, ix: Option<usize>, q: u16) -> Self::Item;
 
     /// Create an input for the evaluator with modulus `q`.
-    fn evaluator_input(&self, q: u16) -> Self::Item;
+    fn evaluator_input(&self, ix: Option<usize>, q: u16) -> Self::Item;
 
     /// Create a constant `x` with modulus `q`.
-    fn constant(&self, x: u16, q: u16) -> Self::Item;
+    fn constant(&self, ix: Option<usize>, x: u16, q: u16) -> Self::Item;
 
     /// Add `x` and `y`.
     fn add(&self, x: &Self::Item, y: &Self::Item) -> Self::Item;
@@ -69,13 +67,13 @@ pub trait Fancy {
     fn cmul(&self, x: &Self::Item, c: u16) -> Self::Item;
 
     /// Multiply `x` and `y`.
-    fn mul(&self, x: &Self::Item, y: &Self::Item) -> Self::Item;
+    fn mul(&self, ix: Option<usize>, x: &Self::Item, y: &Self::Item) -> Self::Item;
 
     /// Project `x` according to the truth table `tt`. Resulting wire has modulus `q`.
-    fn proj(&self, x: &Self::Item, q: u16, tt: &[u16]) -> Self::Item;
+    fn proj(&self, ix: Option<usize>, x: &Self::Item, q: u16, tt: &[u16]) -> Self::Item;
 
     /// Process this wire as output.
-    fn output(&self, x: &Self::Item);
+    fn output(&self, ix: Option<usize>, x: &Self::Item);
 
     ////////////////////////////////////////////////////////////////////////////////
     // synchronization
@@ -90,13 +88,13 @@ pub trait Fancy {
     // Functions built on top of basic fancy operations.
 
     /// Create `n` garbler inputs with modulus `q`.
-    fn garbler_inputs(&self, q: u16, n: usize) -> Vec<Self::Item> {
-        (0..n).map(|_| self.garbler_input(q)).collect()
+    fn garbler_inputs(&self, ix: Option<usize>, q: u16, n: usize) -> Vec<Self::Item> {
+        (0..n).map(|_| self.garbler_input(ix,q)).collect()
     }
 
     /// Create `n` evaluator inputs with modulus `q`.
-    fn evaluator_inputs(&self, q: u16, n: usize) -> Vec<Self::Item> {
-        (0..n).map(|_| self.evaluator_input(q)).collect()
+    fn evaluator_inputs(&self, ix: Option<usize>, q: u16, n: usize) -> Vec<Self::Item> {
+        (0..n).map(|_| self.evaluator_input(ix,q)).collect()
     }
 
     /// Sum up a slice of wires.
@@ -116,92 +114,92 @@ pub trait Fancy {
     }
 
     /// Negate by xoring `x` with `1`.
-    fn negate(&self, x: &Self::Item) -> Self::Item {
+    fn negate(&self, ix: Option<usize>, x: &Self::Item) -> Self::Item {
         assert_eq!(x.modulus(), 2);
-        let one = self.constant(1,2);
+        let one = self.constant(ix, 1,2);
         self.xor(x, &one)
     }
 
     /// And is just multiplication, with the requirement that `x` and `y` are mod 2.
-    fn and(&self, x: &Self::Item, y: &Self::Item) -> Self::Item {
+    fn and(&self, ix: Option<usize>, x: &Self::Item, y: &Self::Item) -> Self::Item {
         assert!(x.modulus() == 2 && y.modulus() == 2);
-        self.mul(x,y)
+        self.mul(ix,x,y)
     }
 
     /// Or uses Demorgan's Rule implemented with multiplication and negation.
-    fn or(&self, x: &Self::Item, y: &Self::Item) -> Self::Item {
+    fn or(&self, ix: Option<usize>, x: &Self::Item, y: &Self::Item) -> Self::Item {
         assert!(x.modulus() == 2 && y.modulus() == 2);
-        let notx = self.negate(x);
-        let noty = self.negate(y);
-        let z = self.and(&notx, &noty);
-        self.negate(&z)
+        let notx = self.negate(ix, x);
+        let noty = self.negate(ix, y);
+        let z = self.and(ix, &notx, &noty);
+        self.negate(ix, &z)
     }
 
     /// Returns 1 if all wires equal 1.
-    fn and_many(&self, args: &[Self::Item]) -> Self::Item {
-        args.iter().skip(1).fold(args[0].clone(), |acc, x| self.and(&acc, x))
+    fn and_many(&self, ix: Option<usize>, args: &[Self::Item]) -> Self::Item {
+        args.iter().skip(1).fold(args[0].clone(), |acc, x| self.and(ix, &acc, x))
     }
 
     /// Returns 1 if any wire equals 1.
-    fn or_many(&self, args: &[Self::Item]) -> Self::Item {
-        args.iter().skip(1).fold(args[0].clone(), |acc, x| self.or(&acc, x))
+    fn or_many(&self, ix: Option<usize>, args: &[Self::Item]) -> Self::Item {
+        args.iter().skip(1).fold(args[0].clone(), |acc, x| self.or(ix, &acc, x))
     }
 
     /// Change the modulus of `x` to `to_modulus` using a projection gate.
-    fn mod_change(&self, x: &Self::Item, to_modulus: u16) -> Self::Item {
+    fn mod_change(&self, ix: Option<usize>, x: &Self::Item, to_modulus: u16) -> Self::Item {
         let from_modulus = x.modulus();
         if from_modulus == to_modulus {
             return x.clone();
         }
         let tab = (0..from_modulus).map(|x| x % to_modulus).collect_vec();
-        self.proj(x, to_modulus, &tab)
+        self.proj(ix, x, to_modulus, &tab)
     }
 
     /// Binary adder. Returns the result and the carry.
-    fn adder(&self, x: &Self::Item, y: &Self::Item, carry_in: Option<&Self::Item>)
+    fn adder(&self, ix: Option<usize>, x: &Self::Item, y: &Self::Item, carry_in: Option<&Self::Item>)
         -> (Self::Item, Self::Item)
     {
         assert!(x.modulus() == 2 && y.modulus() == 2);
         if let Some(c) = carry_in {
-            let z1 = self.xor(x,y);
-            let z2 = self.xor(&z1,c);
-            let z3 = self.xor(x,c);
-            let z4 = self.and(&z1,&z3);
-            let carry = self.xor(&z4,x);
+            let z1 = self.xor(x, y);
+            let z2 = self.xor(&z1, c);
+            let z3 = self.xor(x, c);
+            let z4 = self.and(ix, &z1, &z3);
+            let carry = self.xor(&z4, x);
             (z2, carry)
         } else {
-            let z = self.xor(x,y);
-            let carry = self.and(x,y);
+            let z = self.xor(x, y);
+            let carry = self.and(ix, x, y);
             (z, carry)
         }
     }
 
     /// If `b=0` returns `x` else `y`.
-    fn mux(&self, b: &Self::Item, x: &Self::Item, y: &Self::Item) -> Self::Item {
-        let notb = self.negate(b);
-        let xsel = self.and(&notb,x);
-        let ysel = self.and(b,y);
+    fn mux(&self, ix: Option<usize>, b: &Self::Item, x: &Self::Item, y: &Self::Item) -> Self::Item {
+        let notb = self.negate(ix, b);
+        let xsel = self.and(ix, &notb, x);
+        let ysel = self.and(ix, b, y);
         self.add(&xsel, &ysel)
     }
 
     /// If `x=0` return the constant `b1` else return `b2`. Folds constants if possible.
-    fn mux_constant_bits(&self, x: &Self::Item, b1: bool, b2: bool) -> Self::Item {
+    fn mux_constant_bits(&self, ix: Option<usize>, x: &Self::Item, b1: bool, b2: bool) -> Self::Item {
         assert!(x.modulus() == 2);
         if !b1 && b2 {
             x.clone()
         } else if b1 && !b2 {
-            self.negate(x)
+            self.negate(ix, x)
         } else if !b1 && !b2 {
-            self.constant(0,2)
+            self.constant(ix, 0, 2)
         } else {
-            self.constant(1,2)
+            self.constant(ix, 1, 2)
         }
     }
 
     /// Output a slice of wires.
-    fn outputs(&self, xs: &[Self::Item]) {
+    fn outputs(&self, ix: Option<usize>, xs: &[Self::Item]) {
         for x in xs.iter() {
-            self.output(x);
+            self.output(ix, x);
         }
     }
 }
@@ -212,77 +210,77 @@ pub trait BundleGadgets: Fancy {
     // Bundle creation
 
     /// Crate an input bundle for the garbler using moduli `ps`.
-    fn garbler_input_bundle(&self, ps: &[u16]) -> Bundle<Self::Item> {
-        Bundle(ps.iter().map(|&p| self.garbler_input(p)).collect())
+    fn garbler_input_bundle(&self, ix: Option<usize>, ps: &[u16]) -> Bundle<Self::Item> {
+        Bundle(ps.iter().map(|&p| self.garbler_input(ix, p)).collect())
     }
 
     /// Crate an input bundle for the evaluator using moduli `ps`.
-    fn evaluator_input_bundle(&self, ps: &[u16]) -> Bundle<Self::Item> {
-        Bundle(ps.iter().map(|&p| self.evaluator_input(p)).collect())
+    fn evaluator_input_bundle(&self, ix: Option<usize>, ps: &[u16]) -> Bundle<Self::Item> {
+        Bundle(ps.iter().map(|&p| self.evaluator_input(ix, p)).collect())
     }
 
     /// Crate an input bundle for the garbler using composite CRT modulus `q`.
-    fn garbler_input_bundle_crt(&self, q: u128) -> Bundle<Self::Item> {
-        self.garbler_input_bundle(&util::factor(q))
+    fn garbler_input_bundle_crt(&self, ix: Option<usize>, q: u128) -> Bundle<Self::Item> {
+        self.garbler_input_bundle(ix, &util::factor(q))
     }
 
     /// Crate an input bundle for the evaluator using composite CRT modulus `q`.
-    fn evaluator_input_bundle_crt(&self, q: u128) -> Bundle<Self::Item> {
-        self.evaluator_input_bundle(&util::factor(q))
+    fn evaluator_input_bundle_crt(&self, ix: Option<usize>, q: u128) -> Bundle<Self::Item> {
+        self.evaluator_input_bundle(ix, &util::factor(q))
     }
 
     /// Create an input bundle for the garbler using n base 2 inputs.
-    fn garbler_input_bundle_binary(&self, n: usize) -> Bundle<Self::Item> {
-        self.garbler_input_bundle(&vec![2;n])
+    fn garbler_input_bundle_binary(&self, ix: Option<usize>, n: usize) -> Bundle<Self::Item> {
+        self.garbler_input_bundle(ix, &vec![2;n])
     }
 
     /// Create an input bundle for the evaluator using n base 2 inputs.
-    fn evaluator_input_bundle_binary(&self, n: usize) -> Bundle<Self::Item> {
-        self.evaluator_input_bundle(&vec![2;n])
+    fn evaluator_input_bundle_binary(&self, ix: Option<usize>, n: usize) -> Bundle<Self::Item> {
+        self.evaluator_input_bundle(ix, &vec![2;n])
     }
 
     /// Creates a bundle of constant wires using moduli `ps`.
-    fn constant_bundle(&self, xs: &[u16], ps: &[u16]) -> Bundle<Self::Item> {
-        Bundle(xs.iter().zip(ps.iter()).map(|(&x,&p)| self.constant(x,p)).collect())
+    fn constant_bundle(&self, ix: Option<usize>, xs: &[u16], ps: &[u16]) -> Bundle<Self::Item> {
+        Bundle(xs.iter().zip(ps.iter()).map(|(&x,&p)| self.constant(ix, x, p)).collect())
     }
 
     /// Creates a bundle of constant wires for the CRT representation of `x` under
     /// composite modulus `q`.
-    fn constant_bundle_crt(&self, x: u128, q: u128) -> Bundle<Self::Item> {
+    fn constant_bundle_crt(&self, ix: Option<usize>, x: u128, q: u128) -> Bundle<Self::Item> {
         let ps = util::factor(q);
         let xs = ps.iter().map(|&p| (x % p as u128) as u16).collect_vec();
-        self.constant_bundle(&xs,&ps)
+        self.constant_bundle(ix, &xs, &ps)
     }
 
     /// Create a constant bundle using base 2 inputs.
-    fn constant_bundle_binary(&self, bits: &[u16]) -> Bundle<Self::Item> {
-        self.constant_bundle(bits, &vec![2;bits.len()])
+    fn constant_bundle_binary(&self, ix: Option<usize>, bits: &[u16]) -> Bundle<Self::Item> {
+        self.constant_bundle(ix, bits, &vec![2;bits.len()])
     }
 
     /// Create `n` garbler input bundles, using moduli `ps`.
-    fn garbler_input_bundles(&self, ps: &[u16], n: usize) -> Vec<Bundle<Self::Item>> {
-        (0..n).map(|_| self.garbler_input_bundle(ps)).collect()
+    fn garbler_input_bundles(&self, ix: Option<usize>, ps: &[u16], n: usize) -> Vec<Bundle<Self::Item>> {
+        (0..n).map(|_| self.garbler_input_bundle(ix, ps)).collect()
     }
 
     /// Create `n` evaluator input bundles, using moduli `ps`.
-    fn evaluator_input_bundles(&self, ps: &[u16], n: usize) -> Vec<Bundle<Self::Item>> {
-        (0..n).map(|_| self.evaluator_input_bundle(ps)).collect()
+    fn evaluator_input_bundles(&self, ix: Option<usize>, ps: &[u16], n: usize) -> Vec<Bundle<Self::Item>> {
+        (0..n).map(|_| self.evaluator_input_bundle(ix, ps)).collect()
     }
 
     /// Create `n` garbler input bundles, under composite CRT modulus `q`.
-    fn garbler_input_bundles_crt(&self, q: u128, n: usize) -> Vec<Bundle<Self::Item>> {
-        (0..n).map(|_| self.garbler_input_bundle_crt(q)).collect()
+    fn garbler_input_bundles_crt(&self, ix: Option<usize>, q: u128, n: usize) -> Vec<Bundle<Self::Item>> {
+        (0..n).map(|_| self.garbler_input_bundle_crt(ix, q)).collect()
     }
 
     /// Create `n` evaluator input bundles, under composite CRT modulus `q`.
-    fn evaluator_input_bundles_crt(&self, q: u128, n: usize) -> Vec<Bundle<Self::Item>> {
-        (0..n).map(|_| self.evaluator_input_bundle_crt(q)).collect()
+    fn evaluator_input_bundles_crt(&self, ix: Option<usize>, q: u128, n: usize) -> Vec<Bundle<Self::Item>> {
+        (0..n).map(|_| self.evaluator_input_bundle_crt(ix, q)).collect()
     }
 
     /// Output the wires that make up a bundle.
-    fn output_bundle(&self, x: &Bundle<Self::Item>) {
+    fn output_bundle(&self, ix: Option<usize>, x: &Bundle<Self::Item>) {
         for w in x.wires() {
-            self.output(w);
+            self.output(ix, w);
         }
     }
 
@@ -313,30 +311,32 @@ pub trait BundleGadgets: Fancy {
     }
 
     /// Multiply `x` with `y`.
-    fn mul_bundles(&self, x: &Bundle<Self::Item>, y: &Bundle<Self::Item>) -> Bundle<Self::Item> {
-        Bundle(x.wires().iter().zip(y.wires().iter()).map(|(x,y)| self.mul(x,y)).collect())
+    fn mul_bundles(&self, ix: Option<usize>, x: &Bundle<Self::Item>, y: &Bundle<Self::Item>)
+        -> Bundle<Self::Item>
+    {
+        Bundle(x.wires().iter().zip(y.wires().iter()).map(|(x,y)| self.mul(ix, x, y)).collect())
     }
 
     /// Exponentiate `x` by the constant `c`.
-    fn cexp_bundle(&self, x: &Bundle<Self::Item>, c: u16) -> Bundle<Self::Item> {
+    fn cexp_bundle(&self, ix: Option<usize>, x: &Bundle<Self::Item>, c: u16) -> Bundle<Self::Item> {
         Bundle(x.wires().iter().map(|x| {
             let p = x.modulus();
             let tab = (0..p).map(|x| {
                 ((x as u64).pow(c as u32) % p as u64) as u16
             }).collect_vec();
-            self.proj(x, p, &tab)
+            self.proj(ix, x, p, &tab)
         }).collect())
     }
 
     /// Compute the remainder with respect to modulus `p`.
-    fn rem_bundle(&self, x: &Bundle<Self::Item>, p: u16) -> Bundle<Self::Item> {
+    fn rem_bundle(&self, ix: Option<usize>, x: &Bundle<Self::Item>, p: u16) -> Bundle<Self::Item> {
         let i = x.moduli().iter().position(|&q| p == q).expect("p is not a moduli in this bundle!");
         let w = &x.wires()[i];
-        Bundle(x.moduli().iter().map(|&q| self.mod_change(w,q)).collect())
+        Bundle(x.moduli().iter().map(|&q| self.mod_change(ix, w, q)).collect())
     }
 
     /// Compute `x == y`. Returns a wire encoding the result mod 2.
-    fn eq_bundles(&self, x: &Bundle<Self::Item>, y: &Bundle<Self::Item>) -> Self::Item {
+    fn eq_bundles(&self, ix: Option<usize>, x: &Bundle<Self::Item>, y: &Bundle<Self::Item>) -> Self::Item {
         assert_eq!(x.moduli(), y.moduli());
         let wlen = x.wires().len() as u16;
         let zs = x.wires().iter().zip_eq(y.wires().iter()).map(|(x,y)| {
@@ -344,18 +344,18 @@ pub trait BundleGadgets: Fancy {
             let z = self.sub(x,y);
             let mut eq_zero_tab = vec![0; x.modulus() as usize];
             eq_zero_tab[0] = 1;
-            self.proj(&z, wlen + 1, &eq_zero_tab)
+            self.proj(ix, &z, wlen + 1, &eq_zero_tab)
         }).collect_vec();
         // add up the results, and output whether they equal zero or not, mod 2
         let z = self.add_many(&zs);
         let b = zs.len();
         let mut tab = vec![0;b+1];
         tab[b] = 1;
-        self.proj(&z, 2, &tab)
+        self.proj(ix, &z, 2, &tab)
     }
 
     /// Mixed radix addition.
-    fn mixed_radix_addition(&self, xs: &[Bundle<Self::Item>]) -> Bundle<Self::Item> {
+    fn mixed_radix_addition(&self, ix: Option<usize>, xs: &[Bundle<Self::Item>]) -> Bundle<Self::Item> {
         let nargs = xs.len();
         let n = xs[0].wires().len();
         assert!(xs.len() > 1 && xs.iter().all(|x| x.wires().len() == n));
@@ -382,7 +382,7 @@ pub trait BundleGadgets: Fancy {
                 // now it is the max carry of this iteration
                 max_carry = max_val / q;
 
-                let modded_ds = ds.iter().map(|d| self.mod_change(d, max_val+1)).collect_vec();
+                let modded_ds = ds.iter().map(|d| self.mod_change(ix, d, max_val+1)).collect_vec();
 
                 let carry_sum = self.add_many(&modded_ds);
                 // add in the carry from the previous iteration
@@ -392,16 +392,16 @@ pub trait BundleGadgets: Fancy {
                 // the correct moduli for the next iteration
                 let next_mod = xs[0].wires()[i+1].modulus();
                 let tt = (0..=max_val).map(|i| (i / q) % next_mod).collect_vec();
-                digit_carry = Some(self.proj(&carry, next_mod, &tt));
+                digit_carry = Some(self.proj(ix, &carry, next_mod, &tt));
 
                 let next_max_val = nargs as u16 * (next_mod - 1) + max_carry;
 
                 if i < n-2 {
                     if max_carry < next_mod {
-                        carry_carry = Some(self.mod_change(digit_carry.as_ref().unwrap(), next_max_val + 1));
+                        carry_carry = Some(self.mod_change(ix, digit_carry.as_ref().unwrap(), next_max_val + 1));
                     } else {
                         let tt = (0..=max_val).map(|i| i / q).collect_vec();
-                        carry_carry = Some(self.proj(&carry, next_max_val + 1, &tt));
+                        carry_carry = Some(self.proj(ix, &carry, next_max_val + 1, &tt));
                     }
                 } else {
                     // next digit is MSB so we dont need carry_carry
@@ -421,7 +421,7 @@ pub trait BundleGadgets: Fancy {
 
     /// Helper function for advanced gadgets, returns the fractional part of `X/M` where
     /// `M=product(ms)`.
-    fn fractional_mixed_radix(&self, bun: &Bundle<Self::Item>, ms: &[u16]) -> Bundle<Self::Item> {
+    fn fractional_mixed_radix(&self, ix: Option<usize>, bun: &Bundle<Self::Item>, ms: &[u16]) -> Bundle<Self::Item> {
         let ndigits = ms.len();
 
         let q = util::product(&bun.moduli());
@@ -444,91 +444,91 @@ pub trait BundleGadgets: Fancy {
             }
 
             let new_ds = tabs.into_iter().enumerate()
-                .map(|(i,tt)| self.proj(wire, ms[i], &tt))
+                .map(|(i,tt)| self.proj(ix, wire, ms[i], &tt))
                 .collect_vec();
 
             ds.push(Bundle(new_ds));
         }
 
-        self.mixed_radix_addition(&ds)
+        self.mixed_radix_addition(ix, &ds)
     }
 
     /// Compute `max(x,0)`, using potentially approximate factors of `M`.
-    fn relu(&self, x: &Bundle<Self::Item>, factors_of_m: &[u16]) -> Bundle<Self::Item> {
-        let res = self.fractional_mixed_radix(x, factors_of_m);
+    fn relu(&self, ix: Option<usize>, x: &Bundle<Self::Item>, factors_of_m: &[u16]) -> Bundle<Self::Item> {
+        let res = self.fractional_mixed_radix(ix, x, factors_of_m);
 
         // project the MSB to 0/1, whether or not it is less than p/2
         let p = *factors_of_m.last().unwrap();
         let mask_tt = (0..p).map(|x| (x < p/2) as u16).collect_vec();
-        let mask = self.proj(res.wires().last().unwrap(), 2, &mask_tt);
+        let mask = self.proj(ix, res.wires().last().unwrap(), 2, &mask_tt);
 
         // use the mask to either output x or 0
-        let z = x.wires().iter().map(|x| self.mul(x,&mask)).collect_vec();
+        let z = x.wires().iter().map(|x| self.mul(ix, x, &mask)).collect_vec();
         Bundle(z)
     }
 
     /// Compute `max(x,0)`.
-    fn exact_relu(&self, x: &Bundle<Self::Item>) -> Bundle<Self::Item> {
-        self.relu(x, &exact_ms(x))
+    fn exact_relu(&self, ix: Option<usize>, x: &Bundle<Self::Item>) -> Bundle<Self::Item> {
+        self.relu(ix, x, &exact_ms(x))
     }
 
     /// Return 0 if `x` is positive and 1 if `x` is negative. Potentially approximate
     /// depending on `factors_of_m`.
-    fn sign(&self, x: &Bundle<Self::Item>, factors_of_m: &[u16]) -> Self::Item {
-        let res = self.fractional_mixed_radix(x, factors_of_m);
+    fn sign(&self, ix: Option<usize>, x: &Bundle<Self::Item>, factors_of_m: &[u16]) -> Self::Item {
+        let res = self.fractional_mixed_radix(ix, x, factors_of_m);
         let p = *factors_of_m.last().unwrap();
         let tt = (0..p).map(|x| (x >= p/2) as u16).collect_vec();
-        self.proj(res.wires().last().unwrap(), 2, &tt)
+        self.proj(ix, res.wires().last().unwrap(), 2, &tt)
     }
 
     /// Return 0 if `x` is positive and 1 if `x` is negative.
-    fn exact_sign(&self, x: &Bundle<Self::Item>) -> Self::Item {
-        self.sign(x, &exact_ms(x))
+    fn exact_sign(&self, ix: Option<usize>, x: &Bundle<Self::Item>) -> Self::Item {
+        self.sign(ix, x, &exact_ms(x))
     }
 
     /// Return `if x >= 0 then 1 else -1`, where `-1` is interpreted as `Q-1`. Potentially
     /// approximate depending on `factors_of_m`.
-    fn sgn(&self, x: &Bundle<Self::Item>, factors_of_m: &[u16]) -> Bundle<Self::Item> {
-        let sign = self.sign(x,factors_of_m);
+    fn sgn(&self, ix: Option<usize>, x: &Bundle<Self::Item>, factors_of_m: &[u16]) -> Bundle<Self::Item> {
+        let sign = self.sign(ix, x, factors_of_m);
         let q = util::product(&x.moduli());
         let z = x.moduli().into_iter().map(|p| {
             let tt = vec![ 1, ((q-1) % p as u128) as u16 ];
-            self.proj(&sign, p, &tt)
+            self.proj(ix, &sign, p, &tt)
         }).collect();
         Bundle(z)
     }
 
     /// Return `if x >= 0 then 1 else -1`, where `-1` is interpreted as `Q-1`.
-    fn exact_sgn(&self, x: &Bundle<Self::Item>) -> Bundle<Self::Item> {
-        self.sgn(x, &exact_ms(x))
+    fn exact_sgn(&self, ix: Option<usize>, x: &Bundle<Self::Item>) -> Bundle<Self::Item> {
+        self.sgn(ix, x, &exact_ms(x))
     }
 
     /// Returns 1 if `x < y`. Works on both CRT and binary bundles.
-    fn exact_lt(&self, x: &Bundle<Self::Item>, y: &Bundle<Self::Item>) -> Self::Item {
+    fn exact_lt(&self, ix: Option<usize>, x: &Bundle<Self::Item>, y: &Bundle<Self::Item>) -> Self::Item {
         if x.is_binary() {
-            let (_,z) = self.binary_subtraction(x,y);
+            let (_,z) = self.binary_subtraction(ix,x,y);
             z
         } else {
             let z = self.sub_bundles(x,y);
-            self.exact_sign(&z)
+            self.exact_sign(ix,&z)
         }
     }
 
     /// Returns 1 if `x >= y`. Works on both CRT and binary bundles.
-    fn exact_geq(&self, x: &Bundle<Self::Item>, y: &Bundle<Self::Item>) -> Self::Item {
-        let z = self.exact_lt(x,y);
-        self.negate(&z)
+    fn exact_geq(&self, ix: Option<usize>, x: &Bundle<Self::Item>, y: &Bundle<Self::Item>) -> Self::Item {
+        let z = self.exact_lt(ix,x,y);
+        self.negate(ix,&z)
     }
 
     /// Compute the maximum bundle in `xs`. Works on both CRT and binary bundles.
-    fn max(&self, xs: &[Bundle<Self::Item>]) -> Bundle<Self::Item> {
+    fn max(&self, ix: Option<usize>, xs: &[Bundle<Self::Item>]) -> Bundle<Self::Item> {
         assert!(xs.len() > 1);
         xs.iter().skip(1).fold(xs[0].clone(), |x,y| {
-            let pos = self.exact_lt(&x,y);
-            let neg = self.negate(&pos);
+            let pos = self.exact_lt(ix,&x,y);
+            let neg = self.negate(ix,&pos);
             let z = x.wires().iter().zip(y.wires().iter()).map(|(x,y)| {
-                let xp = self.mul(x,&neg);
-                let yp = self.mul(y,&pos);
+                let xp = self.mul(ix,x,&neg);
+                let yp = self.mul(ix,y,&pos);
                 self.add(&xp,&yp)
             }).collect();
             Bundle(z)
@@ -539,16 +539,16 @@ pub trait BundleGadgets: Fancy {
     // other gadgets
 
     /// Binary addition. Returns the result and the carry.
-    fn binary_addition(&self, xs: &Bundle<Self::Item>, ys: &Bundle<Self::Item>)
+    fn binary_addition(&self, ix: Option<usize>, xs: &Bundle<Self::Item>, ys: &Bundle<Self::Item>)
         -> (Bundle<Self::Item>, Self::Item)
     {
         assert_eq!(xs.moduli(), ys.moduli());
         let xwires = xs.wires();
         let ywires = ys.wires();
-        let (mut z, mut c) = self.adder(&xwires[0], &ywires[0], None);
+        let (mut z, mut c) = self.adder(ix, &xwires[0], &ywires[0], None);
         let mut bs = vec![z];
         for i in 1..xwires.len() {
-            let res = self.adder(&xwires[i], &ywires[i], Some(&c));
+            let res = self.adder(ix, &xwires[i], &ywires[i], Some(&c));
             z = res.0;
             c = res.1;
             bs.push(z);
@@ -557,16 +557,16 @@ pub trait BundleGadgets: Fancy {
     }
 
     /// Binary addition. Avoids creating extra gates for the final carry.
-    fn binary_addition_no_carry(&self, xs: &Bundle<Self::Item>, ys: &Bundle<Self::Item>)
+    fn binary_addition_no_carry(&self, ix: Option<usize>, xs: &Bundle<Self::Item>, ys: &Bundle<Self::Item>)
         -> Bundle<Self::Item>
     {
         assert_eq!(xs.moduli(), ys.moduli());
         let xwires = xs.wires();
         let ywires = ys.wires();
-        let (mut z, mut c) = self.adder(&xwires[0], &ywires[0], None);
+        let (mut z, mut c) = self.adder(ix, &xwires[0], &ywires[0], None);
         let mut bs = vec![z];
         for i in 1..xwires.len()-1 {
-            let res = self.adder(&xwires[i], &ywires[i], Some(&c));
+            let res = self.adder(ix, &xwires[i], &ywires[i], Some(&c));
             z = res.0;
             c = res.1;
             bs.push(z);
@@ -577,55 +577,55 @@ pub trait BundleGadgets: Fancy {
     }
 
     // /// Binary multiplication.
-    // fn binary_multiplication(&self, xs: &Bundle<Self::Item>, ys: &Bundle<Self::Item>)
+    // fn binary_multiplication(&self, ix: Option<usize>, xs: &Bundle<Self::Item>, ys: &Bundle<Self::Item>)
     //     -> Bundle<Self::Item>
     // {
     //     unimplemented!()
     // }
 
     /// Compute the twos complement of the input bundle (which must be base 2).
-    fn twos_complement(&self, xs: &Bundle<Self::Item>) -> Bundle<Self::Item> {
-        let not_xs = xs.wires().iter().map(|x| self.negate(x)).collect_vec();
-        let zero = self.constant(0,2);
+    fn twos_complement(&self, ix: Option<usize>, xs: &Bundle<Self::Item>) -> Bundle<Self::Item> {
+        let not_xs = xs.wires().iter().map(|x| self.negate(ix, x)).collect_vec();
+        let zero = self.constant(ix, 0, 2);
         let mut const1 = vec![zero; xs.size()];
-        const1[0] = self.constant(1,2);
-        self.binary_addition_no_carry(&Bundle(not_xs), &Bundle(const1))
+        const1[0] = self.constant(ix, 1, 2);
+        self.binary_addition_no_carry(ix, &Bundle(not_xs), &Bundle(const1))
     }
 
     /// Subtract two binary bundles. Returns the result and whether it overflowed.
-    fn binary_subtraction(&self, xs: &Bundle<Self::Item>, ys: &Bundle<Self::Item>)
+    fn binary_subtraction(&self, ix: Option<usize>, xs: &Bundle<Self::Item>, ys: &Bundle<Self::Item>)
         -> (Bundle<Self::Item>, Self::Item)
     {
-        let neg_ys = self.twos_complement(&ys);
-        let (zs, c) = self.binary_addition(&xs, &neg_ys);
-        (zs, self.negate(&c))
+        let neg_ys = self.twos_complement(ix, &ys);
+        let (zs, c) = self.binary_addition(ix, &xs, &neg_ys);
+        (zs, self.negate(ix, &c))
     }
 
-    fn multiplex(&self, b: &Self::Item, x: &Bundle<Self::Item>, y: &Bundle<Self::Item>)
+    fn multiplex(&self, ix: Option<usize>, b: &Self::Item, x: &Bundle<Self::Item>, y: &Bundle<Self::Item>)
         -> Bundle<Self::Item>
     {
         let ws = x.wires().iter().zip(y.wires().iter()).map(|(xwire,ywire)| {
-            self.mux(b,xwire,ywire)
+            self.mux(ix,b,xwire,ywire)
         }).collect();
         Bundle(ws)
     }
 
     /// If `x=0` return `c1` as a bundle of constant bits, else return `c2`.
-    fn multiplex_constant_bits(&self, x: &Self::Item, c1: u128, c2: u128, nbits: usize)
+    fn multiplex_constant_bits(&self, ix: Option<usize>, x: &Self::Item, c1: u128, c2: u128, nbits: usize)
         -> Bundle<Self::Item>
     {
         let c1_bs = util::u128_to_bits(c1, nbits).into_iter().map(|x:u16| x > 0).collect_vec();
         let c2_bs = util::u128_to_bits(c2, nbits).into_iter().map(|x:u16| x > 0).collect_vec();
         let ws = c1_bs.into_iter().zip(c2_bs.into_iter()).map(|(b1,b2)| {
-            self.mux_constant_bits(x,b1,b2)
+            self.mux_constant_bits(ix,x,b1,b2)
         }).collect();
         Bundle(ws)
     }
 
     /// Shift residues, replacing them with zeros in the modulus of the last residue.
-    fn shift(&self, x: &Bundle<Self::Item>, n: usize) -> Bundle<Self::Item> {
+    fn shift(&self, ix: Option<usize>, x: &Bundle<Self::Item>, n: usize) -> Bundle<Self::Item> {
         let mut ws = x.wires().to_vec();
-        let zero = self.constant(0, ws.last().unwrap().modulus());
+        let zero = self.constant(ix, 0, ws.last().unwrap().modulus());
         for _ in 0..n {
             ws.pop();
             ws.insert(0, zero.clone());
@@ -634,23 +634,23 @@ pub trait BundleGadgets: Fancy {
     }
 
     /// Write the constant in binary and that gives you the shift amounts, Eg.. 7x is 4x+2x+x.
-    fn binary_cmul(&self, x: &Bundle<Self::Item>, c: u128, nbits: usize) -> Bundle<Self::Item> {
+    fn binary_cmul(&self, ix: Option<usize>, x: &Bundle<Self::Item>, c: u128, nbits: usize) -> Bundle<Self::Item> {
         assert!(x.is_binary());
-        let zero = self.constant_bundle(&vec![0;nbits], &vec![2;nbits]);
+        let zero = self.constant_bundle(ix, &vec![0;nbits], &vec![2;nbits]);
         util::u128_to_bits(c,nbits).into_iter().enumerate()
             .filter_map(|(i,b)| if b > 0 { Some(i) } else { None })
             .fold(zero, |z, shift_amt| {
-            let s = self.shift(x, shift_amt);
-            self.binary_addition_no_carry(&z,&s)
+            let s = self.shift(ix, x, shift_amt);
+            self.binary_addition_no_carry(ix, &z,&s)
         })
     }
 
     /// Compute the absolute value of a binary bundle.
-    fn abs(&self, x: &Bundle<Self::Item>) -> Bundle<Self::Item> {
+    fn abs(&self, ix: Option<usize>, x: &Bundle<Self::Item>) -> Bundle<Self::Item> {
         assert!(x.is_binary());
         let sign = x.wires().last().unwrap();
-        let negated = self.twos_complement(x);
-        self.multiplex(&sign, x, &negated)
+        let negated = self.twos_complement(ix,x);
+        self.multiplex(ix, &sign, x, &negated)
     }
 }
 

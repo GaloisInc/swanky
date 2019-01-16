@@ -143,20 +143,20 @@ pub fn garble(c: &Circuit) -> (Encoder, Decoder, GarbledCircuit) {
         for (i, gate) in c.gates.iter().enumerate() {
             let q = c.modulus(i);
             let w = match gate {
-                Gate::GarblerInput { .. }    => garbler.garbler_input(q),
-                Gate::EvaluatorInput { .. }  => garbler.evaluator_input(q),
-                Gate::Constant { val }       => garbler.constant(*val,q),
+                Gate::GarblerInput { .. }    => garbler.garbler_input(None, q),
+                Gate::EvaluatorInput { .. }  => garbler.evaluator_input(None, q),
+                Gate::Constant { val }       => garbler.constant(None, *val,q),
                 Gate::Add { xref, yref }     => garbler.add(&wires[xref.ix], &wires[yref.ix]),
                 Gate::Sub { xref, yref }     => garbler.sub(&wires[xref.ix], &wires[yref.ix]),
                 Gate::Cmul { xref, c }       => garbler.cmul(&wires[xref.ix], *c),
-                Gate::Mul { xref, yref, .. } => garbler.mul(&wires[xref.ix], &wires[yref.ix]),
-                Gate::Proj { xref, tt, .. }  => garbler.proj(&wires[xref.ix], q, tt),
+                Gate::Mul { xref, yref, .. } => garbler.mul(None, &wires[xref.ix], &wires[yref.ix]),
+                Gate::Proj { xref, tt, .. }  => garbler.proj(None, &wires[xref.ix], q, tt),
             };
             wires.push(w);
         }
 
         for r in c.output_refs.iter() {
-            garbler.output(&wires[r.ix]);
+            garbler.output(None, &wires[r.ix]);
         }
 
         deltas = garbler.get_deltas();
@@ -294,10 +294,10 @@ mod classic {
     fn add() {
         garble_test_helper(|q| {
             let b = CircuitBuilder::new();
-            let x = b.evaluator_input(q);
-            let y = b.evaluator_input(q);
+            let x = b.evaluator_input(None, q);
+            let y = b.evaluator_input(None, q);
             let z = b.add(&x,&y);
-            b.output(&z);
+            b.output(None, &z);
             b.finish()
         });
     }
@@ -306,9 +306,9 @@ mod classic {
     fn add_many() {
         garble_test_helper(|q| {
             let b = CircuitBuilder::new();
-            let xs = b.evaluator_inputs(q,16);
+            let xs = b.evaluator_inputs(None, q, 16);
             let z = b.add_many(&xs);
-            b.output(&z);
+            b.output(None, &z);
             b.finish()
         });
     }
@@ -317,9 +317,9 @@ mod classic {
     fn or_many() {
         garble_test_helper(|_| {
             let b = CircuitBuilder::new();
-            let xs = b.evaluator_inputs(2,16);
-            let z = b.or_many(&xs);
-            b.output(&z);
+            let xs = b.evaluator_inputs(None, 2, 16);
+            let z = b.or_many(None, &xs);
+            b.output(None, &z);
             b.finish()
         });
     }
@@ -328,10 +328,10 @@ mod classic {
     fn sub() {
         garble_test_helper(|q| {
             let b = CircuitBuilder::new();
-            let x = b.evaluator_input(q);
-            let y = b.evaluator_input(q);
+            let x = b.evaluator_input(None, q);
+            let y = b.evaluator_input(None, q);
             let z = b.sub(&x,&y);
-            b.output(&z);
+            b.output(None, &z);
             b.finish()
         });
     }
@@ -340,15 +340,15 @@ mod classic {
     fn cmul() {
         garble_test_helper(|q| {
             let b = CircuitBuilder::new();
-            let x = b.evaluator_input(q);
-            let _ = b.evaluator_input(q);
+            let x = b.evaluator_input(None, q);
+            let _ = b.evaluator_input(None, q);
             let z;
             if q > 2 {
                 z = b.cmul(&x, 2);
             } else {
                 z = b.cmul(&x, 1);
             }
-            b.output(&z);
+            b.output(None, &z);
             b.finish()
         });
     }
@@ -361,10 +361,10 @@ mod classic {
                 tab.push((i + 1) % q);
             }
             let b = CircuitBuilder::new();
-            let x = b.evaluator_input(q);
-            let _ = b.evaluator_input(q);
-            let z = b.proj(&x, q, &tab);
-            b.output(&z);
+            let x = b.evaluator_input(None, q);
+            let _ = b.evaluator_input(None, q);
+            let z = b.proj(None, &x, q, &tab);
+            b.output(None, &z);
             b.finish()
         });
     }
@@ -378,10 +378,10 @@ mod classic {
                 tab.push(rng.gen_u16() % q);
             }
             let b = CircuitBuilder::new();
-            let x = b.evaluator_input(q);
-            let _ = b.evaluator_input(q);
-            let z = b.proj(&x, q, &tab);
-            b.output(&z);
+            let x = b.evaluator_input(None, q);
+            let _ = b.evaluator_input(None, q);
+            let z = b.proj(None, &x, q, &tab);
+            b.output(None, &z);
             b.finish()
         });
     }
@@ -390,9 +390,9 @@ mod classic {
     fn mod_change() {
         garble_test_helper(|q| {
             let b = CircuitBuilder::new();
-            let x = b.evaluator_input(q);
-            let z = b.mod_change(&x,q*2);
-            b.output(&z);
+            let x = b.evaluator_input(None, q);
+            let z = b.mod_change(None, &x, q*2);
+            b.output(None, &z);
             b.finish()
         });
     }
@@ -401,10 +401,10 @@ mod classic {
     fn half_gate() {
         garble_test_helper(|q| {
             let b = CircuitBuilder::new();
-            let x = b.evaluator_input(q);
-            let y = b.evaluator_input(q);
-            let z = b.mul(&x,&y);
-            b.output(&z);
+            let x = b.evaluator_input(None, q);
+            let y = b.evaluator_input(None, q);
+            let z = b.mul(None, &x, &y);
+            b.output(None, &z);
             b.finish()
         });
     }
@@ -416,10 +416,10 @@ mod classic {
             println!("\nTESTING MOD q={} ymod={}", q, ymod);
 
             let b = CircuitBuilder::new();
-            let x = b.evaluator_input(q);
-            let y = b.evaluator_input(ymod);
-            let z = b.mul(&x,&y);
-            b.output(&z);
+            let x = b.evaluator_input(None, q);
+            let y = b.evaluator_input(None, ymod);
+            let z = b.mul(None, &x,&y);
+            b.output(None, &z);
             let c = b.finish();
 
             let (en, de, ev) = garble(&c);
@@ -455,9 +455,9 @@ mod classic {
         let mods = [3,7,10,2,13]; // fast
 
         let b = CircuitBuilder::new();
-        let xs = b.evaluator_input_bundles(&mods, nargs);
-        let z = b.mixed_radix_addition(&xs);
-        b.output_bundle(&z);
+        let xs = b.evaluator_input_bundles(None, &mods, nargs);
+        let z = b.mixed_radix_addition(None, &xs);
+        b.output_bundle(None, &z);
         let circ = b.finish();
 
         let (en, de, ev) = garble(&circ);
@@ -489,8 +489,8 @@ mod classic {
         let q = rng.gen_modulus();
         let c = rng.gen_u16() % q;
 
-        let y = b.constant(c,q);
-        b.output(&y);
+        let y = b.constant(None, c, q);
+        b.output(None, &y);
 
         let circ = b.finish();
         let (_, de, ev) = garble(&circ);
@@ -510,10 +510,10 @@ mod classic {
         let q = rng.gen_modulus();
         let c = rng.gen_u16() % q;
 
-        let x = b.evaluator_input(q);
-        let y = b.constant(c,q);
+        let x = b.evaluator_input(None, q);
+        let y = b.constant(None, c, q);
         let z = b.add(&x,&y);
-        b.output(&z);
+        b.output(None, &z);
 
         let circ = b.finish();
         let (en, de, ev) = garble(&circ);
@@ -537,9 +537,9 @@ mod classic {
         let mods = (0..7).map(|_| rng.gen_modulus()).collect_vec();
 
         let b = CircuitBuilder::new();
-        let xs = b.evaluator_input_bundles(&mods, nargs);
-        let z = b.mixed_radix_addition(&xs);
-        b.output_bundle(&z);
+        let xs = b.evaluator_input_bundles(None, &mods, nargs);
+        let z = b.mixed_radix_addition(None, &xs);
+        b.output_bundle(None, &z);
         let circ = b.finish();
 
         let (en, de, ev) = garble(&circ);
@@ -597,10 +597,10 @@ mod streaming {
 //}}}
     fn fancy_addition<W: Clone + Default + HasModulus>(b: &dyn Fancy<Item=W>, q: u16) //{{{
     {
-        let x = b.garbler_input(q);
-        let y = b.evaluator_input(q);
+        let x = b.garbler_input(None, q);
+        let y = b.evaluator_input(None, q);
         let z = b.add(&x,&y);
-        b.output(&z);
+        b.output(None, &z);
     }
 
     #[test]
@@ -616,10 +616,10 @@ mod streaming {
 //}}}
     fn fancy_subtraction<W: Clone + Default + HasModulus>(b: &dyn Fancy<Item=W>, q: u16) //{{{
     {
-        let x = b.garbler_input(q);
-        let y = b.evaluator_input(q);
+        let x = b.garbler_input(None, q);
+        let y = b.evaluator_input(None, q);
         let z = b.sub(&x,&y);
-        b.output(&z);
+        b.output(None, &z);
     }
 
     #[test]
@@ -635,10 +635,10 @@ mod streaming {
 //}}}
     fn fancy_multiplication<W: Clone + Default + HasModulus>(b: &dyn Fancy<Item=W>, q: u16) // {{{
     {
-        let x = b.garbler_input(q);
-        let y = b.evaluator_input(q);
-        let z = b.mul(&x,&y);
-        b.output(&z);
+        let x = b.garbler_input(None, q);
+        let y = b.evaluator_input(None, q);
+        let z = b.mul(None,&x,&y);
+        b.output(None, &z);
     }
 
     #[test]
@@ -654,9 +654,9 @@ mod streaming {
 //}}}
     fn fancy_cmul<W: Clone + Default + HasModulus>(b: &dyn Fancy<Item=W>, q: u16) // {{{
     {
-        let x = b.garbler_input(q);
+        let x = b.garbler_input(None, q);
         let z = b.cmul(&x,5);
-        b.output(&z);
+        b.output(None, &z);
     }
 
     #[test]
@@ -671,10 +671,10 @@ mod streaming {
 //}}}
     fn fancy_projection<W: Clone + Default + HasModulus>(b: &dyn Fancy<Item=W>, q: u16) // {{{
     {
-        let x = b.garbler_input(q);
+        let x = b.garbler_input(None, q);
         let tab = (0..q).map(|i| (i + 1) % q).collect_vec();
-        let z = b.proj(&x,q,&tab);
-        b.output(&z);
+        let z = b.proj(None,&x,q,&tab);
+        b.output(None,&z);
     }
 
     #[test]
@@ -703,12 +703,12 @@ mod parallel {
             F: Fancy<Item=W> + Send + Sync,
      {
         crossbeam::scope(|scope| {
-            let inps = b.garbler_input_bundles_crt(Q, N);
+            let inps = b.garbler_input_bundles_crt(None, Q, N);
 
             b.begin_sync(0,N);
             let handles = inps.into_iter().enumerate().map(|(i,inp)| {
                 scope.spawn(move |_| {
-                    let z = b.exact_sign(&inp);
+                    let z = b.exact_sign(Some(i), &inp);
                     b.finish_index(i);
                     z
                 })
@@ -716,7 +716,7 @@ mod parallel {
 
             for h in handles.into_iter() {
                 let z = h.join().unwrap();
-                b.output(&z);
+                b.output(None, &z);
             }
         }).unwrap();
     }

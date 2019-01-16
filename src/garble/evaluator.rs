@@ -39,7 +39,7 @@ impl Evaluator {
     }
 
     /// Receive the next message.
-    fn recv(&self, ty: GateType) -> Message {
+    fn recv(&self, _ix: Option<usize>, ty: GateType) -> Message {
         (self.recv_function.lock().unwrap().deref_mut())(ty)
     }
 
@@ -62,21 +62,21 @@ impl Evaluator {
 impl Fancy for Evaluator {
     type Item = Wire;
 
-    fn garbler_input(&self, _q: u16) -> Wire {
-        match self.recv(GateType::Other) {
+    fn garbler_input(&self, ix: Option<usize>, _q: u16) -> Wire {
+        match self.recv(ix, GateType::Other) {
             Message::GarblerInput(w) => w,
             m => panic!("Expected message GarblerInput but got {}", m),
         }
     }
 
-    fn evaluator_input(&self, q: u16) -> Wire {
-        match self.recv(GateType::EvaluatorInput { modulus: q }) {
+    fn evaluator_input(&self, ix: Option<usize>, q: u16) -> Wire {
+        match self.recv(ix, GateType::EvaluatorInput { modulus: q }) {
             Message::EvaluatorInput(w) => w,
             m => panic!("Expected message EvaluatorInput but got {}", m),
         }
     }
 
-    fn constant(&self, x: u16, q: u16) -> Wire {
+    fn constant(&self, ix: Option<usize>, x: u16, q: u16) -> Wire {
         match self.constants.read().unwrap().get(&(x,q)) {
             Some(c) => return c.clone(),
             None => (),
@@ -86,7 +86,7 @@ impl Fancy for Evaluator {
             Some(c) => return c.clone(),
             None => (),
         }
-        let w = match self.recv(GateType::Other) {
+        let w = match self.recv(ix, GateType::Other) {
             Message::Constant { wire, .. } => wire,
             m => panic!("Expected message Constant but got {}", m),
         };
@@ -106,12 +106,12 @@ impl Fancy for Evaluator {
         x.cmul(c)
     }
 
-    fn mul(&self, A: &Wire, B: &Wire) -> Wire {
+    fn mul(&self, ix: Option<usize>, A: &Wire, B: &Wire) -> Wire {
         if A.modulus() < A.modulus() {
-            return self.mul(B,A);
+            return self.mul(ix,B,A);
         }
 
-        let gate = match self.recv(GateType::Other) {
+        let gate = match self.recv(ix, GateType::Other) {
             Message::GarbledGate(g) => g,
             m => panic!("Expected message GarbledGate but got {}", m),
         };
@@ -148,8 +148,8 @@ impl Fancy for Evaluator {
         L.plus(&R.plus(&A.cmul(new_b_color)))
     }
 
-    fn proj(&self, x: &Wire, q: u16, _tt: &[u16]) -> Wire {
-        let gate = match self.recv(GateType::Other) {
+    fn proj(&self, ix: Option<usize>, x: &Wire, q: u16, _tt: &[u16]) -> Wire {
+        let gate = match self.recv(ix, GateType::Other) {
             Message::GarbledGate(g) => g,
             m => panic!("Expected message GarbledGate but got {}", m),
         };
@@ -165,8 +165,8 @@ impl Fancy for Evaluator {
         w
     }
 
-    fn output(&self, x: &Wire) {
-        match self.recv(GateType::Other) {
+    fn output(&self, ix: Option<usize>, x: &Wire) {
+        match self.recv(ix, GateType::Other) {
             Message::OutputCiphertext(c) => {
                 self.output_cts.lock().unwrap().push(c);
             }
@@ -228,14 +228,14 @@ impl GarbledCircuit {
         for (i,gate) in c.gates.iter().enumerate() {
             let q = c.modulus(i);
             let w = match *gate {
-                Gate::GarblerInput { .. }    => eval.garbler_input(q),
-                Gate::EvaluatorInput { .. }  => eval.evaluator_input(q),
-                Gate::Constant { val }       => eval.constant(val, q),
+                Gate::GarblerInput { .. }    => eval.garbler_input(None, q),
+                Gate::EvaluatorInput { .. }  => eval.evaluator_input(None, q),
+                Gate::Constant { val }       => eval.constant(None, val, q),
                 Gate::Add { xref, yref }     => wires[xref.ix].plus(&wires[yref.ix]),
                 Gate::Sub { xref, yref }     => wires[xref.ix].minus(&wires[yref.ix]),
                 Gate::Cmul { xref, c }       => wires[xref.ix].cmul(c),
-                Gate::Proj { xref, .. }      => eval.proj(&wires[xref.ix], q, &[]),
-                Gate::Mul { xref, yref, .. } => eval.mul(&wires[xref.ix], &wires[yref.ix]),
+                Gate::Proj { xref, .. }      => eval.proj(None, &wires[xref.ix], q, &[]),
+                Gate::Mul { xref, yref, .. } => eval.mul(None, &wires[xref.ix], &wires[yref.ix]),
             };
             wires.push(w);
         }

@@ -44,21 +44,21 @@ impl Dummy {
 impl Fancy for Dummy {
     type Item = DummyVal;
 
-    fn garbler_input(&self, modulus: u16) -> DummyVal {
+    fn garbler_input(&self, _ix: Option<usize>, modulus: u16) -> DummyVal {
         let mut inps = self.garbler_inputs.lock().unwrap();
         assert!(inps.len() > 0, "not enough garbler inputs");
         let val = inps.remove(0);
         DummyVal { val, modulus }
     }
 
-    fn evaluator_input(&self, modulus: u16) -> DummyVal {
+    fn evaluator_input(&self, _ix: Option<usize>, modulus: u16) -> DummyVal {
         let mut inps = self.evaluator_inputs.lock().unwrap();
         assert!(inps.len() > 0, "not enough evaluator inputs");
         let val = inps.remove(0);
         DummyVal { val, modulus }
     }
 
-    fn constant(&self, val: u16, modulus: u16) -> DummyVal {
+    fn constant(&self, _ix: Option<usize>, val: u16, modulus: u16) -> DummyVal {
         DummyVal { val, modulus }
     }
 
@@ -79,15 +79,15 @@ impl Fancy for Dummy {
         DummyVal { val, modulus: x.modulus }
     }
 
-    fn mul(&self, x: &DummyVal, y: &DummyVal) -> DummyVal {
+    fn mul(&self, ix: Option<usize>, x: &DummyVal, y: &DummyVal) -> DummyVal {
         if x.modulus < y.modulus {
-            return self.mul(y,x);
+            return self.mul(ix,y,x);
         }
         let val = (x.val * y.val) % x.modulus;
         DummyVal { val, modulus: x.modulus }
     }
 
-    fn proj(&self, x: &DummyVal, modulus: u16, tt: &[u16]) -> DummyVal {
+    fn proj(&self, _ix: Option<usize>, x: &DummyVal, modulus: u16, tt: &[u16]) -> DummyVal {
         assert_eq!(tt.len(), x.modulus as usize);
         assert!(tt.iter().all(|&x| x < modulus));
         assert!(x.val < x.modulus);
@@ -95,7 +95,7 @@ impl Fancy for Dummy {
         DummyVal { val, modulus }
     }
 
-    fn output(&self, x: &DummyVal) {
+    fn output(&self, _ix: Option<usize>, x: &DummyVal) {
         self.outputs.lock().unwrap().push(x.val);
     }
 
@@ -121,10 +121,10 @@ mod bundle {
             let y = rng.gen_u128() % q;
             let d = Dummy::new(&crt_factor(x,q), &crt_factor(y,q));
             {
-                let x = d.garbler_input_bundle_crt(q);
-                let y = d.evaluator_input_bundle_crt(q);
+                let x = d.garbler_input_bundle_crt(None,q);
+                let y = d.evaluator_input_bundle_crt(None,q);
                 let z = d.add_bundles(&x,&y);
-                d.output_bundle(&z);
+                d.output_bundle(None,&z);
             }
             let z = crt_inv_factor(&d.get_output(),q);
             assert_eq!(z, (x+y)%q);
@@ -140,10 +140,10 @@ mod bundle {
             let y = rng.gen_u128() % q;
             let d = Dummy::new(&crt_factor(x,q), &crt_factor(y,q));
             {
-                let x = d.garbler_input_bundle_crt(q);
-                let y = d.evaluator_input_bundle_crt(q);
+                let x = d.garbler_input_bundle_crt(None,q);
+                let y = d.evaluator_input_bundle_crt(None,q);
                 let z = d.sub_bundles(&x,&y);
-                d.output_bundle(&z);
+                d.output_bundle(None,&z);
             }
             let z = crt_inv_factor(&d.get_output(),q);
             assert_eq!(z, (x+q-y)%q);
@@ -160,9 +160,9 @@ mod bundle {
             let c = 1 + rng.gen_u128() % q;
             let d = Dummy::new(&util::u128_to_bits(x,nbits), &[]);
             {
-                let x = d.garbler_input_bundle(&vec![2;nbits]);
-                let z = d.binary_cmul(&x,c,nbits);
-                d.output_bundle(&z);
+                let x = d.garbler_input_bundle(None,&vec![2;nbits]);
+                let z = d.binary_cmul(None,&x,c,nbits);
+                d.output_bundle(None,&z);
             }
             let z = util::u128_from_bits(&d.get_output());
             assert_eq!(z, (x*c)%q);
@@ -180,9 +180,9 @@ mod bundle {
             let enc_inps = inps.into_iter().flat_map(|x| crt_factor(x,q)).collect_vec();
             let d = Dummy::new(&enc_inps, &[]);
             {
-                let xs = d.garbler_input_bundles_crt(q,n);
-                let z = d.max(&xs);
-                d.output_bundle(&z);
+                let xs = d.garbler_input_bundles_crt(None,q,n);
+                let z = d.max(None,&xs);
+                d.output_bundle(None,&z);
             }
             let z = crt_inv_factor(&d.get_output(),q);
             assert_eq!(z, should_be);
@@ -201,9 +201,9 @@ mod bundle {
             let enc_inps = inps.into_iter().flat_map(|x| util::u128_to_bits(x,nbits)).collect_vec();
             let d = Dummy::new(&enc_inps, &[]);
             {
-                let xs = d.garbler_input_bundles(&vec![2;nbits], n);
-                let z = d.max(&xs);
-                d.output_bundle(&z);
+                let xs = d.garbler_input_bundles(None,&vec![2;nbits], n);
+                let z = d.max(None,&xs);
+                d.output_bundle(None,&z);
             }
             let z = util::u128_from_bits(&d.get_output());
             assert_eq!(z, should_be);
@@ -219,9 +219,9 @@ mod bundle {
             let x = rng.gen_u128() % q;
             let d = Dummy::new(&util::u128_to_bits(x,nbits), &[]);
             {
-                let x = d.garbler_input_bundle_binary(nbits);
-                let z = d.abs(&x);
-                d.output_bundle(&z);
+                let x = d.garbler_input_bundle_binary(None,nbits);
+                let z = d.abs(None,&x);
+                d.output_bundle(None,&z);
             }
             let z = util::u128_from_bits(&d.get_output());
             let should_be = if x >> (nbits-1) > 0 {

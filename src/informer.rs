@@ -176,17 +176,17 @@ impl Informer {
 impl Fancy for Informer {
     type Item = InformerVal;
 
-    fn garbler_input(&self, modulus: u16) -> InformerVal {
+    fn garbler_input(&self, _ix: Option<usize>, modulus: u16) -> InformerVal {
         self.garbler_input_moduli.lock().unwrap().push(modulus);
         InformerVal(modulus)
     }
 
-    fn evaluator_input(&self, modulus: u16) -> InformerVal {
+    fn evaluator_input(&self, _ix: Option<usize>, modulus: u16) -> InformerVal {
         self.evaluator_input_moduli.lock().unwrap().push(modulus);
         InformerVal(modulus)
     }
 
-    fn constant(&self, val: u16, modulus: u16) -> InformerVal {
+    fn constant(&self, _ix: Option<usize>, val: u16, modulus: u16) -> InformerVal {
         self.constants.lock().unwrap().insert((val,modulus));
         InformerVal(modulus)
     }
@@ -208,9 +208,9 @@ impl Fancy for Informer {
         InformerVal(x.modulus())
     }
 
-    fn mul(&self, x: &InformerVal, y: &InformerVal) -> InformerVal {
+    fn mul(&self, ix: Option<usize>, x: &InformerVal, y: &InformerVal) -> InformerVal {
         if x.modulus() < y.modulus() {
-            return self.mul(y,x);
+            return self.mul(ix,y,x);
         }
         *self.nmuls.lock().unwrap() += 1;
         *self.nciphertexts.lock().unwrap() += x.modulus() as usize + y.modulus() as usize - 2;
@@ -221,7 +221,7 @@ impl Fancy for Informer {
         InformerVal(x.modulus())
     }
 
-    fn proj(&self, x: &InformerVal, modulus: u16, tt: &[u16]) -> InformerVal {
+    fn proj(&self, _ix: Option<usize>, x: &InformerVal, modulus: u16, tt: &[u16]) -> InformerVal {
         assert_eq!(tt.len(), x.modulus() as usize);
         assert!(tt.iter().all(|&x| x < modulus));
         *self.nprojs.lock().unwrap() += 1;
@@ -229,7 +229,7 @@ impl Fancy for Informer {
         InformerVal(modulus)
     }
 
-    fn output(&self, x: &InformerVal) {
+    fn output(&self, _ix: Option<usize>, x: &InformerVal) {
         self.outputs.lock().unwrap().push(x.modulus());
     }
 
