@@ -253,6 +253,10 @@ impl Fancy for CircuitBuilder {
     fn output(&self, xref: &CircuitRef) {
         self.circ.lock().unwrap().output_refs.push(xref.clone());
     }
+
+    fn begin_sync(&self, _begin_index: usize, _end_index: usize) { }
+
+    fn finish_index(&self, _index: usize) { }
 }
 
 impl CircuitBuilder {

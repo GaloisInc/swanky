@@ -7,6 +7,7 @@ use crate::fancy::{Fancy, HasModulus};
 use std::sync::{Arc, Mutex};
 
 /// Simple struct that performs the fancy computation over u16.
+#[derive(Debug)]
 pub struct Dummy {
     outputs:          Arc<Mutex<Vec<u16>>>,
     garbler_inputs:   Arc<Mutex<Vec<u16>>>,
@@ -97,6 +98,10 @@ impl Fancy for Dummy {
     fn output(&self, x: &DummyVal) {
         self.outputs.lock().unwrap().push(x.val);
     }
+
+    fn begin_sync(&self, _begin_index: usize, _end_index: usize) { }
+
+    fn finish_index(&self, _index: usize) { }
 }
 
 #[cfg(test)]

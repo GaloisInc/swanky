@@ -52,31 +52,31 @@ impl Evaluator {
     }
 
     /// Decode the output received during the Fancy computation.
-    pub fn decode_output(self) -> Vec<u16> {
-        let cts  = Arc::try_unwrap(self.output_cts).unwrap().into_inner().unwrap();
-        let outs = Arc::try_unwrap(self.output_wires).unwrap().into_inner().unwrap();
-        Decoder::new(cts).decode(&outs)
+    pub fn decode_output(&self) -> Vec<u16> {
+        let cts  = self.output_cts.lock().unwrap();
+        let outs = self.output_wires.lock().unwrap();
+        Decoder::new(cts.clone()).decode(&outs)
     }
 }
 
 impl Fancy for Evaluator {
     type Item = Wire;
 
-    fn garbler_input(&self, _q: u16) -> Wire { //{{{
+    fn garbler_input(&self, _q: u16) -> Wire {
         match self.recv(GateType::Other) {
             Message::GarblerInput(w) => w,
             m => panic!("Expected message GarblerInput but got {}", m),
         }
     }
-    //}}}
-    fn evaluator_input(&self, q: u16) -> Wire { //{{{
+
+    fn evaluator_input(&self, q: u16) -> Wire {
         match self.recv(GateType::EvaluatorInput { modulus: q }) {
             Message::EvaluatorInput(w) => w,
             m => panic!("Expected message EvaluatorInput but got {}", m),
         }
     }
-    //}}}
-    fn constant(&self, x: u16, q: u16) -> Wire { //{{{
+
+    fn constant(&self, x: u16, q: u16) -> Wire {
         match self.constants.read().unwrap().get(&(x,q)) {
             Some(c) => return c.clone(),
             None => (),
@@ -93,20 +93,20 @@ impl Fancy for Evaluator {
         constants.insert((x,q),w.clone());
         w
     }
-    //}}}
-    fn add(&self, x: &Wire, y: &Wire) -> Wire { //{{{
+
+    fn add(&self, x: &Wire, y: &Wire) -> Wire {
         x.plus(y)
     }
-    //}}}
-    fn sub(&self, x: &Wire, y: &Wire) -> Wire { //{{{
+
+    fn sub(&self, x: &Wire, y: &Wire) -> Wire {
         x.minus(y)
     }
-    //}}}
-    fn cmul(&self, x: &Wire, c: u16) -> Wire { //{{{
+
+    fn cmul(&self, x: &Wire, c: u16) -> Wire {
         x.cmul(c)
     }
-    //}}}
-    fn mul(&self, A: &Wire, B: &Wire) -> Wire { //{{{
+
+    fn mul(&self, A: &Wire, B: &Wire) -> Wire {
         if A.modulus() < A.modulus() {
             return self.mul(B,A);
         }
@@ -147,8 +147,8 @@ impl Fancy for Evaluator {
 
         L.plus(&R.plus(&A.cmul(new_b_color)))
     }
-    //}}}
-    fn proj(&self, x: &Wire, q: u16, _tt: &[u16]) -> Wire { //{{{
+
+    fn proj(&self, x: &Wire, q: u16, _tt: &[u16]) -> Wire {
         let gate = match self.recv(GateType::Other) {
             Message::GarbledGate(g) => g,
             m => panic!("Expected message GarbledGate but got {}", m),
@@ -157,13 +157,15 @@ impl Fancy for Evaluator {
         let w = if x.color() == 0 {
             x.hashback(gate_num as u128, q)
         } else {
+            assert!(x.color() as usize - 1 < gate.len(),
+                "[evaluator] wire color greater than gate size! synchronization issue?");
             let ct = gate[x.color() as usize - 1];
             Wire::from_u128(ct ^ x.hash(gate_num as u128), q)
         };
         w
     }
-    //}}}
-    fn output(&self, x: &Wire) { //{{{
+
+    fn output(&self, x: &Wire) {
         match self.recv(GateType::Other) {
             Message::OutputCiphertext(c) => {
                 self.output_cts.lock().unwrap().push(c);
@@ -171,7 +173,11 @@ impl Fancy for Evaluator {
             m => panic!("Expected message OutputCiphertext but got {}", m),
         }
         self.output_wires.lock().unwrap().push(x.clone());
-    } //}}}
+    }
+
+    fn begin_sync(&self, _begin_index: usize, _end_index: usize) { }
+
+    fn finish_index(&self, _index: usize) { }
 }
 
 ////////////////////////////////////////////////////////////////////////////////

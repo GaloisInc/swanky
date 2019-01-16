@@ -81,7 +81,7 @@ impl Garbler {
 impl Fancy for Garbler {
     type Item = Wire;
 
-    fn garbler_input(&self, q: u16) -> Wire { // {{{
+    fn garbler_input(&self, q: u16) -> Wire {
         let w = Wire::rand(&mut rand::thread_rng(), q);
         let d = self.delta(q);
         self.send(Message::UnencodedGarblerInput {
@@ -90,8 +90,8 @@ impl Fancy for Garbler {
         });
         w
     }
-    //}}}
-    fn evaluator_input(&self, q: u16) -> Wire { // {{{
+
+    fn evaluator_input(&self, q: u16) -> Wire {
         let w = Wire::rand(&mut rand::thread_rng(), q);
         let d = self.delta(q);
         self.send(Message::UnencodedEvaluatorInput {
@@ -100,8 +100,8 @@ impl Fancy for Garbler {
         });
         w
     }
-    //}}}
-    fn constant(&self, x: u16, q: u16) -> Wire { // {{{
+
+    fn constant(&self, x: u16, q: u16) -> Wire {
         match self.constants.read().unwrap().get(&(x,q)) {
             Some(c) => return c.clone(),
             None => (),
@@ -120,20 +120,20 @@ impl Fancy for Garbler {
         });
         zero
     }
-    //}}}
-    fn add(&self, x: &Wire, y: &Wire) -> Wire { // {{{
+
+    fn add(&self, x: &Wire, y: &Wire) -> Wire {
         x.plus(y)
     }
-    //}}}
-    fn sub(&self, x: &Wire, y: &Wire) -> Wire { // {{{
+
+    fn sub(&self, x: &Wire, y: &Wire) -> Wire {
         x.minus(y)
     }
-    //}}}
-    fn cmul(&self, x: &Wire, c: u16)  -> Wire { // {{{
+
+    fn cmul(&self, x: &Wire, c: u16)  -> Wire {
         x.cmul(c)
     }
-    //}}}
-    fn mul(&self, A: &Wire, B: &Wire) -> Wire { // {{{
+
+    fn mul(&self, A: &Wire, B: &Wire) -> Wire {
         if A.modulus() < A.modulus() {
             return self.mul(B,A);
         }
@@ -250,8 +250,8 @@ impl Fancy for Garbler {
 
         X.plus(&Y)
     }
-    // }}}
-    fn proj(&self, A: &Wire, q_out: u16, tt: &[u16]) -> Wire { // {{{
+
+    fn proj(&self, A: &Wire, q_out: u16, tt: &[u16]) -> Wire { //
         let q_in = A.modulus();
         // we have to fill in the vector in an unkonwn order because of the color bits.
         // Since some of the values in gate will be void temporarily, we use Vec<Option<..>>
@@ -303,8 +303,8 @@ impl Fancy for Garbler {
 
         C
     }
-    // }}}
-    fn output(&self, X: &Wire) { // {{{
+
+    fn output(&self, X: &Wire) {
         let mut cts = Vec::new();
         let q = X.modulus();
         let i = self.current_output();
@@ -315,7 +315,10 @@ impl Fancy for Garbler {
         }
         self.send(Message::OutputCiphertext(cts));
     }
-    // }}}
+
+    fn begin_sync(&self, _begin_index: usize, _end_index: usize) { }
+
+    fn finish_index(&self, _index: usize) { }
 }
 
 #[cfg(test)]

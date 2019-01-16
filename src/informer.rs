@@ -232,6 +232,10 @@ impl Fancy for Informer {
     fn output(&self, x: &InformerVal) {
         self.outputs.lock().unwrap().push(x.modulus());
     }
+
+    fn begin_sync(&self, _begin_index: usize, _end_index: usize) { }
+
+    fn finish_index(&self, _index: usize) { }
 }
 
 #[cfg(test)]

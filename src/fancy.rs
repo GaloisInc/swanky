@@ -78,6 +78,15 @@ pub trait Fancy {
     fn output(&self, x: &Self::Item);
 
     ////////////////////////////////////////////////////////////////////////////////
+    // synchronization
+
+    /// Start synchronization of internal messages.
+    fn begin_sync(&self, start_index: usize, end_index: usize);
+
+    /// Declare this index to be done.
+    fn finish_index(&self, index: usize);
+
+    ////////////////////////////////////////////////////////////////////////////////
     // Functions built on top of basic fancy operations.
 
     /// Create `n` garbler inputs with modulus `q`.

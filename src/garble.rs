@@ -558,20 +558,15 @@ mod streaming {
     use rand::thread_rng;
     use itertools::Itertools;
 
-    const Q: u16 = 103;
-
     // helper {{{
-    fn streaming_test(
-        garbler_computation: fn(&Garbler),
-        evaluator_computation: fn(&Evaluator),
-        garbler_input: &[u16],
-        evaluator_input: &[u16],
-        should_be: &[u16]
-    ) {
-        let mut gb_iter = garble_iter(garbler_computation);
+    fn streaming_test<F,G>(gb_f: F, mut ev_f: G, gb_inp: &[u16], ev_inp: &[u16], should_be: &[u16])
+      where F: FnMut(&Garbler) + Send + 'static,
+            G: FnMut(&Evaluator)
+    {
+        let mut gb_iter = garble_iter(gb_f);
 
-        let mut gb_inp_iter = garbler_input.to_vec().into_iter();
-        let mut ev_inp_iter = evaluator_input.to_vec().into_iter();
+        let mut gb_inp_iter = gb_inp.to_vec().into_iter();
+        let mut ev_inp_iter = ev_inp.to_vec().into_iter();
 
         // the evaluator's recv_function gets the next message from the garble iterator,
         // encodes the appropriate inputs, and sends it along
@@ -593,17 +588,17 @@ mod streaming {
         };
 
         let mut ev = Evaluator::new(recv_func);
-        evaluator_computation(&mut ev);
+        ev_f(&mut ev);
 
         let result = ev.decode_output();
-        println!("gb_inp={:?} ev_inp={:?}", garbler_input, evaluator_input);
+        println!("gb_inp={:?} ev_inp={:?}", gb_inp, ev_inp);
         assert_eq!(result, should_be)
     }
 //}}}
-    fn fancy_addition<W: Clone + Default + HasModulus>(b: &dyn Fancy<Item=W>) //{{{
+    fn fancy_addition<W: Clone + Default + HasModulus>(b: &dyn Fancy<Item=W>, q: u16) //{{{
     {
-        let x = b.garbler_input(Q);
-        let y = b.evaluator_input(Q);
+        let x = b.garbler_input(q);
+        let y = b.evaluator_input(q);
         let z = b.add(&x,&y);
         b.output(&z);
     }
@@ -612,16 +607,17 @@ mod streaming {
     fn addition() {
         let mut rng = thread_rng();
         for _ in 0..16 {
-            let x = rng.gen_u16() % Q;
-            let y = rng.gen_u16() % Q;
-            streaming_test(|b| fancy_addition(b), |b| fancy_addition(b), &[x], &[y], &[(x+y)%Q]);
+            let q = rng.gen_modulus();
+            let x = rng.gen_u16() % q;
+            let y = rng.gen_u16() % q;
+            streaming_test(move |b| fancy_addition(b,q), move |b| fancy_addition(b,q), &[x], &[y], &[(x+y)%q]);
         }
     }
 //}}}
-    fn fancy_subtraction<W: Clone + Default + HasModulus>(b: &dyn Fancy<Item=W>) //{{{
+    fn fancy_subtraction<W: Clone + Default + HasModulus>(b: &dyn Fancy<Item=W>, q: u16) //{{{
     {
-        let x = b.garbler_input(Q);
-        let y = b.evaluator_input(Q);
+        let x = b.garbler_input(q);
+        let y = b.evaluator_input(q);
         let z = b.sub(&x,&y);
         b.output(&z);
     }
@@ -630,16 +626,17 @@ mod streaming {
     fn subtraction() {
         let mut rng = thread_rng();
         for _ in 0..16 {
-            let x = rng.gen_u16() % Q;
-            let y = rng.gen_u16() % Q;
-            streaming_test(|b| fancy_subtraction(b), |b| fancy_subtraction(b), &[x], &[y], &[(Q+x-y)%Q]);
+            let q = rng.gen_modulus();
+            let x = rng.gen_u16() % q;
+            let y = rng.gen_u16() % q;
+            streaming_test(move |b| fancy_subtraction(b,q), move |b| fancy_subtraction(b,q), &[x], &[y], &[(q+x-y)%q]);
         }
     }
 //}}}
-    fn fancy_multiplication<W: Clone + Default + HasModulus>(b: &dyn Fancy<Item=W>) // {{{
+    fn fancy_multiplication<W: Clone + Default + HasModulus>(b: &dyn Fancy<Item=W>, q: u16) // {{{
     {
-        let x = b.garbler_input(Q);
-        let y = b.evaluator_input(Q);
+        let x = b.garbler_input(q);
+        let y = b.evaluator_input(q);
         let z = b.mul(&x,&y);
         b.output(&z);
     }
@@ -648,15 +645,16 @@ mod streaming {
     fn multiplication() {
         let mut rng = thread_rng();
         for _ in 0..16 {
-            let x = rng.gen_u16() % Q;
-            let y = rng.gen_u16() % Q;
-            streaming_test(|b| fancy_multiplication(b), |b| fancy_multiplication(b), &[x], &[y], &[(x*y)%Q]);
+            let q = rng.gen_modulus();
+            let x = rng.gen_u16() % q;
+            let y = rng.gen_u16() % q;
+            streaming_test(move |b| fancy_multiplication(b,q), move |b| fancy_multiplication(b,q), &[x], &[y], &[(x*y)%q]);
         }
     }
 //}}}
-    fn fancy_cmul<W: Clone + Default + HasModulus>(b: &dyn Fancy<Item=W>) // {{{
+    fn fancy_cmul<W: Clone + Default + HasModulus>(b: &dyn Fancy<Item=W>, q: u16) // {{{
     {
-        let x = b.garbler_input(Q);
+        let x = b.garbler_input(q);
         let z = b.cmul(&x,5);
         b.output(&z);
     }
@@ -665,16 +663,17 @@ mod streaming {
     fn cmul() {
         let mut rng = thread_rng();
         for _ in 0..16 {
-            let x = rng.gen_u16() % Q;
-            streaming_test(|b| fancy_cmul(b), |b|fancy_cmul(b), &[x], &[], &[(x*5)%Q]);
+            let q = rng.gen_modulus();
+            let x = rng.gen_u16() % q;
+            streaming_test(move |b| fancy_cmul(b,q), move |b|fancy_cmul(b,q), &[x], &[], &[(x*5)%q]);
         }
     }
 //}}}
-    fn fancy_projection<W: Clone + Default + HasModulus>(b: &dyn Fancy<Item=W>) // {{{
+    fn fancy_projection<W: Clone + Default + HasModulus>(b: &dyn Fancy<Item=W>, q: u16) // {{{
     {
-        let x = b.garbler_input(Q);
-        let tab = (0..Q).map(|i| (i + 1) % Q).collect_vec();
-        let z = b.proj(&x,Q,&tab);
+        let x = b.garbler_input(q);
+        let tab = (0..q).map(|i| (i + 1) % q).collect_vec();
+        let z = b.proj(&x,q,&tab);
         b.output(&z);
     }
 
@@ -682,9 +681,90 @@ mod streaming {
     fn proj() {
         let mut rng = thread_rng();
         for _ in 0..16 {
-            let x = rng.gen_u16() % Q;
-            streaming_test(|b|fancy_projection(b), |b|fancy_projection(b), &[x], &[], &[(x+1)%Q]);
+            let q = rng.gen_modulus();
+            let x = rng.gen_u16() % q;
+            streaming_test(move |b|fancy_projection(b,q), move |b|fancy_projection(b,q), &[x], &[], &[(x+1)%q]);
         }
     }
 //}}}
+}
+
+#[cfg(test)]
+mod parallel {
+    use super::*;
+    use itertools::Itertools;
+    use crate::fancy::BundleGadgets;
+    use crate::dummy::Dummy;
+    use rand::thread_rng;
+    use crate::util::RngExt;
+
+    fn parallel_gadgets<F,W>(b: &F, Q: u128, N: usize)
+      where W: Clone + Default + HasModulus + Send + Sync,
+            F: Fancy<Item=W> + Send + Sync,
+     {
+        crossbeam::scope(|scope| {
+            let inps = b.garbler_input_bundles_crt(Q, N);
+
+            b.begin_sync(0,N);
+            let handles = inps.into_iter().enumerate().map(|(i,inp)| {
+                scope.spawn(move |_| {
+                    let z = b.exact_sign(&inp);
+                    b.finish_index(i);
+                    z
+                })
+            }).collect_vec(); // start the threads
+
+            for h in handles.into_iter() {
+                let z = h.join().unwrap();
+                b.output(&z);
+            }
+        }).unwrap();
+    }
+
+    #[test]
+    fn parallel_test() {
+        let mut rng = thread_rng();
+        let Q = crate::util::modulus_with_width(10);
+        let N = 10;
+        for _ in 0..16 {
+            let input = (0..N).flat_map(|_| {
+                let x = rng.gen_u128() % Q;
+                crate::util::crt_factor(x,Q)
+            }).collect_vec();
+
+            // compute the correct answer using Dummy (which cannot get out of sync)
+            let dummy = Dummy::new(&input, &[]);
+            parallel_gadgets(&dummy, Q, N);
+            let should_be = dummy.get_output();
+
+            // set up garbler and evaluator
+            let (tx, rx) = std::sync::mpsc::channel();
+
+            let mut input_iter = input.into_iter();
+            let send_func = move |m| {
+                let m = match m {
+                    Message::UnencodedGarblerInput { zero, delta } => {
+                        let x = input_iter.next().unwrap();
+                        let w = zero.plus(&delta.cmul(x));
+                        Message::GarblerInput(w)
+                    }
+                    _ => m,
+                };
+                tx.send(m).unwrap();
+            };
+
+            // put garbler on another thread
+            std::thread::spawn(move || {
+                let garbler = Garbler::new(send_func);
+                parallel_gadgets(&garbler, Q, N);
+            });
+
+            // run the evaluator on this one
+            let evaluator = Evaluator::new(move |_| rx.recv().unwrap());
+            parallel_gadgets(&evaluator, Q, N);
+
+            let result = evaluator.decode_output();
+            assert_eq!(result, should_be);
+        }
+    }
 }
