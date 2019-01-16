@@ -1,15 +1,12 @@
-use super::{EllipticCurveOT, ObliviousTransfer};
-use aesni::Aes128;
-use aesni::block_cipher_trait::BlockCipher;
-use aesni::block_cipher_trait::generic_array::GenericArray;
-use std::io::{Error, ErrorKind, Read, Write};
-use rand::rngs::ThreadRng;
+use super::{ObliviousTransfer, Stream};
 use curve25519_dalek::constants;
-use curve25519_dalek::scalar::Scalar;
 use curve25519_dalek::ristretto::RistrettoPoint;
+use curve25519_dalek::scalar::Scalar;
+use rand::rngs::ThreadRng;
+use std::io::{Error, Read, Write};
 
 pub struct ChouOrlandiOT<T: Read + Write> {
-    ot: EllipticCurveOT<T>,
+    stream: Stream<T>,
     rng: ThreadRng,
 }
 
@@ -17,58 +14,43 @@ const P: RistrettoPoint = constants::RISTRETTO_BASEPOINT_POINT;
 
 impl<T: Read + Write> ChouOrlandiOT<T> {
     pub fn new(stream: T) -> Self {
-        let ot = EllipticCurveOT::new(stream);
+        let stream = Stream::new(stream);
         let rng = rand::thread_rng();
-        Self { ot, rng }
+        Self { stream, rng }
     }
 }
 
-impl<T: Read + Write> ObliviousTransfer for ChouOrlandiOT<T>
-{
-    fn send(&mut self, values: Vec<u128>) -> Result<(), Error> {
-        if values.len() != 2 {
-            return Err(Error::new(ErrorKind::InvalidInput, "Number of values must be two"));
-        }
+impl<T: Read + Write> ObliviousTransfer for ChouOrlandiOT<T> {
+    fn send(&mut self, values: (&[u8], &[u8])) -> Result<(), Error> {
+        let length = std::cmp::max(values.0.len(), values.1.len());
         let a = Scalar::random(&mut self.rng);
         let a_ = P * a;
-        self.ot.write_pt(&a_)?;
-        let b_ = self.ot.read_pt()?;
-        let k0 = self.ot.hash_pt(&(b_ * a));
-        let k1 = self.ot.hash_pt(&((b_ - a_) * a));
-        let cipher0 = Aes128::new(GenericArray::from_slice(&k0.to_ne_bytes()));
-        let cipher1 = Aes128::new(GenericArray::from_slice(&k1.to_ne_bytes()));
-        let mut m0 = GenericArray::clone_from_slice(&values[0].to_ne_bytes());
-        let mut m1 = GenericArray::clone_from_slice(&values[1].to_ne_bytes());
-        cipher0.encrypt_block(&mut m0);
-        cipher1.encrypt_block(&mut m1);
-        let c0 = array_ref!(m0.as_slice(), 0, 16);
-        self.ot.write_u128(&u128::from_ne_bytes(*c0))?;
-        let c1 = array_ref!(m1.as_slice(), 0, 16);
-        self.ot.write_u128(&u128::from_ne_bytes(*c1))?;
+        self.stream.write_pt(&a_)?;
+        let b_ = self.stream.read_pt()?;
+        let k0 = super::hash_pt(&(b_ * a), length);
+        let k1 = super::hash_pt(&((b_ - a_) * a), length);
+        let m0 = super::encrypt(&k0, &values.0);
+        let m1 = super::encrypt(&k1, &values.1);
+        self.stream.write_bytes(&m0)?;
+        self.stream.write_bytes(&m1)?;
         Ok(())
     }
 
-    fn receive(&mut self, input: usize) -> Result<u128, Error> {
-        if input != 0 && input != 1 {
-            return Err(Error::new(ErrorKind::InvalidInput, "Input must be zero or one"));
-        }
+    fn receive(&mut self, input: bool, length: usize) -> Result<Vec<u8>, Error> {
         let b = Scalar::random(&mut self.rng);
-        let a_ = self.ot.read_pt()?;
-        let b_ = match input {  // XXX: Timing attack!
-            0 => P * b,
-            1 => a_ + P * b,
-            _ => panic!()
+        let a_ = self.stream.read_pt()?;
+        let b_ = match input {
+            // XXX: Timing attack!
+            false => P * b,
+            true => a_ + P * b,
         };
-        self.ot.write_pt(&b_)?;
-        let kr = self.ot.hash_pt(&(a_ * b));
-        let cipher = Aes128::new(GenericArray::from_slice(&kr.to_ne_bytes()));
-        let c_0 = self.ot.read_u128()?;
-        let c_1 = self.ot.read_u128()?;
-        let c = if input == 1 { c_1 } else { c_0 };
-        let mut c = GenericArray::clone_from_slice(&c.to_ne_bytes());
-        cipher.decrypt_block(&mut c);
-        let m = array_ref!(c.as_slice(), 0, 16);
-        Ok(u128::from_ne_bytes(*m))
+        self.stream.write_pt(&b_)?;
+        let kr = super::hash_pt(&(a_ * b), length);
+        let c_0 = self.stream.read_bytes(length)?;
+        let c_1 = self.stream.read_bytes(length)?;
+        let c = if input { &c_1 } else { &c_0 };
+        let m = super::decrypt(&kr, &c);
+        Ok(m.to_vec())
     }
 }
 
@@ -79,24 +61,26 @@ mod tests {
     use std::os::unix::net::UnixStream;
     use test::Bencher;
 
+    const N: usize = 16;
+
     #[test]
     fn test() {
-        let m0 = rand::random::<u128>();
-        let m1 = rand::random::<u128>();
+        let m0 = rand::random::<[u8; N]>();
+        let m1 = rand::random::<[u8; N]>();
         let b = rand::random::<bool>();
         let (sender, receiver) = match UnixStream::pair() {
             Ok((s1, s2)) => (s1, s2),
             Err(e) => {
                 eprintln!("Couldn't create pair of sockets: {:?}", e);
-                return
+                return;
             }
         };
         std::thread::spawn(move || {
             let mut ot = ChouOrlandiOT::new(sender);
-            ot.send(vec![m0, m1]).unwrap();
+            ot.send((&m0, &m1)).unwrap();
         });
         let mut ot = ChouOrlandiOT::new(receiver);
-        let result = ot.receive(b as usize).unwrap();
+        let result = ot.receive(b, N).unwrap();
         assert_eq!(result, if b { m1 } else { m0 });
     }
 

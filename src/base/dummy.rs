@@ -1,35 +1,29 @@
-use super::ObliviousTransfer;
-use std::io::{Error, ErrorKind, Read, Write};
-use std::sync::{Arc, Mutex};
+use super::{ObliviousTransfer, Stream};
+use std::io::{Error, Read, Write};
 
 pub struct DummyOT<T: Read + Write> {
-    stream: Arc<Mutex<T>>,
+    stream: Stream<T>,
 }
 
 impl<T: Read + Write> DummyOT<T> {
-    pub fn new(stream: Arc<Mutex<T>>) -> Self {
+    pub fn new(stream: T) -> Self {
+        let stream = Stream::new(stream);
         Self { stream }
     }
 }
 
-impl<T: Read + Write> ObliviousTransfer for DummyOT<T>
-{
-    fn send(&mut self, values: Vec<u128>) -> Result<(), Error> {
-        let mut input = [0; 8];
-        self.stream.lock().unwrap().read_exact(&mut input)?;
-        let input = usize::from_ne_bytes(input);
-        if input >= values.len() {
-            return Err(Error::new(ErrorKind::InvalidInput, "Invalid input length"));
-        }
-        self.stream.lock().unwrap().write(&u128::to_ne_bytes(values[input]))?;
+impl<T: Read + Write> ObliviousTransfer for DummyOT<T> {
+    fn send(&mut self, values: (&[u8], &[u8])) -> Result<(), Error> {
+        let input = self.stream.read_bool()?;
+        self.stream
+            .write_bytes(if input { values.1 } else { values.0 })?;
         Ok(())
     }
 
-    fn receive(&mut self, input: usize) -> Result<u128, Error> {
-        let mut output = [0; 16];
-        self.stream.lock().unwrap().write(&usize::to_ne_bytes(input))?;
-        self.stream.lock().unwrap().read_exact(&mut output)?;
-        Ok(u128::from_ne_bytes(output))
+    fn receive(&mut self, input: bool, length: usize) -> Result<Vec<u8>, Error> {
+        self.stream.write_bool(input)?;
+        let output = self.stream.read_bytes(length)?;
+        Ok(output)
     }
 }
 
@@ -42,22 +36,22 @@ mod tests {
 
     #[test]
     fn test() {
-        let m0 = rand::random::<u128>();
-        let m1 = rand::random::<u128>();
+        let m0 = rand::random::<[u8; 8]>();
+        let m1 = rand::random::<[u8; 8]>();
         let b = rand::random::<bool>();
         let (sender, receiver) = match UnixStream::pair() {
             Ok((s1, s2)) => (s1, s2),
             Err(e) => {
                 eprintln!("Couldn't create pair of sockets: {:?}", e);
-                return
+                return;
             }
         };
         std::thread::spawn(move || {
-            let mut ot = DummyOT::new(Arc::new(Mutex::new(sender)));
-            ot.send(vec![m0, m1]).unwrap();
+            let mut ot = DummyOT::new(sender);
+            ot.send((&m0, &m1)).unwrap();
         });
-        let mut ot = DummyOT::new(Arc::new(Mutex::new(receiver)));
-        let result = ot.receive(b as usize).unwrap();
+        let mut ot = DummyOT::new(receiver);
+        let result = ot.receive(b, 8).unwrap();
         assert_eq!(result, if b { m1 } else { m0 });
     }
 
