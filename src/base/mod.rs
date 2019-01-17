@@ -5,13 +5,14 @@ pub mod naor_pinkas;
 use aesni::block_cipher_trait::generic_array::GenericArray;
 use aesni::block_cipher_trait::BlockCipher;
 use aesni::Aes128;
+use bitvec::BitVec;
 use curve25519_dalek::ristretto::{CompressedRistretto, RistrettoPoint};
 use std::io::{Error, ErrorKind, Read, Write};
 use std::sync::{Arc, Mutex, MutexGuard};
 
 pub trait ObliviousTransfer {
-    fn send(&mut self, values: (&[u8], &[u8])) -> Result<(), Error>;
-    fn receive(&mut self, input: bool, length: usize) -> Result<Vec<u8>, Error>;
+    fn send(&mut self, values: (&BitVec, &BitVec)) -> Result<(), Error>;
+    fn receive(&mut self, input: bool, nbits: usize) -> Result<BitVec, Error>;
 }
 
 struct Stream<T: Read + Write> {
@@ -23,7 +24,6 @@ impl<T: Read + Write> Stream<T> {
         let stream = Arc::new(Mutex::new(stream));
         Self { stream }
     }
-
     #[inline(always)]
     fn stream(&mut self) -> MutexGuard<T> {
         self.stream.lock().unwrap()
@@ -48,8 +48,8 @@ impl<T: Read + Write> Stream<T> {
         Ok(pt)
     }
     #[inline(always)]
-    fn write_bool(&mut self, b: bool) -> Result<usize, Error> {
-        self.stream().write(&[b as u8])
+    fn write_bool(&mut self, b: &bool) -> Result<usize, Error> {
+        self.stream().write(&[*b as u8])
     }
     #[inline(always)]
     fn read_bool(&mut self) -> Result<bool, Error> {
@@ -62,11 +62,37 @@ impl<T: Read + Write> Stream<T> {
         self.stream().write(bytes)
     }
     #[inline(always)]
-    fn read_bytes(&mut self, length: usize) -> Result<Vec<u8>, Error> {
-        let mut bytes = vec![0; length];
+    fn read_bytes(&mut self, nbytes: usize) -> Result<Vec<u8>, Error> {
+        let mut bytes = vec![0; nbytes];
         self.stream().read_exact(&mut bytes)?;
         Ok(bytes)
     }
+    #[inline(always)]
+    fn write_bitvec(&mut self, bytes: &BitVec) -> Result<usize, Error> {
+        self.stream().write(&(bitvec_to_vec(bytes)))
+    }
+    #[inline(always)]
+    fn read_bitvec(&mut self, nbits: usize) -> Result<BitVec, Error> {
+        let mut bytes = vec![0; nbits / 8];
+        self.stream().read_exact(&mut bytes)?;
+        Ok(BitVec::from(bytes))
+    }
+}
+
+fn bitvec_to_vec(bytes: &BitVec) -> Vec<u8> {
+    let v = bytes.clone().into_iter().collect::<Vec<bool>>();
+    let v = v
+        .into_boxed_slice()
+        .chunks(8)
+        .map(|bits| {
+            let b = bits.into_iter().enumerate().fold(0u8, |acc, (i, b)| {
+                let acc = acc ^ (u8::from(*b) << (7 - i));
+                acc
+            });
+            b
+        })
+        .collect::<Vec<u8>>();
+    v
 }
 
 #[inline(always)]

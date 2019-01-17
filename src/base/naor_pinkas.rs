@@ -1,4 +1,5 @@
 use super::{ObliviousTransfer, Stream};
+use bitvec::BitVec;
 use curve25519_dalek::constants;
 use curve25519_dalek::ristretto::RistrettoPoint;
 use curve25519_dalek::scalar::Scalar;
@@ -22,8 +23,8 @@ impl<T: Read + Write> NaorPinkasOT<T> {
 }
 
 impl<T: Read + Write> ObliviousTransfer for NaorPinkasOT<T> {
-    fn send(&mut self, values: (&[u8], &[u8])) -> Result<(), Error> {
-        let length = max(values.0.len(), values.1.len());
+    fn send(&mut self, values: (&BitVec, &BitVec)) -> Result<(), Error> {
+        let length = max(values.0.len() / 8, values.1.len() / 8);
         let c = RistrettoPoint::random(&mut self.rng);
         self.stream.write_pt(&c)?;
         let pk0 = self.stream.read_pt()?;
@@ -33,9 +34,9 @@ impl<T: Read + Write> ObliviousTransfer for NaorPinkasOT<T> {
         let e00 = P * r0;
         let e10 = P * r1;
         let h = super::hash_pt(&(pk0 * r0), length);
-        let e01 = super::xor(&h, values.0);
+        let e01 = super::xor(&h, &super::bitvec_to_vec(&values.0));
         let h = super::hash_pt(&(pk1 * r1), length);
-        let e11 = super::xor(&h, values.1);
+        let e11 = super::xor(&h, &super::bitvec_to_vec(&values.1));
         self.stream.write_pt(&e00)?;
         self.stream.write_bytes(&e01)?;
         self.stream.write_pt(&e10)?;
@@ -43,7 +44,8 @@ impl<T: Read + Write> ObliviousTransfer for NaorPinkasOT<T> {
         Ok(())
     }
 
-    fn receive(&mut self, input: bool, length: usize) -> Result<Vec<u8>, Error> {
+    fn receive(&mut self, input: bool, nbits: usize) -> Result<BitVec, Error> {
+        let nbytes = nbits / 8;
         let c = self.stream.read_pt()?;
         let k = Scalar::random(&mut self.rng);
         let pkσ = P * k;
@@ -53,16 +55,16 @@ impl<T: Read + Write> ObliviousTransfer for NaorPinkasOT<T> {
             true => self.stream.write_pt(&pkσ_)?,
         };
         let e00 = self.stream.read_pt()?;
-        let e01 = self.stream.read_bytes(length)?;
+        let e01 = self.stream.read_bytes(nbytes)?;
         let e10 = self.stream.read_pt()?;
-        let e11 = self.stream.read_bytes(length)?;
+        let e11 = self.stream.read_bytes(nbytes)?;
         let (eσ0, eσ1) = match input {
             false => (e00, e01),
             true => (e10, e11),
         };
-        let h = super::hash_pt(&(eσ0 * k), length);
+        let h = super::hash_pt(&(eσ0 * k), nbits / 8);
         let result = super::xor(&h, &eσ1);
-        Ok(result)
+        Ok(BitVec::from(result))
     }
 }
 
@@ -79,6 +81,10 @@ mod tests {
     fn test() {
         let m0 = rand::random::<[u8; N]>();
         let m1 = rand::random::<[u8; N]>();
+        let m0 = BitVec::from(m0.to_vec());
+        let m1 = BitVec::from(m1.to_vec());
+        let m0_ = m0.clone();
+        let m1_ = m1.clone();
         let b = rand::random::<bool>();
         let (sender, receiver) = match UnixStream::pair() {
             Ok((s1, s2)) => (s1, s2),
@@ -92,8 +98,8 @@ mod tests {
             ot.send((&m0, &m1)).unwrap();
         });
         let mut ot = NaorPinkasOT::new(receiver);
-        let result = ot.receive(b, N).unwrap();
-        assert_eq!(result, if b { m1 } else { m0 });
+        let result = ot.receive(b, N * 8).unwrap();
+        assert_eq!(result, if b { m1_ } else { m0_ });
     }
 
     #[bench]
