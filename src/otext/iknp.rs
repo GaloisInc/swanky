@@ -3,8 +3,7 @@ use crate::base::ObliviousTransfer;
 use bitvec::BitVec;
 use rand::rngs::ThreadRng;
 use rand::Rng;
-use std::collections::hash_map::DefaultHasher; // XXX
-use std::hash::{Hash, Hasher};
+use sha2::{Digest, Sha256};
 use std::io::{Error, Read, Write};
 
 pub struct IKNP<S: Read + Write, OT: ObliviousTransfer> {
@@ -22,7 +21,7 @@ impl<S: Read + Write, OT: ObliviousTransfer> IKNP<S, OT> {
 }
 
 impl<S: Read + Write, OT: ObliviousTransfer> OTExtension<OT> for IKNP<S, OT> {
-    fn send(&mut self, values: Vec<(u128, u128)>) -> Result<(), Error> {
+    fn send(&mut self, values: &[(u128, u128)]) -> Result<(), Error> {
         let m = values.len();
         let s = (0..128).map(|_| self.rng.gen::<bool>()).collect::<BitVec>();
         let mut rs = Vec::with_capacity(128);
@@ -44,14 +43,14 @@ impl<S: Read + Write, OT: ObliviousTransfer> OTExtension<OT> for IKNP<S, OT> {
         Ok(())
     }
 
-    fn receive(&mut self, input: Vec<bool>) -> Result<Vec<u128>, Error> {
+    fn receive(&mut self, input: &[bool]) -> Result<Vec<u128>, Error> {
         let m = input.len();
-        let r = input.into_iter().collect::<BitVec>();
+        let r = input.iter().cloned().collect::<BitVec>();
         let ts = (0..128)
             .map(|_| (0..m).map(|_| self.rng.gen::<bool>()).collect::<BitVec>())
             .collect::<Vec<BitVec>>();
         for t in ts.iter() {
-            self.ot.send((&t.clone(), &(t.clone() ^ r.clone())))?;
+            self.ot.send((&t, &(t.clone() ^ r.clone())))?;
         }
         let mut ts_ = Vec::with_capacity(m);
         for i in 0..128 {
@@ -70,9 +69,12 @@ impl<S: Read + Write, OT: ObliviousTransfer> OTExtension<OT> for IKNP<S, OT> {
 }
 
 fn hash(idx: usize, q: &BitVec) -> u128 {
-    let mut h = DefaultHasher::new();
-    q.hash(&mut h);
-    h.finish().into()
+    let mut h = Sha256::new();
+    h.input(idx.to_ne_bytes());
+    h.input(q);
+    let result = h.result();
+    let result = array_ref![result, 0, 16];
+    u128::from_ne_bytes(result.clone())
 }
 
 #[cfg(test)]
@@ -126,13 +128,15 @@ mod tests {
         std::thread::spawn(move || {
             let ot = DummyOT::new(sender_);
             let mut otext = IKNP::new(sender, ot);
-            otext
-                .send(m0s.into_iter().zip(m1s.into_iter()).collect())
-                .unwrap();
+            let ms = m0s
+                .into_iter()
+                .zip(m1s.into_iter())
+                .collect::<Vec<(u128, u128)>>();
+            otext.send(&ms).unwrap();
         });
         let ot = DummyOT::new(receiver_);
         let mut otext = IKNP::new(receiver, ot);
-        let results = otext.receive(bs).unwrap();
+        let results = otext.receive(&bs).unwrap();
         for (b, result, m0, m1) in itertools::izip!(bs_, results, m0s_, m1s_) {
             assert_eq!(result, if b { m1 } else { m0 })
         }

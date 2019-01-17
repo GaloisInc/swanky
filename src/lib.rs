@@ -2,6 +2,8 @@
 #![feature(test)]
 
 #[macro_use]
+extern crate arrayref;
+#[macro_use]
 extern crate itertools;
 
 pub mod base;

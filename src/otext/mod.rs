@@ -5,8 +5,8 @@ use std::io::{Error, Read, Write};
 use std::sync::{Arc, Mutex, MutexGuard};
 
 pub trait OTExtension<OT: ObliviousTransfer> {
-    fn send(&mut self, values: Vec<(u128, u128)>) -> Result<(), Error>;
-    fn receive(&mut self, input: Vec<bool>) -> Result<Vec<u128>, Error>;
+    fn send(&mut self, values: &[(u128, u128)]) -> Result<(), Error>;
+    fn receive(&mut self, input: &[bool]) -> Result<Vec<u128>, Error>;
 }
 
 struct Stream<T: Read + Write> {
