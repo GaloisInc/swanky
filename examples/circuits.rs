@@ -10,22 +10,19 @@ fn main() {
     // half-gate
     let b = CircuitBuilder::new();
     let q = rng.gen_prime();
-    let x = b.garbler_input(q);
-    let y = b.evaluator_input(q);
-    let z = b.mul(&x,&y);
-    b.output(&z);
+    let x = b.garbler_input(None, q);
+    let y = b.evaluator_input(None, q);
+    let z = b.mul(None, &x,&y);
+    b.output(None, &z);
     let c = b.finish();
     c.to_file("half_gate.json").unwrap();
 
     // and-gate-fan-n
     let b = CircuitBuilder::new();
-    let mut inps = Vec::new();
     let n = 2 + (rng.gen_usize() % 200);
-    for _ in 0..n {
-        inps.push(b.garbler_input(2));
-    }
-    let z = b.and_many(&inps);
-    b.output(&z);
+    let inps = b.garbler_inputs(None, 2, n);
+    let z = b.and_many(None, &inps);
+    b.output(None, &z);
     let c = b.finish();
     c.to_file("and_gate_fan_n.json").unwrap()
 }

@@ -9,19 +9,19 @@ fn main() {
 
     println!("binary comparison with {} bit inputs", nbits);
     let binary = Informer::new();
-    let x = binary.garbler_input_bundle(&vec![2;nbits]);
-    let y = binary.evaluator_input_bundle(&vec![2;nbits]);
-    let z = binary.exact_lt(&x,&y);
-    binary.output(&z);
+    let x = binary.garbler_input_bundle(None, &vec![2;nbits]);
+    let y = binary.evaluator_input_bundle(None, &vec![2;nbits]);
+    let z = binary.exact_lt(None, &x,&y);
+    binary.output(None, &z);
     binary.print_info();
     println!("");
 
     let ps = primes_with_width(nbits as u32);
     println!("arithmetic comparison with {} primes", ps.len());
     let arith = Informer::new();
-    let x = arith.garbler_input_bundle(&ps);
-    let y = arith.evaluator_input_bundle(&ps);
-    let z = arith.exact_lt(&x,&y);
-    arith.output(&z);
+    let x = arith.garbler_input_bundle(None, &ps);
+    let y = arith.evaluator_input_bundle(None, &ps);
+    let z = arith.exact_lt(None, &x,&y);
+    arith.output(None, &z);
     arith.print_info();
 }

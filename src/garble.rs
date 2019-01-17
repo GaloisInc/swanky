@@ -21,7 +21,7 @@ pub type GarbledGate = Vec<u128>;
 pub type OutputCiphertext = Vec<u128>;
 
 /// The outputs that can be emitted by a Garbler and consumed by an Evaluator.
-#[derive(Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 pub enum Message {
     /// Zero wire and delta for one of the garbler's inputs.
     ///
@@ -51,15 +51,6 @@ pub enum Message {
     OutputCiphertext(OutputCiphertext),
 }
 
-/// Type of a gate, input to the Evaluator's recv function.
-pub enum GateType {
-    /// The Evaluator in 2PC needs to know to do OT for their own inputs. This as input to
-    /// the recv function means the current gate is an evaluator input.
-    EvaluatorInput { modulus: u16 },
-    /// Some other kind of gate that does not require special OT.
-    Other,
-}
-
 impl std::fmt::Display for Message {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         f.write_str(match self {
@@ -83,6 +74,15 @@ impl Message {
         bincode::deserialize(bs)
             .map_err(|_| failure::err_msg("error decoding Message from bytes"))
     }
+}
+
+/// Type of a gate, input to the Evaluator's recv function.
+pub enum GateType {
+    /// The Evaluator in 2PC needs to know to do OT for their own inputs. This as input to
+    /// the recv function means the current gate is an evaluator input.
+    EvaluatorInput { modulus: u16 },
+    /// Some other kind of gate that does not require special OT.
+    Other,
 }
 
 /// Create an iterator over the messages produced by fancy garbling.
@@ -559,11 +559,10 @@ mod streaming {
     use itertools::Itertools;
 
     // helper {{{
-    fn streaming_test<F,G>(gb_f: F, mut ev_f: G, gb_inp: &[u16], ev_inp: &[u16], should_be: &[u16])
-      where F: FnMut(&Garbler) + Send + 'static,
-            G: FnMut(&Evaluator)
+    fn streaming_test<F>(mut f: F, gb_inp: &[u16], ev_inp: &[u16], should_be: &[u16])
+      where F: FnMut(&dyn Fancy<Item=Wire>) + Send + Copy + 'static,
     {
-        let mut gb_iter = garble_iter(gb_f);
+        let mut gb_iter = garble_iter(move |gb| f(gb));
 
         let mut gb_inp_iter = gb_inp.to_vec().into_iter();
         let mut ev_inp_iter = ev_inp.to_vec().into_iter();
@@ -588,7 +587,7 @@ mod streaming {
         };
 
         let mut ev = Evaluator::new(recv_func);
-        ev_f(&mut ev);
+        f(&mut ev);
 
         let result = ev.decode_output();
         println!("gb_inp={:?} ev_inp={:?}", gb_inp, ev_inp);
@@ -610,7 +609,7 @@ mod streaming {
             let q = rng.gen_modulus();
             let x = rng.gen_u16() % q;
             let y = rng.gen_u16() % q;
-            streaming_test(move |b| fancy_addition(b,q), move |b| fancy_addition(b,q), &[x], &[y], &[(x+y)%q]);
+            streaming_test(move |b| fancy_addition(b,q), &[x], &[y], &[(x+y)%q]);
         }
     }
 //}}}
@@ -629,7 +628,7 @@ mod streaming {
             let q = rng.gen_modulus();
             let x = rng.gen_u16() % q;
             let y = rng.gen_u16() % q;
-            streaming_test(move |b| fancy_subtraction(b,q), move |b| fancy_subtraction(b,q), &[x], &[y], &[(q+x-y)%q]);
+            streaming_test(move |b| fancy_subtraction(b,q), &[x], &[y], &[(q+x-y)%q]);
         }
     }
 //}}}
@@ -648,7 +647,7 @@ mod streaming {
             let q = rng.gen_modulus();
             let x = rng.gen_u16() % q;
             let y = rng.gen_u16() % q;
-            streaming_test(move |b| fancy_multiplication(b,q), move |b| fancy_multiplication(b,q), &[x], &[y], &[(x*y)%q]);
+            streaming_test(move |b| fancy_multiplication(b,q), &[x], &[y], &[(x*y)%q]);
         }
     }
 //}}}
@@ -665,7 +664,7 @@ mod streaming {
         for _ in 0..16 {
             let q = rng.gen_modulus();
             let x = rng.gen_u16() % q;
-            streaming_test(move |b| fancy_cmul(b,q), move |b|fancy_cmul(b,q), &[x], &[], &[(x*5)%q]);
+            streaming_test(move |b|fancy_cmul(b,q), &[x], &[], &[(x*5)%q]);
         }
     }
 //}}}
@@ -683,7 +682,7 @@ mod streaming {
         for _ in 0..16 {
             let q = rng.gen_modulus();
             let x = rng.gen_u16() % q;
-            streaming_test(move |b|fancy_projection(b,q), move |b|fancy_projection(b,q), &[x], &[], &[(x+1)%q]);
+            streaming_test(move |b|fancy_projection(b,q), &[x], &[], &[(x+1)%q]);
         }
     }
 //}}}
@@ -702,23 +701,20 @@ mod parallel {
       where W: Clone + Default + HasModulus + Send + Sync,
             F: Fancy<Item=W> + Send + Sync,
      {
-        crossbeam::scope(|scope| {
-            let inps = b.garbler_input_bundles_crt(None, Q, N);
-
-            b.begin_sync(0,N);
-            let handles = inps.into_iter().enumerate().map(|(i,inp)| {
+        let inps = b.garbler_input_bundles_crt(None, Q, N);
+        b.begin_sync(0,N);
+        let outs = crossbeam::scope(|scope| {
+            let handles = inps.iter().enumerate().map(|(i,inp)| {
                 scope.spawn(move |_| {
-                    let z = b.exact_sign(Some(i), &inp);
+                    let z = b.exact_sign(Some(i), inp);
                     b.finish_index(i);
                     z
                 })
             }).collect_vec(); // start the threads
 
-            for h in handles.into_iter() {
-                let z = h.join().unwrap();
-                b.output(None, &z);
-            }
+            handles.into_iter().map(|h| h.join().unwrap()).collect_vec()
         }).unwrap();
+        b.outputs(None, &outs);
     }
 
     #[test]

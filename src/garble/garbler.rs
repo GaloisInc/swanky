@@ -8,6 +8,20 @@ use std::sync::{Arc, RwLock, Mutex};
 
 use super::Message;
 
+#[derive(Clone)]
+struct TaggedMessage {
+    tag: usize,
+    mesg: Message,
+}
+
+struct SyncInfo {
+    begin_index: usize,
+    end_index: usize,
+    current_index: usize,
+    waiting_messages: Vec<Vec<Message>>,
+    index_done: Vec<bool>,
+}
+
 /// Streams garbled circuit ciphertexts through a callback.
 pub struct Garbler {
     send_function:  Arc<Mutex<FnMut(Message) + Send>>,
@@ -15,6 +29,8 @@ pub struct Garbler {
     deltas:         Arc<RwLock<HashMap<u16, Wire>>>,
     current_output: Arc<Mutex<usize>>,
     current_gate:   Arc<Mutex<usize>>,
+    // sync stuff
+    sync_info: Arc<Mutex<Option<SyncInfo>>>,
 }
 
 impl Garbler {
@@ -31,12 +47,69 @@ impl Garbler {
             deltas:         Arc::new(RwLock::new(HashMap::new())),
             current_gate:   Arc::new(Mutex::new(0)),
             current_output: Arc::new(Mutex::new(0)),
+
+            sync_info: Arc::new(Mutex::new(None)),
         }
     }
 
     /// Output some information from the garbling.
-    fn send(&self, _ix: Option<usize>, m: Message) {
+    fn send(&self, ix: Option<usize>, m: Message) {
+        if let Some(ref mut info) = *self.sync_info.lock().unwrap() {
+            unimplemented!()
+        } else {
+            self.internal_send(m);
+        }
+    }
+
+    fn internal_send(&self, m: Message) {
         (self.send_function.lock().unwrap().deref_mut())(m);
+    }
+
+    fn flush(&self) {
+        let mut opt_info = self.sync_info.lock().unwrap();
+        if let Some(ref mut info) = *opt_info {
+            while info.current_index < info.end_index {
+                let i = info.current_index;
+                if info.index_done[i] {
+                    let mesgs = std::mem::replace(&mut info.waiting_messages[i], Vec::new());
+                    for m in mesgs {
+                        self.internal_send(m);
+                    }
+                    info.current_index += 1;
+                } else {
+                    break;
+                }
+            }
+            if info.current_index == info.end_index {
+                *opt_info = None; // sync is done
+            }
+        }
+    }
+
+    fn internal_begin_sync(&self, begin_index: usize, end_index: usize) {
+        let mut info = self.sync_info.lock().unwrap();
+
+        assert!(info.is_none(),
+            "garbler: begin_sync called before finishing previous sync!");
+
+        let init = SyncInfo {
+            begin_index,
+            end_index,
+            current_index:    begin_index,
+            waiting_messages: vec![Vec::new(); end_index - begin_index],
+            index_done:       vec![false; end_index - begin_index],
+        };
+
+        *info = Some(init);
+    }
+
+    fn internal_finish_index(&self, index: usize) {
+        if let Some(ref mut info) = *self.sync_info.lock().unwrap() {
+            info.index_done[index - info.begin_index] = true;
+        } else {
+            panic!("garbler: finish_index called without starting a sync!");
+        }
+        self.flush();
     }
 
     /// Create a delta if it has not been created yet for this modulus, otherwise just
@@ -316,9 +389,13 @@ impl Fancy for Garbler {
         self.send(ix, Message::OutputCiphertext(cts));
     }
 
-    fn begin_sync(&self, _begin_index: usize, _end_index: usize) { }
+    fn begin_sync(&self, begin_index: usize, end_index: usize) {
+        self.internal_begin_sync(begin_index, end_index);
+    }
 
-    fn finish_index(&self, _index: usize) { }
+    fn finish_index(&self, index: usize) {
+        self.internal_finish_index(index);
+    }
 }
 
 #[cfg(test)]
