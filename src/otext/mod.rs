@@ -14,8 +14,7 @@ struct Stream<T: Read + Write> {
 }
 
 impl<T: Read + Write> Stream<T> {
-    pub fn new(stream: T) -> Self {
-        let stream = Arc::new(Mutex::new(stream));
+    pub fn new(stream: Arc<Mutex<T>>) -> Self {
         Self { stream }
     }
     #[inline(always)]

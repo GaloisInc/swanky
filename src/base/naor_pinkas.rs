@@ -6,6 +6,7 @@ use curve25519_dalek::scalar::Scalar;
 use rand::rngs::ThreadRng;
 use std::cmp::max;
 use std::io::{Error, Read, Write};
+use std::sync::{Arc, Mutex};
 
 pub struct NaorPinkasOT<T: Read + Write> {
     stream: Stream<T>,
@@ -15,7 +16,7 @@ pub struct NaorPinkasOT<T: Read + Write> {
 const P: RistrettoPoint = constants::RISTRETTO_BASEPOINT_POINT;
 
 impl<T: Read + Write> ObliviousTransfer<T> for NaorPinkasOT<T> {
-    fn new(stream: T) -> Self {
+    fn new(stream: Arc<Mutex<T>>) -> Self {
         let stream = Stream::new(stream);
         let rng = rand::thread_rng();
         Self { stream, rng }
@@ -85,7 +86,7 @@ mod tests {
         let m1_ = m1.clone();
         let b = rand::random::<bool>();
         let (sender, receiver) = match UnixStream::pair() {
-            Ok((s1, s2)) => (s1, s2),
+            Ok((s1, s2)) => (Arc::new(Mutex::new(s1)), Arc::new(Mutex::new(s2))),
             Err(e) => {
                 eprintln!("Couldn't create pair of sockets: {:?}", e);
                 return;

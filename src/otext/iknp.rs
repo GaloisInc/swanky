@@ -5,6 +5,7 @@ use rand::rngs::ThreadRng;
 use rand::Rng;
 use sha2::{Digest, Sha256};
 use std::io::{Error, Read, Write};
+use std::sync::{Arc, Mutex};
 
 pub struct IKNP<S: Read + Write, OT: ObliviousTransfer<S>> {
     stream: Stream<S>,
@@ -13,7 +14,7 @@ pub struct IKNP<S: Read + Write, OT: ObliviousTransfer<S>> {
 }
 
 impl<S: Read + Write, OT: ObliviousTransfer<S>> IKNP<S, OT> {
-    pub fn new(stream: S, ot: OT) -> Self {
+    pub fn new(stream: Arc<Mutex<S>>, ot: OT) -> Self {
         let stream = Stream::new(stream);
         let rng = rand::thread_rng();
         Self { stream, ot, rng }
@@ -85,6 +86,7 @@ mod tests {
     use crate::base::dummy::DummyOT;
     use crate::base::naor_pinkas::NaorPinkasOT;
     use std::os::unix::net::UnixStream;
+    use std::sync::{Arc, Mutex};
     use test::Bencher;
 
     const N: usize = 256;
@@ -113,30 +115,23 @@ mod tests {
         let m1s_ = m1s.clone();
         let bs_ = bs.clone();
         let (sender, receiver) = match UnixStream::pair() {
-            Ok((s1, s2)) => (s1, s2),
-            Err(e) => {
-                eprintln!("Couldn't create pair of sockets: {:?}", e);
-                return;
-            }
-        };
-        let (sender_, receiver_) = match UnixStream::pair() {
-            Ok((s1, s2)) => (s1, s2),
+            Ok((s1, s2)) => (Arc::new(Mutex::new(s1)), Arc::new(Mutex::new(s2))),
             Err(e) => {
                 eprintln!("Couldn't create pair of sockets: {:?}", e);
                 return;
             }
         };
         std::thread::spawn(move || {
-            let ot = OT::new(sender_);
-            let mut otext = IKNP::new(sender, ot);
+            let ot = OT::new(sender.clone());
+            let mut otext = IKNP::new(sender.clone(), ot);
             let ms = m0s
                 .into_iter()
                 .zip(m1s.into_iter())
                 .collect::<Vec<(u128, u128)>>();
             otext.send(&ms).unwrap();
         });
-        let ot = OT::new(receiver_);
-        let mut otext = IKNP::new(receiver, ot);
+        let ot = OT::new(receiver.clone());
+        let mut otext = IKNP::new(receiver.clone(), ot);
         let results = otext.receive(&bs).unwrap();
         for (b, result, m0, m1) in itertools::izip!(bs_, results, m0s_, m1s_) {
             assert_eq!(result, if b { m1 } else { m0 })

@@ -1,13 +1,14 @@
 use super::{ObliviousTransfer, Stream};
 use bitvec::BitVec;
 use std::io::{Error, Read, Write};
+use std::sync::{Arc, Mutex};
 
 pub struct DummyOT<T: Read + Write> {
     stream: Stream<T>,
 }
 
 impl<T: Read + Write> ObliviousTransfer<T> for DummyOT<T> {
-    fn new(stream: T) -> Self {
+    fn new(stream: Arc<Mutex<T>>) -> Self {
         let stream = Stream::new(stream);
         Self { stream }
     }
@@ -45,7 +46,7 @@ mod tests {
         let m0_ = m0.clone();
         let m1_ = m1.clone();
         let (sender, receiver) = match UnixStream::pair() {
-            Ok((s1, s2)) => (s1, s2),
+            Ok((s1, s2)) => (Arc::new(Mutex::new(s1)), Arc::new(Mutex::new(s2))),
             Err(e) => {
                 eprintln!("Couldn't create pair of sockets: {:?}", e);
                 return;

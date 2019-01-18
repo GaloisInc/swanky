@@ -11,7 +11,7 @@ use std::io::{Error, ErrorKind, Read, Write};
 use std::sync::{Arc, Mutex, MutexGuard};
 
 pub trait ObliviousTransfer<T: Read + Write> {
-    fn new(stream: T) -> Self;
+    fn new(stream: Arc<Mutex<T>>) -> Self;
     fn send(&mut self, values: (&BitVec, &BitVec)) -> Result<(), Error>;
     fn receive(&mut self, input: bool, nbits: usize) -> Result<BitVec, Error>;
 }
@@ -21,8 +21,7 @@ struct Stream<T: Read + Write> {
 }
 
 impl<T: Read + Write> Stream<T> {
-    pub fn new(stream: T) -> Self {
-        let stream = Arc::new(Mutex::new(stream));
+    pub fn new(stream: Arc<Mutex<T>>) -> Self {
         Self { stream }
     }
     #[inline(always)]
