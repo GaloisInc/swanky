@@ -709,30 +709,34 @@ mod parallel {
                 b.begin_sync(0,N);
                 let hs = inps.iter().enumerate().map(|(i,inp)| {
                     scope.spawn(move |_| {
-                        let z = b.mod_change(Some(i), inp, inp.modulus() + 1);
+                        let m = b.mod_change(Some(i), inp, inp.modulus() + 1);
+                        let c = b.constant(Some(i), 1, inp.modulus() + 1);
+                        let z = b.mul(Some(i), &m, &c);
                         b.finish_index(i);
                         z
                     })
                 }).collect_vec();
                 let outs = hs.into_iter().map(|h| h.join().unwrap()).collect_vec();
                 b.outputs(None, &outs);
-                println!("{:?}", outs);
             }).unwrap()
 
         } else {
-            let outs = inps.iter().map(|inp| b.mod_change(None, inp, inp.modulus() + 1)).collect_vec();
+            let outs = inps.iter().map(|inp| {
+                let m = b.mod_change(None, inp, inp.modulus() + 1);
+                let c = b.constant(None, 1, inp.modulus() + 1);
+                let z = b.mul(None, &m, &c);
+                z
+            }).collect_vec();
             b.outputs(None, &outs);
-            println!("{:?}", outs);
         }
     }
 
     #[test]
     fn parallel_test() {
         let mut rng = thread_rng();
-        let N = 2;
-        for _ in 0..128 {
-            // let input = (0..N).map(|i| rng.gen_u16() % (2 + i as u16)).collect_vec();
-            let input = vec![0;N];
+        let N = 10;
+        for _ in 0..64 {
+            let input = (0..N).map(|i| rng.gen_u16() % (2 + i as u16)).collect_vec();
 
             // compute the correct answer using Dummy (which cannot get out of sync)
             let dummy = Dummy::new(&input, &[]);

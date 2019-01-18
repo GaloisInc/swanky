@@ -14,6 +14,8 @@ struct SyncInfo {
     current_index: usize,
     waiting_messages: Vec<Vec<Message>>,
     index_done: Vec<bool>,
+    start_gate: usize,
+    current_id_for_index: Vec<usize>,
 }
 
 /// Streams garbled circuit ciphertexts through a callback.
@@ -47,7 +49,6 @@ impl Garbler {
     /// Output some information from the garbling.
     fn send(&self, ix: Option<usize>, m: Message) {
         if let Some(ref mut info) = *self.sync_info.lock().unwrap() {
-            println!("sync send [{:?}]", m);
             if let Some(i) = ix {
                 assert!(info.current_index <= i);
                 info.waiting_messages[i].push(m);
@@ -55,7 +56,6 @@ impl Garbler {
                 panic!("garbler.send: called without index during sync!");
             }
         } else {
-            println!("normal send [{:?}]", m);
             self.internal_send(m);
         }
     }
@@ -69,11 +69,10 @@ impl Garbler {
         if let Some(ref mut info) = *opt_info {
             while info.current_index < info.end_index {
                 let i = info.current_index;
+                // TODO: send messages from current index, if possible
                 if info.index_done[i] {
-                    println!("sending messages from index {}", i);
                     let msgs = std::mem::replace(&mut info.waiting_messages[i], Vec::new());
                     for m in msgs {
-                        println!("{:?}", m);
                         self.internal_send(m);
                     }
                     info.current_index += 1;
@@ -82,15 +81,16 @@ impl Garbler {
                 }
             }
             if info.current_index == info.end_index {
-                *opt_info = None; // sync is done
-                println!("sync completed");
+                // set current_gate for synchronous usage
+                let ngates = info.end_index - info.begin_index;
+                *self.current_gate.lock().unwrap() += ngates;
+                // turn off sync
+                *opt_info = None;
             }
         }
     }
 
     fn internal_begin_sync(&self, begin_index: usize, end_index: usize) {
-        println!("begin sync {} {}", begin_index, end_index);
-
         let mut info = self.sync_info.lock().unwrap();
 
         assert!(info.is_none(),
@@ -102,13 +102,14 @@ impl Garbler {
             current_index:    begin_index,
             waiting_messages: vec![Vec::new(); end_index - begin_index],
             index_done:       vec![false; end_index - begin_index],
+            start_gate:       *self.current_gate.lock().unwrap(),
+            current_id_for_index: vec![0; end_index - begin_index],
         };
 
         *info = Some(init);
     }
 
     fn internal_finish_index(&self, index: usize) {
-        println!("finish index {}", index);
         if let Some(ref mut info) = *self.sync_info.lock().unwrap() {
             info.index_done[index - info.begin_index] = true;
         } else {
@@ -120,7 +121,6 @@ impl Garbler {
     /// Create a delta if it has not been created yet for this modulus, otherwise just
     /// return the existing one.
     fn delta(&self, q: u16) -> Wire {
-        println!("delta({}) called in thread {:?}", q, std::thread::current().id());
         let mut deltas = self.deltas.lock().unwrap();
         match deltas.get(&q) {
             Some(delta) => return delta.clone(),
@@ -131,12 +131,21 @@ impl Garbler {
         w
     }
 
-    /// The current non-free gate index of the garbling computation.
-    fn current_gate(&self) -> usize {
-        let mut c = self.current_gate.lock().unwrap();
-        let old = *c;
-        *c += 1;
-        old
+    /// The current non-free gate index of the garbling computation. Respects sync
+    /// ordering.
+    fn current_gate(&self, sync_index: Option<usize>) -> usize {
+        if let Some(ref mut info) = *self.sync_info.lock().unwrap() {
+            let g  = info.start_gate;
+            let ix = sync_index.expect("syncronization requires a sync index");
+            let id = info.current_id_for_index[ix - info.start_gate];
+            info.current_id_for_index[ix] += 1;
+            g + ix + id
+        } else {
+            let mut c = self.current_gate.lock().unwrap();
+            let old = *c;
+            *c += 1;
+            old
+        }
     }
 
     /// The current output index of the garbling computation.
@@ -215,7 +224,7 @@ impl Fancy for Garbler {
 
         let q = A.modulus();
         let qb = B.modulus();
-        let gate_num = self.current_gate();
+        let gate_num = self.current_gate(ix);
 
         debug_assert!(q >= qb); // XXX: for now
 
@@ -332,8 +341,8 @@ impl Fancy for Garbler {
         // Since some of the values in gate will be void temporarily, we use Vec<Option<..>>
         let mut gate = vec![None; q_in as usize - 1];
 
-        let tao = A.color();        // input zero-wire
-        let g = tweak(self.current_gate());    // gate tweak
+        let tao = A.color();
+        let g = tweak(self.current_gate(ix)); // gate tweak
 
         let Din  = self.delta(q_in);
         let Dout = self.delta(q_out);

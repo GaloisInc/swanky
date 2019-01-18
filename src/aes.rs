@@ -52,13 +52,13 @@ impl Aes {
     }
 
     pub fn hash(&self, t: u128, x: u128) -> u128 {
-        let y = poly_double(x) ^ t;
-        self.eval_u128(x) ^ y
+        let y = poly_double(x^t);
+        self.eval_u128(y) ^ y
     }
 
     pub fn hash2(&self, t: u128, x: u128, y: u128) -> u128 {
         let z = x ^ poly_double(y);
-        self.hash(z, t)
+        self.hash(t,z)
     }
 
     pub fn eval_u128(&self, x: u128) -> u128 {
