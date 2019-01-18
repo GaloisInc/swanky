@@ -14,7 +14,7 @@ struct SyncInfo {
     current_index: usize,
     waiting_messages: Vec<Vec<Message>>,
     index_done: Vec<bool>,
-    start_gate: usize,
+    starting_gate_id: usize,
     current_id_for_index: Vec<usize>,
 }
 
@@ -102,7 +102,7 @@ impl Garbler {
             current_index:    begin_index,
             waiting_messages: vec![Vec::new(); end_index - begin_index],
             index_done:       vec![false; end_index - begin_index],
-            start_gate:       *self.current_gate.lock().unwrap(),
+            starting_gate_id: *self.current_gate.lock().unwrap(),
             current_id_for_index: vec![0; end_index - begin_index],
         };
 
@@ -135,11 +135,15 @@ impl Garbler {
     /// ordering.
     fn current_gate(&self, sync_index: Option<usize>) -> usize {
         if let Some(ref mut info) = *self.sync_info.lock().unwrap() {
-            let g  = info.start_gate;
+            let g  = info.starting_gate_id;
             let ix = sync_index.expect("syncronization requires a sync index");
-            let id = info.current_id_for_index[ix - info.start_gate];
+            let id = info.current_id_for_index[ix - info.begin_index];
             info.current_id_for_index[ix] += 1;
-            g + ix + id
+            let res = g + ix + id;
+            println!("g={} ix={} id={} gate={}", g, ix, id, res);
+            // XXX really want it to be g + NgatesPerIndex*ix + id
+            // but i dont know NgatesPerIndex
+            res
         } else {
             let mut c = self.current_gate.lock().unwrap();
             let old = *c;

@@ -709,8 +709,9 @@ mod parallel {
                 b.begin_sync(0,N);
                 let hs = inps.iter().enumerate().map(|(i,inp)| {
                     scope.spawn(move |_| {
-                        let m = b.mod_change(Some(i), inp, inp.modulus() + 1);
-                        let c = b.constant(Some(i), 1, inp.modulus() + 1);
+                        // let c = b.constant(Some(i), 1, inp.modulus() + 1);
+                        let c = b.constant(Some(i), 1, inp.modulus());
+                        let m = b.mul(Some(i), inp, &c);
                         let z = b.mul(Some(i), &m, &c);
                         b.finish_index(i);
                         z
@@ -722,8 +723,10 @@ mod parallel {
 
         } else {
             let outs = inps.iter().map(|inp| {
-                let m = b.mod_change(None, inp, inp.modulus() + 1);
-                let c = b.constant(None, 1, inp.modulus() + 1);
+                // let m = b.mod_change(None, inp, inp.modulus() + 1);
+                // let c = b.constant(None, 1, inp.modulus() + 1);
+                let c = b.constant(None, 1, inp.modulus());
+                let m = b.mul(None, inp, &c);
                 let z = b.mul(None, &m, &c);
                 z
             }).collect_vec();
