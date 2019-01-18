@@ -368,7 +368,26 @@
 <span id="368">368</span>
 <span id="369">369</span>
 <span id="370">370</span>
-</pre><div class="example-wrap"><pre class="rust ">
+<span id="371">371</span>
+<span id="372">372</span>
+<span id="373">373</span>
+<span id="374">374</span>
+<span id="375">375</span>
+<span id="376">376</span>
+<span id="377">377</span>
+<span id="378">378</span>
+<span id="379">379</span>
+<span id="380">380</span>
+<span id="381">381</span>
+<span id="382">382</span>
+<span id="383">383</span>
+<span id="384">384</span>
+<span id="385">385</span>
+<span id="386">386</span>
+<span id="387">387</span>
+<span id="388">388</span>
+<span id="389">389</span>
+</pre><pre class="rust ">
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">circuit</span>::{<span class="ident">Circuit</span>, <span class="ident">Gate</span>};
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">fancy</span>::{<span class="ident">Fancy</span>, <span class="ident">HasModulus</span>};
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::{<span class="ident">tweak2</span>, <span class="ident">output_tweak</span>};
@@ -410,7 +429,7 @@
     }
 
     <span class="doccomment">/// Receive the next message.</span>
-    <span class="kw">fn</span> <span class="ident">recv</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">ty</span>: <span class="ident">GateType</span>) <span class="op">-&gt;</span> <span class="ident">Message</span> {
+    <span class="kw">fn</span> <span class="ident">recv</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">_ix</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span>, <span class="ident">ty</span>: <span class="ident">GateType</span>) <span class="op">-&gt;</span> <span class="ident">Message</span> {
         (<span class="self">self</span>.<span class="ident">recv_function</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>().<span class="ident">deref_mut</span>())(<span class="ident">ty</span>)
     }
 
@@ -423,31 +442,37 @@
     }
 
     <span class="doccomment">/// Decode the output received during the Fancy computation.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">decode_output</span>(<span class="self">self</span>) <span class="op">-&gt;</span> <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u16</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">cts</span>  <span class="op">=</span> <span class="ident">Arc</span>::<span class="ident">try_unwrap</span>(<span class="self">self</span>.<span class="ident">output_cts</span>).<span class="ident">unwrap</span>().<span class="ident">into_inner</span>().<span class="ident">unwrap</span>();
-        <span class="kw">let</span> <span class="ident">outs</span> <span class="op">=</span> <span class="ident">Arc</span>::<span class="ident">try_unwrap</span>(<span class="self">self</span>.<span class="ident">output_wires</span>).<span class="ident">unwrap</span>().<span class="ident">into_inner</span>().<span class="ident">unwrap</span>();
-        <span class="ident">Decoder</span>::<span class="ident">new</span>(<span class="ident">cts</span>).<span class="ident">decode</span>(<span class="kw-2">&amp;</span><span class="ident">outs</span>)
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">decode_output</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-&gt;</span> <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u16</span><span class="op">&gt;</span> {
+        <span class="kw">let</span> <span class="ident">cts</span>  <span class="op">=</span> <span class="self">self</span>.<span class="ident">output_cts</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>();
+        <span class="kw">let</span> <span class="ident">outs</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">output_wires</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>();
+        <span class="ident">Decoder</span>::<span class="ident">new</span>(<span class="ident">cts</span>.<span class="ident">clone</span>()).<span class="ident">decode</span>(<span class="kw-2">&amp;</span><span class="ident">outs</span>)
     }
 }
 
 <span class="kw">impl</span> <span class="ident">Fancy</span> <span class="kw">for</span> <span class="ident">Evaluator</span> {
     <span class="kw">type</span> <span class="ident">Item</span> <span class="op">=</span> <span class="ident">Wire</span>;
 
-    <span class="kw">fn</span> <span class="ident">garbler_input</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">_q</span>: <span class="ident">u16</span>) <span class="op">-&gt;</span> <span class="ident">Wire</span> { <span class="comment">//{{{</span>
-        <span class="kw">match</span> <span class="self">self</span>.<span class="ident">recv</span>(<span class="ident">GateType</span>::<span class="ident">Other</span>) {
-            <span class="ident">Message</span>::<span class="ident">GarblerInput</span>(<span class="ident">w</span>) <span class="op">=&gt;</span> <span class="ident">w</span>,
+    <span class="kw">fn</span> <span class="ident">garbler_input</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">ix</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span>, <span class="ident">q</span>: <span class="ident">u16</span>) <span class="op">-&gt;</span> <span class="ident">Wire</span> {
+        <span class="kw">match</span> <span class="self">self</span>.<span class="ident">recv</span>(<span class="ident">ix</span>, <span class="ident">GateType</span>::<span class="ident">Other</span>) {
+            <span class="ident">Message</span>::<span class="ident">GarblerInput</span>(<span class="ident">w</span>) <span class="op">=&gt;</span> {
+                <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">w</span>.<span class="ident">modulus</span>(), <span class="ident">q</span>);
+                <span class="ident">w</span>
+            }
             <span class="ident">m</span> <span class="op">=&gt;</span> <span class="macro">panic</span><span class="macro">!</span>(<span class="string">&quot;Expected message GarblerInput but got {}&quot;</span>, <span class="ident">m</span>),
         }
     }
-    <span class="comment">//}}}</span>
-    <span class="kw">fn</span> <span class="ident">evaluator_input</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">q</span>: <span class="ident">u16</span>) <span class="op">-&gt;</span> <span class="ident">Wire</span> { <span class="comment">//{{{</span>
-        <span class="kw">match</span> <span class="self">self</span>.<span class="ident">recv</span>(<span class="ident">GateType</span>::<span class="ident">EvaluatorInput</span> { <span class="ident">modulus</span>: <span class="ident">q</span> }) {
-            <span class="ident">Message</span>::<span class="ident">EvaluatorInput</span>(<span class="ident">w</span>) <span class="op">=&gt;</span> <span class="ident">w</span>,
+
+    <span class="kw">fn</span> <span class="ident">evaluator_input</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">ix</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span>, <span class="ident">q</span>: <span class="ident">u16</span>) <span class="op">-&gt;</span> <span class="ident">Wire</span> {
+        <span class="kw">match</span> <span class="self">self</span>.<span class="ident">recv</span>(<span class="ident">ix</span>, <span class="ident">GateType</span>::<span class="ident">EvaluatorInput</span> { <span class="ident">modulus</span>: <span class="ident">q</span> }) {
+            <span class="ident">Message</span>::<span class="ident">EvaluatorInput</span>(<span class="ident">w</span>) <span class="op">=&gt;</span> {
+                <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">w</span>.<span class="ident">modulus</span>(), <span class="ident">q</span>);
+                <span class="ident">w</span>
+            }
             <span class="ident">m</span> <span class="op">=&gt;</span> <span class="macro">panic</span><span class="macro">!</span>(<span class="string">&quot;Expected message EvaluatorInput but got {}&quot;</span>, <span class="ident">m</span>),
         }
     }
-    <span class="comment">//}}}</span>
-    <span class="kw">fn</span> <span class="ident">constant</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">x</span>: <span class="ident">u16</span>, <span class="ident">q</span>: <span class="ident">u16</span>) <span class="op">-&gt;</span> <span class="ident">Wire</span> { <span class="comment">//{{{</span>
+
+    <span class="kw">fn</span> <span class="ident">constant</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">ix</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span>, <span class="ident">x</span>: <span class="ident">u16</span>, <span class="ident">q</span>: <span class="ident">u16</span>) <span class="op">-&gt;</span> <span class="ident">Wire</span> {
         <span class="kw">match</span> <span class="self">self</span>.<span class="ident">constants</span>.<span class="ident">read</span>().<span class="ident">unwrap</span>().<span class="ident">get</span>(<span class="kw-2">&amp;</span>(<span class="ident">x</span>,<span class="ident">q</span>)) {
             <span class="prelude-val">Some</span>(<span class="ident">c</span>) <span class="op">=&gt;</span> <span class="kw">return</span> <span class="ident">c</span>.<span class="ident">clone</span>(),
             <span class="prelude-val">None</span> <span class="op">=&gt;</span> (),
@@ -457,32 +482,32 @@
             <span class="prelude-val">Some</span>(<span class="ident">c</span>) <span class="op">=&gt;</span> <span class="kw">return</span> <span class="ident">c</span>.<span class="ident">clone</span>(),
             <span class="prelude-val">None</span> <span class="op">=&gt;</span> (),
         }
-        <span class="kw">let</span> <span class="ident">w</span> <span class="op">=</span> <span class="kw">match</span> <span class="self">self</span>.<span class="ident">recv</span>(<span class="ident">GateType</span>::<span class="ident">Other</span>) {
+        <span class="kw">let</span> <span class="ident">w</span> <span class="op">=</span> <span class="kw">match</span> <span class="self">self</span>.<span class="ident">recv</span>(<span class="ident">ix</span>, <span class="ident">GateType</span>::<span class="ident">Other</span>) {
             <span class="ident">Message</span>::<span class="ident">Constant</span> { <span class="ident">wire</span>, .. } <span class="op">=&gt;</span> <span class="ident">wire</span>,
             <span class="ident">m</span> <span class="op">=&gt;</span> <span class="macro">panic</span><span class="macro">!</span>(<span class="string">&quot;Expected message Constant but got {}&quot;</span>, <span class="ident">m</span>),
         };
         <span class="ident">constants</span>.<span class="ident">insert</span>((<span class="ident">x</span>,<span class="ident">q</span>),<span class="ident">w</span>.<span class="ident">clone</span>());
         <span class="ident">w</span>
     }
-    <span class="comment">//}}}</span>
-    <span class="kw">fn</span> <span class="ident">add</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">x</span>: <span class="kw-2">&amp;</span><span class="ident">Wire</span>, <span class="ident">y</span>: <span class="kw-2">&amp;</span><span class="ident">Wire</span>) <span class="op">-&gt;</span> <span class="ident">Wire</span> { <span class="comment">//{{{</span>
+
+    <span class="kw">fn</span> <span class="ident">add</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">x</span>: <span class="kw-2">&amp;</span><span class="ident">Wire</span>, <span class="ident">y</span>: <span class="kw-2">&amp;</span><span class="ident">Wire</span>) <span class="op">-&gt;</span> <span class="ident">Wire</span> {
         <span class="ident">x</span>.<span class="ident">plus</span>(<span class="ident">y</span>)
     }
-    <span class="comment">//}}}</span>
-    <span class="kw">fn</span> <span class="ident">sub</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">x</span>: <span class="kw-2">&amp;</span><span class="ident">Wire</span>, <span class="ident">y</span>: <span class="kw-2">&amp;</span><span class="ident">Wire</span>) <span class="op">-&gt;</span> <span class="ident">Wire</span> { <span class="comment">//{{{</span>
+
+    <span class="kw">fn</span> <span class="ident">sub</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">x</span>: <span class="kw-2">&amp;</span><span class="ident">Wire</span>, <span class="ident">y</span>: <span class="kw-2">&amp;</span><span class="ident">Wire</span>) <span class="op">-&gt;</span> <span class="ident">Wire</span> {
         <span class="ident">x</span>.<span class="ident">minus</span>(<span class="ident">y</span>)
     }
-    <span class="comment">//}}}</span>
-    <span class="kw">fn</span> <span class="ident">cmul</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">x</span>: <span class="kw-2">&amp;</span><span class="ident">Wire</span>, <span class="ident">c</span>: <span class="ident">u16</span>) <span class="op">-&gt;</span> <span class="ident">Wire</span> { <span class="comment">//{{{</span>
+
+    <span class="kw">fn</span> <span class="ident">cmul</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">x</span>: <span class="kw-2">&amp;</span><span class="ident">Wire</span>, <span class="ident">c</span>: <span class="ident">u16</span>) <span class="op">-&gt;</span> <span class="ident">Wire</span> {
         <span class="ident">x</span>.<span class="ident">cmul</span>(<span class="ident">c</span>)
     }
-    <span class="comment">//}}}</span>
-    <span class="kw">fn</span> <span class="ident">mul</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">A</span>: <span class="kw-2">&amp;</span><span class="ident">Wire</span>, <span class="ident">B</span>: <span class="kw-2">&amp;</span><span class="ident">Wire</span>) <span class="op">-&gt;</span> <span class="ident">Wire</span> { <span class="comment">//{{{</span>
+
+    <span class="kw">fn</span> <span class="ident">mul</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">ix</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span>, <span class="ident">A</span>: <span class="kw-2">&amp;</span><span class="ident">Wire</span>, <span class="ident">B</span>: <span class="kw-2">&amp;</span><span class="ident">Wire</span>) <span class="op">-&gt;</span> <span class="ident">Wire</span> {
         <span class="kw">if</span> <span class="ident">A</span>.<span class="ident">modulus</span>() <span class="op">&lt;</span> <span class="ident">A</span>.<span class="ident">modulus</span>() {
-            <span class="kw">return</span> <span class="self">self</span>.<span class="ident">mul</span>(<span class="ident">B</span>,<span class="ident">A</span>);
+            <span class="kw">return</span> <span class="self">self</span>.<span class="ident">mul</span>(<span class="ident">ix</span>,<span class="ident">B</span>,<span class="ident">A</span>);
         }
 
-        <span class="kw">let</span> <span class="ident">gate</span> <span class="op">=</span> <span class="kw">match</span> <span class="self">self</span>.<span class="ident">recv</span>(<span class="ident">GateType</span>::<span class="ident">Other</span>) {
+        <span class="kw">let</span> <span class="ident">gate</span> <span class="op">=</span> <span class="kw">match</span> <span class="self">self</span>.<span class="ident">recv</span>(<span class="ident">ix</span>, <span class="ident">GateType</span>::<span class="ident">Other</span>) {
             <span class="ident">Message</span>::<span class="ident">GarbledGate</span>(<span class="ident">g</span>) <span class="op">=&gt;</span> <span class="ident">g</span>,
             <span class="ident">m</span> <span class="op">=&gt;</span> <span class="macro">panic</span><span class="macro">!</span>(<span class="string">&quot;Expected message GarbledGate but got {}&quot;</span>, <span class="ident">m</span>),
         };
@@ -518,12 +543,14 @@
 
         <span class="ident">L</span>.<span class="ident">plus</span>(<span class="kw-2">&amp;</span><span class="ident">R</span>.<span class="ident">plus</span>(<span class="kw-2">&amp;</span><span class="ident">A</span>.<span class="ident">cmul</span>(<span class="ident">new_b_color</span>)))
     }
-    <span class="comment">//}}}</span>
-    <span class="kw">fn</span> <span class="ident">proj</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">x</span>: <span class="kw-2">&amp;</span><span class="ident">Wire</span>, <span class="ident">q</span>: <span class="ident">u16</span>, <span class="ident">_tt</span>: <span class="kw-2">&amp;</span>[<span class="ident">u16</span>]) <span class="op">-&gt;</span> <span class="ident">Wire</span> { <span class="comment">//{{{</span>
-        <span class="kw">let</span> <span class="ident">gate</span> <span class="op">=</span> <span class="kw">match</span> <span class="self">self</span>.<span class="ident">recv</span>(<span class="ident">GateType</span>::<span class="ident">Other</span>) {
+
+    <span class="kw">fn</span> <span class="ident">proj</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">ix</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span>, <span class="ident">x</span>: <span class="kw-2">&amp;</span><span class="ident">Wire</span>, <span class="ident">q</span>: <span class="ident">u16</span>, <span class="ident">_tt</span>: <span class="kw-2">&amp;</span>[<span class="ident">u16</span>]) <span class="op">-&gt;</span> <span class="ident">Wire</span> {
+        <span class="kw">let</span> <span class="ident">gate</span> <span class="op">=</span> <span class="kw">match</span> <span class="self">self</span>.<span class="ident">recv</span>(<span class="ident">ix</span>, <span class="ident">GateType</span>::<span class="ident">Other</span>) {
             <span class="ident">Message</span>::<span class="ident">GarbledGate</span>(<span class="ident">g</span>) <span class="op">=&gt;</span> <span class="ident">g</span>,
             <span class="ident">m</span> <span class="op">=&gt;</span> <span class="macro">panic</span><span class="macro">!</span>(<span class="string">&quot;Expected message GarbledGate but got {}&quot;</span>, <span class="ident">m</span>),
         };
+        <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">gate</span>.<span class="ident">len</span>() <span class="kw">as</span> <span class="ident">u16</span> <span class="op">==</span> <span class="ident">x</span>.<span class="ident">modulus</span>() <span class="op">-</span> <span class="number">1</span>,
+            <span class="string">&quot;evaluator proj: garbled gate length does not equal q-1, sync issue?&quot;</span>);
         <span class="kw">let</span> <span class="ident">gate_num</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">current_gate</span>();
         <span class="kw">let</span> <span class="ident">w</span> <span class="op">=</span> <span class="kw">if</span> <span class="ident">x</span>.<span class="ident">color</span>() <span class="op">==</span> <span class="number">0</span> {
             <span class="ident">x</span>.<span class="ident">hashback</span>(<span class="ident">gate_num</span> <span class="kw">as</span> <span class="ident">u128</span>, <span class="ident">q</span>)
@@ -533,16 +560,21 @@
         };
         <span class="ident">w</span>
     }
-    <span class="comment">//}}}</span>
-    <span class="kw">fn</span> <span class="ident">output</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">x</span>: <span class="kw-2">&amp;</span><span class="ident">Wire</span>) { <span class="comment">//{{{</span>
-        <span class="kw">match</span> <span class="self">self</span>.<span class="ident">recv</span>(<span class="ident">GateType</span>::<span class="ident">Other</span>) {
+
+    <span class="kw">fn</span> <span class="ident">output</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">ix</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span>, <span class="ident">x</span>: <span class="kw-2">&amp;</span><span class="ident">Wire</span>) {
+        <span class="kw">match</span> <span class="self">self</span>.<span class="ident">recv</span>(<span class="ident">ix</span>, <span class="ident">GateType</span>::<span class="ident">Other</span>) {
             <span class="ident">Message</span>::<span class="ident">OutputCiphertext</span>(<span class="ident">c</span>) <span class="op">=&gt;</span> {
+                <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">c</span>.<span class="ident">len</span>() <span class="kw">as</span> <span class="ident">u16</span>, <span class="ident">x</span>.<span class="ident">modulus</span>());
                 <span class="self">self</span>.<span class="ident">output_cts</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>().<span class="ident">push</span>(<span class="ident">c</span>);
             }
             <span class="ident">m</span> <span class="op">=&gt;</span> <span class="macro">panic</span><span class="macro">!</span>(<span class="string">&quot;Expected message OutputCiphertext but got {}&quot;</span>, <span class="ident">m</span>),
         }
         <span class="self">self</span>.<span class="ident">output_wires</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>().<span class="ident">push</span>(<span class="ident">x</span>.<span class="ident">clone</span>());
-    } <span class="comment">//}}}</span>
+    }
+
+    <span class="kw">fn</span> <span class="ident">begin_sync</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">_begin_index</span>: <span class="ident">usize</span>, <span class="ident">_end_index</span>: <span class="ident">usize</span>) { }
+
+    <span class="kw">fn</span> <span class="ident">finish_index</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">_index</span>: <span class="ident">usize</span>) { }
 }
 
 <span class="comment">////////////////////////////////////////////////////////////////////////////////</span>
@@ -593,14 +625,14 @@
         <span class="kw">for</span> (<span class="ident">i</span>,<span class="ident">gate</span>) <span class="kw">in</span> <span class="ident">c</span>.<span class="ident">gates</span>.<span class="ident">iter</span>().<span class="ident">enumerate</span>() {
             <span class="kw">let</span> <span class="ident">q</span> <span class="op">=</span> <span class="ident">c</span>.<span class="ident">modulus</span>(<span class="ident">i</span>);
             <span class="kw">let</span> <span class="ident">w</span> <span class="op">=</span> <span class="kw">match</span> <span class="kw-2">*</span><span class="ident">gate</span> {
-                <span class="ident">Gate</span>::<span class="ident">GarblerInput</span> { .. }    <span class="op">=&gt;</span> <span class="ident">eval</span>.<span class="ident">garbler_input</span>(<span class="ident">q</span>),
-                <span class="ident">Gate</span>::<span class="ident">EvaluatorInput</span> { .. }  <span class="op">=&gt;</span> <span class="ident">eval</span>.<span class="ident">evaluator_input</span>(<span class="ident">q</span>),
-                <span class="ident">Gate</span>::<span class="ident">Constant</span> { <span class="ident">val</span> }       <span class="op">=&gt;</span> <span class="ident">eval</span>.<span class="ident">constant</span>(<span class="ident">val</span>, <span class="ident">q</span>),
+                <span class="ident">Gate</span>::<span class="ident">GarblerInput</span> { .. }    <span class="op">=&gt;</span> <span class="ident">eval</span>.<span class="ident">garbler_input</span>(<span class="prelude-val">None</span>, <span class="ident">q</span>),
+                <span class="ident">Gate</span>::<span class="ident">EvaluatorInput</span> { .. }  <span class="op">=&gt;</span> <span class="ident">eval</span>.<span class="ident">evaluator_input</span>(<span class="prelude-val">None</span>, <span class="ident">q</span>),
+                <span class="ident">Gate</span>::<span class="ident">Constant</span> { <span class="ident">val</span> }       <span class="op">=&gt;</span> <span class="ident">eval</span>.<span class="ident">constant</span>(<span class="prelude-val">None</span>, <span class="ident">val</span>, <span class="ident">q</span>),
                 <span class="ident">Gate</span>::<span class="ident">Add</span> { <span class="ident">xref</span>, <span class="ident">yref</span> }     <span class="op">=&gt;</span> <span class="ident">wires</span>[<span class="ident">xref</span>.<span class="ident">ix</span>].<span class="ident">plus</span>(<span class="kw-2">&amp;</span><span class="ident">wires</span>[<span class="ident">yref</span>.<span class="ident">ix</span>]),
                 <span class="ident">Gate</span>::<span class="ident">Sub</span> { <span class="ident">xref</span>, <span class="ident">yref</span> }     <span class="op">=&gt;</span> <span class="ident">wires</span>[<span class="ident">xref</span>.<span class="ident">ix</span>].<span class="ident">minus</span>(<span class="kw-2">&amp;</span><span class="ident">wires</span>[<span class="ident">yref</span>.<span class="ident">ix</span>]),
                 <span class="ident">Gate</span>::<span class="ident">Cmul</span> { <span class="ident">xref</span>, <span class="ident">c</span> }       <span class="op">=&gt;</span> <span class="ident">wires</span>[<span class="ident">xref</span>.<span class="ident">ix</span>].<span class="ident">cmul</span>(<span class="ident">c</span>),
-                <span class="ident">Gate</span>::<span class="ident">Proj</span> { <span class="ident">xref</span>, .. }      <span class="op">=&gt;</span> <span class="ident">eval</span>.<span class="ident">proj</span>(<span class="kw-2">&amp;</span><span class="ident">wires</span>[<span class="ident">xref</span>.<span class="ident">ix</span>], <span class="ident">q</span>, <span class="kw-2">&amp;</span>[]),
-                <span class="ident">Gate</span>::<span class="ident">Mul</span> { <span class="ident">xref</span>, <span class="ident">yref</span>, .. } <span class="op">=&gt;</span> <span class="ident">eval</span>.<span class="ident">mul</span>(<span class="kw-2">&amp;</span><span class="ident">wires</span>[<span class="ident">xref</span>.<span class="ident">ix</span>], <span class="kw-2">&amp;</span><span class="ident">wires</span>[<span class="ident">yref</span>.<span class="ident">ix</span>]),
+                <span class="ident">Gate</span>::<span class="ident">Proj</span> { <span class="ident">xref</span>, .. }      <span class="op">=&gt;</span> <span class="ident">eval</span>.<span class="ident">proj</span>(<span class="prelude-val">None</span>, <span class="kw-2">&amp;</span><span class="ident">wires</span>[<span class="ident">xref</span>.<span class="ident">ix</span>], <span class="ident">q</span>, <span class="kw-2">&amp;</span>[]),
+                <span class="ident">Gate</span>::<span class="ident">Mul</span> { <span class="ident">xref</span>, <span class="ident">yref</span>, .. } <span class="op">=&gt;</span> <span class="ident">eval</span>.<span class="ident">mul</span>(<span class="prelude-val">None</span>, <span class="kw-2">&amp;</span><span class="ident">wires</span>[<span class="ident">xref</span>.<span class="ident">ix</span>], <span class="kw-2">&amp;</span><span class="ident">wires</span>[<span class="ident">yref</span>.<span class="ident">ix</span>]),
             };
             <span class="ident">wires</span>.<span class="ident">push</span>(<span class="ident">w</span>);
         }
@@ -699,10 +731,14 @@
     }
 
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">decode</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">ws</span>: <span class="kw-2">&amp;</span>[<span class="ident">Wire</span>]) <span class="op">-&gt;</span> <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u16</span><span class="op">&gt;</span> {
-        <span class="macro">debug_assert_eq</span><span class="macro">!</span>(<span class="ident">ws</span>.<span class="ident">len</span>(), <span class="self">self</span>.<span class="ident">outputs</span>.<span class="ident">len</span>());
+        <span class="macro">debug_assert_eq</span><span class="macro">!</span>(<span class="ident">ws</span>.<span class="ident">len</span>(), <span class="self">self</span>.<span class="ident">outputs</span>.<span class="ident">len</span>(),
+            <span class="string">&quot;got {} wires, but have {} output ciphertexts&quot;</span>,
+            <span class="ident">ws</span>.<span class="ident">len</span>(), <span class="self">self</span>.<span class="ident">outputs</span>.<span class="ident">len</span>());
+
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">outs</span> <span class="op">=</span> <span class="ident">Vec</span>::<span class="ident">new</span>();
         <span class="kw">for</span> <span class="ident">i</span> <span class="kw">in</span> <span class="number">0</span>..<span class="ident">ws</span>.<span class="ident">len</span>() {
             <span class="kw">let</span> <span class="ident">q</span> <span class="op">=</span> <span class="ident">ws</span>[<span class="ident">i</span>].<span class="ident">modulus</span>();
+            <span class="macro">debug_assert_eq</span><span class="macro">!</span>(<span class="ident">q</span> <span class="kw">as</span> <span class="ident">usize</span>, <span class="self">self</span>.<span class="ident">outputs</span>[<span class="ident">i</span>].<span class="ident">len</span>());
             <span class="kw">for</span> <span class="ident">k</span> <span class="kw">in</span> <span class="number">0</span>..<span class="ident">q</span> {
                 <span class="kw">let</span> <span class="ident">h</span> <span class="op">=</span> <span class="ident">ws</span>[<span class="ident">i</span>].<span class="ident">hash</span>(<span class="ident">output_tweak</span>(<span class="ident">i</span>,<span class="ident">k</span>));
                 <span class="kw">if</span> <span class="ident">h</span> <span class="op">==</span> <span class="self">self</span>.<span class="ident">outputs</span>[<span class="ident">i</span>][<span class="ident">k</span> <span class="kw">as</span> <span class="ident">usize</span>] {
@@ -711,7 +747,9 @@
                 }
             }
         }
-        <span class="macro">debug_assert_eq</span><span class="macro">!</span>(<span class="ident">ws</span>.<span class="ident">len</span>(), <span class="ident">outs</span>.<span class="ident">len</span>(), <span class="string">&quot;decoding failed&quot;</span>);
+        <span class="macro">debug_assert_eq</span><span class="macro">!</span>(<span class="ident">ws</span>.<span class="ident">len</span>(), <span class="ident">outs</span>.<span class="ident">len</span>(),
+            <span class="string">&quot;decoding failed! decoded {} out of {} wires&quot;</span>,
+            <span class="ident">outs</span>.<span class="ident">len</span>(), <span class="ident">ws</span>.<span class="ident">len</span>());
         <span class="ident">outs</span>
     }
 
@@ -739,5 +777,5 @@
         <span class="ident">check_sync</span>(<span class="ident">Evaluator</span>::<span class="ident">new</span>(<span class="op">|</span><span class="kw">_</span><span class="op">|</span> <span class="macro">unimplemented</span><span class="macro">!</span>()));
     }
 }
-</pre></div>
-</section><section id="search" class="content hidden"></section><section class="footer"></section><aside id="help" class="hidden"><div><h1 class="hidden">Help</h1><div class="shortcuts"><h2>Keyboard Shortcuts</h2><dl><dt><kbd>?</kbd></dt><dd>Show this help dialog</dd><dt><kbd>S</kbd></dt><dd>Focus the search field</dd><dt><kbd>↑</kbd></dt><dd>Move up in search results</dd><dt><kbd>↓</kbd></dt><dd>Move down in search results</dd><dt><kbd>↹</kbd></dt><dd>Switch tab</dd><dt><kbd>&#9166;</kbd></dt><dd>Go to active search result</dd><dt><kbd>+</kbd></dt><dd>Expand all sections</dd><dt><kbd>-</kbd></dt><dd>Collapse all sections</dd></dl></div><div class="infos"><h2>Search Tricks</h2><p>Prefix searches with a type followed by a colon (e.g. <code>fn:</code>) to restrict the search to a given type.</p><p>Accepted types are: <code>fn</code>, <code>mod</code>, <code>struct</code>, <code>enum</code>, <code>trait</code>, <code>type</code>, <code>macro</code>, and <code>const</code>.</p><p>Search functions by type signature (e.g. <code>vec -> usize</code> or <code>* -> vec</code>)</p><p>Search multiple things at once by splitting your query with comma (e.g. <code>str,u8</code> or <code>String,struct:Vec,test</code>)</p></div></div></aside><script>window.rootPath = "../../../";window.currentCrate = "fancy_garbling";</script><script src="../../../aliases.js"></script><script src="../../../main.js"></script><script src="../../../source-files.js"></script><script src="../../../source-script.js"></script><script defer src="../../../search-index.js"></script></body></html>
+</pre>
+</section><section id="search" class="content hidden"></section><section class="footer"></section><aside id="help" class="hidden"><div><h1 class="hidden">Help</h1><div class="shortcuts"><h2>Keyboard Shortcuts</h2><dl><dt><kbd>?</kbd></dt><dd>Show this help dialog</dd><dt><kbd>S</kbd></dt><dd>Focus the search field</dd><dt><kbd>↑</kbd></dt><dd>Move up in search results</dd><dt><kbd>↓</kbd></dt><dd>Move down in search results</dd><dt><kbd>↹</kbd></dt><dd>Switch tab</dd><dt><kbd>&#9166;</kbd></dt><dd>Go to active search result</dd><dt><kbd>+</kbd></dt><dd>Expand all sections</dd><dt><kbd>-</kbd></dt><dd>Collapse all sections</dd></dl></div><div class="infos"><h2>Search Tricks</h2><p>Prefix searches with a type followed by a colon (e.g. <code>fn:</code>) to restrict the search to a given type.</p><p>Accepted types are: <code>fn</code>, <code>mod</code>, <code>struct</code>, <code>enum</code>, <code>trait</code>, <code>type</code>, <code>macro</code>, and <code>const</code>.</p><p>Search functions by type signature (e.g. <code>vec -> usize</code> or <code>* -> vec</code>)</p><p>Search multiple things at once by splitting your query with comma (e.g. <code>str,u8</code> or <code>String,struct:Vec,test</code>)</p></div></div></aside><script>window.rootPath = "../../../";window.currentCrate = "fancy_garbling";</script><script src="../../../aliases.js"></script><script src="../../../main.js"></script><script defer src="../../../search-index.js"></script></body></html>
