@@ -277,6 +277,7 @@ mod tests {
     use super::*;
     use crate::util::RngExt;
     use rand::thread_rng;
+    use itertools::Itertools;
 
     #[test]
     fn packing() {
@@ -407,5 +408,24 @@ mod tests {
             let x = Wire::rand(&mut rng, q);
             assert_eq!(x.digits().len(), util::digits_per_u128(q));
         }
+    }
+
+    #[test]
+    fn parallel_hash() {
+        let n = 1000;
+        let mut rng = thread_rng();
+        let q = rng.gen_modulus();
+        let ws = (0..n).map(|_| Wire::rand(&mut rng, q)).collect_vec();
+
+        let hashes = crossbeam::scope(|scope| {
+            let hs = ws.iter().map(|w| {
+                scope.spawn(move |_| w.hash(0))
+            }).collect_vec();
+            hs.into_iter().map(|h| h.join().unwrap()).collect_vec()
+        }).unwrap();
+
+        let should_be = ws.iter().map(|w| w.hash(0)).collect_vec();
+
+        assert_eq!(hashes, should_be);
     }
 }

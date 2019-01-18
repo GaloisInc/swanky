@@ -20,7 +20,7 @@ struct SyncInfo {
 pub struct Garbler {
     send_function:  Arc<Mutex<FnMut(Message) + Send>>,
     constants:      Arc<RwLock<HashMap<(u16,u16),Wire>>>,
-    deltas:         Arc<RwLock<HashMap<u16, Wire>>>,
+    deltas:         Arc<Mutex<HashMap<u16, Wire>>>,
     current_output: Arc<Mutex<usize>>,
     current_gate:   Arc<Mutex<usize>>,
     sync_info:      Arc<Mutex<Option<SyncInfo>>>,
@@ -37,7 +37,7 @@ impl Garbler {
         Garbler {
             send_function:  Arc::new(Mutex::new(send_func)),
             constants:      Arc::new(RwLock::new(HashMap::new())),
-            deltas:         Arc::new(RwLock::new(HashMap::new())),
+            deltas:         Arc::new(Mutex::new(HashMap::new())),
             current_gate:   Arc::new(Mutex::new(0)),
             current_output: Arc::new(Mutex::new(0)),
             sync_info:      Arc::new(Mutex::new(None)),
@@ -120,11 +120,8 @@ impl Garbler {
     /// Create a delta if it has not been created yet for this modulus, otherwise just
     /// return the existing one.
     fn delta(&self, q: u16) -> Wire {
-        match self.deltas.read().unwrap().get(&q) {
-            Some(delta) => return delta.clone(),
-            None => (),
-        }
-        let mut deltas = self.deltas.write().unwrap();
+        println!("delta({}) called in thread {:?}", q, std::thread::current().id());
+        let mut deltas = self.deltas.lock().unwrap();
         match deltas.get(&q) {
             Some(delta) => return delta.clone(),
             None => (),

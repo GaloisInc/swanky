@@ -730,7 +730,7 @@ mod parallel {
     fn parallel_test() {
         let mut rng = thread_rng();
         let N = 2;
-        for _ in 0..1 {
+        for _ in 0..128 {
             // let input = (0..N).map(|i| rng.gen_u16() % (2 + i as u16)).collect_vec();
             let input = vec![0;N];
 
