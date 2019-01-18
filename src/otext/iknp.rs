@@ -6,13 +6,13 @@ use rand::Rng;
 use sha2::{Digest, Sha256};
 use std::io::{Error, Read, Write};
 
-pub struct IKNP<S: Read + Write, OT: ObliviousTransfer> {
+pub struct IKNP<S: Read + Write, OT: ObliviousTransfer<S>> {
     stream: Stream<S>,
     ot: OT,
     rng: ThreadRng,
 }
 
-impl<S: Read + Write, OT: ObliviousTransfer> IKNP<S, OT> {
+impl<S: Read + Write, OT: ObliviousTransfer<S>> IKNP<S, OT> {
     pub fn new(stream: S, ot: OT) -> Self {
         let stream = Stream::new(stream);
         let rng = rand::thread_rng();
@@ -20,7 +20,7 @@ impl<S: Read + Write, OT: ObliviousTransfer> IKNP<S, OT> {
     }
 }
 
-impl<S: Read + Write, OT: ObliviousTransfer> OTExtension<OT> for IKNP<S, OT> {
+impl<S: Read + Write, OT: ObliviousTransfer<S>> OTExtension<S, OT> for IKNP<S, OT> {
     fn send(&mut self, values: &[(u128, u128)]) -> Result<(), Error> {
         let m = values.len();
         let s = (0..128).map(|_| self.rng.gen::<bool>()).collect::<BitVec>();
@@ -81,7 +81,9 @@ fn hash(idx: usize, q: &BitVec) -> u128 {
 mod tests {
     extern crate test;
     use super::*;
+    use crate::base::chou_orlandi::ChouOrlandiOT;
     use crate::base::dummy::DummyOT;
+    use crate::base::naor_pinkas::NaorPinkasOT;
     use std::os::unix::net::UnixStream;
     use test::Bencher;
 
@@ -103,11 +105,10 @@ mod tests {
         v
     }
 
-    #[test]
-    fn test() {
-        let m0s = rand_u128_vec(N);
-        let m1s = rand_u128_vec(N);
-        let bs = rand_bool_vec(N);
+    fn test_ot<OT: ObliviousTransfer<UnixStream>>(n: usize) {
+        let m0s = rand_u128_vec(n);
+        let m1s = rand_u128_vec(n);
+        let bs = rand_bool_vec(n);
         let m0s_ = m0s.clone();
         let m1s_ = m1s.clone();
         let bs_ = bs.clone();
@@ -126,7 +127,7 @@ mod tests {
             }
         };
         std::thread::spawn(move || {
-            let ot = DummyOT::new(sender_);
+            let ot = OT::new(sender_);
             let mut otext = IKNP::new(sender, ot);
             let ms = m0s
                 .into_iter()
@@ -134,7 +135,7 @@ mod tests {
                 .collect::<Vec<(u128, u128)>>();
             otext.send(&ms).unwrap();
         });
-        let ot = DummyOT::new(receiver_);
+        let ot = OT::new(receiver_);
         let mut otext = IKNP::new(receiver, ot);
         let results = otext.receive(&bs).unwrap();
         for (b, result, m0, m1) in itertools::izip!(bs_, results, m0s_, m1s_) {
@@ -142,8 +143,31 @@ mod tests {
         }
     }
 
+    #[test]
+    fn test_dummy() {
+        test_ot::<DummyOT<UnixStream>>(N);
+    }
+    #[test]
+    fn test_naor_pinkas() {
+        test_ot::<NaorPinkasOT<UnixStream>>(N);
+    }
+    #[test]
+    fn test_chou_orlandi() {
+        test_ot::<ChouOrlandiOT<UnixStream>>(N);
+    }
+
     #[bench]
-    fn bench(b: &mut Bencher) {
-        b.iter(|| test())
+    fn bench_dummy(b: &mut Bencher) {
+        b.iter(|| test_ot::<DummyOT<UnixStream>>(1024))
+    }
+
+    #[bench]
+    fn bench_naor_pinkas(b: &mut Bencher) {
+        b.iter(|| test_ot::<NaorPinkasOT<UnixStream>>(1024))
+    }
+
+    #[bench]
+    fn bench_chou_orlandi(b: &mut Bencher) {
+        b.iter(|| test_ot::<ChouOrlandiOT<UnixStream>>(1024))
     }
 }

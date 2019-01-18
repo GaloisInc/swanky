@@ -2,15 +2,16 @@ pub mod chou_orlandi;
 pub mod dummy;
 pub mod naor_pinkas;
 
-use aesni::block_cipher_trait::generic_array::GenericArray;
-use aesni::block_cipher_trait::BlockCipher;
-use aesni::Aes128;
+use aes::Aes128;
 use bitvec::BitVec;
+use block_modes::block_padding::Pkcs7;
+use block_modes::{BlockMode, Ecb};
 use curve25519_dalek::ristretto::{CompressedRistretto, RistrettoPoint};
 use std::io::{Error, ErrorKind, Read, Write};
 use std::sync::{Arc, Mutex, MutexGuard};
 
-pub trait ObliviousTransfer {
+pub trait ObliviousTransfer<T: Read + Write> {
+    fn new(stream: T) -> Self;
     fn send(&mut self, values: (&BitVec, &BitVec)) -> Result<(), Error>;
     fn receive(&mut self, input: bool, nbits: usize) -> Result<BitVec, Error>;
 }
@@ -97,11 +98,11 @@ fn bitvec_to_vec(bytes: &BitVec) -> Vec<u8> {
 
 #[inline(always)]
 fn hash_pt(pt: &RistrettoPoint, length: usize) -> Vec<u8> {
-    if length > 32 {
-        panic!("lengths > 32 not yet supported")
-    }
-    let pt = pt.compress();
-    pt.as_bytes()[0..length].to_vec()
+    // Hash a point `pt` by compute `E(pt, 0)`
+    let result = pt.compress();
+    let bytes = result.as_bytes();
+    let m = vec![0; length];
+    encrypt(&bytes[0..16], &m).unwrap().drain(16..).collect()
 }
 #[inline(always)]
 fn xor(a: &[u8], b: &[u8]) -> Vec<u8> {
@@ -114,23 +115,44 @@ fn xor(a: &[u8], b: &[u8]) -> Vec<u8> {
     );
     a.iter().zip(b.iter()).map(|(a, b)| a ^ b).collect()
 }
+
+type Cipher = Ecb<Aes128, Pkcs7>;
+
 #[inline(always)]
-fn encrypt(k: &[u8], m: &[u8]) -> Vec<u8> {
-    if m.len() != 16 {
-        panic!("lengths ≠ 16 not yet supported")
-    }
-    let cipher = Aes128::new(GenericArray::from_slice(k));
-    let mut m = GenericArray::clone_from_slice(m);
-    cipher.encrypt_block(&mut m);
-    m.to_vec()
+fn encrypt(k: &[u8], m: &[u8]) -> Result<Vec<u8>, Error> {
+    let cipher = match Cipher::new_var(k, Default::default()) {
+        Ok(c) => c,
+        Err(_) => {
+            return Err(Error::new(
+                ErrorKind::InvalidInput,
+                "initializing AES128-ECB failed",
+            ));
+        }
+    };
+    let mut m = m.to_vec();
+    let ct = cipher.encrypt_vec(&mut m);
+    Ok(ct.to_vec())
 }
 #[inline(always)]
-fn decrypt(k: &[u8], c: &[u8]) -> Vec<u8> {
-    if c.len() != 16 {
-        panic!("lengths ≠ 16 not yet supported")
-    }
-    let cipher = Aes128::new(GenericArray::from_slice(k));
-    let mut c = GenericArray::clone_from_slice(c);
-    cipher.decrypt_block(&mut c);
-    c.to_vec()
+fn decrypt(k: &[u8], c: &[u8]) -> Result<Vec<u8>, Error> {
+    let cipher = match Cipher::new_var(k, Default::default()) {
+        Ok(c) => c,
+        Err(_) => {
+            return Err(Error::new(
+                ErrorKind::InvalidInput,
+                "initializing AES128-ECB failed",
+            ));
+        }
+    };
+    let mut c = c.to_vec();
+    let m = match cipher.decrypt_vec(&mut c) {
+        Ok(m) => m,
+        Err(_) => {
+            return Err(Error::new(
+                ErrorKind::InvalidInput,
+                "decrypting AES128-ECB failed",
+            ));
+        }
+    };
+    Ok(m.to_vec())
 }

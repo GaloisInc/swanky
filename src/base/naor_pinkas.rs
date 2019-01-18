@@ -14,17 +14,15 @@ pub struct NaorPinkasOT<T: Read + Write> {
 
 const P: RistrettoPoint = constants::RISTRETTO_BASEPOINT_POINT;
 
-impl<T: Read + Write> NaorPinkasOT<T> {
-    pub fn new(stream: T) -> Self {
+impl<T: Read + Write> ObliviousTransfer<T> for NaorPinkasOT<T> {
+    fn new(stream: T) -> Self {
         let stream = Stream::new(stream);
         let rng = rand::thread_rng();
         Self { stream, rng }
     }
-}
 
-impl<T: Read + Write> ObliviousTransfer for NaorPinkasOT<T> {
     fn send(&mut self, values: (&BitVec, &BitVec)) -> Result<(), Error> {
-        let length = max(values.0.len() / 8, values.1.len() / 8);
+        let length = max(values.0.len(), values.1.len()) / 8;
         let c = RistrettoPoint::random(&mut self.rng);
         self.stream.write_pt(&c)?;
         let pk0 = self.stream.read_pt()?;

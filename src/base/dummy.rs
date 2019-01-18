@@ -6,14 +6,12 @@ pub struct DummyOT<T: Read + Write> {
     stream: Stream<T>,
 }
 
-impl<T: Read + Write> DummyOT<T> {
-    pub fn new(stream: T) -> Self {
+impl<T: Read + Write> ObliviousTransfer<T> for DummyOT<T> {
+    fn new(stream: T) -> Self {
         let stream = Stream::new(stream);
         Self { stream }
     }
-}
 
-impl<T: Read + Write> ObliviousTransfer for DummyOT<T> {
     fn send(&mut self, values: (&BitVec, &BitVec)) -> Result<(), Error> {
         let input = self.stream.read_bool()?;
         let value = if input { &values.1 } else { &values.0 };

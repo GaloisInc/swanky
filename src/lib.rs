@@ -5,6 +5,7 @@
 extern crate arrayref;
 #[macro_use]
 extern crate itertools;
+extern crate aesni as aes;
 
 pub mod base;
 pub mod otext;

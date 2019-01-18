@@ -12,28 +12,34 @@ pub struct ChouOrlandiOT<T: Read + Write> {
 }
 
 const P: RistrettoPoint = constants::RISTRETTO_BASEPOINT_POINT;
+const KEYSIZE: usize = 16;
 
-impl<T: Read + Write> ChouOrlandiOT<T> {
-    pub fn new(stream: T) -> Self {
+impl<T: Read + Write> ObliviousTransfer<T> for ChouOrlandiOT<T> {
+    fn new(stream: T) -> Self {
         let stream = Stream::new(stream);
         let rng = rand::thread_rng();
         Self { stream, rng }
     }
-}
 
-impl<T: Read + Write> ObliviousTransfer for ChouOrlandiOT<T> {
     fn send(&mut self, values: (&BitVec, &BitVec)) -> Result<(), Error> {
-        let length = std::cmp::max(values.0.len() / 8, values.1.len() / 8);
+        assert_eq!(
+            values.0.len(),
+            values.1.len(),
+            "input values of unequal
+        length: {} ≠ {}",
+            values.0.len(),
+            values.1.len()
+        );
         let a = Scalar::random(&mut self.rng);
         let a_ = P * a;
         self.stream.write_pt(&a_)?;
         let b_ = self.stream.read_pt()?;
-        let k0 = super::hash_pt(&(b_ * a), length);
-        let k1 = super::hash_pt(&((b_ - a_) * a), length);
-        let m0 = super::encrypt(&k0, &super::bitvec_to_vec(values.0));
-        let m1 = super::encrypt(&k1, &super::bitvec_to_vec(values.1));
-        self.stream.write_bytes(&m0)?;
-        self.stream.write_bytes(&m1)?;
+        let k0 = super::hash_pt(&(b_ * a), KEYSIZE);
+        let k1 = super::hash_pt(&((b_ - a_) * a), KEYSIZE);
+        let c0 = super::encrypt(&k0, &super::bitvec_to_vec(values.0))?;
+        let c1 = super::encrypt(&k1, &super::bitvec_to_vec(values.1))?;
+        self.stream.write_bytes(&c0)?;
+        self.stream.write_bytes(&c1)?;
         Ok(())
     }
 
@@ -47,11 +53,11 @@ impl<T: Read + Write> ObliviousTransfer for ChouOrlandiOT<T> {
             true => a_ + P * b,
         };
         self.stream.write_pt(&b_)?;
-        let kr = super::hash_pt(&(a_ * b), nbytes);
-        let c_0 = self.stream.read_bytes(nbytes)?;
-        let c_1 = self.stream.read_bytes(nbytes)?;
+        let kr = super::hash_pt(&(a_ * b), KEYSIZE);
+        let c_0 = self.stream.read_bytes(nbytes + KEYSIZE)?;
+        let c_1 = self.stream.read_bytes(nbytes + KEYSIZE)?;
         let c = if input { &c_1 } else { &c_0 };
-        let m = super::decrypt(&kr, &c);
+        let m = super::decrypt(&kr, &c)?;
         Ok(BitVec::from(m))
     }
 }
@@ -63,13 +69,21 @@ mod tests {
     use std::os::unix::net::UnixStream;
     use test::Bencher;
 
-    const N: usize = 16;
-    const TIMES: usize = 128;
+    const N: usize = 32;
+    const TIMES: usize = 1;
+
+    fn rand_u8_vec(size: usize) -> Vec<u8> {
+        let mut v = Vec::with_capacity(size);
+        for _ in 0..size {
+            v.push(rand::random::<u8>());
+        }
+        v
+    }
 
     #[test]
     fn test() {
-        let m0 = rand::random::<[u8; N]>();
-        let m1 = rand::random::<[u8; N]>();
+        let m0 = rand_u8_vec(N);
+        let m1 = rand_u8_vec(N);
         let m0 = BitVec::from(m0.to_vec());
         let m1 = BitVec::from(m1.to_vec());
         let m0_ = m0.clone();

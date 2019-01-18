@@ -4,7 +4,7 @@ use crate::base::ObliviousTransfer;
 use std::io::{Error, Read, Write};
 use std::sync::{Arc, Mutex, MutexGuard};
 
-pub trait OTExtension<OT: ObliviousTransfer> {
+pub trait OTExtension<T: Read + Write, OT: ObliviousTransfer<T>> {
     fn send(&mut self, values: &[(u128, u128)]) -> Result<(), Error>;
     fn receive(&mut self, input: &[bool]) -> Result<Vec<u128>, Error>;
 }
