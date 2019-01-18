@@ -21,7 +21,7 @@ pub type GarbledGate = Vec<u128>;
 pub type OutputCiphertext = Vec<u128>;
 
 /// The outputs that can be emitted by a Garbler and consumed by an Evaluator.
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize, Debug)]
 pub enum Message {
     /// Zero wire and delta for one of the garbler's inputs.
     ///
@@ -692,46 +692,59 @@ mod streaming {
 mod parallel {
     use super::*;
     use itertools::Itertools;
-    use crate::fancy::BundleGadgets;
     use crate::dummy::Dummy;
     use rand::thread_rng;
     use crate::util::RngExt;
 
-    fn parallel_gadgets<F,W>(b: &F, Q: u128, N: usize)
-      where W: Clone + Default + HasModulus + Send + Sync,
+    fn parallel_gadgets<F,W>(b: &F, N: usize, par: bool)
+      where W: Clone + Default + HasModulus + Send + Sync + std::fmt::Debug,
             F: Fancy<Item=W> + Send + Sync,
      {
-        let inps = b.garbler_input_bundles_crt(None, Q, N);
-        b.begin_sync(0,N);
-        let outs = crossbeam::scope(|scope| {
-            let handles = inps.iter().enumerate().map(|(i,inp)| {
-                scope.spawn(move |_| {
-                    let z = b.exact_sign(Some(i), inp);
-                    b.finish_index(i);
-                    z
-                })
-            }).collect_vec(); // start the threads
+        let inps = (0..N).map(|i| {
+            b.garbler_input(None, 2 + i as u16)
+        }).collect_vec();
 
-            handles.into_iter().map(|h| h.join().unwrap()).collect_vec()
-        }).unwrap();
-        b.outputs(None, &outs);
+        if par {
+            crossbeam::scope(|scope| {
+                b.begin_sync(0,N);
+                let hs = inps.iter().enumerate().map(|(i,inp)| {
+                    scope.spawn(move |_| {
+                        let z = b.mod_change(Some(i), inp, inp.modulus() + 1);
+                        b.finish_index(i);
+                        z
+                    })
+                }).collect_vec();
+                let outs = hs.into_iter().map(|h| h.join().unwrap()).collect_vec();
+                b.outputs(None, &outs);
+                println!("{:?}", outs);
+            }).unwrap()
+
+        } else {
+            let outs = inps.iter().map(|inp| b.mod_change(None, inp, inp.modulus() + 1)).collect_vec();
+            b.outputs(None, &outs);
+            println!("{:?}", outs);
+        }
     }
 
     #[test]
     fn parallel_test() {
         let mut rng = thread_rng();
-        let Q = crate::util::modulus_with_width(10);
-        let N = 10;
-        for _ in 0..16 {
-            let input = (0..N).flat_map(|_| {
-                let x = rng.gen_u128() % Q;
-                crate::util::crt_factor(x,Q)
-            }).collect_vec();
+        let N = 2;
+        for _ in 0..1 {
+            // let input = (0..N).map(|i| rng.gen_u16() % (2 + i as u16)).collect_vec();
+            let input = vec![0;N];
 
             // compute the correct answer using Dummy (which cannot get out of sync)
             let dummy = Dummy::new(&input, &[]);
-            parallel_gadgets(&dummy, Q, N);
+            parallel_gadgets(&dummy, N, true);
+            let should_be_par = dummy.get_output();
+
+            // check serial version agrees with parallel
+            let dummy = Dummy::new(&input, &[]);
+            parallel_gadgets(&dummy, N, false);
             let should_be = dummy.get_output();
+
+            assert_eq!(should_be, should_be_par);
 
             // set up garbler and evaluator
             let (tx, rx) = std::sync::mpsc::channel();
@@ -752,12 +765,12 @@ mod parallel {
             // put garbler on another thread
             std::thread::spawn(move || {
                 let garbler = Garbler::new(send_func);
-                parallel_gadgets(&garbler, Q, N);
+                parallel_gadgets(&garbler, N, true);
             });
 
             // run the evaluator on this one
             let evaluator = Evaluator::new(move |_| rx.recv().unwrap());
-            parallel_gadgets(&evaluator, Q, N);
+            parallel_gadgets(&evaluator, N, false);
 
             let result = evaluator.decode_output();
             assert_eq!(result, should_be);

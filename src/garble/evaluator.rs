@@ -62,16 +62,22 @@ impl Evaluator {
 impl Fancy for Evaluator {
     type Item = Wire;
 
-    fn garbler_input(&self, ix: Option<usize>, _q: u16) -> Wire {
+    fn garbler_input(&self, ix: Option<usize>, q: u16) -> Wire {
         match self.recv(ix, GateType::Other) {
-            Message::GarblerInput(w) => w,
+            Message::GarblerInput(w) => {
+                assert_eq!(w.modulus(), q);
+                w
+            }
             m => panic!("Expected message GarblerInput but got {}", m),
         }
     }
 
     fn evaluator_input(&self, ix: Option<usize>, q: u16) -> Wire {
         match self.recv(ix, GateType::EvaluatorInput { modulus: q }) {
-            Message::EvaluatorInput(w) => w,
+            Message::EvaluatorInput(w) => {
+                assert_eq!(w.modulus(), q);
+                w
+            }
             m => panic!("Expected message EvaluatorInput but got {}", m),
         }
     }
@@ -153,12 +159,12 @@ impl Fancy for Evaluator {
             Message::GarbledGate(g) => g,
             m => panic!("Expected message GarbledGate but got {}", m),
         };
+        assert!(gate.len() as u16 == x.modulus() - 1,
+            "evaluator proj: garbled gate length does not equal q-1, sync issue?");
         let gate_num = self.current_gate();
         let w = if x.color() == 0 {
             x.hashback(gate_num as u128, q)
         } else {
-            assert!(x.color() as usize - 1 < gate.len(),
-                "[evaluator] wire color greater than gate size! synchronization issue?");
             let ct = gate[x.color() as usize - 1];
             Wire::from_u128(ct ^ x.hash(gate_num as u128), q)
         };
@@ -168,6 +174,7 @@ impl Fancy for Evaluator {
     fn output(&self, ix: Option<usize>, x: &Wire) {
         match self.recv(ix, GateType::Other) {
             Message::OutputCiphertext(c) => {
+                assert_eq!(c.len() as u16, x.modulus());
                 self.output_cts.lock().unwrap().push(c);
             }
             m => panic!("Expected message OutputCiphertext but got {}", m),
@@ -334,10 +341,14 @@ impl Decoder {
     }
 
     pub fn decode(&self, ws: &[Wire]) -> Vec<u16> {
-        debug_assert_eq!(ws.len(), self.outputs.len());
+        debug_assert_eq!(ws.len(), self.outputs.len(),
+            "got {} wires, but have {} output ciphertexts",
+            ws.len(), self.outputs.len());
+
         let mut outs = Vec::new();
         for i in 0..ws.len() {
             let q = ws[i].modulus();
+            debug_assert_eq!(q as usize, self.outputs[i].len());
             for k in 0..q {
                 let h = ws[i].hash(output_tweak(i,k));
                 if h == self.outputs[i][k as usize] {
@@ -346,7 +357,9 @@ impl Decoder {
                 }
             }
         }
-        debug_assert_eq!(ws.len(), outs.len(), "decoding failed");
+        debug_assert_eq!(ws.len(), outs.len(),
+            "decoding failed! decoded {} out of {} wires",
+            outs.len(), ws.len());
         outs
     }
 

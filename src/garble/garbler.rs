@@ -8,12 +8,6 @@ use std::sync::{Arc, RwLock, Mutex};
 
 use super::Message;
 
-#[derive(Clone)]
-struct TaggedMessage {
-    tag: usize,
-    mesg: Message,
-}
-
 struct SyncInfo {
     begin_index: usize,
     end_index: usize,
@@ -29,8 +23,7 @@ pub struct Garbler {
     deltas:         Arc<RwLock<HashMap<u16, Wire>>>,
     current_output: Arc<Mutex<usize>>,
     current_gate:   Arc<Mutex<usize>>,
-    // sync stuff
-    sync_info: Arc<Mutex<Option<SyncInfo>>>,
+    sync_info:      Arc<Mutex<Option<SyncInfo>>>,
 }
 
 impl Garbler {
@@ -47,16 +40,22 @@ impl Garbler {
             deltas:         Arc::new(RwLock::new(HashMap::new())),
             current_gate:   Arc::new(Mutex::new(0)),
             current_output: Arc::new(Mutex::new(0)),
-
-            sync_info: Arc::new(Mutex::new(None)),
+            sync_info:      Arc::new(Mutex::new(None)),
         }
     }
 
     /// Output some information from the garbling.
     fn send(&self, ix: Option<usize>, m: Message) {
         if let Some(ref mut info) = *self.sync_info.lock().unwrap() {
-            unimplemented!()
+            println!("sync send [{:?}]", m);
+            if let Some(i) = ix {
+                assert!(info.current_index <= i);
+                info.waiting_messages[i].push(m);
+            } else {
+                panic!("garbler.send: called without index during sync!");
+            }
         } else {
+            println!("normal send [{:?}]", m);
             self.internal_send(m);
         }
     }
@@ -71,8 +70,10 @@ impl Garbler {
             while info.current_index < info.end_index {
                 let i = info.current_index;
                 if info.index_done[i] {
-                    let mesgs = std::mem::replace(&mut info.waiting_messages[i], Vec::new());
-                    for m in mesgs {
+                    println!("sending messages from index {}", i);
+                    let msgs = std::mem::replace(&mut info.waiting_messages[i], Vec::new());
+                    for m in msgs {
+                        println!("{:?}", m);
                         self.internal_send(m);
                     }
                     info.current_index += 1;
@@ -82,11 +83,14 @@ impl Garbler {
             }
             if info.current_index == info.end_index {
                 *opt_info = None; // sync is done
+                println!("sync completed");
             }
         }
     }
 
     fn internal_begin_sync(&self, begin_index: usize, end_index: usize) {
+        println!("begin sync {} {}", begin_index, end_index);
+
         let mut info = self.sync_info.lock().unwrap();
 
         assert!(info.is_none(),
@@ -104,6 +108,7 @@ impl Garbler {
     }
 
     fn internal_finish_index(&self, index: usize) {
+        println!("finish index {}", index);
         if let Some(ref mut info) = *self.sync_info.lock().unwrap() {
             info.index_done[index - info.begin_index] = true;
         } else {
