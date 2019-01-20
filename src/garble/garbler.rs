@@ -142,6 +142,7 @@ impl Garbler {
             let id = info.current_id_for_index[ix - info.begin_index];
             info.current_id_for_index[ix] += 1;
             // 48 bits for gate index, 16 for id
+            assert!(g + ix >> 48 == 0 && id >> 16 == 0);
             let res = g + ix + (id << 48);
             res
         } else {
