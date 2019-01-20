@@ -8,16 +8,6 @@ use std::sync::{Arc, RwLock, Mutex};
 
 use super::Message;
 
-struct SyncInfo {
-    begin_index: usize,
-    end_index: usize,
-    current_index: usize,
-    waiting_messages: Vec<Vec<Message>>,
-    index_done: Vec<bool>,
-    starting_gate_id: usize,
-    current_id_for_index: Vec<usize>,
-}
-
 /// Streams garbled circuit ciphertexts through a callback.
 pub struct Garbler {
     send_function:  Arc<Mutex<FnMut(Message) + Send>>,
@@ -25,7 +15,19 @@ pub struct Garbler {
     deltas:         Arc<Mutex<HashMap<u16, Wire>>>,
     current_output: Arc<Mutex<usize>>,
     current_gate:   Arc<Mutex<usize>>,
-    sync_info:      Arc<Mutex<Option<SyncInfo>>>,
+    sync_info:      Arc<Mutex<Option<GarblerSyncInfo>>>,
+}
+
+/// Struct used to synchronize messages and gate identifiers between asynchronous garbler
+/// and evaluator.
+struct GarblerSyncInfo {
+    begin_index: usize,
+    end_index: usize,
+    current_index: usize,
+    waiting_messages: Vec<Vec<Message>>,
+    index_done: Vec<bool>,
+    starting_gate_id: usize,
+    current_id_for_index: Vec<usize>,
 }
 
 impl Garbler {
@@ -96,7 +98,7 @@ impl Garbler {
         assert!(info.is_none(),
             "garbler: begin_sync called before finishing previous sync!");
 
-        let init = SyncInfo {
+        let init = GarblerSyncInfo {
             begin_index,
             end_index,
             current_index:    begin_index,
@@ -139,10 +141,8 @@ impl Garbler {
             let ix = sync_index.expect("syncronization requires a sync index");
             let id = info.current_id_for_index[ix - info.begin_index];
             info.current_id_for_index[ix] += 1;
-            let res = g + ix + id;
-            println!("g={} ix={} id={} gate={}", g, ix, id, res);
-            // XXX really want it to be g + NgatesPerIndex*ix + id
-            // but i dont know NgatesPerIndex
+            // 48 bits for gate index, 16 for id
+            let res = g + ix + (id << 48);
             res
         } else {
             let mut c = self.current_gate.lock().unwrap();

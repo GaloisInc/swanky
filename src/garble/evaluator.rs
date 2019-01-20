@@ -19,6 +19,18 @@ pub struct Evaluator {
     current_gate:  Arc<Mutex<usize>>,
     output_cts:    Arc<Mutex<Vec<OutputCiphertext>>>,
     output_wires:  Arc<Mutex<Vec<Wire>>>,
+    sync_info:     Arc<Mutex<Option<EvaluatorSyncInfo>>>,
+}
+
+/// Struct used to synchronize messages and gate identifiers between asynchronous garbler
+/// and evaluator.
+struct EvaluatorSyncInfo {
+    begin_index: usize,
+    end_index: usize,
+    current_index: usize,
+    index_done: Vec<bool>,
+    starting_gate_id: usize,
+    current_id_for_index: Vec<usize>,
 }
 
 impl Evaluator {
@@ -35,20 +47,43 @@ impl Evaluator {
             current_gate:  Arc::new(Mutex::new(0)),
             output_cts:    Arc::new(Mutex::new(Vec::new())),
             output_wires:  Arc::new(Mutex::new(Vec::new())),
+            sync_info:     Arc::new(Mutex::new(None)),
         }
     }
 
     /// Receive the next message.
-    fn recv(&self, _ix: Option<usize>, ty: GateType) -> Message {
+    fn recv(&self, sync_index: Option<usize>, ty: GateType) -> Message {
+        if let Some(ref mut info) = *self.sync_info.lock().unwrap() {
+            let ix = sync_index.expect("synchronization requires a sync index");
+            // TODO: another thread, which stores the calls (sync_index, ty), and calls
+            // internal_recv with them, in order, returning the appropriate Message to the
+            // caller here somehow, which waits
+            self.internal_recv(ty) // XXX: not parallel
+        } else {
+            self.internal_recv(ty)
+        }
+    }
+
+    fn internal_recv(&self, ty: GateType) -> Message {
         (self.recv_function.lock().unwrap().deref_mut())(ty)
     }
 
     /// The current non-free gate index of the garbling computation.
-    fn current_gate(&self) -> usize {
-        let mut c = self.current_gate.lock().unwrap();
-        let old = *c;
-        *c += 1;
-        old
+    fn current_gate(&self, sync_index: Option<usize>) -> usize {
+        if let Some(ref mut info) = *self.sync_info.lock().unwrap() {
+            let g  = info.starting_gate_id;
+            let ix = sync_index.expect("syncronization requires a sync index");
+            let id = info.current_id_for_index[ix - info.begin_index];
+            info.current_id_for_index[ix] += 1;
+            // 48 bits for gate index, 16 for id
+            let res = g + ix + (id << 48);
+            res
+        } else {
+            let mut c = self.current_gate.lock().unwrap();
+            let old = *c;
+            *c += 1;
+            old
+        }
     }
 
     /// Decode the output received during the Fancy computation.
@@ -57,6 +92,63 @@ impl Evaluator {
         let outs = self.output_wires.lock().unwrap();
         Decoder::new(cts.clone()).decode(&outs)
     }
+
+    fn internal_begin_sync(&self, begin_index: usize, end_index: usize) {
+        let mut info = self.sync_info.lock().unwrap();
+
+        assert!(info.is_none(),
+            "garbler: begin_sync called before finishing previous sync!");
+
+        let init = EvaluatorSyncInfo {
+            begin_index,
+            end_index,
+            current_index:    begin_index,
+            index_done:       vec![false; end_index - begin_index],
+            starting_gate_id: *self.current_gate.lock().unwrap(),
+            current_id_for_index: vec![0; end_index - begin_index],
+        };
+
+        *info = Some(init);
+    }
+
+    fn internal_finish_index(&self, index: usize) {
+        let mut opt_info = self.sync_info.lock().unwrap();
+        if let Some(ref mut info) = *opt_info {
+            info.index_done[index - info.begin_index] = true;
+            if info.index_done.iter().all(|&x| x) {
+                *opt_info = None;
+            }
+        } else {
+            panic!("garbler: finish_index called without starting a sync!");
+        }
+    }
+
+    // fn flush(&self) {
+    //     let mut opt_info = self.sync_info.lock().unwrap();
+    //     if let Some(ref mut info) = *opt_info {
+    //         while info.current_index < info.end_index {
+    //             let i = info.current_index;
+    //             // TODO: send messages from current index, if possible
+    //             if info.index_done[i] {
+    //                 let msgs = std::mem::replace(&mut info.waiting_messages[i], Vec::new());
+    //                 for (ty,m) in msgs {
+    //                     self.internal_recv(ty, m);
+    //                 }
+    //                 info.current_index += 1;
+    //             } else {
+    //                 break;
+    //             }
+    //         }
+    //         if info.current_index == info.end_index {
+    //             // set current_gate for synchronous usage
+    //             let ngates = info.end_index - info.begin_index;
+    //             *self.current_gate.lock().unwrap() += ngates;
+    //             // turn off sync
+    //             *opt_info = None;
+    //         }
+    //     }
+    // }
+
 }
 
 impl Fancy for Evaluator {
@@ -121,7 +213,7 @@ impl Fancy for Evaluator {
             Message::GarbledGate(g) => g,
             m => panic!("Expected message GarbledGate but got {}", m),
         };
-        let gate_num = self.current_gate();
+        let gate_num = self.current_gate(ix);
         let g = tweak2(gate_num as u64, 0);
         let q = A.modulus();
 
@@ -161,7 +253,7 @@ impl Fancy for Evaluator {
         };
         assert!(gate.len() as u16 == x.modulus() - 1,
             "evaluator proj: garbled gate length does not equal q-1, sync issue?");
-        let gate_num = self.current_gate();
+        let gate_num = self.current_gate(ix);
         let w = if x.color() == 0 {
             x.hashback(gate_num as u128, q)
         } else {
@@ -182,9 +274,13 @@ impl Fancy for Evaluator {
         self.output_wires.lock().unwrap().push(x.clone());
     }
 
-    fn begin_sync(&self, _begin_index: usize, _end_index: usize) { }
+    fn begin_sync(&self, begin_index: usize, end_index: usize) {
+        self.internal_begin_sync(begin_index, end_index);
+    }
 
-    fn finish_index(&self, _index: usize) { }
+    fn finish_index(&self, index: usize) {
+        self.internal_finish_index(index);
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////
