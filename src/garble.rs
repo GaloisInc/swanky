@@ -729,7 +729,7 @@ mod parallel {
     }
 
     #[test]
-    fn parallel_test() {
+    fn parallel_garbling() {
         let mut rng = thread_rng();
         let N = 10;
         let Q = crate::util::modulus_with_width(10);
