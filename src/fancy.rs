@@ -284,6 +284,13 @@ pub trait BundleGadgets: Fancy {
         }
     }
 
+    /// Output a slice of bundles.
+    fn output_bundles(&self, ix: Option<usize>, xs: &[Bundle<Self::Item>]) {
+        for x in xs.iter() {
+            self.output_bundle(ix, x);
+        }
+    }
+
     ////////////////////////////////////////////////////////////////////////////////
     // High-level computations dealing with bundles.
 

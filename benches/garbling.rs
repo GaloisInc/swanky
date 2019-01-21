@@ -1,11 +1,10 @@
-use std::time::Duration;
 use criterion::{criterion_main, criterion_group, Criterion};
-use fancy_garbling::util::RngExt;
-use fancy_garbling::garble::garble;
 use fancy_garbling::circuit::{CircuitBuilder, Circuit};
 use fancy_garbling::fancy::Fancy;
-
+use fancy_garbling::garble::garble;
+use fancy_garbling::util::RngExt;
 use itertools::Itertools;
+use std::time::Duration;
 
 fn bench_garble<F:'static>(c: &mut Criterion, name: &str, make_circuit: F, q: u16)
     where F: Fn(u16) -> Circuit

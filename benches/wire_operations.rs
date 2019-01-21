@@ -67,7 +67,6 @@ fn bench_cmul_eq(c: &mut Criterion, p: u16) {
         let c = rng.gen_u16();
         b.iter(|| {
             x.cmul_eq(c);
-            // criterion::black_box(x);
         });
     });
 }

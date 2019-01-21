@@ -695,43 +695,36 @@ mod parallel {
     use crate::dummy::Dummy;
     use rand::thread_rng;
     use crate::util::RngExt;
+    use crate::fancy::BundleGadgets;
 
-    fn parallel_gadgets<F,W>(b: &F, N: usize, par: bool)
+    fn parallel_gadgets<F,W>(b: &F, Q: u128, N: usize, par: bool)
       where W: Clone + Default + HasModulus + Send + Sync + std::fmt::Debug,
             F: Fancy<Item=W> + Send + Sync,
      {
-        let inps = (0..N).map(|i| {
-            b.garbler_input(None, 2 + i as u16)
-        }).collect_vec();
+        let inps = b.garbler_input_bundles_crt(None, Q, N);
 
         if par {
             crossbeam::scope(|scope| {
                 b.begin_sync(0,N);
                 let hs = inps.iter().enumerate().map(|(i,inp)| {
                     scope.spawn(move |_| {
-                        let c = b.constant(Some(i), 1, inp.modulus());
-                        let m = b.mul(Some(i), inp, &c);
-                        let x = b.mul(Some(i), &m, &c);
-                        let z = b.mod_change(Some(i), &x, x.modulus() + 1);
+                        let z = b.exact_relu(Some(i), inp);
                         b.finish_index(i);
                         z
                     })
                 }).collect_vec();
                 let outs = hs.into_iter().map(|h| h.join().unwrap()).collect_vec();
-                b.outputs(None, &outs);
+                b.output_bundles(None, &outs);
             }).unwrap()
 
         } else {
             b.begin_sync(0,N);
             let outs = inps.iter().enumerate().map(|(i,inp)| {
-                let c = b.constant(Some(i), 1, inp.modulus());
-                let m = b.mul(Some(i), inp, &c);
-                let x = b.mul(Some(i), &m, &c);
-                let z = b.mod_change(Some(i), &x, x.modulus() + 1);
+                let z = b.exact_relu(Some(i), inp);
                 b.finish_index(i);
                 z
             }).collect_vec();
-            b.outputs(None, &outs);
+            b.output_bundles(None, &outs);
         }
     }
 
@@ -739,17 +732,20 @@ mod parallel {
     fn parallel_test() {
         let mut rng = thread_rng();
         let N = 10;
+        let Q = crate::util::modulus_with_width(10);
         for _ in 0..64 {
-            let input = (0..N).map(|i| rng.gen_u16() % (2 + i as u16)).collect_vec();
+            let input = (0..N).flat_map(|_| {
+                crate::util::crt_factor(rng.gen_u128() % Q, Q)
+            }).collect_vec();
 
             // compute the correct answer using Dummy (which cannot get out of sync)
             let dummy = Dummy::new(&input, &[]);
-            parallel_gadgets(&dummy, N, true);
+            parallel_gadgets(&dummy, Q, N, true);
             let should_be_par = dummy.get_output();
 
             // check serial version agrees with parallel
             let dummy = Dummy::new(&input, &[]);
-            parallel_gadgets(&dummy, N, false);
+            parallel_gadgets(&dummy, Q, N, false);
             let should_be = dummy.get_output();
 
             assert_eq!(should_be, should_be_par);
@@ -773,12 +769,12 @@ mod parallel {
             // put garbler on another thread
             std::thread::spawn(move || {
                 let garbler = Garbler::new(send_func);
-                parallel_gadgets(&garbler, N, true);
+                parallel_gadgets(&garbler, Q, N, true);
             });
 
             // run the evaluator on this one
             let evaluator = Evaluator::new(move |_| rx.recv().unwrap());
-            parallel_gadgets(&evaluator, N, false);
+            parallel_gadgets(&evaluator, Q, N, false);
 
             let result = evaluator.decode_output();
             assert_eq!(result, should_be);

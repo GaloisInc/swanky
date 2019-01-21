@@ -51,11 +51,16 @@ impl Garbler {
     /// Output some information from the garbling.
     fn send(&self, ix: Option<usize>, m: Message) {
         if let Some(ref mut info) = *self.sync_info.lock().unwrap() {
-            if let Some(i) = ix {
-                assert!(info.current_index <= i);
-                info.waiting_messages[i].push(m);
+            let i = ix.expect("garbler.send: called without index during sync!");
+            assert!(info.current_index <= i);
+            if i == info.current_index {
+                let msgs = std::mem::replace(&mut info.waiting_messages[i], Vec::new());
+                for m in msgs {
+                    self.internal_send(m);
+                }
+                self.internal_send(m);
             } else {
-                panic!("garbler.send: called without index during sync!");
+                info.waiting_messages[i].push(m);
             }
         } else {
             self.internal_send(m);
@@ -66,12 +71,10 @@ impl Garbler {
         (self.send_function.lock().unwrap().deref_mut())(m);
     }
 
-    fn flush(&self) {
-        let mut opt_info = self.sync_info.lock().unwrap();
-        if let Some(ref mut info) = *opt_info {
+    fn flush(&self, opt_info: &mut Option<GarblerSyncInfo>) {
+        if let Some(ref mut info) = opt_info {
             while info.current_index < info.end_index {
                 let i = info.current_index;
-                // TODO: send messages from current index, if possible
                 if info.index_done[i] {
                     let msgs = std::mem::replace(&mut info.waiting_messages[i], Vec::new());
                     for m in msgs {
@@ -112,12 +115,13 @@ impl Garbler {
     }
 
     fn internal_finish_index(&self, index: usize) {
-        if let Some(ref mut info) = *self.sync_info.lock().unwrap() {
+        let mut opt_info = self.sync_info.lock().unwrap();
+        if let Some(ref mut info) = *opt_info {
             info.index_done[index - info.begin_index] = true;
         } else {
             panic!("garbler: finish_index called without starting a sync!");
         }
-        self.flush();
+        self.flush(&mut *opt_info);
     }
 
     /// Create a delta if it has not been created yet for this modulus, otherwise just
