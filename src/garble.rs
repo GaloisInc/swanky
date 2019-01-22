@@ -21,7 +21,7 @@ pub type GarbledGate = Vec<u128>;
 pub type OutputCiphertext = Vec<u128>;
 
 /// The outputs that can be emitted by a Garbler and consumed by an Evaluator.
-#[derive(Clone, Serialize, Deserialize, Debug)]
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
 pub enum Message {
     /// Zero wire and delta for one of the garbler's inputs.
     ///
@@ -549,6 +549,16 @@ mod classic {
         assert_eq!(de, Decoder::from_bytes(&de.to_bytes()).unwrap());
     }
 //}}}
+    #[test] // message serialization // {{{
+    fn message_serialization() {
+        let mut rng = thread_rng();
+        for _ in 0..128 {
+            let q = rng.gen_modulus();
+            let w = Wire::rand(&mut rng, q);
+            let m = Message::EvaluatorInput(w);
+            assert_eq!(m, Message::from_bytes(&m.to_bytes()).unwrap());
+        }
+    } // }}}
 }
 
 #[cfg(test)]
