@@ -1,8 +1,10 @@
 [package]
-name = "fancy-twopc"
+name = "twopac"
 version = "0.1.0"
 edition = "2018"
 authors = ["Alex J. Malozemoff <amaloz@galois.com>"]
+
+[lib]
 
 [dependencies]
 clap = "2.32.0"
