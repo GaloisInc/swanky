@@ -6,36 +6,34 @@ use itertools::Itertools;
 use serde_derive::{Serialize, Deserialize};
 use std::collections::HashMap;
 use std::ops::DerefMut;
-use std::sync::{Arc, RwLock, Mutex, Condvar};
+use std::sync::{Arc, RwLock, Mutex};
 use super::{Message, GarbledGate, OutputCiphertext, GateType};
 use crossbeam::queue::MsQueue;
-use std::sync::mpsc::{channel, Sender};
+use std::sync::mpsc::{channel, Sender, Receiver};
 use std::thread::{self, JoinHandle};
 
 /// Streaming evaluator using a callback to receive ciphertexts as needed.
 ///
 /// Evaluates a garbled circuit on the fly, using messages containing ciphertexts and
-/// wires.
+/// wires. Parallelizable.
 pub struct Evaluator {
-    recv_function: Arc<Mutex<FnMut(GateType) -> Message + Send>>,
-    constants:     Arc<RwLock<HashMap<(u16,u16), Wire>>>,
-    current_gate:  Arc<Mutex<usize>>,
-    output_cts:    Arc<Mutex<Vec<OutputCiphertext>>>,
-    output_wires:  Arc<Mutex<Vec<Wire>>>,
-    sync_info:     Arc<Mutex<Option<EvaluatorSyncInfo>>>,
-    msg_queues:    Arc<RwLock<Vec<MsQueue<(GateType, Sender<Message>)>>>>,
-    in_sync:       Arc<RwLock<bool>>,
-    begin_index:   Arc<RwLock<usize>>,
+    recv_function:  Arc<Mutex<FnMut(GateType) -> Message + Send>>,
+    constants:      Arc<RwLock<HashMap<(u16,u16), Wire>>>,
+    current_gate:   Arc<Mutex<usize>>,
+    output_cts:     Arc<Mutex<Vec<OutputCiphertext>>>,
+    output_wires:   Arc<Mutex<Vec<Wire>>>,
+
+    in_sync:        Arc<RwLock<bool>>,
+    sync_info:      Arc<Mutex<Option<GateSyncInfo>>>,
+    msg_queues:     Arc<RwLock<Vec<MsQueue<(GateType, Sender<Message>)>>>>,
+    begin_index:    Arc<RwLock<usize>>,
     postman_handle: Arc<Mutex<Option<JoinHandle<()>>>>,
-    postman_notify: Arc<(Mutex<()>, Condvar)>,
+    postman_notify: Arc<Mutex<Option<Sender<()>>>>,
+    index_done:     Arc<RwLock<Option<Vec<bool>>>>,
 }
 
-/// Struct used to synchronize messages and gate identifiers between asynchronous garbler
-/// and evaluator.
-struct EvaluatorSyncInfo {
-    begin_index: usize,
-    end_index: usize,
-    index_done: Vec<bool>,
+// Maintain the state necessary for asynchronous gate identifiers.
+struct GateSyncInfo {
     starting_gate_id: usize,
     current_id_for_index: Vec<usize>,
 }
@@ -55,24 +53,31 @@ impl Evaluator {
             output_cts:     Arc::new(Mutex::new(Vec::new())),
             output_wires:   Arc::new(Mutex::new(Vec::new())),
 
+            in_sync:        Arc::new(RwLock::new(false)),
             sync_info:      Arc::new(Mutex::new(None)),
             msg_queues:     Arc::new(RwLock::new(Vec::new())),
-            in_sync:        Arc::new(RwLock::new(false)),
             begin_index:    Arc::new(RwLock::new(0)),
             postman_handle: Arc::new(Mutex::new(None)),
-            postman_notify: Arc::new((Mutex::new(()), Condvar::new())),
+            postman_notify: Arc::new(Mutex::new(None)),
+            index_done:     Arc::new(RwLock::new(None)),
         }
+    }
+
+    /// Decode the output received during the Fancy computation.
+    pub fn decode_output(&self) -> Vec<u16> {
+        let cts  = self.output_cts.lock().unwrap();
+        let outs = self.output_wires.lock().unwrap();
+        Decoder::new(cts.clone()).decode(&outs)
     }
 
     /// Receive the next message.
     fn recv(&self, sync_index: Option<usize>, ty: GateType) -> Message {
-        if self.in_sync() {
+        if *self.in_sync.read().unwrap() {
             let ix = sync_index.expect("synchronization requires a sync index");
             let (tx, rx) = channel();
             self.msg_queues.read().unwrap()[ix - self.starting_index()].push((ty,tx));
-            self.postman_notify.1.notify_one();
-            let m = rx.recv().unwrap();
-            m
+            self.notify_postman();
+            rx.recv().unwrap()
         } else {
             self.internal_recv(ty)
         }
@@ -87,7 +92,7 @@ impl Evaluator {
         if let Some(ref mut info) = *self.sync_info.lock().unwrap() {
             let g  = info.starting_gate_id;
             let ix = sync_index.expect("syncronization requires a sync index");
-            let id = info.current_id_for_index[ix - info.begin_index];
+            let id = info.current_id_for_index[ix - self.starting_index()];
             info.current_id_for_index[ix] += 1;
             // 48 bits for gate index, 16 for id
             let res = g + ix + (id << 48);
@@ -100,110 +105,103 @@ impl Evaluator {
         }
     }
 
-    /// Decode the output received during the Fancy computation.
-    pub fn decode_output(&self) -> Vec<u16> {
-        let cts  = self.output_cts.lock().unwrap();
-        let outs = self.output_wires.lock().unwrap();
-        Decoder::new(cts.clone()).decode(&outs)
-    }
-
     fn internal_begin_sync(&self, begin_index: usize, end_index: usize) {
-        let mut info = self.sync_info.lock().unwrap();
-
-        assert!(info.is_none(),
-            "garbler: begin_sync called before finishing previous sync!");
-
         let n = end_index - begin_index;
 
-        let init = EvaluatorSyncInfo {
-            begin_index,
-            end_index,
-            index_done:       vec![false; n],
+        assert_eq!(*self.in_sync.read().unwrap(), false,
+            "begin sync called while already in sync mode!");
+
+        *self.in_sync.write().unwrap()  = true;
+        *self.sync_info.lock().unwrap() = Some(GateSyncInfo {
             starting_gate_id: *self.current_gate.lock().unwrap(),
             current_id_for_index: vec![0; n],
-        };
+        });
 
-        *info = Some(init);
         *self.msg_queues.write().unwrap()  = (0..n).map(|_| MsQueue::new()).collect_vec();
-        *self.in_sync.write().unwrap()     = true;
         *self.begin_index.write().unwrap() = begin_index;
+        *self.index_done.write().unwrap()  = Some(vec![false; n]);
 
-        let p_sync_info = self.sync_info.clone();
+        // set up postman
+        let p_index_done = self.index_done.clone();
         let p_msg_queues = self.msg_queues.clone();
         let p_recv = self.recv_function.clone();
-        let p_notify = self.postman_notify.clone();
+        let (tx,rx) = channel();
+
+        // start postman
         let h = thread::spawn(move || {
-            postman(p_sync_info, p_msg_queues, p_recv, p_notify);
+            postman(begin_index, end_index, p_index_done, p_msg_queues, p_recv, rx);
         });
 
         *self.postman_handle.lock().unwrap() = Some(h);
+        *self.postman_notify.lock().unwrap() = Some(tx);
     }
 
     fn internal_finish_index(&self, index: usize) {
         let mut done = false;
         {
-            let mut opt_info = self.sync_info.lock().unwrap();
-            if let Some(ref mut info) = *opt_info {
-                info.index_done[index - info.begin_index] = true;
-                if info.index_done.iter().all(|&x| x) {
+            let mut opt_index_done = self.index_done.write().unwrap();
+            if let Some(ref mut index_done) = *opt_index_done {
+                index_done[index - self.starting_index()] = true;
+                if index_done.iter().all(|&x| x) {
                     // end sync
                     done = true;
-                    *opt_info = None;
-                    *self.msg_queues.write().unwrap() = Vec::new();
-                    *self.in_sync.write().unwrap() = false;
+                    *opt_index_done = None;
+                    *self.in_sync.write().unwrap()     = false;
+                    *self.sync_info.lock().unwrap()    = None;
+                    *self.msg_queues.write().unwrap()  = Vec::new();
                     *self.begin_index.write().unwrap() = 0;
-                    println!("end sync");
                 }
             } else {
                 panic!("garbler: finish_index called without starting a sync!");
             }
+            // unlock index_done for postman
         }
-        self.postman_notify.1.notify_one();
+        self.notify_postman();
         if done {
             self.postman_handle.lock().unwrap().take().unwrap().join().unwrap();
+            *self.postman_notify.lock().unwrap() = None;
         }
     }
 
-    fn in_sync(&self) -> bool {
-        *self.in_sync.read().unwrap()
-    }
-
+    // starting index of the current sync computation
     fn starting_index(&self) -> usize {
         *self.begin_index.read().unwrap()
+    }
+
+    fn notify_postman(&self) {
+        self.postman_notify.lock().unwrap().as_ref().unwrap().send(()).unwrap();
     }
 }
 
 fn postman(
-    sync_info: Arc<Mutex<Option<EvaluatorSyncInfo>>>,
+    start_index: usize,
+    end_index: usize,
+    index_done: Arc<RwLock<Option<Vec<bool>>>>,
     msg_queues: Arc<RwLock<Vec<MsQueue<(GateType, Sender<Message>)>>>>,
     recv: Arc<Mutex<FnMut(GateType) -> Message + Send>>,
-    notify: Arc<(Mutex<()>, Condvar)>,
+    notify: Receiver<()>,
 ){
-    let end;
-    let mut ix;
-    {
-        if let Some(ref info) = *sync_info.lock().unwrap() {
-            end = info.end_index;
-            ix = info.begin_index;
-        } else {
-            panic!("sync required");
-        }
-    }
-    while ix < end {
-        let (ty, tx) = msg_queues.read().unwrap()[ix].pop();
-        let m = (recv.lock().unwrap().deref_mut())(ty);
-        tx.send(m).unwrap();
+    let mut ix = start_index;
+    while ix < end_index {
+        // wait for notification
+        notify.recv().unwrap();
 
-        let (ref lock, ref cvar) = *notify;
-        let _ = cvar.wait(lock.lock().unwrap()).unwrap();
-
-        if let Some(ref info) = *sync_info.lock().unwrap() {
-            if info.index_done[ix] {
+        // check if this index is done yet
+        if let Some(ref index_done) = *index_done.read().unwrap() {
+            if index_done[ix] {
                 ix += 1;
             }
         } else {
             // sync has been cancelled
             break;
+        }
+
+        // check if there is a message to receive for this index
+        if let Some((ty, tx)) = msg_queues.read().unwrap()[ix].try_pop() {
+            // receive message
+            let m = (recv.lock().unwrap().deref_mut())(ty);
+            // return the message to the original caller
+            tx.send(m).unwrap();
         }
     }
 }

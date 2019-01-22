@@ -733,7 +733,7 @@ mod parallel {
         let mut rng = thread_rng();
         let N = 10;
         let Q = crate::util::modulus_with_width(10);
-        for _ in 0..64 {
+        for _ in 0..16 {
             let input = (0..N).flat_map(|_| {
                 crate::util::crt_factor(rng.gen_u128() % Q, Q)
             }).collect_vec();

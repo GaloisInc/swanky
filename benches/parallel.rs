@@ -8,35 +8,23 @@ use itertools::Itertools;
 use rand::thread_rng;
 use std::time::Duration;
 
-fn parallel_gadget<F,W>(b: &F, Q: u128, N: usize, par: bool)
+fn parallel_gadget<F,W>(b: &F, Q: u128, N: usize)
     where W: Clone + Default + HasModulus + Send + Sync + std::fmt::Debug,
         F: Fancy<Item=W> + Send + Sync,
     {
     let inps = b.garbler_input_bundles_crt(None, Q, N);
-
-    if par {
-        crossbeam::scope(|scope| {
-            b.begin_sync(0,N);
-            let hs = inps.iter().enumerate().map(|(i,inp)| {
-                scope.spawn(move |_| {
-                    let z = b.exact_relu(Some(i), inp);
-                    b.finish_index(i);
-                    z
-                })
-            }).collect_vec();
-            let outs = hs.into_iter().map(|h| h.join().unwrap()).collect_vec();
-            b.output_bundles(None, &outs);
-        }).unwrap()
-
-    } else {
+    crossbeam::scope(|scope| {
         b.begin_sync(0,N);
-        let outs = inps.iter().enumerate().map(|(i,inp)| {
-            let z = b.exact_relu(Some(i), inp);
-            b.finish_index(i);
-            z
+        let hs = inps.iter().enumerate().map(|(i,inp)| {
+            scope.spawn(move |_| {
+                let z = b.exact_relu(Some(i), inp);
+                b.finish_index(i);
+                z
+            })
         }).collect_vec();
+        let outs = hs.into_iter().map(|h| h.join().unwrap()).collect_vec();
         b.output_bundles(None, &outs);
-    }
+    }).unwrap();
 }
 
 fn bench_parallel(c: &mut Criterion) {
@@ -66,12 +54,12 @@ fn bench_parallel(c: &mut Criterion) {
             // put garbler on another thread
             std::thread::spawn(move || {
                 let garbler = Garbler::new(send_func);
-                parallel_gadget(&garbler, Q, N, true);
+                parallel_gadget(&garbler, Q, N);
             });
 
             // run the evaluator on this one
             let evaluator = Evaluator::new(move |_| rx.recv().unwrap());
-            parallel_gadget(&evaluator, Q, N, false);
+            parallel_gadget(&evaluator, Q, N);
         });
     });
 }
