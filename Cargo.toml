@@ -44,3 +44,7 @@ harness = false
 [[bench]]
 name = "parallel"
 harness = false
+
+[[bench]]
+name = "thread"
+harness = false

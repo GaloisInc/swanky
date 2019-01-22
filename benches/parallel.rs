@@ -6,31 +6,39 @@ use fancy_garbling::garble::{Garbler, Evaluator, Message};
 use fancy_garbling::util::{RngExt, modulus_with_width, crt_factor};
 use itertools::Itertools;
 use rand::thread_rng;
-use std::time::Duration;
 
-fn parallel_gadget<F,W>(b: &F, Q: u128, N: usize)
+fn parallel_gadget<F,W>(b: &F, Q: u128, N: usize, par: bool)
     where W: Clone + Default + HasModulus + Send + Sync + std::fmt::Debug,
         F: Fancy<Item=W> + Send + Sync,
     {
     let inps = b.garbler_input_bundles_crt(None, Q, N);
-    crossbeam::scope(|scope| {
-        b.begin_sync(0,N);
-        let hs = inps.iter().enumerate().map(|(i,inp)| {
-            scope.spawn(move |_| {
-                let z = b.exact_relu(Some(i), inp);
-                b.finish_index(i);
-                z
-            })
-        }).collect_vec();
-        let outs = hs.into_iter().map(|h| h.join().unwrap()).collect_vec();
-        b.output_bundles(None, &outs);
-    }).unwrap();
+    if par {
+        crossbeam::scope(|scope| {
+            b.begin_sync(0,N);
+            let hs = inps.iter().enumerate().map(|(i,inp)| {
+                scope.spawn(move |_| {
+                    let y = b.exact_relu(Some(i), inp);
+                    let z = b.exact_sign(Some(i), &y);
+                    b.finish_index(i);
+                    z
+                })
+            }).collect_vec();
+            let outs = hs.into_iter().map(|h| h.join().unwrap()).collect_vec();
+            b.outputs(None, &outs);
+        }).unwrap();
+    } else {
+        for inp in inps.iter() {
+            let y = b.exact_relu(None, inp);
+            let z = b.exact_sign(None, &y);
+            b.output(None, &z)
+        }
+    }
 }
 
-fn bench_parallel(c: &mut Criterion) {
-    c.bench_function("parallel streaming", |b| {
+fn bench_setup(c: &mut Criterion, par: bool) {
+    c.bench_function(if par { "parallel streaming" } else { "sequential streaming" }, move |b| {
         let mut rng = thread_rng();
-        let N = 20;
+        let N = 10;
         let Q = modulus_with_width(10);
 
         b.iter(|| {
@@ -54,20 +62,23 @@ fn bench_parallel(c: &mut Criterion) {
             // put garbler on another thread
             std::thread::spawn(move || {
                 let garbler = Garbler::new(send_func);
-                parallel_gadget(&garbler, Q, N);
+                parallel_gadget(&garbler, Q, N, par);
             });
 
             // run the evaluator on this one
             let evaluator = Evaluator::new(move |_| rx.recv().unwrap());
-            parallel_gadget(&evaluator, Q, N);
+            parallel_gadget(&evaluator, Q, N, par);
         });
     });
 }
 
-criterion_group!{
-    name = parallel;
-    config = Criterion::default().warm_up_time(Duration::from_millis(100));
-    targets = bench_parallel,
+fn bench_parallel(c: &mut Criterion) {
+    bench_setup(c, true);
 }
 
+fn bench_sequential(c: &mut Criterion) {
+    bench_setup(c, false);
+}
+
+criterion_group!(parallel, bench_parallel, bench_sequential);
 criterion_main!(parallel);

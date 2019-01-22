@@ -707,7 +707,7 @@ mod parallel {
     use crate::util::RngExt;
     use crate::fancy::BundleGadgets;
 
-    fn parallel_gadgets<F,W>(b: &F, Q: u128, N: usize, par: bool)
+    fn parallel_gadgets<F,W>(b: &F, Q: u128, N: usize, par: bool) // {{{
       where W: Clone + Default + HasModulus + Send + Sync + std::fmt::Debug,
             F: Fancy<Item=W> + Send + Sync,
      {
@@ -789,5 +789,5 @@ mod parallel {
             let result = evaluator.decode_output();
             assert_eq!(result, should_be);
         }
-    }
+    } // }}}
 }
