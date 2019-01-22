@@ -1,13 +1,20 @@
-pub mod comm;
-pub mod garble;
+#![feature(test)]
 
-use crate::comm::{BinaryReceive, BinarySend};
+pub mod comm;
+
 use clap::{App, Arg, ErrorKind, SubCommand};
 use failure::Error;
 use fancy_garbling::fancy::{Fancy, HasModulus};
-use fancy_garbling::garble::{Evaluator, Garbler, Message};
+use fancy_garbling::garble::{Evaluator, Garbler, GateType, Message};
+use fancy_garbling::wire::Wire;
+use ocelot::base::dummy::DummyOT;
+use ocelot::base::{bitvec_to_u128, u128_to_bitvec, ObliviousTransfer};
+use ocelot::otext::iknp::IKNP;
+use ocelot::otext::OTExtension;
 use std::fs;
+use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};
+use std::sync::{Arc, Mutex};
 
 static VERSION: &str = "0.1.0";
 
@@ -44,11 +51,11 @@ pub fn main() {
         match (host, file) {
             (None, None) => Err(failure::err_msg("One of --host or --file must be used")),
             (Some(h), None) => match garbler_tcp(h) {
-                Ok(mut stream) => garble(&mut stream, &input),
+                Ok(stream) => garble(stream, &input),
                 Err(e) => Err(e),
             },
             (None, Some(f)) => match garbler_file(f) {
-                Ok(mut stream) => garble(&mut stream, &input),
+                Ok(stream) => garble(stream, &input),
                 Err(e) => Err(e),
             },
             (_, _) => unreachable!(),
@@ -58,11 +65,11 @@ pub fn main() {
         match (host, file) {
             (None, None) => Err(failure::err_msg("One of --host or --file must be used")),
             (Some(h), None) => match evaluator_tcp(h) {
-                Ok(mut stream) => evaluate(&mut stream, &input),
+                Ok(stream) => evaluate(stream, &input),
                 Err(e) => Err(e),
             },
             (None, Some(f)) => match evaluator_file(f) {
-                Ok(mut stream) => evaluate(&mut stream, &input),
+                Ok(stream) => evaluate(stream, &input),
                 Err(e) => Err(e),
             },
             (_, _) => unreachable!(),
@@ -87,19 +94,19 @@ where
     F: Fancy<Item = W>,
 {
     let q = 17;
-    let a = f.garbler_input(q);
-    let b = f.evaluator_input(q);
+    let b = f.evaluator_input(None, q);
+    let a = f.garbler_input(None, q);
     let c = f.add(&a, &b);
-    f.output(&c);
+    f.output(None, &c);
 }
 
-fn garbler_file(file: &str) -> Result<impl BinarySend + BinaryReceive, Error> {
+fn garbler_file(file: &str) -> Result<impl Read + Write, Error> {
     println!("Creating file '{}'...", file);
     let f = fs::File::create(file)?;
     Ok(f)
 }
 
-fn garbler_tcp(host: &str) -> Result<impl BinarySend + BinaryReceive, Error> {
+fn garbler_tcp(host: &str) -> Result<impl Read + Write, Error> {
     println!("Launching server on '{}'...", host);
     let server = TcpListener::bind(host)?;
     println!("Success!");
@@ -110,58 +117,71 @@ fn garbler_tcp(host: &str) -> Result<impl BinarySend + BinaryReceive, Error> {
     return Err(failure::err_msg("Unable to connect to stream"));
 }
 
-fn garble<S>(stream: &mut S, input: &[u16]) -> Result<(), Error>
+fn garble<S>(stream: S, input: &[u16]) -> Result<(), Error>
 where
-    S: BinaryReceive + BinarySend,
+    S: Read + Write + Send + 'static,
 {
-    let mut input = input.into_iter();
-    let mut callback = |msg: Message| {
-        let msg = match msg {
-            // Message::EvaluatorInputZero { zero, delta } => {
-            //     Message::EvaluatorInput(zero.plus(&delta.cmul(0)))
-            // }
-            Message::GarblerInputZero { zero, delta } => {
-                Message::GarblerInput(zero.plus(&delta.cmul(*input.next().unwrap())))
+    let mut input = input.to_vec().into_iter();
+    let stream = Arc::new(Mutex::new(stream));
+    let callback = move |msg: Message| {
+        let m = match msg {
+            Message::UnencodedGarblerInput { zero, delta } => {
+                Message::GarblerInput(zero.plus(&delta.cmul(input.next().unwrap())))
+            }
+            Message::UnencodedEvaluatorInput { zero, delta } => {
+                let mut ot = DummyOT::new(stream.clone());
+                ot.send((
+                    &u128_to_bitvec(zero.as_u128()),
+                    &u128_to_bitvec(zero.plus(&delta).as_u128()),
+                ))
+                .unwrap();
+                return ();
             }
             m => m,
         };
-        stream
-            .send(&msg.to_bytes())
-            .expect("Unable to send message")
+        let mut stream = stream.lock().unwrap();
+        comm::send(&mut *stream, &m.to_bytes()).expect("Unable to send message");
     };
-    let mut gb = Garbler::new(&mut callback);
+    let mut gb = Garbler::new(callback);
     circuit(&mut gb);
     Ok(())
 }
 
-fn evaluator_file(file: &str) -> Result<impl BinarySend + BinaryReceive, Error> {
+fn evaluator_file(file: &str) -> Result<impl Read + Write, Error> {
     println!("Opening file '{}'...", file);
     let f = fs::File::open(file)?;
     Ok(f)
 }
 
-fn evaluator_tcp(host: &str) -> Result<impl BinarySend + BinaryReceive, Error> {
+fn evaluator_tcp(host: &str) -> Result<impl Read + Write, Error> {
     println!("Connecting to server on '{}'...", host);
     let stream = TcpStream::connect(host)?;
     Ok(stream)
 }
 
-fn evaluate<S>(stream: &mut S, input: &[u16]) -> Result<(), Error>
+fn evaluate<S>(stream: S, input: &[u16]) -> Result<(), Error>
 where
-    S: BinaryReceive + BinarySend,
+    S: Read + Write + Send + 'static,
 {
-    let mut input = input.into_iter();
-    let mut callback = || {
-        let bytes = stream.receive().expect("Failed to receive message");
-        let msg = Message::from_bytes(&bytes).expect("Failed to convert bytes to message");
-        match msg {
-            Message::EvaluatorInputZero { zero, delta } => {
-                Message::EvaluatorInput(zero.plus(&delta.cmul(*input.next().unwrap())))
+    let stream = Arc::new(Mutex::new(stream));
+    let _input = input.into_iter();
+    let callback = move |gate| {
+        let bv = match gate {
+            GateType::EvaluatorInput { modulus } => {
+                let mut ot = DummyOT::new(stream.clone());
+                let wire = ot.receive(false, 128).unwrap();
+                Message::EvaluatorInput(Wire::from_u128(bitvec_to_u128(&wire), modulus))
             }
-            m => m,
-        }
+            GateType::Other => {
+                let mut stream = stream.lock().unwrap();
+                let bytes = comm::receive(&mut *stream).expect("Failed to receive message");
+                let msg = Message::from_bytes(&bytes).expect("Failed to convert bytes to message");
+                msg
+            }
+        };
+        bv
     };
-    let mut ev = Evaluator::new(&mut callback);
+    let mut ev = Evaluator::new(callback);
     circuit(&mut ev);
     let output = ev.decode_output();
     for x in output {
@@ -169,4 +189,26 @@ where
     }
     println!();
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    extern crate test;
+    use super::*;
+    use std::os::unix::net::UnixStream;
+
+    #[test]
+    fn test() {
+        let (sender, receiver) = match UnixStream::pair() {
+            Ok((s1, s2)) => (s1, s2),
+            Err(e) => {
+                eprintln!("Couldn't create pair of sockets: {:?}", e);
+                return;
+            }
+        };
+        std::thread::spawn(move || {
+            garble(sender, &[0]).unwrap();
+        });
+        evaluate(receiver, &[0]).unwrap();
+    }
 }
