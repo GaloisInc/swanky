@@ -3,9 +3,10 @@ use bitvec::BitVec;
 use curve25519_dalek::constants;
 use curve25519_dalek::ristretto::RistrettoPoint;
 use curve25519_dalek::scalar::Scalar;
+use failure::Error;
 use rand::rngs::ThreadRng;
 use std::cmp::max;
-use std::io::{Error, Read, Write};
+use std::io::{ErrorKind, Read, Write};
 use std::sync::{Arc, Mutex};
 
 pub struct NaorPinkasOT<T: Read + Write> {
@@ -15,14 +16,8 @@ pub struct NaorPinkasOT<T: Read + Write> {
 
 const P: RistrettoPoint = constants::RISTRETTO_BASEPOINT_POINT;
 
-impl<T: Read + Write> ObliviousTransfer<T> for NaorPinkasOT<T> {
-    fn new(stream: Arc<Mutex<T>>) -> Self {
-        let stream = Stream::new(stream);
-        let rng = rand::thread_rng();
-        Self { stream, rng }
-    }
-
-    fn send(&mut self, values: (&BitVec, &BitVec)) -> Result<(), Error> {
+impl<T: Read + Write> NaorPinkasOT<T> {
+    fn _send(&mut self, values: &(BitVec, BitVec)) -> Result<(), Error> {
         let length = max(values.0.len(), values.1.len()) / 8;
         let c = RistrettoPoint::random(&mut self.rng);
         self.stream.write_pt(&c)?;
@@ -43,7 +38,17 @@ impl<T: Read + Write> ObliviousTransfer<T> for NaorPinkasOT<T> {
         Ok(())
     }
 
-    fn receive(&mut self, input: bool, nbits: usize) -> Result<BitVec, Error> {
+    fn _receive(&mut self, input: u16, nbits: usize) -> Result<BitVec, Error> {
+        let input = match input {
+            0 => false,
+            1 => true,
+            _ => {
+                return Err(Error::from(std::io::Error::new(
+                    ErrorKind::InvalidInput,
+                    "Input must be zero or one",
+                )));
+            }
+        };
         let nbytes = nbits / 8;
         let c = self.stream.read_pt()?;
         let k = Scalar::random(&mut self.rng);
@@ -64,6 +69,30 @@ impl<T: Read + Write> ObliviousTransfer<T> for NaorPinkasOT<T> {
         let h = super::hash_pt(&(eσ0 * k), nbits / 8);
         let result = super::xor(&h, &eσ1);
         Ok(BitVec::from(result))
+    }
+}
+
+impl<T: Read + Write> ObliviousTransfer<T> for NaorPinkasOT<T> {
+    fn new(stream: Arc<Mutex<T>>) -> Self {
+        let stream = Stream::new(stream);
+        let rng = rand::thread_rng();
+        Self { stream, rng }
+    }
+
+    fn send(&mut self, values: &[(BitVec, BitVec)]) -> Result<(), Error> {
+        for inputs in values.iter() {
+            self._send(inputs)?;
+        }
+        Ok(())
+    }
+
+    fn receive(&mut self, inputs: &[u16], nbits: usize) -> Result<Vec<BitVec>, Error> {
+        let mut outputs = Vec::with_capacity(inputs.len());
+        for input in inputs.iter() {
+            let output = self._receive(*input, nbits)?;
+            outputs.push(output);
+        }
+        Ok(outputs)
     }
 }
 
@@ -94,11 +123,11 @@ mod tests {
         };
         std::thread::spawn(move || {
             let mut ot = NaorPinkasOT::new(sender);
-            ot.send((&m0, &m1)).unwrap();
+            ot.send(&[(m0, m1)]).unwrap();
         });
         let mut ot = NaorPinkasOT::new(receiver);
-        let result = ot.receive(b, N * 8).unwrap();
-        assert_eq!(result, if b { m1_ } else { m0_ });
+        let result = ot.receive(&[b as u16], N * 8).unwrap();
+        assert_eq!(result[0], if b { m1_ } else { m0_ });
     }
 
     #[bench]

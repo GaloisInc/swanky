@@ -1,10 +1,12 @@
 use super::{ObliviousTransfer, Stream};
+use crate::util;
 use bitvec::BitVec;
 use curve25519_dalek::constants;
 use curve25519_dalek::ristretto::RistrettoPoint;
 use curve25519_dalek::scalar::Scalar;
+use failure::Error;
 use rand::rngs::ThreadRng;
-use std::io::{Error, Read, Write};
+use std::io::{ErrorKind, Read, Write};
 use std::sync::{Arc, Mutex};
 
 pub struct ChouOrlandiOT<T: Read + Write> {
@@ -15,14 +17,8 @@ pub struct ChouOrlandiOT<T: Read + Write> {
 const P: RistrettoPoint = constants::RISTRETTO_BASEPOINT_POINT;
 const KEYSIZE: usize = 16;
 
-impl<T: Read + Write> ObliviousTransfer<T> for ChouOrlandiOT<T> {
-    fn new(stream: Arc<Mutex<T>>) -> Self {
-        let stream = Stream::new(stream);
-        let rng = rand::thread_rng();
-        Self { stream, rng }
-    }
-
-    fn send(&mut self, values: (&BitVec, &BitVec)) -> Result<(), Error> {
+impl<T: Read + Write> ChouOrlandiOT<T> {
+    fn _send(&mut self, values: &(BitVec, BitVec)) -> Result<(), Error> {
         assert_eq!(
             values.0.len(),
             values.1.len(),
@@ -37,14 +33,24 @@ impl<T: Read + Write> ObliviousTransfer<T> for ChouOrlandiOT<T> {
         let b_ = self.stream.read_pt()?;
         let k0 = super::hash_pt(&(b_ * a), KEYSIZE);
         let k1 = super::hash_pt(&((b_ - a_) * a), KEYSIZE);
-        let c0 = super::encrypt(&k0, &super::bitvec_to_vec(values.0))?;
-        let c1 = super::encrypt(&k1, &super::bitvec_to_vec(values.1))?;
+        let c0 = super::encrypt(&k0, &util::bitvec_to_vec(&values.0))?;
+        let c1 = super::encrypt(&k1, &util::bitvec_to_vec(&values.1))?;
         self.stream.write_bytes(&c0)?;
         self.stream.write_bytes(&c1)?;
         Ok(())
     }
 
-    fn receive(&mut self, input: bool, nbits: usize) -> Result<BitVec, Error> {
+    fn _receive(&mut self, input: u16, nbits: usize) -> Result<BitVec, Error> {
+        let input = match input {
+            0 => false,
+            1 => true,
+            _ => {
+                return Err(Error::from(std::io::Error::new(
+                    ErrorKind::InvalidInput,
+                    "Input must be zero or one",
+                )));
+            }
+        };
         let nbytes = nbits / 8;
         let b = Scalar::random(&mut self.rng);
         let a_ = self.stream.read_pt()?;
@@ -63,6 +69,30 @@ impl<T: Read + Write> ObliviousTransfer<T> for ChouOrlandiOT<T> {
     }
 }
 
+impl<T: Read + Write> ObliviousTransfer<T> for ChouOrlandiOT<T> {
+    fn new(stream: Arc<Mutex<T>>) -> Self {
+        let stream = Stream::new(stream);
+        let rng = rand::thread_rng();
+        Self { stream, rng }
+    }
+
+    fn send(&mut self, values: &[(BitVec, BitVec)]) -> Result<(), Error> {
+        for inputs in values.iter() {
+            self._send(inputs)?;
+        }
+        Ok(())
+    }
+
+    fn receive(&mut self, inputs: &[u16], nbits: usize) -> Result<Vec<BitVec>, Error> {
+        let mut outputs = Vec::with_capacity(inputs.len());
+        for input in inputs.iter() {
+            let output = self._receive(*input, nbits)?;
+            outputs.push(output);
+        }
+        Ok(outputs)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     extern crate test;
@@ -71,7 +101,6 @@ mod tests {
     use test::Bencher;
 
     const N: usize = 32;
-    const TIMES: usize = 1;
 
     fn rand_u8_vec(size: usize) -> Vec<u8> {
         let mut v = Vec::with_capacity(size);
@@ -99,15 +128,11 @@ mod tests {
         };
         let handler = std::thread::spawn(move || {
             let mut ot = ChouOrlandiOT::new(sender);
-            for _ in 0..TIMES {
-                ot.send((&m0, &m1)).unwrap();
-            }
+            ot.send(&[(m0, m1)]).unwrap();
         });
         let mut ot = ChouOrlandiOT::new(receiver);
-        for _ in 0..TIMES {
-            let result = ot.receive(b, N * 8).unwrap();
-            assert_eq!(&result, if b { &m1_ } else { &m0_ });
-        }
+        let results = ot.receive(&[b as u16], N * 8).unwrap();
+        assert_eq!(results[0], if b { m1_ } else { m0_ });
         handler.join().unwrap();
     }
 

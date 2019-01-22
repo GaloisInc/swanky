@@ -1,19 +1,23 @@
 pub mod chou_orlandi;
 pub mod dummy;
+pub mod iknp;
 pub mod naor_pinkas;
 
+use crate::util::*;
 use aes::Aes128;
 use bitvec::BitVec;
 use block_modes::block_padding::Pkcs7;
 use block_modes::{BlockMode, Ecb};
 use curve25519_dalek::ristretto::{CompressedRistretto, RistrettoPoint};
-use std::io::{Error, ErrorKind, Read, Write};
+use failure::Error;
+use std::io::Error as IOError;
+use std::io::{ErrorKind, Read, Write};
 use std::sync::{Arc, Mutex, MutexGuard};
 
 pub trait ObliviousTransfer<T: Read + Write> {
     fn new(stream: Arc<Mutex<T>>) -> Self;
-    fn send(&mut self, values: (&BitVec, &BitVec)) -> Result<(), Error>;
-    fn receive(&mut self, input: bool, nbits: usize) -> Result<BitVec, Error>;
+    fn send(&mut self, values: &[(BitVec, BitVec)]) -> Result<(), Error>;
+    fn receive(&mut self, inputs: &[u16], nbits: usize) -> Result<Vec<BitVec>, Error>;
 }
 
 struct Stream<T: Read + Write> {
@@ -30,7 +34,9 @@ impl<T: Read + Write> Stream<T> {
     }
     #[inline(always)]
     fn write_pt(&mut self, pt: &RistrettoPoint) -> Result<usize, Error> {
-        self.stream().write(pt.compress().as_bytes())
+        self.stream()
+            .write(pt.compress().as_bytes())
+            .map_err(Error::from)
     }
     #[inline(always)]
     fn read_pt(&mut self) -> Result<RistrettoPoint, Error> {
@@ -39,17 +45,17 @@ impl<T: Read + Write> Stream<T> {
         let pt = match CompressedRistretto::from_slice(&data).decompress() {
             Some(pt) => pt,
             None => {
-                return Err(Error::new(
+                return Err(Error::from(IOError::new(
                     ErrorKind::InvalidData,
                     "Unable to decompress point",
-                ));
+                )));
             }
         };
         Ok(pt)
     }
     #[inline(always)]
-    fn write_bool(&mut self, b: &bool) -> Result<usize, Error> {
-        self.stream().write(&[*b as u8])
+    fn write_bool(&mut self, b: bool) -> Result<usize, Error> {
+        self.stream().write(&[b as u8]).map_err(Error::from)
     }
     #[inline(always)]
     fn read_bool(&mut self) -> Result<bool, Error> {
@@ -59,7 +65,7 @@ impl<T: Read + Write> Stream<T> {
     }
     #[inline(always)]
     fn write_bytes(&mut self, bytes: &[u8]) -> Result<usize, Error> {
-        self.stream().write(bytes)
+        self.stream().write(bytes).map_err(Error::from)
     }
     #[inline(always)]
     fn read_bytes(&mut self, nbytes: usize) -> Result<Vec<u8>, Error> {
@@ -69,7 +75,9 @@ impl<T: Read + Write> Stream<T> {
     }
     #[inline(always)]
     fn write_bitvec(&mut self, bytes: &BitVec) -> Result<usize, Error> {
-        self.stream().write(&(bitvec_to_vec(bytes)))
+        self.stream()
+            .write(&(bitvec_to_vec(bytes)))
+            .map_err(Error::from)
     }
     #[inline(always)]
     fn read_bitvec(&mut self, nbits: usize) -> Result<BitVec, Error> {
@@ -77,22 +85,18 @@ impl<T: Read + Write> Stream<T> {
         self.stream().read_exact(&mut bytes)?;
         Ok(BitVec::from(bytes))
     }
-}
-
-fn bitvec_to_vec(bytes: &BitVec) -> Vec<u8> {
-    let v = bytes.clone().into_iter().collect::<Vec<bool>>();
-    let v = v
-        .into_boxed_slice()
-        .chunks(8)
-        .map(|bits| {
-            let b = bits.into_iter().enumerate().fold(0u8, |acc, (i, b)| {
-                let acc = acc ^ (u8::from(*b) << (7 - i));
-                acc
-            });
-            b
-        })
-        .collect::<Vec<u8>>();
-    v
+    #[inline(always)]
+    fn write_u128(&mut self, data: &u128) -> Result<usize, Error> {
+        self.stream()
+            .write(&data.to_ne_bytes())
+            .map_err(Error::from)
+    }
+    #[inline(always)]
+    fn read_u128(&mut self) -> Result<u128, Error> {
+        let mut data = [0; 16];
+        self.stream().read_exact(&mut data)?;
+        Ok(u128::from_ne_bytes(data))
+    }
 }
 
 #[inline(always)]
@@ -122,10 +126,10 @@ fn encrypt(k: &[u8], m: &[u8]) -> Result<Vec<u8>, Error> {
     let cipher = match Cipher::new_var(k, Default::default()) {
         Ok(c) => c,
         Err(_) => {
-            return Err(Error::new(
+            return Err(Error::from(IOError::new(
                 ErrorKind::InvalidInput,
                 "initializing AES128-ECB failed",
-            ));
+            )));
         }
     };
     let mut m = m.to_vec();
@@ -137,20 +141,20 @@ fn decrypt(k: &[u8], c: &[u8]) -> Result<Vec<u8>, Error> {
     let cipher = match Cipher::new_var(k, Default::default()) {
         Ok(c) => c,
         Err(_) => {
-            return Err(Error::new(
+            return Err(Error::from(IOError::new(
                 ErrorKind::InvalidInput,
                 "initializing AES128-ECB failed",
-            ));
+            )));
         }
     };
     let mut c = c.to_vec();
     let m = match cipher.decrypt_vec(&mut c) {
         Ok(m) => m,
         Err(_) => {
-            return Err(Error::new(
+            return Err(Error::from(IOError::new(
                 ErrorKind::InvalidInput,
                 "decrypting AES128-ECB failed",
-            ));
+            )));
         }
     };
     Ok(m.to_vec())

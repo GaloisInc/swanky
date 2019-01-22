@@ -7,5 +7,5 @@ extern crate arrayref;
 extern crate itertools;
 extern crate aesni as aes;
 
-pub mod base;
-pub mod otext;
+pub mod ot;
+pub mod util;
