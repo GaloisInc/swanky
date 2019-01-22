@@ -19,9 +19,7 @@ where
         let bv = match gate {
             GateType::EvaluatorInput { modulus } => {
                 let mut ot = OT::new(stream.clone());
-                let wire = ot
-                    .receive(&[(input.next().unwrap() != 0) as u16], 128)
-                    .unwrap();
+                let wire = ot.receive(&[input.next().unwrap()], 128).unwrap();
                 Message::EvaluatorInput(Wire::from_u128(bitvec_to_u128(&wire[0]), modulus))
             }
             GateType::Other => {
