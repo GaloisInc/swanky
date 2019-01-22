@@ -1,7 +1,12 @@
-pub mod chou_orlandi;
-pub mod dummy;
-pub mod iknp;
-pub mod naor_pinkas;
+mod chou_orlandi;
+mod dummy;
+mod iknp;
+mod naor_pinkas;
+
+pub use chou_orlandi::ChouOrlandiOT;
+pub use dummy::DummyOT;
+pub use iknp::IknpOT;
+pub use naor_pinkas::NaorPinkasOT;
 
 use crate::util::*;
 use aes::Aes128;
