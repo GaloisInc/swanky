@@ -6,16 +6,16 @@ use failure::Error;
 use rand::rngs::ThreadRng;
 use rand::Rng;
 use sha2::{Digest, Sha256};
-use std::io::{Read, Write};
+use std::io::{ErrorKind, Read, Write};
 use std::sync::{Arc, Mutex};
 
-pub struct IKNP<S: Read + Write, OT: ObliviousTransfer<S>> {
+pub struct IknpOT<S: Read + Write, OT: ObliviousTransfer<S>> {
     stream: Stream<S>,
     ot: OT,
     rng: ThreadRng,
 }
 
-impl<S: Read + Write, OT: ObliviousTransfer<S>> ObliviousTransfer<S> for IKNP<S, OT> {
+impl<S: Read + Write, OT: ObliviousTransfer<S>> ObliviousTransfer<S> for IknpOT<S, OT> {
     fn new(stream: Arc<Mutex<S>>) -> Self {
         let ot = OT::new(stream.clone());
         let stream = Stream::new(stream);
@@ -25,6 +25,10 @@ impl<S: Read + Write, OT: ObliviousTransfer<S>> ObliviousTransfer<S> for IKNP<S,
 
     fn send(&mut self, values: &[(BitVec, BitVec)]) -> Result<(), Error> {
         let m = values.len();
+        if m <= 128 {
+            // Just do normal OT
+            return self.ot.send(values);
+        }
         let s = (0..128).map(|_| self.rng.gen::<bool>()).collect::<BitVec>();
         let mut rs = Vec::with_capacity(128);
         for b in s.iter() {
@@ -46,17 +50,21 @@ impl<S: Read + Write, OT: ObliviousTransfer<S>> ObliviousTransfer<S> for IKNP<S,
     }
 
     fn receive(&mut self, inputs: &[u16], nbits: usize) -> Result<Vec<BitVec>, Error> {
-        assert_eq!(nbits, 128); // XXX
+        if nbits != 128 {
+            return Err(Error::from(std::io::Error::new(
+                ErrorKind::InvalidInput,
+                "Currently only supports 128-bit inputs",
+            )));
+        }
         let m = inputs.len();
+        if m <= 128 {
+            // Just do normal OT
+            return self.ot.receive(inputs, nbits);
+        }
         let r = inputs.iter().cloned().map(|b| b != 0).collect::<BitVec>();
         let ts = (0..128)
             .map(|_| (0..m).map(|_| self.rng.gen::<bool>()).collect::<BitVec>())
             .collect::<Vec<BitVec>>();
-        // let msgs = ts
-        //     .into_iter()
-        //     .map(|t| (&t, &(t.clone() ^ r.clone())))
-        //     .collect::<&[(&BitVec, &BitVec)]>();
-        // self.ot.send(msgs);
         for t in ts.iter() {
             self.ot.send(&[(t.clone(), t.clone() ^ r.clone())])?;
         }
@@ -129,7 +137,7 @@ mod tests {
             }
         };
         std::thread::spawn(move || {
-            let mut otext = IKNP::<UnixStream, OT>::new(sender.clone());
+            let mut otext = IknpOT::<UnixStream, OT>::new(sender.clone());
             let ms = m0s
                 .into_iter()
                 .zip(m1s.into_iter())
@@ -137,7 +145,7 @@ mod tests {
                 .collect::<Vec<(BitVec, BitVec)>>();
             otext.send(&ms).unwrap();
         });
-        let mut otext = IKNP::<UnixStream, OT>::new(receiver.clone());
+        let mut otext = IknpOT::<UnixStream, OT>::new(receiver.clone());
         let results = otext
             .receive(&bs.iter().map(|b| *b as u16).collect::<Vec<u16>>(), 128)
             .unwrap();
