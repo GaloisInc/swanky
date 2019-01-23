@@ -482,6 +482,11 @@
 <span id="482">482</span>
 <span id="483">483</span>
 <span id="484">484</span>
+<span id="485">485</span>
+<span id="486">486</span>
+<span id="487">487</span>
+<span id="488">488</span>
+<span id="489">489</span>
 </pre><pre class="rust ">
 <span class="doccomment">//! Tools useful for interacting with `fancy-garbling`.</span>
 <span class="doccomment">//!</span>
@@ -503,6 +508,11 @@
 <span class="doccomment">/// Tweak function for two items.</span>
 <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">tweak2</span>(<span class="ident">i</span>: <span class="ident">u64</span>, <span class="ident">j</span>: <span class="ident">u64</span>) <span class="op">-&gt;</span> <span class="ident">u128</span> {
     ((<span class="ident">i</span> <span class="kw">as</span> <span class="ident">u128</span>) <span class="op">&lt;&lt;</span> <span class="number">64</span>) <span class="op">+</span> <span class="ident">j</span> <span class="kw">as</span> <span class="ident">u128</span>
+}
+
+<span class="doccomment">/// Create a tweak for three items.</span>
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">tweak3</span>(<span class="ident">i</span>: <span class="ident">u32</span>, <span class="ident">j</span>: <span class="ident">u32</span>, <span class="ident">k</span>: <span class="ident">u32</span>) <span class="op">-&gt;</span> <span class="ident">u128</span> {
+    ((<span class="ident">i</span> <span class="kw">as</span> <span class="ident">u128</span>) <span class="op">&lt;&lt;</span> <span class="number">64</span>) <span class="op">+</span> ((<span class="ident">j</span> <span class="kw">as</span> <span class="ident">u128</span>) <span class="op">&lt;&lt;</span> <span class="number">32</span>) <span class="op">+</span> <span class="ident">k</span> <span class="kw">as</span> <span class="ident">u128</span>
 }
 
 <span class="doccomment">/// Compute the output tweak for a garbled gate where i is the gate id and k is the value.</span>

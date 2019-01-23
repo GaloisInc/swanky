@@ -177,13 +177,13 @@
     }
 
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">hash</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">t</span>: <span class="ident">u128</span>, <span class="ident">x</span>: <span class="ident">u128</span>) <span class="op">-&gt;</span> <span class="ident">u128</span> {
-        <span class="kw">let</span> <span class="ident">y</span> <span class="op">=</span> <span class="ident">poly_double</span>(<span class="ident">x</span>) <span class="op">^</span> <span class="ident">t</span>;
-        <span class="self">self</span>.<span class="ident">eval_u128</span>(<span class="ident">x</span>) <span class="op">^</span> <span class="ident">y</span>
+        <span class="kw">let</span> <span class="ident">y</span> <span class="op">=</span> <span class="ident">poly_double</span>(<span class="ident">x</span><span class="op">^</span><span class="ident">t</span>);
+        <span class="self">self</span>.<span class="ident">eval_u128</span>(<span class="ident">y</span>) <span class="op">^</span> <span class="ident">y</span>
     }
 
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">hash2</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">t</span>: <span class="ident">u128</span>, <span class="ident">x</span>: <span class="ident">u128</span>, <span class="ident">y</span>: <span class="ident">u128</span>) <span class="op">-&gt;</span> <span class="ident">u128</span> {
         <span class="kw">let</span> <span class="ident">z</span> <span class="op">=</span> <span class="ident">x</span> <span class="op">^</span> <span class="ident">poly_double</span>(<span class="ident">y</span>);
-        <span class="self">self</span>.<span class="ident">hash</span>(<span class="ident">z</span>, <span class="ident">t</span>)
+        <span class="self">self</span>.<span class="ident">hash</span>(<span class="ident">t</span>,<span class="ident">z</span>)
     }
 
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">eval_u128</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">x</span>: <span class="ident">u128</span>) <span class="op">-&gt;</span> <span class="ident">u128</span> {

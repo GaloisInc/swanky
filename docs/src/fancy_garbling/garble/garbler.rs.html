@@ -411,6 +411,46 @@
 <span id="411">411</span>
 <span id="412">412</span>
 <span id="413">413</span>
+<span id="414">414</span>
+<span id="415">415</span>
+<span id="416">416</span>
+<span id="417">417</span>
+<span id="418">418</span>
+<span id="419">419</span>
+<span id="420">420</span>
+<span id="421">421</span>
+<span id="422">422</span>
+<span id="423">423</span>
+<span id="424">424</span>
+<span id="425">425</span>
+<span id="426">426</span>
+<span id="427">427</span>
+<span id="428">428</span>
+<span id="429">429</span>
+<span id="430">430</span>
+<span id="431">431</span>
+<span id="432">432</span>
+<span id="433">433</span>
+<span id="434">434</span>
+<span id="435">435</span>
+<span id="436">436</span>
+<span id="437">437</span>
+<span id="438">438</span>
+<span id="439">439</span>
+<span id="440">440</span>
+<span id="441">441</span>
+<span id="442">442</span>
+<span id="443">443</span>
+<span id="444">444</span>
+<span id="445">445</span>
+<span id="446">446</span>
+<span id="447">447</span>
+<span id="448">448</span>
+<span id="449">449</span>
+<span id="450">450</span>
+<span id="451">451</span>
+<span id="452">452</span>
+<span id="453">453</span>
 </pre><pre class="rust ">
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">fancy</span>::{<span class="ident">Fancy</span>, <span class="ident">HasModulus</span>};
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::{<span class="ident">RngExt</span>, <span class="ident">tweak</span>, <span class="ident">tweak2</span>, <span class="ident">output_tweak</span>};
@@ -422,22 +462,26 @@
 
 <span class="kw">use</span> <span class="kw">super</span>::<span class="ident">Message</span>;
 
-<span class="kw">struct</span> <span class="ident">SyncInfo</span> {
-    <span class="ident">begin_index</span>: <span class="ident">usize</span>,
-    <span class="ident">end_index</span>: <span class="ident">usize</span>,
-    <span class="ident">current_index</span>: <span class="ident">usize</span>,
-    <span class="ident">waiting_messages</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Message</span><span class="op">&gt;&gt;</span>,
-    <span class="ident">index_done</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">bool</span><span class="op">&gt;</span>,
-}
-
-<span class="doccomment">/// Streams garbled circuit ciphertexts through a callback.</span>
+<span class="doccomment">/// Streams garbled circuit ciphertexts through a callback. Parallelizable.</span>
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Garbler</span> {
     <span class="ident">send_function</span>:  <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">FnMut</span>(<span class="ident">Message</span>) <span class="op">+</span> <span class="ident">Send</span><span class="op">&gt;&gt;</span>,
     <span class="ident">constants</span>:      <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">RwLock</span><span class="op">&lt;</span><span class="ident">HashMap</span><span class="op">&lt;</span>(<span class="ident">u16</span>,<span class="ident">u16</span>),<span class="ident">Wire</span><span class="op">&gt;&gt;</span><span class="op">&gt;</span>,
     <span class="ident">deltas</span>:         <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">HashMap</span><span class="op">&lt;</span><span class="ident">u16</span>, <span class="ident">Wire</span><span class="op">&gt;&gt;</span><span class="op">&gt;</span>,
     <span class="ident">current_output</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;&gt;</span>,
     <span class="ident">current_gate</span>:   <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;&gt;</span>,
-    <span class="ident">sync_info</span>:      <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">Mutex</span><span class="op">&lt;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">SyncInfo</span><span class="op">&gt;&gt;</span><span class="op">&gt;</span>,
+
+    <span class="comment">// tools to synchronize the ciphertexts and tweaks during parallel Fancy code</span>
+    <span class="ident">sync_info</span>:      <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">RwLock</span><span class="op">&lt;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">SyncInfo</span><span class="op">&gt;&gt;</span><span class="op">&gt;</span>,
+    <span class="ident">current_index</span>:  <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">RwLock</span><span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;&gt;</span>,
+    <span class="ident">msg_queues</span>:     <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">RwLock</span><span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Message</span><span class="op">&gt;&gt;</span><span class="op">&gt;&gt;</span><span class="op">&gt;</span>,
+    <span class="ident">index_done</span>:     <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">bool</span><span class="op">&gt;&gt;</span><span class="op">&gt;</span>,
+    <span class="ident">id_for_index</span>:   <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">RwLock</span><span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;&gt;</span><span class="op">&gt;&gt;</span>,
+}
+
+<span class="kw">struct</span> <span class="ident">SyncInfo</span> {
+    <span class="ident">begin_index</span>: <span class="ident">usize</span>,
+    <span class="ident">end_index</span>: <span class="ident">usize</span>,
+    <span class="ident">starting_gate_id</span>: <span class="ident">usize</span>,
 }
 
 <span class="kw">impl</span> <span class="ident">Garbler</span> {
@@ -454,22 +498,34 @@
             <span class="ident">deltas</span>:         <span class="ident">Arc</span>::<span class="ident">new</span>(<span class="ident">Mutex</span>::<span class="ident">new</span>(<span class="ident">HashMap</span>::<span class="ident">new</span>())),
             <span class="ident">current_gate</span>:   <span class="ident">Arc</span>::<span class="ident">new</span>(<span class="ident">Mutex</span>::<span class="ident">new</span>(<span class="number">0</span>)),
             <span class="ident">current_output</span>: <span class="ident">Arc</span>::<span class="ident">new</span>(<span class="ident">Mutex</span>::<span class="ident">new</span>(<span class="number">0</span>)),
-            <span class="ident">sync_info</span>:      <span class="ident">Arc</span>::<span class="ident">new</span>(<span class="ident">Mutex</span>::<span class="ident">new</span>(<span class="prelude-val">None</span>)),
+
+            <span class="ident">sync_info</span>:      <span class="ident">Arc</span>::<span class="ident">new</span>(<span class="ident">RwLock</span>::<span class="ident">new</span>(<span class="prelude-val">None</span>)),
+            <span class="ident">current_index</span>:  <span class="ident">Arc</span>::<span class="ident">new</span>(<span class="ident">RwLock</span>::<span class="ident">new</span>(<span class="number">0</span>)),
+            <span class="ident">msg_queues</span>:     <span class="ident">Arc</span>::<span class="ident">new</span>(<span class="ident">RwLock</span>::<span class="ident">new</span>(<span class="ident">Vec</span>::<span class="ident">new</span>())),
+            <span class="ident">index_done</span>:     <span class="ident">Arc</span>::<span class="ident">new</span>(<span class="ident">Mutex</span>::<span class="ident">new</span>(<span class="ident">Vec</span>::<span class="ident">new</span>())),
+            <span class="ident">id_for_index</span>:   <span class="ident">Arc</span>::<span class="ident">new</span>(<span class="ident">RwLock</span>::<span class="ident">new</span>(<span class="ident">Vec</span>::<span class="ident">new</span>())),
         }
     }
 
     <span class="doccomment">/// Output some information from the garbling.</span>
     <span class="kw">fn</span> <span class="ident">send</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">ix</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span>, <span class="ident">m</span>: <span class="ident">Message</span>) {
-        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="kw-2">ref</span> <span class="kw-2">mut</span> <span class="ident">info</span>) <span class="op">=</span> <span class="kw-2">*</span><span class="self">self</span>.<span class="ident">sync_info</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>() {
-            <span class="macro">println</span><span class="macro">!</span>(<span class="string">&quot;sync send [{:?}]&quot;</span>, <span class="ident">m</span>);
-            <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">i</span>) <span class="op">=</span> <span class="ident">ix</span> {
-                <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">info</span>.<span class="ident">current_index</span> <span class="op">&lt;=</span> <span class="ident">i</span>);
-                <span class="ident">info</span>.<span class="ident">waiting_messages</span>[<span class="ident">i</span>].<span class="ident">push</span>(<span class="ident">m</span>);
+        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">in_sync</span>() {
+            <span class="kw">let</span> <span class="ident">ix</span> <span class="op">=</span> <span class="ident">ix</span>.<span class="ident">expect</span>(<span class="string">&quot;garbler.send called without index during sync!&quot;</span>);
+            <span class="kw">let</span> <span class="ident">current_index</span> <span class="op">=</span> <span class="kw-2">*</span><span class="self">self</span>.<span class="ident">current_index</span>.<span class="ident">read</span>().<span class="ident">unwrap</span>();
+            <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">ix</span> <span class="op">&gt;=</span> <span class="ident">current_index</span>);
+            <span class="kw">if</span> <span class="ident">ix</span> <span class="op">==</span> <span class="ident">current_index</span> {
+                <span class="kw">let</span> <span class="ident">qs</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">msg_queues</span>.<span class="ident">read</span>().<span class="ident">unwrap</span>();
+                <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">q</span> <span class="op">=</span> <span class="ident">qs</span>[<span class="ident">ix</span>].<span class="ident">lock</span>().<span class="ident">unwrap</span>();
+                <span class="kw">if</span> <span class="ident">q</span>.<span class="ident">len</span>() <span class="op">&gt;</span> <span class="number">0</span> {
+                    <span class="kw">for</span> <span class="ident">m</span> <span class="kw">in</span> <span class="ident">std</span>::<span class="ident">mem</span>::<span class="ident">replace</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="kw-2">*</span><span class="ident">q</span>, <span class="ident">Vec</span>::<span class="ident">new</span>()) {
+                        <span class="self">self</span>.<span class="ident">internal_send</span>(<span class="ident">m</span>);
+                    }
+                }
+                <span class="self">self</span>.<span class="ident">internal_send</span>(<span class="ident">m</span>);
             } <span class="kw">else</span> {
-                <span class="macro">panic</span><span class="macro">!</span>(<span class="string">&quot;garbler.send: called without index during sync!&quot;</span>);
+                <span class="self">self</span>.<span class="ident">msg_queues</span>.<span class="ident">read</span>().<span class="ident">unwrap</span>()[<span class="ident">ix</span>].<span class="ident">lock</span>().<span class="ident">unwrap</span>().<span class="ident">push</span>(<span class="ident">m</span>);
             }
         } <span class="kw">else</span> {
-            <span class="macro">println</span><span class="macro">!</span>(<span class="string">&quot;normal send [{:?}]&quot;</span>, <span class="ident">m</span>);
             <span class="self">self</span>.<span class="ident">internal_send</span>(<span class="ident">m</span>);
         }
     }
@@ -478,63 +534,94 @@
         (<span class="self">self</span>.<span class="ident">send_function</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>().<span class="ident">deref_mut</span>())(<span class="ident">m</span>);
     }
 
-    <span class="kw">fn</span> <span class="ident">flush</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">opt_info</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">sync_info</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>();
-        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="kw-2">ref</span> <span class="kw-2">mut</span> <span class="ident">info</span>) <span class="op">=</span> <span class="kw-2">*</span><span class="ident">opt_info</span> {
-            <span class="kw">while</span> <span class="ident">info</span>.<span class="ident">current_index</span> <span class="op">&lt;</span> <span class="ident">info</span>.<span class="ident">end_index</span> {
-                <span class="kw">let</span> <span class="ident">i</span> <span class="op">=</span> <span class="ident">info</span>.<span class="ident">current_index</span>;
-                <span class="kw">if</span> <span class="ident">info</span>.<span class="ident">index_done</span>[<span class="ident">i</span>] {
-                    <span class="macro">println</span><span class="macro">!</span>(<span class="string">&quot;sending messages from index {}&quot;</span>, <span class="ident">i</span>);
-                    <span class="kw">let</span> <span class="ident">msgs</span> <span class="op">=</span> <span class="ident">std</span>::<span class="ident">mem</span>::<span class="ident">replace</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">info</span>.<span class="ident">waiting_messages</span>[<span class="ident">i</span>], <span class="ident">Vec</span>::<span class="ident">new</span>());
-                    <span class="kw">for</span> <span class="ident">m</span> <span class="kw">in</span> <span class="ident">msgs</span> {
-                        <span class="macro">println</span><span class="macro">!</span>(<span class="string">&quot;{:?}&quot;</span>, <span class="ident">m</span>);
+    <span class="kw">fn</span> <span class="ident">internal_begin_sync</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">begin_index</span>: <span class="ident">usize</span>, <span class="ident">end_index</span>: <span class="ident">usize</span>) {
+        <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="self">self</span>.<span class="ident">in_sync</span>(), <span class="bool-val">false</span>,
+            <span class="string">&quot;garbler: begin_sync called before finishing previous sync!&quot;</span>);
+
+        <span class="kw-2">*</span><span class="self">self</span>.<span class="ident">sync_info</span>.<span class="ident">write</span>().<span class="ident">unwrap</span>() <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">SyncInfo</span> {
+            <span class="ident">begin_index</span>,
+            <span class="ident">end_index</span>,
+            <span class="ident">starting_gate_id</span>: <span class="kw-2">*</span><span class="self">self</span>.<span class="ident">current_gate</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>()
+        });
+
+        <span class="kw-2">*</span><span class="self">self</span>.<span class="ident">current_index</span>.<span class="ident">write</span>().<span class="ident">unwrap</span>() <span class="op">=</span> <span class="ident">begin_index</span>;
+        <span class="kw-2">*</span><span class="self">self</span>.<span class="ident">msg_queues</span>.<span class="ident">write</span>().<span class="ident">unwrap</span>()    <span class="op">=</span> (<span class="ident">begin_index</span>..<span class="ident">end_index</span>).<span class="ident">map</span>(<span class="op">|</span><span class="kw">_</span><span class="op">|</span> <span class="ident">Mutex</span>::<span class="ident">new</span>(<span class="ident">Vec</span>::<span class="ident">new</span>())).<span class="ident">collect_vec</span>();
+        <span class="kw-2">*</span><span class="self">self</span>.<span class="ident">index_done</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>()     <span class="op">=</span> <span class="macro">vec</span><span class="macro">!</span>[<span class="bool-val">false</span>; <span class="ident">end_index</span> <span class="op">-</span> <span class="ident">begin_index</span>];
+        <span class="kw-2">*</span><span class="self">self</span>.<span class="ident">id_for_index</span>.<span class="ident">write</span>().<span class="ident">unwrap</span>()  <span class="op">=</span> (<span class="ident">begin_index</span>..<span class="ident">end_index</span>).<span class="ident">map</span>(<span class="op">|</span><span class="kw">_</span><span class="op">|</span> <span class="ident">Mutex</span>::<span class="ident">new</span>(<span class="number">0</span>)).<span class="ident">collect_vec</span>();
+    }
+
+    <span class="kw">fn</span> <span class="ident">internal_finish_index</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">index</span>: <span class="ident">usize</span>) {
+        <span class="macro">assert</span><span class="macro">!</span>(<span class="self">self</span>.<span class="ident">in_sync</span>(), <span class="string">&quot;garbler: finish_index called out of sync!&quot;</span>);
+
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">cur</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">current_index</span>.<span class="ident">write</span>().<span class="ident">unwrap</span>();
+        <span class="kw">let</span> <span class="ident">end</span>     <span class="op">=</span> <span class="self">self</span>.<span class="ident">ending_index</span>();
+
+        {
+            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">done</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">index_done</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>();
+            <span class="kw">let</span> <span class="ident">qs</span>       <span class="op">=</span> <span class="self">self</span>.<span class="ident">msg_queues</span>.<span class="ident">read</span>().<span class="ident">unwrap</span>();
+
+            <span class="ident">done</span>[<span class="ident">index</span> <span class="op">-</span> <span class="self">self</span>.<span class="ident">starting_index</span>()] <span class="op">=</span> <span class="bool-val">true</span>;
+
+            <span class="kw">while</span> <span class="kw-2">*</span><span class="ident">cur</span> <span class="op">&lt;</span> <span class="ident">end</span> {
+                <span class="kw">if</span> <span class="ident">done</span>[<span class="kw-2">*</span><span class="ident">cur</span>] {
+                    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">q</span> <span class="op">=</span> <span class="ident">qs</span>[<span class="kw-2">*</span><span class="ident">cur</span>].<span class="ident">lock</span>().<span class="ident">unwrap</span>();
+                    <span class="kw">for</span> <span class="ident">m</span> <span class="kw">in</span> <span class="ident">std</span>::<span class="ident">mem</span>::<span class="ident">replace</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="kw-2">*</span><span class="ident">q</span>, <span class="ident">Vec</span>::<span class="ident">new</span>()) {
                         <span class="self">self</span>.<span class="ident">internal_send</span>(<span class="ident">m</span>);
                     }
-                    <span class="ident">info</span>.<span class="ident">current_index</span> <span class="op">+=</span> <span class="number">1</span>;
+                    <span class="kw-2">*</span><span class="ident">cur</span> <span class="op">+=</span> <span class="number">1</span>;
                 } <span class="kw">else</span> {
                     <span class="kw">break</span>;
                 }
             }
-            <span class="kw">if</span> <span class="ident">info</span>.<span class="ident">current_index</span> <span class="op">==</span> <span class="ident">info</span>.<span class="ident">end_index</span> {
-                <span class="kw-2">*</span><span class="ident">opt_info</span> <span class="op">=</span> <span class="prelude-val">None</span>; <span class="comment">// sync is done</span>
-                <span class="macro">println</span><span class="macro">!</span>(<span class="string">&quot;sync completed&quot;</span>);
-            }
+        }
+
+        <span class="kw">if</span> <span class="kw-2">*</span><span class="ident">cur</span> <span class="op">==</span> <span class="ident">end</span> {
+            <span class="comment">// turn off sync</span>
+            <span class="kw-2">*</span><span class="ident">cur</span> <span class="op">=</span> <span class="number">0</span>;
+            <span class="kw-2">*</span><span class="self">self</span>.<span class="ident">sync_info</span>.<span class="ident">write</span>().<span class="ident">unwrap</span>()     <span class="op">=</span> <span class="prelude-val">None</span>;
+            <span class="kw-2">*</span><span class="self">self</span>.<span class="ident">msg_queues</span>.<span class="ident">write</span>().<span class="ident">unwrap</span>()    <span class="op">=</span> <span class="ident">Vec</span>::<span class="ident">new</span>();
+            <span class="kw-2">*</span><span class="self">self</span>.<span class="ident">index_done</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>()     <span class="op">=</span> <span class="ident">Vec</span>::<span class="ident">new</span>();
+            <span class="kw-2">*</span><span class="self">self</span>.<span class="ident">id_for_index</span>.<span class="ident">write</span>().<span class="ident">unwrap</span>()  <span class="op">=</span> <span class="ident">Vec</span>::<span class="ident">new</span>();
         }
     }
 
-    <span class="kw">fn</span> <span class="ident">internal_begin_sync</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">begin_index</span>: <span class="ident">usize</span>, <span class="ident">end_index</span>: <span class="ident">usize</span>) {
-        <span class="macro">println</span><span class="macro">!</span>(<span class="string">&quot;begin sync {} {}&quot;</span>, <span class="ident">begin_index</span>, <span class="ident">end_index</span>);
-
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">info</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">sync_info</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>();
-
-        <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">info</span>.<span class="ident">is_none</span>(),
-            <span class="string">&quot;garbler: begin_sync called before finishing previous sync!&quot;</span>);
-
-        <span class="kw">let</span> <span class="ident">init</span> <span class="op">=</span> <span class="ident">SyncInfo</span> {
-            <span class="ident">begin_index</span>,
-            <span class="ident">end_index</span>,
-            <span class="ident">current_index</span>:    <span class="ident">begin_index</span>,
-            <span class="ident">waiting_messages</span>: <span class="macro">vec</span><span class="macro">!</span>[<span class="ident">Vec</span>::<span class="ident">new</span>(); <span class="ident">end_index</span> <span class="op">-</span> <span class="ident">begin_index</span>],
-            <span class="ident">index_done</span>:       <span class="macro">vec</span><span class="macro">!</span>[<span class="bool-val">false</span>; <span class="ident">end_index</span> <span class="op">-</span> <span class="ident">begin_index</span>],
-        };
-
-        <span class="kw-2">*</span><span class="ident">info</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">init</span>);
+    <span class="kw">fn</span> <span class="ident">in_sync</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-&gt;</span> <span class="ident">bool</span> {
+        <span class="self">self</span>.<span class="ident">sync_info</span>.<span class="ident">read</span>().<span class="ident">unwrap</span>().<span class="ident">is_some</span>()
     }
 
-    <span class="kw">fn</span> <span class="ident">internal_finish_index</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">index</span>: <span class="ident">usize</span>) {
-        <span class="macro">println</span><span class="macro">!</span>(<span class="string">&quot;finish index {}&quot;</span>, <span class="ident">index</span>);
-        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="kw-2">ref</span> <span class="kw-2">mut</span> <span class="ident">info</span>) <span class="op">=</span> <span class="kw-2">*</span><span class="self">self</span>.<span class="ident">sync_info</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>() {
-            <span class="ident">info</span>.<span class="ident">index_done</span>[<span class="ident">index</span> <span class="op">-</span> <span class="ident">info</span>.<span class="ident">begin_index</span>] <span class="op">=</span> <span class="bool-val">true</span>;
+    <span class="comment">// starting index of the current sync computation</span>
+    <span class="kw">fn</span> <span class="ident">starting_index</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-&gt;</span> <span class="ident">usize</span> {
+        <span class="self">self</span>.<span class="ident">sync_info</span>.<span class="ident">read</span>().<span class="ident">unwrap</span>().<span class="ident">as_ref</span>().<span class="ident">unwrap</span>().<span class="ident">begin_index</span>
+    }
+
+    <span class="comment">// ending index of the current sync computation</span>
+    <span class="kw">fn</span> <span class="ident">ending_index</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-&gt;</span> <span class="ident">usize</span> {
+        <span class="self">self</span>.<span class="ident">sync_info</span>.<span class="ident">read</span>().<span class="ident">unwrap</span>().<span class="ident">as_ref</span>().<span class="ident">unwrap</span>().<span class="ident">end_index</span>
+    }
+
+    <span class="doccomment">/// The current non-free gate index of the garbling computation. Respects sync</span>
+    <span class="doccomment">/// ordering.</span>
+    <span class="kw">fn</span> <span class="ident">current_gate</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">sync_index</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span>) <span class="op">-&gt;</span> <span class="ident">usize</span> {
+        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="kw-2">ref</span> <span class="ident">info</span>) <span class="op">=</span> <span class="kw-2">*</span><span class="self">self</span>.<span class="ident">sync_info</span>.<span class="ident">read</span>().<span class="ident">unwrap</span>() {
+            <span class="kw">let</span> <span class="ident">ix</span> <span class="op">=</span> <span class="ident">sync_index</span>.<span class="ident">expect</span>(<span class="string">&quot;syncronization requires a sync index&quot;</span>);
+            <span class="kw">let</span> <span class="ident">ids</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">id_for_index</span>.<span class="ident">read</span>().<span class="ident">unwrap</span>();
+            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">id_mutex</span> <span class="op">=</span> <span class="ident">ids</span>[<span class="ident">ix</span> <span class="op">-</span> <span class="ident">info</span>.<span class="ident">begin_index</span>].<span class="ident">lock</span>().<span class="ident">unwrap</span>();
+            <span class="kw">let</span> <span class="ident">id</span> <span class="op">=</span> <span class="kw-2">*</span><span class="ident">id_mutex</span>;
+            <span class="kw-2">*</span><span class="ident">id_mutex</span> <span class="op">+=</span> <span class="number">1</span>;
+            <span class="comment">// 48 bits for gate index, 16 for id</span>
+            <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">info</span>.<span class="ident">starting_gate_id</span> <span class="op">+</span> <span class="ident">ix</span> <span class="op">&gt;&gt;</span> <span class="number">48</span> <span class="op">==</span> <span class="number">0</span> <span class="op">&amp;&amp;</span> <span class="ident">id</span> <span class="op">&gt;&gt;</span> <span class="number">16</span> <span class="op">==</span> <span class="number">0</span>);
+            <span class="ident">info</span>.<span class="ident">starting_gate_id</span> <span class="op">+</span> <span class="ident">ix</span> <span class="op">+</span> (<span class="ident">id</span> <span class="op">&lt;&lt;</span> <span class="number">48</span>)
         } <span class="kw">else</span> {
-            <span class="macro">panic</span><span class="macro">!</span>(<span class="string">&quot;garbler: finish_index called without starting a sync!&quot;</span>);
+            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">c</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">current_gate</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>();
+            <span class="kw">let</span> <span class="ident">old</span> <span class="op">=</span> <span class="kw-2">*</span><span class="ident">c</span>;
+            <span class="kw-2">*</span><span class="ident">c</span> <span class="op">+=</span> <span class="number">1</span>;
+            <span class="ident">old</span>
         }
-        <span class="self">self</span>.<span class="ident">flush</span>();
     }
 
     <span class="doccomment">/// Create a delta if it has not been created yet for this modulus, otherwise just</span>
     <span class="doccomment">/// return the existing one.</span>
     <span class="kw">fn</span> <span class="ident">delta</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">q</span>: <span class="ident">u16</span>) <span class="op">-&gt;</span> <span class="ident">Wire</span> {
-        <span class="macro">println</span><span class="macro">!</span>(<span class="string">&quot;delta({}) called in thread {:?}&quot;</span>, <span class="ident">q</span>, <span class="ident">std</span>::<span class="ident">thread</span>::<span class="ident">current</span>().<span class="ident">id</span>());
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">deltas</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">deltas</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>();
         <span class="kw">match</span> <span class="ident">deltas</span>.<span class="ident">get</span>(<span class="kw-2">&amp;</span><span class="ident">q</span>) {
             <span class="prelude-val">Some</span>(<span class="ident">delta</span>) <span class="op">=&gt;</span> <span class="kw">return</span> <span class="ident">delta</span>.<span class="ident">clone</span>(),
@@ -543,14 +630,6 @@
         <span class="kw">let</span> <span class="ident">w</span> <span class="op">=</span> <span class="ident">Wire</span>::<span class="ident">rand_delta</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">rand</span>::<span class="ident">thread_rng</span>(), <span class="ident">q</span>);
         <span class="ident">deltas</span>.<span class="ident">insert</span>(<span class="ident">q</span>,<span class="ident">w</span>.<span class="ident">clone</span>());
         <span class="ident">w</span>
-    }
-
-    <span class="doccomment">/// The current non-free gate index of the garbling computation.</span>
-    <span class="kw">fn</span> <span class="ident">current_gate</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-&gt;</span> <span class="ident">usize</span> {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">c</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">current_gate</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>();
-        <span class="kw">let</span> <span class="ident">old</span> <span class="op">=</span> <span class="kw-2">*</span><span class="ident">c</span>;
-        <span class="kw-2">*</span><span class="ident">c</span> <span class="op">+=</span> <span class="number">1</span>;
-        <span class="ident">old</span>
     }
 
     <span class="doccomment">/// The current output index of the garbling computation.</span>
@@ -629,7 +708,7 @@
 
         <span class="kw">let</span> <span class="ident">q</span> <span class="op">=</span> <span class="ident">A</span>.<span class="ident">modulus</span>();
         <span class="kw">let</span> <span class="ident">qb</span> <span class="op">=</span> <span class="ident">B</span>.<span class="ident">modulus</span>();
-        <span class="kw">let</span> <span class="ident">gate_num</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">current_gate</span>();
+        <span class="kw">let</span> <span class="ident">gate_num</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">current_gate</span>(<span class="ident">ix</span>);
 
         <span class="macro">debug_assert</span><span class="macro">!</span>(<span class="ident">q</span> <span class="op">&gt;=</span> <span class="ident">qb</span>); <span class="comment">// XXX: for now</span>
 
@@ -746,8 +825,8 @@
         <span class="comment">// Since some of the values in gate will be void temporarily, we use Vec&lt;Option&lt;..&gt;&gt;</span>
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">gate</span> <span class="op">=</span> <span class="macro">vec</span><span class="macro">!</span>[<span class="prelude-val">None</span>; <span class="ident">q_in</span> <span class="kw">as</span> <span class="ident">usize</span> <span class="op">-</span> <span class="number">1</span>];
 
-        <span class="kw">let</span> <span class="ident">tao</span> <span class="op">=</span> <span class="ident">A</span>.<span class="ident">color</span>();        <span class="comment">// input zero-wire</span>
-        <span class="kw">let</span> <span class="ident">g</span> <span class="op">=</span> <span class="ident">tweak</span>(<span class="self">self</span>.<span class="ident">current_gate</span>());    <span class="comment">// gate tweak</span>
+        <span class="kw">let</span> <span class="ident">tao</span> <span class="op">=</span> <span class="ident">A</span>.<span class="ident">color</span>();
+        <span class="kw">let</span> <span class="ident">g</span> <span class="op">=</span> <span class="ident">tweak</span>(<span class="self">self</span>.<span class="ident">current_gate</span>(<span class="ident">ix</span>)); <span class="comment">// gate tweak</span>
 
         <span class="kw">let</span> <span class="ident">Din</span>  <span class="op">=</span> <span class="self">self</span>.<span class="ident">delta</span>(<span class="ident">q_in</span>);
         <span class="kw">let</span> <span class="ident">Dout</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">delta</span>(<span class="ident">q_out</span>);
@@ -794,6 +873,7 @@
     }
 
     <span class="kw">fn</span> <span class="ident">output</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">ix</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span>, <span class="ident">X</span>: <span class="kw-2">&amp;</span><span class="ident">Wire</span>) {
+        <span class="macro">assert</span><span class="macro">!</span>(<span class="op">!</span><span class="self">self</span>.<span class="ident">in_sync</span>() <span class="op">&amp;&amp;</span> <span class="ident">ix</span>.<span class="ident">is_none</span>(), <span class="string">&quot;garbler: sync output not supported&quot;</span>);
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">cts</span> <span class="op">=</span> <span class="ident">Vec</span>::<span class="ident">new</span>();
         <span class="kw">let</span> <span class="ident">q</span> <span class="op">=</span> <span class="ident">X</span>.<span class="ident">modulus</span>();
         <span class="kw">let</span> <span class="ident">i</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">current_output</span>();
