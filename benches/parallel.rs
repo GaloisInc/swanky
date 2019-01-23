@@ -17,20 +17,18 @@ fn parallel_gadget<F,W>(b: &F, Q: u128, N: usize, par: bool)
             b.begin_sync(0,N);
             let hs = inps.iter().enumerate().map(|(i,inp)| {
                 scope.spawn(move |_| {
-                    let y = b.exact_relu(Some(i), inp);
-                    let z = b.exact_sign(Some(i), &y);
+                    let z = b.exact_relu(Some(i), inp);
                     b.finish_index(i);
                     z
                 })
             }).collect_vec();
             let outs = hs.into_iter().map(|h| h.join().unwrap()).collect_vec();
-            b.outputs(None, &outs);
+            b.output_bundles(None, &outs);
         }).unwrap();
     } else {
         for inp in inps.iter() {
             let y = b.exact_relu(None, inp);
-            let z = b.exact_sign(None, &y);
-            b.output(None, &z)
+            b.output_bundle(None, &y)
         }
     }
 }
@@ -39,7 +37,7 @@ fn bench_setup(c: &mut Criterion, par: bool) {
     c.bench_function(if par { "parallel streaming" } else { "sequential streaming" }, move |b| {
         let mut rng = thread_rng();
         let N = 10;
-        let Q = modulus_with_width(10);
+        let Q = modulus_with_width(4);
 
         b.iter(|| {
             let input = (0..N).flat_map(|_| crt_factor(rng.gen_u128() % Q, Q)).collect_vec();

@@ -23,19 +23,17 @@ pub struct Evaluator {
     output_cts:     Arc<Mutex<Vec<OutputCiphertext>>>,
     output_wires:   Arc<Mutex<Vec<Wire>>>,
 
-    in_sync:        Arc<RwLock<bool>>,
-    sync_info:      Arc<Mutex<Option<GateSyncInfo>>>,
+    sync_info:      Arc<RwLock<Option<SyncInfo>>>,
     msg_queues:     Arc<RwLock<Vec<MsQueue<(GateType, Sender<Message>)>>>>,
-    begin_index:    Arc<RwLock<usize>>,
+    index_done:     Arc<RwLock<Option<Vec<bool>>>>,
+    id_for_index:   Arc<RwLock<Vec<Mutex<usize>>>>,
     postman_handle: Arc<Mutex<Option<JoinHandle<()>>>>,
     postman_notify: Arc<Mutex<Option<Sender<()>>>>,
-    index_done:     Arc<RwLock<Option<Vec<bool>>>>,
 }
 
-// Maintain the state necessary for asynchronous gate identifiers.
-struct GateSyncInfo {
+struct SyncInfo {
+    begin_index: usize,
     starting_gate_id: usize,
-    current_id_for_index: Vec<usize>,
 }
 
 impl Evaluator {
@@ -53,13 +51,12 @@ impl Evaluator {
             output_cts:     Arc::new(Mutex::new(Vec::new())),
             output_wires:   Arc::new(Mutex::new(Vec::new())),
 
-            in_sync:        Arc::new(RwLock::new(false)),
-            sync_info:      Arc::new(Mutex::new(None)),
+            sync_info:      Arc::new(RwLock::new(None)),
             msg_queues:     Arc::new(RwLock::new(Vec::new())),
-            begin_index:    Arc::new(RwLock::new(0)),
+            index_done:     Arc::new(RwLock::new(None)),
+            id_for_index:   Arc::new(RwLock::new(Vec::new())),
             postman_handle: Arc::new(Mutex::new(None)),
             postman_notify: Arc::new(Mutex::new(None)),
-            index_done:     Arc::new(RwLock::new(None)),
         }
     }
 
@@ -72,7 +69,7 @@ impl Evaluator {
 
     /// Receive the next message.
     fn recv(&self, sync_index: Option<usize>, ty: GateType) -> Message {
-        if *self.in_sync.read().unwrap() {
+        if self.in_sync() {
             let ix = sync_index.expect("synchronization requires a sync index");
             let (tx, rx) = channel();
             self.msg_queues.read().unwrap()[ix - self.starting_index()].push((ty,tx));
@@ -87,39 +84,20 @@ impl Evaluator {
         (self.recv_function.lock().unwrap().deref_mut())(ty)
     }
 
-    /// The current non-free gate index of the garbling computation.
-    fn current_gate(&self, sync_index: Option<usize>) -> usize {
-        if let Some(ref mut info) = *self.sync_info.lock().unwrap() {
-            let g  = info.starting_gate_id;
-            let ix = sync_index.expect("syncronization requires a sync index");
-            let id = info.current_id_for_index[ix - self.starting_index()];
-            info.current_id_for_index[ix] += 1;
-            // 48 bits for gate index, 16 for id
-            let res = g + ix + (id << 48);
-            res
-        } else {
-            let mut c = self.current_gate.lock().unwrap();
-            let old = *c;
-            *c += 1;
-            old
-        }
-    }
-
     fn internal_begin_sync(&self, begin_index: usize, end_index: usize) {
         let n = end_index - begin_index;
 
-        assert_eq!(*self.in_sync.read().unwrap(), false,
-            "begin sync called while already in sync mode!");
+        assert_eq!(self.in_sync(), false,
+            "evaluator: begin sync called while already in sync mode!");
 
-        *self.in_sync.write().unwrap()  = true;
-        *self.sync_info.lock().unwrap() = Some(GateSyncInfo {
-            starting_gate_id: *self.current_gate.lock().unwrap(),
-            current_id_for_index: vec![0; n],
+        *self.sync_info.write().unwrap() = Some(SyncInfo {
+            begin_index,
+            starting_gate_id: *self.current_gate.lock().unwrap()
         });
 
-        *self.msg_queues.write().unwrap()  = (0..n).map(|_| MsQueue::new()).collect_vec();
-        *self.begin_index.write().unwrap() = begin_index;
-        *self.index_done.write().unwrap()  = Some(vec![false; n]);
+        *self.msg_queues.write().unwrap()   = (0..n).map(|_| MsQueue::new()).collect_vec();
+        *self.index_done.write().unwrap()   = Some(vec![false; n]);
+        *self.id_for_index.write().unwrap() = (begin_index..end_index).map(|_| Mutex::new(0)).collect_vec();
 
         // set up postman
         let p_index_done = self.index_done.clone();
@@ -146,10 +124,8 @@ impl Evaluator {
                     // end sync
                     done = true;
                     *opt_index_done = None;
-                    *self.in_sync.write().unwrap()     = false;
-                    *self.sync_info.lock().unwrap()    = None;
+                    *self.sync_info.write().unwrap()   = None;
                     *self.msg_queues.write().unwrap()  = Vec::new();
-                    *self.begin_index.write().unwrap() = 0;
                 }
             } else {
                 panic!("garbler: finish_index called without starting a sync!");
@@ -165,11 +141,33 @@ impl Evaluator {
 
     // starting index of the current sync computation
     fn starting_index(&self) -> usize {
-        *self.begin_index.read().unwrap()
+        self.sync_info.read().unwrap().as_ref().unwrap().begin_index
+    }
+
+    fn in_sync(&self) -> bool {
+        self.sync_info.read().unwrap().is_some()
     }
 
     fn notify_postman(&self) {
         self.postman_notify.lock().unwrap().as_ref().unwrap().send(()).unwrap();
+    }
+
+    /// The current non-free gate index of the garbling computation.
+    fn current_gate(&self, sync_index: Option<usize>) -> usize {
+        if let Some(ref info) = *self.sync_info.read().unwrap() {
+            let ix = sync_index.expect("syncronization requires a sync index");
+            let ids = self.id_for_index.read().unwrap();
+            let mut id_mutex = ids[ix - info.begin_index].lock().unwrap();
+            let id = *id_mutex;
+            *id_mutex += 1;
+            // 48 bits for gate index, 16 for id
+            info.starting_gate_id + ix + (id << 48)
+        } else {
+            let mut c = self.current_gate.lock().unwrap();
+            let old = *c;
+            *c += 1;
+            old
+        }
     }
 }
 

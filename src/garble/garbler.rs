@@ -8,26 +8,26 @@ use std::sync::{Arc, RwLock, Mutex};
 
 use super::Message;
 
-/// Streams garbled circuit ciphertexts through a callback.
+/// Streams garbled circuit ciphertexts through a callback. Parallelizable.
 pub struct Garbler {
     send_function:  Arc<Mutex<FnMut(Message) + Send>>,
     constants:      Arc<RwLock<HashMap<(u16,u16),Wire>>>,
     deltas:         Arc<Mutex<HashMap<u16, Wire>>>,
     current_output: Arc<Mutex<usize>>,
     current_gate:   Arc<Mutex<usize>>,
-    sync_info:      Arc<Mutex<Option<GarblerSyncInfo>>>,
+
+    // tools to synchronize the ciphertexts and tweaks during parallel Fancy code
+    sync_info:      Arc<RwLock<Option<SyncInfo>>>,
+    current_index:  Arc<RwLock<usize>>,
+    msg_queues:     Arc<RwLock<Vec<Mutex<Vec<Message>>>>>,
+    index_done:     Arc<Mutex<Vec<bool>>>,
+    id_for_index:   Arc<RwLock<Vec<Mutex<usize>>>>,
 }
 
-/// Struct used to synchronize messages and gate identifiers between asynchronous garbler
-/// and evaluator.
-struct GarblerSyncInfo {
+struct SyncInfo {
     begin_index: usize,
     end_index: usize,
-    current_index: usize,
-    waiting_messages: Vec<Vec<Message>>,
-    index_done: Vec<bool>,
     starting_gate_id: usize,
-    current_id_for_index: Vec<usize>,
 }
 
 impl Garbler {
@@ -44,23 +44,32 @@ impl Garbler {
             deltas:         Arc::new(Mutex::new(HashMap::new())),
             current_gate:   Arc::new(Mutex::new(0)),
             current_output: Arc::new(Mutex::new(0)),
-            sync_info:      Arc::new(Mutex::new(None)),
+
+            sync_info:      Arc::new(RwLock::new(None)),
+            current_index:  Arc::new(RwLock::new(0)),
+            msg_queues:     Arc::new(RwLock::new(Vec::new())),
+            index_done:     Arc::new(Mutex::new(Vec::new())),
+            id_for_index:   Arc::new(RwLock::new(Vec::new())),
         }
     }
 
     /// Output some information from the garbling.
     fn send(&self, ix: Option<usize>, m: Message) {
-        if let Some(ref mut info) = *self.sync_info.lock().unwrap() {
-            let i = ix.expect("garbler.send: called without index during sync!");
-            assert!(info.current_index <= i);
-            if i == info.current_index {
-                let msgs = std::mem::replace(&mut info.waiting_messages[i], Vec::new());
-                for m in msgs {
-                    self.internal_send(m);
+        if self.in_sync() {
+            let ix = ix.expect("garbler.send called without index during sync!");
+            let current_index = *self.current_index.read().unwrap();
+            assert!(ix >= current_index);
+            if ix == current_index {
+                let qs = self.msg_queues.read().unwrap();
+                let mut q = qs[ix].lock().unwrap();
+                if q.len() > 0 {
+                    for m in std::mem::replace(&mut *q, Vec::new()) {
+                        self.internal_send(m);
+                    }
                 }
                 self.internal_send(m);
             } else {
-                info.waiting_messages[i].push(m);
+                self.msg_queues.read().unwrap()[ix].lock().unwrap().push(m);
             }
         } else {
             self.internal_send(m);
@@ -71,57 +80,89 @@ impl Garbler {
         (self.send_function.lock().unwrap().deref_mut())(m);
     }
 
-    fn flush(&self, opt_info: &mut Option<GarblerSyncInfo>) {
-        if let Some(ref mut info) = opt_info {
-            while info.current_index < info.end_index {
-                let i = info.current_index;
-                if info.index_done[i] {
-                    let msgs = std::mem::replace(&mut info.waiting_messages[i], Vec::new());
-                    for m in msgs {
+    fn internal_begin_sync(&self, begin_index: usize, end_index: usize) {
+        assert_eq!(self.in_sync(), false,
+            "garbler: begin_sync called before finishing previous sync!");
+
+        *self.sync_info.write().unwrap() = Some(SyncInfo {
+            begin_index,
+            end_index,
+            starting_gate_id: *self.current_gate.lock().unwrap()
+        });
+
+        *self.current_index.write().unwrap() = begin_index;
+        *self.msg_queues.write().unwrap()    = (begin_index..end_index).map(|_| Mutex::new(Vec::new())).collect_vec();
+        *self.index_done.lock().unwrap()     = vec![false; end_index - begin_index];
+        *self.id_for_index.write().unwrap()  = (begin_index..end_index).map(|_| Mutex::new(0)).collect_vec();
+    }
+
+    fn internal_finish_index(&self, index: usize) {
+        assert!(self.in_sync(), "garbler: finish_index called out of sync!");
+
+        let mut cur = self.current_index.write().unwrap();
+        let end     = self.ending_index();
+
+        {
+            let mut done = self.index_done.lock().unwrap();
+            let qs       = self.msg_queues.read().unwrap();
+
+            done[index - self.starting_index()] = true;
+
+            while *cur < end {
+                if done[*cur] {
+                    let mut q = qs[*cur].lock().unwrap();
+                    for m in std::mem::replace(&mut *q, Vec::new()) {
                         self.internal_send(m);
                     }
-                    info.current_index += 1;
+                    *cur += 1;
                 } else {
                     break;
                 }
             }
-            if info.current_index == info.end_index {
-                // set current_gate for synchronous usage
-                let ngates = info.end_index - info.begin_index;
-                *self.current_gate.lock().unwrap() += ngates;
-                // turn off sync
-                *opt_info = None;
-            }
+        }
+
+        if *cur == end {
+            // turn off sync
+            *cur = 0;
+            *self.sync_info.write().unwrap()     = None;
+            *self.msg_queues.write().unwrap()    = Vec::new();
+            *self.index_done.lock().unwrap()     = Vec::new();
+            *self.id_for_index.write().unwrap()  = Vec::new();
         }
     }
 
-    fn internal_begin_sync(&self, begin_index: usize, end_index: usize) {
-        let mut info = self.sync_info.lock().unwrap();
-
-        assert!(info.is_none(),
-            "garbler: begin_sync called before finishing previous sync!");
-
-        let init = GarblerSyncInfo {
-            begin_index,
-            end_index,
-            current_index:    begin_index,
-            waiting_messages: vec![Vec::new(); end_index - begin_index],
-            index_done:       vec![false; end_index - begin_index],
-            starting_gate_id: *self.current_gate.lock().unwrap(),
-            current_id_for_index: vec![0; end_index - begin_index],
-        };
-
-        *info = Some(init);
+    fn in_sync(&self) -> bool {
+        self.sync_info.read().unwrap().is_some()
     }
 
-    fn internal_finish_index(&self, index: usize) {
-        let mut opt_info = self.sync_info.lock().unwrap();
-        if let Some(ref mut info) = *opt_info {
-            info.index_done[index - info.begin_index] = true;
+    // starting index of the current sync computation
+    fn starting_index(&self) -> usize {
+        self.sync_info.read().unwrap().as_ref().unwrap().begin_index
+    }
+
+    // ending index of the current sync computation
+    fn ending_index(&self) -> usize {
+        self.sync_info.read().unwrap().as_ref().unwrap().end_index
+    }
+
+    /// The current non-free gate index of the garbling computation. Respects sync
+    /// ordering.
+    fn current_gate(&self, sync_index: Option<usize>) -> usize {
+        if let Some(ref info) = *self.sync_info.read().unwrap() {
+            let ix = sync_index.expect("syncronization requires a sync index");
+            let ids = self.id_for_index.read().unwrap();
+            let mut id_mutex = ids[ix - info.begin_index].lock().unwrap();
+            let id = *id_mutex;
+            *id_mutex += 1;
+            // 48 bits for gate index, 16 for id
+            assert!(info.starting_gate_id + ix >> 48 == 0 && id >> 16 == 0);
+            info.starting_gate_id + ix + (id << 48)
         } else {
-            panic!("garbler: finish_index called without starting a sync!");
+            let mut c = self.current_gate.lock().unwrap();
+            let old = *c;
+            *c += 1;
+            old
         }
-        self.flush(&mut *opt_info);
     }
 
     /// Create a delta if it has not been created yet for this modulus, otherwise just
@@ -135,26 +176,6 @@ impl Garbler {
         let w = Wire::rand_delta(&mut rand::thread_rng(), q);
         deltas.insert(q,w.clone());
         w
-    }
-
-    /// The current non-free gate index of the garbling computation. Respects sync
-    /// ordering.
-    fn current_gate(&self, sync_index: Option<usize>) -> usize {
-        if let Some(ref mut info) = *self.sync_info.lock().unwrap() {
-            let g  = info.starting_gate_id;
-            let ix = sync_index.expect("syncronization requires a sync index");
-            let id = info.current_id_for_index[ix - info.begin_index];
-            info.current_id_for_index[ix] += 1;
-            // 48 bits for gate index, 16 for id
-            assert!(g + ix >> 48 == 0 && id >> 16 == 0);
-            let res = g + ix + (id << 48);
-            res
-        } else {
-            let mut c = self.current_gate.lock().unwrap();
-            let old = *c;
-            *c += 1;
-            old
-        }
     }
 
     /// The current output index of the garbling computation.
@@ -398,6 +419,7 @@ impl Fancy for Garbler {
     }
 
     fn output(&self, ix: Option<usize>, X: &Wire) {
+        assert!(!self.in_sync() && ix.is_none(), "garbler: sync output not supported");
         let mut cts = Vec::new();
         let q = X.modulus();
         let i = self.current_output();
