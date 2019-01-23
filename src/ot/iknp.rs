@@ -102,7 +102,6 @@ mod tests {
     use crate::ot::naor_pinkas::NaorPinkasOT;
     use std::os::unix::net::UnixStream;
     use std::sync::{Arc, Mutex};
-    use test::Bencher;
 
     const N: usize = 256;
 
@@ -165,20 +164,5 @@ mod tests {
     #[test]
     fn test_chou_orlandi() {
         test_ot::<ChouOrlandiOT<UnixStream>>(N);
-    }
-
-    #[bench]
-    fn bench_dummy(b: &mut Bencher) {
-        b.iter(|| test_ot::<DummyOT<UnixStream>>(1024))
-    }
-
-    #[bench]
-    fn bench_naor_pinkas(b: &mut Bencher) {
-        b.iter(|| test_ot::<NaorPinkasOT<UnixStream>>(1024))
-    }
-
-    #[bench]
-    fn bench_chou_orlandi(b: &mut Bencher) {
-        b.iter(|| test_ot::<ChouOrlandiOT<UnixStream>>(1024))
     }
 }

@@ -101,7 +101,6 @@ mod tests {
     extern crate test;
     use super::*;
     use std::os::unix::net::UnixStream;
-    use test::Bencher;
 
     const N: usize = 32;
 
@@ -128,10 +127,5 @@ mod tests {
         let mut ot = NaorPinkasOT::new(receiver);
         let result = ot.receive(&[b as u16], N * 8).unwrap();
         assert_eq!(result[0], if b { m1_ } else { m0_ });
-    }
-
-    #[bench]
-    fn bench(b: &mut Bencher) {
-        b.iter(|| test())
     }
 }

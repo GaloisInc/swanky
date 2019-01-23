@@ -1,0 +1,131 @@
+use criterion::{criterion_group, criterion_main, Criterion};
+use std::sync::{Arc, Mutex};
+use bitvec::BitVec;
+use std::os::unix::net::UnixStream;
+use ocelot::ot::*;
+use ocelot::util::*;
+use std::time::Duration;
+
+const N: usize = 32;
+
+fn rand_u8_vec(size: usize) -> Vec<u8> {
+    let mut v = Vec::with_capacity(size);
+    for _ in 0..size {
+        v.push(rand::random::<u8>());
+    }
+    v
+}
+
+fn test<OT: ObliviousTransfer<UnixStream>>(m0: &BitVec, m1: &BitVec) {
+    let m0_ = m0.clone();
+    let m1_ = m1.clone();
+    let b = rand::random::<bool>();
+    let (sender, receiver) = match UnixStream::pair() {
+        Ok((s1, s2)) => (Arc::new(Mutex::new(s1)), Arc::new(Mutex::new(s2))),
+        Err(e) => {
+            eprintln!("Couldn't create pair of sockets: {:?}", e);
+            return;
+        }
+    };
+    let handler = std::thread::spawn(move || {
+        let mut ot = OT::new(sender);
+        ot.send(&[(m0_, m1_)]).unwrap();
+    });
+    let mut ot = OT::new(receiver);
+    let _results = ot.receive(&[b as u16], N * 8).unwrap();
+    handler.join().unwrap();
+}
+
+fn bench_chou_orlandi(c: &mut Criterion) {
+    let m0 = rand_u8_vec(N);
+    let m1 = rand_u8_vec(N);
+    let m0 = BitVec::from(m0);
+    let m1 = BitVec::from(m1);
+    c.bench_function("ot::ChouOrlandiOT", move |bench| {
+        bench.iter(|| test::<ChouOrlandiOT<UnixStream>>(&m0, &m1))
+    });
+}
+
+fn bench_dummy(c: &mut Criterion) {
+    let m0 = rand_u8_vec(N);
+    let m1 = rand_u8_vec(N);
+    let m0 = BitVec::from(m0);
+    let m1 = BitVec::from(m1);
+    c.bench_function("ot::DummyOT", move |bench| {
+        bench.iter(|| test::<DummyOT<UnixStream>>(&m0, &m1))
+    });
+}
+
+fn bench_naor_pinkas(c: &mut Criterion) {
+    let m0 = rand_u8_vec(N);
+    let m1 = rand_u8_vec(N);
+    let m0 = BitVec::from(m0);
+    let m1 = BitVec::from(m1);
+    c.bench_function("ot::NaorPinkasOT", move |bench| {
+        bench.iter(|| test::<NaorPinkasOT<UnixStream>>(&m0, &m1))
+    });
+}
+
+const T: usize = 1024;
+
+fn rand_u128_vec(size: usize) -> Vec<u128> {
+    let mut v = Vec::with_capacity(size);
+    for _ in 0..size {
+        v.push(rand::random::<u128>());
+    }
+    v
+}
+
+fn rand_bool_vec(size: usize) -> Vec<bool> {
+    let mut v = Vec::with_capacity(size);
+    for _ in 0..size {
+        v.push(rand::random::<bool>());
+    }
+    v
+}
+
+fn test_otext<OT: ObliviousTransfer<UnixStream>>(n: usize) {
+    let m0s = rand_u128_vec(n);
+    let m1s = rand_u128_vec(n);
+    let bs = rand_bool_vec(n);
+    // let m0s_ = m0s.clone();
+    // let m1s_ = m1s.clone();
+    // let bs_ = bs.clone();
+    let (sender, receiver) = match UnixStream::pair() {
+        Ok((s1, s2)) => (Arc::new(Mutex::new(s1)), Arc::new(Mutex::new(s2))),
+        Err(e) => {
+            eprintln!("Couldn't create pair of sockets: {:?}", e);
+            return;
+        }
+    };
+    std::thread::spawn(move || {
+        let mut otext = IknpOT::<UnixStream, OT>::new(sender.clone());
+        let ms = m0s
+            .into_iter()
+            .zip(m1s.into_iter())
+            .map(|(a, b)| (u128_to_bitvec(a), u128_to_bitvec(b)))
+            .collect::<Vec<(BitVec, BitVec)>>();
+        otext.send(&ms).unwrap();
+    });
+    let mut otext = IknpOT::<UnixStream, OT>::new(receiver.clone());
+    let _results = otext
+        .receive(&bs.iter().map(|b| *b as u16).collect::<Vec<u16>>(), 128)
+        .unwrap();
+    // for (b, result, m0, m1) in itertools::izip!(bs_, results, m0s_, m1s_) {
+    //     assert_eq!(bitvec_to_u128(&result), if b { m1 } else { m0 })
+    // }
+}
+
+fn bench_iknp(c: &mut Criterion) {
+    c.bench_function("ot::IknpOT", move |bench| {
+        bench.iter(|| test_otext::<ChouOrlandiOT<UnixStream>>(T))
+    });
+}
+
+criterion_group! {
+    name = ot;
+    config = Criterion::default().warm_up_time(Duration::from_millis(100));
+    targets = bench_chou_orlandi, bench_dummy, bench_naor_pinkas, bench_iknp
+}
+
+criterion_main!(ot);

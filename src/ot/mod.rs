@@ -107,10 +107,11 @@ impl<T: Read + Write> Stream<T> {
 #[inline(always)]
 fn hash_pt(pt: &RistrettoPoint, length: usize) -> Vec<u8> {
     // Hash a point `pt` by compute `E(pt, 0)`
+    // XXX DON"T USE ECB MODE
     let result = pt.compress();
     let bytes = result.as_bytes();
-    let m = vec![0; length];
-    encrypt(&bytes[0..16], &m).unwrap().drain(16..).collect()
+    let mut m = vec![0; length];
+    encrypt(&bytes[0..16], &mut m).drain(16..).collect()
 }
 #[inline(always)]
 fn xor(a: &[u8], b: &[u8]) -> Vec<u8> {
@@ -127,40 +128,14 @@ fn xor(a: &[u8], b: &[u8]) -> Vec<u8> {
 type Cipher = Ecb<Aes128, Pkcs7>;
 
 #[inline(always)]
-fn encrypt(k: &[u8], m: &[u8]) -> Result<Vec<u8>, Error> {
-    let cipher = match Cipher::new_var(k, Default::default()) {
-        Ok(c) => c,
-        Err(_) => {
-            return Err(Error::from(IOError::new(
-                ErrorKind::InvalidInput,
-                "initializing AES128-ECB failed",
-            )));
-        }
-    };
-    let mut m = m.to_vec();
-    let ct = cipher.encrypt_vec(&mut m);
-    Ok(ct.to_vec())
+fn encrypt(k: &[u8], m: &[u8]) -> Vec<u8> {
+    let cipher = Cipher::new_var(k, Default::default()).unwrap();
+    let ct = cipher.encrypt_vec(&m);
+    ct.to_vec()
 }
 #[inline(always)]
-fn decrypt(k: &[u8], c: &[u8]) -> Result<Vec<u8>, Error> {
-    let cipher = match Cipher::new_var(k, Default::default()) {
-        Ok(c) => c,
-        Err(_) => {
-            return Err(Error::from(IOError::new(
-                ErrorKind::InvalidInput,
-                "initializing AES128-ECB failed",
-            )));
-        }
-    };
-    let mut c = c.to_vec();
-    let m = match cipher.decrypt_vec(&mut c) {
-        Ok(m) => m,
-        Err(_) => {
-            return Err(Error::from(IOError::new(
-                ErrorKind::InvalidInput,
-                "decrypting AES128-ECB failed",
-            )));
-        }
-    };
-    Ok(m.to_vec())
+fn decrypt(k: &[u8], c: &[u8]) -> Vec<u8> {
+    let cipher = Cipher::new_var(k, Default::default()).unwrap();
+    let m = cipher.decrypt_vec(&c).unwrap();
+    m.to_vec()
 }

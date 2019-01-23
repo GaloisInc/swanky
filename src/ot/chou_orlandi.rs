@@ -6,7 +6,7 @@ use curve25519_dalek::ristretto::RistrettoPoint;
 use curve25519_dalek::scalar::Scalar;
 use failure::Error;
 use rand::rngs::ThreadRng;
-use std::io::{ErrorKind, Read, Write};
+use std::io::{Read, Write};
 use std::sync::{Arc, Mutex};
 
 pub struct ChouOrlandiOT<T: Read + Write> {
@@ -17,58 +17,6 @@ pub struct ChouOrlandiOT<T: Read + Write> {
 const P: RistrettoPoint = constants::RISTRETTO_BASEPOINT_POINT;
 const KEYSIZE: usize = 16;
 
-impl<T: Read + Write> ChouOrlandiOT<T> {
-    fn _send(&mut self, values: &(BitVec, BitVec)) -> Result<(), Error> {
-        assert_eq!(
-            values.0.len(),
-            values.1.len(),
-            "input values of unequal
-        length: {} ≠ {}",
-            values.0.len(),
-            values.1.len()
-        );
-        let a = Scalar::random(&mut self.rng);
-        let a_ = P * a;
-        self.stream.write_pt(&a_)?;
-        let b_ = self.stream.read_pt()?;
-        let k0 = super::hash_pt(&(b_ * a), KEYSIZE);
-        let k1 = super::hash_pt(&((b_ - a_) * a), KEYSIZE);
-        let c0 = super::encrypt(&k0, &util::bitvec_to_vec(&values.0))?;
-        let c1 = super::encrypt(&k1, &util::bitvec_to_vec(&values.1))?;
-        self.stream.write_bytes(&c0)?;
-        self.stream.write_bytes(&c1)?;
-        Ok(())
-    }
-
-    fn _receive(&mut self, input: u16, nbits: usize) -> Result<BitVec, Error> {
-        let input = match input {
-            0 => false,
-            1 => true,
-            _ => {
-                return Err(Error::from(std::io::Error::new(
-                    ErrorKind::InvalidInput,
-                    "Input must be zero or one",
-                )));
-            }
-        };
-        let nbytes = nbits / 8;
-        let b = Scalar::random(&mut self.rng);
-        let a_ = self.stream.read_pt()?;
-        let b_ = match input {
-            // XXX: Timing attack!
-            false => P * b,
-            true => a_ + P * b,
-        };
-        self.stream.write_pt(&b_)?;
-        let kr = super::hash_pt(&(a_ * b), KEYSIZE);
-        let c_0 = self.stream.read_bytes(nbytes + KEYSIZE)?;
-        let c_1 = self.stream.read_bytes(nbytes + KEYSIZE)?;
-        let c = if input { &c_1 } else { &c_0 };
-        let m = super::decrypt(&kr, &c)?;
-        Ok(BitVec::from(m))
-    }
-}
-
 impl<T: Read + Write> ObliviousTransfer<T> for ChouOrlandiOT<T> {
     fn new(stream: Arc<Mutex<T>>) -> Self {
         let stream = Stream::new(stream);
@@ -76,18 +24,38 @@ impl<T: Read + Write> ObliviousTransfer<T> for ChouOrlandiOT<T> {
         Self { stream, rng }
     }
 
-    fn send(&mut self, values: &[(BitVec, BitVec)]) -> Result<(), Error> {
-        for inputs in values.iter() {
-            self._send(inputs)?;
+    fn send(&mut self, inputs: &[(BitVec, BitVec)]) -> Result<(), Error> {
+        let y = Scalar::random(&mut self.rng);
+        let s = P * y;
+        self.stream.write_pt(&s)?;
+        for input in inputs.iter() {
+            let r = self.stream.read_pt()?;
+            let k0 = super::hash_pt(&(r * y), KEYSIZE);
+            let k1 = super::hash_pt(&((r - s) * y), KEYSIZE);
+            let c0 = super::encrypt(&k0, &mut util::bitvec_to_vec(&input.0));
+            let c1 = super::encrypt(&k1, &mut util::bitvec_to_vec(&input.1));
+            self.stream.write_bytes(&c0)?;
+            self.stream.write_bytes(&c1)?;
         }
         Ok(())
     }
 
     fn receive(&mut self, inputs: &[u16], nbits: usize) -> Result<Vec<BitVec>, Error> {
+        let nbytes = nbits / 8;
         let mut outputs = Vec::with_capacity(inputs.len());
+        let s = self.stream.read_pt()?;
         for input in inputs.iter() {
-            let output = self._receive(*input, nbits)?;
-            outputs.push(output);
+            let x = Scalar::random(&mut self.rng);
+            let input = *input != 0u16;
+            let c = if input { Scalar::one() } else { Scalar::zero() };
+            let r = c * s + x * P;
+            self.stream.write_pt(&r)?;
+            let k = super::hash_pt(&(x * s), KEYSIZE);
+            let c0 = self.stream.read_bytes(nbytes + KEYSIZE)?;
+            let c1 = self.stream.read_bytes(nbytes + KEYSIZE)?;
+            let c = if input { &c1 } else { &c0 };
+            let m = super::decrypt(&k, &c);
+            outputs.push(BitVec::from(m));
         }
         Ok(outputs)
     }
@@ -98,7 +66,6 @@ mod tests {
     extern crate test;
     use super::*;
     use std::os::unix::net::UnixStream;
-    use test::Bencher;
 
     const N: usize = 32;
 
@@ -134,10 +101,5 @@ mod tests {
         let results = ot.receive(&[b as u16], N * 8).unwrap();
         assert_eq!(results[0], if b { m1_ } else { m0_ });
         handler.join().unwrap();
-    }
-
-    #[bench]
-    fn bench(b: &mut Bencher) {
-        b.iter(|| test())
     }
 }

@@ -86,8 +86,8 @@ mod tests {
         assert_eq!(result[0], if b { m1_ } else { m0_ });
     }
 
-    #[bench]
-    fn bench(b: &mut Bencher) {
-        b.iter(|| test())
-    }
+    // #[bench]
+    // fn bench(b: &mut Bencher) {
+    //     b.iter(|| test())
+    // }
 }
