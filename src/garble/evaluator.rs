@@ -124,8 +124,9 @@ impl Evaluator {
                     // end sync
                     done = true;
                     *opt_index_done = None;
-                    *self.sync_info.write().unwrap()   = None;
-                    *self.msg_queues.write().unwrap()  = Vec::new();
+                    *self.sync_info.write().unwrap()    = None;
+                    *self.msg_queues.write().unwrap()   = Vec::new();
+                    *self.current_gate.lock().unwrap() += 1;
                 }
             } else {
                 panic!("garbler: finish_index called without starting a sync!");

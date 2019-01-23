@@ -128,6 +128,7 @@ impl Garbler {
             *self.msg_queues.write().unwrap()    = Vec::new();
             *self.index_done.lock().unwrap()     = Vec::new();
             *self.id_for_index.write().unwrap()  = Vec::new();
+            *self.current_gate.lock().unwrap()  += 1;
         }
     }
 

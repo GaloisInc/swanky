@@ -4,14 +4,24 @@
 //! circuits.
 
 use crate::fancy::{Fancy, HasModulus};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, RwLock};
+use std::sync::mpsc::{channel, Sender};
+use crossbeam::queue::MsQueue;
 
 /// Simple struct that performs the fancy computation over u16.
-#[derive(Debug)]
 pub struct Dummy {
     outputs:          Arc<Mutex<Vec<u16>>>,
     garbler_inputs:   Arc<Mutex<Vec<u16>>>,
     evaluator_inputs: Arc<Mutex<Vec<u16>>>,
+    sync_info:        Arc<RwLock<Option<SyncInfo>>>,
+    current_index:    Arc<RwLock<usize>>,
+    waiting_threads:  Arc<MsQueue<Sender<()>>>,
+    index_done:       Arc<Mutex<Vec<bool>>>,
+}
+
+struct SyncInfo {
+    begin_index: usize,
+    end_index: usize,
 }
 
 /// Wrapper around u16.
@@ -32,6 +42,10 @@ impl Dummy {
             garbler_inputs:   Arc::new(Mutex::new(garbler_inputs.to_vec())),
             evaluator_inputs: Arc::new(Mutex::new(evaluator_inputs.to_vec())),
             outputs:          Arc::new(Mutex::new(Vec::new())),
+            sync_info:        Arc::new(RwLock::new(None)),
+            current_index:    Arc::new(RwLock::new(0)),
+            waiting_threads:  Arc::new(MsQueue::new()),
+            index_done:       Arc::new(Mutex::new(Vec::new())),
         }
     }
 
@@ -39,23 +53,67 @@ impl Dummy {
     pub fn get_output(self) -> Vec<u16> {
         Arc::try_unwrap(self.outputs).unwrap().into_inner().unwrap()
     }
-}
 
-impl Fancy for Dummy {
-    type Item = DummyVal;
+    fn in_sync(&self) -> bool {
+        self.sync_info.read().unwrap().is_some()
+    }
 
-    fn garbler_input(&self, _ix: Option<usize>, modulus: u16) -> DummyVal {
+    fn internal_garbler_input(&self, modulus: u16) -> DummyVal {
         let mut inps = self.garbler_inputs.lock().unwrap();
         assert!(inps.len() > 0, "not enough garbler inputs");
         let val = inps.remove(0);
         DummyVal { val, modulus }
     }
 
-    fn evaluator_input(&self, _ix: Option<usize>, modulus: u16) -> DummyVal {
+    fn internal_evaluator_input(&self, modulus: u16) -> DummyVal {
         let mut inps = self.evaluator_inputs.lock().unwrap();
         assert!(inps.len() > 0, "not enough evaluator inputs");
         let val = inps.remove(0);
         DummyVal { val, modulus }
+    }
+}
+
+impl Fancy for Dummy {
+    type Item = DummyVal;
+
+    fn garbler_input(&self, ix: Option<usize>, modulus: u16) -> DummyVal {
+        if self.in_sync() {
+            let (tx,rx) = channel();
+            {
+                let c = self.current_index.read().unwrap();
+                let ix = ix.expect("dummy: sync mode requires index");
+                if ix == *c {
+                    return self.internal_garbler_input(modulus);
+                } else {
+                    self.waiting_threads.push(tx);
+                }
+            }
+            // otherwise wait and try again
+            rx.recv().unwrap();
+            self.garbler_input(ix, modulus)
+        } else {
+            self.internal_garbler_input(modulus)
+        }
+    }
+
+    fn evaluator_input(&self, ix: Option<usize>, modulus: u16) -> DummyVal {
+        if self.in_sync() {
+            let (tx,rx) = channel();
+            {
+                let c = self.current_index.read().unwrap();
+                let ix = ix.expect("dummy: sync mode requires index");
+                if ix == *c {
+                    return self.internal_evaluator_input(modulus);
+                } else {
+                    self.waiting_threads.push(tx);
+                }
+            }
+            // otherwise wait and try again
+            rx.recv().unwrap();
+            self.evaluator_input(ix, modulus)
+        } else {
+            self.internal_evaluator_input(modulus)
+        }
     }
 
     fn constant(&self, _ix: Option<usize>, val: u16, modulus: u16) -> DummyVal {
@@ -99,9 +157,52 @@ impl Fancy for Dummy {
         self.outputs.lock().unwrap().push(x.val);
     }
 
-    fn begin_sync(&self, _begin_index: usize, _end_index: usize) { }
+    fn begin_sync(&self, begin_index: usize, end_index: usize) {
+        *self.sync_info.write().unwrap() = Some(SyncInfo {
+            begin_index,
+            end_index,
+        });
+        *self.current_index.write().unwrap() = begin_index;
+        *self.index_done.lock().unwrap()     = vec![false; end_index - begin_index];
+    }
 
-    fn finish_index(&self, _index: usize) { }
+    fn finish_index(&self, index: usize) {
+        if self.in_sync() {
+            let mut cleanup = false;
+            {
+                let opt_info = self.sync_info.read().unwrap();
+                let info = opt_info.as_ref().unwrap();
+                let mut done = self.index_done.lock().unwrap();
+                done[index - info.begin_index] = true;
+                loop {
+                    *self.current_index.write().unwrap() += 1;
+                    let c = *self.current_index.read().unwrap();
+
+                    if c >= info.end_index {
+                        cleanup = true;
+                        break;
+                    }
+
+                    // release current index lock
+                    while let Some(tx) = self.waiting_threads.try_pop() {
+                        tx.send(()).unwrap();
+                    }
+
+                    if !done[c - info.begin_index] {
+                        break;
+                    }
+                }
+            }
+
+            // if we are completely done, clean up
+            if cleanup {
+                *self.sync_info.write().unwrap() = None;
+            }
+
+        } else {
+            panic!("dummy: finish index called outside of sync!");
+        }
+    }
 }
 
 #[cfg(test)]

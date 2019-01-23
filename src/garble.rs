@@ -711,14 +711,13 @@ mod parallel {
       where W: Clone + Default + HasModulus + Send + Sync + std::fmt::Debug,
             F: Fancy<Item=W> + Send + Sync,
      {
-        let inps = b.garbler_input_bundles_crt(None, Q, N);
-
         if par {
             crossbeam::scope(|scope| {
                 b.begin_sync(0,N);
-                let hs = inps.iter().enumerate().map(|(i,inp)| {
+                let hs = (0..N).map(|i| {
                     scope.spawn(move |_| {
-                        let z = b.exact_relu(Some(i), inp);
+                        let inp = b.garbler_input_bundle_crt(Some(i), Q);
+                        let z = b.exact_relu(Some(i), &inp);
                         b.finish_index(i);
                         z
                     })
@@ -728,13 +727,11 @@ mod parallel {
             }).unwrap()
 
         } else {
-            b.begin_sync(0,N);
-            let outs = inps.iter().enumerate().map(|(i,inp)| {
-                let z = b.exact_relu(Some(i), inp);
-                b.finish_index(i);
-                z
-            }).collect_vec();
-            b.output_bundles(None, &outs);
+            for _ in 0..N {
+                let inp = b.garbler_input_bundle_crt(None, Q);
+                let z = b.exact_relu(None, &inp);
+                b.output_bundle(None, &z);
+            }
         }
     }
 
@@ -748,7 +745,7 @@ mod parallel {
                 crate::util::crt_factor(rng.gen_u128() % Q, Q)
             }).collect_vec();
 
-            // compute the correct answer using Dummy (which cannot get out of sync)
+            // compute the correct answer using Dummy
             let dummy = Dummy::new(&input, &[]);
             parallel_gadgets(&dummy, Q, N, true);
             let should_be_par = dummy.get_output();
@@ -784,7 +781,7 @@ mod parallel {
 
             // run the evaluator on this one
             let evaluator = Evaluator::new(move |_| rx.recv().unwrap());
-            parallel_gadgets(&evaluator, Q, N, false);
+            parallel_gadgets(&evaluator, Q, N, true);
 
             let result = evaluator.decode_output();
             assert_eq!(result, should_be);
