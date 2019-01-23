@@ -6,7 +6,7 @@
 use crate::fancy::{Fancy, HasModulus};
 use crossbeam::queue::MsQueue;
 use itertools::Itertools;
-use std::sync::mpsc::{channel, Sender};
+use std::sync::mpsc::{channel, Sender, Receiver};
 use std::sync::{Arc, Mutex, RwLock};
 use std::thread::{self, JoinHandle};
 
@@ -21,6 +21,7 @@ pub struct Dummy {
     requests:         Arc<RwLock<Option<Vec<MsQueue<(Request, Sender<DummyVal>)>>>>>,
     index_done:       Arc<Mutex<Option<Vec<bool>>>>,
     postman_handle:   Arc<Mutex<Option<JoinHandle<()>>>>,
+    postman_notify:   Arc<Mutex<Option<Sender<()>>>>,
 }
 
 enum Request {
@@ -51,6 +52,7 @@ impl Dummy {
             requests:         Arc::new(RwLock::new(None)),
             index_done:       Arc::new(Mutex::new(None)),
             postman_handle:   Arc::new(Mutex::new(None)),
+            postman_notify:   Arc::new(Mutex::new(None)),
         }
     }
 
@@ -70,6 +72,7 @@ impl Dummy {
     fn request(&self, ix: usize, m: Request) -> DummyVal {
         let (tx,rx) = channel();
         self.requests.read().unwrap().as_ref().unwrap()[ix].push((m,tx));
+        self.postman_notify.lock().unwrap().as_ref().unwrap().send(()).unwrap();
         rx.recv().unwrap()
     }
 }
@@ -147,15 +150,17 @@ impl Fancy for Dummy {
         *self.requests.write().unwrap()  = Some((begin_index..end_index).map(|_| MsQueue::new()).collect_vec());
         *self.index_done.lock().unwrap() = Some(vec![false; end_index - begin_index]);
 
+        let (tx, rx) = channel();
         let p_done = self.index_done.clone();
         let p_reqs = self.requests.clone();
         let p_gb   = self.garbler_inputs.clone();
         let p_ev   = self.evaluator_inputs.clone();
         let h = thread::spawn(move || {
-            postman(begin_index, end_index, p_done, p_reqs, p_gb, p_ev);
+            postman(begin_index, end_index, p_done, p_reqs, p_gb, p_ev, rx);
         });
 
         *self.postman_handle.lock().unwrap() = Some(h);
+        *self.postman_notify.lock().unwrap() = Some(tx);
     }
 
     fn finish_index(&self, index: usize) {
@@ -165,6 +170,7 @@ impl Fancy for Dummy {
                 let mut done = self.index_done.lock().unwrap();
                 let done = done.as_mut().unwrap();
                 done[index - self.starting_index()] = true;
+                self.postman_notify.lock().unwrap().as_ref().unwrap().send(()).unwrap();
                 if done.iter().all(|&x|x) {
                     cleanup = true;
                 }
@@ -175,6 +181,7 @@ impl Fancy for Dummy {
                 *self.index_done.lock().unwrap()   = None;
                 *self.requests.write().unwrap()    = None;
                 self.postman_handle.lock().unwrap().take().unwrap().join().unwrap();
+                *self.postman_notify.lock().unwrap() = None;
             }
         }
     }
@@ -187,6 +194,7 @@ fn postman(
     reqs: Arc<RwLock<Option<Vec<MsQueue<(Request, Sender<DummyVal>)>>>>>,
     gb_inps: Arc<Mutex<Vec<u16>>>,
     ev_inps: Arc<Mutex<Vec<u16>>>,
+    notify: Receiver<()>,
 ){
     let mut c = begin_index;
     while c < end_index {
@@ -205,6 +213,9 @@ fn postman(
                     tx.send(DummyVal { val, modulus }).unwrap();
                 }
             }
+        } else {
+            // wait to be notified
+            notify.recv().unwrap();
         }
         let done_mutex = done.lock().unwrap();
         if let Some(ref done) = *done_mutex {
