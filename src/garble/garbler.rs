@@ -5,6 +5,7 @@ use itertools::Itertools;
 use std::collections::HashMap;
 use std::ops::DerefMut;
 use std::sync::{Arc, RwLock, Mutex};
+use crossbeam::queue::MsQueue;
 
 use super::Message;
 
@@ -19,7 +20,7 @@ pub struct Garbler {
     // tools to synchronize the ciphertexts and tweaks during parallel Fancy code
     sync_info:      Arc<RwLock<Option<SyncInfo>>>,
     current_index:  Arc<RwLock<usize>>,
-    msg_queues:     Arc<RwLock<Vec<Mutex<Vec<Message>>>>>,
+    msg_queues:     Arc<RwLock<Vec<MsQueue<Message>>>>,
     index_done:     Arc<Mutex<Vec<bool>>>,
     id_for_index:   Arc<RwLock<Vec<Mutex<usize>>>>,
 }
@@ -61,15 +62,12 @@ impl Garbler {
             assert!(ix >= current_index);
             if ix == current_index {
                 let qs = self.msg_queues.read().unwrap();
-                let mut q = qs[ix].lock().unwrap();
-                if q.len() > 0 {
-                    for m in std::mem::replace(&mut *q, Vec::new()) {
-                        self.internal_send(m);
-                    }
+                while let Some(m) = qs[ix].try_pop() {
+                    self.internal_send(m);
                 }
                 self.internal_send(m);
             } else {
-                self.msg_queues.read().unwrap()[ix].lock().unwrap().push(m);
+                self.msg_queues.read().unwrap()[ix].push(m);
             }
         } else {
             self.internal_send(m);
@@ -91,7 +89,7 @@ impl Garbler {
         });
 
         *self.current_index.write().unwrap() = begin_index;
-        *self.msg_queues.write().unwrap()    = (begin_index..end_index).map(|_| Mutex::new(Vec::new())).collect_vec();
+        *self.msg_queues.write().unwrap()    = (begin_index..end_index).map(|_| MsQueue::new()).collect_vec();
         *self.index_done.lock().unwrap()     = vec![false; end_index - begin_index];
         *self.id_for_index.write().unwrap()  = (begin_index..end_index).map(|_| Mutex::new(0)).collect_vec();
     }
@@ -110,8 +108,7 @@ impl Garbler {
 
             while *cur < end {
                 if done[*cur] {
-                    let mut q = qs[*cur].lock().unwrap();
-                    for m in std::mem::replace(&mut *q, Vec::new()) {
+                    while let Some(m) = qs[*cur].try_pop() {
                         self.internal_send(m);
                     }
                     *cur += 1;

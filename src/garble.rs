@@ -715,23 +715,27 @@ mod parallel {
             crossbeam::scope(|scope| {
                 b.begin_sync(0,N);
                 let hs = (0..N).map(|i| {
-                    scope.spawn(move |_| {
+                    scope.builder().name(format!("Thread {}", i)).spawn(move |_| {
                         let inp = b.garbler_input_bundle_crt(Some(i), Q);
                         let z = b.exact_relu(Some(i), &inp);
                         b.finish_index(i);
                         z
-                    })
+                    }).unwrap()
                 }).collect_vec();
                 let outs = hs.into_iter().map(|h| h.join().unwrap()).collect_vec();
                 b.output_bundles(None, &outs);
             }).unwrap()
 
         } else {
-            for _ in 0..N {
-                let inp = b.garbler_input_bundle_crt(None, Q);
-                let z = b.exact_relu(None, &inp);
-                b.output_bundle(None, &z);
+            b.begin_sync(0,N);
+            let mut zs = Vec::new();
+            for i in 0..N {
+                let inp = b.garbler_input_bundle_crt(Some(i), Q);
+                let z = b.exact_relu(Some(i), &inp);
+                zs.push(z);
+                b.finish_index(i);
             }
+            b.output_bundles(None, &zs);
         }
     }
 
@@ -740,7 +744,7 @@ mod parallel {
         let mut rng = thread_rng();
         let N = 10;
         let Q = crate::util::modulus_with_width(10);
-        for _ in 0..16 {
+        for _ in 0..128 {
             let input = (0..N).flat_map(|_| {
                 crate::util::crt_factor(rng.gen_u128() % Q, Q)
             }).collect_vec();
