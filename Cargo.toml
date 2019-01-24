@@ -46,5 +46,5 @@ name = "parallel"
 harness = false
 
 [[bench]]
-name = "thread"
+name = "rust"
 harness = false
