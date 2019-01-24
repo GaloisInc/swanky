@@ -25,7 +25,6 @@ impl<T: Read + Write> ObliviousTransfer<T> for ChouOrlandiOT<T> {
     }
 
     fn send(&mut self, inputs: &[(BitVec, BitVec)]) -> Result<(), Error> {
-        // XXX: doesn't work when generation of `s` moved outside of loop!
         let y = Scalar::random(&mut self.rng);
         let s = P * y;
         self.stream.write_pt(&s)?;
