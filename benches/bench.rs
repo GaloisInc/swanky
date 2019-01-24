@@ -1,9 +1,9 @@
-use criterion::{criterion_group, criterion_main, Criterion};
-use std::sync::{Arc, Mutex};
 use bitvec::BitVec;
-use std::os::unix::net::UnixStream;
+use criterion::{criterion_group, criterion_main, Criterion};
 use ocelot::ot::*;
 use ocelot::util::*;
+use std::os::unix::net::UnixStream;
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 const N: usize = 32;
@@ -16,9 +16,9 @@ fn rand_u8_vec(size: usize) -> Vec<u8> {
     v
 }
 
-fn test<OT: ObliviousTransfer<UnixStream>>(m0: &BitVec, m1: &BitVec) {
-    let m0_ = m0.clone();
-    let m1_ = m1.clone();
+fn test<OT: ObliviousTransfer<UnixStream>>(m0: &[u8], m1: &[u8]) {
+    let m0_ = m0.to_vec().clone();
+    let m1_ = m1.to_vec().clone();
     let b = rand::random::<bool>();
     let (sender, receiver) = match UnixStream::pair() {
         Ok((s1, s2)) => (Arc::new(Mutex::new(s1)), Arc::new(Mutex::new(s2))),
@@ -29,18 +29,16 @@ fn test<OT: ObliviousTransfer<UnixStream>>(m0: &BitVec, m1: &BitVec) {
     };
     let handler = std::thread::spawn(move || {
         let mut ot = OT::new(sender);
-        ot.send(&[(m0_, m1_)]).unwrap();
+        ot.send(&[(BitVec::from(m0_), BitVec::from(m1_))]).unwrap();
     });
     let mut ot = OT::new(receiver);
-    let _results = ot.receive(&[b as u16], N * 8).unwrap();
+    let _results = ot.receive(&[b], N * 8).unwrap();
     handler.join().unwrap();
 }
 
 fn bench_chou_orlandi(c: &mut Criterion) {
     let m0 = rand_u8_vec(N);
     let m1 = rand_u8_vec(N);
-    let m0 = BitVec::from(m0);
-    let m1 = BitVec::from(m1);
     c.bench_function("ot::ChouOrlandiOT", move |bench| {
         bench.iter(|| test::<ChouOrlandiOT<UnixStream>>(&m0, &m1))
     });
@@ -49,8 +47,6 @@ fn bench_chou_orlandi(c: &mut Criterion) {
 fn bench_dummy(c: &mut Criterion) {
     let m0 = rand_u8_vec(N);
     let m1 = rand_u8_vec(N);
-    let m0 = BitVec::from(m0);
-    let m1 = BitVec::from(m1);
     c.bench_function("ot::DummyOT", move |bench| {
         bench.iter(|| test::<DummyOT<UnixStream>>(&m0, &m1))
     });
@@ -59,8 +55,6 @@ fn bench_dummy(c: &mut Criterion) {
 fn bench_naor_pinkas(c: &mut Criterion) {
     let m0 = rand_u8_vec(N);
     let m1 = rand_u8_vec(N);
-    let m0 = BitVec::from(m0);
-    let m1 = BitVec::from(m1);
     c.bench_function("ot::NaorPinkasOT", move |bench| {
         bench.iter(|| test::<NaorPinkasOT<UnixStream>>(&m0, &m1))
     });
@@ -88,9 +82,6 @@ fn test_otext<OT: ObliviousTransfer<UnixStream>>(n: usize) {
     let m0s = rand_u128_vec(n);
     let m1s = rand_u128_vec(n);
     let bs = rand_bool_vec(n);
-    // let m0s_ = m0s.clone();
-    // let m1s_ = m1s.clone();
-    // let bs_ = bs.clone();
     let (sender, receiver) = match UnixStream::pair() {
         Ok((s1, s2)) => (Arc::new(Mutex::new(s1)), Arc::new(Mutex::new(s2))),
         Err(e) => {
@@ -108,9 +99,7 @@ fn test_otext<OT: ObliviousTransfer<UnixStream>>(n: usize) {
         otext.send(&ms).unwrap();
     });
     let mut otext = IknpOT::<UnixStream, OT>::new(receiver.clone());
-    let _results = otext
-        .receive(&bs.iter().map(|b| *b as u16).collect::<Vec<u16>>(), 128)
-        .unwrap();
+    let _results = otext.receive(&bs, 128).unwrap();
     // for (b, result, m0, m1) in itertools::izip!(bs_, results, m0s_, m1s_) {
     //     assert_eq!(bitvec_to_u128(&result), if b { m1 } else { m0 })
     // }

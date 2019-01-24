@@ -1,5 +1,4 @@
 use super::{ObliviousTransfer, Stream};
-use crate::util;
 use bitvec::BitVec;
 use curve25519_dalek::constants;
 use curve25519_dalek::ristretto::RistrettoPoint;
@@ -16,6 +15,7 @@ pub struct ChouOrlandiOT<T: Read + Write> {
 
 const P: RistrettoPoint = constants::RISTRETTO_BASEPOINT_POINT;
 const KEYSIZE: usize = 16;
+const IVSIZE: usize = 16;
 
 impl<T: Read + Write> ObliviousTransfer<T> for ChouOrlandiOT<T> {
     fn new(stream: Arc<Mutex<T>>) -> Self {
@@ -25,36 +25,53 @@ impl<T: Read + Write> ObliviousTransfer<T> for ChouOrlandiOT<T> {
     }
 
     fn send(&mut self, inputs: &[(BitVec, BitVec)]) -> Result<(), Error> {
+        // XXX: doesn't work when generation of `s` moved outside of loop!
         let y = Scalar::random(&mut self.rng);
         let s = P * y;
         self.stream.write_pt(&s)?;
         for input in inputs.iter() {
             let r = self.stream.read_pt()?;
-            let k0 = super::hash_pt(&(r * y), KEYSIZE);
-            let k1 = super::hash_pt(&((r - s) * y), KEYSIZE);
-            let c0 = super::encrypt(&k0, &mut util::bitvec_to_vec(&input.0));
-            let c1 = super::encrypt(&k1, &mut util::bitvec_to_vec(&input.1));
+            let mut k0 = vec![0u8; KEYSIZE];
+            let mut k1 = vec![0u8; KEYSIZE];
+            super::hash_pt(&(r * y), &mut k0);
+            super::hash_pt(&((r - s) * y), &mut k1);
+            let iv0 = rand::random::<[u8; IVSIZE]>();
+            let mut c0: Vec<u8> = input.0.clone().into();
+            super::encrypt(&k0, &iv0, &mut c0);
+            let iv1 = rand::random::<[u8; IVSIZE]>();
+            let mut c1: Vec<u8> = input.1.clone().into();
+            super::encrypt(&k1, &iv1, &mut c1);
+            self.stream.write_bytes(&iv0)?;
             self.stream.write_bytes(&c0)?;
+            self.stream.write_bytes(&iv1)?;
             self.stream.write_bytes(&c1)?;
         }
         Ok(())
     }
 
-    fn receive(&mut self, inputs: &[u16], nbits: usize) -> Result<Vec<BitVec>, Error> {
+    fn receive(&mut self, inputs: &[bool], nbits: usize) -> Result<Vec<BitVec>, Error> {
         let nbytes = nbits / 8;
         let mut outputs = Vec::with_capacity(inputs.len());
         let s = self.stream.read_pt()?;
         for input in inputs.iter() {
             let x = Scalar::random(&mut self.rng);
-            let input = *input != 0u16;
-            let c = if input { Scalar::one() } else { Scalar::zero() };
+            let c = if *input {
+                Scalar::one()
+            } else {
+                Scalar::zero()
+            };
             let r = c * s + x * P;
             self.stream.write_pt(&r)?;
-            let k = super::hash_pt(&(x * s), KEYSIZE);
-            let c0 = self.stream.read_bytes(nbytes + KEYSIZE)?;
-            let c1 = self.stream.read_bytes(nbytes + KEYSIZE)?;
-            let c = if input { &c1 } else { &c0 };
-            let m = super::decrypt(&k, &c);
+            let mut k = vec![0u8; KEYSIZE];
+            super::hash_pt(&(x * s), &mut k);
+            let iv0 = self.stream.read_bytes(IVSIZE)?;
+            let c0 = self.stream.read_bytes(nbytes)?;
+            let iv1 = self.stream.read_bytes(IVSIZE)?;
+            let c1 = self.stream.read_bytes(nbytes)?;
+            let iv = if *input { &iv1 } else { &iv0 };
+            let m = if *input { &c1 } else { &c0 };
+            let mut m = m.clone();
+            super::decrypt(&k, &iv, &mut m);
             outputs.push(BitVec::from(m));
         }
         Ok(outputs)
@@ -69,23 +86,18 @@ mod tests {
 
     const N: usize = 32;
 
-    fn rand_u8_vec(size: usize) -> Vec<u8> {
-        let mut v = Vec::with_capacity(size);
-        for _ in 0..size {
-            v.push(rand::random::<u8>());
-        }
-        v
-    }
-
     #[test]
     fn test() {
-        let m0 = rand_u8_vec(N);
-        let m1 = rand_u8_vec(N);
-        let m0 = BitVec::from(m0.to_vec());
-        let m1 = BitVec::from(m1.to_vec());
-        let m0_ = m0.clone();
-        let m1_ = m1.clone();
-        let b = rand::random::<bool>();
+        let m00 = (0..N).map(|_| rand::random::<u8>()).collect::<Vec<u8>>();
+        let m01 = (0..N).map(|_| rand::random::<u8>()).collect::<Vec<u8>>();
+        let m10 = (0..N).map(|_| rand::random::<u8>()).collect::<Vec<u8>>();
+        let m11 = (0..N).map(|_| rand::random::<u8>()).collect::<Vec<u8>>();
+        let b0 = rand::random::<bool>();
+        let b1 = rand::random::<bool>();
+        let m00_ = m00.clone();
+        let m01_ = m01.clone();
+        let m10_ = m10.clone();
+        let m11_ = m11.clone();
         let (sender, receiver) = match UnixStream::pair() {
             Ok((s1, s2)) => (Arc::new(Mutex::new(s1)), Arc::new(Mutex::new(s2))),
             Err(e) => {
@@ -95,11 +107,22 @@ mod tests {
         };
         let handler = std::thread::spawn(move || {
             let mut ot = ChouOrlandiOT::new(sender);
-            ot.send(&[(m0, m1)]).unwrap();
+            ot.send(&[
+                (BitVec::from(m00), BitVec::from(m01)),
+                (BitVec::from(m10), BitVec::from(m11)),
+            ])
+            .unwrap();
         });
         let mut ot = ChouOrlandiOT::new(receiver);
-        let results = ot.receive(&[b as u16], N * 8).unwrap();
-        assert_eq!(results[0], if b { m1_ } else { m0_ });
+        let results = ot.receive(&[b0, b1], N * 8).unwrap();
+        assert_eq!(
+            results[0],
+            BitVec::<bitvec::BigEndian>::from(if b0 { m01_ } else { m00_ })
+        );
+        assert_eq!(
+            results[1],
+            BitVec::<bitvec::BigEndian>::from(if b1 { m11_ } else { m10_ })
+        );
         handler.join().unwrap();
     }
 }

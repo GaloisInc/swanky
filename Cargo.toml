@@ -10,7 +10,7 @@ autobenches = false
 [dependencies]
 aesni = "0.6.0"
 arrayref = "0.3"
-bitvec = "0.9"
+bitvec = { git = "https://github.com/myrrlyn/bitvec" }
 block-modes = "0.3"
 failure = "0.1"
 generic-array = "0.12"

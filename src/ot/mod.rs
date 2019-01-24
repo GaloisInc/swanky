@@ -8,11 +8,10 @@ pub use dummy::DummyOT;
 pub use iknp::IknpOT;
 pub use naor_pinkas::NaorPinkasOT;
 
-use crate::util::*;
-use aes::Aes128;
+use aesni::stream_cipher::generic_array::GenericArray;
+use aesni::stream_cipher::{NewStreamCipher, StreamCipher};
+use aesni::Aes128Ctr;
 use bitvec::BitVec;
-use block_modes::block_padding::Pkcs7;
-use block_modes::{BlockMode, Ecb};
 use curve25519_dalek::ristretto::{CompressedRistretto, RistrettoPoint};
 use failure::Error;
 use std::io::Error as IOError;
@@ -22,7 +21,7 @@ use std::sync::{Arc, Mutex, MutexGuard};
 pub trait ObliviousTransfer<T: Read + Write> {
     fn new(stream: Arc<Mutex<T>>) -> Self;
     fn send(&mut self, values: &[(BitVec, BitVec)]) -> Result<(), Error>;
-    fn receive(&mut self, inputs: &[u16], nbits: usize) -> Result<Vec<BitVec>, Error>;
+    fn receive(&mut self, inputs: &[bool], nbits: usize) -> Result<Vec<BitVec>, Error>;
 }
 
 struct Stream<T: Read + Write> {
@@ -79,10 +78,9 @@ impl<T: Read + Write> Stream<T> {
         Ok(bytes)
     }
     #[inline(always)]
-    fn write_bitvec(&mut self, bytes: &BitVec) -> Result<usize, Error> {
-        self.stream()
-            .write(&(bitvec_to_vec(bytes)))
-            .map_err(Error::from)
+    fn write_bitvec(&mut self, bv: &BitVec) -> Result<usize, Error> {
+        let v: Vec<u8> = bv.clone().into();
+        self.stream().write(&v).map_err(Error::from)
     }
     #[inline(always)]
     fn read_bitvec(&mut self, nbits: usize) -> Result<BitVec, Error> {
@@ -105,13 +103,11 @@ impl<T: Read + Write> Stream<T> {
 }
 
 #[inline(always)]
-fn hash_pt(pt: &RistrettoPoint, length: usize) -> Vec<u8> {
+fn hash_pt(pt: &RistrettoPoint, mut h: &mut [u8]) {
     // Hash a point `pt` by compute `E(pt, 0)`
-    // XXX DON"T USE ECB MODE
-    let result = pt.compress();
-    let bytes = result.as_bytes();
-    let mut m = vec![0; length];
-    encrypt(&bytes[0..16], &mut m).drain(16..).collect()
+    let k = pt.compress();
+    let k = k.as_bytes();
+    encrypt(&k[0..16], &[0u8; 16], &mut h)
 }
 #[inline(always)]
 fn xor(a: &[u8], b: &[u8]) -> Vec<u8> {
@@ -125,17 +121,15 @@ fn xor(a: &[u8], b: &[u8]) -> Vec<u8> {
     a.iter().zip(b.iter()).map(|(a, b)| a ^ b).collect()
 }
 
-type Cipher = Ecb<Aes128, Pkcs7>;
+type Cipher = Aes128Ctr;
 
 #[inline(always)]
-fn encrypt(k: &[u8], m: &[u8]) -> Vec<u8> {
-    let cipher = Cipher::new_var(k, Default::default()).unwrap();
-    let ct = cipher.encrypt_vec(&m);
-    ct.to_vec()
+fn encrypt(k: &[u8], iv: &[u8], mut m: &mut [u8]) {
+    let mut cipher = Cipher::new_var(k, iv).unwrap();
+    cipher.encrypt(&mut m)
 }
 #[inline(always)]
-fn decrypt(k: &[u8], c: &[u8]) -> Vec<u8> {
-    let cipher = Cipher::new_var(k, Default::default()).unwrap();
-    let m = cipher.decrypt_vec(&c).unwrap();
-    m.to_vec()
+fn decrypt(k: &[u8], iv: &[u8], mut c: &mut [u8]) {
+    let mut cipher = Cipher::new(GenericArray::from_slice(k), GenericArray::from_slice(iv));
+    cipher.decrypt(&mut c)
 }

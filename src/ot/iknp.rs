@@ -23,33 +23,27 @@ impl<S: Read + Write, OT: ObliviousTransfer<S>> ObliviousTransfer<S> for IknpOT<
         Self { stream, ot, rng }
     }
 
-    fn send(&mut self, values: &[(BitVec, BitVec)]) -> Result<(), Error> {
-        let m = values.len();
+    fn send(&mut self, inputs: &[(BitVec, BitVec)]) -> Result<(), Error> {
+        let m = inputs.len();
         if m <= 128 {
             // Just do normal OT
-            return self.ot.send(values);
+            return self.ot.send(inputs);
         }
-        let s = (0..128).map(|_| self.rng.gen::<bool>()).collect::<BitVec>();
-        let mut rs = Vec::with_capacity(128);
-        for b in s.iter() {
-            let r = self.ot.receive(&[b as u16], m)?;
-            rs.push(r[0].clone());
-        }
-        let mut qs = Vec::with_capacity(m);
-        for i in 0..128 {
-            let c = rs.iter().map(|r| r.get(i)).collect::<BitVec>();
-            qs.push(c)
-        }
+        let s = (0..128)
+            .map(|_| self.rng.gen::<bool>())
+            .collect::<Vec<bool>>();
+        let rs = self.ot.receive(&s, m)?;
+        let qs = (0..128).map(|i| rs.iter().map(|r| r.get(i).unwrap()).collect::<BitVec>());
         for (j, q) in qs.into_iter().enumerate() {
-            let y0 = hash(j, &q) ^ util::bitvec_to_u128(&values[j].0);
-            let y1 = hash(j, &(q ^ s.clone())) ^ util::bitvec_to_u128(&values[j].1);
+            let y0 = hash(j, &q) ^ util::bitvec_to_u128(inputs[j].0.clone());
+            let y1 = hash(j, &(q ^ s.clone())) ^ util::bitvec_to_u128(inputs[j].1.clone());
             self.stream.write_u128(&y0)?;
             self.stream.write_u128(&y1)?;
         }
         Ok(())
     }
 
-    fn receive(&mut self, inputs: &[u16], nbits: usize) -> Result<Vec<BitVec>, Error> {
+    fn receive(&mut self, inputs: &[bool], nbits: usize) -> Result<Vec<BitVec>, Error> {
         if nbits != 128 {
             return Err(Error::from(std::io::Error::new(
                 ErrorKind::InvalidInput,
@@ -61,16 +55,15 @@ impl<S: Read + Write, OT: ObliviousTransfer<S>> ObliviousTransfer<S> for IknpOT<
             // Just do normal OT
             return self.ot.receive(inputs, nbits);
         }
-        let r = inputs.iter().cloned().map(|b| b != 0).collect::<BitVec>();
+        let r = inputs.iter().cloned().collect::<BitVec>();
         let ts = (0..128)
             .map(|_| (0..m).map(|_| self.rng.gen::<bool>()).collect::<BitVec>())
-            .collect::<Vec<BitVec>>();
-        for t in ts.iter() {
-            self.ot.send(&[(t.clone(), t.clone() ^ r.clone())])?;
-        }
+            .map(|t| (t.clone(), t.clone() ^ r.clone()))
+            .collect::<Vec<(BitVec, BitVec)>>();
+        self.ot.send(&ts)?;
         let mut ts_ = Vec::with_capacity(m);
         for i in 0..128 {
-            let c = ts.iter().map(|r| r.get(i)).collect::<BitVec>();
+            let c = ts.iter().map(|r| r.0.get(i).unwrap()).collect::<BitVec>();
             ts_.push(c)
         }
         let mut out = Vec::with_capacity(m);
@@ -106,19 +99,11 @@ mod tests {
     const N: usize = 256;
 
     fn rand_u128_vec(size: usize) -> Vec<u128> {
-        let mut v = Vec::with_capacity(size);
-        for _ in 0..size {
-            v.push(rand::random::<u128>());
-        }
-        v
+        (0..size).map(|_| rand::random::<u128>()).collect()
     }
 
     fn rand_bool_vec(size: usize) -> Vec<bool> {
-        let mut v = Vec::with_capacity(size);
-        for _ in 0..size {
-            v.push(rand::random::<bool>());
-        }
-        v
+        (0..size).map(|_| rand::random::<bool>()).collect()
     }
 
     fn test_ot<OT: ObliviousTransfer<UnixStream>>(n: usize) {
@@ -145,11 +130,9 @@ mod tests {
             otext.send(&ms).unwrap();
         });
         let mut otext = IknpOT::<UnixStream, OT>::new(receiver.clone());
-        let results = otext
-            .receive(&bs.iter().map(|b| *b as u16).collect::<Vec<u16>>(), 128)
-            .unwrap();
+        let results = otext.receive(&bs, 128).unwrap();
         for (b, result, m0, m1) in itertools::izip!(bs_, results, m0s_, m1s_) {
-            assert_eq!(util::bitvec_to_u128(&result), if b { m1 } else { m0 })
+            assert_eq!(util::bitvec_to_u128(result), if b { m1 } else { m0 })
         }
     }
 
