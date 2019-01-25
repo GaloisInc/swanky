@@ -608,6 +608,7 @@ pub trait BundleGadgets: Fancy {
         (zs, self.negate(ix, &c))
     }
 
+    /// If b=0 then return x, else return y.
     fn multiplex(&self, ix: Option<usize>, b: &Self::Item, x: &Bundle<Self::Item>, y: &Bundle<Self::Item>)
         -> Bundle<Self::Item>
     {
