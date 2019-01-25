@@ -1,10 +1,8 @@
 use super::Stream;
 use crate::ot::ObliviousTransfer;
-use bitvec::BitVec;
 use failure::Error;
 use rand::rngs::{StdRng, ThreadRng};
 use rand::{Rng, SeedableRng};
-use sha2::{Digest, Sha256};
 use std::io::{ErrorKind, Read, Write};
 use std::sync::{Arc, Mutex};
 
@@ -26,7 +24,6 @@ impl<S: Read + Write, OT: ObliviousTransfer<S>> ObliviousTransfer<S> for AlszOT<
     }
 
     fn send(&mut self, inputs: &[(Vec<u8>, Vec<u8>)]) -> Result<(), Error> {
-        let ℓ = 128;
         let m = inputs.len();
         if m % 8 != 0 {
             return Err(Error::from(std::io::Error::new(
@@ -34,15 +31,15 @@ impl<S: Read + Write, OT: ObliviousTransfer<S>> ObliviousTransfer<S> for AlszOT<
                 "Number of inputs must be divisible by 8",
             )));
         }
-        if m <= ℓ {
+        if m <= 128 {
             // Just do normal OT
             return self.ot.send(inputs);
         }
-        let s = (0..ℓ)
+        let s = (0..128)
             .map(|_| self.rng.gen::<bool>())
             .collect::<Vec<bool>>();
         let ks = self.ot.receive(&s, SEED_LENGTH)?;
-        let mut qs = Vec::with_capacity(ℓ);
+        let mut qs = Vec::with_capacity(128);
         for (s, k) in s.iter().zip(ks.iter()) {
             let u = self.stream.read_bytes(m / 8)?;
             let mut rng: Prng = SeedableRng::from_seed(*array_ref![k, 0, SEED_LENGTH]);
@@ -50,12 +47,11 @@ impl<S: Read + Write, OT: ObliviousTransfer<S>> ObliviousTransfer<S> for AlszOT<
             let u = if *s { u } else { vec![0u8; m / 8] };
             qs.push(super::xor(&u, &g));
         }
-        let qs_ = super::transpose(&qs, ℓ);
+        let qs_ = super::transpose(&qs, m / 8);
+        let s = super::boolvec_to_u128(&s);
         for (j, q) in qs_.into_iter().enumerate() {
-            let x0 = array_ref![inputs[j].0, 0, 16];
-            let y0 = u128::from_ne_bytes(*x0) ^ hash(j, &q);
-            let x1 = array_ref![inputs[j].1, 0, 16];
-            let y1 = u128::from_ne_bytes(*x1) ^ hash(j, &(q ^ s.clone()));
+            let y0 = super::hash(j, &q) ^ super::u8vec_to_u128(&inputs[j].0);
+            let y1 = super::hash(j, &(q ^ s)) ^ super::u8vec_to_u128(&inputs[j].1);
             self.stream.write_u128(&y0)?;
             self.stream.write_u128(&y1)?;
         }
@@ -69,14 +65,13 @@ impl<S: Read + Write, OT: ObliviousTransfer<S>> ObliviousTransfer<S> for AlszOT<
                 "Currently only supports 128-bit inputs",
             )));
         }
-        let ℓ = 128;
         let m = inputs.len();
-        if m <= ℓ {
+        if m <= 128 {
             // Just do normal OT
             return self.ot.receive(inputs, nbytes);
         }
-        let r = inputs.iter().cloned().collect::<BitVec>();
-        let ks = (0..ℓ)
+        let r = inputs.iter().cloned().collect::<super::BV>();
+        let ks = (0..128)
             .map(|_| {
                 (
                     rand::random::<[u8; SEED_LENGTH]>().to_vec(),
@@ -85,7 +80,7 @@ impl<S: Read + Write, OT: ObliviousTransfer<S>> ObliviousTransfer<S> for AlszOT<
             })
             .collect::<Vec<(Vec<u8>, Vec<u8>)>>();
         self.ot.send(&ks)?;
-        let mut ts = Vec::with_capacity(ℓ);
+        let mut ts = Vec::with_capacity(128);
         for (k0, k1) in ks.iter() {
             let mut rng: Prng = SeedableRng::from_seed(*array_ref![k0, 0, SEED_LENGTH]);
             let t = (0..m / 8).map(|_| rng.gen::<u8>()).collect::<Vec<u8>>();
@@ -97,26 +92,17 @@ impl<S: Read + Write, OT: ObliviousTransfer<S>> ObliviousTransfer<S> for AlszOT<
             self.stream.write_bytes(&u)?;
             ts.push(t);
         }
-        let ts_ = super::transpose(&ts, ℓ);
+        let ts_ = super::transpose(&ts, m / 8);
         let mut out = Vec::with_capacity(m);
         for ((j, b), t) in r.iter().enumerate().zip(ts_) {
             let y0 = self.stream.read_u128()?;
             let y1 = self.stream.read_u128()?;
             let y = if b { y1 } else { y0 };
-            let r = y ^ hash(j, &BitVec::from(t));
+            let r = y ^ super::hash(j, &t);
             out.push(r.to_ne_bytes().to_vec());
         }
         Ok(out)
     }
-}
-
-fn hash(idx: usize, q: &BitVec) -> u128 {
-    let mut h = Sha256::new();
-    h.input(idx.to_ne_bytes());
-    h.input(q);
-    let result = h.result();
-    let result = array_ref![result, 0, 16];
-    u128::from_ne_bytes(result.clone())
 }
 
 #[cfg(test)]
@@ -129,7 +115,7 @@ mod tests {
     use std::os::unix::net::UnixStream;
     use std::sync::{Arc, Mutex};
 
-    const N: usize = 256;
+    const N: usize = 1024;
 
     fn rand_u128_vec(size: usize) -> Vec<u128> {
         (0..size).map(|_| rand::random::<u128>()).collect()

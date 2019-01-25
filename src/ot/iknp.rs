@@ -1,10 +1,8 @@
 use super::Stream;
 use crate::ot::ObliviousTransfer;
-use bitvec::BitVec;
 use failure::Error;
 use rand::rngs::ThreadRng;
 use rand::Rng;
-use sha2::{Digest, Sha256};
 use std::io::{ErrorKind, Read, Write};
 use std::sync::{Arc, Mutex};
 
@@ -23,7 +21,6 @@ impl<S: Read + Write, OT: ObliviousTransfer<S>> ObliviousTransfer<S> for IknpOT<
     }
 
     fn send(&mut self, inputs: &[(Vec<u8>, Vec<u8>)]) -> Result<(), Error> {
-        let ℓ = 128;
         let m = inputs.len();
         if m % 8 != 0 {
             return Err(Error::from(std::io::Error::new(
@@ -31,20 +28,21 @@ impl<S: Read + Write, OT: ObliviousTransfer<S>> ObliviousTransfer<S> for IknpOT<
                 "Number of inputs must be divisible by 8",
             )));
         }
-        if m <= ℓ {
+        if m <= 128 {
             // Just do normal OT
             return self.ot.send(inputs);
         }
-        let s = (0..ℓ)
+        let s = (0..128)
             .map(|_| self.rng.gen::<bool>())
             .collect::<Vec<bool>>();
         let qs = self.ot.receive(&s, m / 8)?;
-        let qs = super::transpose(&qs, ℓ);
+        let qs = super::transpose(&qs, m / 8);
+        let s = super::boolvec_to_u128(&s);
         for (j, q) in qs.into_iter().enumerate() {
             let x0 = array_ref![inputs[j].0, 0, 16];
-            let y0 = hash(j, &q) ^ u128::from_ne_bytes(*x0);
+            let y0 = super::hash(j, &q) ^ u128::from_ne_bytes(*x0);
             let x1 = array_ref![inputs[j].1, 0, 16];
-            let y1 = hash(j, &(q ^ s.clone())) ^ u128::from_ne_bytes(*x1);
+            let y1 = super::hash(j, &(q ^ s)) ^ u128::from_ne_bytes(*x1);
             self.stream.write_u128(&y0)?;
             self.stream.write_u128(&y1)?;
         }
@@ -58,45 +56,41 @@ impl<S: Read + Write, OT: ObliviousTransfer<S>> ObliviousTransfer<S> for IknpOT<
                 "Currently only supports 128-bit inputs",
             )));
         }
-        let ℓ = 128;
         let m = inputs.len();
-        if m <= ℓ {
+        if m <= 128 {
             // Just do normal OT
             return self.ot.receive(inputs, nbytes);
         }
-        let r = inputs.iter().cloned().collect::<BitVec>();
-        let ts = (0..ℓ)
-            .map(|_| (0..m).map(|_| self.rng.gen::<bool>()).collect::<BitVec>())
+        let r = inputs.iter().cloned().collect::<super::BV>();
+        let ts = (0..128)
+            .map(|_| {
+                (0..m)
+                    .map(|_| self.rng.gen::<bool>())
+                    .collect::<super::BV>()
+            })
             .map(|t| (t.clone(), t.clone() ^ r.clone()))
             .map(|(a, b)| (a.into(), b.into()))
             .collect::<Vec<(Vec<u8>, Vec<u8>)>>();
         self.ot.send(&ts)?;
-        // let ts_ = super::transpose(ts.into_iter().map(|(t, _)| t), ℓ);
-        let ts_ = (0..ℓ).map(|i| {
-            ts.iter()
-                .map(|(t, _)| BitVec::from(t.clone()))
-                .map(|t: BitVec| t.get(i).unwrap())
-                .collect::<BitVec>()
+        let ts_ = (0..m / 8).map(|i| {
+            let bv = ts
+                .iter()
+                .map(|(t, _)| super::BV::from(t.clone()))
+                .map(|t: super::BV| t.get(i).unwrap())
+                .collect::<super::BV>();
+            let v: Vec<u8> = bv.into();
+            u128::from_ne_bytes(*array_ref![v, 0, 16])
         });
         let mut out = Vec::with_capacity(m);
-        for ((j, b), t) in r.iter().enumerate().zip(ts_) {
+        for ((j, b), t) in inputs.iter().enumerate().zip(ts_) {
             let y0 = self.stream.read_u128()?;
             let y1 = self.stream.read_u128()?;
-            let y = if b { y1 } else { y0 };
-            let r = y ^ hash(j, &t);
+            let y = if *b { y1 } else { y0 };
+            let r = y ^ super::hash(j, &t);
             out.push(r.to_ne_bytes().to_vec());
         }
         Ok(out)
     }
-}
-
-fn hash(idx: usize, q: &BitVec) -> u128 {
-    let mut h = Sha256::new();
-    h.input(idx.to_ne_bytes());
-    h.input(q);
-    let result = h.result();
-    let result = array_ref![result, 0, 16];
-    u128::from_ne_bytes(result.clone())
 }
 
 #[cfg(test)]

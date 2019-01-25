@@ -13,9 +13,10 @@ pub use naor_pinkas::NaorPinkasOT;
 use aesni::stream_cipher::generic_array::GenericArray;
 use aesni::stream_cipher::{NewStreamCipher, StreamCipher};
 use aesni::Aes128Ctr;
-use bitvec::BitVec;
+use bitvec::{BitVec, LittleEndian};
 use curve25519_dalek::ristretto::{CompressedRistretto, RistrettoPoint};
 use failure::Error;
+use sha2::{Digest, Sha256};
 use std::io::Error as IOError;
 use std::io::{ErrorKind, Read, Write};
 use std::sync::{Arc, Mutex, MutexGuard};
@@ -67,7 +68,7 @@ impl<T: Read + Write> Stream<T> {
     fn read_bool(&mut self) -> Result<bool, Error> {
         let mut data = [0; 1];
         self.stream().read_exact(&mut data)?;
-        Ok(if data[0] == 0 { false } else { true })
+        Ok(data[0] != 0)
     }
     #[inline(always)]
     fn write_bytes(&mut self, bytes: &[u8]) -> Result<usize, Error> {
@@ -113,6 +114,7 @@ fn xor(a: &[u8], b: &[u8]) -> Vec<u8> {
 }
 
 type Cipher = Aes128Ctr;
+type BV = BitVec<LittleEndian>;
 
 #[inline(always)]
 fn encrypt(k: &[u8], iv: &[u8], mut m: &mut [u8]) {
@@ -124,14 +126,40 @@ fn decrypt(k: &[u8], iv: &[u8], mut c: &mut [u8]) {
     let mut cipher = Cipher::new(GenericArray::from_slice(k), GenericArray::from_slice(iv));
     cipher.decrypt(&mut c)
 }
-
-fn transpose(m: &[Vec<u8>], ℓ: usize) -> Vec<BitVec> {
+#[inline(always)]
+fn transpose(m: &[Vec<u8>], ℓ: usize) -> Vec<u128> {
     (0..ℓ)
         .map(|i| {
-            m.iter()
-                .map(|v| BitVec::from(v.clone()))
-                .map(|v: BitVec| v.get(i).unwrap())
-                .collect::<BitVec>()
+            let bv = m
+                .iter()
+                .map(|v| BV::from(v.clone()))
+                .map(|v: BV| v.get(i).unwrap())
+                .collect::<BV>();
+            let v: Vec<u8> = bv.into();
+            u128::from_ne_bytes(*array_ref![v, 0, 16])
         })
         .collect()
+}
+#[inline(always)]
+fn hash(idx: usize, q: &u128) -> u128 {
+    let mut h = Sha256::new();
+    h.input(idx.to_ne_bytes());
+    h.input(q.to_ne_bytes());
+    let result = h.result();
+    let result = array_ref![result, 0, 16];
+    u128::from_ne_bytes(result.clone())
+}
+#[inline(always)]
+fn boolvec_to_u128(v: &[bool]) -> u128 {
+    let mut u = 0u128;
+    for (i, b) in v.iter().enumerate() {
+        u |= (*b as u128).wrapping_shl(i as u32);
+    }
+    u.reverse_bits();
+    u
+}
+#[inline(always)]
+fn u8vec_to_u128(v: &[u8]) -> u128 {
+    let v = array_ref![v, 0, 16];
+    u128::from_ne_bytes(*v)
 }

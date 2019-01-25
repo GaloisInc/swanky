@@ -58,22 +58,14 @@ fn bench_naor_pinkas(c: &mut Criterion) {
     });
 }
 
-const T: usize = 1024;
+const T: usize = 4096;
 
 fn rand_u128_vec(size: usize) -> Vec<u128> {
-    let mut v = Vec::with_capacity(size);
-    for _ in 0..size {
-        v.push(rand::random::<u128>());
-    }
-    v
+    (0..size).map(|_| rand::random::<u128>()).collect()
 }
 
 fn rand_bool_vec(size: usize) -> Vec<bool> {
-    let mut v = Vec::with_capacity(size);
-    for _ in 0..size {
-        v.push(rand::random::<bool>());
-    }
-    v
+    (0..size).map(|_| rand::random::<bool>()).collect()
 }
 
 fn test_otext_iknp<OT: ObliviousTransfer<UnixStream>>(n: usize) {
