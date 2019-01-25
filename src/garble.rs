@@ -13,6 +13,7 @@ use serde_derive::{Serialize, Deserialize};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use time::{Duration, PreciseTime};
+use std::error::Error;
 
 /// The ciphertext created by a garbled gate.
 pub type GarbledGate = Vec<u128>;
@@ -193,40 +194,40 @@ pub fn bench_garbling<GbF, EvF>(niters: usize, fancy_gb: GbF, fancy_ev: EvF)
 
     let mut total_time = Duration::zero();
 
-    println!("benchmarking garbler");
-    let mut pb = pbr::ProgressBar::new(niters as u64);
-    pb.message("test ");
+    // println!("benchmarking garbler");
+    // let mut pb = pbr::ProgressBar::new(niters as u64);
+    // pb.message("test ");
 
-    for _ in 0..niters {
-        pb.inc();
-        let mut garbler = Garbler::new(|_|());
-        let start = PreciseTime::now();
-        fancy_gb(&mut garbler);
-        let end = PreciseTime::now();
-        total_time = total_time + start.to(end);
-    }
-    pb.finish();
+    // for _ in 0..niters {
+    //     pb.inc();
+    //     let mut garbler = Garbler::new(|_|());
+    //     let start = PreciseTime::now();
+    //     fancy_gb(&mut garbler);
+    //     let end = PreciseTime::now();
+    //     total_time = total_time + start.to(end);
+    // }
+    // pb.finish();
 
-    total_time = total_time / niters as i32;
-    println!("garbling took {} ms", total_time.num_milliseconds());
+    // total_time = total_time / niters as i32;
+    // println!("garbling took {} ms", total_time.num_milliseconds());
 
     // benchmark the garbler and the evaluator together
     println!("benchmarking garbler streaming to evaluator");
-    let mut pb = pbr::ProgressBar::new(niters as u64);
-    pb.message("test ");
+    // let mut pb = pbr::ProgressBar::new(niters as u64);
+    // pb.message("test ");
 
-    total_time = Duration::zero();
+    // total_time = Duration::zero();
     for _ in 0..niters {
-        pb.inc();
+        // pb.inc();
         // set up channel
-        let (sender, receiver) = std::sync::mpsc::sync_channel(20);
+        let (sender, receiver) = std::sync::mpsc::channel();
 
         // start timer
         let start = PreciseTime::now();
 
         // compute garbler on another thread
         let fancy_gb = fancy_gb.clone();
-        std::thread::spawn(move || {
+        let h = std::thread::spawn(move || {
             // set up garbler
             let callback = move |msg| {
                 let m = match msg {
@@ -234,11 +235,16 @@ pub fn bench_garbling<GbF, EvF>(niters: usize, fancy_gb: GbF, fancy_ev: EvF)
                     Message::UnencodedEvaluatorInput { zero, .. } => Message::EvaluatorInput(zero),
                     m => m,
                 };
-                sender.send(m).expect("failed to send message");
+                sender.send(m).map_err(|e| {
+                    eprintln!("{}", e.description());
+                    panic!("{:?}", e);
+                }).unwrap();
             };
             // evaluate garbler
             let mut gb = Garbler::new(callback);
+            println!("gb started");
             fancy_gb(&mut gb);
+            println!("gb done");
         });
 
         // evaluate the evaluator
@@ -247,8 +253,10 @@ pub fn bench_garbling<GbF, EvF>(niters: usize, fancy_gb: GbF, fancy_ev: EvF)
 
         let end = PreciseTime::now();
         total_time = total_time + start.to(end);
+
+        h.join().unwrap();
     }
-    pb.finish();
+    // pb.finish();
 
     total_time = total_time / niters as i32;
     println!("streaming took {} ms", total_time.num_milliseconds());
@@ -716,8 +724,10 @@ mod parallel {
                 b.begin_sync(0,N);
                 let hs = (0..N).map(|i| {
                     scope.builder().name(format!("Thread {}", i)).spawn(move |_| {
-                        let inp = b.garbler_input_bundle_crt(Some(i), Q);
-                        let z = b.exact_relu(Some(i), &inp);
+                        let c = b.constant_bundle_crt(Some(i),1,Q);
+                        let x = b.garbler_input_bundle_crt(Some(i), Q);
+                        let x = b.mul_bundles(Some(i), &x, &c);
+                        let z = b.exact_relu(Some(i), &x);
                         b.finish_index(i);
                         z
                     }).unwrap()
@@ -730,8 +740,10 @@ mod parallel {
             b.begin_sync(0,N);
             let mut zs = Vec::new();
             for i in 0..N {
-                let inp = b.garbler_input_bundle_crt(Some(i), Q);
-                let z = b.exact_relu(Some(i), &inp);
+                let c = b.constant_bundle_crt(Some(i),1,Q);
+                let x = b.garbler_input_bundle_crt(Some(i), Q);
+                let x = b.mul_bundles(Some(i), &x, &c);
+                let z = b.exact_relu(Some(i), &x);
                 zs.push(z);
                 b.finish_index(i);
             }
@@ -744,7 +756,7 @@ mod parallel {
         let mut rng = thread_rng();
         let N = 10;
         let Q = crate::util::modulus_with_width(10);
-        for _ in 0..128 {
+        for _ in 0..16 {
             let input = (0..N).flat_map(|_| {
                 crate::util::crt_factor(rng.gen_u128() % Q, Q)
             }).collect_vec();

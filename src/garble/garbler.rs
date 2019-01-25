@@ -12,7 +12,7 @@ use super::Message;
 /// Streams garbled circuit ciphertexts through a callback. Parallelizable.
 pub struct Garbler {
     send_function:  Arc<Mutex<FnMut(Message) + Send>>,
-    constants:      Arc<RwLock<HashMap<(u16,u16),Wire>>>,
+    constants:      Arc<Mutex<HashMap<(u16,u16),Wire>>>,
     deltas:         Arc<Mutex<HashMap<u16, Wire>>>,
     current_output: Arc<Mutex<usize>>,
     current_gate:   Arc<Mutex<usize>>,
@@ -41,7 +41,7 @@ impl Garbler {
     {
         Garbler {
             send_function:  Arc::new(Mutex::new(send_func)),
-            constants:      Arc::new(RwLock::new(HashMap::new())),
+            constants:      Arc::new(Mutex::new(HashMap::new())),
             deltas:         Arc::new(Mutex::new(HashMap::new())),
             current_gate:   Arc::new(Mutex::new(0)),
             current_output: Arc::new(Mutex::new(0)),
@@ -214,11 +214,7 @@ impl Fancy for Garbler {
     }
 
     fn constant(&self, ix: Option<usize>, x: u16, q: u16) -> Wire {
-        match self.constants.read().unwrap().get(&(x,q)) {
-            Some(c) => return c.clone(),
-            None => (),
-        }
-        let mut constants = self.constants.write().unwrap();
+        let mut constants = self.constants.lock().unwrap();
         match constants.get(&(x,q)) {
             Some(c) => return c.clone(),
             None => (),
