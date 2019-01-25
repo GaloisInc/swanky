@@ -76,7 +76,7 @@ fn rand_bool_vec(size: usize) -> Vec<bool> {
     v
 }
 
-fn test_otext<OT: ObliviousTransfer<UnixStream>>(n: usize) {
+fn test_otext_iknp<OT: ObliviousTransfer<UnixStream>>(n: usize) {
     let m0s = rand_u128_vec(n);
     let m1s = rand_u128_vec(n);
     let bs = rand_bool_vec(n);
@@ -103,16 +103,49 @@ fn test_otext<OT: ObliviousTransfer<UnixStream>>(n: usize) {
     // }
 }
 
+fn test_otext_alsz<OT: ObliviousTransfer<UnixStream>>(n: usize) {
+    let m0s = rand_u128_vec(n);
+    let m1s = rand_u128_vec(n);
+    let bs = rand_bool_vec(n);
+    let (sender, receiver) = match UnixStream::pair() {
+        Ok((s1, s2)) => (Arc::new(Mutex::new(s1)), Arc::new(Mutex::new(s2))),
+        Err(e) => {
+            eprintln!("Couldn't create pair of sockets: {:?}", e);
+            return;
+        }
+    };
+    std::thread::spawn(move || {
+        let mut otext = AlszOT::<UnixStream, OT>::new(sender.clone());
+        let ms = m0s
+            .into_iter()
+            .zip(m1s.into_iter())
+            .map(|(a, b)| (u128::to_ne_bytes(a).to_vec(), u128::to_ne_bytes(b).to_vec()))
+            .collect::<Vec<(Vec<u8>, Vec<u8>)>>();
+        otext.send(&ms).unwrap();
+    });
+    let mut otext = AlszOT::<UnixStream, OT>::new(receiver.clone());
+    let _results = otext.receive(&bs, 16).unwrap();
+    // for (b, result, m0, m1) in itertools::izip!(bs_, results, m0s_, m1s_) {
+    //     assert_eq!(bitvec_to_u128(&result), if b { m1 } else { m0 })
+    // }
+}
+
 fn bench_iknp(c: &mut Criterion) {
     c.bench_function("ot::IknpOT", move |bench| {
-        bench.iter(|| test_otext::<ChouOrlandiOT<UnixStream>>(T))
+        bench.iter(|| test_otext_iknp::<ChouOrlandiOT<UnixStream>>(T))
+    });
+}
+
+fn bench_alsz(c: &mut Criterion) {
+    c.bench_function("ot::AlszOT", move |bench| {
+        bench.iter(|| test_otext_alsz::<ChouOrlandiOT<UnixStream>>(T))
     });
 }
 
 criterion_group! {
     name = ot;
     config = Criterion::default().warm_up_time(Duration::from_millis(100));
-    targets = bench_chou_orlandi, bench_dummy, bench_naor_pinkas, bench_iknp
+    targets = bench_chou_orlandi, bench_dummy, bench_naor_pinkas, bench_iknp, bench_alsz
 }
 
 criterion_main!(ot);

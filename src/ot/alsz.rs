@@ -2,19 +2,22 @@ use super::Stream;
 use crate::ot::ObliviousTransfer;
 use bitvec::BitVec;
 use failure::Error;
-use rand::rngs::ThreadRng;
-use rand::Rng;
+use rand::rngs::{StdRng, ThreadRng};
+use rand::{Rng, SeedableRng};
 use sha2::{Digest, Sha256};
 use std::io::{ErrorKind, Read, Write};
 use std::sync::{Arc, Mutex};
 
-pub struct IknpOT<S: Read + Write, OT: ObliviousTransfer<S>> {
+pub struct AlszOT<S: Read + Write, OT: ObliviousTransfer<S>> {
     stream: Stream<S>,
     ot: OT,
     rng: ThreadRng,
 }
 
-impl<S: Read + Write, OT: ObliviousTransfer<S>> ObliviousTransfer<S> for IknpOT<S, OT> {
+type Prng = StdRng;
+const SEED_LENGTH: usize = 32;
+
+impl<S: Read + Write, OT: ObliviousTransfer<S>> ObliviousTransfer<S> for AlszOT<S, OT> {
     fn new(stream: Arc<Mutex<S>>) -> Self {
         let ot = OT::new(stream.clone());
         let stream = Stream::new(stream);
@@ -38,13 +41,21 @@ impl<S: Read + Write, OT: ObliviousTransfer<S>> ObliviousTransfer<S> for IknpOT<
         let s = (0..ℓ)
             .map(|_| self.rng.gen::<bool>())
             .collect::<Vec<bool>>();
-        let qs = self.ot.receive(&s, m / 8)?;
-        let qs = super::transpose(&qs, ℓ);
-        for (j, q) in qs.into_iter().enumerate() {
+        let ks = self.ot.receive(&s, SEED_LENGTH)?;
+        let mut qs = Vec::with_capacity(ℓ);
+        for (s, k) in s.iter().zip(ks.iter()) {
+            let u = self.stream.read_bytes(m / 8)?;
+            let mut rng: Prng = SeedableRng::from_seed(*array_ref![k, 0, SEED_LENGTH]);
+            let g = (0..m / 8).map(|_| rng.gen::<u8>()).collect::<Vec<u8>>();
+            let u = if *s { u } else { vec![0u8; m / 8] };
+            qs.push(super::xor(&u, &g));
+        }
+        let qs_ = super::transpose(&qs, ℓ);
+        for (j, q) in qs_.into_iter().enumerate() {
             let x0 = array_ref![inputs[j].0, 0, 16];
-            let y0 = hash(j, &q) ^ u128::from_ne_bytes(*x0);
+            let y0 = u128::from_ne_bytes(*x0) ^ hash(j, &q);
             let x1 = array_ref![inputs[j].1, 0, 16];
-            let y1 = hash(j, &(q ^ s.clone())) ^ u128::from_ne_bytes(*x1);
+            let y1 = u128::from_ne_bytes(*x1) ^ hash(j, &(q ^ s.clone()));
             self.stream.write_u128(&y0)?;
             self.stream.write_u128(&y1)?;
         }
@@ -65,25 +76,34 @@ impl<S: Read + Write, OT: ObliviousTransfer<S>> ObliviousTransfer<S> for IknpOT<
             return self.ot.receive(inputs, nbytes);
         }
         let r = inputs.iter().cloned().collect::<BitVec>();
-        let ts = (0..ℓ)
-            .map(|_| (0..m).map(|_| self.rng.gen::<bool>()).collect::<BitVec>())
-            .map(|t| (t.clone(), t.clone() ^ r.clone()))
-            .map(|(a, b)| (a.into(), b.into()))
+        let ks = (0..ℓ)
+            .map(|_| {
+                (
+                    rand::random::<[u8; SEED_LENGTH]>().to_vec(),
+                    rand::random::<[u8; SEED_LENGTH]>().to_vec(),
+                )
+            })
             .collect::<Vec<(Vec<u8>, Vec<u8>)>>();
-        self.ot.send(&ts)?;
-        // let ts_ = super::transpose(ts.into_iter().map(|(t, _)| t), ℓ);
-        let ts_ = (0..ℓ).map(|i| {
-            ts.iter()
-                .map(|(t, _)| BitVec::from(t.clone()))
-                .map(|t: BitVec| t.get(i).unwrap())
-                .collect::<BitVec>()
-        });
+        self.ot.send(&ks)?;
+        let mut ts = Vec::with_capacity(ℓ);
+        for (k0, k1) in ks.iter() {
+            let mut rng: Prng = SeedableRng::from_seed(*array_ref![k0, 0, SEED_LENGTH]);
+            let t = (0..m / 8).map(|_| rng.gen::<u8>()).collect::<Vec<u8>>();
+            let mut rng: Prng = SeedableRng::from_seed(*array_ref![k1, 0, SEED_LENGTH]);
+            let g = (0..m / 8).map(|_| rng.gen::<u8>()).collect::<Vec<u8>>();
+            let u = super::xor(&t, &g);
+            let r: Vec<u8> = r.clone().into();
+            let u = super::xor(&u, &r);
+            self.stream.write_bytes(&u)?;
+            ts.push(t);
+        }
+        let ts_ = super::transpose(&ts, ℓ);
         let mut out = Vec::with_capacity(m);
         for ((j, b), t) in r.iter().enumerate().zip(ts_) {
             let y0 = self.stream.read_u128()?;
             let y1 = self.stream.read_u128()?;
             let y = if b { y1 } else { y0 };
-            let r = y ^ hash(j, &t);
+            let r = y ^ hash(j, &BitVec::from(t));
             out.push(r.to_ne_bytes().to_vec());
         }
         Ok(out)
@@ -134,7 +154,7 @@ mod tests {
             }
         };
         std::thread::spawn(move || {
-            let mut otext = IknpOT::<UnixStream, OT>::new(sender.clone());
+            let mut otext = AlszOT::<UnixStream, OT>::new(sender.clone());
             let ms = m0s
                 .into_iter()
                 .zip(m1s.into_iter())
@@ -142,7 +162,7 @@ mod tests {
                 .collect::<Vec<(Vec<u8>, Vec<u8>)>>();
             otext.send(&ms).unwrap();
         });
-        let mut otext = IknpOT::<UnixStream, OT>::new(receiver.clone());
+        let mut otext = AlszOT::<UnixStream, OT>::new(receiver.clone());
         let results = otext.receive(&bs, 16).unwrap();
         for (b, result, m0, m1) in itertools::izip!(bs_, results, m0s_, m1s_) {
             assert_eq!(

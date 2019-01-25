@@ -1,8 +1,10 @@
+mod alsz;
 mod chou_orlandi;
 mod dummy;
 mod iknp;
 mod naor_pinkas;
 
+pub use alsz::AlszOT;
 pub use chou_orlandi::ChouOrlandiOT;
 pub use dummy::DummyOT;
 pub use iknp::IknpOT;
@@ -11,6 +13,7 @@ pub use naor_pinkas::NaorPinkasOT;
 use aesni::stream_cipher::generic_array::GenericArray;
 use aesni::stream_cipher::{NewStreamCipher, StreamCipher};
 use aesni::Aes128Ctr;
+use bitvec::BitVec;
 use curve25519_dalek::ristretto::{CompressedRistretto, RistrettoPoint};
 use failure::Error;
 use std::io::Error as IOError;
@@ -120,4 +123,15 @@ fn encrypt(k: &[u8], iv: &[u8], mut m: &mut [u8]) {
 fn decrypt(k: &[u8], iv: &[u8], mut c: &mut [u8]) {
     let mut cipher = Cipher::new(GenericArray::from_slice(k), GenericArray::from_slice(iv));
     cipher.decrypt(&mut c)
+}
+
+fn transpose(m: &[Vec<u8>], ℓ: usize) -> Vec<BitVec> {
+    (0..ℓ)
+        .map(|i| {
+            m.iter()
+                .map(|v| BitVec::from(v.clone()))
+                .map(|v: BitVec| v.get(i).unwrap())
+                .collect::<BitVec>()
+        })
+        .collect()
 }
