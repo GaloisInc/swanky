@@ -1,7 +1,5 @@
-use bitvec::BitVec;
 use criterion::{criterion_group, criterion_main, Criterion};
 use ocelot::ot::*;
-use ocelot::util::*;
 use std::os::unix::net::UnixStream;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
@@ -29,10 +27,10 @@ fn test<OT: ObliviousTransfer<UnixStream>>(m0: &[u8], m1: &[u8]) {
     };
     let handler = std::thread::spawn(move || {
         let mut ot = OT::new(sender);
-        ot.send(&[(BitVec::from(m0_), BitVec::from(m1_))]).unwrap();
+        ot.send(&[(m0_, m1_)]).unwrap();
     });
     let mut ot = OT::new(receiver);
-    let _results = ot.receive(&[b], N * 8).unwrap();
+    let _results = ot.receive(&[b], N).unwrap();
     handler.join().unwrap();
 }
 
@@ -94,12 +92,12 @@ fn test_otext<OT: ObliviousTransfer<UnixStream>>(n: usize) {
         let ms = m0s
             .into_iter()
             .zip(m1s.into_iter())
-            .map(|(a, b)| (u128_to_bitvec(a), u128_to_bitvec(b)))
-            .collect::<Vec<(BitVec, BitVec)>>();
+            .map(|(a, b)| (u128::to_ne_bytes(a).to_vec(), u128::to_ne_bytes(b).to_vec()))
+            .collect::<Vec<(Vec<u8>, Vec<u8>)>>();
         otext.send(&ms).unwrap();
     });
     let mut otext = IknpOT::<UnixStream, OT>::new(receiver.clone());
-    let _results = otext.receive(&bs, 128).unwrap();
+    let _results = otext.receive(&bs, 16).unwrap();
     // for (b, result, m0, m1) in itertools::izip!(bs_, results, m0s_, m1s_) {
     //     assert_eq!(bitvec_to_u128(&result), if b { m1 } else { m0 })
     // }

@@ -1,5 +1,4 @@
 use super::{ObliviousTransfer, Stream};
-use bitvec::BitVec;
 use curve25519_dalek::constants;
 use curve25519_dalek::ristretto::RistrettoPoint;
 use curve25519_dalek::scalar::Scalar;
@@ -23,9 +22,9 @@ impl<T: Read + Write> ObliviousTransfer<T> for NaorPinkasOT<T> {
         Self { stream, rng }
     }
 
-    fn send(&mut self, inputs: &[(BitVec, BitVec)]) -> Result<(), Error> {
+    fn send(&mut self, inputs: &[(Vec<u8>, Vec<u8>)]) -> Result<(), Error> {
         for input in inputs.iter() {
-            let nbytes = max(input.0.len(), input.1.len()) / 8;
+            let nbytes = max(input.0.len(), input.1.len());
             let c = RistrettoPoint::random(&mut self.rng);
             self.stream.write_pt(&c)?;
             let pk0 = self.stream.read_pt()?;
@@ -50,8 +49,7 @@ impl<T: Read + Write> ObliviousTransfer<T> for NaorPinkasOT<T> {
         Ok(())
     }
 
-    fn receive(&mut self, inputs: &[bool], nbits: usize) -> Result<Vec<BitVec>, Error> {
-        let nbytes = nbits / 8;
+    fn receive(&mut self, inputs: &[bool], nbytes: usize) -> Result<Vec<Vec<u8>>, Error> {
         let mut outputs = Vec::with_capacity(inputs.len());
         for input in inputs.iter() {
             let c = self.stream.read_pt()?;
@@ -73,7 +71,7 @@ impl<T: Read + Write> ObliviousTransfer<T> for NaorPinkasOT<T> {
             let mut h = vec![0u8; nbytes];
             super::hash_pt(&(eσ0 * k), &mut h);
             let result = super::xor(&h, &eσ1);
-            outputs.push(BitVec::from(result));
+            outputs.push(result);
         }
         Ok(outputs)
     }
@@ -103,13 +101,10 @@ mod tests {
         };
         std::thread::spawn(move || {
             let mut ot = NaorPinkasOT::new(sender);
-            ot.send(&[(BitVec::from(m0), BitVec::from(m1))]).unwrap();
+            ot.send(&[(m0, m1)]).unwrap();
         });
         let mut ot = NaorPinkasOT::new(receiver);
-        let result = ot.receive(&[b], N * 8).unwrap();
-        assert_eq!(
-            result[0],
-            BitVec::<bitvec::BigEndian>::from(if b { m1_ } else { m0_ })
-        );
+        let result = ot.receive(&[b], N).unwrap();
+        assert_eq!(result[0], if b { m1_ } else { m0_ });
     }
 }

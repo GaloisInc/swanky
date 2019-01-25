@@ -8,4 +8,3 @@ extern crate arrayref;
 extern crate itertools;
 
 pub mod ot;
-pub mod util;

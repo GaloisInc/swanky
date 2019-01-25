@@ -1,6 +1,5 @@
 use super::Stream;
 use crate::ot::ObliviousTransfer;
-use crate::util;
 use bitvec::BitVec;
 use failure::Error;
 use rand::rngs::ThreadRng;
@@ -23,8 +22,14 @@ impl<S: Read + Write, OT: ObliviousTransfer<S>> ObliviousTransfer<S> for IknpOT<
         Self { stream, ot, rng }
     }
 
-    fn send(&mut self, inputs: &[(BitVec, BitVec)]) -> Result<(), Error> {
+    fn send(&mut self, inputs: &[(Vec<u8>, Vec<u8>)]) -> Result<(), Error> {
         let m = inputs.len();
+        if m % 8 != 0 {
+            return Err(Error::from(std::io::Error::new(
+                ErrorKind::InvalidInput,
+                "Number of inputs must be divisible by 8",
+            )));
+        }
         if m <= 128 {
             // Just do normal OT
             return self.ot.send(inputs);
@@ -32,19 +37,26 @@ impl<S: Read + Write, OT: ObliviousTransfer<S>> ObliviousTransfer<S> for IknpOT<
         let s = (0..128)
             .map(|_| self.rng.gen::<bool>())
             .collect::<Vec<bool>>();
-        let rs = self.ot.receive(&s, m)?;
-        let qs = (0..128).map(|i| rs.iter().map(|r| r.get(i).unwrap()).collect::<BitVec>());
+        let rs = self.ot.receive(&s, m / 8)?;
+        let qs = (0..128).map(|i| {
+            rs.iter()
+                .map(|r| BitVec::from(r.clone()))
+                .map(|r: BitVec| r.get(i).unwrap())
+                .collect::<BitVec>()
+        });
         for (j, q) in qs.into_iter().enumerate() {
-            let y0 = hash(j, &q) ^ util::bitvec_to_u128(inputs[j].0.clone());
-            let y1 = hash(j, &(q ^ s.clone())) ^ util::bitvec_to_u128(inputs[j].1.clone());
+            let x0 = array_ref![inputs[j].0, 0, 16];
+            let y0 = hash(j, &q) ^ u128::from_ne_bytes(*x0);
+            let x1 = array_ref![inputs[j].1, 0, 16];
+            let y1 = hash(j, &(q ^ s.clone())) ^ u128::from_ne_bytes(*x1);
             self.stream.write_u128(&y0)?;
             self.stream.write_u128(&y1)?;
         }
         Ok(())
     }
 
-    fn receive(&mut self, inputs: &[bool], nbits: usize) -> Result<Vec<BitVec>, Error> {
-        if nbits != 128 {
+    fn receive(&mut self, inputs: &[bool], nbytes: usize) -> Result<Vec<Vec<u8>>, Error> {
+        if nbytes != 16 {
             return Err(Error::from(std::io::Error::new(
                 ErrorKind::InvalidInput,
                 "Currently only supports 128-bit inputs",
@@ -53,17 +65,22 @@ impl<S: Read + Write, OT: ObliviousTransfer<S>> ObliviousTransfer<S> for IknpOT<
         let m = inputs.len();
         if m <= 128 {
             // Just do normal OT
-            return self.ot.receive(inputs, nbits);
+            return self.ot.receive(inputs, nbytes);
         }
         let r = inputs.iter().cloned().collect::<BitVec>();
         let ts = (0..128)
             .map(|_| (0..m).map(|_| self.rng.gen::<bool>()).collect::<BitVec>())
             .map(|t| (t.clone(), t.clone() ^ r.clone()))
-            .collect::<Vec<(BitVec, BitVec)>>();
+            .map(|(a, b)| (a.into(), b.into()))
+            .collect::<Vec<(Vec<u8>, Vec<u8>)>>();
         self.ot.send(&ts)?;
         let mut ts_ = Vec::with_capacity(m);
         for i in 0..128 {
-            let c = ts.iter().map(|r| r.0.get(i).unwrap()).collect::<BitVec>();
+            let c = ts
+                .iter()
+                .map(|r| BitVec::from(r.0.clone()))
+                .map(|r: BitVec| r.get(i).unwrap())
+                .collect::<BitVec>();
             ts_.push(c)
         }
         let mut out = Vec::with_capacity(m);
@@ -71,7 +88,8 @@ impl<S: Read + Write, OT: ObliviousTransfer<S>> ObliviousTransfer<S> for IknpOT<
             let y0 = self.stream.read_u128()?;
             let y1 = self.stream.read_u128()?;
             let y = if b { y1 } else { y0 };
-            out.push(util::u128_to_bitvec(y ^ hash(j, t)))
+            let r = y ^ hash(j, t);
+            out.push(r.to_ne_bytes().to_vec());
         }
         Ok(out)
     }
@@ -125,14 +143,17 @@ mod tests {
             let ms = m0s
                 .into_iter()
                 .zip(m1s.into_iter())
-                .map(|(a, b)| (util::u128_to_bitvec(a), util::u128_to_bitvec(b)))
-                .collect::<Vec<(BitVec, BitVec)>>();
+                .map(|(a, b)| (a.to_ne_bytes().to_vec(), b.to_ne_bytes().to_vec()))
+                .collect::<Vec<(Vec<u8>, Vec<u8>)>>();
             otext.send(&ms).unwrap();
         });
         let mut otext = IknpOT::<UnixStream, OT>::new(receiver.clone());
-        let results = otext.receive(&bs, 128).unwrap();
+        let results = otext.receive(&bs, 16).unwrap();
         for (b, result, m0, m1) in itertools::izip!(bs_, results, m0s_, m1s_) {
-            assert_eq!(util::bitvec_to_u128(result), if b { m1 } else { m0 })
+            assert_eq!(
+                u128::from_ne_bytes(*array_ref![result, 0, 16]),
+                if b { m1 } else { m0 }
+            )
         }
     }
 

@@ -1,5 +1,4 @@
 use super::{ObliviousTransfer, Stream};
-use bitvec::BitVec;
 use curve25519_dalek::constants;
 use curve25519_dalek::ristretto::RistrettoPoint;
 use curve25519_dalek::scalar::Scalar;
@@ -24,7 +23,7 @@ impl<T: Read + Write> ObliviousTransfer<T> for ChouOrlandiOT<T> {
         Self { stream, rng }
     }
 
-    fn send(&mut self, inputs: &[(BitVec, BitVec)]) -> Result<(), Error> {
+    fn send(&mut self, inputs: &[(Vec<u8>, Vec<u8>)]) -> Result<(), Error> {
         let y = Scalar::random(&mut self.rng);
         let s = P * y;
         self.stream.write_pt(&s)?;
@@ -35,10 +34,10 @@ impl<T: Read + Write> ObliviousTransfer<T> for ChouOrlandiOT<T> {
             super::hash_pt(&(r * y), &mut k0);
             super::hash_pt(&((r - s) * y), &mut k1);
             let iv0 = rand::random::<[u8; IVSIZE]>();
-            let mut c0: Vec<u8> = input.0.clone().into();
+            let mut c0 = input.0.clone();
             super::encrypt(&k0, &iv0, &mut c0);
             let iv1 = rand::random::<[u8; IVSIZE]>();
-            let mut c1: Vec<u8> = input.1.clone().into();
+            let mut c1 = input.1.clone();
             super::encrypt(&k1, &iv1, &mut c1);
             self.stream.write_bytes(&iv0)?;
             self.stream.write_bytes(&c0)?;
@@ -48,8 +47,7 @@ impl<T: Read + Write> ObliviousTransfer<T> for ChouOrlandiOT<T> {
         Ok(())
     }
 
-    fn receive(&mut self, inputs: &[bool], nbits: usize) -> Result<Vec<BitVec>, Error> {
-        let nbytes = nbits / 8;
+    fn receive(&mut self, inputs: &[bool], nbytes: usize) -> Result<Vec<Vec<u8>>, Error> {
         let mut outputs = Vec::with_capacity(inputs.len());
         let s = self.stream.read_pt()?;
         for input in inputs.iter() {
@@ -71,7 +69,7 @@ impl<T: Read + Write> ObliviousTransfer<T> for ChouOrlandiOT<T> {
             let m = if *input { &c1 } else { &c0 };
             let mut m = m.clone();
             super::decrypt(&k, &iv, &mut m);
-            outputs.push(BitVec::from(m));
+            outputs.push(m);
         }
         Ok(outputs)
     }
@@ -87,16 +85,11 @@ mod tests {
 
     #[test]
     fn test() {
-        let m00 = (0..N).map(|_| rand::random::<u8>()).collect::<Vec<u8>>();
-        let m01 = (0..N).map(|_| rand::random::<u8>()).collect::<Vec<u8>>();
-        let m10 = (0..N).map(|_| rand::random::<u8>()).collect::<Vec<u8>>();
-        let m11 = (0..N).map(|_| rand::random::<u8>()).collect::<Vec<u8>>();
-        let b0 = rand::random::<bool>();
-        let b1 = rand::random::<bool>();
-        let m00_ = m00.clone();
-        let m01_ = m01.clone();
-        let m10_ = m10.clone();
-        let m11_ = m11.clone();
+        let m0 = (0..N).map(|_| rand::random::<u8>()).collect::<Vec<u8>>();
+        let m1 = (0..N).map(|_| rand::random::<u8>()).collect::<Vec<u8>>();
+        let b = rand::random::<bool>();
+        let m0_ = m0.clone();
+        let m1_ = m1.clone();
         let (sender, receiver) = match UnixStream::pair() {
             Ok((s1, s2)) => (Arc::new(Mutex::new(s1)), Arc::new(Mutex::new(s2))),
             Err(e) => {
@@ -106,22 +99,11 @@ mod tests {
         };
         let handler = std::thread::spawn(move || {
             let mut ot = ChouOrlandiOT::new(sender);
-            ot.send(&[
-                (BitVec::from(m00), BitVec::from(m01)),
-                (BitVec::from(m10), BitVec::from(m11)),
-            ])
-            .unwrap();
+            ot.send(&[(m0, m1)]).unwrap();
         });
         let mut ot = ChouOrlandiOT::new(receiver);
-        let results = ot.receive(&[b0, b1], N * 8).unwrap();
-        assert_eq!(
-            results[0],
-            BitVec::<bitvec::BigEndian>::from(if b0 { m01_ } else { m00_ })
-        );
-        assert_eq!(
-            results[1],
-            BitVec::<bitvec::BigEndian>::from(if b1 { m11_ } else { m10_ })
-        );
+        let results = ot.receive(&[b], N).unwrap();
+        assert_eq!(results[0], if b { m1_ } else { m0_ });
         handler.join().unwrap();
     }
 }

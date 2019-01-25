@@ -1,5 +1,4 @@
 use super::{ObliviousTransfer, Stream};
-use bitvec::BitVec;
 use failure::Error;
 use std::io::{Read, Write};
 use std::sync::{Arc, Mutex};
@@ -14,20 +13,20 @@ impl<T: Read + Write> ObliviousTransfer<T> for DummyOT<T> {
         Self { stream }
     }
 
-    fn send(&mut self, inputs: &[(BitVec, BitVec)]) -> Result<(), Error> {
+    fn send(&mut self, inputs: &[(Vec<u8>, Vec<u8>)]) -> Result<(), Error> {
         for input in inputs.into_iter() {
             let b = self.stream.read_bool()?;
             let m = if b { &input.1 } else { &input.0 };
-            self.stream.write_bitvec(&m)?;
+            self.stream.write_bytes(&m)?;
         }
         Ok(())
     }
 
-    fn receive(&mut self, inputs: &[bool], nbits: usize) -> Result<Vec<BitVec>, Error> {
+    fn receive(&mut self, inputs: &[bool], nbytes: usize) -> Result<Vec<Vec<u8>>, Error> {
         let mut outputs = Vec::with_capacity(inputs.len());
         for b in inputs.iter() {
             self.stream.write_bool(*b)?;
-            let output = self.stream.read_bitvec(nbits)?;
+            let output = self.stream.read_bytes(nbytes)?;
             outputs.push(output);
         }
         Ok(outputs)
@@ -58,14 +57,11 @@ mod tests {
         };
         let handle = std::thread::spawn(|| {
             let mut ot = DummyOT::new(sender);
-            ot.send(&[(BitVec::from(m0), BitVec::from(m1))]).unwrap();
+            ot.send(&[(m0, m1)]).unwrap();
         });
         let mut ot = DummyOT::new(receiver);
-        let result = ot.receive(&[b], N * 8).unwrap();
-        assert_eq!(
-            result[0],
-            BitVec::<bitvec::BigEndian>::from(if b { m1_ } else { m0_ })
-        );
-        handle.join();
+        let result = ot.receive(&[b], N).unwrap();
+        assert_eq!(result[0], if b { m1_ } else { m0_ });
+        let _ = handle.join();
     }
 }

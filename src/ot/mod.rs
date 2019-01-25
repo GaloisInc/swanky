@@ -11,7 +11,6 @@ pub use naor_pinkas::NaorPinkasOT;
 use aesni::stream_cipher::generic_array::GenericArray;
 use aesni::stream_cipher::{NewStreamCipher, StreamCipher};
 use aesni::Aes128Ctr;
-use bitvec::BitVec;
 use curve25519_dalek::ristretto::{CompressedRistretto, RistrettoPoint};
 use failure::Error;
 use std::io::Error as IOError;
@@ -20,8 +19,8 @@ use std::sync::{Arc, Mutex, MutexGuard};
 
 pub trait ObliviousTransfer<T: Read + Write> {
     fn new(stream: Arc<Mutex<T>>) -> Self;
-    fn send(&mut self, values: &[(BitVec, BitVec)]) -> Result<(), Error>;
-    fn receive(&mut self, inputs: &[bool], nbits: usize) -> Result<Vec<BitVec>, Error>;
+    fn send(&mut self, values: &[(Vec<u8>, Vec<u8>)]) -> Result<(), Error>;
+    fn receive(&mut self, inputs: &[bool], nbytes: usize) -> Result<Vec<Vec<u8>>, Error>;
 }
 
 struct Stream<T: Read + Write> {
@@ -76,17 +75,6 @@ impl<T: Read + Write> Stream<T> {
         let mut bytes = vec![0; nbytes];
         self.stream().read_exact(&mut bytes)?;
         Ok(bytes)
-    }
-    #[inline(always)]
-    fn write_bitvec(&mut self, bv: &BitVec) -> Result<usize, Error> {
-        let v: Vec<u8> = bv.clone().into();
-        self.stream().write(&v).map_err(Error::from)
-    }
-    #[inline(always)]
-    fn read_bitvec(&mut self, nbits: usize) -> Result<BitVec, Error> {
-        let mut bytes = vec![0; nbits / 8];
-        self.stream().read_exact(&mut bytes)?;
-        Ok(BitVec::from(bytes))
     }
     #[inline(always)]
     fn write_u128(&mut self, data: &u128) -> Result<usize, Error> {
