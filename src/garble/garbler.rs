@@ -54,18 +54,20 @@ impl Garbler {
 
     /// Output some information from the garbling.
     fn send(&self, ix: Option<usize>, m: Message) {
-        if self.in_sync() {
+        if let Some(ref info) = *self.sync_info.read().unwrap() {
             let ix = ix.expect("garbler.send called without index during sync!");
             let current_index = *self.current_index.read().unwrap();
-            assert!(ix >= current_index);
+            assert!(ix >= info.begin_index && ix < info.end_index && ix >= current_index,
+                    "garbler: invalid ix={}. begin_index={}, end_index={}, current_index={}",
+                    ix, info.begin_index, info.end_index, current_index);
             if ix == current_index {
                 let qs = self.msg_queues.read().unwrap();
-                while let Some(m) = qs[ix].try_pop() {
+                while let Some(m) = qs[ix - info.begin_index].try_pop() {
                     self.internal_send(m);
                 }
                 self.internal_send(m);
             } else {
-                self.msg_queues.read().unwrap()[ix].push(m);
+                self.msg_queues.read().unwrap()[ix - info.begin_index].push(m);
             }
         } else {
             self.internal_send(m);

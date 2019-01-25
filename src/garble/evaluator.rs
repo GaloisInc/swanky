@@ -23,9 +23,9 @@ pub struct Evaluator {
     output_wires:   Arc<Mutex<Vec<Wire>>>,
 
     sync_info:      Arc<RwLock<Option<SyncInfo>>>,
-    msg_queues:     Arc<RwLock<Vec<MsQueue<(GateType, Sender<Message>)>>>>,
+    msg_queues:     Arc<RwLock<Option<Vec<MsQueue<(GateType, Sender<Message>)>>>>>,
     index_done:     Arc<RwLock<Option<Vec<bool>>>>,
-    id_for_index:   Arc<RwLock<Vec<Mutex<usize>>>>,
+    id_for_index:   Arc<RwLock<Option<Vec<Mutex<usize>>>>>,
     postman_handle: Arc<Mutex<Option<JoinHandle<()>>>>,
     postman_notify: Arc<Mutex<Option<Sender<()>>>>,
 }
@@ -50,9 +50,9 @@ impl Evaluator {
             output_wires:   Arc::new(Mutex::new(Vec::new())),
 
             sync_info:      Arc::new(RwLock::new(None)),
-            msg_queues:     Arc::new(RwLock::new(Vec::new())),
+            msg_queues:     Arc::new(RwLock::new(None)),
             index_done:     Arc::new(RwLock::new(None)),
-            id_for_index:   Arc::new(RwLock::new(Vec::new())),
+            id_for_index:   Arc::new(RwLock::new(None)),
             postman_handle: Arc::new(Mutex::new(None)),
             postman_notify: Arc::new(Mutex::new(None)),
         }
@@ -70,7 +70,7 @@ impl Evaluator {
         if self.in_sync() {
             let ix = sync_index.expect("synchronization requires a sync index");
             let (tx, rx) = channel();
-            self.msg_queues.read().unwrap()[ix - self.starting_index()].push((ty,tx));
+            self.msg_queues.read().unwrap().as_ref().unwrap()[ix - self.starting_index()].push((ty,tx));
             self.notify_postman();
             rx.recv().unwrap()
         } else {
@@ -93,9 +93,9 @@ impl Evaluator {
             starting_gate_id: *self.current_gate.lock().unwrap()
         });
 
-        *self.msg_queues.write().unwrap()   = (0..n).map(|_| MsQueue::new()).collect_vec();
+        *self.msg_queues.write().unwrap()   = Some((0..n).map(|_| MsQueue::new()).collect_vec());
         *self.index_done.write().unwrap()   = Some(vec![false; n]);
-        *self.id_for_index.write().unwrap() = (begin_index..end_index).map(|_| Mutex::new(0)).collect_vec();
+        *self.id_for_index.write().unwrap() = Some((begin_index..end_index).map(|_| Mutex::new(0)).collect_vec());
 
         // set up postman
         let p_index_done = self.index_done.clone();
@@ -123,7 +123,7 @@ impl Evaluator {
                     done = true;
                     *opt_index_done = None;
                     *self.sync_info.write().unwrap()    = None;
-                    *self.msg_queues.write().unwrap()   = Vec::new();
+                    *self.msg_queues.write().unwrap()   = None;
                     *self.current_gate.lock().unwrap() += 1;
                 }
             } else {
@@ -156,7 +156,7 @@ impl Evaluator {
         if let Some(ref info) = *self.sync_info.read().unwrap() {
             let ix = sync_index.expect("syncronization requires a sync index");
             let ids = self.id_for_index.read().unwrap();
-            let mut id_mutex = ids[ix - info.begin_index].lock().unwrap();
+            let mut id_mutex = ids.as_ref().unwrap()[ix - info.begin_index].lock().unwrap();
             let id = *id_mutex;
             *id_mutex += 1;
             // 48 bits for gate index, 16 for id
@@ -174,7 +174,7 @@ fn postman(
     start_index: usize,
     end_index: usize,
     index_done: Arc<RwLock<Option<Vec<bool>>>>,
-    msg_queues: Arc<RwLock<Vec<MsQueue<(GateType, Sender<Message>)>>>>,
+    msg_queues: Arc<RwLock<Option<Vec<MsQueue<(GateType, Sender<Message>)>>>>>,
     recv: Arc<Mutex<FnMut(GateType) -> Message + Send>>,
     notify: Receiver<()>,
 ){
@@ -194,7 +194,7 @@ fn postman(
         }
 
         // check if there is a message to receive for this index
-        if let Some((ty, tx)) = msg_queues.read().unwrap()[ix].try_pop() {
+        if let Some((ty, tx)) = msg_queues.read().unwrap().as_ref().unwrap()[ix].try_pop() {
             // receive message
             let m = (recv.lock().unwrap().deref_mut())(ty);
             // return the message to the original caller
