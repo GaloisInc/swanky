@@ -84,6 +84,12 @@ pub trait Fancy {
     /// Declare this index to be done.
     fn finish_index(&self, index: usize);
 
+    /// Declare that evaluator inputs are done.
+    ///
+    /// This is for flushing the input. This has a null default implementation since most
+    /// implementors do not use it. It is useful for batching the OT in a 2PC setting.
+    fn done_with_evaluator_inputs(&self) { }
+
     ////////////////////////////////////////////////////////////////////////////////
     // Functions built on top of basic fancy operations.
 
