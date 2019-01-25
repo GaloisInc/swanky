@@ -18,7 +18,6 @@ use std::thread::{self, JoinHandle};
 /// wires. Parallelizable.
 pub struct Evaluator {
     recv_function:  Arc<Mutex<FnMut(GateType) -> Message + Send>>,
-    constants:      Arc<Mutex<HashMap<(u16,u16), Wire>>>,
     current_gate:   Arc<Mutex<usize>>,
     output_cts:     Arc<Mutex<Vec<OutputCiphertext>>>,
     output_wires:   Arc<Mutex<Vec<Wire>>>,
@@ -46,7 +45,6 @@ impl Evaluator {
     {
         Evaluator {
             recv_function:  Arc::new(Mutex::new(recv_function)),
-            constants:      Arc::new(Mutex::new(HashMap::new())),
             current_gate:   Arc::new(Mutex::new(0)),
             output_cts:     Arc::new(Mutex::new(Vec::new())),
             output_wires:   Arc::new(Mutex::new(Vec::new())),
@@ -228,17 +226,11 @@ impl Fancy for Evaluator {
         }
     }
 
-    fn constant(&self, ix: Option<usize>, x: u16, q: u16) -> Wire {
-        let mut constants = self.constants.lock().unwrap();
-        match constants.get(&(x,q)) {
-            Some(c) => return c.clone(),
-            None => (),
-        }
+    fn constant(&self, ix: Option<usize>, _x: u16, _q: u16) -> Wire {
         let w = match self.recv(ix, GateType::Other) {
             Message::Constant { wire, .. } => wire,
             m => panic!("Expected message Constant but got {}", m),
         };
-        constants.insert((x,q),w.clone());
         w
     }
 

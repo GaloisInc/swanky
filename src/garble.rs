@@ -194,31 +194,31 @@ pub fn bench_garbling<GbF, EvF>(niters: usize, fancy_gb: GbF, fancy_ev: EvF)
 
     let mut total_time = Duration::zero();
 
-    // println!("benchmarking garbler");
-    // let mut pb = pbr::ProgressBar::new(niters as u64);
-    // pb.message("test ");
+    println!("benchmarking garbler");
+    let mut pb = pbr::ProgressBar::new(niters as u64);
+    pb.message("test ");
 
-    // for _ in 0..niters {
-    //     pb.inc();
-    //     let mut garbler = Garbler::new(|_|());
-    //     let start = PreciseTime::now();
-    //     fancy_gb(&mut garbler);
-    //     let end = PreciseTime::now();
-    //     total_time = total_time + start.to(end);
-    // }
-    // pb.finish();
+    for _ in 0..niters {
+        pb.inc();
+        let mut garbler = Garbler::new(|_|());
+        let start = PreciseTime::now();
+        fancy_gb(&mut garbler);
+        let end = PreciseTime::now();
+        total_time = total_time + start.to(end);
+    }
+    pb.finish();
 
-    // total_time = total_time / niters as i32;
-    // println!("garbling took {} ms", total_time.num_milliseconds());
+    total_time = total_time / niters as i32;
+    println!("garbling took {} ms", total_time.num_milliseconds());
 
     // benchmark the garbler and the evaluator together
     println!("benchmarking garbler streaming to evaluator");
-    // let mut pb = pbr::ProgressBar::new(niters as u64);
-    // pb.message("test ");
+    let mut pb = pbr::ProgressBar::new(niters as u64);
+    pb.message("test ");
 
-    // total_time = Duration::zero();
+    total_time = Duration::zero();
     for _ in 0..niters {
-        // pb.inc();
+        pb.inc();
         // set up channel
         let (sender, receiver) = std::sync::mpsc::channel();
 
@@ -242,9 +242,7 @@ pub fn bench_garbling<GbF, EvF>(niters: usize, fancy_gb: GbF, fancy_ev: EvF)
             };
             // evaluate garbler
             let mut gb = Garbler::new(callback);
-            println!("gb started");
             fancy_gb(&mut gb);
-            println!("gb done");
         });
 
         // evaluate the evaluator
@@ -256,7 +254,7 @@ pub fn bench_garbling<GbF, EvF>(niters: usize, fancy_gb: GbF, fancy_ev: EvF)
 
         h.join().unwrap();
     }
-    // pb.finish();
+    pb.finish();
 
     total_time = total_time / niters as i32;
     println!("streaming took {} ms", total_time.num_milliseconds());
