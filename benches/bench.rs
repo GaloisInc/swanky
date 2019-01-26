@@ -58,7 +58,7 @@ fn bench_naor_pinkas(c: &mut Criterion) {
     });
 }
 
-const T: usize = 4096;
+const T: usize = 8192;
 
 fn rand_u128_vec(size: usize) -> Vec<u128> {
     (0..size).map(|_| rand::random::<u128>()).collect()

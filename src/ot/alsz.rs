@@ -35,6 +35,7 @@ impl<S: Read + Write, OT: ObliviousTransfer<S>> ObliviousTransfer<S> for AlszOT<
             // Just do normal OT
             return self.ot.send(inputs);
         }
+        let cipher = super::cipher();
         let s = (0..128)
             .map(|_| self.rng.gen::<bool>())
             .collect::<Vec<bool>>();
@@ -50,8 +51,8 @@ impl<S: Read + Write, OT: ObliviousTransfer<S>> ObliviousTransfer<S> for AlszOT<
         let qs_ = super::transpose(&qs, m / 8);
         let s = super::boolvec_to_u128(&s);
         for (j, q) in qs_.into_iter().enumerate() {
-            let y0 = super::hash(j, &q) ^ super::u8vec_to_u128(&inputs[j].0);
-            let y1 = super::hash(j, &(q ^ s)) ^ super::u8vec_to_u128(&inputs[j].1);
+            let y0 = super::hash(j, &q, &cipher) ^ super::u8vec_to_u128(&inputs[j].0);
+            let y1 = super::hash(j, &(q ^ s), &cipher) ^ super::u8vec_to_u128(&inputs[j].1);
             self.stream.write_u128(&y0)?;
             self.stream.write_u128(&y1)?;
         }
@@ -70,6 +71,7 @@ impl<S: Read + Write, OT: ObliviousTransfer<S>> ObliviousTransfer<S> for AlszOT<
             // Just do normal OT
             return self.ot.receive(inputs, nbytes);
         }
+        let cipher = super::cipher();
         let r = inputs.iter().cloned().collect::<super::BV>();
         let ks = (0..128)
             .map(|_| {
@@ -98,8 +100,8 @@ impl<S: Read + Write, OT: ObliviousTransfer<S>> ObliviousTransfer<S> for AlszOT<
             let y0 = self.stream.read_u128()?;
             let y1 = self.stream.read_u128()?;
             let y = if b { y1 } else { y0 };
-            let r = y ^ super::hash(j, &t);
-            out.push(r.to_ne_bytes().to_vec());
+            let r = y ^ super::hash(j, &t, &cipher);
+            out.push(r.to_le_bytes().to_vec());
         }
         Ok(out)
     }
@@ -144,7 +146,7 @@ mod tests {
             let ms = m0s
                 .into_iter()
                 .zip(m1s.into_iter())
-                .map(|(a, b)| (a.to_ne_bytes().to_vec(), b.to_ne_bytes().to_vec()))
+                .map(|(a, b)| (a.to_le_bytes().to_vec(), b.to_le_bytes().to_vec()))
                 .collect::<Vec<(Vec<u8>, Vec<u8>)>>();
             otext.send(&ms).unwrap();
         });

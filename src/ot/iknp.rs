@@ -32,6 +32,7 @@ impl<S: Read + Write, OT: ObliviousTransfer<S>> ObliviousTransfer<S> for IknpOT<
             // Just do normal OT
             return self.ot.send(inputs);
         }
+        let cipher = super::cipher();
         let s = (0..128)
             .map(|_| self.rng.gen::<bool>())
             .collect::<Vec<bool>>();
@@ -39,10 +40,8 @@ impl<S: Read + Write, OT: ObliviousTransfer<S>> ObliviousTransfer<S> for IknpOT<
         let qs = super::transpose(&qs, m / 8);
         let s = super::boolvec_to_u128(&s);
         for (j, q) in qs.into_iter().enumerate() {
-            let x0 = array_ref![inputs[j].0, 0, 16];
-            let y0 = super::hash(j, &q) ^ u128::from_ne_bytes(*x0);
-            let x1 = array_ref![inputs[j].1, 0, 16];
-            let y1 = super::hash(j, &(q ^ s)) ^ u128::from_ne_bytes(*x1);
+            let y0 = super::hash(j, &q, &cipher) ^ super::u8vec_to_u128(&inputs[j].0);
+            let y1 = super::hash(j, &(q ^ s), &cipher) ^ super::u8vec_to_u128(&inputs[j].1);
             self.stream.write_u128(&y0)?;
             self.stream.write_u128(&y1)?;
         }
@@ -53,7 +52,7 @@ impl<S: Read + Write, OT: ObliviousTransfer<S>> ObliviousTransfer<S> for IknpOT<
         if nbytes != 16 {
             return Err(Error::from(std::io::Error::new(
                 ErrorKind::InvalidInput,
-                "Currently only supports 128-bit inputs",
+                "IKNP OT only supports 128-bit inputs",
             )));
         }
         let m = inputs.len();
@@ -61,6 +60,7 @@ impl<S: Read + Write, OT: ObliviousTransfer<S>> ObliviousTransfer<S> for IknpOT<
             // Just do normal OT
             return self.ot.receive(inputs, nbytes);
         }
+        let cipher = super::cipher();
         let r = inputs.iter().cloned().collect::<super::BV>();
         let ts = (0..128)
             .map(|_| {
@@ -72,22 +72,15 @@ impl<S: Read + Write, OT: ObliviousTransfer<S>> ObliviousTransfer<S> for IknpOT<
             .map(|(a, b)| (a.into(), b.into()))
             .collect::<Vec<(Vec<u8>, Vec<u8>)>>();
         self.ot.send(&ts)?;
-        let ts_ = (0..m / 8).map(|i| {
-            let bv = ts
-                .iter()
-                .map(|(t, _)| super::BV::from(t.clone()))
-                .map(|t: super::BV| t.get(i).unwrap())
-                .collect::<super::BV>();
-            let v: Vec<u8> = bv.into();
-            u128::from_ne_bytes(*array_ref![v, 0, 16])
-        });
+        let ts = ts.into_iter().map(|(t, _)| t).collect::<Vec<Vec<u8>>>();
+        let ts = super::transpose(&ts, m / 8);
         let mut out = Vec::with_capacity(m);
-        for ((j, b), t) in inputs.iter().enumerate().zip(ts_) {
+        for ((j, b), t) in inputs.iter().enumerate().zip(ts) {
             let y0 = self.stream.read_u128()?;
             let y1 = self.stream.read_u128()?;
             let y = if *b { y1 } else { y0 };
-            let r = y ^ super::hash(j, &t);
-            out.push(r.to_ne_bytes().to_vec());
+            let r = y ^ super::hash(j, &t, &cipher);
+            out.push(r.to_le_bytes().to_vec());
         }
         Ok(out)
     }
@@ -132,7 +125,7 @@ mod tests {
             let ms = m0s
                 .into_iter()
                 .zip(m1s.into_iter())
-                .map(|(a, b)| (a.to_ne_bytes().to_vec(), b.to_ne_bytes().to_vec()))
+                .map(|(a, b)| (a.to_le_bytes().to_vec(), b.to_le_bytes().to_vec()))
                 .collect::<Vec<(Vec<u8>, Vec<u8>)>>();
             otext.send(&ms).unwrap();
         });

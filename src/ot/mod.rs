@@ -10,13 +10,13 @@ pub use dummy::DummyOT;
 pub use iknp::IknpOT;
 pub use naor_pinkas::NaorPinkasOT;
 
+use aesni::block_cipher_trait::BlockCipher;
 use aesni::stream_cipher::generic_array::GenericArray;
 use aesni::stream_cipher::{NewStreamCipher, StreamCipher};
-use aesni::Aes128Ctr;
+use aesni::{Aes128, Aes128Ctr};
 use bitvec::{BitVec, LittleEndian};
 use curve25519_dalek::ristretto::{CompressedRistretto, RistrettoPoint};
 use failure::Error;
-use sha2::{Digest, Sha256};
 use std::io::Error as IOError;
 use std::io::{ErrorKind, Read, Write};
 use std::sync::{Arc, Mutex, MutexGuard};
@@ -76,14 +76,19 @@ impl<T: Read + Write> Stream<T> {
     }
     #[inline(always)]
     fn read_bytes(&mut self, nbytes: usize) -> Result<Vec<u8>, Error> {
-        let mut bytes = vec![0; nbytes];
-        self.stream().read_exact(&mut bytes)?;
-        Ok(bytes)
+        let mut v = vec![0; nbytes];
+        // match self.stream().read_exact(&mut bytes) {
+        //     Ok(_) => (),
+        //     Err(e) if e.kind() != ErrorKind::WouldBlock => return Err(Error::from(e)),
+        //     _ => {}
+        // };
+        self.stream().read_exact(&mut v)?;
+        Ok(v)
     }
     #[inline(always)]
     fn write_u128(&mut self, data: &u128) -> Result<usize, Error> {
         self.stream()
-            .write(&data.to_ne_bytes())
+            .write(&data.to_le_bytes())
             .map_err(Error::from)
     }
     #[inline(always)]
@@ -136,18 +141,25 @@ fn transpose(m: &[Vec<u8>], ℓ: usize) -> Vec<u128> {
                 .map(|v: BV| v.get(i).unwrap())
                 .collect::<BV>();
             let v: Vec<u8> = bv.into();
-            u128::from_ne_bytes(*array_ref![v, 0, 16])
+            u8vec_to_u128(&v)
         })
         .collect()
 }
+
+// XXX: Should be able to specify the IV!
 #[inline(always)]
-fn hash(idx: usize, q: &u128) -> u128 {
-    let mut h = Sha256::new();
-    h.input(idx.to_ne_bytes());
-    h.input(q.to_ne_bytes());
-    let result = h.result();
-    let result = array_ref![result, 0, 16];
-    u128::from_ne_bytes(result.clone())
+fn cipher() -> Aes128 {
+    let k = GenericArray::from_slice(&[0u8; 16]);
+    Aes128::new(&k)
+}
+
+#[inline(always)]
+fn hash(_i: usize, x: &u128, cipher: &Aes128) -> u128 {
+    // XXX: Note that this is only secure in the semi-honest setting!
+    let mut c = GenericArray::clone_from_slice(&x.to_le_bytes());
+    cipher.encrypt_block(&mut c);
+    let c = u8vec_to_u128(&c);
+    c ^ x
 }
 #[inline(always)]
 fn boolvec_to_u128(v: &[bool]) -> u128 {
