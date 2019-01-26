@@ -11,13 +11,10 @@ autobenches = false
 aesni = "0.6.0"
 arrayref = "0.3"
 bitvec = { git = "https://github.com/myrrlyn/bitvec" }
-block-modes = "0.3"
 failure = "0.1"
-generic-array = "0.12"
 itertools = "0.8"
 curve25519-dalek = "1"
 rand = "0.6"
-sha2 = "0.8"
 
 [dev-dependencies]
 criterion = "0.2"
