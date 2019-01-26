@@ -159,8 +159,8 @@ impl Evaluator {
             let mut id_mutex = ids.as_ref().unwrap()[ix - info.begin_index].lock().unwrap();
             let id = *id_mutex;
             *id_mutex += 1;
-            // 48 bits for gate index, 16 for id
-            info.starting_gate_id + ix + (id << 48)
+            // 32 bits for gate index, 32 for id
+            info.starting_gate_id + ix + (id << 32)
         } else {
             let mut c = self.current_gate.lock().unwrap();
             let old = *c;
