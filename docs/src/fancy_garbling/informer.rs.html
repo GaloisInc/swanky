@@ -247,15 +247,15 @@
 <span id="247">247</span>
 <span id="248">248</span>
 <span id="249">249</span>
-<span id="250">250</span>
-<span id="251">251</span>
-</pre><div class="example-wrap"><pre class="rust ">
+</pre><pre class="rust ">
 <span class="doccomment">//! Informer runs a fancy computation and learns information from it, like how many of</span>
 <span class="doccomment">//! what kind of inputs there are.</span>
 
-<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">fancy</span>::{<span class="ident">Fancy</span>, <span class="ident">HasModulus</span>};
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">collections</span>::<span class="ident">HashSet</span>;
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">sync</span>::{<span class="ident">Arc</span>, <span class="ident">Mutex</span>};
+<span class="kw">use</span> <span class="ident">std</span>::<span class="ident">sync</span>::<span class="ident">atomic</span>::{<span class="ident">AtomicUsize</span>, <span class="ident">Ordering</span>};
+
+<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">fancy</span>::{<span class="ident">Fancy</span>, <span class="ident">HasModulus</span>, <span class="ident">SyncIndex</span>};
 
 <span class="doccomment">/// Implements Fancy. Use to learn information about a fancy computation in a lightweight</span>
 <span class="doccomment">/// way.</span>
@@ -264,12 +264,12 @@
     <span class="ident">evaluator_input_moduli</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u16</span><span class="op">&gt;&gt;</span><span class="op">&gt;</span>,
     <span class="ident">constants</span>:              <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">HashSet</span><span class="op">&lt;</span>(<span class="ident">u16</span>,<span class="ident">u16</span>)<span class="op">&gt;&gt;</span><span class="op">&gt;</span>,
     <span class="ident">outputs</span>:                <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u16</span><span class="op">&gt;&gt;</span><span class="op">&gt;</span>,
-    <span class="ident">nadds</span>:                  <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;&gt;</span>,
-    <span class="ident">nsubs</span>:                  <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;&gt;</span>,
-    <span class="ident">ncmuls</span>:                 <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;&gt;</span>,
-    <span class="ident">nmuls</span>:                  <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;&gt;</span>,
-    <span class="ident">nprojs</span>:                 <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;&gt;</span>,
-    <span class="ident">nciphertexts</span>:           <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;&gt;</span>,
+    <span class="ident">nadds</span>:                  <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">AtomicUsize</span><span class="op">&gt;</span>,
+    <span class="ident">nsubs</span>:                  <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">AtomicUsize</span><span class="op">&gt;</span>,
+    <span class="ident">ncmuls</span>:                 <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">AtomicUsize</span><span class="op">&gt;</span>,
+    <span class="ident">nmuls</span>:                  <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">AtomicUsize</span><span class="op">&gt;</span>,
+    <span class="ident">nprojs</span>:                 <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">AtomicUsize</span><span class="op">&gt;</span>,
+    <span class="ident">nciphertexts</span>:           <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">AtomicUsize</span><span class="op">&gt;</span>,
 }
 
 <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Clone</span>, <span class="ident">Default</span>, <span class="ident">Debug</span>)]</span>
@@ -286,12 +286,12 @@
             <span class="ident">evaluator_input_moduli</span>: <span class="ident">Arc</span>::<span class="ident">new</span>(<span class="ident">Mutex</span>::<span class="ident">new</span>(<span class="ident">Vec</span>::<span class="ident">new</span>())),
             <span class="ident">constants</span>:              <span class="ident">Arc</span>::<span class="ident">new</span>(<span class="ident">Mutex</span>::<span class="ident">new</span>(<span class="ident">HashSet</span>::<span class="ident">new</span>())),
             <span class="ident">outputs</span>:                <span class="ident">Arc</span>::<span class="ident">new</span>(<span class="ident">Mutex</span>::<span class="ident">new</span>(<span class="ident">Vec</span>::<span class="ident">new</span>())),
-            <span class="ident">nadds</span>:                  <span class="ident">Arc</span>::<span class="ident">new</span>(<span class="ident">Mutex</span>::<span class="ident">new</span>(<span class="number">0</span>)),
-            <span class="ident">nsubs</span>:                  <span class="ident">Arc</span>::<span class="ident">new</span>(<span class="ident">Mutex</span>::<span class="ident">new</span>(<span class="number">0</span>)),
-            <span class="ident">ncmuls</span>:                 <span class="ident">Arc</span>::<span class="ident">new</span>(<span class="ident">Mutex</span>::<span class="ident">new</span>(<span class="number">0</span>)),
-            <span class="ident">nmuls</span>:                  <span class="ident">Arc</span>::<span class="ident">new</span>(<span class="ident">Mutex</span>::<span class="ident">new</span>(<span class="number">0</span>)),
-            <span class="ident">nprojs</span>:                 <span class="ident">Arc</span>::<span class="ident">new</span>(<span class="ident">Mutex</span>::<span class="ident">new</span>(<span class="number">0</span>)),
-            <span class="ident">nciphertexts</span>:           <span class="ident">Arc</span>::<span class="ident">new</span>(<span class="ident">Mutex</span>::<span class="ident">new</span>(<span class="number">0</span>)),
+            <span class="ident">nadds</span>:                  <span class="ident">Arc</span>::<span class="ident">new</span>(<span class="ident">AtomicUsize</span>::<span class="ident">new</span>(<span class="number">0</span>)),
+            <span class="ident">nsubs</span>:                  <span class="ident">Arc</span>::<span class="ident">new</span>(<span class="ident">AtomicUsize</span>::<span class="ident">new</span>(<span class="number">0</span>)),
+            <span class="ident">ncmuls</span>:                 <span class="ident">Arc</span>::<span class="ident">new</span>(<span class="ident">AtomicUsize</span>::<span class="ident">new</span>(<span class="number">0</span>)),
+            <span class="ident">nmuls</span>:                  <span class="ident">Arc</span>::<span class="ident">new</span>(<span class="ident">AtomicUsize</span>::<span class="ident">new</span>(<span class="number">0</span>)),
+            <span class="ident">nprojs</span>:                 <span class="ident">Arc</span>::<span class="ident">new</span>(<span class="ident">AtomicUsize</span>::<span class="ident">new</span>(<span class="number">0</span>)),
+            <span class="ident">nciphertexts</span>:           <span class="ident">Arc</span>::<span class="ident">new</span>(<span class="ident">AtomicUsize</span>::<span class="ident">new</span>(<span class="number">0</span>)),
         }
     }
 
@@ -396,98 +396,94 @@
 
     <span class="doccomment">/// Number of additions in the fancy computation.</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">num_adds</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-&gt;</span> <span class="ident">usize</span> {
-        <span class="kw-2">*</span><span class="self">self</span>.<span class="ident">nadds</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>()
+        <span class="self">self</span>.<span class="ident">nadds</span>.<span class="ident">load</span>(<span class="ident">Ordering</span>::<span class="ident">SeqCst</span>)
     }
 
     <span class="doccomment">/// Number of subtractions in the fancy computation.</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">num_subs</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-&gt;</span> <span class="ident">usize</span> {
-        <span class="kw-2">*</span><span class="self">self</span>.<span class="ident">nsubs</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>()
+        <span class="self">self</span>.<span class="ident">nsubs</span>.<span class="ident">load</span>(<span class="ident">Ordering</span>::<span class="ident">SeqCst</span>)
     }
 
     <span class="doccomment">/// Number of scalar multiplications in the fancy computation.</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">num_cmuls</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-&gt;</span> <span class="ident">usize</span> {
-        <span class="kw-2">*</span><span class="self">self</span>.<span class="ident">ncmuls</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>()
+        <span class="self">self</span>.<span class="ident">ncmuls</span>.<span class="ident">load</span>(<span class="ident">Ordering</span>::<span class="ident">SeqCst</span>)
     }
 
     <span class="doccomment">/// Number of multiplications in the fancy computation.</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">num_muls</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-&gt;</span> <span class="ident">usize</span> {
-        <span class="kw-2">*</span><span class="self">self</span>.<span class="ident">nmuls</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>()
+        <span class="self">self</span>.<span class="ident">nmuls</span>.<span class="ident">load</span>(<span class="ident">Ordering</span>::<span class="ident">SeqCst</span>)
     }
 
     <span class="doccomment">/// Number of projections in the fancy computation.</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">num_projs</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-&gt;</span> <span class="ident">usize</span> {
-        <span class="kw-2">*</span><span class="self">self</span>.<span class="ident">nprojs</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>()
+        <span class="self">self</span>.<span class="ident">nprojs</span>.<span class="ident">load</span>(<span class="ident">Ordering</span>::<span class="ident">SeqCst</span>)
     }
 
     <span class="doccomment">/// Number of ciphertexts in the fancy computation.</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">num_ciphertexts</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-&gt;</span> <span class="ident">usize</span> {
-        <span class="kw-2">*</span><span class="self">self</span>.<span class="ident">nciphertexts</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>()
+        <span class="self">self</span>.<span class="ident">nciphertexts</span>.<span class="ident">load</span>(<span class="ident">Ordering</span>::<span class="ident">SeqCst</span>)
     }
 }
 
 <span class="kw">impl</span> <span class="ident">Fancy</span> <span class="kw">for</span> <span class="ident">Informer</span> {
     <span class="kw">type</span> <span class="ident">Item</span> <span class="op">=</span> <span class="ident">InformerVal</span>;
 
-    <span class="kw">fn</span> <span class="ident">garbler_input</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">_ix</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span>, <span class="ident">modulus</span>: <span class="ident">u16</span>) <span class="op">-&gt;</span> <span class="ident">InformerVal</span> {
+    <span class="kw">fn</span> <span class="ident">garbler_input</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">_ix</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">SyncIndex</span><span class="op">&gt;</span>, <span class="ident">modulus</span>: <span class="ident">u16</span>) <span class="op">-&gt;</span> <span class="ident">InformerVal</span> {
         <span class="self">self</span>.<span class="ident">garbler_input_moduli</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>().<span class="ident">push</span>(<span class="ident">modulus</span>);
         <span class="ident">InformerVal</span>(<span class="ident">modulus</span>)
     }
 
-    <span class="kw">fn</span> <span class="ident">evaluator_input</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">_ix</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span>, <span class="ident">modulus</span>: <span class="ident">u16</span>) <span class="op">-&gt;</span> <span class="ident">InformerVal</span> {
+    <span class="kw">fn</span> <span class="ident">evaluator_input</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">_ix</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">SyncIndex</span><span class="op">&gt;</span>, <span class="ident">modulus</span>: <span class="ident">u16</span>) <span class="op">-&gt;</span> <span class="ident">InformerVal</span> {
         <span class="self">self</span>.<span class="ident">evaluator_input_moduli</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>().<span class="ident">push</span>(<span class="ident">modulus</span>);
         <span class="ident">InformerVal</span>(<span class="ident">modulus</span>)
     }
 
-    <span class="kw">fn</span> <span class="ident">constant</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">_ix</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span>, <span class="ident">val</span>: <span class="ident">u16</span>, <span class="ident">modulus</span>: <span class="ident">u16</span>) <span class="op">-&gt;</span> <span class="ident">InformerVal</span> {
+    <span class="kw">fn</span> <span class="ident">constant</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">_ix</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">SyncIndex</span><span class="op">&gt;</span>, <span class="ident">val</span>: <span class="ident">u16</span>, <span class="ident">modulus</span>: <span class="ident">u16</span>) <span class="op">-&gt;</span> <span class="ident">InformerVal</span> {
         <span class="self">self</span>.<span class="ident">constants</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>().<span class="ident">insert</span>((<span class="ident">val</span>,<span class="ident">modulus</span>));
         <span class="ident">InformerVal</span>(<span class="ident">modulus</span>)
     }
 
     <span class="kw">fn</span> <span class="ident">add</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">x</span>: <span class="kw-2">&amp;</span><span class="ident">InformerVal</span>, <span class="ident">y</span>: <span class="kw-2">&amp;</span><span class="ident">InformerVal</span>) <span class="op">-&gt;</span> <span class="ident">InformerVal</span> {
         <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">x</span>.<span class="ident">modulus</span>() <span class="op">==</span> <span class="ident">y</span>.<span class="ident">modulus</span>());
-        <span class="kw-2">*</span><span class="self">self</span>.<span class="ident">nadds</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>() <span class="op">+=</span> <span class="number">1</span>;
+        <span class="self">self</span>.<span class="ident">nadds</span>.<span class="ident">fetch_add</span>(<span class="number">1</span>, <span class="ident">Ordering</span>::<span class="ident">SeqCst</span>);
         <span class="ident">InformerVal</span>(<span class="ident">x</span>.<span class="ident">modulus</span>())
     }
 
     <span class="kw">fn</span> <span class="ident">sub</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">x</span>: <span class="kw-2">&amp;</span><span class="ident">InformerVal</span>, <span class="ident">y</span>: <span class="kw-2">&amp;</span><span class="ident">InformerVal</span>) <span class="op">-&gt;</span> <span class="ident">InformerVal</span> {
         <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">x</span>.<span class="ident">modulus</span>() <span class="op">==</span> <span class="ident">y</span>.<span class="ident">modulus</span>());
-        <span class="kw-2">*</span><span class="self">self</span>.<span class="ident">nsubs</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>() <span class="op">+=</span> <span class="number">1</span>;
+        <span class="self">self</span>.<span class="ident">nsubs</span>.<span class="ident">fetch_add</span>(<span class="number">1</span>, <span class="ident">Ordering</span>::<span class="ident">SeqCst</span>);
         <span class="ident">InformerVal</span>(<span class="ident">x</span>.<span class="ident">modulus</span>())
     }
 
     <span class="kw">fn</span> <span class="ident">cmul</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">x</span>: <span class="kw-2">&amp;</span><span class="ident">InformerVal</span>, <span class="ident">_c</span>: <span class="ident">u16</span>) <span class="op">-&gt;</span> <span class="ident">InformerVal</span> {
-        <span class="kw-2">*</span><span class="self">self</span>.<span class="ident">ncmuls</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>() <span class="op">+=</span> <span class="number">1</span>;
+        <span class="self">self</span>.<span class="ident">ncmuls</span>.<span class="ident">fetch_add</span>(<span class="number">1</span>, <span class="ident">Ordering</span>::<span class="ident">SeqCst</span>);
         <span class="ident">InformerVal</span>(<span class="ident">x</span>.<span class="ident">modulus</span>())
     }
 
-    <span class="kw">fn</span> <span class="ident">mul</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">ix</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span>, <span class="ident">x</span>: <span class="kw-2">&amp;</span><span class="ident">InformerVal</span>, <span class="ident">y</span>: <span class="kw-2">&amp;</span><span class="ident">InformerVal</span>) <span class="op">-&gt;</span> <span class="ident">InformerVal</span> {
+    <span class="kw">fn</span> <span class="ident">mul</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">ix</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">SyncIndex</span><span class="op">&gt;</span>, <span class="ident">x</span>: <span class="kw-2">&amp;</span><span class="ident">InformerVal</span>, <span class="ident">y</span>: <span class="kw-2">&amp;</span><span class="ident">InformerVal</span>) <span class="op">-&gt;</span> <span class="ident">InformerVal</span> {
         <span class="kw">if</span> <span class="ident">x</span>.<span class="ident">modulus</span>() <span class="op">&lt;</span> <span class="ident">y</span>.<span class="ident">modulus</span>() {
             <span class="kw">return</span> <span class="self">self</span>.<span class="ident">mul</span>(<span class="ident">ix</span>,<span class="ident">y</span>,<span class="ident">x</span>);
         }
-        <span class="kw-2">*</span><span class="self">self</span>.<span class="ident">nmuls</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>() <span class="op">+=</span> <span class="number">1</span>;
-        <span class="kw-2">*</span><span class="self">self</span>.<span class="ident">nciphertexts</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>() <span class="op">+=</span> <span class="ident">x</span>.<span class="ident">modulus</span>() <span class="kw">as</span> <span class="ident">usize</span> <span class="op">+</span> <span class="ident">y</span>.<span class="ident">modulus</span>() <span class="kw">as</span> <span class="ident">usize</span> <span class="op">-</span> <span class="number">2</span>;
+        <span class="self">self</span>.<span class="ident">nmuls</span>.<span class="ident">fetch_add</span>(<span class="number">1</span>, <span class="ident">Ordering</span>::<span class="ident">SeqCst</span>);
+        <span class="self">self</span>.<span class="ident">nciphertexts</span>.<span class="ident">fetch_add</span>(<span class="ident">x</span>.<span class="ident">modulus</span>() <span class="kw">as</span> <span class="ident">usize</span> <span class="op">+</span> <span class="ident">y</span>.<span class="ident">modulus</span>() <span class="kw">as</span> <span class="ident">usize</span> <span class="op">-</span> <span class="number">2</span>, <span class="ident">Ordering</span>::<span class="ident">SeqCst</span>);
         <span class="kw">if</span> <span class="ident">x</span>.<span class="ident">modulus</span>() <span class="op">!=</span> <span class="ident">y</span>.<span class="ident">modulus</span>() {
             <span class="comment">// there is an extra ciphertext to support nonequal inputs</span>
-            <span class="kw-2">*</span><span class="self">self</span>.<span class="ident">nciphertexts</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>() <span class="op">+=</span> <span class="number">1</span>;
+            <span class="self">self</span>.<span class="ident">nciphertexts</span>.<span class="ident">fetch_add</span>(<span class="number">1</span>, <span class="ident">Ordering</span>::<span class="ident">SeqCst</span>);
         }
         <span class="ident">InformerVal</span>(<span class="ident">x</span>.<span class="ident">modulus</span>())
     }
 
-    <span class="kw">fn</span> <span class="ident">proj</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">_ix</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span>, <span class="ident">x</span>: <span class="kw-2">&amp;</span><span class="ident">InformerVal</span>, <span class="ident">modulus</span>: <span class="ident">u16</span>, <span class="ident">tt</span>: <span class="kw-2">&amp;</span>[<span class="ident">u16</span>]) <span class="op">-&gt;</span> <span class="ident">InformerVal</span> {
+    <span class="kw">fn</span> <span class="ident">proj</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">_ix</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">SyncIndex</span><span class="op">&gt;</span>, <span class="ident">x</span>: <span class="kw-2">&amp;</span><span class="ident">InformerVal</span>, <span class="ident">modulus</span>: <span class="ident">u16</span>, <span class="ident">tt</span>: <span class="kw-2">&amp;</span>[<span class="ident">u16</span>]) <span class="op">-&gt;</span> <span class="ident">InformerVal</span> {
         <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">tt</span>.<span class="ident">len</span>(), <span class="ident">x</span>.<span class="ident">modulus</span>() <span class="kw">as</span> <span class="ident">usize</span>);
         <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">tt</span>.<span class="ident">iter</span>().<span class="ident">all</span>(<span class="op">|</span><span class="kw-2">&amp;</span><span class="ident">x</span><span class="op">|</span> <span class="ident">x</span> <span class="op">&lt;</span> <span class="ident">modulus</span>));
-        <span class="kw-2">*</span><span class="self">self</span>.<span class="ident">nprojs</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>() <span class="op">+=</span> <span class="number">1</span>;
-        <span class="kw-2">*</span><span class="self">self</span>.<span class="ident">nciphertexts</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>() <span class="op">+=</span> <span class="ident">x</span>.<span class="ident">modulus</span>() <span class="kw">as</span> <span class="ident">usize</span> <span class="op">-</span> <span class="number">1</span>;
+        <span class="self">self</span>.<span class="ident">nprojs</span>.<span class="ident">fetch_add</span>(<span class="number">1</span>, <span class="ident">Ordering</span>::<span class="ident">SeqCst</span>);
+        <span class="self">self</span>.<span class="ident">nciphertexts</span>.<span class="ident">fetch_add</span>(<span class="ident">x</span>.<span class="ident">modulus</span>() <span class="kw">as</span> <span class="ident">usize</span> <span class="op">-</span> <span class="number">1</span>, <span class="ident">Ordering</span>::<span class="ident">SeqCst</span>);
         <span class="ident">InformerVal</span>(<span class="ident">modulus</span>)
     }
 
-    <span class="kw">fn</span> <span class="ident">output</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">_ix</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span>, <span class="ident">x</span>: <span class="kw-2">&amp;</span><span class="ident">InformerVal</span>) {
+    <span class="kw">fn</span> <span class="ident">output</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">_ix</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">SyncIndex</span><span class="op">&gt;</span>, <span class="ident">x</span>: <span class="kw-2">&amp;</span><span class="ident">InformerVal</span>) {
         <span class="self">self</span>.<span class="ident">outputs</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>().<span class="ident">push</span>(<span class="ident">x</span>.<span class="ident">modulus</span>());
     }
-
-    <span class="kw">fn</span> <span class="ident">begin_sync</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">_begin_index</span>: <span class="ident">usize</span>, <span class="ident">_end_index</span>: <span class="ident">usize</span>) { }
-
-    <span class="kw">fn</span> <span class="ident">finish_index</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">_index</span>: <span class="ident">usize</span>) { }
 }
 
 <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">test</span>)]</span>
@@ -501,5 +497,5 @@
         <span class="ident">check_sync</span>(<span class="ident">Informer</span>::<span class="ident">new</span>());
     }
 }
-</pre></div>
-</section><section id="search" class="content hidden"></section><section class="footer"></section><aside id="help" class="hidden"><div><h1 class="hidden">Help</h1><div class="shortcuts"><h2>Keyboard Shortcuts</h2><dl><dt><kbd>?</kbd></dt><dd>Show this help dialog</dd><dt><kbd>S</kbd></dt><dd>Focus the search field</dd><dt><kbd>↑</kbd></dt><dd>Move up in search results</dd><dt><kbd>↓</kbd></dt><dd>Move down in search results</dd><dt><kbd>↹</kbd></dt><dd>Switch tab</dd><dt><kbd>&#9166;</kbd></dt><dd>Go to active search result</dd><dt><kbd>+</kbd></dt><dd>Expand all sections</dd><dt><kbd>-</kbd></dt><dd>Collapse all sections</dd></dl></div><div class="infos"><h2>Search Tricks</h2><p>Prefix searches with a type followed by a colon (e.g. <code>fn:</code>) to restrict the search to a given type.</p><p>Accepted types are: <code>fn</code>, <code>mod</code>, <code>struct</code>, <code>enum</code>, <code>trait</code>, <code>type</code>, <code>macro</code>, and <code>const</code>.</p><p>Search functions by type signature (e.g. <code>vec -> usize</code> or <code>* -> vec</code>)</p><p>Search multiple things at once by splitting your query with comma (e.g. <code>str,u8</code> or <code>String,struct:Vec,test</code>)</p></div></div></aside><script>window.rootPath = "../../";window.currentCrate = "fancy_garbling";</script><script src="../../aliases.js"></script><script src="../../main.js"></script><script src="../../source-files.js"></script><script src="../../source-script.js"></script><script defer src="../../search-index.js"></script></body></html>
+</pre>
+</section><section id="search" class="content hidden"></section><section class="footer"></section><aside id="help" class="hidden"><div><h1 class="hidden">Help</h1><div class="shortcuts"><h2>Keyboard Shortcuts</h2><dl><dt><kbd>?</kbd></dt><dd>Show this help dialog</dd><dt><kbd>S</kbd></dt><dd>Focus the search field</dd><dt><kbd>↑</kbd></dt><dd>Move up in search results</dd><dt><kbd>↓</kbd></dt><dd>Move down in search results</dd><dt><kbd>↹</kbd></dt><dd>Switch tab</dd><dt><kbd>&#9166;</kbd></dt><dd>Go to active search result</dd><dt><kbd>+</kbd></dt><dd>Expand all sections</dd><dt><kbd>-</kbd></dt><dd>Collapse all sections</dd></dl></div><div class="infos"><h2>Search Tricks</h2><p>Prefix searches with a type followed by a colon (e.g. <code>fn:</code>) to restrict the search to a given type.</p><p>Accepted types are: <code>fn</code>, <code>mod</code>, <code>struct</code>, <code>enum</code>, <code>trait</code>, <code>type</code>, <code>macro</code>, and <code>const</code>.</p><p>Search functions by type signature (e.g. <code>vec -> usize</code> or <code>* -> vec</code>)</p><p>Search multiple things at once by splitting your query with comma (e.g. <code>str,u8</code> or <code>String,struct:Vec,test</code>)</p></div></div></aside><script>window.rootPath = "../../";window.currentCrate = "fancy_garbling";</script><script src="../../aliases.js"></script><script src="../../main.js"></script><script defer src="../../search-index.js"></script></body></html>
