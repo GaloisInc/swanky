@@ -1,33 +1,23 @@
-use crate::fancy::{Fancy, HasModulus};
-use crate::util::{RngExt, tweak, tweak2, output_tweak};
-use crate::wire::Wire;
 use itertools::Itertools;
+
 use std::collections::HashMap;
 use std::ops::DerefMut;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, RwLock, Mutex};
-use crossbeam::queue::MsQueue;
 
-use super::Message;
+use crate::fancy::{Fancy, HasModulus, SyncIndex};
+use crate::util::{RngExt, tweak, tweak2, output_tweak};
+use crate::wire::Wire;
+
+use super::{Message, SyncInfo};
 
 /// Streams garbled circuit ciphertexts through a callback. Parallelizable.
 pub struct Garbler {
-    send_function:  Arc<Mutex<FnMut(Message) + Send>>,
+    send_function:  Arc<Mutex<FnMut(Option<SyncIndex>, Message) + Send>>,
     deltas:         Arc<Mutex<HashMap<u16, Wire>>>,
-    current_output: Arc<Mutex<usize>>,
-    current_gate:   Arc<Mutex<usize>>,
-
-    // tools to synchronize the ciphertexts and tweaks during parallel Fancy code
+    current_output: Arc<AtomicUsize>,
+    current_gate:   Arc<AtomicUsize>,
     sync_info:      Arc<RwLock<Option<SyncInfo>>>,
-    current_index:  Arc<RwLock<usize>>,
-    msg_queues:     Arc<RwLock<Vec<MsQueue<Message>>>>,
-    index_done:     Arc<Mutex<Vec<bool>>>,
-    id_for_index:   Arc<RwLock<Vec<Mutex<usize>>>>,
-}
-
-struct SyncInfo {
-    begin_index: usize,
-    end_index: usize,
-    starting_gate_id: usize,
 }
 
 impl Garbler {
@@ -36,141 +26,57 @@ impl Garbler {
     /// `send_func` is a callback that enables streaming. It gets called as the garbler
     /// generates ciphertext information such as garbled gates or input wirelabels.
     pub fn new<F>(send_func: F) -> Garbler
-      where F: FnMut(Message) + Send + 'static
+      where F: FnMut(Option<SyncIndex>, Message) + Send + 'static
     {
         Garbler {
             send_function:  Arc::new(Mutex::new(send_func)),
             deltas:         Arc::new(Mutex::new(HashMap::new())),
-            current_gate:   Arc::new(Mutex::new(0)),
-            current_output: Arc::new(Mutex::new(0)),
-
+            current_gate:   Arc::new(AtomicUsize::new(0)),
+            current_output: Arc::new(AtomicUsize::new(0)),
             sync_info:      Arc::new(RwLock::new(None)),
-            current_index:  Arc::new(RwLock::new(0)),
-            msg_queues:     Arc::new(RwLock::new(Vec::new())),
-            index_done:     Arc::new(Mutex::new(Vec::new())),
-            id_for_index:   Arc::new(RwLock::new(Vec::new())),
         }
     }
 
     /// Output some information from the garbling.
-    fn send(&self, ix: Option<usize>, m: Message) {
+    fn send(&self, ix: Option<SyncIndex>, m: Message) {
+        (self.send_function.lock().unwrap().deref_mut())(ix, m);
+    }
+
+    fn internal_begin_sync(&self, num_indices: SyncIndex) {
+        let mut opt_info = self.sync_info.write().unwrap();
+        assert!(opt_info.is_none(), "garbler: begin_sync called before finishing previous sync!");
+        *opt_info = Some(SyncInfo::new(self.current_gate.load(Ordering::SeqCst), num_indices));
+    }
+
+    fn internal_finish_index(&self, index: SyncIndex) {
+        let mut done = false;
         if let Some(ref info) = *self.sync_info.read().unwrap() {
-            let ix = ix.expect("garbler.send called without index during sync!");
-            let current_index = *self.current_index.read().unwrap();
-            assert!(ix >= info.begin_index && ix < info.end_index && ix >= current_index,
-                    "garbler: invalid ix={}. begin_index={}, end_index={}, current_index={}",
-                    ix, info.begin_index, info.end_index, current_index);
-            if ix == current_index {
-                let qs = self.msg_queues.read().unwrap();
-                while let Some(m) = qs[ix - info.begin_index].try_pop() {
-                    self.internal_send(m);
-                }
-                self.internal_send(m);
-            } else {
-                self.msg_queues.read().unwrap()[ix - info.begin_index].push(m);
+            info.index_done[index as usize].store(true, Ordering::SeqCst);
+            if info.index_done.iter().all(|x| x.load(Ordering::SeqCst)) {
+                done = true;
             }
         } else {
-            self.internal_send(m);
+            panic!("garbler: finish_index called out of sync mode");
         }
-    }
-
-    fn internal_send(&self, m: Message) {
-        (self.send_function.lock().unwrap().deref_mut())(m);
-    }
-
-    fn internal_begin_sync(&self, begin_index: usize, end_index: usize) {
-        assert_eq!(self.in_sync(), false,
-            "garbler: begin_sync called before finishing previous sync!");
-
-        *self.sync_info.write().unwrap() = Some(SyncInfo {
-            begin_index,
-            end_index,
-            starting_gate_id: *self.current_gate.lock().unwrap()
-        });
-
-        *self.current_index.write().unwrap() = begin_index;
-        *self.msg_queues.write().unwrap()    = (begin_index..end_index).map(|_| MsQueue::new()).collect_vec();
-        *self.index_done.lock().unwrap()     = vec![false; end_index - begin_index];
-        *self.id_for_index.write().unwrap()  = (begin_index..end_index).map(|_| Mutex::new(0)).collect_vec();
-    }
-
-    fn internal_finish_index(&self, index: usize) {
-        assert!(self.in_sync(), "garbler: finish_index called out of sync!");
-
-        let mut cur = self.current_index.write().unwrap();
-        let end     = self.ending_index();
-
-        {
-            let mut done = self.index_done.lock().unwrap();
-            let qs       = self.msg_queues.read().unwrap();
-
-            done[index - self.starting_index()] = true;
-
-            while *cur < end {
-                if done[*cur] {
-                    while let Some(m) = qs[*cur].try_pop() {
-                        self.internal_send(m);
-                    }
-                    *cur += 1;
-                } else {
-                    break;
-                }
-            }
+        if done {
+            *self.sync_info.write().unwrap() = None;
+            self.send(None, Message::EndSync);
+            self.current_gate.fetch_add(1, Ordering::SeqCst);
         }
-
-        if *cur == end {
-            // turn off sync
-            *cur = 0;
-            *self.sync_info.write().unwrap()     = None;
-            *self.msg_queues.write().unwrap()    = Vec::new();
-            *self.index_done.lock().unwrap()     = Vec::new();
-            *self.id_for_index.write().unwrap()  = Vec::new();
-            *self.current_gate.lock().unwrap()  += 1;
-        }
-    }
-
-    fn in_sync(&self) -> bool {
-        self.sync_info.read().unwrap().is_some()
-    }
-
-    // starting index of the current sync computation
-    fn starting_index(&self) -> usize {
-        self.sync_info.read().unwrap().as_ref().unwrap().begin_index
-    }
-
-    // ending index of the current sync computation
-    fn ending_index(&self) -> usize {
-        self.sync_info.read().unwrap().as_ref().unwrap().end_index
     }
 
     /// The current non-free gate index of the garbling computation. Respects sync
-    /// ordering.
-    fn current_gate(&self, sync_index: Option<usize>) -> usize {
-        if let Some(ref info) = *self.sync_info.read().unwrap() {
-            let ix = sync_index.expect("syncronization requires a sync index");
-            let ids = self.id_for_index.read().unwrap();
-            let mut id_mutex = ids[ix - info.begin_index].lock().unwrap();
-            let id = *id_mutex;
-            *id_mutex += 1;
-            // 32 bits for gate index, 32 for id
-            assert!(info.starting_gate_id + ix >> 32 == 0);
-            assert!(id >> 32 == 0);
-            info.starting_gate_id + ix + (id << 32)
-        } else {
-            let mut c = self.current_gate.lock().unwrap();
-            let old = *c;
-            *c += 1;
-            old
-        }
+    /// ordering. Must agree with Evaluator hence compute_gate_id is in the parent mod.
+    fn current_gate(&self, sync_index: Option<SyncIndex>) -> usize {
+        super::compute_gate_id(&self.current_gate, sync_index, &*self.sync_info.read().unwrap())
     }
 
     /// Create a delta if it has not been created yet for this modulus, otherwise just
     /// return the existing one.
     fn delta(&self, q: u16) -> Wire {
         let mut deltas = self.deltas.lock().unwrap();
-        match deltas.get(&q) {
-            Some(delta) => return delta.clone(),
-            None => (),
+        if let Some(delta) = deltas.get(&q) {
+            return delta.clone();
         }
         let w = Wire::rand_delta(&mut rand::thread_rng(), q);
         deltas.insert(q,w.clone());
@@ -179,10 +85,7 @@ impl Garbler {
 
     /// The current output index of the garbling computation.
     fn current_output(&self) -> usize {
-        let mut c = self.current_output.lock().unwrap();
-        let old = *c;
-        *c += 1;
-        old
+        self.current_output.fetch_add(1, Ordering::SeqCst)
     }
 
     /// Get the deltas, consuming the Garbler.
@@ -194,7 +97,7 @@ impl Garbler {
 impl Fancy for Garbler {
     type Item = Wire;
 
-    fn garbler_input(&self, ix: Option<usize>, q: u16) -> Wire {
+    fn garbler_input(&self, ix: Option<SyncIndex>, q: u16) -> Wire {
         let w = Wire::rand(&mut rand::thread_rng(), q);
         let d = self.delta(q);
         self.send(ix, Message::UnencodedGarblerInput {
@@ -204,7 +107,7 @@ impl Fancy for Garbler {
         w
     }
 
-    fn evaluator_input(&self, ix: Option<usize>, q: u16) -> Wire {
+    fn evaluator_input(&self, ix: Option<SyncIndex>, q: u16) -> Wire {
         let w = Wire::rand(&mut rand::thread_rng(), q);
         let d = self.delta(q);
         self.send(ix, Message::UnencodedEvaluatorInput {
@@ -214,7 +117,7 @@ impl Fancy for Garbler {
         w
     }
 
-    fn constant(&self, ix: Option<usize>, x: u16, q: u16) -> Wire {
+    fn constant(&self, ix: Option<SyncIndex>, x: u16, q: u16) -> Wire {
         let zero = Wire::rand(&mut rand::thread_rng(), q);
         let wire = zero.plus(&self.delta(q).cmul(x));
         self.send(ix, Message::Constant {
@@ -236,7 +139,7 @@ impl Fancy for Garbler {
         x.cmul(c)
     }
 
-    fn mul(&self, ix: Option<usize>, A: &Wire, B: &Wire) -> Wire {
+    fn mul(&self, ix: Option<SyncIndex>, A: &Wire, B: &Wire) -> Wire {
         if A.modulus() < A.modulus() {
             return self.mul(ix,B,A);
         }
@@ -354,7 +257,7 @@ impl Fancy for Garbler {
         X.plus(&Y)
     }
 
-    fn proj(&self, ix: Option<usize>, A: &Wire, q_out: u16, tt: &[u16]) -> Wire { //
+    fn proj(&self, ix: Option<SyncIndex>, A: &Wire, q_out: u16, tt: &[u16]) -> Wire { //
         let q_in = A.modulus();
         // we have to fill in the vector in an unkonwn order because of the color bits.
         // Since some of the values in gate will be void temporarily, we use Vec<Option<..>>
@@ -407,8 +310,7 @@ impl Fancy for Garbler {
         C
     }
 
-    fn output(&self, ix: Option<usize>, X: &Wire) {
-        assert!(!self.in_sync() && ix.is_none(), "garbler: sync output not supported");
+    fn output(&self, ix: Option<SyncIndex>, X: &Wire) {
         let mut cts = Vec::new();
         let q = X.modulus();
         let i = self.current_output();
@@ -420,11 +322,11 @@ impl Fancy for Garbler {
         self.send(ix, Message::OutputCiphertext(cts));
     }
 
-    fn begin_sync(&self, begin_index: usize, end_index: usize) {
-        self.internal_begin_sync(begin_index, end_index);
+    fn begin_sync(&self, num_indices: SyncIndex) {
+        self.internal_begin_sync(num_indices);
     }
 
-    fn finish_index(&self, index: usize) {
+    fn finish_index(&self, index: SyncIndex) {
         self.internal_finish_index(index);
     }
 }
@@ -436,7 +338,7 @@ mod tests {
     fn garbler_has_send_and_sync() {
         fn check_send(_: impl Send) { }
         fn check_sync(_: impl Sync) { }
-        check_send(Garbler::new(|_| ()));
-        check_sync(Garbler::new(|_| ()));
+        check_send(Garbler::new(|_,_| ()));
+        check_sync(Garbler::new(|_,_| ()));
     }
 }

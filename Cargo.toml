@@ -17,18 +17,18 @@ base_conversion = { path = "base_conversion" }
 bincode = { version = "1.0.1", features = ["i128"] } 
 failure = "0.1.5"
 itertools = "0.8.0"
-libc = "0.2.47"
+libc = "0.2.48"
 num = "0.2.0"
 rand = "0.6.4"
 serde = "1.0.85"
 serde_derive = "1.0.85"
-serde_json = "1.0.36"
+serde_json = "1.0.37"
 time = "0.1.42"
 pbr = "1.0.1"
 crossbeam = "0.6.0"
 
 [dev-dependencies]
-criterion = "0.2.8"
+criterion = "0.2.9"
 
 [profile.release]
 debug = true

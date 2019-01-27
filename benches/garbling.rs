@@ -1,10 +1,12 @@
 use criterion::{criterion_main, criterion_group, Criterion};
+use itertools::Itertools;
+
+use std::time::Duration;
+
 use fancy_garbling::circuit::{CircuitBuilder, Circuit};
 use fancy_garbling::fancy::Fancy;
-use fancy_garbling::garble::garble;
+use fancy_garbling::garble;
 use fancy_garbling::util::RngExt;
-use itertools::Itertools;
-use std::time::Duration;
 
 fn bench_garble<F:'static>(c: &mut Criterion, name: &str, make_circuit: F, q: u16)
     where F: Fn(u16) -> Circuit
@@ -12,7 +14,7 @@ fn bench_garble<F:'static>(c: &mut Criterion, name: &str, make_circuit: F, q: u1
     c.bench_function(&format!("garbling::{}{}_gb", name, q), move |bench| {
         let c = make_circuit(q);
         bench.iter(|| {
-            let gb = garble(&c);
+            let gb = garble::garble(&c);
             criterion::black_box(gb);
         });
     });
@@ -25,7 +27,7 @@ fn bench_eval<F:'static>(c: &mut Criterion, name: &str, make_circuit: F, q: u16)
         let mut rng = rand::thread_rng();
 
         let c = make_circuit(q);
-        let (en, _, ev) = garble(&c);
+        let (en, _, ev) = garble::garble(&c);
 
         let inps = (0..c.num_garbler_inputs()).map(|i| {
             rng.gen_u16() % c.garbler_input_mod(i)

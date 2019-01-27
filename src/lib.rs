@@ -3,9 +3,9 @@
     clippy::cast_lossless,
     clippy::new_without_default,
     clippy::new_without_default_derive,
-    clippy::block_in_if_condition_stmt,
-    clippy::map_entry,
-    clippy::needless_range_loop
+    clippy::type_complexity,
+    clippy::many_single_char_names,
+    clippy::needless_range_loop,
 )]
 
 #![allow(non_snake_case)]

@@ -1,19 +1,23 @@
 //! Structs and functions for creating, streaming, and evaluating garbled circuits.
 
+use itertools::Itertools;
+use serde_derive::{Serialize, Deserialize};
+use time::{Duration, PreciseTime};
+
+use std::collections::HashMap;
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use std::sync::{Arc, Mutex};
+use std::error::Error;
+
+use crate::circuit::{Circuit, Gate};
+use crate::fancy::{Fancy, HasModulus, SyncIndex};
+use crate::wire::Wire;
+
 mod garbler;
 mod evaluator;
 
 pub use crate::garble::garbler::Garbler;
 pub use crate::garble::evaluator::{Evaluator, Encoder, Decoder, GarbledCircuit};
-
-use crate::circuit::{Circuit, Gate};
-use crate::fancy::{Fancy, HasModulus};
-use crate::wire::Wire;
-use serde_derive::{Serialize, Deserialize};
-use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
-use time::{Duration, PreciseTime};
-use std::error::Error;
 
 /// The ciphertext created by a garbled gate.
 pub type GarbledGate = Vec<u128>;
@@ -34,7 +38,7 @@ pub enum Message {
     ///
     /// This is produced by the Garbler, and must be transformed into EvaluatorInput
     /// before being sent to the Evaluator.
-    UnencodedEvaluatorInput { zero: Wire, delta: Wire},
+    UnencodedEvaluatorInput { zero: Wire, delta: Wire },
 
     /// Encoded input for one of the garbler's inputs.
     GarblerInput(Wire),
@@ -50,6 +54,12 @@ pub enum Message {
 
     /// Output decoding information.
     OutputCiphertext(OutputCiphertext),
+
+    /// End synchronization mode.
+    ///
+    /// For large computations, the Evaluator postman can get far ahead of the threads,
+    /// and we dont want it to receive non-sync messages.
+    EndSync,
 }
 
 impl std::fmt::Display for Message {
@@ -62,6 +72,7 @@ impl std::fmt::Display for Message {
             Message::Constant {..}                => "Constant",
             Message::GarbledGate(_)               => "GarbledGate",
             Message::OutputCiphertext(_)          => "OutputCiphertext",
+            Message::EndSync                      => "EndSync",
         })
     }
 }
@@ -77,14 +88,52 @@ impl Message {
     }
 }
 
-/// Type of a gate, input to the Evaluator's recv function.
-pub enum GateType {
-    /// The Evaluator in 2PC needs to know to do OT for their own inputs. This as input to
-    /// the recv function means the current gate is an evaluator input.
-    EvaluatorInput { modulus: u16 },
-    /// Some other kind of gate that does not require special OT.
-    Other,
+////////////////////////////////////////////////////////////////////////////////
+// utils used by both garbler and evaluator
+
+struct SyncInfo {
+    starting_gate_id: usize,
+    index_done:       Vec<AtomicBool>,
+    id_for_index:     Vec<AtomicUsize>,
 }
+
+impl SyncInfo {
+    fn new(starting_gate_id: usize, nindices: SyncIndex) -> SyncInfo {
+        SyncInfo {
+            starting_gate_id,
+            index_done: (0..nindices).map(|_| AtomicBool::new(false)).collect_vec(),
+            id_for_index: (0..nindices).map(|_| AtomicUsize::new(0)).collect_vec(),
+        }
+    }
+}
+
+/// The current non-free gate index of the garbling computation. Respects sync
+/// ordering. This needs to be exactly the same in both Garbler and Evaluator
+/// since it feeds into the tweaks used to encrypt garbled gates.
+fn compute_gate_id(
+    current_gate: &AtomicUsize,
+    sync_index: Option<SyncIndex>,
+    sync_info: &Option<SyncInfo>
+) -> usize
+{
+    if let Some(ref info) = *sync_info {
+        let ix = sync_index.expect("compute_gate_id: syncronization requires a sync index");
+
+        // get id and bump the count
+        let id = info.id_for_index[ix as usize].fetch_add(1, Ordering::SeqCst);
+
+        // compute the sync id
+        // 32 bits for gate index, 32 for id
+        assert!((info.starting_gate_id + ix as usize) >> 32 == 0);
+        assert!(id >> 32 == 0);
+        info.starting_gate_id + ix as usize + (id << 32)
+    } else {
+        current_gate.fetch_add(1, Ordering::SeqCst)
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// general user-facing garbling functions
 
 /// Create an iterator over the messages produced by fancy garbling.
 ///
@@ -97,7 +146,7 @@ pub fn garble_iter<F>(mut fancy_computation: F) -> impl Iterator<Item=Message>
     let (sender, receiver) = std::sync::mpsc::sync_channel(20);
 
     std::thread::spawn(move || {
-        let send_func = move |m| sender.send(m)
+        let send_func = move |_ix, m| sender.send(m)
             .expect("garble_iter thread could not send message to iterator");
         let mut garbler = Garbler::new(send_func);
         fancy_computation(&mut garbler);
@@ -122,7 +171,7 @@ pub fn garble(c: &Circuit) -> (Encoder, Decoder, GarbledCircuit) {
         let garbled_gates    = garbled_gates.clone();
         let constants        = constants.clone();
         let garbled_outputs  = garbled_outputs.clone();
-        send_func = move |m| {
+        send_func = move |_ix, m| {
             match m {
                 Message::UnencodedGarblerInput   { zero, .. } => garbler_inputs.lock().unwrap().push(zero),
                 Message::UnencodedEvaluatorInput { zero, .. } => evaluator_inputs.lock().unwrap().push(zero),
@@ -200,7 +249,7 @@ pub fn bench_garbling<GbF, EvF>(niters: usize, fancy_gb: GbF, fancy_ev: EvF)
 
     for _ in 0..niters {
         pb.inc();
-        let mut garbler = Garbler::new(|_|());
+        let mut garbler = Garbler::new(|_,_|());
         let start = PreciseTime::now();
         fancy_gb(&mut garbler);
         let end = PreciseTime::now();
@@ -229,13 +278,13 @@ pub fn bench_garbling<GbF, EvF>(niters: usize, fancy_gb: GbF, fancy_ev: EvF)
         let fancy_gb = fancy_gb.clone();
         let h = std::thread::spawn(move || {
             // set up garbler
-            let callback = move |msg| {
+            let callback = move |ix, msg| {
                 let m = match msg {
                     Message::UnencodedGarblerInput   { zero, .. } => Message::GarblerInput(zero),
                     Message::UnencodedEvaluatorInput { zero, .. } => Message::EvaluatorInput(zero),
                     m => m,
                 };
-                sender.send(m).map_err(|e| {
+                sender.send((ix,m)).map_err(|e| {
                     eprintln!("{}", e.description());
                     panic!("{:?}", e);
                 }).unwrap();
@@ -246,7 +295,7 @@ pub fn bench_garbling<GbF, EvF>(niters: usize, fancy_gb: GbF, fancy_ev: EvF)
         });
 
         // evaluate the evaluator
-        let mut ev = Evaluator::new(move |_| receiver.recv().unwrap());
+        let mut ev = Evaluator::new(move || receiver.recv().unwrap());
         fancy_ev(&mut ev);
 
         let end = PreciseTime::now();
@@ -585,8 +634,8 @@ mod streaming {
 
         // the evaluator's recv_function gets the next message from the garble iterator,
         // encodes the appropriate inputs, and sends it along
-        let recv_func = move |_| {
-            match gb_iter.next().unwrap() {
+        let recv_func = move || {
+            let m = match gb_iter.next().unwrap() {
                 Message::UnencodedGarblerInput { zero, delta } => {
                     // Encode the garbler's next input
                     let x = gb_inp_iter.next().expect("not enough garbler inputs!");
@@ -599,7 +648,8 @@ mod streaming {
                     Message::EvaluatorInput( zero.plus(&delta.cmul(x)) )
                 }
                 m => m,
-            }
+            };
+            (None, m)
         };
 
         let mut ev = Evaluator::new(recv_func);
@@ -711,17 +761,20 @@ mod parallel {
     use crate::dummy::Dummy;
     use rand::thread_rng;
     use crate::util::RngExt;
-    use crate::fancy::BundleGadgets;
+    use crate::fancy::{SyncIndex, BundleGadgets};
 
-    fn parallel_gadgets<F,W>(b: &F, Q: u128, N: usize, par: bool) // {{{
+    fn parallel_gadgets<F,W>(b: &F, Q: u128, N: SyncIndex, par: bool) // {{{
       where W: Clone + Default + HasModulus + Send + Sync + std::fmt::Debug,
             F: Fancy<Item=W> + Send + Sync,
      {
         if par {
             crossbeam::scope(|scope| {
-                b.begin_sync(0,N);
+                b.begin_sync(N);
                 let hs = (0..N).map(|i| {
                     scope.builder().name(format!("Thread {}", i)).spawn(move |_| {
+                        // let x = b.garbler_input(Some(i), 2 + i as u16);
+                        // let c = b.constant(Some(i), 1, 2 + i as u16);
+                        // let z = b.mul(Some(i), &x, &c);
                         let c = b.constant_bundle_crt(Some(i),1,Q);
                         let x = b.garbler_input_bundle_crt(Some(i), Q);
                         let x = b.mul_bundles(Some(i), &x, &c);
@@ -732,12 +785,16 @@ mod parallel {
                 }).collect_vec();
                 let outs = hs.into_iter().map(|h| h.join().unwrap()).collect_vec();
                 b.output_bundles(None, &outs);
+                // b.outputs(None, &outs);
             }).unwrap()
 
         } else {
-            b.begin_sync(0,N);
+            b.begin_sync(N);
             let mut zs = Vec::new();
             for i in 0..N {
+                // let x = b.garbler_input(Some(i), 2 + i as u16);
+                // let c = b.constant(Some(i), 1, 2 + i as u16);
+                // let z = b.mul(Some(i), &x, &c);
                 let c = b.constant_bundle_crt(Some(i),1,Q);
                 let x = b.garbler_input_bundle_crt(Some(i), Q);
                 let x = b.mul_bundles(Some(i), &x, &c);
@@ -746,6 +803,7 @@ mod parallel {
                 b.finish_index(i);
             }
             b.output_bundles(None, &zs);
+            // b.outputs(None, &zs);
         }
     }
 
@@ -755,17 +813,18 @@ mod parallel {
         let N = 10;
         let Q = crate::util::modulus_with_width(10);
         for _ in 0..16 {
-            let input = (0..N).flat_map(|_| {
+            let mut input = (0..N).map(|_| {
                 crate::util::crt_factor(rng.gen_u128() % Q, Q)
             }).collect_vec();
 
             // compute the correct answer using Dummy
-            let dummy = Dummy::new(&input, &[]);
+            let dummy_input = input.iter().flatten().cloned().collect_vec();
+            let dummy = Dummy::new(&dummy_input, &[]);
             parallel_gadgets(&dummy, Q, N, true);
             let should_be_par = dummy.get_output();
 
             // check serial version agrees with parallel
-            let dummy = Dummy::new(&input, &[]);
+            let dummy = Dummy::new(&dummy_input, &[]);
             parallel_gadgets(&dummy, Q, N, false);
             let should_be = dummy.get_output();
 
@@ -774,17 +833,17 @@ mod parallel {
             // set up garbler and evaluator
             let (tx, rx) = std::sync::mpsc::channel();
 
-            let mut input_iter = input.into_iter();
-            let send_func = move |m| {
+            let tx = tx.clone();
+            let send_func = move |ix: Option<SyncIndex>, m| {
                 let m = match m {
                     Message::UnencodedGarblerInput { zero, delta } => {
-                        let x = input_iter.next().unwrap();
+                        let x = input[ix.unwrap() as usize].remove(0);
                         let w = zero.plus(&delta.cmul(x));
                         Message::GarblerInput(w)
                     }
                     _ => m,
                 };
-                tx.send(m).unwrap();
+                tx.send((ix,m)).unwrap();
             };
 
             // put garbler on another thread
@@ -794,8 +853,8 @@ mod parallel {
             });
 
             // run the evaluator on this one
-            let evaluator = Evaluator::new(move |_| rx.recv().unwrap());
-            parallel_gadgets(&evaluator, Q, N, true);
+            let evaluator = Evaluator::new(move || rx.recv().unwrap());
+            parallel_gadgets(&evaluator, Q, N, false);
 
             let result = evaluator.decode_output();
             assert_eq!(result, should_be);

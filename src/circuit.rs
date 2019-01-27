@@ -1,10 +1,13 @@
 //! DSL for creating circuits compatible with fancy-garbling in the old-fashioned way,
 //! where you create a circuit for a computation then garble it.
 
-use crate::fancy::{Fancy, HasModulus};
 use serde_derive::{Serialize, Deserialize};
+
 use std::collections::HashMap;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
+
+use crate::fancy::{Fancy, HasModulus, SyncIndex};
 
 /// The index and modulus of a gate in a circuit.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Deserialize)]
@@ -136,15 +139,15 @@ impl Circuit {
         println!("  evaluator inputs: {}", self.num_evaluator_inputs());
         println!("  noutputs:         {}", self.noutputs());
         println!("  nconsts:          {}", nconst);
-        println!("");
+        println!();
         println!("  additions:        {}", nadd);
         println!("  subtractions:     {}", nsub);
         println!("  cmuls:            {}", ncmul);
         println!("  projections:      {}", nproj);
         println!("  halfgates:        {}", nhalfgate);
-        println!("");
+        println!();
         println!("  total non-free gates: {}", self.num_nonfree_gates);
-        println!("");
+        println!();
     }
 
     pub  fn to_file(&self, filename: &str) -> Result<(), failure::Error> {
@@ -164,7 +167,7 @@ impl Circuit {
         serde_json::to_string(self).expect("couldn't serialize circuit")
     }
 
-    pub fn from_str(s: &str) -> Result<Circuit, failure::Error> {
+    pub fn from_string(s: &str) -> Result<Circuit, failure::Error> {
         serde_json::from_str(s).map_err(|why| {
             failure::format_err!("failed to parse json: line {} column {}", why.line(), why.column())
         })
@@ -173,9 +176,9 @@ impl Circuit {
 
 /// CircuitBuilder is used to build circuits.
 pub struct CircuitBuilder {
-    next_ref_ix:             Arc<Mutex<usize>>,
-    next_garbler_input_id:   Arc<Mutex<usize>>,
-    next_evaluator_input_id: Arc<Mutex<usize>>,
+    next_ref_ix:             Arc<AtomicUsize>,
+    next_garbler_input_id:   Arc<AtomicUsize>,
+    next_evaluator_input_id: Arc<AtomicUsize>,
     const_map:               Arc<Mutex<HashMap<(u16,u16), CircuitRef>>>,
     circ:                    Arc<Mutex<Circuit>>,
 }
@@ -183,21 +186,21 @@ pub struct CircuitBuilder {
 impl Fancy for CircuitBuilder {
     type Item = CircuitRef;
 
-    fn garbler_input(&self, _ix: Option<usize>, modulus: u16) -> CircuitRef {
+    fn garbler_input(&self, _ix: Option<SyncIndex>, modulus: u16) -> CircuitRef {
         let gate = Gate::GarblerInput { id: self.get_next_garbler_input_id() };
         let r = self.gate(gate, modulus);
         self.circ.lock().unwrap().garbler_input_refs.push(r);
         r
     }
 
-    fn evaluator_input(&self, _ix: Option<usize>, modulus: u16) -> CircuitRef {
+    fn evaluator_input(&self, _ix: Option<SyncIndex>, modulus: u16) -> CircuitRef {
         let gate = Gate::EvaluatorInput { id: self.get_next_evaluator_input_id() };
         let r = self.gate(gate, modulus);
         self.circ.lock().unwrap().evaluator_input_refs.push(r);
         r
     }
 
-    fn constant(&self, _ix: Option<usize>, val: u16, modulus: u16) -> CircuitRef {
+    fn constant(&self, _ix: Option<SyncIndex>, val: u16, modulus: u16) -> CircuitRef {
         let mut map = self.const_map.lock().unwrap();
         match map.get(&(val, modulus)) {
             Some(&r) => r,
@@ -227,7 +230,7 @@ impl Fancy for CircuitBuilder {
         self.gate(Gate::Cmul { xref: *xref, c }, xref.modulus())
     }
 
-    fn proj(&self, _ix: Option<usize>, xref: &CircuitRef, output_modulus: u16, tt: &[u16]) -> CircuitRef {
+    fn proj(&self, _ix: Option<SyncIndex>, xref: &CircuitRef, output_modulus: u16, tt: &[u16]) -> CircuitRef {
         assert_eq!(tt.len(), xref.modulus() as usize);
         assert!(tt.iter().all(|&x| x < output_modulus),
             "not all xs were less than the output modulus! circuit.proj: tt={:?},
@@ -236,7 +239,7 @@ impl Fancy for CircuitBuilder {
         self.gate(gate, output_modulus)
     }
 
-    fn mul(&self, ix: Option<usize>, xref: &CircuitRef, yref: &CircuitRef) -> CircuitRef {
+    fn mul(&self, ix: Option<SyncIndex>, xref: &CircuitRef, yref: &CircuitRef) -> CircuitRef {
         if xref.modulus() < yref.modulus() {
             return self.mul(ix, yref, xref);
         }
@@ -250,21 +253,17 @@ impl Fancy for CircuitBuilder {
         self.gate(gate, xref.modulus())
     }
 
-    fn output(&self, _ix: Option<usize>, xref: &CircuitRef) {
+    fn output(&self, _ix: Option<SyncIndex>, xref: &CircuitRef) {
         self.circ.lock().unwrap().output_refs.push(xref.clone());
     }
-
-    fn begin_sync(&self, _begin_index: usize, _end_index: usize) { }
-
-    fn finish_index(&self, _index: usize) { }
 }
 
 impl CircuitBuilder {
     pub fn new() -> Self {
         CircuitBuilder {
-            next_ref_ix:             Arc::new(Mutex::new(0)),
-            next_garbler_input_id:   Arc::new(Mutex::new(0)),
-            next_evaluator_input_id: Arc::new(Mutex::new(0)),
+            next_ref_ix:             Arc::new(AtomicUsize::new(0)),
+            next_garbler_input_id:   Arc::new(AtomicUsize::new(0)),
+            next_evaluator_input_id: Arc::new(AtomicUsize::new(0)),
             const_map:               Arc::new(Mutex::new(HashMap::new())),
             circ:                    Arc::new(Mutex::new(Circuit::new())),
         }
@@ -275,17 +274,11 @@ impl CircuitBuilder {
     }
 
     fn get_next_garbler_input_id(&self) -> usize {
-        let mut id = self.next_garbler_input_id.lock().unwrap();
-        let out = *id;
-        *id += 1;
-        out
+        self.next_garbler_input_id.fetch_add(1, Ordering::SeqCst)
     }
 
     fn get_next_evaluator_input_id(&self) -> usize {
-        let mut id = self.next_evaluator_input_id.lock().unwrap();
-        let out = *id;
-        *id += 1;
-        out
+        self.next_evaluator_input_id.fetch_add(1, Ordering::SeqCst)
     }
 
     fn get_next_ciphertext_id(&self) -> usize {
@@ -296,10 +289,7 @@ impl CircuitBuilder {
     }
 
     fn get_next_ref_ix(&self) -> usize {
-        let mut ix = self.next_ref_ix.lock().unwrap();
-        let x = *ix;
-        *ix += 1;
-        x
+        self.next_ref_ix.fetch_add(1, Ordering::SeqCst)
     }
 
     fn gate(&self, gate: Gate, modulus: u16) -> CircuitRef {
@@ -778,7 +768,7 @@ mod bundle {
 
         println!("{}", circ.to_string());
 
-        assert_eq!(circ, Circuit::from_str(&circ.to_string()).unwrap());
+        assert_eq!(circ, Circuit::from_string(&circ.to_string()).unwrap());
     }
 //}}}
     #[test] // builder has send and sync {{{

@@ -3,12 +3,14 @@
 //! Useful for evaluating the circuits produced by Fancy without actually creating any
 //! circuits.
 
-use crate::fancy::{Fancy, HasModulus};
 use crossbeam::queue::MsQueue;
 use itertools::Itertools;
-use std::sync::mpsc::{channel, Sender, Receiver};
+
+use std::error::Error;
+use std::sync::mpsc::{channel, Sender};
 use std::sync::{Arc, Mutex, RwLock};
-use std::thread::{self, JoinHandle};
+
+use crate::fancy::{Fancy, HasModulus, SyncIndex};
 
 /// Simple struct that performs the fancy computation over u16.
 pub struct Dummy {
@@ -17,11 +19,8 @@ pub struct Dummy {
     evaluator_inputs: Arc<Mutex<Vec<u16>>>,
 
     // sync stuff to allow parallel inputs
-    begin_index:      Arc<RwLock<Option<usize>>>,
     requests:         Arc<RwLock<Option<Vec<MsQueue<(Request, Sender<DummyVal>)>>>>>,
     index_done:       Arc<Mutex<Option<Vec<bool>>>>,
-    postman_handle:   Arc<Mutex<Option<JoinHandle<()>>>>,
-    postman_notify:   Arc<Mutex<Option<Sender<()>>>>,
 }
 
 enum Request {
@@ -48,11 +47,8 @@ impl Dummy {
             evaluator_inputs: Arc::new(Mutex::new(evaluator_inputs.to_vec())),
             outputs:          Arc::new(Mutex::new(Vec::new())),
 
-            begin_index:      Arc::new(RwLock::new(None)),
             requests:         Arc::new(RwLock::new(None)),
             index_done:       Arc::new(Mutex::new(None)),
-            postman_handle:   Arc::new(Mutex::new(None)),
-            postman_notify:   Arc::new(Mutex::new(None)),
         }
     }
 
@@ -62,17 +58,12 @@ impl Dummy {
     }
 
     fn in_sync(&self) -> bool {
-        self.begin_index.read().unwrap().is_some()
+        self.requests.read().unwrap().is_some()
     }
 
-    fn starting_index(&self) -> usize {
-        self.begin_index.read().unwrap().unwrap()
-    }
-
-    fn request(&self, ix: usize, m: Request) -> DummyVal {
+    fn request(&self, ix: SyncIndex, m: Request) -> DummyVal {
         let (tx,rx) = channel();
-        self.requests.read().unwrap().as_ref().unwrap()[ix].push((m,tx));
-        self.postman_notify.lock().unwrap().as_ref().unwrap().send(()).unwrap();
+        self.requests.read().unwrap().as_ref().unwrap()[ix as usize].push((m,tx));
         rx.recv().unwrap()
     }
 }
@@ -80,7 +71,7 @@ impl Dummy {
 impl Fancy for Dummy {
     type Item = DummyVal;
 
-    fn garbler_input(&self, ix: Option<usize>, modulus: u16) -> DummyVal {
+    fn garbler_input(&self, ix: Option<SyncIndex>, modulus: u16) -> DummyVal {
         if self.in_sync() {
             let ix = ix.expect("dummy: sync mode requires index");
             self.request(ix, Request::GarblerInput(modulus))
@@ -92,7 +83,7 @@ impl Fancy for Dummy {
         }
     }
 
-    fn evaluator_input(&self, ix: Option<usize>, modulus: u16) -> DummyVal {
+    fn evaluator_input(&self, ix: Option<SyncIndex>, modulus: u16) -> DummyVal {
         if self.in_sync() {
             let ix = ix.expect("dummy: sync mode requires index");
             self.request(ix, Request::EvaluatorInput(modulus))
@@ -104,7 +95,7 @@ impl Fancy for Dummy {
         }
     }
 
-    fn constant(&self, _ix: Option<usize>, val: u16, modulus: u16) -> DummyVal {
+    fn constant(&self, _ix: Option<SyncIndex>, val: u16, modulus: u16) -> DummyVal {
         DummyVal { val, modulus }
     }
 
@@ -125,7 +116,7 @@ impl Fancy for Dummy {
         DummyVal { val, modulus: x.modulus }
     }
 
-    fn mul(&self, ix: Option<usize>, x: &DummyVal, y: &DummyVal) -> DummyVal {
+    fn mul(&self, ix: Option<SyncIndex>, x: &DummyVal, y: &DummyVal) -> DummyVal {
         if x.modulus < y.modulus {
             return self.mul(ix,y,x);
         }
@@ -133,7 +124,7 @@ impl Fancy for Dummy {
         DummyVal { val, modulus: x.modulus }
     }
 
-    fn proj(&self, _ix: Option<usize>, x: &DummyVal, modulus: u16, tt: &[u16]) -> DummyVal {
+    fn proj(&self, _ix: Option<SyncIndex>, x: &DummyVal, modulus: u16, tt: &[u16]) -> DummyVal {
         assert_eq!(tt.len(), x.modulus as usize);
         assert!(tt.iter().all(|&x| x < modulus));
         assert!(x.val < x.modulus);
@@ -141,91 +132,81 @@ impl Fancy for Dummy {
         DummyVal { val, modulus }
     }
 
-    fn output(&self, _ix: Option<usize>, x: &DummyVal) {
+    fn output(&self, _ix: Option<SyncIndex>, x: &DummyVal) {
         self.outputs.lock().unwrap().push(x.val);
     }
 
-    fn begin_sync(&self, begin_index: usize, end_index: usize) {
-        *self.begin_index.write().unwrap() = Some(begin_index);
-        *self.requests.write().unwrap()  = Some((begin_index..end_index).map(|_| MsQueue::new()).collect_vec());
-        *self.index_done.lock().unwrap() = Some(vec![false; end_index - begin_index]);
+    fn begin_sync(&self, num_indices: SyncIndex) {
+        *self.requests.write().unwrap()  = Some((0..num_indices).map(|_| MsQueue::new()).collect_vec());
+        *self.index_done.lock().unwrap() = Some(vec![false; num_indices as usize]);
 
-        let (tx, rx) = channel();
-        let p_done = self.index_done.clone();
-        let p_reqs = self.requests.clone();
-        let p_gb   = self.garbler_inputs.clone();
-        let p_ev   = self.evaluator_inputs.clone();
-        let h = thread::spawn(move || {
-            postman(begin_index, end_index, p_done, p_reqs, p_gb, p_ev, rx);
-        });
-
-        *self.postman_handle.lock().unwrap() = Some(h);
-        *self.postman_notify.lock().unwrap() = Some(tx);
+        start_postman(num_indices,
+            self.index_done.clone(),
+            self.requests.clone(),
+            self.garbler_inputs.clone(),
+            self.evaluator_inputs.clone(),
+        );
     }
 
-    fn finish_index(&self, index: usize) {
+    fn finish_index(&self, index: SyncIndex) {
         if self.in_sync() {
             let mut cleanup = false;
             {
-                let mut done = self.index_done.lock().unwrap();
-                let done = done.as_mut().unwrap();
-                done[index - self.starting_index()] = true;
-                self.postman_notify.lock().unwrap().as_ref().unwrap().send(()).unwrap();
+                let mut done = self.index_done.lock().unwrap_or_else(|e| panic!("{}", e.description()));
+                let done = done.as_mut().expect("dummy.finish_index: already done!");
+                done[index as usize] = true;
                 if done.iter().all(|&x|x) {
                     cleanup = true;
                 }
             }
             // if we are completely done, clean up
             if cleanup {
-                *self.begin_index.write().unwrap() = None;
                 *self.index_done.lock().unwrap()   = None;
                 *self.requests.write().unwrap()    = None;
-                self.postman_handle.lock().unwrap().take().unwrap().join().unwrap();
-                *self.postman_notify.lock().unwrap() = None;
             }
         }
     }
 }
 
-fn postman(
-    begin_index: usize,
-    end_index: usize,
+fn start_postman(
+    end_index: SyncIndex,
     done: Arc<Mutex<Option<Vec<bool>>>>,
     reqs: Arc<RwLock<Option<Vec<MsQueue<(Request, Sender<DummyVal>)>>>>>,
     gb_inps: Arc<Mutex<Vec<u16>>>,
     ev_inps: Arc<Mutex<Vec<u16>>>,
-    notify: Receiver<()>,
-){
-    let mut c = begin_index;
-    while c < end_index {
-        if let Some((r,tx)) = reqs.read().unwrap().as_ref().unwrap()[c].try_pop() {
-            match r {
-                Request::GarblerInput(modulus) => {
-                    let mut inps = gb_inps.lock().unwrap();
-                    assert!(inps.len() > 0, "not enough garbler inputs");
-                    let val = inps.remove(0);
-                    tx.send(DummyVal { val, modulus }).unwrap();
+) {
+    std::thread::spawn(move || {
+        let mut c = 0;
+        while c < end_index {
+            if let Some(ref reqs) = *reqs.read().unwrap() {
+                if let Some((r,tx)) = reqs[c as usize].try_pop() {
+                    match r {
+                        Request::GarblerInput(modulus) => {
+                            let mut inps = gb_inps.lock().unwrap();
+                            assert!(inps.len() > 0, "not enough garbler inputs");
+                            let val = inps.remove(0);
+                            tx.send(DummyVal { val, modulus }).unwrap();
+                        }
+                        Request::EvaluatorInput(modulus) => {
+                            let mut inps = ev_inps.lock().unwrap();
+                            assert!(inps.len() > 0, "not enough evaluator inputs");
+                            let val = inps.remove(0);
+                            tx.send(DummyVal { val, modulus }).unwrap();
+                        }
+                    }
                 }
-                Request::EvaluatorInput(modulus) => {
-                    let mut inps = ev_inps.lock().unwrap();
-                    assert!(inps.len() > 0, "not enough evaluator inputs");
-                    let val = inps.remove(0);
-                    tx.send(DummyVal { val, modulus }).unwrap();
+                let done_mutex = done.lock().unwrap();
+                if let Some(ref done) = *done_mutex {
+                    if done[c as usize] {
+                        c += 1;
+                    }
                 }
+            } else { // requests is None- finish_index has been called
+                return;
             }
-        } else {
-            // wait to be notified
-            notify.recv().unwrap();
+            std::thread::yield_now();
         }
-        let done_mutex = done.lock().unwrap();
-        if let Some(ref done) = *done_mutex {
-            if done[c] {
-                c += 1;
-            }
-        } else {
-            break;
-        }
-    }
+    });
 }
 
 #[cfg(test)]

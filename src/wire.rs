@@ -1,10 +1,11 @@
 //! Low-level operations on wirelabels, the basic building block of garbled circuits.
 
-use crate::aes::AES;
-use crate::util::{self, RngExt};
 use rand::Rng;
 use serde_derive::{Serialize, Deserialize};
+
+use crate::aes::AES;
 use crate::fancy::HasModulus;
+use crate::util::{self, RngExt};
 
 #[derive(Debug, PartialEq, PartialOrd, Clone, Serialize, Deserialize)]
 pub enum Wire {

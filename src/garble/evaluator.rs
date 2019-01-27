@@ -1,38 +1,32 @@
-use crate::circuit::{Circuit, Gate};
-use crate::fancy::{Fancy, HasModulus};
-use crate::util::{tweak2, output_tweak};
-use crate::wire::Wire;
+use crossbeam::queue::MsQueue;
 use itertools::Itertools;
 use serde_derive::{Serialize, Deserialize};
+
 use std::collections::HashMap;
+use std::collections::VecDeque;
 use std::ops::DerefMut;
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::mpsc::Sender;
 use std::sync::{Arc, RwLock, Mutex};
-use super::{Message, GarbledGate, OutputCiphertext, GateType};
-use crossbeam::queue::MsQueue;
-use std::sync::mpsc::{channel, Sender, Receiver};
-use std::thread::{self, JoinHandle};
+
+use crate::circuit::{Circuit, Gate};
+use crate::fancy::{Fancy, HasModulus, SyncIndex};
+use crate::util::{tweak2, output_tweak};
+use crate::wire::Wire;
+
+use super::{Message, GarbledGate, OutputCiphertext, SyncInfo};
 
 /// Streaming evaluator using a callback to receive ciphertexts as needed.
 ///
 /// Evaluates a garbled circuit on the fly, using messages containing ciphertexts and
 /// wires. Parallelizable.
 pub struct Evaluator {
-    recv_function:  Arc<Mutex<FnMut(GateType) -> Message + Send>>,
-    current_gate:   Arc<Mutex<usize>>,
+    recv_function:  Arc<Mutex<FnMut() -> (Option<SyncIndex>, Message) + Send>>,
+    current_gate:   Arc<AtomicUsize>,
     output_cts:     Arc<Mutex<Vec<OutputCiphertext>>>,
     output_wires:   Arc<Mutex<Vec<Wire>>>,
-
     sync_info:      Arc<RwLock<Option<SyncInfo>>>,
-    msg_queues:     Arc<RwLock<Option<Vec<MsQueue<(GateType, Sender<Message>)>>>>>,
-    index_done:     Arc<RwLock<Option<Vec<bool>>>>,
-    id_for_index:   Arc<RwLock<Option<Vec<Mutex<usize>>>>>,
-    postman_handle: Arc<Mutex<Option<JoinHandle<()>>>>,
-    postman_notify: Arc<Mutex<Option<Sender<()>>>>,
-}
-
-struct SyncInfo {
-    begin_index: usize,
-    starting_gate_id: usize,
+    requests:       Arc<RwLock<Option<Vec<MsQueue<Sender<Message>>>>>>,
 }
 
 impl Evaluator {
@@ -41,20 +35,15 @@ impl Evaluator {
     /// `recv_function` enables streaming by producing messages during the `Fancy`
     /// computation, which contain ciphertexts and wirelabels.
     pub fn new<F>(recv_function: F) -> Evaluator
-      where F: FnMut(GateType) -> Message + Send + 'static
+      where F: FnMut() -> (Option<SyncIndex>, Message) + Send + 'static
     {
         Evaluator {
             recv_function:  Arc::new(Mutex::new(recv_function)),
-            current_gate:   Arc::new(Mutex::new(0)),
+            current_gate:   Arc::new(AtomicUsize::new(0)),
             output_cts:     Arc::new(Mutex::new(Vec::new())),
             output_wires:   Arc::new(Mutex::new(Vec::new())),
-
             sync_info:      Arc::new(RwLock::new(None)),
-            msg_queues:     Arc::new(RwLock::new(None)),
-            index_done:     Arc::new(RwLock::new(None)),
-            id_for_index:   Arc::new(RwLock::new(None)),
-            postman_handle: Arc::new(Mutex::new(None)),
-            postman_notify: Arc::new(Mutex::new(None)),
+            requests:       Arc::new(RwLock::new(None)),
         }
     }
 
@@ -66,148 +55,101 @@ impl Evaluator {
     }
 
     /// Receive the next message.
-    fn recv(&self, sync_index: Option<usize>, ty: GateType) -> Message {
-        if self.in_sync() {
-            let ix = sync_index.expect("synchronization requires a sync index");
-            let (tx, rx) = channel();
-            self.msg_queues.read().unwrap().as_ref().unwrap()[ix - self.starting_index()].push((ty,tx));
-            self.notify_postman();
+    fn recv(&self, ix: Option<SyncIndex>) -> Message {
+        if let Some(ix) = ix {
+            // request next message for this index
+            let (tx,rx) = std::sync::mpsc::channel();
+            self.requests.read().unwrap().as_ref().unwrap()[ix as usize].push(tx);
+            // block until postman delivers message
             rx.recv().unwrap()
         } else {
-            self.internal_recv(ty)
-        }
-    }
-
-    fn internal_recv(&self, ty: GateType) -> Message {
-        (self.recv_function.lock().unwrap().deref_mut())(ty)
-    }
-
-    fn internal_begin_sync(&self, begin_index: usize, end_index: usize) {
-        let n = end_index - begin_index;
-
-        assert_eq!(self.in_sync(), false,
-            "evaluator: begin sync called while already in sync mode!");
-
-        *self.sync_info.write().unwrap() = Some(SyncInfo {
-            begin_index,
-            starting_gate_id: *self.current_gate.lock().unwrap()
-        });
-
-        *self.msg_queues.write().unwrap()   = Some((0..n).map(|_| MsQueue::new()).collect_vec());
-        *self.index_done.write().unwrap()   = Some(vec![false; n]);
-        *self.id_for_index.write().unwrap() = Some((begin_index..end_index).map(|_| Mutex::new(0)).collect_vec());
-
-        // set up postman
-        let p_index_done = self.index_done.clone();
-        let p_msg_queues = self.msg_queues.clone();
-        let p_recv = self.recv_function.clone();
-        let (tx,rx) = channel();
-
-        // start postman
-        let h = thread::spawn(move || {
-            postman(begin_index, end_index, p_index_done, p_msg_queues, p_recv, rx);
-        });
-
-        *self.postman_handle.lock().unwrap() = Some(h);
-        *self.postman_notify.lock().unwrap() = Some(tx);
-    }
-
-    fn internal_finish_index(&self, index: usize) {
-        let mut done = false;
-        {
-            let mut opt_index_done = self.index_done.write().unwrap();
-            if let Some(ref mut index_done) = *opt_index_done {
-                index_done[index - self.starting_index()] = true;
-                if index_done.iter().all(|&x| x) {
-                    // end sync
-                    done = true;
-                    *opt_index_done = None;
-                    *self.sync_info.write().unwrap()    = None;
-                    *self.msg_queues.write().unwrap()   = None;
-                    *self.current_gate.lock().unwrap() += 1;
-                }
-            } else {
-                panic!("garbler: finish_index called without starting a sync!");
+            let (ix,m) = (self.recv_function.lock().unwrap().deref_mut())();
+            if m == Message::EndSync {
+                return self.recv(ix);
             }
-            // unlock index_done for postman
-        }
-        self.notify_postman();
-        if done {
-            self.postman_handle.lock().unwrap().take().unwrap().join().unwrap();
-            *self.postman_notify.lock().unwrap() = None;
+            assert!(ix.is_none(), "evaluator: index recieved when not in sync mode!");
+            m
         }
     }
 
-    // starting index of the current sync computation
-    fn starting_index(&self) -> usize {
-        self.sync_info.read().unwrap().as_ref().unwrap().begin_index
+    fn internal_begin_sync(&self, num_indices: SyncIndex) {
+        let mut opt_info = self.sync_info.write().unwrap();
+        assert!(opt_info.is_none(), "evaluator: begin_sync called before finishing previous sync!");
+        *opt_info = Some(SyncInfo::new(self.current_gate.load(Ordering::SeqCst), num_indices));
+        *self.requests.write().unwrap() = Some((0..num_indices).map(|_| MsQueue::new()).collect_vec());
+        start_postman(num_indices, self.sync_info.clone(), self.requests.clone(), self.recv_function.clone());
     }
 
-    fn in_sync(&self) -> bool {
-        self.sync_info.read().unwrap().is_some()
-    }
-
-    fn notify_postman(&self) {
-        self.postman_notify.lock().unwrap().as_ref().unwrap().send(()).unwrap();
-    }
-
-    /// The current non-free gate index of the garbling computation.
-    fn current_gate(&self, sync_index: Option<usize>) -> usize {
+    fn internal_finish_index(&self, index: SyncIndex) {
+        let mut done = false;
         if let Some(ref info) = *self.sync_info.read().unwrap() {
-            let ix = sync_index.expect("syncronization requires a sync index");
-            let ids = self.id_for_index.read().unwrap();
-            let mut id_mutex = ids.as_ref().unwrap()[ix - info.begin_index].lock().unwrap();
-            let id = *id_mutex;
-            *id_mutex += 1;
-            // 32 bits for gate index, 32 for id
-            info.starting_gate_id + ix + (id << 32)
-        } else {
-            let mut c = self.current_gate.lock().unwrap();
-            let old = *c;
-            *c += 1;
-            old
+            info.index_done[index as usize].store(true, Ordering::SeqCst);
+            if info.index_done.iter().all(|x| x.load(Ordering::SeqCst)) {
+                done = true;
+            }
         }
+        if done {
+            *self.sync_info.write().unwrap() = None;
+            *self.requests.write().unwrap() = None;
+            self.current_gate.fetch_add(1, Ordering::SeqCst);
+        }
+    }
+
+    /// The current non-free gate index of the garbling computation. Respects sync
+    /// ordering. Must agree with Garbler hence compute_gate_id is in the parent mod.
+    fn current_gate(&self, sync_index: Option<SyncIndex>) -> usize {
+        super::compute_gate_id(&self.current_gate, sync_index, &*self.sync_info.read().unwrap())
     }
 }
 
-fn postman(
-    start_index: usize,
-    end_index: usize,
-    index_done: Arc<RwLock<Option<Vec<bool>>>>,
-    msg_queues: Arc<RwLock<Option<Vec<MsQueue<(GateType, Sender<Message>)>>>>>,
-    recv: Arc<Mutex<FnMut(GateType) -> Message + Send>>,
-    notify: Receiver<()>,
-){
-    let mut ix = start_index;
-    while ix < end_index {
-        // wait for notification
-        notify.recv().unwrap();
+fn start_postman(
+    nindices: SyncIndex,
+    sync_info: Arc<RwLock<Option<SyncInfo>>>,
+    requests: Arc<RwLock<Option<Vec<MsQueue<Sender<Message>>>>>>,
+    recv_msg: Arc<Mutex<FnMut() -> (Option<SyncIndex>, Message) + Send>>
+) {
+    std::thread::spawn(move || {
+        let mut awaiting = vec![VecDeque::new(); nindices as usize];
+        let mut done_receiving = false;
 
-        // check if this index is done yet
-        if let Some(ref index_done) = *index_done.read().unwrap() {
-            if index_done[ix] {
-                ix += 1;
+        loop {
+            std::thread::yield_now();
+
+            if sync_info.read().unwrap().is_none() {
+                // sync is done, exit
+                return;
             }
-        } else {
-            // sync has been cancelled
-            break;
-        }
 
-        // check if there is a message to receive for this index
-        if let Some((ty, tx)) = msg_queues.read().unwrap().as_ref().unwrap()[ix].try_pop() {
-            // receive message
-            let m = (recv.lock().unwrap().deref_mut())(ty);
-            // return the message to the original caller
-            tx.send(m).unwrap();
+            if !done_receiving {
+                // receive a message
+                let (ix,m) = (recv_msg.lock().unwrap().deref_mut())();
+                if m == Message::EndSync {
+                    done_receiving = true;
+                } else {
+                    let ix = ix.unwrap_or_else(|| panic!("evaluator: message {} received without index in sync mode", m));
+                    awaiting[ix as usize].push_back(m);
+                }
+            }
+
+            // answer requests if possible
+            if let Some(ref requests) = *requests.read().unwrap() {
+                for (ix, reqs) in requests.iter().enumerate() {
+                    if !awaiting[ix].is_empty() {
+                        if let Some(tx) = reqs.try_pop() {
+                            tx.send(awaiting[ix].pop_front().unwrap()).unwrap();
+                        }
+                    }
+                }
+            }
         }
-    }
+    });
 }
 
 impl Fancy for Evaluator {
     type Item = Wire;
 
-    fn garbler_input(&self, ix: Option<usize>, q: u16) -> Wire {
-        match self.recv(ix, GateType::Other) {
+    fn garbler_input(&self, ix: Option<SyncIndex>, q: u16) -> Wire {
+        match self.recv(ix) {
             Message::GarblerInput(w) => {
                 assert_eq!(w.modulus(), q);
                 w
@@ -216,8 +158,8 @@ impl Fancy for Evaluator {
         }
     }
 
-    fn evaluator_input(&self, ix: Option<usize>, q: u16) -> Wire {
-        match self.recv(ix, GateType::EvaluatorInput { modulus: q }) {
+    fn evaluator_input(&self, ix: Option<SyncIndex>, q: u16) -> Wire {
+        match self.recv(ix) {
             Message::EvaluatorInput(w) => {
                 assert_eq!(w.modulus(), q);
                 w
@@ -226,12 +168,11 @@ impl Fancy for Evaluator {
         }
     }
 
-    fn constant(&self, ix: Option<usize>, _x: u16, _q: u16) -> Wire {
-        let w = match self.recv(ix, GateType::Other) {
+    fn constant(&self, ix: Option<SyncIndex>, _x: u16, _q: u16) -> Wire {
+        match self.recv(ix) {
             Message::Constant { wire, .. } => wire,
             m => panic!("Expected message Constant but got {}", m),
-        };
-        w
+        }
     }
 
     fn add(&self, x: &Wire, y: &Wire) -> Wire {
@@ -246,12 +187,12 @@ impl Fancy for Evaluator {
         x.cmul(c)
     }
 
-    fn mul(&self, ix: Option<usize>, A: &Wire, B: &Wire) -> Wire {
+    fn mul(&self, ix: Option<SyncIndex>, A: &Wire, B: &Wire) -> Wire {
         if A.modulus() < A.modulus() {
             return self.mul(ix,B,A);
         }
 
-        let gate = match self.recv(ix, GateType::Other) {
+        let gate = match self.recv(ix) {
             Message::GarbledGate(g) => g,
             m => panic!("Expected message GarbledGate but got {}", m),
         };
@@ -288,25 +229,24 @@ impl Fancy for Evaluator {
         L.plus(&R.plus(&A.cmul(new_b_color)))
     }
 
-    fn proj(&self, ix: Option<usize>, x: &Wire, q: u16, _tt: &[u16]) -> Wire {
-        let gate = match self.recv(ix, GateType::Other) {
+    fn proj(&self, ix: Option<SyncIndex>, x: &Wire, q: u16, _tt: &[u16]) -> Wire {
+        let gate = match self.recv(ix) {
             Message::GarbledGate(g) => g,
             m => panic!("Expected message GarbledGate but got {}", m),
         };
         assert!(gate.len() as u16 == x.modulus() - 1,
             "evaluator proj: garbled gate length does not equal q-1, sync issue?");
         let gate_num = self.current_gate(ix);
-        let w = if x.color() == 0 {
+        if x.color() == 0 {
             x.hashback(gate_num as u128, q)
         } else {
             let ct = gate[x.color() as usize - 1];
             Wire::from_u128(ct ^ x.hash(gate_num as u128), q)
-        };
-        w
+        }
     }
 
-    fn output(&self, ix: Option<usize>, x: &Wire) {
-        match self.recv(ix, GateType::Other) {
+    fn output(&self, ix: Option<SyncIndex>, x: &Wire) {
+        match self.recv(ix) {
             Message::OutputCiphertext(c) => {
                 assert_eq!(c.len() as u16, x.modulus());
                 self.output_cts.lock().unwrap().push(c);
@@ -316,11 +256,11 @@ impl Fancy for Evaluator {
         self.output_wires.lock().unwrap().push(x.clone());
     }
 
-    fn begin_sync(&self, begin_index: usize, end_index: usize) {
-        self.internal_begin_sync(begin_index, end_index);
+    fn begin_sync(&self, num_indices: SyncIndex) {
+        self.internal_begin_sync(num_indices);
     }
 
-    fn finish_index(&self, index: usize) {
+    fn finish_index(&self, index: SyncIndex) {
         self.internal_finish_index(index);
     }
 }
@@ -367,7 +307,7 @@ impl GarbledCircuit {
             }
         }).collect_vec().into_iter();
 
-        let eval = Evaluator::new(move |_| msgs.next().unwrap());
+        let eval = Evaluator::new(move || (None, msgs.next().unwrap()));
 
         let mut wires: Vec<Wire> = Vec::new();
         for (i,gate) in c.gates.iter().enumerate() {
@@ -521,7 +461,7 @@ mod tests {
     fn evaluator_has_send_and_sync() {
         fn check_send(_: impl Send) { }
         fn check_sync(_: impl Sync) { }
-        check_send(Evaluator::new(|_| unimplemented!()));
-        check_sync(Evaluator::new(|_| unimplemented!()));
+        check_send(Evaluator::new(|| unimplemented!()));
+        check_sync(Evaluator::new(|| unimplemented!()));
     }
 }
