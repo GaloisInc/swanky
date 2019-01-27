@@ -342,9 +342,7 @@ impl GarbledCircuit {
 ////////////////////////////////////////////////////////////////////////////////
 // Encoder
 
-/// Encode inputs statically.
-///
-/// Created by the `garble` function.
+/// Encode inputs statically. Created by the `garble` function.
 #[derive(Serialize, Deserialize, PartialEq, Debug)]
 pub struct Encoder {
     garbler_inputs : Vec<Wire>,
@@ -404,9 +402,7 @@ impl Encoder {
 ////////////////////////////////////////////////////////////////////////////////
 // Decoder
 
-/// Decode outputs.
-///
-/// Created by the `garble` function.
+/// Decode outputss statically. Created by the `garble` function.
 #[derive(Serialize, Deserialize, PartialEq, Debug)]
 pub struct Decoder {
     outputs : Vec<OutputCiphertext>,

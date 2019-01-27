@@ -460,10 +460,6 @@
 <span id="460">460</span>
 <span id="461">461</span>
 <span id="462">462</span>
-<span id="463">463</span>
-<span id="464">464</span>
-<span id="465">465</span>
-<span id="466">466</span>
 </pre><pre class="rust ">
 <span class="kw">use</span> <span class="ident">crossbeam</span>::<span class="ident">queue</span>::<span class="ident">MsQueue</span>;
 <span class="kw">use</span> <span class="ident">itertools</span>::<span class="ident">Itertools</span>;
@@ -809,9 +805,7 @@
 <span class="comment">////////////////////////////////////////////////////////////////////////////////</span>
 <span class="comment">// Encoder</span>
 
-<span class="doccomment">/// Encode inputs statically.</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// Created by the `garble` function.</span>
+<span class="doccomment">/// Encode inputs statically. Created by the `garble` function.</span>
 <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Serialize</span>, <span class="ident">Deserialize</span>, <span class="ident">PartialEq</span>, <span class="ident">Debug</span>)]</span>
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Encoder</span> {
     <span class="ident">garbler_inputs</span> : <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Wire</span><span class="op">&gt;</span>,
@@ -871,9 +865,7 @@
 <span class="comment">////////////////////////////////////////////////////////////////////////////////</span>
 <span class="comment">// Decoder</span>
 
-<span class="doccomment">/// Decode outputs.</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// Created by the `garble` function.</span>
+<span class="doccomment">/// Decode outputss statically. Created by the `garble` function.</span>
 <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Serialize</span>, <span class="ident">Deserialize</span>, <span class="ident">PartialEq</span>, <span class="ident">Debug</span>)]</span>
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Decoder</span> {
     <span class="ident">outputs</span> : <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">OutputCiphertext</span><span class="op">&gt;</span>,
