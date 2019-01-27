@@ -419,17 +419,6 @@
 <span id="419">419</span>
 <span id="420">420</span>
 <span id="421">421</span>
-<span id="422">422</span>
-<span id="423">423</span>
-<span id="424">424</span>
-<span id="425">425</span>
-<span id="426">426</span>
-<span id="427">427</span>
-<span id="428">428</span>
-<span id="429">429</span>
-<span id="430">430</span>
-<span id="431">431</span>
-<span id="432">432</span>
 </pre><pre class="rust ">
 <span class="doccomment">//! Low-level operations on wirelabels, the basic building block of garbled circuits.</span>
 
@@ -437,9 +426,11 @@
 <span class="kw">use</span> <span class="ident">serde_derive</span>::{<span class="ident">Serialize</span>, <span class="ident">Deserialize</span>};
 
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">aes</span>::<span class="ident">AES</span>;
-<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">fancy</span>::<span class="ident">HasModulus</span>;
-<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::{<span class="self">self</span>, <span class="ident">RngExt</span>};
+<span class="kw">use</span> <span class="kw">crate</span>::{<span class="ident">fancy</span>::<span class="ident">HasModulus</span>, <span class="ident">util</span>::{<span class="self">self</span>, <span class="ident">RngExt</span>}};
 
+<span class="doccomment">/// The essential wirelabel type used by garbled circuits.</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// It is a list of mod-q digits.</span>
 <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">PartialEq</span>, <span class="ident">PartialOrd</span>, <span class="ident">Clone</span>, <span class="ident">Serialize</span>, <span class="ident">Deserialize</span>)]</span>
 <span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">Wire</span> {
     <span class="ident">Mod2</span> { <span class="ident">val</span>: <span class="ident">u128</span> },
@@ -461,6 +452,7 @@
 }
 
 <span class="kw">impl</span> <span class="ident">Wire</span> {
+    <span class="doccomment">/// Get the digits of the wire.</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">digits</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-&gt;</span> <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u16</span><span class="op">&gt;</span> {
         <span class="kw">match</span> <span class="self">self</span> {
             <span class="ident">Wire</span>::<span class="ident">Mod2</span> { <span class="ident">val</span> } <span class="op">=&gt;</span> (<span class="number">0</span>..<span class="number">128</span>).<span class="ident">map</span>(<span class="op">|</span><span class="ident">i</span><span class="op">|</span> ((<span class="ident">val</span> <span class="op">&gt;&gt;</span> <span class="ident">i</span>) <span class="kw">as</span> <span class="ident">u16</span>) <span class="op">&amp;</span> <span class="number">1</span>).<span class="ident">collect</span>(),
@@ -468,6 +460,7 @@
         }
     }
 
+    <span class="doccomment">/// Get the wire represented by the u128.</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">from_u128</span>(<span class="ident">inp</span>: <span class="ident">u128</span>, <span class="ident">q</span>: <span class="ident">u16</span>) <span class="op">-&gt;</span> <span class="self">Self</span> {
         <span class="kw">if</span> <span class="ident">q</span> <span class="op">==</span> <span class="number">2</span> {
             <span class="ident">Wire</span>::<span class="ident">Mod2</span> { <span class="ident">val</span>: <span class="ident">inp</span> }
@@ -493,6 +486,7 @@
         }
     }
 
+    <span class="doccomment">/// Pack the wire to a u128.</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">as_u128</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-&gt;</span> <span class="ident">u128</span> {
         <span class="kw">match</span> <span class="kw-2">*</span><span class="self">self</span> {
             <span class="ident">Wire</span>::<span class="ident">Mod2</span> { <span class="ident">val</span> } <span class="op">=&gt;</span> <span class="ident">val</span>,
@@ -500,41 +494,18 @@
         }
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">zero</span>(<span class="ident">modulus</span>: <span class="ident">u16</span>) <span class="op">-&gt;</span> <span class="self">Self</span> {
-        <span class="kw">match</span> <span class="ident">modulus</span> {
+    <span class="doccomment">/// The zero wire for the modulus q.</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">zero</span>(<span class="ident">q</span>: <span class="ident">u16</span>) <span class="op">-&gt;</span> <span class="self">Self</span> {
+        <span class="kw">match</span> <span class="ident">q</span> {
             <span class="number">1</span> <span class="op">=&gt;</span> <span class="macro">panic</span><span class="macro">!</span>(<span class="string">&quot;[wire::zero] mod 1 not allowed!&quot;</span>),
             <span class="number">2</span> <span class="op">=&gt;</span> <span class="ident">Wire</span>::<span class="ident">Mod2</span> { <span class="ident">val</span>: <span class="number">0</span> },
-            <span class="kw">_</span> <span class="op">=&gt;</span> <span class="ident">Wire</span>::<span class="ident">ModN</span> { <span class="ident">q</span>: <span class="ident">modulus</span>, <span class="ident">ds</span>: <span class="macro">vec</span><span class="macro">!</span>[<span class="number">0</span>; <span class="ident">util</span>::<span class="ident">digits_per_u128</span>(<span class="ident">modulus</span>)] },
+            <span class="kw">_</span> <span class="op">=&gt;</span> <span class="ident">Wire</span>::<span class="ident">ModN</span> { <span class="ident">q</span>, <span class="ident">ds</span>: <span class="macro">vec</span><span class="macro">!</span>[<span class="number">0</span>; <span class="ident">util</span>::<span class="ident">digits_per_u128</span>(<span class="ident">q</span>)] },
         }
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">set</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">other</span>: <span class="kw-2">&amp;</span><span class="ident">Wire</span>) {
-        <span class="kw">match</span> (<span class="self">self</span>, <span class="ident">other</span>) {
-            (<span class="ident">Wire</span>::<span class="ident">Mod2</span> { <span class="ident">val</span>: <span class="ident">x</span> }, <span class="ident">Wire</span>::<span class="ident">Mod2</span> { <span class="ident">val</span>: <span class="ident">y</span> }) <span class="op">=&gt;</span> {
-                <span class="kw-2">*</span><span class="ident">x</span> <span class="op">=</span> <span class="kw-2">*</span><span class="ident">y</span>;
-            }
-
-            (<span class="ident">Wire</span>::<span class="ident">ModN</span> { <span class="ident">q</span>: <span class="ident">xmod</span>, <span class="ident">ds</span>: <span class="ident">xs</span> }, <span class="ident">Wire</span>::<span class="ident">ModN</span> { <span class="ident">q</span>: <span class="ident">ymod</span>, <span class="ident">ds</span>: <span class="kw-2">ref</span> <span class="ident">ys</span> }) <span class="op">=&gt;</span> {
-                <span class="macro">debug_assert_eq</span><span class="macro">!</span>(<span class="ident">xmod</span>, <span class="ident">ymod</span>);
-                <span class="macro">debug_assert_eq</span><span class="macro">!</span>(<span class="ident">xs</span>.<span class="ident">len</span>(), <span class="ident">ys</span>.<span class="ident">len</span>());
-                <span class="ident">xs</span>.<span class="ident">iter_mut</span>().<span class="ident">zip</span>(<span class="ident">ys</span>.<span class="ident">iter</span>()).<span class="ident">for_each</span>(<span class="op">|</span>(<span class="ident">x</span>,<span class="kw-2">&amp;</span><span class="ident">y</span>)<span class="op">|</span> {
-                    <span class="kw-2">*</span><span class="ident">x</span> <span class="op">=</span> <span class="ident">y</span>;
-                });
-            }
-
-            <span class="kw">_</span> <span class="op">=&gt;</span> <span class="macro">panic</span><span class="macro">!</span>(<span class="string">&quot;[wire::set] unequal moduli!&quot;</span>),
-        }
-    }
-
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">set_zero</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) {
-        <span class="kw">match</span> <span class="self">self</span> {
-            <span class="ident">Wire</span>::<span class="ident">Mod2</span> { <span class="ident">val</span> }    <span class="op">=&gt;</span> <span class="kw-2">*</span><span class="ident">val</span> <span class="op">=</span> <span class="number">0</span>,
-            <span class="ident">Wire</span>::<span class="ident">ModN</span> { <span class="ident">ds</span>, .. } <span class="op">=&gt;</span> <span class="ident">ds</span>.<span class="ident">iter_mut</span>().<span class="ident">for_each</span>(<span class="op">|</span><span class="ident">d</span><span class="op">|</span> <span class="kw-2">*</span><span class="ident">d</span> <span class="op">=</span> <span class="number">0</span>),
-        }
-    }
-
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">rand_delta</span><span class="op">&lt;</span><span class="ident">R</span>:<span class="ident">Rng</span><span class="op">&gt;</span>(<span class="ident">rng</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">R</span>, <span class="ident">modulus</span>: <span class="ident">u16</span>) <span class="op">-&gt;</span> <span class="self">Self</span> {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">w</span> <span class="op">=</span> <span class="self">Self</span>::<span class="ident">rand</span>(<span class="ident">rng</span>, <span class="ident">modulus</span>);
+    <span class="doccomment">/// Get a random wire label for mod q, with the first digit set to 1.</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">rand_delta</span><span class="op">&lt;</span><span class="ident">R</span>:<span class="ident">Rng</span><span class="op">&gt;</span>(<span class="ident">rng</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">R</span>, <span class="ident">q</span>: <span class="ident">u16</span>) <span class="op">-&gt;</span> <span class="self">Self</span> {
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">w</span> <span class="op">=</span> <span class="self">Self</span>::<span class="ident">rand</span>(<span class="ident">rng</span>, <span class="ident">q</span>);
         <span class="kw">match</span> <span class="ident">w</span> {
             <span class="ident">Wire</span>::<span class="ident">Mod2</span> { <span class="kw-2">ref</span> <span class="kw-2">mut</span> <span class="ident">val</span> }    <span class="op">=&gt;</span> <span class="kw-2">*</span><span class="ident">val</span> <span class="op">|=</span> <span class="number">1</span>,
             <span class="ident">Wire</span>::<span class="ident">ModN</span> { <span class="kw-2">ref</span> <span class="kw-2">mut</span> <span class="ident">ds</span>, .. } <span class="op">=&gt;</span> <span class="ident">ds</span>[<span class="number">0</span>] <span class="op">=</span> <span class="number">1</span>,
@@ -542,6 +513,7 @@
         <span class="ident">w</span>
     }
 
+    <span class="doccomment">/// Get the color digit of the wire.</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">color</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-&gt;</span> <span class="ident">u16</span> {
         <span class="kw">match</span> <span class="kw-2">*</span><span class="self">self</span> {
             <span class="ident">Wire</span>::<span class="ident">Mod2</span> { <span class="ident">val</span> }        <span class="op">=&gt;</span> (<span class="ident">val</span> <span class="op">&amp;</span> <span class="number">1</span>) <span class="kw">as</span> <span class="ident">u16</span>,
@@ -549,33 +521,21 @@
         }
     }
 
+    <span class="attribute">#[<span class="ident">inline</span>]</span>
+    <span class="doccomment">/// Add two wires digit-wise mod q, returning a new wire.</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">plus</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">other</span>: <span class="kw-2">&amp;</span><span class="self">Self</span>) <span class="op">-&gt;</span> <span class="self">Self</span> {
-        <span class="kw">match</span> (<span class="self">self</span>, <span class="ident">other</span>) {
-            (<span class="kw-2">&amp;</span><span class="ident">Wire</span>::<span class="ident">Mod2</span> { <span class="ident">val</span>: <span class="ident">x</span> }, <span class="kw-2">&amp;</span><span class="ident">Wire</span>::<span class="ident">Mod2</span> { <span class="ident">val</span>: <span class="ident">y</span> }) <span class="op">=&gt;</span> {
-                <span class="ident">Wire</span>::<span class="ident">Mod2</span> { <span class="ident">val</span>: <span class="ident">x</span> <span class="op">^</span> <span class="ident">y</span> }
-            }
-
-            (<span class="kw-2">&amp;</span><span class="ident">Wire</span>::<span class="ident">ModN</span> { <span class="ident">q</span>: <span class="ident">xmod</span>, <span class="ident">ds</span>: <span class="kw-2">ref</span> <span class="ident">xs</span> }, <span class="kw-2">&amp;</span><span class="ident">Wire</span>::<span class="ident">ModN</span> { <span class="ident">q</span>: <span class="ident">ymod</span>, <span class="ident">ds</span>: <span class="kw-2">ref</span> <span class="ident">ys</span> }) <span class="op">=&gt;</span> {
-                <span class="macro">debug_assert_eq</span><span class="macro">!</span>(<span class="ident">xmod</span>, <span class="ident">ymod</span>);
-                <span class="macro">debug_assert_eq</span><span class="macro">!</span>(<span class="ident">xs</span>.<span class="ident">len</span>(), <span class="ident">ys</span>.<span class="ident">len</span>());
-                <span class="kw">let</span> <span class="ident">zs</span> <span class="op">=</span> <span class="ident">xs</span>.<span class="ident">iter</span>().<span class="ident">zip</span>(<span class="ident">ys</span>.<span class="ident">iter</span>()).<span class="ident">map</span>(<span class="op">|</span>(<span class="kw-2">&amp;</span><span class="ident">x</span>,<span class="kw-2">&amp;</span><span class="ident">y</span>)<span class="op">|</span> {
-                    <span class="kw">let</span> (<span class="ident">zp</span>,<span class="ident">overflow</span>) <span class="op">=</span> (<span class="ident">x</span><span class="op">+</span><span class="ident">y</span>).<span class="ident">overflowing_sub</span>(<span class="ident">xmod</span>);
-                    <span class="kw">if</span> <span class="ident">overflow</span> { <span class="ident">x</span><span class="op">+</span><span class="ident">y</span> } <span class="kw">else</span> { <span class="ident">zp</span> }
-                }).<span class="ident">collect</span>();
-                <span class="ident">Wire</span>::<span class="ident">ModN</span> { <span class="ident">q</span>: <span class="ident">xmod</span>, <span class="ident">ds</span>: <span class="ident">zs</span> }
-            }
-
-            <span class="kw">_</span> <span class="op">=&gt;</span> <span class="macro">panic</span><span class="macro">!</span>(<span class="string">&quot;[wire::plus] unequal moduli!&quot;</span>),
-        }
+        <span class="self">self</span>.<span class="ident">clone</span>().<span class="ident">plus_mov</span>(<span class="ident">other</span>)
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">plus_eq</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">other</span>: <span class="kw-2">&amp;</span><span class="ident">Wire</span>) {
-        <span class="kw">match</span> (<span class="self">self</span>, <span class="ident">other</span>) {
-            (<span class="ident">Wire</span>::<span class="ident">Mod2</span> { <span class="ident">val</span>: <span class="ident">x</span> }, <span class="ident">Wire</span>::<span class="ident">Mod2</span> { <span class="ident">val</span>: <span class="ident">y</span> }) <span class="op">=&gt;</span> {
+    <span class="attribute">#[<span class="ident">inline</span>]</span>
+    <span class="doccomment">/// Add another wire into this one, digit-wise mod q.</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">plus_eq</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> <span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">other</span>: <span class="kw-2">&amp;</span><span class="ident">Wire</span>) <span class="op">-&gt;</span> <span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> <span class="kw-2">mut</span> <span class="ident">Wire</span> {
+        <span class="kw">match</span> (<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="kw-2">*</span><span class="self">self</span>, <span class="ident">other</span>) {
+            (<span class="ident">Wire</span>::<span class="ident">Mod2</span> { <span class="ident">val</span>: <span class="kw-2">ref</span> <span class="kw-2">mut</span> <span class="ident">x</span> }, <span class="ident">Wire</span>::<span class="ident">Mod2</span> { <span class="ident">val</span>: <span class="kw-2">ref</span> <span class="ident">y</span> }) <span class="op">=&gt;</span> {
                 <span class="kw-2">*</span><span class="ident">x</span> <span class="op">^=</span> <span class="ident">y</span>;
             }
 
-            (<span class="ident">Wire</span>::<span class="ident">ModN</span> { <span class="ident">q</span>: <span class="ident">xmod</span>, <span class="ident">ds</span>: <span class="ident">xs</span> }, <span class="ident">Wire</span>::<span class="ident">ModN</span> { <span class="ident">q</span>: <span class="ident">ymod</span>, <span class="ident">ds</span>: <span class="kw-2">ref</span> <span class="ident">ys</span> }) <span class="op">=&gt;</span> {
+            (<span class="ident">Wire</span>::<span class="ident">ModN</span> { <span class="ident">q</span>: <span class="kw-2">ref</span> <span class="ident">xmod</span>, <span class="ident">ds</span>: <span class="kw-2">ref</span> <span class="kw-2">mut</span> <span class="ident">xs</span> }, <span class="ident">Wire</span>::<span class="ident">ModN</span> { <span class="ident">q</span>: <span class="kw-2">ref</span> <span class="ident">ymod</span>, <span class="ident">ds</span>: <span class="kw-2">ref</span> <span class="ident">ys</span> }) <span class="op">=&gt;</span> {
                 <span class="macro">debug_assert_eq</span><span class="macro">!</span>(<span class="ident">xmod</span>, <span class="ident">ymod</span>);
                 <span class="macro">debug_assert_eq</span><span class="macro">!</span>(<span class="ident">xs</span>.<span class="ident">len</span>(), <span class="ident">ys</span>.<span class="ident">len</span>());
                 <span class="ident">xs</span>.<span class="ident">iter_mut</span>().<span class="ident">zip</span>(<span class="ident">ys</span>.<span class="ident">iter</span>()).<span class="ident">for_each</span>(<span class="op">|</span>(<span class="ident">x</span>,<span class="kw-2">&amp;</span><span class="ident">y</span>)<span class="op">|</span> {
@@ -586,28 +546,24 @@
 
             <span class="kw">_</span> <span class="op">=&gt;</span> <span class="macro">panic</span><span class="macro">!</span>(<span class="string">&quot;[wire::plus_eq] unequal moduli!&quot;</span>),
         }
+
+        <span class="self">self</span>
     }
 
+    <span class="attribute">#[<span class="ident">inline</span>]</span>
+    <span class="doccomment">/// Add another wire into this one, consuming it for chained computations.</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">plus_mov</span>(<span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">other</span>: <span class="kw-2">&amp;</span><span class="ident">Wire</span>) <span class="op">-&gt;</span> <span class="ident">Wire</span> {
+        <span class="self">self</span>.<span class="ident">plus_eq</span>(<span class="ident">other</span>);
+        <span class="self">self</span>
+    }
+
+    <span class="doccomment">/// Multiply each digit by a constant c mod q, returning a new wire.</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">cmul</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">c</span>: <span class="ident">u16</span>) <span class="op">-&gt;</span> <span class="self">Self</span> {
-        <span class="kw">match</span> <span class="kw-2">*</span><span class="self">self</span> {
-            <span class="ident">Wire</span>::<span class="ident">Mod2</span> { .. } <span class="op">=&gt;</span> {
-                <span class="kw">if</span> <span class="ident">c</span> <span class="op">%</span> <span class="number">2</span> <span class="op">==</span> <span class="number">0</span> {
-                    <span class="ident">Wire</span>::<span class="ident">zero</span>(<span class="number">2</span>)
-                } <span class="kw">else</span> {
-                    <span class="self">self</span>.<span class="ident">clone</span>()
-                }
-            }
-
-            <span class="ident">Wire</span>::<span class="ident">ModN</span> { <span class="ident">q</span>, <span class="kw-2">ref</span> <span class="ident">ds</span> } <span class="op">=&gt;</span> {
-                <span class="kw">let</span> <span class="ident">zs</span> <span class="op">=</span> <span class="ident">ds</span>.<span class="ident">iter</span>().<span class="ident">map</span>(<span class="op">|</span><span class="kw-2">&amp;</span><span class="ident">d</span><span class="op">|</span> {
-                    (<span class="ident">d</span> <span class="kw">as</span> <span class="ident">u32</span> <span class="op">*</span> <span class="ident">c</span> <span class="kw">as</span> <span class="ident">u32</span> <span class="op">%</span> <span class="ident">q</span> <span class="kw">as</span> <span class="ident">u32</span>) <span class="kw">as</span> <span class="ident">u16</span>
-                }).<span class="ident">collect</span>();
-                <span class="ident">Wire</span>::<span class="ident">ModN</span> { <span class="ident">q</span>, <span class="ident">ds</span>: <span class="ident">zs</span> }
-            }
-        }
+        <span class="self">self</span>.<span class="ident">clone</span>().<span class="ident">cmul_mov</span>(<span class="ident">c</span>)
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">cmul_eq</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">c</span>: <span class="ident">u16</span>) {
+    <span class="doccomment">/// Multiply each digit by a constant c mod q.</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">cmul_eq</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> <span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">c</span>: <span class="ident">u16</span>) <span class="op">-&gt;</span> <span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> <span class="kw-2">mut</span> <span class="ident">Wire</span> {
         <span class="kw">match</span> <span class="self">self</span> {
             <span class="ident">Wire</span>::<span class="ident">Mod2</span> { <span class="ident">val</span> } <span class="op">=&gt;</span> {
                 <span class="kw">if</span> <span class="ident">c</span> <span class="op">&amp;</span> <span class="number">1</span> <span class="op">==</span> <span class="number">0</span> {
@@ -616,31 +572,27 @@
             }
 
             <span class="ident">Wire</span>::<span class="ident">ModN</span> { <span class="ident">q</span>, <span class="ident">ds</span> } <span class="op">=&gt;</span> {
-
                 <span class="ident">ds</span>.<span class="ident">iter_mut</span>().<span class="ident">for_each</span>(<span class="op">|</span><span class="ident">d</span><span class="op">|</span> {
                     <span class="kw-2">*</span><span class="ident">d</span> <span class="op">=</span> (<span class="kw-2">*</span><span class="ident">d</span> <span class="kw">as</span> <span class="ident">u32</span> <span class="op">*</span> <span class="ident">c</span> <span class="kw">as</span> <span class="ident">u32</span> <span class="op">%</span> <span class="kw-2">*</span><span class="ident">q</span> <span class="kw">as</span> <span class="ident">u32</span>) <span class="kw">as</span> <span class="ident">u16</span>
                 });
             }
         }
+        <span class="self">self</span>
     }
 
+    <span class="doccomment">/// Multiply each digit by a constant c mod q, consuming it for chained computations.</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">cmul_mov</span>(<span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">c</span>: <span class="ident">u16</span>) <span class="op">-&gt;</span> <span class="ident">Wire</span> {
+        <span class="self">self</span>.<span class="ident">cmul_eq</span>(<span class="ident">c</span>);
+        <span class="self">self</span>
+    }
+
+    <span class="doccomment">/// Negate all the digits mod q, returning a new wire.</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">negate</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-&gt;</span> <span class="self">Self</span> {
-        <span class="kw">match</span> <span class="kw-2">*</span><span class="self">self</span> {
-            <span class="ident">Wire</span>::<span class="ident">Mod2</span> { <span class="ident">val</span> } <span class="op">=&gt;</span> <span class="ident">Wire</span>::<span class="ident">Mod2</span> { <span class="ident">val</span>: <span class="op">!</span><span class="ident">val</span> },
-            <span class="ident">Wire</span>::<span class="ident">ModN</span> { <span class="ident">q</span>, <span class="kw-2">ref</span> <span class="ident">ds</span> }  <span class="op">=&gt;</span> {
-                <span class="kw">let</span> <span class="ident">zs</span> <span class="op">=</span> <span class="ident">ds</span>.<span class="ident">iter</span>().<span class="ident">map</span>(<span class="op">|</span><span class="kw-2">&amp;</span><span class="ident">d</span><span class="op">|</span> {
-                    <span class="kw">if</span> <span class="ident">d</span> <span class="op">&gt;</span> <span class="number">0</span> {
-                        <span class="ident">q</span> <span class="op">-</span> <span class="ident">d</span>
-                    } <span class="kw">else</span> {
-                        <span class="number">0</span>
-                    }
-                }).<span class="ident">collect</span>();
-                <span class="ident">Wire</span>::<span class="ident">ModN</span> { <span class="ident">q</span>, <span class="ident">ds</span>: <span class="ident">zs</span> }
-            }
-        }
+        <span class="self">self</span>.<span class="ident">clone</span>().<span class="ident">negate_mov</span>()
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">negate_eq</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) {
+    <span class="doccomment">/// Negate all the digits mod q.</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">negate_eq</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> <span class="kw-2">mut</span> <span class="self">self</span>) <span class="op">-&gt;</span> <span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> <span class="kw-2">mut</span> <span class="ident">Wire</span> {
         <span class="kw">match</span> <span class="self">self</span> {
             <span class="ident">Wire</span>::<span class="ident">Mod2</span> { <span class="ident">val</span> } <span class="op">=&gt;</span> <span class="kw-2">*</span><span class="ident">val</span> <span class="op">=</span> <span class="op">!</span><span class="kw-2">*</span><span class="ident">val</span>,
             <span class="ident">Wire</span>::<span class="ident">ModN</span> { <span class="ident">q</span>, <span class="ident">ds</span> }  <span class="op">=&gt;</span> {
@@ -653,39 +605,63 @@
                 });
             }
         }
+        <span class="self">self</span>
     }
 
+    <span class="doccomment">/// Negate all the digits mod q, consuming it for chained computations.</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">negate_mov</span>(<span class="kw-2">mut</span> <span class="self">self</span>) <span class="op">-&gt;</span> <span class="ident">Wire</span> {
+        <span class="self">self</span>.<span class="ident">negate_eq</span>();
+        <span class="self">self</span>
+    }
+
+    <span class="doccomment">/// Subtract two wires, returning the result.</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">minus</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">other</span>: <span class="kw-2">&amp;</span><span class="ident">Wire</span>) <span class="op">-&gt;</span> <span class="ident">Wire</span> {
-        <span class="kw">match</span> <span class="kw-2">*</span><span class="self">self</span> {
-            <span class="ident">Wire</span>::<span class="ident">Mod2</span> { .. } <span class="op">=&gt;</span> <span class="self">self</span>.<span class="ident">plus</span>(<span class="kw-2">&amp;</span><span class="ident">other</span>),
-            <span class="ident">Wire</span>::<span class="ident">ModN</span> { .. } <span class="op">=&gt;</span> <span class="self">self</span>.<span class="ident">plus</span>(<span class="kw-2">&amp;</span><span class="ident">other</span>.<span class="ident">negate</span>()),
-        }
+        <span class="self">self</span>.<span class="ident">clone</span>().<span class="ident">minus_mov</span>(<span class="ident">other</span>)
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">minus_eq</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">other</span>: <span class="kw-2">&amp;</span><span class="ident">Wire</span>) {
+    <span class="doccomment">/// Subtract a wire from this one.</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">minus_eq</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> <span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">other</span>: <span class="kw-2">&amp;</span><span class="ident">Wire</span>) <span class="op">-&gt;</span> <span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> <span class="kw-2">mut</span> <span class="ident">Wire</span> {
         <span class="kw">match</span> <span class="kw-2">*</span><span class="self">self</span> {
             <span class="ident">Wire</span>::<span class="ident">Mod2</span> { .. } <span class="op">=&gt;</span> <span class="self">self</span>.<span class="ident">plus_eq</span>(<span class="kw-2">&amp;</span><span class="ident">other</span>),
             <span class="ident">Wire</span>::<span class="ident">ModN</span> { .. } <span class="op">=&gt;</span> <span class="self">self</span>.<span class="ident">plus_eq</span>(<span class="kw-2">&amp;</span><span class="ident">other</span>.<span class="ident">negate</span>()),
         }
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">rand</span><span class="op">&lt;</span><span class="ident">R</span>:<span class="ident">Rng</span><span class="op">&gt;</span>(<span class="ident">rng</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">R</span>, <span class="ident">modulus</span>: <span class="ident">u16</span>) <span class="op">-&gt;</span> <span class="ident">Wire</span> {
-        <span class="self">Self</span>::<span class="ident">from_u128</span>(<span class="ident">rng</span>.<span class="ident">gen_u128</span>(), <span class="ident">modulus</span>)
+    <span class="doccomment">/// Subtract a wire from this one, consuming it for chained computations.</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">minus_mov</span>(<span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">other</span>: <span class="kw-2">&amp;</span><span class="ident">Wire</span>) <span class="op">-&gt;</span> <span class="ident">Wire</span> {
+        <span class="self">self</span>.<span class="ident">minus_eq</span>(<span class="ident">other</span>);
+        <span class="self">self</span>
     }
 
+    <span class="doccomment">/// Get a random wire mod q.</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">rand</span><span class="op">&lt;</span><span class="ident">R</span>:<span class="ident">Rng</span><span class="op">&gt;</span>(<span class="ident">rng</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">R</span>, <span class="ident">q</span>: <span class="ident">u16</span>) <span class="op">-&gt;</span> <span class="ident">Wire</span> {
+        <span class="self">Self</span>::<span class="ident">from_u128</span>(<span class="ident">rng</span>.<span class="ident">gen_u128</span>(), <span class="ident">q</span>)
+    }
+
+    <span class="doccomment">/// Compute the hash of this wire.</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// Uses fixed-key AES.</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">hash</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">tweak</span>: <span class="ident">u128</span>) <span class="op">-&gt;</span> <span class="ident">u128</span> {
         <span class="ident">AES</span>.<span class="ident">hash</span>(<span class="ident">tweak</span>, <span class="self">self</span>.<span class="ident">as_u128</span>())
     }
 
-    <span class="comment">// hash to u128 and back to Wire</span>
+    <span class="doccomment">/// Compute the hash of this wire, converting the result back to a wire.</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// Uses fixed-key AES.</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">hashback</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">tweak</span>: <span class="ident">u128</span>, <span class="ident">new_mod</span>: <span class="ident">u16</span>) <span class="op">-&gt;</span> <span class="ident">Wire</span> {
         <span class="self">Self</span>::<span class="ident">from_u128</span>(<span class="self">self</span>.<span class="ident">hash</span>(<span class="ident">tweak</span>), <span class="ident">new_mod</span>)
     }
 
+    <span class="doccomment">/// Compute the hash of two wires together.</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// Uses fixed-key AES.</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">hash2</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">other</span>: <span class="kw-2">&amp;</span><span class="ident">Wire</span>, <span class="ident">tweak</span>: <span class="ident">u128</span>) <span class="op">-&gt;</span> <span class="ident">u128</span> {
         <span class="ident">AES</span>.<span class="ident">hash2</span>(<span class="ident">tweak</span>, <span class="self">self</span>.<span class="ident">as_u128</span>(), <span class="ident">other</span>.<span class="ident">as_u128</span>())
     }
 
+    <span class="doccomment">/// Compute the hash of two wires together, converting the result back to a wire.</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// Uses fixed-key AES.</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">hashback2</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">other</span>: <span class="kw-2">&amp;</span><span class="ident">Wire</span>, <span class="ident">tweak</span>: <span class="ident">u128</span>, <span class="ident">new_modulus</span>: <span class="ident">u16</span>) <span class="op">-&gt;</span> <span class="ident">Wire</span> {
         <span class="self">Self</span>::<span class="ident">from_u128</span>(<span class="self">self</span>.<span class="ident">hash2</span>(<span class="ident">other</span>, <span class="ident">tweak</span>), <span class="ident">new_modulus</span>)
     }
@@ -694,10 +670,12 @@
 <span class="comment">////////////////////////////////////////////////////////////////////////////////</span>
 <span class="comment">// serialization</span>
 
+<span class="doccomment">/// Convert a slice of wires to bytes.</span>
 <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">wires_to_bytes</span>(<span class="ident">ws</span>: <span class="kw-2">&amp;</span>[<span class="ident">Wire</span>]) <span class="op">-&gt;</span> <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span> {
     <span class="ident">bincode</span>::<span class="ident">serialize</span>(<span class="ident">ws</span>).<span class="ident">expect</span>(<span class="string">&quot;couldn&#39;t serialize slice of wires&quot;</span>)
 }
 
+<span class="doccomment">/// Convert a slice of bytes back to wires.</span>
 <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">wires_from_bytes</span>(<span class="ident">bs</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>]) <span class="op">-&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Wire</span><span class="op">&gt;</span>, <span class="ident">failure</span>::<span class="ident">Error</span><span class="op">&gt;</span> {
     <span class="ident">bincode</span>::<span class="ident">deserialize</span>(<span class="ident">bs</span>)
         .<span class="ident">map_err</span>(<span class="op">|</span><span class="kw">_</span><span class="op">|</span> <span class="ident">failure</span>::<span class="ident">err_msg</span>(<span class="string">&quot;error decoding wires from bytes&quot;</span>))
