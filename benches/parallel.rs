@@ -18,6 +18,11 @@ fn parallel_gadget<F,W>(b: &F, Q: u128, N: u8, par: bool)
             let hs = inps.iter().enumerate().map(|(i,inp)| {
                 scope.spawn(move |_| {
                     let z = b.exact_relu(Some(i as u8), inp);
+                    let z = b.exact_relu(Some(i as u8), &z);
+                    let z = b.exact_relu(Some(i as u8), &z);
+                    let z = b.exact_relu(Some(i as u8), &z);
+                    let z = b.exact_relu(Some(i as u8), &z);
+                    let z = b.exact_relu(Some(i as u8), &z);
                     b.finish_index(i as u8);
                     z
                 })
@@ -27,8 +32,13 @@ fn parallel_gadget<F,W>(b: &F, Q: u128, N: u8, par: bool)
         }).expect("scoped thread fail");
     } else {
         for inp in inps.iter() {
-            let y = b.exact_relu(None, inp);
-            b.output_bundle(None, &y)
+            let z = b.exact_relu(None, inp);
+            let z = b.exact_relu(None, &z);
+            let z = b.exact_relu(None, &z);
+            let z = b.exact_relu(None, &z);
+            let z = b.exact_relu(None, &z);
+            let z = b.exact_relu(None, &z);
+            b.output_bundle(None, &z)
         }
     }
 }
@@ -36,8 +46,8 @@ fn parallel_gadget<F,W>(b: &F, Q: u128, N: u8, par: bool)
 fn bench_setup(c: &mut Criterion, par: bool) {
     c.bench_function(if par { "parallel streaming" } else { "sequential streaming" }, move |b| {
         let mut rng = rand::thread_rng();
-        let N = 10;
-        let Q = util::modulus_with_width(4);
+        let N = 20;
+        let Q = util::modulus_with_width(10);
 
         b.iter(|| {
             let input = (0..N).flat_map(|_| util::crt_factor(rng.gen_u128() % Q, Q)).collect_vec();

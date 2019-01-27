@@ -7,6 +7,7 @@ pub struct Aes {
 }
 
 impl Clone for Aes {
+    #[inline]
     fn clone(&self) -> Self {
         let mut new = Aes { round_keys: [0; 176] };
         new.round_keys[..176].clone_from_slice(&self.round_keys[..176]);
@@ -36,36 +37,40 @@ pub const AES: Aes = Aes {
 };
 
 impl Aes {
-    #[allow(dead_code)]
+    // #[inline]
+    // pub fn new(key: u128) -> Self {
+    //     let key_bytes = util::u128_to_bytes(key);
+    //     Self::from_bytes(key_bytes)
+    // }
 
-    pub fn new(key: u128) -> Self {
-        let key_bytes = util::u128_to_bytes(key);
-        Self::from_bytes(key_bytes)
-    }
+    // #[inline]
+    // pub fn from_bytes(key_bytes: [u8;16]) -> Self {
+    //     let mut round_keys = [0u8; 176];
+    //     unsafe {
+    //         aesni_setup_round_key_128(key_bytes.as_ptr(), round_keys.as_mut_ptr());
+    //     }
+    //     Aes { round_keys }
+    // }
 
-    pub fn from_bytes(key_bytes: [u8;16]) -> Self {
-        let mut round_keys = [0u8; 176];
-        unsafe {
-            aesni_setup_round_key_128(key_bytes.as_ptr(), round_keys.as_mut_ptr());
-        }
-        Aes { round_keys }
-    }
-
+    #[inline]
     pub fn hash(&self, t: u128, x: u128) -> u128 {
         let y = poly_double(x^t);
         self.eval_u128(y) ^ y
     }
 
+    #[inline]
     pub fn hash2(&self, t: u128, x: u128, y: u128) -> u128 {
         let z = x ^ poly_double(y);
         self.hash(t,z)
     }
 
+    #[inline]
     pub fn eval_u128(&self, x: u128) -> u128 {
         let inp_bytes = util::u128_to_bytes(x);
         util::bytes_to_u128(self.eval(inp_bytes))
     }
 
+    #[inline]
     pub fn eval(&self, inp_bytes: [u8;16]) -> [u8;16] {
         let mut out_bytes = [0; 16];
         unsafe {
@@ -76,11 +81,12 @@ impl Aes {
 }
 
 extern {
-    fn aesni_setup_round_key_128(key: *const u8, round_key: *mut u8);
+    // fn aesni_setup_round_key_128(key: *const u8, round_key: *mut u8);
     fn aesni_encrypt_block(rounds: u8, input: *const u8, round_keys: *const u8, output: *mut u8);
 }
 
 // irr128 = x^128 + x^7 + x^2 + x + 1
+#[inline]
 fn poly_double(x: u128) -> u128 {
     let (y, overflow) = x.overflowing_shl(1);
     if overflow {
@@ -88,37 +94,5 @@ fn poly_double(x: u128) -> u128 {
         y ^ 0x87
     } else {
         y
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::util;
-
-    #[test]
-    fn aes_zero_correct() {
-        let aes = Aes::new(0);
-        let res = aes.hash(0, 0);
-        let should_be = util::bytes_to_u128([102, 233, 75, 212, 239, 138, 44, 59, 136, 76, 250, 89, 202, 52, 43, 46]);
-        assert_eq!(res, should_be);
-    }
-
-    #[test]
-    fn random_aes_correct() {
-        let key = [0x06, 0xa2, 0xf9, 0xe0, 0x79, 0x27, 0x6a, 0x08,
-                   0x04, 0x34, 0xb6, 0x61, 0xba, 0xee, 0xdc, 0xef];
-        let inp = [0x00, 0xd6, 0x18, 0x23, 0x4f, 0x1b, 0x61, 0xce,
-                   0x3b, 0xde, 0x41, 0x04, 0xc5, 0x93, 0xb6, 0x1c];
-        let should_be = [0x84, 0xd1, 0xc3, 0x11, 0x07, 0x5a, 0x96, 0x4a,
-                         0x13, 0xf8, 0x83, 0x35, 0xf9, 0x04, 0x9d, 0x4a];
-
-        let aes = Aes::from_bytes(key);
-        let out = aes.eval(inp);
-        assert_eq!(out, should_be);
-
-        let aes = Aes::new(util::bytes_to_u128(key));
-        let out = aes.eval_u128(util::bytes_to_u128(inp));
-        assert_eq!(out, util::bytes_to_u128(should_be));
     }
 }

@@ -11,21 +11,19 @@ use num::{ToPrimitive, Zero, One, Signed};
 // tweak functions for garbling
 
 /// Tweak function for a single item.
+#[inline]
 pub fn tweak(i: usize) -> u128 {
     i as u128
 }
 
 /// Tweak function for two items.
+#[inline]
 pub fn tweak2(i: u64, j: u64) -> u128 {
     ((i as u128) << 64) + j as u128
 }
 
-/// Create a tweak for three items.
-pub fn tweak3(i: u32, j: u32, k: u32) -> u128 {
-    ((i as u128) << 64) + ((j as u128) << 32) + k as u128
-}
-
 /// Compute the output tweak for a garbled gate where i is the gate id and k is the value.
+#[inline]
 pub fn output_tweak(i: usize, k: u16) -> u128 {
     let (left, _) = (i as u128).overflowing_shl(64);
     left + k as u128
@@ -35,6 +33,7 @@ pub fn output_tweak(i: usize, k: u16) -> u128 {
 // mixed radix stuff
 
 /// Add two base q numbers together.
+#[inline]
 pub fn base_q_add(xs: &[u16], ys: &[u16], q: u16) -> Vec<u16> {
     if ys.len() > xs.len() {
         return base_q_add(ys, xs, q);
@@ -45,6 +44,7 @@ pub fn base_q_add(xs: &[u16], ys: &[u16], q: u16) -> Vec<u16> {
 }
 
 /// Add a base q number into the first one.
+#[inline]
 pub fn base_q_add_eq(xs: &mut [u16], ys: &[u16], q: u16)
 {
     debug_assert!(
@@ -81,22 +81,26 @@ pub fn base_q_add_eq(xs: &mut [u16], ys: &[u16], q: u16)
 }
 
 /// Convert a u128 into base q.
+#[inline]
 pub fn as_base_q(x: u128, q: u16, n: usize) -> Vec<u16> {
     let ms = std::iter::repeat(q).take(n).collect_vec();
     as_mixed_radix(x, &ms)
 }
 
 /// Determine how many mod q digits fit into a u128.
+#[inline]
 pub fn digits_per_u128(modulus: u16) -> usize {
     (128.0 / (modulus as f64).log2().ceil()).floor() as usize
 }
 
 /// Convert a u128 into base q.
+#[inline]
 pub fn as_base_q_u128(x: u128, q: u16) -> Vec<u16> {
     as_base_q(x, q, digits_per_u128(q))
 }
 
 /// Convert a u128 into mixed radix form with the provided radii.
+#[inline]
 pub fn as_mixed_radix(x: u128, radii: &[u16]) -> Vec<u16> {
     let mut x = x;
     radii.iter().map(|&m| {
@@ -113,6 +117,7 @@ pub fn as_mixed_radix(x: u128, radii: &[u16]) -> Vec<u16> {
 }
 
 /// Convert little-endian base q digits into u128.
+#[inline]
 pub fn from_base_q(ds: &[u16], q: u16) -> u128 {
     let mut x: u128 = 0;
     for &d in ds.iter().rev() {
@@ -124,6 +129,7 @@ pub fn from_base_q(ds: &[u16], q: u16) -> u128 {
 }
 
 /// Convert little-endian mixed radix digits into u128.
+#[inline]
 pub fn from_mixed_radix(digits: &[u16], radii: &[u16]) -> u128 {
     let mut x: u128 = 0;
     for (&d,&q) in digits.iter().zip(radii.iter()).rev() {
@@ -139,6 +145,7 @@ pub fn from_mixed_radix(digits: &[u16], radii: &[u16]) -> u128 {
 
 /// Get the bits of a u128 encoded in 128 u16s, which is convenient for the rest of
 /// the library, which uses u16 as the base digit type in Wire.
+#[inline]
 pub fn u128_to_bits(x: u128, n: usize) -> Vec<u16> {
     let mut bits = Vec::with_capacity(n);
     let mut y = x;
@@ -152,6 +159,7 @@ pub fn u128_to_bits(x: u128, n: usize) -> Vec<u16> {
 }
 
 /// Convert into a u128 from the "bits" as u16. Assumes each "bit" is 0 or 1.
+#[inline]
 pub fn u128_from_bits(bs: &[u16]) -> u128 {
     let mut x = 0;
     for &b in bs.iter().skip(1).rev() {
@@ -163,6 +171,7 @@ pub fn u128_from_bits(bs: &[u16]) -> u128 {
 }
 
 /// Convert a u128 into bytes.
+#[inline]
 pub fn u128_to_bytes(x: u128) -> [u8;16] {
     unsafe {
         std::mem::transmute(x)
@@ -170,6 +179,7 @@ pub fn u128_to_bytes(x: u128) -> [u8;16] {
 }
 
 /// Convert bytes to u128.
+#[inline]
 pub fn bytes_to_u128(bytes: [u8;16]) -> u128 {
     unsafe {
         std::mem::transmute(bytes)
@@ -184,6 +194,7 @@ pub fn bytes_to_u128(bytes: [u8;16]) -> u128 {
 ///
 /// We are limited by the size of the digits in Wire, and besides, if need large moduli,
 /// you should use BundleGadgets and save.
+#[inline]
 pub fn factor(inp: u128) -> Vec<u16> {
     let mut x = inp;
     let mut fs = Vec::new();
@@ -201,6 +212,7 @@ pub fn factor(inp: u128) -> Vec<u16> {
 }
 
 /// Compute the CRT representation of x with respect to the primes ps.
+#[inline]
 pub fn crt(x: u128, ps: &[u16]) -> Vec<u16> {
     ps.iter().map(|&p| {
         (x % p as u128) as u16
@@ -208,11 +220,13 @@ pub fn crt(x: u128, ps: &[u16]) -> Vec<u16> {
 }
 
 /// Compute the CRT representation of x with respect to the factorization of q.
+#[inline]
 pub fn crt_factor(x: u128, q: u128) -> Vec<u16> {
     crt(x, &factor(q))
 }
 
 /// Compute the value x given a list of CRT primes and residues.
+#[inline]
 pub fn crt_inv(xs: &[u16], ps: &[u16]) -> u128 {
     let mut ret = BigInt::zero();
     let M = ps.iter().fold(BigInt::one(), |acc, &x| BigInt::from(x) * acc );
@@ -226,12 +240,14 @@ pub fn crt_inv(xs: &[u16], ps: &[u16]) -> u128 {
 }
 
 /// Compute the value x given a composite CRT modulus.
+#[inline]
 pub fn crt_inv_factor(xs: &[u16], q: u128) -> u128 {
     crt_inv(xs, &factor(q))
 }
 
 /// Generic algorithm to invert inp_a mod inp_b. As ref so as to support BigInts without
 /// copying.
+#[inline]
 pub fn inv_ref<T: Clone + Integer + Signed>(inp_a: &T, inp_b: &T) -> T {
     let mut a = inp_a.clone();
     let mut b = inp_b.clone();
@@ -265,6 +281,7 @@ pub fn inv_ref<T: Clone + Integer + Signed>(inp_a: &T, inp_b: &T) -> T {
 }
 
 /// Invert a mod m.
+#[inline]
 pub fn inv<T: Copy + Integer + Signed>(a: T, m: T) -> T {
     inv_ref(&a, &m)
 }
@@ -286,22 +303,26 @@ pub const PRIMES_SKIP_2: [u16;29] = [
 
 /// Generate a CRT modulus that support at least n-bit integers, using the built-in
 /// PRIMES.
+#[inline]
 pub fn modulus_with_width(n: u32) -> u128 {
     base_modulus_with_width(n, &PRIMES)
 }
 
 /// Generate the factors of a CRT modulus that support at least n-bit integers, using the
 /// built-in PRIMES.
+#[inline]
 pub fn primes_with_width(n: u32) -> Vec<u16> {
     base_primes_with_width(n, &PRIMES)
 }
 
 /// Generate a CRT modulus that support at least n-bit integers, using provided primes.
+#[inline]
 pub fn base_modulus_with_width(nbits: u32, primes: &[u16]) -> u128 {
     product(&base_primes_with_width(nbits, primes))
 }
 
 /// Generate the factors of a CRT modulus that support at least n-bit integers, using provided primes.
+#[inline]
 pub fn base_primes_with_width(nbits: u32, primes: &[u16]) -> Vec<u16> {
     let mut res = 1;
     let mut ps = Vec::new();
@@ -318,16 +339,19 @@ pub fn base_primes_with_width(nbits: u32, primes: &[u16]) -> Vec<u16> {
 
 /// Generate a CRT modulus that support at least n-bit integers, using the built-in
 /// PRIMES_SKIP_2 (does not include 2 as a factor).
+#[inline]
 pub fn modulus_with_width_skip2(nbits: u32) -> u128 {
     base_modulus_with_width(nbits, &PRIMES_SKIP_2)
 }
 
 /// Compute the product of some u16s as a u128.
+#[inline]
 pub fn product(xs: &[u16]) -> u128 {
     xs.iter().fold(1, |acc, &x| acc * x as u128)
 }
 
 /// Raise a u16 to a power mod some value.
+#[inline]
 pub fn powm(inp: u16, pow: u16, modulus: u16) -> u16 {
     let mut x = inp as u16;
     let mut z = 1;
@@ -345,6 +369,7 @@ pub fn powm(inp: u16, pow: u16, modulus: u16) -> u16 {
 }
 
 /// Returns true if x is a power of 2. Delightfully generic.
+#[inline]
 pub fn is_power_of_2<I>(x: I) -> bool
     where I: std::ops::Sub<Output=I> + std::ops::BitAnd<Output=I> +
              num::Zero + num::One + std::cmp::PartialEq + Clone
@@ -354,13 +379,25 @@ pub fn is_power_of_2<I>(x: I) -> bool
 
 /// Extra Rng functionality, useful for `fancy-garbling`.
 pub trait RngExt : rand::Rng + Sized {
+    #[inline]
     fn gen_bool(&mut self) -> bool { self.gen() }
+
+    #[inline]
     fn gen_u16(&mut self) -> u16 { self.gen() }
+
+    #[inline]
     fn gen_u32(&mut self) -> u32 { self.gen() }
+
+    #[inline]
     fn gen_u64(&mut self) -> u16 { self.gen() }
+
+    #[inline]
     fn gen_usize(&mut self) -> usize { self.gen() }
+
+    #[inline]
     fn gen_u128(&mut self) -> u128 { self.gen() }
 
+    #[inline]
     fn gen_usable_u128(&mut self, modulus: u16) -> u128 {
         if is_power_of_2(modulus) {
             let nbits = (modulus-1).count_ones();
@@ -373,18 +410,22 @@ pub trait RngExt : rand::Rng + Sized {
         self.gen_u128() % max
     }
 
+    #[inline]
     fn gen_prime(&mut self) -> u16 {
         PRIMES[self.gen::<usize>() % NPRIMES]
     }
 
+    #[inline]
     fn gen_modulus(&mut self) -> u16 {
         2 + (self.gen::<u16>() % 111)
     }
 
+    #[inline]
     fn gen_usable_composite_modulus(&mut self) -> u128 {
         product(&self.gen_usable_factors())
     }
 
+    #[inline]
     fn gen_usable_factors(&mut self) -> Vec<u16> {
         let mut x: u128 = 1;
         PRIMES.iter().cloned()

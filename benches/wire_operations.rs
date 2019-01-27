@@ -104,6 +104,17 @@ fn bench_zero(c: &mut Criterion, p: u16) {
     });
 }
 
+fn bench_rand(c: &mut Criterion, p: u16) {
+    c.bench_function(&format!("wire::rand{}", p), move |b| {
+        let rng = &mut rand::thread_rng();
+        b.iter(|| {
+            let z = Wire::rand(rng, p);
+            criterion::black_box(z);
+        });
+    });
+}
+
+
 
 fn unpack17(c: &mut Criterion) { bench_unpack(c,17) }
 fn pack17(c: &mut Criterion) { bench_pack(c,17) }
@@ -114,11 +125,12 @@ fn cmuleq17(c: &mut Criterion) { bench_cmul_eq(c,17) }
 fn negate17(c: &mut Criterion) { bench_negate(c,17) }
 fn hash17(c: &mut Criterion) { bench_hash(c,17) }
 fn zero17(c: &mut Criterion) { bench_zero(c,17) }
+fn rand17(c: &mut Criterion) { bench_rand(c,17) }
 
 criterion_group!{
-    name = wire_conversion;
+    name = wire_benches;
     config = Criterion::default().warm_up_time(Duration::from_millis(100));
-    targets = unpack17, pack17, plus17, pluseq17, cmul17, cmuleq17, negate17, hash17, zero17
+    targets = unpack17, pack17, plus17, pluseq17, cmul17, cmuleq17, negate17, hash17, zero17, rand17
 }
 
-criterion_main!(wire_conversion);
+criterion_main!(wire_benches);
