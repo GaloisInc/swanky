@@ -2,12 +2,11 @@ use crossbeam::queue::MsQueue;
 use itertools::Itertools;
 use serde_derive::{Serialize, Deserialize};
 
-use std::collections::HashMap;
-use std::collections::VecDeque;
+use std::collections::{HashMap, VecDeque};
 use std::ops::DerefMut;
+use std::sync::{Arc, RwLock, Mutex};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::mpsc::Sender;
-use std::sync::{Arc, RwLock, Mutex};
 
 use crate::circuit::{Circuit, Gate};
 use crate::fancy::{Fancy, HasModulus, SyncIndex};
@@ -226,7 +225,7 @@ impl Fancy for Evaluator {
             B.color()
         };
 
-        L.plus(&R.plus(&A.cmul(new_b_color)))
+        L.plus_mov(&R.plus_mov(&A.cmul(new_b_color)))
     }
 
     fn proj(&self, ix: Option<SyncIndex>, x: &Wire, q: u16, _tt: &[u16]) -> Wire {

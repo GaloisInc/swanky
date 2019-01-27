@@ -11,10 +11,14 @@
 #![allow(non_snake_case)]
 
 mod aes;
-pub mod garble;
-pub mod wire;
-pub mod fancy;
+mod garble;
+mod wire;
+mod fancy;
 pub mod dummy;
 pub mod informer;
 pub mod circuit;
 pub mod util;
+
+pub use crate::garble::*;
+pub use crate::wire::*;
+pub use crate::fancy::*;

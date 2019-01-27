@@ -4,8 +4,7 @@ use criterion::{criterion_main, criterion_group, Criterion};
 use itertools::Itertools;
 use rand;
 
-use fancy_garbling::fancy::{Fancy, BundleGadgets, HasModulus};
-use fancy_garbling::garble::{Garbler, Evaluator, Message};
+use fancy_garbling::{Fancy, BundleGadgets, HasModulus, Garbler, Evaluator, Message};
 use fancy_garbling::util::{self, RngExt};
 
 fn parallel_gadget<F,W>(b: &F, Q: u128, N: u8, par: bool)

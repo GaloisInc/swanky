@@ -1,7 +1,9 @@
-use std::time::Duration;
 use criterion::{criterion_main, criterion_group, Criterion};
+
+use std::time::Duration;
+
+use fancy_garbling::Wire;
 use fancy_garbling::util::RngExt;
-use fancy_garbling::wire::Wire;
 
 fn bench_unpack(c: &mut Criterion, p: u16) {
     c.bench_function(&format!("wire::unpack{}", p), move |b| {

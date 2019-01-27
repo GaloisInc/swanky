@@ -4,9 +4,11 @@ use rand::Rng;
 use serde_derive::{Serialize, Deserialize};
 
 use crate::aes::AES;
-use crate::fancy::HasModulus;
-use crate::util::{self, RngExt};
+use crate::{fancy::HasModulus, util::{self, RngExt}};
 
+/// The essential wirelabel type used by garbled circuits.
+///
+/// It is a list of mod-q digits.
 #[derive(Debug, PartialEq, PartialOrd, Clone, Serialize, Deserialize)]
 pub enum Wire {
     Mod2 { val: u128 },
@@ -28,6 +30,7 @@ impl HasModulus for Wire {
 }
 
 impl Wire {
+    /// Get the digits of the wire.
     pub fn digits(&self) -> Vec<u16> {
         match self {
             Wire::Mod2 { val } => (0..128).map(|i| ((val >> i) as u16) & 1).collect(),
@@ -35,6 +38,7 @@ impl Wire {
         }
     }
 
+    /// Get the wire represented by the u128.
     pub fn from_u128(inp: u128, q: u16) -> Self {
         if q == 2 {
             Wire::Mod2 { val: inp }
@@ -60,6 +64,7 @@ impl Wire {
         }
     }
 
+    /// Pack the wire to a u128.
     pub fn as_u128(&self) -> u128 {
         match *self {
             Wire::Mod2 { val } => val,
@@ -67,41 +72,18 @@ impl Wire {
         }
     }
 
-    pub fn zero(modulus: u16) -> Self {
-        match modulus {
+    /// The zero wire for the modulus q.
+    pub fn zero(q: u16) -> Self {
+        match q {
             1 => panic!("[wire::zero] mod 1 not allowed!"),
             2 => Wire::Mod2 { val: 0 },
-            _ => Wire::ModN { q: modulus, ds: vec![0; util::digits_per_u128(modulus)] },
+            _ => Wire::ModN { q, ds: vec![0; util::digits_per_u128(q)] },
         }
     }
 
-    pub fn set(&mut self, other: &Wire) {
-        match (self, other) {
-            (Wire::Mod2 { val: x }, Wire::Mod2 { val: y }) => {
-                *x = *y;
-            }
-
-            (Wire::ModN { q: xmod, ds: xs }, Wire::ModN { q: ymod, ds: ref ys }) => {
-                debug_assert_eq!(xmod, ymod);
-                debug_assert_eq!(xs.len(), ys.len());
-                xs.iter_mut().zip(ys.iter()).for_each(|(x,&y)| {
-                    *x = y;
-                });
-            }
-
-            _ => panic!("[wire::set] unequal moduli!"),
-        }
-    }
-
-    pub fn set_zero(&mut self) {
-        match self {
-            Wire::Mod2 { val }    => *val = 0,
-            Wire::ModN { ds, .. } => ds.iter_mut().for_each(|d| *d = 0),
-        }
-    }
-
-    pub fn rand_delta<R:Rng>(rng: &mut R, modulus: u16) -> Self {
-        let mut w = Self::rand(rng, modulus);
+    /// Get a random wire label for mod q, with the first digit set to 1.
+    pub fn rand_delta<R:Rng>(rng: &mut R, q: u16) -> Self {
+        let mut w = Self::rand(rng, q);
         match w {
             Wire::Mod2 { ref mut val }    => *val |= 1,
             Wire::ModN { ref mut ds, .. } => ds[0] = 1,
@@ -109,6 +91,7 @@ impl Wire {
         w
     }
 
+    /// Get the color digit of the wire.
     pub fn color(&self) -> u16 {
         match *self {
             Wire::Mod2 { val }        => (val & 1) as u16,
@@ -116,33 +99,21 @@ impl Wire {
         }
     }
 
+    #[inline]
+    /// Add two wires digit-wise mod q, returning a new wire.
     pub fn plus(&self, other: &Self) -> Self {
-        match (self, other) {
-            (&Wire::Mod2 { val: x }, &Wire::Mod2 { val: y }) => {
-                Wire::Mod2 { val: x ^ y }
-            }
-
-            (&Wire::ModN { q: xmod, ds: ref xs }, &Wire::ModN { q: ymod, ds: ref ys }) => {
-                debug_assert_eq!(xmod, ymod);
-                debug_assert_eq!(xs.len(), ys.len());
-                let zs = xs.iter().zip(ys.iter()).map(|(&x,&y)| {
-                    let (zp,overflow) = (x+y).overflowing_sub(xmod);
-                    if overflow { x+y } else { zp }
-                }).collect();
-                Wire::ModN { q: xmod, ds: zs }
-            }
-
-            _ => panic!("[wire::plus] unequal moduli!"),
-        }
+        self.clone().plus_mov(other)
     }
 
-    pub fn plus_eq(&mut self, other: &Wire) {
-        match (self, other) {
-            (Wire::Mod2 { val: x }, Wire::Mod2 { val: y }) => {
+    #[inline]
+    /// Add another wire into this one, digit-wise mod q.
+    pub fn plus_eq<'a>(&'a mut self, other: &Wire) -> &'a mut Wire {
+        match (&mut *self, other) {
+            (Wire::Mod2 { val: ref mut x }, Wire::Mod2 { val: ref y }) => {
                 *x ^= y;
             }
 
-            (Wire::ModN { q: xmod, ds: xs }, Wire::ModN { q: ymod, ds: ref ys }) => {
+            (Wire::ModN { q: ref xmod, ds: ref mut xs }, Wire::ModN { q: ref ymod, ds: ref ys }) => {
                 debug_assert_eq!(xmod, ymod);
                 debug_assert_eq!(xs.len(), ys.len());
                 xs.iter_mut().zip(ys.iter()).for_each(|(x,&y)| {
@@ -153,28 +124,24 @@ impl Wire {
 
             _ => panic!("[wire::plus_eq] unequal moduli!"),
         }
+
+        self
     }
 
+    #[inline]
+    /// Add another wire into this one, consuming it for chained computations.
+    pub fn plus_mov(mut self, other: &Wire) -> Wire {
+        self.plus_eq(other);
+        self
+    }
+
+    /// Multiply each digit by a constant c mod q, returning a new wire.
     pub fn cmul(&self, c: u16) -> Self {
-        match *self {
-            Wire::Mod2 { .. } => {
-                if c % 2 == 0 {
-                    Wire::zero(2)
-                } else {
-                    self.clone()
-                }
-            }
-
-            Wire::ModN { q, ref ds } => {
-                let zs = ds.iter().map(|&d| {
-                    (d as u32 * c as u32 % q as u32) as u16
-                }).collect();
-                Wire::ModN { q, ds: zs }
-            }
-        }
+        self.clone().cmul_mov(c)
     }
 
-    pub fn cmul_eq(&mut self, c: u16) {
+    /// Multiply each digit by a constant c mod q.
+    pub fn cmul_eq<'a>(&'a mut self, c: u16) -> &'a mut Wire {
         match self {
             Wire::Mod2 { val } => {
                 if c & 1 == 0 {
@@ -183,31 +150,27 @@ impl Wire {
             }
 
             Wire::ModN { q, ds } => {
-
                 ds.iter_mut().for_each(|d| {
                     *d = (*d as u32 * c as u32 % *q as u32) as u16
                 });
             }
         }
+        self
     }
 
+    /// Multiply each digit by a constant c mod q, consuming it for chained computations.
+    pub fn cmul_mov(mut self, c: u16) -> Wire {
+        self.cmul_eq(c);
+        self
+    }
+
+    /// Negate all the digits mod q, returning a new wire.
     pub fn negate(&self) -> Self {
-        match *self {
-            Wire::Mod2 { val } => Wire::Mod2 { val: !val },
-            Wire::ModN { q, ref ds }  => {
-                let zs = ds.iter().map(|&d| {
-                    if d > 0 {
-                        q - d
-                    } else {
-                        0
-                    }
-                }).collect();
-                Wire::ModN { q, ds: zs }
-            }
-        }
+        self.clone().negate_mov()
     }
 
-    pub fn negate_eq(&mut self) {
+    /// Negate all the digits mod q.
+    pub fn negate_eq<'a>(&'a mut self) -> &'a mut Wire {
         match self {
             Wire::Mod2 { val } => *val = !*val,
             Wire::ModN { q, ds }  => {
@@ -220,39 +183,63 @@ impl Wire {
                 });
             }
         }
+        self
     }
 
+    /// Negate all the digits mod q, consuming it for chained computations.
+    pub fn negate_mov(mut self) -> Wire {
+        self.negate_eq();
+        self
+    }
+
+    /// Subtract two wires, returning the result.
     pub fn minus(&self, other: &Wire) -> Wire {
-        match *self {
-            Wire::Mod2 { .. } => self.plus(&other),
-            Wire::ModN { .. } => self.plus(&other.negate()),
-        }
+        self.clone().minus_mov(other)
     }
 
-    pub fn minus_eq(&mut self, other: &Wire) {
+    /// Subtract a wire from this one.
+    pub fn minus_eq<'a>(&'a mut self, other: &Wire) -> &'a mut Wire {
         match *self {
             Wire::Mod2 { .. } => self.plus_eq(&other),
             Wire::ModN { .. } => self.plus_eq(&other.negate()),
         }
     }
 
-    pub fn rand<R:Rng>(rng: &mut R, modulus: u16) -> Wire {
-        Self::from_u128(rng.gen_u128(), modulus)
+    /// Subtract a wire from this one, consuming it for chained computations.
+    pub fn minus_mov(mut self, other: &Wire) -> Wire {
+        self.minus_eq(other);
+        self
     }
 
+    /// Get a random wire mod q.
+    pub fn rand<R:Rng>(rng: &mut R, q: u16) -> Wire {
+        Self::from_u128(rng.gen_u128(), q)
+    }
+
+    /// Compute the hash of this wire.
+    ///
+    /// Uses fixed-key AES.
     pub fn hash(&self, tweak: u128) -> u128 {
         AES.hash(tweak, self.as_u128())
     }
 
-    // hash to u128 and back to Wire
+    /// Compute the hash of this wire, converting the result back to a wire.
+    ///
+    /// Uses fixed-key AES.
     pub fn hashback(&self, tweak: u128, new_mod: u16) -> Wire {
         Self::from_u128(self.hash(tweak), new_mod)
     }
 
+    /// Compute the hash of two wires together.
+    ///
+    /// Uses fixed-key AES.
     pub fn hash2(&self, other: &Wire, tweak: u128) -> u128 {
         AES.hash2(tweak, self.as_u128(), other.as_u128())
     }
 
+    /// Compute the hash of two wires together, converting the result back to a wire.
+    ///
+    /// Uses fixed-key AES.
     pub fn hashback2(&self, other: &Wire, tweak: u128, new_modulus: u16) -> Wire {
         Self::from_u128(self.hash2(other, tweak), new_modulus)
     }
@@ -261,10 +248,12 @@ impl Wire {
 ////////////////////////////////////////////////////////////////////////////////
 // serialization
 
+/// Convert a slice of wires to bytes.
 pub fn wires_to_bytes(ws: &[Wire]) -> Vec<u8> {
     bincode::serialize(ws).expect("couldn't serialize slice of wires")
 }
 
+/// Convert a slice of bytes back to wires.
 pub fn wires_from_bytes(bs: &[u8]) -> Result<Vec<Wire>, failure::Error> {
     bincode::deserialize(bs)
         .map_err(|_| failure::err_msg("error decoding wires from bytes"))

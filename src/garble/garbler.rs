@@ -2,8 +2,8 @@ use itertools::Itertools;
 
 use std::collections::HashMap;
 use std::ops::DerefMut;
-use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, RwLock, Mutex};
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 use crate::fancy::{Fancy, HasModulus, SyncIndex};
 use crate::util::{RngExt, tweak, tweak2, output_tweak};
@@ -119,10 +119,10 @@ impl Fancy for Garbler {
 
     fn constant(&self, ix: Option<SyncIndex>, x: u16, q: u16) -> Wire {
         let zero = Wire::rand(&mut rand::thread_rng(), q);
-        let wire = zero.plus(&self.delta(q).cmul(x));
+        let wire = zero.plus(&self.delta(q).cmul_eq(x));
         self.send(ix, Message::Constant {
             value: x,
-            wire: wire.clone()
+            wire: wire,
         });
         zero
     }
@@ -191,13 +191,13 @@ impl Fancy for Garbler {
         let alpha = (q - A.color()) % q; // alpha = -A.color
         let X = A.plus(&D.cmul(alpha))
                 .hashback(g,q)
-                .plus(&D.cmul((alpha * r) % q));
+                .plus_mov(&D.cmul((alpha * r) % q));
 
         // Y = H(B + bD) + (b + r)A such that b + B.color == 0
         let beta = (qb - B.color()) % qb;
         let Y = B.plus(&Db.cmul(beta))
                 .hashback(g,q)
-                .plus(&A.cmul((beta + r) % q));
+                .plus_mov(&A.cmul((beta + r) % q));
 
         // precompute a lookup table of X.minus(&D_cmul[(a * r % q) as usize]).as_u128();
         //                            = X.plus(&D_cmul[((q - (a * r % q)) % q) as usize]).as_u128();
@@ -240,7 +240,7 @@ impl Fancy for Garbler {
         let mut B_ = B.clone();
         for b in 0..qb {
             if b > 0 {
-                B_.plus_eq(&Db)
+                B_.plus_eq(&Db);
             }
             // evaluator's half-gate: outputs Y-(b+r)D
             // G = H(B+bD) + Y-(b+r)A
@@ -254,7 +254,7 @@ impl Fancy for Garbler {
         let gate = gate.into_iter().map(Option::unwrap).collect();
         self.send(ix, Message::GarbledGate(gate));
 
-        X.plus(&Y)
+        X.plus_mov(&Y)
     }
 
     fn proj(&self, ix: Option<SyncIndex>, A: &Wire, q_out: u16, tt: &[u16]) -> Wire { //
@@ -274,10 +274,9 @@ impl Fancy for Garbler {
         // let C = A.minus(&Din.cmul(tao))
         //             .hashback(g, q_out)
         //             .minus(&Dout.cmul(tt[((q_in - tao) % q_in) as usize]));
-        let mut C = A.clone();
-        C.plus_eq(&Din.cmul((q_in-tao) % q_in));
-        C = C.hashback(g, q_out);
-        C.plus_eq(&Dout.cmul((q_out - tt[((q_in - tao) % q_in) as usize]) % q_out));
+        let C = A.plus(&Din.cmul((q_in-tao) % q_in))
+            .hashback(g, q_out)
+            .plus_mov(&Dout.cmul((q_out - tt[((q_in - tao) % q_in) as usize]) % q_out));
 
         // precompute `let C_ = C.plus(&Dout.cmul(tt[x as usize]))`
         let C_precomputed = {

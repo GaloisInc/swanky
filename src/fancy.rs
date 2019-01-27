@@ -7,12 +7,16 @@ use itertools::Itertools;
 
 use crate::util;
 
-/// An object that knows its own modulus.
+/// An object that has some modulus. Basic object of Fancy compuations.
 pub trait HasModulus {
     /// The modulus of the wire.
     fn modulus(&self) -> u16;
 }
 
+/// The index of a thread for synchronization.
+///
+/// This is used within a thread to ensure all the messages within that thread are
+/// sequential, and are delivered to the correct Evaluator thread.
 pub type SyncIndex = u8;
 
 /// A collection of wires, useful for the garbled gadgets defined by `BundleGadgets`.
