@@ -10,7 +10,7 @@ use std::sync::{Arc, Mutex};
 use crate::fancy::{Fancy, HasModulus, SyncIndex};
 
 /// The index and modulus of a gate in a circuit.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 pub struct CircuitRef {
     pub ix: usize,
     modulus: u16,

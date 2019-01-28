@@ -29,7 +29,7 @@ enum Request {
 }
 
 /// Wrapper around u16.
-#[derive(Clone, Default, Debug)]
+#[derive(Clone, Debug)]
 pub struct DummyVal {
     val: u16,
     modulus: u16,
@@ -100,13 +100,13 @@ impl Fancy for Dummy {
     }
 
     fn add(&self, x: &DummyVal, y: &DummyVal) -> DummyVal {
-        assert!(x.modulus == y.modulus);
+        assert!(x.modulus == y.modulus, "dummy: addition moduli unequal");
         let val = (x.val + y.val) % x.modulus;
         DummyVal { val, modulus: x.modulus }
     }
 
     fn sub(&self, x: &DummyVal, y: &DummyVal) -> DummyVal {
-        assert!(x.modulus == y.modulus);
+        assert!(x.modulus == y.modulus, "dummy: subtraction moduli unequal");
         let val = (x.modulus + x.val - y.val) % x.modulus;
         DummyVal { val, modulus: x.modulus }
     }
@@ -125,9 +125,9 @@ impl Fancy for Dummy {
     }
 
     fn proj(&self, _ix: Option<SyncIndex>, x: &DummyVal, modulus: u16, tt: &[u16]) -> DummyVal {
-        assert_eq!(tt.len(), x.modulus as usize);
-        assert!(tt.iter().all(|&x| x < modulus));
-        assert!(x.val < x.modulus);
+        assert_eq!(tt.len(), x.modulus as usize, "dummy: projection truth table not the right size");
+        assert!(tt.iter().all(|&x| x < modulus), "dummy: projection truth table has bogus values");
+        assert!(x.val < x.modulus, "dummy: projection val is greater than its modulus");
         let val = tt[x.val as usize];
         DummyVal { val, modulus }
     }

@@ -22,7 +22,7 @@ pub struct Informer {
     nciphertexts:           Arc<AtomicUsize>,
 }
 
-#[derive(Clone, Default, Debug)]
+#[derive(Clone, Debug)]
 pub struct InformerVal(u16);
 
 impl HasModulus for InformerVal {

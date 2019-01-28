@@ -15,11 +15,6 @@ pub enum Wire {
     ModN { q: u16, ds: Vec<u16> },
 }
 
-impl Default for Wire {
-    #[inline]
-    fn default() -> Wire { Wire::Mod2 { val: 0 } }
-}
-
 impl HasModulus for Wire {
     #[inline]
     fn modulus(&self) -> u16 {

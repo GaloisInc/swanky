@@ -660,7 +660,7 @@ mod streaming {
         assert_eq!(result, should_be)
     }
 //}}}
-    fn fancy_addition<W: Clone + Default + HasModulus>(b: &dyn Fancy<Item=W>, q: u16) //{{{
+    fn fancy_addition<W: Clone + HasModulus>(b: &dyn Fancy<Item=W>, q: u16) //{{{
     {
         let x = b.garbler_input(None, q);
         let y = b.evaluator_input(None, q);
@@ -679,7 +679,7 @@ mod streaming {
         }
     }
 //}}}
-    fn fancy_subtraction<W: Clone + Default + HasModulus>(b: &dyn Fancy<Item=W>, q: u16) //{{{
+    fn fancy_subtraction<W: Clone + HasModulus>(b: &dyn Fancy<Item=W>, q: u16) //{{{
     {
         let x = b.garbler_input(None, q);
         let y = b.evaluator_input(None, q);
@@ -698,7 +698,7 @@ mod streaming {
         }
     }
 //}}}
-    fn fancy_multiplication<W: Clone + Default + HasModulus>(b: &dyn Fancy<Item=W>, q: u16) // {{{
+    fn fancy_multiplication<W: Clone + HasModulus>(b: &dyn Fancy<Item=W>, q: u16) // {{{
     {
         let x = b.garbler_input(None, q);
         let y = b.evaluator_input(None, q);
@@ -717,7 +717,7 @@ mod streaming {
         }
     }
 //}}}
-    fn fancy_cmul<W: Clone + Default + HasModulus>(b: &dyn Fancy<Item=W>, q: u16) // {{{
+    fn fancy_cmul<W: Clone + HasModulus>(b: &dyn Fancy<Item=W>, q: u16) // {{{
     {
         let x = b.garbler_input(None, q);
         let z = b.cmul(&x,5);
@@ -734,7 +734,7 @@ mod streaming {
         }
     }
 //}}}
-    fn fancy_projection<W: Clone + Default + HasModulus>(b: &dyn Fancy<Item=W>, q: u16) // {{{
+    fn fancy_projection<W: Clone + HasModulus>(b: &dyn Fancy<Item=W>, q: u16) // {{{
     {
         let x = b.garbler_input(None, q);
         let tab = (0..q).map(|i| (i + 1) % q).collect_vec();
@@ -764,7 +764,7 @@ mod parallel {
     use crate::fancy::{SyncIndex, BundleGadgets};
 
     fn parallel_gadgets<F,W>(b: &F, Q: u128, N: SyncIndex, par: bool) // {{{
-      where W: Clone + Default + HasModulus + Send + Sync + std::fmt::Debug,
+      where W: Clone + HasModulus + Send + Sync + std::fmt::Debug,
             F: Fancy<Item=W> + Send + Sync,
      {
         if par {

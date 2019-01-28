@@ -20,10 +20,10 @@ pub trait HasModulus {
 pub type SyncIndex = u8;
 
 /// A collection of wires, useful for the garbled gadgets defined by `BundleGadgets`.
-#[derive(Clone, Default)]
-pub struct Bundle<W: Clone + Default + HasModulus>(Vec<W>);
+#[derive(Clone)]
+pub struct Bundle<W: Clone + HasModulus>(Vec<W>);
 
-impl <W: Clone + Default + HasModulus> Bundle<W> {
+impl <W: Clone + HasModulus> Bundle<W> {
     /// Create a new bundle from some wires.
     pub fn new(ws: Vec<W>) -> Bundle<W> {
         Bundle(ws)
@@ -53,7 +53,7 @@ impl <W: Clone + Default + HasModulus> Bundle<W> {
 /// DSL for the basic computations supported by fancy-garbling.
 pub trait Fancy {
     /// The underlying wire datatype created by an object implementing `Fancy`.
-    type Item: Clone + Default + HasModulus;
+    type Item: Clone + HasModulus;
 
     /// Create an input for the garbler with modulus `q`.
     fn garbler_input(&self, ix: Option<SyncIndex>, q: u16) -> Self::Item;
@@ -314,7 +314,9 @@ pub trait BundleGadgets: Fancy {
     /// Add two wire bundles, residue by residue.
     fn add_bundles(&self, x: &Bundle<Self::Item>, y: &Bundle<Self::Item>)
         -> Bundle<Self::Item> {
-        assert_eq!(x.wires().len(), y.wires().len());
+        assert_eq!(x.wires().len(), y.wires().len(),
+                   "fancy::add_bundles: inputs have differing numbers of wires ({} vs {})!",
+                   x.wires().len(), y.wires().len());
         let res = x.wires().iter().zip(y.wires().iter()).map(|(x,y)| self.add(x,y)).collect();
         Bundle(res)
     }
@@ -322,7 +324,9 @@ pub trait BundleGadgets: Fancy {
     /// Subtract two wire bundles, residue by residue.
     fn sub_bundles(&self, x: &Bundle<Self::Item>, y: &Bundle<Self::Item>)
         -> Bundle<Self::Item> {
-        assert_eq!(x.wires().len(), y.wires().len());
+        assert_eq!(x.wires().len(), y.wires().len(),
+                   "fancy::sub_bundles: inputs have differing numbers of wires ({} vs {})!",
+                   x.wires().len(), y.wires().len());
         let res = x.wires().iter().zip(y.wires().iter()).map(|(x,y)| self.sub(x,y)).collect();
         Bundle(res)
     }
@@ -682,7 +686,7 @@ pub trait BundleGadgets: Fancy {
 impl<F: Fancy> BundleGadgets for F { }
 
 // Compute the exact ms needed for the number of CRT primes in `x`.
-fn exact_ms<W: Clone + Default + HasModulus>(x: &Bundle<W>) -> Vec<u16> {
+fn exact_ms<W: Clone + HasModulus>(x: &Bundle<W>) -> Vec<u16> {
     match x.moduli().len() {
         3 => vec![2;5],
         4 => vec![3,26],

@@ -8,7 +8,7 @@ use fancy_garbling::{Fancy, BundleGadgets, HasModulus, Garbler, Evaluator, Messa
 use fancy_garbling::util::{self, RngExt};
 
 fn parallel_gadget<F,W>(b: &F, Q: u128, N: u8, par: bool)
-    where W: Clone + Default + HasModulus + Send + Sync + std::fmt::Debug,
+    where W: Clone + HasModulus + Send + Sync + std::fmt::Debug,
         F: Fancy<Item=W> + Send + Sync,
     {
     let inps = b.garbler_input_bundles_crt(None, Q, N as usize);

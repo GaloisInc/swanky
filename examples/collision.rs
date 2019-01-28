@@ -3,7 +3,7 @@ use itertools::Itertools;
 use fancy_garbling::{self, util, informer::Informer, Fancy, BundleGadgets, HasModulus};
 
 fn collision<W,F>(f: &F, nbits: usize, time_slices: usize, check_for_cheaters: bool)
-    where F: Fancy<Item=W>, W: Clone + Default + HasModulus
+    where F: Fancy<Item=W>, W: Clone + HasModulus
 {
     // obtain inputs into a vec of vecs of arrays of 4
     let inputs = (0..time_slices).map(|_t| {
