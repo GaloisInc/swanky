@@ -56,13 +56,16 @@ impl<S: Send + Read + Write, OT: ObliviousTransfer<S>> Fancy for Garbler<S, OT> 
         let δ = self.garbler.delta(q);
         let mut ot = OT::new(self.stream.clone());
         let mut wire = Wire::zero(q);
-        for i in 0..ℓ {
-            let zero = Wire::rand(&mut rand::thread_rng(), q);
-            let one = zero.plus(&δ);
-            wire = wire.plus(&zero.cmul(1 << i));
-            ot.send(&[(super::wire_to_u8vec(zero), super::wire_to_u8vec(one))])
-                .unwrap(); // XXX: remove unwrap
-        }
+        let inputs = (0..ℓ)
+            .into_iter()
+            .map(|i| {
+                let zero = Wire::rand(&mut rand::thread_rng(), q);
+                let one = zero.plus(&δ);
+                wire = wire.plus(&zero.cmul(1 << i));
+                (super::wire_to_u8vec(zero), super::wire_to_u8vec(one))
+            })
+            .collect::<Vec<(Vec<u8>, Vec<u8>)>>();
+        ot.send(&inputs).unwrap(); // XXX: remove unwrap
         wire
     }
 

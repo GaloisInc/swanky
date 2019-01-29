@@ -53,12 +53,14 @@ impl<S: Send + Read + Write, OT: ObliviousTransfer<S>> Fancy for Evaluator<S, OT
             .map(|i| input & (1 << i) != 0)
             .collect::<Vec<bool>>();
         let mut ot = OT::new(self.stream.clone());
-        let mut wire = Wire::zero(q);
-        for (i, b) in bs.into_iter().enumerate() {
-            let w = ot.receive(&[b], 16).unwrap(); // XXX: unwrap
-            let w = super::u8vec_to_wire(&w[0], q);
-            wire = wire.plus(&w.cmul((1 << i) as u16));
-        }
+        let wires = ot.receive(&bs, 16).unwrap(); // XXX: remove unwrap
+        let wire = wires
+            .into_iter()
+            .enumerate()
+            .fold(Wire::zero(q), |r, (i, w)| {
+                let w = super::u8vec_to_wire(&w, q);
+                r.plus(&w.cmul((1 << i) as u16))
+            });
         wire
     }
 
