@@ -1,82 +1,75 @@
+#![feature(non_ascii_idents)]
 #![feature(test)]
 
 mod comm;
-pub mod evaluator;
-pub mod garbler;
+mod evaluator;
+mod garbler;
+
+pub use evaluator::Evaluator;
+pub use garbler::Garbler;
+
+#[macro_use]
+extern crate arrayref;
+
+use fancy_garbling::Wire;
+
+#[inline(always)]
+fn wire_to_u8vec(wire: Wire) -> Vec<u8> {
+    wire.as_u128().to_le_bytes().to_vec()
+}
+#[inline(always)]
+fn u8vec_to_wire(v: &[u8], modulus: u16) -> Wire {
+    let wire = array_ref![v, 0, 16];
+    Wire::from_u128(u128::from_le_bytes(*wire), modulus)
+}
 
 #[cfg(test)]
 mod tests {
     extern crate test;
     use super::*;
-    use fancy_garbling::fancy::{Fancy, HasModulus};
-    use ocelot::ot::chou_orlandi::ChouOrlandiOT;
-    use ocelot::ot::dummy::DummyOT;
-    use ocelot::ot::iknp::IknpOT;
-    use ocelot::ot::naor_pinkas::NaorPinkasOT;
-    use ocelot::ot::ObliviousTransfer;
+    use fancy_garbling::{Fancy, HasModulus};
+    use ocelot::{DummyOT, ObliviousTransfer};
     use std::os::unix::net::UnixStream;
+
+    const Q: u16 = 3;
 
     fn circuit<F, W>(f: &mut F)
     where
-        W: HasModulus + Default + Clone,
+        W: HasModulus + Clone,
         F: Fancy<Item = W>,
     {
-        let q = 17;
-        let a = f.garbler_input(None, q);
-        let b = f.evaluator_input(None, q);
+        let a = f.garbler_input(None, Q);
+        let b = f.evaluator_input(None, Q);
         let c = f.add(&a, &b);
         f.output(None, &c);
     }
 
-    fn test_simple_circuit<OT: ObliviousTransfer<UnixStream>>(a: bool, b: bool) {
+    fn test_simple_circuit<OT: ObliviousTransfer<UnixStream>>(a: u16, b: u16) {
         let (sender, receiver) = match UnixStream::pair() {
             Ok((s1, s2)) => (s1, s2),
-            Err(e) => {
-                eprintln!("Couldn't create pair of sockets: {:?}", e);
-                return;
-            }
+            Err(e) => panic!("Couldn't create pair of sockets: {:?}", e),
         };
         std::thread::spawn(move || {
-            let mut gb = garbler::garble::<UnixStream, OT>(sender, &[a as u16]).unwrap();
+            let mut gb = Garbler::<UnixStream, OT>::new(sender, &[a]);
             circuit(&mut gb);
         });
-        let mut ev = evaluator::evaluate::<UnixStream, OT>(receiver, &[b as u16]).unwrap();
+        let mut ev = Evaluator::<UnixStream, OT>::new(receiver, &[b]);
         circuit(&mut ev);
         let output = ev.decode_output();
-        let result = a as u16 + b as u16;
-        assert_eq!(vec![result], output);
+        assert_eq!(vec![(a + b) % Q], output);
     }
 
     #[test]
-    fn test_dummy() {
-        test_simple_circuit::<DummyOT<UnixStream>>(false, false);
-        test_simple_circuit::<DummyOT<UnixStream>>(false, true);
-        test_simple_circuit::<DummyOT<UnixStream>>(true, false);
-        test_simple_circuit::<DummyOT<UnixStream>>(true, true);
-    }
-
-    #[test]
-    fn test_chou_orlandi() {
-        test_simple_circuit::<ChouOrlandiOT<UnixStream>>(false, false);
-        test_simple_circuit::<ChouOrlandiOT<UnixStream>>(false, true);
-        test_simple_circuit::<ChouOrlandiOT<UnixStream>>(true, false);
-        test_simple_circuit::<ChouOrlandiOT<UnixStream>>(true, true);
-    }
-
-    #[test]
-    fn test_naor_pinkas() {
-        test_simple_circuit::<NaorPinkasOT<UnixStream>>(false, false);
-        test_simple_circuit::<NaorPinkasOT<UnixStream>>(false, true);
-        test_simple_circuit::<NaorPinkasOT<UnixStream>>(true, false);
-        test_simple_circuit::<NaorPinkasOT<UnixStream>>(true, true);
-    }
-
-    #[test]
-    fn test_iknp() {
-        test_simple_circuit::<IknpOT<UnixStream, DummyOT<UnixStream>>>(false, false);
-        test_simple_circuit::<IknpOT<UnixStream, DummyOT<UnixStream>>>(false, true);
-        test_simple_circuit::<IknpOT<UnixStream, DummyOT<UnixStream>>>(true, false);
-        test_simple_circuit::<IknpOT<UnixStream, DummyOT<UnixStream>>>(true, true);
+    fn test() {
+        test_simple_circuit::<DummyOT<UnixStream>>(0, 0);
+        test_simple_circuit::<DummyOT<UnixStream>>(1, 0);
+        test_simple_circuit::<DummyOT<UnixStream>>(2, 0);
+        test_simple_circuit::<DummyOT<UnixStream>>(0, 1);
+        test_simple_circuit::<DummyOT<UnixStream>>(0, 2);
+        test_simple_circuit::<DummyOT<UnixStream>>(1, 1);
+        test_simple_circuit::<DummyOT<UnixStream>>(2, 1);
+        test_simple_circuit::<DummyOT<UnixStream>>(1, 2);
+        test_simple_circuit::<DummyOT<UnixStream>>(2, 2);
     }
 
 }

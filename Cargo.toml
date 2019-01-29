@@ -7,9 +7,11 @@ authors = ["Alex J. Malozemoff <amaloz@galois.com>"]
 [lib]
 
 [dependencies]
-clap = "2.32.0"
-failure = "0.1"
-fancy_garbling = { git = "https://github.com/spaceships/fancy-garbling" }
+arrayref = "*"
+clap = "*"
+failure = "*"
+# fancy_garbling = { git = "https://github.com/spaceships/fancy-garbling" }
+fancy_garbling = { path = "../fancy-garbling" }
 ocelot = { path = "../ocelot" }
-log = "0.4.6"
-rand = "0.6.1"
+log = "*"
+rand = "*"

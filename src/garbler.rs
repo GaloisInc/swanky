@@ -1,37 +1,96 @@
 use crate::comm;
-use failure::Error;
-use fancy_garbling::garble;
-use fancy_garbling::garble::Message;
-use ocelot::ot::ObliviousTransfer;
-use ocelot::util::u128_to_bitvec;
+use fancy_garbling::Garbler as Gb;
+use fancy_garbling::{Fancy, Message, SyncIndex, Wire};
+use ocelot::ObliviousTransfer;
 use std::io::{Read, Write};
+use std::marker::PhantomData;
 use std::sync::{Arc, Mutex};
 
-pub fn garble<S, OT>(stream: S, input: &[u16]) -> Result<garble::Garbler, Error>
-where
-    S: Read + Write + Send + 'static,
-    OT: ObliviousTransfer<S>,
-{
-    let mut input = input.to_vec().into_iter();
-    let stream = Arc::new(Mutex::new(stream));
-    let callback = move |msg: Message| {
-        let m = match msg {
-            Message::UnencodedGarblerInput { zero, delta } => {
-                Message::GarblerInput(zero.plus(&delta.cmul(input.next().unwrap())))
-            }
-            Message::UnencodedEvaluatorInput { zero, delta } => {
-                let mut ot = OT::new(stream.clone());
-                ot.send(&[(
-                    u128_to_bitvec(zero.as_u128()),
-                    u128_to_bitvec(zero.plus(&delta).as_u128()),
-                )])
-                .unwrap();
-                return ();
-            }
-            m => m,
+pub struct Garbler<S: Send + Read + Write, OT: ObliviousTransfer<S>> {
+    garbler: Gb,
+    stream: Arc<Mutex<S>>,
+    phantom: PhantomData<OT>,
+}
+
+impl<S: Send + Read + Write + 'static, OT: ObliviousTransfer<S>> Garbler<S, OT> {
+    pub fn new(stream: S, inputs: &[u16]) -> Self {
+        let stream = Arc::new(Mutex::new(stream));
+        let inputs = inputs.to_vec();
+        let mut inputs = inputs.into_iter();
+        let stream_ = stream.clone();
+        let callback = move |_idx, msg| {
+            let m = match msg {
+                Message::UnencodedGarblerInput { zero, delta } => {
+                    let input = inputs.next().unwrap();
+                    Message::GarblerInput(zero.plus(&delta.cmul(input)))
+                }
+                Message::UnencodedEvaluatorInput { zero: _, delta: _ } => {
+                    panic!("There should not be an UnencodedEvaluatorInput message in the garbler");
+                }
+                Message::EvaluatorInput(_) => {
+                    panic!("There should not be an EvaluatorInput message in the garbler");
+                }
+                m => m,
+            };
+            let mut stream = stream_.lock().unwrap();
+            comm::send(&mut *stream, &m.to_bytes()).expect("Unable to send message");
         };
-        let mut stream = stream.lock().unwrap();
-        comm::send(&mut *stream, &m.to_bytes()).expect("Unable to send message");
-    };
-    Ok(garble::Garbler::new(callback))
+        let gb = Gb::new(callback);
+        Garbler {
+            garbler: gb,
+            stream: stream,
+            phantom: PhantomData,
+        }
+    }
+}
+
+impl<S: Send + Read + Write, OT: ObliviousTransfer<S>> Fancy for Garbler<S, OT> {
+    type Item = Wire;
+
+    fn garbler_input(&self, ix: Option<SyncIndex>, q: u16) -> Wire {
+        self.garbler.garbler_input(ix, q)
+    }
+
+    fn evaluator_input(&self, _ix: Option<SyncIndex>, q: u16) -> Wire {
+        let ℓ = (q as f64).log(2.0).ceil() as u16;
+        let δ = self.garbler.delta(q);
+        let mut ot = OT::new(self.stream.clone());
+        let mut wire = Wire::zero(q);
+        for i in 0..ℓ {
+            let zero = Wire::rand(&mut rand::thread_rng(), q);
+            let one = zero.plus(&δ);
+            wire = wire.plus(&zero.cmul(1 << i));
+            ot.send(&[(super::wire_to_u8vec(zero), super::wire_to_u8vec(one))])
+                .unwrap(); // XXX: remove unwrap
+        }
+        wire
+    }
+
+    fn constant(&self, ix: Option<SyncIndex>, x: u16, q: u16) -> Wire {
+        self.garbler.constant(ix, x, q)
+    }
+
+    fn add(&self, x: &Wire, y: &Wire) -> Wire {
+        self.garbler.add(x, y)
+    }
+
+    fn sub(&self, x: &Wire, y: &Wire) -> Wire {
+        self.garbler.sub(x, y)
+    }
+
+    fn cmul(&self, x: &Wire, c: u16) -> Wire {
+        self.garbler.cmul(x, c)
+    }
+
+    fn mul(&self, ix: Option<SyncIndex>, x: &Wire, y: &Wire) -> Wire {
+        self.garbler.mul(ix, x, y)
+    }
+
+    fn proj(&self, ix: Option<SyncIndex>, x: &Wire, q: u16, tt: &[u16]) -> Wire {
+        self.garbler.proj(ix, x, q, tt)
+    }
+
+    fn output(&self, ix: Option<SyncIndex>, x: &Wire) {
+        self.garbler.output(ix, x)
+    }
 }
