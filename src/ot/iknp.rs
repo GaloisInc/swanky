@@ -6,13 +6,13 @@ use rand::Rng;
 use std::io::{ErrorKind, Read, Write};
 use std::sync::{Arc, Mutex};
 
-pub struct IknpOT<S: Read + Write, OT: ObliviousTransfer<S>> {
+pub struct IknpOT<S: Read + Write + Send, OT: ObliviousTransfer<S>> {
     stream: Stream<S>,
     ot: OT,
     rng: ThreadRng,
 }
 
-impl<S: Read + Write, OT: ObliviousTransfer<S>> ObliviousTransfer<S> for IknpOT<S, OT> {
+impl<S: Read + Write + Send, OT: ObliviousTransfer<S>> ObliviousTransfer<S> for IknpOT<S, OT> {
     fn new(stream: Arc<Mutex<S>>) -> Self {
         let ot = OT::new(stream.clone());
         let stream = Stream::new(stream);
@@ -32,7 +32,7 @@ impl<S: Read + Write, OT: ObliviousTransfer<S>> ObliviousTransfer<S> for IknpOT<
             // Just do normal OT
             return self.ot.send(inputs);
         }
-        let cipher = super::cipher();
+        let cipher = super::cipher(&[0u8; 16]);
         let s = (0..128)
             .map(|_| self.rng.gen::<bool>())
             .collect::<Vec<bool>>();
@@ -60,7 +60,7 @@ impl<S: Read + Write, OT: ObliviousTransfer<S>> ObliviousTransfer<S> for IknpOT<
             // Just do normal OT
             return self.ot.receive(inputs, nbytes);
         }
-        let cipher = super::cipher();
+        let cipher = super::cipher(&[0u8; 16]);
         let r = inputs.iter().cloned().collect::<super::BV>();
         let ts = (0..128)
             .map(|_| {
@@ -90,9 +90,8 @@ impl<S: Read + Write, OT: ObliviousTransfer<S>> ObliviousTransfer<S> for IknpOT<
 mod tests {
     extern crate test;
     use super::*;
-    use crate::ot::chou_orlandi::ChouOrlandiOT;
-    use crate::ot::dummy::DummyOT;
-    use crate::ot::naor_pinkas::NaorPinkasOT;
+    use crate::ChouOrlandiOT;
+    use crate::DummyOT;
     use std::os::unix::net::UnixStream;
     use std::sync::{Arc, Mutex};
 
@@ -142,10 +141,6 @@ mod tests {
     #[test]
     fn test_dummy() {
         test_ot::<DummyOT<UnixStream>>(N);
-    }
-    #[test]
-    fn test_naor_pinkas() {
-        test_ot::<NaorPinkasOT<UnixStream>>(N);
     }
     #[test]
     fn test_chou_orlandi() {

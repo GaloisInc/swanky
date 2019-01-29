@@ -8,14 +8,14 @@ use std::cmp::max;
 use std::io::{Read, Write};
 use std::sync::{Arc, Mutex};
 
-pub struct NaorPinkasOT<T: Read + Write> {
+pub struct NaorPinkasOT<T: Read + Write + Send> {
     stream: Stream<T>,
     rng: ThreadRng,
 }
 
 const P: RistrettoPoint = constants::RISTRETTO_BASEPOINT_POINT;
 
-impl<T: Read + Write> ObliviousTransfer<T> for NaorPinkasOT<T> {
+impl<T: Read + Write + Send> ObliviousTransfer<T> for NaorPinkasOT<T> {
     fn new(stream: Arc<Mutex<T>>) -> Self {
         let stream = Stream::new(stream);
         let rng = rand::thread_rng();
@@ -34,11 +34,11 @@ impl<T: Read + Write> ObliviousTransfer<T> for NaorPinkasOT<T> {
             let e00 = P * r0;
             let e10 = P * r1;
             let mut h = vec![0u8; nbytes];
-            super::hash_pt(&(pk0 * r0), &mut h);
+            hash_pt(&(pk0 * r0), &mut h);
             let m: Vec<u8> = input.0.clone().into();
             let e01 = super::xor(&h, &m);
             let mut h = vec![0u8; nbytes];
-            super::hash_pt(&(pk1 * r1), &mut h);
+            hash_pt(&(pk1 * r1), &mut h);
             let m: Vec<u8> = input.1.clone().into();
             let e11 = super::xor(&h, &m);
             self.stream.write_pt(&e00)?;
@@ -69,12 +69,19 @@ impl<T: Read + Write> ObliviousTransfer<T> for NaorPinkasOT<T> {
                 true => (e10, e11),
             };
             let mut h = vec![0u8; nbytes];
-            super::hash_pt(&(eσ0 * k), &mut h);
+            hash_pt(&(eσ0 * k), &mut h);
             let result = super::xor(&h, &eσ1);
             outputs.push(result);
         }
         Ok(outputs)
     }
+}
+
+#[inline(always)]
+fn hash_pt(pt: &RistrettoPoint, h: &mut [u8]) {
+    let k = pt.compress();
+    let k = k.as_bytes();
+    super::encrypt(&k[0..16], &[0u8; 16], h)
 }
 
 #[cfg(test)]

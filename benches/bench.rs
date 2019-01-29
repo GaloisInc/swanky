@@ -1,5 +1,5 @@
 use criterion::{criterion_group, criterion_main, Criterion};
-use ocelot::ot::*;
+use ocelot::*;
 use std::os::unix::net::UnixStream;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
@@ -58,7 +58,7 @@ fn bench_naor_pinkas(c: &mut Criterion) {
     });
 }
 
-const T: usize = 8192;
+const T: usize = 16384;
 
 fn rand_u128_vec(size: usize) -> Vec<u128> {
     (0..size).map(|_| rand::random::<u128>()).collect()
@@ -137,7 +137,7 @@ fn bench_alsz(c: &mut Criterion) {
 criterion_group! {
     name = ot;
     config = Criterion::default().warm_up_time(Duration::from_millis(100));
-    targets = bench_chou_orlandi, bench_dummy, bench_naor_pinkas, bench_iknp, bench_alsz
+    targets = bench_chou_orlandi, bench_dummy, bench_naor_pinkas, bench_alsz
 }
 
 criterion_main!(ot);

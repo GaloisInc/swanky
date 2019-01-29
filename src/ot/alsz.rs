@@ -6,7 +6,7 @@ use rand::{Rng, SeedableRng};
 use std::io::{ErrorKind, Read, Write};
 use std::sync::{Arc, Mutex};
 
-pub struct AlszOT<S: Read + Write, OT: ObliviousTransfer<S>> {
+pub struct AlszOT<S: Read + Write + Send, OT: ObliviousTransfer<S>> {
     stream: Stream<S>,
     ot: OT,
     rng: ThreadRng,
@@ -15,7 +15,7 @@ pub struct AlszOT<S: Read + Write, OT: ObliviousTransfer<S>> {
 type Prng = StdRng;
 const SEED_LENGTH: usize = 32;
 
-impl<S: Read + Write, OT: ObliviousTransfer<S>> ObliviousTransfer<S> for AlszOT<S, OT> {
+impl<S: Read + Write + Send, OT: ObliviousTransfer<S>> ObliviousTransfer<S> for AlszOT<S, OT> {
     fn new(stream: Arc<Mutex<S>>) -> Self {
         let ot = OT::new(stream.clone());
         let stream = Stream::new(stream);
@@ -35,24 +35,24 @@ impl<S: Read + Write, OT: ObliviousTransfer<S>> ObliviousTransfer<S> for AlszOT<
             // Just do normal OT
             return self.ot.send(inputs);
         }
-        let cipher = super::cipher();
+        let cipher = super::cipher(&[0u8; 16]);
         let s = (0..128)
             .map(|_| self.rng.gen::<bool>())
             .collect::<Vec<bool>>();
+        let s_ = super::boolvec_to_u128(&s);
         let ks = self.ot.receive(&s, SEED_LENGTH)?;
         let mut qs = Vec::with_capacity(128);
-        for (s, k) in s.iter().zip(ks.iter()) {
+        for (b, k) in s.into_iter().zip(ks.into_iter()) {
             let u = self.stream.read_bytes(m / 8)?;
             let mut rng: Prng = SeedableRng::from_seed(*array_ref![k, 0, SEED_LENGTH]);
             let g = (0..m / 8).map(|_| rng.gen::<u8>()).collect::<Vec<u8>>();
-            let u = if *s { u } else { vec![0u8; m / 8] };
+            let u = if b { u } else { vec![0u8; m / 8] };
             qs.push(super::xor(&u, &g));
         }
         let qs_ = super::transpose(&qs, m / 8);
-        let s = super::boolvec_to_u128(&s);
         for (j, q) in qs_.into_iter().enumerate() {
             let y0 = super::hash(j, &q, &cipher) ^ super::u8vec_to_u128(&inputs[j].0);
-            let y1 = super::hash(j, &(q ^ s), &cipher) ^ super::u8vec_to_u128(&inputs[j].1);
+            let y1 = super::hash(j, &(q ^ s_), &cipher) ^ super::u8vec_to_u128(&inputs[j].1);
             self.stream.write_u128(&y0)?;
             self.stream.write_u128(&y1)?;
         }
@@ -71,7 +71,7 @@ impl<S: Read + Write, OT: ObliviousTransfer<S>> ObliviousTransfer<S> for AlszOT<
             // Just do normal OT
             return self.ot.receive(inputs, nbytes);
         }
-        let cipher = super::cipher();
+        let cipher = super::cipher(&[0u8; 16]);
         let r = inputs.iter().cloned().collect::<super::BV>();
         let ks = (0..128)
             .map(|_| {
@@ -83,20 +83,20 @@ impl<S: Read + Write, OT: ObliviousTransfer<S>> ObliviousTransfer<S> for AlszOT<
             .collect::<Vec<(Vec<u8>, Vec<u8>)>>();
         self.ot.send(&ks)?;
         let mut ts = Vec::with_capacity(128);
-        for (k0, k1) in ks.iter() {
+        let r_: Vec<u8> = r.clone().into();
+        for (k0, k1) in ks.into_iter() {
             let mut rng: Prng = SeedableRng::from_seed(*array_ref![k0, 0, SEED_LENGTH]);
             let t = (0..m / 8).map(|_| rng.gen::<u8>()).collect::<Vec<u8>>();
             let mut rng: Prng = SeedableRng::from_seed(*array_ref![k1, 0, SEED_LENGTH]);
             let g = (0..m / 8).map(|_| rng.gen::<u8>()).collect::<Vec<u8>>();
             let u = super::xor(&t, &g);
-            let r: Vec<u8> = r.clone().into();
-            let u = super::xor(&u, &r);
+            let u = super::xor(&u, &r_);
             self.stream.write_bytes(&u)?;
             ts.push(t);
         }
         let ts_ = super::transpose(&ts, m / 8);
         let mut out = Vec::with_capacity(m);
-        for ((j, b), t) in r.iter().enumerate().zip(ts_) {
+        for ((j, b), t) in r.into_iter().enumerate().zip(ts_) {
             let y0 = self.stream.read_u128()?;
             let y1 = self.stream.read_u128()?;
             let y = if b { y1 } else { y0 };
@@ -111,9 +111,8 @@ impl<S: Read + Write, OT: ObliviousTransfer<S>> ObliviousTransfer<S> for AlszOT<
 mod tests {
     extern crate test;
     use super::*;
-    use crate::ot::chou_orlandi::ChouOrlandiOT;
-    use crate::ot::dummy::DummyOT;
-    use crate::ot::naor_pinkas::NaorPinkasOT;
+    use crate::ChouOrlandiOT;
+    use crate::DummyOT;
     use std::os::unix::net::UnixStream;
     use std::sync::{Arc, Mutex};
 
@@ -163,10 +162,6 @@ mod tests {
     #[test]
     fn test_dummy() {
         test_ot::<DummyOT<UnixStream>>(N);
-    }
-    #[test]
-    fn test_naor_pinkas() {
-        test_ot::<NaorPinkasOT<UnixStream>>(N);
     }
     #[test]
     fn test_chou_orlandi() {

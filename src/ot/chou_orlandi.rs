@@ -7,16 +7,14 @@ use rand::rngs::ThreadRng;
 use std::io::{Read, Write};
 use std::sync::{Arc, Mutex};
 
-pub struct ChouOrlandiOT<T: Read + Write> {
+pub struct ChouOrlandiOT<T: Read + Write + Send> {
     stream: Stream<T>,
     rng: ThreadRng,
 }
 
 const P: RistrettoPoint = constants::RISTRETTO_BASEPOINT_POINT;
-const KEYSIZE: usize = 16;
-const IVSIZE: usize = 16;
 
-impl<T: Read + Write> ObliviousTransfer<T> for ChouOrlandiOT<T> {
+impl<T: Read + Write + Send> ObliviousTransfer<T> for ChouOrlandiOT<T> {
     fn new(stream: Arc<Mutex<T>>) -> Self {
         let stream = Stream::new(stream);
         let rng = rand::thread_rng();
@@ -27,52 +25,55 @@ impl<T: Read + Write> ObliviousTransfer<T> for ChouOrlandiOT<T> {
         let y = Scalar::random(&mut self.rng);
         let s = P * y;
         self.stream.write_pt(&s)?;
-        for input in inputs.iter() {
+        for input in inputs.into_iter() {
+            let nbytes = std::cmp::max(input.0.len(), input.1.len());
             let r = self.stream.read_pt()?;
-            let mut k0 = vec![0u8; KEYSIZE];
-            let mut k1 = vec![0u8; KEYSIZE];
-            super::hash_pt(&(r * y), &mut k0);
-            super::hash_pt(&((r - s) * y), &mut k1);
-            let iv0 = rand::random::<[u8; IVSIZE]>();
-            let mut c0 = input.0.clone();
-            super::encrypt(&k0, &iv0, &mut c0);
-            let iv1 = rand::random::<[u8; IVSIZE]>();
-            let mut c1 = input.1.clone();
-            super::encrypt(&k1, &iv1, &mut c1);
-            self.stream.write_bytes(&iv0)?;
+            let k0 = hash_pt(&(r * y), nbytes);
+            let k1 = hash_pt(&((r - s) * y), nbytes);
+            let c0 = encrypt(&k0, &input.0);
+            let c1 = encrypt(&k1, &input.1);
             self.stream.write_bytes(&c0)?;
-            self.stream.write_bytes(&iv1)?;
             self.stream.write_bytes(&c1)?;
         }
         Ok(())
     }
 
     fn receive(&mut self, inputs: &[bool], nbytes: usize) -> Result<Vec<Vec<u8>>, Error> {
-        let mut outputs = Vec::with_capacity(inputs.len());
         let s = self.stream.read_pt()?;
-        for input in inputs.iter() {
-            let x = Scalar::random(&mut self.rng);
-            let c = if *input {
-                Scalar::one()
-            } else {
-                Scalar::zero()
-            };
-            let r = c * s + x * P;
-            self.stream.write_pt(&r)?;
-            let mut k = vec![0u8; KEYSIZE];
-            super::hash_pt(&(x * s), &mut k);
-            let iv0 = self.stream.read_bytes(IVSIZE)?;
-            let c0 = self.stream.read_bytes(nbytes)?;
-            let iv1 = self.stream.read_bytes(IVSIZE)?;
-            let c1 = self.stream.read_bytes(nbytes)?;
-            let iv = if *input { &iv1 } else { &iv0 };
-            let m = if *input { &c1 } else { &c0 };
-            let mut m = m.clone();
-            super::decrypt(&k, &iv, &mut m);
-            outputs.push(m);
-        }
-        Ok(outputs)
+        inputs
+            .into_iter()
+            .map(|b| {
+                let x = Scalar::random(&mut self.rng);
+                let c = if *b { Scalar::one() } else { Scalar::zero() };
+                let r = c * s + x * P;
+                self.stream.write_pt(&r)?;
+                let k = hash_pt(&(x * s), nbytes);
+                let c0 = self.stream.read_bytes(nbytes)?;
+                let c1 = self.stream.read_bytes(nbytes)?;
+                let c = if *b { &c1 } else { &c0 };
+                let m = decrypt(&k, &c);
+                Ok(m)
+            })
+            .collect()
     }
+}
+
+#[inline(always)]
+fn encrypt(k: &[u8], m: &[u8]) -> Vec<u8> {
+    super::xor(k, m)
+}
+#[inline(always)]
+fn decrypt(k: &[u8], c: &[u8]) -> Vec<u8> {
+    super::xor(k, c)
+}
+
+#[inline(always)]
+fn hash_pt(pt: &RistrettoPoint, nbytes: usize) -> Vec<u8> {
+    let k = pt.compress();
+    let k = k.as_bytes();
+    let mut m = vec![0u8; nbytes];
+    super::encrypt(&k[0..16], &k[16..32], &mut m);
+    m
 }
 
 #[cfg(test)]

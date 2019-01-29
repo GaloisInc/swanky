@@ -8,16 +8,16 @@ autobenches = false
 [lib]
 
 [dependencies]
-aesni = "0.6.0"
-arrayref = "0.3"
+aesni = "*"
+arrayref = "*"
 bitvec = { git = "https://github.com/myrrlyn/bitvec" }
-failure = "0.1"
-itertools = "0.8"
-curve25519-dalek = "1"
-rand = "0.6"
+failure = "*"
+itertools = "*"
+curve25519-dalek = "*"
+rand = "*"
 
 [dev-dependencies]
-criterion = "0.2"
+criterion = "*"
 
 [profile.release]
 debug = true

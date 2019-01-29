@@ -1,3 +1,5 @@
 [build]
-rustflags = ["-C", "target-feature=+aes,+ssse3"]
+rustflags = ["-C", "target-feature=+aes,+ssse3",
+             "-C", "target-cpu=native",
+             "-C", "target-feature=+avx2"]
 rustdocflags = ["-C", "target-feature=+aes,+ssse3"]

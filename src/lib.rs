@@ -8,4 +8,5 @@ extern crate arrayref;
 #[macro_use]
 extern crate itertools;
 
-pub mod ot;
+mod ot;
+pub use crate::ot::*;
