@@ -1,6 +1,5 @@
 use super::{ObliviousTransfer, Stream};
-use curve25519_dalek::constants;
-use curve25519_dalek::ristretto::RistrettoPoint;
+use curve25519_dalek::constants::RISTRETTO_BASEPOINT_TABLE;
 use curve25519_dalek::scalar::Scalar;
 use failure::Error;
 use rand::rngs::ThreadRng;
@@ -12,8 +11,6 @@ pub struct ChouOrlandiOT<T: Read + Write + Send> {
     rng: ThreadRng,
 }
 
-const P: RistrettoPoint = constants::RISTRETTO_BASEPOINT_POINT;
-
 impl<T: Read + Write + Send> ObliviousTransfer<T> for ChouOrlandiOT<T> {
     fn new(stream: Arc<Mutex<T>>) -> Self {
         let stream = Stream::new(stream);
@@ -21,15 +18,19 @@ impl<T: Read + Write + Send> ObliviousTransfer<T> for ChouOrlandiOT<T> {
         Self { stream, rng }
     }
 
-    fn send(&mut self, inputs: &[(Vec<u8>, Vec<u8>)]) -> Result<(), Error> {
+    fn send(&mut self, inputs: &[(Vec<u8>, Vec<u8>)], nbytes: usize) -> Result<(), Error> {
+        let hash = if nbytes == 16 {
+            super::hash_pt_128
+        } else {
+            super::hash_pt
+        };
         let y = Scalar::random(&mut self.rng);
-        let s = P * y;
+        let s = &y * &RISTRETTO_BASEPOINT_TABLE;
         self.stream.write_pt(&s)?;
         for input in inputs.into_iter() {
-            let nbytes = std::cmp::max(input.0.len(), input.1.len());
             let r = self.stream.read_pt()?;
-            let k0 = hash_pt(&(r * y), nbytes);
-            let k1 = hash_pt(&((r - s) * y), nbytes);
+            let k0 = hash(&(&r * &y), nbytes);
+            let k1 = hash(&((&r - &s) * &y), nbytes);
             let c0 = encrypt(&k0, &input.0);
             let c1 = encrypt(&k1, &input.1);
             self.stream.write_bytes(&c0)?;
@@ -39,15 +40,20 @@ impl<T: Read + Write + Send> ObliviousTransfer<T> for ChouOrlandiOT<T> {
     }
 
     fn receive(&mut self, inputs: &[bool], nbytes: usize) -> Result<Vec<Vec<u8>>, Error> {
+        let hash = if nbytes == 16 {
+            super::hash_pt_128
+        } else {
+            super::hash_pt
+        };
         let s = self.stream.read_pt()?;
         inputs
             .into_iter()
             .map(|b| {
                 let x = Scalar::random(&mut self.rng);
                 let c = if *b { Scalar::one() } else { Scalar::zero() };
-                let r = c * s + x * P;
+                let r = &c * &s + &x * &RISTRETTO_BASEPOINT_TABLE;
                 self.stream.write_pt(&r)?;
-                let k = hash_pt(&(x * s), nbytes);
+                let k = hash(&(&x * &s), nbytes);
                 let c0 = self.stream.read_bytes(nbytes)?;
                 let c1 = self.stream.read_bytes(nbytes)?;
                 let c = if *b { &c1 } else { &c0 };
@@ -60,20 +66,11 @@ impl<T: Read + Write + Send> ObliviousTransfer<T> for ChouOrlandiOT<T> {
 
 #[inline(always)]
 fn encrypt(k: &[u8], m: &[u8]) -> Vec<u8> {
-    super::xor(k, m)
+    super::xor(&k, &m)
 }
 #[inline(always)]
 fn decrypt(k: &[u8], c: &[u8]) -> Vec<u8> {
-    super::xor(k, c)
-}
-
-#[inline(always)]
-fn hash_pt(pt: &RistrettoPoint, nbytes: usize) -> Vec<u8> {
-    let k = pt.compress();
-    let k = k.as_bytes();
-    let mut m = vec![0u8; nbytes];
-    super::encrypt(&k[0..16], &k[16..32], &mut m);
-    m
+    super::xor(&k, &c)
 }
 
 #[cfg(test)]
@@ -82,29 +79,26 @@ mod tests {
     use super::*;
     use std::os::unix::net::UnixStream;
 
-    const N: usize = 32;
+    const N: usize = 16;
 
     #[test]
     fn test() {
-        let m0 = (0..N).map(|_| rand::random::<u8>()).collect::<Vec<u8>>();
-        let m1 = (0..N).map(|_| rand::random::<u8>()).collect::<Vec<u8>>();
+        let m0 = rand::random::<[u8; N]>().to_vec();
+        let m1 = rand::random::<[u8; N]>().to_vec();
         let b = rand::random::<bool>();
         let m0_ = m0.clone();
         let m1_ = m1.clone();
         let (sender, receiver) = match UnixStream::pair() {
             Ok((s1, s2)) => (Arc::new(Mutex::new(s1)), Arc::new(Mutex::new(s2))),
-            Err(e) => {
-                eprintln!("Couldn't create pair of sockets: {:?}", e);
-                return;
-            }
+            Err(e) => panic!("Couldn't create pair of sockets: {:?}", e),
         };
-        let handler = std::thread::spawn(move || {
+        let handle = std::thread::spawn(move || {
             let mut ot = ChouOrlandiOT::new(sender);
-            ot.send(&[(m0, m1)]).unwrap();
+            ot.send(&[(m0, m1)], N).unwrap();
         });
         let mut ot = ChouOrlandiOT::new(receiver);
         let results = ot.receive(&[b], N).unwrap();
         assert_eq!(results[0], if b { m1_ } else { m0_ });
-        handler.join().unwrap();
+        handle.join().unwrap();
     }
 }

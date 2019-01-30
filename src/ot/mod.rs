@@ -23,7 +23,7 @@ use std::sync::{Arc, Mutex, MutexGuard};
 
 pub trait ObliviousTransfer<T: Read + Write + Send> {
     fn new(stream: Arc<Mutex<T>>) -> Self;
-    fn send(&mut self, values: &[(Vec<u8>, Vec<u8>)]) -> Result<(), Error>;
+    fn send(&mut self, values: &[(Vec<u8>, Vec<u8>)], nbytes: usize) -> Result<(), Error>;
     fn receive(&mut self, inputs: &[bool], nbytes: usize) -> Result<Vec<Vec<u8>>, Error>;
 }
 
@@ -95,6 +95,26 @@ impl<T: Read + Write + Send> Stream<T> {
 }
 
 #[inline(always)]
+fn hash_pt(pt: &RistrettoPoint, nbytes: usize) -> Vec<u8> {
+    let k = pt.compress();
+    let k = k.as_bytes();
+    let mut m = vec![0u8; nbytes];
+    encrypt(&k[0..16], &k[16..32], &mut m);
+    m
+}
+
+#[inline(always)]
+fn hash_pt_128(pt: &RistrettoPoint, _nbytes: usize) -> Vec<u8> {
+    let k = pt.compress();
+    let k = k.as_bytes();
+    let c = cipher(array_ref![k, 0, 16]);
+    let m = vec![0u8; 16];
+    let mut m = GenericArray::clone_from_slice(&m);
+    c.encrypt_block(&mut m);
+    m.to_vec()
+}
+
+#[inline(always)]
 fn xor(a: &[u8], b: &[u8]) -> Vec<u8> {
     assert_eq!(
         a.len(),
@@ -117,25 +137,61 @@ fn encrypt(k: &[u8], iv: &[u8], mut m: &mut [u8]) {
     let mut cipher = Cipher::new_var(k, iv).unwrap();
     cipher.encrypt(&mut m)
 }
-
 #[inline(always)]
-fn transpose(m: &[Vec<u8>], ℓ: usize) -> Vec<u128> {
-    (0..ℓ)
-        .map(|i| {
-            let bv = m
-                .iter()
-                .map(|v| BV::from(v.clone()))
-                .map(|v: BV| v.get(i).unwrap())
-                .collect::<BV>();
-            let v: Vec<u8> = bv.into();
-            u8vec_to_u128(&v)
-        })
-        .collect()
+fn transpose(m: &[Vec<u8>], ncols: usize) -> Vec<Vec<u8>> {
+    // (0..ncols)
+    //     .map(|i| {
+    //         let c = m
+    //             .into_iter()
+    //             .map(|r| BV::from(r.clone()))
+    //             .map(|r: BV| r.get(i).unwrap())
+    //             .collect::<BV>();
+    //         let c: Vec<u8> = c.into();
+    //         c
+    //     })
+    //     .collect()
+    let nrows = m.len();
+    let m: Vec<u8> = m.to_vec().into_iter().flatten().collect::<Vec<u8>>();
+    let mut m_ = vec![0u8; nrows * ncols / 8];
+    unsafe {
+        sse_trans(
+            m_.as_ptr() as *mut u8,
+            m.as_ptr(),
+            nrows as u64,
+            ncols as u64,
+        )
+    };
+    let mut out = Vec::with_capacity(ncols);
+    for _ in 0..(ncols) {
+        let r = m_.drain(0..nrows / 8).collect();
+        out.push(r);
+    }
+    out
+}
+#[inline(always)]
+fn _transpose(m: &[u8], ncols: usize) -> Vec<u8> {
+    let nrows = m.len();
+    let m_ = vec![0u8; nrows * ncols / 8];
+    unsafe {
+        sse_trans(
+            m_.as_ptr() as *mut u8,
+            m.as_ptr(),
+            nrows as u64,
+            ncols as u64,
+        )
+    };
+    m_
+    // let mut out = Vec::with_capacity(ncols);
+    // for _ in 0..(ncols) {
+    //     let r = m_.drain(0..nrows / 8).collect();
+    //     out.push(r);
+    // }
+    // out
 }
 
 #[inline(always)]
-fn cipher(iv: &[u8; 16]) -> Aes128 {
-    let k = GenericArray::from_slice(iv);
+fn cipher(k: &[u8; 16]) -> Aes128 {
+    let k = GenericArray::from_slice(k);
     Aes128::new(&k)
 }
 
@@ -157,4 +213,51 @@ fn boolvec_to_u128(v: &[bool]) -> u128 {
 fn u8vec_to_u128(v: &[u8]) -> u128 {
     let v = array_ref![v, 0, 16];
     u128::from_ne_bytes(*v)
+}
+
+#[link(name = "transpose")]
+extern "C" {
+    fn sse_trans(out: *mut u8, inp: *const u8, nrows: u64, ncols: u64);
+}
+
+#[cfg(test)]
+mod tests {
+    extern crate test;
+
+    #[test]
+    fn test_transpose() {
+        let nrows = 16;
+        let ncols = 16;
+        let mut m = Vec::with_capacity(nrows);
+        for _ in 0..nrows {
+            let row = (0..ncols)
+                .map(|_| rand::random::<u8>())
+                .collect::<Vec<u8>>();
+            m.push(row);
+        }
+        for r in m.iter() {
+            for c in r.iter() {
+                print!("{:08b} ", c);
+            }
+            println!();
+        }
+        println!();
+        let m_ = super::transpose(&m, ncols * 8);
+        for r in m_.iter() {
+            for c in r.iter() {
+                print!("{:08b} ", c);
+            }
+            println!();
+        }
+        println!();
+        let m__ = super::transpose(&m_, nrows);
+        for r in m__.iter() {
+            for c in r.iter() {
+                print!("{:08b} ", c);
+            }
+            println!();
+        }
+        println!();
+        assert_eq!(m, m__);
+    }
 }

@@ -20,7 +20,7 @@ impl<S: Read + Write + Send, OT: ObliviousTransfer<S>> ObliviousTransfer<S> for 
         Self { stream, ot, rng }
     }
 
-    fn send(&mut self, inputs: &[(Vec<u8>, Vec<u8>)]) -> Result<(), Error> {
+    fn send(&mut self, inputs: &[(Vec<u8>, Vec<u8>)], nbytes: usize) -> Result<(), Error> {
         let m = inputs.len();
         if m % 8 != 0 {
             return Err(Error::from(std::io::Error::new(
@@ -30,16 +30,17 @@ impl<S: Read + Write + Send, OT: ObliviousTransfer<S>> ObliviousTransfer<S> for 
         }
         if m <= 128 {
             // Just do normal OT
-            return self.ot.send(inputs);
+            return self.ot.send(inputs, nbytes);
         }
         let cipher = super::cipher(&[0u8; 16]);
         let s = (0..128)
             .map(|_| self.rng.gen::<bool>())
             .collect::<Vec<bool>>();
         let qs = self.ot.receive(&s, m / 8)?;
-        let qs = super::transpose(&qs, m / 8);
+        let qs = super::transpose(&qs, m);
         let s = super::boolvec_to_u128(&s);
         for (j, q) in qs.into_iter().enumerate() {
+            let q = super::u8vec_to_u128(&q);
             let y0 = super::hash(j, &q, &cipher) ^ super::u8vec_to_u128(&inputs[j].0);
             let y1 = super::hash(j, &(q ^ s), &cipher) ^ super::u8vec_to_u128(&inputs[j].1);
             self.stream.write_u128(&y0)?;
@@ -71,11 +72,12 @@ impl<S: Read + Write + Send, OT: ObliviousTransfer<S>> ObliviousTransfer<S> for 
             .map(|t| (t.clone(), t.clone() ^ r.clone()))
             .map(|(a, b)| (a.into(), b.into()))
             .collect::<Vec<(Vec<u8>, Vec<u8>)>>();
-        self.ot.send(&ts)?;
+        self.ot.send(&ts, m / 8)?;
         let ts = ts.into_iter().map(|(t, _)| t).collect::<Vec<Vec<u8>>>();
-        let ts = super::transpose(&ts, m / 8);
+        let ts = super::transpose(&ts, m);
         let mut out = Vec::with_capacity(m);
         for ((j, b), t) in inputs.iter().enumerate().zip(ts) {
+            let t = super::u8vec_to_u128(&t);
             let y0 = self.stream.read_u128()?;
             let y1 = self.stream.read_u128()?;
             let y = if *b { y1 } else { y0 };
@@ -91,11 +93,10 @@ mod tests {
     extern crate test;
     use super::*;
     use crate::ChouOrlandiOT;
-    use crate::DummyOT;
     use std::os::unix::net::UnixStream;
     use std::sync::{Arc, Mutex};
 
-    const N: usize = 256;
+    const N: usize = 1 << 8;
 
     fn rand_u128_vec(size: usize) -> Vec<u128> {
         (0..size).map(|_| rand::random::<u128>()).collect()
@@ -126,7 +127,7 @@ mod tests {
                 .zip(m1s.into_iter())
                 .map(|(a, b)| (a.to_le_bytes().to_vec(), b.to_le_bytes().to_vec()))
                 .collect::<Vec<(Vec<u8>, Vec<u8>)>>();
-            otext.send(&ms).unwrap();
+            otext.send(&ms, 16).unwrap();
         });
         let mut otext = IknpOT::<UnixStream, OT>::new(receiver.clone());
         let results = otext.receive(&bs, 16).unwrap();
@@ -138,10 +139,10 @@ mod tests {
         }
     }
 
-    #[test]
-    fn test_dummy() {
-        test_ot::<DummyOT<UnixStream>>(N);
-    }
+    // #[test]
+    // fn test_dummy() {
+    //     test_ot::<DummyOT<UnixStream>>(N);
+    // }
     #[test]
     fn test_chou_orlandi() {
         test_ot::<ChouOrlandiOT<UnixStream>>(N);

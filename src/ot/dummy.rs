@@ -13,7 +13,7 @@ impl<T: Read + Write + Send> ObliviousTransfer<T> for DummyOT<T> {
         Self { stream }
     }
 
-    fn send(&mut self, inputs: &[(Vec<u8>, Vec<u8>)]) -> Result<(), Error> {
+    fn send(&mut self, inputs: &[(Vec<u8>, Vec<u8>)], _nbytes: usize) -> Result<(), Error> {
         for input in inputs.into_iter() {
             let b = self.stream.read_bool()?;
             let m = if b { &input.1 } else { &input.0 };
@@ -39,7 +39,7 @@ mod tests {
     use super::*;
     use std::os::unix::net::UnixStream;
 
-    const N: usize = 8;
+    const N: usize = 16;
 
     #[test]
     fn test() {
@@ -54,11 +54,11 @@ mod tests {
         };
         let handle = std::thread::spawn(|| {
             let mut ot = DummyOT::new(sender);
-            ot.send(&[(m0, m1)]).unwrap();
+            ot.send(&[(m0, m1)], N).unwrap();
         });
         let mut ot = DummyOT::new(receiver);
         let result = ot.receive(&[b], N).unwrap();
         assert_eq!(result[0], if b { m1_ } else { m0_ });
-        let _ = handle.join();
+        handle.join().unwrap();
     }
 }

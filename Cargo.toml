@@ -2,6 +2,7 @@
 name = "ocelot"
 version = "0.1.0"
 authors = ["Alex J. Malozemoff <amaloz@galois.com>"]
+build = "build.rs"
 edition = "2018"
 autobenches = false
 
@@ -11,15 +12,23 @@ autobenches = false
 aesni = "*"
 arrayref = "*"
 bitvec = { git = "https://github.com/myrrlyn/bitvec" }
+curve25519-dalek = { version = "*", features = ["std", "avx2_backend"] }
 failure = "*"
 itertools = "*"
-curve25519-dalek = "*"
-rand = "*"
+libc = "*"
+rand = { version = "*", features = ["nightly"] }
+rand_chacha = "*"
+
+[build-dependencies]
+cc = "*"
 
 [dev-dependencies]
 criterion = "*"
 
 [profile.release]
+debug = true
+
+[profile.bench]
 debug = true
 
 [[bench]]

@@ -1,8 +1,9 @@
 use super::Stream;
 use crate::ot::ObliviousTransfer;
 use failure::Error;
-use rand::rngs::{StdRng, ThreadRng};
+use rand::rngs::ThreadRng;
 use rand::{Rng, SeedableRng};
+use rand_chacha::ChaChaRng;
 use std::io::{ErrorKind, Read, Write};
 use std::sync::{Arc, Mutex};
 
@@ -12,7 +13,7 @@ pub struct AlszOT<S: Read + Write + Send, OT: ObliviousTransfer<S>> {
     rng: ThreadRng,
 }
 
-type Prng = StdRng;
+type Prng = ChaChaRng;
 const SEED_LENGTH: usize = 32;
 
 impl<S: Read + Write + Send, OT: ObliviousTransfer<S>> ObliviousTransfer<S> for AlszOT<S, OT> {
@@ -23,7 +24,13 @@ impl<S: Read + Write + Send, OT: ObliviousTransfer<S>> ObliviousTransfer<S> for 
         Self { stream, ot, rng }
     }
 
-    fn send(&mut self, inputs: &[(Vec<u8>, Vec<u8>)]) -> Result<(), Error> {
+    fn send(&mut self, inputs: &[(Vec<u8>, Vec<u8>)], nbytes: usize) -> Result<(), Error> {
+        if nbytes != 16 {
+            return Err(Error::from(std::io::Error::new(
+                ErrorKind::InvalidInput,
+                "ALSZ OT only supports 128-bit inputs",
+            )));
+        }
         let m = inputs.len();
         if m % 8 != 0 {
             return Err(Error::from(std::io::Error::new(
@@ -33,7 +40,7 @@ impl<S: Read + Write + Send, OT: ObliviousTransfer<S>> ObliviousTransfer<S> for 
         }
         if m <= 128 {
             // Just do normal OT
-            return self.ot.send(inputs);
+            return self.ot.send(inputs, nbytes);
         }
         let cipher = super::cipher(&[0u8; 16]);
         let s = (0..128)
@@ -49,8 +56,9 @@ impl<S: Read + Write + Send, OT: ObliviousTransfer<S>> ObliviousTransfer<S> for 
             let u = if b { u } else { vec![0u8; m / 8] };
             qs.push(super::xor(&u, &g));
         }
-        let qs_ = super::transpose(&qs, m / 8);
+        let qs_ = super::transpose(&qs, m);
         for (j, q) in qs_.into_iter().enumerate() {
+            let q = super::u8vec_to_u128(&q);
             let y0 = super::hash(j, &q, &cipher) ^ super::u8vec_to_u128(&inputs[j].0);
             let y1 = super::hash(j, &(q ^ s_), &cipher) ^ super::u8vec_to_u128(&inputs[j].1);
             self.stream.write_u128(&y0)?;
@@ -63,7 +71,7 @@ impl<S: Read + Write + Send, OT: ObliviousTransfer<S>> ObliviousTransfer<S> for 
         if nbytes != 16 {
             return Err(Error::from(std::io::Error::new(
                 ErrorKind::InvalidInput,
-                "Currently only supports 128-bit inputs",
+                "ALSZ OT only supports 128-bit inputs",
             )));
         }
         let m = inputs.len();
@@ -76,12 +84,12 @@ impl<S: Read + Write + Send, OT: ObliviousTransfer<S>> ObliviousTransfer<S> for 
         let ks = (0..128)
             .map(|_| {
                 (
-                    rand::random::<[u8; SEED_LENGTH]>().to_vec(),
-                    rand::random::<[u8; SEED_LENGTH]>().to_vec(),
+                    self.rng.gen::<[u8; SEED_LENGTH]>().to_vec(),
+                    self.rng.gen::<[u8; SEED_LENGTH]>().to_vec(),
                 )
             })
             .collect::<Vec<(Vec<u8>, Vec<u8>)>>();
-        self.ot.send(&ks)?;
+        self.ot.send(&ks, SEED_LENGTH)?;
         let mut ts = Vec::with_capacity(128);
         let r_: Vec<u8> = r.clone().into();
         for (k0, k1) in ks.into_iter() {
@@ -94,9 +102,10 @@ impl<S: Read + Write + Send, OT: ObliviousTransfer<S>> ObliviousTransfer<S> for 
             self.stream.write_bytes(&u)?;
             ts.push(t);
         }
-        let ts_ = super::transpose(&ts, m / 8);
+        let ts_ = super::transpose(&ts, m);
         let mut out = Vec::with_capacity(m);
         for ((j, b), t) in r.into_iter().enumerate().zip(ts_) {
+            let t = super::u8vec_to_u128(&t);
             let y0 = self.stream.read_u128()?;
             let y1 = self.stream.read_u128()?;
             let y = if b { y1 } else { y0 };
@@ -112,11 +121,10 @@ mod tests {
     extern crate test;
     use super::*;
     use crate::ChouOrlandiOT;
-    use crate::DummyOT;
     use std::os::unix::net::UnixStream;
     use std::sync::{Arc, Mutex};
 
-    const N: usize = 1024;
+    const T: usize = 1 << 8;
 
     fn rand_u128_vec(size: usize) -> Vec<u128> {
         (0..size).map(|_| rand::random::<u128>()).collect()
@@ -126,28 +134,25 @@ mod tests {
         (0..size).map(|_| rand::random::<bool>()).collect()
     }
 
-    fn test_ot<OT: ObliviousTransfer<UnixStream>>(n: usize) {
-        let m0s = rand_u128_vec(n);
-        let m1s = rand_u128_vec(n);
-        let bs = rand_bool_vec(n);
+    fn test_ot<OT: ObliviousTransfer<UnixStream>>(t: usize) {
+        let m0s = rand_u128_vec(t);
+        let m1s = rand_u128_vec(t);
+        let bs = rand_bool_vec(t);
         let m0s_ = m0s.clone();
         let m1s_ = m1s.clone();
         let bs_ = bs.clone();
         let (sender, receiver) = match UnixStream::pair() {
             Ok((s1, s2)) => (Arc::new(Mutex::new(s1)), Arc::new(Mutex::new(s2))),
-            Err(e) => {
-                eprintln!("Couldn't create pair of sockets: {:?}", e);
-                return;
-            }
+            Err(e) => panic!("Couldn't create pair of sockets: {:?}", e),
         };
-        std::thread::spawn(move || {
+        let handle = std::thread::spawn(move || {
             let mut otext = AlszOT::<UnixStream, OT>::new(sender.clone());
             let ms = m0s
                 .into_iter()
                 .zip(m1s.into_iter())
                 .map(|(a, b)| (a.to_le_bytes().to_vec(), b.to_le_bytes().to_vec()))
                 .collect::<Vec<(Vec<u8>, Vec<u8>)>>();
-            otext.send(&ms).unwrap();
+            otext.send(&ms, 16).unwrap();
         });
         let mut otext = AlszOT::<UnixStream, OT>::new(receiver.clone());
         let results = otext.receive(&bs, 16).unwrap();
@@ -157,14 +162,11 @@ mod tests {
                 if b { m1 } else { m0 }
             )
         }
+        handle.join().unwrap();
     }
 
     #[test]
-    fn test_dummy() {
-        test_ot::<DummyOT<UnixStream>>(N);
-    }
-    #[test]
     fn test_chou_orlandi() {
-        test_ot::<ChouOrlandiOT<UnixStream>>(N);
+        test_ot::<ChouOrlandiOT<UnixStream>>(T);
     }
 }
