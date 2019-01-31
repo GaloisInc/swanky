@@ -32,19 +32,22 @@ impl<S: Read + Write + Send, OT: ObliviousTransfer<S>> ObliviousTransfer<S> for 
             // Just do normal OT
             return self.ot.send(inputs, nbytes);
         }
+        let (nrows, ncols) = (128, m);
         let cipher = super::cipher(&[0u8; 16]);
         let s = (0..128)
             .map(|_| self.rng.gen::<bool>())
             .collect::<Vec<bool>>();
-        let qs = self.ot.receive(&s, m / 8)?;
-        let qs = super::transpose(&qs, m);
-        let s = super::boolvec_to_u128(&s);
-        for (j, q) in qs.into_iter().enumerate() {
-            let q = super::u8vec_to_u128(&q);
-            let y0 = super::hash(j, &q, &cipher) ^ super::u8vec_to_u128(&inputs[j].0);
-            let y1 = super::hash(j, &(q ^ s), &cipher) ^ super::u8vec_to_u128(&inputs[j].1);
-            self.stream.write_u128(&y0)?;
-            self.stream.write_u128(&y1)?;
+        let qs = self.ot.receive(&s, ncols / 8)?;
+        let qs = qs.into_iter().flatten().collect::<Vec<u8>>();
+        let qs = super::transpose(&qs, nrows, ncols);
+        let s = super::boolvec_to_u8vec(&s);
+        for j in 0..ncols {
+            let range = j * nrows / 8..(j + 1) * nrows / 8;
+            let q = qs.get(range).unwrap();
+            let y0 = super::xor(&super::hash(j, &q, &cipher), &inputs[j].0);
+            let y1 = super::xor(&super::hash(j, &super::xor(&q, &s), &cipher), &inputs[j].1);
+            self.stream.write_bytes(&y0)?;
+            self.stream.write_bytes(&y1)?;
         }
         Ok(())
     }
@@ -61,28 +64,30 @@ impl<S: Read + Write + Send, OT: ObliviousTransfer<S>> ObliviousTransfer<S> for 
             // Just do normal OT
             return self.ot.receive(inputs, nbytes);
         }
+        let (nrows, ncols) = (128, m);
         let cipher = super::cipher(&[0u8; 16]);
-        let r = inputs.iter().cloned().collect::<super::BV>();
+        let r = super::boolvec_to_u8vec(inputs);
         let ts = (0..128)
             .map(|_| {
-                (0..m)
+                let bv = (0..m)
                     .map(|_| self.rng.gen::<bool>())
-                    .collect::<super::BV>()
+                    .collect::<Vec<bool>>();
+                super::boolvec_to_u8vec(&bv)
             })
-            .map(|t| (t.clone(), t.clone() ^ r.clone()))
-            .map(|(a, b)| (a.into(), b.into()))
+            .map(|t| (t.clone(), super::xor(&t, &r)))
             .collect::<Vec<(Vec<u8>, Vec<u8>)>>();
         self.ot.send(&ts, m / 8)?;
-        let ts = ts.into_iter().map(|(t, _)| t).collect::<Vec<Vec<u8>>>();
-        let ts = super::transpose(&ts, m);
+        let ts = ts.into_iter().flat_map(|(t, _)| t).collect::<Vec<u8>>();
+        let ts = super::transpose(&ts, nrows, ncols);
         let mut out = Vec::with_capacity(m);
-        for ((j, b), t) in inputs.iter().enumerate().zip(ts) {
-            let t = super::u8vec_to_u128(&t);
-            let y0 = self.stream.read_u128()?;
-            let y1 = self.stream.read_u128()?;
+        for (j, b) in inputs.iter().enumerate() {
+            let range = j * nrows / 8..(j + 1) * nrows / 8;
+            let t = ts.get(range).unwrap();
+            let y0 = self.stream.read_bytes(16)?;
+            let y1 = self.stream.read_bytes(16)?;
             let y = if *b { y1 } else { y0 };
-            let r = y ^ super::hash(j, &t, &cipher);
-            out.push(r.to_le_bytes().to_vec());
+            let r = super::xor(&y, &super::hash(j, &t, &cipher));
+            out.push(r);
         }
         Ok(out)
     }
@@ -92,11 +97,11 @@ impl<S: Read + Write + Send, OT: ObliviousTransfer<S>> ObliviousTransfer<S> for 
 mod tests {
     extern crate test;
     use super::*;
-    use crate::ChouOrlandiOT;
+    use crate::*;
     use std::os::unix::net::UnixStream;
     use std::sync::{Arc, Mutex};
 
-    const N: usize = 1 << 8;
+    const N: usize = 1 << 12;
 
     fn rand_u128_vec(size: usize) -> Vec<u128> {
         (0..size).map(|_| rand::random::<u128>()).collect()
@@ -139,12 +144,8 @@ mod tests {
         }
     }
 
-    // #[test]
-    // fn test_dummy() {
-    //     test_ot::<DummyOT<UnixStream>>(N);
-    // }
     #[test]
-    fn test_chou_orlandi() {
-        test_ot::<ChouOrlandiOT<UnixStream>>(N);
+    fn test() {
+        test_ot::<DummyOT<UnixStream>>(N);
     }
 }

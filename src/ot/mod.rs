@@ -10,11 +10,9 @@ pub use dummy::DummyOT;
 pub use iknp::IknpOT;
 pub use naor_pinkas::NaorPinkasOT;
 
-use aesni::block_cipher_trait::BlockCipher;
-use aesni::stream_cipher::generic_array::GenericArray;
+use crate::aes::{Aes128, AES};
 use aesni::stream_cipher::{NewStreamCipher, StreamCipher};
-use aesni::{Aes128, Aes128Ctr};
-use bitvec::{BitVec, LittleEndian};
+use aesni::Aes128Ctr;
 use curve25519_dalek::ristretto::{CompressedRistretto, RistrettoPoint};
 use failure::Error;
 use std::io::Error as IOError;
@@ -80,18 +78,6 @@ impl<T: Read + Write + Send> Stream<T> {
         self.stream().read_exact(&mut v)?;
         Ok(v)
     }
-    #[inline(always)]
-    fn write_u128(&mut self, data: &u128) -> Result<usize, Error> {
-        self.stream()
-            .write(&data.to_le_bytes())
-            .map_err(Error::from)
-    }
-    #[inline(always)]
-    fn read_u128(&mut self) -> Result<u128, Error> {
-        let mut data = [0; 16];
-        self.stream().read_exact(&mut data)?;
-        Ok(u128::from_ne_bytes(data))
-    }
 }
 
 #[inline(always)]
@@ -108,21 +94,20 @@ fn hash_pt_128(pt: &RistrettoPoint, _nbytes: usize) -> Vec<u8> {
     let k = pt.compress();
     let k = k.as_bytes();
     let c = cipher(array_ref![k, 0, 16]);
-    let m = vec![0u8; 16];
-    let mut m = GenericArray::clone_from_slice(&m);
-    c.encrypt_block(&mut m);
+    let m = [0u8; 16];
+    let m = c.encrypt_u8(&m);
     m.to_vec()
 }
 
 #[inline(always)]
 fn xor(a: &[u8], b: &[u8]) -> Vec<u8> {
-    assert_eq!(
-        a.len(),
-        b.len(),
-        "xor lengths not equal: {} ≠ {}",
-        a.len(),
-        b.len()
-    );
+    // assert_eq!(
+    //     a.len(),
+    //     b.len(),
+    //     "xor lengths not equal: {} ≠ {}",
+    //     a.len(),
+    //     b.len()
+    // );
     a.into_iter()
         .zip(b.into_iter())
         .map(|(a, b)| a ^ b)
@@ -130,7 +115,6 @@ fn xor(a: &[u8], b: &[u8]) -> Vec<u8> {
 }
 
 type Cipher = Aes128Ctr;
-type BV = BitVec<LittleEndian>;
 
 #[inline(always)]
 fn encrypt(k: &[u8], iv: &[u8], mut m: &mut [u8]) {
@@ -138,39 +122,7 @@ fn encrypt(k: &[u8], iv: &[u8], mut m: &mut [u8]) {
     cipher.encrypt(&mut m)
 }
 #[inline(always)]
-fn transpose(m: &[Vec<u8>], ncols: usize) -> Vec<Vec<u8>> {
-    // (0..ncols)
-    //     .map(|i| {
-    //         let c = m
-    //             .into_iter()
-    //             .map(|r| BV::from(r.clone()))
-    //             .map(|r: BV| r.get(i).unwrap())
-    //             .collect::<BV>();
-    //         let c: Vec<u8> = c.into();
-    //         c
-    //     })
-    //     .collect()
-    let nrows = m.len();
-    let m: Vec<u8> = m.to_vec().into_iter().flatten().collect::<Vec<u8>>();
-    let mut m_ = vec![0u8; nrows * ncols / 8];
-    unsafe {
-        sse_trans(
-            m_.as_ptr() as *mut u8,
-            m.as_ptr(),
-            nrows as u64,
-            ncols as u64,
-        )
-    };
-    let mut out = Vec::with_capacity(ncols);
-    for _ in 0..(ncols) {
-        let r = m_.drain(0..nrows / 8).collect();
-        out.push(r);
-    }
-    out
-}
-#[inline(always)]
-fn _transpose(m: &[u8], ncols: usize) -> Vec<u8> {
-    let nrows = m.len();
+fn transpose(m: &[u8], nrows: usize, ncols: usize) -> Vec<u8> {
     let m_ = vec![0u8; nrows * ncols / 8];
     unsafe {
         sse_trans(
@@ -181,83 +133,30 @@ fn _transpose(m: &[u8], ncols: usize) -> Vec<u8> {
         )
     };
     m_
-    // let mut out = Vec::with_capacity(ncols);
-    // for _ in 0..(ncols) {
-    //     let r = m_.drain(0..nrows / 8).collect();
-    //     out.push(r);
-    // }
-    // out
 }
 
 #[inline(always)]
-fn cipher(k: &[u8; 16]) -> Aes128 {
-    let k = GenericArray::from_slice(k);
-    Aes128::new(&k)
+fn cipher(_k: &[u8; 16]) -> Aes128 {
+    AES
 }
 
 #[inline(always)]
-fn hash(_i: usize, x: &u128, cipher: &Aes128) -> u128 {
+fn hash(_i: usize, x: &[u8], cipher: &Aes128) -> Vec<u8> {
     // XXX: Note that this is only secure in the semi-honest setting!
-    let mut c = GenericArray::clone_from_slice(&x.to_le_bytes());
-    cipher.encrypt_block(&mut c);
-    let c = u8vec_to_u128(&c);
-    c ^ x
+    let y = cipher.encrypt_u8(array_ref![x, 0, 16]);
+    let r = xor(&x, &y);
+    r
 }
 #[inline(always)]
-fn boolvec_to_u128(v: &[bool]) -> u128 {
-    v.into_iter().enumerate().fold(0u128, |acc, (i, b)| {
-        acc | (*b as u128).wrapping_shl(i as u32)
-    })
-}
-#[inline(always)]
-fn u8vec_to_u128(v: &[u8]) -> u128 {
-    let v = array_ref![v, 0, 16];
-    u128::from_ne_bytes(*v)
+fn boolvec_to_u8vec(bv: &[bool]) -> Vec<u8> {
+    let mut v = vec![0u8; bv.len() / 8];
+    for (i, b) in bv.into_iter().enumerate() {
+        v[i / 8] |= (*b as u8) << (i % 8);
+    }
+    v
 }
 
 #[link(name = "transpose")]
 extern "C" {
     fn sse_trans(out: *mut u8, inp: *const u8, nrows: u64, ncols: u64);
-}
-
-#[cfg(test)]
-mod tests {
-    extern crate test;
-
-    #[test]
-    fn test_transpose() {
-        let nrows = 16;
-        let ncols = 16;
-        let mut m = Vec::with_capacity(nrows);
-        for _ in 0..nrows {
-            let row = (0..ncols)
-                .map(|_| rand::random::<u8>())
-                .collect::<Vec<u8>>();
-            m.push(row);
-        }
-        for r in m.iter() {
-            for c in r.iter() {
-                print!("{:08b} ", c);
-            }
-            println!();
-        }
-        println!();
-        let m_ = super::transpose(&m, ncols * 8);
-        for r in m_.iter() {
-            for c in r.iter() {
-                print!("{:08b} ", c);
-            }
-            println!();
-        }
-        println!();
-        let m__ = super::transpose(&m_, nrows);
-        for r in m__.iter() {
-            for c in r.iter() {
-                print!("{:08b} ", c);
-            }
-            println!();
-        }
-        println!();
-        assert_eq!(m, m__);
-    }
 }

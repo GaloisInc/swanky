@@ -11,7 +11,6 @@ autobenches = false
 [dependencies]
 aesni = "*"
 arrayref = "*"
-bitvec = { git = "https://github.com/myrrlyn/bitvec" }
 curve25519-dalek = { version = "*", features = ["std", "avx2_backend"] }
 failure = "*"
 itertools = "*"

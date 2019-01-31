@@ -2,11 +2,12 @@
 #![feature(test)]
 #![feature(reverse_bits)]
 
-extern crate aesni as aes;
 #[macro_use]
 extern crate arrayref;
 #[macro_use]
 extern crate itertools;
 
+mod aes;
 mod ot;
+mod rand_aes;
 pub use crate::ot::*;

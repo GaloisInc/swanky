@@ -1,9 +1,9 @@
 use super::Stream;
-use crate::ot::ObliviousTransfer;
+use crate::rand_aes::AesRng;
+use crate::ObliviousTransfer;
 use failure::Error;
 use rand::rngs::ThreadRng;
-use rand::{Rng, SeedableRng};
-use rand_chacha::ChaChaRng;
+use rand::Rng;
 use std::io::{ErrorKind, Read, Write};
 use std::sync::{Arc, Mutex};
 
@@ -13,8 +13,7 @@ pub struct AlszOT<S: Read + Write + Send, OT: ObliviousTransfer<S>> {
     rng: ThreadRng,
 }
 
-type Prng = ChaChaRng;
-const SEED_LENGTH: usize = 32;
+const SEED_LENGTH: usize = 16;
 
 impl<S: Read + Write + Send, OT: ObliviousTransfer<S>> ObliviousTransfer<S> for AlszOT<S, OT> {
     fn new(stream: Arc<Mutex<S>>) -> Self {
@@ -42,27 +41,30 @@ impl<S: Read + Write + Send, OT: ObliviousTransfer<S>> ObliviousTransfer<S> for 
             // Just do normal OT
             return self.ot.send(inputs, nbytes);
         }
-        let cipher = super::cipher(&[0u8; 16]);
-        let s = (0..128)
+        let (nrows, ncols) = (128, m);
+        let cipher = super::cipher(&[0u8; 16]); // XXX IV should be chosen at random
+        let s = (0..nrows)
             .map(|_| self.rng.gen::<bool>())
             .collect::<Vec<bool>>();
-        let s_ = super::boolvec_to_u128(&s);
+        let s_ = super::boolvec_to_u8vec(&s);
         let ks = self.ot.receive(&s, SEED_LENGTH)?;
-        let mut qs = Vec::with_capacity(128);
-        for (b, k) in s.into_iter().zip(ks.into_iter()) {
-            let u = self.stream.read_bytes(m / 8)?;
-            let mut rng: Prng = SeedableRng::from_seed(*array_ref![k, 0, SEED_LENGTH]);
-            let g = (0..m / 8).map(|_| rng.gen::<u8>()).collect::<Vec<u8>>();
-            let u = if b { u } else { vec![0u8; m / 8] };
-            qs.push(super::xor(&u, &g));
+        let mut qs = vec![0u8; nrows * ncols / 8];
+        for (j, (b, k)) in s.into_iter().zip(ks.into_iter()).enumerate() {
+            let range = j * ncols / 8..(j + 1) * ncols / 8;
+            let u = self.stream.read_bytes(ncols / 8)?;
+            let u = if b { u } else { vec![0u8; ncols / 8] };
+            let rng = AesRng::new(*array_ref![k, 0, SEED_LENGTH]);
+            let g = rng.random(ncols / 8);
+            qs[range].clone_from_slice(&super::xor(&u, &g));
         }
-        let qs_ = super::transpose(&qs, m);
-        for (j, q) in qs_.into_iter().enumerate() {
-            let q = super::u8vec_to_u128(&q);
-            let y0 = super::hash(j, &q, &cipher) ^ super::u8vec_to_u128(&inputs[j].0);
-            let y1 = super::hash(j, &(q ^ s_), &cipher) ^ super::u8vec_to_u128(&inputs[j].1);
-            self.stream.write_u128(&y0)?;
-            self.stream.write_u128(&y1)?;
+        let qs = super::transpose(&qs, nrows, ncols);
+        for j in 0..ncols {
+            let range = j * nrows / 8..(j + 1) * nrows / 8;
+            let q = qs.get(range).unwrap();
+            let y0 = super::xor(&super::hash(j, &q, &cipher), &inputs[j].0);
+            let y1 = super::xor(&super::hash(j, &super::xor(&q, &s_), &cipher), &inputs[j].1);
+            self.stream.write_bytes(&y0)?;
+            self.stream.write_bytes(&y1)?;
         }
         Ok(())
     }
@@ -79,9 +81,9 @@ impl<S: Read + Write + Send, OT: ObliviousTransfer<S>> ObliviousTransfer<S> for 
             // Just do normal OT
             return self.ot.receive(inputs, nbytes);
         }
-        let cipher = super::cipher(&[0u8; 16]);
-        let r = inputs.iter().cloned().collect::<super::BV>();
-        let ks = (0..128)
+        let (nrows, ncols) = (128, m);
+        let cipher = super::cipher(&[0u8; 16]); // XXX IV should be chosen at random
+        let ks = (0..nrows)
             .map(|_| {
                 (
                     self.rng.gen::<[u8; SEED_LENGTH]>().to_vec(),
@@ -90,27 +92,29 @@ impl<S: Read + Write + Send, OT: ObliviousTransfer<S>> ObliviousTransfer<S> for 
             })
             .collect::<Vec<(Vec<u8>, Vec<u8>)>>();
         self.ot.send(&ks, SEED_LENGTH)?;
-        let mut ts = Vec::with_capacity(128);
-        let r_: Vec<u8> = r.clone().into();
-        for (k0, k1) in ks.into_iter() {
-            let mut rng: Prng = SeedableRng::from_seed(*array_ref![k0, 0, SEED_LENGTH]);
-            let t = (0..m / 8).map(|_| rng.gen::<u8>()).collect::<Vec<u8>>();
-            let mut rng: Prng = SeedableRng::from_seed(*array_ref![k1, 0, SEED_LENGTH]);
-            let g = (0..m / 8).map(|_| rng.gen::<u8>()).collect::<Vec<u8>>();
+        let r = super::boolvec_to_u8vec(inputs);
+        let mut ts = vec![0u8; nrows * ncols / 8];
+        for (j, (k0, k1)) in ks.into_iter().enumerate() {
+            let range = j * ncols / 8..(j + 1) * ncols / 8;
+            let rng = AesRng::new(*array_ref![k0, 0, SEED_LENGTH]);
+            let t = rng.random(ncols / 8);
+            let rng = AesRng::new(*array_ref![k1, 0, SEED_LENGTH]);
+            let g = rng.random(ncols / 8);
             let u = super::xor(&t, &g);
-            let u = super::xor(&u, &r_);
+            let u = super::xor(&u, &r);
             self.stream.write_bytes(&u)?;
-            ts.push(t);
+            ts[range].clone_from_slice(&t);
         }
-        let ts_ = super::transpose(&ts, m);
-        let mut out = Vec::with_capacity(m);
-        for ((j, b), t) in r.into_iter().enumerate().zip(ts_) {
-            let t = super::u8vec_to_u128(&t);
-            let y0 = self.stream.read_u128()?;
-            let y1 = self.stream.read_u128()?;
-            let y = if b { y1 } else { y0 };
-            let r = y ^ super::hash(j, &t, &cipher);
-            out.push(r.to_le_bytes().to_vec());
+        let ts = super::transpose(&ts, nrows, ncols);
+        let mut out = Vec::with_capacity(ncols);
+        for (j, b) in inputs.into_iter().enumerate() {
+            let range = j * nrows / 8..(j + 1) * nrows / 8;
+            let t = ts.get(range).unwrap();
+            let y0 = self.stream.read_bytes(16)?;
+            let y1 = self.stream.read_bytes(16)?;
+            let y = if *b { y1 } else { y0 };
+            let r = super::xor(&y, &super::hash(j, &t, &cipher));
+            out.push(r);
         }
         Ok(out)
     }
@@ -120,11 +124,11 @@ impl<S: Read + Write + Send, OT: ObliviousTransfer<S>> ObliviousTransfer<S> for 
 mod tests {
     extern crate test;
     use super::*;
-    use crate::ChouOrlandiOT;
+    use crate::*;
     use std::os::unix::net::UnixStream;
     use std::sync::{Arc, Mutex};
 
-    const T: usize = 1 << 8;
+    const T: usize = 1 << 12;
 
     fn rand_u128_vec(size: usize) -> Vec<u128> {
         (0..size).map(|_| rand::random::<u128>()).collect()
@@ -166,7 +170,7 @@ mod tests {
     }
 
     #[test]
-    fn test_chou_orlandi() {
-        test_ot::<ChouOrlandiOT<UnixStream>>(T);
+    fn test() {
+        test_ot::<DummyOT<UnixStream>>(T);
     }
 }
