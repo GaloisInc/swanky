@@ -1,7 +1,6 @@
-use aesni::block_cipher_trait::generic_array::GenericArray;
-use aesni::block_cipher_trait::BlockCipher;
-use aesni::Aes128;
+use crate::aes::Aes128;
 
+/// Implementation of a random number generator based on fixed-key AES.
 pub struct AesRng {
     aes: Aes128,
 }
@@ -10,19 +9,16 @@ type Seed = [u8; 16];
 
 impl AesRng {
     pub fn new(seed: Seed) -> Self {
-        let k = GenericArray::from_slice(&seed);
-        let aes = Aes128::new(&k);
+        let aes = Aes128::new(&seed);
         AesRng { aes }
     }
-
-    pub fn random(&self, nbytes: usize) -> Vec<u8> {
-        let mut out = Vec::with_capacity(nbytes);
-        for i in 0..nbytes / 16 {
-            let m = i as u128;
-            let mut m = GenericArray::clone_from_slice(&m.to_le_bytes());
-            self.aes.encrypt_block(&mut m);
-            out.extend_from_slice(m.as_slice());
+    pub fn random(&self, bytes: &mut [u8]) {
+        assert_eq!(bytes.len() % 16, 0);
+        for (i, m) in bytes.chunks_mut(16).enumerate() {
+            let data = (i as u128).to_le_bytes();
+            unsafe { std::ptr::copy_nonoverlapping(data.as_ptr(), m.as_mut_ptr(), 16) };
+            let c = self.aes.encrypt_u8(array_mut_ref![m, 0, 16]);
+            unsafe { std::ptr::copy_nonoverlapping(c.as_ptr(), m.as_mut_ptr(), 16) };
         }
-        out[0..nbytes].to_vec()
     }
 }

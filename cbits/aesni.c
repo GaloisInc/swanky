@@ -2,9 +2,9 @@
 #include <stdlib.h>
 
 void
-aesni_setup_round_key_128(uint8_t* key, uint8_t* round_key)
+aesni_setup_round_keys(uint8_t* key, uint8_t* round_key)
 {
-    #ifdef __SSE__
+#ifdef __SSE__
     asm volatile(
         " \
             movdqu (%1), %%xmm1; \
@@ -49,21 +49,21 @@ aesni_setup_round_key_128(uint8_t* key, uint8_t* round_key)
             \
             2: \
         "
-    : "+r" (round_key)
-    : "r" (key)
-    : "xmm1", "xmm2", "xmm3", "memory"
-    );
-    #else
-    exit(1);
-    #endif
+        : "+r" (round_key)
+        : "r" (key)
+        : "xmm1", "xmm2", "xmm3", "memory"
+        );
+#else
+#error __SSE__ must be defined to use AES-NI
+#endif
 }
 
 void
 aesni_encrypt_block(uint8_t rounds, uint8_t* input, uint8_t* round_keys, uint8_t* output)
 {
-    #ifdef __SSE__
+#ifdef __SSE__
     asm volatile(
-    " \
+        " \
         /* Copy the data to encrypt to xmm1 */ \
         movdqu (%2), %%xmm1; \
         \
@@ -88,11 +88,11 @@ aesni_encrypt_block(uint8_t rounds, uint8_t* input, uint8_t* round_keys, uint8_t
         /* Finally, move the result from xmm1 to outp */ \
         movdqu %%xmm1, (%3); \
     "
-    : "+&r" (rounds), "+&r" (round_keys) // outputs
-    : "r" (input), "r" (output) // inputs
-    : "xmm0", "xmm1", "memory", "cc" // clobbers
-    );
-    #else
-    exit(1);
-    #endif
+        : "+&r" (rounds), "+&r" (round_keys) // outputs
+        : "r" (input), "r" (output) // inputs
+        : "xmm0", "xmm1", "memory", "cc" // clobbers
+        );
+#else
+#error __SSE__ must be defined to use AES-NI
+#endif
 }

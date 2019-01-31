@@ -1,4 +1,5 @@
 use super::{ObliviousTransfer, Stream};
+use crate::utils;
 use curve25519_dalek::constants::RISTRETTO_BASEPOINT_TABLE;
 use curve25519_dalek::ristretto::RistrettoPoint;
 use curve25519_dalek::scalar::Scalar;
@@ -21,9 +22,9 @@ impl<T: Read + Write + Send> ObliviousTransfer<T> for NaorPinkasOT<T> {
 
     fn send(&mut self, inputs: &[(Vec<u8>, Vec<u8>)], nbytes: usize) -> Result<(), Error> {
         let hash = if nbytes == 16 {
-            super::hash_pt_128
+            utils::hash_pt_128
         } else {
-            super::hash_pt
+            utils::hash_pt
         };
         for input in inputs.iter() {
             let c = RistrettoPoint::random(&mut self.rng);
@@ -35,9 +36,9 @@ impl<T: Read + Write + Send> ObliviousTransfer<T> for NaorPinkasOT<T> {
             let e00 = &r0 * &RISTRETTO_BASEPOINT_TABLE;
             let e10 = &r1 * &RISTRETTO_BASEPOINT_TABLE;
             let h = hash(&(&pk0 * &r0), nbytes);
-            let e01 = super::xor(&h, &input.0);
+            let e01 = utils::xor(&h, &input.0);
             let h = hash(&(&pk1 * &r1), nbytes);
-            let e11 = super::xor(&h, &input.1);
+            let e11 = utils::xor(&h, &input.1);
             self.stream.write_pt(&e00)?;
             self.stream.write_bytes(&e01)?;
             self.stream.write_pt(&e10)?;
@@ -48,9 +49,9 @@ impl<T: Read + Write + Send> ObliviousTransfer<T> for NaorPinkasOT<T> {
 
     fn receive(&mut self, inputs: &[bool], nbytes: usize) -> Result<Vec<Vec<u8>>, Error> {
         let hash = if nbytes == 16 {
-            super::hash_pt_128
+            utils::hash_pt_128
         } else {
-            super::hash_pt
+            utils::hash_pt
         };
 
         inputs
@@ -73,7 +74,7 @@ impl<T: Read + Write + Send> ObliviousTransfer<T> for NaorPinkasOT<T> {
                     true => (e10, e11),
                 };
                 let h = hash(&(&eσ0 * &k), nbytes);
-                let m = super::xor(&h, &eσ1);
+                let m = utils::xor(&h, &eσ1);
                 Ok(m)
             })
             .collect()

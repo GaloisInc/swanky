@@ -10,9 +10,6 @@ pub use dummy::DummyOT;
 pub use iknp::IknpOT;
 pub use naor_pinkas::NaorPinkasOT;
 
-use crate::aes::{Aes128, AES};
-use aesni::stream_cipher::{NewStreamCipher, StreamCipher};
-use aesni::Aes128Ctr;
 use curve25519_dalek::ristretto::{CompressedRistretto, RistrettoPoint};
 use failure::Error;
 use std::io::Error as IOError;
@@ -78,85 +75,9 @@ impl<T: Read + Write + Send> Stream<T> {
         self.stream().read_exact(&mut v)?;
         Ok(v)
     }
-}
-
-#[inline(always)]
-fn hash_pt(pt: &RistrettoPoint, nbytes: usize) -> Vec<u8> {
-    let k = pt.compress();
-    let k = k.as_bytes();
-    let mut m = vec![0u8; nbytes];
-    encrypt(&k[0..16], &k[16..32], &mut m);
-    m
-}
-
-#[inline(always)]
-fn hash_pt_128(pt: &RistrettoPoint, _nbytes: usize) -> Vec<u8> {
-    let k = pt.compress();
-    let k = k.as_bytes();
-    let c = cipher(array_ref![k, 0, 16]);
-    let m = [0u8; 16];
-    let m = c.encrypt_u8(&m);
-    m.to_vec()
-}
-
-#[inline(always)]
-fn xor(a: &[u8], b: &[u8]) -> Vec<u8> {
-    // assert_eq!(
-    //     a.len(),
-    //     b.len(),
-    //     "xor lengths not equal: {} ≠ {}",
-    //     a.len(),
-    //     b.len()
-    // );
-    a.into_iter()
-        .zip(b.into_iter())
-        .map(|(a, b)| a ^ b)
-        .collect()
-}
-
-type Cipher = Aes128Ctr;
-
-#[inline(always)]
-fn encrypt(k: &[u8], iv: &[u8], mut m: &mut [u8]) {
-    let mut cipher = Cipher::new_var(k, iv).unwrap();
-    cipher.encrypt(&mut m)
-}
-#[inline(always)]
-fn transpose(m: &[u8], nrows: usize, ncols: usize) -> Vec<u8> {
-    let m_ = vec![0u8; nrows * ncols / 8];
-    unsafe {
-        sse_trans(
-            m_.as_ptr() as *mut u8,
-            m.as_ptr(),
-            nrows as u64,
-            ncols as u64,
-        )
-    };
-    m_
-}
-
-#[inline(always)]
-fn cipher(_k: &[u8; 16]) -> Aes128 {
-    AES
-}
-
-#[inline(always)]
-fn hash(_i: usize, x: &[u8], cipher: &Aes128) -> Vec<u8> {
-    // XXX: Note that this is only secure in the semi-honest setting!
-    let y = cipher.encrypt_u8(array_ref![x, 0, 16]);
-    let r = xor(&x, &y);
-    r
-}
-#[inline(always)]
-fn boolvec_to_u8vec(bv: &[bool]) -> Vec<u8> {
-    let mut v = vec![0u8; bv.len() / 8];
-    for (i, b) in bv.into_iter().enumerate() {
-        v[i / 8] |= (*b as u8) << (i % 8);
+    #[inline(always)]
+    fn _read_bytes(&mut self, mut bytes: &mut [u8]) -> Result<(), Error> {
+        self.stream().read_exact(&mut bytes)?;
+        Ok(())
     }
-    v
-}
-
-#[link(name = "transpose")]
-extern "C" {
-    fn sse_trans(out: *mut u8, inp: *const u8, nrows: u64, ncols: u64);
 }

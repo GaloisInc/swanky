@@ -1,5 +1,7 @@
 use super::Stream;
+use crate::hash_aes::AesHash;
 use crate::rand_aes::AesRng;
+use crate::utils;
 use crate::ObliviousTransfer;
 use failure::Error;
 use rand::rngs::ThreadRng;
@@ -7,6 +9,9 @@ use rand::Rng;
 use std::io::{ErrorKind, Read, Write};
 use std::sync::{Arc, Mutex};
 
+/// Implementation of the Asharov-Lindell-Schneider-Zohner semi-honest secure
+/// oblivious transfer extension protocol (cf. https://eprint.iacr.org/2016/602,
+/// Protocol 4).
 pub struct AlszOT<S: Read + Write + Send, OT: ObliviousTransfer<S>> {
     stream: Stream<S>,
     ot: OT,
@@ -42,27 +47,29 @@ impl<S: Read + Write + Send, OT: ObliviousTransfer<S>> ObliviousTransfer<S> for 
             return self.ot.send(inputs, nbytes);
         }
         let (nrows, ncols) = (128, m);
-        let cipher = super::cipher(&[0u8; 16]); // XXX IV should be chosen at random
+        let hash = AesHash::new(&[0u8; 16]); // XXX IV should be chosen at random
         let s = (0..nrows)
             .map(|_| self.rng.gen::<bool>())
             .collect::<Vec<bool>>();
-        let s_ = super::boolvec_to_u8vec(&s);
+        let s_ = utils::boolvec_to_u8vec(&s);
         let ks = self.ot.receive(&s, SEED_LENGTH)?;
         let mut qs = vec![0u8; nrows * ncols / 8];
+        let mut u = vec![0u8; ncols / 8];
         for (j, (b, k)) in s.into_iter().zip(ks.into_iter()).enumerate() {
             let range = j * ncols / 8..(j + 1) * ncols / 8;
-            let u = self.stream.read_bytes(ncols / 8)?;
-            let u = if b { u } else { vec![0u8; ncols / 8] };
+            let mut q = qs.get_mut(range).unwrap();
+            self.stream._read_bytes(&mut u)?;
+            let u = if b { u.clone() } else { vec![0u8; ncols / 8] };
             let rng = AesRng::new(*array_ref![k, 0, SEED_LENGTH]);
-            let g = rng.random(ncols / 8);
-            qs[range].clone_from_slice(&super::xor(&u, &g));
+            rng.random(&mut q);
+            utils::xor_inplace(&mut q, &u);
         }
-        let qs = super::transpose(&qs, nrows, ncols);
+        let qs = utils::transpose(&qs, nrows, ncols);
         for j in 0..ncols {
             let range = j * nrows / 8..(j + 1) * nrows / 8;
             let q = qs.get(range).unwrap();
-            let y0 = super::xor(&super::hash(j, &q, &cipher), &inputs[j].0);
-            let y1 = super::xor(&super::hash(j, &super::xor(&q, &s_), &cipher), &inputs[j].1);
+            let y0 = utils::xor(&hash.hash(j, &q), &inputs[j].0);
+            let y1 = utils::xor(&hash.hash(j, &utils::xor(&q, &s_)), &inputs[j].1);
             self.stream.write_bytes(&y0)?;
             self.stream.write_bytes(&y1)?;
         }
@@ -82,7 +89,7 @@ impl<S: Read + Write + Send, OT: ObliviousTransfer<S>> ObliviousTransfer<S> for 
             return self.ot.receive(inputs, nbytes);
         }
         let (nrows, ncols) = (128, m);
-        let cipher = super::cipher(&[0u8; 16]); // XXX IV should be chosen at random
+        let hash = AesHash::new(&[0u8; 16]); // XXX IV should be chosen at random
         let ks = (0..nrows)
             .map(|_| {
                 (
@@ -92,29 +99,32 @@ impl<S: Read + Write + Send, OT: ObliviousTransfer<S>> ObliviousTransfer<S> for 
             })
             .collect::<Vec<(Vec<u8>, Vec<u8>)>>();
         self.ot.send(&ks, SEED_LENGTH)?;
-        let r = super::boolvec_to_u8vec(inputs);
+        let r = utils::boolvec_to_u8vec(inputs);
         let mut ts = vec![0u8; nrows * ncols / 8];
+        let mut g = vec![0u8; ncols / 8];
         for (j, (k0, k1)) in ks.into_iter().enumerate() {
             let range = j * ncols / 8..(j + 1) * ncols / 8;
+            let mut t = ts.get_mut(range).unwrap();
             let rng = AesRng::new(*array_ref![k0, 0, SEED_LENGTH]);
-            let t = rng.random(ncols / 8);
+            rng.random(&mut t);
             let rng = AesRng::new(*array_ref![k1, 0, SEED_LENGTH]);
-            let g = rng.random(ncols / 8);
-            let u = super::xor(&t, &g);
-            let u = super::xor(&u, &r);
-            self.stream.write_bytes(&u)?;
-            ts[range].clone_from_slice(&t);
+            rng.random(&mut g);
+            utils::xor_inplace(&mut g, &t);
+            utils::xor_inplace(&mut g, &r);
+            self.stream.write_bytes(&g)?;
         }
-        let ts = super::transpose(&ts, nrows, ncols);
+        let ts = utils::transpose(&ts, nrows, ncols);
         let mut out = Vec::with_capacity(ncols);
+        let mut y0 = vec![0u8; 16];
+        let mut y1 = vec![0u8; 16];
         for (j, b) in inputs.into_iter().enumerate() {
             let range = j * nrows / 8..(j + 1) * nrows / 8;
             let t = ts.get(range).unwrap();
-            let y0 = self.stream.read_bytes(16)?;
-            let y1 = self.stream.read_bytes(16)?;
-            let y = if *b { y1 } else { y0 };
-            let r = super::xor(&y, &super::hash(j, &t, &cipher));
-            out.push(r);
+            self.stream._read_bytes(&mut y0)?;
+            self.stream._read_bytes(&mut y1)?;
+            let mut y = if *b { y1.clone() } else { y0.clone() };
+            utils::xor_inplace(&mut y, &hash.hash(j, &t));
+            out.push(y);
         }
         Ok(out)
     }

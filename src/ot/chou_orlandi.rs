@@ -1,4 +1,5 @@
 use super::{ObliviousTransfer, Stream};
+use crate::utils;
 use curve25519_dalek::constants::RISTRETTO_BASEPOINT_TABLE;
 use curve25519_dalek::scalar::Scalar;
 use failure::Error;
@@ -6,13 +7,15 @@ use rand::rngs::ThreadRng;
 use std::io::{Read, Write};
 use std::sync::{Arc, Mutex};
 
+/// Implementation of the Chou-Orlandi semi-honest secure oblivious transfer
+/// protocol (cf. https://eprint.iacr.org/2015/267).
 pub struct ChouOrlandiOT<T: Read + Write + Send> {
     stream: Stream<T>,
     rng: ThreadRng,
 }
 
-impl<T: Read + Write + Send> ObliviousTransfer<T> for ChouOrlandiOT<T> {
-    fn new(stream: Arc<Mutex<T>>) -> Self {
+impl<S: Read + Write + Send> ObliviousTransfer<S> for ChouOrlandiOT<S> {
+    fn new(stream: Arc<Mutex<S>>) -> Self {
         let stream = Stream::new(stream);
         let rng = rand::thread_rng();
         Self { stream, rng }
@@ -20,9 +23,9 @@ impl<T: Read + Write + Send> ObliviousTransfer<T> for ChouOrlandiOT<T> {
 
     fn send(&mut self, inputs: &[(Vec<u8>, Vec<u8>)], nbytes: usize) -> Result<(), Error> {
         let hash = if nbytes == 16 {
-            super::hash_pt_128
+            utils::hash_pt_128
         } else {
-            super::hash_pt
+            utils::hash_pt
         };
         let y = Scalar::random(&mut self.rng);
         let s = &y * &RISTRETTO_BASEPOINT_TABLE;
@@ -41,9 +44,9 @@ impl<T: Read + Write + Send> ObliviousTransfer<T> for ChouOrlandiOT<T> {
 
     fn receive(&mut self, inputs: &[bool], nbytes: usize) -> Result<Vec<Vec<u8>>, Error> {
         let hash = if nbytes == 16 {
-            super::hash_pt_128
+            utils::hash_pt_128
         } else {
-            super::hash_pt
+            utils::hash_pt
         };
         let s = self.stream.read_pt()?;
         inputs
@@ -66,11 +69,11 @@ impl<T: Read + Write + Send> ObliviousTransfer<T> for ChouOrlandiOT<T> {
 
 #[inline(always)]
 fn encrypt(k: &[u8], m: &[u8]) -> Vec<u8> {
-    super::xor(&k, &m)
+    utils::xor(&k, &m)
 }
 #[inline(always)]
 fn decrypt(k: &[u8], c: &[u8]) -> Vec<u8> {
-    super::xor(&k, &c)
+    utils::xor(&k, &c)
 }
 
 #[cfg(test)]

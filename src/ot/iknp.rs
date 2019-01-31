@@ -1,5 +1,7 @@
 use super::Stream;
+use crate::hash_aes::AesHash;
 use crate::ot::ObliviousTransfer;
+use crate::utils;
 use failure::Error;
 use rand::rngs::ThreadRng;
 use rand::Rng;
@@ -33,19 +35,19 @@ impl<S: Read + Write + Send, OT: ObliviousTransfer<S>> ObliviousTransfer<S> for 
             return self.ot.send(inputs, nbytes);
         }
         let (nrows, ncols) = (128, m);
-        let cipher = super::cipher(&[0u8; 16]);
+        let hash = AesHash::new(&[0u8; 16]);
         let s = (0..128)
             .map(|_| self.rng.gen::<bool>())
             .collect::<Vec<bool>>();
         let qs = self.ot.receive(&s, ncols / 8)?;
         let qs = qs.into_iter().flatten().collect::<Vec<u8>>();
-        let qs = super::transpose(&qs, nrows, ncols);
-        let s = super::boolvec_to_u8vec(&s);
+        let qs = utils::transpose(&qs, nrows, ncols);
+        let s = utils::boolvec_to_u8vec(&s);
         for j in 0..ncols {
             let range = j * nrows / 8..(j + 1) * nrows / 8;
             let q = qs.get(range).unwrap();
-            let y0 = super::xor(&super::hash(j, &q, &cipher), &inputs[j].0);
-            let y1 = super::xor(&super::hash(j, &super::xor(&q, &s), &cipher), &inputs[j].1);
+            let y0 = utils::xor(&hash.hash(j, &q), &inputs[j].0);
+            let y1 = utils::xor(&hash.hash(j, &utils::xor(&q, &s)), &inputs[j].1);
             self.stream.write_bytes(&y0)?;
             self.stream.write_bytes(&y1)?;
         }
@@ -65,20 +67,20 @@ impl<S: Read + Write + Send, OT: ObliviousTransfer<S>> ObliviousTransfer<S> for 
             return self.ot.receive(inputs, nbytes);
         }
         let (nrows, ncols) = (128, m);
-        let cipher = super::cipher(&[0u8; 16]);
-        let r = super::boolvec_to_u8vec(inputs);
+        let hash = AesHash::new(&[0u8; 16]);
+        let r = utils::boolvec_to_u8vec(inputs);
         let ts = (0..128)
             .map(|_| {
                 let bv = (0..m)
                     .map(|_| self.rng.gen::<bool>())
                     .collect::<Vec<bool>>();
-                super::boolvec_to_u8vec(&bv)
+                utils::boolvec_to_u8vec(&bv)
             })
-            .map(|t| (t.clone(), super::xor(&t, &r)))
+            .map(|t| (t.clone(), utils::xor(&t, &r)))
             .collect::<Vec<(Vec<u8>, Vec<u8>)>>();
         self.ot.send(&ts, m / 8)?;
         let ts = ts.into_iter().flat_map(|(t, _)| t).collect::<Vec<u8>>();
-        let ts = super::transpose(&ts, nrows, ncols);
+        let ts = utils::transpose(&ts, nrows, ncols);
         let mut out = Vec::with_capacity(m);
         for (j, b) in inputs.iter().enumerate() {
             let range = j * nrows / 8..(j + 1) * nrows / 8;
@@ -86,7 +88,7 @@ impl<S: Read + Write + Send, OT: ObliviousTransfer<S>> ObliviousTransfer<S> for 
             let y0 = self.stream.read_bytes(16)?;
             let y1 = self.stream.read_bytes(16)?;
             let y = if *b { y1 } else { y0 };
-            let r = super::xor(&y, &super::hash(j, &t, &cipher));
+            let r = utils::xor(&y, &hash.hash(j, &t));
             out.push(r);
         }
         Ok(out)

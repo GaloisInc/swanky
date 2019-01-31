@@ -3,6 +3,8 @@ use failure::Error;
 use std::io::{Read, Write};
 use std::sync::{Arc, Mutex};
 
+/// Implementation if an **entirely insecure** oblivious transfer protocol for
+/// testing purposes.
 pub struct DummyOT<T: Read + Write + Send> {
     stream: Stream<T>,
 }
