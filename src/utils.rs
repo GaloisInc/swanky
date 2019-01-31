@@ -11,6 +11,14 @@ pub fn hash_pt(pt: &RistrettoPoint, nbytes: usize) -> Vec<u8> {
     encrypt(&k[0..16], &k[16..32], &mut m);
     m
 }
+#[inline(always)]
+pub fn hash_pt_inplace(pt: &RistrettoPoint, out: &mut [u8]) {
+    let k = pt.compress();
+    let k = k.as_bytes();
+    let mut m = vec![0u8; out.len()];
+    encrypt(&k[0..16], &k[16..32], &mut m);
+    unsafe { std::ptr::copy_nonoverlapping(m.as_ptr(), out.as_mut_ptr(), out.len()) };
+}
 
 #[inline(always)]
 pub fn hash_pt_128(pt: &RistrettoPoint, _nbytes: usize) -> Vec<u8> {
@@ -20,6 +28,15 @@ pub fn hash_pt_128(pt: &RistrettoPoint, _nbytes: usize) -> Vec<u8> {
     let m = [0u8; 16];
     let m = c.encrypt_u8(&m);
     m.to_vec()
+}
+#[inline(always)]
+pub fn hash_pt_128_inplace(pt: &RistrettoPoint, out: &mut [u8]) {
+    let k = pt.compress();
+    let k = k.as_bytes();
+    let c = Aes128::new(array_ref![k, 0, 16]);
+    let m = [0u8; 16];
+    let m = c.encrypt_u8(&m);
+    unsafe { std::ptr::copy_nonoverlapping(m.as_ptr(), out.as_mut_ptr(), 16) };
 }
 
 #[inline(always)]

@@ -9,8 +9,8 @@ use std::sync::{Arc, Mutex};
 
 /// Implementation of the Chou-Orlandi semi-honest secure oblivious transfer
 /// protocol (cf. https://eprint.iacr.org/2015/267).
-pub struct ChouOrlandiOT<T: Read + Write + Send> {
-    stream: Stream<T>,
+pub struct ChouOrlandiOT<S: Read + Write + Send> {
+    stream: Stream<S>,
     rng: ThreadRng,
 }
 
@@ -22,22 +22,24 @@ impl<S: Read + Write + Send> ObliviousTransfer<S> for ChouOrlandiOT<S> {
     }
 
     fn send(&mut self, inputs: &[(Vec<u8>, Vec<u8>)], nbytes: usize) -> Result<(), Error> {
-        let hash = if nbytes == 16 {
-            utils::hash_pt_128
+        let hash_inplace = if nbytes == 16 {
+            utils::hash_pt_128_inplace
         } else {
-            utils::hash_pt
+            utils::hash_pt_inplace
         };
         let y = Scalar::random(&mut self.rng);
         let s = &y * &RISTRETTO_BASEPOINT_TABLE;
         self.stream.write_pt(&s)?;
+        let mut k0 = vec![0u8; nbytes];
+        let mut k1 = vec![0u8; nbytes];
         for input in inputs.into_iter() {
             let r = self.stream.read_pt()?;
-            let k0 = hash(&(&r * &y), nbytes);
-            let k1 = hash(&((&r - &s) * &y), nbytes);
-            let c0 = encrypt(&k0, &input.0);
-            let c1 = encrypt(&k1, &input.1);
-            self.stream.write_bytes(&c0)?;
-            self.stream.write_bytes(&c1)?;
+            hash_inplace(&(&r * &y), &mut k0);
+            hash_inplace(&((&r - &s) * &y), &mut k1);
+            encrypt_inplace(&mut k0, &input.0);
+            encrypt_inplace(&mut k1, &input.1);
+            self.stream.write_bytes(&k0)?;
+            self.stream.write_bytes(&k1)?;
         }
         Ok(())
     }
@@ -56,24 +58,24 @@ impl<S: Read + Write + Send> ObliviousTransfer<S> for ChouOrlandiOT<S> {
                 let c = if *b { Scalar::one() } else { Scalar::zero() };
                 let r = &c * &s + &x * &RISTRETTO_BASEPOINT_TABLE;
                 self.stream.write_pt(&r)?;
-                let k = hash(&(&x * &s), nbytes);
+                let mut k = hash(&(&x * &s), nbytes);
                 let c0 = self.stream.read_bytes(nbytes)?;
                 let c1 = self.stream.read_bytes(nbytes)?;
                 let c = if *b { &c1 } else { &c0 };
-                let m = decrypt(&k, &c);
-                Ok(m)
+                decrypt_inplace(&mut k, &c);
+                Ok(k)
             })
             .collect()
     }
 }
 
 #[inline(always)]
-fn encrypt(k: &[u8], m: &[u8]) -> Vec<u8> {
-    utils::xor(&k, &m)
+fn encrypt_inplace(mut k: &mut [u8], m: &[u8]) {
+    utils::xor_inplace(&mut k, &m)
 }
 #[inline(always)]
-fn decrypt(k: &[u8], c: &[u8]) -> Vec<u8> {
-    utils::xor(&k, &c)
+fn decrypt_inplace(mut k: &mut [u8], c: &[u8]) {
+    utils::xor_inplace(&mut k, &c)
 }
 
 #[cfg(test)]
