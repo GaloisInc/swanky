@@ -76,7 +76,7 @@ impl<T: Read + Write + Send> Stream<T> {
         Ok(v)
     }
     #[inline(always)]
-    fn _read_bytes(&mut self, mut bytes: &mut [u8]) -> Result<(), Error> {
+    fn read_bytes_inplace(&mut self, mut bytes: &mut [u8]) -> Result<(), Error> {
         self.stream().read_exact(&mut bytes)?;
         Ok(())
     }

@@ -1,12 +1,9 @@
 #include <stdint.h>
 #include <stdlib.h>
 
-void
-aesni_setup_round_keys(uint8_t* key, uint8_t* round_key)
-{
+void aesni_setup_round_keys(uint8_t *key, uint8_t *round_key) {
 #ifdef __SSE__
-    asm volatile(
-        " \
+  asm volatile(" \
             movdqu (%1), %%xmm1; \
             movdqu %%xmm1, (%0); \
             add $0x10, %0; \
@@ -49,49 +46,50 @@ aesni_setup_round_keys(uint8_t* key, uint8_t* round_key)
             \
             2: \
         "
-        : "+r" (round_key)
-        : "r" (key)
-        : "xmm1", "xmm2", "xmm3", "memory"
-        );
+               : "+r"(round_key)
+               : "r"(key)
+               : "xmm1", "xmm2", "xmm3", "memory");
 #else
 #error __SSE__ must be defined to use AES-NI
 #endif
 }
 
-void
-aesni_encrypt_block(uint8_t rounds, uint8_t* input, uint8_t* round_keys, uint8_t* output)
-{
+void aesni_encrypt_block(uint8_t *const rkeys, uint8_t *const input,
+                         uint8_t *output) {
 #ifdef __SSE__
-    asm volatile(
-        " \
+  asm volatile(" \
         /* Copy the data to encrypt to xmm1 */ \
-        movdqu (%2), %%xmm1; \
-        \
+        movdqu (%0), %%xmm1; \
         /* Perform round 0 - the whitening step */ \
-        movdqu (%1), %%xmm0; \
-        add $0x10, %1; \
+        movdqu (%1), %%xmm0; add $0x10, %1; \
         pxor %%xmm0, %%xmm1; \
-        \
         /* Perform all remaining rounds (except the final one) */ \
-        1: \
-        movdqu (%1), %%xmm0; \
-        add $0x10, %1; \
+        movdqu (%1), %%xmm0; add $0x10, %1; \
         aesenc %%xmm0, %%xmm1; \
-        sub $0x01, %0; \
-        cmp $0x01, %0; \
-        jne 1b; \
-        \
+        movdqu (%1), %%xmm0; add $0x10, %1; \
+        aesenc %%xmm0, %%xmm1; \
+        movdqu (%1), %%xmm0; add $0x10, %1; \
+        aesenc %%xmm0, %%xmm1; \
+        movdqu (%1), %%xmm0; add $0x10, %1; \
+        aesenc %%xmm0, %%xmm1; \
+        movdqu (%1), %%xmm0; add $0x10, %1; \
+        aesenc %%xmm0, %%xmm1; \
+        movdqu (%1), %%xmm0; add $0x10, %1; \
+        aesenc %%xmm0, %%xmm1; \
+        movdqu (%1), %%xmm0; add $0x10, %1; \
+        aesenc %%xmm0, %%xmm1; \
+        movdqu (%1), %%xmm0; add $0x10, %1; \
+        aesenc %%xmm0, %%xmm1; \
         /* Perform the last round */ \
         movdqu (%1), %%xmm0; \
         aesenclast %%xmm0, %%xmm1; \
-        \
-        /* Finally, move the result from xmm1 to outp */ \
-        movdqu %%xmm1, (%3); \
+        /* Finally, move the result from xmm1 to output */ \
+        movdqu %%xmm1, (%2); \
     "
-        : "+&r" (rounds), "+&r" (round_keys) // outputs
-        : "r" (input), "r" (output) // inputs
-        : "xmm0", "xmm1", "memory", "cc" // clobbers
-        );
+               : "+r"(output)                   // outputs
+               : "r"(input), "r"(rkeys)         // inputs
+               : "xmm0", "xmm1", "memory", "cc" // clobbers
+  );
 #else
 #error __SSE__ must be defined to use AES-NI
 #endif

@@ -53,14 +53,16 @@ impl<S: Read + Write + Send, OT: ObliviousTransfer<S>> ObliviousTransfer<S> for 
             .collect::<Vec<bool>>();
         let s_ = utils::boolvec_to_u8vec(&s);
         let ks = self.ot.receive(&s, SEED_LENGTH)?;
+        let rngs = ks
+            .into_iter()
+            .map(|k| AesRng::new(*array_ref![k, 0, SEED_LENGTH]));
         let mut qs = vec![0u8; nrows * ncols / 8];
         let mut u = vec![0u8; ncols / 8];
-        for (j, (b, k)) in s.into_iter().zip(ks.into_iter()).enumerate() {
+        for (j, (b, rng)) in s.into_iter().zip(rngs.into_iter()).enumerate() {
             let range = j * ncols / 8..(j + 1) * ncols / 8;
             let mut q = qs.get_mut(range).unwrap();
-            self.stream._read_bytes(&mut u)?;
+            self.stream.read_bytes_inplace(&mut u)?;
             let u = if b { u.clone() } else { vec![0u8; ncols / 8] };
-            let rng = AesRng::new(*array_ref![k, 0, SEED_LENGTH]);
             rng.random(&mut q);
             utils::xor_inplace(&mut q, &u);
         }
@@ -99,16 +101,20 @@ impl<S: Read + Write + Send, OT: ObliviousTransfer<S>> ObliviousTransfer<S> for 
             })
             .collect::<Vec<(Vec<u8>, Vec<u8>)>>();
         self.ot.send(&ks, SEED_LENGTH)?;
+        let rngs = ks.into_iter().map(|(k0, k1)| {
+            (
+                AesRng::new(*array_ref![k0, 0, SEED_LENGTH]),
+                AesRng::new(*array_ref![k1, 0, SEED_LENGTH]),
+            )
+        });
         let r = utils::boolvec_to_u8vec(inputs);
         let mut ts = vec![0u8; nrows * ncols / 8];
         let mut g = vec![0u8; ncols / 8];
-        for (j, (k0, k1)) in ks.into_iter().enumerate() {
+        for (j, (rng0, rng1)) in rngs.into_iter().enumerate() {
             let range = j * ncols / 8..(j + 1) * ncols / 8;
             let mut t = ts.get_mut(range).unwrap();
-            let rng = AesRng::new(*array_ref![k0, 0, SEED_LENGTH]);
-            rng.random(&mut t);
-            let rng = AesRng::new(*array_ref![k1, 0, SEED_LENGTH]);
-            rng.random(&mut g);
+            rng0.random(&mut t);
+            rng1.random(&mut g);
             utils::xor_inplace(&mut g, &t);
             utils::xor_inplace(&mut g, &r);
             self.stream.write_bytes(&g)?;
@@ -120,8 +126,8 @@ impl<S: Read + Write + Send, OT: ObliviousTransfer<S>> ObliviousTransfer<S> for 
         for (j, b) in inputs.into_iter().enumerate() {
             let range = j * nrows / 8..(j + 1) * nrows / 8;
             let t = ts.get(range).unwrap();
-            self.stream._read_bytes(&mut y0)?;
-            self.stream._read_bytes(&mut y1)?;
+            self.stream.read_bytes_inplace(&mut y0)?;
+            self.stream.read_bytes_inplace(&mut y1)?;
             let mut y = if *b { y1.clone() } else { y0.clone() };
             utils::xor_inplace(&mut y, &hash.hash(j, &t));
             out.push(y);

@@ -18,11 +18,12 @@ pub struct AesHash {
 }
 
 impl AesHash {
+    #[inline(always)]
     pub fn new(key: &[u8; 16]) -> Self {
         let aes = Aes128::new(key);
         AesHash { aes }
     }
-
+    #[inline(always)]
     pub fn hash(&self, _i: usize, x: &[u8]) -> Vec<u8> {
         let y = self.aes.encrypt_u8(array_ref![x, 0, 16]);
         let r = utils::xor(&x, &y);
