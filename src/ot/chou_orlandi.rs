@@ -8,7 +8,10 @@ use std::io::{Read, Write};
 use std::sync::{Arc, Mutex};
 
 /// Implementation of the Chou-Orlandi semi-honest secure oblivious transfer
-/// protocol (cf. https://eprint.iacr.org/2015/267).
+/// protocol (cf. <https://eprint.iacr.org/2015/267>).
+///
+/// This implementation uses the Ristretto prime order elliptic curve group from
+/// the `curve25519-dalek` library.
 pub struct ChouOrlandiOT<S: Read + Write + Send> {
     stream: Stream<S>,
     rng: ThreadRng,

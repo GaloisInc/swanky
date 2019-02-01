@@ -8,6 +8,11 @@ use rand::rngs::ThreadRng;
 use std::io::{Read, Write};
 use std::sync::{Arc, Mutex};
 
+/// Implementation of the Naor-Pinkas semi-honest secure oblivious transfer
+/// protocol.
+///
+/// This implementation uses the Ristretto prime order elliptic curve group from
+/// the `curve25519-dalek` library.
 pub struct NaorPinkasOT<T: Read + Write + Send> {
     stream: Stream<T>,
     rng: ThreadRng,

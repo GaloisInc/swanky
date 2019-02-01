@@ -16,9 +16,13 @@ use std::io::Error as IOError;
 use std::io::{ErrorKind, Read, Write};
 use std::sync::{Arc, Mutex, MutexGuard};
 
+/// Oblivious transfer trait.
 pub trait ObliviousTransfer<T: Read + Write + Send> {
+    /// Creates a new oblivious transfer instance using `stream` for I/O.
     fn new(stream: Arc<Mutex<T>>) -> Self;
-    fn send(&mut self, values: &[(Vec<u8>, Vec<u8>)], nbytes: usize) -> Result<(), Error>;
+    /// Sends values of `nbytes` each.
+    fn send(&mut self, inputs: &[(Vec<u8>, Vec<u8>)], nbytes: usize) -> Result<(), Error>;
+    /// Receives values of `nbytes` each.
     fn receive(&mut self, inputs: &[bool], nbytes: usize) -> Result<Vec<Vec<u8>>, Error>;
 }
 

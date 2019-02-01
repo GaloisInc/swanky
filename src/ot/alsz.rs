@@ -10,8 +10,8 @@ use std::io::{ErrorKind, Read, Write};
 use std::sync::{Arc, Mutex};
 
 /// Implementation of the Asharov-Lindell-Schneider-Zohner semi-honest secure
-/// oblivious transfer extension protocol (cf. https://eprint.iacr.org/2016/602,
-/// Protocol 4).
+/// oblivious transfer extension protocol (cf.
+/// <https://eprint.iacr.org/2016/602>, Protocol 4).
 pub struct AlszOT<S: Read + Write + Send, OT: ObliviousTransfer<S>> {
     stream: Stream<S>,
     ot: OT,

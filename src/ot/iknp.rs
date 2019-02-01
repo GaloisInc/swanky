@@ -5,9 +5,12 @@ use crate::utils;
 use failure::Error;
 use rand::rngs::ThreadRng;
 use rand::Rng;
-use std::io::{ErrorKind, Read, Write};
+use std::io::{Read, Write};
 use std::sync::{Arc, Mutex};
 
+/// Implementation of the Ishai-Killian-Nissim-Petrank semi-honest secure
+/// oblivious transfer extension protocol (cf.
+/// <https://www.iacr.org/cryptodb/archive/2003/CRYPTO/1432/1432.pdf>).
 pub struct IknpOT<S: Read + Write + Send, OT: ObliviousTransfer<S>> {
     stream: Stream<S>,
     ot: OT,
@@ -23,18 +26,17 @@ impl<S: Read + Write + Send, OT: ObliviousTransfer<S>> ObliviousTransfer<S> for 
     }
 
     fn send(&mut self, inputs: &[(Vec<u8>, Vec<u8>)], nbytes: usize) -> Result<(), Error> {
-        let m = inputs.len();
-        if m % 8 != 0 {
-            return Err(Error::from(std::io::Error::new(
-                ErrorKind::InvalidInput,
-                "Number of inputs must be divisible by 8",
-            )));
-        }
-        if m <= 128 {
+        assert_eq!(nbytes, 16, "IKNP OT only supports 128-bit inputs");
+        assert_eq!(
+            inputs.len() % 8,
+            0,
+            "Number of inputs must be divisible by 8"
+        );
+        if inputs.len() <= 128 {
             // Just do normal OT
             return self.ot.send(inputs, nbytes);
         }
-        let (nrows, ncols) = (128, m);
+        let (nrows, ncols) = (128, inputs.len());
         let hash = AesHash::new(&[0u8; 16]);
         let s = (0..128)
             .map(|_| self.rng.gen::<bool>())
@@ -55,33 +57,27 @@ impl<S: Read + Write + Send, OT: ObliviousTransfer<S>> ObliviousTransfer<S> for 
     }
 
     fn receive(&mut self, inputs: &[bool], nbytes: usize) -> Result<Vec<Vec<u8>>, Error> {
-        if nbytes != 16 {
-            return Err(Error::from(std::io::Error::new(
-                ErrorKind::InvalidInput,
-                "IKNP OT only supports 128-bit inputs",
-            )));
-        }
-        let m = inputs.len();
-        if m <= 128 {
+        assert_eq!(nbytes, 16, "IKNP OT only supports 128-bit inputs");
+        if inputs.len() <= 128 {
             // Just do normal OT
             return self.ot.receive(inputs, nbytes);
         }
-        let (nrows, ncols) = (128, m);
+        let (nrows, ncols) = (128, inputs.len());
         let hash = AesHash::new(&[0u8; 16]);
         let r = utils::boolvec_to_u8vec(inputs);
         let ts = (0..128)
             .map(|_| {
-                let bv = (0..m)
+                let bv = (0..inputs.len())
                     .map(|_| self.rng.gen::<bool>())
                     .collect::<Vec<bool>>();
                 utils::boolvec_to_u8vec(&bv)
             })
             .map(|t| (t.clone(), utils::xor(&t, &r)))
             .collect::<Vec<(Vec<u8>, Vec<u8>)>>();
-        self.ot.send(&ts, m / 8)?;
+        self.ot.send(&ts, inputs.len() / 8)?;
         let ts = ts.into_iter().flat_map(|(t, _)| t).collect::<Vec<u8>>();
         let ts = utils::transpose(&ts, nrows, ncols);
-        let mut out = Vec::with_capacity(m);
+        let mut out = Vec::with_capacity(inputs.len());
         for (j, b) in inputs.iter().enumerate() {
             let range = j * nrows / 8..(j + 1) * nrows / 8;
             let t = ts.get(range).unwrap();
