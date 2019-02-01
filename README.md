@@ -16,4 +16,4 @@ MIT License
 
 - Alex J. Malozemoff <amaloz@galois.com>
 
-Copyright © 2018 Galois, Inc.
+Copyright © 2019 Galois, Inc.
