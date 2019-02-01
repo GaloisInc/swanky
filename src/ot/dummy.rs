@@ -1,7 +1,7 @@
-use super::{ObliviousTransfer, Stream};
+use crate::stream::Stream;
+use crate::ObliviousTransfer;
 use failure::Error;
 use std::io::{Read, Write};
-use std::sync::{Arc, Mutex};
 
 /// Implementation if an **entirely insecure** oblivious transfer protocol for
 /// testing purposes.
@@ -10,7 +10,7 @@ pub struct DummyOT<T: Read + Write + Send> {
 }
 
 impl<T: Read + Write + Send> ObliviousTransfer<T> for DummyOT<T> {
-    fn new(stream: Arc<Mutex<T>>) -> Self {
+    fn new(stream: T) -> Self {
         let stream = Stream::new(stream);
         Self { stream }
     }
@@ -54,7 +54,7 @@ mod tests {
         let m0_ = m0.clone();
         let m1_ = m1.clone();
         let (sender, receiver) = match UnixStream::pair() {
-            Ok((s1, s2)) => (Arc::new(Mutex::new(s1)), Arc::new(Mutex::new(s2))),
+            Ok((s1, s2)) => (s1, s2), // (Arc::new(Mutex::new(s1)), Arc::new(Mutex::new(s2)))
             Err(e) => panic!("Couldn't create pair of sockets: {:?}", e),
         };
         let handle = std::thread::spawn(|| {

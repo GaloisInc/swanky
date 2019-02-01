@@ -5,6 +5,7 @@
 // See LICENSE for licensing information.
 
 use crate::aes::Aes128;
+use crate::Block;
 use aesni::stream_cipher::{NewStreamCipher, StreamCipher};
 use aesni::Aes128Ctr;
 use arrayref::array_ref;
@@ -29,13 +30,12 @@ pub fn hash_pt_inplace(pt: &RistrettoPoint, out: &mut [u8]) {
 }
 
 #[inline(always)]
-pub fn hash_pt_128(pt: &RistrettoPoint, _nbytes: usize) -> Vec<u8> {
+pub fn hash_pt_block(pt: &RistrettoPoint) -> Block {
     let k = pt.compress();
     let k = k.as_bytes();
     let c = Aes128::new(array_ref![k, 0, 16]);
     let m = [0u8; 16];
-    let m = c.encrypt_u8(&m);
-    m.to_vec()
+    c.encrypt_u8(&m)
 }
 #[inline(always)]
 pub fn hash_pt_128_inplace(pt: &RistrettoPoint, out: &mut [u8]) {
@@ -60,11 +60,29 @@ pub fn xor_inplace(a: &mut [u8], b: &[u8]) {
 }
 
 #[inline(always)]
-pub fn xor_block(x: &[u8; 16], y: &[u8; 16]) -> [u8; 16] {
+pub fn xor_block(x: &Block, y: &Block) -> Block {
     unsafe {
-        let z = _mm_xor_si128(u8x16_to_m128i(x), u8x16_to_m128i(y));
-        m128i_to_u8x16(z)
+        let z = _mm_xor_si128(block_to_m128i(x), block_to_m128i(y));
+        m128i_to_block(z)
     }
+}
+
+#[inline(always)]
+pub fn zero_block() -> Block {
+    unsafe { m128i_to_block(_mm_setzero_si128()) }
+}
+
+#[inline(always)]
+pub fn block_to_m128i(v: &Block) -> __m128i {
+    unsafe { std::mem::transmute::<Block, __m128i>(*v) }
+}
+#[inline(always)]
+pub fn m128i_to_block(m: __m128i) -> Block {
+    unsafe { std::mem::transmute::<__m128i, Block>(m) }
+}
+#[inline(always)]
+pub fn u8_to_block(v: &[u8]) -> Block {
+    unsafe { std::mem::transmute::<&[u8], Block>(v) }
 }
 
 type Cipher = Aes128Ctr;
@@ -94,14 +112,6 @@ pub fn boolvec_to_u8vec(bv: &[bool]) -> Vec<u8> {
         v[i / 8] |= (*b as u8) << (i % 8);
     }
     v
-}
-#[inline(always)]
-pub fn u8x16_to_m128i(v: &[u8; 16]) -> __m128i {
-    unsafe { std::mem::transmute::<[u8; 16], __m128i>(*v) }
-}
-#[inline(always)]
-pub fn m128i_to_u8x16(m: __m128i) -> [u8; 16] {
-    unsafe { std::mem::transmute::<__m128i, [u8; 16]>(m) }
 }
 
 #[link(name = "transpose")]

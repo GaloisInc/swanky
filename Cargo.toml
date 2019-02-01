@@ -33,6 +33,6 @@ debug = true
 name = "utils"
 harness = false
 
-# [[bench]]
-# name = "ot"
-# harness = false
+[[bench]]
+name = "ot"
+harness = false

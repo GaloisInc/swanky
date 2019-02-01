@@ -1,17 +1,16 @@
 //! Implementation of a random number generator based on fixed-key AES.
 
 use crate::aes::Aes128;
+use crate::Block;
 use arrayref::array_mut_ref;
 
 pub struct AesRng {
     aes: Aes128,
 }
 
-type Seed = [u8; 16];
-
 impl AesRng {
     #[inline(always)]
-    pub fn new(seed: Seed) -> Self {
+    pub fn new(seed: Block) -> Self {
         let aes = Aes128::new(&seed);
         AesRng { aes }
     }

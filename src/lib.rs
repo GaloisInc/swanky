@@ -21,12 +21,13 @@
 #![feature(stdsimd)]
 #![feature(asm)]
 
-// type Block = core::arch::x86_64::__m128i;
-
 mod aes;
+mod block;
 mod hash_aes;
 mod ot;
 mod rand_aes;
+mod stream;
 pub mod utils; // XXX currently needs to be public for benchmarking...
+pub use crate::block::*;
 pub use crate::hash_aes::AesHash;
 pub use crate::ot::*;

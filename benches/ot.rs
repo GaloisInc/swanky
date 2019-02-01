@@ -1,7 +1,6 @@
 use criterion::{criterion_group, criterion_main, Criterion};
 use ocelot::*;
 use std::os::unix::net::UnixStream;
-use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 const N: usize = 16;
@@ -10,89 +9,93 @@ const T: usize = 1 << 14;
 fn rand_u8_vec(nbytes: usize) -> Vec<u8> {
     (0..nbytes).map(|_| rand::random::<u8>()).collect()
 }
-fn rand_u128_vec(size: usize) -> Vec<u128> {
-    (0..size).map(|_| rand::random::<u128>()).collect()
+fn rand_block_vec(size: usize) -> Vec<Block> {
+    (0..size).map(|_| rand::random::<Block>()).collect()
 }
-
 fn rand_bool_vec(size: usize) -> Vec<bool> {
     (0..size).map(|_| rand::random::<bool>()).collect()
 }
+fn rand_block() -> Block {
+    rand::random::<Block>()
+}
+
+fn _bench_block_ot<OT: BlockObliviousTransfer<UnixStream>>(
+    sender: UnixStream,
+    receiver: UnixStream,
+    bs: &[bool],
+    ms: Vec<(Block, Block)>,
+) {
+    let handle = std::thread::spawn(move || {
+        let mut ot = OT::new(sender);
+        ot.send(&ms).unwrap();
+    });
+    let mut ot = OT::new(receiver);
+    ot.receive(&bs).unwrap();
+    handle.join().unwrap();
+}
 
 fn _bench_ot<OT: ObliviousTransfer<UnixStream>>(
-    sender: Arc<Mutex<UnixStream>>,
-    receiver: Arc<Mutex<UnixStream>>,
+    sender: UnixStream,
+    receiver: UnixStream,
     bs: &[bool],
     ms: Vec<(Vec<u8>, Vec<u8>)>,
 ) {
     let handle = std::thread::spawn(move || {
-        let mut ot = OT::new(sender.clone());
-        ot.send(&ms, 16).unwrap();
+        let mut ot = OT::new(sender);
+        ot.send(&ms, N).unwrap();
     });
-    let mut ot = OT::new(receiver.clone());
-    ot.receive(&bs, 16).unwrap();
+    let mut ot = OT::new(receiver);
+    ot.receive(&bs, N).unwrap();
     handle.join().unwrap();
 }
 
 fn bench_ot(c: &mut Criterion) {
     c.bench_function("ot::ChouOrlandiOT", move |bench| {
-        let (sender, receiver) = match UnixStream::pair() {
-            Ok((s1, s2)) => (Arc::new(Mutex::new(s1)), Arc::new(Mutex::new(s2))),
-            Err(e) => panic!("Couldn't create pair of sockets: {:?}", e),
-        };
-        let m0 = rand_u8_vec(N);
-        let m1 = rand_u8_vec(N);
-        let ms = vec![(m0.clone(), m1.clone())];
+        let m0 = rand_block();
+        let m1 = rand_block();
+        let ms = vec![(m0, m1)];
         let b = vec![rand::random::<bool>()];
         bench.iter(|| {
-            _bench_ot::<ChouOrlandiOT<UnixStream>>(sender.clone(), receiver.clone(), &b, ms.clone())
+            let (sender, receiver) = UnixStream::pair().unwrap();
+            _bench_block_ot::<ChouOrlandiOT<UnixStream>>(sender, receiver, &b, ms.clone())
         })
     });
     c.bench_function("ot::DummyOT", move |bench| {
-        let (sender, receiver) = match UnixStream::pair() {
-            Ok((s1, s2)) => (Arc::new(Mutex::new(s1)), Arc::new(Mutex::new(s2))),
-            Err(e) => panic!("Couldn't create pair of sockets: {:?}", e),
-        };
         let m0 = rand_u8_vec(N);
         let m1 = rand_u8_vec(N);
-        let ms = vec![(m0.clone(), m1.clone())];
+        let ms = vec![(m0, m1)];
         let b = vec![rand::random::<bool>()];
         bench.iter(|| {
-            _bench_ot::<DummyOT<UnixStream>>(sender.clone(), receiver.clone(), &b, ms.clone())
+            let (sender, receiver) = UnixStream::pair().unwrap();
+            _bench_ot::<DummyOT<UnixStream>>(sender, receiver, &b, ms.clone())
         })
     });
     c.bench_function("ot::NaorPinkasOT", move |bench| {
-        let (sender, receiver) = match UnixStream::pair() {
-            Ok((s1, s2)) => (Arc::new(Mutex::new(s1)), Arc::new(Mutex::new(s2))),
-            Err(e) => panic!("Couldn't create pair of sockets: {:?}", e),
-        };
         let m0 = rand_u8_vec(N);
         let m1 = rand_u8_vec(N);
-        let ms = vec![(m0.clone(), m1.clone())];
+        let ms = vec![(m0, m1)];
         let b = vec![rand::random::<bool>()];
         bench.iter(|| {
-            _bench_ot::<NaorPinkasOT<UnixStream>>(sender.clone(), receiver.clone(), &b, ms.clone())
+            let (sender, receiver) = UnixStream::pair().unwrap();
+            _bench_ot::<NaorPinkasOT<UnixStream>>(sender, receiver, &b, ms.clone())
         })
     });
 }
 
 fn bench_otext(c: &mut Criterion) {
     c.bench_function("ot::AlszOT", move |bench| {
-        let (sender, receiver) = match UnixStream::pair() {
-            Ok((s1, s2)) => (Arc::new(Mutex::new(s1)), Arc::new(Mutex::new(s2))),
-            Err(e) => panic!("Couldn't create pair of sockets: {:?}", e),
-        };
-        let m0s = rand_u128_vec(T);
-        let m1s = rand_u128_vec(T);
+        let m0s = rand_block_vec(T);
+        let m1s = rand_block_vec(T);
         let ms = m0s
             .into_iter()
             .zip(m1s.into_iter())
-            .map(|(a, b)| (u128::to_le_bytes(a).to_vec(), u128::to_le_bytes(b).to_vec()))
-            .collect::<Vec<(Vec<u8>, Vec<u8>)>>();
+            .collect::<Vec<(Block, Block)>>();
         let bs = rand_bool_vec(T);
         bench.iter(|| {
-            _bench_ot::<AlszOT<UnixStream, ChouOrlandiOT<UnixStream>>>(
-                sender.clone(),
-                receiver.clone(),
+            let (sender, receiver) = UnixStream::pair().unwrap();
+            _bench_block_ot::<AlszOT<UnixStream, ChouOrlandiOT<UnixStream>>>(
+                sender,
+                receiver,
                 &bs,
                 ms.clone(),
             )

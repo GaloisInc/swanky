@@ -8,6 +8,7 @@
 
 use crate::aes::Aes128;
 use crate::utils;
+use crate::Block;
 use core::arch::x86_64::*;
 
 pub struct AesHash {
@@ -27,7 +28,7 @@ impl AesHash {
     /// The function computes `π(x) ⊕ x`, where `π = AES(K, ·)` for some fixed
     /// key `K`.
     #[inline(always)]
-    pub fn cr_hash(&self, _i: usize, x: &[u8; 16]) -> [u8; 16] {
+    pub fn cr_hash(&self, _i: usize, x: &Block) -> Block {
         let y = self.aes.encrypt_u8(&x);
         utils::xor_block(&x, &y)
     }
@@ -38,16 +39,16 @@ impl AesHash {
     /// The function computes `H(σ(x))`, where `H` is a correlation robust hash
     /// function and `σ(x₀ || x₁) = (x₀ ⊕ x₁) || x₁`.
     #[inline(always)]
-    pub fn ccr_hash(&self, _i: usize, x: &[u8; 16]) -> [u8; 16] {
+    pub fn ccr_hash(&self, _i: usize, x: &Block) -> Block {
         unsafe {
             let x = _mm_xor_si128(
-                _mm_shuffle_epi32(utils::u8x16_to_m128i(x), 78),
+                _mm_shuffle_epi32(utils::block_to_m128i(x), 78),
                 _mm_and_si128(
-                    utils::u8x16_to_m128i(x),
+                    utils::block_to_m128i(x),
                     _mm_set_epi64(_mm_set1_pi8(0xF), _mm_setzero_si64()),
                 ),
             );
-            let x = utils::m128i_to_u8x16(x);
+            let x = utils::m128i_to_block(x);
             let y = self.aes.encrypt_u8(&x);
             utils::xor_block(&x, &y)
         }
