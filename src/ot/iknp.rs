@@ -2,6 +2,7 @@ use super::Stream;
 use crate::hash_aes::AesHash;
 use crate::ot::ObliviousTransfer;
 use crate::utils;
+use arrayref::array_ref;
 use failure::Error;
 use rand::rngs::ThreadRng;
 use rand::Rng;
@@ -43,13 +44,14 @@ impl<S: Read + Write + Send, OT: ObliviousTransfer<S>> ObliviousTransfer<S> for 
             .collect::<Vec<bool>>();
         let qs = self.ot.receive(&s, ncols / 8)?;
         let qs = qs.into_iter().flatten().collect::<Vec<u8>>();
-        let qs = utils::transpose(&qs, nrows, ncols);
+        let mut qs = utils::transpose(&qs, nrows, ncols);
         let s = utils::boolvec_to_u8vec(&s);
         for (j, input) in inputs.iter().enumerate() {
             let range = j * nrows / 8..(j + 1) * nrows / 8;
-            let q = &qs[range];
-            let y0 = utils::xor(&hash.hash(j, &q), &input.0);
-            let y1 = utils::xor(&hash.hash(j, &utils::xor(&q, &s)), &input.1);
+            let mut q = &mut qs[range];
+            let y0 = utils::xor(&hash.cr_hash(j, array_ref![q, 0, 16]), &input.0);
+            utils::xor_inplace(&mut q, &s);
+            let y1 = utils::xor(&hash.cr_hash(j, array_ref![q, 0, 16]), &input.1);
             self.stream.write_bytes(&y0)?;
             self.stream.write_bytes(&y1)?;
         }
@@ -84,7 +86,7 @@ impl<S: Read + Write + Send, OT: ObliviousTransfer<S>> ObliviousTransfer<S> for 
             let y0 = self.stream.read_bytes(16)?;
             let y1 = self.stream.read_bytes(16)?;
             let y = if *b { y1 } else { y0 };
-            let r = utils::xor(&y, &hash.hash(j, &t));
+            let r = utils::xor(&y, &hash.cr_hash(j, array_ref![t, 0, 16]));
             out.push(r);
         }
         Ok(out)

@@ -67,12 +67,13 @@ impl<S: Read + Write + Send, OT: ObliviousTransfer<S>> ObliviousTransfer<S> for 
             rng.random(&mut q);
             utils::xor_inplace(&mut q, &u);
         }
-        let qs = utils::transpose(&qs, nrows, ncols);
+        let mut qs = utils::transpose(&qs, nrows, ncols);
         for (j, input) in inputs.iter().enumerate() {
             let range = j * nrows / 8..(j + 1) * nrows / 8;
-            let q = &qs[range];
-            let y0 = utils::xor(&hash.hash(j, &q), &input.0);
-            let y1 = utils::xor(&hash.hash(j, &utils::xor(&q, &s_)), &input.1);
+            let mut q = &mut qs[range];
+            let y0 = utils::xor(&hash.cr_hash(j, array_ref![q, 0, 16]), &input.0);
+            utils::xor_inplace(&mut q, &s_);
+            let y1 = utils::xor(&hash.cr_hash(j, array_ref![q, 0, 16]), &input.1);
             self.stream.write_bytes(&y0)?;
             self.stream.write_bytes(&y1)?;
         }
@@ -130,7 +131,7 @@ impl<S: Read + Write + Send, OT: ObliviousTransfer<S>> ObliviousTransfer<S> for 
             self.stream.read_bytes_inplace(&mut y0)?;
             self.stream.read_bytes_inplace(&mut y1)?;
             let mut y = if *b { y1.clone() } else { y0.clone() };
-            utils::xor_inplace(&mut y, &hash.hash(j, &t));
+            utils::xor_inplace(&mut y, &hash.cr_hash(j, array_ref![t, 0, 16]));
             out.push(y);
         }
         Ok(out)

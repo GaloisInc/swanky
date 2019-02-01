@@ -1,3 +1,9 @@
+// -*- mode: rust; -*-
+//
+// This file is part of ocelot.
+// Copyright © 2019 Galois, Inc.
+// See LICENSE for licensing information.
+
 //! `ocelot` is an oblivious transfer (+ extension) library written in rust.
 //! Currently it only implements semi-honest constructions.
 //!
@@ -12,10 +18,15 @@
 
 #![feature(non_ascii_idents)]
 #![feature(test)]
+#![feature(stdsimd)]
+#![feature(asm)]
+
+// type Block = core::arch::x86_64::__m128i;
 
 mod aes;
 mod hash_aes;
 mod ot;
 mod rand_aes;
-mod utils;
+pub mod utils; // XXX currently needs to be public for benchmarking...
+pub use crate::hash_aes::AesHash;
 pub use crate::ot::*;

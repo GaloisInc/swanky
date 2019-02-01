@@ -1,18 +1,14 @@
-//! Implementation of a correlation-robust hash function based on fixed-key AES
-//! (cf. https://eprint.iacr.org/2019/074, §7.2).
-//!
-//! The scheme itself is simple: `H(x) = π(x) ⊕ x`, where `π = AES(K, ·)` for
-//! some fixed key `K`. The value `x` here must be of type `[u8; 16]`; namely, a
-//! 128-bit value.
-//!
-//! It is important to note that this scheme only provides
-//! correlation-robustness, and is thus *not* secure for use in settings where a
-//! stronger assumption is needed, such as in maliciously-secure OT extension
-//! protocols.
+// -*- mode: rust; -*-
+//
+// This file is part of ocelot.
+// Copyright © 2019 Galois, Inc.
+// See LICENSE for licensing information.
+
+//! Implementations of correlation-robust hash functions based on fixed-key AES.
 
 use crate::aes::Aes128;
 use crate::utils;
-use arrayref::array_ref;
+use core::arch::x86_64::*;
 
 pub struct AesHash {
     aes: Aes128,
@@ -24,9 +20,36 @@ impl AesHash {
         let aes = Aes128::new(key);
         AesHash { aes }
     }
+
+    /// Correlation robust hash function for 128-bit inputs (cf.
+    /// <https://eprint.iacr.org/2019/074>, §7.2).
+    ///
+    /// The function computes `π(x) ⊕ x`, where `π = AES(K, ·)` for some fixed
+    /// key `K`.
     #[inline(always)]
-    pub fn hash(&self, _i: usize, x: &[u8]) -> Vec<u8> {
-        let y = self.aes.encrypt_u8(array_ref![x, 0, 16]);
-        utils::xor(&x, &y)
+    pub fn cr_hash(&self, _i: usize, x: &[u8; 16]) -> [u8; 16] {
+        let y = self.aes.encrypt_u8(&x);
+        utils::xor_block(&x, &y)
+    }
+
+    /// Circular correlation robust hash function (cf.
+    /// <https://eprint.iacr.org/2019/074>, §7.3).
+    ///
+    /// The function computes `H(σ(x))`, where `H` is a correlation robust hash
+    /// function and `σ(x₀ || x₁) = (x₀ ⊕ x₁) || x₁`.
+    #[inline(always)]
+    pub fn ccr_hash(&self, _i: usize, x: &[u8; 16]) -> [u8; 16] {
+        unsafe {
+            let x = _mm_xor_si128(
+                _mm_shuffle_epi32(utils::u8x16_to_m128i(x), 78),
+                _mm_and_si128(
+                    utils::u8x16_to_m128i(x),
+                    _mm_set_epi64(_mm_set1_pi8(0xF), _mm_setzero_si64()),
+                ),
+            );
+            let x = utils::m128i_to_u8x16(x);
+            let y = self.aes.encrypt_u8(&x);
+            utils::xor_block(&x, &y)
+        }
     }
 }
