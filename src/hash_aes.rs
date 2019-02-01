@@ -4,20 +4,22 @@
 // Copyright © 2019 Galois, Inc.
 // See LICENSE for licensing information.
 
-//! Implementations of correlation-robust hash functions based on fixed-key AES.
+//! Implementations of correlation-robust hash functions (and their variants)
+//! based on fixed-key AES.
 
 use crate::aes::Aes128;
 use crate::utils;
 use crate::Block;
 use core::arch::x86_64::*;
 
+/// AES-based correlation-robust hash function.
 pub struct AesHash {
     aes: Aes128,
 }
 
 impl AesHash {
     #[inline(always)]
-    pub fn new(key: &[u8; 16]) -> Self {
+    pub fn new(key: &Block) -> Self {
         let aes = Aes128::new(key);
         AesHash { aes }
     }

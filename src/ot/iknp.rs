@@ -1,3 +1,9 @@
+// -*- mode: rust; -*-
+//
+// This file is part of ocelot.
+// Copyright © 2019 Galois, Inc.
+// See LICENSE for licensing information.
+
 use crate::hash_aes::AesHash;
 use crate::stream::{CloneStream, Stream};
 use crate::utils;
@@ -37,7 +43,7 @@ impl<S: CloneStream + Read + Write + Send, OT: ObliviousTransfer<S>> BlockOblivi
             // Just do normal OT
             return self.ot.send(
                 &inputs
-                    .into_iter()
+                    .iter()
                     .map(|(a, b)| (a.to_vec(), b.to_vec()))
                     .collect::<Vec<(Vec<u8>, Vec<u8>)>>(),
                 16,

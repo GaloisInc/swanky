@@ -1,3 +1,9 @@
+// -*- mode: rust; -*-
+//
+// This file is part of ocelot.
+// Copyright © 2019 Galois, Inc.
+// See LICENSE for licensing information.
+
 use crate::Block;
 use curve25519_dalek::ristretto::{CompressedRistretto, RistrettoPoint};
 use failure::Error;
@@ -7,6 +13,12 @@ use std::os::unix::net::UnixStream;
 
 pub trait CloneStream: Sized {
     fn try_clone(&self) -> Result<Self, Error>;
+}
+
+impl CloneStream for UnixStream {
+    fn try_clone(&self) -> Result<UnixStream, Error> {
+        self.try_clone().map_err(Error::from)
+    }
 }
 
 pub struct Stream<T: Read + Write + Send> {
@@ -76,11 +88,5 @@ impl<T: Read + Write + Send> Stream<T> {
         let mut v = [0u8; 16];
         self.stream().read_exact(&mut v)?;
         Ok(v)
-    }
-}
-
-impl CloneStream for UnixStream {
-    fn try_clone(&self) -> Result<UnixStream, Error> {
-        self.try_clone().map_err(Error::from)
     }
 }
