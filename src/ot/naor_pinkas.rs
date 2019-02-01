@@ -35,14 +35,14 @@ impl<T: Read + Write + Send> ObliviousTransfer<T> for NaorPinkasOT<T> {
             let c = RistrettoPoint::random(&mut self.rng);
             self.stream.write_pt(&c)?;
             let pk0 = self.stream.read_pt()?;
-            let pk1 = &c - &pk0;
+            let pk1 = c - pk0;
             let r0 = Scalar::random(&mut self.rng);
             let r1 = Scalar::random(&mut self.rng);
             let e00 = &r0 * &RISTRETTO_BASEPOINT_TABLE;
             let e10 = &r1 * &RISTRETTO_BASEPOINT_TABLE;
-            let h = hash(&(&pk0 * &r0), nbytes);
+            let h = hash(&(pk0 * r0), nbytes);
             let e01 = utils::xor(&h, &input.0);
-            let h = hash(&(&pk1 * &r1), nbytes);
+            let h = hash(&(pk1 * r1), nbytes);
             let e11 = utils::xor(&h, &input.1);
             self.stream.write_pt(&e00)?;
             self.stream.write_bytes(&e01)?;
@@ -60,12 +60,12 @@ impl<T: Read + Write + Send> ObliviousTransfer<T> for NaorPinkasOT<T> {
         };
 
         inputs
-            .into_iter()
+            .iter()
             .map(|input| {
                 let c = self.stream.read_pt()?;
                 let k = Scalar::random(&mut self.rng);
                 let pkσ = &k * &RISTRETTO_BASEPOINT_TABLE;
-                let pkσ_ = &c - &pkσ;
+                let pkσ_ = c - pkσ;
                 match input {
                     false => self.stream.write_pt(&pkσ)?,
                     true => self.stream.write_pt(&pkσ_)?,
@@ -78,7 +78,7 @@ impl<T: Read + Write + Send> ObliviousTransfer<T> for NaorPinkasOT<T> {
                     false => (e00, e01),
                     true => (e10, e11),
                 };
-                let h = hash(&(&eσ0 * &k), nbytes);
+                let h = hash(&(eσ0 * k), nbytes);
                 let m = utils::xor(&h, &eσ1);
                 Ok(m)
             })

@@ -12,6 +12,7 @@
 
 use crate::aes::Aes128;
 use crate::utils;
+use arrayref::array_ref;
 
 pub struct AesHash {
     aes: Aes128,
@@ -26,7 +27,6 @@ impl AesHash {
     #[inline(always)]
     pub fn hash(&self, _i: usize, x: &[u8]) -> Vec<u8> {
         let y = self.aes.encrypt_u8(array_ref![x, 0, 16]);
-        let r = utils::xor(&x, &y);
-        r
+        utils::xor(&x, &y)
     }
 }

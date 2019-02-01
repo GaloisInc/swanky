@@ -3,6 +3,7 @@ use crate::hash_aes::AesHash;
 use crate::rand_aes::AesRng;
 use crate::utils;
 use crate::ObliviousTransfer;
+use arrayref::array_ref;
 use failure::Error;
 use rand::rngs::ThreadRng;
 use rand::Rng;
@@ -58,20 +59,20 @@ impl<S: Read + Write + Send, OT: ObliviousTransfer<S>> ObliviousTransfer<S> for 
             .map(|k| AesRng::new(*array_ref![k, 0, SEED_LENGTH]));
         let mut qs = vec![0u8; nrows * ncols / 8];
         let mut u = vec![0u8; ncols / 8];
-        for (j, (b, rng)) in s.into_iter().zip(rngs.into_iter()).enumerate() {
+        for (j, (b, rng)) in s.into_iter().zip(rngs).enumerate() {
             let range = j * ncols / 8..(j + 1) * ncols / 8;
-            let mut q = qs.get_mut(range).unwrap();
+            let mut q = &mut qs[range];
             self.stream.read_bytes_inplace(&mut u)?;
             let u = if b { u.clone() } else { vec![0u8; ncols / 8] };
             rng.random(&mut q);
             utils::xor_inplace(&mut q, &u);
         }
         let qs = utils::transpose(&qs, nrows, ncols);
-        for j in 0..ncols {
+        for (j, input) in inputs.iter().enumerate() {
             let range = j * nrows / 8..(j + 1) * nrows / 8;
-            let q = qs.get(range).unwrap();
-            let y0 = utils::xor(&hash.hash(j, &q), &inputs[j].0);
-            let y1 = utils::xor(&hash.hash(j, &utils::xor(&q, &s_)), &inputs[j].1);
+            let q = &qs[range];
+            let y0 = utils::xor(&hash.hash(j, &q), &input.0);
+            let y1 = utils::xor(&hash.hash(j, &utils::xor(&q, &s_)), &input.1);
             self.stream.write_bytes(&y0)?;
             self.stream.write_bytes(&y1)?;
         }
@@ -110,9 +111,9 @@ impl<S: Read + Write + Send, OT: ObliviousTransfer<S>> ObliviousTransfer<S> for 
         let r = utils::boolvec_to_u8vec(inputs);
         let mut ts = vec![0u8; nrows * ncols / 8];
         let mut g = vec![0u8; ncols / 8];
-        for (j, (rng0, rng1)) in rngs.into_iter().enumerate() {
+        for (j, (rng0, rng1)) in rngs.enumerate() {
             let range = j * ncols / 8..(j + 1) * ncols / 8;
-            let mut t = ts.get_mut(range).unwrap();
+            let mut t = &mut ts[range];
             rng0.random(&mut t);
             rng1.random(&mut g);
             utils::xor_inplace(&mut g, &t);
@@ -123,9 +124,9 @@ impl<S: Read + Write + Send, OT: ObliviousTransfer<S>> ObliviousTransfer<S> for 
         let mut out = Vec::with_capacity(ncols);
         let mut y0 = vec![0u8; 16];
         let mut y1 = vec![0u8; 16];
-        for (j, b) in inputs.into_iter().enumerate() {
+        for (j, b) in inputs.iter().enumerate() {
             let range = j * nrows / 8..(j + 1) * nrows / 8;
-            let t = ts.get(range).unwrap();
+            let t = &ts[range];
             self.stream.read_bytes_inplace(&mut y0)?;
             self.stream.read_bytes_inplace(&mut y1)?;
             let mut y = if *b { y1.clone() } else { y0.clone() };
@@ -141,6 +142,7 @@ mod tests {
     extern crate test;
     use super::*;
     use crate::*;
+    use itertools::izip;
     use std::os::unix::net::UnixStream;
     use std::sync::{Arc, Mutex};
 
@@ -176,7 +178,7 @@ mod tests {
         });
         let mut otext = AlszOT::<UnixStream, OT>::new(receiver.clone());
         let results = otext.receive(&bs, 16).unwrap();
-        for (b, result, m0, m1) in itertools::izip!(bs_, results, m0s_, m1s_) {
+        for (b, result, m0, m1) in izip!(bs_, results, m0s_, m1s_) {
             assert_eq!(
                 u128::from_ne_bytes(*array_ref![result, 0, 16]),
                 if b { m1 } else { m0 }

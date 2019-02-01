@@ -1,6 +1,7 @@
 use crate::aes::Aes128;
 use aesni::stream_cipher::{NewStreamCipher, StreamCipher};
 use aesni::Aes128Ctr;
+use arrayref::array_ref;
 use curve25519_dalek::ristretto::RistrettoPoint;
 
 #[inline(always)]
@@ -41,10 +42,7 @@ pub fn hash_pt_128_inplace(pt: &RistrettoPoint, out: &mut [u8]) {
 
 #[inline(always)]
 pub fn xor(a: &[u8], b: &[u8]) -> Vec<u8> {
-    a.into_iter()
-        .zip(b.into_iter())
-        .map(|(a, b)| a ^ b)
-        .collect()
+    a.iter().zip(b.iter()).map(|(a, b)| a ^ b).collect()
 }
 
 #[inline(always)]
@@ -77,7 +75,7 @@ pub fn transpose(m: &[u8], nrows: usize, ncols: usize) -> Vec<u8> {
 #[inline(always)]
 pub fn boolvec_to_u8vec(bv: &[bool]) -> Vec<u8> {
     let mut v = vec![0u8; bv.len() / 8];
-    for (i, b) in bv.into_iter().enumerate() {
+    for (i, b) in bv.iter().enumerate() {
         v[i / 8] |= (*b as u8) << (i % 8);
     }
     v

@@ -45,11 +45,11 @@ impl<S: Read + Write + Send, OT: ObliviousTransfer<S>> ObliviousTransfer<S> for 
         let qs = qs.into_iter().flatten().collect::<Vec<u8>>();
         let qs = utils::transpose(&qs, nrows, ncols);
         let s = utils::boolvec_to_u8vec(&s);
-        for j in 0..ncols {
+        for (j, input) in inputs.iter().enumerate() {
             let range = j * nrows / 8..(j + 1) * nrows / 8;
-            let q = qs.get(range).unwrap();
-            let y0 = utils::xor(&hash.hash(j, &q), &inputs[j].0);
-            let y1 = utils::xor(&hash.hash(j, &utils::xor(&q, &s)), &inputs[j].1);
+            let q = &qs[range];
+            let y0 = utils::xor(&hash.hash(j, &q), &input.0);
+            let y1 = utils::xor(&hash.hash(j, &utils::xor(&q, &s)), &input.1);
             self.stream.write_bytes(&y0)?;
             self.stream.write_bytes(&y1)?;
         }
@@ -80,7 +80,7 @@ impl<S: Read + Write + Send, OT: ObliviousTransfer<S>> ObliviousTransfer<S> for 
         let mut out = Vec::with_capacity(inputs.len());
         for (j, b) in inputs.iter().enumerate() {
             let range = j * nrows / 8..(j + 1) * nrows / 8;
-            let t = ts.get(range).unwrap();
+            let t = &ts[range];
             let y0 = self.stream.read_bytes(16)?;
             let y1 = self.stream.read_bytes(16)?;
             let y = if *b { y1 } else { y0 };
@@ -96,6 +96,8 @@ mod tests {
     extern crate test;
     use super::*;
     use crate::*;
+    use arrayref::array_ref;
+    use itertools::izip;
     use std::os::unix::net::UnixStream;
     use std::sync::{Arc, Mutex};
 
@@ -134,7 +136,7 @@ mod tests {
         });
         let mut otext = IknpOT::<UnixStream, OT>::new(receiver.clone());
         let results = otext.receive(&bs, 16).unwrap();
-        for (b, result, m0, m1) in itertools::izip!(bs_, results, m0s_, m1s_) {
+        for (b, result, m0, m1) in izip!(bs_, results, m0s_, m1s_) {
             assert_eq!(
                 u128::from_ne_bytes(*array_ref![result, 0, 16]),
                 if b { m1 } else { m0 }

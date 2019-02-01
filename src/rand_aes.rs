@@ -1,6 +1,7 @@
 //! Implementation of a random number generator based on fixed-key AES.
 
 use crate::aes::Aes128;
+use arrayref::array_mut_ref;
 
 pub struct AesRng {
     aes: Aes128,

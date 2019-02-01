@@ -35,10 +35,10 @@ impl<S: Read + Write + Send> ObliviousTransfer<S> for ChouOrlandiOT<S> {
         self.stream.write_pt(&s)?;
         let mut k0 = vec![0u8; nbytes];
         let mut k1 = vec![0u8; nbytes];
-        for input in inputs.into_iter() {
+        for input in inputs.iter() {
             let r = self.stream.read_pt()?;
-            hash_inplace(&(&r * &y), &mut k0);
-            hash_inplace(&((&r - &s) * &y), &mut k1);
+            hash_inplace(&(r * y), &mut k0);
+            hash_inplace(&((r - s) * y), &mut k1);
             encrypt_inplace(&mut k0, &input.0);
             encrypt_inplace(&mut k1, &input.1);
             self.stream.write_bytes(&k0)?;
@@ -55,13 +55,13 @@ impl<S: Read + Write + Send> ObliviousTransfer<S> for ChouOrlandiOT<S> {
         };
         let s = self.stream.read_pt()?;
         inputs
-            .into_iter()
+            .iter()
             .map(|b| {
                 let x = Scalar::random(&mut self.rng);
                 let c = if *b { Scalar::one() } else { Scalar::zero() };
-                let r = &c * &s + &x * &RISTRETTO_BASEPOINT_TABLE;
+                let r = c * s + &x * &RISTRETTO_BASEPOINT_TABLE;
                 self.stream.write_pt(&r)?;
-                let mut k = hash(&(&x * &s), nbytes);
+                let mut k = hash(&(x * s), nbytes);
                 let c0 = self.stream.read_bytes(nbytes)?;
                 let c1 = self.stream.read_bytes(nbytes)?;
                 let c = if *b { &c1 } else { &c0 };

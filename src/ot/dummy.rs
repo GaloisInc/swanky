@@ -21,7 +21,7 @@ impl<T: Read + Write + Send> ObliviousTransfer<T> for DummyOT<T> {
             let b = self.stream.read_bool()?;
             bs.push(b);
         }
-        for (b, m) in bs.into_iter().zip(inputs.into_iter()) {
+        for (b, m) in bs.into_iter().zip(inputs.iter()) {
             let m = if b { &m.1 } else { &m.0 };
             self.stream.write_bytes(&m)?;
         }
@@ -29,11 +29,10 @@ impl<T: Read + Write + Send> ObliviousTransfer<T> for DummyOT<T> {
     }
 
     fn receive(&mut self, inputs: &[bool], nbytes: usize) -> Result<Vec<Vec<u8>>, Error> {
-        for b in inputs.into_iter() {
+        for b in inputs.iter() {
             self.stream.write_bool(*b)?;
         }
         (0..inputs.len())
-            .into_iter()
             .map(|_| self.stream.read_bytes(nbytes))
             .collect()
     }
