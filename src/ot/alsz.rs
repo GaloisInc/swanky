@@ -53,7 +53,7 @@ impl<S: CloneStream + Read + Write + Send, OT: BlockObliviousTransfer<S>> BlockO
             .collect::<Vec<bool>>();
         let s_ = utils::boolvec_to_u8vec(&s);
         let ks = self.ot.receive(&s)?;
-        let rngs = ks.into_iter().map(AesRng::new);
+        let rngs = ks.into_iter().map(|k| AesRng::new(&k));
         let mut qs = vec![0u8; nrows * ncols / 8];
         let mut u = vec![0u8; ncols / 8];
         for (j, (b, rng)) in s.into_iter().zip(rngs).enumerate() {
@@ -91,7 +91,7 @@ impl<S: CloneStream + Read + Write + Send, OT: BlockObliviousTransfer<S>> BlockO
         self.ot.send(&ks)?;
         let rngs = ks
             .into_iter()
-            .map(|(k0, k1)| (AesRng::new(k0), AesRng::new(k1)));
+            .map(|(k0, k1)| (AesRng::new(&k0), AesRng::new(&k1)));
         let r = utils::boolvec_to_u8vec(inputs);
         let mut ts = vec![0u8; nrows * ncols / 8];
         let mut g = vec![0u8; ncols / 8];

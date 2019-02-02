@@ -4,7 +4,7 @@ use std::os::unix::net::UnixStream;
 use std::time::Duration;
 
 const N: usize = 16;
-const T: usize = 1 << 14;
+const T: usize = 1 << 15;
 
 fn rand_u8_vec(nbytes: usize) -> Vec<u8> {
     (0..nbytes).map(|_| rand::random::<u8>()).collect()

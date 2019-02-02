@@ -31,3 +31,4 @@ pub mod utils; // XXX currently needs to be public for benchmarking...
 pub use crate::block::*;
 pub use crate::hash_aes::AesHash;
 pub use crate::ot::*;
+pub use crate::rand_aes::AesRng;
