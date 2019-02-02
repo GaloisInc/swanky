@@ -60,7 +60,7 @@ mod tests {
         let m0_ = m0.clone();
         let m1_ = m1.clone();
         let (sender, receiver) = match UnixStream::pair() {
-            Ok((s1, s2)) => (s1, s2), // (Arc::new(Mutex::new(s1)), Arc::new(Mutex::new(s2)))
+            Ok((s1, s2)) => (s1, s2),
             Err(e) => panic!("Couldn't create pair of sockets: {:?}", e),
         };
         let handle = std::thread::spawn(|| {

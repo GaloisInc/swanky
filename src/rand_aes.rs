@@ -26,8 +26,7 @@ impl AesRng {
     /// Fills `bytes` with random bits.
     ///
     /// This uses AES in a counter-mode-esque way, but with the counter always
-    /// starting on zero. When used as a PRNG this is okay (as long as the seed
-    /// is not repeated!).
+    /// starting at zero. When used as a PRNG this is okay [TODO: citation?].
     #[inline(always)]
     pub fn random(&self, bytes: &mut [u8]) {
         assert_eq!(bytes.len() % 16, 0);
