@@ -180,19 +180,21 @@ fn start_postman(
         let mut c = 0;
         while c < end_index {
             if let Some(ref reqs) = *reqs.read().unwrap() {
-                if let Some((r,tx)) = reqs[c as usize].try_pop() {
-                    match r {
-                        Request::GarblerInput(modulus) => {
-                            let mut inps = gb_inps.lock().unwrap();
-                            assert!(inps.len() > 0, "not enough garbler inputs");
-                            let val = inps.remove(0);
-                            tx.send(DummyVal { val, modulus }).unwrap();
-                        }
-                        Request::EvaluatorInput(modulus) => {
-                            let mut inps = ev_inps.lock().unwrap();
-                            assert!(inps.len() > 0, "not enough evaluator inputs");
-                            let val = inps.remove(0);
-                            tx.send(DummyVal { val, modulus }).unwrap();
+                if let Some(q) = reqs.get(c as usize) { // avoid mysterious indexing error
+                    if let Some((r,tx)) = q.try_pop() {
+                        match r {
+                            Request::GarblerInput(modulus) => {
+                                let mut inps = gb_inps.lock().unwrap();
+                                assert!(inps.len() > 0, "not enough garbler inputs");
+                                let val = inps.remove(0);
+                                tx.send(DummyVal { val, modulus }).unwrap();
+                            }
+                            Request::EvaluatorInput(modulus) => {
+                                let mut inps = ev_inps.lock().unwrap();
+                                assert!(inps.len() > 0, "not enough evaluator inputs");
+                                let val = inps.remove(0);
+                                tx.send(DummyVal { val, modulus }).unwrap();
+                            }
                         }
                     }
                 }
