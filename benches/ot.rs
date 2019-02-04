@@ -46,22 +46,28 @@ fn bench_ot(c: &mut Criterion) {
             .into_iter()
             .zip(m1s.into_iter())
             .collect::<Vec<(Block, Block)>>();
-        let b = vec![rand::random::<bool>()];
-        bench.iter(move || _bench_block_ot::<ChouOrlandiOT<UnixStream>>(&b, ms.clone()))
+        let bs = rand_bool_vec(128);
+        bench.iter(move || _bench_block_ot::<ChouOrlandiOT<UnixStream>>(&bs, ms.clone()))
     });
     c.bench_function("ot::DummyOT", move |bench| {
-        let m0 = rand_u8_vec(N);
-        let m1 = rand_u8_vec(N);
-        let ms = vec![(m0, m1)];
-        let b = vec![rand::random::<bool>()];
-        bench.iter(|| _bench_ot::<DummyOT<UnixStream>>(&b, ms.clone()))
+        let m0s = (0..128).map(|_| rand_u8_vec(N)).collect::<Vec<Vec<u8>>>();
+        let m1s = (0..128).map(|_| rand_u8_vec(N)).collect::<Vec<Vec<u8>>>();
+        let ms = m0s
+            .into_iter()
+            .zip(m1s.into_iter())
+            .collect::<Vec<(Vec<u8>, Vec<u8>)>>();
+        let bs = rand_bool_vec(128);
+        bench.iter(|| _bench_ot::<DummyOT<UnixStream>>(&bs, ms.clone()))
     });
     c.bench_function("ot::NaorPinkasOT", move |bench| {
-        let m0 = rand_u8_vec(N);
-        let m1 = rand_u8_vec(N);
-        let ms = vec![(m0, m1)];
-        let b = vec![rand::random::<bool>()];
-        bench.iter(|| _bench_ot::<NaorPinkasOT<UnixStream>>(&b, ms.clone()))
+        let m0s = (0..128).map(|_| rand_u8_vec(N)).collect::<Vec<Vec<u8>>>();
+        let m1s = (0..128).map(|_| rand_u8_vec(N)).collect::<Vec<Vec<u8>>>();
+        let ms = m0s
+            .into_iter()
+            .zip(m1s.into_iter())
+            .collect::<Vec<(Vec<u8>, Vec<u8>)>>();
+        let bs = rand_bool_vec(128);
+        bench.iter(|| _bench_ot::<NaorPinkasOT<UnixStream>>(&bs, ms.clone()))
     });
 }
 

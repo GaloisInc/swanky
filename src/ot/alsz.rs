@@ -54,16 +54,7 @@ impl<S: Read + Write + Send, OT: BlockObliviousTransfer<S>> BlockObliviousTransf
         let hash = AesHash::new(&[0u8; 16]); // XXX IV should be chosen at random
         let mut s_ = vec![0u8; nrows / 8];
         self.rng.random(&mut s_);
-        let mut s = Vec::with_capacity(nrows);
-        for byte in s_.iter() {
-            for i in 0..8 {
-                s.push((1 << i) & byte != 0);
-            }
-        }
-        // let s = (0..nrows)
-        //     .map(|_| self.rng.gen::<bool>())
-        //     .collect::<Vec<bool>>();
-        let s_ = utils::boolvec_to_u8vec(&s);
+        let s = utils::u8vec_to_boolvec(&s_);
         let ks = self.ot.receive(stream, &s)?;
         let rngs = ks.into_iter().map(|k| AesRng::new(&k));
         let mut qs = vec![0u8; nrows * ncols / 8];
@@ -105,9 +96,6 @@ impl<S: Read + Write + Send, OT: BlockObliviousTransfer<S>> BlockObliviousTransf
             self.rng.random(&mut k1);
             ks.push((k0, k1));
         }
-        // let ks = (0..nrows)
-        //     .map(|_| (self.rng.gen::<Block>(), self.rng.gen::<Block>()))
-        //     .collect::<Vec<(Block, Block)>>();
         self.ot.send(stream, &ks)?;
         let rngs = ks
             .into_iter()

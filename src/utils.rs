@@ -113,6 +113,16 @@ pub fn boolvec_to_u8vec(bv: &[bool]) -> Vec<u8> {
     }
     v
 }
+#[inline(always)]
+pub fn u8vec_to_boolvec(v: &[u8]) -> Vec<bool> {
+    let mut bv = Vec::with_capacity(v.len() * 8);
+    for byte in v.iter() {
+        for i in 0..8 {
+            bv.push((1 << i) & byte != 0);
+        }
+    }
+    bv
+}
 
 #[link(name = "transpose")]
 extern "C" {
