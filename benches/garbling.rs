@@ -45,7 +45,7 @@ fn proj(q: u16) -> Circuit {
     let b = CircuitBuilder::new();
     let x = b.garbler_input(None, q);
     let tab = (0..q).map(|i| (i + 1) % q).collect_vec();
-    let z = b.proj(None, &x, q, &tab);
+    let z = b.proj(None, &x, q, Some(tab));
     b.output(None, &z);
     b.finish()
 }

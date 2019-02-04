@@ -124,7 +124,8 @@ impl Fancy for Dummy {
         DummyVal { val, modulus: x.modulus }
     }
 
-    fn proj(&self, _ix: Option<SyncIndex>, x: &DummyVal, modulus: u16, tt: &[u16]) -> DummyVal {
+    fn proj(&self, _ix: Option<SyncIndex>, x: &DummyVal, modulus: u16, tt: Option<Vec<u16>>) -> DummyVal {
+        let tt = tt.expect("dummy.proj requires truth table");
         assert_eq!(tt.len(), x.modulus as usize, "dummy: projection truth table not the right size");
         assert!(tt.iter().all(|&x| x < modulus), "dummy: projection truth table has bogus values");
         assert!(x.val < x.modulus, "dummy: projection val is greater than its modulus");

@@ -223,9 +223,7 @@ impl Fancy for Informer {
         InformerVal(x.modulus())
     }
 
-    fn proj(&self, _ix: Option<SyncIndex>, x: &InformerVal, modulus: u16, tt: &[u16]) -> InformerVal {
-        assert_eq!(tt.len(), x.modulus() as usize);
-        assert!(tt.iter().all(|&x| x < modulus));
+    fn proj(&self, _ix: Option<SyncIndex>, x: &InformerVal, modulus: u16, _tt: Option<Vec<u16>>) -> InformerVal {
         self.nprojs.fetch_add(1, Ordering::SeqCst);
         self.nciphertexts.fetch_add(x.modulus() as usize - 1, Ordering::SeqCst);
         InformerVal(modulus)

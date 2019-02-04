@@ -230,7 +230,8 @@ impl Fancy for CircuitBuilder {
         self.gate(Gate::Cmul { xref: *xref, c }, xref.modulus())
     }
 
-    fn proj(&self, _ix: Option<SyncIndex>, xref: &CircuitRef, output_modulus: u16, tt: &[u16]) -> CircuitRef {
+    fn proj(&self, _ix: Option<SyncIndex>, xref: &CircuitRef, output_modulus: u16, tt: Option<Vec<u16>>) -> CircuitRef {
+        let tt = tt.expect("builder.proj requires truth table");
         assert_eq!(tt.len(), xref.modulus() as usize);
         assert!(tt.iter().all(|&x| x < output_modulus),
             "not all xs were less than the output modulus! circuit.proj: tt={:?},

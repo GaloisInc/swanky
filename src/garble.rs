@@ -200,7 +200,7 @@ pub fn garble(c: &Circuit) -> (Encoder, Decoder, GarbledCircuit) {
                 Gate::Sub { xref, yref }     => garbler.sub(&wires[xref.ix], &wires[yref.ix]),
                 Gate::Cmul { xref, c }       => garbler.cmul(&wires[xref.ix], *c),
                 Gate::Mul { xref, yref, .. } => garbler.mul(None, &wires[xref.ix], &wires[yref.ix]),
-                Gate::Proj { xref, tt, .. }  => garbler.proj(None, &wires[xref.ix], q, tt),
+                Gate::Proj { xref, tt, .. }  => garbler.proj(None, &wires[xref.ix], q, Some(tt.clone())),
             };
             wires.push(w);
         }
@@ -418,7 +418,7 @@ mod classic {
             let b = CircuitBuilder::new();
             let x = b.evaluator_input(None, q);
             let _ = b.evaluator_input(None, q);
-            let z = b.proj(None, &x, q, &tab);
+            let z = b.proj(None, &x, q, Some(tab));
             b.output(None, &z);
             b.finish()
         });
@@ -435,7 +435,7 @@ mod classic {
             let b = CircuitBuilder::new();
             let x = b.evaluator_input(None, q);
             let _ = b.evaluator_input(None, q);
-            let z = b.proj(None, &x, q, &tab);
+            let z = b.proj(None, &x, q, Some(tab));
             b.output(None, &z);
             b.finish()
         });
@@ -738,7 +738,7 @@ mod streaming {
     {
         let x = b.garbler_input(None, q);
         let tab = (0..q).map(|i| (i + 1) % q).collect_vec();
-        let z = b.proj(None,&x,q,&tab);
+        let z = b.proj(None,&x,q,Some(tab));
         b.output(None,&z);
     }
 

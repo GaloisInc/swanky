@@ -228,7 +228,7 @@ impl Fancy for Evaluator {
         L.plus_mov(&R.plus_mov(&A.cmul(new_b_color)))
     }
 
-    fn proj(&self, ix: Option<SyncIndex>, x: &Wire, q: u16, _tt: &[u16]) -> Wire {
+    fn proj(&self, ix: Option<SyncIndex>, x: &Wire, q: u16, _tt: Option<Vec<u16>>) -> Wire {
         let gate = match self.recv(ix) {
             Message::GarbledGate(g) => g,
             m => panic!("Expected message GarbledGate but got {}", m),
@@ -318,7 +318,7 @@ impl GarbledCircuit {
                 Gate::Add { xref, yref }     => wires[xref.ix].plus(&wires[yref.ix]),
                 Gate::Sub { xref, yref }     => wires[xref.ix].minus(&wires[yref.ix]),
                 Gate::Cmul { xref, c }       => wires[xref.ix].cmul(c),
-                Gate::Proj { xref, .. }      => eval.proj(None, &wires[xref.ix], q, &[]),
+                Gate::Proj { xref, .. }      => eval.proj(None, &wires[xref.ix], q, None),
                 Gate::Mul { xref, yref, .. } => eval.mul(None, &wires[xref.ix], &wires[yref.ix]),
             };
             wires.push(w);

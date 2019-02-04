@@ -257,7 +257,9 @@ impl Fancy for Garbler {
         X.plus_mov(&Y)
     }
 
-    fn proj(&self, ix: Option<SyncIndex>, A: &Wire, q_out: u16, tt: &[u16]) -> Wire { //
+    fn proj(&self, ix: Option<SyncIndex>, A: &Wire, q_out: u16, tt: Option<Vec<u16>>) -> Wire { //
+        let tt = tt.expect("garbler.proj requires truth table");
+
         let q_in = A.modulus();
         // we have to fill in the vector in an unkonwn order because of the color bits.
         // Since some of the values in gate will be void temporarily, we use Vec<Option<..>>
