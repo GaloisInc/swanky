@@ -4,7 +4,7 @@
 // Copyright © 2019 Galois, Inc.
 // See LICENSE for licensing information.
 
-use crate::stream::Stream;
+use crate::stream;
 use crate::utils;
 use crate::{Block, BlockObliviousTransfer};
 use curve25519_dalek::constants::RISTRETTO_BASEPOINT_TABLE;
@@ -12,6 +12,7 @@ use curve25519_dalek::scalar::Scalar;
 use failure::Error;
 use rand::rngs::ThreadRng;
 use std::io::{Read, Write};
+use std::marker::PhantomData;
 
 /// Implementation of the Chou-Orlandi semi-honest secure oblivious transfer
 /// protocol (cf. <https://eprint.iacr.org/2015/267>).
@@ -20,45 +21,47 @@ use std::io::{Read, Write};
 /// the `curve25519-dalek` library and works over blocks rather than arbitrary
 /// length messages.
 pub struct ChouOrlandiOT<S: Read + Write + Send> {
-    stream: Stream<S>,
+    _s: PhantomData<S>,
     rng: ThreadRng,
 }
 
 impl<S: Read + Write + Send> BlockObliviousTransfer<S> for ChouOrlandiOT<S> {
-    fn new(stream: S) -> Self {
-        let stream = Stream::new(stream);
+    fn new() -> Self {
         let rng = rand::thread_rng();
-        Self { stream, rng }
+        Self {
+            _s: PhantomData::<S>,
+            rng,
+        }
     }
 
-    fn send(&mut self, inputs: &[(Block, Block)]) -> Result<(), Error> {
+    fn send(&mut self, stream: &mut S, inputs: &[(Block, Block)]) -> Result<(), Error> {
         let y = Scalar::random(&mut self.rng);
         let s = &y * &RISTRETTO_BASEPOINT_TABLE;
-        self.stream.write_pt(&s)?;
+        stream::write_pt(stream, &s)?;
         for input in inputs.iter() {
-            let r = self.stream.read_pt()?;
+            let r = stream::read_pt(stream)?;
             let k0 = utils::hash_pt_block(&(r * y));
             let k1 = utils::hash_pt_block(&((r - s) * y));
             let c0 = encrypt(&k0, &input.0);
             let c1 = encrypt(&k1, &input.1);
-            self.stream.write_block(&c0)?;
-            self.stream.write_block(&c1)?;
+            stream::write_block(stream, &c0)?;
+            stream::write_block(stream, &c1)?;
         }
         Ok(())
     }
 
-    fn receive(&mut self, inputs: &[bool]) -> Result<Vec<Block>, Error> {
-        let s = self.stream.read_pt()?;
+    fn receive(&mut self, stream: &mut S, inputs: &[bool]) -> Result<Vec<Block>, Error> {
+        let s = stream::read_pt(stream)?;
         inputs
             .iter()
             .map(|b| {
                 let x = Scalar::random(&mut self.rng);
                 let c = if *b { Scalar::one() } else { Scalar::zero() };
                 let r = c * s + &x * &RISTRETTO_BASEPOINT_TABLE;
-                self.stream.write_pt(&r)?;
+                stream::write_pt(stream, &r)?;
                 let k = utils::hash_pt_block(&(x * s));
-                let c0 = self.stream.read_block()?;
-                let c1 = self.stream.read_block()?;
+                let c0 = stream::read_block(stream)?;
+                let c1 = stream::read_block(stream)?;
                 let c = if *b { &c1 } else { &c0 };
                 let c = decrypt(&k, &c);
                 Ok(c)
@@ -89,16 +92,16 @@ mod tests {
         let b = rand::random::<bool>();
         let m0_ = m0.clone();
         let m1_ = m1.clone();
-        let (sender, receiver) = match UnixStream::pair() {
+        let (mut sender, mut receiver) = match UnixStream::pair() {
             Ok((s1, s2)) => (s1, s2),
             Err(e) => panic!("Couldn't create pair of sockets: {:?}", e),
         };
         let handle = std::thread::spawn(move || {
-            let mut ot = ChouOrlandiOT::new(sender);
-            ot.send(&[(m0, m1)]).unwrap();
+            let mut ot = ChouOrlandiOT::new();
+            ot.send(&mut sender, &[(m0, m1)]).unwrap();
         });
-        let mut ot = ChouOrlandiOT::new(receiver);
-        let results = ot.receive(&[b]).unwrap();
+        let mut ot = ChouOrlandiOT::new();
+        let results = ot.receive(&mut receiver, &[b]).unwrap();
         assert_eq!(results[0], if b { m1_ } else { m0_ });
         handle.join().unwrap();
     }

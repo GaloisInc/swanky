@@ -4,42 +4,54 @@
 // Copyright © 2019 Galois, Inc.
 // See LICENSE for licensing information.
 
-use crate::stream::Stream;
+use crate::stream;
 use crate::ObliviousTransfer;
 use failure::Error;
 use std::io::{Read, Write};
+use std::marker::PhantomData;
 
 /// Implementation if an **entirely insecure** oblivious transfer protocol for
 /// testing purposes.
-pub struct DummyOT<T: Read + Write + Send> {
-    stream: Stream<T>,
+pub struct DummyOT<S: Read + Write + Send> {
+    _s: PhantomData<S>,
 }
 
-impl<T: Read + Write + Send> ObliviousTransfer<T> for DummyOT<T> {
-    fn new(stream: T) -> Self {
-        let stream = Stream::new(stream);
-        Self { stream }
+impl<S: Read + Write + Send> ObliviousTransfer<S> for DummyOT<S> {
+    fn new() -> Self {
+        Self {
+            _s: PhantomData::<S>,
+        }
     }
 
-    fn send(&mut self, inputs: &[(Vec<u8>, Vec<u8>)], _nbytes: usize) -> Result<(), Error> {
+    fn send(
+        &mut self,
+        stream: &mut S,
+        inputs: &[(Vec<u8>, Vec<u8>)],
+        _nbytes: usize,
+    ) -> Result<(), Error> {
         let mut bs = Vec::with_capacity(inputs.len());
         for _ in 0..inputs.len() {
-            let b = self.stream.read_bool()?;
+            let b = stream::read_bool(stream)?;
             bs.push(b);
         }
         for (b, m) in bs.into_iter().zip(inputs.iter()) {
             let m = if b { &m.1 } else { &m.0 };
-            self.stream.write_bytes(&m)?;
+            stream::write_bytes(stream, &m)?;
         }
         Ok(())
     }
 
-    fn receive(&mut self, inputs: &[bool], nbytes: usize) -> Result<Vec<Vec<u8>>, Error> {
+    fn receive(
+        &mut self,
+        stream: &mut S,
+        inputs: &[bool],
+        nbytes: usize,
+    ) -> Result<Vec<Vec<u8>>, Error> {
         for b in inputs.iter() {
-            self.stream.write_bool(*b)?;
+            stream::write_bool(stream, *b)?;
         }
         (0..inputs.len())
-            .map(|_| self.stream.read_bytes(nbytes))
+            .map(|_| stream::read_bytes(stream, nbytes))
             .collect()
     }
 }
@@ -59,16 +71,16 @@ mod tests {
         let b = rand::random::<bool>();
         let m0_ = m0.clone();
         let m1_ = m1.clone();
-        let (sender, receiver) = match UnixStream::pair() {
+        let (mut sender, mut receiver) = match UnixStream::pair() {
             Ok((s1, s2)) => (s1, s2),
             Err(e) => panic!("Couldn't create pair of sockets: {:?}", e),
         };
-        let handle = std::thread::spawn(|| {
-            let mut ot = DummyOT::new(sender);
-            ot.send(&[(m0, m1)], N).unwrap();
+        let handle = std::thread::spawn(move || {
+            let mut ot = DummyOT::new();
+            ot.send(&mut sender, &[(m0, m1)], N).unwrap();
         });
-        let mut ot = DummyOT::new(receiver);
-        let result = ot.receive(&[b], N).unwrap();
+        let mut ot = DummyOT::new();
+        let result = ot.receive(&mut receiver, &[b], N).unwrap();
         assert_eq!(result[0], if b { m1_ } else { m0_ });
         handle.join().unwrap();
     }

@@ -4,7 +4,7 @@
 // Copyright © 2019 Galois, Inc.
 // See LICENSE for licensing information.
 
-use crate::stream::Stream;
+use crate::stream;
 use crate::utils;
 use crate::ObliviousTransfer;
 use curve25519_dalek::constants::RISTRETTO_BASEPOINT_TABLE;
@@ -13,29 +13,37 @@ use curve25519_dalek::scalar::Scalar;
 use failure::Error;
 use rand::rngs::ThreadRng;
 use std::io::{Read, Write};
+use std::marker::PhantomData;
 
 /// Implementation of the Naor-Pinkas semi-honest secure oblivious transfer
 /// protocol.
 ///
 /// This implementation uses the Ristretto prime order elliptic curve group from
 /// the `curve25519-dalek` library.
-pub struct NaorPinkasOT<T: Read + Write + Send> {
-    stream: Stream<T>,
+pub struct NaorPinkasOT<S: Read + Write + Send> {
+    _s: PhantomData<S>,
     rng: ThreadRng,
 }
 
-impl<T: Read + Write + Send> ObliviousTransfer<T> for NaorPinkasOT<T> {
-    fn new(stream: T) -> Self {
-        let stream = Stream::new(stream);
+impl<S: Read + Write + Send> ObliviousTransfer<S> for NaorPinkasOT<S> {
+    fn new() -> Self {
         let rng = rand::thread_rng();
-        Self { stream, rng }
+        Self {
+            _s: PhantomData::<S>,
+            rng,
+        }
     }
 
-    fn send(&mut self, inputs: &[(Vec<u8>, Vec<u8>)], nbytes: usize) -> Result<(), Error> {
+    fn send(
+        &mut self,
+        stream: &mut S,
+        inputs: &[(Vec<u8>, Vec<u8>)],
+        nbytes: usize,
+    ) -> Result<(), Error> {
         for input in inputs.iter() {
             let c = RistrettoPoint::random(&mut self.rng);
-            self.stream.write_pt(&c)?;
-            let pk0 = self.stream.read_pt()?;
+            stream::write_pt(stream, &c)?;
+            let pk0 = stream::read_pt(stream)?;
             let pk1 = c - pk0;
             let r0 = Scalar::random(&mut self.rng);
             let r1 = Scalar::random(&mut self.rng);
@@ -45,30 +53,35 @@ impl<T: Read + Write + Send> ObliviousTransfer<T> for NaorPinkasOT<T> {
             let e01 = utils::xor(&h, &input.0);
             let h = utils::hash_pt(&(pk1 * r1), nbytes);
             let e11 = utils::xor(&h, &input.1);
-            self.stream.write_pt(&e00)?;
-            self.stream.write_bytes(&e01)?;
-            self.stream.write_pt(&e10)?;
-            self.stream.write_bytes(&e11)?;
+            stream::write_pt(stream, &e00)?;
+            stream::write_bytes(stream, &e01)?;
+            stream::write_pt(stream, &e10)?;
+            stream::write_bytes(stream, &e11)?;
         }
         Ok(())
     }
 
-    fn receive(&mut self, inputs: &[bool], nbytes: usize) -> Result<Vec<Vec<u8>>, Error> {
+    fn receive(
+        &mut self,
+        stream: &mut S,
+        inputs: &[bool],
+        nbytes: usize,
+    ) -> Result<Vec<Vec<u8>>, Error> {
         inputs
             .iter()
             .map(|input| {
-                let c = self.stream.read_pt()?;
+                let c = stream::read_pt(stream)?;
                 let k = Scalar::random(&mut self.rng);
                 let pkσ = &k * &RISTRETTO_BASEPOINT_TABLE;
                 let pkσ_ = c - pkσ;
                 match input {
-                    false => self.stream.write_pt(&pkσ)?,
-                    true => self.stream.write_pt(&pkσ_)?,
+                    false => stream::write_pt(stream, &pkσ)?,
+                    true => stream::write_pt(stream, &pkσ_)?,
                 };
-                let e00 = self.stream.read_pt()?;
-                let e01 = self.stream.read_bytes(nbytes)?;
-                let e10 = self.stream.read_pt()?;
-                let e11 = self.stream.read_bytes(nbytes)?;
+                let e00 = stream::read_pt(stream)?;
+                let e01 = stream::read_bytes(stream, nbytes)?;
+                let e10 = stream::read_pt(stream)?;
+                let e11 = stream::read_bytes(stream, nbytes)?;
                 let (eσ0, eσ1) = match input {
                     false => (e00, e01),
                     true => (e10, e11),
@@ -96,13 +109,13 @@ mod tests {
         let b = rand::random::<bool>();
         let m0_ = m0.clone();
         let m1_ = m1.clone();
-        let (sender, receiver) = UnixStream::pair().unwrap();
+        let (mut sender, mut receiver) = UnixStream::pair().unwrap();
         let handler = std::thread::spawn(move || {
-            let mut ot = NaorPinkasOT::new(sender);
-            ot.send(&[(m0, m1)], N).unwrap();
+            let mut ot = NaorPinkasOT::new();
+            ot.send(&mut sender, &[(m0, m1)], N).unwrap();
         });
-        let mut ot = NaorPinkasOT::new(receiver);
-        let result = ot.receive(&[b], N).unwrap();
+        let mut ot = NaorPinkasOT::new();
+        let result = ot.receive(&mut receiver, &[b], N).unwrap();
         assert_eq!(result[0], if b { m1_ } else { m0_ });
         handler.join().unwrap();
     }

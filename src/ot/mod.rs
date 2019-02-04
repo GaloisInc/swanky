@@ -23,19 +23,29 @@ use std::io::{Read, Write};
 /// Oblivious transfer trait.
 pub trait ObliviousTransfer<T: Read + Write + Send> {
     /// Creates a new oblivious transfer instance using `stream` for I/O.
-    fn new(stream: T) -> Self;
+    fn new() -> Self;
     /// Sends values of `nbytes` each.
-    fn send(&mut self, inputs: &[(Vec<u8>, Vec<u8>)], nbytes: usize) -> Result<(), Error>;
+    fn send(
+        &mut self,
+        stream: &mut T,
+        inputs: &[(Vec<u8>, Vec<u8>)],
+        nbytes: usize,
+    ) -> Result<(), Error>;
     /// Receives values of `nbytes` each.
-    fn receive(&mut self, inputs: &[bool], nbytes: usize) -> Result<Vec<Vec<u8>>, Error>;
+    fn receive(
+        &mut self,
+        stream: &mut T,
+        inputs: &[bool],
+        nbytes: usize,
+    ) -> Result<Vec<Vec<u8>>, Error>;
 }
 
 /// Oblivious transfer trait for 128-bit inputs.
 pub trait BlockObliviousTransfer<T: Read + Write + Send> {
     /// Creates a new oblivious transfer instance using `stream` for I/O.
-    fn new(stream: T) -> Self;
+    fn new() -> Self;
     /// Sends values of `nbytes` each.
-    fn send(&mut self, inputs: &[(Block, Block)]) -> Result<(), Error>;
+    fn send(&mut self, stream: &mut T, inputs: &[(Block, Block)]) -> Result<(), Error>;
     /// Receives values of `nbytes` each.
-    fn receive(&mut self, inputs: &[bool]) -> Result<Vec<Block>, Error>;
+    fn receive(&mut self, stream: &mut T, inputs: &[bool]) -> Result<Vec<Block>, Error>;
 }
