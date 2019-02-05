@@ -478,7 +478,10 @@ pub trait BundleGadgets: Fancy {
     }
 
     /// Compute `max(x,0)`, using potentially approximate factors of `M`.
-    fn relu(&self, ix: Option<SyncIndex>, x: &Bundle<Self::Item>, factors_of_m: &[u16]) -> Bundle<Self::Item> {
+    ///
+    /// Supported accuracy: ["100%", "99.9%", "99%"]
+    fn relu(&self, ix: Option<SyncIndex>, x: &Bundle<Self::Item>, accuracy: &str) -> Bundle<Self::Item> {
+        let factors_of_m = &get_ms(x, accuracy);
         let res = self.fractional_mixed_radix(ix, x, factors_of_m);
 
         // project the MSB to 0/1, whether or not it is less than p/2
@@ -491,29 +494,24 @@ pub trait BundleGadgets: Fancy {
         Bundle(z)
     }
 
-    /// Compute `max(x,0)`.
-    fn exact_relu(&self, ix: Option<SyncIndex>, x: &Bundle<Self::Item>) -> Bundle<Self::Item> {
-        self.relu(ix, x, &exact_ms(x))
-    }
-
     /// Return 0 if `x` is positive and 1 if `x` is negative. Potentially approximate
     /// depending on `factors_of_m`.
-    fn sign(&self, ix: Option<SyncIndex>, x: &Bundle<Self::Item>, factors_of_m: &[u16]) -> Self::Item {
+    ///
+    /// Supported accuracy: ["100%", "99.9%", "99%"]
+    fn sign(&self, ix: Option<SyncIndex>, x: &Bundle<Self::Item>, accuracy: &str) -> Self::Item {
+        let factors_of_m = &get_ms(x, accuracy);
         let res = self.fractional_mixed_radix(ix, x, factors_of_m);
         let p = *factors_of_m.last().unwrap();
         let tt = (0..p).map(|x| (x >= p/2) as u16).collect_vec();
         self.proj(ix, res.wires().last().unwrap(), 2, Some(tt))
     }
 
-    /// Return 0 if `x` is positive and 1 if `x` is negative.
-    fn exact_sign(&self, ix: Option<SyncIndex>, x: &Bundle<Self::Item>) -> Self::Item {
-        self.sign(ix, x, &exact_ms(x))
-    }
-
     /// Return `if x >= 0 then 1 else -1`, where `-1` is interpreted as `Q-1`. Potentially
     /// approximate depending on `factors_of_m`.
-    fn sgn(&self, ix: Option<SyncIndex>, x: &Bundle<Self::Item>, factors_of_m: &[u16]) -> Bundle<Self::Item> {
-        let sign = self.sign(ix, x, factors_of_m);
+    ///
+    /// Supported accuracy: ["100%", "99.9%", "99%"]
+    fn sgn(&self, ix: Option<SyncIndex>, x: &Bundle<Self::Item>, accuracy: &str) -> Bundle<Self::Item> {
+        let sign = self.sign(ix, x, accuracy);
         let q = util::product(&x.moduli());
         let z = x.moduli().into_iter().map(|p| {
             let tt = vec![ 1, ((q-1) % p as u128) as u16 ];
@@ -522,33 +520,35 @@ pub trait BundleGadgets: Fancy {
         Bundle(z)
     }
 
-    /// Return `if x >= 0 then 1 else -1`, where `-1` is interpreted as `Q-1`.
-    fn exact_sgn(&self, ix: Option<SyncIndex>, x: &Bundle<Self::Item>) -> Bundle<Self::Item> {
-        self.sgn(ix, x, &exact_ms(x))
-    }
-
     /// Returns 1 if `x < y`. Works on both CRT and binary bundles.
-    fn exact_lt(&self, ix: Option<SyncIndex>, x: &Bundle<Self::Item>, y: &Bundle<Self::Item>) -> Self::Item {
+    ///
+    /// Supported accuracy: ["100%", "99.9%", "99%"]
+    /// Binary ignores accuracy argument.
+    fn lt(&self, ix: Option<SyncIndex>, x: &Bundle<Self::Item>, y: &Bundle<Self::Item>, accuracy: &str) -> Self::Item {
         if x.is_binary() {
             let (_,z) = self.binary_subtraction(ix,x,y);
             z
         } else {
             let z = self.sub_bundles(x,y);
-            self.exact_sign(ix,&z)
+            self.sign(ix,&z,accuracy)
         }
     }
 
     /// Returns 1 if `x >= y`. Works on both CRT and binary bundles.
-    fn exact_geq(&self, ix: Option<SyncIndex>, x: &Bundle<Self::Item>, y: &Bundle<Self::Item>) -> Self::Item {
-        let z = self.exact_lt(ix,x,y);
+    ///
+    /// Supported accuracy: ["100%", "99.9%", "99%"]
+    fn geq(&self, ix: Option<SyncIndex>, x: &Bundle<Self::Item>, y: &Bundle<Self::Item>, accuracy: &str) -> Self::Item {
+        let z = self.lt(ix,x,y,accuracy);
         self.negate(ix,&z)
     }
 
-    /// Compute the maximum bundle in `xs`. Works on both CRT and binary bundles.
-    fn max(&self, ix: Option<SyncIndex>, xs: &[Bundle<Self::Item>]) -> Bundle<Self::Item> {
+    /// Compute the maximum bundle in `xs`.
+    ///
+    /// Supported accuracy: ["100%", "99.9%", "99%"]
+    fn max(&self, ix: Option<SyncIndex>, xs: &[Bundle<Self::Item>], accuracy: &str) -> Bundle<Self::Item> {
         assert!(xs.len() > 1);
         xs.iter().skip(1).fold(xs[0].clone(), |x,y| {
-            let pos = self.exact_lt(ix,&x,y);
+            let pos = self.lt(ix,&x,y,accuracy);
             let neg = self.negate(ix,&pos);
             let z = x.wires().iter().zip(y.wires().iter()).map(|(x,y)| {
                 let xp = self.mul(ix,x,&neg);
@@ -681,16 +681,43 @@ pub trait BundleGadgets: Fancy {
 
 impl<F: Fancy> BundleGadgets for F { }
 
-// Compute the exact ms needed for the number of CRT primes in `x`.
-fn exact_ms<W: Clone + HasModulus>(x: &Bundle<W>) -> Vec<u16> {
-    match x.moduli().len() {
-        3 => vec![2;5],
-        4 => vec![3,26],
-        5 => vec![3,4,54],
-        6 => vec![5,5,6,50],
-        7 => vec![6,6,7,7,74],
-        8 => vec![5,7,8,8,9,98],
-        9 => vec![4,7,10,10,10,10,134],
-        n => panic!("unknown exact Ms for {} primes!", n),
+/// Compute the ms needed for the number of CRT primes in `x`, with accuracy acc.
+///
+/// Supported accuracy: ["100%", "99.9%", "99%"]
+fn get_ms<W: Clone + HasModulus>(x: &Bundle<W>, accuracy: &str) -> Vec<u16> {
+    match accuracy {
+        "100%" => {
+            match x.moduli().len() {
+                3 => vec![2;5],
+                4 => vec![3,26],
+                5 => vec![3,4,54],
+                6 => vec![5,5,6,50],
+                7 => vec![6,6,7,7,74],
+                8 => vec![5,7,8,8,9,98],
+                9 => vec![4,7,10,10,10,10,134],
+                n => panic!("unknown exact Ms for {} primes!", n),
+            }
+        }
+        "99.9%" => {
+            match x.moduli().len() {
+                5 => vec![7,58],
+                6 => vec![4,5,48],
+                7 => vec![3,5,78],
+                8 => vec![3,6,70],
+                9 => vec![9,140],
+                n => panic!("unknown 99.9% accurate Ms for {} primes!", n),
+            }
+        }
+        "99%" => {
+            match x.moduli().len() {
+                5 => vec![3,36],
+                6 => vec![3,40],
+                7 => vec![2,60],
+                8 => vec![126],
+                9 => vec![138],
+                n => panic!("unknown 99% accurate Ms for {} primes!", n),
+            }
+        }
+        _ => panic!("get_ms: unsupported accuracy {}", accuracy),
     }
 }

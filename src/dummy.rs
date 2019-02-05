@@ -289,7 +289,7 @@ mod bundle {
             let d = Dummy::new(&enc_inps, &[]);
             {
                 let xs = d.garbler_input_bundles_crt(None,q,n);
-                let z = d.max(None,&xs);
+                let z = d.max(None,&xs,"100%");
                 d.output_bundle(None,&z);
             }
             let z = crt_inv_factor(&d.get_output(),q);
@@ -310,7 +310,7 @@ mod bundle {
             let d = Dummy::new(&enc_inps, &[]);
             {
                 let xs = d.garbler_input_bundles(None,&vec![2;nbits], n);
-                let z = d.max(None,&xs);
+                let z = d.max(None,&xs,"100%");
                 d.output_bundle(None,&z);
             }
             let z = util::u128_from_bits(&d.get_output());

@@ -21,18 +21,18 @@ fn collision<W,F>(f: &F, nbits: usize, time_slices: usize, check_for_cheaters: b
         (0..3).map(|d| { // d=dimension
             let [p1_min, p1_max, p2_min, p2_max] = &inputs[t][d];
             // p1_min > p2_min && p1_min < p2_max
-            let left  = f.exact_geq(None, p1_min, p2_min);
-            let right = f.exact_lt(None, p1_min, p2_max);
+            let left  = f.geq(None, p1_min, p2_min, "100%");
+            let right = f.lt(None, p1_min, p2_max, "100%");
             let case1 = f.and(None, &left, &right);
 
             // p1_max > p2_min && p1_max < p2_max
-            let left  = f.exact_geq(None, p1_max, p2_min);
-            let right = f.exact_lt(None, p1_max, p2_max);
+            let left  = f.geq(None, p1_max, p2_min, "100%");
+            let right = f.lt(None, p1_max, p2_max, "100%");
             let case2 = f.and(None, &left, &right);
 
             // p1_min < p2_min && p1_max > p2_max
-            let left  = f.exact_lt(None, p1_min, p2_min);
-            let right = f.exact_geq(None, p1_max, p2_max);
+            let left  = f.lt(None, p1_min, p2_min, "100%");
+            let right = f.geq(None, p1_max, p2_max, "100%");
             let case3 = f.and(None, &left, &right);
 
             f.or_many(None, &[case1, case2, case3])
@@ -52,7 +52,7 @@ fn collision<W,F>(f: &F, nbits: usize, time_slices: usize, check_for_cheaters: b
                     // ensure the difference between t and the previous t is at most delta
                     let (diff, _) = f.binary_subtraction(None, &inputs[t][d][i], &inputs[t-1][d][i]);
                     let abs  = f.abs(None, &diff);
-                    f.exact_geq(None, &abs, &delta)
+                    f.geq(None, &abs, &delta, "100%")
                 }).collect_vec()
             }).collect_vec()
         }).collect_vec();

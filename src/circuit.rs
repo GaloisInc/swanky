@@ -641,7 +641,7 @@ mod bundle {
 
         let b = CircuitBuilder::new();
         let x = b.garbler_input_bundle_crt(None, q);
-        let z = b.exact_relu(None, &x);
+        let z = b.relu(None, &x, "100%");
         b.output_bundle(None, &z);
         let c = b.finish();
 
@@ -662,7 +662,7 @@ mod bundle {
 
         let b = CircuitBuilder::new();
         let x = b.garbler_input_bundle_crt(None, q);
-        let z = b.exact_sgn(None, &x);
+        let z = b.sgn(None, &x, "100%");
         b.output_bundle(None, &z);
         let c = b.finish();
 
@@ -683,7 +683,7 @@ mod bundle {
         let b = CircuitBuilder::new();
         let x = b.garbler_input_bundle_crt(None, q);
         let y = b.evaluator_input_bundle_crt(None, q);
-        let z = b.exact_lt(None,&x,&y);
+        let z = b.lt(None,&x,&y,"100%");
         b.output(None,&z);
         let c = b.finish();
 
@@ -709,7 +709,7 @@ mod bundle {
 
         let b = CircuitBuilder::new();
         let xs = b.garbler_input_bundles_crt(None,q,n);
-        let z = b.max(None,&xs);
+        let z = b.max(None,&xs,"100%");
         b.output_bundle(None, &z);
         let c = b.finish();
 
