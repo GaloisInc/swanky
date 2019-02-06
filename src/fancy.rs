@@ -710,6 +710,7 @@ fn get_ms<W: Clone + HasModulus>(x: &Bundle<W>, accuracy: &str) -> Vec<u16> {
         }
         "99%" => {
             match x.moduli().len() {
+                4 => vec![3,18],
                 5 => vec![3,36],
                 6 => vec![3,40],
                 7 => vec![2,60],

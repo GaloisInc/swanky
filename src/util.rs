@@ -301,6 +301,12 @@ pub const PRIMES_SKIP_2: [u16;29] = [
     73, 79, 83, 89, 97, 101, 103, 107, 109, 113
 ];
 
+/// Generate a CRT modulus with n primes.
+#[inline]
+pub fn modulus_with_nprimes(n: usize) -> u128 {
+    product(&PRIMES[0..n])
+}
+
 /// Generate a CRT modulus that support at least n-bit integers, using the built-in
 /// PRIMES.
 #[inline]

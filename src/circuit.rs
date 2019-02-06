@@ -446,7 +446,7 @@ mod bundle {
     use rand::thread_rng;
 
     #[test] // bundle addition {{{
-    fn addition() {
+    fn test_addition() {
         let mut rng = thread_rng();
         let q = rng.gen_usable_composite_modulus();
 
@@ -467,7 +467,7 @@ mod bundle {
     }
     //}}}
     #[test] // bundle subtraction {{{
-    fn subtraction() {
+    fn test_subtraction() {
         let mut rng = thread_rng();
         let q = rng.gen_usable_composite_modulus();
 
@@ -488,7 +488,7 @@ mod bundle {
     }
     //}}}
     #[test] // bundle cmul {{{
-    fn cmul() {
+    fn test_cmul() {
         let mut rng = thread_rng();
         let q = util::modulus_with_width(16);
 
@@ -508,7 +508,7 @@ mod bundle {
     }
     //}}}
     #[test] // bundle multiplication {{{
-    fn multiplication() {
+    fn test_multiplication() {
         let mut rng = thread_rng();
         let q = rng.gen_usable_composite_modulus();
 
@@ -529,7 +529,7 @@ mod bundle {
     }
     //}}}
     #[test] // bundle cexp {{{
-    fn cexp() {
+    fn test_cexp() {
         let mut rng = thread_rng();
         let q = util::modulus_with_width(10);
         let y = rng.gen_u16() % 10;
@@ -550,7 +550,7 @@ mod bundle {
     }
     // }}}
     #[test] // bundle remainder {{{
-    fn remainder() {
+    fn test_remainder() {
         let mut rng = thread_rng();
         let ps = rng.gen_usable_factors();
         let q = ps.iter().fold(1, |acc, &x| (x as u128) * acc);
@@ -572,7 +572,7 @@ mod bundle {
     }
     //}}}
     #[test] // bundle equality {{{
-    fn equality() {
+    fn test_equality() {
         let mut rng = thread_rng();
         let q = rng.gen_usable_composite_modulus();
 
@@ -597,7 +597,7 @@ mod bundle {
     }
     //}}}
     #[test] // bundle mixed_radix_addition {{{
-    fn mixed_radix_addition() {
+    fn test_mixed_radix_addition() {
         let mut rng = thread_rng();
 
         let nargs = 2 + rng.gen_usize() % 100;
@@ -634,7 +634,7 @@ mod bundle {
     }
 //}}}
     #[test] // bundle relu {{{
-    fn relu() {
+    fn test_relu() {
         let mut rng = thread_rng();
         let q = util::modulus_with_width(10);
         println!("q={}", q);
@@ -655,7 +655,7 @@ mod bundle {
     }
     //}}}
     #[test] // bundle sgn {{{
-    fn sgn() {
+    fn test_sgn() {
         let mut rng = thread_rng();
         let q = util::modulus_with_width(10);
         println!("q={}", q);
@@ -676,7 +676,7 @@ mod bundle {
     }
     //}}}
     #[test] // bundle leq {{{
-    fn leq() {
+    fn test_leq() {
         let mut rng = thread_rng();
         let q = util::modulus_with_width(10);
 
@@ -701,7 +701,7 @@ mod bundle {
     }
     //}}}
     #[test] // bundle max {{{
-    fn max() {
+    fn test_max() {
         let mut rng = thread_rng();
         let q = util::modulus_with_width(10);
         let n = 10;
@@ -726,7 +726,7 @@ mod bundle {
     }
     //}}}
     #[test] // binary addition {{{
-    fn binary_addition() {
+    fn test_binary_addition() {
         let mut rng = thread_rng();
         let n = 2 + (rng.gen_usize() % 10);
         let q = 2;
@@ -755,7 +755,7 @@ mod bundle {
     }
     //}}}
     #[test] // serialization {{{
-    fn serialization() {
+    fn test_serialization() {
         let mut rng = thread_rng();
 
         let nargs = 2 + rng.gen_usize() % 100;
@@ -773,7 +773,7 @@ mod bundle {
     }
 //}}}
     #[test] // builder has send and sync {{{
-    fn builder_has_send_and_sync() {
+    fn test_builder_has_send_and_sync() {
         fn check_send(_: impl Send) { }
         fn check_sync(_: impl Sync) { }
         check_send(CircuitBuilder::new());
