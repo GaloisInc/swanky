@@ -315,7 +315,7 @@ mod basic {
 
         let b = CircuitBuilder::new();
         let n = 2 + (rng.gen_usize() % 200);
-        let inps = b.evaluator_inputs(None,2,n);
+        let inps = b.evaluator_inputs(None,&vec![2;n]);
         let z = b.and_many(None,&inps);
         b.output(None,&z);
         let c = b.finish();
@@ -339,7 +339,7 @@ mod basic {
         let mut rng = thread_rng();
         let b = CircuitBuilder::new();
         let n = 2 + (rng.gen_usize() % 200);
-        let inps = b.evaluator_inputs(None,2,n);
+        let inps = b.evaluator_inputs(None,&vec![2;n]);
         let z = b.or_many(None,&inps);
         b.output(None,&z);
         let c = b.finish();
@@ -396,7 +396,7 @@ mod basic {
     fn add_many_mod_change() {
         let b = CircuitBuilder::new();
         let n = 113;
-        let args = b.garbler_inputs(None, 2, n);
+        let args = b.garbler_inputs(None, &vec![2;n]);
         let wires = args.iter().map(|x| b.mod_change(None, x, n as u16 + 1)).collect_vec();
         let s = b.add_many(&wires);
         b.output(None, &s);

@@ -361,7 +361,7 @@ mod classic {
     fn add_many() {
         garble_test_helper(|q| {
             let b = CircuitBuilder::new();
-            let xs = b.evaluator_inputs(None, q, 16);
+            let xs = b.evaluator_inputs(None, &vec![q;16]);
             let z = b.add_many(&xs);
             b.output(None, &z);
             b.finish()
@@ -372,7 +372,7 @@ mod classic {
     fn or_many() {
         garble_test_helper(|_| {
             let b = CircuitBuilder::new();
-            let xs = b.evaluator_inputs(None, 2, 16);
+            let xs = b.evaluator_inputs(None, &vec![2;16]);
             let z = b.or_many(None, &xs);
             b.output(None, &z);
             b.finish()

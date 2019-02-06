@@ -100,14 +100,14 @@ pub trait Fancy {
     ////////////////////////////////////////////////////////////////////////////////
     // Functions built on top of basic fancy operations.
 
-    /// Create `n` garbler inputs with modulus `q`.
-    fn garbler_inputs(&self, ix: Option<SyncIndex>, q: u16, n: usize) -> Vec<Self::Item> {
-        (0..n).map(|_| self.garbler_input(ix,q)).collect()
+    /// Create `n` garbler inputs with the moduli `qs`.
+    fn garbler_inputs(&self, ix: Option<SyncIndex>, qs: &[u16]) -> Vec<Self::Item> {
+        qs.iter().map(|&q| self.garbler_input(ix,q)).collect()
     }
 
-    /// Create `n` evaluator inputs with modulus `q`.
-    fn evaluator_inputs(&self, ix: Option<SyncIndex>, q: u16, n: usize) -> Vec<Self::Item> {
-        (0..n).map(|_| self.evaluator_input(ix,q)).collect()
+    /// Create `n` evaluator inputs with the moduli `qs`.
+    fn evaluator_inputs(&self, ix: Option<SyncIndex>, qs: &[u16]) -> Vec<Self::Item> {
+        qs.iter().map(|&q| self.evaluator_input(ix,q)).collect()
     }
 
     /// Sum up a slice of wires.

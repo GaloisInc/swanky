@@ -17,12 +17,12 @@ fn parallel_gadget<F,W>(b: &F, Q: u128, N: u8, par: bool)
             b.begin_sync(N);
             let hs = inps.iter().enumerate().map(|(i,inp)| {
                 scope.spawn(move |_| {
-                    let z = b.exact_relu(Some(i as u8), inp);
-                    let z = b.exact_relu(Some(i as u8), &z);
-                    let z = b.exact_relu(Some(i as u8), &z);
-                    let z = b.exact_relu(Some(i as u8), &z);
-                    let z = b.exact_relu(Some(i as u8), &z);
-                    let z = b.exact_relu(Some(i as u8), &z);
+                    let z = b.relu(Some(i as u8), inp, "100%");
+                    let z = b.relu(Some(i as u8), &z, "100%");
+                    let z = b.relu(Some(i as u8), &z, "100%");
+                    let z = b.relu(Some(i as u8), &z, "100%");
+                    let z = b.relu(Some(i as u8), &z, "100%");
+                    let z = b.relu(Some(i as u8), &z, "100%");
                     b.finish_index(i as u8);
                     z
                 })
@@ -32,12 +32,12 @@ fn parallel_gadget<F,W>(b: &F, Q: u128, N: u8, par: bool)
         }).expect("scoped thread fail");
     } else {
         for inp in inps.iter() {
-            let z = b.exact_relu(None, inp);
-            let z = b.exact_relu(None, &z);
-            let z = b.exact_relu(None, &z);
-            let z = b.exact_relu(None, &z);
-            let z = b.exact_relu(None, &z);
-            let z = b.exact_relu(None, &z);
+            let z = b.relu(None, inp, "100%");
+            let z = b.relu(None, &z, "100%");
+            let z = b.relu(None, &z, "100%");
+            let z = b.relu(None, &z, "100%");
+            let z = b.relu(None, &z, "100%");
+            let z = b.relu(None, &z, "100%");
             b.output_bundle(None, &z)
         }
     }
