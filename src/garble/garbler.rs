@@ -73,7 +73,7 @@ impl Garbler {
 
     /// Create a delta if it has not been created yet for this modulus, otherwise just
     /// return the existing one.
-    fn delta(&self, q: u16) -> Wire {
+    pub fn delta(&self, q: u16) -> Wire {
         let mut deltas = self.deltas.lock().unwrap();
         if let Some(delta) = deltas.get(&q) {
             return delta.clone();
@@ -89,7 +89,7 @@ impl Garbler {
     }
 
     /// Get the deltas, consuming the Garbler.
-    pub fn get_deltas(self) -> HashMap<u16, Wire> {
+    pub(super) fn get_deltas(self) -> HashMap<u16, Wire> {
         Arc::try_unwrap(self.deltas).unwrap().into_inner().unwrap()
     }
 }
