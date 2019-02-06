@@ -1,22 +1,22 @@
 use crate::comm;
 use fancy_garbling::Garbler as Gb;
 use fancy_garbling::{Fancy, Message, SyncIndex, Wire};
-use ocelot::ObliviousTransfer;
+use ocelot::{Block, BlockObliviousTransfer};
 use std::io::{Read, Write};
 use std::marker::PhantomData;
 use std::sync::{Arc, Mutex};
 
-pub struct Garbler<S: Send + Read + Write, OT: ObliviousTransfer<S>> {
+pub struct Garbler<S: Send + Read + Write, OT: BlockObliviousTransfer<S>> {
     garbler: Gb,
     stream: Arc<Mutex<S>>,
     phantom: PhantomData<OT>,
 }
 
-impl<S: Send + Read + Write + 'static, OT: ObliviousTransfer<S>> Garbler<S, OT> {
+impl<S: Send + Read + Write + 'static, OT: BlockObliviousTransfer<S>> Garbler<S, OT> {
     pub fn new(stream: S, inputs: &[u16]) -> Self {
-        let stream = Arc::new(Mutex::new(stream));
         let inputs = inputs.to_vec();
         let mut inputs = inputs.into_iter();
+        let stream = Arc::new(Mutex::new(stream));
         let stream_ = stream.clone();
         let callback = move |_idx, msg| {
             let m = match msg {
@@ -44,29 +44,53 @@ impl<S: Send + Read + Write + 'static, OT: ObliviousTransfer<S>> Garbler<S, OT> 
     }
 }
 
-impl<S: Send + Read + Write, OT: ObliviousTransfer<S>> Fancy for Garbler<S, OT> {
+fn _evaluator_input(δ: &Wire, q: u16) -> (Wire, Vec<(Block, Block)>) {
+    let ℓ = (q as f64).log(2.0).ceil() as u16;
+    let mut wire = Wire::zero(q);
+    let inputs = (0..ℓ)
+        .into_iter()
+        .map(|i| {
+            let zero = Wire::rand(&mut rand::thread_rng(), q);
+            let one = zero.plus(&δ);
+            wire = wire.plus(&zero.cmul(1 << i));
+            (super::wire_to_block(zero), super::wire_to_block(one))
+        })
+        .collect::<Vec<(Block, Block)>>();
+    (wire, inputs)
+}
+
+impl<S: Send + Read + Write, OT: BlockObliviousTransfer<S>> Fancy for Garbler<S, OT> {
     type Item = Wire;
 
     fn garbler_input(&self, ix: Option<SyncIndex>, q: u16) -> Wire {
         self.garbler.garbler_input(ix, q)
     }
 
-    fn evaluator_input(&self, _ix: Option<SyncIndex>, q: u16) -> Wire {
-        let ℓ = (q as f64).log(2.0).ceil() as u16;
-        let δ = self.garbler.delta(q);
-        let mut ot = OT::new(self.stream.clone());
-        let mut wire = Wire::zero(q);
-        let inputs = (0..ℓ)
-            .into_iter()
-            .map(|i| {
-                let zero = Wire::rand(&mut rand::thread_rng(), q);
-                let one = zero.plus(&δ);
-                wire = wire.plus(&zero.cmul(1 << i));
-                (super::wire_to_u8vec(zero), super::wire_to_u8vec(one))
-            })
-            .collect::<Vec<(Vec<u8>, Vec<u8>)>>();
-        ot.send(&inputs).unwrap(); // XXX: remove unwrap
+    fn evaluator_input(&self, ix: Option<SyncIndex>, q: u16) -> Wire {
+        assert!(ix.is_none());
+        let (wire, inputs) = _evaluator_input(&self.garbler.delta(q), q);
+        let mut ot = OT::new();
+        let mut stream = self.stream.lock().unwrap();
+        ot.send(&mut *stream, &inputs).unwrap(); // XXX: remove unwrap
         wire
+    }
+
+    fn evaluator_inputs(&self, ix: Option<SyncIndex>, qs: &[u16]) -> Vec<Wire> {
+        assert!(ix.is_none());
+        let n = qs.len();
+        let ℓs = qs.into_iter().map(|q| (*q as f32).log(2.0).ceil() as usize);
+        let mut wires = Vec::with_capacity(n);
+        let mut inputs = Vec::with_capacity(ℓs.sum());
+        for q in qs.into_iter() {
+            let δ = self.garbler.delta(*q);
+            let (wire, mut input) = _evaluator_input(&δ, *q);
+            wires.push(wire);
+            inputs.append(&mut input);
+        }
+        let mut ot = OT::new();
+        let mut stream = self.stream.lock().unwrap();
+        ot.send(&mut *stream, &inputs).unwrap(); // XXX: remove unwrap
+        wires
     }
 
     fn constant(&self, ix: Option<SyncIndex>, x: u16, q: u16) -> Wire {
@@ -89,7 +113,7 @@ impl<S: Send + Read + Write, OT: ObliviousTransfer<S>> Fancy for Garbler<S, OT> 
         self.garbler.mul(ix, x, y)
     }
 
-    fn proj(&self, ix: Option<SyncIndex>, x: &Wire, q: u16, tt: &[u16]) -> Wire {
+    fn proj(&self, ix: Option<SyncIndex>, x: &Wire, q: u16, tt: Option<Vec<u16>>) -> Wire {
         self.garbler.proj(ix, x, q, tt)
     }
 
