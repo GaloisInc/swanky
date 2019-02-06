@@ -3,14 +3,13 @@ use fancy_garbling::Evaluator as Ev;
 use fancy_garbling::{Fancy, Message, SyncIndex, Wire};
 use ocelot::BlockObliviousTransfer;
 use std::io::{Read, Write};
-use std::marker::PhantomData;
 use std::sync::{Arc, Mutex};
 
 pub struct Evaluator<S: Send + Read + Write, OT: BlockObliviousTransfer<S>> {
     evaluator: Ev,
     stream: Arc<Mutex<S>>,
     inputs: Arc<Mutex<Vec<u16>>>,
-    phantom: PhantomData<OT>,
+    ot: Arc<Mutex<OT>>,
 }
 
 impl<S: Send + Read + Write + 'static, OT: BlockObliviousTransfer<S>> Evaluator<S, OT> {
@@ -24,12 +23,13 @@ impl<S: Send + Read + Write + 'static, OT: BlockObliviousTransfer<S>> Evaluator<
             let msg = Message::from_bytes(&bytes).unwrap(); // XXX: unwrap
             (None, msg)
         };
-        let ev = Ev::new(callback);
+        let evaluator = Ev::new(callback);
+        let ot = Arc::new(Mutex::new(OT::new()));
         Evaluator {
-            evaluator: ev,
-            stream: stream,
-            inputs: inputs,
-            phantom: PhantomData,
+            evaluator,
+            stream,
+            inputs,
+            ot,
         }
     }
 
@@ -53,7 +53,7 @@ impl<S: Send + Read + Write, OT: BlockObliviousTransfer<S>> Fancy for Evaluator<
             .into_iter()
             .map(|i| input & (1 << i) != 0)
             .collect::<Vec<bool>>();
-        let mut ot = OT::new();
+        let mut ot = self.ot.lock().unwrap();
         let mut stream = self.stream.lock().unwrap();
         let wires = ot.receive(&mut *stream, &bs).unwrap(); // XXX: remove unwrap
         let wire = wires
@@ -81,7 +81,7 @@ impl<S: Send + Read + Write, OT: BlockObliviousTransfer<S>> Fancy for Evaluator<
                 .collect::<Vec<bool>>();
             bs.append(&mut bs_);
         }
-        let mut ot = OT::new();
+        let mut ot = self.ot.lock().unwrap();
         let mut stream = self.stream.lock().unwrap();
         let wires_ = ot.receive(&mut *stream, &bs).unwrap(); // XXX: remove unwrap
         let mut start = 0;

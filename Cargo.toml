@@ -1,17 +1,17 @@
 [package]
 name = "twopac"
 version = "0.1.0"
-edition = "2018"
 authors = ["Alex J. Malozemoff <amaloz@galois.com>"]
+edition = "2018"
 
 [lib]
 
 [dependencies]
-arrayref = "*"
-clap = "*"
 failure = "*"
 # fancy_garbling = { git = "https://github.com/spaceships/fancy-garbling" }
 fancy_garbling = { path = "../fancy-garbling" }
 ocelot = { path = "../ocelot" }
-log = "*"
 rand = "*"
+
+[profile.release]
+debug = true
