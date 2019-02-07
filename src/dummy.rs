@@ -8,7 +8,7 @@ use itertools::Itertools;
 
 use std::error::Error;
 use std::sync::mpsc::{channel, Sender};
-use std::sync::{Arc, Mutex, RwLock};
+use std::sync::{Arc, Mutex, RwLock, atomic::{Ordering, AtomicBool}};
 
 use crate::fancy::{Fancy, HasModulus, SyncIndex};
 
@@ -20,7 +20,7 @@ pub struct Dummy {
 
     // sync stuff to allow parallel inputs
     requests:         Arc<RwLock<Option<Vec<MsQueue<(Request, Sender<DummyVal>)>>>>>,
-    index_done:       Arc<Mutex<Option<Vec<bool>>>>,
+    index_done:       Arc<RwLock<Option<Vec<AtomicBool>>>>,
 }
 
 enum Request {
@@ -48,7 +48,7 @@ impl Dummy {
             outputs:          Arc::new(Mutex::new(Vec::new())),
 
             requests:         Arc::new(RwLock::new(None)),
-            index_done:       Arc::new(Mutex::new(None)),
+            index_done:       Arc::new(RwLock::new(None)),
         }
     }
 
@@ -139,7 +139,7 @@ impl Fancy for Dummy {
 
     fn begin_sync(&self, num_indices: SyncIndex) {
         *self.requests.write().unwrap()  = Some((0..num_indices).map(|_| MsQueue::new()).collect_vec());
-        *self.index_done.lock().unwrap() = Some(vec![false; num_indices as usize]);
+        *self.index_done.write().unwrap() = Some((0..num_indices).map(|_| AtomicBool::new(false)).collect_vec());
 
         start_postman(num_indices,
             self.index_done.clone(),
@@ -153,16 +153,20 @@ impl Fancy for Dummy {
         if self.in_sync() {
             let mut cleanup = false;
             {
-                let mut done = self.index_done.lock().unwrap_or_else(|e| panic!("{}", e.description()));
-                let done = done.as_mut().expect("dummy.finish_index: already done!");
-                done[index as usize] = true;
-                if done.iter().all(|&x|x) {
+                let done = self.index_done.read().unwrap_or_else(|e| panic!("{}", e.description()));
+                let done = done.as_ref().expect("dummy.finish_index: already done!");
+                if index as usize >= done.len() {
+                    panic!("sync index out of bounds! got {}, but done array has len {}",
+                           index, done.len());
+                }
+                done[index as usize].store(true, Ordering::SeqCst);
+                if done.iter().all(|x| x.load(Ordering::SeqCst)) {
                     cleanup = true;
                 }
             }
             // if we are completely done, clean up
             if cleanup {
-                *self.index_done.lock().unwrap()   = None;
+                *self.index_done.write().unwrap()   = None;
                 *self.requests.write().unwrap()    = None;
             }
         }
@@ -171,7 +175,7 @@ impl Fancy for Dummy {
 
 fn start_postman(
     end_index: SyncIndex,
-    done: Arc<Mutex<Option<Vec<bool>>>>,
+    done: Arc<RwLock<Option<Vec<AtomicBool>>>>,
     reqs: Arc<RwLock<Option<Vec<MsQueue<(Request, Sender<DummyVal>)>>>>>,
     gb_inps: Arc<Mutex<Vec<u16>>>,
     ev_inps: Arc<Mutex<Vec<u16>>>,
@@ -198,10 +202,15 @@ fn start_postman(
                         }
                     }
                 }
-                let done_mutex = done.lock().unwrap();
+                let done_mutex = done.read().unwrap();
                 if let Some(ref done) = *done_mutex {
-                    if done[c as usize] {
-                        c += 1;
+                    match done.get(c as usize) {
+                        Some(atomic_bool) => {
+                            if atomic_bool.load(Ordering::SeqCst) {
+                                c += 1;
+                            }
+                        }
+                        _ => {},
                     }
                 }
             } else { // requests is None- finish_index has been called
