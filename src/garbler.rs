@@ -5,8 +5,7 @@
 // See LICENSE for licensing information.
 
 use crate::comm;
-use fancy_garbling::Garbler as Gb;
-use fancy_garbling::{Fancy, Message, SyncIndex, Wire};
+use fancy_garbling::{Fancy, Garbler as Gb, Message, SyncIndex, Wire};
 use ocelot::{Block, BlockObliviousTransfer};
 use std::io::{Read, Write};
 use std::sync::{Arc, Mutex};
@@ -55,21 +54,26 @@ impl<S: Send + Sync + Read + Write + 'static, OT: BlockObliviousTransfer<S>> Gar
         }
     }
 
-    fn _evaluator_input(&self, q: u16) -> (Wire, Vec<(Block, Block)>) {
-        let ℓ = (q as f32).log(2.0).ceil() as u16;
-        let δ = self.garbler.delta(q);
-        let mut wire = Wire::zero(q);
-        let inputs = (0..ℓ)
-            .into_iter()
-            .map(|i| {
-                let zero = Wire::rand(&mut rand::thread_rng(), q);
-                let one = zero.plus(&δ);
-                wire = wire.plus(&zero.cmul(1 << i));
-                (super::wire_to_block(zero), super::wire_to_block(one))
-            })
-            .collect::<Vec<(Block, Block)>>();
-        (wire, inputs)
+    fn run_ot(&self, inputs: &[(Block, Block)]) {
+        let mut ot = self.ot.lock().unwrap();
+        let mut stream = self.stream.lock().unwrap();
+        ot.send(&mut *stream, &inputs).unwrap(); // XXX: remove unwrap
     }
+}
+
+fn _evaluator_input(δ: &Wire, q: u16) -> (Wire, Vec<(Block, Block)>) {
+    let ℓ = (q as f32).log(2.0).ceil() as u16;
+    let mut wire = Wire::zero(q);
+    let inputs = (0..ℓ)
+        .into_iter()
+        .map(|i| {
+            let zero = Wire::rand(&mut rand::thread_rng(), q);
+            let one = zero.plus(&δ);
+            wire = wire.plus(&zero.cmul(1 << i));
+            (super::wire_to_block(zero), super::wire_to_block(one))
+        })
+        .collect::<Vec<(Block, Block)>>();
+    (wire, inputs)
 }
 
 impl<S: Send + Sync + Read + Write + 'static, OT: BlockObliviousTransfer<S>> Fancy
@@ -82,10 +86,9 @@ impl<S: Send + Sync + Read + Write + 'static, OT: BlockObliviousTransfer<S>> Fan
     }
 
     fn evaluator_input(&self, _ix: Option<SyncIndex>, q: u16) -> Wire {
-        let (wire, inputs) = self._evaluator_input(q);
-        let mut ot = self.ot.lock().unwrap();
-        let mut stream = self.stream.lock().unwrap();
-        ot.send(&mut *stream, &inputs).unwrap(); // XXX: remove unwrap
+        let δ = self.garbler.delta(q);
+        let (wire, inputs) = _evaluator_input(&δ, q);
+        self.run_ot(&inputs);
         wire
     }
 
@@ -95,15 +98,14 @@ impl<S: Send + Sync + Read + Write + 'static, OT: BlockObliviousTransfer<S>> Fan
         let mut wires = Vec::with_capacity(n);
         let mut inputs = Vec::with_capacity(ℓs.sum());
         for q in qs.into_iter() {
-            let (wire, input) = self._evaluator_input(*q);
+            let δ = self.garbler.delta(*q);
+            let (wire, input) = _evaluator_input(&δ, *q);
             wires.push(wire);
             for i in input.into_iter() {
                 inputs.push(i);
             }
         }
-        let mut ot = self.ot.lock().unwrap();
-        let mut stream = self.stream.lock().unwrap();
-        ot.send(&mut *stream, &inputs).unwrap(); // XXX: remove unwrap
+        self.run_ot(&inputs);
         wires
     }
 

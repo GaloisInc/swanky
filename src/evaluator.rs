@@ -5,8 +5,7 @@
 // See LICENSE for licensing information.
 
 use crate::comm;
-use fancy_garbling::Evaluator as Ev;
-use fancy_garbling::{Fancy, Message, SyncIndex, Wire};
+use fancy_garbling::{Evaluator as Ev, Fancy, Message, SyncIndex, Wire};
 use ocelot::{Block, BlockObliviousTransfer};
 use std::io::{Read, Write};
 use std::sync::{Arc, Mutex};
@@ -46,6 +45,12 @@ impl<S: Send + Sync + Read + Write + 'static, OT: BlockObliviousTransfer<S>> Eva
     pub fn decode_output(&self) -> Vec<u16> {
         self.evaluator.decode_output()
     }
+
+    fn run_ot(&self, inputs: &[bool]) -> Vec<Block> {
+        let mut ot = self.ot.lock().unwrap();
+        let mut stream = self.stream.lock().unwrap();
+        ot.receive(&mut *stream, &inputs).unwrap() // XXX: remove unwrap
+    }
 }
 
 fn combine(wires: &[Block], q: u16) -> Wire {
@@ -58,7 +63,9 @@ fn combine(wires: &[Block], q: u16) -> Wire {
         })
 }
 
-impl<S: Send + Sync + Read + Write, OT: BlockObliviousTransfer<S>> Fancy for Evaluator<S, OT> {
+impl<S: Send + Sync + Read + Write + 'static, OT: BlockObliviousTransfer<S>> Fancy
+    for Evaluator<S, OT>
+{
     type Item = Wire;
 
     fn garbler_input(&self, ix: Option<SyncIndex>, q: u16) -> Wire {
@@ -72,9 +79,7 @@ impl<S: Send + Sync + Read + Write, OT: BlockObliviousTransfer<S>> Fancy for Eva
             .into_iter()
             .map(|i| input & (1 << i) != 0)
             .collect::<Vec<bool>>();
-        let mut ot = self.ot.lock().unwrap();
-        let mut stream = self.stream.lock().unwrap();
-        let wires = ot.receive(&mut *stream, &bs).unwrap(); // XXX: remove unwrap
+        let wires = self.run_ot(&bs);
         combine(&wires, q)
     }
 
@@ -90,15 +95,13 @@ impl<S: Send + Sync + Read + Write, OT: BlockObliviousTransfer<S>> Fancy for Eva
                 bs.push(b);
             }
         }
-        let mut ot = self.ot.lock().unwrap();
-        let mut stream = self.stream.lock().unwrap();
-        let wires_ = ot.receive(&mut *stream, &bs).unwrap(); // XXX: remove unwrap
+        let wires = self.run_ot(&bs);
         let mut start = 0;
         ℓs.into_iter()
             .zip(qs.into_iter())
             .map(|(ℓ, q)| {
                 let range = start..start + ℓ;
-                let chunk = &wires_[range];
+                let chunk = &wires[range];
                 start = start + ℓ;
                 combine(chunk, *q)
             })
