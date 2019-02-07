@@ -267,27 +267,6 @@ mod bundle {
         }
     }
     //}}}
-    #[test] // bundle relu {{{
-    fn test_relu() {
-        let mut rng = thread_rng();
-        for _ in 0..128 {
-            let q = crate::util::modulus_with_nprimes(4 + rng.gen_usize() % 5);
-            let x = rng.gen_u128() % q;
-            let d = Dummy::new(&crt_factor(x,q), &[]);
-            {
-                let x = d.garbler_input_bundle_crt(None,q);
-                let z = d.relu(None,&x,"100%");
-                d.output_bundle(None,&z);
-            }
-            let z = crt_inv_factor(&d.get_output(),q);
-            if x >= q/2 {
-                assert_eq!(z, 0);
-            } else {
-                assert_eq!(z, x);
-            }
-        }
-    }
-    //}}}
     #[test] // binary cmul {{{
     fn binary_cmul() {
         let mut rng = thread_rng();
@@ -345,6 +324,27 @@ mod bundle {
             }
             let z = util::u128_from_bits(&d.get_output());
             assert_eq!(z, should_be);
+        }
+    }
+    //}}}
+    #[test] // bundle relu {{{
+    fn test_relu() {
+        let mut rng = thread_rng();
+        for _ in 0..128 {
+            let q = crate::util::modulus_with_nprimes(4 + rng.gen_usize() % 7); // exact relu supports up to 11 primes
+            let x = rng.gen_u128() % q;
+            let d = Dummy::new(&crt_factor(x,q), &[]);
+            {
+                let x = d.garbler_input_bundle_crt(None,q);
+                let z = d.relu(None,&x,"100%");
+                d.output_bundle(None,&z);
+            }
+            let z = crt_inv_factor(&d.get_output(),q);
+            if x >= q/2 {
+                assert_eq!(z, 0);
+            } else {
+                assert_eq!(z, x);
+            }
         }
     }
     //}}}

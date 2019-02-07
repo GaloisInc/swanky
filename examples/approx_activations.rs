@@ -16,7 +16,7 @@ fn approx_relu<F,W>(b: &F, q: u128)
 }
 
 fn main() {
-    let n = 100000;
+    let n = 10000;
     let mut rng = rand::thread_rng();
 
     let mut approx_999_errors = 0;
@@ -32,6 +32,9 @@ fn main() {
             .chunks(nprimes)
             .map(|xs| crt_inv_factor(xs,q))
             .collect_vec();
+
+        let should_be = if x >= q/2 { 0 } else { x };
+        assert_eq!(outs[0], should_be);
 
         if outs[1] != outs[0] {
             approx_999_errors += 1;

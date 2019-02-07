@@ -695,6 +695,8 @@ fn get_ms<W: Clone + HasModulus>(x: &Bundle<W>, accuracy: &str) -> Vec<u16> {
                 7 => vec![6,6,7,7,74],
                 8 => vec![5,7,8,8,9,98],
                 9 => vec![4,7,10,10,10,10,134],
+                10 => vec![4,7,10,10,10,11,14,212],
+                11 => vec![5,5,5,7,14,15,15,15,15,258],
                 n => panic!("unknown exact Ms for {} primes!", n),
             }
         }
@@ -705,6 +707,7 @@ fn get_ms<W: Clone + HasModulus>(x: &Bundle<W>, accuracy: &str) -> Vec<u16> {
                 7 => vec![3,5,78],
                 8 => vec![3,6,70],
                 9 => vec![9,140],
+                10 => vec![7,190],
                 n => panic!("unknown 99.9% accurate Ms for {} primes!", n),
             }
         }
