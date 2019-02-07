@@ -70,10 +70,10 @@ impl Informer {
             self.num_garbler_inputs() * 128 / 8 / 1024
         );
 
-        println!("  evaluator inputs:   {:16} // OT cost: {}kb",
+        println!("  evaluator inputs:   {:16} // estimated OT cost: {}kb",
             self.num_evaluator_inputs(),
             // cost of IKNP is 256 for 1 random and 1 128 bit string dependent on the random one
-            self.num_evaluator_inputs() * 256 / 8 / 1024
+            self.num_evaluator_inputs() * 384 * 5 / 8 / 1024 // assuming average moduli have 5 bits
         );
 
         println!("  outputs:            {:16}", self.num_outputs());
