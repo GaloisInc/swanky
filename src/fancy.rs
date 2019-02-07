@@ -700,6 +700,22 @@ fn get_ms<W: Clone + HasModulus>(x: &Bundle<W>, accuracy: &str) -> Vec<u16> {
                 n => panic!("unknown exact Ms for {} primes!", n),
             }
         }
+        "99.999%" => {
+            match x.moduli().len() {
+                8 => vec![3,6,8,8,100],
+                n => panic!("unknown 99.999% accurate Ms for {} primes!", n),
+            }
+        }
+        "99.99%" => {
+            match x.moduli().len() {
+                6 => vec![4,5,6,46],
+                7 => vec![4,6,7,62],
+                8 => vec![3,6,8,88],
+                9 => vec![7,9,190],
+                10 => vec![8,10,168],
+                n => panic!("unknown 99.99% accurate Ms for {} primes!", n),
+            }
+        }
         "99.9%" => {
             match x.moduli().len() {
                 5 => vec![7,58],
