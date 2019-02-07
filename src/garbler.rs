@@ -1,25 +1,28 @@
+// -*- mode: rust; -*-
+//
+// This file is part of ocelot.
+// Copyright © 2019 Galois, Inc.
+// See LICENSE for licensing information.
+
 use crate::comm;
 use fancy_garbling::Garbler as Gb;
 use fancy_garbling::{Fancy, Message, SyncIndex, Wire};
 use ocelot::{Block, BlockObliviousTransfer};
-use rand::rngs::ThreadRng;
 use std::io::{Read, Write};
 use std::sync::{Arc, Mutex};
 
-pub struct Garbler<S: Send + Read + Write, OT: BlockObliviousTransfer<S>> {
+pub struct Garbler<S: Send + Sync + Read + Write, OT: BlockObliviousTransfer<S>> {
     garbler: Gb,
     stream: Arc<Mutex<S>>,
     ot: Arc<Mutex<OT>>,
-    rng: Arc<Mutex<ThreadRng>>,
 }
 
-impl<S: Send + Read + Write + 'static, OT: BlockObliviousTransfer<S>> Garbler<S, OT> {
-    pub fn new(stream: S, inputs: &[u16]) -> Self {
+impl<S: Send + Sync + Read + Write + 'static, OT: BlockObliviousTransfer<S>> Garbler<S, OT> {
+    pub fn new(stream: S, stream_: S, inputs: &[u16]) -> Self {
         let inputs = inputs.to_vec();
         let mut inputs = inputs.into_iter();
-        let stream = Arc::new(Mutex::new(stream));
-        let stream_ = stream.clone();
-        let callback = move |_idx, msg| {
+        let stream_ = Arc::new(Mutex::new(stream_));
+        let callback = move |idx: Option<SyncIndex>, msg| {
             let m = match msg {
                 Message::UnencodedGarblerInput { zero, delta } => {
                     let input = inputs.next().unwrap();
@@ -33,29 +36,33 @@ impl<S: Send + Read + Write + 'static, OT: BlockObliviousTransfer<S>> Garbler<S,
                 }
                 m => m,
             };
+            // println!("Garbler: Before lock");
             let mut stream = stream_.lock().unwrap();
+            // println!("Garbler: {:?}, {:?}", idx, m);
+            match idx {
+                Some(i) => comm::send(&mut *stream, &[i]).expect("Unable to send index"),
+                None => comm::send(&mut *stream, &[0xFF]).expect("Unable to send index"),
+            }
             comm::send(&mut *stream, &m.to_bytes()).expect("Unable to send message");
         };
         let garbler = Gb::new(callback);
-        let rng = Arc::new(Mutex::new(rand::thread_rng()));
+        let stream = Arc::new(Mutex::new(stream));
         let ot = Arc::new(Mutex::new(OT::new()));
         Garbler {
             garbler,
             stream,
             ot,
-            rng,
         }
     }
 
     fn _evaluator_input(&self, q: u16) -> (Wire, Vec<(Block, Block)>) {
-        let ℓ = (q as f64).log(2.0).ceil() as u16;
+        let ℓ = (q as f32).log(2.0).ceil() as u16;
         let δ = self.garbler.delta(q);
         let mut wire = Wire::zero(q);
-        let mut rng = self.rng.lock().unwrap();
         let inputs = (0..ℓ)
             .into_iter()
             .map(|i| {
-                let zero = Wire::rand(&mut *rng, q);
+                let zero = Wire::rand(&mut rand::thread_rng(), q);
                 let one = zero.plus(&δ);
                 wire = wire.plus(&zero.cmul(1 << i));
                 (super::wire_to_block(zero), super::wire_to_block(one))
@@ -65,35 +72,37 @@ impl<S: Send + Read + Write + 'static, OT: BlockObliviousTransfer<S>> Garbler<S,
     }
 }
 
-impl<S: Send + Read + Write + 'static, OT: BlockObliviousTransfer<S>> Fancy for Garbler<S, OT> {
+impl<S: Send + Sync + Read + Write + 'static, OT: BlockObliviousTransfer<S>> Fancy
+    for Garbler<S, OT>
+{
     type Item = Wire;
 
     fn garbler_input(&self, ix: Option<SyncIndex>, q: u16) -> Wire {
         self.garbler.garbler_input(ix, q)
     }
 
-    fn evaluator_input(&self, ix: Option<SyncIndex>, q: u16) -> Wire {
-        assert!(ix.is_none());
+    fn evaluator_input(&self, _ix: Option<SyncIndex>, q: u16) -> Wire {
         let (wire, inputs) = self._evaluator_input(q);
-        let mut stream = self.stream.lock().unwrap();
         let mut ot = self.ot.lock().unwrap();
+        let mut stream = self.stream.lock().unwrap();
         ot.send(&mut *stream, &inputs).unwrap(); // XXX: remove unwrap
         wire
     }
 
-    fn evaluator_inputs(&self, ix: Option<SyncIndex>, qs: &[u16]) -> Vec<Wire> {
-        assert!(ix.is_none());
+    fn evaluator_inputs(&self, _ix: Option<SyncIndex>, qs: &[u16]) -> Vec<Wire> {
         let n = qs.len();
         let ℓs = qs.into_iter().map(|q| (*q as f32).log(2.0).ceil() as usize);
         let mut wires = Vec::with_capacity(n);
         let mut inputs = Vec::with_capacity(ℓs.sum());
         for q in qs.into_iter() {
-            let (wire, mut input) = self._evaluator_input(*q);
+            let (wire, input) = self._evaluator_input(*q);
             wires.push(wire);
-            inputs.append(&mut input);
+            for i in input.into_iter() {
+                inputs.push(i);
+            }
         }
-        let mut stream = self.stream.lock().unwrap();
         let mut ot = self.ot.lock().unwrap();
+        let mut stream = self.stream.lock().unwrap();
         ot.send(&mut *stream, &inputs).unwrap(); // XXX: remove unwrap
         wires
     }
@@ -124,5 +133,13 @@ impl<S: Send + Read + Write + 'static, OT: BlockObliviousTransfer<S>> Fancy for 
 
     fn output(&self, ix: Option<SyncIndex>, x: &Wire) {
         self.garbler.output(ix, x)
+    }
+
+    fn begin_sync(&self, n: SyncIndex) {
+        self.garbler.begin_sync(n)
+    }
+
+    fn finish_index(&self, ix: SyncIndex) {
+        self.garbler.finish_index(ix)
     }
 }

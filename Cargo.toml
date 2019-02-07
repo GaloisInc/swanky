@@ -13,5 +13,9 @@ fancy_garbling = { path = "../fancy-garbling" }
 ocelot = { path = "../ocelot" }
 rand = "*"
 
+[dev-dependencies]
+# crossbeam = "*"
+itertools = "*"
+
 [profile.release]
 debug = true

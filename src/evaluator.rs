@@ -1,27 +1,37 @@
+// -*- mode: rust; -*-
+//
+// This file is part of ocelot.
+// Copyright © 2019 Galois, Inc.
+// See LICENSE for licensing information.
+
 use crate::comm;
 use fancy_garbling::Evaluator as Ev;
 use fancy_garbling::{Fancy, Message, SyncIndex, Wire};
-use ocelot::BlockObliviousTransfer;
+use ocelot::{Block, BlockObliviousTransfer};
 use std::io::{Read, Write};
 use std::sync::{Arc, Mutex};
 
-pub struct Evaluator<S: Send + Read + Write, OT: BlockObliviousTransfer<S>> {
+pub struct Evaluator<S: Send + Sync + Read + Write, OT: BlockObliviousTransfer<S>> {
     evaluator: Ev,
     stream: Arc<Mutex<S>>,
     inputs: Arc<Mutex<Vec<u16>>>,
     ot: Arc<Mutex<OT>>,
 }
 
-impl<S: Send + Read + Write + 'static, OT: BlockObliviousTransfer<S>> Evaluator<S, OT> {
-    pub fn new(stream: S, inputs: &[u16]) -> Self {
+impl<S: Send + Sync + Read + Write + 'static, OT: BlockObliviousTransfer<S>> Evaluator<S, OT> {
+    pub fn new(stream: S, stream_: S, inputs: &[u16]) -> Self {
         let inputs = Arc::new(Mutex::new(inputs.to_vec()));
         let stream = Arc::new(Mutex::new(stream));
-        let stream_ = stream.clone();
+        let stream_ = Arc::new(Mutex::new(stream_));
         let callback = move || {
+            // println!("Evaluator: Before lock");
             let mut stream = stream_.lock().unwrap();
+            let idx = comm::receive(&mut *stream).unwrap(); // XXX: unwrap
             let bytes = comm::receive(&mut *stream).unwrap(); // XXX: unwrap
             let msg = Message::from_bytes(&bytes).unwrap(); // XXX: unwrap
-            (None, msg)
+            let idx = if idx[0] == 0xFF { None } else { Some(idx[0]) };
+            // println!("Evaluator: {:?}, {:?}", idx, msg);
+            (idx, msg)
         };
         let evaluator = Ev::new(callback);
         let ot = Arc::new(Mutex::new(OT::new()));
@@ -38,17 +48,26 @@ impl<S: Send + Read + Write + 'static, OT: BlockObliviousTransfer<S>> Evaluator<
     }
 }
 
-impl<S: Send + Read + Write, OT: BlockObliviousTransfer<S>> Fancy for Evaluator<S, OT> {
+fn combine(wires: &[Block], q: u16) -> Wire {
+    wires
+        .into_iter()
+        .enumerate()
+        .fold(Wire::zero(q), |acc, (i, w)| {
+            let w = super::block_to_wire(*w, q);
+            acc.plus(&w.cmul(1 << i))
+        })
+}
+
+impl<S: Send + Sync + Read + Write, OT: BlockObliviousTransfer<S>> Fancy for Evaluator<S, OT> {
     type Item = Wire;
 
     fn garbler_input(&self, ix: Option<SyncIndex>, q: u16) -> Wire {
         self.evaluator.garbler_input(ix, q)
     }
 
-    fn evaluator_input(&self, ix: Option<SyncIndex>, q: u16) -> Wire {
-        assert!(ix.is_none());
+    fn evaluator_input(&self, _ix: Option<SyncIndex>, q: u16) -> Wire {
         let ℓ = (q as f32).log(2.0).ceil() as u16;
-        let input = self.inputs.lock().unwrap().pop().unwrap(); // XXX: unwrap
+        let input = self.inputs.lock().unwrap().remove(0);
         let bs = (0..ℓ)
             .into_iter()
             .map(|i| input & (1 << i) != 0)
@@ -56,30 +75,20 @@ impl<S: Send + Read + Write, OT: BlockObliviousTransfer<S>> Fancy for Evaluator<
         let mut ot = self.ot.lock().unwrap();
         let mut stream = self.stream.lock().unwrap();
         let wires = ot.receive(&mut *stream, &bs).unwrap(); // XXX: remove unwrap
-        let wire = wires
-            .into_iter()
-            .enumerate()
-            .fold(Wire::zero(q), |r, (i, w)| {
-                let w = super::block_to_wire(w, q);
-                r.plus(&w.cmul((1 << i) as u16))
-            });
-        wire
+        combine(&wires, q)
     }
 
-    fn evaluator_inputs(&self, ix: Option<SyncIndex>, qs: &[u16]) -> Vec<Wire> {
-        assert!(ix.is_none());
+    fn evaluator_inputs(&self, _ix: Option<SyncIndex>, qs: &[u16]) -> Vec<Wire> {
         let ℓs = qs
             .into_iter()
             .map(|q| (*q as f32).log(2.0).ceil() as usize)
             .collect::<Vec<usize>>();
         let mut bs = Vec::with_capacity(ℓs.iter().sum());
         for ℓ in ℓs.iter() {
-            let input = self.inputs.lock().unwrap().pop().unwrap(); // XXX: unwrap
-            let mut bs_ = (0..*ℓ)
-                .into_iter()
-                .map(|i| input & (1 << i) != 0)
-                .collect::<Vec<bool>>();
-            bs.append(&mut bs_);
+            let input = self.inputs.lock().unwrap().remove(0);
+            for b in (0..*ℓ).into_iter().map(|i| input & (1 << i) != 0) {
+                bs.push(b);
+            }
         }
         let mut ot = self.ot.lock().unwrap();
         let mut stream = self.stream.lock().unwrap();
@@ -91,14 +100,7 @@ impl<S: Send + Read + Write, OT: BlockObliviousTransfer<S>> Fancy for Evaluator<
                 let range = start..start + ℓ;
                 let chunk = &wires_[range];
                 start = start + ℓ;
-                let wire = chunk
-                    .into_iter()
-                    .enumerate()
-                    .fold(Wire::zero(*q), |r, (i, w)| {
-                        let w = super::block_to_wire(*w, *q);
-                        r.plus(&w.cmul((1 << i) as u16))
-                    });
-                wire
+                combine(chunk, *q)
             })
             .collect::<Vec<Wire>>()
     }
@@ -129,5 +131,13 @@ impl<S: Send + Read + Write, OT: BlockObliviousTransfer<S>> Fancy for Evaluator<
 
     fn output(&self, ix: Option<SyncIndex>, x: &Wire) {
         self.evaluator.output(ix, &x)
+    }
+
+    fn begin_sync(&self, n: SyncIndex) {
+        self.evaluator.begin_sync(n)
+    }
+
+    fn finish_index(&self, ix: SyncIndex) {
+        self.evaluator.finish_index(ix)
     }
 }
