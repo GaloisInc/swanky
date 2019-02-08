@@ -68,7 +68,7 @@ impl<S: Read + Write + Send + Sync, OT: BlockObliviousTransfer<S>> BlockObliviou
             let range = j * ncols / 8..(j + 1) * ncols / 8;
             let mut q = &mut qs[range];
             stream::read_bytes_inplace(stream, &mut u)?;
-            let u = if b { u.clone() } else { vec![0u8; ncols / 8] };
+            if !b { std::mem::replace(&mut u, vec![0u8; ncols / 8]); };
             rng.random(&mut q);
             utils::xor_inplace(&mut q, &u);
         }
