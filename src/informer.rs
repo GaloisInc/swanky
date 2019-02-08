@@ -178,7 +178,7 @@ impl Informer {
 impl Fancy for Informer {
     type Item = InformerVal;
 
-    fn garbler_input(&self, _ix: Option<SyncIndex>, modulus: u16) -> InformerVal {
+    fn garbler_input(&self, _ix: Option<SyncIndex>, modulus: u16, _opt_x: Option<u16>) -> InformerVal {
         self.garbler_input_moduli.lock().unwrap().push(modulus);
         InformerVal(modulus)
     }

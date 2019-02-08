@@ -147,7 +147,7 @@ fn start_postman(
 impl Fancy for Evaluator {
     type Item = Wire;
 
-    fn garbler_input(&self, ix: Option<SyncIndex>, q: u16) -> Wire {
+    fn garbler_input(&self, ix: Option<SyncIndex>, q: u16, _opt_x: Option<u16>) -> Wire {
         match self.recv(ix) {
             Message::GarblerInput(w) => {
                 assert_eq!(w.modulus(), q);
@@ -312,7 +312,7 @@ impl GarbledCircuit {
         for (i,gate) in c.gates.iter().enumerate() {
             let q = c.modulus(i);
             let w = match *gate {
-                Gate::GarblerInput { .. }    => eval.garbler_input(None, q),
+                Gate::GarblerInput { .. }    => eval.garbler_input(None, q, None),
                 Gate::EvaluatorInput { .. }  => eval.evaluator_input(None, q),
                 Gate::Constant { val }       => eval.constant(None, val, q),
                 Gate::Add { xref, yref }     => wires[xref.ix].plus(&wires[yref.ix]),

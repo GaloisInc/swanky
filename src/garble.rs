@@ -193,7 +193,7 @@ pub fn garble(c: &Circuit) -> (Encoder, Decoder, GarbledCircuit) {
         for (i, gate) in c.gates.iter().enumerate() {
             let q = c.modulus(i);
             let w = match gate {
-                Gate::GarblerInput { .. }    => garbler.garbler_input(None, q),
+                Gate::GarblerInput { .. }    => garbler.garbler_input(None, q, None),
                 Gate::EvaluatorInput { .. }  => garbler.evaluator_input(None, q),
                 Gate::Constant { val }       => garbler.constant(None, *val,q),
                 Gate::Add { xref, yref }     => garbler.add(&wires[xref.ix], &wires[yref.ix]),
@@ -662,7 +662,7 @@ mod streaming {
 //}}}
     fn fancy_addition<W: Clone + HasModulus>(b: &dyn Fancy<Item=W>, q: u16) //{{{
     {
-        let x = b.garbler_input(None, q);
+        let x = b.garbler_input(None, q, None);
         let y = b.evaluator_input(None, q);
         let z = b.add(&x,&y);
         b.output(None, &z);
@@ -681,7 +681,7 @@ mod streaming {
 //}}}
     fn fancy_subtraction<W: Clone + HasModulus>(b: &dyn Fancy<Item=W>, q: u16) //{{{
     {
-        let x = b.garbler_input(None, q);
+        let x = b.garbler_input(None, q, None);
         let y = b.evaluator_input(None, q);
         let z = b.sub(&x,&y);
         b.output(None, &z);
@@ -700,7 +700,7 @@ mod streaming {
 //}}}
     fn fancy_multiplication<W: Clone + HasModulus>(b: &dyn Fancy<Item=W>, q: u16) // {{{
     {
-        let x = b.garbler_input(None, q);
+        let x = b.garbler_input(None, q, None);
         let y = b.evaluator_input(None, q);
         let z = b.mul(None,&x,&y);
         b.output(None, &z);
@@ -719,7 +719,7 @@ mod streaming {
 //}}}
     fn fancy_cmul<W: Clone + HasModulus>(b: &dyn Fancy<Item=W>, q: u16) // {{{
     {
-        let x = b.garbler_input(None, q);
+        let x = b.garbler_input(None, q, None);
         let z = b.cmul(&x,5);
         b.output(None, &z);
     }
@@ -736,7 +736,7 @@ mod streaming {
 //}}}
     fn fancy_projection<W: Clone + HasModulus>(b: &dyn Fancy<Item=W>, q: u16) // {{{
     {
-        let x = b.garbler_input(None, q);
+        let x = b.garbler_input(None, q, None);
         let tab = (0..q).map(|i| (i + 1) % q).collect_vec();
         let z = b.proj(None,&x,q,Some(tab));
         b.output(None,&z);
@@ -776,7 +776,7 @@ mod parallel {
                         // let c = b.constant(Some(i), 1, 2 + i as u16);
                         // let z = b.mul(Some(i), &x, &c);
                         let c = b.constant_bundle_crt(Some(i),1,Q);
-                        let x = b.garbler_input_bundle_crt(Some(i), Q);
+                        let x = b.garbler_input_bundle_crt(Some(i), Q, None);
                         let x = b.mul_bundles(Some(i), &x, &c);
                         let z = b.relu(Some(i), &x, "100%");
                         b.finish_index(i);
@@ -796,7 +796,7 @@ mod parallel {
                 // let c = b.constant(Some(i), 1, 2 + i as u16);
                 // let z = b.mul(Some(i), &x, &c);
                 let c = b.constant_bundle_crt(Some(i),1,Q);
-                let x = b.garbler_input_bundle_crt(Some(i), Q);
+                let x = b.garbler_input_bundle_crt(Some(i), Q, None);
                 let x = b.mul_bundles(Some(i), &x, &c);
                 let z = b.relu(Some(i), &x, "100%");
                 zs.push(z);

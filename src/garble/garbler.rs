@@ -97,13 +97,18 @@ impl Garbler {
 impl Fancy for Garbler {
     type Item = Wire;
 
-    fn garbler_input(&self, ix: Option<SyncIndex>, q: u16) -> Wire {
+    fn garbler_input(&self, ix: Option<SyncIndex>, q: u16, opt_x: Option<u16>) -> Wire {
         let w = Wire::rand(&mut rand::thread_rng(), q);
         let d = self.delta(q);
-        self.send(ix, Message::UnencodedGarblerInput {
-            zero: w.clone(),
-            delta: d,
-        });
+        if let Some(x) = opt_x {
+            let encoded_wire = w.plus(&d.cmul(x));
+            self.send(ix, Message::GarblerInput(encoded_wire));
+        } else {
+            self.send(ix, Message::UnencodedGarblerInput {
+                zero: w.clone(),
+                delta: d,
+            });
+        }
         w
     }
 

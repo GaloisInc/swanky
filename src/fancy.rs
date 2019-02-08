@@ -55,8 +55,8 @@ pub trait Fancy {
     /// The underlying wire datatype created by an object implementing `Fancy`.
     type Item: Clone + HasModulus;
 
-    /// Create an input for the garbler with modulus `q`.
-    fn garbler_input(&self, ix: Option<SyncIndex>, q: u16) -> Self::Item;
+    /// Create an input for the garbler with modulus `q` and optional garbler-private value `x`.
+    fn garbler_input(&self, ix: Option<SyncIndex>, q: u16, opt_x: Option<u16>) -> Self::Item;
 
     /// Create an input for the evaluator with modulus `q`.
     fn evaluator_input(&self, ix: Option<SyncIndex>, q: u16) -> Self::Item;
@@ -100,9 +100,12 @@ pub trait Fancy {
     ////////////////////////////////////////////////////////////////////////////////
     // Functions built on top of basic fancy operations.
 
-    /// Create `n` garbler inputs with the moduli `qs`.
-    fn garbler_inputs(&self, ix: Option<SyncIndex>, qs: &[u16]) -> Vec<Self::Item> {
-        qs.iter().map(|&q| self.garbler_input(ix,q)).collect()
+    /// Create `n` garbler inputs with the moduli `qs` and optional inputs `xs`.
+    fn garbler_inputs(&self, ix: Option<SyncIndex>, qs: &[u16], opt_xs: Option<Vec<u16>>) -> Vec<Self::Item> {
+        let xs = to_vec_option(opt_xs, qs.len());
+        qs.iter().zip(xs).map(|(&q,x)| {
+            self.garbler_input(ix,q,x)
+        }).collect()
     }
 
     /// Create `n` evaluator inputs with the moduli `qs`.
@@ -222,9 +225,10 @@ pub trait BundleGadgets: Fancy {
     ////////////////////////////////////////////////////////////////////////////////
     // Bundle creation
 
-    /// Crate an input bundle for the garbler using moduli `ps`.
-    fn garbler_input_bundle(&self, ix: Option<SyncIndex>, ps: &[u16]) -> Bundle<Self::Item> {
-        Bundle(ps.iter().map(|&p| self.garbler_input(ix, p)).collect())
+    /// Crate an input bundle for the garbler using moduli `ps` and optional inputs `xs`.
+    fn garbler_input_bundle(&self, ix: Option<SyncIndex>, ps: &[u16], opt_xs: Option<Vec<u16>>) -> Bundle<Self::Item> {
+        let xs = to_vec_option(opt_xs, ps.len());
+        Bundle(ps.iter().zip(xs).map(|(&p,x)| self.garbler_input(ix, p, x)).collect())
     }
 
     /// Crate an input bundle for the evaluator using moduli `ps`.
@@ -232,9 +236,10 @@ pub trait BundleGadgets: Fancy {
         Bundle(ps.iter().map(|&p| self.evaluator_input(ix, p)).collect())
     }
 
-    /// Crate an input bundle for the garbler using composite CRT modulus `q`.
-    fn garbler_input_bundle_crt(&self, ix: Option<SyncIndex>, q: u128) -> Bundle<Self::Item> {
-        self.garbler_input_bundle(ix, &util::factor(q))
+    /// Crate an input bundle for the garbler using composite CRT modulus `q` and optional
+    /// input `x`.
+    fn garbler_input_bundle_crt(&self, ix: Option<SyncIndex>, q: u128, opt_x: Option<u128>) -> Bundle<Self::Item> {
+        self.garbler_input_bundle(ix, &util::factor(q), opt_x.map(|x| util::crt_factor(x,q)))
     }
 
     /// Crate an input bundle for the evaluator using composite CRT modulus `q`.
@@ -242,9 +247,9 @@ pub trait BundleGadgets: Fancy {
         self.evaluator_input_bundle(ix, &util::factor(q))
     }
 
-    /// Create an input bundle for the garbler using n base 2 inputs.
-    fn garbler_input_bundle_binary(&self, ix: Option<SyncIndex>, n: usize) -> Bundle<Self::Item> {
-        self.garbler_input_bundle(ix, &vec![2;n])
+    /// Create an input bundle for the garbler using `nbits` base 2 inputs and optional input `x`.
+    fn garbler_input_bundle_binary(&self, ix: Option<SyncIndex>, nbits: usize, opt_x: Option<u128>) -> Bundle<Self::Item> {
+        self.garbler_input_bundle(ix, &vec![2;nbits], opt_x.map(|x| util::u128_to_bits(x,nbits)))
     }
 
     /// Create an input bundle for the evaluator using n base 2 inputs.
@@ -270,9 +275,18 @@ pub trait BundleGadgets: Fancy {
         self.constant_bundle(ix, bits, &vec![2;bits.len()])
     }
 
-    /// Create `n` garbler input bundles, using moduli `ps`.
-    fn garbler_input_bundles(&self, ix: Option<SyncIndex>, ps: &[u16], n: usize) -> Vec<Bundle<Self::Item>> {
-        (0..n).map(|_| self.garbler_input_bundle(ix, ps)).collect()
+    /// Create `n` garbler input bundles, using moduli `ps` and optional inputs `xs`.
+    fn garbler_input_bundles(&self, ix: Option<SyncIndex>, ps: &[u16], n: usize, opt_xs: Option<Vec<Vec<u16>>>)
+        -> Vec<Bundle<Self::Item>>
+    {
+        if let Some(inps) = opt_xs {
+            assert_eq!(inps.len(), n, "garbler_input_bundles contradictory inputs");
+            inps.into_iter().map(|xs| {
+                self.garbler_input_bundle(ix, ps, Some(xs))
+            }).collect()
+        } else {
+            (0..n).map(|_| self.garbler_input_bundle(ix, ps, None)).collect()
+        }
     }
 
     /// Create `n` evaluator input bundles, using moduli `ps`.
@@ -280,9 +294,17 @@ pub trait BundleGadgets: Fancy {
         (0..n).map(|_| self.evaluator_input_bundle(ix, ps)).collect()
     }
 
-    /// Create `n` garbler input bundles, under composite CRT modulus `q`.
-    fn garbler_input_bundles_crt(&self, ix: Option<SyncIndex>, q: u128, n: usize) -> Vec<Bundle<Self::Item>> {
-        (0..n).map(|_| self.garbler_input_bundle_crt(ix, q)).collect()
+    /// Create `n` garbler input bundles, under composite CRT modulus `q` and optional
+    /// inputs `xs`.
+    fn garbler_input_bundles_crt(&self, ix: Option<SyncIndex>, q: u128, n: usize, opt_xs: Option<Vec<u128>>)
+        -> Vec<Bundle<Self::Item>>
+    {
+        if let Some(xs) = opt_xs {
+            assert_eq!(xs.len(), n, "garbler_input_bundles_crt contradictory arguments");
+            xs.into_iter().map(|x| self.garbler_input_bundle_crt(ix, q, Some(x))).collect()
+        } else {
+            (0..n).map(|_| self.garbler_input_bundle_crt(ix, q, None)).collect()
+        }
     }
 
     /// Create `n` evaluator input bundles, under composite CRT modulus `q`.
@@ -759,4 +781,11 @@ fn get_ms<W: Clone + HasModulus>(x: &Bundle<W>, accuracy: &str) -> Vec<u16> {
         }
         _ => panic!("get_ms: unsupported accuracy {}", accuracy),
     }
+}
+
+fn to_vec_option<T>(opt_xs: Option<Vec<T>>, len: usize) -> Vec<Option<T>> {
+    opt_xs.map(|vals| {
+        // transform option of slice into vec of options
+        vals.into_iter().map(Some).collect()
+    }).unwrap_or((0..len).map(|_| None).collect())
 }

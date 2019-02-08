@@ -11,7 +11,7 @@ fn parallel_gadget<F,W>(b: &F, Q: u128, N: u8, par: bool)
     where W: Clone + HasModulus + Send + Sync + std::fmt::Debug,
         F: Fancy<Item=W> + Send + Sync,
     {
-    let inps = b.garbler_input_bundles_crt(None, Q, N as usize);
+    let inps = b.garbler_input_bundles_crt(None, Q, N as usize, None);
     if par {
         crossbeam::scope(|scope| {
             b.begin_sync(N);

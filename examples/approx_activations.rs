@@ -8,7 +8,7 @@ fn approx_relu<F,W>(b: &F, q: u128)
   where F: Fancy<Item=W>,
         W: HasModulus + Clone,
 {
-    let x = b.garbler_input_bundle_crt(None, q);
+    let x = b.garbler_input_bundle_crt(None, q, None);
     let exact = b.relu(None, &x, "100%");
     let approx_999 = b.relu(None, &x, "99.9%");
     let approx_99  = b.relu(None, &x, "99%");

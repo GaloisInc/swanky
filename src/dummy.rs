@@ -71,8 +71,10 @@ impl Dummy {
 impl Fancy for Dummy {
     type Item = DummyVal;
 
-    fn garbler_input(&self, ix: Option<SyncIndex>, modulus: u16) -> DummyVal {
-        if self.in_sync() {
+    fn garbler_input(&self, ix: Option<SyncIndex>, modulus: u16, opt_x: Option<u16>) -> DummyVal {
+        if let Some(val) = opt_x {
+            DummyVal { val, modulus }
+        } else if self.in_sync() {
             let ix = ix.expect("dummy: sync mode requires index");
             self.request(ix, Request::GarblerInput(modulus))
         } else {
@@ -238,8 +240,8 @@ mod bundle {
             let y = rng.gen_u128() % q;
             let d = Dummy::new(&crt_factor(x,q), &crt_factor(y,q));
             {
-                let x = d.garbler_input_bundle_crt(None,q);
-                let y = d.evaluator_input_bundle_crt(None,q);
+                let x = d.garbler_input_bundle_crt(None, q, None);
+                let y = d.evaluator_input_bundle_crt(None, q);
                 let z = d.add_bundles(&x,&y);
                 d.output_bundle(None,&z);
             }
@@ -257,8 +259,8 @@ mod bundle {
             let y = rng.gen_u128() % q;
             let d = Dummy::new(&crt_factor(x,q), &crt_factor(y,q));
             {
-                let x = d.garbler_input_bundle_crt(None,q);
-                let y = d.evaluator_input_bundle_crt(None,q);
+                let x = d.garbler_input_bundle_crt(None, q, None);
+                let y = d.evaluator_input_bundle_crt(None, q);
                 let z = d.sub_bundles(&x,&y);
                 d.output_bundle(None,&z);
             }
@@ -277,7 +279,7 @@ mod bundle {
             let c = 1 + rng.gen_u128() % q;
             let d = Dummy::new(&util::u128_to_bits(x,nbits), &[]);
             {
-                let x = d.garbler_input_bundle(None,&vec![2;nbits]);
+                let x = d.garbler_input_bundle(None, &vec![2;nbits], None);
                 let z = d.binary_cmul(None,&x,c,nbits);
                 d.output_bundle(None,&z);
             }
@@ -296,9 +298,9 @@ mod bundle {
             let y = rng.gen_u128() % q;
             let d = Dummy::new(&util::u128_to_bits(x,nbits), &util::u128_to_bits(y,nbits));
             {
-                let x = d.garbler_input_bundle_binary(None,nbits);
-                let y = d.evaluator_input_bundle_binary(None,nbits);
-                let z = d.binary_multiplication_lower_half(None,&x,&y);
+                let x = d.garbler_input_bundle_binary(None, nbits, None);
+                let y = d.evaluator_input_bundle_binary(None, nbits);
+                let z = d.binary_multiplication_lower_half(None, &x, &y);
                 d.output_bundle(None,&z);
             }
             let z = util::u128_from_bits(&d.get_output());
@@ -317,7 +319,7 @@ mod bundle {
             let enc_inps = inps.into_iter().flat_map(|x| crt_factor(x,q)).collect_vec();
             let d = Dummy::new(&enc_inps, &[]);
             {
-                let xs = d.garbler_input_bundles_crt(None,q,n);
+                let xs = d.garbler_input_bundles_crt(None, q, n, None);
                 let z = d.max(None,&xs,"100%");
                 d.output_bundle(None,&z);
             }
@@ -338,7 +340,7 @@ mod bundle {
             let enc_inps = inps.into_iter().flat_map(|x| util::u128_to_bits(x,nbits)).collect_vec();
             let d = Dummy::new(&enc_inps, &[]);
             {
-                let xs = d.garbler_input_bundles(None,&vec![2;nbits], n);
+                let xs = d.garbler_input_bundles(None,&vec![2;nbits], n, None);
                 let z = d.max(None,&xs,"100%");
                 d.output_bundle(None,&z);
             }
@@ -355,7 +357,7 @@ mod bundle {
             let x = rng.gen_u128() % q;
             let d = Dummy::new(&crt_factor(x,q), &[]);
             {
-                let x = d.garbler_input_bundle_crt(None,q);
+                let x = d.garbler_input_bundle_crt(None, q, None);
                 let z = d.relu(None,&x,"100%");
                 d.output_bundle(None,&z);
             }
@@ -377,7 +379,7 @@ mod bundle {
             let x = rng.gen_u128() % q;
             let d = Dummy::new(&util::u128_to_bits(x,nbits), &[]);
             {
-                let x = d.garbler_input_bundle_binary(None,nbits);
+                let x = d.garbler_input_bundle_binary(None, nbits, None);
                 let z = d.abs(None,&x);
                 d.output_bundle(None,&z);
             }

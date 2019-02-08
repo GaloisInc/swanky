@@ -8,8 +8,8 @@ fn collision<W,F>(f: &F, nbits: usize, time_slices: usize, check_for_cheaters: b
     // obtain inputs into a vec of vecs of arrays of 4
     let inputs = (0..time_slices).map(|_t| {
         (0..3).map(|_dimension| {
-            let p1_min = f.garbler_input_bundle_binary(None, nbits);
-            let p1_max = f.garbler_input_bundle_binary(None, nbits);
+            let p1_min = f.garbler_input_bundle_binary(None, nbits, None);
+            let p1_max = f.garbler_input_bundle_binary(None, nbits, None);
             let p2_min = f.evaluator_input_bundle_binary(None, nbits);
             let p2_max = f.evaluator_input_bundle_binary(None, nbits);
             [p1_min, p1_max, p2_min, p2_max]

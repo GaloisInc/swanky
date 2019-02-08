@@ -6,7 +6,7 @@ fn exact_sign<F,W>(b: &F, q: u128)
   where F: Fancy<Item=W>,
         W: HasModulus + Clone,
 {
-    let x = b.garbler_input_bundle_crt(None, q);
+    let x = b.garbler_input_bundle_crt(None, q, None);
     let z = b.sign(None, &x, "100%");
     b.output(None, &z);
 }
