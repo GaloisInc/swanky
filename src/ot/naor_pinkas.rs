@@ -45,13 +45,13 @@ impl<S: Read + Write + Send + Sync> BlockObliviousTransfer<S> for NaorPinkasOT<S
             let e00 = &r0 * &RISTRETTO_BASEPOINT_TABLE;
             let e10 = &r1 * &RISTRETTO_BASEPOINT_TABLE;
             let h = utils::hash_pt_block(i, &(pk0 * r0));
-            let e01 = utils::xor(&h, &input.0);
+            let e01 = utils::xor_block(&h, &input.0);
             let h = utils::hash_pt_block(i, &(pk1 * r1));
-            let e11 = utils::xor(&h, &input.1);
+            let e11 = utils::xor_block(&h, &input.1);
             stream::write_pt(stream, &e00)?;
-            stream::write_bytes(stream, &e01)?;
+            stream::write_block(stream, &e01)?;
             stream::write_pt(stream, &e10)?;
-            stream::write_bytes(stream, &e11)?;
+            stream::write_block(stream, &e11)?;
         }
         Ok(())
     }

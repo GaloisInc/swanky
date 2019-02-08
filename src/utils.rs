@@ -6,20 +6,9 @@
 
 use crate::aes::Aes128;
 use crate::Block;
-use aesni::stream_cipher::{NewStreamCipher, StreamCipher};
-use aesni::Aes128Ctr;
 use arrayref::array_ref;
 use core::arch::x86_64::*;
 use curve25519_dalek::ristretto::RistrettoPoint;
-
-#[inline(always)]
-pub fn hash_pt(pt: &RistrettoPoint, nbytes: usize) -> Vec<u8> {
-    let k = pt.compress();
-    let k = k.as_bytes();
-    let mut m = vec![0u8; nbytes];
-    encrypt(&k[0..16], &k[16..32], &mut m);
-    m
-}
 
 /// Hash an elliptic curve point `pt` by computing `E_{pt}(i)`, where `E` is
 /// AES-128 and `i` is an index.
@@ -34,10 +23,10 @@ pub fn hash_pt_block(i: usize, pt: &RistrettoPoint) -> Block {
     }
 }
 
-#[inline(always)]
-pub fn xor(a: &[u8], b: &[u8]) -> Vec<u8> {
-    a.iter().zip(b.iter()).map(|(a, b)| a ^ b).collect()
-}
+// #[inline(always)]
+// pub fn xor(a: &[u8], b: &[u8]) -> Vec<u8> {
+//     a.iter().zip(b.iter()).map(|(a, b)| a ^ b).collect()
+// }
 
 #[inline(always)]
 pub fn xor_inplace(a: &mut [u8], b: &[u8]) {
@@ -66,14 +55,6 @@ pub fn block_to_m128i(v: &Block) -> __m128i {
 #[inline(always)]
 pub fn m128i_to_block(m: __m128i) -> Block {
     unsafe { std::mem::transmute::<__m128i, Block>(m) }
-}
-
-type Cipher = Aes128Ctr;
-
-#[inline(always)]
-pub fn encrypt(k: &[u8], iv: &[u8], mut m: &mut [u8]) {
-    let mut cipher = Cipher::new_var(k, iv).unwrap();
-    cipher.encrypt(&mut m)
 }
 
 #[inline(always)]
@@ -148,12 +129,6 @@ mod benchamarks {
     use test::Bencher;
 
     #[bench]
-    fn bench_hash_pt(b: &mut Bencher) {
-        let pt = RistrettoPoint::random(&mut rand::thread_rng());
-        b.iter(|| hash_pt(&pt, 16));
-    }
-
-    #[bench]
     fn bench_hash_pt_block(b: &mut Bencher) {
         let pt = RistrettoPoint::random(&mut rand::thread_rng());
         let i = rand::random::<usize>();
@@ -161,10 +136,10 @@ mod benchamarks {
     }
 
     #[bench]
-    fn bench_xor(b: &mut Bencher) {
-        let x = rand::random::<[u8; 16]>().to_vec();
+    fn bench_xor_inplace(b: &mut Bencher) {
+        let mut x = rand::random::<[u8; 16]>().to_vec();
         let y = rand::random::<[u8; 16]>().to_vec();
-        b.iter(|| xor(&x, &y));
+        b.iter(|| xor_inplace(&mut x, &y));
     }
 
     #[bench]
@@ -172,14 +147,6 @@ mod benchamarks {
         let x = rand::random::<[u8; 16]>();
         let y = rand::random::<[u8; 16]>();
         b.iter(|| xor_block(&x, &y));
-    }
-
-    #[bench]
-    fn bench_encrypt(b: &mut Bencher) {
-        let k = rand::random::<[u8; 16]>().to_vec();
-        let iv = rand::random::<[u8; 16]>().to_vec();
-        let mut m = rand::random::<[u8; 16]>().to_vec();
-        b.iter(|| encrypt(&k, &iv, &mut m));
     }
 
     #[bench]

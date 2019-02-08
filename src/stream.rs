@@ -47,12 +47,12 @@ pub fn read_bool<T: Read + Write + Send>(stream: &mut T) -> Result<bool, Error> 
 pub fn write_bytes<T: Read + Write + Send>(stream: &mut T, bytes: &[u8]) -> Result<usize, Error> {
     stream.write(bytes).map_err(Error::from)
 }
-#[inline(always)]
-pub fn read_bytes<T: Read + Write + Send>(stream: &mut T, nbytes: usize) -> Result<Vec<u8>, Error> {
-    let mut v = vec![0; nbytes];
-    stream.read_exact(&mut v)?;
-    Ok(v)
-}
+// #[inline(always)]
+// pub fn read_bytes<T: Read + Write + Send>(stream: &mut T, nbytes: usize) -> Result<Vec<u8>, Error> {
+//     let mut v = vec![0; nbytes];
+//     stream.read_exact(&mut v)?;
+//     Ok(v)
+// }
 #[inline(always)]
 pub fn read_bytes_inplace<T: Read + Write + Send>(
     stream: &mut T,

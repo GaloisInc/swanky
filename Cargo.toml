@@ -9,7 +9,6 @@ autobenches = false
 [lib]
 
 [dependencies]
-aesni = "*"
 arrayref = "*"
 curve25519-dalek = { version = "*", features = ["std", "avx2_backend"] }
 failure = "*"
