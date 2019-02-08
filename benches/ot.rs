@@ -3,12 +3,8 @@ use ocelot::*;
 use std::os::unix::net::UnixStream;
 use std::time::Duration;
 
-const N: usize = 16;
 const T: usize = 1 << 15;
 
-fn rand_u8_vec(nbytes: usize) -> Vec<u8> {
-    (0..nbytes).map(|_| rand::random::<u8>()).collect()
-}
 fn rand_block_vec(size: usize) -> Vec<Block> {
     (0..size).map(|_| rand::random::<Block>()).collect()
 }
@@ -27,17 +23,6 @@ fn _bench_block_ot<OT: BlockObliviousTransfer<UnixStream>>(bs: &[bool], ms: Vec<
     handle.join().unwrap();
 }
 
-fn _bench_ot<OT: ObliviousTransfer<UnixStream>>(bs: &[bool], ms: Vec<(Vec<u8>, Vec<u8>)>) {
-    let (mut sender, mut receiver) = UnixStream::pair().unwrap();
-    let handle = std::thread::spawn(move || {
-        let mut ot = OT::new();
-        ot.send(&mut sender, &ms, N).unwrap();
-    });
-    let mut ot = OT::new();
-    ot.receive(&mut receiver, &bs, N).unwrap();
-    handle.join().unwrap();
-}
-
 fn bench_ot(c: &mut Criterion) {
     c.bench_function("ot::ChouOrlandiOT", move |bench| {
         let m0s = rand_block_vec(128);
@@ -50,24 +35,24 @@ fn bench_ot(c: &mut Criterion) {
         bench.iter(move || _bench_block_ot::<ChouOrlandiOT<UnixStream>>(&bs, ms.clone()))
     });
     c.bench_function("ot::DummyOT", move |bench| {
-        let m0s = (0..128).map(|_| rand_u8_vec(N)).collect::<Vec<Vec<u8>>>();
-        let m1s = (0..128).map(|_| rand_u8_vec(N)).collect::<Vec<Vec<u8>>>();
+        let m0s = rand_block_vec(128);
+        let m1s = rand_block_vec(128);
         let ms = m0s
             .into_iter()
             .zip(m1s.into_iter())
-            .collect::<Vec<(Vec<u8>, Vec<u8>)>>();
+            .collect::<Vec<(Block, Block)>>();
         let bs = rand_bool_vec(128);
-        bench.iter(|| _bench_ot::<DummyOT<UnixStream>>(&bs, ms.clone()))
+        bench.iter(|| _bench_block_ot::<DummyOT<UnixStream>>(&bs, ms.clone()))
     });
     c.bench_function("ot::NaorPinkasOT", move |bench| {
-        let m0s = (0..128).map(|_| rand_u8_vec(N)).collect::<Vec<Vec<u8>>>();
-        let m1s = (0..128).map(|_| rand_u8_vec(N)).collect::<Vec<Vec<u8>>>();
+        let m0s = rand_block_vec(128);
+        let m1s = rand_block_vec(128);
         let ms = m0s
             .into_iter()
             .zip(m1s.into_iter())
-            .collect::<Vec<(Vec<u8>, Vec<u8>)>>();
+            .collect::<Vec<(Block, Block)>>();
         let bs = rand_bool_vec(128);
-        bench.iter(|| _bench_ot::<NaorPinkasOT<UnixStream>>(&bs, ms.clone()))
+        bench.iter(|| _bench_block_ot::<NaorPinkasOT<UnixStream>>(&bs, ms.clone()))
     });
 }
 
@@ -84,10 +69,6 @@ fn bench_otext(c: &mut Criterion) {
             _bench_block_ot::<AlszOT<UnixStream, ChouOrlandiOT<UnixStream>>>(&bs, ms.clone())
         })
     });
-    // c.bench_function("ot::IknpOT", move |bench| {
-    //     bench
-    //         .iter(|| _bench_otext::<IknpOT<UnixStream, ChouOrlandiOT<UnixStream>>>(&bs, ms.clone()))
-    // });
 }
 
 criterion_group! {

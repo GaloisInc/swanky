@@ -6,7 +6,7 @@
 
 use crate::stream;
 use crate::utils;
-use crate::ObliviousTransfer;
+use crate::{Block, BlockObliviousTransfer};
 use curve25519_dalek::constants::RISTRETTO_BASEPOINT_TABLE;
 use curve25519_dalek::ristretto::RistrettoPoint;
 use curve25519_dalek::scalar::Scalar;
@@ -25,7 +25,7 @@ pub struct NaorPinkasOT<S: Read + Write + Send + Sync> {
     rng: ThreadRng,
 }
 
-impl<S: Read + Write + Send + Sync> ObliviousTransfer<S> for NaorPinkasOT<S> {
+impl<S: Read + Write + Send + Sync> BlockObliviousTransfer<S> for NaorPinkasOT<S> {
     fn new() -> Self {
         let rng = rand::thread_rng();
         Self {
@@ -34,13 +34,8 @@ impl<S: Read + Write + Send + Sync> ObliviousTransfer<S> for NaorPinkasOT<S> {
         }
     }
 
-    fn send(
-        &mut self,
-        stream: &mut S,
-        inputs: &[(Vec<u8>, Vec<u8>)],
-        nbytes: usize,
-    ) -> Result<(), Error> {
-        for input in inputs.iter() {
+    fn send(&mut self, stream: &mut S, inputs: &[(Block, Block)]) -> Result<(), Error> {
+        for (i, input) in inputs.iter().enumerate() {
             let c = RistrettoPoint::random(&mut self.rng);
             stream::write_pt(stream, &c)?;
             let pk0 = stream::read_pt(stream)?;
@@ -49,9 +44,9 @@ impl<S: Read + Write + Send + Sync> ObliviousTransfer<S> for NaorPinkasOT<S> {
             let r1 = Scalar::random(&mut self.rng);
             let e00 = &r0 * &RISTRETTO_BASEPOINT_TABLE;
             let e10 = &r1 * &RISTRETTO_BASEPOINT_TABLE;
-            let h = utils::hash_pt(&(pk0 * r0), nbytes);
+            let h = utils::hash_pt_block(i, &(pk0 * r0));
             let e01 = utils::xor(&h, &input.0);
-            let h = utils::hash_pt(&(pk1 * r1), nbytes);
+            let h = utils::hash_pt_block(i, &(pk1 * r1));
             let e11 = utils::xor(&h, &input.1);
             stream::write_pt(stream, &e00)?;
             stream::write_bytes(stream, &e01)?;
@@ -61,15 +56,11 @@ impl<S: Read + Write + Send + Sync> ObliviousTransfer<S> for NaorPinkasOT<S> {
         Ok(())
     }
 
-    fn receive(
-        &mut self,
-        stream: &mut S,
-        inputs: &[bool],
-        nbytes: usize,
-    ) -> Result<Vec<Vec<u8>>, Error> {
+    fn receive(&mut self, stream: &mut S, inputs: &[bool]) -> Result<Vec<Block>, Error> {
         inputs
             .iter()
-            .map(|input| {
+            .enumerate()
+            .map(|(i, input)| {
                 let c = stream::read_pt(stream)?;
                 let k = Scalar::random(&mut self.rng);
                 let pkσ = &k * &RISTRETTO_BASEPOINT_TABLE;
@@ -79,15 +70,15 @@ impl<S: Read + Write + Send + Sync> ObliviousTransfer<S> for NaorPinkasOT<S> {
                     true => stream::write_pt(stream, &pkσ_)?,
                 };
                 let e00 = stream::read_pt(stream)?;
-                let e01 = stream::read_bytes(stream, nbytes)?;
+                let e01 = stream::read_block(stream)?;
                 let e10 = stream::read_pt(stream)?;
-                let e11 = stream::read_bytes(stream, nbytes)?;
+                let e11 = stream::read_block(stream)?;
                 let (eσ0, eσ1) = match input {
                     false => (e00, e01),
                     true => (e10, e11),
                 };
-                let h = utils::hash_pt(&(eσ0 * k), nbytes);
-                let m = utils::xor(&h, &eσ1);
+                let h = utils::hash_pt_block(i, &(eσ0 * k));
+                let m = utils::xor_block(&h, &eσ1);
                 Ok(m)
             })
             .collect()
@@ -100,22 +91,20 @@ mod tests {
     use super::*;
     use std::os::unix::net::UnixStream;
 
-    const N: usize = 16;
-
     #[test]
     fn test() {
-        let m0 = rand::random::<[u8; N]>().to_vec();
-        let m1 = rand::random::<[u8; N]>().to_vec();
+        let m0 = rand::random::<Block>();
+        let m1 = rand::random::<Block>();
         let b = rand::random::<bool>();
         let m0_ = m0.clone();
         let m1_ = m1.clone();
         let (mut sender, mut receiver) = UnixStream::pair().unwrap();
         let handler = std::thread::spawn(move || {
             let mut ot = NaorPinkasOT::new();
-            ot.send(&mut sender, &[(m0, m1)], N).unwrap();
+            ot.send(&mut sender, &[(m0, m1)]).unwrap();
         });
         let mut ot = NaorPinkasOT::new();
-        let result = ot.receive(&mut receiver, &[b], N).unwrap();
+        let result = ot.receive(&mut receiver, &[b]).unwrap();
         assert_eq!(result[0], if b { m1_ } else { m0_ });
         handler.join().unwrap();
     }
