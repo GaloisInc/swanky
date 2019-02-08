@@ -600,12 +600,28 @@ pub trait BundleGadgets: Fancy {
         Bundle(bs)
     }
 
-    // /// Binary multiplication.
-    // fn binary_multiplication(&self, ix: Option<SyncIndex>, xs: &Bundle<Self::Item>, ys: &Bundle<Self::Item>)
-    //     -> Bundle<Self::Item>
-    // {
-    //     unimplemented!()
-    // }
+    /// Binary multiplication.
+    ///
+    /// Returns the lower-order half of the output bits, ie a number with the same number
+    /// of bits as the inputs.
+    fn binary_multiplication_lower_half(&self, ix: Option<SyncIndex>, xs: &Bundle<Self::Item>, ys: &Bundle<Self::Item>)
+        -> Bundle<Self::Item>
+    {
+        assert_eq!(xs.moduli(), ys.moduli());
+
+        let xwires = xs.wires();
+        let ywires = ys.wires();
+
+        let mut sum = Bundle::new(xwires.iter().map(|x| self.and(ix,x,&ywires[0])).collect_vec());
+
+        for i in 1..xwires.len() {
+            let mul = Bundle::new(xwires.iter().map(|x| self.and(ix,x,&ywires[i])).collect_vec());
+            let shifted = self.shift(ix, &mul, i);
+            sum = self.binary_addition_no_carry(ix, &sum, &shifted);
+        }
+
+        sum
+    }
 
     /// Compute the twos complement of the input bundle (which must be base 2).
     fn twos_complement(&self, ix: Option<SyncIndex>, xs: &Bundle<Self::Item>) -> Bundle<Self::Item> {
@@ -647,7 +663,7 @@ pub trait BundleGadgets: Fancy {
         Bundle(ws)
     }
 
-    /// Shift residues, replacing them with zeros in the modulus of the last residue.
+    /// Shift residues, replacing them with zeros in the modulus of the least signifigant residue.
     fn shift(&self, ix: Option<SyncIndex>, x: &Bundle<Self::Item>, n: usize) -> Bundle<Self::Item> {
         let mut ws = x.wires().to_vec();
         let zero = self.constant(ix, 0, ws.last().unwrap().modulus());
@@ -704,6 +720,7 @@ fn get_ms<W: Clone + HasModulus>(x: &Bundle<W>, accuracy: &str) -> Vec<u16> {
             match x.moduli().len() {
                 8 => vec![3,6,8,8,100],
                 9 => vec![7,9,11,170],
+                10 => vec![8,9,10,182],
                 n => panic!("unknown 99.999% accurate Ms for {} primes!", n),
             }
         }

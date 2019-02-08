@@ -230,7 +230,7 @@ mod bundle {
     use rand::thread_rng;
 
     #[test] // bundle addition {{{
-    fn addition() {
+    fn test_addition() {
         let mut rng = thread_rng();
         for _ in 0..16 {
             let q = rng.gen_usable_composite_modulus();
@@ -249,7 +249,7 @@ mod bundle {
     }
     //}}}
     #[test] // bundle subtraction {{{
-    fn subtraction() {
+    fn test_subtraction() {
         let mut rng = thread_rng();
         for _ in 0..16 {
             let q = rng.gen_usable_composite_modulus();
@@ -268,7 +268,7 @@ mod bundle {
     }
     //}}}
     #[test] // binary cmul {{{
-    fn binary_cmul() {
+    fn test_binary_cmul() {
         let mut rng = thread_rng();
         for _ in 0..16 {
             let nbits = 64;
@@ -283,6 +283,26 @@ mod bundle {
             }
             let z = util::u128_from_bits(&d.get_output());
             assert_eq!(z, (x*c)%q);
+        }
+    }
+    //}}}
+    #[test] // binary multiplication {{{
+    fn test_binary_multiplication() {
+        let mut rng = thread_rng();
+        for _ in 0..1024 {
+            let nbits = 64;
+            let q = 1<<nbits;
+            let x = rng.gen_u128() % q;
+            let y = rng.gen_u128() % q;
+            let d = Dummy::new(&util::u128_to_bits(x,nbits), &util::u128_to_bits(y,nbits));
+            {
+                let x = d.garbler_input_bundle_binary(None,nbits);
+                let y = d.evaluator_input_bundle_binary(None,nbits);
+                let z = d.binary_multiplication_lower_half(None,&x,&y);
+                d.output_bundle(None,&z);
+            }
+            let z = util::u128_from_bits(&d.get_output());
+            assert_eq!(z, (x*y)&(q-1));
         }
     }
     //}}}
