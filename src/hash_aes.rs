@@ -56,3 +56,26 @@ impl AesHash {
         }
     }
 }
+
+#[cfg(test)]
+mod benchmarks {
+    extern crate test;
+
+    use super::*;
+    use test::Bencher;
+
+    #[bench]
+    fn bench_cr_hash(b: &mut Bencher) {
+        let hash = AesHash::new(&[0u8; 16]);
+        let x = [0u8; 16];
+        b.iter(|| hash.cr_hash(0, &x));
+    }
+
+    #[bench]
+    fn bench_ccr_hash(b: &mut Bencher) {
+        let hash = AesHash::new(&[0u8; 16]);
+        let x = [0u8; 16];
+        b.iter(|| hash.ccr_hash(0, &x));
+    }
+
+}

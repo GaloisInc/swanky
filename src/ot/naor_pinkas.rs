@@ -20,12 +20,12 @@ use std::marker::PhantomData;
 ///
 /// This implementation uses the Ristretto prime order elliptic curve group from
 /// the `curve25519-dalek` library.
-pub struct NaorPinkasOT<S: Read + Write + Send> {
+pub struct NaorPinkasOT<S: Read + Write + Send + Sync> {
     _s: PhantomData<S>,
     rng: ThreadRng,
 }
 
-impl<S: Read + Write + Send> ObliviousTransfer<S> for NaorPinkasOT<S> {
+impl<S: Read + Write + Send + Sync> ObliviousTransfer<S> for NaorPinkasOT<S> {
     fn new() -> Self {
         let rng = rand::thread_rng();
         Self {

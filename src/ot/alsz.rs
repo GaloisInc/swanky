@@ -11,26 +11,27 @@ use crate::utils;
 use crate::{Block, BlockObliviousTransfer};
 use arrayref::array_ref;
 use failure::Error;
-// use rand::rngs::ThreadRng;
-// use rand::Rng;
+use rand::rngs::ThreadRng;
+use rand::Rng;
 use std::io::{ErrorKind, Read, Write};
 use std::marker::PhantomData;
 
 /// Implementation of the Asharov-Lindell-Schneider-Zohner semi-honest secure
 /// oblivious transfer extension protocol (cf.
 /// <https://eprint.iacr.org/2016/602>, Protocol 4).
-pub struct AlszOT<S: Read + Write + Send, OT: BlockObliviousTransfer<S>> {
+pub struct AlszOT<S: Read + Write + Send + Sync, OT: BlockObliviousTransfer<S>> {
     s: PhantomData<S>,
     ot: OT,
-    rng: AesRng,
+    rng: ThreadRng,
 }
 
-impl<S: Read + Write + Send, OT: BlockObliviousTransfer<S>> BlockObliviousTransfer<S>
+impl<S: Read + Write + Send + Sync, OT: BlockObliviousTransfer<S>> BlockObliviousTransfer<S>
     for AlszOT<S, OT>
 {
     fn new() -> Self {
         let ot = OT::new();
-        let rng = AesRng::new(&rand::random::<Block>());
+        // let rng = AesRng::new(&rand::random::<Block>());
+        let rng = rand::thread_rng();
         Self {
             s: PhantomData::<S>,
             ot,
@@ -52,8 +53,12 @@ impl<S: Read + Write + Send, OT: BlockObliviousTransfer<S>> BlockObliviousTransf
         }
         let (nrows, ncols) = (128, m);
         let hash = AesHash::new(&[0u8; 16]); // XXX IV should be chosen at random
-        let mut s_ = vec![0u8; nrows / 8];
-        self.rng.random(&mut s_);
+
+        // let mut s_ = vec![0u8; nrows / 8];
+        // self.rng.random(&mut s_);
+        let s_ = (0..nrows / 8)
+            .map(|_| self.rng.gen::<u8>())
+            .collect::<Vec<u8>>();
         let s = utils::u8vec_to_boolvec(&s_);
         let ks = self.ot.receive(stream, &s)?;
         let rngs = ks.into_iter().map(|k| AesRng::new(&k));
@@ -90,20 +95,23 @@ impl<S: Read + Write + Send, OT: BlockObliviousTransfer<S>> BlockObliviousTransf
         let hash = AesHash::new(&[0u8; 16]); // XXX IV should be chosen at random
         let mut ks = Vec::with_capacity(nrows);
         for _ in 0..nrows {
-            let mut k0 = [0u8; 16];
-            let mut k1 = [0u8; 16];
-            self.rng.random(&mut k0);
-            self.rng.random(&mut k1);
+            // let mut k0 = [0u8; 16];
+            // let mut k1 = [0u8; 16];
+            // self.rng.random(&mut k0);
+            // self.rng.random(&mut k1);
+            let k0 = self.rng.gen::<[u8; 16]>();
+            let k1 = self.rng.gen::<[u8; 16]>();
             ks.push((k0, k1));
         }
         self.ot.send(stream, &ks)?;
         let rngs = ks
             .into_iter()
-            .map(|(k0, k1)| (AesRng::new(&k0), AesRng::new(&k1)));
+            .map(|(k0, k1)| (AesRng::new(&k0), AesRng::new(&k1)))
+            .collect::<Vec<(AesRng, AesRng)>>();
         let r = utils::boolvec_to_u8vec(inputs);
         let mut ts = vec![0u8; nrows * ncols / 8];
         let mut g = vec![0u8; ncols / 8];
-        for (j, (rng0, rng1)) in rngs.enumerate() {
+        for (j, (rng0, rng1)) in rngs.into_iter().enumerate() {
             let range = j * ncols / 8..(j + 1) * ncols / 8;
             let mut t = &mut ts[range];
             rng0.random(&mut t);

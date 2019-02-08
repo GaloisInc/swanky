@@ -37,3 +37,18 @@ impl AesRng {
         }
     }
 }
+
+#[cfg(test)]
+mod benchamarks {
+    extern crate test;
+
+    use super::*;
+    use test::Bencher;
+
+    #[bench]
+    fn bench_aes_rand(b: &mut Bencher) {
+        let rng = AesRng::new(&[0u8; 16]);
+        let mut x = [0u8; 16 * 1024];
+        b.iter(|| rng.random(&mut x));
+    }
+}

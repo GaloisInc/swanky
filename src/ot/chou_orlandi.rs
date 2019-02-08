@@ -10,7 +10,6 @@ use crate::{Block, BlockObliviousTransfer};
 use curve25519_dalek::constants::RISTRETTO_BASEPOINT_TABLE;
 use curve25519_dalek::scalar::Scalar;
 use failure::Error;
-use rand::rngs::ThreadRng;
 use std::io::{Read, Write};
 use std::marker::PhantomData;
 
@@ -20,22 +19,20 @@ use std::marker::PhantomData;
 /// This implementation uses the Ristretto prime order elliptic curve group from
 /// the `curve25519-dalek` library and works over blocks rather than arbitrary
 /// length messages.
-pub struct ChouOrlandiOT<S: Read + Write + Send> {
+pub struct ChouOrlandiOT<S: Read + Write + Send + Sync> {
     _s: PhantomData<S>,
-    rng: ThreadRng,
 }
 
-impl<S: Read + Write + Send> BlockObliviousTransfer<S> for ChouOrlandiOT<S> {
+impl<S: Read + Write + Send + Sync> BlockObliviousTransfer<S> for ChouOrlandiOT<S> {
     fn new() -> Self {
-        let rng = rand::thread_rng();
         Self {
             _s: PhantomData::<S>,
-            rng,
         }
     }
 
     fn send(&mut self, stream: &mut S, inputs: &[(Block, Block)]) -> Result<(), Error> {
-        let y = Scalar::random(&mut self.rng);
+        // let y = Scalar::random(&mut self.rng);
+        let y = Scalar::random(&mut rand::thread_rng());
         let s = &y * &RISTRETTO_BASEPOINT_TABLE;
         stream::write_pt(stream, &s)?;
         for input in inputs.iter() {
@@ -55,7 +52,8 @@ impl<S: Read + Write + Send> BlockObliviousTransfer<S> for ChouOrlandiOT<S> {
         inputs
             .iter()
             .map(|b| {
-                let x = Scalar::random(&mut self.rng);
+                // let x = Scalar::random(&mut self.rng);
+                let x = Scalar::random(&mut rand::thread_rng());
                 let c = if *b { Scalar::one() } else { Scalar::zero() };
                 let r = c * s + &x * &RISTRETTO_BASEPOINT_TABLE;
                 stream::write_pt(stream, &r)?;

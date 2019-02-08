@@ -5,18 +5,18 @@
 // See LICENSE for licensing information.
 
 use crate::stream;
-use crate::ObliviousTransfer;
+use crate::{Block, BlockObliviousTransfer, ObliviousTransfer};
 use failure::Error;
 use std::io::{Read, Write};
 use std::marker::PhantomData;
 
 /// Implementation if an **entirely insecure** oblivious transfer protocol for
 /// testing purposes.
-pub struct DummyOT<S: Read + Write + Send> {
+pub struct DummyOT<S: Read + Write + Send + Sync> {
     _s: PhantomData<S>,
 }
 
-impl<S: Read + Write + Send> ObliviousTransfer<S> for DummyOT<S> {
+impl<S: Read + Write + Send + Sync> ObliviousTransfer<S> for DummyOT<S> {
     fn new() -> Self {
         Self {
             _s: PhantomData::<S>,
@@ -52,6 +52,42 @@ impl<S: Read + Write + Send> ObliviousTransfer<S> for DummyOT<S> {
         }
         (0..inputs.len())
             .map(|_| stream::read_bytes(stream, nbytes))
+            .collect()
+    }
+}
+
+/// Implementation if an **entirely insecure** oblivious transfer protocol for
+/// testing purposes.
+pub struct DummyBlockOT<S: Read + Write + Send + Sync> {
+    _s: PhantomData<S>,
+}
+
+impl<S: Read + Write + Send + Sync> BlockObliviousTransfer<S> for DummyBlockOT<S> {
+    fn new() -> Self {
+        Self {
+            _s: PhantomData::<S>,
+        }
+    }
+
+    fn send(&mut self, stream: &mut S, inputs: &[(Block, Block)]) -> Result<(), Error> {
+        let mut bs = Vec::with_capacity(inputs.len());
+        for _ in 0..inputs.len() {
+            let b = stream::read_bool(stream)?;
+            bs.push(b);
+        }
+        for (b, m) in bs.into_iter().zip(inputs.iter()) {
+            let m = if b { &m.1 } else { &m.0 };
+            stream::write_block(stream, &m)?;
+        }
+        Ok(())
+    }
+
+    fn receive(&mut self, stream: &mut S, inputs: &[bool]) -> Result<Vec<Block>, Error> {
+        for b in inputs.iter() {
+            stream::write_bool(stream, *b)?;
+        }
+        (0..inputs.len())
+            .map(|_| stream::read_block(stream))
             .collect()
     }
 }

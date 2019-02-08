@@ -12,7 +12,7 @@ mod naor_pinkas;
 
 pub use alsz::AlszOT;
 pub use chou_orlandi::ChouOrlandiOT;
-pub use dummy::DummyOT;
+pub use dummy::{DummyBlockOT, DummyOT};
 pub use iknp::IknpOT;
 pub use naor_pinkas::NaorPinkasOT;
 
@@ -21,7 +21,7 @@ use failure::Error;
 use std::io::{Read, Write};
 
 /// Oblivious transfer trait.
-pub trait ObliviousTransfer<T: Read + Write + Send> {
+pub trait ObliviousTransfer<T: Read + Write + Send + Sync> {
     /// Creates a new oblivious transfer instance using `stream` for I/O.
     fn new() -> Self;
     /// Sends values of `nbytes` each.
@@ -41,7 +41,7 @@ pub trait ObliviousTransfer<T: Read + Write + Send> {
 }
 
 /// Oblivious transfer trait for 128-bit inputs.
-pub trait BlockObliviousTransfer<T: Read + Write + Send> {
+pub trait BlockObliviousTransfer<T: Read + Write + Send + Sync> {
     /// Creates a new oblivious transfer instance using `stream` for I/O.
     fn new() -> Self;
     /// Sends values of `nbytes` each.

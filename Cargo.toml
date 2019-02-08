@@ -29,10 +29,10 @@ debug = true
 [profile.bench]
 debug = true
 
-[[bench]]
-name = "utils"
-harness = false
+# [[bench]]
+# name = "utils"
+# harness = false
 
-[[bench]]
-name = "ot"
-harness = false
+# [[bench]]
+# name = "ot"
+# harness = false

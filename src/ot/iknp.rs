@@ -18,13 +18,15 @@ use std::marker::PhantomData;
 /// Implementation of the Ishai-Killian-Nissim-Petrank semi-honest secure
 /// oblivious transfer extension protocol (cf.
 /// <https://www.iacr.org/cryptodb/archive/2003/CRYPTO/1432/1432.pdf>).
-pub struct IknpOT<S: Read + Write + Send, OT: ObliviousTransfer<S>> {
+pub struct IknpOT<S: Read + Write + Send + Sync, OT: ObliviousTransfer<S>> {
     _s: PhantomData<S>,
     ot: OT,
     rng: ThreadRng,
 }
 
-impl<S: Read + Write + Send, OT: ObliviousTransfer<S>> BlockObliviousTransfer<S> for IknpOT<S, OT> {
+impl<S: Read + Write + Send + Sync, OT: ObliviousTransfer<S>> BlockObliviousTransfer<S>
+    for IknpOT<S, OT>
+{
     fn new() -> Self {
         let ot = OT::new();
         let rng = rand::thread_rng();

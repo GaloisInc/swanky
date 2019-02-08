@@ -27,7 +27,8 @@ mod hash_aes;
 mod ot;
 mod rand_aes;
 mod stream;
-pub mod utils; // XXX currently needs to be public for benchmarking...
+mod utils;
+
 pub use crate::block::*;
 pub use crate::hash_aes::AesHash;
 pub use crate::ot::*;

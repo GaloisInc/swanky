@@ -20,14 +20,6 @@ pub fn hash_pt(pt: &RistrettoPoint, nbytes: usize) -> Vec<u8> {
     encrypt(&k[0..16], &k[16..32], &mut m);
     m
 }
-#[inline(always)]
-pub fn hash_pt_inplace(pt: &RistrettoPoint, out: &mut [u8]) {
-    let k = pt.compress();
-    let k = k.as_bytes();
-    let mut m = vec![0u8; out.len()];
-    encrypt(&k[0..16], &k[16..32], &mut m);
-    unsafe { std::ptr::copy_nonoverlapping(m.as_ptr(), out.as_mut_ptr(), out.len()) };
-}
 
 #[inline(always)]
 pub fn hash_pt_block(pt: &RistrettoPoint) -> Block {
@@ -36,15 +28,6 @@ pub fn hash_pt_block(pt: &RistrettoPoint) -> Block {
     let c = Aes128::new(array_ref![k, 0, 16]);
     let m = [0u8; 16];
     c.encrypt_u8(&m)
-}
-#[inline(always)]
-pub fn hash_pt_128_inplace(pt: &RistrettoPoint, out: &mut [u8]) {
-    let k = pt.compress();
-    let k = k.as_bytes();
-    let c = Aes128::new(array_ref![k, 0, 16]);
-    let m = [0u8; 16];
-    let m = c.encrypt_u8(&m);
-    unsafe { std::ptr::copy_nonoverlapping(m.as_ptr(), out.as_mut_ptr(), 16) };
 }
 
 #[inline(always)]
@@ -80,10 +63,10 @@ pub fn block_to_m128i(v: &Block) -> __m128i {
 pub fn m128i_to_block(m: __m128i) -> Block {
     unsafe { std::mem::transmute::<__m128i, Block>(m) }
 }
-#[inline(always)]
-pub fn u8_to_block(v: &[u8]) -> Block {
-    unsafe { std::mem::transmute::<&[u8], Block>(v) }
-}
+// #[inline(always)]
+// pub fn u8_to_block(v: &[u8]) -> Block {
+//     unsafe { std::mem::transmute::<&[u8], Block>(v) }
+// }
 
 type Cipher = Aes128Ctr;
 
@@ -92,6 +75,7 @@ pub fn encrypt(k: &[u8], iv: &[u8], mut m: &mut [u8]) {
     let mut cipher = Cipher::new_var(k, iv).unwrap();
     cipher.encrypt(&mut m)
 }
+
 #[inline(always)]
 pub fn transpose(m: &[u8], nrows: usize, ncols: usize) -> Vec<u8> {
     let m_ = vec![0u8; nrows * ncols / 8];
@@ -131,7 +115,6 @@ extern "C" {
 
 #[cfg(test)]
 mod tests {
-    extern crate test;
     use super::*;
 
     #[test]
@@ -139,7 +122,68 @@ mod tests {
         let x = rand::random::<[u8; 16]>();
         let y = rand::random::<[u8; 16]>();
         let z = xor_block(&x, &y);
-        let z = xor_block(array_ref![z, 0, 16], &y);
-        assert_eq!(x, *array_ref![z, 0, 16]);
+        let z = xor_block(&z, &y);
+        assert_eq!(x, z);
+    }
+
+    #[test]
+    fn test_transpose() {
+        let (nrows, ncols) = (128, 1 << 15);
+        let m = (0..nrows * ncols / 8)
+            .map(|_| rand::random::<u8>())
+            .collect::<Vec<u8>>();
+        let m_ = m.clone();
+        let m = transpose(&m, nrows, ncols);
+        let m = transpose(&m, ncols, nrows);
+        assert_eq!(m, m_);
+    }
+}
+
+#[cfg(test)]
+mod benchamarks {
+    extern crate test;
+
+    use super::*;
+    use test::Bencher;
+
+    #[bench]
+    fn bench_hash_pt(b: &mut Bencher) {
+        let pt = RistrettoPoint::random(&mut rand::thread_rng());
+        b.iter(|| hash_pt(&pt, 16));
+    }
+
+    #[bench]
+    fn bench_hash_pt_block(b: &mut Bencher) {
+        let pt = RistrettoPoint::random(&mut rand::thread_rng());
+        b.iter(|| hash_pt_block(&pt));
+    }
+
+    #[bench]
+    fn bench_xor(b: &mut Bencher) {
+        let x = rand::random::<[u8; 16]>().to_vec();
+        let y = rand::random::<[u8; 16]>().to_vec();
+        b.iter(|| xor(&x, &y));
+    }
+
+    #[bench]
+    fn bench_xor_block(b: &mut Bencher) {
+        let x = rand::random::<[u8; 16]>();
+        let y = rand::random::<[u8; 16]>();
+        b.iter(|| xor_block(&x, &y));
+    }
+
+    #[bench]
+    fn bench_encrypt(b: &mut Bencher) {
+        let k = rand::random::<[u8; 16]>().to_vec();
+        let iv = rand::random::<[u8; 16]>().to_vec();
+        let mut m = rand::random::<[u8; 16]>().to_vec();
+        b.iter(|| encrypt(&k, &iv, &mut m));
+    }
+
+    #[bench]
+    fn bench_tranpose(b: &mut Bencher) {
+        let (nrows, ncols) = (128, 1 << 15);
+        let m = vec![0u8; nrows * ncols / 8];
+        b.iter(|| transpose(&m, nrows, ncols));
     }
 }
