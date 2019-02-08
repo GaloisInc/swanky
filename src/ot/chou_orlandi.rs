@@ -35,12 +35,12 @@ impl<S: Read + Write + Send + Sync> BlockObliviousTransfer<S> for ChouOrlandiOT<
         let y = Scalar::random(&mut rand::thread_rng());
         let s = &y * &RISTRETTO_BASEPOINT_TABLE;
         stream::write_pt(stream, &s)?;
-        for input in inputs.iter() {
+        for (i, input) in inputs.iter().enumerate() {
             let r = stream::read_pt(stream)?;
-            let k0 = utils::hash_pt_block(&(r * y));
-            let k1 = utils::hash_pt_block(&((r - s) * y));
-            let c0 = encrypt(&k0, &input.0);
-            let c1 = encrypt(&k1, &input.1);
+            let k0 = utils::hash_pt_block(i, &(r * y));
+            let k1 = utils::hash_pt_block(i, &((r - s) * y));
+            let c0 = utils::xor_block(&k0, &input.0);
+            let c1 = utils::xor_block(&k1, &input.1);
             stream::write_block(stream, &c0)?;
             stream::write_block(stream, &c1)?;
         }
@@ -51,30 +51,22 @@ impl<S: Read + Write + Send + Sync> BlockObliviousTransfer<S> for ChouOrlandiOT<
         let s = stream::read_pt(stream)?;
         inputs
             .iter()
-            .map(|b| {
+            .enumerate()
+            .map(|(i, b)| {
                 // let x = Scalar::random(&mut self.rng);
                 let x = Scalar::random(&mut rand::thread_rng());
                 let c = if *b { Scalar::one() } else { Scalar::zero() };
                 let r = c * s + &x * &RISTRETTO_BASEPOINT_TABLE;
                 stream::write_pt(stream, &r)?;
-                let k = utils::hash_pt_block(&(x * s));
+                let k = utils::hash_pt_block(i, &(x * s));
                 let c0 = stream::read_block(stream)?;
                 let c1 = stream::read_block(stream)?;
                 let c = if *b { &c1 } else { &c0 };
-                let c = decrypt(&k, &c);
+                let c = utils::xor_block(&k, &c);
                 Ok(c)
             })
             .collect()
     }
-}
-
-#[inline(always)]
-fn encrypt(k: &Block, m: &Block) -> Block {
-    utils::xor_block(&k, &m)
-}
-#[inline(always)]
-fn decrypt(k: &Block, c: &Block) -> Block {
-    utils::xor_block(&k, &c)
 }
 
 #[cfg(test)]

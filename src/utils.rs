@@ -21,13 +21,17 @@ pub fn hash_pt(pt: &RistrettoPoint, nbytes: usize) -> Vec<u8> {
     m
 }
 
+/// Hash an elliptic curve point `pt` by computing `E_{pt}(i)`, where `E` is
+/// AES-128 and `i` is an index.
 #[inline(always)]
-pub fn hash_pt_block(pt: &RistrettoPoint) -> Block {
+pub fn hash_pt_block(i: usize, pt: &RistrettoPoint) -> Block {
     let k = pt.compress();
     let k = k.as_bytes();
     let c = Aes128::new(array_ref![k, 0, 16]);
-    let m = [0u8; 16];
-    c.encrypt_u8(&m)
+    unsafe {
+        let m = _mm_set_epi64(_mm_setzero_si64(), std::mem::transmute::<usize, __m64>(i));
+        c.encrypt_u8(&m128i_to_block(m))
+    }
 }
 
 #[inline(always)]
@@ -50,10 +54,10 @@ pub fn xor_block(x: &Block, y: &Block) -> Block {
     }
 }
 
-#[inline(always)]
-pub fn zero_block() -> Block {
-    unsafe { m128i_to_block(_mm_setzero_si128()) }
-}
+// #[inline(always)]
+// pub fn zero_block() -> Block {
+//     unsafe { m128i_to_block(_mm_setzero_si128()) }
+// }
 
 #[inline(always)]
 pub fn block_to_m128i(v: &Block) -> __m128i {
@@ -63,10 +67,6 @@ pub fn block_to_m128i(v: &Block) -> __m128i {
 pub fn m128i_to_block(m: __m128i) -> Block {
     unsafe { std::mem::transmute::<__m128i, Block>(m) }
 }
-// #[inline(always)]
-// pub fn u8_to_block(v: &[u8]) -> Block {
-//     unsafe { std::mem::transmute::<&[u8], Block>(v) }
-// }
 
 type Cipher = Aes128Ctr;
 
@@ -89,6 +89,12 @@ pub fn transpose(m: &[u8], nrows: usize, ncols: usize) -> Vec<u8> {
     };
     m_
 }
+
+#[link(name = "transpose")]
+extern "C" {
+    fn sse_trans(out: *mut u8, inp: *const u8, nrows: u64, ncols: u64);
+}
+
 #[inline(always)]
 pub fn boolvec_to_u8vec(bv: &[bool]) -> Vec<u8> {
     let mut v = vec![0u8; bv.len() / 8];
@@ -106,11 +112,6 @@ pub fn u8vec_to_boolvec(v: &[u8]) -> Vec<bool> {
         }
     }
     bv
-}
-
-#[link(name = "transpose")]
-extern "C" {
-    fn sse_trans(out: *mut u8, inp: *const u8, nrows: u64, ncols: u64);
 }
 
 #[cfg(test)]
@@ -155,7 +156,8 @@ mod benchamarks {
     #[bench]
     fn bench_hash_pt_block(b: &mut Bencher) {
         let pt = RistrettoPoint::random(&mut rand::thread_rng());
-        b.iter(|| hash_pt_block(&pt));
+        let i = rand::random::<usize>();
+        b.iter(|| hash_pt_block(i, &pt));
     }
 
     #[bench]
