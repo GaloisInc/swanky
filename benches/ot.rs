@@ -1,9 +1,10 @@
 use criterion::{criterion_group, criterion_main, Criterion};
 use ocelot::*;
+use std::io::{BufReader, BufWriter};
 use std::os::unix::net::UnixStream;
 use std::time::Duration;
 
-const T: usize = 1 << 15;
+const T: usize = 1 << 16;
 
 fn rand_block_vec(size: usize) -> Vec<Block> {
     (0..size).map(|_| rand::random::<Block>()).collect()
@@ -13,13 +14,17 @@ fn rand_bool_vec(size: usize) -> Vec<bool> {
 }
 
 fn _bench_block_ot<OT: BlockObliviousTransfer<UnixStream>>(bs: &[bool], ms: Vec<(Block, Block)>) {
-    let (mut sender, mut receiver) = UnixStream::pair().unwrap();
+    let (sender, receiver) = UnixStream::pair().unwrap();
     let handle = std::thread::spawn(move || {
         let mut ot = OT::new();
-        ot.send(&mut sender, &ms).unwrap();
+        let mut reader = BufReader::new(sender.try_clone().unwrap());
+        let mut writer = BufWriter::new(sender);
+        ot.send(&mut reader, &mut writer, &ms).unwrap();
     });
     let mut ot = OT::new();
-    ot.receive(&mut receiver, &bs).unwrap();
+    let mut reader = BufReader::new(receiver.try_clone().unwrap());
+    let mut writer = BufWriter::new(receiver);
+    ot.receive(&mut reader, &mut writer, &bs).unwrap();
     handle.join().unwrap();
 }
 
@@ -74,7 +79,8 @@ fn bench_otext(c: &mut Criterion) {
 criterion_group! {
     name = ot;
     config = Criterion::default().warm_up_time(Duration::from_millis(100));
-    targets = bench_ot, bench_otext
+    targets = // bench_ot,
+    bench_otext
 }
 
 criterion_main!(ot);

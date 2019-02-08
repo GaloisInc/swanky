@@ -7,7 +7,7 @@
 use crate::stream;
 use crate::{Block, BlockObliviousTransfer};
 use failure::Error;
-use std::io::{Read, Write};
+use std::io::{BufReader, BufWriter, Read, Write};
 use std::marker::PhantomData;
 
 /// Implementation if an **entirely insecure** oblivious transfer protocol for
@@ -23,25 +23,36 @@ impl<S: Read + Write + Send + Sync> BlockObliviousTransfer<S> for DummyOT<S> {
         }
     }
 
-    fn send(&mut self, stream: &mut S, inputs: &[(Block, Block)]) -> Result<(), Error> {
+    fn send(
+        &mut self,
+        mut reader: &mut BufReader<S>,
+        mut writer: &mut BufWriter<S>,
+        inputs: &[(Block, Block)],
+    ) -> Result<(), Error> {
         let mut bs = Vec::with_capacity(inputs.len());
         for _ in 0..inputs.len() {
-            let b = stream::read_bool(stream)?;
+            let b = stream::read_bool(&mut reader)?;
             bs.push(b);
         }
         for (b, m) in bs.into_iter().zip(inputs.iter()) {
             let m = if b { &m.1 } else { &m.0 };
-            stream::write_block(stream, &m)?;
+            stream::write_block(&mut writer, &m)?;
         }
         Ok(())
     }
 
-    fn receive(&mut self, stream: &mut S, inputs: &[bool]) -> Result<Vec<Block>, Error> {
+    fn receive(
+        &mut self,
+        reader: &mut BufReader<S>,
+        writer: &mut BufWriter<S>,
+        inputs: &[bool],
+    ) -> Result<Vec<Block>, Error> {
         for b in inputs.iter() {
-            stream::write_bool(stream, *b)?;
+            stream::write_bool(writer, *b)?;
         }
+        writer.flush()?;
         (0..inputs.len())
-            .map(|_| stream::read_block(stream))
+            .map(|_| stream::read_block(reader))
             .collect()
     }
 }
@@ -59,16 +70,17 @@ mod tests {
         let b = rand::random::<bool>();
         let m0_ = m0.clone();
         let m1_ = m1.clone();
-        let (mut sender, mut receiver) = match UnixStream::pair() {
-            Ok((s1, s2)) => (s1, s2),
-            Err(e) => panic!("Couldn't create pair of sockets: {:?}", e),
-        };
+        let (sender, receiver) = UnixStream::pair().unwrap();
         let handle = std::thread::spawn(move || {
             let mut ot = DummyOT::new();
-            ot.send(&mut sender, &[(m0, m1)]).unwrap();
+            let mut reader = BufReader::new(sender.try_clone().unwrap());
+            let mut writer = BufWriter::new(sender);
+            ot.send(&mut reader, &mut writer, &[(m0, m1)]).unwrap();
         });
         let mut ot = DummyOT::new();
-        let result = ot.receive(&mut receiver, &[b]).unwrap();
+        let mut reader = BufReader::new(receiver.try_clone().unwrap());
+        let mut writer = BufWriter::new(receiver);
+        let result = ot.receive(&mut reader, &mut writer, &[b]).unwrap();
         assert_eq!(result[0], if b { m1_ } else { m0_ });
         handle.join().unwrap();
     }

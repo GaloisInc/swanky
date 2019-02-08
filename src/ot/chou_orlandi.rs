@@ -10,7 +10,7 @@ use crate::{Block, BlockObliviousTransfer};
 use curve25519_dalek::constants::RISTRETTO_BASEPOINT_TABLE;
 use curve25519_dalek::scalar::Scalar;
 use failure::Error;
-use std::io::{Read, Write};
+use std::io::{BufReader, BufWriter, Read, Write};
 use std::marker::PhantomData;
 
 /// Implementation of the Chou-Orlandi semi-honest secure oblivious transfer
@@ -30,37 +30,57 @@ impl<S: Read + Write + Send + Sync> BlockObliviousTransfer<S> for ChouOrlandiOT<
         }
     }
 
-    fn send(&mut self, stream: &mut S, inputs: &[(Block, Block)]) -> Result<(), Error> {
-        // let y = Scalar::random(&mut self.rng);
+    fn send(
+        &mut self,
+        reader: &mut BufReader<S>,
+        writer: &mut BufWriter<S>,
+        inputs: &[(Block, Block)],
+    ) -> Result<(), Error> {
         let y = Scalar::random(&mut rand::thread_rng());
         let s = &y * &RISTRETTO_BASEPOINT_TABLE;
-        stream::write_pt(stream, &s)?;
-        for (i, input) in inputs.iter().enumerate() {
-            let r = stream::read_pt(stream)?;
+        stream::write_pt(writer, &s)?;
+        writer.flush()?;
+        let mut rs = Vec::with_capacity(inputs.len());
+        for _ in 0..inputs.len() {
+            let r = stream::read_pt(reader)?;
+            rs.push(r);
+        }
+        for (i, (input, r)) in inputs.into_iter().zip(rs.into_iter()).enumerate() {
             let k0 = utils::hash_pt_block(i, &(r * y));
             let k1 = utils::hash_pt_block(i, &((r - s) * y));
             let c0 = utils::xor_block(&k0, &input.0);
             let c1 = utils::xor_block(&k1, &input.1);
-            stream::write_block(stream, &c0)?;
-            stream::write_block(stream, &c1)?;
+            stream::write_block(writer, &c0)?;
+            stream::write_block(writer, &c1)?;
         }
+        writer.flush()?;
         Ok(())
     }
 
-    fn receive(&mut self, stream: &mut S, inputs: &[bool]) -> Result<Vec<Block>, Error> {
-        let s = stream::read_pt(stream)?;
+    fn receive(
+        &mut self,
+        reader: &mut BufReader<S>,
+        writer: &mut BufWriter<S>,
+        inputs: &[bool],
+    ) -> Result<Vec<Block>, Error> {
+        let s = stream::read_pt(reader)?;
+        let mut xs = Vec::with_capacity(inputs.len());
+        for b in inputs.iter() {
+            let x = Scalar::random(&mut rand::thread_rng());
+            let c = if *b { Scalar::one() } else { Scalar::zero() };
+            let r = c * s + &x * &RISTRETTO_BASEPOINT_TABLE;
+            stream::write_pt(writer, &r)?;
+            xs.push(x);
+        }
+        writer.flush()?;
         inputs
-            .iter()
+            .into_iter()
+            .zip(xs.into_iter())
             .enumerate()
-            .map(|(i, b)| {
-                // let x = Scalar::random(&mut self.rng);
-                let x = Scalar::random(&mut rand::thread_rng());
-                let c = if *b { Scalar::one() } else { Scalar::zero() };
-                let r = c * s + &x * &RISTRETTO_BASEPOINT_TABLE;
-                stream::write_pt(stream, &r)?;
+            .map(|(i, (b, x))| {
                 let k = utils::hash_pt_block(i, &(x * s));
-                let c0 = stream::read_block(stream)?;
-                let c1 = stream::read_block(stream)?;
+                let c0 = stream::read_block(reader)?;
+                let c1 = stream::read_block(reader)?;
                 let c = if *b { &c1 } else { &c0 };
                 let c = utils::xor_block(&k, &c);
                 Ok(c)
@@ -82,17 +102,18 @@ mod tests {
         let b = rand::random::<bool>();
         let m0_ = m0.clone();
         let m1_ = m1.clone();
-        let (mut sender, mut receiver) = match UnixStream::pair() {
-            Ok((s1, s2)) => (s1, s2),
-            Err(e) => panic!("Couldn't create pair of sockets: {:?}", e),
-        };
+        let (sender, receiver) = UnixStream::pair().unwrap();
         let handle = std::thread::spawn(move || {
             let mut ot = ChouOrlandiOT::new();
-            ot.send(&mut sender, &[(m0, m1)]).unwrap();
+            let mut reader = BufReader::new(sender.try_clone().unwrap());
+            let mut writer = BufWriter::new(sender);
+            ot.send(&mut reader, &mut writer, &[(m0, m1)]).unwrap();
         });
         let mut ot = ChouOrlandiOT::new();
-        let results = ot.receive(&mut receiver, &[b]).unwrap();
-        assert_eq!(results[0], if b { m1_ } else { m0_ });
+        let mut reader = BufReader::new(receiver.try_clone().unwrap());
+        let mut writer = BufWriter::new(receiver);
+        let result = ot.receive(&mut reader, &mut writer, &[b]).unwrap();
+        assert_eq!(result[0], if b { m1_ } else { m0_ });
         handle.join().unwrap();
     }
 }

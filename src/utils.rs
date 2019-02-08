@@ -43,10 +43,10 @@ pub fn xor_block(x: &Block, y: &Block) -> Block {
     }
 }
 
-// #[inline(always)]
-// pub fn zero_block() -> Block {
-//     unsafe { m128i_to_block(_mm_setzero_si128()) }
-// }
+#[inline(always)]
+pub fn zero_block() -> Block {
+    unsafe { m128i_to_block(_mm_setzero_si128()) }
+}
 
 #[inline(always)]
 pub fn block_to_m128i(v: &Block) -> __m128i {

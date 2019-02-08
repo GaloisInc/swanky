@@ -16,14 +16,24 @@ pub use naor_pinkas::NaorPinkasOT;
 
 use crate::Block;
 use failure::Error;
-use std::io::{Read, Write};
+use std::io::{BufReader, BufWriter, Read, Write};
 
 /// Oblivious transfer trait for 128-bit inputs.
 pub trait BlockObliviousTransfer<T: Read + Write + Send + Sync> {
     /// Creates a new oblivious transfer instance using `stream` for I/O.
     fn new() -> Self;
     /// Sends values.
-    fn send(&mut self, stream: &mut T, inputs: &[(Block, Block)]) -> Result<(), Error>;
+    fn send(
+        &mut self,
+        reader: &mut BufReader<T>,
+        writer: &mut BufWriter<T>,
+        inputs: &[(Block, Block)],
+    ) -> Result<(), Error>;
     /// Receives values.
-    fn receive(&mut self, stream: &mut T, inputs: &[bool]) -> Result<Vec<Block>, Error>;
+    fn receive(
+        &mut self,
+        reader: &mut BufReader<T>,
+        writer: &mut BufWriter<T>,
+        inputs: &[bool],
+    ) -> Result<Vec<Block>, Error>;
 }
