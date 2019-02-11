@@ -485,50 +485,42 @@ pub trait BundleGadgets: Fancy {
         let mut opt_carry = None;
         let mut max_carry = 0;
 
-        for i in 0..n {
-            println!("modulus {}", xs[0].moduli()[i]);
-
+        for i in 0..n-1 {
             // all the ith digits, in one vec
             let ds = xs.iter().map(|x| x.wires()[i].clone()).collect_vec();
+            // compute the carry
+            let q = xs[0].moduli()[i];
+            // max_carry currently contains the max carry from the previous iteration
+            let max_val = nargs as u16 * (q-1) + max_carry;
+            // now it is the max carry of this iteration
+            max_carry = max_val / q;
 
-            if i < n-1 {
-                // compute the carry
-                let q = xs[0].moduli()[i];
-                // max_carry currently contains the max carry from the previous iteration
-                let max_val = nargs as u16 * (q-1) + max_carry;
-                // now it is the max carry of this iteration
-                max_carry = max_val / q;
+            // mod change the digits to the max sum possible plus the max carry of the
+            // previous iteration
+            let modded_ds = ds.iter().map(|d| self.mod_change(ix, d, max_val+1)).collect_vec();
+            // add them up
+            let sum = self.add_many(&modded_ds);
+            // add in the carry
+            let sum_with_carry = opt_carry.as_ref().map_or(sum.clone(), |c| self.add(&sum, &c));
 
-                // mod change the digits to the max sum possible plus the max carry of the
-                // previous iteration
-                let modded_ds = ds.iter().map(|d| self.mod_change(ix, d, max_val+1)).collect_vec();
-                // add them up
-                let sum = self.add_many(&modded_ds);
-                // add in the carry
-                let sum_with_carry = opt_carry.as_ref().map_or(sum.clone(), |c| self.add(&sum, &c));
-
-                // carry now contains the carry information, we just have to project it to
-                // the correct moduli for the next iteration. It will either be used to
-                // compute the next carry, if i < n-2, or it will be used to compute the
-                // output MSB, in which case it should be the modulus of the SB
-                let next_mod = if i < n-2 {
-                    nargs as u16 * (xs[0].moduli()[i+1] - 1) + max_carry + 1
-                } else {
-                    xs[0].moduli()[i+1] // we will be adding the carry to the MSB
-                };
-
-                println!("next mod: {}", next_mod);
-
-                let tt = (0..=max_val).map(|i| (i / q) % next_mod).collect_vec();
-                opt_carry = Some(self.proj(ix, &sum_with_carry, next_mod, Some(tt)));
+            // carry now contains the carry information, we just have to project it to
+            // the correct moduli for the next iteration. It will either be used to
+            // compute the next carry, if i < n-2, or it will be used to compute the
+            // output MSB, in which case it should be the modulus of the SB
+            let next_mod = if i < n-2 {
+                nargs as u16 * (xs[0].moduli()[i+1] - 1) + max_carry + 1
             } else {
-                // compute the msb
-                let digit_sum = self.add_many(&ds);
-                return opt_carry.as_ref().map_or(digit_sum.clone(), |d| self.add(&digit_sum, &d));
-            }
+                xs[0].moduli()[i+1] // we will be adding the carry to the MSB
+            };
+
+            let tt = (0..=max_val).map(|i| (i / q) % next_mod).collect_vec();
+            opt_carry = Some(self.proj(ix, &sum_with_carry, next_mod, Some(tt)));
         }
 
-        unreachable!()
+        // compute the msb
+        let ds = xs.iter().map(|x| x.wires()[n-1].clone()).collect_vec();
+        let digit_sum = self.add_many(&ds);
+        opt_carry.as_ref().map_or(digit_sum.clone(), |d| self.add(&digit_sum, &d))
     }
 
     ////////////////////////////////////////////////////////////////////////////////
