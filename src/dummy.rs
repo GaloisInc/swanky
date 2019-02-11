@@ -293,7 +293,7 @@ mod bundle {
     #[test] // binary multiplication {{{
     fn test_binary_multiplication() {
         let mut rng = thread_rng();
-        for _ in 0..1024 {
+        for _ in 0..128 {
             let nbits = 64;
             let q = 1<<nbits;
             let x = rng.gen_u128() % q;
@@ -398,7 +398,7 @@ mod bundle {
     #[test] // bundle mixed_radix_addition MSB {{{
     fn test_mixed_radix_addition_msb_only() {
         let mut rng = thread_rng();
-         for _ in 0..16 {
+         for _ in 0..128 {
 
             let nargs = 2 + rng.gen_usize() % 10;
             let mods = (0..7).map(|_| rng.gen_modulus()).collect_vec();
