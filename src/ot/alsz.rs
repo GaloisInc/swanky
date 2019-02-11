@@ -16,14 +16,14 @@ use std::marker::PhantomData;
 
 /// Implementation of the Asharov-Lindell-Schneider-Zohner oblivious transfer
 /// extension protocol (cf. <https://eprint.iacr.org/2016/602>, Protocol 4).
-pub struct AlszOT<S: Read + Write + Send + Sync, OT: BlockObliviousTransfer<S>> {
+pub struct AlszOT<S: Read + Write + Send + Sync, OT: BlockObliviousTransfer<S> + SemiHonest> {
     _s: PhantomData<S>,
     ot: OT,
     rng: AesRng,
 }
 
-impl<S: Read + Write + Send + Sync, OT: BlockObliviousTransfer<S>> BlockObliviousTransfer<S>
-    for AlszOT<S, OT>
+impl<S: Read + Write + Send + Sync, OT: BlockObliviousTransfer<S> + SemiHonest>
+    BlockObliviousTransfer<S> for AlszOT<S, OT>
 {
     fn new() -> Self {
         let ot = OT::new();
@@ -139,7 +139,10 @@ impl<S: Read + Write + Send + Sync, OT: BlockObliviousTransfer<S>> BlockObliviou
     }
 }
 
-impl<S: Read + Write + Send + Sync, OT: BlockObliviousTransfer<S>> SemiHonest for AlszOT<S, OT> {}
+impl<S: Read + Write + Send + Sync, OT: BlockObliviousTransfer<S> + SemiHonest> SemiHonest
+    for AlszOT<S, OT>
+{
+}
 
 #[cfg(test)]
 mod tests {
@@ -159,7 +162,7 @@ mod tests {
         (0..size).map(|_| rand::random::<bool>()).collect()
     }
 
-    fn test_ot<OT: BlockObliviousTransfer<UnixStream>>() {
+    fn test_ot<OT: BlockObliviousTransfer<UnixStream> + SemiHonest>() {
         let m0s = rand_block_vec(T);
         let m1s = rand_block_vec(T);
         let bs = rand_bool_vec(T);
