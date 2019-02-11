@@ -6,7 +6,7 @@
 
 use crate::stream;
 use crate::utils;
-use crate::{Block, BlockObliviousTransfer};
+use crate::{Block, BlockObliviousTransfer, SemiHonest};
 use curve25519_dalek::constants::RISTRETTO_BASEPOINT_TABLE;
 use curve25519_dalek::ristretto::RistrettoPoint;
 use curve25519_dalek::scalar::Scalar;
@@ -15,13 +15,12 @@ use rand::rngs::ThreadRng;
 use std::io::{BufReader, BufWriter, Read, Write};
 use std::marker::PhantomData;
 
-/// Implementation of the Naor-Pinkas semi-honest secure oblivious transfer
-/// protocol.
+/// Implementation of the Naor-Pinkas oblivious transfer protocol.
 ///
 /// This implementation uses the Ristretto prime order elliptic curve group from
 /// the `curve25519-dalek` library.
 pub struct NaorPinkasOT<S: Read + Write + Send + Sync> {
-    _s: PhantomData<S>,
+    _placeholder: PhantomData<S>,
     rng: ThreadRng,
 }
 
@@ -29,7 +28,7 @@ impl<S: Read + Write + Send + Sync> BlockObliviousTransfer<S> for NaorPinkasOT<S
     fn new() -> Self {
         let rng = rand::thread_rng();
         Self {
-            _s: PhantomData::<S>,
+            _placeholder: PhantomData::<S>,
             rng,
         }
     }
@@ -121,6 +120,8 @@ impl<S: Read + Write + Send + Sync> BlockObliviousTransfer<S> for NaorPinkasOT<S
             .collect()
     }
 }
+
+impl<S: Read + Write + Send + Sync> SemiHonest for NaorPinkasOT<S> {}
 
 #[cfg(test)]
 mod tests {

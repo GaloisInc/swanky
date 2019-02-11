@@ -13,13 +13,13 @@ use std::marker::PhantomData;
 /// Implementation if an **entirely insecure** oblivious transfer protocol for
 /// testing purposes.
 pub struct DummyOT<S: Read + Write + Send + Sync> {
-    _s: PhantomData<S>,
+    _placeholder: PhantomData<S>,
 }
 
 impl<S: Read + Write + Send + Sync> BlockObliviousTransfer<S> for DummyOT<S> {
     fn new() -> Self {
         Self {
-            _s: PhantomData::<S>,
+            _placeholder: PhantomData::<S>,
         }
     }
 

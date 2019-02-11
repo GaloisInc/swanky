@@ -79,8 +79,7 @@ fn bench_otext(c: &mut Criterion) {
 criterion_group! {
     name = ot;
     config = Criterion::default().warm_up_time(Duration::from_millis(100));
-    targets = // bench_ot,
-    bench_otext
+    targets = bench_ot, bench_otext
 }
 
 criterion_main!(ot);

@@ -6,27 +6,29 @@
 
 use crate::stream;
 use crate::utils;
-use crate::{Block, BlockObliviousTransfer};
+use crate::{Block, BlockObliviousTransfer, Malicious, SemiHonest};
 use curve25519_dalek::constants::RISTRETTO_BASEPOINT_TABLE;
 use curve25519_dalek::scalar::Scalar;
 use failure::Error;
 use std::io::{BufReader, BufWriter, Read, Write};
 use std::marker::PhantomData;
 
-/// Implementation of the Chou-Orlandi semi-honest secure oblivious transfer
-/// protocol (cf. <https://eprint.iacr.org/2015/267>).
+/// Implementation of the Chou-Orlandi oblivious transfer protocol (cf.
+/// <https://eprint.iacr.org/2015/267>).
 ///
 /// This implementation uses the Ristretto prime order elliptic curve group from
 /// the `curve25519-dalek` library and works over blocks rather than arbitrary
 /// length messages.
+///
+/// Security: malicious
 pub struct ChouOrlandiOT<S: Read + Write + Send + Sync> {
-    _s: PhantomData<S>,
+    _placeholder: PhantomData<S>,
 }
 
 impl<S: Read + Write + Send + Sync> BlockObliviousTransfer<S> for ChouOrlandiOT<S> {
     fn new() -> Self {
         Self {
-            _s: PhantomData::<S>,
+            _placeholder: PhantomData::<S>,
         }
     }
 
@@ -88,6 +90,9 @@ impl<S: Read + Write + Send + Sync> BlockObliviousTransfer<S> for ChouOrlandiOT<
             .collect()
     }
 }
+
+impl<S: Read + Write + Send + Sync> SemiHonest for ChouOrlandiOT<S> {}
+impl<S: Read + Write + Send + Sync> Malicious for ChouOrlandiOT<S> {}
 
 #[cfg(test)]
 mod tests {

@@ -8,15 +8,14 @@ use crate::hash_aes::AesHash;
 use crate::rand_aes::AesRng;
 use crate::stream;
 use crate::utils;
-use crate::{Block, BlockObliviousTransfer};
+use crate::{Block, BlockObliviousTransfer, SemiHonest};
 use arrayref::array_ref;
 use failure::Error;
 use std::io::{BufReader, BufWriter, ErrorKind, Read, Write};
 use std::marker::PhantomData;
 
-/// Implementation of the Asharov-Lindell-Schneider-Zohner semi-honest secure
-/// oblivious transfer extension protocol (cf.
-/// <https://eprint.iacr.org/2016/602>, Protocol 4).
+/// Implementation of the Asharov-Lindell-Schneider-Zohner oblivious transfer
+/// extension protocol (cf. <https://eprint.iacr.org/2016/602>, Protocol 4).
 pub struct AlszOT<S: Read + Write + Send + Sync, OT: BlockObliviousTransfer<S>> {
     _s: PhantomData<S>,
     ot: OT,
@@ -139,6 +138,8 @@ impl<S: Read + Write + Send + Sync, OT: BlockObliviousTransfer<S>> BlockObliviou
         Ok(out)
     }
 }
+
+impl<S: Read + Write + Send + Sync, OT: BlockObliviousTransfer<S>> SemiHonest for AlszOT<S, OT> {}
 
 #[cfg(test)]
 mod tests {

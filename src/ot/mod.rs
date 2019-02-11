@@ -18,9 +18,9 @@ use crate::Block;
 use failure::Error;
 use std::io::{BufReader, BufWriter, Read, Write};
 
-/// Oblivious transfer trait for 128-bit inputs.
+/// A trait for one-out-of-two oblivious transfer on 128-bit inputs.
 pub trait BlockObliviousTransfer<T: Read + Write + Send + Sync> {
-    /// Creates a new oblivious transfer instance using `stream` for I/O.
+    /// Creates a new oblivious transfer instance.
     fn new() -> Self;
     /// Sends values.
     fn send(
@@ -37,3 +37,8 @@ pub trait BlockObliviousTransfer<T: Read + Write + Send + Sync> {
         inputs: &[bool],
     ) -> Result<Vec<Block>, Error>;
 }
+
+/// A marker trait denoting that the given scheme is semi-honest secure.
+pub trait SemiHonest {}
+/// A marker trait denoting that the given scheme is maliciously secure.
+pub trait Malicious {}
