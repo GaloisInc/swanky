@@ -66,7 +66,7 @@ impl AesRng {
 #[derive(Clone)]
 pub struct AesRngCore {
     aes: Aes128,
-    state: u64,
+    state: u32,
 }
 
 impl fmt::Debug for AesRngCore {
@@ -85,8 +85,8 @@ impl BlockRngCore for AesRngCore {
         let data = unsafe { _mm_set_epi64(_mm_setzero_si64(), _mm_set_pi32(0, self.state as i32)) };
         let c = self.aes.encrypt_u8(&utils::m128i_to_block(data));
         unsafe {
-            let mut results = std::mem::transmute::<[u32; 4], Block>(*results);
-            std::ptr::copy_nonoverlapping(c.as_ptr(), results.as_mut_ptr(), 16)
+            let c = std::mem::transmute::<Block, [u32; 4]>(c);
+            std::ptr::copy_nonoverlapping(c.as_ptr(), results.as_mut_ptr(), 16);
         };
         self.state = self.state.wrapping_add(1);
     }
