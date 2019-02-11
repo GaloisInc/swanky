@@ -21,7 +21,10 @@ use std::marker::PhantomData;
 /// the `curve25519-dalek` library and works over blocks rather than arbitrary
 /// length messages.
 ///
-/// Security: malicious
+/// This version fixes a bug in the current ePrint write-up (Page 4): if the
+/// value `x^i` produced by the receiver is not randomized, all the random-OTs
+/// produced by the protocol will be the same. We fix this by hashing in `i`
+/// during the key derivation phase.
 pub struct ChouOrlandiOT<S: Read + Write + Send + Sync> {
     _placeholder: PhantomData<S>,
     rng: AesRng,
