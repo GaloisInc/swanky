@@ -102,7 +102,9 @@ impl Fancy for Dummy {
     }
 
     fn add(&self, x: &DummyVal, y: &DummyVal) -> DummyVal {
-        assert!(x.modulus == y.modulus, "dummy: addition moduli unequal");
+        assert!(x.modulus == y.modulus,
+                "dummy: addition moduli unequal x.modulus={}, y.modulus={}",
+                x.modulus, y.modulus);
         let val = (x.val + y.val) % x.modulus;
         DummyVal { val, modulus: x.modulus }
     }
@@ -358,10 +360,10 @@ mod bundle {
             let d = Dummy::new(&crt_factor(x,q), &[]);
             {
                 let x = d.garbler_input_bundle_crt(None, q, None);
-                let z = d.relu(None,&x,"100%");
-                d.output_bundle(None,&z);
+                let z = d.relu(None, &x, "100%", None);
+                d.output_bundle(None, &z);
             }
-            let z = crt_inv_factor(&d.get_output(),q);
+            let z = crt_inv_factor(&d.get_output(), q);
             if x >= q/2 {
                 assert_eq!(z, 0);
             } else {
@@ -393,6 +395,56 @@ mod bundle {
         }
     }
     //}}}
+    #[test] // bundle mixed_radix_addition MSB {{{
+    fn test_mixed_radix_addition_msb_only() {
+        let mut rng = thread_rng();
+         for _ in 0..16 {
+
+            let nargs = 2 + rng.gen_usize() % 10;
+            let mods = (0..7).map(|_| rng.gen_modulus()).collect_vec();
+            let Q: u128 = util::product(&mods);
+
+            println!("nargs={} mods={:?} Q={}", nargs, mods, Q);
+
+            // test maximum overflow
+            let mut ds = Vec::new();
+            for _ in 0..nargs {
+                ds.extend(util::as_mixed_radix(Q-1, &mods).iter());
+            }
+
+            let b = Dummy::new(&ds, &[]);
+            let xs = b.garbler_input_bundles(None, &mods, nargs, None);
+            let z = b.mixed_radix_addition_msb_only(None,&xs);
+            b.output(None, &z);
+            let res = b.get_output()[0];
+
+            let should_be = *util::as_mixed_radix((Q-1)*(nargs as u128) % Q, &mods).last().unwrap();
+            assert_eq!(res, should_be);
+
+            // test random values
+            for _ in 0..4 {
+                let mut sum = 0;
+                let mut ds = Vec::new();
+                for _ in 0..nargs {
+                    let x = rng.gen_u128() % Q;
+                    sum = (sum + x) % Q;
+                    ds.extend(util::as_mixed_radix(x, &mods).iter());
+                }
+
+                let b = Dummy::new(&ds, &[]);
+                let xs = b.garbler_input_bundles(None, &mods, nargs, None);
+                let z = b.mixed_radix_addition_msb_only(None,&xs);
+                b.output(None, &z);
+                let res = b.get_output()[0];
+
+                let should_be = *util::as_mixed_radix(sum, &mods).last().unwrap();
+                assert_eq!(res, should_be);
+            }
+
+        }
+
+    }
+//}}}
     #[test] // dummy has send and sync {{{
     fn dummy_has_send_and_sync() {
         fn check_send(_: impl Send) { }

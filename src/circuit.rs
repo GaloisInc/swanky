@@ -215,7 +215,9 @@ impl Fancy for CircuitBuilder {
     }
 
     fn add(&self, xref: &CircuitRef, yref: &CircuitRef) -> CircuitRef {
-        assert!(xref.modulus() == yref.modulus(), "xmod={} ymod={}", xref.modulus(), yref.modulus());
+        assert!(xref.modulus() == yref.modulus(),
+                "addition of two wires with unequal mods: xmod={} ymod={}",
+                xref.modulus(), yref.modulus());
         let gate = Gate::Add { xref: *xref, yref: *yref };
         self.gate(gate, xref.modulus())
     }
@@ -641,7 +643,7 @@ mod bundle {
 
         let b = CircuitBuilder::new();
         let x = b.garbler_input_bundle_crt(None, q, None);
-        let z = b.relu(None, &x, "100%");
+        let z = b.relu(None, &x, "100%", None);
         b.output_bundle(None, &z);
         let c = b.finish();
 
@@ -662,7 +664,7 @@ mod bundle {
 
         let b = CircuitBuilder::new();
         let x = b.garbler_input_bundle_crt(None, q, None);
-        let z = b.sgn(None, &x, "100%");
+        let z = b.sgn(None, &x, "100%", None);
         b.output_bundle(None, &z);
         let c = b.finish();
 

@@ -9,9 +9,9 @@ fn approx_relu<F,W>(b: &F, q: u128)
         W: HasModulus + Clone,
 {
     let x = b.garbler_input_bundle_crt(None, q, None);
-    let exact = b.relu(None, &x, "100%");
-    let approx_999 = b.relu(None, &x, "99.9%");
-    let approx_99  = b.relu(None, &x, "99%");
+    let exact = b.relu(None, &x, "100%", None);
+    let approx_999 = b.relu(None, &x, "99.9%", None);
+    let approx_99  = b.relu(None, &x, "99%", None);
     b.output_bundles(None, &[exact, approx_999, approx_99]);
 }
 

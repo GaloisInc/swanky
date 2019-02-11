@@ -48,6 +48,20 @@ impl <W: Clone + HasModulus> Bundle<W> {
     pub fn is_binary(&self) -> bool {
         self.moduli().iter().all(|m| *m == 2)
     }
+
+    /// Returns a new bundle only containing wires with matching moduli.
+    pub fn with_moduli(&self, moduli: &[u16]) -> Bundle<W> {
+        let old_ws = self.wires();
+        let mut new_ws = Vec::with_capacity(moduli.len());
+        for &p in moduli {
+            if let Some(w) = old_ws.iter().find(|&x| x.modulus() == p) {
+                new_ws.push(w.clone());
+            } else {
+                panic!("Bundle::with_moduli: no {} modulus in bundle", p);
+            }
+        }
+        Bundle(new_ws)
+    }
 }
 
 /// DSL for the basic computations supported by fancy-garbling.
@@ -462,6 +476,61 @@ pub trait BundleGadgets: Fancy {
         Bundle(res)
     }
 
+    /// Mixed radix addition only returning the MSB.
+    fn mixed_radix_addition_msb_only(&self, ix: Option<SyncIndex>, xs: &[Bundle<Self::Item>]) -> Self::Item {
+        let nargs = xs.len();
+        let n = xs[0].wires().len();
+        assert!(xs.len() > 1 && xs.iter().all(|x| x.moduli() == xs[0].moduli()));
+
+        let mut opt_carry = None;
+        let mut max_carry = 0;
+
+        for i in 0..n {
+            println!("modulus {}", xs[0].moduli()[i]);
+
+            // all the ith digits, in one vec
+            let ds = xs.iter().map(|x| x.wires()[i].clone()).collect_vec();
+
+            if i < n-1 {
+                // compute the carry
+                let q = xs[0].moduli()[i];
+                // max_carry currently contains the max carry from the previous iteration
+                let max_val = nargs as u16 * (q-1) + max_carry;
+                // now it is the max carry of this iteration
+                max_carry = max_val / q;
+
+                // mod change the digits to the max sum possible plus the max carry of the
+                // previous iteration
+                let modded_ds = ds.iter().map(|d| self.mod_change(ix, d, max_val+1)).collect_vec();
+                // add them up
+                let sum = self.add_many(&modded_ds);
+                // add in the carry
+                let sum_with_carry = opt_carry.as_ref().map_or(sum.clone(), |c| self.add(&sum, &c));
+
+                // carry now contains the carry information, we just have to project it to
+                // the correct moduli for the next iteration. It will either be used to
+                // compute the next carry, if i < n-2, or it will be used to compute the
+                // output MSB, in which case it should be the modulus of the SB
+                let next_mod = if i < n-2 {
+                    nargs as u16 * (xs[0].moduli()[i+1] - 1) + max_carry + 1
+                } else {
+                    xs[0].moduli()[i+1] // we will be adding the carry to the MSB
+                };
+
+                println!("next mod: {}", next_mod);
+
+                let tt = (0..=max_val).map(|i| (i / q) % next_mod).collect_vec();
+                opt_carry = Some(self.proj(ix, &sum_with_carry, next_mod, Some(tt)));
+            } else {
+                // compute the msb
+                let digit_sum = self.add_many(&ds);
+                return opt_carry.as_ref().map_or(digit_sum.clone(), |d| self.add(&digit_sum, &d));
+            }
+        }
+
+        unreachable!()
+    }
+
     ////////////////////////////////////////////////////////////////////////////////
     // Fancy functions based on Mike's fractional mixed radix trick.
 
@@ -499,10 +568,11 @@ pub trait BundleGadgets: Fancy {
         self.mixed_radix_addition(ix, &ds)
     }
 
-    /// Compute `max(x,0)`, using potentially approximate factors of `M`.
+    /// Compute `max(x,0)`.
     ///
-    /// Supported accuracy: ["100%", "99.9%", "99%"]
-    fn relu(&self, ix: Option<SyncIndex>, x: &Bundle<Self::Item>, accuracy: &str) -> Bundle<Self::Item> {
+    /// Optional output moduli.
+    fn relu(&self, ix: Option<SyncIndex>, x: &Bundle<Self::Item>, accuracy: &str,
+            output_moduli: Option<&[u16]>) -> Bundle<Self::Item> {
         let factors_of_m = &get_ms(x, accuracy);
         let res = self.fractional_mixed_radix(ix, x, factors_of_m);
 
@@ -512,14 +582,18 @@ pub trait BundleGadgets: Fancy {
         let mask = self.proj(ix, res.wires().last().unwrap(), 2, Some(mask_tt));
 
         // use the mask to either output x or 0
-        let z = x.wires().iter().map(|x| self.mul(ix, x, &mask)).collect_vec();
+        let z = output_moduli
+            .map(|ps| x.with_moduli(ps))
+            .as_ref()
+            .unwrap_or(x)
+            .wires()
+            .iter()
+            .map(|x| self.mul(ix, x, &mask))
+            .collect();
         Bundle(z)
     }
 
-    /// Return 0 if `x` is positive and 1 if `x` is negative. Potentially approximate
-    /// depending on `factors_of_m`.
-    ///
-    /// Supported accuracy: ["100%", "99.9%", "99%"]
+    /// Return 0 if `x` is positive and 1 if `x` is negative.
     fn sign(&self, ix: Option<SyncIndex>, x: &Bundle<Self::Item>, accuracy: &str) -> Self::Item {
         let factors_of_m = &get_ms(x, accuracy);
         let res = self.fractional_mixed_radix(ix, x, factors_of_m);
@@ -528,15 +602,14 @@ pub trait BundleGadgets: Fancy {
         self.proj(ix, res.wires().last().unwrap(), 2, Some(tt))
     }
 
-    /// Return `if x >= 0 then 1 else -1`, where `-1` is interpreted as `Q-1`. Potentially
-    /// approximate depending on `factors_of_m`.
+    /// Return `if x >= 0 then 1 else -1`, where `-1` is interpreted as `Q-1`.
     ///
-    /// Supported accuracy: ["100%", "99.9%", "99%"]
-    fn sgn(&self, ix: Option<SyncIndex>, x: &Bundle<Self::Item>, accuracy: &str) -> Bundle<Self::Item> {
+    /// If provided, will produce a bundle under `output_moduli` instead of `x.moduli()`
+    fn sgn(&self, ix: Option<SyncIndex>, x: &Bundle<Self::Item>, accuracy: &str,
+           output_moduli: Option<&[u16]>) -> Bundle<Self::Item> {
         let sign = self.sign(ix, x, accuracy);
-        let q = util::product(&x.moduli());
-        let z = x.moduli().into_iter().map(|p| {
-            let tt = vec![ 1, ((q-1) % p as u128) as u16 ];
+        let z = output_moduli.unwrap_or(&x.moduli()).into_iter().map(|&p| {
+            let tt = vec![ 1, p - 1];
             self.proj(ix, &sign, p, Some(tt))
         }).collect();
         Bundle(z)
@@ -544,9 +617,9 @@ pub trait BundleGadgets: Fancy {
 
     /// Returns 1 if `x < y`. Works on both CRT and binary bundles.
     ///
-    /// Supported accuracy: ["100%", "99.9%", "99%"]
     /// Binary ignores accuracy argument.
-    fn lt(&self, ix: Option<SyncIndex>, x: &Bundle<Self::Item>, y: &Bundle<Self::Item>, accuracy: &str) -> Self::Item {
+    fn lt(&self, ix: Option<SyncIndex>, x: &Bundle<Self::Item>, y: &Bundle<Self::Item>,
+          accuracy: &str) -> Self::Item {
         if x.is_binary() {
             let (_,z) = self.binary_subtraction(ix,x,y);
             z
@@ -557,17 +630,15 @@ pub trait BundleGadgets: Fancy {
     }
 
     /// Returns 1 if `x >= y`. Works on both CRT and binary bundles.
-    ///
-    /// Supported accuracy: ["100%", "99.9%", "99%"]
-    fn geq(&self, ix: Option<SyncIndex>, x: &Bundle<Self::Item>, y: &Bundle<Self::Item>, accuracy: &str) -> Self::Item {
+    fn geq(&self, ix: Option<SyncIndex>, x: &Bundle<Self::Item>, y: &Bundle<Self::Item>,
+           accuracy: &str) -> Self::Item {
         let z = self.lt(ix,x,y,accuracy);
         self.negate(ix,&z)
     }
 
     /// Compute the maximum bundle in `xs`.
-    ///
-    /// Supported accuracy: ["100%", "99.9%", "99%"]
-    fn max(&self, ix: Option<SyncIndex>, xs: &[Bundle<Self::Item>], accuracy: &str) -> Bundle<Self::Item> {
+    fn max(&self, ix: Option<SyncIndex>, xs: &[Bundle<Self::Item>], accuracy: &str) ->
+        Bundle<Self::Item> {
         assert!(xs.len() > 1);
         xs.iter().skip(1).fold(xs[0].clone(), |x,y| {
             let pos = self.lt(ix,&x,y,accuracy);

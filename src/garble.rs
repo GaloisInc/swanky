@@ -778,7 +778,7 @@ mod parallel {
                         let c = b.constant_bundle_crt(Some(i),1,Q);
                         let x = b.garbler_input_bundle_crt(Some(i), Q, None);
                         let x = b.mul_bundles(Some(i), &x, &c);
-                        let z = b.relu(Some(i), &x, "100%");
+                        let z = b.relu(Some(i), &x, "100%", None);
                         b.finish_index(i);
                         z
                     }).unwrap()
@@ -798,7 +798,7 @@ mod parallel {
                 let c = b.constant_bundle_crt(Some(i),1,Q);
                 let x = b.garbler_input_bundle_crt(Some(i), Q, None);
                 let x = b.mul_bundles(Some(i), &x, &c);
-                let z = b.relu(Some(i), &x, "100%");
+                let z = b.relu(Some(i), &x, "100%", None);
                 zs.push(z);
                 b.finish_index(i);
             }
