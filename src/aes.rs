@@ -6,6 +6,7 @@
 
 //! Implementation of AES-128 using Intel's AES-NI.
 
+#[derive(Clone)]
 pub struct Aes128 {
     round_keys: [u8; 176],
 }

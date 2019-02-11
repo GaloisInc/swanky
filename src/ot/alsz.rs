@@ -11,6 +11,7 @@ use crate::utils;
 use crate::{Block, BlockObliviousTransfer, SemiHonest};
 use arrayref::array_ref;
 use failure::Error;
+use rand_core::{RngCore, SeedableRng};
 use std::io::{BufReader, BufWriter, ErrorKind, Read, Write};
 use std::marker::PhantomData;
 
@@ -27,7 +28,7 @@ impl<S: Read + Write + Send + Sync, OT: BlockObliviousTransfer<S> + SemiHonest>
 {
     fn new() -> Self {
         let ot = OT::new();
-        let rng = AesRng::new(&rand::random::<Block>());
+        let rng = AesRng::new();
         Self {
             _s: PhantomData::<S>,
             ot,
@@ -56,20 +57,20 @@ impl<S: Read + Write + Send + Sync, OT: BlockObliviousTransfer<S> + SemiHonest>
         let hash = AesHash::new(&[0u8; 16]); // XXX IV should be chosen at random
 
         let mut s_ = vec![0u8; nrows / 8];
-        self.rng.random(&mut s_);
+        self.rng.fill_bytes(&mut s_);
         let s = utils::u8vec_to_boolvec(&s_);
         let ks = self.ot.receive(reader, writer, &s)?;
-        let rngs = ks.into_iter().map(|k| AesRng::new(&k));
+        let rngs = ks.into_iter().map(|k| AesRng::from_seed(k));
         let mut qs = vec![0u8; nrows * ncols / 8];
         let mut u = vec![0u8; ncols / 8];
-        for (j, (b, rng)) in s.into_iter().zip(rngs).enumerate() {
+        for (j, (b, mut rng)) in s.into_iter().zip(rngs).enumerate() {
             let range = j * ncols / 8..(j + 1) * ncols / 8;
             let mut q = &mut qs[range];
             stream::read_bytes_inplace(reader, &mut u)?;
             if !b {
                 std::mem::replace(&mut u, vec![0u8; ncols / 8]);
             };
-            rng.random(&mut q);
+            rng.fill_bytes(&mut q);
             utils::xor_inplace(&mut q, &u);
         }
         let mut qs = utils::transpose(&qs, nrows, ncols);
@@ -102,23 +103,23 @@ impl<S: Read + Write + Send + Sync, OT: BlockObliviousTransfer<S> + SemiHonest>
         for _ in 0..nrows {
             let mut k0 = [0u8; 16];
             let mut k1 = [0u8; 16];
-            self.rng.random(&mut k0);
-            self.rng.random(&mut k1);
+            self.rng.fill_bytes(&mut k0);
+            self.rng.fill_bytes(&mut k1);
             ks.push((k0, k1));
         }
         self.ot.send(reader, writer, &ks)?;
         let rngs = ks
             .into_iter()
-            .map(|(k0, k1)| (AesRng::new(&k0), AesRng::new(&k1)))
+            .map(|(k0, k1)| (AesRng::from_seed(k0), AesRng::from_seed(k1)))
             .collect::<Vec<(AesRng, AesRng)>>();
         let r = utils::boolvec_to_u8vec(inputs);
         let mut ts = vec![0u8; nrows * ncols / 8];
         let mut g = vec![0u8; ncols / 8];
-        for (j, (rng0, rng1)) in rngs.into_iter().enumerate() {
+        for (j, (mut rng0, mut rng1)) in rngs.into_iter().enumerate() {
             let range = j * ncols / 8..(j + 1) * ncols / 8;
             let mut t = &mut ts[range];
-            rng0.random(&mut t);
-            rng1.random(&mut g);
+            rng0.fill_bytes(&mut t);
+            rng1.fill_bytes(&mut g);
             utils::xor_inplace(&mut g, &t);
             utils::xor_inplace(&mut g, &r);
             stream::write_bytes(&mut writer, &g)?;

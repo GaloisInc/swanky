@@ -4,6 +4,7 @@
 // Copyright © 2019 Galois, Inc.
 // See LICENSE for licensing information.
 
+use crate::rand_aes::AesRng;
 use crate::stream;
 use crate::utils;
 use crate::{Block, BlockObliviousTransfer, SemiHonest};
@@ -11,7 +12,6 @@ use curve25519_dalek::constants::RISTRETTO_BASEPOINT_TABLE;
 use curve25519_dalek::ristretto::RistrettoPoint;
 use curve25519_dalek::scalar::Scalar;
 use failure::Error;
-use rand::rngs::ThreadRng;
 use std::io::{BufReader, BufWriter, Read, Write};
 use std::marker::PhantomData;
 
@@ -21,12 +21,12 @@ use std::marker::PhantomData;
 /// the `curve25519-dalek` library.
 pub struct NaorPinkasOT<S: Read + Write + Send + Sync> {
     _placeholder: PhantomData<S>,
-    rng: ThreadRng,
+    rng: AesRng,
 }
 
 impl<S: Read + Write + Send + Sync> BlockObliviousTransfer<S> for NaorPinkasOT<S> {
     fn new() -> Self {
-        let rng = rand::thread_rng();
+        let rng = AesRng::new();
         Self {
             _placeholder: PhantomData::<S>,
             rng,

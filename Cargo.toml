@@ -15,6 +15,7 @@ failure = "*"
 itertools = "*"
 libc = "*"
 rand = { version = "*", features = ["nightly"] }
+rand_core = "*"
 
 [build-dependencies]
 cc = "*"

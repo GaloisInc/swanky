@@ -4,6 +4,7 @@
 // Copyright © 2019 Galois, Inc.
 // See LICENSE for licensing information.
 
+use crate::rand_aes::AesRng;
 use crate::stream;
 use crate::utils;
 use crate::{Block, BlockObliviousTransfer, Malicious, SemiHonest};
@@ -23,12 +24,15 @@ use std::marker::PhantomData;
 /// Security: malicious
 pub struct ChouOrlandiOT<S: Read + Write + Send + Sync> {
     _placeholder: PhantomData<S>,
+    rng: AesRng,
 }
 
 impl<S: Read + Write + Send + Sync> BlockObliviousTransfer<S> for ChouOrlandiOT<S> {
     fn new() -> Self {
+        let rng = AesRng::new();
         Self {
             _placeholder: PhantomData::<S>,
+            rng,
         }
     }
 
@@ -38,7 +42,7 @@ impl<S: Read + Write + Send + Sync> BlockObliviousTransfer<S> for ChouOrlandiOT<
         writer: &mut BufWriter<S>,
         inputs: &[(Block, Block)],
     ) -> Result<(), Error> {
-        let y = Scalar::random(&mut rand::thread_rng());
+        let y = Scalar::random(&mut self.rng);
         let s = &y * &RISTRETTO_BASEPOINT_TABLE;
         stream::write_pt(writer, &s)?;
         writer.flush()?;
@@ -68,7 +72,7 @@ impl<S: Read + Write + Send + Sync> BlockObliviousTransfer<S> for ChouOrlandiOT<
         let s = stream::read_pt(reader)?;
         let mut xs = Vec::with_capacity(inputs.len());
         for b in inputs.iter() {
-            let x = Scalar::random(&mut rand::thread_rng());
+            let x = Scalar::random(&mut self.rng);
             let c = if *b { Scalar::one() } else { Scalar::zero() };
             let r = c * s + &x * &RISTRETTO_BASEPOINT_TABLE;
             stream::write_pt(writer, &r)?;
