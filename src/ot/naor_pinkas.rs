@@ -4,9 +4,9 @@
 // Copyright © 2019 Galois, Inc.
 // See LICENSE for licensing information.
 
+use crate::block;
 use crate::rand_aes::AesRng;
 use crate::stream;
-use crate::utils;
 use crate::{Block, BlockObliviousTransfer, SemiHonest};
 use curve25519_dalek::constants::RISTRETTO_BASEPOINT_TABLE;
 use curve25519_dalek::ristretto::RistrettoPoint;
@@ -63,10 +63,10 @@ impl<S: Read + Write + Send + Sync> BlockObliviousTransfer<S> for NaorPinkasOT<S
             let r1 = Scalar::random(&mut self.rng);
             let e00 = &r0 * &RISTRETTO_BASEPOINT_TABLE;
             let e10 = &r1 * &RISTRETTO_BASEPOINT_TABLE;
-            let h = utils::hash_pt_block(i, &(pk0 * r0));
-            let e01 = utils::xor_block(&h, &input.0);
-            let h = utils::hash_pt_block(i, &(pk1 * r1));
-            let e11 = utils::xor_block(&h, &input.1);
+            let h = block::hash_pt_block(i, &(pk0 * r0));
+            let e01 = block::xor_block(&h, &input.0);
+            let h = block::hash_pt_block(i, &(pk1 * r1));
+            let e11 = block::xor_block(&h, &input.1);
             stream::write_pt(writer, &e00)?;
             stream::write_block(writer, &e01)?;
             stream::write_pt(writer, &e10)?;
@@ -113,8 +113,8 @@ impl<S: Read + Write + Send + Sync> BlockObliviousTransfer<S> for NaorPinkasOT<S
                     false => (e00, e01),
                     true => (e10, e11),
                 };
-                let h = utils::hash_pt_block(i, &(eσ0 * k));
-                let m = utils::xor_block(&h, &eσ1);
+                let h = block::hash_pt_block(i, &(eσ0 * k));
+                let m = block::xor_block(&h, &eσ1);
                 Ok(m)
             })
             .collect()

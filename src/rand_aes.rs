@@ -10,8 +10,8 @@
 //! starting at zero. When used as a PRNG this is okay [TODO: citation?].
 
 use crate::aes::Aes128;
-use crate::utils;
-use crate::Block;
+use crate::block;
+use crate::block::Block;
 use core::arch::x86_64::*;
 use core::fmt;
 use rand_core::block::{BlockRng, BlockRngCore};
@@ -83,7 +83,7 @@ impl BlockRngCore for AesRngCore {
 
     fn generate(&mut self, results: &mut Self::Results) {
         let data = unsafe { _mm_set_epi64(_mm_setzero_si64(), _mm_set_pi32(0, self.state as i32)) };
-        let c = self.aes.encrypt_u8(&utils::m128i_to_block(data));
+        let c = self.aes.encrypt_u8(&block::m128i_to_block(data));
         unsafe {
             let c = std::mem::transmute::<Block, [u32; 4]>(c);
             std::ptr::copy_nonoverlapping(c.as_ptr(), results.as_mut_ptr(), 16);

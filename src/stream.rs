@@ -4,7 +4,7 @@
 // Copyright © 2019 Galois, Inc.
 // See LICENSE for licensing information.
 
-use crate::utils;
+use crate::block;
 use crate::Block;
 use curve25519_dalek::ristretto::{CompressedRistretto, RistrettoPoint};
 use failure::Error;
@@ -77,7 +77,7 @@ pub fn write_block<T: Read + Write + Send>(
 }
 #[inline(always)]
 pub fn read_block<T: Read + Write + Send>(stream: &mut BufReader<T>) -> Result<Block, Error> {
-    let mut v = utils::zero_block();
+    let mut v = block::zero_block();
     stream.read_exact(&mut v)?;
     Ok(v)
 }

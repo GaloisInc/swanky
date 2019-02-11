@@ -4,9 +4,9 @@
 // Copyright © 2019 Galois, Inc.
 // See LICENSE for licensing information.
 
+use crate::block;
 use crate::rand_aes::AesRng;
 use crate::stream;
-use crate::utils;
 use crate::{Block, BlockObliviousTransfer, Malicious, SemiHonest};
 use curve25519_dalek::constants::RISTRETTO_BASEPOINT_TABLE;
 use curve25519_dalek::scalar::Scalar;
@@ -55,10 +55,10 @@ impl<S: Read + Write + Send + Sync> BlockObliviousTransfer<S> for ChouOrlandiOT<
             rs.push(r);
         }
         for (i, (input, r)) in inputs.into_iter().zip(rs.into_iter()).enumerate() {
-            let k0 = utils::hash_pt_block(i, &(r * y));
-            let k1 = utils::hash_pt_block(i, &((r - s) * y));
-            let c0 = utils::xor_block(&k0, &input.0);
-            let c1 = utils::xor_block(&k1, &input.1);
+            let k0 = block::hash_pt_block(i, &(r * y));
+            let k1 = block::hash_pt_block(i, &((r - s) * y));
+            let c0 = block::xor_block(&k0, &input.0);
+            let c1 = block::xor_block(&k1, &input.1);
             stream::write_block(writer, &c0)?;
             stream::write_block(writer, &c1)?;
         }
@@ -87,11 +87,11 @@ impl<S: Read + Write + Send + Sync> BlockObliviousTransfer<S> for ChouOrlandiOT<
             .zip(xs.into_iter())
             .enumerate()
             .map(|(i, (b, x))| {
-                let k = utils::hash_pt_block(i, &(x * s));
+                let k = block::hash_pt_block(i, &(x * s));
                 let c0 = stream::read_block(reader)?;
                 let c1 = stream::read_block(reader)?;
                 let c = if *b { &c1 } else { &c0 };
-                let c = utils::xor_block(&k, &c);
+                let c = block::xor_block(&k, &c);
                 Ok(c)
             })
             .collect()

@@ -8,7 +8,7 @@
 //! based on fixed-key AES.
 
 use crate::aes::Aes128;
-use crate::utils;
+use crate::block;
 use crate::Block;
 use core::arch::x86_64::*;
 
@@ -32,7 +32,7 @@ impl AesHash {
     #[inline(always)]
     pub fn cr_hash(&self, _i: usize, x: &Block) -> Block {
         let y = self.aes.encrypt_u8(&x);
-        utils::xor_block(&x, &y)
+        block::xor_block(&x, &y)
     }
 
     /// Circular correlation robust hash function (cf.
@@ -44,15 +44,15 @@ impl AesHash {
     pub fn ccr_hash(&self, _i: usize, x: &Block) -> Block {
         unsafe {
             let x = _mm_xor_si128(
-                _mm_shuffle_epi32(utils::block_to_m128i(x), 78),
+                _mm_shuffle_epi32(block::block_to_m128i(x), 78),
                 _mm_and_si128(
-                    utils::block_to_m128i(x),
+                    block::block_to_m128i(x),
                     _mm_set_epi64(_mm_set1_pi8(0xF), _mm_setzero_si64()),
                 ),
             );
-            let x = utils::m128i_to_block(x);
+            let x = block::m128i_to_block(x);
             let y = self.aes.encrypt_u8(&x);
-            utils::xor_block(&x, &y)
+            block::xor_block(&x, &y)
         }
     }
 }

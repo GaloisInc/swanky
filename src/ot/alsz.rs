@@ -6,8 +6,7 @@
 
 use crate::hash_aes::AesHash;
 use crate::rand_aes::AesRng;
-use crate::stream;
-use crate::utils;
+use crate::{block, stream, utils};
 use crate::{Block, BlockObliviousTransfer, SemiHonest};
 use arrayref::array_ref;
 use failure::Error;
@@ -22,6 +21,11 @@ pub struct AlszOT<S: Read + Write + Send + Sync, OT: BlockObliviousTransfer<S> +
     ot: OT,
     rng: AesRng,
 }
+
+// Fixed key for AES hash. This is the same fixed key as used in the EMP toolkit.
+const FIXED_KEY: [u8; 16] = [
+    0x61, 0x7e, 0x8d, 0xa2, 0xa0, 0x51, 0x1e, 0x96, 0x5e, 0x41, 0xc2, 0x9b, 0x15, 0x3f, 0xc7, 0x7a,
+];
 
 impl<S: Read + Write + Send + Sync, OT: BlockObliviousTransfer<S> + SemiHonest>
     BlockObliviousTransfer<S> for AlszOT<S, OT>
@@ -54,7 +58,7 @@ impl<S: Read + Write + Send + Sync, OT: BlockObliviousTransfer<S> + SemiHonest>
             return self.ot.send(reader, writer, inputs);
         }
         let (nrows, ncols) = (128, m);
-        let hash = AesHash::new(&[0u8; 16]); // XXX IV should be chosen at random
+        let hash = AesHash::new(&FIXED_KEY);
 
         let mut s_ = vec![0u8; nrows / 8];
         self.rng.fill_bytes(&mut s_);
@@ -77,9 +81,9 @@ impl<S: Read + Write + Send + Sync, OT: BlockObliviousTransfer<S> + SemiHonest>
         for (j, input) in inputs.iter().enumerate() {
             let range = j * nrows / 8..(j + 1) * nrows / 8;
             let mut q = &mut qs[range];
-            let y0 = utils::xor_block(&hash.cr_hash(j, array_ref![q, 0, 16]), &input.0);
+            let y0 = block::xor_block(&hash.cr_hash(j, array_ref![q, 0, 16]), &input.0);
             utils::xor_inplace(&mut q, &s_);
-            let y1 = utils::xor_block(&hash.cr_hash(j, array_ref![q, 0, 16]), &input.1);
+            let y1 = block::xor_block(&hash.cr_hash(j, array_ref![q, 0, 16]), &input.1);
             stream::write_block(&mut writer, &y0)?;
             stream::write_block(&mut writer, &y1)?;
         }
@@ -98,7 +102,7 @@ impl<S: Read + Write + Send + Sync, OT: BlockObliviousTransfer<S> + SemiHonest>
             return self.ot.receive(reader, writer, inputs);
         }
         let (nrows, ncols) = (128, m);
-        let hash = AesHash::new(&[0u8; 16]); // XXX IV should be chosen at random
+        let hash = AesHash::new(&FIXED_KEY);
         let mut ks = Vec::with_capacity(nrows);
         for _ in 0..nrows {
             let mut k0 = [0u8; 16];
@@ -133,7 +137,7 @@ impl<S: Read + Write + Send + Sync, OT: BlockObliviousTransfer<S> + SemiHonest>
             let y0 = stream::read_block(&mut reader)?;
             let y1 = stream::read_block(&mut reader)?;
             let y = if *b { y1 } else { y0 };
-            let y = utils::xor_block(&y, &hash.cr_hash(j, array_ref![t, 0, 16]));
+            let y = block::xor_block(&y, &hash.cr_hash(j, array_ref![t, 0, 16]));
             out.push(y);
         }
         Ok(out)
