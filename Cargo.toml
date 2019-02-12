@@ -12,7 +12,6 @@ autobenches = false
 arrayref = "*"
 curve25519-dalek = { version = "*", features = ["std", "avx2_backend"] }
 failure = "*"
-itertools = "*"
 libc = "*"
 rand = { version = "*", features = ["nightly"] }
 rand_core = "*"
@@ -22,6 +21,7 @@ cc = "*"
 
 [dev-dependencies]
 criterion = "*"
+itertools = "*"
 
 [profile.release]
 debug = true

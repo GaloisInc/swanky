@@ -118,7 +118,7 @@ impl Aes128 {
     }
     #[inline]
     pub fn encrypt_u8(&self, m: &[u8; 16]) -> [u8; 16] {
-        let mut c = [0; 16];
+        let mut c = [0u8; 16];
         unsafe {
             asm!("
             movdqu ($2), %xmm1;

@@ -7,7 +7,7 @@
 use crate::hash_aes::AesHash;
 use crate::rand_aes::AesRng;
 use crate::{block, cointoss, stream, utils};
-use crate::{Block, BlockObliviousTransfer, Malicious};
+use crate::{Block, Malicious, ObliviousTransfer};
 use arrayref::array_ref;
 use failure::Error;
 use rand_core::{RngCore, SeedableRng};
@@ -16,7 +16,7 @@ use std::marker::PhantomData;
 
 /// Implementation of the Keller-Orsini-Scholl oblivious transfer extension
 /// protocol (cf. <https://eprint.iacr.org/2015/546>).
-pub struct KosOT<S: Read + Write + Send + Sync, OT: BlockObliviousTransfer<S> + Malicious> {
+pub struct KosOT<S: Read + Write + Send + Sync, OT: ObliviousTransfer<S, Msg = Block> + Malicious> {
     _placeholder: PhantomData<S>,
     ot: OT,
     rng: AesRng,
@@ -25,9 +25,11 @@ pub struct KosOT<S: Read + Write + Send + Sync, OT: BlockObliviousTransfer<S> + 
 
 const SSP: usize = 40;
 
-impl<S: Read + Write + Send + Sync, OT: BlockObliviousTransfer<S> + Malicious>
-    BlockObliviousTransfer<S> for KosOT<S, OT>
+impl<S: Read + Write + Send + Sync, OT: ObliviousTransfer<S, Msg = Block> + Malicious>
+    ObliviousTransfer<S> for KosOT<S, OT>
 {
+    type Msg = Block;
+
     fn new() -> Self {
         let ot = OT::new();
         let rng = AesRng::new();
@@ -200,7 +202,7 @@ impl<S: Read + Write + Send + Sync, OT: BlockObliviousTransfer<S> + Malicious>
     }
 }
 
-impl<S: Read + Write + Send + Sync, OT: BlockObliviousTransfer<S> + Malicious> Malicious
+impl<S: Read + Write + Send + Sync, OT: ObliviousTransfer<S, Msg = Block> + Malicious> Malicious
     for KosOT<S, OT>
 {
 }
@@ -223,7 +225,7 @@ mod tests {
         (0..size).map(|_| rand::random::<bool>()).collect()
     }
 
-    fn test_ot<OT: BlockObliviousTransfer<UnixStream> + Malicious>() {
+    fn test_ot<OT: ObliviousTransfer<UnixStream, Msg = Block> + Malicious>() {
         let m0s = rand_block_vec(T);
         let m1s = rand_block_vec(T);
         let bs = rand_bool_vec(T);

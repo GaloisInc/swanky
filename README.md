@@ -6,7 +6,7 @@ world.
 
 # Building
 
-You will need `rustc` nightly to build for now.
+Simply use `cargo build` to build.
 
 # License
 

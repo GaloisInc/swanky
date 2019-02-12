@@ -7,7 +7,7 @@
 use crate::block;
 use crate::rand_aes::AesRng;
 use crate::stream;
-use crate::{Block, BlockObliviousTransfer, SemiHonest};
+use crate::{Block, ObliviousTransfer, SemiHonest};
 use curve25519_dalek::constants::RISTRETTO_BASEPOINT_TABLE;
 use curve25519_dalek::ristretto::RistrettoPoint;
 use curve25519_dalek::scalar::Scalar;
@@ -24,7 +24,9 @@ pub struct NaorPinkasOT<S: Read + Write + Send + Sync> {
     rng: AesRng,
 }
 
-impl<S: Read + Write + Send + Sync> BlockObliviousTransfer<S> for NaorPinkasOT<S> {
+impl<S: Read + Write + Send + Sync> ObliviousTransfer<S> for NaorPinkasOT<S> {
+    type Msg = Block;
+
     fn new() -> Self {
         let rng = AesRng::new();
         Self {

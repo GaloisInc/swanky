@@ -6,7 +6,7 @@
 
 use crate::rand_aes::AesRng;
 use crate::{block, stream};
-use crate::{Block, BlockObliviousTransfer, Malicious, SemiHonest};
+use crate::{Block, Malicious, ObliviousTransfer, SemiHonest};
 use curve25519_dalek::constants::RISTRETTO_BASEPOINT_TABLE;
 use curve25519_dalek::scalar::Scalar;
 use failure::Error;
@@ -29,7 +29,9 @@ pub struct ChouOrlandiOT<S: Read + Write + Send + Sync> {
     rng: AesRng,
 }
 
-impl<S: Read + Write + Send + Sync> BlockObliviousTransfer<S> for ChouOrlandiOT<S> {
+impl<S: Read + Write + Send + Sync> ObliviousTransfer<S> for ChouOrlandiOT<S> {
+    type Msg = Block;
+
     fn new() -> Self {
         let rng = AesRng::new();
         Self {

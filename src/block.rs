@@ -4,6 +4,8 @@
 // Copyright © 2019 Galois, Inc.
 // See LICENSE for licensing information.
 
+//! Defines a block as a 128-bit value, and implements block-related functions.
+
 use crate::aes::Aes128;
 use arrayref::array_ref;
 use core::arch::x86_64::*;

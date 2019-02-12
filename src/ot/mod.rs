@@ -16,12 +16,18 @@ pub use dummy::DummyOT;
 pub use kos::KosOT;
 pub use naor_pinkas::NaorPinkasOT;
 
-use crate::Block;
 use failure::Error;
 use std::io::{BufReader, BufWriter, Read, Write};
 
-/// A trait for one-out-of-two oblivious transfer on 128-bit inputs.
-pub trait BlockObliviousTransfer<T: Read + Write + Send + Sync> {
+/// Trait for one-out-of-two oblivious transfer on 128-bit inputs.
+///
+/// This trait encapsulates the functionality common to oblivious transfer
+/// protocols.
+pub trait ObliviousTransfer<T: Read + Write + Send + Sync> {
+    /// Message type, restricted to types that are mutably-dereferencable as
+    /// `u8` arrays.
+    type Msg: Sized + AsMut<[u8]>;
+
     /// Creates a new oblivious transfer instance.
     fn new() -> Self;
     /// Sends values.
@@ -29,7 +35,7 @@ pub trait BlockObliviousTransfer<T: Read + Write + Send + Sync> {
         &mut self,
         reader: &mut BufReader<T>,
         writer: &mut BufWriter<T>,
-        inputs: &[(Block, Block)],
+        inputs: &[(Self::Msg, Self::Msg)],
     ) -> Result<(), Error>;
     /// Receives values.
     fn receive(
@@ -37,7 +43,7 @@ pub trait BlockObliviousTransfer<T: Read + Write + Send + Sync> {
         reader: &mut BufReader<T>,
         writer: &mut BufWriter<T>,
         inputs: &[bool],
-    ) -> Result<Vec<Block>, Error>;
+    ) -> Result<Vec<Self::Msg>, Error>;
 }
 
 /// A marker trait denoting that the given scheme is semi-honest secure.

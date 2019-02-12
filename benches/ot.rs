@@ -1,3 +1,11 @@
+// -*- mode: rust; -*-
+//
+// This file is part of ocelot.
+// Copyright © 2019 Galois, Inc.
+// See LICENSE for licensing information.
+
+//! Oblivious transfer benchmarks using `criterion`.
+
 use criterion::{criterion_group, criterion_main, Criterion};
 use ocelot::*;
 use std::io::{BufReader, BufWriter};
@@ -13,7 +21,10 @@ fn rand_bool_vec(size: usize) -> Vec<bool> {
     (0..size).map(|_| rand::random::<bool>()).collect()
 }
 
-fn _bench_block_ot<OT: BlockObliviousTransfer<UnixStream>>(bs: &[bool], ms: Vec<(Block, Block)>) {
+fn _bench_block_ot<OT: ObliviousTransfer<UnixStream, Msg = Block>>(
+    bs: &[bool],
+    ms: Vec<(Block, Block)>,
+) {
     let (sender, receiver) = UnixStream::pair().unwrap();
     let handle = std::thread::spawn(move || {
         let mut ot = OT::new();

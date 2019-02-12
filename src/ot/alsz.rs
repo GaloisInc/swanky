@@ -7,7 +7,7 @@
 use crate::hash_aes::AesHash;
 use crate::rand_aes::AesRng;
 use crate::{block, stream, utils};
-use crate::{Block, BlockObliviousTransfer, SemiHonest};
+use crate::{Block, ObliviousTransfer, SemiHonest};
 use arrayref::array_ref;
 use failure::Error;
 use rand_core::{RngCore, SeedableRng};
@@ -16,16 +16,19 @@ use std::marker::PhantomData;
 
 /// Implementation of the Asharov-Lindell-Schneider-Zohner oblivious transfer
 /// extension protocol (cf. <https://eprint.iacr.org/2016/602>, Protocol 4).
-pub struct AlszOT<S: Read + Write + Send + Sync, OT: BlockObliviousTransfer<S> + SemiHonest> {
+pub struct AlszOT<S: Read + Write + Send + Sync, OT: ObliviousTransfer<S, Msg = Block> + SemiHonest>
+{
     _s: PhantomData<S>,
     ot: OT,
     rng: AesRng,
     hash: AesHash,
 }
 
-impl<S: Read + Write + Send + Sync, OT: BlockObliviousTransfer<S> + SemiHonest>
-    BlockObliviousTransfer<S> for AlszOT<S, OT>
+impl<S: Read + Write + Send + Sync, OT: ObliviousTransfer<S, Msg = Block> + SemiHonest>
+    ObliviousTransfer<S> for AlszOT<S, OT>
 {
+    type Msg = Block;
+
     fn new() -> Self {
         let ot = OT::new();
         let rng = AesRng::new();
@@ -91,7 +94,7 @@ impl<S: Read + Write + Send + Sync, OT: BlockObliviousTransfer<S> + SemiHonest>
         mut reader: &mut BufReader<S>,
         mut writer: &mut BufWriter<S>,
         inputs: &[bool],
-    ) -> Result<Vec<Block>, Error> {
+    ) -> Result<Vec<Self::Msg>, Error> {
         let m = inputs.len();
         if m <= 128 {
             // Just do normal OT
@@ -139,7 +142,7 @@ impl<S: Read + Write + Send + Sync, OT: BlockObliviousTransfer<S> + SemiHonest>
     }
 }
 
-impl<S: Read + Write + Send + Sync, OT: BlockObliviousTransfer<S> + SemiHonest> SemiHonest
+impl<S: Read + Write + Send + Sync, OT: ObliviousTransfer<S, Msg = Block> + SemiHonest> SemiHonest
     for AlszOT<S, OT>
 {
 }
@@ -162,7 +165,7 @@ mod tests {
         (0..size).map(|_| rand::random::<bool>()).collect()
     }
 
-    fn test_ot<OT: BlockObliviousTransfer<UnixStream> + SemiHonest>() {
+    fn test_ot<OT: ObliviousTransfer<UnixStream, Msg = Block> + SemiHonest>() {
         let m0s = rand_block_vec(T);
         let m1s = rand_block_vec(T);
         let bs = rand_bool_vec(T);

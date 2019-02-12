@@ -5,7 +5,7 @@
 // See LICENSE for licensing information.
 
 use crate::stream;
-use crate::{Block, BlockObliviousTransfer};
+use crate::{Block, ObliviousTransfer};
 use failure::Error;
 use std::io::{BufReader, BufWriter, Read, Write};
 use std::marker::PhantomData;
@@ -16,7 +16,9 @@ pub struct DummyOT<S: Read + Write + Send + Sync> {
     _placeholder: PhantomData<S>,
 }
 
-impl<S: Read + Write + Send + Sync> BlockObliviousTransfer<S> for DummyOT<S> {
+impl<S: Read + Write + Send + Sync> ObliviousTransfer<S> for DummyOT<S> {
+    type Msg = Block;
+
     fn new() -> Self {
         Self {
             _placeholder: PhantomData::<S>,
