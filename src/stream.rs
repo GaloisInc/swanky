@@ -41,7 +41,7 @@ pub fn write_bool<T: Read + Write + Send>(
 }
 #[inline(always)]
 pub fn read_bool<T: Read + Write + Send>(stream: &mut BufReader<T>) -> Result<bool, Error> {
-    let mut data = [0; 1];
+    let mut data = [0u8; 1];
     stream.read_exact(&mut data)?;
     Ok(data[0] != 0)
 }

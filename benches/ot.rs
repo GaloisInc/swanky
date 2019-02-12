@@ -12,7 +12,7 @@ use std::io::{BufReader, BufWriter};
 use std::os::unix::net::UnixStream;
 use std::time::Duration;
 
-const T: usize = 1 << 16;
+const T: usize = 1 << 20;
 
 fn rand_block_vec(size: usize) -> Vec<Block> {
     (0..size).map(|_| rand::random::<Block>()).collect()
