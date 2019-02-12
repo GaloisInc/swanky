@@ -6,7 +6,7 @@
 
 use crate::hash_aes::AesHash;
 use crate::rand_aes::AesRng;
-use crate::{block, stream, utils};
+use crate::{stream, utils};
 use crate::{Block, ObliviousTransfer, SemiHonest};
 use arrayref::array_ref;
 use failure::Error;
@@ -83,9 +83,10 @@ impl<S: Read + Write + Send + Sync, OT: ObliviousTransfer<S, Msg = Block> + Semi
             let y0 = self.hash.cr_hash(j, Block::from(*array_ref![q, 0, 16])) ^ input.0;
             utils::xor_inplace(&mut q, &s_);
             let y1 = self.hash.cr_hash(j, Block::from(*array_ref![q, 0, 16])) ^ input.1;
-            block::write_block(&mut writer, &y0)?;
-            block::write_block(&mut writer, &y1)?;
+            y0.write(&mut writer)?;
+            y1.write(&mut writer)?;
         }
+        writer.flush()?;
         Ok(())
     }
 
@@ -132,8 +133,8 @@ impl<S: Read + Write + Send + Sync, OT: ObliviousTransfer<S, Msg = Block> + Semi
         for (j, b) in inputs.iter().enumerate() {
             let range = j * nrows / 8..(j + 1) * nrows / 8;
             let t = &ts[range];
-            let y0 = block::read_block(&mut reader)?;
-            let y1 = block::read_block(&mut reader)?;
+            let y0 = Block::read(&mut reader)?;
+            let y1 = Block::read(&mut reader)?;
             let y = if *b { y1 } else { y0 };
             let y = y ^ self.hash.cr_hash(j, Block::from(*array_ref![t, 0, 16]));
             out.push(y);

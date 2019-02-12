@@ -5,7 +5,7 @@
 // See LICENSE for licensing information.
 
 use crate::rand_aes::AesRng;
-use crate::{block, stream};
+use crate::stream;
 use crate::{Block, Malicious, ObliviousTransfer, SemiHonest};
 use curve25519_dalek::constants::RISTRETTO_BASEPOINT_TABLE;
 use curve25519_dalek::scalar::Scalar;
@@ -60,8 +60,8 @@ impl<S: Read + Write + Send + Sync> ObliviousTransfer<S> for ChouOrlandiOT<S> {
             let k1 = Block::hash_pt(i, &((r - s) * y));
             let c0 = k0 ^ input.0;
             let c1 = k1 ^ input.1;
-            block::write_block(writer, &c0)?;
-            block::write_block(writer, &c1)?;
+            c0.write(writer)?;
+            c1.write(writer)?;
         }
         writer.flush()?;
         Ok(())
@@ -89,8 +89,8 @@ impl<S: Read + Write + Send + Sync> ObliviousTransfer<S> for ChouOrlandiOT<S> {
             .enumerate()
             .map(|(i, (b, x))| {
                 let k = Block::hash_pt(i, &(x * s));
-                let c0 = block::read_block(reader)?;
-                let c1 = block::read_block(reader)?;
+                let c0 = Block::read(reader)?;
+                let c1 = Block::read(reader)?;
                 let c = if *b { c1 } else { c0 };
                 let c = k ^ c;
                 Ok(c)

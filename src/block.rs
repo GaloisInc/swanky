@@ -72,11 +72,22 @@ impl Block {
     }
 
     // Fixed key for AES hash. This is the same fixed key as used in the EMP toolkit.
+    #[inline(always)]
     pub fn fixed_key() -> Self {
         Block::from([
             0x61, 0x7e, 0x8d, 0xa2, 0xa0, 0x51, 0x1e, 0x96, 0x5e, 0x41, 0xc2, 0x9b, 0x15, 0x3f,
             0xc7, 0x7a,
         ])
+    }
+    #[inline(always)]
+    pub fn write<T: Read + Write + Send>(&self, stream: &mut BufWriter<T>) -> Result<usize, Error> {
+        stream.write(self.as_ref()).map_err(Error::from)
+    }
+    #[inline(always)]
+    pub fn read<T: Read + Write + Send>(stream: &mut BufReader<T>) -> Result<Block, Error> {
+        let mut v = Block::zero();
+        stream.read_exact(v.as_mut())?;
+        Ok(v)
     }
 }
 
@@ -151,19 +162,6 @@ impl From<[u8; 16]> for Block {
     }
 }
 
-#[inline(always)]
-pub fn write_block<T: Read + Write + Send>(
-    stream: &mut BufWriter<T>,
-    block: &Block,
-) -> Result<usize, Error> {
-    stream.write(block.as_ref()).map_err(Error::from)
-}
-#[inline(always)]
-pub fn read_block<T: Read + Write + Send>(stream: &mut BufReader<T>) -> Result<Block, Error> {
-    let mut v = Block::zero();
-    stream.read_exact(v.as_mut())?;
-    Ok(v)
-}
 #[inline(always)]
 pub fn xor_two_blocks(x: &(Block, Block), y: &(Block, Block)) -> (Block, Block) {
     (x.0 ^ y.0, x.1 ^ y.1)

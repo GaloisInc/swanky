@@ -13,7 +13,7 @@
 //! the sender, and then receives `seed_`, checking that `PRG(seed_) = r`.
 
 use crate::rand_aes::AesRng;
-use crate::{block, Block};
+use crate::Block;
 use failure::Error;
 use rand_core::{RngCore, SeedableRng};
 use std::io::{BufReader, BufWriter, ErrorKind, Read, Write};
@@ -29,10 +29,10 @@ where
     let mut rng = AesRng::from_seed(seed);
     let mut com = Block::zero();
     rng.fill_bytes(&mut com.as_mut());
-    block::write_block(writer, &com)?;
+    com.write(writer)?;
     writer.flush()?;
-    let seed_ = block::read_block(&mut reader)?;
-    block::write_block(&mut writer, &seed)?;
+    let seed_ = Block::read(&mut reader)?;
+    seed.write(&mut writer)?;
     writer.flush()?;
     Ok(seed ^ seed_)
 }
@@ -45,10 +45,10 @@ pub fn receive<S>(
 where
     S: Read + Write + Send + Sync,
 {
-    let com_ = block::read_block(&mut reader)?;
-    block::write_block(&mut writer, &seed)?;
+    let com_ = Block::read(&mut reader)?;
+    seed.write(&mut writer)?;
     writer.flush()?;
-    let seed_ = block::read_block(&mut reader)?;
+    let seed_ = Block::read(&mut reader)?;
     let mut rng_ = AesRng::from_seed(seed_);
     let mut check = Block::zero();
     rng_.fill_bytes(&mut check.as_mut());

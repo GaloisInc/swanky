@@ -94,9 +94,9 @@ impl<S: Read + Write + Send + Sync, OT: ObliviousTransfer<S, Msg = Block> + Mali
             let tmp = q.mul128(χ);
             check = block::xor_two_blocks(&check, &tmp);
         }
-        let x = block::read_block(reader)?;
-        let t0 = block::read_block(reader)?;
-        let t1 = block::read_block(reader)?;
+        let x = Block::read(reader)?;
+        let t0 = Block::read(reader)?;
+        let t1 = Block::read(reader)?;
         let tmp = x.mul128(Block::from(*array_ref![δ_, 0, 16]));
         let check = block::xor_two_blocks(&check, &tmp);
         if check != (t0, t1) {
@@ -113,8 +113,8 @@ impl<S: Read + Write + Send + Sync, OT: ObliviousTransfer<S, Msg = Block> + Mali
             let y0 = self.hash.tccr_hash(j, Block::from(*array_ref![q, 0, 16])) ^ input.0;
             utils::xor_inplace(&mut q, &δ_);
             let y1 = self.hash.tccr_hash(j, Block::from(*array_ref![q, 0, 16])) ^ input.1;
-            block::write_block(&mut writer, &y0)?;
-            block::write_block(&mut writer, &y1)?;
+            y0.write(&mut writer)?;
+            y1.write(&mut writer)?;
         }
         writer.flush()?;
         Ok(())
@@ -179,17 +179,17 @@ impl<S: Read + Write + Send + Sync, OT: ObliviousTransfer<S, Msg = Block> + Mali
             let tmp = tj.mul128(χ);
             t = block::xor_two_blocks(&t, &tmp);
         }
-        block::write_block(&mut writer, &x)?;
-        block::write_block(&mut writer, &t.0)?;
-        block::write_block(&mut writer, &t.1)?;
+        x.write(&mut writer)?;
+        t.0.write(&mut writer)?;
+        t.1.write(&mut writer)?;
         writer.flush()?;
         // Output result
         let mut out = Vec::with_capacity(ncols);
         for (j, b) in inputs.iter().enumerate() {
             let range = j * nrows / 8..(j + 1) * nrows / 8;
             let t = &ts[range];
-            let y0 = block::read_block(&mut reader)?;
-            let y1 = block::read_block(&mut reader)?;
+            let y0 = Block::read(&mut reader)?;
+            let y1 = Block::read(&mut reader)?;
             let y = if *b { y1 } else { y0 };
             let y = y ^ self.hash.tccr_hash(j, Block::from(*array_ref![t, 0, 16]));
             out.push(y);

@@ -4,7 +4,6 @@
 // Copyright © 2019 Galois, Inc.
 // See LICENSE for licensing information.
 
-use crate::block;
 use crate::rand_aes::AesRng;
 use crate::stream;
 use crate::{Block, ObliviousTransfer, SemiHonest};
@@ -70,9 +69,9 @@ impl<S: Read + Write + Send + Sync> ObliviousTransfer<S> for NaorPinkasOT<S> {
             let h = Block::hash_pt(i, &(pk1 * r1));
             let e11 = h ^ input.1;
             stream::write_pt(writer, &e00)?;
-            block::write_block(writer, &e01)?;
+            e01.write(writer)?;
             stream::write_pt(writer, &e10)?;
-            block::write_block(writer, &e11)?;
+            e11.write(writer)?;
         }
         writer.flush()?;
         Ok(())
@@ -108,9 +107,9 @@ impl<S: Read + Write + Send + Sync> ObliviousTransfer<S> for NaorPinkasOT<S> {
             .enumerate()
             .map(|(i, (b, k))| {
                 let e00 = stream::read_pt(reader)?;
-                let e01 = block::read_block(reader)?;
+                let e01 = Block::read(reader)?;
                 let e10 = stream::read_pt(reader)?;
-                let e11 = block::read_block(reader)?;
+                let e11 = Block::read(reader)?;
                 let (eσ0, eσ1) = match b {
                     false => (e00, e01),
                     true => (e10, e11),
