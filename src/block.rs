@@ -14,35 +14,38 @@ use failure::Error;
 use std::io::{BufReader, BufWriter, Read, Write};
 
 /// A 128-bit chunk.
-#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
-pub struct Block([u8; 16]);
+#[derive(Clone, Copy, Debug)]
+pub struct Block(__m128i);
 
 // Fixed key for AES hash. This is the same fixed key as used in the EMP toolkit.
-pub const FIXED_KEY: Block = Block([
-    0x61, 0x7e, 0x8d, 0xa2, 0xa0, 0x51, 0x1e, 0x96, 0x5e, 0x41, 0xc2, 0x9b, 0x15, 0x3f, 0xc7, 0x7a,
-]);
+// pub const FIXED_KEY: Block = Block(unsafe {
+//     std::mem::transmute::<[u8; 16], __m128i>([
+//         0x61, 0x7e, 0x8d, 0xa2, 0xa0, 0x51, 0x1e, 0x96, 0x5e, 0x41, 0xc2, 0x9b, 0x15, 0x3f, 0xc7,
+//         0x7a,
+//     ])
+// });
 
 impl Block {
     #[inline(always)]
     pub fn as_ptr(&self) -> *const u8 {
-        self.0.as_ptr()
+        self.as_ref().as_ptr()
     }
     #[inline(always)]
     pub fn as_mut_ptr(&mut self) -> *mut u8 {
-        self.0.as_mut_ptr()
+        self.as_mut().as_mut_ptr()
     }
-    /// Outputs the all-zero block.
+    /// Output the all-zero block.
     #[inline(always)]
     pub fn zero() -> Self {
-        unsafe { Block::from(_mm_setzero_si128()) }
+        unsafe { Block(_mm_setzero_si128()) }
     }
     /// Carryless multiplication. This code is adapted from the EMP toolkit's
     /// implementation.
     #[inline(always)]
     pub fn mul128(self, rhs: Self) -> (Self, Self) {
         unsafe {
-            let x = self.into();
-            let y = rhs.into();
+            let x = self.0;
+            let y = rhs.0;
             let zero = _mm_clmulepi64_si128(x, y, 0x00);
             let one = _mm_clmulepi64_si128(x, y, 0x01);
             let two = _mm_clmulepi64_si128(x, y, 0x10);
@@ -52,9 +55,7 @@ impl Block {
             let rl = _mm_srli_si128(tmp, 8);
             let x = _mm_xor_si128(zero, ll);
             let y = _mm_xor_si128(three, rl);
-            let x = Block::from(x);
-            let y = Block::from(y);
-            (x, y)
+            (Block(x), Block(y))
         }
     }
     /// Hash an elliptic curve point `pt` by computing `E_{pt}(i)`, where `E` is
@@ -63,10 +64,33 @@ impl Block {
     pub fn hash_pt(i: usize, pt: &RistrettoPoint) -> Self {
         let k = pt.compress();
         let k = k.as_bytes();
-        let c = Aes128::new(&Block(*array_ref![k, 0, 16]));
+        let c = Aes128::new(&Block::from(*array_ref![k, 0, 16]));
         unsafe {
             let m = _mm_set_epi64(_mm_setzero_si64(), std::mem::transmute::<usize, __m64>(i));
-            c.encrypt_u8(&Block::from(m))
+            c.encrypt_u8(&Block(m))
+        }
+    }
+
+    // Fixed key for AES hash. This is the same fixed key as used in the EMP toolkit.
+    pub fn fixed_key() -> Self {
+        Block::from([
+            0x61, 0x7e, 0x8d, 0xa2, 0xa0, 0x51, 0x1e, 0x96, 0x5e, 0x41, 0xc2, 0x9b, 0x15, 0x3f,
+            0xc7, 0x7a,
+        ])
+    }
+}
+
+impl Default for Block {
+    fn default() -> Self {
+        Block::zero()
+    }
+}
+
+impl PartialEq for Block {
+    fn eq(&self, other: &Block) -> bool {
+        unsafe {
+            let neq = _mm_xor_si128(self.0, other.0);
+            _mm_test_all_zeros(neq, neq) != 0
         }
     }
 }
@@ -74,14 +98,14 @@ impl Block {
 impl AsRef<[u8]> for Block {
     #[inline(always)]
     fn as_ref(&self) -> &[u8] {
-        &self.0
+        unsafe { &*(self as *const Block as *const [u8; 16]) }
     }
 }
 
 impl AsMut<[u8]> for Block {
     #[inline(always)]
     fn as_mut(&mut self) -> &mut [u8] {
-        &mut self.0
+        unsafe { &mut *(self as *mut Block as *mut [u8; 16]) }
     }
 }
 
@@ -89,44 +113,41 @@ impl std::ops::BitXor for Block {
     type Output = Block;
     #[inline(always)]
     fn bitxor(self, rhs: Self) -> Self {
-        unsafe {
-            let z = _mm_xor_si128(self.into(), rhs.into());
-            Block::from(z)
-        }
+        unsafe { Block(_mm_xor_si128(self.0, rhs.0)) }
     }
 }
 
 impl rand::distributions::Distribution<Block> for rand::distributions::Standard {
     fn sample<R: rand::Rng + ?Sized>(&self, rng: &mut R) -> Block {
-        Block(rng.gen::<[u8; 16]>())
+        Block::from(rng.gen::<[u8; 16]>())
     }
 }
 
 impl Into<__m128i> for Block {
     #[inline(always)]
     fn into(self) -> __m128i {
-        unsafe { std::mem::transmute::<Block, __m128i>(self) }
+        self.0
     }
 }
 
 impl From<__m128i> for Block {
     #[inline(always)]
     fn from(m: __m128i) -> Self {
-        unsafe { std::mem::transmute::<__m128i, Block>(m) }
+        Block(m)
     }
 }
 
 impl Into<[u8; 16]> for Block {
     #[inline(always)]
     fn into(self) -> [u8; 16] {
-        self.0
+        unsafe { std::mem::transmute::<Block, [u8; 16]>(self) }
     }
 }
 
 impl From<[u8; 16]> for Block {
     #[inline(always)]
     fn from(m: [u8; 16]) -> Self {
-        Block(m)
+        unsafe { std::mem::transmute::<[u8; 16], Block>(m) }
     }
 }
 
@@ -135,12 +156,12 @@ pub fn write_block<T: Read + Write + Send>(
     stream: &mut BufWriter<T>,
     block: &Block,
 ) -> Result<usize, Error> {
-    stream.write(&block.0).map_err(Error::from)
+    stream.write(block.as_ref()).map_err(Error::from)
 }
 #[inline(always)]
 pub fn read_block<T: Read + Write + Send>(stream: &mut BufReader<T>) -> Result<Block, Error> {
     let mut v = Block::zero();
-    stream.read_exact(&mut v.0)?;
+    stream.read_exact(v.as_mut())?;
     Ok(v)
 }
 #[inline(always)]

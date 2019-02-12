@@ -33,7 +33,7 @@ impl<S: Read + Write + Send + Sync, OT: ObliviousTransfer<S, Msg = Block> + Mali
     fn new() -> Self {
         let ot = OT::new();
         let rng = AesRng::new();
-        let hash = AesHash::new(&block::FIXED_KEY);
+        let hash = AesHash::new(&Block::fixed_key());
         Self {
             _placeholder: PhantomData::<S>,
             ot,
