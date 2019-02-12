@@ -4,6 +4,14 @@
 // Copyright © 2019 Galois, Inc.
 // See LICENSE for licensing information.
 
+//! Implementation of a simple two-party coin tossing protocol using a PRG as a
+//! commitment.
+//!
+//! On input `seed`, the sender computes `r := PRG(seed)` and sends `r` to the
+//! receiver. It then receives `seed_` from the receiver and outputs `seed ⊕
+//! seed_`. Likewise, on input `seed`, the receiver gets `r`, sends `seed` to
+//! the sender, and then receives `seed_`, checking that `PRG(seed_) = r`.
+
 use crate::rand_aes::AesRng;
 use crate::{block, stream, Block};
 use failure::Error;
@@ -23,19 +31,9 @@ where
     rng.fill_bytes(&mut com);
     stream::write_block(writer, &com)?;
     writer.flush()?;
-    let com_ = stream::read_block(&mut reader)?;
     let seed_ = stream::read_block(&mut reader)?;
     stream::write_block(&mut writer, &seed)?;
     writer.flush()?;
-    let mut rng_ = AesRng::from_seed(seed_);
-    let mut check = block::zero_block();
-    rng_.fill_bytes(&mut check);
-    if check != com_ {
-        return Err(Error::from(std::io::Error::new(
-            ErrorKind::InvalidData,
-            "Commitment check failed",
-        )));
-    }
     Ok(block::xor_block(&seed, &seed_))
 }
 
@@ -47,11 +45,7 @@ pub fn receive<S>(
 where
     S: Read + Write + Send + Sync,
 {
-    let mut rng = AesRng::from_seed(seed);
-    let mut com = block::zero_block();
-    rng.fill_bytes(&mut com);
     let com_ = stream::read_block(&mut reader)?;
-    stream::write_block(writer, &com)?;
     stream::write_block(&mut writer, &seed)?;
     writer.flush()?;
     let seed_ = stream::read_block(&mut reader)?;

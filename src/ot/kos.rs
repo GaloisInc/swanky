@@ -6,7 +6,7 @@
 
 use crate::hash_aes::AesHash;
 use crate::rand_aes::AesRng;
-use crate::{block, commit, stream, utils};
+use crate::{block, cointoss, stream, utils};
 use crate::{Block, BlockObliviousTransfer, Malicious};
 use arrayref::array_ref;
 use failure::Error;
@@ -14,6 +14,8 @@ use rand_core::{RngCore, SeedableRng};
 use std::io::{BufReader, BufWriter, ErrorKind, Read, Write};
 use std::marker::PhantomData;
 
+/// Implementation of the Keller-Orsini-Scholl oblivious transfer extension
+/// protocol (cf. <https://eprint.iacr.org/2015/546>).
 pub struct KosOT<S: Read + Write + Send + Sync, OT: BlockObliviousTransfer<S> + Malicious> {
     _placeholder: PhantomData<S>,
     ot: OT,
@@ -78,7 +80,7 @@ impl<S: Read + Write + Send + Sync, OT: BlockObliviousTransfer<S> + Malicious>
         // Check correlation
         let mut seed = block::zero_block();
         self.rng.fill_bytes(&mut seed);
-        let seed = commit::send(reader, writer, seed)?;
+        let seed = cointoss::send(reader, writer, seed)?;
         let mut rng = AesRng::from_seed(seed);
         let mut check = (block::zero_block(), block::zero_block());
         for j in 0..ncols {
@@ -163,7 +165,7 @@ impl<S: Read + Write + Send + Sync, OT: BlockObliviousTransfer<S> + Malicious>
         // Check correlation
         let mut seed = block::zero_block();
         self.rng.fill_bytes(&mut seed);
-        let seed = commit::receive(reader, writer, seed)?;
+        let seed = cointoss::receive(reader, writer, seed)?;
         let mut rng = AesRng::from_seed(seed);
         let mut x = block::zero_block();
         let mut t = (block::zero_block(), block::zero_block());

@@ -56,6 +56,8 @@ pub fn hash_pt_block(i: usize, pt: &RistrettoPoint) -> Block {
     }
 }
 
+/// Carryless multiplication. This code is adapted from the EMP toolkit's
+/// implementation.
 #[inline(always)]
 pub fn mul128(x: Block, y: Block) -> (Block, Block) {
     unsafe {
