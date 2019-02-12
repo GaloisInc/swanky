@@ -4,10 +4,7 @@
 // Copyright © 2019 Galois, Inc.
 // See LICENSE for licensing information.
 
-//! Implementation of a random number generator based on fixed-key AES.
-//!
-//! This uses AES in a counter-mode-esque way, but with the counter always
-//! starting at zero. When used as a PRNG this is okay [TODO: citation?].
+//! Fixed-key AES random number generator.
 
 use crate::aes::Aes128;
 use crate::block;
@@ -17,6 +14,10 @@ use core::fmt;
 use rand_core::block::{BlockRng, BlockRngCore};
 use rand_core::{CryptoRng, Error, RngCore, SeedableRng};
 
+/// Implementation of a random number generator based on fixed-key AES.
+///
+/// This uses AES in a counter-mode-esque way, but with the counter always
+/// starting at zero. When used as a PRNG this is okay [TODO: citation?].
 #[derive(Clone, Debug)]
 pub struct AesRng(BlockRng<AesRngCore>);
 
@@ -62,11 +63,11 @@ impl AesRng {
     }
 }
 
-/// AES-based random number generator.
+/// The core of `AesRng`, used with `BlockRng`.
 #[derive(Clone)]
 pub struct AesRngCore {
     aes: Aes128,
-    state: u32,
+    state: u64,
 }
 
 impl fmt::Debug for AesRngCore {
@@ -82,7 +83,12 @@ impl BlockRngCore for AesRngCore {
     type Results = [u32; 4];
 
     fn generate(&mut self, results: &mut Self::Results) {
-        let data = unsafe { _mm_set_epi64(_mm_setzero_si64(), _mm_set_pi32(0, self.state as i32)) };
+        let data = unsafe {
+            _mm_set_epi64(
+                _mm_setzero_si64(),
+                std::mem::transmute::<u64, __m64>(self.state),
+            )
+        };
         let c = self.aes.encrypt_u8(&block::m128i_to_block(data));
         unsafe {
             let c = std::mem::transmute::<Block, [u32; 4]>(c);

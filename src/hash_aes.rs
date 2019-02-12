@@ -27,8 +27,7 @@ impl AesHash {
     /// Correlation robust hash function for 128-bit inputs (cf.
     /// <https://eprint.iacr.org/2019/074>, §7.2).
     ///
-    /// The function computes `π(x) ⊕ x`, where `π = AES(K, ·)` for some fixed
-    /// key `K`.
+    /// The function computes `π(x) ⊕ x`.
     #[inline(always)]
     pub fn cr_hash(&self, _i: usize, x: &Block) -> Block {
         let y = self.aes.encrypt_u8(&x);
@@ -55,6 +54,21 @@ impl AesHash {
             block::xor_block(&x, &y)
         }
     }
+
+    /// Tweakable circular correlation robust hash function (cf.
+    /// <https://eprint.iacr.org/2019/074>, §7.4).
+    ///
+    /// The function computes `π(π(x) ⊕ i) ⊕ π(x)`.
+    #[inline(always)]
+    pub fn tccr_hash(&self, i: usize, x: &Block) -> Block {
+        unsafe {
+            let y = self.aes.encrypt_u8(&x);
+            let i = _mm_set_epi64(_mm_setzero_si64(), std::mem::transmute::<usize, __m64>(i));
+            let t = _mm_xor_si128(block::block_to_m128i(&y), i);
+            let z = self.aes.encrypt_u8(&block::m128i_to_block(t));
+            block::xor_block(&y, &z)
+        }
+    }
 }
 
 #[cfg(test)]
@@ -66,16 +80,23 @@ mod benchmarks {
 
     #[bench]
     fn bench_cr_hash(b: &mut Bencher) {
-        let hash = AesHash::new(&[0u8; 16]);
-        let x = [0u8; 16];
+        let hash = AesHash::new(&block::zero_block());
+        let x = block::zero_block();
         b.iter(|| hash.cr_hash(0, &x));
     }
 
     #[bench]
     fn bench_ccr_hash(b: &mut Bencher) {
-        let hash = AesHash::new(&[0u8; 16]);
-        let x = [0u8; 16];
+        let hash = AesHash::new(&block::zero_block());
+        let x = block::zero_block();
         b.iter(|| hash.ccr_hash(0, &x));
+    }
+
+    #[bench]
+    fn bench_tccr_hash(b: &mut Bencher) {
+        let hash = AesHash::new(&block::zero_block());
+        let x = block::zero_block();
+        b.iter(|| hash.tccr_hash(0, &x));
     }
 
 }

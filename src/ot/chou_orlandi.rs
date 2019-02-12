@@ -4,9 +4,8 @@
 // Copyright © 2019 Galois, Inc.
 // See LICENSE for licensing information.
 
-use crate::block;
 use crate::rand_aes::AesRng;
-use crate::stream;
+use crate::{block, stream};
 use crate::{Block, BlockObliviousTransfer, Malicious, SemiHonest};
 use curve25519_dalek::constants::RISTRETTO_BASEPOINT_TABLE;
 use curve25519_dalek::scalar::Scalar;

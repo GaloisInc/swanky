@@ -74,6 +74,19 @@ fn bench_otext(c: &mut Criterion) {
             _bench_block_ot::<AlszOT<UnixStream, ChouOrlandiOT<UnixStream>>>(&bs, ms.clone())
         })
     });
+
+    c.bench_function("ot::KosOT", move |bench| {
+        let m0s = rand_block_vec(T);
+        let m1s = rand_block_vec(T);
+        let ms = m0s
+            .into_iter()
+            .zip(m1s.into_iter())
+            .collect::<Vec<(Block, Block)>>();
+        let bs = rand_bool_vec(T);
+        bench.iter(|| {
+            _bench_block_ot::<KosOT<UnixStream, ChouOrlandiOT<UnixStream>>>(&bs, ms.clone())
+        })
+    });
 }
 
 criterion_group! {

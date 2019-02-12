@@ -34,6 +34,15 @@ pub fn xor_block(x: &Block, y: &Block) -> Block {
     }
 }
 
+#[inline(always)]
+pub fn xor_two_blocks(x: &(Block, Block), y: &(Block, Block)) -> (Block, Block) {
+    unsafe {
+        let z0 = _mm_xor_si128(block_to_m128i(&x.0), block_to_m128i(&y.0));
+        let z1 = _mm_xor_si128(block_to_m128i(&x.1), block_to_m128i(&y.1));
+        (m128i_to_block(z0), m128i_to_block(z1))
+    }
+}
+
 /// Hash an elliptic curve point `pt` by computing `E_{pt}(i)`, where `E` is
 /// AES-128 and `i` is an index.
 #[inline(always)]
@@ -44,6 +53,26 @@ pub fn hash_pt_block(i: usize, pt: &RistrettoPoint) -> Block {
     unsafe {
         let m = _mm_set_epi64(_mm_setzero_si64(), std::mem::transmute::<usize, __m64>(i));
         c.encrypt_u8(&m128i_to_block(m))
+    }
+}
+
+#[inline(always)]
+pub fn mul128(x: Block, y: Block) -> (Block, Block) {
+    unsafe {
+        let x = std::mem::transmute::<Block, __m128i>(x);
+        let y = std::mem::transmute::<Block, __m128i>(y);
+        let zero = _mm_clmulepi64_si128(x, y, 0x00);
+        let one = _mm_clmulepi64_si128(x, y, 0x01);
+        let two = _mm_clmulepi64_si128(x, y, 0x10);
+        let three = _mm_clmulepi64_si128(x, y, 0x11);
+        let tmp = _mm_xor_si128(one, two);
+        let ll = _mm_slli_si128(tmp, 8);
+        let rl = _mm_srli_si128(tmp, 8);
+        let x = _mm_xor_si128(zero, ll);
+        let y = _mm_xor_si128(three, rl);
+        let x = std::mem::transmute::<__m128i, Block>(x);
+        let y = std::mem::transmute::<__m128i, Block>(y);
+        (x, y)
     }
 }
 

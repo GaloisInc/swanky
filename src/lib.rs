@@ -19,6 +19,7 @@
 
 mod aes;
 mod block;
+mod commit;
 mod hash_aes;
 mod ot;
 mod rand_aes;
