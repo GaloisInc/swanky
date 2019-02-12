@@ -33,7 +33,7 @@ impl<S: Read + Write + Send + Sync, OT: ObliviousTransfer<S, Msg = Block> + Mali
     fn new() -> Self {
         let ot = OT::new();
         let rng = AesRng::new();
-        let hash = AesHash::new(&super::FIXED_KEY);
+        let hash = AesHash::new(&block::FIXED_KEY);
         Self {
             _placeholder: PhantomData::<S>,
             ot,
@@ -80,27 +80,24 @@ impl<S: Read + Write + Send + Sync, OT: ObliviousTransfer<S, Msg = Block> + Mali
         }
         let mut qs = utils::transpose(&qs, nrows, ncols);
         // Check correlation
-        let mut seed = block::zero_block();
-        self.rng.fill_bytes(&mut seed);
+        let mut seed = Block::zero();
+        self.rng.fill_bytes(&mut seed.as_mut());
         let seed = cointoss::send(reader, writer, seed)?;
         let mut rng = AesRng::from_seed(seed);
-        let mut check = (block::zero_block(), block::zero_block());
+        let mut check = (Block::zero(), Block::zero());
         for j in 0..ncols {
             let range = j * nrows / 8..(j + 1) * nrows / 8;
             let q = &qs[range];
-            let q = *array_ref![q, 0, 16];
-            let mut χ = block::zero_block();
-            rng.fill_bytes(&mut χ);
+            let q = Block::from(*array_ref![q, 0, 16]);
+            let mut χ = Block::zero();
+            rng.fill_bytes(&mut χ.as_mut());
             let tmp = block::mul128(q, χ);
             check = block::xor_two_blocks(&check, &tmp);
         }
-        let mut x = block::zero_block();
-        let mut t0 = block::zero_block();
-        let mut t1 = block::zero_block();
-        stream::read_bytes_inplace(reader, &mut x)?;
-        stream::read_bytes_inplace(reader, &mut t0)?;
-        stream::read_bytes_inplace(reader, &mut t1)?;
-        let tmp = block::mul128(x, *array_ref![δ_, 0, 16]);
+        let x = block::read_block(reader)?;
+        let t0 = block::read_block(reader)?;
+        let t1 = block::read_block(reader)?;
+        let tmp = block::mul128(x, Block::from(*array_ref![δ_, 0, 16]));
         let check = block::xor_two_blocks(&check, &tmp);
         if check.0 != t0 || check.1 != t1 {
             println!("Consistency check failed!");
@@ -113,11 +110,11 @@ impl<S: Read + Write + Send + Sync, OT: ObliviousTransfer<S, Msg = Block> + Mali
         for (j, input) in inputs.iter().enumerate() {
             let range = j * nrows / 8..(j + 1) * nrows / 8;
             let mut q = &mut qs[range];
-            let y0 = block::xor_block(&self.hash.tccr_hash(j, array_ref![q, 0, 16]), &input.0);
+            let y0 = self.hash.tccr_hash(j, Block::from(*array_ref![q, 0, 16])) ^ input.0;
             utils::xor_inplace(&mut q, &δ_);
-            let y1 = block::xor_block(&self.hash.tccr_hash(j, array_ref![q, 0, 16]), &input.1);
-            stream::write_block(&mut writer, &y0)?;
-            stream::write_block(&mut writer, &y1)?;
+            let y1 = self.hash.tccr_hash(j, Block::from(*array_ref![q, 0, 16])) ^ input.1;
+            block::write_block(&mut writer, &y0)?;
+            block::write_block(&mut writer, &y1)?;
         }
         Ok(())
     }
@@ -136,17 +133,22 @@ impl<S: Read + Write + Send + Sync, OT: ObliviousTransfer<S, Msg = Block> + Mali
         let ℓ_ = ℓ + 128 + SSP;
         let (nrows, ncols) = (128, ℓ_);
         let mut ks = Vec::with_capacity(nrows);
-        let mut k0 = [0u8; 16];
-        let mut k1 = [0u8; 16];
+        let mut k0 = Block::zero();
+        let mut k1 = Block::zero();
         for _ in 0..nrows {
-            self.rng.fill_bytes(&mut k0);
-            self.rng.fill_bytes(&mut k1);
+            self.rng.fill_bytes(&mut k0.as_mut());
+            self.rng.fill_bytes(&mut k1.as_mut());
             ks.push((k0, k1));
         }
         self.ot.send(reader, writer, &ks)?;
         let rngs = ks
             .into_iter()
-            .map(|(k0, k1)| (AesRng::from_seed(k0), AesRng::from_seed(k1)))
+            .map(|(k0, k1)| {
+                (
+                    AesRng::from_seed(Block::from(k0)),
+                    AesRng::from_seed(Block::from(k1)),
+                )
+            })
             .collect::<Vec<(AesRng, AesRng)>>();
         let mut r = utils::boolvec_to_u8vec(inputs);
         r.extend((0..(ℓ_ - ℓ) / 8).map(|_| rand::random::<u8>()));
@@ -165,37 +167,37 @@ impl<S: Read + Write + Send + Sync, OT: ObliviousTransfer<S, Msg = Block> + Mali
         }
         let ts = utils::transpose(&ts, nrows, ncols);
         // Check correlation
-        let mut seed = block::zero_block();
-        self.rng.fill_bytes(&mut seed);
+        let mut seed = Block::zero();
+        self.rng.fill_bytes(&mut seed.as_mut());
         let seed = cointoss::receive(reader, writer, seed)?;
         let mut rng = AesRng::from_seed(seed);
-        let mut x = block::zero_block();
-        let mut t = (block::zero_block(), block::zero_block());
+        let mut x = Block::zero();
+        let mut t = (Block::zero(), Block::zero());
         let r_ = utils::u8vec_to_boolvec(&r);
         for (j, xj) in r_.into_iter().enumerate() {
             let range = j * nrows / 8..(j + 1) * nrows / 8;
             let tj = &ts[range];
-            let tj = *array_ref![tj, 0, 16];
-            let mut χ = block::zero_block();
-            rng.fill_bytes(&mut χ);
-            let tmp = if xj { χ } else { block::zero_block() };
-            x = block::xor_block(&x, &tmp);
+            let tj = Block::from(*array_ref![tj, 0, 16]);
+            let mut χ = Block::zero();
+            rng.fill_bytes(&mut χ.as_mut());
+            let tmp = if xj { χ } else { Block::zero() };
+            x = x ^ tmp;
             let tmp = block::mul128(tj, χ);
             t = block::xor_two_blocks(&t, &tmp);
         }
-        stream::write_bytes(&mut writer, &x)?;
-        stream::write_bytes(&mut writer, &t.0)?;
-        stream::write_bytes(&mut writer, &t.1)?;
+        block::write_block(&mut writer, &x)?;
+        block::write_block(&mut writer, &t.0)?;
+        block::write_block(&mut writer, &t.1)?;
         writer.flush()?;
         // Output result
         let mut out = Vec::with_capacity(ncols);
         for (j, b) in inputs.iter().enumerate() {
             let range = j * nrows / 8..(j + 1) * nrows / 8;
             let t = &ts[range];
-            let y0 = stream::read_block(&mut reader)?;
-            let y1 = stream::read_block(&mut reader)?;
+            let y0 = block::read_block(&mut reader)?;
+            let y1 = block::read_block(&mut reader)?;
             let y = if *b { y1 } else { y0 };
-            let y = block::xor_block(&y, &self.hash.tccr_hash(j, array_ref![t, 0, 16]));
+            let y = y ^ self.hash.tccr_hash(j, Block::from(*array_ref![t, 0, 16]));
             out.push(y);
         }
         Ok(out)

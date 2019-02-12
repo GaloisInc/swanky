@@ -13,7 +13,7 @@
 //! the sender, and then receives `seed_`, checking that `PRG(seed_) = r`.
 
 use crate::rand_aes::AesRng;
-use crate::{block, stream, Block};
+use crate::{block, Block};
 use failure::Error;
 use rand_core::{RngCore, SeedableRng};
 use std::io::{BufReader, BufWriter, ErrorKind, Read, Write};
@@ -27,14 +27,14 @@ where
     S: Read + Write + Send + Sync,
 {
     let mut rng = AesRng::from_seed(seed);
-    let mut com = block::zero_block();
-    rng.fill_bytes(&mut com);
-    stream::write_block(writer, &com)?;
+    let mut com = Block::zero();
+    rng.fill_bytes(&mut com.as_mut());
+    block::write_block(writer, &com)?;
     writer.flush()?;
-    let seed_ = stream::read_block(&mut reader)?;
-    stream::write_block(&mut writer, &seed)?;
+    let seed_ = block::read_block(&mut reader)?;
+    block::write_block(&mut writer, &seed)?;
     writer.flush()?;
-    Ok(block::xor_block(&seed, &seed_))
+    Ok(seed ^ seed_)
 }
 
 pub fn receive<S>(
@@ -45,20 +45,20 @@ pub fn receive<S>(
 where
     S: Read + Write + Send + Sync,
 {
-    let com_ = stream::read_block(&mut reader)?;
-    stream::write_block(&mut writer, &seed)?;
+    let com_ = block::read_block(&mut reader)?;
+    block::write_block(&mut writer, &seed)?;
     writer.flush()?;
-    let seed_ = stream::read_block(&mut reader)?;
+    let seed_ = block::read_block(&mut reader)?;
     let mut rng_ = AesRng::from_seed(seed_);
-    let mut check = block::zero_block();
-    rng_.fill_bytes(&mut check);
+    let mut check = Block::zero();
+    rng_.fill_bytes(&mut check.as_mut());
     if check != com_ {
         return Err(Error::from(std::io::Error::new(
             ErrorKind::InvalidData,
             "Commitment check failed",
         )));
     }
-    Ok(block::xor_block(&seed, &seed_))
+    Ok(seed ^ seed_)
 }
 
 #[cfg(test)]
@@ -76,12 +76,12 @@ mod tests {
             let mut reader = BufReader::new(sender.try_clone().unwrap());
             let mut writer = BufWriter::new(sender);
             let output = send(&mut reader, &mut writer, seed).unwrap();
-            assert_eq!(output, block::xor_block(&seed, &seed_));
+            assert_eq!(output, seed ^ seed_);
         });
         let mut reader = BufReader::new(receiver.try_clone().unwrap());
         let mut writer = BufWriter::new(receiver);
         let output_ = receive(&mut reader, &mut writer, seed_).unwrap();
-        assert_eq!(output_, block::xor_block(&seed, &seed_));
+        assert_eq!(output_, seed ^ seed_);
         handle.join().unwrap();
     }
 }

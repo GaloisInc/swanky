@@ -50,8 +50,3 @@ pub trait ObliviousTransfer<T: Read + Write + Send + Sync> {
 pub trait SemiHonest {}
 /// A marker trait denoting that the given scheme is maliciously secure.
 pub trait Malicious {}
-
-// Fixed key for AES hash. This is the same fixed key as used in the EMP toolkit.
-const FIXED_KEY: [u8; 16] = [
-    0x61, 0x7e, 0x8d, 0xa2, 0xa0, 0x51, 0x1e, 0x96, 0x5e, 0x41, 0xc2, 0x9b, 0x15, 0x3f, 0xc7, 0x7a,
-];

@@ -8,7 +8,6 @@
 //! based on fixed-key AES.
 
 use crate::aes::Aes128;
-use crate::block;
 use crate::Block;
 use core::arch::x86_64::*;
 
@@ -29,9 +28,8 @@ impl AesHash {
     ///
     /// The function computes `π(x) ⊕ x`.
     #[inline(always)]
-    pub fn cr_hash(&self, _i: usize, x: &Block) -> Block {
-        let y = self.aes.encrypt_u8(&x);
-        block::xor_block(&x, &y)
+    pub fn cr_hash(&self, _i: usize, x: Block) -> Block {
+        self.aes.encrypt_u8(&x) ^ x
     }
 
     /// Circular correlation robust hash function (cf.
@@ -40,18 +38,18 @@ impl AesHash {
     /// The function computes `H(σ(x))`, where `H` is a correlation robust hash
     /// function and `σ(x₀ || x₁) = (x₀ ⊕ x₁) || x₁`.
     #[inline(always)]
-    pub fn ccr_hash(&self, _i: usize, x: &Block) -> Block {
+    pub fn ccr_hash(&self, _i: usize, x: Block) -> Block {
         unsafe {
             let x = _mm_xor_si128(
-                _mm_shuffle_epi32(block::block_to_m128i(x), 78),
+                _mm_shuffle_epi32(x.into(), 78),
                 _mm_and_si128(
-                    block::block_to_m128i(x),
+                    x.into(),
                     _mm_set_epi64(_mm_set1_pi8(0xF), _mm_setzero_si64()),
                 ),
             );
-            let x = block::m128i_to_block(x);
+            let x = Block::from(x);
             let y = self.aes.encrypt_u8(&x);
-            block::xor_block(&x, &y)
+            x ^ y
         }
     }
 
@@ -60,13 +58,13 @@ impl AesHash {
     ///
     /// The function computes `π(π(x) ⊕ i) ⊕ π(x)`.
     #[inline(always)]
-    pub fn tccr_hash(&self, i: usize, x: &Block) -> Block {
+    pub fn tccr_hash(&self, i: usize, x: Block) -> Block {
         unsafe {
             let y = self.aes.encrypt_u8(&x);
             let i = _mm_set_epi64(_mm_setzero_si64(), std::mem::transmute::<usize, __m64>(i));
-            let t = _mm_xor_si128(block::block_to_m128i(&y), i);
-            let z = self.aes.encrypt_u8(&block::m128i_to_block(t));
-            block::xor_block(&y, &z)
+            let t = _mm_xor_si128(y.into(), i);
+            let z = self.aes.encrypt_u8(&Block::from(t));
+            y ^ z
         }
     }
 }
@@ -80,23 +78,26 @@ mod benchmarks {
 
     #[bench]
     fn bench_cr_hash(b: &mut Bencher) {
-        let hash = AesHash::new(&block::zero_block());
-        let x = block::zero_block();
-        b.iter(|| hash.cr_hash(0, &x));
+        let hash = AesHash::new(&rand::random::<Block>());
+        let x = rand::random::<Block>();
+        let i = rand::random::<usize>();
+        b.iter(|| hash.cr_hash(i, x));
     }
 
     #[bench]
     fn bench_ccr_hash(b: &mut Bencher) {
-        let hash = AesHash::new(&block::zero_block());
-        let x = block::zero_block();
-        b.iter(|| hash.ccr_hash(0, &x));
+        let hash = AesHash::new(&rand::random::<Block>());
+        let x = rand::random::<Block>();
+        let i = rand::random::<usize>();
+        b.iter(|| hash.ccr_hash(i, x));
     }
 
     #[bench]
     fn bench_tccr_hash(b: &mut Bencher) {
-        let hash = AesHash::new(&block::zero_block());
-        let x = block::zero_block();
-        b.iter(|| hash.tccr_hash(0, &x));
+        let hash = AesHash::new(&rand::random::<Block>());
+        let x = rand::random::<Block>();
+        let i = rand::random::<usize>();
+        b.iter(|| hash.tccr_hash(i, x));
     }
 
 }

@@ -6,6 +6,8 @@
 
 //! Implementation of AES-128 using Intel's AES-NI.
 
+use crate::Block;
+
 #[derive(Clone)]
 pub struct Aes128 {
     round_keys: [u8; 176],
@@ -13,7 +15,7 @@ pub struct Aes128 {
 
 impl Aes128 {
     #[inline(always)]
-    pub fn new(key: &[u8; 16]) -> Self {
+    pub fn new(key: &Block) -> Self {
         let mut rk = [0u8; 176];
         unsafe {
             asm!("
@@ -117,8 +119,8 @@ impl Aes128 {
         Aes128 { round_keys: rk }
     }
     #[inline]
-    pub fn encrypt_u8(&self, m: &[u8; 16]) -> [u8; 16] {
-        let mut c = [0u8; 16];
+    pub fn encrypt_u8(&self, m: &Block) -> Block {
+        let mut c = Block::zero();
         unsafe {
             asm!("
             movdqu ($2), %xmm1;

@@ -66,13 +66,13 @@ impl<S: Read + Write + Send + Sync> ObliviousTransfer<S> for NaorPinkasOT<S> {
             let e00 = &r0 * &RISTRETTO_BASEPOINT_TABLE;
             let e10 = &r1 * &RISTRETTO_BASEPOINT_TABLE;
             let h = block::hash_pt_block(i, &(pk0 * r0));
-            let e01 = block::xor_block(&h, &input.0);
+            let e01 = h ^ input.0;
             let h = block::hash_pt_block(i, &(pk1 * r1));
-            let e11 = block::xor_block(&h, &input.1);
+            let e11 = h ^ input.1;
             stream::write_pt(writer, &e00)?;
-            stream::write_block(writer, &e01)?;
+            block::write_block(writer, &e01)?;
             stream::write_pt(writer, &e10)?;
-            stream::write_block(writer, &e11)?;
+            block::write_block(writer, &e11)?;
         }
         writer.flush()?;
         Ok(())
@@ -108,16 +108,15 @@ impl<S: Read + Write + Send + Sync> ObliviousTransfer<S> for NaorPinkasOT<S> {
             .enumerate()
             .map(|(i, (b, k))| {
                 let e00 = stream::read_pt(reader)?;
-                let e01 = stream::read_block(reader)?;
+                let e01 = block::read_block(reader)?;
                 let e10 = stream::read_pt(reader)?;
-                let e11 = stream::read_block(reader)?;
+                let e11 = block::read_block(reader)?;
                 let (eσ0, eσ1) = match b {
                     false => (e00, e01),
                     true => (e10, e11),
                 };
                 let h = block::hash_pt_block(i, &(eσ0 * k));
-                let m = block::xor_block(&h, &eσ1);
-                Ok(m)
+                Ok(h ^ eσ1)
             })
             .collect()
     }

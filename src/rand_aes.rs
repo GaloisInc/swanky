@@ -7,8 +7,7 @@
 //! Fixed-key AES random number generator.
 
 use crate::aes::Aes128;
-use crate::block;
-use crate::block::Block;
+use crate::Block;
 use core::arch::x86_64::*;
 use core::fmt;
 use rand_core::block::{BlockRng, BlockRngCore};
@@ -89,7 +88,7 @@ impl BlockRngCore for AesRngCore {
                 std::mem::transmute::<u64, __m64>(self.state),
             )
         };
-        let c = self.aes.encrypt_u8(&block::m128i_to_block(data));
+        let c = self.aes.encrypt_u8(&Block::from(data));
         unsafe {
             let c = std::mem::transmute::<Block, [u32; 4]>(c);
             std::ptr::copy_nonoverlapping(c.as_ptr(), results.as_mut_ptr(), 16);

@@ -4,7 +4,7 @@
 // Copyright © 2019 Galois, Inc.
 // See LICENSE for licensing information.
 
-use crate::stream;
+use crate::{block, stream};
 use crate::{Block, ObliviousTransfer};
 use failure::Error;
 use std::io::{BufReader, BufWriter, Read, Write};
@@ -38,7 +38,7 @@ impl<S: Read + Write + Send + Sync> ObliviousTransfer<S> for DummyOT<S> {
         }
         for (b, m) in bs.into_iter().zip(inputs.iter()) {
             let m = if b { &m.1 } else { &m.0 };
-            stream::write_block(&mut writer, &m)?;
+            block::write_block(&mut writer, &m)?;
         }
         Ok(())
     }
@@ -54,7 +54,7 @@ impl<S: Read + Write + Send + Sync> ObliviousTransfer<S> for DummyOT<S> {
         }
         writer.flush()?;
         (0..inputs.len())
-            .map(|_| stream::read_block(reader))
+            .map(|_| block::read_block(reader))
             .collect()
     }
 }

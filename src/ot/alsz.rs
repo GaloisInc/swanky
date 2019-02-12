@@ -32,7 +32,7 @@ impl<S: Read + Write + Send + Sync, OT: ObliviousTransfer<S, Msg = Block> + Semi
     fn new() -> Self {
         let ot = OT::new();
         let rng = AesRng::new();
-        let hash = AesHash::new(&super::FIXED_KEY);
+        let hash = AesHash::new(&block::FIXED_KEY);
         Self {
             _s: PhantomData::<S>,
             ot,
@@ -80,11 +80,11 @@ impl<S: Read + Write + Send + Sync, OT: ObliviousTransfer<S, Msg = Block> + Semi
         for (j, input) in inputs.iter().enumerate() {
             let range = j * nrows / 8..(j + 1) * nrows / 8;
             let mut q = &mut qs[range];
-            let y0 = block::xor_block(&self.hash.cr_hash(j, array_ref![q, 0, 16]), &input.0);
+            let y0 = self.hash.cr_hash(j, Block::from(*array_ref![q, 0, 16])) ^ input.0;
             utils::xor_inplace(&mut q, &s_);
-            let y1 = block::xor_block(&self.hash.cr_hash(j, array_ref![q, 0, 16]), &input.1);
-            stream::write_block(&mut writer, &y0)?;
-            stream::write_block(&mut writer, &y1)?;
+            let y1 = self.hash.cr_hash(j, Block::from(*array_ref![q, 0, 16])) ^ input.1;
+            block::write_block(&mut writer, &y0)?;
+            block::write_block(&mut writer, &y1)?;
         }
         Ok(())
     }
@@ -102,17 +102,22 @@ impl<S: Read + Write + Send + Sync, OT: ObliviousTransfer<S, Msg = Block> + Semi
         }
         let (nrows, ncols) = (128, m);
         let mut ks = Vec::with_capacity(nrows);
-        let mut k0 = [0u8; 16];
-        let mut k1 = [0u8; 16];
+        let mut k0 = Block::zero();
+        let mut k1 = Block::zero();
         for _ in 0..nrows {
-            self.rng.fill_bytes(&mut k0);
-            self.rng.fill_bytes(&mut k1);
+            self.rng.fill_bytes(&mut k0.as_mut());
+            self.rng.fill_bytes(&mut k1.as_mut());
             ks.push((k0, k1));
         }
         self.ot.send(reader, writer, &ks)?;
         let rngs = ks
             .into_iter()
-            .map(|(k0, k1)| (AesRng::from_seed(k0), AesRng::from_seed(k1)))
+            .map(|(k0, k1)| {
+                (
+                    AesRng::from_seed(Block::from(k0)),
+                    AesRng::from_seed(Block::from(k1)),
+                )
+            })
             .collect::<Vec<(AesRng, AesRng)>>();
         let r = utils::boolvec_to_u8vec(inputs);
         let mut ts = vec![0u8; nrows * ncols / 8];
@@ -132,10 +137,10 @@ impl<S: Read + Write + Send + Sync, OT: ObliviousTransfer<S, Msg = Block> + Semi
         for (j, b) in inputs.iter().enumerate() {
             let range = j * nrows / 8..(j + 1) * nrows / 8;
             let t = &ts[range];
-            let y0 = stream::read_block(&mut reader)?;
-            let y1 = stream::read_block(&mut reader)?;
+            let y0 = block::read_block(&mut reader)?;
+            let y1 = block::read_block(&mut reader)?;
             let y = if *b { y1 } else { y0 };
-            let y = block::xor_block(&y, &self.hash.cr_hash(j, array_ref![t, 0, 16]));
+            let y = y ^ self.hash.cr_hash(j, Block::from(*array_ref![t, 0, 16]));
             out.push(y);
         }
         Ok(out)
