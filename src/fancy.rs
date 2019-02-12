@@ -526,9 +526,11 @@ pub trait BundleGadgets: Fancy {
     ////////////////////////////////////////////////////////////////////////////////
     // Fancy functions based on Mike's fractional mixed radix trick.
 
-    /// Helper function for advanced gadgets, returns the fractional part of `X/M` where
-    /// `M=product(ms)`.
-    fn fractional_mixed_radix(&self, ix: Option<SyncIndex>, bun: &Bundle<Self::Item>, ms: &[u16]) -> Bundle<Self::Item> {
+    /// Helper function for advanced gadgets, returns the MSB of the fractional part of
+    /// `X/M` where `M=product(ms)`.
+    fn fractional_mixed_radix(&self, ix: Option<SyncIndex>, bun: &Bundle<Self::Item>, ms: &[u16])
+        -> Self::Item
+    {
         let ndigits = ms.len();
 
         let q = util::product(&bun.moduli());
@@ -557,7 +559,7 @@ pub trait BundleGadgets: Fancy {
             ds.push(Bundle(new_ds));
         }
 
-        self.mixed_radix_addition(ix, &ds)
+        self.mixed_radix_addition_msb_only(ix, &ds)
     }
 
     /// Compute `max(x,0)`.
@@ -571,7 +573,7 @@ pub trait BundleGadgets: Fancy {
         // project the MSB to 0/1, whether or not it is less than p/2
         let p = *factors_of_m.last().unwrap();
         let mask_tt = (0..p).map(|x| (x < p/2) as u16).collect_vec();
-        let mask = self.proj(ix, res.wires().last().unwrap(), 2, Some(mask_tt));
+        let mask = self.proj(ix, &res, 2, Some(mask_tt));
 
         // use the mask to either output x or 0
         let z = output_moduli
@@ -591,7 +593,7 @@ pub trait BundleGadgets: Fancy {
         let res = self.fractional_mixed_radix(ix, x, factors_of_m);
         let p = *factors_of_m.last().unwrap();
         let tt = (0..p).map(|x| (x >= p/2) as u16).collect_vec();
-        self.proj(ix, res.wires().last().unwrap(), 2, Some(tt))
+        self.proj(ix, &res, 2, Some(tt))
     }
 
     /// Return `if x >= 0 then 1 else -1`, where `-1` is interpreted as `Q-1`.
@@ -792,40 +794,41 @@ fn get_ms<W: Clone + HasModulus>(x: &Bundle<W>, accuracy: &str) -> Vec<u16> {
                 3 => vec![2;5],
                 4 => vec![3,26],
                 5 => vec![3,4,54],
-                6 => vec![5,5,6,50],
-                7 => vec![6,6,7,7,74],
+                6 => vec![5,5,5,60],
+                7 => vec![5,6,6,7,86],
                 8 => vec![5,7,8,8,9,98],
-                9 => vec![4,7,10,10,10,10,134],
-                10 => vec![4,7,10,10,10,11,14,212],
-                11 => vec![6,10,11,11,11,12,13,15,214],
+                9 => vec![5,5,7,7,7,7,7,76],
+                10 => vec![5,5,6,6,6,6,11,11,202],
+                11 => vec![5,5,5,5,5,6,6,6,7,7,8,150],
                 n => panic!("unknown exact Ms for {} primes!", n),
             }
         }
         "99.999%" => {
             match x.moduli().len() {
-                8 => vec![3,6,8,8,100],
-                9 => vec![7,9,11,170],
-                10 => vec![8,9,10,182],
-                11 => vec![7,10,11,174],
+                8 => vec![5,5,6,7,102],
+                9 => vec![5,5,6,7,114],
+                10 => vec![5,6,6,7,102],
+                11 => vec![5,5,6,7,130],
                 n => panic!("unknown 99.999% accurate Ms for {} primes!", n),
             }
         }
         "99.99%" => {
             match x.moduli().len() {
-                6 => vec![4,5,6,46],
-                7 => vec![4,6,7,62],
-                8 => vec![3,6,8,88],
-                9 => vec![7,9,190],
-                10 => vec![8,10,168],
+                6 => vec![5,5,5,42],
+                7 => vec![4,5,6,88],
+                8 => vec![4,5,7,78],
+                9 => vec![5,5,6,84],
+                10 => vec![4,5,6,112],
+                11 => vec![7,11,174],
                 n => panic!("unknown 99.99% accurate Ms for {} primes!", n),
             }
         }
         "99.9%" => {
             match x.moduli().len() {
-                5 => vec![7,58],
+                5 => vec![3,5,30],
                 6 => vec![4,5,48],
-                7 => vec![3,5,78],
-                8 => vec![3,6,70],
+                7 => vec![4,5,60],
+                8 => vec![3,5,78],
                 9 => vec![9,140],
                 10 => vec![7,190],
                 n => panic!("unknown 99.9% accurate Ms for {} primes!", n),
@@ -836,7 +839,7 @@ fn get_ms<W: Clone + HasModulus>(x: &Bundle<W>, accuracy: &str) -> Vec<u16> {
                 4 => vec![3,18],
                 5 => vec![3,36],
                 6 => vec![3,40],
-                7 => vec![2,60],
+                7 => vec![3,40],
                 8 => vec![126],
                 9 => vec![138],
                 10 => vec![140],
