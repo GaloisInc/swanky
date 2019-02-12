@@ -17,6 +17,11 @@ use std::io::{BufReader, BufWriter, Read, Write};
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub struct Block([u8; 16]);
 
+// Fixed key for AES hash. This is the same fixed key as used in the EMP toolkit.
+pub const FIXED_KEY: Block = Block([
+    0x61, 0x7e, 0x8d, 0xa2, 0xa0, 0x51, 0x1e, 0x96, 0x5e, 0x41, 0xc2, 0x9b, 0x15, 0x3f, 0xc7, 0x7a,
+]);
+
 impl Block {
     #[inline(always)]
     pub fn as_ptr(&self) -> *const u8 {
@@ -26,9 +31,43 @@ impl Block {
     pub fn as_mut_ptr(&mut self) -> *mut u8 {
         self.0.as_mut_ptr()
     }
+    /// Outputs the all-zero block.
     #[inline(always)]
     pub fn zero() -> Self {
         unsafe { Block::from(_mm_setzero_si128()) }
+    }
+    /// Carryless multiplication. This code is adapted from the EMP toolkit's
+    /// implementation.
+    #[inline(always)]
+    pub fn mul128(self, rhs: Self) -> (Self, Self) {
+        unsafe {
+            let x = self.into();
+            let y = rhs.into();
+            let zero = _mm_clmulepi64_si128(x, y, 0x00);
+            let one = _mm_clmulepi64_si128(x, y, 0x01);
+            let two = _mm_clmulepi64_si128(x, y, 0x10);
+            let three = _mm_clmulepi64_si128(x, y, 0x11);
+            let tmp = _mm_xor_si128(one, two);
+            let ll = _mm_slli_si128(tmp, 8);
+            let rl = _mm_srli_si128(tmp, 8);
+            let x = _mm_xor_si128(zero, ll);
+            let y = _mm_xor_si128(three, rl);
+            let x = Block::from(x);
+            let y = Block::from(y);
+            (x, y)
+        }
+    }
+    /// Hash an elliptic curve point `pt` by computing `E_{pt}(i)`, where `E` is
+    /// AES-128 and `i` is an index.
+    #[inline(always)]
+    pub fn hash_pt(i: usize, pt: &RistrettoPoint) -> Self {
+        let k = pt.compress();
+        let k = k.as_bytes();
+        let c = Aes128::new(&Block(*array_ref![k, 0, 16]));
+        unsafe {
+            let m = _mm_set_epi64(_mm_setzero_si64(), std::mem::transmute::<usize, __m64>(i));
+            c.encrypt_u8(&Block::from(m))
+        }
     }
 }
 
@@ -63,25 +102,6 @@ impl rand::distributions::Distribution<Block> for rand::distributions::Standard 
     }
 }
 
-// Fixed key for AES hash. This is the same fixed key as used in the EMP toolkit.
-pub const FIXED_KEY: Block = Block([
-    0x61, 0x7e, 0x8d, 0xa2, 0xa0, 0x51, 0x1e, 0x96, 0x5e, 0x41, 0xc2, 0x9b, 0x15, 0x3f, 0xc7, 0x7a,
-]);
-
-#[inline(always)]
-pub fn write_block<T: Read + Write + Send>(
-    stream: &mut BufWriter<T>,
-    block: &Block,
-) -> Result<usize, Error> {
-    stream.write(&block.0).map_err(Error::from)
-}
-#[inline(always)]
-pub fn read_block<T: Read + Write + Send>(stream: &mut BufReader<T>) -> Result<Block, Error> {
-    let mut v = Block::zero();
-    stream.read_exact(&mut v.0)?;
-    Ok(v)
-}
-
 impl Into<__m128i> for Block {
     #[inline(always)]
     fn into(self) -> __m128i {
@@ -111,47 +131,21 @@ impl From<[u8; 16]> for Block {
 }
 
 #[inline(always)]
+pub fn write_block<T: Read + Write + Send>(
+    stream: &mut BufWriter<T>,
+    block: &Block,
+) -> Result<usize, Error> {
+    stream.write(&block.0).map_err(Error::from)
+}
+#[inline(always)]
+pub fn read_block<T: Read + Write + Send>(stream: &mut BufReader<T>) -> Result<Block, Error> {
+    let mut v = Block::zero();
+    stream.read_exact(&mut v.0)?;
+    Ok(v)
+}
+#[inline(always)]
 pub fn xor_two_blocks(x: &(Block, Block), y: &(Block, Block)) -> (Block, Block) {
-    unsafe {
-        let z0 = _mm_xor_si128(x.0.into(), y.0.into());
-        let z1 = _mm_xor_si128(x.1.into(), y.1.into());
-        (Block::from(z0), Block::from(z1))
-    }
-}
-
-/// Hash an elliptic curve point `pt` by computing `E_{pt}(i)`, where `E` is
-/// AES-128 and `i` is an index.
-#[inline(always)]
-pub fn hash_pt_block(i: usize, pt: &RistrettoPoint) -> Block {
-    let k = pt.compress();
-    let k = k.as_bytes();
-    let c = Aes128::new(&Block(*array_ref![k, 0, 16]));
-    unsafe {
-        let m = _mm_set_epi64(_mm_setzero_si64(), std::mem::transmute::<usize, __m64>(i));
-        c.encrypt_u8(&Block::from(m))
-    }
-}
-
-/// Carryless multiplication. This code is adapted from the EMP toolkit's
-/// implementation.
-#[inline(always)]
-pub fn mul128(x: Block, y: Block) -> (Block, Block) {
-    unsafe {
-        let x = std::mem::transmute::<Block, __m128i>(x);
-        let y = std::mem::transmute::<Block, __m128i>(y);
-        let zero = _mm_clmulepi64_si128(x, y, 0x00);
-        let one = _mm_clmulepi64_si128(x, y, 0x01);
-        let two = _mm_clmulepi64_si128(x, y, 0x10);
-        let three = _mm_clmulepi64_si128(x, y, 0x11);
-        let tmp = _mm_xor_si128(one, two);
-        let ll = _mm_slli_si128(tmp, 8);
-        let rl = _mm_srli_si128(tmp, 8);
-        let x = _mm_xor_si128(zero, ll);
-        let y = _mm_xor_si128(three, rl);
-        let x = std::mem::transmute::<__m128i, Block>(x);
-        let y = std::mem::transmute::<__m128i, Block>(y);
-        (x, y)
-    }
+    (x.0 ^ y.0, x.1 ^ y.1)
 }
 
 #[cfg(test)]
@@ -179,7 +173,7 @@ mod benchamarks {
     fn bench_hash_pt_block(b: &mut Bencher) {
         let pt = RistrettoPoint::random(&mut rand::thread_rng());
         let i = rand::random::<usize>();
-        b.iter(|| hash_pt_block(i, &pt));
+        b.iter(|| Block::hash_pt(i, &pt));
     }
 
     #[bench]
@@ -193,6 +187,6 @@ mod benchamarks {
     fn bench_mul128(b: &mut Bencher) {
         let x = rand::random::<Block>();
         let y = rand::random::<Block>();
-        b.iter(|| mul128(x, y));
+        b.iter(|| x.mul128(y));
     }
 }

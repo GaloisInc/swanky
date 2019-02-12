@@ -62,6 +62,12 @@ impl AesRng {
     }
 }
 
+impl Default for AesRng {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 /// The core of `AesRng`, used with `BlockRng`.
 #[derive(Clone)]
 pub struct AesRngCore {

@@ -4,8 +4,6 @@
 // Copyright © 2019 Galois, Inc.
 // See LICENSE for licensing information.
 
-// use crate::block;
-// use crate::Block;
 use curve25519_dalek::ristretto::{CompressedRistretto, RistrettoPoint};
 use failure::Error;
 use std::io::Error as IOError;
@@ -54,12 +52,6 @@ pub fn write_bytes<T: Read + Write + Send>(
 ) -> Result<usize, Error> {
     stream.write(bytes).map_err(Error::from)
 }
-// #[inline(always)]
-// pub fn read_bytes<T: Read + Write + Send>(stream: &mut T, nbytes: usize) -> Result<Vec<u8>, Error> {
-//     let mut v = vec![0; nbytes];
-//     stream.read_exact(&mut v)?;
-//     Ok(v)
-// }
 #[inline(always)]
 pub fn read_bytes_inplace<T: Read + Write + Send>(
     stream: &mut BufReader<T>,

@@ -12,6 +12,7 @@
 //!
 //! **THIS IS VERY MUCH RESEARCH CODE!** (for now)
 
+#![allow(clippy::many_single_char_names)]
 #![feature(non_ascii_idents)]
 #![feature(test)]
 #![feature(stdsimd)]

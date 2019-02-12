@@ -55,7 +55,7 @@ impl<S: Read + Write + Send + Sync> ObliviousTransfer<S> for NaorPinkasOT<S> {
             pk0s.push(pk0);
         }
         for (i, ((input, c), pk0)) in inputs
-            .into_iter()
+            .iter()
             .zip(cs.into_iter())
             .zip(pk0s.into_iter())
             .enumerate()
@@ -65,9 +65,9 @@ impl<S: Read + Write + Send + Sync> ObliviousTransfer<S> for NaorPinkasOT<S> {
             let r1 = Scalar::random(&mut self.rng);
             let e00 = &r0 * &RISTRETTO_BASEPOINT_TABLE;
             let e10 = &r1 * &RISTRETTO_BASEPOINT_TABLE;
-            let h = block::hash_pt_block(i, &(pk0 * r0));
+            let h = Block::hash_pt(i, &(pk0 * r0));
             let e01 = h ^ input.0;
-            let h = block::hash_pt_block(i, &(pk1 * r1));
+            let h = Block::hash_pt(i, &(pk1 * r1));
             let e11 = h ^ input.1;
             stream::write_pt(writer, &e00)?;
             block::write_block(writer, &e01)?;
@@ -91,7 +91,7 @@ impl<S: Read + Write + Send + Sync> ObliviousTransfer<S> for NaorPinkasOT<S> {
             let c = stream::read_pt(reader)?;
             cs.push(c);
         }
-        for (b, c) in inputs.into_iter().zip(cs.into_iter()) {
+        for (b, c) in inputs.iter().zip(cs.into_iter()) {
             let k = Scalar::random(&mut self.rng);
             let pkσ = &k * &RISTRETTO_BASEPOINT_TABLE;
             let pkσ_ = c - pkσ;
@@ -103,7 +103,7 @@ impl<S: Read + Write + Send + Sync> ObliviousTransfer<S> for NaorPinkasOT<S> {
         }
         writer.flush()?;
         inputs
-            .into_iter()
+            .iter()
             .zip(ks.into_iter())
             .enumerate()
             .map(|(i, (b, k))| {
@@ -115,7 +115,7 @@ impl<S: Read + Write + Send + Sync> ObliviousTransfer<S> for NaorPinkasOT<S> {
                     false => (e00, e01),
                     true => (e10, e11),
                 };
-                let h = block::hash_pt_block(i, &(eσ0 * k));
+                let h = Block::hash_pt(i, &(eσ0 * k));
                 Ok(h ^ eσ1)
             })
             .collect()

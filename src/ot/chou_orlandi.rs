@@ -55,9 +55,9 @@ impl<S: Read + Write + Send + Sync> ObliviousTransfer<S> for ChouOrlandiOT<S> {
             let r = stream::read_pt(reader)?;
             rs.push(r);
         }
-        for (i, (input, r)) in inputs.into_iter().zip(rs.into_iter()).enumerate() {
-            let k0 = block::hash_pt_block(i, &(r * y));
-            let k1 = block::hash_pt_block(i, &((r - s) * y));
+        for (i, (input, r)) in inputs.iter().zip(rs.into_iter()).enumerate() {
+            let k0 = Block::hash_pt(i, &(r * y));
+            let k1 = Block::hash_pt(i, &((r - s) * y));
             let c0 = k0 ^ input.0;
             let c1 = k1 ^ input.1;
             block::write_block(writer, &c0)?;
@@ -84,11 +84,11 @@ impl<S: Read + Write + Send + Sync> ObliviousTransfer<S> for ChouOrlandiOT<S> {
         }
         writer.flush()?;
         inputs
-            .into_iter()
+            .iter()
             .zip(xs.into_iter())
             .enumerate()
             .map(|(i, (b, x))| {
-                let k = block::hash_pt_block(i, &(x * s));
+                let k = Block::hash_pt(i, &(x * s));
                 let c0 = block::read_block(reader)?;
                 let c1 = block::read_block(reader)?;
                 let c = if *b { c1 } else { c0 };

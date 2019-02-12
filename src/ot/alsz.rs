@@ -112,12 +112,7 @@ impl<S: Read + Write + Send + Sync, OT: ObliviousTransfer<S, Msg = Block> + Semi
         self.ot.send(reader, writer, &ks)?;
         let rngs = ks
             .into_iter()
-            .map(|(k0, k1)| {
-                (
-                    AesRng::from_seed(Block::from(k0)),
-                    AesRng::from_seed(Block::from(k1)),
-                )
-            })
+            .map(|(k0, k1)| (AesRng::from_seed(k0), AesRng::from_seed(k1)))
             .collect::<Vec<(AesRng, AesRng)>>();
         let r = utils::boolvec_to_u8vec(inputs);
         let mut ts = vec![0u8; nrows * ncols / 8];
