@@ -7,28 +7,30 @@
 use crate::stream;
 use crate::{Block, ObliviousTransfer};
 use failure::Error;
-use std::io::{BufReader, BufWriter, Read, Write};
+use std::io::{Read, Write};
 use std::marker::PhantomData;
 
 /// Implementation if an **entirely insecure** oblivious transfer protocol for
 /// testing purposes.
-pub struct DummyOT<S: Read + Write + Send + Sync> {
-    _placeholder: PhantomData<S>,
+pub struct DummyOT<R: Read, W: Write> {
+    _r: PhantomData<R>,
+    _w: PhantomData<W>,
 }
 
-impl<S: Read + Write + Send + Sync> ObliviousTransfer<S> for DummyOT<S> {
+impl<R: Read, W: Write> ObliviousTransfer<R, W> for DummyOT<R, W> {
     type Msg = Block;
 
     fn new() -> Self {
         Self {
-            _placeholder: PhantomData::<S>,
+            _r: PhantomData::<R>,
+            _w: PhantomData::<W>,
         }
     }
 
     fn send(
         &mut self,
-        mut reader: &mut BufReader<S>,
-        mut writer: &mut BufWriter<S>,
+        mut reader: &mut R,
+        mut writer: &mut W,
         inputs: &[(Block, Block)],
     ) -> Result<(), Error> {
         let mut bs = Vec::with_capacity(inputs.len());
@@ -37,7 +39,7 @@ impl<S: Read + Write + Send + Sync> ObliviousTransfer<S> for DummyOT<S> {
             bs.push(b);
         }
         for (b, m) in bs.into_iter().zip(inputs.iter()) {
-            let m = if b { &m.1 } else { &m.0 };
+            let m = if b { m.1 } else { m.0 };
             m.write(&mut writer)?;
         }
         Ok(())
@@ -45,8 +47,8 @@ impl<S: Read + Write + Send + Sync> ObliviousTransfer<S> for DummyOT<S> {
 
     fn receive(
         &mut self,
-        reader: &mut BufReader<S>,
-        writer: &mut BufWriter<S>,
+        reader: &mut R,
+        writer: &mut W,
         inputs: &[bool],
     ) -> Result<Vec<Block>, Error> {
         for b in inputs.iter() {
@@ -61,6 +63,7 @@ impl<S: Read + Write + Send + Sync> ObliviousTransfer<S> for DummyOT<S> {
 mod tests {
     extern crate test;
     use super::*;
+    use std::io::{BufReader, BufWriter};
     use std::os::unix::net::UnixStream;
 
     #[test]

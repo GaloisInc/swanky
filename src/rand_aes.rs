@@ -88,15 +88,10 @@ impl BlockRngCore for AesRngCore {
     type Results = [u32; 4];
 
     fn generate(&mut self, results: &mut Self::Results) {
-        let data = unsafe {
-            _mm_set_epi64(
-                _mm_setzero_si64(),
-                std::mem::transmute::<u64, __m64>(self.state),
-            )
-        };
+        let data = unsafe { _mm_set_epi64(_mm_setzero_si64(), std::mem::transmute(self.state)) };
         let c = self.aes.encrypt_u8(&Block::from(data));
         unsafe {
-            let c = std::mem::transmute::<Block, [u32; 4]>(c);
+            let c: Self::Results = std::mem::transmute(c.0);
             std::ptr::copy_nonoverlapping(c.as_ptr(), results.as_mut_ptr(), 16);
         };
         self.state = self.state.wrapping_add(1);
@@ -122,7 +117,20 @@ impl From<AesRngCore> for AesRng {
 }
 
 #[cfg(test)]
-mod benchamarks {
+mod tests {
+    extern crate test;
+
+    use super::*;
+    use curve25519_dalek::scalar::Scalar;
+
+    #[test]
+    fn test_scalar_sample() {
+        let _ = Scalar::random(&mut AesRng::new());
+    }
+}
+
+#[cfg(test)]
+mod benchmarks {
     extern crate test;
 
     use super::*;

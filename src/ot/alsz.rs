@@ -11,21 +11,21 @@ use crate::{Block, ObliviousTransfer, SemiHonest};
 use arrayref::array_ref;
 use failure::Error;
 use rand_core::{RngCore, SeedableRng};
-use std::io::{BufReader, BufWriter, ErrorKind, Read, Write};
+use std::io::{ErrorKind, Read, Write};
 use std::marker::PhantomData;
 
 /// Implementation of the Asharov-Lindell-Schneider-Zohner oblivious transfer
 /// extension protocol (cf. <https://eprint.iacr.org/2016/602>, Protocol 4).
-pub struct AlszOT<S: Read + Write + Send + Sync, OT: ObliviousTransfer<S, Msg = Block> + SemiHonest>
-{
-    _s: PhantomData<S>,
+pub struct AlszOT<R: Read, W: Write, OT: ObliviousTransfer<R, W, Msg = Block> + SemiHonest> {
+    _r: PhantomData<R>,
+    _w: PhantomData<W>,
     ot: OT,
     rng: AesRng,
     hash: AesHash,
 }
 
-impl<S: Read + Write + Send + Sync, OT: ObliviousTransfer<S, Msg = Block> + SemiHonest>
-    ObliviousTransfer<S> for AlszOT<S, OT>
+impl<R: Read, W: Write, OT: ObliviousTransfer<R, W, Msg = Block> + SemiHonest>
+    ObliviousTransfer<R, W> for AlszOT<R, W, OT>
 {
     type Msg = Block;
 
@@ -34,7 +34,8 @@ impl<S: Read + Write + Send + Sync, OT: ObliviousTransfer<S, Msg = Block> + Semi
         let rng = AesRng::new();
         let hash = AesHash::new(&Block::fixed_key());
         Self {
-            _s: PhantomData::<S>,
+            _r: PhantomData::<R>,
+            _w: PhantomData::<W>,
             ot,
             rng,
             hash,
@@ -43,8 +44,8 @@ impl<S: Read + Write + Send + Sync, OT: ObliviousTransfer<S, Msg = Block> + Semi
 
     fn send(
         &mut self,
-        reader: &mut BufReader<S>,
-        mut writer: &mut BufWriter<S>,
+        reader: &mut R,
+        mut writer: &mut W,
         inputs: &[(Block, Block)],
     ) -> Result<(), Error> {
         let m = inputs.len();
@@ -92,8 +93,8 @@ impl<S: Read + Write + Send + Sync, OT: ObliviousTransfer<S, Msg = Block> + Semi
 
     fn receive(
         &mut self,
-        mut reader: &mut BufReader<S>,
-        mut writer: &mut BufWriter<S>,
+        mut reader: &mut R,
+        mut writer: &mut W,
         inputs: &[bool],
     ) -> Result<Vec<Self::Msg>, Error> {
         let m = inputs.len();
@@ -143,8 +144,8 @@ impl<S: Read + Write + Send + Sync, OT: ObliviousTransfer<S, Msg = Block> + Semi
     }
 }
 
-impl<S: Read + Write + Send + Sync, OT: ObliviousTransfer<S, Msg = Block> + SemiHonest> SemiHonest
-    for AlszOT<S, OT>
+impl<R: Read + Send, W: Write + Send, OT: ObliviousTransfer<R, W, Msg = Block> + SemiHonest>
+    SemiHonest for AlszOT<R, W, OT>
 {
 }
 
@@ -154,6 +155,7 @@ mod tests {
     use super::*;
     use crate::*;
     use itertools::izip;
+    use std::io::{BufReader, BufWriter};
     use std::os::unix::net::UnixStream;
 
     const T: usize = 1 << 12;
@@ -166,7 +168,8 @@ mod tests {
         (0..size).map(|_| rand::random::<bool>()).collect()
     }
 
-    fn test_ot<OT: ObliviousTransfer<UnixStream, Msg = Block> + SemiHonest>() {
+    #[test]
+    fn test() {
         let m0s = rand_block_vec(T);
         let m1s = rand_block_vec(T);
         let bs = rand_bool_vec(T);
@@ -175,7 +178,11 @@ mod tests {
         let bs_ = bs.clone();
         let (sender, receiver) = UnixStream::pair().unwrap();
         let handle = std::thread::spawn(move || {
-            let mut otext = AlszOT::<UnixStream, OT>::new();
+            let mut otext = AlszOT::<
+                BufReader<UnixStream>,
+                BufWriter<UnixStream>,
+                ChouOrlandiOT<BufReader<UnixStream>, BufWriter<UnixStream>>,
+            >::new();
             let mut reader = BufReader::new(sender.try_clone().unwrap());
             let mut writer = BufWriter::new(sender);
             let ms = m0s
@@ -184,7 +191,11 @@ mod tests {
                 .collect::<Vec<(Block, Block)>>();
             otext.send(&mut reader, &mut writer, &ms).unwrap();
         });
-        let mut otext = AlszOT::<UnixStream, OT>::new();
+        let mut otext = AlszOT::<
+            BufReader<UnixStream>,
+            BufWriter<UnixStream>,
+            ChouOrlandiOT<BufReader<UnixStream>, BufWriter<UnixStream>>,
+        >::new();
         let mut reader = BufReader::new(receiver.try_clone().unwrap());
         let mut writer = BufWriter::new(receiver);
         let results = otext.receive(&mut reader, &mut writer, &bs).unwrap();
@@ -192,10 +203,5 @@ mod tests {
             assert_eq!(result, if b { m1 } else { m0 })
         }
         handle.join().unwrap();
-    }
-
-    #[test]
-    fn test() {
-        test_ot::<ChouOrlandiOT<UnixStream>>();
     }
 }

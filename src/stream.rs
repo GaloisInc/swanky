@@ -7,18 +7,15 @@
 use curve25519_dalek::ristretto::{CompressedRistretto, RistrettoPoint};
 use failure::Error;
 use std::io::Error as IOError;
-use std::io::{BufReader, BufWriter, ErrorKind, Read, Write};
+use std::io::{ErrorKind, Read, Write};
 
 #[inline(always)]
-pub fn write_pt<T: Read + Write + Send>(
-    stream: &mut BufWriter<T>,
-    pt: &RistrettoPoint,
-) -> Result<usize, Error> {
+pub fn write_pt<T: Write>(stream: &mut T, pt: &RistrettoPoint) -> Result<usize, Error> {
     stream.write(pt.compress().as_bytes()).map_err(Error::from)
 }
 
 #[inline(always)]
-pub fn read_pt<T: Read + Write + Send>(stream: &mut BufReader<T>) -> Result<RistrettoPoint, Error> {
+pub fn read_pt<T: Read>(stream: &mut T) -> Result<RistrettoPoint, Error> {
     let mut data = [0u8; 32];
     stream.read_exact(&mut data)?;
     let pt = match CompressedRistretto::from_slice(&data).decompress() {
@@ -32,31 +29,26 @@ pub fn read_pt<T: Read + Write + Send>(stream: &mut BufReader<T>) -> Result<Rist
     };
     Ok(pt)
 }
+
 #[inline(always)]
-pub fn write_bool<T: Read + Write + Send>(
-    stream: &mut BufWriter<T>,
-    b: bool,
-) -> Result<usize, Error> {
+pub fn write_bool<T: Write>(stream: &mut T, b: bool) -> Result<usize, Error> {
     stream.write(&[b as u8]).map_err(Error::from)
 }
+
 #[inline(always)]
-pub fn read_bool<T: Read + Write + Send>(stream: &mut BufReader<T>) -> Result<bool, Error> {
+pub fn read_bool<T: Read>(stream: &mut T) -> Result<bool, Error> {
     let mut data = [0u8; 1];
     stream.read_exact(&mut data)?;
     Ok(data[0] != 0)
 }
+
 #[inline(always)]
-pub fn write_bytes<T: Read + Write + Send>(
-    stream: &mut BufWriter<T>,
-    bytes: &[u8],
-) -> Result<usize, Error> {
+pub fn write_bytes<T: Write>(stream: &mut T, bytes: &[u8]) -> Result<usize, Error> {
     stream.write(bytes).map_err(Error::from)
 }
+
 #[inline(always)]
-pub fn read_bytes_inplace<T: Read + Write + Send>(
-    stream: &mut BufReader<T>,
-    mut bytes: &mut [u8],
-) -> Result<(), Error> {
+pub fn read_bytes_inplace<T: Read>(stream: &mut T, mut bytes: &mut [u8]) -> Result<(), Error> {
     stream.read_exact(&mut bytes)?;
     Ok(())
 }

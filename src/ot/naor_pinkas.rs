@@ -11,33 +11,36 @@ use curve25519_dalek::constants::RISTRETTO_BASEPOINT_TABLE;
 use curve25519_dalek::ristretto::RistrettoPoint;
 use curve25519_dalek::scalar::Scalar;
 use failure::Error;
-use std::io::{BufReader, BufWriter, Read, Write};
+use rand::rngs::ThreadRng;
+use std::io::{Read, Write};
 use std::marker::PhantomData;
 
 /// Implementation of the Naor-Pinkas oblivious transfer protocol.
 ///
 /// This implementation uses the Ristretto prime order elliptic curve group from
 /// the `curve25519-dalek` library.
-pub struct NaorPinkasOT<S: Read + Write + Send + Sync> {
-    _placeholder: PhantomData<S>,
-    rng: AesRng,
+pub struct NaorPinkasOT<R: Read, W: Write> {
+    _r: PhantomData<R>,
+    _w: PhantomData<W>,
+    rng: ThreadRng,
 }
 
-impl<S: Read + Write + Send + Sync> ObliviousTransfer<S> for NaorPinkasOT<S> {
+impl<R: Read + Send, W: Write + Send> ObliviousTransfer<R, W> for NaorPinkasOT<R, W> {
     type Msg = Block;
 
     fn new() -> Self {
-        let rng = AesRng::new();
+        let rng = rand::thread_rng();
         Self {
-            _placeholder: PhantomData::<S>,
+            _r: PhantomData::<R>,
+            _w: PhantomData::<W>,
             rng,
         }
     }
 
     fn send(
         &mut self,
-        reader: &mut BufReader<S>,
-        writer: &mut BufWriter<S>,
+        reader: &mut R,
+        writer: &mut W,
         inputs: &[(Block, Block)],
     ) -> Result<(), Error> {
         let m = inputs.len();
@@ -79,8 +82,8 @@ impl<S: Read + Write + Send + Sync> ObliviousTransfer<S> for NaorPinkasOT<S> {
 
     fn receive(
         &mut self,
-        reader: &mut BufReader<S>,
-        writer: &mut BufWriter<S>,
+        reader: &mut R,
+        writer: &mut W,
         inputs: &[bool],
     ) -> Result<Vec<Block>, Error> {
         let m = inputs.len();
@@ -121,12 +124,13 @@ impl<S: Read + Write + Send + Sync> ObliviousTransfer<S> for NaorPinkasOT<S> {
     }
 }
 
-impl<S: Read + Write + Send + Sync> SemiHonest for NaorPinkasOT<S> {}
+impl<R: Read, W: Write> SemiHonest for NaorPinkasOT<R, W> {}
 
 #[cfg(test)]
 mod tests {
     extern crate test;
     use super::*;
+    use std::io::{BufReader, BufWriter};
     use std::os::unix::net::UnixStream;
 
     #[test]

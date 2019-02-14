@@ -10,7 +10,8 @@ use crate::{Block, Malicious, ObliviousTransfer, SemiHonest};
 use curve25519_dalek::constants::RISTRETTO_BASEPOINT_TABLE;
 use curve25519_dalek::scalar::Scalar;
 use failure::Error;
-use std::io::{BufReader, BufWriter, Read, Write};
+use rand::rngs::ThreadRng;
+use std::io::{Read, Write};
 use std::marker::PhantomData;
 
 /// Implementation of the Chou-Orlandi oblivious transfer protocol (cf.
@@ -24,26 +25,28 @@ use std::marker::PhantomData;
 /// value `x^i` produced by the receiver is not randomized, all the random-OTs
 /// produced by the protocol will be the same. We fix this by hashing in `i`
 /// during the key derivation phase.
-pub struct ChouOrlandiOT<S: Read + Write + Send + Sync> {
-    _placeholder: PhantomData<S>,
-    rng: AesRng,
+pub struct ChouOrlandiOT<R: Read, W: Write> {
+    _r: PhantomData<R>,
+    _w: PhantomData<W>,
+    rng: ThreadRng, // XXX Using AesRng here causes a seg-fault on a call to Scalar::random !?
 }
 
-impl<S: Read + Write + Send + Sync> ObliviousTransfer<S> for ChouOrlandiOT<S> {
+impl<R: Read + Send, W: Write + Send> ObliviousTransfer<R, W> for ChouOrlandiOT<R, W> {
     type Msg = Block;
 
     fn new() -> Self {
-        let rng = AesRng::new();
+        let rng = rand::thread_rng();
         Self {
-            _placeholder: PhantomData::<S>,
+            _r: PhantomData::<R>,
+            _w: PhantomData::<W>,
             rng,
         }
     }
 
     fn send(
         &mut self,
-        reader: &mut BufReader<S>,
-        writer: &mut BufWriter<S>,
+        reader: &mut R,
+        writer: &mut W,
         inputs: &[(Block, Block)],
     ) -> Result<(), Error> {
         let y = Scalar::random(&mut self.rng);
@@ -69,8 +72,8 @@ impl<S: Read + Write + Send + Sync> ObliviousTransfer<S> for ChouOrlandiOT<S> {
 
     fn receive(
         &mut self,
-        reader: &mut BufReader<S>,
-        writer: &mut BufWriter<S>,
+        reader: &mut R,
+        writer: &mut W,
         inputs: &[bool],
     ) -> Result<Vec<Block>, Error> {
         let s = stream::read_pt(reader)?;
@@ -99,13 +102,14 @@ impl<S: Read + Write + Send + Sync> ObliviousTransfer<S> for ChouOrlandiOT<S> {
     }
 }
 
-impl<S: Read + Write + Send + Sync> SemiHonest for ChouOrlandiOT<S> {}
-impl<S: Read + Write + Send + Sync> Malicious for ChouOrlandiOT<S> {}
+impl<R: Read, W: Write> SemiHonest for ChouOrlandiOT<R, W> {}
+impl<R: Read, W: Write> Malicious for ChouOrlandiOT<R, W> {}
 
 #[cfg(test)]
 mod tests {
     extern crate test;
     use super::*;
+    use std::io::{BufReader, BufWriter};
     use std::os::unix::net::UnixStream;
 
     #[test]

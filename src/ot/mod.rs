@@ -17,13 +17,13 @@ pub use kos::KosOT;
 pub use naor_pinkas::NaorPinkasOT;
 
 use failure::Error;
-use std::io::{BufReader, BufWriter, Read, Write};
+use std::io::{Read, Write};
 
 /// Trait for one-out-of-two oblivious transfer on 128-bit inputs.
 ///
 /// This trait encapsulates the functionality common to oblivious transfer
 /// protocols.
-pub trait ObliviousTransfer<T: Read + Write + Send + Sync> {
+pub trait ObliviousTransfer<R: Read, W: Write> {
     /// Message type, restricted to types that are mutably-dereferencable as
     /// `u8` arrays.
     type Msg: Sized + AsMut<[u8]>;
@@ -33,15 +33,15 @@ pub trait ObliviousTransfer<T: Read + Write + Send + Sync> {
     /// Sends values.
     fn send(
         &mut self,
-        reader: &mut BufReader<T>,
-        writer: &mut BufWriter<T>,
+        reader: &mut R,
+        writer: &mut W,
         inputs: &[(Self::Msg, Self::Msg)],
     ) -> Result<(), Error>;
     /// Receives values.
     fn receive(
         &mut self,
-        reader: &mut BufReader<T>,
-        writer: &mut BufWriter<T>,
+        reader: &mut R,
+        writer: &mut W,
         inputs: &[bool],
     ) -> Result<Vec<Self::Msg>, Error>;
 }

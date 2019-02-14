@@ -11,19 +11,11 @@ use arrayref::array_ref;
 use core::arch::x86_64::*;
 use curve25519_dalek::ristretto::RistrettoPoint;
 use failure::Error;
-use std::io::{BufReader, BufWriter, Read, Write};
+use std::io::{Read, Write};
 
 /// A 128-bit chunk.
 #[derive(Clone, Copy, Debug)]
-pub struct Block(__m128i);
-
-// Fixed key for AES hash. This is the same fixed key as used in the EMP toolkit.
-// pub const FIXED_KEY: Block = Block(unsafe {
-//     std::mem::transmute::<[u8; 16], __m128i>([
-//         0x61, 0x7e, 0x8d, 0xa2, 0xa0, 0x51, 0x1e, 0x96, 0x5e, 0x41, 0xc2, 0x9b, 0x15, 0x3f, 0xc7,
-//         0x7a,
-//     ])
-// });
+pub struct Block(pub __m128i);
 
 impl Block {
     #[inline(always)]
@@ -80,11 +72,11 @@ impl Block {
         ])
     }
     #[inline(always)]
-    pub fn write<T: Read + Write + Send>(&self, stream: &mut BufWriter<T>) -> Result<usize, Error> {
+    pub fn write<T: Write>(&self, stream: &mut T) -> Result<usize, Error> {
         stream.write(self.as_ref()).map_err(Error::from)
     }
     #[inline(always)]
-    pub fn read<T: Read + Write + Send>(stream: &mut BufReader<T>) -> Result<Block, Error> {
+    pub fn read<T: Read>(stream: &mut T) -> Result<Block, Error> {
         let mut v = Block::zero();
         stream.read_exact(v.as_mut())?;
         Ok(v)
@@ -145,6 +137,20 @@ impl From<__m128i> for Block {
     #[inline(always)]
     fn from(m: __m128i) -> Self {
         Block(m)
+    }
+}
+
+impl Into<u128> for Block {
+    #[inline(always)]
+    fn into(self) -> u128 {
+        unsafe { std::mem::transmute(self.0) }
+    }
+}
+
+impl From<u128> for Block {
+    #[inline(always)]
+    fn from(m: u128) -> Self {
+        unsafe { Block(std::mem::transmute(m)) }
     }
 }
 

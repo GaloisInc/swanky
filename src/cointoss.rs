@@ -16,16 +16,13 @@ use crate::rand_aes::AesRng;
 use crate::Block;
 use failure::Error;
 use rand_core::{RngCore, SeedableRng};
-use std::io::{BufReader, BufWriter, ErrorKind, Read, Write};
+use std::io::{ErrorKind, Read, Write};
 
-pub fn send<S>(
-    mut reader: &mut BufReader<S>,
-    mut writer: &mut BufWriter<S>,
+pub fn send<R: Read, W: Write>(
+    mut reader: &mut R,
+    mut writer: &mut W,
     seed: Block,
-) -> Result<Block, Error>
-where
-    S: Read + Write + Send + Sync,
-{
+) -> Result<Block, Error> {
     let mut rng = AesRng::from_seed(seed);
     let mut com = Block::zero();
     rng.fill_bytes(&mut com.as_mut());
@@ -37,14 +34,11 @@ where
     Ok(seed ^ seed_)
 }
 
-pub fn receive<S>(
-    mut reader: &mut BufReader<S>,
-    mut writer: &mut BufWriter<S>,
+pub fn receive<R: Read, W: Write>(
+    mut reader: &mut R,
+    mut writer: &mut W,
     seed: Block,
-) -> Result<Block, Error>
-where
-    S: Read + Write + Send + Sync,
-{
+) -> Result<Block, Error> {
     let com_ = Block::read(&mut reader)?;
     seed.write(&mut writer)?;
     writer.flush()?;
@@ -65,6 +59,7 @@ where
 mod tests {
     extern crate test;
     use super::*;
+    use std::io::{BufReader, BufWriter};
     use std::os::unix::net::UnixStream;
 
     #[test]
