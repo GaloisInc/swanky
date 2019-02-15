@@ -27,7 +27,7 @@ impl AesHash {
         AesHash { aes }
     }
 
-    /// Correlation robust hash function for 128-bit inputs (cf.
+    /// Correlation-robust hash function for 128-bit inputs (cf.
     /// <https://eprint.iacr.org/2019/074>, §7.2).
     ///
     /// The function computes `π(x) ⊕ x`.
@@ -36,24 +36,20 @@ impl AesHash {
         self.aes.encrypt(x) ^ x
     }
 
-    /// Circular correlation robust hash function (cf.
+    /// Circular correlation-robust hash function (cf.
     /// <https://eprint.iacr.org/2019/074>, §7.3).
     ///
-    /// The function computes `H(σ(x))`, where `H` is a correlation robust hash
+    /// The function computes `H(σ(x))`, where `H` is a correlation-robust hash
     /// function and `σ(x₀ || x₁) = (x₀ ⊕ x₁) || x₁`.
     #[inline(always)]
-    pub fn ccr_hash(&self, _i: usize, x: Block) -> Block {
+    pub fn ccr_hash(&self, i: usize, x: Block) -> Block {
         unsafe {
             let x = _mm_xor_si128(
                 _mm_shuffle_epi32(x.into(), 78),
-                _mm_and_si128(
-                    x.into(),
-                    _mm_set_epi64(_mm_set1_pi8(0xF), _mm_setzero_si64()),
-                ),
+                #[allow(overflowing_literals)]
+                _mm_and_si128(x.into(), _mm_set_epi64x(0xFFFFFFFFFFFFFFFF, 0x00)),
             );
-            let x = Block::from(x);
-            let y = self.aes.encrypt(x);
-            x ^ y
+            self.cr_hash(i, Block::from(x))
         }
     }
 
