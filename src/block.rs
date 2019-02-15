@@ -56,6 +56,7 @@ impl Block {
     pub fn hash_pt(i: usize, pt: &RistrettoPoint) -> Self {
         let k = pt.compress();
         let k = k.as_bytes();
+        // XXX: We're just taking the first 16 bytes of the compressed point... Is that secure?!
         let c = Aes128::new(Block::from(*array_ref![k, 0, 16]));
         unsafe {
             let m = _mm_set_epi64(_mm_setzero_si64(), std::mem::transmute::<usize, __m64>(i));
@@ -188,21 +189,21 @@ mod tests {
 }
 
 #[cfg(test)]
-mod benchamarks {
+mod benchmarks {
     extern crate test;
 
     use super::*;
     use test::Bencher;
 
     #[bench]
-    fn bench_hash_pt_block(b: &mut Bencher) {
+    fn bench_hash_pt(b: &mut Bencher) {
         let pt = RistrettoPoint::random(&mut rand::thread_rng());
         let i = rand::random::<usize>();
         b.iter(|| Block::hash_pt(i, &pt));
     }
 
     #[bench]
-    fn bench_xor_block(b: &mut Bencher) {
+    fn bench_xor(b: &mut Bencher) {
         let x = rand::random::<Block>();
         let y = rand::random::<Block>();
         b.iter(|| x ^ y);

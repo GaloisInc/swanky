@@ -21,7 +21,7 @@ use crate::rand_aes::AesRng;
 use crate::stream;
 use crate::{Block, Malicious, ObliviousTransferReceiver, ObliviousTransferSender, SemiHonest};
 use curve25519_dalek::constants::RISTRETTO_BASEPOINT_TABLE;
-use curve25519_dalek::ristretto::RistrettoPoint;
+use curve25519_dalek::ristretto::{RistrettoBasepointTable, RistrettoPoint};
 use curve25519_dalek::scalar::Scalar;
 use failure::Error;
 use std::io::{Read, Write};
@@ -31,13 +31,6 @@ pub struct ChouOrlandiOTSender<R: Read, W: Write> {
     _r: PhantomData<R>,
     _w: PhantomData<W>,
     y: Scalar,
-    s: RistrettoPoint,
-}
-
-pub struct ChouOrlandiOTReceiver<R: Read, W: Write> {
-    _r: PhantomData<R>,
-    _w: PhantomData<W>,
-    rng: AesRng,
     s: RistrettoPoint,
 }
 
@@ -64,22 +57,29 @@ impl<R: Read + Send, W: Write + Send> ObliviousTransferSender<R, W> for ChouOrla
         writer: &mut W,
         inputs: &[(Block, Block)],
     ) -> Result<(), Error> {
-        let mut rs = Vec::with_capacity(inputs.len());
-        for _ in 0..inputs.len() {
+        let mut ks = Vec::with_capacity(inputs.len());
+        for i in 0..inputs.len() {
             let r = stream::read_pt(reader)?;
-            rs.push(r);
+            let k0 = Block::hash_pt(i, &(self.y * r));
+            let k1 = Block::hash_pt(i, &(self.y * (r - self.s)));
+            ks.push((k0, k1));
         }
-        for (i, (input, r)) in inputs.iter().zip(rs.into_iter()).enumerate() {
-            let k0 = Block::hash_pt(i, &(r * self.y));
-            let k1 = Block::hash_pt(i, &((r - self.s) * self.y));
-            let c0 = k0 ^ input.0;
-            let c1 = k1 ^ input.1;
+        for (input, k) in inputs.iter().zip(ks.into_iter()) {
+            let c0 = k.0 ^ input.0;
+            let c1 = k.1 ^ input.1;
             c0.write(writer)?;
             c1.write(writer)?;
         }
         writer.flush()?;
         Ok(())
     }
+}
+
+pub struct ChouOrlandiOTReceiver<R: Read, W: Write> {
+    _r: PhantomData<R>,
+    _w: PhantomData<W>,
+    rng: AesRng,
+    s: RistrettoBasepointTable,
 }
 
 impl<R: Read + Send, W: Write + Send> ObliviousTransferReceiver<R, W>
@@ -90,6 +90,7 @@ impl<R: Read + Send, W: Write + Send> ObliviousTransferReceiver<R, W>
     fn init(reader: &mut R, _: &mut W) -> Result<Self, Error> {
         let rng = AesRng::new();
         let s = stream::read_pt(reader)?;
+        let s = RistrettoBasepointTable::create(&s);
         Ok(Self {
             _r: PhantomData::<R>,
             _w: PhantomData::<W>,
@@ -104,21 +105,19 @@ impl<R: Read + Send, W: Write + Send> ObliviousTransferReceiver<R, W>
         writer: &mut W,
         inputs: &[bool],
     ) -> Result<Vec<Block>, Error> {
-        let mut xs = Vec::with_capacity(inputs.len());
-        for b in inputs.iter() {
+        let mut ks = Vec::with_capacity(inputs.len());
+        for (i, b) in inputs.iter().enumerate() {
             let x = Scalar::random(&mut self.rng);
             let c = if *b { Scalar::one() } else { Scalar::zero() };
-            let r = c * self.s + &x * &RISTRETTO_BASEPOINT_TABLE;
+            let r = &c * &self.s + &x * &RISTRETTO_BASEPOINT_TABLE;
             stream::write_pt(writer, &r)?;
-            xs.push(x);
+            ks.push(Block::hash_pt(i, &(&x * &self.s)));
         }
         writer.flush()?;
         inputs
             .iter()
-            .zip(xs.into_iter())
-            .enumerate()
-            .map(|(i, (b, x))| {
-                let k = Block::hash_pt(i, &(x * self.s));
+            .zip(ks.into_iter())
+            .map(|(b, k)| {
                 let c0 = Block::read(reader)?;
                 let c1 = Block::read(reader)?;
                 let c = if *b { c1 } else { c0 };

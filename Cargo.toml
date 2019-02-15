@@ -10,7 +10,7 @@ autobenches = false
 
 [dependencies]
 arrayref = "*"
-curve25519-dalek = { version = "*", features = ["std", "avx2_backend"] }
+curve25519-dalek = { version = "*", features = ["std", "simd_backend"] }
 failure = "*"
 libc = "*"
 rand = { version = "*", features = ["nightly"] }

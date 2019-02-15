@@ -51,31 +51,25 @@ impl<R: Read + Send, W: Write + Send> ObliviousTransferSender<R, W> for NaorPink
     ) -> Result<(), Error> {
         let m = inputs.len();
         let mut cs = Vec::with_capacity(m);
-        let mut pk0s = Vec::with_capacity(m);
+        let mut pks = Vec::with_capacity(m);
         for _ in 0..m {
             let c = RistrettoPoint::random(&mut self.rng);
             stream::write_pt(writer, &c)?;
             cs.push(c);
         }
         writer.flush()?;
-        for _ in 0..m {
+        for c in cs.into_iter() {
             let pk0 = stream::read_pt(reader)?;
-            pk0s.push(pk0);
+            pks.push((pk0, c - pk0));
         }
-        for (i, ((input, c), pk0)) in inputs
-            .iter()
-            .zip(cs.into_iter())
-            .zip(pk0s.into_iter())
-            .enumerate()
-        {
-            let pk1 = c - pk0;
+        for (i, (input, pk)) in inputs.iter().zip(pks.into_iter()).enumerate() {
             let r0 = Scalar::random(&mut self.rng);
             let r1 = Scalar::random(&mut self.rng);
             let e00 = &r0 * &RISTRETTO_BASEPOINT_TABLE;
             let e10 = &r1 * &RISTRETTO_BASEPOINT_TABLE;
-            let h = Block::hash_pt(i, &(pk0 * r0));
+            let h = Block::hash_pt(i, &(pk.0 * r0));
             let e01 = h ^ input.0;
-            let h = Block::hash_pt(i, &(pk1 * r1));
+            let h = Block::hash_pt(i, &(pk.1 * r1));
             let e11 = h ^ input.1;
             stream::write_pt(writer, &e00)?;
             e01.write(writer)?;

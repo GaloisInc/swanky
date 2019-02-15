@@ -85,7 +85,7 @@ mod tests {
 }
 
 #[cfg(test)]
-mod benchamarks {
+mod benchmarks {
     extern crate test;
 
     use super::*;
