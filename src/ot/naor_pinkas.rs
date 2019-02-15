@@ -11,7 +11,6 @@ use curve25519_dalek::constants::RISTRETTO_BASEPOINT_TABLE;
 use curve25519_dalek::ristretto::RistrettoPoint;
 use curve25519_dalek::scalar::Scalar;
 use failure::Error;
-use rand::rngs::ThreadRng;
 use std::io::{Read, Write};
 use std::marker::PhantomData;
 
@@ -22,14 +21,14 @@ use std::marker::PhantomData;
 pub struct NaorPinkasOT<R: Read, W: Write> {
     _r: PhantomData<R>,
     _w: PhantomData<W>,
-    rng: ThreadRng,
+    rng: AesRng,
 }
 
 impl<R: Read + Send, W: Write + Send> ObliviousTransfer<R, W> for NaorPinkasOT<R, W> {
     type Msg = Block;
 
     fn new() -> Self {
-        let rng = rand::thread_rng();
+        let rng = AesRng::new();
         Self {
             _r: PhantomData::<R>,
             _w: PhantomData::<W>,

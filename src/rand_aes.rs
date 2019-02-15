@@ -72,7 +72,7 @@ impl Default for AesRng {
 #[derive(Clone)]
 pub struct AesRngCore {
     aes: Aes128,
-    state: u64,
+    state: __m64,
 }
 
 impl fmt::Debug for AesRngCore {
@@ -87,14 +87,12 @@ impl BlockRngCore for AesRngCore {
     // compatible with `RngCore`.
     type Results = [u32; 4];
 
+    // Compute `E(state)`, where `state` is a counter initialized to zero.
     fn generate(&mut self, results: &mut Self::Results) {
-        let data = unsafe { _mm_set_epi64(_mm_setzero_si64(), std::mem::transmute(self.state)) };
-        let c = self.aes.encrypt_u8(&Block::from(data));
-        unsafe {
-            let c: Self::Results = std::mem::transmute(c.0);
-            std::ptr::copy_nonoverlapping(c.as_ptr(), results.as_mut_ptr(), 16);
-        };
-        self.state = self.state.wrapping_add(1);
+        let data = unsafe { _mm_set_epi64(_mm_setzero_si64(), self.state) };
+        let c = self.aes.encrypt(Block::from(data));
+        unsafe { *results = std::mem::transmute(c.0) };
+        self.state = unsafe { _mm_add_pi32(self.state, _mm_set_pi32(0, 1)) };
     }
 }
 
@@ -103,8 +101,11 @@ impl SeedableRng for AesRngCore {
 
     #[inline(always)]
     fn from_seed(seed: Self::Seed) -> Self {
-        let aes = Aes128::new(&seed);
-        AesRngCore { aes, state: 0 }
+        let aes = Aes128::new(seed);
+        AesRngCore {
+            aes,
+            state: unsafe { _mm_setzero_si64() },
+        }
     }
 }
 

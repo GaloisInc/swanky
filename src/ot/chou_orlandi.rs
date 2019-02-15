@@ -10,7 +10,6 @@ use crate::{Block, Malicious, ObliviousTransfer, SemiHonest};
 use curve25519_dalek::constants::RISTRETTO_BASEPOINT_TABLE;
 use curve25519_dalek::scalar::Scalar;
 use failure::Error;
-use rand::rngs::ThreadRng;
 use std::io::{Read, Write};
 use std::marker::PhantomData;
 
@@ -28,14 +27,14 @@ use std::marker::PhantomData;
 pub struct ChouOrlandiOT<R: Read, W: Write> {
     _r: PhantomData<R>,
     _w: PhantomData<W>,
-    rng: ThreadRng, // XXX Using AesRng here causes a seg-fault on a call to Scalar::random !?
+    rng: AesRng,
 }
 
 impl<R: Read + Send, W: Write + Send> ObliviousTransfer<R, W> for ChouOrlandiOT<R, W> {
     type Msg = Block;
 
     fn new() -> Self {
-        let rng = rand::thread_rng();
+        let rng = AesRng::new();
         Self {
             _r: PhantomData::<R>,
             _w: PhantomData::<W>,

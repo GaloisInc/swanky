@@ -32,7 +32,7 @@ impl<R: Read, W: Write, OT: ObliviousTransfer<R, W, Msg = Block> + SemiHonest>
     fn new() -> Self {
         let ot = OT::new();
         let rng = AesRng::new();
-        let hash = AesHash::new(&Block::fixed_key());
+        let hash = AesHash::new(Block::fixed_key());
         Self {
             _r: PhantomData::<R>,
             _w: PhantomData::<W>,

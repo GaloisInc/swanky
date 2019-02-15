@@ -18,7 +18,7 @@ pub struct AesHash {
 
 impl AesHash {
     #[inline(always)]
-    pub fn new(key: &Block) -> Self {
+    pub fn new(key: Block) -> Self {
         let aes = Aes128::new(key);
         AesHash { aes }
     }
@@ -29,7 +29,7 @@ impl AesHash {
     /// The function computes `π(x) ⊕ x`.
     #[inline(always)]
     pub fn cr_hash(&self, _i: usize, x: Block) -> Block {
-        self.aes.encrypt_u8(&x) ^ x
+        self.aes.encrypt(x) ^ x
     }
 
     /// Circular correlation robust hash function (cf.
@@ -48,7 +48,7 @@ impl AesHash {
                 ),
             );
             let x = Block::from(x);
-            let y = self.aes.encrypt_u8(&x);
+            let y = self.aes.encrypt(x);
             x ^ y
         }
     }
@@ -60,10 +60,10 @@ impl AesHash {
     #[inline(always)]
     pub fn tccr_hash(&self, i: usize, x: Block) -> Block {
         unsafe {
-            let y = self.aes.encrypt_u8(&x);
+            let y = self.aes.encrypt(x);
             let i = _mm_set_epi64(_mm_setzero_si64(), std::mem::transmute::<usize, __m64>(i));
             let t = _mm_xor_si128(y.into(), i);
-            let z = self.aes.encrypt_u8(&Block::from(t));
+            let z = self.aes.encrypt(Block::from(t));
             y ^ z
         }
     }
@@ -78,7 +78,7 @@ mod benchmarks {
 
     #[bench]
     fn bench_cr_hash(b: &mut Bencher) {
-        let hash = AesHash::new(&rand::random::<Block>());
+        let hash = AesHash::new(rand::random::<Block>());
         let x = rand::random::<Block>();
         let i = rand::random::<usize>();
         b.iter(|| hash.cr_hash(i, x));
@@ -86,7 +86,7 @@ mod benchmarks {
 
     #[bench]
     fn bench_ccr_hash(b: &mut Bencher) {
-        let hash = AesHash::new(&rand::random::<Block>());
+        let hash = AesHash::new(rand::random::<Block>());
         let x = rand::random::<Block>();
         let i = rand::random::<usize>();
         b.iter(|| hash.ccr_hash(i, x));
@@ -94,7 +94,7 @@ mod benchmarks {
 
     #[bench]
     fn bench_tccr_hash(b: &mut Bencher) {
-        let hash = AesHash::new(&rand::random::<Block>());
+        let hash = AesHash::new(rand::random::<Block>());
         let x = rand::random::<Block>();
         let i = rand::random::<usize>();
         b.iter(|| hash.tccr_hash(i, x));

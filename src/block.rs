@@ -56,10 +56,10 @@ impl Block {
     pub fn hash_pt(i: usize, pt: &RistrettoPoint) -> Self {
         let k = pt.compress();
         let k = k.as_bytes();
-        let c = Aes128::new(&Block::from(*array_ref![k, 0, 16]));
+        let c = Aes128::new(Block::from(*array_ref![k, 0, 16]));
         unsafe {
             let m = _mm_set_epi64(_mm_setzero_si64(), std::mem::transmute::<usize, __m64>(i));
-            c.encrypt_u8(&Block(m))
+            c.encrypt(Block(m))
         }
     }
 
