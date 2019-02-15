@@ -4,44 +4,76 @@
 // Copyright © 2019 Galois, Inc.
 // See LICENSE for licensing information.
 
+//! Implementation of the Keller-Orsini-Scholl oblivious transfer extension
+//! protocol (cf. <https://eprint.iacr.org/2015/546>).
+
 use crate::hash_aes::AesHash;
 use crate::rand_aes::AesRng;
 use crate::{block, cointoss, stream, utils};
-use crate::{Block, Malicious, ObliviousTransfer};
+use crate::{Block, Malicious, ObliviousTransferReceiver, ObliviousTransferSender};
 use arrayref::array_ref;
 use failure::Error;
 use rand_core::{RngCore, SeedableRng};
 use std::io::{ErrorKind, Read, Write};
 use std::marker::PhantomData;
 
-/// Implementation of the Keller-Orsini-Scholl oblivious transfer extension
-/// protocol (cf. <https://eprint.iacr.org/2015/546>).
-pub struct KosOT<R: Read, W: Write, OT: ObliviousTransfer<R, W, Msg = Block> + Malicious> {
-    _r: PhantomData<R>,
-    _w: PhantomData<W>,
-    ot: OT,
-    rng: AesRng,
-    hash: AesHash,
-}
-
 const SSP: usize = 40;
 
-impl<R: Read, W: Write, OT: ObliviousTransfer<R, W, Msg = Block> + Malicious>
-    ObliviousTransfer<R, W> for KosOT<R, W, OT>
+pub struct KosOTSender<
+    R: Read,
+    W: Write,
+    OT: ObliviousTransferReceiver<R, W, Msg = Block> + Malicious,
+> {
+    _r: PhantomData<R>,
+    _w: PhantomData<W>,
+    _ot: PhantomData<OT>,
+    rng: AesRng,
+    hash: AesHash,
+    δ: Vec<bool>,
+    δ_: [u8; 16],
+    rngs: Vec<AesRng>,
+}
+
+pub struct KosOTReceiver<
+    R: Read,
+    W: Write,
+    OT: ObliviousTransferSender<R, W, Msg = Block> + Malicious,
+> {
+    _r: PhantomData<R>,
+    _w: PhantomData<W>,
+    _ot: PhantomData<OT>,
+    rng: AesRng,
+    hash: AesHash,
+    rngs: Vec<(AesRng, AesRng)>,
+}
+
+impl<R: Read, W: Write, OT: ObliviousTransferReceiver<R, W, Msg = Block> + Malicious>
+    ObliviousTransferSender<R, W> for KosOTSender<R, W, OT>
 {
     type Msg = Block;
 
-    fn new() -> Self {
-        let ot = OT::new();
-        let rng = AesRng::new();
+    fn init(mut reader: &mut R, mut writer: &mut W) -> Result<Self, Error> {
+        let mut rng = AesRng::new();
         let hash = AesHash::new(Block::fixed_key());
-        Self {
+        let mut ot = OT::init(&mut reader, &mut writer)?;
+        let mut δ_ = [0u8; 16];
+        rng.fill_bytes(&mut δ_);
+        let δ = utils::u8vec_to_boolvec(&δ_);
+        let ks = ot.receive(reader, writer, &δ)?;
+        let rngs = ks
+            .into_iter()
+            .map(AesRng::from_seed)
+            .collect::<Vec<AesRng>>();
+        Ok(Self {
             _r: PhantomData::<R>,
             _w: PhantomData::<W>,
-            ot,
+            _ot: PhantomData::<OT>,
             rng,
             hash,
-        }
+            δ,
+            δ_,
+            rngs,
+        })
     }
 
     fn send(
@@ -57,20 +89,12 @@ impl<R: Read, W: Write, OT: ObliviousTransfer<R, W, Msg = Block> + Malicious>
                 "Number of inputs must be divisible by 8",
             )));
         }
-        if ℓ <= 128 {
-            // Just do normal OT
-            return self.ot.send(reader, writer, inputs);
-        }
         let ℓ_ = ℓ + 128 + SSP;
         let (nrows, ncols) = (128, ℓ_);
-        let mut δ_ = vec![0u8; nrows / 8];
-        self.rng.fill_bytes(&mut δ_);
-        let δ = utils::u8vec_to_boolvec(&δ_);
-        let ks = self.ot.receive(reader, writer, &δ)?;
-        let rngs = ks.into_iter().map(AesRng::from_seed);
         let mut qs = vec![0u8; nrows * ncols / 8];
         let mut u = vec![0u8; ncols / 8];
-        for (j, (b, mut rng)) in δ.into_iter().zip(rngs).enumerate() {
+        let rngs = &mut self.rngs;
+        for (j, (b, rng)) in self.δ.iter().zip(rngs.into_iter()).enumerate() {
             let range = j * ncols / 8..(j + 1) * ncols / 8;
             let mut q = &mut qs[range];
             rng.fill_bytes(&mut q);
@@ -99,7 +123,7 @@ impl<R: Read, W: Write, OT: ObliviousTransfer<R, W, Msg = Block> + Malicious>
         let x = Block::read(reader)?;
         let t0 = Block::read(reader)?;
         let t1 = Block::read(reader)?;
-        let tmp = x.mul128(Block::from(*array_ref![δ_, 0, 16]));
+        let tmp = x.mul128(Block::from(self.δ_));
         let check = block::xor_two_blocks(&check, &tmp);
         if check != (t0, t1) {
             println!("Consistency check failed!");
@@ -113,13 +137,46 @@ impl<R: Read, W: Write, OT: ObliviousTransfer<R, W, Msg = Block> + Malicious>
             let range = j * nrows / 8..(j + 1) * nrows / 8;
             let mut q = &mut qs[range];
             let y0 = self.hash.tccr_hash(j, Block::from(*array_ref![q, 0, 16])) ^ input.0;
-            utils::xor_inplace(&mut q, &δ_);
+            utils::xor_inplace(&mut q, &self.δ_);
             let y1 = self.hash.tccr_hash(j, Block::from(*array_ref![q, 0, 16])) ^ input.1;
             y0.write(&mut writer)?;
             y1.write(&mut writer)?;
         }
         writer.flush()?;
         Ok(())
+    }
+}
+
+impl<R: Read, W: Write, OT: ObliviousTransferSender<R, W, Msg = Block> + Malicious>
+    ObliviousTransferReceiver<R, W> for KosOTReceiver<R, W, OT>
+{
+    type Msg = Block;
+
+    fn init(mut reader: &mut R, mut writer: &mut W) -> Result<Self, Error> {
+        let mut rng = AesRng::new();
+        let hash = AesHash::new(Block::fixed_key());
+        let mut ot = OT::init(&mut reader, &mut writer)?;
+        let mut ks = Vec::with_capacity(128);
+        let mut k0 = Block::zero();
+        let mut k1 = Block::zero();
+        for _ in 0..128 {
+            rng.fill_bytes(&mut k0.as_mut());
+            rng.fill_bytes(&mut k1.as_mut());
+            ks.push((k0, k1));
+        }
+        ot.send(reader, writer, &ks)?;
+        let rngs = ks
+            .into_iter()
+            .map(|(k0, k1)| (AesRng::from_seed(k0), AesRng::from_seed(k1)))
+            .collect::<Vec<(AesRng, AesRng)>>();
+        Ok(Self {
+            _r: PhantomData::<R>,
+            _w: PhantomData::<W>,
+            _ot: PhantomData::<OT>,
+            rng,
+            hash,
+            rngs,
+        })
     }
 
     fn receive(
@@ -129,34 +186,17 @@ impl<R: Read, W: Write, OT: ObliviousTransfer<R, W, Msg = Block> + Malicious>
         inputs: &[bool],
     ) -> Result<Vec<Block>, Error> {
         let ℓ = inputs.len();
-        if ℓ <= 128 {
-            // Just do normal OT
-            return self.ot.receive(reader, writer, inputs);
-        }
         let ℓ_ = ℓ + 128 + SSP;
         let (nrows, ncols) = (128, ℓ_);
-        let mut ks = Vec::with_capacity(nrows);
-        let mut k0 = Block::zero();
-        let mut k1 = Block::zero();
-        for _ in 0..nrows {
-            self.rng.fill_bytes(&mut k0.as_mut());
-            self.rng.fill_bytes(&mut k1.as_mut());
-            ks.push((k0, k1));
-        }
-        self.ot.send(reader, writer, &ks)?;
-        let rngs = ks
-            .into_iter()
-            .map(|(k0, k1)| (AesRng::from_seed(k0), AesRng::from_seed(k1)))
-            .collect::<Vec<(AesRng, AesRng)>>();
         let mut r = utils::boolvec_to_u8vec(inputs);
         r.extend((0..(ℓ_ - ℓ) / 8).map(|_| rand::random::<u8>()));
         let mut ts = vec![0u8; nrows * ncols / 8];
         let mut g = vec![0u8; ncols / 8];
-        for (j, (mut rng0, mut rng1)) in rngs.into_iter().enumerate() {
+        for j in 0..self.rngs.len() {
             let range = j * ncols / 8..(j + 1) * ncols / 8;
             let mut t = &mut ts[range];
-            rng0.fill_bytes(&mut t);
-            rng1.fill_bytes(&mut g);
+            self.rngs[j].0.fill_bytes(&mut t);
+            self.rngs[j].1.fill_bytes(&mut g);
             utils::xor_inplace(&mut g, &t);
             utils::xor_inplace(&mut g, &r);
             stream::write_bytes(&mut writer, &g)?;
@@ -200,8 +240,12 @@ impl<R: Read, W: Write, OT: ObliviousTransfer<R, W, Msg = Block> + Malicious>
     }
 }
 
-impl<R: Read, W: Write, OT: ObliviousTransfer<R, W, Msg = Block> + Malicious> Malicious
-    for KosOT<R, W, OT>
+impl<R: Read, W: Write, OT: ObliviousTransferReceiver<R, W, Msg = Block> + Malicious> Malicious
+    for KosOTSender<R, W, OT>
+{
+}
+impl<R: Read, W: Write, OT: ObliviousTransferSender<R, W, Msg = Block> + Malicious> Malicious
+    for KosOTReceiver<R, W, OT>
 {
 }
 
@@ -234,26 +278,28 @@ mod tests {
         let bs_ = bs.clone();
         let (sender, receiver) = UnixStream::pair().unwrap();
         let handle = std::thread::spawn(move || {
-            let mut otext = KosOT::<
-                BufReader<UnixStream>,
-                BufWriter<UnixStream>,
-                ChouOrlandiOT<BufReader<UnixStream>, BufWriter<UnixStream>>,
-            >::new();
             let mut reader = BufReader::new(sender.try_clone().unwrap());
             let mut writer = BufWriter::new(sender);
+            let mut otext = KosOTSender::<
+                BufReader<UnixStream>,
+                BufWriter<UnixStream>,
+                chou_orlandi::ChouOrlandiOTReceiver<BufReader<UnixStream>, BufWriter<UnixStream>>,
+            >::init(&mut reader, &mut writer)
+            .unwrap();
             let ms = m0s
                 .into_iter()
                 .zip(m1s.into_iter())
                 .collect::<Vec<(Block, Block)>>();
             otext.send(&mut reader, &mut writer, &ms).unwrap();
         });
-        let mut otext = KosOT::<
-            BufReader<UnixStream>,
-            BufWriter<UnixStream>,
-            ChouOrlandiOT<BufReader<UnixStream>, BufWriter<UnixStream>>,
-        >::new();
         let mut reader = BufReader::new(receiver.try_clone().unwrap());
         let mut writer = BufWriter::new(receiver);
+        let mut otext = KosOTReceiver::<
+            BufReader<UnixStream>,
+            BufWriter<UnixStream>,
+            chou_orlandi::ChouOrlandiOTSender<BufReader<UnixStream>, BufWriter<UnixStream>>,
+        >::init(&mut reader, &mut writer)
+        .unwrap();
         let results = otext.receive(&mut reader, &mut writer, &bs).unwrap();
         for (b, result, m0, m1) in izip!(bs_, results, m0s_, m1s_) {
             assert_eq!(result, if b { m1 } else { m0 })

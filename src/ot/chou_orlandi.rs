@@ -4,42 +4,58 @@
 // Copyright © 2019 Galois, Inc.
 // See LICENSE for licensing information.
 
+//! Implementation of the Chou-Orlandi oblivious transfer protocol (cf.
+//! <https://eprint.iacr.org/2015/267>).
+//!
+//! This implementation uses the Ristretto prime order elliptic curve group from
+//! the `curve25519-dalek` library and works over blocks rather than arbitrary
+//! length messages.
+//!
+//! This version fixes a bug in the current ePrint write-up
+//! (<https://eprint.iacr.org/2015/267/20180529:135402>, Page 4): if the value
+//! `x^i` produced by the receiver is not randomized, all the random-OTs
+//! produced by the protocol will be the same. We fix this by hashing in `i`
+//! during the key derivation phase.
+
 use crate::rand_aes::AesRng;
 use crate::stream;
-use crate::{Block, Malicious, ObliviousTransfer, SemiHonest};
+use crate::{Block, Malicious, ObliviousTransferReceiver, ObliviousTransferSender, SemiHonest};
 use curve25519_dalek::constants::RISTRETTO_BASEPOINT_TABLE;
+use curve25519_dalek::ristretto::RistrettoPoint;
 use curve25519_dalek::scalar::Scalar;
 use failure::Error;
 use std::io::{Read, Write};
 use std::marker::PhantomData;
 
-/// Implementation of the Chou-Orlandi oblivious transfer protocol (cf.
-/// <https://eprint.iacr.org/2015/267>).
-///
-/// This implementation uses the Ristretto prime order elliptic curve group from
-/// the `curve25519-dalek` library and works over blocks rather than arbitrary
-/// length messages.
-///
-/// This version fixes a bug in the current ePrint write-up (Page 4): if the
-/// value `x^i` produced by the receiver is not randomized, all the random-OTs
-/// produced by the protocol will be the same. We fix this by hashing in `i`
-/// during the key derivation phase.
-pub struct ChouOrlandiOT<R: Read, W: Write> {
+pub struct ChouOrlandiOTSender<R: Read, W: Write> {
+    _r: PhantomData<R>,
+    _w: PhantomData<W>,
+    y: Scalar,
+    s: RistrettoPoint,
+}
+
+pub struct ChouOrlandiOTReceiver<R: Read, W: Write> {
     _r: PhantomData<R>,
     _w: PhantomData<W>,
     rng: AesRng,
+    s: RistrettoPoint,
 }
 
-impl<R: Read + Send, W: Write + Send> ObliviousTransfer<R, W> for ChouOrlandiOT<R, W> {
+impl<R: Read + Send, W: Write + Send> ObliviousTransferSender<R, W> for ChouOrlandiOTSender<R, W> {
     type Msg = Block;
 
-    fn new() -> Self {
-        let rng = AesRng::new();
-        Self {
+    fn init(_: &mut R, writer: &mut W) -> Result<Self, Error> {
+        let mut rng = AesRng::new();
+        let y = Scalar::random(&mut rng);
+        let s = &y * &RISTRETTO_BASEPOINT_TABLE;
+        stream::write_pt(writer, &s)?;
+        writer.flush()?;
+        Ok(Self {
             _r: PhantomData::<R>,
             _w: PhantomData::<W>,
-            rng,
-        }
+            y,
+            s,
+        })
     }
 
     fn send(
@@ -48,18 +64,14 @@ impl<R: Read + Send, W: Write + Send> ObliviousTransfer<R, W> for ChouOrlandiOT<
         writer: &mut W,
         inputs: &[(Block, Block)],
     ) -> Result<(), Error> {
-        let y = Scalar::random(&mut self.rng);
-        let s = &y * &RISTRETTO_BASEPOINT_TABLE;
-        stream::write_pt(writer, &s)?;
-        writer.flush()?;
         let mut rs = Vec::with_capacity(inputs.len());
         for _ in 0..inputs.len() {
             let r = stream::read_pt(reader)?;
             rs.push(r);
         }
         for (i, (input, r)) in inputs.iter().zip(rs.into_iter()).enumerate() {
-            let k0 = Block::hash_pt(i, &(r * y));
-            let k1 = Block::hash_pt(i, &((r - s) * y));
+            let k0 = Block::hash_pt(i, &(r * self.y));
+            let k1 = Block::hash_pt(i, &((r - self.s) * self.y));
             let c0 = k0 ^ input.0;
             let c1 = k1 ^ input.1;
             c0.write(writer)?;
@@ -68,6 +80,23 @@ impl<R: Read + Send, W: Write + Send> ObliviousTransfer<R, W> for ChouOrlandiOT<
         writer.flush()?;
         Ok(())
     }
+}
+
+impl<R: Read + Send, W: Write + Send> ObliviousTransferReceiver<R, W>
+    for ChouOrlandiOTReceiver<R, W>
+{
+    type Msg = Block;
+
+    fn init(reader: &mut R, _: &mut W) -> Result<Self, Error> {
+        let rng = AesRng::new();
+        let s = stream::read_pt(reader)?;
+        Ok(Self {
+            _r: PhantomData::<R>,
+            _w: PhantomData::<W>,
+            rng,
+            s,
+        })
+    }
 
     fn receive(
         &mut self,
@@ -75,12 +104,11 @@ impl<R: Read + Send, W: Write + Send> ObliviousTransfer<R, W> for ChouOrlandiOT<
         writer: &mut W,
         inputs: &[bool],
     ) -> Result<Vec<Block>, Error> {
-        let s = stream::read_pt(reader)?;
         let mut xs = Vec::with_capacity(inputs.len());
         for b in inputs.iter() {
             let x = Scalar::random(&mut self.rng);
             let c = if *b { Scalar::one() } else { Scalar::zero() };
-            let r = c * s + &x * &RISTRETTO_BASEPOINT_TABLE;
+            let r = c * self.s + &x * &RISTRETTO_BASEPOINT_TABLE;
             stream::write_pt(writer, &r)?;
             xs.push(x);
         }
@@ -90,7 +118,7 @@ impl<R: Read + Send, W: Write + Send> ObliviousTransfer<R, W> for ChouOrlandiOT<
             .zip(xs.into_iter())
             .enumerate()
             .map(|(i, (b, x))| {
-                let k = Block::hash_pt(i, &(x * s));
+                let k = Block::hash_pt(i, &(x * self.s));
                 let c0 = Block::read(reader)?;
                 let c1 = Block::read(reader)?;
                 let c = if *b { c1 } else { c0 };
@@ -101,8 +129,10 @@ impl<R: Read + Send, W: Write + Send> ObliviousTransfer<R, W> for ChouOrlandiOT<
     }
 }
 
-impl<R: Read, W: Write> SemiHonest for ChouOrlandiOT<R, W> {}
-impl<R: Read, W: Write> Malicious for ChouOrlandiOT<R, W> {}
+impl<R: Read, W: Write> SemiHonest for ChouOrlandiOTSender<R, W> {}
+impl<R: Read, W: Write> Malicious for ChouOrlandiOTSender<R, W> {}
+impl<R: Read, W: Write> SemiHonest for ChouOrlandiOTReceiver<R, W> {}
+impl<R: Read, W: Write> Malicious for ChouOrlandiOTReceiver<R, W> {}
 
 #[cfg(test)]
 mod tests {
@@ -120,14 +150,14 @@ mod tests {
         let m1_ = m1.clone();
         let (sender, receiver) = UnixStream::pair().unwrap();
         let handle = std::thread::spawn(move || {
-            let mut ot = ChouOrlandiOT::new();
             let mut reader = BufReader::new(sender.try_clone().unwrap());
             let mut writer = BufWriter::new(sender);
+            let mut ot = ChouOrlandiOTSender::init(&mut reader, &mut writer).unwrap();
             ot.send(&mut reader, &mut writer, &[(m0, m1)]).unwrap();
         });
-        let mut ot = ChouOrlandiOT::new();
         let mut reader = BufReader::new(receiver.try_clone().unwrap());
         let mut writer = BufWriter::new(receiver);
+        let mut ot = ChouOrlandiOTReceiver::init(&mut reader, &mut writer).unwrap();
         let result = ot.receive(&mut reader, &mut writer, &[b]).unwrap();
         assert_eq!(result[0], if b { m1_ } else { m0_ });
         handle.join().unwrap();

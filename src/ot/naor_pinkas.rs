@@ -4,9 +4,14 @@
 // Copyright © 2019 Galois, Inc.
 // See LICENSE for licensing information.
 
+//! Implementation of the Naor-Pinkas oblivious transfer protocol.
+//!
+//! This implementation uses the Ristretto prime order elliptic curve group from
+//! the `curve25519-dalek` library.
+
 use crate::rand_aes::AesRng;
 use crate::stream;
-use crate::{Block, ObliviousTransfer, SemiHonest};
+use crate::{Block, ObliviousTransferReceiver, ObliviousTransferSender, SemiHonest};
 use curve25519_dalek::constants::RISTRETTO_BASEPOINT_TABLE;
 use curve25519_dalek::ristretto::RistrettoPoint;
 use curve25519_dalek::scalar::Scalar;
@@ -14,26 +19,28 @@ use failure::Error;
 use std::io::{Read, Write};
 use std::marker::PhantomData;
 
-/// Implementation of the Naor-Pinkas oblivious transfer protocol.
-///
-/// This implementation uses the Ristretto prime order elliptic curve group from
-/// the `curve25519-dalek` library.
-pub struct NaorPinkasOT<R: Read, W: Write> {
+pub struct NaorPinkasOTSender<R: Read, W: Write> {
     _r: PhantomData<R>,
     _w: PhantomData<W>,
     rng: AesRng,
 }
 
-impl<R: Read + Send, W: Write + Send> ObliviousTransfer<R, W> for NaorPinkasOT<R, W> {
+pub struct NaorPinkasOTReceiver<R: Read, W: Write> {
+    _r: PhantomData<R>,
+    _w: PhantomData<W>,
+    rng: AesRng,
+}
+
+impl<R: Read + Send, W: Write + Send> ObliviousTransferSender<R, W> for NaorPinkasOTSender<R, W> {
     type Msg = Block;
 
-    fn new() -> Self {
+    fn init(_: &mut R, _: &mut W) -> Result<Self, Error> {
         let rng = AesRng::new();
-        Self {
+        Ok(Self {
             _r: PhantomData::<R>,
             _w: PhantomData::<W>,
             rng,
-        }
+        })
     }
 
     fn send(
@@ -77,6 +84,21 @@ impl<R: Read + Send, W: Write + Send> ObliviousTransfer<R, W> for NaorPinkasOT<R
         }
         writer.flush()?;
         Ok(())
+    }
+}
+
+impl<R: Read + Send, W: Write + Send> ObliviousTransferReceiver<R, W>
+    for NaorPinkasOTReceiver<R, W>
+{
+    type Msg = Block;
+
+    fn init(_: &mut R, _: &mut W) -> Result<Self, Error> {
+        let rng = AesRng::new();
+        Ok(Self {
+            _r: PhantomData::<R>,
+            _w: PhantomData::<W>,
+            rng,
+        })
     }
 
     fn receive(
@@ -123,7 +145,8 @@ impl<R: Read + Send, W: Write + Send> ObliviousTransfer<R, W> for NaorPinkasOT<R
     }
 }
 
-impl<R: Read, W: Write> SemiHonest for NaorPinkasOT<R, W> {}
+impl<R: Read, W: Write> SemiHonest for NaorPinkasOTSender<R, W> {}
+impl<R: Read, W: Write> SemiHonest for NaorPinkasOTReceiver<R, W> {}
 
 #[cfg(test)]
 mod tests {
@@ -141,14 +164,14 @@ mod tests {
         let m1_ = m1.clone();
         let (sender, receiver) = UnixStream::pair().unwrap();
         let handle = std::thread::spawn(move || {
-            let mut ot = NaorPinkasOT::new();
             let mut reader = BufReader::new(sender.try_clone().unwrap());
             let mut writer = BufWriter::new(sender);
+            let mut ot = NaorPinkasOTSender::init(&mut reader, &mut writer).unwrap();
             ot.send(&mut reader, &mut writer, &[(m0, m1)]).unwrap();
         });
-        let mut ot = NaorPinkasOT::new();
         let mut reader = BufReader::new(receiver.try_clone().unwrap());
         let mut writer = BufWriter::new(receiver);
+        let mut ot = NaorPinkasOTReceiver::init(&mut reader, &mut writer).unwrap();
         let result = ot.receive(&mut reader, &mut writer, &[b]).unwrap();
         assert_eq!(result[0], if b { m1_ } else { m0_ });
         handle.join().unwrap();

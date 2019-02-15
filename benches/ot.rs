@@ -21,29 +21,36 @@ fn rand_bool_vec(size: usize) -> Vec<bool> {
     (0..size).map(|_| rand::random::<bool>()).collect()
 }
 
+type Reader = BufReader<UnixStream>;
+type Writer = BufWriter<UnixStream>;
+
 fn _bench_block_ot<
-    OT: ObliviousTransfer<BufReader<UnixStream>, BufWriter<UnixStream>, Msg = Block>,
+    OTSender: ObliviousTransferSender<Reader, Writer, Msg = Block>,
+    OTReceiver: ObliviousTransferReceiver<Reader, Writer, Msg = Block>,
 >(
     bs: &[bool],
     ms: Vec<(Block, Block)>,
 ) {
     let (sender, receiver) = UnixStream::pair().unwrap();
     let handle = std::thread::spawn(move || {
-        let mut ot = OT::new();
         let mut reader = BufReader::new(sender.try_clone().unwrap());
         let mut writer = BufWriter::new(sender);
+        let mut ot = OTSender::init(&mut reader, &mut writer).unwrap();
         ot.send(&mut reader, &mut writer, &ms).unwrap();
     });
-    let mut ot = OT::new();
     let mut reader = BufReader::new(receiver.try_clone().unwrap());
     let mut writer = BufWriter::new(receiver);
+    let mut ot = OTReceiver::init(&mut reader, &mut writer).unwrap();
     ot.receive(&mut reader, &mut writer, &bs).unwrap();
     handle.join().unwrap();
 }
 
-type ChouOrlandi = ChouOrlandiOT<BufReader<UnixStream>, BufWriter<UnixStream>>;
-type Dummy = DummyOT<BufReader<UnixStream>, BufWriter<UnixStream>>;
-type NaorPinkas = NaorPinkasOT<BufReader<UnixStream>, BufWriter<UnixStream>>;
+type ChouOrlandiSender = chou_orlandi::ChouOrlandiOTSender<Reader, Writer>;
+type ChouOrlandiReceiver = chou_orlandi::ChouOrlandiOTReceiver<Reader, Writer>;
+type DummySender = dummy::DummyOTSender<Reader, Writer>;
+type DummyReceiver = dummy::DummyOTReceiver<Reader, Writer>;
+type NaorPinkasSender = naor_pinkas::NaorPinkasOTSender<Reader, Writer>;
+type NaorPinkasReceiver = naor_pinkas::NaorPinkasOTReceiver<Reader, Writer>;
 
 fn bench_ot(c: &mut Criterion) {
     c.bench_function("ot::ChouOrlandiOT", move |bench| {
@@ -54,7 +61,9 @@ fn bench_ot(c: &mut Criterion) {
             .zip(m1s.into_iter())
             .collect::<Vec<(Block, Block)>>();
         let bs = rand_bool_vec(128);
-        bench.iter(move || _bench_block_ot::<ChouOrlandi>(&bs, ms.clone()))
+        bench.iter(move || {
+            _bench_block_ot::<ChouOrlandiSender, ChouOrlandiReceiver>(&bs, ms.clone())
+        })
     });
     c.bench_function("ot::DummyOT", move |bench| {
         let m0s = rand_block_vec(128);
@@ -64,7 +73,7 @@ fn bench_ot(c: &mut Criterion) {
             .zip(m1s.into_iter())
             .collect::<Vec<(Block, Block)>>();
         let bs = rand_bool_vec(128);
-        bench.iter(|| _bench_block_ot::<Dummy>(&bs, ms.clone()))
+        bench.iter(|| _bench_block_ot::<DummySender, DummyReceiver>(&bs, ms.clone()))
     });
     c.bench_function("ot::NaorPinkasOT", move |bench| {
         let m0s = rand_block_vec(128);
@@ -74,12 +83,14 @@ fn bench_ot(c: &mut Criterion) {
             .zip(m1s.into_iter())
             .collect::<Vec<(Block, Block)>>();
         let bs = rand_bool_vec(128);
-        bench.iter(|| _bench_block_ot::<NaorPinkas>(&bs, ms.clone()))
+        bench.iter(|| _bench_block_ot::<NaorPinkasSender, NaorPinkasReceiver>(&bs, ms.clone()))
     });
 }
 
-type Alsz = AlszOT<BufReader<UnixStream>, BufWriter<UnixStream>, ChouOrlandi>;
-type Kos = KosOT<BufReader<UnixStream>, BufWriter<UnixStream>, ChouOrlandi>;
+type AlszSender = alsz::AlszOTSender<Reader, Writer, ChouOrlandiReceiver>;
+type AlszReceiver = alsz::AlszOTReceiver<Reader, Writer, ChouOrlandiSender>;
+type KosSender = kos::KosOTSender<Reader, Writer, ChouOrlandiReceiver>;
+type KosReceiver = kos::KosOTReceiver<Reader, Writer, ChouOrlandiSender>;
 
 fn bench_otext(c: &mut Criterion) {
     c.bench_function("ot::AlszOT", move |bench| {
@@ -90,7 +101,7 @@ fn bench_otext(c: &mut Criterion) {
             .zip(m1s.into_iter())
             .collect::<Vec<(Block, Block)>>();
         let bs = rand_bool_vec(T);
-        bench.iter(|| _bench_block_ot::<Alsz>(&bs, ms.clone()))
+        bench.iter(|| _bench_block_ot::<AlszSender, AlszReceiver>(&bs, ms.clone()))
     });
 
     c.bench_function("ot::KosOT", move |bench| {
@@ -101,7 +112,7 @@ fn bench_otext(c: &mut Criterion) {
             .zip(m1s.into_iter())
             .collect::<Vec<(Block, Block)>>();
         let bs = rand_bool_vec(T);
-        bench.iter(|| _bench_block_ot::<Kos>(&bs, ms.clone()))
+        bench.iter(|| _bench_block_ot::<KosSender, KosReceiver>(&bs, ms.clone()))
     });
 }
 

@@ -4,17 +4,11 @@
 // Copyright © 2019 Galois, Inc.
 // See LICENSE for licensing information.
 
-mod alsz;
-mod chou_orlandi;
-mod dummy;
-mod kos;
-mod naor_pinkas;
-
-pub use alsz::AlszOT;
-pub use chou_orlandi::ChouOrlandiOT;
-pub use dummy::DummyOT;
-pub use kos::KosOT;
-pub use naor_pinkas::NaorPinkasOT;
+pub mod alsz;
+pub mod chou_orlandi;
+pub mod dummy;
+pub mod kos;
+pub mod naor_pinkas;
 
 use failure::Error;
 use std::io::{Read, Write};
@@ -38,6 +32,36 @@ pub trait ObliviousTransfer<R: Read, W: Write> {
         inputs: &[(Self::Msg, Self::Msg)],
     ) -> Result<(), Error>;
     /// Receives values.
+    fn receive(
+        &mut self,
+        reader: &mut R,
+        writer: &mut W,
+        inputs: &[bool],
+    ) -> Result<Vec<Self::Msg>, Error>;
+}
+
+pub trait ObliviousTransferSender<R: Read, W: Write>
+where
+    Self: Sized,
+{
+    type Msg: Sized + AsMut<[u8]>;
+
+    fn init(reader: &mut R, writer: &mut W) -> Result<Self, Error>;
+    fn send(
+        &mut self,
+        reader: &mut R,
+        writer: &mut W,
+        inputs: &[(Self::Msg, Self::Msg)],
+    ) -> Result<(), Error>;
+}
+
+pub trait ObliviousTransferReceiver<R: Read, W: Write>
+where
+    Self: Sized,
+{
+    type Msg: Sized + AsMut<[u8]>;
+
+    fn init(reader: &mut R, writer: &mut W) -> Result<Self, Error>;
     fn receive(
         &mut self,
         reader: &mut R,

@@ -4,27 +4,33 @@
 // Copyright © 2019 Galois, Inc.
 // See LICENSE for licensing information.
 
+//! Implementation if an **entirely insecure** oblivious transfer protocol for
+//! testing purposes.
+
 use crate::stream;
-use crate::{Block, ObliviousTransfer};
+use crate::{Block, ObliviousTransferReceiver, ObliviousTransferSender};
 use failure::Error;
 use std::io::{Read, Write};
 use std::marker::PhantomData;
 
-/// Implementation if an **entirely insecure** oblivious transfer protocol for
-/// testing purposes.
-pub struct DummyOT<R: Read, W: Write> {
+pub struct DummyOTSender<R: Read, W: Write> {
     _r: PhantomData<R>,
     _w: PhantomData<W>,
 }
 
-impl<R: Read, W: Write> ObliviousTransfer<R, W> for DummyOT<R, W> {
+pub struct DummyOTReceiver<R: Read, W: Write> {
+    _r: PhantomData<R>,
+    _w: PhantomData<W>,
+}
+
+impl<R: Read, W: Write> ObliviousTransferSender<R, W> for DummyOTSender<R, W> {
     type Msg = Block;
 
-    fn new() -> Self {
-        Self {
+    fn init(_: &mut R, _: &mut W) -> Result<Self, Error> {
+        Ok(Self {
             _r: PhantomData::<R>,
             _w: PhantomData::<W>,
-        }
+        })
     }
 
     fn send(
@@ -43,6 +49,17 @@ impl<R: Read, W: Write> ObliviousTransfer<R, W> for DummyOT<R, W> {
             m.write(&mut writer)?;
         }
         Ok(())
+    }
+}
+
+impl<R: Read, W: Write> ObliviousTransferReceiver<R, W> for DummyOTReceiver<R, W> {
+    type Msg = Block;
+
+    fn init(_: &mut R, _: &mut W) -> Result<Self, Error> {
+        Ok(Self {
+            _r: PhantomData::<R>,
+            _w: PhantomData::<W>,
+        })
     }
 
     fn receive(
@@ -75,14 +92,14 @@ mod tests {
         let m1_ = m1.clone();
         let (sender, receiver) = UnixStream::pair().unwrap();
         let handle = std::thread::spawn(move || {
-            let mut ot = DummyOT::new();
             let mut reader = BufReader::new(sender.try_clone().unwrap());
             let mut writer = BufWriter::new(sender);
+            let mut ot = DummyOTSender::init(&mut reader, &mut writer).unwrap();
             ot.send(&mut reader, &mut writer, &[(m0, m1)]).unwrap();
         });
-        let mut ot = DummyOT::new();
         let mut reader = BufReader::new(receiver.try_clone().unwrap());
         let mut writer = BufWriter::new(receiver);
+        let mut ot = DummyOTReceiver::init(&mut reader, &mut writer).unwrap();
         let result = ot.receive(&mut reader, &mut writer, &[b]).unwrap();
         assert_eq!(result[0], if b { m1_ } else { m0_ });
         handle.join().unwrap();
