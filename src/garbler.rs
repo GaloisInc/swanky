@@ -1,26 +1,30 @@
 // -*- mode: rust; -*-
 //
-// This file is part of ocelot.
+// This file is part of twopac.
 // Copyright © 2019 Galois, Inc.
 // See LICENSE for licensing information.
 
 use crate::comm;
 use fancy_garbling::{Fancy, Garbler as Gb, Message, SyncIndex, Wire};
-use ocelot::{Block, BlockObliviousTransfer};
+use ocelot::{Block, ObliviousTransfer};
 use std::io::{Read, Write};
 use std::sync::{Arc, Mutex};
 
-pub struct Garbler<S: Send + Sync + Read + Write, OT: BlockObliviousTransfer<S>> {
+pub struct Garbler<R: Read + Send, W: Write + Send, OT: ObliviousTransfer<R, W>> {
     garbler: Gb,
-    stream: Arc<Mutex<S>>,
+    reader: Arc<Mutex<R>>,
+    writer: Arc<Mutex<W>>,
     ot: Arc<Mutex<OT>>,
 }
 
-impl<S: Send + Sync + Read + Write + 'static, OT: BlockObliviousTransfer<S>> Garbler<S, OT> {
-    pub fn new(stream: S, stream_: S, inputs: &[u16]) -> Self {
-        let inputs = inputs.to_vec();
-        let mut inputs = inputs.into_iter();
-        let stream_ = Arc::new(Mutex::new(stream_));
+impl<R: Read + Send, W: Write + Send + 'static, OT: ObliviousTransfer<R, W, Msg = Block>>
+    Garbler<R, W, OT>
+{
+    pub fn new(reader: R, writer: W, inputs: &[u16]) -> Self {
+        let mut inputs = inputs.to_vec().into_iter();
+        let reader = Arc::new(Mutex::new(reader));
+        let writer = Arc::new(Mutex::new(writer));
+        let writer_ = writer.clone();
         let callback = move |idx: Option<SyncIndex>, msg| {
             let m = match msg {
                 Message::UnencodedGarblerInput { zero, delta } => {
@@ -35,29 +39,28 @@ impl<S: Send + Sync + Read + Write + 'static, OT: BlockObliviousTransfer<S>> Gar
                 }
                 m => m,
             };
-            // println!("Garbler: Before lock");
-            let mut stream = stream_.lock().unwrap();
-            // println!("Garbler: {:?}, {:?}", idx, m);
+            let mut writer = writer_.lock().unwrap();
             match idx {
-                Some(i) => comm::send(&mut *stream, &[i]).expect("Unable to send index"),
-                None => comm::send(&mut *stream, &[0xFF]).expect("Unable to send index"),
+                Some(i) => comm::send(&mut *writer, &[i]).expect("Unable to send index"),
+                None => comm::send(&mut *writer, &[0xFF]).expect("Unable to send index"),
             }
-            comm::send(&mut *stream, &m.to_bytes()).expect("Unable to send message");
+            comm::send(&mut *writer, &m.to_bytes()).expect("Unable to send message");
         };
         let garbler = Gb::new(callback);
-        let stream = Arc::new(Mutex::new(stream));
         let ot = Arc::new(Mutex::new(OT::new()));
         Garbler {
             garbler,
-            stream,
+            reader,
+            writer,
             ot,
         }
     }
 
     fn run_ot(&self, inputs: &[(Block, Block)]) {
         let mut ot = self.ot.lock().unwrap();
-        let mut stream = self.stream.lock().unwrap();
-        ot.send(&mut *stream, &inputs).unwrap(); // XXX: remove unwrap
+        let mut reader = self.reader.lock().unwrap();
+        let mut writer = self.writer.lock().unwrap();
+        ot.send(&mut *reader, &mut *writer, inputs).unwrap(); // XXX: remove unwrap
     }
 }
 
@@ -76,13 +79,13 @@ fn _evaluator_input(δ: &Wire, q: u16) -> (Wire, Vec<(Block, Block)>) {
     (wire, inputs)
 }
 
-impl<S: Send + Sync + Read + Write + 'static, OT: BlockObliviousTransfer<S>> Fancy
-    for Garbler<S, OT>
+impl<R: Read + Send, W: Write + Send + 'static, OT: ObliviousTransfer<R, W, Msg = Block>> Fancy
+    for Garbler<R, W, OT>
 {
     type Item = Wire;
 
-    fn garbler_input(&self, ix: Option<SyncIndex>, q: u16) -> Wire {
-        self.garbler.garbler_input(ix, q)
+    fn garbler_input(&self, ix: Option<SyncIndex>, q: u16, opt_x: Option<u16>) -> Wire {
+        self.garbler.garbler_input(ix, q, opt_x)
     }
 
     fn evaluator_input(&self, _ix: Option<SyncIndex>, q: u16) -> Wire {

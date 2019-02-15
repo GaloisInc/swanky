@@ -1,24 +1,25 @@
 // -*- mode: rust; -*-
 //
-// This file is part of ocelot.
+// This file is part of twopac.
 // Copyright © 2019 Galois, Inc.
 // See LICENSE for licensing information.
 
 use failure::Error;
 use std::io::{Read, Write};
 
-pub fn send<T: Read + Write>(stream: &mut T, data: &[u8]) -> Result<(), Error> {
+pub fn send<W: Write>(writer: &mut W, data: &[u8]) -> Result<(), Error> {
     let len = data.len().to_le_bytes();
-    stream.write_all(&len)?;
-    stream.write_all(&data)?;
+    writer.write_all(&len)?;
+    writer.write_all(&data)?;
+    writer.flush()?;
     Ok(())
 }
 
-pub fn receive<T: Read + Write>(stream: &mut T) -> Result<Vec<u8>, Error> {
-    let mut bytes: [u8; 8] = Default::default();
-    stream.read_exact(&mut bytes)?;
+pub fn receive<R: Read>(reader: &mut R) -> Result<Vec<u8>, Error> {
+    let mut bytes = [0u8; 8];
+    reader.read_exact(&mut bytes)?;
     let len = usize::from_le_bytes(bytes);
     let mut v = vec![0u8; len];
-    stream.read_exact(&mut v)?;
+    reader.read_exact(&mut v)?;
     Ok(v)
 }

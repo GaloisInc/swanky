@@ -1,42 +1,45 @@
 // -*- mode: rust; -*-
 //
-// This file is part of ocelot.
+// This file is part of twopac.
 // Copyright © 2019 Galois, Inc.
 // See LICENSE for licensing information.
 
 use crate::comm;
 use fancy_garbling::{Evaluator as Ev, Fancy, Message, SyncIndex, Wire};
-use ocelot::{Block, BlockObliviousTransfer};
+use ocelot::{Block, ObliviousTransfer};
 use std::io::{Read, Write};
 use std::sync::{Arc, Mutex};
 
-pub struct Evaluator<S: Send + Sync + Read + Write, OT: BlockObliviousTransfer<S>> {
+pub struct Evaluator<R: Read + Send, W: Write + Send, OT: ObliviousTransfer<R, W>> {
     evaluator: Ev,
-    stream: Arc<Mutex<S>>,
+    reader: Arc<Mutex<R>>,
+    writer: Arc<Mutex<W>>,
     inputs: Arc<Mutex<Vec<u16>>>,
     ot: Arc<Mutex<OT>>,
 }
 
-impl<S: Send + Sync + Read + Write + 'static, OT: BlockObliviousTransfer<S>> Evaluator<S, OT> {
-    pub fn new(stream: S, stream_: S, inputs: &[u16]) -> Self {
+impl<R: Read + Send + 'static, W: Write + Send, OT: ObliviousTransfer<R, W, Msg = Block>>
+    Evaluator<R, W, OT>
+{
+    pub fn new(reader: R, writer: W, inputs: &[u16]) -> Self {
         let inputs = Arc::new(Mutex::new(inputs.to_vec()));
-        let stream = Arc::new(Mutex::new(stream));
-        let stream_ = Arc::new(Mutex::new(stream_));
+        let reader = Arc::new(Mutex::new(reader));
+        let writer = Arc::new(Mutex::new(writer));
+        let reader_ = reader.clone();
         let callback = move || {
-            // println!("Evaluator: Before lock");
-            let mut stream = stream_.lock().unwrap();
-            let idx = comm::receive(&mut *stream).unwrap(); // XXX: unwrap
-            let bytes = comm::receive(&mut *stream).unwrap(); // XXX: unwrap
+            let mut reader = reader_.lock().unwrap();
+            let idx = comm::receive(&mut *reader).unwrap(); // XXX: unwrap
+            let bytes = comm::receive(&mut *reader).unwrap(); // XXX: unwrap
             let msg = Message::from_bytes(&bytes).unwrap(); // XXX: unwrap
             let idx = if idx[0] == 0xFF { None } else { Some(idx[0]) };
-            // println!("Evaluator: {:?}, {:?}", idx, msg);
             (idx, msg)
         };
         let evaluator = Ev::new(callback);
         let ot = Arc::new(Mutex::new(OT::new()));
         Evaluator {
             evaluator,
-            stream,
+            reader,
+            writer,
             inputs,
             ot,
         }
@@ -48,8 +51,9 @@ impl<S: Send + Sync + Read + Write + 'static, OT: BlockObliviousTransfer<S>> Eva
 
     fn run_ot(&self, inputs: &[bool]) -> Vec<Block> {
         let mut ot = self.ot.lock().unwrap();
-        let mut stream = self.stream.lock().unwrap();
-        ot.receive(&mut *stream, &inputs).unwrap() // XXX: remove unwrap
+        let mut reader = self.reader.lock().unwrap();
+        let mut writer = self.writer.lock().unwrap();
+        ot.receive(&mut *reader, &mut *writer, &inputs).unwrap() // XXX: remove unwrap
     }
 }
 
@@ -63,13 +67,13 @@ fn combine(wires: &[Block], q: u16) -> Wire {
         })
 }
 
-impl<S: Send + Sync + Read + Write + 'static, OT: BlockObliviousTransfer<S>> Fancy
-    for Evaluator<S, OT>
+impl<R: Read + Send + 'static, W: Write + Send, OT: ObliviousTransfer<R, W, Msg = Block>> Fancy
+    for Evaluator<R, W, OT>
 {
     type Item = Wire;
 
-    fn garbler_input(&self, ix: Option<SyncIndex>, q: u16) -> Wire {
-        self.evaluator.garbler_input(ix, q)
+    fn garbler_input(&self, ix: Option<SyncIndex>, q: u16, opt_x: Option<u16>) -> Wire {
+        self.evaluator.garbler_input(ix, q, opt_x)
     }
 
     fn evaluator_input(&self, _ix: Option<SyncIndex>, q: u16) -> Wire {

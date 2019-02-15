@@ -1,6 +1,6 @@
 // -*- mode: rust; -*-
 //
-// This file is part of ocelot.
+// This file is part of twopac.
 // Copyright © 2019 Galois, Inc.
 // See LICENSE for licensing information.
 
@@ -25,11 +25,11 @@ use ocelot::Block;
 
 #[inline(always)]
 fn wire_to_block(w: Wire) -> Block {
-    w.as_u128().to_le_bytes()
+    Block::from(w.as_u128().to_le_bytes())
 }
 #[inline(always)]
 fn block_to_wire(b: Block, q: u16) -> Wire {
-    Wire::from_u128(u128::from_le_bytes(b), q)
+    Wire::from_u128(b.into(), q)
 }
 
 #[cfg(test)]
@@ -40,51 +40,69 @@ mod tests {
     use fancy_garbling::util::RngExt;
     use fancy_garbling::{BundleGadgets, Fancy, HasModulus, SyncIndex};
     use itertools::Itertools;
-    use ocelot::{BlockObliviousTransfer, ChouOrlandiOT, DummyBlockOT};
+    use ocelot::*;
+    use std::io::{BufReader, BufWriter};
     use std::os::unix::net::UnixStream;
 
     fn c1<F: Fancy<Item = W>, W: HasModulus + Clone>(f: &mut F) {
-        let a = f.garbler_input(None, 3);
+        let a = f.garbler_input(None, 3, None);
         let b = f.evaluator_input(None, 3);
         let c = f.add(&a, &b);
         f.output(None, &c);
     }
 
-    fn test_c1<OT: BlockObliviousTransfer<UnixStream>>(a: u16, b: u16) {
+    fn test_c1<OT: ObliviousTransfer<BufReader<UnixStream>, BufWriter<UnixStream>, Msg = Block>>(
+        a: u16,
+        b: u16,
+    ) {
         let (sender, receiver) = UnixStream::pair().unwrap();
-        let (sender2, receiver2) = UnixStream::pair().unwrap();
         std::thread::spawn(move || {
-            let mut gb = Garbler::<UnixStream, OT>::new(sender, sender2, &[a]);
+            let reader = BufReader::new(sender.try_clone().unwrap());
+            let writer = BufWriter::new(sender);
+            let mut gb = Garbler::<BufReader<UnixStream>, BufWriter<UnixStream>, OT>::new(
+                reader,
+                writer,
+                &[a],
+            );
             c1(&mut gb);
         });
-        let mut ev = Evaluator::<UnixStream, OT>::new(receiver, receiver2, &[b]);
+        let reader = BufReader::new(receiver.try_clone().unwrap());
+        let writer = BufWriter::new(receiver);
+        let mut ev = Evaluator::<BufReader<UnixStream>, BufWriter<UnixStream>, OT>::new(
+            reader,
+            writer,
+            &[b],
+        );
         c1(&mut ev);
         let output = ev.decode_output();
         assert_eq!(vec![(a + b) % 3], output);
     }
 
+    type ChouOrlandi = ChouOrlandiOT<BufReader<UnixStream>, BufWriter<UnixStream>>;
+
     #[test]
     fn test_simple_circuits() {
-        test_c1::<ChouOrlandiOT<UnixStream>>(0, 0);
-        test_c1::<ChouOrlandiOT<UnixStream>>(1, 0);
-        test_c1::<ChouOrlandiOT<UnixStream>>(2, 0);
-        test_c1::<ChouOrlandiOT<UnixStream>>(0, 1);
-        test_c1::<ChouOrlandiOT<UnixStream>>(0, 2);
-        test_c1::<ChouOrlandiOT<UnixStream>>(1, 1);
-        test_c1::<ChouOrlandiOT<UnixStream>>(2, 1);
-        test_c1::<ChouOrlandiOT<UnixStream>>(1, 2);
-        test_c1::<ChouOrlandiOT<UnixStream>>(2, 2);
+        test_c1::<ChouOrlandi>(0, 0);
+        test_c1::<ChouOrlandi>(1, 0);
+        test_c1::<ChouOrlandi>(2, 0);
+        test_c1::<ChouOrlandi>(0, 1);
+        test_c1::<ChouOrlandi>(0, 2);
+        test_c1::<ChouOrlandi>(1, 1);
+        test_c1::<ChouOrlandi>(2, 1);
+        test_c1::<ChouOrlandi>(1, 2);
+        test_c1::<ChouOrlandi>(2, 2);
     }
 
     fn c2<F: Fancy<Item = W>, W: HasModulus + Clone>(f: &F, q: u128, n: SyncIndex) {
         // f.begin_sync(n);
         let mut zs = Vec::new();
         for i in 0..n {
+            // let idx = Some(i);
             let idx = None;
             let c = f.constant_bundle_crt(idx, 1, q);
             let x = f.evaluator_input_bundle_crt(idx, q);
             let x = f.mul_bundles(idx, &x, &c);
-            let z = f.relu(idx, &x, "100%");
+            let z = f.relu(idx, &x, "100%", None);
             zs.push(z);
             // f.finish_index(i);
         }
@@ -104,13 +122,21 @@ mod tests {
         c2(&dummy, q, n);
         let target = dummy.get_output();
         let (sender, receiver) = UnixStream::pair().unwrap();
-        let (sender2, receiver2) = UnixStream::pair().unwrap();
         std::thread::spawn(move || {
-            let gb = Garbler::<UnixStream, DummyBlockOT<UnixStream>>::new(sender, sender2, &[]);
+            let reader = BufReader::new(sender.try_clone().unwrap());
+            let writer = BufWriter::new(sender);
+            let gb = Garbler::<BufReader<UnixStream>, BufWriter<UnixStream>, ChouOrlandi>::new(
+                reader,
+                writer,
+                &[],
+            );
             c2(&gb, q, n);
         });
-        let ev =
-            Evaluator::<UnixStream, DummyBlockOT<UnixStream>>::new(receiver, receiver2, &input);
+        let reader = BufReader::new(receiver.try_clone().unwrap());
+        let writer = BufWriter::new(receiver);
+        let ev = Evaluator::<BufReader<UnixStream>, BufWriter<UnixStream>, ChouOrlandi>::new(
+            reader, writer, &input,
+        );
         c2(&ev, q, n);
         let result = ev.decode_output();
         assert_eq!(target, result);
