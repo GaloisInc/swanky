@@ -13,17 +13,17 @@ pub mod naor_pinkas;
 use failure::Error;
 use std::io::{Read, Write};
 
-/// Trait for one-out-of-two oblivious transfer on 128-bit inputs.
-///
-/// This trait encapsulates the functionality common to oblivious transfer
-/// protocols.
-pub trait ObliviousTransfer<R: Read, W: Write> {
+/// Trait for one-out-of-two oblivious transfer from the sender's point-of-view.
+pub trait ObliviousTransferSender<R: Read, W: Write>
+where
+    Self: Sized,
+{
     /// Message type, restricted to types that are mutably-dereferencable as
     /// `u8` arrays.
     type Msg: Sized + AsMut<[u8]>;
-
-    /// Creates a new oblivious transfer instance.
-    fn new() -> Self;
+    /// Runs any one-time initialization to create the oblivious transfer
+    /// object.
+    fn init(reader: &mut R, writer: &mut W) -> Result<Self, Error>;
     /// Sends values.
     fn send(
         &mut self,
@@ -31,37 +31,21 @@ pub trait ObliviousTransfer<R: Read, W: Write> {
         writer: &mut W,
         inputs: &[(Self::Msg, Self::Msg)],
     ) -> Result<(), Error>;
-    /// Receives values.
-    fn receive(
-        &mut self,
-        reader: &mut R,
-        writer: &mut W,
-        inputs: &[bool],
-    ) -> Result<Vec<Self::Msg>, Error>;
 }
 
-pub trait ObliviousTransferSender<R: Read, W: Write>
-where
-    Self: Sized,
-{
-    type Msg: Sized + AsMut<[u8]>;
-
-    fn init(reader: &mut R, writer: &mut W) -> Result<Self, Error>;
-    fn send(
-        &mut self,
-        reader: &mut R,
-        writer: &mut W,
-        inputs: &[(Self::Msg, Self::Msg)],
-    ) -> Result<(), Error>;
-}
-
+/// Trait for one-out-of-two oblivious transfer from the receiver's
+/// point-of-view.
 pub trait ObliviousTransferReceiver<R: Read, W: Write>
 where
     Self: Sized,
 {
+    /// Message type, restricted to types that are mutably-dereferencable as
+    /// `u8` arrays.
     type Msg: Sized + AsMut<[u8]>;
-
+    /// Runs any one-time initialization to create the oblivious transfer
+    /// object.
     fn init(reader: &mut R, writer: &mut W) -> Result<Self, Error>;
+    /// Receives values.
     fn receive(
         &mut self,
         reader: &mut R,

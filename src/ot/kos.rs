@@ -93,8 +93,7 @@ impl<R: Read, W: Write, OT: ObliviousTransferReceiver<R, W, Msg = Block> + Malic
         let (nrows, ncols) = (128, ℓ_);
         let mut qs = vec![0u8; nrows * ncols / 8];
         let mut u = vec![0u8; ncols / 8];
-        let rngs = &mut self.rngs;
-        for (j, (b, rng)) in self.δ.iter().zip(rngs.into_iter()).enumerate() {
+        for (j, (b, rng)) in self.δ.iter().zip(self.rngs.iter_mut()).enumerate() {
             let range = j * ncols / 8..(j + 1) * ncols / 8;
             let mut q = &mut qs[range];
             rng.fill_bytes(&mut q);

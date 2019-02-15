@@ -12,11 +12,15 @@ use crate::Block;
 use core::arch::x86_64::*;
 
 /// AES-based correlation-robust hash function.
+///
+/// This hash function supports the correlation-robust variants given in
+/// <https://eprint.iacr.org/2019/074>.
 pub struct AesHash {
     aes: Aes128,
 }
 
 impl AesHash {
+    /// Initialize the hash function using `key`.
     #[inline(always)]
     pub fn new(key: Block) -> Self {
         let aes = Aes128::new(key);

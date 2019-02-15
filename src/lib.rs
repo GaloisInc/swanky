@@ -6,11 +6,20 @@
 
 //! `ocelot` is an oblivious transfer (+ extension) library written in rust.
 //!
-//! `ocelot` attempts to use all the latest-and-greatest optimizations, including:
-//! * Fixed-key AES wherever possible (cf. <https://eprint.iacr.org/2019/074>)
-//! * An assembly implementation of matrix transposition from the EMP toolkit's OT implementation (cf. <https://github.com/emp-toolkit/emp-ot>)
+//! `ocelot` exposes oblivious transfer (OT) through two traits:
+//! `ObliviousTransferSender` and `ObliviousTransferReceiver`. Each trait has an
+//! `init` function, which runs any one-time initialization (e.g., for OT
+//! extension this corresponds to the running of the base OTs). The traits then
+//! have either a `send` or `receive` method, which runs the OT sender or
+//! receiver, respectively. This method can be run multiple times, allowing one
+//! to for example run OT extension multiple times without having to re-do the
+//! initialization phase.
 //!
-//! **THIS IS VERY MUCH RESEARCH CODE!** (for now)
+//! `ocelot` attempts to use all the latest-and-greatest optimizations, including:
+//! * Fixed-key AES wherever possible (cf. <https://eprint.iacr.org/2019/074>).
+//! * An optimized implementation of matrix transposition from the EMP toolkit's OT implementation (cf. <https://github.com/emp-toolkit/emp-ot>).
+//!
+//! **THIS IS STILL VERY MUCH RESEARCH CODE**, for now.
 
 #![allow(clippy::many_single_char_names)]
 #![feature(non_ascii_idents)]
