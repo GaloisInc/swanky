@@ -5,12 +5,13 @@
 // See LICENSE for licensing information.
 
 use crate::comm;
+use failure::Error;
 use fancy_garbling::{Evaluator as Ev, Fancy, Message, SyncIndex, Wire};
-use ocelot::{Block, ObliviousTransfer};
+use ocelot::{Block, ObliviousTransferReceiver};
 use std::io::{Read, Write};
 use std::sync::{Arc, Mutex};
 
-pub struct Evaluator<R: Read + Send, W: Write + Send, OT: ObliviousTransfer<R, W>> {
+pub struct Evaluator<R: Read + Send, W: Write + Send, OT: ObliviousTransferReceiver<R, W>> {
     evaluator: Ev,
     reader: Arc<Mutex<R>>,
     writer: Arc<Mutex<W>>,
@@ -18,14 +19,18 @@ pub struct Evaluator<R: Read + Send, W: Write + Send, OT: ObliviousTransfer<R, W
     ot: Arc<Mutex<OT>>,
 }
 
-impl<R: Read + Send + 'static, W: Write + Send, OT: ObliviousTransfer<R, W, Msg = Block>>
-    Evaluator<R, W, OT>
+impl<
+        R: Read + Send + 'static,
+        W: Write + Send,
+        OT: ObliviousTransferReceiver<R, W, Msg = Block>,
+    > Evaluator<R, W, OT>
 {
-    pub fn new(reader: R, writer: W, inputs: &[u16]) -> Self {
+    pub fn new(mut reader: R, mut writer: W, inputs: &[u16]) -> Result<Self, Error> {
+        let ot = OT::init(&mut reader, &mut writer)?;
         let inputs = Arc::new(Mutex::new(inputs.to_vec()));
         let reader = Arc::new(Mutex::new(reader));
         let writer = Arc::new(Mutex::new(writer));
-        let reader_ = reader.clone();
+        let reader_ = Arc::clone(&reader);
         let callback = move || {
             let mut reader = reader_.lock().unwrap();
             let idx = comm::receive(&mut *reader).unwrap(); // XXX: unwrap
@@ -35,14 +40,14 @@ impl<R: Read + Send + 'static, W: Write + Send, OT: ObliviousTransfer<R, W, Msg 
             (idx, msg)
         };
         let evaluator = Ev::new(callback);
-        let ot = Arc::new(Mutex::new(OT::new()));
-        Evaluator {
+        let ot = Arc::new(Mutex::new(ot));
+        Ok(Evaluator {
             evaluator,
             reader,
             writer,
             inputs,
             ot,
-        }
+        })
     }
 
     pub fn decode_output(&self) -> Vec<u16> {
@@ -67,8 +72,11 @@ fn combine(wires: &[Block], q: u16) -> Wire {
         })
 }
 
-impl<R: Read + Send + 'static, W: Write + Send, OT: ObliviousTransfer<R, W, Msg = Block>> Fancy
-    for Evaluator<R, W, OT>
+impl<
+        R: Read + Send + 'static,
+        W: Write + Send,
+        OT: ObliviousTransferReceiver<R, W, Msg = Block>,
+    > Fancy for Evaluator<R, W, OT>
 {
     type Item = Wire;
 
@@ -88,6 +96,7 @@ impl<R: Read + Send + 'static, W: Write + Send, OT: ObliviousTransfer<R, W, Msg 
     }
 
     fn evaluator_inputs(&self, _ix: Option<SyncIndex>, qs: &[u16]) -> Vec<Wire> {
+        println!("Evaluator: evaluator_inputs");
         let ℓs = qs
             .into_iter()
             .map(|q| (*q as f32).log(2.0).ceil() as usize)

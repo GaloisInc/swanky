@@ -44,6 +44,9 @@ mod tests {
     use std::io::{BufReader, BufWriter};
     use std::os::unix::net::UnixStream;
 
+    type Reader = BufReader<UnixStream>;
+    type Writer = BufWriter<UnixStream>;
+
     fn c1<F: Fancy<Item = W>, W: HasModulus + Clone>(f: &mut F) {
         let a = f.garbler_input(None, 3, None);
         let b = f.evaluator_input(None, 3);
@@ -51,7 +54,10 @@ mod tests {
         f.output(None, &c);
     }
 
-    fn test_c1<OT: ObliviousTransfer<BufReader<UnixStream>, BufWriter<UnixStream>, Msg = Block>>(
+    fn test_c1<
+        OTSender: ObliviousTransferSender<Reader, Writer, Msg = Block>,
+        OTReceiver: ObliviousTransferReceiver<Reader, Writer, Msg = Block>,
+    >(
         a: u16,
         b: u16,
     ) {
@@ -59,38 +65,31 @@ mod tests {
         std::thread::spawn(move || {
             let reader = BufReader::new(sender.try_clone().unwrap());
             let writer = BufWriter::new(sender);
-            let mut gb = Garbler::<BufReader<UnixStream>, BufWriter<UnixStream>, OT>::new(
-                reader,
-                writer,
-                &[a],
-            );
+            let mut gb = Garbler::<Reader, Writer, OTSender>::new(reader, writer, &[a]).unwrap();
             c1(&mut gb);
         });
         let reader = BufReader::new(receiver.try_clone().unwrap());
         let writer = BufWriter::new(receiver);
-        let mut ev = Evaluator::<BufReader<UnixStream>, BufWriter<UnixStream>, OT>::new(
-            reader,
-            writer,
-            &[b],
-        );
+        let mut ev = Evaluator::<Reader, Writer, OTReceiver>::new(reader, writer, &[b]).unwrap();
         c1(&mut ev);
         let output = ev.decode_output();
         assert_eq!(vec![(a + b) % 3], output);
     }
 
-    type ChouOrlandi = ChouOrlandiOT<BufReader<UnixStream>, BufWriter<UnixStream>>;
+    type ChouOrlandiSender = chou_orlandi::ChouOrlandiOTSender<Reader, Writer>;
+    type ChouOrlandiReceiver = chou_orlandi::ChouOrlandiOTReceiver<Reader, Writer>;
 
     #[test]
     fn test_simple_circuits() {
-        test_c1::<ChouOrlandi>(0, 0);
-        test_c1::<ChouOrlandi>(1, 0);
-        test_c1::<ChouOrlandi>(2, 0);
-        test_c1::<ChouOrlandi>(0, 1);
-        test_c1::<ChouOrlandi>(0, 2);
-        test_c1::<ChouOrlandi>(1, 1);
-        test_c1::<ChouOrlandi>(2, 1);
-        test_c1::<ChouOrlandi>(1, 2);
-        test_c1::<ChouOrlandi>(2, 2);
+        test_c1::<ChouOrlandiSender, ChouOrlandiReceiver>(0, 0);
+        test_c1::<ChouOrlandiSender, ChouOrlandiReceiver>(1, 0);
+        test_c1::<ChouOrlandiSender, ChouOrlandiReceiver>(2, 0);
+        test_c1::<ChouOrlandiSender, ChouOrlandiReceiver>(0, 1);
+        test_c1::<ChouOrlandiSender, ChouOrlandiReceiver>(0, 2);
+        test_c1::<ChouOrlandiSender, ChouOrlandiReceiver>(1, 1);
+        test_c1::<ChouOrlandiSender, ChouOrlandiReceiver>(2, 1);
+        test_c1::<ChouOrlandiSender, ChouOrlandiReceiver>(1, 2);
+        test_c1::<ChouOrlandiSender, ChouOrlandiReceiver>(2, 2);
     }
 
     fn c2<F: Fancy<Item = W>, W: HasModulus + Clone>(f: &F, q: u128, n: SyncIndex) {
@@ -125,18 +124,14 @@ mod tests {
         std::thread::spawn(move || {
             let reader = BufReader::new(sender.try_clone().unwrap());
             let writer = BufWriter::new(sender);
-            let gb = Garbler::<BufReader<UnixStream>, BufWriter<UnixStream>, ChouOrlandi>::new(
-                reader,
-                writer,
-                &[],
-            );
+            let gb =
+                Garbler::<Reader, Writer, ChouOrlandiSender>::new(reader, writer, &[]).unwrap();
             c2(&gb, q, n);
         });
         let reader = BufReader::new(receiver.try_clone().unwrap());
         let writer = BufWriter::new(receiver);
-        let ev = Evaluator::<BufReader<UnixStream>, BufWriter<UnixStream>, ChouOrlandi>::new(
-            reader, writer, &input,
-        );
+        let ev =
+            Evaluator::<Reader, Writer, ChouOrlandiReceiver>::new(reader, writer, &input).unwrap();
         c2(&ev, q, n);
         let result = ev.decode_output();
         assert_eq!(target, result);
