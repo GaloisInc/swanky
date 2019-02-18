@@ -253,7 +253,6 @@ mod tests {
     extern crate test;
     use super::*;
     use crate::*;
-    use itertools::izip;
     use std::io::{BufReader, BufWriter};
     use std::os::unix::net::UnixStream;
 
@@ -274,7 +273,6 @@ mod tests {
         let bs = rand_bool_vec(T);
         let m0s_ = m0s.clone();
         let m1s_ = m1s.clone();
-        let bs_ = bs.clone();
         let (sender, receiver) = UnixStream::pair().unwrap();
         let handle = std::thread::spawn(move || {
             let mut reader = BufReader::new(sender.try_clone().unwrap());
@@ -300,8 +298,8 @@ mod tests {
         >::init(&mut reader, &mut writer)
         .unwrap();
         let results = otext.receive(&mut reader, &mut writer, &bs).unwrap();
-        for (b, result, m0, m1) in izip!(bs_, results, m0s_, m1s_) {
-            assert_eq!(result, if b { m1 } else { m0 })
+        for j in 0..T {
+            assert_eq!(results[j], if bs[j] { m1s_[j] } else { m0s_[j] })
         }
         handle.join().unwrap();
     }

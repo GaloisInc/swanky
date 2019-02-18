@@ -21,7 +21,6 @@ cc = "*"
 
 [dev-dependencies]
 criterion = "*"
-itertools = "*"
 
 [profile.release]
 debug = true

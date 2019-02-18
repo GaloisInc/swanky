@@ -68,6 +68,27 @@ fn _bench_block_cot<
     handle.join().unwrap();
 }
 
+fn _bench_block_rot<
+    OTSender: RandomObliviousTransferSender<Reader, Writer, Msg = Block>,
+    OTReceiver: RandomObliviousTransferReceiver<Reader, Writer, Msg = Block>,
+>(
+    bs: &[bool],
+) {
+    let (sender, receiver) = UnixStream::pair().unwrap();
+    let m = bs.len();
+    let handle = std::thread::spawn(move || {
+        let mut reader = BufReader::new(sender.try_clone().unwrap());
+        let mut writer = BufWriter::new(sender);
+        let mut ot = OTSender::init(&mut reader, &mut writer).unwrap();
+        ot.send_random(&mut reader, &mut writer, m).unwrap();
+    });
+    let mut reader = BufReader::new(receiver.try_clone().unwrap());
+    let mut writer = BufWriter::new(receiver);
+    let mut ot = OTReceiver::init(&mut reader, &mut writer).unwrap();
+    ot.receive_random(&mut reader, &mut writer, &bs).unwrap();
+    handle.join().unwrap();
+}
+
 type ChouOrlandiSender = chou_orlandi::ChouOrlandiOTSender<Reader, Writer>;
 type ChouOrlandiReceiver = chou_orlandi::ChouOrlandiOTReceiver<Reader, Writer>;
 type DummySender = dummy::DummyOTSender<Reader, Writer>;
@@ -146,10 +167,17 @@ fn bench_correlated_otext(c: &mut Criterion) {
     });
 }
 
+fn bench_random_otext(c: &mut Criterion) {
+    c.bench_function("rot::AlszOT", move |bench| {
+        let bs = rand_bool_vec(T);
+        bench.iter(|| _bench_block_rot::<AlszSender, AlszReceiver>(&bs))
+    });
+}
+
 criterion_group! {
     name = ot;
     config = Criterion::default().warm_up_time(Duration::from_millis(100));
-    targets = bench_ot, bench_otext, bench_correlated_otext
+    targets = bench_ot, bench_otext, bench_correlated_otext, bench_random_otext
 }
 
 criterion_main!(ot);

@@ -12,7 +12,8 @@ use crate::rand_aes::AesRng;
 use crate::{stream, utils};
 use crate::{
     Block, CorrelatedObliviousTransferReceiver, CorrelatedObliviousTransferSender,
-    ObliviousTransferReceiver, ObliviousTransferSender, SemiHonest,
+    ObliviousTransferReceiver, ObliviousTransferSender, RandomObliviousTransferReceiver,
+    RandomObliviousTransferSender, SemiHonest,
 };
 use arrayref::array_ref;
 use failure::Error;
@@ -133,20 +134,43 @@ impl<R: Read, W: Write, OT: ObliviousTransferReceiver<R, W, Msg = Block> + SemiH
         reader: &mut R,
         mut writer: &mut W,
         deltas: &[Self::Msg],
-    ) -> Result<(), Error> {
+    ) -> Result<Vec<(Self::Msg, Self::Msg)>, Error> {
         let m = deltas.len();
         let mut qs = self.send_setup(reader, m)?;
+        let mut out = Vec::with_capacity(m);
         for (j, delta) in deltas.iter().enumerate() {
-            let range = j * 16..(j + 1) * 16;
-            let mut q = &mut qs[range];
+            let mut q = &mut qs[j * 16..(j + 1) * 16];
             let x0 = self.hash.cr_hash(j, Block::from(*array_ref![q, 0, 16]));
             let x1 = x0 ^ *delta;
             utils::xor_inplace(&mut q, &self.s_);
             let y = self.hash.cr_hash(j, Block::from(*array_ref![q, 0, 16])) ^ x1;
             y.write(&mut writer)?;
+            out.push((x0, x1));
         }
         writer.flush()?;
-        Ok(())
+        Ok(out)
+    }
+}
+
+impl<R: Read, W: Write, OT: ObliviousTransferReceiver<R, W, Msg = Block> + SemiHonest>
+    RandomObliviousTransferSender<R, W> for AlszOTSender<R, W, OT>
+{
+    fn send_random(
+        &mut self,
+        reader: &mut R,
+        _: &mut W,
+        m: usize,
+    ) -> Result<Vec<(Self::Msg, Self::Msg)>, Error> {
+        let mut qs = self.send_setup(reader, m)?;
+        let mut out = Vec::with_capacity(m);
+        for j in 0..m {
+            let mut q = &mut qs[j * 16..(j + 1) * 16];
+            let x0 = self.hash.cr_hash(j, Block::from(*array_ref![q, 0, 16]));
+            utils::xor_inplace(&mut q, &self.s_);
+            let x1 = self.hash.cr_hash(j, Block::from(*array_ref![q, 0, 16]));
+            out.push((x0, x1));
+        }
+        Ok(out)
     }
 }
 
@@ -253,6 +277,26 @@ impl<R: Read, W: Write, OT: ObliviousTransferSender<R, W, Msg = Block> + SemiHon
     }
 }
 
+impl<R: Read, W: Write, OT: ObliviousTransferSender<R, W, Msg = Block> + SemiHonest>
+    RandomObliviousTransferReceiver<R, W> for AlszOTReceiver<R, W, OT>
+{
+    fn receive_random(
+        &mut self,
+        _: &mut R,
+        writer: &mut W,
+        inputs: &[bool],
+    ) -> Result<Vec<Self::Msg>, Error> {
+        let ts = self.receive_setup(writer, inputs)?;
+        let mut out = Vec::with_capacity(inputs.len());
+        for j in 0..inputs.len() {
+            let t = &ts[j * 16..(j + 1) * 16];
+            let h = self.hash.cr_hash(j, Block::from(*array_ref![t, 0, 16]));
+            out.push(h);
+        }
+        Ok(out)
+    }
+}
+
 impl<R: Read, W: Write, OT: ObliviousTransferReceiver<R, W, Msg = Block> + SemiHonest> SemiHonest
     for AlszOTSender<R, W, OT>
 {
@@ -268,9 +312,9 @@ mod tests {
     extern crate test;
     use super::*;
     use crate::*;
-    use itertools::izip;
     use std::io::{BufReader, BufWriter};
     use std::os::unix::net::UnixStream;
+    use std::sync::{Arc, Mutex};
 
     const T: usize = 1 << 12;
 
@@ -289,7 +333,6 @@ mod tests {
         let bs = rand_bool_vec(T);
         let m0s_ = m0s.clone();
         let m1s_ = m1s.clone();
-        let bs_ = bs.clone();
         let (sender, receiver) = UnixStream::pair().unwrap();
         let handle = std::thread::spawn(move || {
             let mut reader = BufReader::new(sender.try_clone().unwrap());
@@ -315,9 +358,82 @@ mod tests {
         >::init(&mut reader, &mut writer)
         .unwrap();
         let results = otext.receive(&mut reader, &mut writer, &bs).unwrap();
-        for (b, result, m0, m1) in izip!(bs_, results, m0s_, m1s_) {
-            assert_eq!(result, if b { m1 } else { m0 })
+        for j in 0..T {
+            assert_eq!(results[j], if bs[j] { m1s_[j] } else { m0s_[j] })
         }
         handle.join().unwrap();
+    }
+
+    #[test]
+    fn test_cotext() {
+        let deltas = rand_block_vec(T);
+        let bs = rand_bool_vec(T);
+        let out = Arc::new(Mutex::new(vec![]));
+        let out_ = out.clone();
+        let (sender, receiver) = UnixStream::pair().unwrap();
+        let handle = std::thread::spawn(move || {
+            let mut reader = BufReader::new(sender.try_clone().unwrap());
+            let mut writer = BufWriter::new(sender);
+            let mut otext = AlszOTSender::<
+                BufReader<UnixStream>,
+                BufWriter<UnixStream>,
+                chou_orlandi::ChouOrlandiOTReceiver<BufReader<UnixStream>, BufWriter<UnixStream>>,
+            >::init(&mut reader, &mut writer)
+            .unwrap();
+            let mut out = out.lock().unwrap();
+            *out = otext
+                .send_correlated(&mut reader, &mut writer, &deltas)
+                .unwrap();
+        });
+        let mut reader = BufReader::new(receiver.try_clone().unwrap());
+        let mut writer = BufWriter::new(receiver);
+        let mut otext = AlszOTReceiver::<
+            BufReader<UnixStream>,
+            BufWriter<UnixStream>,
+            chou_orlandi::ChouOrlandiOTSender<BufReader<UnixStream>, BufWriter<UnixStream>>,
+        >::init(&mut reader, &mut writer)
+        .unwrap();
+        let results = otext
+            .receive_correlated(&mut reader, &mut writer, &bs)
+            .unwrap();
+        handle.join().unwrap();
+        let out_ = out_.lock().unwrap();
+        for j in 0..T {
+            assert_eq!(results[j], if bs[j] { out_[j].1 } else { out_[j].0 })
+        }
+    }
+
+    #[test]
+    fn test_rotext() {
+        let bs = rand_bool_vec(T);
+        let out = Arc::new(Mutex::new(vec![]));
+        let out_ = out.clone();
+        let (sender, receiver) = UnixStream::pair().unwrap();
+        let handle = std::thread::spawn(move || {
+            let mut reader = BufReader::new(sender.try_clone().unwrap());
+            let mut writer = BufWriter::new(sender);
+            let mut otext = AlszOTSender::<
+                BufReader<UnixStream>,
+                BufWriter<UnixStream>,
+                chou_orlandi::ChouOrlandiOTReceiver<BufReader<UnixStream>, BufWriter<UnixStream>>,
+            >::init(&mut reader, &mut writer)
+            .unwrap();
+            let mut out = out.lock().unwrap();
+            *out = otext.send_random(&mut reader, &mut writer, T).unwrap();
+        });
+        let mut reader = BufReader::new(receiver.try_clone().unwrap());
+        let mut writer = BufWriter::new(receiver);
+        let mut otext = AlszOTReceiver::<
+            BufReader<UnixStream>,
+            BufWriter<UnixStream>,
+            chou_orlandi::ChouOrlandiOTSender<BufReader<UnixStream>, BufWriter<UnixStream>>,
+        >::init(&mut reader, &mut writer)
+        .unwrap();
+        let results = otext.receive_random(&mut reader, &mut writer, &bs).unwrap();
+        handle.join().unwrap();
+        let out_ = out_.lock().unwrap();
+        for j in 0..T {
+            assert_eq!(results[j], if bs[j] { out_[j].1 } else { out_[j].0 })
+        }
     }
 }
