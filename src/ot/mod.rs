@@ -54,6 +54,36 @@ where
     ) -> Result<Vec<Self::Msg>, Error>;
 }
 
+/// Trait for one-out-of-two correlated oblivious transfer from the sender's
+/// point-of-view.
+pub trait CorrelatedObliviousTransferSender<R: Read, W: Write>:
+    ObliviousTransferSender<R, W>
+where
+    Self: Sized,
+{
+    fn send_correlated(
+        &mut self,
+        reader: &mut R,
+        writer: &mut W,
+        inputs: &[Self::Msg],
+    ) -> Result<(), Error>;
+}
+
+/// Trait for one-out-of-two correlated oblivious transfer from the receiver's
+/// point-of-view.
+pub trait CorrelatedObliviousTransferReceiver<R: Read, W: Write>:
+    ObliviousTransferReceiver<R, W>
+where
+    Self: Sized,
+{
+    fn receive_correlated(
+        &mut self,
+        reader: &mut R,
+        writer: &mut W,
+        deltas: &[bool],
+    ) -> Result<Vec<Self::Msg>, Error>;
+}
+
 /// A marker trait denoting that the given scheme is semi-honest secure.
 pub trait SemiHonest {}
 /// A marker trait denoting that the given scheme is maliciously secure.

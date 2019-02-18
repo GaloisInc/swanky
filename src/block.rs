@@ -15,7 +15,7 @@ use std::io::{Read, Write};
 
 /// A 128-bit chunk.
 #[derive(Clone, Copy, Debug)]
-pub struct Block(pub __m128i);
+pub struct Block(pub(crate) __m128i);
 
 impl Block {
     #[inline(always)]
@@ -58,10 +58,9 @@ impl Block {
         let k = k.as_bytes();
         // XXX: We're just taking the first 16 bytes of the compressed point... Is that secure?!
         let c = Aes128::new(Block::from(*array_ref![k, 0, 16]));
-        unsafe {
-            let m = _mm_set_epi64(_mm_setzero_si64(), std::mem::transmute::<usize, __m64>(i));
-            c.encrypt(Block(m))
-        }
+        let m =
+            unsafe { _mm_set_epi64(_mm_setzero_si64(), std::mem::transmute::<usize, __m64>(i)) };
+        c.encrypt(Block(m))
     }
 
     // Fixed key for AES hash. This is the same fixed key as used in the EMP toolkit.

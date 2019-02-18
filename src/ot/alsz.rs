@@ -10,7 +10,10 @@
 use crate::hash_aes::AesHash;
 use crate::rand_aes::AesRng;
 use crate::{stream, utils};
-use crate::{Block, ObliviousTransferReceiver, ObliviousTransferSender, SemiHonest};
+use crate::{
+    Block, CorrelatedObliviousTransferReceiver, CorrelatedObliviousTransferSender,
+    ObliviousTransferReceiver, ObliviousTransferSender, SemiHonest,
+};
 use arrayref::array_ref;
 use failure::Error;
 use rand_core::{RngCore, SeedableRng};
@@ -41,6 +44,35 @@ pub struct AlszOTReceiver<
     _ot: PhantomData<OT>,
     hash: AesHash,
     rngs: Vec<(AesRng, AesRng)>,
+}
+
+impl<R: Read, W: Write, OT: ObliviousTransferReceiver<R, W, Msg = Block> + SemiHonest>
+    AlszOTSender<R, W, OT>
+{
+    #[inline(always)]
+    fn send_setup(&mut self, reader: &mut R, m: usize) -> Result<Vec<u8>, Error> {
+        if m % 8 != 0 {
+            return Err(Error::from(std::io::Error::new(
+                ErrorKind::InvalidInput,
+                "Number of inputs must be divisible by 8",
+            )));
+        }
+        let (nrows, ncols) = (128, m);
+        let mut qs = vec![0u8; nrows * ncols / 8];
+        let mut u = vec![0u8; ncols / 8];
+        for (j, (b, mut rng)) in self.s.iter().zip(self.rngs.iter_mut()).enumerate() {
+            let range = j * ncols / 8..(j + 1) * ncols / 8;
+            let mut q = &mut qs[range];
+            stream::read_bytes_inplace(reader, &mut u)?;
+            if !b {
+                std::mem::replace(&mut u, vec![0u8; ncols / 8]);
+            };
+            let rng = &mut rng;
+            rng.fill_bytes(&mut q);
+            utils::xor_inplace(&mut q, &u);
+        }
+        Ok(utils::transpose(&qs, nrows, ncols))
+    }
 }
 
 impl<R: Read, W: Write, OT: ObliviousTransferReceiver<R, W, Msg = Block> + SemiHonest>
@@ -78,29 +110,9 @@ impl<R: Read, W: Write, OT: ObliviousTransferReceiver<R, W, Msg = Block> + SemiH
         inputs: &[(Self::Msg, Self::Msg)],
     ) -> Result<(), Error> {
         let m = inputs.len();
-        if m % 8 != 0 {
-            return Err(Error::from(std::io::Error::new(
-                ErrorKind::InvalidInput,
-                "Number of inputs must be divisible by 8",
-            )));
-        }
-        let (nrows, ncols) = (128, m);
-        let mut qs = vec![0u8; nrows * ncols / 8];
-        let mut u = vec![0u8; ncols / 8];
-        for (j, (b, mut rng)) in self.s.iter().zip(self.rngs.iter_mut()).enumerate() {
-            let range = j * ncols / 8..(j + 1) * ncols / 8;
-            let mut q = &mut qs[range];
-            stream::read_bytes_inplace(reader, &mut u)?;
-            if !b {
-                std::mem::replace(&mut u, vec![0u8; ncols / 8]);
-            };
-            let rng = &mut rng;
-            rng.fill_bytes(&mut q);
-            utils::xor_inplace(&mut q, &u);
-        }
-        let mut qs = utils::transpose(&qs, nrows, ncols);
+        let mut qs = self.send_setup(reader, m)?;
         for (j, input) in inputs.iter().enumerate() {
-            let range = j * nrows / 8..(j + 1) * nrows / 8;
+            let range = j * 16..(j + 1) * 16;
             let mut q = &mut qs[range];
             let y0 = self.hash.cr_hash(j, Block::from(*array_ref![q, 0, 16])) ^ input.0;
             utils::xor_inplace(&mut q, &self.s_);
@@ -110,6 +122,61 @@ impl<R: Read, W: Write, OT: ObliviousTransferReceiver<R, W, Msg = Block> + SemiH
         }
         writer.flush()?;
         Ok(())
+    }
+}
+
+impl<R: Read, W: Write, OT: ObliviousTransferReceiver<R, W, Msg = Block> + SemiHonest>
+    CorrelatedObliviousTransferSender<R, W> for AlszOTSender<R, W, OT>
+{
+    fn send_correlated(
+        &mut self,
+        reader: &mut R,
+        mut writer: &mut W,
+        deltas: &[Self::Msg],
+    ) -> Result<(), Error> {
+        let m = deltas.len();
+        let mut qs = self.send_setup(reader, m)?;
+        for (j, delta) in deltas.iter().enumerate() {
+            let range = j * 16..(j + 1) * 16;
+            let mut q = &mut qs[range];
+            let x0 = self.hash.cr_hash(j, Block::from(*array_ref![q, 0, 16]));
+            let x1 = x0 ^ *delta;
+            utils::xor_inplace(&mut q, &self.s_);
+            let y = self.hash.cr_hash(j, Block::from(*array_ref![q, 0, 16])) ^ x1;
+            y.write(&mut writer)?;
+        }
+        writer.flush()?;
+        Ok(())
+    }
+}
+
+impl<R: Read, W: Write, OT: ObliviousTransferSender<R, W, Msg = Block> + SemiHonest>
+    AlszOTReceiver<R, W, OT>
+{
+    #[inline(always)]
+    fn receive_setup(&mut self, mut writer: &mut W, inputs: &[bool]) -> Result<Vec<u8>, Error> {
+        let m = inputs.len();
+        if m % 8 != 0 {
+            return Err(Error::from(std::io::Error::new(
+                ErrorKind::InvalidInput,
+                "Number of inputs must be divisible by 8",
+            )));
+        }
+        let (nrows, ncols) = (128, m);
+        let r = utils::boolvec_to_u8vec(inputs);
+        let mut ts = vec![0u8; nrows * ncols / 8];
+        let mut g = vec![0u8; ncols / 8];
+        for j in 0..self.rngs.len() {
+            let range = j * ncols / 8..(j + 1) * ncols / 8;
+            let mut t = &mut ts[range];
+            self.rngs[j].0.fill_bytes(&mut t);
+            self.rngs[j].1.fill_bytes(&mut g);
+            utils::xor_inplace(&mut g, &t);
+            utils::xor_inplace(&mut g, &r);
+            stream::write_bytes(&mut writer, &g)?;
+            writer.flush()?;
+        }
+        Ok(utils::transpose(&ts, nrows, ncols))
     }
 }
 
@@ -147,40 +214,40 @@ impl<R: Read, W: Write, OT: ObliviousTransferSender<R, W, Msg = Block> + SemiHon
     fn receive(
         &mut self,
         mut reader: &mut R,
-        mut writer: &mut W,
+        writer: &mut W,
         inputs: &[bool],
     ) -> Result<Vec<Self::Msg>, Error> {
-        let m = inputs.len();
-        if m % 8 != 0 {
-            return Err(Error::from(std::io::Error::new(
-                ErrorKind::InvalidInput,
-                "Number of inputs must be divisible by 8",
-            )));
-        }
-        let (nrows, ncols) = (128, m);
-        let r = utils::boolvec_to_u8vec(inputs);
-        let mut ts = vec![0u8; nrows * ncols / 8];
-        let mut g = vec![0u8; ncols / 8];
-        for j in 0..self.rngs.len() {
-            let range = j * ncols / 8..(j + 1) * ncols / 8;
-            let mut t = &mut ts[range];
-            self.rngs[j].0.fill_bytes(&mut t);
-            self.rngs[j].1.fill_bytes(&mut g);
-            utils::xor_inplace(&mut g, &t);
-            utils::xor_inplace(&mut g, &r);
-            stream::write_bytes(&mut writer, &g)?;
-            writer.flush()?;
-        }
-        let ts = utils::transpose(&ts, nrows, ncols);
-        let mut out = Vec::with_capacity(ncols);
+        let ts = self.receive_setup(writer, inputs)?;
+        let mut out = Vec::with_capacity(inputs.len());
         for (j, b) in inputs.iter().enumerate() {
-            let range = j * nrows / 8..(j + 1) * nrows / 8;
-            let t = &ts[range];
+            let t = &ts[j * 16..(j + 1) * 16];
             let y0 = Block::read(&mut reader)?;
             let y1 = Block::read(&mut reader)?;
             let y = if *b { y1 } else { y0 };
             let y = y ^ self.hash.cr_hash(j, Block::from(*array_ref![t, 0, 16]));
             out.push(y);
+        }
+        Ok(out)
+    }
+}
+
+impl<R: Read, W: Write, OT: ObliviousTransferSender<R, W, Msg = Block> + SemiHonest>
+    CorrelatedObliviousTransferReceiver<R, W> for AlszOTReceiver<R, W, OT>
+{
+    fn receive_correlated(
+        &mut self,
+        mut reader: &mut R,
+        writer: &mut W,
+        inputs: &[bool],
+    ) -> Result<Vec<Self::Msg>, Error> {
+        let ts = self.receive_setup(writer, inputs)?;
+        let mut out = Vec::with_capacity(inputs.len());
+        for (j, b) in inputs.iter().enumerate() {
+            let t = &ts[j * 16..(j + 1) * 16];
+            let y = Block::read(&mut reader)?;
+            let y = if *b { y } else { Block::zero() };
+            let h = self.hash.cr_hash(j, Block::from(*array_ref![t, 0, 16]));
+            out.push(y ^ h);
         }
         Ok(out)
     }
@@ -216,7 +283,7 @@ mod tests {
     }
 
     #[test]
-    fn test() {
+    fn test_otext() {
         let m0s = rand_block_vec(T);
         let m1s = rand_block_vec(T);
         let bs = rand_bool_vec(T);
