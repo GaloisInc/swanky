@@ -20,6 +20,19 @@ use std::io::{Read, Write};
 #[derive(Clone, Copy, Debug)]
 pub struct Block(pub(crate) __m128i);
 
+union __U128 {
+    vector: __m128i,
+    bytes: u128,
+}
+
+const ONE: __m128i = unsafe { (__U128 { bytes: 1 }).vector };
+const ONES: __m128i = unsafe {
+    (__U128 {
+        bytes: 0xFFFF_FFFF_FFFF_FFFF,
+    })
+    .vector
+};
+
 impl Block {
     #[inline]
     pub fn as_ptr(&self) -> *const u8 {
@@ -84,6 +97,21 @@ impl Block {
         let mut v = Block::zero();
         stream.read_exact(v.as_mut())?;
         Ok(v)
+    }
+    /// Return the "color" bit (when viewing `Block` as a wire label).
+    #[inline]
+    pub fn color_bit(&self) -> bool {
+        unsafe { _mm_extract_epi8(_mm_and_si128(self.0, ONE), 0) == 1 }
+    }
+    /// Set the "color" bit (when viewing `Block` as a wire label).
+    #[inline]
+    pub fn set_color_bit(&self) -> Block {
+        unsafe { Block::from(_mm_or_si128(self.0, ONE)) }
+    }
+    /// Flip all bits.
+    #[inline]
+    pub fn flip(&self) -> Block {
+        unsafe { Block::from(_mm_xor_si128(self.0, ONES)) }
     }
 }
 
@@ -222,5 +250,21 @@ mod tests {
         let z = x ^ y;
         let z = z ^ y;
         assert_eq!(x, z);
+    }
+
+    #[test]
+    fn test_color_bit() {
+        let x = rand::random::<Block>();
+        let x = Block::from(unsafe { _mm_or_si128(x.0, ONE) });
+        assert!(x.color_bit());
+        let x = Block::from(unsafe { _mm_xor_si128(x.0, ONE) });
+        assert!(!x.color_bit());
+    }
+
+    #[test]
+    fn test_flip() {
+        let x = rand::random::<Block>();
+        let y = x.flip().flip();
+        assert_eq!(x, y);
     }
 }
