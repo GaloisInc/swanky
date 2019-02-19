@@ -10,26 +10,26 @@ edition = "2018"
 doctest = false
 
 [build-dependencies]
-cc = "1.0.28"
+cc = "1.0.29"
 
 [dependencies]
 base_conversion = { path = "base_conversion" }
-bincode = { version = "1.0.1", features = ["i128"] }
+bincode = { version = "1.1.2", features = ["i128"] }
 failure = "0.1.5"
 itertools = "0.8.0"
 libc = "0.2.48"
 num = "0.2.0"
-rand = "0.6.4"
-serde = "1.0.85"
-serde_derive = "1.0.85"
-serde_json = "1.0.37"
+rand = "0.6.5"
+serde = "1.0.88"
+serde_derive = "1.0.88"
+serde_json = "1.0.38"
 time = "0.1.42"
 pbr = "1.0.1"
-crossbeam = "0.6.0"
+crossbeam = "0.7.1"
 scuttlebutt = { path = "../scuttlebutt", default-features = false, features = ["serde"] }
 
 [dev-dependencies]
-criterion = "0.2.9"
+criterion = "0.2.10"
 
 [profile.release]
 debug = true

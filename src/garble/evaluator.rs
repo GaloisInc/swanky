@@ -1,4 +1,4 @@
-use crossbeam::queue::MsQueue;
+use crossbeam::queue::SegQueue;
 use itertools::Itertools;
 use serde_derive::{Deserialize, Serialize};
 
@@ -25,7 +25,7 @@ pub struct Evaluator {
     output_cts: Arc<Mutex<Vec<OutputCiphertext>>>,
     output_wires: Arc<Mutex<Vec<Wire>>>,
     sync_info: Arc<RwLock<Option<SyncInfo>>>,
-    requests: Arc<RwLock<Option<Vec<MsQueue<Sender<Message>>>>>>,
+    requests: Arc<RwLock<Option<Vec<SegQueue<Sender<Message>>>>>>,
 }
 
 impl Evaluator {
@@ -86,7 +86,7 @@ impl Evaluator {
             num_indices,
         ));
         *self.requests.write().unwrap() =
-            Some((0..num_indices).map(|_| MsQueue::new()).collect_vec());
+            Some((0..num_indices).map(|_| SegQueue::new()).collect_vec());
         start_postman(
             num_indices,
             self.sync_info.clone(),
@@ -124,7 +124,7 @@ impl Evaluator {
 fn start_postman(
     nindices: SyncIndex,
     sync_info: Arc<RwLock<Option<SyncInfo>>>,
-    requests: Arc<RwLock<Option<Vec<MsQueue<Sender<Message>>>>>>,
+    requests: Arc<RwLock<Option<Vec<SegQueue<Sender<Message>>>>>>,
     recv_msg: Arc<Mutex<FnMut() -> (Option<SyncIndex>, Message) + Send>>,
 ) {
     std::thread::spawn(move || {
@@ -159,7 +159,7 @@ fn start_postman(
             if let Some(ref requests) = *requests.read().unwrap() {
                 for (ix, reqs) in requests.iter().enumerate() {
                     if !awaiting[ix].is_empty() {
-                        if let Some(tx) = reqs.try_pop() {
+                        if let Ok(tx) = reqs.pop() {
                             tx.send(awaiting[ix].pop_front().unwrap()).unwrap();
                         }
                     }

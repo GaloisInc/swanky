@@ -3,7 +3,7 @@
 //! Useful for evaluating the circuits produced by Fancy without actually creating any
 //! circuits.
 
-use crossbeam::queue::MsQueue;
+use crossbeam::queue::SegQueue;
 use itertools::Itertools;
 
 use std::error::Error;
@@ -19,7 +19,7 @@ pub struct Dummy {
     evaluator_inputs: Arc<Mutex<Vec<u16>>>,
 
     // sync stuff to allow parallel inputs
-    requests:         Arc<RwLock<Option<Vec<MsQueue<(Request, Sender<DummyVal>)>>>>>,
+    requests:         Arc<RwLock<Option<Vec<SegQueue<(Request, Sender<DummyVal>)>>>>>,
     index_done:       Arc<RwLock<Option<Vec<AtomicBool>>>>,
 }
 
@@ -142,7 +142,7 @@ impl Fancy for Dummy {
     }
 
     fn begin_sync(&self, num_indices: SyncIndex) {
-        *self.requests.write().unwrap()  = Some((0..num_indices).map(|_| MsQueue::new()).collect_vec());
+        *self.requests.write().unwrap()  = Some((0..num_indices).map(|_| SegQueue::new()).collect_vec());
         *self.index_done.write().unwrap() = Some((0..num_indices).map(|_| AtomicBool::new(false)).collect_vec());
 
         start_postman(num_indices,
@@ -180,7 +180,7 @@ impl Fancy for Dummy {
 fn start_postman(
     end_index: SyncIndex,
     done: Arc<RwLock<Option<Vec<AtomicBool>>>>,
-    reqs: Arc<RwLock<Option<Vec<MsQueue<(Request, Sender<DummyVal>)>>>>>,
+    reqs: Arc<RwLock<Option<Vec<SegQueue<(Request, Sender<DummyVal>)>>>>>,
     gb_inps: Arc<Mutex<Vec<u16>>>,
     ev_inps: Arc<Mutex<Vec<u16>>>,
 ) {
@@ -189,7 +189,7 @@ fn start_postman(
         while c < end_index {
             if let Some(ref reqs) = *reqs.read().unwrap() {
                 if let Some(q) = reqs.get(c as usize) { // avoid mysterious indexing error
-                    if let Some((r,tx)) = q.try_pop() {
+                    if let Ok((r,tx)) = q.pop() {
                         match r {
                             Request::GarblerInput(modulus) => {
                                 let mut inps = gb_inps.lock().unwrap();
