@@ -8,6 +8,7 @@
 
 use criterion::{criterion_group, criterion_main, Criterion};
 use ocelot::*;
+use scuttlebutt::Block;
 use std::io::{BufReader, BufWriter};
 use std::os::unix::net::UnixStream;
 use std::time::Duration;

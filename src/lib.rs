@@ -31,16 +31,9 @@
 #![feature(stdsimd)]
 #![feature(asm)]
 
-mod aes;
-mod block;
 mod cointoss;
-mod hash_aes;
 mod ot;
-mod rand_aes;
 mod stream;
 mod utils;
 
-pub use crate::block::Block;
-pub use crate::hash_aes::AesHash;
 pub use crate::ot::*;
-pub use crate::rand_aes::AesRng;

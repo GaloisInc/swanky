@@ -12,10 +12,9 @@
 //! seed_`. Likewise, on input `seed`, the receiver gets `r`, sends `seed` to
 //! the sender, and then receives `seed_`, checking that `PRG(seed_) = r`.
 
-use crate::rand_aes::AesRng;
-use crate::Block;
 use failure::Error;
 use rand_core::{RngCore, SeedableRng};
+use scuttlebutt::{AesRng, Block};
 use std::io::{ErrorKind, Read, Write};
 
 pub fn send<R: Read, W: Write>(

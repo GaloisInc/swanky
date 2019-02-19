@@ -4,6 +4,8 @@
 // Copyright © 2019 Galois, Inc.
 // See LICENSE for licensing information.
 
+use scuttlebutt::Block;
+
 #[inline(always)]
 pub fn xor_inplace(a: &mut [u8], b: &[u8]) {
     for i in 0..a.len() {
@@ -47,6 +49,11 @@ pub fn u8vec_to_boolvec(v: &[u8]) -> Vec<bool> {
         }
     }
     bv
+}
+
+#[inline(always)]
+pub fn xor_two_blocks(x: &(Block, Block), y: &(Block, Block)) -> (Block, Block) {
+    (x.0 ^ y.0, x.1 ^ y.1)
 }
 
 #[cfg(test)]

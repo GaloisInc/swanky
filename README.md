@@ -52,8 +52,8 @@ details).
 
 # Building
 
-Use `cargo build` to build, `cargo test` to run the test suite, and `cargo
-bench` to benchmark the various protocols.
+Use `cargo build` to build, `cargo test` to run the test suite, `cargo bench` to
+benchmark the various protocols, and `cargo doc --open` to view documentation.
 
 # License
 

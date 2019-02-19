@@ -8,8 +8,9 @@
 //! testing purposes.
 
 use crate::stream;
-use crate::{Block, ObliviousTransferReceiver, ObliviousTransferSender};
+use crate::{ObliviousTransferReceiver, ObliviousTransferSender};
 use failure::Error;
+use scuttlebutt::Block;
 use std::io::{Read, Write};
 use std::marker::PhantomData;
 

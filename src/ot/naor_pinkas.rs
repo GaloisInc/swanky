@@ -9,13 +9,13 @@
 //! This implementation uses the Ristretto prime order elliptic curve group from
 //! the `curve25519-dalek` library.
 
-use crate::rand_aes::AesRng;
 use crate::stream;
-use crate::{Block, ObliviousTransferReceiver, ObliviousTransferSender, SemiHonest};
+use crate::{ObliviousTransferReceiver, ObliviousTransferSender, SemiHonest};
 use curve25519_dalek::constants::RISTRETTO_BASEPOINT_TABLE;
 use curve25519_dalek::ristretto::RistrettoPoint;
 use curve25519_dalek::scalar::Scalar;
 use failure::Error;
+use scuttlebutt::{AesRng, Block};
 use std::io::{Read, Write};
 use std::marker::PhantomData;
 

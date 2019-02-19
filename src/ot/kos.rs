@@ -7,13 +7,12 @@
 //! Implementation of the Keller-Orsini-Scholl oblivious transfer extension
 //! protocol (cf. <https://eprint.iacr.org/2015/546>).
 
-use crate::hash_aes::AesHash;
-use crate::rand_aes::AesRng;
-use crate::{block, cointoss, stream, utils};
-use crate::{Block, Malicious, ObliviousTransferReceiver, ObliviousTransferSender};
+use crate::{cointoss, stream, utils};
+use crate::{Malicious, ObliviousTransferReceiver, ObliviousTransferSender};
 use arrayref::array_ref;
 use failure::Error;
 use rand_core::{RngCore, SeedableRng};
+use scuttlebutt::{AesHash, AesRng, Block};
 use std::io::{ErrorKind, Read, Write};
 use std::marker::PhantomData;
 
@@ -116,13 +115,13 @@ impl<R: Read, W: Write, OT: ObliviousTransferReceiver<R, W, Msg = Block> + Malic
             let q = Block::from(*array_ref![q, 0, 16]);
             rng.fill_bytes(&mut χ.as_mut());
             let tmp = q.mul128(χ);
-            check = block::xor_two_blocks(&check, &tmp);
+            check = utils::xor_two_blocks(&check, &tmp);
         }
         let x = Block::read(reader)?;
         let t0 = Block::read(reader)?;
         let t1 = Block::read(reader)?;
         let tmp = x.mul128(self.δ_);
-        let check = block::xor_two_blocks(&check, &tmp);
+        let check = utils::xor_two_blocks(&check, &tmp);
         if check != (t0, t1) {
             println!("Consistency check failed!");
             return Err(Error::from(std::io::Error::new(
@@ -216,7 +215,7 @@ impl<R: Read, W: Write, OT: ObliviousTransferSender<R, W, Msg = Block> + Malicio
             rng.fill_bytes(&mut χ.as_mut());
             x = x ^ if xj { χ } else { Block::zero() };
             let tmp = tj.mul128(χ);
-            t = block::xor_two_blocks(&t, &tmp);
+            t = utils::xor_two_blocks(&t, &tmp);
         }
         x.write(&mut writer)?;
         t.0.write(&mut writer)?;
