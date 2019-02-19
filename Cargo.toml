@@ -1,0 +1,31 @@
+[package]
+name = "scuttlebutt"
+version = "0.1.0"
+authors = ["Alex J. Malozemoff <amaloz@galois.com>"]
+edition = "2018"
+autobenches = false
+
+[lib]
+
+[features]
+default = ["curve25519-dalek"]
+
+[dependencies]
+arrayref = "*"
+curve25519-dalek = { version = "*", features = ["std", "simd_backend"], optional = true }
+failure = "*"
+rand = { version = "*", features = ["nightly"] }
+rand_core = { version = "*" }
+
+[dev-dependencies]
+criterion = "*"
+
+[profile.release]
+debug = true
+
+[profile.bench]
+debug = true
+
+[[bench]]
+name = "bench"
+harness = false
