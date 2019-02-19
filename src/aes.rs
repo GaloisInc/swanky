@@ -1,6 +1,6 @@
 // -*- mode: rust; -*-
 //
-// This file is part of ocelot.
+// This file is part of `scuttlebutt`.
 // Copyright © 2019 Galois, Inc.
 // See LICENSE for licensing information.
 
