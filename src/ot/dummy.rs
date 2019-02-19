@@ -76,33 +76,3 @@ impl<R: Read, W: Write> ObliviousTransferReceiver<R, W> for DummyOTReceiver<R, W
         (0..inputs.len()).map(|_| Block::read(reader)).collect()
     }
 }
-
-#[cfg(test)]
-mod tests {
-    extern crate test;
-    use super::*;
-    use std::io::{BufReader, BufWriter};
-    use std::os::unix::net::UnixStream;
-
-    #[test]
-    fn test() {
-        let m0 = rand::random::<Block>();
-        let m1 = rand::random::<Block>();
-        let b = rand::random::<bool>();
-        let m0_ = m0.clone();
-        let m1_ = m1.clone();
-        let (sender, receiver) = UnixStream::pair().unwrap();
-        let handle = std::thread::spawn(move || {
-            let mut reader = BufReader::new(sender.try_clone().unwrap());
-            let mut writer = BufWriter::new(sender);
-            let mut ot = DummyOTSender::init(&mut reader, &mut writer).unwrap();
-            ot.send(&mut reader, &mut writer, &[(m0, m1)]).unwrap();
-        });
-        let mut reader = BufReader::new(receiver.try_clone().unwrap());
-        let mut writer = BufWriter::new(receiver);
-        let mut ot = DummyOTReceiver::init(&mut reader, &mut writer).unwrap();
-        let result = ot.receive(&mut reader, &mut writer, &[b]).unwrap();
-        assert_eq!(result[0], if b { m1_ } else { m0_ });
-        handle.join().unwrap();
-    }
-}

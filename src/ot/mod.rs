@@ -143,6 +143,37 @@ mod tests {
         (0..size).map(|_| rand::random::<bool>()).collect()
     }
 
+    type ChouOrlandiSender = chou_orlandi::ChouOrlandiOTSender<Reader, Writer>;
+    type ChouOrlandiReceiver = chou_orlandi::ChouOrlandiOTReceiver<Reader, Writer>;
+    type DummySender = dummy::DummyOTSender<Reader, Writer>;
+    type DummyReceiver = dummy::DummyOTReceiver<Reader, Writer>;
+    type NaorPinkasSender = naor_pinkas::NaorPinkasOTSender<Reader, Writer>;
+    type NaorPinkasReceiver = naor_pinkas::NaorPinkasOTReceiver<Reader, Writer>;
+
+    fn test_ot<
+        OTSender: ObliviousTransferSender<Reader, Writer, Msg = Block>,
+        OTReceiver: ObliviousTransferReceiver<Reader, Writer, Msg = Block>,
+    >() {
+        let m0 = rand::random::<Block>();
+        let m1 = rand::random::<Block>();
+        let b = rand::random::<bool>();
+        let m0_ = m0.clone();
+        let m1_ = m1.clone();
+        let (sender, receiver) = UnixStream::pair().unwrap();
+        let handle = std::thread::spawn(move || {
+            let mut reader = BufReader::new(sender.try_clone().unwrap());
+            let mut writer = BufWriter::new(sender);
+            let mut ot = OTSender::init(&mut reader, &mut writer).unwrap();
+            ot.send(&mut reader, &mut writer, &[(m0, m1)]).unwrap();
+        });
+        let mut reader = BufReader::new(receiver.try_clone().unwrap());
+        let mut writer = BufWriter::new(receiver);
+        let mut ot = OTReceiver::init(&mut reader, &mut writer).unwrap();
+        let result = ot.receive(&mut reader, &mut writer, &[b]).unwrap();
+        assert_eq!(result[0], if b { m1_ } else { m0_ });
+        handle.join().unwrap();
+    }
+
     fn test_otext<
         OTSender: ObliviousTransferSender<Reader, Writer, Msg = Block>,
         OTReceiver: ObliviousTransferReceiver<Reader, Writer, Msg = Block>,
@@ -230,12 +261,25 @@ mod tests {
         }
     }
 
-    type ChouOrlandiSender = chou_orlandi::ChouOrlandiOTSender<Reader, Writer>;
-    type ChouOrlandiReceiver = chou_orlandi::ChouOrlandiOTReceiver<Reader, Writer>;
     type AlszSender = alsz::AlszOTSender<Reader, Writer, ChouOrlandiReceiver>;
     type AlszReceiver = alsz::AlszOTReceiver<Reader, Writer, ChouOrlandiSender>;
     type KosSender = kos::KosOTSender<Reader, Writer, ChouOrlandiReceiver>;
     type KosReceiver = kos::KosOTReceiver<Reader, Writer, ChouOrlandiSender>;
+
+    #[test]
+    fn test_dummy() {
+        test_ot::<DummySender, DummyReceiver>();
+    }
+
+    #[test]
+    fn test_naor_pinkas() {
+        test_ot::<NaorPinkasSender, NaorPinkasReceiver>();
+    }
+
+    #[test]
+    fn test_chou_orlandi() {
+        test_ot::<ChouOrlandiSender, ChouOrlandiReceiver>();
+    }
 
     #[test]
     fn test_alsz() {
