@@ -2,6 +2,11 @@
 name = "scuttlebutt"
 version = "0.1.0"
 authors = ["Alex J. Malozemoff <amaloz@galois.com>"]
+readme = "README.md"
+license = "MIT"
+categories = ["cryptography"]
+keywords = ["cryptography", "MPC", "secure-computation"]
+description = "A library of useful multi-party computation utilities"
 edition = "2018"
 autobenches = false
 

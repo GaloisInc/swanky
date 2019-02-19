@@ -5,6 +5,9 @@ The `scuttlebutt` library provides a bunch of core primitives for building
 multi-party computation (MPC) related protocols, such as garbled circuits or
 oblivious transfer.
 
+**`scuttlebutt` should be considered unstable and under active development until
+version 1.0 is released**
+
 # Building
 
 Use `cargo build` to build, `cargo test` to run the test suite, `cargo bench` to
