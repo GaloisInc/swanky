@@ -167,12 +167,21 @@ fn bench_correlated_otext(c: &mut Criterion) {
         let bs = rand_bool_vec(T);
         bench.iter(|| _bench_block_cot::<AlszSender, AlszReceiver>(&bs, deltas.clone()))
     });
+    c.bench_function("cot::KosOT", move |bench| {
+        let deltas = rand_block_vec(T);
+        let bs = rand_bool_vec(T);
+        bench.iter(|| _bench_block_cot::<KosSender, KosReceiver>(&bs, deltas.clone()))
+    });
 }
 
 fn bench_random_otext(c: &mut Criterion) {
     c.bench_function("rot::AlszOT", move |bench| {
         let bs = rand_bool_vec(T);
         bench.iter(|| _bench_block_rot::<AlszSender, AlszReceiver>(&bs))
+    });
+    c.bench_function("rot::KosOT", move |bench| {
+        let bs = rand_bool_vec(T);
+        bench.iter(|| _bench_block_rot::<KosSender, KosReceiver>(&bs))
     });
 }
 

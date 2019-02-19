@@ -50,7 +50,7 @@ pub struct AlszOTReceiver<
 impl<R: Read, W: Write, OT: ObliviousTransferReceiver<R, W, Msg = Block> + SemiHonest>
     AlszOTSender<R, W, OT>
 {
-    #[inline(always)]
+    #[inline]
     fn send_setup(&mut self, reader: &mut R, m: usize) -> Result<Vec<u8>, Error> {
         if m % 8 != 0 {
             return Err(Error::from(std::io::Error::new(
@@ -179,7 +179,7 @@ impl<R: Read, W: Write, OT: ObliviousTransferReceiver<R, W, Msg = Block> + SemiH
 impl<R: Read, W: Write, OT: ObliviousTransferSender<R, W, Msg = Block> + SemiHonest>
     AlszOTReceiver<R, W, OT>
 {
-    #[inline(always)]
+    #[inline]
     fn receive_setup(&mut self, mut writer: &mut W, inputs: &[bool]) -> Result<Vec<u8>, Error> {
         let m = inputs.len();
         if m % 8 != 0 {
@@ -307,135 +307,4 @@ impl<R: Read, W: Write, OT: ObliviousTransferReceiver<R, W, Msg = Block> + SemiH
 impl<R: Read, W: Write, OT: ObliviousTransferSender<R, W, Msg = Block> + SemiHonest> SemiHonest
     for AlszOTReceiver<R, W, OT>
 {
-}
-
-#[cfg(test)]
-mod tests {
-    extern crate test;
-    use super::*;
-    use crate::*;
-    use std::io::{BufReader, BufWriter};
-    use std::os::unix::net::UnixStream;
-    use std::sync::{Arc, Mutex};
-
-    const T: usize = 1 << 12;
-
-    fn rand_block_vec(size: usize) -> Vec<Block> {
-        (0..size).map(|_| rand::random::<Block>()).collect()
-    }
-
-    fn rand_bool_vec(size: usize) -> Vec<bool> {
-        (0..size).map(|_| rand::random::<bool>()).collect()
-    }
-
-    #[test]
-    fn test_otext() {
-        let m0s = rand_block_vec(T);
-        let m1s = rand_block_vec(T);
-        let bs = rand_bool_vec(T);
-        let m0s_ = m0s.clone();
-        let m1s_ = m1s.clone();
-        let (sender, receiver) = UnixStream::pair().unwrap();
-        let handle = std::thread::spawn(move || {
-            let mut reader = BufReader::new(sender.try_clone().unwrap());
-            let mut writer = BufWriter::new(sender);
-            let mut otext = AlszOTSender::<
-                BufReader<UnixStream>,
-                BufWriter<UnixStream>,
-                chou_orlandi::ChouOrlandiOTReceiver<BufReader<UnixStream>, BufWriter<UnixStream>>,
-            >::init(&mut reader, &mut writer)
-            .unwrap();
-            let ms = m0s
-                .into_iter()
-                .zip(m1s.into_iter())
-                .collect::<Vec<(Block, Block)>>();
-            otext.send(&mut reader, &mut writer, &ms).unwrap();
-        });
-        let mut reader = BufReader::new(receiver.try_clone().unwrap());
-        let mut writer = BufWriter::new(receiver);
-        let mut otext = AlszOTReceiver::<
-            BufReader<UnixStream>,
-            BufWriter<UnixStream>,
-            chou_orlandi::ChouOrlandiOTSender<BufReader<UnixStream>, BufWriter<UnixStream>>,
-        >::init(&mut reader, &mut writer)
-        .unwrap();
-        let results = otext.receive(&mut reader, &mut writer, &bs).unwrap();
-        for j in 0..T {
-            assert_eq!(results[j], if bs[j] { m1s_[j] } else { m0s_[j] })
-        }
-        handle.join().unwrap();
-    }
-
-    #[test]
-    fn test_cotext() {
-        let deltas = rand_block_vec(T);
-        let bs = rand_bool_vec(T);
-        let out = Arc::new(Mutex::new(vec![]));
-        let out_ = out.clone();
-        let (sender, receiver) = UnixStream::pair().unwrap();
-        let handle = std::thread::spawn(move || {
-            let mut reader = BufReader::new(sender.try_clone().unwrap());
-            let mut writer = BufWriter::new(sender);
-            let mut otext = AlszOTSender::<
-                BufReader<UnixStream>,
-                BufWriter<UnixStream>,
-                chou_orlandi::ChouOrlandiOTReceiver<BufReader<UnixStream>, BufWriter<UnixStream>>,
-            >::init(&mut reader, &mut writer)
-            .unwrap();
-            let mut out = out.lock().unwrap();
-            *out = otext
-                .send_correlated(&mut reader, &mut writer, &deltas)
-                .unwrap();
-        });
-        let mut reader = BufReader::new(receiver.try_clone().unwrap());
-        let mut writer = BufWriter::new(receiver);
-        let mut otext = AlszOTReceiver::<
-            BufReader<UnixStream>,
-            BufWriter<UnixStream>,
-            chou_orlandi::ChouOrlandiOTSender<BufReader<UnixStream>, BufWriter<UnixStream>>,
-        >::init(&mut reader, &mut writer)
-        .unwrap();
-        let results = otext
-            .receive_correlated(&mut reader, &mut writer, &bs)
-            .unwrap();
-        handle.join().unwrap();
-        let out_ = out_.lock().unwrap();
-        for j in 0..T {
-            assert_eq!(results[j], if bs[j] { out_[j].1 } else { out_[j].0 })
-        }
-    }
-
-    #[test]
-    fn test_rotext() {
-        let bs = rand_bool_vec(T);
-        let out = Arc::new(Mutex::new(vec![]));
-        let out_ = out.clone();
-        let (sender, receiver) = UnixStream::pair().unwrap();
-        let handle = std::thread::spawn(move || {
-            let mut reader = BufReader::new(sender.try_clone().unwrap());
-            let mut writer = BufWriter::new(sender);
-            let mut otext = AlszOTSender::<
-                BufReader<UnixStream>,
-                BufWriter<UnixStream>,
-                chou_orlandi::ChouOrlandiOTReceiver<BufReader<UnixStream>, BufWriter<UnixStream>>,
-            >::init(&mut reader, &mut writer)
-            .unwrap();
-            let mut out = out.lock().unwrap();
-            *out = otext.send_random(&mut reader, &mut writer, T).unwrap();
-        });
-        let mut reader = BufReader::new(receiver.try_clone().unwrap());
-        let mut writer = BufWriter::new(receiver);
-        let mut otext = AlszOTReceiver::<
-            BufReader<UnixStream>,
-            BufWriter<UnixStream>,
-            chou_orlandi::ChouOrlandiOTSender<BufReader<UnixStream>, BufWriter<UnixStream>>,
-        >::init(&mut reader, &mut writer)
-        .unwrap();
-        let results = otext.receive_random(&mut reader, &mut writer, &bs).unwrap();
-        handle.join().unwrap();
-        let out_ = out_.lock().unwrap();
-        for j in 0..T {
-            assert_eq!(results[j], if bs[j] { out_[j].1 } else { out_[j].0 })
-        }
-    }
 }
