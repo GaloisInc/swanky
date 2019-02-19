@@ -8,7 +8,7 @@
 
 #[cfg(feature = "curve25519-dalek")]
 use crate::aes::Aes128;
-#[cfg(feature = "curve25519-dalek")]
+#[cfg(any(feature = "curve25519-dalek", feature = "serde"))]
 use arrayref::array_ref;
 use core::arch::x86_64::*;
 #[cfg(feature = "curve25519-dalek")]
@@ -133,24 +133,10 @@ impl rand::distributions::Distribution<Block> for rand::distributions::Standard 
     }
 }
 
-impl Into<__m128i> for Block {
+impl From<Block> for u128 {
     #[inline]
-    fn into(self) -> __m128i {
-        self.0
-    }
-}
-
-impl From<__m128i> for Block {
-    #[inline]
-    fn from(m: __m128i) -> Self {
-        Block(m)
-    }
-}
-
-impl Into<u128> for Block {
-    #[inline]
-    fn into(self) -> u128 {
-        unsafe { std::mem::transmute(self.0) }
+    fn from(m: Block) -> u128 {
+        unsafe { std::mem::transmute(m.0) }
     }
 }
 
@@ -161,17 +147,67 @@ impl From<u128> for Block {
     }
 }
 
-impl Into<[u8; 16]> for Block {
+impl From<Block> for __m128i {
     #[inline]
-    fn into(self) -> [u8; 16] {
-        unsafe { std::mem::transmute::<Block, [u8; 16]>(self) }
+    fn from(m: Block) -> __m128i {
+        m.0
+    }
+}
+
+impl From<__m128i> for Block {
+    #[inline]
+    fn from(m: __m128i) -> Self {
+        Block(m)
+    }
+}
+
+impl From<Block> for [u8; 16] {
+    #[inline]
+    fn from(m: Block) -> [u8; 16] {
+        unsafe { std::mem::transmute(m) }
     }
 }
 
 impl From<[u8; 16]> for Block {
     #[inline]
     fn from(m: [u8; 16]) -> Self {
-        unsafe { std::mem::transmute::<[u8; 16], Block>(m) }
+        unsafe { std::mem::transmute(m) }
+    }
+}
+
+#[cfg(feature = "serde")]
+use serde::de::Visitor;
+#[cfg(feature = "serde")]
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
+
+#[cfg(feature = "serde")]
+impl Serialize for Block {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        serializer.serialize_bytes(&unsafe { std::mem::transmute::<__m128i, [u8; 16]>(self.0) })
+    }
+}
+
+#[cfg(feature = "serde")]
+impl<'de> Deserialize<'de> for Block {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        struct BlockVisitor;
+        impl<'de> Visitor<'de> for BlockVisitor {
+            type Value = Block;
+
+            fn expecting(&self, formatter: &mut ::core::fmt::Formatter) -> ::core::fmt::Result {
+                formatter.write_str("a 128-bit chunk")
+            }
+
+            fn visit_bytes<E: serde::de::Error>(self, v: &[u8]) -> Result<Block, E> {
+                if v.len() == 16 {
+                    Ok(Block::from(*array_ref![v, 0, 16]))
+                } else {
+                    Err(serde::de::Error::invalid_length(v.len(), &self))
+                }
+            }
+        }
+
+        deserializer.deserialize_bytes(BlockVisitor)
     }
 }
 

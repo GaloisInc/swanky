@@ -21,6 +21,7 @@ curve25519-dalek = { version = "*", features = ["std", "simd_backend"], optional
 failure = "*"
 rand = { version = "*", features = ["nightly"] }
 rand_core = { version = "*" }
+serde = { version = "*", features = ["derive"], optional = true }
 
 [dev-dependencies]
 criterion = "*"

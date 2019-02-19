@@ -21,19 +21,19 @@ use rand_core::{CryptoRng, Error, RngCore, SeedableRng};
 pub struct AesRng(BlockRng<AesRngCore>);
 
 impl RngCore for AesRng {
-    #[inline(always)]
+    #[inline]
     fn next_u32(&mut self) -> u32 {
         self.0.next_u32()
     }
-    #[inline(always)]
+    #[inline]
     fn next_u64(&mut self) -> u64 {
         self.0.next_u64()
     }
-    #[inline(always)]
+    #[inline]
     fn fill_bytes(&mut self, dest: &mut [u8]) {
         self.0.fill_bytes(dest)
     }
-    #[inline(always)]
+    #[inline]
     fn try_fill_bytes(&mut self, dest: &mut [u8]) -> Result<(), Error> {
         self.0.try_fill_bytes(dest)
     }
@@ -42,10 +42,11 @@ impl RngCore for AesRng {
 impl SeedableRng for AesRng {
     type Seed = <AesRngCore as SeedableRng>::Seed;
 
+    #[inline]
     fn from_seed(seed: Self::Seed) -> Self {
         AesRng(BlockRng::<AesRngCore>::from_seed(seed))
     }
-
+    #[inline]
     fn from_rng<R: RngCore>(rng: R) -> Result<Self, Error> {
         BlockRng::<AesRngCore>::from_rng(rng).map(AesRng)
     }
@@ -56,6 +57,7 @@ impl CryptoRng for AesRng {}
 impl AesRng {
     /// Create a new random number generator using a random seed from
     /// `rand::random`.
+    #[inline]
     pub fn new() -> Self {
         let seed = rand::random::<Block>();
         AesRng::from_seed(seed)
@@ -63,6 +65,7 @@ impl AesRng {
 }
 
 impl Default for AesRng {
+    #[inline]
     fn default() -> Self {
         Self::new()
     }
@@ -88,6 +91,7 @@ impl BlockRngCore for AesRngCore {
     type Results = [u32; 4];
 
     // Compute `E(state)`, where `state` is a counter initialized to zero.
+    #[inline]
     fn generate(&mut self, results: &mut Self::Results) {
         let data = unsafe { _mm_set_epi64(_mm_setzero_si64(), self.state) };
         let c = self.aes.encrypt(Block::from(data));
@@ -99,7 +103,7 @@ impl BlockRngCore for AesRngCore {
 impl SeedableRng for AesRngCore {
     type Seed = Block;
 
-    #[inline(always)]
+    #[inline]
     fn from_seed(seed: Self::Seed) -> Self {
         let aes = Aes128::new(seed);
         AesRngCore {
@@ -112,6 +116,7 @@ impl SeedableRng for AesRngCore {
 impl CryptoRng for AesRngCore {}
 
 impl From<AesRngCore> for AesRng {
+    #[inline]
     fn from(core: AesRngCore) -> Self {
         AesRng(BlockRng::new(core))
     }

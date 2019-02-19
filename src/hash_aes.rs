@@ -21,7 +21,7 @@ pub struct AesHash {
 
 impl AesHash {
     /// Initialize the hash function using `key`.
-    #[inline(always)]
+    #[inline]
     pub fn new(key: Block) -> Self {
         let aes = Aes128::new(key);
         AesHash { aes }
@@ -31,7 +31,7 @@ impl AesHash {
     /// <https://eprint.iacr.org/2019/074>, §7.2).
     ///
     /// The function computes `π(x) ⊕ x`.
-    #[inline(always)]
+    #[inline]
     pub fn cr_hash(&self, _i: usize, x: Block) -> Block {
         self.aes.encrypt(x) ^ x
     }
@@ -41,7 +41,7 @@ impl AesHash {
     ///
     /// The function computes `H(σ(x))`, where `H` is a correlation-robust hash
     /// function and `σ(x₀ || x₁) = (x₀ ⊕ x₁) || x₁`.
-    #[inline(always)]
+    #[inline]
     pub fn ccr_hash(&self, i: usize, x: Block) -> Block {
         unsafe {
             let x = _mm_xor_si128(
@@ -57,7 +57,7 @@ impl AesHash {
     /// <https://eprint.iacr.org/2019/074>, §7.4).
     ///
     /// The function computes `π(π(x) ⊕ i) ⊕ π(x)`.
-    #[inline(always)]
+    #[inline]
     pub fn tccr_hash(&self, i: usize, x: Block) -> Block {
         unsafe {
             let y = self.aes.encrypt(x);
