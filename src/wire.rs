@@ -1,26 +1,30 @@
 //! Low-level operations on wirelabels, the basic building block of garbled circuits.
 
 use rand::Rng;
-use serde_derive::{Serialize, Deserialize};
+use scuttlebutt::Block;
+use serde_derive::{Deserialize, Serialize};
 
 use crate::aes::AES;
-use crate::{fancy::HasModulus, util::{self, RngExt}};
+use crate::{
+    fancy::HasModulus,
+    util::{self, RngExt},
+};
 
 /// The essential wirelabel type used by garbled circuits.
 ///
 /// It is a list of mod-q digits.
-#[derive(Debug, PartialEq, PartialOrd, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum Wire {
-    Mod2 { val: u128 },
+    Mod2 { val: Block },
     ModN { q: u16, ds: Vec<u16> },
 }
 
 impl HasModulus for Wire {
     #[inline]
     fn modulus(&self) -> u16 {
-        match *self {
+        match self {
             Wire::Mod2 { .. } => 2,
-            Wire::ModN { q, .. } => q,
+            Wire::ModN { q, .. } => *q,
         }
     }
 }
@@ -30,7 +34,9 @@ impl Wire {
     #[inline]
     pub fn digits(&self) -> Vec<u16> {
         match self {
-            Wire::Mod2 { val } => (0..128).map(|i| ((val >> i) as u16) & 1).collect(),
+            Wire::Mod2 { val } => (0..128)
+                .map(|i| ((u128::from(*val) >> i) as u16) & 1)
+                .collect(),
             Wire::ModN { ds, .. } => ds.clone(),
         }
     }
@@ -39,8 +45,9 @@ impl Wire {
     #[inline]
     pub fn from_u128(inp: u128, q: u16) -> Self {
         if q == 2 {
-            Wire::Mod2 { val: inp }
-
+            Wire::Mod2 {
+                val: Block::from(inp),
+            }
         } else if q < 256 && base_conversion::lookup_defined_for_mod(q) {
             let bytes = util::u128_to_bytes(inp);
 
@@ -56,18 +63,20 @@ impl Wire {
             // they get multiplied
             ds.truncate(util::digits_per_u128(q));
             Wire::ModN { q, ds }
-
         } else {
-            Wire::ModN { q, ds: util::as_base_q_u128(inp, q) }
+            Wire::ModN {
+                q,
+                ds: util::as_base_q_u128(inp, q),
+            }
         }
     }
 
     /// Pack the wire to a u128.
     #[inline]
     pub fn as_u128(&self) -> u128 {
-        match *self {
-            Wire::Mod2 { val } => val,
-            Wire::ModN { q, ref ds } => util::from_base_q(ds, q),
+        match self {
+            Wire::Mod2 { val } => u128::from(*val),
+            Wire::ModN { q, ref ds } => util::from_base_q(ds, *q),
         }
     }
 
@@ -76,17 +85,20 @@ impl Wire {
     pub fn zero(q: u16) -> Self {
         match q {
             1 => panic!("[wire::zero] mod 1 not allowed!"),
-            2 => Wire::Mod2 { val: 0 },
-            _ => Wire::ModN { q, ds: vec![0; util::digits_per_u128(q)] },
+            2 => Wire::Mod2 { val: Block::zero() },
+            _ => Wire::ModN {
+                q,
+                ds: vec![0; util::digits_per_u128(q)],
+            },
         }
     }
 
     /// Get a random wire label for mod q, with the first digit set to 1.
     #[inline]
-    pub fn rand_delta<R:Rng>(rng: &mut R, q: u16) -> Self {
+    pub fn rand_delta<R: Rng>(rng: &mut R, q: u16) -> Self {
         let mut w = Self::rand(rng, q);
         match w {
-            Wire::Mod2 { ref mut val }    => *val |= 1,
+            Wire::Mod2 { ref mut val } => *val = val.set_color_bit(),
             Wire::ModN { ref mut ds, .. } => ds[0] = 1,
         }
         w
@@ -95,8 +107,8 @@ impl Wire {
     /// Get the color digit of the wire.
     #[inline]
     pub fn color(&self) -> u16 {
-        match *self {
-            Wire::Mod2 { val }        => (val & 1) as u16,
+        match self {
+            Wire::Mod2 { val } => val.color_bit() as u16,
             Wire::ModN { ref ds, .. } => ds[0],
         }
     }
@@ -112,15 +124,24 @@ impl Wire {
     pub fn plus_eq<'a>(&'a mut self, other: &Wire) -> &'a mut Wire {
         match (&mut *self, other) {
             (Wire::Mod2 { val: ref mut x }, Wire::Mod2 { val: ref y }) => {
-                *x ^= y;
+                *x = *x ^ *y;
             }
 
-            (Wire::ModN { q: ref xmod, ds: ref mut xs }, Wire::ModN { q: ref ymod, ds: ref ys }) => {
+            (
+                Wire::ModN {
+                    q: ref xmod,
+                    ds: ref mut xs,
+                },
+                Wire::ModN {
+                    q: ref ymod,
+                    ds: ref ys,
+                },
+            ) => {
                 debug_assert_eq!(xmod, ymod);
                 debug_assert_eq!(xs.len(), ys.len());
-                xs.iter_mut().zip(ys.iter()).for_each(|(x,&y)| {
-                    let (zp,overflow) = (*x+y).overflowing_sub(*xmod);
-                    *x = if overflow { *x+y } else { zp }
+                xs.iter_mut().zip(ys.iter()).for_each(|(x, &y)| {
+                    let (zp, overflow) = (*x + y).overflowing_sub(*xmod);
+                    *x = if overflow { *x + y } else { zp }
                 });
             }
 
@@ -149,14 +170,13 @@ impl Wire {
         match self {
             Wire::Mod2 { val } => {
                 if c & 1 == 0 {
-                    *val = 0;
+                    *val = Block::zero();
                 }
             }
 
             Wire::ModN { q, ds } => {
-                ds.iter_mut().for_each(|d| {
-                    *d = (*d as u32 * c as u32 % *q as u32) as u16
-                });
+                ds.iter_mut()
+                    .for_each(|d| *d = (*d as u32 * c as u32 % *q as u32) as u16);
             }
         }
         self
@@ -179,8 +199,8 @@ impl Wire {
     #[inline]
     pub fn negate_eq<'a>(&'a mut self) -> &'a mut Wire {
         match self {
-            Wire::Mod2 { val } => *val = !*val,
-            Wire::ModN { q, ds }  => {
+            Wire::Mod2 { val } => *val = val.flip(),
+            Wire::ModN { q, ds } => {
                 ds.iter_mut().for_each(|d| {
                     if *d > 0 {
                         *d = *q - *d;
@@ -224,7 +244,7 @@ impl Wire {
 
     /// Get a random wire mod q.
     #[inline]
-    pub fn rand<R:Rng>(rng: &mut R, q: u16) -> Wire {
+    pub fn rand<R: Rng>(rng: &mut R, q: u16) -> Wire {
         Self::from_u128(rng.gen_u128(), q)
     }
 
@@ -271,8 +291,7 @@ pub fn wires_to_bytes(ws: &[Wire]) -> Vec<u8> {
 
 /// Convert a slice of bytes back to wires.
 pub fn wires_from_bytes(bs: &[u8]) -> Result<Vec<Wire>, failure::Error> {
-    bincode::deserialize(bs)
-        .map_err(|_| failure::err_msg("error decoding wires from bytes"))
+    bincode::deserialize(bs).map_err(|_| failure::err_msg("error decoding wires from bytes"))
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -282,8 +301,8 @@ pub fn wires_from_bytes(bs: &[u8]) -> Result<Vec<Wire>, failure::Error> {
 mod tests {
     use super::*;
     use crate::util::RngExt;
-    use rand::thread_rng;
     use itertools::Itertools;
+    use rand::thread_rng;
 
     #[test]
     fn packing() {
@@ -306,7 +325,7 @@ mod tests {
             let q = 3 + (rng.gen_u16() % 110);
             let x = rng.gen_u128();
             let w = Wire::from_u128(x, q);
-            let should_be = util::as_base_q_u128(x,q);
+            let should_be = util::as_base_q_u128(x, q);
             assert_eq!(w.digits(), should_be, "x={} q={}", x, q);
         }
     }
@@ -320,7 +339,7 @@ mod tests {
             let y = x.hashback(1, q);
             assert!(x != y);
             match y {
-                Wire::Mod2 { val }    => assert!(val > 0),
+                Wire::Mod2 { val } => assert!(u128::from(val) > 0),
                 Wire::ModN { ds, .. } => assert!(!ds.iter().all(|&y| y == 0)),
             }
         }
@@ -348,7 +367,7 @@ mod tests {
             let q = 3 + (rng.gen_u16() % 110);
             let z = Wire::zero(q);
             let ds = z.digits();
-            assert_eq!(ds, vec![0;ds.len()], "q={}", q);
+            assert_eq!(ds, vec![0; ds.len()], "q={}", q);
         }
     }
 
@@ -424,11 +443,13 @@ mod tests {
         let ws = (0..n).map(|_| Wire::rand(&mut rng, q)).collect_vec();
 
         let hashes = crossbeam::scope(|scope| {
-            let hs = ws.iter().map(|w| {
-                scope.spawn(move |_| w.hash(0))
-            }).collect_vec();
+            let hs = ws
+                .iter()
+                .map(|w| scope.spawn(move |_| w.hash(0)))
+                .collect_vec();
             hs.into_iter().map(|h| h.join().unwrap()).collect_vec()
-        }).unwrap();
+        })
+        .unwrap();
 
         let should_be = ws.iter().map(|w| w.hash(0)).collect_vec();
 

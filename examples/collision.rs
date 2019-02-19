@@ -1,43 +1,54 @@
 use itertools::Itertools;
 
-use fancy_garbling::{self, util, informer::Informer, Fancy, BundleGadgets, HasModulus};
+use fancy_garbling::{self, informer::Informer, util, BundleGadgets, Fancy, HasModulus};
 
-fn collision<W,F>(f: &F, nbits: usize, time_slices: usize, check_for_cheaters: bool)
-    where F: Fancy<Item=W>, W: Clone + HasModulus
+fn collision<W, F>(f: &F, nbits: usize, time_slices: usize, check_for_cheaters: bool)
+where
+    F: Fancy<Item = W>,
+    W: Clone + HasModulus,
 {
     // obtain inputs into a vec of vecs of arrays of 4
-    let inputs = (0..time_slices).map(|_t| {
-        (0..3).map(|_dimension| {
-            let p1_min = f.garbler_input_bundle_binary(None, nbits, None);
-            let p1_max = f.garbler_input_bundle_binary(None, nbits, None);
-            let p2_min = f.evaluator_input_bundle_binary(None, nbits);
-            let p2_max = f.evaluator_input_bundle_binary(None, nbits);
-            [p1_min, p1_max, p2_min, p2_max]
-        }).collect_vec()
-    }).collect_vec();
+    let inputs = (0..time_slices)
+        .map(|_t| {
+            (0..3)
+                .map(|_dimension| {
+                    let p1_min = f.garbler_input_bundle_binary(None, nbits, None);
+                    let p1_max = f.garbler_input_bundle_binary(None, nbits, None);
+                    let p2_min = f.evaluator_input_bundle_binary(None, nbits);
+                    let p2_max = f.evaluator_input_bundle_binary(None, nbits);
+                    [p1_min, p1_max, p2_min, p2_max]
+                })
+                .collect_vec()
+        })
+        .collect_vec();
 
     // check for collisions
-    let collisions = (0..time_slices).flat_map(|t| {
-        (0..3).map(|d| { // d=dimension
-            let [p1_min, p1_max, p2_min, p2_max] = &inputs[t][d];
-            // p1_min > p2_min && p1_min < p2_max
-            let left  = f.geq(None, p1_min, p2_min, "100%");
-            let right = f.lt(None, p1_min, p2_max, "100%");
-            let case1 = f.and(None, &left, &right);
+    let collisions = (0..time_slices)
+        .flat_map(|t| {
+            (0..3)
+                .map(|d| {
+                    // d=dimension
+                    let [p1_min, p1_max, p2_min, p2_max] = &inputs[t][d];
+                    // p1_min > p2_min && p1_min < p2_max
+                    let left = f.geq(None, p1_min, p2_min, "100%");
+                    let right = f.lt(None, p1_min, p2_max, "100%");
+                    let case1 = f.and(None, &left, &right);
 
-            // p1_max > p2_min && p1_max < p2_max
-            let left  = f.geq(None, p1_max, p2_min, "100%");
-            let right = f.lt(None, p1_max, p2_max, "100%");
-            let case2 = f.and(None, &left, &right);
+                    // p1_max > p2_min && p1_max < p2_max
+                    let left = f.geq(None, p1_max, p2_min, "100%");
+                    let right = f.lt(None, p1_max, p2_max, "100%");
+                    let case2 = f.and(None, &left, &right);
 
-            // p1_min < p2_min && p1_max > p2_max
-            let left  = f.lt(None, p1_min, p2_min, "100%");
-            let right = f.geq(None, p1_max, p2_max, "100%");
-            let case3 = f.and(None, &left, &right);
+                    // p1_min < p2_min && p1_max > p2_max
+                    let left = f.lt(None, p1_min, p2_min, "100%");
+                    let right = f.geq(None, p1_max, p2_max, "100%");
+                    let case3 = f.and(None, &left, &right);
 
-            f.or_many(None, &[case1, case2, case3])
-        }).collect_vec()
-    }).collect_vec();
+                    f.or_many(None, &[case1, case2, case3])
+                })
+                .collect_vec()
+        })
+        .collect_vec();
 
     let collision = f.or_many(None, &collisions);
 
@@ -46,16 +57,26 @@ fn collision<W,F>(f: &F, nbits: usize, time_slices: usize, check_for_cheaters: b
         // slices are at most delta.
         let delta = f.constant_bundle_binary(None, &util::u128_to_bits(10, nbits));
 
-        let possible_cheats = (1..time_slices).flat_map(|t| {
-            (0..3).flat_map(|d| {
-                (0..4).map(|i| {
-                    // ensure the difference between t and the previous t is at most delta
-                    let (diff, _) = f.binary_subtraction(None, &inputs[t][d][i], &inputs[t-1][d][i]);
-                    let abs  = f.abs(None, &diff);
-                    f.geq(None, &abs, &delta, "100%")
-                }).collect_vec()
-            }).collect_vec()
-        }).collect_vec();
+        let possible_cheats = (1..time_slices)
+            .flat_map(|t| {
+                (0..3)
+                    .flat_map(|d| {
+                        (0..4)
+                            .map(|i| {
+                                // ensure the difference between t and the previous t is at most delta
+                                let (diff, _) = f.binary_subtraction(
+                                    None,
+                                    &inputs[t][d][i],
+                                    &inputs[t - 1][d][i],
+                                );
+                                let abs = f.abs(None, &diff);
+                                f.geq(None, &abs, &delta, "100%")
+                            })
+                            .collect_vec()
+                    })
+                    .collect_vec()
+            })
+            .collect_vec();
 
         let cheater_detected = f.or_many(None, &possible_cheats);
         let output = f.or(None, &collision, &cheater_detected);
@@ -76,8 +97,8 @@ fn main() {
     informer.print_info();
     println!("");
 
-    fancy_garbling::bench_garbling(10,
-        move |f| collision(f, nbits, time_slices, check_for_cheaters),
-        move |f| collision(f, nbits, time_slices, check_for_cheaters)
-    );
+    // fancy_garbling::bench_garbling(10,
+    //     move |f| collision(f, nbits, time_slices, check_for_cheaters),
+    //     move |f| collision(f, nbits, time_slices, check_for_cheaters)
+    // );
 }

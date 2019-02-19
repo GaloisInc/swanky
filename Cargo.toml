@@ -14,7 +14,7 @@ cc = "1.0.28"
 
 [dependencies]
 base_conversion = { path = "base_conversion" }
-bincode = { version = "1.0.1", features = ["i128"] } 
+bincode = { version = "1.0.1", features = ["i128"] }
 failure = "0.1.5"
 itertools = "0.8.0"
 libc = "0.2.48"
@@ -26,6 +26,7 @@ serde_json = "1.0.37"
 time = "0.1.42"
 pbr = "1.0.1"
 crossbeam = "0.6.0"
+scuttlebutt = { path = "../scuttlebutt", features = ["serde"] }
 
 [dev-dependencies]
 criterion = "0.2.9"

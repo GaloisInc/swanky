@@ -5,20 +5,19 @@
     clippy::new_without_default_derive,
     clippy::type_complexity,
     clippy::many_single_char_names,
-    clippy::needless_range_loop,
+    clippy::needless_range_loop
 )]
-
 #![allow(non_snake_case)]
 
 mod aes;
-mod garble;
-mod wire;
-mod fancy;
-pub mod dummy;
-pub mod informer;
 pub mod circuit;
+pub mod dummy;
+mod fancy;
+mod garble;
+pub mod informer;
 pub mod util;
+mod wire;
 
+pub use crate::fancy::*;
 pub use crate::garble::*;
 pub use crate::wire::*;
-pub use crate::fancy::*;

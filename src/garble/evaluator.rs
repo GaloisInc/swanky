@@ -1,31 +1,31 @@
 use crossbeam::queue::MsQueue;
 use itertools::Itertools;
-use serde_derive::{Serialize, Deserialize};
+use serde_derive::{Deserialize, Serialize};
 
 use std::collections::{HashMap, VecDeque};
 use std::ops::DerefMut;
-use std::sync::{Arc, RwLock, Mutex};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::mpsc::Sender;
+use std::sync::{Arc, Mutex, RwLock};
 
 use crate::circuit::{Circuit, Gate};
 use crate::fancy::{Fancy, HasModulus, SyncIndex};
-use crate::util::{tweak2, output_tweak};
+use crate::util::{output_tweak, tweak2};
 use crate::wire::Wire;
 
-use super::{Message, GarbledGate, OutputCiphertext, SyncInfo};
+use super::{GarbledGate, Message, OutputCiphertext, SyncInfo};
 
 /// Streaming evaluator using a callback to receive ciphertexts as needed.
 ///
 /// Evaluates a garbled circuit on the fly, using messages containing ciphertexts and
 /// wires. Parallelizable.
 pub struct Evaluator {
-    recv_function:  Arc<Mutex<FnMut() -> (Option<SyncIndex>, Message) + Send>>,
-    current_gate:   Arc<AtomicUsize>,
-    output_cts:     Arc<Mutex<Vec<OutputCiphertext>>>,
-    output_wires:   Arc<Mutex<Vec<Wire>>>,
-    sync_info:      Arc<RwLock<Option<SyncInfo>>>,
-    requests:       Arc<RwLock<Option<Vec<MsQueue<Sender<Message>>>>>>,
+    recv_function: Arc<Mutex<FnMut() -> (Option<SyncIndex>, Message) + Send>>,
+    current_gate: Arc<AtomicUsize>,
+    output_cts: Arc<Mutex<Vec<OutputCiphertext>>>,
+    output_wires: Arc<Mutex<Vec<Wire>>>,
+    sync_info: Arc<RwLock<Option<SyncInfo>>>,
+    requests: Arc<RwLock<Option<Vec<MsQueue<Sender<Message>>>>>>,
 }
 
 impl Evaluator {
@@ -34,21 +34,22 @@ impl Evaluator {
     /// `recv_function` enables streaming by producing messages during the `Fancy`
     /// computation, which contain ciphertexts and wirelabels.
     pub fn new<F>(recv_function: F) -> Evaluator
-      where F: FnMut() -> (Option<SyncIndex>, Message) + Send + 'static
+    where
+        F: FnMut() -> (Option<SyncIndex>, Message) + Send + 'static,
     {
         Evaluator {
-            recv_function:  Arc::new(Mutex::new(recv_function)),
-            current_gate:   Arc::new(AtomicUsize::new(0)),
-            output_cts:     Arc::new(Mutex::new(Vec::new())),
-            output_wires:   Arc::new(Mutex::new(Vec::new())),
-            sync_info:      Arc::new(RwLock::new(None)),
-            requests:       Arc::new(RwLock::new(None)),
+            recv_function: Arc::new(Mutex::new(recv_function)),
+            current_gate: Arc::new(AtomicUsize::new(0)),
+            output_cts: Arc::new(Mutex::new(Vec::new())),
+            output_wires: Arc::new(Mutex::new(Vec::new())),
+            sync_info: Arc::new(RwLock::new(None)),
+            requests: Arc::new(RwLock::new(None)),
         }
     }
 
     /// Decode the output received during the Fancy computation.
     pub fn decode_output(&self) -> Vec<u16> {
-        let cts  = self.output_cts.lock().unwrap();
+        let cts = self.output_cts.lock().unwrap();
         let outs = self.output_wires.lock().unwrap();
         Decoder::new(cts.clone()).decode(&outs)
     }
@@ -57,26 +58,41 @@ impl Evaluator {
     fn recv(&self, ix: Option<SyncIndex>) -> Message {
         if let Some(ix) = ix {
             // request next message for this index
-            let (tx,rx) = std::sync::mpsc::channel();
+            let (tx, rx) = std::sync::mpsc::channel();
             self.requests.read().unwrap().as_ref().unwrap()[ix as usize].push(tx);
             // block until postman delivers message
             rx.recv().unwrap()
         } else {
-            let (ix,m) = (self.recv_function.lock().unwrap().deref_mut())();
+            let (ix, m) = (self.recv_function.lock().unwrap().deref_mut())();
             if m == Message::EndSync {
                 return self.recv(ix);
             }
-            assert!(ix.is_none(), "evaluator: index recieved when not in sync mode!");
+            assert!(
+                ix.is_none(),
+                "evaluator: index recieved when not in sync mode!"
+            );
             m
         }
     }
 
     fn internal_begin_sync(&self, num_indices: SyncIndex) {
         let mut opt_info = self.sync_info.write().unwrap();
-        assert!(opt_info.is_none(), "evaluator: begin_sync called before finishing previous sync!");
-        *opt_info = Some(SyncInfo::new(self.current_gate.load(Ordering::SeqCst), num_indices));
-        *self.requests.write().unwrap() = Some((0..num_indices).map(|_| MsQueue::new()).collect_vec());
-        start_postman(num_indices, self.sync_info.clone(), self.requests.clone(), self.recv_function.clone());
+        assert!(
+            opt_info.is_none(),
+            "evaluator: begin_sync called before finishing previous sync!"
+        );
+        *opt_info = Some(SyncInfo::new(
+            self.current_gate.load(Ordering::SeqCst),
+            num_indices,
+        ));
+        *self.requests.write().unwrap() =
+            Some((0..num_indices).map(|_| MsQueue::new()).collect_vec());
+        start_postman(
+            num_indices,
+            self.sync_info.clone(),
+            self.requests.clone(),
+            self.recv_function.clone(),
+        );
     }
 
     fn internal_finish_index(&self, index: SyncIndex) {
@@ -97,7 +113,11 @@ impl Evaluator {
     /// The current non-free gate index of the garbling computation. Respects sync
     /// ordering. Must agree with Garbler hence compute_gate_id is in the parent mod.
     fn current_gate(&self, sync_index: Option<SyncIndex>) -> usize {
-        super::compute_gate_id(&self.current_gate, sync_index, &*self.sync_info.read().unwrap())
+        super::compute_gate_id(
+            &self.current_gate,
+            sync_index,
+            &*self.sync_info.read().unwrap(),
+        )
     }
 }
 
@@ -105,7 +125,7 @@ fn start_postman(
     nindices: SyncIndex,
     sync_info: Arc<RwLock<Option<SyncInfo>>>,
     requests: Arc<RwLock<Option<Vec<MsQueue<Sender<Message>>>>>>,
-    recv_msg: Arc<Mutex<FnMut() -> (Option<SyncIndex>, Message) + Send>>
+    recv_msg: Arc<Mutex<FnMut() -> (Option<SyncIndex>, Message) + Send>>,
 ) {
     std::thread::spawn(move || {
         let mut awaiting = vec![VecDeque::new(); nindices as usize];
@@ -121,11 +141,16 @@ fn start_postman(
 
             if !done_receiving {
                 // receive a message
-                let (ix,m) = (recv_msg.lock().unwrap().deref_mut())();
+                let (ix, m) = (recv_msg.lock().unwrap().deref_mut())();
                 if m == Message::EndSync {
                     done_receiving = true;
                 } else {
-                    let ix = ix.unwrap_or_else(|| panic!("evaluator: message {} received without index in sync mode", m));
+                    let ix = ix.unwrap_or_else(|| {
+                        panic!(
+                            "evaluator: message {} received without index in sync mode",
+                            m
+                        )
+                    });
                     awaiting[ix as usize].push_back(m);
                 }
             }
@@ -188,7 +213,7 @@ impl Fancy for Evaluator {
 
     fn mul(&self, ix: Option<SyncIndex>, A: &Wire, B: &Wire) -> Wire {
         if A.modulus() < A.modulus() {
-            return self.mul(ix,B,A);
+            return self.mul(ix, B, A);
         }
 
         let gate = match self.recv(ix) {
@@ -201,7 +226,7 @@ impl Fancy for Evaluator {
 
         // garbler's half gate
         let L = if A.color() == 0 {
-            A.hashback(g,q)
+            A.hashback(g, q)
         } else {
             let ct_left = gate[A.color() as usize - 1];
             Wire::from_u128(ct_left ^ A.hash(g), q)
@@ -209,7 +234,7 @@ impl Fancy for Evaluator {
 
         // evaluator's half gate
         let R = if B.color() == 0 {
-            B.hashback(g,q)
+            B.hashback(g, q)
         } else {
             let ct_right = gate[(q + B.color()) as usize - 2];
             Wire::from_u128(ct_right ^ B.hash(g), q)
@@ -233,8 +258,10 @@ impl Fancy for Evaluator {
             Message::GarbledGate(g) => g,
             m => panic!("Expected message GarbledGate but got {}", m),
         };
-        assert!(gate.len() as u16 == x.modulus() - 1,
-            "evaluator proj: garbled gate length does not equal q-1, sync issue?");
+        assert!(
+            gate.len() as u16 == x.modulus() - 1,
+            "evaluator proj: garbled gate length does not equal q-1, sync issue?"
+        );
         let gate_num = self.current_gate(ix);
         if x.color() == 0 {
             x.hashback(gate_num as u128, q)
@@ -272,13 +299,13 @@ impl Fancy for Evaluator {
 /// Uses `Evaluator` under the hood to actually implement the evaluation.
 #[derive(Serialize, Deserialize, PartialEq, Debug)]
 pub struct GarbledCircuit {
-    gates  : Vec<GarbledGate>,
-    consts : HashMap<(u16,u16),Wire>,
+    gates: Vec<GarbledGate>,
+    consts: HashMap<(u16, u16), Wire>,
 }
 
 impl GarbledCircuit {
     /// Create a new GarbledCircuit from a vec of garbled gates and constant wires.
-    pub fn new(gates: Vec<GarbledGate>, consts: HashMap<(u16,u16),Wire>) -> Self {
+    pub fn new(gates: Vec<GarbledGate>, consts: HashMap<(u16, u16), Wire>) -> Self {
         GarbledCircuit { gates, consts }
     }
 
@@ -292,41 +319,57 @@ impl GarbledCircuit {
     }
 
     /// Evaluate the garbled circuit.
-    pub fn eval(&self, c: &Circuit, garbler_inputs: &[Wire], evaluator_inputs: &[Wire]) -> Vec<Wire> {
+    pub fn eval(
+        &self,
+        c: &Circuit,
+        garbler_inputs: &[Wire],
+        evaluator_inputs: &[Wire],
+    ) -> Vec<Wire> {
         // create a message iterator to pass as the Evaluator recv function
-        let mut msgs = c.gates.iter().enumerate().filter_map(|(i,gate)| {
-            let q = c.modulus(i);
-            match *gate {
-                Gate::GarblerInput { id }   => Some(Message::GarblerInput(garbler_inputs[id].clone())),
-                Gate::EvaluatorInput { id } => Some(Message::EvaluatorInput(evaluator_inputs[id].clone())),
-                Gate::Constant { val }      => Some(Message::Constant { value: val, wire: self.consts[&(val,q)].clone() }),
-                Gate::Mul { id, .. }        => Some(Message::GarbledGate(self.gates[id].clone())),
-                Gate::Proj { id, .. }       => Some(Message::GarbledGate(self.gates[id].clone())),
-                _ => None,
-            }
-        }).collect_vec().into_iter();
+        let mut msgs = c
+            .gates
+            .iter()
+            .enumerate()
+            .filter_map(|(i, gate)| {
+                let q = c.modulus(i);
+                match *gate {
+                    Gate::GarblerInput { id } => {
+                        Some(Message::GarblerInput(garbler_inputs[id].clone()))
+                    }
+                    Gate::EvaluatorInput { id } => {
+                        Some(Message::EvaluatorInput(evaluator_inputs[id].clone()))
+                    }
+                    Gate::Constant { val } => Some(Message::Constant {
+                        value: val,
+                        wire: self.consts[&(val, q)].clone(),
+                    }),
+                    Gate::Mul { id, .. } => Some(Message::GarbledGate(self.gates[id].clone())),
+                    Gate::Proj { id, .. } => Some(Message::GarbledGate(self.gates[id].clone())),
+                    _ => None,
+                }
+            })
+            .collect_vec()
+            .into_iter();
 
         let eval = Evaluator::new(move || (None, msgs.next().unwrap()));
 
         let mut wires: Vec<Wire> = Vec::new();
-        for (i,gate) in c.gates.iter().enumerate() {
+        for (i, gate) in c.gates.iter().enumerate() {
             let q = c.modulus(i);
             let w = match *gate {
-                Gate::GarblerInput { .. }    => eval.garbler_input(None, q, None),
-                Gate::EvaluatorInput { .. }  => eval.evaluator_input(None, q),
-                Gate::Constant { val }       => eval.constant(None, val, q),
-                Gate::Add { xref, yref }     => wires[xref.ix].plus(&wires[yref.ix]),
-                Gate::Sub { xref, yref }     => wires[xref.ix].minus(&wires[yref.ix]),
-                Gate::Cmul { xref, c }       => wires[xref.ix].cmul(c),
-                Gate::Proj { xref, .. }      => eval.proj(None, &wires[xref.ix], q, None),
+                Gate::GarblerInput { .. } => eval.garbler_input(None, q, None),
+                Gate::EvaluatorInput { .. } => eval.evaluator_input(None, q),
+                Gate::Constant { val } => eval.constant(None, val, q),
+                Gate::Add { xref, yref } => wires[xref.ix].plus(&wires[yref.ix]),
+                Gate::Sub { xref, yref } => wires[xref.ix].minus(&wires[yref.ix]),
+                Gate::Cmul { xref, c } => wires[xref.ix].cmul(c),
+                Gate::Proj { xref, .. } => eval.proj(None, &wires[xref.ix], q, None),
                 Gate::Mul { xref, yref, .. } => eval.mul(None, &wires[xref.ix], &wires[yref.ix]),
             };
             wires.push(w);
         }
 
-        c.output_refs.iter().map(|&r| {
-            wires[r.ix].clone()
-        }).collect()
+        c.output_refs.iter().map(|&r| wires[r.ix].clone()).collect()
     }
 
     pub fn to_bytes(&self) -> Vec<u8> {
@@ -345,14 +388,22 @@ impl GarbledCircuit {
 /// Encode inputs statically. Created by the `garble` function.
 #[derive(Serialize, Deserialize, PartialEq, Debug)]
 pub struct Encoder {
-    garbler_inputs : Vec<Wire>,
-    evaluator_inputs : Vec<Wire>,
-    deltas : HashMap<u16,Wire>,
+    garbler_inputs: Vec<Wire>,
+    evaluator_inputs: Vec<Wire>,
+    deltas: HashMap<u16, Wire>,
 }
 
 impl Encoder {
-    pub fn new(garbler_inputs: Vec<Wire>, evaluator_inputs: Vec<Wire>, deltas: HashMap<u16,Wire>) -> Self {
-        Encoder { garbler_inputs, evaluator_inputs, deltas }
+    pub fn new(
+        garbler_inputs: Vec<Wire>,
+        evaluator_inputs: Vec<Wire>,
+        deltas: HashMap<u16, Wire>,
+    ) -> Self {
+        Encoder {
+            garbler_inputs,
+            evaluator_inputs,
+            deltas,
+        }
     }
 
     pub fn num_garbler_inputs(&self) -> usize {
@@ -377,16 +428,18 @@ impl Encoder {
 
     pub fn encode_garbler_inputs(&self, inputs: &[u16]) -> Vec<Wire> {
         debug_assert_eq!(inputs.len(), self.garbler_inputs.len());
-        (0..inputs.len()).zip(inputs).map(|(id,&x)| {
-            self.encode_garbler_input(x,id)
-        }).collect()
+        (0..inputs.len())
+            .zip(inputs)
+            .map(|(id, &x)| self.encode_garbler_input(x, id))
+            .collect()
     }
 
     pub fn encode_evaluator_inputs(&self, inputs: &[u16]) -> Vec<Wire> {
         debug_assert_eq!(inputs.len(), self.evaluator_inputs.len());
-        (0..inputs.len()).zip(inputs).map(|(id,&x)| {
-            self.encode_evaluator_input(x,id)
-        }).collect()
+        (0..inputs.len())
+            .zip(inputs)
+            .map(|(id, &x)| self.encode_evaluator_input(x, id))
+            .collect()
     }
 
     pub fn to_bytes(&self) -> Vec<u8> {
@@ -394,8 +447,7 @@ impl Encoder {
     }
 
     pub fn from_bytes(bs: &[u8]) -> Result<Self, failure::Error> {
-        bincode::deserialize(bs)
-            .map_err(|_| failure::err_msg("error decoding Encoder from bytes"))
+        bincode::deserialize(bs).map_err(|_| failure::err_msg("error decoding Encoder from bytes"))
     }
 }
 
@@ -405,7 +457,7 @@ impl Encoder {
 /// Decode outputss statically. Created by the `garble` function.
 #[derive(Serialize, Deserialize, PartialEq, Debug)]
 pub struct Decoder {
-    outputs : Vec<OutputCiphertext>,
+    outputs: Vec<OutputCiphertext>,
 }
 
 impl Decoder {
@@ -414,25 +466,33 @@ impl Decoder {
     }
 
     pub fn decode(&self, ws: &[Wire]) -> Vec<u16> {
-        debug_assert_eq!(ws.len(), self.outputs.len(),
+        debug_assert_eq!(
+            ws.len(),
+            self.outputs.len(),
             "got {} wires, but have {} output ciphertexts",
-            ws.len(), self.outputs.len());
+            ws.len(),
+            self.outputs.len()
+        );
 
         let mut outs = Vec::new();
         for i in 0..ws.len() {
             let q = ws[i].modulus();
             debug_assert_eq!(q as usize, self.outputs[i].len());
             for k in 0..q {
-                let h = ws[i].hash(output_tweak(i,k));
+                let h = ws[i].hash(output_tweak(i, k));
                 if h == self.outputs[i][k as usize] {
                     outs.push(k);
                     break;
                 }
             }
         }
-        debug_assert_eq!(ws.len(), outs.len(),
+        debug_assert_eq!(
+            ws.len(),
+            outs.len(),
             "decoding failed! decoded {} out of {} wires",
-            outs.len(), ws.len());
+            outs.len(),
+            ws.len()
+        );
         outs
     }
 
@@ -441,8 +501,7 @@ impl Decoder {
     }
 
     pub fn from_bytes(bs: &[u8]) -> Result<Self, failure::Error> {
-        bincode::deserialize(bs)
-            .map_err(|_| failure::err_msg("error decoding Decoder from bytes"))
+        bincode::deserialize(bs).map_err(|_| failure::err_msg("error decoding Decoder from bytes"))
     }
 }
 
@@ -454,8 +513,8 @@ mod tests {
     use super::*;
     #[test]
     fn evaluator_has_send_and_sync() {
-        fn check_send(_: impl Send) { }
-        fn check_sync(_: impl Sync) { }
+        fn check_send(_: impl Send) {}
+        fn check_sync(_: impl Sync) {}
         check_send(Evaluator::new(|| unimplemented!()));
         check_sync(Evaluator::new(|| unimplemented!()));
     }
