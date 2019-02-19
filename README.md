@@ -26,6 +26,9 @@ It also exposes various traits for implementing your very own OT protocol:
 * `RandomObliviousTransferSender` / `RandomObliviousTransferReceiver` exposes a
   `send_random` / `receive_random` method for random OT.
 
+**`ocelot` should be considered unstable and under active development until
+version 1.0 is released**
+
 # Performance
 
 `ocelot` seems to be close in performance with the latest and greatest OT
