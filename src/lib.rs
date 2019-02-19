@@ -15,6 +15,10 @@
 //! to for example run OT extension multiple times without having to re-do the
 //! initialization phase.
 //!
+//! `ocelot` also supports correlated OT and random OT through the
+//! `CorrelatedObliviousTransferSender/Receiver` and
+//! `RandomObliviousTransferSender/Receiver` traits.
+//!
 //! `ocelot` attempts to use all the latest-and-greatest optimizations, including:
 //! * Fixed-key AES wherever possible (cf. <https://eprint.iacr.org/2019/074>).
 //! * An optimized implementation of matrix transposition from the EMP toolkit's OT implementation (cf. <https://github.com/emp-toolkit/emp-ot>).

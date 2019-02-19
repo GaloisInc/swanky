@@ -47,7 +47,7 @@ impl AesHash {
             let x = _mm_xor_si128(
                 _mm_shuffle_epi32(x.into(), 78),
                 #[allow(overflowing_literals)]
-                _mm_and_si128(x.into(), _mm_set_epi64x(0xFFFFFFFFFFFFFFFF, 0x00)),
+                _mm_and_si128(x.into(), _mm_set_epi64x(0xFFFF_FFFF_FFFF_FFFF, 0x00)),
             );
             self.cr_hash(i, Block::from(x))
         }

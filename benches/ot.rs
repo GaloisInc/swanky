@@ -12,6 +12,7 @@ use std::io::{BufReader, BufWriter};
 use std::os::unix::net::UnixStream;
 use std::time::Duration;
 
+/// Specifies the number of OTs to run when benchmarking OT extension.
 const T: usize = 1 << 16;
 
 fn rand_block_vec(size: usize) -> Vec<Block> {

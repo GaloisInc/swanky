@@ -21,6 +21,7 @@ use rand_core::{RngCore, SeedableRng};
 use std::io::{ErrorKind, Read, Write};
 use std::marker::PhantomData;
 
+/// Oblivious transfer sender.
 pub struct AlszOTSender<
     R: Read,
     W: Write,
@@ -31,10 +32,10 @@ pub struct AlszOTSender<
     _ot: PhantomData<OT>,
     hash: AesHash,
     s: Vec<bool>,
-    s_: [u8; 16],
+    s_: Block,
     rngs: Vec<AesRng>,
 }
-
+/// Oblivious transfer receiver.
 pub struct AlszOTReceiver<
     R: Read,
     W: Write,
@@ -99,7 +100,7 @@ impl<R: Read, W: Write, OT: ObliviousTransferReceiver<R, W, Msg = Block> + SemiH
             _ot: PhantomData::<OT>,
             hash,
             s,
-            s_,
+            s_: Block::from(s_),
             rngs,
         })
     }
@@ -111,13 +112,13 @@ impl<R: Read, W: Write, OT: ObliviousTransferReceiver<R, W, Msg = Block> + SemiH
         inputs: &[(Self::Msg, Self::Msg)],
     ) -> Result<(), Error> {
         let m = inputs.len();
-        let mut qs = self.send_setup(reader, m)?;
+        let qs = self.send_setup(reader, m)?;
         for (j, input) in inputs.iter().enumerate() {
-            let range = j * 16..(j + 1) * 16;
-            let mut q = &mut qs[range];
-            let y0 = self.hash.cr_hash(j, Block::from(*array_ref![q, 0, 16])) ^ input.0;
-            utils::xor_inplace(&mut q, &self.s_);
-            let y1 = self.hash.cr_hash(j, Block::from(*array_ref![q, 0, 16])) ^ input.1;
+            let q = &qs[j * 16..(j + 1) * 16];
+            let q = Block::from(*array_ref![q, 0, 16]);
+            let y0 = self.hash.cr_hash(j, q) ^ input.0;
+            let q = q ^ self.s_;
+            let y1 = self.hash.cr_hash(j, q) ^ input.1;
             y0.write(&mut writer)?;
             y1.write(&mut writer)?;
         }
@@ -136,14 +137,15 @@ impl<R: Read, W: Write, OT: ObliviousTransferReceiver<R, W, Msg = Block> + SemiH
         deltas: &[Self::Msg],
     ) -> Result<Vec<(Self::Msg, Self::Msg)>, Error> {
         let m = deltas.len();
-        let mut qs = self.send_setup(reader, m)?;
+        let qs = self.send_setup(reader, m)?;
         let mut out = Vec::with_capacity(m);
         for (j, delta) in deltas.iter().enumerate() {
-            let mut q = &mut qs[j * 16..(j + 1) * 16];
-            let x0 = self.hash.cr_hash(j, Block::from(*array_ref![q, 0, 16]));
+            let q = &qs[j * 16..(j + 1) * 16];
+            let q = Block::from(*array_ref![q, 0, 16]);
+            let x0 = self.hash.cr_hash(j, q);
             let x1 = x0 ^ *delta;
-            utils::xor_inplace(&mut q, &self.s_);
-            let y = self.hash.cr_hash(j, Block::from(*array_ref![q, 0, 16])) ^ x1;
+            let q = q ^ self.s_;
+            let y = self.hash.cr_hash(j, q) ^ x1;
             y.write(&mut writer)?;
             out.push((x0, x1));
         }
@@ -161,13 +163,14 @@ impl<R: Read, W: Write, OT: ObliviousTransferReceiver<R, W, Msg = Block> + SemiH
         _: &mut W,
         m: usize,
     ) -> Result<Vec<(Self::Msg, Self::Msg)>, Error> {
-        let mut qs = self.send_setup(reader, m)?;
+        let qs = self.send_setup(reader, m)?;
         let mut out = Vec::with_capacity(m);
         for j in 0..m {
-            let mut q = &mut qs[j * 16..(j + 1) * 16];
-            let x0 = self.hash.cr_hash(j, Block::from(*array_ref![q, 0, 16]));
-            utils::xor_inplace(&mut q, &self.s_);
-            let x1 = self.hash.cr_hash(j, Block::from(*array_ref![q, 0, 16]));
+            let q = &qs[j * 16..(j + 1) * 16];
+            let q = Block::from(*array_ref![q, 0, 16]);
+            let x0 = self.hash.cr_hash(j, q);
+            let q = q ^ self.s_;
+            let x1 = self.hash.cr_hash(j, q);
             out.push((x0, x1));
         }
         Ok(out)

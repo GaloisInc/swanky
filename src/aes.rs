@@ -58,8 +58,8 @@ macro_rules! expand_round {
     };
 }
 
-#[inline(always)]
-pub(super) fn expand(key: __m128i) -> [__m128i; 11] {
+#[inline]
+fn expand(key: __m128i) -> [__m128i; 11] {
     unsafe {
         let mut keys: [__m128i; 11] = mem::uninitialized();
         _mm_store_si128(keys.as_mut_ptr(), key);
@@ -78,7 +78,7 @@ pub(super) fn expand(key: __m128i) -> [__m128i; 11] {
 }
 
 impl Aes128 {
-    #[inline(always)]
+    #[inline]
     pub fn new(key: Block) -> Self {
         let rkeys = expand(key.0);
         Aes128 { rkeys }

@@ -30,7 +30,7 @@ pub struct KosOTSender<
     rng: AesRng,
     hash: AesHash,
     δ: Vec<bool>,
-    δ_: [u8; 16],
+    δ_: Block,
     rngs: Vec<AesRng>,
 }
 
@@ -71,7 +71,7 @@ impl<R: Read, W: Write, OT: ObliviousTransferReceiver<R, W, Msg = Block> + Malic
             rng,
             hash,
             δ,
-            δ_,
+            δ_: Block::from(δ_),
             rngs,
         })
     }
@@ -103,7 +103,7 @@ impl<R: Read, W: Write, OT: ObliviousTransferReceiver<R, W, Msg = Block> + Malic
             };
             utils::xor_inplace(&mut q, &u);
         }
-        let mut qs = utils::transpose(&qs, nrows, ncols);
+        let qs = utils::transpose(&qs, nrows, ncols);
         // Check correlation
         let mut seed = Block::zero();
         self.rng.fill_bytes(&mut seed.as_mut());
@@ -112,8 +112,7 @@ impl<R: Read, W: Write, OT: ObliviousTransferReceiver<R, W, Msg = Block> + Malic
         let mut check = (Block::zero(), Block::zero());
         let mut χ = Block::zero();
         for j in 0..ncols {
-            let range = j * nrows / 8..(j + 1) * nrows / 8;
-            let q = &qs[range];
+            let q = &qs[j * 16..(j + 1) * 16];
             let q = Block::from(*array_ref![q, 0, 16]);
             rng.fill_bytes(&mut χ.as_mut());
             let tmp = q.mul128(χ);
@@ -122,7 +121,7 @@ impl<R: Read, W: Write, OT: ObliviousTransferReceiver<R, W, Msg = Block> + Malic
         let x = Block::read(reader)?;
         let t0 = Block::read(reader)?;
         let t1 = Block::read(reader)?;
-        let tmp = x.mul128(Block::from(self.δ_));
+        let tmp = x.mul128(self.δ_);
         let check = block::xor_two_blocks(&check, &tmp);
         if check != (t0, t1) {
             println!("Consistency check failed!");
@@ -133,11 +132,11 @@ impl<R: Read, W: Write, OT: ObliviousTransferReceiver<R, W, Msg = Block> + Malic
         }
         // Output result
         for (j, input) in inputs.iter().enumerate() {
-            let range = j * nrows / 8..(j + 1) * nrows / 8;
-            let mut q = &mut qs[range];
-            let y0 = self.hash.tccr_hash(j, Block::from(*array_ref![q, 0, 16])) ^ input.0;
-            utils::xor_inplace(&mut q, &self.δ_);
-            let y1 = self.hash.tccr_hash(j, Block::from(*array_ref![q, 0, 16])) ^ input.1;
+            let q = &qs[j * 16..(j + 1) * 16];
+            let q = Block::from(*array_ref![q, 0, 16]);
+            let y0 = self.hash.tccr_hash(j, q) ^ input.0;
+            let q = q ^ self.δ_;
+            let y1 = self.hash.tccr_hash(j, q) ^ input.1;
             y0.write(&mut writer)?;
             y1.write(&mut writer)?;
         }
@@ -212,8 +211,7 @@ impl<R: Read, W: Write, OT: ObliviousTransferSender<R, W, Msg = Block> + Malicio
         let r_ = utils::u8vec_to_boolvec(&r);
         let mut χ = Block::zero();
         for (j, xj) in r_.into_iter().enumerate() {
-            let range = j * nrows / 8..(j + 1) * nrows / 8;
-            let tj = &ts[range];
+            let tj = &ts[j * 16..(j + 1) * 16];
             let tj = Block::from(*array_ref![tj, 0, 16]);
             rng.fill_bytes(&mut χ.as_mut());
             x = x ^ if xj { χ } else { Block::zero() };
@@ -227,8 +225,7 @@ impl<R: Read, W: Write, OT: ObliviousTransferSender<R, W, Msg = Block> + Malicio
         // Output result
         let mut out = Vec::with_capacity(ncols);
         for (j, b) in inputs.iter().enumerate() {
-            let range = j * nrows / 8..(j + 1) * nrows / 8;
-            let t = &ts[range];
+            let t = &ts[j * 16..(j + 1) * 16];
             let y0 = Block::read(&mut reader)?;
             let y1 = Block::read(&mut reader)?;
             let y = if *b { y1 } else { y0 };

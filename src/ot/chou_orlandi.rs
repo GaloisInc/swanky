@@ -27,6 +27,7 @@ use failure::Error;
 use std::io::{Read, Write};
 use std::marker::PhantomData;
 
+/// Oblivious transfer sender.
 pub struct ChouOrlandiOTSender<R: Read, W: Write> {
     _r: PhantomData<R>,
     _w: PhantomData<W>,
@@ -75,6 +76,7 @@ impl<R: Read + Send, W: Write + Send> ObliviousTransferSender<R, W> for ChouOrla
     }
 }
 
+/// Oblivious transfer receiver.
 pub struct ChouOrlandiOTReceiver<R: Read, W: Write> {
     _r: PhantomData<R>,
     _w: PhantomData<W>,

@@ -61,11 +61,13 @@ pub trait CorrelatedObliviousTransferSender<R: Read, W: Write>:
 where
     Self: Sized,
 {
+    /// Correlated oblivious transfer send. Takes as input an array `deltas`
+    /// which specifies the offset between the zero and one message.
     fn send_correlated(
         &mut self,
         reader: &mut R,
         writer: &mut W,
-        inputs: &[Self::Msg],
+        deltas: &[Self::Msg],
     ) -> Result<Vec<(Self::Msg, Self::Msg)>, Error>;
 }
 
@@ -76,11 +78,12 @@ pub trait CorrelatedObliviousTransferReceiver<R: Read, W: Write>:
 where
     Self: Sized,
 {
+    /// Correlated oblivious transfer receive.
     fn receive_correlated(
         &mut self,
         reader: &mut R,
         writer: &mut W,
-        deltas: &[bool],
+        inputs: &[bool],
     ) -> Result<Vec<Self::Msg>, Error>;
 }
 
