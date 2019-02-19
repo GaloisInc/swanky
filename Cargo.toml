@@ -26,7 +26,7 @@ serde_json = "1.0.37"
 time = "0.1.42"
 pbr = "1.0.1"
 crossbeam = "0.6.0"
-scuttlebutt = { path = "../scuttlebutt", features = ["serde"] }
+scuttlebutt = { path = "../scuttlebutt", default-features = false, features = ["serde"] }
 
 [dev-dependencies]
 criterion = "0.2.9"
