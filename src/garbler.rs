@@ -7,22 +7,34 @@
 use crate::comm;
 use failure::Error;
 use fancy_garbling::{Fancy, Garbler as Gb, Message, SyncIndex, Wire};
-use ocelot::{Block, ObliviousTransferSender};
+use ocelot::ObliviousTransferSender;
+use rand::{CryptoRng, RngCore};
+use scuttlebutt::Block;
 use std::io::{Read, Write};
 use std::sync::{Arc, Mutex};
 
-pub struct Garbler<R: Read + Send, W: Write + Send, OT: ObliviousTransferSender<R, W>> {
+pub struct Garbler<
+    R: Read + Send,
+    W: Write + Send,
+    RNG: CryptoRng + RngCore,
+    OT: ObliviousTransferSender,
+> {
     garbler: Gb,
     reader: Arc<Mutex<R>>,
     writer: Arc<Mutex<W>>,
     ot: Arc<Mutex<OT>>,
+    rng: Arc<Mutex<RNG>>,
 }
 
-impl<R: Read + Send, W: Write + Send + 'static, OT: ObliviousTransferSender<R, W, Msg = Block>>
-    Garbler<R, W, OT>
+impl<
+        R: Read + Send,
+        W: Write + Send + 'static,
+        RNG: CryptoRng + RngCore,
+        OT: ObliviousTransferSender<Msg = Block>,
+    > Garbler<R, W, RNG, OT>
 {
-    pub fn new(mut reader: R, mut writer: W, inputs: &[u16]) -> Result<Self, Error> {
-        let ot = OT::init(&mut reader, &mut writer)?;
+    pub fn new(mut reader: R, mut writer: W, inputs: &[u16], mut rng: RNG) -> Result<Self, Error> {
+        let ot = OT::init(&mut reader, &mut writer, &mut rng)?;
         let mut inputs = inputs.to_vec().into_iter();
         let reader = Arc::new(Mutex::new(reader));
         let writer = Arc::new(Mutex::new(writer));
@@ -50,11 +62,13 @@ impl<R: Read + Send, W: Write + Send + 'static, OT: ObliviousTransferSender<R, W
         };
         let garbler = Gb::new(callback);
         let ot = Arc::new(Mutex::new(ot));
+        let rng = Arc::new(Mutex::new(rng));
         Ok(Garbler {
             garbler,
             reader,
             writer,
             ot,
+            rng,
         })
     }
 
@@ -62,7 +76,9 @@ impl<R: Read + Send, W: Write + Send + 'static, OT: ObliviousTransferSender<R, W
         let mut ot = self.ot.lock().unwrap();
         let mut reader = self.reader.lock().unwrap();
         let mut writer = self.writer.lock().unwrap();
-        ot.send(&mut *reader, &mut *writer, inputs).unwrap() // XXX: remove unwrap
+        let mut rng = self.rng.lock().unwrap();
+        ot.send(&mut *reader, &mut *writer, inputs, &mut *rng)
+            .unwrap() // XXX: remove unwrap
     }
 }
 
@@ -81,8 +97,12 @@ fn _evaluator_input(δ: &Wire, q: u16) -> (Wire, Vec<(Block, Block)>) {
     (wire, inputs)
 }
 
-impl<R: Read + Send, W: Write + Send + 'static, OT: ObliviousTransferSender<R, W, Msg = Block>>
-    Fancy for Garbler<R, W, OT>
+impl<
+        R: Read + Send,
+        W: Write + Send + 'static,
+        RNG: CryptoRng + RngCore,
+        OT: ObliviousTransferSender<Msg = Block>,
+    > Fancy for Garbler<R, W, RNG, OT>
 {
     type Item = Wire;
 

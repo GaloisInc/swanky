@@ -11,6 +11,7 @@ failure = "*"
 fancy_garbling = { git = "https://github.com/spaceships/fancy-garbling" }
 # fancy_garbling = { path = "../fancy-garbling" }
 ocelot = { path = "../ocelot" }
+scuttlebutt = { path = "../scuttlebutt" }
 rand = "*"
 
 [dev-dependencies]

@@ -21,7 +21,7 @@ pub use evaluator::Evaluator;
 pub use garbler::Garbler;
 
 use fancy_garbling::Wire;
-use ocelot::Block;
+use scuttlebutt::Block;
 
 #[inline(always)]
 fn wire_to_block(w: Wire) -> Block {
@@ -41,6 +41,7 @@ mod tests {
     use fancy_garbling::{BundleGadgets, Fancy, HasModulus, SyncIndex};
     use itertools::Itertools;
     use ocelot::*;
+    use scuttlebutt::AesRng;
     use std::io::{BufReader, BufWriter};
     use std::os::unix::net::UnixStream;
 
@@ -55,29 +56,35 @@ mod tests {
     }
 
     fn test_c1<
-        OTSender: ObliviousTransferSender<Reader, Writer, Msg = Block>,
-        OTReceiver: ObliviousTransferReceiver<Reader, Writer, Msg = Block>,
+        OTSender: ObliviousTransferSender<Msg = Block>,
+        OTReceiver: ObliviousTransferReceiver<Msg = Block>,
     >(
         a: u16,
         b: u16,
     ) {
         let (sender, receiver) = UnixStream::pair().unwrap();
         std::thread::spawn(move || {
+            let rng = AesRng::new();
             let reader = BufReader::new(sender.try_clone().unwrap());
             let writer = BufWriter::new(sender);
-            let mut gb = Garbler::<Reader, Writer, OTSender>::new(reader, writer, &[a]).unwrap();
+            let mut gb =
+                Garbler::<Reader, Writer, AesRng, OTSender>::new(reader, writer, &[a], rng)
+                    .unwrap();
             c1(&mut gb);
         });
+        let rng = AesRng::new();
         let reader = BufReader::new(receiver.try_clone().unwrap());
         let writer = BufWriter::new(receiver);
-        let mut ev = Evaluator::<Reader, Writer, OTReceiver>::new(reader, writer, &[b]).unwrap();
+        let mut ev =
+            Evaluator::<Reader, Writer, AesRng, OTReceiver>::new(reader, writer, &[b], rng)
+                .unwrap();
         c1(&mut ev);
         let output = ev.decode_output();
         assert_eq!(vec![(a + b) % 3], output);
     }
 
-    type ChouOrlandiSender = chou_orlandi::ChouOrlandiOTSender<Reader, Writer>;
-    type ChouOrlandiReceiver = chou_orlandi::ChouOrlandiOTReceiver<Reader, Writer>;
+    type ChouOrlandiSender = chou_orlandi::ChouOrlandiOTSender;
+    type ChouOrlandiReceiver = chou_orlandi::ChouOrlandiOTReceiver;
 
     #[test]
     fn test_simple_circuits() {
@@ -122,16 +129,21 @@ mod tests {
         let target = dummy.get_output();
         let (sender, receiver) = UnixStream::pair().unwrap();
         std::thread::spawn(move || {
+            let rng = AesRng::new();
             let reader = BufReader::new(sender.try_clone().unwrap());
             let writer = BufWriter::new(sender);
             let gb =
-                Garbler::<Reader, Writer, ChouOrlandiSender>::new(reader, writer, &[]).unwrap();
+                Garbler::<Reader, Writer, AesRng, ChouOrlandiSender>::new(reader, writer, &[], rng)
+                    .unwrap();
             c2(&gb, q, n);
         });
+        let rng = AesRng::new();
         let reader = BufReader::new(receiver.try_clone().unwrap());
         let writer = BufWriter::new(receiver);
-        let ev =
-            Evaluator::<Reader, Writer, ChouOrlandiReceiver>::new(reader, writer, &input).unwrap();
+        let ev = Evaluator::<Reader, Writer, AesRng, ChouOrlandiReceiver>::new(
+            reader, writer, &input, rng,
+        )
+        .unwrap();
         c2(&ev, q, n);
         let result = ev.decode_output();
         assert_eq!(target, result);

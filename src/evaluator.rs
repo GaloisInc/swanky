@@ -7,26 +7,35 @@
 use crate::comm;
 use failure::Error;
 use fancy_garbling::{Evaluator as Ev, Fancy, Message, SyncIndex, Wire};
-use ocelot::{Block, ObliviousTransferReceiver};
+use ocelot::ObliviousTransferReceiver;
+use rand::{CryptoRng, RngCore};
+use scuttlebutt::Block;
 use std::io::{Read, Write};
 use std::sync::{Arc, Mutex};
 
-pub struct Evaluator<R: Read + Send, W: Write + Send, OT: ObliviousTransferReceiver<R, W>> {
+pub struct Evaluator<
+    R: Read + Send,
+    W: Write + Send,
+    RNG: CryptoRng + RngCore,
+    OT: ObliviousTransferReceiver,
+> {
     evaluator: Ev,
     reader: Arc<Mutex<R>>,
     writer: Arc<Mutex<W>>,
     inputs: Arc<Mutex<Vec<u16>>>,
     ot: Arc<Mutex<OT>>,
+    rng: Arc<Mutex<RNG>>,
 }
 
 impl<
         R: Read + Send + 'static,
         W: Write + Send,
-        OT: ObliviousTransferReceiver<R, W, Msg = Block>,
-    > Evaluator<R, W, OT>
+        RNG: CryptoRng + RngCore,
+        OT: ObliviousTransferReceiver<Msg = Block>,
+    > Evaluator<R, W, RNG, OT>
 {
-    pub fn new(mut reader: R, mut writer: W, inputs: &[u16]) -> Result<Self, Error> {
-        let ot = OT::init(&mut reader, &mut writer)?;
+    pub fn new(mut reader: R, mut writer: W, inputs: &[u16], mut rng: RNG) -> Result<Self, Error> {
+        let ot = OT::init(&mut reader, &mut writer, &mut rng)?;
         let inputs = Arc::new(Mutex::new(inputs.to_vec()));
         let reader = Arc::new(Mutex::new(reader));
         let writer = Arc::new(Mutex::new(writer));
@@ -41,12 +50,14 @@ impl<
         };
         let evaluator = Ev::new(callback);
         let ot = Arc::new(Mutex::new(ot));
+        let rng = Arc::new(Mutex::new(rng));
         Ok(Evaluator {
             evaluator,
             reader,
             writer,
             inputs,
             ot,
+            rng,
         })
     }
 
@@ -58,7 +69,9 @@ impl<
         let mut ot = self.ot.lock().unwrap();
         let mut reader = self.reader.lock().unwrap();
         let mut writer = self.writer.lock().unwrap();
-        ot.receive(&mut *reader, &mut *writer, &inputs).unwrap() // XXX: remove unwrap
+        let mut rng = self.rng.lock().unwrap();
+        ot.receive(&mut *reader, &mut *writer, &inputs, &mut *rng)
+            .unwrap() // XXX: remove unwrap
     }
 }
 
@@ -75,8 +88,9 @@ fn combine(wires: &[Block], q: u16) -> Wire {
 impl<
         R: Read + Send + 'static,
         W: Write + Send,
-        OT: ObliviousTransferReceiver<R, W, Msg = Block>,
-    > Fancy for Evaluator<R, W, OT>
+        RNG: CryptoRng + RngCore,
+        OT: ObliviousTransferReceiver<Msg = Block>,
+    > Fancy for Evaluator<R, W, RNG, OT>
 {
     type Item = Wire;
 
