@@ -15,6 +15,7 @@ use crate::{
 };
 use arrayref::array_ref;
 use failure::Error;
+use rand::CryptoRng;
 use rand_core::{RngCore, SeedableRng};
 use scuttlebutt::{AesHash, AesRng, Block};
 use std::io::{ErrorKind, Read, Write};
@@ -22,39 +23,29 @@ use std::marker::PhantomData;
 
 const SSP: usize = 40;
 
-pub struct KosOTSender<
-    R: Read,
-    W: Write,
-    OT: ObliviousTransferReceiver<R, W, Msg = Block> + Malicious,
-> {
-    _r: PhantomData<R>,
-    _w: PhantomData<W>,
+pub struct KosOTSender<OT: ObliviousTransferReceiver<Msg = Block> + Malicious> {
     _ot: PhantomData<OT>,
-    rng: AesRng,
     hash: AesHash,
     δ: Vec<bool>,
     δ_: Block,
     rngs: Vec<AesRng>,
 }
 
-pub struct KosOTReceiver<
-    R: Read,
-    W: Write,
-    OT: ObliviousTransferSender<R, W, Msg = Block> + Malicious,
-> {
-    _r: PhantomData<R>,
-    _w: PhantomData<W>,
+pub struct KosOTReceiver<OT: ObliviousTransferSender<Msg = Block> + Malicious> {
     _ot: PhantomData<OT>,
-    rng: AesRng,
     hash: AesHash,
     rngs: Vec<(AesRng, AesRng)>,
 }
 
-impl<R: Read, W: Write, OT: ObliviousTransferReceiver<R, W, Msg = Block> + Malicious>
-    KosOTSender<R, W, OT>
-{
+impl<OT: ObliviousTransferReceiver<Msg = Block> + Malicious> KosOTSender<OT> {
     #[inline]
-    fn send_setup(&mut self, reader: &mut R, writer: &mut W, m: usize) -> Result<Vec<u8>, Error> {
+    fn send_setup<R: Read + Send, W: Write + Send, RNG: CryptoRng + RngCore>(
+        &mut self,
+        reader: &mut R,
+        writer: &mut W,
+        m: usize,
+        rng: &mut RNG,
+    ) -> Result<Vec<u8>, Error> {
         if m % 8 != 0 {
             return Err(Error::from(std::io::Error::new(
                 ErrorKind::InvalidInput,
@@ -78,7 +69,7 @@ impl<R: Read, W: Write, OT: ObliviousTransferReceiver<R, W, Msg = Block> + Malic
         let qs = utils::transpose(&qs, nrows, ncols);
         // Check correlation
         let mut seed = Block::zero();
-        self.rng.fill_bytes(&mut seed.as_mut());
+        rng.fill_bytes(&mut seed.as_mut());
         let seed = cointoss::send(reader, writer, seed)?;
         let mut rng = AesRng::from_seed(seed);
         let mut check = (Block::zero(), Block::zero());
@@ -106,28 +97,28 @@ impl<R: Read, W: Write, OT: ObliviousTransferReceiver<R, W, Msg = Block> + Malic
     }
 }
 
-impl<R: Read, W: Write, OT: ObliviousTransferReceiver<R, W, Msg = Block> + Malicious>
-    ObliviousTransferSender<R, W> for KosOTSender<R, W, OT>
+impl<OT: ObliviousTransferReceiver<Msg = Block> + Malicious> ObliviousTransferSender
+    for KosOTSender<OT>
 {
     type Msg = Block;
 
-    fn init(mut reader: &mut R, mut writer: &mut W) -> Result<Self, Error> {
-        let mut rng = AesRng::new();
+    fn init<R: Read + Send, W: Write + Send, RNG: CryptoRng + RngCore>(
+        mut reader: &mut R,
+        mut writer: &mut W,
+        rng: &mut RNG,
+    ) -> Result<Self, Error> {
         let hash = AesHash::new(Block::fixed_key());
-        let mut ot = OT::init(&mut reader, &mut writer)?;
+        let mut ot = OT::init(&mut reader, &mut writer, rng)?;
         let mut δ_ = [0u8; 16];
         rng.fill_bytes(&mut δ_);
         let δ = utils::u8vec_to_boolvec(&δ_);
-        let ks = ot.receive(reader, writer, &δ)?;
+        let ks = ot.receive(reader, writer, &δ, rng)?;
         let rngs = ks
             .into_iter()
             .map(AesRng::from_seed)
             .collect::<Vec<AesRng>>();
         Ok(Self {
-            _r: PhantomData::<R>,
-            _w: PhantomData::<W>,
             _ot: PhantomData::<OT>,
-            rng,
             hash,
             δ,
             δ_: Block::from(δ_),
@@ -135,14 +126,15 @@ impl<R: Read, W: Write, OT: ObliviousTransferReceiver<R, W, Msg = Block> + Malic
         })
     }
 
-    fn send(
+    fn send<R: Read + Send, W: Write + Send, RNG: CryptoRng + RngCore>(
         &mut self,
         reader: &mut R,
         mut writer: &mut W,
         inputs: &[(Block, Block)],
+        rng: &mut RNG,
     ) -> Result<(), Error> {
         let m = inputs.len();
-        let qs = self.send_setup(reader, writer, m)?;
+        let qs = self.send_setup(reader, writer, m, rng)?;
         // Output result
         for (j, input) in inputs.iter().enumerate() {
             let q = &qs[j * 16..(j + 1) * 16];
@@ -158,18 +150,19 @@ impl<R: Read, W: Write, OT: ObliviousTransferReceiver<R, W, Msg = Block> + Malic
     }
 }
 
-impl<R: Read, W: Write, OT: ObliviousTransferReceiver<R, W, Msg = Block> + Malicious>
-    CorrelatedObliviousTransferSender<R, W> for KosOTSender<R, W, OT>
+impl<OT: ObliviousTransferReceiver<Msg = Block> + Malicious> CorrelatedObliviousTransferSender
+    for KosOTSender<OT>
 {
     #[inline]
-    fn send_correlated(
+    fn send_correlated<R: Read + Send, W: Write + Send, RNG: CryptoRng + RngCore>(
         &mut self,
         reader: &mut R,
         mut writer: &mut W,
         deltas: &[Self::Msg],
+        rng: &mut RNG,
     ) -> Result<Vec<(Self::Msg, Self::Msg)>, Error> {
         let m = deltas.len();
-        let qs = self.send_setup(reader, writer, m)?;
+        let qs = self.send_setup(reader, writer, m, rng)?;
         let mut out = Vec::with_capacity(m);
         for (j, delta) in deltas.iter().enumerate() {
             let q = &qs[j * 16..(j + 1) * 16];
@@ -186,17 +179,18 @@ impl<R: Read, W: Write, OT: ObliviousTransferReceiver<R, W, Msg = Block> + Malic
     }
 }
 
-impl<R: Read, W: Write, OT: ObliviousTransferReceiver<R, W, Msg = Block> + Malicious>
-    RandomObliviousTransferSender<R, W> for KosOTSender<R, W, OT>
+impl<OT: ObliviousTransferReceiver<Msg = Block> + Malicious> RandomObliviousTransferSender
+    for KosOTSender<OT>
 {
     #[inline]
-    fn send_random(
+    fn send_random<R: Read + Send, W: Write + Send, RNG: CryptoRng + RngCore>(
         &mut self,
         reader: &mut R,
         writer: &mut W,
         m: usize,
+        rng: &mut RNG,
     ) -> Result<Vec<(Self::Msg, Self::Msg)>, Error> {
-        let qs = self.send_setup(reader, writer, m)?;
+        let qs = self.send_setup(reader, writer, m, rng)?;
         let mut out = Vec::with_capacity(m);
         for j in 0..m {
             let q = &qs[j * 16..(j + 1) * 16];
@@ -210,15 +204,14 @@ impl<R: Read, W: Write, OT: ObliviousTransferReceiver<R, W, Msg = Block> + Malic
     }
 }
 
-impl<R: Read, W: Write, OT: ObliviousTransferSender<R, W, Msg = Block> + Malicious>
-    KosOTReceiver<R, W, OT>
-{
+impl<OT: ObliviousTransferSender<Msg = Block> + Malicious> KosOTReceiver<OT> {
     #[inline]
-    fn receive_setup(
+    fn receive_setup<R: Read + Send, W: Write + Send, RNG: CryptoRng + RngCore>(
         &mut self,
         reader: &mut R,
         mut writer: &mut W,
         inputs: &[bool],
+        rng: &mut RNG,
     ) -> Result<Vec<u8>, Error> {
         let ℓ = inputs.len();
         let ℓ_ = ℓ + 128 + SSP;
@@ -240,7 +233,7 @@ impl<R: Read, W: Write, OT: ObliviousTransferSender<R, W, Msg = Block> + Malicio
         let ts = utils::transpose(&ts, nrows, ncols);
         // Check correlation
         let mut seed = Block::zero();
-        self.rng.fill_bytes(&mut seed.as_mut());
+        rng.fill_bytes(&mut seed.as_mut());
         let seed = cointoss::receive(reader, writer, seed)?;
         let mut rng = AesRng::from_seed(seed);
         let mut x = Block::zero();
@@ -263,15 +256,18 @@ impl<R: Read, W: Write, OT: ObliviousTransferSender<R, W, Msg = Block> + Malicio
     }
 }
 
-impl<R: Read, W: Write, OT: ObliviousTransferSender<R, W, Msg = Block> + Malicious>
-    ObliviousTransferReceiver<R, W> for KosOTReceiver<R, W, OT>
+impl<OT: ObliviousTransferSender<Msg = Block> + Malicious> ObliviousTransferReceiver
+    for KosOTReceiver<OT>
 {
     type Msg = Block;
 
-    fn init(mut reader: &mut R, mut writer: &mut W) -> Result<Self, Error> {
-        let mut rng = AesRng::new();
+    fn init<R: Read + Send, W: Write + Send, RNG: CryptoRng + RngCore>(
+        mut reader: &mut R,
+        mut writer: &mut W,
+        rng: &mut RNG,
+    ) -> Result<Self, Error> {
         let hash = AesHash::new(Block::fixed_key());
-        let mut ot = OT::init(&mut reader, &mut writer)?;
+        let mut ot = OT::init(&mut reader, &mut writer, rng)?;
         let mut ks = Vec::with_capacity(128);
         let mut k0 = Block::zero();
         let mut k1 = Block::zero();
@@ -280,28 +276,26 @@ impl<R: Read, W: Write, OT: ObliviousTransferSender<R, W, Msg = Block> + Malicio
             rng.fill_bytes(&mut k1.as_mut());
             ks.push((k0, k1));
         }
-        ot.send(reader, writer, &ks)?;
+        ot.send(reader, writer, &ks, rng)?;
         let rngs = ks
             .into_iter()
             .map(|(k0, k1)| (AesRng::from_seed(k0), AesRng::from_seed(k1)))
             .collect::<Vec<(AesRng, AesRng)>>();
         Ok(Self {
-            _r: PhantomData::<R>,
-            _w: PhantomData::<W>,
             _ot: PhantomData::<OT>,
-            rng,
             hash,
             rngs,
         })
     }
 
-    fn receive(
+    fn receive<R: Read + Send, W: Write + Send, RNG: CryptoRng + RngCore>(
         &mut self,
         mut reader: &mut R,
         writer: &mut W,
         inputs: &[bool],
+        rng: &mut RNG,
     ) -> Result<Vec<Block>, Error> {
-        let ts = self.receive_setup(reader, writer, inputs)?;
+        let ts = self.receive_setup(reader, writer, inputs, rng)?;
         // Output result
         let mut out = Vec::with_capacity(inputs.len());
         for (j, b) in inputs.iter().enumerate() {
@@ -316,16 +310,17 @@ impl<R: Read, W: Write, OT: ObliviousTransferSender<R, W, Msg = Block> + Malicio
     }
 }
 
-impl<R: Read, W: Write, OT: ObliviousTransferSender<R, W, Msg = Block> + Malicious>
-    CorrelatedObliviousTransferReceiver<R, W> for KosOTReceiver<R, W, OT>
+impl<OT: ObliviousTransferSender<Msg = Block> + Malicious> CorrelatedObliviousTransferReceiver
+    for KosOTReceiver<OT>
 {
-    fn receive_correlated(
+    fn receive_correlated<R: Read + Send, W: Write + Send, RNG: CryptoRng + RngCore>(
         &mut self,
         mut reader: &mut R,
         writer: &mut W,
         inputs: &[bool],
+        rng: &mut RNG,
     ) -> Result<Vec<Self::Msg>, Error> {
-        let ts = self.receive_setup(reader, writer, inputs)?;
+        let ts = self.receive_setup(reader, writer, inputs, rng)?;
         let mut out = Vec::with_capacity(inputs.len());
         for (j, b) in inputs.iter().enumerate() {
             let t = &ts[j * 16..(j + 1) * 16];
@@ -338,16 +333,17 @@ impl<R: Read, W: Write, OT: ObliviousTransferSender<R, W, Msg = Block> + Malicio
     }
 }
 
-impl<R: Read, W: Write, OT: ObliviousTransferSender<R, W, Msg = Block> + Malicious>
-    RandomObliviousTransferReceiver<R, W> for KosOTReceiver<R, W, OT>
+impl<OT: ObliviousTransferSender<Msg = Block> + Malicious> RandomObliviousTransferReceiver
+    for KosOTReceiver<OT>
 {
-    fn receive_random(
+    fn receive_random<R: Read + Send, W: Write + Send, RNG: CryptoRng + RngCore>(
         &mut self,
         reader: &mut R,
         writer: &mut W,
         inputs: &[bool],
+        rng: &mut RNG,
     ) -> Result<Vec<Self::Msg>, Error> {
-        let ts = self.receive_setup(reader, writer, inputs)?;
+        let ts = self.receive_setup(reader, writer, inputs, rng)?;
         let mut out = Vec::with_capacity(inputs.len());
         for j in 0..inputs.len() {
             let t = &ts[j * 16..(j + 1) * 16];
@@ -358,11 +354,5 @@ impl<R: Read, W: Write, OT: ObliviousTransferSender<R, W, Msg = Block> + Malicio
     }
 }
 
-impl<R: Read, W: Write, OT: ObliviousTransferReceiver<R, W, Msg = Block> + Malicious> Malicious
-    for KosOTSender<R, W, OT>
-{
-}
-impl<R: Read, W: Write, OT: ObliviousTransferSender<R, W, Msg = Block> + Malicious> Malicious
-    for KosOTReceiver<R, W, OT>
-{
-}
+impl<OT: ObliviousTransferReceiver<Msg = Block> + Malicious> Malicious for KosOTSender<OT> {}
+impl<OT: ObliviousTransferSender<Msg = Block> + Malicious> Malicious for KosOTReceiver<OT> {}

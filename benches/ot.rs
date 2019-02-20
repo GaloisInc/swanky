@@ -8,7 +8,7 @@
 
 use criterion::{criterion_group, criterion_main, Criterion};
 use ocelot::*;
-use scuttlebutt::Block;
+use scuttlebutt::{AesRng, Block};
 use std::io::{BufReader, BufWriter};
 use std::os::unix::net::UnixStream;
 use std::time::Duration;
@@ -23,80 +23,85 @@ fn rand_bool_vec(size: usize) -> Vec<bool> {
     (0..size).map(|_| rand::random::<bool>()).collect()
 }
 
-type Reader = BufReader<UnixStream>;
-type Writer = BufWriter<UnixStream>;
-
 fn _bench_block_ot<
-    OTSender: ObliviousTransferSender<Reader, Writer, Msg = Block>,
-    OTReceiver: ObliviousTransferReceiver<Reader, Writer, Msg = Block>,
+    OTSender: ObliviousTransferSender<Msg = Block>,
+    OTReceiver: ObliviousTransferReceiver<Msg = Block>,
 >(
     bs: &[bool],
     ms: Vec<(Block, Block)>,
 ) {
     let (sender, receiver) = UnixStream::pair().unwrap();
     let handle = std::thread::spawn(move || {
+        let mut rng = AesRng::new();
         let mut reader = BufReader::new(sender.try_clone().unwrap());
         let mut writer = BufWriter::new(sender);
-        let mut ot = OTSender::init(&mut reader, &mut writer).unwrap();
-        ot.send(&mut reader, &mut writer, &ms).unwrap();
+        let mut ot = OTSender::init(&mut reader, &mut writer, &mut rng).unwrap();
+        ot.send(&mut reader, &mut writer, &ms, &mut rng).unwrap();
     });
+    let mut rng = AesRng::new();
     let mut reader = BufReader::new(receiver.try_clone().unwrap());
     let mut writer = BufWriter::new(receiver);
-    let mut ot = OTReceiver::init(&mut reader, &mut writer).unwrap();
-    ot.receive(&mut reader, &mut writer, &bs).unwrap();
+    let mut ot = OTReceiver::init(&mut reader, &mut writer, &mut rng).unwrap();
+    ot.receive(&mut reader, &mut writer, &bs, &mut rng).unwrap();
     handle.join().unwrap();
 }
 
 fn _bench_block_cot<
-    OTSender: CorrelatedObliviousTransferSender<Reader, Writer, Msg = Block>,
-    OTReceiver: CorrelatedObliviousTransferReceiver<Reader, Writer, Msg = Block>,
+    OTSender: CorrelatedObliviousTransferSender<Msg = Block>,
+    OTReceiver: CorrelatedObliviousTransferReceiver<Msg = Block>,
 >(
     bs: &[bool],
     deltas: Vec<Block>,
 ) {
     let (sender, receiver) = UnixStream::pair().unwrap();
     let handle = std::thread::spawn(move || {
+        let mut rng = AesRng::new();
         let mut reader = BufReader::new(sender.try_clone().unwrap());
         let mut writer = BufWriter::new(sender);
-        let mut ot = OTSender::init(&mut reader, &mut writer).unwrap();
-        ot.send_correlated(&mut reader, &mut writer, &deltas)
+        let mut ot = OTSender::init(&mut reader, &mut writer, &mut rng).unwrap();
+        ot.send_correlated(&mut reader, &mut writer, &deltas, &mut rng)
             .unwrap();
     });
+    let mut rng = AesRng::new();
     let mut reader = BufReader::new(receiver.try_clone().unwrap());
     let mut writer = BufWriter::new(receiver);
-    let mut ot = OTReceiver::init(&mut reader, &mut writer).unwrap();
-    ot.receive_correlated(&mut reader, &mut writer, &bs)
+    let mut ot = OTReceiver::init(&mut reader, &mut writer, &mut rng).unwrap();
+    ot.receive_correlated(&mut reader, &mut writer, &bs, &mut rng)
         .unwrap();
     handle.join().unwrap();
 }
 
 fn _bench_block_rot<
-    OTSender: RandomObliviousTransferSender<Reader, Writer, Msg = Block>,
-    OTReceiver: RandomObliviousTransferReceiver<Reader, Writer, Msg = Block>,
+    OTSender: RandomObliviousTransferSender<Msg = Block>,
+    OTReceiver: RandomObliviousTransferReceiver<Msg = Block>,
 >(
     bs: &[bool],
 ) {
     let (sender, receiver) = UnixStream::pair().unwrap();
     let m = bs.len();
     let handle = std::thread::spawn(move || {
+        let mut rng = AesRng::new();
         let mut reader = BufReader::new(sender.try_clone().unwrap());
         let mut writer = BufWriter::new(sender);
-        let mut ot = OTSender::init(&mut reader, &mut writer).unwrap();
-        ot.send_random(&mut reader, &mut writer, m).unwrap();
+        let mut ot = OTSender::init(&mut reader, &mut writer, &mut rng).unwrap();
+        ot.send_random(&mut reader, &mut writer, m, &mut rng)
+            .unwrap();
     });
+    let mut rng = AesRng::new();
     let mut reader = BufReader::new(receiver.try_clone().unwrap());
     let mut writer = BufWriter::new(receiver);
-    let mut ot = OTReceiver::init(&mut reader, &mut writer).unwrap();
-    ot.receive_random(&mut reader, &mut writer, &bs).unwrap();
+    let mut ot = OTReceiver::init(&mut reader, &mut writer, &mut rng).unwrap();
+    ot.receive_random(&mut reader, &mut writer, &bs, &mut rng)
+        .unwrap();
     handle.join().unwrap();
 }
 
-type ChouOrlandiSender = chou_orlandi::ChouOrlandiOTSender<Reader, Writer>;
-type ChouOrlandiReceiver = chou_orlandi::ChouOrlandiOTReceiver<Reader, Writer>;
-type DummySender = dummy::DummyOTSender<Reader, Writer>;
-type DummyReceiver = dummy::DummyOTReceiver<Reader, Writer>;
-type NaorPinkasSender = naor_pinkas::NaorPinkasOTSender<Reader, Writer>;
-type NaorPinkasReceiver = naor_pinkas::NaorPinkasOTReceiver<Reader, Writer>;
+type ChouOrlandiSender = chou_orlandi::ChouOrlandiOTSender;
+type ChouOrlandiReceiver = chou_orlandi::ChouOrlandiOTReceiver;
+type DummySender = dummy::DummyOTSender;
+type DummyReceiver = dummy::DummyOTReceiver;
+type NaorPinkasSender = naor_pinkas::NaorPinkasOTSender;
+type NaorPinkasReceiver = naor_pinkas::NaorPinkasOTReceiver;
 
 fn bench_ot(c: &mut Criterion) {
     c.bench_function("ot::ChouOrlandiOT", move |bench| {
@@ -133,10 +138,10 @@ fn bench_ot(c: &mut Criterion) {
     });
 }
 
-type AlszSender = alsz::AlszOTSender<Reader, Writer, ChouOrlandiReceiver>;
-type AlszReceiver = alsz::AlszOTReceiver<Reader, Writer, ChouOrlandiSender>;
-type KosSender = kos::KosOTSender<Reader, Writer, ChouOrlandiReceiver>;
-type KosReceiver = kos::KosOTReceiver<Reader, Writer, ChouOrlandiSender>;
+type AlszSender = alsz::AlszOTSender<ChouOrlandiReceiver>;
+type AlszReceiver = alsz::AlszOTReceiver<ChouOrlandiSender>;
+type KosSender = kos::KosOTSender<ChouOrlandiReceiver>;
+type KosReceiver = kos::KosOTReceiver<ChouOrlandiSender>;
 
 fn bench_otext(c: &mut Criterion) {
     c.bench_function("ot::AlszOT", move |bench| {

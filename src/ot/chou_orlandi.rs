@@ -23,40 +23,37 @@ use curve25519_dalek::constants::RISTRETTO_BASEPOINT_TABLE;
 use curve25519_dalek::ristretto::{RistrettoBasepointTable, RistrettoPoint};
 use curve25519_dalek::scalar::Scalar;
 use failure::Error;
-use scuttlebutt::{AesRng, Block};
+use rand::{CryptoRng, RngCore};
+use scuttlebutt::Block;
 use std::io::{Read, Write};
-use std::marker::PhantomData;
 
 /// Oblivious transfer sender.
-pub struct ChouOrlandiOTSender<R: Read, W: Write> {
-    _r: PhantomData<R>,
-    _w: PhantomData<W>,
+pub struct ChouOrlandiOTSender {
     y: Scalar,
     s: RistrettoPoint,
 }
 
-impl<R: Read + Send, W: Write + Send> ObliviousTransferSender<R, W> for ChouOrlandiOTSender<R, W> {
+impl ObliviousTransferSender for ChouOrlandiOTSender {
     type Msg = Block;
 
-    fn init(_: &mut R, writer: &mut W) -> Result<Self, Error> {
-        let mut rng = AesRng::new();
+    fn init<R: Read + Send, W: Write + Send, RNG: CryptoRng + RngCore>(
+        _: &mut R,
+        writer: &mut W,
+        mut rng: &mut RNG,
+    ) -> Result<Self, Error> {
         let y = Scalar::random(&mut rng);
         let s = &y * &RISTRETTO_BASEPOINT_TABLE;
         stream::write_pt(writer, &s)?;
         writer.flush()?;
-        Ok(Self {
-            _r: PhantomData::<R>,
-            _w: PhantomData::<W>,
-            y,
-            s,
-        })
+        Ok(Self { y, s })
     }
 
-    fn send(
+    fn send<R: Read + Send, W: Write + Send, RNG: CryptoRng + RngCore>(
         &mut self,
         reader: &mut R,
         writer: &mut W,
         inputs: &[(Block, Block)],
+        _: &mut RNG,
     ) -> Result<(), Error> {
         let mut ks = Vec::with_capacity(inputs.len());
         for i in 0..inputs.len() {
@@ -77,39 +74,33 @@ impl<R: Read + Send, W: Write + Send> ObliviousTransferSender<R, W> for ChouOrla
 }
 
 /// Oblivious transfer receiver.
-pub struct ChouOrlandiOTReceiver<R: Read, W: Write> {
-    _r: PhantomData<R>,
-    _w: PhantomData<W>,
-    rng: AesRng,
+pub struct ChouOrlandiOTReceiver {
     s: RistrettoBasepointTable,
 }
 
-impl<R: Read + Send, W: Write + Send> ObliviousTransferReceiver<R, W>
-    for ChouOrlandiOTReceiver<R, W>
-{
+impl ObliviousTransferReceiver for ChouOrlandiOTReceiver {
     type Msg = Block;
 
-    fn init(reader: &mut R, _: &mut W) -> Result<Self, Error> {
-        let rng = AesRng::new();
+    fn init<R: Read + Send, W: Write + Send, RNG: CryptoRng + RngCore>(
+        reader: &mut R,
+        _: &mut W,
+        _: &mut RNG,
+    ) -> Result<Self, Error> {
         let s = stream::read_pt(reader)?;
         let s = RistrettoBasepointTable::create(&s);
-        Ok(Self {
-            _r: PhantomData::<R>,
-            _w: PhantomData::<W>,
-            rng,
-            s,
-        })
+        Ok(Self { s })
     }
 
-    fn receive(
+    fn receive<R: Read + Send, W: Write + Send, RNG: CryptoRng + RngCore>(
         &mut self,
         reader: &mut R,
         writer: &mut W,
         inputs: &[bool],
+        mut rng: &mut RNG,
     ) -> Result<Vec<Block>, Error> {
         let mut ks = Vec::with_capacity(inputs.len());
         for (i, b) in inputs.iter().enumerate() {
-            let x = Scalar::random(&mut self.rng);
+            let x = Scalar::random(&mut rng);
             let c = if *b { Scalar::one() } else { Scalar::zero() };
             let r = &c * &self.s + &x * &RISTRETTO_BASEPOINT_TABLE;
             stream::write_pt(writer, &r)?;
@@ -130,7 +121,7 @@ impl<R: Read + Send, W: Write + Send> ObliviousTransferReceiver<R, W>
     }
 }
 
-impl<R: Read, W: Write> SemiHonest for ChouOrlandiOTSender<R, W> {}
-impl<R: Read, W: Write> Malicious for ChouOrlandiOTSender<R, W> {}
-impl<R: Read, W: Write> SemiHonest for ChouOrlandiOTReceiver<R, W> {}
-impl<R: Read, W: Write> Malicious for ChouOrlandiOTReceiver<R, W> {}
+impl SemiHonest for ChouOrlandiOTSender {}
+impl Malicious for ChouOrlandiOTSender {}
+impl SemiHonest for ChouOrlandiOTReceiver {}
+impl Malicious for ChouOrlandiOTReceiver {}

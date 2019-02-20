@@ -11,10 +11,11 @@ pub mod kos;
 pub mod naor_pinkas;
 
 use failure::Error;
+use rand::{CryptoRng, RngCore};
 use std::io::{Read, Write};
 
 /// Trait for one-out-of-two oblivious transfer from the sender's point-of-view.
-pub trait ObliviousTransferSender<R: Read, W: Write>
+pub trait ObliviousTransferSender
 where
     Self: Sized,
 {
@@ -23,19 +24,24 @@ where
     type Msg: Sized + AsMut<[u8]>;
     /// Runs any one-time initialization to create the oblivious transfer
     /// object.
-    fn init(reader: &mut R, writer: &mut W) -> Result<Self, Error>;
+    fn init<R: Read + Send, W: Write + Send, RNG: CryptoRng + RngCore>(
+        reader: &mut R,
+        writer: &mut W,
+        rng: &mut RNG,
+    ) -> Result<Self, Error>;
     /// Sends values.
-    fn send(
+    fn send<R: Read + Send, W: Write + Send, RNG: CryptoRng + RngCore>(
         &mut self,
         reader: &mut R,
         writer: &mut W,
         inputs: &[(Self::Msg, Self::Msg)],
+        rng: &mut RNG,
     ) -> Result<(), Error>;
 }
 
 /// Trait for one-out-of-two oblivious transfer from the receiver's
 /// point-of-view.
-pub trait ObliviousTransferReceiver<R: Read, W: Write>
+pub trait ObliviousTransferReceiver
 where
     Self: Sized,
 {
@@ -44,75 +50,81 @@ where
     type Msg: Sized + AsMut<[u8]>;
     /// Runs any one-time initialization to create the oblivious transfer
     /// object.
-    fn init(reader: &mut R, writer: &mut W) -> Result<Self, Error>;
+    fn init<R: Read + Send, W: Write + Send, RNG: CryptoRng + RngCore>(
+        reader: &mut R,
+        writer: &mut W,
+        rng: &mut RNG,
+    ) -> Result<Self, Error>;
     /// Receives values.
-    fn receive(
+    fn receive<R: Read + Send, W: Write + Send, RNG: CryptoRng + RngCore>(
         &mut self,
         reader: &mut R,
         writer: &mut W,
         inputs: &[bool],
+        rng: &mut RNG,
     ) -> Result<Vec<Self::Msg>, Error>;
 }
 
 /// Trait for one-out-of-two _correlated_ oblivious transfer from the sender's
 /// point-of-view.
-pub trait CorrelatedObliviousTransferSender<R: Read, W: Write>:
-    ObliviousTransferSender<R, W>
+pub trait CorrelatedObliviousTransferSender: ObliviousTransferSender
 where
     Self: Sized,
 {
     /// Correlated oblivious transfer send. Takes as input an array `deltas`
     /// which specifies the offset between the zero and one message.
-    fn send_correlated(
+    fn send_correlated<R: Read + Send, W: Write + Send, RNG: CryptoRng + RngCore>(
         &mut self,
         reader: &mut R,
         writer: &mut W,
         deltas: &[Self::Msg],
+        rng: &mut RNG,
     ) -> Result<Vec<(Self::Msg, Self::Msg)>, Error>;
 }
 
 /// Trait for one-out-of-two _correlated_ oblivious transfer from the receiver's
 /// point-of-view.
-pub trait CorrelatedObliviousTransferReceiver<R: Read, W: Write>:
-    ObliviousTransferReceiver<R, W>
+pub trait CorrelatedObliviousTransferReceiver: ObliviousTransferReceiver
 where
     Self: Sized,
 {
     /// Correlated oblivious transfer receive.
-    fn receive_correlated(
+    fn receive_correlated<R: Read + Send, W: Write + Send, RNG: CryptoRng + RngCore>(
         &mut self,
         reader: &mut R,
         writer: &mut W,
         inputs: &[bool],
+        rng: &mut RNG,
     ) -> Result<Vec<Self::Msg>, Error>;
 }
 
 /// Trait for one-out-of-two _random_ oblivious transfer from the sender's
 /// point-of-view.
-pub trait RandomObliviousTransferSender<R: Read, W: Write>: ObliviousTransferSender<R, W>
+pub trait RandomObliviousTransferSender: ObliviousTransferSender
 where
     Self: Sized,
 {
-    fn send_random(
+    fn send_random<R: Read + Send, W: Write + Send, RNG: CryptoRng + RngCore>(
         &mut self,
         reader: &mut R,
         writer: &mut W,
         m: usize,
+        rng: &mut RNG,
     ) -> Result<Vec<(Self::Msg, Self::Msg)>, Error>;
 }
 
 /// Trait for one-out-of-two _random_ oblivious transfer from the receiver's
 /// point-of-view.
-pub trait RandomObliviousTransferReceiver<R: Read, W: Write>:
-    ObliviousTransferReceiver<R, W>
+pub trait RandomObliviousTransferReceiver: ObliviousTransferReceiver
 where
     Self: Sized,
 {
-    fn receive_random(
+    fn receive_random<R: Read + Send, W: Write + Send, RNG: CryptoRng + RngCore>(
         &mut self,
         reader: &mut R,
         writer: &mut W,
         deltas: &[bool],
+        rng: &mut RNG,
     ) -> Result<Vec<Self::Msg>, Error>;
 }
 
@@ -125,13 +137,10 @@ pub trait Malicious {}
 mod tests {
     extern crate test;
     use super::*;
-    use scuttlebutt::Block;
+    use scuttlebutt::{AesRng, Block};
     use std::io::{BufReader, BufWriter};
     use std::os::unix::net::UnixStream;
     use std::sync::{Arc, Mutex};
-
-    type Reader = BufReader<UnixStream>;
-    type Writer = BufWriter<UnixStream>;
 
     const T: usize = 1 << 12;
 
@@ -143,16 +152,9 @@ mod tests {
         (0..size).map(|_| rand::random::<bool>()).collect()
     }
 
-    type ChouOrlandiSender = chou_orlandi::ChouOrlandiOTSender<Reader, Writer>;
-    type ChouOrlandiReceiver = chou_orlandi::ChouOrlandiOTReceiver<Reader, Writer>;
-    type DummySender = dummy::DummyOTSender<Reader, Writer>;
-    type DummyReceiver = dummy::DummyOTReceiver<Reader, Writer>;
-    type NaorPinkasSender = naor_pinkas::NaorPinkasOTSender<Reader, Writer>;
-    type NaorPinkasReceiver = naor_pinkas::NaorPinkasOTReceiver<Reader, Writer>;
-
     fn test_ot<
-        OTSender: ObliviousTransferSender<Reader, Writer, Msg = Block>,
-        OTReceiver: ObliviousTransferReceiver<Reader, Writer, Msg = Block>,
+        OTSender: ObliviousTransferSender<Msg = Block>,
+        OTReceiver: ObliviousTransferReceiver<Msg = Block>,
     >() {
         let m0 = rand::random::<Block>();
         let m1 = rand::random::<Block>();
@@ -161,22 +163,27 @@ mod tests {
         let m1_ = m1.clone();
         let (sender, receiver) = UnixStream::pair().unwrap();
         let handle = std::thread::spawn(move || {
+            let mut rng = AesRng::new();
             let mut reader = BufReader::new(sender.try_clone().unwrap());
             let mut writer = BufWriter::new(sender);
-            let mut ot = OTSender::init(&mut reader, &mut writer).unwrap();
-            ot.send(&mut reader, &mut writer, &[(m0, m1)]).unwrap();
+            let mut ot = OTSender::init(&mut reader, &mut writer, &mut rng).unwrap();
+            ot.send(&mut reader, &mut writer, &[(m0, m1)], &mut rng)
+                .unwrap();
         });
+        let mut rng = AesRng::new();
         let mut reader = BufReader::new(receiver.try_clone().unwrap());
         let mut writer = BufWriter::new(receiver);
-        let mut ot = OTReceiver::init(&mut reader, &mut writer).unwrap();
-        let result = ot.receive(&mut reader, &mut writer, &[b]).unwrap();
+        let mut ot = OTReceiver::init(&mut reader, &mut writer, &mut rng).unwrap();
+        let result = ot
+            .receive(&mut reader, &mut writer, &[b], &mut rng)
+            .unwrap();
         assert_eq!(result[0], if b { m1_ } else { m0_ });
         handle.join().unwrap();
     }
 
     fn test_otext<
-        OTSender: ObliviousTransferSender<Reader, Writer, Msg = Block>,
-        OTReceiver: ObliviousTransferReceiver<Reader, Writer, Msg = Block>,
+        OTSender: ObliviousTransferSender<Msg = Block>,
+        OTReceiver: ObliviousTransferReceiver<Msg = Block>,
     >() {
         let m0s = rand_block_vec(T);
         let m1s = rand_block_vec(T);
@@ -185,19 +192,23 @@ mod tests {
         let m1s_ = m1s.clone();
         let (sender, receiver) = UnixStream::pair().unwrap();
         let handle = std::thread::spawn(move || {
+            let mut rng = AesRng::new();
             let mut reader = BufReader::new(sender.try_clone().unwrap());
             let mut writer = BufWriter::new(sender);
-            let mut otext = OTSender::init(&mut reader, &mut writer).unwrap();
+            let mut otext = OTSender::init(&mut reader, &mut writer, &mut rng).unwrap();
             let ms = m0s
                 .into_iter()
                 .zip(m1s.into_iter())
                 .collect::<Vec<(Block, Block)>>();
-            otext.send(&mut reader, &mut writer, &ms).unwrap();
+            otext.send(&mut reader, &mut writer, &ms, &mut rng).unwrap();
         });
+        let mut rng = AesRng::new();
         let mut reader = BufReader::new(receiver.try_clone().unwrap());
         let mut writer = BufWriter::new(receiver);
-        let mut otext = OTReceiver::init(&mut reader, &mut writer).unwrap();
-        let results = otext.receive(&mut reader, &mut writer, &bs).unwrap();
+        let mut otext = OTReceiver::init(&mut reader, &mut writer, &mut rng).unwrap();
+        let results = otext
+            .receive(&mut reader, &mut writer, &bs, &mut rng)
+            .unwrap();
         for j in 0..T {
             assert_eq!(results[j], if bs[j] { m1s_[j] } else { m0s_[j] })
         }
@@ -205,8 +216,8 @@ mod tests {
     }
 
     fn test_cotext<
-        OTSender: CorrelatedObliviousTransferSender<Reader, Writer, Msg = Block>,
-        OTReceiver: CorrelatedObliviousTransferReceiver<Reader, Writer, Msg = Block>,
+        OTSender: CorrelatedObliviousTransferSender<Msg = Block>,
+        OTReceiver: CorrelatedObliviousTransferReceiver<Msg = Block>,
     >() {
         let deltas = rand_block_vec(T);
         let bs = rand_bool_vec(T);
@@ -214,19 +225,21 @@ mod tests {
         let out_ = out.clone();
         let (sender, receiver) = UnixStream::pair().unwrap();
         let handle = std::thread::spawn(move || {
+            let mut rng = AesRng::new();
             let mut reader = BufReader::new(sender.try_clone().unwrap());
             let mut writer = BufWriter::new(sender);
-            let mut otext = OTSender::init(&mut reader, &mut writer).unwrap();
+            let mut otext = OTSender::init(&mut reader, &mut writer, &mut rng).unwrap();
             let mut out = out.lock().unwrap();
             *out = otext
-                .send_correlated(&mut reader, &mut writer, &deltas)
+                .send_correlated(&mut reader, &mut writer, &deltas, &mut rng)
                 .unwrap();
         });
+        let mut rng = AesRng::new();
         let mut reader = BufReader::new(receiver.try_clone().unwrap());
         let mut writer = BufWriter::new(receiver);
-        let mut otext = OTReceiver::init(&mut reader, &mut writer).unwrap();
+        let mut otext = OTReceiver::init(&mut reader, &mut writer, &mut rng).unwrap();
         let results = otext
-            .receive_correlated(&mut reader, &mut writer, &bs)
+            .receive_correlated(&mut reader, &mut writer, &bs, &mut rng)
             .unwrap();
         handle.join().unwrap();
         let out_ = out_.lock().unwrap();
@@ -236,24 +249,30 @@ mod tests {
     }
 
     fn test_rotext<
-        OTSender: RandomObliviousTransferSender<Reader, Writer, Msg = Block>,
-        OTReceiver: RandomObliviousTransferReceiver<Reader, Writer, Msg = Block>,
+        OTSender: RandomObliviousTransferSender<Msg = Block>,
+        OTReceiver: RandomObliviousTransferReceiver<Msg = Block>,
     >() {
         let bs = rand_bool_vec(T);
         let out = Arc::new(Mutex::new(vec![]));
         let out_ = out.clone();
         let (sender, receiver) = UnixStream::pair().unwrap();
         let handle = std::thread::spawn(move || {
+            let mut rng = AesRng::new();
             let mut reader = BufReader::new(sender.try_clone().unwrap());
             let mut writer = BufWriter::new(sender);
-            let mut otext = OTSender::init(&mut reader, &mut writer).unwrap();
+            let mut otext = OTSender::init(&mut reader, &mut writer, &mut rng).unwrap();
             let mut out = out.lock().unwrap();
-            *out = otext.send_random(&mut reader, &mut writer, T).unwrap();
+            *out = otext
+                .send_random(&mut reader, &mut writer, T, &mut rng)
+                .unwrap();
         });
+        let mut rng = AesRng::new();
         let mut reader = BufReader::new(receiver.try_clone().unwrap());
         let mut writer = BufWriter::new(receiver);
-        let mut otext = OTReceiver::init(&mut reader, &mut writer).unwrap();
-        let results = otext.receive_random(&mut reader, &mut writer, &bs).unwrap();
+        let mut otext = OTReceiver::init(&mut reader, &mut writer, &mut rng).unwrap();
+        let results = otext
+            .receive_random(&mut reader, &mut writer, &bs, &mut rng)
+            .unwrap();
         handle.join().unwrap();
         let out_ = out_.lock().unwrap();
         for j in 0..T {
@@ -261,24 +280,24 @@ mod tests {
         }
     }
 
-    type AlszSender = alsz::AlszOTSender<Reader, Writer, ChouOrlandiReceiver>;
-    type AlszReceiver = alsz::AlszOTReceiver<Reader, Writer, ChouOrlandiSender>;
-    type KosSender = kos::KosOTSender<Reader, Writer, ChouOrlandiReceiver>;
-    type KosReceiver = kos::KosOTReceiver<Reader, Writer, ChouOrlandiSender>;
+    type AlszSender = alsz::AlszOTSender<chou_orlandi::ChouOrlandiOTReceiver>;
+    type AlszReceiver = alsz::AlszOTReceiver<chou_orlandi::ChouOrlandiOTSender>;
+    type KosSender = kos::KosOTSender<chou_orlandi::ChouOrlandiOTReceiver>;
+    type KosReceiver = kos::KosOTReceiver<chou_orlandi::ChouOrlandiOTSender>;
 
     #[test]
     fn test_dummy() {
-        test_ot::<DummySender, DummyReceiver>();
+        test_ot::<dummy::DummyOTSender, dummy::DummyOTReceiver>();
     }
 
     #[test]
     fn test_naor_pinkas() {
-        test_ot::<NaorPinkasSender, NaorPinkasReceiver>();
+        test_ot::<naor_pinkas::NaorPinkasOTSender, naor_pinkas::NaorPinkasOTReceiver>();
     }
 
     #[test]
     fn test_chou_orlandi() {
-        test_ot::<ChouOrlandiSender, ChouOrlandiReceiver>();
+        test_ot::<chou_orlandi::ChouOrlandiOTSender, chou_orlandi::ChouOrlandiOTReceiver>();
     }
 
     #[test]

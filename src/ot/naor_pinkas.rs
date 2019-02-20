@@ -15,45 +15,36 @@ use curve25519_dalek::constants::RISTRETTO_BASEPOINT_TABLE;
 use curve25519_dalek::ristretto::RistrettoPoint;
 use curve25519_dalek::scalar::Scalar;
 use failure::Error;
-use scuttlebutt::{AesRng, Block};
+use rand::{CryptoRng, RngCore};
+use scuttlebutt::Block;
 use std::io::{Read, Write};
-use std::marker::PhantomData;
 
-pub struct NaorPinkasOTSender<R: Read, W: Write> {
-    _r: PhantomData<R>,
-    _w: PhantomData<W>,
-    rng: AesRng,
-}
+pub struct NaorPinkasOTSender {}
+pub struct NaorPinkasOTReceiver {}
 
-pub struct NaorPinkasOTReceiver<R: Read, W: Write> {
-    _r: PhantomData<R>,
-    _w: PhantomData<W>,
-    rng: AesRng,
-}
-
-impl<R: Read + Send, W: Write + Send> ObliviousTransferSender<R, W> for NaorPinkasOTSender<R, W> {
+impl ObliviousTransferSender for NaorPinkasOTSender {
     type Msg = Block;
 
-    fn init(_: &mut R, _: &mut W) -> Result<Self, Error> {
-        let rng = AesRng::new();
-        Ok(Self {
-            _r: PhantomData::<R>,
-            _w: PhantomData::<W>,
-            rng,
-        })
+    fn init<R: Read + Send, W: Write + Send, RNG: CryptoRng + RngCore>(
+        _: &mut R,
+        _: &mut W,
+        _: &mut RNG,
+    ) -> Result<Self, Error> {
+        Ok(Self {})
     }
 
-    fn send(
+    fn send<R: Read + Send, W: Write + Send, RNG: CryptoRng + RngCore>(
         &mut self,
         reader: &mut R,
         writer: &mut W,
         inputs: &[(Block, Block)],
+        mut rng: &mut RNG,
     ) -> Result<(), Error> {
         let m = inputs.len();
         let mut cs = Vec::with_capacity(m);
         let mut pks = Vec::with_capacity(m);
         for _ in 0..m {
-            let c = RistrettoPoint::random(&mut self.rng);
+            let c = RistrettoPoint::random(&mut rng);
             stream::write_pt(writer, &c)?;
             cs.push(c);
         }
@@ -63,8 +54,8 @@ impl<R: Read + Send, W: Write + Send> ObliviousTransferSender<R, W> for NaorPink
             pks.push((pk0, c - pk0));
         }
         for (i, (input, pk)) in inputs.iter().zip(pks.into_iter()).enumerate() {
-            let r0 = Scalar::random(&mut self.rng);
-            let r1 = Scalar::random(&mut self.rng);
+            let r0 = Scalar::random(&mut rng);
+            let r1 = Scalar::random(&mut rng);
             let e00 = &r0 * &RISTRETTO_BASEPOINT_TABLE;
             let e10 = &r1 * &RISTRETTO_BASEPOINT_TABLE;
             let h = Block::hash_pt(i, &(pk.0 * r0));
@@ -81,25 +72,23 @@ impl<R: Read + Send, W: Write + Send> ObliviousTransferSender<R, W> for NaorPink
     }
 }
 
-impl<R: Read + Send, W: Write + Send> ObliviousTransferReceiver<R, W>
-    for NaorPinkasOTReceiver<R, W>
-{
+impl ObliviousTransferReceiver for NaorPinkasOTReceiver {
     type Msg = Block;
 
-    fn init(_: &mut R, _: &mut W) -> Result<Self, Error> {
-        let rng = AesRng::new();
-        Ok(Self {
-            _r: PhantomData::<R>,
-            _w: PhantomData::<W>,
-            rng,
-        })
+    fn init<R: Read + Send, W: Write + Send, RNG: CryptoRng + RngCore>(
+        _: &mut R,
+        _: &mut W,
+        _: &mut RNG,
+    ) -> Result<Self, Error> {
+        Ok(Self {})
     }
 
-    fn receive(
+    fn receive<R: Read + Send, W: Write + Send, RNG: CryptoRng + RngCore>(
         &mut self,
         reader: &mut R,
         writer: &mut W,
         inputs: &[bool],
+        mut rng: &mut RNG,
     ) -> Result<Vec<Block>, Error> {
         let m = inputs.len();
         let mut cs = Vec::with_capacity(m);
@@ -109,7 +98,7 @@ impl<R: Read + Send, W: Write + Send> ObliviousTransferReceiver<R, W>
             cs.push(c);
         }
         for (b, c) in inputs.iter().zip(cs.into_iter()) {
-            let k = Scalar::random(&mut self.rng);
+            let k = Scalar::random(&mut rng);
             let pkσ = &k * &RISTRETTO_BASEPOINT_TABLE;
             let pkσ_ = c - pkσ;
             match b {
@@ -139,5 +128,5 @@ impl<R: Read + Send, W: Write + Send> ObliviousTransferReceiver<R, W>
     }
 }
 
-impl<R: Read, W: Write> SemiHonest for NaorPinkasOTSender<R, W> {}
-impl<R: Read, W: Write> SemiHonest for NaorPinkasOTReceiver<R, W> {}
+impl SemiHonest for NaorPinkasOTSender {}
+impl SemiHonest for NaorPinkasOTReceiver {}

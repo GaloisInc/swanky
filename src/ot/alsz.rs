@@ -15,19 +15,14 @@ use crate::{
 };
 use arrayref::array_ref;
 use failure::Error;
+use rand::CryptoRng;
 use rand_core::{RngCore, SeedableRng};
 use scuttlebutt::{AesHash, AesRng, Block};
 use std::io::{ErrorKind, Read, Write};
 use std::marker::PhantomData;
 
 /// Oblivious transfer sender.
-pub struct AlszOTSender<
-    R: Read,
-    W: Write,
-    OT: ObliviousTransferReceiver<R, W, Msg = Block> + SemiHonest,
-> {
-    _r: PhantomData<R>,
-    _w: PhantomData<W>,
+pub struct AlszOTSender<OT: ObliviousTransferReceiver<Msg = Block> + SemiHonest> {
     _ot: PhantomData<OT>,
     hash: AesHash,
     s: Vec<bool>,
@@ -35,23 +30,15 @@ pub struct AlszOTSender<
     rngs: Vec<AesRng>,
 }
 /// Oblivious transfer receiver.
-pub struct AlszOTReceiver<
-    R: Read,
-    W: Write,
-    OT: ObliviousTransferSender<R, W, Msg = Block> + SemiHonest,
-> {
-    _r: PhantomData<R>,
-    _w: PhantomData<W>,
+pub struct AlszOTReceiver<OT: ObliviousTransferSender<Msg = Block> + SemiHonest> {
     _ot: PhantomData<OT>,
     hash: AesHash,
     rngs: Vec<(AesRng, AesRng)>,
 }
 
-impl<R: Read, W: Write, OT: ObliviousTransferReceiver<R, W, Msg = Block> + SemiHonest>
-    AlszOTSender<R, W, OT>
-{
+impl<OT: ObliviousTransferReceiver<Msg = Block> + SemiHonest> AlszOTSender<OT> {
     #[inline]
-    fn send_setup(&mut self, reader: &mut R, m: usize) -> Result<Vec<u8>, Error> {
+    fn send_setup<R: Read + Send>(&mut self, reader: &mut R, m: usize) -> Result<Vec<u8>, Error> {
         if m % 8 != 0 {
             return Err(Error::from(std::io::Error::new(
                 ErrorKind::InvalidInput,
@@ -76,26 +63,27 @@ impl<R: Read, W: Write, OT: ObliviousTransferReceiver<R, W, Msg = Block> + SemiH
     }
 }
 
-impl<R: Read, W: Write, OT: ObliviousTransferReceiver<R, W, Msg = Block> + SemiHonest>
-    ObliviousTransferSender<R, W> for AlszOTSender<R, W, OT>
+impl<OT: ObliviousTransferReceiver<Msg = Block> + SemiHonest> ObliviousTransferSender
+    for AlszOTSender<OT>
 {
     type Msg = Block;
 
-    fn init(reader: &mut R, writer: &mut W) -> Result<Self, Error> {
-        let mut rng = AesRng::new();
-        let mut ot = OT::init(reader, writer)?;
+    fn init<R: Read + Send, W: Write + Send, RNG: CryptoRng + RngCore>(
+        reader: &mut R,
+        writer: &mut W,
+        rng: &mut RNG,
+    ) -> Result<Self, Error> {
+        let mut ot = OT::init(reader, writer, rng)?;
         let hash = AesHash::new(Block::fixed_key());
         let mut s_ = [0u8; 16];
         rng.fill_bytes(&mut s_);
         let s = utils::u8vec_to_boolvec(&s_);
-        let ks = ot.receive(reader, writer, &s)?;
+        let ks = ot.receive(reader, writer, &s, rng)?;
         let rngs = ks
             .into_iter()
             .map(AesRng::from_seed)
             .collect::<Vec<AesRng>>();
         Ok(Self {
-            _r: PhantomData::<R>,
-            _w: PhantomData::<W>,
             _ot: PhantomData::<OT>,
             hash,
             s,
@@ -104,11 +92,12 @@ impl<R: Read, W: Write, OT: ObliviousTransferReceiver<R, W, Msg = Block> + SemiH
         })
     }
 
-    fn send(
+    fn send<R: Read + Send, W: Write + Send, RNG: CryptoRng + RngCore>(
         &mut self,
         reader: &mut R,
         mut writer: &mut W,
         inputs: &[(Self::Msg, Self::Msg)],
+        _: &mut RNG,
     ) -> Result<(), Error> {
         let m = inputs.len();
         let qs = self.send_setup(reader, m)?;
@@ -126,14 +115,15 @@ impl<R: Read, W: Write, OT: ObliviousTransferReceiver<R, W, Msg = Block> + SemiH
     }
 }
 
-impl<R: Read, W: Write, OT: ObliviousTransferReceiver<R, W, Msg = Block> + SemiHonest>
-    CorrelatedObliviousTransferSender<R, W> for AlszOTSender<R, W, OT>
+impl<OT: ObliviousTransferReceiver<Msg = Block> + SemiHonest> CorrelatedObliviousTransferSender
+    for AlszOTSender<OT>
 {
-    fn send_correlated(
+    fn send_correlated<R: Read + Send, W: Write + Send, RNG: CryptoRng + RngCore>(
         &mut self,
         reader: &mut R,
         mut writer: &mut W,
         deltas: &[Self::Msg],
+        _: &mut RNG,
     ) -> Result<Vec<(Self::Msg, Self::Msg)>, Error> {
         let m = deltas.len();
         let qs = self.send_setup(reader, m)?;
@@ -153,14 +143,15 @@ impl<R: Read, W: Write, OT: ObliviousTransferReceiver<R, W, Msg = Block> + SemiH
     }
 }
 
-impl<R: Read, W: Write, OT: ObliviousTransferReceiver<R, W, Msg = Block> + SemiHonest>
-    RandomObliviousTransferSender<R, W> for AlszOTSender<R, W, OT>
+impl<OT: ObliviousTransferReceiver<Msg = Block> + SemiHonest> RandomObliviousTransferSender
+    for AlszOTSender<OT>
 {
-    fn send_random(
+    fn send_random<R: Read + Send, W: Write + Send, RNG: CryptoRng + RngCore>(
         &mut self,
         reader: &mut R,
         _: &mut W,
         m: usize,
+        _: &mut RNG,
     ) -> Result<Vec<(Self::Msg, Self::Msg)>, Error> {
         let qs = self.send_setup(reader, m)?;
         let mut out = Vec::with_capacity(m);
@@ -176,11 +167,13 @@ impl<R: Read, W: Write, OT: ObliviousTransferReceiver<R, W, Msg = Block> + SemiH
     }
 }
 
-impl<R: Read, W: Write, OT: ObliviousTransferSender<R, W, Msg = Block> + SemiHonest>
-    AlszOTReceiver<R, W, OT>
-{
+impl<OT: ObliviousTransferSender<Msg = Block> + SemiHonest> AlszOTReceiver<OT> {
     #[inline]
-    fn receive_setup(&mut self, mut writer: &mut W, inputs: &[bool]) -> Result<Vec<u8>, Error> {
+    fn receive_setup<W: Write + Send>(
+        &mut self,
+        mut writer: &mut W,
+        inputs: &[bool],
+    ) -> Result<Vec<u8>, Error> {
         let m = inputs.len();
         if m % 8 != 0 {
             return Err(Error::from(std::io::Error::new(
@@ -206,14 +199,17 @@ impl<R: Read, W: Write, OT: ObliviousTransferSender<R, W, Msg = Block> + SemiHon
     }
 }
 
-impl<R: Read, W: Write, OT: ObliviousTransferSender<R, W, Msg = Block> + SemiHonest>
-    ObliviousTransferReceiver<R, W> for AlszOTReceiver<R, W, OT>
+impl<OT: ObliviousTransferSender<Msg = Block> + SemiHonest> ObliviousTransferReceiver
+    for AlszOTReceiver<OT>
 {
     type Msg = Block;
 
-    fn init(reader: &mut R, writer: &mut W) -> Result<Self, Error> {
-        let mut rng = AesRng::new();
-        let mut ot = OT::init(reader, writer)?;
+    fn init<R: Read + Send, W: Write + Send, RNG: CryptoRng + RngCore>(
+        reader: &mut R,
+        writer: &mut W,
+        rng: &mut RNG,
+    ) -> Result<Self, Error> {
+        let mut ot = OT::init(reader, writer, rng)?;
         let hash = AesHash::new(Block::fixed_key());
         let mut ks = Vec::with_capacity(128);
         let mut k0 = Block::zero();
@@ -223,25 +219,24 @@ impl<R: Read, W: Write, OT: ObliviousTransferSender<R, W, Msg = Block> + SemiHon
             rng.fill_bytes(&mut k1.as_mut());
             ks.push((k0, k1));
         }
-        ot.send(reader, writer, &ks)?;
+        ot.send(reader, writer, &ks, rng)?;
         let rngs = ks
             .into_iter()
             .map(|(k0, k1)| (AesRng::from_seed(k0), AesRng::from_seed(k1)))
             .collect::<Vec<(AesRng, AesRng)>>();
         Ok(Self {
-            _r: PhantomData::<R>,
-            _w: PhantomData::<W>,
             _ot: PhantomData::<OT>,
             hash,
             rngs,
         })
     }
 
-    fn receive(
+    fn receive<R: Read + Send, W: Write + Send, RNG: CryptoRng + RngCore>(
         &mut self,
         mut reader: &mut R,
         writer: &mut W,
         inputs: &[bool],
+        _: &mut RNG,
     ) -> Result<Vec<Self::Msg>, Error> {
         let ts = self.receive_setup(writer, inputs)?;
         let mut out = Vec::with_capacity(inputs.len());
@@ -257,14 +252,15 @@ impl<R: Read, W: Write, OT: ObliviousTransferSender<R, W, Msg = Block> + SemiHon
     }
 }
 
-impl<R: Read, W: Write, OT: ObliviousTransferSender<R, W, Msg = Block> + SemiHonest>
-    CorrelatedObliviousTransferReceiver<R, W> for AlszOTReceiver<R, W, OT>
+impl<OT: ObliviousTransferSender<Msg = Block> + SemiHonest> CorrelatedObliviousTransferReceiver
+    for AlszOTReceiver<OT>
 {
-    fn receive_correlated(
+    fn receive_correlated<R: Read + Send, W: Write + Send, RNG: CryptoRng + RngCore>(
         &mut self,
         mut reader: &mut R,
         writer: &mut W,
         inputs: &[bool],
+        _: &mut RNG,
     ) -> Result<Vec<Self::Msg>, Error> {
         let ts = self.receive_setup(writer, inputs)?;
         let mut out = Vec::with_capacity(inputs.len());
@@ -279,14 +275,15 @@ impl<R: Read, W: Write, OT: ObliviousTransferSender<R, W, Msg = Block> + SemiHon
     }
 }
 
-impl<R: Read, W: Write, OT: ObliviousTransferSender<R, W, Msg = Block> + SemiHonest>
-    RandomObliviousTransferReceiver<R, W> for AlszOTReceiver<R, W, OT>
+impl<OT: ObliviousTransferSender<Msg = Block> + SemiHonest> RandomObliviousTransferReceiver
+    for AlszOTReceiver<OT>
 {
-    fn receive_random(
+    fn receive_random<R: Read + Send, W: Write + Send, RNG: CryptoRng + RngCore>(
         &mut self,
         _: &mut R,
         writer: &mut W,
         inputs: &[bool],
+        _: &mut RNG,
     ) -> Result<Vec<Self::Msg>, Error> {
         let ts = self.receive_setup(writer, inputs)?;
         let mut out = Vec::with_capacity(inputs.len());
@@ -299,12 +296,5 @@ impl<R: Read, W: Write, OT: ObliviousTransferSender<R, W, Msg = Block> + SemiHon
     }
 }
 
-impl<R: Read, W: Write, OT: ObliviousTransferReceiver<R, W, Msg = Block> + SemiHonest> SemiHonest
-    for AlszOTSender<R, W, OT>
-{
-}
-
-impl<R: Read, W: Write, OT: ObliviousTransferSender<R, W, Msg = Block> + SemiHonest> SemiHonest
-    for AlszOTReceiver<R, W, OT>
-{
-}
+impl<OT: ObliviousTransferReceiver<Msg = Block> + SemiHonest> SemiHonest for AlszOTSender<OT> {}
+impl<OT: ObliviousTransferSender<Msg = Block> + SemiHonest> SemiHonest for AlszOTReceiver<OT> {}

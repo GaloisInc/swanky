@@ -10,35 +10,30 @@
 use crate::stream;
 use crate::{ObliviousTransferReceiver, ObliviousTransferSender};
 use failure::Error;
+use rand::{CryptoRng, RngCore};
 use scuttlebutt::Block;
 use std::io::{Read, Write};
-use std::marker::PhantomData;
 
-pub struct DummyOTSender<R: Read, W: Write> {
-    _r: PhantomData<R>,
-    _w: PhantomData<W>,
-}
+pub struct DummyOTSender {}
+pub struct DummyOTReceiver {}
 
-pub struct DummyOTReceiver<R: Read, W: Write> {
-    _r: PhantomData<R>,
-    _w: PhantomData<W>,
-}
-
-impl<R: Read, W: Write> ObliviousTransferSender<R, W> for DummyOTSender<R, W> {
+impl ObliviousTransferSender for DummyOTSender {
     type Msg = Block;
 
-    fn init(_: &mut R, _: &mut W) -> Result<Self, Error> {
-        Ok(Self {
-            _r: PhantomData::<R>,
-            _w: PhantomData::<W>,
-        })
+    fn init<R: Read + Send, W: Write + Send, RNG: CryptoRng + RngCore>(
+        _: &mut R,
+        _: &mut W,
+        _: &mut RNG,
+    ) -> Result<Self, Error> {
+        Ok(Self {})
     }
 
-    fn send(
+    fn send<R: Read + Send, W: Write + Send, RNG: CryptoRng + RngCore>(
         &mut self,
         mut reader: &mut R,
         mut writer: &mut W,
         inputs: &[(Block, Block)],
+        _: &mut RNG,
     ) -> Result<(), Error> {
         let mut bs = Vec::with_capacity(inputs.len());
         for _ in 0..inputs.len() {
@@ -53,21 +48,23 @@ impl<R: Read, W: Write> ObliviousTransferSender<R, W> for DummyOTSender<R, W> {
     }
 }
 
-impl<R: Read, W: Write> ObliviousTransferReceiver<R, W> for DummyOTReceiver<R, W> {
+impl ObliviousTransferReceiver for DummyOTReceiver {
     type Msg = Block;
 
-    fn init(_: &mut R, _: &mut W) -> Result<Self, Error> {
-        Ok(Self {
-            _r: PhantomData::<R>,
-            _w: PhantomData::<W>,
-        })
+    fn init<R: Read + Send, W: Write + Send, RNG: CryptoRng + RngCore>(
+        _: &mut R,
+        _: &mut W,
+        _: &mut RNG,
+    ) -> Result<Self, Error> {
+        Ok(Self {})
     }
 
-    fn receive(
+    fn receive<R: Read + Send, W: Write + Send, RNG: CryptoRng + RngCore>(
         &mut self,
         reader: &mut R,
         writer: &mut W,
         inputs: &[bool],
+        _: &mut RNG,
     ) -> Result<Vec<Block>, Error> {
         for b in inputs.iter() {
             stream::write_bool(writer, *b)?;
