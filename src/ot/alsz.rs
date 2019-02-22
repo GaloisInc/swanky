@@ -24,21 +24,25 @@ use std::marker::PhantomData;
 /// Oblivious transfer sender.
 pub struct AlszOTSender<OT: ObliviousTransferReceiver<Msg = Block> + SemiHonest> {
     _ot: PhantomData<OT>,
-    hash: AesHash,
+    pub(super) hash: AesHash,
     s: Vec<bool>,
-    s_: Block,
+    pub(super) s_: Block,
     rngs: Vec<AesRng>,
 }
 /// Oblivious transfer receiver.
 pub struct AlszOTReceiver<OT: ObliviousTransferSender<Msg = Block> + SemiHonest> {
     _ot: PhantomData<OT>,
-    hash: AesHash,
+    pub(super) hash: AesHash,
     rngs: Vec<(AesRng, AesRng)>,
 }
 
 impl<OT: ObliviousTransferReceiver<Msg = Block> + SemiHonest> AlszOTSender<OT> {
     #[inline]
-    fn send_setup<R: Read + Send>(&mut self, reader: &mut R, m: usize) -> Result<Vec<u8>, Error> {
+    pub(super) fn send_setup<R: Read + Send>(
+        &mut self,
+        reader: &mut R,
+        m: usize,
+    ) -> Result<Vec<u8>, Error> {
         if m % 8 != 0 {
             return Err(Error::from(std::io::Error::new(
                 ErrorKind::InvalidInput,
@@ -95,7 +99,7 @@ impl<OT: ObliviousTransferReceiver<Msg = Block> + SemiHonest> ObliviousTransferS
     fn send<R: Read + Send, W: Write + Send, RNG: CryptoRng + RngCore>(
         &mut self,
         reader: &mut R,
-        mut writer: &mut W,
+        writer: &mut W,
         inputs: &[(Self::Msg, Self::Msg)],
         _: &mut RNG,
     ) -> Result<(), Error> {
@@ -107,8 +111,8 @@ impl<OT: ObliviousTransferReceiver<Msg = Block> + SemiHonest> ObliviousTransferS
             let y0 = self.hash.cr_hash(j, q) ^ input.0;
             let q = q ^ self.s_;
             let y1 = self.hash.cr_hash(j, q) ^ input.1;
-            y0.write(&mut writer)?;
-            y1.write(&mut writer)?;
+            y0.write(writer)?;
+            y1.write(writer)?;
         }
         writer.flush()?;
         Ok(())
@@ -121,7 +125,7 @@ impl<OT: ObliviousTransferReceiver<Msg = Block> + SemiHonest> CorrelatedObliviou
     fn send_correlated<R: Read + Send, W: Write + Send, RNG: CryptoRng + RngCore>(
         &mut self,
         reader: &mut R,
-        mut writer: &mut W,
+        writer: &mut W,
         deltas: &[Self::Msg],
         _: &mut RNG,
     ) -> Result<Vec<(Self::Msg, Self::Msg)>, Error> {
@@ -135,7 +139,7 @@ impl<OT: ObliviousTransferReceiver<Msg = Block> + SemiHonest> CorrelatedObliviou
             let x1 = x0 ^ *delta;
             let q = q ^ self.s_;
             let y = self.hash.cr_hash(j, q) ^ x1;
-            y.write(&mut writer)?;
+            y.write(writer)?;
             out.push((x0, x1));
         }
         writer.flush()?;
@@ -169,12 +173,12 @@ impl<OT: ObliviousTransferReceiver<Msg = Block> + SemiHonest> RandomObliviousTra
 
 impl<OT: ObliviousTransferSender<Msg = Block> + SemiHonest> AlszOTReceiver<OT> {
     #[inline]
-    fn receive_setup<W: Write + Send>(
+    pub(super) fn receive_setup<W: Write + Send>(
         &mut self,
-        mut writer: &mut W,
-        inputs: &[bool],
+        writer: &mut W,
+        r: &[u8],
+        m: usize,
     ) -> Result<Vec<u8>, Error> {
-        let m = inputs.len();
         if m % 8 != 0 {
             return Err(Error::from(std::io::Error::new(
                 ErrorKind::InvalidInput,
@@ -182,7 +186,6 @@ impl<OT: ObliviousTransferSender<Msg = Block> + SemiHonest> AlszOTReceiver<OT> {
             )));
         }
         let (nrows, ncols) = (128, m);
-        let r = utils::boolvec_to_u8vec(inputs);
         let mut ts = vec![0u8; nrows * ncols / 8];
         let mut g = vec![0u8; ncols / 8];
         for j in 0..self.rngs.len() {
@@ -192,7 +195,7 @@ impl<OT: ObliviousTransferSender<Msg = Block> + SemiHonest> AlszOTReceiver<OT> {
             self.rngs[j].1.fill_bytes(&mut g);
             utils::xor_inplace(&mut g, &t);
             utils::xor_inplace(&mut g, &r);
-            stream::write_bytes(&mut writer, &g)?;
+            stream::write_bytes(writer, &g)?;
             writer.flush()?;
         }
         Ok(utils::transpose(&ts, nrows, ncols))
@@ -233,17 +236,18 @@ impl<OT: ObliviousTransferSender<Msg = Block> + SemiHonest> ObliviousTransferRec
 
     fn receive<R: Read + Send, W: Write + Send, RNG: CryptoRng + RngCore>(
         &mut self,
-        mut reader: &mut R,
+        reader: &mut R,
         writer: &mut W,
         inputs: &[bool],
         _: &mut RNG,
     ) -> Result<Vec<Self::Msg>, Error> {
-        let ts = self.receive_setup(writer, inputs)?;
+        let r = utils::boolvec_to_u8vec(inputs);
+        let ts = self.receive_setup(writer, &r, inputs.len())?;
         let mut out = Vec::with_capacity(inputs.len());
         for (j, b) in inputs.iter().enumerate() {
             let t = &ts[j * 16..(j + 1) * 16];
-            let y0 = Block::read(&mut reader)?;
-            let y1 = Block::read(&mut reader)?;
+            let y0 = Block::read(reader)?;
+            let y1 = Block::read(reader)?;
             let y = if *b { y1 } else { y0 };
             let y = y ^ self.hash.cr_hash(j, Block::from(*array_ref![t, 0, 16]));
             out.push(y);
@@ -257,16 +261,17 @@ impl<OT: ObliviousTransferSender<Msg = Block> + SemiHonest> CorrelatedObliviousT
 {
     fn receive_correlated<R: Read + Send, W: Write + Send, RNG: CryptoRng + RngCore>(
         &mut self,
-        mut reader: &mut R,
+        reader: &mut R,
         writer: &mut W,
         inputs: &[bool],
         _: &mut RNG,
     ) -> Result<Vec<Self::Msg>, Error> {
-        let ts = self.receive_setup(writer, inputs)?;
+        let r = utils::boolvec_to_u8vec(inputs);
+        let ts = self.receive_setup(writer, &r, inputs.len())?;
         let mut out = Vec::with_capacity(inputs.len());
         for (j, b) in inputs.iter().enumerate() {
             let t = &ts[j * 16..(j + 1) * 16];
-            let y = Block::read(&mut reader)?;
+            let y = Block::read(reader)?;
             let y = if *b { y } else { Block::zero() };
             let h = self.hash.cr_hash(j, Block::from(*array_ref![t, 0, 16]));
             out.push(y ^ h);
@@ -285,7 +290,8 @@ impl<OT: ObliviousTransferSender<Msg = Block> + SemiHonest> RandomObliviousTrans
         inputs: &[bool],
         _: &mut RNG,
     ) -> Result<Vec<Self::Msg>, Error> {
-        let ts = self.receive_setup(writer, inputs)?;
+        let r = utils::boolvec_to_u8vec(inputs);
+        let ts = self.receive_setup(writer, &r, inputs.len())?;
         let mut out = Vec::with_capacity(inputs.len());
         for j in 0..inputs.len() {
             let t = &ts[j * 16..(j + 1) * 16];
