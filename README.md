@@ -26,3 +26,9 @@ fancy_garbling = { git = "https://github.com/spaceships/fancy-garbling" }
 MIT License
 
 Copyright 2018 Brent Carmer
+
+This material is based in part upon work supported by the ARO and DARPA under Contract No.
+W911NF-15-C-0227.
+
+Any opinions, findings and conclusions or recommendations expressed in this material are
+those of the author(s) and do not necessarily reflect the views of the ARO and DARPA.
