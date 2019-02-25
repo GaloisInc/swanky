@@ -99,11 +99,11 @@ impl ObliviousTransferReceiver for NaorPinkasOTReceiver {
         }
         for (b, c) in inputs.iter().zip(cs.into_iter()) {
             let k = Scalar::random(&mut rng);
-            let pkσ = &k * &RISTRETTO_BASEPOINT_TABLE;
-            let pkσ_ = c - pkσ;
+            let pk = &k * &RISTRETTO_BASEPOINT_TABLE;
+            let pk_ = c - pk;
             match b {
-                false => stream::write_pt(writer, &pkσ)?,
-                true => stream::write_pt(writer, &pkσ_)?,
+                false => stream::write_pt(writer, &pk)?,
+                true => stream::write_pt(writer, &pk_)?,
             };
             ks.push(k);
         }
@@ -117,12 +117,12 @@ impl ObliviousTransferReceiver for NaorPinkasOTReceiver {
                 let e01 = Block::read(reader)?;
                 let e10 = stream::read_pt(reader)?;
                 let e11 = Block::read(reader)?;
-                let (eσ0, eσ1) = match b {
+                let (e0, e1) = match b {
                     false => (e00, e01),
                     true => (e10, e11),
                 };
-                let h = Block::hash_pt(i, &(eσ0 * k));
-                Ok(h ^ eσ1)
+                let h = Block::hash_pt(i, &(e0 * k));
+                Ok(h ^ e1)
             })
             .collect()
     }

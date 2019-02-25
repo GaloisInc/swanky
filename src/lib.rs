@@ -19,17 +19,12 @@
 //! `CorrelatedObliviousTransferSender/Receiver` and
 //! `RandomObliviousTransferSender/Receiver` traits.
 //!
-//! `ocelot` attempts to use all the latest-and-greatest optimizations, including:
-//! * Fixed-key AES wherever possible (cf. <https://eprint.iacr.org/2019/074>).
-//! * An optimized implementation of matrix transposition from the EMP toolkit's OT implementation (cf. <https://github.com/emp-toolkit/emp-ot>).
-//!
 //! **THIS IS STILL VERY MUCH RESEARCH CODE**, for now.
 
 #![allow(clippy::many_single_char_names)]
-#![feature(non_ascii_idents)]
-#![feature(test)]
-#![feature(stdsimd)]
-#![feature(asm)]
+#![cfg_attr(feature = "nightly", feature(test))]
+#![cfg_attr(feature = "nightly", feature(stdsimd))]
+#![cfg_attr(feature = "nightly", feature(asm))]
 
 mod cointoss;
 mod ot;

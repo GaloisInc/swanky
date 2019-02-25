@@ -56,6 +56,7 @@ pub fn receive<R: Read, W: Write>(
 
 #[cfg(test)]
 mod tests {
+    #[cfg(feature = "nightly")]
     extern crate test;
     use super::*;
     use std::io::{BufReader, BufWriter};

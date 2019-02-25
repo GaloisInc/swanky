@@ -54,12 +54,12 @@ impl<OT: ObliviousTransferReceiver<Msg = Block> + Malicious> KosOTSender<OT> {
         let seed = cointoss::send(reader, writer, seed)?;
         let mut rng = AesRng::from_seed(seed);
         let mut check = (Block::zero(), Block::zero());
-        let mut χ = Block::zero();
+        let mut chi = Block::zero();
         for j in 0..ncols {
             let q = &qs[j * 16..(j + 1) * 16];
             let q = Block::from(*array_ref![q, 0, 16]);
-            rng.fill_bytes(&mut χ.as_mut());
-            let tmp = q.mul128(χ);
+            rng.fill_bytes(&mut chi.as_mut());
+            let tmp = q.mul128(chi);
             check = utils::xor_two_blocks(&check, &tmp);
         }
         let x = Block::read(reader)?;
@@ -192,13 +192,13 @@ impl<OT: ObliviousTransferSender<Msg = Block> + Malicious> KosOTReceiver<OT> {
         let mut x = Block::zero();
         let mut t = (Block::zero(), Block::zero());
         let r_ = utils::u8vec_to_boolvec(&r);
-        let mut χ = Block::zero();
+        let mut chi = Block::zero();
         for (j, xj) in r_.into_iter().enumerate() {
             let tj = &ts[j * 16..(j + 1) * 16];
             let tj = Block::from(*array_ref![tj, 0, 16]);
-            rng.fill_bytes(&mut χ.as_mut());
-            x = x ^ if xj { χ } else { Block::zero() };
-            let tmp = tj.mul128(χ);
+            rng.fill_bytes(&mut chi.as_mut());
+            x = x ^ if xj { chi } else { Block::zero() };
+            let tmp = tj.mul128(chi);
             t = utils::xor_two_blocks(&t, &tmp);
         }
         x.write(&mut writer)?;

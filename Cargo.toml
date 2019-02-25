@@ -2,24 +2,26 @@
 name = "ocelot"
 version = "0.1.0"
 authors = ["Alex J. Malozemoff <amaloz@galois.com>"]
-readme = "README.md"
 license = "MIT"
+readme = "README.md"
+description = "A library for oblivious transfer protocols"
 categories = ["cryptography"]
 keywords = ["cryptography", "oblivious-transfer"]
-description = "A library for oblivious transfer protocols"
-build = "build.rs"
 edition = "2018"
-autobenches = false
+build = "build.rs"
 
 [lib]
 
+[features]
+nightly = ["curve25519-dalek/simd_backend", "rand/nightly", "scuttlebutt/nightly"]
+
 [dependencies]
-arrayref = "*"
-curve25519-dalek = { version = "*", features = ["std", "simd_backend"] }
-failure = "*"
+arrayref = "0.3"
+curve25519-dalek = { version = "1.1", features = ["std"] }
+failure = "0.1"
 libc = "*"
-rand = { version = "*", features = ["nightly"] }
-rand_core = "*"
+rand = "0.6"
+rand_core = "0.4"
 scuttlebutt = { path = "../scuttlebutt", features = ["curve25519-dalek"] }
 
 [build-dependencies]
@@ -29,10 +31,22 @@ cc = "*"
 criterion = "*"
 
 [profile.release]
+opt-level = 3
+debug = false
+debug-assertions = false
+overflow-checks = false
+
+[profile.dev]
+opt-level = 0
 debug = true
+debug-assertions = true
+overflow-checks = true
 
 [profile.bench]
-debug = true
+opt-level = 3
+debug = false
+debug-assertions = false
+overflow-checks = false
 
 [[bench]]
 name = "ot"
