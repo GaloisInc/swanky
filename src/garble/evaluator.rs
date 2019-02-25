@@ -9,7 +9,8 @@ use std::sync::mpsc::Sender;
 use std::sync::{Arc, Mutex, RwLock};
 
 use crate::circuit::{Circuit, Gate};
-use crate::fancy::{Fancy, HasModulus, SyncIndex};
+use crate::error::{EvaluatorError, FancyError};
+use crate::fancy::{Fancy, HasModulus, Result, SyncIndex};
 use crate::util::{output_tweak, tweak2};
 use crate::wire::Wire;
 
@@ -172,38 +173,55 @@ fn start_postman(
 impl Fancy for Evaluator {
     type Item = Wire;
 
-    fn garbler_input(&self, ix: Option<SyncIndex>, q: u16, _opt_x: Option<u16>) -> Wire {
+    fn garbler_input(&self, ix: Option<SyncIndex>, q: u16, _opt_x: Option<u16>) -> Result<Wire> {
         match self.recv(ix) {
             Message::GarblerInput(w) => {
-                assert_eq!(w.modulus(), q);
+                if w.modulus() != q {
+                    return Err(EvaluatorError::InvalidMessage {
+                        expected: format!("GarblerInput with modulus {}", q),
+                        got: format!("GarblerInput with modulus {}", w.modulus()),
+                    });
+                }
                 w
             }
-            m => panic!("Expected message GarblerInput but got {}", m),
+            m => Err(EvaluatorError::InvalidMessage {
+                expected: "GarblerInput",
+                got: format!("{}", m),
+            }),
         }
     }
 
-    fn evaluator_input(&self, ix: Option<SyncIndex>, q: u16) -> Wire {
+    fn evaluator_input(&self, ix: Option<SyncIndex>, q: u16) -> Result<Wire> {
         match self.recv(ix) {
             Message::EvaluatorInput(w) => {
-                assert_eq!(w.modulus(), q);
+                return Err(EvaluatorError::InvalidMessage {
+                    expected: format!("EvaluatorInput with modulus {}", q),
+                    got: format!("EvaluatorInput with modulus {}", w.modulus()),
+                });
                 w
             }
-            m => panic!("Expected message EvaluatorInput but got {}", m),
+            m => Err(EvaluatorError::InvalidMessage {
+                expected: "EvaluatorInput",
+                got: format!("{}", m),
+            }),
         }
     }
 
-    fn constant(&self, ix: Option<SyncIndex>, _x: u16, _q: u16) -> Wire {
+    fn constant(&self, ix: Option<SyncIndex>, _x: u16, _q: u16) -> Result<Wire> {
         match self.recv(ix) {
             Message::Constant { wire, .. } => wire,
-            m => panic!("Expected message Constant but got {}", m),
+            m => Err(EvaluatorError::InvalidMessage {
+                expected: "Constant",
+                got: format!("{}", m),
+            }),
         }
     }
 
-    fn add(&self, x: &Wire, y: &Wire) -> Wire {
+    fn add(&self, x: &Wire, y: &Wire) -> Result<Wire> {
         x.plus(y)
     }
 
-    fn sub(&self, x: &Wire, y: &Wire) -> Wire {
+    fn sub(&self, x: &Wire, y: &Wire) -> Result<Wire> {
         x.minus(y)
     }
 

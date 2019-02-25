@@ -226,9 +226,7 @@ pub fn crt_factor(x: u128, q: u128) -> Vec<u16> {
 #[inline]
 pub fn crt_inv(xs: &[u16], ps: &[u16]) -> u128 {
     let mut ret = 0;
-    let M = ps
-        .iter()
-        .fold(1, |acc, &x| x as i128 * acc);
+    let M = ps.iter().fold(1, |acc, &x| x as i128 * acc);
     for (&p, &a) in ps.iter().zip(xs.iter()) {
         let p = p as i128;
         let q = &M / &p;
