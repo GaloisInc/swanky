@@ -1,9 +1,9 @@
-use criterion::{criterion_main, criterion_group, Criterion, black_box};
+use criterion::{black_box, criterion_group, criterion_main, Criterion};
 
 fn bench_thread(c: &mut Criterion) {
     c.bench_function("thread startup time", |b| {
         b.iter(|| {
-            let h = std::thread::spawn(||());
+            let h = std::thread::spawn(|| ());
             black_box(h);
         });
     });
@@ -39,5 +39,11 @@ fn bench_rwlock_read(c: &mut Criterion) {
     });
 }
 
-criterion_group!(benches, bench_thread, bench_mutex, bench_rwlock_write, bench_rwlock_read);
+criterion_group!(
+    benches,
+    bench_thread,
+    bench_mutex,
+    bench_rwlock_write,
+    bench_rwlock_read
+);
 criterion_main!(benches);
