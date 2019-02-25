@@ -4,7 +4,7 @@
 // Copyright © 2019 Galois, Inc.
 // See LICENSE for licensing information.
 
-//! Implementation if an **entirely insecure** oblivious transfer protocol for
+//! Implementation of an **entirely insecure** oblivious transfer protocol for
 //! testing purposes.
 
 use crate::stream;
