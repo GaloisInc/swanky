@@ -3,9 +3,8 @@
 //! Note: all number representations in this library are little-endian.
 
 use itertools::Itertools;
-use num::bigint::BigInt;
 use num::integer::Integer;
-use num::{One, Signed, ToPrimitive, Zero};
+use num::Signed;
 
 ////////////////////////////////////////////////////////////////////////////////
 // tweak functions for garbling
@@ -228,17 +227,17 @@ pub fn crt_factor(x: u128, q: u128) -> Vec<u16> {
 /// Compute the value x given a list of CRT primes and residues.
 #[inline]
 pub fn crt_inv(xs: &[u16], ps: &[u16]) -> u128 {
-    let mut ret = BigInt::zero();
+    let mut ret = 0;
     let M = ps
         .iter()
-        .fold(BigInt::one(), |acc, &x| BigInt::from(x) * acc);
+        .fold(1, |acc, &x| x as i128 * acc);
     for (&p, &a) in ps.iter().zip(xs.iter()) {
-        let p = BigInt::from(p);
+        let p = p as i128;
         let q = &M / &p;
-        ret += BigInt::from(a) * inv_ref(&q, &p) * q;
+        ret += a as i128 * inv_ref(&q, &p) * q;
         ret %= &M;
     }
-    ret.to_u128().unwrap()
+    ret as u128
 }
 
 /// Compute the value x given a composite CRT modulus.
