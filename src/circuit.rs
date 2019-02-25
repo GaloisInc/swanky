@@ -1,7 +1,7 @@
 //! DSL for creating circuits compatible with fancy-garbling in the old-fashioned way,
 //! where you create a circuit for a computation then garble it.
 
-use serde_derive::{Serialize, Deserialize};
+use serde::{Serialize, Deserialize};
 
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -148,29 +148,6 @@ impl Circuit {
         println!();
         println!("  total non-free gates: {}", self.num_nonfree_gates);
         println!();
-    }
-
-    pub  fn to_file(&self, filename: &str) -> Result<(), failure::Error> {
-        let f = std::fs::File::create(filename)?;
-        serde_json::to_writer(f, self)
-            .map_err(|_| failure::err_msg("error writing json into file"))
-    }
-
-    pub fn from_file(filename: &str) -> Result<Circuit, failure::Error> {
-        let f = std::fs::File::open(filename)?;
-        serde_json::from_reader(f).map_err(|why| {
-            failure::format_err!("failed to parse json: line {} column {}", why.line(), why.column())
-        })
-    }
-
-    pub fn to_string(&self) -> String {
-        serde_json::to_string(self).expect("couldn't serialize circuit")
-    }
-
-    pub fn from_string(s: &str) -> Result<Circuit, failure::Error> {
-        serde_json::from_str(s).map_err(|why| {
-            failure::format_err!("failed to parse json: line {} column {}", why.line(), why.column())
-        })
     }
 }
 
@@ -756,24 +733,6 @@ mod bundle {
         }
     }
     //}}}
-    #[test] // serialization {{{
-    fn test_serialization() {
-        let mut rng = thread_rng();
-
-        let nargs = 2 + rng.gen_usize() % 100;
-        let mods = (0..7).map(|_| rng.gen_modulus()).collect_vec();
-
-        let b = CircuitBuilder::new();
-        let xs = b.evaluator_input_bundles(None,&mods, nargs);
-        let z = b.mixed_radix_addition(None,&xs);
-        b.output_bundle(None, &z);
-        let circ = b.finish();
-
-        println!("{}", circ.to_string());
-
-        assert_eq!(circ, Circuit::from_string(&circ.to_string()).unwrap());
-    }
-//}}}
     #[test] // builder has send and sync {{{
     fn test_builder_has_send_and_sync() {
         fn check_send(_: impl Send) { }

@@ -1,7 +1,7 @@
 //! Structs and functions for creating, streaming, and evaluating garbled circuits.
 
 use itertools::Itertools;
-use serde_derive::{Serialize, Deserialize};
+use serde::{Serialize, Deserialize};
 
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
@@ -72,17 +72,6 @@ impl std::fmt::Display for Message {
             Message::OutputCiphertext(_)          => "OutputCiphertext",
             Message::EndSync                      => "EndSync",
         })
-    }
-}
-
-impl Message {
-    pub fn to_bytes(&self) -> Vec<u8> {
-        bincode::serialize(self).expect("couldn't serialize Message")
-    }
-
-    pub fn from_bytes(bs: &[u8]) -> Result<Self, failure::Error> {
-        bincode::deserialize(bs)
-            .map_err(|_| failure::err_msg("error decoding Message from bytes"))
     }
 }
 
@@ -504,36 +493,6 @@ mod classic {
         }
     }
 //}}}
-    #[test] // serialization {{{
-    fn serialization() {
-        let mut rng = thread_rng();
-
-        let nargs = 2 + rng.gen_usize() % 10;
-        let mods = (0..7).map(|_| rng.gen_modulus()).collect_vec();
-
-        let b = CircuitBuilder::new();
-        let xs = b.evaluator_input_bundles(None, &mods, nargs);
-        let z = b.mixed_radix_addition(None, &xs);
-        b.output_bundle(None, &z);
-        let circ = b.finish();
-
-        let (en, de, ev) = garble(&circ);
-
-        assert_eq!(ev, GarbledCircuit::from_bytes(&ev.to_bytes()).unwrap());
-        assert_eq!(en, Encoder::from_bytes(&en.to_bytes()).unwrap());
-        assert_eq!(de, Decoder::from_bytes(&de.to_bytes()).unwrap());
-    }
-//}}}
-    #[test] // message serialization // {{{
-    fn message_serialization() {
-        let mut rng = thread_rng();
-        for _ in 0..128 {
-            let q = rng.gen_modulus();
-            let w = Wire::rand(&mut rng, q);
-            let m = Message::EvaluatorInput(w);
-            assert_eq!(m, Message::from_bytes(&m.to_bytes()).unwrap());
-        }
-    } // }}}
 }
 
 #[cfg(test)]

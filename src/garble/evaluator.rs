@@ -1,6 +1,6 @@
 use crossbeam::queue::SegQueue;
 use itertools::Itertools;
-use serde_derive::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 
 use std::collections::{HashMap, VecDeque};
 use std::ops::DerefMut;
@@ -371,15 +371,6 @@ impl GarbledCircuit {
 
         c.output_refs.iter().map(|&r| wires[r.ix].clone()).collect()
     }
-
-    pub fn to_bytes(&self) -> Vec<u8> {
-        bincode::serialize(self).expect("couldn't serialize Evaluator")
-    }
-
-    pub fn from_bytes(bs: &[u8]) -> Result<Self, failure::Error> {
-        bincode::deserialize(bs)
-            .map_err(|_| failure::err_msg("error decoding Evaluator from bytes"))
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -441,14 +432,6 @@ impl Encoder {
             .map(|(id, &x)| self.encode_evaluator_input(x, id))
             .collect()
     }
-
-    pub fn to_bytes(&self) -> Vec<u8> {
-        bincode::serialize(self).expect("couldn't serialize Encoder")
-    }
-
-    pub fn from_bytes(bs: &[u8]) -> Result<Self, failure::Error> {
-        bincode::deserialize(bs).map_err(|_| failure::err_msg("error decoding Encoder from bytes"))
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -494,14 +477,6 @@ impl Decoder {
             ws.len()
         );
         outs
-    }
-
-    pub fn to_bytes(&self) -> Vec<u8> {
-        bincode::serialize(self).expect("couldn't serialize Decoder")
-    }
-
-    pub fn from_bytes(bs: &[u8]) -> Result<Self, failure::Error> {
-        bincode::deserialize(bs).map_err(|_| failure::err_msg("error decoding Decoder from bytes"))
     }
 }
 

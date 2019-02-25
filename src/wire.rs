@@ -2,7 +2,7 @@
 
 use rand::Rng;
 use scuttlebutt::Block;
-use serde_derive::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 
 use crate::aes::AES;
 use crate::{
@@ -279,19 +279,6 @@ impl Wire {
     pub fn hashback2(&self, other: &Wire, tweak: u128, new_modulus: u16) -> Wire {
         Self::from_u128(self.hash2(other, tweak), new_modulus)
     }
-}
-
-////////////////////////////////////////////////////////////////////////////////
-// serialization
-
-/// Convert a slice of wires to bytes.
-pub fn wires_to_bytes(ws: &[Wire]) -> Vec<u8> {
-    bincode::serialize(ws).expect("couldn't serialize slice of wires")
-}
-
-/// Convert a slice of bytes back to wires.
-pub fn wires_from_bytes(bs: &[u8]) -> Result<Vec<Wire>, failure::Error> {
-    bincode::deserialize(bs).map_err(|_| failure::err_msg("error decoding wires from bytes"))
 }
 
 ////////////////////////////////////////////////////////////////////////////////
