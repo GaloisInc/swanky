@@ -4,8 +4,8 @@
 // Copyright © 2019 Galois, Inc.
 // See LICENSE for licensing information.
 
-#![feature(stdsimd)]
-#![feature(test)]
+#![cfg_attr(feature = "nightly", feature(stdsimd))]
+#![cfg_attr(feature = "nightly", feature(test))]
 
 mod aes;
 mod block;

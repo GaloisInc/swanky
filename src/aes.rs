@@ -104,7 +104,7 @@ impl Aes128 {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(feature = "nightly", test))]
 mod benchmarks {
     extern crate test;
     use super::*;

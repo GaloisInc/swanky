@@ -2,24 +2,24 @@
 name = "scuttlebutt"
 version = "0.1.0"
 authors = ["Alex J. Malozemoff <amaloz@galois.com>"]
-readme = "README.md"
 license = "MIT"
-categories = ["cryptography"]
-keywords = ["cryptography", "MPC", "secure-computation"]
+readme = "README.md"
 description = "A library of useful multi-party computation utilities"
+keywords = ["cryptography", "MPC", "secure-computation"]
+categories = ["cryptography"]
 edition = "2018"
-autobenches = false
+publish = false
 
 [lib]
 
 [features]
-default = ["curve25519-dalek"]
+nightly = ["curve25519-dalek/simd_backend", "rand/nightly"]
 
 [dependencies]
 arrayref = "*"
-curve25519-dalek = { version = "*", features = ["std", "simd_backend"], optional = true }
+curve25519-dalek = { version = "1.1", features = ["std"], optional = true }
 failure = "*"
-rand = { version = "*", features = ["nightly"] }
+rand = { version = "*" }
 rand_core = { version = "*" }
 serde = { version = "*", features = ["derive"], optional = true }
 
@@ -27,10 +27,22 @@ serde = { version = "*", features = ["derive"], optional = true }
 criterion = "*"
 
 [profile.release]
+opt-level = 3
+debug = false
+debug-assertions = false
+overflow-checks = false
+
+[profile.dev]
+opt-level = 0
 debug = true
+debug-assertions = true
+overflow-checks = true
 
 [profile.bench]
-debug = true
+opt-level = 3
+debug = false
+debug-assertions = false
+overflow-checks = false
 
 [[bench]]
 name = "bench"

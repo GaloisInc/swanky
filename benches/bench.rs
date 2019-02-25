@@ -41,14 +41,16 @@ fn bench_aes_rand(c: &mut Criterion) {
     });
 }
 
+#[cfg(feature = "curve25519-dalek")]
 fn bench_hash_pt(c: &mut Criterion) {
-    #[cfg(feature = "curve25519-dalek")]
     c.bench_function("hash pt", |b| {
         let pt = RistrettoPoint::random(&mut rand::thread_rng());
         let i = rand::random::<usize>();
         b.iter(|| Block::hash_pt(i, &pt));
     });
 }
+#[cfg(not(feature = "curve25519-dalek"))]
+fn bench_hash_pt(_c: &mut Criterion) {}
 
 fn bench_xor(c: &mut Criterion) {
     c.bench_function("xor", |b| {

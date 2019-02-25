@@ -8,6 +8,7 @@
 
 use crate::aes::Aes128;
 use crate::Block;
+#[cfg(feature = "nightly")]
 use core::arch::x86_64::*;
 use core::fmt;
 use rand_core::block::{BlockRng, BlockRngCore};
@@ -75,7 +76,10 @@ impl Default for AesRng {
 #[derive(Clone)]
 pub struct AesRngCore {
     aes: Aes128,
+    #[cfg(feature = "nightly")]
     state: __m64,
+    #[cfg(not(feature = "nightly"))]
+    state: u64,
 }
 
 impl fmt::Debug for AesRngCore {
@@ -92,11 +96,22 @@ impl BlockRngCore for AesRngCore {
 
     // Compute `E(state)`, where `state` is a counter initialized to zero.
     #[inline]
+    #[cfg(feature = "nightly")]
     fn generate(&mut self, results: &mut Self::Results) {
         let data = unsafe { _mm_set_epi64(_mm_setzero_si64(), self.state) };
         let c = self.aes.encrypt(Block::from(data));
         unsafe { *results = std::mem::transmute(c.0) };
         self.state = unsafe { _mm_add_pi32(self.state, _mm_set_pi32(0, 1)) };
+    }
+
+    // Compute `E(state)`, where `state` is a counter initialized to zero.
+    #[inline]
+    #[cfg(not(feature = "nightly"))]
+    fn generate(&mut self, results: &mut Self::Results) {
+        let data = self.state as u128;
+        let c = self.aes.encrypt(Block::from(data));
+        unsafe { *results = std::mem::transmute(c.0) };
+        self.state = self.state + 1;
     }
 }
 
@@ -104,11 +119,22 @@ impl SeedableRng for AesRngCore {
     type Seed = Block;
 
     #[inline]
+    #[cfg(feature = "nightly")]
     fn from_seed(seed: Self::Seed) -> Self {
         let aes = Aes128::new(seed);
         AesRngCore {
             aes,
             state: unsafe { _mm_setzero_si64() },
+        }
+    }
+
+    #[inline]
+    #[cfg(not(feature = "nightly"))]
+    fn from_seed(seed: Self::Seed) -> Self {
+        let aes = Aes128::new(seed);
+        AesRngCore {
+            aes,
+            state: 0u64,
         }
     }
 }
