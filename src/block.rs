@@ -38,15 +38,18 @@ impl Block {
     pub fn as_ptr(&self) -> *const u8 {
         self.as_ref().as_ptr()
     }
+
     #[inline]
     pub fn as_mut_ptr(&mut self) -> *mut u8 {
         self.as_mut().as_mut_ptr()
     }
+
     /// Output the all-zero block.
     #[inline]
     pub fn zero() -> Self {
         unsafe { Block(_mm_setzero_si128()) }
     }
+
     /// Carryless multiplication. This code is adapted from the EMP toolkit's
     /// implementation.
     #[inline]
@@ -66,9 +69,10 @@ impl Block {
             (Block(x), Block(y))
         }
     }
+
     /// Hash an elliptic curve point `pt` by computing `E_{pt}(i)`, where `E` is
     /// AES-128 and `i` is an index.
-    #[cfg(feature = "curve25519-dalek")]
+    #[cfg(all(feature = "curve25519-dalek", feature = "nightly"))]
     #[inline]
     pub fn hash_pt(i: usize, pt: &RistrettoPoint) -> Self {
         let k = pt.compress();
@@ -78,6 +82,19 @@ impl Block {
         let m =
             unsafe { _mm_set_epi64(_mm_setzero_si64(), std::mem::transmute::<usize, __m64>(i)) };
         c.encrypt(Block(m))
+    }
+
+    /// Hash an elliptic curve point `pt` by computing `E_{pt}(i)`, where `E` is
+    /// AES-128 and `i` is an index.
+    #[cfg(all(feature = "curve25519-dalek", not(feature = "nightly")))]
+    #[inline]
+    pub fn hash_pt(i: usize, pt: &RistrettoPoint) -> Self {
+        let k = pt.compress();
+        let k = k.as_bytes();
+        // XXX: We're just taking the first 16 bytes of the compressed point... Is that secure?!
+        let c = Aes128::new(Block::from(*array_ref![k, 0, 16]));
+        let m = i as u128;
+        c.encrypt(Block::from(m))
     }
 
     // Fixed key for AES hash. This is the same fixed key as used in the EMP toolkit.

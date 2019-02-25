@@ -103,15 +103,13 @@ impl BlockRngCore for AesRngCore {
         unsafe { *results = std::mem::transmute(c.0) };
         self.state = unsafe { _mm_add_pi32(self.state, _mm_set_pi32(0, 1)) };
     }
-
-    // Compute `E(state)`, where `state` is a counter initialized to zero.
     #[inline]
     #[cfg(not(feature = "nightly"))]
     fn generate(&mut self, results: &mut Self::Results) {
-        let data = self.state as u128;
+        let data = u128::from(self.state);
         let c = self.aes.encrypt(Block::from(data));
         unsafe { *results = std::mem::transmute(c.0) };
-        self.state = self.state + 1;
+        self.state += 1;
     }
 }
 
@@ -127,7 +125,6 @@ impl SeedableRng for AesRngCore {
             state: unsafe { _mm_setzero_si64() },
         }
     }
-
     #[inline]
     #[cfg(not(feature = "nightly"))]
     fn from_seed(seed: Self::Seed) -> Self {
