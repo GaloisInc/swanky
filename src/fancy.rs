@@ -544,7 +544,7 @@ pub trait BundleGadgets: Fancy {
             let mut tabs = vec![Vec::with_capacity(p as usize); ndigits];
 
             for x in 0..p {
-                let crt_coef = util::inv(((q / p as u128) % p as u128) as i64, p as i64);
+                let crt_coef = util::inv(((q / p as u128) % p as u128) as i128, p as i128);
                 let y = (M as f64 * x as f64 * crt_coef as f64 / p as f64).round() as u128 % M;
                 let digits = util::as_mixed_radix(y, ms);
                 for i in 0..ndigits {

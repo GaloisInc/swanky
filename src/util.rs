@@ -3,8 +3,6 @@
 //! Note: all number representations in this library are little-endian.
 
 use itertools::Itertools;
-use num::integer::Integer;
-use num::Signed;
 
 ////////////////////////////////////////////////////////////////////////////////
 // tweak functions for garbling
@@ -234,7 +232,7 @@ pub fn crt_inv(xs: &[u16], ps: &[u16]) -> u128 {
     for (&p, &a) in ps.iter().zip(xs.iter()) {
         let p = p as i128;
         let q = &M / &p;
-        ret += a as i128 * inv_ref(&q, &p) * q;
+        ret += a as i128 * inv(q, p) * q;
         ret %= &M;
     }
     ret as u128
@@ -249,42 +247,36 @@ pub fn crt_inv_factor(xs: &[u16], q: u128) -> u128 {
 /// Generic algorithm to invert inp_a mod inp_b. As ref so as to support BigInts without
 /// copying.
 #[inline]
-pub fn inv_ref<T: Clone + Integer + Signed>(inp_a: &T, inp_b: &T) -> T {
-    let mut a = inp_a.clone();
-    let mut b = inp_b.clone();
+pub fn inv(inp_a: i128, inp_b: i128) -> i128 {
+    let mut a = inp_a;
+    let mut b = inp_b;
     let mut q;
     let mut tmp;
 
-    let (mut x0, mut x1) = (T::zero(), T::one());
+    let (mut x0, mut x1) = (0, 1);
 
-    if b == T::one() {
-        return T::one();
+    if b == 1 {
+        return 1;
     }
 
-    while a > T::one() {
-        q = a.clone() / b.clone();
+    while a > 1 {
+        q = a / b;
 
         // a, b = b, a%b
-        tmp = b.clone();
-        b = a.clone() % b.clone();
+        tmp = b;
+        b = a % b;
         a = tmp;
 
-        tmp = x0.clone();
-        x0 = x1.clone() - q.clone() * x0.clone();
-        x1 = tmp.clone();
+        tmp = x0;
+        x0 = x1 - q * x0;
+        x1 = tmp;
     }
 
-    if x1 < T::zero() {
-        x1 = x1 + inp_b.clone();
+    if x1 < 0 {
+        x1 = x1 + inp_b;
     }
 
     x1
-}
-
-/// Invert a mod m.
-#[inline]
-pub fn inv<T: Copy + Integer + Signed>(a: T, m: T) -> T {
-    inv_ref(&a, &m)
 }
 
 /// Number of primes supported by our library.
@@ -375,18 +367,10 @@ pub fn powm(inp: u16, pow: u16, modulus: u16) -> u16 {
     z as u16
 }
 
-/// Returns true if x is a power of 2. Delightfully generic.
+/// Returns true if x is a power of 2
 #[inline]
-pub fn is_power_of_2<I>(x: I) -> bool
-where
-    I: std::ops::Sub<Output = I>
-        + std::ops::BitAnd<Output = I>
-        + num::Zero
-        + num::One
-        + std::cmp::PartialEq
-        + Clone,
-{
-    (x.clone() & (x - I::one())) == I::zero()
+pub fn is_power_of_2(x: u16) -> bool {
+    (x & (x - 1)) == 0
 }
 
 /// Extra Rng functionality, useful for `fancy-garbling`.
