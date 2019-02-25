@@ -2,12 +2,10 @@
 
 use itertools::Itertools;
 use serde_derive::{Serialize, Deserialize};
-use time::{Duration, PreciseTime};
 
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
-use std::error::Error;
 
 use crate::circuit::{Circuit, Gate};
 use crate::fancy::{Fancy, HasModulus, SyncIndex};
@@ -230,84 +228,6 @@ pub fn garble(c: &Circuit) -> (Encoder, Decoder, GarbledCircuit) {
     (en, de, ev)
 }
 
-////////////////////////////////////////////////////////////////////////////////
-// benchmarking function
-
-/// Run benchmark garbling and streaming on the function. Garbling function is evaluated
-/// on another thread.
-pub fn bench_garbling<GbF, EvF>(niters: usize, fancy_gb: GbF, fancy_ev: EvF)
-  where GbF: Fn(&mut Garbler) + Send + Sync + 'static,
-        EvF: Fn(&mut Evaluator)
-{
-    let fancy_gb = Arc::new(fancy_gb);
-
-    let mut total_time = Duration::zero();
-
-    println!("benchmarking garbler");
-    let mut pb = pbr::ProgressBar::new(niters as u64);
-    pb.message("test ");
-
-    for _ in 0..niters {
-        pb.inc();
-        let mut garbler = Garbler::new(|_,_|());
-        let start = PreciseTime::now();
-        fancy_gb(&mut garbler);
-        let end = PreciseTime::now();
-        total_time = total_time + start.to(end);
-    }
-    pb.finish();
-
-    total_time = total_time / niters as i32;
-    println!("garbling took {} ms", total_time.num_milliseconds());
-
-    // benchmark the garbler and the evaluator together
-    println!("benchmarking garbler streaming to evaluator");
-    let mut pb = pbr::ProgressBar::new(niters as u64);
-    pb.message("test ");
-
-    total_time = Duration::zero();
-    for _ in 0..niters {
-        pb.inc();
-        // set up channel
-        let (sender, receiver) = std::sync::mpsc::channel();
-
-        // start timer
-        let start = PreciseTime::now();
-
-        // compute garbler on another thread
-        let fancy_gb = fancy_gb.clone();
-        let h = std::thread::spawn(move || {
-            // set up garbler
-            let callback = move |ix, msg| {
-                let m = match msg {
-                    Message::UnencodedGarblerInput   { zero, .. } => Message::GarblerInput(zero),
-                    Message::UnencodedEvaluatorInput { zero, .. } => Message::EvaluatorInput(zero),
-                    m => m,
-                };
-                sender.send((ix,m)).map_err(|e| {
-                    eprintln!("{}", e.description());
-                    panic!("{:?}", e);
-                }).unwrap();
-            };
-            // evaluate garbler
-            let mut gb = Garbler::new(callback);
-            fancy_gb(&mut gb);
-        });
-
-        // evaluate the evaluator
-        let mut ev = Evaluator::new(move || receiver.recv().unwrap());
-        fancy_ev(&mut ev);
-
-        let end = PreciseTime::now();
-        total_time = total_time + start.to(end);
-
-        h.join().unwrap();
-    }
-    pb.finish();
-
-    total_time = total_time / niters as i32;
-    println!("streaming took {} ms", total_time.num_milliseconds());
-}
 
 ////////////////////////////////////////////////////////////////////////////////
 // tests

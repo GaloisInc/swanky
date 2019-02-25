@@ -96,9 +96,4 @@ fn main() {
     collision(&informer, nbits, time_slices, check_for_cheaters);
     informer.print_info();
     println!("");
-
-    // fancy_garbling::bench_garbling(10,
-    //     move |f| collision(f, nbits, time_slices, check_for_cheaters),
-    //     move |f| collision(f, nbits, time_slices, check_for_cheaters)
-    // );
 }
