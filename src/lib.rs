@@ -16,7 +16,7 @@ mod error;
 mod fancy;
 mod garble;
 pub mod informer;
-mod parser;
+// mod parser;
 pub mod util;
 mod wire;
 
