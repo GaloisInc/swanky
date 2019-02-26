@@ -99,9 +99,9 @@ impl<
     }
 
     fn evaluator_input(&self, _ix: Option<SyncIndex>, q: u16) -> Wire {
-        let ℓ = (q as f32).log(2.0).ceil() as u16;
+        let len = (q as f32).log(2.0).ceil() as u16;
         let input = self.inputs.lock().unwrap().remove(0);
-        let bs = (0..ℓ)
+        let bs = (0..len)
             .into_iter()
             .map(|i| input & (1 << i) != 0)
             .collect::<Vec<bool>>();
@@ -110,26 +110,25 @@ impl<
     }
 
     fn evaluator_inputs(&self, _ix: Option<SyncIndex>, qs: &[u16]) -> Vec<Wire> {
-        println!("Evaluator: evaluator_inputs");
-        let ℓs = qs
+        let lens = qs
             .into_iter()
             .map(|q| (*q as f32).log(2.0).ceil() as usize)
             .collect::<Vec<usize>>();
-        let mut bs = Vec::with_capacity(ℓs.iter().sum());
-        for ℓ in ℓs.iter() {
+        let mut bs = Vec::with_capacity(lens.iter().sum());
+        for len in lens.iter() {
             let input = self.inputs.lock().unwrap().remove(0);
-            for b in (0..*ℓ).into_iter().map(|i| input & (1 << i) != 0) {
+            for b in (0..*len).into_iter().map(|i| input & (1 << i) != 0) {
                 bs.push(b);
             }
         }
         let wires = self.run_ot(&bs);
         let mut start = 0;
-        ℓs.into_iter()
+        lens.into_iter()
             .zip(qs.into_iter())
-            .map(|(ℓ, q)| {
-                let range = start..start + ℓ;
+            .map(|(len, q)| {
+                let range = start..start + len;
                 let chunk = &wires[range];
-                start = start + ℓ;
+                start = start + len;
                 combine(chunk, *q)
             })
             .collect::<Vec<Wire>>()

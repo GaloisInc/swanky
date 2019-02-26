@@ -2,17 +2,25 @@
 name = "twopac"
 version = "0.1.0"
 authors = ["Alex J. Malozemoff <amaloz@galois.com>"]
+license = "MIT"
+readme = "README.md"
+description = "A library for secure two-party computation"
+categories = ["cryptography"]
+keywords = ["cryptography", "secure-computation", "2PC"]
 edition = "2018"
 
 [lib]
 
+[features]
+nightly = ["rand/nightly", "scuttlebutt/nightly"]
+
 [dependencies]
 failure = "*"
-fancy_garbling = { git = "https://github.com/spaceships/fancy-garbling" }
 # fancy_garbling = { path = "../fancy-garbling" }
+fancy_garbling = { git = "https://github.com/spaceships/fancy-garbling" }
 ocelot = { path = "../ocelot" }
-scuttlebutt = { path = "../scuttlebutt" }
 rand = "*"
+scuttlebutt = { path = "../scuttlebutt" }
 
 [dev-dependencies]
 # crossbeam = "*"

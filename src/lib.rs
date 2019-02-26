@@ -10,8 +10,7 @@
 //!
 //! **THIS IS VERY MUCH RESEARCH CODE!** (for now)
 
-#![feature(non_ascii_idents)]
-#![feature(test)]
+#![cfg_attr(feature = "nightly", feature(test))]
 
 mod comm;
 mod evaluator;

@@ -82,14 +82,14 @@ impl<
     }
 }
 
-fn _evaluator_input(δ: &Wire, q: u16) -> (Wire, Vec<(Block, Block)>) {
-    let ℓ = (q as f32).log(2.0).ceil() as u16;
+fn _evaluator_input(delta: &Wire, q: u16) -> (Wire, Vec<(Block, Block)>) {
+    let len = (q as f32).log(2.0).ceil() as u16;
     let mut wire = Wire::zero(q);
-    let inputs = (0..ℓ)
+    let inputs = (0..len)
         .into_iter()
         .map(|i| {
             let zero = Wire::rand(&mut rand::thread_rng(), q);
-            let one = zero.plus(&δ);
+            let one = zero.plus(&delta);
             wire = wire.plus(&zero.cmul(1 << i));
             (super::wire_to_block(zero), super::wire_to_block(one))
         })
@@ -111,20 +111,20 @@ impl<
     }
 
     fn evaluator_input(&self, _ix: Option<SyncIndex>, q: u16) -> Wire {
-        let δ = self.garbler.delta(q);
-        let (wire, inputs) = _evaluator_input(&δ, q);
+        let delta = self.garbler.delta(q);
+        let (wire, inputs) = _evaluator_input(&delta, q);
         self.run_ot(&inputs);
         wire
     }
 
     fn evaluator_inputs(&self, _ix: Option<SyncIndex>, qs: &[u16]) -> Vec<Wire> {
         let n = qs.len();
-        let ℓs = qs.into_iter().map(|q| (*q as f32).log(2.0).ceil() as usize);
+        let lens = qs.into_iter().map(|q| (*q as f32).log(2.0).ceil() as usize);
         let mut wires = Vec::with_capacity(n);
-        let mut inputs = Vec::with_capacity(ℓs.sum());
+        let mut inputs = Vec::with_capacity(lens.sum());
         for q in qs.into_iter() {
-            let δ = self.garbler.delta(*q);
-            let (wire, input) = _evaluator_input(&δ, *q);
+            let delta = self.garbler.delta(*q);
+            let (wire, input) = _evaluator_input(&delta, *q);
             wires.push(wire);
             for i in input.into_iter() {
                 inputs.push(i);
