@@ -263,22 +263,6 @@ impl Wire {
     pub fn hashback(&self, tweak: u128, new_mod: u16) -> Wire {
         Self::from_u128(self.hash(tweak), new_mod)
     }
-
-    /// Compute the hash of two wires together.
-    ///
-    /// Uses fixed-key AES.
-    #[inline]
-    pub fn hash2(&self, other: &Wire, tweak: u128) -> u128 {
-        AES.hash2(tweak, self.as_u128(), other.as_u128())
-    }
-
-    /// Compute the hash of two wires together, converting the result back to a wire.
-    ///
-    /// Uses fixed-key AES.
-    #[inline]
-    pub fn hashback2(&self, other: &Wire, tweak: u128, new_modulus: u16) -> Wire {
-        Self::from_u128(self.hash2(other, tweak), new_modulus)
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////

@@ -35,31 +35,10 @@ pub const AES: Aes = Aes {
 };
 
 impl Aes {
-    // #[inline]
-    // pub fn new(key: u128) -> Self {
-    //     let key_bytes = util::u128_to_bytes(key);
-    //     Self::from_bytes(key_bytes)
-    // }
-
-    // #[inline]
-    // pub fn from_bytes(key_bytes: [u8;16]) -> Self {
-    //     let mut round_keys = [0u8; 176];
-    //     unsafe {
-    //         aesni_setup_round_key_128(key_bytes.as_ptr(), round_keys.as_mut_ptr());
-    //     }
-    //     Aes { round_keys }
-    // }
-
     #[inline]
     pub fn hash(&self, t: u128, x: u128) -> u128 {
         let y = poly_double(x ^ t);
         self.eval_u128(y) ^ y
-    }
-
-    #[inline]
-    pub fn hash2(&self, t: u128, x: u128, y: u128) -> u128 {
-        let z = x ^ poly_double(y);
-        self.hash(t, z)
     }
 
     #[inline]
