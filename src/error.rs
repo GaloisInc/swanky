@@ -5,7 +5,8 @@ use std::fmt::{self, Display, Formatter};
 pub enum FancyError {
     UnequalModuli { xmod: u16, ymod: u16 },
     NotImplemented,
-    NotEnoughArgs { nargs: usize, needed: usize },
+    NotEnoughArgs { got: usize, needed: usize },
+    InvalidArgMod { got: u16,   needed: u16 },
     NoTruthTable,
     InvalidTruthTable,
     IndexRequired,
@@ -44,11 +45,14 @@ impl Display for FancyError {
                 write!(f, "unequal moduli: {} and {}", xmod, ymod)
             }
             FancyError::NotImplemented { name } => "not implemented".fmt(f),
-            FancyError::NotEnoughArgs { nargs, needed } => write!(
+            FancyError::NotEnoughArgs { got, needed } => write!(
                 f,
                 "not enough args: need at least {} but got {}",
-                nargs, needed
+                got, needed
             ),
+            FancyError::InvalidArgMod { got, needed } => {
+                write!(f, "invalid mod: got mod {} but require mod {}", got, needed)
+            }
             FancyError::NoTruthTable => "truth table required".fmt(f),
             FancyError::InvalidTruthTable => "invalid truth table".fmt(f),
             FancyError::IndexRequired => "sync index required in sync mode".fmt(f),

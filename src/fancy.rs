@@ -119,16 +119,14 @@ pub trait Fancy {
     ///
     /// Optional, throws `FancyError::NotImplemented` if used without an implementation.
     fn begin_sync(&self, _num_indices: SyncIndex) -> Result<()> {
-        Err(FancyError::NotImplemented { name: "begin_sync" })
+        Err(FancyError::NotImplemented)
     }
 
     /// Declare this index to be done.
     ///
     /// Optional, throws `FancyError::NotImplemented` if used without an implementation.
     fn finish_index(&self, _ix: SyncIndex) -> Result<()> {
-        Err(FancyError::NotImplemented {
-            name: "finish_index",
-        })
+        Err(FancyError::NotImplemented)
     }
 
     ////////////////////////////////////////////////////////////////////////////////
@@ -157,8 +155,7 @@ pub trait Fancy {
     fn add_many(&self, args: &[Self::Item]) -> Result<Self::Item> {
         if args.len() < 2 {
             return Err(FancyError::NotEnoughArgs {
-                name: "add_many",
-                nargs: args.len(),
+                got: args.len(),
                 needed: 2,
             });
         }
@@ -170,52 +167,75 @@ pub trait Fancy {
     }
 
     /// Xor is just addition, with the requirement that `x` and `y` are mod 2.
-    fn xor(&self, x: &Self::Item, y: &Self::Item) -> Self::Item {
-        assert!(x.modulus() == 2 && y.modulus() == 2);
+    fn xor(&self, x: &Self::Item, y: &Self::Item) -> Result<Self::Item> {
+        if x.modulus() != 2 {
+            return Err(FancyError::InvalidArgMod { got: x.modulus(), needed: 2 });
+        }
+        if y.modulus() != 2 {
+            return Err(FancyError::InvalidArgMod { got: y.modulus(), needed: 2 });
+        }
         self.add(x, y)
     }
 
     /// Negate by xoring `x` with `1`.
-    fn negate(&self, ix: Option<SyncIndex>, x: &Self::Item) -> Self::Item {
-        assert_eq!(x.modulus(), 2);
-        let one = self.constant(ix, 1, 2);
+    fn negate(&self, ix: Option<SyncIndex>, x: &Self::Item) -> Result<Self::Item> {
+        if x.modulus() != 2 {
+            return Err(FancyError::InvalidArgMod { got: x.modulus(), needed: 2 });
+        }
+        let one = self.constant(ix, 1, 2)?;
         self.xor(x, &one)
     }
 
     /// And is just multiplication, with the requirement that `x` and `y` are mod 2.
-    fn and(&self, ix: Option<SyncIndex>, x: &Self::Item, y: &Self::Item) -> Self::Item {
-        assert!(x.modulus() == 2 && y.modulus() == 2);
+    fn and(&self, ix: Option<SyncIndex>, x: &Self::Item, y: &Self::Item) -> Result<Self::Item> {
+        if x.modulus() != 2 {
+            return Err(FancyError::InvalidArgMod { got: x.modulus(), needed: 2 });
+        }
+        if y.modulus() != 2 {
+            return Err(FancyError::InvalidArgMod { got: y.modulus(), needed: 2 });
+        }
         self.mul(ix, x, y)
     }
 
     /// Or uses Demorgan's Rule implemented with multiplication and negation.
-    fn or(&self, ix: Option<SyncIndex>, x: &Self::Item, y: &Self::Item) -> Self::Item {
-        assert!(x.modulus() == 2 && y.modulus() == 2);
-        let notx = self.negate(ix, x);
-        let noty = self.negate(ix, y);
-        let z = self.and(ix, &notx, &noty);
+    fn or(&self, ix: Option<SyncIndex>, x: &Self::Item, y: &Self::Item) -> Result<Self::Item> {
+        if x.modulus() != 2 {
+            return Err(FancyError::InvalidArgMod { got: x.modulus(), needed: 2 });
+        }
+        if y.modulus() != 2 {
+            return Err(FancyError::InvalidArgMod { got: y.modulus(), needed: 2 });
+        }
+        let notx = self.negate(ix, x)?;
+        let noty = self.negate(ix, y)?;
+        let z = self.and(ix, &notx, &noty)?;
         self.negate(ix, &z)
     }
 
     /// Returns 1 if all wires equal 1.
-    fn and_many(&self, ix: Option<SyncIndex>, args: &[Self::Item]) -> Self::Item {
+    fn and_many(&self, ix: Option<SyncIndex>, args: &[Self::Item]) -> Result<Self::Item> {
+        if args.len() < 2 {
+            return Err(FancyError::NotEnoughArgs { got: args.len(), needed: 2 });
+        }
         args.iter()
             .skip(1)
-            .fold(args[0].clone(), |acc, x| self.and(ix, &acc, x))
+            .fold(Ok(args[0].clone()), |acc, x| self.and(ix, &(acc?), x))
     }
 
     /// Returns 1 if any wire equals 1.
-    fn or_many(&self, ix: Option<SyncIndex>, args: &[Self::Item]) -> Self::Item {
+    fn or_many(&self, ix: Option<SyncIndex>, args: &[Self::Item]) -> Result<Self::Item> {
+        if args.len() < 2 {
+            return Err(FancyError::NotEnoughArgs { got: args.len(), needed: 2 });
+        }
         args.iter()
             .skip(1)
-            .fold(args[0].clone(), |acc, x| self.or(ix, &acc, x))
+            .fold(Ok(args[0].clone()), |acc, x| self.or(ix, &(acc?), x))
     }
 
     /// Change the modulus of `x` to `to_modulus` using a projection gate.
-    fn mod_change(&self, ix: Option<SyncIndex>, x: &Self::Item, to_modulus: u16) -> Self::Item {
+    fn mod_change(&self, ix: Option<SyncIndex>, x: &Self::Item, to_modulus: u16) -> Result<Self::Item> {
         let from_modulus = x.modulus();
         if from_modulus == to_modulus {
-            return x.clone();
+            return Ok(x.clone());
         }
         let tab = (0..from_modulus).map(|x| x % to_modulus).collect_vec();
         self.proj(ix, x, to_modulus, Some(tab))
@@ -228,19 +248,24 @@ pub trait Fancy {
         x: &Self::Item,
         y: &Self::Item,
         carry_in: Option<&Self::Item>,
-    ) -> (Self::Item, Self::Item) {
-        assert!(x.modulus() == 2 && y.modulus() == 2);
+    ) -> Result<(Self::Item, Self::Item)> {
+        if x.modulus() != 2 {
+            return Err(FancyError::InvalidArgMod { got: x.modulus(), needed: 2 });
+        }
+        if y.modulus() != 2 {
+            return Err(FancyError::InvalidArgMod { got: y.modulus(), needed: 2 });
+        }
         if let Some(c) = carry_in {
-            let z1 = self.xor(x, y);
-            let z2 = self.xor(&z1, c);
-            let z3 = self.xor(x, c);
-            let z4 = self.and(ix, &z1, &z3);
-            let carry = self.xor(&z4, x);
-            (z2, carry)
+            let z1 = self.xor(x, y)?;
+            let z2 = self.xor(&z1, c)?;
+            let z3 = self.xor(x, c)?;
+            let z4 = self.and(ix, &z1, &z3)?;
+            let carry = self.xor(&z4, x)?;
+            Ok((z2, carry))
         } else {
-            let z = self.xor(x, y);
-            let carry = self.and(ix, x, y);
-            (z, carry)
+            let z = self.xor(x, y)?;
+            let carry = self.and(ix, x, y)?;
+            Ok((z, carry))
         }
     }
 
@@ -251,10 +276,10 @@ pub trait Fancy {
         b: &Self::Item,
         x: &Self::Item,
         y: &Self::Item,
-    ) -> Self::Item {
-        let notb = self.negate(ix, b);
-        let xsel = self.and(ix, &notb, x);
-        let ysel = self.and(ix, b, y);
+    ) -> Result<Self::Item> {
+        let notb = self.negate(ix, b)?;
+        let xsel = self.and(ix, &notb, x)?;
+        let ysel = self.and(ix, b, y)?;
         self.add(&xsel, &ysel)
     }
 
@@ -265,10 +290,12 @@ pub trait Fancy {
         x: &Self::Item,
         b1: bool,
         b2: bool,
-    ) -> Self::Item {
-        assert!(x.modulus() == 2);
+    ) -> Result<Self::Item> {
+        if x.modulus() != 2 {
+            return Err(FancyError::InvalidArgMod { got: x.modulus(), needed: 2 });
+        }
         if !b1 && b2 {
-            x.clone()
+            Ok(x.clone())
         } else if b1 && !b2 {
             self.negate(ix, x)
         } else if !b1 && !b2 {
@@ -279,10 +306,11 @@ pub trait Fancy {
     }
 
     /// Output a slice of wires.
-    fn outputs(&self, ix: Option<SyncIndex>, xs: &[Self::Item]) {
+    fn outputs(&self, ix: Option<SyncIndex>, xs: &[Self::Item]) -> Result<()> {
         for x in xs.iter() {
-            self.output(ix, x);
+            self.output(ix, x)?;
         }
+        Ok(())
     }
 }
 
