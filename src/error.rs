@@ -111,7 +111,7 @@ impl Display for EvaluatorError {
 ////////////////////////////////////////////////////////////////////////////////
 // standard library stuff
 
-impl <T> From<std::sync::PoisonError<T>> for FancyError {
+impl<T> From<std::sync::PoisonError<T>> for FancyError {
     fn from(e: std::sync::PoisonError<T>) -> FancyError {
         FancyError::LockError(Box::new(e))
     }

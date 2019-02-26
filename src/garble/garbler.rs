@@ -5,7 +5,7 @@ use std::ops::DerefMut;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex, RwLock};
 
-use crate::fancy::{Fancy, HasModulus, SyncIndex, Result};
+use crate::fancy::{Fancy, HasModulus, Result, SyncIndex};
 use crate::util::{output_tweak, tweak, tweak2, RngExt};
 use crate::wire::Wire;
 
@@ -287,7 +287,13 @@ impl Fancy for Garbler {
         X.plus_mov(&Y)
     }
 
-    fn proj(&self, ix: Option<SyncIndex>, A: &Wire, q_out: u16, tt: Option<Vec<u16>>) -> Result<Wire> {
+    fn proj(
+        &self,
+        ix: Option<SyncIndex>,
+        A: &Wire,
+        q_out: u16,
+        tt: Option<Vec<u16>>,
+    ) -> Result<Wire> {
         //
         let tt = tt.expect("garbler.proj requires truth table");
 

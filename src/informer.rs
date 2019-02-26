@@ -6,7 +6,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 
 use crate::error::FancyError;
-use crate::fancy::{Fancy, HasModulus, SyncIndex, Result};
+use crate::fancy::{Fancy, HasModulus, Result, SyncIndex};
 
 /// Implements Fancy. Use to learn information about a fancy computation in a lightweight
 /// way.
