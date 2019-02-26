@@ -225,11 +225,11 @@ impl Fancy for Evaluator {
         x.minus(y)
     }
 
-    fn cmul(&self, x: &Wire, c: u16) -> Wire {
+    fn cmul(&self, x: &Wire, c: u16) -> Result<Wire> {
         x.cmul(c)
     }
 
-    fn mul(&self, ix: Option<SyncIndex>, A: &Wire, B: &Wire) -> Wire {
+    fn mul(&self, ix: Option<SyncIndex>, A: &Wire, B: &Wire) -> Result<Wire> {
         if A.modulus() < A.modulus() {
             return self.mul(ix, B, A);
         }
@@ -271,7 +271,7 @@ impl Fancy for Evaluator {
         L.plus_mov(&R.plus_mov(&A.cmul(new_b_color)))
     }
 
-    fn proj(&self, ix: Option<SyncIndex>, x: &Wire, q: u16, _tt: Option<Vec<u16>>) -> Wire {
+    fn proj(&self, ix: Option<SyncIndex>, x: &Wire, q: u16, _tt: Option<Vec<u16>>) -> Result<Wire> {
         let gate = match self.recv(ix) {
             Message::GarbledGate(g) => g,
             m => panic!("Expected message GarbledGate but got {}", m),
@@ -289,7 +289,7 @@ impl Fancy for Evaluator {
         }
     }
 
-    fn output(&self, ix: Option<SyncIndex>, x: &Wire) {
+    fn output(&self, ix: Option<SyncIndex>, x: &Wire) -> Result<()> {
         match self.recv(ix) {
             Message::OutputCiphertext(c) => {
                 assert_eq!(c.len() as u16, x.modulus());
@@ -300,12 +300,12 @@ impl Fancy for Evaluator {
         self.output_wires.lock().unwrap().push(x.clone());
     }
 
-    fn begin_sync(&self, num_indices: SyncIndex) {
-        self.internal_begin_sync(num_indices);
+    fn begin_sync(&self, num_indices: SyncIndex) -> Result<()> {
+        self.internal_begin_sync(num_indices)
     }
 
-    fn finish_index(&self, index: SyncIndex) {
-        self.internal_finish_index(index);
+    fn finish_index(&self, index: SyncIndex) -> Result<()> {
+        self.internal_finish_index(index)
     }
 }
 

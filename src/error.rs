@@ -11,6 +11,7 @@ pub enum FancyError {
     IndexRequired,
     IndexOutOfBounds,
     IndexUsedOUtOfSync,
+    LockError(Box<Error>),
     ClientError(Box<Error>),
 }
 
@@ -104,5 +105,14 @@ impl Display for EvaluatorError {
                 write!(f, "expected message {} but got {}", expected, got)
             }
         }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// standard library stuff
+
+impl <T> From<std::sync::PoisonError<T>> for FancyError {
+    fn from(e: std::sync::PoisonError<T>) -> FancyError {
+        FancyError::LockError(Box::new(e))
     }
 }

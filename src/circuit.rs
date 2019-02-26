@@ -213,7 +213,7 @@ impl Fancy for CircuitBuilder {
             id: self.get_next_garbler_input_id(),
         };
         let r = self.gate(gate, modulus);
-        self.circ.lock().unwrap().garbler_input_refs.push(r);
+        self.circ.lock()?.garbler_input_refs.push(r);
         Ok(r)
     }
 
@@ -222,19 +222,19 @@ impl Fancy for CircuitBuilder {
             id: self.get_next_evaluator_input_id(),
         };
         let r = self.gate(gate, modulus);
-        self.circ.lock().unwrap().evaluator_input_refs.push(r);
+        self.circ.lock()?.evaluator_input_refs.push(r);
         Ok(r)
     }
 
     fn constant(&self, _ix: Option<SyncIndex>, val: u16, modulus: u16) -> Result<CircuitRef> {
-        let mut map = self.const_map.lock().unwrap();
+        let mut map = self.const_map.lock()?;
         match map.get(&(val, modulus)) {
             Some(&r) => Ok(r),
             None => {
                 let gate = Gate::Constant { val };
                 let r = self.gate(gate, modulus);
                 map.insert((val, modulus), r);
-                self.circ.lock().unwrap().const_refs.push(r);
+                self.circ.lock()?.const_refs.push(r);
                 Ok(r)
             }
         }
@@ -257,7 +257,6 @@ impl Fancy for CircuitBuilder {
     fn sub(&self, xref: &CircuitRef, yref: &CircuitRef) -> Result<CircuitRef> {
         if xref.modulus() != yref.modulus() {
             return Err(FancyError::UnequalModuli {
-                name: "sub gate",
                 xmod: xref.modulus(),
                 ymod: yref.modulus(),
             });
@@ -280,7 +279,7 @@ impl Fancy for CircuitBuilder {
         output_modulus: u16,
         tt: Option<Vec<u16>>,
     ) -> Result<CircuitRef> {
-        let tt = tt.unwrap_or_else(|| return Err(FancyError::NoTruthTable));
+        let tt = tt.ok_or(FancyError::NoTruthTable)?;
         if tt.len() < xref.modulus() as usize || !tt.iter().all(|&x| x < output_modulus) {
             return Err(FancyError::InvalidTruthTable);
         }
@@ -289,7 +288,7 @@ impl Fancy for CircuitBuilder {
             tt: tt.to_vec(),
             id: self.get_next_ciphertext_id(),
         };
-        self.gate(gate, output_modulus)
+        Ok(self.gate(gate, output_modulus))
     }
 
     fn mul(
@@ -312,7 +311,7 @@ impl Fancy for CircuitBuilder {
     }
 
     fn output(&self, _ix: Option<SyncIndex>, xref: &CircuitRef) -> Result<()> {
-        Ok(self.circ.lock().unwrap().output_refs.push(xref.clone()));
+        Ok(self.circ.lock()?.output_refs.push(xref.clone()))
     }
 }
 
