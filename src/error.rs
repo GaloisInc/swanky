@@ -3,10 +3,12 @@ use std::fmt::{self, Display, Formatter};
 
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub enum FancyError {
-    UnequalModuli { xmod: u16, ymod: u16 },
+    UnequalModuli,
     NotImplemented,
-    NotEnoughArgs { got: usize, needed: usize },
-    InvalidArgMod { got: u16,   needed: u16 },
+    InvalidArg { desc: String },
+    InvalidArgNum { got: usize, needed: usize },
+    InvalidArgMod { got: u16, needed: u16 },
+    ArgNotBinary,
     NoTruthTable,
     InvalidTruthTable,
     IndexRequired,
@@ -45,14 +47,16 @@ impl Display for FancyError {
                 write!(f, "unequal moduli: {} and {}", xmod, ymod)
             }
             FancyError::NotImplemented { name } => "not implemented".fmt(f),
-            FancyError::NotEnoughArgs { got, needed } => write!(
+            FancyError::InvalidArg { desc } => write!(f, "invalid argument: {}", desc),
+            FancyError::InvalidArgNum { got, needed } => write!(
                 f,
-                "not enough args: need at least {} but got {}",
+                "invalid number of args: needed {} but got {}",
                 got, needed
             ),
             FancyError::InvalidArgMod { got, needed } => {
                 write!(f, "invalid mod: got mod {} but require mod {}", got, needed)
             }
+            FancyError::ArgNotBinary => "argument bundle must be boolean",
             FancyError::NoTruthTable => "truth table required".fmt(f),
             FancyError::InvalidTruthTable => "invalid truth table".fmt(f),
             FancyError::IndexRequired => "sync index required in sync mode".fmt(f),
