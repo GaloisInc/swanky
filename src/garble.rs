@@ -4,7 +4,6 @@ use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 
 use std::collections::HashMap;
-use std::fmt::{Debug, Display};
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 
@@ -202,7 +201,7 @@ pub fn garble(c: &Circuit) -> Result<(Encoder, Decoder, GarbledCircuit), FancyEr
         }
 
         for r in c.output_refs.iter() {
-            garbler.output(None, &wires[r.ix]);
+            garbler.output(None, &wires[r.ix])?;
         }
 
         deltas = garbler.get_deltas();
@@ -338,7 +337,7 @@ mod classic {
             } else {
                 z = b.cmul(&x, 1).unwrap();
             }
-            b.output(None, &z);
+            b.output(None, &z).unwrap();
             b.finish()
         });
     }
@@ -533,6 +532,7 @@ mod streaming {
     use crate::util::RngExt;
     use itertools::Itertools;
     use rand::thread_rng;
+    use std::fmt::{Debug, Display};
 
     // helper {{{
     fn streaming_test<F, G>(

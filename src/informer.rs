@@ -201,7 +201,7 @@ impl Fancy for Informer {
         _opt_x: Option<u16>,
     ) -> Result<InformerVal, FancyError<InformerError>> {
         self.garbler_input_moduli.lock().unwrap().push(modulus);
-        InformerVal(modulus)
+        Ok(InformerVal(modulus))
     }
 
     fn evaluator_input(
@@ -210,7 +210,7 @@ impl Fancy for Informer {
         modulus: u16,
     ) -> Result<InformerVal, FancyError<InformerError>> {
         self.evaluator_input_moduli.lock().unwrap().push(modulus);
-        InformerVal(modulus)
+        Ok(InformerVal(modulus))
     }
 
     fn constant(
@@ -220,7 +220,7 @@ impl Fancy for Informer {
         modulus: u16,
     ) -> Result<InformerVal, FancyError<InformerError>> {
         self.constants.lock().unwrap().insert((val, modulus));
-        InformerVal(modulus)
+        Ok(InformerVal(modulus))
     }
 
     fn add(
@@ -229,11 +229,7 @@ impl Fancy for Informer {
         y: &InformerVal,
     ) -> Result<InformerVal, FancyError<InformerError>> {
         if x.modulus() != y.modulus() {
-            return Err(FancyError::UnequalModuli {
-                name: "add gate",
-                xmod: x.modulus(),
-                ymod: y.modulus(),
-            });
+            Err(FancyError::UnequalModuli)?;
         }
         self.nadds.fetch_add(1, Ordering::SeqCst);
         Ok(InformerVal(x.modulus()))
@@ -244,14 +240,16 @@ impl Fancy for Informer {
         x: &InformerVal,
         y: &InformerVal,
     ) -> Result<InformerVal, FancyError<InformerError>> {
-        assert!(x.modulus() == y.modulus());
+        if x.modulus() != y.modulus() {
+            Err(FancyError::UnequalModuli)?;
+        }
         self.nsubs.fetch_add(1, Ordering::SeqCst);
-        InformerVal(x.modulus())
+        Ok(InformerVal(x.modulus()))
     }
 
     fn cmul(&self, x: &InformerVal, _c: u16) -> Result<InformerVal, FancyError<InformerError>> {
         self.ncmuls.fetch_add(1, Ordering::SeqCst);
-        InformerVal(x.modulus())
+        Ok(InformerVal(x.modulus()))
     }
 
     fn mul(
@@ -272,7 +270,7 @@ impl Fancy for Informer {
             // there is an extra ciphertext to support nonequal inputs
             self.nciphertexts.fetch_add(1, Ordering::SeqCst);
         }
-        InformerVal(x.modulus())
+        Ok(InformerVal(x.modulus()))
     }
 
     fn proj(
@@ -285,7 +283,7 @@ impl Fancy for Informer {
         self.nprojs.fetch_add(1, Ordering::SeqCst);
         self.nciphertexts
             .fetch_add(x.modulus() as usize - 1, Ordering::SeqCst);
-        InformerVal(modulus)
+        Ok(InformerVal(modulus))
     }
 
     fn output(
@@ -294,6 +292,7 @@ impl Fancy for Informer {
         x: &InformerVal,
     ) -> Result<(), FancyError<InformerError>> {
         self.outputs.lock().unwrap().push(x.modulus());
+        Ok(())
     }
 }
 

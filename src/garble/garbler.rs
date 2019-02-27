@@ -147,7 +147,7 @@ impl Fancy for Garbler {
                 delta: d,
             },
         );
-        w
+        Ok(w)
     }
 
     fn constant(
@@ -165,19 +165,19 @@ impl Fancy for Garbler {
                 wire: wire,
             },
         );
-        zero
+        Ok(zero)
     }
 
     fn add(&self, x: &Wire, y: &Wire) -> Result<Wire, FancyError<GarblerError>> {
-        x.plus(y)
+        Ok(x.plus(y))
     }
 
     fn sub(&self, x: &Wire, y: &Wire) -> Result<Wire, FancyError<GarblerError>> {
-        x.minus(y)
+        Ok(x.minus(y))
     }
 
     fn cmul(&self, x: &Wire, c: u16) -> Result<Wire, FancyError<GarblerError>> {
-        x.cmul(c)
+        Ok(x.cmul(c))
     }
 
     fn mul(
@@ -305,7 +305,7 @@ impl Fancy for Garbler {
         let gate = gate.into_iter().map(Option::unwrap).collect();
         self.send(ix, Message::GarbledGate(gate));
 
-        X.plus_mov(&Y)
+        Ok(X.plus_mov(&Y))
     }
 
     fn proj(
@@ -371,7 +371,7 @@ impl Fancy for Garbler {
         let gate = gate.into_iter().map(Option::unwrap).collect();
         self.send(ix, Message::GarbledGate(gate));
 
-        C
+        Ok(C)
     }
 
     fn output(&self, ix: Option<SyncIndex>, X: &Wire) -> Result<(), FancyError<GarblerError>> {
@@ -384,14 +384,17 @@ impl Fancy for Garbler {
             cts.push(X.plus(&D.cmul(k)).hash(t));
         }
         self.send(ix, Message::OutputCiphertext(cts));
+        Ok(())
     }
 
     fn begin_sync(&self, num_indices: SyncIndex) -> Result<(), FancyError<GarblerError>> {
         self.internal_begin_sync(num_indices);
+        Ok(())
     }
 
     fn finish_index(&self, index: SyncIndex) -> Result<(), FancyError<GarblerError>> {
         self.internal_finish_index(index);
+        Ok(())
     }
 }
 

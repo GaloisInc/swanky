@@ -156,7 +156,7 @@ impl Fancy for Dummy {
 
     fn mul(
         &self,
-        ix: Option<SyncIndex>,
+        _ix: Option<SyncIndex>,
         x: &DummyVal,
         y: &DummyVal,
     ) -> Result<DummyVal, FancyError<DummyError>> {

@@ -1061,18 +1061,20 @@ pub trait BundleGadgets: Fancy {
             });
         }
         xs.iter().skip(1).fold(Ok(xs[0].clone()), |x, y| {
-            let pos = self.lt(ix, &(x?), y, accuracy)?;
-            let neg = self.negate(ix, &pos)?;
-            x?.wires()
-                .iter()
-                .zip(y.wires().iter())
-                .map(|(x, y)| {
-                    let xp = self.mul(ix, x, &neg)?;
-                    let yp = self.mul(ix, y, &pos)?;
-                    self.add(&xp, &yp)
-                })
-                .collect::<Result<Vec<Self::Item>, FancyError<Self::Error>>>()
-                .map(Bundle)
+            x.map(|x| {
+                let pos = self.lt(ix, &x, y, accuracy)?;
+                let neg = self.negate(ix, &pos)?;
+                x.wires()
+                    .iter()
+                    .zip(y.wires().iter())
+                    .map(|(x, y)| {
+                        let xp = self.mul(ix, x, &neg)?;
+                        let yp = self.mul(ix, y, &pos)?;
+                        self.add(&xp, &yp)
+                    })
+                    .collect::<Result<Vec<Self::Item>, FancyError<Self::Error>>>()
+                    .map(Bundle)
+            })?
         })
     }
 
