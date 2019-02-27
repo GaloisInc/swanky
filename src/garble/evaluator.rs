@@ -10,7 +10,7 @@ use std::sync::{Arc, Mutex, RwLock};
 
 use crate::circuit::{Circuit, Gate};
 use crate::error::{EvaluatorError, FancyError};
-use crate::fancy::{Fancy, HasModulus, Result, SyncIndex};
+use crate::fancy::{Fancy, HasModulus, SyncIndex};
 use crate::util::{output_tweak, tweak2};
 use crate::wire::Wire;
 
@@ -172,8 +172,9 @@ fn start_postman(
 
 impl Fancy for Evaluator {
     type Item = Wire;
+    type Error = EvaluatorError;
 
-    fn garbler_input(&self, ix: Option<SyncIndex>, q: u16, _opt_x: Option<u16>) -> Result<Wire> {
+    fn garbler_input(&self, ix: Option<SyncIndex>, q: u16, _opt_x: Option<u16>) -> Result<Wire, FancyError<EvaluatorError>> {
         match self.recv(ix) {
             Message::GarblerInput(w) => {
                 if w.modulus() != q {
@@ -191,7 +192,7 @@ impl Fancy for Evaluator {
         }
     }
 
-    fn evaluator_input(&self, ix: Option<SyncIndex>, q: u16) -> Result<Wire> {
+    fn evaluator_input(&self, ix: Option<SyncIndex>, q: u16) -> Result<Wire, FancyError<EvaluatorError>> {
         match self.recv(ix) {
             Message::EvaluatorInput(w) => {
                 return Err(EvaluatorError::InvalidMessage {
@@ -207,7 +208,7 @@ impl Fancy for Evaluator {
         }
     }
 
-    fn constant(&self, ix: Option<SyncIndex>, _x: u16, _q: u16) -> Result<Wire> {
+    fn constant(&self, ix: Option<SyncIndex>, _x: u16, _q: u16) -> Result<Wire, FancyError<EvaluatorError>> {
         match self.recv(ix) {
             Message::Constant { wire, .. } => wire,
             m => Err(EvaluatorError::InvalidMessage {
@@ -217,19 +218,19 @@ impl Fancy for Evaluator {
         }
     }
 
-    fn add(&self, x: &Wire, y: &Wire) -> Result<Wire> {
+    fn add(&self, x: &Wire, y: &Wire) -> Result<Wire, FancyError<EvaluatorError>> {
         x.plus(y)
     }
 
-    fn sub(&self, x: &Wire, y: &Wire) -> Result<Wire> {
+    fn sub(&self, x: &Wire, y: &Wire) -> Result<Wire, FancyError<EvaluatorError>> {
         x.minus(y)
     }
 
-    fn cmul(&self, x: &Wire, c: u16) -> Result<Wire> {
+    fn cmul(&self, x: &Wire, c: u16) -> Result<Wire, FancyError<EvaluatorError>> {
         x.cmul(c)
     }
 
-    fn mul(&self, ix: Option<SyncIndex>, A: &Wire, B: &Wire) -> Result<Wire> {
+    fn mul(&self, ix: Option<SyncIndex>, A: &Wire, B: &Wire) -> Result<Wire, FancyError<EvaluatorError>> {
         if A.modulus() < A.modulus() {
             return self.mul(ix, B, A);
         }
@@ -271,7 +272,7 @@ impl Fancy for Evaluator {
         L.plus_mov(&R.plus_mov(&A.cmul(new_b_color)))
     }
 
-    fn proj(&self, ix: Option<SyncIndex>, x: &Wire, q: u16, _tt: Option<Vec<u16>>) -> Result<Wire> {
+    fn proj(&self, ix: Option<SyncIndex>, x: &Wire, q: u16, _tt: Option<Vec<u16>>) -> Result<Wire, FancyError<EvaluatorError>> {
         let gate = match self.recv(ix) {
             Message::GarbledGate(g) => g,
             m => panic!("Expected message GarbledGate but got {}", m),
@@ -289,7 +290,7 @@ impl Fancy for Evaluator {
         }
     }
 
-    fn output(&self, ix: Option<SyncIndex>, x: &Wire) -> Result<()> {
+    fn output(&self, ix: Option<SyncIndex>, x: &Wire) -> Result<(), FancyError<EvaluatorError>> {
         match self.recv(ix) {
             Message::OutputCiphertext(c) => {
                 assert_eq!(c.len() as u16, x.modulus());
@@ -300,11 +301,11 @@ impl Fancy for Evaluator {
         self.output_wires.lock().unwrap().push(x.clone());
     }
 
-    fn begin_sync(&self, num_indices: SyncIndex) -> Result<()> {
+    fn begin_sync(&self, num_indices: SyncIndex) -> Result<(), FancyError<EvaluatorError>> {
         self.internal_begin_sync(num_indices)
     }
 
-    fn finish_index(&self, index: SyncIndex) -> Result<()> {
+    fn finish_index(&self, index: SyncIndex) -> Result<(), FancyError<EvaluatorError>> {
         self.internal_finish_index(index)
     }
 }

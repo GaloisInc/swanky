@@ -7,8 +7,8 @@ use std::collections::HashMap;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 
-use crate::error::FancyError;
-use crate::fancy::{Fancy, HasModulus, Result, SyncIndex};
+use crate::error::{FancyError, CircuitBuilderError};
+use crate::fancy::{Fancy, HasModulus, SyncIndex};
 
 /// The index and modulus of a gate in a circuit.
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
@@ -202,45 +202,46 @@ pub struct CircuitBuilder {
 
 impl Fancy for CircuitBuilder {
     type Item = CircuitRef;
+    type Error = CircuitBuilderError;
 
     fn garbler_input(
         &self,
         _ix: Option<SyncIndex>,
         modulus: u16,
         _opt_x: Option<u16>,
-    ) -> Result<CircuitRef> {
+    ) -> Result<CircuitRef, FancyError<CircuitBuilderError>> {
         let gate = Gate::GarblerInput {
             id: self.get_next_garbler_input_id(),
         };
         let r = self.gate(gate, modulus);
-        self.circ.lock()?.garbler_input_refs.push(r);
+        self.circ.lock().unwrap().garbler_input_refs.push(r);
         Ok(r)
     }
 
-    fn evaluator_input(&self, _ix: Option<SyncIndex>, modulus: u16) -> Result<CircuitRef> {
+    fn evaluator_input(&self, _ix: Option<SyncIndex>, modulus: u16) -> Result<CircuitRef, FancyError<CircuitBuilderError>> {
         let gate = Gate::EvaluatorInput {
             id: self.get_next_evaluator_input_id(),
         };
         let r = self.gate(gate, modulus);
-        self.circ.lock()?.evaluator_input_refs.push(r);
+        self.circ.lock().unwrap().evaluator_input_refs.push(r);
         Ok(r)
     }
 
-    fn constant(&self, _ix: Option<SyncIndex>, val: u16, modulus: u16) -> Result<CircuitRef> {
-        let mut map = self.const_map.lock()?;
+    fn constant(&self, _ix: Option<SyncIndex>, val: u16, modulus: u16) -> Result<CircuitRef, FancyError<CircuitBuilderError>> {
+        let mut map = self.const_map.lock().unwrap();
         match map.get(&(val, modulus)) {
             Some(&r) => Ok(r),
             None => {
                 let gate = Gate::Constant { val };
                 let r = self.gate(gate, modulus);
                 map.insert((val, modulus), r);
-                self.circ.lock()?.const_refs.push(r);
+                self.circ.lock().unwrap().const_refs.push(r);
                 Ok(r)
             }
         }
     }
 
-    fn add(&self, xref: &CircuitRef, yref: &CircuitRef) -> Result<CircuitRef> {
+    fn add(&self, xref: &CircuitRef, yref: &CircuitRef) -> Result<CircuitRef, FancyError<CircuitBuilderError>> {
         if xref.modulus() != yref.modulus() {
             return Err(FancyError::UnequalModuli);
         }
@@ -251,7 +252,7 @@ impl Fancy for CircuitBuilder {
         Ok(self.gate(gate, xref.modulus()))
     }
 
-    fn sub(&self, xref: &CircuitRef, yref: &CircuitRef) -> Result<CircuitRef> {
+    fn sub(&self, xref: &CircuitRef, yref: &CircuitRef) -> Result<CircuitRef, FancyError<CircuitBuilderError>> {
         if xref.modulus() != yref.modulus() {
             return Err(FancyError::UnequalModuli);
         }
@@ -262,7 +263,7 @@ impl Fancy for CircuitBuilder {
         Ok(self.gate(gate, xref.modulus()))
     }
 
-    fn cmul(&self, xref: &CircuitRef, c: u16) -> Result<CircuitRef> {
+    fn cmul(&self, xref: &CircuitRef, c: u16) -> Result<CircuitRef, FancyError<CircuitBuilderError>> {
         Ok(self.gate(Gate::Cmul { xref: *xref, c }, xref.modulus()))
     }
 
@@ -272,7 +273,7 @@ impl Fancy for CircuitBuilder {
         xref: &CircuitRef,
         output_modulus: u16,
         tt: Option<Vec<u16>>,
-    ) -> Result<CircuitRef> {
+    ) -> Result<CircuitRef, FancyError<CircuitBuilderError>> {
         let tt = tt.ok_or(FancyError::NoTruthTable)?;
         if tt.len() < xref.modulus() as usize || !tt.iter().all(|&x| x < output_modulus) {
             return Err(FancyError::InvalidTruthTable);
@@ -290,7 +291,7 @@ impl Fancy for CircuitBuilder {
         ix: Option<SyncIndex>,
         xref: &CircuitRef,
         yref: &CircuitRef,
-    ) -> Result<CircuitRef> {
+    ) -> Result<CircuitRef, FancyError<CircuitBuilderError>> {
         if xref.modulus() < yref.modulus() {
             return self.mul(ix, yref, xref);
         }
@@ -304,8 +305,8 @@ impl Fancy for CircuitBuilder {
         Ok(self.gate(gate, xref.modulus()))
     }
 
-    fn output(&self, _ix: Option<SyncIndex>, xref: &CircuitRef) -> Result<()> {
-        Ok(self.circ.lock()?.output_refs.push(xref.clone()))
+    fn output(&self, _ix: Option<SyncIndex>, xref: &CircuitRef) -> Result<(), FancyError<CircuitBuilderError>> {
+        Ok(self.circ.lock().unwrap().output_refs.push(xref.clone()))
     }
 }
 

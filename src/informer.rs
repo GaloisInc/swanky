@@ -5,8 +5,8 @@ use std::collections::HashSet;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 
-use crate::error::FancyError;
-use crate::fancy::{Fancy, HasModulus, Result, SyncIndex};
+use crate::error::{FancyError, InformerError};
+use crate::fancy::{Fancy, HasModulus, SyncIndex};
 
 /// Implements Fancy. Use to learn information about a fancy computation in a lightweight
 /// way.
@@ -192,28 +192,29 @@ impl Informer {
 
 impl Fancy for Informer {
     type Item = InformerVal;
+    type Error = InformerError;
 
     fn garbler_input(
         &self,
         _ix: Option<SyncIndex>,
         modulus: u16,
         _opt_x: Option<u16>,
-    ) -> Result<InformerVal> {
+    ) -> Result<InformerVal, FancyError<InformerError>> {
         self.garbler_input_moduli.lock().unwrap().push(modulus);
         InformerVal(modulus)
     }
 
-    fn evaluator_input(&self, _ix: Option<SyncIndex>, modulus: u16) -> Result<InformerVal> {
+    fn evaluator_input(&self, _ix: Option<SyncIndex>, modulus: u16) -> Result<InformerVal, FancyError<InformerError>> {
         self.evaluator_input_moduli.lock().unwrap().push(modulus);
         InformerVal(modulus)
     }
 
-    fn constant(&self, _ix: Option<SyncIndex>, val: u16, modulus: u16) -> Result<InformerVal> {
+    fn constant(&self, _ix: Option<SyncIndex>, val: u16, modulus: u16) -> Result<InformerVal, FancyError<InformerError>> {
         self.constants.lock().unwrap().insert((val, modulus));
         InformerVal(modulus)
     }
 
-    fn add(&self, x: &InformerVal, y: &InformerVal) -> Result<InformerVal> {
+    fn add(&self, x: &InformerVal, y: &InformerVal) -> Result<InformerVal, FancyError<InformerError>> {
         if x.modulus() != y.modulus() {
             return Err(FancyError::UnequalModuli {
                 name: "add gate",
@@ -225,18 +226,18 @@ impl Fancy for Informer {
         Ok(InformerVal(x.modulus()))
     }
 
-    fn sub(&self, x: &InformerVal, y: &InformerVal) -> Result<InformerVal> {
+    fn sub(&self, x: &InformerVal, y: &InformerVal) -> Result<InformerVal, FancyError<InformerError>> {
         assert!(x.modulus() == y.modulus());
         self.nsubs.fetch_add(1, Ordering::SeqCst);
         InformerVal(x.modulus())
     }
 
-    fn cmul(&self, x: &InformerVal, _c: u16) -> Result<InformerVal> {
+    fn cmul(&self, x: &InformerVal, _c: u16) -> Result<InformerVal, FancyError<InformerError>> {
         self.ncmuls.fetch_add(1, Ordering::SeqCst);
         InformerVal(x.modulus())
     }
 
-    fn mul(&self, ix: Option<SyncIndex>, x: &InformerVal, y: &InformerVal) -> Result<InformerVal> {
+    fn mul(&self, ix: Option<SyncIndex>, x: &InformerVal, y: &InformerVal) -> Result<InformerVal, FancyError<InformerError>> {
         if x.modulus() < y.modulus() {
             return self.mul(ix, y, x);
         }
@@ -258,14 +259,14 @@ impl Fancy for Informer {
         x: &InformerVal,
         modulus: u16,
         _tt: Option<Vec<u16>>,
-    ) -> Result<InformerVal> {
+    ) -> Result<InformerVal, FancyError<InformerError>> {
         self.nprojs.fetch_add(1, Ordering::SeqCst);
         self.nciphertexts
             .fetch_add(x.modulus() as usize - 1, Ordering::SeqCst);
         InformerVal(modulus)
     }
 
-    fn output(&self, _ix: Option<SyncIndex>, x: &InformerVal) -> Result<()> {
+    fn output(&self, _ix: Option<SyncIndex>, x: &InformerVal) -> Result<(), FancyError<InformerError>> {
         self.outputs.lock().unwrap().push(x.modulus());
     }
 }

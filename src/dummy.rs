@@ -13,7 +13,7 @@ use std::sync::{
 };
 
 use crate::error::{DummyError, FancyError};
-use crate::fancy::{Fancy, HasModulus, Result, SyncIndex};
+use crate::fancy::{Fancy, HasModulus, SyncIndex};
 
 /// Simple struct that performs the fancy computation over u16.
 pub struct Dummy {
@@ -74,38 +74,24 @@ impl Dummy {
 }
 
 impl Fancy for Dummy {
-    type Item = DummyVal;
+    type Item  = DummyVal;
+    type Error = DummyError;
 
     fn garbler_input(
         &self,
         ix: Option<SyncIndex>,
         modulus: u16,
         opt_x: Option<u16>,
-    ) -> Result<DummyVal> {
+    ) -> Result<DummyVal, FancyError<DummyError>> {
         let res = if let Some(val) = opt_x {
             DummyVal { val, modulus }
         } else if self.in_sync() {
-            let ix = ix.unwrap_or_else(|| return Err(FancyError::IndexRequired));
+            let ix = ix.ok_or(FancyError::IndexRequired)?;
             self.request(ix, Request::GarblerInput(modulus))
         } else {
             let mut inps = self.garbler_inputs.lock().unwrap();
             if inps.len() == 0 {
-                return Err(DummyError::NotEnoughGarblerInputs);
-            }
-            let val = inps.remove(0);
-            DummyVal { val, modulus }
-        };
-        Ok(res);
-    }
-
-    fn evaluator_input(&self, ix: Option<SyncIndex>, modulus: u16) -> Result<DummyVal> {
-        let res = if self.in_sync() {
-            let ix = ix.unwrap_or_else(|| return Err(FancyError::IndexRequired));
-            self.request(ix, Request::EvaluatorInput(modulus))
-        } else {
-            let mut inps = self.evaluator_inputs.lock().unwrap();
-            if inps.len() == 0 {
-                return Err(DummyError::NotEnoughEvaluatorInputs);
+                return Err(FancyError::from(DummyError::NotEnoughGarblerInputs));
             }
             let val = inps.remove(0);
             DummyVal { val, modulus }
@@ -113,16 +99,28 @@ impl Fancy for Dummy {
         Ok(res)
     }
 
-    fn constant(&self, _ix: Option<SyncIndex>, val: u16, modulus: u16) -> Result<DummyVal> {
+    fn evaluator_input(&self, ix: Option<SyncIndex>, modulus: u16) -> Result<DummyVal, FancyError<DummyError>> {
+        let res = if self.in_sync() {
+            let ix = ix.ok_or(FancyError::IndexRequired)?;
+            self.request(ix, Request::EvaluatorInput(modulus))
+        } else {
+            let mut inps = self.evaluator_inputs.lock().unwrap();
+            if inps.len() == 0 {
+                return Err(FancyError::from(DummyError::NotEnoughEvaluatorInputs));
+            }
+            let val = inps.remove(0);
+            DummyVal { val, modulus }
+        };
+        Ok(res)
+    }
+
+    fn constant(&self, _ix: Option<SyncIndex>, val: u16, modulus: u16) -> Result<DummyVal, FancyError<DummyError>> {
         Ok(DummyVal { val, modulus })
     }
 
-    fn add(&self, x: &DummyVal, y: &DummyVal) -> Result<DummyVal> {
+    fn add(&self, x: &DummyVal, y: &DummyVal) -> Result<DummyVal, FancyError<DummyError>> {
         if x.modulus() != y.modulus() {
-            return Err(FancyError::UnequalModuli {
-                xmod: x.modulus(),
-                ymod: y.modulus(),
-            });
+            return Err(FancyError::UnequalModuli);
         }
         Ok(DummyVal {
             val: (x.val + y.val) % x.modulus,
@@ -130,12 +128,9 @@ impl Fancy for Dummy {
         })
     }
 
-    fn sub(&self, x: &DummyVal, y: &DummyVal) -> Result<DummyVal> {
+    fn sub(&self, x: &DummyVal, y: &DummyVal) -> Result<DummyVal, FancyError<DummyError>> {
         if x.modulus() != y.modulus() {
-            return Err(FancyError::UnequalModuli {
-                xmod: x.modulus(),
-                ymod: y.modulus(),
-            });
+            return Err(FancyError::UnequalModuli);
         }
         Ok(DummyVal {
             val: (x.modulus + x.val - y.val) % x.modulus,
@@ -143,14 +138,14 @@ impl Fancy for Dummy {
         })
     }
 
-    fn cmul(&self, x: &DummyVal, c: u16) -> Result<DummyVal> {
+    fn cmul(&self, x: &DummyVal, c: u16) -> Result<DummyVal, FancyError<DummyError>> {
         Ok(DummyVal {
             val: (x.val * c) % x.modulus,
             modulus: x.modulus,
         })
     }
 
-    fn mul(&self, ix: Option<SyncIndex>, x: &DummyVal, y: &DummyVal) -> Result<DummyVal> {
+    fn mul(&self, ix: Option<SyncIndex>, x: &DummyVal, y: &DummyVal) -> Result<DummyVal, FancyError<DummyError>> {
         Ok(DummyVal {
             val: x.val * y.val % x.modulus,
             modulus: x.modulus,
@@ -163,8 +158,8 @@ impl Fancy for Dummy {
         x: &DummyVal,
         modulus: u16,
         tt: Option<Vec<u16>>,
-    ) -> Result<DummyVal> {
-        let tt = tt.unwrap_or_else(|| return Err(FancyError::NoTruthTable));
+    ) -> Result<DummyVal, FancyError<DummyError>> {
+        let tt = tt.ok_or(FancyError::NoTruthTable)?;
         if tt.len() < x.modulus() as usize || !tt.iter().all(|&x| x < modulus) {
             return Err(FancyError::InvalidTruthTable);
         }
@@ -172,11 +167,11 @@ impl Fancy for Dummy {
         Ok(DummyVal { val, modulus })
     }
 
-    fn output(&self, _ix: Option<SyncIndex>, x: &DummyVal) -> Result<()> {
-        Ok(self.outputs.lock().unwrap().push(x.val));
+    fn output(&self, _ix: Option<SyncIndex>, x: &DummyVal) -> Result<(), FancyError<DummyError>> {
+        Ok(self.outputs.lock().unwrap().push(x.val))
     }
 
-    fn begin_sync(&self, num_indices: SyncIndex) -> Result<()> {
+    fn begin_sync(&self, num_indices: SyncIndex) -> Result<(), FancyError<DummyError>> {
         *self.requests.write().unwrap() =
             Some((0..num_indices).map(|_| SegQueue::new()).collect_vec());
         *self.index_done.write().unwrap() = Some(
@@ -196,14 +191,12 @@ impl Fancy for Dummy {
         Ok(())
     }
 
-    fn finish_index(&self, index: SyncIndex) -> Result<()> {
+    fn finish_index(&self, index: SyncIndex) -> Result<(), FancyError<DummyError>> {
         if self.in_sync() {
             let mut cleanup = false;
             {
                 let done = self.index_done.read().unwrap();
-                let done = done
-                    .as_ref()
-                    .unwrap_or_else(|| return Err(FancyError::IndexUsedOUtOfSync));
+                let done = done.as_ref().ok_or(FancyError::IndexUsedOutOfSync)?;
                 if index as usize >= done.len() {
                     return Err(FancyError::IndexOutOfBounds);
                 }
@@ -289,10 +282,10 @@ mod bundle {
             let y = rng.gen_u128() % q;
             let d = Dummy::new(&crt_factor(x, q), &crt_factor(y, q));
             {
-                let x = d.garbler_input_bundle_crt(None, q, None);
-                let y = d.evaluator_input_bundle_crt(None, q);
-                let z = d.add_bundles(&x, &y);
-                d.output_bundle(None, &z);
+                let x = d.garbler_input_bundle_crt(None, q, None).unwrap();
+                let y = d.evaluator_input_bundle_crt(None, q).unwrap();
+                let z = d.add_bundles(&x, &y).unwrap();
+                d.output_bundle(None, &z).unwrap();
             }
             let z = crt_inv_factor(&d.get_output(), q);
             assert_eq!(z, (x + y) % q);
@@ -308,10 +301,10 @@ mod bundle {
             let y = rng.gen_u128() % q;
             let d = Dummy::new(&crt_factor(x, q), &crt_factor(y, q));
             {
-                let x = d.garbler_input_bundle_crt(None, q, None);
-                let y = d.evaluator_input_bundle_crt(None, q);
-                let z = d.sub_bundles(&x, &y);
-                d.output_bundle(None, &z);
+                let x = d.garbler_input_bundle_crt(None, q, None).unwrap();
+                let y = d.evaluator_input_bundle_crt(None, q).unwrap();
+                let z = d.sub_bundles(&x, &y).unwrap();
+                d.output_bundle(None, &z).unwrap();
             }
             let z = crt_inv_factor(&d.get_output(), q);
             assert_eq!(z, (x + q - y) % q);
@@ -328,9 +321,9 @@ mod bundle {
             let c = 1 + rng.gen_u128() % q;
             let d = Dummy::new(&util::u128_to_bits(x, nbits), &[]);
             {
-                let x = d.garbler_input_bundle(None, &vec![2; nbits], None);
-                let z = d.binary_cmul(None, &x, c, nbits);
-                d.output_bundle(None, &z);
+                let x = d.garbler_input_bundle(None, &vec![2; nbits], None).unwrap();
+                let z = d.binary_cmul(None, &x, c, nbits).unwrap();
+                d.output_bundle(None, &z).unwrap();
             }
             let z = util::u128_from_bits(&d.get_output());
             assert_eq!(z, (x * c) % q);
@@ -347,10 +340,10 @@ mod bundle {
             let y = rng.gen_u128() % q;
             let d = Dummy::new(&util::u128_to_bits(x, nbits), &util::u128_to_bits(y, nbits));
             {
-                let x = d.garbler_input_bundle_binary(None, nbits, None);
-                let y = d.evaluator_input_bundle_binary(None, nbits);
-                let z = d.binary_multiplication_lower_half(None, &x, &y);
-                d.output_bundle(None, &z);
+                let x = d.garbler_input_bundle_binary(None, nbits, None).unwrap();
+                let y = d.evaluator_input_bundle_binary(None, nbits).unwrap();
+                let z = d.binary_multiplication_lower_half(None, &x, &y).unwrap();
+                d.output_bundle(None, &z).unwrap();
             }
             let z = util::u128_from_bits(&d.get_output());
             assert_eq!(z, (x * y) & (q - 1));
@@ -371,9 +364,9 @@ mod bundle {
                 .collect_vec();
             let d = Dummy::new(&enc_inps, &[]);
             {
-                let xs = d.garbler_input_bundles_crt(None, q, n, None);
-                let z = d.max(None, &xs, "100%");
-                d.output_bundle(None, &z);
+                let xs = d.garbler_input_bundles_crt(None, q, n, None).unwrap();
+                let z = d.max(None, &xs, "100%").unwrap();
+                d.output_bundle(None, &z).unwrap();
             }
             let z = crt_inv_factor(&d.get_output(), q);
             assert_eq!(z, should_be);
@@ -395,9 +388,11 @@ mod bundle {
                 .collect_vec();
             let d = Dummy::new(&enc_inps, &[]);
             {
-                let xs = d.garbler_input_bundles(None, &vec![2; nbits], n, None);
-                let z = d.max(None, &xs, "100%");
-                d.output_bundle(None, &z);
+                let xs = d
+                    .garbler_input_bundles(None, &vec![2; nbits], n, None)
+                    .unwrap();
+                let z = d.max(None, &xs, "100%").unwrap();
+                d.output_bundle(None, &z).unwrap();
             }
             let z = util::u128_from_bits(&d.get_output());
             assert_eq!(z, should_be);
@@ -412,9 +407,9 @@ mod bundle {
             let x = rng.gen_u128() % q;
             let d = Dummy::new(&crt_factor(x, q), &[]);
             {
-                let x = d.garbler_input_bundle_crt(None, q, None);
-                let z = d.relu(None, &x, "100%", None);
-                d.output_bundle(None, &z);
+                let x = d.garbler_input_bundle_crt(None, q, None).unwrap();
+                let z = d.relu(None, &x, "100%", None).unwrap();
+                d.output_bundle(None, &z).unwrap();
             }
             let z = crt_inv_factor(&d.get_output(), q);
             if x >= q / 2 {
@@ -434,9 +429,9 @@ mod bundle {
             let x = rng.gen_u128() % q;
             let d = Dummy::new(&util::u128_to_bits(x, nbits), &[]);
             {
-                let x = d.garbler_input_bundle_binary(None, nbits, None);
-                let z = d.abs(None, &x);
-                d.output_bundle(None, &z);
+                let x = d.garbler_input_bundle_binary(None, nbits, None).unwrap();
+                let z = d.abs(None, &x).unwrap();
+                d.output_bundle(None, &z).unwrap();
             }
             let z = util::u128_from_bits(&d.get_output());
             let should_be = if x >> (nbits - 1) > 0 {
@@ -465,9 +460,9 @@ mod bundle {
             }
 
             let b = Dummy::new(&ds, &[]);
-            let xs = b.garbler_input_bundles(None, &mods, nargs, None);
-            let z = b.mixed_radix_addition_msb_only(None, &xs);
-            b.output(None, &z);
+            let xs = b.garbler_input_bundles(None, &mods, nargs, None).unwrap();
+            let z = b.mixed_radix_addition_msb_only(None, &xs).unwrap();
+            b.output(None, &z).unwrap();
             let res = b.get_output()[0];
 
             let should_be = *util::as_mixed_radix((Q - 1) * (nargs as u128) % Q, &mods)
@@ -486,9 +481,9 @@ mod bundle {
                 }
 
                 let b = Dummy::new(&ds, &[]);
-                let xs = b.garbler_input_bundles(None, &mods, nargs, None);
-                let z = b.mixed_radix_addition_msb_only(None, &xs);
-                b.output(None, &z);
+                let xs = b.garbler_input_bundles(None, &mods, nargs, None).unwrap();
+                let z = b.mixed_radix_addition_msb_only(None, &xs).unwrap();
+                b.output(None, &z).unwrap();
                 let res = b.get_output()[0];
 
                 let should_be = *util::as_mixed_radix(sum, &mods).last().unwrap();

@@ -5,9 +5,10 @@ use std::ops::DerefMut;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex, RwLock};
 
-use crate::fancy::{Fancy, HasModulus, Result, SyncIndex};
+use crate::fancy::{Fancy, HasModulus, SyncIndex};
 use crate::util::{output_tweak, tweak, tweak2, RngExt};
 use crate::wire::Wire;
+use crate::error::{FancyError, GarblerError};
 
 use super::{Message, SyncInfo};
 
@@ -107,8 +108,9 @@ impl Garbler {
 
 impl Fancy for Garbler {
     type Item = Wire;
+    type Error = GarblerError;
 
-    fn garbler_input(&self, ix: Option<SyncIndex>, q: u16, opt_x: Option<u16>) -> Result<Wire> {
+    fn garbler_input(&self, ix: Option<SyncIndex>, q: u16, opt_x: Option<u16>) -> Result<Wire, FancyError<GarblerError>> {
         let w = Wire::rand(&mut rand::thread_rng(), q);
         let d = self.delta(q);
         if let Some(x) = opt_x {
@@ -126,7 +128,7 @@ impl Fancy for Garbler {
         w
     }
 
-    fn evaluator_input(&self, ix: Option<SyncIndex>, q: u16) -> Result<Wire> {
+    fn evaluator_input(&self, ix: Option<SyncIndex>, q: u16) -> Result<Wire, FancyError<GarblerError>> {
         let w = Wire::rand(&mut rand::thread_rng(), q);
         let d = self.delta(q);
         self.send(
@@ -139,7 +141,7 @@ impl Fancy for Garbler {
         w
     }
 
-    fn constant(&self, ix: Option<SyncIndex>, x: u16, q: u16) -> Result<Wire> {
+    fn constant(&self, ix: Option<SyncIndex>, x: u16, q: u16) -> Result<Wire, FancyError<GarblerError>> {
         let zero = Wire::rand(&mut rand::thread_rng(), q);
         let wire = zero.plus(&self.delta(q).cmul_eq(x));
         self.send(
@@ -152,19 +154,19 @@ impl Fancy for Garbler {
         zero
     }
 
-    fn add(&self, x: &Wire, y: &Wire) -> Result<Wire> {
+    fn add(&self, x: &Wire, y: &Wire) -> Result<Wire, FancyError<GarblerError>> {
         x.plus(y)
     }
 
-    fn sub(&self, x: &Wire, y: &Wire) -> Result<Wire> {
+    fn sub(&self, x: &Wire, y: &Wire) -> Result<Wire, FancyError<GarblerError>> {
         x.minus(y)
     }
 
-    fn cmul(&self, x: &Wire, c: u16) -> Result<Wire> {
+    fn cmul(&self, x: &Wire, c: u16) -> Result<Wire, FancyError<GarblerError>> {
         x.cmul(c)
     }
 
-    fn mul(&self, ix: Option<SyncIndex>, A: &Wire, B: &Wire) -> Result<Wire> {
+    fn mul(&self, ix: Option<SyncIndex>, A: &Wire, B: &Wire) -> Result<Wire, FancyError<GarblerError>> {
         if A.modulus() < A.modulus() {
             return self.mul(ix, B, A);
         }
@@ -293,7 +295,7 @@ impl Fancy for Garbler {
         A: &Wire,
         q_out: u16,
         tt: Option<Vec<u16>>,
-    ) -> Result<Wire> {
+    ) -> Result<Wire, FancyError<GarblerError>> {
         //
         let tt = tt.expect("garbler.proj requires truth table");
 
@@ -353,7 +355,7 @@ impl Fancy for Garbler {
         C
     }
 
-    fn output(&self, ix: Option<SyncIndex>, X: &Wire) -> Result<()> {
+    fn output(&self, ix: Option<SyncIndex>, X: &Wire) -> Result<(), FancyError<GarblerError>> {
         let mut cts = Vec::new();
         let q = X.modulus();
         let i = self.current_output();
@@ -365,11 +367,11 @@ impl Fancy for Garbler {
         self.send(ix, Message::OutputCiphertext(cts));
     }
 
-    fn begin_sync(&self, num_indices: SyncIndex) -> Result<()> {
+    fn begin_sync(&self, num_indices: SyncIndex) -> Result<(), FancyError<GarblerError>> {
         self.internal_begin_sync(num_indices);
     }
 
-    fn finish_index(&self, index: SyncIndex) -> Result<()> {
+    fn finish_index(&self, index: SyncIndex) -> Result<(), FancyError<GarblerError>> {
         self.internal_finish_index(index);
     }
 }
