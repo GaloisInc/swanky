@@ -5,10 +5,10 @@ use std::ops::DerefMut;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex, RwLock};
 
+use crate::error::{FancyError, GarblerError};
 use crate::fancy::{Fancy, HasModulus, SyncIndex};
 use crate::util::{output_tweak, tweak, tweak2, RngExt};
 use crate::wire::Wire;
-use crate::error::{FancyError, GarblerError};
 
 use super::{Message, SyncInfo};
 
@@ -110,7 +110,12 @@ impl Fancy for Garbler {
     type Item = Wire;
     type Error = GarblerError;
 
-    fn garbler_input(&self, ix: Option<SyncIndex>, q: u16, opt_x: Option<u16>) -> Result<Wire, FancyError<GarblerError>> {
+    fn garbler_input(
+        &self,
+        ix: Option<SyncIndex>,
+        q: u16,
+        opt_x: Option<u16>,
+    ) -> Result<Wire, FancyError<GarblerError>> {
         let w = Wire::rand(&mut rand::thread_rng(), q);
         let d = self.delta(q);
         if let Some(x) = opt_x {
@@ -125,10 +130,14 @@ impl Fancy for Garbler {
                 },
             );
         }
-        w
+        Ok(w)
     }
 
-    fn evaluator_input(&self, ix: Option<SyncIndex>, q: u16) -> Result<Wire, FancyError<GarblerError>> {
+    fn evaluator_input(
+        &self,
+        ix: Option<SyncIndex>,
+        q: u16,
+    ) -> Result<Wire, FancyError<GarblerError>> {
         let w = Wire::rand(&mut rand::thread_rng(), q);
         let d = self.delta(q);
         self.send(
@@ -141,7 +150,12 @@ impl Fancy for Garbler {
         w
     }
 
-    fn constant(&self, ix: Option<SyncIndex>, x: u16, q: u16) -> Result<Wire, FancyError<GarblerError>> {
+    fn constant(
+        &self,
+        ix: Option<SyncIndex>,
+        x: u16,
+        q: u16,
+    ) -> Result<Wire, FancyError<GarblerError>> {
         let zero = Wire::rand(&mut rand::thread_rng(), q);
         let wire = zero.plus(&self.delta(q).cmul_eq(x));
         self.send(
@@ -166,7 +180,12 @@ impl Fancy for Garbler {
         x.cmul(c)
     }
 
-    fn mul(&self, ix: Option<SyncIndex>, A: &Wire, B: &Wire) -> Result<Wire, FancyError<GarblerError>> {
+    fn mul(
+        &self,
+        ix: Option<SyncIndex>,
+        A: &Wire,
+        B: &Wire,
+    ) -> Result<Wire, FancyError<GarblerError>> {
         if A.modulus() < A.modulus() {
             return self.mul(ix, B, A);
         }

@@ -74,7 +74,7 @@ impl Dummy {
 }
 
 impl Fancy for Dummy {
-    type Item  = DummyVal;
+    type Item = DummyVal;
     type Error = DummyError;
 
     fn garbler_input(
@@ -99,7 +99,11 @@ impl Fancy for Dummy {
         Ok(res)
     }
 
-    fn evaluator_input(&self, ix: Option<SyncIndex>, modulus: u16) -> Result<DummyVal, FancyError<DummyError>> {
+    fn evaluator_input(
+        &self,
+        ix: Option<SyncIndex>,
+        modulus: u16,
+    ) -> Result<DummyVal, FancyError<DummyError>> {
         let res = if self.in_sync() {
             let ix = ix.ok_or(FancyError::IndexRequired)?;
             self.request(ix, Request::EvaluatorInput(modulus))
@@ -114,7 +118,12 @@ impl Fancy for Dummy {
         Ok(res)
     }
 
-    fn constant(&self, _ix: Option<SyncIndex>, val: u16, modulus: u16) -> Result<DummyVal, FancyError<DummyError>> {
+    fn constant(
+        &self,
+        _ix: Option<SyncIndex>,
+        val: u16,
+        modulus: u16,
+    ) -> Result<DummyVal, FancyError<DummyError>> {
         Ok(DummyVal { val, modulus })
     }
 
@@ -145,7 +154,12 @@ impl Fancy for Dummy {
         })
     }
 
-    fn mul(&self, ix: Option<SyncIndex>, x: &DummyVal, y: &DummyVal) -> Result<DummyVal, FancyError<DummyError>> {
+    fn mul(
+        &self,
+        ix: Option<SyncIndex>,
+        x: &DummyVal,
+        y: &DummyVal,
+    ) -> Result<DummyVal, FancyError<DummyError>> {
         Ok(DummyVal {
             val: x.val * y.val % x.modulus,
             modulus: x.modulus,

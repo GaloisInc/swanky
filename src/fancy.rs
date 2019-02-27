@@ -426,7 +426,8 @@ pub trait BundleGadgets: Fancy {
         ix: Option<SyncIndex>,
         ps: &[u16],
     ) -> Result<Bundle<Self::Item>, FancyError<Self::Error>> {
-        ps.iter().map(|&p| self.evaluator_input(ix, p))
+        ps.iter()
+            .map(|&p| self.evaluator_input(ix, p))
             .collect::<Result<Vec<Self::Item>, FancyError<Self::Error>>>()
             .map(Bundle)
     }
@@ -1062,8 +1063,7 @@ pub trait BundleGadgets: Fancy {
         xs.iter().skip(1).fold(Ok(xs[0].clone()), |x, y| {
             let pos = self.lt(ix, &(x?), y, accuracy)?;
             let neg = self.negate(ix, &pos)?;
-            x?
-                .wires()
+            x?.wires()
                 .iter()
                 .zip(y.wires().iter())
                 .map(|(x, y)| {
@@ -1148,20 +1148,18 @@ pub trait BundleGadgets: Fancy {
         let xwires = xs.wires();
         let ywires = ys.wires();
 
-        let mut sum =
-            xwires
-                .iter()
-                .map(|x| self.and(ix, x, &ywires[0]))
-                .collect::<Result<Vec<Self::Item>, FancyError<Self::Error>>>()
-                .map(Bundle)?;
+        let mut sum = xwires
+            .iter()
+            .map(|x| self.and(ix, x, &ywires[0]))
+            .collect::<Result<Vec<Self::Item>, FancyError<Self::Error>>>()
+            .map(Bundle)?;
 
         for i in 1..xwires.len() {
-            let mul =
-                xwires
-                    .iter()
-                    .map(|x| self.and(ix, x, &ywires[i]))
-                    .collect::<Result<Vec<Self::Item>, FancyError<Self::Error>>>()
-                    .map(Bundle)?;
+            let mul = xwires
+                .iter()
+                .map(|x| self.and(ix, x, &ywires[i]))
+                .collect::<Result<Vec<Self::Item>, FancyError<Self::Error>>>()
+                .map(Bundle)?;
             let shifted = self.shift(ix, &mul, i)?;
             sum = self.binary_addition_no_carry(ix, &sum, &shifted)?;
         }

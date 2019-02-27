@@ -204,17 +204,30 @@ impl Fancy for Informer {
         InformerVal(modulus)
     }
 
-    fn evaluator_input(&self, _ix: Option<SyncIndex>, modulus: u16) -> Result<InformerVal, FancyError<InformerError>> {
+    fn evaluator_input(
+        &self,
+        _ix: Option<SyncIndex>,
+        modulus: u16,
+    ) -> Result<InformerVal, FancyError<InformerError>> {
         self.evaluator_input_moduli.lock().unwrap().push(modulus);
         InformerVal(modulus)
     }
 
-    fn constant(&self, _ix: Option<SyncIndex>, val: u16, modulus: u16) -> Result<InformerVal, FancyError<InformerError>> {
+    fn constant(
+        &self,
+        _ix: Option<SyncIndex>,
+        val: u16,
+        modulus: u16,
+    ) -> Result<InformerVal, FancyError<InformerError>> {
         self.constants.lock().unwrap().insert((val, modulus));
         InformerVal(modulus)
     }
 
-    fn add(&self, x: &InformerVal, y: &InformerVal) -> Result<InformerVal, FancyError<InformerError>> {
+    fn add(
+        &self,
+        x: &InformerVal,
+        y: &InformerVal,
+    ) -> Result<InformerVal, FancyError<InformerError>> {
         if x.modulus() != y.modulus() {
             return Err(FancyError::UnequalModuli {
                 name: "add gate",
@@ -226,7 +239,11 @@ impl Fancy for Informer {
         Ok(InformerVal(x.modulus()))
     }
 
-    fn sub(&self, x: &InformerVal, y: &InformerVal) -> Result<InformerVal, FancyError<InformerError>> {
+    fn sub(
+        &self,
+        x: &InformerVal,
+        y: &InformerVal,
+    ) -> Result<InformerVal, FancyError<InformerError>> {
         assert!(x.modulus() == y.modulus());
         self.nsubs.fetch_add(1, Ordering::SeqCst);
         InformerVal(x.modulus())
@@ -237,7 +254,12 @@ impl Fancy for Informer {
         InformerVal(x.modulus())
     }
 
-    fn mul(&self, ix: Option<SyncIndex>, x: &InformerVal, y: &InformerVal) -> Result<InformerVal, FancyError<InformerError>> {
+    fn mul(
+        &self,
+        ix: Option<SyncIndex>,
+        x: &InformerVal,
+        y: &InformerVal,
+    ) -> Result<InformerVal, FancyError<InformerError>> {
         if x.modulus() < y.modulus() {
             return self.mul(ix, y, x);
         }
@@ -266,7 +288,11 @@ impl Fancy for Informer {
         InformerVal(modulus)
     }
 
-    fn output(&self, _ix: Option<SyncIndex>, x: &InformerVal) -> Result<(), FancyError<InformerError>> {
+    fn output(
+        &self,
+        _ix: Option<SyncIndex>,
+        x: &InformerVal,
+    ) -> Result<(), FancyError<InformerError>> {
         self.outputs.lock().unwrap().push(x.modulus());
     }
 }

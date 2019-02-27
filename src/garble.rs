@@ -4,14 +4,14 @@ use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 
 use std::collections::HashMap;
+use std::fmt::{Debug, Display};
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
-use std::fmt::{Debug, Display};
 
 use crate::circuit::{Circuit, Gate};
+use crate::error::{FancyError, GarblerError};
 use crate::fancy::{Fancy, HasModulus, SyncIndex};
 use crate::wire::Wire;
-use crate::error::{FancyError, GarblerError};
 
 mod evaluator;
 mod garbler;
@@ -266,7 +266,7 @@ mod classic {
                     .map(|i| rng.gen_u16() % c.evaluator_input_mod(i))
                     .collect_vec();
                 let xs = &en.encode_evaluator_inputs(&inps);
-                let ys = &ev.eval(c, &[], xs);
+                let ys = &ev.eval(c, &[], xs).unwrap();
                 let decoded = de.decode(ys)[0];
                 let should_be = c.eval(&[], &inps)[0];
                 if decoded != should_be {
@@ -419,7 +419,7 @@ mod classic {
                 for y in 0..ymod {
                     println!("TEST x={} y={}", x, y);
                     let xs = &en.encode_evaluator_inputs(&[x, y]);
-                    let ys = &ev.eval(&c, &[], xs);
+                    let ys = &ev.eval(&c, &[], xs).unwrap();
                     let decoded = de.decode(ys)[0];
                     let should_be = c.eval(&[], &[x, y])[0];
                     if decoded != should_be {
@@ -471,7 +471,7 @@ mod classic {
                 ds.extend(util::as_mixed_radix(x, &mods).iter());
             }
             let X = en.encode_evaluator_inputs(&ds);
-            let Y = ev.eval(&circ, &[], &X);
+            let Y = ev.eval(&circ, &[], &X).unwrap();
             let res = de.decode(&Y);
             assert_eq!(util::from_mixed_radix(&res, &mods), should_be);
         }
@@ -493,7 +493,7 @@ mod classic {
 
         for _ in 0..64 {
             assert_eq!(circ.eval(&[], &[])[0], c, "plaintext eval failed");
-            let Y = ev.eval(&circ, &[], &[]);
+            let Y = ev.eval(&circ, &[], &[]).unwrap();
             assert_eq!(de.decode(&Y)[0], c, "garbled eval failed");
         }
     }
@@ -520,7 +520,7 @@ mod classic {
             assert_eq!(circ.eval(&[], &[x])[0], (x + c) % q, "plaintext");
 
             let X = en.encode_evaluator_inputs(&[x]);
-            let Y = ev.eval(&circ, &[], &X);
+            let Y = ev.eval(&circ, &[], &X).unwrap();
             assert_eq!(de.decode(&Y)[0], (x + c) % q, "garbled");
         }
     }
@@ -535,9 +535,15 @@ mod streaming {
     use rand::thread_rng;
 
     // helper {{{
-    fn streaming_test<F>(mut f: F, gb_inp: &[u16], ev_inp: &[u16], should_be: &[u16])
-    where
+    fn streaming_test<F, G>(
+        mut f_gb: F,
+        mut f_ev: G,
+        gb_inp: &[u16],
+        ev_inp: &[u16],
+        should_be: &[u16],
+    ) where
         F: FnMut(&Garbler) + Send + Copy + 'static,
+        G: FnMut(&Evaluator) + Send + Copy + 'static,
     {
         let mut gb_iter = garble_iter(move |gb| f_gb(gb));
 
@@ -572,7 +578,10 @@ mod streaming {
         assert_eq!(result, should_be)
     }
     //}}}
-    fn fancy_addition<W: Clone + HasModulus, E: Display + Debug>(b: &dyn Fancy<Item = W, Error = E>, q: u16) //{{{
+    fn fancy_addition<W: Clone + HasModulus, E: Display + Debug>(
+        b: &dyn Fancy<Item = W, Error = E>,
+        q: u16,
+    ) //{{{
     {
         let x = b.garbler_input(None, q, None).unwrap();
         let y = b.evaluator_input(None, q).unwrap();
@@ -587,11 +596,20 @@ mod streaming {
             let q = rng.gen_modulus();
             let x = rng.gen_u16() % q;
             let y = rng.gen_u16() % q;
-            streaming_test(move |b| fancy_addition(b,q), &[x], &[y], &[(x + y) % q]);
+            streaming_test(
+                move |b| fancy_addition(b, q),
+                move |b| fancy_addition(b, q),
+                &[x],
+                &[y],
+                &[(x + y) % q],
+            );
         }
     }
     //}}}
-    fn fancy_subtraction<W: Clone + HasModulus, E: Display + Debug>(b: &dyn Fancy<Item=W, Error=E>, q: u16) //{{{
+    fn fancy_subtraction<W: Clone + HasModulus, E: Display + Debug>(
+        b: &dyn Fancy<Item = W, Error = E>,
+        q: u16,
+    ) //{{{
     {
         let x = b.garbler_input(None, q, None).unwrap();
         let y = b.evaluator_input(None, q).unwrap();
@@ -608,6 +626,7 @@ mod streaming {
             let y = rng.gen_u16() % q;
             streaming_test(
                 move |b| fancy_subtraction(b, q),
+                move |b| fancy_subtraction(b, q),
                 &[x],
                 &[y],
                 &[(q + x - y) % q],
@@ -615,7 +634,10 @@ mod streaming {
         }
     }
     //}}}
-    fn fancy_multiplication<W: Clone + HasModulus, E: Debug + Display>(b: &dyn Fancy<Item=W, Error=E>, q: u16) // {{{
+    fn fancy_multiplication<W: Clone + HasModulus, E: Debug + Display>(
+        b: &dyn Fancy<Item = W, Error = E>,
+        q: u16,
+    ) // {{{
     {
         let x = b.garbler_input(None, q, None).unwrap();
         let y = b.evaluator_input(None, q).unwrap();
@@ -632,6 +654,7 @@ mod streaming {
             let y = rng.gen_u16() % q;
             streaming_test(
                 move |b| fancy_multiplication(b, q),
+                move |b| fancy_multiplication(b, q),
                 &[x],
                 &[y],
                 &[(x * y) % q],
@@ -639,7 +662,10 @@ mod streaming {
         }
     }
     //}}}
-    fn fancy_cmul<W: Clone + HasModulus, E: Debug + Display>(b: &dyn Fancy<Item=W, Error=E>, q: u16) // {{{
+    fn fancy_cmul<W: Clone + HasModulus, E: Debug + Display>(
+        b: &dyn Fancy<Item = W, Error = E>,
+        q: u16,
+    ) // {{{
     {
         let x = b.garbler_input(None, q, None).unwrap();
         let z = b.cmul(&x, 5).unwrap();
@@ -652,11 +678,20 @@ mod streaming {
         for _ in 0..16 {
             let q = rng.gen_modulus();
             let x = rng.gen_u16() % q;
-            streaming_test(move |b| fancy_cmul(b, q), &[x], &[], &[(x * 5) % q]);
+            streaming_test(
+                move |b| fancy_cmul(b, q),
+                move |b| fancy_cmul(b, q),
+                &[x],
+                &[],
+                &[(x * 5) % q],
+            );
         }
     }
     //}}}
-    fn fancy_projection<W: Clone + HasModulus, E: Debug + Display>(b: &dyn Fancy<Item=W, Error=E>, q: u16) // {{{
+    fn fancy_projection<W: Clone + HasModulus, E: Debug + Display>(
+        b: &dyn Fancy<Item = W, Error = E>,
+        q: u16,
+    ) // {{{
     {
         let x = b.garbler_input(None, q, None).unwrap();
         let tab = (0..q).map(|i| (i + 1) % q).collect_vec();
@@ -670,7 +705,13 @@ mod streaming {
         for _ in 0..16 {
             let q = rng.gen_modulus();
             let x = rng.gen_u16() % q;
-            streaming_test(move |b| fancy_projection(b, q), &[x], &[], &[(x + 1) % q]);
+            streaming_test(
+                move |b| fancy_projection(b, q),
+                move |b| fancy_projection(b, q),
+                &[x],
+                &[],
+                &[(x + 1) % q],
+            );
         }
     }
     //}}}
@@ -693,7 +734,7 @@ mod parallel {
     {
         if par {
             crossbeam::scope(|scope| {
-                b.begin_sync(N);
+                b.begin_sync(N).unwrap();
                 let hs = (0..N)
                     .map(|i| {
                         scope
@@ -703,36 +744,36 @@ mod parallel {
                                 // let x = b.garbler_input(Some(i), 2 + i as u16);
                                 // let c = b.constant(Some(i), 1, 2 + i as u16);
                                 // let z = b.mul(Some(i), &x, &c);
-                                let c = b.constant_bundle_crt(Some(i), 1, Q);
-                                let x = b.garbler_input_bundle_crt(Some(i), Q, None);
-                                let x = b.mul_bundles(Some(i), &x, &c);
-                                let z = b.relu(Some(i), &x, "100%", None);
-                                b.finish_index(i);
+                                let c = b.constant_bundle_crt(Some(i), 1, Q).unwrap();
+                                let x = b.garbler_input_bundle_crt(Some(i), Q, None).unwrap();
+                                let x = b.mul_bundles(Some(i), &x, &c).unwrap();
+                                let z = b.relu(Some(i), &x, "100%", None).unwrap();
+                                b.finish_index(i).unwrap();
                                 z
                             })
                             .unwrap()
                     })
                     .collect_vec();
                 let outs = hs.into_iter().map(|h| h.join().unwrap()).collect_vec();
-                b.output_bundles(None, &outs);
+                b.output_bundles(None, &outs).unwrap();
                 // b.outputs(None, &outs);
             })
             .unwrap()
         } else {
-            b.begin_sync(N);
+            b.begin_sync(N).unwrap();
             let mut zs = Vec::new();
             for i in 0..N {
                 // let x = b.garbler_input(Some(i), 2 + i as u16);
                 // let c = b.constant(Some(i), 1, 2 + i as u16);
                 // let z = b.mul(Some(i), &x, &c);
-                let c = b.constant_bundle_crt(Some(i), 1, Q);
-                let x = b.garbler_input_bundle_crt(Some(i), Q, None);
-                let x = b.mul_bundles(Some(i), &x, &c);
-                let z = b.relu(Some(i), &x, "100%", None);
+                let c = b.constant_bundle_crt(Some(i), 1, Q).unwrap();
+                let x = b.garbler_input_bundle_crt(Some(i), Q, None).unwrap();
+                let x = b.mul_bundles(Some(i), &x, &c).unwrap();
+                let z = b.relu(Some(i), &x, "100%", None).unwrap();
                 zs.push(z);
-                b.finish_index(i);
+                b.finish_index(i).unwrap();
             }
-            b.output_bundles(None, &zs);
+            b.output_bundles(None, &zs).unwrap();
             // b.outputs(None, &zs);
         }
     }

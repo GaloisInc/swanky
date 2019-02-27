@@ -7,7 +7,7 @@ use std::collections::HashMap;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 
-use crate::error::{FancyError, CircuitBuilderError};
+use crate::error::{CircuitBuilderError, FancyError};
 use crate::fancy::{Fancy, HasModulus, SyncIndex};
 
 /// The index and modulus of a gate in a circuit.
@@ -218,7 +218,11 @@ impl Fancy for CircuitBuilder {
         Ok(r)
     }
 
-    fn evaluator_input(&self, _ix: Option<SyncIndex>, modulus: u16) -> Result<CircuitRef, FancyError<CircuitBuilderError>> {
+    fn evaluator_input(
+        &self,
+        _ix: Option<SyncIndex>,
+        modulus: u16,
+    ) -> Result<CircuitRef, FancyError<CircuitBuilderError>> {
         let gate = Gate::EvaluatorInput {
             id: self.get_next_evaluator_input_id(),
         };
@@ -227,7 +231,12 @@ impl Fancy for CircuitBuilder {
         Ok(r)
     }
 
-    fn constant(&self, _ix: Option<SyncIndex>, val: u16, modulus: u16) -> Result<CircuitRef, FancyError<CircuitBuilderError>> {
+    fn constant(
+        &self,
+        _ix: Option<SyncIndex>,
+        val: u16,
+        modulus: u16,
+    ) -> Result<CircuitRef, FancyError<CircuitBuilderError>> {
         let mut map = self.const_map.lock().unwrap();
         match map.get(&(val, modulus)) {
             Some(&r) => Ok(r),
@@ -241,7 +250,11 @@ impl Fancy for CircuitBuilder {
         }
     }
 
-    fn add(&self, xref: &CircuitRef, yref: &CircuitRef) -> Result<CircuitRef, FancyError<CircuitBuilderError>> {
+    fn add(
+        &self,
+        xref: &CircuitRef,
+        yref: &CircuitRef,
+    ) -> Result<CircuitRef, FancyError<CircuitBuilderError>> {
         if xref.modulus() != yref.modulus() {
             return Err(FancyError::UnequalModuli);
         }
@@ -252,7 +265,11 @@ impl Fancy for CircuitBuilder {
         Ok(self.gate(gate, xref.modulus()))
     }
 
-    fn sub(&self, xref: &CircuitRef, yref: &CircuitRef) -> Result<CircuitRef, FancyError<CircuitBuilderError>> {
+    fn sub(
+        &self,
+        xref: &CircuitRef,
+        yref: &CircuitRef,
+    ) -> Result<CircuitRef, FancyError<CircuitBuilderError>> {
         if xref.modulus() != yref.modulus() {
             return Err(FancyError::UnequalModuli);
         }
@@ -263,7 +280,11 @@ impl Fancy for CircuitBuilder {
         Ok(self.gate(gate, xref.modulus()))
     }
 
-    fn cmul(&self, xref: &CircuitRef, c: u16) -> Result<CircuitRef, FancyError<CircuitBuilderError>> {
+    fn cmul(
+        &self,
+        xref: &CircuitRef,
+        c: u16,
+    ) -> Result<CircuitRef, FancyError<CircuitBuilderError>> {
         Ok(self.gate(Gate::Cmul { xref: *xref, c }, xref.modulus()))
     }
 
@@ -305,7 +326,11 @@ impl Fancy for CircuitBuilder {
         Ok(self.gate(gate, xref.modulus()))
     }
 
-    fn output(&self, _ix: Option<SyncIndex>, xref: &CircuitRef) -> Result<(), FancyError<CircuitBuilderError>> {
+    fn output(
+        &self,
+        _ix: Option<SyncIndex>,
+        xref: &CircuitRef,
+    ) -> Result<(), FancyError<CircuitBuilderError>> {
         Ok(self.circ.lock().unwrap().output_refs.push(xref.clone()))
     }
 }

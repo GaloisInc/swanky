@@ -56,32 +56,30 @@ impl Evaluator {
     }
 
     /// Receive the next message.
-    fn recv(&self, ix: Option<SyncIndex>) -> Message {
+    fn recv(&self, ix: Option<SyncIndex>) -> Result<Message, EvaluatorError> {
         if let Some(ix) = ix {
             // request next message for this index
             let (tx, rx) = std::sync::mpsc::channel();
             self.requests.read().unwrap().as_ref().unwrap()[ix as usize].push(tx);
             // block until postman delivers message
-            rx.recv().unwrap()
+            Ok(rx.recv().unwrap())
         } else {
             let (ix, m) = (self.recv_function.lock().unwrap().deref_mut())();
             if m == Message::EndSync {
                 return self.recv(ix);
             }
-            assert!(
-                ix.is_none(),
-                "evaluator: index recieved when not in sync mode!"
-            );
-            m
+            if ix.is_some() {
+                Err(EvaluatorError::IndexReceivedInSyncMode)?;
+            }
+            Ok(m)
         }
     }
 
-    fn internal_begin_sync(&self, num_indices: SyncIndex) {
+    fn internal_begin_sync(&self, num_indices: SyncIndex) -> Result<(), FancyError<EvaluatorError>> {
         let mut opt_info = self.sync_info.write().unwrap();
-        assert!(
-            opt_info.is_none(),
-            "evaluator: begin_sync called before finishing previous sync!"
-        );
+        if opt_info.is_some() {
+            Err(FancyError::SyncStartedInSync)?;
+        }
         *opt_info = Some(SyncInfo::new(
             self.current_gate.load(Ordering::SeqCst),
             num_indices,
@@ -94,6 +92,7 @@ impl Evaluator {
             self.requests.clone(),
             self.recv_function.clone(),
         );
+        Ok(())
     }
 
     fn internal_finish_index(&self, index: SyncIndex) {
@@ -174,70 +173,96 @@ impl Fancy for Evaluator {
     type Item = Wire;
     type Error = EvaluatorError;
 
-    fn garbler_input(&self, ix: Option<SyncIndex>, q: u16, _opt_x: Option<u16>) -> Result<Wire, FancyError<EvaluatorError>> {
-        match self.recv(ix) {
+    fn garbler_input(
+        &self,
+        ix: Option<SyncIndex>,
+        q: u16,
+        _opt_x: Option<u16>,
+    ) -> Result<Wire, FancyError<EvaluatorError>> {
+        match self.recv(ix)? {
             Message::GarblerInput(w) => {
                 if w.modulus() != q {
-                    return Err(EvaluatorError::InvalidMessage {
+                    Err(EvaluatorError::InvalidMessage {
                         expected: format!("GarblerInput with modulus {}", q),
                         got: format!("GarblerInput with modulus {}", w.modulus()),
-                    });
+                    })?
+                } else {
+                    Ok(w)
                 }
-                w
             }
             m => Err(EvaluatorError::InvalidMessage {
-                expected: "GarblerInput",
+                expected: "GarblerInput".to_string(),
                 got: format!("{}", m),
-            }),
+            })?,
         }
     }
 
-    fn evaluator_input(&self, ix: Option<SyncIndex>, q: u16) -> Result<Wire, FancyError<EvaluatorError>> {
-        match self.recv(ix) {
+    fn evaluator_input(
+        &self,
+        ix: Option<SyncIndex>,
+        q: u16,
+    ) -> Result<Wire, FancyError<EvaluatorError>> {
+        match self.recv(ix)? {
             Message::EvaluatorInput(w) => {
-                return Err(EvaluatorError::InvalidMessage {
-                    expected: format!("EvaluatorInput with modulus {}", q),
-                    got: format!("EvaluatorInput with modulus {}", w.modulus()),
-                });
-                w
+                if w.modulus() != q {
+                    return Err(EvaluatorError::InvalidMessage {
+                        expected: format!("EvaluatorInput with modulus {}", q),
+                        got: format!("EvaluatorInput with modulus {}", w.modulus()),
+                    })?;
+                } else {
+                    Ok(w)
+                }
             }
             m => Err(EvaluatorError::InvalidMessage {
-                expected: "EvaluatorInput",
+                expected: "EvaluatorInput".to_string(),
                 got: format!("{}", m),
-            }),
+            })?,
         }
     }
 
-    fn constant(&self, ix: Option<SyncIndex>, _x: u16, _q: u16) -> Result<Wire, FancyError<EvaluatorError>> {
-        match self.recv(ix) {
-            Message::Constant { wire, .. } => wire,
+    fn constant(
+        &self,
+        ix: Option<SyncIndex>,
+        _x: u16,
+        _q: u16,
+    ) -> Result<Wire, FancyError<EvaluatorError>> {
+        match self.recv(ix)? {
+            Message::Constant { wire, .. } => Ok(wire),
             m => Err(EvaluatorError::InvalidMessage {
-                expected: "Constant",
+                expected: "Constant".to_string(),
                 got: format!("{}", m),
-            }),
+            })?,
         }
     }
 
     fn add(&self, x: &Wire, y: &Wire) -> Result<Wire, FancyError<EvaluatorError>> {
-        x.plus(y)
+        Ok(x.plus(y))
     }
 
     fn sub(&self, x: &Wire, y: &Wire) -> Result<Wire, FancyError<EvaluatorError>> {
-        x.minus(y)
+        Ok(x.minus(y))
     }
 
     fn cmul(&self, x: &Wire, c: u16) -> Result<Wire, FancyError<EvaluatorError>> {
-        x.cmul(c)
+        Ok(x.cmul(c))
     }
 
-    fn mul(&self, ix: Option<SyncIndex>, A: &Wire, B: &Wire) -> Result<Wire, FancyError<EvaluatorError>> {
+    fn mul(
+        &self,
+        ix: Option<SyncIndex>,
+        A: &Wire,
+        B: &Wire,
+    ) -> Result<Wire, FancyError<EvaluatorError>> {
         if A.modulus() < A.modulus() {
             return self.mul(ix, B, A);
         }
 
-        let gate = match self.recv(ix) {
+        let gate = match self.recv(ix)? {
             Message::GarbledGate(g) => g,
-            m => panic!("Expected message GarbledGate but got {}", m),
+            m => return Err(EvaluatorError::InvalidMessage {
+                expected: "GarbledGate".to_string(),
+                got: format!("{}", m)
+            })?,
         };
         let gate_num = self.current_gate(ix);
         let g = tweak2(gate_num as u64, 0);
@@ -269,13 +294,23 @@ impl Fancy for Evaluator {
             B.color()
         };
 
-        L.plus_mov(&R.plus_mov(&A.cmul(new_b_color)))
+        let res = L.plus_mov(&R.plus_mov(&A.cmul(new_b_color)));
+        Ok(res)
     }
 
-    fn proj(&self, ix: Option<SyncIndex>, x: &Wire, q: u16, _tt: Option<Vec<u16>>) -> Result<Wire, FancyError<EvaluatorError>> {
-        let gate = match self.recv(ix) {
+    fn proj(
+        &self,
+        ix: Option<SyncIndex>,
+        x: &Wire,
+        q: u16,
+        _tt: Option<Vec<u16>>,
+    ) -> Result<Wire, FancyError<EvaluatorError>> {
+        let gate = match self.recv(ix)? {
             Message::GarbledGate(g) => g,
-            m => panic!("Expected message GarbledGate but got {}", m),
+            m => return Err(EvaluatorError::InvalidMessage {
+                expected: "GarbledGate".to_string(),
+                got: format!("{}", m)
+            })?,
         };
         assert!(
             gate.len() as u16 == x.modulus() - 1,
@@ -283,22 +318,31 @@ impl Fancy for Evaluator {
         );
         let gate_num = self.current_gate(ix);
         if x.color() == 0 {
-            x.hashback(gate_num as u128, q)
+            Ok(x.hashback(gate_num as u128, q))
         } else {
             let ct = gate[x.color() as usize - 1];
-            Wire::from_u128(ct ^ x.hash(gate_num as u128), q)
+            Ok(Wire::from_u128(ct ^ x.hash(gate_num as u128), q))
         }
     }
 
     fn output(&self, ix: Option<SyncIndex>, x: &Wire) -> Result<(), FancyError<EvaluatorError>> {
-        match self.recv(ix) {
+        match self.recv(ix)? {
             Message::OutputCiphertext(c) => {
-                assert_eq!(c.len() as u16, x.modulus());
+                if c.len() as u16 != x.modulus() {
+                    Err(EvaluatorError::InvalidMessage {
+                        expected: format!("OutputCiphertext of len {}", x.modulus()),
+                        got: format!("OutputCiphertext of len {}", c.len())
+                    })?
+                }
                 self.output_cts.lock().unwrap().push(c);
             }
-            m => panic!("Expected message OutputCiphertext but got {}", m),
+            m => return Err(EvaluatorError::InvalidMessage {
+                expected: "OutputCiphertext".to_string(),
+                got: format!("{}", m)
+            })?,
         }
         self.output_wires.lock().unwrap().push(x.clone());
+        Ok(())
     }
 
     fn begin_sync(&self, num_indices: SyncIndex) -> Result<(), FancyError<EvaluatorError>> {
@@ -306,7 +350,8 @@ impl Fancy for Evaluator {
     }
 
     fn finish_index(&self, index: SyncIndex) -> Result<(), FancyError<EvaluatorError>> {
-        self.internal_finish_index(index)
+        self.internal_finish_index(index);
+        Ok(())
     }
 }
 
@@ -343,7 +388,7 @@ impl GarbledCircuit {
         c: &Circuit,
         garbler_inputs: &[Wire],
         evaluator_inputs: &[Wire],
-    ) -> Vec<Wire> {
+    ) -> Result<Vec<Wire>, FancyError<EvaluatorError>> {
         // create a message iterator to pass as the Evaluator recv function
         let mut msgs = c
             .gates
@@ -376,19 +421,20 @@ impl GarbledCircuit {
         for (i, gate) in c.gates.iter().enumerate() {
             let q = c.modulus(i);
             let w = match *gate {
-                Gate::GarblerInput { .. } => eval.garbler_input(None, q, None),
-                Gate::EvaluatorInput { .. } => eval.evaluator_input(None, q),
-                Gate::Constant { val } => eval.constant(None, val, q),
+                Gate::GarblerInput { .. } => eval.garbler_input(None, q, None)?,
+                Gate::EvaluatorInput { .. } => eval.evaluator_input(None, q)?,
+                Gate::Constant { val } => eval.constant(None, val, q)?,
                 Gate::Add { xref, yref } => wires[xref.ix].plus(&wires[yref.ix]),
                 Gate::Sub { xref, yref } => wires[xref.ix].minus(&wires[yref.ix]),
                 Gate::Cmul { xref, c } => wires[xref.ix].cmul(c),
-                Gate::Proj { xref, .. } => eval.proj(None, &wires[xref.ix], q, None),
-                Gate::Mul { xref, yref, .. } => eval.mul(None, &wires[xref.ix], &wires[yref.ix]),
+                Gate::Proj { xref, .. } => eval.proj(None, &wires[xref.ix], q, None)?,
+                Gate::Mul { xref, yref, .. } => eval.mul(None, &wires[xref.ix], &wires[yref.ix])?,
             };
             wires.push(w);
         }
 
-        c.output_refs.iter().map(|&r| wires[r.ix].clone()).collect()
+        let res = c.output_refs.iter().map(|&r| wires[r.ix].clone()).collect();
+        Ok(res)
     }
 }
 

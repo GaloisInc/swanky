@@ -13,6 +13,7 @@ pub enum FancyError<T> {
     IndexRequired,
     IndexOutOfBounds,
     IndexUsedOutOfSync,
+    SyncStartedInSync,
     ClientError(T),
 }
 
@@ -25,6 +26,7 @@ pub enum DummyError {
 #[derive(Debug)]
 pub enum EvaluatorError {
     InvalidMessage { expected: String, got: String },
+    IndexReceivedInSyncMode,
 }
 
 #[derive(Debug)]
@@ -58,6 +60,7 @@ impl<T: Display> Display for FancyError<T> {
             FancyError::IndexRequired => "sync index required in sync mode".fmt(f),
             FancyError::IndexOutOfBounds => "sync index out of bounds".fmt(f),
             FancyError::IndexUsedOutOfSync => "sync index used out of sync mode".fmt(f),
+            FancyError::SyncStartedInSync => "begin_sync called before finishing previous sync".fmt(f),
             FancyError::ClientError(e) => write!(f, "client error: {}", e),
         }
     }
@@ -96,6 +99,7 @@ impl Display for EvaluatorError {
             EvaluatorError::InvalidMessage { expected, got } => {
                 write!(f, "expected message {} but got {}", expected, got)
             }
+            EvaluatorError::IndexReceivedInSyncMode => "index received in sync mode".fmt(f),
         }
     }
 }
