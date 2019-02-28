@@ -159,13 +159,7 @@ impl Fancy for Garbler {
     ) -> Result<Wire, FancyError<GarblerError>> {
         let zero = Wire::rand(&mut rand::thread_rng(), q);
         let wire = zero.plus(&self.delta(q).cmul_eq(x));
-        self.send(
-            ix,
-            Message::Constant {
-                value: x,
-                wire,
-            },
-        );
+        self.send(ix, Message::Constant { value: x, wire });
         Ok(zero)
     }
 
