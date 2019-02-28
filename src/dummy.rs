@@ -12,7 +12,7 @@ use std::sync::{
     Arc, Mutex, RwLock,
 };
 
-use crate::error::{DummyError, FancyError};
+use crate::error::{DummyError, FancyError, SyncError};
 use crate::fancy::{Fancy, HasModulus, SyncIndex};
 
 /// Simple struct that performs the fancy computation over u16.
@@ -86,12 +86,12 @@ impl Fancy for Dummy {
         let res = if let Some(val) = opt_x {
             DummyVal { val, modulus }
         } else if self.in_sync() {
-            let ix = ix.ok_or(FancyError::IndexRequired)?;
+            let ix = ix.ok_or_else(|| DummyError::from(SyncError::IndexRequired))?;
             self.request(ix, Request::GarblerInput(modulus))
         } else {
             let mut inps = self.garbler_inputs.lock().unwrap();
             if inps.len() == 0 {
-                return Err(FancyError::from(DummyError::NotEnoughGarblerInputs));
+                return Err(DummyError::NotEnoughGarblerInputs)?;
             }
             let val = inps.remove(0);
             DummyVal { val, modulus }
@@ -105,12 +105,12 @@ impl Fancy for Dummy {
         modulus: u16,
     ) -> Result<DummyVal, FancyError<DummyError>> {
         let res = if self.in_sync() {
-            let ix = ix.ok_or(FancyError::IndexRequired)?;
+            let ix = ix.ok_or_else(|| DummyError::from(SyncError::IndexRequired))?;
             self.request(ix, Request::EvaluatorInput(modulus))
         } else {
             let mut inps = self.evaluator_inputs.lock().unwrap();
             if inps.len() == 0 {
-                return Err(FancyError::from(DummyError::NotEnoughEvaluatorInputs));
+                return Err(DummyError::NotEnoughEvaluatorInputs)?;
             }
             let val = inps.remove(0);
             DummyVal { val, modulus }
@@ -182,7 +182,8 @@ impl Fancy for Dummy {
     }
 
     fn output(&self, _ix: Option<SyncIndex>, x: &DummyVal) -> Result<(), FancyError<DummyError>> {
-        Ok(self.outputs.lock().unwrap().push(x.val))
+        self.outputs.lock().unwrap().push(x.val);
+        Ok(())
     }
 
     fn begin_sync(&self, num_indices: SyncIndex) -> Result<(), FancyError<DummyError>> {
@@ -210,9 +211,11 @@ impl Fancy for Dummy {
             let mut cleanup = false;
             {
                 let done = self.index_done.read().unwrap();
-                let done = done.as_ref().ok_or(FancyError::IndexUsedOutOfSync)?;
+                let done = done
+                    .as_ref()
+                    .ok_or_else(|| DummyError::from(SyncError::IndexUsedOutOfSync))?;
                 if index as usize >= done.len() {
-                    return Err(FancyError::IndexOutOfBounds);
+                    return Err(DummyError::from(SyncError::IndexOutOfBounds))?;
                 }
                 done[index as usize].store(true, Ordering::SeqCst);
                 if done.iter().all(|x| x.load(Ordering::SeqCst)) {
@@ -261,13 +264,10 @@ fn start_postman(
                 }
                 let done_mutex = done.read().unwrap();
                 if let Some(ref done) = *done_mutex {
-                    match done.get(c as usize) {
-                        Some(atomic_bool) => {
-                            if atomic_bool.load(Ordering::SeqCst) {
-                                c += 1;
-                            }
+                    if let Some(atomic_bool) = done.get(c as usize) {
+                        if atomic_bool.load(Ordering::SeqCst) {
+                            c += 1;
                         }
-                        _ => {}
                     }
                 }
             } else {

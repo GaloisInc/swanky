@@ -9,7 +9,7 @@ use std::sync::mpsc::Sender;
 use std::sync::{Arc, Mutex, RwLock};
 
 use crate::circuit::{Circuit, Gate};
-use crate::error::{EvaluatorError, FancyError};
+use crate::error::{EvaluatorError, FancyError, SyncError};
 use crate::fancy::{Fancy, HasModulus, SyncIndex};
 use crate::util::{output_tweak, tweak2};
 use crate::wire::Wire;
@@ -75,10 +75,13 @@ impl Evaluator {
         }
     }
 
-    fn internal_begin_sync(&self, num_indices: SyncIndex) -> Result<(), FancyError<EvaluatorError>> {
+    fn internal_begin_sync(
+        &self,
+        num_indices: SyncIndex,
+    ) -> Result<(), FancyError<EvaluatorError>> {
         let mut opt_info = self.sync_info.write().unwrap();
         if opt_info.is_some() {
-            Err(FancyError::SyncStartedInSync)?;
+            Err(EvaluatorError::from(SyncError::SyncStartedInSync))?;
         }
         *opt_info = Some(SyncInfo::new(
             self.current_gate.load(Ordering::SeqCst),
@@ -205,10 +208,10 @@ impl Fancy for Evaluator {
         match self.recv(ix)? {
             Message::EvaluatorInput(w) => {
                 if w.modulus() != q {
-                    return Err(EvaluatorError::InvalidMessage {
+                    Err(EvaluatorError::InvalidMessage {
                         expected: format!("EvaluatorInput with modulus {}", q),
                         got: format!("EvaluatorInput with modulus {}", w.modulus()),
-                    })?;
+                    })?
                 } else {
                     Ok(w)
                 }
@@ -223,23 +226,42 @@ impl Fancy for Evaluator {
     fn constant(
         &self,
         ix: Option<SyncIndex>,
-        _x: u16,
-        _q: u16,
+        x: u16,
+        q: u16,
     ) -> Result<Wire, FancyError<EvaluatorError>> {
         match self.recv(ix)? {
-            Message::Constant { wire, .. } => Ok(wire),
+            Message::Constant { wire, value } => {
+                if x == value && wire.modulus() == q {
+                    Ok(wire)
+                } else {
+                    Err(EvaluatorError::InvalidMessage {
+                        expected: format!("Constant with value {} and modulus {}", x, q),
+                        got: format!(
+                            "Constant with value {} and modulus {}",
+                            value,
+                            wire.modulus()
+                        ),
+                    })?
+                }
+            }
             m => Err(EvaluatorError::InvalidMessage {
-                expected: "Constant".to_string(),
+                expected: format!("Constant with value {} and modulus {}", x, q),
                 got: format!("{}", m),
             })?,
         }
     }
 
     fn add(&self, x: &Wire, y: &Wire) -> Result<Wire, FancyError<EvaluatorError>> {
+        if x.modulus() != y.modulus() {
+            return Err(FancyError::UnequalModuli);
+        }
         Ok(x.plus(y))
     }
 
     fn sub(&self, x: &Wire, y: &Wire) -> Result<Wire, FancyError<EvaluatorError>> {
+        if x.modulus() != y.modulus() {
+            return Err(FancyError::UnequalModuli);
+        }
         Ok(x.minus(y))
     }
 
@@ -259,10 +281,12 @@ impl Fancy for Evaluator {
 
         let gate = match self.recv(ix)? {
             Message::GarbledGate(g) => g,
-            m => return Err(EvaluatorError::InvalidMessage {
-                expected: "GarbledGate".to_string(),
-                got: format!("{}", m)
-            })?,
+            m => {
+                return Err(EvaluatorError::InvalidMessage {
+                    expected: "GarbledGate".to_string(),
+                    got: format!("{}", m),
+                })?;
+            }
         };
         let gate_num = self.current_gate(ix);
         let g = tweak2(gate_num as u64, 0);
@@ -307,15 +331,19 @@ impl Fancy for Evaluator {
     ) -> Result<Wire, FancyError<EvaluatorError>> {
         let gate = match self.recv(ix)? {
             Message::GarbledGate(g) => g,
-            m => return Err(EvaluatorError::InvalidMessage {
-                expected: "GarbledGate".to_string(),
-                got: format!("{}", m)
-            })?,
+            m => {
+                return Err(EvaluatorError::InvalidMessage {
+                    expected: "GarbledGate".to_string(),
+                    got: format!("{}", m),
+                })?;
+            }
         };
-        assert!(
-            gate.len() as u16 == x.modulus() - 1,
-            "evaluator proj: garbled gate length does not equal q-1, sync issue?"
-        );
+        if gate.len() as u16 != x.modulus() - 1 {
+            return Err(EvaluatorError::InvalidMessage {
+                expected: format!("GarbledGate of len {}", q - 1),
+                got: format!("GarbledGate of len {}", gate.len()),
+            })?;
+        }
         let gate_num = self.current_gate(ix);
         if x.color() == 0 {
             Ok(x.hashback(gate_num as u128, q))
@@ -331,15 +359,17 @@ impl Fancy for Evaluator {
                 if c.len() as u16 != x.modulus() {
                     Err(EvaluatorError::InvalidMessage {
                         expected: format!("OutputCiphertext of len {}", x.modulus()),
-                        got: format!("OutputCiphertext of len {}", c.len())
+                        got: format!("OutputCiphertext of len {}", c.len()),
                     })?
                 }
                 self.output_cts.lock().unwrap().push(c);
             }
-            m => return Err(EvaluatorError::InvalidMessage {
-                expected: "OutputCiphertext".to_string(),
-                got: format!("{}", m)
-            })?,
+            m => {
+                return Err(EvaluatorError::InvalidMessage {
+                    expected: "OutputCiphertext".to_string(),
+                    got: format!("{}", m),
+                })?;
+            }
         }
         self.output_wires.lock().unwrap().push(x.clone());
         Ok(())

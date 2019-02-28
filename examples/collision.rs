@@ -55,7 +55,9 @@ where
     if check_for_cheaters {
         // we want to ensure that the difference of two inputs of any two sequential time
         // slices are at most delta.
-        let delta = f.constant_bundle_binary(None, &util::u128_to_bits(10, nbits)).unwrap();
+        let delta = f
+            .constant_bundle_binary(None, &util::u128_to_bits(10, nbits))
+            .unwrap();
 
         let possible_cheats = (1..time_slices)
             .flat_map(|t| {
@@ -64,11 +66,13 @@ where
                         (0..4)
                             .map(|i| {
                                 // ensure the difference between t and the previous t is at most delta
-                                let (diff, _) = f.binary_subtraction(
-                                    None,
-                                    &inputs[t][d][i],
-                                    &inputs[t - 1][d][i],
-                                ).unwrap();
+                                let (diff, _) = f
+                                    .binary_subtraction(
+                                        None,
+                                        &inputs[t][d][i],
+                                        &inputs[t - 1][d][i],
+                                    )
+                                    .unwrap();
                                 let abs = f.abs(None, &diff).unwrap();
                                 f.geq(None, &abs, &delta, "100%").unwrap()
                             })

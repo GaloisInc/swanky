@@ -1007,7 +1007,7 @@ pub trait BundleGadgets: Fancy {
         let sign = self.sign(ix, x, accuracy)?;
         output_moduli
             .unwrap_or(&x.moduli())
-            .into_iter()
+            .iter()
             .map(|&p| {
                 let tt = vec![1, p - 1];
                 self.proj(ix, &sign, p, Some(tt))
@@ -1356,5 +1356,5 @@ fn to_vec_option<T>(opt_xs: Option<Vec<T>>, len: usize) -> Vec<Option<T>> {
             // transform option of slice into vec of options
             vals.into_iter().map(Some).collect()
         })
-        .unwrap_or((0..len).map(|_| None).collect())
+        .unwrap_or_else(|| (0..len).map(|_| None).collect())
 }

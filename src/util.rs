@@ -229,7 +229,7 @@ pub fn crt_inv(xs: &[u16], ps: &[u16]) -> u128 {
     let M = ps.iter().fold(1, |acc, &x| x as i128 * acc);
     for (&p, &a) in ps.iter().zip(xs.iter()) {
         let p = p as i128;
-        let q = &M / &p;
+        let q = M / p;
         ret += a as i128 * inv(q, p) * q;
         ret %= &M;
     }
@@ -271,7 +271,7 @@ pub fn inv(inp_a: i128, inp_b: i128) -> i128 {
     }
 
     if x1 < 0 {
-        x1 = x1 + inp_b;
+        x1 += inp_b;
     }
 
     x1

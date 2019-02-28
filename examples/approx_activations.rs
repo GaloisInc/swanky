@@ -13,7 +13,8 @@ where
     let exact = b.relu(None, &x, "100%", None).unwrap();
     let approx_999 = b.relu(None, &x, "99.9%", None).unwrap();
     let approx_99 = b.relu(None, &x, "99%", None).unwrap();
-    b.output_bundles(None, &[exact, approx_999, approx_99]).unwrap();
+    b.output_bundles(None, &[exact, approx_999, approx_99])
+        .unwrap();
 }
 
 fn main() {

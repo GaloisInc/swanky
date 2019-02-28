@@ -5,7 +5,7 @@ use std::ops::DerefMut;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex, RwLock};
 
-use crate::error::{FancyError, GarblerError};
+use crate::error::{FancyError, GarblerError, SyncError};
 use crate::fancy::{Fancy, HasModulus, SyncIndex};
 use crate::util::{output_tweak, tweak, tweak2, RngExt};
 use crate::wire::Wire;
@@ -44,19 +44,19 @@ impl Garbler {
         (self.send_function.lock().unwrap().deref_mut())(ix, m);
     }
 
-    fn internal_begin_sync(&self, num_indices: SyncIndex) {
+    fn internal_begin_sync(&self, num_indices: SyncIndex) -> Result<(), FancyError<GarblerError>> {
         let mut opt_info = self.sync_info.write().unwrap();
-        assert!(
-            opt_info.is_none(),
-            "garbler: begin_sync called before finishing previous sync!"
-        );
+        if opt_info.is_some() {
+            return Err(GarblerError::from(SyncError::SyncStartedInSync))?;
+        }
         *opt_info = Some(SyncInfo::new(
             self.current_gate.load(Ordering::SeqCst),
             num_indices,
         ));
+        Ok(())
     }
 
-    fn internal_finish_index(&self, index: SyncIndex) {
+    fn internal_finish_index(&self, index: SyncIndex) -> Result<(), FancyError<GarblerError>> {
         let mut done = false;
         if let Some(ref info) = *self.sync_info.read().unwrap() {
             info.index_done[index as usize].store(true, Ordering::SeqCst);
@@ -64,13 +64,14 @@ impl Garbler {
                 done = true;
             }
         } else {
-            panic!("garbler: finish_index called out of sync mode");
+            return Err(GarblerError::from(SyncError::IndexUsedOutOfSync))?;
         }
         if done {
             *self.sync_info.write().unwrap() = None;
             self.send(None, Message::EndSync);
             self.current_gate.fetch_add(1, Ordering::SeqCst);
         }
+        Ok(())
     }
 
     /// The current non-free gate index of the garbling computation. Respects sync
@@ -162,17 +163,23 @@ impl Fancy for Garbler {
             ix,
             Message::Constant {
                 value: x,
-                wire: wire,
+                wire,
             },
         );
         Ok(zero)
     }
 
     fn add(&self, x: &Wire, y: &Wire) -> Result<Wire, FancyError<GarblerError>> {
+        if x.modulus() != y.modulus() {
+            return Err(FancyError::UnequalModuli);
+        }
         Ok(x.plus(y))
     }
 
     fn sub(&self, x: &Wire, y: &Wire) -> Result<Wire, FancyError<GarblerError>> {
+        if x.modulus() != y.modulus() {
+            return Err(FancyError::UnequalModuli);
+        }
         Ok(x.minus(y))
     }
 
@@ -194,8 +201,6 @@ impl Fancy for Garbler {
         let qb = B.modulus();
         let gate_num = self.current_gate(ix);
 
-        debug_assert!(q >= qb); // XXX: for now
-
         let D = self.delta(q);
         let Db = self.delta(qb);
 
@@ -205,7 +210,9 @@ impl Fancy for Garbler {
         // hack for unequal moduli
         if q != qb {
             // would need to pack minitable into more than one u128 to support qb > 8
-            debug_assert!(qb <= 8, "qb capped at 8 for now, for assymmetric moduli");
+            if qb > 8 {
+                return Err(GarblerError::AsymmetricHalfGateModuliMax8(qb))?;
+            }
 
             r = rand::thread_rng().gen_u16() % q;
             let t = tweak2(gate_num as u64, 1);
@@ -316,7 +323,7 @@ impl Fancy for Garbler {
         tt: Option<Vec<u16>>,
     ) -> Result<Wire, FancyError<GarblerError>> {
         //
-        let tt = tt.expect("garbler.proj requires truth table");
+        let tt = tt.ok_or(GarblerError::TruthTableRequired)?;
 
         let q_in = A.modulus();
         // we have to fill in the vector in an unkonwn order because of the color bits.
@@ -388,13 +395,11 @@ impl Fancy for Garbler {
     }
 
     fn begin_sync(&self, num_indices: SyncIndex) -> Result<(), FancyError<GarblerError>> {
-        self.internal_begin_sync(num_indices);
-        Ok(())
+        self.internal_begin_sync(num_indices)
     }
 
     fn finish_index(&self, index: SyncIndex) -> Result<(), FancyError<GarblerError>> {
-        self.internal_finish_index(index);
-        Ok(())
+        self.internal_finish_index(index)
     }
 }
 

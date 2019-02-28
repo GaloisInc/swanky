@@ -166,7 +166,7 @@ impl Wire {
 
     /// Multiply each digit by a constant c mod q.
     #[inline]
-    pub fn cmul_eq<'a>(&'a mut self, c: u16) -> &'a mut Wire {
+    pub fn cmul_eq(&mut self, c: u16) -> &mut Wire {
         match self {
             Wire::Mod2 { val } => {
                 if c & 1 == 0 {
@@ -197,7 +197,7 @@ impl Wire {
 
     /// Negate all the digits mod q.
     #[inline]
-    pub fn negate_eq<'a>(&'a mut self) -> &'a mut Wire {
+    pub fn negate_eq(&mut self) -> &mut Wire {
         match self {
             Wire::Mod2 { val } => *val = val.flip(),
             Wire::ModN { q, ds } => {

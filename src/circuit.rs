@@ -331,7 +331,8 @@ impl Fancy for CircuitBuilder {
         _ix: Option<SyncIndex>,
         xref: &CircuitRef,
     ) -> Result<(), FancyError<CircuitBuilderError>> {
-        Ok(self.circ.lock().unwrap().output_refs.push(xref.clone()))
+        self.circ.lock().unwrap().output_refs.push(xref.clone());
+        Ok(())
     }
 }
 
