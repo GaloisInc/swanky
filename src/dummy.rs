@@ -287,10 +287,12 @@ mod bundle {
     use itertools::Itertools;
     use rand::thread_rng;
 
+    const NITERS: usize = 1 << 10;
+
     #[test] // bundle addition {{{
     fn test_addition() {
         let mut rng = thread_rng();
-        for _ in 0..16 {
+        for _ in 0..NITERS {
             let q = rng.gen_usable_composite_modulus();
             let x = rng.gen_u128() % q;
             let y = rng.gen_u128() % q;
@@ -309,7 +311,7 @@ mod bundle {
     #[test] // bundle subtraction {{{
     fn test_subtraction() {
         let mut rng = thread_rng();
-        for _ in 0..16 {
+        for _ in 0..NITERS {
             let q = rng.gen_usable_composite_modulus();
             let x = rng.gen_u128() % q;
             let y = rng.gen_u128() % q;
@@ -328,7 +330,7 @@ mod bundle {
     #[test] // binary cmul {{{
     fn test_binary_cmul() {
         let mut rng = thread_rng();
-        for _ in 0..16 {
+        for _ in 0..NITERS {
             let nbits = 64;
             let q = 1 << nbits;
             let x = rng.gen_u128() % q;
@@ -347,7 +349,7 @@ mod bundle {
     #[test] // binary multiplication {{{
     fn test_binary_multiplication() {
         let mut rng = thread_rng();
-        for _ in 0..128 {
+        for _ in 0..NITERS {
             let nbits = 64;
             let q = 1 << nbits;
             let x = rng.gen_u128() % q;
@@ -369,7 +371,7 @@ mod bundle {
         let mut rng = thread_rng();
         let q = util::modulus_with_width(10);
         let n = 10;
-        for _ in 0..16 {
+        for _ in 0..NITERS {
             let inps = (0..n).map(|_| rng.gen_u128() % (q / 2)).collect_vec();
             let should_be = *inps.iter().max().unwrap();
             let enc_inps = inps
@@ -393,7 +395,7 @@ mod bundle {
         let n = 10;
         let nbits = 16;
         let q = 1 << nbits;
-        for _ in 0..16 {
+        for _ in 0..NITERS {
             let inps = (0..n).map(|_| rng.gen_u128() % q).collect_vec();
             let should_be = *inps.iter().max().unwrap();
             let enc_inps = inps
@@ -416,7 +418,7 @@ mod bundle {
     #[test] // bundle relu {{{
     fn test_relu() {
         let mut rng = thread_rng();
-        for _ in 0..128 {
+        for _ in 0..NITERS {
             let q = crate::util::modulus_with_nprimes(4 + rng.gen_usize() % 7); // exact relu supports up to 11 primes
             let x = rng.gen_u128() % q;
             let d = Dummy::new(&crt_factor(x, q), &[]);
@@ -437,7 +439,7 @@ mod bundle {
     #[test] // abs {{{
     fn binary_abs() {
         let mut rng = thread_rng();
-        for _ in 0..16 {
+        for _ in 0..NITERS {
             let nbits = 64;
             let q = 1 << nbits;
             let x = rng.gen_u128() % q;
@@ -460,7 +462,7 @@ mod bundle {
     #[test] // bundle mixed_radix_addition MSB {{{
     fn test_mixed_radix_addition_msb_only() {
         let mut rng = thread_rng();
-        for _ in 0..128 {
+        for _ in 0..NITERS {
             let nargs = 2 + rng.gen_usize() % 10;
             let mods = (0..7).map(|_| rng.gen_modulus()).collect_vec();
             let Q: u128 = util::product(&mods);

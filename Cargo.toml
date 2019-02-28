@@ -12,12 +12,17 @@ doctest = false
 [build-dependencies]
 cc = "1.0.29"
 
+[features]
+nightly = ["rand/nightly", "scuttlebutt/nightly"]
+
 [dependencies]
 base_conversion = { path = "base_conversion" }
 crossbeam = "0.7.1"
+failure = "*"
 itertools = "0.8.0"
 libc = "0.2.49"
 rand = "0.6.5"
+regex = "*"
 scuttlebutt = { path = "../scuttlebutt", default-features = false, features = ["serde"] }
 serde = { version = "1.0.88", features = ["derive"] }
 
@@ -25,20 +30,39 @@ serde = { version = "1.0.88", features = ["derive"] }
 criterion = "0.2.10"
 
 [profile.release]
+opt-level = 3
+debug = false
+debug-assertions = false
+overflow-checks = false
+
+[profile.dev]
+opt-level = 0
 debug = true
+debug-assertions = true
+overflow-checks = true
+
+[profile.bench]
+opt-level = 3
+debug = false
+debug-assertions = false
+overflow-checks = false
+
+# [[bench]]
+# name = "wire_operations"
+# harness = false
+
+# [[bench]]
+# name = "garbling"
+# harness = false
+
+# [[bench]]
+# name = "parallel"
+# harness = false
+
+# [[bench]]
+# name = "rust"
+# harness = false
 
 [[bench]]
-name = "wire_operations"
-harness = false
-
-[[bench]]
-name = "garbling"
-harness = false
-
-[[bench]]
-name = "parallel"
-harness = false
-
-[[bench]]
-name = "rust"
+name = "parser"
 harness = false

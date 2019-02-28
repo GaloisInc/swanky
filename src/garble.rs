@@ -7,9 +7,9 @@ use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 
-use crate::circuit::{Circuit, Gate};
+use crate::circuit::Circuit;
 use crate::error::{FancyError, GarblerError};
-use crate::fancy::{Fancy, HasModulus, SyncIndex};
+use crate::fancy::{HasModulus, SyncIndex};
 use crate::wire::Wire;
 
 mod evaluator;
@@ -179,33 +179,9 @@ pub fn garble(c: &Circuit) -> Result<(Encoder, Decoder, GarbledCircuit), FancyEr
         };
     }
 
-    {
-        let garbler = Garbler::new(send_func);
-
-        let mut wires = Vec::new();
-        for (i, gate) in c.gates.iter().enumerate() {
-            let q = c.modulus(i);
-            let w = match gate {
-                Gate::GarblerInput { .. } => garbler.garbler_input(None, q, None),
-                Gate::EvaluatorInput { .. } => garbler.evaluator_input(None, q),
-                Gate::Constant { val } => garbler.constant(None, *val, q),
-                Gate::Add { xref, yref } => garbler.add(&wires[xref.ix], &wires[yref.ix]),
-                Gate::Sub { xref, yref } => garbler.sub(&wires[xref.ix], &wires[yref.ix]),
-                Gate::Cmul { xref, c } => garbler.cmul(&wires[xref.ix], *c),
-                Gate::Mul { xref, yref, .. } => garbler.mul(None, &wires[xref.ix], &wires[yref.ix]),
-                Gate::Proj { xref, tt, .. } => {
-                    garbler.proj(None, &wires[xref.ix], q, Some(tt.clone()))
-                }
-            }?;
-            wires.push(w);
-        }
-
-        for r in c.output_refs.iter() {
-            garbler.output(None, &wires[r.ix])?;
-        }
-
-        deltas = garbler.get_deltas();
-    }
+    let garbler = Garbler::new(send_func);
+    c.eval(&garbler)?;
+    deltas = garbler.get_deltas();
 
     let en = Encoder::new(
         Arc::try_unwrap(garbler_inputs)
@@ -244,6 +220,7 @@ pub fn garble(c: &Circuit) -> Result<(Encoder, Decoder, GarbledCircuit), FancyEr
 mod classic {
     use super::*;
     use crate::circuit::{Circuit, CircuitBuilder};
+    use crate::dummy::Dummy;
     use crate::fancy::{BundleGadgets, Fancy};
     use crate::util::{self, RngExt};
     use itertools::Itertools;
@@ -267,7 +244,9 @@ mod classic {
                 let xs = &en.encode_evaluator_inputs(&inps);
                 let ys = &ev.eval(c, &[], xs).unwrap();
                 let decoded = de.decode(ys)[0];
-                let should_be = c.eval(&[], &inps)[0];
+                let dummy = Dummy::new(&[], &inps);
+                c.eval(&dummy).unwrap();
+                let should_be = dummy.get_output()[0];
                 if decoded != should_be {
                     println!(
                         "inp={:?} q={} got={} should_be={}",
@@ -420,7 +399,9 @@ mod classic {
                     let xs = &en.encode_evaluator_inputs(&[x, y]);
                     let ys = &ev.eval(&c, &[], xs).unwrap();
                     let decoded = de.decode(ys)[0];
-                    let should_be = c.eval(&[], &[x, y])[0];
+                    let dummy = Dummy::new(&[], &[x, y]);
+                    c.eval(&dummy).unwrap();
+                    let should_be = dummy.get_output()[0];
                     if decoded != should_be {
                         println!(
                             "FAILED inp={:?} q={} got={} should_be={}",
@@ -491,7 +472,9 @@ mod classic {
         let (_, de, ev) = garble(&circ).unwrap();
 
         for _ in 0..64 {
-            assert_eq!(circ.eval(&[], &[])[0], c, "plaintext eval failed");
+            let dummy = Dummy::new(&[], &[]);
+            circ.eval(&dummy).unwrap();
+            assert_eq!(dummy.get_output()[0], c, "plaintext eval failed");
             let Y = ev.eval(&circ, &[], &[]).unwrap();
             assert_eq!(de.decode(&Y)[0], c, "garbled eval failed");
         }
@@ -515,8 +498,9 @@ mod classic {
 
         for _ in 0..64 {
             let x = rng.gen_u16() % q;
-
-            assert_eq!(circ.eval(&[], &[x])[0], (x + c) % q, "plaintext");
+            let dummy = Dummy::new(&[], &[x]);
+            circ.eval(&dummy).unwrap();
+            assert_eq!(dummy.get_output()[0], (x + c) % q, "plaintext");
 
             let X = en.encode_evaluator_inputs(&[x]);
             let Y = ev.eval(&circ, &[], &X).unwrap();
@@ -529,6 +513,7 @@ mod classic {
 #[cfg(test)]
 mod streaming {
     use super::*;
+    use crate::fancy::Fancy;
     use crate::util::RngExt;
     use itertools::Itertools;
     use rand::thread_rng;
@@ -721,6 +706,7 @@ mod streaming {
 mod parallel {
     use super::*;
     use crate::dummy::Dummy;
+    use crate::fancy::Fancy;
     use crate::fancy::{BundleGadgets, SyncIndex};
     use crate::util::RngExt;
     use itertools::Itertools;

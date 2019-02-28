@@ -32,7 +32,7 @@ pub struct Circuit {
     pub evaluator_input_refs: Vec<CircuitRef>,
     pub const_refs: Vec<CircuitRef>,
     pub output_refs: Vec<CircuitRef>,
-    pub num_nonfree_gates: usize,
+    num_nonfree_gates: usize,
 }
 
 /// The most basic types of computation supported by fancy garbling.
@@ -84,47 +84,38 @@ impl Circuit {
         }
     }
 
-    pub fn eval(&self, garbler_inputs: &[u16], evaluator_inputs: &[u16]) -> Vec<u16> {
-        assert_eq!(
-            garbler_inputs.len(),
-            self.num_garbler_inputs(),
-            "[circuit.eval] needed {} garbler inputs but got {}!",
-            self.num_garbler_inputs(),
-            garbler_inputs.len()
-        );
-
-        assert_eq!(
-            evaluator_inputs.len(),
-            self.num_evaluator_inputs(),
-            "[circuit.eval] needed {} garbler inputs but got {}!",
-            self.num_evaluator_inputs(),
-            evaluator_inputs.len()
-        );
-
-        let mut cache = vec![0; self.gates.len()];
+    pub fn eval<F: Fancy>(&self, f: &F) -> Result<(), FancyError<F::Error>> {
+        let mut cache: Vec<Option<F::Item>> = vec![None; self.gates.len()];
         for zref in 0..self.gates.len() {
             let q = self.gate_moduli[zref];
             let val = match self.gates[zref] {
-                Gate::GarblerInput { id } => garbler_inputs[id],
-                Gate::EvaluatorInput { id } => evaluator_inputs[id],
-
-                Gate::Constant { val } => val,
-
-                Gate::Add { xref, yref } => (cache[xref.ix] + cache[yref.ix]) % q,
-                Gate::Sub { xref, yref } => (cache[xref.ix] + q - cache[yref.ix]) % q,
-
-                Gate::Cmul { xref, c } => cache[xref.ix] * c % q,
-
-                Gate::Proj { xref, ref tt, .. } => tt[cache[xref.ix] as usize],
-
-                Gate::Mul { xref, yref, .. } => (cache[xref.ix] * cache[yref.ix] % q),
+                Gate::GarblerInput { .. } => f.garbler_input(None, q, None)?,
+                Gate::EvaluatorInput { .. } => f.evaluator_input(None, q)?,
+                Gate::Constant { val } => f.constant(None, val, q)?,
+                Gate::Add { xref, yref } => f.add(
+                    &cache[xref.ix].clone().unwrap(),
+                    &cache[yref.ix].clone().unwrap(),
+                )?,
+                Gate::Sub { xref, yref } => f.sub(
+                    &cache[xref.ix].clone().unwrap(),
+                    &cache[yref.ix].clone().unwrap(),
+                )?,
+                Gate::Cmul { xref, c } => f.cmul(&cache[xref.ix].clone().unwrap(), c)?,
+                Gate::Proj { xref, ref tt, .. } => {
+                    f.proj(None, &cache[xref.ix].clone().unwrap(), q, Some(tt.to_vec()))?
+                }
+                Gate::Mul { xref, yref, .. } => f.mul(
+                    None,
+                    &cache[xref.ix].clone().unwrap(),
+                    &cache[yref.ix].clone().unwrap(),
+                )?,
             };
-            cache[zref] = val;
+            cache[zref] = Some(val.clone());
         }
-        self.output_refs
-            .iter()
-            .map(|outref| cache[outref.ix])
-            .collect()
+        for r in self.output_refs.iter() {
+            f.output(None, &cache[r.ix].clone().unwrap())?;
+        }
+        Ok(())
     }
 
     pub fn num_garbler_inputs(&self) -> usize {
@@ -151,43 +142,6 @@ impl Circuit {
     pub fn evaluator_input_mod(&self, id: usize) -> u16 {
         let r = self.evaluator_input_refs[id];
         r.modulus()
-    }
-
-    pub fn print_info(&self) {
-        let mut nconst = 0;
-        let mut nadd = 0;
-        let mut nsub = 0;
-        let mut ncmul = 0;
-        let mut nproj = 0;
-        let mut nhalfgate = 0;
-
-        for g in self.gates.iter() {
-            match g {
-                Gate::GarblerInput { .. } => (),
-                Gate::EvaluatorInput { .. } => (),
-                Gate::Constant { .. } => nconst += 1,
-                Gate::Add { .. } => nadd += 1,
-                Gate::Sub { .. } => nsub += 1,
-                Gate::Cmul { .. } => ncmul += 1,
-                Gate::Proj { .. } => nproj += 1,
-                Gate::Mul { .. } => nhalfgate += 1,
-            }
-        }
-
-        println!("circuit info:");
-        println!("  garbler inputs:   {}", self.num_garbler_inputs());
-        println!("  evaluator inputs: {}", self.num_evaluator_inputs());
-        println!("  noutputs:         {}", self.noutputs());
-        println!("  nconsts:          {}", nconst);
-        println!();
-        println!("  additions:        {}", nadd);
-        println!("  subtractions:     {}", nsub);
-        println!("  cmuls:            {}", ncmul);
-        println!("  projections:      {}", nproj);
-        println!("  halfgates:        {}", nhalfgate);
-        println!();
-        println!("  total non-free gates: {}", self.num_nonfree_gates);
-        println!();
     }
 }
 
@@ -382,6 +336,7 @@ impl CircuitBuilder {
 #[cfg(test)]
 mod basic {
     use super::*;
+    use crate::dummy::Dummy;
     use crate::util::RngExt;
     use itertools::Itertools;
     use rand::thread_rng;
@@ -403,7 +358,9 @@ mod basic {
                 inps.push(rng.gen_bool() as u16);
             }
             let res = inps.iter().fold(1, |acc, &x| x & acc);
-            let out = c.eval(&[], &inps)[0];
+            let dummy = Dummy::new(&[], &inps);
+            c.eval(&dummy).unwrap();
+            let out = dummy.get_output()[0];
             if !(out == res) {
                 println!("{:?} {} {}", inps, out, res);
                 panic!("incorrect output n={}", n);
@@ -427,7 +384,9 @@ mod basic {
                 inps.push(rng.gen_bool() as u16);
             }
             let res = inps.iter().fold(0, |acc, &x| x | acc);
-            let out = c.eval(&[], &inps)[0];
+            let dummy = Dummy::new(&[], &inps);
+            c.eval(&dummy).unwrap();
+            let out = dummy.get_output()[0];
             if !(out == res) {
                 println!("{:?} {} {}", inps, out, res);
                 panic!();
@@ -448,7 +407,9 @@ mod basic {
         for _ in 0..16 {
             let x = rng.gen_u16() % q;
             let y = rng.gen_u16() % q;
-            assert_eq!(c.eval(&[x], &[y])[0], x * y % q);
+            let dummy = Dummy::new(&[x], &[y]);
+            c.eval(&dummy).unwrap();
+            assert_eq!(dummy.get_output()[0], x * y % q);
         }
     }
     //}}}
@@ -465,7 +426,9 @@ mod basic {
         let c = b.finish();
         for _ in 0..16 {
             let x = rng.gen_u16() % p;
-            assert_eq!(c.eval(&[x], &[])[0], x % q);
+            let dummy = Dummy::new(&[x], &[]);
+            c.eval(&dummy).unwrap();
+            assert_eq!(dummy.get_output()[0], x % q);
         }
     }
     //}}}
@@ -489,7 +452,9 @@ mod basic {
                 .collect_vec();
             let s: u16 = inps.iter().sum();
             println!("{:?}, sum={}", inps, s);
-            assert_eq!(c.eval(&inps, &[])[0], s);
+            let dummy = Dummy::new(&inps, &[]);
+            c.eval(&dummy).unwrap();
+            assert_eq!(dummy.get_output()[0], s);
         }
     }
     // }}}
@@ -510,7 +475,9 @@ mod basic {
 
         for _ in 0..64 {
             let x = rng.gen_u16() % q;
-            let z = circ.eval(&[], &[x]);
+            let dummy = Dummy::new(&[], &[x]);
+            circ.eval(&dummy).unwrap();
+            let z = dummy.get_output();
             assert_eq!(z[0], (x + c) % q);
         }
     }
@@ -520,6 +487,7 @@ mod basic {
 #[cfg(test)]
 mod bundle {
     use super::*;
+    use crate::dummy::Dummy;
     use crate::fancy::BundleGadgets;
     use crate::util::{self, crt_factor, crt_inv_factor, RngExt};
     use itertools::Itertools;
@@ -540,7 +508,9 @@ mod bundle {
         for _ in 0..16 {
             let x = rng.gen_u128() % q;
             let y = rng.gen_u128() % q;
-            let res = c.eval(&crt_factor(x, q), &crt_factor(y, q));
+            let dummy = Dummy::new(&crt_factor(x, q), &crt_factor(y, q));
+            c.eval(&dummy).unwrap();
+            let res = dummy.get_output();
             let z = crt_inv_factor(&res, q);
             assert_eq!(z, (x + y) % q);
         }
@@ -561,7 +531,9 @@ mod bundle {
         for _ in 0..16 {
             let x = rng.gen_u128() % q;
             let y = rng.gen_u128() % q;
-            let res = c.eval(&crt_factor(x, q), &crt_factor(y, q));
+            let dummy = Dummy::new(&crt_factor(x, q), &crt_factor(y, q));
+            c.eval(&dummy).unwrap();
+            let res = dummy.get_output();
             let z = crt_inv_factor(&res, q);
             assert_eq!(z, (x + q - y) % q);
         }
@@ -581,7 +553,9 @@ mod bundle {
 
         for _ in 0..16 {
             let x = rng.gen_u128() % q;
-            let res = c.eval(&crt_factor(x, q), &[]);
+            let dummy = Dummy::new(&crt_factor(x, q), &[]);
+            c.eval(&dummy).unwrap();
+            let res = dummy.get_output();
             let z = crt_inv_factor(&res, q);
             assert_eq!(z, (x * y) % q);
         }
@@ -602,12 +576,14 @@ mod bundle {
         for _ in 0..16 {
             let x = rng.gen_u64() as u128 % q;
             let y = rng.gen_u64() as u128 % q;
-            let res = c.eval(&crt_factor(x, q), &crt_factor(y, q));
+            let dummy = Dummy::new(&crt_factor(x, q), &crt_factor(y, q));
+            c.eval(&dummy).unwrap();
+            let res = dummy.get_output();
             let z = crt_inv_factor(&res, q);
             assert_eq!(z, (x * y) % q);
         }
     }
-    //}}}
+    // }}}
     #[test] // bundle cexp {{{
     fn test_cexp() {
         let mut rng = thread_rng();
@@ -623,7 +599,9 @@ mod bundle {
         for _ in 0..64 {
             let x = rng.gen_u16() as u128 % q;
             let should_be = x.pow(y as u32) % q;
-            let res = c.eval(&crt_factor(x, q), &[]);
+            let dummy = Dummy::new(&crt_factor(x, q), &[]);
+            c.eval(&dummy).unwrap();
+            let res = dummy.get_output();
             let z = crt_inv_factor(&res, q);
             assert_eq!(z, should_be);
         }
@@ -645,7 +623,9 @@ mod bundle {
         for _ in 0..64 {
             let x = rng.gen_u128() % q;
             let should_be = x % p as u128;
-            let res = c.eval(&crt_factor(x, q), &[]);
+            let dummy = Dummy::new(&crt_factor(x, q), &[]);
+            c.eval(&dummy).unwrap();
+            let res = dummy.get_output();
             let z = crt_inv_factor(&res, q);
             assert_eq!(z, should_be);
         }
@@ -665,13 +645,17 @@ mod bundle {
 
         // lets have at least one test where they are surely equal
         let x = rng.gen_u128() % q;
-        let res = c.eval(&crt_factor(x, q), &crt_factor(x, q));
+        let dummy = Dummy::new(&crt_factor(x, q), &crt_factor(x, q));
+        c.eval(&dummy).unwrap();
+        let res = dummy.get_output();
         assert_eq!(res, &[(x == x) as u16]);
 
         for _ in 0..64 {
             let x = rng.gen_u128() % q;
             let y = rng.gen_u128() % q;
-            let res = c.eval(&crt_factor(x, q), &crt_factor(y, q));
+            let dummy = Dummy::new(&crt_factor(x, q), &crt_factor(y, q));
+            c.eval(&dummy).unwrap();
+            let res = dummy.get_output();
             assert_eq!(res, &[(x == y) as u16]);
         }
     }
@@ -696,7 +680,9 @@ mod bundle {
         for _ in 0..nargs {
             ds.extend(util::as_mixed_radix(Q - 1, &mods).iter());
         }
-        let res = circ.eval(&[], &ds);
+        let dummy = Dummy::new(&[], &ds);
+        circ.eval(&dummy).unwrap();
+        let res = dummy.get_output();
         assert_eq!(
             util::from_mixed_radix(&res, &mods),
             (Q - 1) * (nargs as u128) % Q
@@ -711,7 +697,9 @@ mod bundle {
                 should_be = (should_be + x) % Q;
                 ds.extend(util::as_mixed_radix(x, &mods).iter());
             }
-            let res = circ.eval(&[], &ds);
+            let dummy = Dummy::new(&[], &ds);
+            circ.eval(&dummy).unwrap();
+            let res = dummy.get_output();
             assert_eq!(util::from_mixed_radix(&res, &mods), should_be);
         }
     }
@@ -731,7 +719,9 @@ mod bundle {
         for _ in 0..128 {
             let pt = rng.gen_u128() % q;
             let should_be = if pt < q / 2 { pt } else { 0 };
-            let res = c.eval(&crt_factor(pt, q), &[]);
+            let dummy = Dummy::new(&crt_factor(pt, q), &[]);
+            c.eval(&dummy).unwrap();
+            let res = dummy.get_output();
             let z = crt_inv_factor(&res, q);
             assert_eq!(z, should_be);
         }
@@ -752,7 +742,9 @@ mod bundle {
         for _ in 0..128 {
             let pt = rng.gen_u128() % q;
             let should_be = if pt < q / 2 { 1 } else { q - 1 };
-            let res = c.eval(&crt_factor(pt, q), &[]);
+            let dummy = Dummy::new(&crt_factor(pt, q), &[]);
+            c.eval(&dummy).unwrap();
+            let res = dummy.get_output();
             let z = crt_inv_factor(&res, q);
             assert_eq!(z, should_be);
         }
@@ -772,13 +764,17 @@ mod bundle {
 
         // lets have at least one test where they are surely equal
         let x = rng.gen_u128() % q / 2;
-        let res = c.eval(&crt_factor(x, q), &crt_factor(x, q));
+        let dummy = Dummy::new(&crt_factor(x, q), &crt_factor(x, q));
+        c.eval(&dummy).unwrap();
+        let res = dummy.get_output();
         assert_eq!(res, &[(x < x) as u16], "x={}", x);
 
         for _ in 0..64 {
             let x = rng.gen_u128() % q / 2;
             let y = rng.gen_u128() % q / 2;
-            let res = c.eval(&crt_factor(x, q), &crt_factor(y, q));
+            let dummy = Dummy::new(&crt_factor(x, q), &crt_factor(y, q));
+            c.eval(&dummy).unwrap();
+            let res = dummy.get_output();
             assert_eq!(res, &[(x < y) as u16], "x={} y={}", x, y);
         }
     }
@@ -805,7 +801,9 @@ mod bundle {
                 .into_iter()
                 .flat_map(|x| crt_factor(x, q))
                 .collect_vec();
-            let res = c.eval(&enc_inps, &[]);
+            let dummy = Dummy::new(&enc_inps, &[]);
+            c.eval(&dummy).unwrap();
+            let res = dummy.get_output();
             let z = crt_inv_factor(&res, q);
             assert_eq!(z, should_be);
         }
@@ -833,8 +831,9 @@ mod bundle {
             println!("x={} y={}", x, y);
             let res_should_be = (x + y) % Q;
             let carry_should_be = (x + y >= Q) as u16;
-
-            let res = c.eval(&util::u128_to_bits(x, n), &util::u128_to_bits(y, n));
+            let dummy = Dummy::new(&util::u128_to_bits(x, n), &util::u128_to_bits(y, n));
+            c.eval(&dummy).unwrap();
+            let res = dummy.get_output();
             assert_eq!(util::u128_from_bits(&res[1..]), res_should_be);
             assert_eq!(res[0], carry_should_be);
         }
