@@ -434,7 +434,7 @@ pub trait RngExt: rand::Rng + Sized {
     #[inline]
     fn gen_usable_factors(&mut self) -> Vec<u16> {
         let mut x: u128 = 1;
-        PRIMES
+        PRIMES[..25]
             .iter()
             .cloned()
             .filter(|_| self.gen()) // randomly take this prime
