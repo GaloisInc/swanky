@@ -10,6 +10,7 @@ pub enum FancyError<T> {
     ArgNotBinary,
     NoTruthTable,
     InvalidTruthTable,
+    UninitializedValue,
     ClientError(T),
 }
 
@@ -68,6 +69,9 @@ impl<T: Display> Display for FancyError<T> {
             FancyError::ArgNotBinary => "argument bundle must be boolean".fmt(f),
             FancyError::NoTruthTable => "truth table required".fmt(f),
             FancyError::InvalidTruthTable => "invalid truth table".fmt(f),
+            FancyError::UninitializedValue => {
+                "uninitialized value in circuit. is the circuit topologically sorted?".fmt(f)
+            }
             FancyError::ClientError(e) => write!(f, "client error: {}", e),
         }
     }

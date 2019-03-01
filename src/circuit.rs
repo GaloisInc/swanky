@@ -93,27 +93,52 @@ impl Circuit {
                 Gate::EvaluatorInput { .. } => f.evaluator_input(None, q)?,
                 Gate::Constant { val } => f.constant(None, val, q)?,
                 Gate::Add { xref, yref } => f.add(
-                    &cache[xref.ix].clone().unwrap(),
-                    &cache[yref.ix].clone().unwrap(),
+                    cache[xref.ix]
+                        .as_ref()
+                        .ok_or(FancyError::UninitializedValue)?,
+                    cache[yref.ix]
+                        .as_ref()
+                        .ok_or(FancyError::UninitializedValue)?,
                 )?,
                 Gate::Sub { xref, yref } => f.sub(
-                    &cache[xref.ix].clone().unwrap(),
-                    &cache[yref.ix].clone().unwrap(),
+                    cache[xref.ix]
+                        .as_ref()
+                        .ok_or(FancyError::UninitializedValue)?,
+                    cache[yref.ix]
+                        .as_ref()
+                        .ok_or(FancyError::UninitializedValue)?,
                 )?,
-                Gate::Cmul { xref, c } => f.cmul(&cache[xref.ix].clone().unwrap(), c)?,
-                Gate::Proj { xref, ref tt, .. } => {
-                    f.proj(None, &cache[xref.ix].clone().unwrap(), q, Some(tt.to_vec()))?
-                }
+                Gate::Cmul { xref, c } => f.cmul(
+                    cache[xref.ix]
+                        .as_ref()
+                        .ok_or(FancyError::UninitializedValue)?,
+                    c,
+                )?,
+                Gate::Proj { xref, ref tt, .. } => f.proj(
+                    None,
+                    cache[xref.ix]
+                        .as_ref()
+                        .ok_or(FancyError::UninitializedValue)?,
+                    q,
+                    Some(tt.to_vec()),
+                )?,
                 Gate::Mul { xref, yref, .. } => f.mul(
                     None,
-                    &cache[xref.ix].clone().unwrap(),
-                    &cache[yref.ix].clone().unwrap(),
+                    cache[xref.ix]
+                        .as_ref()
+                        .ok_or(FancyError::UninitializedValue)?,
+                    cache[yref.ix]
+                        .as_ref()
+                        .ok_or(FancyError::UninitializedValue)?,
                 )?,
             };
-            cache[zref] = Some(val.clone());
+            cache[zref] = Some(val);
         }
         for r in self.output_refs.iter() {
-            f.output(None, &cache[r.ix].clone().unwrap())?;
+            f.output(
+                None,
+                cache[r.ix].as_ref().ok_or(FancyError::UninitializedValue)?,
+            )?;
         }
         Ok(())
     }
