@@ -1,6 +1,6 @@
 use itertools::Itertools;
 
-use fancy_garbling::{self, informer::Informer, util, BundleGadgets, Fancy, HasModulus};
+use fancy_garbling::{self, informer::Informer, BundleGadgets, Fancy, HasModulus};
 
 fn collision<W, F>(f: &F, nbits: usize, time_slices: usize, check_for_cheaters: bool)
 where
@@ -56,7 +56,7 @@ where
         // we want to ensure that the difference of two inputs of any two sequential time
         // slices are at most delta.
         let delta = f
-            .constant_bundle_binary(None, &util::u128_to_bits(10, nbits))
+            .constant_bundle_binary(None, 10, nbits)
             .unwrap();
 
         let possible_cheats = (1..time_slices)

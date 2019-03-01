@@ -389,6 +389,109 @@ mod bundle {
         }
     }
     //}}}
+    #[test] // twos complement {{{
+    fn twos_complement() {
+        let mut rng = thread_rng();
+        let nbits = 16;
+        let q = 1 << nbits;
+        for _ in 0..NITERS {
+            let x = rng.gen_u128() % q;
+            let should_be = (!x + 1) % q;
+            let d = Dummy::new(&util::u128_to_bits(x,nbits), &[]);
+            {
+                let x = d.garbler_input_bundle_binary(None, nbits, None).unwrap();
+                let y = d.twos_complement(None, &x).unwrap();
+                d.output_bundle(None, &y).unwrap();
+            }
+            let outs = d.get_output();
+            let y = util::u128_from_bits(&outs);
+            assert_eq!(y, should_be, "x={} y={} should_be={}", x, y, should_be);
+        }
+    }
+    //}}}
+    #[test] // binary addition {{{
+    fn binary_addition() {
+        let mut rng = thread_rng();
+        let nbits = 16;
+        let q = 1 << nbits;
+        for _ in 0..NITERS {
+            let x = rng.gen_u128() % q;
+            let y = rng.gen_u128() % q;
+            let should_be = (x + y) % q;
+            let enc_inps = [x,y]
+                .into_iter()
+                .flat_map(|&x| util::u128_to_bits(x, nbits))
+                .collect_vec();
+            let d = Dummy::new(&enc_inps, &[]);
+            {
+                let x = d.garbler_input_bundle_binary(None, nbits, None).unwrap();
+                let y = d.garbler_input_bundle_binary(None, nbits, None).unwrap();
+                let (z, overflow) = d.binary_addition(None, &x, &y).unwrap();
+                d.output(None, &overflow).unwrap();
+                d.output_bundle(None, &z).unwrap();
+            }
+            let outs = d.get_output();
+            let overflow = outs[0] > 0;
+            let z = util::u128_from_bits(&outs[1..]);
+            assert_eq!(z, should_be, "x={} y={} z={} should_be={}", x, y, z, should_be);
+            assert_eq!(overflow, x + y >= q, "x={} y={}", x, y);
+        }
+    }
+    //}}}
+    #[test] // binary subtraction {{{
+    fn binary_subtraction() {
+        let mut rng = thread_rng();
+        let nbits = 16;
+        let q = 1 << nbits;
+        for _ in 0..NITERS {
+            let x = rng.gen_u128() % q;
+            let y = rng.gen_u128() % q;
+            let should_be = (x - y) % q;
+            let enc_inps = [x,y]
+                .into_iter()
+                .flat_map(|&x| util::u128_to_bits(x, nbits))
+                .collect_vec();
+            let d = Dummy::new(&enc_inps, &[]);
+            {
+                let x = d.garbler_input_bundle_binary(None, nbits, None).unwrap();
+                let y = d.garbler_input_bundle_binary(None, nbits, None).unwrap();
+                let (z, overflow) = d.binary_subtraction(None, &x, &y).unwrap();
+                d.output(None, &overflow).unwrap();
+                d.output_bundle(None, &z).unwrap();
+            }
+            let outs = d.get_output();
+            let overflow = outs[0] > 0;
+            let z = util::u128_from_bits(&outs[1..]);
+            assert_eq!(z, should_be, "x={} y={} z={} should_be={}", x, y, z, should_be);
+            assert_eq!(overflow, (y != 0 && x >= y), "x={} y={}", x, y);
+        }
+    }
+    //}}}
+    #[test] // binary lt {{{
+    fn binary_lt() {
+        let mut rng = thread_rng();
+        let nbits = 16;
+        let q = 1 << nbits;
+        for _ in 0..NITERS {
+            let x = rng.gen_u128() % q;
+            let y = rng.gen_u128() % q;
+            let should_be = x < y;
+            let enc_inps = [x,y]
+                .into_iter()
+                .flat_map(|&x| util::u128_to_bits(x, nbits))
+                .collect_vec();
+            let d = Dummy::new(&enc_inps, &[]);
+            {
+                let x = d.garbler_input_bundle_binary(None, nbits, None).unwrap();
+                let y = d.garbler_input_bundle_binary(None, nbits, None).unwrap();
+                let z = d.lt(None, &x, &y, "100%").unwrap();
+                d.output(None, &z).unwrap();
+            }
+            let z = d.get_output()[0] > 0;
+            assert_eq!(z, should_be, "x={} y={}", x, y);
+        }
+    }
+    //}}}
     #[test] // binary max {{{
     fn binary_max() {
         let mut rng = thread_rng();

@@ -47,6 +47,16 @@ impl<W: Clone + HasModulus> Bundle<W> {
         }
         Bundle(new_ws)
     }
+
+    /// Pad the Bundle with val, n times.
+    pub fn pad(&mut self, val: W) {
+        self.0.push(val);
+    }
+
+    /// Extract a wire from the Bundle, removing it and returning it.
+    pub fn extract(&mut self, wire_index: usize) -> W {
+        self.0.remove(wire_index)
+    }
 }
 
 /// Extension trait for `Fancy` providing advanced gadgets based on bundles of wires.
@@ -155,9 +165,10 @@ pub trait BundleGadgets: Fancy {
     fn constant_bundle_binary(
         &self,
         ix: Option<SyncIndex>,
-        bits: &[u16],
+        val: u128,
+        nbits: usize,
     ) -> Result<Bundle<Self::Item>, FancyError<Self::Error>> {
-        self.constant_bundle(ix, bits, &vec![2; bits.len()])
+        self.constant_bundle(ix, &util::u128_to_bits(val, nbits), &vec![2; nbits])
     }
 
     /// Create `n` garbler input bundles, using moduli `ps` and optional inputs `xs`.
@@ -676,8 +687,28 @@ pub trait BundleGadgets: Fancy {
         accuracy: &str,
     ) -> Result<Self::Item, FancyError<Self::Error>> {
         if x.is_binary() {
-            let (_, z) = self.binary_subtraction(ix, x, y)?;
-            Ok(z)
+            // underflow indicates y != 0 && x >= y
+            // requiring special care to remove the y != 0, which is what follows.
+            let (_, lhs) = self.binary_subtraction(ix, x, y)?;
+
+            // Now we build a clause equal to (y == 0 || x >= y), which we can OR with
+            // lhs to remove the y==0 aspect.
+            // check if y==0
+            let y_contains_1 = self.or_many(ix, y.wires())?;
+            let y_eq_0 = self.negate(ix, &y_contains_1)?;
+
+            // if x != 0, then x >= y, ... assuming x is not negative
+            let x_contains_1 = self.or_many(ix, x.wires())?;
+
+            // y == 0 && x >= y
+            let rhs = self.and(ix, &y_eq_0, &x_contains_1)?;
+
+            // (y != 0 && x >= y) || (y == 0 && x >= y)
+            // => x >= y && (y != 0 || y == 0)\
+            // => x >= y && 1
+            // => x >= y
+            let geq = self.or(ix, &lhs, &rhs)?;
+            self.negate(ix, &geq)
         } else {
             let z = self.sub_bundles(x, y)?;
             self.sign(ix, &z, accuracy)
@@ -829,13 +860,13 @@ pub trait BundleGadgets: Fancy {
             .iter()
             .map(|x| self.negate(ix, x))
             .collect::<Result<Vec<Self::Item>, FancyError<Self::Error>>>()?;
-        let zero = self.constant(ix, 0, 2)?;
-        let mut const1 = vec![zero; xs.size()];
-        const1[0] = self.constant(ix, 1, 2)?;
-        self.binary_addition_no_carry(ix, &Bundle(not_xs), &Bundle(const1))
+        let one = self.constant_bundle_binary(ix, 1, xs.size())?;
+        self.binary_addition_no_carry(ix, &Bundle(not_xs), &one)
     }
 
-    /// Subtract two binary bundles. Returns the result and whether it overflowed.
+    /// Subtract two binary bundles. Returns the result and whether it underflowed.
+    ///
+    /// Due to the way that `twos_complement(0) = 0`, underflow indicates `y != 0 && x >= y`.
     fn binary_subtraction(
         &self,
         ix: Option<SyncIndex>,
@@ -843,8 +874,7 @@ pub trait BundleGadgets: Fancy {
         ys: &Bundle<Self::Item>,
     ) -> Result<(Bundle<Self::Item>, Self::Item), FancyError<Self::Error>> {
         let neg_ys = self.twos_complement(ix, &ys)?;
-        let (zs, c) = self.binary_addition(ix, &xs, &neg_ys)?;
-        Ok((zs, self.negate(ix, &c)?))
+        self.binary_addition(ix, &xs, &neg_ys)
     }
 
     /// If b=0 then return x, else return y.
