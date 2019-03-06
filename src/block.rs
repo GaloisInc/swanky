@@ -13,7 +13,6 @@ use arrayref::array_ref;
 use core::arch::x86_64::*;
 #[cfg(feature = "curve25519-dalek")]
 use curve25519_dalek::ristretto::RistrettoPoint;
-use failure::Error;
 use std::io::{Read, Write};
 
 /// A 128-bit chunk.
@@ -107,11 +106,11 @@ impl Block {
     }
 
     #[inline]
-    pub fn write<T: Write>(&self, stream: &mut T) -> Result<usize, Error> {
-        stream.write(self.as_ref()).map_err(Error::from)
+    pub fn write<T: Write>(&self, stream: &mut T) -> Result<usize, std::io::Error> {
+        stream.write(self.as_ref())
     }
     #[inline]
-    pub fn read<T: Read>(stream: &mut T) -> Result<Block, Error> {
+    pub fn read<T: Read>(stream: &mut T) -> Result<Block, std::io::Error> {
         let mut v = Block::zero();
         stream.read_exact(v.as_mut())?;
         Ok(v)
