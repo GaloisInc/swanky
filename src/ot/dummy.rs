@@ -7,9 +7,9 @@
 //! Implementation of an **entirely insecure** oblivious transfer protocol for
 //! testing purposes.
 
+use crate::errors::Error;
 use crate::stream;
 use crate::{ObliviousTransferReceiver, ObliviousTransferSender};
-use failure::Error;
 use rand::{CryptoRng, RngCore};
 use scuttlebutt::Block;
 use std::io::{Read, Write};
@@ -70,7 +70,12 @@ impl ObliviousTransferReceiver for DummyOTReceiver {
             stream::write_bool(writer, *b)?;
         }
         writer.flush()?;
-        (0..inputs.len()).map(|_| Block::read(reader)).collect()
+        let mut out = Vec::with_capacity(inputs.len());
+        for _ in 0..inputs.len() {
+            let m = Block::read(reader)?;
+            out.push(m);
+        }
+        Ok(out)
     }
 }
 

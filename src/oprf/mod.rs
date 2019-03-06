@@ -7,7 +7,7 @@
 pub mod kkrt;
 mod prc;
 
-use crate::errors::OprfError;
+use crate::errors::Error;
 use rand::{CryptoRng, RngCore};
 use std::io::{Read, Write};
 
@@ -24,7 +24,7 @@ where
         reader: &mut R,
         writer: &mut W,
         rng: &mut RNG,
-    ) -> Result<Self, OprfError>;
+    ) -> Result<Self, Error>;
 
     fn send<R: Read + Send, W: Write + Send, RNG: CryptoRng + RngCore>(
         &mut self,
@@ -32,7 +32,7 @@ where
         writer: &mut W,
         m: usize,
         rng: &mut RNG,
-    ) -> Result<Vec<Self::Seed>, OprfError>;
+    ) -> Result<Vec<Self::Seed>, Error>;
 
     fn compute(&self, seed: Self::Seed, input: Self::Input) -> Self::Output;
 }
@@ -49,7 +49,7 @@ where
         reader: &mut R,
         writer: &mut W,
         rng: &mut RNG,
-    ) -> Result<Self, OprfError>;
+    ) -> Result<Self, Error>;
 
     fn receive<R: Read + Send, W: Write + Send, RNG: CryptoRng + RngCore>(
         &mut self,
@@ -57,5 +57,5 @@ where
         writer: &mut W,
         selections: &[Self::Input],
         rng: &mut RNG,
-    ) -> Result<Vec<Self::Output>, OprfError>;
+    ) -> Result<Vec<Self::Output>, Error>;
 }

@@ -13,20 +13,15 @@ use std::io::{BufReader, BufWriter};
 use std::os::unix::net::UnixStream;
 use std::time::Duration;
 
-// fn rand_vec(t: usize) -> Vec<Vec<u8>> {
-//     (0..t)
-//         .map(|_| (0..64).map(|_| rand::random::<u8>()).collect::<Vec<u8>>())
-//         .collect()
-// }
 fn rand_block_vec(size: usize) -> Vec<Block> {
     (0..size).map(|_| rand::random::<Block>()).collect()
 }
 
-const T: usize = 1 << 10;
+const T: usize = 1 << 16;
 
 fn _bench_oprf<
-    OPRFSender: ObliviousPrfSender<Seed = (usize, [u8; 64]), Input = Block, Output = (usize, [u8; 64])>,
-    OPRFReceiver: ObliviousPrfReceiver<Input = Block, Output = (usize, [u8; 64])>,
+    OPRFSender: ObliviousPrfSender<Seed = [u8; 64], Input = Block, Output = [u8; 64]>,
+    OPRFReceiver: ObliviousPrfReceiver<Input = Block, Output = [u8; 64]>,
 >(
     rs: &[Block],
 ) {
@@ -47,8 +42,12 @@ fn _bench_oprf<
     handle.join().unwrap();
 }
 
-type KkrtSender = kkrt::KkrtOPRFSender<dummy::DummyVecOTReceiver>;
-type KkrtReceiver = kkrt::KkrtOPRFReceiver<dummy::DummyVecOTSender>;
+type ChouOrlandiSender = chou_orlandi::ChouOrlandiOTSender;
+type ChouOrlandiReceiver = chou_orlandi::ChouOrlandiOTReceiver;
+type AlszSender = alsz::AlszOTSender<ChouOrlandiReceiver>;
+type AlszReceiver = alsz::AlszOTReceiver<ChouOrlandiSender>;
+type KkrtSender = kkrt::KkrtOPRFSender<AlszReceiver>;
+type KkrtReceiver = kkrt::KkrtOPRFReceiver<AlszSender>;
 
 fn bench_oprf(c: &mut Criterion) {
     c.bench_function("oprf::KkrtOPRF", move |bench| {

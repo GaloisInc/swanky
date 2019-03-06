@@ -17,12 +17,12 @@
 //! produced by the protocol will be the same. We fix this by hashing in `i`
 //! during the key derivation phase.
 
+use crate::errors::Error;
 use crate::stream;
 use crate::{ObliviousTransferReceiver, ObliviousTransferSender};
 use curve25519_dalek::constants::RISTRETTO_BASEPOINT_TABLE;
 use curve25519_dalek::ristretto::{RistrettoBasepointTable, RistrettoPoint};
 use curve25519_dalek::scalar::Scalar;
-use failure::Error;
 use rand::{CryptoRng, RngCore};
 use scuttlebutt::{Block, Malicious, SemiHonest};
 use std::io::{Read, Write};

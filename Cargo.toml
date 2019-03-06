@@ -24,7 +24,6 @@ libc = "*"
 rand = "0.6"
 rand_core = "0.4"
 scuttlebutt = { path = "../scuttlebutt", features = ["curve25519-dalek"] }
-sha2 = "*"
 
 [build-dependencies]
 cc = "*"

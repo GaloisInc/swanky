@@ -10,7 +10,7 @@ pub mod dummy;
 pub mod kos;
 pub mod naor_pinkas;
 
-use failure::Error;
+use crate::errors::Error;
 use rand::{CryptoRng, RngCore};
 use std::io::{Read, Write};
 

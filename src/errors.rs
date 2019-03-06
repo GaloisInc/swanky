@@ -5,16 +5,20 @@
 // See LICENSE for licensing information.
 
 #[derive(Debug)]
-pub enum OprfError {
+pub enum Error {
     InvalidInputLength,
+    IoError(String),
     Other(String),
 }
 
-#[derive(Debug)]
-pub enum OtError {}
+impl From<failure::Error> for Error {
+    fn from(e: failure::Error) -> Error {
+        Error::Other(e.to_string())
+    }
+}
 
-impl From<failure::Error> for OprfError {
-    fn from(e: failure::Error) -> OprfError {
-        OprfError::Other(e.to_string())
+impl From<std::io::Error> for Error {
+    fn from(e: std::io::Error) -> Error {
+        Error::IoError(e.to_string())
     }
 }

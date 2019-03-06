@@ -7,6 +7,7 @@
 //! Implementation of the Asharov-Lindell-Schneider-Zohner oblivious transfer
 //! extension protocol (cf. <https://eprint.iacr.org/2016/602>, Protocol 4).
 
+use crate::errors::Error;
 use crate::{stream, utils};
 use crate::{
     CorrelatedObliviousTransferReceiver, CorrelatedObliviousTransferSender,
@@ -14,7 +15,6 @@ use crate::{
     RandomObliviousTransferSender,
 };
 use arrayref::array_ref;
-use failure::Error;
 use rand::CryptoRng;
 use rand_core::{RngCore, SeedableRng};
 use scuttlebutt::{AesHash, AesRng, Block, SemiHonest};
