@@ -97,7 +97,7 @@ impl Block {
         c.encrypt(Block::from(m))
     }
 
-    // Fixed key for AES hash. This is the same fixed key as used in the EMP toolkit.
+    /// Fixed key for AES hash. This is the same fixed key as used in the EMP toolkit.
     #[inline]
     pub fn fixed_key() -> Self {
         Block::from([
@@ -105,6 +105,7 @@ impl Block {
             0xc7, 0x7a,
         ])
     }
+
     #[inline]
     pub fn write<T: Write>(&self, stream: &mut T) -> Result<usize, Error> {
         stream.write(self.as_ref()).map_err(Error::from)

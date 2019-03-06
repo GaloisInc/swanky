@@ -23,6 +23,12 @@ mod block;
 mod hash_aes;
 mod rand_aes;
 
+pub use crate::aes::Aes128;
 pub use crate::block::Block;
 pub use crate::hash_aes::AesHash;
 pub use crate::rand_aes::AesRng;
+
+/// A marker trait denoting that the given scheme is semi-honest secure.
+pub trait SemiHonest {}
+/// A marker trait denoting that the given scheme is maliciously secure.
+pub trait Malicious: SemiHonest {}
