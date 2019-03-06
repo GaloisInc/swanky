@@ -33,6 +33,8 @@ mod cointoss;
 mod stream;
 mod utils;
 
+pub mod errors;
+
 mod ot;
 pub use crate::ot::*;
 mod oprf;

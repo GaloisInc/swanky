@@ -51,8 +51,8 @@ impl<OT: ObliviousTransferReceiver<Msg = Block> + Malicious> KosOTSender<OT> {
         // Check correlation
         let mut seed = Block::zero();
         rng.fill_bytes(&mut seed.as_mut());
-        let seed = cointoss::send(reader, writer, seed)?;
-        let mut rng = AesRng::from_seed(seed);
+        let seed = cointoss::send(reader, writer, &[seed])?;
+        let mut rng = AesRng::from_seed(seed[0]);
         let mut check = (Block::zero(), Block::zero());
         let mut chi = Block::zero();
         for j in 0..ncols {
@@ -187,8 +187,8 @@ impl<OT: ObliviousTransferSender<Msg = Block> + Malicious> KosOTReceiver<OT> {
         // Check correlation
         let mut seed = Block::zero();
         rng.fill_bytes(&mut seed.as_mut());
-        let seed = cointoss::receive(reader, writer, seed)?;
-        let mut rng = AesRng::from_seed(seed);
+        let seed = cointoss::receive(reader, writer, &[seed])?;
+        let mut rng = AesRng::from_seed(seed[0]);
         let mut x = Block::zero();
         let mut t = (Block::zero(), Block::zero());
         let r_ = utils::u8vec_to_boolvec(&r);

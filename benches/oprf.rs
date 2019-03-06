@@ -8,24 +8,27 @@
 
 use criterion::{criterion_group, criterion_main, Criterion};
 use ocelot::*;
-use scuttlebutt::AesRng;
+use scuttlebutt::{AesRng, Block};
 use std::io::{BufReader, BufWriter};
 use std::os::unix::net::UnixStream;
 use std::time::Duration;
 
-fn rand_vec(t: usize) -> Vec<Vec<u8>> {
-    (0..t)
-        .map(|_| (0..64).map(|_| rand::random::<u8>()).collect::<Vec<u8>>())
-        .collect()
+// fn rand_vec(t: usize) -> Vec<Vec<u8>> {
+//     (0..t)
+//         .map(|_| (0..64).map(|_| rand::random::<u8>()).collect::<Vec<u8>>())
+//         .collect()
+// }
+fn rand_block_vec(size: usize) -> Vec<Block> {
+    (0..size).map(|_| rand::random::<Block>()).collect()
 }
 
-const T: usize = 1 << 16;
+const T: usize = 1 << 10;
 
 fn _bench_oprf<
-    OPRFSender: ObliviousPrfSender<Seed = (usize, Vec<u8>), Input = Vec<u8>, Output = (usize, Vec<u8>)>,
-    OPRFReceiver: ObliviousPrfReceiver<Input = Vec<u8>, Output = (usize, Vec<u8>)>,
+    OPRFSender: ObliviousPrfSender<Seed = (usize, [u8; 64]), Input = Block, Output = (usize, [u8; 64])>,
+    OPRFReceiver: ObliviousPrfReceiver<Input = Block, Output = (usize, [u8; 64])>,
 >(
-    rs: &[Vec<u8>],
+    rs: &[Block],
 ) {
     let (sender, receiver) = UnixStream::pair().unwrap();
     let m = rs.len();
@@ -49,7 +52,7 @@ type KkrtReceiver = kkrt::KkrtOPRFReceiver<dummy::DummyVecOTSender>;
 
 fn bench_oprf(c: &mut Criterion) {
     c.bench_function("oprf::KkrtOPRF", move |bench| {
-        let rs = rand_vec(T);
+        let rs = rand_block_vec(T);
         bench.iter(|| _bench_oprf::<KkrtSender, KkrtReceiver>(&rs.clone()))
     });
 }
