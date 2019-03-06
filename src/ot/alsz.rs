@@ -11,13 +11,13 @@ use crate::{stream, utils};
 use crate::{
     CorrelatedObliviousTransferReceiver, CorrelatedObliviousTransferSender,
     ObliviousTransferReceiver, ObliviousTransferSender, RandomObliviousTransferReceiver,
-    RandomObliviousTransferSender, SemiHonest,
+    RandomObliviousTransferSender,
 };
 use arrayref::array_ref;
 use failure::Error;
 use rand::CryptoRng;
 use rand_core::{RngCore, SeedableRng};
-use scuttlebutt::{AesHash, AesRng, Block};
+use scuttlebutt::{AesHash, AesRng, Block, SemiHonest};
 use std::io::{ErrorKind, Read, Write};
 use std::marker::PhantomData;
 
@@ -56,6 +56,7 @@ impl<OT: ObliviousTransferReceiver<Msg = Block> + SemiHonest> AlszOTSender<OT> {
             let range = j * ncols / 8..(j + 1) * ncols / 8;
             let mut q = &mut qs[range];
             stream::read_bytes_inplace(reader, &mut u)?;
+            // XXX: make constant time independent of `b`
             if !b {
                 std::mem::replace(&mut u, vec![0u8; ncols / 8]);
             };

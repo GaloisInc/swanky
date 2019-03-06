@@ -6,14 +6,30 @@
 
 use scuttlebutt::Block;
 
-#[inline(always)]
+#[inline]
 pub fn xor_inplace(a: &mut [u8], b: &[u8]) {
     for i in 0..a.len() {
         a[i] ^= b[i];
     }
 }
 
-#[inline(always)]
+#[inline]
+pub fn xor(a: &[u8], b: &[u8]) -> Vec<u8> {
+    a.iter()
+        .zip(b.iter())
+        .map(|(a, b)| a ^ b)
+        .collect::<Vec<u8>>()
+}
+
+#[inline]
+pub fn and(a: &[u8], b: &[u8]) -> Vec<u8> {
+    a.iter()
+        .zip(b.iter())
+        .map(|(a, b)| a & b)
+        .collect::<Vec<u8>>()
+}
+
+#[inline]
 pub fn transpose(m: &[u8], nrows: usize, ncols: usize) -> Vec<u8> {
     let m_ = vec![0u8; nrows * ncols / 8];
     unsafe {
@@ -32,7 +48,7 @@ extern "C" {
     fn sse_trans(out: *mut u8, inp: *const u8, nrows: u64, ncols: u64);
 }
 
-#[inline(always)]
+#[inline]
 pub fn boolvec_to_u8vec(bv: &[bool]) -> Vec<u8> {
     let mut v = vec![0u8; bv.len() / 8];
     for (i, b) in bv.iter().enumerate() {
@@ -40,7 +56,7 @@ pub fn boolvec_to_u8vec(bv: &[bool]) -> Vec<u8> {
     }
     v
 }
-#[inline(always)]
+#[inline]
 pub fn u8vec_to_boolvec(v: &[u8]) -> Vec<bool> {
     let mut bv = Vec::with_capacity(v.len() * 8);
     for byte in v.iter() {
@@ -88,6 +104,14 @@ mod tests {
         let v_ = u8vec_to_boolvec(&v);
         let v__ = boolvec_to_u8vec(&v_);
         assert_eq!(v, v__);
+    }
+
+    #[test]
+    fn test_and() {
+        let v = (0..128).map(|_| rand::random::<u8>()).collect::<Vec<u8>>();
+        let v_ = (0..128).map(|_| 0xFF).collect::<Vec<u8>>();
+        let v__ = and(&v, &v_);
+        assert_eq!(v__, v);
     }
 }
 

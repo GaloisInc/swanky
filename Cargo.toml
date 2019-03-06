@@ -17,12 +17,14 @@ nightly = ["curve25519-dalek/simd_backend", "rand/nightly", "scuttlebutt/nightly
 
 [dependencies]
 arrayref = "0.3"
+
 curve25519-dalek = { version = "1.1", features = ["std"] }
 failure = "0.1"
 libc = "*"
 rand = "0.6"
 rand_core = "0.4"
 scuttlebutt = { path = "../scuttlebutt", features = ["curve25519-dalek"] }
+sha2 = "*"
 
 [build-dependencies]
 cc = "*"
@@ -48,6 +50,10 @@ debug = false
 debug-assertions = false
 overflow-checks = false
 
+# [[bench]]
+# name = "ot"
+# harness = false
+
 [[bench]]
-name = "ot"
+name = "oprf"
 harness = false

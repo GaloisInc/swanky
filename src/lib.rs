@@ -19,6 +19,9 @@
 //! `CorrelatedObliviousTransferSender/Receiver` and
 //! `RandomObliviousTransferSender/Receiver` traits.
 //!
+//! We use a computation security parameter of `κ = 128` throughout in order to
+//! benefit from SIMD operations over 128-bit values.
+//!
 //! **THIS IS STILL VERY MUCH RESEARCH CODE**, for now.
 
 #![allow(clippy::many_single_char_names)]
@@ -27,8 +30,10 @@
 #![cfg_attr(feature = "nightly", feature(asm))]
 
 mod cointoss;
-mod ot;
 mod stream;
 mod utils;
 
+mod ot;
 pub use crate::ot::*;
+mod oprf;
+pub use crate::oprf::*;

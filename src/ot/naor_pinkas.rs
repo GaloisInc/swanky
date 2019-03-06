@@ -4,19 +4,20 @@
 // Copyright © 2019 Galois, Inc.
 // See LICENSE for licensing information.
 
-//! Implementation of the Naor-Pinkas oblivious transfer protocol.
+//! Implementation of the Naor-Pinkas oblivious transfer protocol <cf.
+//! https://dl.acm.org/citation.cfm?id=365502>.
 //!
 //! This implementation uses the Ristretto prime order elliptic curve group from
 //! the `curve25519-dalek` library.
 
 use crate::stream;
-use crate::{ObliviousTransferReceiver, ObliviousTransferSender, SemiHonest};
+use crate::{ObliviousTransferReceiver, ObliviousTransferSender};
 use curve25519_dalek::constants::RISTRETTO_BASEPOINT_TABLE;
 use curve25519_dalek::ristretto::RistrettoPoint;
 use curve25519_dalek::scalar::Scalar;
 use failure::Error;
 use rand::{CryptoRng, RngCore};
-use scuttlebutt::Block;
+use scuttlebutt::{Block, SemiHonest};
 use std::io::{Read, Write};
 
 pub struct NaorPinkasOTSender {}

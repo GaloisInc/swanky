@@ -10,15 +10,15 @@
 use crate::alsz::*;
 use crate::{cointoss, utils};
 use crate::{
-    CorrelatedObliviousTransferReceiver, CorrelatedObliviousTransferSender, Malicious,
+    CorrelatedObliviousTransferReceiver, CorrelatedObliviousTransferSender,
     ObliviousTransferReceiver, ObliviousTransferSender, RandomObliviousTransferReceiver,
-    RandomObliviousTransferSender, SemiHonest,
+    RandomObliviousTransferSender,
 };
 use arrayref::array_ref;
 use failure::Error;
 use rand::CryptoRng;
 use rand_core::{RngCore, SeedableRng};
-use scuttlebutt::{AesRng, Block};
+use scuttlebutt::{AesRng, Block, Malicious, SemiHonest};
 use std::io::{ErrorKind, Read, Write};
 
 const SSP: usize = 40;

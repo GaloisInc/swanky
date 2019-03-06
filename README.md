@@ -9,7 +9,7 @@ world.
 * Naor-Pinkas semi-honest OT
 * Chou-Orlandi malicious OT
 * Asharov-Lindell-Schneider-Zohner semi-honest OT extension (+ correlated and random OT)
-* Keller-Orsini-Scholl malicious OT extension
+* Keller-Orsini-Scholl malicious OT extension (+ correlated and random OT)
 
 It also exposes various traits for implementing your very own OT protocol:
 
@@ -32,7 +32,7 @@ version 1.0 is released**
 # Performance
 
 `ocelot` seems to be close in performance with the latest and greatest OT
-libraries out there. When using the benchmarks with `1 << 23` OTs we get the
+libraries out there. When running the benchmarks with `1 << 23` OTs we get the
 following results (in # million OTs per second and using Chou-Orlandi as the
 base OT):
 

@@ -18,13 +18,13 @@
 //! during the key derivation phase.
 
 use crate::stream;
-use crate::{Malicious, ObliviousTransferReceiver, ObliviousTransferSender, SemiHonest};
+use crate::{ObliviousTransferReceiver, ObliviousTransferSender};
 use curve25519_dalek::constants::RISTRETTO_BASEPOINT_TABLE;
 use curve25519_dalek::ristretto::{RistrettoBasepointTable, RistrettoPoint};
 use curve25519_dalek::scalar::Scalar;
 use failure::Error;
 use rand::{CryptoRng, RngCore};
-use scuttlebutt::Block;
+use scuttlebutt::{Block, Malicious, SemiHonest};
 use std::io::{Read, Write};
 
 /// Oblivious transfer sender.
