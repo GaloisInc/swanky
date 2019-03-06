@@ -12,10 +12,10 @@
 //! seed_`. Likewise, on input `seed`, the receiver gets `r`, sends `seed` to
 //! the sender, and then receives `seed_`, checking that `PRG(seed_) = r`.
 
-use failure::Error;
+use crate::errors::Error;
 use rand_core::{RngCore, SeedableRng};
 use scuttlebutt::{AesRng, Block};
-use std::io::{ErrorKind, Read, Write};
+use std::io::{Read, Write};
 
 #[inline]
 pub fn send<R: Read, W: Write>(
@@ -64,10 +64,7 @@ pub fn receive<R: Read, W: Write>(
         let mut check = Block::zero();
         rng_.fill_bytes(&mut check.as_mut());
         if check != com {
-            return Err(Error::from(std::io::Error::new(
-                ErrorKind::InvalidData,
-                "Commitment check failed",
-            )));
+            return Err(Error::CommitmentCheck);
         }
         out.push(*seed ^ seed_)
     }

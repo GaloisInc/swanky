@@ -7,18 +7,14 @@
 #[derive(Debug)]
 pub enum Error {
     InvalidInputLength,
-    IoError(String),
+    IoError(std::io::Error),
     Other(String),
-}
-
-impl From<failure::Error> for Error {
-    fn from(e: failure::Error) -> Error {
-        Error::Other(e.to_string())
-    }
+    CommitmentCheck,
+    DecompressPoint,
 }
 
 impl From<std::io::Error> for Error {
     fn from(e: std::io::Error) -> Error {
-        Error::IoError(e.to_string())
+        Error::IoError(e)
     }
 }

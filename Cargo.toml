@@ -19,7 +19,6 @@ nightly = ["curve25519-dalek/simd_backend", "rand/nightly", "scuttlebutt/nightly
 arrayref = "0.3"
 
 curve25519-dalek = { version = "1.1", features = ["std"] }
-failure = "0.1"
 libc = "*"
 rand = "0.6"
 rand_core = "0.4"

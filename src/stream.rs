@@ -4,10 +4,9 @@
 // Copyright © 2019 Galois, Inc.
 // See LICENSE for licensing information.
 
+use crate::errors::Error;
 use curve25519_dalek::ristretto::{CompressedRistretto, RistrettoPoint};
-use failure::Error;
-use std::io::Error as IOError;
-use std::io::{ErrorKind, Read, Write};
+use std::io::{Read, Write};
 
 #[inline(always)]
 pub fn write_pt<T: Write>(stream: &mut T, pt: &RistrettoPoint) -> Result<usize, Error> {
@@ -21,10 +20,7 @@ pub fn read_pt<T: Read>(stream: &mut T) -> Result<RistrettoPoint, Error> {
     let pt = match CompressedRistretto::from_slice(&data).decompress() {
         Some(pt) => pt,
         None => {
-            return Err(Error::from(IOError::new(
-                ErrorKind::InvalidData,
-                "Unable to decompress point",
-            )));
+            return Err(Error::DecompressPoint);
         }
     };
     Ok(pt)
