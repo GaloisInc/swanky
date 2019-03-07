@@ -6,7 +6,6 @@
 
 mod cuckoo;
 mod errors;
-mod hashtable;
 mod psi;
 mod stream;
 

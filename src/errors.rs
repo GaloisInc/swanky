@@ -8,6 +8,7 @@
 pub enum Error {
     OprfError(ocelot::Error),
     IoError(std::io::Error),
+    CuckooHashFull,
 }
 
 impl From<std::io::Error> for Error {
