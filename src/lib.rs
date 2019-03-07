@@ -33,7 +33,8 @@ mod cointoss;
 mod stream;
 mod utils;
 
-pub mod errors;
+mod errors;
+pub use crate::errors::Error;
 
 mod ot;
 pub use crate::ot::*;

@@ -105,13 +105,11 @@ impl ObliviousTransferSender for DummyVecOTSender {
             let b = stream::read_bool(&mut reader)?;
             bs.push(b);
         }
-        let mut j = 0;
         for (b, m) in bs.into_iter().zip(inputs.iter()) {
-            j = j + 1;
             let m = if b { &m.1 } else { &m.0 };
             let l = unsafe { std::mem::transmute::<usize, [u8; 8]>(m.len()) };
-            writer.write(&l)?;
-            writer.write(&m)?;
+            writer.write_all(&l)?;
+            writer.write_all(&m)?;
         }
         writer.flush()?;
         Ok(())
