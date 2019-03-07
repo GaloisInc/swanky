@@ -1,0 +1,34 @@
+[package]
+name = "popsicle"
+version = "0.1.0"
+authors = ["Alex J. Malozemoff <amaloz@galois.com>"]
+edition = "2018"
+
+[lib]
+
+[features]
+nightly = ["rand/nightly", "scuttlebutt/nightly"]
+
+[dependencies]
+ocelot = { path = "../ocelot" }
+rand = "*"
+rand_core = "*"
+scuttlebutt = { path = "../scuttlebutt"}
+
+[profile.release]
+opt-level = 3
+debug = false
+debug-assertions = false
+overflow-checks = false
+
+[profile.dev]
+opt-level = 0
+debug = true
+debug-assertions = true
+overflow-checks = true
+
+[profile.bench]
+opt-level = 3
+debug = false
+debug-assertions = false
+overflow-checks = false
