@@ -10,8 +10,7 @@ use crate::Error;
 use ocelot::kkrt::{Output, Seed};
 use ocelot::{ObliviousPrfReceiver, ObliviousPrfSender};
 use rand::{CryptoRng, RngCore};
-use scuttlebutt::Block;
-use std::collections::hash_map::DefaultHasher;
+use scuttlebutt::{AesHash, Block};
 use std::io::{Read, Write};
 use std::marker::PhantomData;
 
@@ -34,40 +33,29 @@ where
         inputs: &[Block],
         rng: &mut RNG,
     ) -> Result<(), Error> {
-        let n = inputs.len();
         let nbins = stream::read_usize(reader)?;
         let stashsize = stream::read_usize(reader)?;
-        let mut init_states = Vec::with_capacity(NHASHES);
+        let mut hashes = Vec::with_capacity(NHASHES);
         for _ in 0..NHASHES {
-            let state = stream::read_usize(reader)?;
-            init_states.push(state as u64);
+            let state = Block::read(reader)?;
+            hashes.push(AesHash::new(state));
         }
         let mut oprf = OPRF::init(reader, writer, rng)?;
         let seeds = oprf.send(reader, writer, nbins + stashsize, rng)?;
         for i in 0..NHASHES {
-            let mut hs = Vec::with_capacity(n);
             for input in inputs.iter() {
-                let idx =
-                    CuckooHash::hash_with_state::<DefaultHasher>(input, init_states[i], nbins);
+                let idx = CuckooHash::hash_with_state(*input, &hashes[i], nbins);
                 let out = oprf.compute(&seeds[idx], input);
-                hs.push(out);
-            }
-            for h in hs.iter() {
-                h.write(writer)?;
+                out.write(writer)?;
             }
         }
         for j in 0..stashsize {
-            let mut ss = Vec::with_capacity(n);
             for input in inputs.iter() {
                 let out = oprf.compute(&seeds[nbins + j], input);
-                ss.push(out);
-            }
-            for s in ss.iter() {
-                s.write(writer)?;
+                out.write(writer)?;
             }
         }
         writer.flush()?;
-        // XXX: get output from receiver
         Ok(())
     }
 }
@@ -76,86 +64,112 @@ impl<OPRF> PszPsiReceiver<OPRF>
 where
     OPRF: ObliviousPrfReceiver<Input = Block, Output = Output>,
 {
-    pub fn run<R: Read + Send, W: Write + Send, RNG: CryptoRng + RngCore>(
+    pub fn run<R, W, RNG>(
         reader: &mut R,
         writer: &mut W,
         inputs: &[Block],
         rng: &mut RNG,
-    ) -> Result<Vec<Output>, Error> {
+    ) -> Result<Vec<Output>, Error>
+    where
+        R: Read + Send,
+        W: Write + Send,
+        RNG: CryptoRng + RngCore,
+    {
         let n = inputs.len();
         let nbins = compute_nbins(n);
-        let stashsize = 16; // XXX FIXME
+        let stashsize = compute_stashsize(n)?;
         let init_states = (0..NHASHES)
-            .map(|_| rand::random::<u64>())
-            .collect::<Vec<u64>>();
+            .map(|_| rand::random::<Block>())
+            .collect::<Vec<Block>>();
         stream::write_usize(writer, nbins)?;
         stream::write_usize(writer, stashsize)?;
         for state in init_states.iter() {
-            stream::write_usize(writer, *state as usize)?;
+            state.write(writer)?;
         }
         writer.flush()?;
-        let mut hash = CuckooHash::<Block>::new(nbins, stashsize, init_states);
+        let mut tbl = CuckooHash::new(nbins, stashsize, init_states);
         for input in inputs.iter() {
-            hash.hash::<DefaultHasher>(input)?;
+            tbl.hash(*input)?;
         }
-        hash.fill(&Default::default());
+        tbl.fill(Default::default());
         let mut oprf = OPRF::init(reader, writer, rng)?;
         let outputs = oprf.receive(
             reader,
             writer,
-            &hash
-                .items
-                .iter()
-                .map(|item| item.unwrap().0) // This unwrap should *never* fail. If it does that's a bug in this code.b
+            &tbl.items
+                .into_iter()
+                .filter_map(|x| x)
                 .collect::<Vec<Block>>(),
             rng,
         )?;
-        let mut intersection = vec![];
+        let mut outputs = outputs
+            .iter()
+            .map(|x| Some(x))
+            .collect::<Vec<Option<&Output>>>();
+        let mut intersection = Vec::with_capacity(n);
         for _ in 0..NHASHES {
             for _ in 0..n {
                 let out = Output::read(reader)?;
-                if outputs.contains(&out) {
-                    intersection.push(out);
+                match outputs.iter_mut().find(|&&mut x| x == Some(&out)) {
+                    Some(item) => {
+                        *item = None;
+                        intersection.push(out)
+                    }
+                    None => (),
                 }
             }
         }
         for _ in 0..stashsize {
             for _ in 0..n {
                 let out = Output::read(reader)?;
-                if outputs.contains(&out) {
-                    intersection.push(out);
+                match outputs.iter_mut().find(|&&mut x| x == Some(&out)) {
+                    Some(item) => {
+                        *item = None;
+                        intersection.push(out)
+                    }
+                    None => (),
                 }
             }
         }
-        intersection.sort();
-        intersection.dedup();
         Ok(intersection)
     }
 }
 
 #[inline]
 fn compute_nbins(n: usize) -> usize {
-    let size = (1.2 * (n as f64)).floor() as usize;
-    // The OPRF only supports sizes mod 16, so let's fix that!
-    if size % 16 != 0 {
-        size + (16 - size % 16)
-    } else {
-        size
-    }
+    (2.4 * (n as f64)).ceil() as usize
 }
+#[inline]
+fn compute_stashsize(n: usize) -> Result<usize, Error> {
+    let stashsize = if n <= 1 << 8 {
+        12
+    } else if n <= 1 << 12 {
+        6
+    } else if n <= 1 << 16 {
+        4
+    } else if n <= 1 << 20 {
+        3
+    } else if n <= 1 << 24 {
+        2
+    } else {
+        return Err(Error::InvalidInputLength);
+    };
+    Ok(stashsize)
+}
+
+use ocelot::kkrt;
+
+pub type PszSender = PszPsiSender<kkrt::KkrtSender>;
+pub type PszReceiver = PszPsiReceiver<kkrt::KkrtReceiver>;
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ocelot::kkrt;
     use scuttlebutt::AesRng;
     use std::io::{BufReader, BufWriter};
     use std::os::unix::net::UnixStream;
 
-    type PszSender = PszPsiSender<kkrt::KkrtSender>;
-    type PszReceiver = PszPsiReceiver<kkrt::KkrtReceiver>;
-
-    const T: usize = 16;
+    const T: usize = 1 << 8;
 
     fn rand_block_vec(size: usize) -> Vec<Block> {
         (0..size).map(|_| rand::random::<Block>()).collect()

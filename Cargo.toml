@@ -2,6 +2,11 @@
 name = "popsicle"
 version = "0.1.0"
 authors = ["Alex J. Malozemoff <amaloz@galois.com>"]
+license = "MIT"
+readme = "README.md"
+description = "A library for private set intersection protocols"
+categories = ["cryptography"]
+keywords = ["cryptography", "private-set-intersection", "PSI"]
 edition = "2018"
 
 [lib]
@@ -14,6 +19,9 @@ ocelot = { path = "../ocelot" }
 rand = "*"
 rand_core = "*"
 scuttlebutt = { path = "../scuttlebutt"}
+
+[dev-dependencies]
+criterion = "*"
 
 [profile.release]
 opt-level = 3
@@ -29,6 +37,11 @@ overflow-checks = true
 
 [profile.bench]
 opt-level = 3
-debug = false
+debug = true
 debug-assertions = false
 overflow-checks = false
+
+
+[[bench]]
+name = "psi"
+harness = false

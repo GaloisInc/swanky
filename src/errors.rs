@@ -9,6 +9,7 @@ pub enum Error {
     OprfError(ocelot::Error),
     IoError(std::io::Error),
     CuckooHashFull,
+    InvalidInputLength,
 }
 
 impl From<std::io::Error> for Error {

@@ -4,6 +4,8 @@
 // Copyright © 2019 Galois, Inc.
 // See LICENSE for licensing information.
 
+#![cfg_attr(feature = "nightly", feature(test))]
+
 mod cuckoo;
 mod errors;
 mod psi;
