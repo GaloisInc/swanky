@@ -41,7 +41,7 @@ impl Output {
     }
 
     pub fn write<W: Write>(&self, writer: &mut W) -> Result<(), Error> {
-        writer.write(&self.0)?;
+        writer.write_all(&self.0)?;
         Ok(())
     }
 }
