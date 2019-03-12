@@ -8,6 +8,7 @@ description = "A library for oblivious transfer protocols"
 categories = ["cryptography"]
 keywords = ["cryptography", "oblivious-transfer"]
 edition = "2018"
+publish = false
 build = "build.rs"
 
 [lib]
@@ -17,12 +18,11 @@ nightly = ["curve25519-dalek/simd_backend", "rand/nightly", "scuttlebutt/nightly
 
 [dependencies]
 arrayref = "0.3"
-
 curve25519-dalek = { version = "1.1", features = ["std"] }
 libc = "*"
 rand = "0.6"
 rand_core = "0.4"
-scuttlebutt = { path = "../scuttlebutt", features = ["curve25519-dalek"] }
+scuttlebutt = { git = "https://github.com/amaloz/scuttlebutt", features = ["curve25519-dalek"] }
 
 [build-dependencies]
 cc = "*"
@@ -48,9 +48,9 @@ debug = false
 debug-assertions = false
 overflow-checks = false
 
-# [[bench]]
-# name = "ot"
-# harness = false
+[[bench]]
+name = "ot"
+harness = false
 
 [[bench]]
 name = "oprf"
