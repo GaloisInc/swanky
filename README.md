@@ -36,10 +36,10 @@ libraries out there. When running the benchmarks with `1 << 23` OTs we get the
 following results (in # million OTs per second and using Chou-Orlandi as the
 base OT):
 
-| Protocol |  OT |  COT |  ROT |
-|----------|-----|------|------|
-| ALSZ     | 8.6 | 10.0 | 12.3 |
-| KOS      | 7.5 |      |      |
+| Protocol |  OT | COT |  ROT |
+|----------|-----|-----|------|
+| ALSZ     | 9.0 | 9.9 | 12.5 |
+| KOS      | 7.8 | 8.5 | 10.4 |
 
 For our base OT protocols, we get the following results (in time to run 128
 OTs):
