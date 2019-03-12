@@ -7,6 +7,7 @@
 //! Oblivious pseudorandom function benchmarks using `criterion`.
 
 use criterion::{criterion_group, criterion_main, Criterion};
+use ocelot::kkrt::{Output, Seed};
 use ocelot::*;
 use scuttlebutt::{AesRng, Block};
 use std::io::{BufReader, BufWriter};
@@ -17,11 +18,11 @@ fn rand_block_vec(size: usize) -> Vec<Block> {
     (0..size).map(|_| rand::random::<Block>()).collect()
 }
 
-const T: usize = 1 << 16;
+const T: usize = 1 << 8;
 
 fn _bench_oprf<
-    OPRFSender: ObliviousPrfSender<Seed = [u8; 64], Input = Block, Output = [u8; 64]>,
-    OPRFReceiver: ObliviousPrfReceiver<Input = Block, Output = [u8; 64]>,
+    OPRFSender: ObliviousPrfSender<Seed = Seed, Input = Block, Output = Output>,
+    OPRFReceiver: ObliviousPrfReceiver<Input = Block, Output = Output>,
 >(
     rs: &[Block],
 ) {
@@ -31,14 +32,15 @@ fn _bench_oprf<
         let mut rng = AesRng::new();
         let mut reader = BufReader::new(sender.try_clone().unwrap());
         let mut writer = BufWriter::new(sender);
-        let mut ot = OPRFSender::init(&mut reader, &mut writer, &mut rng).unwrap();
-        let _ = ot.send(&mut reader, &mut writer, m, &mut rng).unwrap();
+        let mut oprf = OPRFSender::init(&mut reader, &mut writer, &mut rng).unwrap();
+        let _ = oprf.send(&mut reader, &mut writer, m, &mut rng).unwrap();
     });
     let mut rng = AesRng::new();
     let mut reader = BufReader::new(receiver.try_clone().unwrap());
     let mut writer = BufWriter::new(receiver);
-    let mut ot = OPRFReceiver::init(&mut reader, &mut writer, &mut rng).unwrap();
-    ot.receive(&mut reader, &mut writer, rs, &mut rng).unwrap();
+    let mut oprf = OPRFReceiver::init(&mut reader, &mut writer, &mut rng).unwrap();
+    oprf.receive(&mut reader, &mut writer, rs, &mut rng)
+        .unwrap();
     handle.join().unwrap();
 }
 
@@ -56,10 +58,30 @@ fn bench_oprf(c: &mut Criterion) {
     });
 }
 
+fn bench_oprf_compute(c: &mut Criterion) {
+    c.bench_function("oprf::KkrtOPRF::compute", move |bench| {
+        let (sender, receiver) = UnixStream::pair().unwrap();
+        let handle = std::thread::spawn(move || {
+            let mut rng = AesRng::new();
+            let mut reader = BufReader::new(receiver.try_clone().unwrap());
+            let mut writer = BufWriter::new(receiver);
+            let _ = KkrtReceiver::init(&mut reader, &mut writer, &mut rng).unwrap();
+        });
+        let mut rng = AesRng::new();
+        let mut reader = BufReader::new(sender.try_clone().unwrap());
+        let mut writer = BufWriter::new(sender);
+        let oprf = KkrtSender::init(&mut reader, &mut writer, &mut rng).unwrap();
+        handle.join().unwrap();
+        let seed = Seed::default();
+        let input = rand::random::<Block>();
+        bench.iter(|| oprf.compute(&seed, &input))
+    });
+}
+
 criterion_group! {
     name = oprf;
     config = Criterion::default().warm_up_time(Duration::from_millis(100));
-    targets = bench_oprf
+    targets = bench_oprf, bench_oprf_compute
 }
 
 criterion_main!(oprf);

@@ -34,7 +34,7 @@ where
         rng: &mut RNG,
     ) -> Result<Vec<Self::Seed>, Error>;
 
-    fn compute(&self, seed: Self::Seed, input: Self::Input) -> Self::Output;
+    fn compute(&self, seed: &Self::Seed, input: &Self::Input) -> Self::Output;
 }
 
 /// Trait for oblivious PRF from the receiver's point-of-view.

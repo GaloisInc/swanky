@@ -18,8 +18,71 @@ use arrayref::array_ref;
 use rand::CryptoRng;
 use rand_core::{RngCore, SeedableRng};
 use scuttlebutt::{AesRng, Block, SemiHonest};
+use std::hash::{Hash, Hasher};
 use std::io::{Read, Write};
 use std::marker::PhantomData;
+
+pub struct Seed([u8; 64]);
+#[derive(Clone, Copy)]
+pub struct Output([u8; 64]);
+
+impl Default for Seed {
+    fn default() -> Self {
+        Self([0u8; 64])
+    }
+}
+
+impl Output {
+    pub fn read<R: Read>(reader: &mut R) -> Result<Self, Error> {
+        let mut data = [0u8; 64];
+        reader.read_exact(&mut data)?;
+        let output = unsafe { std::mem::transmute(data) };
+        Ok(Self(output))
+    }
+
+    pub fn write<W: Write>(&self, writer: &mut W) -> Result<(), Error> {
+        writer.write(&self.0)?;
+        Ok(())
+    }
+}
+
+impl std::fmt::Debug for Output {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "Output {{ {:?} }}", self.0.to_vec())
+    }
+}
+
+impl Default for Output {
+    fn default() -> Self {
+        Self([0u8; 64])
+    }
+}
+
+impl Eq for Output {}
+
+impl Hash for Output {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.0.to_vec().hash(state);
+    }
+}
+
+impl Ord for Output {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.0.to_vec().cmp(&other.0.to_vec())
+    }
+}
+
+impl PartialEq for Output {
+    fn eq(&self, other: &Output) -> bool {
+        self.0.to_vec() == other.0.to_vec()
+    }
+}
+
+impl PartialOrd for Output {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.0.to_vec().cmp(&other.0.to_vec()))
+    }
+}
 
 pub struct KkrtOPRFSender<OT: ObliviousTransferReceiver + SemiHonest> {
     _ot: PhantomData<OT>,
@@ -38,15 +101,16 @@ pub struct KkrtOPRFReceiver<OT: ObliviousTransferSender + SemiHonest> {
 impl<OT: ObliviousTransferReceiver<Msg = Block> + SemiHonest> ObliviousPrfSender
     for KkrtOPRFSender<OT>
 {
-    type Seed = [u8; 64];
+    type Seed = Seed;
     type Input = Block;
-    type Output = [u8; 64];
+    type Output = Output;
 
-    fn init<R: Read + Send, W: Write + Send, RNG: CryptoRng + RngCore>(
-        reader: &mut R,
-        writer: &mut W,
-        rng: &mut RNG,
-    ) -> Result<Self, Error> {
+    fn init<R, W, RNG>(reader: &mut R, writer: &mut W, rng: &mut RNG) -> Result<Self, Error>
+    where
+        R: Read + Send,
+        W: Write + Send,
+        RNG: CryptoRng + RngCore,
+    {
         let mut ot = OT::init(reader, writer, rng)?;
         let mut s_ = [0u8; 64];
         rng.fill_bytes(&mut s_);
@@ -70,16 +134,19 @@ impl<OT: ObliviousTransferReceiver<Msg = Block> + SemiHonest> ObliviousPrfSender
         })
     }
 
-    fn send<R: Read + Send, W: Write + Send, RNG: CryptoRng + RngCore>(
+    fn send<R, W, RNG>(
         &mut self,
         reader: &mut R,
         _: &mut W,
         m: usize,
         _: &mut RNG,
-    ) -> Result<Vec<Self::Seed>, Error> {
-        if m % 16 != 0 {
-            return Err(Error::InvalidInputLength);
-        }
+    ) -> Result<Vec<Self::Seed>, Error>
+    where
+        R: Read + Send,
+        W: Write + Send,
+        RNG: CryptoRng + RngCore,
+    {
+        let m = if m % 16 != 0 { m + (16 - m % 16) } else { m };
         let (nrows, ncols) = (m, 512);
         let mut t0 = vec![0u8; nrows / 8];
         let mut t1 = vec![0u8; nrows / 8];
@@ -99,16 +166,16 @@ impl<OT: ObliviousTransferReceiver<Msg = Block> + SemiHonest> ObliviousPrfSender
         let qs = utils::transpose(&qs, ncols, nrows);
         let seeds = qs
             .chunks(ncols / 8)
-            .map(|q| *array_ref![q, 0, 64])
+            .map(|q| Seed(*array_ref![q, 0, 64]))
             .collect();
         Ok(seeds)
     }
 
-    fn compute(&self, seed: Self::Seed, input: Self::Input) -> Self::Output {
-        let c = self.code.encode(input);
+    fn compute(&self, seed: &Self::Seed, input: &Self::Input) -> Self::Output {
+        let c = self.code.encode(*input);
         let tmp = utils::and(&c, &self.s_);
-        let out = utils::xor(&seed, &tmp);
-        *array_ref![out, 0, 64]
+        let out = utils::xor(&seed.0, &tmp);
+        Output(*array_ref![out, 0, 64])
     }
 }
 
@@ -116,13 +183,18 @@ impl<OT: ObliviousTransferSender<Msg = Block> + SemiHonest> ObliviousPrfReceiver
     for KkrtOPRFReceiver<OT>
 {
     type Input = Block;
-    type Output = [u8; 64];
+    type Output = Output;
 
     fn init<R: Read + Send, W: Write + Send, RNG: CryptoRng + RngCore>(
         reader: &mut R,
         writer: &mut W,
         rng: &mut RNG,
-    ) -> Result<Self, Error> {
+    ) -> Result<Self, Error>
+    where
+        R: Read + Send,
+        W: Write + Send,
+        RNG: CryptoRng + RngCore,
+    {
         let mut ot = OT::init(reader, writer, rng)?;
         let seeds = (0..4)
             .map(|_| rand::random::<Block>())
@@ -157,9 +229,7 @@ impl<OT: ObliviousTransferSender<Msg = Block> + SemiHonest> ObliviousPrfReceiver
         rng: &mut RNG,
     ) -> Result<Vec<Self::Output>, Error> {
         let m = selections.len();
-        if m % 16 != 0 {
-            return Err(Error::InvalidInputLength);
-        }
+        let m = if m % 16 != 0 { m + (16 - m % 16) } else { m };
         let (nrows, ncols) = (m, 512);
         let mut t0s = vec![0u8; nrows * ncols / 8];
         let mut t1s = vec![0u8; nrows * ncols / 8];
@@ -173,7 +243,7 @@ impl<OT: ObliviousTransferSender<Msg = Block> + SemiHonest> ObliviousPrfReceiver
             let c = self.code.encode(*r);
             utils::xor_inplace(&mut t1, &t0);
             utils::xor_inplace(&mut t1, &c);
-            out.push(*array_ref![t0, 0, 64])
+            out.push(Output(*array_ref![t0, 0, 64]))
         }
         let t0s_ = utils::transpose(&t0s, nrows, ncols);
         let t1s_ = utils::transpose(&t1s, nrows, ncols);
@@ -198,6 +268,11 @@ impl<OT: ObliviousTransferSender<Msg = Block> + SemiHonest> ObliviousPrfReceiver
 impl<OT: ObliviousTransferReceiver<Msg = Block> + SemiHonest> SemiHonest for KkrtOPRFSender<OT> {}
 impl<OT: ObliviousTransferSender<Msg = Block> + SemiHonest> SemiHonest for KkrtOPRFReceiver<OT> {}
 
+use crate::{alsz, chou_orlandi};
+
+pub type KkrtSender = KkrtOPRFSender<alsz::AlszOTReceiver<chou_orlandi::ChouOrlandiOTSender>>;
+pub type KkrtReceiver = KkrtOPRFReceiver<alsz::AlszOTSender<chou_orlandi::ChouOrlandiOTReceiver>>;
+
 #[cfg(test)]
 mod tests {
     #[cfg(feature = "nightly")]
@@ -210,8 +285,6 @@ mod tests {
     use std::os::unix::net::UnixStream;
     use std::sync::{Arc, Mutex};
 
-    const T: usize = 64;
-
     fn rand_block_vec(size: usize) -> Vec<Block> {
         (0..size).map(|_| rand::random::<Block>()).collect()
     }
@@ -219,9 +292,8 @@ mod tests {
     type KkrtSender = KkrtOPRFSender<chou_orlandi::ChouOrlandiOTReceiver>;
     type KkrtReceiver = KkrtOPRFReceiver<chou_orlandi::ChouOrlandiOTSender>;
 
-    #[test]
-    fn test_oprf() {
-        let selections = rand_block_vec(T);
+    fn _test_oprf(n: usize) {
+        let selections = rand_block_vec(n);
         let selections_ = selections.clone();
         let results = Arc::new(Mutex::new(vec![]));
         let results_ = results.clone();
@@ -231,13 +303,13 @@ mod tests {
             let mut reader = BufReader::new(sender.try_clone().unwrap());
             let mut writer = BufWriter::new(sender);
             let mut oprf = KkrtSender::init(&mut reader, &mut writer, &mut rng).unwrap();
-            let seeds = oprf.send(&mut reader, &mut writer, T, &mut rng).unwrap();
+            let seeds = oprf.send(&mut reader, &mut writer, n, &mut rng).unwrap();
             let mut results = results.lock().unwrap();
             *results = selections_
                 .iter()
                 .zip(seeds.iter())
-                .map(|(inp, seed)| oprf.compute(seed.clone(), *inp))
-                .collect::<Vec<[u8; 64]>>();
+                .map(|(inp, seed)| oprf.compute(seed, inp))
+                .collect::<Vec<Output>>();
         });
         let mut rng = AesRng::new();
         let mut reader = BufReader::new(receiver.try_clone().unwrap());
@@ -248,8 +320,15 @@ mod tests {
             .unwrap();
         handle.join().unwrap();
         let results_ = results_.lock().unwrap();
-        for j in 0..T {
-            assert_eq!(results_[j].to_vec(), outputs[j].to_vec());
+        for j in 0..n {
+            assert_eq!(results_[j].0.to_vec(), outputs[j].0.to_vec());
         }
+    }
+
+    #[test]
+    fn test_oprf() {
+        _test_oprf(8);
+        _test_oprf(11);
+        _test_oprf(64);
     }
 }
