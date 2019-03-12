@@ -4,7 +4,7 @@
 // Copyright © 2019 Galois, Inc.
 // See LICENSE for licensing information.
 
-use failure::Error;
+use crate::errors::Error;
 use std::io::{Read, Write};
 
 pub fn send<W: Write>(writer: &mut W, data: &[u8]) -> Result<(), Error> {

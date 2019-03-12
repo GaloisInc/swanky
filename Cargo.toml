@@ -15,7 +15,6 @@ edition = "2018"
 nightly = ["rand/nightly", "scuttlebutt/nightly"]
 
 [dependencies]
-failure = "*"
 # fancy_garbling = { path = "../fancy-garbling" }
 fancy_garbling = { git = "https://github.com/spaceships/fancy-garbling" }
 ocelot = { path = "../ocelot" }

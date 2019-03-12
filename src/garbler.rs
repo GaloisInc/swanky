@@ -5,7 +5,7 @@
 // See LICENSE for licensing information.
 
 use crate::comm;
-use failure::Error;
+use crate::errors::Error;
 use fancy_garbling::{Fancy, Garbler as Gb, Message, SyncIndex, Wire};
 use ocelot::ObliviousTransferSender;
 use rand::{CryptoRng, RngCore};

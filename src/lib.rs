@@ -13,9 +13,11 @@
 #![cfg_attr(feature = "nightly", feature(test))]
 
 mod comm;
+mod errors;
 mod evaluator;
 mod garbler;
 
+pub use errors::Error;
 pub use evaluator::Evaluator;
 pub use garbler::Garbler;
 
