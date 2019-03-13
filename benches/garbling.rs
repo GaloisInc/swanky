@@ -14,7 +14,7 @@ where
     c.bench_function(&format!("garbling::{}{}_gb", name, q), move |bench| {
         let c = make_circuit(q);
         bench.iter(|| {
-            let gb = fancy_garbling::garble(&c);
+            let gb = fancy_garbling::garble(&c).unwrap();
             criterion::black_box(gb);
         });
     });
@@ -28,7 +28,7 @@ where
         let mut rng = rand::thread_rng();
 
         let c = make_circuit(q);
-        let (en, _, ev) = fancy_garbling::garble(&c);
+        let (en, _, ev) = fancy_garbling::garble(&c).unwrap();
 
         let inps = (0..c.num_garbler_inputs())
             .map(|i| rng.gen_u16() % c.garbler_input_mod(i))
@@ -37,7 +37,7 @@ where
         let xs = en.encode_garbler_inputs(&inps);
 
         bench.iter(|| {
-            let ys = ev.eval(&c, &xs, &[]);
+            let ys = ev.eval(&c, &xs, &[]).unwrap();
             criterion::black_box(ys);
         });
     });
@@ -45,19 +45,19 @@ where
 
 fn proj(q: u16) -> Circuit {
     let b = CircuitBuilder::new();
-    let x = b.garbler_input(None, q, None);
+    let x = b.garbler_input(None, q, None).unwrap();
     let tab = (0..q).map(|i| (i + 1) % q).collect_vec();
-    let z = b.proj(None, &x, q, Some(tab));
-    b.output(None, &z);
+    let z = b.proj(None, &x, q, Some(tab)).unwrap();
+    b.output(None, &z).unwrap();
     b.finish()
 }
 
 fn half_gate(q: u16) -> Circuit {
     let b = CircuitBuilder::new();
-    let x = b.garbler_input(None, q, None);
-    let y = b.garbler_input(None, q, None);
-    let z = b.mul(None, &x, &y);
-    b.output(None, &z);
+    let x = b.garbler_input(None, q, None).unwrap();
+    let y = b.garbler_input(None, q, None).unwrap();
+    let z = b.mul(None, &x, &y).unwrap();
+    b.output(None, &z).unwrap();
     b.finish()
 }
 

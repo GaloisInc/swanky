@@ -12,22 +12,22 @@ where
     W: Clone + HasModulus + Send + Sync + std::fmt::Debug,
     F: Fancy<Item = W> + Send + Sync,
 {
-    let inps = b.garbler_input_bundles_crt(None, Q, N as usize, None);
+    let inps = b.garbler_input_bundles_crt(None, Q, N as usize, None).unwrap();
     if par {
         crossbeam::scope(|scope| {
-            b.begin_sync(N);
+            b.begin_sync(N).unwrap();
             let hs = inps
                 .iter()
                 .enumerate()
                 .map(|(i, inp)| {
                     scope.spawn(move |_| {
-                        let z = b.relu(Some(i as u8), inp, "100%", None);
-                        let z = b.relu(Some(i as u8), &z, "100%", None);
-                        let z = b.relu(Some(i as u8), &z, "100%", None);
-                        let z = b.relu(Some(i as u8), &z, "100%", None);
-                        let z = b.relu(Some(i as u8), &z, "100%", None);
-                        let z = b.relu(Some(i as u8), &z, "100%", None);
-                        b.finish_index(i as u8);
+                        let z = b.relu(Some(i as u8), inp, "100%", None).unwrap();
+                        let z = b.relu(Some(i as u8), &z, "100%", None).unwrap();
+                        let z = b.relu(Some(i as u8), &z, "100%", None).unwrap();
+                        let z = b.relu(Some(i as u8), &z, "100%", None).unwrap();
+                        let z = b.relu(Some(i as u8), &z, "100%", None).unwrap();
+                        let z = b.relu(Some(i as u8), &z, "100%", None).unwrap();
+                        b.finish_index(i as u8).unwrap();
                         z
                     })
                 })
@@ -36,18 +36,18 @@ where
                 .into_iter()
                 .map(|h| h.join().expect("join fail"))
                 .collect_vec();
-            b.output_bundles(None, &outs);
+            b.output_bundles(None, &outs).unwrap();
         })
         .expect("scoped thread fail");
     } else {
         for inp in inps.iter() {
-            let z = b.relu(None, inp, "100%", None);
-            let z = b.relu(None, &z, "100%", None);
-            let z = b.relu(None, &z, "100%", None);
-            let z = b.relu(None, &z, "100%", None);
-            let z = b.relu(None, &z, "100%", None);
-            let z = b.relu(None, &z, "100%", None);
-            b.output_bundle(None, &z)
+            let z = b.relu(None, inp, "100%", None).unwrap();
+            let z = b.relu(None, &z, "100%", None).unwrap();
+            let z = b.relu(None, &z, "100%", None).unwrap();
+            let z = b.relu(None, &z, "100%", None).unwrap();
+            let z = b.relu(None, &z, "100%", None).unwrap();
+            let z = b.relu(None, &z, "100%", None).unwrap();
+            b.output_bundle(None, &z).unwrap()
         }
     }
 }
