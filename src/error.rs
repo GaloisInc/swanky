@@ -1,5 +1,12 @@
+//! Errors that may be outputted by this library.
+
 use std::fmt::{self, Display, Formatter};
 
+/// Errors that may occur when using the `Fancy` trait. `ClientError` wraps errors from
+/// underlying fancy object.
+///
+/// With the exception of ClientError, FancyErrors should be API-usage errors, such as
+/// trying to add two Items with different moduli.
 #[derive(Debug)]
 pub enum FancyError<T> {
     UnequalModuli,
@@ -14,6 +21,7 @@ pub enum FancyError<T> {
     ClientError(T),
 }
 
+/// Common errors emitted by fancy objects in sync mode.
 #[derive(Debug)]
 pub enum SyncError {
     IndexRequired,
@@ -22,6 +30,7 @@ pub enum SyncError {
     SyncStartedInSync,
 }
 
+/// Errors from the dummy fancy object.
 #[derive(Debug)]
 pub enum DummyError {
     NotEnoughGarblerInputs,
@@ -29,6 +38,7 @@ pub enum DummyError {
     SyncError(SyncError),
 }
 
+/// Errors from the evaluator.
 #[derive(Debug)]
 pub enum EvaluatorError {
     InvalidMessage { expected: String, got: String },
@@ -36,6 +46,7 @@ pub enum EvaluatorError {
     SyncError(SyncError),
 }
 
+/// Errors from the garbler.
 #[derive(Debug)]
 pub enum GarblerError {
     AsymmetricHalfGateModuliMax8(u16),
@@ -43,9 +54,11 @@ pub enum GarblerError {
     SyncError(SyncError),
 }
 
+/// Errors emitted when building a circuit.
 #[derive(Debug)]
 pub struct CircuitBuilderError;
 
+/// Errors emitted when running the informer.
 #[derive(Debug)]
 pub struct InformerError;
 

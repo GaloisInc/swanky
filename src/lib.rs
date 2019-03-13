@@ -12,7 +12,7 @@
 mod aes;
 pub mod circuit;
 pub mod dummy;
-mod error;
+pub mod error;
 mod fancy;
 mod garble;
 pub mod informer;
@@ -20,7 +20,6 @@ pub mod informer;
 pub mod util;
 mod wire;
 
-pub use crate::error::*;
 pub use crate::fancy::*;
 pub use crate::garble::*;
 pub use crate::wire::*;

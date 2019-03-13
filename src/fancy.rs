@@ -9,7 +9,7 @@ use crate::error::FancyError;
 
 pub use crt::{Bundle, BundleGadgets};
 
-pub mod crt;
+mod crt;
 
 /// An object that has some modulus. Basic object of Fancy compuations.
 pub trait HasModulus {

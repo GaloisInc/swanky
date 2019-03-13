@@ -1,3 +1,5 @@
+//! Module containing `BundleGadgets`, which are mostly CRT-based gadgets for Fancy.
+
 use itertools::Itertools;
 
 use super::{to_vec_option, Fancy, HasModulus, SyncIndex};
