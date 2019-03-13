@@ -1,4 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source to the Rust file `src/util.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>util.rs.html -- source</title><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../dark.css"><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script src="../../storage.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="shortcut icon" href="../../favicon.ico"><style type="text/css">#crate-search{background-image:url("../../down-arrow.svg");}</style></head><body class="rustdoc source"><!--[if lte IE 8]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu">&#9776;</div><a href='../..//index.html'><img src='../../rust-logo.png' alt='logo' width='100'></a></nav><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!"><img src="../../brush.svg" width="18" alt="Pick another theme!"></button><div id="theme-choices"></div></div><script src="../../theme.js"></script><nav class="sub"><form class="search-form js-only"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><a id="settings-menu" href="../../settings.html"><img src="../../wheel.svg" width="18" alt="Change settings"></a></div></form></nav><section id="main" class="content"><pre class="line-numbers"><span id="1">  1</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source to the Rust file `src/util.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>util.rs.html -- source</title><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../dark.css"><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script src="../../storage.js"></script></head><body class="rustdoc source"><!--[if lte IE 8]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu">&#9776;</div></nav><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!"><img src="../../brush.svg" width="18" alt="Pick another theme!"></button><div id="theme-choices"></div></div><script src="../../theme.js"></script><nav class="sub"><form class="search-form js-only"><div class="search-container"><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><a id="settings-menu" href="../../settings.html"><img src="../../wheel.svg" width="18" alt="Change settings"></a></div></form></nav><section id="main" class="content"><pre class="line-numbers"><span id="1">  1</span>
 <span id="2">  2</span>
 <span id="3">  3</span>
 <span id="4">  4</span>
@@ -534,15 +534,16 @@
 <span id="534">534</span>
 <span id="535">535</span>
 <span id="536">536</span>
+<span id="537">537</span>
+<span id="538">538</span>
+<span id="539">539</span>
+<span id="540">540</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="doccomment">//! Tools useful for interacting with `fancy-garbling`.</span>
 <span class="doccomment">//!</span>
 <span class="doccomment">//! Note: all number representations in this library are little-endian.</span>
 
 <span class="kw">use</span> <span class="ident">itertools</span>::<span class="ident">Itertools</span>;
-<span class="kw">use</span> <span class="ident">num</span>::<span class="ident">bigint</span>::<span class="ident">BigInt</span>;
-<span class="kw">use</span> <span class="ident">num</span>::<span class="ident">integer</span>::<span class="ident">Integer</span>;
-<span class="kw">use</span> <span class="ident">num</span>::{<span class="ident">ToPrimitive</span>, <span class="ident">Zero</span>, <span class="ident">One</span>, <span class="ident">Signed</span>};
 
 <span class="comment">////////////////////////////////////////////////////////////////////////////////</span>
 <span class="comment">// tweak functions for garbling</span>
@@ -582,12 +583,15 @@
 
 <span class="doccomment">/// Add a base q number into the first one.</span>
 <span class="attribute">#[<span class="ident">inline</span>]</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">base_q_add_eq</span>(<span class="ident">xs</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> [<span class="ident">u16</span>], <span class="ident">ys</span>: <span class="kw-2">&amp;</span>[<span class="ident">u16</span>], <span class="ident">q</span>: <span class="ident">u16</span>)
-{
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">base_q_add_eq</span>(<span class="ident">xs</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> [<span class="ident">u16</span>], <span class="ident">ys</span>: <span class="kw-2">&amp;</span>[<span class="ident">u16</span>], <span class="ident">q</span>: <span class="ident">u16</span>) {
     <span class="macro">debug_assert</span><span class="macro">!</span>(
         <span class="ident">xs</span>.<span class="ident">len</span>() <span class="op">&gt;=</span> <span class="ident">ys</span>.<span class="ident">len</span>(),
         <span class="string">&quot;q={} xs.len()={} ys.len()={} xs={:?} ys={:?}&quot;</span>,
-        <span class="ident">q</span>, <span class="ident">xs</span>.<span class="ident">len</span>(), <span class="ident">ys</span>.<span class="ident">len</span>(), <span class="ident">xs</span>, <span class="ident">ys</span>
+        <span class="ident">q</span>,
+        <span class="ident">xs</span>.<span class="ident">len</span>(),
+        <span class="ident">ys</span>.<span class="ident">len</span>(),
+        <span class="ident">xs</span>,
+        <span class="ident">ys</span>
     );
 
     <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">c</span> <span class="op">=</span> <span class="number">0</span>;
@@ -608,7 +612,7 @@
         <span class="ident">xs</span>[<span class="ident">i</span>] <span class="op">+=</span> <span class="ident">c</span>;
         <span class="kw">if</span> <span class="ident">xs</span>[<span class="ident">i</span>] <span class="op">&gt;=</span> <span class="ident">q</span> {
             <span class="ident">xs</span>[<span class="ident">i</span>] <span class="op">-=</span> <span class="ident">q</span>;
-            <span class="comment">// c = 1</span>
+        <span class="comment">// c = 1</span>
         } <span class="kw">else</span> {
             <span class="comment">// c = 0</span>
             <span class="kw">break</span>;
@@ -640,17 +644,20 @@
 <span class="attribute">#[<span class="ident">inline</span>]</span>
 <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">as_mixed_radix</span>(<span class="ident">x</span>: <span class="ident">u128</span>, <span class="ident">radii</span>: <span class="kw-2">&amp;</span>[<span class="ident">u16</span>]) <span class="op">-&gt;</span> <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u16</span><span class="op">&gt;</span> {
     <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">x</span> <span class="op">=</span> <span class="ident">x</span>;
-    <span class="ident">radii</span>.<span class="ident">iter</span>().<span class="ident">map</span>(<span class="op">|</span><span class="kw-2">&amp;</span><span class="ident">m</span><span class="op">|</span> {
-        <span class="kw">if</span> <span class="ident">x</span> <span class="op">&gt;=</span> <span class="ident">m</span> <span class="kw">as</span> <span class="ident">u128</span> {
-            <span class="kw">let</span> <span class="ident">d</span> <span class="op">=</span> <span class="ident">x</span> <span class="op">%</span> <span class="ident">m</span> <span class="kw">as</span> <span class="ident">u128</span>;
-            <span class="ident">x</span> <span class="op">=</span> (<span class="ident">x</span> <span class="op">-</span> <span class="ident">d</span>) <span class="op">/</span> <span class="ident">m</span> <span class="kw">as</span> <span class="ident">u128</span>;
-            <span class="ident">d</span> <span class="kw">as</span> <span class="ident">u16</span>
-        } <span class="kw">else</span> {
-            <span class="kw">let</span> <span class="ident">d</span> <span class="op">=</span> <span class="ident">x</span> <span class="kw">as</span> <span class="ident">u16</span>;
-            <span class="ident">x</span> <span class="op">=</span> <span class="number">0</span>;
-            <span class="ident">d</span>
-        }
-    }).<span class="ident">collect</span>()
+    <span class="ident">radii</span>
+        .<span class="ident">iter</span>()
+        .<span class="ident">map</span>(<span class="op">|</span><span class="kw-2">&amp;</span><span class="ident">m</span><span class="op">|</span> {
+            <span class="kw">if</span> <span class="ident">x</span> <span class="op">&gt;=</span> <span class="ident">m</span> <span class="kw">as</span> <span class="ident">u128</span> {
+                <span class="kw">let</span> <span class="ident">d</span> <span class="op">=</span> <span class="ident">x</span> <span class="op">%</span> <span class="ident">m</span> <span class="kw">as</span> <span class="ident">u128</span>;
+                <span class="ident">x</span> <span class="op">=</span> (<span class="ident">x</span> <span class="op">-</span> <span class="ident">d</span>) <span class="op">/</span> <span class="ident">m</span> <span class="kw">as</span> <span class="ident">u128</span>;
+                <span class="ident">d</span> <span class="kw">as</span> <span class="ident">u16</span>
+            } <span class="kw">else</span> {
+                <span class="kw">let</span> <span class="ident">d</span> <span class="op">=</span> <span class="ident">x</span> <span class="kw">as</span> <span class="ident">u16</span>;
+                <span class="ident">x</span> <span class="op">=</span> <span class="number">0</span>;
+                <span class="ident">d</span>
+            }
+        })
+        .<span class="ident">collect</span>()
 }
 
 <span class="doccomment">/// Convert little-endian base q digits into u128.</span>
@@ -658,7 +665,7 @@
 <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">from_base_q</span>(<span class="ident">ds</span>: <span class="kw-2">&amp;</span>[<span class="ident">u16</span>], <span class="ident">q</span>: <span class="ident">u16</span>) <span class="op">-&gt;</span> <span class="ident">u128</span> {
     <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">x</span>: <span class="ident">u128</span> <span class="op">=</span> <span class="number">0</span>;
     <span class="kw">for</span> <span class="kw-2">&amp;</span><span class="ident">d</span> <span class="kw">in</span> <span class="ident">ds</span>.<span class="ident">iter</span>().<span class="ident">rev</span>() {
-        <span class="kw">let</span> (<span class="ident">xp</span>,<span class="ident">overflow</span>) <span class="op">=</span> <span class="ident">x</span>.<span class="ident">overflowing_mul</span>(<span class="ident">q</span> <span class="kw">as</span> <span class="ident">u128</span>);
+        <span class="kw">let</span> (<span class="ident">xp</span>, <span class="ident">overflow</span>) <span class="op">=</span> <span class="ident">x</span>.<span class="ident">overflowing_mul</span>(<span class="ident">q</span> <span class="kw">as</span> <span class="ident">u128</span>);
         <span class="macro">debug_assert_eq</span><span class="macro">!</span>(<span class="ident">overflow</span>, <span class="bool-val">false</span>, <span class="string">&quot;overflow!!!! x={}&quot;</span>, <span class="ident">x</span>);
         <span class="ident">x</span> <span class="op">=</span> <span class="ident">xp</span> <span class="op">+</span> <span class="ident">d</span> <span class="kw">as</span> <span class="ident">u128</span>;
     }
@@ -669,8 +676,8 @@
 <span class="attribute">#[<span class="ident">inline</span>]</span>
 <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">from_mixed_radix</span>(<span class="ident">digits</span>: <span class="kw-2">&amp;</span>[<span class="ident">u16</span>], <span class="ident">radii</span>: <span class="kw-2">&amp;</span>[<span class="ident">u16</span>]) <span class="op">-&gt;</span> <span class="ident">u128</span> {
     <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">x</span>: <span class="ident">u128</span> <span class="op">=</span> <span class="number">0</span>;
-    <span class="kw">for</span> (<span class="kw-2">&amp;</span><span class="ident">d</span>,<span class="kw-2">&amp;</span><span class="ident">q</span>) <span class="kw">in</span> <span class="ident">digits</span>.<span class="ident">iter</span>().<span class="ident">zip</span>(<span class="ident">radii</span>.<span class="ident">iter</span>()).<span class="ident">rev</span>() {
-        <span class="kw">let</span> (<span class="ident">xp</span>,<span class="ident">overflow</span>) <span class="op">=</span> <span class="ident">x</span>.<span class="ident">overflowing_mul</span>(<span class="ident">q</span> <span class="kw">as</span> <span class="ident">u128</span>);
+    <span class="kw">for</span> (<span class="kw-2">&amp;</span><span class="ident">d</span>, <span class="kw-2">&amp;</span><span class="ident">q</span>) <span class="kw">in</span> <span class="ident">digits</span>.<span class="ident">iter</span>().<span class="ident">zip</span>(<span class="ident">radii</span>.<span class="ident">iter</span>()).<span class="ident">rev</span>() {
+        <span class="kw">let</span> (<span class="ident">xp</span>, <span class="ident">overflow</span>) <span class="op">=</span> <span class="ident">x</span>.<span class="ident">overflowing_mul</span>(<span class="ident">q</span> <span class="kw">as</span> <span class="ident">u128</span>);
         <span class="macro">debug_assert_eq</span><span class="macro">!</span>(<span class="ident">overflow</span>, <span class="bool-val">false</span>, <span class="string">&quot;overflow!!!! x={}&quot;</span>, <span class="ident">x</span>);
         <span class="ident">x</span> <span class="op">=</span> <span class="ident">xp</span> <span class="op">+</span> <span class="ident">d</span> <span class="kw">as</span> <span class="ident">u128</span>;
     }
@@ -709,18 +716,14 @@
 
 <span class="doccomment">/// Convert a u128 into bytes.</span>
 <span class="attribute">#[<span class="ident">inline</span>]</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">u128_to_bytes</span>(<span class="ident">x</span>: <span class="ident">u128</span>) <span class="op">-&gt;</span> [<span class="ident">u8</span>;<span class="number">16</span>] {
-    <span class="kw">unsafe</span> {
-        <span class="ident">std</span>::<span class="ident">mem</span>::<span class="ident">transmute</span>(<span class="ident">x</span>)
-    }
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">u128_to_bytes</span>(<span class="ident">x</span>: <span class="ident">u128</span>) <span class="op">-&gt;</span> [<span class="ident">u8</span>; <span class="number">16</span>] {
+    <span class="kw">unsafe</span> { <span class="ident">std</span>::<span class="ident">mem</span>::<span class="ident">transmute</span>(<span class="ident">x</span>) }
 }
 
 <span class="doccomment">/// Convert bytes to u128.</span>
 <span class="attribute">#[<span class="ident">inline</span>]</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">bytes_to_u128</span>(<span class="ident">bytes</span>: [<span class="ident">u8</span>;<span class="number">16</span>]) <span class="op">-&gt;</span> <span class="ident">u128</span> {
-    <span class="kw">unsafe</span> {
-        <span class="ident">std</span>::<span class="ident">mem</span>::<span class="ident">transmute</span>(<span class="ident">bytes</span>)
-    }
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">bytes_to_u128</span>(<span class="ident">bytes</span>: [<span class="ident">u8</span>; <span class="number">16</span>]) <span class="op">-&gt;</span> <span class="ident">u128</span> {
+    <span class="kw">unsafe</span> { <span class="ident">std</span>::<span class="ident">mem</span>::<span class="ident">transmute</span>(<span class="ident">bytes</span>) }
 }
 
 <span class="comment">////////////////////////////////////////////////////////////////////////////////</span>
@@ -751,9 +754,7 @@
 <span class="doccomment">/// Compute the CRT representation of x with respect to the primes ps.</span>
 <span class="attribute">#[<span class="ident">inline</span>]</span>
 <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">crt</span>(<span class="ident">x</span>: <span class="ident">u128</span>, <span class="ident">ps</span>: <span class="kw-2">&amp;</span>[<span class="ident">u16</span>]) <span class="op">-&gt;</span> <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u16</span><span class="op">&gt;</span> {
-    <span class="ident">ps</span>.<span class="ident">iter</span>().<span class="ident">map</span>(<span class="op">|</span><span class="kw-2">&amp;</span><span class="ident">p</span><span class="op">|</span> {
-        (<span class="ident">x</span> <span class="op">%</span> <span class="ident">p</span> <span class="kw">as</span> <span class="ident">u128</span>) <span class="kw">as</span> <span class="ident">u16</span>
-    }).<span class="ident">collect</span>()
+    <span class="ident">ps</span>.<span class="ident">iter</span>().<span class="ident">map</span>(<span class="op">|</span><span class="kw-2">&amp;</span><span class="ident">p</span><span class="op">|</span> (<span class="ident">x</span> <span class="op">%</span> <span class="ident">p</span> <span class="kw">as</span> <span class="ident">u128</span>) <span class="kw">as</span> <span class="ident">u16</span>).<span class="ident">collect</span>()
 }
 
 <span class="doccomment">/// Compute the CRT representation of x with respect to the factorization of q.</span>
@@ -765,15 +766,15 @@
 <span class="doccomment">/// Compute the value x given a list of CRT primes and residues.</span>
 <span class="attribute">#[<span class="ident">inline</span>]</span>
 <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">crt_inv</span>(<span class="ident">xs</span>: <span class="kw-2">&amp;</span>[<span class="ident">u16</span>], <span class="ident">ps</span>: <span class="kw-2">&amp;</span>[<span class="ident">u16</span>]) <span class="op">-&gt;</span> <span class="ident">u128</span> {
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">ret</span> <span class="op">=</span> <span class="ident">BigInt</span>::<span class="ident">zero</span>();
-    <span class="kw">let</span> <span class="ident">M</span> <span class="op">=</span> <span class="ident">ps</span>.<span class="ident">iter</span>().<span class="ident">fold</span>(<span class="ident">BigInt</span>::<span class="ident">one</span>(), <span class="op">|</span><span class="ident">acc</span>, <span class="kw-2">&amp;</span><span class="ident">x</span><span class="op">|</span> <span class="ident">BigInt</span>::<span class="ident">from</span>(<span class="ident">x</span>) <span class="op">*</span> <span class="ident">acc</span> );
+    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">ret</span> <span class="op">=</span> <span class="number">0</span>;
+    <span class="kw">let</span> <span class="ident">M</span> <span class="op">=</span> <span class="ident">ps</span>.<span class="ident">iter</span>().<span class="ident">fold</span>(<span class="number">1</span>, <span class="op">|</span><span class="ident">acc</span>, <span class="kw-2">&amp;</span><span class="ident">x</span><span class="op">|</span> <span class="ident">x</span> <span class="kw">as</span> <span class="ident">i128</span> <span class="op">*</span> <span class="ident">acc</span>);
     <span class="kw">for</span> (<span class="kw-2">&amp;</span><span class="ident">p</span>, <span class="kw-2">&amp;</span><span class="ident">a</span>) <span class="kw">in</span> <span class="ident">ps</span>.<span class="ident">iter</span>().<span class="ident">zip</span>(<span class="ident">xs</span>.<span class="ident">iter</span>()) {
-        <span class="kw">let</span> <span class="ident">p</span> <span class="op">=</span> <span class="ident">BigInt</span>::<span class="ident">from</span>(<span class="ident">p</span>);
-        <span class="kw">let</span> <span class="ident">q</span> <span class="op">=</span> <span class="kw-2">&amp;</span><span class="ident">M</span> <span class="op">/</span> <span class="kw-2">&amp;</span><span class="ident">p</span>;
-        <span class="ident">ret</span> <span class="op">+=</span> <span class="ident">BigInt</span>::<span class="ident">from</span>(<span class="ident">a</span>) <span class="op">*</span> <span class="ident">inv_ref</span>(<span class="kw-2">&amp;</span><span class="ident">q</span>,<span class="kw-2">&amp;</span><span class="ident">p</span>) <span class="op">*</span> <span class="ident">q</span>;
+        <span class="kw">let</span> <span class="ident">p</span> <span class="op">=</span> <span class="ident">p</span> <span class="kw">as</span> <span class="ident">i128</span>;
+        <span class="kw">let</span> <span class="ident">q</span> <span class="op">=</span> <span class="ident">M</span> <span class="op">/</span> <span class="ident">p</span>;
+        <span class="ident">ret</span> <span class="op">+=</span> <span class="ident">a</span> <span class="kw">as</span> <span class="ident">i128</span> <span class="op">*</span> <span class="ident">inv</span>(<span class="ident">q</span>, <span class="ident">p</span>) <span class="op">*</span> <span class="ident">q</span>;
         <span class="ident">ret</span> <span class="op">%=</span> <span class="kw-2">&amp;</span><span class="ident">M</span>;
     }
-    <span class="ident">ret</span>.<span class="ident">to_u128</span>().<span class="ident">unwrap</span>()
+    <span class="ident">ret</span> <span class="kw">as</span> <span class="ident">u128</span>
 }
 
 <span class="doccomment">/// Compute the value x given a composite CRT modulus.</span>
@@ -785,57 +786,51 @@
 <span class="doccomment">/// Generic algorithm to invert inp_a mod inp_b. As ref so as to support BigInts without</span>
 <span class="doccomment">/// copying.</span>
 <span class="attribute">#[<span class="ident">inline</span>]</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">inv_ref</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">Clone</span> <span class="op">+</span> <span class="ident">Integer</span> <span class="op">+</span> <span class="ident">Signed</span><span class="op">&gt;</span>(<span class="ident">inp_a</span>: <span class="kw-2">&amp;</span><span class="ident">T</span>, <span class="ident">inp_b</span>: <span class="kw-2">&amp;</span><span class="ident">T</span>) <span class="op">-&gt;</span> <span class="ident">T</span> {
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">a</span> <span class="op">=</span> <span class="ident">inp_a</span>.<span class="ident">clone</span>();
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">b</span> <span class="op">=</span> <span class="ident">inp_b</span>.<span class="ident">clone</span>();
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">inv</span>(<span class="ident">inp_a</span>: <span class="ident">i128</span>, <span class="ident">inp_b</span>: <span class="ident">i128</span>) <span class="op">-&gt;</span> <span class="ident">i128</span> {
+    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">a</span> <span class="op">=</span> <span class="ident">inp_a</span>;
+    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">b</span> <span class="op">=</span> <span class="ident">inp_b</span>;
     <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">q</span>;
     <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">tmp</span>;
 
-    <span class="kw">let</span> (<span class="kw-2">mut</span> <span class="ident">x0</span>, <span class="kw-2">mut</span> <span class="ident">x1</span>) <span class="op">=</span> (<span class="ident">T</span>::<span class="ident">zero</span>(), <span class="ident">T</span>::<span class="ident">one</span>());
+    <span class="kw">let</span> (<span class="kw-2">mut</span> <span class="ident">x0</span>, <span class="kw-2">mut</span> <span class="ident">x1</span>) <span class="op">=</span> (<span class="number">0</span>, <span class="number">1</span>);
 
-    <span class="kw">if</span> <span class="ident">b</span> <span class="op">==</span> <span class="ident">T</span>::<span class="ident">one</span>() {
-        <span class="kw">return</span> <span class="ident">T</span>::<span class="ident">one</span>();
+    <span class="kw">if</span> <span class="ident">b</span> <span class="op">==</span> <span class="number">1</span> {
+        <span class="kw">return</span> <span class="number">1</span>;
     }
 
-    <span class="kw">while</span> <span class="ident">a</span> <span class="op">&gt;</span> <span class="ident">T</span>::<span class="ident">one</span>() {
-        <span class="ident">q</span> <span class="op">=</span> <span class="ident">a</span>.<span class="ident">clone</span>() <span class="op">/</span> <span class="ident">b</span>.<span class="ident">clone</span>();
+    <span class="kw">while</span> <span class="ident">a</span> <span class="op">&gt;</span> <span class="number">1</span> {
+        <span class="ident">q</span> <span class="op">=</span> <span class="ident">a</span> <span class="op">/</span> <span class="ident">b</span>;
 
         <span class="comment">// a, b = b, a%b</span>
-        <span class="ident">tmp</span> <span class="op">=</span> <span class="ident">b</span>.<span class="ident">clone</span>();
-        <span class="ident">b</span> <span class="op">=</span> <span class="ident">a</span>.<span class="ident">clone</span>() <span class="op">%</span> <span class="ident">b</span>.<span class="ident">clone</span>();
+        <span class="ident">tmp</span> <span class="op">=</span> <span class="ident">b</span>;
+        <span class="ident">b</span> <span class="op">=</span> <span class="ident">a</span> <span class="op">%</span> <span class="ident">b</span>;
         <span class="ident">a</span> <span class="op">=</span> <span class="ident">tmp</span>;
 
-        <span class="ident">tmp</span> <span class="op">=</span> <span class="ident">x0</span>.<span class="ident">clone</span>();
-        <span class="ident">x0</span> <span class="op">=</span> <span class="ident">x1</span>.<span class="ident">clone</span>() <span class="op">-</span> <span class="ident">q</span>.<span class="ident">clone</span>() <span class="op">*</span> <span class="ident">x0</span>.<span class="ident">clone</span>();
-        <span class="ident">x1</span> <span class="op">=</span> <span class="ident">tmp</span>.<span class="ident">clone</span>();
+        <span class="ident">tmp</span> <span class="op">=</span> <span class="ident">x0</span>;
+        <span class="ident">x0</span> <span class="op">=</span> <span class="ident">x1</span> <span class="op">-</span> <span class="ident">q</span> <span class="op">*</span> <span class="ident">x0</span>;
+        <span class="ident">x1</span> <span class="op">=</span> <span class="ident">tmp</span>;
     }
 
-    <span class="kw">if</span> <span class="ident">x1</span> <span class="op">&lt;</span> <span class="ident">T</span>::<span class="ident">zero</span>() {
-        <span class="ident">x1</span> <span class="op">=</span> <span class="ident">x1</span> <span class="op">+</span> <span class="ident">inp_b</span>.<span class="ident">clone</span>();
+    <span class="kw">if</span> <span class="ident">x1</span> <span class="op">&lt;</span> <span class="number">0</span> {
+        <span class="ident">x1</span> <span class="op">+=</span> <span class="ident">inp_b</span>;
     }
 
     <span class="ident">x1</span>
-}
-
-<span class="doccomment">/// Invert a mod m.</span>
-<span class="attribute">#[<span class="ident">inline</span>]</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">inv</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">Copy</span> <span class="op">+</span> <span class="ident">Integer</span> <span class="op">+</span> <span class="ident">Signed</span><span class="op">&gt;</span>(<span class="ident">a</span>: <span class="ident">T</span>, <span class="ident">m</span>: <span class="ident">T</span>) <span class="op">-&gt;</span> <span class="ident">T</span> {
-    <span class="ident">inv_ref</span>(<span class="kw-2">&amp;</span><span class="ident">a</span>, <span class="kw-2">&amp;</span><span class="ident">m</span>)
 }
 
 <span class="doccomment">/// Number of primes supported by our library.</span>
 <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">NPRIMES</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">29</span>;
 
 <span class="doccomment">/// Primes used in fancy garbling.</span>
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">PRIMES</span>: [<span class="ident">u16</span>;<span class="number">29</span>] <span class="op">=</span> [
-    <span class="number">2</span>, <span class="number">3</span>, <span class="number">5</span>, <span class="number">7</span>, <span class="number">11</span>, <span class="number">13</span>, <span class="number">17</span>, <span class="number">19</span>, <span class="number">23</span>, <span class="number">29</span>, <span class="number">31</span>, <span class="number">37</span>, <span class="number">41</span>, <span class="number">43</span>, <span class="number">47</span>, <span class="number">53</span>, <span class="number">59</span>, <span class="number">61</span>, <span class="number">67</span>, <span class="number">71</span>,
-    <span class="number">73</span>, <span class="number">79</span>, <span class="number">83</span>, <span class="number">89</span>, <span class="number">97</span>, <span class="number">101</span>, <span class="number">103</span>, <span class="number">107</span>, <span class="number">109</span>
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">PRIMES</span>: [<span class="ident">u16</span>; <span class="number">29</span>] <span class="op">=</span> [
+    <span class="number">2</span>, <span class="number">3</span>, <span class="number">5</span>, <span class="number">7</span>, <span class="number">11</span>, <span class="number">13</span>, <span class="number">17</span>, <span class="number">19</span>, <span class="number">23</span>, <span class="number">29</span>, <span class="number">31</span>, <span class="number">37</span>, <span class="number">41</span>, <span class="number">43</span>, <span class="number">47</span>, <span class="number">53</span>, <span class="number">59</span>, <span class="number">61</span>, <span class="number">67</span>, <span class="number">71</span>, <span class="number">73</span>, <span class="number">79</span>, <span class="number">83</span>, <span class="number">89</span>, <span class="number">97</span>,
+    <span class="number">101</span>, <span class="number">103</span>, <span class="number">107</span>, <span class="number">109</span>,
 ];
 
 <span class="doccomment">/// Primes skipping the modulus 2, which allows certain gadgets.</span>
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">PRIMES_SKIP_2</span>: [<span class="ident">u16</span>;<span class="number">29</span>] <span class="op">=</span> [
-    <span class="number">3</span>, <span class="number">5</span>, <span class="number">7</span>, <span class="number">11</span>, <span class="number">13</span>, <span class="number">17</span>, <span class="number">19</span>, <span class="number">23</span>, <span class="number">29</span>, <span class="number">31</span>, <span class="number">37</span>, <span class="number">41</span>, <span class="number">43</span>, <span class="number">47</span>, <span class="number">53</span>, <span class="number">59</span>, <span class="number">61</span>, <span class="number">67</span>, <span class="number">71</span>,
-    <span class="number">73</span>, <span class="number">79</span>, <span class="number">83</span>, <span class="number">89</span>, <span class="number">97</span>, <span class="number">101</span>, <span class="number">103</span>, <span class="number">107</span>, <span class="number">109</span>, <span class="number">113</span>
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">PRIMES_SKIP_2</span>: [<span class="ident">u16</span>; <span class="number">29</span>] <span class="op">=</span> [
+    <span class="number">3</span>, <span class="number">5</span>, <span class="number">7</span>, <span class="number">11</span>, <span class="number">13</span>, <span class="number">17</span>, <span class="number">19</span>, <span class="number">23</span>, <span class="number">29</span>, <span class="number">31</span>, <span class="number">37</span>, <span class="number">41</span>, <span class="number">43</span>, <span class="number">47</span>, <span class="number">53</span>, <span class="number">59</span>, <span class="number">61</span>, <span class="number">67</span>, <span class="number">71</span>, <span class="number">73</span>, <span class="number">79</span>, <span class="number">83</span>, <span class="number">89</span>, <span class="number">97</span>,
+    <span class="number">101</span>, <span class="number">103</span>, <span class="number">107</span>, <span class="number">109</span>, <span class="number">113</span>,
 ];
 
 <span class="doccomment">/// Generate a CRT modulus with n primes.</span>
@@ -873,7 +868,7 @@
         <span class="ident">res</span> <span class="op">*=</span> <span class="ident">u128</span>::<span class="ident">from</span>(<span class="ident">p</span>);
         <span class="ident">ps</span>.<span class="ident">push</span>(<span class="ident">p</span>);
         <span class="kw">if</span> (<span class="ident">res</span> <span class="op">&gt;&gt;</span> <span class="ident">nbits</span>) <span class="op">&gt;</span> <span class="number">0</span> {
-            <span class="kw">break</span>
+            <span class="kw">break</span>;
         }
     }
     <span class="macro">assert</span><span class="macro">!</span>((<span class="ident">res</span> <span class="op">&gt;&gt;</span> <span class="ident">nbits</span>) <span class="op">&gt;</span> <span class="number">0</span>, <span class="string">&quot;not enough primes!&quot;</span>);
@@ -911,39 +906,48 @@
     <span class="ident">z</span> <span class="kw">as</span> <span class="ident">u16</span>
 }
 
-<span class="doccomment">/// Returns true if x is a power of 2. Delightfully generic.</span>
+<span class="doccomment">/// Returns true if x is a power of 2</span>
 <span class="attribute">#[<span class="ident">inline</span>]</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">is_power_of_2</span><span class="op">&lt;</span><span class="ident">I</span><span class="op">&gt;</span>(<span class="ident">x</span>: <span class="ident">I</span>) <span class="op">-&gt;</span> <span class="ident">bool</span>
-    <span class="kw">where</span> <span class="ident">I</span>: <span class="ident">std</span>::<span class="ident">ops</span>::<span class="ident">Sub</span><span class="op">&lt;</span><span class="ident">Output</span><span class="op">=</span><span class="ident">I</span><span class="op">&gt;</span> <span class="op">+</span> <span class="ident">std</span>::<span class="ident">ops</span>::<span class="ident">BitAnd</span><span class="op">&lt;</span><span class="ident">Output</span><span class="op">=</span><span class="ident">I</span><span class="op">&gt;</span> <span class="op">+</span>
-             <span class="ident">num</span>::<span class="ident">Zero</span> <span class="op">+</span> <span class="ident">num</span>::<span class="ident">One</span> <span class="op">+</span> <span class="ident">std</span>::<span class="ident">cmp</span>::<span class="ident">PartialEq</span> <span class="op">+</span> <span class="ident">Clone</span>
-{
-    (<span class="ident">x</span>.<span class="ident">clone</span>() <span class="op">&amp;</span> (<span class="ident">x</span> <span class="op">-</span> <span class="ident">I</span>::<span class="ident">one</span>())) <span class="op">==</span> <span class="ident">I</span>::<span class="ident">zero</span>()
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">is_power_of_2</span>(<span class="ident">x</span>: <span class="ident">u16</span>) <span class="op">-&gt;</span> <span class="ident">bool</span> {
+    (<span class="ident">x</span> <span class="op">&amp;</span> (<span class="ident">x</span> <span class="op">-</span> <span class="number">1</span>)) <span class="op">==</span> <span class="number">0</span>
 }
 
 <span class="doccomment">/// Extra Rng functionality, useful for `fancy-garbling`.</span>
-<span class="kw">pub</span> <span class="kw">trait</span> <span class="ident">RngExt</span> : <span class="ident">rand</span>::<span class="ident">Rng</span> <span class="op">+</span> <span class="ident">Sized</span> {
+<span class="kw">pub</span> <span class="kw">trait</span> <span class="ident">RngExt</span>: <span class="ident">rand</span>::<span class="ident">Rng</span> <span class="op">+</span> <span class="ident">Sized</span> {
     <span class="attribute">#[<span class="ident">inline</span>]</span>
-    <span class="kw">fn</span> <span class="ident">gen_bool</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) <span class="op">-&gt;</span> <span class="ident">bool</span> { <span class="self">self</span>.<span class="ident">gen</span>() }
+    <span class="kw">fn</span> <span class="ident">gen_bool</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) <span class="op">-&gt;</span> <span class="ident">bool</span> {
+        <span class="self">self</span>.<span class="ident">gen</span>()
+    }
 
     <span class="attribute">#[<span class="ident">inline</span>]</span>
-    <span class="kw">fn</span> <span class="ident">gen_u16</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) <span class="op">-&gt;</span> <span class="ident">u16</span> { <span class="self">self</span>.<span class="ident">gen</span>() }
+    <span class="kw">fn</span> <span class="ident">gen_u16</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) <span class="op">-&gt;</span> <span class="ident">u16</span> {
+        <span class="self">self</span>.<span class="ident">gen</span>()
+    }
 
     <span class="attribute">#[<span class="ident">inline</span>]</span>
-    <span class="kw">fn</span> <span class="ident">gen_u32</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) <span class="op">-&gt;</span> <span class="ident">u32</span> { <span class="self">self</span>.<span class="ident">gen</span>() }
+    <span class="kw">fn</span> <span class="ident">gen_u32</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) <span class="op">-&gt;</span> <span class="ident">u32</span> {
+        <span class="self">self</span>.<span class="ident">gen</span>()
+    }
 
     <span class="attribute">#[<span class="ident">inline</span>]</span>
-    <span class="kw">fn</span> <span class="ident">gen_u64</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) <span class="op">-&gt;</span> <span class="ident">u16</span> { <span class="self">self</span>.<span class="ident">gen</span>() }
+    <span class="kw">fn</span> <span class="ident">gen_u64</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) <span class="op">-&gt;</span> <span class="ident">u64</span> {
+        <span class="self">self</span>.<span class="ident">gen</span>()
+    }
 
     <span class="attribute">#[<span class="ident">inline</span>]</span>
-    <span class="kw">fn</span> <span class="ident">gen_usize</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) <span class="op">-&gt;</span> <span class="ident">usize</span> { <span class="self">self</span>.<span class="ident">gen</span>() }
+    <span class="kw">fn</span> <span class="ident">gen_usize</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) <span class="op">-&gt;</span> <span class="ident">usize</span> {
+        <span class="self">self</span>.<span class="ident">gen</span>()
+    }
 
     <span class="attribute">#[<span class="ident">inline</span>]</span>
-    <span class="kw">fn</span> <span class="ident">gen_u128</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) <span class="op">-&gt;</span> <span class="ident">u128</span> { <span class="self">self</span>.<span class="ident">gen</span>() }
+    <span class="kw">fn</span> <span class="ident">gen_u128</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) <span class="op">-&gt;</span> <span class="ident">u128</span> {
+        <span class="self">self</span>.<span class="ident">gen</span>()
+    }
 
     <span class="attribute">#[<span class="ident">inline</span>]</span>
     <span class="kw">fn</span> <span class="ident">gen_usable_u128</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">modulus</span>: <span class="ident">u16</span>) <span class="op">-&gt;</span> <span class="ident">u128</span> {
         <span class="kw">if</span> <span class="ident">is_power_of_2</span>(<span class="ident">modulus</span>) {
-            <span class="kw">let</span> <span class="ident">nbits</span> <span class="op">=</span> (<span class="ident">modulus</span><span class="op">-</span><span class="number">1</span>).<span class="ident">count_ones</span>();
+            <span class="kw">let</span> <span class="ident">nbits</span> <span class="op">=</span> (<span class="ident">modulus</span> <span class="op">-</span> <span class="number">1</span>).<span class="ident">count_ones</span>();
             <span class="kw">if</span> <span class="number">128</span> <span class="op">%</span> <span class="ident">nbits</span> <span class="op">==</span> <span class="number">0</span> {
                 <span class="kw">return</span> <span class="self">self</span>.<span class="ident">gen_u128</span>();
             }
@@ -971,21 +975,25 @@
     <span class="attribute">#[<span class="ident">inline</span>]</span>
     <span class="kw">fn</span> <span class="ident">gen_usable_factors</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) <span class="op">-&gt;</span> <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u16</span><span class="op">&gt;</span> {
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">x</span>: <span class="ident">u128</span> <span class="op">=</span> <span class="number">1</span>;
-        <span class="ident">PRIMES</span>.<span class="ident">iter</span>().<span class="ident">cloned</span>()
+        <span class="ident">PRIMES</span>[..<span class="number">25</span>]
+            .<span class="ident">iter</span>()
+            .<span class="ident">cloned</span>()
             .<span class="ident">filter</span>(<span class="op">|</span><span class="kw">_</span><span class="op">|</span> <span class="self">self</span>.<span class="ident">gen</span>()) <span class="comment">// randomly take this prime</span>
-            .<span class="ident">take_while</span>(<span class="op">|</span><span class="kw-2">&amp;</span><span class="ident">q</span><span class="op">|</span> { <span class="comment">// make sure that we don&#39;t overflow!</span>
+            .<span class="ident">take_while</span>(<span class="op">|</span><span class="kw-2">&amp;</span><span class="ident">q</span><span class="op">|</span> {
+                <span class="comment">// make sure that we don&#39;t overflow!</span>
                 <span class="kw">match</span> <span class="ident">x</span>.<span class="ident">checked_mul</span>(<span class="ident">q</span> <span class="kw">as</span> <span class="ident">u128</span>) {
                     <span class="prelude-val">None</span> <span class="op">=&gt;</span> <span class="bool-val">false</span>,
                     <span class="prelude-val">Some</span>(<span class="ident">y</span>) <span class="op">=&gt;</span> {
                         <span class="ident">x</span> <span class="op">=</span> <span class="ident">y</span>;
                         <span class="bool-val">true</span>
-                    },
+                    }
                 }
-            }).<span class="ident">collect</span>()
+            })
+            .<span class="ident">collect</span>()
     }
 }
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">R</span>: <span class="ident">rand</span>::<span class="ident">Rng</span> <span class="op">+</span> <span class="ident">Sized</span><span class="op">&gt;</span> <span class="ident">RngExt</span> <span class="kw">for</span> <span class="ident">R</span> { }
+<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">R</span>: <span class="ident">rand</span>::<span class="ident">Rng</span> <span class="op">+</span> <span class="ident">Sized</span><span class="op">&gt;</span> <span class="ident">RngExt</span> <span class="kw">for</span> <span class="ident">R</span> {}
 
 <span class="comment">////////////////////////////////////////////////////////////////////////////////</span>
 <span class="comment">// tests</span>
@@ -1060,16 +1068,16 @@
             <span class="kw">let</span> <span class="ident">x</span> <span class="op">=</span> <span class="ident">rng</span>.<span class="ident">gen_u128</span>() <span class="op">%</span> <span class="ident">Q</span>;
             <span class="kw">let</span> <span class="ident">y</span> <span class="op">=</span> <span class="ident">rng</span>.<span class="ident">gen_u128</span>() <span class="op">%</span> <span class="ident">Q</span>;
 
-            <span class="kw">let</span> <span class="ident">xp</span> <span class="op">=</span> <span class="ident">as_base_q</span>(<span class="ident">x</span>,<span class="ident">q</span>,<span class="ident">n</span>);
-            <span class="kw">let</span> <span class="ident">yp</span> <span class="op">=</span> <span class="ident">as_base_q</span>(<span class="ident">y</span>,<span class="ident">q</span>,<span class="ident">n</span>);
+            <span class="kw">let</span> <span class="ident">xp</span> <span class="op">=</span> <span class="ident">as_base_q</span>(<span class="ident">x</span>, <span class="ident">q</span>, <span class="ident">n</span>);
+            <span class="kw">let</span> <span class="ident">yp</span> <span class="op">=</span> <span class="ident">as_base_q</span>(<span class="ident">y</span>, <span class="ident">q</span>, <span class="ident">n</span>);
 
             <span class="kw">let</span> <span class="ident">zp</span> <span class="op">=</span> <span class="ident">base_q_add</span>(<span class="kw-2">&amp;</span><span class="ident">xp</span>, <span class="kw-2">&amp;</span><span class="ident">yp</span>, <span class="ident">q</span>);
 
             <span class="kw">let</span> <span class="ident">z</span> <span class="op">=</span> <span class="ident">from_base_q</span>(<span class="kw-2">&amp;</span><span class="ident">zp</span>, <span class="ident">q</span>);
 
-            <span class="macro">assert_eq</span><span class="macro">!</span>((<span class="ident">x</span><span class="op">+</span><span class="ident">y</span>) <span class="op">%</span> <span class="ident">Q</span>, <span class="ident">z</span>);
+            <span class="macro">assert_eq</span><span class="macro">!</span>((<span class="ident">x</span> <span class="op">+</span> <span class="ident">y</span>) <span class="op">%</span> <span class="ident">Q</span>, <span class="ident">z</span>);
         }
     }
 }
 </pre></div>
-</section><section id="search" class="content hidden"></section><section class="footer"></section><aside id="help" class="hidden"><div><h1 class="hidden">Help</h1><div class="shortcuts"><h2>Keyboard Shortcuts</h2><dl><dt><kbd>?</kbd></dt><dd>Show this help dialog</dd><dt><kbd>S</kbd></dt><dd>Focus the search field</dd><dt><kbd>↑</kbd></dt><dd>Move up in search results</dd><dt><kbd>↓</kbd></dt><dd>Move down in search results</dd><dt><kbd>↹</kbd></dt><dd>Switch tab</dd><dt><kbd>&#9166;</kbd></dt><dd>Go to active search result</dd><dt><kbd>+</kbd></dt><dd>Expand all sections</dd><dt><kbd>-</kbd></dt><dd>Collapse all sections</dd></dl></div><div class="infos"><h2>Search Tricks</h2><p>Prefix searches with a type followed by a colon (e.g., <code>fn:</code>) to restrict the search to a given type.</p><p>Accepted types are: <code>fn</code>, <code>mod</code>, <code>struct</code>, <code>enum</code>, <code>trait</code>, <code>type</code>, <code>macro</code>, and <code>const</code>.</p><p>Search functions by type signature (e.g., <code>vec -> usize</code> or <code>* -> vec</code>)</p><p>Search multiple things at once by splitting your query with comma (e.g., <code>str,u8</code> or <code>String,struct:Vec,test</code>)</p></div></div></aside><script>window.rootPath = "../../";window.currentCrate = "fancy_garbling";</script><script src="../../aliases.js"></script><script src="../../main.js"></script><script src="../../source-script.js"></script><script src="../../source-files.js"></script><script defer src="../../search-index.js"></script></body></html>
+</section><section id="search" class="content hidden"></section><section class="footer"></section><aside id="help" class="hidden"><div><h1 class="hidden">Help</h1><div class="shortcuts"><h2>Keyboard Shortcuts</h2><dl><dt><kbd>?</kbd></dt><dd>Show this help dialog</dd><dt><kbd>S</kbd></dt><dd>Focus the search field</dd><dt><kbd>↑</kbd></dt><dd>Move up in search results</dd><dt><kbd>↓</kbd></dt><dd>Move down in search results</dd><dt><kbd>↹</kbd></dt><dd>Switch tab</dd><dt><kbd>&#9166;</kbd></dt><dd>Go to active search result</dd><dt><kbd>+</kbd></dt><dd>Expand all sections</dd><dt><kbd>-</kbd></dt><dd>Collapse all sections</dd></dl></div><div class="infos"><h2>Search Tricks</h2><p>Prefix searches with a type followed by a colon (e.g. <code>fn:</code>) to restrict the search to a given type.</p><p>Accepted types are: <code>fn</code>, <code>mod</code>, <code>struct</code>, <code>enum</code>, <code>trait</code>, <code>type</code>, <code>macro</code>, and <code>const</code>.</p><p>Search functions by type signature (e.g. <code>vec -> usize</code> or <code>* -> vec</code>)</p><p>Search multiple things at once by splitting your query with comma (e.g. <code>str,u8</code> or <code>String,struct:Vec,test</code>)</p></div></div></aside><script>window.rootPath = "../../";window.currentCrate = "fancy_garbling";</script><script src="../../aliases.js"></script><script src="../../main.js"></script><script src="../../source-files.js"></script><script src="../../source-script.js"></script><script defer src="../../search-index.js"></script></body></html>
