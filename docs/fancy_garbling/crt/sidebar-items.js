@@ -1,1 +1,0 @@
-initSidebarItems({"struct":[["Bundle","A collection of wires, useful for the garbled gadgets defined by `BundleGadgets`."]],"trait":[["BundleGadgets","Extension trait for `Fancy` providing advanced gadgets based on bundles of wires."]]});
