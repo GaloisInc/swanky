@@ -90,6 +90,26 @@ impl<T: Display> Display for FancyError<T> {
     }
 }
 
+impl <A> FancyError<A> {
+    /// Map the underlying client error type.
+    ///
+    /// Useful for wrapping errors from fancy objects.
+    pub fn map_client_err<B>(self, f: impl Fn(A) -> B) -> FancyError<B> {
+        match self {
+            FancyError::UnequalModuli => FancyError::UnequalModuli,
+            FancyError::NotImplemented => FancyError::NotImplemented,
+            FancyError::InvalidArg { desc } => FancyError::InvalidArg { desc },
+            FancyError::InvalidArgNum { got, needed } => FancyError::InvalidArgNum { got, needed },
+            FancyError::InvalidArgMod { got, needed } => FancyError::InvalidArgMod { got, needed },
+            FancyError::ArgNotBinary => FancyError::ArgNotBinary,
+            FancyError::NoTruthTable => FancyError::NoTruthTable,
+            FancyError::InvalidTruthTable => FancyError::InvalidTruthTable,
+            FancyError::UninitializedValue => FancyError::UninitializedValue,
+            FancyError::ClientError(e) => FancyError::ClientError(f(e)),
+        }
+    }
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 // sync error
 
