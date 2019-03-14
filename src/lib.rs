@@ -23,3 +23,4 @@ mod wire;
 pub use crate::fancy::*;
 pub use crate::garble::*;
 pub use crate::wire::*;
+pub use crate::error::FancyError;
