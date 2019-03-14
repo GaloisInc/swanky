@@ -15,11 +15,11 @@ edition = "2018"
 nightly = ["rand/nightly", "scuttlebutt/nightly"]
 
 [dependencies]
-# fancy_garbling = { path = "../fancy-garbling" }
 fancy_garbling = { git = "https://github.com/spaceships/fancy-garbling" }
-ocelot = { path = "../ocelot" }
-rand = "*"
-scuttlebutt = { path = "../scuttlebutt" }
+ocelot         = { git = "https://github.com/amaloz/ocelot" }
+scuttlebutt    = { git = "https://github.com/amaloz/scuttlebutt" }
+rand = "0.6.5"
+bincode = "1.1.2"
 
 [dev-dependencies]
 # crossbeam = "*"

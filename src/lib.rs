@@ -10,7 +10,7 @@
 //!
 //! **THIS IS VERY MUCH RESEARCH CODE!** (for now)
 
-#![cfg_attr(feature = "nightly", feature(test))]
+// #![cfg_attr(feature = "nightly", feature(test))]
 
 mod comm;
 mod errors;
@@ -35,7 +35,6 @@ fn block_to_wire(b: Block, q: u16) -> Wire {
 
 #[cfg(test)]
 mod tests {
-    extern crate test;
     use super::*;
     use fancy_garbling::dummy::Dummy;
     use fancy_garbling::util::RngExt;
@@ -50,10 +49,10 @@ mod tests {
     type Writer = BufWriter<UnixStream>;
 
     fn c1<F: Fancy<Item = W>, W: HasModulus + Clone>(f: &mut F) {
-        let a = f.garbler_input(None, 3, None);
-        let b = f.evaluator_input(None, 3);
-        let c = f.add(&a, &b);
-        f.output(None, &c);
+        let a = f.garbler_input(None, 3, None).unwrap();
+        let b = f.evaluator_input(None, 3).unwrap();
+        let c = f.add(&a, &b).unwrap();
+        f.output(None, &c).unwrap();
     }
 
     fn test_c1<
@@ -103,17 +102,17 @@ mod tests {
     fn c2<F: Fancy<Item = W>, W: HasModulus + Clone>(f: &F, q: u128, n: SyncIndex) {
         // f.begin_sync(n);
         let mut zs = Vec::new();
-        for i in 0..n {
+        for _i in 0..n {
             // let idx = Some(i);
             let idx = None;
-            let c = f.constant_bundle_crt(idx, 1, q);
-            let x = f.evaluator_input_bundle_crt(idx, q);
-            let x = f.mul_bundles(idx, &x, &c);
-            let z = f.relu(idx, &x, "100%", None);
+            let c = f.constant_bundle_crt(idx, 1, q).unwrap();
+            let x = f.evaluator_input_bundle_crt(idx, q).unwrap();
+            let x = f.mul_bundles(idx, &x, &c).unwrap();
+            let z = f.relu(idx, &x, "100%", None).unwrap();
             zs.push(z);
             // f.finish_index(i);
         }
-        f.output_bundles(None, &zs);
+        f.output_bundles(None, &zs).unwrap();
     }
 
     #[test]
