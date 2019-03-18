@@ -15,6 +15,7 @@ build = "build.rs"
 
 [features]
 nightly = ["curve25519-dalek/simd_backend", "rand/nightly", "scuttlebutt/nightly"]
+unstable = []
 
 [dependencies]
 arrayref = "0.3"
@@ -55,3 +56,4 @@ harness = false
 [[bench]]
 name = "oprf"
 harness = false
+required-features = ["unstable"]

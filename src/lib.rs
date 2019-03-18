@@ -38,5 +38,7 @@ pub use crate::errors::Error;
 
 mod ot;
 pub use crate::ot::*;
+#[cfg(feature = "unstable")]
 mod oprf;
+#[cfg(feature = "unstable")]
 pub use crate::oprf::*;
