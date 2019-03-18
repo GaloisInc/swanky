@@ -4,6 +4,7 @@
 // Copyright © 2019 Galois, Inc.
 // See LICENSE for licensing information.
 
+/// Errors produced by oblivious transfer protocols.
 #[derive(Debug)]
 pub enum Error {
     InvalidInputLength,

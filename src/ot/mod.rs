@@ -29,7 +29,7 @@ where
         writer: &mut W,
         rng: &mut RNG,
     ) -> Result<Self, Error>;
-    /// Sends values.
+    /// Sends messages.
     fn send<R: Read + Send, W: Write + Send, RNG: CryptoRng + RngCore>(
         &mut self,
         reader: &mut R,
@@ -55,7 +55,7 @@ where
         writer: &mut W,
         rng: &mut RNG,
     ) -> Result<Self, Error>;
-    /// Receives values.
+    /// Receives messages.
     fn receive<R: Read + Send, W: Write + Send, RNG: CryptoRng + RngCore>(
         &mut self,
         reader: &mut R,
@@ -104,6 +104,8 @@ pub trait RandomObliviousTransferSender: ObliviousTransferSender
 where
     Self: Sized,
 {
+    /// Random oblivious transfer send. Returns a vector of tuples containing
+    /// the two random messages.
     fn send_random<R: Read + Send, W: Write + Send, RNG: CryptoRng + RngCore>(
         &mut self,
         reader: &mut R,
@@ -119,6 +121,7 @@ pub trait RandomObliviousTransferReceiver: ObliviousTransferReceiver
 where
     Self: Sized,
 {
+    /// Random oblivious transfer receive.
     fn receive_random<R: Read + Send, W: Write + Send, RNG: CryptoRng + RngCore>(
         &mut self,
         reader: &mut R,
