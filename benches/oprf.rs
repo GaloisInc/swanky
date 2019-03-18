@@ -18,7 +18,7 @@ fn rand_block_vec(size: usize) -> Vec<Block> {
     (0..size).map(|_| rand::random::<Block>()).collect()
 }
 
-const T: usize = 1 << 8;
+const T: usize = 1 << 12;
 
 fn _bench_oprf<
     OPRFSender: ObliviousPrfSender<Seed = Seed, Input = Block, Output = Output>,

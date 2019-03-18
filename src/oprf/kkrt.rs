@@ -11,8 +11,8 @@
 use super::prc::PseudorandomCode;
 use crate::errors::Error;
 use crate::{
-    cointoss, stream, utils, ObliviousPrfReceiver, ObliviousPrfSender, ObliviousTransferReceiver,
-    ObliviousTransferSender,
+    cointoss, stream, utils, ObliviousPrf, ObliviousPrfReceiver, ObliviousPrfSender,
+    ObliviousTransferReceiver, ObliviousTransferSender,
 };
 use arrayref::array_ref;
 use rand::CryptoRng;
@@ -84,6 +84,19 @@ impl PartialOrd for Output {
     }
 }
 
+impl<OT: ObliviousTransferReceiver<Msg = Block> + SemiHonest> ObliviousPrf for KkrtOPRFSender<OT> {
+    type Seed = Seed;
+    type Input = Block;
+    type Output = Output;
+}
+
+impl<OT: ObliviousTransferSender<Msg = Block> + SemiHonest> ObliviousPrf for KkrtOPRFReceiver<OT> {
+    type Seed = Seed;
+    type Input = Block;
+    type Output = Output;
+}
+
+/// KKRT oblivious PRF sender.
 pub struct KkrtOPRFSender<OT: ObliviousTransferReceiver + SemiHonest> {
     _ot: PhantomData<OT>,
     s: Vec<bool>,
@@ -92,19 +105,9 @@ pub struct KkrtOPRFSender<OT: ObliviousTransferReceiver + SemiHonest> {
     rngs: Vec<AesRng>,
 }
 
-pub struct KkrtOPRFReceiver<OT: ObliviousTransferSender + SemiHonest> {
-    _ot: PhantomData<OT>,
-    code: PseudorandomCode,
-    rngs: Vec<(AesRng, AesRng)>,
-}
-
 impl<OT: ObliviousTransferReceiver<Msg = Block> + SemiHonest> ObliviousPrfSender
     for KkrtOPRFSender<OT>
 {
-    type Seed = Seed;
-    type Input = Block;
-    type Output = Output;
-
     fn init<R, W, RNG>(reader: &mut R, writer: &mut W, rng: &mut RNG) -> Result<Self, Error>
     where
         R: Read + Send,
@@ -146,6 +149,7 @@ impl<OT: ObliviousTransferReceiver<Msg = Block> + SemiHonest> ObliviousPrfSender
         W: Write + Send,
         RNG: CryptoRng + RngCore,
     {
+        // Round up if necessary so that `m mod 16 ≡ 0`.
         let m = if m % 16 != 0 { m + (16 - m % 16) } else { m };
         let (nrows, ncols) = (m, 512);
         let mut t0 = vec![0u8; nrows / 8];
@@ -154,9 +158,9 @@ impl<OT: ObliviousTransferReceiver<Msg = Block> + SemiHonest> ObliviousPrfSender
         for (j, b) in self.s.iter().enumerate() {
             let range = j * nrows / 8..(j + 1) * nrows / 8;
             let mut q = &mut qs[range];
+            self.rngs[j].fill_bytes(&mut q);
             stream::read_bytes_inplace(reader, &mut t0)?;
             stream::read_bytes_inplace(reader, &mut t1)?;
-            self.rngs[j].fill_bytes(&mut q);
             if *b {
                 utils::xor_inplace(&mut q, &t1);
             } else {
@@ -179,12 +183,16 @@ impl<OT: ObliviousTransferReceiver<Msg = Block> + SemiHonest> ObliviousPrfSender
     }
 }
 
+/// KKRT oblivious PRF receiver.
+pub struct KkrtOPRFReceiver<OT: ObliviousTransferSender + SemiHonest> {
+    _ot: PhantomData<OT>,
+    code: PseudorandomCode,
+    rngs: Vec<(AesRng, AesRng)>,
+}
+
 impl<OT: ObliviousTransferSender<Msg = Block> + SemiHonest> ObliviousPrfReceiver
     for KkrtOPRFReceiver<OT>
 {
-    type Input = Block;
-    type Output = Output;
-
     fn init<R: Read + Send, W: Write + Send, RNG: CryptoRng + RngCore>(
         reader: &mut R,
         writer: &mut W,
@@ -229,30 +237,30 @@ impl<OT: ObliviousTransferSender<Msg = Block> + SemiHonest> ObliviousPrfReceiver
         rng: &mut RNG,
     ) -> Result<Vec<Self::Output>, Error> {
         let m = selections.len();
+        // Round up if necessary so that `m mod 16 ≡ 0`.
         let m = if m % 16 != 0 { m + (16 - m % 16) } else { m };
         let (nrows, ncols) = (m, 512);
         let mut t0s = vec![0u8; nrows * ncols / 8];
-        let mut t1s = vec![0u8; nrows * ncols / 8];
-        let mut out = Vec::with_capacity(m);
+        rng.fill_bytes(&mut t0s);
+        let out = t0s
+            .chunks(64)
+            .map(|c| Output(*array_ref![c, 0, 64]))
+            .collect::<Vec<Output>>();
+        let mut t1s = t0s.clone();
         for (j, r) in selections.iter().enumerate() {
             let range = j * ncols / 8..(j + 1) * ncols / 8;
-            let mut t0 = &mut t0s[range];
-            let range = j * ncols / 8..(j + 1) * ncols / 8;
             let mut t1 = &mut t1s[range];
-            rng.fill_bytes(&mut t0);
             let c = self.code.encode(*r);
-            utils::xor_inplace(&mut t1, &t0);
             utils::xor_inplace(&mut t1, &c);
-            out.push(Output(*array_ref![t0, 0, 64]))
         }
-        let t0s_ = utils::transpose(&t0s, nrows, ncols);
-        let t1s_ = utils::transpose(&t1s, nrows, ncols);
+        let t0s = utils::transpose(&t0s, nrows, ncols);
+        let t1s = utils::transpose(&t1s, nrows, ncols);
         let mut t = vec![0u8; nrows / 8];
         for j in 0..self.rngs.len() {
             let range = j * nrows / 8..(j + 1) * nrows / 8;
-            let t0 = &t0s_[range];
+            let t0 = &t0s[range];
             let range = j * nrows / 8..(j + 1) * nrows / 8;
-            let t1 = &t1s_[range];
+            let t1 = &t1s[range];
             self.rngs[j].0.fill_bytes(&mut t);
             utils::xor_inplace(&mut t, &t0);
             stream::write_bytes(writer, &t)?;
@@ -270,7 +278,9 @@ impl<OT: ObliviousTransferSender<Msg = Block> + SemiHonest> SemiHonest for KkrtO
 
 use crate::{alsz, chou_orlandi};
 
+/// KKRT oblivious PRF sender using ALSZ OT extension with Chou-Orlandi as the base OT.
 pub type KkrtSender = KkrtOPRFSender<alsz::AlszOTReceiver<chou_orlandi::ChouOrlandiOTSender>>;
+/// KKRT oblivious PRF receiver using ALSZ OT extension with Chou-Orlandi as the base OT.
 pub type KkrtReceiver = KkrtOPRFReceiver<alsz::AlszOTSender<chou_orlandi::ChouOrlandiOTReceiver>>;
 
 #[cfg(test)]

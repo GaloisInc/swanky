@@ -40,3 +40,30 @@ impl PseudorandomCode {
         *array_ref![c, 0, 64]
     }
 }
+
+#[cfg(all(feature = "nightly", test))]
+mod benchmarks {
+    extern crate test;
+    use super::*;
+    use test::Bencher;
+
+    #[bench]
+    fn bench_new(b: &mut Bencher) {
+        let k1 = rand::random::<Block>();
+        let k2 = rand::random::<Block>();
+        let k3 = rand::random::<Block>();
+        let k4 = rand::random::<Block>();
+        b.iter(|| PseudorandomCode::new(k1, k2, k3, k4));
+    }
+
+    #[bench]
+    fn bench_encode(b: &mut Bencher) {
+        let k1 = rand::random::<Block>();
+        let k2 = rand::random::<Block>();
+        let k3 = rand::random::<Block>();
+        let k4 = rand::random::<Block>();
+        let prc = PseudorandomCode::new(k1, k2, k3, k4);
+        let m = rand::random::<Block>();
+        b.iter(|| prc.encode(m));
+    }
+}

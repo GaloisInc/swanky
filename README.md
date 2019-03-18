@@ -51,12 +51,19 @@ OTs):
 
 All results use unix sockets and were run on a 2.7 GHz machine with 16 GB RAM,
 with the sender and receiver being on different threads (see `benches/ot.rs` for
-details).
+details), using the `nightly` feature (see below).
 
 # Building
 
 Use `cargo build` to build, `cargo test` to run the test suite, `cargo bench` to
 benchmark the various protocols, and `cargo doc --open` to view documentation.
+
+`ocelot` also supports the following features:
+
+* `nightly`: Use nightly features from `rust` and the underlying libraries.
+
+* `unstable`: Enable unstable components of `ocelot`. Currently this enables
+  oblivious PRF support.
 
 # License
 
