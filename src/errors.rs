@@ -18,7 +18,7 @@ impl std::fmt::Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
             Error::IoError(e) => write!(f, "IO Error: {}", e),
-            Error::OtError(_e) => write!(f, "OT Error: ???"), // XXX: Print OT error when Ocelot adds Display
+            Error::OtError(e) => write!(f, "OT Error: {}", e),
             Error::EvError(e) => write!(f, "Evaluator Error: {}", e),
             Error::GbError(e) => write!(f, "Garbler Error: {}", e),
         }
