@@ -62,6 +62,6 @@ harness = false
 name = "rust"
 harness = false
 
-# [[bench]]
-# name = "parser"
-# harness = false
+[[bench]]
+name = "parser"
+harness = false
