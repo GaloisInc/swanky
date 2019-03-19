@@ -454,9 +454,9 @@ impl GarbledCircuit {
                 Gate::GarblerInput { .. } => eval.garbler_input(None, q, None)?,
                 Gate::EvaluatorInput { .. } => eval.evaluator_input(None, q)?,
                 Gate::Constant { val } => eval.constant(None, val, q)?,
-                Gate::Add { xref, yref } => wires[xref.ix].plus(&wires[yref.ix]),
-                Gate::Sub { xref, yref } => wires[xref.ix].minus(&wires[yref.ix]),
-                Gate::Cmul { xref, c } => wires[xref.ix].cmul(c),
+                Gate::Add { xref, yref, .. } => wires[xref.ix].plus(&wires[yref.ix]),
+                Gate::Sub { xref, yref, .. } => wires[xref.ix].minus(&wires[yref.ix]),
+                Gate::Cmul { xref, c, .. } => wires[xref.ix].cmul(c),
                 Gate::Proj { xref, .. } => eval.proj(None, &wires[xref.ix], q, None)?,
                 Gate::Mul { xref, yref, .. } => eval.mul(None, &wires[xref.ix], &wires[yref.ix])?,
             };

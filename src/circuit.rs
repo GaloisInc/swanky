@@ -14,7 +14,13 @@ use crate::fancy::{Fancy, HasModulus, SyncIndex};
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 pub struct CircuitRef {
     pub ix: usize,
-    modulus: u16,
+    pub modulus: u16,
+}
+
+impl std::fmt::Display for CircuitRef {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "[{} | {}]", self.ix, self.modulus)
+    }
 }
 
 impl HasModulus for CircuitRef {
@@ -50,31 +56,59 @@ pub enum Gate {
     Add {
         xref: CircuitRef,
         yref: CircuitRef,
+        out: Option<usize>,
     },
     Sub {
         xref: CircuitRef,
         yref: CircuitRef,
+        out: Option<usize>,
     },
     Cmul {
         xref: CircuitRef,
         c: u16,
+        out: Option<usize>,
     },
     Mul {
         xref: CircuitRef,
         yref: CircuitRef,
         id: usize,
+        out: Option<usize>,
     }, // id is the gate number
     Proj {
         xref: CircuitRef,
         tt: Vec<u16>,
         id: usize,
+        out: Option<usize>,
     }, // id is the gate number
 }
 
+impl std::fmt::Display for Gate {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            Gate::GarblerInput { id } => write!(f, "GarblerInput {}", id),
+            Gate::EvaluatorInput { id } => write!(f, "EvaluatorInput {}", id),
+            Gate::Constant { val } => write!(f, "Constant {}", val),
+            Gate::Add { xref, yref, out } => write!(f, "Add ( {}, {}, {:?} )", xref, yref, out),
+            Gate::Sub { xref, yref, out } => write!(f, "Sub ( {}, {}, {:?} )", xref, yref, out),
+            Gate::Cmul { xref, c, out } => write!(f, "Cmul ( {}, {}, {:?} )", xref, c, out),
+            Gate::Mul {
+                xref,
+                yref,
+                id,
+                out,
+            } => write!(f, "Mul ( {}, {}, {}, {:?} )", xref, yref, id, out),
+            Gate::Proj { xref, tt, id, out } => {
+                write!(f, "Proj ( {}, {:?}, {}, {:?} )", xref, tt, id, out)
+            }
+        }
+    }
+}
+
 impl Circuit {
-    fn new() -> Circuit {
+    pub fn new(ngates: Option<usize>) -> Circuit {
+        let gates = Vec::with_capacity(ngates.unwrap_or(0));
         Circuit {
-            gates: Vec::new(),
+            gates,
             garbler_input_refs: Vec::new(),
             evaluator_input_refs: Vec::new(),
             const_refs: Vec::new(),
@@ -88,51 +122,76 @@ impl Circuit {
         let mut cache: Vec<Option<F::Item>> = vec![None; self.gates.len()];
         for zref in 0..self.gates.len() {
             let q = self.gate_moduli[zref];
-            let val = match self.gates[zref] {
-                Gate::GarblerInput { .. } => f.garbler_input(None, q, None)?,
-                Gate::EvaluatorInput { .. } => f.evaluator_input(None, q)?,
-                Gate::Constant { val } => f.constant(None, val, q)?,
-                Gate::Add { xref, yref } => f.add(
-                    cache[xref.ix]
-                        .as_ref()
-                        .ok_or(FancyError::UninitializedValue)?,
-                    cache[yref.ix]
-                        .as_ref()
-                        .ok_or(FancyError::UninitializedValue)?,
-                )?,
-                Gate::Sub { xref, yref } => f.sub(
-                    cache[xref.ix]
-                        .as_ref()
-                        .ok_or(FancyError::UninitializedValue)?,
-                    cache[yref.ix]
-                        .as_ref()
-                        .ok_or(FancyError::UninitializedValue)?,
-                )?,
-                Gate::Cmul { xref, c } => f.cmul(
-                    cache[xref.ix]
-                        .as_ref()
-                        .ok_or(FancyError::UninitializedValue)?,
-                    c,
-                )?,
-                Gate::Proj { xref, ref tt, .. } => f.proj(
-                    None,
-                    cache[xref.ix]
-                        .as_ref()
-                        .ok_or(FancyError::UninitializedValue)?,
-                    q,
-                    Some(tt.to_vec()),
-                )?,
-                Gate::Mul { xref, yref, .. } => f.mul(
-                    None,
-                    cache[xref.ix]
-                        .as_ref()
-                        .ok_or(FancyError::UninitializedValue)?,
-                    cache[yref.ix]
-                        .as_ref()
-                        .ok_or(FancyError::UninitializedValue)?,
-                )?,
+            let (zref_, val) = match self.gates[zref] {
+                Gate::GarblerInput { .. } => (None, f.garbler_input(None, q, None)?),
+                Gate::EvaluatorInput { .. } => (None, f.evaluator_input(None, q)?),
+                Gate::Constant { val } => (None, f.constant(None, val, q)?),
+                Gate::Add { xref, yref, out } => (
+                    out,
+                    f.add(
+                        cache[xref.ix]
+                            .as_ref()
+                            .ok_or(FancyError::UninitializedValue)?,
+                        cache[yref.ix]
+                            .as_ref()
+                            .ok_or(FancyError::UninitializedValue)?,
+                    )?,
+                ),
+                Gate::Sub { xref, yref, out } => (
+                    out,
+                    f.sub(
+                        cache[xref.ix]
+                            .as_ref()
+                            .ok_or(FancyError::UninitializedValue)?,
+                        cache[yref.ix]
+                            .as_ref()
+                            .ok_or(FancyError::UninitializedValue)?,
+                    )?,
+                ),
+                Gate::Cmul { xref, c, out } => (
+                    out,
+                    f.cmul(
+                        cache[xref.ix]
+                            .as_ref()
+                            .ok_or(FancyError::UninitializedValue)?,
+                        c,
+                    )?,
+                ),
+                Gate::Proj {
+                    xref,
+                    ref tt,
+                    id: _,
+                    out,
+                } => (
+                    out,
+                    f.proj(
+                        None,
+                        cache[xref.ix]
+                            .as_ref()
+                            .ok_or(FancyError::UninitializedValue)?,
+                        q,
+                        Some(tt.to_vec()),
+                    )?,
+                ),
+                Gate::Mul {
+                    xref,
+                    yref,
+                    id: _,
+                    out,
+                } => (
+                    out,
+                    f.mul(
+                        None,
+                        cache[xref.ix]
+                            .as_ref()
+                            .ok_or(FancyError::UninitializedValue)?,
+                        cache[yref.ix]
+                            .as_ref()
+                            .ok_or(FancyError::UninitializedValue)?,
+                    )?,
+                ),
             };
-            cache[zref] = Some(val);
+            cache[zref_.unwrap_or(zref)] = Some(val);
         }
         for r in self.output_refs.iter() {
             f.output(
@@ -148,6 +207,13 @@ impl Circuit {
         let dummy = crate::dummy::Dummy::new(garbler_inputs, evaluator_inputs);
         self.eval(&dummy).unwrap();
         dummy.get_output()
+    }
+
+    /// Print circuit info.
+    pub fn info(&self) -> Result<(), FancyError<crate::error::InformerError>> {
+        let informer = crate::informer::Informer::new();
+        self.eval(&informer)?;
+        Ok(())
     }
 
     pub fn num_garbler_inputs(&self) -> usize {
@@ -247,6 +313,7 @@ impl Fancy for CircuitBuilder {
         let gate = Gate::Add {
             xref: *xref,
             yref: *yref,
+            out: None,
         };
         Ok(self.gate(gate, xref.modulus()))
     }
@@ -262,6 +329,7 @@ impl Fancy for CircuitBuilder {
         let gate = Gate::Sub {
             xref: *xref,
             yref: *yref,
+            out: None,
         };
         Ok(self.gate(gate, xref.modulus()))
     }
@@ -271,7 +339,14 @@ impl Fancy for CircuitBuilder {
         xref: &CircuitRef,
         c: u16,
     ) -> Result<CircuitRef, FancyError<CircuitBuilderError>> {
-        Ok(self.gate(Gate::Cmul { xref: *xref, c }, xref.modulus()))
+        Ok(self.gate(
+            Gate::Cmul {
+                xref: *xref,
+                c,
+                out: None,
+            },
+            xref.modulus(),
+        ))
     }
 
     fn proj(
@@ -289,6 +364,7 @@ impl Fancy for CircuitBuilder {
             xref: *xref,
             tt: tt.to_vec(),
             id: self.get_next_ciphertext_id(),
+            out: None,
         };
         Ok(self.gate(gate, output_modulus))
     }
@@ -307,6 +383,7 @@ impl Fancy for CircuitBuilder {
             xref: *xref,
             yref: *yref,
             id: self.get_next_ciphertext_id(),
+            out: None,
         };
 
         Ok(self.gate(gate, xref.modulus()))
@@ -329,7 +406,7 @@ impl CircuitBuilder {
             next_garbler_input_id: Arc::new(AtomicUsize::new(0)),
             next_evaluator_input_id: Arc::new(AtomicUsize::new(0)),
             const_map: Arc::new(Mutex::new(HashMap::new())),
-            circ: Arc::new(Mutex::new(Circuit::new())),
+            circ: Arc::new(Mutex::new(Circuit::new(None))),
         }
     }
 
