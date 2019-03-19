@@ -7,14 +7,14 @@ use std::collections::HashMap;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 
-use crate::error::{CircuitBuilderError, FancyError};
+use crate::error::{CircuitBuilderError, DummyError, FancyError, InformerError};
 use crate::fancy::{Fancy, HasModulus, SyncIndex};
 
 /// The index and modulus of a gate in a circuit.
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 pub struct CircuitRef {
     pub ix: usize,
-    pub modulus: u16,
+    pub(crate) modulus: u16,
 }
 
 impl std::fmt::Display for CircuitRef {
@@ -203,14 +203,18 @@ impl Circuit {
     }
 
     /// Evaluate the circuit in plaintext.
-    pub fn eval_plain(&self, garbler_inputs: &[u16], evaluator_inputs: &[u16]) -> Vec<u16> {
+    pub fn eval_plain(
+        &self,
+        garbler_inputs: &[u16],
+        evaluator_inputs: &[u16],
+    ) -> Result<Vec<u16>, FancyError<DummyError>> {
         let dummy = crate::dummy::Dummy::new(garbler_inputs, evaluator_inputs);
-        self.eval(&dummy).unwrap();
-        dummy.get_output()
+        self.eval(&dummy)?;
+        Ok(dummy.get_output())
     }
 
     /// Print circuit info.
-    pub fn info(&self) -> Result<(), FancyError<crate::error::InformerError>> {
+    pub fn info(&self) -> Result<(), FancyError<InformerError>> {
         let informer = crate::informer::Informer::new();
         self.eval(&informer)?;
         Ok(())
@@ -466,7 +470,7 @@ mod basic {
                 inps.push(rng.gen_bool() as u16);
             }
             let res = inps.iter().fold(1, |acc, &x| x & acc);
-            let out = c.eval_plain(&[], &inps)[0];
+            let out = c.eval_plain(&[], &inps).unwrap()[0];
             if !(out == res) {
                 println!("{:?} {} {}", inps, out, res);
                 panic!("incorrect output n={}", n);
@@ -490,7 +494,7 @@ mod basic {
                 inps.push(rng.gen_bool() as u16);
             }
             let res = inps.iter().fold(0, |acc, &x| x | acc);
-            let out = c.eval_plain(&[], &inps)[0];
+            let out = c.eval_plain(&[], &inps).unwrap()[0];
             if !(out == res) {
                 println!("{:?} {} {}", inps, out, res);
                 panic!();
@@ -511,7 +515,7 @@ mod basic {
         for _ in 0..16 {
             let x = rng.gen_u16() % q;
             let y = rng.gen_u16() % q;
-            let out = c.eval_plain(&[x], &[y]);
+            let out = c.eval_plain(&[x], &[y]).unwrap();
             assert_eq!(out[0], x * y % q);
         }
     }
@@ -529,7 +533,7 @@ mod basic {
         let c = b.finish();
         for _ in 0..16 {
             let x = rng.gen_u16() % p;
-            let out = c.eval_plain(&[x], &[]);
+            let out = c.eval_plain(&[x], &[]).unwrap();
             assert_eq!(out[0], x % q);
         }
     }
@@ -554,7 +558,7 @@ mod basic {
                 .collect_vec();
             let s: u16 = inps.iter().sum();
             println!("{:?}, sum={}", inps, s);
-            let out = c.eval_plain(&inps, &[]);
+            let out = c.eval_plain(&inps, &[]).unwrap();
             assert_eq!(out[0], s);
         }
     }
@@ -576,7 +580,7 @@ mod basic {
 
         for _ in 0..64 {
             let x = rng.gen_u16() % q;
-            let z = circ.eval_plain(&[], &[x]);
+            let z = circ.eval_plain(&[], &[x]).unwrap();
             assert_eq!(z[0], (x + c) % q);
         }
     }
@@ -606,7 +610,7 @@ mod bundle {
         for _ in 0..16 {
             let x = rng.gen_u128() % q;
             let y = rng.gen_u128() % q;
-            let res = c.eval_plain(&crt_factor(x, q), &crt_factor(y, q));
+            let res = c.eval_plain(&crt_factor(x, q), &crt_factor(y, q)).unwrap();
             let z = crt_inv_factor(&res, q);
             assert_eq!(z, (x + y) % q);
         }
@@ -627,7 +631,7 @@ mod bundle {
         for _ in 0..16 {
             let x = rng.gen_u128() % q;
             let y = rng.gen_u128() % q;
-            let res = c.eval_plain(&crt_factor(x, q), &crt_factor(y, q));
+            let res = c.eval_plain(&crt_factor(x, q), &crt_factor(y, q)).unwrap();
             let z = crt_inv_factor(&res, q);
             assert_eq!(z, (x + q - y) % q);
         }
@@ -647,7 +651,7 @@ mod bundle {
 
         for _ in 0..16 {
             let x = rng.gen_u128() % q;
-            let res = c.eval_plain(&crt_factor(x, q), &[]);
+            let res = c.eval_plain(&crt_factor(x, q), &[]).unwrap();
             let z = crt_inv_factor(&res, q);
             assert_eq!(z, (x * y) % q);
         }
@@ -668,7 +672,7 @@ mod bundle {
         for _ in 0..16 {
             let x = rng.gen_u64() as u128 % q;
             let y = rng.gen_u64() as u128 % q;
-            let res = c.eval_plain(&crt_factor(x, q), &crt_factor(y, q));
+            let res = c.eval_plain(&crt_factor(x, q), &crt_factor(y, q)).unwrap();
             let z = crt_inv_factor(&res, q);
             assert_eq!(z, (x * y) % q);
         }
@@ -689,7 +693,7 @@ mod bundle {
         for _ in 0..64 {
             let x = rng.gen_u16() as u128 % q;
             let should_be = x.pow(y as u32) % q;
-            let res = c.eval_plain(&crt_factor(x, q), &[]);
+            let res = c.eval_plain(&crt_factor(x, q), &[]).unwrap();
             let z = crt_inv_factor(&res, q);
             assert_eq!(z, should_be);
         }
@@ -711,7 +715,7 @@ mod bundle {
         for _ in 0..64 {
             let x = rng.gen_u128() % q;
             let should_be = x % p as u128;
-            let res = c.eval_plain(&crt_factor(x, q), &[]);
+            let res = c.eval_plain(&crt_factor(x, q), &[]).unwrap();
             let z = crt_inv_factor(&res, q);
             assert_eq!(z, should_be);
         }
@@ -731,13 +735,13 @@ mod bundle {
 
         // lets have at least one test where they are surely equal
         let x = rng.gen_u128() % q;
-        let res = c.eval_plain(&crt_factor(x, q), &crt_factor(x, q));
+        let res = c.eval_plain(&crt_factor(x, q), &crt_factor(x, q)).unwrap();
         assert_eq!(res, &[(x == x) as u16]);
 
         for _ in 0..64 {
             let x = rng.gen_u128() % q;
             let y = rng.gen_u128() % q;
-            let res = c.eval_plain(&crt_factor(x, q), &crt_factor(y, q));
+            let res = c.eval_plain(&crt_factor(x, q), &crt_factor(y, q)).unwrap();
             assert_eq!(res, &[(x == y) as u16]);
         }
     }
@@ -762,7 +766,7 @@ mod bundle {
         for _ in 0..nargs {
             ds.extend(util::as_mixed_radix(Q - 1, &mods).iter());
         }
-        let res = circ.eval_plain(&[], &ds);
+        let res = circ.eval_plain(&[], &ds).unwrap();
         assert_eq!(
             util::from_mixed_radix(&res, &mods),
             (Q - 1) * (nargs as u128) % Q
@@ -777,7 +781,7 @@ mod bundle {
                 should_be = (should_be + x) % Q;
                 ds.extend(util::as_mixed_radix(x, &mods).iter());
             }
-            let res = circ.eval_plain(&[], &ds);
+            let res = circ.eval_plain(&[], &ds).unwrap();
             assert_eq!(util::from_mixed_radix(&res, &mods), should_be);
         }
     }
@@ -797,7 +801,7 @@ mod bundle {
         for _ in 0..128 {
             let pt = rng.gen_u128() % q;
             let should_be = if pt < q / 2 { pt } else { 0 };
-            let res = c.eval_plain(&crt_factor(pt, q), &[]);
+            let res = c.eval_plain(&crt_factor(pt, q), &[]).unwrap();
             let z = crt_inv_factor(&res, q);
             assert_eq!(z, should_be);
         }
@@ -818,7 +822,7 @@ mod bundle {
         for _ in 0..128 {
             let pt = rng.gen_u128() % q;
             let should_be = if pt < q / 2 { 1 } else { q - 1 };
-            let res = c.eval_plain(&crt_factor(pt, q), &[]);
+            let res = c.eval_plain(&crt_factor(pt, q), &[]).unwrap();
             let z = crt_inv_factor(&res, q);
             assert_eq!(z, should_be);
         }
@@ -838,13 +842,13 @@ mod bundle {
 
         // lets have at least one test where they are surely equal
         let x = rng.gen_u128() % q / 2;
-        let res = c.eval_plain(&crt_factor(x, q), &crt_factor(x, q));
+        let res = c.eval_plain(&crt_factor(x, q), &crt_factor(x, q)).unwrap();
         assert_eq!(res, &[(x < x) as u16], "x={}", x);
 
         for _ in 0..64 {
             let x = rng.gen_u128() % q / 2;
             let y = rng.gen_u128() % q / 2;
-            let res = c.eval_plain(&crt_factor(x, q), &crt_factor(y, q));
+            let res = c.eval_plain(&crt_factor(x, q), &crt_factor(y, q)).unwrap();
             assert_eq!(res, &[(x < y) as u16], "x={} y={}", x, y);
         }
     }
@@ -871,7 +875,7 @@ mod bundle {
                 .into_iter()
                 .flat_map(|x| crt_factor(x, q))
                 .collect_vec();
-            let res = c.eval_plain(&enc_inps, &[]);
+            let res = c.eval_plain(&enc_inps, &[]).unwrap();
             let z = crt_inv_factor(&res, q);
             assert_eq!(z, should_be);
         }
@@ -899,7 +903,9 @@ mod bundle {
             println!("x={} y={}", x, y);
             let res_should_be = (x + y) % Q;
             let carry_should_be = (x + y >= Q) as u16;
-            let res = c.eval_plain(&util::u128_to_bits(x, n), &util::u128_to_bits(y, n));
+            let res = c
+                .eval_plain(&util::u128_to_bits(x, n), &util::u128_to_bits(y, n))
+                .unwrap();
             assert_eq!(util::u128_from_bits(&res[1..]), res_should_be);
             assert_eq!(res[0], carry_should_be);
         }

@@ -447,20 +447,36 @@ impl GarbledCircuit {
 
         let eval = Evaluator::new(move || (None, msgs.next().unwrap()));
 
-        let mut wires: Vec<Wire> = Vec::new();
+        let mut wires: Vec<Wire> = vec![
+            Wire::default();
+            c.gates.len()
+                + c.garbler_input_refs.len()
+                + c.evaluator_input_refs.len()
+                + c.const_refs.len()
+        ];
         for (i, gate) in c.gates.iter().enumerate() {
             let q = c.modulus(i);
-            let w = match *gate {
-                Gate::GarblerInput { .. } => eval.garbler_input(None, q, None)?,
-                Gate::EvaluatorInput { .. } => eval.evaluator_input(None, q)?,
-                Gate::Constant { val } => eval.constant(None, val, q)?,
-                Gate::Add { xref, yref, .. } => wires[xref.ix].plus(&wires[yref.ix]),
-                Gate::Sub { xref, yref, .. } => wires[xref.ix].minus(&wires[yref.ix]),
-                Gate::Cmul { xref, c, .. } => wires[xref.ix].cmul(c),
-                Gate::Proj { xref, .. } => eval.proj(None, &wires[xref.ix], q, None)?,
-                Gate::Mul { xref, yref, .. } => eval.mul(None, &wires[xref.ix], &wires[yref.ix])?,
+            let (zref, w) = match *gate {
+                Gate::GarblerInput { .. } => (None, eval.garbler_input(None, q, None)?),
+                Gate::EvaluatorInput { .. } => (None, eval.evaluator_input(None, q)?),
+                Gate::Constant { val } => (None, eval.constant(None, val, q)?),
+                Gate::Add { xref, yref, out } => (out, wires[xref.ix].plus(&wires[yref.ix])),
+                Gate::Sub { xref, yref, out } => (out, wires[xref.ix].minus(&wires[yref.ix])),
+                Gate::Cmul { xref, c, out } => (out, wires[xref.ix].cmul(c)),
+                Gate::Proj {
+                    xref,
+                    tt: _,
+                    id: _,
+                    out,
+                } => (out, eval.proj(None, &wires[xref.ix], q, None)?),
+                Gate::Mul {
+                    xref,
+                    yref,
+                    id: _,
+                    out,
+                } => (out, eval.mul(None, &wires[xref.ix], &wires[yref.ix])?),
             };
-            wires.push(w);
+            wires[zref.unwrap_or(i)] = w;
         }
 
         let res = c.output_refs.iter().map(|&r| wires[r.ix].clone()).collect();

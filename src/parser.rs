@@ -195,13 +195,23 @@ impl Circuit {
 #[cfg(test)]
 mod tests {
     use crate::circuit::Circuit;
+    use crate::garble;
 
     #[test]
     fn test_parser() {
         let circ = Circuit::parse("circuits/AES-non-expanded.txt").unwrap();
         circ.info().unwrap();
-        let output = circ.eval_plain(&vec![0u16; 128], &vec![0u16; 128]);
+        let output = circ.eval_plain(&vec![0u16; 128], &vec![0u16; 128]).unwrap();
         assert_eq!(output.iter().map(|i| i.to_string()).collect::<String>(),
                    "01100110111010010100101111010100111011111000101000101100001110111000100001001100111110100101100111001010001101000010101100101110");
+    }
+
+    #[test]
+    fn test_gc_eval() {
+        let circ = Circuit::parse("circuits/AES-non-expanded.txt").unwrap();
+        let (en, _, gc) = garble(&circ).unwrap();
+        let gb = en.encode_garbler_inputs(&vec![0u16; 128]);
+        let ev = en.encode_evaluator_inputs(&vec![0u16; 128]);
+        gc.eval(&circ, &gb, &ev);
     }
 }
