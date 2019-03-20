@@ -8,6 +8,7 @@
 //! here: <https://homes.esat.kuleuven.be/~nsmart/MPC/>.
 
 use crate::circuit::{Circuit, CircuitRef, Gate};
+use crate::error::CircuitParserError as Error;
 use regex::{Captures, Regex};
 use std::fs::File;
 use std::io::{BufRead, BufReader};
@@ -16,33 +17,6 @@ use std::str::FromStr;
 enum GateType {
     AndGate,
     XorGate,
-}
-
-#[derive(Debug)]
-pub enum Error {
-    IoError(std::io::Error),
-    RegexError(regex::Error),
-    ParseIntError,
-    ParseLineError { line: String },
-    ParseGateError,
-}
-
-impl From<std::io::Error> for Error {
-    fn from(e: std::io::Error) -> Error {
-        Error::IoError(e)
-    }
-}
-
-impl From<regex::Error> for Error {
-    fn from(e: regex::Error) -> Error {
-        Error::RegexError(e)
-    }
-}
-
-impl From<std::num::ParseIntError> for Error {
-    fn from(_: std::num::ParseIntError) -> Error {
-        Error::ParseIntError
-    }
 }
 
 #[inline]

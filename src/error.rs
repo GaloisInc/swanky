@@ -1,4 +1,4 @@
-//! Errors that may be outputted by this library.
+//! Errors that may be output by this library.
 
 use std::fmt::{self, Display, Formatter};
 
@@ -90,7 +90,7 @@ impl<T: Display> Display for FancyError<T> {
     }
 }
 
-impl <A> FancyError<A> {
+impl<A> FancyError<A> {
     /// Map the underlying client error type.
     ///
     /// Useful for wrapping errors from fancy objects.
@@ -235,6 +235,46 @@ impl Display for InformerError {
 
 impl From<InformerError> for FancyError<InformerError> {
     fn from(e: InformerError) -> FancyError<InformerError> {
+        FancyError::ClientError(e)
+    }
+}
+
+/// Errors emitted by the circuit parser.
+#[derive(Debug)]
+pub enum CircuitParserError {
+    IoError(std::io::Error),
+    RegexError(regex::Error),
+    ParseIntError,
+    ParseLineError { line: String },
+    ParseGateError,
+}
+
+impl From<std::io::Error> for CircuitParserError {
+    fn from(e: std::io::Error) -> CircuitParserError {
+        CircuitParserError::IoError(e)
+    }
+}
+
+impl From<regex::Error> for CircuitParserError {
+    fn from(e: regex::Error) -> CircuitParserError {
+        CircuitParserError::RegexError(e)
+    }
+}
+
+impl From<std::num::ParseIntError> for CircuitParserError {
+    fn from(_: std::num::ParseIntError) -> CircuitParserError {
+        CircuitParserError::ParseIntError
+    }
+}
+
+impl Display for CircuitParserError {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        "CircuitParserError".fmt(f)
+    }
+}
+
+impl From<CircuitParserError> for FancyError<CircuitParserError> {
+    fn from(e: CircuitParserError) -> FancyError<CircuitParserError> {
         FancyError::ClientError(e)
     }
 }
