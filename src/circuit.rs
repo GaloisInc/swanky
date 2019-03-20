@@ -118,11 +118,11 @@ impl Circuit {
         }
     }
 
-    pub fn eval<F: Fancy>(&self, f: &F) -> Result<(), FancyError<F::Error>> {
+    pub fn eval<F: Fancy>(&self, f: &F) -> Result<Vec<F::Item>, FancyError<F::Error>> {
         let mut cache: Vec<Option<F::Item>> = vec![None; self.gates.len()];
-        for zref in 0..self.gates.len() {
-            let q = self.gate_moduli[zref];
-            let (zref_, val) = match self.gates[zref] {
+        for (i, gate) in self.gates.iter().enumerate() {
+            let q = self.modulus(i);
+            let (zref_, val) = match *gate {
                 Gate::GarblerInput { .. } => (None, f.garbler_input(None, q, None)?),
                 Gate::EvaluatorInput { .. } => (None, f.evaluator_input(None, q)?),
                 Gate::Constant { val } => (None, f.constant(None, val, q)?),
@@ -191,13 +191,23 @@ impl Circuit {
                     )?,
                 ),
             };
-            cache[zref_.unwrap_or(zref)] = Some(val);
+            cache[zref_.unwrap_or(i)] = Some(val);
         }
+        let mut outputs = Vec::with_capacity(self.output_refs.len());
         for r in self.output_refs.iter() {
-            f.output(
-                None,
-                cache[r.ix].as_ref().ok_or(FancyError::UninitializedValue)?,
-            )?;
+            let out = cache[r.ix].clone().ok_or(FancyError::UninitializedValue)?;
+            outputs.push(out);
+        }
+        Ok(outputs)
+    }
+
+    pub fn process_outputs<F: Fancy>(
+        &self,
+        outputs: &[F::Item],
+        f: &F,
+    ) -> Result<(), FancyError<F::Error>> {
+        for r in outputs.iter() {
+            f.output(None, r)?;
         }
         Ok(())
     }
@@ -209,7 +219,8 @@ impl Circuit {
         evaluator_inputs: &[u16],
     ) -> Result<Vec<u16>, FancyError<DummyError>> {
         let dummy = crate::dummy::Dummy::new(garbler_inputs, evaluator_inputs);
-        self.eval(&dummy)?;
+        let outputs = self.eval(&dummy)?;
+        self.process_outputs(&outputs, &dummy)?;
         Ok(dummy.get_output())
     }
 
@@ -219,28 +230,28 @@ impl Circuit {
         self.eval(&informer)?;
         Ok(())
     }
-
+    #[inline]
     pub fn num_garbler_inputs(&self) -> usize {
         self.garbler_input_refs.len()
     }
-
+    #[inline]
     pub fn num_evaluator_inputs(&self) -> usize {
         self.evaluator_input_refs.len()
     }
-
+    #[inline]
     pub fn noutputs(&self) -> usize {
         self.output_refs.len()
     }
-
+    #[inline]
     pub fn modulus(&self, gate_num: usize) -> u16 {
         self.gate_moduli[gate_num]
     }
-
+    #[inline]
     pub fn garbler_input_mod(&self, id: usize) -> u16 {
         let r = self.garbler_input_refs[id];
         r.modulus()
     }
-
+    #[inline]
     pub fn evaluator_input_mod(&self, id: usize) -> u16 {
         let r = self.evaluator_input_refs[id];
         r.modulus()

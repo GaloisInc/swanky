@@ -212,6 +212,6 @@ mod tests {
         let (en, _, gc) = garble(&circ).unwrap();
         let gb = en.encode_garbler_inputs(&vec![0u16; 128]);
         let ev = en.encode_evaluator_inputs(&vec![0u16; 128]);
-        gc.eval(&circ, &gb, &ev);
+        gc.eval(&circ, &gb, &ev).unwrap();
     }
 }
