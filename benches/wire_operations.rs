@@ -87,9 +87,10 @@ fn bench_negate(c: &mut Criterion, p: u16) {
 fn bench_hash(c: &mut Criterion, p: u16) {
     c.bench_function(&format!("wire::hash{}", p), move |b| {
         let rng = &mut rand::thread_rng();
+        let tweak = rand::random::<u128>();
         let x = Wire::rand(rng, p);
         b.iter(|| {
-            let z = x.hash(42);
+            let z = x.hash(tweak);
             criterion::black_box(z);
         });
     });
