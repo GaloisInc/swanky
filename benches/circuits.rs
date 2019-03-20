@@ -4,6 +4,8 @@
 // Copyright © 2019 Galois, Inc.
 // See LICENSE for licensing information.
 
+//! Benchmark code of garbling / evaluating using Nigel's circuits.
+
 use criterion::{criterion_group, criterion_main, Criterion};
 use fancy_garbling::circuit::Circuit;
 use fancy_garbling::garble;

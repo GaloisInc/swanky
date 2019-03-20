@@ -63,5 +63,5 @@ name = "rust"
 harness = false
 
 [[bench]]
-name = "parser"
+name = "circuits"
 harness = false
