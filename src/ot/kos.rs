@@ -59,13 +59,13 @@ impl<OT: ObliviousTransferReceiver<Msg = Block> + Malicious> KosOTSender<OT> {
             let q = &qs[j * 16..(j + 1) * 16];
             let q = Block::from(*array_ref![q, 0, 16]);
             rng.fill_bytes(&mut chi.as_mut());
-            let tmp = q.mul128(chi);
+            let tmp = q.clmul(chi);
             check = utils::xor_two_blocks(&check, &tmp);
         }
         let x = Block::read(reader)?;
         let t0 = Block::read(reader)?;
         let t1 = Block::read(reader)?;
-        let tmp = x.mul128(self.ot.s_);
+        let tmp = x.clmul(self.ot.s_);
         let check = utils::xor_two_blocks(&check, &tmp);
         if check != (t0, t1) {
             println!("Consistency check failed!");
@@ -198,7 +198,7 @@ impl<OT: ObliviousTransferSender<Msg = Block> + Malicious> KosOTReceiver<OT> {
             let tj = Block::from(*array_ref![tj, 0, 16]);
             rng.fill_bytes(&mut chi.as_mut());
             x = x ^ if xj { chi } else { Block::zero() };
-            let tmp = tj.mul128(chi);
+            let tmp = tj.clmul(chi);
             t = utils::xor_two_blocks(&t, &tmp);
         }
         x.write(&mut writer)?;
