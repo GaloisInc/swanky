@@ -44,5 +44,13 @@ debug-assertions = false
 overflow-checks = false
 
 [[bench]]
-name = "bench"
+name = "block"
+harness = false
+
+[[bench]]
+name = "hash_aes"
+harness = false
+
+[[bench]]
+name = "rand_aes"
 harness = false

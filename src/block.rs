@@ -13,11 +13,12 @@ use arrayref::array_ref;
 use core::arch::x86_64::*;
 #[cfg(feature = "curve25519-dalek")]
 use curve25519_dalek::ristretto::RistrettoPoint;
+use std::hash::{Hash, Hasher};
 use std::io::{Read, Write};
 
 /// A 128-bit chunk.
 #[derive(Clone, Copy, Debug)]
-pub struct Block(pub(crate) __m128i);
+pub struct Block(pub __m128i);
 
 union __U128 {
     vector: __m128i,
@@ -52,13 +53,13 @@ impl Block {
     /// Carryless multiplication. This code is adapted from the EMP toolkit's
     /// implementation.
     #[inline]
-    pub fn mul128(self, rhs: Self) -> (Self, Self) {
+    pub fn clmul(self, rhs: Self) -> (Self, Self) {
         unsafe {
             let x = self.0;
             let y = rhs.0;
             let zero = _mm_clmulepi64_si128(x, y, 0x00);
-            let one = _mm_clmulepi64_si128(x, y, 0x01);
-            let two = _mm_clmulepi64_si128(x, y, 0x10);
+            let one = _mm_clmulepi64_si128(x, y, 0x10);
+            let two = _mm_clmulepi64_si128(x, y, 0x01);
             let three = _mm_clmulepi64_si128(x, y, 0x11);
             let tmp = _mm_xor_si128(one, two);
             let ll = _mm_slli_si128(tmp, 8);
@@ -220,6 +221,13 @@ impl From<[u8; 16]> for Block {
     }
 }
 
+impl Hash for Block {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        let v: u128 = (*self).into();
+        v.hash(state);
+    }
+}
+
 #[cfg(feature = "serde")]
 use serde::de::Visitor;
 #[cfg(feature = "serde")]
@@ -283,5 +291,12 @@ mod tests {
         let x = rand::random::<Block>();
         let y = x.flip().flip();
         assert_eq!(x, y);
+    }
+
+    #[test]
+    fn test_conversion() {
+        let x = rand::random::<u128>();
+        let x_ = u128::from(Block::from(x));
+        assert_eq!(x, x_);
     }
 }
