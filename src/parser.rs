@@ -31,14 +31,13 @@ fn cap2typ(cap: &Captures, idx: usize) -> Result<GateType, Error> {
     match s {
         "AND" => Ok(GateType::AndGate),
         "XOR" => Ok(GateType::XorGate),
-        _ => Err(Error::ParseGateError),
+        s => Err(Error::ParseGateError(s.to_string())),
     }
 }
 #[inline]
 fn regex2captures<'t>(re: &Regex, line: &'t str) -> Result<Captures<'t>, Error> {
-    re.captures(&line).ok_or(Error::ParseLineError {
-        line: line.to_string(),
-    })
+    re.captures(&line)
+        .ok_or(Error::ParseLineError(line.to_string()))
 }
 
 impl Circuit {
@@ -153,9 +152,7 @@ impl Circuit {
                 }
                 None => break,
                 _ => {
-                    return Err(Error::from(Error::ParseLineError {
-                        line: line.to_string(),
-                    }));
+                    return Err(Error::from(Error::ParseLineError(line.to_string())));
                 }
             }
         }
