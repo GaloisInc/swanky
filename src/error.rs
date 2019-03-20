@@ -245,8 +245,8 @@ pub enum CircuitParserError {
     IoError(std::io::Error),
     RegexError(regex::Error),
     ParseIntError,
-    ParseLineError { line: String },
-    ParseGateError,
+    ParseLineError(String),
+    ParseGateError(String),
 }
 
 impl From<std::io::Error> for CircuitParserError {
@@ -269,7 +269,13 @@ impl From<std::num::ParseIntError> for CircuitParserError {
 
 impl Display for CircuitParserError {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        "CircuitParserError".fmt(f)
+        match self {
+            CircuitParserError::IoError(e) => write!(f, "io error: {}", e),
+            CircuitParserError::RegexError(e) => write!(f, "regex error: {}", e),
+            CircuitParserError::ParseIntError => write!(f, "unable to parse integer"),
+            CircuitParserError::ParseLineError(s) => write!(f, "unable to parse line '{}'", s),
+            CircuitParserError::ParseGateError(s) => write!(f, "unable to parse gate '{}'", s),
+        }
     }
 }
 
