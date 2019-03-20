@@ -110,7 +110,7 @@ impl Garbler {
 impl Fancy for Garbler {
     type Item = Wire;
     type Error = GarblerError;
-
+    #[inline]
     fn garbler_input(
         &self,
         ix: Option<SyncIndex>,
@@ -133,7 +133,7 @@ impl Fancy for Garbler {
         }
         Ok(w)
     }
-
+    #[inline]
     fn evaluator_input(
         &self,
         ix: Option<SyncIndex>,
@@ -150,7 +150,7 @@ impl Fancy for Garbler {
         );
         Ok(w)
     }
-
+    #[inline]
     fn constant(
         &self,
         ix: Option<SyncIndex>,
@@ -162,25 +162,25 @@ impl Fancy for Garbler {
         self.send(ix, Message::Constant { value: x, wire });
         Ok(zero)
     }
-
+    #[inline]
     fn add(&self, x: &Wire, y: &Wire) -> Result<Wire, FancyError<GarblerError>> {
         if x.modulus() != y.modulus() {
             return Err(FancyError::UnequalModuli);
         }
         Ok(x.plus(y))
     }
-
+    #[inline]
     fn sub(&self, x: &Wire, y: &Wire) -> Result<Wire, FancyError<GarblerError>> {
         if x.modulus() != y.modulus() {
             return Err(FancyError::UnequalModuli);
         }
         Ok(x.minus(y))
     }
-
+    #[inline]
     fn cmul(&self, x: &Wire, c: u16) -> Result<Wire, FancyError<GarblerError>> {
         Ok(x.cmul(c))
     }
-
+    #[inline]
     fn mul(
         &self,
         ix: Option<SyncIndex>,
@@ -308,7 +308,7 @@ impl Fancy for Garbler {
 
         Ok(X.plus_mov(&Y))
     }
-
+    #[inline]
     fn proj(
         &self,
         ix: Option<SyncIndex>,
@@ -374,7 +374,7 @@ impl Fancy for Garbler {
 
         Ok(C)
     }
-
+    #[inline]
     fn output(&self, ix: Option<SyncIndex>, X: &Wire) -> Result<(), FancyError<GarblerError>> {
         let mut cts = Vec::new();
         let q = X.modulus();
@@ -387,11 +387,11 @@ impl Fancy for Garbler {
         self.send(ix, Message::OutputCiphertext(cts));
         Ok(())
     }
-
+    #[inline]
     fn begin_sync(&self, num_indices: SyncIndex) -> Result<(), FancyError<GarblerError>> {
         self.internal_begin_sync(num_indices)
     }
-
+    #[inline]
     fn finish_index(&self, index: SyncIndex) -> Result<(), FancyError<GarblerError>> {
         self.internal_finish_index(index)
     }

@@ -399,7 +399,7 @@ pub struct GarbledCircuit {
 }
 
 impl GarbledCircuit {
-    /// Create a new GarbledCircuit from a vec of garbled gates and constant wires.
+    /// Create a new object from a vector of garbled gates and constant wires.
     pub fn new(gates: Vec<GarbledGate>, consts: HashMap<(u16, u16), Wire>) -> Self {
         GarbledCircuit { gates, consts }
     }
