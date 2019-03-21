@@ -54,27 +54,31 @@ where
         inputs: &[Self::Msg],
         mut rng: &mut RNG,
     ) -> Result<(), Error> {
-        let inputs = compress_inputs(inputs);
         let mut hashes = Vec::with_capacity(NHASHES);
         let mut hindices = Vec::with_capacity(NHASHES);
-        let nbins = stream::read_usize(reader)?;
-        let stashsize = stream::read_usize(reader)?;
+        // Compress inputs to fit in a `Block`.
+        let inputs = compress_inputs(inputs);
+        // Initialize hashes for cuckoo hash table.
         for i in 0..NHASHES {
             let state = Block::read(reader)?;
             hashes.push(AesHash::new(state));
             let index = Block::from(i as u128);
             hindices.push(index);
         }
+        let nbins = stream::read_usize(reader)?;
+        let stashsize = stream::read_usize(reader)?;
         let seeds = self.oprf.send(reader, writer, nbins + stashsize, rng)?;
         // For each `hᵢ`, construct set `Hᵢ = {F(k_{hᵢ(x)}, x) | x ∈ X)}`,
         // randomly permute it, and send it to the receiver.
-        for (hash, index) in hashes.into_iter().zip(hindices.into_iter()) {
+        for (hash, i) in hashes.into_iter().zip(hindices.into_iter()) {
             let mut outputs = inputs
                 .iter()
                 .map(|input| {
-                    let idx = CuckooHash::hash_with_state(*input, &hash, nbins);
-                    let input = *input ^ index;
-                    self.oprf.compute(&seeds[idx], &input)
+                    // Compute `k_{hᵢ(x)}`.
+                    let key_index = CuckooHash::hash_with_state(*input, &hash, nbins);
+                    // Compute `F(k_{hᵢ(x)}, x || i)`.
+                    let input = *input ^ i;
+                    self.oprf.compute(&seeds[key_index], &input)
                 })
                 .collect::<Vec<Output>>();
             outputs.shuffle(&mut rng);
@@ -87,6 +91,7 @@ where
         // {F(k_{nbins+j}, x) | x ∈ X}`, randomly permute it, and send it to the
         // receiver.
         for j in 0..stashsize {
+            // We don't need to append any hash index to OPRF inputs in the stash.
             let mut outputs = inputs
                 .iter()
                 .map(|input| self.oprf.compute(&seeds[nbins + j], input))
@@ -128,23 +133,27 @@ where
         W: Write + Send,
         RNG: CryptoRng + RngCore,
     {
+        // Compress inputs to fit in a `Block`.
         let inputs_ = compress_inputs(inputs);
         let hindices = (0..NHASHES)
             .map(|i| Block::from(i as u128))
             .collect::<Vec<Block>>();
-        let n = inputs.len();
-        let nbins = compute_nbins(n);
-        let stashsize = compute_stashsize(n)?;
-        stream::write_usize(writer, nbins)?;
-        stream::write_usize(writer, stashsize)?;
         let states = (0..NHASHES)
             .map(|_| rand::random::<Block>())
             .collect::<Vec<Block>>();
+
+        let n = inputs.len();
+        let nbins = compute_nbins(n);
+        let stashsize = compute_stashsize(n)?;
         let tbl = make_hash_table(nbins, stashsize, &inputs_, &states)?;
         for state in states.into_iter() {
             state.write(writer)?;
         }
+        stream::write_usize(writer, nbins)?;
+        stream::write_usize(writer, stashsize)?;
         writer.flush()?;
+        // Set up inputs to use `x || i` or `x` depending on whether the input
+        // is in a bin or the stash.
         let inputs_ = tbl
             .items
             .iter()
@@ -169,6 +178,8 @@ where
             .collect::<Vec<Vec<(Output, usize)>>>();
         let mut outputs_stash = Vec::with_capacity(stashsize);
         for (output, item) in outputs.into_iter().zip(tbl.items.into_iter()) {
+            // The OPRF outputs correspond to the table elements, so we can process
+            // them in pairs.
             let (_, idx, hidx) = item;
             if hidx != usize::max_value() {
                 outputs_bin[hidx].push((output, idx));
@@ -176,6 +187,9 @@ where
                 outputs_stash.push((output, idx))
             }
         }
+        // We are now ready to compute the intersection. We go through each set
+        // provided by the sender and check whether there's a match. If so, we
+        // put the corresponding input into our output vector.
         let mut intersection = Vec::with_capacity(n);
         for outputs in outputs_bin.iter_mut() {
             for _ in 0..n {
