@@ -3,7 +3,7 @@
 `popsicle` is a library written in rust that provides traits and protocol
 implementations for private set intersection (PSI).
 
-`popsicle** currently only implements the Pinkas-Schneider-Zohner PSI protocol
+`popsicle` currently only implements the Pinkas-Schneider-Zohner PSI protocol
 based on the oblivious PRF of Kolesnikov-Kumaresan-Rosulek-Trieu. Hopefully more
 flavors of PSI will be added in the future.
 
