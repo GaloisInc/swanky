@@ -19,6 +19,7 @@ ocelot = { path = "../ocelot", features = ["unstable"] }
 rand = "*"
 rand_core = "*"
 scuttlebutt = { path = "../scuttlebutt"}
+sha2 = "*"
 
 [dev-dependencies]
 criterion = "*"

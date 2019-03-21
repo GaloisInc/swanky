@@ -9,16 +9,21 @@
 use criterion::{criterion_group, criterion_main, Criterion};
 use popsicle::psz::{PszReceiver, PszSender};
 use popsicle::{PrivateSetIntersectionReceiver, PrivateSetIntersectionSender};
-use scuttlebutt::{AesRng, Block};
+use scuttlebutt::AesRng;
 use std::io::{BufReader, BufWriter};
 use std::os::unix::net::UnixStream;
 use std::time::Duration;
 
-fn rand_block_vec(size: usize) -> Vec<Block> {
-    (0..size).map(|_| rand::random::<Block>()).collect()
+const SIZE: usize = 16;
+const NTIMES: usize = 1 << 8;
+
+fn rand_vec(n: usize) -> Vec<u8> {
+    (0..n).map(|_| rand::random::<u8>()).collect()
 }
 
-const T: usize = 1 << 8;
+fn rand_vec_vec(size: usize) -> Vec<Vec<u8>> {
+    (0..size).map(|_| rand_vec(SIZE)).collect()
+}
 
 fn _bench_psz_init() {
     let (sender, receiver) = UnixStream::pair().unwrap();
@@ -35,7 +40,7 @@ fn _bench_psz_init() {
     handle.join().unwrap();
 }
 
-fn _bench_psz(inputs1: Vec<Block>, inputs2: Vec<Block>) {
+fn _bench_psz(inputs1: Vec<Vec<u8>>, inputs2: Vec<Vec<u8>>) {
     let (sender, receiver) = UnixStream::pair().unwrap();
     let handle = std::thread::spawn(move || {
         let mut rng = AesRng::new();
@@ -60,7 +65,7 @@ fn bench_oprf(c: &mut Criterion) {
         bench.iter(|| _bench_psz_init())
     });
     c.bench_function("psi::PszPSI", move |bench| {
-        let rs = rand_block_vec(T);
+        let rs = rand_vec_vec(NTIMES);
         bench.iter(|| _bench_psz(rs.clone(), rs.clone()))
     });
 }

@@ -7,9 +7,6 @@
 //! Implementation of the Pinkas-Schneider-Zohner private set intersection
 //! protocol (cf. <https://eprint.iacr.org/2014/447>) as specified by
 //! Kolesnikov-Kumaresan-Rosulek-Trieu (cf. <https://eprint.iacr.org/2016/799>).
-//!
-//! This implementation uses the Kolesnikov-Kumaresan-Rosulek-Trieu oblivious
-//! PRF implementation in the `ocelot` library.
 
 use crate::cuckoo::CuckooHash;
 use crate::stream;
@@ -20,6 +17,7 @@ use ocelot::{ObliviousPrfReceiver, ObliviousPrfSender};
 use rand::seq::SliceRandom;
 use rand::{CryptoRng, RngCore};
 use scuttlebutt::{AesHash, Block};
+use sha2::{Digest, Sha256};
 use std::io::{Read, Write};
 
 pub struct PszPsiSender<OPRF: ObliviousPrfSender<Seed = Seed, Input = Block, Output = Output>> {
@@ -35,7 +33,7 @@ impl<OPRF> PrivateSetIntersectionSender for PszPsiSender<OPRF>
 where
     OPRF: ObliviousPrfSender<Seed = Seed, Input = Block, Output = Output>,
 {
-    type Msg = Block;
+    type Msg = Vec<u8>;
 
     fn init<R: Read + Send, W: Write + Send, RNG: CryptoRng + RngCore>(
         reader: &mut R,
@@ -53,6 +51,7 @@ where
         inputs: &[Self::Msg],
         mut rng: &mut RNG,
     ) -> Result<(), Error> {
+        let inputs = compress_inputs(inputs);
         let mut hashes = Vec::with_capacity(NHASHES);
         let nbins = stream::read_usize(reader)?;
         let stashsize = stream::read_usize(reader)?;
@@ -99,7 +98,7 @@ impl<OPRF> PrivateSetIntersectionReceiver for PszPsiReceiver<OPRF>
 where
     OPRF: ObliviousPrfReceiver<Seed = Seed, Input = Block, Output = Output>,
 {
-    type Msg = Block;
+    type Msg = Vec<u8>;
 
     fn init<R: Read + Send, W: Write + Send, RNG: CryptoRng + RngCore>(
         reader: &mut R,
@@ -122,6 +121,7 @@ where
         W: Write + Send,
         RNG: CryptoRng + RngCore,
     {
+        let inputs_ = compress_inputs(inputs);
         let n = inputs.len();
         let nbins = compute_nbins(n);
         let stashsize = compute_stashsize(n)?;
@@ -130,7 +130,7 @@ where
         let states = (0..NHASHES)
             .map(|_| rand::random::<Block>())
             .collect::<Vec<Block>>();
-        let tbl = make_hash_table(nbins, stashsize, inputs, &states)?;
+        let tbl = make_hash_table(nbins, stashsize, &inputs_, &states)?;
         for state in states.into_iter() {
             state.write(writer)?;
         }
@@ -163,7 +163,7 @@ where
                 for (out_, idx) in outputs.iter_mut() {
                     if out == *out_ {
                         *out_ = Output::default();
-                        intersection.push(inputs[*idx]);
+                        intersection.push(inputs[*idx].clone());
                         break; // XXX: timing attack
                     }
                 }
@@ -176,7 +176,7 @@ where
                 for (out_, idx) in outputs.iter_mut() {
                     if out == *out_ {
                         *out_ = Output::default();
-                        intersection.push(inputs[*idx]);
+                        intersection.push(inputs[*idx].clone());
                         break; // XXX: timing attack!
                     }
                 }
@@ -184,6 +184,30 @@ where
         }
         Ok(intersection)
     }
+}
+
+fn compress_inputs(inputs: &[Vec<u8>]) -> Vec<Block> {
+    let mut compressed = Vec::with_capacity(inputs.len());
+    for input in inputs.iter() {
+        let mut digest = [0u8; 16];
+        if input.len() < 16 {
+            // Map `input` directly to a `Block`
+            let mut digest = [0u8; 16];
+            for (byte, result) in input.into_iter().zip(digest.iter_mut()) {
+                *result = *byte;
+            }
+        } else {
+            // Hash `input` first
+            let mut hasher = Sha256::new();
+            hasher.input(input);
+            let h = hasher.result();
+            for (result, byte) in digest.iter_mut().zip(h.into_iter()) {
+                *result = byte;
+            }
+        }
+        compressed.push(Block::from(digest));
+    }
+    compressed
 }
 
 #[inline]
@@ -225,7 +249,9 @@ fn compute_stashsize(n: usize) -> Result<usize, Error> {
 
 use ocelot::kkrt;
 
+/// The PSI sender using the KKRT oblivious PRF under-the-hood.
 pub type PszSender = PszPsiSender<kkrt::KkrtSender>;
+/// The PSI receiver using the KKRT oblivious PRF under-the-hood.
 pub type PszReceiver = PszPsiReceiver<kkrt::KkrtReceiver>;
 
 #[cfg(test)]
@@ -235,16 +261,21 @@ mod tests {
     use std::io::{BufReader, BufWriter};
     use std::os::unix::net::UnixStream;
 
-    const T: usize = 1 << 8;
+    const SIZE: usize = 16;
+    const NTIMES: usize = 1 << 8;
 
-    fn rand_block_vec(size: usize) -> Vec<Block> {
-        (0..size).map(|_| rand::random::<Block>()).collect()
+    fn rand_vec(n: usize) -> Vec<u8> {
+        (0..n).map(|_| rand::random::<u8>()).collect()
+    }
+
+    fn rand_vec_vec(size: usize) -> Vec<Vec<u8>> {
+        (0..size).map(|_| rand_vec(SIZE)).collect()
     }
 
     #[test]
     fn test_psi() {
         let (sender, receiver) = UnixStream::pair().unwrap();
-        let sender_inputs = rand_block_vec(T);
+        let sender_inputs = rand_vec_vec(NTIMES);
         let receiver_inputs = sender_inputs.clone();
         let handle = std::thread::spawn(move || {
             let mut rng = AesRng::new();
@@ -262,6 +293,6 @@ mod tests {
             .receive(&mut reader, &mut writer, &receiver_inputs, &mut rng)
             .unwrap();
         handle.join().unwrap();
-        assert_eq!(intersection.len(), T);
+        assert_eq!(intersection.len(), NTIMES);
     }
 }
