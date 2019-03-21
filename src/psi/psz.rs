@@ -20,13 +20,16 @@ use scuttlebutt::{AesHash, Block};
 use sha2::{Digest, Sha256};
 use std::io::{Read, Write};
 
+/// Private set intersection sender.
 pub struct PszPsiSender<OPRF: ObliviousPrfSender<Seed = Seed, Input = Block, Output = Output>> {
     oprf: OPRF,
 }
+/// Private set intersection receiver.
 pub struct PszPsiReceiver<OPRF: ObliviousPrfReceiver<Seed = Seed, Input = Block, Output = Output>> {
     oprf: OPRF,
 }
 
+/// Specifies the number of hash functions to use in the cuckoo hash.
 const NHASHES: usize = 2;
 
 impl<OPRF> PrivateSetIntersectionSender for PszPsiSender<OPRF>
@@ -53,21 +56,25 @@ where
     ) -> Result<(), Error> {
         let inputs = compress_inputs(inputs);
         let mut hashes = Vec::with_capacity(NHASHES);
+        let mut hindices = Vec::with_capacity(NHASHES);
         let nbins = stream::read_usize(reader)?;
         let stashsize = stream::read_usize(reader)?;
-        for _ in 0..NHASHES {
+        for i in 0..NHASHES {
             let state = Block::read(reader)?;
             hashes.push(AesHash::new(state));
+            let index = Block::from(i as u128);
+            hindices.push(index);
         }
         let seeds = self.oprf.send(reader, writer, nbins + stashsize, rng)?;
         // For each `hᵢ`, construct set `Hᵢ = {F(k_{hᵢ(x)}, x) | x ∈ X)}`,
         // randomly permute it, and send it to the receiver.
-        for hash in hashes.into_iter() {
+        for (hash, index) in hashes.into_iter().zip(hindices.into_iter()) {
             let mut outputs = inputs
                 .iter()
                 .map(|input| {
                     let idx = CuckooHash::hash_with_state(*input, &hash, nbins);
-                    self.oprf.compute(&seeds[idx], input)
+                    let input = *input ^ index;
+                    self.oprf.compute(&seeds[idx], &input)
                 })
                 .collect::<Vec<Output>>();
             outputs.shuffle(&mut rng);
@@ -122,6 +129,9 @@ where
         RNG: CryptoRng + RngCore,
     {
         let inputs_ = compress_inputs(inputs);
+        let hindices = (0..NHASHES)
+            .map(|i| Block::from(i as u128))
+            .collect::<Vec<Block>>();
         let n = inputs.len();
         let nbins = compute_nbins(n);
         let stashsize = compute_stashsize(n)?;
@@ -138,7 +148,17 @@ where
         let inputs_ = tbl
             .items
             .iter()
-            .filter_map(|(item, _, _)| *item)
+            .filter_map(|(item, _, hidx)| {
+                if let Some(item) = item {
+                    if *hidx == usize::max_value() {
+                        Some(*item)
+                    } else {
+                        Some(*item ^ hindices[*hidx])
+                    }
+                } else {
+                    None
+                }
+            })
             .collect::<Vec<Block>>();
         let outputs = self.oprf.receive(reader, writer, &inputs_, rng)?;
         // Map `outputs` to tuple containing (OPRF output, input index) for
@@ -186,13 +206,15 @@ where
     }
 }
 
+// Compress an arbitrary vector into a 128-bit chunk, leaving the final 8-bits
+// as zero. We need to leave 8 bits free in order to add in the hash index when
+// running the OPRF (cf. <https://eprint.iacr.org/2016/799>, §5.2).
 fn compress_inputs(inputs: &[Vec<u8>]) -> Vec<Block> {
     let mut compressed = Vec::with_capacity(inputs.len());
     for input in inputs.iter() {
         let mut digest = [0u8; 16];
         if input.len() < 16 {
             // Map `input` directly to a `Block`
-            let mut digest = [0u8; 16];
             for (byte, result) in input.into_iter().zip(digest.iter_mut()) {
                 *result = *byte;
             }
@@ -204,6 +226,7 @@ fn compress_inputs(inputs: &[Vec<u8>]) -> Vec<Block> {
             for (result, byte) in digest.iter_mut().zip(h.into_iter()) {
                 *result = byte;
             }
+            digest[15] = 0u8;
         }
         compressed.push(Block::from(digest));
     }
