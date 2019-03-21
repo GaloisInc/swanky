@@ -6,8 +6,9 @@
 
 use crate::Error;
 use scuttlebutt::{AesHash, Block};
+use std::fmt::Debug;
 
-const NTIMES: usize = 100;
+const NITERS: usize = 100;
 
 pub(crate) struct CuckooHash {
     // Contains the bins + stash
@@ -30,12 +31,12 @@ impl CuckooHash {
     }
 
     pub fn hash(&mut self, input: Block, idx: usize) -> Result<(), Error> {
-        self._hash(input, idx, NTIMES)
+        self._hash(input, idx, NITERS)
     }
 
     pub fn _hash(&mut self, input: Block, idx: usize, times: usize) -> Result<(), Error> {
         if times == 0 {
-            // Put `input` in the stash, or fail if the stash is full
+            // Put `input` in the stash, or fail if the stash is full.
             for i in self.nbins..self.nbins + self.stashsize {
                 if self.items[i].0.is_none() {
                     self.items[i] = (Some(input), idx, usize::max_value());
@@ -59,19 +60,18 @@ impl CuckooHash {
                 }
             };
         }
-        // Item doesn't fit, so evict an item at random
-        let choice = rand::random::<usize>() % self.hashes.len();
-        let idx_ = indices[choice];
+        // Item doesn't fit, so evict an item at random.
+        let hidx = rand::random::<usize>() % self.hashes.len();
+        let idx_ = indices[hidx];
         let evicted = self.items[idx_];
-        self.items[idx_] = (Some(input), idx, choice);
+        self.items[idx_] = (Some(input), idx, hidx);
         self._hash(evicted.0.unwrap(), evicted.1, times - 1)?;
         Ok(())
     }
 
     pub fn hash_with_state(input: Block, hash: &AesHash, range: usize) -> usize {
         let output = hash.cr_hash(0, input);
-        let block: u128 = output.into();
-        (block % (range as u128)) as usize
+        (u128::from(output) % (range as u128)) as usize
     }
 
     pub fn fill(&mut self, value: Block) {
@@ -84,17 +84,17 @@ impl CuckooHash {
     }
 }
 
-// impl<T: Sized> Debug for CuckooHash<T> {
-//     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-//         for i in 0..self.nbins {
-//             writeln!(f, "{}: {:?}", i, self.items[i])?;
-//         }
-//         for i in self.nbins..self.nbins + self.stashsize {
-//             writeln!(f, "[Stash] {}: {:?}", i, self.items[i])?;
-//         }
-//         Ok(())
-//     }
-// }
+impl Debug for CuckooHash {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        for i in 0..self.nbins {
+            writeln!(f, "{}: {:?}", i, self.items[i])?;
+        }
+        for i in self.nbins..self.nbins + self.stashsize {
+            writeln!(f, "[Stash] {}: {:?}", i, self.items[i])?;
+        }
+        Ok(())
+    }
+}
 
 #[cfg(all(feature = "nightly", test))]
 mod benchmarks {

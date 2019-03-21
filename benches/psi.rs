@@ -15,7 +15,6 @@ use std::os::unix::net::UnixStream;
 use std::time::Duration;
 
 const SIZE: usize = 16;
-const NTIMES: usize = 1 << 8;
 
 fn rand_vec(n: usize) -> Vec<u8> {
     (0..n).map(|_| rand::random::<u8>()).collect()
@@ -40,7 +39,7 @@ fn _bench_psz_init() {
     handle.join().unwrap();
 }
 
-fn _bench_psz(inputs1: Vec<Vec<u8>>, inputs2: Vec<Vec<u8>>) {
+fn _bench_psz(inputs1: Vec<Vec<u8>>, inputs2: Vec<Vec<u8>>) -> Vec<Vec<u8>> {
     let (sender, receiver) = UnixStream::pair().unwrap();
     let handle = std::thread::spawn(move || {
         let mut rng = AesRng::new();
@@ -54,20 +53,38 @@ fn _bench_psz(inputs1: Vec<Vec<u8>>, inputs2: Vec<Vec<u8>>) {
     let mut reader = BufReader::new(receiver.try_clone().unwrap());
     let mut writer = BufWriter::new(receiver);
     let mut psi = PszReceiver::init(&mut reader, &mut writer, &mut rng).unwrap();
-    let _ = psi
+    let intersection = psi
         .receive(&mut reader, &mut writer, &inputs2, &mut rng)
         .unwrap();
     handle.join().unwrap();
+    intersection
 }
 
 fn bench_oprf(c: &mut Criterion) {
-    c.bench_function("psi::PszPSI::Init", move |bench| {
-        bench.iter(|| _bench_psz_init())
+    // c.bench_function("psi::PSZ (initialization)", move |bench| {
+    //     bench.iter(|| _bench_psz_init())
+    // });
+    c.bench_function("psi::PSZ (n = 2^8)", move |bench| {
+        let rs = rand_vec_vec(1 << 8);
+        bench.iter(|| {
+            let v = _bench_psz(rs.clone(), rs.clone());
+            criterion::black_box(v)
+        })
     });
-    c.bench_function("psi::PszPSI", move |bench| {
-        let rs = rand_vec_vec(NTIMES);
-        bench.iter(|| _bench_psz(rs.clone(), rs.clone()))
+    c.bench_function("psi::PSZ (n = 2^12)", move |bench| {
+        let rs = rand_vec_vec(1 << 12);
+        bench.iter(|| {
+            let v = _bench_psz(rs.clone(), rs.clone());
+            criterion::black_box(v)
+        })
     });
+    // c.bench_function("psi::PSZ (n = 2^16)", move |bench| {
+    //     let rs = rand_vec_vec(1 << 16);
+    //     bench.iter(|| {
+    //         let v = _bench_psz(rs.clone(), rs.clone());
+    //         criterion::black_box(v)
+    //     })
+    // });
 }
 
 criterion_group! {

@@ -7,6 +7,8 @@
 //! Implementation of the Pinkas-Schneider-Zohner private set intersection
 //! protocol (cf. <https://eprint.iacr.org/2014/447>) as specified by
 //! Kolesnikov-Kumaresan-Rosulek-Trieu (cf. <https://eprint.iacr.org/2016/799>).
+//!
+//! The current implementation does not hash the output of the (relaxed) OPRF
 
 use crate::cuckoo::CuckooHash;
 use crate::stream;
@@ -18,6 +20,7 @@ use rand::seq::SliceRandom;
 use rand::{CryptoRng, RngCore};
 use scuttlebutt::{AesHash, Block};
 use sha2::{Digest, Sha256};
+use std::collections::HashSet;
 use std::io::{Read, Write};
 
 /// Private set intersection sender.
@@ -30,7 +33,57 @@ pub struct PszPsiReceiver<OPRF: ObliviousPrfReceiver<Seed = Seed, Input = Block,
 }
 
 /// Specifies the number of hash functions to use in the cuckoo hash.
-const NHASHES: usize = 2;
+const NHASHES: usize = 3;
+
+#[inline]
+fn compute_nbins(n: usize) -> usize {
+    (1.2 * (n as f64)).ceil() as usize
+}
+#[inline]
+fn compute_stashsize(n: usize) -> Result<usize, Error> {
+    let stashsize = if n <= 1 << 8 {
+        12
+    } else if n <= 1 << 12 {
+        6
+    } else if n <= 1 << 16 {
+        4
+    } else if n <= 1 << 20 {
+        3
+    } else if n <= 1 << 24 {
+        2
+    } else {
+        return Err(Error::InvalidSetSize(n));
+    };
+    Ok(stashsize)
+}
+#[inline]
+fn compute_output_length(n: usize) -> Result<usize, Error> {
+    let len = if n <= 1 << 8 {
+        56
+    } else if n <= 1 << 12 {
+        64
+    } else if n <= 1 << 16 {
+        72
+    } else if n <= 1 << 20 {
+        80
+    } else if n <= 1 << 24 {
+        88
+    } else {
+        return Err(Error::InvalidSetSize(n));
+    };
+    Ok(len)
+}
+
+/// κ-Hamming correlation robust hash function.
+#[inline]
+pub fn khcr_hash(_: usize, x: Output, outlen: usize) -> Vec<u8> {
+    // XXX: insecure!
+    let mut output = vec![0u8; outlen];
+    for (output, byte) in output.iter_mut().zip(x.into_iter()) {
+        *output = byte;
+    }
+    output
+}
 
 impl<OPRF> PrivateSetIntersectionSender for PszPsiSender<OPRF>
 where
@@ -67,13 +120,16 @@ where
         }
         let nbins = stream::read_usize(reader)?;
         let stashsize = stream::read_usize(reader)?;
+        let outlen = compute_output_length(inputs.len())?;
         let seeds = self.oprf.send(reader, writer, nbins + stashsize, rng)?;
         // For each `hᵢ`, construct set `Hᵢ = {F(k_{hᵢ(x)}, x) | x ∈ X)}`,
         // randomly permute it, and send it to the receiver.
+        // let start = SystemTime::now();
         for (hash, i) in hashes.into_iter().zip(hindices.into_iter()) {
             let mut outputs = inputs
                 .iter()
-                .map(|input| {
+                .enumerate()
+                .map(|(j, input)| {
                     // Compute `k_{hᵢ(x)}`.
                     let key_index = CuckooHash::hash_with_state(*input, &hash, nbins);
                     // Compute `F(k_{hᵢ(x)}, x || i)`.
@@ -82,23 +138,25 @@ where
                 })
                 .collect::<Vec<Output>>();
             outputs.shuffle(&mut rng);
-            for output in outputs.into_iter() {
+            for output in outputs.iter() {
                 output.write(writer)?;
+                // writer.write_all(output)?;
             }
-            writer.flush()?;
         }
-        // For each `j ∈ {1, ..., stashsize}`, construct set `Sⱼ =
-        // {F(k_{nbins+j}, x) | x ∈ X}`, randomly permute it, and send it to the
+        // For each `i ∈ {1, ..., stashsize}`, construct set `Sᵢ =
+        // {F(k_{nbins+i}, x) | x ∈ X}`, randomly permute it, and send it to the
         // receiver.
-        for j in 0..stashsize {
+        for i in 0..stashsize {
             // We don't need to append any hash index to OPRF inputs in the stash.
             let mut outputs = inputs
                 .iter()
-                .map(|input| self.oprf.compute(&seeds[nbins + j], input))
+                .enumerate()
+                .map(|(j, input)| self.oprf.compute(&seeds[nbins + i], input))
                 .collect::<Vec<Output>>();
             outputs.shuffle(&mut rng);
-            for output in outputs.into_iter() {
+            for output in outputs.iter() {
                 output.write(writer)?;
+                // writer.write_all(output)?;
             }
         }
         writer.flush()?;
@@ -145,6 +203,7 @@ where
         let n = inputs.len();
         let nbins = compute_nbins(n);
         let stashsize = compute_stashsize(n)?;
+        let outlen = compute_output_length(n)?;
         let tbl = make_hash_table(nbins, stashsize, &inputs_, &states)?;
         for state in states.into_iter() {
             state.write(writer)?;
@@ -170,49 +229,48 @@ where
             })
             .collect::<Vec<Block>>();
         let outputs = self.oprf.receive(reader, writer, &inputs_, rng)?;
-        // Map `outputs` to tuple containing (OPRF output, input index) for
-        // outputs that correspond to valid inputs and not dummy values, split
-        // by hash index.
-        let mut outputs_bin = (0..NHASHES)
-            .map(|_| Vec::with_capacity(nbins))
-            .collect::<Vec<Vec<(Output, usize)>>>();
-        let mut outputs_stash = Vec::with_capacity(stashsize);
-        for (output, item) in outputs.into_iter().zip(tbl.items.into_iter()) {
-            // The OPRF outputs correspond to the table elements, so we can process
-            // them in pairs.
+        // Receive all the sets from the sender.
+        // let start = SystemTime::now();
+        let mut hs = (0..NHASHES)
+            .map(|_| HashSet::with_capacity(n))
+            .collect::<Vec<HashSet<Output>>>();
+        let mut ss = (0..stashsize)
+            .map(|_| HashSet::with_capacity(n))
+            .collect::<Vec<HashSet<Output>>>();
+        for h in hs.iter_mut() {
+            for _ in 0..n {
+                let buf = Output::read(reader)?;
+                // let mut buf = vec![0u8; outlen];
+                // reader.read_exact(&mut buf)?;
+                h.insert(buf);
+            }
+        }
+        for s in ss.iter_mut() {
+            for _ in 0..n {
+                let buf = Output::read(reader)?;
+                // let mut buf = vec![0u8; outlen];
+                // reader.read_exact(&mut buf)?;
+                s.insert(buf);
+            }
+        }
+        // Iterate through each input/output pair and see whether it exists in
+        // the appropriate set.
+        let outputs = outputs.into_iter();
+        // .enumerate()
+        // .map(|(j, output)| khcr_hash(j, output, outlen));
+        let mut intersection = Vec::with_capacity(n);
+        for (i, (&item, output)) in tbl.items.iter().zip(outputs).enumerate() {
             let (_, idx, hidx) = item;
             if hidx != usize::max_value() {
-                outputs_bin[hidx].push((output, idx));
-            } else if idx != usize::max_value() {
-                outputs_stash.push((output, idx))
-            }
-        }
-        // We are now ready to compute the intersection. We go through each set
-        // provided by the sender and check whether there's a match. If so, we
-        // put the corresponding input into our output vector.
-        let mut intersection = Vec::with_capacity(n);
-        for outputs in outputs_bin.iter_mut() {
-            for _ in 0..n {
-                let out = Output::read(reader)?;
-                for (out_, idx) in outputs.iter_mut() {
-                    if out == *out_ {
-                        *out_ = Output::default();
-                        intersection.push(inputs[*idx].clone());
-                        break; // XXX: timing attack
-                    }
+                // We have a bin item.
+                if hs[hidx].contains(&output) {
+                    intersection.push(inputs[idx].clone());
                 }
-            }
-        }
-        let outputs = &mut outputs_stash;
-        for _ in 0..stashsize {
-            for _ in 0..n {
-                let out = Output::read(reader)?;
-                for (out_, idx) in outputs.iter_mut() {
-                    if out == *out_ {
-                        *out_ = Output::default();
-                        intersection.push(inputs[*idx].clone());
-                        break; // XXX: timing attack!
-                    }
+            } else if idx != usize::max_value() {
+                // We have a stash item.
+                let j = i - nbins;
+                if ss[j].contains(&output) {
+                    intersection.push(inputs[idx].clone());
                 }
             }
         }
@@ -229,7 +287,7 @@ fn compress_inputs(inputs: &[Vec<u8>]) -> Vec<Block> {
         let mut digest = [0u8; 16];
         if input.len() < 16 {
             // Map `input` directly to a `Block`
-            for (byte, result) in input.into_iter().zip(digest.iter_mut()) {
+            for (byte, result) in input.iter().zip(digest.iter_mut()) {
                 *result = *byte;
             }
         } else {
@@ -262,28 +320,6 @@ fn make_hash_table(
     Ok(tbl)
 }
 
-#[inline]
-fn compute_nbins(n: usize) -> usize {
-    (2.4 * (n as f64)).ceil() as usize
-}
-#[inline]
-fn compute_stashsize(n: usize) -> Result<usize, Error> {
-    let stashsize = if n <= 1 << 8 {
-        8
-    } else if n <= 1 << 12 {
-        5
-    } else if n <= 1 << 16 {
-        3
-    } else if n <= 1 << 28 {
-        2
-    } else if n <= 1 << 32 {
-        4
-    } else {
-        return Err(Error::InvalidInputLength);
-    };
-    Ok(stashsize)
-}
-
 use ocelot::kkrt;
 
 /// The PSI sender using the KKRT oblivious PRF under-the-hood.
@@ -299,7 +335,7 @@ mod tests {
     use std::os::unix::net::UnixStream;
 
     const SIZE: usize = 16;
-    const NTIMES: usize = 1 << 8;
+    const NTIMES: usize = 1 << 12;
 
     fn rand_vec(n: usize) -> Vec<u8> {
         (0..n).map(|_| rand::random::<u8>()).collect()

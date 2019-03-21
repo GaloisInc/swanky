@@ -10,7 +10,7 @@ pub enum Error {
     OprfError(ocelot::Error),
     IoError(std::io::Error),
     CuckooHashFull,
-    InvalidInputLength,
+    InvalidSetSize(usize),
 }
 
 impl From<std::io::Error> for Error {
@@ -24,5 +24,16 @@ impl From<ocelot::Error> for Error {
     #[inline]
     fn from(e: ocelot::Error) -> Error {
         Error::OprfError(e)
+    }
+}
+
+impl std::fmt::Display for Error {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            Error::OprfError(e) => write!(f, "oblivious PRF error: {}", e),
+            Error::IoError(e) => write!(f, "IO error: {}", e),
+            Error::CuckooHashFull => write!(f, "cuckoo hash is full"),
+            Error::InvalidSetSize(n) => write!(f, "set size {} is too large", n),
+        }
     }
 }
