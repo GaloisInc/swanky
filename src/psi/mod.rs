@@ -10,26 +10,48 @@ use crate::errors::Error;
 use rand::{CryptoRng, RngCore};
 use std::io::{Read, Write};
 
+/// Trait for a private set intersection sender.
 pub trait PrivateSetIntersectionSender
 where
     Self: Sized,
 {
-    fn run<R: Read + Send, W: Write + Send, RNG: CryptoRng + RngCore>(
+    /// Input message type.
+    type Msg: Sized + AsMut<[u8]>;
+    /// Runs any one-time initialization required by the protocol.
+    fn init<R: Read + Send, W: Write + Send, RNG: CryptoRng + RngCore>(
         reader: &mut R,
         writer: &mut W,
-        inputs: &[Vec<u8>],
         rng: &mut RNG,
     ) -> Result<Self, Error>;
+    /// Runs the protocol.
+    fn send<R: Read + Send, W: Write + Send, RNG: CryptoRng + RngCore>(
+        &mut self,
+        reader: &mut R,
+        writer: &mut W,
+        inputs: &[Self::Msg],
+        rng: &mut RNG,
+    ) -> Result<(), Error>;
 }
 
+/// Trait for a private set intersection receiver.
 pub trait PrivateSetIntersectionReceiver
 where
     Self: Sized,
 {
-    fn run<R: Read + Send, W: Write + Send, RNG: CryptoRng + RngCore>(
+    /// Input message type.
+    type Msg: Sized + AsMut<[u8]>;
+    /// Runs any one-time initialization required by the protocol.
+    fn init<R: Read + Send, W: Write + Send, RNG: CryptoRng + RngCore>(
         reader: &mut R,
         writer: &mut W,
-        inputs: &[Vec<u8>],
         rng: &mut RNG,
     ) -> Result<Self, Error>;
+    /// Runs the protocol, receiving the intersection as output.
+    fn receive<R: Read + Send, W: Write + Send, RNG: CryptoRng + RngCore>(
+        &mut self,
+        reader: &mut R,
+        writer: &mut W,
+        inputs: &[Self::Msg],
+        rng: &mut RNG,
+    ) -> Result<Vec<Self::Msg>, Error>;
 }

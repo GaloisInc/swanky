@@ -18,6 +18,6 @@ pub fn read_usize<T: Read>(reader: &mut T) -> Result<usize, Error> {
 #[inline]
 pub fn write_usize<T: Write>(writer: &mut T, s: usize) -> Result<(), Error> {
     let data: [u8; 8] = unsafe { std::mem::transmute(s) };
-    writer.write(&data)?;
+    writer.write_all(&data)?;
     Ok(())
 }

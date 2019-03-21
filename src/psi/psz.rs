@@ -4,55 +4,90 @@
 // Copyright © 2019 Galois, Inc.
 // See LICENSE for licensing information.
 
+//! Implementation of the Pinkas-Schneider-Zohner private set intersection
+//! protocol (cf. <https://eprint.iacr.org/2014/447>) as specified by
+//! Kolesnikov-Kumaresan-Rosulek-Trieu (cf. <https://eprint.iacr.org/2016/799>).
+//!
+//! This implementation uses the Kolesnikov-Kumaresan-Rosulek-Trieu oblivious
+//! PRF implementation in the `ocelot` library.
+
 use crate::cuckoo::CuckooHash;
 use crate::stream;
 use crate::Error;
+use crate::{PrivateSetIntersectionReceiver, PrivateSetIntersectionSender};
 use ocelot::kkrt::{Output, Seed};
 use ocelot::{ObliviousPrfReceiver, ObliviousPrfSender};
+use rand::seq::SliceRandom;
 use rand::{CryptoRng, RngCore};
 use scuttlebutt::{AesHash, Block};
 use std::io::{Read, Write};
-use std::marker::PhantomData;
 
-pub struct PszPsiSender<OPRF: ObliviousPrfSender> {
-    _oprf: PhantomData<OPRF>,
+pub struct PszPsiSender<OPRF: ObliviousPrfSender<Seed = Seed, Input = Block, Output = Output>> {
+    oprf: OPRF,
 }
-pub struct PszPsiReceiver<OPRF: ObliviousPrfReceiver> {
-    _oprf: PhantomData<OPRF>,
+pub struct PszPsiReceiver<OPRF: ObliviousPrfReceiver<Seed = Seed, Input = Block, Output = Output>> {
+    oprf: OPRF,
 }
 
-const NHASHES: usize = 3;
+const NHASHES: usize = 2;
 
-impl<OPRF> PszPsiSender<OPRF>
+impl<OPRF> PrivateSetIntersectionSender for PszPsiSender<OPRF>
 where
     OPRF: ObliviousPrfSender<Seed = Seed, Input = Block, Output = Output>,
 {
-    pub fn run<R: Read + Send, W: Write + Send, RNG: CryptoRng + RngCore>(
+    type Msg = Block;
+
+    fn init<R: Read + Send, W: Write + Send, RNG: CryptoRng + RngCore>(
         reader: &mut R,
         writer: &mut W,
-        inputs: &[Block],
         rng: &mut RNG,
+    ) -> Result<Self, Error> {
+        let oprf = OPRF::init(reader, writer, rng)?;
+        Ok(Self { oprf })
+    }
+
+    fn send<R: Read + Send, W: Write + Send, RNG: CryptoRng + RngCore>(
+        &mut self,
+        reader: &mut R,
+        writer: &mut W,
+        inputs: &[Self::Msg],
+        mut rng: &mut RNG,
     ) -> Result<(), Error> {
+        let mut hashes = Vec::with_capacity(NHASHES);
         let nbins = stream::read_usize(reader)?;
         let stashsize = stream::read_usize(reader)?;
-        let mut hashes = Vec::with_capacity(NHASHES);
         for _ in 0..NHASHES {
             let state = Block::read(reader)?;
             hashes.push(AesHash::new(state));
         }
-        let mut oprf = OPRF::init(reader, writer, rng)?;
-        let seeds = oprf.send(reader, writer, nbins + stashsize, rng)?;
-        for i in 0..NHASHES {
-            for input in inputs.iter() {
-                let idx = CuckooHash::hash_with_state(*input, &hashes[i], nbins);
-                let out = oprf.compute(&seeds[idx], input);
-                out.write(writer)?;
+        let seeds = self.oprf.send(reader, writer, nbins + stashsize, rng)?;
+        // For each `hᵢ`, construct set `Hᵢ = {F(k_{hᵢ(x)}, x) | x ∈ X)}`,
+        // randomly permute it, and send it to the receiver.
+        for hash in hashes.into_iter() {
+            let mut outputs = inputs
+                .iter()
+                .map(|input| {
+                    let idx = CuckooHash::hash_with_state(*input, &hash, nbins);
+                    self.oprf.compute(&seeds[idx], input)
+                })
+                .collect::<Vec<Output>>();
+            outputs.shuffle(&mut rng);
+            for output in outputs.into_iter() {
+                output.write(writer)?;
             }
+            writer.flush()?;
         }
+        // For each `j ∈ {1, ..., stashsize}`, construct set `Sⱼ =
+        // {F(k_{nbins+j}, x) | x ∈ X}`, randomly permute it, and send it to the
+        // receiver.
         for j in 0..stashsize {
-            for input in inputs.iter() {
-                let out = oprf.compute(&seeds[nbins + j], input);
-                out.write(writer)?;
+            let mut outputs = inputs
+                .iter()
+                .map(|input| self.oprf.compute(&seeds[nbins + j], input))
+                .collect::<Vec<Output>>();
+            outputs.shuffle(&mut rng);
+            for output in outputs.into_iter() {
+                output.write(writer)?;
             }
         }
         writer.flush()?;
@@ -60,16 +95,28 @@ where
     }
 }
 
-impl<OPRF> PszPsiReceiver<OPRF>
+impl<OPRF> PrivateSetIntersectionReceiver for PszPsiReceiver<OPRF>
 where
-    OPRF: ObliviousPrfReceiver<Input = Block, Output = Output>,
+    OPRF: ObliviousPrfReceiver<Seed = Seed, Input = Block, Output = Output>,
 {
-    pub fn run<R, W, RNG>(
+    type Msg = Block;
+
+    fn init<R: Read + Send, W: Write + Send, RNG: CryptoRng + RngCore>(
         reader: &mut R,
         writer: &mut W,
-        inputs: &[Block],
         rng: &mut RNG,
-    ) -> Result<Vec<Output>, Error>
+    ) -> Result<Self, Error> {
+        let oprf = OPRF::init(reader, writer, rng)?;
+        Ok(Self { oprf })
+    }
+
+    fn receive<R, W, RNG>(
+        &mut self,
+        reader: &mut R,
+        writer: &mut W,
+        inputs: &[Self::Msg],
+        rng: &mut RNG,
+    ) -> Result<Vec<Self::Msg>, Error>
     where
         R: Read + Send,
         W: Write + Send,
@@ -78,61 +125,80 @@ where
         let n = inputs.len();
         let nbins = compute_nbins(n);
         let stashsize = compute_stashsize(n)?;
-        let init_states = (0..NHASHES)
-            .map(|_| rand::random::<Block>())
-            .collect::<Vec<Block>>();
         stream::write_usize(writer, nbins)?;
         stream::write_usize(writer, stashsize)?;
-        for state in init_states.iter() {
+        let states = (0..NHASHES)
+            .map(|_| rand::random::<Block>())
+            .collect::<Vec<Block>>();
+        let tbl = make_hash_table(nbins, stashsize, inputs, &states)?;
+        for state in states.into_iter() {
             state.write(writer)?;
         }
         writer.flush()?;
-        let mut tbl = CuckooHash::new(nbins, stashsize, init_states);
-        for input in inputs.iter() {
-            tbl.hash(*input)?;
-        }
-        tbl.fill(Default::default());
-        let mut oprf = OPRF::init(reader, writer, rng)?;
-        let outputs = oprf.receive(
-            reader,
-            writer,
-            &tbl.items
-                .into_iter()
-                .filter_map(|x| x)
-                .collect::<Vec<Block>>(),
-            rng,
-        )?;
-        let mut outputs = outputs
+        let inputs_ = tbl
+            .items
             .iter()
-            .map(|x| Some(x))
-            .collect::<Vec<Option<&Output>>>();
+            .filter_map(|(item, _, _)| *item)
+            .collect::<Vec<Block>>();
+        let outputs = self.oprf.receive(reader, writer, &inputs_, rng)?;
+        // Map `outputs` to tuple containing (OPRF output, input index) for
+        // outputs that correspond to valid inputs and not dummy values, split
+        // by hash index.
+        let mut outputs_bin = (0..NHASHES)
+            .map(|_| Vec::with_capacity(nbins))
+            .collect::<Vec<Vec<(Output, usize)>>>();
+        let mut outputs_stash = Vec::with_capacity(stashsize);
+        for (output, item) in outputs.into_iter().zip(tbl.items.into_iter()) {
+            let (_, idx, hidx) = item;
+            if hidx != usize::max_value() {
+                outputs_bin[hidx].push((output, idx));
+            } else if idx != usize::max_value() {
+                outputs_stash.push((output, idx))
+            }
+        }
         let mut intersection = Vec::with_capacity(n);
-        for _ in 0..NHASHES {
+        for outputs in outputs_bin.iter_mut() {
             for _ in 0..n {
                 let out = Output::read(reader)?;
-                match outputs.iter_mut().find(|&&mut x| x == Some(&out)) {
-                    Some(item) => {
-                        *item = None;
-                        intersection.push(out)
+                for (out_, idx) in outputs.iter_mut() {
+                    if out == *out_ {
+                        *out_ = Output::default();
+                        intersection.push(inputs[*idx]);
+                        break; // XXX: timing attack
                     }
-                    None => (),
                 }
             }
         }
+        let outputs = &mut outputs_stash;
         for _ in 0..stashsize {
             for _ in 0..n {
                 let out = Output::read(reader)?;
-                match outputs.iter_mut().find(|&&mut x| x == Some(&out)) {
-                    Some(item) => {
-                        *item = None;
-                        intersection.push(out)
+                for (out_, idx) in outputs.iter_mut() {
+                    if out == *out_ {
+                        *out_ = Output::default();
+                        intersection.push(inputs[*idx]);
+                        break; // XXX: timing attack!
                     }
-                    None => (),
                 }
             }
         }
         Ok(intersection)
     }
+}
+
+#[inline]
+fn make_hash_table(
+    nbins: usize,
+    stashsize: usize,
+    inputs: &[Block],
+    states: &[Block],
+) -> Result<CuckooHash, Error> {
+    let mut tbl = CuckooHash::new(nbins, stashsize, states);
+    for (j, input) in inputs.iter().enumerate() {
+        tbl.hash(*input, j)?;
+    }
+    tbl.fill(Default::default());
+    Ok(tbl)
 }
 
 #[inline]
@@ -142,15 +208,15 @@ fn compute_nbins(n: usize) -> usize {
 #[inline]
 fn compute_stashsize(n: usize) -> Result<usize, Error> {
     let stashsize = if n <= 1 << 8 {
-        12
+        8
     } else if n <= 1 << 12 {
-        6
+        5
     } else if n <= 1 << 16 {
-        4
-    } else if n <= 1 << 20 {
         3
-    } else if n <= 1 << 24 {
+    } else if n <= 1 << 28 {
         2
+    } else if n <= 1 << 32 {
+        4
     } else {
         return Err(Error::InvalidInputLength);
     };
@@ -184,13 +250,17 @@ mod tests {
             let mut rng = AesRng::new();
             let mut reader = BufReader::new(sender.try_clone().unwrap());
             let mut writer = BufWriter::new(sender);
-            PszSender::run(&mut reader, &mut writer, &sender_inputs, &mut rng).unwrap();
+            let mut psi = PszSender::init(&mut reader, &mut writer, &mut rng).unwrap();
+            psi.send(&mut reader, &mut writer, &sender_inputs, &mut rng)
+                .unwrap();
         });
         let mut rng = AesRng::new();
         let mut reader = BufReader::new(receiver.try_clone().unwrap());
         let mut writer = BufWriter::new(receiver);
-        let intersection =
-            PszReceiver::run(&mut reader, &mut writer, &receiver_inputs, &mut rng).unwrap();
+        let mut psi = PszReceiver::init(&mut reader, &mut writer, &mut rng).unwrap();
+        let intersection = psi
+            .receive(&mut reader, &mut writer, &receiver_inputs, &mut rng)
+            .unwrap();
         handle.join().unwrap();
         assert_eq!(intersection.len(), T);
     }
