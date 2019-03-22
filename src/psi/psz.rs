@@ -10,7 +10,7 @@
 //!
 //! The current implementation does not hash the output of the (relaxed) OPRF.
 
-use crate::cuckoo::{CuckooHash, NHASHES};
+use crate::cuckoo::{compute_masksize, CuckooHash, NHASHES};
 use crate::stream;
 use crate::Error;
 use crate::{PrivateSetIntersectionReceiver, PrivateSetIntersectionSender};
@@ -18,10 +18,12 @@ use ocelot::kkrt::{Output, Seed};
 use ocelot::{ObliviousPrfReceiver, ObliviousPrfSender};
 use rand::seq::SliceRandom;
 use rand::{CryptoRng, RngCore};
+use scuttlebutt::utils as scutils;
 use scuttlebutt::{Aes128, Block};
 use sha2::{Digest, Sha256};
 use std::collections::HashSet;
 use std::io::{Read, Write};
+use std::time::SystemTime;
 
 /// Private set intersection sender.
 pub struct PszPsiSender<OPRF: ObliviousPrfSender<Seed = Seed, Input = Block, Output = Output>> {
@@ -54,46 +56,51 @@ where
         inputs: &[Self::Msg],
         mut rng: &mut RNG,
     ) -> Result<(), Error> {
-        let inputs = compress_inputs(inputs);
         let key = Block::read(reader)?;
         let aes = Aes128::new(key);
+        let mut inputs = compress_and_hash_inputs(inputs, &aes);
+        let masksize = compute_masksize(inputs.len())?;
         let nbins = stream::read_usize(reader)?;
         let stashsize = stream::read_usize(reader)?;
+        // let start = SystemTime::now();
         let seeds = self.oprf.send(reader, writer, nbins + stashsize, rng)?;
-
+        // eprintln!("[S] OPRF: {} ms", start.elapsed().unwrap().as_millis());
         // For each `hᵢ`, construct set `Hᵢ = {F(k_{hᵢ(x)}, x || i) | x ∈ X)}`,
         // randomly permute it, and send it to the receiver.
         let hindices = (0..NHASHES).map(|i| Block::from(i as u128));
         for (i, hidx) in hindices.enumerate() {
-            let mut outputs = inputs
-                .iter()
-                .map(|input| {
-                    // Compute `bin := hᵢ(x)`.
-                    let hash = aes.encrypt(*input);
-                    let bin = CuckooHash::bin(hash, i, nbins);
-                    // Output `F(k_{hᵢ(x)}, x || i)`.
-                    let hash = hash ^ hidx;
-                    self.oprf.compute(&seeds[bin], &hash)
-                })
-                .collect::<Vec<Output>>();
-            outputs.shuffle(&mut rng);
-            for output in outputs.iter() {
-                output.write(writer)?;
+            inputs.shuffle(&mut rng);
+            // let start = SystemTime::now();
+            for input in inputs.iter() {
+                // Compute `bin := hᵢ(x)`.
+                let bin = CuckooHash::bin(*input, i, nbins);
+                let mut encoded = self.oprf.encode(&(*input ^ hidx));
+                // Compute rest of `F(k_{hᵢ(x)}, x || i)` and chop off extra bytes.
+                scutils::xor_inplace_n(&mut encoded.0, &seeds[bin].0, masksize);
+                writer.write_all(&encoded.0[0..masksize])?;
             }
+            // eprintln!("[S] Send set: {} ms", start.elapsed().unwrap().as_millis());
         }
         // For each `i ∈ {1, ..., stashsize}`, construct set `Sᵢ =
         // {F(k_{nbins+i}, x) | x ∈ X}`, randomly permute it, and send it to the
         // receiver.
+        // let start = SystemTime::now();
+        let mut encoded = inputs
+            .iter()
+            .map(|input| self.oprf.encode(input))
+            .collect::<Vec<Output>>();
+        // eprintln!("[S] Encode: {} ms", start.elapsed().unwrap().as_millis());
         for i in 0..stashsize {
-            // We don't need to append any hash index to OPRF inputs in the stash.
-            let mut outputs = inputs
-                .iter()
-                .map(|input| self.oprf.compute(&seeds[nbins + i], input))
-                .collect::<Vec<Output>>();
-            outputs.shuffle(&mut rng);
-            for output in outputs.iter() {
-                output.write(writer)?;
+            encoded.shuffle(&mut rng);
+            // let start = SystemTime::now();-
+            for encoded in encoded.iter() {
+                // We don't need to append any hash index to OPRF inputs in the stash.
+                let mut output = vec![0u8; masksize];
+                scutils::xor_inplace(&mut output, &encoded.0);
+                scutils::xor_inplace(&mut output, &seeds[nbins + i].0);
+                writer.write_all(&output)?;
             }
+            // eprintln!("[S] Send set: {} ms", start.elapsed().unwrap().as_millis());
         }
         writer.flush()?;
         Ok(())
@@ -128,11 +135,14 @@ where
         RNG: CryptoRng + RngCore,
     {
         let n = inputs.len();
-        let inputs_ = compress_inputs(inputs);
+
         let key = rand::random::<Block>();
-        let tbl = CuckooHash::build(&inputs_, key)?;
+        let aes = Aes128::new(key);
+        let inputs_ = compress_and_hash_inputs(inputs, &aes);
+        let tbl = CuckooHash::build(&inputs_)?;
         let nbins = tbl.nbins;
         let stashsize = tbl.stashsize;
+        let masksize = compute_masksize(n)?;
         let hindices = (0..NHASHES)
             .map(|i| Block::from(i as u128))
             .collect::<Vec<Block>>();
@@ -161,29 +171,39 @@ where
             .collect::<Vec<Block>>();
         let outputs = self.oprf.receive(reader, writer, &inputs_, rng)?;
         // Receive all the sets from the sender.
+        // let start = SystemTime::now();
         let mut hs = (0..NHASHES)
             .map(|_| HashSet::with_capacity(n))
-            .collect::<Vec<HashSet<Output>>>();
+            .collect::<Vec<HashSet<Vec<u8>>>>();
         let mut ss = (0..stashsize)
             .map(|_| HashSet::with_capacity(n))
-            .collect::<Vec<HashSet<Output>>>();
+            .collect::<Vec<HashSet<Vec<u8>>>>();
         for h in hs.iter_mut() {
             for _ in 0..n {
-                let buf = Output::read(reader)?;
+                let mut buf = vec![0u8; masksize];
+                reader.read_exact(&mut buf)?;
                 h.insert(buf);
             }
         }
         for s in ss.iter_mut() {
             for _ in 0..n {
-                let buf = Output::read(reader)?;
+                let mut buf = vec![0u8; masksize];
+                reader.read_exact(&mut buf)?;
                 s.insert(buf);
             }
         }
+        // println!(
+        //     "[R] Receive sets: {} ms",
+        //     start.elapsed().unwrap().as_millis()
+        // );
         // Iterate through each input/output pair and see whether it exists in
         // the appropriate set.
+        // let start = SystemTime::now();
         let mut intersection = Vec::with_capacity(n);
-        for (i, (&item, output)) in tbl.items().zip(outputs.into_iter()).enumerate() {
+        for (i, (&item, output_)) in tbl.items().zip(outputs.into_iter()).enumerate() {
             let (_, idx, hidx) = item;
+            let mut output = vec![0u8; masksize];
+            output.copy_from_slice(&output_.0[0..masksize]);
             if let Some(hidx) = hidx {
                 // We have a bin item.
                 if hs[hidx].contains(&output) {
@@ -197,6 +217,10 @@ where
                 }
             }
         }
+        // println!(
+        //     "[R] Compute intersection: {} ms",
+        //     start.elapsed().unwrap().as_millis()
+        // );
         Ok(intersection)
     }
 }
@@ -204,7 +228,7 @@ where
 // Compress an arbitrary vector into a 128-bit chunk, leaving the final 8-bits
 // as zero. We need to leave 8 bits free in order to add in the hash index when
 // running the OPRF (cf. <https://eprint.iacr.org/2016/799>, §5.2).
-fn compress_inputs(inputs: &[Vec<u8>]) -> Vec<Block> {
+fn compress_and_hash_inputs(inputs: &[Vec<u8>], aes: &Aes128) -> Vec<Block> {
     let mut compressed = Vec::with_capacity(inputs.len());
     for input in inputs.iter() {
         let mut digest = [0u8; 16];
@@ -223,7 +247,8 @@ fn compress_inputs(inputs: &[Vec<u8>]) -> Vec<Block> {
             }
             digest[15] = 0u8;
         }
-        compressed.push(Block::from(digest));
+        let digest = aes.encrypt(Block::from(digest));
+        compressed.push(digest);
     }
     compressed
 }
@@ -311,8 +336,10 @@ mod benchmarks {
     #[bench]
     fn bench_compress_inputs(b: &mut Bencher) {
         let inputs = rand_vec_vec(NTIMES);
+        let key = rand::random::<Block>();
+        let aes = Aes128::new(key);
         b.iter(|| {
-            let _ = compress_inputs(&inputs);
+            let _ = compress_and_hash_inputs(&inputs, &aes);
         });
     }
 }

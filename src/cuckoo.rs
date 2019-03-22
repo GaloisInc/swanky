@@ -6,7 +6,7 @@
 
 use crate::Error;
 use arrayref::array_ref;
-use scuttlebutt::{Aes128, Block};
+use scuttlebutt::Block;
 use std::fmt::Debug;
 
 pub(crate) struct CuckooHash {
@@ -17,7 +17,6 @@ pub(crate) struct CuckooHash {
     items: Vec<(Option<Block>, Option<usize>, Option<usize>)>,
     pub(crate) nbins: usize,
     pub(crate) stashsize: usize,
-    hashfn: Aes128,
 }
 
 /// The number of hash functions to use in the cuckoo hash.
@@ -46,9 +45,26 @@ fn compute_stashsize(n: usize) -> Result<usize, Error> {
     };
     Ok(stashsize)
 }
+#[inline]
+pub fn compute_masksize(n: usize) -> Result<usize, Error> {
+    let masksize = if n <= 1 << 8 {
+        7
+    } else if n <= 1 << 12 {
+        8
+    } else if n <= 1 << 16 {
+        9
+    } else if n <= 1 << 20 {
+        10
+    } else if n <= 1 << 24 {
+        11
+    } else {
+        return Err(Error::InvalidSetSize(n));
+    };
+    Ok(masksize)
+}
 
 impl CuckooHash {
-    pub fn build(inputs: &[Block], key: Block) -> Result<Self, Error> {
+    pub fn build(inputs: &[Block]) -> Result<Self, Error> {
         let nbins = compute_nbins(inputs.len());
         // We don't support more than 2**32 bins due to the way we compute the
         // bin number (cf. the `bin` function below).
@@ -56,7 +72,7 @@ impl CuckooHash {
             return Err(Error::InvalidSetSize(inputs.len()));
         }
         let stashsize = compute_stashsize(inputs.len())?;
-        let mut tbl = CuckooHash::_build(nbins, stashsize, key)?;
+        let mut tbl = CuckooHash::new(nbins, stashsize);
         // Fill table with `inputs`
         for (j, input) in inputs.iter().enumerate() {
             tbl.hash(*input, j)?;
@@ -64,29 +80,27 @@ impl CuckooHash {
         Ok(tbl)
     }
 
-    fn _build(nbins: usize, stashsize: usize, key: Block) -> Result<Self, Error> {
+    pub fn new(nbins: usize, stashsize: usize) -> Self {
         let items = vec![(None, None, None); nbins + stashsize];
-        let hashfn = Aes128::new(key);
-        Ok(Self {
+        Self {
             items,
             nbins,
             stashsize,
-            hashfn,
-        })
+        }
     }
 
     /// Place `input`, alongside the input index `idx` it corresponds to, in the
     /// hash table.
     pub fn hash(&mut self, input: Block, idx: usize) -> Result<(), Error> {
-        let mut hash = self.hashfn.encrypt(input);
+        let mut input = input;
         let mut idx = idx;
         let mut hidx = 0;
         for _ in 0..NITERS {
-            let i = Self::bin(hash, hidx, self.nbins);
+            let i = Self::bin(input, hidx, self.nbins);
             let old = self.items[i];
-            self.items[i] = (Some(hash), Some(idx), Some(hidx));
+            self.items[i] = (Some(input), Some(idx), Some(hidx));
             if let Some(item) = old.0 {
-                hash = item;
+                input = item;
                 idx = old.1.unwrap();
                 hidx = (old.2.unwrap() + 1) % NHASHES;
             } else {
@@ -96,7 +110,7 @@ impl CuckooHash {
         // Unable to place in bin, so place in stash
         for i in self.nbins..self.nbins + self.stashsize {
             if self.items[i].0.is_none() {
-                self.items[i] = (Some(hash), Some(idx), None);
+                self.items[i] = (Some(input), Some(idx), None);
                 return Ok(());
             }
         }
@@ -104,6 +118,7 @@ impl CuckooHash {
     }
 
     /// Output the bin number for a given hash output `hash` and hash index `hidx`.
+    #[inline]
     pub fn bin(hash: Block, hidx: usize, nbins: usize) -> usize {
         debug_assert!(hidx <= 4);
         let bytes: [u8; 16] = hash.into();
@@ -112,6 +127,7 @@ impl CuckooHash {
         (value as usize) % nbins
     }
 
+    #[inline]
     pub fn items(&self) -> std::slice::Iter<(Option<Block>, Option<usize>, Option<usize>)> {
         self.items.iter()
     }
@@ -140,8 +156,7 @@ mod tests {
         let inputs = (0..SETSIZE)
             .map(|_| rand::random::<Block>())
             .collect::<Vec<Block>>();
-        let key = rand::random::<Block>();
-        let tbl = CuckooHash::build(&inputs, key);
+        let tbl = CuckooHash::build(&inputs);
         assert!(tbl.err().is_none());
     }
 }
@@ -159,8 +174,7 @@ mod benchmarks {
         let inputs = (0..SETSIZE)
             .map(|_| rand::random::<Block>())
             .collect::<Vec<Block>>();
-        let key = rand::random::<Block>();
-        b.iter(|| CuckooHash::build(&inputs, key));
+        b.iter(|| CuckooHash::build(&inputs));
     }
 
     #[bench]
