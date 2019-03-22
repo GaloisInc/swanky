@@ -11,16 +11,20 @@ use std::fmt::Debug;
 const NITERS: usize = 100;
 
 pub(crate) struct CuckooHash {
-    // Contains the bins + stash
-    pub(crate) items: Vec<(Option<Block>, usize, usize)>,
+    // Contains the bins + stash. Each entry is a tuple containing:
+    // 0. The entry, or None if there is no such entry.
+    // 1. The input index associated with the entry.
+    // 2. The hash index used.
+    pub(crate) items: Vec<(Option<Block>, Option<usize>, Option<usize>)>,
     nbins: usize,
     stashsize: usize,
+    // The hash functions
     hashes: Vec<AesHash>,
 }
 
 impl CuckooHash {
     pub fn new(nbins: usize, stashsize: usize, init_states: &[Block]) -> Self {
-        let items = vec![(None, usize::max_value(), usize::max_value()); nbins + stashsize];
+        let items = vec![(None, None, None); nbins + stashsize];
         let hashes = init_states.iter().map(|s| AesHash::new(*s)).collect();
         Self {
             items,
@@ -39,10 +43,11 @@ impl CuckooHash {
             // Put `input` in the stash, or fail if the stash is full.
             for i in self.nbins..self.nbins + self.stashsize {
                 if self.items[i].0.is_none() {
-                    self.items[i] = (Some(input), idx, usize::max_value());
+                    self.items[i] = (Some(input), Some(idx), None);
                     return Ok(());
                 }
             }
+            println!("{:?}", self);
             return Err(Error::CuckooHashFull);
         }
         let indices = self
@@ -55,7 +60,7 @@ impl CuckooHash {
             match item {
                 Some(_) => (),
                 None => {
-                    self.items[*j] = (Some(input), idx, i);
+                    self.items[*j] = (Some(input), Some(idx), Some(i));
                     return Ok(());
                 }
             };
@@ -64,8 +69,8 @@ impl CuckooHash {
         let hidx = rand::random::<usize>() % self.hashes.len();
         let idx_ = indices[hidx];
         let evicted = self.items[idx_];
-        self.items[idx_] = (Some(input), idx, hidx);
-        self._hash(evicted.0.unwrap(), evicted.1, times - 1)?;
+        self.items[idx_] = (Some(input), Some(idx), Some(hidx));
+        self._hash(evicted.0.unwrap(), evicted.1.unwrap(), times - 1)?;
         Ok(())
     }
 
@@ -78,7 +83,7 @@ impl CuckooHash {
         for item in self.items.iter_mut() {
             match item.0 {
                 Some(_) => (),
-                None => *item = (Some(value), usize::max_value(), usize::max_value()),
+                None => *item = (Some(value), None, None),
             }
         }
     }

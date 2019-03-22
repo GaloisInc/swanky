@@ -33,24 +33,24 @@ pub struct PszPsiReceiver<OPRF: ObliviousPrfReceiver<Seed = Seed, Input = Block,
 }
 
 /// Specifies the number of hash functions to use in the cuckoo hash.
-const NHASHES: usize = 3;
+const NHASHES: usize = 2;
 
 #[inline]
 fn compute_nbins(n: usize) -> usize {
-    (1.2 * (n as f64)).ceil() as usize
+    (2.4 * (n as f64)).ceil() as usize
 }
 #[inline]
 fn compute_stashsize(n: usize) -> Result<usize, Error> {
     let stashsize = if n <= 1 << 8 {
-        12
+        8
     } else if n <= 1 << 12 {
-        6
+        5
     } else if n <= 1 << 16 {
-        4
-    } else if n <= 1 << 20 {
         3
-    } else if n <= 1 << 24 {
+    } else if n <= 1 << 28 {
         2
+    } else if n <= 1 << 32 {
+        4
     } else {
         return Err(Error::InvalidSetSize(n));
     };
@@ -218,10 +218,10 @@ where
             .iter()
             .filter_map(|(item, _, hidx)| {
                 if let Some(item) = item {
-                    if *hidx == usize::max_value() {
-                        Some(*item)
-                    } else {
+                    if let Some(hidx) = hidx {
                         Some(*item ^ hindices[*hidx])
+                    } else {
+                        Some(*item)
                     }
                 } else {
                     None
@@ -261,12 +261,12 @@ where
         let mut intersection = Vec::with_capacity(n);
         for (i, (&item, output)) in tbl.items.iter().zip(outputs).enumerate() {
             let (_, idx, hidx) = item;
-            if hidx != usize::max_value() {
+            if let Some(hidx) = hidx {
                 // We have a bin item.
                 if hs[hidx].contains(&output) {
-                    intersection.push(inputs[idx].clone());
+                    intersection.push(inputs[idx.unwrap()].clone());
                 }
-            } else if idx != usize::max_value() {
+            } else if let Some(idx) = idx {
                 // We have a stash item.
                 let j = i - nbins;
                 if ss[j].contains(&output) {
@@ -335,7 +335,7 @@ mod tests {
     use std::os::unix::net::UnixStream;
 
     const SIZE: usize = 16;
-    const NTIMES: usize = 1 << 12;
+    const NTIMES: usize = 1 << 16;
 
     fn rand_vec(n: usize) -> Vec<u8> {
         (0..n).map(|_| rand::random::<u8>()).collect()

@@ -78,13 +78,13 @@ fn bench_oprf(c: &mut Criterion) {
             criterion::black_box(v)
         })
     });
-    // c.bench_function("psi::PSZ (n = 2^16)", move |bench| {
-    //     let rs = rand_vec_vec(1 << 16);
-    //     bench.iter(|| {
-    //         let v = _bench_psz(rs.clone(), rs.clone());
-    //         criterion::black_box(v)
-    //     })
-    // });
+    c.bench_function("psi::PSZ (n = 2^16)", move |bench| {
+        let rs = rand_vec_vec(1 << 16);
+        bench.iter(|| {
+            let v = _bench_psz(rs.clone(), rs.clone());
+            criterion::black_box(v)
+        })
+    });
 }
 
 criterion_group! {
