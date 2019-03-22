@@ -11,6 +11,7 @@ pub enum Error {
     IoError(std::io::Error),
     CuckooHashFull,
     InvalidSetSize(usize),
+    UnsupportedBinLength(usize),
 }
 
 impl From<std::io::Error> for Error {
@@ -34,6 +35,9 @@ impl std::fmt::Display for Error {
             Error::IoError(e) => write!(f, "IO error: {}", e),
             Error::CuckooHashFull => write!(f, "cuckoo hash is full"),
             Error::InvalidSetSize(n) => write!(f, "set size {} is too large", n),
+            Error::UnsupportedBinLength(n) => {
+                write!(f, "unsupported number of bins: {} is too large", n)
+            }
         }
     }
 }

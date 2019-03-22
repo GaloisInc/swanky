@@ -15,6 +15,7 @@ edition = "2018"
 nightly = ["rand/nightly", "scuttlebutt/nightly"]
 
 [dependencies]
+arrayref = "*"
 ocelot = { path = "../ocelot", features = ["unstable"] }
 rand = "*"
 rand_core = "*"

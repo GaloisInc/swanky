@@ -10,7 +10,7 @@
 //!
 //! The current implementation does not hash the output of the (relaxed) OPRF
 
-use crate::cuckoo::CuckooHash;
+use crate::cuckoo::{CuckooHash, NHASHES};
 use crate::stream;
 use crate::Error;
 use crate::{PrivateSetIntersectionReceiver, PrivateSetIntersectionSender};
@@ -18,7 +18,7 @@ use ocelot::kkrt::{Output, Seed};
 use ocelot::{ObliviousPrfReceiver, ObliviousPrfSender};
 use rand::seq::SliceRandom;
 use rand::{CryptoRng, RngCore};
-use scuttlebutt::{AesHash, Block};
+use scuttlebutt::{Aes128, Block};
 use sha2::{Digest, Sha256};
 use std::collections::HashSet;
 use std::io::{Read, Write};
@@ -30,59 +30,6 @@ pub struct PszPsiSender<OPRF: ObliviousPrfSender<Seed = Seed, Input = Block, Out
 /// Private set intersection receiver.
 pub struct PszPsiReceiver<OPRF: ObliviousPrfReceiver<Seed = Seed, Input = Block, Output = Output>> {
     oprf: OPRF,
-}
-
-/// Specifies the number of hash functions to use in the cuckoo hash.
-const NHASHES: usize = 2;
-
-#[inline]
-fn compute_nbins(n: usize) -> usize {
-    (2.4 * (n as f64)).ceil() as usize
-}
-#[inline]
-fn compute_stashsize(n: usize) -> Result<usize, Error> {
-    let stashsize = if n <= 1 << 8 {
-        8
-    } else if n <= 1 << 12 {
-        5
-    } else if n <= 1 << 16 {
-        3
-    } else if n <= 1 << 28 {
-        2
-    } else if n <= 1 << 32 {
-        4
-    } else {
-        return Err(Error::InvalidSetSize(n));
-    };
-    Ok(stashsize)
-}
-#[inline]
-fn compute_output_length(n: usize) -> Result<usize, Error> {
-    let len = if n <= 1 << 8 {
-        56
-    } else if n <= 1 << 12 {
-        64
-    } else if n <= 1 << 16 {
-        72
-    } else if n <= 1 << 20 {
-        80
-    } else if n <= 1 << 24 {
-        88
-    } else {
-        return Err(Error::InvalidSetSize(n));
-    };
-    Ok(len)
-}
-
-/// κ-Hamming correlation robust hash function.
-#[inline]
-pub fn khcr_hash(_: usize, x: Output, outlen: usize) -> Vec<u8> {
-    // XXX: insecure!
-    let mut output = vec![0u8; outlen];
-    for (output, byte) in output.iter_mut().zip(x.into_iter()) {
-        *output = byte;
-    }
-    output
 }
 
 impl<OPRF> PrivateSetIntersectionSender for PszPsiSender<OPRF>
@@ -107,34 +54,31 @@ where
         inputs: &[Self::Msg],
         mut rng: &mut RNG,
     ) -> Result<(), Error> {
-        let mut hashes = Vec::with_capacity(NHASHES);
         let mut hindices = Vec::with_capacity(NHASHES);
         // Compress inputs to fit in a `Block`.
         let inputs = compress_inputs(inputs);
         // Initialize hashes for cuckoo hash table.
         for i in 0..NHASHES {
-            let state = Block::read(reader)?;
-            hashes.push(AesHash::new(state));
             let index = Block::from(i as u128);
             hindices.push(index);
         }
+        let key = Block::read(reader)?;
+        let aes = Aes128::new(key);
         let nbins = stream::read_usize(reader)?;
         let stashsize = stream::read_usize(reader)?;
-        let outlen = compute_output_length(inputs.len())?;
         let seeds = self.oprf.send(reader, writer, nbins + stashsize, rng)?;
-        // For each `hᵢ`, construct set `Hᵢ = {F(k_{hᵢ(x)}, x) | x ∈ X)}`,
+        // For each `hᵢ`, construct set `Hᵢ = {F(k_{hᵢ(x)}, x || i) | x ∈ X)}`,
         // randomly permute it, and send it to the receiver.
-        // let start = SystemTime::now();
-        for (hash, i) in hashes.into_iter().zip(hindices.into_iter()) {
+        for (i, hidx) in hindices.into_iter().enumerate() {
             let mut outputs = inputs
                 .iter()
-                .enumerate()
-                .map(|(j, input)| {
-                    // Compute `k_{hᵢ(x)}`.
-                    let key_index = CuckooHash::hash_with_state(*input, &hash, nbins);
-                    // Compute `F(k_{hᵢ(x)}, x || i)`.
-                    let input = *input ^ i;
-                    self.oprf.compute(&seeds[key_index], &input)
+                .map(|input| {
+                    // Compute `bin := hᵢ(x)`.
+                    let hash = aes.encrypt(*input);
+                    let bin = CuckooHash::bin(hash, i, nbins);
+                    // Output `F(k_{hᵢ(x)}, x || i)`.
+                    let input = *input ^ hidx;
+                    self.oprf.compute(&seeds[bin], &input)
                 })
                 .collect::<Vec<Output>>();
             outputs.shuffle(&mut rng);
@@ -150,8 +94,7 @@ where
             // We don't need to append any hash index to OPRF inputs in the stash.
             let mut outputs = inputs
                 .iter()
-                .enumerate()
-                .map(|(j, input)| self.oprf.compute(&seeds[nbins + i], input))
+                .map(|input| self.oprf.compute(&seeds[nbins + i], input))
                 .collect::<Vec<Output>>();
             outputs.shuffle(&mut rng);
             for output in outputs.iter() {
@@ -196,26 +139,20 @@ where
         let hindices = (0..NHASHES)
             .map(|i| Block::from(i as u128))
             .collect::<Vec<Block>>();
-        let states = (0..NHASHES)
-            .map(|_| rand::random::<Block>())
-            .collect::<Vec<Block>>();
-
+        let key = rand::random::<Block>();
         let n = inputs.len();
-        let nbins = compute_nbins(n);
-        let stashsize = compute_stashsize(n)?;
-        let outlen = compute_output_length(n)?;
-        let tbl = make_hash_table(nbins, stashsize, &inputs_, &states)?;
-        for state in states.into_iter() {
-            state.write(writer)?;
-        }
+        let tbl = CuckooHash::build(&inputs_, key)?;
+        let nbins = tbl.nbins;
+        let stashsize = tbl.stashsize;
+
+        key.write(writer)?;
         stream::write_usize(writer, nbins)?;
         stream::write_usize(writer, stashsize)?;
         writer.flush()?;
         // Set up inputs to use `x || i` or `x` depending on whether the input
         // is in a bin or the stash.
         let inputs_ = tbl
-            .items
-            .iter()
+            .items()
             .filter_map(|(item, _, hidx)| {
                 if let Some(item) = item {
                     if let Some(hidx) = hidx {
@@ -230,7 +167,6 @@ where
             .collect::<Vec<Block>>();
         let outputs = self.oprf.receive(reader, writer, &inputs_, rng)?;
         // Receive all the sets from the sender.
-        // let start = SystemTime::now();
         let mut hs = (0..NHASHES)
             .map(|_| HashSet::with_capacity(n))
             .collect::<Vec<HashSet<Output>>>();
@@ -240,26 +176,19 @@ where
         for h in hs.iter_mut() {
             for _ in 0..n {
                 let buf = Output::read(reader)?;
-                // let mut buf = vec![0u8; outlen];
-                // reader.read_exact(&mut buf)?;
                 h.insert(buf);
             }
         }
         for s in ss.iter_mut() {
             for _ in 0..n {
                 let buf = Output::read(reader)?;
-                // let mut buf = vec![0u8; outlen];
-                // reader.read_exact(&mut buf)?;
                 s.insert(buf);
             }
         }
         // Iterate through each input/output pair and see whether it exists in
         // the appropriate set.
-        let outputs = outputs.into_iter();
-        // .enumerate()
-        // .map(|(j, output)| khcr_hash(j, output, outlen));
         let mut intersection = Vec::with_capacity(n);
-        for (i, (&item, output)) in tbl.items.iter().zip(outputs).enumerate() {
+        for (i, (&item, output)) in tbl.items().zip(outputs.into_iter()).enumerate() {
             let (_, idx, hidx) = item;
             if let Some(hidx) = hidx {
                 // We have a bin item.
@@ -303,21 +232,6 @@ fn compress_inputs(inputs: &[Vec<u8>]) -> Vec<Block> {
         compressed.push(Block::from(digest));
     }
     compressed
-}
-
-#[inline]
-fn make_hash_table(
-    nbins: usize,
-    stashsize: usize,
-    inputs: &[Block],
-    states: &[Block],
-) -> Result<CuckooHash, Error> {
-    let mut tbl = CuckooHash::new(nbins, stashsize, states);
-    for (j, input) in inputs.iter().enumerate() {
-        tbl.hash(*input, j)?;
-    }
-    tbl.fill(Default::default());
-    Ok(tbl)
 }
 
 use ocelot::kkrt;
