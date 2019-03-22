@@ -218,6 +218,26 @@
 <span id="218">218</span>
 <span id="219">219</span>
 <span id="220">220</span>
+<span id="221">221</span>
+<span id="222">222</span>
+<span id="223">223</span>
+<span id="224">224</span>
+<span id="225">225</span>
+<span id="226">226</span>
+<span id="227">227</span>
+<span id="228">228</span>
+<span id="229">229</span>
+<span id="230">230</span>
+<span id="231">231</span>
+<span id="232">232</span>
+<span id="233">233</span>
+<span id="234">234</span>
+<span id="235">235</span>
+<span id="236">236</span>
+<span id="237">237</span>
+<span id="238">238</span>
+<span id="239">239</span>
+<span id="240">240</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="doccomment">//! Errors that may be outputted by this library.</span>
 
@@ -307,6 +327,26 @@
                 <span class="string">&quot;uninitialized value in circuit. is the circuit topologically sorted?&quot;</span>.<span class="ident">fmt</span>(<span class="ident">f</span>)
             }
             <span class="ident">FancyError</span>::<span class="ident">ClientError</span>(<span class="ident">e</span>) <span class="op">=&gt;</span> <span class="macro">write</span><span class="macro">!</span>(<span class="ident">f</span>, <span class="string">&quot;client error: {}&quot;</span>, <span class="ident">e</span>),
+        }
+    }
+}
+
+<span class="kw">impl</span> <span class="op">&lt;</span><span class="ident">A</span><span class="op">&gt;</span> <span class="ident">FancyError</span><span class="op">&lt;</span><span class="ident">A</span><span class="op">&gt;</span> {
+    <span class="doccomment">/// Map the underlying client error type.</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// Useful for wrapping errors from fancy objects.</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">map_client_err</span><span class="op">&lt;</span><span class="ident">B</span><span class="op">&gt;</span>(<span class="self">self</span>, <span class="ident">f</span>: <span class="kw">impl</span> <span class="ident">Fn</span>(<span class="ident">A</span>) <span class="op">-&gt;</span> <span class="ident">B</span>) <span class="op">-&gt;</span> <span class="ident">FancyError</span><span class="op">&lt;</span><span class="ident">B</span><span class="op">&gt;</span> {
+        <span class="kw">match</span> <span class="self">self</span> {
+            <span class="ident">FancyError</span>::<span class="ident">UnequalModuli</span> <span class="op">=&gt;</span> <span class="ident">FancyError</span>::<span class="ident">UnequalModuli</span>,
+            <span class="ident">FancyError</span>::<span class="ident">NotImplemented</span> <span class="op">=&gt;</span> <span class="ident">FancyError</span>::<span class="ident">NotImplemented</span>,
+            <span class="ident">FancyError</span>::<span class="ident">InvalidArg</span> { <span class="ident">desc</span> } <span class="op">=&gt;</span> <span class="ident">FancyError</span>::<span class="ident">InvalidArg</span> { <span class="ident">desc</span> },
+            <span class="ident">FancyError</span>::<span class="ident">InvalidArgNum</span> { <span class="ident">got</span>, <span class="ident">needed</span> } <span class="op">=&gt;</span> <span class="ident">FancyError</span>::<span class="ident">InvalidArgNum</span> { <span class="ident">got</span>, <span class="ident">needed</span> },
+            <span class="ident">FancyError</span>::<span class="ident">InvalidArgMod</span> { <span class="ident">got</span>, <span class="ident">needed</span> } <span class="op">=&gt;</span> <span class="ident">FancyError</span>::<span class="ident">InvalidArgMod</span> { <span class="ident">got</span>, <span class="ident">needed</span> },
+            <span class="ident">FancyError</span>::<span class="ident">ArgNotBinary</span> <span class="op">=&gt;</span> <span class="ident">FancyError</span>::<span class="ident">ArgNotBinary</span>,
+            <span class="ident">FancyError</span>::<span class="ident">NoTruthTable</span> <span class="op">=&gt;</span> <span class="ident">FancyError</span>::<span class="ident">NoTruthTable</span>,
+            <span class="ident">FancyError</span>::<span class="ident">InvalidTruthTable</span> <span class="op">=&gt;</span> <span class="ident">FancyError</span>::<span class="ident">InvalidTruthTable</span>,
+            <span class="ident">FancyError</span>::<span class="ident">UninitializedValue</span> <span class="op">=&gt;</span> <span class="ident">FancyError</span>::<span class="ident">UninitializedValue</span>,
+            <span class="ident">FancyError</span>::<span class="ident">ClientError</span>(<span class="ident">e</span>) <span class="op">=&gt;</span> <span class="ident">FancyError</span>::<span class="ident">ClientError</span>(<span class="ident">f</span>(<span class="ident">e</span>)),
         }
     }
 }
