@@ -8,7 +8,7 @@
 //! protocol (cf. <https://eprint.iacr.org/2014/447>) as specified by
 //! Kolesnikov-Kumaresan-Rosulek-Trieu (cf. <https://eprint.iacr.org/2016/799>).
 //!
-//! The current implementation does not hash the output of the (relaxed) OPRF
+//! The current implementation does not hash the output of the (relaxed) OPRF.
 
 use crate::cuckoo::{CuckooHash, NHASHES};
 use crate::stream;
@@ -54,22 +54,17 @@ where
         inputs: &[Self::Msg],
         mut rng: &mut RNG,
     ) -> Result<(), Error> {
-        let mut hindices = Vec::with_capacity(NHASHES);
-        // Compress inputs to fit in a `Block`.
         let inputs = compress_inputs(inputs);
-        // Initialize hashes for cuckoo hash table.
-        for i in 0..NHASHES {
-            let index = Block::from(i as u128);
-            hindices.push(index);
-        }
         let key = Block::read(reader)?;
         let aes = Aes128::new(key);
         let nbins = stream::read_usize(reader)?;
         let stashsize = stream::read_usize(reader)?;
         let seeds = self.oprf.send(reader, writer, nbins + stashsize, rng)?;
+
         // For each `hᵢ`, construct set `Hᵢ = {F(k_{hᵢ(x)}, x || i) | x ∈ X)}`,
         // randomly permute it, and send it to the receiver.
-        for (i, hidx) in hindices.into_iter().enumerate() {
+        let hindices = (0..NHASHES).map(|i| Block::from(i as u128));
+        for (i, hidx) in hindices.enumerate() {
             let mut outputs = inputs
                 .iter()
                 .map(|input| {
@@ -77,14 +72,13 @@ where
                     let hash = aes.encrypt(*input);
                     let bin = CuckooHash::bin(hash, i, nbins);
                     // Output `F(k_{hᵢ(x)}, x || i)`.
-                    let input = *input ^ hidx;
-                    self.oprf.compute(&seeds[bin], &input)
+                    let hash = hash ^ hidx;
+                    self.oprf.compute(&seeds[bin], &hash)
                 })
                 .collect::<Vec<Output>>();
             outputs.shuffle(&mut rng);
             for output in outputs.iter() {
                 output.write(writer)?;
-                // writer.write_all(output)?;
             }
         }
         // For each `i ∈ {1, ..., stashsize}`, construct set `Sᵢ =
@@ -99,7 +93,6 @@ where
             outputs.shuffle(&mut rng);
             for output in outputs.iter() {
                 output.write(writer)?;
-                // writer.write_all(output)?;
             }
         }
         writer.flush()?;
@@ -134,17 +127,16 @@ where
         W: Write + Send,
         RNG: CryptoRng + RngCore,
     {
-        // Compress inputs to fit in a `Block`.
-        let inputs_ = compress_inputs(inputs);
-        let hindices = (0..NHASHES)
-            .map(|i| Block::from(i as u128))
-            .collect::<Vec<Block>>();
-        let key = rand::random::<Block>();
         let n = inputs.len();
+        let inputs_ = compress_inputs(inputs);
+        let key = rand::random::<Block>();
         let tbl = CuckooHash::build(&inputs_, key)?;
         let nbins = tbl.nbins;
         let stashsize = tbl.stashsize;
-
+        let hindices = (0..NHASHES)
+            .map(|i| Block::from(i as u128))
+            .collect::<Vec<Block>>();
+        // Send cuckoo hash info to sender.
         key.write(writer)?;
         stream::write_usize(writer, nbins)?;
         stream::write_usize(writer, stashsize)?;
@@ -156,12 +148,14 @@ where
             .filter_map(|(item, _, hidx)| {
                 if let Some(item) = item {
                     if let Some(hidx) = hidx {
+                        // Item in bin.
                         Some(*item ^ hindices[*hidx])
                     } else {
+                        // Item in stash.
                         Some(*item)
                     }
                 } else {
-                    None
+                    Some(Default::default())
                 }
             })
             .collect::<Vec<Block>>();
@@ -247,6 +241,7 @@ mod tests {
     use scuttlebutt::AesRng;
     use std::io::{BufReader, BufWriter};
     use std::os::unix::net::UnixStream;
+    use std::time::SystemTime;
 
     const SIZE: usize = 16;
     const NTIMES: usize = 1 << 16;
@@ -269,17 +264,55 @@ mod tests {
             let mut reader = BufReader::new(sender.try_clone().unwrap());
             let mut writer = BufWriter::new(sender);
             let mut psi = PszSender::init(&mut reader, &mut writer, &mut rng).unwrap();
+            let start = SystemTime::now();
             psi.send(&mut reader, &mut writer, &sender_inputs, &mut rng)
                 .unwrap();
+            println!(
+                "[{}] Sender time: {} ms",
+                NTIMES,
+                start.elapsed().unwrap().as_millis()
+            );
         });
         let mut rng = AesRng::new();
         let mut reader = BufReader::new(receiver.try_clone().unwrap());
         let mut writer = BufWriter::new(receiver);
         let mut psi = PszReceiver::init(&mut reader, &mut writer, &mut rng).unwrap();
+        let start = SystemTime::now();
         let intersection = psi
             .receive(&mut reader, &mut writer, &receiver_inputs, &mut rng)
             .unwrap();
+        println!(
+            "[{}] Receiver time: {} ms",
+            NTIMES,
+            start.elapsed().unwrap().as_millis()
+        );
         handle.join().unwrap();
         assert_eq!(intersection.len(), NTIMES);
+    }
+}
+
+#[cfg(all(feature = "nightly", test))]
+mod benchmarks {
+    extern crate test;
+    use super::*;
+    use test::Bencher;
+
+    const SIZE: usize = 16;
+    const NTIMES: usize = 1 << 16;
+
+    fn rand_vec(n: usize) -> Vec<u8> {
+        (0..n).map(|_| rand::random::<u8>()).collect()
+    }
+
+    fn rand_vec_vec(size: usize) -> Vec<Vec<u8>> {
+        (0..size).map(|_| rand_vec(SIZE)).collect()
+    }
+
+    #[bench]
+    fn bench_compress_inputs(b: &mut Bencher) {
+        let inputs = rand_vec_vec(NTIMES);
+        b.iter(|| {
+            let _ = compress_inputs(&inputs);
+        });
     }
 }

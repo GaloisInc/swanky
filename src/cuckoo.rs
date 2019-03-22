@@ -50,21 +50,21 @@ fn compute_stashsize(n: usize) -> Result<usize, Error> {
 impl CuckooHash {
     pub fn build(inputs: &[Block], key: Block) -> Result<Self, Error> {
         let nbins = compute_nbins(inputs.len());
+        // We don't support more than 2**32 bins due to the way we compute the
+        // bin number (cf. the `bin` function below).
+        if nbins >= 1 << 32 {
+            return Err(Error::InvalidSetSize(inputs.len()));
+        }
         let stashsize = compute_stashsize(inputs.len())?;
         let mut tbl = CuckooHash::_build(nbins, stashsize, key)?;
+        // Fill table with `inputs`
         for (j, input) in inputs.iter().enumerate() {
             tbl.hash(*input, j)?;
         }
-        tbl.fill(Default::default());
         Ok(tbl)
     }
 
     fn _build(nbins: usize, stashsize: usize, key: Block) -> Result<Self, Error> {
-        // We don't support more than 2**32 bins due to the way we compute the
-        // bin number (cf. the `bin` function below).
-        if nbins >= 1 << 32 {
-            return Err(Error::UnsupportedBinLength(nbins));
-        }
         let items = vec![(None, None, None); nbins + stashsize];
         let hashfn = Aes128::new(key);
         Ok(Self {
@@ -110,15 +110,6 @@ impl CuckooHash {
         let value: u32 =
             unsafe { std::mem::transmute(*array_ref![bytes[4 * hidx..4 * (hidx + 1)], 0, 4]) };
         (value as usize) % nbins
-    }
-
-    fn fill(&mut self, value: Block) {
-        for item in self.items.iter_mut() {
-            match item.0 {
-                Some(_) => (),
-                None => *item = (Some(value), None, None),
-            }
-        }
     }
 
     pub fn items(&self) -> std::slice::Iter<(Option<Block>, Option<usize>, Option<usize>)> {

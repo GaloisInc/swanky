@@ -61,9 +61,9 @@ fn _bench_psz(inputs1: Vec<Vec<u8>>, inputs2: Vec<Vec<u8>>) -> Vec<Vec<u8>> {
 }
 
 fn bench_oprf(c: &mut Criterion) {
-    // c.bench_function("psi::PSZ (initialization)", move |bench| {
-    //     bench.iter(|| _bench_psz_init())
-    // });
+    c.bench_function("psi::PSZ (initialization)", move |bench| {
+        bench.iter(|| _bench_psz_init())
+    });
     c.bench_function("psi::PSZ (n = 2^8)", move |bench| {
         let rs = rand_vec_vec(1 << 8);
         bench.iter(|| {
