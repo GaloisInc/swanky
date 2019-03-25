@@ -17,14 +17,16 @@ use crate::{
 use arrayref::array_ref;
 use rand::CryptoRng;
 use rand_core::{RngCore, SeedableRng};
+use scuttlebutt::utils as scutils;
 use scuttlebutt::{AesRng, Block, SemiHonest};
 use std::hash::{Hash, Hasher};
 use std::io::{Read, Write};
 use std::marker::PhantomData;
 
-pub struct Seed([u8; 64]);
 #[derive(Clone, Copy)]
-pub struct Output([u8; 64]);
+pub struct Seed(pub [u8; 64]);
+#[derive(Clone, Copy)]
+pub struct Output(pub [u8; 64]);
 
 impl Default for Seed {
     fn default() -> Self {
@@ -36,8 +38,7 @@ impl Output {
     pub fn read<R: Read>(reader: &mut R) -> Result<Self, Error> {
         let mut data = [0u8; 64];
         reader.read_exact(&mut data)?;
-        let output = unsafe { std::mem::transmute(data) };
-        Ok(Self(output))
+        Ok(Self(data))
     }
 
     pub fn write<W: Write>(&self, writer: &mut W) -> Result<(), Error> {
@@ -46,9 +47,12 @@ impl Output {
     }
 }
 
-impl std::fmt::Debug for Output {
+impl std::fmt::Display for Output {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "Output {{ {:?} }}", self.0.to_vec())
+        self.0
+            .iter()
+            .map(|byte| write!(f, "{:02X}", byte))
+            .collect::<std::fmt::Result>()
     }
 }
 
@@ -162,9 +166,9 @@ impl<OT: ObliviousTransferReceiver<Msg = Block> + SemiHonest> ObliviousPrfSender
             stream::read_bytes_inplace(reader, &mut t0)?;
             stream::read_bytes_inplace(reader, &mut t1)?;
             if *b {
-                utils::xor_inplace(&mut q, &t1);
+                scutils::xor_inplace(&mut q, &t1);
             } else {
-                utils::xor_inplace(&mut q, &t0);
+                scutils::xor_inplace(&mut q, &t0);
             }
         }
         let qs = utils::transpose(&qs, ncols, nrows);
@@ -175,11 +179,30 @@ impl<OT: ObliviousTransferReceiver<Msg = Block> + SemiHonest> ObliviousPrfSender
         Ok(seeds)
     }
 
-    fn compute(&self, seed: &Self::Seed, input: &Self::Input) -> Self::Output {
-        let c = self.code.encode(*input);
-        let tmp = utils::and(&c, &self.s_);
-        let out = utils::xor(&seed.0, &tmp);
-        Output(*array_ref![out, 0, 64])
+    #[inline]
+    fn compute(&self, seed: Self::Seed, input: Self::Input) -> Self::Output {
+        let mut out = Output([0u8; 64]);
+        self.encode(input, &mut out);
+        scutils::xor_inplace(&mut out.0, &seed.0);
+        out
+    }
+
+    #[inline]
+    fn encode(&self, input: Self::Input, output: &mut Self::Output) {
+        self.code.encode(input, &mut output.0);
+        scutils::and_inplace(&mut output.0, &self.s_);
+    }
+}
+
+impl<OT: ObliviousTransferReceiver<Msg = Block> + SemiHonest> KkrtOPRFSender<OT> {
+    #[inline]
+    fn encode(
+        &self,
+        input: <KkrtOPRFSender<OT> as ObliviousPrf>::Input,
+        output: &mut <KkrtOPRFSender<OT> as ObliviousPrf>::Output,
+    ) {
+        self.code.encode(input, &mut output.0);
+        scutils::and_inplace(&mut output.0, &self.s_);
     }
 }
 
@@ -233,10 +256,10 @@ impl<OT: ObliviousTransferSender<Msg = Block> + SemiHonest> ObliviousPrfReceiver
         &mut self,
         _: &mut R,
         writer: &mut W,
-        selections: &[Self::Input],
+        inputs: &[Self::Input],
         rng: &mut RNG,
     ) -> Result<Vec<Self::Output>, Error> {
-        let m = selections.len();
+        let m = inputs.len();
         // Round up if necessary so that `m mod 16 ≡ 0`.
         let m = if m % 16 != 0 { m + (16 - m % 16) } else { m };
         let (nrows, ncols) = (m, 512);
@@ -247,11 +270,12 @@ impl<OT: ObliviousTransferSender<Msg = Block> + SemiHonest> ObliviousPrfReceiver
             .map(|c| Output(*array_ref![c, 0, 64]))
             .collect::<Vec<Output>>();
         let mut t1s = t0s.clone();
-        for (j, r) in selections.iter().enumerate() {
+        let mut c = [0u8; 64];
+        for (j, r) in inputs.iter().enumerate() {
             let range = j * ncols / 8..(j + 1) * ncols / 8;
             let mut t1 = &mut t1s[range];
-            let c = self.code.encode(*r);
-            utils::xor_inplace(&mut t1, &c);
+            self.code.encode(*r, &mut c);
+            scutils::xor_inplace(&mut t1, &c);
         }
         let t0s = utils::transpose(&t0s, nrows, ncols);
         let t1s = utils::transpose(&t1s, nrows, ncols);
@@ -262,10 +286,10 @@ impl<OT: ObliviousTransferSender<Msg = Block> + SemiHonest> ObliviousPrfReceiver
             let range = j * nrows / 8..(j + 1) * nrows / 8;
             let t1 = &t1s[range];
             self.rngs[j].0.fill_bytes(&mut t);
-            utils::xor_inplace(&mut t, &t0);
+            scutils::xor_inplace(&mut t, &t0);
             stream::write_bytes(writer, &t)?;
             self.rngs[j].1.fill_bytes(&mut t);
-            utils::xor_inplace(&mut t, &t1);
+            scutils::xor_inplace(&mut t, &t1);
             stream::write_bytes(writer, &t)?;
         }
         writer.flush()?;
@@ -289,7 +313,6 @@ mod tests {
     extern crate test;
     use super::*;
     use crate::oprf::ObliviousPrfReceiver;
-    use crate::ot::chou_orlandi;
     use scuttlebutt::AesRng;
     use std::io::{BufReader, BufWriter};
     use std::os::unix::net::UnixStream;
@@ -298,9 +321,6 @@ mod tests {
     fn rand_block_vec(size: usize) -> Vec<Block> {
         (0..size).map(|_| rand::random::<Block>()).collect()
     }
-
-    type KkrtSender = KkrtOPRFSender<chou_orlandi::ChouOrlandiOTReceiver>;
-    type KkrtReceiver = KkrtOPRFReceiver<chou_orlandi::ChouOrlandiOTSender>;
 
     fn _test_oprf(n: usize) {
         let selections = rand_block_vec(n);
@@ -317,8 +337,8 @@ mod tests {
             let mut results = results.lock().unwrap();
             *results = selections_
                 .iter()
-                .zip(seeds.iter())
-                .map(|(inp, seed)| oprf.compute(seed, inp))
+                .zip(seeds.into_iter())
+                .map(|(inp, seed)| oprf.compute(seed, *inp))
                 .collect::<Vec<Output>>();
         });
         let mut rng = AesRng::new();

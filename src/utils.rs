@@ -7,29 +7,6 @@
 use scuttlebutt::Block;
 
 #[inline]
-pub fn xor_inplace(a: &mut [u8], b: &[u8]) {
-    for i in 0..a.len() {
-        a[i] ^= b[i];
-    }
-}
-
-#[inline]
-pub fn xor(a: &[u8], b: &[u8]) -> Vec<u8> {
-    a.iter()
-        .zip(b.iter())
-        .map(|(a, b)| a ^ b)
-        .collect::<Vec<u8>>()
-}
-
-#[inline]
-pub fn and(a: &[u8], b: &[u8]) -> Vec<u8> {
-    a.iter()
-        .zip(b.iter())
-        .map(|(a, b)| a & b)
-        .collect::<Vec<u8>>()
-}
-
-#[inline]
 pub fn transpose(m: &[u8], nrows: usize, ncols: usize) -> Vec<u8> {
     let m_ = vec![0u8; nrows * ncols / 8];
     unsafe {
@@ -105,14 +82,6 @@ mod tests {
         let v__ = boolvec_to_u8vec(&v_);
         assert_eq!(v, v__);
     }
-
-    #[test]
-    fn test_and() {
-        let v = (0..128).map(|_| rand::random::<u8>()).collect::<Vec<u8>>();
-        let v_ = (0..128).map(|_| 0xFF).collect::<Vec<u8>>();
-        let v__ = and(&v, &v_);
-        assert_eq!(v__, v);
-    }
 }
 
 #[cfg(all(feature = "nightly", test))]
@@ -120,13 +89,6 @@ mod benchmarks {
     extern crate test;
     use super::*;
     use test::Bencher;
-
-    #[bench]
-    fn bench_xor_inplace(b: &mut Bencher) {
-        let mut x = (0..128).map(|_| rand::random::<u8>()).collect::<Vec<u8>>();
-        let y = (0..128).map(|_| rand::random::<u8>()).collect::<Vec<u8>>();
-        b.iter(|| xor_inplace(&mut x, &y));
-    }
 
     #[bench]
     fn bench_tranpose(b: &mut Bencher) {

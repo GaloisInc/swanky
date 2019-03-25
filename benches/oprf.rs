@@ -74,7 +74,7 @@ fn bench_oprf_compute(c: &mut Criterion) {
         handle.join().unwrap();
         let seed = Seed::default();
         let input = rand::random::<Block>();
-        bench.iter(|| oprf.compute(&seed, &input))
+        bench.iter(|| oprf.compute(seed.clone(), input))
     });
 }
 

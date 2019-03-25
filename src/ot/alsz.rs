@@ -17,6 +17,7 @@ use crate::{
 use arrayref::array_ref;
 use rand::CryptoRng;
 use rand_core::{RngCore, SeedableRng};
+use scuttlebutt::utils as scutils;
 use scuttlebutt::{AesHash, AesRng, Block, SemiHonest};
 use std::io::{ErrorKind, Read, Write};
 use std::marker::PhantomData;
@@ -62,7 +63,7 @@ impl<OT: ObliviousTransferReceiver<Msg = Block> + SemiHonest> AlszOTSender<OT> {
             };
             let rng = &mut rng;
             rng.fill_bytes(&mut q);
-            utils::xor_inplace(&mut q, &u);
+            scutils::xor_inplace(&mut q, &u);
         }
         Ok(utils::transpose(&qs, nrows, ncols))
     }
@@ -194,8 +195,8 @@ impl<OT: ObliviousTransferSender<Msg = Block> + SemiHonest> AlszOTReceiver<OT> {
             let mut t = &mut ts[range];
             self.rngs[j].0.fill_bytes(&mut t);
             self.rngs[j].1.fill_bytes(&mut g);
-            utils::xor_inplace(&mut g, &t);
-            utils::xor_inplace(&mut g, &r);
+            scutils::xor_inplace(&mut g, &t);
+            scutils::xor_inplace(&mut g, &r);
             stream::write_bytes(writer, &g)?;
             writer.flush()?;
         }
