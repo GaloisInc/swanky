@@ -150,6 +150,20 @@ impl PartialEq for Block {
     }
 }
 
+impl Eq for Block {}
+
+impl Ord for Block {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        u128::from(*self).cmp(&u128::from(*other))
+    }
+}
+
+impl PartialOrd for Block {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(u128::from(*self).cmp(&u128::from(*other)))
+    }
+}
+
 impl AsRef<[u8]> for Block {
     #[inline]
     fn as_ref(&self) -> &[u8] {

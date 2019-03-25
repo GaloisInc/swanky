@@ -22,6 +22,7 @@ mod aes;
 mod block;
 mod hash_aes;
 mod rand_aes;
+pub mod utils;
 
 pub use crate::aes::Aes128;
 pub use crate::block::Block;
