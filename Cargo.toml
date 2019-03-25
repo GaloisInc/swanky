@@ -43,7 +43,6 @@ debug = false
 debug-assertions = false
 overflow-checks = false
 
-
 [[bench]]
 name = "psi"
 harness = false

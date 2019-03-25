@@ -19,7 +19,7 @@ use ocelot::{ObliviousPrfReceiver, ObliviousPrfSender};
 use rand::seq::SliceRandom;
 use rand::{CryptoRng, RngCore};
 use scuttlebutt::utils as scutils;
-use scuttlebutt::{Aes128, Block};
+use scuttlebutt::{Aes128, Block, SemiHonest};
 use sha2::{Digest, Sha256};
 use std::collections::HashSet;
 use std::io::{Read, Write};
@@ -52,6 +52,7 @@ impl PrivateSetIntersectionSender for PszPsiSender {
         inputs: &[Self::Msg],
         mut rng: &mut RNG,
     ) -> Result<(), Error> {
+        // XXX: do we need to do cointossing here?
         let key = Block::read(reader)?;
         let aes = Aes128::new(key);
         let mut inputs = compress_and_hash_inputs(inputs, &aes);
@@ -61,10 +62,10 @@ impl PrivateSetIntersectionSender for PszPsiSender {
         let seeds = self.oprf.send(reader, writer, nbins + stashsize, rng)?;
         // For each `hᵢ`, construct set `Hᵢ = {F(k_{hᵢ(x)}, x || i) | x ∈ X)}`,
         // randomly permute it, and send it to the receiver.
+        let mut encoded = Output([0u8; 64]);
         for i in 0..NHASHES {
             inputs.shuffle(&mut rng);
             let hidx = Block::from(i as u128);
-            let mut encoded = Output([0u8; 64]);
             for input in &inputs {
                 // Compute `bin := hᵢ(x)`.
                 let bin = CuckooHash::bin(*input, i, nbins);
@@ -211,29 +212,27 @@ impl PrivateSetIntersectionReceiver for PszPsiReceiver {
 // as zero. We need to leave 8 bits free in order to add in the hash index when
 // running the OPRF (cf. <https://eprint.iacr.org/2016/799>, §5.2).
 fn compress_and_hash_inputs(inputs: &[Vec<u8>], aes: &Aes128) -> Vec<Block> {
-    let mut compressed = Vec::with_capacity(inputs.len());
-    for input in inputs.iter() {
-        let mut digest = [0u8; 16];
-        if input.len() < 16 {
-            // Map `input` directly to a `Block`
-            for (byte, result) in input.iter().zip(digest.iter_mut()) {
-                *result = *byte;
+    let mut hasher = Sha256::new(); // XXX can we do better than using SHA-256?
+    inputs
+        .iter()
+        .map(|input| {
+            let mut digest = [0u8; 16];
+            if input.len() < 16 {
+                // Map `input` directly to a `Block`.
+                digest[0..input.len()].copy_from_slice(input);
+            } else {
+                // Hash `input` first.
+                hasher.input(input);
+                let h = hasher.result_reset();
+                digest[0..15].copy_from_slice(&h[0..15]);
             }
-        } else {
-            // Hash `input` first
-            let mut hasher = Sha256::new();
-            hasher.input(input);
-            let h = hasher.result();
-            for (result, byte) in digest.iter_mut().zip(h.into_iter()) {
-                *result = byte;
-            }
-            digest[15] = 0u8;
-        }
-        let digest = aes.encrypt(Block::from(digest));
-        compressed.push(digest);
-    }
-    compressed
+            aes.encrypt(Block::from(digest))
+        })
+        .collect::<Vec<Block>>()
 }
+
+impl SemiHonest for PszPsiSender {}
+impl SemiHonest for PszPsiReceiver {}
 
 use ocelot::kkrt;
 
@@ -263,6 +262,13 @@ mod tests {
     }
 
     #[test]
+    fn test_compress_and_hash_inputs() {
+        let aes = Aes128::new(rand::random::<Block>());
+        let inputs = rand_vec_vec(13);
+        let _ = compress_and_hash_inputs(&inputs, &aes);
+    }
+
+    #[test]
     fn test_psi() {
         let (sender, receiver) = UnixStream::pair().unwrap();
         let sender_inputs = rand_vec_vec(NTIMES);
@@ -271,12 +277,17 @@ mod tests {
             let mut rng = AesRng::new();
             let mut reader = BufReader::new(sender.try_clone().unwrap());
             let mut writer = BufWriter::new(sender);
+            let start = SystemTime::now();
             let mut psi = PszSender::init(&mut reader, &mut writer, &mut rng).unwrap();
+            println!(
+                "Sender init time: {} ms",
+                start.elapsed().unwrap().as_millis()
+            );
             let start = SystemTime::now();
             psi.send(&mut reader, &mut writer, &sender_inputs, &mut rng)
                 .unwrap();
             println!(
-                "[{}] Sender time: {} ms",
+                "[{}] Send time: {} ms",
                 NTIMES,
                 start.elapsed().unwrap().as_millis()
             );
@@ -284,7 +295,12 @@ mod tests {
         let mut rng = AesRng::new();
         let mut reader = BufReader::new(receiver.try_clone().unwrap());
         let mut writer = BufWriter::new(receiver);
+        let start = SystemTime::now();
         let mut psi = PszReceiver::init(&mut reader, &mut writer, &mut rng).unwrap();
+        println!(
+            "Receiver init time: {} ms",
+            start.elapsed().unwrap().as_millis()
+        );
         let start = SystemTime::now();
         let intersection = psi
             .receive(&mut reader, &mut writer, &receiver_inputs, &mut rng)
@@ -305,24 +321,34 @@ mod benchmarks {
     use super::*;
     use test::Bencher;
 
-    const SIZE: usize = 16;
     const NTIMES: usize = 1 << 16;
 
     fn rand_vec(n: usize) -> Vec<u8> {
         (0..n).map(|_| rand::random::<u8>()).collect()
     }
 
-    fn rand_vec_vec(size: usize) -> Vec<Vec<u8>> {
-        (0..size).map(|_| rand_vec(SIZE)).collect()
+    fn rand_vec_vec(n: usize, size: usize) -> Vec<Vec<u8>> {
+        (0..n).map(|_| rand_vec(size)).collect()
     }
 
     #[bench]
-    fn bench_compress_inputs(b: &mut Bencher) {
-        let inputs = rand_vec_vec(NTIMES);
+    fn bench_compress_and_hash_inputs_small(b: &mut Bencher) {
+        let inputs = rand_vec_vec(NTIMES, 15);
         let key = rand::random::<Block>();
         let aes = Aes128::new(key);
         b.iter(|| {
             let _ = compress_and_hash_inputs(&inputs, &aes);
         });
     }
+
+    #[bench]
+    fn bench_compress_and_hash_inputs_large(b: &mut Bencher) {
+        let inputs = rand_vec_vec(NTIMES, 32);
+        let key = rand::random::<Block>();
+        let aes = Aes128::new(key);
+        b.iter(|| {
+            let _ = compress_and_hash_inputs(&inputs, &aes);
+        });
+    }
+
 }

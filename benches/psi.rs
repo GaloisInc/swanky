@@ -14,7 +14,7 @@ use std::io::{BufReader, BufWriter};
 use std::os::unix::net::UnixStream;
 use std::time::Duration;
 
-const SIZE: usize = 16;
+const SIZE: usize = 15;
 
 fn rand_vec(n: usize) -> Vec<u8> {
     (0..n).map(|_| rand::random::<u8>()).collect()
@@ -62,7 +62,10 @@ fn _bench_psz(inputs1: Vec<Vec<u8>>, inputs2: Vec<Vec<u8>>) -> Vec<Vec<u8>> {
 
 fn bench_psi(c: &mut Criterion) {
     c.bench_function("psi::PSZ (initialization)", move |bench| {
-        bench.iter(|| _bench_psz_init())
+        bench.iter(|| {
+            let result = _bench_psz_init();
+            criterion::black_box(result)
+        })
     });
     c.bench_function("psi::PSZ (n = 2^8)", move |bench| {
         let rs = rand_vec_vec(1 << 8);
@@ -85,13 +88,13 @@ fn bench_psi(c: &mut Criterion) {
             criterion::black_box(v)
         })
     });
-    c.bench_function("psi::PSZ (n = 2^20)", move |bench| {
-        let rs = rand_vec_vec(1 << 20);
-        bench.iter(|| {
-            let v = _bench_psz(rs.clone(), rs.clone());
-            criterion::black_box(v)
-        })
-    });
+    // c.bench_function("psi::PSZ (n = 2^20)", move |bench| {
+    //     let rs = rand_vec_vec(1 << 20);
+    //     bench.iter(|| {
+    //         let v = _bench_psz(rs.clone(), rs.clone());
+    //         criterion::black_box(v)
+    //     })
+    // });
 }
 
 criterion_group! {
