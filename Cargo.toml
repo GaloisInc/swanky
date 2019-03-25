@@ -12,14 +12,14 @@ edition = "2018"
 [lib]
 
 [features]
-nightly = ["rand/nightly", "scuttlebutt/nightly"]
+nightly = ["rand/nightly", "scuttlebutt/nightly", "ocelot/nightly"]
 
 [dependencies]
 arrayref = "*"
-ocelot = { path = "../ocelot", features = ["unstable"] }
+ocelot = { git = "https://github.com/amaloz/ocelot", features = ["unstable"] }
 rand = "*"
 rand_core = "*"
-scuttlebutt = { path = "../scuttlebutt"}
+scuttlebutt = { git = "https://github.com/amaloz/scuttlebutt"}
 sha2 = "*"
 
 [dev-dependencies]

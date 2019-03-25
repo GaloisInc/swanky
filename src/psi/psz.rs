@@ -14,7 +14,7 @@ use crate::cuckoo::{compute_masksize, CuckooHash, NHASHES};
 use crate::stream;
 use crate::Error;
 use crate::{PrivateSetIntersectionReceiver, PrivateSetIntersectionSender};
-use ocelot::kkrt::{Output, Seed};
+use ocelot::kkrt::Output;
 use ocelot::{ObliviousPrfReceiver, ObliviousPrfSender};
 use rand::seq::SliceRandom;
 use rand::{CryptoRng, RngCore};
@@ -25,18 +25,15 @@ use std::collections::HashSet;
 use std::io::{Read, Write};
 
 /// Private set intersection sender.
-pub struct PszPsiSender<OPRF: ObliviousPrfSender<Seed = Seed, Input = Block, Output = Output>> {
-    oprf: OPRF,
+pub struct PszPsiSender {
+    oprf: kkrt::KkrtSender,
 }
 /// Private set intersection receiver.
-pub struct PszPsiReceiver<OPRF: ObliviousPrfReceiver<Seed = Seed, Input = Block, Output = Output>> {
-    oprf: OPRF,
+pub struct PszPsiReceiver {
+    oprf: kkrt::KkrtReceiver,
 }
 
-impl<OPRF> PrivateSetIntersectionSender for PszPsiSender<OPRF>
-where
-    OPRF: ObliviousPrfSender<Seed = Seed, Input = Block, Output = Output>,
-{
+impl PrivateSetIntersectionSender for PszPsiSender {
     type Msg = Vec<u8>;
 
     fn init<R: Read + Send, W: Write + Send, RNG: CryptoRng + RngCore>(
@@ -44,7 +41,7 @@ where
         writer: &mut W,
         rng: &mut RNG,
     ) -> Result<Self, Error> {
-        let oprf = OPRF::init(reader, writer, rng)?;
+        let oprf = kkrt::KkrtSender::init(reader, writer, rng)?;
         Ok(Self { oprf })
     }
 
@@ -103,10 +100,7 @@ where
     }
 }
 
-impl<OPRF> PrivateSetIntersectionReceiver for PszPsiReceiver<OPRF>
-where
-    OPRF: ObliviousPrfReceiver<Seed = Seed, Input = Block, Output = Output>,
-{
+impl PrivateSetIntersectionReceiver for PszPsiReceiver {
     type Msg = Vec<u8>;
 
     fn init<R: Read + Send, W: Write + Send, RNG: CryptoRng + RngCore>(
@@ -114,7 +108,7 @@ where
         writer: &mut W,
         rng: &mut RNG,
     ) -> Result<Self, Error> {
-        let oprf = OPRF::init(reader, writer, rng)?;
+        let oprf = kkrt::KkrtReceiver::init(reader, writer, rng)?;
         Ok(Self { oprf })
     }
 
@@ -243,10 +237,11 @@ fn compress_and_hash_inputs(inputs: &[Vec<u8>], aes: &Aes128) -> Vec<Block> {
 
 use ocelot::kkrt;
 
-/// The PSI sender using the KKRT oblivious PRF under-the-hood.
-pub type PszSender = PszPsiSender<kkrt::KkrtSender>;
-/// The PSI receiver using the KKRT oblivious PRF under-the-hood.
-pub type PszReceiver = PszPsiReceiver<kkrt::KkrtReceiver>;
+/// Private set intersection sender using the KKRT oblivious PRF under-the-hood.
+pub type PszSender = PszPsiSender;
+/// Private set intersection receiver using the KKRT oblivious PRF
+/// under-the-hood.
+pub type PszReceiver = PszPsiReceiver;
 
 #[cfg(test)]
 mod tests {
