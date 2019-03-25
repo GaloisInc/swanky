@@ -1,6 +1,6 @@
 // -*- mode: rust; -*-
 //
-// This file is part of ocelot.
+// This file is part of `popsicle`.
 // Copyright © 2019 Galois, Inc.
 // See LICENSE for licensing information.
 
@@ -60,26 +60,33 @@ fn _bench_psz(inputs1: Vec<Vec<u8>>, inputs2: Vec<Vec<u8>>) -> Vec<Vec<u8>> {
     intersection
 }
 
-fn bench_oprf(c: &mut Criterion) {
-    // c.bench_function("psi::PSZ (initialization)", move |bench| {
-    //     bench.iter(|| _bench_psz_init())
-    // });
-    // c.bench_function("psi::PSZ (n = 2^8)", move |bench| {
-    //     let rs = rand_vec_vec(1 << 8);
-    //     bench.iter(|| {
-    //         let v = _bench_psz(rs.clone(), rs.clone());
-    //         criterion::black_box(v)
-    //     })
-    // });
-    // c.bench_function("psi::PSZ (n = 2^12)", move |bench| {
-    //     let rs = rand_vec_vec(1 << 12);
-    //     bench.iter(|| {
-    //         let v = _bench_psz(rs.clone(), rs.clone());
-    //         criterion::black_box(v)
-    //     })
-    // });
+fn bench_psi(c: &mut Criterion) {
+    c.bench_function("psi::PSZ (initialization)", move |bench| {
+        bench.iter(|| _bench_psz_init())
+    });
+    c.bench_function("psi::PSZ (n = 2^8)", move |bench| {
+        let rs = rand_vec_vec(1 << 8);
+        bench.iter(|| {
+            let v = _bench_psz(rs.clone(), rs.clone());
+            criterion::black_box(v)
+        })
+    });
+    c.bench_function("psi::PSZ (n = 2^12)", move |bench| {
+        let rs = rand_vec_vec(1 << 12);
+        bench.iter(|| {
+            let v = _bench_psz(rs.clone(), rs.clone());
+            criterion::black_box(v)
+        })
+    });
     c.bench_function("psi::PSZ (n = 2^16)", move |bench| {
         let rs = rand_vec_vec(1 << 16);
+        bench.iter(|| {
+            let v = _bench_psz(rs.clone(), rs.clone());
+            criterion::black_box(v)
+        })
+    });
+    c.bench_function("psi::PSZ (n = 2^20)", move |bench| {
+        let rs = rand_vec_vec(1 << 20);
         bench.iter(|| {
             let v = _bench_psz(rs.clone(), rs.clone());
             criterion::black_box(v)
@@ -88,9 +95,9 @@ fn bench_oprf(c: &mut Criterion) {
 }
 
 criterion_group! {
-    name = oprf;
-    config = Criterion::default().warm_up_time(Duration::from_millis(100));
-    targets = bench_oprf
+    name = psi;
+    config = Criterion::default().warm_up_time(Duration::from_millis(100))
+    targets = bench_psi
 }
 
-criterion_main!(oprf);
+criterion_main!(psi);

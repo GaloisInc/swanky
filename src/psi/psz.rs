@@ -23,7 +23,6 @@ use scuttlebutt::{Aes128, Block};
 use sha2::{Digest, Sha256};
 use std::collections::HashSet;
 use std::io::{Read, Write};
-use std::time::SystemTime;
 
 /// Private set intersection sender.
 pub struct PszPsiSender<OPRF: ObliviousPrfSender<Seed = Seed, Input = Block, Output = Output>> {
@@ -62,45 +61,42 @@ where
         let masksize = compute_masksize(inputs.len())?;
         let nbins = stream::read_usize(reader)?;
         let stashsize = stream::read_usize(reader)?;
-        // let start = SystemTime::now();
         let seeds = self.oprf.send(reader, writer, nbins + stashsize, rng)?;
-        // eprintln!("[S] OPRF: {} ms", start.elapsed().unwrap().as_millis());
         // For each `hᵢ`, construct set `Hᵢ = {F(k_{hᵢ(x)}, x || i) | x ∈ X)}`,
         // randomly permute it, and send it to the receiver.
-        let hindices = (0..NHASHES).map(|i| Block::from(i as u128));
-        for (i, hidx) in hindices.enumerate() {
+        for i in 0..NHASHES {
             inputs.shuffle(&mut rng);
-            // let start = SystemTime::now();
-            for input in inputs.iter() {
+            let hidx = Block::from(i as u128);
+            let mut encoded = Output([0u8; 64]);
+            for input in &inputs {
                 // Compute `bin := hᵢ(x)`.
                 let bin = CuckooHash::bin(*input, i, nbins);
-                let mut encoded = self.oprf.encode(&(*input ^ hidx));
                 // Compute rest of `F(k_{hᵢ(x)}, x || i)` and chop off extra bytes.
+                self.oprf.encode(*input ^ hidx, &mut encoded);
                 scutils::xor_inplace_n(&mut encoded.0, &seeds[bin].0, masksize);
                 writer.write_all(&encoded.0[0..masksize])?;
             }
-            // eprintln!("[S] Send set: {} ms", start.elapsed().unwrap().as_millis());
         }
         // For each `i ∈ {1, ..., stashsize}`, construct set `Sᵢ =
         // {F(k_{nbins+i}, x) | x ∈ X}`, randomly permute it, and send it to the
         // receiver.
-        // let start = SystemTime::now();
         let mut encoded = inputs
             .iter()
-            .map(|input| self.oprf.encode(input))
+            .map(|input| {
+                let mut out = Output([0u8; 64]);
+                self.oprf.encode(*input, &mut out);
+                out
+            })
             .collect::<Vec<Output>>();
-        // eprintln!("[S] Encode: {} ms", start.elapsed().unwrap().as_millis());
         for i in 0..stashsize {
             encoded.shuffle(&mut rng);
-            // let start = SystemTime::now();-
-            for encoded in encoded.iter() {
+            for encoded in &encoded {
                 // We don't need to append any hash index to OPRF inputs in the stash.
                 let mut output = vec![0u8; masksize];
                 scutils::xor_inplace(&mut output, &encoded.0);
                 scutils::xor_inplace(&mut output, &seeds[nbins + i].0);
                 writer.write_all(&output)?;
             }
-            // eprintln!("[S] Send set: {} ms", start.elapsed().unwrap().as_millis());
         }
         writer.flush()?;
         Ok(())
@@ -158,13 +154,16 @@ where
             .filter_map(|(item, _, hidx)| {
                 if let Some(item) = item {
                     if let Some(hidx) = hidx {
-                        // Item in bin.
+                        // Item in bin. In this case, set the last byte to the
+                        // hash index.
                         Some(*item ^ hindices[*hidx])
                     } else {
-                        // Item in stash.
+                        // Item in stash. No need to add the hash index in this
+                        // case.
                         Some(*item)
                     }
                 } else {
+                    // No item found, so use the "default" item.
                     Some(Default::default())
                 }
             })
@@ -192,35 +191,24 @@ where
                 s.insert(buf);
             }
         }
-        // println!(
-        //     "[R] Receive sets: {} ms",
-        //     start.elapsed().unwrap().as_millis()
-        // );
         // Iterate through each input/output pair and see whether it exists in
         // the appropriate set.
-        // let start = SystemTime::now();
         let mut intersection = Vec::with_capacity(n);
         for (i, (&item, output_)) in tbl.items().zip(outputs.into_iter()).enumerate() {
             let (_, idx, hidx) = item;
-            let mut output = vec![0u8; masksize];
-            output.copy_from_slice(&output_.0[0..masksize]);
             if let Some(hidx) = hidx {
                 // We have a bin item.
-                if hs[hidx].contains(&output) {
+                if hs[hidx].contains(&output_.0[0..masksize]) {
                     intersection.push(inputs[idx.unwrap()].clone());
                 }
             } else if let Some(idx) = idx {
                 // We have a stash item.
                 let j = i - nbins;
-                if ss[j].contains(&output) {
+                if ss[j].contains(&output_.0[0..masksize]) {
                     intersection.push(inputs[idx].clone());
                 }
             }
         }
-        // println!(
-        //     "[R] Compute intersection: {} ms",
-        //     start.elapsed().unwrap().as_millis()
-        // );
         Ok(intersection)
     }
 }
