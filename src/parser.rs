@@ -41,7 +41,9 @@ fn regex2captures<'t>(re: &Regex, line: &'t str) -> Result<Captures<'t>, Error> 
 }
 
 impl Circuit {
-    /// Generates a new `Circuit` from file `filename`.
+    /// Generates a new `Circuit` from file `filename`. The file must follow the
+    /// format given here: <https://homes.esat.kuleuven.be/~nsmart/MPC/>,
+    /// otherwise a `CircuitParserError` is returned.
     pub fn parse(filename: &str) -> Result<Self, Error> {
         let f = File::open(filename)?;
         let mut reader = BufReader::new(f);
@@ -59,9 +61,9 @@ impl Circuit {
         let _ = reader.read_line(&mut line);
         let re = Regex::new(r"(\d+)\s+(\d+)\s+(\d+)")?;
         let cap = regex2captures(&re, &line)?;
-        let n1 = cap2int(&cap, 1)?;
-        let n2 = cap2int(&cap, 2)?;
-        let n3 = cap2int(&cap, 3)?;
+        let n1 = cap2int(&cap, 1)?; // Number of garbler inputs
+        let n2 = cap2int(&cap, 2)?; // Number of evaluator inputs
+        let n3 = cap2int(&cap, 3)?; // Number of outputs
 
         // Parse third line: \n
         let mut line = String::new();
@@ -76,11 +78,13 @@ impl Circuit {
 
         let mut id = 0;
 
+        // Process garbler inputs.
         for i in 0..n1 {
             circ.gates.push(Gate::GarblerInput { id: i });
             circ.garbler_input_refs
                 .push(CircuitRef { ix: i, modulus: 2 });
         }
+        // Process evaluator inputs.
         for i in 0..n2 {
             circ.gates.push(Gate::EvaluatorInput { id: i });
             circ.evaluator_input_refs.push(CircuitRef {
@@ -88,12 +92,14 @@ impl Circuit {
                 modulus: 2,
             });
         }
+        // Create a constant wire for negations.
         circ.gates.push(Gate::Constant { val: 1 });
         let oneref = CircuitRef {
             ix: n1 + n2,
             modulus: 2,
         };
         circ.const_refs.push(oneref);
+        // Process outputs.
         for i in 0..n3 {
             circ.output_refs.push(CircuitRef {
                 ix: nwires - n3 + i,
@@ -171,10 +177,30 @@ mod tests {
     #[test]
     fn test_parser() {
         let circ = Circuit::parse("circuits/AES-non-expanded.txt").unwrap();
-        circ.info().unwrap();
-        let output = circ.eval_plain(&vec![0u16; 128], &vec![0u16; 128]).unwrap();
+        let key = vec![0u16; 128];
+        let pt = vec![0u16; 128];
+        let output = circ.eval_plain(&pt, &key).unwrap();
         assert_eq!(output.iter().map(|i| i.to_string()).collect::<String>(),
                    "01100110111010010100101111010100111011111000101000101100001110111000100001001100111110100101100111001010001101000010101100101110");
+        let key = vec![1u16; 128];
+        let pt = vec![0u16; 128];
+        let output = circ.eval_plain(&pt, &key).unwrap();
+        assert_eq!(output.iter().map(|i| i.to_string()).collect::<String>(),
+                   "10100001111101100010010110001100100001110111110101011111110011011000100101100100010010000100010100111000101111111100100100101100");
+        let mut key = vec![0u16; 128];
+        for i in 0..8 {
+            key[i] = 1;
+        }
+        let pt = vec![0u16; 128];
+        let output = circ.eval_plain(&pt, &key).unwrap();
+        assert_eq!(output.iter().map(|i| i.to_string()).collect::<String>(),
+                   "10110001110101110101100000100101011010110010100011111101100001010000101011010100100101000100001000001000110011110001000101010101");
+        let mut key = vec![0u16; 128];
+        key[7] = 1;
+        let pt = vec![0u16; 128];
+        let output = circ.eval_plain(&pt, &key).unwrap();
+        assert_eq!(output.iter().map(|i| i.to_string()).collect::<String>(),
+                   "11011100000011101101100001011101111110010110000100011010101110110111001001001001110011011101000101101000110001010100011001111110");
     }
 
     #[test]
