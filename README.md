@@ -7,7 +7,7 @@ world.
 `ocelot` implements the following oblivious transfer (OT) protocols:
 
 * Naor-Pinkas semi-honest OT
-* Chou-Orlandi malicious OT
+* Chou-Orlandi malicious OT (including a fix for a security flaw in the existing protocol write-up)
 * Asharov-Lindell-Schneider-Zohner semi-honest OT extension (+ correlated and random OT)
 * Keller-Orsini-Scholl malicious OT extension (+ correlated and random OT)
 

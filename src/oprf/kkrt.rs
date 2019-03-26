@@ -104,7 +104,7 @@ impl<OT: ObliviousTransferSender<Msg = Block> + SemiHonest> ObliviousPrf for Kkr
 pub struct KkrtOPRFSender<OT: ObliviousTransferReceiver + SemiHonest> {
     _ot: PhantomData<OT>,
     s: Vec<bool>,
-    s_: Vec<u8>,
+    s_: [u8; 64],
     code: PseudorandomCode,
     rngs: Vec<AesRng>,
 }
@@ -135,7 +135,7 @@ impl<OT: ObliviousTransferReceiver<Msg = Block> + SemiHonest> ObliviousPrfSender
         Ok(Self {
             _ot: PhantomData::<OT>,
             s,
-            s_: s_.to_vec(),
+            s_,
             code,
             rngs,
         })
@@ -165,11 +165,7 @@ impl<OT: ObliviousTransferReceiver<Msg = Block> + SemiHonest> ObliviousPrfSender
             self.rngs[j].fill_bytes(&mut q);
             stream::read_bytes_inplace(reader, &mut t0)?;
             stream::read_bytes_inplace(reader, &mut t1)?;
-            if *b {
-                scutils::xor_inplace(&mut q, &t1);
-            } else {
-                scutils::xor_inplace(&mut q, &t0);
-            }
+            scutils::xor_inplace(&mut q, if *b { &t1 } else { &t0 });
         }
         let qs = utils::transpose(&qs, ncols, nrows);
         let seeds = qs
@@ -181,22 +177,18 @@ impl<OT: ObliviousTransferReceiver<Msg = Block> + SemiHonest> ObliviousPrfSender
 
     #[inline]
     fn compute(&self, seed: Self::Seed, input: Self::Input) -> Self::Output {
-        let mut out = Output([0u8; 64]);
-        self.encode(input, &mut out);
-        scutils::xor_inplace(&mut out.0, &seed.0);
-        out
-    }
-
-    #[inline]
-    fn encode(&self, input: Self::Input, output: &mut Self::Output) {
+        let mut output = Output([0u8; 64]);
         self.code.encode(input, &mut output.0);
         scutils::and_inplace(&mut output.0, &self.s_);
+        scutils::xor_inplace(&mut output.0, &seed.0);
+        output
     }
 }
 
+// Separate out `encode` function for optimization purposes.
 impl<OT: ObliviousTransferReceiver<Msg = Block> + SemiHonest> KkrtOPRFSender<OT> {
     #[inline]
-    fn encode(
+    pub fn encode(
         &self,
         input: <KkrtOPRFSender<OT> as ObliviousPrf>::Input,
         output: &mut <KkrtOPRFSender<OT> as ObliviousPrf>::Output,

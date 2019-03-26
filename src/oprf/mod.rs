@@ -44,7 +44,6 @@ where
     ) -> Result<Vec<Self::Seed>, Error>;
     /// Computes the oblivious PRF on seed `seed` and input `input`.
     fn compute(&self, seed: Self::Seed, input: Self::Input) -> Self::Output;
-    fn encode(&self, input: Self::Input, output: &mut Self::Output);
 }
 
 /// Trait for oblivious PRF from the receiver's point-of-view.

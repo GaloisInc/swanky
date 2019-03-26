@@ -7,7 +7,7 @@
 //! Oblivious pseudorandom function benchmarks using `criterion`.
 
 use criterion::{criterion_group, criterion_main, Criterion};
-use ocelot::kkrt::{Output, Seed};
+use ocelot::kkrt::{KkrtReceiver, KkrtSender, Output, Seed};
 use ocelot::*;
 use scuttlebutt::{AesRng, Block};
 use std::io::{BufReader, BufWriter};
@@ -19,6 +19,24 @@ fn rand_block_vec(size: usize) -> Vec<Block> {
 }
 
 const T: usize = 1 << 12;
+
+fn _bench_oprf_init<
+    OPRFSender: ObliviousPrfSender<Seed = Seed, Input = Block, Output = Output>,
+    OPRFReceiver: ObliviousPrfReceiver<Input = Block, Output = Output>,
+>() {
+    let (sender, receiver) = UnixStream::pair().unwrap();
+    let handle = std::thread::spawn(move || {
+        let mut rng = AesRng::new();
+        let mut reader = BufReader::new(sender.try_clone().unwrap());
+        let mut writer = BufWriter::new(sender);
+        let _ = OPRFSender::init(&mut reader, &mut writer, &mut rng).unwrap();
+    });
+    let mut rng = AesRng::new();
+    let mut reader = BufReader::new(receiver.try_clone().unwrap());
+    let mut writer = BufWriter::new(receiver);
+    let _ = OPRFReceiver::init(&mut reader, &mut writer, &mut rng).unwrap();
+    handle.join().unwrap();
+}
 
 fn _bench_oprf<
     OPRFSender: ObliviousPrfSender<Seed = Seed, Input = Block, Output = Output>,
@@ -44,22 +62,24 @@ fn _bench_oprf<
     handle.join().unwrap();
 }
 
-type ChouOrlandiSender = chou_orlandi::ChouOrlandiOTSender;
-type ChouOrlandiReceiver = chou_orlandi::ChouOrlandiOTReceiver;
-type AlszSender = alsz::AlszOTSender<ChouOrlandiReceiver>;
-type AlszReceiver = alsz::AlszOTReceiver<ChouOrlandiSender>;
-type KkrtSender = kkrt::KkrtOPRFSender<AlszReceiver>;
-type KkrtReceiver = kkrt::KkrtOPRFReceiver<AlszSender>;
-
 fn bench_oprf(c: &mut Criterion) {
-    c.bench_function("oprf::KkrtOPRF", move |bench| {
+    c.bench_function("oprf::KKRT (initialization)", move |bench| {
+        bench.iter(|| {
+            let result = _bench_oprf_init::<KkrtSender, KkrtReceiver>();
+            criterion::black_box(result);
+        })
+    });
+    c.bench_function("oprf::KKRT", move |bench| {
         let rs = rand_block_vec(T);
-        bench.iter(|| _bench_oprf::<KkrtSender, KkrtReceiver>(&rs.clone()))
+        bench.iter(|| {
+            let result = _bench_oprf::<KkrtSender, KkrtReceiver>(&rs.clone());
+            criterion::black_box(result);
+        })
     });
 }
 
 fn bench_oprf_compute(c: &mut Criterion) {
-    c.bench_function("oprf::KkrtOPRF::compute", move |bench| {
+    c.bench_function("oprf::KKRT (compute)", move |bench| {
         let (sender, receiver) = UnixStream::pair().unwrap();
         let handle = std::thread::spawn(move || {
             let mut rng = AesRng::new();
