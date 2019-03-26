@@ -29,7 +29,6 @@
 #![cfg_attr(feature = "nightly", feature(stdsimd))]
 #![cfg_attr(feature = "nightly", feature(asm))]
 
-mod cointoss;
 mod stream;
 mod utils;
 

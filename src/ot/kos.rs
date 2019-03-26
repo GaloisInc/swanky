@@ -9,7 +9,7 @@
 
 use crate::alsz::*;
 use crate::errors::Error;
-use crate::{cointoss, utils};
+use crate::utils;
 use crate::{
     CorrelatedObliviousTransferReceiver, CorrelatedObliviousTransferSender,
     ObliviousTransferReceiver, ObliviousTransferSender, RandomObliviousTransferReceiver,
@@ -18,7 +18,7 @@ use crate::{
 use arrayref::array_ref;
 use rand::CryptoRng;
 use rand_core::{RngCore, SeedableRng};
-use scuttlebutt::{AesRng, Block, Malicious, SemiHonest};
+use scuttlebutt::{cointoss, AesRng, Block, Malicious, SemiHonest};
 use std::io::{ErrorKind, Read, Write};
 
 const SSP: usize = 40;

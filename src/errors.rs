@@ -10,13 +10,19 @@ pub enum Error {
     InvalidInputLength,
     IoError(std::io::Error),
     Other(String),
-    CommitmentCheck,
     DecompressPoint,
+    CoinTossError(scuttlebutt::cointoss::Error),
 }
 
 impl From<std::io::Error> for Error {
     fn from(e: std::io::Error) -> Error {
         Error::IoError(e)
+    }
+}
+
+impl From<scuttlebutt::cointoss::Error> for Error {
+    fn from(e: scuttlebutt::cointoss::Error) -> Error {
+        Error::CoinTossError(e)
     }
 }
 
@@ -26,8 +32,8 @@ impl std::fmt::Display for Error {
             Error::InvalidInputLength => "invalid input length".fmt(f),
             Error::IoError(e) => write!(f, "IO error: {}", e),
             Error::Other(s) => write!(f, "other error: {}", s),
-            Error::CommitmentCheck => "committment check failed".fmt(f),
             Error::DecompressPoint => "could not decompress point".fmt(f),
+            Error::CoinTossError(e) => write!(f, "coin toss error: {}", e),
         }
     }
 }

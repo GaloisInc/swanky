@@ -18,8 +18,6 @@ fn rand_block_vec(size: usize) -> Vec<Block> {
     (0..size).map(|_| rand::random::<Block>()).collect()
 }
 
-const T: usize = 1 << 12;
-
 fn _bench_oprf_init<
     OPRFSender: ObliviousPrfSender<Seed = Seed, Input = Block, Output = Output>,
     OPRFReceiver: ObliviousPrfReceiver<Input = Block, Output = Output>,
@@ -69,8 +67,15 @@ fn bench_oprf(c: &mut Criterion) {
             criterion::black_box(result);
         })
     });
-    c.bench_function("oprf::KKRT", move |bench| {
-        let rs = rand_block_vec(T);
+    c.bench_function("oprf::KKRT (n = 2^12)", move |bench| {
+        let rs = rand_block_vec(1 << 12);
+        bench.iter(|| {
+            let result = _bench_oprf::<KkrtSender, KkrtReceiver>(&rs.clone());
+            criterion::black_box(result);
+        })
+    });
+    c.bench_function("oprf::KKRT (n = 2^16)", move |bench| {
+        let rs = rand_block_vec(1 << 16);
         bench.iter(|| {
             let result = _bench_oprf::<KkrtSender, KkrtReceiver>(&rs.clone());
             criterion::black_box(result);

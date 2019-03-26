@@ -8,17 +8,19 @@
 //! (BaRK-OPRF) protocol of Kolesnikov, Kumaresan, Rosulek, and Trieu (cf.
 //! <https://eprint.iacr.org/2016/799>, Figure 2).
 
+#![allow(non_upper_case_globals)]
+
 use super::prc::PseudorandomCode;
 use crate::errors::Error;
 use crate::{
-    cointoss, stream, utils, ObliviousPrf, ObliviousPrfReceiver, ObliviousPrfSender,
+    stream, utils, ObliviousPrf, ObliviousPrfReceiver, ObliviousPrfSender,
     ObliviousTransferReceiver, ObliviousTransferSender,
 };
 use arrayref::array_ref;
 use rand::CryptoRng;
 use rand_core::{RngCore, SeedableRng};
 use scuttlebutt::utils as scutils;
-use scuttlebutt::{AesRng, Block, SemiHonest};
+use scuttlebutt::{cointoss, AesRng, Block, SemiHonest};
 use std::hash::{Hash, Hasher};
 use std::io::{Read, Write};
 use std::marker::PhantomData;
@@ -154,8 +156,8 @@ impl<OT: ObliviousTransferReceiver<Msg = Block> + SemiHonest> ObliviousPrfSender
         RNG: CryptoRng + RngCore,
     {
         // Round up if necessary so that `m mod 16 ≡ 0`.
-        let m = if m % 16 != 0 { m + (16 - m % 16) } else { m };
-        let (nrows, ncols) = (m, 512);
+        let nrows = if m % 16 != 0 { m + (16 - m % 16) } else { m };
+        const ncols: usize = 512;
         let mut t0 = vec![0u8; nrows / 8];
         let mut t1 = vec![0u8; nrows / 8];
         let mut qs = vec![0u8; nrows * ncols / 8];
@@ -171,8 +173,8 @@ impl<OT: ObliviousTransferReceiver<Msg = Block> + SemiHonest> ObliviousPrfSender
         let seeds = qs
             .chunks(ncols / 8)
             .map(|q| Seed(*array_ref![q, 0, 64]))
-            .collect();
-        Ok(seeds)
+            .collect::<Vec<Self::Seed>>();
+        Ok(seeds[0..m].to_vec())
     }
 
     #[inline]
@@ -253,8 +255,8 @@ impl<OT: ObliviousTransferSender<Msg = Block> + SemiHonest> ObliviousPrfReceiver
     ) -> Result<Vec<Self::Output>, Error> {
         let m = inputs.len();
         // Round up if necessary so that `m mod 16 ≡ 0`.
-        let m = if m % 16 != 0 { m + (16 - m % 16) } else { m };
-        let (nrows, ncols) = (m, 512);
+        let nrows = if m % 16 != 0 { m + (16 - m % 16) } else { m };
+        const ncols: usize = 512;
         let mut t0s = vec![0u8; nrows * ncols / 8];
         rng.fill_bytes(&mut t0s);
         let out = t0s
@@ -262,7 +264,7 @@ impl<OT: ObliviousTransferSender<Msg = Block> + SemiHonest> ObliviousPrfReceiver
             .map(|c| Output(*array_ref![c, 0, 64]))
             .collect::<Vec<Output>>();
         let mut t1s = t0s.clone();
-        let mut c = [0u8; 64];
+        let mut c = [0u8; ncols / 8];
         for (j, r) in inputs.iter().enumerate() {
             let range = j * ncols / 8..(j + 1) * ncols / 8;
             let mut t1 = &mut t1s[range];
@@ -285,7 +287,7 @@ impl<OT: ObliviousTransferSender<Msg = Block> + SemiHonest> ObliviousPrfReceiver
             stream::write_bytes(writer, &t)?;
         }
         writer.flush()?;
-        Ok(out)
+        Ok(out[0..m].to_vec())
     }
 }
 
