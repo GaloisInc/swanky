@@ -13,6 +13,10 @@ version 1.0 is released**
 Use `cargo build` to build, `cargo test` to run the test suite, `cargo bench` to
 benchmark the various protocols, and `cargo doc --open` to view documentation.
 
+`scuttlebutt` also supports the following features:
+
+* `nightly`: Use nightly features from `rust` and the underlying libraries.
+
 # License
 
 MIT License
