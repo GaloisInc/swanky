@@ -2,9 +2,14 @@
 name = "fancy_garbling"
 version = "0.1.0"
 authors = ["Brent Carmer <bcarmer@galois.com>"]
+license = "MIT"
+readme = "README.md"
+description = "A library for boolean and arithmetic garbling"
+categories = ["cryptography"]
+keywords = ["cryptography", "garbled-circuit", "GC"]
+edition = "2018"
 build = "build.rs"
 autobenches = false
-edition = "2018"
 
 [lib]
 doctest = false
