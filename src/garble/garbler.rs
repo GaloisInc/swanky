@@ -4,6 +4,7 @@ use crate::fancy::{Fancy, HasModulus, SyncIndex};
 use crate::util::{output_tweak, tweak, tweak2, RngExt};
 use crate::wire::Wire;
 use itertools::Itertools;
+use scuttlebutt::Block;
 use std::collections::HashMap;
 use std::ops::DerefMut;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -200,16 +201,16 @@ impl Fancy for Garbler {
                 if b > 0 {
                     B_.plus_eq(&Db);
                 }
-                let new_color = (r + b) % q;
-                let ct = (B_.hash(t) & 0xFFFF) ^ new_color as u128;
+                let new_color = Block::from(((r + b) % q) as u128);
+                let ct = Block::from(u128::from(B_.hash(t)) & 0xFFFF) ^ new_color;
                 minitable[B_.color() as usize] = Some(ct);
             }
 
             let mut packed = 0;
             for i in 0..qb as usize {
-                packed += minitable[i].unwrap() << (16 * i);
+                packed += u128::from(minitable[i].unwrap()) << (16 * i);
             }
-            gate.push(Some(packed));
+            gate.push(Some(Block::from(packed)));
         } else {
             r = B.color(); // secret value known only to the garbler (ev knows r+b)
         }
@@ -239,9 +240,9 @@ impl Fancy for Garbler {
                     if x > 0 {
                         X_.plus_eq(&D);
                     }
-                    X_.as_u128()
+                    X_.as_block()
                 })
-                .collect_vec()
+                .collect::<Vec<Block>>()
         };
 
         let mut A_ = A.clone();
@@ -267,9 +268,9 @@ impl Fancy for Garbler {
                     if x > 0 {
                         Y_.plus_eq(&A);
                     }
-                    Y_.as_u128()
+                    Y_.as_block()
                 })
-                .collect_vec()
+                .collect::<Vec<Block>>()
         };
 
         let mut B_ = B.clone();
@@ -331,9 +332,9 @@ impl Fancy for Garbler {
                     if x > 0 {
                         C_.plus_eq(&Dout);
                     }
-                    C_.as_u128()
+                    C_.as_block()
                 })
-                .collect_vec()
+                .collect::<Vec<Block>>()
         };
 
         let mut A_ = A.clone();

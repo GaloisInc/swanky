@@ -47,15 +47,13 @@ impl Wire {
         }
     }
 
-    /// Get the wire represented by the u128.
+    /// Get the wire represented by the `Block`.
     #[inline]
-    pub fn from_u128(inp: u128, q: u16) -> Self {
+    pub fn from_block(inp: Block, q: u16) -> Self {
         if q == 2 {
-            Wire::Mod2 {
-                val: Block::from(inp),
-            }
+            Wire::Mod2 { val: inp }
         } else if q < 256 && base_conversion::lookup_defined_for_mod(q) {
-            let bytes = util::u128_to_bytes(inp);
+            let bytes: [u8; 16] = inp.into();
 
             // the digits in position 15 will be the longest, so we can use stateful
             // (fast) base_q_addition
@@ -72,27 +70,29 @@ impl Wire {
         } else {
             Wire::ModN {
                 q,
-                ds: util::as_base_q_u128(inp, q),
+                ds: util::as_base_q_u128(u128::from(inp), q),
             }
         }
     }
 
-    /// Pack the wire to a u128.
+    /// Pack the wire to a `Block`.
     #[inline]
-    pub fn as_u128(&self) -> u128 {
+    pub fn as_block(&self) -> Block {
         match self {
-            Wire::Mod2 { val } => u128::from(*val),
-            Wire::ModN { q, ref ds } => util::from_base_q(ds, *q),
+            Wire::Mod2 { val } => *val,
+            Wire::ModN { q, ref ds } => Block::from(util::from_base_q(ds, *q)),
         }
     }
 
+    #[inline]
     pub fn to_bytes(&self) -> Vec<u8> {
-        self.as_u128().to_ne_bytes().to_vec()
+        u128::from(self.as_block()).to_ne_bytes().to_vec()
     }
 
+    #[inline]
     pub fn from_bytes(v: Vec<u8>, q: u16) -> Self {
         let w = unsafe { std::mem::transmute(*array_ref![v, 0, 16]) };
-        Wire::from_u128(w, q)
+        Wire::from_block(w, q)
     }
 
     /// The zero wire for the modulus q.
@@ -260,15 +260,15 @@ impl Wire {
     /// Get a random wire mod q.
     #[inline]
     pub fn rand<R: Rng>(rng: &mut R, q: u16) -> Wire {
-        Self::from_u128(rng.gen_u128(), q)
+        Self::from_block(Block::from(rng.gen_u128()), q)
     }
 
     /// Compute the hash of this wire.
     ///
     /// Uses fixed-key AES.
     #[inline]
-    pub fn hash(&self, tweak: u128) -> u128 {
-        AES.hash(tweak, self.as_u128())
+    pub fn hash(&self, tweak: u128) -> Block {
+        Block::from(AES.hash(tweak, u128::from(self.as_block())))
     }
 
     /// Compute the hash of this wire, converting the result back to a wire.
@@ -276,7 +276,7 @@ impl Wire {
     /// Uses fixed-key AES.
     #[inline]
     pub fn hashback(&self, tweak: u128, new_mod: u16) -> Wire {
-        Self::from_u128(self.hash(tweak), new_mod)
+        Self::from_block(self.hash(tweak), new_mod)
     }
 
     #[inline]

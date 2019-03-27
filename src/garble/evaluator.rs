@@ -1,4 +1,4 @@
-use super::{vec_u128_from_bytes, vec_u128_to_bytes};
+use super::{blocks_from_bytes, blocks_to_bytes};
 use super::{GarbledGate, Message, OutputCiphertext, SyncInfo};
 use crate::circuit::{Circuit, Gate};
 use crate::error::{EvaluatorError, FancyError, SyncError};
@@ -8,6 +8,7 @@ use crate::wire::Wire;
 use arrayref::array_ref;
 use crossbeam::queue::SegQueue;
 use itertools::Itertools;
+use scuttlebutt::Block;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, VecDeque};
 use std::ops::DerefMut;
@@ -89,7 +90,7 @@ impl Evaluator {
         } else {
             let nbytes = 16 * ngates; // XXX: 16 should be something like Gate::length()
             let (ix, bytes) = (self.callback.lock().unwrap().deref_mut())(nbytes)?;
-            Ok(vec_u128_from_bytes(&bytes, ngates))
+            Ok(blocks_from_bytes(&bytes, ngates))
         }
     }
 
@@ -104,7 +105,7 @@ impl Evaluator {
         } else {
             let nbytes = 16 * noutputs; // XXX: 16 should be something like Output::length()
             let (ix, bytes) = (self.callback.lock().unwrap().deref_mut())(nbytes)?;
-            Ok(vec_u128_from_bytes(&bytes, noutputs))
+            Ok(blocks_from_bytes(&bytes, noutputs))
         }
     }
 
@@ -260,7 +261,7 @@ impl Fancy for Evaluator {
             A.hashback(g, q)
         } else {
             let ct_left = gate[A.color() as usize - 1];
-            Wire::from_u128(ct_left ^ A.hash(g), q)
+            Wire::from_block(ct_left ^ A.hash(g), q)
         };
 
         // evaluator's half gate
@@ -268,14 +269,14 @@ impl Fancy for Evaluator {
             B.hashback(g, q)
         } else {
             let ct_right = gate[(q + B.color()) as usize - 2];
-            Wire::from_u128(ct_right ^ B.hash(g), q)
+            Wire::from_block(ct_right ^ B.hash(g), q)
         };
 
         // hack for unequal mods
         let new_b_color = if A.modulus() != B.modulus() {
             let minitable = *gate.last().unwrap();
-            let ct = minitable >> (B.color() * 16);
-            let pt = B.hash(tweak2(gate_num as u64, 1)) ^ ct;
+            let ct = u128::from(minitable) >> (B.color() * 16);
+            let pt = u128::from(B.hash(tweak2(gate_num as u64, 1))) ^ ct;
             pt as u16
         } else {
             B.color()
@@ -299,7 +300,7 @@ impl Fancy for Evaluator {
             Ok(x.hashback(gate_num as u128, q))
         } else {
             let ct = gate[x.color() as usize - 1];
-            Ok(Wire::from_u128(ct ^ x.hash(gate_num as u128), q))
+            Ok(Wire::from_block(ct ^ x.hash(gate_num as u128), q))
         }
     }
     #[inline]
@@ -364,8 +365,8 @@ impl GarbledCircuit {
                 Gate::GarblerInput { id } => Some(garbler_inputs[id].to_bytes()),
                 Gate::EvaluatorInput { id } => Some(evaluator_inputs[id].to_bytes()),
                 Gate::Constant { val } => Some(self.consts[&(val, c.modulus(i))].to_bytes()),
-                Gate::Mul { id, .. } => Some(vec_u128_to_bytes(&self.gates[id])),
-                Gate::Proj { id, .. } => Some(vec_u128_to_bytes(&self.gates[id])),
+                Gate::Mul { id, .. } => Some(blocks_to_bytes(&self.gates[id])),
+                Gate::Proj { id, .. } => Some(blocks_to_bytes(&self.gates[id])),
                 _ => None,
             })
             .collect::<Vec<Vec<u8>>>()
@@ -446,7 +447,7 @@ pub struct Decoder {
 }
 
 impl Decoder {
-    pub fn new(outputs: Vec<Vec<u128>>) -> Self {
+    pub fn new(outputs: Vec<Vec<Block>>) -> Self {
         Decoder { outputs }
     }
 
@@ -465,7 +466,7 @@ impl Decoder {
             debug_assert_eq!(q as usize, self.outputs[i].len());
             for k in 0..q {
                 let h = ws[i].hash(output_tweak(i, k));
-                if h == self.outputs[i][k as usize] {
+                if h == Block::from(self.outputs[i][k as usize]) {
                     outs.push(k);
                     break;
                 }

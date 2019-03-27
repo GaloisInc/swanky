@@ -6,6 +6,7 @@ use crate::fancy::{HasModulus, SyncIndex};
 use crate::wire::Wire;
 use arrayref::array_ref;
 use itertools::Itertools;
+use scuttlebutt::Block;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
@@ -17,25 +18,25 @@ mod garbler;
 pub use crate::garble::evaluator::{Decoder, Encoder, Evaluator, GarbledCircuit};
 pub use crate::garble::garbler::Garbler;
 
-pub(crate) fn vec_u128_from_bytes(bytes: &[u8], _n: usize) -> Vec<u128> {
+pub(crate) fn blocks_from_bytes(bytes: &[u8], _n: usize) -> Vec<Block> {
     bytes
         .chunks_exact(16)
-        .map(|chunk| unsafe { std::mem::transmute(*array_ref![chunk, 0, 16]) })
-        .collect::<Vec<u128>>()
+        .map(|chunk| Block::from(*array_ref![chunk, 0, 16]))
+        .collect::<Vec<Block>>()
 }
 
-pub(crate) fn vec_u128_to_bytes(v: &[u128]) -> Vec<u8> {
+pub(crate) fn blocks_to_bytes(v: &[Block]) -> Vec<u8> {
     v.iter()
-        .map(|item| item.to_ne_bytes().to_vec())
+        .map(|item| u128::from(*item).to_ne_bytes().to_vec())
         .flatten()
         .collect::<Vec<u8>>()
 }
 
 /// The ciphertext created by a garbled gate.
-pub type GarbledGate = Vec<u128>; // XXX: replace u128 with `Block`
+pub type GarbledGate = Vec<Block>;
 
 /// Ciphertext created by the garbler for output gates.
-pub type OutputCiphertext = Vec<u128>; // XXX: replace u128 with `Block`
+pub type OutputCiphertext = Vec<Block>;
 
 /// The outputs that can be emitted by a Garbler and consumed by an Evaluator.
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]

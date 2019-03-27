@@ -91,7 +91,7 @@ impl Fancy for Dummy {
         } else {
             let mut inps = self.garbler_inputs.lock().unwrap();
             if inps.len() == 0 {
-                return Err(DummyError::NotEnoughGarblerInputs)?;
+                return Err(DummyError::NotEnoughGarblerInputs);
             }
             let val = inps.remove(0);
             DummyVal { val, modulus }
@@ -110,7 +110,7 @@ impl Fancy for Dummy {
         } else {
             let mut inps = self.evaluator_inputs.lock().unwrap();
             if inps.len() == 0 {
-                return Err(DummyError::NotEnoughEvaluatorInputs)?;
+                return Err(DummyError::NotEnoughEvaluatorInputs);
             }
             let val = inps.remove(0);
             DummyVal { val, modulus }
