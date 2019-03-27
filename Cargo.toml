@@ -21,7 +21,9 @@ cc = "1.0.31"
 nightly = ["rand/nightly", "scuttlebutt/nightly"]
 
 [dependencies]
+arrayref = "*"                  # XXX: remove
 base_conversion = { path = "base_conversion" }
+bincode = "*"                   # XXX: remove
 crossbeam = "0.7.1"
 itertools = "0.8.0"
 libc = "0.2.50"

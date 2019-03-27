@@ -1,9 +1,11 @@
+use super::{vec_u128_from_bytes, vec_u128_to_bytes};
 use super::{GarbledGate, Message, OutputCiphertext, SyncInfo};
 use crate::circuit::{Circuit, Gate};
 use crate::error::{EvaluatorError, FancyError, SyncError};
 use crate::fancy::{Fancy, HasModulus, SyncIndex};
 use crate::util::{output_tweak, tweak2};
 use crate::wire::Wire;
+use arrayref::array_ref;
 use crossbeam::queue::SegQueue;
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
@@ -13,31 +15,34 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::mpsc::Sender;
 use std::sync::{Arc, Mutex, RwLock};
 
+/// Callback used by evaluator to receive messages.
+pub trait Callback: FnMut(usize) -> Result<(Option<SyncIndex>, Vec<u8>), EvaluatorError> {}
+
 /// Streaming evaluator using a callback to receive ciphertexts as needed.
 ///
 /// Evaluates a garbled circuit on the fly, using messages containing ciphertexts and
 /// wires. Parallelizable.
 pub struct Evaluator {
-    recv_function:
-        Arc<Mutex<FnMut() -> Result<(Option<SyncIndex>, Message), EvaluatorError> + Send>>,
+    callback:
+        Arc<Mutex<FnMut(usize) -> Result<(Option<SyncIndex>, Vec<u8>), EvaluatorError> + Send>>,
     current_gate: Arc<AtomicUsize>,
     output_cts: Arc<Mutex<Vec<OutputCiphertext>>>,
     output_wires: Arc<Mutex<Vec<Wire>>>,
     sync_info: Arc<RwLock<Option<SyncInfo>>>,
-    requests: Arc<RwLock<Option<Vec<SegQueue<Sender<Message>>>>>>,
+    requests: Arc<RwLock<Option<Vec<SegQueue<Sender<Vec<u8>>>>>>>,
 }
 
 impl Evaluator {
     /// Create a new Evaluator.
     ///
-    /// `recv_function` enables streaming by producing messages during the `Fancy`
+    /// `callback` enables streaming by producing messages during the `Fancy`
     /// computation, which contain ciphertexts and wirelabels.
-    pub fn new<F>(recv_function: F) -> Evaluator
+    pub fn new<F>(callback: F) -> Evaluator
     where
-        F: FnMut() -> Result<(Option<SyncIndex>, Message), EvaluatorError> + Send + 'static,
+        F: FnMut(usize) -> Result<(Option<SyncIndex>, Vec<u8>), EvaluatorError> + Send + 'static,
     {
         Evaluator {
-            recv_function: Arc::new(Mutex::new(recv_function)),
+            callback: Arc::new(Mutex::new(callback)),
             current_gate: Arc::new(AtomicUsize::new(0)),
             output_cts: Arc::new(Mutex::new(Vec::new())),
             output_wires: Arc::new(Mutex::new(Vec::new())),
@@ -53,23 +58,53 @@ impl Evaluator {
         Decoder::new(cts.clone()).decode(&outs)
     }
 
-    /// Receive the next message.
-    fn recv(&self, ix: Option<SyncIndex>) -> Result<Message, EvaluatorError> {
+    #[inline]
+    fn recv_wire(&self, ix: Option<SyncIndex>, q: u16) -> Result<Wire, EvaluatorError> {
         if let Some(ix) = ix {
-            // request next message for this index
-            let (tx, rx) = std::sync::mpsc::channel();
-            self.requests.read().unwrap().as_ref().unwrap()[ix as usize].push(tx);
-            // block until postman delivers message
-            Ok(rx.recv().unwrap())
+            unimplemented!();
+        // // request next message for this index
+        // let (sender, receiver) = std::sync::mpsc::channel();
+        // self.requests.read().unwrap().as_ref().unwrap()[ix as usize].push(sender);
+        // // block until postman delivers message
+        // Ok(receiver.recv().unwrap())
         } else {
-            let (ix, m) = (self.recv_function.lock().unwrap().deref_mut())()?;
-            if m == Message::EndSync {
-                self.recv(ix)
-            } else if ix.is_some() {
-                Err(EvaluatorError::IndexReceivedInSyncMode)
-            } else {
-                Ok(m)
-            }
+            let (ix, bytes) = (self.callback.lock().unwrap().deref_mut())(Wire::length())?;
+            Ok(Wire::from_bytes(bytes, q))
+        }
+    }
+
+    #[inline]
+    fn recv_gate(
+        &self,
+        ix: Option<SyncIndex>,
+        ngates: usize,
+    ) -> Result<GarbledGate, EvaluatorError> {
+        if let Some(ix) = ix {
+            unimplemented!();
+        // // request next message for this index
+        // let (tx, rx) = std::sync::mpsc::channel();
+        // self.requests.read().unwrap().as_ref().unwrap()[ix as usize].push(tx);
+        // // block until postman delivers message
+        // Ok(rx.recv().unwrap())
+        } else {
+            let nbytes = 16 * ngates; // XXX: 16 should be something like Gate::length()
+            let (ix, bytes) = (self.callback.lock().unwrap().deref_mut())(nbytes)?;
+            Ok(vec_u128_from_bytes(&bytes, ngates))
+        }
+    }
+
+    #[inline]
+    fn recv_outputs(
+        &self,
+        ix: Option<SyncIndex>,
+        noutputs: usize,
+    ) -> Result<OutputCiphertext, EvaluatorError> {
+        if let Some(ix) = ix {
+            unimplemented!();
+        } else {
+            let nbytes = 16 * noutputs; // XXX: 16 should be something like Output::length()
+            let (ix, bytes) = (self.callback.lock().unwrap().deref_mut())(nbytes)?;
+            Ok(vec_u128_from_bytes(&bytes, noutputs))
         }
     }
 
@@ -88,7 +123,7 @@ impl Evaluator {
             num_indices,
             self.sync_info.clone(),
             self.requests.clone(),
-            self.recv_function.clone(),
+            self.callback.clone(),
         );
         Ok(())
     }
@@ -122,49 +157,52 @@ impl Evaluator {
 fn start_postman(
     nindices: SyncIndex,
     sync_info: Arc<RwLock<Option<SyncInfo>>>,
-    requests: Arc<RwLock<Option<Vec<SegQueue<Sender<Message>>>>>>,
-    recv_msg: Arc<Mutex<FnMut() -> Result<(Option<SyncIndex>, Message), EvaluatorError> + Send>>,
+    requests: Arc<RwLock<Option<Vec<SegQueue<Sender<Vec<u8>>>>>>>,
+    callback: Arc<
+        Mutex<FnMut(usize) -> Result<(Option<SyncIndex>, Vec<u8>), EvaluatorError> + Send>,
+    >,
 ) {
-    std::thread::spawn(move || {
-        let mut awaiting = vec![VecDeque::new(); nindices as usize];
-        let mut done_receiving = false;
+    unimplemented!();
+    //     std::thread::spawn(move || {
+    //         let mut awaiting = vec![VecDeque::new(); nindices as usize];
+    //         let mut done_receiving = false;
 
-        loop {
-            std::thread::yield_now();
+    //         loop {
+    //             std::thread::yield_now();
 
-            if sync_info.read().unwrap().is_none() {
-                // sync is done, exit
-                return;
-            }
+    //             if sync_info.read().unwrap().is_none() {
+    //                 // sync is done, exit
+    //                 return;
+    //             }
 
-            if !done_receiving {
-                // receive a message
-                let (ix, m) = (recv_msg.lock().unwrap().deref_mut())().unwrap(); // XXX: remove this `unwrap`
-                if m == Message::EndSync {
-                    done_receiving = true;
-                } else {
-                    let ix = ix.unwrap_or_else(|| {
-                        panic!(
-                            "evaluator: message {} received without index in sync mode",
-                            m
-                        )
-                    });
-                    awaiting[ix as usize].push_back(m);
-                }
-            }
+    //             if !done_receiving {
+    //                 // receive a message
+    //                 let (ix, bytes) = (callback.lock().unwrap().deref_mut())().unwrap(); // XXX: remove this `unwrap`
+    //                 if m == Message::EndSync {
+    //                     done_receiving = true;
+    //                 } else {
+    //                     let ix = ix.unwrap_or_else(|| {
+    //                         panic!(
+    //                             "evaluator: message {} received without index in sync mode",
+    //                             m
+    //                         )
+    //                     });
+    //                     awaiting[ix as usize].push_back(bytes);
+    //                 }
+    //             }
 
-            // answer requests if possible
-            if let Some(ref requests) = *requests.read().unwrap() {
-                for (ix, reqs) in requests.iter().enumerate() {
-                    if !awaiting[ix].is_empty() {
-                        if let Ok(tx) = reqs.pop() {
-                            tx.send(awaiting[ix].pop_front().unwrap()).unwrap();
-                        }
-                    }
-                }
-            }
-        }
-    });
+    //             // answer requests if possible
+    //             if let Some(ref requests) = *requests.read().unwrap() {
+    //                 for (ix, reqs) in requests.iter().enumerate() {
+    //                     if !awaiting[ix].is_empty() {
+    //                         if let Ok(sender) = reqs.pop() {
+    //                             sender.send(awaiting[ix].pop_front().unwrap()).unwrap();
+    //                         }
+    //                     }
+    //                 }
+    //             }
+    //         }
+    //     });
 }
 
 impl Fancy for Evaluator {
@@ -178,64 +216,15 @@ impl Fancy for Evaluator {
         q: u16,
         _opt_x: Option<u16>,
     ) -> Result<Wire, EvaluatorError> {
-        match self.recv(ix)? {
-            Message::GarblerInput(w) => {
-                if w.modulus() != q {
-                    Err(EvaluatorError::InvalidMessage {
-                        expected: format!("GarblerInput with modulus {}", q),
-                        got: format!("GarblerInput with modulus {}", w.modulus()),
-                    })?
-                } else {
-                    Ok(w)
-                }
-            }
-            m => Err(EvaluatorError::InvalidMessage {
-                expected: "GarblerInput".to_string(),
-                got: format!("{}", m),
-            })?,
-        }
+        self.recv_wire(ix, q)
     }
     #[inline]
     fn evaluator_input(&self, ix: Option<SyncIndex>, q: u16) -> Result<Wire, EvaluatorError> {
-        match self.recv(ix)? {
-            Message::EvaluatorInput(w) => {
-                if w.modulus() != q {
-                    Err(EvaluatorError::InvalidMessage {
-                        expected: format!("EvaluatorInput with modulus {}", q),
-                        got: format!("EvaluatorInput with modulus {}", w.modulus()),
-                    })?
-                } else {
-                    Ok(w)
-                }
-            }
-            m => Err(EvaluatorError::InvalidMessage {
-                expected: "EvaluatorInput".to_string(),
-                got: format!("{}", m),
-            })?,
-        }
+        self.recv_wire(ix, q)
     }
     #[inline]
-    fn constant(&self, ix: Option<SyncIndex>, x: u16, q: u16) -> Result<Wire, EvaluatorError> {
-        match self.recv(ix)? {
-            Message::Constant { wire, value } => {
-                if x == value && wire.modulus() == q {
-                    Ok(wire)
-                } else {
-                    Err(EvaluatorError::InvalidMessage {
-                        expected: format!("Constant with value {} and modulus {}", x, q),
-                        got: format!(
-                            "Constant with value {} and modulus {}",
-                            value,
-                            wire.modulus()
-                        ),
-                    })?
-                }
-            }
-            m => Err(EvaluatorError::InvalidMessage {
-                expected: format!("Constant with value {} and modulus {}", x, q),
-                got: format!("{}", m),
-            })?,
-        }
+    fn constant(&self, ix: Option<SyncIndex>, _: u16, q: u16) -> Result<Wire, EvaluatorError> {
+        self.recv_wire(ix, q)
     }
     #[inline]
     fn add(&self, x: &Wire, y: &Wire) -> Result<Wire, EvaluatorError> {
@@ -260,19 +249,11 @@ impl Fancy for Evaluator {
         if A.modulus() < A.modulus() {
             return self.mul(ix, B, A);
         }
-
-        let gate = match self.recv(ix)? {
-            Message::GarbledGate(g) => g,
-            m => {
-                return Err(EvaluatorError::InvalidMessage {
-                    expected: "GarbledGate".to_string(),
-                    got: format!("{}", m),
-                })?;
-            }
-        };
+        let q = A.modulus();
+        let qb = B.modulus();
+        let gate = self.recv_gate(ix, q as usize + qb as usize - 2)?;
         let gate_num = self.current_gate(ix);
         let g = tweak2(gate_num as u64, 0);
-        let q = A.modulus();
 
         // garbler's half gate
         let L = if A.color() == 0 {
@@ -311,21 +292,8 @@ impl Fancy for Evaluator {
         q: u16,
         _tt: Option<Vec<u16>>,
     ) -> Result<Wire, EvaluatorError> {
-        let gate = match self.recv(ix)? {
-            Message::GarbledGate(g) => g,
-            m => {
-                return Err(EvaluatorError::InvalidMessage {
-                    expected: "GarbledGate".to_string(),
-                    got: format!("{}", m),
-                })?;
-            }
-        };
-        if gate.len() as u16 != x.modulus() - 1 {
-            return Err(EvaluatorError::InvalidMessage {
-                expected: format!("GarbledGate of len {}", q - 1),
-                got: format!("GarbledGate of len {}", gate.len()),
-            })?;
-        }
+        let ngates = (x.modulus() - 1) as usize;
+        let gate = self.recv_gate(ix, ngates)?;
         let gate_num = self.current_gate(ix);
         if x.color() == 0 {
             Ok(x.hashback(gate_num as u128, q))
@@ -336,23 +304,9 @@ impl Fancy for Evaluator {
     }
     #[inline]
     fn output(&self, ix: Option<SyncIndex>, x: &Wire) -> Result<(), EvaluatorError> {
-        match self.recv(ix)? {
-            Message::OutputCiphertext(c) => {
-                if c.len() as u16 != x.modulus() {
-                    Err(EvaluatorError::InvalidMessage {
-                        expected: format!("OutputCiphertext of len {}", x.modulus()),
-                        got: format!("OutputCiphertext of len {}", c.len()),
-                    })?
-                }
-                self.output_cts.lock().unwrap().push(c);
-            }
-            m => {
-                return Err(EvaluatorError::InvalidMessage {
-                    expected: "OutputCiphertext".to_string(),
-                    got: format!("{}", m),
-                })?;
-            }
-        }
+        let noutputs = x.modulus() as usize;
+        let c = self.recv_outputs(ix, noutputs)?;
+        self.output_cts.lock().unwrap().push(c);
         self.output_wires.lock().unwrap().push(x.clone());
         Ok(())
     }
@@ -407,24 +361,16 @@ impl GarbledCircuit {
             .iter()
             .enumerate()
             .filter_map(|(i, gate)| match *gate {
-                Gate::GarblerInput { id } => {
-                    Some(Message::GarblerInput(garbler_inputs[id].clone()))
-                }
-                Gate::EvaluatorInput { id } => {
-                    Some(Message::EvaluatorInput(evaluator_inputs[id].clone()))
-                }
-                Gate::Constant { val } => Some(Message::Constant {
-                    value: val,
-                    wire: self.consts[&(val, c.modulus(i))].clone(),
-                }),
-                Gate::Mul { id, .. } => Some(Message::GarbledGate(self.gates[id].clone())),
-                Gate::Proj { id, .. } => Some(Message::GarbledGate(self.gates[id].clone())),
+                Gate::GarblerInput { id } => Some(garbler_inputs[id].to_bytes()),
+                Gate::EvaluatorInput { id } => Some(evaluator_inputs[id].to_bytes()),
+                Gate::Constant { val } => Some(self.consts[&(val, c.modulus(i))].to_bytes()),
+                Gate::Mul { id, .. } => Some(vec_u128_to_bytes(&self.gates[id])),
+                Gate::Proj { id, .. } => Some(vec_u128_to_bytes(&self.gates[id])),
                 _ => None,
             })
-            .collect_vec()
+            .collect::<Vec<Vec<u8>>>()
             .into_iter();
-
-        let eval = Evaluator::new(move || Ok((None, msgs.next().unwrap())));
+        let eval = Evaluator::new(move |_: usize| Ok((None, msgs.next().unwrap())));
         c.eval(&eval)
     }
 }
@@ -546,7 +492,7 @@ mod tests {
     fn evaluator_has_send_and_sync() {
         fn check_send(_: impl Send) {}
         fn check_sync(_: impl Sync) {}
-        check_send(Evaluator::new(|| unimplemented!()));
-        check_sync(Evaluator::new(|| unimplemented!()));
+        check_send(Evaluator::new(|_| unimplemented!()));
+        check_sync(Evaluator::new(|_| unimplemented!()));
     }
 }

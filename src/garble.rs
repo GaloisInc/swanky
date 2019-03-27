@@ -4,6 +4,7 @@ use crate::circuit::Circuit;
 use crate::error::GarblerError;
 use crate::fancy::{HasModulus, SyncIndex};
 use crate::wire::Wire;
+use arrayref::array_ref;
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -16,11 +17,25 @@ mod garbler;
 pub use crate::garble::evaluator::{Decoder, Encoder, Evaluator, GarbledCircuit};
 pub use crate::garble::garbler::Garbler;
 
+pub(crate) fn vec_u128_from_bytes(bytes: &[u8], _n: usize) -> Vec<u128> {
+    bytes
+        .chunks_exact(16)
+        .map(|chunk| unsafe { std::mem::transmute(*array_ref![chunk, 0, 16]) })
+        .collect::<Vec<u128>>()
+}
+
+pub(crate) fn vec_u128_to_bytes(v: &[u128]) -> Vec<u8> {
+    v.iter()
+        .map(|item| item.to_ne_bytes().to_vec())
+        .flatten()
+        .collect::<Vec<u8>>()
+}
+
 /// The ciphertext created by a garbled gate.
-pub type GarbledGate = Vec<u128>;
+pub type GarbledGate = Vec<u128>; // XXX: replace u128 with `Block`
 
 /// Ciphertext created by the garbler for output gates.
-pub type OutputCiphertext = Vec<u128>;
+pub type OutputCiphertext = Vec<u128>; // XXX: replace u128 with `Block`
 
 /// The outputs that can be emitted by a Garbler and consumed by an Evaluator.
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
@@ -57,19 +72,6 @@ pub enum Message {
     /// For large computations, the Evaluator postman can get far ahead of the threads,
     /// and we don't want it to receive non-sync messages.
     EndSync,
-}
-
-impl Message {
-    pub fn to_u128s(self) -> Vec<u128> {
-        match self {
-            Message::GarblerInput(w) => vec![w.as_u128()],
-            Message::EvaluatorInput(w) => vec![w.as_u128()],
-            Message::Constant { wire, .. } => vec![wire.as_u128()],
-            Message::GarbledGate(gate) => gate,
-            Message::OutputCiphertext(ct) => ct,
-            _ => panic!("[Message::to_bytes] message type not allowed"),
-        }
-    }
 }
 
 impl std::fmt::Display for Message {
@@ -172,7 +174,7 @@ pub fn garble(c: &Circuit) -> Result<(Encoder, Decoder, GarbledCircuit), Garbler
         let garbled_gates = garbled_gates.clone();
         let constants = constants.clone();
         let garbled_outputs = garbled_outputs.clone();
-        send_func = move |_ix, m| match m {
+        send_func = move |_, m| match m {
             Message::UnencodedGarblerInput { zero, .. } => {
                 garbler_inputs.lock().unwrap().push(zero)
             }
@@ -530,6 +532,7 @@ mod streaming {
     use super::*;
     use crate::fancy::Fancy;
     use crate::util::RngExt;
+    use crate::FancyError;
     use itertools::Itertools;
     use rand::thread_rng;
     use std::fmt::{Debug, Display};
@@ -550,27 +553,30 @@ mod streaming {
         let mut gb_inp_iter = gb_inp.to_vec().into_iter();
         let mut ev_inp_iter = ev_inp.to_vec().into_iter();
 
-        // the evaluator's recv_function gets the next message from the garble iterator,
+        // the evaluator's callback gets the next message from the garble iterator,
         // encodes the appropriate inputs, and sends it along
-        let recv_func = move || {
-            let m = match gb_iter.next().unwrap() {
+        let callback = move |_| {
+            let bytes = match gb_iter.next().unwrap() {
                 Message::UnencodedGarblerInput { zero, delta } => {
                     // Encode the garbler's next input
                     let x = gb_inp_iter.next().expect("not enough garbler inputs!");
-                    Message::GarblerInput(zero.plus(&delta.cmul(x)))
+                    zero.plus(&delta.cmul(x)).as_u8_vec()
                 }
 
                 Message::UnencodedEvaluatorInput { zero, delta } => {
                     // Encode the garbler's next input
                     let x = ev_inp_iter.next().expect("not enough evaluator inputs!");
-                    Message::EvaluatorInput(zero.plus(&delta.cmul(x)))
+                    zero.plus(&delta.cmul(x)).as_u8_vec()
                 }
-                m => m,
+                Message::Constant { value: _, wire } => wire.as_u8_vec(),
+                Message::GarbledGate(gate) => vec_u128_to_bytes(&gate),
+                Message::OutputCiphertext(ct) => vec_u128_to_bytes(&ct),
+                _ => unimplemented!(),
             };
-            (None, m)
+            Ok((None, bytes))
         };
 
-        let mut ev = Evaluator::new(recv_func);
+        let mut ev = Evaluator::new(callback);
         f_ev(&mut ev);
 
         let result = ev.decode_output();
@@ -578,7 +584,7 @@ mod streaming {
         assert_eq!(result, should_be)
     }
     //}}}
-    fn fancy_addition<W: Clone + HasModulus, E: Display + Debug>(
+    fn fancy_addition<W: Clone + HasModulus, E: Display + Debug + From<FancyError>>(
         b: &dyn Fancy<Item = W, Error = E>,
         q: u16,
     ) //{{{
@@ -606,7 +612,8 @@ mod streaming {
         }
     }
     //}}}
-    fn fancy_subtraction<W: Clone + HasModulus, E: Display + Debug>(
+
+    fn fancy_subtraction<W: Clone + HasModulus, E: Display + Debug + From<FancyError>>(
         b: &dyn Fancy<Item = W, Error = E>,
         q: u16,
     ) //{{{
@@ -634,7 +641,8 @@ mod streaming {
         }
     }
     //}}}
-    fn fancy_multiplication<W: Clone + HasModulus, E: Debug + Display>(
+
+    fn fancy_multiplication<W: Clone + HasModulus, E: Debug + Display + From<FancyError>>(
         b: &dyn Fancy<Item = W, Error = E>,
         q: u16,
     ) // {{{
@@ -662,7 +670,8 @@ mod streaming {
         }
     }
     //}}}
-    fn fancy_cmul<W: Clone + HasModulus, E: Debug + Display>(
+
+    fn fancy_cmul<W: Clone + HasModulus, E: Debug + Display + From<FancyError>>(
         b: &dyn Fancy<Item = W, Error = E>,
         q: u16,
     ) // {{{
@@ -688,7 +697,7 @@ mod streaming {
         }
     }
     //}}}
-    fn fancy_projection<W: Clone + HasModulus, E: Debug + Display>(
+    fn fancy_projection<W: Clone + HasModulus, E: Debug + Display + From<FancyError>>(
         b: &dyn Fancy<Item = W, Error = E>,
         q: u16,
     ) // {{{
@@ -742,9 +751,6 @@ mod parallel {
                             .builder()
                             .name(format!("Thread {}", i))
                             .spawn(move |_| {
-                                // let x = b.garbler_input(Some(i), 2 + i as u16);
-                                // let c = b.constant(Some(i), 1, 2 + i as u16);
-                                // let z = b.mul(Some(i), &x, &c);
                                 let c = b.constant_bundle_crt(Some(i), 1, Q).unwrap();
                                 let x = b.garbler_input_bundle_crt(Some(i), Q, None).unwrap();
                                 let x = b.mul_bundles(Some(i), &x, &c).unwrap();
@@ -757,16 +763,12 @@ mod parallel {
                     .collect_vec();
                 let outs = hs.into_iter().map(|h| h.join().unwrap()).collect_vec();
                 b.output_bundles(None, &outs).unwrap();
-                // b.outputs(None, &outs);
             })
             .unwrap()
         } else {
             b.begin_sync(N).unwrap();
             let mut zs = Vec::new();
             for i in 0..N {
-                // let x = b.garbler_input(Some(i), 2 + i as u16);
-                // let c = b.constant(Some(i), 1, 2 + i as u16);
-                // let z = b.mul(Some(i), &x, &c);
                 let c = b.constant_bundle_crt(Some(i), 1, Q).unwrap();
                 let x = b.garbler_input_bundle_crt(Some(i), Q, None).unwrap();
                 let x = b.mul_bundles(Some(i), &x, &c).unwrap();
@@ -775,7 +777,6 @@ mod parallel {
                 b.finish_index(i).unwrap();
             }
             b.output_bundles(None, &zs).unwrap();
-            // b.outputs(None, &zs);
         }
     }
 
@@ -825,7 +826,7 @@ mod parallel {
             });
 
             // run the evaluator on this one
-            let evaluator = Evaluator::new(move || rx.recv().unwrap());
+            let evaluator = Evaluator::new(move |_| rx.recv());
             parallel_gadgets(&evaluator, Q, N, false);
 
             let result = evaluator.decode_output();

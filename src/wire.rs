@@ -1,14 +1,14 @@
 //! Low-level operations on wirelabels, the basic building block of garbled circuits.
 
-use rand::Rng;
-use scuttlebutt::Block;
-use serde::{Deserialize, Serialize};
-
 use crate::aes::AES;
 use crate::{
     fancy::HasModulus,
     util::{self, RngExt},
 };
+use arrayref::array_ref;
+use rand::Rng;
+use scuttlebutt::Block;
+use serde::{Deserialize, Serialize};
 
 /// The essential wirelabel type used by garbled circuits.
 ///
@@ -84,6 +84,15 @@ impl Wire {
             Wire::Mod2 { val } => u128::from(*val),
             Wire::ModN { q, ref ds } => util::from_base_q(ds, *q),
         }
+    }
+
+    pub fn to_bytes(&self) -> Vec<u8> {
+        self.as_u128().to_ne_bytes().to_vec()
+    }
+
+    pub fn from_bytes(v: Vec<u8>, q: u16) -> Self {
+        let w = unsafe { std::mem::transmute(*array_ref![v, 0, 16]) };
+        Wire::from_u128(w, q)
     }
 
     /// The zero wire for the modulus q.
@@ -268,6 +277,11 @@ impl Wire {
     #[inline]
     pub fn hashback(&self, tweak: u128, new_mod: u16) -> Wire {
         Self::from_u128(self.hash(tweak), new_mod)
+    }
+
+    #[inline]
+    pub fn length() -> usize {
+        16
     }
 }
 
