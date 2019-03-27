@@ -1,27 +1,25 @@
+use super::{GarbledGate, Message, OutputCiphertext, SyncInfo};
+use crate::circuit::{Circuit, Gate};
+use crate::error::{EvaluatorError, FancyError, SyncError};
+use crate::fancy::{Fancy, HasModulus, SyncIndex};
+use crate::util::{output_tweak, tweak2};
+use crate::wire::Wire;
 use crossbeam::queue::SegQueue;
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
-
 use std::collections::{HashMap, VecDeque};
 use std::ops::DerefMut;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::mpsc::Sender;
 use std::sync::{Arc, Mutex, RwLock};
 
-use crate::circuit::{Circuit, Gate};
-use crate::error::{EvaluatorError, FancyError, SyncError};
-use crate::fancy::{Fancy, HasModulus, SyncIndex};
-use crate::util::{output_tweak, tweak2};
-use crate::wire::Wire;
-
-use super::{GarbledGate, Message, OutputCiphertext, SyncInfo};
-
 /// Streaming evaluator using a callback to receive ciphertexts as needed.
 ///
 /// Evaluates a garbled circuit on the fly, using messages containing ciphertexts and
 /// wires. Parallelizable.
 pub struct Evaluator {
-    recv_function: Arc<Mutex<FnMut() -> (Option<SyncIndex>, Message) + Send>>,
+    recv_function:
+        Arc<Mutex<FnMut() -> Result<(Option<SyncIndex>, Message), EvaluatorError> + Send>>,
     current_gate: Arc<AtomicUsize>,
     output_cts: Arc<Mutex<Vec<OutputCiphertext>>>,
     output_wires: Arc<Mutex<Vec<Wire>>>,
@@ -36,7 +34,7 @@ impl Evaluator {
     /// computation, which contain ciphertexts and wirelabels.
     pub fn new<F>(recv_function: F) -> Evaluator
     where
-        F: FnMut() -> (Option<SyncIndex>, Message) + Send + 'static,
+        F: FnMut() -> Result<(Option<SyncIndex>, Message), EvaluatorError> + Send + 'static,
     {
         Evaluator {
             recv_function: Arc::new(Mutex::new(recv_function)),
@@ -64,21 +62,21 @@ impl Evaluator {
             // block until postman delivers message
             Ok(rx.recv().unwrap())
         } else {
-            let (ix, m) = (self.recv_function.lock().unwrap().deref_mut())();
+            let (ix, m) = (self.recv_function.lock().unwrap().deref_mut())()?;
             if m == Message::EndSync {
-                return self.recv(ix);
+                self.recv(ix)
+            } else if ix.is_some() {
+                Err(EvaluatorError::IndexReceivedInSyncMode)
+            } else {
+                Ok(m)
             }
-            if ix.is_some() {
-                Err(EvaluatorError::IndexReceivedInSyncMode)?;
-            }
-            Ok(m)
         }
     }
 
     fn internal_begin_sync(&self, num_indices: SyncIndex) -> Result<(), EvaluatorError> {
         let mut opt_info = self.sync_info.write().unwrap();
         if opt_info.is_some() {
-            Err(EvaluatorError::from(SyncError::SyncStartedInSync))?;
+            return Err(EvaluatorError::from(SyncError::SyncStartedInSync));
         }
         *opt_info = Some(SyncInfo::new(
             self.current_gate.load(Ordering::SeqCst),
@@ -125,7 +123,7 @@ fn start_postman(
     nindices: SyncIndex,
     sync_info: Arc<RwLock<Option<SyncInfo>>>,
     requests: Arc<RwLock<Option<Vec<SegQueue<Sender<Message>>>>>>,
-    recv_msg: Arc<Mutex<FnMut() -> (Option<SyncIndex>, Message) + Send>>,
+    recv_msg: Arc<Mutex<FnMut() -> Result<(Option<SyncIndex>, Message), EvaluatorError> + Send>>,
 ) {
     std::thread::spawn(move || {
         let mut awaiting = vec![VecDeque::new(); nindices as usize];
@@ -141,7 +139,7 @@ fn start_postman(
 
             if !done_receiving {
                 // receive a message
-                let (ix, m) = (recv_msg.lock().unwrap().deref_mut())();
+                let (ix, m) = (recv_msg.lock().unwrap().deref_mut())().unwrap(); // XXX: remove this `unwrap`
                 if m == Message::EndSync {
                     done_receiving = true;
                 } else {
@@ -426,7 +424,7 @@ impl GarbledCircuit {
             .collect_vec()
             .into_iter();
 
-        let eval = Evaluator::new(move || (None, msgs.next().unwrap()));
+        let eval = Evaluator::new(move || Ok((None, msgs.next().unwrap())));
         c.eval(&eval)
     }
 }

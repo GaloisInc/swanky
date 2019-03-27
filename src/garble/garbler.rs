@@ -1,16 +1,13 @@
-use itertools::Itertools;
-
-use std::collections::HashMap;
-use std::ops::DerefMut;
-use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::{Arc, Mutex, RwLock};
-
+use super::{Message, SyncInfo};
 use crate::error::{FancyError, GarblerError, SyncError};
 use crate::fancy::{Fancy, HasModulus, SyncIndex};
 use crate::util::{output_tweak, tweak, tweak2, RngExt};
 use crate::wire::Wire;
-
-use super::{Message, SyncInfo};
+use itertools::Itertools;
+use std::collections::HashMap;
+use std::ops::DerefMut;
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::{Arc, Mutex, RwLock};
 
 /// Streams garbled circuit ciphertexts through a callback. Parallelizable.
 pub struct Garbler {
@@ -47,7 +44,7 @@ impl Garbler {
     fn internal_begin_sync(&self, num_indices: SyncIndex) -> Result<(), GarblerError> {
         let mut opt_info = self.sync_info.write().unwrap();
         if opt_info.is_some() {
-            return Err(GarblerError::from(SyncError::SyncStartedInSync))?;
+            return Err(GarblerError::from(SyncError::SyncStartedInSync));
         }
         *opt_info = Some(SyncInfo::new(
             self.current_gate.load(Ordering::SeqCst),
@@ -64,7 +61,7 @@ impl Garbler {
                 done = true;
             }
         } else {
-            return Err(GarblerError::from(SyncError::IndexUsedOutOfSync))?;
+            return Err(GarblerError::from(SyncError::IndexUsedOutOfSync));
         }
         if done {
             *self.sync_info.write().unwrap() = None;

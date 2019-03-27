@@ -1,16 +1,14 @@
 //! Structs and functions for creating, streaming, and evaluating garbled circuits.
 
-use itertools::Itertools;
-use serde::{Deserialize, Serialize};
-
-use std::collections::HashMap;
-use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
-use std::sync::{Arc, Mutex};
-
 use crate::circuit::Circuit;
 use crate::error::GarblerError;
 use crate::fancy::{HasModulus, SyncIndex};
 use crate::wire::Wire;
+use itertools::Itertools;
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use std::sync::{Arc, Mutex};
 
 mod evaluator;
 mod garbler;
@@ -59,6 +57,19 @@ pub enum Message {
     /// For large computations, the Evaluator postman can get far ahead of the threads,
     /// and we don't want it to receive non-sync messages.
     EndSync,
+}
+
+impl Message {
+    pub fn to_u128s(self) -> Vec<u128> {
+        match self {
+            Message::GarblerInput(w) => vec![w.as_u128()],
+            Message::EvaluatorInput(w) => vec![w.as_u128()],
+            Message::Constant { wire, .. } => vec![wire.as_u128()],
+            Message::GarbledGate(gate) => gate,
+            Message::OutputCiphertext(ct) => ct,
+            _ => panic!("[Message::to_bytes] message type not allowed"),
+        }
+    }
 }
 
 impl std::fmt::Display for Message {
