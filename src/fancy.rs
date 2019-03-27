@@ -29,7 +29,7 @@ pub trait Fancy {
     type Item: Clone + HasModulus;
 
     /// Errors which may be thrown by the users of Fancy.
-    type Error: std::fmt::Debug + std::fmt::Display;
+    type Error: std::fmt::Debug + std::fmt::Display + std::convert::From<FancyError>;
 
     /// Create an input for the garbler with modulus `q` and optional garbler-private value `x`.
     fn garbler_input(
@@ -37,31 +37,22 @@ pub trait Fancy {
         ix: Option<SyncIndex>,
         q: u16,
         opt_x: Option<u16>,
-    ) -> Result<Self::Item, FancyError<Self::Error>>;
+    ) -> Result<Self::Item, Self::Error>;
 
     /// Create an input for the evaluator with modulus `q`.
-    fn evaluator_input(
-        &self,
-        ix: Option<SyncIndex>,
-        q: u16,
-    ) -> Result<Self::Item, FancyError<Self::Error>>;
+    fn evaluator_input(&self, ix: Option<SyncIndex>, q: u16) -> Result<Self::Item, Self::Error>;
 
     /// Create a constant `x` with modulus `q`.
-    fn constant(
-        &self,
-        ix: Option<SyncIndex>,
-        x: u16,
-        q: u16,
-    ) -> Result<Self::Item, FancyError<Self::Error>>;
+    fn constant(&self, ix: Option<SyncIndex>, x: u16, q: u16) -> Result<Self::Item, Self::Error>;
 
     /// Add `x` and `y`.
-    fn add(&self, x: &Self::Item, y: &Self::Item) -> Result<Self::Item, FancyError<Self::Error>>;
+    fn add(&self, x: &Self::Item, y: &Self::Item) -> Result<Self::Item, Self::Error>;
 
     /// Subtract `x` and `y`.
-    fn sub(&self, x: &Self::Item, y: &Self::Item) -> Result<Self::Item, FancyError<Self::Error>>;
+    fn sub(&self, x: &Self::Item, y: &Self::Item) -> Result<Self::Item, Self::Error>;
 
     /// Multiply `x` times the constant `c`.
-    fn cmul(&self, x: &Self::Item, c: u16) -> Result<Self::Item, FancyError<Self::Error>>;
+    fn cmul(&self, x: &Self::Item, c: u16) -> Result<Self::Item, Self::Error>;
 
     /// Multiply `x` and `y`.
     fn mul(
@@ -69,7 +60,7 @@ pub trait Fancy {
         ix: Option<SyncIndex>,
         x: &Self::Item,
         y: &Self::Item,
-    ) -> Result<Self::Item, FancyError<Self::Error>>;
+    ) -> Result<Self::Item, Self::Error>;
 
     /// Project `x` according to the truth table `tt`. Resulting wire has modulus `q`.
     ///
@@ -80,10 +71,10 @@ pub trait Fancy {
         x: &Self::Item,
         q: u16,
         tt: Option<Vec<u16>>,
-    ) -> Result<Self::Item, FancyError<Self::Error>>;
+    ) -> Result<Self::Item, Self::Error>;
 
     /// Process this wire as output.
-    fn output(&self, ix: Option<SyncIndex>, x: &Self::Item) -> Result<(), FancyError<Self::Error>>;
+    fn output(&self, ix: Option<SyncIndex>, x: &Self::Item) -> Result<(), Self::Error>;
 
     ////////////////////////////////////////////////////////////////////////////////
     // synchronization
@@ -91,15 +82,15 @@ pub trait Fancy {
     /// Start synchronization of internal messages.
     ///
     /// Optional, throws `FancyError::NotImplemented` if used without an implementation.
-    fn begin_sync(&self, _num_indices: SyncIndex) -> Result<(), FancyError<Self::Error>> {
-        Err(FancyError::NotImplemented)
+    fn begin_sync(&self, _num_indices: SyncIndex) -> Result<(), Self::Error> {
+        Err(Self::Error::from(FancyError::NotImplemented))
     }
 
     /// Declare this index to be done.
     ///
     /// Optional, throws `FancyError::NotImplemented` if used without an implementation.
-    fn finish_index(&self, _ix: SyncIndex) -> Result<(), FancyError<Self::Error>> {
-        Err(FancyError::NotImplemented)
+    fn finish_index(&self, _ix: SyncIndex) -> Result<(), Self::Error> {
+        Err(Self::Error::from(FancyError::NotImplemented))
     }
 
     ////////////////////////////////////////////////////////////////////////////////
@@ -111,7 +102,7 @@ pub trait Fancy {
         ix: Option<SyncIndex>,
         qs: &[u16],
         opt_xs: Option<Vec<u16>>,
-    ) -> Result<Vec<Self::Item>, FancyError<Self::Error>> {
+    ) -> Result<Vec<Self::Item>, Self::Error> {
         let xs = to_vec_option(opt_xs, qs.len());
         qs.iter()
             .zip(xs)
@@ -124,17 +115,17 @@ pub trait Fancy {
         &self,
         ix: Option<SyncIndex>,
         qs: &[u16],
-    ) -> Result<Vec<Self::Item>, FancyError<Self::Error>> {
+    ) -> Result<Vec<Self::Item>, Self::Error> {
         qs.iter().map(|&q| self.evaluator_input(ix, q)).collect()
     }
 
     /// Sum up a slice of wires.
-    fn add_many(&self, args: &[Self::Item]) -> Result<Self::Item, FancyError<Self::Error>> {
+    fn add_many(&self, args: &[Self::Item]) -> Result<Self::Item, Self::Error> {
         if args.len() < 2 {
-            return Err(FancyError::InvalidArgNum {
+            return Err(Self::Error::from(FancyError::InvalidArgNum {
                 got: args.len(),
                 needed: 2,
-            });
+            }));
         }
         let mut z = args[0].clone();
         for x in args.iter().skip(1) {
@@ -144,33 +135,29 @@ pub trait Fancy {
     }
 
     /// Xor is just addition, with the requirement that `x` and `y` are mod 2.
-    fn xor(&self, x: &Self::Item, y: &Self::Item) -> Result<Self::Item, FancyError<Self::Error>> {
+    fn xor(&self, x: &Self::Item, y: &Self::Item) -> Result<Self::Item, Self::Error> {
         if x.modulus() != 2 {
-            return Err(FancyError::InvalidArgMod {
+            return Err(Self::Error::from(FancyError::InvalidArgMod {
                 got: x.modulus(),
                 needed: 2,
-            });
+            }));
         }
         if y.modulus() != 2 {
-            return Err(FancyError::InvalidArgMod {
+            return Err(Self::Error::from(FancyError::InvalidArgMod {
                 got: y.modulus(),
                 needed: 2,
-            });
+            }));
         }
         self.add(x, y)
     }
 
     /// Negate by xoring `x` with `1`.
-    fn negate(
-        &self,
-        ix: Option<SyncIndex>,
-        x: &Self::Item,
-    ) -> Result<Self::Item, FancyError<Self::Error>> {
+    fn negate(&self, ix: Option<SyncIndex>, x: &Self::Item) -> Result<Self::Item, Self::Error> {
         if x.modulus() != 2 {
-            return Err(FancyError::InvalidArgMod {
+            return Err(Self::Error::from(FancyError::InvalidArgMod {
                 got: x.modulus(),
                 needed: 2,
-            });
+            }));
         }
         let one = self.constant(ix, 1, 2)?;
         self.xor(x, &one)
@@ -182,18 +169,18 @@ pub trait Fancy {
         ix: Option<SyncIndex>,
         x: &Self::Item,
         y: &Self::Item,
-    ) -> Result<Self::Item, FancyError<Self::Error>> {
+    ) -> Result<Self::Item, Self::Error> {
         if x.modulus() != 2 {
-            return Err(FancyError::InvalidArgMod {
+            return Err(Self::Error::from(FancyError::InvalidArgMod {
                 got: x.modulus(),
                 needed: 2,
-            });
+            }));
         }
         if y.modulus() != 2 {
-            return Err(FancyError::InvalidArgMod {
+            return Err(Self::Error::from(FancyError::InvalidArgMod {
                 got: y.modulus(),
                 needed: 2,
-            });
+            }));
         }
         self.mul(ix, x, y)
     }
@@ -204,18 +191,18 @@ pub trait Fancy {
         ix: Option<SyncIndex>,
         x: &Self::Item,
         y: &Self::Item,
-    ) -> Result<Self::Item, FancyError<Self::Error>> {
+    ) -> Result<Self::Item, Self::Error> {
         if x.modulus() != 2 {
-            return Err(FancyError::InvalidArgMod {
+            return Err(Self::Error::from(FancyError::InvalidArgMod {
                 got: x.modulus(),
                 needed: 2,
-            });
+            }));
         }
         if y.modulus() != 2 {
-            return Err(FancyError::InvalidArgMod {
+            return Err(Self::Error::from(FancyError::InvalidArgMod {
                 got: y.modulus(),
                 needed: 2,
-            });
+            }));
         }
         let notx = self.negate(ix, x)?;
         let noty = self.negate(ix, y)?;
@@ -228,12 +215,12 @@ pub trait Fancy {
         &self,
         ix: Option<SyncIndex>,
         args: &[Self::Item],
-    ) -> Result<Self::Item, FancyError<Self::Error>> {
+    ) -> Result<Self::Item, Self::Error> {
         if args.len() < 2 {
-            return Err(FancyError::InvalidArgNum {
+            return Err(Self::Error::from(FancyError::InvalidArgNum {
                 got: args.len(),
                 needed: 2,
-            });
+            }));
         }
         args.iter()
             .skip(1)
@@ -245,12 +232,12 @@ pub trait Fancy {
         &self,
         ix: Option<SyncIndex>,
         args: &[Self::Item],
-    ) -> Result<Self::Item, FancyError<Self::Error>> {
+    ) -> Result<Self::Item, Self::Error> {
         if args.len() < 2 {
-            return Err(FancyError::InvalidArgNum {
+            return Err(Self::Error::from(FancyError::InvalidArgNum {
                 got: args.len(),
                 needed: 2,
-            });
+            }));
         }
         args.iter()
             .skip(1)
@@ -263,7 +250,7 @@ pub trait Fancy {
         ix: Option<SyncIndex>,
         x: &Self::Item,
         to_modulus: u16,
-    ) -> Result<Self::Item, FancyError<Self::Error>> {
+    ) -> Result<Self::Item, Self::Error> {
         let from_modulus = x.modulus();
         if from_modulus == to_modulus {
             return Ok(x.clone());
@@ -279,18 +266,18 @@ pub trait Fancy {
         x: &Self::Item,
         y: &Self::Item,
         carry_in: Option<&Self::Item>,
-    ) -> Result<(Self::Item, Self::Item), FancyError<Self::Error>> {
+    ) -> Result<(Self::Item, Self::Item), Self::Error> {
         if x.modulus() != 2 {
-            return Err(FancyError::InvalidArgMod {
+            return Err(Self::Error::from(FancyError::InvalidArgMod {
                 got: x.modulus(),
                 needed: 2,
-            });
+            }));
         }
         if y.modulus() != 2 {
-            return Err(FancyError::InvalidArgMod {
+            return Err(Self::Error::from(FancyError::InvalidArgMod {
                 got: y.modulus(),
                 needed: 2,
-            });
+            }));
         }
         if let Some(c) = carry_in {
             let z1 = self.xor(x, y)?;
@@ -313,7 +300,7 @@ pub trait Fancy {
         b: &Self::Item,
         x: &Self::Item,
         y: &Self::Item,
-    ) -> Result<Self::Item, FancyError<Self::Error>> {
+    ) -> Result<Self::Item, Self::Error> {
         let notb = self.negate(ix, b)?;
         let xsel = self.and(ix, &notb, x)?;
         let ysel = self.and(ix, b, y)?;
@@ -327,12 +314,12 @@ pub trait Fancy {
         x: &Self::Item,
         b1: bool,
         b2: bool,
-    ) -> Result<Self::Item, FancyError<Self::Error>> {
+    ) -> Result<Self::Item, Self::Error> {
         if x.modulus() != 2 {
-            return Err(FancyError::InvalidArgMod {
+            return Err(Self::Error::from(FancyError::InvalidArgMod {
                 got: x.modulus(),
                 needed: 2,
-            });
+            }));
         }
         if !b1 && b2 {
             Ok(x.clone())
@@ -346,11 +333,7 @@ pub trait Fancy {
     }
 
     /// Output a slice of wires.
-    fn outputs(
-        &self,
-        ix: Option<SyncIndex>,
-        xs: &[Self::Item],
-    ) -> Result<(), FancyError<Self::Error>> {
+    fn outputs(&self, ix: Option<SyncIndex>, xs: &[Self::Item]) -> Result<(), Self::Error> {
         for x in xs.iter() {
             self.output(ix, x)?;
         }

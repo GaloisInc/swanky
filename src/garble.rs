@@ -8,7 +8,7 @@ use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 
 use crate::circuit::Circuit;
-use crate::error::{FancyError, GarblerError};
+use crate::error::GarblerError;
 use crate::fancy::{HasModulus, SyncIndex};
 use crate::wire::Wire;
 
@@ -57,7 +57,7 @@ pub enum Message {
     /// End synchronization mode.
     ///
     /// For large computations, the Evaluator postman can get far ahead of the threads,
-    /// and we dont want it to receive non-sync messages.
+    /// and we don't want it to receive non-sync messages.
     EndSync,
 }
 
@@ -147,13 +147,12 @@ where
 }
 
 /// Garble a circuit without streaming.
-pub fn garble(c: &Circuit) -> Result<(Encoder, Decoder, GarbledCircuit), FancyError<GarblerError>> {
+pub fn garble(c: &Circuit) -> Result<(Encoder, Decoder, GarbledCircuit), GarblerError> {
     let garbler_inputs = Arc::new(Mutex::new(Vec::new()));
     let evaluator_inputs = Arc::new(Mutex::new(Vec::new()));
     let garbled_gates = Arc::new(Mutex::new(Vec::new()));
     let constants = Arc::new(Mutex::new(HashMap::new()));
     let garbled_outputs = Arc::new(Mutex::new(Vec::new()));
-    let deltas;
 
     let send_func;
     {
@@ -182,7 +181,7 @@ pub fn garble(c: &Circuit) -> Result<(Encoder, Decoder, GarbledCircuit), FancyEr
     let garbler = Garbler::new(send_func);
     let outputs = c.eval(&garbler)?;
     c.process_outputs(&outputs, &garbler)?;
-    deltas = garbler.get_deltas();
+    let deltas = garbler.get_deltas();
 
     let en = Encoder::new(
         Arc::try_unwrap(garbler_inputs)

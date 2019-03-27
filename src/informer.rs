@@ -199,7 +199,7 @@ impl Fancy for Informer {
         _ix: Option<SyncIndex>,
         modulus: u16,
         _opt_x: Option<u16>,
-    ) -> Result<InformerVal, FancyError<InformerError>> {
+    ) -> Result<InformerVal, InformerError> {
         self.garbler_input_moduli.lock().unwrap().push(modulus);
         Ok(InformerVal(modulus))
     }
@@ -208,7 +208,7 @@ impl Fancy for Informer {
         &self,
         _ix: Option<SyncIndex>,
         modulus: u16,
-    ) -> Result<InformerVal, FancyError<InformerError>> {
+    ) -> Result<InformerVal, InformerError> {
         self.evaluator_input_moduli.lock().unwrap().push(modulus);
         Ok(InformerVal(modulus))
     }
@@ -218,16 +218,12 @@ impl Fancy for Informer {
         _ix: Option<SyncIndex>,
         val: u16,
         modulus: u16,
-    ) -> Result<InformerVal, FancyError<InformerError>> {
+    ) -> Result<InformerVal, InformerError> {
         self.constants.lock().unwrap().insert((val, modulus));
         Ok(InformerVal(modulus))
     }
 
-    fn add(
-        &self,
-        x: &InformerVal,
-        y: &InformerVal,
-    ) -> Result<InformerVal, FancyError<InformerError>> {
+    fn add(&self, x: &InformerVal, y: &InformerVal) -> Result<InformerVal, InformerError> {
         if x.modulus() != y.modulus() {
             Err(FancyError::UnequalModuli)?;
         }
@@ -235,11 +231,7 @@ impl Fancy for Informer {
         Ok(InformerVal(x.modulus()))
     }
 
-    fn sub(
-        &self,
-        x: &InformerVal,
-        y: &InformerVal,
-    ) -> Result<InformerVal, FancyError<InformerError>> {
+    fn sub(&self, x: &InformerVal, y: &InformerVal) -> Result<InformerVal, InformerError> {
         if x.modulus() != y.modulus() {
             Err(FancyError::UnequalModuli)?;
         }
@@ -247,7 +239,7 @@ impl Fancy for Informer {
         Ok(InformerVal(x.modulus()))
     }
 
-    fn cmul(&self, x: &InformerVal, _c: u16) -> Result<InformerVal, FancyError<InformerError>> {
+    fn cmul(&self, x: &InformerVal, _c: u16) -> Result<InformerVal, InformerError> {
         self.ncmuls.fetch_add(1, Ordering::SeqCst);
         Ok(InformerVal(x.modulus()))
     }
@@ -257,7 +249,7 @@ impl Fancy for Informer {
         ix: Option<SyncIndex>,
         x: &InformerVal,
         y: &InformerVal,
-    ) -> Result<InformerVal, FancyError<InformerError>> {
+    ) -> Result<InformerVal, InformerError> {
         if x.modulus() < y.modulus() {
             return self.mul(ix, y, x);
         }
@@ -279,18 +271,14 @@ impl Fancy for Informer {
         x: &InformerVal,
         modulus: u16,
         _tt: Option<Vec<u16>>,
-    ) -> Result<InformerVal, FancyError<InformerError>> {
+    ) -> Result<InformerVal, InformerError> {
         self.nprojs.fetch_add(1, Ordering::SeqCst);
         self.nciphertexts
             .fetch_add(x.modulus() as usize - 1, Ordering::SeqCst);
         Ok(InformerVal(modulus))
     }
 
-    fn output(
-        &self,
-        _ix: Option<SyncIndex>,
-        x: &InformerVal,
-    ) -> Result<(), FancyError<InformerError>> {
+    fn output(&self, _ix: Option<SyncIndex>, x: &InformerVal) -> Result<(), InformerError> {
         self.outputs.lock().unwrap().push(x.modulus());
         Ok(())
     }

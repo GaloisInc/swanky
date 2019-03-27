@@ -118,7 +118,7 @@ impl Circuit {
         }
     }
 
-    pub fn eval<F: Fancy>(&self, f: &F) -> Result<Vec<F::Item>, FancyError<F::Error>> {
+    pub fn eval<F: Fancy>(&self, f: &F) -> Result<Vec<F::Item>, F::Error> {
         let mut cache: Vec<Option<F::Item>> = vec![None; self.gates.len()];
         for (i, gate) in self.gates.iter().enumerate() {
             let q = self.modulus(i);
@@ -131,10 +131,10 @@ impl Circuit {
                     f.add(
                         cache[xref.ix]
                             .as_ref()
-                            .ok_or(FancyError::UninitializedValue)?,
+                            .ok_or(F::Error::from(FancyError::UninitializedValue))?,
                         cache[yref.ix]
                             .as_ref()
-                            .ok_or(FancyError::UninitializedValue)?,
+                            .ok_or(F::Error::from(FancyError::UninitializedValue))?,
                     )?,
                 ),
                 Gate::Sub { xref, yref, out } => (
@@ -142,10 +142,10 @@ impl Circuit {
                     f.sub(
                         cache[xref.ix]
                             .as_ref()
-                            .ok_or(FancyError::UninitializedValue)?,
+                            .ok_or(F::Error::from(FancyError::UninitializedValue))?,
                         cache[yref.ix]
                             .as_ref()
-                            .ok_or(FancyError::UninitializedValue)?,
+                            .ok_or(F::Error::from(FancyError::UninitializedValue))?,
                     )?,
                 ),
                 Gate::Cmul { xref, c, out } => (
@@ -153,7 +153,7 @@ impl Circuit {
                     f.cmul(
                         cache[xref.ix]
                             .as_ref()
-                            .ok_or(FancyError::UninitializedValue)?,
+                            .ok_or(F::Error::from(FancyError::UninitializedValue))?,
                         c,
                     )?,
                 ),
@@ -168,7 +168,7 @@ impl Circuit {
                         None,
                         cache[xref.ix]
                             .as_ref()
-                            .ok_or(FancyError::UninitializedValue)?,
+                            .ok_or(F::Error::from(FancyError::UninitializedValue))?,
                         q,
                         Some(tt.to_vec()),
                     )?,
@@ -184,10 +184,10 @@ impl Circuit {
                         None,
                         cache[xref.ix]
                             .as_ref()
-                            .ok_or(FancyError::UninitializedValue)?,
+                            .ok_or(F::Error::from(FancyError::UninitializedValue))?,
                         cache[yref.ix]
                             .as_ref()
-                            .ok_or(FancyError::UninitializedValue)?,
+                            .ok_or(F::Error::from(FancyError::UninitializedValue))?,
                     )?,
                 ),
             };
@@ -195,17 +195,15 @@ impl Circuit {
         }
         let mut outputs = Vec::with_capacity(self.output_refs.len());
         for r in self.output_refs.iter() {
-            let out = cache[r.ix].clone().ok_or(FancyError::UninitializedValue)?;
+            let out = cache[r.ix]
+                .clone()
+                .ok_or(F::Error::from(FancyError::UninitializedValue))?;
             outputs.push(out);
         }
         Ok(outputs)
     }
 
-    pub fn process_outputs<F: Fancy>(
-        &self,
-        outputs: &[F::Item],
-        f: &F,
-    ) -> Result<(), FancyError<F::Error>> {
+    pub fn process_outputs<F: Fancy>(&self, outputs: &[F::Item], f: &F) -> Result<(), F::Error> {
         for r in outputs.iter() {
             f.output(None, r)?;
         }
@@ -217,7 +215,7 @@ impl Circuit {
         &self,
         garbler_inputs: &[u16],
         evaluator_inputs: &[u16],
-    ) -> Result<Vec<u16>, FancyError<DummyError>> {
+    ) -> Result<Vec<u16>, DummyError> {
         let dummy = crate::dummy::Dummy::new(garbler_inputs, evaluator_inputs);
         let outputs = self.eval(&dummy)?;
         self.process_outputs(&outputs, &dummy)?;
@@ -225,7 +223,7 @@ impl Circuit {
     }
 
     /// Print circuit info.
-    pub fn info(&self) -> Result<(), FancyError<InformerError>> {
+    pub fn info(&self) -> Result<(), InformerError> {
         let informer = crate::informer::Informer::new();
         self.eval(&informer)?;
         Ok(())
@@ -276,7 +274,7 @@ impl Fancy for CircuitBuilder {
         _ix: Option<SyncIndex>,
         modulus: u16,
         _opt_x: Option<u16>,
-    ) -> Result<CircuitRef, FancyError<CircuitBuilderError>> {
+    ) -> Result<CircuitRef, Self::Error> {
         let gate = Gate::GarblerInput {
             id: self.get_next_garbler_input_id(),
         };
@@ -289,7 +287,7 @@ impl Fancy for CircuitBuilder {
         &self,
         _ix: Option<SyncIndex>,
         modulus: u16,
-    ) -> Result<CircuitRef, FancyError<CircuitBuilderError>> {
+    ) -> Result<CircuitRef, Self::Error> {
         let gate = Gate::EvaluatorInput {
             id: self.get_next_evaluator_input_id(),
         };
@@ -303,7 +301,7 @@ impl Fancy for CircuitBuilder {
         _ix: Option<SyncIndex>,
         val: u16,
         modulus: u16,
-    ) -> Result<CircuitRef, FancyError<CircuitBuilderError>> {
+    ) -> Result<CircuitRef, Self::Error> {
         let mut map = self.const_map.lock().unwrap();
         match map.get(&(val, modulus)) {
             Some(&r) => Ok(r),
@@ -317,13 +315,9 @@ impl Fancy for CircuitBuilder {
         }
     }
 
-    fn add(
-        &self,
-        xref: &CircuitRef,
-        yref: &CircuitRef,
-    ) -> Result<CircuitRef, FancyError<CircuitBuilderError>> {
+    fn add(&self, xref: &CircuitRef, yref: &CircuitRef) -> Result<CircuitRef, Self::Error> {
         if xref.modulus() != yref.modulus() {
-            return Err(FancyError::UnequalModuli);
+            return Err(Self::Error::from(FancyError::UnequalModuli));
         }
         let gate = Gate::Add {
             xref: *xref,
@@ -333,13 +327,9 @@ impl Fancy for CircuitBuilder {
         Ok(self.gate(gate, xref.modulus()))
     }
 
-    fn sub(
-        &self,
-        xref: &CircuitRef,
-        yref: &CircuitRef,
-    ) -> Result<CircuitRef, FancyError<CircuitBuilderError>> {
+    fn sub(&self, xref: &CircuitRef, yref: &CircuitRef) -> Result<CircuitRef, Self::Error> {
         if xref.modulus() != yref.modulus() {
-            return Err(FancyError::UnequalModuli);
+            return Err(Self::Error::from(FancyError::UnequalModuli));
         }
         let gate = Gate::Sub {
             xref: *xref,
@@ -349,11 +339,7 @@ impl Fancy for CircuitBuilder {
         Ok(self.gate(gate, xref.modulus()))
     }
 
-    fn cmul(
-        &self,
-        xref: &CircuitRef,
-        c: u16,
-    ) -> Result<CircuitRef, FancyError<CircuitBuilderError>> {
+    fn cmul(&self, xref: &CircuitRef, c: u16) -> Result<CircuitRef, Self::Error> {
         Ok(self.gate(
             Gate::Cmul {
                 xref: *xref,
@@ -370,10 +356,10 @@ impl Fancy for CircuitBuilder {
         xref: &CircuitRef,
         output_modulus: u16,
         tt: Option<Vec<u16>>,
-    ) -> Result<CircuitRef, FancyError<CircuitBuilderError>> {
-        let tt = tt.ok_or(FancyError::NoTruthTable)?;
+    ) -> Result<CircuitRef, Self::Error> {
+        let tt = tt.ok_or(Self::Error::from(FancyError::NoTruthTable))?;
         if tt.len() < xref.modulus() as usize || !tt.iter().all(|&x| x < output_modulus) {
-            return Err(FancyError::InvalidTruthTable);
+            return Err(Self::Error::from(FancyError::InvalidTruthTable));
         }
         let gate = Gate::Proj {
             xref: *xref,
@@ -389,7 +375,7 @@ impl Fancy for CircuitBuilder {
         ix: Option<SyncIndex>,
         xref: &CircuitRef,
         yref: &CircuitRef,
-    ) -> Result<CircuitRef, FancyError<CircuitBuilderError>> {
+    ) -> Result<CircuitRef, Self::Error> {
         if xref.modulus() < yref.modulus() {
             return self.mul(ix, yref, xref);
         }
@@ -404,11 +390,7 @@ impl Fancy for CircuitBuilder {
         Ok(self.gate(gate, xref.modulus()))
     }
 
-    fn output(
-        &self,
-        _ix: Option<SyncIndex>,
-        xref: &CircuitRef,
-    ) -> Result<(), FancyError<CircuitBuilderError>> {
+    fn output(&self, _ix: Option<SyncIndex>, xref: &CircuitRef) -> Result<(), Self::Error> {
         self.circ.lock().unwrap().output_refs.push(xref.clone());
         Ok(())
     }

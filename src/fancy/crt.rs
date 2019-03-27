@@ -72,12 +72,12 @@ pub trait BundleGadgets: Fancy {
         ix: Option<SyncIndex>,
         ps: &[u16],
         opt_xs: Option<Vec<u16>>,
-    ) -> Result<Bundle<Self::Item>, FancyError<Self::Error>> {
+    ) -> Result<Bundle<Self::Item>, Self::Error> {
         let xs = to_vec_option(opt_xs, ps.len());
         ps.iter()
             .zip(xs)
             .map(|(&p, x)| self.garbler_input(ix, p, x))
-            .collect::<Result<Vec<Self::Item>, FancyError<Self::Error>>>()
+            .collect::<Result<Vec<Self::Item>, Self::Error>>()
             .map(Bundle)
     }
 
@@ -86,10 +86,10 @@ pub trait BundleGadgets: Fancy {
         &self,
         ix: Option<SyncIndex>,
         ps: &[u16],
-    ) -> Result<Bundle<Self::Item>, FancyError<Self::Error>> {
+    ) -> Result<Bundle<Self::Item>, Self::Error> {
         ps.iter()
             .map(|&p| self.evaluator_input(ix, p))
-            .collect::<Result<Vec<Self::Item>, FancyError<Self::Error>>>()
+            .collect::<Result<Vec<Self::Item>, Self::Error>>()
             .map(Bundle)
     }
 
@@ -100,7 +100,7 @@ pub trait BundleGadgets: Fancy {
         ix: Option<SyncIndex>,
         q: u128,
         opt_x: Option<u128>,
-    ) -> Result<Bundle<Self::Item>, FancyError<Self::Error>> {
+    ) -> Result<Bundle<Self::Item>, Self::Error> {
         self.garbler_input_bundle(ix, &util::factor(q), opt_x.map(|x| util::crt_factor(x, q)))
     }
 
@@ -109,7 +109,7 @@ pub trait BundleGadgets: Fancy {
         &self,
         ix: Option<SyncIndex>,
         q: u128,
-    ) -> Result<Bundle<Self::Item>, FancyError<Self::Error>> {
+    ) -> Result<Bundle<Self::Item>, Self::Error> {
         self.evaluator_input_bundle(ix, &util::factor(q))
     }
 
@@ -119,7 +119,7 @@ pub trait BundleGadgets: Fancy {
         ix: Option<SyncIndex>,
         nbits: usize,
         opt_x: Option<u128>,
-    ) -> Result<Bundle<Self::Item>, FancyError<Self::Error>> {
+    ) -> Result<Bundle<Self::Item>, Self::Error> {
         self.garbler_input_bundle(
             ix,
             &vec![2; nbits],
@@ -132,7 +132,7 @@ pub trait BundleGadgets: Fancy {
         &self,
         ix: Option<SyncIndex>,
         n: usize,
-    ) -> Result<Bundle<Self::Item>, FancyError<Self::Error>> {
+    ) -> Result<Bundle<Self::Item>, Self::Error> {
         self.evaluator_input_bundle(ix, &vec![2; n])
     }
 
@@ -142,11 +142,11 @@ pub trait BundleGadgets: Fancy {
         ix: Option<SyncIndex>,
         xs: &[u16],
         ps: &[u16],
-    ) -> Result<Bundle<Self::Item>, FancyError<Self::Error>> {
+    ) -> Result<Bundle<Self::Item>, Self::Error> {
         xs.iter()
             .zip(ps.iter())
             .map(|(&x, &p)| self.constant(ix, x, p))
-            .collect::<Result<Vec<Self::Item>, FancyError<Self::Error>>>()
+            .collect::<Result<Vec<Self::Item>, Self::Error>>()
             .map(Bundle)
     }
 
@@ -157,7 +157,7 @@ pub trait BundleGadgets: Fancy {
         ix: Option<SyncIndex>,
         x: u128,
         q: u128,
-    ) -> Result<Bundle<Self::Item>, FancyError<Self::Error>> {
+    ) -> Result<Bundle<Self::Item>, Self::Error> {
         let ps = util::factor(q);
         let xs = ps.iter().map(|&p| (x % p as u128) as u16).collect_vec();
         self.constant_bundle(ix, &xs, &ps)
@@ -169,7 +169,7 @@ pub trait BundleGadgets: Fancy {
         ix: Option<SyncIndex>,
         val: u128,
         nbits: usize,
-    ) -> Result<Bundle<Self::Item>, FancyError<Self::Error>> {
+    ) -> Result<Bundle<Self::Item>, Self::Error> {
         self.constant_bundle(ix, &util::u128_to_bits(val, nbits), &vec![2; nbits])
     }
 
@@ -180,13 +180,13 @@ pub trait BundleGadgets: Fancy {
         ps: &[u16],
         n: usize,
         opt_xs: Option<Vec<Vec<u16>>>,
-    ) -> Result<Vec<Bundle<Self::Item>>, FancyError<Self::Error>> {
+    ) -> Result<Vec<Bundle<Self::Item>>, Self::Error> {
         if let Some(inps) = opt_xs {
             if inps.len() != n {
-                return Err(FancyError::InvalidArgNum {
+                return Err(Self::Error::from(FancyError::InvalidArgNum {
                     got: inps.len(),
                     needed: n,
-                });
+                }));
             }
             inps.into_iter()
                 .map(|xs| self.garbler_input_bundle(ix, ps, Some(xs)))
@@ -204,7 +204,7 @@ pub trait BundleGadgets: Fancy {
         ix: Option<SyncIndex>,
         ps: &[u16],
         n: usize,
-    ) -> Result<Vec<Bundle<Self::Item>>, FancyError<Self::Error>> {
+    ) -> Result<Vec<Bundle<Self::Item>>, Self::Error> {
         (0..n)
             .map(|_| self.evaluator_input_bundle(ix, ps))
             .collect()
@@ -218,13 +218,13 @@ pub trait BundleGadgets: Fancy {
         q: u128,
         n: usize,
         opt_xs: Option<Vec<u128>>,
-    ) -> Result<Vec<Bundle<Self::Item>>, FancyError<Self::Error>> {
+    ) -> Result<Vec<Bundle<Self::Item>>, Self::Error> {
         if let Some(xs) = opt_xs {
             if xs.len() != n {
-                return Err(FancyError::InvalidArgNum {
+                return Err(Self::Error::from(FancyError::InvalidArgNum {
                     got: xs.len(),
                     needed: n,
-                });
+                }));
             }
             xs.into_iter()
                 .map(|x| self.garbler_input_bundle_crt(ix, q, Some(x)))
@@ -242,7 +242,7 @@ pub trait BundleGadgets: Fancy {
         ix: Option<SyncIndex>,
         q: u128,
         n: usize,
-    ) -> Result<Vec<Bundle<Self::Item>>, FancyError<Self::Error>> {
+    ) -> Result<Vec<Bundle<Self::Item>>, Self::Error> {
         (0..n)
             .map(|_| self.evaluator_input_bundle_crt(ix, q))
             .collect()
@@ -253,7 +253,7 @@ pub trait BundleGadgets: Fancy {
         &self,
         ix: Option<SyncIndex>,
         x: &Bundle<Self::Item>,
-    ) -> Result<(), FancyError<Self::Error>> {
+    ) -> Result<(), Self::Error> {
         for w in x.wires() {
             self.output(ix, w)?;
         }
@@ -265,7 +265,7 @@ pub trait BundleGadgets: Fancy {
         &self,
         ix: Option<SyncIndex>,
         xs: &[Bundle<Self::Item>],
-    ) -> Result<(), FancyError<Self::Error>> {
+    ) -> Result<(), Self::Error> {
         for x in xs.iter() {
             self.output_bundle(ix, x)?;
         }
@@ -280,18 +280,18 @@ pub trait BundleGadgets: Fancy {
         &self,
         x: &Bundle<Self::Item>,
         y: &Bundle<Self::Item>,
-    ) -> Result<Bundle<Self::Item>, FancyError<Self::Error>> {
+    ) -> Result<Bundle<Self::Item>, Self::Error> {
         if x.wires().len() != y.wires().len() {
-            return Err(FancyError::InvalidArgNum {
+            return Err(Self::Error::from(FancyError::InvalidArgNum {
                 got: y.wires().len(),
                 needed: x.wires().len(),
-            });
+            }));
         }
         x.wires()
             .iter()
             .zip(y.wires().iter())
             .map(|(x, y)| self.add(x, y))
-            .collect::<Result<Vec<Self::Item>, FancyError<Self::Error>>>()
+            .collect::<Result<Vec<Self::Item>, Self::Error>>()
             .map(Bundle)
     }
 
@@ -300,18 +300,18 @@ pub trait BundleGadgets: Fancy {
         &self,
         x: &Bundle<Self::Item>,
         y: &Bundle<Self::Item>,
-    ) -> Result<Bundle<Self::Item>, FancyError<Self::Error>> {
+    ) -> Result<Bundle<Self::Item>, Self::Error> {
         if x.wires().len() != y.wires().len() {
-            return Err(FancyError::InvalidArgNum {
+            return Err(Self::Error::from(FancyError::InvalidArgNum {
                 got: y.wires().len(),
                 needed: x.wires().len(),
-            });
+            }));
         }
         x.wires()
             .iter()
             .zip(y.wires().iter())
             .map(|(x, y)| self.sub(x, y))
-            .collect::<Result<Vec<Self::Item>, FancyError<Self::Error>>>()
+            .collect::<Result<Vec<Self::Item>, Self::Error>>()
             .map(Bundle)
     }
 
@@ -320,13 +320,13 @@ pub trait BundleGadgets: Fancy {
         &self,
         x: &Bundle<Self::Item>,
         c: u128,
-    ) -> Result<Bundle<Self::Item>, FancyError<Self::Error>> {
+    ) -> Result<Bundle<Self::Item>, Self::Error> {
         let cs = util::crt(c, &x.moduli());
         x.wires()
             .iter()
             .zip(cs.into_iter())
             .map(|(x, c)| self.cmul(x, c))
-            .collect::<Result<Vec<Self::Item>, FancyError<Self::Error>>>()
+            .collect::<Result<Vec<Self::Item>, Self::Error>>()
             .map(Bundle)
     }
 
@@ -336,12 +336,12 @@ pub trait BundleGadgets: Fancy {
         ix: Option<SyncIndex>,
         x: &Bundle<Self::Item>,
         y: &Bundle<Self::Item>,
-    ) -> Result<Bundle<Self::Item>, FancyError<Self::Error>> {
+    ) -> Result<Bundle<Self::Item>, Self::Error> {
         x.wires()
             .iter()
             .zip(y.wires().iter())
             .map(|(x, y)| self.mul(ix, x, y))
-            .collect::<Result<Vec<Self::Item>, FancyError<Self::Error>>>()
+            .collect::<Result<Vec<Self::Item>, Self::Error>>()
             .map(Bundle)
     }
 
@@ -351,7 +351,7 @@ pub trait BundleGadgets: Fancy {
         ix: Option<SyncIndex>,
         x: &Bundle<Self::Item>,
         c: u16,
-    ) -> Result<Bundle<Self::Item>, FancyError<Self::Error>> {
+    ) -> Result<Bundle<Self::Item>, Self::Error> {
         x.wires()
             .iter()
             .map(|x| {
@@ -361,7 +361,7 @@ pub trait BundleGadgets: Fancy {
                     .collect_vec();
                 self.proj(ix, x, p, Some(tab))
             })
-            .collect::<Result<Vec<Self::Item>, FancyError<Self::Error>>>()
+            .collect::<Result<Vec<Self::Item>, Self::Error>>()
             .map(Bundle)
     }
 
@@ -371,19 +371,19 @@ pub trait BundleGadgets: Fancy {
         ix: Option<SyncIndex>,
         x: &Bundle<Self::Item>,
         p: u16,
-    ) -> Result<Bundle<Self::Item>, FancyError<Self::Error>> {
+    ) -> Result<Bundle<Self::Item>, Self::Error> {
         let i = x
             .moduli()
             .iter()
             .position(|&q| p == q)
-            .ok_or(FancyError::InvalidArg {
+            .ok_or(Self::Error::from(FancyError::InvalidArg {
                 desc: "p is not a moduli in this bundle!".to_string(),
-            })?;
+            }))?;
         let w = &x.wires()[i];
         x.moduli()
             .iter()
             .map(|&q| self.mod_change(ix, w, q))
-            .collect::<Result<Vec<Self::Item>, FancyError<Self::Error>>>()
+            .collect::<Result<Vec<Self::Item>, Self::Error>>()
             .map(Bundle)
     }
 
@@ -393,9 +393,9 @@ pub trait BundleGadgets: Fancy {
         ix: Option<SyncIndex>,
         x: &Bundle<Self::Item>,
         y: &Bundle<Self::Item>,
-    ) -> Result<Self::Item, FancyError<Self::Error>> {
+    ) -> Result<Self::Item, Self::Error> {
         if x.moduli() != y.moduli() {
-            return Err(FancyError::UnequalModuli);
+            return Err(Self::Error::from(FancyError::UnequalModuli));
         }
         let wlen = x.wires().len() as u16;
         let zs = x
@@ -409,7 +409,7 @@ pub trait BundleGadgets: Fancy {
                 eq_zero_tab[0] = 1;
                 self.proj(ix, &z, wlen + 1, Some(eq_zero_tab))
             })
-            .collect::<Result<Vec<Self::Item>, FancyError<Self::Error>>>()?;
+            .collect::<Result<Vec<Self::Item>, Self::Error>>()?;
         // add up the results, and output whether they equal zero or not, mod 2
         let z = self.add_many(&zs)?;
         let b = zs.len();
@@ -423,18 +423,18 @@ pub trait BundleGadgets: Fancy {
         &self,
         ix: Option<SyncIndex>,
         xs: &[Bundle<Self::Item>],
-    ) -> Result<Bundle<Self::Item>, FancyError<Self::Error>> {
+    ) -> Result<Bundle<Self::Item>, Self::Error> {
         let nargs = xs.len();
         let n = xs[0].wires().len();
 
         if nargs < 2 {
-            return Err(FancyError::InvalidArgNum {
+            return Err(Self::Error::from(FancyError::InvalidArgNum {
                 got: nargs,
                 needed: 2,
-            });
+            }));
         }
         if !xs.iter().all(|x| x.moduli() == xs[0].moduli()) {
-            return Err(FancyError::UnequalModuli);
+            return Err(Self::Error::from(FancyError::UnequalModuli));
         }
 
         let mut digit_carry = None;
@@ -462,7 +462,7 @@ pub trait BundleGadgets: Fancy {
                 let modded_ds = ds
                     .iter()
                     .map(|d| self.mod_change(ix, d, max_val + 1))
-                    .collect::<Result<Vec<Self::Item>, FancyError<Self::Error>>>()?;
+                    .collect::<Result<Vec<Self::Item>, Self::Error>>()?;
 
                 let carry_sum = self.add_many(&modded_ds)?;
                 // add in the carry from the previous iteration
@@ -506,18 +506,18 @@ pub trait BundleGadgets: Fancy {
         &self,
         ix: Option<SyncIndex>,
         xs: &[Bundle<Self::Item>],
-    ) -> Result<Self::Item, FancyError<Self::Error>> {
+    ) -> Result<Self::Item, Self::Error> {
         let nargs = xs.len();
         let n = xs[0].wires().len();
 
         if nargs < 2 {
-            return Err(FancyError::InvalidArgNum {
+            return Err(Self::Error::from(FancyError::InvalidArgNum {
                 got: nargs,
                 needed: 2,
-            });
+            }));
         }
         if !xs.iter().all(|x| x.moduli() == xs[0].moduli()) {
-            return Err(FancyError::UnequalModuli);
+            return Err(Self::Error::from(FancyError::UnequalModuli));
         }
 
         let mut opt_carry = None;
@@ -538,7 +538,7 @@ pub trait BundleGadgets: Fancy {
             let modded_ds = ds
                 .iter()
                 .map(|d| self.mod_change(ix, d, max_val + 1))
-                .collect::<Result<Vec<Self::Item>, FancyError<Self::Error>>>()?;
+                .collect::<Result<Vec<Self::Item>, Self::Error>>()?;
             // add them up
             let sum = self.add_many(&modded_ds)?;
             // add in the carry
@@ -578,7 +578,7 @@ pub trait BundleGadgets: Fancy {
         ix: Option<SyncIndex>,
         bun: &Bundle<Self::Item>,
         ms: &[u16],
-    ) -> Result<Self::Item, FancyError<Self::Error>> {
+    ) -> Result<Self::Item, Self::Error> {
         let ndigits = ms.len();
 
         let q = util::product(&bun.moduli());
@@ -604,7 +604,7 @@ pub trait BundleGadgets: Fancy {
                 .into_iter()
                 .enumerate()
                 .map(|(i, tt)| self.proj(ix, wire, ms[i], Some(tt)))
-                .collect::<Result<Vec<Self::Item>, FancyError<Self::Error>>>()?;
+                .collect::<Result<Vec<Self::Item>, Self::Error>>()?;
 
             ds.push(Bundle(new_ds));
         }
@@ -621,7 +621,7 @@ pub trait BundleGadgets: Fancy {
         x: &Bundle<Self::Item>,
         accuracy: &str,
         output_moduli: Option<&[u16]>,
-    ) -> Result<Bundle<Self::Item>, FancyError<Self::Error>> {
+    ) -> Result<Bundle<Self::Item>, Self::Error> {
         let factors_of_m = &get_ms(x, accuracy);
         let res = self.fractional_mixed_radix(ix, x, factors_of_m)?;
 
@@ -638,7 +638,7 @@ pub trait BundleGadgets: Fancy {
             .wires()
             .iter()
             .map(|x| self.mul(ix, x, &mask))
-            .collect::<Result<Vec<Self::Item>, FancyError<Self::Error>>>()
+            .collect::<Result<Vec<Self::Item>, Self::Error>>()
             .map(Bundle)
     }
 
@@ -648,7 +648,7 @@ pub trait BundleGadgets: Fancy {
         ix: Option<SyncIndex>,
         x: &Bundle<Self::Item>,
         accuracy: &str,
-    ) -> Result<Self::Item, FancyError<Self::Error>> {
+    ) -> Result<Self::Item, Self::Error> {
         let factors_of_m = &get_ms(x, accuracy);
         let res = self.fractional_mixed_radix(ix, x, factors_of_m)?;
         let p = *factors_of_m.last().unwrap();
@@ -665,7 +665,7 @@ pub trait BundleGadgets: Fancy {
         x: &Bundle<Self::Item>,
         accuracy: &str,
         output_moduli: Option<&[u16]>,
-    ) -> Result<Bundle<Self::Item>, FancyError<Self::Error>> {
+    ) -> Result<Bundle<Self::Item>, Self::Error> {
         let sign = self.sign(ix, x, accuracy)?;
         output_moduli
             .unwrap_or(&x.moduli())
@@ -674,7 +674,7 @@ pub trait BundleGadgets: Fancy {
                 let tt = vec![1, p - 1];
                 self.proj(ix, &sign, p, Some(tt))
             })
-            .collect::<Result<Vec<Self::Item>, FancyError<Self::Error>>>()
+            .collect::<Result<Vec<Self::Item>, Self::Error>>()
             .map(Bundle)
     }
 
@@ -687,7 +687,7 @@ pub trait BundleGadgets: Fancy {
         x: &Bundle<Self::Item>,
         y: &Bundle<Self::Item>,
         accuracy: &str,
-    ) -> Result<Self::Item, FancyError<Self::Error>> {
+    ) -> Result<Self::Item, Self::Error> {
         if x.is_binary() {
             // underflow indicates y != 0 && x >= y
             // requiring special care to remove the y != 0, which is what follows.
@@ -724,7 +724,7 @@ pub trait BundleGadgets: Fancy {
         x: &Bundle<Self::Item>,
         y: &Bundle<Self::Item>,
         accuracy: &str,
-    ) -> Result<Self::Item, FancyError<Self::Error>> {
+    ) -> Result<Self::Item, Self::Error> {
         let z = self.lt(ix, x, y, accuracy)?;
         self.negate(ix, &z)
     }
@@ -735,12 +735,12 @@ pub trait BundleGadgets: Fancy {
         ix: Option<SyncIndex>,
         xs: &[Bundle<Self::Item>],
         accuracy: &str,
-    ) -> Result<Bundle<Self::Item>, FancyError<Self::Error>> {
+    ) -> Result<Bundle<Self::Item>, Self::Error> {
         if xs.len() < 2 {
-            return Err(FancyError::InvalidArgNum {
+            return Err(Self::Error::from(FancyError::InvalidArgNum {
                 got: xs.len(),
                 needed: 2,
-            });
+            }));
         }
         xs.iter().skip(1).fold(Ok(xs[0].clone()), |x, y| {
             x.map(|x| {
@@ -754,7 +754,7 @@ pub trait BundleGadgets: Fancy {
                         let yp = self.mul(ix, y, &pos)?;
                         self.add(&xp, &yp)
                     })
-                    .collect::<Result<Vec<Self::Item>, FancyError<Self::Error>>>()
+                    .collect::<Result<Vec<Self::Item>, Self::Error>>()
                     .map(Bundle)
             })?
         })
@@ -769,9 +769,9 @@ pub trait BundleGadgets: Fancy {
         ix: Option<SyncIndex>,
         xs: &Bundle<Self::Item>,
         ys: &Bundle<Self::Item>,
-    ) -> Result<(Bundle<Self::Item>, Self::Item), FancyError<Self::Error>> {
+    ) -> Result<(Bundle<Self::Item>, Self::Item), Self::Error> {
         if xs.moduli() != ys.moduli() {
-            return Err(FancyError::UnequalModuli);
+            return Err(Self::Error::from(FancyError::UnequalModuli));
         }
         let xwires = xs.wires();
         let ywires = ys.wires();
@@ -792,9 +792,9 @@ pub trait BundleGadgets: Fancy {
         ix: Option<SyncIndex>,
         xs: &Bundle<Self::Item>,
         ys: &Bundle<Self::Item>,
-    ) -> Result<Bundle<Self::Item>, FancyError<Self::Error>> {
+    ) -> Result<Bundle<Self::Item>, Self::Error> {
         if xs.moduli() != ys.moduli() {
-            return Err(FancyError::UnequalModuli);
+            return Err(Self::Error::from(FancyError::UnequalModuli));
         }
         let xwires = xs.wires();
         let ywires = ys.wires();
@@ -824,9 +824,9 @@ pub trait BundleGadgets: Fancy {
         ix: Option<SyncIndex>,
         xs: &Bundle<Self::Item>,
         ys: &Bundle<Self::Item>,
-    ) -> Result<Bundle<Self::Item>, FancyError<Self::Error>> {
+    ) -> Result<Bundle<Self::Item>, Self::Error> {
         if xs.moduli() != ys.moduli() {
-            return Err(FancyError::UnequalModuli);
+            return Err(Self::Error::from(FancyError::UnequalModuli));
         }
 
         let xwires = xs.wires();
@@ -835,14 +835,14 @@ pub trait BundleGadgets: Fancy {
         let mut sum = xwires
             .iter()
             .map(|x| self.and(ix, x, &ywires[0]))
-            .collect::<Result<Vec<Self::Item>, FancyError<Self::Error>>>()
+            .collect::<Result<Vec<Self::Item>, Self::Error>>()
             .map(Bundle)?;
 
         for i in 1..xwires.len() {
             let mul = xwires
                 .iter()
                 .map(|x| self.and(ix, x, &ywires[i]))
-                .collect::<Result<Vec<Self::Item>, FancyError<Self::Error>>>()
+                .collect::<Result<Vec<Self::Item>, Self::Error>>()
                 .map(Bundle)?;
             let shifted = self.shift(ix, &mul, i)?;
             sum = self.binary_addition_no_carry(ix, &sum, &shifted)?;
@@ -856,12 +856,12 @@ pub trait BundleGadgets: Fancy {
         &self,
         ix: Option<SyncIndex>,
         xs: &Bundle<Self::Item>,
-    ) -> Result<Bundle<Self::Item>, FancyError<Self::Error>> {
+    ) -> Result<Bundle<Self::Item>, Self::Error> {
         let not_xs = xs
             .wires()
             .iter()
             .map(|x| self.negate(ix, x))
-            .collect::<Result<Vec<Self::Item>, FancyError<Self::Error>>>()?;
+            .collect::<Result<Vec<Self::Item>, Self::Error>>()?;
         let one = self.constant_bundle_binary(ix, 1, xs.size())?;
         self.binary_addition_no_carry(ix, &Bundle(not_xs), &one)
     }
@@ -874,7 +874,7 @@ pub trait BundleGadgets: Fancy {
         ix: Option<SyncIndex>,
         xs: &Bundle<Self::Item>,
         ys: &Bundle<Self::Item>,
-    ) -> Result<(Bundle<Self::Item>, Self::Item), FancyError<Self::Error>> {
+    ) -> Result<(Bundle<Self::Item>, Self::Item), Self::Error> {
         let neg_ys = self.twos_complement(ix, &ys)?;
         self.binary_addition(ix, &xs, &neg_ys)
     }
@@ -886,12 +886,12 @@ pub trait BundleGadgets: Fancy {
         b: &Self::Item,
         x: &Bundle<Self::Item>,
         y: &Bundle<Self::Item>,
-    ) -> Result<Bundle<Self::Item>, FancyError<Self::Error>> {
+    ) -> Result<Bundle<Self::Item>, Self::Error> {
         x.wires()
             .iter()
             .zip(y.wires().iter())
             .map(|(xwire, ywire)| self.mux(ix, b, xwire, ywire))
-            .collect::<Result<Vec<Self::Item>, FancyError<Self::Error>>>()
+            .collect::<Result<Vec<Self::Item>, Self::Error>>()
             .map(Bundle)
     }
 
@@ -903,7 +903,7 @@ pub trait BundleGadgets: Fancy {
         c1: u128,
         c2: u128,
         nbits: usize,
-    ) -> Result<Bundle<Self::Item>, FancyError<Self::Error>> {
+    ) -> Result<Bundle<Self::Item>, Self::Error> {
         let c1_bs = util::u128_to_bits(c1, nbits)
             .into_iter()
             .map(|x: u16| x > 0)
@@ -916,7 +916,7 @@ pub trait BundleGadgets: Fancy {
             .into_iter()
             .zip(c2_bs.into_iter())
             .map(|(b1, b2)| self.mux_constant_bits(ix, x, b1, b2))
-            .collect::<Result<Vec<Self::Item>, FancyError<Self::Error>>>()
+            .collect::<Result<Vec<Self::Item>, Self::Error>>()
             .map(Bundle)
     }
 
@@ -926,7 +926,7 @@ pub trait BundleGadgets: Fancy {
         ix: Option<SyncIndex>,
         x: &Bundle<Self::Item>,
         n: usize,
-    ) -> Result<Bundle<Self::Item>, FancyError<Self::Error>> {
+    ) -> Result<Bundle<Self::Item>, Self::Error> {
         let mut ws = x.wires().to_vec();
         let zero = self.constant(ix, 0, ws.last().unwrap().modulus())?;
         for _ in 0..n {
@@ -943,9 +943,9 @@ pub trait BundleGadgets: Fancy {
         x: &Bundle<Self::Item>,
         c: u128,
         nbits: usize,
-    ) -> Result<Bundle<Self::Item>, FancyError<Self::Error>> {
+    ) -> Result<Bundle<Self::Item>, Self::Error> {
         if !x.is_binary() {
-            return Err(FancyError::ArgNotBinary);
+            return Err(Self::Error::from(FancyError::ArgNotBinary));
         }
         let zero = self.constant_bundle(ix, &vec![0; nbits], &vec![2; nbits])?;
         util::u128_to_bits(c, nbits)
@@ -963,9 +963,9 @@ pub trait BundleGadgets: Fancy {
         &self,
         ix: Option<SyncIndex>,
         x: &Bundle<Self::Item>,
-    ) -> Result<Bundle<Self::Item>, FancyError<Self::Error>> {
+    ) -> Result<Bundle<Self::Item>, Self::Error> {
         if !x.is_binary() {
-            return Err(FancyError::ArgNotBinary);
+            return Err(Self::Error::from(FancyError::ArgNotBinary));
         }
         let sign = x.wires().last().unwrap();
         let negated = self.twos_complement(ix, x)?;

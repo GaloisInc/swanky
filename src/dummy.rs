@@ -82,7 +82,7 @@ impl Fancy for Dummy {
         ix: Option<SyncIndex>,
         modulus: u16,
         opt_x: Option<u16>,
-    ) -> Result<DummyVal, FancyError<DummyError>> {
+    ) -> Result<DummyVal, Self::Error> {
         let res = if let Some(val) = opt_x {
             DummyVal { val, modulus }
         } else if self.in_sync() {
@@ -103,7 +103,7 @@ impl Fancy for Dummy {
         &self,
         ix: Option<SyncIndex>,
         modulus: u16,
-    ) -> Result<DummyVal, FancyError<DummyError>> {
+    ) -> Result<DummyVal, Self::Error> {
         let res = if self.in_sync() {
             let ix = ix.ok_or_else(|| DummyError::from(SyncError::IndexRequired))?;
             self.request(ix, Request::EvaluatorInput(modulus))
@@ -123,13 +123,13 @@ impl Fancy for Dummy {
         _ix: Option<SyncIndex>,
         val: u16,
         modulus: u16,
-    ) -> Result<DummyVal, FancyError<DummyError>> {
+    ) -> Result<DummyVal, Self::Error> {
         Ok(DummyVal { val, modulus })
     }
 
-    fn add(&self, x: &DummyVal, y: &DummyVal) -> Result<DummyVal, FancyError<DummyError>> {
+    fn add(&self, x: &DummyVal, y: &DummyVal) -> Result<DummyVal, Self::Error> {
         if x.modulus() != y.modulus() {
-            return Err(FancyError::UnequalModuli);
+            return Err(Self::Error::from(FancyError::UnequalModuli));
         }
         Ok(DummyVal {
             val: (x.val + y.val) % x.modulus,
@@ -137,9 +137,9 @@ impl Fancy for Dummy {
         })
     }
 
-    fn sub(&self, x: &DummyVal, y: &DummyVal) -> Result<DummyVal, FancyError<DummyError>> {
+    fn sub(&self, x: &DummyVal, y: &DummyVal) -> Result<DummyVal, Self::Error> {
         if x.modulus() != y.modulus() {
-            return Err(FancyError::UnequalModuli);
+            return Err(Self::Error::from(FancyError::UnequalModuli));
         }
         Ok(DummyVal {
             val: (x.modulus + x.val - y.val) % x.modulus,
@@ -147,7 +147,7 @@ impl Fancy for Dummy {
         })
     }
 
-    fn cmul(&self, x: &DummyVal, c: u16) -> Result<DummyVal, FancyError<DummyError>> {
+    fn cmul(&self, x: &DummyVal, c: u16) -> Result<DummyVal, Self::Error> {
         Ok(DummyVal {
             val: (x.val * c) % x.modulus,
             modulus: x.modulus,
@@ -159,7 +159,7 @@ impl Fancy for Dummy {
         _ix: Option<SyncIndex>,
         x: &DummyVal,
         y: &DummyVal,
-    ) -> Result<DummyVal, FancyError<DummyError>> {
+    ) -> Result<DummyVal, Self::Error> {
         Ok(DummyVal {
             val: x.val * y.val % x.modulus,
             modulus: x.modulus,
@@ -172,21 +172,21 @@ impl Fancy for Dummy {
         x: &DummyVal,
         modulus: u16,
         tt: Option<Vec<u16>>,
-    ) -> Result<DummyVal, FancyError<DummyError>> {
-        let tt = tt.ok_or(FancyError::NoTruthTable)?;
+    ) -> Result<DummyVal, Self::Error> {
+        let tt = tt.ok_or(Self::Error::from(FancyError::NoTruthTable))?;
         if tt.len() < x.modulus() as usize || !tt.iter().all(|&x| x < modulus) {
-            return Err(FancyError::InvalidTruthTable);
+            return Err(Self::Error::from(FancyError::InvalidTruthTable));
         }
         let val = tt[x.val as usize];
         Ok(DummyVal { val, modulus })
     }
 
-    fn output(&self, _ix: Option<SyncIndex>, x: &DummyVal) -> Result<(), FancyError<DummyError>> {
+    fn output(&self, _ix: Option<SyncIndex>, x: &DummyVal) -> Result<(), Self::Error> {
         self.outputs.lock().unwrap().push(x.val);
         Ok(())
     }
 
-    fn begin_sync(&self, num_indices: SyncIndex) -> Result<(), FancyError<DummyError>> {
+    fn begin_sync(&self, num_indices: SyncIndex) -> Result<(), Self::Error> {
         *self.requests.write().unwrap() =
             Some((0..num_indices).map(|_| SegQueue::new()).collect_vec());
         *self.index_done.write().unwrap() = Some(
@@ -206,7 +206,7 @@ impl Fancy for Dummy {
         Ok(())
     }
 
-    fn finish_index(&self, index: SyncIndex) -> Result<(), FancyError<DummyError>> {
+    fn finish_index(&self, index: SyncIndex) -> Result<(), Self::Error> {
         if self.in_sync() {
             let mut cleanup = false;
             {
@@ -397,7 +397,7 @@ mod bundle {
         for _ in 0..NITERS {
             let x = rng.gen_u128() % q;
             let should_be = (!x + 1) % q;
-            let d = Dummy::new(&util::u128_to_bits(x,nbits), &[]);
+            let d = Dummy::new(&util::u128_to_bits(x, nbits), &[]);
             {
                 let x = d.garbler_input_bundle_binary(None, nbits, None).unwrap();
                 let y = d.twos_complement(None, &x).unwrap();
@@ -418,7 +418,7 @@ mod bundle {
             let x = rng.gen_u128() % q;
             let y = rng.gen_u128() % q;
             let should_be = (x + y) % q;
-            let enc_inps = [x,y]
+            let enc_inps = [x, y]
                 .into_iter()
                 .flat_map(|&x| util::u128_to_bits(x, nbits))
                 .collect_vec();
@@ -433,7 +433,11 @@ mod bundle {
             let outs = d.get_output();
             let overflow = outs[0] > 0;
             let z = util::u128_from_bits(&outs[1..]);
-            assert_eq!(z, should_be, "x={} y={} z={} should_be={}", x, y, z, should_be);
+            assert_eq!(
+                z, should_be,
+                "x={} y={} z={} should_be={}",
+                x, y, z, should_be
+            );
             assert_eq!(overflow, x + y >= q, "x={} y={}", x, y);
         }
     }
@@ -447,7 +451,7 @@ mod bundle {
             let x = rng.gen_u128() % q;
             let y = rng.gen_u128() % q;
             let should_be = (x - y) % q;
-            let enc_inps = [x,y]
+            let enc_inps = [x, y]
                 .into_iter()
                 .flat_map(|&x| util::u128_to_bits(x, nbits))
                 .collect_vec();
@@ -462,7 +466,11 @@ mod bundle {
             let outs = d.get_output();
             let overflow = outs[0] > 0;
             let z = util::u128_from_bits(&outs[1..]);
-            assert_eq!(z, should_be, "x={} y={} z={} should_be={}", x, y, z, should_be);
+            assert_eq!(
+                z, should_be,
+                "x={} y={} z={} should_be={}",
+                x, y, z, should_be
+            );
             assert_eq!(overflow, (y != 0 && x >= y), "x={} y={}", x, y);
         }
     }
@@ -476,7 +484,7 @@ mod bundle {
             let x = rng.gen_u128() % q;
             let y = rng.gen_u128() % q;
             let should_be = x < y;
-            let enc_inps = [x,y]
+            let enc_inps = [x, y]
                 .into_iter()
                 .flat_map(|&x| util::u128_to_bits(x, nbits))
                 .collect_vec();

@@ -75,10 +75,7 @@ impl Evaluator {
         }
     }
 
-    fn internal_begin_sync(
-        &self,
-        num_indices: SyncIndex,
-    ) -> Result<(), FancyError<EvaluatorError>> {
+    fn internal_begin_sync(&self, num_indices: SyncIndex) -> Result<(), EvaluatorError> {
         let mut opt_info = self.sync_info.write().unwrap();
         if opt_info.is_some() {
             Err(EvaluatorError::from(SyncError::SyncStartedInSync))?;
@@ -182,7 +179,7 @@ impl Fancy for Evaluator {
         ix: Option<SyncIndex>,
         q: u16,
         _opt_x: Option<u16>,
-    ) -> Result<Wire, FancyError<EvaluatorError>> {
+    ) -> Result<Wire, EvaluatorError> {
         match self.recv(ix)? {
             Message::GarblerInput(w) => {
                 if w.modulus() != q {
@@ -201,11 +198,7 @@ impl Fancy for Evaluator {
         }
     }
     #[inline]
-    fn evaluator_input(
-        &self,
-        ix: Option<SyncIndex>,
-        q: u16,
-    ) -> Result<Wire, FancyError<EvaluatorError>> {
+    fn evaluator_input(&self, ix: Option<SyncIndex>, q: u16) -> Result<Wire, EvaluatorError> {
         match self.recv(ix)? {
             Message::EvaluatorInput(w) => {
                 if w.modulus() != q {
@@ -224,12 +217,7 @@ impl Fancy for Evaluator {
         }
     }
     #[inline]
-    fn constant(
-        &self,
-        ix: Option<SyncIndex>,
-        x: u16,
-        q: u16,
-    ) -> Result<Wire, FancyError<EvaluatorError>> {
+    fn constant(&self, ix: Option<SyncIndex>, x: u16, q: u16) -> Result<Wire, EvaluatorError> {
         match self.recv(ix)? {
             Message::Constant { wire, value } => {
                 if x == value && wire.modulus() == q {
@@ -252,30 +240,25 @@ impl Fancy for Evaluator {
         }
     }
     #[inline]
-    fn add(&self, x: &Wire, y: &Wire) -> Result<Wire, FancyError<EvaluatorError>> {
+    fn add(&self, x: &Wire, y: &Wire) -> Result<Wire, EvaluatorError> {
         if x.modulus() != y.modulus() {
-            return Err(FancyError::UnequalModuli);
+            return Err(EvaluatorError::FancyError(FancyError::UnequalModuli));
         }
         Ok(x.plus(y))
     }
     #[inline]
-    fn sub(&self, x: &Wire, y: &Wire) -> Result<Wire, FancyError<EvaluatorError>> {
+    fn sub(&self, x: &Wire, y: &Wire) -> Result<Wire, EvaluatorError> {
         if x.modulus() != y.modulus() {
-            return Err(FancyError::UnequalModuli);
+            return Err(EvaluatorError::FancyError(FancyError::UnequalModuli));
         }
         Ok(x.minus(y))
     }
     #[inline]
-    fn cmul(&self, x: &Wire, c: u16) -> Result<Wire, FancyError<EvaluatorError>> {
+    fn cmul(&self, x: &Wire, c: u16) -> Result<Wire, EvaluatorError> {
         Ok(x.cmul(c))
     }
     #[inline]
-    fn mul(
-        &self,
-        ix: Option<SyncIndex>,
-        A: &Wire,
-        B: &Wire,
-    ) -> Result<Wire, FancyError<EvaluatorError>> {
+    fn mul(&self, ix: Option<SyncIndex>, A: &Wire, B: &Wire) -> Result<Wire, EvaluatorError> {
         if A.modulus() < A.modulus() {
             return self.mul(ix, B, A);
         }
@@ -329,7 +312,7 @@ impl Fancy for Evaluator {
         x: &Wire,
         q: u16,
         _tt: Option<Vec<u16>>,
-    ) -> Result<Wire, FancyError<EvaluatorError>> {
+    ) -> Result<Wire, EvaluatorError> {
         let gate = match self.recv(ix)? {
             Message::GarbledGate(g) => g,
             m => {
@@ -354,7 +337,7 @@ impl Fancy for Evaluator {
         }
     }
     #[inline]
-    fn output(&self, ix: Option<SyncIndex>, x: &Wire) -> Result<(), FancyError<EvaluatorError>> {
+    fn output(&self, ix: Option<SyncIndex>, x: &Wire) -> Result<(), EvaluatorError> {
         match self.recv(ix)? {
             Message::OutputCiphertext(c) => {
                 if c.len() as u16 != x.modulus() {
@@ -376,11 +359,11 @@ impl Fancy for Evaluator {
         Ok(())
     }
     #[inline]
-    fn begin_sync(&self, num_indices: SyncIndex) -> Result<(), FancyError<EvaluatorError>> {
+    fn begin_sync(&self, num_indices: SyncIndex) -> Result<(), EvaluatorError> {
         self.internal_begin_sync(num_indices)
     }
     #[inline]
-    fn finish_index(&self, index: SyncIndex) -> Result<(), FancyError<EvaluatorError>> {
+    fn finish_index(&self, index: SyncIndex) -> Result<(), EvaluatorError> {
         self.internal_finish_index(index);
         Ok(())
     }
@@ -419,7 +402,7 @@ impl GarbledCircuit {
         c: &Circuit,
         garbler_inputs: &[Wire],
         evaluator_inputs: &[Wire],
-    ) -> Result<Vec<Wire>, FancyError<EvaluatorError>> {
+    ) -> Result<Vec<Wire>, EvaluatorError> {
         // create a message iterator to pass as the Evaluator recv function
         let mut msgs = c
             .gates

@@ -2,13 +2,10 @@
 
 use std::fmt::{self, Display, Formatter};
 
-/// Errors that may occur when using the `Fancy` trait. `ClientError` wraps errors from
-/// underlying fancy object.
-///
-/// With the exception of ClientError, FancyErrors should be API-usage errors, such as
-/// trying to add two Items with different moduli.
+/// Errors that may occur when using the `Fancy` trait. These errors are
+/// API-usage errors, such as trying to add two `Items` with different moduli.
 #[derive(Debug)]
-pub enum FancyError<T> {
+pub enum FancyError {
     UnequalModuli,
     NotImplemented,
     InvalidArg { desc: String },
@@ -18,7 +15,6 @@ pub enum FancyError<T> {
     NoTruthTable,
     InvalidTruthTable,
     UninitializedValue,
-    ClientError(T),
 }
 
 /// Common errors emitted by fancy objects in sync mode.
@@ -36,6 +32,7 @@ pub enum DummyError {
     NotEnoughGarblerInputs,
     NotEnoughEvaluatorInputs,
     SyncError(SyncError),
+    FancyError(FancyError),
 }
 
 /// Errors from the evaluator.
@@ -44,6 +41,7 @@ pub enum EvaluatorError {
     InvalidMessage { expected: String, got: String },
     IndexReceivedInSyncMode,
     SyncError(SyncError),
+    FancyError(FancyError),
 }
 
 /// Errors from the garbler.
@@ -52,20 +50,25 @@ pub enum GarblerError {
     AsymmetricHalfGateModuliMax8(u16),
     TruthTableRequired,
     SyncError(SyncError),
+    FancyError(FancyError),
 }
 
 /// Errors emitted when building a circuit.
 #[derive(Debug)]
-pub struct CircuitBuilderError;
+pub enum CircuitBuilderError {
+    FancyError(FancyError),
+}
 
 /// Errors emitted when running the informer.
 #[derive(Debug)]
-pub struct InformerError;
+pub enum InformerError {
+    FancyError(FancyError),
+}
 
 ////////////////////////////////////////////////////////////////////////////////
 // fancy error
 
-impl<T: Display> Display for FancyError<T> {
+impl Display for FancyError {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         match self {
             FancyError::UnequalModuli => "unequal moduli".fmt(f),
@@ -85,27 +88,6 @@ impl<T: Display> Display for FancyError<T> {
             FancyError::UninitializedValue => {
                 "uninitialized value in circuit. is the circuit topologically sorted?".fmt(f)
             }
-            FancyError::ClientError(e) => write!(f, "client error: {}", e),
-        }
-    }
-}
-
-impl<A> FancyError<A> {
-    /// Map the underlying client error type.
-    ///
-    /// Useful for wrapping errors from fancy objects.
-    pub fn map_client_err<B>(self, f: impl Fn(A) -> B) -> FancyError<B> {
-        match self {
-            FancyError::UnequalModuli => FancyError::UnequalModuli,
-            FancyError::NotImplemented => FancyError::NotImplemented,
-            FancyError::InvalidArg { desc } => FancyError::InvalidArg { desc },
-            FancyError::InvalidArgNum { got, needed } => FancyError::InvalidArgNum { got, needed },
-            FancyError::InvalidArgMod { got, needed } => FancyError::InvalidArgMod { got, needed },
-            FancyError::ArgNotBinary => FancyError::ArgNotBinary,
-            FancyError::NoTruthTable => FancyError::NoTruthTable,
-            FancyError::InvalidTruthTable => FancyError::InvalidTruthTable,
-            FancyError::UninitializedValue => FancyError::UninitializedValue,
-            FancyError::ClientError(e) => FancyError::ClientError(f(e)),
         }
     }
 }
@@ -153,13 +135,14 @@ impl Display for DummyError {
             DummyError::NotEnoughGarblerInputs => "not enough garbler inputs".fmt(f),
             DummyError::NotEnoughEvaluatorInputs => "not enough evaluator inputs".fmt(f),
             DummyError::SyncError(e) => write!(f, "dummy sync error: {}", e),
+            DummyError::FancyError(e) => write!(f, "fancy error: {}", e),
         }
     }
 }
 
-impl From<DummyError> for FancyError<DummyError> {
-    fn from(e: DummyError) -> FancyError<DummyError> {
-        FancyError::ClientError(e)
+impl From<FancyError> for DummyError {
+    fn from(e: FancyError) -> DummyError {
+        DummyError::FancyError(e)
     }
 }
 
@@ -174,24 +157,19 @@ impl Display for EvaluatorError {
             }
             EvaluatorError::IndexReceivedInSyncMode => "index received in sync mode".fmt(f),
             EvaluatorError::SyncError(e) => write!(f, "evaluator sync error: {}", e),
+            EvaluatorError::FancyError(e) => write!(f, "fancy error: {}", e),
         }
     }
 }
 
-impl From<EvaluatorError> for FancyError<EvaluatorError> {
-    fn from(e: EvaluatorError) -> FancyError<EvaluatorError> {
-        FancyError::ClientError(e)
+impl From<FancyError> for EvaluatorError {
+    fn from(e: FancyError) -> EvaluatorError {
+        EvaluatorError::FancyError(e)
     }
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 // Garbler error
-
-impl From<GarblerError> for FancyError<GarblerError> {
-    fn from(e: GarblerError) -> FancyError<GarblerError> {
-        FancyError::ClientError(e)
-    }
-}
 
 impl Display for GarblerError {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
@@ -205,7 +183,14 @@ impl Display for GarblerError {
                 "truth table required for garbler projection gates".fmt(f)
             }
             GarblerError::SyncError(e) => write!(f, "garbler sync error: {}", e),
+            GarblerError::FancyError(e) => write!(f, "fancy error: {}", e),
         }
+    }
+}
+
+impl From<FancyError> for GarblerError {
+    fn from(e: FancyError) -> GarblerError {
+        GarblerError::FancyError(e)
     }
 }
 
@@ -214,13 +199,15 @@ impl Display for GarblerError {
 
 impl Display for CircuitBuilderError {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        "CircuitBuilderError".fmt(f)
+        match self {
+            CircuitBuilderError::FancyError(e) => write!(f, "fancy error: {}", e),
+        }
     }
 }
 
-impl From<CircuitBuilderError> for FancyError<CircuitBuilderError> {
-    fn from(e: CircuitBuilderError) -> FancyError<CircuitBuilderError> {
-        FancyError::ClientError(e)
+impl From<FancyError> for CircuitBuilderError {
+    fn from(e: FancyError) -> CircuitBuilderError {
+        CircuitBuilderError::FancyError(e)
     }
 }
 
@@ -229,13 +216,15 @@ impl From<CircuitBuilderError> for FancyError<CircuitBuilderError> {
 
 impl Display for InformerError {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        "InformerError".fmt(f)
+        match self {
+            InformerError::FancyError(e) => write!(f, "fancy error: {}", e),
+        }
     }
 }
 
-impl From<InformerError> for FancyError<InformerError> {
-    fn from(e: InformerError) -> FancyError<InformerError> {
-        FancyError::ClientError(e)
+impl From<FancyError> for InformerError {
+    fn from(e: FancyError) -> InformerError {
+        InformerError::FancyError(e)
     }
 }
 
@@ -247,6 +236,18 @@ pub enum CircuitParserError {
     ParseIntError,
     ParseLineError(String),
     ParseGateError(String),
+}
+
+impl Display for CircuitParserError {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        match self {
+            CircuitParserError::IoError(e) => write!(f, "io error: {}", e),
+            CircuitParserError::RegexError(e) => write!(f, "regex error: {}", e),
+            CircuitParserError::ParseIntError => write!(f, "unable to parse integer"),
+            CircuitParserError::ParseLineError(s) => write!(f, "unable to parse line '{}'", s),
+            CircuitParserError::ParseGateError(s) => write!(f, "unable to parse gate '{}'", s),
+        }
+    }
 }
 
 impl From<std::io::Error> for CircuitParserError {
@@ -264,23 +265,5 @@ impl From<regex::Error> for CircuitParserError {
 impl From<std::num::ParseIntError> for CircuitParserError {
     fn from(_: std::num::ParseIntError) -> CircuitParserError {
         CircuitParserError::ParseIntError
-    }
-}
-
-impl Display for CircuitParserError {
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        match self {
-            CircuitParserError::IoError(e) => write!(f, "io error: {}", e),
-            CircuitParserError::RegexError(e) => write!(f, "regex error: {}", e),
-            CircuitParserError::ParseIntError => write!(f, "unable to parse integer"),
-            CircuitParserError::ParseLineError(s) => write!(f, "unable to parse line '{}'", s),
-            CircuitParserError::ParseGateError(s) => write!(f, "unable to parse gate '{}'", s),
-        }
-    }
-}
-
-impl From<CircuitParserError> for FancyError<CircuitParserError> {
-    fn from(e: CircuitParserError) -> FancyError<CircuitParserError> {
-        FancyError::ClientError(e)
     }
 }
