@@ -7,7 +7,7 @@
 //! Implementations of correlation-robust hash functions (and their variants)
 //! based on fixed-key AES.
 
-use crate::aes::Aes128;
+use crate::aes::{Aes128, AES};
 use crate::Block;
 use core::arch::x86_64::*;
 
@@ -18,6 +18,9 @@ use core::arch::x86_64::*;
 pub struct AesHash {
     aes: Aes128,
 }
+
+/// `AesHash` with a fixed key.
+pub const AES_HASH: AesHash = AesHash { aes: AES };
 
 impl AesHash {
     /// Initialize the hash function using `key`.

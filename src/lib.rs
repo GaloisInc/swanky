@@ -27,7 +27,7 @@ pub mod utils;
 
 pub use crate::aes::{Aes128, AES};
 pub use crate::block::Block;
-pub use crate::hash_aes::AesHash;
+pub use crate::hash_aes::{AesHash, AES_HASH};
 pub use crate::rand_aes::AesRng;
 
 /// A marker trait denoting that the given scheme is semi-honest secure.
