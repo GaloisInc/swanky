@@ -110,9 +110,9 @@ impl<OT: ObliviousTransferReceiver<Msg = Block> + SemiHonest> ObliviousTransferS
         for (j, input) in inputs.iter().enumerate() {
             let q = &qs[j * 16..(j + 1) * 16];
             let q = Block::from(*array_ref![q, 0, 16]);
-            let y0 = self.hash.cr_hash(j, q) ^ input.0;
+            let y0 = self.hash.cr_hash(Block::from(j as u128), q) ^ input.0;
             let q = q ^ self.s_;
-            let y1 = self.hash.cr_hash(j, q) ^ input.1;
+            let y1 = self.hash.cr_hash(Block::from(j as u128), q) ^ input.1;
             y0.write(writer)?;
             y1.write(writer)?;
         }
@@ -137,10 +137,10 @@ impl<OT: ObliviousTransferReceiver<Msg = Block> + SemiHonest> CorrelatedObliviou
         for (j, delta) in deltas.iter().enumerate() {
             let q = &qs[j * 16..(j + 1) * 16];
             let q = Block::from(*array_ref![q, 0, 16]);
-            let x0 = self.hash.cr_hash(j, q);
+            let x0 = self.hash.cr_hash(Block::from(j as u128), q);
             let x1 = x0 ^ *delta;
             let q = q ^ self.s_;
-            let y = self.hash.cr_hash(j, q) ^ x1;
+            let y = self.hash.cr_hash(Block::from(j as u128), q) ^ x1;
             y.write(writer)?;
             out.push((x0, x1));
         }
@@ -164,9 +164,9 @@ impl<OT: ObliviousTransferReceiver<Msg = Block> + SemiHonest> RandomObliviousTra
         for j in 0..m {
             let q = &qs[j * 16..(j + 1) * 16];
             let q = Block::from(*array_ref![q, 0, 16]);
-            let x0 = self.hash.cr_hash(j, q);
+            let x0 = self.hash.cr_hash(Block::from(j as u128), q);
             let q = q ^ self.s_;
-            let x1 = self.hash.cr_hash(j, q);
+            let x1 = self.hash.cr_hash(Block::from(j as u128), q);
             out.push((x0, x1));
         }
         Ok(out)
@@ -251,7 +251,9 @@ impl<OT: ObliviousTransferSender<Msg = Block> + SemiHonest> ObliviousTransferRec
             let y0 = Block::read(reader)?;
             let y1 = Block::read(reader)?;
             let y = if *b { y1 } else { y0 };
-            let y = y ^ self.hash.cr_hash(j, Block::from(*array_ref![t, 0, 16]));
+            let y = y ^ self
+                .hash
+                .cr_hash(Block::from(j as u128), Block::from(*array_ref![t, 0, 16]));
             out.push(y);
         }
         Ok(out)
@@ -275,7 +277,9 @@ impl<OT: ObliviousTransferSender<Msg = Block> + SemiHonest> CorrelatedObliviousT
             let t = &ts[j * 16..(j + 1) * 16];
             let y = Block::read(reader)?;
             let y = if *b { y } else { Block::zero() };
-            let h = self.hash.cr_hash(j, Block::from(*array_ref![t, 0, 16]));
+            let h = self
+                .hash
+                .cr_hash(Block::from(j as u128), Block::from(*array_ref![t, 0, 16]));
             out.push(y ^ h);
         }
         Ok(out)
@@ -297,7 +301,9 @@ impl<OT: ObliviousTransferSender<Msg = Block> + SemiHonest> RandomObliviousTrans
         let mut out = Vec::with_capacity(inputs.len());
         for j in 0..inputs.len() {
             let t = &ts[j * 16..(j + 1) * 16];
-            let h = self.hash.cr_hash(j, Block::from(*array_ref![t, 0, 16]));
+            let h = self
+                .hash
+                .cr_hash(Block::from(j as u128), Block::from(*array_ref![t, 0, 16]));
             out.push(h);
         }
         Ok(out)

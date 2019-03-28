@@ -105,9 +105,9 @@ impl<OT: ObliviousTransferReceiver<Msg = Block> + Malicious> ObliviousTransferSe
         for (j, input) in inputs.iter().enumerate() {
             let q = &qs[j * 16..(j + 1) * 16];
             let q = Block::from(*array_ref![q, 0, 16]);
-            let y0 = self.ot.hash.tccr_hash(j, q) ^ input.0;
+            let y0 = self.ot.hash.tccr_hash(Block::from(j as u128), q) ^ input.0;
             let q = q ^ self.ot.s_;
-            let y1 = self.ot.hash.tccr_hash(j, q) ^ input.1;
+            let y1 = self.ot.hash.tccr_hash(Block::from(j as u128), q) ^ input.1;
             y0.write(&mut writer)?;
             y1.write(&mut writer)?;
         }
@@ -133,10 +133,10 @@ impl<OT: ObliviousTransferReceiver<Msg = Block> + Malicious> CorrelatedOblivious
         for (j, delta) in deltas.iter().enumerate() {
             let q = &qs[j * 16..(j + 1) * 16];
             let q = Block::from(*array_ref![q, 0, 16]);
-            let x0 = self.ot.hash.tccr_hash(j, q);
+            let x0 = self.ot.hash.tccr_hash(Block::from(j as u128), q);
             let x1 = x0 ^ *delta;
             let q = q ^ self.ot.s_;
-            let y = self.ot.hash.tccr_hash(j, q) ^ x1;
+            let y = self.ot.hash.tccr_hash(Block::from(j as u128), q) ^ x1;
             y.write(&mut writer)?;
             out.push((x0, x1));
         }
@@ -161,9 +161,9 @@ impl<OT: ObliviousTransferReceiver<Msg = Block> + Malicious> RandomObliviousTran
         for j in 0..m {
             let q = &qs[j * 16..(j + 1) * 16];
             let q = Block::from(*array_ref![q, 0, 16]);
-            let x0 = self.ot.hash.tccr_hash(j, q);
+            let x0 = self.ot.hash.tccr_hash(Block::from(j as u128), q);
             let q = q ^ self.ot.s_;
-            let x1 = self.ot.hash.tccr_hash(j, q);
+            let x1 = self.ot.hash.tccr_hash(Block::from(j as u128), q);
             out.push((x0, x1));
         }
         Ok(out)
@@ -241,7 +241,7 @@ impl<OT: ObliviousTransferSender<Msg = Block> + Malicious> ObliviousTransferRece
             let y = y ^ self
                 .ot
                 .hash
-                .tccr_hash(j, Block::from(*array_ref![t, 0, 16]));
+                .tccr_hash(Block::from(j as u128), Block::from(*array_ref![t, 0, 16]));
             out.push(y);
         }
         Ok(out)
@@ -267,7 +267,7 @@ impl<OT: ObliviousTransferSender<Msg = Block> + Malicious> CorrelatedObliviousTr
             let h = self
                 .ot
                 .hash
-                .tccr_hash(j, Block::from(*array_ref![t, 0, 16]));
+                .tccr_hash(Block::from(j as u128), Block::from(*array_ref![t, 0, 16]));
             out.push(y ^ h);
         }
         Ok(out)
@@ -291,7 +291,7 @@ impl<OT: ObliviousTransferSender<Msg = Block> + Malicious> RandomObliviousTransf
             let h = self
                 .ot
                 .hash
-                .tccr_hash(j, Block::from(*array_ref![t, 0, 16]));
+                .tccr_hash(Block::from(j as u128), Block::from(*array_ref![t, 0, 16]));
             out.push(h);
         }
         Ok(out)
