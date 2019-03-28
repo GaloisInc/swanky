@@ -23,6 +23,7 @@
 <span id="23">23</span>
 <span id="24">24</span>
 <span id="25">25</span>
+<span id="26">26</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="attribute">#![<span class="ident">deny</span>(<span class="ident">clippy</span>::<span class="ident">all</span>)]</span>
 <span class="attribute">#![<span class="ident">allow</span>(
@@ -42,10 +43,11 @@
 <span class="kw">mod</span> <span class="ident">fancy</span>;
 <span class="kw">mod</span> <span class="ident">garble</span>;
 <span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">informer</span>;
-<span class="comment">// mod parser;</span>
+<span class="kw">mod</span> <span class="ident">parser</span>;
 <span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">util</span>;
 <span class="kw">mod</span> <span class="ident">wire</span>;
 
+<span class="kw">pub</span> <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">error</span>::<span class="ident">FancyError</span>;
 <span class="kw">pub</span> <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">fancy</span>::<span class="kw-2">*</span>;
 <span class="kw">pub</span> <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">garble</span>::<span class="kw-2">*</span>;
 <span class="kw">pub</span> <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">wire</span>::<span class="kw-2">*</span>;
