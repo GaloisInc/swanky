@@ -12,7 +12,7 @@ fn bench_cr_hash(c: &mut Criterion) {
     c.bench_function("AesHash::cr_hash", |b| {
         let hash = AesHash::new(rand::random::<Block>());
         let x = rand::random::<Block>();
-        let i = rand::random::<usize>();
+        let i = rand::random::<Block>();
         b.iter(|| {
             let z = hash.cr_hash(i, x);
             criterion::black_box(z)
@@ -24,7 +24,7 @@ fn bench_ccr_hash(c: &mut Criterion) {
     c.bench_function("AesHash::ccr_hash", |b| {
         let hash = AesHash::new(rand::random::<Block>());
         let x = rand::random::<Block>();
-        let i = rand::random::<usize>();
+        let i = rand::random::<Block>();
         b.iter(|| {
             let z = hash.ccr_hash(i, x);
             criterion::black_box(z)
@@ -36,7 +36,7 @@ fn bench_tccr_hash(c: &mut Criterion) {
     c.bench_function("AesHash::tccr_hash", |b| {
         let hash = AesHash::new(rand::random::<Block>());
         let x = rand::random::<Block>();
-        let i = rand::random::<usize>();
+        let i = rand::random::<Block>();
         b.iter(|| {
             let z = hash.tccr_hash(i, x);
             criterion::black_box(z)

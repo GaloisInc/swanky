@@ -35,7 +35,7 @@ impl AesHash {
     ///
     /// The function computes `π(x) ⊕ x`.
     #[inline]
-    pub fn cr_hash(&self, _i: usize, x: Block) -> Block {
+    pub fn cr_hash(&self, _i: Block, x: Block) -> Block {
         self.aes.encrypt(x) ^ x
     }
 
@@ -45,7 +45,7 @@ impl AesHash {
     /// The function computes `H(σ(x))`, where `H` is a correlation-robust hash
     /// function and `σ(x₀ || x₁) = (x₀ ⊕ x₁) || x₁`.
     #[inline]
-    pub fn ccr_hash(&self, i: usize, x: Block) -> Block {
+    pub fn ccr_hash(&self, i: Block, x: Block) -> Block {
         unsafe {
             let x = _mm_xor_si128(
                 _mm_shuffle_epi32(x.into(), 78),
@@ -62,11 +62,10 @@ impl AesHash {
     /// The function computes `π(π(x) ⊕ i) ⊕ π(x)`.
     #[inline]
     #[cfg(feature = "nightly")]
-    pub fn tccr_hash(&self, i: usize, x: Block) -> Block {
+    pub fn tccr_hash(&self, i: Block, x: Block) -> Block {
         unsafe {
             let y = self.aes.encrypt(x);
-            let i = _mm_set_epi64(_mm_setzero_si64(), std::mem::transmute::<usize, __m64>(i));
-            let t = _mm_xor_si128(y.into(), i);
+            let t = _mm_xor_si128(y.into(), i.into());
             let z = self.aes.encrypt(Block::from(t));
             y ^ z
         }
@@ -78,12 +77,10 @@ impl AesHash {
     /// The function computes `π(π(x) ⊕ i) ⊕ π(x)`.
     #[inline]
     #[cfg(not(feature = "nightly"))]
-    pub fn tccr_hash(&self, i: usize, x: Block) -> Block {
+    pub fn tccr_hash(&self, i: Block, x: Block) -> Block {
         unsafe {
             let y = self.aes.encrypt(x);
-            let t = _mm_setzero_si128();
-            let t = _mm_insert_epi64(t, i as i64, 0);
-            let t = _mm_xor_si128(y.into(), t);
+            let t = _mm_xor_si128(y.into(), i.into());
             let z = self.aes.encrypt(Block::from(t));
             y ^ z
         }
