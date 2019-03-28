@@ -221,7 +221,9 @@ mod classic {
     use crate::circuit::{Circuit, CircuitBuilder};
     use crate::dummy::Dummy;
     use crate::fancy::{BundleGadgets, Fancy};
+    use crate::util::{self, RngExt};
     use itertools::Itertools;
+    use rand::thread_rng;
 
     // helper {{{
     fn garble_test_helper<F>(f: F)
