@@ -26,16 +26,12 @@ where
 {
     c.bench_function(&format!("garbling::{}{}_ev", name, q), move |bench| {
         let mut rng = rand::thread_rng();
-
         let c = make_circuit(q);
         let (en, _, ev) = fancy_garbling::garble(&c).unwrap();
-
         let inps = (0..c.num_garbler_inputs())
             .map(|i| rng.gen_u16() % c.garbler_input_mod(i))
             .collect_vec();
-
         let xs = en.encode_garbler_inputs(&inps);
-
         bench.iter(|| {
             let ys = ev.eval(&c, &xs, &[]).unwrap();
             criterion::black_box(ys);

@@ -2,7 +2,7 @@ use super::{GarbledGate, Message, OutputCiphertext, SyncInfo};
 use crate::circuit::{Circuit, Gate};
 use crate::error::{EvaluatorError, FancyError, SyncError};
 use crate::fancy::{Fancy, HasModulus, SyncIndex};
-use crate::util::{output_tweak, tweak2};
+use crate::util::{output_tweak, tweak, tweak2};
 use crate::wire::Wire;
 use crossbeam::queue::SegQueue;
 use itertools::Itertools;
@@ -288,12 +288,12 @@ impl Fancy for Evaluator {
     ) -> Result<Wire, EvaluatorError> {
         let ngates = (x.modulus() - 1) as usize;
         let gate = self.recv_gate(ix, ngates)?;
-        let gate_num = self.current_gate(ix);
+        let t = tweak(self.current_gate(ix));
         if x.color() == 0 {
-            Ok(x.hashback(gate_num as u128, q))
+            Ok(x.hashback(t, q))
         } else {
             let ct = gate[x.color() as usize - 1];
-            Ok(Wire::from_block(ct ^ x.hash(gate_num as u128), q))
+            Ok(Wire::from_block(ct ^ x.hash(t), q))
         }
     }
     #[inline]

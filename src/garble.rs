@@ -715,12 +715,12 @@ mod streaming {
 #[cfg(test)]
 mod parallel {
     use super::*;
-    use crate::dummy::Dummy;
+    // use crate::dummy::Dummy;
     use crate::fancy::Fancy;
     use crate::fancy::{BundleGadgets, SyncIndex};
-    use crate::util::RngExt;
+    // use crate::util::RngExt;
     use itertools::Itertools;
-    use rand::thread_rng;
+    // use rand::thread_rng;
 
     fn parallel_gadgets<F, W>(b: &F, Q: u128, N: SyncIndex, par: bool)
     // {{{

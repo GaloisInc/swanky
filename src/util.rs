@@ -10,21 +10,21 @@ use scuttlebutt::Block;
 
 /// Tweak function for a single item.
 #[inline]
-pub fn tweak(i: usize) -> u128 {
-    i as u128
+pub fn tweak(i: usize) -> Block {
+    Block::from(i as u128)
 }
 
 /// Tweak function for two items.
 #[inline]
-pub fn tweak2(i: u64, j: u64) -> u128 {
-    ((i as u128) << 64) + j as u128
+pub fn tweak2(i: u64, j: u64) -> Block {
+    Block::from(((i as u128) << 64) + j as u128)
 }
 
 /// Compute the output tweak for a garbled gate where i is the gate id and k is the value.
 #[inline]
-pub fn output_tweak(i: usize, k: u16) -> u128 {
+pub fn output_tweak(i: usize, k: u16) -> Block {
     let (left, _) = (i as u128).overflowing_shl(64);
-    left + k as u128
+    Block::from(left + k as u128)
 }
 
 ////////////////////////////////////////////////////////////////////////////////

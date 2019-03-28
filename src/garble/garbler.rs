@@ -252,7 +252,6 @@ impl Fancy for Garbler {
             // garbler's half-gate: outputs X-arD
             // G = H(A+aD) ^ X+a(-r)D = H(A+aD) ^ X-arD
             if A_.color() != 0 {
-                // let G = A_.hash(g) ^ X.minus(&D_cmul[(a * r % q) as usize]).as_u128();
                 let G = A_.hash(g) ^ X_cmul[((q - (a * r % q)) % q) as usize];
                 gate[A_.color() as usize - 1] = Some(G);
             }
@@ -280,7 +279,6 @@ impl Fancy for Garbler {
             // evaluator's half-gate: outputs Y-(b+r)D
             // G = H(B+bD) + Y-(b+r)A
             if B_.color() != 0 {
-                // let G = B_.hash(g) ^ Y.minus(&A_cmul[((b+r) % q) as usize]).as_u128();
                 let G = B_.hash(g) ^ Y_cmul[((q - ((b + r) % q)) % q) as usize];
                 gate[q as usize - 1 + B_.color() as usize - 1] = Some(G);
             }
@@ -303,7 +301,7 @@ impl Fancy for Garbler {
         let tt = tt.ok_or(GarblerError::TruthTableRequired)?;
 
         let q_in = A.modulus();
-        // we have to fill in the vector in an unkonwn order because of the color bits.
+        // we have to fill in the vector in an unknown order because of the color bits.
         // Since some of the values in gate will be void temporarily, we use Vec<Option<..>>
         let mut gate = vec![None; q_in as usize - 1];
 

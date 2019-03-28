@@ -4,7 +4,7 @@ use crate::aes::AES;
 use crate::fancy::HasModulus;
 use crate::util;
 use rand::{CryptoRng, RngCore};
-use scuttlebutt::Block;
+use scuttlebutt::{Block, AES_HASH};
 use serde::{Deserialize, Serialize};
 
 /// The essential wirelabel type used by garbled circuits.
@@ -253,21 +253,17 @@ impl Wire {
     ///
     /// Uses fixed-key AES.
     #[inline]
-    pub fn hash(&self, tweak: u128) -> Block {
-        Block::from(AES.hash(tweak, u128::from(self.as_block())))
+    pub fn hash(&self, tweak: Block) -> Block {
+        // AES_HASH.tccr_hash(tweak, self.as_block())
+        Block::from(AES.hash(u128::from(tweak), u128::from(self.as_block())))
     }
 
     /// Compute the hash of this wire, converting the result back to a wire.
     ///
     /// Uses fixed-key AES.
     #[inline]
-    pub fn hashback(&self, tweak: u128, new_mod: u16) -> Wire {
-        Self::from_block(self.hash(tweak), new_mod)
-    }
-
-    #[inline]
-    pub fn length() -> usize {
-        16
+    pub fn hashback(&self, tweak: Block, q: u16) -> Wire {
+        Self::from_block(self.hash(tweak), q)
     }
 }
 
@@ -313,7 +309,7 @@ mod tests {
         for _ in 0..100 {
             let q = 2 + (rng.gen_u16() % 110);
             let x = Wire::rand(&mut rng, q);
-            let y = x.hashback(1, q);
+            let y = x.hashback(Block::from(1u128), q);
             assert!(x != y);
             match y {
                 Wire::Mod2 { val } => assert!(u128::from(val) > 0),
@@ -327,7 +323,6 @@ mod tests {
         let ref mut rng = thread_rng();
         for _ in 0..1000 {
             let q = rng.gen_modulus();
-            // let q = 2;
             let x = Wire::rand(rng, q);
             let xneg = x.negate();
             println!("{:?}", xneg);
@@ -422,13 +417,13 @@ mod tests {
         let hashes = crossbeam::scope(|scope| {
             let hs = ws
                 .iter()
-                .map(|w| scope.spawn(move |_| w.hash(0)))
+                .map(|w| scope.spawn(move |_| w.hash(Block::zero())))
                 .collect_vec();
             hs.into_iter().map(|h| h.join().unwrap()).collect_vec()
         })
         .unwrap();
 
-        let should_be = ws.iter().map(|w| w.hash(0)).collect_vec();
+        let should_be = ws.iter().map(|w| w.hash(Block::zero())).collect_vec();
 
         assert_eq!(hashes, should_be);
     }
