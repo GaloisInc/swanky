@@ -38,6 +38,63 @@ pub struct Aes128 {
     rkeys: [__m128i; 11],
 }
 
+union __U128 {
+    vector: __m128i,
+    bytes: u128,
+}
+
+/// Fixed-key AES-128.
+pub const AES: Aes128 = Aes128 {
+    rkeys: unsafe {
+        [
+            (__U128 {
+                bytes: 0x15B5_32C2_F193_1C94,
+            })
+            .vector,
+            (__U128 {
+                bytes: 0xD754_876D_FE7E_6726,
+            })
+            .vector,
+            (__U128 {
+                bytes: 0xA7EB_4F98_1986_CFCF,
+            })
+            .vector,
+            (__U128 {
+                bytes: 0x80E6_BBED_F88D_E8C9,
+            })
+            .vector,
+            (__U128 {
+                bytes: 0x1210_4B44_43D8_B35C,
+            })
+            .vector,
+            (__U128 {
+                bytes: 0xF467_7B3C_8DCB_047B,
+            })
+            .vector,
+            (__U128 {
+                bytes: 0x578C_DBAC_AED1_C9DC,
+            })
+            .vector,
+            (__U128 {
+                bytes: 0x295D_2051_CF6F_5E25,
+            })
+            .vector,
+            (__U128 {
+                bytes: 0x0CE1_FD36_50DE_FFAB,
+            })
+            .vector,
+            (__U128 {
+                bytes: 0xDDFA_4FE9_E2CD_2D23,
+            })
+            .vector,
+            (__U128 {
+                bytes: 0x96F6_769D_AF14_18D2,
+            })
+            .vector,
+        ]
+    },
+};
+
 macro_rules! expand_round {
     ($enc_keys:expr, $pos:expr, $round:expr) => {
         let mut t1 = _mm_load_si128($enc_keys.as_ptr().offset($pos - 1));
