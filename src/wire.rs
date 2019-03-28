@@ -1,6 +1,5 @@
 //! Low-level operations on wirelabels, the basic building block of garbled circuits.
 
-use crate::aes::AES;
 use crate::fancy::HasModulus;
 use crate::util;
 use rand::{CryptoRng, RngCore};
@@ -254,8 +253,7 @@ impl Wire {
     /// Uses fixed-key AES.
     #[inline]
     pub fn hash(&self, tweak: Block) -> Block {
-        // AES_HASH.tccr_hash(tweak, self.as_block())
-        Block::from(AES.hash(u128::from(tweak), u128::from(self.as_block())))
+        AES_HASH.tccr_hash(tweak, self.as_block())
     }
 
     /// Compute the hash of this wire, converting the result back to a wire.

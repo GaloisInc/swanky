@@ -9,7 +9,7 @@
 )]
 #![allow(non_snake_case)]
 
-mod aes;
+// mod aes;
 pub mod circuit;
 pub mod dummy;
 pub mod error;
