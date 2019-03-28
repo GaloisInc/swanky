@@ -1,11 +1,9 @@
-use super::{blocks_from_bytes, blocks_to_bytes};
 use super::{GarbledGate, Message, OutputCiphertext, SyncInfo};
 use crate::circuit::{Circuit, Gate};
 use crate::error::{EvaluatorError, FancyError, SyncError};
 use crate::fancy::{Fancy, HasModulus, SyncIndex};
 use crate::util::{output_tweak, tweak2};
 use crate::wire::Wire;
-use arrayref::array_ref;
 use crossbeam::queue::SegQueue;
 use itertools::Itertools;
 use scuttlebutt::Block;
@@ -16,16 +14,13 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::mpsc::Sender;
 use std::sync::{Arc, Mutex, RwLock};
 
-/// Callback used by evaluator to receive messages.
-pub trait Callback: FnMut(usize) -> Result<(Option<SyncIndex>, Vec<u8>), EvaluatorError> {}
-
 /// Streaming evaluator using a callback to receive ciphertexts as needed.
 ///
 /// Evaluates a garbled circuit on the fly, using messages containing ciphertexts and
 /// wires. Parallelizable.
 pub struct Evaluator {
     callback:
-        Arc<Mutex<FnMut(usize) -> Result<(Option<SyncIndex>, Vec<u8>), EvaluatorError> + Send>>,
+        Arc<Mutex<FnMut(usize) -> Result<(Option<SyncIndex>, Vec<Block>), EvaluatorError> + Send>>,
     current_gate: Arc<AtomicUsize>,
     output_cts: Arc<Mutex<Vec<OutputCiphertext>>>,
     output_wires: Arc<Mutex<Vec<Wire>>>,
@@ -34,13 +29,13 @@ pub struct Evaluator {
 }
 
 impl Evaluator {
-    /// Create a new Evaluator.
+    /// Create a new `Evaluator`.
     ///
     /// `callback` enables streaming by producing messages during the `Fancy`
-    /// computation, which contain ciphertexts and wirelabels.
+    /// computation, which contain ciphertexts and wire-labels.
     pub fn new<F>(callback: F) -> Evaluator
     where
-        F: FnMut(usize) -> Result<(Option<SyncIndex>, Vec<u8>), EvaluatorError> + Send + 'static,
+        F: FnMut(usize) -> Result<(Option<SyncIndex>, Vec<Block>), EvaluatorError> + Send + 'static,
     {
         Evaluator {
             callback: Arc::new(Mutex::new(callback)),
@@ -69,8 +64,8 @@ impl Evaluator {
         // // block until postman delivers message
         // Ok(receiver.recv().unwrap())
         } else {
-            let (ix, bytes) = (self.callback.lock().unwrap().deref_mut())(Wire::length())?;
-            Ok(Wire::from_bytes(bytes, q))
+            let (ix, blocks) = (self.callback.lock().unwrap().deref_mut())(1)?;
+            Ok(Wire::from_block(blocks[0], q))
         }
     }
 
@@ -88,9 +83,8 @@ impl Evaluator {
         // // block until postman delivers message
         // Ok(rx.recv().unwrap())
         } else {
-            let nbytes = 16 * ngates; // XXX: 16 should be something like Gate::length()
-            let (ix, bytes) = (self.callback.lock().unwrap().deref_mut())(nbytes)?;
-            Ok(blocks_from_bytes(&bytes, ngates))
+            let (ix, blocks) = (self.callback.lock().unwrap().deref_mut())(ngates)?;
+            Ok(blocks)
         }
     }
 
@@ -103,9 +97,8 @@ impl Evaluator {
         if let Some(ix) = ix {
             unimplemented!();
         } else {
-            let nbytes = 16 * noutputs; // XXX: 16 should be something like Output::length()
-            let (ix, bytes) = (self.callback.lock().unwrap().deref_mut())(nbytes)?;
-            Ok(blocks_from_bytes(&bytes, noutputs))
+            let (ix, blocks) = (self.callback.lock().unwrap().deref_mut())(noutputs)?;
+            Ok(blocks)
         }
     }
 
@@ -160,7 +153,7 @@ fn start_postman(
     sync_info: Arc<RwLock<Option<SyncInfo>>>,
     requests: Arc<RwLock<Option<Vec<SegQueue<Sender<Vec<u8>>>>>>>,
     callback: Arc<
-        Mutex<FnMut(usize) -> Result<(Option<SyncIndex>, Vec<u8>), EvaluatorError> + Send>,
+        Mutex<FnMut(usize) -> Result<(Option<SyncIndex>, Vec<Block>), EvaluatorError> + Send>,
     >,
 ) {
     unimplemented!();
@@ -340,13 +333,12 @@ impl GarbledCircuit {
         GarbledCircuit { gates, consts }
     }
 
-    /// The number of 128 bit ciphertexts and constant wires in the garbled circuit.
+    /// The number of garbled rows and constant wires in the garbled circuit.
+    #[inline]
     pub fn size(&self) -> usize {
-        let mut c = self.consts.len();
-        for g in self.gates.iter() {
-            c += g.len();
-        }
-        c
+        self.gates
+            .iter()
+            .fold(self.consts.len(), |acc, g| acc + g.len())
     }
 
     /// Evaluate the garbled circuit.
@@ -362,16 +354,16 @@ impl GarbledCircuit {
             .iter()
             .enumerate()
             .filter_map(|(i, gate)| match *gate {
-                Gate::GarblerInput { id } => Some(garbler_inputs[id].to_bytes()),
-                Gate::EvaluatorInput { id } => Some(evaluator_inputs[id].to_bytes()),
-                Gate::Constant { val } => Some(self.consts[&(val, c.modulus(i))].to_bytes()),
-                Gate::Mul { id, .. } => Some(blocks_to_bytes(&self.gates[id])),
-                Gate::Proj { id, .. } => Some(blocks_to_bytes(&self.gates[id])),
+                Gate::GarblerInput { id } => Some(vec![garbler_inputs[id].as_block()]),
+                Gate::EvaluatorInput { id } => Some(vec![evaluator_inputs[id].as_block()]),
+                Gate::Constant { val } => Some(vec![self.consts[&(val, c.modulus(i))].as_block()]),
+                Gate::Mul { id, .. } => Some(self.gates[id].clone()),
+                Gate::Proj { id, .. } => Some(self.gates[id].clone()),
                 _ => None,
             })
-            .collect::<Vec<Vec<u8>>>()
+            .collect::<Vec<Vec<Block>>>()
             .into_iter();
-        let eval = Evaluator::new(move |_: usize| Ok((None, msgs.next().unwrap())));
+        let eval = Evaluator::new(move |_| Ok((None, msgs.next().unwrap())));
         c.eval(&eval)
     }
 }

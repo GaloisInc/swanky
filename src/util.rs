@@ -3,6 +3,7 @@
 //! Note: all number representations in this library are little-endian.
 
 use itertools::Itertools;
+use scuttlebutt::Block;
 
 ////////////////////////////////////////////////////////////////////////////////
 // tweak functions for garbling
@@ -421,16 +422,21 @@ pub trait RngExt: rand::Rng + Sized {
     }
 
     #[inline]
-    fn gen_usable_u128(&mut self, modulus: u16) -> u128 {
+    fn gen_block(&mut self) -> Block {
+        Block::from(self.gen_u128())
+    }
+
+    #[inline]
+    fn gen_usable_block(&mut self, modulus: u16) -> Block {
         if is_power_of_2(modulus) {
             let nbits = (modulus - 1).count_ones();
             if 128 % nbits == 0 {
-                return self.gen_u128();
+                return Block::from(self.gen_u128());
             }
         }
         let n = digits_per_u128(modulus);
         let max = (modulus as u128).pow(n as u32);
-        self.gen_u128() % max
+        Block::from(self.gen_u128() % max)
     }
 
     #[inline]
@@ -525,7 +531,7 @@ mod tests {
         let mut rng = thread_rng();
         for _ in 0..1000 {
             let q = 2 + (rng.gen_u16() % 111);
-            let x = rng.gen_usable_u128(q);
+            let x = u128::from(rng.gen_usable_block(q));
             let y = as_base_q(x, q, digits_per_u128(q));
             let z = from_base_q(&y, q);
             assert_eq!(x, z);

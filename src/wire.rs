@@ -1,12 +1,9 @@
 //! Low-level operations on wirelabels, the basic building block of garbled circuits.
 
 use crate::aes::AES;
-use crate::{
-    fancy::HasModulus,
-    util::{self, RngExt},
-};
-use arrayref::array_ref;
-use rand::Rng;
+use crate::fancy::HasModulus;
+use crate::util;
+use rand::{CryptoRng, RngCore};
 use scuttlebutt::Block;
 use serde::{Deserialize, Serialize};
 
@@ -84,17 +81,6 @@ impl Wire {
         }
     }
 
-    #[inline]
-    pub fn to_bytes(&self) -> Vec<u8> {
-        u128::from(self.as_block()).to_ne_bytes().to_vec()
-    }
-
-    #[inline]
-    pub fn from_bytes(v: Vec<u8>, q: u16) -> Self {
-        let w = unsafe { std::mem::transmute(*array_ref![v, 0, 16]) };
-        Wire::from_block(w, q)
-    }
-
     /// The zero wire for the modulus q.
     #[inline]
     pub fn zero(q: u16) -> Self {
@@ -110,7 +96,7 @@ impl Wire {
 
     /// Get a random wire label for mod q, with the first digit set to 1.
     #[inline]
-    pub fn rand_delta<R: Rng>(rng: &mut R, q: u16) -> Self {
+    pub fn rand_delta<R: CryptoRng + RngCore>(rng: &mut R, q: u16) -> Self {
         let mut w = Self::rand(rng, q);
         match w {
             Wire::Mod2 { ref mut val } => *val = val.set_color_bit(),
@@ -259,8 +245,8 @@ impl Wire {
 
     /// Get a random wire mod q.
     #[inline]
-    pub fn rand<R: Rng>(rng: &mut R, q: u16) -> Wire {
-        Self::from_block(Block::from(rng.gen_u128()), q)
+    pub fn rand<R: CryptoRng + RngCore>(rng: &mut R, q: u16) -> Wire {
+        Self::from_block(Block::rand(rng), q)
     }
 
     /// Compute the hash of this wire.
@@ -300,11 +286,11 @@ mod tests {
         let ref mut rng = thread_rng();
         for _ in 0..100 {
             let q = 2 + (rng.gen_u16() % 111);
-            let w = rng.gen_usable_u128(q);
-            let x = Wire::from_u128(w, q);
-            let y = x.as_u128();
+            let w = rng.gen_usable_block(q);
+            let x = Wire::from_block(w, q);
+            let y = x.as_block();
             assert_eq!(w, y);
-            let z = Wire::from_u128(y, q);
+            let z = Wire::from_block(y, q);
             assert_eq!(x, z);
         }
     }
@@ -315,7 +301,7 @@ mod tests {
         for _ in 0..1000 {
             let q = 3 + (rng.gen_u16() % 110);
             let x = rng.gen_u128();
-            let w = Wire::from_u128(x, q);
+            let w = Wire::from_block(Block::from(x), q);
             let should_be = util::as_base_q_u128(x, q);
             assert_eq!(w.digits(), should_be, "x={} q={}", x, q);
         }

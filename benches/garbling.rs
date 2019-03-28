@@ -61,23 +61,27 @@ fn half_gate(q: u16) -> Circuit {
     b.finish()
 }
 
-fn proj17_gb(c: &mut Criterion) {
+fn proj_gb(c: &mut Criterion) {
+    bench_garble(c, "proj", proj, 2);
     bench_garble(c, "proj", proj, 17)
 }
-fn proj17_ev(c: &mut Criterion) {
+fn proj_ev(c: &mut Criterion) {
+    bench_eval(c, "proj", proj, 2);
     bench_eval(c, "proj", proj, 17)
 }
 fn mul_gb(c: &mut Criterion) {
+    bench_garble(c, "mul", half_gate, 2);
     bench_garble(c, "mul", half_gate, 17)
 }
 fn mul_ev(c: &mut Criterion) {
+    bench_eval(c, "mul", half_gate, 2);
     bench_eval(c, "mul", half_gate, 17)
 }
 
 criterion_group! {
     name = garbling;
     config = Criterion::default().warm_up_time(Duration::from_millis(100));
-    targets = proj17_gb, proj17_ev, mul_gb, mul_ev
+    targets = proj_gb, proj_ev, mul_gb, mul_ev
 }
 
 criterion_main!(garbling);

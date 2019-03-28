@@ -3,7 +3,6 @@ use crate::error::{FancyError, GarblerError, SyncError};
 use crate::fancy::{Fancy, HasModulus, SyncIndex};
 use crate::util::{output_tweak, tweak, tweak2, RngExt};
 use crate::wire::Wire;
-use itertools::Itertools;
 use scuttlebutt::Block;
 use std::collections::HashMap;
 use std::ops::DerefMut;
