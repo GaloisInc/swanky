@@ -129,10 +129,7 @@ impl SeedableRng for AesRngCore {
     #[cfg(not(feature = "nightly"))]
     fn from_seed(seed: Self::Seed) -> Self {
         let aes = Aes128::new(seed);
-        AesRngCore {
-            aes,
-            state: 0u64,
-        }
+        AesRngCore { aes, state: 0u64 }
     }
 }
 

@@ -13,6 +13,7 @@ use arrayref::array_ref;
 use core::arch::x86_64::*;
 #[cfg(feature = "curve25519-dalek")]
 use curve25519_dalek::ristretto::RistrettoPoint;
+use rand::{CryptoRng, RngCore};
 use std::hash::{Hash, Hasher};
 use std::io::{Read, Write};
 
@@ -128,8 +129,15 @@ impl Block {
     }
     /// Flip all bits.
     #[inline]
-    pub fn flip(&self) -> Block {
+    pub fn flip(&self) -> Self {
         unsafe { Block::from(_mm_xor_si128(self.0, ONES)) }
+    }
+    /// Generate a random block.
+    #[inline]
+    pub fn rand<RNG: CryptoRng + RngCore>(rng: &mut RNG) -> Self {
+        let mut block = Block::zero();
+        rng.fill_bytes(&mut block.as_mut());
+        block
     }
 }
 
