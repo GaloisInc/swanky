@@ -7,9 +7,9 @@ where
     F: Fancy<Item = W>,
     W: HasModulus + Clone,
 {
-    let x = b.garbler_input_bundle_crt(None, q, None).unwrap();
-    let z = b.sign(None, &x, "100%").unwrap();
-    b.output(None, &z).unwrap();
+    let x = b.garbler_input_bundle_crt(q, None).unwrap();
+    let z = b.sign(&x, "100%").unwrap();
+    b.output(&z).unwrap();
 }
 
 fn main() {

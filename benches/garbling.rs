@@ -41,19 +41,19 @@ where
 
 fn proj(q: u16) -> Circuit {
     let b = CircuitBuilder::new();
-    let x = b.garbler_input(None, q, None).unwrap();
+    let x = b.garbler_input(q, None).unwrap();
     let tab = (0..q).map(|i| (i + 1) % q).collect_vec();
-    let z = b.proj(None, &x, q, Some(tab)).unwrap();
-    b.output(None, &z).unwrap();
+    let z = b.proj(&x, q, Some(tab)).unwrap();
+    b.output(&z).unwrap();
     b.finish()
 }
 
 fn half_gate(q: u16) -> Circuit {
     let b = CircuitBuilder::new();
-    let x = b.garbler_input(None, q, None).unwrap();
-    let y = b.garbler_input(None, q, None).unwrap();
-    let z = b.mul(None, &x, &y).unwrap();
-    b.output(None, &z).unwrap();
+    let x = b.garbler_input(q, None).unwrap();
+    let y = b.garbler_input(q, None).unwrap();
+    let z = b.mul(&x, &y).unwrap();
+    b.output(&z).unwrap();
     b.finish()
 }
 

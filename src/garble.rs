@@ -2,13 +2,11 @@
 
 use crate::circuit::Circuit;
 use crate::error::GarblerError;
-use crate::fancy::{HasModulus, SyncIndex};
+use crate::fancy::HasModulus;
 use crate::wire::Wire;
-use itertools::Itertools;
-use scuttlebutt::Block;
+use scuttlebutt::{AesRng, Block};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 
 mod evaluator;
@@ -76,49 +74,6 @@ impl std::fmt::Display for Message {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-// utils used by both garbler and evaluator
-
-struct SyncInfo {
-    starting_gate_id: usize,
-    index_done: Vec<AtomicBool>,
-    id_for_index: Vec<AtomicUsize>,
-}
-
-impl SyncInfo {
-    fn new(starting_gate_id: usize, nindices: SyncIndex) -> SyncInfo {
-        SyncInfo {
-            starting_gate_id,
-            index_done: (0..nindices).map(|_| AtomicBool::new(false)).collect_vec(),
-            id_for_index: (0..nindices).map(|_| AtomicUsize::new(0)).collect_vec(),
-        }
-    }
-}
-
-/// The current non-free gate index of the garbling computation. Respects sync
-/// ordering. This needs to be exactly the same in both Garbler and Evaluator
-/// since it feeds into the tweaks used to encrypt garbled gates.
-fn compute_gate_id(
-    current_gate: &AtomicUsize,
-    sync_index: Option<SyncIndex>,
-    sync_info: &Option<SyncInfo>,
-) -> usize {
-    if let Some(ref info) = *sync_info {
-        let ix = sync_index.expect("compute_gate_id: syncronization requires a sync index");
-
-        // get id and bump the count
-        let id = info.id_for_index[ix as usize].fetch_add(1, Ordering::SeqCst);
-
-        // compute the sync id
-        // 32 bits for gate index, 32 for id
-        assert!((info.starting_gate_id + ix as usize) >> 32 == 0);
-        assert!(id >> 32 == 0);
-        info.starting_gate_id + ix as usize + (id << 32)
-    } else {
-        current_gate.fetch_add(1, Ordering::SeqCst)
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////
 // general user-facing garbling functions
 
 /// Create an iterator over the messages produced by fancy garbling.
@@ -126,20 +81,20 @@ fn compute_gate_id(
 /// This creates a new thread for the garbler, which passes messages back through a
 /// channel one by one. This function has a restrictive input type because
 /// `fancy_computation` is sent to the new thread.
-pub fn garble_iter<F>(mut fancy_computation: F) -> impl Iterator<Item = Message>
+pub fn garble_iter<F>(mut fancy_computation: F, rng: AesRng) -> impl Iterator<Item = Message>
 where
-    F: FnMut(&Garbler) + Send + 'static,
+    F: FnMut(&Garbler<AesRng>) + Send + 'static,
 {
     let (sender, receiver) = std::sync::mpsc::sync_channel(20);
 
     std::thread::spawn(move || {
-        let send_func = move |_ix, m| {
+        let callback = move |m| {
             sender
                 .send(m)
                 .expect("garble_iter thread could not send message to iterator")
         };
-        let mut garbler = Garbler::new(send_func);
-        fancy_computation(&mut garbler);
+        let garbler = Garbler::new(callback, rng);
+        fancy_computation(&garbler);
     });
 
     receiver.into_iter()
@@ -152,6 +107,7 @@ pub fn garble(c: &Circuit) -> Result<(Encoder, Decoder, GarbledCircuit), Garbler
     let garbled_gates = Arc::new(Mutex::new(Vec::new()));
     let constants = Arc::new(Mutex::new(HashMap::new()));
     let garbled_outputs = Arc::new(Mutex::new(Vec::new()));
+    let rng = AesRng::new();
 
     let send_func;
     {
@@ -160,7 +116,7 @@ pub fn garble(c: &Circuit) -> Result<(Encoder, Decoder, GarbledCircuit), Garbler
         let garbled_gates = garbled_gates.clone();
         let constants = constants.clone();
         let garbled_outputs = garbled_outputs.clone();
-        send_func = move |_, m| match m {
+        send_func = move |m| match m {
             Message::UnencodedGarblerInput { zero, .. } => {
                 garbler_inputs.lock().unwrap().push(zero)
             }
@@ -177,7 +133,7 @@ pub fn garble(c: &Circuit) -> Result<(Encoder, Decoder, GarbledCircuit), Garbler
         };
     }
 
-    let garbler = Garbler::new(send_func);
+    let garbler = Garbler::new(send_func, rng);
     let outputs = c.eval(&garbler)?;
     c.process_outputs(&outputs, &garbler)?;
     let deltas = garbler.get_deltas();
@@ -262,10 +218,10 @@ mod classic {
     fn add() {
         garble_test_helper(|q| {
             let b = CircuitBuilder::new();
-            let x = b.evaluator_input(None, q).unwrap();
-            let y = b.evaluator_input(None, q).unwrap();
+            let x = b.evaluator_input(q).unwrap();
+            let y = b.evaluator_input(q).unwrap();
             let z = b.add(&x, &y).unwrap();
-            b.output(None, &z).unwrap();
+            b.output(&z).unwrap();
             b.finish()
         });
     }
@@ -274,9 +230,9 @@ mod classic {
     fn add_many() {
         garble_test_helper(|q| {
             let b = CircuitBuilder::new();
-            let xs = b.evaluator_inputs(None, &vec![q; 16]).unwrap();
+            let xs = b.evaluator_inputs(&vec![q; 16]).unwrap();
             let z = b.add_many(&xs).unwrap();
-            b.output(None, &z).unwrap();
+            b.output(&z).unwrap();
             b.finish()
         });
     }
@@ -285,9 +241,9 @@ mod classic {
     fn or_many() {
         garble_test_helper(|_| {
             let b = CircuitBuilder::new();
-            let xs = b.evaluator_inputs(None, &vec![2; 16]).unwrap();
-            let z = b.or_many(None, &xs).unwrap();
-            b.output(None, &z).unwrap();
+            let xs = b.evaluator_inputs(&vec![2; 16]).unwrap();
+            let z = b.or_many(&xs).unwrap();
+            b.output(&z).unwrap();
             b.finish()
         });
     }
@@ -296,10 +252,10 @@ mod classic {
     fn sub() {
         garble_test_helper(|q| {
             let b = CircuitBuilder::new();
-            let x = b.evaluator_input(None, q).unwrap();
-            let y = b.evaluator_input(None, q).unwrap();
+            let x = b.evaluator_input(q).unwrap();
+            let y = b.evaluator_input(q).unwrap();
             let z = b.sub(&x, &y).unwrap();
-            b.output(None, &z).unwrap();
+            b.output(&z).unwrap();
             b.finish()
         });
     }
@@ -308,15 +264,15 @@ mod classic {
     fn cmul() {
         garble_test_helper(|q| {
             let b = CircuitBuilder::new();
-            let x = b.evaluator_input(None, q).unwrap();
-            let _ = b.evaluator_input(None, q).unwrap();
+            let x = b.evaluator_input(q).unwrap();
+            let _ = b.evaluator_input(q).unwrap();
             let z;
             if q > 2 {
                 z = b.cmul(&x, 2).unwrap();
             } else {
                 z = b.cmul(&x, 1).unwrap();
             }
-            b.output(None, &z).unwrap();
+            b.output(&z).unwrap();
             b.finish()
         });
     }
@@ -329,10 +285,10 @@ mod classic {
                 tab.push((i + 1) % q);
             }
             let b = CircuitBuilder::new();
-            let x = b.evaluator_input(None, q).unwrap();
-            let _ = b.evaluator_input(None, q).unwrap();
-            let z = b.proj(None, &x, q, Some(tab)).unwrap();
-            b.output(None, &z).unwrap();
+            let x = b.evaluator_input(q).unwrap();
+            let _ = b.evaluator_input(q).unwrap();
+            let z = b.proj(&x, q, Some(tab)).unwrap();
+            b.output(&z).unwrap();
             b.finish()
         });
     }
@@ -346,10 +302,10 @@ mod classic {
                 tab.push(rng.gen_u16() % q);
             }
             let b = CircuitBuilder::new();
-            let x = b.evaluator_input(None, q).unwrap();
-            let _ = b.evaluator_input(None, q).unwrap();
-            let z = b.proj(None, &x, q, Some(tab)).unwrap();
-            b.output(None, &z).unwrap();
+            let x = b.evaluator_input(q).unwrap();
+            let _ = b.evaluator_input(q).unwrap();
+            let z = b.proj(&x, q, Some(tab)).unwrap();
+            b.output(&z).unwrap();
             b.finish()
         });
     }
@@ -358,9 +314,9 @@ mod classic {
     fn mod_change() {
         garble_test_helper(|q| {
             let b = CircuitBuilder::new();
-            let x = b.evaluator_input(None, q).unwrap();
-            let z = b.mod_change(None, &x, q * 2).unwrap();
-            b.output(None, &z).unwrap();
+            let x = b.evaluator_input(q).unwrap();
+            let z = b.mod_change(&x, q * 2).unwrap();
+            b.output(&z).unwrap();
             b.finish()
         });
     }
@@ -369,10 +325,10 @@ mod classic {
     fn half_gate() {
         garble_test_helper(|q| {
             let b = CircuitBuilder::new();
-            let x = b.evaluator_input(None, q).unwrap();
-            let y = b.evaluator_input(None, q).unwrap();
-            let z = b.mul(None, &x, &y).unwrap();
-            b.output(None, &z).unwrap();
+            let x = b.evaluator_input(q).unwrap();
+            let y = b.evaluator_input(q).unwrap();
+            let z = b.mul(&x, &y).unwrap();
+            b.output(&z).unwrap();
             b.finish()
         });
     }
@@ -384,10 +340,10 @@ mod classic {
             println!("\nTESTING MOD q={} ymod={}", q, ymod);
 
             let b = CircuitBuilder::new();
-            let x = b.evaluator_input(None, q).unwrap();
-            let y = b.evaluator_input(None, ymod).unwrap();
-            let z = b.mul(None, &x, &y).unwrap();
-            b.output(None, &z).unwrap();
+            let x = b.evaluator_input(q).unwrap();
+            let y = b.evaluator_input(ymod).unwrap();
+            let z = b.mul(&x, &y).unwrap();
+            b.output(&z).unwrap();
             let c = b.finish();
 
             let (en, de, ev) = garble(&c).unwrap();
@@ -432,9 +388,9 @@ mod classic {
         let mods = [3, 7, 10, 2, 13]; // fast
 
         let b = CircuitBuilder::new();
-        let xs = b.evaluator_input_bundles(None, &mods, nargs).unwrap();
-        let z = b.mixed_radix_addition(None, &xs).unwrap();
-        b.output_bundle(None, &z).unwrap();
+        let xs = b.evaluator_input_bundles(&mods, nargs).unwrap();
+        let z = b.mixed_radix_addition(&xs).unwrap();
+        b.output_bundle(&z).unwrap();
         let circ = b.finish();
 
         let (en, de, ev) = garble(&circ).unwrap();
@@ -466,8 +422,8 @@ mod classic {
         let q = rng.gen_modulus();
         let c = rng.gen_u16() % q;
 
-        let y = b.constant(None, c, q).unwrap();
-        b.output(None, &y).unwrap();
+        let y = b.constant(c, q).unwrap();
+        b.output(&y).unwrap();
 
         let circ = b.finish();
         let (_, de, ev) = garble(&circ).unwrap();
@@ -490,10 +446,10 @@ mod classic {
         let q = rng.gen_modulus();
         let c = rng.gen_u16() % q;
 
-        let x = b.evaluator_input(None, q).unwrap();
-        let y = b.constant(None, c, q).unwrap();
+        let x = b.evaluator_input(q).unwrap();
+        let y = b.constant(c, q).unwrap();
         let z = b.add(&x, &y).unwrap();
-        b.output(None, &z).unwrap();
+        b.output(&z).unwrap();
 
         let circ = b.finish();
         let (en, de, ev) = garble(&circ).unwrap();
@@ -531,10 +487,11 @@ mod streaming {
         ev_inp: &[u16],
         should_be: &[u16],
     ) where
-        F: FnMut(&Garbler) + Send + Copy + 'static,
+        F: FnMut(&Garbler<AesRng>) + Send + Copy + 'static,
         G: FnMut(&Evaluator) + Send + Copy + 'static,
     {
-        let mut gb_iter = garble_iter(move |gb| f_gb(gb));
+        let rng = AesRng::new();
+        let mut gb_iter = garble_iter(move |gb| f_gb(gb), rng);
 
         let mut gb_inp_iter = gb_inp.to_vec().into_iter();
         let mut ev_inp_iter = ev_inp.to_vec().into_iter();
@@ -559,7 +516,7 @@ mod streaming {
                 Message::OutputCiphertext(ct) => ct,
                 _ => unimplemented!(),
             };
-            Ok((None, blocks))
+            Ok(blocks)
         };
 
         let mut ev = Evaluator::new(callback);
@@ -575,10 +532,10 @@ mod streaming {
         q: u16,
     ) //{{{
     {
-        let x = b.garbler_input(None, q, None).unwrap();
-        let y = b.evaluator_input(None, q).unwrap();
+        let x = b.garbler_input(q, None).unwrap();
+        let y = b.evaluator_input(q).unwrap();
         let z = b.add(&x, &y).unwrap();
-        b.output(None, &z).unwrap();
+        b.output(&z).unwrap();
     }
 
     #[test]
@@ -604,10 +561,10 @@ mod streaming {
         q: u16,
     ) //{{{
     {
-        let x = b.garbler_input(None, q, None).unwrap();
-        let y = b.evaluator_input(None, q).unwrap();
+        let x = b.garbler_input(q, None).unwrap();
+        let y = b.evaluator_input(q).unwrap();
         let z = b.sub(&x, &y).unwrap();
-        b.output(None, &z).unwrap();
+        b.output(&z).unwrap();
     }
 
     #[test]
@@ -633,10 +590,10 @@ mod streaming {
         q: u16,
     ) // {{{
     {
-        let x = b.garbler_input(None, q, None).unwrap();
-        let y = b.evaluator_input(None, q).unwrap();
-        let z = b.mul(None, &x, &y).unwrap();
-        b.output(None, &z).unwrap();
+        let x = b.garbler_input(q, None).unwrap();
+        let y = b.evaluator_input(q).unwrap();
+        let z = b.mul(&x, &y).unwrap();
+        b.output(&z).unwrap();
     }
 
     #[test]
@@ -662,9 +619,9 @@ mod streaming {
         q: u16,
     ) // {{{
     {
-        let x = b.garbler_input(None, q, None).unwrap();
+        let x = b.garbler_input(q, None).unwrap();
         let z = b.cmul(&x, 5).unwrap();
-        b.output(None, &z).unwrap();
+        b.output(&z).unwrap();
     }
 
     #[test]
@@ -688,10 +645,10 @@ mod streaming {
         q: u16,
     ) // {{{
     {
-        let x = b.garbler_input(None, q, None).unwrap();
+        let x = b.garbler_input(q, None).unwrap();
         let tab = (0..q).map(|i| (i + 1) % q).collect_vec();
-        let z = b.proj(None, &x, q, Some(tab)).unwrap();
-        b.output(None, &z).unwrap();
+        let z = b.proj(&x, q, Some(tab)).unwrap();
+        b.output(&z).unwrap();
     }
 
     #[test]
@@ -712,111 +669,111 @@ mod streaming {
     //}}}
 }
 
-#[cfg(test)]
-mod parallel {
-    use super::*;
-    // use crate::dummy::Dummy;
-    use crate::fancy::Fancy;
-    use crate::fancy::{BundleGadgets, SyncIndex};
-    // use crate::util::RngExt;
-    use itertools::Itertools;
-    // use rand::thread_rng;
+// #[cfg(test)]
+// mod parallel {
+//     use super::*;
+//     // use crate::dummy::Dummy;
+//     use crate::fancy::BundleGadgets;
+//     use crate::fancy::Fancy;
+//     // use crate::util::RngExt;
+//     use itertools::Itertools;
+//     // use rand::thread_rng;
 
-    fn parallel_gadgets<F, W>(b: &F, Q: u128, N: SyncIndex, par: bool)
-    // {{{
-    where
-        W: Clone + HasModulus + Send + Sync + std::fmt::Debug,
-        F: Fancy<Item = W> + Send + Sync,
-    {
-        if par {
-            crossbeam::scope(|scope| {
-                b.begin_sync(N).unwrap();
-                let hs = (0..N)
-                    .map(|i| {
-                        scope
-                            .builder()
-                            .name(format!("Thread {}", i))
-                            .spawn(move |_| {
-                                let c = b.constant_bundle_crt(Some(i), 1, Q).unwrap();
-                                let x = b.garbler_input_bundle_crt(Some(i), Q, None).unwrap();
-                                let x = b.mul_bundles(Some(i), &x, &c).unwrap();
-                                let z = b.relu(Some(i), &x, "100%", None).unwrap();
-                                b.finish_index(i).unwrap();
-                                z
-                            })
-                            .unwrap()
-                    })
-                    .collect_vec();
-                let outs = hs.into_iter().map(|h| h.join().unwrap()).collect_vec();
-                b.output_bundles(None, &outs).unwrap();
-            })
-            .unwrap()
-        } else {
-            b.begin_sync(N).unwrap();
-            let mut zs = Vec::new();
-            for i in 0..N {
-                let c = b.constant_bundle_crt(Some(i), 1, Q).unwrap();
-                let x = b.garbler_input_bundle_crt(Some(i), Q, None).unwrap();
-                let x = b.mul_bundles(Some(i), &x, &c).unwrap();
-                let z = b.relu(Some(i), &x, "100%", None).unwrap();
-                zs.push(z);
-                b.finish_index(i).unwrap();
-            }
-            b.output_bundles(None, &zs).unwrap();
-        }
-    }
+//     fn parallel_gadgets<F, W>(b: &F, Q: u128, N: SyncIndex, par: bool)
+//     // {{{
+//     where
+//         W: Clone + HasModulus + Send + Sync + std::fmt::Debug,
+//         F: Fancy<Item = W> + Send + Sync,
+//     {
+//         if par {
+//             crossbeam::scope(|scope| {
+//                 b.begin_sync(N).unwrap();
+//                 let hs = (0..N)
+//                     .map(|i| {
+//                         scope
+//                             .builder()
+//                             .name(format!("Thread {}", i))
+//                             .spawn(move |_| {
+//                                 let c = b.constant_bundle_crt(Some(i), 1, Q).unwrap();
+//                                 let x = b.garbler_input_bundle_crt(Some(i), Q, None).unwrap();
+//                                 let x = b.mul_bundles(Some(i), &x, &c).unwrap();
+//                                 let z = b.relu(Some(i), &x, "100%", None).unwrap();
+//                                 b.finish_index(i).unwrap();
+//                                 z
+//                             })
+//                             .unwrap()
+//                     })
+//                     .collect_vec();
+//                 let outs = hs.into_iter().map(|h| h.join().unwrap()).collect_vec();
+//                 b.output_bundles(&outs).unwrap();
+//             })
+//             .unwrap()
+//         } else {
+//             b.begin_sync(N).unwrap();
+//             let mut zs = Vec::new();
+//             for i in 0..N {
+//                 let c = b.constant_bundle_crt(Some(i), 1, Q).unwrap();
+//                 let x = b.garbler_input_bundle_crt(Some(i), Q, None).unwrap();
+//                 let x = b.mul_bundles(Some(i), &x, &c).unwrap();
+//                 let z = b.relu(Some(i), &x, "100%", None).unwrap();
+//                 zs.push(z);
+//                 b.finish_index(i).unwrap();
+//             }
+//             b.output_bundles(&zs).unwrap();
+//         }
+//     }
 
-    // #[test]
-    // fn parallel_garbling() {
-    //     let mut rng = thread_rng();
-    //     let N = 10;
-    //     let Q = crate::util::modulus_with_width(10);
-    //     for _ in 0..16 {
-    //         let mut input = (0..N)
-    //             .map(|_| crate::util::crt_factor(rng.gen_u128() % Q, Q))
-    //             .collect_vec();
+//     // #[test]
+//     // fn parallel_garbling() {
+//     //     let mut rng = thread_rng();
+//     //     let N = 10;
+//     //     let Q = crate::util::modulus_with_width(10);
+//     //     for _ in 0..16 {
+//     //         let mut input = (0..N)
+//     //             .map(|_| crate::util::crt_factor(rng.gen_u128() % Q, Q))
+//     //             .collect_vec();
 
-    //         // compute the correct answer using Dummy
-    //         let dummy_input = input.iter().flatten().cloned().collect_vec();
-    //         let dummy = Dummy::new(&dummy_input, &[]);
-    //         parallel_gadgets(&dummy, Q, N, true);
-    //         let should_be_par = dummy.get_output();
+//     //         // compute the correct answer using Dummy
+//     //         let dummy_input = input.iter().flatten().cloned().collect_vec();
+//     //         let dummy = Dummy::new(&dummy_input, &[]);
+//     //         parallel_gadgets(&dummy, Q, N, true);
+//     //         let should_be_par = dummy.get_output();
 
-    //         // check serial version agrees with parallel
-    //         let dummy = Dummy::new(&dummy_input, &[]);
-    //         parallel_gadgets(&dummy, Q, N, false);
-    //         let should_be = dummy.get_output();
+//     //         // check serial version agrees with parallel
+//     //         let dummy = Dummy::new(&dummy_input, &[]);
+//     //         parallel_gadgets(&dummy, Q, N, false);
+//     //         let should_be = dummy.get_output();
 
-    //         assert_eq!(should_be, should_be_par);
+//     //         assert_eq!(should_be, should_be_par);
 
-    //         // set up garbler and evaluator
-    //         let (tx, rx) = std::sync::mpsc::channel();
+//     //         // set up garbler and evaluator
+//     //         let (tx, rx) = std::sync::mpsc::channel();
 
-    //         let tx = tx.clone();
-    //         let send_func = move |ix: Option<SyncIndex>, m| {
-    //             let m = match m {
-    //                 Message::UnencodedGarblerInput { zero, delta } => {
-    //                     let x = input[ix.unwrap() as usize].remove(0);
-    //                     let w = zero.plus(&delta.cmul(x));
-    //                     Message::GarblerInput(w)
-    //                 }
-    //                 _ => m,
-    //             };
-    //             tx.send((ix, m)).unwrap();
-    //         };
+//     //         let tx = tx.clone();
+//     //         let send_func = move |ix: Option<SyncIndex>, m| {
+//     //             let m = match m {
+//     //                 Message::UnencodedGarblerInput { zero, delta } => {
+//     //                     let x = input[ix.unwrap() as usize].remove(0);
+//     //                     let w = zero.plus(&delta.cmul(x));
+//     //                     Message::GarblerInput(w)
+//     //                 }
+//     //                 _ => m,
+//     //             };
+//     //             tx.send((ix, m)).unwrap();
+//     //         };
 
-    //         // put garbler on another thread
-    //         std::thread::spawn(move || {
-    //             let garbler = Garbler::new(send_func);
-    //             parallel_gadgets(&garbler, Q, N, true);
-    //         });
+//     //         // put garbler on another thread
+//     //         std::thread::spawn(move || {
+//     //             let garbler = Garbler::new(send_func);
+//     //             parallel_gadgets(&garbler, Q, N, true);
+//     //         });
 
-    //         // run the evaluator on this one
-    //         let evaluator = Evaluator::new(move |_| rx.recv());
-    //         parallel_gadgets(&evaluator, Q, N, false);
+//     //         // run the evaluator on this one
+//     //         let evaluator = Evaluator::new(move |_| rx.recv());
+//     //         parallel_gadgets(&evaluator, Q, N, false);
 
-    //         let result = evaluator.decode_output();
-    //         assert_eq!(result, should_be);
-    //     }
-    // } // }}}
-}
+//     //         let result = evaluator.decode_output();
+//     //         assert_eq!(result, should_be);
+//     //     }
+//     // } // }}}
+// }

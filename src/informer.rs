@@ -1,15 +1,14 @@
-//! Informer runs a fancy computation and learns information from it, like how many of
-//! what kind of inputs there are.
+//! `Informer` runs a fancy computation and learns information from it.
 
 use std::collections::HashSet;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 
 use crate::error::{FancyError, InformerError};
-use crate::fancy::{Fancy, HasModulus, SyncIndex};
+use crate::fancy::{Fancy, HasModulus};
 
-/// Implements Fancy. Use to learn information about a fancy computation in a lightweight
-/// way.
+/// Implements `Fancy`. Used to learn information about a `Fancy` computation in
+/// a lightweight way.
 pub struct Informer {
     garbler_input_moduli: Arc<Mutex<Vec<u16>>>,
     evaluator_input_moduli: Arc<Mutex<Vec<u16>>>,
@@ -194,31 +193,17 @@ impl Fancy for Informer {
     type Item = InformerVal;
     type Error = InformerError;
 
-    fn garbler_input(
-        &self,
-        _ix: Option<SyncIndex>,
-        modulus: u16,
-        _opt_x: Option<u16>,
-    ) -> Result<InformerVal, InformerError> {
+    fn garbler_input(&self, modulus: u16, _: Option<u16>) -> Result<InformerVal, InformerError> {
         self.garbler_input_moduli.lock().unwrap().push(modulus);
         Ok(InformerVal(modulus))
     }
 
-    fn evaluator_input(
-        &self,
-        _ix: Option<SyncIndex>,
-        modulus: u16,
-    ) -> Result<InformerVal, InformerError> {
+    fn evaluator_input(&self, modulus: u16) -> Result<InformerVal, InformerError> {
         self.evaluator_input_moduli.lock().unwrap().push(modulus);
         Ok(InformerVal(modulus))
     }
 
-    fn constant(
-        &self,
-        _ix: Option<SyncIndex>,
-        val: u16,
-        modulus: u16,
-    ) -> Result<InformerVal, InformerError> {
+    fn constant(&self, val: u16, modulus: u16) -> Result<InformerVal, InformerError> {
         self.constants.lock().unwrap().insert((val, modulus));
         Ok(InformerVal(modulus))
     }
@@ -244,14 +229,9 @@ impl Fancy for Informer {
         Ok(InformerVal(x.modulus()))
     }
 
-    fn mul(
-        &self,
-        ix: Option<SyncIndex>,
-        x: &InformerVal,
-        y: &InformerVal,
-    ) -> Result<InformerVal, InformerError> {
+    fn mul(&self, x: &InformerVal, y: &InformerVal) -> Result<InformerVal, InformerError> {
         if x.modulus() < y.modulus() {
-            return self.mul(ix, y, x);
+            return self.mul(y, x);
         }
         self.nmuls.fetch_add(1, Ordering::SeqCst);
         self.nciphertexts.fetch_add(
@@ -267,10 +247,9 @@ impl Fancy for Informer {
 
     fn proj(
         &self,
-        _ix: Option<SyncIndex>,
         x: &InformerVal,
         modulus: u16,
-        _tt: Option<Vec<u16>>,
+        _: Option<Vec<u16>>,
     ) -> Result<InformerVal, InformerError> {
         self.nprojs.fetch_add(1, Ordering::SeqCst);
         self.nciphertexts
@@ -278,7 +257,7 @@ impl Fancy for Informer {
         Ok(InformerVal(modulus))
     }
 
-    fn output(&self, _ix: Option<SyncIndex>, x: &InformerVal) -> Result<(), InformerError> {
+    fn output(&self, x: &InformerVal) -> Result<(), InformerError> {
         self.outputs.lock().unwrap().push(x.modulus());
         Ok(())
     }

@@ -1,94 +1,66 @@
-use super::{Message, SyncInfo};
-use crate::error::{FancyError, GarblerError, SyncError};
-use crate::fancy::{Fancy, HasModulus, SyncIndex};
+use super::Message;
+use crate::error::{FancyError, GarblerError};
+use crate::fancy::{Fancy, HasModulus};
 use crate::util::{output_tweak, tweak, tweak2, RngExt};
 use crate::wire::Wire;
+use rand::{CryptoRng, RngCore};
 use scuttlebutt::Block;
 use std::collections::HashMap;
 use std::ops::DerefMut;
 use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::{Arc, Mutex, RwLock};
+use std::sync::{Arc, Mutex};
 
 /// Streams garbled circuit ciphertexts through a callback. Parallelizable.
-pub struct Garbler {
-    send_function: Arc<Mutex<FnMut(Option<SyncIndex>, Message) + Send>>,
+pub struct Garbler<R: CryptoRng + RngCore> {
+    callback: Arc<Mutex<FnMut(Message) + Send>>,
+    // Hash map containing modulus -> associated delta.
     deltas: Arc<Mutex<HashMap<u16, Wire>>>,
     current_output: Arc<AtomicUsize>,
     current_gate: Arc<AtomicUsize>,
-    sync_info: Arc<RwLock<Option<SyncInfo>>>,
+    rng: Arc<Mutex<R>>,
 }
 
-impl Garbler {
+impl<R: CryptoRng + RngCore> Garbler<R> {
     /// Create a new garbler.
     ///
-    /// `send_func` is a callback that enables streaming. It gets called as the garbler
-    /// generates ciphertext information such as garbled gates or input wirelabels.
-    pub fn new<F>(send_func: F) -> Garbler
+    /// `callback` is a function that enables streaming. It gets called as the
+    /// garbler generates ciphertext information such as garbled gates or input
+    /// wire-labels.
+    pub fn new<F>(callback: F, rng: R) -> Self
     where
-        F: FnMut(Option<SyncIndex>, Message) + Send + 'static,
+        F: FnMut(Message) + Send + 'static,
     {
         Garbler {
-            send_function: Arc::new(Mutex::new(send_func)),
+            callback: Arc::new(Mutex::new(callback)),
             deltas: Arc::new(Mutex::new(HashMap::new())),
             current_gate: Arc::new(AtomicUsize::new(0)),
             current_output: Arc::new(AtomicUsize::new(0)),
-            sync_info: Arc::new(RwLock::new(None)),
+            rng: Arc::new(Mutex::new(rng)),
         }
     }
 
     /// Output some information from the garbling.
-    fn send(&self, ix: Option<SyncIndex>, m: Message) {
-        (self.send_function.lock().unwrap().deref_mut())(ix, m);
-    }
-
-    fn internal_begin_sync(&self, num_indices: SyncIndex) -> Result<(), GarblerError> {
-        let mut opt_info = self.sync_info.write().unwrap();
-        if opt_info.is_some() {
-            return Err(GarblerError::from(SyncError::SyncStartedInSync));
-        }
-        *opt_info = Some(SyncInfo::new(
-            self.current_gate.load(Ordering::SeqCst),
-            num_indices,
-        ));
-        Ok(())
-    }
-
-    fn internal_finish_index(&self, index: SyncIndex) -> Result<(), GarblerError> {
-        let mut done = false;
-        if let Some(ref info) = *self.sync_info.read().unwrap() {
-            info.index_done[index as usize].store(true, Ordering::SeqCst);
-            if info.index_done.iter().all(|x| x.load(Ordering::SeqCst)) {
-                done = true;
-            }
-        } else {
-            return Err(GarblerError::from(SyncError::IndexUsedOutOfSync));
-        }
-        if done {
-            *self.sync_info.write().unwrap() = None;
-            self.send(None, Message::EndSync);
-            self.current_gate.fetch_add(1, Ordering::SeqCst);
-        }
-        Ok(())
+    #[inline]
+    fn send(&self, m: Message) {
+        (self.callback.lock().unwrap().deref_mut())(m);
     }
 
     /// The current non-free gate index of the garbling computation. Respects sync
     /// ordering. Must agree with Evaluator hence compute_gate_id is in the parent mod.
-    fn current_gate(&self, sync_index: Option<SyncIndex>) -> usize {
-        super::compute_gate_id(
-            &self.current_gate,
-            sync_index,
-            &*self.sync_info.read().unwrap(),
-        )
+    #[inline]
+    fn current_gate(&self) -> usize {
+        self.current_gate.fetch_add(1, Ordering::SeqCst)
     }
 
     /// Create a delta if it has not been created yet for this modulus, otherwise just
     /// return the existing one.
+    #[inline]
     pub fn delta(&self, q: u16) -> Wire {
         let mut deltas = self.deltas.lock().unwrap();
         if let Some(delta) = deltas.get(&q) {
             return delta.clone();
         }
-        let w = Wire::rand_delta(&mut rand::thread_rng(), q);
+        let w = Wire::rand_delta(&mut *self.rng.lock().unwrap(), q);
         deltas.insert(q, w.clone());
         w
     }
@@ -104,50 +76,40 @@ impl Garbler {
     }
 }
 
-impl Fancy for Garbler {
+impl<R: CryptoRng + RngCore> Fancy for Garbler<R> {
     type Item = Wire;
     type Error = GarblerError;
+
     #[inline]
-    fn garbler_input(
-        &self,
-        ix: Option<SyncIndex>,
-        q: u16,
-        opt_x: Option<u16>,
-    ) -> Result<Wire, GarblerError> {
-        let w = Wire::rand(&mut rand::thread_rng(), q);
+    fn garbler_input(&self, q: u16, opt_x: Option<u16>) -> Result<Wire, GarblerError> {
+        let w = Wire::rand(&mut *self.rng.lock().unwrap(), q);
         let d = self.delta(q);
         if let Some(x) = opt_x {
             let encoded_wire = w.plus(&d.cmul(x));
-            self.send(ix, Message::GarblerInput(encoded_wire));
+            self.send(Message::GarblerInput(encoded_wire));
         } else {
-            self.send(
-                ix,
-                Message::UnencodedGarblerInput {
-                    zero: w.clone(),
-                    delta: d,
-                },
-            );
+            self.send(Message::UnencodedGarblerInput {
+                zero: w.clone(),
+                delta: d,
+            });
         }
         Ok(w)
     }
     #[inline]
-    fn evaluator_input(&self, ix: Option<SyncIndex>, q: u16) -> Result<Wire, GarblerError> {
-        let w = Wire::rand(&mut rand::thread_rng(), q);
+    fn evaluator_input(&self, q: u16) -> Result<Wire, GarblerError> {
+        let w = Wire::rand(&mut *self.rng.lock().unwrap(), q);
         let d = self.delta(q);
-        self.send(
-            ix,
-            Message::UnencodedEvaluatorInput {
-                zero: w.clone(),
-                delta: d,
-            },
-        );
+        self.send(Message::UnencodedEvaluatorInput {
+            zero: w.clone(),
+            delta: d,
+        });
         Ok(w)
     }
     #[inline]
-    fn constant(&self, ix: Option<SyncIndex>, x: u16, q: u16) -> Result<Wire, GarblerError> {
-        let zero = Wire::rand(&mut rand::thread_rng(), q);
+    fn constant(&self, x: u16, q: u16) -> Result<Wire, GarblerError> {
+        let zero = Wire::rand(&mut *self.rng.lock().unwrap(), q);
         let wire = zero.plus(&self.delta(q).cmul_eq(x));
-        self.send(ix, Message::Constant { value: x, wire });
+        self.send(Message::Constant { value: x, wire });
         Ok(zero)
     }
     #[inline]
@@ -169,14 +131,14 @@ impl Fancy for Garbler {
         Ok(x.cmul(c))
     }
     #[inline]
-    fn mul(&self, ix: Option<SyncIndex>, A: &Wire, B: &Wire) -> Result<Wire, GarblerError> {
+    fn mul(&self, A: &Wire, B: &Wire) -> Result<Wire, GarblerError> {
         if A.modulus() < A.modulus() {
-            return self.mul(ix, B, A);
+            return self.mul(B, A);
         }
 
         let q = A.modulus();
         let qb = B.modulus();
-        let gate_num = self.current_gate(ix);
+        let gate_num = self.current_gate();
 
         let D = self.delta(q);
         let Db = self.delta(qb);
@@ -191,7 +153,7 @@ impl Fancy for Garbler {
                 return Err(GarblerError::AsymmetricHalfGateModuliMax8(qb))?;
             }
 
-            r = rand::thread_rng().gen_u16() % q;
+            r = self.rng.lock().unwrap().gen_u16() % q;
             let t = tweak2(gate_num as u64, 1);
 
             let mut minitable = vec![None; qb as usize];
@@ -285,18 +247,12 @@ impl Fancy for Garbler {
         }
 
         let gate = gate.into_iter().map(Option::unwrap).collect();
-        self.send(ix, Message::GarbledGate(gate));
+        self.send(Message::GarbledGate(gate));
 
         Ok(X.plus_mov(&Y))
     }
     #[inline]
-    fn proj(
-        &self,
-        ix: Option<SyncIndex>,
-        A: &Wire,
-        q_out: u16,
-        tt: Option<Vec<u16>>,
-    ) -> Result<Wire, GarblerError> {
+    fn proj(&self, A: &Wire, q_out: u16, tt: Option<Vec<u16>>) -> Result<Wire, GarblerError> {
         //
         let tt = tt.ok_or(GarblerError::TruthTableRequired)?;
 
@@ -306,7 +262,7 @@ impl Fancy for Garbler {
         let mut gate = vec![None; q_in as usize - 1];
 
         let tao = A.color();
-        let g = tweak(self.current_gate(ix)); // gate tweak
+        let g = tweak(self.current_gate()); // gate tweak
 
         let Din = self.delta(q_in);
         let Dout = self.delta(q_out);
@@ -351,12 +307,12 @@ impl Fancy for Garbler {
 
         // unwrap the Option elems inside the Vec
         let gate = gate.into_iter().map(Option::unwrap).collect();
-        self.send(ix, Message::GarbledGate(gate));
+        self.send(Message::GarbledGate(gate));
 
         Ok(C)
     }
     #[inline]
-    fn output(&self, ix: Option<SyncIndex>, X: &Wire) -> Result<(), GarblerError> {
+    fn output(&self, X: &Wire) -> Result<(), GarblerError> {
         let mut cts = Vec::new();
         let q = X.modulus();
         let i = self.current_output();
@@ -365,27 +321,23 @@ impl Fancy for Garbler {
             let t = output_tweak(i, k);
             cts.push(X.plus(&D.cmul(k)).hash(t));
         }
-        self.send(ix, Message::OutputCiphertext(cts));
+        self.send(Message::OutputCiphertext(cts));
         Ok(())
     }
-    #[inline]
-    fn begin_sync(&self, num_indices: SyncIndex) -> Result<(), GarblerError> {
-        self.internal_begin_sync(num_indices)
-    }
-    #[inline]
-    fn finish_index(&self, index: SyncIndex) -> Result<(), GarblerError> {
-        self.internal_finish_index(index)
-    }
 }
+
+// `Garbler` tests
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use scuttlebutt::AesRng;
+
     #[test]
     fn garbler_has_send_and_sync() {
         fn check_send(_: impl Send) {}
         fn check_sync(_: impl Sync) {}
-        check_send(Garbler::new(|_, _| ()));
-        check_sync(Garbler::new(|_, _| ()));
+        check_send(Garbler::new(|_| (), AesRng::new()));
+        check_sync(Garbler::new(|_| (), AesRng::new()));
     }
 }

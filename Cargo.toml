@@ -60,9 +60,9 @@ harness = false
 name = "garbling"
 harness = false
 
-[[bench]]
-name = "parallel"
-harness = false
+# [[bench]]
+# name = "parallel"
+# harness = false
 
 [[bench]]
 name = "rust"
