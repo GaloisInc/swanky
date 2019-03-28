@@ -176,6 +176,7 @@ impl Fancy for Evaluator {
     type Item = Wire;
     type Error = EvaluatorError;
 
+    #[inline]
     fn garbler_input(
         &self,
         ix: Option<SyncIndex>,
@@ -199,7 +200,7 @@ impl Fancy for Evaluator {
             })?,
         }
     }
-
+    #[inline]
     fn evaluator_input(
         &self,
         ix: Option<SyncIndex>,
@@ -222,7 +223,7 @@ impl Fancy for Evaluator {
             })?,
         }
     }
-
+    #[inline]
     fn constant(
         &self,
         ix: Option<SyncIndex>,
@@ -250,25 +251,25 @@ impl Fancy for Evaluator {
             })?,
         }
     }
-
+    #[inline]
     fn add(&self, x: &Wire, y: &Wire) -> Result<Wire, FancyError<EvaluatorError>> {
         if x.modulus() != y.modulus() {
             return Err(FancyError::UnequalModuli);
         }
         Ok(x.plus(y))
     }
-
+    #[inline]
     fn sub(&self, x: &Wire, y: &Wire) -> Result<Wire, FancyError<EvaluatorError>> {
         if x.modulus() != y.modulus() {
             return Err(FancyError::UnequalModuli);
         }
         Ok(x.minus(y))
     }
-
+    #[inline]
     fn cmul(&self, x: &Wire, c: u16) -> Result<Wire, FancyError<EvaluatorError>> {
         Ok(x.cmul(c))
     }
-
+    #[inline]
     fn mul(
         &self,
         ix: Option<SyncIndex>,
@@ -321,7 +322,7 @@ impl Fancy for Evaluator {
         let res = L.plus_mov(&R.plus_mov(&A.cmul(new_b_color)));
         Ok(res)
     }
-
+    #[inline]
     fn proj(
         &self,
         ix: Option<SyncIndex>,
@@ -352,7 +353,7 @@ impl Fancy for Evaluator {
             Ok(Wire::from_u128(ct ^ x.hash(gate_num as u128), q))
         }
     }
-
+    #[inline]
     fn output(&self, ix: Option<SyncIndex>, x: &Wire) -> Result<(), FancyError<EvaluatorError>> {
         match self.recv(ix)? {
             Message::OutputCiphertext(c) => {
@@ -374,11 +375,11 @@ impl Fancy for Evaluator {
         self.output_wires.lock().unwrap().push(x.clone());
         Ok(())
     }
-
+    #[inline]
     fn begin_sync(&self, num_indices: SyncIndex) -> Result<(), FancyError<EvaluatorError>> {
         self.internal_begin_sync(num_indices)
     }
-
+    #[inline]
     fn finish_index(&self, index: SyncIndex) -> Result<(), FancyError<EvaluatorError>> {
         self.internal_finish_index(index);
         Ok(())
@@ -398,7 +399,7 @@ pub struct GarbledCircuit {
 }
 
 impl GarbledCircuit {
-    /// Create a new GarbledCircuit from a vec of garbled gates and constant wires.
+    /// Create a new object from a vector of garbled gates and constant wires.
     pub fn new(gates: Vec<GarbledGate>, consts: HashMap<(u16, u16), Wire>) -> Self {
         GarbledCircuit { gates, consts }
     }
@@ -424,47 +425,26 @@ impl GarbledCircuit {
             .gates
             .iter()
             .enumerate()
-            .filter_map(|(i, gate)| {
-                let q = c.modulus(i);
-                match *gate {
-                    Gate::GarblerInput { id } => {
-                        Some(Message::GarblerInput(garbler_inputs[id].clone()))
-                    }
-                    Gate::EvaluatorInput { id } => {
-                        Some(Message::EvaluatorInput(evaluator_inputs[id].clone()))
-                    }
-                    Gate::Constant { val } => Some(Message::Constant {
-                        value: val,
-                        wire: self.consts[&(val, q)].clone(),
-                    }),
-                    Gate::Mul { id, .. } => Some(Message::GarbledGate(self.gates[id].clone())),
-                    Gate::Proj { id, .. } => Some(Message::GarbledGate(self.gates[id].clone())),
-                    _ => None,
+            .filter_map(|(i, gate)| match *gate {
+                Gate::GarblerInput { id } => {
+                    Some(Message::GarblerInput(garbler_inputs[id].clone()))
                 }
+                Gate::EvaluatorInput { id } => {
+                    Some(Message::EvaluatorInput(evaluator_inputs[id].clone()))
+                }
+                Gate::Constant { val } => Some(Message::Constant {
+                    value: val,
+                    wire: self.consts[&(val, c.modulus(i))].clone(),
+                }),
+                Gate::Mul { id, .. } => Some(Message::GarbledGate(self.gates[id].clone())),
+                Gate::Proj { id, .. } => Some(Message::GarbledGate(self.gates[id].clone())),
+                _ => None,
             })
             .collect_vec()
             .into_iter();
 
         let eval = Evaluator::new(move || (None, msgs.next().unwrap()));
-
-        let mut wires: Vec<Wire> = Vec::new();
-        for (i, gate) in c.gates.iter().enumerate() {
-            let q = c.modulus(i);
-            let w = match *gate {
-                Gate::GarblerInput { .. } => eval.garbler_input(None, q, None)?,
-                Gate::EvaluatorInput { .. } => eval.evaluator_input(None, q)?,
-                Gate::Constant { val } => eval.constant(None, val, q)?,
-                Gate::Add { xref, yref } => wires[xref.ix].plus(&wires[yref.ix]),
-                Gate::Sub { xref, yref } => wires[xref.ix].minus(&wires[yref.ix]),
-                Gate::Cmul { xref, c } => wires[xref.ix].cmul(c),
-                Gate::Proj { xref, .. } => eval.proj(None, &wires[xref.ix], q, None)?,
-                Gate::Mul { xref, yref, .. } => eval.mul(None, &wires[xref.ix], &wires[yref.ix])?,
-            };
-            wires.push(w);
-        }
-
-        let res = c.output_refs.iter().map(|&r| wires[r.ix].clone()).collect();
-        Ok(res)
+        c.eval(&eval)
     }
 }
 
@@ -532,7 +512,7 @@ impl Encoder {
 ////////////////////////////////////////////////////////////////////////////////
 // Decoder
 
-/// Decode outputss statically. Created by the `garble` function.
+/// Decode outputs statically. Created by the `garble` function.
 #[derive(Serialize, Deserialize, PartialEq, Debug)]
 pub struct Decoder {
     outputs: Vec<OutputCiphertext>,

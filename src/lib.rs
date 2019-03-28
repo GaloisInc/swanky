@@ -16,11 +16,11 @@ pub mod error;
 mod fancy;
 mod garble;
 pub mod informer;
-// mod parser;
+mod parser;
 pub mod util;
 mod wire;
 
+pub use crate::error::FancyError;
 pub use crate::fancy::*;
 pub use crate::garble::*;
 pub use crate::wire::*;
-pub use crate::error::FancyError;

@@ -80,26 +80,43 @@ pub fn base_q_add_eq(xs: &mut [u16], ys: &[u16], q: u16) {
     }
 }
 
-/// Convert a u128 into base q.
+/// Convert a `u128` into base `q`.
 #[inline]
 pub fn as_base_q(x: u128, q: u16, n: usize) -> Vec<u16> {
     let ms = std::iter::repeat(q).take(n).collect_vec();
     as_mixed_radix(x, &ms)
 }
 
-/// Determine how many mod q digits fit into a u128.
+/// Determine how many `mod q` digits fit into a `u128`.
 #[inline]
 pub fn digits_per_u128(modulus: u16) -> usize {
-    (128.0 / (modulus as f64).log2().ceil()).floor() as usize
+    debug_assert_ne!(modulus, 1);
+    if modulus == 2 {
+        128
+    } else if modulus <= 4 {
+        64
+    } else if modulus <= 8 {
+        42
+    } else if modulus <= 16 {
+        32
+    } else if modulus <= 32 {
+        25
+    } else if modulus <= 64 {
+        21
+    } else if modulus <= 128 {
+        18
+    } else {
+        (128.0 / (modulus as f64).log2().ceil()).floor() as usize
+    }
 }
 
-/// Convert a u128 into base q.
+/// Convert a `u128` into base `q`.
 #[inline]
 pub fn as_base_q_u128(x: u128, q: u16) -> Vec<u16> {
     as_base_q(x, q, digits_per_u128(q))
 }
 
-/// Convert a u128 into mixed radix form with the provided radii.
+/// Convert a `u128` into mixed radix form with the provided radii.
 #[inline]
 pub fn as_mixed_radix(x: u128, radii: &[u16]) -> Vec<u16> {
     let mut x = x;

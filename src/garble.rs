@@ -180,7 +180,8 @@ pub fn garble(c: &Circuit) -> Result<(Encoder, Decoder, GarbledCircuit), FancyEr
     }
 
     let garbler = Garbler::new(send_func);
-    c.eval(&garbler)?;
+    let outputs = c.eval(&garbler)?;
+    c.process_outputs(&outputs, &garbler)?;
     deltas = garbler.get_deltas();
 
     let en = Encoder::new(
@@ -245,7 +246,8 @@ mod classic {
                 let ys = &ev.eval(c, &[], xs).unwrap();
                 let decoded = de.decode(ys)[0];
                 let dummy = Dummy::new(&[], &inps);
-                c.eval(&dummy).unwrap();
+                let outputs = c.eval(&dummy).unwrap();
+                c.process_outputs(&outputs, &dummy).unwrap();
                 let should_be = dummy.get_output()[0];
                 if decoded != should_be {
                     println!(
@@ -400,7 +402,8 @@ mod classic {
                     let ys = &ev.eval(&c, &[], xs).unwrap();
                     let decoded = de.decode(ys)[0];
                     let dummy = Dummy::new(&[], &[x, y]);
-                    c.eval(&dummy).unwrap();
+                    let outputs = c.eval(&dummy).unwrap();
+                    c.process_outputs(&outputs, &dummy).unwrap();
                     let should_be = dummy.get_output()[0];
                     if decoded != should_be {
                         println!(
@@ -473,7 +476,8 @@ mod classic {
 
         for _ in 0..64 {
             let dummy = Dummy::new(&[], &[]);
-            circ.eval(&dummy).unwrap();
+            let outputs = circ.eval(&dummy).unwrap();
+            circ.process_outputs(&outputs, &dummy).unwrap();
             assert_eq!(dummy.get_output()[0], c, "plaintext eval failed");
             let Y = ev.eval(&circ, &[], &[]).unwrap();
             assert_eq!(de.decode(&Y)[0], c, "garbled eval failed");
@@ -499,7 +503,8 @@ mod classic {
         for _ in 0..64 {
             let x = rng.gen_u16() % q;
             let dummy = Dummy::new(&[], &[x]);
-            circ.eval(&dummy).unwrap();
+            let outputs = circ.eval(&dummy).unwrap();
+            circ.process_outputs(&outputs, &dummy).unwrap();
             assert_eq!(dummy.get_output()[0], (x + c) % q, "plaintext");
 
             let X = en.encode_evaluator_inputs(&[x]);
