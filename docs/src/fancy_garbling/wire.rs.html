@@ -427,6 +427,12 @@
 <span id="427">427</span>
 <span id="428">428</span>
 <span id="429">429</span>
+<span id="430">430</span>
+<span id="431">431</span>
+<span id="432">432</span>
+<span id="433">433</span>
+<span id="434">434</span>
+<span id="435">435</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="doccomment">//! Low-level operations on wirelabels, the basic building block of garbled circuits.</span>
 
@@ -447,6 +453,12 @@
 <span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">Wire</span> {
     <span class="ident">Mod2</span> { <span class="ident">val</span>: <span class="ident">Block</span> },
     <span class="ident">ModN</span> { <span class="ident">q</span>: <span class="ident">u16</span>, <span class="ident">ds</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u16</span><span class="op">&gt;</span> },
+}
+
+<span class="kw">impl</span> <span class="ident">std</span>::<span class="ident">default</span>::<span class="ident">Default</span> <span class="kw">for</span> <span class="ident">Wire</span> {
+    <span class="kw">fn</span> <span class="ident">default</span>() <span class="op">-&gt;</span> <span class="self">Self</span> {
+        <span class="ident">Wire</span>::<span class="ident">Mod2</span> { <span class="ident">val</span>: <span class="ident">Block</span>::<span class="ident">zero</span>() }
+    }
 }
 
 <span class="kw">impl</span> <span class="ident">HasModulus</span> <span class="kw">for</span> <span class="ident">Wire</span> {

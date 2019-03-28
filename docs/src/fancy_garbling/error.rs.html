@@ -238,8 +238,54 @@
 <span id="238">238</span>
 <span id="239">239</span>
 <span id="240">240</span>
+<span id="241">241</span>
+<span id="242">242</span>
+<span id="243">243</span>
+<span id="244">244</span>
+<span id="245">245</span>
+<span id="246">246</span>
+<span id="247">247</span>
+<span id="248">248</span>
+<span id="249">249</span>
+<span id="250">250</span>
+<span id="251">251</span>
+<span id="252">252</span>
+<span id="253">253</span>
+<span id="254">254</span>
+<span id="255">255</span>
+<span id="256">256</span>
+<span id="257">257</span>
+<span id="258">258</span>
+<span id="259">259</span>
+<span id="260">260</span>
+<span id="261">261</span>
+<span id="262">262</span>
+<span id="263">263</span>
+<span id="264">264</span>
+<span id="265">265</span>
+<span id="266">266</span>
+<span id="267">267</span>
+<span id="268">268</span>
+<span id="269">269</span>
+<span id="270">270</span>
+<span id="271">271</span>
+<span id="272">272</span>
+<span id="273">273</span>
+<span id="274">274</span>
+<span id="275">275</span>
+<span id="276">276</span>
+<span id="277">277</span>
+<span id="278">278</span>
+<span id="279">279</span>
+<span id="280">280</span>
+<span id="281">281</span>
+<span id="282">282</span>
+<span id="283">283</span>
+<span id="284">284</span>
+<span id="285">285</span>
+<span id="286">286</span>
 </pre><div class="example-wrap"><pre class="rust ">
-<span class="doccomment">//! Errors that may be outputted by this library.</span>
+<span class="doccomment">//! Errors that may be output by this library.</span>
 
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">fmt</span>::{<span class="self">self</span>, <span class="ident">Display</span>, <span class="ident">Formatter</span>};
 
@@ -331,7 +377,7 @@
     }
 }
 
-<span class="kw">impl</span> <span class="op">&lt;</span><span class="ident">A</span><span class="op">&gt;</span> <span class="ident">FancyError</span><span class="op">&lt;</span><span class="ident">A</span><span class="op">&gt;</span> {
+<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">A</span><span class="op">&gt;</span> <span class="ident">FancyError</span><span class="op">&lt;</span><span class="ident">A</span><span class="op">&gt;</span> {
     <span class="doccomment">/// Map the underlying client error type.</span>
     <span class="doccomment">///</span>
     <span class="doccomment">/// Useful for wrapping errors from fancy objects.</span>
@@ -476,6 +522,52 @@
 
 <span class="kw">impl</span> <span class="ident">From</span><span class="op">&lt;</span><span class="ident">InformerError</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">FancyError</span><span class="op">&lt;</span><span class="ident">InformerError</span><span class="op">&gt;</span> {
     <span class="kw">fn</span> <span class="ident">from</span>(<span class="ident">e</span>: <span class="ident">InformerError</span>) <span class="op">-&gt;</span> <span class="ident">FancyError</span><span class="op">&lt;</span><span class="ident">InformerError</span><span class="op">&gt;</span> {
+        <span class="ident">FancyError</span>::<span class="ident">ClientError</span>(<span class="ident">e</span>)
+    }
+}
+
+<span class="doccomment">/// Errors emitted by the circuit parser.</span>
+<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>)]</span>
+<span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">CircuitParserError</span> {
+    <span class="ident">IoError</span>(<span class="ident">std</span>::<span class="ident">io</span>::<span class="ident">Error</span>),
+    <span class="ident">RegexError</span>(<span class="ident">regex</span>::<span class="ident">Error</span>),
+    <span class="ident">ParseIntError</span>,
+    <span class="ident">ParseLineError</span>(<span class="ident">String</span>),
+    <span class="ident">ParseGateError</span>(<span class="ident">String</span>),
+}
+
+<span class="kw">impl</span> <span class="ident">From</span><span class="op">&lt;</span><span class="ident">std</span>::<span class="ident">io</span>::<span class="ident">Error</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">CircuitParserError</span> {
+    <span class="kw">fn</span> <span class="ident">from</span>(<span class="ident">e</span>: <span class="ident">std</span>::<span class="ident">io</span>::<span class="ident">Error</span>) <span class="op">-&gt;</span> <span class="ident">CircuitParserError</span> {
+        <span class="ident">CircuitParserError</span>::<span class="ident">IoError</span>(<span class="ident">e</span>)
+    }
+}
+
+<span class="kw">impl</span> <span class="ident">From</span><span class="op">&lt;</span><span class="ident">regex</span>::<span class="ident">Error</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">CircuitParserError</span> {
+    <span class="kw">fn</span> <span class="ident">from</span>(<span class="ident">e</span>: <span class="ident">regex</span>::<span class="ident">Error</span>) <span class="op">-&gt;</span> <span class="ident">CircuitParserError</span> {
+        <span class="ident">CircuitParserError</span>::<span class="ident">RegexError</span>(<span class="ident">e</span>)
+    }
+}
+
+<span class="kw">impl</span> <span class="ident">From</span><span class="op">&lt;</span><span class="ident">std</span>::<span class="ident">num</span>::<span class="ident">ParseIntError</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">CircuitParserError</span> {
+    <span class="kw">fn</span> <span class="ident">from</span>(<span class="kw">_</span>: <span class="ident">std</span>::<span class="ident">num</span>::<span class="ident">ParseIntError</span>) <span class="op">-&gt;</span> <span class="ident">CircuitParserError</span> {
+        <span class="ident">CircuitParserError</span>::<span class="ident">ParseIntError</span>
+    }
+}
+
+<span class="kw">impl</span> <span class="ident">Display</span> <span class="kw">for</span> <span class="ident">CircuitParserError</span> {
+    <span class="kw">fn</span> <span class="ident">fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">f</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">Formatter</span>) <span class="op">-&gt;</span> <span class="ident">fmt</span>::<span class="prelude-ty">Result</span> {
+        <span class="kw">match</span> <span class="self">self</span> {
+            <span class="ident">CircuitParserError</span>::<span class="ident">IoError</span>(<span class="ident">e</span>) <span class="op">=&gt;</span> <span class="macro">write</span><span class="macro">!</span>(<span class="ident">f</span>, <span class="string">&quot;io error: {}&quot;</span>, <span class="ident">e</span>),
+            <span class="ident">CircuitParserError</span>::<span class="ident">RegexError</span>(<span class="ident">e</span>) <span class="op">=&gt;</span> <span class="macro">write</span><span class="macro">!</span>(<span class="ident">f</span>, <span class="string">&quot;regex error: {}&quot;</span>, <span class="ident">e</span>),
+            <span class="ident">CircuitParserError</span>::<span class="ident">ParseIntError</span> <span class="op">=&gt;</span> <span class="macro">write</span><span class="macro">!</span>(<span class="ident">f</span>, <span class="string">&quot;unable to parse integer&quot;</span>),
+            <span class="ident">CircuitParserError</span>::<span class="ident">ParseLineError</span>(<span class="ident">s</span>) <span class="op">=&gt;</span> <span class="macro">write</span><span class="macro">!</span>(<span class="ident">f</span>, <span class="string">&quot;unable to parse line &#39;{}&#39;&quot;</span>, <span class="ident">s</span>),
+            <span class="ident">CircuitParserError</span>::<span class="ident">ParseGateError</span>(<span class="ident">s</span>) <span class="op">=&gt;</span> <span class="macro">write</span><span class="macro">!</span>(<span class="ident">f</span>, <span class="string">&quot;unable to parse gate &#39;{}&#39;&quot;</span>, <span class="ident">s</span>),
+        }
+    }
+}
+
+<span class="kw">impl</span> <span class="ident">From</span><span class="op">&lt;</span><span class="ident">CircuitParserError</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">FancyError</span><span class="op">&lt;</span><span class="ident">CircuitParserError</span><span class="op">&gt;</span> {
+    <span class="kw">fn</span> <span class="ident">from</span>(<span class="ident">e</span>: <span class="ident">CircuitParserError</span>) <span class="op">-&gt;</span> <span class="ident">FancyError</span><span class="op">&lt;</span><span class="ident">CircuitParserError</span><span class="op">&gt;</span> {
         <span class="ident">FancyError</span>::<span class="ident">ClientError</span>(<span class="ident">e</span>)
     }
 }
