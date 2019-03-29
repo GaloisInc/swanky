@@ -8,12 +8,11 @@
 //! extension protocol (cf. <https://eprint.iacr.org/2016/602>, Protocol 4).
 
 use crate::errors::Error;
-use crate::{stream, utils};
-use crate::{
-    CorrelatedObliviousTransferReceiver, CorrelatedObliviousTransferSender,
-    ObliviousTransferReceiver, ObliviousTransferSender, RandomObliviousTransferReceiver,
-    RandomObliviousTransferSender,
+use crate::ot::{
+    CorrelatedReceiver, CorrelatedSender, RandomReceiver, RandomSender, Receiver as OtReceiver,
+    Sender as OtSender,
 };
+use crate::{stream, utils};
 use arrayref::array_ref;
 use rand::CryptoRng;
 use rand_core::{RngCore, SeedableRng};
@@ -23,7 +22,7 @@ use std::io::{ErrorKind, Read, Write};
 use std::marker::PhantomData;
 
 /// Oblivious transfer sender.
-pub struct AlszOTSender<OT: ObliviousTransferReceiver<Msg = Block> + SemiHonest> {
+pub struct Sender<OT: OtReceiver<Msg = Block> + SemiHonest> {
     _ot: PhantomData<OT>,
     pub(super) hash: AesHash,
     s: Vec<bool>,
@@ -31,13 +30,13 @@ pub struct AlszOTSender<OT: ObliviousTransferReceiver<Msg = Block> + SemiHonest>
     rngs: Vec<AesRng>,
 }
 /// Oblivious transfer receiver.
-pub struct AlszOTReceiver<OT: ObliviousTransferSender<Msg = Block> + SemiHonest> {
+pub struct Receiver<OT: OtSender<Msg = Block> + SemiHonest> {
     _ot: PhantomData<OT>,
     pub(super) hash: AesHash,
     rngs: Vec<(AesRng, AesRng)>,
 }
 
-impl<OT: ObliviousTransferReceiver<Msg = Block> + SemiHonest> AlszOTSender<OT> {
+impl<OT: OtReceiver<Msg = Block> + SemiHonest> Sender<OT> {
     #[inline]
     pub(super) fn send_setup<R: Read + Send>(
         &mut self,
@@ -69,9 +68,7 @@ impl<OT: ObliviousTransferReceiver<Msg = Block> + SemiHonest> AlszOTSender<OT> {
     }
 }
 
-impl<OT: ObliviousTransferReceiver<Msg = Block> + SemiHonest> ObliviousTransferSender
-    for AlszOTSender<OT>
-{
+impl<OT: OtReceiver<Msg = Block> + SemiHonest> OtSender for Sender<OT> {
     type Msg = Block;
 
     fn init<R: Read + Send, W: Write + Send, RNG: CryptoRng + RngCore>(
@@ -121,9 +118,7 @@ impl<OT: ObliviousTransferReceiver<Msg = Block> + SemiHonest> ObliviousTransferS
     }
 }
 
-impl<OT: ObliviousTransferReceiver<Msg = Block> + SemiHonest> CorrelatedObliviousTransferSender
-    for AlszOTSender<OT>
-{
+impl<OT: OtReceiver<Msg = Block> + SemiHonest> CorrelatedSender for Sender<OT> {
     fn send_correlated<R: Read + Send, W: Write + Send, RNG: CryptoRng + RngCore>(
         &mut self,
         reader: &mut R,
@@ -149,9 +144,7 @@ impl<OT: ObliviousTransferReceiver<Msg = Block> + SemiHonest> CorrelatedObliviou
     }
 }
 
-impl<OT: ObliviousTransferReceiver<Msg = Block> + SemiHonest> RandomObliviousTransferSender
-    for AlszOTSender<OT>
-{
+impl<OT: OtReceiver<Msg = Block> + SemiHonest> RandomSender for Sender<OT> {
     fn send_random<R: Read + Send, W: Write + Send, RNG: CryptoRng + RngCore>(
         &mut self,
         reader: &mut R,
@@ -173,7 +166,7 @@ impl<OT: ObliviousTransferReceiver<Msg = Block> + SemiHonest> RandomObliviousTra
     }
 }
 
-impl<OT: ObliviousTransferSender<Msg = Block> + SemiHonest> AlszOTReceiver<OT> {
+impl<OT: OtSender<Msg = Block> + SemiHonest> Receiver<OT> {
     #[inline]
     pub(super) fn receive_setup<W: Write + Send>(
         &mut self,
@@ -204,9 +197,7 @@ impl<OT: ObliviousTransferSender<Msg = Block> + SemiHonest> AlszOTReceiver<OT> {
     }
 }
 
-impl<OT: ObliviousTransferSender<Msg = Block> + SemiHonest> ObliviousTransferReceiver
-    for AlszOTReceiver<OT>
-{
+impl<OT: OtSender<Msg = Block> + SemiHonest> OtReceiver for Receiver<OT> {
     type Msg = Block;
 
     fn init<R: Read + Send, W: Write + Send, RNG: CryptoRng + RngCore>(
@@ -260,9 +251,7 @@ impl<OT: ObliviousTransferSender<Msg = Block> + SemiHonest> ObliviousTransferRec
     }
 }
 
-impl<OT: ObliviousTransferSender<Msg = Block> + SemiHonest> CorrelatedObliviousTransferReceiver
-    for AlszOTReceiver<OT>
-{
+impl<OT: OtSender<Msg = Block> + SemiHonest> CorrelatedReceiver for Receiver<OT> {
     fn receive_correlated<R: Read + Send, W: Write + Send, RNG: CryptoRng + RngCore>(
         &mut self,
         reader: &mut R,
@@ -286,9 +275,7 @@ impl<OT: ObliviousTransferSender<Msg = Block> + SemiHonest> CorrelatedObliviousT
     }
 }
 
-impl<OT: ObliviousTransferSender<Msg = Block> + SemiHonest> RandomObliviousTransferReceiver
-    for AlszOTReceiver<OT>
-{
+impl<OT: OtSender<Msg = Block> + SemiHonest> RandomReceiver for Receiver<OT> {
     fn receive_random<R: Read + Send, W: Write + Send, RNG: CryptoRng + RngCore>(
         &mut self,
         _: &mut R,
@@ -310,5 +297,5 @@ impl<OT: ObliviousTransferSender<Msg = Block> + SemiHonest> RandomObliviousTrans
     }
 }
 
-impl<OT: ObliviousTransferReceiver<Msg = Block> + SemiHonest> SemiHonest for AlszOTSender<OT> {}
-impl<OT: ObliviousTransferSender<Msg = Block> + SemiHonest> SemiHonest for AlszOTReceiver<OT> {}
+impl<OT: OtReceiver<Msg = Block> + SemiHonest> SemiHonest for Sender<OT> {}
+impl<OT: OtSender<Msg = Block> + SemiHonest> SemiHonest for Receiver<OT> {}

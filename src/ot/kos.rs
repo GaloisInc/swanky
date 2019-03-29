@@ -7,14 +7,13 @@
 //! Implementation of the Keller-Orsini-Scholl oblivious transfer extension
 //! protocol (cf. <https://eprint.iacr.org/2015/546>).
 
-use crate::alsz::*;
 use crate::errors::Error;
-use crate::utils;
-use crate::{
-    CorrelatedObliviousTransferReceiver, CorrelatedObliviousTransferSender,
-    ObliviousTransferReceiver, ObliviousTransferSender, RandomObliviousTransferReceiver,
-    RandomObliviousTransferSender,
+use crate::ot::alsz::{Receiver as AlszReceiver, Sender as AlszSender};
+use crate::ot::{
+    CorrelatedReceiver, CorrelatedSender, RandomReceiver, RandomSender, Receiver as OtReceiver,
+    Sender as OtSender,
 };
+use crate::utils;
 use arrayref::array_ref;
 use rand::CryptoRng;
 use rand_core::{RngCore, SeedableRng};
@@ -23,15 +22,16 @@ use std::io::{ErrorKind, Read, Write};
 
 const SSP: usize = 40;
 
-pub struct KosOTSender<OT: ObliviousTransferReceiver<Msg = Block> + Malicious> {
-    ot: AlszOTSender<OT>,
+/// Oblivious transfer extension sender.
+pub struct Sender<OT: OtReceiver<Msg = Block> + Malicious> {
+    ot: AlszSender<OT>,
+}
+/// Oblivious transfer extension receiver.
+pub struct Receiver<OT: OtSender<Msg = Block> + Malicious> {
+    ot: AlszReceiver<OT>,
 }
 
-pub struct KosOTReceiver<OT: ObliviousTransferSender<Msg = Block> + Malicious> {
-    ot: AlszOTReceiver<OT>,
-}
-
-impl<OT: ObliviousTransferReceiver<Msg = Block> + Malicious> KosOTSender<OT> {
+impl<OT: OtReceiver<Msg = Block> + Malicious> Sender<OT> {
     #[inline]
     fn send_setup<R: Read + Send, W: Write + Send, RNG: CryptoRng + RngCore>(
         &mut self,
@@ -78,9 +78,7 @@ impl<OT: ObliviousTransferReceiver<Msg = Block> + Malicious> KosOTSender<OT> {
     }
 }
 
-impl<OT: ObliviousTransferReceiver<Msg = Block> + Malicious> ObliviousTransferSender
-    for KosOTSender<OT>
-{
+impl<OT: OtReceiver<Msg = Block> + Malicious> OtSender for Sender<OT> {
     type Msg = Block;
 
     fn init<R: Read + Send, W: Write + Send, RNG: CryptoRng + RngCore>(
@@ -88,7 +86,7 @@ impl<OT: ObliviousTransferReceiver<Msg = Block> + Malicious> ObliviousTransferSe
         writer: &mut W,
         rng: &mut RNG,
     ) -> Result<Self, Error> {
-        let ot = AlszOTSender::<OT>::init(reader, writer, rng)?;
+        let ot = AlszSender::<OT>::init(reader, writer, rng)?;
         Ok(Self { ot })
     }
 
@@ -116,9 +114,7 @@ impl<OT: ObliviousTransferReceiver<Msg = Block> + Malicious> ObliviousTransferSe
     }
 }
 
-impl<OT: ObliviousTransferReceiver<Msg = Block> + Malicious> CorrelatedObliviousTransferSender
-    for KosOTSender<OT>
-{
+impl<OT: OtReceiver<Msg = Block> + Malicious> CorrelatedSender for Sender<OT> {
     #[inline]
     fn send_correlated<R: Read + Send, W: Write + Send, RNG: CryptoRng + RngCore>(
         &mut self,
@@ -145,9 +141,7 @@ impl<OT: ObliviousTransferReceiver<Msg = Block> + Malicious> CorrelatedOblivious
     }
 }
 
-impl<OT: ObliviousTransferReceiver<Msg = Block> + Malicious> RandomObliviousTransferSender
-    for KosOTSender<OT>
-{
+impl<OT: OtReceiver<Msg = Block> + Malicious> RandomSender for Sender<OT> {
     #[inline]
     fn send_random<R: Read + Send, W: Write + Send, RNG: CryptoRng + RngCore>(
         &mut self,
@@ -170,7 +164,7 @@ impl<OT: ObliviousTransferReceiver<Msg = Block> + Malicious> RandomObliviousTran
     }
 }
 
-impl<OT: ObliviousTransferSender<Msg = Block> + Malicious> KosOTReceiver<OT> {
+impl<OT: OtSender<Msg = Block> + Malicious> Receiver<OT> {
     #[inline]
     fn receive_setup<R: Read + Send, W: Write + Send, RNG: CryptoRng + RngCore>(
         &mut self,
@@ -209,9 +203,7 @@ impl<OT: ObliviousTransferSender<Msg = Block> + Malicious> KosOTReceiver<OT> {
     }
 }
 
-impl<OT: ObliviousTransferSender<Msg = Block> + Malicious> ObliviousTransferReceiver
-    for KosOTReceiver<OT>
-{
+impl<OT: OtSender<Msg = Block> + Malicious> OtReceiver for Receiver<OT> {
     type Msg = Block;
 
     fn init<R: Read + Send, W: Write + Send, RNG: CryptoRng + RngCore>(
@@ -219,7 +211,7 @@ impl<OT: ObliviousTransferSender<Msg = Block> + Malicious> ObliviousTransferRece
         writer: &mut W,
         rng: &mut RNG,
     ) -> Result<Self, Error> {
-        let ot = AlszOTReceiver::<OT>::init(reader, writer, rng)?;
+        let ot = AlszReceiver::<OT>::init(reader, writer, rng)?;
         Ok(Self { ot })
     }
 
@@ -248,9 +240,7 @@ impl<OT: ObliviousTransferSender<Msg = Block> + Malicious> ObliviousTransferRece
     }
 }
 
-impl<OT: ObliviousTransferSender<Msg = Block> + Malicious> CorrelatedObliviousTransferReceiver
-    for KosOTReceiver<OT>
-{
+impl<OT: OtSender<Msg = Block> + Malicious> CorrelatedReceiver for Receiver<OT> {
     fn receive_correlated<R: Read + Send, W: Write + Send, RNG: CryptoRng + RngCore>(
         &mut self,
         reader: &mut R,
@@ -274,9 +264,7 @@ impl<OT: ObliviousTransferSender<Msg = Block> + Malicious> CorrelatedObliviousTr
     }
 }
 
-impl<OT: ObliviousTransferSender<Msg = Block> + Malicious> RandomObliviousTransferReceiver
-    for KosOTReceiver<OT>
-{
+impl<OT: OtSender<Msg = Block> + Malicious> RandomReceiver for Receiver<OT> {
     fn receive_random<R: Read + Send, W: Write + Send, RNG: CryptoRng + RngCore>(
         &mut self,
         reader: &mut R,
@@ -298,7 +286,7 @@ impl<OT: ObliviousTransferSender<Msg = Block> + Malicious> RandomObliviousTransf
     }
 }
 
-impl<OT: ObliviousTransferReceiver<Msg = Block> + Malicious> SemiHonest for KosOTSender<OT> {}
-impl<OT: ObliviousTransferSender<Msg = Block> + Malicious> SemiHonest for KosOTReceiver<OT> {}
-impl<OT: ObliviousTransferReceiver<Msg = Block> + Malicious> Malicious for KosOTSender<OT> {}
-impl<OT: ObliviousTransferSender<Msg = Block> + Malicious> Malicious for KosOTReceiver<OT> {}
+impl<OT: OtReceiver<Msg = Block> + Malicious> SemiHonest for Sender<OT> {}
+impl<OT: OtSender<Msg = Block> + Malicious> SemiHonest for Receiver<OT> {}
+impl<OT: OtReceiver<Msg = Block> + Malicious> Malicious for Sender<OT> {}
+impl<OT: OtSender<Msg = Block> + Malicious> Malicious for Receiver<OT> {}

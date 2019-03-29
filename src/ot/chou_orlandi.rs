@@ -18,8 +18,8 @@
 //! during the key derivation phase.
 
 use crate::errors::Error;
+use crate::ot::{Receiver as OtReceiver, Sender as OtSender};
 use crate::stream;
-use crate::{ObliviousTransferReceiver, ObliviousTransferSender};
 use curve25519_dalek::constants::RISTRETTO_BASEPOINT_TABLE;
 use curve25519_dalek::ristretto::{RistrettoBasepointTable, RistrettoPoint};
 use curve25519_dalek::scalar::Scalar;
@@ -28,12 +28,12 @@ use scuttlebutt::{Block, Malicious, SemiHonest};
 use std::io::{Read, Write};
 
 /// Oblivious transfer sender.
-pub struct ChouOrlandiOTSender {
+pub struct Sender {
     y: Scalar,
     s: RistrettoPoint,
 }
 
-impl ObliviousTransferSender for ChouOrlandiOTSender {
+impl OtSender for Sender {
     type Msg = Block;
 
     fn init<R: Read + Send, W: Write + Send, RNG: CryptoRng + RngCore>(
@@ -74,11 +74,11 @@ impl ObliviousTransferSender for ChouOrlandiOTSender {
 }
 
 /// Oblivious transfer receiver.
-pub struct ChouOrlandiOTReceiver {
+pub struct Receiver {
     s: RistrettoBasepointTable,
 }
 
-impl ObliviousTransferReceiver for ChouOrlandiOTReceiver {
+impl OtReceiver for Receiver {
     type Msg = Block;
 
     fn init<R: Read + Send, W: Write + Send, RNG: CryptoRng + RngCore>(
@@ -121,7 +121,7 @@ impl ObliviousTransferReceiver for ChouOrlandiOTReceiver {
     }
 }
 
-impl SemiHonest for ChouOrlandiOTSender {}
-impl Malicious for ChouOrlandiOTSender {}
-impl SemiHonest for ChouOrlandiOTReceiver {}
-impl Malicious for ChouOrlandiOTReceiver {}
+impl SemiHonest for Sender {}
+impl Malicious for Sender {}
+impl SemiHonest for Receiver {}
+impl Malicious for Receiver {}

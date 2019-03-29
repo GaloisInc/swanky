@@ -12,10 +12,9 @@
 
 use super::prc::PseudorandomCode;
 use crate::errors::Error;
-use crate::{
-    stream, utils, ObliviousPrf, ObliviousPrfReceiver, ObliviousPrfSender,
-    ObliviousTransferReceiver, ObliviousTransferSender,
-};
+use crate::oprf::{ObliviousPrf, Receiver as OprfReceiver, Sender as OprfSender};
+use crate::ot::{Receiver as OtReceiver, Sender as OtSender};
+use crate::{stream, utils};
 use arrayref::array_ref;
 use rand::CryptoRng;
 use rand_core::{RngCore, SeedableRng};
@@ -90,20 +89,20 @@ impl PartialOrd for Output {
     }
 }
 
-impl<OT: ObliviousTransferReceiver<Msg = Block> + SemiHonest> ObliviousPrf for KkrtOPRFSender<OT> {
+impl<OT: OtReceiver<Msg = Block> + SemiHonest> ObliviousPrf for Sender<OT> {
     type Seed = Seed;
     type Input = Block;
     type Output = Output;
 }
 
-impl<OT: ObliviousTransferSender<Msg = Block> + SemiHonest> ObliviousPrf for KkrtOPRFReceiver<OT> {
+impl<OT: OtSender<Msg = Block> + SemiHonest> ObliviousPrf for Receiver<OT> {
     type Seed = Seed;
     type Input = Block;
     type Output = Output;
 }
 
 /// KKRT oblivious PRF sender.
-pub struct KkrtOPRFSender<OT: ObliviousTransferReceiver + SemiHonest> {
+pub struct Sender<OT: OtReceiver + SemiHonest> {
     _ot: PhantomData<OT>,
     s: Vec<bool>,
     s_: [u8; 64],
@@ -111,9 +110,7 @@ pub struct KkrtOPRFSender<OT: ObliviousTransferReceiver + SemiHonest> {
     rngs: Vec<AesRng>,
 }
 
-impl<OT: ObliviousTransferReceiver<Msg = Block> + SemiHonest> ObliviousPrfSender
-    for KkrtOPRFSender<OT>
-{
+impl<OT: OtReceiver<Msg = Block> + SemiHonest> OprfSender for Sender<OT> {
     fn init<R, W, RNG>(reader: &mut R, writer: &mut W, rng: &mut RNG) -> Result<Self, Error>
     where
         R: Read + Send,
@@ -188,12 +185,12 @@ impl<OT: ObliviousTransferReceiver<Msg = Block> + SemiHonest> ObliviousPrfSender
 }
 
 // Separate out `encode` function for optimization purposes.
-impl<OT: ObliviousTransferReceiver<Msg = Block> + SemiHonest> KkrtOPRFSender<OT> {
+impl<OT: OtReceiver<Msg = Block> + SemiHonest> Sender<OT> {
     #[inline]
     pub fn encode(
         &self,
-        input: <KkrtOPRFSender<OT> as ObliviousPrf>::Input,
-        output: &mut <KkrtOPRFSender<OT> as ObliviousPrf>::Output,
+        input: <Sender<OT> as ObliviousPrf>::Input,
+        output: &mut <Sender<OT> as ObliviousPrf>::Output,
     ) {
         self.code.encode(input, &mut output.0);
         scutils::and_inplace(&mut output.0, &self.s_);
@@ -201,15 +198,13 @@ impl<OT: ObliviousTransferReceiver<Msg = Block> + SemiHonest> KkrtOPRFSender<OT>
 }
 
 /// KKRT oblivious PRF receiver.
-pub struct KkrtOPRFReceiver<OT: ObliviousTransferSender + SemiHonest> {
+pub struct Receiver<OT: OtSender + SemiHonest> {
     _ot: PhantomData<OT>,
     code: PseudorandomCode,
     rngs: Vec<(AesRng, AesRng)>,
 }
 
-impl<OT: ObliviousTransferSender<Msg = Block> + SemiHonest> ObliviousPrfReceiver
-    for KkrtOPRFReceiver<OT>
-{
+impl<OT: OtSender<Msg = Block> + SemiHonest> OprfReceiver for Receiver<OT> {
     fn init<R: Read + Send, W: Write + Send, RNG: CryptoRng + RngCore>(
         reader: &mut R,
         writer: &mut W,
@@ -291,22 +286,13 @@ impl<OT: ObliviousTransferSender<Msg = Block> + SemiHonest> ObliviousPrfReceiver
     }
 }
 
-impl<OT: ObliviousTransferReceiver<Msg = Block> + SemiHonest> SemiHonest for KkrtOPRFSender<OT> {}
-impl<OT: ObliviousTransferSender<Msg = Block> + SemiHonest> SemiHonest for KkrtOPRFReceiver<OT> {}
-
-use crate::{alsz, chou_orlandi};
-
-/// KKRT oblivious PRF sender using ALSZ OT extension with Chou-Orlandi as the base OT.
-pub type KkrtSender = KkrtOPRFSender<alsz::AlszOTReceiver<chou_orlandi::ChouOrlandiOTSender>>;
-/// KKRT oblivious PRF receiver using ALSZ OT extension with Chou-Orlandi as the base OT.
-pub type KkrtReceiver = KkrtOPRFReceiver<alsz::AlszOTSender<chou_orlandi::ChouOrlandiOTReceiver>>;
+impl<OT: OtReceiver<Msg = Block> + SemiHonest> SemiHonest for Sender<OT> {}
+impl<OT: OtSender<Msg = Block> + SemiHonest> SemiHonest for Receiver<OT> {}
 
 #[cfg(test)]
 mod tests {
-    #[cfg(feature = "nightly")]
-    extern crate test;
     use super::*;
-    use crate::oprf::ObliviousPrfReceiver;
+    use crate::oprf;
     use scuttlebutt::AesRng;
     use std::io::{BufReader, BufWriter};
     use std::os::unix::net::UnixStream;
@@ -326,7 +312,7 @@ mod tests {
             let mut rng = AesRng::new();
             let mut reader = BufReader::new(sender.try_clone().unwrap());
             let mut writer = BufWriter::new(sender);
-            let mut oprf = KkrtSender::init(&mut reader, &mut writer, &mut rng).unwrap();
+            let mut oprf = oprf::KkrtSender::init(&mut reader, &mut writer, &mut rng).unwrap();
             let seeds = oprf.send(&mut reader, &mut writer, n, &mut rng).unwrap();
             let mut results = results.lock().unwrap();
             *results = selections_
@@ -338,7 +324,7 @@ mod tests {
         let mut rng = AesRng::new();
         let mut reader = BufReader::new(receiver.try_clone().unwrap());
         let mut writer = BufWriter::new(receiver);
-        let mut oprf = KkrtReceiver::init(&mut reader, &mut writer, &mut rng).unwrap();
+        let mut oprf = oprf::KkrtReceiver::init(&mut reader, &mut writer, &mut rng).unwrap();
         let outputs = oprf
             .receive(&mut reader, &mut writer, &selections, &mut rng)
             .unwrap();

@@ -11,8 +11,8 @@
 //! the `curve25519-dalek` library.
 
 use crate::errors::Error;
+use crate::ot::{Receiver as OtReceiver, Sender as OtSender};
 use crate::stream;
-use crate::{ObliviousTransferReceiver, ObliviousTransferSender};
 use curve25519_dalek::constants::RISTRETTO_BASEPOINT_TABLE;
 use curve25519_dalek::ristretto::RistrettoPoint;
 use curve25519_dalek::scalar::Scalar;
@@ -20,10 +20,12 @@ use rand::{CryptoRng, RngCore};
 use scuttlebutt::{Block, SemiHonest};
 use std::io::{Read, Write};
 
-pub struct NaorPinkasOTSender {}
-pub struct NaorPinkasOTReceiver {}
+/// Oblivious transfer sender.
+pub struct Sender {}
+/// Oblivious transfer receiver.
+pub struct Receiver {}
 
-impl ObliviousTransferSender for NaorPinkasOTSender {
+impl OtSender for Sender {
     type Msg = Block;
 
     fn init<R: Read + Send, W: Write + Send, RNG: CryptoRng + RngCore>(
@@ -73,7 +75,7 @@ impl ObliviousTransferSender for NaorPinkasOTSender {
     }
 }
 
-impl ObliviousTransferReceiver for NaorPinkasOTReceiver {
+impl OtReceiver for Receiver {
     type Msg = Block;
 
     fn init<R: Read + Send, W: Write + Send, RNG: CryptoRng + RngCore>(
@@ -129,5 +131,5 @@ impl ObliviousTransferReceiver for NaorPinkasOTReceiver {
     }
 }
 
-impl SemiHonest for NaorPinkasOTSender {}
-impl SemiHonest for NaorPinkasOTReceiver {}
+impl SemiHonest for Sender {}
+impl SemiHonest for Receiver {}

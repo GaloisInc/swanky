@@ -7,7 +7,9 @@
 //! Oblivious transfer benchmarks using `criterion`.
 
 use criterion::{criterion_group, criterion_main, Criterion};
-use ocelot::*;
+use ocelot::ot::{
+    self, CorrelatedReceiver, CorrelatedSender, RandomReceiver, RandomSender, Receiver, Sender,
+};
 use scuttlebutt::{AesRng, Block};
 use std::io::{BufReader, BufWriter};
 use std::os::unix::net::UnixStream;
@@ -23,10 +25,7 @@ fn rand_bool_vec(size: usize) -> Vec<bool> {
     (0..size).map(|_| rand::random::<bool>()).collect()
 }
 
-fn _bench_block_ot<
-    OTSender: ObliviousTransferSender<Msg = Block>,
-    OTReceiver: ObliviousTransferReceiver<Msg = Block>,
->(
+fn _bench_block_ot<OTSender: Sender<Msg = Block>, OTReceiver: Receiver<Msg = Block>>(
     bs: &[bool],
     ms: Vec<(Block, Block)>,
 ) {
@@ -47,8 +46,8 @@ fn _bench_block_ot<
 }
 
 fn _bench_block_cot<
-    OTSender: CorrelatedObliviousTransferSender<Msg = Block>,
-    OTReceiver: CorrelatedObliviousTransferReceiver<Msg = Block>,
+    OTSender: CorrelatedSender<Msg = Block>,
+    OTReceiver: CorrelatedReceiver<Msg = Block>,
 >(
     bs: &[bool],
     deltas: Vec<Block>,
@@ -72,8 +71,8 @@ fn _bench_block_cot<
 }
 
 fn _bench_block_rot<
-    OTSender: RandomObliviousTransferSender<Msg = Block>,
-    OTReceiver: RandomObliviousTransferReceiver<Msg = Block>,
+    OTSender: RandomSender<Msg = Block>,
+    OTReceiver: RandomReceiver<Msg = Block>,
 >(
     bs: &[bool],
 ) {
@@ -96,13 +95,6 @@ fn _bench_block_rot<
     handle.join().unwrap();
 }
 
-type ChouOrlandiSender = chou_orlandi::ChouOrlandiOTSender;
-type ChouOrlandiReceiver = chou_orlandi::ChouOrlandiOTReceiver;
-type DummySender = dummy::DummyOTSender;
-type DummyReceiver = dummy::DummyOTReceiver;
-type NaorPinkasSender = naor_pinkas::NaorPinkasOTSender;
-type NaorPinkasReceiver = naor_pinkas::NaorPinkasOTReceiver;
-
 fn bench_ot(c: &mut Criterion) {
     c.bench_function("ot::ChouOrlandiOT", move |bench| {
         let m0s = rand_block_vec(128);
@@ -113,7 +105,7 @@ fn bench_ot(c: &mut Criterion) {
             .collect::<Vec<(Block, Block)>>();
         let bs = rand_bool_vec(128);
         bench.iter(move || {
-            _bench_block_ot::<ChouOrlandiSender, ChouOrlandiReceiver>(&bs, ms.clone())
+            _bench_block_ot::<ot::ChouOrlandiSender, ot::ChouOrlandiReceiver>(&bs, ms.clone())
         })
     });
     c.bench_function("ot::DummyOT", move |bench| {
@@ -124,7 +116,7 @@ fn bench_ot(c: &mut Criterion) {
             .zip(m1s.into_iter())
             .collect::<Vec<(Block, Block)>>();
         let bs = rand_bool_vec(128);
-        bench.iter(|| _bench_block_ot::<DummySender, DummyReceiver>(&bs, ms.clone()))
+        bench.iter(|| _bench_block_ot::<ot::DummySender, ot::DummyReceiver>(&bs, ms.clone()))
     });
     c.bench_function("ot::NaorPinkasOT", move |bench| {
         let m0s = rand_block_vec(128);
@@ -134,14 +126,11 @@ fn bench_ot(c: &mut Criterion) {
             .zip(m1s.into_iter())
             .collect::<Vec<(Block, Block)>>();
         let bs = rand_bool_vec(128);
-        bench.iter(|| _bench_block_ot::<NaorPinkasSender, NaorPinkasReceiver>(&bs, ms.clone()))
+        bench.iter(|| {
+            _bench_block_ot::<ot::NaorPinkasSender, ot::NaorPinkasReceiver>(&bs, ms.clone())
+        })
     });
 }
-
-type AlszSender = alsz::AlszOTSender<ChouOrlandiReceiver>;
-type AlszReceiver = alsz::AlszOTReceiver<ChouOrlandiSender>;
-type KosSender = kos::KosOTSender<ChouOrlandiReceiver>;
-type KosReceiver = kos::KosOTReceiver<ChouOrlandiSender>;
 
 fn bench_otext(c: &mut Criterion) {
     c.bench_function("ot::AlszOT", move |bench| {
@@ -152,7 +141,7 @@ fn bench_otext(c: &mut Criterion) {
             .zip(m1s.into_iter())
             .collect::<Vec<(Block, Block)>>();
         let bs = rand_bool_vec(T);
-        bench.iter(|| _bench_block_ot::<AlszSender, AlszReceiver>(&bs, ms.clone()))
+        bench.iter(|| _bench_block_ot::<ot::AlszSender, ot::AlszReceiver>(&bs, ms.clone()))
     });
     c.bench_function("ot::KosOT", move |bench| {
         let m0s = rand_block_vec(T);
@@ -162,7 +151,7 @@ fn bench_otext(c: &mut Criterion) {
             .zip(m1s.into_iter())
             .collect::<Vec<(Block, Block)>>();
         let bs = rand_bool_vec(T);
-        bench.iter(|| _bench_block_ot::<KosSender, KosReceiver>(&bs, ms.clone()))
+        bench.iter(|| _bench_block_ot::<ot::KosSender, ot::KosReceiver>(&bs, ms.clone()))
     });
 }
 
@@ -170,23 +159,23 @@ fn bench_correlated_otext(c: &mut Criterion) {
     c.bench_function("cot::AlszOT", move |bench| {
         let deltas = rand_block_vec(T);
         let bs = rand_bool_vec(T);
-        bench.iter(|| _bench_block_cot::<AlszSender, AlszReceiver>(&bs, deltas.clone()))
+        bench.iter(|| _bench_block_cot::<ot::AlszSender, ot::AlszReceiver>(&bs, deltas.clone()))
     });
     c.bench_function("cot::KosOT", move |bench| {
         let deltas = rand_block_vec(T);
         let bs = rand_bool_vec(T);
-        bench.iter(|| _bench_block_cot::<KosSender, KosReceiver>(&bs, deltas.clone()))
+        bench.iter(|| _bench_block_cot::<ot::KosSender, ot::KosReceiver>(&bs, deltas.clone()))
     });
 }
 
 fn bench_random_otext(c: &mut Criterion) {
     c.bench_function("rot::AlszOT", move |bench| {
         let bs = rand_bool_vec(T);
-        bench.iter(|| _bench_block_rot::<AlszSender, AlszReceiver>(&bs))
+        bench.iter(|| _bench_block_rot::<ot::AlszSender, ot::AlszReceiver>(&bs))
     });
     c.bench_function("rot::KosOT", move |bench| {
         let bs = rand_bool_vec(T);
-        bench.iter(|| _bench_block_rot::<KosSender, KosReceiver>(&bs))
+        bench.iter(|| _bench_block_rot::<ot::KosSender, ot::KosReceiver>(&bs))
     });
 }
 

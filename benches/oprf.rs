@@ -7,8 +7,8 @@
 //! Oblivious pseudorandom function benchmarks using `criterion`.
 
 use criterion::{criterion_group, criterion_main, Criterion};
-use ocelot::kkrt::{KkrtReceiver, KkrtSender, Output, Seed};
-use ocelot::*;
+use ocelot::oprf::kkrt::{Output, Seed};
+use ocelot::oprf::{self, Receiver, Sender};
 use scuttlebutt::{AesRng, Block};
 use std::io::{BufReader, BufWriter};
 use std::os::unix::net::UnixStream;
@@ -19,8 +19,8 @@ fn rand_block_vec(size: usize) -> Vec<Block> {
 }
 
 fn _bench_oprf_init<
-    OPRFSender: ObliviousPrfSender<Seed = Seed, Input = Block, Output = Output>,
-    OPRFReceiver: ObliviousPrfReceiver<Input = Block, Output = Output>,
+    OPRFSender: Sender<Seed = Seed, Input = Block, Output = Output>,
+    OPRFReceiver: Receiver<Input = Block, Output = Output>,
 >() {
     let (sender, receiver) = UnixStream::pair().unwrap();
     let handle = std::thread::spawn(move || {
@@ -37,8 +37,8 @@ fn _bench_oprf_init<
 }
 
 fn _bench_oprf<
-    OPRFSender: ObliviousPrfSender<Seed = Seed, Input = Block, Output = Output>,
-    OPRFReceiver: ObliviousPrfReceiver<Input = Block, Output = Output>,
+    OPRFSender: Sender<Seed = Seed, Input = Block, Output = Output>,
+    OPRFReceiver: Receiver<Input = Block, Output = Output>,
 >(
     rs: &[Block],
 ) {
@@ -63,21 +63,21 @@ fn _bench_oprf<
 fn bench_oprf(c: &mut Criterion) {
     c.bench_function("oprf::KKRT (initialization)", move |bench| {
         bench.iter(|| {
-            let result = _bench_oprf_init::<KkrtSender, KkrtReceiver>();
+            let result = _bench_oprf_init::<oprf::KkrtSender, oprf::KkrtReceiver>();
             criterion::black_box(result);
         })
     });
     c.bench_function("oprf::KKRT (n = 2^12)", move |bench| {
         let rs = rand_block_vec(1 << 12);
         bench.iter(|| {
-            let result = _bench_oprf::<KkrtSender, KkrtReceiver>(&rs.clone());
+            let result = _bench_oprf::<oprf::KkrtSender, oprf::KkrtReceiver>(&rs.clone());
             criterion::black_box(result);
         })
     });
     c.bench_function("oprf::KKRT (n = 2^16)", move |bench| {
         let rs = rand_block_vec(1 << 16);
         bench.iter(|| {
-            let result = _bench_oprf::<KkrtSender, KkrtReceiver>(&rs.clone());
+            let result = _bench_oprf::<oprf::KkrtSender, oprf::KkrtReceiver>(&rs.clone());
             criterion::black_box(result);
         })
     });
@@ -90,12 +90,12 @@ fn bench_oprf_compute(c: &mut Criterion) {
             let mut rng = AesRng::new();
             let mut reader = BufReader::new(receiver.try_clone().unwrap());
             let mut writer = BufWriter::new(receiver);
-            let _ = KkrtReceiver::init(&mut reader, &mut writer, &mut rng).unwrap();
+            let _ = oprf::KkrtReceiver::init(&mut reader, &mut writer, &mut rng).unwrap();
         });
         let mut rng = AesRng::new();
         let mut reader = BufReader::new(sender.try_clone().unwrap());
         let mut writer = BufWriter::new(sender);
-        let oprf = KkrtSender::init(&mut reader, &mut writer, &mut rng).unwrap();
+        let oprf = oprf::KkrtSender::init(&mut reader, &mut writer, &mut rng).unwrap();
         handle.join().unwrap();
         let seed = Seed::default();
         let input = rand::random::<Block>();

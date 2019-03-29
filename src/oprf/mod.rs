@@ -4,12 +4,22 @@
 // Copyright © 2019 Galois, Inc.
 // See LICENSE for licensing information.
 
+//! Oblivious PRF traits + instantiations.
+//!
+//! This module provides traits for an oblivious PRF.
+
 pub mod kkrt;
 mod prc;
 
 use crate::errors::Error;
+use crate::ot;
 use rand::{CryptoRng, RngCore};
 use std::io::{Read, Write};
+
+/// KKRT oblivious PRF sender using ALSZ OT extension with Chou-Orlandi as the base OT.
+pub type KkrtSender = kkrt::Sender<ot::AlszReceiver>;
+/// KKRT oblivious PRF receiver using ALSZ OT extension with Chou-Orlandi as the base OT.
+pub type KkrtReceiver = kkrt::Receiver<ot::AlszSender>;
 
 pub trait ObliviousPrf
 where
@@ -24,7 +34,7 @@ where
 }
 
 /// Trait for oblivious PRF from the sender's point-of-view.
-pub trait ObliviousPrfSender: ObliviousPrf
+pub trait Sender: ObliviousPrf
 where
     Self: Sized,
 {
@@ -47,7 +57,7 @@ where
 }
 
 /// Trait for oblivious PRF from the receiver's point-of-view.
-pub trait ObliviousPrfReceiver: ObliviousPrf
+pub trait Receiver: ObliviousPrf
 where
     Self: Sized,
 {

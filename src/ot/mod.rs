@@ -4,6 +4,11 @@
 // Copyright © 2019 Galois, Inc.
 // See LICENSE for licensing information.
 
+//! Oblivious transfer traits + instantiations.
+//!
+//! This module provides traits for standard oblivious transfer (OT), correlated
+//! OT, and random OT.
+
 pub mod alsz;
 pub mod chou_orlandi;
 pub mod dummy;
@@ -14,8 +19,29 @@ use crate::errors::Error;
 use rand::{CryptoRng, RngCore};
 use std::io::{Read, Write};
 
+/// Instantiation of the Chou-Orlandi OT sender.
+pub type ChouOrlandiSender = chou_orlandi::Sender;
+/// Instantiation of the Chou-Orlandi OT receiver.
+pub type ChouOrlandiReceiver = chou_orlandi::Receiver;
+/// Instantiation of the dummy OT sender.
+pub type DummySender = dummy::Sender;
+/// Instantiation of the dummy OT receiver.
+pub type DummyReceiver = dummy::Receiver;
+/// Instantiation of the Naor-Pinkas OT sender.
+pub type NaorPinkasSender = naor_pinkas::Sender;
+/// Instantiation of the Naor-Pinkas OT receiver.
+pub type NaorPinkasReceiver = naor_pinkas::Receiver;
+/// Instantiation of the ALSZ OT extension sender, using Chou-Orlandi as the base OT.
+pub type AlszSender = alsz::Sender<ChouOrlandiReceiver>;
+/// Instantiation of the ALSZ OT extension receiver, using Chou-Orlandi as the base OT.
+pub type AlszReceiver = alsz::Receiver<ChouOrlandiSender>;
+/// Instantiation of the KOS OT extension sender, using Chou-Orlandi as the base OT.
+pub type KosSender = kos::Sender<ChouOrlandiReceiver>;
+/// Instantiation of the KOS OT extension receiver, using Chou-Orlandi as the base OT.
+pub type KosReceiver = kos::Receiver<ChouOrlandiSender>;
+
 /// Trait for one-out-of-two oblivious transfer from the sender's point-of-view.
-pub trait ObliviousTransferSender
+pub trait Sender
 where
     Self: Sized,
 {
@@ -41,7 +67,7 @@ where
 
 /// Trait for one-out-of-two oblivious transfer from the receiver's
 /// point-of-view.
-pub trait ObliviousTransferReceiver
+pub trait Receiver
 where
     Self: Sized,
 {
@@ -67,7 +93,7 @@ where
 
 /// Trait for one-out-of-two _correlated_ oblivious transfer from the sender's
 /// point-of-view.
-pub trait CorrelatedObliviousTransferSender: ObliviousTransferSender
+pub trait CorrelatedSender: Sender
 where
     Self: Sized,
 {
@@ -84,7 +110,7 @@ where
 
 /// Trait for one-out-of-two _correlated_ oblivious transfer from the receiver's
 /// point-of-view.
-pub trait CorrelatedObliviousTransferReceiver: ObliviousTransferReceiver
+pub trait CorrelatedReceiver: Receiver
 where
     Self: Sized,
 {
@@ -100,7 +126,7 @@ where
 
 /// Trait for one-out-of-two _random_ oblivious transfer from the sender's
 /// point-of-view.
-pub trait RandomObliviousTransferSender: ObliviousTransferSender
+pub trait RandomSender: Sender
 where
     Self: Sized,
 {
@@ -117,7 +143,7 @@ where
 
 /// Trait for one-out-of-two _random_ oblivious transfer from the receiver's
 /// point-of-view.
-pub trait RandomObliviousTransferReceiver: ObliviousTransferReceiver
+pub trait RandomReceiver: Receiver
 where
     Self: Sized,
 {
@@ -151,10 +177,7 @@ mod tests {
         (0..size).map(|_| rand::random::<bool>()).collect()
     }
 
-    fn test_ot<
-        OTSender: ObliviousTransferSender<Msg = Block>,
-        OTReceiver: ObliviousTransferReceiver<Msg = Block>,
-    >() {
+    fn test_ot<OTSender: Sender<Msg = Block>, OTReceiver: Receiver<Msg = Block>>() {
         let m0 = rand::random::<Block>();
         let m1 = rand::random::<Block>();
         let b = rand::random::<bool>();
@@ -180,10 +203,7 @@ mod tests {
         handle.join().unwrap();
     }
 
-    fn test_otext<
-        OTSender: ObliviousTransferSender<Msg = Block>,
-        OTReceiver: ObliviousTransferReceiver<Msg = Block>,
-    >() {
+    fn test_otext<OTSender: Sender<Msg = Block>, OTReceiver: Receiver<Msg = Block>>() {
         let m0s = rand_block_vec(T);
         let m1s = rand_block_vec(T);
         let bs = rand_bool_vec(T);
@@ -215,8 +235,8 @@ mod tests {
     }
 
     fn test_cotext<
-        OTSender: CorrelatedObliviousTransferSender<Msg = Block>,
-        OTReceiver: CorrelatedObliviousTransferReceiver<Msg = Block>,
+        OTSender: CorrelatedSender<Msg = Block>,
+        OTReceiver: CorrelatedReceiver<Msg = Block>,
     >() {
         let deltas = rand_block_vec(T);
         let bs = rand_bool_vec(T);
@@ -247,10 +267,7 @@ mod tests {
         }
     }
 
-    fn test_rotext<
-        OTSender: RandomObliviousTransferSender<Msg = Block>,
-        OTReceiver: RandomObliviousTransferReceiver<Msg = Block>,
-    >() {
+    fn test_rotext<OTSender: RandomSender<Msg = Block>, OTReceiver: RandomReceiver<Msg = Block>>() {
         let bs = rand_bool_vec(T);
         let out = Arc::new(Mutex::new(vec![]));
         let out_ = out.clone();
@@ -279,24 +296,19 @@ mod tests {
         }
     }
 
-    type AlszSender = alsz::AlszOTSender<chou_orlandi::ChouOrlandiOTReceiver>;
-    type AlszReceiver = alsz::AlszOTReceiver<chou_orlandi::ChouOrlandiOTSender>;
-    type KosSender = kos::KosOTSender<chou_orlandi::ChouOrlandiOTReceiver>;
-    type KosReceiver = kos::KosOTReceiver<chou_orlandi::ChouOrlandiOTSender>;
-
     #[test]
     fn test_dummy() {
-        test_ot::<dummy::DummyOTSender, dummy::DummyOTReceiver>();
+        test_ot::<DummySender, DummyReceiver>();
     }
 
     #[test]
     fn test_naor_pinkas() {
-        test_ot::<naor_pinkas::NaorPinkasOTSender, naor_pinkas::NaorPinkasOTReceiver>();
+        test_ot::<NaorPinkasSender, NaorPinkasReceiver>();
     }
 
     #[test]
     fn test_chou_orlandi() {
-        test_ot::<chou_orlandi::ChouOrlandiOTSender, chou_orlandi::ChouOrlandiOTReceiver>();
+        test_ot::<ChouOrlandiSender, ChouOrlandiReceiver>();
     }
 
     #[test]

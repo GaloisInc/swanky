@@ -4,13 +4,18 @@
 // Copyright © 2019 Galois, Inc.
 // See LICENSE for licensing information.
 
-/// Errors produced by oblivious transfer protocols.
+/// Errors produced by `ocelot`.
 #[derive(Debug)]
 pub enum Error {
+    /// The input length is invalid.
     InvalidInputLength,
+    /// An I/O error has occurred.
     IoError(std::io::Error),
+    /// Some other error, given by `String`.
     Other(String),
+    /// Decompressing a elliptic curve point failed.
     DecompressPoint,
+    /// Coin tossing failed.
     CoinTossError(scuttlebutt::cointoss::Error),
 }
 
