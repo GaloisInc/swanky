@@ -7,18 +7,13 @@
 use crate::comm;
 use crate::errors::Error;
 use fancy_garbling::{Fancy, Garbler as Gb, Message, Wire};
-use ocelot::ObliviousTransferSender;
+use ocelot::ot::Sender as OtSender;
 use rand::{CryptoRng, RngCore};
 use scuttlebutt::Block;
 use std::io::{Read, Write};
 use std::sync::{Arc, Mutex};
 
-pub struct Garbler<
-    R: Read + Send,
-    W: Write + Send,
-    RNG: CryptoRng + RngCore,
-    OT: ObliviousTransferSender,
-> {
+pub struct Garbler<R: Read + Send, W: Write + Send, RNG: CryptoRng + RngCore, OT: OtSender> {
     garbler: Gb<RNG>,
     reader: Arc<Mutex<R>>,
     writer: Arc<Mutex<W>>,
@@ -30,7 +25,7 @@ impl<
         R: Read + Send,
         W: Write + Send + 'static,
         RNG: CryptoRng + RngCore,
-        OT: ObliviousTransferSender<Msg = Block>,
+        OT: OtSender<Msg = Block>,
     > Garbler<R, W, RNG, OT>
 {
     pub fn new(mut reader: R, mut writer: W, inputs: &[u16], mut rng: RNG) -> Result<Self, Error> {
@@ -106,7 +101,7 @@ impl<
         R: Read + Send,
         W: Write + Send + 'static,
         RNG: CryptoRng + RngCore,
-        OT: ObliviousTransferSender<Msg = Block>,
+        OT: OtSender<Msg = Block>,
     > Fancy for Garbler<R, W, RNG, OT>
 {
     type Item = Wire;

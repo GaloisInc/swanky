@@ -7,18 +7,13 @@
 use crate::comm;
 use crate::errors::Error;
 use fancy_garbling::{Evaluator as Ev, Fancy, Wire};
-use ocelot::ObliviousTransferReceiver;
+use ocelot::ot::Receiver as OtReceiver;
 use rand::{CryptoRng, RngCore};
 use scuttlebutt::Block;
 use std::io::{Read, Write};
 use std::sync::{Arc, Mutex};
 
-pub struct Evaluator<
-    R: Read + Send,
-    W: Write + Send,
-    RNG: CryptoRng + RngCore,
-    OT: ObliviousTransferReceiver,
-> {
+pub struct Evaluator<R: Read + Send, W: Write + Send, RNG: CryptoRng + RngCore, OT: OtReceiver> {
     evaluator: Ev,
     reader: Arc<Mutex<R>>,
     writer: Arc<Mutex<W>>,
@@ -31,7 +26,7 @@ impl<
         R: Read + Send + 'static,
         W: Write + Send,
         RNG: CryptoRng + RngCore,
-        OT: ObliviousTransferReceiver<Msg = Block>,
+        OT: OtReceiver<Msg = Block>,
     > Evaluator<R, W, RNG, OT>
 {
     pub fn new(mut reader: R, mut writer: W, inputs: &[u16], mut rng: RNG) -> Result<Self, Error> {
@@ -62,13 +57,13 @@ impl<
         self.evaluator.decode_output()
     }
 
-    fn run_ot(&self, inputs: &[bool]) -> Vec<Block> {
+    fn run_ot(&self, inputs: &[bool]) -> Result<Vec<Block>, Error> {
         let mut ot = self.ot.lock().unwrap();
         let mut reader = self.reader.lock().unwrap();
         let mut writer = self.writer.lock().unwrap();
         let mut rng = self.rng.lock().unwrap();
         ot.receive(&mut *reader, &mut *writer, &inputs, &mut *rng)
-            .unwrap() // XXX: remove unwrap
+            .map_err(Error::from)
     }
 }
 
@@ -86,7 +81,7 @@ impl<
         R: Read + Send + 'static,
         W: Write + Send,
         RNG: CryptoRng + RngCore,
-        OT: ObliviousTransferReceiver<Msg = Block>,
+        OT: OtReceiver<Msg = Block>,
     > Fancy for Evaluator<R, W, RNG, OT>
 {
     type Item = Wire;
@@ -106,7 +101,7 @@ impl<
             .into_iter()
             .map(|i| input & (1 << i) != 0)
             .collect::<Vec<bool>>();
-        let wires = self.run_ot(&bs);
+        let wires = self.run_ot(&bs)?;
         Ok(combine(&wires, q))
     }
     #[inline]
@@ -122,7 +117,7 @@ impl<
                 bs.push(b);
             }
         }
-        let wires = self.run_ot(&bs);
+        let wires = self.run_ot(&bs)?;
         let mut start = 0;
         Ok(lens
             .into_iter()
