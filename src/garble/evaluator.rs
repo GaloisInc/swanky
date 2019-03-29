@@ -64,8 +64,7 @@ impl Evaluator {
         Ok(blocks)
     }
 
-    /// The current non-free gate index of the garbling computation. Respects sync
-    /// ordering. Must agree with Garbler hence compute_gate_id is in the parent mod.
+    /// The current non-free gate index of the garbling computation.
     #[inline]
     fn current_gate(&self) -> usize {
         self.current_gate.fetch_add(1, Ordering::SeqCst)
@@ -113,7 +112,8 @@ impl Fancy for Evaluator {
         }
         let q = A.modulus();
         let qb = B.modulus();
-        let gate = self.recv_gate(q as usize + qb as usize - 2)?;
+        let unequal = A.modulus() != B.modulus();
+        let gate = self.recv_gate(q as usize + qb as usize - 2 + unequal as usize)?;
         let gate_num = self.current_gate();
         let g = tweak2(gate_num as u64, 0);
 
@@ -134,7 +134,7 @@ impl Fancy for Evaluator {
         };
 
         // hack for unequal mods
-        let new_b_color = if A.modulus() != B.modulus() {
+        let new_b_color = if unequal {
             let minitable = *gate.last().unwrap();
             let ct = u128::from(minitable) >> (B.color() * 16);
             let pt = u128::from(B.hash(tweak2(gate_num as u64, 1))) ^ ct;

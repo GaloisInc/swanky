@@ -13,7 +13,7 @@ use std::sync::{Arc, Mutex};
 /// Streams garbled circuit ciphertexts through a callback. Parallelizable.
 pub struct Garbler<R: CryptoRng + RngCore> {
     callback: Arc<Mutex<FnMut(Message) + Send>>,
-    // Hash map containing modulus -> associated delta.
+    // Hash map containing modulus -> associated delta wire-label.
     deltas: Arc<Mutex<HashMap<u16, Wire>>>,
     current_output: Arc<AtomicUsize>,
     current_gate: Arc<AtomicUsize>,
@@ -45,8 +45,7 @@ impl<R: CryptoRng + RngCore> Garbler<R> {
         (self.callback.lock().unwrap().deref_mut())(m);
     }
 
-    /// The current non-free gate index of the garbling computation. Respects sync
-    /// ordering. Must agree with Evaluator hence compute_gate_id is in the parent mod.
+    /// The current non-free gate index of the garbling computation
     #[inline]
     fn current_gate(&self) -> usize {
         self.current_gate.fetch_add(1, Ordering::SeqCst)
@@ -269,9 +268,6 @@ impl<R: CryptoRng + RngCore> Fancy for Garbler<R> {
 
         // output zero-wire
         // W_g^0 <- -H(g, W_{a_1}^0 - \tao\Delta_m) - \phi(-\tao)\Delta_n
-        // let C = A.minus(&Din.cmul(tao))
-        //             .hashback(g, q_out)
-        //             .minus(&Dout.cmul(tt[((q_in - tao) % q_in) as usize]));
         let C = A
             .plus(&Din.cmul((q_in - tao) % q_in))
             .hashback(g, q_out)
