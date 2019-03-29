@@ -37,7 +37,7 @@ fn cap2typ(cap: &Captures, idx: usize) -> Result<GateType, Error> {
 #[inline]
 fn regex2captures<'t>(re: &Regex, line: &'t str) -> Result<Captures<'t>, Error> {
     re.captures(&line)
-        .ok_or(Error::ParseLineError(line.to_string()))
+        .ok_or_else(|| Error::ParseLineError(line.to_string()))
 }
 
 impl Circuit {
@@ -50,7 +50,7 @@ impl Circuit {
 
         // Parse first line: ngates nwires\n
         let mut line = String::new();
-        let _ = reader.read_line(&mut line);
+        reader.read_line(&mut line)?;
         let re = Regex::new(r"(\d+)\s+(\d+)")?;
         let cap = regex2captures(&re, &line)?;
         let ngates = cap2int(&cap, 1)?;
@@ -58,7 +58,7 @@ impl Circuit {
 
         // Parse second line: n1 n2 n3\n
         let mut line = String::new();
-        let _ = reader.read_line(&mut line);
+        reader.read_line(&mut line)?;
         let re = Regex::new(r"(\d+)\s+(\d+)\s+(\d+)")?;
         let cap = regex2captures(&re, &line)?;
         let n1 = cap2int(&cap, 1)?; // Number of garbler inputs
@@ -67,7 +67,8 @@ impl Circuit {
 
         // Parse third line: \n
         let mut line = String::new();
-        let _ = reader.read_line(&mut line);
+        reader.read_line(&mut line)?;
+        #[allow(clippy::trivial_regex)]
         let re = Regex::new(r"\n")?;
         let _ = regex2captures(&re, &line)?;
 
@@ -142,7 +143,7 @@ impl Circuit {
                             let gate = Gate::Mul {
                                 xref,
                                 yref,
-                                id: id,
+                                id,
                                 out: Some(out),
                             };
                             id += 1;
@@ -158,7 +159,7 @@ impl Circuit {
                 }
                 None => break,
                 _ => {
-                    return Err(Error::from(Error::ParseLineError(line.to_string())));
+                    return Err(Error::ParseLineError(line.to_string()));
                 }
             }
         }

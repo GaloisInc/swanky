@@ -127,10 +127,10 @@ impl Circuit {
                     f.add(
                         cache[xref.ix]
                             .as_ref()
-                            .ok_or(F::Error::from(FancyError::UninitializedValue))?,
+                            .ok_or_else(|| F::Error::from(FancyError::UninitializedValue))?,
                         cache[yref.ix]
                             .as_ref()
-                            .ok_or(F::Error::from(FancyError::UninitializedValue))?,
+                            .ok_or_else(|| F::Error::from(FancyError::UninitializedValue))?,
                     )?,
                 ),
                 Gate::Sub { xref, yref, out } => (
@@ -138,10 +138,10 @@ impl Circuit {
                     f.sub(
                         cache[xref.ix]
                             .as_ref()
-                            .ok_or(F::Error::from(FancyError::UninitializedValue))?,
+                            .ok_or_else(|| F::Error::from(FancyError::UninitializedValue))?,
                         cache[yref.ix]
                             .as_ref()
-                            .ok_or(F::Error::from(FancyError::UninitializedValue))?,
+                            .ok_or_else(|| F::Error::from(FancyError::UninitializedValue))?,
                     )?,
                 ),
                 Gate::Cmul { xref, c, out } => (
@@ -149,39 +149,33 @@ impl Circuit {
                     f.cmul(
                         cache[xref.ix]
                             .as_ref()
-                            .ok_or(F::Error::from(FancyError::UninitializedValue))?,
+                            .ok_or_else(|| F::Error::from(FancyError::UninitializedValue))?,
                         c,
                     )?,
                 ),
                 Gate::Proj {
-                    xref,
-                    ref tt,
-                    id: _,
-                    out,
+                    xref, ref tt, out, ..
                 } => (
                     out,
                     f.proj(
                         cache[xref.ix]
                             .as_ref()
-                            .ok_or(F::Error::from(FancyError::UninitializedValue))?,
+                            .ok_or_else(|| F::Error::from(FancyError::UninitializedValue))?,
                         q,
                         Some(tt.to_vec()),
                     )?,
                 ),
                 Gate::Mul {
-                    xref,
-                    yref,
-                    id: _,
-                    out,
+                    xref, yref, out, ..
                 } => (
                     out,
                     f.mul(
                         cache[xref.ix]
                             .as_ref()
-                            .ok_or(F::Error::from(FancyError::UninitializedValue))?,
+                            .ok_or_else(|| F::Error::from(FancyError::UninitializedValue))?,
                         cache[yref.ix]
                             .as_ref()
-                            .ok_or(F::Error::from(FancyError::UninitializedValue))?,
+                            .ok_or_else(|| F::Error::from(FancyError::UninitializedValue))?,
                     )?,
                 ),
             };
@@ -191,7 +185,7 @@ impl Circuit {
         for r in self.output_refs.iter() {
             let out = cache[r.ix]
                 .clone()
-                .ok_or(F::Error::from(FancyError::UninitializedValue))?;
+                .ok_or_else(|| F::Error::from(FancyError::UninitializedValue))?;
             outputs.push(out);
         }
         Ok(outputs)
@@ -345,7 +339,7 @@ impl Fancy for CircuitBuilder {
         output_modulus: u16,
         tt: Option<Vec<u16>>,
     ) -> Result<CircuitRef, Self::Error> {
-        let tt = tt.ok_or(Self::Error::from(FancyError::NoTruthTable))?;
+        let tt = tt.ok_or_else(|| Self::Error::from(FancyError::NoTruthTable))?;
         if tt.len() < xref.modulus() as usize || !tt.iter().all(|&x| x < output_modulus) {
             return Err(Self::Error::from(FancyError::InvalidTruthTable));
         }

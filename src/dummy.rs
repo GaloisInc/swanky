@@ -50,7 +50,7 @@ impl Fancy for Dummy {
         let res = if let Some(val) = opt_x {
             DummyVal { val, modulus }
         } else {
-            if self.garbler_inputs.len() == 0 {
+            if self.garbler_inputs.is_empty() {
                 return Err(DummyError::NotEnoughGarblerInputs);
             }
             let val = self.garbler_inputs.remove(0);
@@ -60,7 +60,7 @@ impl Fancy for Dummy {
     }
 
     fn evaluator_input(&mut self, modulus: u16) -> Result<DummyVal, Self::Error> {
-        if self.evaluator_inputs.len() == 0 {
+        if self.evaluator_inputs.is_empty() {
             return Err(DummyError::NotEnoughEvaluatorInputs);
         }
         let val = self.evaluator_inputs.remove(0);
@@ -111,7 +111,7 @@ impl Fancy for Dummy {
         modulus: u16,
         tt: Option<Vec<u16>>,
     ) -> Result<DummyVal, Self::Error> {
-        let tt = tt.ok_or(Self::Error::from(FancyError::NoTruthTable))?;
+        let tt = tt.ok_or_else(|| Self::Error::from(FancyError::NoTruthTable))?;
         if tt.len() < x.modulus() as usize || !tt.iter().all(|&x| x < modulus) {
             return Err(Self::Error::from(FancyError::InvalidTruthTable));
         }

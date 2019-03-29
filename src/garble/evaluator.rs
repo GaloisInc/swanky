@@ -308,7 +308,7 @@ impl Decoder {
             debug_assert_eq!(q as usize, self.outputs[i].len());
             for k in 0..q {
                 let h = ws[i].hash(output_tweak(i, k));
-                if h == Block::from(self.outputs[i][k as usize]) {
+                if h == self.outputs[i][k as usize] {
                     outs.push(k);
                     break;
                 }

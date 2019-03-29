@@ -18,7 +18,7 @@ impl<W: Clone + HasModulus> Bundle<W> {
 
     /// Return the moduli of all the wires in the bundle.
     pub fn moduli(&self) -> Vec<u16> {
-        self.0.iter().map(|w| w.modulus()).collect()
+        self.0.iter().map(HasModulus::modulus).collect()
     }
 
     /// Extract the wires from this bundle.
@@ -330,13 +330,11 @@ pub trait BundleGadgets: Fancy {
         x: &Bundle<Self::Item>,
         p: u16,
     ) -> Result<Bundle<Self::Item>, Self::Error> {
-        let i = x
-            .moduli()
-            .iter()
-            .position(|&q| p == q)
-            .ok_or(Self::Error::from(FancyError::InvalidArg {
+        let i = x.moduli().iter().position(|&q| p == q).ok_or_else(|| {
+            Self::Error::from(FancyError::InvalidArg {
                 desc: "p is not a moduli in this bundle!".to_string(),
-            }))?;
+            })
+        })?;
         let w = &x.wires()[i];
         x.moduli()
             .iter()
