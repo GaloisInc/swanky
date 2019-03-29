@@ -1,6 +1,5 @@
-target
+target/
 Cargo.lock
-deps
-build
-libOTe
+deps/
+build/
 .tags*
