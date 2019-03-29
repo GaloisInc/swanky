@@ -8,17 +8,17 @@ use crate::comm;
 use crate::errors::Error;
 use fancy_garbling::{Fancy, Garbler as Gb, Message, Wire};
 use ocelot::ot::Sender as OtSender;
-use rand::{CryptoRng, RngCore};
-use scuttlebutt::Block;
+use rand::{CryptoRng, RngCore, SeedableRng};
+use scuttlebutt::{AesRng, Block};
 use std::io::{Read, Write};
 use std::sync::{Arc, Mutex};
 
 pub struct Garbler<R: Read + Send, W: Write + Send, RNG: CryptoRng + RngCore, OT: OtSender> {
-    garbler: Gb<RNG>,
+    garbler: Gb<AesRng>,
     reader: Arc<Mutex<R>>,
     writer: Arc<Mutex<W>>,
     ot: Arc<Mutex<OT>>,
-    rng: Arc<Mutex<RNG>>,
+    rng: RNG,
 }
 
 impl<
@@ -59,9 +59,9 @@ impl<
             comm::send_blocks(&mut *writer, &blocks).unwrap();
             ()
         };
-        let rng = Arc::new(Mutex::new(rng));
-        let rng_ = rng.clone();
-        let garbler = Gb::new(callback, rng_);
+        let mut key = [0u8; 16];
+        rng.fill_bytes(&mut key);
+        let garbler = Gb::new(callback, AesRng::from_seed(Block::from(key)));
         let ot = Arc::new(Mutex::new(ot));
         Ok(Garbler {
             garbler,
@@ -72,12 +72,11 @@ impl<
         })
     }
 
-    fn run_ot(&self, inputs: &[(Block, Block)]) {
+    fn run_ot(&mut self, inputs: &[(Block, Block)]) {
         let mut ot = self.ot.lock().unwrap();
         let mut reader = self.reader.lock().unwrap();
         let mut writer = self.writer.lock().unwrap();
-        let mut rng = self.rng.lock().unwrap();
-        ot.send(&mut *reader, &mut *writer, inputs, &mut *rng)
+        ot.send(&mut *reader, &mut *writer, inputs, &mut self.rng)
             .unwrap() // XXX: remove unwrap
     }
 }
@@ -108,20 +107,20 @@ impl<
     type Error = Error;
 
     #[inline]
-    fn garbler_input(&self, q: u16, opt_x: Option<u16>) -> Result<Self::Item, Self::Error> {
+    fn garbler_input(&mut self, q: u16, opt_x: Option<u16>) -> Result<Self::Item, Self::Error> {
         self.garbler
             .garbler_input(q, opt_x)
             .map_err(Self::Error::from)
     }
     #[inline]
-    fn evaluator_input(&self, q: u16) -> Result<Self::Item, Self::Error> {
+    fn evaluator_input(&mut self, q: u16) -> Result<Self::Item, Self::Error> {
         let delta = self.garbler.delta(q);
         let (wire, inputs) = _evaluator_input(&delta, q);
         self.run_ot(&inputs);
         Ok(wire)
     }
     #[inline]
-    fn evaluator_inputs(&self, qs: &[u16]) -> Result<Vec<Self::Item>, Self::Error> {
+    fn evaluator_inputs(&mut self, qs: &[u16]) -> Result<Vec<Self::Item>, Self::Error> {
         let n = qs.len();
         let lens = qs.into_iter().map(|q| (*q as f32).log(2.0).ceil() as usize);
         let mut wires = Vec::with_capacity(n);
@@ -138,31 +137,31 @@ impl<
         Ok(wires)
     }
     #[inline]
-    fn constant(&self, x: u16, q: u16) -> Result<Self::Item, Self::Error> {
+    fn constant(&mut self, x: u16, q: u16) -> Result<Self::Item, Self::Error> {
         self.garbler.constant(x, q).map_err(Self::Error::from)
     }
     #[inline]
-    fn add(&self, x: &Wire, y: &Wire) -> Result<Self::Item, Self::Error> {
+    fn add(&mut self, x: &Wire, y: &Wire) -> Result<Self::Item, Self::Error> {
         self.garbler.add(x, y).map_err(Self::Error::from)
     }
     #[inline]
-    fn sub(&self, x: &Wire, y: &Wire) -> Result<Self::Item, Self::Error> {
+    fn sub(&mut self, x: &Wire, y: &Wire) -> Result<Self::Item, Self::Error> {
         self.garbler.sub(x, y).map_err(Self::Error::from)
     }
     #[inline]
-    fn cmul(&self, x: &Wire, c: u16) -> Result<Self::Item, Self::Error> {
+    fn cmul(&mut self, x: &Wire, c: u16) -> Result<Self::Item, Self::Error> {
         self.garbler.cmul(x, c).map_err(Self::Error::from)
     }
     #[inline]
-    fn mul(&self, x: &Wire, y: &Wire) -> Result<Self::Item, Self::Error> {
+    fn mul(&mut self, x: &Wire, y: &Wire) -> Result<Self::Item, Self::Error> {
         self.garbler.mul(x, y).map_err(Self::Error::from)
     }
     #[inline]
-    fn proj(&self, x: &Wire, q: u16, tt: Option<Vec<u16>>) -> Result<Self::Item, Self::Error> {
+    fn proj(&mut self, x: &Wire, q: u16, tt: Option<Vec<u16>>) -> Result<Self::Item, Self::Error> {
         self.garbler.proj(x, q, tt).map_err(Self::Error::from)
     }
     #[inline]
-    fn output(&self, x: &Self::Item) -> Result<(), Self::Error> {
+    fn output(&mut self, x: &Self::Item) -> Result<(), Self::Error> {
         self.garbler.output(x).map_err(Self::Error::from)
     }
 }

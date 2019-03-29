@@ -88,13 +88,13 @@ impl<
     type Error = Error;
 
     #[inline]
-    fn garbler_input(&self, q: u16, opt_x: Option<u16>) -> Result<Self::Item, Self::Error> {
+    fn garbler_input(&mut self, q: u16, opt_x: Option<u16>) -> Result<Self::Item, Self::Error> {
         self.evaluator
             .garbler_input(q, opt_x)
             .map_err(Self::Error::from)
     }
     #[inline]
-    fn evaluator_input(&self, q: u16) -> Result<Self::Item, Self::Error> {
+    fn evaluator_input(&mut self, q: u16) -> Result<Self::Item, Self::Error> {
         let len = (q as f32).log(2.0).ceil() as u16;
         let input = self.inputs.lock().unwrap().remove(0);
         let bs = (0..len)
@@ -105,7 +105,7 @@ impl<
         Ok(combine(&wires, q))
     }
     #[inline]
-    fn evaluator_inputs(&self, qs: &[u16]) -> Result<Vec<Self::Item>, Self::Error> {
+    fn evaluator_inputs(&mut self, qs: &[u16]) -> Result<Vec<Self::Item>, Self::Error> {
         let lens = qs
             .into_iter()
             .map(|q| (*q as f32).log(2.0).ceil() as usize)
@@ -131,31 +131,31 @@ impl<
             .collect::<Vec<Wire>>())
     }
     #[inline]
-    fn constant(&self, x: u16, q: u16) -> Result<Self::Item, Self::Error> {
+    fn constant(&mut self, x: u16, q: u16) -> Result<Self::Item, Self::Error> {
         self.evaluator.constant(x, q).map_err(Self::Error::from)
     }
     #[inline]
-    fn add(&self, x: &Wire, y: &Wire) -> Result<Self::Item, Self::Error> {
+    fn add(&mut self, x: &Wire, y: &Wire) -> Result<Self::Item, Self::Error> {
         self.evaluator.add(&x, &y).map_err(Self::Error::from)
     }
     #[inline]
-    fn sub(&self, x: &Wire, y: &Wire) -> Result<Self::Item, Self::Error> {
+    fn sub(&mut self, x: &Wire, y: &Wire) -> Result<Self::Item, Self::Error> {
         self.evaluator.sub(&x, &y).map_err(Self::Error::from)
     }
     #[inline]
-    fn cmul(&self, x: &Wire, c: u16) -> Result<Self::Item, Self::Error> {
+    fn cmul(&mut self, x: &Wire, c: u16) -> Result<Self::Item, Self::Error> {
         self.evaluator.cmul(&x, c).map_err(Self::Error::from)
     }
     #[inline]
-    fn mul(&self, x: &Wire, y: &Wire) -> Result<Self::Item, Self::Error> {
+    fn mul(&mut self, x: &Wire, y: &Wire) -> Result<Self::Item, Self::Error> {
         self.evaluator.mul(&x, &y).map_err(Self::Error::from)
     }
     #[inline]
-    fn proj(&self, x: &Wire, q: u16, tt: Option<Vec<u16>>) -> Result<Self::Item, Self::Error> {
+    fn proj(&mut self, x: &Wire, q: u16, tt: Option<Vec<u16>>) -> Result<Self::Item, Self::Error> {
         self.evaluator.proj(&x, q, tt).map_err(Self::Error::from)
     }
     #[inline]
-    fn output(&self, x: &Wire) -> Result<(), Self::Error> {
+    fn output(&mut self, x: &Wire) -> Result<(), Self::Error> {
         self.evaluator.output(&x).map_err(Self::Error::from)
     }
 }

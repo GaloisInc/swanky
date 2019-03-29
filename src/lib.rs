@@ -27,7 +27,7 @@ mod tests {
     use fancy_garbling::dummy::Dummy;
     use fancy_garbling::util::RngExt;
     use fancy_garbling::{BundleGadgets, Fancy, HasModulus};
-    use ocelot::*;
+    use ocelot::ot;
     use scuttlebutt::AesRng;
     use scuttlebutt::Block;
     use std::io::{BufReader, BufWriter};
@@ -44,10 +44,7 @@ mod tests {
         Ok(())
     }
 
-    fn test_c1<
-        OTSender: ObliviousTransferSender<Msg = Block>,
-        OTReceiver: ObliviousTransferReceiver<Msg = Block>,
-    >(
+    fn test_c1<OTSender: ot::Sender<Msg = Block>, OTReceiver: ot::Receiver<Msg = Block>>(
         a: u16,
         b: u16,
     ) {
@@ -72,26 +69,23 @@ mod tests {
         assert_eq!(vec![(a + b) % 3], output);
     }
 
-    type ChouOrlandiSender = chou_orlandi::ChouOrlandiOTSender;
-    type ChouOrlandiReceiver = chou_orlandi::ChouOrlandiOTReceiver;
-
     #[test]
     fn test_simple_circuits() {
-        test_c1::<ChouOrlandiSender, ChouOrlandiReceiver>(0, 0);
-        test_c1::<ChouOrlandiSender, ChouOrlandiReceiver>(1, 0);
-        test_c1::<ChouOrlandiSender, ChouOrlandiReceiver>(2, 0);
-        test_c1::<ChouOrlandiSender, ChouOrlandiReceiver>(0, 1);
-        test_c1::<ChouOrlandiSender, ChouOrlandiReceiver>(0, 2);
-        test_c1::<ChouOrlandiSender, ChouOrlandiReceiver>(1, 1);
-        test_c1::<ChouOrlandiSender, ChouOrlandiReceiver>(2, 1);
-        test_c1::<ChouOrlandiSender, ChouOrlandiReceiver>(1, 2);
-        test_c1::<ChouOrlandiSender, ChouOrlandiReceiver>(2, 2);
+        test_c1::<ot::ChouOrlandiSender, ot::ChouOrlandiReceiver>(0, 0);
+        test_c1::<ot::ChouOrlandiSender, ot::ChouOrlandiReceiver>(1, 0);
+        test_c1::<ot::ChouOrlandiSender, ot::ChouOrlandiReceiver>(2, 0);
+        test_c1::<ot::ChouOrlandiSender, ot::ChouOrlandiReceiver>(0, 1);
+        test_c1::<ot::ChouOrlandiSender, ot::ChouOrlandiReceiver>(0, 2);
+        test_c1::<ot::ChouOrlandiSender, ot::ChouOrlandiReceiver>(1, 1);
+        test_c1::<ot::ChouOrlandiSender, ot::ChouOrlandiReceiver>(2, 1);
+        test_c1::<ot::ChouOrlandiSender, ot::ChouOrlandiReceiver>(1, 2);
+        test_c1::<ot::ChouOrlandiSender, ot::ChouOrlandiReceiver>(2, 2);
     }
 
-    fn relu<F, W>(b: &F, q: u128, n: usize)
+    fn relu<F, W>(b: &mut F, q: u128, n: usize)
     where
-        W: Clone + HasModulus + Send + Sync + std::fmt::Debug,
-        F: Fancy<Item = W> + Send + Sync,
+        W: Clone + HasModulus,
+        F: Fancy<Item = W>,
     {
         let mut zs = Vec::with_capacity(n);
         for _ in 0..n {
@@ -114,8 +108,8 @@ mod tests {
             .flatten()
             .collect::<Vec<u16>>();
         // Run dummy version.
-        let dummy = Dummy::new(&input.clone(), &[]);
-        relu(&dummy, q, n);
+        let mut dummy = Dummy::new(&input.clone(), &[]);
+        relu(&mut dummy, q, n);
         let target = dummy.get_output();
         // Run 2PC version.
         let (sender, receiver) = UnixStream::pair().unwrap();
@@ -123,19 +117,23 @@ mod tests {
             let rng = AesRng::new();
             let reader = BufReader::new(sender.try_clone().unwrap());
             let writer = BufWriter::new(sender);
-            let gb = Garbler::<Reader, Writer, AesRng, ChouOrlandiSender>::new(
+            let mut gb = Garbler::<Reader, Writer, AesRng, ot::ChouOrlandiSender>::new(
                 reader, writer, &input, rng,
             )
             .unwrap();
-            relu(&gb, q, n);
+            relu(&mut gb, q, n);
         });
         let rng = AesRng::new();
         let reader = BufReader::new(receiver.try_clone().unwrap());
         let writer = BufWriter::new(receiver);
-        let ev =
-            Evaluator::<Reader, Writer, AesRng, ChouOrlandiReceiver>::new(reader, writer, &[], rng)
-                .unwrap();
-        relu(&ev, q, n);
+        let mut ev = Evaluator::<Reader, Writer, AesRng, ot::ChouOrlandiReceiver>::new(
+            reader,
+            writer,
+            &[],
+            rng,
+        )
+        .unwrap();
+        relu(&mut ev, q, n);
         let result = ev.decode_output();
         assert_eq!(target, result);
     }
