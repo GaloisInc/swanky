@@ -4,7 +4,7 @@ use fancy_garbling::*;
 use itertools::Itertools;
 use rand::Rng;
 
-fn approx_relu<F, W>(b: &F, q: u128)
+fn approx_relu<F, W>(b: &mut F, q: u128)
 where
     F: Fancy<Item = W>,
     W: HasModulus + Clone,
@@ -27,8 +27,8 @@ fn main() {
         let nprimes = rng.gen_range(5, 9);
         let q = modulus_with_nprimes(nprimes);
         let x = rng.gen_u128() % q;
-        let d = Dummy::new(&crt_factor(x, q), &[]);
-        approx_relu(&d, q);
+        let mut d = Dummy::new(&crt_factor(x, q), &[]);
+        approx_relu(&mut d, q);
         let outs = d
             .get_output()
             .chunks(nprimes)

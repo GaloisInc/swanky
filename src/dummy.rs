@@ -5,13 +5,12 @@
 
 use crate::error::{DummyError, FancyError};
 use crate::fancy::{Fancy, HasModulus};
-use std::sync::{Arc, Mutex};
 
 /// Simple struct that performs the fancy computation over `u16`.
 pub struct Dummy {
-    outputs: Arc<Mutex<Vec<u16>>>,
-    garbler_inputs: Arc<Mutex<Vec<u16>>>,
-    evaluator_inputs: Arc<Mutex<Vec<u16>>>,
+    outputs: Vec<u16>,
+    garbler_inputs: Vec<u16>,
+    evaluator_inputs: Vec<u16>,
 }
 
 /// Wrapper around `u16`.
@@ -31,15 +30,15 @@ impl Dummy {
     /// Create a new Dummy.
     pub fn new(garbler_inputs: &[u16], evaluator_inputs: &[u16]) -> Dummy {
         Dummy {
-            garbler_inputs: Arc::new(Mutex::new(garbler_inputs.to_vec())),
-            evaluator_inputs: Arc::new(Mutex::new(evaluator_inputs.to_vec())),
-            outputs: Arc::new(Mutex::new(Vec::new())),
+            garbler_inputs: garbler_inputs.to_vec(),
+            evaluator_inputs: evaluator_inputs.to_vec(),
+            outputs: Vec::new(),
         }
     }
 
     /// Get the output from the fancy computation, consuming the Dummy.
     pub fn get_output(self) -> Vec<u16> {
-        Arc::try_unwrap(self.outputs).unwrap().into_inner().unwrap()
+        self.outputs
     }
 }
 
@@ -47,34 +46,32 @@ impl Fancy for Dummy {
     type Item = DummyVal;
     type Error = DummyError;
 
-    fn garbler_input(&self, modulus: u16, opt_x: Option<u16>) -> Result<DummyVal, Self::Error> {
+    fn garbler_input(&mut self, modulus: u16, opt_x: Option<u16>) -> Result<DummyVal, Self::Error> {
         let res = if let Some(val) = opt_x {
             DummyVal { val, modulus }
         } else {
-            let mut inps = self.garbler_inputs.lock().unwrap();
-            if inps.len() == 0 {
+            if self.garbler_inputs.len() == 0 {
                 return Err(DummyError::NotEnoughGarblerInputs);
             }
-            let val = inps.remove(0);
+            let val = self.garbler_inputs.remove(0);
             DummyVal { val, modulus }
         };
         Ok(res)
     }
 
-    fn evaluator_input(&self, modulus: u16) -> Result<DummyVal, Self::Error> {
-        let mut inps = self.evaluator_inputs.lock().unwrap();
-        if inps.len() == 0 {
+    fn evaluator_input(&mut self, modulus: u16) -> Result<DummyVal, Self::Error> {
+        if self.evaluator_inputs.len() == 0 {
             return Err(DummyError::NotEnoughEvaluatorInputs);
         }
-        let val = inps.remove(0);
+        let val = self.evaluator_inputs.remove(0);
         Ok(DummyVal { val, modulus })
     }
 
-    fn constant(&self, val: u16, modulus: u16) -> Result<DummyVal, Self::Error> {
+    fn constant(&mut self, val: u16, modulus: u16) -> Result<DummyVal, Self::Error> {
         Ok(DummyVal { val, modulus })
     }
 
-    fn add(&self, x: &DummyVal, y: &DummyVal) -> Result<DummyVal, Self::Error> {
+    fn add(&mut self, x: &DummyVal, y: &DummyVal) -> Result<DummyVal, Self::Error> {
         if x.modulus() != y.modulus() {
             return Err(Self::Error::from(FancyError::UnequalModuli));
         }
@@ -84,7 +81,7 @@ impl Fancy for Dummy {
         })
     }
 
-    fn sub(&self, x: &DummyVal, y: &DummyVal) -> Result<DummyVal, Self::Error> {
+    fn sub(&mut self, x: &DummyVal, y: &DummyVal) -> Result<DummyVal, Self::Error> {
         if x.modulus() != y.modulus() {
             return Err(Self::Error::from(FancyError::UnequalModuli));
         }
@@ -94,14 +91,14 @@ impl Fancy for Dummy {
         })
     }
 
-    fn cmul(&self, x: &DummyVal, c: u16) -> Result<DummyVal, Self::Error> {
+    fn cmul(&mut self, x: &DummyVal, c: u16) -> Result<DummyVal, Self::Error> {
         Ok(DummyVal {
             val: (x.val * c) % x.modulus,
             modulus: x.modulus,
         })
     }
 
-    fn mul(&self, x: &DummyVal, y: &DummyVal) -> Result<DummyVal, Self::Error> {
+    fn mul(&mut self, x: &DummyVal, y: &DummyVal) -> Result<DummyVal, Self::Error> {
         Ok(DummyVal {
             val: x.val * y.val % x.modulus,
             modulus: x.modulus,
@@ -109,7 +106,7 @@ impl Fancy for Dummy {
     }
 
     fn proj(
-        &self,
+        &mut self,
         x: &DummyVal,
         modulus: u16,
         tt: Option<Vec<u16>>,
@@ -122,8 +119,8 @@ impl Fancy for Dummy {
         Ok(DummyVal { val, modulus })
     }
 
-    fn output(&self, x: &DummyVal) -> Result<(), Self::Error> {
-        self.outputs.lock().unwrap().push(x.val);
+    fn output(&mut self, x: &DummyVal) -> Result<(), Self::Error> {
+        self.outputs.push(x.val);
         Ok(())
     }
 }
@@ -145,7 +142,7 @@ mod bundle {
             let q = rng.gen_usable_composite_modulus();
             let x = rng.gen_u128() % q;
             let y = rng.gen_u128() % q;
-            let d = Dummy::new(&crt_factor(x, q), &crt_factor(y, q));
+            let mut d = Dummy::new(&crt_factor(x, q), &crt_factor(y, q));
             {
                 let x = d.garbler_input_bundle_crt(q, None).unwrap();
                 let y = d.evaluator_input_bundle_crt(q).unwrap();
@@ -164,7 +161,7 @@ mod bundle {
             let q = rng.gen_usable_composite_modulus();
             let x = rng.gen_u128() % q;
             let y = rng.gen_u128() % q;
-            let d = Dummy::new(&crt_factor(x, q), &crt_factor(y, q));
+            let mut d = Dummy::new(&crt_factor(x, q), &crt_factor(y, q));
             {
                 let x = d.garbler_input_bundle_crt(q, None).unwrap();
                 let y = d.evaluator_input_bundle_crt(q).unwrap();
@@ -184,7 +181,7 @@ mod bundle {
             let q = 1 << nbits;
             let x = rng.gen_u128() % q;
             let c = 1 + rng.gen_u128() % q;
-            let d = Dummy::new(&util::u128_to_bits(x, nbits), &[]);
+            let mut d = Dummy::new(&util::u128_to_bits(x, nbits), &[]);
             {
                 let x = d.garbler_input_bundle(&vec![2; nbits], None).unwrap();
                 let z = d.binary_cmul(&x, c, nbits).unwrap();
@@ -203,7 +200,7 @@ mod bundle {
             let q = 1 << nbits;
             let x = rng.gen_u128() % q;
             let y = rng.gen_u128() % q;
-            let d = Dummy::new(&util::u128_to_bits(x, nbits), &util::u128_to_bits(y, nbits));
+            let mut d = Dummy::new(&util::u128_to_bits(x, nbits), &util::u128_to_bits(y, nbits));
             {
                 let x = d.garbler_input_bundle_binary(nbits, None).unwrap();
                 let y = d.evaluator_input_bundle_binary(nbits).unwrap();
@@ -227,7 +224,7 @@ mod bundle {
                 .into_iter()
                 .flat_map(|x| crt_factor(x, q))
                 .collect_vec();
-            let d = Dummy::new(&enc_inps, &[]);
+            let mut d = Dummy::new(&enc_inps, &[]);
             {
                 let xs = d.garbler_input_bundles_crt(q, n, None).unwrap();
                 let z = d.max(&xs, "100%").unwrap();
@@ -246,7 +243,7 @@ mod bundle {
         for _ in 0..NITERS {
             let x = rng.gen_u128() % q;
             let should_be = (!x + 1) % q;
-            let d = Dummy::new(&util::u128_to_bits(x, nbits), &[]);
+            let mut d = Dummy::new(&util::u128_to_bits(x, nbits), &[]);
             {
                 let x = d.garbler_input_bundle_binary(nbits, None).unwrap();
                 let y = d.twos_complement(&x).unwrap();
@@ -271,7 +268,7 @@ mod bundle {
                 .into_iter()
                 .flat_map(|&x| util::u128_to_bits(x, nbits))
                 .collect_vec();
-            let d = Dummy::new(&enc_inps, &[]);
+            let mut d = Dummy::new(&enc_inps, &[]);
             {
                 let x = d.garbler_input_bundle_binary(nbits, None).unwrap();
                 let y = d.garbler_input_bundle_binary(nbits, None).unwrap();
@@ -304,7 +301,7 @@ mod bundle {
                 .into_iter()
                 .flat_map(|&x| util::u128_to_bits(x, nbits))
                 .collect_vec();
-            let d = Dummy::new(&enc_inps, &[]);
+            let mut d = Dummy::new(&enc_inps, &[]);
             {
                 let x = d.garbler_input_bundle_binary(nbits, None).unwrap();
                 let y = d.garbler_input_bundle_binary(nbits, None).unwrap();
@@ -337,7 +334,7 @@ mod bundle {
                 .into_iter()
                 .flat_map(|&x| util::u128_to_bits(x, nbits))
                 .collect_vec();
-            let d = Dummy::new(&enc_inps, &[]);
+            let mut d = Dummy::new(&enc_inps, &[]);
             {
                 let x = d.garbler_input_bundle_binary(nbits, None).unwrap();
                 let y = d.garbler_input_bundle_binary(nbits, None).unwrap();
@@ -362,7 +359,7 @@ mod bundle {
                 .into_iter()
                 .flat_map(|x| util::u128_to_bits(x, nbits))
                 .collect_vec();
-            let d = Dummy::new(&enc_inps, &[]);
+            let mut d = Dummy::new(&enc_inps, &[]);
             {
                 let xs = d.garbler_input_bundles(&vec![2; nbits], n, None).unwrap();
                 let z = d.max(&xs, "100%").unwrap();
@@ -379,7 +376,7 @@ mod bundle {
         for _ in 0..NITERS {
             let q = crate::util::modulus_with_nprimes(4 + rng.gen_usize() % 7); // exact relu supports up to 11 primes
             let x = rng.gen_u128() % q;
-            let d = Dummy::new(&crt_factor(x, q), &[]);
+            let mut d = Dummy::new(&crt_factor(x, q), &[]);
             {
                 let x = d.garbler_input_bundle_crt(q, None).unwrap();
                 let z = d.relu(&x, "100%", None).unwrap();
@@ -401,7 +398,7 @@ mod bundle {
             let nbits = 64;
             let q = 1 << nbits;
             let x = rng.gen_u128() % q;
-            let d = Dummy::new(&util::u128_to_bits(x, nbits), &[]);
+            let mut d = Dummy::new(&util::u128_to_bits(x, nbits), &[]);
             {
                 let x = d.garbler_input_bundle_binary(nbits, None).unwrap();
                 let z = d.abs(&x).unwrap();
@@ -433,7 +430,7 @@ mod bundle {
                 ds.extend(util::as_mixed_radix(Q - 1, &mods).iter());
             }
 
-            let b = Dummy::new(&ds, &[]);
+            let mut b = Dummy::new(&ds, &[]);
             let xs = b.garbler_input_bundles(&mods, nargs, None).unwrap();
             let z = b.mixed_radix_addition_msb_only(&xs).unwrap();
             b.output(&z).unwrap();
@@ -454,7 +451,7 @@ mod bundle {
                     ds.extend(util::as_mixed_radix(x, &mods).iter());
                 }
 
-                let b = Dummy::new(&ds, &[]);
+                let mut b = Dummy::new(&ds, &[]);
                 let xs = b.garbler_input_bundles(&mods, nargs, None).unwrap();
                 let z = b.mixed_radix_addition_msb_only(&xs).unwrap();
                 b.output(&z).unwrap();

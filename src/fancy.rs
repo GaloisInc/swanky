@@ -3,13 +3,11 @@
 //! An implementer must be able to create inputs, constants, do modular arithmetic, and
 //! create projections.
 
+use crate::error::FancyError;
 use itertools::Itertools;
 
-use crate::error::FancyError;
-
-pub use crt::{Bundle, BundleGadgets};
-
 mod crt;
+pub use crt::{Bundle, BundleGadgets};
 
 /// An object that has some modulus. Basic object of `Fancy` computations.
 pub trait HasModulus {
@@ -32,58 +30,45 @@ pub trait Fancy {
     type Error: std::fmt::Debug + std::fmt::Display + std::convert::From<FancyError>;
 
     /// Create an input for the garbler with modulus `q` and optional garbler-private value `x`.
-    fn garbler_input(&self, q: u16, opt_x: Option<u16>) -> Result<Self::Item, Self::Error>;
+    fn garbler_input(&mut self, q: u16, opt_x: Option<u16>) -> Result<Self::Item, Self::Error>;
 
     /// Create an input for the evaluator with modulus `q`.
-    fn evaluator_input(&self, q: u16) -> Result<Self::Item, Self::Error>;
+    fn evaluator_input(&mut self, q: u16) -> Result<Self::Item, Self::Error>;
 
     /// Create a constant `x` with modulus `q`.
-    fn constant(&self, x: u16, q: u16) -> Result<Self::Item, Self::Error>;
+    fn constant(&mut self, x: u16, q: u16) -> Result<Self::Item, Self::Error>;
 
     /// Add `x` and `y`.
-    fn add(&self, x: &Self::Item, y: &Self::Item) -> Result<Self::Item, Self::Error>;
+    fn add(&mut self, x: &Self::Item, y: &Self::Item) -> Result<Self::Item, Self::Error>;
 
     /// Subtract `x` and `y`.
-    fn sub(&self, x: &Self::Item, y: &Self::Item) -> Result<Self::Item, Self::Error>;
+    fn sub(&mut self, x: &Self::Item, y: &Self::Item) -> Result<Self::Item, Self::Error>;
 
     /// Multiply `x` times the constant `c`.
-    fn cmul(&self, x: &Self::Item, c: u16) -> Result<Self::Item, Self::Error>;
+    fn cmul(&mut self, x: &Self::Item, c: u16) -> Result<Self::Item, Self::Error>;
 
     /// Multiply `x` and `y`.
-    fn mul(&self, x: &Self::Item, y: &Self::Item) -> Result<Self::Item, Self::Error>;
+    fn mul(&mut self, x: &Self::Item, y: &Self::Item) -> Result<Self::Item, Self::Error>;
 
     /// Project `x` according to the truth table `tt`. Resulting wire has modulus `q`.
     ///
     /// Optional `tt` is useful for hiding the gate from evaluator.
-    fn proj(&self, x: &Self::Item, q: u16, tt: Option<Vec<u16>>)
-        -> Result<Self::Item, Self::Error>;
+    fn proj(
+        &mut self,
+        x: &Self::Item,
+        q: u16,
+        tt: Option<Vec<u16>>,
+    ) -> Result<Self::Item, Self::Error>;
 
     /// Process this wire as output.
-    fn output(&self, x: &Self::Item) -> Result<(), Self::Error>;
-
-    ////////////////////////////////////////////////////////////////////////////////
-    // synchronization
-
-    /// Start synchronization of internal messages.
-    ///
-    /// Optional, throws `FancyError::NotImplemented` if used without an implementation.
-    // fn begin_sync(&self, _num_indices: SyncIndex) -> Result<(), Self::Error> {
-    //     Err(Self::Error::from(FancyError::NotImplemented))
-    // }
-
-    /// Declare this index to be done.
-    ///
-    /// Optional, throws `FancyError::NotImplemented` if used without an implementation.
-    // fn finish_index(&self, _ix: SyncIndex) -> Result<(), Self::Error> {
-    //     Err(Self::Error::from(FancyError::NotImplemented))
-    // }
+    fn output(&mut self, x: &Self::Item) -> Result<(), Self::Error>;
 
     ////////////////////////////////////////////////////////////////////////////////
     // Functions built on top of basic fancy operations.
 
     /// Create `n` garbler inputs with the moduli `qs` and optional inputs `xs`.
     fn garbler_inputs(
-        &self,
+        &mut self,
         qs: &[u16],
         opt_xs: Option<Vec<u16>>,
     ) -> Result<Vec<Self::Item>, Self::Error> {
@@ -95,12 +80,12 @@ pub trait Fancy {
     }
 
     /// Create `n` evaluator inputs with the moduli `qs`.
-    fn evaluator_inputs(&self, qs: &[u16]) -> Result<Vec<Self::Item>, Self::Error> {
+    fn evaluator_inputs(&mut self, qs: &[u16]) -> Result<Vec<Self::Item>, Self::Error> {
         qs.iter().map(|&q| self.evaluator_input(q)).collect()
     }
 
     /// Sum up a slice of wires.
-    fn add_many(&self, args: &[Self::Item]) -> Result<Self::Item, Self::Error> {
+    fn add_many(&mut self, args: &[Self::Item]) -> Result<Self::Item, Self::Error> {
         if args.len() < 2 {
             return Err(Self::Error::from(FancyError::InvalidArgNum {
                 got: args.len(),
@@ -115,7 +100,7 @@ pub trait Fancy {
     }
 
     /// Xor is just addition, with the requirement that `x` and `y` are mod 2.
-    fn xor(&self, x: &Self::Item, y: &Self::Item) -> Result<Self::Item, Self::Error> {
+    fn xor(&mut self, x: &Self::Item, y: &Self::Item) -> Result<Self::Item, Self::Error> {
         if x.modulus() != 2 {
             return Err(Self::Error::from(FancyError::InvalidArgMod {
                 got: x.modulus(),
@@ -132,7 +117,7 @@ pub trait Fancy {
     }
 
     /// Negate by xoring `x` with `1`.
-    fn negate(&self, x: &Self::Item) -> Result<Self::Item, Self::Error> {
+    fn negate(&mut self, x: &Self::Item) -> Result<Self::Item, Self::Error> {
         if x.modulus() != 2 {
             return Err(Self::Error::from(FancyError::InvalidArgMod {
                 got: x.modulus(),
@@ -144,7 +129,7 @@ pub trait Fancy {
     }
 
     /// And is just multiplication, with the requirement that `x` and `y` are mod 2.
-    fn and(&self, x: &Self::Item, y: &Self::Item) -> Result<Self::Item, Self::Error> {
+    fn and(&mut self, x: &Self::Item, y: &Self::Item) -> Result<Self::Item, Self::Error> {
         if x.modulus() != 2 {
             return Err(Self::Error::from(FancyError::InvalidArgMod {
                 got: x.modulus(),
@@ -161,7 +146,7 @@ pub trait Fancy {
     }
 
     /// Or uses Demorgan's Rule implemented with multiplication and negation.
-    fn or(&self, x: &Self::Item, y: &Self::Item) -> Result<Self::Item, Self::Error> {
+    fn or(&mut self, x: &Self::Item, y: &Self::Item) -> Result<Self::Item, Self::Error> {
         if x.modulus() != 2 {
             return Err(Self::Error::from(FancyError::InvalidArgMod {
                 got: x.modulus(),
@@ -181,7 +166,7 @@ pub trait Fancy {
     }
 
     /// Returns 1 if all wires equal 1.
-    fn and_many(&self, args: &[Self::Item]) -> Result<Self::Item, Self::Error> {
+    fn and_many(&mut self, args: &[Self::Item]) -> Result<Self::Item, Self::Error> {
         if args.len() < 2 {
             return Err(Self::Error::from(FancyError::InvalidArgNum {
                 got: args.len(),
@@ -194,7 +179,7 @@ pub trait Fancy {
     }
 
     /// Returns 1 if any wire equals 1.
-    fn or_many(&self, args: &[Self::Item]) -> Result<Self::Item, Self::Error> {
+    fn or_many(&mut self, args: &[Self::Item]) -> Result<Self::Item, Self::Error> {
         if args.len() < 2 {
             return Err(Self::Error::from(FancyError::InvalidArgNum {
                 got: args.len(),
@@ -207,7 +192,7 @@ pub trait Fancy {
     }
 
     /// Change the modulus of `x` to `to_modulus` using a projection gate.
-    fn mod_change(&self, x: &Self::Item, to_modulus: u16) -> Result<Self::Item, Self::Error> {
+    fn mod_change(&mut self, x: &Self::Item, to_modulus: u16) -> Result<Self::Item, Self::Error> {
         let from_modulus = x.modulus();
         if from_modulus == to_modulus {
             return Ok(x.clone());
@@ -218,7 +203,7 @@ pub trait Fancy {
 
     /// Binary adder. Returns the result and the carry.
     fn adder(
-        &self,
+        &mut self,
         x: &Self::Item,
         y: &Self::Item,
         carry_in: Option<&Self::Item>,
@@ -251,7 +236,7 @@ pub trait Fancy {
 
     /// If `b = 0` returns `x` else `y`.
     fn mux(
-        &self,
+        &mut self,
         b: &Self::Item,
         x: &Self::Item,
         y: &Self::Item,
@@ -264,7 +249,7 @@ pub trait Fancy {
 
     /// If `x = 0` returns the constant `b1` else return `b2`. Folds constants if possible.
     fn mux_constant_bits(
-        &self,
+        &mut self,
         x: &Self::Item,
         b1: bool,
         b2: bool,
@@ -287,7 +272,7 @@ pub trait Fancy {
     }
 
     /// Output a slice of wires.
-    fn outputs(&self, xs: &[Self::Item]) -> Result<(), Self::Error> {
+    fn outputs(&mut self, xs: &[Self::Item]) -> Result<(), Self::Error> {
         for x in xs.iter() {
             self.output(x)?;
         }

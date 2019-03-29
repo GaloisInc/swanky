@@ -1,14 +1,10 @@
 //! DSL for creating circuits compatible with fancy-garbling in the old-fashioned way,
 //! where you create a circuit for a computation then garble it.
 
-use serde::{Deserialize, Serialize};
-
-use std::collections::HashMap;
-use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::{Arc, Mutex};
-
 use crate::error::{CircuitBuilderError, DummyError, FancyError, InformerError};
 use crate::fancy::{Fancy, HasModulus};
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 /// The index and modulus of a gate in a circuit.
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
@@ -118,7 +114,7 @@ impl Circuit {
         }
     }
 
-    pub fn eval<F: Fancy>(&self, f: &F) -> Result<Vec<F::Item>, F::Error> {
+    pub fn eval<F: Fancy>(&mut self, f: &mut F) -> Result<Vec<F::Item>, F::Error> {
         let mut cache: Vec<Option<F::Item>> = vec![None; self.gates.len()];
         for (i, gate) in self.gates.iter().enumerate() {
             let q = self.modulus(i);
@@ -201,7 +197,11 @@ impl Circuit {
         Ok(outputs)
     }
 
-    pub fn process_outputs<F: Fancy>(&self, outputs: &[F::Item], f: &F) -> Result<(), F::Error> {
+    pub fn process_outputs<F: Fancy>(
+        &mut self,
+        outputs: &[F::Item],
+        f: &mut F,
+    ) -> Result<(), F::Error> {
         for r in outputs.iter() {
             f.output(r)?;
         }
@@ -210,21 +210,21 @@ impl Circuit {
 
     /// Evaluate the circuit in plaintext.
     pub fn eval_plain(
-        &self,
+        &mut self,
         garbler_inputs: &[u16],
         evaluator_inputs: &[u16],
     ) -> Result<Vec<u16>, DummyError> {
-        let dummy = crate::dummy::Dummy::new(garbler_inputs, evaluator_inputs);
-        let outputs = self.eval(&dummy)?;
-        self.process_outputs(&outputs, &dummy)?;
+        let mut dummy = crate::dummy::Dummy::new(garbler_inputs, evaluator_inputs);
+        let outputs = self.eval(&mut dummy)?;
+        self.process_outputs(&outputs, &mut dummy)?;
         Ok(dummy.get_output())
     }
 
     /// Print circuit info.
-    pub fn print_info(&self) -> Result<(), InformerError> {
-        let informer = crate::informer::Informer::new();
-        let outputs = self.eval(&informer)?;
-        self.process_outputs(&outputs, &informer)?;
+    pub fn print_info(&mut self) -> Result<(), InformerError> {
+        let mut informer = crate::informer::Informer::new();
+        let outputs = self.eval(&mut informer)?;
+        self.process_outputs(&outputs, &mut informer)?;
         informer.print_info();
         Ok(())
     }
@@ -258,50 +258,53 @@ impl Circuit {
 
 /// CircuitBuilder is used to build circuits.
 pub struct CircuitBuilder {
-    next_ref_ix: Arc<AtomicUsize>,
-    next_garbler_input_id: Arc<AtomicUsize>,
-    next_evaluator_input_id: Arc<AtomicUsize>,
-    const_map: Arc<Mutex<HashMap<(u16, u16), CircuitRef>>>,
-    circ: Arc<Mutex<Circuit>>,
+    next_ref_ix: usize,
+    next_garbler_input_id: usize,
+    next_evaluator_input_id: usize,
+    const_map: HashMap<(u16, u16), CircuitRef>,
+    circ: Circuit,
 }
 
 impl Fancy for CircuitBuilder {
     type Item = CircuitRef;
     type Error = CircuitBuilderError;
 
-    fn garbler_input(&self, modulus: u16, _opt_x: Option<u16>) -> Result<CircuitRef, Self::Error> {
+    fn garbler_input(
+        &mut self,
+        modulus: u16,
+        _opt_x: Option<u16>,
+    ) -> Result<CircuitRef, Self::Error> {
         let gate = Gate::GarblerInput {
             id: self.get_next_garbler_input_id(),
         };
         let r = self.gate(gate, modulus);
-        self.circ.lock().unwrap().garbler_input_refs.push(r);
+        self.circ.garbler_input_refs.push(r);
         Ok(r)
     }
 
-    fn evaluator_input(&self, modulus: u16) -> Result<CircuitRef, Self::Error> {
+    fn evaluator_input(&mut self, modulus: u16) -> Result<CircuitRef, Self::Error> {
         let gate = Gate::EvaluatorInput {
             id: self.get_next_evaluator_input_id(),
         };
         let r = self.gate(gate, modulus);
-        self.circ.lock().unwrap().evaluator_input_refs.push(r);
+        self.circ.evaluator_input_refs.push(r);
         Ok(r)
     }
 
-    fn constant(&self, val: u16, modulus: u16) -> Result<CircuitRef, Self::Error> {
-        let mut map = self.const_map.lock().unwrap();
-        match map.get(&(val, modulus)) {
+    fn constant(&mut self, val: u16, modulus: u16) -> Result<CircuitRef, Self::Error> {
+        match self.const_map.get(&(val, modulus)) {
             Some(&r) => Ok(r),
             None => {
                 let gate = Gate::Constant { val };
                 let r = self.gate(gate, modulus);
-                map.insert((val, modulus), r);
-                self.circ.lock().unwrap().const_refs.push(r);
+                self.const_map.insert((val, modulus), r);
+                self.circ.const_refs.push(r);
                 Ok(r)
             }
         }
     }
 
-    fn add(&self, xref: &CircuitRef, yref: &CircuitRef) -> Result<CircuitRef, Self::Error> {
+    fn add(&mut self, xref: &CircuitRef, yref: &CircuitRef) -> Result<CircuitRef, Self::Error> {
         if xref.modulus() != yref.modulus() {
             return Err(Self::Error::from(FancyError::UnequalModuli));
         }
@@ -313,7 +316,7 @@ impl Fancy for CircuitBuilder {
         Ok(self.gate(gate, xref.modulus()))
     }
 
-    fn sub(&self, xref: &CircuitRef, yref: &CircuitRef) -> Result<CircuitRef, Self::Error> {
+    fn sub(&mut self, xref: &CircuitRef, yref: &CircuitRef) -> Result<CircuitRef, Self::Error> {
         if xref.modulus() != yref.modulus() {
             return Err(Self::Error::from(FancyError::UnequalModuli));
         }
@@ -325,7 +328,7 @@ impl Fancy for CircuitBuilder {
         Ok(self.gate(gate, xref.modulus()))
     }
 
-    fn cmul(&self, xref: &CircuitRef, c: u16) -> Result<CircuitRef, Self::Error> {
+    fn cmul(&mut self, xref: &CircuitRef, c: u16) -> Result<CircuitRef, Self::Error> {
         Ok(self.gate(
             Gate::Cmul {
                 xref: *xref,
@@ -337,7 +340,7 @@ impl Fancy for CircuitBuilder {
     }
 
     fn proj(
-        &self,
+        &mut self,
         xref: &CircuitRef,
         output_modulus: u16,
         tt: Option<Vec<u16>>,
@@ -355,7 +358,7 @@ impl Fancy for CircuitBuilder {
         Ok(self.gate(gate, output_modulus))
     }
 
-    fn mul(&self, xref: &CircuitRef, yref: &CircuitRef) -> Result<CircuitRef, Self::Error> {
+    fn mul(&mut self, xref: &CircuitRef, yref: &CircuitRef) -> Result<CircuitRef, Self::Error> {
         if xref.modulus() < yref.modulus() {
             return self.mul(yref, xref);
         }
@@ -370,8 +373,8 @@ impl Fancy for CircuitBuilder {
         Ok(self.gate(gate, xref.modulus()))
     }
 
-    fn output(&self, xref: &CircuitRef) -> Result<(), Self::Error> {
-        self.circ.lock().unwrap().output_refs.push(xref.clone());
+    fn output(&mut self, xref: &CircuitRef) -> Result<(), Self::Error> {
+        self.circ.output_refs.push(xref.clone());
         Ok(())
     }
 }
@@ -379,41 +382,45 @@ impl Fancy for CircuitBuilder {
 impl CircuitBuilder {
     pub fn new() -> Self {
         CircuitBuilder {
-            next_ref_ix: Arc::new(AtomicUsize::new(0)),
-            next_garbler_input_id: Arc::new(AtomicUsize::new(0)),
-            next_evaluator_input_id: Arc::new(AtomicUsize::new(0)),
-            const_map: Arc::new(Mutex::new(HashMap::new())),
-            circ: Arc::new(Mutex::new(Circuit::new(None))),
+            next_ref_ix: 0,
+            next_garbler_input_id: 0,
+            next_evaluator_input_id: 0,
+            const_map: HashMap::new(),
+            circ: Circuit::new(None),
         }
     }
 
     pub fn finish(self) -> Circuit {
-        Arc::try_unwrap(self.circ).unwrap().into_inner().unwrap()
+        self.circ
     }
 
-    fn get_next_garbler_input_id(&self) -> usize {
-        self.next_garbler_input_id.fetch_add(1, Ordering::SeqCst)
+    fn get_next_garbler_input_id(&mut self) -> usize {
+        let current = self.next_garbler_input_id;
+        self.next_garbler_input_id += 1;
+        current
     }
 
-    fn get_next_evaluator_input_id(&self) -> usize {
-        self.next_evaluator_input_id.fetch_add(1, Ordering::SeqCst)
+    fn get_next_evaluator_input_id(&mut self) -> usize {
+        let current = self.next_evaluator_input_id;
+        self.next_evaluator_input_id += 1;
+        current
     }
 
-    fn get_next_ciphertext_id(&self) -> usize {
-        let mut c = self.circ.lock().unwrap();
-        let id = c.num_nonfree_gates;
-        c.num_nonfree_gates += 1;
-        id
+    fn get_next_ciphertext_id(&mut self) -> usize {
+        let current = self.circ.num_nonfree_gates;
+        self.circ.num_nonfree_gates += 1;
+        current
     }
 
-    fn get_next_ref_ix(&self) -> usize {
-        self.next_ref_ix.fetch_add(1, Ordering::SeqCst)
+    fn get_next_ref_ix(&mut self) -> usize {
+        let current = self.next_ref_ix;
+        self.next_ref_ix += 1;
+        current
     }
 
-    fn gate(&self, gate: Gate, modulus: u16) -> CircuitRef {
-        let mut c = self.circ.lock().unwrap();
-        c.gates.push(gate);
-        c.gate_moduli.push(modulus);
+    fn gate(&mut self, gate: Gate, modulus: u16) -> CircuitRef {
+        self.circ.gates.push(gate);
+        self.circ.gate_moduli.push(modulus);
         let ix = self.get_next_ref_ix();
         CircuitRef { ix, modulus }
     }
@@ -430,12 +437,12 @@ mod basic {
     fn and_gate_fan_n() {
         let mut rng = thread_rng();
 
-        let b = CircuitBuilder::new();
+        let mut b = CircuitBuilder::new();
         let n = 2 + (rng.gen_usize() % 200);
         let inps = b.evaluator_inputs(&vec![2; n]).unwrap();
         let z = b.and_many(&inps).unwrap();
         b.output(&z).unwrap();
-        let c = b.finish();
+        let mut c = b.finish();
 
         for _ in 0..16 {
             let mut inps: Vec<u16> = Vec::new();
@@ -454,12 +461,12 @@ mod basic {
     #[test] // {{{ or_gate_fan_n
     fn or_gate_fan_n() {
         let mut rng = thread_rng();
-        let b = CircuitBuilder::new();
+        let mut b = CircuitBuilder::new();
         let n = 2 + (rng.gen_usize() % 200);
         let inps = b.evaluator_inputs(&vec![2; n]).unwrap();
         let z = b.or_many(&inps).unwrap();
         b.output(&z).unwrap();
-        let c = b.finish();
+        let mut c = b.finish();
 
         for _ in 0..16 {
             let mut inps: Vec<u16> = Vec::new();
@@ -478,13 +485,13 @@ mod basic {
     #[test] // {{{ half_gate
     fn half_gate() {
         let mut rng = thread_rng();
-        let b = CircuitBuilder::new();
+        let mut b = CircuitBuilder::new();
         let q = rng.gen_prime();
         let x = b.garbler_input(q, None).unwrap();
         let y = b.evaluator_input(q).unwrap();
         let z = b.mul(&x, &y).unwrap();
         b.output(&z).unwrap();
-        let c = b.finish();
+        let mut c = b.finish();
         for _ in 0..16 {
             let x = rng.gen_u16() % q;
             let y = rng.gen_u16() % q;
@@ -496,14 +503,14 @@ mod basic {
     #[test] // mod_change {{{
     fn mod_change() {
         let mut rng = thread_rng();
-        let b = CircuitBuilder::new();
+        let mut b = CircuitBuilder::new();
         let p = rng.gen_prime();
         let q = rng.gen_prime();
         let x = b.garbler_input(p, None).unwrap();
         let y = b.mod_change(&x, q).unwrap();
         let z = b.mod_change(&y, p).unwrap();
         b.output(&z).unwrap();
-        let c = b.finish();
+        let mut c = b.finish();
         for _ in 0..16 {
             let x = rng.gen_u16() % p;
             let out = c.eval_plain(&[x], &[]).unwrap();
@@ -513,7 +520,7 @@ mod basic {
     //}}}
     #[test] // add_many_mod_change {{{
     fn add_many_mod_change() {
-        let b = CircuitBuilder::new();
+        let mut b = CircuitBuilder::new();
         let n = 113;
         let args = b.garbler_inputs(&vec![2; n], None).unwrap();
         let wires = args
@@ -522,7 +529,7 @@ mod basic {
             .collect_vec();
         let s = b.add_many(&wires).unwrap();
         b.output(&s).unwrap();
-        let c = b.finish();
+        let mut c = b.finish();
 
         let mut rng = thread_rng();
         for _ in 0..64 {
@@ -538,7 +545,7 @@ mod basic {
     // }}}
     #[test] // constants {{{
     fn constants() {
-        let b = CircuitBuilder::new();
+        let mut b = CircuitBuilder::new();
         let mut rng = thread_rng();
 
         let q = rng.gen_modulus();
@@ -549,7 +556,7 @@ mod basic {
         let z = b.add(&x, &y).unwrap();
         b.output(&z).unwrap();
 
-        let circ = b.finish();
+        let mut circ = b.finish();
 
         for _ in 0..64 {
             let x = rng.gen_u16() % q;
@@ -573,12 +580,12 @@ mod bundle {
         let mut rng = thread_rng();
         let q = rng.gen_usable_composite_modulus();
 
-        let b = CircuitBuilder::new();
+        let mut b = CircuitBuilder::new();
         let x = b.garbler_input_bundle_crt(q, None).unwrap();
         let y = b.evaluator_input_bundle_crt(q).unwrap();
         let z = b.add_bundles(&x, &y).unwrap();
         b.output_bundle(&z).unwrap();
-        let c = b.finish();
+        let mut c = b.finish();
 
         for _ in 0..16 {
             let x = rng.gen_u128() % q;
@@ -594,12 +601,12 @@ mod bundle {
         let mut rng = thread_rng();
         let q = rng.gen_usable_composite_modulus();
 
-        let b = CircuitBuilder::new();
+        let mut b = CircuitBuilder::new();
         let x = b.garbler_input_bundle_crt(q, None).unwrap();
         let y = b.evaluator_input_bundle_crt(q).unwrap();
         let z = b.sub_bundles(&x, &y).unwrap();
         b.output_bundle(&z).unwrap();
-        let c = b.finish();
+        let mut c = b.finish();
 
         for _ in 0..16 {
             let x = rng.gen_u128() % q;
@@ -615,12 +622,12 @@ mod bundle {
         let mut rng = thread_rng();
         let q = util::modulus_with_width(16);
 
-        let b = CircuitBuilder::new();
+        let mut b = CircuitBuilder::new();
         let x = b.garbler_input_bundle_crt(q, None).unwrap();
         let y = rng.gen_u128() % q;
         let z = b.cmul_bundle(&x, y).unwrap();
         b.output_bundle(&z).unwrap();
-        let c = b.finish();
+        let mut c = b.finish();
 
         for _ in 0..16 {
             let x = rng.gen_u128() % q;
@@ -635,12 +642,12 @@ mod bundle {
         let mut rng = thread_rng();
         let q = rng.gen_usable_composite_modulus();
 
-        let b = CircuitBuilder::new();
+        let mut b = CircuitBuilder::new();
         let x = b.garbler_input_bundle_crt(q, None).unwrap();
         let y = b.evaluator_input_bundle_crt(q).unwrap();
         let z = b.mul_bundles(&x, &y).unwrap();
         b.output_bundle(&z).unwrap();
-        let c = b.finish();
+        let mut c = b.finish();
 
         for _ in 0..16 {
             let x = rng.gen_u64() as u128 % q;
@@ -657,11 +664,11 @@ mod bundle {
         let q = util::modulus_with_width(10);
         let y = rng.gen_u16() % 10;
 
-        let b = CircuitBuilder::new();
+        let mut b = CircuitBuilder::new();
         let x = b.garbler_input_bundle_crt(q, None).unwrap();
         let z = b.cexp_bundle(&x, y).unwrap();
         b.output_bundle(&z).unwrap();
-        let c = b.finish();
+        let mut c = b.finish();
 
         for _ in 0..64 {
             let x = rng.gen_u16() as u128 % q;
@@ -679,11 +686,11 @@ mod bundle {
         let q = ps.iter().fold(1, |acc, &x| (x as u128) * acc);
         let p = ps[rng.gen_u16() as usize % ps.len()];
 
-        let b = CircuitBuilder::new();
+        let mut b = CircuitBuilder::new();
         let x = b.garbler_input_bundle_crt(q, None).unwrap();
         let z = b.rem_bundle(&x, p).unwrap();
         b.output_bundle(&z).unwrap();
-        let c = b.finish();
+        let mut c = b.finish();
 
         for _ in 0..64 {
             let x = rng.gen_u128() % q;
@@ -699,12 +706,12 @@ mod bundle {
         let mut rng = thread_rng();
         let q = rng.gen_usable_composite_modulus();
 
-        let b = CircuitBuilder::new();
+        let mut b = CircuitBuilder::new();
         let x = b.garbler_input_bundle_crt(q, None).unwrap();
         let y = b.evaluator_input_bundle_crt(q).unwrap();
         let z = b.eq_bundles(&x, &y).unwrap();
         b.output(&z).unwrap();
-        let c = b.finish();
+        let mut c = b.finish();
 
         // lets have at least one test where they are surely equal
         let x = rng.gen_u128() % q;
@@ -726,11 +733,11 @@ mod bundle {
         let nargs = 2 + rng.gen_usize() % 100;
         let mods = (0..7).map(|_| rng.gen_modulus()).collect_vec();
 
-        let b = CircuitBuilder::new();
+        let mut b = CircuitBuilder::new();
         let xs = b.evaluator_input_bundles(&mods, nargs).unwrap();
         let z = b.mixed_radix_addition(&xs).unwrap();
         b.output_bundle(&z).unwrap();
-        let circ = b.finish();
+        let mut circ = b.finish();
 
         let Q: u128 = mods.iter().map(|&q| q as u128).product();
 
@@ -765,11 +772,11 @@ mod bundle {
         let q = util::modulus_with_width(10);
         println!("q={}", q);
 
-        let b = CircuitBuilder::new();
+        let mut b = CircuitBuilder::new();
         let x = b.garbler_input_bundle_crt(q, None).unwrap();
         let z = b.relu(&x, "100%", None).unwrap();
         b.output_bundle(&z).unwrap();
-        let c = b.finish();
+        let mut c = b.finish();
 
         for _ in 0..128 {
             let pt = rng.gen_u128() % q;
@@ -786,11 +793,11 @@ mod bundle {
         let q = util::modulus_with_width(10);
         println!("q={}", q);
 
-        let b = CircuitBuilder::new();
+        let mut b = CircuitBuilder::new();
         let x = b.garbler_input_bundle_crt(q, None).unwrap();
         let z = b.sgn(&x, "100%", None).unwrap();
         b.output_bundle(&z).unwrap();
-        let c = b.finish();
+        let mut c = b.finish();
 
         for _ in 0..128 {
             let pt = rng.gen_u128() % q;
@@ -806,12 +813,12 @@ mod bundle {
         let mut rng = thread_rng();
         let q = util::modulus_with_width(10);
 
-        let b = CircuitBuilder::new();
+        let mut b = CircuitBuilder::new();
         let x = b.garbler_input_bundle_crt(q, None).unwrap();
         let y = b.evaluator_input_bundle_crt(q).unwrap();
         let z = b.lt(&x, &y, "100%").unwrap();
         b.output(&z).unwrap();
-        let c = b.finish();
+        let mut c = b.finish();
 
         // lets have at least one test where they are surely equal
         let x = rng.gen_u128() % q / 2;
@@ -833,11 +840,11 @@ mod bundle {
         let n = 10;
         println!("n={} q={}", n, q);
 
-        let b = CircuitBuilder::new();
+        let mut b = CircuitBuilder::new();
         let xs = b.garbler_input_bundles_crt(q, n, None).unwrap();
         let z = b.max(&xs, "100%").unwrap();
         b.output_bundle(&z).unwrap();
-        let c = b.finish();
+        let mut c = b.finish();
 
         for _ in 0..16 {
             let inps = (0..n).map(|_| rng.gen_u128() % (q / 2)).collect_vec();
@@ -862,13 +869,13 @@ mod bundle {
         let Q = util::product(&vec![q; n]);
         println!("n={} q={} Q={}", n, q, Q);
 
-        let b = CircuitBuilder::new();
+        let mut b = CircuitBuilder::new();
         let xs = b.garbler_input_bundle(&vec![q; n], None).unwrap();
         let ys = b.evaluator_input_bundle(&vec![q; n]).unwrap();
         let (zs, carry) = b.binary_addition(&xs, &ys).unwrap();
         b.output(&carry).unwrap();
         b.output_bundle(&zs).unwrap();
-        let c = b.finish();
+        let mut c = b.finish();
 
         for _ in 0..16 {
             let x = rng.gen_u128() % Q;

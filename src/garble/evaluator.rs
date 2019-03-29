@@ -7,19 +7,16 @@ use crate::wire::Wire;
 use scuttlebutt::Block;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::ops::DerefMut;
-use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::{Arc, Mutex};
 
 /// Streaming evaluator using a callback to receive ciphertexts as needed.
 ///
 /// Evaluates a garbled circuit on the fly, using messages containing ciphertexts and
 /// wires. Parallelizable.
 pub struct Evaluator {
-    callback: Arc<Mutex<FnMut(usize) -> Result<Vec<Block>, EvaluatorError> + Send>>,
-    current_gate: Arc<AtomicUsize>,
-    output_cts: Arc<Mutex<Vec<OutputCiphertext>>>,
-    output_wires: Arc<Mutex<Vec<Wire>>>,
+    callback: Box<FnMut(usize) -> Result<Vec<Block>, EvaluatorError> + Send>,
+    current_gate: usize,
+    output_cts: Vec<OutputCiphertext>,
+    output_wires: Vec<Wire>,
 }
 
 impl Evaluator {
@@ -32,42 +29,42 @@ impl Evaluator {
         F: FnMut(usize) -> Result<Vec<Block>, EvaluatorError> + Send + 'static,
     {
         Evaluator {
-            callback: Arc::new(Mutex::new(callback)),
-            current_gate: Arc::new(AtomicUsize::new(0)),
-            output_cts: Arc::new(Mutex::new(Vec::new())),
-            output_wires: Arc::new(Mutex::new(Vec::new())),
+            callback: Box::new(callback),
+            current_gate: 0,
+            output_cts: Vec::new(),
+            output_wires: Vec::new(),
         }
     }
 
     /// Decode the output received during the Fancy computation.
     pub fn decode_output(&self) -> Vec<u16> {
-        let cts = self.output_cts.lock().unwrap();
-        let outs = self.output_wires.lock().unwrap();
-        Decoder::new(cts.clone()).decode(&outs)
+        Decoder::new(self.output_cts.clone()).decode(&self.output_wires)
     }
 
     #[inline]
-    fn recv_wire(&self, q: u16) -> Result<Wire, EvaluatorError> {
-        let blocks = (self.callback.lock().unwrap().deref_mut())(1)?;
+    fn recv_wire(&mut self, q: u16) -> Result<Wire, EvaluatorError> {
+        let blocks = (self.callback)(1)?;
         Ok(Wire::from_block(blocks[0], q))
     }
 
     #[inline]
-    fn recv_gate(&self, ngates: usize) -> Result<GarbledGate, EvaluatorError> {
-        let blocks = (self.callback.lock().unwrap().deref_mut())(ngates)?;
+    fn recv_gate(&mut self, ngates: usize) -> Result<GarbledGate, EvaluatorError> {
+        let blocks = (self.callback)(ngates)?;
         Ok(blocks)
     }
 
     #[inline]
-    fn recv_outputs(&self, noutputs: usize) -> Result<OutputCiphertext, EvaluatorError> {
-        let blocks = (self.callback.lock().unwrap().deref_mut())(noutputs)?;
+    fn recv_outputs(&mut self, noutputs: usize) -> Result<OutputCiphertext, EvaluatorError> {
+        let blocks = (self.callback)(noutputs)?;
         Ok(blocks)
     }
 
     /// The current non-free gate index of the garbling computation.
     #[inline]
-    fn current_gate(&self) -> usize {
-        self.current_gate.fetch_add(1, Ordering::SeqCst)
+    fn current_gate(&mut self) -> usize {
+        let current = self.current_gate;
+        self.current_gate += 1;
+        current
     }
 }
 
@@ -76,37 +73,37 @@ impl Fancy for Evaluator {
     type Error = EvaluatorError;
 
     #[inline]
-    fn garbler_input(&self, q: u16, _: Option<u16>) -> Result<Wire, EvaluatorError> {
+    fn garbler_input(&mut self, q: u16, _: Option<u16>) -> Result<Wire, EvaluatorError> {
         self.recv_wire(q)
     }
     #[inline]
-    fn evaluator_input(&self, q: u16) -> Result<Wire, EvaluatorError> {
+    fn evaluator_input(&mut self, q: u16) -> Result<Wire, EvaluatorError> {
         self.recv_wire(q)
     }
     #[inline]
-    fn constant(&self, _: u16, q: u16) -> Result<Wire, EvaluatorError> {
+    fn constant(&mut self, _: u16, q: u16) -> Result<Wire, EvaluatorError> {
         self.recv_wire(q)
     }
     #[inline]
-    fn add(&self, x: &Wire, y: &Wire) -> Result<Wire, EvaluatorError> {
+    fn add(&mut self, x: &Wire, y: &Wire) -> Result<Wire, EvaluatorError> {
         if x.modulus() != y.modulus() {
             return Err(EvaluatorError::FancyError(FancyError::UnequalModuli));
         }
         Ok(x.plus(y))
     }
     #[inline]
-    fn sub(&self, x: &Wire, y: &Wire) -> Result<Wire, EvaluatorError> {
+    fn sub(&mut self, x: &Wire, y: &Wire) -> Result<Wire, EvaluatorError> {
         if x.modulus() != y.modulus() {
             return Err(EvaluatorError::FancyError(FancyError::UnequalModuli));
         }
         Ok(x.minus(y))
     }
     #[inline]
-    fn cmul(&self, x: &Wire, c: u16) -> Result<Wire, EvaluatorError> {
+    fn cmul(&mut self, x: &Wire, c: u16) -> Result<Wire, EvaluatorError> {
         Ok(x.cmul(c))
     }
     #[inline]
-    fn mul(&self, A: &Wire, B: &Wire) -> Result<Wire, EvaluatorError> {
+    fn mul(&mut self, A: &Wire, B: &Wire) -> Result<Wire, EvaluatorError> {
         if A.modulus() < A.modulus() {
             return self.mul(B, A);
         }
@@ -147,7 +144,7 @@ impl Fancy for Evaluator {
         Ok(res)
     }
     #[inline]
-    fn proj(&self, x: &Wire, q: u16, _tt: Option<Vec<u16>>) -> Result<Wire, EvaluatorError> {
+    fn proj(&mut self, x: &Wire, q: u16, _tt: Option<Vec<u16>>) -> Result<Wire, EvaluatorError> {
         let ngates = (x.modulus() - 1) as usize;
         let gate = self.recv_gate(ngates)?;
         let t = tweak(self.current_gate());
@@ -159,11 +156,11 @@ impl Fancy for Evaluator {
         }
     }
     #[inline]
-    fn output(&self, x: &Wire) -> Result<(), EvaluatorError> {
+    fn output(&mut self, x: &Wire) -> Result<(), EvaluatorError> {
         let noutputs = x.modulus() as usize;
         let cts = self.recv_outputs(noutputs)?;
-        self.output_cts.lock().unwrap().push(cts);
-        self.output_wires.lock().unwrap().push(x.clone());
+        self.output_cts.push(cts);
+        self.output_wires.push(x.clone());
         Ok(())
     }
 }
@@ -197,7 +194,7 @@ impl GarbledCircuit {
     /// Evaluate the garbled circuit.
     pub fn eval(
         &self,
-        c: &Circuit,
+        c: &mut Circuit,
         garbler_inputs: &[Wire],
         evaluator_inputs: &[Wire],
     ) -> Result<Vec<Wire>, EvaluatorError> {
@@ -216,8 +213,8 @@ impl GarbledCircuit {
             })
             .collect::<Vec<Vec<Block>>>()
             .into_iter();
-        let eval = Evaluator::new(move |_| Ok(msgs.next().unwrap()));
-        c.eval(&eval)
+        let mut eval = Evaluator::new(move |_| Ok(msgs.next().unwrap()));
+        c.eval(&mut eval)
     }
 }
 
@@ -337,8 +334,8 @@ mod tests {
     #[test]
     fn evaluator_has_send_and_sync() {
         fn check_send(_: impl Send) {}
-        fn check_sync(_: impl Sync) {}
+        // fn check_sync(_: impl Sync) {}
         check_send(Evaluator::new(|_| unimplemented!()));
-        check_sync(Evaluator::new(|_| unimplemented!()));
+        // check_sync(Evaluator::new(|_| unimplemented!()));
     }
 }

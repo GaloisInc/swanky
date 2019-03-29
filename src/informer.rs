@@ -1,8 +1,6 @@
 //! `Informer` runs a fancy computation and learns information from it.
 
 use std::collections::HashSet;
-use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::{Arc, Mutex};
 
 use crate::error::{FancyError, InformerError};
 use crate::fancy::{Fancy, HasModulus};
@@ -10,16 +8,16 @@ use crate::fancy::{Fancy, HasModulus};
 /// Implements `Fancy`. Used to learn information about a `Fancy` computation in
 /// a lightweight way.
 pub struct Informer {
-    garbler_input_moduli: Arc<Mutex<Vec<u16>>>,
-    evaluator_input_moduli: Arc<Mutex<Vec<u16>>>,
-    constants: Arc<Mutex<HashSet<(u16, u16)>>>,
-    outputs: Arc<Mutex<Vec<u16>>>,
-    nadds: Arc<AtomicUsize>,
-    nsubs: Arc<AtomicUsize>,
-    ncmuls: Arc<AtomicUsize>,
-    nmuls: Arc<AtomicUsize>,
-    nprojs: Arc<AtomicUsize>,
-    nciphertexts: Arc<AtomicUsize>,
+    garbler_input_moduli: Vec<u16>,
+    evaluator_input_moduli: Vec<u16>,
+    constants: HashSet<(u16, u16)>,
+    outputs: Vec<u16>,
+    nadds: usize,
+    nsubs: usize,
+    ncmuls: usize,
+    nmuls: usize,
+    nprojs: usize,
+    nciphertexts: usize,
     // TODO: we should also accumulate nice info about what are the various
     // moduli in the computation, and how many of such moduli are there. moduli:
     // Arc<Mutex<HashSet<(u16, usize)>>>,
@@ -37,16 +35,16 @@ impl HasModulus for InformerVal {
 impl Informer {
     pub fn new() -> Informer {
         Informer {
-            garbler_input_moduli: Arc::new(Mutex::new(Vec::new())),
-            evaluator_input_moduli: Arc::new(Mutex::new(Vec::new())),
-            constants: Arc::new(Mutex::new(HashSet::new())),
-            outputs: Arc::new(Mutex::new(Vec::new())),
-            nadds: Arc::new(AtomicUsize::new(0)),
-            nsubs: Arc::new(AtomicUsize::new(0)),
-            ncmuls: Arc::new(AtomicUsize::new(0)),
-            nmuls: Arc::new(AtomicUsize::new(0)),
-            nprojs: Arc::new(AtomicUsize::new(0)),
-            nciphertexts: Arc::new(AtomicUsize::new(0)),
+            garbler_input_moduli: Vec::new(),
+            evaluator_input_moduli: Vec::new(),
+            constants: HashSet::new(),
+            outputs: Vec::new(),
+            nadds: 0,
+            nsubs: 0,
+            ncmuls: 0,
+            nmuls: 0,
+            nprojs: 0,
+            nciphertexts: 0,
             // moduli: Arc::new(Mutex::new(HashSet::new())),
         }
     }
@@ -82,14 +80,9 @@ impl Informer {
         // The cost of IKNP is 256 bits for one random and one 128 bit string
         // dependent on the random one. This is for each input bit, so for
         // modulus `q` we need to do `log2(q)` OTs.
-        let comm = self
-            .evaluator_input_moduli
-            .lock()
-            .unwrap()
-            .iter()
-            .fold(0.0, |acc, q| {
-                acc + (*q as f64).log2().ceil() * 384.0 / 1024.0
-            });
+        let comm = self.evaluator_input_moduli.iter().fold(0.0, |acc, q| {
+            acc + (*q as f64).log2().ceil() * 384.0 / 1024.0
+        });
         println!(
             "  evaluator inputs:   {:16} // comms cost: {} Kb",
             self.num_evaluator_inputs(),
@@ -132,72 +125,67 @@ impl Informer {
 
     /// Number of garbler inputs in the fancy computation.
     pub fn num_garbler_inputs(&self) -> usize {
-        self.garbler_input_moduli.lock().unwrap().len()
+        self.garbler_input_moduli.len()
     }
 
     /// Moduli of garbler inputs in the fancy computation.
     pub fn garbler_input_moduli(&self) -> Vec<u16> {
-        self.garbler_input_moduli.lock().unwrap().clone()
+        self.garbler_input_moduli.clone()
     }
 
     /// Number of evaluator inputs in the fancy computation.
     pub fn num_evaluator_inputs(&self) -> usize {
-        self.evaluator_input_moduli.lock().unwrap().len()
+        self.evaluator_input_moduli.len()
     }
 
     /// Moduli of evaluator inputs in the fancy computation.
     pub fn evaluator_input_moduli(&self) -> Vec<u16> {
-        self.evaluator_input_moduli.lock().unwrap().clone()
+        self.evaluator_input_moduli.clone()
     }
 
     /// Number of constants in the fancy computation.
     pub fn num_consts(&self) -> usize {
-        self.constants.lock().unwrap().len()
+        self.constants.len()
     }
 
     /// Number of outputs in the fancy computation.
     pub fn num_outputs(&self) -> usize {
-        self.outputs.lock().unwrap().len()
+        self.outputs.len()
     }
 
     /// Number of output ciphertexts.
     pub fn num_output_ciphertexts(&self) -> usize {
-        self.outputs
-            .lock()
-            .unwrap()
-            .iter()
-            .map(|&m| m as usize)
-            .sum()
+        self.outputs.iter().map(|&m| m as usize).sum()
     }
 
     /// Number of additions in the fancy computation.
     pub fn num_adds(&self) -> usize {
-        self.nadds.load(Ordering::SeqCst)
+        self.nadds
     }
 
     /// Number of subtractions in the fancy computation.
     pub fn num_subs(&self) -> usize {
-        self.nsubs.load(Ordering::SeqCst)
+        self.nsubs
     }
 
     /// Number of scalar multiplications in the fancy computation.
     pub fn num_cmuls(&self) -> usize {
-        self.ncmuls.load(Ordering::SeqCst)
+        self.ncmuls
     }
 
     /// Number of multiplications in the fancy computation.
     pub fn num_muls(&self) -> usize {
-        self.nmuls.load(Ordering::SeqCst)
+        self.nmuls
     }
 
     /// Number of projections in the fancy computation.
     pub fn num_projs(&self) -> usize {
-        self.nprojs.load(Ordering::SeqCst)
+        self.nprojs
     }
 
     /// Number of ciphertexts in the fancy computation.
     pub fn num_ciphertexts(&self) -> usize {
-        self.nciphertexts.load(Ordering::SeqCst)
+        self.nciphertexts
     }
 }
 
@@ -205,72 +193,72 @@ impl Fancy for Informer {
     type Item = InformerVal;
     type Error = InformerError;
 
-    fn garbler_input(&self, modulus: u16, _: Option<u16>) -> Result<InformerVal, InformerError> {
-        self.garbler_input_moduli.lock().unwrap().push(modulus);
+    fn garbler_input(
+        &mut self,
+        modulus: u16,
+        _: Option<u16>,
+    ) -> Result<InformerVal, InformerError> {
+        self.garbler_input_moduli.push(modulus);
         Ok(InformerVal(modulus))
     }
 
-    fn evaluator_input(&self, modulus: u16) -> Result<InformerVal, InformerError> {
-        self.evaluator_input_moduli.lock().unwrap().push(modulus);
+    fn evaluator_input(&mut self, modulus: u16) -> Result<InformerVal, InformerError> {
+        self.evaluator_input_moduli.push(modulus);
         Ok(InformerVal(modulus))
     }
 
-    fn constant(&self, val: u16, modulus: u16) -> Result<InformerVal, InformerError> {
-        self.constants.lock().unwrap().insert((val, modulus));
+    fn constant(&mut self, val: u16, modulus: u16) -> Result<InformerVal, InformerError> {
+        self.constants.insert((val, modulus));
         Ok(InformerVal(modulus))
     }
 
-    fn add(&self, x: &InformerVal, y: &InformerVal) -> Result<InformerVal, InformerError> {
+    fn add(&mut self, x: &InformerVal, y: &InformerVal) -> Result<InformerVal, InformerError> {
         if x.modulus() != y.modulus() {
             Err(FancyError::UnequalModuli)?;
         }
-        self.nadds.fetch_add(1, Ordering::SeqCst);
+        self.nadds += 1;
         Ok(InformerVal(x.modulus()))
     }
 
-    fn sub(&self, x: &InformerVal, y: &InformerVal) -> Result<InformerVal, InformerError> {
+    fn sub(&mut self, x: &InformerVal, y: &InformerVal) -> Result<InformerVal, InformerError> {
         if x.modulus() != y.modulus() {
             Err(FancyError::UnequalModuli)?;
         }
-        self.nsubs.fetch_add(1, Ordering::SeqCst);
+        self.nsubs += 1;
         Ok(InformerVal(x.modulus()))
     }
 
-    fn cmul(&self, x: &InformerVal, _c: u16) -> Result<InformerVal, InformerError> {
-        self.ncmuls.fetch_add(1, Ordering::SeqCst);
+    fn cmul(&mut self, x: &InformerVal, _c: u16) -> Result<InformerVal, InformerError> {
+        self.ncmuls += 1;
         Ok(InformerVal(x.modulus()))
     }
 
-    fn mul(&self, x: &InformerVal, y: &InformerVal) -> Result<InformerVal, InformerError> {
+    fn mul(&mut self, x: &InformerVal, y: &InformerVal) -> Result<InformerVal, InformerError> {
         if x.modulus() < y.modulus() {
             return self.mul(y, x);
         }
-        self.nmuls.fetch_add(1, Ordering::SeqCst);
-        self.nciphertexts.fetch_add(
-            x.modulus() as usize + y.modulus() as usize - 2,
-            Ordering::SeqCst,
-        );
+        self.nmuls += 1;
+        self.nciphertexts += x.modulus() as usize + y.modulus() as usize - 2;
         if x.modulus() != y.modulus() {
             // there is an extra ciphertext to support nonequal inputs
-            self.nciphertexts.fetch_add(1, Ordering::SeqCst);
+            self.nciphertexts += 1;
         }
         Ok(InformerVal(x.modulus()))
     }
 
     fn proj(
-        &self,
+        &mut self,
         x: &InformerVal,
         modulus: u16,
         _: Option<Vec<u16>>,
     ) -> Result<InformerVal, InformerError> {
-        self.nprojs.fetch_add(1, Ordering::SeqCst);
-        self.nciphertexts
-            .fetch_add(x.modulus() as usize - 1, Ordering::SeqCst);
+        self.nprojs += 1;
+        self.nciphertexts += x.modulus() as usize - 1;
         Ok(InformerVal(modulus))
     }
 
-    fn output(&self, x: &InformerVal) -> Result<(), InformerError> {
-        self.outputs.lock().unwrap().push(x.modulus());
+    fn output(&mut self, x: &InformerVal) -> Result<(), InformerError> {
+        self.outputs.push(x.modulus());
         Ok(())
     }
 }

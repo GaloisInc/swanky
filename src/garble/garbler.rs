@@ -6,18 +6,15 @@ use crate::wire::Wire;
 use rand::{CryptoRng, RngCore};
 use scuttlebutt::Block;
 use std::collections::HashMap;
-use std::ops::DerefMut;
-use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::{Arc, Mutex};
 
 /// Streams garbled circuit ciphertexts through a callback. Parallelizable.
 pub struct Garbler<R: CryptoRng + RngCore> {
-    callback: Arc<Mutex<FnMut(Message) + Send>>,
+    callback: Box<FnMut(Message) + Send>,
     // Hash map containing modulus -> associated delta wire-label.
-    deltas: Arc<Mutex<HashMap<u16, Wire>>>,
-    current_output: Arc<AtomicUsize>,
-    current_gate: Arc<AtomicUsize>,
-    rng: Arc<Mutex<R>>,
+    deltas: HashMap<u16, Wire>,
+    current_output: usize,
+    current_gate: usize,
+    rng: R,
 }
 
 impl<R: CryptoRng + RngCore> Garbler<R> {
@@ -26,52 +23,55 @@ impl<R: CryptoRng + RngCore> Garbler<R> {
     /// `callback` is a function that enables streaming. It gets called as the
     /// garbler generates ciphertext information such as garbled gates or input
     /// wire-labels.
-    pub fn new<F>(callback: F, rng: Arc<Mutex<R>>) -> Self
+    pub fn new<F>(callback: F, rng: R) -> Self
     where
         F: FnMut(Message) + Send + 'static, // XXX: add -> Result<(), Error>
     {
         Garbler {
-            callback: Arc::new(Mutex::new(callback)),
-            deltas: Arc::new(Mutex::new(HashMap::new())),
-            current_gate: Arc::new(AtomicUsize::new(0)),
-            current_output: Arc::new(AtomicUsize::new(0)),
+            callback: Box::new(callback),
+            deltas: HashMap::new(),
+            current_gate: 0,
+            current_output: 0,
             rng,
         }
     }
 
     /// Output some information from the garbling.
     #[inline]
-    fn send(&self, m: Message) {
-        (self.callback.lock().unwrap().deref_mut())(m);
+    fn send(&mut self, m: Message) {
+        (self.callback)(m);
     }
 
     /// The current non-free gate index of the garbling computation
     #[inline]
-    fn current_gate(&self) -> usize {
-        self.current_gate.fetch_add(1, Ordering::SeqCst)
+    fn current_gate(&mut self) -> usize {
+        let current = self.current_gate;
+        self.current_gate += 1;
+        current
     }
 
     /// Create a delta if it has not been created yet for this modulus, otherwise just
     /// return the existing one.
     #[inline]
-    pub fn delta(&self, q: u16) -> Wire {
-        let mut deltas = self.deltas.lock().unwrap();
-        if let Some(delta) = deltas.get(&q) {
+    pub fn delta(&mut self, q: u16) -> Wire {
+        if let Some(delta) = self.deltas.get(&q) {
             return delta.clone();
         }
-        let w = Wire::rand_delta(&mut *self.rng.lock().unwrap(), q);
-        deltas.insert(q, w.clone());
+        let w = Wire::rand_delta(&mut self.rng, q);
+        self.deltas.insert(q, w.clone());
         w
     }
 
     /// The current output index of the garbling computation.
-    fn current_output(&self) -> usize {
-        self.current_output.fetch_add(1, Ordering::SeqCst)
+    fn current_output(&mut self) -> usize {
+        let current = self.current_output;
+        self.current_output += 1;
+        current
     }
 
     /// Get the deltas, consuming the Garbler.
     pub(super) fn get_deltas(self) -> HashMap<u16, Wire> {
-        Arc::try_unwrap(self.deltas).unwrap().into_inner().unwrap()
+        self.deltas
     }
 }
 
@@ -80,8 +80,8 @@ impl<R: CryptoRng + RngCore> Fancy for Garbler<R> {
     type Error = GarblerError;
 
     #[inline]
-    fn garbler_input(&self, q: u16, opt_x: Option<u16>) -> Result<Wire, GarblerError> {
-        let w = Wire::rand(&mut *self.rng.lock().unwrap(), q);
+    fn garbler_input(&mut self, q: u16, opt_x: Option<u16>) -> Result<Wire, GarblerError> {
+        let w = Wire::rand(&mut self.rng, q);
         let d = self.delta(q);
         if let Some(x) = opt_x {
             let encoded_wire = w.plus(&d.cmul(x));
@@ -95,8 +95,8 @@ impl<R: CryptoRng + RngCore> Fancy for Garbler<R> {
         Ok(w)
     }
     #[inline]
-    fn evaluator_input(&self, q: u16) -> Result<Wire, GarblerError> {
-        let w = Wire::rand(&mut *self.rng.lock().unwrap(), q);
+    fn evaluator_input(&mut self, q: u16) -> Result<Wire, GarblerError> {
+        let w = Wire::rand(&mut self.rng, q);
         let d = self.delta(q);
         self.send(Message::UnencodedEvaluatorInput {
             zero: w.clone(),
@@ -105,32 +105,32 @@ impl<R: CryptoRng + RngCore> Fancy for Garbler<R> {
         Ok(w)
     }
     #[inline]
-    fn constant(&self, x: u16, q: u16) -> Result<Wire, GarblerError> {
-        let zero = Wire::rand(&mut *self.rng.lock().unwrap(), q);
+    fn constant(&mut self, x: u16, q: u16) -> Result<Wire, GarblerError> {
+        let zero = Wire::rand(&mut self.rng, q);
         let wire = zero.plus(&self.delta(q).cmul_eq(x));
         self.send(Message::Constant { value: x, wire });
         Ok(zero)
     }
     #[inline]
-    fn add(&self, x: &Wire, y: &Wire) -> Result<Wire, GarblerError> {
+    fn add(&mut self, x: &Wire, y: &Wire) -> Result<Wire, GarblerError> {
         if x.modulus() != y.modulus() {
             return Err(GarblerError::FancyError(FancyError::UnequalModuli));
         }
         Ok(x.plus(y))
     }
     #[inline]
-    fn sub(&self, x: &Wire, y: &Wire) -> Result<Wire, GarblerError> {
+    fn sub(&mut self, x: &Wire, y: &Wire) -> Result<Wire, GarblerError> {
         if x.modulus() != y.modulus() {
             return Err(GarblerError::FancyError(FancyError::UnequalModuli));
         }
         Ok(x.minus(y))
     }
     #[inline]
-    fn cmul(&self, x: &Wire, c: u16) -> Result<Wire, GarblerError> {
+    fn cmul(&mut self, x: &Wire, c: u16) -> Result<Wire, GarblerError> {
         Ok(x.cmul(c))
     }
     #[inline]
-    fn mul(&self, A: &Wire, B: &Wire) -> Result<Wire, GarblerError> {
+    fn mul(&mut self, A: &Wire, B: &Wire) -> Result<Wire, GarblerError> {
         if A.modulus() < A.modulus() {
             return self.mul(B, A);
         }
@@ -152,7 +152,7 @@ impl<R: CryptoRng + RngCore> Fancy for Garbler<R> {
                 return Err(GarblerError::AsymmetricHalfGateModuliMax8(qb))?;
             }
 
-            r = self.rng.lock().unwrap().gen_u16() % q;
+            r = self.rng.gen_u16() % q;
             let t = tweak2(gate_num as u64, 1);
 
             let mut minitable = vec![None; qb as usize];
@@ -251,7 +251,7 @@ impl<R: CryptoRng + RngCore> Fancy for Garbler<R> {
         Ok(X.plus_mov(&Y))
     }
     #[inline]
-    fn proj(&self, A: &Wire, q_out: u16, tt: Option<Vec<u16>>) -> Result<Wire, GarblerError> {
+    fn proj(&mut self, A: &Wire, q_out: u16, tt: Option<Vec<u16>>) -> Result<Wire, GarblerError> {
         //
         let tt = tt.ok_or(GarblerError::TruthTableRequired)?;
 
@@ -308,7 +308,7 @@ impl<R: CryptoRng + RngCore> Fancy for Garbler<R> {
         Ok(C)
     }
     #[inline]
-    fn output(&self, X: &Wire) -> Result<(), GarblerError> {
+    fn output(&mut self, X: &Wire) -> Result<(), GarblerError> {
         let mut cts = Vec::new();
         let q = X.modulus();
         let i = self.current_output();
@@ -332,8 +332,8 @@ mod tests {
     #[test]
     fn garbler_has_send_and_sync() {
         fn check_send(_: impl Send) {}
-        fn check_sync(_: impl Sync) {}
-        check_send(Garbler::new(|_| (), Arc::new(Mutex::new(AesRng::new()))));
-        check_sync(Garbler::new(|_| (), Arc::new(Mutex::new(AesRng::new()))));
+        // fn check_sync(_: impl Sync) {}
+        check_send(Garbler::new(|_| (), AesRng::new()));
+        // check_sync(Garbler::new(|_| (), AesRng::new()));
     }
 }

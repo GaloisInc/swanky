@@ -68,7 +68,7 @@ pub trait BundleGadgets: Fancy {
 
     /// Crate an input bundle for the garbler using moduli `ps` and optional inputs `xs`.
     fn garbler_input_bundle(
-        &self,
+        &mut self,
         ps: &[u16],
         opt_xs: Option<Vec<u16>>,
     ) -> Result<Bundle<Self::Item>, Self::Error> {
@@ -81,7 +81,7 @@ pub trait BundleGadgets: Fancy {
     }
 
     /// Crate an input bundle for the evaluator using moduli `ps`.
-    fn evaluator_input_bundle(&self, ps: &[u16]) -> Result<Bundle<Self::Item>, Self::Error> {
+    fn evaluator_input_bundle(&mut self, ps: &[u16]) -> Result<Bundle<Self::Item>, Self::Error> {
         ps.iter()
             .map(|&p| self.evaluator_input(p))
             .collect::<Result<Vec<Self::Item>, Self::Error>>()
@@ -91,7 +91,7 @@ pub trait BundleGadgets: Fancy {
     /// Crate an input bundle for the garbler using composite CRT modulus `q` and optional
     /// input `x`.
     fn garbler_input_bundle_crt(
-        &self,
+        &mut self,
         q: u128,
         opt_x: Option<u128>,
     ) -> Result<Bundle<Self::Item>, Self::Error> {
@@ -99,13 +99,13 @@ pub trait BundleGadgets: Fancy {
     }
 
     /// Crate an input bundle for the evaluator using composite CRT modulus `q`.
-    fn evaluator_input_bundle_crt(&self, q: u128) -> Result<Bundle<Self::Item>, Self::Error> {
+    fn evaluator_input_bundle_crt(&mut self, q: u128) -> Result<Bundle<Self::Item>, Self::Error> {
         self.evaluator_input_bundle(&util::factor(q))
     }
 
     /// Create an input bundle for the garbler using `nbits` base 2 inputs and optional input `x`.
     fn garbler_input_bundle_binary(
-        &self,
+        &mut self,
         nbits: usize,
         opt_x: Option<u128>,
     ) -> Result<Bundle<Self::Item>, Self::Error> {
@@ -113,12 +113,19 @@ pub trait BundleGadgets: Fancy {
     }
 
     /// Create an input bundle for the evaluator using n base 2 inputs.
-    fn evaluator_input_bundle_binary(&self, n: usize) -> Result<Bundle<Self::Item>, Self::Error> {
+    fn evaluator_input_bundle_binary(
+        &mut self,
+        n: usize,
+    ) -> Result<Bundle<Self::Item>, Self::Error> {
         self.evaluator_input_bundle(&vec![2; n])
     }
 
     /// Creates a bundle of constant wires using moduli `ps`.
-    fn constant_bundle(&self, xs: &[u16], ps: &[u16]) -> Result<Bundle<Self::Item>, Self::Error> {
+    fn constant_bundle(
+        &mut self,
+        xs: &[u16],
+        ps: &[u16],
+    ) -> Result<Bundle<Self::Item>, Self::Error> {
         xs.iter()
             .zip(ps.iter())
             .map(|(&x, &p)| self.constant(x, p))
@@ -128,7 +135,7 @@ pub trait BundleGadgets: Fancy {
 
     /// Creates a bundle of constant wires for the CRT representation of `x` under
     /// composite modulus `q`.
-    fn constant_bundle_crt(&self, x: u128, q: u128) -> Result<Bundle<Self::Item>, Self::Error> {
+    fn constant_bundle_crt(&mut self, x: u128, q: u128) -> Result<Bundle<Self::Item>, Self::Error> {
         let ps = util::factor(q);
         let xs = ps.iter().map(|&p| (x % p as u128) as u16).collect_vec();
         self.constant_bundle(&xs, &ps)
@@ -136,7 +143,7 @@ pub trait BundleGadgets: Fancy {
 
     /// Create a constant bundle using base 2 inputs.
     fn constant_bundle_binary(
-        &self,
+        &mut self,
         val: u128,
         nbits: usize,
     ) -> Result<Bundle<Self::Item>, Self::Error> {
@@ -145,7 +152,7 @@ pub trait BundleGadgets: Fancy {
 
     /// Create `n` garbler input bundles, using moduli `ps` and optional inputs `xs`.
     fn garbler_input_bundles(
-        &self,
+        &mut self,
         ps: &[u16],
         n: usize,
         opt_xs: Option<Vec<Vec<u16>>>,
@@ -169,7 +176,7 @@ pub trait BundleGadgets: Fancy {
 
     /// Create `n` evaluator input bundles, using moduli `ps`.
     fn evaluator_input_bundles(
-        &self,
+        &mut self,
         ps: &[u16],
         n: usize,
     ) -> Result<Vec<Bundle<Self::Item>>, Self::Error> {
@@ -179,7 +186,7 @@ pub trait BundleGadgets: Fancy {
     /// Create `n` garbler input bundles, under composite CRT modulus `q` and optional
     /// inputs `xs`.
     fn garbler_input_bundles_crt(
-        &self,
+        &mut self,
         q: u128,
         n: usize,
         opt_xs: Option<Vec<u128>>,
@@ -203,7 +210,7 @@ pub trait BundleGadgets: Fancy {
 
     /// Create `n` evaluator input bundles, under composite CRT modulus `q`.
     fn evaluator_input_bundles_crt(
-        &self,
+        &mut self,
         q: u128,
         n: usize,
     ) -> Result<Vec<Bundle<Self::Item>>, Self::Error> {
@@ -211,7 +218,7 @@ pub trait BundleGadgets: Fancy {
     }
 
     /// Output the wires that make up a bundle.
-    fn output_bundle(&self, x: &Bundle<Self::Item>) -> Result<(), Self::Error> {
+    fn output_bundle(&mut self, x: &Bundle<Self::Item>) -> Result<(), Self::Error> {
         for w in x.wires() {
             self.output(w)?;
         }
@@ -219,7 +226,7 @@ pub trait BundleGadgets: Fancy {
     }
 
     /// Output a slice of bundles.
-    fn output_bundles(&self, xs: &[Bundle<Self::Item>]) -> Result<(), Self::Error> {
+    fn output_bundles(&mut self, xs: &[Bundle<Self::Item>]) -> Result<(), Self::Error> {
         for x in xs.iter() {
             self.output_bundle(x)?;
         }
@@ -231,7 +238,7 @@ pub trait BundleGadgets: Fancy {
 
     /// Add two wire bundles, residue by residue.
     fn add_bundles(
-        &self,
+        &mut self,
         x: &Bundle<Self::Item>,
         y: &Bundle<Self::Item>,
     ) -> Result<Bundle<Self::Item>, Self::Error> {
@@ -251,7 +258,7 @@ pub trait BundleGadgets: Fancy {
 
     /// Subtract two wire bundles, residue by residue.
     fn sub_bundles(
-        &self,
+        &mut self,
         x: &Bundle<Self::Item>,
         y: &Bundle<Self::Item>,
     ) -> Result<Bundle<Self::Item>, Self::Error> {
@@ -271,7 +278,7 @@ pub trait BundleGadgets: Fancy {
 
     /// Multiplies each wire in `x` by the corresponding residue of `c`.
     fn cmul_bundle(
-        &self,
+        &mut self,
         x: &Bundle<Self::Item>,
         c: u128,
     ) -> Result<Bundle<Self::Item>, Self::Error> {
@@ -286,7 +293,7 @@ pub trait BundleGadgets: Fancy {
 
     /// Multiply `x` with `y`.
     fn mul_bundles(
-        &self,
+        &mut self,
         x: &Bundle<Self::Item>,
         y: &Bundle<Self::Item>,
     ) -> Result<Bundle<Self::Item>, Self::Error> {
@@ -300,7 +307,7 @@ pub trait BundleGadgets: Fancy {
 
     /// Exponentiate `x` by the constant `c`.
     fn cexp_bundle(
-        &self,
+        &mut self,
         x: &Bundle<Self::Item>,
         c: u16,
     ) -> Result<Bundle<Self::Item>, Self::Error> {
@@ -319,7 +326,7 @@ pub trait BundleGadgets: Fancy {
 
     /// Compute the remainder with respect to modulus `p`.
     fn rem_bundle(
-        &self,
+        &mut self,
         x: &Bundle<Self::Item>,
         p: u16,
     ) -> Result<Bundle<Self::Item>, Self::Error> {
@@ -340,7 +347,7 @@ pub trait BundleGadgets: Fancy {
 
     /// Compute `x == y`. Returns a wire encoding the result mod 2.
     fn eq_bundles(
-        &self,
+        &mut self,
         x: &Bundle<Self::Item>,
         y: &Bundle<Self::Item>,
     ) -> Result<Self::Item, Self::Error> {
@@ -370,7 +377,7 @@ pub trait BundleGadgets: Fancy {
 
     /// Mixed radix addition.
     fn mixed_radix_addition(
-        &self,
+        &mut self,
         xs: &[Bundle<Self::Item>],
     ) -> Result<Bundle<Self::Item>, Self::Error> {
         let nargs = xs.len();
@@ -449,7 +456,7 @@ pub trait BundleGadgets: Fancy {
 
     /// Mixed radix addition only returning the MSB.
     fn mixed_radix_addition_msb_only(
-        &self,
+        &mut self,
         xs: &[Bundle<Self::Item>],
     ) -> Result<Self::Item, Self::Error> {
         let nargs = xs.len();
@@ -519,7 +526,7 @@ pub trait BundleGadgets: Fancy {
     /// Helper function for advanced gadgets, returns the MSB of the fractional part of
     /// `X/M` where `M=product(ms)`.
     fn fractional_mixed_radix(
-        &self,
+        &mut self,
         bun: &Bundle<Self::Item>,
         ms: &[u16],
     ) -> Result<Self::Item, Self::Error> {
@@ -560,7 +567,7 @@ pub trait BundleGadgets: Fancy {
     ///
     /// Optional output moduli.
     fn relu(
-        &self,
+        &mut self,
         x: &Bundle<Self::Item>,
         accuracy: &str,
         output_moduli: Option<&[u16]>,
@@ -586,7 +593,7 @@ pub trait BundleGadgets: Fancy {
     }
 
     /// Return 0 if `x` is positive and 1 if `x` is negative.
-    fn sign(&self, x: &Bundle<Self::Item>, accuracy: &str) -> Result<Self::Item, Self::Error> {
+    fn sign(&mut self, x: &Bundle<Self::Item>, accuracy: &str) -> Result<Self::Item, Self::Error> {
         let factors_of_m = &get_ms(x, accuracy);
         let res = self.fractional_mixed_radix(x, factors_of_m)?;
         let p = *factors_of_m.last().unwrap();
@@ -598,7 +605,7 @@ pub trait BundleGadgets: Fancy {
     ///
     /// If provided, will produce a bundle under `output_moduli` instead of `x.moduli()`
     fn sgn(
-        &self,
+        &mut self,
         x: &Bundle<Self::Item>,
         accuracy: &str,
         output_moduli: Option<&[u16]>,
@@ -619,7 +626,7 @@ pub trait BundleGadgets: Fancy {
     ///
     /// Binary ignores accuracy argument.
     fn lt(
-        &self,
+        &mut self,
         x: &Bundle<Self::Item>,
         y: &Bundle<Self::Item>,
         accuracy: &str,
@@ -655,7 +662,7 @@ pub trait BundleGadgets: Fancy {
 
     /// Returns 1 if `x >= y`. Works on both CRT and binary bundles.
     fn geq(
-        &self,
+        &mut self,
         x: &Bundle<Self::Item>,
         y: &Bundle<Self::Item>,
         accuracy: &str,
@@ -666,7 +673,7 @@ pub trait BundleGadgets: Fancy {
 
     /// Compute the maximum bundle in `xs`.
     fn max(
-        &self,
+        &mut self,
         xs: &[Bundle<Self::Item>],
         accuracy: &str,
     ) -> Result<Bundle<Self::Item>, Self::Error> {
@@ -699,7 +706,7 @@ pub trait BundleGadgets: Fancy {
 
     /// Binary addition. Returns the result and the carry.
     fn binary_addition(
-        &self,
+        &mut self,
         xs: &Bundle<Self::Item>,
         ys: &Bundle<Self::Item>,
     ) -> Result<(Bundle<Self::Item>, Self::Item), Self::Error> {
@@ -721,7 +728,7 @@ pub trait BundleGadgets: Fancy {
 
     /// Binary addition. Avoids creating extra gates for the final carry.
     fn binary_addition_no_carry(
-        &self,
+        &mut self,
         xs: &Bundle<Self::Item>,
         ys: &Bundle<Self::Item>,
     ) -> Result<Bundle<Self::Item>, Self::Error> {
@@ -752,7 +759,7 @@ pub trait BundleGadgets: Fancy {
     /// Returns the lower-order half of the output bits, ie a number with the same number
     /// of bits as the inputs.
     fn binary_multiplication_lower_half(
-        &self,
+        &mut self,
         xs: &Bundle<Self::Item>,
         ys: &Bundle<Self::Item>,
     ) -> Result<Bundle<Self::Item>, Self::Error> {
@@ -783,7 +790,10 @@ pub trait BundleGadgets: Fancy {
     }
 
     /// Compute the twos complement of the input bundle (which must be base 2).
-    fn twos_complement(&self, xs: &Bundle<Self::Item>) -> Result<Bundle<Self::Item>, Self::Error> {
+    fn twos_complement(
+        &mut self,
+        xs: &Bundle<Self::Item>,
+    ) -> Result<Bundle<Self::Item>, Self::Error> {
         let not_xs = xs
             .wires()
             .iter()
@@ -797,7 +807,7 @@ pub trait BundleGadgets: Fancy {
     ///
     /// Due to the way that `twos_complement(0) = 0`, underflow indicates `y != 0 && x >= y`.
     fn binary_subtraction(
-        &self,
+        &mut self,
         xs: &Bundle<Self::Item>,
         ys: &Bundle<Self::Item>,
     ) -> Result<(Bundle<Self::Item>, Self::Item), Self::Error> {
@@ -807,7 +817,7 @@ pub trait BundleGadgets: Fancy {
 
     /// If b=0 then return x, else return y.
     fn multiplex(
-        &self,
+        &mut self,
         b: &Self::Item,
         x: &Bundle<Self::Item>,
         y: &Bundle<Self::Item>,
@@ -822,7 +832,7 @@ pub trait BundleGadgets: Fancy {
 
     /// If `x=0` return `c1` as a bundle of constant bits, else return `c2`.
     fn multiplex_constant_bits(
-        &self,
+        &mut self,
         x: &Self::Item,
         c1: u128,
         c2: u128,
@@ -845,7 +855,11 @@ pub trait BundleGadgets: Fancy {
     }
 
     /// Shift residues, replacing them with zeros in the modulus of the least signifigant residue.
-    fn shift(&self, x: &Bundle<Self::Item>, n: usize) -> Result<Bundle<Self::Item>, Self::Error> {
+    fn shift(
+        &mut self,
+        x: &Bundle<Self::Item>,
+        n: usize,
+    ) -> Result<Bundle<Self::Item>, Self::Error> {
         let mut ws = x.wires().to_vec();
         let zero = self.constant(0, ws.last().unwrap().modulus())?;
         for _ in 0..n {
@@ -857,7 +871,7 @@ pub trait BundleGadgets: Fancy {
 
     /// Write the constant in binary and that gives you the shift amounts, Eg.. 7x is 4x+2x+x.
     fn binary_cmul(
-        &self,
+        &mut self,
         x: &Bundle<Self::Item>,
         c: u128,
         nbits: usize,
@@ -877,7 +891,7 @@ pub trait BundleGadgets: Fancy {
     }
 
     /// Compute the absolute value of a binary bundle.
-    fn abs(&self, x: &Bundle<Self::Item>) -> Result<Bundle<Self::Item>, Self::Error> {
+    fn abs(&mut self, x: &Bundle<Self::Item>) -> Result<Bundle<Self::Item>, Self::Error> {
         if !x.is_binary() {
             return Err(Self::Error::from(FancyError::ArgNotBinary));
         }
