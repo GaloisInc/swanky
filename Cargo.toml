@@ -8,8 +8,8 @@ description = "A library for boolean and arithmetic garbling"
 categories = ["cryptography"]
 keywords = ["cryptography", "garbled-circuit", "GC"]
 edition = "2018"
-build = "build.rs"
 autobenches = false
+publish = false
 
 [lib]
 doctest = false
@@ -59,10 +59,6 @@ harness = false
 [[bench]]
 name = "garbling"
 harness = false
-
-# [[bench]]
-# name = "parallel"
-# harness = false
 
 [[bench]]
 name = "rust"
