@@ -6,7 +6,7 @@
 
 use crate::comm;
 use crate::errors::Error;
-use fancy_garbling::{Evaluator as Ev, Fancy, Message, SyncIndex, Wire};
+use fancy_garbling::{Evaluator as Ev, Fancy, Wire};
 use ocelot::ObliviousTransferReceiver;
 use rand::{CryptoRng, RngCore};
 use scuttlebutt::Block;
@@ -40,13 +40,10 @@ impl<
         let reader = Arc::new(Mutex::new(reader));
         let writer = Arc::new(Mutex::new(writer));
         let reader_ = Arc::clone(&reader);
-        let callback = move || {
+        let callback = move |nblocks| {
             let mut reader = reader_.lock().unwrap();
-            let idx = comm::receive(&mut *reader).unwrap(); // XXX: unwrap
-            let bytes = comm::receive(&mut *reader).unwrap(); // XXX: unwrap
-            let msg = Message::from_bytes(&bytes).unwrap(); // XXX: unwrap
-            let idx = if idx[0] == 0xFF { None } else { Some(idx[0]) };
-            (idx, msg)
+            let blocks = comm::receive_blocks(&mut *reader, nblocks).unwrap(); // XXX: FIXME
+            Ok(blocks)
         };
         let evaluator = Ev::new(callback);
         let ot = Arc::new(Mutex::new(ot));
@@ -80,7 +77,7 @@ fn combine(wires: &[Block], q: u16) -> Wire {
         .into_iter()
         .enumerate()
         .fold(Wire::zero(q), |acc, (i, w)| {
-            let w = super::block_to_wire(*w, q);
+            let w = Wire::from_block(*w, q);
             acc.plus(&w.cmul(1 << i))
         })
 }
@@ -93,12 +90,16 @@ impl<
     > Fancy for Evaluator<R, W, RNG, OT>
 {
     type Item = Wire;
+    type Error = Error;
 
-    fn garbler_input(&self, ix: Option<SyncIndex>, q: u16, opt_x: Option<u16>) -> Wire {
-        self.evaluator.garbler_input(ix, q, opt_x)
+    #[inline]
+    fn garbler_input(&self, q: u16, opt_x: Option<u16>) -> Result<Self::Item, Self::Error> {
+        self.evaluator
+            .garbler_input(q, opt_x)
+            .map_err(Self::Error::from)
     }
-
-    fn evaluator_input(&self, _ix: Option<SyncIndex>, q: u16) -> Wire {
+    #[inline]
+    fn evaluator_input(&self, q: u16) -> Result<Self::Item, Self::Error> {
         let len = (q as f32).log(2.0).ceil() as u16;
         let input = self.inputs.lock().unwrap().remove(0);
         let bs = (0..len)
@@ -106,10 +107,10 @@ impl<
             .map(|i| input & (1 << i) != 0)
             .collect::<Vec<bool>>();
         let wires = self.run_ot(&bs);
-        combine(&wires, q)
+        Ok(combine(&wires, q))
     }
-
-    fn evaluator_inputs(&self, _ix: Option<SyncIndex>, qs: &[u16]) -> Vec<Wire> {
+    #[inline]
+    fn evaluator_inputs(&self, qs: &[u16]) -> Result<Vec<Self::Item>, Self::Error> {
         let lens = qs
             .into_iter()
             .map(|q| (*q as f32).log(2.0).ceil() as usize)
@@ -123,7 +124,8 @@ impl<
         }
         let wires = self.run_ot(&bs);
         let mut start = 0;
-        lens.into_iter()
+        Ok(lens
+            .into_iter()
             .zip(qs.into_iter())
             .map(|(len, q)| {
                 let range = start..start + len;
@@ -131,42 +133,34 @@ impl<
                 start = start + len;
                 combine(chunk, *q)
             })
-            .collect::<Vec<Wire>>()
+            .collect::<Vec<Wire>>())
     }
-
-    fn constant(&self, ix: Option<SyncIndex>, x: u16, q: u16) -> Wire {
-        self.evaluator.constant(ix, x, q)
+    #[inline]
+    fn constant(&self, x: u16, q: u16) -> Result<Self::Item, Self::Error> {
+        self.evaluator.constant(x, q).map_err(Self::Error::from)
     }
-
-    fn add(&self, x: &Wire, y: &Wire) -> Wire {
-        self.evaluator.add(&x, &y)
+    #[inline]
+    fn add(&self, x: &Wire, y: &Wire) -> Result<Self::Item, Self::Error> {
+        self.evaluator.add(&x, &y).map_err(Self::Error::from)
     }
-
-    fn sub(&self, x: &Wire, y: &Wire) -> Wire {
-        self.evaluator.sub(&x, &y)
+    #[inline]
+    fn sub(&self, x: &Wire, y: &Wire) -> Result<Self::Item, Self::Error> {
+        self.evaluator.sub(&x, &y).map_err(Self::Error::from)
     }
-
-    fn cmul(&self, x: &Wire, c: u16) -> Wire {
-        self.evaluator.cmul(&x, c)
+    #[inline]
+    fn cmul(&self, x: &Wire, c: u16) -> Result<Self::Item, Self::Error> {
+        self.evaluator.cmul(&x, c).map_err(Self::Error::from)
     }
-
-    fn mul(&self, ix: Option<SyncIndex>, x: &Wire, y: &Wire) -> Wire {
-        self.evaluator.mul(ix, &x, &y)
+    #[inline]
+    fn mul(&self, x: &Wire, y: &Wire) -> Result<Self::Item, Self::Error> {
+        self.evaluator.mul(&x, &y).map_err(Self::Error::from)
     }
-
-    fn proj(&self, ix: Option<SyncIndex>, x: &Wire, q: u16, tt: Option<Vec<u16>>) -> Wire {
-        self.evaluator.proj(ix, &x, q, tt)
+    #[inline]
+    fn proj(&self, x: &Wire, q: u16, tt: Option<Vec<u16>>) -> Result<Self::Item, Self::Error> {
+        self.evaluator.proj(&x, q, tt).map_err(Self::Error::from)
     }
-
-    fn output(&self, ix: Option<SyncIndex>, x: &Wire) {
-        self.evaluator.output(ix, &x)
-    }
-
-    fn begin_sync(&self, n: SyncIndex) {
-        self.evaluator.begin_sync(n)
-    }
-
-    fn finish_index(&self, ix: SyncIndex) {
-        self.evaluator.finish_index(ix)
+    #[inline]
+    fn output(&self, x: &Wire) -> Result<(), Self::Error> {
+        self.evaluator.output(&x).map_err(Self::Error::from)
     }
 }

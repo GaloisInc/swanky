@@ -6,7 +6,7 @@
 
 use crate::comm;
 use crate::errors::Error;
-use fancy_garbling::{Fancy, Garbler as Gb, Message, SyncIndex, Wire};
+use fancy_garbling::{Fancy, Garbler as Gb, Message, Wire};
 use ocelot::ObliviousTransferSender;
 use rand::{CryptoRng, RngCore};
 use scuttlebutt::Block;
@@ -19,7 +19,7 @@ pub struct Garbler<
     RNG: CryptoRng + RngCore,
     OT: ObliviousTransferSender,
 > {
-    garbler: Gb,
+    garbler: Gb<RNG>,
     reader: Arc<Mutex<R>>,
     writer: Arc<Mutex<W>>,
     ot: Arc<Mutex<OT>>,
@@ -39,30 +39,35 @@ impl<
         let reader = Arc::new(Mutex::new(reader));
         let writer = Arc::new(Mutex::new(writer));
         let writer_ = writer.clone();
-        let callback = move |idx: Option<SyncIndex>, msg| {
-            let m = match msg {
+        let callback = move |msg| {
+            let mut writer = writer_.lock().unwrap();
+            let blocks = match msg {
                 Message::UnencodedGarblerInput { zero, delta } => {
                     let input = inputs.next().unwrap();
-                    Message::GarblerInput(zero.plus(&delta.cmul(input)))
+                    vec![zero.plus(&delta.cmul(input)).as_block()]
                 }
-                Message::UnencodedEvaluatorInput { zero: _, delta: _ } => {
-                    panic!("There should not be an UnencodedEvaluatorInput message in the garbler");
+                Message::UnencodedEvaluatorInput { .. } => {
+                    panic!(
+                        "There should not be an `UnencodedEvaluatorInput` message in the garbler"
+                    );
                 }
                 Message::EvaluatorInput(_) => {
-                    panic!("There should not be an EvaluatorInput message in the garbler");
+                    panic!("There should not be an `EvaluatorInput` message in the garbler");
                 }
-                m => m,
+                Message::GarblerInput(_) => {
+                    panic!("There should not be a `GarblerInput` message in the garbler");
+                }
+                Message::Constant { value: _, wire } => vec![wire.as_block()],
+                Message::GarbledGate(gate) => gate,
+                Message::OutputCiphertext(ct) => ct,
             };
-            let mut writer = writer_.lock().unwrap();
-            match idx {
-                Some(i) => comm::send(&mut *writer, &[i]).expect("Unable to send index"),
-                None => comm::send(&mut *writer, &[0xFF]).expect("Unable to send index"),
-            }
-            comm::send(&mut *writer, &m.to_bytes()).expect("Unable to send message");
+            comm::send_blocks(&mut *writer, &blocks).unwrap();
+            ()
         };
-        let garbler = Gb::new(callback);
-        let ot = Arc::new(Mutex::new(ot));
         let rng = Arc::new(Mutex::new(rng));
+        let rng_ = rng.clone();
+        let garbler = Gb::new(callback, rng_);
+        let ot = Arc::new(Mutex::new(ot));
         Ok(Garbler {
             garbler,
             reader,
@@ -91,7 +96,7 @@ fn _evaluator_input(delta: &Wire, q: u16) -> (Wire, Vec<(Block, Block)>) {
             let zero = Wire::rand(&mut rand::thread_rng(), q);
             let one = zero.plus(&delta);
             wire = wire.plus(&zero.cmul(1 << i));
-            (super::wire_to_block(zero), super::wire_to_block(one))
+            (zero.as_block(), one.as_block())
         })
         .collect::<Vec<(Block, Block)>>();
     (wire, inputs)
@@ -105,19 +110,23 @@ impl<
     > Fancy for Garbler<R, W, RNG, OT>
 {
     type Item = Wire;
+    type Error = Error;
 
-    fn garbler_input(&self, ix: Option<SyncIndex>, q: u16, opt_x: Option<u16>) -> Wire {
-        self.garbler.garbler_input(ix, q, opt_x)
+    #[inline]
+    fn garbler_input(&self, q: u16, opt_x: Option<u16>) -> Result<Self::Item, Self::Error> {
+        self.garbler
+            .garbler_input(q, opt_x)
+            .map_err(Self::Error::from)
     }
-
-    fn evaluator_input(&self, _ix: Option<SyncIndex>, q: u16) -> Wire {
+    #[inline]
+    fn evaluator_input(&self, q: u16) -> Result<Self::Item, Self::Error> {
         let delta = self.garbler.delta(q);
         let (wire, inputs) = _evaluator_input(&delta, q);
         self.run_ot(&inputs);
-        wire
+        Ok(wire)
     }
-
-    fn evaluator_inputs(&self, _ix: Option<SyncIndex>, qs: &[u16]) -> Vec<Wire> {
+    #[inline]
+    fn evaluator_inputs(&self, qs: &[u16]) -> Result<Vec<Self::Item>, Self::Error> {
         let n = qs.len();
         let lens = qs.into_iter().map(|q| (*q as f32).log(2.0).ceil() as usize);
         let mut wires = Vec::with_capacity(n);
@@ -131,42 +140,34 @@ impl<
             }
         }
         self.run_ot(&inputs);
-        wires
+        Ok(wires)
     }
-
-    fn constant(&self, ix: Option<SyncIndex>, x: u16, q: u16) -> Wire {
-        self.garbler.constant(ix, x, q)
+    #[inline]
+    fn constant(&self, x: u16, q: u16) -> Result<Self::Item, Self::Error> {
+        self.garbler.constant(x, q).map_err(Self::Error::from)
     }
-
-    fn add(&self, x: &Wire, y: &Wire) -> Wire {
-        self.garbler.add(x, y)
+    #[inline]
+    fn add(&self, x: &Wire, y: &Wire) -> Result<Self::Item, Self::Error> {
+        self.garbler.add(x, y).map_err(Self::Error::from)
     }
-
-    fn sub(&self, x: &Wire, y: &Wire) -> Wire {
-        self.garbler.sub(x, y)
+    #[inline]
+    fn sub(&self, x: &Wire, y: &Wire) -> Result<Self::Item, Self::Error> {
+        self.garbler.sub(x, y).map_err(Self::Error::from)
     }
-
-    fn cmul(&self, x: &Wire, c: u16) -> Wire {
-        self.garbler.cmul(x, c)
+    #[inline]
+    fn cmul(&self, x: &Wire, c: u16) -> Result<Self::Item, Self::Error> {
+        self.garbler.cmul(x, c).map_err(Self::Error::from)
     }
-
-    fn mul(&self, ix: Option<SyncIndex>, x: &Wire, y: &Wire) -> Wire {
-        self.garbler.mul(ix, x, y)
+    #[inline]
+    fn mul(&self, x: &Wire, y: &Wire) -> Result<Self::Item, Self::Error> {
+        self.garbler.mul(x, y).map_err(Self::Error::from)
     }
-
-    fn proj(&self, ix: Option<SyncIndex>, x: &Wire, q: u16, tt: Option<Vec<u16>>) -> Wire {
-        self.garbler.proj(ix, x, q, tt)
+    #[inline]
+    fn proj(&self, x: &Wire, q: u16, tt: Option<Vec<u16>>) -> Result<Self::Item, Self::Error> {
+        self.garbler.proj(x, q, tt).map_err(Self::Error::from)
     }
-
-    fn output(&self, ix: Option<SyncIndex>, x: &Wire) {
-        self.garbler.output(ix, x)
-    }
-
-    fn begin_sync(&self, n: SyncIndex) {
-        self.garbler.begin_sync(n)
-    }
-
-    fn finish_index(&self, ix: SyncIndex) {
-        self.garbler.finish_index(ix)
+    #[inline]
+    fn output(&self, x: &Self::Item) -> Result<(), Self::Error> {
+        self.garbler.output(x).map_err(Self::Error::from)
     }
 }

@@ -1,4 +1,4 @@
-# The `twopac` secure two-party computation library
+# `twopac`: A rust library for secure two-party computation
 
 The `twopac` library implements various garbled-circuit-based secure two-party
 computation protocols.

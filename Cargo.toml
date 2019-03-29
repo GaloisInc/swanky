@@ -12,17 +12,15 @@ edition = "2018"
 [lib]
 
 [features]
-nightly = ["rand/nightly", "scuttlebutt/nightly"]
+nightly = ["rand/nightly", "scuttlebutt/nightly", "ocelot/nightly", "fancy_garbling/nightly"]
 
 [dependencies]
-# fancy_garbling = { path = "../fancy-garbling" }
-fancy_garbling = { git = "https://github.com/spaceships/fancy-garbling" }
-ocelot = { path = "../ocelot" }
+fancy_garbling = { path = "../fancy-garbling" }
+ocelot = { git = "https://github.com/amaloz/ocelot" }
 rand = "*"
-scuttlebutt = { path = "../scuttlebutt" }
+scuttlebutt = { git = "https://github.com/amaloz/scuttlebutt" }
 
 [dev-dependencies]
-# crossbeam = "*"
 itertools = "*"
 
 [profile.release]

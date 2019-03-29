@@ -5,21 +5,22 @@
 // See LICENSE for licensing information.
 
 use crate::errors::Error;
+use scuttlebutt::Block;
 use std::io::{Read, Write};
 
-pub fn send<W: Write>(writer: &mut W, data: &[u8]) -> Result<(), Error> {
-    let len = data.len().to_le_bytes();
-    writer.write_all(&len)?;
-    writer.write_all(&data)?;
+pub fn send_blocks<W: Write>(writer: &mut W, blocks: &[Block]) -> Result<(), Error> {
+    for block in blocks.iter() {
+        block.write(writer)?;
+    }
     writer.flush()?;
     Ok(())
 }
 
-pub fn receive<R: Read>(reader: &mut R) -> Result<Vec<u8>, Error> {
-    let mut bytes = [0u8; 8];
-    reader.read_exact(&mut bytes)?;
-    let len = usize::from_le_bytes(bytes);
-    let mut v = vec![0u8; len];
-    reader.read_exact(&mut v)?;
-    Ok(v)
+pub fn receive_blocks<R: Read>(reader: &mut R, nblocks: usize) -> Result<Vec<Block>, Error> {
+    let mut out = Vec::with_capacity(nblocks);
+    for _ in 0..nblocks {
+        let b = Block::read(reader)?;
+        out.push(b);
+    }
+    Ok(out)
 }
