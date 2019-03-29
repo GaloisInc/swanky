@@ -50,12 +50,6 @@ pub enum Message {
 
     /// Output decoding information.
     OutputCiphertext(OutputCiphertext),
-
-    /// End synchronization mode.
-    ///
-    /// For large computations, the Evaluator postman can get far ahead of the threads,
-    /// and we don't want it to receive non-sync messages.
-    EndSync,
 }
 
 impl std::fmt::Display for Message {
@@ -68,7 +62,6 @@ impl std::fmt::Display for Message {
             Message::Constant { .. } => "Constant",
             Message::GarbledGate(_) => "GarbledGate",
             Message::OutputCiphertext(_) => "OutputCiphertext",
-            Message::EndSync => "EndSync",
         })
     }
 }
@@ -93,7 +86,7 @@ where
                 .send(m)
                 .expect("garble_iter thread could not send message to iterator")
         };
-        let garbler = Garbler::new(callback, rng);
+        let garbler = Garbler::new(callback, Arc::new(Mutex::new(rng)));
         fancy_computation(&garbler);
     });
 
@@ -133,7 +126,7 @@ pub fn garble(c: &Circuit) -> Result<(Encoder, Decoder, GarbledCircuit), Garbler
         };
     }
 
-    let garbler = Garbler::new(send_func, rng);
+    let garbler = Garbler::new(send_func, Arc::new(Mutex::new(rng)));
     let outputs = c.eval(&garbler)?;
     c.process_outputs(&outputs, &garbler)?;
     let deltas = garbler.get_deltas();
@@ -178,7 +171,6 @@ mod classic {
     use crate::dummy::Dummy;
     use crate::fancy::{BundleGadgets, Fancy};
     use crate::util::{self, RngExt};
-    use itertools::Itertools;
     use rand::thread_rng;
 
     // helper {{{
@@ -191,25 +183,28 @@ mod classic {
             let q = rng.gen_prime();
             let c = &f(q);
             let (en, de, ev) = garble(c).unwrap();
-            println!("number of ciphertexts for mod {}: {}", q, ev.size());
             for _ in 0..16 {
                 let inps = (0..c.num_evaluator_inputs())
                     .map(|i| rng.gen_u16() % c.evaluator_input_mod(i))
-                    .collect_vec();
+                    .collect::<Vec<u16>>();
+                // Run the garbled circuit evaluator.
                 let xs = &en.encode_evaluator_inputs(&inps);
                 let ys = &ev.eval(c, &[], xs).unwrap();
                 let decoded = de.decode(ys)[0];
+                // Run the dummy evaluator.
                 let dummy = Dummy::new(&[], &inps);
                 let outputs = c.eval(&dummy).unwrap();
                 c.process_outputs(&outputs, &dummy).unwrap();
                 let should_be = dummy.get_output()[0];
-                if decoded != should_be {
-                    println!(
-                        "inp={:?} q={} got={} should_be={}",
-                        inps, q, decoded, should_be
-                    );
-                    panic!("failed test!");
-                }
+
+                assert_eq!(decoded, should_be);
+                // if decoded != should_be {
+                //     println!(
+                //         "inp={:?} q={} got={} should_be={}",
+                //         inps, q, decoded, should_be
+                //     );
+                //     panic!("failed test!");
+                // }
             }
         }
     }
@@ -669,111 +664,138 @@ mod streaming {
     //}}}
 }
 
-// #[cfg(test)]
-// mod parallel {
-//     use super::*;
-//     // use crate::dummy::Dummy;
-//     use crate::fancy::BundleGadgets;
-//     use crate::fancy::Fancy;
-//     // use crate::util::RngExt;
-//     use itertools::Itertools;
-//     // use rand::thread_rng;
+#[cfg(test)]
+mod complex {
+    use super::*;
+    use crate::dummy::Dummy;
+    use crate::fancy::BundleGadgets;
+    use crate::fancy::Fancy;
+    use crate::util::RngExt;
+    use rand::thread_rng;
 
-//     fn parallel_gadgets<F, W>(b: &F, Q: u128, N: SyncIndex, par: bool)
-//     // {{{
-//     where
-//         W: Clone + HasModulus + Send + Sync + std::fmt::Debug,
-//         F: Fancy<Item = W> + Send + Sync,
-//     {
-//         if par {
-//             crossbeam::scope(|scope| {
-//                 b.begin_sync(N).unwrap();
-//                 let hs = (0..N)
-//                     .map(|i| {
-//                         scope
-//                             .builder()
-//                             .name(format!("Thread {}", i))
-//                             .spawn(move |_| {
-//                                 let c = b.constant_bundle_crt(Some(i), 1, Q).unwrap();
-//                                 let x = b.garbler_input_bundle_crt(Some(i), Q, None).unwrap();
-//                                 let x = b.mul_bundles(Some(i), &x, &c).unwrap();
-//                                 let z = b.relu(Some(i), &x, "100%", None).unwrap();
-//                                 b.finish_index(i).unwrap();
-//                                 z
-//                             })
-//                             .unwrap()
-//                     })
-//                     .collect_vec();
-//                 let outs = hs.into_iter().map(|h| h.join().unwrap()).collect_vec();
-//                 b.output_bundles(&outs).unwrap();
-//             })
-//             .unwrap()
-//         } else {
-//             b.begin_sync(N).unwrap();
-//             let mut zs = Vec::new();
-//             for i in 0..N {
-//                 let c = b.constant_bundle_crt(Some(i), 1, Q).unwrap();
-//                 let x = b.garbler_input_bundle_crt(Some(i), Q, None).unwrap();
-//                 let x = b.mul_bundles(Some(i), &x, &c).unwrap();
-//                 let z = b.relu(Some(i), &x, "100%", None).unwrap();
-//                 zs.push(z);
-//                 b.finish_index(i).unwrap();
-//             }
-//             b.output_bundles(&zs).unwrap();
-//         }
-//     }
+    fn complex_gadget<F, W>(b: &F, q: u128, n: usize)
+    where
+        W: Clone + HasModulus + Send + Sync + std::fmt::Debug,
+        F: Fancy<Item = W> + Send + Sync,
+    {
+        let mut zs = Vec::with_capacity(n);
+        for _ in 0..n {
+            let c = b.constant_bundle_crt(1, q).unwrap();
+            let x = b.garbler_input_bundle_crt(q, None).unwrap();
+            let x = b.mul_bundles(&x, &c).unwrap();
+            let z = b.relu(&x, "100%", None).unwrap();
+            zs.push(z);
+        }
+        b.output_bundles(&zs).unwrap();
+    }
 
-//     // #[test]
-//     // fn parallel_garbling() {
-//     //     let mut rng = thread_rng();
-//     //     let N = 10;
-//     //     let Q = crate::util::modulus_with_width(10);
-//     //     for _ in 0..16 {
-//     //         let mut input = (0..N)
-//     //             .map(|_| crate::util::crt_factor(rng.gen_u128() % Q, Q))
-//     //             .collect_vec();
+    fn complex_gadget_<F, W>(b: &F, q: u128, n: usize)
+    where
+        W: Clone + HasModulus + Send + Sync + std::fmt::Debug,
+        F: Fancy<Item = W> + Send + Sync,
+    {
+        let mut zs = Vec::with_capacity(n);
+        for _ in 0..n {
+            let c = b.constant_bundle_crt(1, q).unwrap();
+            let x = b.evaluator_input_bundle_crt(q).unwrap();
+            let x = b.mul_bundles(&x, &c).unwrap();
+            let z = b.relu(&x, "100%", None).unwrap();
+            zs.push(z);
+        }
+        b.output_bundles(&zs).unwrap();
+    }
 
-//     //         // compute the correct answer using Dummy
-//     //         let dummy_input = input.iter().flatten().cloned().collect_vec();
-//     //         let dummy = Dummy::new(&dummy_input, &[]);
-//     //         parallel_gadgets(&dummy, Q, N, true);
-//     //         let should_be_par = dummy.get_output();
+    #[test]
+    fn test_complex_gadgets() {
+        let mut rng = thread_rng();
+        let N = 10;
+        let Q = crate::util::modulus_with_width(10);
+        for _ in 0..16 {
+            let input = (0..N)
+                .map(|_| crate::util::crt_factor(rng.gen_u128() % Q, Q))
+                .flatten()
+                .collect::<Vec<u16>>();
 
-//     //         // check serial version agrees with parallel
-//     //         let dummy = Dummy::new(&dummy_input, &[]);
-//     //         parallel_gadgets(&dummy, Q, N, false);
-//     //         let should_be = dummy.get_output();
+            // Compute the correct answer using `Dummy`.
+            let input_ = input.clone();
+            let dummy = Dummy::new(&input_, &[]);
+            complex_gadget(&dummy, Q, N);
+            let should_be = dummy.get_output();
+            // Do 2PC computation.
+            let (tx, rx) = std::sync::mpsc::channel();
+            let tx = tx.clone();
+            let mut input_ = input.clone();
+            let callback = move |m| {
+                let m = match m {
+                    Message::UnencodedGarblerInput { zero, delta } => {
+                        let x = input_.remove(0);
+                        let w = zero.plus(&delta.cmul(x));
+                        vec![w.as_block()]
+                    }
+                    Message::UnencodedEvaluatorInput { .. } => {
+                        panic!(
+                            "There should not be an `UnencodedEvaluatorInput` message in the garbler"
+                        );
+                    }
+                    Message::EvaluatorInput(_) => {
+                        panic!("There should not be an `EvaluatorInput` message in the garbler");
+                    }
+                    Message::GarblerInput(_) => {
+                        panic!("There should not be a `GarblerInput` message in the garbler");
+                    }
+                    Message::Constant { value: _, wire } => vec![wire.as_block()],
+                    Message::GarbledGate(gate) => gate,
+                    Message::OutputCiphertext(ct) => ct,
+                };
+                tx.send(m).unwrap();
+            };
 
-//     //         assert_eq!(should_be, should_be_par);
+            std::thread::spawn(move || {
+                let rng = AesRng::new();
+                let garbler = Garbler::new(callback, Arc::new(Mutex::new(rng)));
+                complex_gadget(&garbler, Q, N);
+            });
+            let evaluator = Evaluator::new(move |_| Ok(rx.recv().unwrap()));
+            complex_gadget(&evaluator, Q, N);
+            let result = evaluator.decode_output();
+            assert_eq!(result, should_be);
 
-//     //         // set up garbler and evaluator
-//     //         let (tx, rx) = std::sync::mpsc::channel();
-
-//     //         let tx = tx.clone();
-//     //         let send_func = move |ix: Option<SyncIndex>, m| {
-//     //             let m = match m {
-//     //                 Message::UnencodedGarblerInput { zero, delta } => {
-//     //                     let x = input[ix.unwrap() as usize].remove(0);
-//     //                     let w = zero.plus(&delta.cmul(x));
-//     //                     Message::GarblerInput(w)
-//     //                 }
-//     //                 _ => m,
-//     //             };
-//     //             tx.send((ix, m)).unwrap();
-//     //         };
-
-//     //         // put garbler on another thread
-//     //         std::thread::spawn(move || {
-//     //             let garbler = Garbler::new(send_func);
-//     //             parallel_gadgets(&garbler, Q, N, true);
-//     //         });
-
-//     //         // run the evaluator on this one
-//     //         let evaluator = Evaluator::new(move |_| rx.recv());
-//     //         parallel_gadgets(&evaluator, Q, N, false);
-
-//     //         let result = evaluator.decode_output();
-//     //         assert_eq!(result, should_be);
-//     //     }
-//     // } // }}}
-// }
+            let (tx, rx) = std::sync::mpsc::channel();
+            let tx = tx.clone();
+            let mut input_ = input.clone();
+            let callback = move |m| {
+                let m = match m {
+                    Message::UnencodedGarblerInput { .. } => {
+                        panic!(
+                            "There should not be an `UnencodedEvaluatorInput` message in the garbler"
+                        );
+                    }
+                    Message::UnencodedEvaluatorInput { zero, delta } => {
+                        let x = input_.remove(0);
+                        let w = zero.plus(&delta.cmul(x));
+                        vec![w.as_block()]
+                    }
+                    Message::EvaluatorInput(_) => {
+                        panic!("There should not be an `EvaluatorInput` message in the garbler");
+                    }
+                    Message::GarblerInput(_) => {
+                        panic!("There should not be a `GarblerInput` message in the garbler");
+                    }
+                    Message::Constant { value: _, wire } => vec![wire.as_block()],
+                    Message::GarbledGate(gate) => gate,
+                    Message::OutputCiphertext(ct) => ct,
+                };
+                tx.send(m).unwrap();
+            };
+            std::thread::spawn(move || {
+                let rng = AesRng::new();
+                let garbler = Garbler::new(callback, Arc::new(Mutex::new(rng)));
+                complex_gadget_(&garbler, Q, N);
+            });
+            let evaluator = Evaluator::new(move |_| Ok(rx.recv().unwrap()));
+            complex_gadget_(&evaluator, Q, N);
+            let result = evaluator.decode_output();
+            assert_eq!(result, should_be);
+        }
+    }
+}

@@ -17,21 +17,11 @@ pub enum FancyError {
     UninitializedValue,
 }
 
-/// Common errors emitted by fancy objects in sync mode.
-#[derive(Debug)]
-pub enum SyncError {
-    IndexRequired,
-    IndexOutOfBounds,
-    IndexUsedOutOfSync,
-    SyncStartedInSync,
-}
-
 /// Errors from the dummy fancy object.
 #[derive(Debug)]
 pub enum DummyError {
     NotEnoughGarblerInputs,
     NotEnoughEvaluatorInputs,
-    SyncError(SyncError),
     FancyError(FancyError),
 }
 
@@ -40,7 +30,6 @@ pub enum DummyError {
 pub enum EvaluatorError {
     InvalidMessage { expected: String, got: String },
     IndexReceivedInSyncMode,
-    SyncError(SyncError),
     FancyError(FancyError),
 }
 
@@ -49,7 +38,6 @@ pub enum EvaluatorError {
 pub enum GarblerError {
     AsymmetricHalfGateModuliMax8(u16),
     TruthTableRequired,
-    SyncError(SyncError),
     FancyError(FancyError),
 }
 
@@ -93,40 +81,6 @@ impl Display for FancyError {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-// sync error
-
-impl Display for SyncError {
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        match self {
-            SyncError::IndexRequired => "sync index required in sync mode".fmt(f),
-            SyncError::IndexOutOfBounds => "sync index out of bounds".fmt(f),
-            SyncError::IndexUsedOutOfSync => "sync index used out of sync mode".fmt(f),
-            SyncError::SyncStartedInSync => {
-                "begin_sync called before finishing previous sync".fmt(f)
-            }
-        }
-    }
-}
-
-impl From<SyncError> for GarblerError {
-    fn from(e: SyncError) -> GarblerError {
-        GarblerError::SyncError(e)
-    }
-}
-
-impl From<SyncError> for EvaluatorError {
-    fn from(e: SyncError) -> EvaluatorError {
-        EvaluatorError::SyncError(e)
-    }
-}
-
-impl From<SyncError> for DummyError {
-    fn from(e: SyncError) -> DummyError {
-        DummyError::SyncError(e)
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////
 // Dummy error
 
 impl Display for DummyError {
@@ -134,7 +88,6 @@ impl Display for DummyError {
         match self {
             DummyError::NotEnoughGarblerInputs => "not enough garbler inputs".fmt(f),
             DummyError::NotEnoughEvaluatorInputs => "not enough evaluator inputs".fmt(f),
-            DummyError::SyncError(e) => write!(f, "dummy sync error: {}", e),
             DummyError::FancyError(e) => write!(f, "fancy error: {}", e),
         }
     }
@@ -156,7 +109,6 @@ impl Display for EvaluatorError {
                 write!(f, "expected message {} but got {}", expected, got)
             }
             EvaluatorError::IndexReceivedInSyncMode => "index received in sync mode".fmt(f),
-            EvaluatorError::SyncError(e) => write!(f, "evaluator sync error: {}", e),
             EvaluatorError::FancyError(e) => write!(f, "fancy error: {}", e),
         }
     }
@@ -182,7 +134,6 @@ impl Display for GarblerError {
             GarblerError::TruthTableRequired => {
                 "truth table required for garbler projection gates".fmt(f)
             }
-            GarblerError::SyncError(e) => write!(f, "garbler sync error: {}", e),
             GarblerError::FancyError(e) => write!(f, "fancy error: {}", e),
         }
     }

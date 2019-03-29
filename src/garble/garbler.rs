@@ -26,16 +26,16 @@ impl<R: CryptoRng + RngCore> Garbler<R> {
     /// `callback` is a function that enables streaming. It gets called as the
     /// garbler generates ciphertext information such as garbled gates or input
     /// wire-labels.
-    pub fn new<F>(callback: F, rng: R) -> Self
+    pub fn new<F>(callback: F, rng: Arc<Mutex<R>>) -> Self
     where
-        F: FnMut(Message) + Send + 'static,
+        F: FnMut(Message) + Send + 'static, // XXX: add -> Result<(), Error>
     {
         Garbler {
             callback: Arc::new(Mutex::new(callback)),
             deltas: Arc::new(Mutex::new(HashMap::new())),
             current_gate: Arc::new(AtomicUsize::new(0)),
             current_output: Arc::new(AtomicUsize::new(0)),
-            rng: Arc::new(Mutex::new(rng)),
+            rng,
         }
     }
 
@@ -337,7 +337,7 @@ mod tests {
     fn garbler_has_send_and_sync() {
         fn check_send(_: impl Send) {}
         fn check_sync(_: impl Sync) {}
-        check_send(Garbler::new(|_| (), AesRng::new()));
-        check_sync(Garbler::new(|_| (), AesRng::new()));
+        check_send(Garbler::new(|_| (), Arc::new(Mutex::new(AesRng::new()))));
+        check_sync(Garbler::new(|_| (), Arc::new(Mutex::new(AesRng::new()))));
     }
 }
