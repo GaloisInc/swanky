@@ -221,9 +221,11 @@ impl Circuit {
     }
 
     /// Print circuit info.
-    pub fn info(&self) -> Result<(), InformerError> {
+    pub fn print_info(&self) -> Result<(), InformerError> {
         let informer = crate::informer::Informer::new();
-        self.eval(&informer)?;
+        let outputs = self.eval(&informer)?;
+        self.process_outputs(&outputs, &informer)?;
+        informer.print_info();
         Ok(())
     }
     #[inline]

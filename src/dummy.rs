@@ -7,14 +7,14 @@ use crate::error::{DummyError, FancyError};
 use crate::fancy::{Fancy, HasModulus};
 use std::sync::{Arc, Mutex};
 
-/// Simple struct that performs the fancy computation over u16.
+/// Simple struct that performs the fancy computation over `u16`.
 pub struct Dummy {
     outputs: Arc<Mutex<Vec<u16>>>,
     garbler_inputs: Arc<Mutex<Vec<u16>>>,
     evaluator_inputs: Arc<Mutex<Vec<u16>>>,
 }
 
-/// Wrapper around u16.
+/// Wrapper around `u16`.
 #[derive(Clone, Debug)]
 pub struct DummyVal {
     val: u16,

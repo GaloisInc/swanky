@@ -20,6 +20,9 @@ pub struct Informer {
     nmuls: Arc<AtomicUsize>,
     nprojs: Arc<AtomicUsize>,
     nciphertexts: Arc<AtomicUsize>,
+    // TODO: we should also accumulate nice info about what are the various
+    // moduli in the computation, and how many of such moduli are there. moduli:
+    // Arc<Mutex<HashSet<(u16, usize)>>>,
 }
 
 #[derive(Clone, Debug)]
@@ -44,6 +47,7 @@ impl Informer {
             nmuls: Arc::new(AtomicUsize::new(0)),
             nprojs: Arc::new(AtomicUsize::new(0)),
             nciphertexts: Arc::new(AtomicUsize::new(0)),
+            // moduli: Arc::new(Mutex::new(HashSet::new())),
         }
     }
 
@@ -52,46 +56,61 @@ impl Informer {
     /// For example:
     /// ```
     /// computation info:
-    ///   garbler inputs:             345600 // comms cost: 5400kb
-    ///   evaluator inputs:           345600 // OT cost: 10800kb
-    ///   outputs:                         1 // comms cost: ??kb
-    ///   constants:                       2 // comms cost: 0kb
-    ///   additions:                 9169197
-    ///   subtractions:                    0
-    ///   cmuls:                           0
-    ///   projections:                     0
-    ///   multiplications:           2073599
-    ///   ciphertexts:               4147198 // comms cost: 63.28mb (64799.97kb)
-    ///   total comms cost:          79.10mb // 81000.00kb
+    ///   garbler inputs:                  128 // comms cost: 16 Kb
+    ///   evaluator inputs:                128 // comms cost: 48 Kb
+    ///   outputs:                         128
+    ///   output ciphertexts:              256 // comms cost: 32 Kb
+    ///   constants:                         1 // comms cost: 0.125 Kb
+    ///   additions:                     25124
+    ///   subtractions:                   1692
+    ///   cmuls:                             0
+    ///   projections:                       0
+    ///   multiplications:                6800
+    ///   ciphertexts:                   13600 // comms cost: 1.66 Mb (1700.00 Kb)
+    ///   total comms cost:            1.75 Mb // 1700.00 Kb
     /// ```
     pub fn print_info(&self) {
+        let mut total = 0.0;
         println!("computation info:");
-
+        let comm = self.num_garbler_inputs() as f64 * 128.0 / 1024.0;
         println!(
-            "  garbler inputs:     {:16} // comms cost: {}kb",
+            "  garbler inputs:     {:16} // comms cost: {} Kb",
             self.num_garbler_inputs(),
-            self.num_garbler_inputs() * 128 / 8 / 1024
+            comm
         );
-
+        total += comm;
+        // The cost of IKNP is 256 bits for one random and one 128 bit string
+        // dependent on the random one. This is for each input bit, so for
+        // modulus `q` we need to do `log2(q)` OTs.
+        let comm = self
+            .evaluator_input_moduli
+            .lock()
+            .unwrap()
+            .iter()
+            .fold(0.0, |acc, q| {
+                acc + (*q as f64).log2().ceil() * 384.0 / 1024.0
+            });
         println!(
-            "  evaluator inputs:   {:16} // estimated OT cost: {}kb",
+            "  evaluator inputs:   {:16} // comms cost: {} Kb",
             self.num_evaluator_inputs(),
-            // cost of IKNP is 256 for 1 random and 1 128 bit string dependent on the random one
-            self.num_evaluator_inputs() * 384 * 5 / 8 / 1024 // assuming average moduli have 5 bits
+            comm
         );
-
+        total += comm;
+        let comm = self.num_output_ciphertexts() as f64 * 128.0 / 1024.0;
         println!("  outputs:            {:16}", self.num_outputs());
         println!(
-            "  output ciphertexts: {:16} // comms cost: {}kb",
+            "  output ciphertexts: {:16} // comms cost: {} Kb",
             self.num_output_ciphertexts(),
-            self.num_output_ciphertexts() * 128 / 8 / 1024
+            comm
         );
-
+        total += comm;
+        let comm = self.num_consts() as f64 * 128.0 / 1024.0;
         println!(
-            "  constants:          {:16} // comms cost: {}kb",
+            "  constants:          {:16} // comms cost: {} Kb",
             self.num_consts(),
-            self.num_consts() * 128 / 8 / 1024
+            comm
         );
+        total += comm;
 
         println!("  additions:          {:16}", self.num_adds());
         println!("  subtractions:       {:16}", self.num_subs());
@@ -99,23 +118,16 @@ impl Informer {
         println!("  projections:        {:16}", self.num_projs());
         println!("  multiplications:    {:16}", self.num_muls());
         let cs = self.num_ciphertexts();
-        let kb = cs as f64 * 128.0 / 8.0 / 1024.0;
+        let kb = cs as f64 * 128.0 / 1024.0;
         let mb = kb / 1024.0;
         println!(
-            "  ciphertexts:        {:16} // comms cost: {:.2}mb ({:.2}kb)",
+            "  ciphertexts:        {:16} // comms cost: {:.2} Mb ({:.2} Kb)",
             cs, mb, kb
         );
+        total += kb;
 
-        // compute total comms cost
-        let mut comms_bits = 0;
-        comms_bits += self.num_garbler_inputs() * 128;
-        comms_bits += self.num_evaluator_inputs() * 256;
-        comms_bits += self.num_consts() * 128;
-        comms_bits += self.num_ciphertexts() * 128;
-        comms_bits += self.num_output_ciphertexts() * 128;
-        let kb = comms_bits as f64 / 8.0 / 1024.0;
-        let mb = kb / 1024.0;
-        println!("  total comms cost:   {:14.2}mb // {:.2}kb", mb, kb);
+        let mb = total / 1024.0;
+        println!("  total comms cost:  {:14.2} Mb // {:.2} Kb", mb, kb);
     }
 
     /// Number of garbler inputs in the fancy computation.
