@@ -221,7 +221,7 @@ impl GarbledCircuit {
 ////////////////////////////////////////////////////////////////////////////////
 // Encoder
 
-/// Encode inputs statically. Created by the `garble` function.
+/// Encode inputs statically.
 #[derive(Serialize, Deserialize, PartialEq, Debug)]
 pub struct Encoder {
     garbler_inputs: Vec<Wire>,
@@ -230,6 +230,8 @@ pub struct Encoder {
 }
 
 impl Encoder {
+    /// Make a new `Encoder` from lists of garbler and evaluator inputs,
+    /// alongside a map of moduli-to-wire-offsets.
     pub fn new(
         garbler_inputs: Vec<Wire>,
         evaluator_inputs: Vec<Wire>,
@@ -242,26 +244,31 @@ impl Encoder {
         }
     }
 
+    /// Output the number of garbler inputs.
     pub fn num_garbler_inputs(&self) -> usize {
         self.garbler_inputs.len()
     }
 
+    /// Output the number of evaluator inputs.
     pub fn num_evaluator_inputs(&self) -> usize {
         self.evaluator_inputs.len()
     }
 
+    /// Encode a single garbler input into its associated wire-label.
     pub fn encode_garbler_input(&self, x: u16, id: usize) -> Wire {
         let X = &self.garbler_inputs[id];
         let q = X.modulus();
         X.plus(&self.deltas[&q].cmul(x))
     }
 
+    /// Encode a single evaluator input into its associated wire-label.
     pub fn encode_evaluator_input(&self, x: u16, id: usize) -> Wire {
         let X = &self.evaluator_inputs[id];
         let q = X.modulus();
         X.plus(&self.deltas[&q].cmul(x))
     }
 
+    /// Encode a slice of garbler inputs into their associated wire-labels.
     pub fn encode_garbler_inputs(&self, inputs: &[u16]) -> Vec<Wire> {
         debug_assert_eq!(inputs.len(), self.garbler_inputs.len());
         (0..inputs.len())
@@ -270,6 +277,7 @@ impl Encoder {
             .collect()
     }
 
+    /// Encode a slice of evaluator inputs into their associated wire-labels.
     pub fn encode_evaluator_inputs(&self, inputs: &[u16]) -> Vec<Wire> {
         debug_assert_eq!(inputs.len(), self.evaluator_inputs.len());
         (0..inputs.len())
@@ -282,17 +290,19 @@ impl Encoder {
 ////////////////////////////////////////////////////////////////////////////////
 // Decoder
 
-/// Decode outputs statically. Created by the `garble` function.
+/// Decode outputs statically.
 #[derive(Serialize, Deserialize, PartialEq, Debug)]
 pub struct Decoder {
     outputs: Vec<OutputCiphertext>,
 }
 
 impl Decoder {
+    /// Make a new `Decoder` from a set of output ciphertexts.
     pub fn new(outputs: Vec<Vec<Block>>) -> Self {
         Decoder { outputs }
     }
 
+    /// Decode a slice of wire-labels `ws`.
     pub fn decode(&self, ws: &[Wire]) -> Vec<u16> {
         debug_assert_eq!(
             ws.len(),

@@ -23,6 +23,8 @@ pub struct Informer {
     // Arc<Mutex<HashSet<(u16, usize)>>>,
 }
 
+/// The item type used by `Informer`. It simply contains the modulus of the
+/// wire-label.
 #[derive(Clone, Debug)]
 pub struct InformerVal(u16);
 
@@ -33,6 +35,7 @@ impl HasModulus for InformerVal {
 }
 
 impl Informer {
+    /// Make a new `Informer`.
     pub fn new() -> Informer {
         Informer {
             garbler_input_moduli: Vec::new(),

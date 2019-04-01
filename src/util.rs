@@ -305,10 +305,10 @@ pub const PRIMES: [u16; 29] = [
 ];
 
 /// Primes skipping the modulus 2, which allows certain gadgets.
-pub const PRIMES_SKIP_2: [u16; 29] = [
-    3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47, 53, 59, 61, 67, 71, 73, 79, 83, 89, 97,
-    101, 103, 107, 109, 113,
-];
+// pub const PRIMES_SKIP_2: [u16; 29] = [
+//     3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47, 53, 59, 61, 67, 71, 73, 79, 83, 89, 97,
+//     101, 103, 107, 109, 113,
+// ];
 
 /// Generate a CRT modulus with n primes.
 #[inline]
@@ -325,20 +325,20 @@ pub fn modulus_with_width(n: u32) -> u128 {
 
 /// Generate the factors of a CRT modulus that support at least n-bit integers, using the
 /// built-in PRIMES.
-#[inline]
-pub fn primes_with_width(n: u32) -> Vec<u16> {
-    base_primes_with_width(n, &PRIMES)
-}
+// #[inline]
+// pub fn primes_with_width(n: u32) -> Vec<u16> {
+//     base_primes_with_width(n, &PRIMES)
+// }
 
 /// Generate a CRT modulus that support at least n-bit integers, using provided primes.
 #[inline]
-pub fn base_modulus_with_width(nbits: u32, primes: &[u16]) -> u128 {
+pub(crate) fn base_modulus_with_width(nbits: u32, primes: &[u16]) -> u128 {
     product(&base_primes_with_width(nbits, primes))
 }
 
 /// Generate the factors of a CRT modulus that support at least n-bit integers, using provided primes.
 #[inline]
-pub fn base_primes_with_width(nbits: u32, primes: &[u16]) -> Vec<u16> {
+pub(crate) fn base_primes_with_width(nbits: u32, primes: &[u16]) -> Vec<u16> {
     let mut res = 1;
     let mut ps = Vec::new();
     for &p in primes.iter() {
@@ -354,10 +354,10 @@ pub fn base_primes_with_width(nbits: u32, primes: &[u16]) -> Vec<u16> {
 
 /// Generate a CRT modulus that support at least n-bit integers, using the built-in
 /// PRIMES_SKIP_2 (does not include 2 as a factor).
-#[inline]
-pub fn modulus_with_width_skip2(nbits: u32) -> u128 {
-    base_modulus_with_width(nbits, &PRIMES_SKIP_2)
-}
+// #[inline]
+// pub fn modulus_with_width_skip2(nbits: u32) -> u128 {
+//     base_modulus_with_width(nbits, &PRIMES_SKIP_2)
+// }
 
 /// Compute the product of some u16s as a u128.
 #[inline]
@@ -366,22 +366,22 @@ pub fn product(xs: &[u16]) -> u128 {
 }
 
 /// Raise a u16 to a power mod some value.
-#[inline]
-pub fn powm(inp: u16, pow: u16, modulus: u16) -> u16 {
-    let mut x = inp as u16;
-    let mut z = 1;
-    let mut n = pow;
-    while n > 0 {
-        if n % 2 == 0 {
-            x = x.pow(2) % modulus as u16;
-            n /= 2;
-        } else {
-            z = x * z % modulus as u16;
-            n -= 1;
-        }
-    }
-    z as u16
-}
+// #[inline]
+// pub fn powm(inp: u16, pow: u16, modulus: u16) -> u16 {
+//     let mut x = inp as u16;
+//     let mut z = 1;
+//     let mut n = pow;
+//     while n > 0 {
+//         if n % 2 == 0 {
+//             x = x.pow(2) % modulus as u16;
+//             n /= 2;
+//         } else {
+//             z = x * z % modulus as u16;
+//             n -= 1;
+//         }
+//     }
+//     z as u16
+// }
 
 /// Returns true if x is a power of 2
 #[inline]

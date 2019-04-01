@@ -331,9 +331,9 @@ pub trait BundleGadgets: Fancy {
         p: u16,
     ) -> Result<Bundle<Self::Item>, Self::Error> {
         let i = x.moduli().iter().position(|&q| p == q).ok_or_else(|| {
-            Self::Error::from(FancyError::InvalidArg {
-                desc: "p is not a moduli in this bundle!".to_string(),
-            })
+            Self::Error::from(FancyError::InvalidArg(
+                "p is not a modulus in this bundle!".to_string(),
+            ))
         })?;
         let w = &x.wires()[i];
         x.moduli()

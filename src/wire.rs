@@ -1,4 +1,4 @@
-//! Low-level operations on wirelabels, the basic building block of garbled circuits.
+//! Low-level operations on wire-labels, the basic building block of garbled circuits.
 
 use crate::fancy::HasModulus;
 use crate::util;
@@ -6,13 +6,22 @@ use rand::{CryptoRng, RngCore};
 use scuttlebutt::{Block, AES_HASH};
 use serde::{Deserialize, Serialize};
 
-/// The essential wirelabel type used by garbled circuits.
-///
-/// It is a list of mod-q digits.
+/// The essential wire-label type used by garbled circuits.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum Wire {
-    Mod2 { val: Block },
-    ModN { q: u16, ds: Vec<u16> },
+    /// `Mod2` gates are simple 128-bit values.
+    Mod2 {
+        /// A 128-bit value.
+        val: Block,
+    },
+    /// `ModN` gates contain the modulus, provided by `q`, and a list of `mod-q`
+    /// digits.
+    ModN {
+        /// The modulus of this wire-label.
+        q: u16,
+        /// A list of `mod-q` digits.
+        ds: Vec<u16>,
+    },
 }
 
 impl std::default::Default for Wire {

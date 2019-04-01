@@ -9,7 +9,7 @@ use std::collections::HashMap;
 /// The index and modulus of a gate in a circuit.
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 pub struct CircuitRef {
-    pub ix: usize,
+    pub(crate) ix: usize,
     pub(crate) modulus: u16,
 }
 
@@ -28,18 +28,18 @@ impl HasModulus for CircuitRef {
 /// Static representation of the type of computation supported by fancy garbling.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct Circuit {
-    pub gates: Vec<Gate>,
-    pub gate_moduli: Vec<u16>,
-    pub garbler_input_refs: Vec<CircuitRef>,
-    pub evaluator_input_refs: Vec<CircuitRef>,
-    pub const_refs: Vec<CircuitRef>,
-    pub output_refs: Vec<CircuitRef>,
+    pub(crate) gates: Vec<Gate>,
+    pub(crate) gate_moduli: Vec<u16>,
+    pub(crate) garbler_input_refs: Vec<CircuitRef>,
+    pub(crate) evaluator_input_refs: Vec<CircuitRef>,
+    pub(crate) const_refs: Vec<CircuitRef>,
+    pub(crate) output_refs: Vec<CircuitRef>,
     num_nonfree_gates: usize,
 }
 
 /// The most basic types of computation supported by fancy garbling.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
-pub enum Gate {
+pub(crate) enum Gate {
     GarblerInput {
         id: usize,
     },
@@ -101,6 +101,7 @@ impl std::fmt::Display for Gate {
 }
 
 impl Circuit {
+    /// Make a new `Circuit` object.
     pub fn new(ngates: Option<usize>) -> Circuit {
         let gates = Vec::with_capacity(ngates.unwrap_or(0));
         Circuit {
@@ -114,6 +115,7 @@ impl Circuit {
         }
     }
 
+    /// Evaluate the circuit using fancy object `f`.
     pub fn eval<F: Fancy>(&mut self, f: &mut F) -> Result<Vec<F::Item>, F::Error> {
         let mut cache: Vec<Option<F::Item>> = vec![None; self.gates.len()];
         for (i, gate) in self.gates.iter().enumerate() {
@@ -191,6 +193,7 @@ impl Circuit {
         Ok(outputs)
     }
 
+    /// Process the outputs provided by `outputs` using fancy object `f`.
     pub fn process_outputs<F: Fancy>(
         &mut self,
         outputs: &[F::Item],
@@ -222,30 +225,36 @@ impl Circuit {
         informer.print_info();
         Ok(())
     }
+    /// Return the number of garbler inputs.
     #[inline]
     pub fn num_garbler_inputs(&self) -> usize {
         self.garbler_input_refs.len()
     }
+    /// Return the number of evaluator inputs.
     #[inline]
     pub fn num_evaluator_inputs(&self) -> usize {
         self.evaluator_input_refs.len()
     }
+    /// Return the number of outputs.
     #[inline]
     pub fn noutputs(&self) -> usize {
         self.output_refs.len()
     }
+    /// Return the modulus of the gate indexed by `i`.
     #[inline]
-    pub fn modulus(&self, gate_num: usize) -> u16 {
-        self.gate_moduli[gate_num]
+    pub fn modulus(&self, i: usize) -> u16 {
+        self.gate_moduli[i]
     }
+    /// Return the modulus of the garbler input indexed by `i`.
     #[inline]
-    pub fn garbler_input_mod(&self, id: usize) -> u16 {
-        let r = self.garbler_input_refs[id];
+    pub fn garbler_input_mod(&self, i: usize) -> u16 {
+        let r = self.garbler_input_refs[i];
         r.modulus()
     }
+    /// Return the modulus of the evaluator input indexed by `i`.
     #[inline]
-    pub fn evaluator_input_mod(&self, id: usize) -> u16 {
-        let r = self.evaluator_input_refs[id];
+    pub fn evaluator_input_mod(&self, i: usize) -> u16 {
+        let r = self.evaluator_input_refs[i];
         r.modulus()
     }
 }
@@ -374,6 +383,7 @@ impl Fancy for CircuitBuilder {
 }
 
 impl CircuitBuilder {
+    /// Make a new `CircuitBuilder`.
     pub fn new() -> Self {
         CircuitBuilder {
             next_ref_ix: 0,
@@ -384,6 +394,7 @@ impl CircuitBuilder {
         }
     }
 
+    /// Finish circuit building, outputting the resulting circuit.
     pub fn finish(self) -> Circuit {
         self.circ
     }

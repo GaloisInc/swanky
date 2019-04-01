@@ -1,3 +1,11 @@
+// -*- mode: rust; -*-
+//
+// This file is part of `fancy-garbling`.
+// Copyright © 2018 Brent Carmer.
+// See LICENSE for licensing information.
+
+//! `fancy-garbling` provides boolean and arithmetic garbling capabilities.
+
 #![deny(clippy::all)]
 #![allow(
     clippy::cast_lossless,
@@ -7,6 +15,7 @@
     clippy::needless_range_loop
 )]
 #![allow(non_snake_case)]
+#![cfg_attr(feature = "nightly", deny(missing_docs))]
 
 pub mod circuit;
 pub mod dummy;
@@ -15,7 +24,7 @@ mod fancy;
 mod garble;
 pub mod informer;
 mod parser;
-pub mod util;
+mod util;
 mod wire;
 
 pub use crate::error::FancyError;

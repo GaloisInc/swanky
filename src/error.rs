@@ -6,50 +6,74 @@ use std::fmt::{self, Display, Formatter};
 /// API-usage errors, such as trying to add two `Items` with different moduli.
 #[derive(Debug)]
 pub enum FancyError {
+    /// Unequal moduli.
     UnequalModuli,
-    NotImplemented,
-    InvalidArg { desc: String },
-    InvalidArgNum { got: usize, needed: usize },
-    InvalidArgMod { got: u16, needed: u16 },
+    /// Invalid argument.
+    InvalidArg(String),
+    /// Invalid number of arguments.
+    InvalidArgNum {
+        /// Received number of arguments.
+        got: usize,
+        /// Expected number of arguments.
+        needed: usize,
+    },
+    /// Invalid argument modulus.
+    InvalidArgMod {
+        /// Received modulus.
+        got: u16,
+        /// Expected modulus.
+        needed: u16,
+    },
+    /// Expected binary argument.
     ArgNotBinary,
+    /// Truth table expected but none given.
     NoTruthTable,
+    /// Projection truth table is invalid.
     InvalidTruthTable,
+    /// Uninitialized value encountered.
     UninitializedValue,
 }
 
 /// Errors from the dummy fancy object.
 #[derive(Debug)]
 pub enum DummyError {
+    /// Not enough garbler inputs provided.
     NotEnoughGarblerInputs,
+    /// Not enough evaluator inputs provided.
     NotEnoughEvaluatorInputs,
+    /// A fancy error has occurred.
     FancyError(FancyError),
 }
 
 /// Errors from the evaluator.
 #[derive(Debug)]
 pub enum EvaluatorError {
-    InvalidMessage { expected: String, got: String },
-    IndexReceivedInSyncMode,
+    /// A fancy error has occurred.
     FancyError(FancyError),
 }
 
 /// Errors from the garbler.
 #[derive(Debug)]
 pub enum GarblerError {
+    /// Asymmetric moduli error.
     AsymmetricHalfGateModuliMax8(u16),
+    /// A truth table was missing.
     TruthTableRequired,
+    /// A fancy error has occurred.
     FancyError(FancyError),
 }
 
 /// Errors emitted when building a circuit.
 #[derive(Debug)]
 pub enum CircuitBuilderError {
+    /// A fancy error has occurred.
     FancyError(FancyError),
 }
 
 /// Errors emitted when running the informer.
 #[derive(Debug)]
 pub enum InformerError {
+    /// A fancy error has occurred.
     FancyError(FancyError),
 }
 
@@ -60,16 +84,17 @@ impl Display for FancyError {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         match self {
             FancyError::UnequalModuli => "unequal moduli".fmt(f),
-            FancyError::NotImplemented => "not implemented".fmt(f),
-            FancyError::InvalidArg { desc } => write!(f, "invalid argument: {}", desc),
+            FancyError::InvalidArg(s) => write!(f, "invalid argument: {}", s),
             FancyError::InvalidArgNum { got, needed } => write!(
                 f,
-                "invalid number of args: needed {} but got {}",
+                "invalid number of arguments: needed {} but got {}",
                 got, needed
             ),
-            FancyError::InvalidArgMod { got, needed } => {
-                write!(f, "invalid mod: got mod {} but require mod {}", got, needed)
-            }
+            FancyError::InvalidArgMod { got, needed } => write!(
+                f,
+                "invalid modulus: got mod {} but require mod {}",
+                got, needed
+            ),
             FancyError::ArgNotBinary => "argument bundle must be boolean".fmt(f),
             FancyError::NoTruthTable => "truth table required".fmt(f),
             FancyError::InvalidTruthTable => "invalid truth table".fmt(f),
@@ -105,10 +130,6 @@ impl From<FancyError> for DummyError {
 impl Display for EvaluatorError {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         match self {
-            EvaluatorError::InvalidMessage { expected, got } => {
-                write!(f, "expected message {} but got {}", expected, got)
-            }
-            EvaluatorError::IndexReceivedInSyncMode => "index received in sync mode".fmt(f),
             EvaluatorError::FancyError(e) => write!(f, "fancy error: {}", e),
         }
     }
@@ -182,10 +203,15 @@ impl From<FancyError> for InformerError {
 /// Errors emitted by the circuit parser.
 #[derive(Debug)]
 pub enum CircuitParserError {
+    /// An I/O error occurred.
     IoError(std::io::Error),
+    /// A regular expression parsing error occurred.
     RegexError(regex::Error),
+    /// An error occurred parsing an integer.
     ParseIntError,
+    /// An error occurred parsing a line.
     ParseLineError(String),
+    /// An error occurred parsing a gate type.
     ParseGateError(String),
 }
 

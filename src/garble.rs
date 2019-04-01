@@ -28,13 +28,23 @@ pub enum Message {
     ///
     /// This is produced by the Garbler, and must be transformed into GarblerInput before
     /// being sent to the Evaluator.
-    UnencodedGarblerInput { zero: Wire, delta: Wire },
+    UnencodedGarblerInput {
+        /// The zero wire-label.
+        zero: Wire,
+        /// THe offset wire-label.
+        delta: Wire,
+    },
 
     /// Zero wire and delta for one of the evaluator's inputs.
     ///
     /// This is produced by the Garbler, and must be transformed into EvaluatorInput
     /// before being sent to the Evaluator.
-    UnencodedEvaluatorInput { zero: Wire, delta: Wire },
+    UnencodedEvaluatorInput {
+        /// The zero wire-label.
+        zero: Wire,
+        /// The offset wire-label.
+        delta: Wire,
+    },
 
     /// Encoded input for one of the garbler's inputs.
     GarblerInput(Wire),
@@ -43,7 +53,12 @@ pub enum Message {
     EvaluatorInput(Wire),
 
     /// Constant wire carrying the value.
-    Constant { value: u16, wire: Wire },
+    Constant {
+        /// The constant value.
+        value: u16,
+        /// The constant's wire-label.
+        wire: Wire,
+    },
 
     /// Garbled gate emitted by a projection or multiplication.
     GarbledGate(GarbledGate),
