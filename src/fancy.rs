@@ -15,12 +15,6 @@ pub trait HasModulus {
     fn modulus(&self) -> u16;
 }
 
-/// The index of a thread for synchronization.
-///
-/// This is used within a thread to ensure all the messages within that thread are
-/// sequential, and are delivered to the correct Evaluator thread.
-// pub type SyncIndex = u8;
-
 /// DSL for the basic computations supported by `fancy-garbling`.
 pub trait Fancy {
     /// The underlying wire datatype created by an object implementing `Fancy`.
@@ -29,7 +23,7 @@ pub trait Fancy {
     /// Errors which may be thrown by the users of Fancy.
     type Error: std::fmt::Debug + std::fmt::Display + std::convert::From<FancyError>;
 
-    /// Create an input for the garbler with modulus `q` and optional garbler-private value `x`.
+    /// Create an input for the garbler with modulus `q` and optional garbler-private value `opt_x`.
     fn garbler_input(&mut self, q: u16, opt_x: Option<u16>) -> Result<Self::Item, Self::Error>;
 
     /// Create an input for the evaluator with modulus `q`.
@@ -52,7 +46,7 @@ pub trait Fancy {
 
     /// Project `x` according to the truth table `tt`. Resulting wire has modulus `q`.
     ///
-    /// Optional `tt` is useful for hiding the gate from evaluator.
+    /// Optional `tt` is useful for hiding the gate from the evaluator.
     fn proj(
         &mut self,
         x: &Self::Item,
