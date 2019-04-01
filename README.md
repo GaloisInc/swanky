@@ -13,18 +13,18 @@ world.
 
 It also exposes various traits for implementing your very own OT protocol:
 
-* `ObliviousTransferSender` and `ObliviousTransferReceiver` are the "base"
-  traits for an OT implementation. They include an `init` function, which does
-  any initial setup and outputs an OT object, and `send`/`receive`, which runs
-  the actual OT part. The `send` and `receive` functions can be repeated without
-  needing to re-run `init`.
+* `Sender` and `Receiver` are the "base" traits for an OT implementation. They
+  include an `init` function, which does any initial setup and outputs an OT
+  object, and `send`/`receive`, which runs the actual OT part. The `send` and
+  `receive` functions can be repeated without needing to re-run `init`.
 
-* `CorrelatedObliviousTransferSender` / `CorrelatedObliviousTransferReceiver`
-  exposes a `send_correlated` / `receive_correlated` method for
-  correlated OT.
+* `CorrelatedSender` / `CorrelatedReceiver` exposes a `send_correlated` /
+  `receive_correlated` method for correlated OT.
 
-* `RandomObliviousTransferSender` / `RandomObliviousTransferReceiver` exposes a
-  `send_random` / `receive_random` method for random OT.
+* `RandomSender` / `RandomReceiver` exposes a `send_random` / `receive_random`
+  method for random OT.
+
+`ocelot` also provides support for oblivious PRF (OPRF) protocols.
 
 **`ocelot` should be considered unstable and under active development until
 version 1.0 is released**
