@@ -6,28 +6,15 @@
 
 //! `ocelot` is an oblivious transfer (+ extension) library written in rust.
 //!
-//! `ocelot` exposes oblivious transfer (OT) through two traits:
-//! `ObliviousTransferSender` and `ObliviousTransferReceiver`. Each trait has an
-//! `init` function, which runs any one-time initialization (e.g., for OT
-//! extension this corresponds to the running of the base OTs). The traits then
-//! have either a `send` or `receive` method, which runs the OT sender or
-//! receiver, respectively. This method can be run multiple times, allowing one
-//! to for example run OT extension multiple times without having to re-do the
-//! initialization phase.
-//!
-//! `ocelot` also supports correlated OT and random OT through the
-//! `CorrelatedObliviousTransferSender/Receiver` and
-//! `RandomObliviousTransferSender/Receiver` traits.
-//!
-//! We use a computation security parameter of `κ = 128` throughout in order to
-//! benefit from SIMD operations over 128-bit values.
-//!
-//! **THIS IS STILL VERY MUCH RESEARCH CODE**, for now.
+//! `ocelot` supports all the latest-and-greatest OT-esque protocols, including
+//! efficient base OT and semi-honest + malicious OT extension. `ocelot` also
+//! provides oblivious PRF support.
 
 #![allow(clippy::many_single_char_names)]
 #![cfg_attr(feature = "nightly", feature(test))]
 #![cfg_attr(feature = "nightly", feature(stdsimd))]
 #![cfg_attr(feature = "nightly", feature(asm))]
+#![cfg_attr(feature = "nightly", deny(missing_docs))]
 
 mod stream;
 mod utils;

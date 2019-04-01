@@ -24,8 +24,10 @@ use std::hash::{Hash, Hasher};
 use std::io::{Read, Write};
 use std::marker::PhantomData;
 
+/// The oblivious PRF seed.
 #[derive(Clone, Copy)]
 pub struct Seed(pub [u8; 64]);
+/// The oblivious PRF output.
 #[derive(Clone, Copy)]
 pub struct Output(pub [u8; 64]);
 
@@ -36,12 +38,13 @@ impl Default for Seed {
 }
 
 impl Output {
+    /// Read an output from `reader`.
     pub fn read<R: Read>(reader: &mut R) -> Result<Self, Error> {
         let mut data = [0u8; 64];
         reader.read_exact(&mut data)?;
         Ok(Self(data))
     }
-
+    /// Write the output to `writer`.
     pub fn write<W: Write>(&self, writer: &mut W) -> Result<(), Error> {
         writer.write_all(&self.0)?;
         Ok(())
@@ -186,6 +189,10 @@ impl<OT: OtReceiver<Msg = Block> + SemiHonest> OprfSender for Sender<OT> {
 
 // Separate out `encode` function for optimization purposes.
 impl<OT: OtReceiver<Msg = Block> + SemiHonest> Sender<OT> {
+    /// Encode `input` into `output`. This is *not* the same as the `compute`
+    /// method as it does not integrate the OPRF seed. However, it is useful for
+    /// optimization purposes (e.g., when the same seed is used on multiple
+    /// encoded inputs).
     #[inline]
     pub fn encode(
         &self,

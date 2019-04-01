@@ -21,6 +21,7 @@ pub type KkrtSender = kkrt::Sender<ot::AlszReceiver>;
 /// KKRT oblivious PRF receiver using ALSZ OT extension with Chou-Orlandi as the base OT.
 pub type KkrtReceiver = kkrt::Receiver<ot::AlszSender>;
 
+/// Trait containing the associated types used by an oblivious PRF.
 pub trait ObliviousPrf
 where
     Self: Sized,
