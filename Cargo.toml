@@ -56,4 +56,3 @@ harness = false
 [[bench]]
 name = "oprf"
 harness = false
-required-features = ["unstable"]
