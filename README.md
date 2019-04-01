@@ -62,8 +62,7 @@ benchmark the various protocols, and `cargo doc --open` to view documentation.
 
 * `nightly`: Use nightly features from `rust` and the underlying libraries.
 
-* `unstable`: Enable unstable components of `ocelot`. Currently this enables
-  oblivious PRF support.
+* `unstable`: Enable unstable components of `ocelot`.
 
 # License
 

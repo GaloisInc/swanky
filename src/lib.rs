@@ -20,6 +20,5 @@ mod utils;
 mod errors;
 pub use crate::errors::Error;
 
-#[cfg(feature = "unstable")]
 pub mod oprf;
 pub mod ot;
