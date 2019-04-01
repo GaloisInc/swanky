@@ -1,4 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source to the Rust file `src/error.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>error.rs.html -- source</title><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../dark.css"><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script src="../../storage.js"></script></head><body class="rustdoc source"><!--[if lte IE 8]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu">&#9776;</div></nav><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!"><img src="../../brush.svg" width="18" alt="Pick another theme!"></button><div id="theme-choices"></div></div><script src="../../theme.js"></script><nav class="sub"><form class="search-form js-only"><div class="search-container"><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><a id="settings-menu" href="../../settings.html"><img src="../../wheel.svg" width="18" alt="Change settings"></a></div></form></nav><section id="main" class="content"><pre class="line-numbers"><span id="1">  1</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source to the Rust file `src/error.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>error.rs.html -- source</title><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../dark.css"><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script src="../../storage.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="shortcut icon" href="../../favicon.ico"><style type="text/css">#crate-search{background-image:url("../../down-arrow.svg");}</style></head><body class="rustdoc source"><!--[if lte IE 8]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu">&#9776;</div><a href='../../fancy_garbling/index.html'><img src='../../rust-logo.png' alt='logo' width='100'></a></nav><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!"><img src="../../brush.svg" width="18" alt="Pick another theme!"></button><div id="theme-choices"></div></div><script src="../../theme.js"></script><nav class="sub"><form class="search-form js-only"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><a id="settings-menu" href="../../settings.html"><img src="../../wheel.svg" width="18" alt="Change settings"></a></div></form></nav><section id="main" class="content"><pre class="line-numbers"><span id="1">  1</span>
 <span id="2">  2</span>
 <span id="3">  3</span>
 <span id="4">  4</span>
@@ -219,17 +219,14 @@
 <span id="219">219</span>
 <span id="220">220</span>
 </pre><div class="example-wrap"><pre class="rust ">
-<span class="doccomment">//! Errors that may be outputted by this library.</span>
+<span class="doccomment">//! Errors that may be output by this library.</span>
 
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">fmt</span>::{<span class="self">self</span>, <span class="ident">Display</span>, <span class="ident">Formatter</span>};
 
-<span class="doccomment">/// Errors that may occur when using the `Fancy` trait. `ClientError` wraps errors from</span>
-<span class="doccomment">/// underlying fancy object.</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// With the exception of ClientError, FancyErrors should be API-usage errors, such as</span>
-<span class="doccomment">/// trying to add two Items with different moduli.</span>
+<span class="doccomment">/// Errors that may occur when using the `Fancy` trait. These errors are</span>
+<span class="doccomment">/// API-usage errors, such as trying to add two `Items` with different moduli.</span>
 <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>)]</span>
-<span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">FancyError</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
+<span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">FancyError</span> {
     <span class="ident">UnequalModuli</span>,
     <span class="ident">NotImplemented</span>,
     <span class="ident">InvalidArg</span> { <span class="ident">desc</span>: <span class="ident">String</span> },
@@ -239,16 +236,6 @@
     <span class="ident">NoTruthTable</span>,
     <span class="ident">InvalidTruthTable</span>,
     <span class="ident">UninitializedValue</span>,
-    <span class="ident">ClientError</span>(<span class="ident">T</span>),
-}
-
-<span class="doccomment">/// Common errors emitted by fancy objects in sync mode.</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>)]</span>
-<span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">SyncError</span> {
-    <span class="ident">IndexRequired</span>,
-    <span class="ident">IndexOutOfBounds</span>,
-    <span class="ident">IndexUsedOutOfSync</span>,
-    <span class="ident">SyncStartedInSync</span>,
 }
 
 <span class="doccomment">/// Errors from the dummy fancy object.</span>
@@ -256,7 +243,7 @@
 <span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">DummyError</span> {
     <span class="ident">NotEnoughGarblerInputs</span>,
     <span class="ident">NotEnoughEvaluatorInputs</span>,
-    <span class="ident">SyncError</span>(<span class="ident">SyncError</span>),
+    <span class="ident">FancyError</span>(<span class="ident">FancyError</span>),
 }
 
 <span class="doccomment">/// Errors from the evaluator.</span>
@@ -264,7 +251,7 @@
 <span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">EvaluatorError</span> {
     <span class="ident">InvalidMessage</span> { <span class="ident">expected</span>: <span class="ident">String</span>, <span class="ident">got</span>: <span class="ident">String</span> },
     <span class="ident">IndexReceivedInSyncMode</span>,
-    <span class="ident">SyncError</span>(<span class="ident">SyncError</span>),
+    <span class="ident">FancyError</span>(<span class="ident">FancyError</span>),
 }
 
 <span class="doccomment">/// Errors from the garbler.</span>
@@ -272,21 +259,25 @@
 <span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">GarblerError</span> {
     <span class="ident">AsymmetricHalfGateModuliMax8</span>(<span class="ident">u16</span>),
     <span class="ident">TruthTableRequired</span>,
-    <span class="ident">SyncError</span>(<span class="ident">SyncError</span>),
+    <span class="ident">FancyError</span>(<span class="ident">FancyError</span>),
 }
 
 <span class="doccomment">/// Errors emitted when building a circuit.</span>
 <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">CircuitBuilderError</span>;
+<span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">CircuitBuilderError</span> {
+    <span class="ident">FancyError</span>(<span class="ident">FancyError</span>),
+}
 
 <span class="doccomment">/// Errors emitted when running the informer.</span>
 <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">InformerError</span>;
+<span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">InformerError</span> {
+    <span class="ident">FancyError</span>(<span class="ident">FancyError</span>),
+}
 
 <span class="comment">////////////////////////////////////////////////////////////////////////////////</span>
 <span class="comment">// fancy error</span>
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">Display</span><span class="op">&gt;</span> <span class="ident">Display</span> <span class="kw">for</span> <span class="ident">FancyError</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
+<span class="kw">impl</span> <span class="ident">Display</span> <span class="kw">for</span> <span class="ident">FancyError</span> {
     <span class="kw">fn</span> <span class="ident">fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">f</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">Formatter</span>) <span class="op">-&gt;</span> <span class="ident">fmt</span>::<span class="prelude-ty">Result</span> {
         <span class="kw">match</span> <span class="self">self</span> {
             <span class="ident">FancyError</span>::<span class="ident">UnequalModuli</span> <span class="op">=&gt;</span> <span class="string">&quot;unequal moduli&quot;</span>.<span class="ident">fmt</span>(<span class="ident">f</span>),
@@ -306,42 +297,7 @@
             <span class="ident">FancyError</span>::<span class="ident">UninitializedValue</span> <span class="op">=&gt;</span> {
                 <span class="string">&quot;uninitialized value in circuit. is the circuit topologically sorted?&quot;</span>.<span class="ident">fmt</span>(<span class="ident">f</span>)
             }
-            <span class="ident">FancyError</span>::<span class="ident">ClientError</span>(<span class="ident">e</span>) <span class="op">=&gt;</span> <span class="macro">write</span><span class="macro">!</span>(<span class="ident">f</span>, <span class="string">&quot;client error: {}&quot;</span>, <span class="ident">e</span>),
         }
-    }
-}
-
-<span class="comment">////////////////////////////////////////////////////////////////////////////////</span>
-<span class="comment">// sync error</span>
-
-<span class="kw">impl</span> <span class="ident">Display</span> <span class="kw">for</span> <span class="ident">SyncError</span> {
-    <span class="kw">fn</span> <span class="ident">fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">f</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">Formatter</span>) <span class="op">-&gt;</span> <span class="ident">fmt</span>::<span class="prelude-ty">Result</span> {
-        <span class="kw">match</span> <span class="self">self</span> {
-            <span class="ident">SyncError</span>::<span class="ident">IndexRequired</span> <span class="op">=&gt;</span> <span class="string">&quot;sync index required in sync mode&quot;</span>.<span class="ident">fmt</span>(<span class="ident">f</span>),
-            <span class="ident">SyncError</span>::<span class="ident">IndexOutOfBounds</span> <span class="op">=&gt;</span> <span class="string">&quot;sync index out of bounds&quot;</span>.<span class="ident">fmt</span>(<span class="ident">f</span>),
-            <span class="ident">SyncError</span>::<span class="ident">IndexUsedOutOfSync</span> <span class="op">=&gt;</span> <span class="string">&quot;sync index used out of sync mode&quot;</span>.<span class="ident">fmt</span>(<span class="ident">f</span>),
-            <span class="ident">SyncError</span>::<span class="ident">SyncStartedInSync</span> <span class="op">=&gt;</span> {
-                <span class="string">&quot;begin_sync called before finishing previous sync&quot;</span>.<span class="ident">fmt</span>(<span class="ident">f</span>)
-            }
-        }
-    }
-}
-
-<span class="kw">impl</span> <span class="ident">From</span><span class="op">&lt;</span><span class="ident">SyncError</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">GarblerError</span> {
-    <span class="kw">fn</span> <span class="ident">from</span>(<span class="ident">e</span>: <span class="ident">SyncError</span>) <span class="op">-&gt;</span> <span class="ident">GarblerError</span> {
-        <span class="ident">GarblerError</span>::<span class="ident">SyncError</span>(<span class="ident">e</span>)
-    }
-}
-
-<span class="kw">impl</span> <span class="ident">From</span><span class="op">&lt;</span><span class="ident">SyncError</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">EvaluatorError</span> {
-    <span class="kw">fn</span> <span class="ident">from</span>(<span class="ident">e</span>: <span class="ident">SyncError</span>) <span class="op">-&gt;</span> <span class="ident">EvaluatorError</span> {
-        <span class="ident">EvaluatorError</span>::<span class="ident">SyncError</span>(<span class="ident">e</span>)
-    }
-}
-
-<span class="kw">impl</span> <span class="ident">From</span><span class="op">&lt;</span><span class="ident">SyncError</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">DummyError</span> {
-    <span class="kw">fn</span> <span class="ident">from</span>(<span class="ident">e</span>: <span class="ident">SyncError</span>) <span class="op">-&gt;</span> <span class="ident">DummyError</span> {
-        <span class="ident">DummyError</span>::<span class="ident">SyncError</span>(<span class="ident">e</span>)
     }
 }
 
@@ -353,14 +309,14 @@
         <span class="kw">match</span> <span class="self">self</span> {
             <span class="ident">DummyError</span>::<span class="ident">NotEnoughGarblerInputs</span> <span class="op">=&gt;</span> <span class="string">&quot;not enough garbler inputs&quot;</span>.<span class="ident">fmt</span>(<span class="ident">f</span>),
             <span class="ident">DummyError</span>::<span class="ident">NotEnoughEvaluatorInputs</span> <span class="op">=&gt;</span> <span class="string">&quot;not enough evaluator inputs&quot;</span>.<span class="ident">fmt</span>(<span class="ident">f</span>),
-            <span class="ident">DummyError</span>::<span class="ident">SyncError</span>(<span class="ident">e</span>) <span class="op">=&gt;</span> <span class="macro">write</span><span class="macro">!</span>(<span class="ident">f</span>, <span class="string">&quot;dummy sync error: {}&quot;</span>, <span class="ident">e</span>),
+            <span class="ident">DummyError</span>::<span class="ident">FancyError</span>(<span class="ident">e</span>) <span class="op">=&gt;</span> <span class="macro">write</span><span class="macro">!</span>(<span class="ident">f</span>, <span class="string">&quot;fancy error: {}&quot;</span>, <span class="ident">e</span>),
         }
     }
 }
 
-<span class="kw">impl</span> <span class="ident">From</span><span class="op">&lt;</span><span class="ident">DummyError</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">FancyError</span><span class="op">&lt;</span><span class="ident">DummyError</span><span class="op">&gt;</span> {
-    <span class="kw">fn</span> <span class="ident">from</span>(<span class="ident">e</span>: <span class="ident">DummyError</span>) <span class="op">-&gt;</span> <span class="ident">FancyError</span><span class="op">&lt;</span><span class="ident">DummyError</span><span class="op">&gt;</span> {
-        <span class="ident">FancyError</span>::<span class="ident">ClientError</span>(<span class="ident">e</span>)
+<span class="kw">impl</span> <span class="ident">From</span><span class="op">&lt;</span><span class="ident">FancyError</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">DummyError</span> {
+    <span class="kw">fn</span> <span class="ident">from</span>(<span class="ident">e</span>: <span class="ident">FancyError</span>) <span class="op">-&gt;</span> <span class="ident">DummyError</span> {
+        <span class="ident">DummyError</span>::<span class="ident">FancyError</span>(<span class="ident">e</span>)
     }
 }
 
@@ -374,25 +330,19 @@
                 <span class="macro">write</span><span class="macro">!</span>(<span class="ident">f</span>, <span class="string">&quot;expected message {} but got {}&quot;</span>, <span class="ident">expected</span>, <span class="ident">got</span>)
             }
             <span class="ident">EvaluatorError</span>::<span class="ident">IndexReceivedInSyncMode</span> <span class="op">=&gt;</span> <span class="string">&quot;index received in sync mode&quot;</span>.<span class="ident">fmt</span>(<span class="ident">f</span>),
-            <span class="ident">EvaluatorError</span>::<span class="ident">SyncError</span>(<span class="ident">e</span>) <span class="op">=&gt;</span> <span class="macro">write</span><span class="macro">!</span>(<span class="ident">f</span>, <span class="string">&quot;evaluator sync error: {}&quot;</span>, <span class="ident">e</span>),
+            <span class="ident">EvaluatorError</span>::<span class="ident">FancyError</span>(<span class="ident">e</span>) <span class="op">=&gt;</span> <span class="macro">write</span><span class="macro">!</span>(<span class="ident">f</span>, <span class="string">&quot;fancy error: {}&quot;</span>, <span class="ident">e</span>),
         }
     }
 }
 
-<span class="kw">impl</span> <span class="ident">From</span><span class="op">&lt;</span><span class="ident">EvaluatorError</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">FancyError</span><span class="op">&lt;</span><span class="ident">EvaluatorError</span><span class="op">&gt;</span> {
-    <span class="kw">fn</span> <span class="ident">from</span>(<span class="ident">e</span>: <span class="ident">EvaluatorError</span>) <span class="op">-&gt;</span> <span class="ident">FancyError</span><span class="op">&lt;</span><span class="ident">EvaluatorError</span><span class="op">&gt;</span> {
-        <span class="ident">FancyError</span>::<span class="ident">ClientError</span>(<span class="ident">e</span>)
+<span class="kw">impl</span> <span class="ident">From</span><span class="op">&lt;</span><span class="ident">FancyError</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">EvaluatorError</span> {
+    <span class="kw">fn</span> <span class="ident">from</span>(<span class="ident">e</span>: <span class="ident">FancyError</span>) <span class="op">-&gt;</span> <span class="ident">EvaluatorError</span> {
+        <span class="ident">EvaluatorError</span>::<span class="ident">FancyError</span>(<span class="ident">e</span>)
     }
 }
 
 <span class="comment">////////////////////////////////////////////////////////////////////////////////</span>
 <span class="comment">// Garbler error</span>
-
-<span class="kw">impl</span> <span class="ident">From</span><span class="op">&lt;</span><span class="ident">GarblerError</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">FancyError</span><span class="op">&lt;</span><span class="ident">GarblerError</span><span class="op">&gt;</span> {
-    <span class="kw">fn</span> <span class="ident">from</span>(<span class="ident">e</span>: <span class="ident">GarblerError</span>) <span class="op">-&gt;</span> <span class="ident">FancyError</span><span class="op">&lt;</span><span class="ident">GarblerError</span><span class="op">&gt;</span> {
-        <span class="ident">FancyError</span>::<span class="ident">ClientError</span>(<span class="ident">e</span>)
-    }
-}
 
 <span class="kw">impl</span> <span class="ident">Display</span> <span class="kw">for</span> <span class="ident">GarblerError</span> {
     <span class="kw">fn</span> <span class="ident">fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">f</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">Formatter</span>) <span class="op">-&gt;</span> <span class="ident">fmt</span>::<span class="prelude-ty">Result</span> {
@@ -405,8 +355,14 @@
             <span class="ident">GarblerError</span>::<span class="ident">TruthTableRequired</span> <span class="op">=&gt;</span> {
                 <span class="string">&quot;truth table required for garbler projection gates&quot;</span>.<span class="ident">fmt</span>(<span class="ident">f</span>)
             }
-            <span class="ident">GarblerError</span>::<span class="ident">SyncError</span>(<span class="ident">e</span>) <span class="op">=&gt;</span> <span class="macro">write</span><span class="macro">!</span>(<span class="ident">f</span>, <span class="string">&quot;garbler sync error: {}&quot;</span>, <span class="ident">e</span>),
+            <span class="ident">GarblerError</span>::<span class="ident">FancyError</span>(<span class="ident">e</span>) <span class="op">=&gt;</span> <span class="macro">write</span><span class="macro">!</span>(<span class="ident">f</span>, <span class="string">&quot;fancy error: {}&quot;</span>, <span class="ident">e</span>),
         }
+    }
+}
+
+<span class="kw">impl</span> <span class="ident">From</span><span class="op">&lt;</span><span class="ident">FancyError</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">GarblerError</span> {
+    <span class="kw">fn</span> <span class="ident">from</span>(<span class="ident">e</span>: <span class="ident">FancyError</span>) <span class="op">-&gt;</span> <span class="ident">GarblerError</span> {
+        <span class="ident">GarblerError</span>::<span class="ident">FancyError</span>(<span class="ident">e</span>)
     }
 }
 
@@ -415,13 +371,15 @@
 
 <span class="kw">impl</span> <span class="ident">Display</span> <span class="kw">for</span> <span class="ident">CircuitBuilderError</span> {
     <span class="kw">fn</span> <span class="ident">fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">f</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">Formatter</span>) <span class="op">-&gt;</span> <span class="ident">fmt</span>::<span class="prelude-ty">Result</span> {
-        <span class="string">&quot;CircuitBuilderError&quot;</span>.<span class="ident">fmt</span>(<span class="ident">f</span>)
+        <span class="kw">match</span> <span class="self">self</span> {
+            <span class="ident">CircuitBuilderError</span>::<span class="ident">FancyError</span>(<span class="ident">e</span>) <span class="op">=&gt;</span> <span class="macro">write</span><span class="macro">!</span>(<span class="ident">f</span>, <span class="string">&quot;fancy error: {}&quot;</span>, <span class="ident">e</span>),
+        }
     }
 }
 
-<span class="kw">impl</span> <span class="ident">From</span><span class="op">&lt;</span><span class="ident">CircuitBuilderError</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">FancyError</span><span class="op">&lt;</span><span class="ident">CircuitBuilderError</span><span class="op">&gt;</span> {
-    <span class="kw">fn</span> <span class="ident">from</span>(<span class="ident">e</span>: <span class="ident">CircuitBuilderError</span>) <span class="op">-&gt;</span> <span class="ident">FancyError</span><span class="op">&lt;</span><span class="ident">CircuitBuilderError</span><span class="op">&gt;</span> {
-        <span class="ident">FancyError</span>::<span class="ident">ClientError</span>(<span class="ident">e</span>)
+<span class="kw">impl</span> <span class="ident">From</span><span class="op">&lt;</span><span class="ident">FancyError</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">CircuitBuilderError</span> {
+    <span class="kw">fn</span> <span class="ident">from</span>(<span class="ident">e</span>: <span class="ident">FancyError</span>) <span class="op">-&gt;</span> <span class="ident">CircuitBuilderError</span> {
+        <span class="ident">CircuitBuilderError</span>::<span class="ident">FancyError</span>(<span class="ident">e</span>)
     }
 }
 
@@ -430,14 +388,56 @@
 
 <span class="kw">impl</span> <span class="ident">Display</span> <span class="kw">for</span> <span class="ident">InformerError</span> {
     <span class="kw">fn</span> <span class="ident">fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">f</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">Formatter</span>) <span class="op">-&gt;</span> <span class="ident">fmt</span>::<span class="prelude-ty">Result</span> {
-        <span class="string">&quot;InformerError&quot;</span>.<span class="ident">fmt</span>(<span class="ident">f</span>)
+        <span class="kw">match</span> <span class="self">self</span> {
+            <span class="ident">InformerError</span>::<span class="ident">FancyError</span>(<span class="ident">e</span>) <span class="op">=&gt;</span> <span class="macro">write</span><span class="macro">!</span>(<span class="ident">f</span>, <span class="string">&quot;fancy error: {}&quot;</span>, <span class="ident">e</span>),
+        }
     }
 }
 
-<span class="kw">impl</span> <span class="ident">From</span><span class="op">&lt;</span><span class="ident">InformerError</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">FancyError</span><span class="op">&lt;</span><span class="ident">InformerError</span><span class="op">&gt;</span> {
-    <span class="kw">fn</span> <span class="ident">from</span>(<span class="ident">e</span>: <span class="ident">InformerError</span>) <span class="op">-&gt;</span> <span class="ident">FancyError</span><span class="op">&lt;</span><span class="ident">InformerError</span><span class="op">&gt;</span> {
-        <span class="ident">FancyError</span>::<span class="ident">ClientError</span>(<span class="ident">e</span>)
+<span class="kw">impl</span> <span class="ident">From</span><span class="op">&lt;</span><span class="ident">FancyError</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">InformerError</span> {
+    <span class="kw">fn</span> <span class="ident">from</span>(<span class="ident">e</span>: <span class="ident">FancyError</span>) <span class="op">-&gt;</span> <span class="ident">InformerError</span> {
+        <span class="ident">InformerError</span>::<span class="ident">FancyError</span>(<span class="ident">e</span>)
+    }
+}
+
+<span class="doccomment">/// Errors emitted by the circuit parser.</span>
+<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>)]</span>
+<span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">CircuitParserError</span> {
+    <span class="ident">IoError</span>(<span class="ident">std</span>::<span class="ident">io</span>::<span class="ident">Error</span>),
+    <span class="ident">RegexError</span>(<span class="ident">regex</span>::<span class="ident">Error</span>),
+    <span class="ident">ParseIntError</span>,
+    <span class="ident">ParseLineError</span>(<span class="ident">String</span>),
+    <span class="ident">ParseGateError</span>(<span class="ident">String</span>),
+}
+
+<span class="kw">impl</span> <span class="ident">Display</span> <span class="kw">for</span> <span class="ident">CircuitParserError</span> {
+    <span class="kw">fn</span> <span class="ident">fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">f</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">Formatter</span>) <span class="op">-&gt;</span> <span class="ident">fmt</span>::<span class="prelude-ty">Result</span> {
+        <span class="kw">match</span> <span class="self">self</span> {
+            <span class="ident">CircuitParserError</span>::<span class="ident">IoError</span>(<span class="ident">e</span>) <span class="op">=&gt;</span> <span class="macro">write</span><span class="macro">!</span>(<span class="ident">f</span>, <span class="string">&quot;io error: {}&quot;</span>, <span class="ident">e</span>),
+            <span class="ident">CircuitParserError</span>::<span class="ident">RegexError</span>(<span class="ident">e</span>) <span class="op">=&gt;</span> <span class="macro">write</span><span class="macro">!</span>(<span class="ident">f</span>, <span class="string">&quot;regex error: {}&quot;</span>, <span class="ident">e</span>),
+            <span class="ident">CircuitParserError</span>::<span class="ident">ParseIntError</span> <span class="op">=&gt;</span> <span class="macro">write</span><span class="macro">!</span>(<span class="ident">f</span>, <span class="string">&quot;unable to parse integer&quot;</span>),
+            <span class="ident">CircuitParserError</span>::<span class="ident">ParseLineError</span>(<span class="ident">s</span>) <span class="op">=&gt;</span> <span class="macro">write</span><span class="macro">!</span>(<span class="ident">f</span>, <span class="string">&quot;unable to parse line &#39;{}&#39;&quot;</span>, <span class="ident">s</span>),
+            <span class="ident">CircuitParserError</span>::<span class="ident">ParseGateError</span>(<span class="ident">s</span>) <span class="op">=&gt;</span> <span class="macro">write</span><span class="macro">!</span>(<span class="ident">f</span>, <span class="string">&quot;unable to parse gate &#39;{}&#39;&quot;</span>, <span class="ident">s</span>),
+        }
+    }
+}
+
+<span class="kw">impl</span> <span class="ident">From</span><span class="op">&lt;</span><span class="ident">std</span>::<span class="ident">io</span>::<span class="ident">Error</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">CircuitParserError</span> {
+    <span class="kw">fn</span> <span class="ident">from</span>(<span class="ident">e</span>: <span class="ident">std</span>::<span class="ident">io</span>::<span class="ident">Error</span>) <span class="op">-&gt;</span> <span class="ident">CircuitParserError</span> {
+        <span class="ident">CircuitParserError</span>::<span class="ident">IoError</span>(<span class="ident">e</span>)
+    }
+}
+
+<span class="kw">impl</span> <span class="ident">From</span><span class="op">&lt;</span><span class="ident">regex</span>::<span class="ident">Error</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">CircuitParserError</span> {
+    <span class="kw">fn</span> <span class="ident">from</span>(<span class="ident">e</span>: <span class="ident">regex</span>::<span class="ident">Error</span>) <span class="op">-&gt;</span> <span class="ident">CircuitParserError</span> {
+        <span class="ident">CircuitParserError</span>::<span class="ident">RegexError</span>(<span class="ident">e</span>)
+    }
+}
+
+<span class="kw">impl</span> <span class="ident">From</span><span class="op">&lt;</span><span class="ident">std</span>::<span class="ident">num</span>::<span class="ident">ParseIntError</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">CircuitParserError</span> {
+    <span class="kw">fn</span> <span class="ident">from</span>(<span class="kw">_</span>: <span class="ident">std</span>::<span class="ident">num</span>::<span class="ident">ParseIntError</span>) <span class="op">-&gt;</span> <span class="ident">CircuitParserError</span> {
+        <span class="ident">CircuitParserError</span>::<span class="ident">ParseIntError</span>
     }
 }
 </pre></div>
-</section><section id="search" class="content hidden"></section><section class="footer"></section><aside id="help" class="hidden"><div><h1 class="hidden">Help</h1><div class="shortcuts"><h2>Keyboard Shortcuts</h2><dl><dt><kbd>?</kbd></dt><dd>Show this help dialog</dd><dt><kbd>S</kbd></dt><dd>Focus the search field</dd><dt><kbd>↑</kbd></dt><dd>Move up in search results</dd><dt><kbd>↓</kbd></dt><dd>Move down in search results</dd><dt><kbd>↹</kbd></dt><dd>Switch tab</dd><dt><kbd>&#9166;</kbd></dt><dd>Go to active search result</dd><dt><kbd>+</kbd></dt><dd>Expand all sections</dd><dt><kbd>-</kbd></dt><dd>Collapse all sections</dd></dl></div><div class="infos"><h2>Search Tricks</h2><p>Prefix searches with a type followed by a colon (e.g. <code>fn:</code>) to restrict the search to a given type.</p><p>Accepted types are: <code>fn</code>, <code>mod</code>, <code>struct</code>, <code>enum</code>, <code>trait</code>, <code>type</code>, <code>macro</code>, and <code>const</code>.</p><p>Search functions by type signature (e.g. <code>vec -> usize</code> or <code>* -> vec</code>)</p><p>Search multiple things at once by splitting your query with comma (e.g. <code>str,u8</code> or <code>String,struct:Vec,test</code>)</p></div></div></aside><script>window.rootPath = "../../";window.currentCrate = "fancy_garbling";</script><script src="../../aliases.js"></script><script src="../../main.js"></script><script src="../../source-files.js"></script><script src="../../source-script.js"></script><script defer src="../../search-index.js"></script></body></html>
+</section><section id="search" class="content hidden"></section><section class="footer"></section><aside id="help" class="hidden"><div><h1 class="hidden">Help</h1><div class="shortcuts"><h2>Keyboard Shortcuts</h2><dl><dt><kbd>?</kbd></dt><dd>Show this help dialog</dd><dt><kbd>S</kbd></dt><dd>Focus the search field</dd><dt><kbd>↑</kbd></dt><dd>Move up in search results</dd><dt><kbd>↓</kbd></dt><dd>Move down in search results</dd><dt><kbd>↹</kbd></dt><dd>Switch tab</dd><dt><kbd>&#9166;</kbd></dt><dd>Go to active search result</dd><dt><kbd>+</kbd></dt><dd>Expand all sections</dd><dt><kbd>-</kbd></dt><dd>Collapse all sections</dd></dl></div><div class="infos"><h2>Search Tricks</h2><p>Prefix searches with a type followed by a colon (e.g., <code>fn:</code>) to restrict the search to a given type.</p><p>Accepted types are: <code>fn</code>, <code>mod</code>, <code>struct</code>, <code>enum</code>, <code>trait</code>, <code>type</code>, <code>macro</code>, and <code>const</code>.</p><p>Search functions by type signature (e.g., <code>vec -> usize</code> or <code>* -> vec</code>)</p><p>Search multiple things at once by splitting your query with comma (e.g., <code>str,u8</code> or <code>String,struct:Vec,test</code>)</p></div></div></aside><script>window.rootPath = "../../";window.currentCrate = "fancy_garbling";</script><script src="../../aliases.js"></script><script src="../../main.js"></script><script src="../../source-script.js"></script><script src="../../source-files.js"></script><script defer src="../../search-index.js"></script></body></html>
