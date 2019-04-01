@@ -33,6 +33,7 @@ use crate::Block;
 use core::arch::x86_64::*;
 use core::mem;
 
+/// AES-128.
 #[derive(Clone)]
 pub struct Aes128 {
     rkeys: [__m128i; 11],
@@ -135,12 +136,13 @@ fn expand(key: __m128i) -> [__m128i; 11] {
 }
 
 impl Aes128 {
+    /// Create a new `Aes128` object, using `key` as the AES key.
     #[inline]
     pub fn new(key: Block) -> Self {
         let rkeys = expand(key.0);
         Aes128 { rkeys }
     }
-
+    /// Encrypt `m`, outputting the encryption.
     #[inline]
     pub fn encrypt(&self, m: Block) -> Block {
         let keys = self.rkeys;

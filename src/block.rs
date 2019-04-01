@@ -35,11 +35,12 @@ const ONES: __m128i = unsafe {
 };
 
 impl Block {
+    /// Convert into a pointer.
     #[inline]
     pub fn as_ptr(&self) -> *const u8 {
         self.as_ref().as_ptr()
     }
-
+    /// Convert into a mutable pointer.
     #[inline]
     pub fn as_mut_ptr(&mut self) -> *mut u8 {
         self.as_mut().as_mut_ptr()
@@ -99,18 +100,20 @@ impl Block {
     }
 
     /// Fixed key for AES hash. This is the same fixed key as used in the EMP toolkit.
-    #[inline]
-    pub fn fixed_key() -> Self {
-        Block::from([
-            0x61, 0x7e, 0x8d, 0xa2, 0xa0, 0x51, 0x1e, 0x96, 0x5e, 0x41, 0xc2, 0x9b, 0x15, 0x3f,
-            0xc7, 0x7a,
-        ])
-    }
+    // #[inline]
+    // pub fn fixed_key() -> Self {
+    //     Block::from([
+    //         0x61, 0x7e, 0x8d, 0xa2, 0xa0, 0x51, 0x1e, 0x96, 0x5e, 0x41, 0xc2, 0x9b, 0x15, 0x3f,
+    //         0xc7, 0x7a,
+    //     ])
+    // }
 
+    /// Write a block to `stream`.
     #[inline]
     pub fn write<T: Write>(&self, stream: &mut T) -> Result<usize, std::io::Error> {
         stream.write(self.as_ref())
     }
+    /// Read a block from `stream`.
     #[inline]
     pub fn read<T: Read>(stream: &mut T) -> Result<Block, std::io::Error> {
         let mut v = Block::zero();

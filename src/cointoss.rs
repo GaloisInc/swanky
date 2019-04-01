@@ -19,7 +19,9 @@ use std::io::{Read, Write};
 /// Errors produced by the coin tossing protocol.
 #[derive(Debug)]
 pub enum Error {
+    /// An I/O error occurred.
     IoError(std::io::Error),
+    /// The commitment check failed.
     CommitmentCheckFailed,
 }
 
