@@ -1,5 +1,5 @@
 use fancy_garbling::dummy::Dummy;
-use fancy_garbling::util::{crt_factor, crt_inv_factor, modulus_with_nprimes, RngExt};
+use fancy_garbling::util::{crt_factor, crt_inv_factor, modulus_with_nprimes};
 use fancy_garbling::*;
 use itertools::Itertools;
 use rand::Rng;
@@ -26,7 +26,7 @@ fn main() {
     for _ in 0..n {
         let nprimes = rng.gen_range(5, 9);
         let q = modulus_with_nprimes(nprimes);
-        let x = rng.gen_u128() % q;
+        let x = rand::random::<u128>() % q;
         let mut d = Dummy::new(&crt_factor(x, q), &[]);
         approx_relu(&mut d, q);
         let outs = d

@@ -10,19 +10,19 @@ use scuttlebutt::Block;
 
 /// Tweak function for a single item.
 #[inline]
-pub fn tweak(i: usize) -> Block {
+pub(crate) fn tweak(i: usize) -> Block {
     Block::from(i as u128)
 }
 
 /// Tweak function for two items.
 #[inline]
-pub fn tweak2(i: u64, j: u64) -> Block {
+pub(crate) fn tweak2(i: u64, j: u64) -> Block {
     Block::from(((i as u128) << 64) + j as u128)
 }
 
 /// Compute the output tweak for a garbled gate where i is the gate id and k is the value.
 #[inline]
-pub fn output_tweak(i: usize, k: u16) -> Block {
+pub(crate) fn output_tweak(i: usize, k: u16) -> Block {
     let (left, _) = (i as u128).overflowing_shl(64);
     Block::from(left + k as u128)
 }
@@ -31,19 +31,19 @@ pub fn output_tweak(i: usize, k: u16) -> Block {
 // mixed radix stuff
 
 /// Add two base q numbers together.
-#[inline]
-pub fn base_q_add(xs: &[u16], ys: &[u16], q: u16) -> Vec<u16> {
-    if ys.len() > xs.len() {
-        return base_q_add(ys, xs, q);
-    }
-    let mut ret = xs.to_vec();
-    base_q_add_eq(&mut ret, ys, q);
-    ret
-}
+// #[inline]
+// pub(crate) fn base_q_add(xs: &[u16], ys: &[u16], q: u16) -> Vec<u16> {
+//     if ys.len() > xs.len() {
+//         return base_q_add(ys, xs, q);
+//     }
+//     let mut ret = xs.to_vec();
+//     base_q_add_eq(&mut ret, ys, q);
+//     ret
+// }
 
 /// Add a base q number into the first one.
 #[inline]
-pub fn base_q_add_eq(xs: &mut [u16], ys: &[u16], q: u16) {
+pub(crate) fn base_q_add_eq(xs: &mut [u16], ys: &[u16], q: u16) {
     debug_assert!(
         xs.len() >= ys.len(),
         "q={} xs.len()={} ys.len()={} xs={:?} ys={:?}",
@@ -83,14 +83,14 @@ pub fn base_q_add_eq(xs: &mut [u16], ys: &[u16], q: u16) {
 
 /// Convert a `u128` into base `q`.
 #[inline]
-pub fn as_base_q(x: u128, q: u16, n: usize) -> Vec<u16> {
+pub(crate) fn as_base_q(x: u128, q: u16, n: usize) -> Vec<u16> {
     let ms = std::iter::repeat(q).take(n).collect_vec();
     as_mixed_radix(x, &ms)
 }
 
 /// Determine how many `mod q` digits fit into a `u128`.
 #[inline]
-pub fn digits_per_u128(modulus: u16) -> usize {
+pub(crate) fn digits_per_u128(modulus: u16) -> usize {
     debug_assert_ne!(modulus, 1);
     if modulus == 2 {
         128
@@ -113,13 +113,13 @@ pub fn digits_per_u128(modulus: u16) -> usize {
 
 /// Convert a `u128` into base `q`.
 #[inline]
-pub fn as_base_q_u128(x: u128, q: u16) -> Vec<u16> {
+pub(crate) fn as_base_q_u128(x: u128, q: u16) -> Vec<u16> {
     as_base_q(x, q, digits_per_u128(q))
 }
 
 /// Convert a `u128` into mixed radix form with the provided radii.
 #[inline]
-pub fn as_mixed_radix(x: u128, radii: &[u16]) -> Vec<u16> {
+pub(crate) fn as_mixed_radix(x: u128, radii: &[u16]) -> Vec<u16> {
     let mut x = x;
     radii
         .iter()
@@ -139,7 +139,7 @@ pub fn as_mixed_radix(x: u128, radii: &[u16]) -> Vec<u16> {
 
 /// Convert little-endian base q digits into u128.
 #[inline]
-pub fn from_base_q(ds: &[u16], q: u16) -> u128 {
+pub(crate) fn from_base_q(ds: &[u16], q: u16) -> u128 {
     let mut x: u128 = 0;
     for &d in ds.iter().rev() {
         let (xp, overflow) = x.overflowing_mul(q as u128);
@@ -151,7 +151,7 @@ pub fn from_base_q(ds: &[u16], q: u16) -> u128 {
 
 /// Convert little-endian mixed radix digits into u128.
 #[inline]
-pub fn from_mixed_radix(digits: &[u16], radii: &[u16]) -> u128 {
+pub(crate) fn from_mixed_radix(digits: &[u16], radii: &[u16]) -> u128 {
     let mut x: u128 = 0;
     for (&d, &q) in digits.iter().zip(radii.iter()).rev() {
         let (xp, overflow) = x.overflowing_mul(q as u128);
@@ -167,7 +167,7 @@ pub fn from_mixed_radix(digits: &[u16], radii: &[u16]) -> u128 {
 /// Get the bits of a u128 encoded in 128 u16s, which is convenient for the rest of
 /// the library, which uses u16 as the base digit type in Wire.
 #[inline]
-pub fn u128_to_bits(x: u128, n: usize) -> Vec<u16> {
+pub(crate) fn u128_to_bits(x: u128, n: usize) -> Vec<u16> {
     let mut bits = Vec::with_capacity(n);
     let mut y = x;
     for _ in 0..n {
@@ -181,7 +181,7 @@ pub fn u128_to_bits(x: u128, n: usize) -> Vec<u16> {
 
 /// Convert into a u128 from the "bits" as u16. Assumes each "bit" is 0 or 1.
 #[inline]
-pub fn u128_from_bits(bs: &[u16]) -> u128 {
+pub(crate) fn u128_from_bits(bs: &[u16]) -> u128 {
     let mut x = 0;
     for &b in bs.iter().skip(1).rev() {
         x += b as u128;
@@ -189,18 +189,6 @@ pub fn u128_from_bits(bs: &[u16]) -> u128 {
     }
     x += bs[0] as u128;
     x
-}
-
-/// Convert a u128 into bytes.
-#[inline]
-pub fn u128_to_bytes(x: u128) -> [u8; 16] {
-    unsafe { std::mem::transmute(x) }
-}
-
-/// Convert bytes to u128.
-#[inline]
-pub fn bytes_to_u128(bytes: [u8; 16]) -> u128 {
-    unsafe { std::mem::transmute(bytes) }
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -212,7 +200,7 @@ pub fn bytes_to_u128(bytes: [u8; 16]) -> u128 {
 /// We are limited by the size of the digits in Wire, and besides, if need large moduli,
 /// you should use BundleGadgets and save.
 #[inline]
-pub fn factor(inp: u128) -> Vec<u16> {
+pub(crate) fn factor(inp: u128) -> Vec<u16> {
     let mut x = inp;
     let mut fs = Vec::new();
     for &p in PRIMES.iter() {
@@ -230,11 +218,12 @@ pub fn factor(inp: u128) -> Vec<u16> {
 
 /// Compute the CRT representation of x with respect to the primes ps.
 #[inline]
-pub fn crt(x: u128, ps: &[u16]) -> Vec<u16> {
+pub(crate) fn crt(x: u128, ps: &[u16]) -> Vec<u16> {
     ps.iter().map(|&p| (x % p as u128) as u16).collect()
 }
 
-/// Compute the CRT representation of x with respect to the factorization of q.
+/// Compute the CRT representation of `x` with respect to the factorization of
+/// `q`.
 #[inline]
 pub fn crt_factor(x: u128, q: u128) -> Vec<u16> {
     crt(x, &factor(q))
@@ -242,7 +231,7 @@ pub fn crt_factor(x: u128, q: u128) -> Vec<u16> {
 
 /// Compute the value x given a list of CRT primes and residues.
 #[inline]
-pub fn crt_inv(xs: &[u16], ps: &[u16]) -> u128 {
+pub(crate) fn crt_inv(xs: &[u16], ps: &[u16]) -> u128 {
     let mut ret = 0;
     let M = ps.iter().fold(1, |acc, &x| x as i128 * acc);
     for (&p, &a) in ps.iter().zip(xs.iter()) {
@@ -254,7 +243,7 @@ pub fn crt_inv(xs: &[u16], ps: &[u16]) -> u128 {
     ret as u128
 }
 
-/// Compute the value x given a composite CRT modulus.
+/// Compute the value `x` given a composite CRT modulus provided by `xs`.
 #[inline]
 pub fn crt_inv_factor(xs: &[u16], q: u128) -> u128 {
     crt_inv(xs, &factor(q))
@@ -263,7 +252,7 @@ pub fn crt_inv_factor(xs: &[u16], q: u128) -> u128 {
 /// Generic algorithm to invert inp_a mod inp_b. As ref so as to support BigInts without
 /// copying.
 #[inline]
-pub fn inv(inp_a: i128, inp_b: i128) -> i128 {
+pub(crate) fn inv(inp_a: i128, inp_b: i128) -> i128 {
     let mut a = inp_a;
     let mut b = inp_b;
     let mut q;
@@ -361,7 +350,7 @@ pub(crate) fn base_primes_with_width(nbits: u32, primes: &[u16]) -> Vec<u16> {
 
 /// Compute the product of some u16s as a u128.
 #[inline]
-pub fn product(xs: &[u16]) -> u128 {
+pub(crate) fn product(xs: &[u16]) -> u128 {
     xs.iter().fold(1, |acc, &x| acc * x as u128)
 }
 
@@ -385,47 +374,48 @@ pub fn product(xs: &[u16]) -> u128 {
 
 /// Returns true if x is a power of 2
 #[inline]
-pub fn is_power_of_2(x: u16) -> bool {
+pub(crate) fn is_power_of_2(x: u16) -> bool {
     (x & (x - 1)) == 0
 }
 
 /// Extra Rng functionality, useful for `fancy-garbling`.
 pub trait RngExt: rand::Rng + Sized {
+    /// Randomly generate a `bool`.
     #[inline]
     fn gen_bool(&mut self) -> bool {
         self.gen()
     }
-
+    /// Randomly generate a `u16`.
     #[inline]
     fn gen_u16(&mut self) -> u16 {
         self.gen()
     }
-
+    /// Randomly generate a `u32`.
     #[inline]
     fn gen_u32(&mut self) -> u32 {
         self.gen()
     }
-
+    /// Randomly generate a `u64`.
     #[inline]
     fn gen_u64(&mut self) -> u64 {
         self.gen()
     }
-
+    /// Randomly generate a `usize`.
     #[inline]
     fn gen_usize(&mut self) -> usize {
         self.gen()
     }
-
+    /// Randomly generate a `u128`.
     #[inline]
     fn gen_u128(&mut self) -> u128 {
         self.gen()
     }
-
+    /// Randomly generate a `Block`.
     #[inline]
     fn gen_block(&mut self) -> Block {
         Block::from(self.gen_u128())
     }
-
+    /// Randomly generate a valid `Block`.
     #[inline]
     fn gen_usable_block(&mut self, modulus: u16) -> Block {
         if is_power_of_2(modulus) {
@@ -438,22 +428,22 @@ pub trait RngExt: rand::Rng + Sized {
         let max = (modulus as u128).pow(n as u32);
         Block::from(self.gen_u128() % max)
     }
-
+    /// Randomly generate a prime (among the set of supported primes).
     #[inline]
     fn gen_prime(&mut self) -> u16 {
         PRIMES[self.gen::<usize>() % NPRIMES]
     }
-
+    /// Randomly generate a (supported) modulus.
     #[inline]
     fn gen_modulus(&mut self) -> u16 {
         2 + (self.gen::<u16>() % 111)
     }
-
+    /// Randomly generate a valid composite modulus.
     #[inline]
     fn gen_usable_composite_modulus(&mut self) -> u128 {
         product(&self.gen_usable_factors())
     }
-
+    /// Randomly generate a vector of valid factor
     #[inline]
     fn gen_usable_factors(&mut self) -> Vec<u16> {
         let mut x: u128 = 1;
@@ -538,26 +528,26 @@ mod tests {
         }
     }
 
-    #[test]
-    fn base_q_addition() {
-        let mut rng = thread_rng();
-        for _ in 0..1000 {
-            let q = 2 + (rng.gen_u16() % 111);
-            let n = digits_per_u128(q) - 2;
-            println!("q={} n={}", q, n);
-            let Q = (q as u128).pow(n as u32);
+    // #[test]
+    // fn base_q_addition() {
+    //     let mut rng = thread_rng();
+    //     for _ in 0..1000 {
+    //         let q = 2 + (rng.gen_u16() % 111);
+    //         let n = digits_per_u128(q) - 2;
+    //         println!("q={} n={}", q, n);
+    //         let Q = (q as u128).pow(n as u32);
 
-            let x = rng.gen_u128() % Q;
-            let y = rng.gen_u128() % Q;
+    //         let x = rng.gen_u128() % Q;
+    //         let y = rng.gen_u128() % Q;
 
-            let xp = as_base_q(x, q, n);
-            let yp = as_base_q(y, q, n);
+    //         let xp = as_base_q(x, q, n);
+    //         let yp = as_base_q(y, q, n);
 
-            let zp = base_q_add(&xp, &yp, q);
+    //         let zp = base_q_add(&xp, &yp, q);
 
-            let z = from_base_q(&zp, q);
+    //         let z = from_base_q(&zp, q);
 
-            assert_eq!((x + y) % Q, z);
-        }
-    }
+    //         assert_eq!((x + y) % Q, z);
+    //     }
+    // }
 }

@@ -61,9 +61,5 @@ name = "garbling"
 harness = false
 
 [[bench]]
-name = "rust"
-harness = false
-
-[[bench]]
 name = "circuits"
 harness = false

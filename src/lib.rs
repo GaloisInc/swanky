@@ -24,7 +24,7 @@ mod fancy;
 mod garble;
 pub mod informer;
 mod parser;
-mod util;
+pub mod util;
 mod wire;
 
 pub use crate::error::FancyError;
