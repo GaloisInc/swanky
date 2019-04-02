@@ -14,23 +14,24 @@ use crate::cuckoo::{compute_masksize, CuckooHash, NHASHES};
 use crate::stream;
 use crate::Error;
 use crate::{PrivateSetIntersectionReceiver, PrivateSetIntersectionSender};
-use ocelot::kkrt::Output;
-use ocelot::{ObliviousPrfReceiver, ObliviousPrfSender};
+use ocelot::oprf::kkrt::Output;
+use ocelot::oprf::{self, Receiver as OprfReceiver, Sender as OprfSender};
 use rand::seq::SliceRandom;
 use rand::{CryptoRng, RngCore};
 use scuttlebutt::utils as scutils;
-use scuttlebutt::{Aes128, Block, SemiHonest};
+use scuttlebutt::{AesHash, Block, SemiHonest};
 use sha2::{Digest, Sha256};
 use std::collections::HashSet;
 use std::io::{Read, Write};
+use std::time::SystemTime;
 
 /// Private set intersection sender.
 pub struct PszPsiSender {
-    oprf: kkrt::KkrtSender,
+    oprf: oprf::KkrtSender,
 }
 /// Private set intersection receiver.
 pub struct PszPsiReceiver {
-    oprf: kkrt::KkrtReceiver,
+    oprf: oprf::KkrtReceiver,
 }
 
 impl PrivateSetIntersectionSender for PszPsiSender {
@@ -41,7 +42,7 @@ impl PrivateSetIntersectionSender for PszPsiSender {
         writer: &mut W,
         rng: &mut RNG,
     ) -> Result<Self, Error> {
-        let oprf = kkrt::KkrtSender::init(reader, writer, rng)?;
+        let oprf = oprf::KkrtSender::init(reader, writer, rng)?;
         Ok(Self { oprf })
     }
 
@@ -53,15 +54,18 @@ impl PrivateSetIntersectionSender for PszPsiSender {
         mut rng: &mut RNG,
     ) -> Result<(), Error> {
         // XXX: do we need to do cointossing here?
+        let total = SystemTime::now();
         let key = Block::read(reader)?;
-        let aes = Aes128::new(key);
-        let mut inputs = compress_and_hash_inputs(inputs, &aes);
+        let mut inputs = compress_and_hash_inputs(inputs, key);
         let masksize = compute_masksize(inputs.len())?;
         let nbins = stream::read_usize(reader)?;
         let stashsize = stream::read_usize(reader)?;
+        let start = SystemTime::now();
         let seeds = self.oprf.send(reader, writer, nbins + stashsize, rng)?;
+        println!("[S] OPRF send: {} ms", start.elapsed().unwrap().as_millis());
         // For each `hᵢ`, construct set `Hᵢ = {F(k_{hᵢ(x)}, x || i) | x ∈ X)}`,
         // randomly permute it, and send it to the receiver.
+        let start = SystemTime::now();
         let mut encoded = Output([0u8; 64]);
         for i in 0..NHASHES {
             inputs.shuffle(&mut rng);
@@ -96,7 +100,9 @@ impl PrivateSetIntersectionSender for PszPsiSender {
                 writer.write_all(&output)?;
             }
         }
+        println!("[S] Send sets: {} ms", start.elapsed().unwrap().as_millis());
         writer.flush()?;
+        println!("[S] Total: {} ms", total.elapsed().unwrap().as_millis());
         Ok(())
     }
 }
@@ -109,7 +115,7 @@ impl PrivateSetIntersectionReceiver for PszPsiReceiver {
         writer: &mut W,
         rng: &mut RNG,
     ) -> Result<Self, Error> {
-        let oprf = kkrt::KkrtReceiver::init(reader, writer, rng)?;
+        let oprf = oprf::KkrtReceiver::init(reader, writer, rng)?;
         Ok(Self { oprf })
     }
 
@@ -128,8 +134,7 @@ impl PrivateSetIntersectionReceiver for PszPsiReceiver {
         let n = inputs.len();
 
         let key = rand::random::<Block>();
-        let aes = Aes128::new(key);
-        let inputs_ = compress_and_hash_inputs(inputs, &aes);
+        let inputs_ = compress_and_hash_inputs(inputs, key);
         let tbl = CuckooHash::build(&inputs_)?;
         let nbins = tbl.nbins;
         let stashsize = tbl.stashsize;
@@ -172,6 +177,7 @@ impl PrivateSetIntersectionReceiver for PszPsiReceiver {
         let mut ss = (0..stashsize)
             .map(|_| HashSet::with_capacity(n))
             .collect::<Vec<HashSet<Vec<u8>>>>();
+        let start = SystemTime::now();
         for h in hs.iter_mut() {
             for _ in 0..n {
                 let mut buf = vec![0u8; masksize];
@@ -179,6 +185,10 @@ impl PrivateSetIntersectionReceiver for PszPsiReceiver {
                 h.insert(buf);
             }
         }
+        println!(
+            "[R] Inserts to hash set: {} ms",
+            start.elapsed().unwrap().as_millis()
+        );
         for s in ss.iter_mut() {
             for _ in 0..n {
                 let mut buf = vec![0u8; masksize];
@@ -211,11 +221,13 @@ impl PrivateSetIntersectionReceiver for PszPsiReceiver {
 // Compress an arbitrary vector into a 128-bit chunk, leaving the final 8-bits
 // as zero. We need to leave 8 bits free in order to add in the hash index when
 // running the OPRF (cf. <https://eprint.iacr.org/2016/799>, §5.2).
-fn compress_and_hash_inputs(inputs: &[Vec<u8>], aes: &Aes128) -> Vec<Block> {
+fn compress_and_hash_inputs(inputs: &[Vec<u8>], key: Block) -> Vec<Block> {
     let mut hasher = Sha256::new(); // XXX can we do better than using SHA-256?
+    let aes = AesHash::new(key);
     inputs
         .iter()
-        .map(|input| {
+        .enumerate()
+        .map(|(i, input)| {
             let mut digest = [0u8; 16];
             if input.len() < 16 {
                 // Map `input` directly to a `Block`.
@@ -226,15 +238,13 @@ fn compress_and_hash_inputs(inputs: &[Vec<u8>], aes: &Aes128) -> Vec<Block> {
                 let h = hasher.result_reset();
                 digest[0..15].copy_from_slice(&h[0..15]);
             }
-            aes.encrypt(Block::from(digest))
+            aes.cr_hash(Block::from(i as u128), Block::from(digest))
         })
         .collect::<Vec<Block>>()
 }
 
 impl SemiHonest for PszPsiSender {}
 impl SemiHonest for PszPsiReceiver {}
-
-use ocelot::kkrt;
 
 /// Private set intersection sender using the KKRT oblivious PRF under-the-hood.
 pub type PszSender = PszPsiSender;
@@ -251,7 +261,7 @@ mod tests {
     use std::time::SystemTime;
 
     const SIZE: usize = 16;
-    const NTIMES: usize = 1 << 16;
+    const NTIMES: usize = 1 << 18;
 
     fn rand_vec(n: usize) -> Vec<u8> {
         (0..n).map(|_| rand::random::<u8>()).collect()
@@ -263,9 +273,9 @@ mod tests {
 
     #[test]
     fn test_compress_and_hash_inputs() {
-        let aes = Aes128::new(rand::random::<Block>());
+        let key = rand::random::<Block>();
         let inputs = rand_vec_vec(13);
-        let _ = compress_and_hash_inputs(&inputs, &aes);
+        let _ = compress_and_hash_inputs(&inputs, key);
     }
 
     #[test]
@@ -335,9 +345,8 @@ mod benchmarks {
     fn bench_compress_and_hash_inputs_small(b: &mut Bencher) {
         let inputs = rand_vec_vec(NTIMES, 15);
         let key = rand::random::<Block>();
-        let aes = Aes128::new(key);
         b.iter(|| {
-            let _ = compress_and_hash_inputs(&inputs, &aes);
+            let _ = compress_and_hash_inputs(&inputs, key);
         });
     }
 
@@ -345,9 +354,8 @@ mod benchmarks {
     fn bench_compress_and_hash_inputs_large(b: &mut Bencher) {
         let inputs = rand_vec_vec(NTIMES, 32);
         let key = rand::random::<Block>();
-        let aes = Aes128::new(key);
         b.iter(|| {
-            let _ = compress_and_hash_inputs(&inputs, &aes);
+            let _ = compress_and_hash_inputs(&inputs, key);
         });
     }
 
