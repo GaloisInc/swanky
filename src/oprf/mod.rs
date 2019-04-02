@@ -5,10 +5,10 @@
 // See LICENSE for licensing information.
 
 //! Oblivious PRF traits + instantiations.
-//!
-//! This module provides traits for an oblivious PRF.
 
 pub mod kkrt;
+#[cfg(feature = "unstable")]
+pub mod kmprt;
 mod prc;
 
 use crate::errors::Error;
@@ -73,6 +73,51 @@ where
         &mut self,
         reader: &mut R,
         writer: &mut W,
+        inputs: &[Self::Input],
+        rng: &mut RNG,
+    ) -> Result<Vec<Self::Output>, Error>;
+}
+
+#[cfg(feature = "unstable")]
+pub trait ObliviousPprf: ObliviousPrf {
+    type Hint: Sized;
+}
+
+#[cfg(feature = "unstable")]
+pub trait ProgrammableSender: ObliviousPprf {
+    /// Runs any one-time initialization.
+    fn init<R: Read + Send, W: Write + Send, RNG: CryptoRng + RngCore>(
+        reader: &mut R,
+        writer: &mut W,
+        rng: &mut RNG,
+    ) -> Result<Self, Error>;
+    /// Runs `m` OPRF instances as the sender, returning the OPRF seeds.
+    fn send<R: Read + Send, W: Write + Send, RNG: CryptoRng + RngCore>(
+        &mut self,
+        reader: &mut R,
+        writer: &mut W,
+        points: &[(Self::Input, Self::Output)],
+        ninputs: usize,
+        rng: &mut RNG,
+    ) -> Result<Vec<(Self::Seed, Self::Hint)>, Error>;
+    /// Computes the oblivious PRF on seed `seed` and input `input`.
+    fn compute(&self, seed: Self::Seed, hint: Self::Hint, input: Self::Input) -> Self::Output;
+}
+
+#[cfg(feature = "unstable")]
+pub trait ProgrammableReceiver: ObliviousPprf {
+    /// Runs any one-time initialization.
+    fn init<R: Read + Send, W: Write + Send, RNG: CryptoRng + RngCore>(
+        reader: &mut R,
+        writer: &mut W,
+        rng: &mut RNG,
+    ) -> Result<Self, Error>;
+    /// Runs the oblivious PRF on inputs `inputs`, returning the OPRF outputs.
+    fn receive<R: Read + Send, W: Write + Send, RNG: CryptoRng + RngCore>(
+        &mut self,
+        reader: &mut R,
+        writer: &mut W,
+        npoints: usize,
         inputs: &[Self::Input],
         rng: &mut RNG,
     ) -> Result<Vec<Self::Output>, Error>;

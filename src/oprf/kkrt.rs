@@ -16,8 +16,7 @@ use crate::oprf::{ObliviousPrf, Receiver as OprfReceiver, Sender as OprfSender};
 use crate::ot::{Receiver as OtReceiver, Sender as OtSender};
 use crate::{stream, utils};
 use arrayref::array_ref;
-use rand::CryptoRng;
-use rand_core::{RngCore, SeedableRng};
+use rand::{CryptoRng, RngCore, SeedableRng};
 use scuttlebutt::utils as scutils;
 use scuttlebutt::{cointoss, AesRng, Block, SemiHonest};
 use std::hash::{Hash, Hasher};
@@ -48,6 +47,19 @@ impl Output {
     pub fn write<W: Write>(&self, writer: &mut W) -> Result<(), Error> {
         writer.write_all(&self.0)?;
         Ok(())
+    }
+    /// Generate a random `Output`.
+    #[inline]
+    pub fn rand<RNG: CryptoRng + RngCore>(rng: &mut RNG) -> Self {
+        let mut bytes = [0u8; 64];
+        rng.fill_bytes(&mut bytes.as_mut());
+        Self(bytes)
+    }
+}
+
+impl AsRef<[u8]> for Output {
+    fn as_ref(&self) -> &[u8] {
+        self.0.as_ref()
     }
 }
 
@@ -92,18 +104,6 @@ impl PartialOrd for Output {
     }
 }
 
-impl<OT: OtReceiver<Msg = Block> + SemiHonest> ObliviousPrf for Sender<OT> {
-    type Seed = Seed;
-    type Input = Block;
-    type Output = Output;
-}
-
-impl<OT: OtSender<Msg = Block> + SemiHonest> ObliviousPrf for Receiver<OT> {
-    type Seed = Seed;
-    type Input = Block;
-    type Output = Output;
-}
-
 /// KKRT oblivious PRF sender.
 pub struct Sender<OT: OtReceiver + SemiHonest> {
     _ot: PhantomData<OT>,
@@ -111,6 +111,12 @@ pub struct Sender<OT: OtReceiver + SemiHonest> {
     s_: [u8; 64],
     code: PseudorandomCode,
     rngs: Vec<AesRng>,
+}
+
+impl<OT: OtReceiver<Msg = Block> + SemiHonest> ObliviousPrf for Sender<OT> {
+    type Seed = Seed;
+    type Input = Block;
+    type Output = Output;
 }
 
 impl<OT: OtReceiver<Msg = Block> + SemiHonest> OprfSender for Sender<OT> {
@@ -209,6 +215,12 @@ pub struct Receiver<OT: OtSender + SemiHonest> {
     _ot: PhantomData<OT>,
     code: PseudorandomCode,
     rngs: Vec<(AesRng, AesRng)>,
+}
+
+impl<OT: OtSender<Msg = Block> + SemiHonest> ObliviousPrf for Receiver<OT> {
+    type Seed = Seed;
+    type Input = Block;
+    type Output = Output;
 }
 
 impl<OT: OtSender<Msg = Block> + SemiHonest> OprfReceiver for Receiver<OT> {
@@ -344,6 +356,7 @@ mod tests {
 
     #[test]
     fn test_oprf() {
+        _test_oprf(1);
         _test_oprf(8);
         _test_oprf(11);
         _test_oprf(64);

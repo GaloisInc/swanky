@@ -24,6 +24,7 @@ libc = "*"
 rand = "0.6"
 rand_core = "0.4"
 scuttlebutt = { git = "https://github.com/amaloz/scuttlebutt", features = ["curve25519-dalek"] }
+sha2 = "*"
 
 [build-dependencies]
 cc = "*"
