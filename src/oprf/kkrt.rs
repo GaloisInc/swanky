@@ -23,18 +23,36 @@ use std::hash::{Hash, Hasher};
 use std::io::{Read, Write};
 use std::marker::PhantomData;
 
-/// The oblivious PRF seed.
+/// The KKRT oblivious PRF seed.
 #[derive(Clone, Copy)]
 pub struct Seed(pub [u8; 64]);
-/// The oblivious PRF output.
-#[derive(Clone, Copy)]
-pub struct Output(pub [u8; 64]);
 
 impl Default for Seed {
     fn default() -> Self {
         Self([0u8; 64])
     }
 }
+
+impl std::fmt::Display for Seed {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        self.0
+            .iter()
+            .map(|byte| write!(f, "{:02X}", byte))
+            .collect::<std::fmt::Result>()
+    }
+}
+
+impl rand::distributions::Distribution<Seed> for rand::distributions::Standard {
+    #[inline]
+    fn sample<R: rand::Rng + ?Sized>(&self, rng: &mut R) -> Seed {
+        let v = (0..64).map(|_| rng.gen::<u8>()).collect::<Vec<u8>>();
+        Seed(*array_ref![v, 0, 64])
+    }
+}
+
+/// The KKRT oblivious PRF output.
+#[derive(Clone, Copy)]
+pub struct Output(pub [u8; 64]);
 
 impl Output {
     /// Read an output from `reader`.
@@ -63,6 +81,12 @@ impl AsRef<[u8]> for Output {
     }
 }
 
+impl Default for Output {
+    fn default() -> Self {
+        Self([0u8; 64])
+    }
+}
+
 impl std::fmt::Display for Output {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         self.0
@@ -72,9 +96,11 @@ impl std::fmt::Display for Output {
     }
 }
 
-impl Default for Output {
-    fn default() -> Self {
-        Self([0u8; 64])
+impl rand::distributions::Distribution<Output> for rand::distributions::Standard {
+    #[inline]
+    fn sample<R: rand::Rng + ?Sized>(&self, rng: &mut R) -> Output {
+        let v = (0..64).map(|_| rng.gen::<u8>()).collect::<Vec<u8>>();
+        Output(*array_ref![v, 0, 64])
     }
 }
 
