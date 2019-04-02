@@ -23,7 +23,6 @@ use scuttlebutt::{AesHash, Block, SemiHonest};
 use sha2::{Digest, Sha256};
 use std::collections::HashSet;
 use std::io::{Read, Write};
-use std::time::SystemTime;
 
 /// Private set intersection sender.
 pub struct PszPsiSender {
@@ -54,18 +53,14 @@ impl PrivateSetIntersectionSender for PszPsiSender {
         mut rng: &mut RNG,
     ) -> Result<(), Error> {
         // XXX: do we need to do cointossing here?
-        let total = SystemTime::now();
         let key = Block::read(reader)?;
         let mut inputs = compress_and_hash_inputs(inputs, key);
         let masksize = compute_masksize(inputs.len())?;
         let nbins = stream::read_usize(reader)?;
         let stashsize = stream::read_usize(reader)?;
-        let start = SystemTime::now();
         let seeds = self.oprf.send(reader, writer, nbins + stashsize, rng)?;
-        println!("[S] OPRF send: {} ms", start.elapsed().unwrap().as_millis());
         // For each `hᵢ`, construct set `Hᵢ = {F(k_{hᵢ(x)}, x || i) | x ∈ X)}`,
         // randomly permute it, and send it to the receiver.
-        let start = SystemTime::now();
         let mut encoded = Output([0u8; 64]);
         for i in 0..NHASHES {
             inputs.shuffle(&mut rng);
@@ -100,9 +95,7 @@ impl PrivateSetIntersectionSender for PszPsiSender {
                 writer.write_all(&output)?;
             }
         }
-        println!("[S] Send sets: {} ms", start.elapsed().unwrap().as_millis());
         writer.flush()?;
-        println!("[S] Total: {} ms", total.elapsed().unwrap().as_millis());
         Ok(())
     }
 }
@@ -177,7 +170,6 @@ impl PrivateSetIntersectionReceiver for PszPsiReceiver {
         let mut ss = (0..stashsize)
             .map(|_| HashSet::with_capacity(n))
             .collect::<Vec<HashSet<Vec<u8>>>>();
-        let start = SystemTime::now();
         for h in hs.iter_mut() {
             for _ in 0..n {
                 let mut buf = vec![0u8; masksize];
@@ -185,10 +177,6 @@ impl PrivateSetIntersectionReceiver for PszPsiReceiver {
                 h.insert(buf);
             }
         }
-        println!(
-            "[R] Inserts to hash set: {} ms",
-            start.elapsed().unwrap().as_millis()
-        );
         for s in ss.iter_mut() {
             for _ in 0..n {
                 let mut buf = vec![0u8; masksize];
