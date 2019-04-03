@@ -34,7 +34,7 @@ where
     type Output: Sized;
 }
 
-/// Trait for oblivious PRF from the sender's point-of-view.
+/// Trait for an oblivious PRF sender.
 pub trait Sender: ObliviousPrf
 where
     Self: Sized,
@@ -57,7 +57,7 @@ where
     fn compute(&self, seed: Self::Seed, input: Self::Input) -> Self::Output;
 }
 
-/// Trait for oblivious PRF from the receiver's point-of-view.
+/// Trait for an oblivious PRF receiver.
 pub trait Receiver: ObliviousPrf
 where
     Self: Sized,
@@ -78,11 +78,14 @@ where
     ) -> Result<Vec<Self::Output>, Error>;
 }
 
+/// Trait containing the associated types used by an oblivious programmable PRF.
 #[cfg(feature = "unstable")]
 pub trait ObliviousPprf: ObliviousPrf {
+    /// PRF hint.
     type Hint: Sized;
 }
 
+/// Trait for an oblivious programmable PRF sender.
 #[cfg(feature = "unstable")]
 pub trait ProgrammableSender: ObliviousPprf {
     /// Runs any one-time initialization.
@@ -97,13 +100,16 @@ pub trait ProgrammableSender: ObliviousPprf {
         reader: &mut R,
         writer: &mut W,
         points: &[(Self::Input, Self::Output)],
+        // Max number of points allowed.
+        npoints: usize,
         ninputs: usize,
         rng: &mut RNG,
     ) -> Result<Vec<(Self::Seed, Self::Hint)>, Error>;
     /// Computes the oblivious PRF on seed `seed` and input `input`.
-    fn compute(&self, seed: Self::Seed, hint: Self::Hint, input: Self::Input) -> Self::Output;
+    fn compute(&self, seed: &Self::Seed, hint: &Self::Hint, input: &Self::Input) -> Self::Output;
 }
 
+/// Trait for an oblivious programmable PRF receiver.
 #[cfg(feature = "unstable")]
 pub trait ProgrammableReceiver: ObliviousPprf {
     /// Runs any one-time initialization.
@@ -117,6 +123,7 @@ pub trait ProgrammableReceiver: ObliviousPprf {
         &mut self,
         reader: &mut R,
         writer: &mut W,
+        // Max number of points allowed.
         npoints: usize,
         inputs: &[Self::Input],
         rng: &mut RNG,

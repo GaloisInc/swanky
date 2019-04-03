@@ -81,9 +81,41 @@ impl AsRef<[u8]> for Output {
     }
 }
 
+impl std::ops::BitXor for Output {
+    type Output = Self;
+
+    #[inline]
+    fn bitxor(self, rhs: Self) -> Self {
+        let lhs = self
+            .0
+            .iter()
+            .zip(rhs.0.iter())
+            .map(|(a, b)| a ^ b)
+            .collect::<Vec<u8>>();
+        Self(*array_ref![lhs, 0, 64])
+    }
+}
+
+impl std::ops::BitXorAssign for Output {
+    fn bitxor_assign(&mut self, rhs: Self) {
+        for (a, b) in self.0.iter_mut().zip(rhs.0.into_iter()) {
+            *a ^= b;
+        }
+    }
+}
+
 impl Default for Output {
     fn default() -> Self {
         Self([0u8; 64])
+    }
+}
+
+impl std::fmt::Debug for Output {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        self.0
+            .iter()
+            .map(|byte| write!(f, "{:02X}", byte))
+            .collect::<std::fmt::Result>()
     }
 }
 
@@ -201,7 +233,9 @@ impl<OT: OtReceiver<Msg = Block> + SemiHonest> OprfSender for Sender<OT> {
             stream::read_bytes_inplace(reader, &mut t1)?;
             scutils::xor_inplace(&mut q, if *b { &t1 } else { &t0 });
         }
+
         let qs = utils::transpose(&qs, ncols, nrows);
+
         let seeds = qs
             .chunks(ncols / 8)
             .map(|q| Seed(*array_ref![q, 0, 64]))

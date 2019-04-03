@@ -4,6 +4,10 @@
 // Copyright © 2019 Galois, Inc.
 // See LICENSE for licensing information.
 
+//! Implementations of the tabled-based one-time OPPRF and the hash-based
+//! multi-use OPPRF of Kolesnikov, Matania, Pinkas, Rosulek, and Trieu (cf.
+//! <https://eprint.iacr.org/2017/799>).
+
 use super::kkrt::{Output, Seed};
 use crate::errors::Error;
 use crate::oprf::{
@@ -12,14 +16,33 @@ use crate::oprf::{
 };
 use arrayref::array_ref;
 use rand::{CryptoRng, RngCore};
-use scuttlebutt::utils as scutils;
-use scuttlebutt::{Block, SemiHonest};
+use scuttlebutt::{cointoss, Block, SemiHonest};
 use sha2::{Digest, Sha256};
 use std::collections::HashSet;
 use std::io::{Read, Write};
 
+mod cuckoo;
+
+impl From<cuckoo::Error> for Error {
+    fn from(e: cuckoo::Error) -> Error {
+        Error::Other(format!("Cuckoo hash error: {}", e))
+    }
+}
+
 // Number of times to iterate when creating the sender's hash table.
 const N_TABLE_LOOPS: usize = 100;
+
+fn hash<T>(x: T, v: Block, range: usize) -> usize
+where
+    T: AsRef<[u8]>,
+{
+    let mut hasher = Sha256::new();
+    hasher.input(x);
+    hasher.input(v);
+    let h = hasher.result();
+    let h = *array_ref![h, 0, 16];
+    (u128::from_ne_bytes(h) % (range as u128)) as usize
+}
 
 /// The oblivious programmable PRF hint.
 #[derive(Clone)]
@@ -38,8 +61,7 @@ impl Hint {
 }
 
 /// KMPRT oblivious programmable PRF sender for a single input value.
-pub struct SingleSender<OPRF: OprfSender<Seed = Seed, Input = Block, Output = Output> + SemiHonest>
-{
+pub struct SingleSender<OPRF: OprfSender + SemiHonest> {
     oprf: OPRF,
 }
 
@@ -75,7 +97,8 @@ impl<OPRF: OprfSender<Seed = Seed, Input = Block, Output = Output> + SemiHonest>
         reader: &mut R,
         writer: &mut W,
         points: &[(Self::Input, Self::Output)],
-        _: usize,
+        npoints: usize,
+        t: usize,
         rng: &mut RNG,
     ) -> Result<Vec<(Self::Seed, Self::Hint)>, Error>
     where
@@ -83,13 +106,15 @@ impl<OPRF: OprfSender<Seed = Seed, Input = Block, Output = Output> + SemiHonest>
         W: Write + Send,
         RNG: CryptoRng + RngCore,
     {
-        let npoints = points.len();
-        let m = ((npoints + 1) as f32).log2().ceil().exp2() as usize;
+        if t != 1 {
+            return Err(Error::InvalidInputLength);
+        }
+        let m = table_size(npoints);
         let mut table = (0..m).map(|_| Output::default()).collect::<Vec<Output>>();
         let seeds = self.oprf.send(reader, writer, 1, rng)?;
         let seed = seeds[0];
         let mut v = Block::rand(rng);
-        let mut map = HashSet::with_capacity(npoints);
+        let mut map = HashSet::with_capacity(points.len());
         // Sample `v` until all values in `map` are distinct.
         for _ in 0..N_TABLE_LOOPS {
             for (x, _) in points.iter() {
@@ -99,58 +124,53 @@ impl<OPRF: OprfSender<Seed = Seed, Input = Block, Output = Output> + SemiHonest>
                     break;
                 }
             }
-            if map.len() == npoints {
+            if map.len() == points.len() {
                 break;
+            } else {
+                v = Block::rand(rng);
+                map.clear();
             }
-            v = Block::rand(rng);
-            map = HashSet::with_capacity(npoints);
         }
-        if map.len() != npoints {
-            return Err(Error::Other("unable to construct table".to_string()));
+        if map.len() != points.len() {
+            return Err(Error::Other(format!(
+                "unable to construct table after {} iterations",
+                N_TABLE_LOOPS
+            )));
         }
+        // Place points in table based on the hash of their OPRF output.
         for (x, y) in points.iter() {
             let y_ = self.oprf.compute(seed, *x);
             let h = hash(y_, v, m);
-            let entry = scutils::xor(&y_.0.to_vec(), &y.0.to_vec());
-            table[h] = Output(*array_ref![entry, 0, 64]);
+            table[h] = *y ^ y_;
         }
+        // Fill rest of table with random elements.
         for entry in table.iter_mut() {
             if *entry == Output::default() {
                 *entry = Output::rand(rng);
             }
         }
+        // Write `v` and `table` to the receiver.
         v.write(writer)?;
         for entry in table.iter() {
             entry.write(writer)?;
         }
         writer.flush()?;
-        let output = vec![(seed, Hint(v, table))];
+        let hint = Hint(v, table);
+        let output = vec![(seed, hint)];
         Ok(output)
     }
 
     #[inline]
-    fn compute(&self, seed: Self::Seed, hint: Self::Hint, input: Self::Input) -> Self::Output {
-        let (v, table) = (hint.0, hint.1);
-        let y = self.oprf.compute(seed, input);
-        let h = hash(y, v, table.len());
-        let output = scutils::xor(&y.0.to_vec(), &table[h].0.to_vec());
-        Output(*array_ref![output, 0, 64])
+    fn compute(&self, seed: &Self::Seed, hint: &Self::Hint, input: &Self::Input) -> Self::Output {
+        let (v, table) = (&hint.0, &hint.1);
+        let y = self.oprf.compute(*seed, *input);
+        let h = hash(y, *v, table.len());
+        y ^ table[h]
     }
 }
 
-fn hash(x: Output, v: Block, range: usize) -> usize {
-    let mut hasher = Sha256::new();
-    hasher.input(x);
-    hasher.input(v);
-    let h = hasher.result();
-    let h = *array_ref![h, 0, 16];
-    (u128::from_ne_bytes(h) % (range as u128)) as usize
-}
-
 /// KMPRT oblivious programmable PRF receiver for a single input value.
-pub struct SingleReceiver<
-    OPRF: OprfReceiver<Seed = Seed, Input = Block, Output = Output> + SemiHonest,
-> {
+pub struct SingleReceiver<OPRF: OprfReceiver + SemiHonest> {
     oprf: OPRF,
 }
 
@@ -197,30 +217,263 @@ impl<OPRF: OprfReceiver<Seed = Seed, Input = Block, Output = Output> + SemiHones
         if inputs.len() != 1 {
             return Err(Error::InvalidInputLength);
         }
-        let m = ((npoints + 1) as f32).log2().ceil().exp2() as usize;
+        let m = table_size(npoints);
         let mut table = Vec::with_capacity(m);
-        let outputs = self.oprf.receive(reader, writer, inputs, rng)?;
-        let output = outputs[0];
+        let mut outputs = self.oprf.receive(reader, writer, inputs, rng)?;
         let v = Block::read(reader)?;
-        let h = hash(output, v, m);
         for _ in 0..m {
             let entry = Output::read(reader)?;
             table.push(entry);
         }
-        let output = scutils::xor(&table[h].0.to_vec(), &output.0.to_vec());
-        let output = Output(*array_ref![output, 0, 64]);
-        Ok(vec![output])
+        let h = hash(outputs[0], v, m);
+        outputs[0] ^= table[h];
+        Ok(outputs)
+    }
+}
+
+fn table_size(npoints: usize) -> usize {
+    (((npoints + 1) as f32).log2().ceil() + 1.0).exp2() as usize
+}
+
+//
+// Batched OPPRF.
+//
+
+struct Parameters {
+    m1: usize,
+    m2: usize,
+    beta1: usize,
+    beta2: usize,
+    h1: usize,
+    h2: usize,
+}
+
+impl Parameters {
+    pub fn new(n: usize) -> Result<Self, Error> {
+        let (m1, m2, beta1, beta2, h1, h2) = if n <= 1 << 12 {
+            (1.17, 0.15, 27, 63, 3, 2)
+        } else if n <= 1 << 14 {
+            (1.15, 0.16, 28, 63, 3, 2)
+        } else if n <= 1 << 16 {
+            (1.14, 0.16, 29, 63, 3, 2)
+        } else if n <= 1 << 20 {
+            (1.13, 0.17, 30, 63, 3, 2)
+        } else if n <= 1 << 24 {
+            (1.12, 0.17, 31, 63, 3, 2)
+        } else {
+            return Err(Error::InvalidInputLength);
+        };
+        let m1 = ((n as f32) * m1).ceil() as usize;
+        let m2 = ((n as f32) * m2).ceil() as usize;
+        Ok(Self {
+            m1,
+            m2,
+            beta1,
+            beta2,
+            h1,
+            h2,
+        })
+    }
+}
+
+/// KMPRT oblivious programmable PRF sender.
+pub struct Sender<T: OprfSender + SemiHonest> {
+    opprf: SingleSender<T>,
+}
+
+impl<T: OprfSender<Seed = Seed, Input = Block, Output = Output> + SemiHonest> ObliviousPrf
+    for Sender<T>
+{
+    type Seed = Seed;
+    type Input = Block;
+    type Output = Output;
+}
+
+impl<T: OprfSender<Seed = Seed, Input = Block, Output = Output> + SemiHonest> ObliviousPprf
+    for Sender<T>
+{
+    type Hint = Hint;
+}
+
+impl<T: OprfSender<Seed = Seed, Input = Block, Output = Output> + SemiHonest> OpprfSender
+    for Sender<T>
+{
+    fn init<R, W, RNG>(reader: &mut R, writer: &mut W, rng: &mut RNG) -> Result<Self, Error>
+    where
+        R: Read + Send,
+        W: Write + Send,
+        RNG: CryptoRng + RngCore,
+    {
+        let opprf = SingleSender::<T>::init(reader, writer, rng)?;
+        Ok(Self { opprf })
+    }
+
+    fn send<R, W, RNG>(
+        &mut self,
+        reader: &mut R,
+        writer: &mut W,
+        points: &[(Self::Input, Self::Output)],
+        _: usize,
+        ninputs: usize,
+        rng: &mut RNG,
+    ) -> Result<Vec<(Self::Seed, Self::Hint)>, Error>
+    where
+        R: Read + Send,
+        W: Write + Send,
+        RNG: CryptoRng + RngCore,
+    {
+        let params = Parameters::new(ninputs)?;
+
+        let seeds = (0..params.h1 + params.h2)
+            .map(|_| Block::rand(rng))
+            .collect::<Vec<Block>>();
+        let hashkeys = cointoss::send(reader, writer, &seeds)?;
+
+        let mut bins = Vec::with_capacity(params.m1 + params.m2);
+        for _ in 0..params.m1 {
+            bins.push(Vec::with_capacity(params.beta1));
+        }
+        for _ in params.m1..params.m1 + params.m2 {
+            bins.push(Vec::with_capacity(params.beta2));
+        }
+
+        for (x, y) in points.iter() {
+            for key in hashkeys[0..params.h1].iter() {
+                let h = hash(*x, *key, params.m1);
+                if bins[h].iter().find(|&&entry| entry == (*x, *y)).is_none() {
+                    bins[h].push((*x, *y));
+                }
+            }
+            for key in hashkeys[params.h1..params.h1 + params.h2].iter() {
+                let h = hash(*x, *key, params.m2);
+                if bins[params.m1 + h]
+                    .iter()
+                    .find(|&&entry| entry == (*x, *y))
+                    .is_none()
+                {
+                    bins[params.m1 + h].push((*x, *y));
+                }
+            }
+        }
+        let mut outputs = Vec::with_capacity(params.m1 + params.m2);
+        for (j, bin) in bins.into_iter().enumerate() {
+            let beta = if j < params.m1 {
+                params.beta1
+            } else {
+                params.beta2
+            };
+            let output = self.opprf.send(reader, writer, &bin, beta, 1, rng)?;
+            outputs.push(output[0].clone());
+        }
+        Ok(outputs)
+    }
+
+    #[inline]
+    fn compute(&self, seed: &Self::Seed, hint: &Self::Hint, input: &Self::Input) -> Self::Output {
+        self.opprf.compute(seed, hint, input)
+    }
+}
+
+/// KMPRT oblivious programmable PRF receiver.
+pub struct Receiver<T: OprfReceiver + SemiHonest> {
+    opprf: SingleReceiver<T>,
+}
+
+impl<T: OprfReceiver<Seed = Seed, Input = Block, Output = Output> + SemiHonest> ObliviousPrf
+    for Receiver<T>
+{
+    type Seed = Seed;
+    type Input = Block;
+    type Output = Output;
+}
+
+impl<T: OprfReceiver<Seed = Seed, Input = Block, Output = Output> + SemiHonest> ObliviousPprf
+    for Receiver<T>
+{
+    type Hint = Hint;
+}
+
+impl<T: OprfReceiver<Seed = Seed, Input = Block, Output = Output> + SemiHonest> OpprfReceiver
+    for Receiver<T>
+{
+    fn init<R, W, RNG>(reader: &mut R, writer: &mut W, rng: &mut RNG) -> Result<Self, Error>
+    where
+        R: Read + Send,
+        W: Write + Send,
+        RNG: CryptoRng + RngCore,
+    {
+        let opprf = SingleReceiver::<T>::init(reader, writer, rng)?;
+        Ok(Self { opprf })
+    }
+
+    fn receive<R, W, RNG>(
+        &mut self,
+        reader: &mut R,
+        writer: &mut W,
+        _: usize,
+        inputs: &[Self::Input],
+        rng: &mut RNG,
+    ) -> Result<Vec<Self::Output>, Error>
+    where
+        R: Read + Send,
+        W: Write + Send,
+        RNG: CryptoRng + RngCore,
+    {
+        let params = Parameters::new(inputs.len())?;
+
+        let seeds = (0..params.h1 + params.h2)
+            .map(|_| Block::rand(rng))
+            .collect::<Vec<Block>>();
+        let hashkeys = cointoss::receive(reader, writer, &seeds)?;
+
+        let table = cuckoo::CuckooHash::build(inputs, &hashkeys, params.m1, params.m2)?;
+        let mut outputs = (0..inputs.len())
+            .map(|_| Output::default())
+            .collect::<Vec<Output>>();
+        for (j, (item, idx, _)) in table.items.into_iter().enumerate() {
+            let beta = if j < params.m1 {
+                params.beta1
+            } else {
+                params.beta2
+            };
+            if let Some(item) = item {
+                let idx = idx.unwrap();
+                assert_eq!(inputs[idx], item);
+                let out = self.opprf.receive(reader, writer, beta, &vec![item], rng)?;
+                assert_eq!(outputs[idx], Output::default());
+                outputs[idx] = out[0];
+            } else {
+                let item = Block::rand(rng);
+                let _ = self.opprf.receive(reader, writer, beta, &vec![item], rng)?;
+            }
+        }
+        Ok(outputs)
     }
 }
 
 use crate::oprf;
 
+/// Instantiation of the KMPRT one-time OPPRF sender, using KKRT as the
+/// underlying OPRF.
 pub type KmprtSingleSender = SingleSender<oprf::KkrtSender>;
+/// Instantiation of the KMPRT one-time OPPRF receiver, using KKRT as the
+/// underlying OPRF.
 pub type KmprtSingleReceiver = SingleReceiver<oprf::KkrtReceiver>;
+/// Instantiation of the KMPRT hash-based OPPRF sender, using KKRT as the
+/// underlying OPRF.
+pub type KmprtSender = Sender<oprf::KkrtSender>;
+/// Instantiation of the KMPRT hash-based OPPRF receiver, using KKRT as the
+/// underlying OPRF.
+pub type KmprtReceiver = Receiver<oprf::KkrtReceiver>;
+
+//
+// Tests
+//
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::oprf::{ProgrammableReceiver, ProgrammableSender};
     use scuttlebutt::AesRng;
     use std::io::{BufReader, BufWriter};
     use std::os::unix::net::UnixStream;
@@ -230,49 +483,64 @@ mod tests {
         (0..size).map(|_| rand::random::<Block>()).collect()
     }
 
-    fn _test_opprf(n: usize) {
-        let inputs = rand_block_vec(n);
+    fn _test_opprf<
+        S: ProgrammableSender<Seed = Seed, Input = Block, Output = Output>,
+        R: ProgrammableReceiver<Seed = Seed, Input = Block, Output = Output>,
+    >(
+        ninputs: usize,
+        npoints: usize,
+    ) {
+        let inputs = rand_block_vec(ninputs);
         let inputs_ = inputs.clone();
         let results = Arc::new(Mutex::new(vec![]));
         let results_ = results.clone();
         let mut rng = AesRng::new();
-        let points = (0..10)
+        let points = (0..npoints)
             .map(|_| (Block::rand(&mut rng), Output::rand(&mut rng)))
             .collect::<Vec<(Block, Output)>>();
-        let points_ = points.clone();
+        // let points_ = points.clone();
         let (sender, receiver) = UnixStream::pair().unwrap();
         let handle = std::thread::spawn(move || {
             let mut rng = AesRng::new();
             let mut reader = BufReader::new(sender.try_clone().unwrap());
             let mut writer = BufWriter::new(sender);
-            let mut oprf = KmprtSingleSender::init(&mut reader, &mut writer, &mut rng).unwrap();
+            let mut oprf = S::init(&mut reader, &mut writer, &mut rng).unwrap();
             let outputs = oprf
-                .send(&mut reader, &mut writer, &points, n, &mut rng)
+                .send(
+                    &mut reader,
+                    &mut writer,
+                    &points,
+                    npoints,
+                    ninputs,
+                    &mut rng,
+                )
                 .unwrap();
             let mut results = results.lock().unwrap();
             *results = inputs_
                 .iter()
-                .zip(outputs.into_iter())
-                .map(|(inp, (seed, hint))| oprf.compute(seed, hint, *inp))
+                .zip(outputs.iter())
+                .map(|(inp, (seed, hint))| oprf.compute(seed, hint, inp))
                 .collect::<Vec<Output>>();
         });
         let mut rng = AesRng::new();
         let mut reader = BufReader::new(receiver.try_clone().unwrap());
         let mut writer = BufWriter::new(receiver);
-        let mut oprf = KmprtSingleReceiver::init(&mut reader, &mut writer, &mut rng).unwrap();
+        let mut oprf = R::init(&mut reader, &mut writer, &mut rng).unwrap();
+        // let inputs = points_.iter().map(|(x, _)| *x).collect::<Vec<Block>>();
         let outputs = oprf
-            .receive(&mut reader, &mut writer, points_.len(), &inputs, &mut rng)
+            .receive(&mut reader, &mut writer, npoints, &inputs, &mut rng)
             .unwrap();
         handle.join().unwrap();
         let results_ = results_.lock().unwrap();
-        for j in 0..n {
-            assert_eq!(results_[j].0.to_vec(), outputs[j].0.to_vec());
+        for j in 0..ninputs {
+            assert_eq!(results_[j], outputs[j]);
         }
     }
 
     #[test]
     fn test_opprf() {
-        _test_opprf(1);
+        _test_opprf::<KmprtSingleSender, KmprtSingleReceiver>(1, 8);
+        // _test_opprf::<KmprtSender, KmprtReceiver>(8, 8);
     }
 
 }

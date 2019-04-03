@@ -123,7 +123,7 @@ fn _bench_opprf<
         let mut writer = BufWriter::new(sender);
         let mut oprf = S::init(&mut reader, &mut writer, &mut rng).unwrap();
         let _ = oprf
-            .send(&mut reader, &mut writer, &points, t, &mut rng)
+            .send(&mut reader, &mut writer, &points, points.len(), t, &mut rng)
             .unwrap();
     });
     let mut rng = AesRng::new();
@@ -148,6 +148,17 @@ fn bench_opprf(c: &mut Criterion) {
             criterion::black_box(result);
         })
     });
+    c.bench_function("opprf::KMPRT (t = 2^4, n = 2^4)", move |bench| {
+        let inputs = rand_block_vec(1 << 4);
+        let points = rand_point_vec(1 << 4);
+        bench.iter(|| {
+            let result = _bench_opprf::<oprf::kmprt::KmprtSender, oprf::kmprt::KmprtReceiver>(
+                points.clone(),
+                inputs.clone(),
+            );
+            criterion::black_box(result);
+        })
+    });
 }
 #[cfg(feature = "unstable")]
 fn bench_opprf_compute(c: &mut Criterion) {
@@ -169,7 +180,7 @@ fn bench_opprf_compute(c: &mut Criterion) {
         let seed = rand::random::<Seed>();
         let hint = Hint::rand(&mut rng, 8);
         let input = rand::random::<Block>();
-        bench.iter(|| oprf.compute(seed.clone(), hint.clone(), input))
+        bench.iter(|| oprf.compute(&seed, &hint, &input))
     });
 }
 
