@@ -197,6 +197,13 @@ impl std::ops::BitXor for Block {
     }
 }
 
+impl std::ops::BitXorAssign for Block {
+    #[inline]
+    fn bitxor_assign(&mut self, rhs: Self) {
+        unsafe { self.0 = _mm_xor_si128(self.0, rhs.0) }
+    }
+}
+
 impl rand::distributions::Distribution<Block> for rand::distributions::Standard {
     #[inline]
     fn sample<R: rand::Rng + ?Sized>(&self, rng: &mut R) -> Block {
