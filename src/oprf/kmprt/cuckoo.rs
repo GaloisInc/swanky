@@ -76,7 +76,7 @@ impl CuckooHash {
         // Unable to place, so try to place in extra `m2` bins.
         hidx = 0;
         for _ in 0..N_ATTEMPTS {
-            let i = super::hash(input, self.hashkeys[hidx + self.hs.0], self.ms.0);
+            let i = super::hash(input, self.hashkeys[hidx + self.hs.0], self.ms.1);
             let old = self.items[self.ms.0 + i];
             self.items[i] = (Some(input), Some(idx), Some(hidx));
             if let Some(item) = old.0 {
