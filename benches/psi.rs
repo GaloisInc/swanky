@@ -8,7 +8,7 @@
 
 use criterion::{criterion_group, criterion_main, Criterion};
 use popsicle::psz::{PszReceiver, PszSender};
-use popsicle::{PrivateSetIntersectionReceiver, PrivateSetIntersectionSender};
+use popsicle::{Receiver, Sender};
 use scuttlebutt::AesRng;
 use std::io::{BufReader, BufWriter};
 use std::os::unix::net::UnixStream;
