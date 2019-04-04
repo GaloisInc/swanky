@@ -11,7 +11,7 @@ use rand::{CryptoRng, RngCore};
 use std::io::{Read, Write};
 
 /// Trait for a private set intersection sender.
-pub trait PrivateSetIntersectionSender
+pub trait Sender
 where
     Self: Sized,
 {
@@ -34,7 +34,7 @@ where
 }
 
 /// Trait for a private set intersection receiver.
-pub trait PrivateSetIntersectionReceiver
+pub trait Receiver
 where
     Self: Sized,
 {

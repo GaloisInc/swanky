@@ -13,7 +13,7 @@
 use crate::cuckoo::{compute_masksize, CuckooHash, NHASHES};
 use crate::stream;
 use crate::Error;
-use crate::{PrivateSetIntersectionReceiver, PrivateSetIntersectionSender};
+use crate::{Receiver as PsiReceiver, Sender as PsiSender};
 use ocelot::oprf::kkrt::Output;
 use ocelot::oprf::{self, Receiver as OprfReceiver, Sender as OprfSender};
 use rand::seq::SliceRandom;
@@ -25,15 +25,15 @@ use std::collections::HashSet;
 use std::io::{Read, Write};
 
 /// Private set intersection sender.
-pub struct PszPsiSender {
+pub struct Sender {
     oprf: oprf::KkrtSender,
 }
 /// Private set intersection receiver.
-pub struct PszPsiReceiver {
+pub struct Receiver {
     oprf: oprf::KkrtReceiver,
 }
 
-impl PrivateSetIntersectionSender for PszPsiSender {
+impl PsiSender for Sender {
     type Msg = Vec<u8>;
 
     fn init<R: Read + Send, W: Write + Send, RNG: CryptoRng + RngCore>(
@@ -100,7 +100,7 @@ impl PrivateSetIntersectionSender for PszPsiSender {
     }
 }
 
-impl PrivateSetIntersectionReceiver for PszPsiReceiver {
+impl PsiReceiver for Receiver {
     type Msg = Vec<u8>;
 
     fn init<R: Read + Send, W: Write + Send, RNG: CryptoRng + RngCore>(
@@ -231,14 +231,14 @@ fn compress_and_hash_inputs(inputs: &[Vec<u8>], key: Block) -> Vec<Block> {
         .collect::<Vec<Block>>()
 }
 
-impl SemiHonest for PszPsiSender {}
-impl SemiHonest for PszPsiReceiver {}
+impl SemiHonest for Sender {}
+impl SemiHonest for Receiver {}
 
 /// Private set intersection sender using the KKRT oblivious PRF under-the-hood.
-pub type PszSender = PszPsiSender;
+pub type PszSender = Sender;
 /// Private set intersection receiver using the KKRT oblivious PRF
 /// under-the-hood.
-pub type PszReceiver = PszPsiReceiver;
+pub type PszReceiver = Receiver;
 
 #[cfg(test)]
 mod tests {
