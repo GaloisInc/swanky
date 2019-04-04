@@ -134,13 +134,6 @@ impl Block {
     pub fn flip(&self) -> Self {
         unsafe { Block::from(_mm_xor_si128(self.0, ONES)) }
     }
-    /// Generate a random block.
-    #[inline]
-    pub fn rand<RNG: CryptoRng + RngCore>(rng: &mut RNG) -> Self {
-        let mut block = Block::zero();
-        rng.fill_bytes(&mut block.as_mut());
-        block
-    }
 }
 
 impl Default for Block {
@@ -206,7 +199,7 @@ impl std::ops::BitXorAssign for Block {
 impl rand::distributions::Distribution<Block> for rand::distributions::Standard {
     #[inline]
     fn sample<R: rand::Rng + ?Sized>(&self, rng: &mut R) -> Block {
-        Block::from(rng.gen::<[u8; 16]>())
+        Block::from(rng.gen::<u128>())
     }
 }
 

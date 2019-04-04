@@ -7,6 +7,7 @@
 use criterion::{criterion_group, criterion_main, Criterion};
 #[cfg(feature = "curve25519-dalek")]
 use curve25519_dalek::ristretto::RistrettoPoint;
+use rand::Rng;
 use scuttlebutt::{AesRng, Block};
 use std::time::Duration;
 
@@ -22,7 +23,7 @@ fn bench_hash_pt(c: &mut Criterion) {
     });
 }
 #[cfg(not(feature = "curve25519-dalek"))]
-fn bench_hash_pt(_c: &mut Criterion) {}
+fn bench_hash_pt(_: &mut Criterion) {}
 
 fn bench_clmul(c: &mut Criterion) {
     c.bench_function("Block::clmul", |b| {
@@ -39,7 +40,7 @@ fn bench_rand(c: &mut Criterion) {
     c.bench_function("Block::rand", |b| {
         let mut rng = AesRng::new();
         b.iter(|| {
-            let block = Block::rand(&mut rng);
+            let block = rng.gen::<Block>();
             criterion::black_box(block)
         });
     });
