@@ -2,7 +2,7 @@
 
 use crate::fancy::HasModulus;
 use crate::util;
-use rand::{CryptoRng, RngCore};
+use rand::{CryptoRng, Rng, RngCore};
 use scuttlebutt::{Block, AES_HASH};
 use serde::{Deserialize, Serialize};
 
@@ -254,7 +254,7 @@ impl Wire {
     /// Get a random wire mod q.
     #[inline]
     pub fn rand<R: CryptoRng + RngCore>(rng: &mut R, q: u16) -> Wire {
-        Self::from_block(Block::rand(rng), q)
+        Self::from_block(rng.gen::<Block>(), q)
     }
 
     /// Compute the hash of this wire.
