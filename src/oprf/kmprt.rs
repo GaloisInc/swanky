@@ -32,13 +32,15 @@ impl From<cuckoo::Error> for Error {
 // Number of times to iterate when creating the sender's hash table.
 const N_TABLE_LOOPS: usize = 100;
 
-fn hash<T>(x: T, v: Block, range: usize) -> usize
+// Hash `x`, using `key` as the hash "key", and output the result in the range
+// `[0..range]`.
+fn hash<T>(x: T, key: Block, range: usize) -> usize
 where
     T: AsRef<[u8]>,
 {
     let mut hasher = Sha256::new();
     hasher.input(x);
-    hasher.input(v);
+    hasher.input(key);
     let h = hasher.result();
     let h = *array_ref![h, 0, 16];
     (u128::from_ne_bytes(h) % (range as u128)) as usize
@@ -218,15 +220,14 @@ impl<OPRF: OprfReceiver<Seed = Seed, Input = Block, Output = Output> + SemiHones
             return Err(Error::InvalidInputLength);
         }
         let m = table_size(npoints);
-        let mut table = Vec::with_capacity(m);
         let mut outputs = self.oprf.receive(reader, writer, inputs, rng)?;
         let v = Block::read(reader)?;
-        for _ in 0..m {
-            let entry = Output::read(reader)?;
-            table.push(entry);
-        }
         let h = hash(outputs[0], v, m);
-        outputs[0] ^= table[h];
+        let zero = Output::zero();
+        for i in 0..m {
+            let entry = Output::read(reader)?;
+            outputs[0] ^= if i == h { entry } else { zero };
+        }
         Ok(outputs)
     }
 }
@@ -499,7 +500,7 @@ pub type KmprtSender = Sender<oprf::KkrtSender>;
 pub type KmprtReceiver = Receiver<oprf::KkrtReceiver>;
 
 //
-// Tests
+// Tests.
 //
 
 #[cfg(test)]
@@ -573,6 +574,26 @@ mod tests {
     fn test_opprf() {
         _test_opprf::<KmprtSingleSender, KmprtSingleReceiver>(1, 8);
         // _test_opprf::<KmprtSender, KmprtReceiver>(8, 8);
+    }
+
+}
+
+//
+// Benchmarks.
+//
+
+#[cfg(all(feature = "nightly", test))]
+mod benchmarks {
+    extern crate test;
+    use super::*;
+    use test::{black_box, Bencher};
+
+    #[bench]
+    fn bench_hash(b: &mut Bencher) {
+        let x = black_box(rand::random::<Block>());
+        let v = black_box(rand::random::<Block>());
+        let range = 15;
+        b.iter(|| super::hash(x, v, range));
     }
 
 }

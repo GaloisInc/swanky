@@ -90,3 +90,39 @@ impl CuckooHash {
         Err(Error::CuckooHashFull)
     }
 }
+
+//
+// Benchmarks.
+//
+
+#[cfg(all(feature = "nightly", test))]
+mod benchmarks {
+    extern crate test;
+    use super::*;
+    use test::{black_box, Bencher};
+
+    const SET_SIZE: usize = 1 << 12;
+
+    #[bench]
+    fn bench_build(b: &mut Bencher) {
+        let inputs = black_box(
+            (0..SET_SIZE)
+                .map(|_| rand::random::<Block>())
+                .collect::<Vec<Block>>(),
+        );
+        let params = super::super::Parameters::new(inputs.len()).unwrap();
+        let hashkeys = black_box(
+            (0..params.h1 + params.h2)
+                .map(|_| rand::random::<Block>())
+                .collect::<Vec<Block>>(),
+        );
+        b.iter(|| {
+            CuckooHash::build(
+                &inputs,
+                &hashkeys,
+                (params.m1, params.m2),
+                (params.h1, params.h2),
+            )
+        });
+    }
+}

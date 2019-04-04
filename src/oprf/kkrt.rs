@@ -25,11 +25,32 @@ use std::marker::PhantomData;
 
 /// The KKRT oblivious PRF seed.
 #[derive(Clone, Copy)]
-pub struct Seed(pub [u8; 64]);
+pub struct Seed([u8; 64]);
+
+impl Seed {
+    /// Generate a zero-valued `Seed`.
+    #[inline]
+    pub fn zero() -> Self {
+        Self([0u8; 64])
+    }
+    /// Return the first `n` bytes of `Seed`.
+    #[inline]
+    pub fn prefix<'a>(&'a self, n: usize) -> &'a [u8] {
+        debug_assert!(n <= 64);
+        &(self.0[0..n])
+    }
+
+    /// Return the first `n` bytes of `Seed` as mutable.
+    #[inline]
+    pub fn prefix_mut<'a>(&'a mut self, n: usize) -> &'a mut [u8] {
+        debug_assert!(n <= 64);
+        &mut (self.0[0..n])
+    }
+}
 
 impl Default for Seed {
     fn default() -> Self {
-        Self([0u8; 64])
+        Self::zero()
     }
 }
 
@@ -52,7 +73,7 @@ impl rand::distributions::Distribution<Seed> for rand::distributions::Standard {
 
 /// The KKRT oblivious PRF output.
 #[derive(Clone, Copy)]
-pub struct Output(pub [u8; 64]);
+pub struct Output([u8; 64]);
 
 impl Output {
     /// Read an output from `reader`.
@@ -72,6 +93,24 @@ impl Output {
         let mut bytes = [0u8; 64];
         rng.fill_bytes(&mut bytes.as_mut());
         Self(bytes)
+    }
+    /// Generate a zero-valued `Output`.
+    #[inline]
+    pub fn zero() -> Self {
+        Output([0u8; 64])
+    }
+    /// Return the first `n` bytes of `Output`.
+    #[inline]
+    pub fn prefix<'a>(&'a self, n: usize) -> &'a [u8] {
+        debug_assert!(n <= 64);
+        &(self.0[0..n])
+    }
+
+    /// Return the first `n` bytes of `Output` as mutable.
+    #[inline]
+    pub fn prefix_mut<'a>(&'a mut self, n: usize) -> &'a mut [u8] {
+        debug_assert!(n <= 64);
+        &mut (self.0[0..n])
     }
 }
 
@@ -106,7 +145,7 @@ impl std::ops::BitXorAssign for Output {
 
 impl Default for Output {
     fn default() -> Self {
-        Self([0u8; 64])
+        Self::zero()
     }
 }
 
