@@ -98,7 +98,7 @@ impl std::ops::BitXor for Output {
 
 impl std::ops::BitXorAssign for Output {
     fn bitxor_assign(&mut self, rhs: Self) {
-        for (a, b) in self.0.iter_mut().zip(rhs.0.into_iter()) {
+        for (a, b) in self.0.iter_mut().zip(rhs.0.iter()) {
             *a ^= b;
         }
     }
@@ -245,9 +245,8 @@ impl<OT: OtReceiver<Msg = Block> + SemiHonest> OprfSender for Sender<OT> {
 
     #[inline]
     fn compute(&self, seed: Self::Seed, input: Self::Input) -> Self::Output {
-        let mut output = Output([0u8; 64]);
-        self.code.encode(input, &mut output.0);
-        scutils::and_inplace(&mut output.0, &self.s_);
+        let mut output = Output::default();
+        self.encode(input, &mut output);
         scutils::xor_inplace(&mut output.0, &seed.0);
         output
     }

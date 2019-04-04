@@ -120,7 +120,7 @@ impl<OPRF: OprfSender<Seed = Seed, Input = Block, Output = Output> + SemiHonest>
             for (x, _) in points.iter() {
                 let y = self.oprf.compute(seed, *x);
                 let h = hash(y, v, m);
-                if map.insert(h) == false {
+                if !map.insert(h) {
                     break;
                 }
             }
@@ -439,12 +439,12 @@ impl<T: OprfReceiver<Seed = Seed, Input = Block, Output = Output> + SemiHonest> 
             if let Some(item) = item {
                 let idx = idx.unwrap();
                 assert_eq!(inputs[idx], item);
-                let out = self.opprf.receive(reader, writer, beta, &vec![item], rng)?;
+                let out = self.opprf.receive(reader, writer, beta, &[item], rng)?;
                 assert_eq!(outputs[idx], Output::default());
                 outputs[idx] = out[0];
             } else {
                 let item = Block::rand(rng);
-                let _ = self.opprf.receive(reader, writer, beta, &vec![item], rng)?;
+                let _ = self.opprf.receive(reader, writer, beta, &[item], rng)?;
             }
         }
         Ok(outputs)

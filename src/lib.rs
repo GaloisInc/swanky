@@ -5,6 +5,7 @@
 // See LICENSE for licensing information.
 
 #![allow(clippy::many_single_char_names)]
+#![allow(clippy::type_complexity)]
 #![cfg_attr(feature = "nightly", feature(test))]
 #![cfg_attr(feature = "nightly", feature(stdsimd))]
 #![cfg_attr(feature = "nightly", feature(asm))]

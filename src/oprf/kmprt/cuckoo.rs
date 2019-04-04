@@ -87,6 +87,6 @@ impl CuckooHash {
                 return Ok(());
             }
         }
-        return Err(Error::CuckooHashFull);
+        Err(Error::CuckooHashFull)
     }
 }
