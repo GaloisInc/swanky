@@ -9,8 +9,8 @@ use scuttlebutt::Block;
 pub struct CuckooHash {
     pub items: Vec<(Option<Block>, Option<usize>, Option<usize>)>,
     hashkeys: Vec<Block>,
-    m1: usize,
-    m2: usize,
+    ms: (usize, usize),
+    hs: (usize, usize),
 }
 
 pub enum Error {
@@ -28,17 +28,15 @@ impl std::fmt::Display for Error {
 }
 
 const N_ATTEMPTS: usize = 100;
-const N_HASHES_1: usize = 3;
-const N_HASHES_2: usize = 2;
 
 impl CuckooHash {
     pub fn build(
         inputs: &[Block],
         hashkeys: &[Block],
-        m1: usize,
-        m2: usize,
+        ms: (usize, usize),
+        hs: (usize, usize),
     ) -> Result<Self, Error> {
-        let mut tbl = CuckooHash::new(hashkeys, m1, m2);
+        let mut tbl = CuckooHash::new(hashkeys, ms, hs);
         // Fill table with `inputs`
         for (j, input) in inputs.iter().enumerate() {
             tbl.hash(*input, j)?;
@@ -46,43 +44,45 @@ impl CuckooHash {
         Ok(tbl)
     }
 
-    pub fn new(hashkeys: &[Block], m1: usize, m2: usize) -> Self {
-        let items = vec![(None, None, None); m1 + m2];
+    fn new(hashkeys: &[Block], ms: (usize, usize), hs: (usize, usize)) -> Self {
+        let items = vec![(None, None, None); ms.0 + ms.1];
         let hashkeys = hashkeys.to_vec();
         Self {
             items,
-            m1,
-            m2,
             hashkeys,
+            ms,
+            hs,
         }
     }
 
-    pub fn hash(&mut self, input: Block, idx: usize) -> Result<(), Error> {
+    #[inline]
+    fn hash(&mut self, input: Block, idx: usize) -> Result<(), Error> {
         let mut input = input;
         let mut idx = idx;
         let mut hidx = 0;
+        // Try to place in the first `m1` bins.
         for _ in 0..N_ATTEMPTS {
-            let i = super::hash(input, self.hashkeys[hidx], self.m1);
+            let i = super::hash(input, self.hashkeys[hidx], self.ms.0);
             let old = self.items[i];
             self.items[i] = (Some(input), Some(idx), Some(hidx));
             if let Some(item) = old.0 {
                 input = item;
                 idx = old.1.unwrap();
-                hidx = (old.2.unwrap() + 1) % N_HASHES_1;
+                hidx = (old.2.unwrap() + 1) % self.hs.0;
             } else {
                 return Ok(());
             }
         }
+        // Unable to place, so try to place in extra `m2` bins.
         hidx = 0;
-        // Unable to place in bin, so place in extra bins
         for _ in 0..N_ATTEMPTS {
-            let i = super::hash(input, self.hashkeys[hidx + N_HASHES_1], self.m2);
-            let old = self.items[self.m1 + i];
+            let i = super::hash(input, self.hashkeys[hidx + self.hs.0], self.ms.0);
+            let old = self.items[self.ms.0 + i];
             self.items[i] = (Some(input), Some(idx), Some(hidx));
             if let Some(item) = old.0 {
                 input = item;
                 idx = old.1.unwrap();
-                hidx = (old.2.unwrap() + 1) % N_HASHES_2;
+                hidx = (old.2.unwrap() + 1) % self.hs.1;
             } else {
                 return Ok(());
             }

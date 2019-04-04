@@ -239,12 +239,19 @@ fn table_size(npoints: usize) -> usize {
 // Batched OPPRF.
 //
 
+// OPPRF parameters.
 struct Parameters {
+    // The length of the "first" cuckoo hash table.
     m1: usize,
+    // The length of the "second" cuckoo hash table.
     m2: usize,
+    // The max bin size of the sender's "first" simple hash table.
     beta1: usize,
+    // The max bin size of the sender's "second" simple hash table.
     beta2: usize,
+    // The number of hashes used in the first hash table.
     h1: usize,
+    // The number of hashes used in the second hash table.
     h2: usize,
 }
 
@@ -276,7 +283,11 @@ impl Parameters {
     }
 }
 
-/// KMPRT oblivious programmable PRF sender.
+/// KMPRT hashing-based OPPRF sender.
+///
+/// This implements the hashing-based OPPRF sender in Figure 7 of the paper. It
+/// uses the table-based one-time OPPRF under-the-hood (Figure 6 of the paper),
+/// which itself uses an OPRF.
 pub struct Sender<T: OprfSender + SemiHonest> {
     opprf: SingleSender<T>,
 }
@@ -323,7 +334,7 @@ impl<T: OprfSender<Seed = Seed, Input = Block, Output = Output> + SemiHonest> Op
         RNG: CryptoRng + RngCore,
     {
         let params = Parameters::new(ninputs)?;
-
+        // Generate random values to be used for the hash functions.
         let seeds = (0..params.h1 + params.h2)
             .map(|_| Block::rand(rng))
             .collect::<Vec<Block>>();
@@ -336,7 +347,7 @@ impl<T: OprfSender<Seed = Seed, Input = Block, Output = Output> + SemiHonest> Op
         for _ in params.m1..params.m1 + params.m2 {
             bins.push(Vec::with_capacity(params.beta2));
         }
-
+        // Place each point in the hash table, once for each hash function.
         for (x, y) in points.iter() {
             for key in hashkeys[0..params.h1].iter() {
                 let h = hash(*x, *key, params.m1);
@@ -355,26 +366,39 @@ impl<T: OprfSender<Seed = Seed, Input = Block, Output = Output> + SemiHonest> Op
                 }
             }
         }
+        // Run the one-time OPPRF on each bin.
         let mut outputs = Vec::with_capacity(params.m1 + params.m2);
         for (j, bin) in bins.into_iter().enumerate() {
+            // `beta` is the maximum number of entries a bin could have.
             let beta = if j < params.m1 {
                 params.beta1
             } else {
                 params.beta2
             };
             let output = self.opprf.send(reader, writer, &bin, beta, 1, rng)?;
-            outputs.push(output[0].clone());
+            outputs.push(output);
         }
-        Ok(outputs)
+        // XXX: this returns `m1 + m2` (seed, hint) pairs. But there doesn't
+        // really seem to be a way to *use* this when computing the OPPRF.
+        // Namely, this doesn't jive with the OPPRF API as specified in Figure 3
+        // of the paper. I believe this is okay in how its used to build PSI
+        // (namely, the `compute` method is never used).
+        Ok(outputs.into_iter().flatten().collect())
     }
 
     #[inline]
-    fn compute(&self, seed: &Self::Seed, hint: &Self::Hint, input: &Self::Input) -> Self::Output {
-        self.opprf.compute(seed, hint, input)
+    fn compute(&self, _: &Self::Seed, _: &Self::Hint, _: &Self::Input) -> Self::Output {
+        // This method doesn't work for the hash-based batched OPPRF, so let's panic for now.
+        // self.opprf.compute(seed, hint, input)
+        unimplemented!()
     }
 }
 
 /// KMPRT oblivious programmable PRF receiver.
+///
+/// This implements the hashing-based OPPRF receiver in Figure 7 of the paper. It
+/// uses the table-based one-time OPPRF under-the-hood (Figure 6 of the paper),
+/// which itself uses an OPRF.
 pub struct Receiver<T: OprfReceiver + SemiHonest> {
     opprf: SingleReceiver<T>,
 }
@@ -420,16 +444,24 @@ impl<T: OprfReceiver<Seed = Seed, Input = Block, Output = Output> + SemiHonest> 
         RNG: CryptoRng + RngCore,
     {
         let params = Parameters::new(inputs.len())?;
-
+        // Generate random values to be used for the hash functions.
         let seeds = (0..params.h1 + params.h2)
             .map(|_| Block::rand(rng))
             .collect::<Vec<Block>>();
         let hashkeys = cointoss::receive(reader, writer, &seeds)?;
-
-        let table = cuckoo::CuckooHash::build(inputs, &hashkeys, params.m1, params.m2)?;
+        // Build a cuckoo hash table using `hashkeys`.
+        let table = cuckoo::CuckooHash::build(
+            inputs,
+            &hashkeys,
+            (params.m1, params.m2),
+            (params.h1, params.h2),
+        )?;
         let mut outputs = (0..inputs.len())
             .map(|_| Output::default())
             .collect::<Vec<Output>>();
+        // Run the one-time OPPRF for each table entry. For those where the
+        // entry is a real input value, store the OPPRF output, otherwise use a
+        // dummy value and ignore the output.
         for (j, (item, idx, _)) in table.items.into_iter().enumerate() {
             let beta = if j < params.m1 {
                 params.beta1
