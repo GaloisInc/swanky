@@ -61,7 +61,7 @@ impl PsiSender for Sender {
         let seeds = self.oprf.send(reader, writer, nbins + stashsize, rng)?;
         // For each `hᵢ`, construct set `Hᵢ = {F(k_{hᵢ(x)}, x || i) | x ∈ X)}`,
         // randomly permute it, and send it to the receiver.
-        let mut encoded = Output([0u8; 64]);
+        let mut encoded = Output::zero();
         for i in 0..NHASHES {
             inputs.shuffle(&mut rng);
             let hidx = Block::from(i as u128);
@@ -70,8 +70,12 @@ impl PsiSender for Sender {
                 let bin = CuckooHash::bin(*input, i, nbins);
                 // Compute rest of `F(k_{hᵢ(x)}, x || i)` and chop off extra bytes.
                 self.oprf.encode(*input ^ hidx, &mut encoded);
-                scutils::xor_inplace_n(&mut encoded.0, &seeds[bin].0, masksize);
-                writer.write_all(&encoded.0[0..masksize])?;
+                scutils::xor_inplace_n(
+                    &mut encoded.prefix_mut(masksize),
+                    &seeds[bin].prefix(masksize),
+                    masksize,
+                );
+                writer.write_all(&encoded.prefix(masksize))?;
             }
         }
         // For each `i ∈ {1, ..., stashsize}`, construct set `Sᵢ =
@@ -80,7 +84,7 @@ impl PsiSender for Sender {
         let mut encoded = inputs
             .iter()
             .map(|input| {
-                let mut out = Output([0u8; 64]);
+                let mut out = Output::zero();
                 self.oprf.encode(*input, &mut out);
                 out
             })
@@ -90,8 +94,8 @@ impl PsiSender for Sender {
             for encoded in &encoded {
                 // We don't need to append any hash index to OPRF inputs in the stash.
                 let mut output = vec![0u8; masksize];
-                scutils::xor_inplace(&mut output, &encoded.0);
-                scutils::xor_inplace(&mut output, &seeds[nbins + i].0);
+                scutils::xor_inplace(&mut output, &encoded.prefix(masksize));
+                scutils::xor_inplace(&mut output, &seeds[nbins + i].prefix(masksize));
                 writer.write_all(&output)?;
             }
         }
@@ -189,15 +193,17 @@ impl PsiReceiver for Receiver {
         let mut intersection = Vec::with_capacity(n);
         for (i, (&item, output_)) in tbl.items().zip(outputs.into_iter()).enumerate() {
             let (_, idx, hidx) = item;
+            let prefix = output_.prefix(masksize);
+            // let prefix = &output_.0[0..masksize];
             if let Some(hidx) = hidx {
                 // We have a bin item.
-                if hs[hidx].contains(&output_.0[0..masksize]) {
+                if hs[hidx].contains(prefix) {
                     intersection.push(inputs[idx.unwrap()].clone());
                 }
             } else if let Some(idx) = idx {
                 // We have a stash item.
                 let j = i - nbins;
-                if ss[j].contains(&output_.0[0..masksize]) {
+                if ss[j].contains(prefix) {
                     intersection.push(inputs[idx].clone());
                 }
             }
