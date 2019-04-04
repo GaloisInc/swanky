@@ -81,8 +81,7 @@ impl Block {
         let k = k.as_bytes();
         // XXX: We're just taking the first 16 bytes of the compressed point... Is that secure?!
         let c = Aes128::new(Block::from(*array_ref![k, 0, 16]));
-        let m =
-            unsafe { _mm_set_epi64(_mm_setzero_si64(), std::mem::transmute::<usize, __m64>(i)) };
+        let m = unsafe { _mm_set_epi64(_mm_setzero_si64(), *(&i as *const usize as *const __m64)) };
         c.encrypt(Block(m))
     }
 
@@ -214,14 +213,14 @@ impl rand::distributions::Distribution<Block> for rand::distributions::Standard 
 impl From<Block> for u128 {
     #[inline]
     fn from(m: Block) -> u128 {
-        unsafe { std::mem::transmute(m.0) }
+        unsafe { *(&m as *const Block as *const u128) }
     }
 }
 
 impl From<u128> for Block {
     #[inline]
     fn from(m: u128) -> Self {
-        unsafe { Block(std::mem::transmute(m)) }
+        unsafe { *(&m as *const u128 as *const Block) }
     }
 }
 
@@ -242,14 +241,14 @@ impl From<__m128i> for Block {
 impl From<Block> for [u8; 16] {
     #[inline]
     fn from(m: Block) -> [u8; 16] {
-        unsafe { std::mem::transmute(m) }
+        unsafe { *(&m as *const Block as *const [u8; 16]) }
     }
 }
 
 impl From<[u8; 16]> for Block {
     #[inline]
     fn from(m: [u8; 16]) -> Self {
-        unsafe { std::mem::transmute(m) }
+        unsafe { *(&m as *const [u8; 16] as *const Block) }
     }
 }
 
