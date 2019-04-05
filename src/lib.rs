@@ -16,6 +16,7 @@
 mod aes;
 mod block;
 pub mod cointoss;
+pub mod comm;
 mod hash_aes;
 mod rand_aes;
 pub mod utils;
