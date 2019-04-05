@@ -206,8 +206,8 @@ impl<OT: OtSender<Msg = Block> + SemiHonest> OtReceiver for Receiver<OT> {
     ) -> Result<Self, Error> {
         let mut ot = OT::init(reader, writer, rng)?;
         let mut ks = Vec::with_capacity(128);
-        let mut k0 = Block::zero();
-        let mut k1 = Block::zero();
+        let mut k0 = Block::default();
+        let mut k1 = Block::default();
         for _ in 0..128 {
             rng.fill_bytes(&mut k0.as_mut());
             rng.fill_bytes(&mut k1.as_mut());
@@ -263,7 +263,7 @@ impl<OT: OtSender<Msg = Block> + SemiHonest> CorrelatedReceiver for Receiver<OT>
         for (j, b) in inputs.iter().enumerate() {
             let t = &ts[j * 16..(j + 1) * 16];
             let y = Block::read(reader)?;
-            let y = if *b { y } else { Block::zero() };
+            let y = if *b { y } else { Block::default() };
             let h = self
                 .hash
                 .cr_hash(Block::from(j as u128), Block::from(*array_ref![t, 0, 16]));

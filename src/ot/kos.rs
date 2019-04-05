@@ -49,12 +49,12 @@ impl<OT: OtReceiver<Msg = Block> + Malicious> Sender<OT> {
         let ncols = m + 128 + SSP;
         let qs = self.ot.send_setup(reader, ncols)?;
         // Check correlation
-        let mut seed = Block::zero();
+        let mut seed = Block::default();
         rng.fill_bytes(&mut seed.as_mut());
         let seed = cointoss::send(reader, writer, &[seed])?;
         let mut rng = AesRng::from_seed(seed[0]);
-        let mut check = (Block::zero(), Block::zero());
-        let mut chi = Block::zero();
+        let mut check = (Block::default(), Block::default());
+        let mut chi = Block::default();
         for j in 0..ncols {
             let q = &qs[j * 16..(j + 1) * 16];
             let q = Block::from(*array_ref![q, 0, 16]);
@@ -179,19 +179,19 @@ impl<OT: OtSender<Msg = Block> + Malicious> Receiver<OT> {
         r.extend((0..(m_ - m) / 8).map(|_| rand::random::<u8>()));
         let ts = self.ot.receive_setup(writer, &r, m_)?;
         // Check correlation
-        let mut seed = Block::zero();
+        let mut seed = Block::default();
         rng.fill_bytes(&mut seed.as_mut());
         let seed = cointoss::receive(reader, writer, &[seed])?;
         let mut rng = AesRng::from_seed(seed[0]);
-        let mut x = Block::zero();
-        let mut t = (Block::zero(), Block::zero());
+        let mut x = Block::default();
+        let mut t = (Block::default(), Block::default());
         let r_ = utils::u8vec_to_boolvec(&r);
-        let mut chi = Block::zero();
+        let mut chi = Block::default();
         for (j, xj) in r_.into_iter().enumerate() {
             let tj = &ts[j * 16..(j + 1) * 16];
             let tj = Block::from(*array_ref![tj, 0, 16]);
             rng.fill_bytes(&mut chi.as_mut());
-            x = x ^ if xj { chi } else { Block::zero() };
+            x ^= if xj { chi } else { Block::default() };
             let tmp = tj.clmul(chi);
             t = utils::xor_two_blocks(&t, &tmp);
         }
@@ -253,7 +253,7 @@ impl<OT: OtSender<Msg = Block> + Malicious> CorrelatedReceiver for Receiver<OT> 
         for (j, b) in inputs.iter().enumerate() {
             let t = &ts[j * 16..(j + 1) * 16];
             let y = Block::read(reader)?;
-            let y = if *b { y } else { Block::zero() };
+            let y = if *b { y } else { Block::default() };
             let h = self
                 .ot
                 .hash
