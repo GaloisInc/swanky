@@ -1,5 +1,5 @@
 [package]
-name = "fancy_garbling"
+name = "fancy-garbling"
 version = "0.1.0"
 authors = ["Brent Carmer <bcarmer@galois.com>"]
 license = "MIT"
