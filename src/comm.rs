@@ -27,6 +27,10 @@ impl<R: Read> TrackReader<R> {
     pub fn count(&self) -> usize {
         self.nbits
     }
+    /// Return the count in kilobits.
+    pub fn kilobits(&self) -> f64 {
+        self.count() as f64 / 1000.0
+    }
 }
 
 impl<R: Read> Read for TrackReader<R> {
@@ -54,6 +58,10 @@ impl<W: Write> TrackWriter<W> {
     /// Return the count of bits written.
     pub fn count(&self) -> usize {
         self.nbits
+    }
+    /// Return the count in kilobits.
+    pub fn kilobits(&self) -> f64 {
+        self.count() as f64 / 1000.0
     }
 }
 
