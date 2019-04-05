@@ -35,7 +35,11 @@ impl std::fmt::Display for Error {
             Error::IoError(e) => write!(f, "IO error: {}", e),
             Error::CuckooStashOverflow => write!(f, "CuckooHash: overflowed stash"),
             Error::InvalidCuckooSetSize(n) => write!(f, "CuckooHash: invalid size {}", n),
-            Error::InvalidCuckooParameters { nitems, nhashes } => write!(f, "CuckooHash: no parameters set for {} items and {} hashes", nitems, nhashes),
+            Error::InvalidCuckooParameters { nitems, nhashes } => write!(
+                f,
+                "CuckooHash: no parameters set for {} items and {} hashes",
+                nitems, nhashes
+            ),
         }
     }
 }
