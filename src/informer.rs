@@ -51,7 +51,7 @@ impl Informer {
 
     /// Print information about the fancy computation.
     ///
-    /// For example, below is the output when run in the AES circuit:
+    /// For example, below is the output when run on `circuits/AES-non-expanded.txt`:
     /// ```
     /// computation info:
     ///   garbler inputs:                  128 // comms cost: 16 Kb
@@ -121,7 +121,7 @@ impl Informer {
 
         let mb = total / 1000.0;
         println!("  total communication:  {:11.2} Mb", mb);
-        println!("  wire moduli: {:?}", self.moduli);
+        println!("  wire moduli: {:#?}", self.moduli);
     }
 
     /// Number of garbler inputs in the fancy computation.
