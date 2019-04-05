@@ -94,7 +94,9 @@ impl Wire {
     pub fn zero(q: u16) -> Self {
         match q {
             1 => panic!("[wire::zero] mod 1 not allowed!"),
-            2 => Wire::Mod2 { val: Block::zero() },
+            2 => Wire::Mod2 {
+                val: Block::default(),
+            },
             _ => Wire::ModN {
                 q,
                 ds: vec![0; util::digits_per_u128(q)],
@@ -133,7 +135,7 @@ impl Wire {
     pub fn plus_eq<'a>(&'a mut self, other: &Wire) -> &'a mut Wire {
         match (&mut *self, other) {
             (Wire::Mod2 { val: ref mut x }, Wire::Mod2 { val: ref y }) => {
-                *x = *x ^ *y;
+                *x ^= *y;
             }
 
             (
