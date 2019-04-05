@@ -5,6 +5,7 @@
 // See LICENSE for licensing information.
 
 pub mod psz;
+pub mod psty;
 
 use crate::errors::Error;
 use rand::{CryptoRng, RngCore};
