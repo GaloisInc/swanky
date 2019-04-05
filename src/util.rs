@@ -151,7 +151,7 @@ pub(crate) fn from_base_q(ds: &[u16], q: u16) -> u128 {
 
 /// Convert little-endian mixed radix digits into u128.
 #[inline]
-pub(crate) fn from_mixed_radix(digits: &[u16], radii: &[u16]) -> u128 {
+pub fn from_mixed_radix(digits: &[u16], radii: &[u16]) -> u128 {
     let mut x: u128 = 0;
     for (&d, &q) in digits.iter().zip(radii.iter()).rev() {
         let (xp, overflow) = x.overflowing_mul(q as u128);
