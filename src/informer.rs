@@ -73,9 +73,9 @@ impl Informer {
     pub fn print_info(&self) {
         let mut total = 0.0;
         println!("computation info:");
-        let comm = self.num_garbler_inputs() as f64 * 128.0 / 1024.0;
+        let comm = self.num_garbler_inputs() as f64 * 128.0 / 1000.0;
         println!(
-            "  garbler inputs:     {:16} // comms cost: {} Kb",
+            "  garbler inputs:     {:16} // communication: {:.2} Kb",
             self.num_garbler_inputs(),
             comm
         );
@@ -84,25 +84,25 @@ impl Informer {
         // dependent on the random one. This is for each input bit, so for
         // modulus `q` we need to do `log2(q)` OTs.
         let comm = self.evaluator_input_moduli.iter().fold(0.0, |acc, q| {
-            acc + (*q as f64).log2().ceil() * 384.0 / 1024.0
+            acc + (*q as f64).log2().ceil() * 384.0 / 1000.0
         });
         println!(
-            "  evaluator inputs:   {:16} // comms cost: {} Kb",
+            "  evaluator inputs:   {:16} // communication: {:.2} Kb",
             self.num_evaluator_inputs(),
             comm
         );
         total += comm;
-        let comm = self.num_output_ciphertexts() as f64 * 128.0 / 1024.0;
+        let comm = self.num_output_ciphertexts() as f64 * 128.0 / 1000.0;
         println!("  outputs:            {:16}", self.num_outputs());
         println!(
-            "  output ciphertexts: {:16} // comms cost: {} Kb",
+            "  output ciphertexts: {:16} // communication: {:.2} Kb",
             self.num_output_ciphertexts(),
             comm
         );
         total += comm;
-        let comm = self.num_consts() as f64 * 128.0 / 1024.0;
+        let comm = self.num_consts() as f64 * 128.0 / 1000.0;
         println!(
-            "  constants:          {:16} // comms cost: {} Kb",
+            "  constants:          {:16} // communication: {:.2} Kb",
             self.num_consts(),
             comm
         );
@@ -114,16 +114,16 @@ impl Informer {
         println!("  projections:        {:16}", self.num_projs());
         println!("  multiplications:    {:16}", self.num_muls());
         let cs = self.num_ciphertexts();
-        let kb = cs as f64 * 128.0 / 1024.0;
-        let mb = kb / 1024.0;
+        let kb = cs as f64 * 128.0 / 1000.0;
+        let mb = kb / 1000.0;
         println!(
-            "  ciphertexts:        {:16} // comms cost: {:.2} Mb ({:.2} Kb)",
+            "  ciphertexts:        {:16} // communication: {:.2} Mb ({:.2} Kb)",
             cs, mb, kb
         );
         total += kb;
 
-        let mb = total / 1024.0;
-        println!("  total comms cost:  {:14.2} Mb // {:.2} Kb", mb, kb);
+        let mb = total / 1000.0;
+        println!("  total communication:  {:11.2} Mb", mb);
     }
 
     /// Number of garbler inputs in the fancy computation.
