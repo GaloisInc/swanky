@@ -164,6 +164,12 @@ impl<OT: OtReceiver<Msg = Block> + Malicious> RandomSender for Sender<OT> {
     }
 }
 
+impl<OT: OtReceiver<Msg = Block> + Malicious> std::fmt::Display for Sender<OT> {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "KOS Sender")
+    }
+}
+
 impl<OT: OtSender<Msg = Block> + Malicious> Receiver<OT> {
     #[inline]
     fn receive_setup<R: Read + Send, W: Write + Send, RNG: CryptoRng + RngCore>(
@@ -283,6 +289,12 @@ impl<OT: OtSender<Msg = Block> + Malicious> RandomReceiver for Receiver<OT> {
             out.push(h);
         }
         Ok(out)
+    }
+}
+
+impl<OT: OtSender<Msg = Block> + Malicious> std::fmt::Display for Receiver<OT> {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "KOS Receiver")
     }
 }
 

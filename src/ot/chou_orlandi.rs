@@ -73,6 +73,12 @@ impl OtSender for Sender {
     }
 }
 
+impl std::fmt::Display for Sender {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "Chou-Orlandi Sender")
+    }
+}
+
 /// Oblivious transfer receiver.
 pub struct Receiver {
     s: RistrettoBasepointTable,
@@ -118,6 +124,12 @@ impl OtReceiver for Receiver {
                 Ok(c)
             })
             .collect()
+    }
+}
+
+impl std::fmt::Display for Receiver {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "Chou-Orlandi Receiver")
     }
 }
 

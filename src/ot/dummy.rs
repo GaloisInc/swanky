@@ -50,6 +50,12 @@ impl OtSender for Sender {
     }
 }
 
+impl std::fmt::Display for Sender {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "Dummy Sender")
+    }
+}
+
 impl OtReceiver for Receiver {
     type Msg = Block;
 
@@ -78,5 +84,11 @@ impl OtReceiver for Receiver {
             out.push(m);
         }
         Ok(out)
+    }
+}
+
+impl std::fmt::Display for Receiver {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "Dummy Receiver")
     }
 }

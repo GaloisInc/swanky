@@ -75,6 +75,12 @@ impl OtSender for Sender {
     }
 }
 
+impl std::fmt::Display for Sender {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "Naor-Pinkas Sender")
+    }
+}
+
 impl OtReceiver for Receiver {
     type Msg = Block;
 
@@ -128,6 +134,12 @@ impl OtReceiver for Receiver {
                 Ok(h ^ e1)
             })
             .collect()
+    }
+}
+
+impl std::fmt::Display for Receiver {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "Naor-Pinkas Receiver")
     }
 }
 

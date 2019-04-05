@@ -162,12 +162,14 @@ mod tests {
     #[cfg(feature = "nightly")]
     extern crate test;
     use super::*;
+    use scuttlebutt::comm::{TrackReader, TrackWriter};
     use scuttlebutt::{AesRng, Block};
+    use std::fmt::Display;
     use std::io::{BufReader, BufWriter};
     use std::os::unix::net::UnixStream;
     use std::sync::{Arc, Mutex};
 
-    const T: usize = 16;
+    const T: usize = 1 << 10;
 
     fn rand_block_vec(size: usize) -> Vec<Block> {
         (0..size).map(|_| rand::random::<Block>()).collect()
@@ -177,33 +179,43 @@ mod tests {
         (0..size).map(|_| rand::random::<bool>()).collect()
     }
 
-    fn test_ot<OTSender: Sender<Msg = Block>, OTReceiver: Receiver<Msg = Block>>() {
-        let m0 = rand::random::<Block>();
-        let m1 = rand::random::<Block>();
-        let b = rand::random::<bool>();
-        let m0_ = m0.clone();
-        let m1_ = m1.clone();
+    fn test_ot<OTSender: Sender<Msg = Block>, OTReceiver: Receiver<Msg = Block> + Display>() {
+        let m0s = rand_block_vec(128);
+        let m1s = rand_block_vec(128);
+        let bs = rand_bool_vec(128);
+        let m0s_ = m0s.clone();
+        let m1s_ = m1s.clone();
         let (sender, receiver) = UnixStream::pair().unwrap();
         let handle = std::thread::spawn(move || {
             let mut rng = AesRng::new();
-            let mut reader = BufReader::new(sender.try_clone().unwrap());
-            let mut writer = BufWriter::new(sender);
+            let mut reader = TrackReader::new(BufReader::new(sender.try_clone().unwrap()));
+            let mut writer = TrackWriter::new(BufWriter::new(sender));
             let mut ot = OTSender::init(&mut reader, &mut writer, &mut rng).unwrap();
-            ot.send(&mut reader, &mut writer, &[(m0, m1)], &mut rng)
-                .unwrap();
+            let ms = m0s
+                .into_iter()
+                .zip(m1s.into_iter())
+                .collect::<Vec<(Block, Block)>>();
+            ot.send(&mut reader, &mut writer, &ms, &mut rng).unwrap();
         });
         let mut rng = AesRng::new();
-        let mut reader = BufReader::new(receiver.try_clone().unwrap());
-        let mut writer = BufWriter::new(receiver);
+        let mut reader = TrackReader::new(BufReader::new(receiver.try_clone().unwrap()));
+        let mut writer = TrackWriter::new(BufWriter::new(receiver));
         let mut ot = OTReceiver::init(&mut reader, &mut writer, &mut rng).unwrap();
-        let result = ot
-            .receive(&mut reader, &mut writer, &[b], &mut rng)
-            .unwrap();
-        assert_eq!(result[0], if b { m1_ } else { m0_ });
+        let result = ot.receive(&mut reader, &mut writer, &bs, &mut rng).unwrap();
         handle.join().unwrap();
+        println!(
+            "{} [{} OTs]: read = {:2} Kb, written = {:2} Kb",
+            ot,
+            128,
+            reader.kilobits(),
+            writer.kilobits()
+        );
+        for j in 0..128 {
+            assert_eq!(result[j], if bs[j] { m1s_[j] } else { m0s_[j] });
+        }
     }
 
-    fn test_otext<OTSender: Sender<Msg = Block>, OTReceiver: Receiver<Msg = Block>>() {
+    fn test_otext<OTSender: Sender<Msg = Block>, OTReceiver: Receiver<Msg = Block> + Display>() {
         let m0s = rand_block_vec(T);
         let m1s = rand_block_vec(T);
         let bs = rand_bool_vec(T);
@@ -212,8 +224,8 @@ mod tests {
         let (sender, receiver) = UnixStream::pair().unwrap();
         let handle = std::thread::spawn(move || {
             let mut rng = AesRng::new();
-            let mut reader = BufReader::new(sender.try_clone().unwrap());
-            let mut writer = BufWriter::new(sender);
+            let mut reader = TrackReader::new(BufReader::new(sender.try_clone().unwrap()));
+            let mut writer = TrackWriter::new(BufWriter::new(sender));
             let mut otext = OTSender::init(&mut reader, &mut writer, &mut rng).unwrap();
             let ms = m0s
                 .into_iter()
@@ -222,21 +234,28 @@ mod tests {
             otext.send(&mut reader, &mut writer, &ms, &mut rng).unwrap();
         });
         let mut rng = AesRng::new();
-        let mut reader = BufReader::new(receiver.try_clone().unwrap());
-        let mut writer = BufWriter::new(receiver);
+        let mut reader = TrackReader::new(BufReader::new(receiver.try_clone().unwrap()));
+        let mut writer = TrackWriter::new(BufWriter::new(receiver));
         let mut otext = OTReceiver::init(&mut reader, &mut writer, &mut rng).unwrap();
         let results = otext
             .receive(&mut reader, &mut writer, &bs, &mut rng)
             .unwrap();
+        handle.join().unwrap();
+        println!(
+            "{} [{} OTs]: read = {:2} Kb, written = {:2} Kb",
+            otext,
+            T,
+            reader.kilobits(),
+            writer.kilobits()
+        );
         for j in 0..T {
             assert_eq!(results[j], if bs[j] { m1s_[j] } else { m0s_[j] })
         }
-        handle.join().unwrap();
     }
 
     fn test_cotext<
         OTSender: CorrelatedSender<Msg = Block>,
-        OTReceiver: CorrelatedReceiver<Msg = Block>,
+        OTReceiver: CorrelatedReceiver<Msg = Block> + Display,
     >() {
         let deltas = rand_block_vec(T);
         let bs = rand_bool_vec(T);
@@ -254,20 +273,30 @@ mod tests {
                 .unwrap();
         });
         let mut rng = AesRng::new();
-        let mut reader = BufReader::new(receiver.try_clone().unwrap());
-        let mut writer = BufWriter::new(receiver);
+        let mut reader = TrackReader::new(BufReader::new(receiver.try_clone().unwrap()));
+        let mut writer = TrackWriter::new(BufWriter::new(receiver));
         let mut otext = OTReceiver::init(&mut reader, &mut writer, &mut rng).unwrap();
         let results = otext
             .receive_correlated(&mut reader, &mut writer, &bs, &mut rng)
             .unwrap();
         handle.join().unwrap();
         let out_ = out_.lock().unwrap();
+        println!(
+            "{} [{} COTs]: read = {:2} Kb, written = {:2} Kb",
+            otext,
+            T,
+            reader.kilobits(),
+            writer.kilobits()
+        );
         for j in 0..T {
             assert_eq!(results[j], if bs[j] { out_[j].1 } else { out_[j].0 })
         }
     }
 
-    fn test_rotext<OTSender: RandomSender<Msg = Block>, OTReceiver: RandomReceiver<Msg = Block>>() {
+    fn test_rotext<
+        OTSender: RandomSender<Msg = Block>,
+        OTReceiver: RandomReceiver<Msg = Block> + Display,
+    >() {
         let bs = rand_bool_vec(T);
         let out = Arc::new(Mutex::new(vec![]));
         let out_ = out.clone();
@@ -283,14 +312,21 @@ mod tests {
                 .unwrap();
         });
         let mut rng = AesRng::new();
-        let mut reader = BufReader::new(receiver.try_clone().unwrap());
-        let mut writer = BufWriter::new(receiver);
+        let mut reader = TrackReader::new(BufReader::new(receiver.try_clone().unwrap()));
+        let mut writer = TrackWriter::new(BufWriter::new(receiver));
         let mut otext = OTReceiver::init(&mut reader, &mut writer, &mut rng).unwrap();
         let results = otext
             .receive_random(&mut reader, &mut writer, &bs, &mut rng)
             .unwrap();
         handle.join().unwrap();
         let out_ = out_.lock().unwrap();
+        println!(
+            "{} [{} ROTs]: read = {:2} Kb, written = {:2} Kb",
+            otext,
+            T,
+            reader.kilobits(),
+            writer.kilobits()
+        );
         for j in 0..T {
             assert_eq!(results[j], if bs[j] { out_[j].1 } else { out_[j].0 })
         }
