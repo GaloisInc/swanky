@@ -13,7 +13,7 @@ use std::collections::HashMap;
 /// Evaluates a garbled circuit on the fly, using messages containing ciphertexts and
 /// wires. Parallelizable.
 pub struct Evaluator {
-    callback: Box<FnMut(usize) -> Result<Vec<Block>, EvaluatorError> + Send>,
+    callback: Box<FnMut(usize) -> Result<Vec<Block>, EvaluatorError> + Send + Sync>,
     current_gate: usize,
     output_cts: Vec<OutputCiphertext>,
     output_wires: Vec<Wire>,
@@ -26,7 +26,7 @@ impl Evaluator {
     /// computation, which contain ciphertexts and wire-labels.
     pub fn new<F>(callback: F) -> Evaluator
     where
-        F: FnMut(usize) -> Result<Vec<Block>, EvaluatorError> + Send + 'static,
+        F: FnMut(usize) -> Result<Vec<Block>, EvaluatorError> + Send + Sync + 'static,
     {
         Evaluator {
             callback: Box::new(callback),

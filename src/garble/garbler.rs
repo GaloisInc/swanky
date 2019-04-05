@@ -9,7 +9,7 @@ use std::collections::HashMap;
 
 /// Streams garbled circuit ciphertexts through a callback. Parallelizable.
 pub struct Garbler<R: CryptoRng + RngCore> {
-    callback: Box<FnMut(Message) -> Result<(), GarblerError> + Send>,
+    callback: Box<FnMut(Message) -> Result<(), GarblerError> + Send + Sync>,
     // Hash map containing modulus -> associated delta wire-label.
     deltas: HashMap<u16, Wire>,
     current_output: usize,
@@ -25,7 +25,7 @@ impl<R: CryptoRng + RngCore> Garbler<R> {
     /// wire-labels.
     pub fn new<F>(callback: F, rng: R) -> Self
     where
-        F: FnMut(Message) -> Result<(), GarblerError> + Send + 'static,
+        F: FnMut(Message) -> Result<(), GarblerError> + Send + Sync + 'static,
     {
         Garbler {
             callback: Box::new(callback),

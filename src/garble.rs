@@ -468,6 +468,7 @@ mod streaming {
     use itertools::Itertools;
     use rand::thread_rng;
     use std::fmt::{Debug, Display};
+    use std::sync::{Arc, Mutex};
 
     // helper {{{
     fn streaming_test<F, G>(
@@ -477,19 +478,20 @@ mod streaming {
         ev_inp: &[u16],
         should_be: &[u16],
     ) where
-        F: FnMut(&mut Garbler<AesRng>) + Send + Copy + 'static,
-        G: FnMut(&mut Evaluator) + Send + Copy + 'static,
+        F: FnMut(&mut Garbler<AesRng>) + Send + Sync + Copy + 'static,
+        G: FnMut(&mut Evaluator) + Send + Sync + Copy + 'static,
     {
         let rng = AesRng::new();
         let (sender, receiver) = std::sync::mpsc::sync_channel(20);
+        let sender = Arc::new(Mutex::new(sender));
+        let receiver = receiver.into_iter();
+        let receiver = Arc::new(Mutex::new(receiver));
 
         std::thread::spawn(move || {
-            let callback = move |m| sender.send(m).map_err(GarblerError::from);
+            let callback = move |m| sender.lock().unwrap().send(m).map_err(GarblerError::from);
             let mut garbler = Garbler::new(callback, rng);
             f_gb(&mut garbler);
         });
-
-        let mut gb_iter = receiver.into_iter();
 
         let mut gb_inp_iter = gb_inp.to_vec().into_iter();
         let mut ev_inp_iter = ev_inp.to_vec().into_iter();
@@ -497,7 +499,7 @@ mod streaming {
         // the evaluator's callback gets the next message from the garble iterator,
         // encodes the appropriate inputs, and sends it along
         let callback = move |_| {
-            let blocks = match gb_iter.next().unwrap() {
+            let blocks = match receiver.lock().unwrap().next().unwrap() {
                 Message::UnencodedGarblerInput { zero, delta } => {
                     // Encode the garbler's next input
                     let x = gb_inp_iter.next().expect("not enough garbler inputs!");
@@ -682,6 +684,7 @@ mod complex {
     use crate::fancy::Fancy;
     use crate::util::RngExt;
     use rand::thread_rng;
+    use std::sync::{Arc, Mutex};
 
     fn complex_gadget<F, W>(b: &mut F, q: u128, n: usize)
     where
@@ -733,7 +736,8 @@ mod complex {
             let should_be = dummy.get_output();
             // Do 2PC computation.
             let (tx, rx) = std::sync::mpsc::channel();
-            let tx = tx.clone();
+            let tx = Arc::new(Mutex::new(tx));
+            let rx = Arc::new(Mutex::new(rx));
             let mut input_ = input.clone();
             let callback = move |m| {
                 let m = match m {
@@ -755,7 +759,7 @@ mod complex {
                     Message::GarbledGate(gate) => gate,
                     Message::OutputCiphertext(ct) => ct,
                 };
-                tx.send(m).map_err(GarblerError::from)
+                tx.lock().unwrap().send(m).map_err(GarblerError::from)
             };
 
             std::thread::spawn(move || {
@@ -763,13 +767,14 @@ mod complex {
                 let mut garbler = Garbler::new(callback, rng);
                 complex_gadget(&mut garbler, Q, N);
             });
-            let mut evaluator = Evaluator::new(move |_| Ok(rx.recv().unwrap()));
+            let mut evaluator = Evaluator::new(move |_| Ok(rx.lock().unwrap().recv().unwrap()));
             complex_gadget(&mut evaluator, Q, N);
             let result = evaluator.decode_output();
             assert_eq!(result, should_be);
 
             let (tx, rx) = std::sync::mpsc::channel();
-            let tx = tx.clone();
+            let tx = Arc::new(Mutex::new(tx));
+            let rx = Arc::new(Mutex::new(rx));
             let mut input_ = input.clone();
             std::thread::spawn(move || {
                 let callback = move |m| {
@@ -788,13 +793,14 @@ mod complex {
                         Message::GarbledGate(gate) => gate,
                         Message::OutputCiphertext(ct) => ct,
                     };
-                    tx.send(m).map_err(GarblerError::from)
+                    tx.lock().unwrap().send(m).map_err(GarblerError::from)
                 };
                 let rng = AesRng::new();
                 let mut garbler = Garbler::new(callback, rng);
                 complex_gadget_(&mut garbler, Q, N);
             });
-            let mut evaluator = Evaluator::new(move |_| rx.recv().map_err(EvaluatorError::from));
+            let mut evaluator =
+                Evaluator::new(move |_| rx.lock().unwrap().recv().map_err(EvaluatorError::from));
             complex_gadget_(&mut evaluator, Q, N);
             let result = evaluator.decode_output();
             assert_eq!(result, should_be);
