@@ -167,7 +167,7 @@ pub(crate) fn from_mixed_radix(digits: &[u16], radii: &[u16]) -> u128 {
 /// Get the bits of a u128 encoded in 128 u16s, which is convenient for the rest of
 /// the library, which uses u16 as the base digit type in Wire.
 #[inline]
-pub(crate) fn u128_to_bits(x: u128, n: usize) -> Vec<u16> {
+pub fn u128_to_bits(x: u128, n: usize) -> Vec<u16> {
     let mut bits = Vec::with_capacity(n);
     let mut y = x;
     for _ in 0..n {
@@ -181,7 +181,7 @@ pub(crate) fn u128_to_bits(x: u128, n: usize) -> Vec<u16> {
 
 /// Convert into a u128 from the "bits" as u16. Assumes each "bit" is 0 or 1.
 #[inline]
-pub(crate) fn u128_from_bits(bs: &[u16]) -> u128 {
+pub fn u128_from_bits(bs: &[u16]) -> u128 {
     let mut x = 0;
     for &b in bs.iter().skip(1).rev() {
         x += b as u128;
@@ -200,7 +200,7 @@ pub(crate) fn u128_from_bits(bs: &[u16]) -> u128 {
 /// We are limited by the size of the digits in Wire, and besides, if need large moduli,
 /// you should use BundleGadgets and save.
 #[inline]
-pub(crate) fn factor(inp: u128) -> Vec<u16> {
+pub fn factor(inp: u128) -> Vec<u16> {
     let mut x = inp;
     let mut fs = Vec::new();
     for &p in PRIMES.iter() {
