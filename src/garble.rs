@@ -24,10 +24,10 @@ pub type OutputCiphertext = Vec<Block>;
 /// The outputs that can be emitted by a Garbler and consumed by an Evaluator.
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
 pub enum Message {
-    /// Zero wire and delta for one of the garbler's inputs.
+    /// The zero wire and delta offset for one of the garbler's inputs.
     ///
-    /// This is produced by the Garbler, and must be transformed into GarblerInput before
-    /// being sent to the Evaluator.
+    /// This is produced by the garbler, and should be transformed into
+    /// `GarblerInput` before being sent to the evaluator.
     UnencodedGarblerInput {
         /// The zero wire-label.
         zero: Wire,
@@ -35,10 +35,10 @@ pub enum Message {
         delta: Wire,
     },
 
-    /// Zero wire and delta for one of the evaluator's inputs.
+    /// The zero wire and delta offset for one of the evaluator's inputs.
     ///
-    /// This is produced by the Garbler, and must be transformed into EvaluatorInput
-    /// before being sent to the Evaluator.
+    /// This is produced by the garbler, and should be transformed into
+    /// `EvaluatorInput` before being sent to the evaluator.
     UnencodedEvaluatorInput {
         /// The zero wire-label.
         zero: Wire,
@@ -52,7 +52,7 @@ pub enum Message {
     /// Encoded input for one of the evaluator's inputs.
     EvaluatorInput(Wire),
 
-    /// Constant wire carrying the value.
+    /// Constant wire.
     Constant {
         /// The constant value.
         value: u16,
