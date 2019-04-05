@@ -13,7 +13,6 @@ use arrayref::array_ref;
 use core::arch::x86_64::*;
 #[cfg(feature = "curve25519-dalek")]
 use curve25519_dalek::ristretto::RistrettoPoint;
-use rand::{CryptoRng, RngCore};
 use std::hash::{Hash, Hasher};
 use std::io::{Read, Write};
 
@@ -46,14 +45,15 @@ impl Block {
         self.as_mut().as_mut_ptr()
     }
 
-    /// Output the all-zero block.
+    /// Output the all-zero block. (XXX: remove eventually in favor of `Block::default`.)
     #[inline]
     pub fn zero() -> Self {
         unsafe { Block(_mm_setzero_si128()) }
     }
 
-    /// Carryless multiplication. This code is adapted from the EMP toolkit's
-    /// implementation.
+    /// Carryless multiplication.
+    ///
+    /// This code is adapted from the EMP toolkit's implementation.
     #[inline]
     pub fn clmul(self, rhs: Self) -> (Self, Self) {
         unsafe {
@@ -72,8 +72,10 @@ impl Block {
         }
     }
 
-    /// Hash an elliptic curve point `pt` by computing `E_{pt}(i)`, where `E` is
-    /// AES-128 and `i` is an index.
+    /// Hash an elliptic curve point `pt` and tweak `i`.
+    ///
+    /// Computes the hash by computing `E_{pt}(i)`, where `E` is AES-128 and `i`
+    /// is an index.
     #[cfg(all(feature = "curve25519-dalek", feature = "nightly"))]
     #[inline]
     pub fn hash_pt(i: usize, pt: &RistrettoPoint) -> Self {
@@ -85,8 +87,10 @@ impl Block {
         c.encrypt(Block(m))
     }
 
-    /// Hash an elliptic curve point `pt` by computing `E_{pt}(i)`, where `E` is
-    /// AES-128 and `i` is an index.
+    /// Hash an elliptic curve point `pt` and tweak `i`.
+    ///
+    /// Computes the hash by computing `E_{pt}(i)`, where `E` is AES-128 and `i`
+    /// is an index.
     #[cfg(all(feature = "curve25519-dalek", not(feature = "nightly")))]
     #[inline]
     pub fn hash_pt(i: usize, pt: &RistrettoPoint) -> Self {
@@ -96,15 +100,6 @@ impl Block {
         let c = Aes128::new(Block::from(*array_ref![k, 0, 16]));
         let m = i as u128;
         c.encrypt(Block::from(m))
-    }
-
-    /// Fixed key for AES hash. This is the same fixed key as used in the EMP toolkit.
-    #[inline]
-    pub fn fixed_key() -> Self {
-        Block::from([
-            0x61, 0x7e, 0x8d, 0xa2, 0xa0, 0x51, 0x1e, 0x96, 0x5e, 0x41, 0xc2, 0x9b, 0x15, 0x3f,
-            0xc7, 0x7a,
-        ])
     }
 
     /// Write a block to `stream`.
@@ -139,7 +134,7 @@ impl Block {
 impl Default for Block {
     #[inline]
     fn default() -> Self {
-        Block::zero()
+        unsafe { Block(_mm_setzero_si128()) }
     }
 }
 
@@ -206,14 +201,16 @@ impl rand::distributions::Distribution<Block> for rand::distributions::Standard 
 impl From<Block> for u128 {
     #[inline]
     fn from(m: Block) -> u128 {
-        unsafe { *(&m as *const Block as *const u128) }
+        unsafe { *(&m as *const _ as *const u128) }
     }
 }
 
 impl From<u128> for Block {
     #[inline]
     fn from(m: u128) -> Self {
-        unsafe { *(&m as *const u128 as *const Block) }
+        unsafe { std::mem::transmute(m) }
+        // XXX: the below doesn't work due to pointer-alignment issues.
+        // unsafe { *(&m as *const _ as *const Block) }
     }
 }
 
@@ -234,14 +231,16 @@ impl From<__m128i> for Block {
 impl From<Block> for [u8; 16] {
     #[inline]
     fn from(m: Block) -> [u8; 16] {
-        unsafe { *(&m as *const Block as *const [u8; 16]) }
+        unsafe { *(&m as *const _ as *const [u8; 16]) }
     }
 }
 
 impl From<[u8; 16]> for Block {
     #[inline]
     fn from(m: [u8; 16]) -> Self {
-        unsafe { *(&m as *const [u8; 16] as *const Block) }
+        unsafe { std::mem::transmute(m) }
+        // XXX: the below doesn't work due to pointer-alignment issues.
+        // unsafe { *(&m as *const _ as *const Block) }
     }
 }
 
