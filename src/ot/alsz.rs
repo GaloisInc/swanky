@@ -17,7 +17,7 @@ use arrayref::array_ref;
 use rand::CryptoRng;
 use rand_core::{RngCore, SeedableRng};
 use scuttlebutt::utils as scutils;
-use scuttlebutt::{AesHash, AesRng, Block, SemiHonest};
+use scuttlebutt::{AesHash, AesRng, Block, SemiHonest, AES_HASH};
 use std::io::{ErrorKind, Read, Write};
 use std::marker::PhantomData;
 
@@ -77,7 +77,6 @@ impl<OT: OtReceiver<Msg = Block> + SemiHonest> OtSender for Sender<OT> {
         rng: &mut RNG,
     ) -> Result<Self, Error> {
         let mut ot = OT::init(reader, writer, rng)?;
-        let hash = AesHash::new(Block::fixed_key());
         let mut s_ = [0u8; 16];
         rng.fill_bytes(&mut s_);
         let s = utils::u8vec_to_boolvec(&s_);
@@ -88,7 +87,7 @@ impl<OT: OtReceiver<Msg = Block> + SemiHonest> OtSender for Sender<OT> {
             .collect::<Vec<AesRng>>();
         Ok(Self {
             _ot: PhantomData::<OT>,
-            hash,
+            hash: AES_HASH,
             s,
             s_: Block::from(s_),
             rngs,
@@ -206,7 +205,6 @@ impl<OT: OtSender<Msg = Block> + SemiHonest> OtReceiver for Receiver<OT> {
         rng: &mut RNG,
     ) -> Result<Self, Error> {
         let mut ot = OT::init(reader, writer, rng)?;
-        let hash = AesHash::new(Block::fixed_key());
         let mut ks = Vec::with_capacity(128);
         let mut k0 = Block::zero();
         let mut k1 = Block::zero();
@@ -222,7 +220,7 @@ impl<OT: OtSender<Msg = Block> + SemiHonest> OtReceiver for Receiver<OT> {
             .collect::<Vec<(AesRng, AesRng)>>();
         Ok(Self {
             _ot: PhantomData::<OT>,
-            hash,
+            hash: AES_HASH,
             rngs,
         })
     }
