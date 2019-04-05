@@ -6,6 +6,7 @@
 
 use crate::comm;
 use crate::errors::Error;
+use fancy_garbling::error::GarblerError;
 use fancy_garbling::{Fancy, Garbler as Gb, Message, Wire};
 use ocelot::ot::Sender as OtSender;
 use rand::{CryptoRng, RngCore, SeedableRng};
@@ -41,23 +42,13 @@ impl<
                     let input = inputs.next().unwrap();
                     vec![zero.plus(&delta.cmul(input)).as_block()]
                 }
-                Message::UnencodedEvaluatorInput { .. } => {
-                    panic!(
-                        "There should not be an `UnencodedEvaluatorInput` message in the garbler"
-                    );
-                }
-                Message::EvaluatorInput(_) => {
-                    panic!("There should not be an `EvaluatorInput` message in the garbler");
-                }
-                Message::GarblerInput(_) => {
-                    panic!("There should not be a `GarblerInput` message in the garbler");
-                }
                 Message::Constant { value: _, wire } => vec![wire.as_block()],
                 Message::GarbledGate(gate) => gate,
                 Message::OutputCiphertext(ct) => ct,
+                m => return Err(GarblerError::InvalidMessage(m)),
             };
-            comm::send_blocks(&mut *writer, &blocks).unwrap();
-            ()
+            comm::send_blocks(&mut *writer, &blocks).unwrap(); // XXX unwrap
+            Ok(())
         };
         let mut key = [0u8; 16];
         rng.fill_bytes(&mut key);

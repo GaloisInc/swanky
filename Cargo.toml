@@ -12,10 +12,10 @@ edition = "2018"
 [lib]
 
 [features]
-nightly = ["rand/nightly", "scuttlebutt/nightly", "ocelot/nightly", "fancy_garbling/nightly"]
+nightly = ["rand/nightly", "scuttlebutt/nightly", "ocelot/nightly", "fancy-garbling/nightly"]
 
 [dependencies]
-fancy_garbling = { path = "../fancy-garbling" }
+fancy-garbling = { path = "../fancy-garbling" }
 ocelot = { git = "https://github.com/amaloz/ocelot" }
 rand = "*"
 scuttlebutt = { git = "https://github.com/amaloz/scuttlebutt" }
