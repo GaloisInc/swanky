@@ -88,18 +88,18 @@ fn bench_psi(c: &mut Criterion) {
             criterion::black_box(v)
         })
     });
-    // c.bench_function("psi::PSZ (n = 2^20)", move |bench| {
-    //     let rs = rand_vec_vec(1 << 20);
-    //     bench.iter(|| {
-    //         let v = _bench_psz(rs.clone(), rs.clone());
-    //         criterion::black_box(v)
-    //     })
-    // });
+    c.bench_function("psi::PSZ (n = 2^20)", move |bench| {
+        let rs = rand_vec_vec(1 << 20);
+        bench.iter(|| {
+            let v = _bench_psz(rs.clone(), rs.clone());
+            criterion::black_box(v)
+        })
+    });
 }
 
 criterion_group! {
     name = psi;
-    config = Criterion::default().warm_up_time(Duration::from_millis(100));
+    config = Criterion::default().warm_up_time(Duration::from_millis(100)).sample_size(2);
     targets = bench_psi
 }
 

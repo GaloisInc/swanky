@@ -9,42 +9,63 @@ use arrayref::array_ref;
 use scuttlebutt::Block;
 use std::fmt::Debug;
 
-pub(crate) struct CuckooHash {
-    // Contains the bins + stash. Each entry is a tuple containing:
-    // 0. The entry, or None if there is no such entry.
-    // 1. The input index associated with the entry.
-    // 2. The hash index used.
-    items: Vec<(Option<Block>, Option<usize>, Option<usize>)>,
-    pub(crate) nbins: usize,
-    pub(crate) stashsize: usize,
+#[derive(Clone, Debug)]
+pub(crate) struct CuckooItem {
+    pub(crate) entry: Block,             // the actual value
+    pub(crate) input_index: usize,       // the input index associated with the entry
+    pub(crate) hash_index: Option<usize> // the hash index used. None for stash items.
 }
 
-/// The number of hash functions to use in the cuckoo hash.
-pub(crate) const NHASHES: usize = 2;
+pub(crate) struct CuckooHash {
+    items: Vec<Option<CuckooItem>>,
+    pub(crate) nbins: usize,
+    pub(crate) stashsize: usize,
+    pub(crate) nhashes: usize,
+}
+
 /// The number of times to loop when trying to place an entry in a bin.
 const NITERS: usize = 100;
 
 #[inline]
-fn compute_nbins(n: usize) -> usize {
-    (2.4 * (n as f64)).ceil() as usize
-}
-#[inline]
-fn compute_stashsize(n: usize) -> Result<usize, Error> {
-    let stashsize = if n <= 1 << 8 {
-        8
-    } else if n <= 1 << 12 {
-        5
-    } else if n <= 1 << 16 {
-        3
-    } else if n <= 1 << 28 {
-        2
-    } else if n <= 1 << 32 {
-        4
+fn compute_nbins(n: usize, nhashes: usize) -> Result<usize, Error> {
+    if nhashes == 2 {
+        Ok((2.4 * (n as f64)).ceil() as usize)
+    } else if nhashes == 3 {
+        Ok((1.27 * (n as f64)).ceil() as usize)
+    } else if nhashes == 4 {
+        Ok((1.09 * (n as f64)).ceil() as usize)
+    } else if nhashes == 5 {
+        Ok((1.05 * (n as f64)).ceil() as usize)
     } else {
-        return Err(Error::InvalidSetSize(n));
-    };
-    Ok(stashsize)
+        Err(Error::InvalidCuckooParameters { nitems: n, nhashes })
+    }
 }
+
+#[inline]
+fn compute_stashsize(n: usize, nhashes: usize) -> Result<usize, Error> {
+    if nhashes == 1 {
+        Err(Error::InvalidCuckooParameters { nitems: n, nhashes })
+    } else if nhashes > 2 {
+        // No stash necessary when H > 2
+        Ok(0)
+    } else {
+        // nhashes == 2
+        if n <= 1 << 8 {
+            Ok(8)
+        } else if n <= 1 << 12 {
+            Ok(5)
+        } else if n <= 1 << 16 {
+            Ok(3)
+        } else if n <= 1 << 28 {
+            Ok(2)
+        } else if n <= 1 << 32 {
+            Ok(4)
+        } else {
+            Err(Error::InvalidCuckooSetSize(n))
+        }
+    }
+}
+
 #[inline]
 pub fn compute_masksize(n: usize) -> Result<usize, Error> {
     let masksize = if n <= 1 << 8 {
@@ -58,63 +79,69 @@ pub fn compute_masksize(n: usize) -> Result<usize, Error> {
     } else if n <= 1 << 24 {
         11
     } else {
-        return Err(Error::InvalidSetSize(n));
+        return Err(Error::InvalidCuckooSetSize(n));
     };
     Ok(masksize)
 }
 
 impl CuckooHash {
-    pub fn build(inputs: &[Block]) -> Result<Self, Error> {
-        let nbins = compute_nbins(inputs.len());
+    pub fn new(inputs: &[Block], nhashes: usize) -> Result<CuckooHash, Error> {
         // We don't support more than 2**32 bins due to the way we compute the
         // bin number (cf. the `bin` function below).
-        if nbins >= 1 << 32 {
-            return Err(Error::InvalidSetSize(inputs.len()));
-        }
-        let stashsize = compute_stashsize(inputs.len())?;
-        let mut tbl = CuckooHash::new(nbins, stashsize);
+        let nbins     = compute_nbins(inputs.len(), nhashes)?;
+        let stashsize = compute_stashsize(inputs.len(), nhashes)?;
+
+        let mut tbl = CuckooHash {
+            items: vec![None; nbins + stashsize],
+            nbins,
+            stashsize,
+            nhashes,
+        };
+
         // Fill table with `inputs`
         for (j, input) in inputs.iter().enumerate() {
             tbl.hash(*input, j)?;
         }
-        Ok(tbl)
-    }
 
-    pub fn new(nbins: usize, stashsize: usize) -> Self {
-        let items = vec![(None, None, None); nbins + stashsize];
-        Self {
-            items,
-            nbins,
-            stashsize,
-        }
+        Ok(tbl)
     }
 
     /// Place `input`, alongside the input index `idx` it corresponds to, in the
     /// hash table.
     pub fn hash(&mut self, input: Block, idx: usize) -> Result<(), Error> {
-        let mut input = input;
-        let mut idx = idx;
-        let mut hidx = 0;
+        let mut item = CuckooItem { entry: input, input_index: idx, hash_index: Some(0) };
+
         for _ in 0..NITERS {
-            let i = Self::bin(input, hidx, self.nbins);
-            let old = self.items[i];
-            self.items[i] = (Some(input), Some(idx), Some(hidx));
-            if let Some(item) = old.0 {
-                input = item;
-                idx = old.1.unwrap();
-                hidx = (old.2.unwrap() + 1) % NHASHES;
+            let i = CuckooHash::bin(item.entry, item.hash_index.unwrap(), self.nbins);
+
+            let opt_item = self.items[i].replace(item);
+
+            if let Some(x) = opt_item {
+                // if there is a value already in the bin, continue
+                item = x;
+                // bump the hash index
+                item.hash_index.iter_mut().for_each(|h| {
+                    *h += 1;
+                    *h %= self.nhashes;
+                });
             } else {
+                // otherwise, halt
                 return Ok(());
             }
         }
+
         // Unable to place in bin, so place in stash
+        // set hash index to none, indicating stash placement
+        item.hash_index = None;
         for i in self.nbins..self.nbins + self.stashsize {
-            if self.items[i].0.is_none() {
-                self.items[i] = (Some(input), Some(idx), None);
+            if self.items[i].is_none() {
+                self.items[i] = Some(item);
                 return Ok(());
             }
         }
-        return Err(Error::CuckooHashFull);
+
+        // overflowed the stash
+        return Err(Error::CuckooStashOverflow);
     }
 
     /// Output the bin number for a given hash output `hash` and hash index `hidx`.
@@ -128,7 +155,7 @@ impl CuckooHash {
     }
 
     #[inline]
-    pub fn items(&self) -> std::slice::Iter<(Option<Block>, Option<usize>, Option<usize>)> {
+    pub fn items(&self) -> impl Iterator<Item=&Option<CuckooItem>> {
         self.items.iter()
     }
 }
@@ -154,9 +181,9 @@ mod tests {
     #[test]
     fn test_build() {
         let inputs = (0..SETSIZE)
-            .map(|_| rand::random::<Block>())
+            .map(|_| Block::from(rand::random::<u128>()))
             .collect::<Vec<Block>>();
-        let tbl = CuckooHash::build(&inputs);
+        let tbl = CuckooHash::new(&inputs, 3);
         assert!(tbl.err().is_none());
     }
 }
@@ -174,7 +201,7 @@ mod benchmarks {
         let inputs = (0..SETSIZE)
             .map(|_| rand::random::<Block>())
             .collect::<Vec<Block>>();
-        b.iter(|| CuckooHash::build(&inputs));
+        b.iter(|| CuckooHash::new(&inputs, 3));
     }
 
     #[bench]

@@ -9,8 +9,9 @@
 pub enum Error {
     OprfError(ocelot::Error),
     IoError(std::io::Error),
-    CuckooHashFull,
-    InvalidSetSize(usize),
+    CuckooStashOverflow,
+    InvalidCuckooSetSize(usize),
+    InvalidCuckooParameters { nitems: usize, nhashes: usize },
 }
 
 impl From<std::io::Error> for Error {
@@ -32,8 +33,9 @@ impl std::fmt::Display for Error {
         match self {
             Error::OprfError(e) => write!(f, "oblivious PRF error: {}", e),
             Error::IoError(e) => write!(f, "IO error: {}", e),
-            Error::CuckooHashFull => write!(f, "cuckoo hash is full"),
-            Error::InvalidSetSize(n) => write!(f, "set size {} is too large", n),
+            Error::CuckooStashOverflow => write!(f, "CuckooHash: overflowed stash"),
+            Error::InvalidCuckooSetSize(n) => write!(f, "CuckooHash: invalid size {}", n),
+            Error::InvalidCuckooParameters { nitems, nhashes } => write!(f, "CuckooHash: no parameters set for {} items and {} hashes", nitems, nhashes),
         }
     }
 }

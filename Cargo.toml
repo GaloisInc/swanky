@@ -15,16 +15,15 @@ edition = "2018"
 nightly = ["rand/nightly", "scuttlebutt/nightly", "ocelot/nightly"]
 
 [dependencies]
-arrayref = "*"
-# ocelot = { git = "https://github.com/amaloz/ocelot" }
-ocelot = { path = "../ocelot" }
-rand = "*"
-rand_core = "*"
+arrayref = "0.3.5"
+ocelot = { git = "https://github.com/amaloz/ocelot" }
+rand = "0.6.5"
+rand_core = "0.4.0"
 scuttlebutt = { git = "https://github.com/amaloz/scuttlebutt"}
-sha2 = "*"
+sha2 = "0.8.0"
 
 [dev-dependencies]
-criterion = "*"
+criterion = "0.2.10"
 
 [profile.release]
 opt-level = 3
