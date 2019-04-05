@@ -9,6 +9,7 @@ oblivious transfer. In particular, `scuttlebutt` provides the following:
 * `AesRng`, which provides a random number generator based on fixed-key AES.
 * `Block`, which wraps an `__m128i` type and provides methods useful when used as a garbled circuit wire label.
 * A `cointoss` module, which implements a simple random-oracle-based coin-tossing protocol.
+* A `comm` module, which contains `Read`/`Write` objects for tracking the number of bits read/written.
 * A `utils` module, which contains useful utility functions.
 
 **`scuttlebutt` should be considered unstable and under active development until
