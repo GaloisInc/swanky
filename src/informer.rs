@@ -1,9 +1,8 @@
 //! `Informer` runs a fancy computation and learns information from it.
 
-use std::collections::HashSet;
-
 use crate::error::{FancyError, InformerError};
 use crate::fancy::{Fancy, HasModulus};
+use std::collections::{HashMap, HashSet};
 
 /// Implements `Fancy`. Used to learn information about a `Fancy` computation in
 /// a lightweight way.
@@ -18,9 +17,7 @@ pub struct Informer {
     nmuls: usize,
     nprojs: usize,
     nciphertexts: usize,
-    // TODO: we should also accumulate nice info about what are the various
-    // moduli in the computation, and how many of such moduli are there. moduli:
-    // Arc<Mutex<HashSet<(u16, usize)>>>,
+    moduli: HashMap<u16, usize>,
 }
 
 /// The item type used by `Informer`. It simply contains the modulus of the
@@ -48,13 +45,13 @@ impl Informer {
             nmuls: 0,
             nprojs: 0,
             nciphertexts: 0,
-            // moduli: Arc::new(Mutex::new(HashSet::new())),
+            moduli: HashMap::new(),
         }
     }
 
     /// Print information about the fancy computation.
     ///
-    /// For example:
+    /// For example, below is the output when run in the AES circuit:
     /// ```
     /// computation info:
     ///   garbler inputs:                  128 // comms cost: 16 Kb
@@ -124,6 +121,7 @@ impl Informer {
 
         let mb = total / 1000.0;
         println!("  total communication:  {:11.2} Mb", mb);
+        println!("  wire moduli: {:?}", self.moduli);
     }
 
     /// Number of garbler inputs in the fancy computation.
@@ -190,29 +188,33 @@ impl Informer {
     pub fn num_ciphertexts(&self) -> usize {
         self.nciphertexts
     }
+
+    fn update_moduli(&mut self, q: u16) {
+        let entry = self.moduli.entry(q).or_insert(0);
+        *entry += 1;
+    }
 }
 
 impl Fancy for Informer {
     type Item = InformerVal;
     type Error = InformerError;
 
-    fn garbler_input(
-        &mut self,
-        modulus: u16,
-        _: Option<u16>,
-    ) -> Result<InformerVal, InformerError> {
-        self.garbler_input_moduli.push(modulus);
-        Ok(InformerVal(modulus))
+    fn garbler_input(&mut self, q: u16, _: Option<u16>) -> Result<InformerVal, InformerError> {
+        self.garbler_input_moduli.push(q);
+        self.update_moduli(q);
+        Ok(InformerVal(q))
     }
 
-    fn evaluator_input(&mut self, modulus: u16) -> Result<InformerVal, InformerError> {
-        self.evaluator_input_moduli.push(modulus);
-        Ok(InformerVal(modulus))
+    fn evaluator_input(&mut self, q: u16) -> Result<InformerVal, InformerError> {
+        self.evaluator_input_moduli.push(q);
+        self.update_moduli(q);
+        Ok(InformerVal(q))
     }
 
-    fn constant(&mut self, val: u16, modulus: u16) -> Result<InformerVal, InformerError> {
-        self.constants.insert((val, modulus));
-        Ok(InformerVal(modulus))
+    fn constant(&mut self, val: u16, q: u16) -> Result<InformerVal, InformerError> {
+        self.constants.insert((val, q));
+        self.update_moduli(q);
+        Ok(InformerVal(q))
     }
 
     fn add(&mut self, x: &InformerVal, y: &InformerVal) -> Result<InformerVal, InformerError> {
@@ -220,6 +222,7 @@ impl Fancy for Informer {
             Err(FancyError::UnequalModuli)?;
         }
         self.nadds += 1;
+        self.update_moduli(x.modulus());
         Ok(InformerVal(x.modulus()))
     }
 
@@ -228,11 +231,13 @@ impl Fancy for Informer {
             Err(FancyError::UnequalModuli)?;
         }
         self.nsubs += 1;
+        self.update_moduli(x.modulus());
         Ok(InformerVal(x.modulus()))
     }
 
-    fn cmul(&mut self, x: &InformerVal, _c: u16) -> Result<InformerVal, InformerError> {
+    fn cmul(&mut self, x: &InformerVal, _: u16) -> Result<InformerVal, InformerError> {
         self.ncmuls += 1;
+        self.update_moduli(x.modulus());
         Ok(InformerVal(x.modulus()))
     }
 
@@ -246,18 +251,20 @@ impl Fancy for Informer {
             // there is an extra ciphertext to support nonequal inputs
             self.nciphertexts += 1;
         }
+        self.update_moduli(x.modulus());
         Ok(InformerVal(x.modulus()))
     }
 
     fn proj(
         &mut self,
         x: &InformerVal,
-        modulus: u16,
+        q: u16,
         _: Option<Vec<u16>>,
     ) -> Result<InformerVal, InformerError> {
         self.nprojs += 1;
         self.nciphertexts += x.modulus() as usize - 1;
-        Ok(InformerVal(modulus))
+        self.update_moduli(q);
+        Ok(InformerVal(q))
     }
 
     fn output(&mut self, x: &InformerVal) -> Result<(), InformerError> {
