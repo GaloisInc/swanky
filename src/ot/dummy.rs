@@ -46,6 +46,7 @@ impl OtSender for Sender {
             let m = if b { m.1 } else { m.0 };
             m.write(&mut writer)?;
         }
+        writer.flush()?;
         Ok(())
     }
 }
