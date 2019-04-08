@@ -31,7 +31,7 @@ pub enum Message {
     UnencodedGarblerInput {
         /// The zero wire-label.
         zero: Wire,
-        /// THe offset wire-label.
+        /// The offset wire-label.
         delta: Wire,
     },
 
