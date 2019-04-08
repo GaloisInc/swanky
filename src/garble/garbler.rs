@@ -245,16 +245,13 @@ impl<R: CryptoRng + RngCore> Fancy for Garbler<R> {
     }
     #[inline]
     fn proj(&mut self, A: &Wire, q_out: u16, tt: Option<Vec<u16>>) -> Result<Wire, GarblerError> {
-        //
         let tt = tt.ok_or(GarblerError::TruthTableRequired)?;
 
         let q_in = A.modulus();
-        // we have to fill in the vector in an unknown order because of the color bits.
-        // Since some of the values in gate will be void temporarily, we use Vec<Option<..>>
         let mut gate = vec![Block::default(); q_in as usize - 1];
 
         let tao = A.color();
-        let g = tweak(self.current_gate()); // gate tweak
+        let g = tweak(self.current_gate());
 
         let Din = self.delta(q_in);
         let Dout = self.delta(q_out);
@@ -294,9 +291,7 @@ impl<R: CryptoRng + RngCore> Fancy for Garbler<R> {
             gate[ix - 1] = ct;
         }
 
-        // unwrap the Option elems inside the Vec
         self.send(Message::GarbledGate(gate))?;
-
         Ok(C)
     }
     #[inline]
@@ -311,21 +306,5 @@ impl<R: CryptoRng + RngCore> Fancy for Garbler<R> {
         }
         self.send(Message::OutputCiphertext(cts))?;
         Ok(())
-    }
-}
-
-// `Garbler` tests
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use scuttlebutt::AesRng;
-
-    #[test]
-    fn garbler_has_send_and_sync() {
-        fn check_send(_: impl Send) {}
-        // fn check_sync(_: impl Sync) {}
-        check_send(Garbler::new(|_| Ok(()), AesRng::new()));
-        // check_sync(Garbler::new(|_| Ok(()), AesRng::new()));
     }
 }

@@ -47,14 +47,8 @@ impl Evaluator {
     }
 
     #[inline]
-    fn recv_gate(&mut self, ngates: usize) -> Result<Vec<Block>, EvaluatorError> {
+    fn recv_blocks(&mut self, ngates: usize) -> Result<Vec<Block>, EvaluatorError> {
         let blocks = (self.callback)(ngates)?;
-        Ok(blocks)
-    }
-
-    #[inline]
-    fn recv_outputs(&mut self, noutputs: usize) -> Result<Vec<Block>, EvaluatorError> {
-        let blocks = (self.callback)(noutputs)?;
         Ok(blocks)
     }
 
@@ -109,7 +103,7 @@ impl Fancy for Evaluator {
         let q = A.modulus();
         let qb = B.modulus();
         let unequal = q != qb;
-        let gate = self.recv_gate(q as usize + qb as usize - 2 + unequal as usize)?;
+        let gate = self.recv_blocks(q as usize + qb as usize - 2 + unequal as usize)?;
         let gate_num = self.current_gate();
         let g = tweak2(gate_num as u64, 0);
 
@@ -145,7 +139,7 @@ impl Fancy for Evaluator {
     #[inline]
     fn proj(&mut self, x: &Wire, q: u16, _: Option<Vec<u16>>) -> Result<Wire, EvaluatorError> {
         let ngates = (x.modulus() - 1) as usize;
-        let gate = self.recv_gate(ngates)?;
+        let gate = self.recv_blocks(ngates)?;
         let t = tweak(self.current_gate());
         if x.color() == 0 {
             Ok(x.hashback(t, q))
@@ -157,8 +151,8 @@ impl Fancy for Evaluator {
     #[inline]
     fn output(&mut self, x: &Wire) -> Result<(), EvaluatorError> {
         let noutputs = x.modulus() as usize;
-        let cts = self.recv_outputs(noutputs)?;
-        self.output_cts.push(cts);
+        let blocks = self.recv_blocks(noutputs)?;
+        self.output_cts.push(blocks);
         self.output_wires.push(x.clone());
         Ok(())
     }
@@ -311,7 +305,7 @@ impl Decoder {
             self.outputs.len()
         );
 
-        let mut outs = Vec::new();
+        let mut outs = Vec::with_capacity(ws.len());
         for i in 0..ws.len() {
             let q = ws[i].modulus();
             debug_assert_eq!(q as usize, self.outputs[i].len());
@@ -331,20 +325,5 @@ impl Decoder {
             ws.len()
         );
         outs
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////
-// tests
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    #[test]
-    fn evaluator_has_send_and_sync() {
-        fn check_send(_: impl Send) {}
-        // fn check_sync(_: impl Sync) {}
-        check_send(Evaluator::new(|_| unimplemented!()));
-        // check_sync(Evaluator::new(|_| unimplemented!()));
     }
 }
