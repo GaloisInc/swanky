@@ -103,12 +103,12 @@ impl Fancy for Evaluator {
     }
     #[inline]
     fn mul(&mut self, A: &Wire, B: &Wire) -> Result<Wire, EvaluatorError> {
-        if A.modulus() < A.modulus() {
+        if A.modulus() < B.modulus() {
             return self.mul(B, A);
         }
         let q = A.modulus();
         let qb = B.modulus();
-        let unequal = A.modulus() != B.modulus();
+        let unequal = q != qb;
         let gate = self.recv_gate(q as usize + qb as usize - 2 + unequal as usize)?;
         let gate_num = self.current_gate();
         let g = tweak2(gate_num as u64, 0);
@@ -143,7 +143,7 @@ impl Fancy for Evaluator {
         Ok(res)
     }
     #[inline]
-    fn proj(&mut self, x: &Wire, q: u16, _tt: Option<Vec<u16>>) -> Result<Wire, EvaluatorError> {
+    fn proj(&mut self, x: &Wire, q: u16, _: Option<Vec<u16>>) -> Result<Wire, EvaluatorError> {
         let ngates = (x.modulus() - 1) as usize;
         let gate = self.recv_gate(ngates)?;
         let t = tweak(self.current_gate());
