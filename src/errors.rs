@@ -4,13 +4,15 @@
 // Copyright © 2019 Galois, Inc.
 // See LICENSE for licensing information.
 
+use fancy_garbling::error::{EvaluatorError, FancyError, GarblerError};
+
 #[derive(Debug)]
 pub enum Error {
     IoError(std::io::Error),
     OtError(ocelot::Error),
-    GarblerError(fancy_garbling::error::GarblerError),
-    EvaluatorError(fancy_garbling::error::EvaluatorError),
-    FancyError(fancy_garbling::error::FancyError),
+    GarblerError(GarblerError),
+    EvaluatorError(EvaluatorError),
+    FancyError(FancyError),
 }
 
 impl From<ocelot::Error> for Error {
@@ -25,20 +27,20 @@ impl From<std::io::Error> for Error {
     }
 }
 
-impl From<fancy_garbling::error::EvaluatorError> for Error {
-    fn from(e: fancy_garbling::error::EvaluatorError) -> Error {
+impl From<EvaluatorError> for Error {
+    fn from(e: EvaluatorError) -> Error {
         Error::EvaluatorError(e)
     }
 }
 
-impl From<fancy_garbling::error::GarblerError> for Error {
-    fn from(e: fancy_garbling::error::GarblerError) -> Error {
+impl From<GarblerError> for Error {
+    fn from(e: GarblerError) -> Error {
         Error::GarblerError(e)
     }
 }
 
-impl From<fancy_garbling::error::FancyError> for Error {
-    fn from(e: fancy_garbling::error::FancyError) -> Error {
+impl From<FancyError> for Error {
+    fn from(e: FancyError) -> Error {
         Error::FancyError(e)
     }
 }
@@ -52,5 +54,17 @@ impl std::fmt::Display for Error {
             Error::GarblerError(e) => write!(f, "garbler error: {}", e),
             Error::FancyError(e) => write!(f, "fancy error: {}", e),
         }
+    }
+}
+
+impl From<Error> for GarblerError {
+    fn from(e: Error) -> GarblerError {
+        GarblerError::CommunicationError(e.to_string())
+    }
+}
+
+impl From<Error> for EvaluatorError {
+    fn from(e: Error) -> EvaluatorError {
+        EvaluatorError::CommunicationError(e.to_string())
     }
 }

@@ -28,8 +28,7 @@ mod tests {
     use fancy_garbling::util::RngExt;
     use fancy_garbling::{BundleGadgets, Fancy, HasModulus};
     use ocelot::ot;
-    use scuttlebutt::AesRng;
-    use scuttlebutt::Block;
+    use scuttlebutt::{AesRng, Block, SemiHonest};
     use std::io::{BufReader, BufWriter};
     use std::os::unix::net::UnixStream;
 
@@ -44,7 +43,10 @@ mod tests {
         Ok(())
     }
 
-    fn test_c1<OTSender: ot::Sender<Msg = Block>, OTReceiver: ot::Receiver<Msg = Block>>(
+    fn test_c1<
+        OTSender: ot::Sender<Msg = Block> + SemiHonest,
+        OTReceiver: ot::Receiver<Msg = Block> + SemiHonest,
+    >(
         a: u16,
         b: u16,
     ) {

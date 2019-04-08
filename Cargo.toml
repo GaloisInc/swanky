@@ -8,6 +8,7 @@ description = "A library for secure two-party computation"
 categories = ["cryptography"]
 keywords = ["cryptography", "secure-computation", "2PC"]
 edition = "2018"
+publish = false
 
 [lib]
 
@@ -17,11 +18,30 @@ nightly = ["rand/nightly", "scuttlebutt/nightly", "ocelot/nightly", "fancy-garbl
 [dependencies]
 fancy-garbling = { path = "../fancy-garbling" }
 ocelot = { git = "https://github.com/amaloz/ocelot" }
-rand = "*"
+rand = "0.6"
 scuttlebutt = { git = "https://github.com/amaloz/scuttlebutt" }
 
 [dev-dependencies]
-itertools = "*"
+criterion = "0.2"
 
 [profile.release]
+opt-level = 3
+debug = false
+debug-assertions = false
+overflow-checks = false
+
+[profile.dev]
+opt-level = 0
 debug = true
+debug-assertions = true
+overflow-checks = true
+
+[profile.bench]
+opt-level = 3
+debug = true
+debug-assertions = true
+overflow-checks = true
+
+[[bench]]
+name = "semihonest"
+harness = false

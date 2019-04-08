@@ -8,11 +8,20 @@ use crate::errors::Error;
 use scuttlebutt::Block;
 use std::io::{Read, Write};
 
+pub fn send_block<W: Write>(writer: &mut W, block: &Block) -> Result<(), Error> {
+    block.write(writer)?;
+    Ok(())
+}
+
+// pub fn receive_block<R: Read>(reader: &mut R) -> Result<Block, Error> {
+//     let b = Block::read(reader)?;
+//     Ok(b)
+// }
+
 pub fn send_blocks<W: Write>(writer: &mut W, blocks: &[Block]) -> Result<(), Error> {
     for block in blocks.iter() {
         block.write(writer)?;
     }
-    writer.flush()?;
     Ok(())
 }
 

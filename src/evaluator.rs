@@ -6,6 +6,7 @@
 
 use crate::comm;
 use crate::errors::Error;
+use fancy_garbling::error::EvaluatorError;
 use fancy_garbling::{Evaluator as Ev, Fancy, Wire};
 use ocelot::ot::Receiver as OtReceiver;
 use rand::{CryptoRng, RngCore};
@@ -37,8 +38,7 @@ impl<
         let reader_ = Arc::clone(&reader);
         let callback = move |nblocks| {
             let mut reader = reader_.lock().unwrap();
-            let blocks = comm::receive_blocks(&mut *reader, nblocks).unwrap(); // XXX: FIXME
-            Ok(blocks)
+            comm::receive_blocks(&mut *reader, nblocks).map_err(EvaluatorError::from)
         };
         let evaluator = Ev::new(callback);
         let ot = Arc::new(Mutex::new(ot));
