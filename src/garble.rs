@@ -15,12 +15,6 @@ mod garbler;
 pub use crate::garble::evaluator::{Decoder, Encoder, Evaluator, GarbledCircuit};
 pub use crate::garble::garbler::Garbler;
 
-/// The ciphertext created by a garbled gate.
-pub type GarbledGate = Vec<Block>;
-
-/// Ciphertext created by the garbler for output gates.
-pub type OutputCiphertext = Vec<Block>;
-
 /// The outputs that can be emitted by a Garbler and consumed by an Evaluator.
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
 pub enum Message {
@@ -61,10 +55,10 @@ pub enum Message {
     },
 
     /// Garbled gate emitted by a projection or multiplication.
-    GarbledGate(GarbledGate),
+    GarbledGate(Vec<Block>),
 
     /// Output decoding information.
-    OutputCiphertext(OutputCiphertext),
+    OutputCiphertext(Vec<Block>),
 }
 
 impl std::fmt::Display for Message {

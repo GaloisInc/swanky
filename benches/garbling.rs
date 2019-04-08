@@ -1,17 +1,14 @@
 use criterion::{criterion_group, criterion_main, Criterion};
-use itertools::Itertools;
-
-use std::time::Duration;
-
 use fancy_garbling::circuit::{Circuit, CircuitBuilder};
 use fancy_garbling::util::RngExt;
 use fancy_garbling::Fancy;
+use std::time::Duration;
 
 fn bench_garble<F: 'static>(c: &mut Criterion, name: &str, make_circuit: F, q: u16)
 where
     F: Fn(u16) -> Circuit,
 {
-    c.bench_function(&format!("garbling::{}{}_gb", name, q), move |bench| {
+    c.bench_function(&format!("garbling::{}_gb ({})", name, q), move |bench| {
         let mut c = make_circuit(q);
         bench.iter(|| {
             let gb = fancy_garbling::garble(&mut c).unwrap();
@@ -24,13 +21,13 @@ fn bench_eval<F: 'static>(c: &mut Criterion, name: &str, make_circuit: F, q: u16
 where
     F: Fn(u16) -> Circuit,
 {
-    c.bench_function(&format!("garbling::{}{}_ev", name, q), move |bench| {
+    c.bench_function(&format!("garbling::{}_ev ({})", name, q), move |bench| {
         let mut rng = rand::thread_rng();
         let mut c = make_circuit(q);
         let (en, _, ev) = fancy_garbling::garble(&mut c).unwrap();
         let inps = (0..c.num_garbler_inputs())
             .map(|i| rng.gen_u16() % c.garbler_input_mod(i))
-            .collect_vec();
+            .collect::<Vec<u16>>();
         let xs = en.encode_garbler_inputs(&inps);
         bench.iter(|| {
             let ys = ev.eval(&mut c, &xs, &[]).unwrap();
@@ -40,20 +37,21 @@ where
 }
 
 fn proj(q: u16) -> Circuit {
+    let tt = (0..q).map(|i| (i + 1) % q).collect::<Vec<u16>>();
     let mut b = CircuitBuilder::new();
     let x = b.garbler_input(q, None).unwrap();
-    let tab = (0..q).map(|i| (i + 1) % q).collect_vec();
-    let z = b.proj(&x, q, Some(tab)).unwrap();
-    b.output(&z).unwrap();
+    for _ in 0..1000 {
+        let _ = b.proj(&x, q, Some(tt.clone())).unwrap();
+    }
     b.finish()
 }
 
-fn half_gate(q: u16) -> Circuit {
+fn mul(q: u16) -> Circuit {
     let mut b = CircuitBuilder::new();
     let x = b.garbler_input(q, None).unwrap();
-    let y = b.garbler_input(q, None).unwrap();
-    let z = b.mul(&x, &y).unwrap();
-    b.output(&z).unwrap();
+    for _ in 0..1000 {
+        let _ = b.mul(&x, &x).unwrap();
+    }
     b.finish()
 }
 
@@ -66,12 +64,12 @@ fn proj_ev(c: &mut Criterion) {
     bench_eval(c, "proj", proj, 17)
 }
 fn mul_gb(c: &mut Criterion) {
-    bench_garble(c, "mul", half_gate, 2);
-    bench_garble(c, "mul", half_gate, 17)
+    bench_garble(c, "mul", mul, 2);
+    bench_garble(c, "mul", mul, 17)
 }
 fn mul_ev(c: &mut Criterion) {
-    bench_eval(c, "mul", half_gate, 2);
-    bench_eval(c, "mul", half_gate, 17)
+    bench_eval(c, "mul", mul, 2);
+    bench_eval(c, "mul", mul, 17)
 }
 
 criterion_group! {

@@ -2,6 +2,8 @@
 //!
 //! Note: all number representations in this library are little-endian.
 
+#[cfg(feature = "nightly")]
+use core::arch::x86_64::*;
 use itertools::Itertools;
 use scuttlebutt::Block;
 
@@ -9,12 +11,31 @@ use scuttlebutt::Block;
 // tweak functions for garbling
 
 /// Tweak function for a single item.
+#[cfg(feature = "nightly")]
+#[inline]
+pub(crate) fn tweak(i: usize) -> Block {
+    let data = unsafe { _mm_set_epi64(_mm_setzero_si64(), *(&i as *const _ as *const __m64)) };
+    Block(data)
+}
+#[cfg(not(feature = "nightly"))]
 #[inline]
 pub(crate) fn tweak(i: usize) -> Block {
     Block::from(i as u128)
 }
 
 /// Tweak function for two items.
+#[cfg(feature = "nightly")]
+#[inline]
+pub(crate) fn tweak2(i: u64, j: u64) -> Block {
+    let data = unsafe {
+        _mm_set_epi64(
+            *(&i as *const _ as *const __m64),
+            *(&j as *const _ as *const __m64),
+        )
+    };
+    Block(data)
+}
+#[cfg(not(feature = "nightly"))]
 #[inline]
 pub(crate) fn tweak2(i: u64, j: u64) -> Block {
     Block::from(((i as u128) << 64) + j as u128)
@@ -527,27 +548,30 @@ mod tests {
             assert_eq!(x, z);
         }
     }
+}
 
-    // #[test]
-    // fn base_q_addition() {
-    //     let mut rng = thread_rng();
-    //     for _ in 0..1000 {
-    //         let q = 2 + (rng.gen_u16() % 111);
-    //         let n = digits_per_u128(q) - 2;
-    //         println!("q={} n={}", q, n);
-    //         let Q = (q as u128).pow(n as u32);
+#[cfg(all(feature = "nightly", test))]
+mod benchmarks {
+    extern crate test;
+    use super::*;
+    use test::Bencher;
 
-    //         let x = rng.gen_u128() % Q;
-    //         let y = rng.gen_u128() % Q;
+    #[bench]
+    fn bench_tweak(b: &mut Bencher) {
+        let i = test::black_box(rand::random::<usize>());
+        b.iter(|| {
+            let b = test::black_box(tweak(i));
+            test::black_box(b)
+        });
+    }
 
-    //         let xp = as_base_q(x, q, n);
-    //         let yp = as_base_q(y, q, n);
-
-    //         let zp = base_q_add(&xp, &yp, q);
-
-    //         let z = from_base_q(&zp, q);
-
-    //         assert_eq!((x + y) % Q, z);
-    //     }
-    // }
+    #[bench]
+    fn bench_tweak2(b: &mut Bencher) {
+        let i = test::black_box(rand::random::<u64>());
+        let j = test::black_box(rand::random::<u64>());
+        b.iter(|| {
+            let b = test::black_box(tweak2(i, j));
+            test::black_box(b)
+        });
+    }
 }

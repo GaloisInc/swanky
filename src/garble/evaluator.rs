@@ -1,4 +1,3 @@
-use super::{GarbledGate, OutputCiphertext};
 use crate::circuit::{Circuit, Gate};
 use crate::error::{EvaluatorError, FancyError};
 use crate::fancy::{Fancy, HasModulus};
@@ -15,7 +14,7 @@ use std::collections::HashMap;
 pub struct Evaluator {
     callback: Box<FnMut(usize) -> Result<Vec<Block>, EvaluatorError> + Send + Sync>,
     current_gate: usize,
-    output_cts: Vec<OutputCiphertext>,
+    output_cts: Vec<Vec<Block>>,
     output_wires: Vec<Wire>,
 }
 
@@ -48,13 +47,13 @@ impl Evaluator {
     }
 
     #[inline]
-    fn recv_gate(&mut self, ngates: usize) -> Result<GarbledGate, EvaluatorError> {
+    fn recv_gate(&mut self, ngates: usize) -> Result<Vec<Block>, EvaluatorError> {
         let blocks = (self.callback)(ngates)?;
         Ok(blocks)
     }
 
     #[inline]
-    fn recv_outputs(&mut self, noutputs: usize) -> Result<OutputCiphertext, EvaluatorError> {
+    fn recv_outputs(&mut self, noutputs: usize) -> Result<Vec<Block>, EvaluatorError> {
         let blocks = (self.callback)(noutputs)?;
         Ok(blocks)
     }
@@ -173,13 +172,13 @@ impl Fancy for Evaluator {
 /// Uses `Evaluator` under the hood to actually implement the evaluation.
 #[derive(Serialize, Deserialize, PartialEq, Debug)]
 pub struct GarbledCircuit {
-    gates: Vec<GarbledGate>,
+    gates: Vec<Vec<Block>>,
     consts: HashMap<(u16, u16), Wire>,
 }
 
 impl GarbledCircuit {
     /// Create a new object from a vector of garbled gates and constant wires.
-    pub fn new(gates: Vec<GarbledGate>, consts: HashMap<(u16, u16), Wire>) -> Self {
+    pub fn new(gates: Vec<Vec<Block>>, consts: HashMap<(u16, u16), Wire>) -> Self {
         GarbledCircuit { gates, consts }
     }
 
@@ -293,7 +292,7 @@ impl Encoder {
 /// Decode outputs statically.
 #[derive(Serialize, Deserialize, PartialEq, Debug)]
 pub struct Decoder {
-    outputs: Vec<OutputCiphertext>,
+    outputs: Vec<Vec<Block>>,
 }
 
 impl Decoder {
