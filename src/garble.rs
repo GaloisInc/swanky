@@ -139,7 +139,7 @@ pub fn garble(c: &mut Circuit) -> Result<(Encoder, Decoder, GarbledCircuit), Gar
                     let q = wire.modulus();
                     constants.lock().unwrap().insert((value, q), wire);
                 }
-                m => return Err(GarblerError::InvalidMessage(m)),
+                m => return Err(GarblerError::MessageError(format!("invalid message {}", m))),
             }
             Ok(())
         }
@@ -746,18 +746,12 @@ mod complex {
                         let w = zero.plus(&delta.cmul(x));
                         vec![w.as_block()]
                     }
-                    Message::UnencodedEvaluatorInput { .. } => {
-                        return Err(GarblerError::InvalidMessage(m));
-                    }
-                    Message::EvaluatorInput(_) => {
-                        return Err(GarblerError::InvalidMessage(m));
-                    }
-                    Message::GarblerInput(_) => {
-                        return Err(GarblerError::InvalidMessage(m));
-                    }
                     Message::Constant { value: _, wire } => vec![wire.as_block()],
                     Message::GarbledGate(gate) => gate,
                     Message::OutputCiphertext(ct) => ct,
+                    m => {
+                        return Err(GarblerError::MessageError(format!("invalid message {}", m)));
+                    }
                 };
                 tx.lock().unwrap().send(m).map_err(GarblerError::from)
             };
@@ -779,19 +773,20 @@ mod complex {
             std::thread::spawn(move || {
                 let callback = move |m| {
                     let m = match m {
-                        Message::UnencodedGarblerInput { .. } => {
-                            return Err(GarblerError::InvalidMessage(m));
-                        }
                         Message::UnencodedEvaluatorInput { zero, delta } => {
                             let x = input_.remove(0);
                             let w = zero.plus(&delta.cmul(x));
                             vec![w.as_block()]
                         }
-                        Message::GarblerInput(_) => return Err(GarblerError::InvalidMessage(m)),
-                        Message::EvaluatorInput(_) => return Err(GarblerError::InvalidMessage(m)),
                         Message::Constant { value: _, wire } => vec![wire.as_block()],
                         Message::GarbledGate(gate) => gate,
                         Message::OutputCiphertext(ct) => ct,
+                        m => {
+                            return Err(GarblerError::MessageError(format!(
+                                "invalid message {}",
+                                m
+                            )));
+                        }
                     };
                     tx.lock().unwrap().send(m).map_err(GarblerError::from)
                 };

@@ -2,7 +2,6 @@
 
 use crate::garble::Message;
 use scuttlebutt::Block;
-use std::error::Error;
 use std::fmt::{self, Display, Formatter};
 
 /// Errors that may occur when using the `Fancy` trait. These errors are
@@ -60,8 +59,8 @@ pub enum EvaluatorError {
 /// Errors from the garbler.
 #[derive(Debug)]
 pub enum GarblerError {
-    /// Invalid message received.
-    InvalidMessage(Message),
+    /// An error occurred while processing a message.
+    MessageError(String),
     /// A communication error has occurred.
     CommunicationError(String),
     /// Asymmetric moduli error.
@@ -153,7 +152,7 @@ impl From<FancyError> for EvaluatorError {
 
 impl From<std::sync::mpsc::RecvError> for EvaluatorError {
     fn from(e: std::sync::mpsc::RecvError) -> EvaluatorError {
-        EvaluatorError::CommunicationError(e.description().to_string())
+        EvaluatorError::CommunicationError(e.to_string())
     }
 }
 
@@ -163,8 +162,8 @@ impl From<std::sync::mpsc::RecvError> for EvaluatorError {
 impl Display for GarblerError {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         match self {
-            GarblerError::InvalidMessage(m) => write!(f, "invalid message received: {}", m),
-            GarblerError::CommunicationError(s) => write!(f, "communication error: {}", s),
+            GarblerError::MessageError(s) => write!(f, "{}", s),
+            GarblerError::CommunicationError(s) => write!(f, "{}", s),
             GarblerError::AsymmetricHalfGateModuliMax8(q) => write!(
                 f,
                 "the small modulus in a half gate with asymmetric moduli is capped at 8, got {}",
@@ -173,7 +172,7 @@ impl Display for GarblerError {
             GarblerError::TruthTableRequired => {
                 "truth table required for garbler projection gates".fmt(f)
             }
-            GarblerError::FancyError(e) => write!(f, "fancy error: {}", e),
+            GarblerError::FancyError(e) => write!(f, "{}", e),
         }
     }
 }
@@ -184,15 +183,21 @@ impl From<FancyError> for GarblerError {
     }
 }
 
+impl From<std::io::Error> for GarblerError {
+    fn from(e: std::io::Error) -> GarblerError {
+        GarblerError::CommunicationError(e.to_string())
+    }
+}
+
 impl From<std::sync::mpsc::SendError<Message>> for GarblerError {
     fn from(e: std::sync::mpsc::SendError<Message>) -> GarblerError {
-        GarblerError::CommunicationError(e.description().to_string())
+        GarblerError::CommunicationError(e.to_string())
     }
 }
 
 impl From<std::sync::mpsc::SendError<Vec<Block>>> for GarblerError {
     fn from(e: std::sync::mpsc::SendError<Vec<Block>>) -> GarblerError {
-        GarblerError::CommunicationError(e.description().to_string())
+        GarblerError::CommunicationError(e.to_string())
     }
 }
 
