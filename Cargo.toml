@@ -38,9 +38,9 @@ overflow-checks = true
 
 [profile.bench]
 opt-level = 3
-debug = true
-debug-assertions = true
-overflow-checks = true
+debug = false
+debug-assertions = false
+overflow-checks = false
 
 [[bench]]
 name = "semihonest"

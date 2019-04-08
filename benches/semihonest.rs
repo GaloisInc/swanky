@@ -8,7 +8,8 @@
 
 use criterion::{criterion_group, criterion_main, Criterion};
 use fancy_garbling::circuit::Circuit;
-use ocelot::ot::{ChouOrlandiReceiver as OtReceiver, ChouOrlandiSender as OtSender};
+// use ocelot::ot::{ChouOrlandiReceiver as OtReceiver, ChouOrlandiSender as OtSender};
+use ocelot::ot::{DummyReceiver as OtReceiver, DummySender as OtSender};
 use scuttlebutt::AesRng;
 use std::io::{BufReader, BufWriter};
 use std::os::unix::net::UnixStream;
@@ -17,6 +18,13 @@ use twopac::{Evaluator, Garbler};
 
 type Reader = BufReader<UnixStream>;
 type Writer = BufWriter<UnixStream>;
+
+fn circuit(fname: &str) -> Circuit {
+    let mut circ = Circuit::parse(fname).unwrap();
+    println!("{}", fname);
+    circ.print_info().unwrap();
+    circ
+}
 
 fn _bench_circuit(circ: &mut Circuit) {
     let mut circ_ = circ.clone();
@@ -41,7 +49,7 @@ fn _bench_circuit(circ: &mut Circuit) {
 }
 
 fn bench_aes(c: &mut Criterion) {
-    let mut circ = Circuit::parse("circuits/AES-non-expanded.txt").unwrap();
+    let mut circ = circuit("circuits/AES-non-expanded.txt");
     c.bench_function("twopac::semi-honest (AES)", move |bench| {
         bench.iter(|| _bench_circuit(&mut circ))
     });

@@ -9,7 +9,7 @@ use crate::errors::Error;
 use fancy_garbling::error::GarblerError;
 use fancy_garbling::{Fancy, Garbler as Gb, Message, Wire};
 use ocelot::ot::Sender as OtSender;
-use rand::{CryptoRng, RngCore, SeedableRng};
+use rand::{CryptoRng, Rng, RngCore, SeedableRng};
 use scuttlebutt::{AesRng, Block, SemiHonest};
 use std::io::{Read, Write};
 use std::sync::{Arc, Mutex};
@@ -18,7 +18,7 @@ pub struct Garbler<
     R: Read + Send,
     W: Write + Send,
     RNG: CryptoRng + RngCore,
-    OT: OtSender + SemiHonest,
+    OT: OtSender, // + SemiHonest
 > {
     garbler: Gb<AesRng>,
     reader: Arc<Mutex<R>>,
@@ -31,7 +31,7 @@ impl<
         R: Read + Send,
         W: Write + Send + 'static,
         RNG: CryptoRng + RngCore,
-        OT: OtSender<Msg = Block> + SemiHonest,
+        OT: OtSender<Msg = Block>, // + SemiHonest
     > Garbler<R, W, RNG, OT>
 {
     pub fn new(mut reader: R, mut writer: W, inputs: &[u16], mut rng: RNG) -> Result<Self, Error> {
@@ -53,7 +53,7 @@ impl<
                         ))
                     }
                 }
-                Message::Constant { value: _, wire } => {
+                Message::Constant { wire, .. } => {
                     comm::send_block(&mut *writer, &wire.as_block()).map_err(GarblerError::from)
                 }
                 Message::GarbledGate(gate) => {
@@ -67,9 +67,7 @@ impl<
             writer.flush()?;
             res
         };
-        let mut key = [0u8; 16];
-        rng.fill_bytes(&mut key);
-        let garbler = Gb::new(callback, AesRng::from_seed(Block::from(key)));
+        let garbler = Gb::new(callback, AesRng::from_seed(rng.gen::<Block>()));
         let ot = Arc::new(Mutex::new(ot));
         Ok(Garbler {
             garbler,
@@ -87,28 +85,29 @@ impl<
         ot.send(&mut *reader, &mut *writer, inputs, &mut self.rng)
             .map_err(Error::from)
     }
-}
 
-fn _evaluator_input(delta: &Wire, q: u16) -> (Wire, Vec<(Block, Block)>) {
-    let len = (q as f32).log(2.0).ceil() as u16;
-    let mut wire = Wire::zero(q);
-    let inputs = (0..len)
-        .into_iter()
-        .map(|i| {
-            let zero = Wire::rand(&mut rand::thread_rng(), q);
-            let one = zero.plus(&delta);
-            wire = wire.plus(&zero.cmul(1 << i));
-            (zero.as_block(), one.as_block())
-        })
-        .collect::<Vec<(Block, Block)>>();
-    (wire, inputs)
+    #[inline]
+    fn _evaluator_input(&mut self, delta: &Wire, q: u16) -> (Wire, Vec<(Block, Block)>) {
+        let len = (q as f32).log(2.0).ceil() as u16;
+        let mut wire = Wire::zero(q);
+        let inputs = (0..len)
+            .into_iter()
+            .map(|i| {
+                let zero = Wire::rand(&mut self.rng, q);
+                let one = zero.plus(&delta);
+                wire = wire.plus(&zero.cmul(1 << i));
+                (zero.as_block(), one.as_block())
+            })
+            .collect::<Vec<(Block, Block)>>();
+        (wire, inputs)
+    }
 }
 
 impl<
         R: Read + Send,
         W: Write + Send + 'static,
         RNG: CryptoRng + RngCore,
-        OT: OtSender<Msg = Block> + SemiHonest,
+        OT: OtSender<Msg = Block>, // + SemiHonest
     > Fancy for Garbler<R, W, RNG, OT>
 {
     type Item = Wire;
@@ -122,10 +121,8 @@ impl<
     }
     #[inline]
     fn evaluator_input(&mut self, q: u16) -> Result<Self::Item, Self::Error> {
-        let delta = self.garbler.delta(q);
-        let (wire, inputs) = _evaluator_input(&delta, q);
-        self.run_ot(&inputs)?;
-        Ok(wire)
+        let wires = self.evaluator_inputs(&[q])?;
+        Ok(wires[0].clone())
     }
     #[inline]
     fn evaluator_inputs(&mut self, qs: &[u16]) -> Result<Vec<Self::Item>, Self::Error> {
@@ -135,7 +132,7 @@ impl<
         let mut inputs = Vec::with_capacity(lens.sum());
         for q in qs.into_iter() {
             let delta = self.garbler.delta(*q);
-            let (wire, input) = _evaluator_input(&delta, *q);
+            let (wire, input) = self._evaluator_input(&delta, *q);
             wires.push(wire);
             for i in input.into_iter() {
                 inputs.push(i);
@@ -179,6 +176,6 @@ where
     R: Read + Send,
     W: Write + Send + 'static,
     RNG: CryptoRng + RngCore,
-    OT: OtSender<Msg = Block> + SemiHonest,
+    OT: OtSender<Msg = Block>, // + SemiHonest
 {
 }

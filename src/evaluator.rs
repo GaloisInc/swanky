@@ -95,14 +95,8 @@ impl<
     }
     #[inline]
     fn evaluator_input(&mut self, q: u16) -> Result<Self::Item, Self::Error> {
-        let len = (q as f32).log(2.0).ceil() as u16;
-        let input = self.inputs.lock().unwrap().remove(0);
-        let bs = (0..len)
-            .into_iter()
-            .map(|i| input & (1 << i) != 0)
-            .collect::<Vec<bool>>();
-        let wires = self.run_ot(&bs)?;
-        Ok(combine(&wires, q))
+        let wires = self.evaluator_inputs(&[q])?;
+        Ok(wires[0].clone())
     }
     #[inline]
     fn evaluator_inputs(&mut self, qs: &[u16]) -> Result<Vec<Self::Item>, Self::Error> {

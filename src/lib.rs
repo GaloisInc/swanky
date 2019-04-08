@@ -139,4 +139,40 @@ mod tests {
         let result = ev.decode_output();
         assert_eq!(target, result);
     }
+
+    use fancy_garbling::circuit::Circuit;
+    // use ocelot::ot::{ChouOrlandiReceiver as OtReceiver, ChouOrlandiSender as OtSender};
+    use ocelot::ot::{DummyReceiver as OtReceiver, DummySender as OtSender};
+
+    #[test]
+    fn test_aes() {
+        let mut circ = Circuit::parse("circuits/AES-non-expanded.txt").unwrap();
+        let mut circ_ = circ.clone();
+        let (sender, receiver) = UnixStream::pair().unwrap();
+        let handle = std::thread::spawn(move || {
+            let rng = AesRng::new();
+            let reader = BufReader::new(sender.try_clone().unwrap());
+            let writer = BufWriter::new(sender);
+            let mut gb = Garbler::<Reader, Writer, AesRng, OtSender>::new(
+                reader,
+                writer,
+                &vec![0u16; 128],
+                rng,
+            )
+            .unwrap();
+            circ_.eval(&mut gb).unwrap();
+        });
+        let rng = AesRng::new();
+        let reader = BufReader::new(receiver.try_clone().unwrap());
+        let writer = BufWriter::new(receiver);
+        let mut ev = Evaluator::<Reader, Writer, AesRng, OtReceiver>::new(
+            reader,
+            writer,
+            &vec![0u16; 128],
+            rng,
+        )
+        .unwrap();
+        circ.eval(&mut ev).unwrap();
+        handle.join().unwrap();
+    }
 }
