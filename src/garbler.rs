@@ -20,7 +20,7 @@ pub struct Garbler<
     RNG: CryptoRng + RngCore,
     OT: OtSender, // + SemiHonest
 > {
-    garbler: Gb<AesRng>,
+    garbler: Gb<W, AesRng>,
     reader: Arc<Mutex<R>>,
     writer: Arc<Mutex<W>>,
     ot: Arc<Mutex<OT>>,
@@ -53,21 +53,16 @@ impl<
                         ))
                     }
                 }
-                Message::Constant { wire, .. } => {
-                    comm::send_block(&mut *writer, &wire.as_block()).map_err(GarblerError::from)
-                }
-                Message::GarbledGate(gate) => {
-                    comm::send_blocks(&mut *writer, &gate).map_err(GarblerError::from)
-                }
-                Message::OutputCiphertext(ct) => {
-                    comm::send_blocks(&mut *writer, &ct).map_err(GarblerError::from)
-                }
                 m => Err(GarblerError::MessageError(format!("invalid message {}", m))),
             };
             writer.flush()?;
             res
         };
-        let garbler = Gb::new(callback, AesRng::from_seed(rng.gen::<Block>()));
+        let garbler = Gb::new(
+            writer.clone(),
+            callback,
+            AesRng::from_seed(rng.gen::<Block>()),
+        );
         let ot = Arc::new(Mutex::new(ot));
         Ok(Garbler {
             garbler,

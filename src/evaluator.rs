@@ -15,7 +15,7 @@ use std::io::{Read, Write};
 use std::sync::{Arc, Mutex};
 
 pub struct Evaluator<R: Read + Send, W: Write + Send, RNG: CryptoRng + RngCore, OT: OtReceiver> {
-    evaluator: Ev,
+    evaluator: Ev<R>,
     reader: Arc<Mutex<R>>,
     writer: Arc<Mutex<W>>,
     inputs: Arc<Mutex<Vec<u16>>>,
@@ -35,12 +35,7 @@ impl<
         let inputs = Arc::new(Mutex::new(inputs.to_vec()));
         let reader = Arc::new(Mutex::new(reader));
         let writer = Arc::new(Mutex::new(writer));
-        let reader_ = Arc::clone(&reader);
-        let callback = move |nblocks| {
-            let mut reader = reader_.lock().unwrap();
-            comm::receive_blocks(&mut *reader, nblocks).map_err(EvaluatorError::from)
-        };
-        let evaluator = Ev::new(callback);
+        let evaluator = Ev::new(reader.clone());
         let ot = Arc::new(Mutex::new(ot));
         let rng = Arc::new(Mutex::new(rng));
         Ok(Evaluator {
