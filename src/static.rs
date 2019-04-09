@@ -216,7 +216,7 @@ impl std::io::Read for GarbledReader {
         assert_eq!(buf.len() % 16, 0);
         for data in buf.chunks_mut(16) {
             let block: [u8; 16] = self.blocks[self.index].into();
-            for (a, b) in data.iter_mut().zip(block.into_iter()) {
+            for (a, b) in data.iter_mut().zip(block.iter()) {
                 *a = *b;
             }
             self.index += 1;

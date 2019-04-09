@@ -27,7 +27,7 @@ scuttlebutt = { git = "https://github.com/amaloz/scuttlebutt", default-features 
 serde = { version = "1.0.89", features = ["derive"] }
 
 [dev-dependencies]
-criterion = "0.2.10"
+criterion = "0.2"
 crossbeam = "0.7.1"
 
 [profile.release]
@@ -58,4 +58,8 @@ harness = false
 
 [[bench]]
 name = "circuits"
+harness = false
+
+[[bench]]
+name = "util"
 harness = false
