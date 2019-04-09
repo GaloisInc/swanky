@@ -6,28 +6,32 @@ use crate::wire::Wire;
 use rand::{CryptoRng, RngCore};
 use scuttlebutt::Block;
 use std::collections::HashMap;
+use std::io::Write;
+use std::sync::{Arc, Mutex};
 
 /// Streams garbled circuit ciphertexts through a callback. Parallelizable.
-pub struct Garbler<R: CryptoRng + RngCore> {
+pub struct Garbler<W: Write, RNG: CryptoRng + RngCore> {
+    writer: Arc<Mutex<W>>,
     callback: Box<FnMut(Message) -> Result<(), GarblerError> + Send + Sync>,
     // Hash map containing modulus -> associated delta wire-label.
     deltas: HashMap<u16, Wire>,
     current_output: usize,
     current_gate: usize,
-    rng: R,
+    rng: RNG,
 }
 
-impl<R: CryptoRng + RngCore> Garbler<R> {
+impl<W: Write, RNG: CryptoRng + RngCore> Garbler<W, RNG> {
     /// Create a new garbler.
     ///
     /// `callback` is a function that enables streaming. It gets called as the
     /// garbler generates ciphertext information such as garbled gates or input
     /// wire-labels.
-    pub fn new<F>(callback: F, rng: R) -> Self
+    pub fn new<F>(writer: Arc<Mutex<W>>, callback: F, rng: RNG) -> Self
     where
         F: FnMut(Message) -> Result<(), GarblerError> + Send + Sync + 'static,
     {
         Garbler {
+            writer,
             callback: Box::new(callback),
             deltas: HashMap::new(),
             current_gate: 0,
@@ -70,12 +74,12 @@ impl<R: CryptoRng + RngCore> Garbler<R> {
     }
 
     /// Get the deltas, consuming the Garbler.
-    pub(super) fn get_deltas(self) -> HashMap<u16, Wire> {
+    pub(crate) fn get_deltas(self) -> HashMap<u16, Wire> {
         self.deltas
     }
 }
 
-impl<R: CryptoRng + RngCore> Fancy for Garbler<R> {
+impl<W: Write, RNG: CryptoRng + RngCore> Fancy for Garbler<W, RNG> {
     type Item = Wire;
     type Error = GarblerError;
 
@@ -84,8 +88,9 @@ impl<R: CryptoRng + RngCore> Fancy for Garbler<R> {
         let w = Wire::rand(&mut self.rng, q);
         let d = self.delta(q);
         if let Some(x) = opt_x {
-            let encoded_wire = w.plus(&d.cmul(x));
-            self.send(Message::GarblerInput(encoded_wire))?;
+            let wire = w.plus(&d.cmul(x));
+            let mut writer = self.writer.lock().unwrap();
+            writer.write_all(wire.as_block().as_ref())?;
         } else {
             self.send(Message::UnencodedGarblerInput {
                 zero: w.clone(),
@@ -108,7 +113,8 @@ impl<R: CryptoRng + RngCore> Fancy for Garbler<R> {
     fn constant(&mut self, x: u16, q: u16) -> Result<Wire, GarblerError> {
         let zero = Wire::rand(&mut self.rng, q);
         let wire = zero.plus(&self.delta(q).cmul_eq(x));
-        self.send(Message::Constant { value: x, wire })?;
+        let mut writer = self.writer.lock().unwrap();
+        writer.write_all(wire.as_block().as_ref())?;
         Ok(zero)
     }
     #[inline]
@@ -239,8 +245,10 @@ impl<R: CryptoRng + RngCore> Fancy for Garbler<R> {
             }
         }
 
-        self.send(Message::GarbledGate(gate))?;
-
+        let mut writer = self.writer.lock().unwrap();
+        for block in gate.into_iter() {
+            writer.write_all(block.as_ref())?;
+        }
         Ok(X.plus_mov(&Y))
     }
     #[inline]
@@ -291,7 +299,10 @@ impl<R: CryptoRng + RngCore> Fancy for Garbler<R> {
             gate[ix - 1] = ct;
         }
 
-        self.send(Message::GarbledGate(gate))?;
+        let mut writer = self.writer.lock().unwrap();
+        for block in gate.into_iter() {
+            writer.write_all(block.as_ref())?;
+        }
         Ok(C)
     }
     #[inline]
@@ -304,7 +315,10 @@ impl<R: CryptoRng + RngCore> Fancy for Garbler<R> {
             let t = output_tweak(i, k);
             cts.push(X.plus(&D.cmul(k)).hash(t));
         }
-        self.send(Message::OutputCiphertext(cts))?;
+        let mut writer = self.writer.lock().unwrap();
+        for block in cts.into_iter() {
+            writer.write_all(block.as_ref())?;
+        }
         Ok(())
     }
 }

@@ -50,6 +50,10 @@ pub enum DummyError {
 /// Errors from the evaluator.
 #[derive(Debug)]
 pub enum EvaluatorError {
+    /// Not enough garbler inputs provided.
+    NotEnoughGarblerInputs,
+    /// Not enough evaluator inputs provided.
+    NotEnoughEvaluatorInputs,
     /// A communication error has occurred.
     CommunicationError(String),
     /// A fancy error has occurred.
@@ -138,6 +142,8 @@ impl From<FancyError> for DummyError {
 impl Display for EvaluatorError {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         match self {
+            EvaluatorError::NotEnoughGarblerInputs => "not enough garbler inputs".fmt(f),
+            EvaluatorError::NotEnoughEvaluatorInputs => "not enough evaluator inputs".fmt(f),
             EvaluatorError::CommunicationError(s) => write!(f, "communication error: {}", s),
             EvaluatorError::FancyError(e) => write!(f, "fancy error: {}", e),
         }
@@ -145,13 +151,19 @@ impl Display for EvaluatorError {
 }
 
 impl From<FancyError> for EvaluatorError {
-    fn from(e: FancyError) -> EvaluatorError {
+    fn from(e: FancyError) -> Self {
         EvaluatorError::FancyError(e)
     }
 }
 
+impl From<std::io::Error> for EvaluatorError {
+    fn from(e: std::io::Error) -> Self {
+        EvaluatorError::CommunicationError(e.to_string())
+    }
+}
+
 impl From<std::sync::mpsc::RecvError> for EvaluatorError {
-    fn from(e: std::sync::mpsc::RecvError) -> EvaluatorError {
+    fn from(e: std::sync::mpsc::RecvError) -> Self {
         EvaluatorError::CommunicationError(e.to_string())
     }
 }
@@ -178,25 +190,25 @@ impl Display for GarblerError {
 }
 
 impl From<FancyError> for GarblerError {
-    fn from(e: FancyError) -> GarblerError {
+    fn from(e: FancyError) -> Self {
         GarblerError::FancyError(e)
     }
 }
 
 impl From<std::io::Error> for GarblerError {
-    fn from(e: std::io::Error) -> GarblerError {
+    fn from(e: std::io::Error) -> Self {
         GarblerError::CommunicationError(e.to_string())
     }
 }
 
 impl From<std::sync::mpsc::SendError<Message>> for GarblerError {
-    fn from(e: std::sync::mpsc::SendError<Message>) -> GarblerError {
+    fn from(e: std::sync::mpsc::SendError<Message>) -> Self {
         GarblerError::CommunicationError(e.to_string())
     }
 }
 
 impl From<std::sync::mpsc::SendError<Vec<Block>>> for GarblerError {
-    fn from(e: std::sync::mpsc::SendError<Vec<Block>>) -> GarblerError {
+    fn from(e: std::sync::mpsc::SendError<Vec<Block>>) -> Self {
         GarblerError::CommunicationError(e.to_string())
     }
 }
@@ -213,7 +225,7 @@ impl Display for CircuitBuilderError {
 }
 
 impl From<FancyError> for CircuitBuilderError {
-    fn from(e: FancyError) -> CircuitBuilderError {
+    fn from(e: FancyError) -> Self {
         CircuitBuilderError::FancyError(e)
     }
 }
