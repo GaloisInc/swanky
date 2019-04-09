@@ -4,13 +4,13 @@
 // Copyright © 2019 Galois, Inc.
 // See LICENSE for licensing information.
 
-//! Provides objects for statically garbling and evaluating a circuit.
+//! Provides objects and functions for statically garbling and evaluating a
+//! circuit.
 
 use crate::circuit::Circuit;
 use crate::error::{EvaluatorError, GarblerError};
 use crate::fancy::HasModulus;
 use crate::garble::{Evaluator, Garbler, Message};
-use crate::util::output_tweak;
 use crate::wire::Wire;
 use crate::Fancy;
 use arrayref::array_ref;
@@ -165,8 +165,6 @@ impl Fancy for StaticEvaluator {
 #[derive(Serialize, Deserialize, PartialEq, Debug)]
 pub struct GarbledCircuit {
     blocks: Vec<Block>,
-    output_wires: Vec<Wire>,
-    output_cts: Vec<Vec<Block>>,
 }
 
 impl GarbledCircuit {
@@ -174,8 +172,6 @@ impl GarbledCircuit {
     pub fn new(blocks: &[Block]) -> Self {
         GarbledCircuit {
             blocks: blocks.to_vec(),
-            output_wires: vec![],
-            output_cts: vec![],
         }
     }
 
@@ -187,22 +183,15 @@ impl GarbledCircuit {
 
     /// Evaluate the garbled circuit.
     pub fn eval(
-        &mut self,
+        &self,
         c: &mut Circuit,
         garbler_inputs: &[Wire],
         evaluator_inputs: &[Wire],
-    ) -> Result<Vec<Wire>, EvaluatorError> {
+    ) -> Result<Vec<u16>, EvaluatorError> {
         let mut evaluator = StaticEvaluator::new(garbler_inputs, evaluator_inputs, &self.blocks);
         let outputs = c.eval(&mut evaluator)?;
         c.process_outputs(&outputs, &mut evaluator)?;
-        self.output_wires = evaluator.evaluator.output_wires.clone();
-        self.output_cts = evaluator.evaluator.output_cts.clone();
-        Ok(outputs)
-    }
-
-    /// Decode the output received during the Fancy computation.
-    pub fn decode_output(&self) -> Vec<u16> {
-        Decoder::new(self.output_cts.clone()).decode(&self.output_wires)
+        Ok(evaluator.evaluator.decode_output())
     }
 }
 
@@ -300,53 +289,5 @@ impl Encoder {
             .zip(inputs)
             .map(|(id, &x)| self.encode_evaluator_input(x, id))
             .collect()
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////
-// Decoder
-
-/// Decode outputs statically.
-#[derive(Serialize, Deserialize, PartialEq, Debug)]
-pub struct Decoder {
-    outputs: Vec<Vec<Block>>,
-}
-
-impl Decoder {
-    /// Make a new `Decoder` from a set of output ciphertexts.
-    pub fn new(outputs: Vec<Vec<Block>>) -> Self {
-        Decoder { outputs }
-    }
-
-    /// Decode a slice of wire-labels `ws`.
-    pub fn decode(&self, ws: &[Wire]) -> Vec<u16> {
-        debug_assert_eq!(
-            ws.len(),
-            self.outputs.len(),
-            "got {} wires, but have {} output ciphertexts",
-            ws.len(),
-            self.outputs.len()
-        );
-
-        let mut outs = Vec::with_capacity(ws.len());
-        for i in 0..ws.len() {
-            let q = ws[i].modulus();
-            debug_assert_eq!(q as usize, self.outputs[i].len());
-            for k in 0..q {
-                let h = ws[i].hash(output_tweak(i, k));
-                if h == self.outputs[i][k as usize] {
-                    outs.push(k);
-                    break;
-                }
-            }
-        }
-        debug_assert_eq!(
-            ws.len(),
-            outs.len(),
-            "decoding failed! decoded {} out of {} wires",
-            outs.len(),
-            ws.len()
-        );
-        outs
     }
 }

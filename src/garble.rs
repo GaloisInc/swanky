@@ -65,21 +65,20 @@ mod classic {
         for _ in 0..16 {
             let q = rng.gen_prime();
             let mut c = &mut f(q);
-            let (encoder, mut gc) = garble(&mut c).unwrap();
+            let (en, ev) = garble(&mut c).unwrap();
             for _ in 0..16 {
                 let inps = (0..c.num_evaluator_inputs())
                     .map(|i| rng.gen_u16() % c.evaluator_input_mod(i))
                     .collect::<Vec<u16>>();
                 // Run the garbled circuit evaluator.
-                let xs = &encoder.encode_evaluator_inputs(&inps);
-                let _ = &gc.eval(&mut c, &[], xs).unwrap();
-                let decoded = gc.decode_output()[0];
+                let xs = &en.encode_evaluator_inputs(&inps);
+                let decoded = &ev.eval(&mut c, &[], xs).unwrap();
                 // Run the dummy evaluator.
                 let mut dummy = Dummy::new(&[], &inps);
                 let outputs = c.eval(&mut dummy).unwrap();
                 c.process_outputs(&outputs, &mut dummy).unwrap();
-                let should_be = dummy.get_output()[0];
-                assert_eq!(decoded, should_be);
+                let should_be = dummy.get_output();
+                assert_eq!(decoded[0], should_be[0]);
             }
         }
     }
@@ -216,35 +215,19 @@ mod classic {
             b.output(&z).unwrap();
             let mut c = b.finish();
 
-            let (en, mut ev) = garble(&mut c).unwrap();
+            let (en, ev) = garble(&mut c).unwrap();
 
-            let mut fail = false;
             for x in 0..q {
                 for y in 0..ymod {
                     println!("TEST x={} y={}", x, y);
                     let xs = &en.encode_evaluator_inputs(&[x, y]);
-                    let _ = &ev.eval(&mut c, &[], xs).unwrap();
-                    let decoded = ev.decode_output()[0];
+                    let decoded = &ev.eval(&mut c, &[], xs).unwrap();
                     let mut dummy = Dummy::new(&[], &[x, y]);
                     let outputs = c.eval(&mut dummy).unwrap();
                     c.process_outputs(&outputs, &mut dummy).unwrap();
-                    let should_be = dummy.get_output()[0];
-                    if decoded != should_be {
-                        println!(
-                            "FAILED inp={:?} q={} got={} should_be={}",
-                            [x, y],
-                            q,
-                            decoded,
-                            should_be
-                        );
-                        fail = true;
-                    } else {
-                        // println!("SUCCEEDED inp={:?} q={} got={} should_be={}", [x,y], q, decoded, should_be);
-                    }
+                    let should_be = dummy.get_output();
+                    assert_eq!(decoded[0], should_be[0]);
                 }
-            }
-            if fail {
-                panic!("failed!")
             }
         }
     }
@@ -263,7 +246,7 @@ mod classic {
         b.output_bundle(&z).unwrap();
         let mut circ = b.finish();
 
-        let (en, mut ev) = garble(&mut circ).unwrap();
+        let (en, ev) = garble(&mut circ).unwrap();
         println!("mods={:?} nargs={} size={}", mods, nargs, ev.size());
 
         let Q: u128 = mods.iter().map(|&q| q as u128).product();
@@ -278,9 +261,8 @@ mod classic {
                 ds.extend(util::as_mixed_radix(x, &mods).iter());
             }
             let X = en.encode_evaluator_inputs(&ds);
-            let _ = ev.eval(&mut circ, &[], &X).unwrap();
-            let res = ev.decode_output();
-            assert_eq!(util::from_mixed_radix(&res, &mods), should_be);
+            let outputs = ev.eval(&mut circ, &[], &X).unwrap();
+            assert_eq!(util::from_mixed_radix(&outputs, &mods), should_be);
         }
     }
     //}}}
@@ -296,15 +278,15 @@ mod classic {
         b.output(&y).unwrap();
 
         let mut circ = b.finish();
-        let (_, mut ev) = garble(&mut circ).unwrap();
+        let (_, ev) = garble(&mut circ).unwrap();
 
         for _ in 0..64 {
             let mut dummy = Dummy::new(&[], &[]);
             let outputs = circ.eval(&mut dummy).unwrap();
             circ.process_outputs(&outputs, &mut dummy).unwrap();
             assert_eq!(dummy.get_output()[0], c, "plaintext eval failed");
-            let _ = ev.eval(&mut circ, &[], &[]).unwrap();
-            assert_eq!(ev.decode_output()[0], c, "garbled eval failed");
+            let outputs = ev.eval(&mut circ, &[], &[]).unwrap();
+            assert_eq!(outputs[0], c, "garbled eval failed");
         }
     }
     //}}}
@@ -322,7 +304,7 @@ mod classic {
         b.output(&z).unwrap();
 
         let mut circ = b.finish();
-        let (en, mut ev) = garble(&mut circ).unwrap();
+        let (en, ev) = garble(&mut circ).unwrap();
 
         for _ in 0..64 {
             let x = rng.gen_u16() % q;
@@ -332,8 +314,8 @@ mod classic {
             assert_eq!(dummy.get_output()[0], (x + c) % q, "plaintext");
 
             let X = en.encode_evaluator_inputs(&[x]);
-            let _ = ev.eval(&mut circ, &[], &X).unwrap();
-            assert_eq!(ev.decode_output()[0], (x + c) % q, "garbled");
+            let Y = ev.eval(&mut circ, &[], &X).unwrap();
+            assert_eq!(Y[0], (x + c) % q, "garbled");
         }
     }
     //}}}

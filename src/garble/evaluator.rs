@@ -1,6 +1,6 @@
 use crate::error::{EvaluatorError, FancyError};
 use crate::fancy::{Fancy, HasModulus};
-use crate::util::{tweak, tweak2};
+use crate::util::{output_tweak, tweak, tweak2};
 use crate::wire::Wire;
 use scuttlebutt::Block;
 use std::io::Read;
@@ -33,7 +33,34 @@ impl<R: Read> Evaluator<R> {
 
     /// Decode the output received during the Fancy computation.
     pub fn decode_output(&self) -> Vec<u16> {
-        crate::r#static::Decoder::new(self.output_cts.clone()).decode(&self.output_wires)
+        debug_assert_eq!(
+            self.output_wires.len(),
+            self.output_cts.len(),
+            "got {} wires, but have {} output ciphertexts",
+            self.output_wires.len(),
+            self.output_cts.len()
+        );
+
+        let mut outs = Vec::with_capacity(self.output_wires.len());
+        for i in 0..self.output_wires.len() {
+            let q = self.output_wires[i].modulus();
+            debug_assert_eq!(q as usize, self.output_cts[i].len());
+            for k in 0..q {
+                let h = self.output_wires[i].hash(output_tweak(i, k));
+                if h == self.output_cts[i][k as usize] {
+                    outs.push(k);
+                    break;
+                }
+            }
+        }
+        debug_assert_eq!(
+            self.output_wires.len(),
+            outs.len(),
+            "decoding failed! decoded {} out of {} wires",
+            outs.len(),
+            self.output_wires.len()
+        );
+        outs
     }
 
     /// The current non-free gate index of the garbling computation.
