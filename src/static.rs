@@ -19,14 +19,16 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
-struct GarbledWriter {
+/// Implementation of the `Write` trait for use by `Garbler`.
+pub struct GarbledWriter {
     gb_inputs: Vec<Wire>,
     ev_inputs: Vec<Wire>,
     data: Vec<Block>,
 }
 
 impl GarbledWriter {
-    fn new() -> Self {
+    /// Make a new `GarbledWriter`.
+    pub fn new() -> Self {
         let gb_inputs = Vec::new();
         let ev_inputs = Vec::new();
         let data = Vec::new();
