@@ -48,6 +48,23 @@ impl PsiSender for Sender {
         inputs: &[Self::Msg],
         mut rng: &mut RNG,
     ) -> Result<(), Error> {
+        let n = inputs.len();
+
+        let key = rand::random::<Block>();
+        let hashed_inputs = utils::compress_and_hash_inputs(inputs, key);
+
+        let tbl = CuckooHash::new(&hashed_inputs, NHASHES)?;
+
+        let nbins = tbl.nbins;
+        let stashsize = tbl.stashsize;
+
+        // Send cuckoo hash info to receiver.
+        key.write(writer)?;
+        stream::write_usize(writer, nbins)?;
+        stream::write_usize(writer, stashsize)?;
+        writer.flush()?;
+
+        // let hindices = (0..NHASHES as u128).map(Block::from).collect::<Vec<Block>>();
         unimplemented!()
     }
 }
@@ -75,26 +92,12 @@ impl PsiReceiver for Receiver {
         W: Write + Send,
         RNG: CryptoRng + RngCore,
     {
-        let n = inputs.len();
+        // receive cuckoo hash info from sender
+        let key = Block::read(reader)?;
+        let nbins = stream::read_usize(reader)?;
+        let stashsize = stream::read_usize(reader)?;
 
-        let key = rand::random::<Block>();
-        let hashed_inputs = utils::compress_and_hash_inputs(inputs, key);
-
-        let tbl = CuckooHash::new(&hashed_inputs, NHASHES)?;
-
-        let nbins = tbl.nbins;
-        let stashsize = tbl.stashsize;
-        let masksize = compute_masksize(n)?;
-
-        let hindices = (0..NHASHES)
-            .map(|i| Block::from(i as u128))
-            .collect::<Vec<Block>>();
-
-        // Send cuckoo hash info to receiver.
-        key.write(writer)?;
-        stream::write_usize(writer, nbins)?;
-        stream::write_usize(writer, stashsize)?;
-        writer.flush()?;
+        let inputs = utils::compress_and_hash_inputs(inputs, key);
 
         unimplemented!()
     }
