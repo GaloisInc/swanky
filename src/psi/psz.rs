@@ -10,17 +10,17 @@
 //!
 //! The current implementation does not hash the output of the (relaxed) OPRF.
 
+use crate::Error;
 use crate::cuckoo::{compute_masksize, CuckooHash};
 use crate::stream;
-use crate::Error;
+use crate::utils;
 use crate::{Receiver as PsiReceiver, Sender as PsiSender};
 use ocelot::oprf::kkrt::Output;
 use ocelot::oprf::{self, Receiver as OprfReceiver, Sender as OprfSender};
 use rand::seq::SliceRandom;
 use rand::{CryptoRng, RngCore};
 use scuttlebutt::utils as scutils;
-use scuttlebutt::{AesHash, Block, SemiHonest};
-use sha2::{Digest, Sha256};
+use scuttlebutt::{Block, SemiHonest};
 use std::collections::HashSet;
 use std::io::{Read, Write};
 
@@ -56,7 +56,7 @@ impl PsiSender for Sender {
     ) -> Result<(), Error> {
         // XXX: do we need to do cointossing here?
         let key = Block::read(reader)?;
-        let mut inputs = compress_and_hash_inputs(inputs, key);
+        let mut inputs = utils::compress_and_hash_inputs(inputs, key);
         let masksize = compute_masksize(inputs.len())?;
         let nbins = stream::read_usize(reader)?;
         let stashsize = stream::read_usize(reader)?;
@@ -137,14 +137,14 @@ impl PsiReceiver for Receiver {
         let n = inputs.len();
 
         let key = rand::random::<Block>();
-        let inputs_ = compress_and_hash_inputs(inputs, key);
+        let inputs_ = utils::compress_and_hash_inputs(inputs, key);
 
         let tbl = CuckooHash::new(&inputs_, NHASHES)?;
 
         let nbins = tbl.nbins;
         let stashsize = tbl.stashsize;
-
         let masksize = compute_masksize(n)?;
+
         let hindices = (0..NHASHES)
             .map(|i| Block::from(i as u128))
             .collect::<Vec<Block>>();
@@ -229,31 +229,6 @@ impl PsiReceiver for Receiver {
     }
 }
 
-// Compress an arbitrary vector into a 128-bit chunk, leaving the final 8-bits
-// as zero. We need to leave 8 bits free in order to add in the hash index when
-// running the OPRF (cf. <https://eprint.iacr.org/2016/799>, §5.2).
-fn compress_and_hash_inputs(inputs: &[Vec<u8>], key: Block) -> Vec<Block> {
-    let mut hasher = Sha256::new(); // XXX can we do better than using SHA-256?
-    let aes = AesHash::new(key);
-    inputs
-        .iter()
-        .enumerate()
-        .map(|(i, input)| {
-            let mut digest = [0u8; 16];
-            if input.len() < 16 {
-                // Map `input` directly to a `Block`.
-                digest[0..input.len()].copy_from_slice(input);
-            } else {
-                // Hash `input` first.
-                hasher.input(input);
-                let h = hasher.result_reset();
-                digest[0..15].copy_from_slice(&h[0..15]);
-            }
-            aes.cr_hash(Block::from(i as u128), Block::from(digest))
-        })
-        .collect::<Vec<Block>>()
-}
-
 impl SemiHonest for Sender {}
 impl SemiHonest for Receiver {}
 
@@ -270,29 +245,15 @@ mod tests {
     use std::io::{BufReader, BufWriter};
     use std::os::unix::net::UnixStream;
     use std::time::SystemTime;
+    use crate::utils::rand_vec_vec;
 
     const SIZE: usize = 16;
-    const NTIMES: usize = 1 << 18;
-
-    fn rand_vec(n: usize) -> Vec<u8> {
-        (0..n).map(|_| rand::random::<u8>()).collect()
-    }
-
-    fn rand_vec_vec(size: usize) -> Vec<Vec<u8>> {
-        (0..size).map(|_| rand_vec(SIZE)).collect()
-    }
-
-    #[test]
-    fn test_compress_and_hash_inputs() {
-        let key = rand::random::<Block>();
-        let inputs = rand_vec_vec(13);
-        let _ = compress_and_hash_inputs(&inputs, key);
-    }
+    const NTIMES: usize = 1 << 10;
 
     #[test]
     fn test_psi() {
         let (sender, receiver) = UnixStream::pair().unwrap();
-        let sender_inputs = rand_vec_vec(NTIMES);
+        let sender_inputs = rand_vec_vec(NTIMES, SIZE);
         let receiver_inputs = sender_inputs.clone();
         let handle = std::thread::spawn(move || {
             let mut rng = AesRng::new();

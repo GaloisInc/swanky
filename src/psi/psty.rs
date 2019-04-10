@@ -7,16 +7,17 @@
 //! Implementation of the Pinkas-Tkachenko-Yanai private set intersection
 //! protocol (cf. <https://eprint.iacr.org/2019/241>).
 
-// use crate::cuckoo::{compute_masksize, CuckooHash};
+use crate::cuckoo::CuckooHash;
 // use crate::stream;
 use crate::Error;
 use crate::{Receiver as PsiReceiver, Sender as PsiSender};
+use crate::utils;
 // use ocelot::oprf::kkrt::Output;
 // use ocelot::oprf::{self, Receiver as OprfReceiver, Sender as OprfSender};
 // use rand::seq::SliceRandom;
 use rand::{CryptoRng, RngCore};
 // use scuttlebutt::utils as scutils;
-use scuttlebutt::{SemiHonest};
+use scuttlebutt::{Block, SemiHonest};
 // use sha2::{Digest, Sha256};
 // use std::collections::HashSet;
 use std::io::{Read, Write};
@@ -74,6 +75,27 @@ impl PsiReceiver for Receiver {
         W: Write + Send,
         RNG: CryptoRng + RngCore,
     {
+        let n = inputs.len();
+
+        let key = rand::random::<Block>();
+        let hashed_inputs = utils::compress_and_hash_inputs(inputs, key);
+
+        let tbl = CuckooHash::new(&hashed_inputs, NHASHES)?;
+
+        let nbins = tbl.nbins;
+        let stashsize = tbl.stashsize;
+        let masksize = compute_masksize(n)?;
+
+        let hindices = (0..NHASHES)
+            .map(|i| Block::from(i as u128))
+            .collect::<Vec<Block>>();
+
+        // Send cuckoo hash info to receiver.
+        key.write(writer)?;
+        stream::write_usize(writer, nbins)?;
+        stream::write_usize(writer, stashsize)?;
+        writer.flush()?;
+
         unimplemented!()
     }
 }
