@@ -14,7 +14,7 @@ use scuttlebutt::AesRng;
 use std::io::{BufReader, BufWriter};
 use std::os::unix::net::UnixStream;
 use std::time::Duration;
-use twopac::{Evaluator, Garbler};
+use twopac::semihonest::{Evaluator, Garbler};
 
 type Reader = BufReader<UnixStream>;
 type Writer = BufWriter<UnixStream>;
@@ -26,7 +26,7 @@ fn circuit(fname: &str) -> Circuit {
     circ
 }
 
-fn _bench_circuit(circ: &mut Circuit) {
+fn _bench_circuit(circ: &mut Circuit, gb_inputs: Vec<u16>, ev_inputs: Vec<u16>) {
     let mut circ_ = circ.clone();
     let (sender, receiver) = UnixStream::pair().unwrap();
     let handle = std::thread::spawn(move || {
@@ -34,7 +34,7 @@ fn _bench_circuit(circ: &mut Circuit) {
         let reader = BufReader::new(sender.try_clone().unwrap());
         let writer = BufWriter::new(sender);
         let mut gb =
-            Garbler::<Reader, Writer, AesRng, OtSender>::new(reader, writer, &vec![0u16; 128], rng)
+            Garbler::<Reader, Writer, AesRng, OtSender>::new(reader, writer, &gb_inputs, rng)
                 .unwrap();
         circ_.eval(&mut gb).unwrap();
     });
@@ -42,7 +42,7 @@ fn _bench_circuit(circ: &mut Circuit) {
     let reader = BufReader::new(receiver.try_clone().unwrap());
     let writer = BufWriter::new(receiver);
     let mut ev =
-        Evaluator::<Reader, Writer, AesRng, OtReceiver>::new(reader, writer, &vec![0u16; 128], rng)
+        Evaluator::<Reader, Writer, AesRng, OtReceiver>::new(reader, writer, &ev_inputs, rng)
             .unwrap();
     circ.eval(&mut ev).unwrap();
     handle.join().unwrap();
@@ -51,14 +51,28 @@ fn _bench_circuit(circ: &mut Circuit) {
 fn bench_aes(c: &mut Criterion) {
     let mut circ = circuit("circuits/AES-non-expanded.txt");
     c.bench_function("twopac::semi-honest (AES)", move |bench| {
-        bench.iter(|| _bench_circuit(&mut circ))
+        bench.iter(|| _bench_circuit(&mut circ, vec![0u16; 128], vec![0u16; 128]))
+    });
+}
+
+fn bench_sha_1(c: &mut Criterion) {
+    let mut circ = circuit("circuits/sha-1.txt");
+    c.bench_function("twopac::semi-honest (SHA-1)", move |bench| {
+        bench.iter(|| _bench_circuit(&mut circ, vec![0u16; 512], vec![]))
+    });
+}
+
+fn bench_sha_256(c: &mut Criterion) {
+    let mut circ = circuit("circuits/sha-256.txt");
+    c.bench_function("twopac::semi-honest (SHA-256)", move |bench| {
+        bench.iter(|| _bench_circuit(&mut circ, vec![0u16; 512], vec![]))
     });
 }
 
 criterion_group! {
     name = semihonest;
     config = Criterion::default().warm_up_time(Duration::from_millis(100));
-    targets = bench_aes
+    targets = bench_aes, bench_sha_1, bench_sha_256,
 }
 
 criterion_main!(semihonest);
