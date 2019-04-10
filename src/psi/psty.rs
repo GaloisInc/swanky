@@ -7,8 +7,8 @@
 //! Implementation of the Pinkas-Tkachenko-Yanai private set intersection
 //! protocol (cf. <https://eprint.iacr.org/2019/241>).
 
-use crate::cuckoo::CuckooHash;
-// use crate::stream;
+use crate::cuckoo::{CuckooHash, compute_masksize};
+use crate::stream;
 use crate::Error;
 use crate::{Receiver as PsiReceiver, Sender as PsiSender};
 use crate::utils;
