@@ -4,9 +4,7 @@
 // Copyright © 2019 Galois, Inc.
 // See LICENSE for licensing information.
 
-use crate::comm;
 use crate::errors::Error;
-use fancy_garbling::error::EvaluatorError;
 use fancy_garbling::{Evaluator as Ev, Fancy, Wire};
 use ocelot::ot::Receiver as OtReceiver;
 use rand::{CryptoRng, RngCore};
@@ -14,13 +12,14 @@ use scuttlebutt::Block;
 use std::io::{Read, Write};
 use std::sync::{Arc, Mutex};
 
+/// Semi-honest evaluator.
 pub struct Evaluator<R: Read + Send, W: Write + Send, RNG: CryptoRng + RngCore, OT: OtReceiver> {
     evaluator: Ev<R>,
     reader: Arc<Mutex<R>>,
     writer: Arc<Mutex<W>>,
-    inputs: Arc<Mutex<Vec<u16>>>,
-    ot: Arc<Mutex<OT>>,
-    rng: Arc<Mutex<RNG>>,
+    inputs: Vec<u16>,
+    ot: OT,
+    rng: RNG,
 }
 
 impl<
@@ -30,14 +29,13 @@ impl<
         OT: OtReceiver<Msg = Block>,
     > Evaluator<R, W, RNG, OT>
 {
+    /// Make a new `Evaluator`.
     pub fn new(mut reader: R, mut writer: W, inputs: &[u16], mut rng: RNG) -> Result<Self, Error> {
         let ot = OT::init(&mut reader, &mut writer, &mut rng)?;
-        let inputs = Arc::new(Mutex::new(inputs.to_vec()));
         let reader = Arc::new(Mutex::new(reader));
         let writer = Arc::new(Mutex::new(writer));
         let evaluator = Ev::new(reader.clone());
-        let ot = Arc::new(Mutex::new(ot));
-        let rng = Arc::new(Mutex::new(rng));
+        let inputs = inputs.to_vec();
         Ok(Evaluator {
             evaluator,
             reader,
@@ -48,16 +46,16 @@ impl<
         })
     }
 
+    /// Decode the output post-evaluation.
     pub fn decode_output(&self) -> Vec<u16> {
         self.evaluator.decode_output()
     }
 
-    fn run_ot(&self, inputs: &[bool]) -> Result<Vec<Block>, Error> {
-        let mut ot = self.ot.lock().unwrap();
+    fn run_ot(&mut self, inputs: &[bool]) -> Result<Vec<Block>, Error> {
         let mut reader = self.reader.lock().unwrap();
         let mut writer = self.writer.lock().unwrap();
-        let mut rng = self.rng.lock().unwrap();
-        ot.receive(&mut *reader, &mut *writer, &inputs, &mut *rng)
+        self.ot
+            .receive(&mut *reader, &mut *writer, &inputs, &mut self.rng)
             .map_err(Error::from)
     }
 }
@@ -101,7 +99,7 @@ impl<
             .collect::<Vec<usize>>();
         let mut bs = Vec::with_capacity(lens.iter().sum());
         for len in lens.iter() {
-            let input = self.inputs.lock().unwrap().remove(0);
+            let input = self.inputs.remove(0);
             for b in (0..*len).into_iter().map(|i| input & (1 << i) != 0) {
                 bs.push(b);
             }

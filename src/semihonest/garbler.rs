@@ -14,6 +14,7 @@ use scuttlebutt::{AesRng, Block, SemiHonest};
 use std::io::{Read, Write};
 use std::sync::{Arc, Mutex};
 
+/// Semi-honest garbler.
 pub struct Garbler<
     R: Read + Send,
     W: Write + Send,
@@ -23,7 +24,7 @@ pub struct Garbler<
     garbler: Gb<W, AesRng>,
     reader: Arc<Mutex<R>>,
     writer: Arc<Mutex<W>>,
-    ot: Arc<Mutex<OT>>,
+    ot: OT,
     rng: RNG,
 }
 
@@ -34,6 +35,7 @@ impl<
         OT: OtSender<Msg = Block>, // + SemiHonest
     > Garbler<R, W, RNG, OT>
 {
+    /// Make a new `Garbler` with inputs `inputs`.
     pub fn new(mut reader: R, mut writer: W, inputs: &[u16], mut rng: RNG) -> Result<Self, Error> {
         let ot = OT::init(&mut reader, &mut writer, &mut rng)?;
         let mut inputs = inputs.to_vec().into_iter();
@@ -63,7 +65,6 @@ impl<
             callback,
             AesRng::from_seed(rng.gen::<Block>()),
         );
-        let ot = Arc::new(Mutex::new(ot));
         Ok(Garbler {
             garbler,
             reader,
@@ -74,10 +75,10 @@ impl<
     }
 
     fn run_ot(&mut self, inputs: &[(Block, Block)]) -> Result<(), Error> {
-        let mut ot = self.ot.lock().unwrap();
         let mut reader = self.reader.lock().unwrap();
         let mut writer = self.writer.lock().unwrap();
-        ot.send(&mut *reader, &mut *writer, inputs, &mut self.rng)
+        self.ot
+            .send(&mut *reader, &mut *writer, inputs, &mut self.rng)
             .map_err(Error::from)
     }
 

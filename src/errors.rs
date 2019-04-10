@@ -6,12 +6,18 @@
 
 use fancy_garbling::error::{EvaluatorError, FancyError, GarblerError};
 
+/// Errors produced by `twopac`.
 #[derive(Debug)]
 pub enum Error {
+    /// An I/O error has occurred.
     IoError(std::io::Error),
+    /// An oblivious transfer error has occurred.
     OtError(ocelot::Error),
+    /// The garbler produced an error.
     GarblerError(GarblerError),
+    /// The evaluator produced an error.
     EvaluatorError(EvaluatorError),
+    /// Processing the garbled circuit produced an error.
     FancyError(FancyError),
 }
 
