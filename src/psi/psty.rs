@@ -7,11 +7,11 @@
 //! Implementation of the Pinkas-Tkachenko-Yanai private set intersection
 //! protocol (cf. <https://eprint.iacr.org/2019/241>).
 
-use crate::cuckoo::{CuckooHash, compute_masksize};
+use crate::cuckoo::CuckooHash;
 use crate::stream;
+use crate::utils;
 use crate::Error;
 use crate::{Receiver as PsiReceiver, Sender as PsiSender};
-use crate::utils;
 // use ocelot::oprf::kkrt::Output;
 // use ocelot::oprf::{self, Receiver as OprfReceiver, Sender as OprfSender};
 // use rand::seq::SliceRandom;
@@ -25,10 +25,10 @@ use std::io::{Read, Write};
 const NHASHES: usize = 3;
 
 /// Private set intersection sender.
-pub struct Sender { }
+pub struct Sender {}
 
 /// Private set intersection receiver.
-pub struct Receiver { }
+pub struct Receiver {}
 
 impl PsiSender for Sender {
     type Msg = Vec<u8>;
@@ -38,7 +38,7 @@ impl PsiSender for Sender {
         writer: &mut W,
         rng: &mut RNG,
     ) -> Result<Self, Error> {
-        unimplemented!()
+        Ok(Sender {})
     }
 
     fn send<R: Read + Send, W: Write + Send, RNG: CryptoRng + RngCore>(
@@ -52,19 +52,27 @@ impl PsiSender for Sender {
 
         let key = rand::random::<Block>();
         let hashed_inputs = utils::compress_and_hash_inputs(inputs, key);
+        let cuckoo = CuckooHash::new(&hashed_inputs, NHASHES)?;
 
-        let tbl = CuckooHash::new(&hashed_inputs, NHASHES)?;
-
-        let nbins = tbl.nbins;
-        let stashsize = tbl.stashsize;
+        let nbins = cuckoo.nbins;
+        assert_eq!(cuckoo.stashsize, 0);
 
         // Send cuckoo hash info to receiver.
         key.write(writer)?;
         stream::write_usize(writer, nbins)?;
-        stream::write_usize(writer, stashsize)?;
         writer.flush()?;
 
-        // let hindices = (0..NHASHES as u128).map(Block::from).collect::<Vec<Block>>();
+        // Set up inputs to use `x || i` or `x` depending on whether the input
+        // is in a bin or the stash.
+        let table = cuckoo
+            .items()
+            .map(|opt_item| {
+                opt_item
+                    .as_ref()
+                    .map_or(Block::default(), |item| item.entry)
+            })
+            .collect::<Vec<Block>>();
+
         unimplemented!()
     }
 }
@@ -77,7 +85,7 @@ impl PsiReceiver for Receiver {
         writer: &mut W,
         rng: &mut RNG,
     ) -> Result<Self, Error> {
-        unimplemented!()
+        Ok(Receiver {})
     }
 
     fn receive<R, W, RNG>(
@@ -95,9 +103,18 @@ impl PsiReceiver for Receiver {
         // receive cuckoo hash info from sender
         let key = Block::read(reader)?;
         let nbins = stream::read_usize(reader)?;
-        let stashsize = stream::read_usize(reader)?;
 
         let inputs = utils::compress_and_hash_inputs(inputs, key);
+
+        // map inputs to table using all hash functions
+        let mut table = vec![Vec::new(); nbins];
+
+        for h in 0..NHASHES {
+            for &x in &inputs {
+                let bin = CuckooHash::bin(x, h, nbins);
+                table[bin].push(x);
+            }
+        }
 
         unimplemented!()
     }
@@ -109,9 +126,65 @@ impl SemiHonest for Receiver {}
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::utils::rand_vec_vec;
+    use scuttlebutt::AesRng;
+    use std::io::{BufReader, BufWriter};
+    use std::os::unix::net::UnixStream;
+    use std::time::SystemTime;
+
+    const SIZE: usize = 16;
+    const NTIMES: usize = 1 << 10;
 
     #[test]
-    fn it_works() {
-        assert!(true);
+    fn test_psi() {
+        let (sender, receiver) = UnixStream::pair().unwrap();
+        let sender_inputs = rand_vec_vec(NTIMES, SIZE);
+        let receiver_inputs = sender_inputs.clone();
+
+        let handle = std::thread::spawn(move || {
+            let mut rng = AesRng::new();
+            let mut reader = BufReader::new(sender.try_clone().unwrap());
+            let mut writer = BufWriter::new(sender);
+
+            let start = SystemTime::now();
+            let mut psi = Sender::init(&mut reader, &mut writer, &mut rng).unwrap();
+            println!(
+                "Sender init time: {} ms",
+                start.elapsed().unwrap().as_millis()
+            );
+
+            let start = SystemTime::now();
+            psi.send(&mut reader, &mut writer, &sender_inputs, &mut rng)
+                .unwrap();
+            println!(
+                "[{}] Send time: {} ms",
+                NTIMES,
+                start.elapsed().unwrap().as_millis()
+            );
+        });
+
+        let mut rng = AesRng::new();
+        let mut reader = BufReader::new(receiver.try_clone().unwrap());
+        let mut writer = BufWriter::new(receiver);
+
+        let start = SystemTime::now();
+        let mut psi = Receiver::init(&mut reader, &mut writer, &mut rng).unwrap();
+        println!(
+            "Receiver init time: {} ms",
+            start.elapsed().unwrap().as_millis()
+        );
+
+        let start = SystemTime::now();
+        let intersection = psi
+            .receive(&mut reader, &mut writer, &receiver_inputs, &mut rng)
+            .unwrap();
+        println!(
+            "[{}] Receiver time: {} ms",
+            NTIMES,
+            start.elapsed().unwrap().as_millis()
+        );
+
+        handle.join().unwrap();
+        assert_eq!(intersection.len(), NTIMES);
     }
 }

@@ -4,8 +4,8 @@
 // Copyright © 2019 Galois, Inc.
 // See LICENSE for licensing information.
 
-pub mod psz;
 pub mod psty;
+pub mod psz;
 
 use crate::errors::Error;
 use rand::{CryptoRng, RngCore};

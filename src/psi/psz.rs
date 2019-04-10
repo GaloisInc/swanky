@@ -10,10 +10,10 @@
 //!
 //! The current implementation does not hash the output of the (relaxed) OPRF.
 
-use crate::Error;
 use crate::cuckoo::{compute_masksize, CuckooHash};
 use crate::stream;
 use crate::utils;
+use crate::Error;
 use crate::{Receiver as PsiReceiver, Sender as PsiSender};
 use ocelot::oprf::kkrt::Output;
 use ocelot::oprf::{self, Receiver as OprfReceiver, Sender as OprfSender};
@@ -241,11 +241,11 @@ pub type PszReceiver = Receiver;
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::utils::rand_vec_vec;
     use scuttlebutt::AesRng;
     use std::io::{BufReader, BufWriter};
     use std::os::unix::net::UnixStream;
     use std::time::SystemTime;
-    use crate::utils::rand_vec_vec;
 
     const SIZE: usize = 16;
     const NTIMES: usize = 1 << 10;
@@ -295,40 +295,4 @@ mod tests {
         handle.join().unwrap();
         assert_eq!(intersection.len(), NTIMES);
     }
-}
-
-#[cfg(all(feature = "nightly", test))]
-mod benchmarks {
-    extern crate test;
-    use super::*;
-    use test::Bencher;
-
-    const NTIMES: usize = 1 << 16;
-
-    fn rand_vec(n: usize) -> Vec<u8> {
-        (0..n).map(|_| rand::random::<u8>()).collect()
-    }
-
-    fn rand_vec_vec(n: usize, size: usize) -> Vec<Vec<u8>> {
-        (0..n).map(|_| rand_vec(size)).collect()
-    }
-
-    #[bench]
-    fn bench_compress_and_hash_inputs_small(b: &mut Bencher) {
-        let inputs = rand_vec_vec(NTIMES, 15);
-        let key = rand::random::<Block>();
-        b.iter(|| {
-            let _ = compress_and_hash_inputs(&inputs, key);
-        });
-    }
-
-    #[bench]
-    fn bench_compress_and_hash_inputs_large(b: &mut Bencher) {
-        let inputs = rand_vec_vec(NTIMES, 32);
-        let key = rand::random::<Block>();
-        b.iter(|| {
-            let _ = compress_and_hash_inputs(&inputs, key);
-        });
-    }
-
 }

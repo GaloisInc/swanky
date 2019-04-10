@@ -11,9 +11,9 @@ use std::fmt::Debug;
 
 #[derive(Clone, Debug)]
 pub(crate) struct CuckooItem {
-    pub(crate) entry: Block,             // the actual value
-    pub(crate) input_index: usize,       // the input index associated with the entry
-    pub(crate) hash_index: Option<usize> // the hash index used. None for stash items.
+    pub(crate) entry: Block,              // the actual value
+    pub(crate) input_index: usize,        // the input index associated with the entry
+    pub(crate) hash_index: Option<usize>, // the hash index used. None for stash items.
 }
 
 pub(crate) struct CuckooHash {
@@ -88,7 +88,7 @@ impl CuckooHash {
     pub fn new(inputs: &[Block], nhashes: usize) -> Result<CuckooHash, Error> {
         // We don't support more than 2**32 bins due to the way we compute the
         // bin number (cf. the `bin` function below).
-        let nbins     = compute_nbins(inputs.len(), nhashes)?;
+        let nbins = compute_nbins(inputs.len(), nhashes)?;
         let stashsize = compute_stashsize(inputs.len(), nhashes)?;
 
         let mut tbl = CuckooHash {
@@ -109,7 +109,11 @@ impl CuckooHash {
     /// Place `input`, alongside the input index `idx` it corresponds to, in the
     /// hash table.
     pub fn hash(&mut self, input: Block, idx: usize) -> Result<(), Error> {
-        let mut item = CuckooItem { entry: input, input_index: idx, hash_index: Some(0) };
+        let mut item = CuckooItem {
+            entry: input,
+            input_index: idx,
+            hash_index: Some(0),
+        };
 
         for _ in 0..NITERS {
             let i = CuckooHash::bin(item.entry, item.hash_index.unwrap(), self.nbins);
@@ -155,7 +159,7 @@ impl CuckooHash {
     }
 
     #[inline]
-    pub fn items(&self) -> impl Iterator<Item=&Option<CuckooItem>> {
+    pub fn items(&self) -> impl Iterator<Item = &Option<CuckooItem>> {
         self.items.iter()
     }
 }

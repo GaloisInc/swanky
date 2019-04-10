@@ -1,5 +1,5 @@
-use sha2::{Digest, Sha256};
 use scuttlebutt::{AesHash, Block};
+use sha2::{Digest, Sha256};
 
 // Compress an arbitrary vector into a 128-bit chunk, leaving the final 8-bits
 // as zero. We need to leave 8 bits free in order to add in the hash index when
@@ -26,10 +26,12 @@ pub fn compress_and_hash_inputs(inputs: &[Vec<u8>], key: Block) -> Vec<Block> {
         .collect::<Vec<Block>>()
 }
 
+#[allow(dead_code)] // used in tests
 pub fn rand_vec(n: usize) -> Vec<u8> {
     (0..n).map(|_| rand::random::<u8>()).collect()
 }
 
+#[allow(dead_code)] // used in tests
 pub fn rand_vec_vec(n: usize, m: usize) -> Vec<Vec<u8>> {
     (0..n).map(|_| rand_vec(m)).collect()
 }
@@ -44,4 +46,41 @@ mod tests {
         let inputs = rand_vec_vec(13, 16);
         let _ = compress_and_hash_inputs(&inputs, key);
     }
+}
+
+#[cfg(all(feature = "nightly", test))]
+mod benchmarks {
+    extern crate test;
+    use super::*;
+    use test::Bencher;
+    use crate::utils;
+
+    const NTIMES: usize = 1 << 16;
+
+    fn rand_vec(n: usize) -> Vec<u8> {
+        (0..n).map(|_| rand::random::<u8>()).collect()
+    }
+
+    fn rand_vec_vec(n: usize, size: usize) -> Vec<Vec<u8>> {
+        (0..n).map(|_| rand_vec(size)).collect()
+    }
+
+    #[bench]
+    fn bench_compress_and_hash_inputs_small(b: &mut Bencher) {
+        let inputs = rand_vec_vec(NTIMES, 15);
+        let key = rand::random::<Block>();
+        b.iter(|| {
+            let _ = compress_and_hash_inputs(&inputs, key);
+        });
+    }
+
+    #[bench]
+    fn bench_compress_and_hash_inputs_large(b: &mut Bencher) {
+        let inputs = rand_vec_vec(NTIMES, 32);
+        let key = rand::random::<Block>();
+        b.iter(|| {
+            let _ = compress_and_hash_inputs(&inputs, key);
+        });
+    }
+
 }
