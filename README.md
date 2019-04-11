@@ -47,7 +47,7 @@ OTs):
 | Protocol     | Running Time |
 |--------------|--------------|
 | Naor-Pinkas  | 21.9 ms      |
-| Chou-Orlandi | 18.5 ms      |
+| Chou-Orlandi | 16.5 ms      |
 
 All results use unix sockets and were run on a 2.7 GHz machine with 16 GB RAM,
 with the sender and receiver being on different threads (see `benches/ot.rs` for
