@@ -16,8 +16,7 @@ nightly = ["rand/nightly", "scuttlebutt/nightly", "ocelot/unstable", "ocelot/nig
 
 [dependencies]
 arrayref = "0.3.5"
-# ocelot = { git = "https://github.com/amaloz/ocelot" }
-ocelot = { path = "../ocelot" }
+ocelot = { git = "https://github.com/amaloz/ocelot" }
 rand = "0.6.5"
 rand_core = "0.4.0"
 scuttlebutt = { git = "https://github.com/amaloz/scuttlebutt"}

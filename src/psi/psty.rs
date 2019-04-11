@@ -121,8 +121,6 @@ impl P2 {
         inputs.sort();
         inputs.dedup();
 
-        assert_eq!(inputs.len(), n);
-
         // map inputs to table using all hash functions
         let mut table = vec![Vec::new(); nbins];
 
@@ -130,7 +128,7 @@ impl P2 {
             let mut bins = Vec::with_capacity(NHASHES);
             for h in 0..NHASHES {
                 let bin = CuckooHash::bin(x, h, nbins);
-                table[bin].push(x);
+                table[bin].push(x ^ Block::from(h as u128));
                 bins.push(bin);
             }
             // if j = H1(y) = H2(y) for some y, then P2 adds a uniformly random element to
@@ -146,6 +144,11 @@ impl P2 {
             // map all the points in a bin to the same tag
             bin.into_iter().map(move |item| (item, t.clone()))
         }).collect::<Vec<(Block, kkrt::Output)>>();
+
+        let mut check = points.iter().map(|(x,_)| x.clone()).collect::<Vec<_>>();
+        check.sort();
+        check.dedup();
+        assert_eq!(check.len(), points.len());
 
         let _ = self.opprf.send(reader, writer, &points, points.len(), nbins, rng)?;
 
