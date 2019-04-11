@@ -7,7 +7,7 @@
 //! Defines a block as a 128-bit value, and implements block-related functions.
 
 #[cfg(feature = "curve25519-dalek")]
-use crate::aes::Aes128;
+use crate::aes::Aes256;
 #[cfg(any(feature = "curve25519-dalek", feature = "serde"))]
 use arrayref::array_ref;
 use core::arch::x86_64::*;
@@ -17,7 +17,7 @@ use std::hash::{Hash, Hasher};
 use std::io::{Read, Write};
 
 /// A 128-bit chunk.
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy)]
 pub struct Block(pub __m128i);
 
 union __U128 {
@@ -45,7 +45,8 @@ impl Block {
         self.as_mut().as_mut_ptr()
     }
 
-    /// Output the all-zero block. (XXX: remove eventually in favor of `Block::default`.)
+    /// Output the all-zero block.
+    #[deprecated(note = "use `Block::default` instead")]
     #[inline]
     pub fn zero() -> Self {
         unsafe { Block(_mm_setzero_si128()) }
@@ -72,19 +73,17 @@ impl Block {
         }
     }
 
-    /// Hash an elliptic curve point `pt` and tweak `i`.
+    /// Hash an elliptic curve point `pt` and tweak `tweak`.
     ///
-    /// Computes the hash by computing `E_{pt}(i)`, where `E` is AES-128 and `i`
-    /// is an index.
+    /// Computes the hash by computing `E_{pt}(tweak)`, where `E` is AES-128.
     #[cfg(all(feature = "curve25519-dalek", feature = "nightly"))]
     #[inline]
-    pub fn hash_pt(i: usize, pt: &RistrettoPoint) -> Self {
+    pub fn hash_pt(tweak: u64, pt: &RistrettoPoint) -> Self {
         let k = pt.compress();
-        let k = k.as_bytes();
-        // XXX: We're just taking the first 16 bytes of the compressed point... Is that secure?!
-        let c = Aes128::new(Block::from(*array_ref![k, 0, 16]));
-        let m = unsafe { _mm_set_epi64(_mm_setzero_si64(), *(&i as *const usize as *const __m64)) };
-        c.encrypt(Block(m))
+        let c = Aes256::new(k.as_bytes());
+        let m = unsafe { _mm_set_epi64(_mm_setzero_si64(), *(&tweak as *const _ as *const __m64)) };
+        let m = Block(m);
+        c.encrypt(m.into())
     }
 
     /// Hash an elliptic curve point `pt` and tweak `i`.
@@ -93,11 +92,9 @@ impl Block {
     /// is an index.
     #[cfg(all(feature = "curve25519-dalek", not(feature = "nightly")))]
     #[inline]
-    pub fn hash_pt(i: usize, pt: &RistrettoPoint) -> Self {
+    pub fn hash_pt(i: u64, pt: &RistrettoPoint) -> Self {
         let k = pt.compress();
-        let k = k.as_bytes();
-        // XXX: We're just taking the first 16 bytes of the compressed point... Is that secure?!
-        let c = Aes128::new(Block::from(*array_ref![k, 0, 16]));
+        let c = Aes256::new(k.as_bytes());
         let m = i as u128;
         c.encrypt(Block::from(m))
     }
@@ -110,7 +107,7 @@ impl Block {
     /// Read a block from `stream`.
     #[inline]
     pub fn read<T: Read>(stream: &mut T) -> Result<Block, std::io::Error> {
-        let mut v = Block::zero();
+        let mut v = Block::default();
         stream.read_exact(v.as_mut())?;
         Ok(v)
     }
@@ -188,6 +185,26 @@ impl std::ops::BitXorAssign for Block {
     #[inline]
     fn bitxor_assign(&mut self, rhs: Self) {
         unsafe { self.0 = _mm_xor_si128(self.0, rhs.0) }
+    }
+}
+
+impl std::fmt::Debug for Block {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        let block: [u8; 16] = (*self).into();
+        for byte in block.iter() {
+            write!(f, "{:02X}", byte)?;
+        }
+        Ok(())
+    }
+}
+
+impl std::fmt::Display for Block {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        let block: [u8; 16] = (*self).into();
+        for byte in block.iter() {
+            write!(f, "{:02X}", byte)?;
+        }
+        Ok(())
     }
 }
 

@@ -50,7 +50,7 @@ pub fn send<R: Read, W: Write>(
     let mut out = Vec::with_capacity(seeds.len());
     for seed in seeds.iter() {
         let mut rng = AesRng::from_seed(*seed);
-        let mut com = Block::zero();
+        let mut com = Block::default();
         rng.fill_bytes(&mut com.as_mut());
         com.write(writer)?;
     }
@@ -86,7 +86,7 @@ pub fn receive<R: Read, W: Write>(
     for (seed, com) in seeds.iter().zip(coms.into_iter()) {
         let seed_ = Block::read(&mut reader)?;
         let mut rng_ = AesRng::from_seed(seed_);
-        let mut check = Block::zero();
+        let mut check = Block::default();
         rng_.fill_bytes(&mut check.as_mut());
         if check != com {
             return Err(Error::CommitmentCheckFailed);

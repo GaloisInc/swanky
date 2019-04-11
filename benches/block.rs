@@ -15,9 +15,9 @@ use std::time::Duration;
 fn bench_hash_pt(c: &mut Criterion) {
     c.bench_function("Block::hash_pt", |b| {
         let pt = RistrettoPoint::random(&mut rand::thread_rng());
-        let i = rand::random::<usize>();
+        let tweak = rand::random::<u64>();
         b.iter(|| {
-            let h = Block::hash_pt(i, &pt);
+            let h = Block::hash_pt(tweak, &pt);
             criterion::black_box(h)
         });
     });
@@ -57,10 +57,10 @@ fn bench_xor(c: &mut Criterion) {
     });
 }
 
-fn bench_zero(c: &mut Criterion) {
+fn bench_default(c: &mut Criterion) {
     c.bench_function("Block::zero", |b| {
         b.iter(|| {
-            let z = Block::zero();
+            let z = Block::default();
             criterion::black_box(z)
         })
     });
@@ -69,6 +69,6 @@ fn bench_zero(c: &mut Criterion) {
 criterion_group! {
     name = block;
     config = Criterion::default().warm_up_time(Duration::from_millis(100));
-    targets = bench_hash_pt, bench_clmul, bench_rand, bench_xor, bench_zero
+    targets = bench_hash_pt, bench_clmul, bench_rand, bench_xor, bench_default
 }
 criterion_main!(block);
