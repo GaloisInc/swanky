@@ -55,7 +55,7 @@ impl P1 {
         writer: &mut W,
         inputs: &[Msg],
         mut rng: &mut RNG,
-    ) -> Result<Vec<Msg>, Error> {
+    ) -> Result<Vec<kkrt::Output>, Error> {
         let n = inputs.len();
 
         let key = rand::random::<Block>();
@@ -82,7 +82,9 @@ impl P1 {
             })
             .collect::<Vec<Block>>();
 
-        unimplemented!()
+        let outputs = self.opprf.receive(reader, writer, 0, &table, rng)?;
+
+        Ok(outputs)
     }
 }
 
@@ -113,7 +115,13 @@ impl P2 {
         let key = Block::read(reader)?;
         let nbins = stream::read_usize(reader)?;
 
-        let inputs = utils::compress_and_hash_inputs(inputs, key);
+        let mut inputs = utils::compress_and_hash_inputs(inputs, key);
+        let n = inputs.len();
+
+        inputs.sort();
+        inputs.dedup();
+
+        assert_eq!(inputs.len(), n);
 
         // map inputs to table using all hash functions
         let mut table = vec![Vec::new(); nbins];
@@ -132,17 +140,16 @@ impl P2 {
             }
         }
 
-        let ts = (0..nbins).map(|_| rng.gen()).collect::<Vec<kkrt::Output>>();
-
         // select the target values
+        let ts = (0..nbins).map(|_| rng.gen()).collect::<Vec<kkrt::Output>>();
         let points = table.into_iter().zip(ts.iter()).flat_map(|(bin,t)| {
             // map all the points in a bin to the same tag
             bin.into_iter().map(move |item| (item, t.clone()))
-        // }).collect::<Vec<(Block, kkrt::Output)>>();
         }).collect::<Vec<(Block, kkrt::Output)>>();
 
-        let _ = self.opprf.send(reader, writer, &points, 0, nbins, rng)?;
+        let _ = self.opprf.send(reader, writer, &points, points.len(), nbins, rng)?;
 
+        // return the target values for input to the MPC
         Ok(ts)
     }
 }
@@ -157,7 +164,7 @@ mod tests {
     use std::time::SystemTime;
 
     const ITEM_SIZE: usize = 8;
-    const SET_SIZE: usize = 1 << 2;
+    const SET_SIZE: usize = 1 << 8;
 
     #[test]
     fn test_psi() {
