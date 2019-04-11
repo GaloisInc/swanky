@@ -109,6 +109,15 @@ impl<OPRF: OprfSender<Seed = Seed, Input = Block, Output = Output> + SemiHonest>
         if t != 1 {
             return Err(Error::InvalidInputLength);
         }
+        assert_eq!(
+            {
+                let mut inputs = points.iter().map(|(x, _)| *x).collect::<Vec<Self::Input>>();
+                inputs.sort();
+                inputs.dedup();
+                inputs.len()
+            },
+            points.len()
+        );
         let m = table_size(npoints);
         let mut table = (0..m).map(|_| Output::default()).collect::<Vec<Output>>();
         let seeds = self.oprf.send(reader, writer, 1, rng)?;
