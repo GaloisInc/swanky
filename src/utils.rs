@@ -52,8 +52,8 @@ mod tests {
 mod benchmarks {
     extern crate test;
     use super::*;
-    use test::Bencher;
     use crate::utils;
+    use test::Bencher;
 
     const NTIMES: usize = 1 << 16;
 

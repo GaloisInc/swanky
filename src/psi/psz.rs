@@ -18,6 +18,7 @@ use crate::{Receiver as PsiReceiver, Sender as PsiSender};
 use ocelot::oprf::kkrt::Output;
 use ocelot::oprf::{self, Receiver as OprfReceiver, Sender as OprfSender};
 use rand::seq::SliceRandom;
+use rand::Rng;
 use rand::{CryptoRng, RngCore};
 use scuttlebutt::utils as scutils;
 use scuttlebutt::{Block, SemiHonest};
@@ -136,7 +137,7 @@ impl PsiReceiver for Receiver {
     {
         let n = inputs.len();
 
-        let key = rand::random::<Block>();
+        let key = rng.gen();
         let inputs_ = utils::compress_and_hash_inputs(inputs, key);
 
         let tbl = CuckooHash::new(&inputs_, NHASHES)?;

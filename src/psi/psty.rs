@@ -11,10 +11,10 @@ use crate::cuckoo::CuckooHash;
 use crate::stream;
 use crate::utils;
 use crate::Error;
-// use ocelot::oprf::kkrt::Output;
+use ocelot::oprf::kkrt;
 // use ocelot::oprf::{self, Receiver as OprfReceiver, Sender as OprfSender};
 // use rand::seq::SliceRandom;
-use rand::{CryptoRng, RngCore};
+use rand::{Rng, CryptoRng, RngCore};
 // use scuttlebutt::utils as scutils;
 use scuttlebutt::{Block, SemiHonest};
 // use sha2::{Digest, Sha256};
@@ -22,30 +22,30 @@ use scuttlebutt::{Block, SemiHonest};
 use std::io::{Read, Write};
 
 use ocelot::oprf::kmprt;
-use ocelot::oprf::{ProgrammableSender, ProgrammableReceiver};
+use ocelot::oprf::{ProgrammableReceiver, ProgrammableSender};
 
 const NHASHES: usize = 3;
 
 pub type Msg = Vec<u8>;
 
 /// Private set intersection sender.
-pub struct Sender {
-    opprf: kmprt::KmprtSender,
-}
-
-/// Private set intersection receiver.
-pub struct Receiver {
+pub struct P1 {
     opprf: kmprt::KmprtReceiver,
 }
 
-impl Sender {
+/// Private set intersection receiver.
+pub struct P2 {
+    opprf: kmprt::KmprtSender,
+}
+
+impl P1 {
     pub fn init<R: Read + Send, W: Write + Send, RNG: CryptoRng + RngCore>(
         reader: &mut R,
         writer: &mut W,
         rng: &mut RNG,
     ) -> Result<Self, Error> {
-        Ok(Sender {
-            opprf: kmprt::KmprtSender::init(reader, writer, rng)?,
+        Ok(Self {
+            opprf: kmprt::KmprtReceiver::init(reader, writer, rng)?,
         })
     }
 
@@ -55,7 +55,7 @@ impl Sender {
         writer: &mut W,
         inputs: &[Msg],
         mut rng: &mut RNG,
-    ) -> Result<(), Error> {
+    ) -> Result<Vec<Msg>, Error> {
         let n = inputs.len();
 
         let key = rand::random::<Block>();
@@ -86,22 +86,24 @@ impl Sender {
     }
 }
 
-impl Receiver {
+impl P2 {
     pub fn init<R: Read + Send, W: Write + Send, RNG: CryptoRng + RngCore>(
         reader: &mut R,
         writer: &mut W,
         rng: &mut RNG,
     ) -> Result<Self, Error> {
-        Ok(Receiver {})
+        Ok(Self {
+            opprf: kmprt::KmprtSender::init(reader, writer, rng)?,
+        })
     }
 
-    pub fn receive<R, W, RNG>(
+    pub fn send<R, W, RNG>(
         &mut self,
         reader: &mut R,
         writer: &mut W,
         inputs: &[Msg],
         rng: &mut RNG,
-    ) -> Result<Vec<Msg>, Error>
+    ) -> Result<Vec<kkrt::Output>, Error>
     where
         R: Read + Send,
         W: Write + Send,
@@ -116,16 +118,32 @@ impl Receiver {
         // map inputs to table using all hash functions
         let mut table = vec![Vec::new(); nbins];
 
-        for h in 0..NHASHES {
-            for &x in &inputs {
+        for &x in &inputs {
+            let mut bins = Vec::with_capacity(NHASHES);
+            for h in 0..NHASHES {
                 let bin = CuckooHash::bin(x, h, nbins);
                 table[bin].push(x);
+                bins.push(bin);
+            }
+            // if j = H1(y) = H2(y) for some y, then P2 adds a uniformly random element to
+            // table2[j].
+            if bins.iter().skip(1).all(|&x| x == bins[0]) {
+                table[bins[0]].push(rng.gen());
             }
         }
 
-        // println!("{:?}", table);
+        let ts = (0..nbins).map(|_| rng.gen()).collect::<Vec<kkrt::Output>>();
 
-        unimplemented!()
+        // select the target values
+        let points = table.into_iter().zip(ts.iter()).flat_map(|(bin,t)| {
+            // map all the points in a bin to the same tag
+            bin.into_iter().map(move |item| (item, t.clone()))
+        // }).collect::<Vec<(Block, kkrt::Output)>>();
+        }).collect::<Vec<(Block, kkrt::Output)>>();
+
+        let _ = self.opprf.send(reader, writer, &points, 0, nbins, rng)?;
+
+        Ok(ts)
     }
 }
 
@@ -138,13 +156,13 @@ mod tests {
     use std::os::unix::net::UnixStream;
     use std::time::SystemTime;
 
-    const SIZE: usize = 8;
-    const NTIMES: usize = 1 << 2;
+    const ITEM_SIZE: usize = 8;
+    const SET_SIZE: usize = 1 << 2;
 
     #[test]
     fn test_psi() {
         let (sender, receiver) = UnixStream::pair().unwrap();
-        let sender_inputs = rand_vec_vec(NTIMES, SIZE);
+        let sender_inputs = rand_vec_vec(SET_SIZE, ITEM_SIZE);
         let receiver_inputs = sender_inputs.clone();
 
         let handle = std::thread::spawn(move || {
@@ -153,7 +171,7 @@ mod tests {
             let mut writer = BufWriter::new(sender);
 
             let start = SystemTime::now();
-            let mut psi = Sender::init(&mut reader, &mut writer, &mut rng).unwrap();
+            let mut psi = P1::init(&mut reader, &mut writer, &mut rng).unwrap();
             println!(
                 "Sender init time: {} ms",
                 start.elapsed().unwrap().as_millis()
@@ -164,7 +182,7 @@ mod tests {
                 .unwrap();
             println!(
                 "[{}] Send time: {} ms",
-                NTIMES,
+                SET_SIZE,
                 start.elapsed().unwrap().as_millis()
             );
         });
@@ -174,7 +192,7 @@ mod tests {
         let mut writer = BufWriter::new(receiver);
 
         let start = SystemTime::now();
-        let mut psi = Receiver::init(&mut reader, &mut writer, &mut rng).unwrap();
+        let mut psi = P2::init(&mut reader, &mut writer, &mut rng).unwrap();
         println!(
             "Receiver init time: {} ms",
             start.elapsed().unwrap().as_millis()
@@ -182,15 +200,15 @@ mod tests {
 
         let start = SystemTime::now();
         let intersection = psi
-            .receive(&mut reader, &mut writer, &receiver_inputs, &mut rng)
+            .send(&mut reader, &mut writer, &receiver_inputs, &mut rng)
             .unwrap();
         println!(
             "[{}] Receiver time: {} ms",
-            NTIMES,
+            SET_SIZE,
             start.elapsed().unwrap().as_millis()
         );
 
         handle.join().unwrap();
-        assert_eq!(intersection.len(), NTIMES);
+        assert_eq!(intersection.len(), SET_SIZE);
     }
 }
