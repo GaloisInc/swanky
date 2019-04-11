@@ -405,6 +405,7 @@ impl<T: OprfSender<Seed = Seed, Input = Block, Output = Output> + SemiHonest> Op
         Ok(outputs.into_iter().flatten().collect())
     }
 
+    /// Unimplemented. The KMPRT OPPRF does not support the sender evaluating the OPPRF.
     #[inline]
     fn compute(&self, _: &Self::Seed, _: &Self::Hint, _: &Self::Input) -> Self::Output {
         // This method doesn't work for the hash-based batched OPPRF, so let's panic for now.
@@ -503,6 +504,8 @@ impl<T: OprfReceiver<Seed = Seed, Input = Block, Output = Output> + SemiHonest> 
 }
 
 use crate::oprf;
+
+// XXX: Move to `oprf/mod.rs` once deemed stable enough.
 
 /// Instantiation of the KMPRT one-time OPPRF sender, using KKRT as the
 /// underlying OPRF.
