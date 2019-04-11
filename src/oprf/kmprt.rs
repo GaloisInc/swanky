@@ -92,6 +92,14 @@ impl<OPRF: OprfSender<Seed = Seed, Input = Block, Output = Output> + SemiHonest>
         Ok(Self { oprf })
     }
 
+    /// Run the OPPRF, with `(x, y)` values given by `points` being programmed
+    /// into the PRF. The value `npoints` is an upper-bound on the length of
+    /// `points`. The value `t` must be set to `1`, otherwise we return
+    /// `Error::InvalidInputLength`.
+    ///
+    /// Note that `npoints` often needs to be much larger than the length of
+    /// `points`, as otherwise the sender won't be able to uniquely map the `x`
+    /// values. If this is the case, we return `Error::Other`.
     fn send<R, W, RNG>(
         &mut self,
         reader: &mut R,
@@ -109,7 +117,7 @@ impl<OPRF: OprfSender<Seed = Seed, Input = Block, Output = Output> + SemiHonest>
         if t != 1 {
             return Err(Error::InvalidInputLength);
         }
-        assert_eq!(
+        debug_assert_eq!(
             {
                 let mut inputs = points.iter().map(|(x, _)| *x).collect::<Vec<Self::Input>>();
                 inputs.sort();
@@ -141,6 +149,7 @@ impl<OPRF: OprfSender<Seed = Seed, Input = Block, Output = Output> + SemiHonest>
             }
         }
         if map.len() != points.len() {
+            // XXX: return a better error than `Error::Other`.
             return Err(Error::Other(format!(
                 "unable to construct table after {} iterations",
                 N_TABLE_LOOPS
@@ -240,7 +249,9 @@ impl<OPRF: OprfReceiver<Seed = Seed, Input = Block, Output = Output> + SemiHones
 }
 
 fn table_size(npoints: usize) -> usize {
-    (((npoints + 1) as f32).log2().ceil() + 1.0).exp2() as usize
+    // NOTE: KMPRT gives `npoints + 1` here, but we use `+ 2` as otherwise we
+    // can reach states where the table size is too small.
+    (((npoints + 2) as f32).log2().ceil() + 1.0).exp2() as usize
 }
 
 //
