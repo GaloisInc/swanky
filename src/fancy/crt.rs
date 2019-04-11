@@ -1,5 +1,7 @@
 //! Module containing `BundleGadgets`, which are mostly CRT-based gadgets for Fancy.
 
+use std::ops::Index;
+
 use itertools::Itertools;
 
 use super::{to_vec_option, Fancy, HasModulus};
@@ -58,6 +60,19 @@ impl<W: Clone + HasModulus> Bundle<W> {
     /// Extract a wire from the Bundle, removing it and returning it.
     pub fn extract(&mut self, wire_index: usize) -> W {
         self.0.remove(wire_index)
+    }
+
+    /// Access the underlying iterator
+    pub fn iter(&self) -> std::slice::Iter<W> {
+        self.0.iter()
+    }
+}
+
+impl <W: Clone + HasModulus> Index<usize> for Bundle<W> {
+    type Output = W;
+
+    fn index(&self, idx: usize) -> &Self::Output {
+        self.0.index(idx)
     }
 }
 
