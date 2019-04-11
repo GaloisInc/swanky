@@ -25,26 +25,36 @@ use std::marker::PhantomData;
 
 /// The KKRT oblivious PRF seed.
 #[derive(Clone, Copy)]
-pub struct Seed([u8; 64]);
+pub struct Seed([Block; 4]);
 
 impl Seed {
+    /// Make a new `Seed` from `v`.
+    #[inline]
+    pub fn new(v: [u8; 64]) -> Self {
+        unsafe { std::mem::transmute(v) }
+        // unsafe { Self(*(&v as *const u8 as *const [Block; 4])) }
+    }
     /// Generate a zero-valued `Seed`.
     #[inline]
     pub fn zero() -> Self {
-        Self([0u8; 64])
+        Self([
+            Block::default(),
+            Block::default(),
+            Block::default(),
+            Block::default(),
+        ])
     }
     /// Return the first `n` bytes of `Seed`.
     #[inline]
-    pub fn prefix<'a>(&'a self, n: usize) -> &'a [u8] {
+    pub fn prefix(&self, n: usize) -> &[u8] {
         debug_assert!(n <= 64);
-        &(self.0[0..n])
+        unsafe { std::slice::from_raw_parts(self as *const Self as *const u8, n) }
     }
-
     /// Return the first `n` bytes of `Seed` as mutable.
     #[inline]
-    pub fn prefix_mut<'a>(&'a mut self, n: usize) -> &'a mut [u8] {
+    pub fn prefix_mut(&mut self, n: usize) -> &mut [u8] {
         debug_assert!(n <= 64);
-        &mut (self.0[0..n])
+        unsafe { std::slice::from_raw_parts_mut(self as *mut Self as *mut u8, n) }
     }
 }
 
@@ -54,69 +64,94 @@ impl Default for Seed {
     }
 }
 
+impl std::fmt::Debug for Seed {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "{:#?}", self.0)
+    }
+}
+
 impl std::fmt::Display for Seed {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        self.0
-            .iter()
-            .map(|byte| write!(f, "{:02X}", byte))
-            .collect::<std::fmt::Result>()
+        write!(f, "{:#?}", self.0)
     }
 }
 
 impl rand::distributions::Distribution<Seed> for rand::distributions::Standard {
     #[inline]
     fn sample<R: rand::Rng + ?Sized>(&self, rng: &mut R) -> Seed {
-        let v = (0..64).map(|_| rng.gen::<u8>()).collect::<Vec<u8>>();
-        Seed(*array_ref![v, 0, 64])
+        let b1 = rng.gen::<Block>();
+        let b2 = rng.gen::<Block>();
+        let b3 = rng.gen::<Block>();
+        let b4 = rng.gen::<Block>();
+        Seed([b1, b2, b3, b4])
+    }
+}
+
+impl AsRef<[u8]> for Seed {
+    #[inline]
+    fn as_ref(&self) -> &[u8] {
+        self.prefix(64)
     }
 }
 
 /// The KKRT oblivious PRF output.
 #[derive(Clone, Copy)]
-pub struct Output([u8; 64]);
+pub struct Output([Block; 4]);
 
 impl Output {
+    /// Make a new `Output` from `v`.
+    #[inline]
+    pub fn new(v: [u8; 64]) -> Self {
+        unsafe { std::mem::transmute(v) }
+        // unsafe { Self(*(&v as *const u8 as *const [Block; 4])) }
+    }
     /// Read an output from `reader`.
     pub fn read<R: Read>(reader: &mut R) -> Result<Self, Error> {
         let mut data = [0u8; 64];
         reader.read_exact(&mut data)?;
-        Ok(Self(data))
+        Ok(Self::new(data))
     }
     /// Write the output to `writer`.
     pub fn write<W: Write>(&self, writer: &mut W) -> Result<(), Error> {
-        writer.write_all(&self.0)?;
+        for block in self.0.iter() {
+            block.write(writer)?;
+        }
         Ok(())
-    }
-    /// Generate a random `Output`.
-    #[inline]
-    pub fn rand<RNG: CryptoRng + RngCore>(rng: &mut RNG) -> Self {
-        let mut bytes = [0u8; 64];
-        rng.fill_bytes(&mut bytes.as_mut());
-        Self(bytes)
     }
     /// Generate a zero-valued `Output`.
     #[inline]
     pub fn zero() -> Self {
-        Output([0u8; 64])
+        Self([
+            Block::default(),
+            Block::default(),
+            Block::default(),
+            Block::default(),
+        ])
     }
     /// Return the first `n` bytes of `Output`.
     #[inline]
-    pub fn prefix<'a>(&'a self, n: usize) -> &'a [u8] {
+    pub fn prefix(&self, n: usize) -> &[u8] {
         debug_assert!(n <= 64);
-        &(self.0[0..n])
+        unsafe { std::slice::from_raw_parts(self as *const Self as *const u8, n) }
     }
 
     /// Return the first `n` bytes of `Output` as mutable.
     #[inline]
-    pub fn prefix_mut<'a>(&'a mut self, n: usize) -> &'a mut [u8] {
+    pub fn prefix_mut(&mut self, n: usize) -> &mut [u8] {
         debug_assert!(n <= 64);
-        &mut (self.0[0..n])
+        unsafe { std::slice::from_raw_parts_mut(self as *mut Self as *mut u8, n) }
+    }
+}
+
+impl AsMut<[u8]> for Output {
+    fn as_mut(&mut self) -> &mut [u8] {
+        self.prefix_mut(64)
     }
 }
 
 impl AsRef<[u8]> for Output {
     fn as_ref(&self) -> &[u8] {
-        self.0.as_ref()
+        self.prefix(64)
     }
 }
 
@@ -125,20 +160,18 @@ impl std::ops::BitXor for Output {
 
     #[inline]
     fn bitxor(self, rhs: Self) -> Self {
-        let lhs = self
-            .0
-            .iter()
-            .zip(rhs.0.iter())
-            .map(|(a, b)| a ^ b)
-            .collect::<Vec<u8>>();
-        Self(*array_ref![lhs, 0, 64])
+        let b0 = self.0[0] ^ rhs.0[0];
+        let b1 = self.0[1] ^ rhs.0[1];
+        let b2 = self.0[2] ^ rhs.0[2];
+        let b3 = self.0[3] ^ rhs.0[3];
+        Self([b0, b1, b2, b3])
     }
 }
 
 impl std::ops::BitXorAssign for Output {
     fn bitxor_assign(&mut self, rhs: Self) {
         for (a, b) in self.0.iter_mut().zip(rhs.0.iter()) {
-            *a ^= b;
+            *a ^= *b;
         }
     }
 }
@@ -151,27 +184,24 @@ impl Default for Output {
 
 impl std::fmt::Debug for Output {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        self.0
-            .iter()
-            .map(|byte| write!(f, "{:02X}", byte))
-            .collect::<std::fmt::Result>()
+        write!(f, "{:#?}", self.0)
     }
 }
 
 impl std::fmt::Display for Output {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        self.0
-            .iter()
-            .map(|byte| write!(f, "{:02X}", byte))
-            .collect::<std::fmt::Result>()
+        write!(f, "{:#?}", self.0)
     }
 }
 
 impl rand::distributions::Distribution<Output> for rand::distributions::Standard {
     #[inline]
     fn sample<R: rand::Rng + ?Sized>(&self, rng: &mut R) -> Output {
-        let v = (0..64).map(|_| rng.gen::<u8>()).collect::<Vec<u8>>();
-        Output(*array_ref![v, 0, 64])
+        let b1 = rng.gen::<Block>();
+        let b2 = rng.gen::<Block>();
+        let b3 = rng.gen::<Block>();
+        let b4 = rng.gen::<Block>();
+        Output([b1, b2, b3, b4])
     }
 }
 
@@ -179,25 +209,25 @@ impl Eq for Output {}
 
 impl Hash for Output {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        self.0.to_vec().hash(state);
+        self.0.hash(state);
     }
 }
 
 impl Ord for Output {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.0.to_vec().cmp(&other.0.to_vec())
+        self.0.cmp(&other.0)
     }
 }
 
 impl PartialEq for Output {
     fn eq(&self, other: &Output) -> bool {
-        self.0.to_vec() == other.0.to_vec()
+        self.0 == other.0
     }
 }
 
 impl PartialOrd for Output {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        Some(self.0.to_vec().cmp(&other.0.to_vec()))
+        Some(self.0.cmp(&other.0))
     }
 }
 
@@ -272,12 +302,10 @@ impl<OT: OtReceiver<Msg = Block> + SemiHonest> OprfSender for Sender<OT> {
             stream::read_bytes_inplace(reader, &mut t1)?;
             scutils::xor_inplace(&mut q, if *b { &t1 } else { &t0 });
         }
-
         let qs = utils::transpose(&qs, ncols, nrows);
-
         let seeds = qs
             .chunks(ncols / 8)
-            .map(|q| Seed(*array_ref![q, 0, 64]))
+            .map(|q| Seed::new(*array_ref![q, 0, 64]))
             .collect::<Vec<Self::Seed>>();
         Ok(seeds[0..m].to_vec())
     }
@@ -286,7 +314,7 @@ impl<OT: OtReceiver<Msg = Block> + SemiHonest> OprfSender for Sender<OT> {
     fn compute(&self, seed: Self::Seed, input: Self::Input) -> Self::Output {
         let mut output = Output::default();
         self.encode(input, &mut output);
-        scutils::xor_inplace(&mut output.0, &seed.0);
+        scutils::xor_inplace(&mut output.as_mut(), seed.as_ref());
         output
     }
 }
@@ -304,7 +332,7 @@ impl<OT: OtReceiver<Msg = Block> + SemiHonest> Sender<OT> {
         output: &mut <Sender<OT> as ObliviousPrf>::Output,
     ) {
         self.code.encode(input, &mut output.0);
-        scutils::and_inplace(&mut output.0, &self.s_);
+        scutils::and_inplace(&mut output.as_mut(), &self.s_);
     }
 }
 
@@ -339,8 +367,8 @@ impl<OT: OtSender<Msg = Block> + SemiHonest> OprfReceiver for Receiver<OT> {
         let keys = cointoss::receive(reader, writer, &seeds)?;
         let code = PseudorandomCode::new(keys[0], keys[1], keys[2], keys[3]);
         let mut ks = Vec::with_capacity(512);
-        let mut k0 = Block::zero();
-        let mut k1 = Block::zero();
+        let mut k0 = Block::default();
+        let mut k1 = Block::default();
         for _ in 0..512 {
             rng.fill_bytes(&mut k0.as_mut());
             rng.fill_bytes(&mut k1.as_mut());
@@ -373,15 +401,15 @@ impl<OT: OtSender<Msg = Block> + SemiHonest> OprfReceiver for Receiver<OT> {
         rng.fill_bytes(&mut t0s);
         let out = t0s
             .chunks(64)
-            .map(|c| Output(*array_ref![c, 0, 64]))
+            .map(|c| Output::new(*array_ref![c, 0, 64]))
             .collect::<Vec<Output>>();
         let mut t1s = t0s.clone();
-        let mut c = [0u8; ncols / 8];
+        let mut c = Output::zero();
         for (j, r) in inputs.iter().enumerate() {
             let range = j * ncols / 8..(j + 1) * ncols / 8;
             let mut t1 = &mut t1s[range];
-            self.code.encode(*r, &mut c);
-            scutils::xor_inplace(&mut t1, &c);
+            self.code.encode(*r, &mut c.0);
+            scutils::xor_inplace(&mut t1, &c.as_ref());
         }
         let t0s = utils::transpose(&t0s, nrows, ncols);
         let t1s = utils::transpose(&t1s, nrows, ncols);
@@ -414,6 +442,17 @@ mod tests {
     use std::io::{BufReader, BufWriter};
     use std::os::unix::net::UnixStream;
     use std::sync::{Arc, Mutex};
+
+    #[test]
+    fn test_seed() {
+        let mut rng = AesRng::new();
+        let mut input = [0u8; 64];
+        rng.fill_bytes(&mut input);
+        let seed = Seed::new(input);
+        println!("seed = {}", seed);
+        println!("input = {:?}", input.as_ref());
+        assert_eq!(seed.as_ref(), input.as_ref());
+    }
 
     fn rand_block_vec(size: usize) -> Vec<Block> {
         (0..size).map(|_| rand::random::<Block>()).collect()

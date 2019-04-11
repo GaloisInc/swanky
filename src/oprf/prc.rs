@@ -28,15 +28,11 @@ impl PseudorandomCode {
     }
 
     #[inline]
-    pub fn encode(&self, m: Block, out: &mut [u8; 64]) {
-        let c: [u8; 16] = self.cipher1.encrypt(m).into();
-        out[0..16].copy_from_slice(&c);
-        let c: [u8; 16] = self.cipher2.encrypt(m).into();
-        out[16..32].copy_from_slice(&c);
-        let c: [u8; 16] = self.cipher3.encrypt(m).into();
-        out[32..48].copy_from_slice(&c);
-        let c: [u8; 16] = self.cipher4.encrypt(m).into();
-        out[48..64].copy_from_slice(&c);
+    pub fn encode(&self, m: Block, out: &mut [Block; 4]) {
+        out[0] = self.cipher1.encrypt(m);
+        out[1] = self.cipher2.encrypt(m);
+        out[2] = self.cipher3.encrypt(m);
+        out[3] = self.cipher4.encrypt(m);
     }
 }
 
@@ -63,7 +59,7 @@ mod benchmarks {
         let k4 = rand::random::<Block>();
         let prc = PseudorandomCode::new(k1, k2, k3, k4);
         let m = rand::random::<Block>();
-        let mut out = [0u8; 64];
+        let mut out = [Block::default(); 4];
         b.iter(|| prc.encode(m, &mut out));
     }
 }
