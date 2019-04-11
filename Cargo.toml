@@ -44,6 +44,12 @@ debug = true
 debug-assertions = true
 overflow-checks = true
 
+[profile.test]
+opt-level = 0
+debug = true
+debug-assertions = true
+overflow-checks = true
+
 [profile.bench]
 opt-level = 3
 debug = false
