@@ -15,7 +15,7 @@ use crate::oprf::{
     ProgrammableSender as OpprfSender, Receiver as OprfReceiver, Sender as OprfSender,
 };
 use arrayref::array_ref;
-use rand::{CryptoRng, RngCore};
+use rand::{CryptoRng, Rng, RngCore};
 use scuttlebutt::{cointoss, Block, SemiHonest};
 use sha2::{Digest, Sha256};
 use std::collections::HashSet;
@@ -53,11 +53,9 @@ pub struct Hint(Block, Vec<Output>);
 impl Hint {
     /// Generate a random hint with table size `n`.
     #[inline]
-    pub fn rand<RNG: CryptoRng + RngCore>(mut rng: &mut RNG, n: usize) -> Self {
-        let block = Block::rand(&mut rng);
-        let table = (0..n)
-            .map(|_| Output::rand(&mut rng))
-            .collect::<Vec<Output>>();
+    pub fn rand<RNG: CryptoRng + RngCore>(rng: &mut RNG, n: usize) -> Self {
+        let block = rng.gen::<Block>();
+        let table = (0..n).map(|_| rng.gen::<Output>()).collect::<Vec<Output>>();
         Hint(block, table)
     }
 }
@@ -115,7 +113,7 @@ impl<OPRF: OprfSender<Seed = Seed, Input = Block, Output = Output> + SemiHonest>
         let mut table = (0..m).map(|_| Output::default()).collect::<Vec<Output>>();
         let seeds = self.oprf.send(reader, writer, 1, rng)?;
         let seed = seeds[0];
-        let mut v = Block::rand(rng);
+        let mut v = rng.gen::<Block>();
         let mut map = HashSet::with_capacity(points.len());
         // Sample `v` until all values in `map` are distinct.
         for _ in 0..N_TABLE_LOOPS {
@@ -129,7 +127,7 @@ impl<OPRF: OprfSender<Seed = Seed, Input = Block, Output = Output> + SemiHonest>
             if map.len() == points.len() {
                 break;
             } else {
-                v = Block::rand(rng);
+                v = rng.gen::<Block>();
                 map.clear();
             }
         }
@@ -148,7 +146,7 @@ impl<OPRF: OprfSender<Seed = Seed, Input = Block, Output = Output> + SemiHonest>
         // Fill rest of table with random elements.
         for entry in table.iter_mut() {
             if *entry == Output::default() {
-                *entry = Output::rand(rng);
+                *entry = rng.gen::<Output>();
             }
         }
         // Write `v` and `table` to the receiver.
@@ -337,7 +335,7 @@ impl<T: OprfSender<Seed = Seed, Input = Block, Output = Output> + SemiHonest> Op
         let params = Parameters::new(ninputs)?;
         // Generate random values to be used for the hash functions.
         let seeds = (0..params.h1 + params.h2)
-            .map(|_| Block::rand(rng))
+            .map(|_| rng.gen::<Block>())
             .collect::<Vec<Block>>();
         let hashkeys = cointoss::send(reader, writer, &seeds)?;
 
@@ -447,7 +445,7 @@ impl<T: OprfReceiver<Seed = Seed, Input = Block, Output = Output> + SemiHonest> 
         let params = Parameters::new(inputs.len())?;
         // Generate random values to be used for the hash functions.
         let seeds = (0..params.h1 + params.h2)
-            .map(|_| Block::rand(rng))
+            .map(|_| rng.gen::<Block>())
             .collect::<Vec<Block>>();
         let hashkeys = cointoss::receive(reader, writer, &seeds)?;
         // Build a cuckoo hash table using `hashkeys`.
@@ -476,7 +474,7 @@ impl<T: OprfReceiver<Seed = Seed, Input = Block, Output = Output> + SemiHonest> 
                 assert_eq!(outputs[idx], Output::default());
                 outputs[idx] = out[0];
             } else {
-                let item = Block::rand(rng);
+                let item = rng.gen::<Block>();
                 let _ = self.opprf.receive(reader, writer, beta, &[item], rng)?;
             }
         }
@@ -529,7 +527,7 @@ mod tests {
         let results_ = results.clone();
         let mut rng = AesRng::new();
         let points = (0..npoints)
-            .map(|_| (Block::rand(&mut rng), Output::rand(&mut rng)))
+            .map(|_| (rng.gen::<Block>(), rng.gen::<Output>()))
             .collect::<Vec<(Block, Output)>>();
         // let points_ = points.clone();
         let (sender, receiver) = UnixStream::pair().unwrap();
