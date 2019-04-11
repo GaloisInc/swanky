@@ -30,7 +30,7 @@ impl From<cuckoo::Error> for Error {
 }
 
 // Number of times to iterate when creating the sender's hash table.
-const N_TABLE_LOOPS: usize = 100;
+const N_TABLE_LOOPS: usize = 1000;
 
 // Hash `x`, using `key` as the hash "key", and output the result in the range
 // `[0..range]`.
