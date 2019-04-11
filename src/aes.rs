@@ -12,7 +12,3 @@
 
 pub mod aes128;
 pub mod aes256;
-
-#[allow(deprecated)]
-pub use aes128::{Aes128, AES, FIXED_KEY_AES128};
-pub use aes256::Aes256;

@@ -6,8 +6,7 @@
 
 //! Fixed-key AES random number generator.
 
-use crate::aes::Aes128;
-use crate::Block;
+use crate::{Aes128, Block};
 #[cfg(feature = "nightly")]
 use core::arch::x86_64::*;
 use core::fmt;

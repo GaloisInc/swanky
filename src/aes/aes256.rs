@@ -92,7 +92,7 @@ macro_rules! expand_round_last {
 }
 
 #[inline(always)]
-pub(super) fn expand(key: &[u8; 32]) -> [__m128i; 15] {
+fn expand(key: &[u8; 32]) -> [__m128i; 15] {
     unsafe {
         let mut enc_keys: [__m128i; 15] = mem::uninitialized();
 

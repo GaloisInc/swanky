@@ -7,7 +7,7 @@
 //! Defines a block as a 128-bit value, and implements block-related functions.
 
 #[cfg(feature = "curve25519-dalek")]
-use crate::aes::Aes256;
+use crate::Aes256;
 #[cfg(any(feature = "curve25519-dalek", feature = "serde"))]
 use arrayref::array_ref;
 use core::arch::x86_64::*;
@@ -78,7 +78,7 @@ impl Block {
     /// Computes the hash by computing `E_{pt}(tweak)`, where `E` is AES-128.
     #[cfg(all(feature = "curve25519-dalek", feature = "nightly"))]
     #[inline]
-    pub fn hash_pt(tweak: u64, pt: &RistrettoPoint) -> Self {
+    pub fn hash_pt(tweak: usize, pt: &RistrettoPoint) -> Self {
         let k = pt.compress();
         let c = Aes256::new(k.as_bytes());
         let m = unsafe { _mm_set_epi64(_mm_setzero_si64(), *(&tweak as *const _ as *const __m64)) };
@@ -86,16 +86,15 @@ impl Block {
         c.encrypt(m.into())
     }
 
-    /// Hash an elliptic curve point `pt` and tweak `i`.
+    /// Hash an elliptic curve point `pt` and tweak `tweak`.
     ///
-    /// Computes the hash by computing `E_{pt}(i)`, where `E` is AES-128 and `i`
-    /// is an index.
+    /// Computes the hash by computing `E_{pt}(tweak)`, where `E` is AES-128.
     #[cfg(all(feature = "curve25519-dalek", not(feature = "nightly")))]
     #[inline]
-    pub fn hash_pt(i: u64, pt: &RistrettoPoint) -> Self {
+    pub fn hash_pt(tweak: usize, pt: &RistrettoPoint) -> Self {
         let k = pt.compress();
         let c = Aes256::new(k.as_bytes());
-        let m = i as u128;
+        let m = tweak as u128;
         c.encrypt(Block::from(m))
     }
 

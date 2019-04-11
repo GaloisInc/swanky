@@ -7,8 +7,7 @@
 //! Implementations of correlation-robust hash functions (and their variants)
 //! based on fixed-key AES.
 
-use crate::aes::{Aes128, FIXED_KEY_AES128};
-use crate::Block;
+use crate::{Aes128, Block, FIXED_KEY_AES128};
 use core::arch::x86_64::*;
 
 /// AES-based correlation-robust hash function.
