@@ -4,8 +4,9 @@
 // Copyright © 2019 Galois, Inc.
 // See LICENSE for licensing information.
 
-pub mod psty;
 pub mod psz;
+#[cfg(feature = "nightly")]
+pub mod psty;
 
 use crate::errors::Error;
 use rand::{CryptoRng, RngCore};

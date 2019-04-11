@@ -11,7 +11,6 @@ use crate::cuckoo::CuckooHash;
 use crate::stream;
 use crate::utils;
 use crate::Error;
-use crate::{Receiver as PsiReceiver, Sender as PsiSender};
 // use ocelot::oprf::kkrt::Output;
 // use ocelot::oprf::{self, Receiver as OprfReceiver, Sender as OprfSender};
 // use rand::seq::SliceRandom;
@@ -22,30 +21,39 @@ use scuttlebutt::{Block, SemiHonest};
 // use std::collections::HashSet;
 use std::io::{Read, Write};
 
+use ocelot::oprf::kmprt;
+use ocelot::oprf::{ProgrammableSender, ProgrammableReceiver};
+
 const NHASHES: usize = 3;
 
+pub type Msg = Vec<u8>;
+
 /// Private set intersection sender.
-pub struct Sender {}
+pub struct Sender {
+    opprf: kmprt::KmprtSender,
+}
 
 /// Private set intersection receiver.
-pub struct Receiver {}
+pub struct Receiver {
+    opprf: kmprt::KmprtReceiver,
+}
 
-impl PsiSender for Sender {
-    type Msg = Vec<u8>;
-
-    fn init<R: Read + Send, W: Write + Send, RNG: CryptoRng + RngCore>(
+impl Sender {
+    pub fn init<R: Read + Send, W: Write + Send, RNG: CryptoRng + RngCore>(
         reader: &mut R,
         writer: &mut W,
         rng: &mut RNG,
     ) -> Result<Self, Error> {
-        Ok(Sender {})
+        Ok(Sender {
+            opprf: kmprt::KmprtSender::init(reader, writer, rng)?,
+        })
     }
 
-    fn send<R: Read + Send, W: Write + Send, RNG: CryptoRng + RngCore>(
+    pub fn send<R: Read + Send, W: Write + Send, RNG: CryptoRng + RngCore>(
         &mut self,
         reader: &mut R,
         writer: &mut W,
-        inputs: &[Self::Msg],
+        inputs: &[Msg],
         mut rng: &mut RNG,
     ) -> Result<(), Error> {
         let n = inputs.len();
@@ -57,13 +65,14 @@ impl PsiSender for Sender {
         let nbins = cuckoo.nbins;
         assert_eq!(cuckoo.stashsize, 0);
 
+        println!("n={} nbins={}", n, nbins);
+
         // Send cuckoo hash info to receiver.
         key.write(writer)?;
         stream::write_usize(writer, nbins)?;
         writer.flush()?;
 
-        // Set up inputs to use `x || i` or `x` depending on whether the input
-        // is in a bin or the stash.
+        // Fill in table with default values
         let table = cuckoo
             .items()
             .map(|opt_item| {
@@ -77,10 +86,8 @@ impl PsiSender for Sender {
     }
 }
 
-impl PsiReceiver for Receiver {
-    type Msg = Vec<u8>;
-
-    fn init<R: Read + Send, W: Write + Send, RNG: CryptoRng + RngCore>(
+impl Receiver {
+    pub fn init<R: Read + Send, W: Write + Send, RNG: CryptoRng + RngCore>(
         reader: &mut R,
         writer: &mut W,
         rng: &mut RNG,
@@ -88,13 +95,13 @@ impl PsiReceiver for Receiver {
         Ok(Receiver {})
     }
 
-    fn receive<R, W, RNG>(
+    pub fn receive<R, W, RNG>(
         &mut self,
         reader: &mut R,
         writer: &mut W,
-        inputs: &[Self::Msg],
+        inputs: &[Msg],
         rng: &mut RNG,
-    ) -> Result<Vec<Self::Msg>, Error>
+    ) -> Result<Vec<Msg>, Error>
     where
         R: Read + Send,
         W: Write + Send,
@@ -116,12 +123,11 @@ impl PsiReceiver for Receiver {
             }
         }
 
+        // println!("{:?}", table);
+
         unimplemented!()
     }
 }
-
-impl SemiHonest for Sender {}
-impl SemiHonest for Receiver {}
 
 #[cfg(test)]
 mod tests {
@@ -132,8 +138,8 @@ mod tests {
     use std::os::unix::net::UnixStream;
     use std::time::SystemTime;
 
-    const SIZE: usize = 16;
-    const NTIMES: usize = 1 << 10;
+    const SIZE: usize = 8;
+    const NTIMES: usize = 1 << 2;
 
     #[test]
     fn test_psi() {
