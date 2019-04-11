@@ -55,13 +55,14 @@ impl OtSender for Sender {
         inputs: &[(Block, Block)],
         _: &mut RNG,
     ) -> Result<(), Error> {
-        let mut ks = Vec::with_capacity(inputs.len());
-        for i in 0..inputs.len() {
-            let r = stream::read_pt(reader)?;
-            let k0 = Block::hash_pt(i, &(self.y * r));
-            let k1 = Block::hash_pt(i, &(self.y * (r - self.s)));
-            ks.push((k0, k1));
-        }
+        let ks = (0..inputs.len())
+            .map(|i| {
+                let r = stream::read_pt(reader)?;
+                let k0 = Block::hash_pt(i, &(self.y * r));
+                let k1 = Block::hash_pt(i, &(self.y * (r - self.s)));
+                Ok((k0, k1))
+            })
+            .collect::<Result<Vec<(Block, Block)>, Error>>()?;
         for (input, k) in inputs.iter().zip(ks.into_iter()) {
             let c0 = k.0 ^ input.0;
             let c1 = k.1 ^ input.1;
@@ -104,14 +105,19 @@ impl OtReceiver for Receiver {
         inputs: &[bool],
         mut rng: &mut RNG,
     ) -> Result<Vec<Block>, Error> {
-        let mut ks = Vec::with_capacity(inputs.len());
-        for (i, b) in inputs.iter().enumerate() {
-            let x = Scalar::random(&mut rng);
-            let c = if *b { Scalar::one() } else { Scalar::zero() };
-            let r = &c * &self.s + &x * &RISTRETTO_BASEPOINT_TABLE;
-            stream::write_pt(writer, &r)?;
-            ks.push(Block::hash_pt(i, &(&x * &self.s)));
-        }
+        let zero = &Scalar::zero() * &self.s;
+        let one = &Scalar::one() * &self.s;
+        let ks = inputs
+            .iter()
+            .enumerate()
+            .map(|(i, b)| {
+                let x = Scalar::random(&mut rng);
+                let c = if *b { one } else { zero };
+                let r = c + &x * &RISTRETTO_BASEPOINT_TABLE;
+                stream::write_pt(writer, &r)?;
+                Ok(Block::hash_pt(i, &(&x * &self.s)))
+            })
+            .collect::<Result<Vec<Block>, Error>>()?;
         writer.flush()?;
         inputs
             .iter()
@@ -119,8 +125,7 @@ impl OtReceiver for Receiver {
             .map(|(b, k)| {
                 let c0 = Block::read(reader)?;
                 let c1 = Block::read(reader)?;
-                let c = if *b { c1 } else { c0 };
-                let c = k ^ c;
+                let c = k ^ if *b { c1 } else { c0 };
                 Ok(c)
             })
             .collect()
