@@ -16,7 +16,6 @@ publish = false
 nightly = ["curve25519-dalek/simd_backend", "rand/nightly"]
 
 [dependencies]
-arrayref = "0.3"
 curve25519-dalek = { version = "1.1", features = ["std"], optional = true }
 rand = "0.6"
 rand_core = "0.4"

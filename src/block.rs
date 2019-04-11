@@ -8,11 +8,11 @@
 
 #[cfg(feature = "curve25519-dalek")]
 use crate::Aes256;
-#[cfg(any(feature = "curve25519-dalek", feature = "serde"))]
-use arrayref::array_ref;
 use core::arch::x86_64::*;
 #[cfg(feature = "curve25519-dalek")]
 use curve25519_dalek::ristretto::RistrettoPoint;
+#[cfg(feature = "serde")]
+use std::convert::TryInto;
 use std::hash::{Hash, Hasher};
 use std::io::{Read, Write};
 
@@ -292,7 +292,11 @@ impl<'de> Deserialize<'de> for Block {
 
             fn visit_bytes<E: serde::de::Error>(self, v: &[u8]) -> Result<Block, E> {
                 if v.len() == 16 {
-                    Ok(Block::from(*array_ref![v, 0, 16]))
+                    let bytes: [u8; 16] = match v.try_into() {
+                        Ok(bytes) => bytes,
+                        Err(_) => return Err(serde::de::Error::invalid_length(v.len(), &self)),
+                    };
+                    Ok(Block::from(bytes))
                 } else {
                     Err(serde::de::Error::invalid_length(v.len(), &self))
                 }
