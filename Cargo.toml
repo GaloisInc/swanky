@@ -44,5 +44,5 @@ debug-assertions = false
 overflow-checks = false
 
 [[bench]]
-name = "psi"
+name = "psz"
 harness = false

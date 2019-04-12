@@ -219,6 +219,5 @@ mod tests {
         );
 
         handle.join().unwrap();
-        assert_eq!(intersection.len(), SET_SIZE);
     }
 }
