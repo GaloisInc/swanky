@@ -65,8 +65,6 @@ impl P1 {
         let nbins = cuckoo.nbins;
         assert_eq!(cuckoo.stashsize, 0);
 
-        println!("n={} nbins={}", n, nbins);
-
         // Send cuckoo hash info to receiver.
         key.write(writer)?;
         stream::write_usize(writer, nbins)?;

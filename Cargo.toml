@@ -46,3 +46,7 @@ overflow-checks = false
 [[bench]]
 name = "psz"
 harness = false
+
+[[bench]]
+name = "psty"
+harness = false

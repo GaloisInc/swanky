@@ -4,11 +4,10 @@
 // Copyright © 2019 Galois, Inc.
 // See LICENSE for licensing information.
 
-//! Private set intersection (PSZ) benchmarks using `criterion`.
+//! Private set intersection (PSTY) benchmarks using `criterion`.
 
 use criterion::{criterion_group, criterion_main, Criterion};
-use popsicle::psz::{PszReceiver, PszSender};
-use popsicle::{Receiver, Sender};
+use popsicle::psty::{P1, P2};
 use scuttlebutt::AesRng;
 use std::io::{BufReader, BufWriter};
 use std::os::unix::net::UnixStream;
@@ -24,77 +23,81 @@ fn rand_vec_vec(size: usize) -> Vec<Vec<u8>> {
     (0..size).map(|_| rand_vec(SIZE)).collect()
 }
 
-fn _bench_psz_init() {
+fn bench_psty_init() {
     let (sender, receiver) = UnixStream::pair().unwrap();
+
     let handle = std::thread::spawn(move || {
         let mut rng = AesRng::new();
         let mut reader = BufReader::new(sender.try_clone().unwrap());
         let mut writer = BufWriter::new(sender);
-        let _ = PszSender::init(&mut reader, &mut writer, &mut rng).unwrap();
+        let _ = P1::init(&mut reader, &mut writer, &mut rng).unwrap();
     });
+
     let mut rng = AesRng::new();
     let mut reader = BufReader::new(receiver.try_clone().unwrap());
     let mut writer = BufWriter::new(receiver);
-    let _ = PszReceiver::init(&mut reader, &mut writer, &mut rng).unwrap();
+    let _ = P2::init(&mut reader, &mut writer, &mut rng).unwrap();
+
     handle.join().unwrap();
 }
 
-fn _bench_psz(inputs1: Vec<Vec<u8>>, inputs2: Vec<Vec<u8>>) -> Vec<Vec<u8>> {
+fn bench_psty(inputs1: Vec<Vec<u8>>, inputs2: Vec<Vec<u8>>) -> (Vec<ocelot::oprf::kkrt::Output>, Vec<ocelot::oprf::kkrt::Output>) {
     let (sender, receiver) = UnixStream::pair().unwrap();
+
     let handle = std::thread::spawn(move || {
         let mut rng = AesRng::new();
         let mut reader = BufReader::new(sender.try_clone().unwrap());
         let mut writer = BufWriter::new(sender);
-        let mut psi = PszSender::init(&mut reader, &mut writer, &mut rng).unwrap();
-        psi.send(&mut reader, &mut writer, &inputs1, &mut rng)
-            .unwrap();
+        let mut p1 = P1::init(&mut reader, &mut writer, &mut rng).unwrap();
+        p1.send(&mut reader, &mut writer, &inputs1, &mut rng).unwrap()
     });
+
     let mut rng = AesRng::new();
     let mut reader = BufReader::new(receiver.try_clone().unwrap());
     let mut writer = BufWriter::new(receiver);
-    let mut psi = PszReceiver::init(&mut reader, &mut writer, &mut rng).unwrap();
-    let intersection = psi
-        .receive(&mut reader, &mut writer, &inputs2, &mut rng)
-        .unwrap();
-    handle.join().unwrap();
-    intersection
+    let mut p2 = P2::init(&mut reader, &mut writer, &mut rng).unwrap();
+    let p2_out = p2.send(&mut reader, &mut writer, &inputs2, &mut rng).unwrap();
+
+    let p1_out = handle.join().unwrap();
+
+    (p1_out, p2_out)
 }
 
 fn bench_psi(c: &mut Criterion) {
-    c.bench_function("psi::PSZ (initialization)", move |bench| {
+    c.bench_function("psi::PSTY (initialization)", move |bench| {
         bench.iter(|| {
-            let result = _bench_psz_init();
+            let result = bench_psty_init();
             criterion::black_box(result)
         })
     });
-    c.bench_function("psi::PSZ (n = 2^8)", move |bench| {
+    c.bench_function("psi::PSTY (n = 2^8)", move |bench| {
         let rs = rand_vec_vec(1 << 8);
         bench.iter(|| {
-            let v = _bench_psz(rs.clone(), rs.clone());
+            let v = bench_psty(rs.clone(), rs.clone());
             criterion::black_box(v)
         })
     });
-    c.bench_function("psi::PSZ (n = 2^12)", move |bench| {
+    c.bench_function("psi::PSTY (n = 2^12)", move |bench| {
         let rs = rand_vec_vec(1 << 12);
         bench.iter(|| {
-            let v = _bench_psz(rs.clone(), rs.clone());
+            let v = bench_psty(rs.clone(), rs.clone());
             criterion::black_box(v)
         })
     });
-    c.bench_function("psi::PSZ (n = 2^16)", move |bench| {
-        let rs = rand_vec_vec(1 << 16);
-        bench.iter(|| {
-            let v = _bench_psz(rs.clone(), rs.clone());
-            criterion::black_box(v)
-        })
-    });
-    c.bench_function("psi::PSZ (n = 2^20)", move |bench| {
-        let rs = rand_vec_vec(1 << 20);
-        bench.iter(|| {
-            let v = _bench_psz(rs.clone(), rs.clone());
-            criterion::black_box(v)
-        })
-    });
+    // c.bench_function("psi::PSTY (n = 2^16)", move |bench| {
+    //     let rs = rand_vec_vec(1 << 16);
+    //     bench.iter(|| {
+    //         let v = bench_psty(rs.clone(), rs.clone());
+    //         criterion::black_box(v)
+    //     })
+    // });
+    // c.bench_function("psi::PSTY (n = 2^20)", move |bench| {
+    //     let rs = rand_vec_vec(1 << 20);
+    //     bench.iter(|| {
+    //         let v = bench_psty(rs.clone(), rs.clone());
+    //         criterion::black_box(v)
+    //     })
+    // });
 }
 
 criterion_group! {
