@@ -1,4 +1,4 @@
-# The `scuttlebutt` multi-party computation utilities toolkit
+# The `scuttlebutt` multi-party computation utilities toolkit [![](https://travis-ci.org/amaloz/scuttlebutt.svg?branch=master)](https://travis-ci.org/amaloz/scuttlebutt)
 Or: "Where rust MPC libraries come to drink"
 
 The `scuttlebutt` library provides a bunch of core primitives for building
