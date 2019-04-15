@@ -193,7 +193,7 @@ criterion_group! {
 #[cfg(feature = "unstable")]
 criterion_group! {
     name = oprf;
-    config = Criterion::default().warm_up_time(Duration::from_millis(100));
+    config = Criterion::default().warm_up_time(Duration::from_millis(100)).sample_size(50);
     targets = bench_opprf, bench_opprf_compute, bench_oprf, bench_oprf_compute
 }
 

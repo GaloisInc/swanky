@@ -96,7 +96,7 @@ impl AsRef<[u8]> for Seed {
 
 /// The KKRT oblivious PRF output.
 #[derive(Clone, Copy)]
-pub struct Output([Block; 4]);
+pub struct Output(pub(crate) [Block; 4]);
 
 impl Output {
     /// Make a new `Output` from `v`.

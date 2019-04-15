@@ -14,10 +14,8 @@ use crate::oprf::{
     ObliviousPprf, ObliviousPrf, ProgrammableReceiver as OpprfReceiver,
     ProgrammableSender as OpprfSender, Receiver as OprfReceiver, Sender as OprfSender,
 };
-use arrayref::array_ref;
 use rand::{CryptoRng, Rng, RngCore};
-use scuttlebutt::{cointoss, Block, SemiHonest};
-use sha2::{Digest, Sha256};
+use scuttlebutt::{cointoss, Aes128, Block, SemiHonest};
 use std::collections::HashSet;
 use std::io::{Read, Write};
 
@@ -32,18 +30,28 @@ impl From<cuckoo::Error> for Error {
 // Number of times to iterate when creating the sender's hash table.
 const N_TABLE_LOOPS: usize = 1000;
 
-// Hash `x`, using `key` as the hash "key", and output the result in the range
+// Hash `x`, using `k` as the hash "key", and output the result in the range
 // `[0..range]`.
-fn hash<T>(x: T, key: Block, range: usize) -> usize
-where
-    T: AsRef<[u8]>,
-{
-    let mut hasher = Sha256::new();
-    hasher.input(x);
-    hasher.input(key);
-    let h = hasher.result();
-    let h = *array_ref![h, 0, 16];
-    (u128::from_ne_bytes(h) % (range as u128)) as usize
+#[inline]
+fn hash_output(x: Output, k: Block, range: usize) -> usize {
+    let aes = Aes128::new(k);
+    hash_output_keyed(x, &aes, range)
+}
+
+// XXX: IS THIS SECURE?!
+#[inline]
+fn hash_output_keyed(x: Output, aes: &Aes128, range: usize) -> usize {
+    let h = aes.encrypt(x.0[0]) ^ x.0[0];
+    let h = aes.encrypt(h) ^ x.0[1];
+    let h = aes.encrypt(h) ^ x.0[2];
+    let h = aes.encrypt(h) ^ x.0[3];
+    (u128::from(h) % (range as u128)) as usize
+    // let mut hasher = Sha256::new();
+    // hasher.input(x);
+    // hasher.input(k);
+    // let h = hasher.result();
+    // let h = *array_ref![h, 0, 16];
+    // (u128::from_ne_bytes(h) % (range as u128)) as usize
 }
 
 /// The oblivious programmable PRF hint.
@@ -131,12 +139,13 @@ impl<OPRF: OprfSender<Seed = Seed, Input = Block, Output = Output> + SemiHonest>
         let seeds = self.oprf.send(reader, writer, 1, rng)?;
         let seed = seeds[0];
         let mut v = rng.gen::<Block>();
+        let mut aes = Aes128::new(v);
         let mut map = HashSet::with_capacity(points.len());
         // Sample `v` until all values in `map` are distinct.
         for _ in 0..N_TABLE_LOOPS {
             for (x, _) in points.iter() {
                 let y = self.oprf.compute(seed, *x);
-                let h = hash(y, v, m);
+                let h = hash_output_keyed(y, &aes, m);
                 if !map.insert(h) {
                     break;
                 }
@@ -145,6 +154,7 @@ impl<OPRF: OprfSender<Seed = Seed, Input = Block, Output = Output> + SemiHonest>
                 break;
             } else {
                 v = rng.gen::<Block>();
+                aes = Aes128::new(v);
                 map.clear();
             }
         }
@@ -158,7 +168,7 @@ impl<OPRF: OprfSender<Seed = Seed, Input = Block, Output = Output> + SemiHonest>
         // Place points in table based on the hash of their OPRF output.
         for (x, y) in points.iter() {
             let y_ = self.oprf.compute(seed, *x);
-            let h = hash(y_, v, m);
+            let h = hash_output_keyed(y_, &aes, m);
             table[h] = *y ^ y_;
         }
         // Fill rest of table with random elements.
@@ -182,7 +192,7 @@ impl<OPRF: OprfSender<Seed = Seed, Input = Block, Output = Output> + SemiHonest>
     fn compute(&self, seed: &Self::Seed, hint: &Self::Hint, input: &Self::Input) -> Self::Output {
         let (v, table) = (&hint.0, &hint.1);
         let y = self.oprf.compute(*seed, *input);
-        let h = hash(y, *v, table.len());
+        let h = hash_output(y, *v, table.len());
         y ^ table[h]
     }
 }
@@ -238,7 +248,7 @@ impl<OPRF: OprfReceiver<Seed = Seed, Input = Block, Output = Output> + SemiHones
         let m = table_size(npoints);
         let mut outputs = self.oprf.receive(reader, writer, inputs, rng)?;
         let v = Block::read(reader)?;
-        let h = hash(outputs[0], v, m);
+        let h = hash_output(outputs[0], v, m);
         let zero = Output::zero();
         for i in 0..m {
             let entry = Output::read(reader)?;
@@ -300,6 +310,21 @@ impl Parameters {
             h2,
         })
     }
+}
+
+// Hash `x` and `k`, producing a result in range `[0..range-1]`. We use the
+// Davies-Meyer single-block-length compression function under-the-hood.
+#[inline]
+fn hash_input(x: Block, k: Block, range: usize) -> usize {
+    let aes = Aes128::new(x);
+    hash_input_keyed(&aes, k, range)
+}
+
+// Same as `hash_input`, but with a pre-keyed AES.
+#[inline]
+fn hash_input_keyed(aes: &Aes128, k: Block, range: usize) -> usize {
+    let h = aes.encrypt(k) ^ k;
+    (u128::from(h) % (range as u128)) as usize
 }
 
 /// KMPRT hashing-based OPPRF sender.
@@ -368,14 +393,15 @@ impl<T: OprfSender<Seed = Seed, Input = Block, Output = Output> + SemiHonest> Op
         }
         // Place each point in the hash table, once for each hash function.
         for (x, y) in points.iter() {
+            let aes = Aes128::new(*x);
             for key in hashkeys[0..params.h1].iter() {
-                let h = hash(*x, *key, params.m1);
+                let h = hash_input_keyed(&aes, *key, params.m1);
                 if bins[h].iter().find(|&&entry| entry == (*x, *y)).is_none() {
                     bins[h].push((*x, *y));
                 }
             }
             for key in hashkeys[params.h1..params.h1 + params.h2].iter() {
-                let h = hash(*x, *key, params.m2);
+                let h = hash_input_keyed(&aes, *key, params.m2);
                 if bins[params.m1 + h]
                     .iter()
                     .find(|&&entry| entry == (*x, *y))
@@ -552,7 +578,6 @@ mod tests {
         let points = (0..npoints)
             .map(|_| (rng.gen::<Block>(), rng.gen::<Output>()))
             .collect::<Vec<(Block, Output)>>();
-        // let points_ = points.clone();
         let (sender, receiver) = UnixStream::pair().unwrap();
         let handle = std::thread::spawn(move || {
             let mut rng = AesRng::new();
@@ -580,7 +605,6 @@ mod tests {
         let mut reader = BufReader::new(receiver.try_clone().unwrap());
         let mut writer = BufWriter::new(receiver);
         let mut oprf = R::init(&mut reader, &mut writer, &mut rng).unwrap();
-        // let inputs = points_.iter().map(|(x, _)| *x).collect::<Vec<Block>>();
         let outputs = oprf
             .receive(&mut reader, &mut writer, npoints, &inputs, &mut rng)
             .unwrap();
@@ -594,7 +618,6 @@ mod tests {
     #[test]
     fn test_opprf() {
         _test_opprf::<KmprtSingleSender, KmprtSingleReceiver>(1, 8);
-        // _test_opprf::<KmprtSender, KmprtReceiver>(8, 8);
     }
 
 }
@@ -610,11 +633,36 @@ mod benchmarks {
     use test::{black_box, Bencher};
 
     #[bench]
-    fn bench_hash(b: &mut Bencher) {
-        let x = black_box(rand::random::<Block>());
-        let v = black_box(rand::random::<Block>());
+    fn bench_hash_output(b: &mut Bencher) {
+        let x = black_box(rand::random::<Output>());
+        let k = black_box(rand::random::<Block>());
         let range = 15;
-        b.iter(|| super::hash(x, v, range));
+        b.iter(|| super::hash_output(x, k, range));
     }
 
+    #[bench]
+    fn bench_hash_output_keyed(b: &mut Bencher) {
+        let x = black_box(rand::random::<Output>());
+        let k = black_box(rand::random::<Block>());
+        let aes = Aes128::new(k);
+        let range = 15;
+        b.iter(|| super::hash_output_keyed(x, &aes, range));
+    }
+
+    #[bench]
+    fn bench_hash_input(b: &mut Bencher) {
+        let x = black_box(rand::random::<Block>());
+        let k = black_box(rand::random::<Block>());
+        let range = 15;
+        b.iter(|| super::hash_input(x, k, range));
+    }
+
+    #[bench]
+    fn bench_hash_input_keyed(b: &mut Bencher) {
+        let x = black_box(rand::random::<Block>());
+        let k = black_box(rand::random::<Block>());
+        let aes = Aes128::new(x);
+        let range = 15;
+        b.iter(|| super::hash_input_keyed(&aes, k, range));
+    }
 }
