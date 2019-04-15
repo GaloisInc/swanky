@@ -3,26 +3,28 @@ use crate::fancy::{Fancy, HasModulus};
 use crate::util::{output_tweak, tweak, tweak2};
 use crate::wire::Wire;
 use scuttlebutt::Block;
+use std::cell::RefCell;
+use std::fmt::Debug;
 use std::io::Read;
-use std::sync::{Arc, Mutex};
+use std::rc::Rc;
 
 /// Streaming evaluator using a callback to receive ciphertexts as needed.
 ///
 /// Evaluates a garbled circuit on the fly, using messages containing ciphertexts and
 /// wires. Parallelizable.
-pub struct Evaluator<R: Read> {
-    reader: Arc<Mutex<R>>,
+pub struct Evaluator<R: Read + Debug> {
+    reader: Rc<RefCell<R>>,
     current_gate: usize,
     pub(crate) output_cts: Vec<Vec<Block>>,
     pub(crate) output_wires: Vec<Wire>,
 }
 
-impl<R: Read> Evaluator<R> {
+impl<R: Read + Debug> Evaluator<R> {
     /// Create a new `Evaluator`.
     ///
     /// `callback` enables streaming by producing messages during the `Fancy`
     /// computation, which contain ciphertexts and wire-labels.
-    pub fn new(reader: Arc<Mutex<R>>) -> Self {
+    pub fn new(reader: Rc<RefCell<R>>) -> Self {
         Evaluator {
             reader,
             current_gate: 0,
@@ -72,25 +74,25 @@ impl<R: Read> Evaluator<R> {
     }
 }
 
-impl<R: Read> Fancy for Evaluator<R> {
+impl<R: Read + Debug> Fancy for Evaluator<R> {
     type Item = Wire;
     type Error = EvaluatorError;
 
     #[inline]
     fn garbler_input(&mut self, q: u16, _: Option<u16>) -> Result<Self::Item, Self::Error> {
-        let mut reader = self.reader.lock().unwrap();
+        let mut reader = self.reader.borrow_mut();
         let block = Block::read(&mut *reader)?;
         Ok(Wire::from_block(block, q))
     }
     #[inline]
     fn evaluator_input(&mut self, q: u16) -> Result<Self::Item, Self::Error> {
-        let mut reader = self.reader.lock().unwrap();
+        let mut reader = self.reader.borrow_mut();
         let block = Block::read(&mut *reader)?;
         Ok(Wire::from_block(block, q))
     }
     #[inline]
     fn constant(&mut self, _: u16, q: u16) -> Result<Wire, EvaluatorError> {
-        let mut reader = self.reader.lock().unwrap();
+        let mut reader = self.reader.borrow_mut();
         let block = Block::read(&mut *reader)?;
         Ok(Wire::from_block(block, q))
     }
@@ -123,7 +125,7 @@ impl<R: Read> Fancy for Evaluator<R> {
         let ngates = q as usize + qb as usize - 2 + unequal as usize;
         let mut gate = Vec::with_capacity(ngates);
         {
-            let mut reader = self.reader.lock().unwrap();
+            let mut reader = self.reader.borrow_mut();
             for _ in 0..ngates {
                 let block = Block::read(&mut *reader)?;
                 gate.push(block);
@@ -166,7 +168,7 @@ impl<R: Read> Fancy for Evaluator<R> {
         let ngates = (x.modulus() - 1) as usize;
         let mut gate = Vec::with_capacity(ngates);
         {
-            let mut reader = self.reader.lock().unwrap();
+            let mut reader = self.reader.borrow_mut();
             for _ in 0..ngates {
                 let block = Block::read(&mut *reader)?;
                 gate.push(block);
@@ -183,7 +185,7 @@ impl<R: Read> Fancy for Evaluator<R> {
     #[inline]
     fn output(&mut self, x: &Wire) -> Result<(), EvaluatorError> {
         let noutputs = x.modulus() as usize;
-        let mut reader = self.reader.lock().unwrap();
+        let mut reader = self.reader.borrow_mut();
         let mut blocks = Vec::with_capacity(noutputs);
         for _ in 0..noutputs {
             let block = Block::read(&mut *reader)?;

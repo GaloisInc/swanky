@@ -26,7 +26,9 @@ pub enum Wire {
 
 impl std::default::Default for Wire {
     fn default() -> Self {
-        Wire::Mod2 { val: Block::zero() }
+        Wire::Mod2 {
+            val: Block::default(),
+        }
     }
 }
 
@@ -181,7 +183,7 @@ impl Wire {
         match self {
             Wire::Mod2 { val } => {
                 if c & 1 == 0 {
-                    *val = Block::zero();
+                    *val = Block::default();
                 }
             }
 
@@ -426,13 +428,13 @@ mod tests {
         let hashes = crossbeam::scope(|scope| {
             let hs = ws
                 .iter()
-                .map(|w| scope.spawn(move |_| w.hash(Block::zero())))
+                .map(|w| scope.spawn(move |_| w.hash(Block::default())))
                 .collect_vec();
             hs.into_iter().map(|h| h.join().unwrap()).collect_vec()
         })
         .unwrap();
 
-        let should_be = ws.iter().map(|w| w.hash(Block::zero())).collect_vec();
+        let should_be = ws.iter().map(|w| w.hash(Block::default())).collect_vec();
 
         assert_eq!(hashes, should_be);
     }

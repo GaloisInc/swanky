@@ -1,4 +1,4 @@
-//! Module containing `BundleGadgets`, which are mostly CRT-based gadgets for Fancy.
+//! Module containing `BundleGadgets`, which are mostly CRT-based gadgets for `Fancy`.
 
 use itertools::Itertools;
 

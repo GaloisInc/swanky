@@ -331,9 +331,10 @@ mod streaming {
     use itertools::Itertools;
     use rand::thread_rng;
     use scuttlebutt::AesRng;
+    use std::cell::RefCell;
     use std::fmt::{Debug, Display};
     use std::os::unix::net::UnixStream;
-    use std::sync::{Arc, Mutex};
+    use std::rc::Rc;
 
     type Reader = UnixStream;
     type Writer = UnixStream;
@@ -351,42 +352,37 @@ mod streaming {
     {
         let rng = AesRng::new();
         let (sender, receiver) = UnixStream::pair().unwrap();
-        let sender = Arc::new(Mutex::new(sender));
-        let receiver = Arc::new(Mutex::new(receiver));
 
         let mut gb_inp_iter = gb_inp.to_vec().into_iter();
         let mut ev_inp_iter = ev_inp.to_vec().into_iter();
 
-        let writer = sender.clone();
         std::thread::spawn(move || {
-            let writer_ = writer.clone();
+            let sender = Rc::new(RefCell::new(sender));
+            let sender_ = sender.clone();
             let callback = move |m| {
                 match m {
                     Message::UnencodedGarblerInput { zero, delta } => {
                         let x = gb_inp_iter.next().expect("not enough garbler inputs!");
-                        let mut writer = writer_.lock().unwrap();
-                        zero.plus(&delta.cmul(x)).as_block().write(&mut *writer)?;
+                        let mut sender = sender_.borrow_mut();
+                        zero.plus(&delta.cmul(x)).as_block().write(&mut *sender)?;
                     }
                     Message::UnencodedEvaluatorInput { zero, delta } => {
                         let x = ev_inp_iter.next().expect("not enough evaluator inputs!");
-                        let mut writer = writer_.lock().unwrap();
-                        zero.plus(&delta.cmul(x)).as_block().write(&mut *writer)?;
+                        let mut sender = sender_.borrow_mut();
+                        zero.plus(&delta.cmul(x)).as_block().write(&mut *sender)?;
                     }
                 }
                 Ok(())
             };
-            let mut garbler = Garbler::new(writer.clone(), callback, rng);
+            let mut garbler = Garbler::new(sender, callback, rng);
             f_gb(&mut garbler);
         });
 
-        let reader = receiver.clone();
-        // the evaluator's callback gets the next message from the garble iterator,
-        // encodes the appropriate inputs, and sends it along
-        let mut ev = Evaluator::new(reader);
+        let receiver = Rc::new(RefCell::new(receiver));
+        let mut ev = Evaluator::new(receiver);
         f_ev(&mut ev);
 
         let result = ev.decode_output();
-        println!("gb_inp={:?} ev_inp={:?}", gb_inp, ev_inp);
         assert_eq!(result, should_be)
     }
     //}}}
@@ -546,13 +542,14 @@ mod complex {
     use crate::{BundleGadgets, Evaluator, Fancy, Garbler, HasModulus, Message};
     use rand::thread_rng;
     use scuttlebutt::AesRng;
+    use std::cell::RefCell;
     use std::os::unix::net::UnixStream;
-    use std::sync::{Arc, Mutex};
+    use std::rc::Rc;
 
     fn complex_gadget<F, W>(b: &mut F, q: u128, n: usize)
     where
-        W: Clone + HasModulus + Send,
-        F: Fancy<Item = W> + Send,
+        W: Clone + HasModulus,
+        F: Fancy<Item = W>,
     {
         let mut zs = Vec::with_capacity(n);
         for _ in 0..n {
@@ -567,8 +564,8 @@ mod complex {
 
     fn complex_gadget_<F, W>(b: &mut F, q: u128, n: usize)
     where
-        W: Clone + HasModulus + Send,
-        F: Fancy<Item = W> + Send,
+        W: Clone + HasModulus,
+        F: Fancy<Item = W>,
     {
         let mut zs = Vec::with_capacity(n);
         for _ in 0..n {
@@ -597,22 +594,19 @@ mod complex {
             let mut dummy = Dummy::new(&input_, &[]);
             complex_gadget(&mut dummy, Q, N);
             let should_be = dummy.get_output();
-            // Do 2PC computation.
-            let (sender, receiver) = UnixStream::pair().unwrap();
-            let sender = Arc::new(Mutex::new(sender));
-            let receiver = Arc::new(Mutex::new(receiver));
 
-            let writer = sender.clone();
+            let (sender, receiver) = UnixStream::pair().unwrap();
             let mut input_ = input.clone();
             std::thread::spawn(move || {
-                let writer_ = writer.clone();
+                let sender = Rc::new(RefCell::new(sender));
+                let sender_ = sender.clone();
                 let callback = move |m| {
                     match m {
                         Message::UnencodedGarblerInput { zero, delta } => {
                             let x = input_.remove(0);
                             let w = zero.plus(&delta.cmul(x));
-                            let mut writer = writer_.lock().unwrap();
-                            w.as_block().write(&mut *writer)?;
+                            let mut sender = sender_.borrow_mut();
+                            w.as_block().write(&mut *sender)?;
                         }
                         m => {
                             return Err(GarblerError::MessageError(format!(
@@ -624,25 +618,27 @@ mod complex {
                     Ok(())
                 };
                 let rng = AesRng::new();
-                let mut garbler = Garbler::new(writer.clone(), callback, rng);
+                let mut garbler = Garbler::new(sender, callback, rng);
                 complex_gadget(&mut garbler, Q, N);
             });
-            let mut evaluator = Evaluator::new(receiver.clone());
+            let receiver = Rc::new(RefCell::new(receiver));
+            let mut evaluator = Evaluator::new(receiver);
             complex_gadget(&mut evaluator, Q, N);
             let result = evaluator.decode_output();
             assert_eq!(result, should_be);
 
-            let writer = sender.clone();
+            let (sender, receiver) = UnixStream::pair().unwrap();
             let mut input_ = input.clone();
             std::thread::spawn(move || {
-                let writer_ = writer.clone();
+                let sender = Rc::new(RefCell::new(sender));
+                let sender_ = sender.clone();
                 let callback = move |m| {
                     match m {
                         Message::UnencodedEvaluatorInput { zero, delta } => {
                             let x = input_.remove(0);
                             let w = zero.plus(&delta.cmul(x));
-                            let mut writer = writer_.lock().unwrap();
-                            w.as_block().write(&mut *writer)?;
+                            let mut sender = sender_.borrow_mut();
+                            w.as_block().write(&mut *sender)?;
                         }
                         m => {
                             return Err(GarblerError::MessageError(format!(
@@ -654,10 +650,11 @@ mod complex {
                     Ok(())
                 };
                 let rng = AesRng::new();
-                let mut garbler = Garbler::new(writer.clone(), callback, rng);
+                let mut garbler = Garbler::new(sender, callback, rng);
                 complex_gadget_(&mut garbler, Q, N);
             });
-            let mut evaluator = Evaluator::new(receiver.clone());
+            let receiver = Rc::new(RefCell::new(receiver));
+            let mut evaluator = Evaluator::new(receiver);
             complex_gadget_(&mut evaluator, Q, N);
             let result = evaluator.decode_output();
             assert_eq!(result, should_be);

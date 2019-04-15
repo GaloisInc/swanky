@@ -24,7 +24,7 @@ where
     c.bench_function(&format!("garbling::{}_ev ({})", name, q), move |bench| {
         let mut rng = rand::thread_rng();
         let mut c = make_circuit(q);
-        let (en, mut ev) = garble(&mut c).unwrap();
+        let (en, ev) = garble(&mut c).unwrap();
         let inps = (0..c.num_garbler_inputs())
             .map(|i| rng.gen_u16() % c.garbler_input_mod(i))
             .collect::<Vec<u16>>();

@@ -13,38 +13,78 @@ use crate::fancy::HasModulus;
 use crate::garble::{Evaluator, Garbler, Message};
 use crate::wire::Wire;
 use crate::Fancy;
-use arrayref::array_ref;
 use scuttlebutt::{AesRng, Block};
 use serde::{Deserialize, Serialize};
+use std::cell::RefCell;
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
+use std::convert::TryInto;
+use std::rc::Rc;
+
+/// Static evaluator for a circuit, created by the `garble` function.
+///
+/// Uses `Evaluator` under the hood to actually implement the evaluation.
+#[derive(Serialize, Deserialize, PartialEq, Debug)]
+pub struct GarbledCircuit {
+    blocks: Vec<Block>,
+}
+
+impl GarbledCircuit {
+    /// Create a new object from a vector of garbled gates and constant wires.
+    pub fn new(blocks: Vec<Block>) -> Self {
+        GarbledCircuit { blocks }
+    }
+
+    /// The number of garbled rows and constant wires in the garbled circuit.
+    #[inline]
+    pub fn size(&self) -> usize {
+        self.blocks.len()
+    }
+
+    /// Evaluate the garbled circuit.
+    pub fn eval(
+        &self,
+        c: &mut Circuit,
+        garbler_inputs: &[Wire],
+        evaluator_inputs: &[Wire],
+    ) -> Result<Vec<u16>, EvaluatorError> {
+        let mut evaluator = StaticEvaluator::new(garbler_inputs, evaluator_inputs, &self.blocks);
+        let outputs = c.eval(&mut evaluator)?;
+        c.process_outputs(&outputs, &mut evaluator)?;
+        Ok(evaluator.evaluator.decode_output())
+    }
+}
 
 /// Implementation of the `Write` trait for use by `Garbler`.
-pub struct GarbledWriter {
-    gb_inputs: Vec<Wire>,
-    ev_inputs: Vec<Wire>,
-    data: Vec<Block>,
+#[derive(Debug)]
+struct GarbledWriter {
+    blocks: Vec<Block>,
 }
 
 impl GarbledWriter {
     /// Make a new `GarbledWriter`.
-    pub fn new() -> Self {
-        let gb_inputs = Vec::new();
-        let ev_inputs = Vec::new();
-        let data = Vec::new();
-        Self {
-            gb_inputs,
-            ev_inputs,
-            data,
-        }
+    pub fn new(ngates: Option<usize>) -> Self {
+        let blocks = if let Some(n) = ngates {
+            Vec::with_capacity(2 * n)
+        } else {
+            Vec::new()
+        };
+        Self { blocks }
     }
 }
 
 impl std::io::Write for GarbledWriter {
     fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
-        assert_eq!(buf.len() % 16, 0);
         for item in buf.chunks(16) {
-            self.data.push(Block::from(*array_ref![item, 0, 16]));
+            let bytes: [u8; 16] = match item.try_into() {
+                Ok(bytes) => bytes,
+                Err(_) => {
+                    return Err(std::io::Error::new(
+                        std::io::ErrorKind::InvalidData,
+                        "unable to map bytes to block",
+                    ));
+                }
+            };
+            self.blocks.push(Block::from(bytes));
         }
         Ok(buf.len())
     }
@@ -55,31 +95,36 @@ impl std::io::Write for GarbledWriter {
 
 /// Garble a circuit without streaming.
 pub fn garble(c: &mut Circuit) -> Result<(Encoder, GarbledCircuit), GarblerError> {
-    let writer = Arc::new(Mutex::new(GarbledWriter::new()));
+    let gb_inputs = Vec::with_capacity(c.num_garbler_inputs());
+    let ev_inputs = Vec::with_capacity(c.num_evaluator_inputs());
+    let writer = GarbledWriter::new(Some(c.num_nonfree_gates));
+    let writer = Rc::new(RefCell::new(writer));
     let writer_ = writer.clone();
-    let callback = move |m| {
-        match m {
-            Message::UnencodedGarblerInput { zero, .. } => {
-                writer_.lock().unwrap().gb_inputs.push(zero)
-            }
-            Message::UnencodedEvaluatorInput { zero, .. } => {
-                writer_.lock().unwrap().ev_inputs.push(zero)
-            }
-        }
-        Ok(())
-    };
-
+    let gb_inputs = Rc::new(RefCell::new(gb_inputs));
+    let ev_inputs = Rc::new(RefCell::new(ev_inputs));
+    let gb_inputs_ = gb_inputs.clone();
+    let ev_inputs_ = ev_inputs.clone();
     let deltas = {
+        let callback = move |m| {
+            match m {
+                Message::UnencodedGarblerInput { zero, .. } => gb_inputs_.borrow_mut().push(zero),
+                Message::UnencodedEvaluatorInput { zero, .. } => ev_inputs_.borrow_mut().push(zero),
+            }
+            Ok(())
+        };
+
         let rng = AesRng::new();
-        let mut garbler = Garbler::new(writer.clone(), callback, rng);
+        let mut garbler = Garbler::new(writer_, callback, rng);
         let outputs = c.eval(&mut garbler)?;
         c.process_outputs(&outputs, &mut garbler)?;
         garbler.get_deltas()
     };
-    let gb_inputs = writer.lock().unwrap().gb_inputs.clone();
-    let ev_inputs = writer.lock().unwrap().ev_inputs.clone();
-    let en = Encoder::new(gb_inputs, ev_inputs, deltas);
-    let gc = GarbledCircuit::new(&writer.lock().unwrap().data);
+    let en = Encoder::new(
+        Rc::try_unwrap(gb_inputs).unwrap().into_inner(),
+        Rc::try_unwrap(ev_inputs).unwrap().into_inner(),
+        deltas,
+    );
+    let gc = GarbledCircuit::new(Rc::try_unwrap(writer).unwrap().into_inner().blocks);
 
     Ok((en, gc))
 }
@@ -98,7 +143,7 @@ impl StaticEvaluator {
     /// Make a new `StaticEvaluator` object.
     pub fn new(garbler_inputs: &[Wire], evaluator_inputs: &[Wire], blocks: &[Block]) -> Self {
         let reader = GarbledReader::new(blocks);
-        let evaluator = Evaluator::new(Arc::new(Mutex::new(reader)));
+        let evaluator = Evaluator::new(Rc::new(RefCell::new(reader)));
         Self {
             garbler_inputs: garbler_inputs.to_vec(),
             evaluator_inputs: evaluator_inputs.to_vec(),
@@ -161,42 +206,7 @@ impl Fancy for StaticEvaluator {
     }
 }
 
-/// Static evaluator for a circuit, created by the `garble` function.
-///
-/// Uses `Evaluator` under the hood to actually implement the evaluation.
-#[derive(Serialize, Deserialize, PartialEq, Debug)]
-pub struct GarbledCircuit {
-    blocks: Vec<Block>,
-}
-
-impl GarbledCircuit {
-    /// Create a new object from a vector of garbled gates and constant wires.
-    pub fn new(blocks: &[Block]) -> Self {
-        GarbledCircuit {
-            blocks: blocks.to_vec(),
-        }
-    }
-
-    /// The number of garbled rows and constant wires in the garbled circuit.
-    #[inline]
-    pub fn size(&self) -> usize {
-        self.blocks.len()
-    }
-
-    /// Evaluate the garbled circuit.
-    pub fn eval(
-        &self,
-        c: &mut Circuit,
-        garbler_inputs: &[Wire],
-        evaluator_inputs: &[Wire],
-    ) -> Result<Vec<u16>, EvaluatorError> {
-        let mut evaluator = StaticEvaluator::new(garbler_inputs, evaluator_inputs, &self.blocks);
-        let outputs = c.eval(&mut evaluator)?;
-        c.process_outputs(&outputs, &mut evaluator)?;
-        Ok(evaluator.evaluator.decode_output())
-    }
-}
-
+#[derive(Debug)]
 struct GarbledReader {
     blocks: Vec<Block>,
     index: usize,
