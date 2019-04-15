@@ -116,11 +116,8 @@ impl P2 {
         let mut inputs = utils::compress_and_hash_inputs(inputs, key);
         let n = inputs.len();
 
-        inputs.sort();
-        inputs.dedup();
-
         // map inputs to table using all hash functions
-        let mut table = vec![Vec::new(); nbins];
+        let mut table = vec![Vec::with_capacity(inputs.len()); nbins];
 
         for &x in &inputs {
             let mut bins = Vec::with_capacity(NHASHES);
@@ -144,8 +141,6 @@ impl P2 {
         }).collect::<Vec<(Block, kkrt::Output)>>();
 
         let mut check = points.iter().map(|(x,_)| x.clone()).collect::<Vec<_>>();
-        check.sort();
-        check.dedup();
         assert_eq!(check.len(), points.len());
 
         let _ = self.opprf.send(reader, writer, &points, points.len(), nbins, rng)?;

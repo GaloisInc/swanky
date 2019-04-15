@@ -27,7 +27,7 @@ criterion = "0.2.10"
 
 [profile.release]
 opt-level = 3
-debug = false
+debug = true
 debug-assertions = false
 overflow-checks = false
 
