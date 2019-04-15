@@ -1,4 +1,4 @@
-# `ocelot`: A rust library for oblivious transfer
+# `ocelot`: A rust library for oblivious transfer [![](https://travis-ci.org/amaloz/ocelot.svg?branch=master)](https://travis-ci.org/amaloz/ocelot)
 
 The `ocelot` library implements various one-out-of-two oblivious transfer (+
 extension) protocols in rust. It's the coolest cat in the oblivious transfer
