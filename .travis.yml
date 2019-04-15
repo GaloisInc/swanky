@@ -3,7 +3,7 @@ matrix:
   include:
     - rust: stable
       env:
-        - FEATURES=''
+        - FEATURES=
     - rust: nightly
       env:
         - FEATURES='nightly'
