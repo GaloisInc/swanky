@@ -56,7 +56,7 @@ impl GarbledCircuit {
 
 /// Implementation of the `Write` trait for use by `Garbler`.
 #[derive(Debug)]
-struct GarbledWriter {
+pub struct GarbledWriter {
     blocks: Vec<Block>,
 }
 
