@@ -46,12 +46,6 @@ fn hash_output_keyed(x: Output, aes: &Aes128, range: usize) -> usize {
     let h = aes.encrypt(h) ^ x.0[2];
     let h = aes.encrypt(h) ^ x.0[3];
     (u128::from(h) % (range as u128)) as usize
-    // let mut hasher = Sha256::new();
-    // hasher.input(x);
-    // hasher.input(k);
-    // let h = hasher.result();
-    // let h = *array_ref![h, 0, 16];
-    // (u128::from_ne_bytes(h) % (range as u128)) as usize
 }
 
 /// The oblivious programmable PRF hint.
@@ -92,8 +86,8 @@ impl<OPRF: OprfSender<Seed = Seed, Input = Block, Output = Output> + SemiHonest>
 {
     fn init<R, W, RNG>(reader: &mut R, writer: &mut W, rng: &mut RNG) -> Result<Self, Error>
     where
-        R: Read + Send,
-        W: Write + Send,
+        R: Read,
+        W: Write,
         RNG: CryptoRng + RngCore,
     {
         let oprf = OPRF::init(reader, writer, rng)?;
@@ -118,8 +112,8 @@ impl<OPRF: OprfSender<Seed = Seed, Input = Block, Output = Output> + SemiHonest>
         rng: &mut RNG,
     ) -> Result<Vec<(Self::Seed, Self::Hint)>, Error>
     where
-        R: Read + Send,
-        W: Write + Send,
+        R: Read,
+        W: Write,
         RNG: CryptoRng + RngCore,
     {
         if t != 1 {
@@ -221,8 +215,8 @@ impl<OPRF: OprfReceiver<Seed = Seed, Input = Block, Output = Output> + SemiHones
 {
     fn init<R, W, RNG>(reader: &mut R, writer: &mut W, rng: &mut RNG) -> Result<Self, Error>
     where
-        R: Read + Send,
-        W: Write + Send,
+        R: Read,
+        W: Write,
         RNG: CryptoRng + RngCore,
     {
         let oprf = OPRF::init(reader, writer, rng)?;
@@ -238,8 +232,8 @@ impl<OPRF: OprfReceiver<Seed = Seed, Input = Block, Output = Output> + SemiHones
         rng: &mut RNG,
     ) -> Result<Vec<Self::Output>, Error>
     where
-        R: Read + Send,
-        W: Write + Send,
+        R: Read,
+        W: Write,
         RNG: CryptoRng + RngCore,
     {
         if inputs.len() != 1 {
@@ -355,8 +349,8 @@ impl<T: OprfSender<Seed = Seed, Input = Block, Output = Output> + SemiHonest> Op
 {
     fn init<R, W, RNG>(reader: &mut R, writer: &mut W, rng: &mut RNG) -> Result<Self, Error>
     where
-        R: Read + Send,
-        W: Write + Send,
+        R: Read,
+        W: Write,
         RNG: CryptoRng + RngCore,
     {
         let opprf = SingleSender::<T>::init(reader, writer, rng)?;
@@ -373,8 +367,8 @@ impl<T: OprfSender<Seed = Seed, Input = Block, Output = Output> + SemiHonest> Op
         rng: &mut RNG,
     ) -> Result<Vec<(Self::Seed, Self::Hint)>, Error>
     where
-        R: Read + Send,
-        W: Write + Send,
+        R: Read,
+        W: Write,
         RNG: CryptoRng + RngCore,
     {
         let params = Parameters::new(ninputs)?;
@@ -468,8 +462,8 @@ impl<T: OprfReceiver<Seed = Seed, Input = Block, Output = Output> + SemiHonest> 
 {
     fn init<R, W, RNG>(reader: &mut R, writer: &mut W, rng: &mut RNG) -> Result<Self, Error>
     where
-        R: Read + Send,
-        W: Write + Send,
+        R: Read,
+        W: Write,
         RNG: CryptoRng + RngCore,
     {
         let opprf = SingleReceiver::<T>::init(reader, writer, rng)?;
@@ -485,8 +479,8 @@ impl<T: OprfReceiver<Seed = Seed, Input = Block, Output = Output> + SemiHonest> 
         rng: &mut RNG,
     ) -> Result<Vec<Self::Output>, Error>
     where
-        R: Read + Send,
-        W: Write + Send,
+        R: Read,
+        W: Write,
         RNG: CryptoRng + RngCore,
     {
         let params = Parameters::new(inputs.len())?;

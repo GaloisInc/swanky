@@ -40,13 +40,13 @@ where
     Self: Sized,
 {
     /// Runs any one-time initialization.
-    fn init<R: Read + Send, W: Write + Send, RNG: CryptoRng + RngCore>(
+    fn init<R: Read, W: Write, RNG: CryptoRng + RngCore>(
         reader: &mut R,
         writer: &mut W,
         rng: &mut RNG,
     ) -> Result<Self, Error>;
     /// Runs `m` OPRF instances as the sender, returning the OPRF seeds.
-    fn send<R: Read + Send, W: Write + Send, RNG: CryptoRng + RngCore>(
+    fn send<R: Read, W: Write, RNG: CryptoRng + RngCore>(
         &mut self,
         reader: &mut R,
         writer: &mut W,
@@ -63,13 +63,13 @@ where
     Self: Sized,
 {
     /// Runs any one-time initialization.
-    fn init<R: Read + Send, W: Write + Send, RNG: CryptoRng + RngCore>(
+    fn init<R: Read, W: Write, RNG: CryptoRng + RngCore>(
         reader: &mut R,
         writer: &mut W,
         rng: &mut RNG,
     ) -> Result<Self, Error>;
     /// Runs the oblivious PRF on inputs `inputs`, returning the OPRF outputs.
-    fn receive<R: Read + Send, W: Write + Send, RNG: CryptoRng + RngCore>(
+    fn receive<R: Read, W: Write, RNG: CryptoRng + RngCore>(
         &mut self,
         reader: &mut R,
         writer: &mut W,
@@ -89,13 +89,13 @@ pub trait ObliviousPprf: ObliviousPrf {
 #[cfg(feature = "unstable")]
 pub trait ProgrammableSender: ObliviousPprf {
     /// Runs any one-time initialization.
-    fn init<R: Read + Send, W: Write + Send, RNG: CryptoRng + RngCore>(
+    fn init<R: Read, W: Write, RNG: CryptoRng + RngCore>(
         reader: &mut R,
         writer: &mut W,
         rng: &mut RNG,
     ) -> Result<Self, Error>;
     /// Runs `m` OPRF instances as the sender, returning the OPRF seeds.
-    fn send<R: Read + Send, W: Write + Send, RNG: CryptoRng + RngCore>(
+    fn send<R: Read, W: Write, RNG: CryptoRng + RngCore>(
         &mut self,
         reader: &mut R,
         writer: &mut W,
@@ -113,13 +113,13 @@ pub trait ProgrammableSender: ObliviousPprf {
 #[cfg(feature = "unstable")]
 pub trait ProgrammableReceiver: ObliviousPprf {
     /// Runs any one-time initialization.
-    fn init<R: Read + Send, W: Write + Send, RNG: CryptoRng + RngCore>(
+    fn init<R: Read, W: Write, RNG: CryptoRng + RngCore>(
         reader: &mut R,
         writer: &mut W,
         rng: &mut RNG,
     ) -> Result<Self, Error>;
     /// Runs the oblivious PRF on inputs `inputs`, returning the OPRF outputs.
-    fn receive<R: Read + Send, W: Write + Send, RNG: CryptoRng + RngCore>(
+    fn receive<R: Read, W: Write, RNG: CryptoRng + RngCore>(
         &mut self,
         reader: &mut R,
         writer: &mut W,

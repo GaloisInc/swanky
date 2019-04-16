@@ -249,8 +249,8 @@ impl<OT: OtReceiver<Msg = Block> + SemiHonest> ObliviousPrf for Sender<OT> {
 impl<OT: OtReceiver<Msg = Block> + SemiHonest> OprfSender for Sender<OT> {
     fn init<R, W, RNG>(reader: &mut R, writer: &mut W, rng: &mut RNG) -> Result<Self, Error>
     where
-        R: Read + Send,
-        W: Write + Send,
+        R: Read,
+        W: Write,
         RNG: CryptoRng + RngCore,
     {
         let mut ot = OT::init(reader, writer, rng)?;
@@ -284,8 +284,8 @@ impl<OT: OtReceiver<Msg = Block> + SemiHonest> OprfSender for Sender<OT> {
         _: &mut RNG,
     ) -> Result<Vec<Self::Seed>, Error>
     where
-        R: Read + Send,
-        W: Write + Send,
+        R: Read,
+        W: Write,
         RNG: CryptoRng + RngCore,
     {
         // Round up if necessary so that `m mod 16 ≡ 0`.
@@ -350,14 +350,14 @@ impl<OT: OtSender<Msg = Block> + SemiHonest> ObliviousPrf for Receiver<OT> {
 }
 
 impl<OT: OtSender<Msg = Block> + SemiHonest> OprfReceiver for Receiver<OT> {
-    fn init<R: Read + Send, W: Write + Send, RNG: CryptoRng + RngCore>(
+    fn init<R: Read, W: Write, RNG: CryptoRng + RngCore>(
         reader: &mut R,
         writer: &mut W,
         rng: &mut RNG,
     ) -> Result<Self, Error>
     where
-        R: Read + Send,
-        W: Write + Send,
+        R: Read,
+        W: Write,
         RNG: CryptoRng + RngCore,
     {
         let mut ot = OT::init(reader, writer, rng)?;
@@ -386,7 +386,7 @@ impl<OT: OtSender<Msg = Block> + SemiHonest> OprfReceiver for Receiver<OT> {
         })
     }
 
-    fn receive<R: Read + Send, W: Write + Send, RNG: CryptoRng + RngCore>(
+    fn receive<R: Read, W: Write, RNG: CryptoRng + RngCore>(
         &mut self,
         _: &mut R,
         writer: &mut W,
