@@ -10,6 +10,7 @@ keywords = ["cryptography", "oblivious-transfer", "OT"]
 edition = "2018"
 publish = false
 build = "build.rs"
+autoexamples = true
 
 [lib]
 
@@ -63,3 +64,8 @@ harness = false
 [[bench]]
 name = "oprf"
 harness = false
+
+[[example]]
+name = "kmprt"
+harness = false
+required-features = ["unstable"]

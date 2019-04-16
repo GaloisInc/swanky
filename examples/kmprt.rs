@@ -4,8 +4,6 @@
 // Copyright © 2019 Galois, Inc.
 // See LICENSE for licensing information.
 
-#![cfg(feature = "unstable")]
-
 use ocelot::oprf::kkrt::{Output, Seed};
 use ocelot::oprf::kmprt::{KmprtSingleReceiver, KmprtSingleSender};
 use ocelot::oprf::{ProgrammableReceiver, ProgrammableSender};
