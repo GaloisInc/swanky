@@ -50,13 +50,13 @@ where
     type Msg: Sized + AsMut<[u8]>;
     /// Runs any one-time initialization to create the oblivious transfer
     /// object.
-    fn init<R: Read + Send, W: Write + Send, RNG: CryptoRng + RngCore>(
+    fn init<R: Read, W: Write, RNG: CryptoRng + RngCore>(
         reader: &mut R,
         writer: &mut W,
         rng: &mut RNG,
     ) -> Result<Self, Error>;
     /// Sends messages.
-    fn send<R: Read + Send, W: Write + Send, RNG: CryptoRng + RngCore>(
+    fn send<R: Read, W: Write, RNG: CryptoRng + RngCore>(
         &mut self,
         reader: &mut R,
         writer: &mut W,
@@ -76,13 +76,13 @@ where
     type Msg: Sized + AsMut<[u8]>;
     /// Runs any one-time initialization to create the oblivious transfer
     /// object.
-    fn init<R: Read + Send, W: Write + Send, RNG: CryptoRng + RngCore>(
+    fn init<R: Read, W: Write, RNG: CryptoRng + RngCore>(
         reader: &mut R,
         writer: &mut W,
         rng: &mut RNG,
     ) -> Result<Self, Error>;
     /// Receives messages.
-    fn receive<R: Read + Send, W: Write + Send, RNG: CryptoRng + RngCore>(
+    fn receive<R: Read, W: Write, RNG: CryptoRng + RngCore>(
         &mut self,
         reader: &mut R,
         writer: &mut W,
@@ -99,7 +99,7 @@ where
 {
     /// Correlated oblivious transfer send. Takes as input an array `deltas`
     /// which specifies the offset between the zero and one message.
-    fn send_correlated<R: Read + Send, W: Write + Send, RNG: CryptoRng + RngCore>(
+    fn send_correlated<R: Read, W: Write, RNG: CryptoRng + RngCore>(
         &mut self,
         reader: &mut R,
         writer: &mut W,
@@ -115,7 +115,7 @@ where
     Self: Sized,
 {
     /// Correlated oblivious transfer receive.
-    fn receive_correlated<R: Read + Send, W: Write + Send, RNG: CryptoRng + RngCore>(
+    fn receive_correlated<R: Read, W: Write, RNG: CryptoRng + RngCore>(
         &mut self,
         reader: &mut R,
         writer: &mut W,
@@ -132,7 +132,7 @@ where
 {
     /// Random oblivious transfer send. Returns a vector of tuples containing
     /// the two random messages.
-    fn send_random<R: Read + Send, W: Write + Send, RNG: CryptoRng + RngCore>(
+    fn send_random<R: Read, W: Write, RNG: CryptoRng + RngCore>(
         &mut self,
         reader: &mut R,
         writer: &mut W,
@@ -148,7 +148,7 @@ where
     Self: Sized,
 {
     /// Random oblivious transfer receive.
-    fn receive_random<R: Read + Send, W: Write + Send, RNG: CryptoRng + RngCore>(
+    fn receive_random<R: Read, W: Write, RNG: CryptoRng + RngCore>(
         &mut self,
         reader: &mut R,
         writer: &mut W,

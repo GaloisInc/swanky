@@ -36,7 +36,7 @@ pub struct Sender {
 impl OtSender for Sender {
     type Msg = Block;
 
-    fn init<R: Read + Send, W: Write + Send, RNG: CryptoRng + RngCore>(
+    fn init<R: Read, W: Write, RNG: CryptoRng + RngCore>(
         _: &mut R,
         writer: &mut W,
         mut rng: &mut RNG,
@@ -48,7 +48,7 @@ impl OtSender for Sender {
         Ok(Self { y, s })
     }
 
-    fn send<R: Read + Send, W: Write + Send, RNG: CryptoRng + RngCore>(
+    fn send<R: Read, W: Write, RNG: CryptoRng + RngCore>(
         &mut self,
         reader: &mut R,
         writer: &mut W,
@@ -88,7 +88,7 @@ pub struct Receiver {
 impl OtReceiver for Receiver {
     type Msg = Block;
 
-    fn init<R: Read + Send, W: Write + Send, RNG: CryptoRng + RngCore>(
+    fn init<R: Read, W: Write, RNG: CryptoRng + RngCore>(
         reader: &mut R,
         _: &mut W,
         _: &mut RNG,
@@ -98,7 +98,7 @@ impl OtReceiver for Receiver {
         Ok(Self { s })
     }
 
-    fn receive<R: Read + Send, W: Write + Send, RNG: CryptoRng + RngCore>(
+    fn receive<R: Read, W: Write, RNG: CryptoRng + RngCore>(
         &mut self,
         reader: &mut R,
         writer: &mut W,

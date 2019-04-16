@@ -33,7 +33,7 @@ pub struct Receiver<OT: OtSender<Msg = Block> + Malicious> {
 
 impl<OT: OtReceiver<Msg = Block> + Malicious> Sender<OT> {
     #[inline]
-    fn send_setup<R: Read + Send, W: Write + Send, RNG: CryptoRng + RngCore>(
+    fn send_setup<R: Read, W: Write, RNG: CryptoRng + RngCore>(
         &mut self,
         reader: &mut R,
         writer: &mut W,
@@ -81,7 +81,7 @@ impl<OT: OtReceiver<Msg = Block> + Malicious> Sender<OT> {
 impl<OT: OtReceiver<Msg = Block> + Malicious> OtSender for Sender<OT> {
     type Msg = Block;
 
-    fn init<R: Read + Send, W: Write + Send, RNG: CryptoRng + RngCore>(
+    fn init<R: Read, W: Write, RNG: CryptoRng + RngCore>(
         reader: &mut R,
         writer: &mut W,
         rng: &mut RNG,
@@ -90,7 +90,7 @@ impl<OT: OtReceiver<Msg = Block> + Malicious> OtSender for Sender<OT> {
         Ok(Self { ot })
     }
 
-    fn send<R: Read + Send, W: Write + Send, RNG: CryptoRng + RngCore>(
+    fn send<R: Read, W: Write, RNG: CryptoRng + RngCore>(
         &mut self,
         reader: &mut R,
         mut writer: &mut W,
@@ -116,7 +116,7 @@ impl<OT: OtReceiver<Msg = Block> + Malicious> OtSender for Sender<OT> {
 
 impl<OT: OtReceiver<Msg = Block> + Malicious> CorrelatedSender for Sender<OT> {
     #[inline]
-    fn send_correlated<R: Read + Send, W: Write + Send, RNG: CryptoRng + RngCore>(
+    fn send_correlated<R: Read, W: Write, RNG: CryptoRng + RngCore>(
         &mut self,
         reader: &mut R,
         mut writer: &mut W,
@@ -143,7 +143,7 @@ impl<OT: OtReceiver<Msg = Block> + Malicious> CorrelatedSender for Sender<OT> {
 
 impl<OT: OtReceiver<Msg = Block> + Malicious> RandomSender for Sender<OT> {
     #[inline]
-    fn send_random<R: Read + Send, W: Write + Send, RNG: CryptoRng + RngCore>(
+    fn send_random<R: Read, W: Write, RNG: CryptoRng + RngCore>(
         &mut self,
         reader: &mut R,
         writer: &mut W,
@@ -172,7 +172,7 @@ impl<OT: OtReceiver<Msg = Block> + Malicious> std::fmt::Display for Sender<OT> {
 
 impl<OT: OtSender<Msg = Block> + Malicious> Receiver<OT> {
     #[inline]
-    fn receive_setup<R: Read + Send, W: Write + Send, RNG: CryptoRng + RngCore>(
+    fn receive_setup<R: Read, W: Write, RNG: CryptoRng + RngCore>(
         &mut self,
         reader: &mut R,
         mut writer: &mut W,
@@ -212,7 +212,7 @@ impl<OT: OtSender<Msg = Block> + Malicious> Receiver<OT> {
 impl<OT: OtSender<Msg = Block> + Malicious> OtReceiver for Receiver<OT> {
     type Msg = Block;
 
-    fn init<R: Read + Send, W: Write + Send, RNG: CryptoRng + RngCore>(
+    fn init<R: Read, W: Write, RNG: CryptoRng + RngCore>(
         reader: &mut R,
         writer: &mut W,
         rng: &mut RNG,
@@ -221,7 +221,7 @@ impl<OT: OtSender<Msg = Block> + Malicious> OtReceiver for Receiver<OT> {
         Ok(Self { ot })
     }
 
-    fn receive<R: Read + Send, W: Write + Send, RNG: CryptoRng + RngCore>(
+    fn receive<R: Read, W: Write, RNG: CryptoRng + RngCore>(
         &mut self,
         mut reader: &mut R,
         writer: &mut W,
@@ -247,7 +247,7 @@ impl<OT: OtSender<Msg = Block> + Malicious> OtReceiver for Receiver<OT> {
 }
 
 impl<OT: OtSender<Msg = Block> + Malicious> CorrelatedReceiver for Receiver<OT> {
-    fn receive_correlated<R: Read + Send, W: Write + Send, RNG: CryptoRng + RngCore>(
+    fn receive_correlated<R: Read, W: Write, RNG: CryptoRng + RngCore>(
         &mut self,
         reader: &mut R,
         writer: &mut W,
@@ -271,7 +271,7 @@ impl<OT: OtSender<Msg = Block> + Malicious> CorrelatedReceiver for Receiver<OT> 
 }
 
 impl<OT: OtSender<Msg = Block> + Malicious> RandomReceiver for Receiver<OT> {
-    fn receive_random<R: Read + Send, W: Write + Send, RNG: CryptoRng + RngCore>(
+    fn receive_random<R: Read, W: Write, RNG: CryptoRng + RngCore>(
         &mut self,
         reader: &mut R,
         writer: &mut W,
