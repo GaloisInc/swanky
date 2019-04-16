@@ -7,6 +7,7 @@
 /// Errors produced by the private set intersection protocols.
 #[derive(Debug)]
 pub enum Error {
+    CoinTossError(scuttlebutt::cointoss::Error),
     OprfError(ocelot::Error),
     IoError(std::io::Error),
     CuckooStashOverflow,
@@ -28,9 +29,17 @@ impl From<ocelot::Error> for Error {
     }
 }
 
+impl From<scuttlebutt::cointoss::Error> for Error {
+    #[inline]
+    fn from(e: scuttlebutt::cointoss::Error) -> Error {
+        Error::CoinTossError(e)
+    }
+}
+
 impl std::fmt::Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
+            Error::CoinTossError(e) => write!(f, "coin toss error: {}", e),
             Error::OprfError(e) => write!(f, "oblivious PRF error: {}", e),
             Error::IoError(e) => write!(f, "IO error: {}", e),
             Error::CuckooStashOverflow => write!(f, "CuckooHash: overflowed stash"),

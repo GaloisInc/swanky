@@ -99,7 +99,7 @@ fn bench_psi(c: &mut Criterion) {
 
 criterion_group! {
     name = psi;
-    config = Criterion::default().warm_up_time(Duration::from_millis(100)).sample_size(2);
+    config = Criterion::default().warm_up_time(Duration::from_millis(100)).sample_size(10);
     targets = bench_psi
 }
 

@@ -21,7 +21,7 @@ use rand::seq::SliceRandom;
 use rand::Rng;
 use rand::{CryptoRng, RngCore};
 use scuttlebutt::utils as scutils;
-use scuttlebutt::{Block, SemiHonest};
+use scuttlebutt::{cointoss, Block, SemiHonest};
 use std::collections::HashSet;
 use std::io::{Read, Write};
 
@@ -55,24 +55,23 @@ impl PsiSender for Sender {
         inputs: &[Self::Msg],
         mut rng: &mut RNG,
     ) -> Result<(), Error> {
-        // XXX: do we need to do cointossing here?
-        let key = Block::read(reader)?;
-        let mut inputs = utils::compress_and_hash_inputs(inputs, key);
+        let keys = cointoss::send(reader, writer, &[rng.gen()])?;
+        let mut inputs = utils::compress_and_hash_inputs(inputs, keys[0]);
         let masksize = compute_masksize(inputs.len())?;
         let nbins = stream::read_usize(reader)?;
         let stashsize = stream::read_usize(reader)?;
         let seeds = self.oprf.send(reader, writer, nbins + stashsize, rng)?;
 
-        // For each `hᵢ`, construct set `Hᵢ = {F(k_{hᵢ(x)}, x || i) | x ∈ X)}`,
-        // randomly permute it, and send it to the receiver.
-        let mut encoded = Output::zero();
+        // For each hash function `hᵢ`, construct set `Hᵢ = {F(k_{hᵢ(x)}, x ||
+        // i) | x ∈ X)}`, randomly permute it, and send it to the receiver.
+        let mut encoded = Output::default();
         for i in 0..NHASHES {
             inputs.shuffle(&mut rng);
             let hidx = Block::from(i as u128);
             for input in &inputs {
                 // Compute `bin := hᵢ(x)`.
                 let bin = CuckooHash::bin(*input, i, nbins);
-                // Compute rest of `F(k_{hᵢ(x)}, x || i)` and chop off extra bytes.
+                // Compute `F(k_{hᵢ(x)}, x || i)` and chop off extra bytes.
                 self.oprf.encode(*input ^ hidx, &mut encoded);
                 scutils::xor_inplace_n(
                     &mut encoded.prefix_mut(masksize),
@@ -81,32 +80,32 @@ impl PsiSender for Sender {
                 );
                 writer.write_all(&encoded.prefix(masksize))?;
             }
+            writer.flush()?;
         }
-
-        // For each `i ∈ {1, ..., stashsize}`, construct set `Sᵢ =
-        // {F(k_{nbins+i}, x) | x ∈ X}`, randomly permute it, and send it to the
-        // receiver.
-        let mut encoded = inputs
-            .iter()
-            .map(|input| {
-                let mut out = Output::zero();
-                self.oprf.encode(*input, &mut out);
-                out
-            })
-            .collect::<Vec<Output>>();
-
-        for i in 0..stashsize {
-            encoded.shuffle(&mut rng);
-            for encoded in &encoded {
-                // We don't need to append any hash index to OPRF inputs in the stash.
-                let mut output = vec![0u8; masksize];
-                scutils::xor_inplace(&mut output, &encoded.prefix(masksize));
-                scutils::xor_inplace(&mut output, &seeds[nbins + i].prefix(masksize));
-                writer.write_all(&output)?;
+        if stashsize > 0 {
+            // For each `i ∈ {1, ..., stashsize}`, construct set `Sᵢ =
+            // {F(k_{nbins+i}, x) | x ∈ X}`, randomly permute it, and send it to the
+            // receiver.
+            let mut encoded = inputs
+                .iter()
+                .map(|input| {
+                    let mut out = Output::default();
+                    self.oprf.encode(*input, &mut out);
+                    out
+                })
+                .collect::<Vec<Output>>();
+            for i in 0..stashsize {
+                encoded.shuffle(&mut rng);
+                for encoded in &encoded {
+                    // We don't need to append any hash index to OPRF inputs in the stash.
+                    let mut output = vec![0u8; masksize];
+                    scutils::xor_inplace(&mut output, &encoded.prefix(masksize));
+                    scutils::xor_inplace(&mut output, &seeds[nbins + i].prefix(masksize));
+                    writer.write_all(&output)?;
+                }
             }
+            writer.flush()?;
         }
-
-        writer.flush()?;
         Ok(())
     }
 }
@@ -137,8 +136,8 @@ impl PsiReceiver for Receiver {
     {
         let n = inputs.len();
 
-        let key = rng.gen();
-        let inputs_ = utils::compress_and_hash_inputs(inputs, key);
+        let keys = cointoss::receive(reader, writer, &[rng.gen()])?;
+        let inputs_ = utils::compress_and_hash_inputs(inputs, keys[0]);
 
         let tbl = CuckooHash::new(&inputs_, NHASHES)?;
 
@@ -151,7 +150,6 @@ impl PsiReceiver for Receiver {
             .collect::<Vec<Block>>();
 
         // Send cuckoo hash info to sender.
-        key.write(writer)?;
         stream::write_usize(writer, nbins)?;
         stream::write_usize(writer, stashsize)?;
         writer.flush()?;
@@ -160,28 +158,28 @@ impl PsiReceiver for Receiver {
         // is in a bin or the stash.
         let inputs_ = tbl
             .items()
-            .filter_map(|opt_item| {
+            .map(|opt_item| {
                 if let Some(item) = opt_item {
                     if let Some(hidx) = item.hash_index {
                         // Item in bin. In this case, set the last byte to the
                         // hash index.
-                        Some(item.entry ^ hindices[hidx])
+                        item.entry ^ hindices[hidx]
                     } else {
                         // Item in stash. No need to add the hash index in this
                         // case.
-                        Some(item.entry)
+                        item.entry
                     }
                 } else {
                     // No item found, so use the "default" item.
-                    Some(Default::default())
+                    Default::default()
                 }
             })
             .collect::<Vec<Block>>();
+        assert_eq!(inputs_.len(), nbins + stashsize);
 
         let outputs = self.oprf.receive(reader, writer, &inputs_, rng)?;
 
         // Receive all the sets from the sender.
-        // let start = SystemTime::now();
         let mut hs = (0..NHASHES)
             .map(|_| HashSet::with_capacity(n))
             .collect::<Vec<HashSet<Vec<u8>>>>();
@@ -209,9 +207,9 @@ impl PsiReceiver for Receiver {
         // Iterate through each input/output pair and see whether it exists in
         // the appropriate set.
         let mut intersection = Vec::with_capacity(n);
-        for (i, (opt_item, output_)) in tbl.items().zip(outputs.into_iter()).enumerate() {
+        for (i, (opt_item, output)) in tbl.items().zip(outputs.into_iter()).enumerate() {
             if let Some(item) = opt_item {
-                let prefix = output_.prefix(masksize);
+                let prefix = output.prefix(masksize);
                 if let Some(hidx) = item.hash_index {
                     // We have a bin item.
                     if hs[hidx].contains(prefix) {

@@ -12,17 +12,11 @@ use crate::stream;
 use crate::utils;
 use crate::Error;
 use ocelot::oprf::kkrt;
-// use ocelot::oprf::{self, Receiver as OprfReceiver, Sender as OprfSender};
-// use rand::seq::SliceRandom;
-use rand::{Rng, CryptoRng, RngCore};
-// use scuttlebutt::utils as scutils;
-use scuttlebutt::{Block, SemiHonest};
-// use sha2::{Digest, Sha256};
-// use std::collections::HashSet;
-use std::io::{Read, Write};
-
 use ocelot::oprf::kmprt;
 use ocelot::oprf::{ProgrammableReceiver, ProgrammableSender};
+use rand::{CryptoRng, Rng, RngCore};
+use scuttlebutt::Block;
+use std::io::{Read, Write};
 
 const NHASHES: usize = 3;
 
@@ -54,11 +48,9 @@ impl P1 {
         reader: &mut R,
         writer: &mut W,
         inputs: &[Msg],
-        mut rng: &mut RNG,
+        rng: &mut RNG,
     ) -> Result<Vec<kkrt::Output>, Error> {
-        let n = inputs.len();
-
-        let key = rand::random::<Block>();
+        let key = rng.gen::<Block>();
         let hashed_inputs = utils::compress_and_hash_inputs(inputs, key);
         let cuckoo = CuckooHash::new(&hashed_inputs, NHASHES)?;
 
@@ -113,8 +105,7 @@ impl P2 {
         let key = Block::read(reader)?;
         let nbins = stream::read_usize(reader)?;
 
-        let mut inputs = utils::compress_and_hash_inputs(inputs, key);
-        let n = inputs.len();
+        let inputs = utils::compress_and_hash_inputs(inputs, key);
 
         // map inputs to table using all hash functions
         let mut table = vec![Vec::with_capacity(inputs.len()); nbins];
@@ -135,15 +126,18 @@ impl P2 {
 
         // select the target values
         let ts = (0..nbins).map(|_| rng.gen()).collect::<Vec<kkrt::Output>>();
-        let points = table.into_iter().zip(ts.iter()).flat_map(|(bin,t)| {
-            // map all the points in a bin to the same tag
-            bin.into_iter().map(move |item| (item, t.clone()))
-        }).collect::<Vec<(Block, kkrt::Output)>>();
+        let points = table
+            .into_iter()
+            .zip(ts.iter())
+            .flat_map(|(bin, t)| {
+                // map all the points in a bin to the same tag
+                bin.into_iter().map(move |item| (item, t.clone()))
+            })
+            .collect::<Vec<(Block, kkrt::Output)>>();
 
-        let mut check = points.iter().map(|(x,_)| x.clone()).collect::<Vec<_>>();
-        assert_eq!(check.len(), points.len());
-
-        let _ = self.opprf.send(reader, writer, &points, points.len(), nbins, rng)?;
+        let _ = self
+            .opprf
+            .send(reader, writer, &points, points.len(), nbins, rng)?;
 
         // return the target values for input to the MPC
         Ok(ts)
@@ -202,7 +196,7 @@ mod tests {
         );
 
         let start = SystemTime::now();
-        let intersection = psi
+        let _ = psi
             .send(&mut reader, &mut writer, &receiver_inputs, &mut rng)
             .unwrap();
         println!(

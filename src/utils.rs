@@ -1,3 +1,9 @@
+// -*- mode: rust; -*-
+//
+// This file is part of `popsicle`.
+// Copyright © 2019 Galois, Inc.
+// See LICENSE for licensing information.
+
 use scuttlebutt::{AesHash, Block};
 use sha2::{Digest, Sha256};
 
@@ -52,7 +58,6 @@ mod tests {
 mod benchmarks {
     extern crate test;
     use super::*;
-    use crate::utils;
     use test::Bencher;
 
     const NTIMES: usize = 1 << 16;

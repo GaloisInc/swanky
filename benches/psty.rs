@@ -41,7 +41,13 @@ fn bench_psty_init() {
     handle.join().unwrap();
 }
 
-fn bench_psty(inputs1: Vec<Vec<u8>>, inputs2: Vec<Vec<u8>>) -> (Vec<ocelot::oprf::kkrt::Output>, Vec<ocelot::oprf::kkrt::Output>) {
+fn bench_psty(
+    inputs1: Vec<Vec<u8>>,
+    inputs2: Vec<Vec<u8>>,
+) -> (
+    Vec<ocelot::oprf::kkrt::Output>,
+    Vec<ocelot::oprf::kkrt::Output>,
+) {
     let (sender, receiver) = UnixStream::pair().unwrap();
 
     let handle = std::thread::spawn(move || {
@@ -49,14 +55,17 @@ fn bench_psty(inputs1: Vec<Vec<u8>>, inputs2: Vec<Vec<u8>>) -> (Vec<ocelot::oprf
         let mut reader = BufReader::new(sender.try_clone().unwrap());
         let mut writer = BufWriter::new(sender);
         let mut p1 = P1::init(&mut reader, &mut writer, &mut rng).unwrap();
-        p1.send(&mut reader, &mut writer, &inputs1, &mut rng).unwrap()
+        p1.send(&mut reader, &mut writer, &inputs1, &mut rng)
+            .unwrap()
     });
 
     let mut rng = AesRng::new();
     let mut reader = BufReader::new(receiver.try_clone().unwrap());
     let mut writer = BufWriter::new(receiver);
     let mut p2 = P2::init(&mut reader, &mut writer, &mut rng).unwrap();
-    let p2_out = p2.send(&mut reader, &mut writer, &inputs2, &mut rng).unwrap();
+    let p2_out = p2
+        .send(&mut reader, &mut writer, &inputs2, &mut rng)
+        .unwrap();
 
     let p1_out = handle.join().unwrap();
 
@@ -84,13 +93,13 @@ fn bench_psi(c: &mut Criterion) {
             criterion::black_box(v)
         })
     });
-    // c.bench_function("psi::PSTY (n = 2^16)", move |bench| {
-    //     let rs = rand_vec_vec(1 << 16);
-    //     bench.iter(|| {
-    //         let v = bench_psty(rs.clone(), rs.clone());
-    //         criterion::black_box(v)
-    //     })
-    // });
+    c.bench_function("psi::PSTY (n = 2^16)", move |bench| {
+        let rs = rand_vec_vec(1 << 16);
+        bench.iter(|| {
+            let v = bench_psty(rs.clone(), rs.clone());
+            criterion::black_box(v)
+        })
+    });
     // c.bench_function("psi::PSTY (n = 2^20)", move |bench| {
     //     let rs = rand_vec_vec(1 << 20);
     //     bench.iter(|| {
