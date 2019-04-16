@@ -896,11 +896,4 @@ mod bundle {
         }
     }
     //}}}
-    #[test] // builder has send and sync {{{
-    fn test_builder_has_send_and_sync() {
-        fn check_send(_: impl Send) {}
-        fn check_sync(_: impl Sync) {}
-        check_send(CircuitBuilder::new());
-        check_sync(CircuitBuilder::new());
-    } // }}}
 }

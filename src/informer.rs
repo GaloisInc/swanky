@@ -272,15 +272,3 @@ impl Fancy for Informer {
         Ok(())
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    #[test]
-    fn informer_has_send_and_sync() {
-        fn check_send(_: impl Send) {}
-        fn check_sync(_: impl Sync) {}
-        check_send(Informer::new());
-        check_sync(Informer::new());
-    }
-}
