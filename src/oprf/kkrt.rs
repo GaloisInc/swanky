@@ -16,6 +16,7 @@ use crate::oprf::{ObliviousPrf, Receiver as OprfReceiver, Sender as OprfSender};
 use crate::ot::{Receiver as OtReceiver, Sender as OtSender};
 use crate::{stream, utils};
 use arrayref::array_ref;
+use rand::Rng;
 use rand::{CryptoRng, RngCore, SeedableRng};
 use scuttlebutt::utils as scutils;
 use scuttlebutt::{cointoss, AesRng, Block, SemiHonest};
@@ -257,9 +258,7 @@ impl<OT: OtReceiver<Msg = Block> + SemiHonest> OprfSender for Sender<OT> {
         let mut s_ = [0u8; 64];
         rng.fill_bytes(&mut s_);
         let s = utils::u8vec_to_boolvec(&s_);
-        let seeds = (0..4)
-            .map(|_| rand::random::<Block>())
-            .collect::<Vec<Block>>();
+        let seeds = (0..4).map(|_| rng.gen()).collect::<Vec<Block>>();
         let keys = cointoss::send(reader, writer, &seeds)?;
         let code = PseudorandomCode::new(keys[0], keys[1], keys[2], keys[3]);
         let ks = ot.receive(reader, writer, &s, rng)?;
@@ -361,9 +360,7 @@ impl<OT: OtSender<Msg = Block> + SemiHonest> OprfReceiver for Receiver<OT> {
         RNG: CryptoRng + RngCore,
     {
         let mut ot = OT::init(reader, writer, rng)?;
-        let seeds = (0..4)
-            .map(|_| rand::random::<Block>())
-            .collect::<Vec<Block>>();
+        let seeds = (0..4).map(|_| rng.gen()).collect::<Vec<Block>>();
         let keys = cointoss::receive(reader, writer, &seeds)?;
         let code = PseudorandomCode::new(keys[0], keys[1], keys[2], keys[3]);
         let mut ks = Vec::with_capacity(512);
@@ -404,7 +401,7 @@ impl<OT: OtSender<Msg = Block> + SemiHonest> OprfReceiver for Receiver<OT> {
             .map(|c| Output::new(*array_ref![c, 0, 64]))
             .collect::<Vec<Output>>();
         let mut t1s = t0s.clone();
-        let mut c = Output::zero();
+        let mut c = Output::default();
         for (j, r) in inputs.iter().enumerate() {
             let range = j * ncols / 8..(j + 1) * ncols / 8;
             let mut t1 = &mut t1s[range];
@@ -449,8 +446,6 @@ mod tests {
         let mut input = [0u8; 64];
         rng.fill_bytes(&mut input);
         let seed = Seed::new(input);
-        println!("seed = {}", seed);
-        println!("input = {:?}", input.as_ref());
         assert_eq!(seed.as_ref(), input.as_ref());
     }
 
