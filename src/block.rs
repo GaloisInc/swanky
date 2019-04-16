@@ -82,8 +82,7 @@ impl Block {
         let k = pt.compress();
         let c = Aes256::new(k.as_bytes());
         let m = unsafe { _mm_set_epi64(_mm_setzero_si64(), *(&tweak as *const _ as *const __m64)) };
-        let m = Block(m);
-        c.encrypt(m.into())
+        c.encrypt(Block(m))
     }
 
     /// Hash an elliptic curve point `pt` and tweak `tweak`.
