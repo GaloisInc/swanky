@@ -11,26 +11,28 @@ use fancy_garbling::{Fancy, Garbler as Gb, Message, Wire};
 use ocelot::ot::Sender as OtSender;
 use rand::{CryptoRng, Rng, RngCore, SeedableRng};
 use scuttlebutt::{AesRng, Block, SemiHonest};
+use std::cell::RefCell;
+use std::fmt::Debug;
 use std::io::{Read, Write};
-use std::sync::{Arc, Mutex};
+use std::rc::Rc;
 
 /// Semi-honest garbler.
 pub struct Garbler<
     R: Read + Send,
-    W: Write + Send,
+    W: Write + Send + Debug,
     RNG: CryptoRng + RngCore,
     OT: OtSender, // + SemiHonest
 > {
     garbler: Gb<W, AesRng>,
-    reader: Arc<Mutex<R>>,
-    writer: Arc<Mutex<W>>,
+    reader: Rc<RefCell<R>>,
+    writer: Rc<RefCell<W>>,
     ot: OT,
     rng: RNG,
 }
 
 impl<
         R: Read + Send,
-        W: Write + Send + 'static,
+        W: Write + Send + Debug + 'static,
         RNG: CryptoRng + RngCore,
         OT: OtSender<Msg = Block>, // + SemiHonest
     > Garbler<R, W, RNG, OT>
@@ -39,11 +41,11 @@ impl<
     pub fn new(mut reader: R, mut writer: W, inputs: &[u16], mut rng: RNG) -> Result<Self, Error> {
         let ot = OT::init(&mut reader, &mut writer, &mut rng)?;
         let mut inputs = inputs.to_vec().into_iter();
-        let reader = Arc::new(Mutex::new(reader));
-        let writer = Arc::new(Mutex::new(writer));
+        let reader = Rc::new(RefCell::new(reader));
+        let writer = Rc::new(RefCell::new(writer));
         let writer_ = writer.clone();
         let callback = move |m| {
-            let mut writer = writer_.lock().unwrap();
+            let mut writer = writer_.borrow_mut();
             let res = match m {
                 Message::UnencodedGarblerInput { zero, delta } => {
                     if let Some(input) = inputs.next() {
@@ -75,10 +77,13 @@ impl<
     }
 
     fn run_ot(&mut self, inputs: &[(Block, Block)]) -> Result<(), Error> {
-        let mut reader = self.reader.lock().unwrap();
-        let mut writer = self.writer.lock().unwrap();
         self.ot
-            .send(&mut *reader, &mut *writer, inputs, &mut self.rng)
+            .send(
+                &mut *self.reader.borrow_mut(),
+                &mut *self.writer.borrow_mut(),
+                inputs,
+                &mut self.rng,
+            )
             .map_err(Error::from)
     }
 
@@ -101,7 +106,7 @@ impl<
 
 impl<
         R: Read + Send,
-        W: Write + Send + 'static,
+        W: Write + Send + Debug + 'static,
         RNG: CryptoRng + RngCore,
         OT: OtSender<Msg = Block>, // + SemiHonest
     > Fancy for Garbler<R, W, RNG, OT>
@@ -170,7 +175,7 @@ impl<
 impl<R, W, RNG, OT> SemiHonest for Garbler<R, W, RNG, OT>
 where
     R: Read + Send,
-    W: Write + Send + 'static,
+    W: Write + Send + Debug + 'static,
     RNG: CryptoRng + RngCore,
     OT: OtSender<Msg = Block>, // + SemiHonest
 {

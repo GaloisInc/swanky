@@ -4,14 +4,12 @@
 // Copyright © 2019 Galois, Inc.
 // See LICENSE for licensing information.
 
-//! `twopac` implements (semi-honest) garbled-circuit-based two-party secure
-//! computation in rust, using `ocelot` for oblivious transfer and
-//! `fancy-garbling` for garbled circuits.
-//!
-//! **THIS IS VERY MUCH RESEARCH CODE!** (for now)
-
 #![cfg_attr(feature = "nightly", feature(test))]
+#![cfg_attr(feature = "nightly", feature(external_doc))]
+#![cfg_attr(feature = "nightly", doc(include = "../README.md"))]
 #![cfg_attr(feature = "nightly", deny(missing_docs))]
+
+//!
 
 mod comm;
 mod errors;

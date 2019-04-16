@@ -9,22 +9,24 @@ use fancy_garbling::{Evaluator as Ev, Fancy, Wire};
 use ocelot::ot::Receiver as OtReceiver;
 use rand::{CryptoRng, RngCore};
 use scuttlebutt::Block;
+use std::cell::RefCell;
+use std::fmt::Debug;
 use std::io::{Read, Write};
-use std::sync::{Arc, Mutex};
+use std::rc::Rc;
 
 /// Semi-honest evaluator.
-pub struct Evaluator<R: Read + Send, W: Write + Send, RNG: CryptoRng + RngCore, OT: OtReceiver> {
+pub struct Evaluator<R: Read + Debug, W: Write + Debug, RNG: CryptoRng + RngCore, OT: OtReceiver> {
     evaluator: Ev<R>,
-    reader: Arc<Mutex<R>>,
-    writer: Arc<Mutex<W>>,
+    reader: Rc<RefCell<R>>,
+    writer: Rc<RefCell<W>>,
     inputs: Vec<u16>,
     ot: OT,
     rng: RNG,
 }
 
 impl<
-        R: Read + Send + 'static,
-        W: Write + Send,
+        R: Read + Send + Debug + 'static,
+        W: Write + Send + Debug,
         RNG: CryptoRng + RngCore,
         OT: OtReceiver<Msg = Block>,
     > Evaluator<R, W, RNG, OT>
@@ -32,8 +34,8 @@ impl<
     /// Make a new `Evaluator`.
     pub fn new(mut reader: R, mut writer: W, inputs: &[u16], mut rng: RNG) -> Result<Self, Error> {
         let ot = OT::init(&mut reader, &mut writer, &mut rng)?;
-        let reader = Arc::new(Mutex::new(reader));
-        let writer = Arc::new(Mutex::new(writer));
+        let reader = Rc::new(RefCell::new(reader));
+        let writer = Rc::new(RefCell::new(writer));
         let evaluator = Ev::new(reader.clone());
         let inputs = inputs.to_vec();
         Ok(Evaluator {
@@ -52,10 +54,13 @@ impl<
     }
 
     fn run_ot(&mut self, inputs: &[bool]) -> Result<Vec<Block>, Error> {
-        let mut reader = self.reader.lock().unwrap();
-        let mut writer = self.writer.lock().unwrap();
         self.ot
-            .receive(&mut *reader, &mut *writer, &inputs, &mut self.rng)
+            .receive(
+                &mut *self.reader.borrow_mut(),
+                &mut *self.writer.borrow_mut(),
+                &inputs,
+                &mut self.rng,
+            )
             .map_err(Error::from)
     }
 }
@@ -71,8 +76,8 @@ fn combine(wires: &[Block], q: u16) -> Wire {
 }
 
 impl<
-        R: Read + Send + 'static,
-        W: Write + Send,
+        R: Read + Send + Debug + 'static,
+        W: Write + Send + Debug,
         RNG: CryptoRng + RngCore,
         OT: OtReceiver<Msg = Block>,
     > Fancy for Evaluator<R, W, RNG, OT>
