@@ -50,3 +50,8 @@ harness = false
 [[bench]]
 name = "psty"
 harness = false
+
+[[example]]
+name = "psty"
+harness = false
+required-features = ["nightly"]
