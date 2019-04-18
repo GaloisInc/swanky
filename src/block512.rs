@@ -7,6 +7,7 @@
 //! Defines a 512-bit value.
 
 use crate::Block;
+use std::arch::x86_64::*;
 use std::hash::{Hash, Hasher};
 use std::io::{Read, Write};
 
@@ -117,6 +118,51 @@ impl rand::distributions::Distribution<Block512> for rand::distributions::Standa
 }
 
 impl Eq for Block512 {}
+
+impl From<Block512> for [u32; 16] {
+    #[inline]
+    fn from(m: Block512) -> [u32; 16] {
+        unsafe { *(&m.0 as *const _ as *const [u32; 16]) }
+    }
+}
+
+impl From<Block512> for [__m128i; 4] {
+    #[inline]
+    fn from(m: Block512) -> [__m128i; 4] {
+        [m.0[0].into(), m.0[1].into(), m.0[2].into(), m.0[3].into()]
+    }
+}
+
+impl From<[__m128i; 4]> for Block512 {
+    #[inline]
+    fn from(m: [__m128i; 4]) -> Block512 {
+        Block512([Block(m[0]), Block(m[1]), Block(m[2]), Block(m[3])])
+    }
+}
+
+impl From<[Block; 4]> for Block512 {
+    #[inline]
+    fn from(m: [Block; 4]) -> Block512 {
+        Block512([m[0], m[1], m[2], m[3]])
+    }
+}
+
+#[cfg(feature = "nightly")]
+impl From<Block512> for __m512i {
+    #[inline]
+    fn from(m: Block512) -> __m512i {
+        unsafe { std::mem::transmute(m) }
+        // unsafe { *(&m as *const _ as *const __m512i) }
+    }
+}
+
+#[cfg(feature = "nightly")]
+impl From<__m512i> for Block512 {
+    #[inline]
+    fn from(m: __m512i) -> Block512 {
+        Block512(unsafe { *(&m as *const _ as *const [Block; 4]) })
+    }
+}
 
 impl Hash for Block512 {
     fn hash<H: Hasher>(&self, state: &mut H) {

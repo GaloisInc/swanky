@@ -27,9 +27,8 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-use crate::Block;
-use core::arch::x86_64::*;
-use core::mem;
+use crate::{Block, Block512};
+use std::arch::x86_64::*;
 
 /// AES-128, encryption only.
 #[derive(Clone)]
@@ -44,7 +43,7 @@ impl Aes128 {
         let rkeys = expand(key.0);
         Aes128 { rkeys }
     }
-    /// Encrypt `m`, outputting the encryption.
+    /// Encrypt a block, outputting the ciphertext.
     #[inline]
     pub fn encrypt(&self, m: Block) -> Block {
         let keys = self.rkeys;
@@ -61,6 +60,59 @@ impl Aes128 {
             c = _mm_aesenc_si128(c, keys[8]);
             c = _mm_aesenc_si128(c, keys[9]);
             Block(_mm_aesenclast_si128(c, keys[10]))
+        }
+    }
+    /// Encrypt four blocks at a time, outputting the ciphertexts.
+    #[inline]
+    pub fn encrypt4(&self, m: Block512) -> Block512 {
+        let keys = self.rkeys;
+        let mut c: [__m128i; 4] = m.into();
+        unsafe {
+            c[0] = _mm_xor_si128(c[0], keys[0]);
+            c[1] = _mm_xor_si128(c[1], keys[0]);
+            c[2] = _mm_xor_si128(c[2], keys[0]);
+            c[3] = _mm_xor_si128(c[3], keys[0]);
+            c[0] = _mm_aesenc_si128(c[0], keys[1]);
+            c[1] = _mm_aesenc_si128(c[1], keys[1]);
+            c[2] = _mm_aesenc_si128(c[2], keys[1]);
+            c[3] = _mm_aesenc_si128(c[3], keys[1]);
+            c[0] = _mm_aesenc_si128(c[0], keys[2]);
+            c[1] = _mm_aesenc_si128(c[1], keys[2]);
+            c[2] = _mm_aesenc_si128(c[2], keys[2]);
+            c[3] = _mm_aesenc_si128(c[3], keys[2]);
+            c[0] = _mm_aesenc_si128(c[0], keys[3]);
+            c[1] = _mm_aesenc_si128(c[1], keys[3]);
+            c[2] = _mm_aesenc_si128(c[2], keys[3]);
+            c[3] = _mm_aesenc_si128(c[3], keys[3]);
+            c[0] = _mm_aesenc_si128(c[0], keys[4]);
+            c[1] = _mm_aesenc_si128(c[1], keys[4]);
+            c[2] = _mm_aesenc_si128(c[2], keys[4]);
+            c[3] = _mm_aesenc_si128(c[3], keys[4]);
+            c[0] = _mm_aesenc_si128(c[0], keys[5]);
+            c[1] = _mm_aesenc_si128(c[1], keys[5]);
+            c[2] = _mm_aesenc_si128(c[2], keys[5]);
+            c[3] = _mm_aesenc_si128(c[3], keys[5]);
+            c[0] = _mm_aesenc_si128(c[0], keys[6]);
+            c[1] = _mm_aesenc_si128(c[1], keys[6]);
+            c[2] = _mm_aesenc_si128(c[2], keys[6]);
+            c[3] = _mm_aesenc_si128(c[3], keys[6]);
+            c[0] = _mm_aesenc_si128(c[0], keys[7]);
+            c[1] = _mm_aesenc_si128(c[1], keys[7]);
+            c[2] = _mm_aesenc_si128(c[2], keys[7]);
+            c[3] = _mm_aesenc_si128(c[3], keys[7]);
+            c[0] = _mm_aesenc_si128(c[0], keys[8]);
+            c[1] = _mm_aesenc_si128(c[1], keys[8]);
+            c[2] = _mm_aesenc_si128(c[2], keys[8]);
+            c[3] = _mm_aesenc_si128(c[3], keys[8]);
+            c[0] = _mm_aesenc_si128(c[0], keys[9]);
+            c[1] = _mm_aesenc_si128(c[1], keys[9]);
+            c[2] = _mm_aesenc_si128(c[2], keys[9]);
+            c[3] = _mm_aesenc_si128(c[3], keys[9]);
+            c[0] = _mm_aesenclast_si128(c[0], keys[10]);
+            c[1] = _mm_aesenclast_si128(c[1], keys[10]);
+            c[2] = _mm_aesenclast_si128(c[2], keys[10]);
+            c[3] = _mm_aesenclast_si128(c[3], keys[10]);
+            Block512::from(c)
         }
     }
 }
@@ -88,7 +140,7 @@ macro_rules! expand_round {
 #[inline(always)]
 fn expand(key: __m128i) -> [__m128i; 11] {
     unsafe {
-        let mut keys: [__m128i; 11] = mem::uninitialized();
+        let mut keys: [__m128i; 11] = std::mem::uninitialized();
         _mm_store_si128(keys.as_mut_ptr(), key);
         expand_round!(keys, 1, 0x01);
         expand_round!(keys, 2, 0x02);

@@ -7,11 +7,10 @@
 //! Fixed-key AES random number generator.
 
 use crate::{Aes128, Block};
-#[cfg(feature = "nightly")]
-use core::arch::x86_64::*;
-use core::fmt;
 use rand_core::block::{BlockRng, BlockRngCore};
 use rand_core::{CryptoRng, Error, RngCore, SeedableRng};
+#[cfg(feature = "nightly")]
+use std::arch::x86_64::*;
 
 /// Implementation of a random number generator based on fixed-key AES.
 ///
@@ -81,8 +80,8 @@ pub struct AesRngCore {
     state: u64,
 }
 
-impl fmt::Debug for AesRngCore {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+impl std::fmt::Debug for AesRngCore {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "AesRngCore {{}}")
     }
 }
@@ -97,18 +96,36 @@ impl BlockRngCore for AesRngCore {
     #[inline]
     #[cfg(feature = "nightly")]
     fn generate(&mut self, results: &mut Self::Results) {
-        let data = unsafe { _mm_set_epi64(_mm_setzero_si64(), self.state) };
-        let c = self.aes.encrypt(Block::from(data));
-        *results = unsafe { *(&c.0 as *const _ as *const [u32; 4]) };
+        let m0 = unsafe { _mm_set_epi64(_mm_setzero_si64(), self.state) };
         self.state = unsafe { _mm_add_pi32(self.state, _mm_set_pi32(0, 1)) };
+        *results = self.aes.encrypt(Block(m0)).into();
+        // let m0 = unsafe { _mm_set_epi64(_mm_setzero_si64(), self.state) };
+        // self.state = unsafe { _mm_add_pi32(self.state, _mm_set_pi32(0, 1)) };
+        // let m1 = unsafe { _mm_set_epi64(_mm_setzero_si64(), self.state) };
+        // self.state = unsafe { _mm_add_pi32(self.state, _mm_set_pi32(0, 1)) };
+        // let m2 = unsafe { _mm_set_epi64(_mm_setzero_si64(), self.state) };
+        // self.state = unsafe { _mm_add_pi32(self.state, _mm_set_pi32(0, 1)) };
+        // let m3 = unsafe { _mm_set_epi64(_mm_setzero_si64(), self.state) };
+        // self.state = unsafe { _mm_add_pi32(self.state, _mm_set_pi32(0, 1)) };
+        // let c = self.aes.encrypt4(Block512::from([m0, m1, m2, m3]));
+        // *results = c.into();
     }
     #[inline]
     #[cfg(not(feature = "nightly"))]
     fn generate(&mut self, results: &mut Self::Results) {
-        let data = u128::from(self.state);
-        let c = self.aes.encrypt(Block::from(data));
-        *results = unsafe { *(&c.0 as *const _ as *const [u32; 4]) };
+        let m0 = Block::from(u128::from(self.state));
         self.state += 1;
+        *results = self.aes.encrypt(m0).into();
+        // let m0 = Block::from(self.state as u128);
+        // self.state += 1;
+        // let m1 = Block::from(self.state as u128);
+        // self.state += 1;
+        // let m2 = Block::from(self.state as u128);
+        // self.state += 1;
+        // let m3 = Block::from(self.state as u128);
+        // self.state += 1;
+        // let c = self.aes.encrypt4(Block512::from([m0, m1, m2, m3]));
+        // *results = c.into();
     }
 }
 

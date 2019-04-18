@@ -8,9 +8,9 @@
 
 #[cfg(feature = "curve25519-dalek")]
 use crate::Aes256;
-use core::arch::x86_64::*;
 #[cfg(feature = "curve25519-dalek")]
 use curve25519_dalek::ristretto::RistrettoPoint;
+use std::arch::x86_64::*;
 #[cfg(feature = "serde")]
 use std::convert::TryInto;
 use std::hash::{Hash, Hasher};
@@ -256,6 +256,13 @@ impl From<[u8; 16]> for Block {
         unsafe { std::mem::transmute(m) }
         // XXX: the below doesn't work due to pointer-alignment issues.
         // unsafe { *(&m as *const _ as *const Block) }
+    }
+}
+
+impl From<Block> for [u32; 4] {
+    #[inline]
+    fn from(m: Block) -> Self {
+        unsafe { *(&m as *const _ as *const [u32; 4]) }
     }
 }
 

@@ -96,6 +96,7 @@ fn expand(key: &[u8; 32]) -> [__m128i; 15] {
     unsafe {
         let mut enc_keys: [__m128i; 15] = mem::uninitialized();
 
+        #[allow(clippy::useless_transmute)] // XXX remove if possible!
         let kp = std::mem::transmute(key);
         // let kp = key.as_ptr() as *const __m128i;
         let k1 = _mm_loadu_si128(kp);
