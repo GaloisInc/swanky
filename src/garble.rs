@@ -1,70 +1,38 @@
 //! Structs and functions for creating, streaming, and evaluating garbled circuits.
 
-use crate::circuit::Circuit;
-use crate::error::GarblerError;
-use crate::fancy::HasModulus;
 use crate::wire::Wire;
-use scuttlebutt::{AesRng, Block};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
 
 mod evaluator;
 mod garbler;
 
-pub use crate::garble::evaluator::{Decoder, Encoder, Evaluator, GarbledCircuit};
+pub use crate::garble::evaluator::Evaluator;
 pub use crate::garble::garbler::Garbler;
-
-/// The ciphertext created by a garbled gate.
-pub type GarbledGate = Vec<Block>;
-
-/// Ciphertext created by the garbler for output gates.
-pub type OutputCiphertext = Vec<Block>;
 
 /// The outputs that can be emitted by a Garbler and consumed by an Evaluator.
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
 pub enum Message {
-    /// Zero wire and delta for one of the garbler's inputs.
+    /// The zero wire and delta offset for one of the garbler's inputs.
     ///
-    /// This is produced by the Garbler, and must be transformed into GarblerInput before
-    /// being sent to the Evaluator.
+    /// This is produced by the garbler, and should be transformed into
+    /// `GarblerInput` before being sent to the evaluator.
     UnencodedGarblerInput {
-        /// The zero wire-label.
-        zero: Wire,
-        /// THe offset wire-label.
-        delta: Wire,
-    },
-
-    /// Zero wire and delta for one of the evaluator's inputs.
-    ///
-    /// This is produced by the Garbler, and must be transformed into EvaluatorInput
-    /// before being sent to the Evaluator.
-    UnencodedEvaluatorInput {
         /// The zero wire-label.
         zero: Wire,
         /// The offset wire-label.
         delta: Wire,
     },
 
-    /// Encoded input for one of the garbler's inputs.
-    GarblerInput(Wire),
-
-    /// Encoded input for one of the evaluator's inputs.
-    EvaluatorInput(Wire),
-
-    /// Constant wire carrying the value.
-    Constant {
-        /// The constant value.
-        value: u16,
-        /// The constant's wire-label.
-        wire: Wire,
+    /// The zero wire and delta offset for one of the evaluator's inputs.
+    ///
+    /// This is produced by the garbler, and should be transformed into
+    /// `EvaluatorInput` before being sent to the evaluator.
+    UnencodedEvaluatorInput {
+        /// The zero wire-label.
+        zero: Wire,
+        /// The offset wire-label.
+        delta: Wire,
     },
-
-    /// Garbled gate emitted by a projection or multiplication.
-    GarbledGate(GarbledGate),
-
-    /// Output decoding information.
-    OutputCiphertext(OutputCiphertext),
 }
 
 impl std::fmt::Display for Message {
@@ -72,93 +40,8 @@ impl std::fmt::Display for Message {
         f.write_str(match self {
             Message::UnencodedGarblerInput { .. } => "UnencodedGarblerInput",
             Message::UnencodedEvaluatorInput { .. } => "UnencodedEvaluatorInput",
-            Message::GarblerInput(_) => "GarblerInput",
-            Message::EvaluatorInput(_) => "EvaluatorInput",
-            Message::Constant { .. } => "Constant",
-            Message::GarbledGate(_) => "GarbledGate",
-            Message::OutputCiphertext(_) => "OutputCiphertext",
         })
     }
-}
-
-////////////////////////////////////////////////////////////////////////////////
-// general user-facing garbling functions
-
-// XXX: remove?
-
-/// Create an iterator over the messages produced by fancy garbling.
-///
-/// This creates a new thread for the garbler, which passes messages back through a
-/// channel one by one. This function has a restrictive input type because
-/// `fancy_computation` is sent to the new thread.
-pub fn garble_iter<F>(f: &'static mut F, rng: AesRng) -> impl Iterator<Item = Message>
-where
-    F: FnMut(&mut Garbler<AesRng>) + Send + 'static,
-{
-    let (sender, receiver) = std::sync::mpsc::sync_channel(20);
-
-    std::thread::spawn(move || {
-        let callback = move |m| {
-            sender
-                .send(m)
-                .expect("garble_iter thread could not send message to iterator")
-        };
-        let mut garbler = Garbler::new(callback, rng);
-        f(&mut garbler);
-    });
-
-    receiver.into_iter()
-}
-
-/// Garble a circuit without streaming.
-pub fn garble(c: &mut Circuit) -> Result<(Encoder, Decoder, GarbledCircuit), GarblerError> {
-    let garbler_inputs = Arc::new(Mutex::new(Vec::new()));
-    let evaluator_inputs = Arc::new(Mutex::new(Vec::new()));
-    let garbled_gates = Arc::new(Mutex::new(Vec::new()));
-    let constants = Arc::new(Mutex::new(HashMap::new()));
-    let garbled_outputs = Arc::new(Mutex::new(Vec::new()));
-    let rng = AesRng::new();
-
-    let callback = {
-        let garbler_inputs = garbler_inputs.clone();
-        let evaluator_inputs = evaluator_inputs.clone();
-        let garbled_gates = garbled_gates.clone();
-        let constants = constants.clone();
-        let garbled_outputs = garbled_outputs.clone();
-        move |m| match m {
-            Message::UnencodedGarblerInput { zero, .. } => {
-                garbler_inputs.lock().unwrap().push(zero)
-            }
-            Message::UnencodedEvaluatorInput { zero, .. } => {
-                evaluator_inputs.lock().unwrap().push(zero)
-            }
-            Message::GarbledGate(w) => garbled_gates.lock().unwrap().push(w),
-            Message::OutputCiphertext(c) => garbled_outputs.lock().unwrap().push(c),
-            Message::Constant { value, wire } => {
-                let q = wire.modulus();
-                constants.lock().unwrap().insert((value, q), wire);
-            }
-            m => panic!("unexpected message: {}", m),
-        }
-    };
-
-    let mut garbler = Garbler::new(callback, rng);
-    let outputs = c.eval(&mut garbler)?;
-    c.process_outputs(&outputs, &mut garbler)?;
-    let deltas = garbler.get_deltas();
-
-    let en = Encoder::new(
-        garbler_inputs.lock().unwrap().clone(),
-        evaluator_inputs.lock().unwrap().clone(),
-        deltas,
-    );
-    let ev = GarbledCircuit::new(
-        garbled_gates.lock().unwrap().clone(),
-        constants.lock().unwrap().clone(),
-    );
-    let de = Decoder::new(garbled_outputs.lock().unwrap().clone());
-
-    Ok((en, de, ev))
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -166,10 +49,10 @@ pub fn garble(c: &mut Circuit) -> Result<(Encoder, Decoder, GarbledCircuit), Gar
 
 #[cfg(test)]
 mod classic {
-    use super::*;
     use crate::circuit::{Circuit, CircuitBuilder};
     use crate::dummy::Dummy;
     use crate::fancy::{BundleGadgets, Fancy};
+    use crate::r#static::garble;
     use crate::util::{self, RngExt};
     use rand::thread_rng;
 
@@ -182,21 +65,20 @@ mod classic {
         for _ in 0..16 {
             let q = rng.gen_prime();
             let mut c = &mut f(q);
-            let (en, de, ev) = garble(&mut c).unwrap();
+            let (en, ev) = garble(&mut c).unwrap();
             for _ in 0..16 {
                 let inps = (0..c.num_evaluator_inputs())
                     .map(|i| rng.gen_u16() % c.evaluator_input_mod(i))
                     .collect::<Vec<u16>>();
                 // Run the garbled circuit evaluator.
                 let xs = &en.encode_evaluator_inputs(&inps);
-                let ys = &ev.eval(&mut c, &[], xs).unwrap();
-                let decoded = de.decode(ys)[0];
+                let decoded = &ev.eval(&mut c, &[], xs).unwrap();
                 // Run the dummy evaluator.
                 let mut dummy = Dummy::new(&[], &inps);
                 let outputs = c.eval(&mut dummy).unwrap();
                 c.process_outputs(&outputs, &mut dummy).unwrap();
-                let should_be = dummy.get_output()[0];
-                assert_eq!(decoded, should_be);
+                let should_be = dummy.get_output();
+                assert_eq!(decoded[0], should_be[0]);
             }
         }
     }
@@ -333,35 +215,19 @@ mod classic {
             b.output(&z).unwrap();
             let mut c = b.finish();
 
-            let (en, de, ev) = garble(&mut c).unwrap();
+            let (en, ev) = garble(&mut c).unwrap();
 
-            let mut fail = false;
             for x in 0..q {
                 for y in 0..ymod {
                     println!("TEST x={} y={}", x, y);
                     let xs = &en.encode_evaluator_inputs(&[x, y]);
-                    let ys = &ev.eval(&mut c, &[], xs).unwrap();
-                    let decoded = de.decode(ys)[0];
+                    let decoded = &ev.eval(&mut c, &[], xs).unwrap();
                     let mut dummy = Dummy::new(&[], &[x, y]);
                     let outputs = c.eval(&mut dummy).unwrap();
                     c.process_outputs(&outputs, &mut dummy).unwrap();
-                    let should_be = dummy.get_output()[0];
-                    if decoded != should_be {
-                        println!(
-                            "FAILED inp={:?} q={} got={} should_be={}",
-                            [x, y],
-                            q,
-                            decoded,
-                            should_be
-                        );
-                        fail = true;
-                    } else {
-                        // println!("SUCCEEDED inp={:?} q={} got={} should_be={}", [x,y], q, decoded, should_be);
-                    }
+                    let should_be = dummy.get_output();
+                    assert_eq!(decoded[0], should_be[0]);
                 }
-            }
-            if fail {
-                panic!("failed!")
             }
         }
     }
@@ -380,7 +246,7 @@ mod classic {
         b.output_bundle(&z).unwrap();
         let mut circ = b.finish();
 
-        let (en, de, ev) = garble(&mut circ).unwrap();
+        let (en, ev) = garble(&mut circ).unwrap();
         println!("mods={:?} nargs={} size={}", mods, nargs, ev.size());
 
         let Q: u128 = mods.iter().map(|&q| q as u128).product();
@@ -395,9 +261,8 @@ mod classic {
                 ds.extend(util::as_mixed_radix(x, &mods).iter());
             }
             let X = en.encode_evaluator_inputs(&ds);
-            let Y = ev.eval(&mut circ, &[], &X).unwrap();
-            let res = de.decode(&Y);
-            assert_eq!(util::from_mixed_radix(&res, &mods), should_be);
+            let outputs = ev.eval(&mut circ, &[], &X).unwrap();
+            assert_eq!(util::from_mixed_radix(&outputs, &mods), should_be);
         }
     }
     //}}}
@@ -413,15 +278,15 @@ mod classic {
         b.output(&y).unwrap();
 
         let mut circ = b.finish();
-        let (_, de, ev) = garble(&mut circ).unwrap();
+        let (_, ev) = garble(&mut circ).unwrap();
 
         for _ in 0..64 {
             let mut dummy = Dummy::new(&[], &[]);
             let outputs = circ.eval(&mut dummy).unwrap();
             circ.process_outputs(&outputs, &mut dummy).unwrap();
             assert_eq!(dummy.get_output()[0], c, "plaintext eval failed");
-            let Y = ev.eval(&mut circ, &[], &[]).unwrap();
-            assert_eq!(de.decode(&Y)[0], c, "garbled eval failed");
+            let outputs = ev.eval(&mut circ, &[], &[]).unwrap();
+            assert_eq!(outputs[0], c, "garbled eval failed");
         }
     }
     //}}}
@@ -439,7 +304,7 @@ mod classic {
         b.output(&z).unwrap();
 
         let mut circ = b.finish();
-        let (en, de, ev) = garble(&mut circ).unwrap();
+        let (en, ev) = garble(&mut circ).unwrap();
 
         for _ in 0..64 {
             let x = rng.gen_u16() % q;
@@ -450,7 +315,7 @@ mod classic {
 
             let X = en.encode_evaluator_inputs(&[x]);
             let Y = ev.eval(&mut circ, &[], &X).unwrap();
-            assert_eq!(de.decode(&Y)[0], (x + c) % q, "garbled");
+            assert_eq!(Y[0], (x + c) % q, "garbled");
         }
     }
     //}}}
@@ -458,13 +323,21 @@ mod classic {
 
 #[cfg(test)]
 mod streaming {
-    use super::*;
-    use crate::fancy::Fancy;
     use crate::util::RngExt;
     use crate::FancyError;
+    use crate::Message;
+    use crate::{Evaluator, Garbler};
+    use crate::{Fancy, HasModulus};
     use itertools::Itertools;
     use rand::thread_rng;
+    use scuttlebutt::AesRng;
+    use std::cell::RefCell;
     use std::fmt::{Debug, Display};
+    use std::os::unix::net::UnixStream;
+    use std::rc::Rc;
+
+    type Reader = UnixStream;
+    type Writer = UnixStream;
 
     // helper {{{
     fn streaming_test<F, G>(
@@ -474,55 +347,42 @@ mod streaming {
         ev_inp: &[u16],
         should_be: &[u16],
     ) where
-        F: FnMut(&mut Garbler<AesRng>) + Send + Copy + 'static,
-        G: FnMut(&mut Evaluator) + Send + Copy + 'static,
+        F: FnMut(&mut Garbler<Writer, AesRng>) + Send + Sync + Copy + 'static,
+        G: FnMut(&mut Evaluator<Reader>) + Send + Sync + Copy + 'static,
     {
         let rng = AesRng::new();
-        let (sender, receiver) = std::sync::mpsc::sync_channel(20);
-
-        std::thread::spawn(move || {
-            let callback = move |m| {
-                sender
-                    .send(m)
-                    .expect("garble_iter thread could not send message to iterator")
-            };
-            let mut garbler = Garbler::new(callback, rng);
-            f_gb(&mut garbler);
-        });
-
-        let mut gb_iter = receiver.into_iter();
+        let (sender, receiver) = UnixStream::pair().unwrap();
 
         let mut gb_inp_iter = gb_inp.to_vec().into_iter();
         let mut ev_inp_iter = ev_inp.to_vec().into_iter();
 
-        // the evaluator's callback gets the next message from the garble iterator,
-        // encodes the appropriate inputs, and sends it along
-        let callback = move |_| {
-            let blocks = match gb_iter.next().unwrap() {
-                Message::UnencodedGarblerInput { zero, delta } => {
-                    // Encode the garbler's next input
-                    let x = gb_inp_iter.next().expect("not enough garbler inputs!");
-                    vec![zero.plus(&delta.cmul(x)).as_block()]
+        std::thread::spawn(move || {
+            let sender = Rc::new(RefCell::new(sender));
+            let sender_ = sender.clone();
+            let callback = move |m| {
+                match m {
+                    Message::UnencodedGarblerInput { zero, delta } => {
+                        let x = gb_inp_iter.next().expect("not enough garbler inputs!");
+                        let mut sender = sender_.borrow_mut();
+                        zero.plus(&delta.cmul(x)).as_block().write(&mut *sender)?;
+                    }
+                    Message::UnencodedEvaluatorInput { zero, delta } => {
+                        let x = ev_inp_iter.next().expect("not enough evaluator inputs!");
+                        let mut sender = sender_.borrow_mut();
+                        zero.plus(&delta.cmul(x)).as_block().write(&mut *sender)?;
+                    }
                 }
-
-                Message::UnencodedEvaluatorInput { zero, delta } => {
-                    // Encode the garbler's next input
-                    let x = ev_inp_iter.next().expect("not enough evaluator inputs!");
-                    vec![zero.plus(&delta.cmul(x)).as_block()]
-                }
-                Message::Constant { value: _, wire } => vec![wire.as_block()],
-                Message::GarbledGate(gate) => gate,
-                Message::OutputCiphertext(ct) => ct,
-                _ => panic!(),
+                Ok(())
             };
-            Ok(blocks)
-        };
+            let mut garbler = Garbler::new(sender, callback, rng);
+            f_gb(&mut garbler);
+        });
 
-        let mut ev = Evaluator::new(callback);
+        let receiver = Rc::new(RefCell::new(receiver));
+        let mut ev = Evaluator::new(receiver);
         f_ev(&mut ev);
 
         let result = ev.decode_output();
-        println!("gb_inp={:?} ev_inp={:?}", gb_inp, ev_inp);
         assert_eq!(result, should_be)
     }
     //}}}
@@ -676,17 +536,20 @@ mod streaming {
 
 #[cfg(test)]
 mod complex {
-    use super::*;
     use crate::dummy::Dummy;
-    use crate::fancy::BundleGadgets;
-    use crate::fancy::Fancy;
+    use crate::error::GarblerError;
     use crate::util::RngExt;
+    use crate::{BundleGadgets, Evaluator, Fancy, Garbler, HasModulus, Message};
     use rand::thread_rng;
+    use scuttlebutt::AesRng;
+    use std::cell::RefCell;
+    use std::os::unix::net::UnixStream;
+    use std::rc::Rc;
 
     fn complex_gadget<F, W>(b: &mut F, q: u128, n: usize)
     where
-        W: Clone + HasModulus + Send,
-        F: Fancy<Item = W> + Send,
+        W: Clone + HasModulus,
+        F: Fancy<Item = W>,
     {
         let mut zs = Vec::with_capacity(n);
         for _ in 0..n {
@@ -701,8 +564,8 @@ mod complex {
 
     fn complex_gadget_<F, W>(b: &mut F, q: u128, n: usize)
     where
-        W: Clone + HasModulus + Send,
-        F: Fancy<Item = W> + Send,
+        W: Clone + HasModulus,
+        F: Fancy<Item = W>,
     {
         let mut zs = Vec::with_capacity(n);
         for _ in 0..n {
@@ -731,80 +594,67 @@ mod complex {
             let mut dummy = Dummy::new(&input_, &[]);
             complex_gadget(&mut dummy, Q, N);
             let should_be = dummy.get_output();
-            // Do 2PC computation.
-            let (tx, rx) = std::sync::mpsc::channel();
-            let tx = tx.clone();
-            let mut input_ = input.clone();
-            let callback = move |m| {
-                let m = match m {
-                    Message::UnencodedGarblerInput { zero, delta } => {
-                        let x = input_.remove(0);
-                        let w = zero.plus(&delta.cmul(x));
-                        vec![w.as_block()]
-                    }
-                    Message::UnencodedEvaluatorInput { .. } => {
-                        panic!(
-                            "There should not be an `UnencodedEvaluatorInput` message in the garbler"
-                        );
-                    }
-                    Message::EvaluatorInput(_) => {
-                        panic!("There should not be an `EvaluatorInput` message in the garbler");
-                    }
-                    Message::GarblerInput(_) => {
-                        panic!("There should not be a `GarblerInput` message in the garbler");
-                    }
-                    Message::Constant { value: _, wire } => vec![wire.as_block()],
-                    Message::GarbledGate(gate) => gate,
-                    Message::OutputCiphertext(ct) => ct,
-                };
-                tx.send(m).unwrap();
-            };
 
+            let (sender, receiver) = UnixStream::pair().unwrap();
+            let mut input_ = input.clone();
             std::thread::spawn(move || {
+                let sender = Rc::new(RefCell::new(sender));
+                let sender_ = sender.clone();
+                let callback = move |m| {
+                    match m {
+                        Message::UnencodedGarblerInput { zero, delta } => {
+                            let x = input_.remove(0);
+                            let w = zero.plus(&delta.cmul(x));
+                            let mut sender = sender_.borrow_mut();
+                            w.as_block().write(&mut *sender)?;
+                        }
+                        m => {
+                            return Err(GarblerError::MessageError(format!(
+                                "invalid message {}",
+                                m
+                            )));
+                        }
+                    };
+                    Ok(())
+                };
                 let rng = AesRng::new();
-                let mut garbler = Garbler::new(callback, rng);
+                let mut garbler = Garbler::new(sender, callback, rng);
                 complex_gadget(&mut garbler, Q, N);
             });
-            let mut evaluator = Evaluator::new(move |_| Ok(rx.recv().unwrap()));
+            let receiver = Rc::new(RefCell::new(receiver));
+            let mut evaluator = Evaluator::new(receiver);
             complex_gadget(&mut evaluator, Q, N);
             let result = evaluator.decode_output();
             assert_eq!(result, should_be);
 
-            let (tx, rx) = std::sync::mpsc::channel();
-            let tx = tx.clone();
+            let (sender, receiver) = UnixStream::pair().unwrap();
             let mut input_ = input.clone();
             std::thread::spawn(move || {
+                let sender = Rc::new(RefCell::new(sender));
+                let sender_ = sender.clone();
                 let callback = move |m| {
-                    let m = match m {
-                        Message::UnencodedGarblerInput { .. } => {
-                            panic!(
-                            "There should not be an `UnencodedEvaluatorInput` message in the garbler"
-                        );
-                        }
+                    match m {
                         Message::UnencodedEvaluatorInput { zero, delta } => {
                             let x = input_.remove(0);
                             let w = zero.plus(&delta.cmul(x));
-                            vec![w.as_block()]
+                            let mut sender = sender_.borrow_mut();
+                            w.as_block().write(&mut *sender)?;
                         }
-                        Message::EvaluatorInput(_) => {
-                            panic!(
-                                "There should not be an `EvaluatorInput` message in the garbler"
-                            );
+                        m => {
+                            return Err(GarblerError::MessageError(format!(
+                                "invalid message {}",
+                                m
+                            )));
                         }
-                        Message::GarblerInput(_) => {
-                            panic!("There should not be a `GarblerInput` message in the garbler");
-                        }
-                        Message::Constant { value: _, wire } => vec![wire.as_block()],
-                        Message::GarbledGate(gate) => gate,
-                        Message::OutputCiphertext(ct) => ct,
                     };
-                    tx.send(m).unwrap();
+                    Ok(())
                 };
                 let rng = AesRng::new();
-                let mut garbler = Garbler::new(callback, rng);
+                let mut garbler = Garbler::new(sender, callback, rng);
                 complex_gadget_(&mut garbler, Q, N);
             });
-            let mut evaluator = Evaluator::new(move |_| Ok(rx.recv().unwrap()));
+            let receiver = Rc::new(RefCell::new(receiver));
+            let mut evaluator = Evaluator::new(receiver);
             complex_gadget_(&mut evaluator, Q, N);
             let result = evaluator.decode_output();
             assert_eq!(result, should_be);

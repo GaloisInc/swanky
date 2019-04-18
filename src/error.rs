@@ -1,5 +1,7 @@
 //! Errors that may be output by this library.
 
+use crate::garble::Message;
+use scuttlebutt::Block;
 use std::fmt::{self, Display, Formatter};
 
 /// Errors that may occur when using the `Fancy` trait. These errors are
@@ -48,6 +50,12 @@ pub enum DummyError {
 /// Errors from the evaluator.
 #[derive(Debug)]
 pub enum EvaluatorError {
+    /// Not enough garbler inputs provided.
+    NotEnoughGarblerInputs,
+    /// Not enough evaluator inputs provided.
+    NotEnoughEvaluatorInputs,
+    /// A communication error has occurred.
+    CommunicationError(String),
     /// A fancy error has occurred.
     FancyError(FancyError),
 }
@@ -55,6 +63,10 @@ pub enum EvaluatorError {
 /// Errors from the garbler.
 #[derive(Debug)]
 pub enum GarblerError {
+    /// An error occurred while processing a message.
+    MessageError(String),
+    /// A communication error has occurred.
+    CommunicationError(String),
     /// Asymmetric moduli error.
     AsymmetricHalfGateModuliMax8(u16),
     /// A truth table was missing.
@@ -130,14 +142,29 @@ impl From<FancyError> for DummyError {
 impl Display for EvaluatorError {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         match self {
+            EvaluatorError::NotEnoughGarblerInputs => "not enough garbler inputs".fmt(f),
+            EvaluatorError::NotEnoughEvaluatorInputs => "not enough evaluator inputs".fmt(f),
+            EvaluatorError::CommunicationError(s) => write!(f, "communication error: {}", s),
             EvaluatorError::FancyError(e) => write!(f, "fancy error: {}", e),
         }
     }
 }
 
 impl From<FancyError> for EvaluatorError {
-    fn from(e: FancyError) -> EvaluatorError {
+    fn from(e: FancyError) -> Self {
         EvaluatorError::FancyError(e)
+    }
+}
+
+impl From<std::io::Error> for EvaluatorError {
+    fn from(e: std::io::Error) -> Self {
+        EvaluatorError::CommunicationError(e.to_string())
+    }
+}
+
+impl From<std::sync::mpsc::RecvError> for EvaluatorError {
+    fn from(e: std::sync::mpsc::RecvError) -> Self {
+        EvaluatorError::CommunicationError(e.to_string())
     }
 }
 
@@ -147,6 +174,8 @@ impl From<FancyError> for EvaluatorError {
 impl Display for GarblerError {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         match self {
+            GarblerError::MessageError(s) => write!(f, "{}", s),
+            GarblerError::CommunicationError(s) => write!(f, "{}", s),
             GarblerError::AsymmetricHalfGateModuliMax8(q) => write!(
                 f,
                 "the small modulus in a half gate with asymmetric moduli is capped at 8, got {}",
@@ -155,14 +184,32 @@ impl Display for GarblerError {
             GarblerError::TruthTableRequired => {
                 "truth table required for garbler projection gates".fmt(f)
             }
-            GarblerError::FancyError(e) => write!(f, "fancy error: {}", e),
+            GarblerError::FancyError(e) => write!(f, "{}", e),
         }
     }
 }
 
 impl From<FancyError> for GarblerError {
-    fn from(e: FancyError) -> GarblerError {
+    fn from(e: FancyError) -> Self {
         GarblerError::FancyError(e)
+    }
+}
+
+impl From<std::io::Error> for GarblerError {
+    fn from(e: std::io::Error) -> Self {
+        GarblerError::CommunicationError(e.to_string())
+    }
+}
+
+impl From<std::sync::mpsc::SendError<Message>> for GarblerError {
+    fn from(e: std::sync::mpsc::SendError<Message>) -> Self {
+        GarblerError::CommunicationError(e.to_string())
+    }
+}
+
+impl From<std::sync::mpsc::SendError<Vec<Block>>> for GarblerError {
+    fn from(e: std::sync::mpsc::SendError<Vec<Block>>) -> Self {
+        GarblerError::CommunicationError(e.to_string())
     }
 }
 
@@ -178,7 +225,7 @@ impl Display for CircuitBuilderError {
 }
 
 impl From<FancyError> for CircuitBuilderError {
-    fn from(e: FancyError) -> CircuitBuilderError {
+    fn from(e: FancyError) -> Self {
         CircuitBuilderError::FancyError(e)
     }
 }

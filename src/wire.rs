@@ -52,7 +52,7 @@ impl Wire {
         }
     }
 
-    /// Get the wire represented by the `Block`.
+    /// Get the wire represented by `inp` with modulus `q`.
     #[inline]
     pub fn from_block(inp: Block, q: u16) -> Self {
         if q == 2 {
@@ -89,7 +89,7 @@ impl Wire {
         }
     }
 
-    /// The zero wire for the modulus q.
+    /// The zero wire with modulus `q`.
     #[inline]
     pub fn zero(q: u16) -> Self {
         match q {
@@ -102,7 +102,7 @@ impl Wire {
         }
     }
 
-    /// Get a random wire label for mod q, with the first digit set to 1.
+    /// Get a random wire label mod `q`, with the first digit set to `1`.
     #[inline]
     pub fn rand_delta<R: CryptoRng + RngCore>(rng: &mut R, q: u16) -> Self {
         let mut w = Self::rand(rng, q);
@@ -122,7 +122,7 @@ impl Wire {
         }
     }
 
-    /// Add two wires digit-wise mod q, returning a new wire.
+    /// Add two wires digit-wise, returning a new wire.
     #[inline]
     pub fn plus(&self, other: &Self) -> Self {
         self.clone().plus_mov(other)
@@ -133,7 +133,7 @@ impl Wire {
     pub fn plus_eq<'a>(&'a mut self, other: &Wire) -> &'a mut Wire {
         match (&mut *self, other) {
             (Wire::Mod2 { val: ref mut x }, Wire::Mod2 { val: ref y }) => {
-                *x = *x ^ *y;
+                *x ^= *y;
             }
 
             (

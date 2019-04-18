@@ -1,7 +1,7 @@
 use criterion::{criterion_group, criterion_main, Criterion};
 use fancy_garbling::util::RngExt;
 use fancy_garbling::Wire;
-use scuttlebutt::Block;
+use scuttlebutt::{AesRng, Block};
 use std::time::Duration;
 
 fn bench_digits(c: &mut Criterion, p: u16) {
@@ -155,7 +155,7 @@ fn bench_zero(c: &mut Criterion, p: u16) {
 
 fn bench_rand(c: &mut Criterion, p: u16) {
     c.bench_function(&format!("wire::rand ({})", p), move |b| {
-        let rng = &mut rand::thread_rng();
+        let rng = &mut AesRng::new();
         b.iter(|| {
             let z = Wire::rand(rng, p);
             criterion::black_box(z);
@@ -163,68 +163,112 @@ fn bench_rand(c: &mut Criterion, p: u16) {
     });
 }
 
+fn bench_rand_delta(c: &mut Criterion, p: u16) {
+    c.bench_function(&format!("wire::rand_delta ({})", p), move |b| {
+        let rng = &mut AesRng::new();
+        b.iter(|| {
+            let z = Wire::rand_delta(rng, p);
+            criterion::black_box(z);
+        });
+    });
+}
+
 fn digits(c: &mut Criterion) {
     bench_digits(c, 2);
+    bench_digits(c, 3);
+    bench_digits(c, 5);
     bench_digits(c, 17);
 }
 
 fn unpack(c: &mut Criterion) {
     bench_unpack(c, 2);
+    bench_unpack(c, 3);
+    bench_unpack(c, 5);
     bench_unpack(c, 17);
 }
 fn pack(c: &mut Criterion) {
     bench_pack(c, 2);
+    bench_pack(c, 3);
+    bench_pack(c, 5);
     bench_pack(c, 17);
 }
 fn plus(c: &mut Criterion) {
     bench_plus(c, 2);
+    bench_plus(c, 3);
+    bench_plus(c, 5);
     bench_plus(c, 17);
 }
 fn plus_eq(c: &mut Criterion) {
     bench_plus_eq(c, 2);
+    bench_plus_eq(c, 3);
+    bench_plus_eq(c, 5);
     bench_plus_eq(c, 17);
 }
 fn minus(c: &mut Criterion) {
     bench_minus(c, 2);
+    bench_minus(c, 3);
+    bench_minus(c, 5);
     bench_minus(c, 17);
 }
 fn minus_eq(c: &mut Criterion) {
     bench_minus_eq(c, 2);
+    bench_minus_eq(c, 3);
+    bench_minus_eq(c, 5);
     bench_minus_eq(c, 17);
 }
 fn cmul(c: &mut Criterion) {
     bench_cmul(c, 2);
+    bench_cmul(c, 3);
+    bench_cmul(c, 5);
     bench_cmul(c, 17);
 }
 fn cmul_eq(c: &mut Criterion) {
     bench_cmul_eq(c, 2);
+    bench_cmul_eq(c, 3);
+    bench_cmul_eq(c, 5);
     bench_cmul_eq(c, 17);
 }
 fn negate(c: &mut Criterion) {
     bench_negate(c, 2);
+    bench_negate(c, 3);
+    bench_negate(c, 5);
     bench_negate(c, 17);
 }
 fn negate_eq(c: &mut Criterion) {
     bench_negate_eq(c, 2);
+    bench_negate_eq(c, 3);
+    bench_negate_eq(c, 5);
     bench_negate_eq(c, 17);
 }
 fn hash(c: &mut Criterion) {
     bench_hash(c, 2);
+    bench_hash(c, 3);
+    bench_hash(c, 5);
     bench_hash(c, 17);
 }
 fn zero(c: &mut Criterion) {
     bench_zero(c, 2);
+    bench_zero(c, 3);
+    bench_zero(c, 5);
     bench_zero(c, 17);
 }
 fn rand(c: &mut Criterion) {
     bench_rand(c, 2);
+    bench_rand(c, 3);
+    bench_rand(c, 5);
     bench_rand(c, 17);
+}
+fn rand_delta(c: &mut Criterion) {
+    bench_rand_delta(c, 2);
+    bench_rand_delta(c, 3);
+    bench_rand_delta(c, 5);
+    bench_rand_delta(c, 17);
 }
 
 criterion_group! {
     name = wire_benches;
     config = Criterion::default().warm_up_time(Duration::from_millis(100));
-    targets = digits, unpack, pack, plus, plus_eq, minus, minus_eq, cmul, cmul_eq, negate, negate_eq, hash, zero, rand
+    targets = digits, unpack, pack, plus, plus_eq, minus, minus_eq, cmul, cmul_eq, negate, negate_eq, hash, zero, rand, rand_delta
 }
 
 criterion_main!(wire_benches);

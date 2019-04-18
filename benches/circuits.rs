@@ -27,7 +27,7 @@ fn bench_garble_aes(c: &mut Criterion) {
 
 fn bench_eval_aes(c: &mut Criterion) {
     let mut circ = circuit("circuits/AES-non-expanded.txt");
-    let (en, _, gc) = garble(&mut circ).unwrap();
+    let (en, gc) = garble(&mut circ).unwrap();
     let gb = en.encode_garbler_inputs(&vec![0u16; 128]);
     let ev = en.encode_evaluator_inputs(&vec![0u16; 128]);
     c.bench_function("eval::aes", move |bench| {
@@ -44,7 +44,7 @@ fn bench_garble_sha_1(c: &mut Criterion) {
 
 fn bench_eval_sha_1(c: &mut Criterion) {
     let mut circ = circuit("circuits/sha-1.txt");
-    let (en, _, gc) = garble(&mut circ).unwrap();
+    let (en, gc) = garble(&mut circ).unwrap();
     let gb = en.encode_garbler_inputs(&vec![0u16; 512]);
     let ev = en.encode_evaluator_inputs(&vec![]);
     c.bench_function("eval::sha-1", move |bench| {
@@ -61,7 +61,7 @@ fn bench_garble_sha_256(c: &mut Criterion) {
 
 fn bench_eval_sha_256(c: &mut Criterion) {
     let mut circ = circuit("circuits/sha-256.txt");
-    let (en, _, gc) = garble(&mut circ).unwrap();
+    let (en, gc) = garble(&mut circ).unwrap();
     let gb = en.encode_garbler_inputs(&vec![0u16; 512]);
     let ev = en.encode_evaluator_inputs(&vec![]);
     c.bench_function("eval::sha-256", move |bench| {

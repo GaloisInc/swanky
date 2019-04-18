@@ -463,11 +463,4 @@ mod bundle {
         }
     }
     //}}}
-    #[test] // dummy has send and sync {{{
-    fn dummy_has_send_and_sync() {
-        fn check_send(_: impl Send) {}
-        fn check_sync(_: impl Sync) {}
-        check_send(Dummy::new(&[], &[]));
-        check_sync(Dummy::new(&[], &[]));
-    } // }}}
 }

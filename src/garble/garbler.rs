@@ -5,29 +5,35 @@ use crate::util::{output_tweak, tweak, tweak2, RngExt};
 use crate::wire::Wire;
 use rand::{CryptoRng, RngCore};
 use scuttlebutt::Block;
+use std::cell::RefCell;
 use std::collections::HashMap;
+use std::fmt::Debug;
+use std::io::Write;
+use std::rc::Rc;
 
 /// Streams garbled circuit ciphertexts through a callback. Parallelizable.
-pub struct Garbler<R: CryptoRng + RngCore> {
-    callback: Box<FnMut(Message) + Send>,
+pub struct Garbler<W: Write + Debug, RNG: CryptoRng + RngCore> {
+    writer: Rc<RefCell<W>>,
+    callback: Box<FnMut(Message) -> Result<(), GarblerError>>,
     // Hash map containing modulus -> associated delta wire-label.
     deltas: HashMap<u16, Wire>,
     current_output: usize,
     current_gate: usize,
-    rng: R,
+    rng: RNG,
 }
 
-impl<R: CryptoRng + RngCore> Garbler<R> {
+impl<W: Write + Debug, RNG: CryptoRng + RngCore> Garbler<W, RNG> {
     /// Create a new garbler.
     ///
     /// `callback` is a function that enables streaming. It gets called as the
     /// garbler generates ciphertext information such as garbled gates or input
     /// wire-labels.
-    pub fn new<F>(callback: F, rng: R) -> Self
+    pub fn new<F>(writer: Rc<RefCell<W>>, callback: F, rng: RNG) -> Self
     where
-        F: FnMut(Message) + Send + 'static, // XXX: add -> Result<(), Error>
+        F: FnMut(Message) -> Result<(), GarblerError> + 'static,
     {
         Garbler {
+            writer,
             callback: Box::new(callback),
             deltas: HashMap::new(),
             current_gate: 0,
@@ -38,8 +44,8 @@ impl<R: CryptoRng + RngCore> Garbler<R> {
 
     /// Output some information from the garbling.
     #[inline]
-    fn send(&mut self, m: Message) {
-        (self.callback)(m);
+    fn send(&mut self, m: Message) -> Result<(), GarblerError> {
+        (self.callback)(m)
     }
 
     /// The current non-free gate index of the garbling computation
@@ -70,12 +76,12 @@ impl<R: CryptoRng + RngCore> Garbler<R> {
     }
 
     /// Get the deltas, consuming the Garbler.
-    pub(super) fn get_deltas(self) -> HashMap<u16, Wire> {
+    pub(crate) fn get_deltas(self) -> HashMap<u16, Wire> {
         self.deltas
     }
 }
 
-impl<R: CryptoRng + RngCore> Fancy for Garbler<R> {
+impl<W: Write + Debug, RNG: CryptoRng + RngCore> Fancy for Garbler<W, RNG> {
     type Item = Wire;
     type Error = GarblerError;
 
@@ -84,13 +90,14 @@ impl<R: CryptoRng + RngCore> Fancy for Garbler<R> {
         let w = Wire::rand(&mut self.rng, q);
         let d = self.delta(q);
         if let Some(x) = opt_x {
-            let encoded_wire = w.plus(&d.cmul(x));
-            self.send(Message::GarblerInput(encoded_wire));
+            let wire = w.plus(&d.cmul(x));
+            let mut writer = self.writer.borrow_mut();
+            writer.write_all(wire.as_block().as_ref())?;
         } else {
             self.send(Message::UnencodedGarblerInput {
                 zero: w.clone(),
                 delta: d,
-            });
+            })?;
         }
         Ok(w)
     }
@@ -101,14 +108,15 @@ impl<R: CryptoRng + RngCore> Fancy for Garbler<R> {
         self.send(Message::UnencodedEvaluatorInput {
             zero: w.clone(),
             delta: d,
-        });
+        })?;
         Ok(w)
     }
     #[inline]
     fn constant(&mut self, x: u16, q: u16) -> Result<Wire, GarblerError> {
         let zero = Wire::rand(&mut self.rng, q);
         let wire = zero.plus(&self.delta(q).cmul_eq(x));
-        self.send(Message::Constant { value: x, wire });
+        let mut writer = self.writer.borrow_mut();
+        writer.write_all(wire.as_block().as_ref())?;
         Ok(zero)
     }
     #[inline]
@@ -131,7 +139,7 @@ impl<R: CryptoRng + RngCore> Fancy for Garbler<R> {
     }
     #[inline]
     fn mul(&mut self, A: &Wire, B: &Wire) -> Result<Wire, GarblerError> {
-        if A.modulus() < A.modulus() {
+        if A.modulus() < B.modulus() {
             return self.mul(B, A);
         }
 
@@ -143,7 +151,7 @@ impl<R: CryptoRng + RngCore> Fancy for Garbler<R> {
         let Db = self.delta(qb);
 
         let r;
-        let mut gate = vec![None; q as usize + qb as usize - 2];
+        let mut gate = vec![Block::default(); q as usize + qb as usize - 2];
 
         // hack for unequal moduli
         if q != qb {
@@ -155,22 +163,22 @@ impl<R: CryptoRng + RngCore> Fancy for Garbler<R> {
             r = self.rng.gen_u16() % q;
             let t = tweak2(gate_num as u64, 1);
 
-            let mut minitable = vec![None; qb as usize];
+            let mut minitable = vec![u128::default(); qb as usize];
             let mut B_ = B.clone();
             for b in 0..qb {
                 if b > 0 {
                     B_.plus_eq(&Db);
                 }
-                let new_color = Block::from(((r + b) % q) as u128);
-                let ct = Block::from(u128::from(B_.hash(t)) & 0xFFFF) ^ new_color;
-                minitable[B_.color() as usize] = Some(ct);
+                let new_color = ((r + b) % q) as u128;
+                let ct = (u128::from(B_.hash(t)) & 0xFFFF) ^ new_color;
+                minitable[B_.color() as usize] = ct;
             }
 
             let mut packed = 0;
             for i in 0..qb as usize {
-                packed += u128::from(minitable[i].unwrap()) << (16 * i);
+                packed += minitable[i] << (16 * i);
             }
-            gate.push(Some(Block::from(packed)));
+            gate.push(Block::from(packed));
         } else {
             r = B.color(); // secret value known only to the garbler (ev knows r+b)
         }
@@ -182,7 +190,7 @@ impl<R: CryptoRng + RngCore> Fancy for Garbler<R> {
         let X = A
             .plus(&D.cmul(alpha))
             .hashback(g, q)
-            .plus_mov(&D.cmul((alpha * r) % q));
+            .plus_mov(&D.cmul(alpha * r % q));
 
         // Y = H(B + bD) + (b + r)A such that b + B.color == 0
         let beta = (qb - B.color()) % qb;
@@ -191,19 +199,16 @@ impl<R: CryptoRng + RngCore> Fancy for Garbler<R> {
             .hashback(g, q)
             .plus_mov(&A.cmul((beta + r) % q));
 
-        // precompute a lookup table of X.minus(&D_cmul[(a * r % q) as usize]).as_u128();
-        //                            = X.plus(&D_cmul[((q - (a * r % q)) % q) as usize]).as_u128();
-        let X_cmul = {
-            let mut X_ = X.clone();
-            (0..q)
-                .map(|x| {
-                    if x > 0 {
-                        X_.plus_eq(&D);
-                    }
-                    X_.as_block()
-                })
-                .collect::<Vec<Block>>()
-        };
+        let mut precomp = Vec::with_capacity(q as usize);
+
+        // precompute a lookup table of X.minus(&D_cmul[(a * r % q)])
+        //                            = X.plus(&D_cmul[((q - (a * r % q)) % q)])
+        let mut X_ = X.clone();
+        precomp.push(X_.as_block());
+        for _ in 1..q {
+            X_.plus_eq(&D);
+            precomp.push(X_.as_block());
+        }
 
         let mut A_ = A.clone();
         for a in 0..q {
@@ -213,24 +218,21 @@ impl<R: CryptoRng + RngCore> Fancy for Garbler<R> {
             // garbler's half-gate: outputs X-arD
             // G = H(A+aD) ^ X+a(-r)D = H(A+aD) ^ X-arD
             if A_.color() != 0 {
-                let G = A_.hash(g) ^ X_cmul[((q - (a * r % q)) % q) as usize];
-                gate[A_.color() as usize - 1] = Some(G);
+                gate[A_.color() as usize - 1] =
+                    A_.hash(g) ^ precomp[((q - (a * r % q)) % q) as usize];
             }
         }
 
-        // precompute a lookup table of Y.minus(&A_cmul[((b+r) % q) as usize]).as_u128();
-        //                            = Y.plus(&A_cmul[((q - ((b+r) % q)) % q) as usize]).as_u128();
-        let Y_cmul = {
-            let mut Y_ = Y.clone();
-            (0..q)
-                .map(|x| {
-                    if x > 0 {
-                        Y_.plus_eq(&A);
-                    }
-                    Y_.as_block()
-                })
-                .collect::<Vec<Block>>()
-        };
+        precomp.clear();
+
+        // precompute a lookup table of Y.minus(&A_cmul[((b+r) % q)])
+        //                            = Y.plus(&A_cmul[((q - ((b+r) % q)) % q)])
+        let mut Y_ = Y.clone();
+        precomp.push(Y_.as_block());
+        for _ in 1..q {
+            Y_.plus_eq(&A);
+            precomp.push(Y_.as_block());
+        }
 
         let mut B_ = B.clone();
         for b in 0..qb {
@@ -240,28 +242,26 @@ impl<R: CryptoRng + RngCore> Fancy for Garbler<R> {
             // evaluator's half-gate: outputs Y-(b+r)D
             // G = H(B+bD) + Y-(b+r)A
             if B_.color() != 0 {
-                let G = B_.hash(g) ^ Y_cmul[((q - ((b + r) % q)) % q) as usize];
-                gate[q as usize - 1 + B_.color() as usize - 1] = Some(G);
+                gate[q as usize - 1 + B_.color() as usize - 1] =
+                    B_.hash(g) ^ precomp[((q - ((b + r) % q)) % q) as usize];
             }
         }
 
-        let gate = gate.into_iter().map(Option::unwrap).collect();
-        self.send(Message::GarbledGate(gate));
-
+        let mut writer = self.writer.borrow_mut();
+        for block in gate.into_iter() {
+            writer.write_all(block.as_ref())?;
+        }
         Ok(X.plus_mov(&Y))
     }
     #[inline]
     fn proj(&mut self, A: &Wire, q_out: u16, tt: Option<Vec<u16>>) -> Result<Wire, GarblerError> {
-        //
         let tt = tt.ok_or(GarblerError::TruthTableRequired)?;
 
         let q_in = A.modulus();
-        // we have to fill in the vector in an unknown order because of the color bits.
-        // Since some of the values in gate will be void temporarily, we use Vec<Option<..>>
-        let mut gate = vec![None; q_in as usize - 1];
+        let mut gate = vec![Block::default(); q_in as usize - 1];
 
         let tao = A.color();
-        let g = tweak(self.current_gate()); // gate tweak
+        let g = tweak(self.current_gate());
 
         let Din = self.delta(q_in);
         let Dout = self.delta(q_out);
@@ -298,42 +298,29 @@ impl<R: CryptoRng + RngCore> Fancy for Garbler<R> {
             }
 
             let ct = A_.hash(g) ^ C_precomputed[tt[x as usize] as usize];
-            gate[ix - 1] = Some(ct);
+            gate[ix - 1] = ct;
         }
 
-        // unwrap the Option elems inside the Vec
-        let gate = gate.into_iter().map(Option::unwrap).collect();
-        self.send(Message::GarbledGate(gate));
-
+        let mut writer = self.writer.borrow_mut();
+        for block in gate.into_iter() {
+            writer.write_all(block.as_ref())?;
+        }
         Ok(C)
     }
     #[inline]
     fn output(&mut self, X: &Wire) -> Result<(), GarblerError> {
-        let mut cts = Vec::new();
         let q = X.modulus();
+        let mut cts = Vec::with_capacity(q as usize);
         let i = self.current_output();
         let D = self.delta(q);
         for k in 0..q {
             let t = output_tweak(i, k);
             cts.push(X.plus(&D.cmul(k)).hash(t));
         }
-        self.send(Message::OutputCiphertext(cts));
+        let mut writer = self.writer.borrow_mut();
+        for block in cts.into_iter() {
+            writer.write_all(block.as_ref())?;
+        }
         Ok(())
-    }
-}
-
-// `Garbler` tests
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use scuttlebutt::AesRng;
-
-    #[test]
-    fn garbler_has_send_and_sync() {
-        fn check_send(_: impl Send) {}
-        // fn check_sync(_: impl Sync) {}
-        check_send(Garbler::new(|_| (), AesRng::new()));
-        // check_sync(Garbler::new(|_| (), AesRng::new()));
     }
 }

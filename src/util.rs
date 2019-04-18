@@ -2,6 +2,8 @@
 //!
 //! Note: all number representations in this library are little-endian.
 
+#[cfg(feature = "nightly")]
+use core::arch::x86_64::*;
 use itertools::Itertools;
 use scuttlebutt::Block;
 
@@ -9,20 +11,39 @@ use scuttlebutt::Block;
 // tweak functions for garbling
 
 /// Tweak function for a single item.
+#[cfg(feature = "nightly")]
 #[inline]
-pub(crate) fn tweak(i: usize) -> Block {
+pub fn tweak(i: usize) -> Block {
+    let data = unsafe { _mm_set_epi64(_mm_setzero_si64(), *(&i as *const _ as *const __m64)) };
+    Block(data)
+}
+#[cfg(not(feature = "nightly"))]
+#[inline]
+pub fn tweak(i: usize) -> Block {
     Block::from(i as u128)
 }
 
 /// Tweak function for two items.
+#[cfg(feature = "nightly")]
 #[inline]
-pub(crate) fn tweak2(i: u64, j: u64) -> Block {
+pub fn tweak2(i: u64, j: u64) -> Block {
+    let data = unsafe {
+        _mm_set_epi64(
+            *(&i as *const _ as *const __m64),
+            *(&j as *const _ as *const __m64),
+        )
+    };
+    Block(data)
+}
+#[cfg(not(feature = "nightly"))]
+#[inline]
+pub fn tweak2(i: u64, j: u64) -> Block {
     Block::from(((i as u128) << 64) + j as u128)
 }
 
 /// Compute the output tweak for a garbled gate where i is the gate id and k is the value.
 #[inline]
-pub(crate) fn output_tweak(i: usize, k: u16) -> Block {
+pub fn output_tweak(i: usize, k: u16) -> Block {
     let (left, _) = (i as u128).overflowing_shl(64);
     Block::from(left + k as u128)
 }
@@ -43,7 +64,7 @@ pub(crate) fn output_tweak(i: usize, k: u16) -> Block {
 
 /// Add a base q number into the first one.
 #[inline]
-pub(crate) fn base_q_add_eq(xs: &mut [u16], ys: &[u16], q: u16) {
+pub fn base_q_add_eq(xs: &mut [u16], ys: &[u16], q: u16) {
     debug_assert!(
         xs.len() >= ys.len(),
         "q={} xs.len()={} ys.len()={} xs={:?} ys={:?}",
@@ -81,9 +102,9 @@ pub(crate) fn base_q_add_eq(xs: &mut [u16], ys: &[u16], q: u16) {
     }
 }
 
-/// Convert a `u128` into base `q`.
+/// Convert `x` into base `q`.
 #[inline]
-pub(crate) fn as_base_q(x: u128, q: u16, n: usize) -> Vec<u16> {
+fn as_base_q(x: u128, q: u16, n: usize) -> Vec<u16> {
     let ms = std::iter::repeat(q).take(n).collect_vec();
     as_mixed_radix(x, &ms)
 }
@@ -111,13 +132,13 @@ pub(crate) fn digits_per_u128(modulus: u16) -> usize {
     }
 }
 
-/// Convert a `u128` into base `q`.
+/// Convert `x` into base `q`.
 #[inline]
-pub(crate) fn as_base_q_u128(x: u128, q: u16) -> Vec<u16> {
+pub fn as_base_q_u128(x: u128, q: u16) -> Vec<u16> {
     as_base_q(x, q, digits_per_u128(q))
 }
 
-/// Convert a `u128` into mixed radix form with the provided radii.
+/// Convert `x` into mixed radix form using the provided `radii`.
 #[inline]
 pub(crate) fn as_mixed_radix(x: u128, radii: &[u16]) -> Vec<u16> {
     let mut x = x;
@@ -137,9 +158,9 @@ pub(crate) fn as_mixed_radix(x: u128, radii: &[u16]) -> Vec<u16> {
         .collect()
 }
 
-/// Convert little-endian base q digits into u128.
+/// Convert little-endian base `q` digits into `u128`.
 #[inline]
-pub(crate) fn from_base_q(ds: &[u16], q: u16) -> u128 {
+pub fn from_base_q(ds: &[u16], q: u16) -> u128 {
     let mut x: u128 = 0;
     for &d in ds.iter().rev() {
         let (xp, overflow) = x.overflowing_mul(q as u128);
@@ -151,7 +172,7 @@ pub(crate) fn from_base_q(ds: &[u16], q: u16) -> u128 {
 
 /// Convert little-endian mixed radix digits into u128.
 #[inline]
-pub(crate) fn from_mixed_radix(digits: &[u16], radii: &[u16]) -> u128 {
+pub fn from_mixed_radix(digits: &[u16], radii: &[u16]) -> u128 {
     let mut x: u128 = 0;
     for (&d, &q) in digits.iter().zip(radii.iter()).rev() {
         let (xp, overflow) = x.overflowing_mul(q as u128);
@@ -167,7 +188,7 @@ pub(crate) fn from_mixed_radix(digits: &[u16], radii: &[u16]) -> u128 {
 /// Get the bits of a u128 encoded in 128 u16s, which is convenient for the rest of
 /// the library, which uses u16 as the base digit type in Wire.
 #[inline]
-pub(crate) fn u128_to_bits(x: u128, n: usize) -> Vec<u16> {
+pub fn u128_to_bits(x: u128, n: usize) -> Vec<u16> {
     let mut bits = Vec::with_capacity(n);
     let mut y = x;
     for _ in 0..n {
@@ -181,7 +202,7 @@ pub(crate) fn u128_to_bits(x: u128, n: usize) -> Vec<u16> {
 
 /// Convert into a u128 from the "bits" as u16. Assumes each "bit" is 0 or 1.
 #[inline]
-pub(crate) fn u128_from_bits(bs: &[u16]) -> u128 {
+pub fn u128_from_bits(bs: &[u16]) -> u128 {
     let mut x = 0;
     for &b in bs.iter().skip(1).rev() {
         x += b as u128;
@@ -200,7 +221,7 @@ pub(crate) fn u128_from_bits(bs: &[u16]) -> u128 {
 /// We are limited by the size of the digits in Wire, and besides, if need large moduli,
 /// you should use BundleGadgets and save.
 #[inline]
-pub(crate) fn factor(inp: u128) -> Vec<u16> {
+pub fn factor(inp: u128) -> Vec<u16> {
     let mut x = inp;
     let mut fs = Vec::new();
     for &p in PRIMES.iter() {
@@ -413,7 +434,7 @@ pub trait RngExt: rand::Rng + Sized {
     /// Randomly generate a `Block`.
     #[inline]
     fn gen_block(&mut self) -> Block {
-        Block::from(self.gen_u128())
+        self.gen()
     }
     /// Randomly generate a valid `Block`.
     #[inline]
@@ -527,27 +548,30 @@ mod tests {
             assert_eq!(x, z);
         }
     }
+}
 
-    // #[test]
-    // fn base_q_addition() {
-    //     let mut rng = thread_rng();
-    //     for _ in 0..1000 {
-    //         let q = 2 + (rng.gen_u16() % 111);
-    //         let n = digits_per_u128(q) - 2;
-    //         println!("q={} n={}", q, n);
-    //         let Q = (q as u128).pow(n as u32);
+#[cfg(all(feature = "nightly", test))]
+mod benchmarks {
+    extern crate test;
+    use super::*;
+    use test::Bencher;
 
-    //         let x = rng.gen_u128() % Q;
-    //         let y = rng.gen_u128() % Q;
+    #[bench]
+    fn bench_tweak(b: &mut Bencher) {
+        let i = test::black_box(rand::random::<usize>());
+        b.iter(|| {
+            let b = test::black_box(tweak(i));
+            test::black_box(b)
+        });
+    }
 
-    //         let xp = as_base_q(x, q, n);
-    //         let yp = as_base_q(y, q, n);
-
-    //         let zp = base_q_add(&xp, &yp, q);
-
-    //         let z = from_base_q(&zp, q);
-
-    //         assert_eq!((x + y) % Q, z);
-    //     }
-    // }
+    #[bench]
+    fn bench_tweak2(b: &mut Bencher) {
+        let i = test::black_box(rand::random::<u64>());
+        let j = test::black_box(rand::random::<u64>());
+        b.iter(|| {
+            let b = test::black_box(tweak2(i, j));
+            test::black_box(b)
+        });
+    }
 }

@@ -34,7 +34,7 @@ pub struct Circuit {
     pub(crate) evaluator_input_refs: Vec<CircuitRef>,
     pub(crate) const_refs: Vec<CircuitRef>,
     pub(crate) output_refs: Vec<CircuitRef>,
-    num_nonfree_gates: usize,
+    pub(crate) num_nonfree_gates: usize,
 }
 
 /// The most basic types of computation supported by fancy garbling.
@@ -896,11 +896,4 @@ mod bundle {
         }
     }
     //}}}
-    #[test] // builder has send and sync {{{
-    fn test_builder_has_send_and_sync() {
-        fn check_send(_: impl Send) {}
-        fn check_sync(_: impl Sync) {}
-        check_send(CircuitBuilder::new());
-        check_sync(CircuitBuilder::new());
-    } // }}}
 }
