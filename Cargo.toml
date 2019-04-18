@@ -43,7 +43,19 @@ debug-assertions = false
 overflow-checks = false
 
 [[bench]]
+name = "aes128"
+harness = false
+
+[[bench]]
+name = "aes256"
+harness = false
+
+[[bench]]
 name = "block"
+harness = false
+
+[[bench]]
+name = "block512"
 harness = false
 
 [[bench]]

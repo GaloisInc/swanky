@@ -10,7 +10,7 @@ use scuttlebutt::AesRng;
 use std::time::Duration;
 
 fn bench_aes_rand(c: &mut Criterion) {
-    c.bench_function("aes rand", |b| {
+    c.bench_function("AesRng::rand", |b| {
         let mut rng = AesRng::new();
         let mut x = (0..16 * 1024)
             .map(|_| rand::random::<u8>())

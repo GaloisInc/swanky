@@ -15,6 +15,7 @@
 
 mod aes;
 mod block;
+mod block512;
 pub mod cointoss;
 pub mod comm;
 mod hash_aes;
@@ -25,6 +26,7 @@ pub mod utils;
 pub use crate::aes::aes128::{Aes128, AES, FIXED_KEY_AES128};
 pub use crate::aes::aes256::Aes256;
 pub use crate::block::Block;
+pub use crate::block512::Block512;
 pub use crate::hash_aes::{AesHash, AES_HASH};
 pub use crate::rand_aes::AesRng;
 

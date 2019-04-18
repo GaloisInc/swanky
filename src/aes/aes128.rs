@@ -179,23 +179,3 @@ mod tests {
         assert_eq!(ct, Block::from(0x97EF6624F3CA9EA860367A0DB47BD73A));
     }
 }
-
-#[cfg(all(feature = "nightly", test))]
-mod benchmarks {
-    extern crate test;
-    use super::*;
-    use test::Bencher;
-
-    #[bench]
-    fn bench_aes_new(b: &mut Bencher) {
-        let key = rand::random::<Block>();
-        b.iter(|| Aes128::new(key));
-    }
-
-    #[bench]
-    fn bench_aes_encrypt(b: &mut Bencher) {
-        let aes = Aes128::new(rand::random::<Block>());
-        let block = rand::random::<Block>();
-        b.iter(|| aes.encrypt(block));
-    }
-}
