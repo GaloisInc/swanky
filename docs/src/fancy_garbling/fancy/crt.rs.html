@@ -956,8 +956,25 @@
 <span id="956">956</span>
 <span id="957">957</span>
 <span id="958">958</span>
+<span id="959">959</span>
+<span id="960">960</span>
+<span id="961">961</span>
+<span id="962">962</span>
+<span id="963">963</span>
+<span id="964">964</span>
+<span id="965">965</span>
+<span id="966">966</span>
+<span id="967">967</span>
+<span id="968">968</span>
+<span id="969">969</span>
+<span id="970">970</span>
+<span id="971">971</span>
+<span id="972">972</span>
+<span id="973">973</span>
 </pre><div class="example-wrap"><pre class="rust ">
-<span class="doccomment">//! Module containing `BundleGadgets`, which are mostly CRT-based gadgets for Fancy.</span>
+<span class="doccomment">//! Module containing `BundleGadgets`, which are mostly CRT-based gadgets for `Fancy`.</span>
+
+<span class="kw">use</span> <span class="ident">std</span>::<span class="ident">ops</span>::<span class="ident">Index</span>;
 
 <span class="kw">use</span> <span class="ident">itertools</span>::<span class="ident">Itertools</span>;
 
@@ -1017,6 +1034,19 @@
     <span class="doccomment">/// Extract a wire from the Bundle, removing it and returning it.</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">extract</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">wire_index</span>: <span class="ident">usize</span>) <span class="op">-&gt;</span> <span class="ident">W</span> {
         <span class="self">self</span>.<span class="number">0</span>.<span class="ident">remove</span>(<span class="ident">wire_index</span>)
+    }
+
+    <span class="doccomment">/// Access the underlying iterator</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">iter</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-&gt;</span> <span class="ident">std</span>::<span class="ident">slice</span>::<span class="ident">Iter</span><span class="op">&lt;</span><span class="ident">W</span><span class="op">&gt;</span> {
+        <span class="self">self</span>.<span class="number">0</span>.<span class="ident">iter</span>()
+    }
+}
+
+<span class="kw">impl</span> <span class="op">&lt;</span><span class="ident">W</span>: <span class="ident">Clone</span> <span class="op">+</span> <span class="ident">HasModulus</span><span class="op">&gt;</span> <span class="ident">Index</span><span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">Bundle</span><span class="op">&lt;</span><span class="ident">W</span><span class="op">&gt;</span> {
+    <span class="kw">type</span> <span class="ident">Output</span> <span class="op">=</span> <span class="ident">W</span>;
+
+    <span class="kw">fn</span> <span class="ident">index</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">idx</span>: <span class="ident">usize</span>) <span class="op">-&gt;</span> <span class="kw-2">&amp;</span><span class="self">Self</span>::<span class="ident">Output</span> {
+        <span class="self">self</span>.<span class="number">0</span>.<span class="ident">index</span>(<span class="ident">idx</span>)
     }
 }
 
@@ -1290,9 +1320,9 @@
         <span class="ident">p</span>: <span class="ident">u16</span>,
     ) <span class="op">-&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Bundle</span><span class="op">&lt;</span><span class="self">Self</span>::<span class="ident">Item</span><span class="op">&gt;</span>, <span class="self">Self</span>::<span class="ident">Error</span><span class="op">&gt;</span> {
         <span class="kw">let</span> <span class="ident">i</span> <span class="op">=</span> <span class="ident">x</span>.<span class="ident">moduli</span>().<span class="ident">iter</span>().<span class="ident">position</span>(<span class="op">|</span><span class="kw-2">&amp;</span><span class="ident">q</span><span class="op">|</span> <span class="ident">p</span> <span class="op">==</span> <span class="ident">q</span>).<span class="ident">ok_or_else</span>(<span class="op">||</span> {
-            <span class="self">Self</span>::<span class="ident">Error</span>::<span class="ident">from</span>(<span class="ident">FancyError</span>::<span class="ident">InvalidArg</span> {
-                <span class="ident">desc</span>: <span class="string">&quot;p is not a moduli in this bundle!&quot;</span>.<span class="ident">to_string</span>(),
-            })
+            <span class="self">Self</span>::<span class="ident">Error</span>::<span class="ident">from</span>(<span class="ident">FancyError</span>::<span class="ident">InvalidArg</span>(
+                <span class="string">&quot;p is not a modulus in this bundle!&quot;</span>.<span class="ident">to_string</span>(),
+            ))
         })<span class="question-mark">?</span>;
         <span class="kw">let</span> <span class="ident">w</span> <span class="op">=</span> <span class="kw-2">&amp;</span><span class="ident">x</span>.<span class="ident">wires</span>()[<span class="ident">i</span>];
         <span class="ident">x</span>.<span class="ident">moduli</span>()

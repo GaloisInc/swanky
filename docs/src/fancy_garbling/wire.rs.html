@@ -426,27 +426,45 @@
 <span id="426">426</span>
 <span id="427">427</span>
 <span id="428">428</span>
+<span id="429">429</span>
+<span id="430">430</span>
+<span id="431">431</span>
+<span id="432">432</span>
+<span id="433">433</span>
+<span id="434">434</span>
+<span id="435">435</span>
+<span id="436">436</span>
+<span id="437">437</span>
 </pre><div class="example-wrap"><pre class="rust ">
-<span class="doccomment">//! Low-level operations on wirelabels, the basic building block of garbled circuits.</span>
+<span class="doccomment">//! Low-level operations on wire-labels, the basic building block of garbled circuits.</span>
 
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">fancy</span>::<span class="ident">HasModulus</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>;
-<span class="kw">use</span> <span class="ident">rand</span>::{<span class="ident">CryptoRng</span>, <span class="ident">RngCore</span>};
+<span class="kw">use</span> <span class="ident">rand</span>::{<span class="ident">CryptoRng</span>, <span class="ident">Rng</span>, <span class="ident">RngCore</span>};
 <span class="kw">use</span> <span class="ident">scuttlebutt</span>::{<span class="ident">Block</span>, <span class="ident">AES_HASH</span>};
 <span class="kw">use</span> <span class="ident">serde</span>::{<span class="ident">Deserialize</span>, <span class="ident">Serialize</span>};
 
-<span class="doccomment">/// The essential wirelabel type used by garbled circuits.</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// It is a list of mod-q digits.</span>
+<span class="doccomment">/// The essential wire-label type used by garbled circuits.</span>
 <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Clone</span>, <span class="ident">PartialEq</span>, <span class="ident">Serialize</span>, <span class="ident">Deserialize</span>)]</span>
 <span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">Wire</span> {
-    <span class="ident">Mod2</span> { <span class="ident">val</span>: <span class="ident">Block</span> },
-    <span class="ident">ModN</span> { <span class="ident">q</span>: <span class="ident">u16</span>, <span class="ident">ds</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u16</span><span class="op">&gt;</span> },
+    <span class="doccomment">/// `Mod2` gates are simple 128-bit values.</span>
+    <span class="ident">Mod2</span> {
+        <span class="doccomment">/// A 128-bit value.</span>
+        <span class="ident">val</span>: <span class="ident">Block</span>,
+    },
+    <span class="doccomment">/// `ModN` gates contain the modulus, provided by `q`, and a list of `mod-q`</span>
+    <span class="doccomment">/// digits.</span>
+    <span class="ident">ModN</span> {
+        <span class="doccomment">/// The modulus of this wire-label.</span>
+        <span class="ident">q</span>: <span class="ident">u16</span>,
+        <span class="doccomment">/// A list of `mod-q` digits.</span>
+        <span class="ident">ds</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u16</span><span class="op">&gt;</span>,
+    },
 }
 
 <span class="kw">impl</span> <span class="ident">std</span>::<span class="ident">default</span>::<span class="ident">Default</span> <span class="kw">for</span> <span class="ident">Wire</span> {
     <span class="kw">fn</span> <span class="ident">default</span>() <span class="op">-&gt;</span> <span class="self">Self</span> {
-        <span class="ident">Wire</span>::<span class="ident">Mod2</span> { <span class="ident">val</span>: <span class="ident">Block</span>::<span class="ident">zero</span>() }
+        <span class="ident">Wire</span>::<span class="ident">Mod2</span> { <span class="ident">val</span>: <span class="ident">Block</span>::<span class="ident">default</span>() }
     }
 }
 
@@ -472,7 +490,7 @@
         }
     }
 
-    <span class="doccomment">/// Get the wire represented by the `Block`.</span>
+    <span class="doccomment">/// Get the wire represented by `inp` with modulus `q`.</span>
     <span class="attribute">#[<span class="ident">inline</span>]</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">from_block</span>(<span class="ident">inp</span>: <span class="ident">Block</span>, <span class="ident">q</span>: <span class="ident">u16</span>) <span class="op">-&gt;</span> <span class="self">Self</span> {
         <span class="kw">if</span> <span class="ident">q</span> <span class="op">==</span> <span class="number">2</span> {
@@ -509,12 +527,12 @@
         }
     }
 
-    <span class="doccomment">/// The zero wire for the modulus q.</span>
+    <span class="doccomment">/// The zero wire with modulus `q`.</span>
     <span class="attribute">#[<span class="ident">inline</span>]</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">zero</span>(<span class="ident">q</span>: <span class="ident">u16</span>) <span class="op">-&gt;</span> <span class="self">Self</span> {
         <span class="kw">match</span> <span class="ident">q</span> {
             <span class="number">1</span> <span class="op">=&gt;</span> <span class="macro">panic</span><span class="macro">!</span>(<span class="string">&quot;[wire::zero] mod 1 not allowed!&quot;</span>),
-            <span class="number">2</span> <span class="op">=&gt;</span> <span class="ident">Wire</span>::<span class="ident">Mod2</span> { <span class="ident">val</span>: <span class="ident">Block</span>::<span class="ident">zero</span>() },
+            <span class="number">2</span> <span class="op">=&gt;</span> <span class="ident">Wire</span>::<span class="ident">Mod2</span> { <span class="ident">val</span>: <span class="ident">Block</span>::<span class="ident">default</span>() },
             <span class="kw">_</span> <span class="op">=&gt;</span> <span class="ident">Wire</span>::<span class="ident">ModN</span> {
                 <span class="ident">q</span>,
                 <span class="ident">ds</span>: <span class="macro">vec</span><span class="macro">!</span>[<span class="number">0</span>; <span class="ident">util</span>::<span class="ident">digits_per_u128</span>(<span class="ident">q</span>)],
@@ -522,7 +540,7 @@
         }
     }
 
-    <span class="doccomment">/// Get a random wire label for mod q, with the first digit set to 1.</span>
+    <span class="doccomment">/// Get a random wire label mod `q`, with the first digit set to `1`.</span>
     <span class="attribute">#[<span class="ident">inline</span>]</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">rand_delta</span><span class="op">&lt;</span><span class="ident">R</span>: <span class="ident">CryptoRng</span> <span class="op">+</span> <span class="ident">RngCore</span><span class="op">&gt;</span>(<span class="ident">rng</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">R</span>, <span class="ident">q</span>: <span class="ident">u16</span>) <span class="op">-&gt;</span> <span class="self">Self</span> {
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">w</span> <span class="op">=</span> <span class="self">Self</span>::<span class="ident">rand</span>(<span class="ident">rng</span>, <span class="ident">q</span>);
@@ -542,7 +560,7 @@
         }
     }
 
-    <span class="doccomment">/// Add two wires digit-wise mod q, returning a new wire.</span>
+    <span class="doccomment">/// Add two wires digit-wise, returning a new wire.</span>
     <span class="attribute">#[<span class="ident">inline</span>]</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">plus</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">other</span>: <span class="kw-2">&amp;</span><span class="self">Self</span>) <span class="op">-&gt;</span> <span class="self">Self</span> {
         <span class="self">self</span>.<span class="ident">clone</span>().<span class="ident">plus_mov</span>(<span class="ident">other</span>)
@@ -553,7 +571,7 @@
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">plus_eq</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> <span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">other</span>: <span class="kw-2">&amp;</span><span class="ident">Wire</span>) <span class="op">-&gt;</span> <span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> <span class="kw-2">mut</span> <span class="ident">Wire</span> {
         <span class="kw">match</span> (<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="kw-2">*</span><span class="self">self</span>, <span class="ident">other</span>) {
             (<span class="ident">Wire</span>::<span class="ident">Mod2</span> { <span class="ident">val</span>: <span class="kw-2">ref</span> <span class="kw-2">mut</span> <span class="ident">x</span> }, <span class="ident">Wire</span>::<span class="ident">Mod2</span> { <span class="ident">val</span>: <span class="kw-2">ref</span> <span class="ident">y</span> }) <span class="op">=&gt;</span> {
-                <span class="kw-2">*</span><span class="ident">x</span> <span class="op">=</span> <span class="kw-2">*</span><span class="ident">x</span> <span class="op">^</span> <span class="kw-2">*</span><span class="ident">y</span>;
+                <span class="kw-2">*</span><span class="ident">x</span> <span class="op">^=</span> <span class="kw-2">*</span><span class="ident">y</span>;
             }
 
             (
@@ -599,7 +617,7 @@
         <span class="kw">match</span> <span class="self">self</span> {
             <span class="ident">Wire</span>::<span class="ident">Mod2</span> { <span class="ident">val</span> } <span class="op">=&gt;</span> {
                 <span class="kw">if</span> <span class="ident">c</span> <span class="op">&amp;</span> <span class="number">1</span> <span class="op">==</span> <span class="number">0</span> {
-                    <span class="kw-2">*</span><span class="ident">val</span> <span class="op">=</span> <span class="ident">Block</span>::<span class="ident">zero</span>();
+                    <span class="kw-2">*</span><span class="ident">val</span> <span class="op">=</span> <span class="ident">Block</span>::<span class="ident">default</span>();
                 }
             }
 
@@ -674,7 +692,7 @@
     <span class="doccomment">/// Get a random wire mod q.</span>
     <span class="attribute">#[<span class="ident">inline</span>]</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">rand</span><span class="op">&lt;</span><span class="ident">R</span>: <span class="ident">CryptoRng</span> <span class="op">+</span> <span class="ident">RngCore</span><span class="op">&gt;</span>(<span class="ident">rng</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">R</span>, <span class="ident">q</span>: <span class="ident">u16</span>) <span class="op">-&gt;</span> <span class="ident">Wire</span> {
-        <span class="self">Self</span>::<span class="ident">from_block</span>(<span class="ident">Block</span>::<span class="ident">rand</span>(<span class="ident">rng</span>), <span class="ident">q</span>)
+        <span class="self">Self</span>::<span class="ident">from_block</span>(<span class="ident">rng</span>.<span class="ident">gen</span>::<span class="op">&lt;</span><span class="ident">Block</span><span class="op">&gt;</span>(), <span class="ident">q</span>)
     }
 
     <span class="doccomment">/// Compute the hash of this wire.</span>
@@ -844,13 +862,13 @@
         <span class="kw">let</span> <span class="ident">hashes</span> <span class="op">=</span> <span class="ident">crossbeam</span>::<span class="ident">scope</span>(<span class="op">|</span><span class="ident">scope</span><span class="op">|</span> {
             <span class="kw">let</span> <span class="ident">hs</span> <span class="op">=</span> <span class="ident">ws</span>
                 .<span class="ident">iter</span>()
-                .<span class="ident">map</span>(<span class="op">|</span><span class="ident">w</span><span class="op">|</span> <span class="ident">scope</span>.<span class="ident">spawn</span>(<span class="kw">move</span> <span class="op">|</span><span class="kw">_</span><span class="op">|</span> <span class="ident">w</span>.<span class="ident">hash</span>(<span class="ident">Block</span>::<span class="ident">zero</span>())))
+                .<span class="ident">map</span>(<span class="op">|</span><span class="ident">w</span><span class="op">|</span> <span class="ident">scope</span>.<span class="ident">spawn</span>(<span class="kw">move</span> <span class="op">|</span><span class="kw">_</span><span class="op">|</span> <span class="ident">w</span>.<span class="ident">hash</span>(<span class="ident">Block</span>::<span class="ident">default</span>())))
                 .<span class="ident">collect_vec</span>();
             <span class="ident">hs</span>.<span class="ident">into_iter</span>().<span class="ident">map</span>(<span class="op">|</span><span class="ident">h</span><span class="op">|</span> <span class="ident">h</span>.<span class="ident">join</span>().<span class="ident">unwrap</span>()).<span class="ident">collect_vec</span>()
         })
         .<span class="ident">unwrap</span>();
 
-        <span class="kw">let</span> <span class="ident">should_be</span> <span class="op">=</span> <span class="ident">ws</span>.<span class="ident">iter</span>().<span class="ident">map</span>(<span class="op">|</span><span class="ident">w</span><span class="op">|</span> <span class="ident">w</span>.<span class="ident">hash</span>(<span class="ident">Block</span>::<span class="ident">zero</span>())).<span class="ident">collect_vec</span>();
+        <span class="kw">let</span> <span class="ident">should_be</span> <span class="op">=</span> <span class="ident">ws</span>.<span class="ident">iter</span>().<span class="ident">map</span>(<span class="op">|</span><span class="ident">w</span><span class="op">|</span> <span class="ident">w</span>.<span class="ident">hash</span>(<span class="ident">Block</span>::<span class="ident">default</span>())).<span class="ident">collect_vec</span>();
 
         <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">hashes</span>, <span class="ident">should_be</span>);
     }

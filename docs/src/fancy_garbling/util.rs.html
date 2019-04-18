@@ -561,11 +561,27 @@
 <span id="561">561</span>
 <span id="562">562</span>
 <span id="563">563</span>
+<span id="564">564</span>
+<span id="565">565</span>
+<span id="566">566</span>
+<span id="567">567</span>
+<span id="568">568</span>
+<span id="569">569</span>
+<span id="570">570</span>
+<span id="571">571</span>
+<span id="572">572</span>
+<span id="573">573</span>
+<span id="574">574</span>
+<span id="575">575</span>
+<span id="576">576</span>
+<span id="577">577</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="doccomment">//! Tools useful for interacting with `fancy-garbling`.</span>
 <span class="doccomment">//!</span>
 <span class="doccomment">//! Note: all number representations in this library are little-endian.</span>
 
+<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;nightly&quot;</span>)]</span>
+<span class="kw">use</span> <span class="ident">core</span>::<span class="ident">arch</span>::<span class="ident">x86_64</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="ident">itertools</span>::<span class="ident">Itertools</span>;
 <span class="kw">use</span> <span class="ident">scuttlebutt</span>::<span class="ident">Block</span>;
 
@@ -573,12 +589,31 @@
 <span class="comment">// tweak functions for garbling</span>
 
 <span class="doccomment">/// Tweak function for a single item.</span>
+<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;nightly&quot;</span>)]</span>
+<span class="attribute">#[<span class="ident">inline</span>]</span>
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">tweak</span>(<span class="ident">i</span>: <span class="ident">usize</span>) <span class="op">-&gt;</span> <span class="ident">Block</span> {
+    <span class="kw">let</span> <span class="ident">data</span> <span class="op">=</span> <span class="kw">unsafe</span> { <span class="ident">_mm_set_epi64</span>(<span class="ident">_mm_setzero_si64</span>(), <span class="kw-2">*</span>(<span class="kw-2">&amp;</span><span class="ident">i</span> <span class="kw">as</span> <span class="kw-2">*</span><span class="kw">const</span> <span class="kw">_</span> <span class="kw">as</span> <span class="kw-2">*</span><span class="kw">const</span> <span class="ident">__m64</span>)) };
+    <span class="ident">Block</span>(<span class="ident">data</span>)
+}
+<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">not</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;nightly&quot;</span>))]</span>
 <span class="attribute">#[<span class="ident">inline</span>]</span>
 <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">tweak</span>(<span class="ident">i</span>: <span class="ident">usize</span>) <span class="op">-&gt;</span> <span class="ident">Block</span> {
     <span class="ident">Block</span>::<span class="ident">from</span>(<span class="ident">i</span> <span class="kw">as</span> <span class="ident">u128</span>)
 }
 
 <span class="doccomment">/// Tweak function for two items.</span>
+<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;nightly&quot;</span>)]</span>
+<span class="attribute">#[<span class="ident">inline</span>]</span>
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">tweak2</span>(<span class="ident">i</span>: <span class="ident">u64</span>, <span class="ident">j</span>: <span class="ident">u64</span>) <span class="op">-&gt;</span> <span class="ident">Block</span> {
+    <span class="kw">let</span> <span class="ident">data</span> <span class="op">=</span> <span class="kw">unsafe</span> {
+        <span class="ident">_mm_set_epi64</span>(
+            <span class="kw-2">*</span>(<span class="kw-2">&amp;</span><span class="ident">i</span> <span class="kw">as</span> <span class="kw-2">*</span><span class="kw">const</span> <span class="kw">_</span> <span class="kw">as</span> <span class="kw-2">*</span><span class="kw">const</span> <span class="ident">__m64</span>),
+            <span class="kw-2">*</span>(<span class="kw-2">&amp;</span><span class="ident">j</span> <span class="kw">as</span> <span class="kw-2">*</span><span class="kw">const</span> <span class="kw">_</span> <span class="kw">as</span> <span class="kw-2">*</span><span class="kw">const</span> <span class="ident">__m64</span>),
+        )
+    };
+    <span class="ident">Block</span>(<span class="ident">data</span>)
+}
+<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">not</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;nightly&quot;</span>))]</span>
 <span class="attribute">#[<span class="ident">inline</span>]</span>
 <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">tweak2</span>(<span class="ident">i</span>: <span class="ident">u64</span>, <span class="ident">j</span>: <span class="ident">u64</span>) <span class="op">-&gt;</span> <span class="ident">Block</span> {
     <span class="ident">Block</span>::<span class="ident">from</span>(((<span class="ident">i</span> <span class="kw">as</span> <span class="ident">u128</span>) <span class="op">&lt;&lt;</span> <span class="number">64</span>) <span class="op">+</span> <span class="ident">j</span> <span class="kw">as</span> <span class="ident">u128</span>)
@@ -595,15 +630,15 @@
 <span class="comment">// mixed radix stuff</span>
 
 <span class="doccomment">/// Add two base q numbers together.</span>
-<span class="attribute">#[<span class="ident">inline</span>]</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">base_q_add</span>(<span class="ident">xs</span>: <span class="kw-2">&amp;</span>[<span class="ident">u16</span>], <span class="ident">ys</span>: <span class="kw-2">&amp;</span>[<span class="ident">u16</span>], <span class="ident">q</span>: <span class="ident">u16</span>) <span class="op">-&gt;</span> <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u16</span><span class="op">&gt;</span> {
-    <span class="kw">if</span> <span class="ident">ys</span>.<span class="ident">len</span>() <span class="op">&gt;</span> <span class="ident">xs</span>.<span class="ident">len</span>() {
-        <span class="kw">return</span> <span class="ident">base_q_add</span>(<span class="ident">ys</span>, <span class="ident">xs</span>, <span class="ident">q</span>);
-    }
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">ret</span> <span class="op">=</span> <span class="ident">xs</span>.<span class="ident">to_vec</span>();
-    <span class="ident">base_q_add_eq</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">ret</span>, <span class="ident">ys</span>, <span class="ident">q</span>);
-    <span class="ident">ret</span>
-}
+<span class="comment">// #[inline]</span>
+<span class="comment">// pub(crate) fn base_q_add(xs: &amp;[u16], ys: &amp;[u16], q: u16) -&gt; Vec&lt;u16&gt; {</span>
+<span class="comment">//     if ys.len() &gt; xs.len() {</span>
+<span class="comment">//         return base_q_add(ys, xs, q);</span>
+<span class="comment">//     }</span>
+<span class="comment">//     let mut ret = xs.to_vec();</span>
+<span class="comment">//     base_q_add_eq(&amp;mut ret, ys, q);</span>
+<span class="comment">//     ret</span>
+<span class="comment">// }</span>
 
 <span class="doccomment">/// Add a base q number into the first one.</span>
 <span class="attribute">#[<span class="ident">inline</span>]</span>
@@ -645,16 +680,16 @@
     }
 }
 
-<span class="doccomment">/// Convert a `u128` into base `q`.</span>
+<span class="doccomment">/// Convert `x` into base `q`.</span>
 <span class="attribute">#[<span class="ident">inline</span>]</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">as_base_q</span>(<span class="ident">x</span>: <span class="ident">u128</span>, <span class="ident">q</span>: <span class="ident">u16</span>, <span class="ident">n</span>: <span class="ident">usize</span>) <span class="op">-&gt;</span> <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u16</span><span class="op">&gt;</span> {
+<span class="kw">fn</span> <span class="ident">as_base_q</span>(<span class="ident">x</span>: <span class="ident">u128</span>, <span class="ident">q</span>: <span class="ident">u16</span>, <span class="ident">n</span>: <span class="ident">usize</span>) <span class="op">-&gt;</span> <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u16</span><span class="op">&gt;</span> {
     <span class="kw">let</span> <span class="ident">ms</span> <span class="op">=</span> <span class="ident">std</span>::<span class="ident">iter</span>::<span class="ident">repeat</span>(<span class="ident">q</span>).<span class="ident">take</span>(<span class="ident">n</span>).<span class="ident">collect_vec</span>();
     <span class="ident">as_mixed_radix</span>(<span class="ident">x</span>, <span class="kw-2">&amp;</span><span class="ident">ms</span>)
 }
 
 <span class="doccomment">/// Determine how many `mod q` digits fit into a `u128`.</span>
 <span class="attribute">#[<span class="ident">inline</span>]</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">digits_per_u128</span>(<span class="ident">modulus</span>: <span class="ident">u16</span>) <span class="op">-&gt;</span> <span class="ident">usize</span> {
+<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn</span> <span class="ident">digits_per_u128</span>(<span class="ident">modulus</span>: <span class="ident">u16</span>) <span class="op">-&gt;</span> <span class="ident">usize</span> {
     <span class="macro">debug_assert_ne</span><span class="macro">!</span>(<span class="ident">modulus</span>, <span class="number">1</span>);
     <span class="kw">if</span> <span class="ident">modulus</span> <span class="op">==</span> <span class="number">2</span> {
         <span class="number">128</span>
@@ -675,15 +710,15 @@
     }
 }
 
-<span class="doccomment">/// Convert a `u128` into base `q`.</span>
+<span class="doccomment">/// Convert `x` into base `q`.</span>
 <span class="attribute">#[<span class="ident">inline</span>]</span>
 <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">as_base_q_u128</span>(<span class="ident">x</span>: <span class="ident">u128</span>, <span class="ident">q</span>: <span class="ident">u16</span>) <span class="op">-&gt;</span> <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u16</span><span class="op">&gt;</span> {
     <span class="ident">as_base_q</span>(<span class="ident">x</span>, <span class="ident">q</span>, <span class="ident">digits_per_u128</span>(<span class="ident">q</span>))
 }
 
-<span class="doccomment">/// Convert a `u128` into mixed radix form with the provided radii.</span>
+<span class="doccomment">/// Convert `x` into mixed radix form using the provided `radii`.</span>
 <span class="attribute">#[<span class="ident">inline</span>]</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">as_mixed_radix</span>(<span class="ident">x</span>: <span class="ident">u128</span>, <span class="ident">radii</span>: <span class="kw-2">&amp;</span>[<span class="ident">u16</span>]) <span class="op">-&gt;</span> <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u16</span><span class="op">&gt;</span> {
+<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn</span> <span class="ident">as_mixed_radix</span>(<span class="ident">x</span>: <span class="ident">u128</span>, <span class="ident">radii</span>: <span class="kw-2">&amp;</span>[<span class="ident">u16</span>]) <span class="op">-&gt;</span> <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u16</span><span class="op">&gt;</span> {
     <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">x</span> <span class="op">=</span> <span class="ident">x</span>;
     <span class="ident">radii</span>
         .<span class="ident">iter</span>()
@@ -701,7 +736,7 @@
         .<span class="ident">collect</span>()
 }
 
-<span class="doccomment">/// Convert little-endian base q digits into u128.</span>
+<span class="doccomment">/// Convert little-endian base `q` digits into `u128`.</span>
 <span class="attribute">#[<span class="ident">inline</span>]</span>
 <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">from_base_q</span>(<span class="ident">ds</span>: <span class="kw-2">&amp;</span>[<span class="ident">u16</span>], <span class="ident">q</span>: <span class="ident">u16</span>) <span class="op">-&gt;</span> <span class="ident">u128</span> {
     <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">x</span>: <span class="ident">u128</span> <span class="op">=</span> <span class="number">0</span>;
@@ -755,18 +790,6 @@
     <span class="ident">x</span>
 }
 
-<span class="doccomment">/// Convert a u128 into bytes.</span>
-<span class="attribute">#[<span class="ident">inline</span>]</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">u128_to_bytes</span>(<span class="ident">x</span>: <span class="ident">u128</span>) <span class="op">-&gt;</span> [<span class="ident">u8</span>; <span class="number">16</span>] {
-    <span class="kw">unsafe</span> { <span class="ident">std</span>::<span class="ident">mem</span>::<span class="ident">transmute</span>(<span class="ident">x</span>) }
-}
-
-<span class="doccomment">/// Convert bytes to u128.</span>
-<span class="attribute">#[<span class="ident">inline</span>]</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">bytes_to_u128</span>(<span class="ident">bytes</span>: [<span class="ident">u8</span>; <span class="number">16</span>]) <span class="op">-&gt;</span> <span class="ident">u128</span> {
-    <span class="kw">unsafe</span> { <span class="ident">std</span>::<span class="ident">mem</span>::<span class="ident">transmute</span>(<span class="ident">bytes</span>) }
-}
-
 <span class="comment">////////////////////////////////////////////////////////////////////////////////</span>
 <span class="comment">// primes &amp; crt</span>
 
@@ -794,11 +817,12 @@
 
 <span class="doccomment">/// Compute the CRT representation of x with respect to the primes ps.</span>
 <span class="attribute">#[<span class="ident">inline</span>]</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">crt</span>(<span class="ident">x</span>: <span class="ident">u128</span>, <span class="ident">ps</span>: <span class="kw-2">&amp;</span>[<span class="ident">u16</span>]) <span class="op">-&gt;</span> <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u16</span><span class="op">&gt;</span> {
+<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn</span> <span class="ident">crt</span>(<span class="ident">x</span>: <span class="ident">u128</span>, <span class="ident">ps</span>: <span class="kw-2">&amp;</span>[<span class="ident">u16</span>]) <span class="op">-&gt;</span> <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u16</span><span class="op">&gt;</span> {
     <span class="ident">ps</span>.<span class="ident">iter</span>().<span class="ident">map</span>(<span class="op">|</span><span class="kw-2">&amp;</span><span class="ident">p</span><span class="op">|</span> (<span class="ident">x</span> <span class="op">%</span> <span class="ident">p</span> <span class="kw">as</span> <span class="ident">u128</span>) <span class="kw">as</span> <span class="ident">u16</span>).<span class="ident">collect</span>()
 }
 
-<span class="doccomment">/// Compute the CRT representation of x with respect to the factorization of q.</span>
+<span class="doccomment">/// Compute the CRT representation of `x` with respect to the factorization of</span>
+<span class="doccomment">/// `q`.</span>
 <span class="attribute">#[<span class="ident">inline</span>]</span>
 <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">crt_factor</span>(<span class="ident">x</span>: <span class="ident">u128</span>, <span class="ident">q</span>: <span class="ident">u128</span>) <span class="op">-&gt;</span> <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u16</span><span class="op">&gt;</span> {
     <span class="ident">crt</span>(<span class="ident">x</span>, <span class="kw-2">&amp;</span><span class="ident">factor</span>(<span class="ident">q</span>))
@@ -806,7 +830,7 @@
 
 <span class="doccomment">/// Compute the value x given a list of CRT primes and residues.</span>
 <span class="attribute">#[<span class="ident">inline</span>]</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">crt_inv</span>(<span class="ident">xs</span>: <span class="kw-2">&amp;</span>[<span class="ident">u16</span>], <span class="ident">ps</span>: <span class="kw-2">&amp;</span>[<span class="ident">u16</span>]) <span class="op">-&gt;</span> <span class="ident">u128</span> {
+<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn</span> <span class="ident">crt_inv</span>(<span class="ident">xs</span>: <span class="kw-2">&amp;</span>[<span class="ident">u16</span>], <span class="ident">ps</span>: <span class="kw-2">&amp;</span>[<span class="ident">u16</span>]) <span class="op">-&gt;</span> <span class="ident">u128</span> {
     <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">ret</span> <span class="op">=</span> <span class="number">0</span>;
     <span class="kw">let</span> <span class="ident">M</span> <span class="op">=</span> <span class="ident">ps</span>.<span class="ident">iter</span>().<span class="ident">fold</span>(<span class="number">1</span>, <span class="op">|</span><span class="ident">acc</span>, <span class="kw-2">&amp;</span><span class="ident">x</span><span class="op">|</span> <span class="ident">x</span> <span class="kw">as</span> <span class="ident">i128</span> <span class="op">*</span> <span class="ident">acc</span>);
     <span class="kw">for</span> (<span class="kw-2">&amp;</span><span class="ident">p</span>, <span class="kw-2">&amp;</span><span class="ident">a</span>) <span class="kw">in</span> <span class="ident">ps</span>.<span class="ident">iter</span>().<span class="ident">zip</span>(<span class="ident">xs</span>.<span class="ident">iter</span>()) {
@@ -818,7 +842,7 @@
     <span class="ident">ret</span> <span class="kw">as</span> <span class="ident">u128</span>
 }
 
-<span class="doccomment">/// Compute the value x given a composite CRT modulus.</span>
+<span class="doccomment">/// Compute the value `x` given a composite CRT modulus provided by `xs`.</span>
 <span class="attribute">#[<span class="ident">inline</span>]</span>
 <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">crt_inv_factor</span>(<span class="ident">xs</span>: <span class="kw-2">&amp;</span>[<span class="ident">u16</span>], <span class="ident">q</span>: <span class="ident">u128</span>) <span class="op">-&gt;</span> <span class="ident">u128</span> {
     <span class="ident">crt_inv</span>(<span class="ident">xs</span>, <span class="kw-2">&amp;</span><span class="ident">factor</span>(<span class="ident">q</span>))
@@ -827,7 +851,7 @@
 <span class="doccomment">/// Generic algorithm to invert inp_a mod inp_b. As ref so as to support BigInts without</span>
 <span class="doccomment">/// copying.</span>
 <span class="attribute">#[<span class="ident">inline</span>]</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">inv</span>(<span class="ident">inp_a</span>: <span class="ident">i128</span>, <span class="ident">inp_b</span>: <span class="ident">i128</span>) <span class="op">-&gt;</span> <span class="ident">i128</span> {
+<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn</span> <span class="ident">inv</span>(<span class="ident">inp_a</span>: <span class="ident">i128</span>, <span class="ident">inp_b</span>: <span class="ident">i128</span>) <span class="op">-&gt;</span> <span class="ident">i128</span> {
     <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">a</span> <span class="op">=</span> <span class="ident">inp_a</span>;
     <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">b</span> <span class="op">=</span> <span class="ident">inp_b</span>;
     <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">q</span>;
@@ -869,10 +893,10 @@
 ];
 
 <span class="doccomment">/// Primes skipping the modulus 2, which allows certain gadgets.</span>
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">PRIMES_SKIP_2</span>: [<span class="ident">u16</span>; <span class="number">29</span>] <span class="op">=</span> [
-    <span class="number">3</span>, <span class="number">5</span>, <span class="number">7</span>, <span class="number">11</span>, <span class="number">13</span>, <span class="number">17</span>, <span class="number">19</span>, <span class="number">23</span>, <span class="number">29</span>, <span class="number">31</span>, <span class="number">37</span>, <span class="number">41</span>, <span class="number">43</span>, <span class="number">47</span>, <span class="number">53</span>, <span class="number">59</span>, <span class="number">61</span>, <span class="number">67</span>, <span class="number">71</span>, <span class="number">73</span>, <span class="number">79</span>, <span class="number">83</span>, <span class="number">89</span>, <span class="number">97</span>,
-    <span class="number">101</span>, <span class="number">103</span>, <span class="number">107</span>, <span class="number">109</span>, <span class="number">113</span>,
-];
+<span class="comment">// pub const PRIMES_SKIP_2: [u16; 29] = [</span>
+<span class="comment">//     3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47, 53, 59, 61, 67, 71, 73, 79, 83, 89, 97,</span>
+<span class="comment">//     101, 103, 107, 109, 113,</span>
+<span class="comment">// ];</span>
 
 <span class="doccomment">/// Generate a CRT modulus with n primes.</span>
 <span class="attribute">#[<span class="ident">inline</span>]</span>
@@ -889,20 +913,20 @@
 
 <span class="doccomment">/// Generate the factors of a CRT modulus that support at least n-bit integers, using the</span>
 <span class="doccomment">/// built-in PRIMES.</span>
-<span class="attribute">#[<span class="ident">inline</span>]</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">primes_with_width</span>(<span class="ident">n</span>: <span class="ident">u32</span>) <span class="op">-&gt;</span> <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u16</span><span class="op">&gt;</span> {
-    <span class="ident">base_primes_with_width</span>(<span class="ident">n</span>, <span class="kw-2">&amp;</span><span class="ident">PRIMES</span>)
-}
+<span class="comment">// #[inline]</span>
+<span class="comment">// pub fn primes_with_width(n: u32) -&gt; Vec&lt;u16&gt; {</span>
+<span class="comment">//     base_primes_with_width(n, &amp;PRIMES)</span>
+<span class="comment">// }</span>
 
 <span class="doccomment">/// Generate a CRT modulus that support at least n-bit integers, using provided primes.</span>
 <span class="attribute">#[<span class="ident">inline</span>]</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">base_modulus_with_width</span>(<span class="ident">nbits</span>: <span class="ident">u32</span>, <span class="ident">primes</span>: <span class="kw-2">&amp;</span>[<span class="ident">u16</span>]) <span class="op">-&gt;</span> <span class="ident">u128</span> {
+<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn</span> <span class="ident">base_modulus_with_width</span>(<span class="ident">nbits</span>: <span class="ident">u32</span>, <span class="ident">primes</span>: <span class="kw-2">&amp;</span>[<span class="ident">u16</span>]) <span class="op">-&gt;</span> <span class="ident">u128</span> {
     <span class="ident">product</span>(<span class="kw-2">&amp;</span><span class="ident">base_primes_with_width</span>(<span class="ident">nbits</span>, <span class="ident">primes</span>))
 }
 
 <span class="doccomment">/// Generate the factors of a CRT modulus that support at least n-bit integers, using provided primes.</span>
 <span class="attribute">#[<span class="ident">inline</span>]</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">base_primes_with_width</span>(<span class="ident">nbits</span>: <span class="ident">u32</span>, <span class="ident">primes</span>: <span class="kw-2">&amp;</span>[<span class="ident">u16</span>]) <span class="op">-&gt;</span> <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u16</span><span class="op">&gt;</span> {
+<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn</span> <span class="ident">base_primes_with_width</span>(<span class="ident">nbits</span>: <span class="ident">u32</span>, <span class="ident">primes</span>: <span class="kw-2">&amp;</span>[<span class="ident">u16</span>]) <span class="op">-&gt;</span> <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u16</span><span class="op">&gt;</span> {
     <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">res</span> <span class="op">=</span> <span class="number">1</span>;
     <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">ps</span> <span class="op">=</span> <span class="ident">Vec</span>::<span class="ident">new</span>();
     <span class="kw">for</span> <span class="kw-2">&amp;</span><span class="ident">p</span> <span class="kw">in</span> <span class="ident">primes</span>.<span class="ident">iter</span>() {
@@ -918,78 +942,79 @@
 
 <span class="doccomment">/// Generate a CRT modulus that support at least n-bit integers, using the built-in</span>
 <span class="doccomment">/// PRIMES_SKIP_2 (does not include 2 as a factor).</span>
-<span class="attribute">#[<span class="ident">inline</span>]</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">modulus_with_width_skip2</span>(<span class="ident">nbits</span>: <span class="ident">u32</span>) <span class="op">-&gt;</span> <span class="ident">u128</span> {
-    <span class="ident">base_modulus_with_width</span>(<span class="ident">nbits</span>, <span class="kw-2">&amp;</span><span class="ident">PRIMES_SKIP_2</span>)
-}
+<span class="comment">// #[inline]</span>
+<span class="comment">// pub fn modulus_with_width_skip2(nbits: u32) -&gt; u128 {</span>
+<span class="comment">//     base_modulus_with_width(nbits, &amp;PRIMES_SKIP_2)</span>
+<span class="comment">// }</span>
 
 <span class="doccomment">/// Compute the product of some u16s as a u128.</span>
 <span class="attribute">#[<span class="ident">inline</span>]</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">product</span>(<span class="ident">xs</span>: <span class="kw-2">&amp;</span>[<span class="ident">u16</span>]) <span class="op">-&gt;</span> <span class="ident">u128</span> {
+<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn</span> <span class="ident">product</span>(<span class="ident">xs</span>: <span class="kw-2">&amp;</span>[<span class="ident">u16</span>]) <span class="op">-&gt;</span> <span class="ident">u128</span> {
     <span class="ident">xs</span>.<span class="ident">iter</span>().<span class="ident">fold</span>(<span class="number">1</span>, <span class="op">|</span><span class="ident">acc</span>, <span class="kw-2">&amp;</span><span class="ident">x</span><span class="op">|</span> <span class="ident">acc</span> <span class="op">*</span> <span class="ident">x</span> <span class="kw">as</span> <span class="ident">u128</span>)
 }
 
 <span class="doccomment">/// Raise a u16 to a power mod some value.</span>
-<span class="attribute">#[<span class="ident">inline</span>]</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">powm</span>(<span class="ident">inp</span>: <span class="ident">u16</span>, <span class="ident">pow</span>: <span class="ident">u16</span>, <span class="ident">modulus</span>: <span class="ident">u16</span>) <span class="op">-&gt;</span> <span class="ident">u16</span> {
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">x</span> <span class="op">=</span> <span class="ident">inp</span> <span class="kw">as</span> <span class="ident">u16</span>;
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">z</span> <span class="op">=</span> <span class="number">1</span>;
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">n</span> <span class="op">=</span> <span class="ident">pow</span>;
-    <span class="kw">while</span> <span class="ident">n</span> <span class="op">&gt;</span> <span class="number">0</span> {
-        <span class="kw">if</span> <span class="ident">n</span> <span class="op">%</span> <span class="number">2</span> <span class="op">==</span> <span class="number">0</span> {
-            <span class="ident">x</span> <span class="op">=</span> <span class="ident">x</span>.<span class="ident">pow</span>(<span class="number">2</span>) <span class="op">%</span> <span class="ident">modulus</span> <span class="kw">as</span> <span class="ident">u16</span>;
-            <span class="ident">n</span> <span class="op">/=</span> <span class="number">2</span>;
-        } <span class="kw">else</span> {
-            <span class="ident">z</span> <span class="op">=</span> <span class="ident">x</span> <span class="op">*</span> <span class="ident">z</span> <span class="op">%</span> <span class="ident">modulus</span> <span class="kw">as</span> <span class="ident">u16</span>;
-            <span class="ident">n</span> <span class="op">-=</span> <span class="number">1</span>;
-        }
-    }
-    <span class="ident">z</span> <span class="kw">as</span> <span class="ident">u16</span>
-}
+<span class="comment">// #[inline]</span>
+<span class="comment">// pub fn powm(inp: u16, pow: u16, modulus: u16) -&gt; u16 {</span>
+<span class="comment">//     let mut x = inp as u16;</span>
+<span class="comment">//     let mut z = 1;</span>
+<span class="comment">//     let mut n = pow;</span>
+<span class="comment">//     while n &gt; 0 {</span>
+<span class="comment">//         if n % 2 == 0 {</span>
+<span class="comment">//             x = x.pow(2) % modulus as u16;</span>
+<span class="comment">//             n /= 2;</span>
+<span class="comment">//         } else {</span>
+<span class="comment">//             z = x * z % modulus as u16;</span>
+<span class="comment">//             n -= 1;</span>
+<span class="comment">//         }</span>
+<span class="comment">//     }</span>
+<span class="comment">//     z as u16</span>
+<span class="comment">// }</span>
 
 <span class="doccomment">/// Returns true if x is a power of 2</span>
 <span class="attribute">#[<span class="ident">inline</span>]</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">is_power_of_2</span>(<span class="ident">x</span>: <span class="ident">u16</span>) <span class="op">-&gt;</span> <span class="ident">bool</span> {
+<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn</span> <span class="ident">is_power_of_2</span>(<span class="ident">x</span>: <span class="ident">u16</span>) <span class="op">-&gt;</span> <span class="ident">bool</span> {
     (<span class="ident">x</span> <span class="op">&amp;</span> (<span class="ident">x</span> <span class="op">-</span> <span class="number">1</span>)) <span class="op">==</span> <span class="number">0</span>
 }
 
 <span class="doccomment">/// Extra Rng functionality, useful for `fancy-garbling`.</span>
 <span class="kw">pub</span> <span class="kw">trait</span> <span class="ident">RngExt</span>: <span class="ident">rand</span>::<span class="ident">Rng</span> <span class="op">+</span> <span class="ident">Sized</span> {
+    <span class="doccomment">/// Randomly generate a `bool`.</span>
     <span class="attribute">#[<span class="ident">inline</span>]</span>
     <span class="kw">fn</span> <span class="ident">gen_bool</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) <span class="op">-&gt;</span> <span class="ident">bool</span> {
         <span class="self">self</span>.<span class="ident">gen</span>()
     }
-
+    <span class="doccomment">/// Randomly generate a `u16`.</span>
     <span class="attribute">#[<span class="ident">inline</span>]</span>
     <span class="kw">fn</span> <span class="ident">gen_u16</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) <span class="op">-&gt;</span> <span class="ident">u16</span> {
         <span class="self">self</span>.<span class="ident">gen</span>()
     }
-
+    <span class="doccomment">/// Randomly generate a `u32`.</span>
     <span class="attribute">#[<span class="ident">inline</span>]</span>
     <span class="kw">fn</span> <span class="ident">gen_u32</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) <span class="op">-&gt;</span> <span class="ident">u32</span> {
         <span class="self">self</span>.<span class="ident">gen</span>()
     }
-
+    <span class="doccomment">/// Randomly generate a `u64`.</span>
     <span class="attribute">#[<span class="ident">inline</span>]</span>
     <span class="kw">fn</span> <span class="ident">gen_u64</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) <span class="op">-&gt;</span> <span class="ident">u64</span> {
         <span class="self">self</span>.<span class="ident">gen</span>()
     }
-
+    <span class="doccomment">/// Randomly generate a `usize`.</span>
     <span class="attribute">#[<span class="ident">inline</span>]</span>
     <span class="kw">fn</span> <span class="ident">gen_usize</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) <span class="op">-&gt;</span> <span class="ident">usize</span> {
         <span class="self">self</span>.<span class="ident">gen</span>()
     }
-
+    <span class="doccomment">/// Randomly generate a `u128`.</span>
     <span class="attribute">#[<span class="ident">inline</span>]</span>
     <span class="kw">fn</span> <span class="ident">gen_u128</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) <span class="op">-&gt;</span> <span class="ident">u128</span> {
         <span class="self">self</span>.<span class="ident">gen</span>()
     }
-
+    <span class="doccomment">/// Randomly generate a `Block`.</span>
     <span class="attribute">#[<span class="ident">inline</span>]</span>
     <span class="kw">fn</span> <span class="ident">gen_block</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) <span class="op">-&gt;</span> <span class="ident">Block</span> {
-        <span class="ident">Block</span>::<span class="ident">from</span>(<span class="self">self</span>.<span class="ident">gen_u128</span>())
+        <span class="self">self</span>.<span class="ident">gen</span>()
     }
-
+    <span class="doccomment">/// Randomly generate a valid `Block`.</span>
     <span class="attribute">#[<span class="ident">inline</span>]</span>
     <span class="kw">fn</span> <span class="ident">gen_usable_block</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">modulus</span>: <span class="ident">u16</span>) <span class="op">-&gt;</span> <span class="ident">Block</span> {
         <span class="kw">if</span> <span class="ident">is_power_of_2</span>(<span class="ident">modulus</span>) {
@@ -1002,22 +1027,22 @@
         <span class="kw">let</span> <span class="ident">max</span> <span class="op">=</span> (<span class="ident">modulus</span> <span class="kw">as</span> <span class="ident">u128</span>).<span class="ident">pow</span>(<span class="ident">n</span> <span class="kw">as</span> <span class="ident">u32</span>);
         <span class="ident">Block</span>::<span class="ident">from</span>(<span class="self">self</span>.<span class="ident">gen_u128</span>() <span class="op">%</span> <span class="ident">max</span>)
     }
-
+    <span class="doccomment">/// Randomly generate a prime (among the set of supported primes).</span>
     <span class="attribute">#[<span class="ident">inline</span>]</span>
     <span class="kw">fn</span> <span class="ident">gen_prime</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) <span class="op">-&gt;</span> <span class="ident">u16</span> {
         <span class="ident">PRIMES</span>[<span class="self">self</span>.<span class="ident">gen</span>::<span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span>() <span class="op">%</span> <span class="ident">NPRIMES</span>]
     }
-
+    <span class="doccomment">/// Randomly generate a (supported) modulus.</span>
     <span class="attribute">#[<span class="ident">inline</span>]</span>
     <span class="kw">fn</span> <span class="ident">gen_modulus</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) <span class="op">-&gt;</span> <span class="ident">u16</span> {
         <span class="number">2</span> <span class="op">+</span> (<span class="self">self</span>.<span class="ident">gen</span>::<span class="op">&lt;</span><span class="ident">u16</span><span class="op">&gt;</span>() <span class="op">%</span> <span class="number">111</span>)
     }
-
+    <span class="doccomment">/// Randomly generate a valid composite modulus.</span>
     <span class="attribute">#[<span class="ident">inline</span>]</span>
     <span class="kw">fn</span> <span class="ident">gen_usable_composite_modulus</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) <span class="op">-&gt;</span> <span class="ident">u128</span> {
         <span class="ident">product</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">gen_usable_factors</span>())
     }
-
+    <span class="doccomment">/// Randomly generate a vector of valid factor</span>
     <span class="attribute">#[<span class="ident">inline</span>]</span>
     <span class="kw">fn</span> <span class="ident">gen_usable_factors</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) <span class="op">-&gt;</span> <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u16</span><span class="op">&gt;</span> {
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">x</span>: <span class="ident">u128</span> <span class="op">=</span> <span class="number">1</span>;
@@ -1101,28 +1126,31 @@
             <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">x</span>, <span class="ident">z</span>);
         }
     }
+}
 
-    <span class="attribute">#[<span class="ident">test</span>]</span>
-    <span class="kw">fn</span> <span class="ident">base_q_addition</span>() {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">rng</span> <span class="op">=</span> <span class="ident">thread_rng</span>();
-        <span class="kw">for</span> <span class="kw">_</span> <span class="kw">in</span> <span class="number">0</span>..<span class="number">1000</span> {
-            <span class="kw">let</span> <span class="ident">q</span> <span class="op">=</span> <span class="number">2</span> <span class="op">+</span> (<span class="ident">rng</span>.<span class="ident">gen_u16</span>() <span class="op">%</span> <span class="number">111</span>);
-            <span class="kw">let</span> <span class="ident">n</span> <span class="op">=</span> <span class="ident">digits_per_u128</span>(<span class="ident">q</span>) <span class="op">-</span> <span class="number">2</span>;
-            <span class="macro">println</span><span class="macro">!</span>(<span class="string">&quot;q={} n={}&quot;</span>, <span class="ident">q</span>, <span class="ident">n</span>);
-            <span class="kw">let</span> <span class="ident">Q</span> <span class="op">=</span> (<span class="ident">q</span> <span class="kw">as</span> <span class="ident">u128</span>).<span class="ident">pow</span>(<span class="ident">n</span> <span class="kw">as</span> <span class="ident">u32</span>);
+<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">all</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;nightly&quot;</span>, <span class="ident">test</span>))]</span>
+<span class="kw">mod</span> <span class="ident">benchmarks</span> {
+    <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">test</span>;
+    <span class="kw">use</span> <span class="kw">super</span>::<span class="kw-2">*</span>;
+    <span class="kw">use</span> <span class="ident">test</span>::<span class="ident">Bencher</span>;
 
-            <span class="kw">let</span> <span class="ident">x</span> <span class="op">=</span> <span class="ident">rng</span>.<span class="ident">gen_u128</span>() <span class="op">%</span> <span class="ident">Q</span>;
-            <span class="kw">let</span> <span class="ident">y</span> <span class="op">=</span> <span class="ident">rng</span>.<span class="ident">gen_u128</span>() <span class="op">%</span> <span class="ident">Q</span>;
+    <span class="attribute">#[<span class="ident">bench</span>]</span>
+    <span class="kw">fn</span> <span class="ident">bench_tweak</span>(<span class="ident">b</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">Bencher</span>) {
+        <span class="kw">let</span> <span class="ident">i</span> <span class="op">=</span> <span class="ident">test</span>::<span class="ident">black_box</span>(<span class="ident">rand</span>::<span class="ident">random</span>::<span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span>());
+        <span class="ident">b</span>.<span class="ident">iter</span>(<span class="op">||</span> {
+            <span class="kw">let</span> <span class="ident">b</span> <span class="op">=</span> <span class="ident">test</span>::<span class="ident">black_box</span>(<span class="ident">tweak</span>(<span class="ident">i</span>));
+            <span class="ident">test</span>::<span class="ident">black_box</span>(<span class="ident">b</span>)
+        });
+    }
 
-            <span class="kw">let</span> <span class="ident">xp</span> <span class="op">=</span> <span class="ident">as_base_q</span>(<span class="ident">x</span>, <span class="ident">q</span>, <span class="ident">n</span>);
-            <span class="kw">let</span> <span class="ident">yp</span> <span class="op">=</span> <span class="ident">as_base_q</span>(<span class="ident">y</span>, <span class="ident">q</span>, <span class="ident">n</span>);
-
-            <span class="kw">let</span> <span class="ident">zp</span> <span class="op">=</span> <span class="ident">base_q_add</span>(<span class="kw-2">&amp;</span><span class="ident">xp</span>, <span class="kw-2">&amp;</span><span class="ident">yp</span>, <span class="ident">q</span>);
-
-            <span class="kw">let</span> <span class="ident">z</span> <span class="op">=</span> <span class="ident">from_base_q</span>(<span class="kw-2">&amp;</span><span class="ident">zp</span>, <span class="ident">q</span>);
-
-            <span class="macro">assert_eq</span><span class="macro">!</span>((<span class="ident">x</span> <span class="op">+</span> <span class="ident">y</span>) <span class="op">%</span> <span class="ident">Q</span>, <span class="ident">z</span>);
-        }
+    <span class="attribute">#[<span class="ident">bench</span>]</span>
+    <span class="kw">fn</span> <span class="ident">bench_tweak2</span>(<span class="ident">b</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">Bencher</span>) {
+        <span class="kw">let</span> <span class="ident">i</span> <span class="op">=</span> <span class="ident">test</span>::<span class="ident">black_box</span>(<span class="ident">rand</span>::<span class="ident">random</span>::<span class="op">&lt;</span><span class="ident">u64</span><span class="op">&gt;</span>());
+        <span class="kw">let</span> <span class="ident">j</span> <span class="op">=</span> <span class="ident">test</span>::<span class="ident">black_box</span>(<span class="ident">rand</span>::<span class="ident">random</span>::<span class="op">&lt;</span><span class="ident">u64</span><span class="op">&gt;</span>());
+        <span class="ident">b</span>.<span class="ident">iter</span>(<span class="op">||</span> {
+            <span class="kw">let</span> <span class="ident">b</span> <span class="op">=</span> <span class="ident">test</span>::<span class="ident">black_box</span>(<span class="ident">tweak2</span>(<span class="ident">i</span>, <span class="ident">j</span>));
+            <span class="ident">test</span>::<span class="ident">black_box</span>(<span class="ident">b</span>)
+        });
     }
 }
 </pre></div>
