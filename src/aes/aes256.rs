@@ -96,7 +96,8 @@ fn expand(key: &[u8; 32]) -> [__m128i; 15] {
     unsafe {
         let mut enc_keys: [__m128i; 15] = mem::uninitialized();
 
-        let kp = key.as_ptr() as *const __m128i;
+        let kp = std::mem::transmute(key);
+        // let kp = key.as_ptr() as *const __m128i;
         let k1 = _mm_loadu_si128(kp);
         let k2 = _mm_loadu_si128(kp.offset(1));
         _mm_store_si128(enc_keys.as_mut_ptr(), k1);

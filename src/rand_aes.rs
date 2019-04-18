@@ -99,7 +99,7 @@ impl BlockRngCore for AesRngCore {
     fn generate(&mut self, results: &mut Self::Results) {
         let data = unsafe { _mm_set_epi64(_mm_setzero_si64(), self.state) };
         let c = self.aes.encrypt(Block::from(data));
-        unsafe { *results = std::mem::transmute(c.0) };
+        *results = unsafe { *(&c.0 as *const _ as *const [u32; 4]) };
         self.state = unsafe { _mm_add_pi32(self.state, _mm_set_pi32(0, 1)) };
     }
     #[inline]
@@ -107,7 +107,7 @@ impl BlockRngCore for AesRngCore {
     fn generate(&mut self, results: &mut Self::Results) {
         let data = u128::from(self.state);
         let c = self.aes.encrypt(Block::from(data));
-        unsafe { *results = std::mem::transmute(c.0) };
+        *results = unsafe { *(&c.0 as *const _ as *const [u32; 4]) };
         self.state += 1;
     }
 }

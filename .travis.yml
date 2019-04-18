@@ -11,5 +11,7 @@ script:
   - |
     cargo build --verbose &&
     cargo test --verbose &&
+    cargo bench --verbose &&
     cargo build --verbose --features "$FEATURES" &&
-    cargo test --verbose --features "$FEATURES"
+    cargo test --verbose --features "$FEATURES" &&
+    cargo bench --verbose --features "$FEATURES"

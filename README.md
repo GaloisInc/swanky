@@ -24,6 +24,8 @@ benchmark the various protocols, and `cargo doc --open` to view documentation.
 `scuttlebutt` also supports the following features:
 
 * `nightly`: Use nightly features from `rust` and the underlying libraries.
+* `curve25519-dalek`: Enable functions that use `curve25519-dalek`.
+* `serde`: Enable `serde` support.
 
 # License
 
