@@ -6,10 +6,12 @@
 use crate::error::FancyError;
 use itertools::Itertools;
 
-pub mod bundle;
-
+mod bundle;
+mod binary;
 mod crt;
-pub use crt::CrtGadgets;
+pub use bundle::{Bundle, BundleGadgets};
+pub use binary::{BinaryBundle, BinaryGadgets};
+pub use crt::{CrtBundle, CrtGadgets};
 
 /// An object that has some modulus. Basic object of `Fancy` computations.
 pub trait HasModulus {

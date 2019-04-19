@@ -51,7 +51,7 @@ impl std::fmt::Display for Message {
 mod classic {
     use crate::circuit::{Circuit, CircuitBuilder};
     use crate::dummy::Dummy;
-    use crate::fancy::{CrtGadgets, Fancy};
+    use crate::fancy::{Fancy, BundleGadgets};
     use crate::r#static::garble;
     use crate::util::{self, RngExt};
     use rand::thread_rng;
@@ -553,13 +553,13 @@ mod complex {
     {
         let mut zs = Vec::with_capacity(n);
         for _ in 0..n {
-            let c = b.constant_bundle_crt(1, q).unwrap();
-            let x = b.garbler_input_bundle_crt(q, None).unwrap();
-            let x = b.mul_bundles(&x, &c).unwrap();
-            let z = b.relu(&x, "100%", None).unwrap();
+            let c = b.crt_constant_bundle(1, q).unwrap();
+            let x = b.crt_garbler_input_bundle(q, None).unwrap();
+            let x = b.crt_mul(&x, &c).unwrap();
+            let z = b.crt_relu(&x, "100%", None).unwrap();
             zs.push(z);
         }
-        b.output_bundles(&zs).unwrap();
+        b.crt_outputs(&zs).unwrap();
     }
 
     fn complex_gadget_<F, W>(b: &mut F, q: u128, n: usize)
@@ -569,13 +569,13 @@ mod complex {
     {
         let mut zs = Vec::with_capacity(n);
         for _ in 0..n {
-            let c = b.constant_bundle_crt(1, q).unwrap();
-            let x = b.evaluator_input_bundle_crt(q).unwrap();
-            let x = b.mul_bundles(&x, &c).unwrap();
-            let z = b.relu(&x, "100%", None).unwrap();
+            let c = b.crt_constant_bundle(1, q).unwrap();
+            let x = b.crt_evaluator_input_bundle(q).unwrap();
+            let x = b.crt_mul(&x, &c).unwrap();
+            let z = b.crt_relu(&x, "100%", None).unwrap();
             zs.push(z);
         }
-        b.output_bundles(&zs).unwrap();
+        b.crt_outputs(&zs).unwrap();
     }
 
     #[test]

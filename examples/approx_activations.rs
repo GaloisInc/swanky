@@ -9,11 +9,11 @@ where
     F: Fancy<Item = W>,
     W: HasModulus + Clone,
 {
-    let x = b.garbler_input_bundle_crt(q, None).unwrap();
-    let exact = b.relu(&x, "100%", None).unwrap();
-    let approx_999 = b.relu(&x, "99.9%", None).unwrap();
-    let approx_99 = b.relu(&x, "99%", None).unwrap();
-    b.output_bundles(&[exact, approx_999, approx_99]).unwrap();
+    let x = b.crt_garbler_input_bundle(q, None).unwrap();
+    let exact = b.crt_relu(&x, "100%", None).unwrap();
+    let approx_999 = b.crt_relu(&x, "99.9%", None).unwrap();
+    let approx_99 = b.crt_relu(&x, "99%", None).unwrap();
+    b.crt_outputs(&[exact, approx_999, approx_99]).unwrap();
 }
 
 fn main() {

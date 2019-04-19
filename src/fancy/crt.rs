@@ -12,6 +12,12 @@ use std::ops::Deref;
 pub struct CrtBundle<W: Clone + HasModulus>(Bundle<W>);
 
 impl<W: Clone + HasModulus> CrtBundle<W> {
+    /// Create a new CRT bundle from a vector of wires.
+    pub fn new(ws: Vec<W>) -> CrtBundle<W> {
+        CrtBundle(Bundle::new(ws))
+    }
+
+    /// Unwrap the underlying bundle from this CRT bundle.
     pub fn unwrap<'a>(&'a self) -> &'a Bundle<W> {
         &self.0
     }
@@ -94,9 +100,18 @@ pub trait CrtGadgets: Fancy + BundleGadgets {
         (0..n).map(|_| self.crt_evaluator_input_bundle(q)).collect()
     }
 
+    /// Output a slice of CRT bundles.
+    fn crt_outputs(&mut self, xs: &[CrtBundle<Self::Item>]) -> Result<(), Self::Error> {
+        for x in xs.iter() {
+            self.output_bundle(x)?;
+        }
+        Ok(())
+    }
+
     ////////////////////////////////////////////////////////////////////////////////
     // High-level computations dealing with bundles.
 
+    /// Add two CRT bundles.
     fn crt_add(
         &mut self,
         x: &CrtBundle<Self::Item>,
@@ -105,6 +120,7 @@ pub trait CrtGadgets: Fancy + BundleGadgets {
         self.add_bundles(x, y).map(CrtBundle)
     }
 
+    /// Subtract two CRT bundles.
     fn crt_sub(
         &mut self,
         x: &CrtBundle<Self::Item>,
@@ -114,7 +130,7 @@ pub trait CrtGadgets: Fancy + BundleGadgets {
     }
 
     /// Multiplies each wire in `x` by the corresponding residue of `c`.
-    fn crt_cmul_bundle(
+    fn crt_cmul(
         &mut self,
         x: &CrtBundle<Self::Item>,
         c: u128,
@@ -125,12 +141,11 @@ pub trait CrtGadgets: Fancy + BundleGadgets {
             .zip(cs.into_iter())
             .map(|(x, c)| self.cmul(x, c))
             .collect::<Result<Vec<Self::Item>, Self::Error>>()
-            .map(Bundle::new)
-            .map(CrtBundle)
+            .map(CrtBundle::new)
     }
 
     /// Multiply `x` with `y`.
-    fn crt_mul_bundles(
+    fn crt_mul(
         &mut self,
         x: &CrtBundle<Self::Item>,
         y: &CrtBundle<Self::Item>,
@@ -139,7 +154,7 @@ pub trait CrtGadgets: Fancy + BundleGadgets {
     }
 
     /// Exponentiate `x` by the constant `c`.
-    fn crt_cexp_bundle(
+    fn crt_cexp(
         &mut self,
         x: &CrtBundle<Self::Item>,
         c: u16,
@@ -154,12 +169,11 @@ pub trait CrtGadgets: Fancy + BundleGadgets {
                 self.proj(x, p, Some(tab))
             })
             .collect::<Result<Vec<Self::Item>, Self::Error>>()
-            .map(Bundle::new)
-            .map(CrtBundle)
+            .map(CrtBundle::new)
     }
 
     /// Compute the remainder with respect to modulus `p`.
-    fn crt_rem_bundle(
+    fn crt_rem(
         &mut self,
         x: &CrtBundle<Self::Item>,
         p: u16,
@@ -174,38 +188,7 @@ pub trait CrtGadgets: Fancy + BundleGadgets {
             .iter()
             .map(|&q| self.mod_change(w, q))
             .collect::<Result<Vec<Self::Item>, Self::Error>>()
-            .map(Bundle::new)
-            .map(CrtBundle)
-    }
-
-    /// Compute `x == y`. Returns a wire encoding the result mod 2.
-    fn crt_eq_bundles(
-        &mut self,
-        x: &Bundle<Self::Item>,
-        y: &Bundle<Self::Item>,
-    ) -> Result<Self::Item, Self::Error> {
-        if x.moduli() != y.moduli() {
-            return Err(Self::Error::from(FancyError::UnequalModuli));
-        }
-        let wlen = x.wires().len() as u16;
-        let zs = x
-            .wires()
-            .iter()
-            .zip_eq(y.wires().iter())
-            .map(|(x, y)| {
-                // compute (x-y == 0) for each residue
-                let z = self.sub(x, y)?;
-                let mut eq_zero_tab = vec![0; x.modulus() as usize];
-                eq_zero_tab[0] = 1;
-                self.proj(&z, wlen + 1, Some(eq_zero_tab))
-            })
-            .collect::<Result<Vec<Self::Item>, Self::Error>>()?;
-        // add up the results, and output whether they equal zero or not, mod 2
-        let z = self.add_many(&zs)?;
-        let b = zs.len();
-        let mut tab = vec![0; b + 1];
-        tab[b] = 1;
-        self.proj(&z, 2, Some(tab))
+            .map(CrtBundle::new)
     }
 
     ////////////////////////////////////////////////////////////////////////////////
@@ -261,7 +244,7 @@ pub trait CrtGadgets: Fancy + BundleGadgets {
         output_moduli: Option<&[u16]>,
     ) -> Result<CrtBundle<Self::Item>, Self::Error> {
         let factors_of_m = &get_ms(x, accuracy);
-        let res = self.fractional_mixed_radix(x, factors_of_m)?;
+        let res = self.crt_fractional_mixed_radix(x, factors_of_m)?;
 
         // project the MSB to 0/1, whether or not it is less than p/2
         let p = *factors_of_m.last().unwrap();
@@ -277,14 +260,17 @@ pub trait CrtGadgets: Fancy + BundleGadgets {
             .iter()
             .map(|x| self.mul(x, &mask))
             .collect::<Result<Vec<Self::Item>, Self::Error>>()
-            .map(Bundle::new)
-            .map(CrtBundle)
+            .map(CrtBundle::new)
     }
 
     /// Return 0 if `x` is positive and 1 if `x` is negative.
-    fn crt_sign(&mut self, x: &CrtBundle<Self::Item>, accuracy: &str) -> Result<Self::Item, Self::Error> {
+    fn crt_sign(
+        &mut self,
+        x: &CrtBundle<Self::Item>,
+        accuracy: &str,
+    ) -> Result<Self::Item, Self::Error> {
         let factors_of_m = &get_ms(x, accuracy);
-        let res = self.fractional_mixed_radix(x, factors_of_m)?;
+        let res = self.crt_fractional_mixed_radix(x, factors_of_m)?;
         let p = *factors_of_m.last().unwrap();
         let tt = (0..p).map(|x| (x >= p / 2) as u16).collect_vec();
         self.proj(&res, 2, Some(tt))
@@ -299,7 +285,7 @@ pub trait CrtGadgets: Fancy + BundleGadgets {
         accuracy: &str,
         output_moduli: Option<&[u16]>,
     ) -> Result<CrtBundle<Self::Item>, Self::Error> {
-        let sign = self.sign(x, accuracy)?;
+        let sign = self.crt_sign(x, accuracy)?;
         output_moduli
             .unwrap_or(&x.moduli())
             .iter()
@@ -308,8 +294,7 @@ pub trait CrtGadgets: Fancy + BundleGadgets {
                 self.proj(&sign, p, Some(tt))
             })
             .collect::<Result<Vec<Self::Item>, Self::Error>>()
-            .map(Bundle::new)
-            .map(CrtBundle)
+            .map(CrtBundle::new)
     }
 
     /// Returns 1 if `x < y`.
@@ -320,7 +305,7 @@ pub trait CrtGadgets: Fancy + BundleGadgets {
         accuracy: &str,
     ) -> Result<Self::Item, Self::Error> {
         let z = self.crt_sub(x, y)?;
-        self.sign(&z, accuracy)
+        self.crt_sign(&z, accuracy)
     }
 
     /// Returns 1 if `x >= y`.
@@ -330,7 +315,7 @@ pub trait CrtGadgets: Fancy + BundleGadgets {
         y: &CrtBundle<Self::Item>,
         accuracy: &str,
     ) -> Result<Self::Item, Self::Error> {
-        let z = self.lt(x, y, accuracy)?;
+        let z = self.crt_lt(x, y, accuracy)?;
         self.negate(&z)
     }
 
@@ -348,7 +333,7 @@ pub trait CrtGadgets: Fancy + BundleGadgets {
         }
         xs.iter().skip(1).fold(Ok(xs[0].clone()), |x, y| {
             x.map(|x| {
-                let pos = self.lt(&x, y, accuracy)?;
+                let pos = self.crt_lt(&x, y, accuracy)?;
                 let neg = self.negate(&pos)?;
                 x.wires()
                     .iter()
@@ -359,8 +344,7 @@ pub trait CrtGadgets: Fancy + BundleGadgets {
                         self.add(&xp, &yp)
                     })
                     .collect::<Result<Vec<Self::Item>, Self::Error>>()
-                    .map(Bundle::new)
-                    .map(CrtBundle)
+                    .map(CrtBundle::new)
             })?
         })
     }

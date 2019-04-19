@@ -73,6 +73,8 @@ impl<W: Clone + HasModulus> Index<usize> for Bundle<W> {
 
 impl<F: Fancy> BundleGadgets for F {}
 
+/// Extension trait for Fancy which provides Bundle constructions which are not
+/// necessarily CRT nor binary-based.
 pub trait BundleGadgets: Fancy {
     /// Crate an input bundle for the garbler using moduli `ps` and optional inputs `xs`.
     fn garbler_input_bundle(
@@ -394,5 +396,35 @@ pub trait BundleGadgets: Fancy {
             ws.insert(0, zero.clone());
         }
         Ok(Bundle(ws))
+    }
+
+    /// Compute `x == y`. Returns a wire encoding the result mod 2.
+    fn eq_bundles(
+        &mut self,
+        x: &Bundle<Self::Item>,
+        y: &Bundle<Self::Item>,
+    ) -> Result<Self::Item, Self::Error> {
+        if x.moduli() != y.moduli() {
+            return Err(Self::Error::from(FancyError::UnequalModuli));
+        }
+        let wlen = x.wires().len() as u16;
+        let zs = x
+            .wires()
+            .iter()
+            .zip_eq(y.wires().iter())
+            .map(|(x, y)| {
+                // compute (x-y == 0) for each residue
+                let z = self.sub(x, y)?;
+                let mut eq_zero_tab = vec![0; x.modulus() as usize];
+                eq_zero_tab[0] = 1;
+                self.proj(&z, wlen + 1, Some(eq_zero_tab))
+            })
+            .collect::<Result<Vec<Self::Item>, Self::Error>>()?;
+        // add up the results, and output whether they equal zero or not, mod 2
+        let z = self.add_many(&zs)?;
+        let b = zs.len();
+        let mut tab = vec![0; b + 1];
+        tab[b] = 1;
+        self.proj(&z, 2, Some(tab))
     }
 }
