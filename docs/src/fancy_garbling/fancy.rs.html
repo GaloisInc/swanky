@@ -282,6 +282,12 @@
 <span id="282">282</span>
 <span id="283">283</span>
 <span id="284">284</span>
+<span id="285">285</span>
+<span id="286">286</span>
+<span id="287">287</span>
+<span id="288">288</span>
+<span id="289">289</span>
+<span id="290">290</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="doccomment">//! The `Fancy` trait represents the kinds of computations possible in `fancy-garbling`.</span>
 <span class="doccomment">//!</span>
@@ -291,8 +297,12 @@
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">error</span>::<span class="ident">FancyError</span>;
 <span class="kw">use</span> <span class="ident">itertools</span>::<span class="ident">Itertools</span>;
 
+<span class="kw">mod</span> <span class="ident">bundle</span>;
+<span class="kw">mod</span> <span class="ident">binary</span>;
 <span class="kw">mod</span> <span class="ident">crt</span>;
-<span class="kw">pub</span> <span class="kw">use</span> <span class="ident">crt</span>::{<span class="ident">Bundle</span>, <span class="ident">BundleGadgets</span>};
+<span class="kw">pub</span> <span class="kw">use</span> <span class="ident">bundle</span>::{<span class="ident">Bundle</span>, <span class="ident">BundleGadgets</span>};
+<span class="kw">pub</span> <span class="kw">use</span> <span class="ident">binary</span>::{<span class="ident">BinaryBundle</span>, <span class="ident">BinaryGadgets</span>};
+<span class="kw">pub</span> <span class="kw">use</span> <span class="ident">crt</span>::{<span class="ident">CrtBundle</span>, <span class="ident">CrtGadgets</span>};
 
 <span class="doccomment">/// An object that has some modulus. Basic object of `Fancy` computations.</span>
 <span class="kw">pub</span> <span class="kw">trait</span> <span class="ident">HasModulus</span> {
@@ -514,6 +524,8 @@
     }
 
     <span class="doccomment">/// If `b = 0` returns `x` else `y`.</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// `b` must be mod 2 but `x` and `y` can be have any modulus.</span>
     <span class="kw">fn</span> <span class="ident">mux</span>(
         <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>,
         <span class="ident">b</span>: <span class="kw-2">&amp;</span><span class="self">Self</span>::<span class="ident">Item</span>,
@@ -521,8 +533,8 @@
         <span class="ident">y</span>: <span class="kw-2">&amp;</span><span class="self">Self</span>::<span class="ident">Item</span>,
     ) <span class="op">-&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="self">Self</span>::<span class="ident">Item</span>, <span class="self">Self</span>::<span class="ident">Error</span><span class="op">&gt;</span> {
         <span class="kw">let</span> <span class="ident">notb</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">negate</span>(<span class="ident">b</span>)<span class="question-mark">?</span>;
-        <span class="kw">let</span> <span class="ident">xsel</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">and</span>(<span class="kw-2">&amp;</span><span class="ident">notb</span>, <span class="ident">x</span>)<span class="question-mark">?</span>;
-        <span class="kw">let</span> <span class="ident">ysel</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">and</span>(<span class="ident">b</span>, <span class="ident">y</span>)<span class="question-mark">?</span>;
+        <span class="kw">let</span> <span class="ident">xsel</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">mul</span>(<span class="kw-2">&amp;</span><span class="ident">notb</span>, <span class="ident">x</span>)<span class="question-mark">?</span>;
+        <span class="kw">let</span> <span class="ident">ysel</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">mul</span>(<span class="ident">b</span>, <span class="ident">y</span>)<span class="question-mark">?</span>;
         <span class="self">self</span>.<span class="ident">add</span>(<span class="kw-2">&amp;</span><span class="ident">xsel</span>, <span class="kw-2">&amp;</span><span class="ident">ysel</span>)
     }
 
@@ -559,7 +571,7 @@
     }
 }
 
-<span class="kw">fn</span> <span class="ident">to_vec_option</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>(<span class="ident">opt_xs</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;&gt;</span>, <span class="ident">len</span>: <span class="ident">usize</span>) <span class="op">-&gt;</span> <span class="ident">Vec</span><span class="op">&lt;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;&gt;</span> {
+<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn</span> <span class="ident">to_vec_option</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>(<span class="ident">opt_xs</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;&gt;</span>, <span class="ident">len</span>: <span class="ident">usize</span>) <span class="op">-&gt;</span> <span class="ident">Vec</span><span class="op">&lt;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;&gt;</span> {
     <span class="ident">opt_xs</span>
         .<span class="ident">map</span>(<span class="op">|</span><span class="ident">vals</span><span class="op">|</span> {
             <span class="comment">// transform option of slice into vec of options</span>
