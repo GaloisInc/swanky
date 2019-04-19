@@ -51,7 +51,7 @@ impl std::fmt::Display for Message {
 mod classic {
     use crate::circuit::{Circuit, CircuitBuilder};
     use crate::dummy::Dummy;
-    use crate::fancy::{BundleGadgets, Fancy};
+    use crate::fancy::{CrtGadgets, Fancy};
     use crate::r#static::garble;
     use crate::util::{self, RngExt};
     use rand::thread_rng;
@@ -539,7 +539,7 @@ mod complex {
     use crate::dummy::Dummy;
     use crate::error::GarblerError;
     use crate::util::RngExt;
-    use crate::{BundleGadgets, Evaluator, Fancy, Garbler, HasModulus, Message};
+    use crate::{CrtGadgets, Evaluator, Fancy, Garbler, HasModulus, Message};
     use rand::thread_rng;
     use scuttlebutt::AesRng;
     use std::cell::RefCell;

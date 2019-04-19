@@ -128,7 +128,7 @@ impl Fancy for Dummy {
 #[cfg(test)]
 mod bundle {
     use super::*;
-    use crate::fancy::BundleGadgets;
+    use crate::fancy::CrtGadgets;
     use crate::util::{self, crt_factor, crt_inv_factor, RngExt};
     use itertools::Itertools;
     use rand::thread_rng;

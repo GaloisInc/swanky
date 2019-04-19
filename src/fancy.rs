@@ -6,8 +6,9 @@
 use crate::error::FancyError;
 use itertools::Itertools;
 
+pub mod bundle;
+
 mod crt;
-pub use bundle::Bundle;
 pub use crt::CrtGadgets;
 
 /// An object that has some modulus. Basic object of `Fancy` computations.
@@ -230,6 +231,8 @@ pub trait Fancy {
     }
 
     /// If `b = 0` returns `x` else `y`.
+    ///
+    /// `b` must be mod 2 but `x` and `y` can be have any modulus.
     fn mux(
         &mut self,
         b: &Self::Item,
@@ -237,8 +240,8 @@ pub trait Fancy {
         y: &Self::Item,
     ) -> Result<Self::Item, Self::Error> {
         let notb = self.negate(b)?;
-        let xsel = self.and(&notb, x)?;
-        let ysel = self.and(b, y)?;
+        let xsel = self.mul(&notb, x)?;
+        let ysel = self.mul(b, y)?;
         self.add(&xsel, &ysel)
     }
 
@@ -275,7 +278,7 @@ pub trait Fancy {
     }
 }
 
-fn to_vec_option<T>(opt_xs: Option<Vec<T>>, len: usize) -> Vec<Option<T>> {
+pub(crate) fn to_vec_option<T>(opt_xs: Option<Vec<T>>, len: usize) -> Vec<Option<T>> {
     opt_xs
         .map(|vals| {
             // transform option of slice into vec of options
