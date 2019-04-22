@@ -150,6 +150,7 @@ impl Aes128 {
         }
         blocks
     }
+    /// Encrypt eight blocks at a time, outputting the ciphertexts.
     #[inline(always)]
     pub fn encrypt8(&self, mut blocks: [Block; 8]) -> [Block; 8] {
         let rkeys = self.rkeys;
