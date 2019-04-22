@@ -1,6 +1,7 @@
 ![fancy garbling logo](logo.png)
 
 # `fancy-garbling`: Library for garbling boolean (+ arithmetic!) circuits
+[![](https://travis-ci.org/spaceships/fancy-garbling.svg?branch=master)](https://travis-ci.org/spaceships/fancy-garbling)
 
 `fancy-garbling` implements the [BMR16](https://eprint.iacr.org/2016/969)
 arithmetic garbling scheme, plus some additional bonus features.
