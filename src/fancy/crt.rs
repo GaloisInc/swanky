@@ -17,9 +17,14 @@ impl<W: Clone + HasModulus> CrtBundle<W> {
         CrtBundle(Bundle::new(ws))
     }
 
-    /// Unwrap the underlying bundle from this CRT bundle.
-    pub fn unwrap<'a>(&'a self) -> &'a Bundle<W> {
+    /// Borrow the underlying bundle from this CRT bundle.
+    pub fn borrow<'a>(&'a self) -> &'a Bundle<W> {
         &self.0
+    }
+
+    /// Extract the underlying bundle from this CRT bundle.
+    pub fn extract(self) -> Bundle<W> {
+        self.0
     }
 }
 

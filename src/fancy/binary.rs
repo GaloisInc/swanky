@@ -16,8 +16,13 @@ impl<W: Clone + HasModulus> BinaryBundle<W> {
     }
 
     /// Unwrap the underlying bundle from this binary bundle.
-    pub fn unwrap<'a>(&'a self) -> &'a Bundle<W> {
+    pub fn borrow<'a>(&'a self) -> &'a Bundle<W> {
         &self.0
+    }
+
+    /// Extract the underlying bundle from this binary bundle.
+    pub fn extract(self) -> Bundle<W> {
+        self.0
     }
 }
 
@@ -103,7 +108,7 @@ pub trait BinaryGadgets: Fancy + BundleGadgets {
         x: &BinaryBundle<Self::Item>,
         y: &BinaryBundle<Self::Item>,
     ) -> Result<BinaryBundle<Self::Item>, Self::Error> {
-        self.add_bundles(x.unwrap(), y.unwrap()).map(BinaryBundle)
+        self.add_bundles(x.borrow(), y.borrow()).map(BinaryBundle)
     }
 
     /// And the bits of two bundles together pairwise.
@@ -112,7 +117,7 @@ pub trait BinaryGadgets: Fancy + BundleGadgets {
         x: &BinaryBundle<Self::Item>,
         y: &BinaryBundle<Self::Item>,
     ) -> Result<BinaryBundle<Self::Item>, Self::Error> {
-        self.mul_bundles(x.unwrap(), y.unwrap()).map(BinaryBundle)
+        self.mul_bundles(x.borrow(), y.borrow()).map(BinaryBundle)
     }
 
     /// Binary addition. Returns the result and the carry.
