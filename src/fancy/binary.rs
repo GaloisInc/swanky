@@ -82,7 +82,9 @@ pub trait BinaryGadgets: Fancy + BundleGadgets {
         nbits: usize,
         n: usize,
     ) -> Result<Vec<BinaryBundle<Self::Item>>, Self::Error> {
-        (0..n).map(|_| self.bin_evaluator_input_bundle(nbits)).collect()
+        (0..n)
+            .map(|_| self.bin_evaluator_input_bundle(nbits))
+            .collect()
     }
 
     /// Create a constant bundle using base 2 inputs.
@@ -268,7 +270,10 @@ pub trait BinaryGadgets: Fancy + BundleGadgets {
     }
 
     /// Compute the absolute value of a binary bundle.
-    fn bin_abs(&mut self, x: &BinaryBundle<Self::Item>) -> Result<BinaryBundle<Self::Item>, Self::Error> {
+    fn bin_abs(
+        &mut self,
+        x: &BinaryBundle<Self::Item>,
+    ) -> Result<BinaryBundle<Self::Item>, Self::Error> {
         let sign = x.wires().last().unwrap();
         let negated = self.bin_twos_complement(x)?;
         self.multiplex(&sign, x, &negated).map(BinaryBundle)

@@ -96,7 +96,9 @@ impl Wire {
     pub fn zero(q: u16) -> Self {
         match q {
             1 => panic!("[wire::zero] mod 1 not allowed!"),
-            2 => Wire::Mod2 { val: Block::default() },
+            2 => Wire::Mod2 {
+                val: Block::default(),
+            },
             _ => Wire::ModN {
                 q,
                 ds: vec![0; util::digits_per_u128(q)],

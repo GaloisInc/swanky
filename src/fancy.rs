@@ -6,11 +6,11 @@
 use crate::error::FancyError;
 use itertools::Itertools;
 
-mod bundle;
 mod binary;
+mod bundle;
 mod crt;
-pub use bundle::{Bundle, BundleGadgets};
 pub use binary::{BinaryBundle, BinaryGadgets};
+pub use bundle::{Bundle, BundleGadgets};
 pub use crt::{CrtBundle, CrtGadgets};
 
 /// An object that has some modulus. Basic object of `Fancy` computations.
