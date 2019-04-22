@@ -9,8 +9,6 @@
 use crate::{Aes128, Block};
 use rand_core::block::{BlockRng, BlockRngCore};
 use rand_core::{CryptoRng, Error, RngCore, SeedableRng};
-#[cfg(feature = "nightly")]
-use std::arch::x86_64::*;
 
 /// Implementation of a random number generator based on fixed-key AES.
 ///
@@ -74,10 +72,7 @@ impl Default for AesRng {
 #[derive(Clone)]
 pub struct AesRngCore {
     aes: Aes128,
-    #[cfg(feature = "nightly")]
-    state: __m64,
-    #[cfg(not(feature = "nightly"))]
-    state: u64,
+    state: u128,
 }
 
 impl std::fmt::Debug for AesRngCore {
@@ -88,44 +83,34 @@ impl std::fmt::Debug for AesRngCore {
 
 impl BlockRngCore for AesRngCore {
     type Item = u32;
-    // This is equivalent to `[u8; 16]`, but we need to use `u32` to be
+    // This is equivalent to `[Block; 8]`, but we need to use `u32` to be
     // compatible with `RngCore`.
-    type Results = [u32; 4];
+    type Results = [u32; 32];
 
-    // Compute `E(state)`, where `state` is a counter initialized to zero.
+    // Compute `E(state)` eight times, where `state` is a counter.
     #[inline]
-    #[cfg(feature = "nightly")]
     fn generate(&mut self, results: &mut Self::Results) {
-        let m0 = unsafe { _mm_set_epi64(_mm_setzero_si64(), self.state) };
-        self.state = unsafe { _mm_add_pi32(self.state, _mm_set_pi32(0, 1)) };
-        *results = self.aes.encrypt(Block(m0)).into();
-        // let m0 = unsafe { _mm_set_epi64(_mm_setzero_si64(), self.state) };
-        // self.state = unsafe { _mm_add_pi32(self.state, _mm_set_pi32(0, 1)) };
-        // let m1 = unsafe { _mm_set_epi64(_mm_setzero_si64(), self.state) };
-        // self.state = unsafe { _mm_add_pi32(self.state, _mm_set_pi32(0, 1)) };
-        // let m2 = unsafe { _mm_set_epi64(_mm_setzero_si64(), self.state) };
-        // self.state = unsafe { _mm_add_pi32(self.state, _mm_set_pi32(0, 1)) };
-        // let m3 = unsafe { _mm_set_epi64(_mm_setzero_si64(), self.state) };
-        // self.state = unsafe { _mm_add_pi32(self.state, _mm_set_pi32(0, 1)) };
-        // let c = self.aes.encrypt4(Block512::from([m0, m1, m2, m3]));
-        // *results = c.into();
-    }
-    #[inline]
-    #[cfg(not(feature = "nightly"))]
-    fn generate(&mut self, results: &mut Self::Results) {
-        let m0 = Block::from(u128::from(self.state));
-        self.state += 1;
-        *results = self.aes.encrypt(m0).into();
-        // let m0 = Block::from(self.state as u128);
-        // self.state += 1;
-        // let m1 = Block::from(self.state as u128);
-        // self.state += 1;
-        // let m2 = Block::from(self.state as u128);
-        // self.state += 1;
-        // let m3 = Block::from(self.state as u128);
-        // self.state += 1;
-        // let c = self.aes.encrypt4(Block512::from([m0, m1, m2, m3]));
-        // *results = c.into();
+        unsafe {
+            let mut ms: [Block; 8] = *(results as *mut _ as *mut [Block; 8]);
+            ms[0] = Block::from(self.state);
+            self.state += 1;
+            ms[1] = Block::from(self.state);
+            self.state += 1;
+            ms[2] = Block::from(self.state);
+            self.state += 1;
+            ms[3] = Block::from(self.state);
+            self.state += 1;
+            ms[4] = Block::from(self.state);
+            self.state += 1;
+            ms[5] = Block::from(self.state);
+            self.state += 1;
+            ms[6] = Block::from(self.state);
+            self.state += 1;
+            ms[7] = Block::from(self.state);
+            self.state += 1;
+            let c = self.aes.encrypt8(ms);
+            *results = *(&c as *const _ as *const [u32; 32]);
+        }
     }
 }
 
@@ -133,19 +118,12 @@ impl SeedableRng for AesRngCore {
     type Seed = Block;
 
     #[inline]
-    #[cfg(feature = "nightly")]
     fn from_seed(seed: Self::Seed) -> Self {
         let aes = Aes128::new(seed);
         AesRngCore {
             aes,
-            state: unsafe { _mm_setzero_si64() },
+            state: Default::default(),
         }
-    }
-    #[inline]
-    #[cfg(not(feature = "nightly"))]
-    fn from_seed(seed: Self::Seed) -> Self {
-        let aes = Aes128::new(seed);
-        AesRngCore { aes, state: 0u64 }
     }
 }
 
@@ -155,5 +133,21 @@ impl From<AesRngCore> for AesRng {
     #[inline]
     fn from(core: AesRngCore) -> Self {
         AesRng(BlockRng::new(core))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use rand::Rng;
+
+    #[test]
+    fn test_generate() {
+        let mut rng = AesRng::new();
+        let a = rng.gen::<[Block; 8]>();
+        let b = rng.gen::<[Block; 8]>();
+        println!("{:?}", a);
+        println!("{:?}", b);
+        assert_ne!(a, b);
     }
 }

@@ -27,13 +27,79 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-use crate::{Block, Block512};
+use crate::Block;
 use std::arch::x86_64::*;
 
 /// AES-128, encryption only.
 #[derive(Clone)]
 pub struct Aes128 {
     rkeys: [__m128i; 11],
+}
+
+macro_rules! xor4 {
+    ($b:expr, $key:expr) => {
+        $b[0].0 = _mm_xor_si128($b[0].0, $key);
+        $b[1].0 = _mm_xor_si128($b[1].0, $key);
+        $b[2].0 = _mm_xor_si128($b[2].0, $key);
+        $b[3].0 = _mm_xor_si128($b[3].0, $key);
+    };
+}
+
+macro_rules! aesenc4 {
+    ($b:expr, $key:expr) => {
+        $b[0].0 = _mm_aesenc_si128($b[0].0, $key);
+        $b[1].0 = _mm_aesenc_si128($b[1].0, $key);
+        $b[2].0 = _mm_aesenc_si128($b[2].0, $key);
+        $b[3].0 = _mm_aesenc_si128($b[3].0, $key);
+    };
+}
+
+macro_rules! aesenclast4 {
+    ($b:expr, $key:expr) => {
+        $b[0].0 = _mm_aesenclast_si128($b[0].0, $key);
+        $b[1].0 = _mm_aesenclast_si128($b[1].0, $key);
+        $b[2].0 = _mm_aesenclast_si128($b[2].0, $key);
+        $b[3].0 = _mm_aesenclast_si128($b[3].0, $key);
+    };
+}
+
+macro_rules! xor8 {
+    ($b:expr, $key:expr) => {
+        $b[0].0 = _mm_xor_si128($b[0].0, $key);
+        $b[1].0 = _mm_xor_si128($b[1].0, $key);
+        $b[2].0 = _mm_xor_si128($b[2].0, $key);
+        $b[3].0 = _mm_xor_si128($b[3].0, $key);
+        $b[4].0 = _mm_xor_si128($b[4].0, $key);
+        $b[5].0 = _mm_xor_si128($b[5].0, $key);
+        $b[6].0 = _mm_xor_si128($b[6].0, $key);
+        $b[7].0 = _mm_xor_si128($b[7].0, $key);
+    };
+}
+
+macro_rules! aesenc8 {
+    ($b:expr, $key:expr) => {
+        $b[0].0 = _mm_aesenc_si128($b[0].0, $key);
+        $b[1].0 = _mm_aesenc_si128($b[1].0, $key);
+        $b[2].0 = _mm_aesenc_si128($b[2].0, $key);
+        $b[3].0 = _mm_aesenc_si128($b[3].0, $key);
+        $b[4].0 = _mm_aesenc_si128($b[4].0, $key);
+        $b[5].0 = _mm_aesenc_si128($b[5].0, $key);
+        $b[6].0 = _mm_aesenc_si128($b[6].0, $key);
+        $b[7].0 = _mm_aesenc_si128($b[7].0, $key);
+    };
+}
+
+macro_rules! aesenclast8 {
+    ($b:expr, $key:expr) => {
+        $b[0].0 = _mm_aesenclast_si128($b[0].0, $key);
+        $b[1].0 = _mm_aesenclast_si128($b[1].0, $key);
+        $b[2].0 = _mm_aesenclast_si128($b[2].0, $key);
+        $b[3].0 = _mm_aesenclast_si128($b[3].0, $key);
+        $b[4].0 = _mm_aesenclast_si128($b[4].0, $key);
+        $b[5].0 = _mm_aesenclast_si128($b[5].0, $key);
+        $b[6].0 = _mm_aesenclast_si128($b[6].0, $key);
+        $b[7].0 = _mm_aesenclast_si128($b[7].0, $key);
+    };
 }
 
 impl Aes128 {
@@ -44,76 +110,63 @@ impl Aes128 {
         Aes128 { rkeys }
     }
     /// Encrypt a block, outputting the ciphertext.
-    #[inline]
+    #[inline(always)]
     pub fn encrypt(&self, m: Block) -> Block {
-        let keys = self.rkeys;
+        let rkeys = self.rkeys;
         unsafe {
-            let mut c: __m128i;
-            c = _mm_xor_si128(m.0, keys[0]);
-            c = _mm_aesenc_si128(c, keys[1]);
-            c = _mm_aesenc_si128(c, keys[2]);
-            c = _mm_aesenc_si128(c, keys[3]);
-            c = _mm_aesenc_si128(c, keys[4]);
-            c = _mm_aesenc_si128(c, keys[5]);
-            c = _mm_aesenc_si128(c, keys[6]);
-            c = _mm_aesenc_si128(c, keys[7]);
-            c = _mm_aesenc_si128(c, keys[8]);
-            c = _mm_aesenc_si128(c, keys[9]);
-            Block(_mm_aesenclast_si128(c, keys[10]))
+            let mut c: __m128i = m.into();
+            c = _mm_xor_si128(c, rkeys[0]);
+            c = _mm_aesenc_si128(c, rkeys[1]);
+            c = _mm_aesenc_si128(c, rkeys[2]);
+            c = _mm_aesenc_si128(c, rkeys[3]);
+            c = _mm_aesenc_si128(c, rkeys[4]);
+            c = _mm_aesenc_si128(c, rkeys[5]);
+            c = _mm_aesenc_si128(c, rkeys[6]);
+            c = _mm_aesenc_si128(c, rkeys[7]);
+            c = _mm_aesenc_si128(c, rkeys[8]);
+            c = _mm_aesenc_si128(c, rkeys[9]);
+            Block(_mm_aesenclast_si128(c, rkeys[10]))
         }
     }
     /// Encrypt four blocks at a time, outputting the ciphertexts.
-    #[inline]
-    pub fn encrypt4(&self, m: Block512) -> Block512 {
-        let keys = self.rkeys;
-        let mut c: [__m128i; 4] = m.into();
+    ///
+    /// XXX: This *should* be faster than encrypting one block four times, but
+    /// that doesn't appear to be the case...
+    #[inline(always)]
+    pub fn encrypt4(&self, mut blocks: [Block; 4]) -> [Block; 4] {
+        let rkeys = self.rkeys;
         unsafe {
-            c[0] = _mm_xor_si128(c[0], keys[0]);
-            c[1] = _mm_xor_si128(c[1], keys[0]);
-            c[2] = _mm_xor_si128(c[2], keys[0]);
-            c[3] = _mm_xor_si128(c[3], keys[0]);
-            c[0] = _mm_aesenc_si128(c[0], keys[1]);
-            c[1] = _mm_aesenc_si128(c[1], keys[1]);
-            c[2] = _mm_aesenc_si128(c[2], keys[1]);
-            c[3] = _mm_aesenc_si128(c[3], keys[1]);
-            c[0] = _mm_aesenc_si128(c[0], keys[2]);
-            c[1] = _mm_aesenc_si128(c[1], keys[2]);
-            c[2] = _mm_aesenc_si128(c[2], keys[2]);
-            c[3] = _mm_aesenc_si128(c[3], keys[2]);
-            c[0] = _mm_aesenc_si128(c[0], keys[3]);
-            c[1] = _mm_aesenc_si128(c[1], keys[3]);
-            c[2] = _mm_aesenc_si128(c[2], keys[3]);
-            c[3] = _mm_aesenc_si128(c[3], keys[3]);
-            c[0] = _mm_aesenc_si128(c[0], keys[4]);
-            c[1] = _mm_aesenc_si128(c[1], keys[4]);
-            c[2] = _mm_aesenc_si128(c[2], keys[4]);
-            c[3] = _mm_aesenc_si128(c[3], keys[4]);
-            c[0] = _mm_aesenc_si128(c[0], keys[5]);
-            c[1] = _mm_aesenc_si128(c[1], keys[5]);
-            c[2] = _mm_aesenc_si128(c[2], keys[5]);
-            c[3] = _mm_aesenc_si128(c[3], keys[5]);
-            c[0] = _mm_aesenc_si128(c[0], keys[6]);
-            c[1] = _mm_aesenc_si128(c[1], keys[6]);
-            c[2] = _mm_aesenc_si128(c[2], keys[6]);
-            c[3] = _mm_aesenc_si128(c[3], keys[6]);
-            c[0] = _mm_aesenc_si128(c[0], keys[7]);
-            c[1] = _mm_aesenc_si128(c[1], keys[7]);
-            c[2] = _mm_aesenc_si128(c[2], keys[7]);
-            c[3] = _mm_aesenc_si128(c[3], keys[7]);
-            c[0] = _mm_aesenc_si128(c[0], keys[8]);
-            c[1] = _mm_aesenc_si128(c[1], keys[8]);
-            c[2] = _mm_aesenc_si128(c[2], keys[8]);
-            c[3] = _mm_aesenc_si128(c[3], keys[8]);
-            c[0] = _mm_aesenc_si128(c[0], keys[9]);
-            c[1] = _mm_aesenc_si128(c[1], keys[9]);
-            c[2] = _mm_aesenc_si128(c[2], keys[9]);
-            c[3] = _mm_aesenc_si128(c[3], keys[9]);
-            c[0] = _mm_aesenclast_si128(c[0], keys[10]);
-            c[1] = _mm_aesenclast_si128(c[1], keys[10]);
-            c[2] = _mm_aesenclast_si128(c[2], keys[10]);
-            c[3] = _mm_aesenclast_si128(c[3], keys[10]);
-            Block512::from(c)
+            xor4!(blocks, rkeys[0]);
+            aesenc4!(blocks, rkeys[1]);
+            aesenc4!(blocks, rkeys[2]);
+            aesenc4!(blocks, rkeys[3]);
+            aesenc4!(blocks, rkeys[4]);
+            aesenc4!(blocks, rkeys[5]);
+            aesenc4!(blocks, rkeys[6]);
+            aesenc4!(blocks, rkeys[7]);
+            aesenc4!(blocks, rkeys[8]);
+            aesenc4!(blocks, rkeys[9]);
+            aesenclast4!(blocks, rkeys[10]);
         }
+        blocks
+    }
+    #[inline(always)]
+    pub fn encrypt8(&self, mut blocks: [Block; 8]) -> [Block; 8] {
+        let rkeys = self.rkeys;
+        unsafe {
+            xor8!(blocks, rkeys[0]);
+            aesenc8!(blocks, rkeys[1]);
+            aesenc8!(blocks, rkeys[2]);
+            aesenc8!(blocks, rkeys[3]);
+            aesenc8!(blocks, rkeys[4]);
+            aesenc8!(blocks, rkeys[5]);
+            aesenc8!(blocks, rkeys[6]);
+            aesenc8!(blocks, rkeys[7]);
+            aesenc8!(blocks, rkeys[8]);
+            aesenc8!(blocks, rkeys[9]);
+            aesenclast8!(blocks, rkeys[10]);
+        }
+        blocks
     }
 }
 
