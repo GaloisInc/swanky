@@ -17,7 +17,7 @@ mod tests {
     use super::*;
     use fancy_garbling::dummy::Dummy;
     use fancy_garbling::util::RngExt;
-    use fancy_garbling::{BundleGadgets, Fancy, HasModulus};
+    use fancy_garbling::{CrtGadgets, Fancy, HasModulus};
     use ocelot::ot;
     use scuttlebutt::{AesRng, Block, SemiHonest};
     use std::io::{BufReader, BufWriter};
@@ -82,13 +82,13 @@ mod tests {
     {
         let mut zs = Vec::with_capacity(n);
         for _ in 0..n {
-            let c = b.constant_bundle_crt(1, q).unwrap();
-            let x = b.garbler_input_bundle_crt(q, None).unwrap();
-            let x = b.mul_bundles(&x, &c).unwrap();
-            let z = b.relu(&x, "100%", None).unwrap();
+            let c = b.crt_constant_bundle(1, q).unwrap();
+            let x = b.crt_garbler_input_bundle(q, None).unwrap();
+            let x = b.crt_mul(&x, &c).unwrap();
+            let z = b.crt_relu(&x, "100%", None).unwrap();
             zs.push(z);
         }
-        b.output_bundles(&zs).unwrap();
+        b.crt_outputs(&zs).unwrap();
     }
 
     #[test]

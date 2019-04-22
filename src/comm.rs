@@ -6,7 +6,7 @@
 
 use crate::errors::Error;
 use scuttlebutt::Block;
-use std::io::{Read, Write};
+use std::io::Write;
 
 pub fn send_block<W: Write>(writer: &mut W, block: &Block) -> Result<(), Error> {
     block.write(writer)?;
@@ -18,18 +18,18 @@ pub fn send_block<W: Write>(writer: &mut W, block: &Block) -> Result<(), Error> 
 //     Ok(b)
 // }
 
-pub fn send_blocks<W: Write>(writer: &mut W, blocks: &[Block]) -> Result<(), Error> {
-    for block in blocks.iter() {
-        block.write(writer)?;
-    }
-    Ok(())
-}
+// pub fn send_blocks<W: Write>(writer: &mut W, blocks: &[Block]) -> Result<(), Error> {
+//     for block in blocks.iter() {
+//         block.write(writer)?;
+//     }
+//     Ok(())
+// }
 
-pub fn receive_blocks<R: Read>(reader: &mut R, nblocks: usize) -> Result<Vec<Block>, Error> {
-    let mut out = Vec::with_capacity(nblocks);
-    for _ in 0..nblocks {
-        let b = Block::read(reader)?;
-        out.push(b);
-    }
-    Ok(out)
-}
+// pub fn receive_blocks<R: Read>(reader: &mut R, nblocks: usize) -> Result<Vec<Block>, Error> {
+//     let mut out = Vec::with_capacity(nblocks);
+//     for _ in 0..nblocks {
+//         let b = Block::read(reader)?;
+//         out.push(b);
+//     }
+//     Ok(out)
+// }
