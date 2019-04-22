@@ -16,7 +16,7 @@ publish = false
 nightly = ["rand/nightly", "scuttlebutt/nightly", "ocelot/nightly", "fancy-garbling/nightly"]
 
 [dependencies]
-fancy-garbling = { path = "../fancy-garbling" }
+fancy-garbling = { git = "https://github.com/spaceships/fancy-garbling" }
 ocelot = { git = "https://github.com/amaloz/ocelot" }
 rand = "0.6.5"
 scuttlebutt = { git = "https://github.com/amaloz/scuttlebutt" }
