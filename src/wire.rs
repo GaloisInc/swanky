@@ -26,7 +26,9 @@ pub enum Wire {
 
 impl std::default::Default for Wire {
     fn default() -> Self {
-        Wire::Mod2 { val: Block::default() }
+        Wire::Mod2 {
+            val: Block::default(),
+        }
     }
 }
 
