@@ -15,6 +15,11 @@ impl<W: Clone + HasModulus> BinaryBundle<W> {
         BinaryBundle(Bundle::new(ws))
     }
 
+    /// Mark a regular bundle as Binary.
+    pub fn from_bundle(b: Bundle<W>) -> BinaryBundle<W> {
+        BinaryBundle(b)
+    }
+
     /// Unwrap the underlying bundle from this binary bundle.
     pub fn borrow<'a>(&'a self) -> &'a Bundle<W> {
         &self.0

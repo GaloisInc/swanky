@@ -17,6 +17,11 @@ impl<W: Clone + HasModulus> CrtBundle<W> {
         CrtBundle(Bundle::new(ws))
     }
 
+    /// Mark a regular bundle as CRT.
+    pub fn from_bundle(b: Bundle<W>) -> CrtBundle<W> {
+        CrtBundle(b)
+    }
+
     /// Borrow the underlying bundle from this CRT bundle.
     pub fn borrow<'a>(&'a self) -> &'a Bundle<W> {
         &self.0
