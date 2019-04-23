@@ -14,6 +14,7 @@ use crate::Error;
 use ocelot::oprf::kkrt;
 use ocelot::oprf::kmprt;
 use ocelot::oprf::{ProgrammableReceiver, ProgrammableSender};
+use ocelot::ot::{ChouOrlandiReceiver as OtReceiver, ChouOrlandiSender as OtSender};
 use rand::{CryptoRng, Rng, RngCore};
 use scuttlebutt::Block;
 use std::io::{Read, Write};
@@ -35,23 +36,29 @@ pub struct P2 {
 }
 
 impl P1 {
-    pub fn init<R: Read + Send, W: Write + Send, RNG: CryptoRng + RngCore>(
-        reader: &mut R,
-        writer: &mut W,
-        rng: &mut RNG,
-    ) -> Result<Self, Error> {
+    pub fn init<R, W, RNG>(reader: &mut R, writer: &mut W, rng: &mut RNG) -> Result<Self, Error>
+    where
+        R: Read + Send,
+        W: Write + Send + std::fmt::Debug,
+        RNG: CryptoRng + RngCore,
+    {
         Ok(Self {
             opprf: kmprt::KmprtReceiver::init(reader, writer, rng)?,
         })
     }
 
-    pub fn send<R: Read + Send, W: Write + Send, RNG: CryptoRng + RngCore>(
+    pub fn send<R, W, RNG>(
         &mut self,
         reader: &mut R,
         writer: &mut W,
         inputs: &[Msg],
         rng: &mut RNG,
-    ) -> Result<Vec<kkrt::Output>, Error> {
+    ) -> Result<Vec<kkrt::Output>, Error>
+    where
+        R: Read + Send + Clone,
+        W: Write + Send + Clone + std::fmt::Debug,
+        RNG: CryptoRng + RngCore,
+    {
         let key = rng.gen::<Block>();
         let hashed_inputs = utils::compress_and_hash_inputs(inputs, key);
         let cuckoo = CuckooHash::new(&hashed_inputs, NHASHES)?;
@@ -74,9 +81,17 @@ impl P1 {
             })
             .collect::<Vec<Block>>();
 
-        let outputs = self.opprf.receive(reader, writer, 0, &table, rng)?;
+        let opprf_outputs = self.opprf.receive(reader, writer, 0, &table, rng)?;
 
-        Ok(outputs)
+        let gb_inps = opprf_outputs.iter().flat_map(|blk| {
+            blk.prefix(16).iter().flat_map(|byte| {
+                (0..8).map(|i| ((byte >> i) & 1_u8) as u16)
+            })
+        }).collect::<Vec<u16>>();
+
+        let gb = twopac::semihonest::Garbler::<R, W, RNG, OtSender>::new(reader.clone(), writer.clone(), &gb_inps, RNG::from_seed(rng.gen::<Block>()));
+
+        Ok(opprf_outputs)
     }
 }
 
