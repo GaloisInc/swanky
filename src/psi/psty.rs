@@ -18,6 +18,8 @@ use rand::{CryptoRng, Rng, RngCore};
 use scuttlebutt::Block;
 use std::io::{Read, Write};
 
+use fancy_garbling::{BinaryBundle, BinaryGadgets, BundleGadgets, Fancy, FancyError, HasModulus};
+
 const NHASHES: usize = 3;
 
 pub type Msg = Vec<u8>;
@@ -142,6 +144,31 @@ impl P2 {
         // return the target values for input to the MPC
         Ok(ts)
     }
+}
+
+/// Fancy function to compute the intersection and return encoded vector of 0/1 masks.
+fn compute_intersection<F, W, E>(
+    f: &mut F,
+    ninputs_p1: usize,
+    ninputs_p2: usize,
+    input_size: usize,
+) -> Result<Vec<W>, E>
+where
+    F: Fancy<Item = W, Error = E>,
+    W: Clone + HasModulus,
+    E: std::fmt::Debug + std::fmt::Display + From<FancyError>,
+{
+    let p1_inps = f.bin_garbler_input_bundles(input_size, ninputs_p1, None)?;
+    let p2_inps = f.bin_evaluator_input_bundles(input_size, ninputs_p2)?;
+
+    let mut res = Vec::with_capacity(p1_inps.len());
+
+    for (p1, p2) in p1_inps.into_iter().zip(p2_inps.into_iter()) {
+        let eq = f.eq_bundles(p1.borrow(), p2.borrow())?;
+        res.push(eq);
+    }
+
+    Ok(res)
 }
 
 #[cfg(test)]

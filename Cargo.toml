@@ -19,8 +19,10 @@ arrayref = "0.3.5"
 ocelot = { git = "https://github.com/amaloz/ocelot" }
 rand = "0.6.5"
 rand_core = "0.4.0"
-scuttlebutt = { git = "https://github.com/amaloz/scuttlebutt"}
+scuttlebutt = { git = "https://github.com/amaloz/scuttlebutt" }
 sha2 = "0.8.0"
+fancy-garbling = { git = "https://github.com/spaceships/fancy-garbling" }
+twopac = { path = "../twopac" }
 
 [dev-dependencies]
 criterion = "0.2.10"
