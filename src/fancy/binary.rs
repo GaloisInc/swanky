@@ -39,6 +39,13 @@ impl<W: Clone + HasModulus> Deref for BinaryBundle<W> {
     }
 }
 
+impl<W: Clone + HasModulus> From<Bundle<W>> for BinaryBundle<W> {
+    fn from(b: Bundle<W>) -> BinaryBundle<W> {
+        debug_assert!(b.moduli().iter().all(|&p| p == 2));
+        BinaryBundle(b)
+    }
+}
+
 impl<F: Fancy> BinaryGadgets for F {}
 
 /// Extension trait for `Fancy` providing gadgets that operate over bundles of mod2 wires.
