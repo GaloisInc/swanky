@@ -38,11 +38,9 @@ impl<
     > Garbler<R, W, RNG, OT>
 {
     /// Make a new `Garbler` with inputs `inputs`.
-    pub fn new(mut reader: R, mut writer: W, inputs: &[u16], mut rng: RNG) -> Result<Self, Error> {
-        let ot = OT::init(&mut reader, &mut writer, &mut rng)?;
+    pub fn new(reader: Rc<RefCell<R>>, writer: Rc<RefCell<W>>, inputs: &[u16], mut rng: RNG) -> Result<Self, Error> {
+        let ot = OT::init(&mut *reader.borrow_mut(), &mut *writer.borrow_mut(), &mut rng)?;
         let mut inputs = inputs.to_vec().into_iter();
-        let reader = Rc::new(RefCell::new(reader));
-        let writer = Rc::new(RefCell::new(writer));
         let writer_ = writer.clone();
         let callback = move |m| {
             let mut writer = writer_.borrow_mut();

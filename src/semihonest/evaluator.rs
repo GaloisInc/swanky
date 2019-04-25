@@ -32,10 +32,9 @@ impl<
     > Evaluator<R, W, RNG, OT>
 {
     /// Make a new `Evaluator`.
-    pub fn new(mut reader: R, mut writer: W, inputs: &[u16], mut rng: RNG) -> Result<Self, Error> {
-        let ot = OT::init(&mut reader, &mut writer, &mut rng)?;
-        let reader = Rc::new(RefCell::new(reader));
-        let writer = Rc::new(RefCell::new(writer));
+    pub fn new(reader: Rc<RefCell<R>>, writer: Rc<RefCell<W>>, inputs: &[u16], mut rng:
+               RNG) -> Result<Self, Error> {
+        let ot = OT::init(&mut *reader.borrow_mut(), &mut *writer.borrow_mut(), &mut rng)?;
         let evaluator = Ev::new(reader.clone());
         let inputs = inputs.to_vec();
         Ok(Evaluator {

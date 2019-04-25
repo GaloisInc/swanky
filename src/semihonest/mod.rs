@@ -22,6 +22,9 @@ mod tests {
     use scuttlebutt::{AesRng, Block, SemiHonest};
     use std::io::{BufReader, BufWriter};
     use std::os::unix::net::UnixStream;
+    use std::rc::Rc;
+    use std::cell::RefCell;
+
 
     type Reader = BufReader<UnixStream>;
     type Writer = BufWriter<UnixStream>;
@@ -44,16 +47,16 @@ mod tests {
         let (sender, receiver) = UnixStream::pair().unwrap();
         std::thread::spawn(move || {
             let rng = AesRng::new();
-            let reader = BufReader::new(sender.try_clone().unwrap());
-            let writer = BufWriter::new(sender);
+            let reader = Rc::new(RefCell::new(BufReader::new(sender.try_clone().unwrap())));
+            let writer = Rc::new(RefCell::new(BufWriter::new(sender)));
             let mut gb =
                 Garbler::<Reader, Writer, AesRng, OTSender>::new(reader, writer, &[a], rng)
                     .unwrap();
             c1(&mut gb).unwrap();
         });
         let rng = AesRng::new();
-        let reader = BufReader::new(receiver.try_clone().unwrap());
-        let writer = BufWriter::new(receiver);
+        let reader = Rc::new(RefCell::new(BufReader::new(receiver.try_clone().unwrap())));
+        let writer = Rc::new(RefCell::new(BufWriter::new(receiver)));
         let mut ev =
             Evaluator::<Reader, Writer, AesRng, OTReceiver>::new(reader, writer, &[b], rng)
                 .unwrap();
@@ -108,8 +111,8 @@ mod tests {
         let (sender, receiver) = UnixStream::pair().unwrap();
         std::thread::spawn(move || {
             let rng = AesRng::new();
-            let reader = BufReader::new(sender.try_clone().unwrap());
-            let writer = BufWriter::new(sender);
+            let reader = Rc::new(RefCell::new(BufReader::new(sender.try_clone().unwrap())));
+            let writer = Rc::new(RefCell::new(BufWriter::new(sender)));
             let mut gb = Garbler::<Reader, Writer, AesRng, ot::ChouOrlandiSender>::new(
                 reader, writer, &input, rng,
             )
@@ -120,8 +123,8 @@ mod tests {
         let reader = BufReader::new(receiver.try_clone().unwrap());
         let writer = BufWriter::new(receiver);
         let mut ev = Evaluator::<Reader, Writer, AesRng, ot::ChouOrlandiReceiver>::new(
-            reader,
-            writer,
+            Rc::new(RefCell::new(reader)),
+            Rc::new(RefCell::new(writer)),
             &[],
             rng,
         )
@@ -142,8 +145,8 @@ mod tests {
         let (sender, receiver) = UnixStream::pair().unwrap();
         let handle = std::thread::spawn(move || {
             let rng = AesRng::new();
-            let reader = BufReader::new(sender.try_clone().unwrap());
-            let writer = BufWriter::new(sender);
+            let reader = Rc::new(RefCell::new(BufReader::new(sender.try_clone().unwrap())));
+            let writer = Rc::new(RefCell::new(BufWriter::new(sender)));
             let mut gb = Garbler::<Reader, Writer, AesRng, OtSender>::new(
                 reader,
                 writer,
@@ -157,8 +160,8 @@ mod tests {
         let reader = BufReader::new(receiver.try_clone().unwrap());
         let writer = BufWriter::new(receiver);
         let mut ev = Evaluator::<Reader, Writer, AesRng, OtReceiver>::new(
-            reader,
-            writer,
+            Rc::new(RefCell::new(reader)),
+            Rc::new(RefCell::new(writer)),
             &vec![0u16; 128],
             rng,
         )
