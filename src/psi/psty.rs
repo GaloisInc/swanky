@@ -108,12 +108,14 @@ impl<R, W> P1<R, W> {
             })
             .collect::<Vec<u16>>();
 
-        let _gb = twopac::semihonest::Garbler::<R, W, AesRng, OtSender>::new(
+        let mut gb = twopac::semihonest::Garbler::<R, W, AesRng, OtSender>::new(
             self.reader.clone(),
             self.writer.clone(),
             &gb_inps,
             AesRng::from_seed(rng.gen::<Block>()),
-        );
+        )?;
+
+        let _res = compute_intersection(&mut gb, gb_inps.len(), 128)?;
 
         Ok(opprf_outputs)
     }
@@ -141,8 +143,8 @@ impl<R, W> P2<R, W> {
 
     pub fn send<RNG>(&mut self, inputs: &[Msg], rng: &mut RNG) -> Result<Vec<kkrt::Output>, Error>
     where
-        R: Read + Send,
-        W: Write + Send,
+        R: Read + Send + Debug + 'static,
+        W: Write + Send + Debug,
         RNG: CryptoRng + RngCore,
     {
         // receive cuckoo hash info from sender
@@ -188,6 +190,24 @@ impl<R, W> P2<R, W> {
             rng,
         )?;
 
+        let ev_inps = ts
+            .iter()
+            .flat_map(|blk| {
+                blk.prefix(16)
+                    .iter()
+                    .flat_map(|byte| (0..8).map(|i| ((byte >> i) & 1_u8) as u16).collect_vec())
+            })
+            .collect::<Vec<u16>>();
+
+        let mut ev = twopac::semihonest::Evaluator::<R, W, AesRng, OtReceiver>::new(
+            self.reader.clone(),
+            self.writer.clone(),
+            &ev_inps,
+            AesRng::from_seed(rng.gen::<Block>()),
+        )?;
+
+        let _res = compute_intersection(&mut ev, ev_inps.len(), 128)?;
+
         // return the target values for input to the MPC
         Ok(ts)
     }
@@ -196,8 +216,7 @@ impl<R, W> P2<R, W> {
 /// Fancy function to compute the intersection and return encoded vector of 0/1 masks.
 fn compute_intersection<F, W, E>(
     f: &mut F,
-    ninputs_p1: usize,
-    ninputs_p2: usize,
+    ninputs: usize,
     input_size: usize,
 ) -> Result<Vec<W>, E>
 where
@@ -205,8 +224,8 @@ where
     W: Clone + HasModulus,
     E: std::fmt::Debug + std::fmt::Display + From<FancyError>,
 {
-    let p1_inps = f.bin_garbler_input_bundles(input_size, ninputs_p1, None)?;
-    let p2_inps = f.bin_evaluator_input_bundles(input_size, ninputs_p2)?;
+    let p1_inps = f.bin_garbler_input_bundles(input_size, ninputs, None)?;
+    let p2_inps = f.bin_evaluator_input_bundles(input_size, ninputs)?;
 
     let mut res = Vec::with_capacity(p1_inps.len());
 

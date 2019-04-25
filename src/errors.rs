@@ -13,6 +13,7 @@ pub enum Error {
     CuckooStashOverflow,
     InvalidCuckooSetSize(usize),
     InvalidCuckooParameters { nitems: usize, nhashes: usize },
+    TwopacError(twopac::Error),
 }
 
 impl From<std::io::Error> for Error {
@@ -36,6 +37,13 @@ impl From<scuttlebutt::cointoss::Error> for Error {
     }
 }
 
+impl From<twopac::Error> for Error {
+    #[inline]
+    fn from(e: twopac::Error) -> Error {
+        Error::TwopacError(e)
+    }
+}
+
 impl std::fmt::Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
@@ -49,6 +57,7 @@ impl std::fmt::Display for Error {
                 "CuckooHash: no parameters set for {} items and {} hashes",
                 nitems, nhashes
             ),
+            Error::TwopacError(e) => write!(f, "Twopac error: {}", e),
         }
     }
 }
