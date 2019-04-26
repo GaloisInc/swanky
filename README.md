@@ -1,8 +1,8 @@
 # `ocelot`: A rust library for oblivious transfer [![](https://travis-ci.org/amaloz/ocelot.svg?branch=master)](https://travis-ci.org/amaloz/ocelot)
 
 The `ocelot` library implements various one-out-of-two oblivious transfer (+
-extension) protocols in rust. It's the coolest cat in the oblivious transfer
-world.
+extension) protocols in rust, alongside oblivious pseudorandom function
+protocols inspired by OT. It's the coolest cat in the oblivious transfer world.
 
 `ocelot` implements the following oblivious transfer (OT) protocols:
 
@@ -11,12 +11,17 @@ world.
 * Asharov-Lindell-Schneider-Zohner semi-honest OT extension (+ correlated and random OT)
 * Keller-Orsini-Scholl malicious OT extension (+ correlated and random OT)
 
+And the following oblivious (programmable) PRF protocols:
+
+* Kolesnikov-Kumaresan-Rosulek-Trieu OPRF
+* Kolesnikov-Matania-Pinkas-Rosulek-Trieu OPPRF (currently requires the `unstable` feature to use)
+
 It also exposes various traits for implementing your very own OT protocol:
 
-* `Sender` and `Receiver` are the "base" traits for an OT implementation. They
-  include an `init` function, which does any initial setup and outputs an OT
-  object, and `send`/`receive`, which runs the actual OT part. The `send` and
-  `receive` functions can be repeated without needing to re-run `init`.
+* `Sender` and `Receiver` are the "base" traits for OT. They include an `init`
+  function, which does any initial setup and outputs an OT object, and
+  `send`/`receive`, which runs the actual OT part. The `send` and `receive`
+  functions can be repeated without needing to re-run `init`.
 
 * `CorrelatedSender` / `CorrelatedReceiver` exposes a `send_correlated` /
   `receive_correlated` method for correlated OT.
@@ -24,9 +29,7 @@ It also exposes various traits for implementing your very own OT protocol:
 * `RandomSender` / `RandomReceiver` exposes a `send_random` / `receive_random`
   method for random OT.
 
-`ocelot` also provides support for oblivious PRF (OPRF) protocols.
-
-**`ocelot` should be considered unstable and under active development until
+**`ocelot` should be considered unstable and with potential API changes until
 version 1.0 is released**
 
 # Performance
