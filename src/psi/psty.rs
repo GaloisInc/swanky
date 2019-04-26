@@ -66,11 +66,10 @@ impl<R: Read + Send + Debug + 'static, W: Write + Send + Debug + 'static> Sender
     pub fn send(&mut self, inputs: &[Msg]) -> Result<Vec<kkrt::Output>, Error> {
         // receive cuckoo hash info from sender
         let key = Block::read(&mut *self.reader.borrow_mut())?;
-        let nbins = stream::read_usize(&mut *self.reader.borrow_mut())?;
-
         let hashes = utils::compress_and_hash_inputs(inputs, key);
 
         // map inputs to table using all hash functions
+        let nbins = stream::read_usize(&mut *self.reader.borrow_mut())?;
         let mut table = vec![Vec::new(); nbins];
 
         for &x in &hashes {
@@ -163,9 +162,9 @@ impl<R: Read + Send + Debug + 'static, W: Write + Send + Debug> Receiver<R, W> {
         let table = cuckoo
             .items()
             .map(|opt_item| {
-                opt_item
-                    .as_ref()
-                    .map_or(Block::default(), |item| item.entry)
+                opt_item.as_ref().map_or(Block::default(), |item| {
+                    item.entry ^ Block::from(item.hash_index.unwrap() as u128)
+                })
             })
             .collect::<Vec<Block>>();
 
@@ -289,7 +288,10 @@ mod tests {
         let sender_opprf_outputs = handle.join().unwrap();
 
         let mut size = 0;
-        for (s,r) in sender_opprf_outputs.into_iter().zip(receiver_opprf_outputs.into_iter()) {
+        for (s, r) in sender_opprf_outputs
+            .into_iter()
+            .zip(receiver_opprf_outputs.into_iter())
+        {
             if s == r {
                 size += 1;
             }
@@ -298,5 +300,40 @@ mod tests {
         assert_eq!(size, SET_SIZE);
 
         assert_eq!(intersection.len(), SET_SIZE);
+    }
+
+    #[test]
+    fn test_hashing() {
+        let mut rng = AesRng::new();
+        let inputs = rand_vec_vec(SET_SIZE, ITEM_SIZE);
+
+        let key = rng.gen();
+        let hashes = utils::compress_and_hash_inputs(&inputs, key);
+        let cuckoo = CuckooHash::new(&hashes, NHASHES).unwrap();
+
+        // map inputs to table using all hash functions
+        let mut table = vec![Vec::new(); cuckoo.nbins];
+
+        for &x in &hashes {
+            let mut bins = Vec::with_capacity(NHASHES);
+            for h in 0..NHASHES {
+                let bin = CuckooHash::bin(x, h, cuckoo.nbins);
+                table[bin].push(x ^ Block::from(h as u128));
+                bins.push(bin);
+            }
+            // if j = H1(y) = H2(y) for some y, then P2 adds a uniformly random element to
+            // table2[j].
+            if bins.iter().skip(1).all(|&x| x == bins[0]) {
+                table[bins[0]].push(rng.gen());
+            }
+        }
+
+        // for each item matched to a cuckoo bin, it should also be in one of the bins
+        for (opt_item, bin) in cuckoo.items().zip(&table) {
+            if let Some(item) = opt_item {
+                assert!(bin.iter().any(|bin_elem| *bin_elem
+                    == item.entry ^ Block::from(item.hash_index.unwrap() as u128)));
+            }
+        }
     }
 }
