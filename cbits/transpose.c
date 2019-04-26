@@ -66,18 +66,34 @@ void sse_trans(uint8_t *out, uint8_t const *inp, uint64_t nrows,
 
   // The remainder is a block of 8x(16n+8) bits (n may be 0).
   //  Do a PAIR of 8x8 blocks in each step:
-  for (cc = 0; cc <= ncols - 16; cc += 16) {
-    vec = _mm_set_epi16(*(uint16_t const *)&INP(rr + 7, cc),
-                        *(uint16_t const *)&INP(rr + 6, cc),
-                        *(uint16_t const *)&INP(rr + 5, cc),
-                        *(uint16_t const *)&INP(rr + 4, cc),
-                        *(uint16_t const *)&INP(rr + 3, cc),
-                        *(uint16_t const *)&INP(rr + 2, cc),
-                        *(uint16_t const *)&INP(rr + 1, cc),
-                        *(uint16_t const *)&INP(rr + 0, cc));
-    for (i = 8; --i >= 0; vec = _mm_slli_epi64(vec, 1)) {
-      OUT(rr, cc + i) = h = _mm_movemask_epi8(vec);
-      OUT(rr, cc + i + 8) = h >> 8;
+  if ((ncols % 8 == 0 && ncols % 16 != 0) ||
+      (nrows % 8 == 0 && nrows % 16 != 0)) {
+    // The fancy optimizations in the else-branch don't work if the above if-condition
+    // holds, so we use the simpler non-simd variant for that case.
+    for (cc = 0; cc <= ncols - 16; cc += 16) {
+      for (i = 0; i < 8; ++i) {
+        tmp.b[i] = h = *(uint16_t const *)&INP(rr + i, cc);
+        tmp.b[i + 8] = h >> 8;
+      }
+      for (i = 8; --i >= 0; tmp.x = _mm_slli_epi64(tmp.x, 1)) {
+        OUT(rr, cc + i) = h = _mm_movemask_epi8(tmp.x);
+        OUT(rr, cc + i + 8) = h >> 8;
+      }
+    }
+  } else {
+    for (cc = 0; cc <= ncols - 16; cc += 16) {
+      vec = _mm_set_epi16(*(uint16_t const *)&INP(rr + 7, cc),
+                          *(uint16_t const *)&INP(rr + 6, cc),
+                          *(uint16_t const *)&INP(rr + 5, cc),
+                          *(uint16_t const *)&INP(rr + 4, cc),
+                          *(uint16_t const *)&INP(rr + 3, cc),
+                          *(uint16_t const *)&INP(rr + 2, cc),
+                          *(uint16_t const *)&INP(rr + 1, cc),
+                          *(uint16_t const *)&INP(rr + 0, cc));
+      for (i = 8; --i >= 0; vec = _mm_slli_epi64(vec, 1)) {
+        OUT(rr, cc + i) = h = _mm_movemask_epi8(vec);
+        OUT(rr, cc + i + 8) = h >> 8;
+      }
     }
   }
   if (cc == ncols)
