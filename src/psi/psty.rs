@@ -63,17 +63,17 @@ impl<R: Read + Send + Debug + 'static, W: Write + Send + Debug + 'static> Sender
         })
     }
 
-    pub fn send(&mut self, inputs: &[Msg]) -> Result<(), Error> {
+    pub fn send(&mut self, inputs: &[Msg]) -> Result<Vec<kkrt::Output>, Error> {
         // receive cuckoo hash info from sender
         let key = Block::read(&mut *self.reader.borrow_mut())?;
         let nbins = stream::read_usize(&mut *self.reader.borrow_mut())?;
 
-        let inputs = utils::compress_and_hash_inputs(inputs, key);
+        let hashes = utils::compress_and_hash_inputs(inputs, key);
 
         // map inputs to table using all hash functions
-        let mut table = vec![Vec::with_capacity(inputs.len()); nbins];
+        let mut table = vec![Vec::new(); nbins];
 
-        for &x in &inputs {
+        for &x in &hashes {
             let mut bins = Vec::with_capacity(NHASHES);
             for h in 0..NHASHES {
                 let bin = CuckooHash::bin(x, h, nbins);
@@ -109,7 +109,6 @@ impl<R: Read + Send + Debug + 'static, W: Write + Send + Debug + 'static> Sender
             &mut self.rng,
         )?;
 
-        let n = ts.len();
         let mpc_input_bits = ts
             .iter()
             .flat_map(|blk| {
@@ -125,9 +124,9 @@ impl<R: Read + Send + Debug + 'static, W: Write + Send + Debug + 'static> Sender
             &mpc_input_bits,
             self.rng.fork(),
         )?;
-        compute_intersection(&mut gb, n, HASH_SIZE * 8)?;
+        compute_intersection(&mut gb, nbins, HASH_SIZE * 8)?;
 
-        Ok(())
+        Ok(ts)
     }
 }
 
@@ -147,7 +146,7 @@ impl<R: Read + Send + Debug + 'static, W: Write + Send + Debug> Receiver<R, W> {
         })
     }
 
-    pub fn receive(&mut self, inputs: &[Msg]) -> Result<Vec<Msg>, Error> {
+    pub fn receive(&mut self, inputs: &[Msg]) -> Result<(Vec<kkrt::Output>, Vec<Msg>), Error> {
         let key = self.rng.gen();
         let hashed_inputs = utils::compress_and_hash_inputs(inputs, key);
         let cuckoo = CuckooHash::new(&hashed_inputs, NHASHES)?;
@@ -207,7 +206,7 @@ impl<R: Read + Send + Debug + 'static, W: Write + Send + Debug> Receiver<R, W> {
             }
         }
 
-        Ok(intersection)
+        Ok((opprf_outputs, intersection))
     }
 }
 
@@ -239,8 +238,8 @@ mod tests {
     use std::os::unix::net::UnixStream;
     use std::time::SystemTime;
 
-    const ITEM_SIZE: usize = 8;
-    const SET_SIZE: usize = 1 << 8;
+    const ITEM_SIZE: usize = 4;
+    const SET_SIZE: usize = 1 << 4;
 
     #[test]
     fn test_psi() {
@@ -260,12 +259,13 @@ mod tests {
             );
 
             let start = SystemTime::now();
-            psi.send(&sender_inputs).unwrap();
+            let sender_opprf_outputs = psi.send(&sender_inputs).unwrap();
             println!(
                 "[{}] Send time: {} ms",
                 SET_SIZE,
                 start.elapsed().unwrap().as_millis()
             );
+            sender_opprf_outputs
         });
 
         let reader = Rc::new(RefCell::new(BufReader::new(receiver.try_clone().unwrap())));
@@ -279,14 +279,23 @@ mod tests {
         );
 
         let start = SystemTime::now();
-        let intersection = psi.receive(&receiver_inputs).unwrap();
+        let (receiver_opprf_outputs, intersection) = psi.receive(&receiver_inputs).unwrap();
         println!(
             "[{}] Receiver time: {} ms",
             SET_SIZE,
             start.elapsed().unwrap().as_millis()
         );
 
-        handle.join().unwrap();
+        let sender_opprf_outputs = handle.join().unwrap();
+
+        let mut size = 0;
+        for (s,r) in sender_opprf_outputs.into_iter().zip(receiver_opprf_outputs.into_iter()) {
+            if s == r {
+                size += 1;
+            }
+        }
+
+        assert_eq!(size, SET_SIZE);
 
         assert_eq!(intersection.len(), SET_SIZE);
     }
