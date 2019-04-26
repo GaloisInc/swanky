@@ -7,7 +7,14 @@
 //! Oblivious transfer traits + instantiations.
 //!
 //! This module provides traits for standard oblivious transfer (OT), correlated
-//! OT, and random OT.
+//! OT, and random OT, alongside implementations of the following OT protocols:
+//!
+//! * `dummy`: a dummy and completely insecure OT for testing purposes.
+//! * `naor_pinkas`: Naor-Pinkas semi-honest OT.
+//! * `chou_orlandi`: Chou-Orlandi malicious OT.
+//! * `alsz`: Asharov-Lindell-Schneider-Zohner semi-honest OT extension (+ correlated and random OT).
+//! * `kos`: Keller-Orsini-Scholl malicious OT extension (+ correlated and random OT).
+//!
 
 pub mod alsz;
 pub mod chou_orlandi;
