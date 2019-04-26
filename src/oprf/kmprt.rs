@@ -609,9 +609,60 @@ mod tests {
         }
     }
 
+    fn _test_opprf_points<
+        S: ProgrammableSender<Seed = Seed, Input = Block, Output = Output>,
+        R: ProgrammableReceiver<Seed = Seed, Input = Block, Output = Output>,
+    >(
+        ninputs: usize,
+        npoints: usize,
+    ) {
+        assert!(ninputs <= npoints);
+        let mut rng = AesRng::new();
+        let points = (0..npoints)
+            .map(|_| (rng.gen::<Block>(), rng.gen::<Output>()))
+            .collect::<Vec<(Block, Output)>>();
+        let xs = points[0..ninputs]
+            .iter()
+            .map(|(x, _)| *x)
+            .collect::<Vec<Block>>();
+        let ys = points[0..ninputs]
+            .iter()
+            .map(|(_, y)| *y)
+            .collect::<Vec<Output>>();
+        let (sender, receiver) = UnixStream::pair().unwrap();
+        let handle = std::thread::spawn(move || {
+            let mut rng = AesRng::new();
+            let mut reader = BufReader::new(sender.try_clone().unwrap());
+            let mut writer = BufWriter::new(sender);
+            let mut oprf = S::init(&mut reader, &mut writer, &mut rng).unwrap();
+            let _ = oprf
+                .send(
+                    &mut reader,
+                    &mut writer,
+                    &points,
+                    npoints,
+                    ninputs,
+                    &mut rng,
+                )
+                .unwrap();
+        });
+        let mut rng = AesRng::new();
+        let mut reader = BufReader::new(receiver.try_clone().unwrap());
+        let mut writer = BufWriter::new(receiver);
+        let mut oprf = R::init(&mut reader, &mut writer, &mut rng).unwrap();
+        let outputs = oprf
+            .receive(&mut reader, &mut writer, npoints, &xs, &mut rng)
+            .unwrap();
+        handle.join().unwrap();
+        for j in 0..ninputs {
+            assert_eq!(ys[j], outputs[j]);
+        }
+    }
+
     #[test]
     fn test_opprf() {
         _test_opprf::<KmprtSingleSender, KmprtSingleReceiver>(1, 8);
+        _test_opprf_points::<KmprtSingleSender, KmprtSingleReceiver>(1, 8);
     }
 
 }
