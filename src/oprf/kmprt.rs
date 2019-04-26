@@ -30,6 +30,21 @@ impl From<cuckoo::Error> for Error {
 // Number of times to iterate when creating the sender's hash table.
 const N_TABLE_LOOPS: usize = 1000;
 
+// Hash `x` and `k`, producing a result in range `[0..range-1]`. We use the
+// Davies-Meyer single-block-length compression function under-the-hood.
+#[inline]
+fn hash_input(x: Block, k: Block, range: usize) -> usize {
+    let aes = Aes128::new(x);
+    hash_input_keyed(&aes, k, range)
+}
+
+// Same as `hash_input`, but with a pre-keyed AES for `x`.
+#[inline]
+fn hash_input_keyed(x: &Aes128, k: Block, range: usize) -> usize {
+    let h = x.encrypt(k) ^ k;
+    (u128::from(h) % (range as u128)) as usize
+}
+
 // Hash `x`, using `k` as the hash "key", and output the result in the range
 // `[0..range]`.
 #[inline]
@@ -119,17 +134,18 @@ impl<OPRF: OprfSender<Seed = Seed, Input = Block, Output = Output> + SemiHonest>
         if t != 1 {
             return Err(Error::InvalidInputLength);
         }
+        // Check that all input points are unique.
         debug_assert_eq!(
             {
-                let mut inputs = points.iter().map(|(x, _)| *x).collect::<Vec<Self::Input>>();
-                inputs.sort();
-                inputs.dedup();
-                inputs.len()
+                let mut points = points.iter().map(|(x, _)| *x).collect::<Vec<Self::Input>>();
+                points.sort();
+                points.dedup();
+                points.len()
             },
             points.len()
         );
         let m = table_size(npoints);
-        let mut table = (0..m).map(|_| Output::default()).collect::<Vec<Output>>();
+        let mut table = vec![Output::default(); m];
         let seeds = self.oprf.send(reader, writer, 1, rng)?;
         let seed = seeds[0];
         let mut v = rng.gen::<Block>();
@@ -147,6 +163,7 @@ impl<OPRF: OprfSender<Seed = Seed, Input = Block, Output = Output> + SemiHonest>
             if map.len() == points.len() {
                 break;
             } else {
+                // Try again.
                 v = rng.gen::<Block>();
                 aes = Aes128::new(v);
                 map.clear();
@@ -243,7 +260,7 @@ impl<OPRF: OprfReceiver<Seed = Seed, Input = Block, Output = Output> + SemiHones
         let mut outputs = self.oprf.receive(reader, writer, inputs, rng)?;
         let v = Block::read(reader)?;
         let h = hash_output(outputs[0], v, m);
-        let zero = Output::zero();
+        let zero = Output::default();
         for i in 0..m {
             let entry = Output::read(reader)?;
             outputs[0] ^= if i == h { entry } else { zero };
@@ -304,21 +321,6 @@ impl Parameters {
             h2,
         })
     }
-}
-
-// Hash `x` and `k`, producing a result in range `[0..range-1]`. We use the
-// Davies-Meyer single-block-length compression function under-the-hood.
-#[inline]
-fn hash_input(x: Block, k: Block, range: usize) -> usize {
-    let aes = Aes128::new(x);
-    hash_input_keyed(&aes, k, range)
-}
-
-// Same as `hash_input`, but with a pre-keyed AES.
-#[inline]
-fn hash_input_keyed(aes: &Aes128, k: Block, range: usize) -> usize {
-    let h = aes.encrypt(k) ^ k;
-    (u128::from(h) % (range as u128)) as usize
 }
 
 /// KMPRT hashing-based OPPRF sender.
@@ -660,11 +662,15 @@ mod tests {
     }
 
     #[test]
-    fn test_opprf() {
+    fn test_single_opprf() {
         _test_opprf::<KmprtSingleSender, KmprtSingleReceiver>(1, 8);
         _test_opprf_points::<KmprtSingleSender, KmprtSingleReceiver>(1, 8);
     }
 
+    #[test]
+    fn test_opprf() {
+        _test_opprf_points::<KmprtSender, KmprtReceiver>(1, 8);
+    }
 }
 
 //
