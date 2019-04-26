@@ -16,7 +16,7 @@ use ocelot::oprf::kkrt;
 use ocelot::oprf::kmprt;
 use ocelot::oprf::{ProgrammableReceiver, ProgrammableSender};
 use ocelot::ot::{ChouOrlandiReceiver as OtReceiver, ChouOrlandiSender as OtSender};
-use rand::{CryptoRng, Rng, RngCore, SeedableRng};
+use rand::Rng;
 use scuttlebutt::{AesRng, Block};
 use std::cell::RefCell;
 use std::fmt::Debug;
@@ -26,50 +26,45 @@ use std::rc::Rc;
 use fancy_garbling::{BinaryGadgets, BundleGadgets, Fancy, FancyError, HasModulus};
 
 const NHASHES: usize = 3;
+const HASH_SIZE: usize = 4; // how many bytes of the hash to use for the equality tests
 
 pub type Msg = Vec<u8>;
 
 /// Private set intersection sender.
-pub struct P1<R, W> {
+pub struct Sender<R: Read + Send + Debug, W: Write + Send + Debug + 'static> {
     opprf: kmprt::KmprtReceiver,
     reader: Rc<RefCell<R>>,
     writer: Rc<RefCell<W>>,
+    rng: AesRng,
 }
 
 /// Private set intersection receiver.
-pub struct P2<R, W> {
+pub struct Receiver<R, W> {
     opprf: kmprt::KmprtSender,
     reader: Rc<RefCell<R>>,
     writer: Rc<RefCell<W>>,
+    rng: AesRng,
 }
 
-impl<R, W> P1<R, W> {
-    pub fn init<RNG>(
+impl<R: Read + Send + Debug, W: Write + Send + Debug + 'static> Sender<R, W> {
+    pub fn init(
         reader: Rc<RefCell<R>>,
         writer: Rc<RefCell<W>>,
-        rng: &mut RNG,
-    ) -> Result<Self, Error>
-    where
-        R: Read + Send,
-        W: Write + Send + Debug,
-        RNG: CryptoRng + RngCore + SeedableRng,
-    {
+    ) -> Result<Self, Error> {
+        let mut rng = AesRng::new();
         let opprf =
-            kmprt::KmprtReceiver::init(&mut *reader.borrow_mut(), &mut *writer.borrow_mut(), rng)?;
+            kmprt::KmprtReceiver::init(&mut *reader.borrow_mut(), &mut *writer.borrow_mut(), &mut rng)?;
         Ok(Self {
             opprf,
             reader,
             writer,
+            rng,
         })
     }
 
-    pub fn send<RNG>(&mut self, inputs: &[Msg], rng: &mut RNG) -> Result<Vec<kkrt::Output>, Error>
-    where
-        R: Read + Send,
-        W: Write + Send + std::fmt::Debug + 'static,
-        RNG: CryptoRng + RngCore + SeedableRng,
+    pub fn send(&mut self, inputs: &[Msg]) -> Result<(), Error>
     {
-        let key = rng.gen::<Block>();
+        let key = self.rng.gen();
         let hashed_inputs = utils::compress_and_hash_inputs(inputs, key);
         let cuckoo = CuckooHash::new(&hashed_inputs, NHASHES)?;
 
@@ -96,13 +91,13 @@ impl<R, W> P1<R, W> {
             &mut *self.writer.borrow_mut(),
             0,
             &table,
-            rng,
+            &mut self.rng,
         )?;
 
         let gb_inps = opprf_outputs
             .iter()
             .flat_map(|blk| {
-                blk.prefix(16)
+                blk.prefix(HASH_SIZE)
                     .iter()
                     .flat_map(|byte| (0..8).map(|i| ((byte >> i) & 1_u8) as u16).collect_vec())
             })
@@ -112,40 +107,32 @@ impl<R, W> P1<R, W> {
             self.reader.clone(),
             self.writer.clone(),
             &gb_inps,
-            AesRng::from_seed(rng.gen::<Block>()),
+            self.rng.fork(),
         )?;
+        compute_intersection(&mut gb, opprf_outputs.len(), HASH_SIZE * 8)?;
 
-        let _res = compute_intersection(&mut gb, gb_inps.len(), 128)?;
-
-        Ok(opprf_outputs)
+        Ok(())
     }
 }
 
-impl<R, W> P2<R, W> {
-    pub fn init<RNG>(
+impl<R: Read + Send + Debug + 'static, W: Write + Send + Debug + 'static> Receiver<R, W> {
+    pub fn init(
         reader: Rc<RefCell<R>>,
         writer: Rc<RefCell<W>>,
-        rng: &mut RNG,
     ) -> Result<Self, Error>
-    where
-        R: Read + Send,
-        W: Write + Send,
-        RNG: CryptoRng + RngCore,
     {
+        let mut rng = AesRng::new();
         let opprf =
-            kmprt::KmprtSender::init(&mut *reader.borrow_mut(), &mut *writer.borrow_mut(), rng)?;
+            kmprt::KmprtSender::init(&mut *reader.borrow_mut(), &mut *writer.borrow_mut(), &mut rng)?;
         Ok(Self {
             opprf,
             reader,
             writer,
+            rng,
         })
     }
 
-    pub fn send<RNG>(&mut self, inputs: &[Msg], rng: &mut RNG) -> Result<Vec<kkrt::Output>, Error>
-    where
-        R: Read + Send + Debug + 'static,
-        W: Write + Send + Debug,
-        RNG: CryptoRng + RngCore,
+    pub fn receive(&mut self, inputs: &[Msg]) -> Result<Vec<Msg>, Error>
     {
         // receive cuckoo hash info from sender
         let key = Block::read(&mut *self.reader.borrow_mut())?;
@@ -166,12 +153,12 @@ impl<R, W> P2<R, W> {
             // if j = H1(y) = H2(y) for some y, then P2 adds a uniformly random element to
             // table2[j].
             if bins.iter().skip(1).all(|&x| x == bins[0]) {
-                table[bins[0]].push(rng.gen());
+                table[bins[0]].push(self.rng.gen());
             }
         }
 
         // select the target values
-        let ts = (0..nbins).map(|_| rng.gen()).collect::<Vec<kkrt::Output>>();
+        let ts = (0..nbins).map(|_| self.rng.gen()).collect::<Vec<kkrt::Output>>();
         let points = table
             .into_iter()
             .zip(ts.iter())
@@ -187,13 +174,13 @@ impl<R, W> P2<R, W> {
             &points,
             points.len(),
             nbins,
-            rng,
+            &mut self.rng,
         )?;
 
         let ev_inps = ts
             .iter()
             .flat_map(|blk| {
-                blk.prefix(16)
+                blk.prefix(HASH_SIZE)
                     .iter()
                     .flat_map(|byte| (0..8).map(|i| ((byte >> i) & 1_u8) as u16).collect_vec())
             })
@@ -203,13 +190,12 @@ impl<R, W> P2<R, W> {
             self.reader.clone(),
             self.writer.clone(),
             &ev_inps,
-            AesRng::from_seed(rng.gen::<Block>()),
+            self.rng.fork(),
         )?;
+        compute_intersection(&mut ev, ts.len(), HASH_SIZE * 8)?;
+        let outs = ev.decode_output();
 
-        let _res = compute_intersection(&mut ev, ev_inps.len(), 128)?;
-
-        // return the target values for input to the MPC
-        Ok(ts)
+        unimplemented!()
     }
 }
 
@@ -218,7 +204,7 @@ fn compute_intersection<F, W, E>(
     f: &mut F,
     ninputs: usize,
     input_size: usize,
-) -> Result<Vec<W>, E>
+) -> Result<(), E>
 where
     F: Fancy<Item = W, Error = E>,
     W: Clone + HasModulus,
@@ -234,14 +220,13 @@ where
         res.push(eq);
     }
 
-    Ok(res)
+    f.outputs(&res)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::utils::rand_vec_vec;
-    use scuttlebutt::AesRng;
     use std::io::{BufReader, BufWriter};
     use std::os::unix::net::UnixStream;
     use std::time::SystemTime;
@@ -256,19 +241,18 @@ mod tests {
         let receiver_inputs = sender_inputs.clone();
 
         let handle = std::thread::spawn(move || {
-            let mut rng = AesRng::new();
             let reader = Rc::new(RefCell::new(BufReader::new(sender.try_clone().unwrap())));
             let writer = Rc::new(RefCell::new(BufWriter::new(sender)));
 
             let start = SystemTime::now();
-            let mut psi = P1::init(reader, writer, &mut rng).unwrap();
+            let mut psi = Sender::init(reader, writer).unwrap();
             println!(
                 "Sender init time: {} ms",
                 start.elapsed().unwrap().as_millis()
             );
 
             let start = SystemTime::now();
-            psi.send(&sender_inputs, &mut rng).unwrap();
+            psi.send(&sender_inputs).unwrap();
             println!(
                 "[{}] Send time: {} ms",
                 SET_SIZE,
@@ -276,19 +260,18 @@ mod tests {
             );
         });
 
-        let mut rng = AesRng::new();
         let reader = Rc::new(RefCell::new(BufReader::new(receiver.try_clone().unwrap())));
         let writer = Rc::new(RefCell::new(BufWriter::new(receiver)));
 
         let start = SystemTime::now();
-        let mut psi = P2::init(reader.clone(), writer.clone(), &mut rng).unwrap();
+        let mut psi = Receiver::init(reader.clone(), writer.clone()).unwrap();
         println!(
             "Receiver init time: {} ms",
             start.elapsed().unwrap().as_millis()
         );
 
         let start = SystemTime::now();
-        let _ = psi.send(&receiver_inputs, &mut rng).unwrap();
+        let _ = psi.receive(&receiver_inputs).unwrap();
         println!(
             "[{}] Receiver time: {} ms",
             SET_SIZE,

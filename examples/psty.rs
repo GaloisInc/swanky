@@ -12,6 +12,8 @@ use scuttlebutt::AesRng;
 use std::io::{BufReader, BufWriter};
 use std::os::unix::net::UnixStream;
 use std::time::SystemTime;
+use std::rc::Rc;
+use std::cell::RefCell;
 
 const NBYTES: usize = 15;
 const NTIMES: usize = 1 << 16;
@@ -29,16 +31,17 @@ fn psty(inputs1: Vec<Vec<u8>>, inputs2: Vec<Vec<u8>>) {
     let total = SystemTime::now();
     let handle = std::thread::spawn(move || {
         let mut rng = AesRng::new();
-        let mut reader = TrackReader::new(BufReader::new(sender.try_clone().unwrap()));
-        let mut writer = TrackWriter::new(BufWriter::new(sender));
+        let reader = Rc::new(RefCell::new(TrackReader::new(BufReader::new(sender.try_clone().unwrap()))));
+        let writer = Rc::new(RefCell::new(TrackWriter::new(BufWriter::new(sender))));
+
         let start = SystemTime::now();
-        let mut p1 = P1::init(&mut reader, &mut writer, &mut rng).unwrap();
+        let mut p1 = P1::init(reader.clone(), writer.clone(), &mut rng).unwrap();
         println!(
             "Sender init time: {} ms",
             start.elapsed().unwrap().as_millis()
         );
         let start = SystemTime::now();
-        p1.send(&mut reader, &mut writer, &inputs1, &mut rng)
+        p1.send(&inputs1, &mut rng)
             .unwrap();
         println!(
             "[{}] Send time: {} ms",
@@ -47,26 +50,27 @@ fn psty(inputs1: Vec<Vec<u8>>, inputs2: Vec<Vec<u8>>) {
         );
         println!(
             "Sender communication (read): {:.2} Mb",
-            reader.kilobits() / 1000.0
+            reader.borrow().kilobits() / 1000.0
         );
         println!(
             "Sender communication (write): {:.2} Mb",
-            writer.kilobits() / 1000.0
+            writer.borrow().kilobits() / 1000.0
         );
     });
 
     let mut rng = AesRng::new();
-    let mut reader = TrackReader::new(BufReader::new(receiver.try_clone().unwrap()));
-    let mut writer = TrackWriter::new(BufWriter::new(receiver));
+    let reader = Rc::new(RefCell::new(TrackReader::new(BufReader::new(receiver.try_clone().unwrap()))));
+    let writer = Rc::new(RefCell::new(TrackWriter::new(BufWriter::new(receiver))));
+
     let start = SystemTime::now();
-    let mut p2 = P2::init(&mut reader, &mut writer, &mut rng).unwrap();
+    let mut p2 = P2::init(reader.clone(), writer.clone(), &mut rng).unwrap();
     println!(
         "Receiver init time: {} ms",
         start.elapsed().unwrap().as_millis()
     );
     let start = SystemTime::now();
     let _ = p2
-        .send(&mut reader, &mut writer, &inputs2, &mut rng)
+        .send(&inputs2, &mut rng)
         .unwrap();
     println!(
         "[{}] Receiver time: {} ms",
@@ -76,11 +80,11 @@ fn psty(inputs1: Vec<Vec<u8>>, inputs2: Vec<Vec<u8>>) {
     let _ = handle.join().unwrap();
     println!(
         "Receiver communication (read): {:.2} Mb",
-        reader.kilobits() / 1000.0
+        reader.borrow().kilobits() / 1000.0
     );
     println!(
         "Receiver communication (write): {:.2} Mb",
-        writer.kilobits() / 1000.0
+        writer.borrow().kilobits() / 1000.0
     );
     println!("Total time: {} ms", total.elapsed().unwrap().as_millis());
 }
