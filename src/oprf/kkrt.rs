@@ -102,7 +102,7 @@ impl<OT: OtReceiver<Msg = Block> + SemiHonest> OprfSender for Sender<OT> {
 
     #[inline]
     fn compute(&self, seed: Self::Seed, input: Self::Input) -> Self::Output {
-        let mut output = Block512::default();
+        let mut output = Self::Output::default();
         self.encode(input, &mut output);
         scutils::xor_inplace(&mut output.as_mut(), seed.as_ref());
         output
@@ -188,15 +188,16 @@ impl<OT: OtSender<Msg = Block> + SemiHonest> OprfReceiver for Receiver<OT> {
         let mut t0s = vec![0u8; nrows * ncols / 8];
         rng.fill_bytes(&mut t0s);
         let out = t0s
-            .chunks(64)
+            .chunks(ncols / 8)
             .map(|c| c.try_into().unwrap())
             .collect::<Vec<Block512>>();
         let mut t1s = t0s.clone();
         let mut c = Block512::default();
-        for (j, r) in inputs.iter().enumerate() {
+        for (j, input) in inputs.iter().enumerate() {
+            // Compute `C(input) ⊕ t_{0,j}`. Thus, `range` is a 512-bit chunk.
             let range = j * ncols / 8..(j + 1) * ncols / 8;
             let mut t1 = &mut t1s[range];
-            self.code.encode(*r, (&mut c).into());
+            self.code.encode(*input, (&mut c).into());
             scutils::xor_inplace(&mut t1, c.as_ref());
         }
         let t0s = utils::transpose(&t0s, nrows, ncols);

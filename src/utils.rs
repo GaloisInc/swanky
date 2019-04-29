@@ -8,19 +8,22 @@ use scuttlebutt::Block;
 
 #[inline]
 pub fn transpose(m: &[u8], nrows: usize, ncols: usize) -> Vec<u8> {
-    let m_ = vec![0u8; nrows * ncols / 8];
+    let mut m_ = vec![0u8; nrows * ncols / 8];
+    _transpose(
+        m_.as_mut_ptr() as *mut u8,
+        m.as_ptr(),
+        nrows as u64,
+        ncols as u64,
+    );
+    m_
+}
+
+#[inline(always)]
+fn _transpose(out: *mut u8, inp: *const u8, nrows: u64, ncols: u64) {
     assert!(nrows >= 16);
     assert_eq!(nrows % 8, 0);
     assert_eq!(ncols % 8, 0);
-    unsafe {
-        sse_trans(
-            m_.as_ptr() as *mut u8,
-            m.as_ptr(),
-            nrows as u64,
-            ncols as u64,
-        )
-    };
-    m_
+    unsafe { sse_trans(out, inp, nrows, ncols) }
 }
 
 #[link(name = "transpose")]

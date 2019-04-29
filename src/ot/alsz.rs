@@ -52,17 +52,13 @@ impl<OT: OtReceiver<Msg = Block> + SemiHonest> Sender<OT> {
         let (nrows, ncols) = (128, m);
         let mut qs = vec![0u8; nrows * ncols / 8];
         let mut u = vec![0u8; ncols / 8];
-        for (j, (b, mut rng)) in self.s.iter().zip(self.rngs.iter_mut()).enumerate() {
+        let zero = vec![0u8; ncols / 8];
+        for (j, (b, rng)) in self.s.iter().zip(self.rngs.iter_mut()).enumerate() {
             let range = j * ncols / 8..(j + 1) * ncols / 8;
             let mut q = &mut qs[range];
             stream::read_bytes_inplace(reader, &mut u)?;
-            // XXX: make constant time independent of `b`
-            if !b {
-                std::mem::replace(&mut u, vec![0u8; ncols / 8]);
-            };
-            let rng = &mut rng;
             rng.fill_bytes(&mut q);
-            scutils::xor_inplace(&mut q, &u);
+            scutils::xor_inplace(&mut q, if *b { &u } else { &zero });
         }
         Ok(utils::transpose(&qs, nrows, ncols))
     }

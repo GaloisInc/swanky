@@ -211,9 +211,8 @@ mod tests {
         let result = ot.receive(&mut reader, &mut writer, &bs, &mut rng).unwrap();
         handle.join().unwrap();
         println!(
-            "{} [{} OTs]: read = {:2} Kb, written = {:2} Kb",
+            "{} [128 OTs]: read = {:2} Kb, written = {:2} Kb",
             ot,
-            128,
             reader.kilobits(),
             writer.kilobits()
         );
