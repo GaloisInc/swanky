@@ -19,7 +19,7 @@ version 1.0 is released**
 
 # Documentation
 
-https://amaloz.github.io/scuttlebutt/scuttlebutt/
+The documentation can be found here: <https://amaloz.github.io/scuttlebutt/scuttlebutt/>.
 
 # Building
 
