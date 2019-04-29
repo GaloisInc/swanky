@@ -14,10 +14,10 @@ use crate::ot::{
     Sender as OtSender,
 };
 use crate::utils;
-use arrayref::array_ref;
 use rand::CryptoRng;
 use rand_core::{RngCore, SeedableRng};
 use scuttlebutt::{cointoss, AesRng, Block, Malicious, SemiHonest};
+use std::convert::TryInto;
 use std::io::{ErrorKind, Read, Write};
 
 const SSP: usize = 40;
@@ -57,7 +57,8 @@ impl<OT: OtReceiver<Msg = Block> + Malicious> Sender<OT> {
         let mut chi = Block::default();
         for j in 0..ncols {
             let q = &qs[j * 16..(j + 1) * 16];
-            let q = Block::from(*array_ref![q, 0, 16]);
+            let q: [u8; 16] = q.try_into().unwrap();
+            let q = Block::from(q);
             rng.fill_bytes(&mut chi.as_mut());
             let tmp = q.clmul(chi);
             check = utils::xor_two_blocks(&check, &tmp);
@@ -102,7 +103,8 @@ impl<OT: OtReceiver<Msg = Block> + Malicious> OtSender for Sender<OT> {
         // Output result
         for (j, input) in inputs.iter().enumerate() {
             let q = &qs[j * 16..(j + 1) * 16];
-            let q = Block::from(*array_ref![q, 0, 16]);
+            let q: [u8; 16] = q.try_into().unwrap();
+            let q = Block::from(q);
             let y0 = self.ot.hash.tccr_hash(Block::from(j as u128), q) ^ input.0;
             let q = q ^ self.ot.s_;
             let y1 = self.ot.hash.tccr_hash(Block::from(j as u128), q) ^ input.1;
@@ -128,7 +130,8 @@ impl<OT: OtReceiver<Msg = Block> + Malicious> CorrelatedSender for Sender<OT> {
         let mut out = Vec::with_capacity(m);
         for (j, delta) in deltas.iter().enumerate() {
             let q = &qs[j * 16..(j + 1) * 16];
-            let q = Block::from(*array_ref![q, 0, 16]);
+            let q: [u8; 16] = q.try_into().unwrap();
+            let q = Block::from(q);
             let x0 = self.ot.hash.tccr_hash(Block::from(j as u128), q);
             let x1 = x0 ^ *delta;
             let q = q ^ self.ot.s_;
@@ -154,7 +157,8 @@ impl<OT: OtReceiver<Msg = Block> + Malicious> RandomSender for Sender<OT> {
         let mut out = Vec::with_capacity(m);
         for j in 0..m {
             let q = &qs[j * 16..(j + 1) * 16];
-            let q = Block::from(*array_ref![q, 0, 16]);
+            let q: [u8; 16] = q.try_into().unwrap();
+            let q = Block::from(q);
             let x0 = self.ot.hash.tccr_hash(Block::from(j as u128), q);
             let q = q ^ self.ot.s_;
             let x1 = self.ot.hash.tccr_hash(Block::from(j as u128), q);
@@ -195,7 +199,8 @@ impl<OT: OtSender<Msg = Block> + Malicious> Receiver<OT> {
         let mut chi = Block::default();
         for (j, xj) in r_.into_iter().enumerate() {
             let tj = &ts[j * 16..(j + 1) * 16];
-            let tj = Block::from(*array_ref![tj, 0, 16]);
+            let tj: [u8; 16] = tj.try_into().unwrap();
+            let tj = Block::from(tj);
             rng.fill_bytes(&mut chi.as_mut());
             x ^= if xj { chi } else { Block::default() };
             let tmp = tj.clmul(chi);
@@ -233,13 +238,14 @@ impl<OT: OtSender<Msg = Block> + Malicious> OtReceiver for Receiver<OT> {
         let mut out = Vec::with_capacity(inputs.len());
         for (j, b) in inputs.iter().enumerate() {
             let t = &ts[j * 16..(j + 1) * 16];
+            let t: [u8; 16] = t.try_into().unwrap();
             let y0 = Block::read(&mut reader)?;
             let y1 = Block::read(&mut reader)?;
             let y = if *b { y1 } else { y0 };
             let y = y ^ self
                 .ot
                 .hash
-                .tccr_hash(Block::from(j as u128), Block::from(*array_ref![t, 0, 16]));
+                .tccr_hash(Block::from(j as u128), Block::from(t));
             out.push(y);
         }
         Ok(out)
@@ -258,12 +264,13 @@ impl<OT: OtSender<Msg = Block> + Malicious> CorrelatedReceiver for Receiver<OT> 
         let mut out = Vec::with_capacity(inputs.len());
         for (j, b) in inputs.iter().enumerate() {
             let t = &ts[j * 16..(j + 1) * 16];
+            let t: [u8; 16] = t.try_into().unwrap();
             let y = Block::read(reader)?;
             let y = if *b { y } else { Block::default() };
             let h = self
                 .ot
                 .hash
-                .tccr_hash(Block::from(j as u128), Block::from(*array_ref![t, 0, 16]));
+                .tccr_hash(Block::from(j as u128), Block::from(t));
             out.push(y ^ h);
         }
         Ok(out)
@@ -282,10 +289,11 @@ impl<OT: OtSender<Msg = Block> + Malicious> RandomReceiver for Receiver<OT> {
         let mut out = Vec::with_capacity(inputs.len());
         for j in 0..inputs.len() {
             let t = &ts[j * 16..(j + 1) * 16];
+            let t: [u8; 16] = t.try_into().unwrap();
             let h = self
                 .ot
                 .hash
-                .tccr_hash(Block::from(j as u128), Block::from(*array_ref![t, 0, 16]));
+                .tccr_hash(Block::from(j as u128), Block::from(t));
             out.push(h);
         }
         Ok(out)

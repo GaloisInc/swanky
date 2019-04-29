@@ -13,11 +13,11 @@ use crate::ot::{
     Sender as OtSender,
 };
 use crate::{stream, utils};
-use arrayref::array_ref;
 use rand::CryptoRng;
 use rand_core::{RngCore, SeedableRng};
 use scuttlebutt::utils as scutils;
 use scuttlebutt::{AesHash, AesRng, Block, SemiHonest, AES_HASH};
+use std::convert::TryInto;
 use std::io::{ErrorKind, Read, Write};
 use std::marker::PhantomData;
 
@@ -105,7 +105,8 @@ impl<OT: OtReceiver<Msg = Block> + SemiHonest> OtSender for Sender<OT> {
         let qs = self.send_setup(reader, m)?;
         for (j, input) in inputs.iter().enumerate() {
             let q = &qs[j * 16..(j + 1) * 16];
-            let q = Block::from(*array_ref![q, 0, 16]);
+            let q: [u8; 16] = q.try_into().unwrap();
+            let q = Block::from(q);
             let y0 = self.hash.cr_hash(Block::from(j as u128), q) ^ input.0;
             let q = q ^ self.s_;
             let y1 = self.hash.cr_hash(Block::from(j as u128), q) ^ input.1;
@@ -136,7 +137,8 @@ impl<OT: OtReceiver<Msg = Block> + SemiHonest> CorrelatedSender for Sender<OT> {
         let mut out = Vec::with_capacity(m);
         for (j, delta) in deltas.iter().enumerate() {
             let q = &qs[j * 16..(j + 1) * 16];
-            let q = Block::from(*array_ref![q, 0, 16]);
+            let q: [u8; 16] = q.try_into().unwrap();
+            let q = Block::from(q);
             let x0 = self.hash.cr_hash(Block::from(j as u128), q);
             let x1 = x0 ^ *delta;
             let q = q ^ self.s_;
@@ -161,7 +163,8 @@ impl<OT: OtReceiver<Msg = Block> + SemiHonest> RandomSender for Sender<OT> {
         let mut out = Vec::with_capacity(m);
         for j in 0..m {
             let q = &qs[j * 16..(j + 1) * 16];
-            let q = Block::from(*array_ref![q, 0, 16]);
+            let q: [u8; 16] = q.try_into().unwrap();
+            let q = Block::from(q);
             let x0 = self.hash.cr_hash(Block::from(j as u128), q);
             let q = q ^ self.s_;
             let x1 = self.hash.cr_hash(Block::from(j as u128), q);
@@ -243,12 +246,11 @@ impl<OT: OtSender<Msg = Block> + SemiHonest> OtReceiver for Receiver<OT> {
         let mut out = Vec::with_capacity(inputs.len());
         for (j, b) in inputs.iter().enumerate() {
             let t = &ts[j * 16..(j + 1) * 16];
+            let t: [u8; 16] = t.try_into().unwrap();
             let y0 = Block::read(reader)?;
             let y1 = Block::read(reader)?;
             let y = if *b { y1 } else { y0 };
-            let y = y ^ self
-                .hash
-                .cr_hash(Block::from(j as u128), Block::from(*array_ref![t, 0, 16]));
+            let y = y ^ self.hash.cr_hash(Block::from(j as u128), Block::from(t));
             out.push(y);
         }
         Ok(out)
@@ -268,11 +270,10 @@ impl<OT: OtSender<Msg = Block> + SemiHonest> CorrelatedReceiver for Receiver<OT>
         let mut out = Vec::with_capacity(inputs.len());
         for (j, b) in inputs.iter().enumerate() {
             let t = &ts[j * 16..(j + 1) * 16];
+            let t: [u8; 16] = t.try_into().unwrap();
             let y = Block::read(reader)?;
             let y = if *b { y } else { Block::default() };
-            let h = self
-                .hash
-                .cr_hash(Block::from(j as u128), Block::from(*array_ref![t, 0, 16]));
+            let h = self.hash.cr_hash(Block::from(j as u128), Block::from(t));
             out.push(y ^ h);
         }
         Ok(out)
@@ -292,9 +293,8 @@ impl<OT: OtSender<Msg = Block> + SemiHonest> RandomReceiver for Receiver<OT> {
         let mut out = Vec::with_capacity(inputs.len());
         for j in 0..inputs.len() {
             let t = &ts[j * 16..(j + 1) * 16];
-            let h = self
-                .hash
-                .cr_hash(Block::from(j as u128), Block::from(*array_ref![t, 0, 16]));
+            let t: [u8; 16] = t.try_into().unwrap();
+            let h = self.hash.cr_hash(Block::from(j as u128), Block::from(t));
             out.push(h);
         }
         Ok(out)
