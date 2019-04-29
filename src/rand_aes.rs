@@ -90,25 +90,27 @@ impl BlockRngCore for AesRngCore {
     // Compute `E(state)` eight times, where `state` is a counter.
     #[inline]
     fn generate(&mut self, results: &mut Self::Results) {
+        // We can't just cast this because the alignment of [u32; 32] may not
+        // match that of [Block; 8].
+        let mut ms: [Block; 8] = unsafe { std::mem::transmute(*results) };
+        ms[0] = Block::from(self.state);
+        self.state += 1;
+        ms[1] = Block::from(self.state);
+        self.state += 1;
+        ms[2] = Block::from(self.state);
+        self.state += 1;
+        ms[3] = Block::from(self.state);
+        self.state += 1;
+        ms[4] = Block::from(self.state);
+        self.state += 1;
+        ms[5] = Block::from(self.state);
+        self.state += 1;
+        ms[6] = Block::from(self.state);
+        self.state += 1;
+        ms[7] = Block::from(self.state);
+        self.state += 1;
+        let c = self.aes.encrypt8(ms);
         unsafe {
-            let mut ms: [Block; 8] = *(results as *mut _ as *mut [Block; 8]);
-            ms[0] = Block::from(self.state);
-            self.state += 1;
-            ms[1] = Block::from(self.state);
-            self.state += 1;
-            ms[2] = Block::from(self.state);
-            self.state += 1;
-            ms[3] = Block::from(self.state);
-            self.state += 1;
-            ms[4] = Block::from(self.state);
-            self.state += 1;
-            ms[5] = Block::from(self.state);
-            self.state += 1;
-            ms[6] = Block::from(self.state);
-            self.state += 1;
-            ms[7] = Block::from(self.state);
-            self.state += 1;
-            let c = self.aes.encrypt8(ms);
             *results = *(&c as *const _ as *const [u32; 32]);
         }
     }
