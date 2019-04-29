@@ -75,6 +75,9 @@
 <span id="75">75</span>
 <span id="76">76</span>
 <span id="77">77</span>
+<span id="78">78</span>
+<span id="79">79</span>
+<span id="80">80</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// -*- mode: rust; -*-</span>
 <span class="comment">//</span>
@@ -84,15 +87,17 @@
 
 <span class="doccomment">//! A module for useful communication-related objects.</span>
 
+<span class="kw">use</span> <span class="ident">std</span>::<span class="ident">fmt</span>::<span class="ident">Debug</span>;
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">io</span>::{<span class="ident">Read</span>, <span class="prelude-ty">Result</span>, <span class="ident">Write</span>};
 
 <span class="doccomment">/// An object for tracking the number of bits read from a stream.</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">TrackReader</span><span class="op">&lt;</span><span class="ident">R</span>: <span class="ident">Read</span><span class="op">&gt;</span> {
+<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>)]</span>
+<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">TrackReader</span><span class="op">&lt;</span><span class="ident">R</span>: <span class="ident">Read</span> <span class="op">+</span> <span class="ident">Debug</span><span class="op">&gt;</span> {
     <span class="ident">inner</span>: <span class="ident">R</span>,
     <span class="ident">nbits</span>: <span class="ident">usize</span>,
 }
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">R</span>: <span class="ident">Read</span><span class="op">&gt;</span> <span class="ident">TrackReader</span><span class="op">&lt;</span><span class="ident">R</span><span class="op">&gt;</span> {
+<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">R</span>: <span class="ident">Read</span> <span class="op">+</span> <span class="ident">Debug</span><span class="op">&gt;</span> <span class="ident">TrackReader</span><span class="op">&lt;</span><span class="ident">R</span><span class="op">&gt;</span> {
     <span class="doccomment">/// Make a new `TrackReader` from an inner `Read` object.</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">inner</span>: <span class="ident">R</span>) <span class="op">-&gt;</span> <span class="self">Self</span> {
         <span class="self">Self</span> { <span class="ident">inner</span>, <span class="ident">nbits</span>: <span class="number">0</span> }
@@ -111,7 +116,7 @@
     }
 }
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">R</span>: <span class="ident">Read</span><span class="op">&gt;</span> <span class="ident">Read</span> <span class="kw">for</span> <span class="ident">TrackReader</span><span class="op">&lt;</span><span class="ident">R</span><span class="op">&gt;</span> {
+<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">R</span>: <span class="ident">Read</span> <span class="op">+</span> <span class="ident">Debug</span><span class="op">&gt;</span> <span class="ident">Read</span> <span class="kw">for</span> <span class="ident">TrackReader</span><span class="op">&lt;</span><span class="ident">R</span><span class="op">&gt;</span> {
     <span class="kw">fn</span> <span class="ident">read</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">buf</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> [<span class="ident">u8</span>]) <span class="op">-&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span> {
         <span class="self">self</span>.<span class="ident">nbits</span> <span class="op">+=</span> <span class="ident">buf</span>.<span class="ident">len</span>() <span class="op">*</span> <span class="number">8</span>;
         <span class="self">self</span>.<span class="ident">inner</span>.<span class="ident">read</span>(<span class="ident">buf</span>)
@@ -119,12 +124,13 @@
 }
 
 <span class="doccomment">/// An object for tracking the number of bits written to a stream.</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">TrackWriter</span><span class="op">&lt;</span><span class="ident">W</span>: <span class="ident">Write</span><span class="op">&gt;</span> {
+<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>)]</span>
+<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">TrackWriter</span><span class="op">&lt;</span><span class="ident">W</span>: <span class="ident">Write</span> <span class="op">+</span> <span class="ident">Debug</span><span class="op">&gt;</span> {
     <span class="ident">inner</span>: <span class="ident">W</span>,
     <span class="ident">nbits</span>: <span class="ident">usize</span>,
 }
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">W</span>: <span class="ident">Write</span><span class="op">&gt;</span> <span class="ident">TrackWriter</span><span class="op">&lt;</span><span class="ident">W</span><span class="op">&gt;</span> {
+<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">W</span>: <span class="ident">Write</span> <span class="op">+</span> <span class="ident">Debug</span><span class="op">&gt;</span> <span class="ident">TrackWriter</span><span class="op">&lt;</span><span class="ident">W</span><span class="op">&gt;</span> {
     <span class="doccomment">/// Make a new `TrackWriter` from an inner `Write` object.</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">inner</span>: <span class="ident">W</span>) <span class="op">-&gt;</span> <span class="self">Self</span> {
         <span class="self">Self</span> { <span class="ident">inner</span>, <span class="ident">nbits</span>: <span class="number">0</span> }
@@ -143,7 +149,7 @@
     }
 }
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">W</span>: <span class="ident">Write</span><span class="op">&gt;</span> <span class="ident">Write</span> <span class="kw">for</span> <span class="ident">TrackWriter</span><span class="op">&lt;</span><span class="ident">W</span><span class="op">&gt;</span> {
+<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">W</span>: <span class="ident">Write</span> <span class="op">+</span> <span class="ident">Debug</span><span class="op">&gt;</span> <span class="ident">Write</span> <span class="kw">for</span> <span class="ident">TrackWriter</span><span class="op">&lt;</span><span class="ident">W</span><span class="op">&gt;</span> {
     <span class="kw">fn</span> <span class="ident">write</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">buf</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>]) <span class="op">-&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span> {
         <span class="self">self</span>.<span class="ident">nbits</span> <span class="op">+=</span> <span class="ident">buf</span>.<span class="ident">len</span>() <span class="op">*</span> <span class="number">8</span>;
         <span class="self">self</span>.<span class="ident">inner</span>.<span class="ident">write</span>(<span class="ident">buf</span>)
