@@ -29,7 +29,7 @@ It also exposes various traits for implementing your very own OT protocol:
 * `RandomSender` / `RandomReceiver` exposes a `send_random` / `receive_random`
   method for random OT.
 
-**`ocelot` should be considered unstable and with potential API changes until
+**`ocelot` should be considered unstable with potential API changes until
 version 1.0 is released**
 
 # Performance
@@ -39,10 +39,10 @@ libraries out there. When running the benchmarks with `1 << 23` OTs we get the
 following results (in # million OTs per second and using Chou-Orlandi as the
 base OT):
 
-| Protocol |  OT | COT |  ROT |
-|----------|-----|-----|------|
-| ALSZ     | 9.0 | 9.9 | 12.5 |
-| KOS      | 7.8 | 8.5 | 10.4 |
+| Protocol |   OT |  COT |  ROT |
+|----------|------|------|------|
+| ALSZ     | 10.2 | 11.2 | 15.0 |
+| KOS      |  8.4 |  9.3 | 11.4 |
 
 For our base OT protocols, we get the following results (in time to run 128
 OTs):
@@ -50,10 +50,10 @@ OTs):
 | Protocol     | Running Time |
 |--------------|--------------|
 | Naor-Pinkas  | 21.9 ms      |
-| Chou-Orlandi | 16.5 ms      |
+| Chou-Orlandi | 17.5 ms      |
 
 All results use unix sockets and were run on a 2.7 GHz machine with 16 GB RAM,
-with the sender and receiver being on different threads (see `benches/ot.rs` for
+with the sender and receiver run on different threads (see `benches/ot.rs` for
 details), using the `nightly` feature (see below).
 
 # Building
