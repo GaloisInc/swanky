@@ -56,6 +56,10 @@ All results use unix sockets and were run on a 2.7 GHz machine with 16 GB RAM,
 with the sender and receiver run on different threads (see `benches/ot.rs` for
 details), using the `nightly` feature (see below).
 
+# Documentation
+
+The documentation can be found here: <https://amaloz.github.com/ocelot/ocelot/>.
+
 # Building
 
 Use `cargo build` to build, `cargo test` to run the test suite, `cargo bench` to
