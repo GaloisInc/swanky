@@ -17,10 +17,14 @@ oblivious transfer. In particular, `scuttlebutt` provides the following:
 **`scuttlebutt` should be considered unstable and under active development until
 version 1.0 is released**
 
+# Documentation
+
+https://amaloz.github.io/scuttlebutt/scuttlebutt/
+
 # Building
 
-Use `cargo build` to build, `cargo test` to run the test suite, `cargo bench` to
-benchmark the various protocols, and `cargo doc --open` to view documentation.
+Use `cargo build` to build, `cargo test` to run the test suite, and `cargo
+bench` to benchmark the various protocols.
 
 `scuttlebutt` also supports the following features:
 
