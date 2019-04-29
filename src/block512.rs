@@ -8,6 +8,7 @@
 
 use crate::Block;
 use std::arch::x86_64::*;
+use std::convert::TryFrom;
 use std::hash::{Hash, Hasher};
 use std::io::{Read, Write};
 
@@ -16,17 +17,11 @@ use std::io::{Read, Write};
 pub struct Block512([Block; 4]);
 
 impl Block512 {
-    /// Make a new `Block512` from `v`.
-    #[inline]
-    pub fn new(v: [u8; 64]) -> Self {
-        unsafe { std::mem::transmute(v) }
-        // unsafe { Self(*(&v as *const u8 as *const [Block; 4])) }
-    }
     /// Read a `Block512` from `reader`.
     pub fn read<R: Read>(reader: &mut R) -> Result<Self, std::io::Error> {
         let mut data = [0u8; 64];
         reader.read_exact(&mut data)?;
-        Ok(Self::new(data))
+        Ok(Self::from(data))
     }
     /// Write a `Block512` to `writer`.
     pub fn write<W: Write>(&self, writer: &mut W) -> Result<(), std::io::Error> {
@@ -133,6 +128,34 @@ impl From<Block512> for [__m128i; 4] {
     }
 }
 
+impl From<Block512> for [Block; 4] {
+    #[inline]
+    fn from(m: Block512) -> [Block; 4] {
+        unsafe { *(&m as *const _ as *const [Block; 4]) }
+    }
+}
+
+impl<'a> From<&'a Block512> for &'a [Block; 4] {
+    #[inline]
+    fn from(m: &Block512) -> &[Block; 4] {
+        unsafe { &*(m as *const _ as *const [Block; 4]) }
+    }
+}
+
+impl<'a> From<&'a mut Block512> for &'a mut [Block; 4] {
+    #[inline]
+    fn from(m: &mut Block512) -> &mut [Block; 4] {
+        unsafe { &mut *(m as *mut _ as *mut [Block; 4]) }
+    }
+}
+
+impl<'a> From<&'a mut Block512> for &'a mut [u8; 64] {
+    #[inline]
+    fn from(m: &mut Block512) -> Self {
+        unsafe { &mut *(m as *mut _ as *mut [u8; 64]) }
+    }
+}
+
 impl From<[__m128i; 4]> for Block512 {
     #[inline]
     fn from(m: [__m128i; 4]) -> Block512 {
@@ -144,6 +167,14 @@ impl From<[Block; 4]> for Block512 {
     #[inline]
     fn from(m: [Block; 4]) -> Block512 {
         Block512([m[0], m[1], m[2], m[3]])
+    }
+}
+
+impl From<[u8; 64]> for Block512 {
+    #[inline]
+    fn from(m: [u8; 64]) -> Block512 {
+        unsafe { std::mem::transmute(m) }
+        // unsafe { Self(*(&v as *const u8 as *const [Block; 4])) }
     }
 }
 
@@ -185,5 +216,16 @@ impl PartialEq for Block512 {
 impl PartialOrd for Block512 {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         Some(self.0.cmp(&other.0))
+    }
+}
+
+impl TryFrom<&[u8]> for Block512 {
+    type Error = core::array::TryFromSliceError;
+    #[inline]
+    fn try_from(u: &[u8]) -> Result<Self, Self::Error> {
+        let mut block = Block512::default();
+        let arr: &mut [u8; 64] = (&mut block).into();
+        arr.clone_from_slice(u);
+        Ok(block)
     }
 }
