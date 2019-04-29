@@ -1,0 +1,1 @@
+initSidebarItems({"struct":[["TrackReader","An object for tracking the number of bits read from a stream."],["TrackWriter","An object for tracking the number of bits written to a stream."]]});
