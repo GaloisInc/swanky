@@ -9,6 +9,7 @@
 use crate::{Aes128, Block};
 use rand_core::block::{BlockRng, BlockRngCore};
 use rand_core::{CryptoRng, Error, RngCore, SeedableRng};
+use rand::Rng;
 
 /// Implementation of a random number generator based on fixed-key AES.
 ///
@@ -57,6 +58,13 @@ impl AesRng {
     #[inline]
     pub fn new() -> Self {
         let seed = rand::random::<Block>();
+        AesRng::from_seed(seed)
+    }
+
+    /// Create a new RNG using a random seed from this one.
+    #[inline]
+    pub fn fork(&mut self) -> Self {
+        let seed = self.gen::<Block>();
         AesRng::from_seed(seed)
     }
 }
