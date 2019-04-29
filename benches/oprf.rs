@@ -21,9 +21,9 @@ fn rand_block_vec(size: usize) -> Vec<Block> {
     (0..size).map(|_| rand::random::<Block>()).collect()
 }
 #[cfg(feature = "unstable")]
-fn rand_point_vec(size: usize) -> Vec<(Block, Output)> {
+fn rand_point_vec(size: usize) -> Vec<(Block, Block512)> {
     (0..size)
-        .map(|_| rand::random::<(Block, Output)>())
+        .map(|_| rand::random::<(Block, Block512)>())
         .collect()
 }
 
@@ -106,10 +106,10 @@ fn bench_oprf_compute(c: &mut Criterion) {
 
 #[cfg(feature = "unstable")]
 fn _bench_opprf<
-    S: OpprfSender<Input = Block, Output = Output>,
-    R: OpprfReceiver<Input = Block, Output = Output>,
+    S: OpprfSender<Input = Block, Output = Block512>,
+    R: OpprfReceiver<Input = Block, Output = Block512>,
 >(
-    points: Vec<(Block, Output)>,
+    points: Vec<(Block, Block512)>,
     inputs: Vec<Block>,
 ) {
     let (sender, receiver) = UnixStream::pair().unwrap();
@@ -175,7 +175,7 @@ fn bench_opprf_compute(c: &mut Criterion) {
         let oprf =
             oprf::kmprt::KmprtSingleSender::init(&mut reader, &mut writer, &mut rng).unwrap();
         handle.join().unwrap();
-        let seed = rand::random::<Seed>();
+        let seed = rand::random::<Block512>();
         let hint = Hint::rand(&mut rng, 8);
         let input = rand::random::<Block>();
         bench.iter(|| oprf.compute(&seed, &hint, &input))
@@ -191,7 +191,7 @@ criterion_group! {
 #[cfg(feature = "unstable")]
 criterion_group! {
     name = oprf;
-    config = Criterion::default().warm_up_time(Duration::from_millis(100)).sample_size(50);
+    config = Criterion::default().warm_up_time(Duration::from_millis(100)).sample_size(20);
     targets = bench_opprf, bench_opprf_compute, bench_oprf, bench_oprf_compute
 }
 
