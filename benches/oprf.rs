@@ -7,14 +7,12 @@
 //! Oblivious pseudorandom function benchmarks using `criterion`.
 
 use criterion::{criterion_group, criterion_main, Criterion};
-use ocelot::oprf::kkrt::Seed;
 use ocelot::oprf::{self, Receiver as OprfReceiver, Sender as OprfSender};
 #[cfg(feature = "unstable")]
 use ocelot::oprf::{
-    kkrt::Output, kmprt::Hint, ProgrammableReceiver as OpprfReceiver,
-    ProgrammableSender as OpprfSender,
+    kmprt::Hint, ProgrammableReceiver as OpprfReceiver, ProgrammableSender as OpprfSender,
 };
-use scuttlebutt::{AesRng, Block};
+use scuttlebutt::{AesRng, Block, Block512};
 use std::io::{BufReader, BufWriter};
 use std::os::unix::net::UnixStream;
 use std::time::Duration;
@@ -100,7 +98,7 @@ fn bench_oprf_compute(c: &mut Criterion) {
         let mut writer = BufWriter::new(sender);
         let oprf = oprf::KkrtSender::init(&mut reader, &mut writer, &mut rng).unwrap();
         handle.join().unwrap();
-        let seed = rand::random::<Seed>();
+        let seed = rand::random::<Block512>();
         let input = rand::random::<Block>();
         bench.iter(|| oprf.compute(seed.clone(), input))
     });

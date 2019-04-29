@@ -8,14 +8,13 @@
 //! multi-use OPPRF of Kolesnikov, Matania, Pinkas, Rosulek, and Trieu (cf.
 //! <https://eprint.iacr.org/2017/799>).
 
-use super::kkrt::{Output, Seed};
 use crate::errors::Error;
 use crate::oprf::{
     ObliviousPprf, ObliviousPrf, ProgrammableReceiver as OpprfReceiver,
     ProgrammableSender as OpprfSender, Receiver as OprfReceiver, Sender as OprfSender,
 };
 use rand::{CryptoRng, Rng, RngCore};
-use scuttlebutt::{cointoss, Aes128, Block, SemiHonest};
+use scuttlebutt::{cointoss, Aes128, Block, Block512, SemiHonest};
 use std::collections::HashSet;
 use std::io::{Read, Write};
 
@@ -48,31 +47,32 @@ fn hash_input_keyed(x: &Aes128, k: Block, range: usize) -> usize {
 // Hash `x`, using `k` as the hash "key", and output the result in the range
 // `[0..range]`.
 #[inline]
-fn hash_output(x: Output, k: Block, range: usize) -> usize {
+fn hash_output(x: &Block512, k: Block, range: usize) -> usize {
     let aes = Aes128::new(k);
     hash_output_keyed(x, &aes, range)
 }
 
 // XXX: IS THIS SECURE?!
 #[inline]
-fn hash_output_keyed(x: Output, aes: &Aes128, range: usize) -> usize {
-    let h = aes.encrypt(x.0[0]) ^ x.0[0];
-    let h = aes.encrypt(h) ^ x.0[1];
-    let h = aes.encrypt(h) ^ x.0[2];
-    let h = aes.encrypt(h) ^ x.0[3];
+fn hash_output_keyed(x: &Block512, aes: &Aes128, range: usize) -> usize {
+    let x: &[Block; 4] = x.into();
+    let h = aes.encrypt(x[0]) ^ x[0];
+    let h = aes.encrypt(h) ^ x[1];
+    let h = aes.encrypt(h) ^ x[2];
+    let h = aes.encrypt(h) ^ x[3];
     (u128::from(h) % (range as u128)) as usize
 }
 
 /// The oblivious programmable PRF hint.
 #[derive(Clone)]
-pub struct Hint(Block, Vec<Output>);
+pub struct Hint(Block, Vec<Block512>);
 
 impl Hint {
     /// Generate a random hint with table size `n`.
     #[inline]
     pub fn rand<RNG: CryptoRng + RngCore>(rng: &mut RNG, n: usize) -> Self {
         let block = rng.gen::<Block>();
-        let table = (0..n).map(|_| rng.gen::<Output>()).collect::<Vec<Output>>();
+        let table = (0..n).map(|_| rng.gen()).collect::<Vec<Block512>>();
         Hint(block, table)
     }
 }
@@ -82,21 +82,21 @@ pub struct SingleSender<OPRF: OprfSender + SemiHonest> {
     oprf: OPRF,
 }
 
-impl<OPRF: OprfSender<Seed = Seed, Input = Block, Output = Output> + SemiHonest> ObliviousPrf
+impl<OPRF: OprfSender<Seed = Block512, Input = Block, Output = Block512> + SemiHonest> ObliviousPrf
     for SingleSender<OPRF>
 {
-    type Seed = Seed;
+    type Seed = Block512;
     type Input = Block;
-    type Output = Output;
+    type Output = Block512;
 }
 
-impl<OPRF: OprfSender<Seed = Seed, Input = Block, Output = Output> + SemiHonest> ObliviousPprf
+impl<OPRF: OprfSender<Seed = Block512, Input = Block, Output = Block512> + SemiHonest> ObliviousPprf
     for SingleSender<OPRF>
 {
     type Hint = Hint;
 }
 
-impl<OPRF: OprfSender<Seed = Seed, Input = Block, Output = Output> + SemiHonest> OpprfSender
+impl<OPRF: OprfSender<Seed = Block512, Input = Block, Output = Block512> + SemiHonest> OpprfSender
     for SingleSender<OPRF>
 {
     fn init<R, W, RNG>(reader: &mut R, writer: &mut W, rng: &mut RNG) -> Result<Self, Error>
@@ -145,7 +145,7 @@ impl<OPRF: OprfSender<Seed = Seed, Input = Block, Output = Output> + SemiHonest>
             points.len()
         );
         let m = table_size(npoints);
-        let mut table = vec![Output::default(); m];
+        let mut table = vec![Block512::default(); m];
         let seeds = self.oprf.send(reader, writer, 1, rng)?;
         let seed = seeds[0];
         let mut v = rng.gen::<Block>();
@@ -155,7 +155,7 @@ impl<OPRF: OprfSender<Seed = Seed, Input = Block, Output = Output> + SemiHonest>
         for _ in 0..N_TABLE_LOOPS {
             for (x, _) in points.iter() {
                 let y = self.oprf.compute(seed, *x);
-                let h = hash_output_keyed(y, &aes, m);
+                let h = hash_output_keyed(&y, &aes, m);
                 if !map.insert(h) {
                     break;
                 }
@@ -179,13 +179,13 @@ impl<OPRF: OprfSender<Seed = Seed, Input = Block, Output = Output> + SemiHonest>
         // Place points in table based on the hash of their OPRF output.
         for (x, y) in points.iter() {
             let y_ = self.oprf.compute(seed, *x);
-            let h = hash_output_keyed(y_, &aes, m);
+            let h = hash_output_keyed(&y_, &aes, m);
             table[h] = *y ^ y_;
         }
         // Fill rest of table with random elements.
         for entry in table.iter_mut() {
-            if *entry == Output::default() {
-                *entry = rng.gen::<Output>();
+            if *entry == Block512::default() {
+                *entry = rng.gen::<Block512>();
             }
         }
         // Write `v` and `table` to the receiver.
@@ -203,7 +203,7 @@ impl<OPRF: OprfSender<Seed = Seed, Input = Block, Output = Output> + SemiHonest>
     fn compute(&self, seed: &Self::Seed, hint: &Self::Hint, input: &Self::Input) -> Self::Output {
         let (v, table) = (&hint.0, &hint.1);
         let y = self.oprf.compute(*seed, *input);
-        let h = hash_output(y, *v, table.len());
+        let h = hash_output(&y, *v, table.len());
         y ^ table[h]
     }
 }
@@ -213,22 +213,22 @@ pub struct SingleReceiver<OPRF: OprfReceiver + SemiHonest> {
     oprf: OPRF,
 }
 
-impl<OPRF: OprfReceiver<Seed = Seed, Input = Block, Output = Output> + SemiHonest> ObliviousPrf
-    for SingleReceiver<OPRF>
+impl<OPRF: OprfReceiver<Seed = Block512, Input = Block, Output = Block512> + SemiHonest>
+    ObliviousPrf for SingleReceiver<OPRF>
 {
-    type Seed = Seed;
+    type Seed = Block512;
     type Input = Block;
-    type Output = Output;
+    type Output = Block512;
 }
 
-impl<OPRF: OprfReceiver<Seed = Seed, Input = Block, Output = Output> + SemiHonest> ObliviousPprf
-    for SingleReceiver<OPRF>
+impl<OPRF: OprfReceiver<Seed = Block512, Input = Block, Output = Block512> + SemiHonest>
+    ObliviousPprf for SingleReceiver<OPRF>
 {
     type Hint = Hint;
 }
 
-impl<OPRF: OprfReceiver<Seed = Seed, Input = Block, Output = Output> + SemiHonest> OpprfReceiver
-    for SingleReceiver<OPRF>
+impl<OPRF: OprfReceiver<Seed = Block512, Input = Block, Output = Block512> + SemiHonest>
+    OpprfReceiver for SingleReceiver<OPRF>
 {
     fn init<R, W, RNG>(reader: &mut R, writer: &mut W, rng: &mut RNG) -> Result<Self, Error>
     where
@@ -259,10 +259,10 @@ impl<OPRF: OprfReceiver<Seed = Seed, Input = Block, Output = Output> + SemiHones
         let m = table_size(npoints);
         let mut outputs = self.oprf.receive(reader, writer, inputs, rng)?;
         let v = Block::read(reader)?;
-        let h = hash_output(outputs[0], v, m);
-        let zero = Output::default();
+        let h = hash_output(&outputs[0], v, m);
+        let zero = Block512::default();
         for i in 0..m {
-            let entry = Output::read(reader)?;
+            let entry = Block512::read(reader)?;
             outputs[0] ^= if i == h { entry } else { zero };
         }
         Ok(outputs)
@@ -332,21 +332,21 @@ pub struct Sender<T: OprfSender + SemiHonest> {
     opprf: SingleSender<T>,
 }
 
-impl<T: OprfSender<Seed = Seed, Input = Block, Output = Output> + SemiHonest> ObliviousPrf
+impl<T: OprfSender<Seed = Block512, Input = Block, Output = Block512> + SemiHonest> ObliviousPrf
     for Sender<T>
 {
-    type Seed = Seed;
+    type Seed = Block512;
     type Input = Block;
-    type Output = Output;
+    type Output = Block512;
 }
 
-impl<T: OprfSender<Seed = Seed, Input = Block, Output = Output> + SemiHonest> ObliviousPprf
+impl<T: OprfSender<Seed = Block512, Input = Block, Output = Block512> + SemiHonest> ObliviousPprf
     for Sender<T>
 {
     type Hint = Hint;
 }
 
-impl<T: OprfSender<Seed = Seed, Input = Block, Output = Output> + SemiHonest> OpprfSender
+impl<T: OprfSender<Seed = Block512, Input = Block, Output = Block512> + SemiHonest> OpprfSender
     for Sender<T>
 {
     fn init<R, W, RNG>(reader: &mut R, writer: &mut W, rng: &mut RNG) -> Result<Self, Error>
@@ -445,21 +445,21 @@ pub struct Receiver<T: OprfReceiver + SemiHonest> {
     opprf: SingleReceiver<T>,
 }
 
-impl<T: OprfReceiver<Seed = Seed, Input = Block, Output = Output> + SemiHonest> ObliviousPrf
+impl<T: OprfReceiver<Seed = Block512, Input = Block, Output = Block512> + SemiHonest> ObliviousPrf
     for Receiver<T>
 {
-    type Seed = Seed;
+    type Seed = Block512;
     type Input = Block;
-    type Output = Output;
+    type Output = Block512;
 }
 
-impl<T: OprfReceiver<Seed = Seed, Input = Block, Output = Output> + SemiHonest> ObliviousPprf
+impl<T: OprfReceiver<Seed = Block512, Input = Block, Output = Block512> + SemiHonest> ObliviousPprf
     for Receiver<T>
 {
     type Hint = Hint;
 }
 
-impl<T: OprfReceiver<Seed = Seed, Input = Block, Output = Output> + SemiHonest> OpprfReceiver
+impl<T: OprfReceiver<Seed = Block512, Input = Block, Output = Block512> + SemiHonest> OpprfReceiver
     for Receiver<T>
 {
     fn init<R, W, RNG>(reader: &mut R, writer: &mut W, rng: &mut RNG) -> Result<Self, Error>
@@ -499,8 +499,8 @@ impl<T: OprfReceiver<Seed = Seed, Input = Block, Output = Output> + SemiHonest> 
             (params.h1, params.h2),
         )?;
         let mut outputs = (0..inputs.len())
-            .map(|_| Output::default())
-            .collect::<Vec<Output>>();
+            .map(|_| Default::default())
+            .collect::<Vec<Block512>>();
         // Run the one-time OPPRF for each table entry. For those where the
         // entry is a real input value, store the OPPRF output, otherwise use a
         // dummy value and ignore the output.
@@ -514,7 +514,7 @@ impl<T: OprfReceiver<Seed = Seed, Input = Block, Output = Output> + SemiHonest> 
                 let idx = idx.unwrap();
                 assert_eq!(inputs[idx], item);
                 let out = self.opprf.receive(reader, writer, beta, &[item], rng)?;
-                assert_eq!(outputs[idx], Output::default());
+                assert_eq!(outputs[idx], Default::default());
                 outputs[idx] = out[0];
             } else {
                 let item = rng.gen::<Block>();
@@ -560,8 +560,8 @@ mod tests {
     }
 
     fn _test_opprf<
-        S: ProgrammableSender<Seed = Seed, Input = Block, Output = Output>,
-        R: ProgrammableReceiver<Seed = Seed, Input = Block, Output = Output>,
+        S: ProgrammableSender<Seed = Block512, Input = Block, Output = Block512>,
+        R: ProgrammableReceiver<Seed = Block512, Input = Block, Output = Block512>,
     >(
         ninputs: usize,
         npoints: usize,
@@ -572,8 +572,8 @@ mod tests {
         let results_ = results.clone();
         let mut rng = AesRng::new();
         let points = (0..npoints)
-            .map(|_| (rng.gen::<Block>(), rng.gen::<Output>()))
-            .collect::<Vec<(Block, Output)>>();
+            .map(|_| (rng.gen(), rng.gen()))
+            .collect::<Vec<(Block, Block512)>>();
         let (sender, receiver) = UnixStream::pair().unwrap();
         let handle = std::thread::spawn(move || {
             let mut rng = AesRng::new();
@@ -595,7 +595,7 @@ mod tests {
                 .iter()
                 .zip(outputs.iter())
                 .map(|(inp, (seed, hint))| oprf.compute(seed, hint, inp))
-                .collect::<Vec<Output>>();
+                .collect::<Vec<Block512>>();
         });
         let mut rng = AesRng::new();
         let mut reader = BufReader::new(receiver.try_clone().unwrap());
@@ -612,8 +612,8 @@ mod tests {
     }
 
     fn _test_opprf_points<
-        S: ProgrammableSender<Seed = Seed, Input = Block, Output = Output>,
-        R: ProgrammableReceiver<Seed = Seed, Input = Block, Output = Output>,
+        S: ProgrammableSender<Seed = Block512, Input = Block, Output = Block512>,
+        R: ProgrammableReceiver<Seed = Block512, Input = Block, Output = Block512>,
     >(
         ninputs: usize,
         npoints: usize,
@@ -621,8 +621,8 @@ mod tests {
         assert!(ninputs <= npoints);
         let mut rng = AesRng::new();
         let points = (0..npoints)
-            .map(|_| (rng.gen::<Block>(), rng.gen::<Output>()))
-            .collect::<Vec<(Block, Output)>>();
+            .map(|_| (rng.gen::<Block>(), rng.gen()))
+            .collect::<Vec<(Block, Block512)>>();
         let xs = points[0..ninputs]
             .iter()
             .map(|(x, _)| *x)
@@ -630,7 +630,7 @@ mod tests {
         let ys = points[0..ninputs]
             .iter()
             .map(|(_, y)| *y)
-            .collect::<Vec<Output>>();
+            .collect::<Vec<Block512>>();
         let (sender, receiver) = UnixStream::pair().unwrap();
         let handle = std::thread::spawn(move || {
             let mut rng = AesRng::new();
@@ -685,19 +685,19 @@ mod benchmarks {
 
     #[bench]
     fn bench_hash_output(b: &mut Bencher) {
-        let x = black_box(rand::random::<Output>());
+        let x = black_box(rand::random::<Block512>());
         let k = black_box(rand::random::<Block>());
         let range = 15;
-        b.iter(|| super::hash_output(x, k, range));
+        b.iter(|| super::hash_output(&x, k, range));
     }
 
     #[bench]
     fn bench_hash_output_keyed(b: &mut Bencher) {
-        let x = black_box(rand::random::<Output>());
+        let x = black_box(rand::random::<Block512>());
         let k = black_box(rand::random::<Block>());
         let aes = Aes128::new(k);
         let range = 15;
-        b.iter(|| super::hash_output_keyed(x, &aes, range));
+        b.iter(|| super::hash_output_keyed(&x, &aes, range));
     }
 
     #[bench]

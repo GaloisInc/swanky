@@ -4,11 +4,10 @@
 // Copyright © 2019 Galois, Inc.
 // See LICENSE for licensing information.
 
-use ocelot::oprf::kkrt::{Output, Seed};
 use ocelot::oprf::kmprt::{KmprtSingleReceiver, KmprtSingleSender};
 use ocelot::oprf::{ProgrammableReceiver, ProgrammableSender};
 use rand::Rng;
-use scuttlebutt::{AesRng, Block};
+use scuttlebutt::{AesRng, Block, Block512};
 use std::io::{BufReader, BufWriter};
 use std::os::unix::net::UnixStream;
 
@@ -17,8 +16,8 @@ fn rand_block_vec(size: usize) -> Vec<Block> {
 }
 
 fn _test_opprf<
-    S: ProgrammableSender<Seed = Seed, Input = Block, Output = Output>,
-    R: ProgrammableReceiver<Seed = Seed, Input = Block, Output = Output>,
+    S: ProgrammableSender<Seed = Block512, Input = Block, Output = Block512>,
+    R: ProgrammableReceiver<Seed = Block512, Input = Block, Output = Block512>,
 >(
     ninputs: usize,
     npoints: usize,
@@ -26,8 +25,8 @@ fn _test_opprf<
     let inputs = rand_block_vec(ninputs);
     let mut rng = AesRng::new();
     let points = (0..npoints)
-        .map(|_| (rng.gen::<Block>(), rng.gen::<Output>()))
-        .collect::<Vec<(Block, Output)>>();
+        .map(|_| (rng.gen(), rng.gen()))
+        .collect::<Vec<(Block, Block512)>>();
     let (sender, receiver) = UnixStream::pair().unwrap();
     let handle = std::thread::spawn(move || {
         let mut rng = AesRng::new();

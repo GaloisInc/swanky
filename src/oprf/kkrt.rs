@@ -15,222 +15,13 @@ use crate::errors::Error;
 use crate::oprf::{ObliviousPrf, Receiver as OprfReceiver, Sender as OprfSender};
 use crate::ot::{Receiver as OtReceiver, Sender as OtSender};
 use crate::{stream, utils};
-use arrayref::array_ref;
 use rand::Rng;
 use rand::{CryptoRng, RngCore, SeedableRng};
 use scuttlebutt::utils as scutils;
-use scuttlebutt::{cointoss, AesRng, Block, SemiHonest};
-use std::hash::{Hash, Hasher};
+use scuttlebutt::{cointoss, AesRng, Block, Block512, SemiHonest};
+use std::convert::TryInto;
 use std::io::{Read, Write};
 use std::marker::PhantomData;
-
-/// The KKRT oblivious PRF seed.
-#[derive(Clone, Copy)]
-pub struct Seed([Block; 4]);
-
-impl Seed {
-    /// Make a new `Seed` from `v`.
-    #[inline]
-    pub fn new(v: [u8; 64]) -> Self {
-        unsafe { std::mem::transmute(v) }
-        // unsafe { Self(*(&v as *const u8 as *const [Block; 4])) }
-    }
-    /// Generate a zero-valued `Seed`.
-    #[inline]
-    pub fn zero() -> Self {
-        Self([
-            Block::default(),
-            Block::default(),
-            Block::default(),
-            Block::default(),
-        ])
-    }
-    /// Return the first `n` bytes of `Seed`.
-    #[inline]
-    pub fn prefix(&self, n: usize) -> &[u8] {
-        debug_assert!(n <= 64);
-        unsafe { std::slice::from_raw_parts(self as *const Self as *const u8, n) }
-    }
-    /// Return the first `n` bytes of `Seed` as mutable.
-    #[inline]
-    pub fn prefix_mut(&mut self, n: usize) -> &mut [u8] {
-        debug_assert!(n <= 64);
-        unsafe { std::slice::from_raw_parts_mut(self as *mut Self as *mut u8, n) }
-    }
-}
-
-impl Default for Seed {
-    fn default() -> Self {
-        Self::zero()
-    }
-}
-
-impl std::fmt::Debug for Seed {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "{:#?}", self.0)
-    }
-}
-
-impl std::fmt::Display for Seed {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "{:#?}", self.0)
-    }
-}
-
-impl rand::distributions::Distribution<Seed> for rand::distributions::Standard {
-    #[inline]
-    fn sample<R: rand::Rng + ?Sized>(&self, rng: &mut R) -> Seed {
-        let b1 = rng.gen::<Block>();
-        let b2 = rng.gen::<Block>();
-        let b3 = rng.gen::<Block>();
-        let b4 = rng.gen::<Block>();
-        Seed([b1, b2, b3, b4])
-    }
-}
-
-impl AsRef<[u8]> for Seed {
-    #[inline]
-    fn as_ref(&self) -> &[u8] {
-        self.prefix(64)
-    }
-}
-
-/// The KKRT oblivious PRF output.
-#[derive(Clone, Copy)]
-pub struct Output(pub(crate) [Block; 4]);
-
-impl Output {
-    /// Make a new `Output` from `v`.
-    #[inline]
-    pub fn new(v: [u8; 64]) -> Self {
-        unsafe { std::mem::transmute(v) }
-        // unsafe { Self(*(&v as *const u8 as *const [Block; 4])) }
-    }
-    /// Read an output from `reader`.
-    pub fn read<R: Read>(reader: &mut R) -> Result<Self, Error> {
-        let mut data = [0u8; 64];
-        reader.read_exact(&mut data)?;
-        Ok(Self::new(data))
-    }
-    /// Write the output to `writer`.
-    pub fn write<W: Write>(&self, writer: &mut W) -> Result<(), Error> {
-        for block in self.0.iter() {
-            block.write(writer)?;
-        }
-        Ok(())
-    }
-    /// Generate a zero-valued `Output`.
-    #[inline]
-    pub fn zero() -> Self {
-        Self([
-            Block::default(),
-            Block::default(),
-            Block::default(),
-            Block::default(),
-        ])
-    }
-    /// Return the first `n` bytes of `Output`.
-    #[inline]
-    pub fn prefix(&self, n: usize) -> &[u8] {
-        debug_assert!(n <= 64);
-        unsafe { std::slice::from_raw_parts(self as *const Self as *const u8, n) }
-    }
-
-    /// Return the first `n` bytes of `Output` as mutable.
-    #[inline]
-    pub fn prefix_mut(&mut self, n: usize) -> &mut [u8] {
-        debug_assert!(n <= 64);
-        unsafe { std::slice::from_raw_parts_mut(self as *mut Self as *mut u8, n) }
-    }
-}
-
-impl AsMut<[u8]> for Output {
-    fn as_mut(&mut self) -> &mut [u8] {
-        self.prefix_mut(64)
-    }
-}
-
-impl AsRef<[u8]> for Output {
-    fn as_ref(&self) -> &[u8] {
-        self.prefix(64)
-    }
-}
-
-impl std::ops::BitXor for Output {
-    type Output = Self;
-
-    #[inline]
-    fn bitxor(self, rhs: Self) -> Self {
-        let b0 = self.0[0] ^ rhs.0[0];
-        let b1 = self.0[1] ^ rhs.0[1];
-        let b2 = self.0[2] ^ rhs.0[2];
-        let b3 = self.0[3] ^ rhs.0[3];
-        Self([b0, b1, b2, b3])
-    }
-}
-
-impl std::ops::BitXorAssign for Output {
-    fn bitxor_assign(&mut self, rhs: Self) {
-        for (a, b) in self.0.iter_mut().zip(rhs.0.iter()) {
-            *a ^= *b;
-        }
-    }
-}
-
-impl Default for Output {
-    fn default() -> Self {
-        Self::zero()
-    }
-}
-
-impl std::fmt::Debug for Output {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "{:#?}", self.0)
-    }
-}
-
-impl std::fmt::Display for Output {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "{:#?}", self.0)
-    }
-}
-
-impl rand::distributions::Distribution<Output> for rand::distributions::Standard {
-    #[inline]
-    fn sample<R: rand::Rng + ?Sized>(&self, rng: &mut R) -> Output {
-        let b1 = rng.gen::<Block>();
-        let b2 = rng.gen::<Block>();
-        let b3 = rng.gen::<Block>();
-        let b4 = rng.gen::<Block>();
-        Output([b1, b2, b3, b4])
-    }
-}
-
-impl Eq for Output {}
-
-impl Hash for Output {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        self.0.hash(state);
-    }
-}
-
-impl Ord for Output {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.0.cmp(&other.0)
-    }
-}
-
-impl PartialEq for Output {
-    fn eq(&self, other: &Output) -> bool {
-        self.0 == other.0
-    }
-}
-
-impl PartialOrd for Output {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        Some(self.0.cmp(&other.0))
-    }
-}
 
 /// KKRT oblivious PRF sender.
 pub struct Sender<OT: OtReceiver + SemiHonest> {
@@ -242,9 +33,9 @@ pub struct Sender<OT: OtReceiver + SemiHonest> {
 }
 
 impl<OT: OtReceiver<Msg = Block> + SemiHonest> ObliviousPrf for Sender<OT> {
-    type Seed = Seed;
+    type Seed = Block512;
     type Input = Block;
-    type Output = Output;
+    type Output = Block512;
 }
 
 impl<OT: OtReceiver<Msg = Block> + SemiHonest> OprfSender for Sender<OT> {
@@ -304,14 +95,14 @@ impl<OT: OtReceiver<Msg = Block> + SemiHonest> OprfSender for Sender<OT> {
         let qs = utils::transpose(&qs, ncols, nrows);
         let seeds = qs
             .chunks(ncols / 8)
-            .map(|q| Seed::new(*array_ref![q, 0, 64]))
+            .map(|q| q.try_into().unwrap())
             .collect::<Vec<Self::Seed>>();
         Ok(seeds[0..m].to_vec())
     }
 
     #[inline]
     fn compute(&self, seed: Self::Seed, input: Self::Input) -> Self::Output {
-        let mut output = Output::default();
+        let mut output = Block512::default();
         self.encode(input, &mut output);
         scutils::xor_inplace(&mut output.as_mut(), seed.as_ref());
         output
@@ -330,7 +121,7 @@ impl<OT: OtReceiver<Msg = Block> + SemiHonest> Sender<OT> {
         input: <Sender<OT> as ObliviousPrf>::Input,
         output: &mut <Sender<OT> as ObliviousPrf>::Output,
     ) {
-        self.code.encode(input, &mut output.0);
+        self.code.encode(input, output.into());
         scutils::and_inplace(&mut output.as_mut(), &self.s_);
     }
 }
@@ -343,9 +134,9 @@ pub struct Receiver<OT: OtSender + SemiHonest> {
 }
 
 impl<OT: OtSender<Msg = Block> + SemiHonest> ObliviousPrf for Receiver<OT> {
-    type Seed = Seed;
+    type Seed = Block512;
     type Input = Block;
-    type Output = Output;
+    type Output = Block512;
 }
 
 impl<OT: OtSender<Msg = Block> + SemiHonest> OprfReceiver for Receiver<OT> {
@@ -398,15 +189,15 @@ impl<OT: OtSender<Msg = Block> + SemiHonest> OprfReceiver for Receiver<OT> {
         rng.fill_bytes(&mut t0s);
         let out = t0s
             .chunks(64)
-            .map(|c| Output::new(*array_ref![c, 0, 64]))
-            .collect::<Vec<Output>>();
+            .map(|c| c.try_into().unwrap())
+            .collect::<Vec<Block512>>();
         let mut t1s = t0s.clone();
-        let mut c = Output::default();
+        let mut c = Block512::default();
         for (j, r) in inputs.iter().enumerate() {
             let range = j * ncols / 8..(j + 1) * ncols / 8;
             let mut t1 = &mut t1s[range];
-            self.code.encode(*r, &mut c.0);
-            scutils::xor_inplace(&mut t1, &c.as_ref());
+            self.code.encode(*r, (&mut c).into());
+            scutils::xor_inplace(&mut t1, c.as_ref());
         }
         let t0s = utils::transpose(&t0s, nrows, ncols);
         let t1s = utils::transpose(&t1s, nrows, ncols);
@@ -445,7 +236,7 @@ mod tests {
         let mut rng = AesRng::new();
         let mut input = [0u8; 64];
         rng.fill_bytes(&mut input);
-        let seed = Seed::new(input);
+        let seed = Block512::from(input);
         assert_eq!(seed.as_ref(), input.as_ref());
     }
 
@@ -470,7 +261,7 @@ mod tests {
                 .iter()
                 .zip(seeds.into_iter())
                 .map(|(inp, seed)| oprf.compute(seed, *inp))
-                .collect::<Vec<Output>>();
+                .collect::<Vec<Block512>>();
         });
         let mut rng = AesRng::new();
         let mut reader = BufReader::new(receiver.try_clone().unwrap());
@@ -482,7 +273,7 @@ mod tests {
         handle.join().unwrap();
         let results_ = results_.lock().unwrap();
         for j in 0..n {
-            assert_eq!(results_[j].0.to_vec(), outputs[j].0.to_vec());
+            assert_eq!(results_[j], outputs[j]);
         }
     }
 
