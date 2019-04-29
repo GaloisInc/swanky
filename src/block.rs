@@ -45,13 +45,6 @@ impl Block {
         self.as_mut().as_mut_ptr()
     }
 
-    /// Output the all-zero block.
-    #[deprecated(note = "use `Block::default` instead")]
-    #[inline]
-    pub fn zero() -> Self {
-        unsafe { Block(_mm_setzero_si128()) }
-    }
-
     /// Carryless multiplication.
     ///
     /// This code is adapted from the EMP toolkit's implementation.
