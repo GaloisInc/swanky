@@ -8,7 +8,7 @@
 
 use criterion::{criterion_group, criterion_main, Criterion};
 use popsicle::psty::{P1, P2};
-use scuttlebutt::AesRng;
+use scuttlebutt::{AesRng, Block512};
 use std::io::{BufReader, BufWriter};
 use std::os::unix::net::UnixStream;
 use std::time::Duration;
@@ -41,13 +41,7 @@ fn bench_psty_init() {
     handle.join().unwrap();
 }
 
-fn bench_psty(
-    inputs1: Vec<Vec<u8>>,
-    inputs2: Vec<Vec<u8>>,
-) -> (
-    Vec<ocelot::oprf::kkrt::Output>,
-    Vec<ocelot::oprf::kkrt::Output>,
-) {
+fn bench_psty(inputs1: Vec<Vec<u8>>, inputs2: Vec<Vec<u8>>) -> (Vec<Block512>, Vec<Block512>) {
     let (sender, receiver) = UnixStream::pair().unwrap();
 
     let handle = std::thread::spawn(move || {

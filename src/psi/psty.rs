@@ -12,12 +12,11 @@ use crate::stream;
 use crate::utils;
 use crate::Error;
 use itertools::Itertools;
-use ocelot::oprf::kkrt;
 use ocelot::oprf::kmprt;
 use ocelot::oprf::{ProgrammableReceiver, ProgrammableSender};
 use ocelot::ot::{ChouOrlandiReceiver as OtReceiver, ChouOrlandiSender as OtSender};
 use rand::Rng;
-use scuttlebutt::{AesRng, Block};
+use scuttlebutt::{AesRng, Block, Block512};
 use std::cell::RefCell;
 use std::fmt::Debug;
 use std::io::{Read, Write};
@@ -63,7 +62,7 @@ impl<R: Read + Send + Debug + 'static, W: Write + Send + Debug + 'static> Sender
         })
     }
 
-    pub fn send(&mut self, inputs: &[Msg]) -> Result<Vec<kkrt::Output>, Error> {
+    pub fn send(&mut self, inputs: &[Msg]) -> Result<Vec<Block512>, Error> {
         // receive cuckoo hash info from sender
         let key = Block::read(&mut *self.reader.borrow_mut())?;
         let hashes = utils::compress_and_hash_inputs(inputs, key);
@@ -89,7 +88,7 @@ impl<R: Read + Send + Debug + 'static, W: Write + Send + Debug + 'static> Sender
         // select the target values
         let ts = (0..nbins)
             .map(|_| self.rng.gen())
-            .collect::<Vec<kkrt::Output>>();
+            .collect::<Vec<Block512>>();
         let points = table
             .into_iter()
             .zip(ts.iter())
@@ -97,7 +96,7 @@ impl<R: Read + Send + Debug + 'static, W: Write + Send + Debug + 'static> Sender
                 // map all the points in a bin to the same tag
                 bin.into_iter().map(move |item| (item, t.clone()))
             })
-            .collect::<Vec<(Block, kkrt::Output)>>();
+            .collect::<Vec<(Block, Block512)>>();
 
         let _ = self.opprf.send(
             &mut *self.reader.borrow_mut(),
@@ -145,7 +144,7 @@ impl<R: Read + Send + Debug + 'static, W: Write + Send + Debug> Receiver<R, W> {
         })
     }
 
-    pub fn receive(&mut self, inputs: &[Msg]) -> Result<(Vec<kkrt::Output>, Vec<Msg>), Error> {
+    pub fn receive(&mut self, inputs: &[Msg]) -> Result<(Vec<Block512>, Vec<Msg>), Error> {
         let key = self.rng.gen();
         let hashed_inputs = utils::compress_and_hash_inputs(inputs, key);
         let cuckoo = CuckooHash::new(&hashed_inputs, NHASHES)?;

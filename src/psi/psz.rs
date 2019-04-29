@@ -15,13 +15,12 @@ use crate::stream;
 use crate::utils;
 use crate::Error;
 use crate::{Receiver as PsiReceiver, Sender as PsiSender};
-use ocelot::oprf::kkrt::Output;
 use ocelot::oprf::{self, Receiver as OprfReceiver, Sender as OprfSender};
 use rand::seq::SliceRandom;
 use rand::Rng;
 use rand::{CryptoRng, RngCore};
 use scuttlebutt::utils as scutils;
-use scuttlebutt::{cointoss, Block, SemiHonest};
+use scuttlebutt::{cointoss, Block, Block512, SemiHonest};
 use std::collections::HashSet;
 use std::io::{Read, Write};
 
@@ -64,7 +63,7 @@ impl PsiSender for Sender {
 
         // For each hash function `hᵢ`, construct set `Hᵢ = {F(k_{hᵢ(x)}, x ||
         // i) | x ∈ X)}`, randomly permute it, and send it to the receiver.
-        let mut encoded = Output::default();
+        let mut encoded = Default::default();
         for i in 0..NHASHES {
             inputs.shuffle(&mut rng);
             let hidx = Block::from(i as u128);
@@ -89,11 +88,11 @@ impl PsiSender for Sender {
             let mut encoded = inputs
                 .iter()
                 .map(|input| {
-                    let mut out = Output::default();
+                    let mut out = Default::default();
                     self.oprf.encode(*input, &mut out);
                     out
                 })
-                .collect::<Vec<Output>>();
+                .collect::<Vec<Block512>>();
             for i in 0..stashsize {
                 encoded.shuffle(&mut rng);
                 for encoded in &encoded {
