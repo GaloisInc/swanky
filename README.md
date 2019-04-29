@@ -5,9 +5,10 @@ The `scuttlebutt` library provides a bunch of core primitives for building
 multi-party computation (MPC) related protocols, such as garbled circuits or
 oblivious transfer. In particular, `scuttlebutt` provides the following:
 
+* `Aes128` and `Aes256` provide AES encryption capabilities using AES-NI.
 * `AesHash`, which provides a correlation-robust hash function based on fixed-key AES (cf. <https://eprint.iacr.org/2019/074>).
 * `AesRng`, which provides a random number generator based on fixed-key AES.
-* `Block`, which wraps an `__m128i` type and provides methods useful when used as a garbled circuit wire label.
+* `Block`, which wraps a 128-bit value and provides methods useful when used as a garbled circuit wire label.
 * `Block512`, which wraps a 512-bit value and provides methods operating on that value.
 * A `cointoss` module, which implements a simple random-oracle-based coin-tossing protocol.
 * A `comm` module, which contains `Read`/`Write` objects for tracking the number of bits read/written.
