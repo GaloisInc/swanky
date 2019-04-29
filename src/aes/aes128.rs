@@ -216,8 +216,7 @@ union __U128 {
 }
 
 /// Fixed-key AES-128.
-#[deprecated(note = "use `FIXED_KEY_AES128` instead")]
-pub const AES: Aes128 = Aes128 {
+pub const FIXED_KEY_AES128: Aes128 = Aes128 {
     rkeys: unsafe {
         [
             (__U128 {
@@ -267,10 +266,6 @@ pub const AES: Aes128 = Aes128 {
         ]
     },
 };
-
-/// AES-128 with a fixed key.
-#[allow(deprecated)]
-pub const FIXED_KEY_AES128: Aes128 = AES;
 
 mod tests {
     #[allow(unused_imports)]
