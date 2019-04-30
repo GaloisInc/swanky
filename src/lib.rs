@@ -18,6 +18,7 @@ mod block;
 mod block512;
 pub mod cointoss;
 pub mod comm;
+pub mod commitment;
 mod hash_aes;
 mod rand_aes;
 pub mod utils;
