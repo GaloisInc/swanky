@@ -225,32 +225,38 @@ impl Circuit {
         informer.print_info();
         Ok(())
     }
+
     /// Return the number of garbler inputs.
     #[inline]
     pub fn num_garbler_inputs(&self) -> usize {
         self.garbler_input_refs.len()
     }
+
     /// Return the number of evaluator inputs.
     #[inline]
     pub fn num_evaluator_inputs(&self) -> usize {
         self.evaluator_input_refs.len()
     }
+
     /// Return the number of outputs.
     #[inline]
     pub fn noutputs(&self) -> usize {
         self.output_refs.len()
     }
+
     /// Return the modulus of the gate indexed by `i`.
     #[inline]
     pub fn modulus(&self, i: usize) -> u16 {
         self.gate_moduli[i]
     }
+
     /// Return the modulus of the garbler input indexed by `i`.
     #[inline]
     pub fn garbler_input_mod(&self, i: usize) -> u16 {
         let r = self.garbler_input_refs[i];
         r.modulus()
     }
+
     /// Return the modulus of the evaluator input indexed by `i`.
     #[inline]
     pub fn evaluator_input_mod(&self, i: usize) -> u16 {
@@ -379,6 +385,10 @@ impl Fancy for CircuitBuilder {
     fn output(&mut self, xref: &CircuitRef) -> Result<(), Self::Error> {
         self.circ.output_refs.push(xref.clone());
         Ok(())
+    }
+
+    fn reuse(&mut self, _xref: &CircuitRef, _delta: Option<&CircuitRef>) -> Result<CircuitRef, Self::Error> {
+        Err(CircuitBuilderError::ReuseUndefined)
     }
 }
 
@@ -575,7 +585,7 @@ mod basic {
 #[cfg(test)]
 mod bundle {
     use super::*;
-    use crate::fancy::{BundleGadgets, CrtGadgets, BinaryGadgets};
+    use crate::fancy::{BinaryGadgets, BundleGadgets, CrtGadgets};
     use crate::util::{self, crt_factor, crt_inv_factor, RngExt};
     use itertools::Itertools;
     use rand::thread_rng;

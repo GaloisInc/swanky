@@ -50,7 +50,7 @@ impl GarbledCircuit {
         let mut evaluator = StaticEvaluator::new(garbler_inputs, evaluator_inputs, &self.blocks);
         let outputs = c.eval(&mut evaluator)?;
         c.process_outputs(&outputs, &mut evaluator)?;
-        Ok(evaluator.evaluator.decode_output())
+        evaluator.evaluator.decode_output()
     }
 }
 
@@ -203,6 +203,10 @@ impl Fancy for StaticEvaluator {
 
     fn output(&mut self, x: &Self::Item) -> Result<(), Self::Error> {
         self.evaluator.output(x)
+    }
+
+    fn reuse(&mut self, x: &Self::Item, delta: Option<&Self::Item>) -> Result<Self::Item, Self::Error> {
+        self.evaluator.reuse(x, delta)
     }
 }
 

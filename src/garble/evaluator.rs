@@ -7,6 +7,7 @@ use std::cell::RefCell;
 use std::fmt::Debug;
 use std::io::Read;
 use std::rc::Rc;
+use itertools::Itertools;
 
 /// Streaming evaluator using a callback to receive ciphertexts as needed.
 ///
@@ -34,7 +35,7 @@ impl<R: Read + Debug> Evaluator<R> {
     }
 
     /// Decode the output received during the Fancy computation.
-    pub fn decode_output(&self) -> Vec<u16> {
+    pub fn decode_output(&self) -> Result<Vec<u16>, EvaluatorError> {
         debug_assert_eq!(
             self.output_wires.len(),
             self.output_cts.len(),
@@ -55,14 +56,10 @@ impl<R: Read + Debug> Evaluator<R> {
                 }
             }
         }
-        debug_assert_eq!(
-            self.output_wires.len(),
-            outs.len(),
-            "decoding failed! decoded {} out of {} wires",
-            outs.len(),
-            self.output_wires.len()
-        );
-        outs
+        if self.output_wires.len() != outs.len() {
+            return Err(EvaluatorError::DecodingFailed);
+        }
+        Ok(outs)
     }
 
     /// The current non-free gate index of the garbling computation.
@@ -72,6 +69,21 @@ impl<R: Read + Debug> Evaluator<R> {
         self.current_gate += 1;
         current
     }
+
+    /// Read a Block from the reader.
+    #[inline]
+    fn read_block(&mut self) -> Result<Block, EvaluatorError> {
+        let mut reader = self.reader.borrow_mut();
+        let b = Block::read(&mut *reader)?;
+        Ok(b)
+    }
+
+    /// Read a Wire from the reader.
+    #[inline]
+    fn read_wire(&mut self, modulus: u16) -> Result<Wire, EvaluatorError> {
+        let block = self.read_block()?;
+        Ok(Wire::from_block(block, modulus))
+    }
 }
 
 impl<R: Read + Debug> Fancy for Evaluator<R> {
@@ -80,22 +92,19 @@ impl<R: Read + Debug> Fancy for Evaluator<R> {
 
     #[inline]
     fn garbler_input(&mut self, q: u16, _: Option<u16>) -> Result<Self::Item, Self::Error> {
-        let mut reader = self.reader.borrow_mut();
-        let block = Block::read(&mut *reader)?;
-        Ok(Wire::from_block(block, q))
+        self.read_wire(q)
     }
+
     #[inline]
     fn evaluator_input(&mut self, q: u16) -> Result<Self::Item, Self::Error> {
-        let mut reader = self.reader.borrow_mut();
-        let block = Block::read(&mut *reader)?;
-        Ok(Wire::from_block(block, q))
+        self.read_wire(q)
     }
+
     #[inline]
     fn constant(&mut self, _: u16, q: u16) -> Result<Wire, EvaluatorError> {
-        let mut reader = self.reader.borrow_mut();
-        let block = Block::read(&mut *reader)?;
-        Ok(Wire::from_block(block, q))
+        self.read_wire(q)
     }
+
     #[inline]
     fn add(&mut self, x: &Wire, y: &Wire) -> Result<Wire, EvaluatorError> {
         if x.modulus() != y.modulus() {
@@ -103,6 +112,7 @@ impl<R: Read + Debug> Fancy for Evaluator<R> {
         }
         Ok(x.plus(y))
     }
+
     #[inline]
     fn sub(&mut self, x: &Wire, y: &Wire) -> Result<Wire, EvaluatorError> {
         if x.modulus() != y.modulus() {
@@ -110,10 +120,12 @@ impl<R: Read + Debug> Fancy for Evaluator<R> {
         }
         Ok(x.minus(y))
     }
+
     #[inline]
     fn cmul(&mut self, x: &Wire, c: u16) -> Result<Wire, EvaluatorError> {
         Ok(x.cmul(c))
     }
+
     #[inline]
     fn mul(&mut self, A: &Wire, B: &Wire) -> Result<Wire, EvaluatorError> {
         if A.modulus() < B.modulus() {
@@ -163,6 +175,7 @@ impl<R: Read + Debug> Fancy for Evaluator<R> {
         let res = L.plus_mov(&R.plus_mov(&A.cmul(new_b_color)));
         Ok(res)
     }
+
     #[inline]
     fn proj(&mut self, x: &Wire, q: u16, _: Option<Vec<u16>>) -> Result<Wire, EvaluatorError> {
         let ngates = (x.modulus() - 1) as usize;
@@ -182,6 +195,7 @@ impl<R: Read + Debug> Fancy for Evaluator<R> {
             Ok(Wire::from_block(ct ^ x.hash(t), q))
         }
     }
+
     #[inline]
     fn output(&mut self, x: &Wire) -> Result<(), EvaluatorError> {
         let noutputs = x.modulus() as usize;
@@ -194,5 +208,13 @@ impl<R: Read + Debug> Fancy for Evaluator<R> {
         self.output_cts.push(blocks);
         self.output_wires.push(x.clone());
         Ok(())
+    }
+
+    #[inline]
+    fn reuse(&mut self, x: &Wire, _delta: Option<&Wire>) -> Result<Wire, EvaluatorError> {
+        let cts = (0..x.modulus()).map(|_| {
+            self.read_block()
+        }).flatten().collect_vec();
+        Ok(Wire::from_block(cts[x.color() as usize] ^ x.as_block(), x.modulus()))
     }
 }

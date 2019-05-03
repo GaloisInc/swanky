@@ -51,7 +51,7 @@ impl std::fmt::Display for Message {
 mod classic {
     use crate::circuit::{Circuit, CircuitBuilder};
     use crate::dummy::Dummy;
-    use crate::fancy::{Fancy, BundleGadgets};
+    use crate::fancy::{BundleGadgets, Fancy};
     use crate::r#static::garble;
     use crate::util::{self, RngExt};
     use rand::thread_rng;
@@ -382,7 +382,7 @@ mod streaming {
         let mut ev = Evaluator::new(receiver);
         f_ev(&mut ev);
 
-        let result = ev.decode_output();
+        let result = ev.decode_output().unwrap();
         assert_eq!(result, should_be)
     }
     //}}}
@@ -624,7 +624,7 @@ mod complex {
             let receiver = Rc::new(RefCell::new(receiver));
             let mut evaluator = Evaluator::new(receiver);
             complex_gadget(&mut evaluator, Q, N);
-            let result = evaluator.decode_output();
+            let result = evaluator.decode_output().unwrap();
             assert_eq!(result, should_be);
 
             let (sender, receiver) = UnixStream::pair().unwrap();
@@ -656,8 +656,85 @@ mod complex {
             let receiver = Rc::new(RefCell::new(receiver));
             let mut evaluator = Evaluator::new(receiver);
             complex_gadget_(&mut evaluator, Q, N);
-            let result = evaluator.decode_output();
+            let result = evaluator.decode_output().unwrap();
             assert_eq!(result, should_be);
         }
+    }
+}
+
+// testing reused wirelabels
+#[cfg(test)]
+mod reuse {
+    use super::*;
+    use std::os::unix::net::UnixStream;
+    use std::rc::Rc;
+    use std::cell::RefCell;
+    use scuttlebutt::AesRng;
+    use crate::*;
+    use std::fmt::{Debug, Display};
+    use itertools::Itertools;
+    use rand::random;
+
+    fn prog1<F,W,E>(f: &mut F, input: &[(u16, u16)]) -> Result<Vec<W>, E>
+        where F: Fancy<Item=W, Error=E>,
+              W: Clone + HasModulus,
+              E: Debug + Display + From<FancyError>,
+    {
+        input.iter().map(|(x,q)| {
+            f.garbler_input(*q, Some(*x))
+        }).collect()
+    }
+
+    fn prog2<F,W,E>(f: &mut F, reused: &[W], deltas: Option<&[W]>)
+        -> Result<(), E>
+        where F: Fancy<Item=W, Error=E>,
+              W: Clone + HasModulus,
+              E: Debug + Display + From<FancyError>,
+    {
+
+        let res = reused.iter().enumerate().map(|(i,w)| {
+            f.reuse(w, deltas.map(|ds| &ds[i]))
+        }).collect::<Result<Vec<W>, E>>()?;
+        f.outputs(&res)?;
+        Ok(())
+    }
+
+
+    #[test]
+    fn reuse_wirelabels() {
+        let n = 16;
+
+        let mut should_be = Vec::new();
+        let mut inps = Vec::new();
+
+        for _ in 0..n {
+            let q = 2 + random::<u16>() % 100;
+            let x = random::<u16>() % q;
+            inps.push((x,q));
+            should_be.push(x);
+        }
+
+        let (sender, receiver) = UnixStream::pair().unwrap();
+        let receiver = Rc::new(RefCell::new(receiver));
+
+        let inps_ = inps.clone();
+        std::thread::spawn(move || {
+            let sender = Rc::new(RefCell::new(sender));
+            let mut gb1 = Garbler::new(sender.clone(), |_| unreachable!(), AesRng::new());
+            let ws = prog1(&mut gb1, &inps_).unwrap();
+            let ds = ws.iter().map(|w| gb1.delta(w.modulus())).collect_vec();
+
+            let mut gb2 = Garbler::new(sender.clone(), |_| unreachable!(), AesRng::new());
+            prog2(&mut gb2, &ws, Some(&ds)).unwrap();
+        });
+
+        let mut ev1 = Evaluator::new(receiver.clone());
+        let ws = prog1(&mut ev1, &inps).unwrap();
+
+        let mut ev2 = Evaluator::new(receiver.clone());
+        prog2(&mut ev2, &ws, None).unwrap();
+
+        let result = ev2.decode_output().unwrap();
+        assert_eq!(result, should_be);
     }
 }

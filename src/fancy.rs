@@ -6,11 +6,11 @@
 use crate::error::FancyError;
 use itertools::Itertools;
 
-mod bundle;
 mod binary;
+mod bundle;
 mod crt;
-pub use bundle::{Bundle, BundleGadgets};
 pub use binary::{BinaryBundle, BinaryGadgets};
+pub use bundle::{Bundle, BundleGadgets};
 pub use crt::{CrtBundle, CrtGadgets};
 
 /// An object that has some modulus. Basic object of `Fancy` computations.
@@ -60,6 +60,11 @@ pub trait Fancy {
 
     /// Process this wire as output.
     fn output(&mut self, x: &Self::Item) -> Result<(), Self::Error>;
+
+    /// Reuse a wire from a previous computation.
+    ///
+    /// Garbler must input the delta as well as the zero wire.
+    fn reuse(&mut self, x: &Self::Item, delta: Option<&Self::Item>) -> Result<Self::Item, Self::Error>;
 
     ////////////////////////////////////////////////////////////////////////////////
     // Functions built on top of basic fancy operations.

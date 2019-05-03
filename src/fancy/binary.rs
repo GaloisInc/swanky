@@ -15,9 +15,14 @@ impl<W: Clone + HasModulus> BinaryBundle<W> {
         BinaryBundle(Bundle::new(ws))
     }
 
-    /// Unwrap the underlying bundle from this binary bundle.
-    pub fn unwrap<'a>(&'a self) -> &'a Bundle<W> {
-        &self.0
+    /// Mark a regular bundle as Binary.
+    pub fn from_bundle(b: Bundle<W>) -> BinaryBundle<W> {
+        BinaryBundle(b)
+    }
+
+    /// Extract the underlying bundle from this binary bundle.
+    pub fn extract(self) -> Bundle<W> {
+        self.0
     }
 }
 
@@ -26,6 +31,13 @@ impl<W: Clone + HasModulus> Deref for BinaryBundle<W> {
 
     fn deref(&self) -> &Bundle<W> {
         &self.0
+    }
+}
+
+impl<W: Clone + HasModulus> From<Bundle<W>> for BinaryBundle<W> {
+    fn from(b: Bundle<W>) -> BinaryBundle<W> {
+        debug_assert!(b.moduli().iter().all(|&p| p == 2));
+        BinaryBundle(b)
     }
 }
 
@@ -82,7 +94,9 @@ pub trait BinaryGadgets: Fancy + BundleGadgets {
         nbits: usize,
         n: usize,
     ) -> Result<Vec<BinaryBundle<Self::Item>>, Self::Error> {
-        (0..n).map(|_| self.bin_evaluator_input_bundle(nbits)).collect()
+        (0..n)
+            .map(|_| self.bin_evaluator_input_bundle(nbits))
+            .collect()
     }
 
     /// Create a constant bundle using base 2 inputs.
@@ -101,7 +115,7 @@ pub trait BinaryGadgets: Fancy + BundleGadgets {
         x: &BinaryBundle<Self::Item>,
         y: &BinaryBundle<Self::Item>,
     ) -> Result<BinaryBundle<Self::Item>, Self::Error> {
-        self.add_bundles(x.unwrap(), y.unwrap()).map(BinaryBundle)
+        self.add_bundles(&x, &y).map(BinaryBundle)
     }
 
     /// And the bits of two bundles together pairwise.
@@ -110,7 +124,7 @@ pub trait BinaryGadgets: Fancy + BundleGadgets {
         x: &BinaryBundle<Self::Item>,
         y: &BinaryBundle<Self::Item>,
     ) -> Result<BinaryBundle<Self::Item>, Self::Error> {
-        self.mul_bundles(x.unwrap(), y.unwrap()).map(BinaryBundle)
+        self.mul_bundles(&x, &y).map(BinaryBundle)
     }
 
     /// Binary addition. Returns the result and the carry.
@@ -268,7 +282,10 @@ pub trait BinaryGadgets: Fancy + BundleGadgets {
     }
 
     /// Compute the absolute value of a binary bundle.
-    fn bin_abs(&mut self, x: &BinaryBundle<Self::Item>) -> Result<BinaryBundle<Self::Item>, Self::Error> {
+    fn bin_abs(
+        &mut self,
+        x: &BinaryBundle<Self::Item>,
+    ) -> Result<BinaryBundle<Self::Item>, Self::Error> {
         let sign = x.wires().last().unwrap();
         let negated = self.bin_twos_complement(x)?;
         self.multiplex(&sign, x, &negated).map(BinaryBundle)

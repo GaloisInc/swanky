@@ -44,7 +44,7 @@ impl<W: Write + Debug, RNG: CryptoRng + RngCore> Garbler<W, RNG> {
 
     /// Output some information from the garbling.
     #[inline]
-    fn send(&mut self, m: Message) -> Result<(), GarblerError> {
+    fn send_message(&mut self, m: Message) -> Result<(), GarblerError> {
         (self.callback)(m)
     }
 
@@ -79,6 +79,14 @@ impl<W: Write + Debug, RNG: CryptoRng + RngCore> Garbler<W, RNG> {
     pub(crate) fn get_deltas(self) -> HashMap<u16, Wire> {
         self.deltas
     }
+
+    /// Send a wire using the Sender.
+    #[inline]
+    fn send_wire(&mut self, wire: &Wire) -> Result<(), GarblerError> {
+        let mut writer = self.writer.borrow_mut();
+        writer.write_all(wire.as_block().as_ref())?;
+        Ok(())
+    }
 }
 
 impl<W: Write + Debug, RNG: CryptoRng + RngCore> Fancy for Garbler<W, RNG> {
@@ -91,34 +99,35 @@ impl<W: Write + Debug, RNG: CryptoRng + RngCore> Fancy for Garbler<W, RNG> {
         let d = self.delta(q);
         if let Some(x) = opt_x {
             let wire = w.plus(&d.cmul(x));
-            let mut writer = self.writer.borrow_mut();
-            writer.write_all(wire.as_block().as_ref())?;
+            self.send_wire(&wire)?;
         } else {
-            self.send(Message::UnencodedGarblerInput {
+            self.send_message(Message::UnencodedGarblerInput {
                 zero: w.clone(),
                 delta: d,
             })?;
         }
         Ok(w)
     }
+
     #[inline]
     fn evaluator_input(&mut self, q: u16) -> Result<Wire, GarblerError> {
         let w = Wire::rand(&mut self.rng, q);
         let d = self.delta(q);
-        self.send(Message::UnencodedEvaluatorInput {
+        self.send_message(Message::UnencodedEvaluatorInput {
             zero: w.clone(),
             delta: d,
         })?;
         Ok(w)
     }
+
     #[inline]
     fn constant(&mut self, x: u16, q: u16) -> Result<Wire, GarblerError> {
         let zero = Wire::rand(&mut self.rng, q);
         let wire = zero.plus(&self.delta(q).cmul_eq(x));
-        let mut writer = self.writer.borrow_mut();
-        writer.write_all(wire.as_block().as_ref())?;
+        self.send_wire(&wire)?;
         Ok(zero)
     }
+
     #[inline]
     fn add(&mut self, x: &Wire, y: &Wire) -> Result<Wire, GarblerError> {
         if x.modulus() != y.modulus() {
@@ -126,6 +135,7 @@ impl<W: Write + Debug, RNG: CryptoRng + RngCore> Fancy for Garbler<W, RNG> {
         }
         Ok(x.plus(y))
     }
+
     #[inline]
     fn sub(&mut self, x: &Wire, y: &Wire) -> Result<Wire, GarblerError> {
         if x.modulus() != y.modulus() {
@@ -133,10 +143,12 @@ impl<W: Write + Debug, RNG: CryptoRng + RngCore> Fancy for Garbler<W, RNG> {
         }
         Ok(x.minus(y))
     }
+
     #[inline]
     fn cmul(&mut self, x: &Wire, c: u16) -> Result<Wire, GarblerError> {
         Ok(x.cmul(c))
     }
+
     #[inline]
     fn mul(&mut self, A: &Wire, B: &Wire) -> Result<Wire, GarblerError> {
         if A.modulus() < B.modulus() {
@@ -253,6 +265,7 @@ impl<W: Write + Debug, RNG: CryptoRng + RngCore> Fancy for Garbler<W, RNG> {
         }
         Ok(X.plus_mov(&Y))
     }
+
     #[inline]
     fn proj(&mut self, A: &Wire, q_out: u16, tt: Option<Vec<u16>>) -> Result<Wire, GarblerError> {
         let tt = tt.ok_or(GarblerError::TruthTableRequired)?;
@@ -307,6 +320,7 @@ impl<W: Write + Debug, RNG: CryptoRng + RngCore> Fancy for Garbler<W, RNG> {
         }
         Ok(C)
     }
+
     #[inline]
     fn output(&mut self, X: &Wire) -> Result<(), GarblerError> {
         let q = X.modulus();
@@ -322,5 +336,34 @@ impl<W: Write + Debug, RNG: CryptoRng + RngCore> Fancy for Garbler<W, RNG> {
             writer.write_all(block.as_ref())?;
         }
         Ok(())
+    }
+
+    #[inline]
+    fn reuse(&mut self, old_zero_wire: &Wire, old_delta: Option<&Wire>) -> Result<Wire, GarblerError> {
+        if let Some(old_delta) = old_delta {
+            let q = old_zero_wire.modulus();
+
+            let new_zero_wire = Wire::rand(&mut self.rng, q);
+            let new_delta = self.delta(q);
+
+            let mut cts = vec![None; q as usize];
+
+            for x in 0..q {
+                let col     = ((old_zero_wire.color() + x) % q) as usize;
+                let mask    = old_zero_wire.plus(&old_delta.cmul(x));
+                let payload = new_zero_wire.plus(&new_delta.cmul(x));
+                let ct      = mask.as_block() ^ payload.as_block();
+                cts[col]    = Some(ct);
+            }
+
+            let mut writer = self.writer.borrow_mut();
+            for ct in cts.into_iter() {
+                writer.write_all(ct.expect("unassigned ciphertext!").as_ref())?;
+            }
+
+            Ok(new_zero_wire)
+        } else {
+            Err(GarblerError::DeltaRequired)
+        }
     }
 }

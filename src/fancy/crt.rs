@@ -17,9 +17,9 @@ impl<W: Clone + HasModulus> CrtBundle<W> {
         CrtBundle(Bundle::new(ws))
     }
 
-    /// Unwrap the underlying bundle from this CRT bundle.
-    pub fn unwrap<'a>(&'a self) -> &'a Bundle<W> {
-        &self.0
+    /// Extract the underlying bundle from this CRT bundle.
+    pub fn extract(self) -> Bundle<W> {
+        self.0
     }
 }
 
@@ -28,6 +28,12 @@ impl<W: Clone + HasModulus> Deref for CrtBundle<W> {
 
     fn deref(&self) -> &Bundle<W> {
         &self.0
+    }
+}
+
+impl<W: Clone + HasModulus> From<Bundle<W>> for CrtBundle<W> {
+    fn from(b: Bundle<W>) -> CrtBundle<W> {
+        CrtBundle(b)
     }
 }
 

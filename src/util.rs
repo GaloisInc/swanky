@@ -335,10 +335,10 @@ pub fn modulus_with_width(n: u32) -> u128 {
 
 /// Generate the factors of a CRT modulus that support at least n-bit integers, using the
 /// built-in PRIMES.
-// #[inline]
-// pub fn primes_with_width(n: u32) -> Vec<u16> {
-//     base_primes_with_width(n, &PRIMES)
-// }
+#[inline]
+pub fn primes_with_width(n: u32) -> Vec<u16> {
+    base_primes_with_width(n, &PRIMES)
+}
 
 /// Generate a CRT modulus that support at least n-bit integers, using provided primes.
 #[inline]
