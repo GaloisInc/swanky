@@ -192,7 +192,8 @@ impl Display for GarblerError {
                 "truth table required for garbler projection gates".fmt(f)
             }
             GarblerError::DeltaRequired => {
-                "delta from previous execution of garbler must be provided with wire to reuse".fmt(f)
+                "delta from previous execution of garbler must be provided with wire to reuse"
+                    .fmt(f)
             }
             GarblerError::FancyError(e) => write!(f, "{}", e),
         }

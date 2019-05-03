@@ -666,39 +666,41 @@ mod complex {
 #[cfg(test)]
 mod reuse {
     use super::*;
-    use std::os::unix::net::UnixStream;
-    use std::rc::Rc;
-    use std::cell::RefCell;
-    use scuttlebutt::AesRng;
     use crate::*;
-    use std::fmt::{Debug, Display};
     use itertools::Itertools;
     use rand::random;
+    use scuttlebutt::AesRng;
+    use std::cell::RefCell;
+    use std::fmt::{Debug, Display};
+    use std::os::unix::net::UnixStream;
+    use std::rc::Rc;
 
-    fn prog1<F,W,E>(f: &mut F, input: &[(u16, u16)]) -> Result<Vec<W>, E>
-        where F: Fancy<Item=W, Error=E>,
-              W: Clone + HasModulus,
-              E: Debug + Display + From<FancyError>,
+    fn prog1<F, W, E>(f: &mut F, input: &[(u16, u16)]) -> Result<Vec<W>, E>
+    where
+        F: Fancy<Item = W, Error = E>,
+        W: Clone + HasModulus,
+        E: Debug + Display + From<FancyError>,
     {
-        input.iter().map(|(x,q)| {
-            f.garbler_input(*q, Some(*x))
-        }).collect()
+        input
+            .iter()
+            .map(|(x, q)| f.garbler_input(*q, Some(*x)))
+            .collect()
     }
 
-    fn prog2<F,W,E>(f: &mut F, reused: &[W], deltas: Option<&[W]>)
-        -> Result<(), E>
-        where F: Fancy<Item=W, Error=E>,
-              W: Clone + HasModulus,
-              E: Debug + Display + From<FancyError>,
+    fn prog2<F, W, E>(f: &mut F, reused: &[W], deltas: Option<&[W]>) -> Result<(), E>
+    where
+        F: Fancy<Item = W, Error = E>,
+        W: Clone + HasModulus,
+        E: Debug + Display + From<FancyError>,
     {
-
-        let res = reused.iter().enumerate().map(|(i,w)| {
-            f.reuse(w, deltas.map(|ds| &ds[i]))
-        }).collect::<Result<Vec<W>, E>>()?;
+        let res = reused
+            .iter()
+            .enumerate()
+            .map(|(i, w)| f.reuse(w, deltas.map(|ds| &ds[i])))
+            .collect::<Result<Vec<W>, E>>()?;
         f.outputs(&res)?;
         Ok(())
     }
-
 
     #[test]
     fn reuse_wirelabels() {
@@ -710,7 +712,7 @@ mod reuse {
         for _ in 0..n {
             let q = 2 + random::<u16>() % 100;
             let x = random::<u16>() % q;
-            inps.push((x,q));
+            inps.push((x, q));
             should_be.push(x);
         }
 

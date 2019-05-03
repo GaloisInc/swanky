@@ -281,7 +281,11 @@ impl Fancy for Informer {
         Ok(())
     }
 
-    fn reuse(&mut self, x: &InformerVal, _delta: Option<&InformerVal>) -> Result<InformerVal, InformerError> {
+    fn reuse(
+        &mut self,
+        x: &InformerVal,
+        _delta: Option<&InformerVal>,
+    ) -> Result<InformerVal, InformerError> {
         self.nreuses += 1;
         self.nciphertexts += x.modulus() as usize;
         Ok(x.clone())

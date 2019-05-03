@@ -161,9 +161,18 @@ pub trait BundleGadgets: Fancy {
     }
 
     /// Reuse a bundle from a previous computation.
-    fn reuse_bundle(&mut self, x: &Bundle<Self::Item>, deltas: &[Option<&Self::Item>]) -> Result<Bundle<Self::Item>, Self::Error> {
+    fn reuse_bundle(
+        &mut self,
+        x: &Bundle<Self::Item>,
+        deltas: &[Option<&Self::Item>],
+    ) -> Result<Bundle<Self::Item>, Self::Error> {
         Ok(Bundle::new(
-            x.wires().iter().zip(deltas).map(|(w,d)| self.reuse(w,*d)).flatten().collect(),
+            x.wires()
+                .iter()
+                .zip(deltas)
+                .map(|(w, d)| self.reuse(w, *d))
+                .flatten()
+                .collect(),
         ))
     }
 

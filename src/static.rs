@@ -205,7 +205,11 @@ impl Fancy for StaticEvaluator {
         self.evaluator.output(x)
     }
 
-    fn reuse(&mut self, x: &Self::Item, delta: Option<&Self::Item>) -> Result<Self::Item, Self::Error> {
+    fn reuse(
+        &mut self,
+        x: &Self::Item,
+        delta: Option<&Self::Item>,
+    ) -> Result<Self::Item, Self::Error> {
         self.evaluator.reuse(x, delta)
     }
 }

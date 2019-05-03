@@ -387,7 +387,11 @@ impl Fancy for CircuitBuilder {
         Ok(())
     }
 
-    fn reuse(&mut self, _xref: &CircuitRef, _delta: Option<&CircuitRef>) -> Result<CircuitRef, Self::Error> {
+    fn reuse(
+        &mut self,
+        _xref: &CircuitRef,
+        _delta: Option<&CircuitRef>,
+    ) -> Result<CircuitRef, Self::Error> {
         Err(CircuitBuilderError::ReuseUndefined)
     }
 }

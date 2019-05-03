@@ -64,7 +64,11 @@ pub trait Fancy {
     /// Reuse a wire from a previous computation.
     ///
     /// Garbler must input the delta as well as the zero wire.
-    fn reuse(&mut self, x: &Self::Item, delta: Option<&Self::Item>) -> Result<Self::Item, Self::Error>;
+    fn reuse(
+        &mut self,
+        x: &Self::Item,
+        delta: Option<&Self::Item>,
+    ) -> Result<Self::Item, Self::Error>;
 
     ////////////////////////////////////////////////////////////////////////////////
     // Functions built on top of basic fancy operations.

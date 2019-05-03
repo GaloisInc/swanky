@@ -339,7 +339,11 @@ impl<W: Write + Debug, RNG: CryptoRng + RngCore> Fancy for Garbler<W, RNG> {
     }
 
     #[inline]
-    fn reuse(&mut self, old_zero_wire: &Wire, old_delta: Option<&Wire>) -> Result<Wire, GarblerError> {
+    fn reuse(
+        &mut self,
+        old_zero_wire: &Wire,
+        old_delta: Option<&Wire>,
+    ) -> Result<Wire, GarblerError> {
         if let Some(old_delta) = old_delta {
             let q = old_zero_wire.modulus();
 
@@ -349,11 +353,11 @@ impl<W: Write + Debug, RNG: CryptoRng + RngCore> Fancy for Garbler<W, RNG> {
             let mut cts = vec![None; q as usize];
 
             for x in 0..q {
-                let col     = ((old_zero_wire.color() + x) % q) as usize;
-                let mask    = old_zero_wire.plus(&old_delta.cmul(x));
+                let col = ((old_zero_wire.color() + x) % q) as usize;
+                let mask = old_zero_wire.plus(&old_delta.cmul(x));
                 let payload = new_zero_wire.plus(&new_delta.cmul(x));
-                let ct      = mask.as_block() ^ payload.as_block();
-                cts[col]    = Some(ct);
+                let ct = mask.as_block() ^ payload.as_block();
+                cts[col] = Some(ct);
             }
 
             let mut writer = self.writer.borrow_mut();

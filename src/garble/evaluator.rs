@@ -2,12 +2,12 @@ use crate::error::{EvaluatorError, FancyError};
 use crate::fancy::{Fancy, HasModulus};
 use crate::util::{output_tweak, tweak, tweak2};
 use crate::wire::Wire;
+use itertools::Itertools;
 use scuttlebutt::Block;
 use std::cell::RefCell;
 use std::fmt::Debug;
 use std::io::Read;
 use std::rc::Rc;
-use itertools::Itertools;
 
 /// Streaming evaluator using a callback to receive ciphertexts as needed.
 ///
@@ -212,9 +212,13 @@ impl<R: Read + Debug> Fancy for Evaluator<R> {
 
     #[inline]
     fn reuse(&mut self, x: &Wire, _delta: Option<&Wire>) -> Result<Wire, EvaluatorError> {
-        let cts = (0..x.modulus()).map(|_| {
-            self.read_block()
-        }).flatten().collect_vec();
-        Ok(Wire::from_block(cts[x.color() as usize] ^ x.as_block(), x.modulus()))
+        let cts = (0..x.modulus())
+            .map(|_| self.read_block())
+            .flatten()
+            .collect_vec();
+        Ok(Wire::from_block(
+            cts[x.color() as usize] ^ x.as_block(),
+            x.modulus(),
+        ))
     }
 }
