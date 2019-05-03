@@ -15,31 +15,6 @@ impl<W: Clone + HasModulus> BinaryBundle<W> {
         BinaryBundle(Bundle::new(ws))
     }
 
-<<<<<<< HEAD
-    /// Mark a regular bundle as Binary.
-    pub fn from_bundle(b: Bundle<W>) -> BinaryBundle<W> {
-        BinaryBundle(b)
-    }
-
-    /// Extract the underlying bundle from this binary bundle.
-    pub fn extract(self) -> Bundle<W> {
-        self.0
-||||||| merged common ancestors
-    /// Unwrap the underlying bundle from this binary bundle.
-    pub fn unwrap<'a>(&'a self) -> &'a Bundle<W> {
-        &self.0
-=======
-    /// Mark a regular bundle as Binary.
-    pub fn from_bundle(b: Bundle<W>) -> BinaryBundle<W> {
-        BinaryBundle(b)
-    }
-
-    /// Unwrap the underlying bundle from this binary bundle.
-    pub fn borrow<'a>(&'a self) -> &'a Bundle<W> {
-        &self.0
->>>>>>> 8b3bce563e51c2202836be81d3874b034f172324
-    }
-
     /// Extract the underlying bundle from this binary bundle.
     pub fn extract(self) -> Bundle<W> {
         self.0
@@ -135,13 +110,7 @@ pub trait BinaryGadgets: Fancy + BundleGadgets {
         x: &BinaryBundle<Self::Item>,
         y: &BinaryBundle<Self::Item>,
     ) -> Result<BinaryBundle<Self::Item>, Self::Error> {
-<<<<<<< HEAD
         self.add_bundles(&x, &y).map(BinaryBundle)
-||||||| merged common ancestors
-        self.add_bundles(x.unwrap(), y.unwrap()).map(BinaryBundle)
-=======
-        self.add_bundles(x.borrow(), y.borrow()).map(BinaryBundle)
->>>>>>> 8b3bce563e51c2202836be81d3874b034f172324
     }
 
     /// And the bits of two bundles together pairwise.
@@ -150,13 +119,7 @@ pub trait BinaryGadgets: Fancy + BundleGadgets {
         x: &BinaryBundle<Self::Item>,
         y: &BinaryBundle<Self::Item>,
     ) -> Result<BinaryBundle<Self::Item>, Self::Error> {
-<<<<<<< HEAD
         self.mul_bundles(&x, &y).map(BinaryBundle)
-||||||| merged common ancestors
-        self.mul_bundles(x.unwrap(), y.unwrap()).map(BinaryBundle)
-=======
-        self.mul_bundles(x.borrow(), y.borrow()).map(BinaryBundle)
->>>>>>> 8b3bce563e51c2202836be81d3874b034f172324
     }
 
     /// Binary addition. Returns the result and the carry.
