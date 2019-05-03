@@ -20,6 +20,10 @@ impl<W: Clone + HasModulus> CrtBundle<W> {
     /// Extract the underlying bundle from this CRT bundle.
     pub fn extract(self) -> Bundle<W> {
         self.0
+
+    /// Extract the underlying bundle from this CRT bundle.
+    pub fn extract(self) -> Bundle<W> {
+        self.0
     }
 }
 
