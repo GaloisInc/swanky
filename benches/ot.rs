@@ -16,7 +16,7 @@ use std::os::unix::net::UnixStream;
 use std::time::Duration;
 
 /// Specifies the number of OTs to run when benchmarking OT extension.
-const T: usize = 1 << 16;
+const T: usize = 1 << 18;
 
 fn rand_block_vec(size: usize) -> Vec<Block> {
     (0..size).map(|_| rand::random::<Block>()).collect()
@@ -181,7 +181,7 @@ fn bench_random_otext(c: &mut Criterion) {
 
 criterion_group! {
     name = ot;
-    config = Criterion::default().warm_up_time(Duration::from_millis(100));
+    config = Criterion::default().warm_up_time(Duration::from_millis(100)).sample_size(10);
     targets = bench_ot, bench_otext, bench_correlated_otext, bench_random_otext
 }
 

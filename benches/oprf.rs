@@ -82,6 +82,13 @@ fn bench_oprf(c: &mut Criterion) {
             criterion::black_box(result);
         })
     });
+    let inputs = rand_block_vec(1 << 18);
+    c.bench_function("oprf::KKRT (n = 2^18)", move |bench| {
+        bench.iter(|| {
+            let result = _bench_oprf::<oprf::KkrtSender, oprf::KkrtReceiver>(inputs.clone());
+            criterion::black_box(result);
+        })
+    });
 }
 
 fn bench_oprf_compute(c: &mut Criterion) {
@@ -100,7 +107,10 @@ fn bench_oprf_compute(c: &mut Criterion) {
         handle.join().unwrap();
         let seed = rand::random::<Block512>();
         let input = rand::random::<Block>();
-        bench.iter(|| oprf.compute(seed.clone(), input))
+        bench.iter(|| {
+            let result = oprf.compute(seed.clone(), input);
+            criterion::black_box(result);
+        })
     });
 }
 
@@ -191,7 +201,7 @@ criterion_group! {
 #[cfg(feature = "unstable")]
 criterion_group! {
     name = oprf;
-    config = Criterion::default().warm_up_time(Duration::from_millis(100)).sample_size(20);
+    config = Criterion::default().warm_up_time(Duration::from_millis(100)).sample_size(10);
     targets = bench_opprf, bench_opprf_compute, bench_oprf, bench_oprf_compute
 }
 
