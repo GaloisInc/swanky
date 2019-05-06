@@ -90,14 +90,14 @@ impl<R: Read + Debug> Fancy for Evaluator<R> {
     type Item = Wire;
     type Error = EvaluatorError;
 
-    #[inline]
-    fn garbler_input(&mut self, q: u16, _: Option<u16>) -> Result<Self::Item, Self::Error> {
-        self.read_wire(q)
-    }
-
-    #[inline]
-    fn evaluator_input(&mut self, q: u16) -> Result<Self::Item, Self::Error> {
-        self.read_wire(q)
+    fn init(
+        &mut self,
+        garbler_input_moduli: &[u16],
+        evaluator_input_moduli: &[u16],
+        reused_deltas: &[(u16, Self::Item)],
+    ) -> Result<(Vec<Self::Item>, Vec<Self::Item>), Self::Error>
+    {
+        unimplemented!()
     }
 
     #[inline]
@@ -208,17 +208,5 @@ impl<R: Read + Debug> Fancy for Evaluator<R> {
         self.output_cts.push(blocks);
         self.output_wires.push(x.clone());
         Ok(())
-    }
-
-    #[inline]
-    fn reuse(&mut self, x: &Wire, _delta: Option<&Wire>) -> Result<Wire, EvaluatorError> {
-        let cts = (0..x.modulus())
-            .map(|_| self.read_block())
-            .flatten()
-            .collect_vec();
-        Ok(Wire::from_block(
-            cts[x.color() as usize] ^ x.as_block(),
-            x.modulus(),
-        ))
     }
 }

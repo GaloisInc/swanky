@@ -208,16 +208,14 @@ impl Fancy for Informer {
     type Item = InformerVal;
     type Error = InformerError;
 
-    fn garbler_input(&mut self, q: u16, _: Option<u16>) -> Result<InformerVal, InformerError> {
-        self.garbler_input_moduli.push(q);
-        self.update_moduli(q);
-        Ok(InformerVal(q))
-    }
-
-    fn evaluator_input(&mut self, q: u16) -> Result<InformerVal, InformerError> {
-        self.evaluator_input_moduli.push(q);
-        self.update_moduli(q);
-        Ok(InformerVal(q))
+    fn init(
+        &mut self,
+        garbler_input_moduli: &[u16],
+        evaluator_input_moduli: &[u16],
+        reused_deltas: &[(u16, Self::Item)],
+    ) -> Result<(Vec<Self::Item>, Vec<Self::Item>), Self::Error>
+    {
+        unimplemented!()
     }
 
     fn constant(&mut self, val: u16, q: u16) -> Result<InformerVal, InformerError> {
@@ -279,15 +277,5 @@ impl Fancy for Informer {
     fn output(&mut self, x: &InformerVal) -> Result<(), InformerError> {
         self.outputs.push(x.modulus());
         Ok(())
-    }
-
-    fn reuse(
-        &mut self,
-        x: &InformerVal,
-        _delta: Option<&InformerVal>,
-    ) -> Result<InformerVal, InformerError> {
-        self.nreuses += 1;
-        self.nciphertexts += x.modulus() as usize;
-        Ok(x.clone())
     }
 }

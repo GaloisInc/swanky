@@ -93,31 +93,14 @@ impl<W: Write + Debug, RNG: CryptoRng + RngCore> Fancy for Garbler<W, RNG> {
     type Item = Wire;
     type Error = GarblerError;
 
-    #[inline]
-    fn garbler_input(&mut self, q: u16, opt_x: Option<u16>) -> Result<Wire, GarblerError> {
-        let w = Wire::rand(&mut self.rng, q);
-        let d = self.delta(q);
-        if let Some(x) = opt_x {
-            let wire = w.plus(&d.cmul(x));
-            self.send_wire(&wire)?;
-        } else {
-            self.send_message(Message::UnencodedGarblerInput {
-                zero: w.clone(),
-                delta: d,
-            })?;
-        }
-        Ok(w)
-    }
-
-    #[inline]
-    fn evaluator_input(&mut self, q: u16) -> Result<Wire, GarblerError> {
-        let w = Wire::rand(&mut self.rng, q);
-        let d = self.delta(q);
-        self.send_message(Message::UnencodedEvaluatorInput {
-            zero: w.clone(),
-            delta: d,
-        })?;
-        Ok(w)
+    fn init(
+        &mut self,
+        garbler_input_moduli: &[u16],
+        evaluator_input_moduli: &[u16],
+        reused_deltas: &[(u16, Self::Item)],
+    ) -> Result<(Vec<Self::Item>, Vec<Self::Item>), Self::Error>
+    {
+        unimplemented!()
     }
 
     #[inline]
@@ -336,38 +319,5 @@ impl<W: Write + Debug, RNG: CryptoRng + RngCore> Fancy for Garbler<W, RNG> {
             writer.write_all(block.as_ref())?;
         }
         Ok(())
-    }
-
-    #[inline]
-    fn reuse(
-        &mut self,
-        old_zero_wire: &Wire,
-        old_delta: Option<&Wire>,
-    ) -> Result<Wire, GarblerError> {
-        if let Some(old_delta) = old_delta {
-            let q = old_zero_wire.modulus();
-
-            let new_zero_wire = Wire::rand(&mut self.rng, q);
-            let new_delta = self.delta(q);
-
-            let mut cts = vec![None; q as usize];
-
-            for x in 0..q {
-                let col = ((old_zero_wire.color() + x) % q) as usize;
-                let mask = old_zero_wire.plus(&old_delta.cmul(x));
-                let payload = new_zero_wire.plus(&new_delta.cmul(x));
-                let ct = mask.as_block() ^ payload.as_block();
-                cts[col] = Some(ct);
-            }
-
-            let mut writer = self.writer.borrow_mut();
-            for ct in cts.into_iter() {
-                writer.write_all(ct.expect("unassigned ciphertext!").as_ref())?;
-            }
-
-            Ok(new_zero_wire)
-        } else {
-            Err(GarblerError::DeltaRequired)
-        }
     }
 }

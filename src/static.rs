@@ -156,20 +156,14 @@ impl Fancy for StaticEvaluator {
     type Item = Wire;
     type Error = EvaluatorError;
 
-    fn garbler_input(&mut self, _: u16, _: Option<u16>) -> Result<Self::Item, Self::Error> {
-        if self.garbler_inputs.is_empty() {
-            return Err(EvaluatorError::NotEnoughGarblerInputs);
-        }
-        let wire = self.garbler_inputs.remove(0);
-        Ok(wire)
-    }
-
-    fn evaluator_input(&mut self, _: u16) -> Result<Self::Item, Self::Error> {
-        if self.evaluator_inputs.is_empty() {
-            return Err(EvaluatorError::NotEnoughEvaluatorInputs);
-        }
-        let wire = self.evaluator_inputs.remove(0);
-        Ok(wire)
+    fn init(
+        &mut self,
+        garbler_input_moduli: &[u16],
+        evaluator_input_moduli: &[u16],
+        reused_deltas: &[(u16, Self::Item)],
+    ) -> Result<(Vec<Self::Item>, Vec<Self::Item>), Self::Error>
+    {
+        unimplemented!()
     }
 
     fn constant(&mut self, val: u16, q: u16) -> Result<Self::Item, Self::Error> {
@@ -203,14 +197,6 @@ impl Fancy for StaticEvaluator {
 
     fn output(&mut self, x: &Self::Item) -> Result<(), Self::Error> {
         self.evaluator.output(x)
-    }
-
-    fn reuse(
-        &mut self,
-        x: &Self::Item,
-        delta: Option<&Self::Item>,
-    ) -> Result<Self::Item, Self::Error> {
-        self.evaluator.reuse(x, delta)
     }
 }
 

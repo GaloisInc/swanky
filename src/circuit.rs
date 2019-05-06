@@ -121,8 +121,8 @@ impl Circuit {
         for (i, gate) in self.gates.iter().enumerate() {
             let q = self.modulus(i);
             let (zref_, val) = match *gate {
-                Gate::GarblerInput { .. } => (None, f.garbler_input(q, None)?),
-                Gate::EvaluatorInput { .. } => (None, f.evaluator_input(q)?),
+                Gate::GarblerInput { .. } => unimplemented!(),
+                Gate::EvaluatorInput { .. } => unimplemented!(),
                 Gate::Constant { val } => (None, f.constant(val, q)?),
                 Gate::Add { xref, yref, out } => (
                     out,
@@ -278,26 +278,14 @@ impl Fancy for CircuitBuilder {
     type Item = CircuitRef;
     type Error = CircuitBuilderError;
 
-    fn garbler_input(
+    fn init(
         &mut self,
-        modulus: u16,
-        _opt_x: Option<u16>,
-    ) -> Result<CircuitRef, Self::Error> {
-        let gate = Gate::GarblerInput {
-            id: self.get_next_garbler_input_id(),
-        };
-        let r = self.gate(gate, modulus);
-        self.circ.garbler_input_refs.push(r);
-        Ok(r)
-    }
-
-    fn evaluator_input(&mut self, modulus: u16) -> Result<CircuitRef, Self::Error> {
-        let gate = Gate::EvaluatorInput {
-            id: self.get_next_evaluator_input_id(),
-        };
-        let r = self.gate(gate, modulus);
-        self.circ.evaluator_input_refs.push(r);
-        Ok(r)
+        garbler_input_moduli: &[u16],
+        evaluator_input_moduli: &[u16],
+        reused_deltas: &[(u16, Self::Item)],
+    ) -> Result<(Vec<Self::Item>, Vec<Self::Item>), Self::Error>
+    {
+        unimplemented!()
     }
 
     fn constant(&mut self, val: u16, modulus: u16) -> Result<CircuitRef, Self::Error> {
@@ -386,14 +374,6 @@ impl Fancy for CircuitBuilder {
         self.circ.output_refs.push(xref.clone());
         Ok(())
     }
-
-    fn reuse(
-        &mut self,
-        _xref: &CircuitRef,
-        _delta: Option<&CircuitRef>,
-    ) -> Result<CircuitRef, Self::Error> {
-        Err(CircuitBuilderError::ReuseUndefined)
-    }
 }
 
 impl CircuitBuilder {
@@ -458,7 +438,7 @@ mod basic {
 
         let mut b = CircuitBuilder::new();
         let n = 2 + (rng.gen_usize() % 200);
-        let inps = b.evaluator_inputs(&vec![2; n]).unwrap();
+        let (inps, _) = b.init(&[], &vec![2; n], &[]).unwrap();
         let z = b.and_many(&inps).unwrap();
         b.output(&z).unwrap();
         let mut c = b.finish();
@@ -482,7 +462,7 @@ mod basic {
         let mut rng = thread_rng();
         let mut b = CircuitBuilder::new();
         let n = 2 + (rng.gen_usize() % 200);
-        let inps = b.evaluator_inputs(&vec![2; n]).unwrap();
+        let (inps, _) = b.init(&[], &vec![2; n], &[]).unwrap();
         let z = b.or_many(&inps).unwrap();
         b.output(&z).unwrap();
         let mut c = b.finish();
@@ -506,9 +486,8 @@ mod basic {
         let mut rng = thread_rng();
         let mut b = CircuitBuilder::new();
         let q = rng.gen_prime();
-        let x = b.garbler_input(q, None).unwrap();
-        let y = b.evaluator_input(q).unwrap();
-        let z = b.mul(&x, &y).unwrap();
+        let (xs, ys) = b.init(&[q], &[q], &[]).unwrap();
+        let z = b.mul(&xs[0], &ys[0]).unwrap();
         b.output(&z).unwrap();
         let mut c = b.finish();
         for _ in 0..16 {
@@ -525,8 +504,8 @@ mod basic {
         let mut b = CircuitBuilder::new();
         let p = rng.gen_prime();
         let q = rng.gen_prime();
-        let x = b.garbler_input(p, None).unwrap();
-        let y = b.mod_change(&x, q).unwrap();
+        let (xs, _) = b.init(&[p], &[], &[]).unwrap();
+        let y = b.mod_change(&xs[0], q).unwrap();
         let z = b.mod_change(&y, p).unwrap();
         b.output(&z).unwrap();
         let mut c = b.finish();
@@ -541,7 +520,7 @@ mod basic {
     fn add_many_mod_change() {
         let mut b = CircuitBuilder::new();
         let n = 113;
-        let args = b.garbler_inputs(&vec![2; n], None).unwrap();
+        let (_, args) = b.init(&[], &vec![2; n], &[]).unwrap();
         let wires = args
             .iter()
             .map(|x| b.mod_change(x, n as u16 + 1).unwrap())
@@ -570,9 +549,9 @@ mod basic {
         let q = rng.gen_modulus();
         let c = rng.gen_u16() % q;
 
-        let x = b.evaluator_input(q).unwrap();
+        let (_, xs) = b.init(&[], &[q], &[]).unwrap();
         let y = b.constant(c, q).unwrap();
-        let z = b.add(&x, &y).unwrap();
+        let z = b.add(&xs[0], &y).unwrap();
         b.output(&z).unwrap();
 
         let mut circ = b.finish();

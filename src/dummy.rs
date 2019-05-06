@@ -46,25 +46,14 @@ impl Fancy for Dummy {
     type Item = DummyVal;
     type Error = DummyError;
 
-    fn garbler_input(&mut self, modulus: u16, opt_x: Option<u16>) -> Result<DummyVal, Self::Error> {
-        let res = if let Some(val) = opt_x {
-            DummyVal { val, modulus }
-        } else {
-            if self.garbler_inputs.is_empty() {
-                return Err(DummyError::NotEnoughGarblerInputs);
-            }
-            let val = self.garbler_inputs.remove(0);
-            DummyVal { val, modulus }
-        };
-        Ok(res)
-    }
-
-    fn evaluator_input(&mut self, modulus: u16) -> Result<DummyVal, Self::Error> {
-        if self.evaluator_inputs.is_empty() {
-            return Err(DummyError::NotEnoughEvaluatorInputs);
-        }
-        let val = self.evaluator_inputs.remove(0);
-        Ok(DummyVal { val, modulus })
+    fn init(
+        &mut self,
+        garbler_input_moduli: &[u16],
+        evaluator_input_moduli: &[u16],
+        reused_deltas: &[(u16, Self::Item)],
+    ) -> Result<(Vec<Self::Item>, Vec<Self::Item>), Self::Error>
+    {
+        unimplemented!()
     }
 
     fn constant(&mut self, val: u16, modulus: u16) -> Result<DummyVal, Self::Error> {
@@ -122,13 +111,6 @@ impl Fancy for Dummy {
     fn output(&mut self, x: &DummyVal) -> Result<(), Self::Error> {
         self.outputs.push(x.val);
         Ok(())
-    }
-
-    fn reuse(&mut self, x: &DummyVal, _delta: Option<&DummyVal>) -> Result<DummyVal, Self::Error> {
-        Ok(DummyVal {
-            val: x.val,
-            modulus: x.modulus,
-        })
     }
 }
 
