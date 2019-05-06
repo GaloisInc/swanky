@@ -55,11 +55,13 @@ impl OtSender for Sender {
         inputs: &[(Block, Block)],
         _: &mut RNG,
     ) -> Result<(), Error> {
+        let ys = &self.y * &self.s;
         let ks = (0..inputs.len())
             .map(|i| {
                 let r = stream::read_pt(reader)?;
-                let k0 = Block::hash_pt(i, &(self.y * r));
-                let k1 = Block::hash_pt(i, &(self.y * (r - self.s)));
+                let yr = &self.y * &r;
+                let k0 = Block::hash_pt(i, &yr);
+                let k1 = Block::hash_pt(i, &(&yr - &ys));
                 Ok((k0, k1))
             })
             .collect::<Result<Vec<(Block, Block)>, Error>>()?;
