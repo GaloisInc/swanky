@@ -208,15 +208,6 @@ impl Fancy for Informer {
     type Item = InformerVal;
     type Error = InformerError;
 
-    fn init(
-        &mut self,
-        garbler_input_moduli: &[u16],
-        evaluator_input_moduli: &[u16],
-        reused_deltas: &[Self::Item],
-    ) -> Result<(Vec<Self::Item>, Vec<Self::Item>), Self::Error> {
-        unimplemented!()
-    }
-
     fn constant(&mut self, val: u16, q: u16) -> Result<InformerVal, InformerError> {
         self.constants.insert((val, q));
         self.update_moduli(q);

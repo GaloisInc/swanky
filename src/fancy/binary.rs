@@ -40,27 +40,6 @@ impl<F: Fancy> BinaryGadgets for F {}
 
 /// Extension trait for `Fancy` providing gadgets that operate over bundles of mod2 wires.
 pub trait BinaryGadgets: Fancy + BundleGadgets {
-    /// Initialize a fancy object using binary bundles for convenience. Can only be called once.
-    fn bin_init(
-        &mut self,
-        garbler_nbits: &[usize],
-        evaluator_nbits: &[usize],
-        reused_deltas: &[Self::Item],
-    ) -> Result<(Vec<BinaryBundle<Self::Item>>, Vec<BinaryBundle<Self::Item>>), Self::Error> {
-        let gb_ms = garbler_nbits.iter().map(|n| vec![2_u16; *n]).collect_vec();
-        let ev_ms = evaluator_nbits
-            .iter()
-            .map(|n| vec![2_u16; *n])
-            .collect_vec();
-
-        let (xs, ys) = self.init_bundles(&gb_ms, &ev_ms, reused_deltas)?;
-
-        Ok((
-            xs.into_iter().map(BinaryBundle::from).collect_vec(),
-            ys.into_iter().map(BinaryBundle::from).collect_vec(),
-        ))
-    }
-
     /// Create a constant bundle using base 2 inputs.
     fn bin_constant_bundle(
         &mut self,

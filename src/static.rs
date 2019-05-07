@@ -10,7 +10,7 @@
 use crate::circuit::Circuit;
 use crate::error::{EvaluatorError, GarblerError};
 use crate::fancy::HasModulus;
-use crate::garble::{Evaluator, Garbler, Message};
+use crate::garble::{Evaluator, Garbler};
 use crate::wire::Wire;
 use crate::Fancy;
 use scuttlebutt::{AesRng, Block};
@@ -155,15 +155,6 @@ impl StaticEvaluator {
 impl Fancy for StaticEvaluator {
     type Item = Wire;
     type Error = EvaluatorError;
-
-    fn init(
-        &mut self,
-        garbler_input_moduli: &[u16],
-        evaluator_input_moduli: &[u16],
-        reused_deltas: &[Self::Item],
-    ) -> Result<(Vec<Self::Item>, Vec<Self::Item>), Self::Error> {
-        unimplemented!()
-    }
 
     fn constant(&mut self, val: u16, q: u16) -> Result<Self::Item, Self::Error> {
         self.evaluator.constant(val, q)

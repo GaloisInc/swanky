@@ -1,4 +1,3 @@
-use super::Message;
 use crate::error::{FancyError, GarblerError};
 use crate::fancy::{Fancy, HasModulus};
 use crate::util::{output_tweak, tweak, tweak2, RngExt};
@@ -14,9 +13,7 @@ use std::rc::Rc;
 /// Streams garbled circuit ciphertexts through a callback. Parallelizable.
 pub struct Garbler<W: Write + Debug, RNG: CryptoRng + RngCore> {
     writer: Rc<RefCell<W>>,
-    callback: Box<FnMut(Message) -> Result<(), GarblerError>>,
-    // Hash map containing modulus -> associated delta wire-label.
-    deltas: HashMap<u16, Wire>,
+    deltas: HashMap<u16, Wire>, // map from modulus to associated delta wire-label.
     current_output: usize,
     current_gate: usize,
     rng: RNG,
@@ -24,28 +21,16 @@ pub struct Garbler<W: Write + Debug, RNG: CryptoRng + RngCore> {
 
 impl<W: Write + Debug, RNG: CryptoRng + RngCore> Garbler<W, RNG> {
     /// Create a new garbler.
-    ///
-    /// `callback` is a function that enables streaming. It gets called as the
-    /// garbler generates ciphertext information such as garbled gates or input
-    /// wire-labels.
-    pub fn new<F>(writer: Rc<RefCell<W>>, callback: F, rng: RNG) -> Self
-    where
-        F: FnMut(Message) -> Result<(), GarblerError> + 'static,
+    #[inline]
+    pub fn new(writer: Rc<RefCell<W>>, rng: RNG, reused_deltas: &[Wire]) -> Self
     {
         Garbler {
             writer,
-            callback: Box::new(callback),
-            deltas: HashMap::new(),
+            deltas: reused_deltas.iter().map(|w| (w.modulus(), w.clone())).collect(),
             current_gate: 0,
             current_output: 0,
             rng,
         }
-    }
-
-    /// Output some information from the garbling.
-    #[inline]
-    fn send_message(&mut self, m: Message) -> Result<(), GarblerError> {
-        (self.callback)(m)
     }
 
     /// The current non-free gate index of the garbling computation
@@ -69,6 +54,7 @@ impl<W: Write + Debug, RNG: CryptoRng + RngCore> Garbler<W, RNG> {
     }
 
     /// The current output index of the garbling computation.
+    #[inline]
     fn current_output(&mut self) -> usize {
         let current = self.current_output;
         self.current_output += 1;
@@ -76,7 +62,10 @@ impl<W: Write + Debug, RNG: CryptoRng + RngCore> Garbler<W, RNG> {
     }
 
     /// Get the deltas, consuming the Garbler.
-    pub(crate) fn get_deltas(self) -> HashMap<u16, Wire> {
+    ///
+    /// This is useful for reusing wires in multiple garbled circuit instances.
+    #[inline]
+    pub fn get_deltas(self) -> HashMap<u16, Wire> {
         self.deltas
     }
 
@@ -87,20 +76,20 @@ impl<W: Write + Debug, RNG: CryptoRng + RngCore> Garbler<W, RNG> {
         writer.write_all(wire.as_block().as_ref())?;
         Ok(())
     }
+
+    /// Encode a wire, producing the zero wire as well as the encoded value.
+    #[inline]
+    pub fn encode(&mut self, val: u16, modulus: u16) -> (Wire, Wire) {
+        let zero  = Wire::rand(&mut self.rng, modulus);
+        let delta = self.delta(modulus);
+        let enc   = zero.plus(&delta.cmul(val));
+        (zero, enc)
+    }
 }
 
 impl<W: Write + Debug, RNG: CryptoRng + RngCore> Fancy for Garbler<W, RNG> {
     type Item = Wire;
     type Error = GarblerError;
-
-    fn init(
-        &mut self,
-        garbler_input_moduli: &[u16],
-        evaluator_input_moduli: &[u16],
-        reused_deltas: &[Self::Item],
-    ) -> Result<(Vec<Self::Item>, Vec<Self::Item>), Self::Error> {
-        unimplemented!()
-    }
 
     #[inline]
     fn constant(&mut self, x: u16, q: u16) -> Result<Wire, GarblerError> {

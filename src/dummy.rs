@@ -47,23 +47,6 @@ impl Fancy for Dummy {
     type Item = DummyVal;
     type Error = DummyError;
 
-    fn init(
-        &mut self,
-        gb_input_moduli: &[u16],
-        ev_input_moduli: &[u16],
-        _reused_deltas: &[Self::Item],
-    ) -> Result<(Vec<Self::Item>, Vec<Self::Item>), Self::Error> {
-        if self.garbler_inputs.len() != gb_input_moduli.len() {
-            return Err(DummyError::NotEnoughGarblerInputs);
-        }
-        if self.evaluator_inputs.len() != ev_input_moduli.len() {
-            return Err(DummyError::NotEnoughEvaluatorInputs);
-        }
-        let gb = gb_input_moduli.iter().zip(self.garbler_inputs.iter()).map(|(&modulus, &val)| DummyVal { val, modulus }).collect_vec();
-        let ev = ev_input_moduli.iter().zip(self.evaluator_inputs.iter()).map(|(&modulus, &val)| DummyVal { val, modulus }).collect_vec();
-        Ok((gb, ev))
-    }
-
     fn constant(&mut self, val: u16, modulus: u16) -> Result<DummyVal, Self::Error> {
         Ok(DummyVal { val, modulus })
     }

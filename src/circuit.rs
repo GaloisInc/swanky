@@ -278,15 +278,6 @@ impl Fancy for CircuitBuilder {
     type Item = CircuitRef;
     type Error = CircuitBuilderError;
 
-    fn init(
-        &mut self,
-        garbler_input_moduli: &[u16],
-        evaluator_input_moduli: &[u16],
-        reused_deltas: &[Self::Item],
-    ) -> Result<(Vec<Self::Item>, Vec<Self::Item>), Self::Error> {
-        unimplemented!()
-    }
-
     fn constant(&mut self, val: u16, modulus: u16) -> Result<CircuitRef, Self::Error> {
         match self.const_map.get(&(val, modulus)) {
             Some(&r) => Ok(r),

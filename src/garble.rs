@@ -9,41 +9,6 @@ mod garbler;
 pub use crate::garble::evaluator::Evaluator;
 pub use crate::garble::garbler::Garbler;
 
-/// The outputs that can be emitted by a Garbler and consumed by an Evaluator.
-#[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
-pub enum Message {
-    /// The zero wire and delta offset for one of the garbler's inputs.
-    ///
-    /// This is produced by the garbler, and should be transformed into
-    /// `GarblerInput` before being sent to the evaluator.
-    UnencodedGarblerInput {
-        /// The zero wire-label.
-        zero: Wire,
-        /// The offset wire-label.
-        delta: Wire,
-    },
-
-    /// The zero wire and delta offset for one of the evaluator's inputs.
-    ///
-    /// This is produced by the garbler, and should be transformed into
-    /// `EvaluatorInput` before being sent to the evaluator.
-    UnencodedEvaluatorInput {
-        /// The zero wire-label.
-        zero: Wire,
-        /// The offset wire-label.
-        delta: Wire,
-    },
-}
-
-impl std::fmt::Display for Message {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        f.write_str(match self {
-            Message::UnencodedGarblerInput { .. } => "UnencodedGarblerInput",
-            Message::UnencodedEvaluatorInput { .. } => "UnencodedEvaluatorInput",
-        })
-    }
-}
-
 ////////////////////////////////////////////////////////////////////////////////
 // tests
 
@@ -325,7 +290,6 @@ mod classic {
 mod streaming {
     use crate::util::RngExt;
     use crate::FancyError;
-    use crate::Message;
     use crate::{Evaluator, Garbler};
     use crate::{Fancy, HasModulus};
     use itertools::Itertools;
@@ -359,22 +323,7 @@ mod streaming {
         std::thread::spawn(move || {
             let sender = Rc::new(RefCell::new(sender));
             let sender_ = sender.clone();
-            let callback = move |m| {
-                match m {
-                    Message::UnencodedGarblerInput { zero, delta } => {
-                        let x = gb_inp_iter.next().expect("not enough garbler inputs!");
-                        let mut sender = sender_.borrow_mut();
-                        zero.plus(&delta.cmul(x)).as_block().write(&mut *sender)?;
-                    }
-                    Message::UnencodedEvaluatorInput { zero, delta } => {
-                        let x = ev_inp_iter.next().expect("not enough evaluator inputs!");
-                        let mut sender = sender_.borrow_mut();
-                        zero.plus(&delta.cmul(x)).as_block().write(&mut *sender)?;
-                    }
-                }
-                Ok(())
-            };
-            let mut garbler = Garbler::new(sender, callback, rng);
+            let mut garbler = Garbler::new(sender, rng);
             f_gb(&mut garbler);
         });
 
@@ -526,7 +475,7 @@ mod complex {
     use crate::dummy::Dummy;
     use crate::error::GarblerError;
     use crate::util::RngExt;
-    use crate::{CrtGadgets, Evaluator, Fancy, Garbler, HasModulus, Message};
+    use crate::{CrtGadgets, Evaluator, Fancy, Garbler, HasModulus};
     use rand::thread_rng;
     use scuttlebutt::AesRng;
     use std::cell::RefCell;
@@ -586,26 +535,8 @@ mod complex {
             let mut input_ = input.clone();
             std::thread::spawn(move || {
                 let sender = Rc::new(RefCell::new(sender));
-                let sender_ = sender.clone();
-                let callback = move |m| {
-                    match m {
-                        Message::UnencodedGarblerInput { zero, delta } => {
-                            let x = input_.remove(0);
-                            let w = zero.plus(&delta.cmul(x));
-                            let mut sender = sender_.borrow_mut();
-                            w.as_block().write(&mut *sender)?;
-                        }
-                        m => {
-                            return Err(GarblerError::MessageError(format!(
-                                "invalid message {}",
-                                m
-                            )));
-                        }
-                    };
-                    Ok(())
-                };
                 let rng = AesRng::new();
-                let mut garbler = Garbler::new(sender, callback, rng);
+                let mut garbler = Garbler::new(sender, rng);
                 complex_gadget(&mut garbler, Q, N);
             });
             let receiver = Rc::new(RefCell::new(receiver));
@@ -618,26 +549,8 @@ mod complex {
             let mut input_ = input.clone();
             std::thread::spawn(move || {
                 let sender = Rc::new(RefCell::new(sender));
-                let sender_ = sender.clone();
-                let callback = move |m| {
-                    match m {
-                        Message::UnencodedEvaluatorInput { zero, delta } => {
-                            let x = input_.remove(0);
-                            let w = zero.plus(&delta.cmul(x));
-                            let mut sender = sender_.borrow_mut();
-                            w.as_block().write(&mut *sender)?;
-                        }
-                        m => {
-                            return Err(GarblerError::MessageError(format!(
-                                "invalid message {}",
-                                m
-                            )));
-                        }
-                    };
-                    Ok(())
-                };
                 let rng = AesRng::new();
-                let mut garbler = Garbler::new(sender, callback, rng);
+                let mut garbler = Garbler::new(sender, rng);
                 complex_gadget_(&mut garbler, Q, N);
             });
             let receiver = Rc::new(RefCell::new(receiver));
@@ -685,25 +598,14 @@ mod reuse {
         std::thread::spawn(move || {
             let sender = Rc::new(RefCell::new(sender));
             let sender_ = sender.clone();
-            let mut gb1 = Garbler::new(sender.clone(), move |m| {
-                match m {
-                    Message::UnencodedGarblerInput { zero, delta } => {
-                        let x = inps_.remove(0);
-                        let w = zero.plus(&delta.cmul(x));
-                        let mut sender = sender_.borrow_mut();
-                        w.as_block().write(&mut *sender)?;
-                        Ok(())
-                    }
-                    _ => unimplemented!(),
-                }
-            }, AesRng::new());
+            let mut gb1 = Garbler::new(sender.clone(), AesRng::new());
 
             // get the input wirelabels for the garbler
             let (xs, _) = gb1.init(&mods_, &[], &[]).unwrap();
             // also get deltas for those wires
             let ds = xs.iter().map(|w| gb1.delta(w.modulus())).collect_vec();
 
-            let mut gb2 = Garbler::new(sender.clone(), |_| unreachable!(), AesRng::new());
+            let mut gb2 = Garbler::new(sender.clone(), AesRng::new());
             // initialize deltas from previous garbler
             gb2.init(&[], &[], &ds).unwrap();
             // output the input wires from the previous garbler

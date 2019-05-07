@@ -41,27 +41,6 @@ impl<F: Fancy> CrtGadgets for F {}
 
 /// Extension trait for `Fancy` providing advanced CRT gadgets based on bundles of wires.
 pub trait CrtGadgets: Fancy + BundleGadgets {
-    /// Initialize a fancy object using CRT bundles for convenience. Can only be called once.
-    fn crt_init(
-        &mut self,
-        garbler_mods: &[u128],
-        evaluator_mods: &[u128],
-        reused_deltas: &[Self::Item],
-    ) -> Result<(Vec<CrtBundle<Self::Item>>, Vec<CrtBundle<Self::Item>>), Self::Error> {
-        let gb_ms = garbler_mods.iter().map(|q| util::factor(*q)).collect_vec();
-        let ev_ms = evaluator_mods
-            .iter()
-            .map(|q| util::factor(*q))
-            .collect_vec();
-
-        let (xs, ys) = self.init_bundles(&gb_ms, &ev_ms, reused_deltas)?;
-
-        Ok((
-            xs.into_iter().map(CrtBundle::from).collect_vec(),
-            ys.into_iter().map(CrtBundle::from).collect_vec(),
-        ))
-    }
-
     /// Creates a bundle of constant wires for the CRT representation of `x` under
     /// composite modulus `q`.
     fn crt_constant_bundle(

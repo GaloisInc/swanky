@@ -27,21 +27,6 @@ pub trait Fancy {
     /// Errors which may be thrown by the users of Fancy.
     type Error: std::fmt::Debug + std::fmt::Display + std::convert::From<FancyError>;
 
-    /// Initialize the inputs and reused wirelabels for the Fancy object. Init can only be
-    /// called once.
-    fn init(
-        &mut self,
-        garbler_input_moduli: &[u16],
-        evaluator_input_moduli: &[u16],
-        reused_deltas: &[Self::Item],
-    ) -> Result<(Vec<Self::Item>, Vec<Self::Item>), Self::Error>;
-
-    // /// Create an input for the garbler with modulus `q` and optional garbler-private value `opt_x`.
-    // fn garbler_input(&mut self, q: u16, opt_x: Option<u16>) -> Result<Self::Item, Self::Error>;
-
-    // /// Create an input for the evaluator with modulus `q`.
-    // fn evaluator_input(&mut self, q: u16) -> Result<Self::Item, Self::Error>;
-
     /// Create a constant `x` with modulus `q`.
     fn constant(&mut self, x: u16, q: u16) -> Result<Self::Item, Self::Error>;
 
@@ -70,35 +55,8 @@ pub trait Fancy {
     /// Process this wire as output.
     fn output(&mut self, x: &Self::Item) -> Result<(), Self::Error>;
 
-    // /// Reuse a wire from a previous computation.
-    // ///
-    // /// Garbler must input the delta as well as the zero wire.
-    // fn reuse(
-    //     &mut self,
-    //     x: &Self::Item,
-    //     delta: Option<&Self::Item>,
-    // ) -> Result<Self::Item, Self::Error>;
-
     ////////////////////////////////////////////////////////////////////////////////
     // Functions built on top of basic fancy operations.
-
-    // /// Create `n` garbler inputs with the moduli `qs` and optional inputs `xs`.
-    // fn garbler_inputs(
-    //     &mut self,
-    //     qs: &[u16],
-    //     opt_xs: Option<Vec<u16>>,
-    // ) -> Result<Vec<Self::Item>, Self::Error> {
-    //     let xs = to_vec_option(opt_xs, qs.len());
-    //     qs.iter()
-    //         .zip(xs)
-    //         .map(|(&q, x)| self.garbler_input(q, x))
-    //         .collect()
-    // }
-
-    // /// Create `n` evaluator inputs with the moduli `qs`.
-    // fn evaluator_inputs(&mut self, qs: &[u16]) -> Result<Vec<Self::Item>, Self::Error> {
-    //     qs.iter().map(|&q| self.evaluator_input(q)).collect()
-    // }
 
     /// Sum up a slice of wires.
     fn add_many(&mut self, args: &[Self::Item]) -> Result<Self::Item, Self::Error> {

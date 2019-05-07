@@ -1,6 +1,5 @@
 //! Errors that may be output by this library.
 
-use crate::garble::Message;
 use scuttlebutt::Block;
 use std::fmt::{self, Display, Formatter};
 
@@ -66,8 +65,6 @@ pub enum EvaluatorError {
 #[derive(Debug)]
 pub enum GarblerError {
     /// An error occurred while processing a message.
-    MessageError(String),
-    /// A communication error has occurred.
     CommunicationError(String),
     /// Asymmetric moduli error.
     AsymmetricHalfGateModuliMax8(u16),
@@ -181,7 +178,6 @@ impl From<std::sync::mpsc::RecvError> for EvaluatorError {
 impl Display for GarblerError {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         match self {
-            GarblerError::MessageError(s) => write!(f, "{}", s),
             GarblerError::CommunicationError(s) => write!(f, "{}", s),
             GarblerError::AsymmetricHalfGateModuliMax8(q) => write!(
                 f,
@@ -208,12 +204,6 @@ impl From<FancyError> for GarblerError {
 
 impl From<std::io::Error> for GarblerError {
     fn from(e: std::io::Error) -> Self {
-        GarblerError::CommunicationError(e.to_string())
-    }
-}
-
-impl From<std::sync::mpsc::SendError<Message>> for GarblerError {
-    fn from(e: std::sync::mpsc::SendError<Message>) -> Self {
         GarblerError::CommunicationError(e.to_string())
     }
 }

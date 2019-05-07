@@ -89,15 +89,6 @@ impl<R: Read + Debug> Fancy for Evaluator<R> {
     type Item = Wire;
     type Error = EvaluatorError;
 
-    fn init(
-        &mut self,
-        garbler_input_moduli: &[u16],
-        evaluator_input_moduli: &[u16],
-        reused_deltas: &[Self::Item],
-    ) -> Result<(Vec<Self::Item>, Vec<Self::Item>), Self::Error> {
-        unimplemented!()
-    }
-
     #[inline]
     fn constant(&mut self, _: u16, q: u16) -> Result<Wire, EvaluatorError> {
         self.read_wire(q)
