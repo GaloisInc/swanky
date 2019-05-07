@@ -40,58 +40,25 @@ impl<F: Fancy> BinaryGadgets for F {}
 
 /// Extension trait for `Fancy` providing gadgets that operate over bundles of mod2 wires.
 pub trait BinaryGadgets: Fancy + BundleGadgets {
-    /// Create an input bundle for the garbler using `nbits` base 2 inputs and optional input `x`.
-    fn bin_garbler_input_bundle(
+    /// Initialize a fancy object using binary bundles for convenience. Can only be called once.
+    fn bin_init(
         &mut self,
-        nbits: usize,
-        opt_x: Option<u128>,
-    ) -> Result<BinaryBundle<Self::Item>, Self::Error> {
-        self.garbler_input_bundle(&vec![2; nbits], opt_x.map(|x| util::u128_to_bits(x, nbits)))
-            .map(BinaryBundle)
-    }
+        garbler_nbits: &[usize],
+        evaluator_nbits: &[usize],
+        reused_deltas: &[(u16, Self::Item)],
+    ) -> Result<(Vec<BinaryBundle<Self::Item>>, Vec<BinaryBundle<Self::Item>>), Self::Error> {
+        let gb_ms = garbler_nbits.iter().map(|n| vec![2_u16; *n]).collect_vec();
+        let ev_ms = evaluator_nbits
+            .iter()
+            .map(|n| vec![2_u16; *n])
+            .collect_vec();
 
-    /// Create an input bundle for the evaluator using n base 2 inputs.
-    fn bin_evaluator_input_bundle(
-        &mut self,
-        n: usize,
-    ) -> Result<BinaryBundle<Self::Item>, Self::Error> {
-        self.evaluator_input_bundle(&vec![2; n]).map(BinaryBundle)
-    }
+        let (xs, ys) = self.init_bundles(&gb_ms, &ev_ms, reused_deltas)?;
 
-    /// Create `n` garbler input bundles, each with `nbits` bits and optional
-    /// inputs `xs`.
-    fn bin_garbler_input_bundles(
-        &mut self,
-        nbits: usize,
-        n: usize,
-        opt_xs: Option<Vec<u128>>,
-    ) -> Result<Vec<BinaryBundle<Self::Item>>, Self::Error> {
-        if let Some(xs) = opt_xs {
-            if xs.len() != n {
-                return Err(Self::Error::from(FancyError::InvalidArgNum {
-                    got: xs.len(),
-                    needed: n,
-                }));
-            }
-            xs.into_iter()
-                .map(|x| self.bin_garbler_input_bundle(nbits, Some(x)))
-                .collect()
-        } else {
-            (0..n)
-                .map(|_| self.bin_garbler_input_bundle(nbits, None))
-                .collect()
-        }
-    }
-
-    /// Create `n` evaluator input bundles, each with `nbits` bits.
-    fn bin_evaluator_input_bundles(
-        &mut self,
-        nbits: usize,
-        n: usize,
-    ) -> Result<Vec<BinaryBundle<Self::Item>>, Self::Error> {
-        (0..n)
-            .map(|_| self.bin_evaluator_input_bundle(nbits))
-            .collect()
+        Ok((
+            xs.into_iter().map(BinaryBundle::from).collect_vec(),
+            ys.into_iter().map(BinaryBundle::from).collect_vec(),
+        ))
     }
 
     /// Create a constant bundle using base 2 inputs.

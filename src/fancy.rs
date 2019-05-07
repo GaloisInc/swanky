@@ -27,7 +27,8 @@ pub trait Fancy {
     /// Errors which may be thrown by the users of Fancy.
     type Error: std::fmt::Debug + std::fmt::Display + std::convert::From<FancyError>;
 
-    /// Initialize the inputs and reused wirelabels for the Fancy object.
+    /// Initialize the inputs and reused wirelabels for the Fancy object. Init can only be
+    /// called once.
     fn init(
         &mut self,
         garbler_input_moduli: &[u16],

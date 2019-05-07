@@ -76,6 +76,42 @@ impl<F: Fancy> BundleGadgets for F {}
 /// Extension trait for Fancy which provides Bundle constructions which are not
 /// necessarily CRT nor binary-based.
 pub trait BundleGadgets: Fancy {
+    /// Initialize a fancy object using bundles for convenience. Can only be called once.
+    fn init_bundles(
+        &mut self,
+        garbler_bundle_moduli: &[Vec<u16>],
+        evaluator_bundle_moduli: &[Vec<u16>],
+        reused_deltas: &[(u16, Self::Item)],
+    ) -> Result<(Vec<Bundle<Self::Item>>, Vec<Bundle<Self::Item>>), Self::Error> {
+        let (mut xs, mut ys) = self.init(
+            &garbler_bundle_moduli
+                .iter()
+                .flatten()
+                .cloned()
+                .collect_vec(),
+            &evaluator_bundle_moduli
+                .iter()
+                .flatten()
+                .cloned()
+                .collect_vec(),
+            reused_deltas,
+        )?;
+
+        let gb = garbler_bundle_moduli
+            .iter()
+            .map(|ms| Bundle::new(xs.split_off(ms.len())))
+            .collect_vec();
+
+        let ev = evaluator_bundle_moduli
+            .iter()
+            .map(|ms| Bundle::new(ys.split_off(ms.len())))
+            .collect_vec();
+
+        assert!(xs.is_empty() && ys.is_empty());
+
+        Ok((gb, ev))
+    }
+
     /// Creates a bundle of constant wires using moduli `ps`.
     fn constant_bundle(
         &mut self,

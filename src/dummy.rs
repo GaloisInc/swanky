@@ -51,8 +51,7 @@ impl Fancy for Dummy {
         garbler_input_moduli: &[u16],
         evaluator_input_moduli: &[u16],
         reused_deltas: &[(u16, Self::Item)],
-    ) -> Result<(Vec<Self::Item>, Vec<Self::Item>), Self::Error>
-    {
+    ) -> Result<(Vec<Self::Item>, Vec<Self::Item>), Self::Error> {
         unimplemented!()
     }
 
@@ -133,9 +132,8 @@ mod bundle {
             let y = rng.gen_u128() % q;
             let mut d = Dummy::new(&crt_factor(x, q), &crt_factor(y, q));
             {
-                let x = d.crt_garbler_input_bundle(q, None).unwrap();
-                let y = d.crt_evaluator_input_bundle(q).unwrap();
-                let z = d.crt_add(&x, &y).unwrap();
+                let (xs,ys) = d.crt_init(&[q], &[q], &[]).unwrap();
+                let z = d.crt_add(&xs[0], &ys[0]).unwrap();
                 d.output_bundle(&z).unwrap();
             }
             let z = crt_inv_factor(&d.get_output(), q);
@@ -152,9 +150,8 @@ mod bundle {
             let y = rng.gen_u128() % q;
             let mut d = Dummy::new(&crt_factor(x, q), &crt_factor(y, q));
             {
-                let x = d.crt_garbler_input_bundle(q, None).unwrap();
-                let y = d.crt_evaluator_input_bundle(q).unwrap();
-                let z = d.sub_bundles(&x, &y).unwrap();
+                let (xs,ys) = d.crt_init(&[q], &[q], &[]).unwrap();
+                let z = d.sub_bundles(&xs[0], &ys[0]).unwrap();
                 d.output_bundle(&z).unwrap();
             }
             let z = crt_inv_factor(&d.get_output(), q);
@@ -172,8 +169,8 @@ mod bundle {
             let c = 1 + rng.gen_u128() % q;
             let mut d = Dummy::new(&util::u128_to_bits(x, nbits), &[]);
             {
-                let x = d.bin_garbler_input_bundle(nbits, None).unwrap();
-                let z = d.bin_cmul(&x, c, nbits).unwrap();
+                let (xs,_) = d.bin_init(&[nbits], &[], &[]).unwrap();
+                let z = d.bin_cmul(&xs[0], c, nbits).unwrap();
                 d.output_bundle(&z).unwrap();
             }
             let z = util::u128_from_bits(&d.get_output());
@@ -191,9 +188,8 @@ mod bundle {
             let y = rng.gen_u128() % q;
             let mut d = Dummy::new(&util::u128_to_bits(x, nbits), &util::u128_to_bits(y, nbits));
             {
-                let x = d.bin_garbler_input_bundle(nbits, None).unwrap();
-                let y = d.bin_evaluator_input_bundle(nbits).unwrap();
-                let z = d.bin_multiplication_lower_half(&x, &y).unwrap();
+                let (xs,ys) = d.bin_init(&[nbits], &[nbits], &[]).unwrap();
+                let z = d.bin_multiplication_lower_half(&xs[0], &ys[0]).unwrap();
                 d.output_bundle(&z).unwrap();
             }
             let z = util::u128_from_bits(&d.get_output());
@@ -215,7 +211,7 @@ mod bundle {
                 .collect_vec();
             let mut d = Dummy::new(&enc_inps, &[]);
             {
-                let xs = d.crt_garbler_input_bundles(q, n, None).unwrap();
+                let (xs,_) = d.crt_init(&itertools::repeat_n(q,n).collect_vec(), &[], &[]).unwrap();
                 let z = d.crt_max(&xs, "100%").unwrap();
                 d.output_bundle(&z).unwrap();
             }
@@ -234,8 +230,8 @@ mod bundle {
             let should_be = (!x + 1) % q;
             let mut d = Dummy::new(&util::u128_to_bits(x, nbits), &[]);
             {
-                let x = d.bin_garbler_input_bundle(nbits, None).unwrap();
-                let y = d.bin_twos_complement(&x).unwrap();
+                let (xs,_) = d.bin_init(&[nbits], &[], &[]).unwrap();
+                let y = d.bin_twos_complement(&xs[0]).unwrap();
                 d.output_bundle(&y).unwrap();
             }
             let outs = d.get_output();
@@ -259,9 +255,8 @@ mod bundle {
                 .collect_vec();
             let mut d = Dummy::new(&enc_inps, &[]);
             {
-                let x = d.bin_garbler_input_bundle(nbits, None).unwrap();
-                let y = d.bin_garbler_input_bundle(nbits, None).unwrap();
-                let (z, overflow) = d.bin_addition(&x, &y).unwrap();
+                let (xs,ys) = d.bin_init(&[nbits], &[nbits], &[]).unwrap();
+                let (z, overflow) = d.bin_addition(&xs[0], &ys[0]).unwrap();
                 d.output(&overflow).unwrap();
                 d.output_bundle(&z).unwrap();
             }
@@ -292,9 +287,8 @@ mod bundle {
                 .collect_vec();
             let mut d = Dummy::new(&enc_inps, &[]);
             {
-                let x = d.bin_garbler_input_bundle(nbits, None).unwrap();
-                let y = d.bin_garbler_input_bundle(nbits, None).unwrap();
-                let (z, overflow) = d.bin_subtraction(&x, &y).unwrap();
+                let (xs,ys) = d.bin_init(&[nbits], &[nbits], &[]).unwrap();
+                let (z, overflow) = d.bin_subtraction(&xs[0], &ys[0]).unwrap();
                 d.output(&overflow).unwrap();
                 d.output_bundle(&z).unwrap();
             }
@@ -325,9 +319,8 @@ mod bundle {
                 .collect_vec();
             let mut d = Dummy::new(&enc_inps, &[]);
             {
-                let x = d.bin_garbler_input_bundle(nbits, None).unwrap();
-                let y = d.bin_garbler_input_bundle(nbits, None).unwrap();
-                let z = d.bin_lt(&x, &y).unwrap();
+                let (xs,ys) = d.bin_init(&[nbits], &[nbits], &[]).unwrap();
+                let z = d.bin_lt(&xs[0], &ys[0]).unwrap();
                 d.output(&z).unwrap();
             }
             let z = d.get_output()[0] > 0;
@@ -350,7 +343,7 @@ mod bundle {
                 .collect_vec();
             let mut d = Dummy::new(&enc_inps, &[]);
             {
-                let xs = d.bin_garbler_input_bundles(nbits, n, None).unwrap();
+                let (xs,_) = d.bin_init(&itertools::repeat_n(nbits,n).collect_vec(), &[], &[]).unwrap();
                 let z = d.bin_max(&xs).unwrap();
                 d.output_bundle(&z).unwrap();
             }
@@ -367,8 +360,8 @@ mod bundle {
             let x = rng.gen_u128() % q;
             let mut d = Dummy::new(&crt_factor(x, q), &[]);
             {
-                let x = d.crt_garbler_input_bundle(q, None).unwrap();
-                let z = d.crt_relu(&x, "100%", None).unwrap();
+                let (xs,_) = d.crt_init(&[q], &[], &[]).unwrap();
+                let z = d.crt_relu(&xs[0], "100%", None).unwrap();
                 d.output_bundle(&z).unwrap();
             }
             let z = crt_inv_factor(&d.get_output(), q);
@@ -389,8 +382,8 @@ mod bundle {
             let x = rng.gen_u128() % q;
             let mut d = Dummy::new(&util::u128_to_bits(x, nbits), &[]);
             {
-                let x = d.bin_garbler_input_bundle(nbits, None).unwrap();
-                let z = d.bin_abs(&x).unwrap();
+                let (xs,_) = d.bin_init(&[nbits], &[], &[]).unwrap();
+                let z = d.bin_abs(&xs[0]).unwrap();
                 d.output_bundle(&z).unwrap();
             }
             let z = util::u128_from_bits(&d.get_output());
@@ -420,7 +413,9 @@ mod bundle {
             }
 
             let mut b = Dummy::new(&ds, &[]);
-            let xs = b.garbler_input_bundles(&mods, nargs, None).unwrap();
+            let (xs, _) = b
+                .init_bundles(&itertools::repeat_n(mods, nargs).collect_vec(), &[], &[])
+                .unwrap();
             let z = b.mixed_radix_addition_msb_only(&xs).unwrap();
             b.output(&z).unwrap();
             let res = b.get_output()[0];
@@ -441,7 +436,9 @@ mod bundle {
                 }
 
                 let mut b = Dummy::new(&ds, &[]);
-                let xs = b.garbler_input_bundles(&mods, nargs, None).unwrap();
+                let (xs, _) = b
+                    .init_bundles(&itertools::repeat_n(mods, nargs).collect_vec(), &[], &[])
+                    .unwrap();
                 let z = b.mixed_radix_addition_msb_only(&xs).unwrap();
                 b.output(&z).unwrap();
                 let res = b.get_output()[0];

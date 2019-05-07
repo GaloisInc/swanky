@@ -41,23 +41,25 @@ impl<F: Fancy> CrtGadgets for F {}
 
 /// Extension trait for `Fancy` providing advanced CRT gadgets based on bundles of wires.
 pub trait CrtGadgets: Fancy + BundleGadgets {
-    /// Create an input bundle for the garbler using composite CRT modulus `q` and optional
-    /// input `x`.
-    fn crt_garbler_input_bundle(
+    /// Initialize a fancy object using CRT bundles for convenience. Can only be called once.
+    fn crt_init(
         &mut self,
-        q: u128,
-        opt_x: Option<u128>,
-    ) -> Result<CrtBundle<Self::Item>, Self::Error> {
-        self.garbler_input_bundle(&util::factor(q), opt_x.map(|x| util::crt_factor(x, q)))
-            .map(CrtBundle)
-    }
+        garbler_mods: &[u128],
+        evaluator_mods: &[u128],
+        reused_deltas: &[(u16, Self::Item)],
+    ) -> Result<(Vec<CrtBundle<Self::Item>>, Vec<CrtBundle<Self::Item>>), Self::Error> {
+        let gb_ms = garbler_mods.iter().map(|q| util::factor(*q)).collect_vec();
+        let ev_ms = evaluator_mods
+            .iter()
+            .map(|q| util::factor(*q))
+            .collect_vec();
 
-    /// Create an input bundle for the evaluator using composite CRT modulus `q`.
-    fn crt_evaluator_input_bundle(
-        &mut self,
-        q: u128,
-    ) -> Result<CrtBundle<Self::Item>, Self::Error> {
-        self.evaluator_input_bundle(&util::factor(q)).map(CrtBundle)
+        let (xs, ys) = self.init_bundles(&gb_ms, &ev_ms, reused_deltas)?;
+
+        Ok((
+            xs.into_iter().map(CrtBundle::from).collect_vec(),
+            ys.into_iter().map(CrtBundle::from).collect_vec(),
+        ))
     }
 
     /// Creates a bundle of constant wires for the CRT representation of `x` under
@@ -70,40 +72,6 @@ pub trait CrtGadgets: Fancy + BundleGadgets {
         let ps = util::factor(q);
         let xs = ps.iter().map(|&p| (x % p as u128) as u16).collect_vec();
         self.constant_bundle(&xs, &ps).map(CrtBundle)
-    }
-
-    /// Create `n` garbler input bundles, under composite CRT modulus `q` and optional
-    /// inputs `xs`.
-    fn crt_garbler_input_bundles(
-        &mut self,
-        q: u128,
-        n: usize,
-        opt_xs: Option<Vec<u128>>,
-    ) -> Result<Vec<CrtBundle<Self::Item>>, Self::Error> {
-        if let Some(xs) = opt_xs {
-            if xs.len() != n {
-                return Err(Self::Error::from(FancyError::InvalidArgNum {
-                    got: xs.len(),
-                    needed: n,
-                }));
-            }
-            xs.into_iter()
-                .map(|x| self.crt_garbler_input_bundle(q, Some(x)))
-                .collect()
-        } else {
-            (0..n)
-                .map(|_| self.crt_garbler_input_bundle(q, None))
-                .collect()
-        }
-    }
-
-    /// Create `n` evaluator input bundles, under composite CRT modulus `q`.
-    fn crt_evaluator_input_bundles(
-        &mut self,
-        q: u128,
-        n: usize,
-    ) -> Result<Vec<CrtBundle<Self::Item>>, Self::Error> {
-        (0..n).map(|_| self.crt_evaluator_input_bundle(q)).collect()
     }
 
     /// Output a slice of CRT bundles.
