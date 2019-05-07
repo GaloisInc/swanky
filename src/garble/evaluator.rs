@@ -2,7 +2,6 @@ use crate::error::{EvaluatorError, FancyError};
 use crate::fancy::{Fancy, HasModulus};
 use crate::util::{output_tweak, tweak, tweak2};
 use crate::wire::Wire;
-use itertools::Itertools;
 use scuttlebutt::Block;
 use std::cell::RefCell;
 use std::fmt::Debug;
@@ -94,7 +93,7 @@ impl<R: Read + Debug> Fancy for Evaluator<R> {
         &mut self,
         garbler_input_moduli: &[u16],
         evaluator_input_moduli: &[u16],
-        reused_deltas: &[(u16, Self::Item)],
+        reused_deltas: &[Self::Item],
     ) -> Result<(Vec<Self::Item>, Vec<Self::Item>), Self::Error> {
         unimplemented!()
     }

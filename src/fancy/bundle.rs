@@ -1,5 +1,5 @@
 use crate::error::FancyError;
-use crate::fancy::{to_vec_option, Fancy, HasModulus};
+use crate::fancy::{Fancy, HasModulus};
 use itertools::Itertools;
 use std::ops::Index;
 
@@ -81,7 +81,7 @@ pub trait BundleGadgets: Fancy {
         &mut self,
         garbler_bundle_moduli: &[Vec<u16>],
         evaluator_bundle_moduli: &[Vec<u16>],
-        reused_deltas: &[(u16, Self::Item)],
+        reused_deltas: &[Self::Item],
     ) -> Result<(Vec<Bundle<Self::Item>>, Vec<Bundle<Self::Item>>), Self::Error> {
         let (mut xs, mut ys) = self.init(
             &garbler_bundle_moduli

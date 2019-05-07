@@ -97,7 +97,7 @@ impl<W: Write + Debug, RNG: CryptoRng + RngCore> Fancy for Garbler<W, RNG> {
         &mut self,
         garbler_input_moduli: &[u16],
         evaluator_input_moduli: &[u16],
-        reused_deltas: &[(u16, Self::Item)],
+        reused_deltas: &[Self::Item],
     ) -> Result<(Vec<Self::Item>, Vec<Self::Item>), Self::Error> {
         unimplemented!()
     }

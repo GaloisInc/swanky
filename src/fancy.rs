@@ -33,7 +33,7 @@ pub trait Fancy {
         &mut self,
         garbler_input_moduli: &[u16],
         evaluator_input_moduli: &[u16],
-        reused_deltas: &[(u16, Self::Item)],
+        reused_deltas: &[Self::Item],
     ) -> Result<(Vec<Self::Item>, Vec<Self::Item>), Self::Error>;
 
     // /// Create an input for the garbler with modulus `q` and optional garbler-private value `opt_x`.

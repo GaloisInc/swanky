@@ -46,7 +46,7 @@ pub trait CrtGadgets: Fancy + BundleGadgets {
         &mut self,
         garbler_mods: &[u128],
         evaluator_mods: &[u128],
-        reused_deltas: &[(u16, Self::Item)],
+        reused_deltas: &[Self::Item],
     ) -> Result<(Vec<CrtBundle<Self::Item>>, Vec<CrtBundle<Self::Item>>), Self::Error> {
         let gb_ms = garbler_mods.iter().map(|q| util::factor(*q)).collect_vec();
         let ev_ms = evaluator_mods

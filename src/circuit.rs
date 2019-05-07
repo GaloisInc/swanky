@@ -282,7 +282,7 @@ impl Fancy for CircuitBuilder {
         &mut self,
         garbler_input_moduli: &[u16],
         evaluator_input_moduli: &[u16],
-        reused_deltas: &[(u16, Self::Item)],
+        reused_deltas: &[Self::Item],
     ) -> Result<(Vec<Self::Item>, Vec<Self::Item>), Self::Error> {
         unimplemented!()
     }
@@ -725,7 +725,7 @@ mod bundle {
 
         let nargs = 2 + rng.gen_usize() % 100;
         let mods = (0..7).map(|_| rng.gen_modulus()).collect_vec();
-        let buns = itertools::repeat_n(mods, nargs).collect_vec();
+        let buns = itertools::repeat_n(mods.clone(), nargs).collect_vec();
 
         let mut b = CircuitBuilder::new();
         let (_, xs) = b.init_bundles(&[], &buns, &[]).unwrap();
@@ -767,7 +767,7 @@ mod bundle {
         println!("q={}", q);
 
         let mut b = CircuitBuilder::new();
-        let (xs,_) = b.crt_init(&[q], &[], &[]).unwrap();
+        let (xs, _) = b.crt_init(&[q], &[], &[]).unwrap();
         let z = b.crt_relu(&xs[0], "100%", None).unwrap();
         b.output_bundle(&z).unwrap();
         let mut c = b.finish();
@@ -788,7 +788,7 @@ mod bundle {
         println!("q={}", q);
 
         let mut b = CircuitBuilder::new();
-        let (xs,_) = b.crt_init(&[q], &[], &[]).unwrap();
+        let (xs, _) = b.crt_init(&[q], &[], &[]).unwrap();
         let z = b.crt_sgn(&xs[0], "100%", None).unwrap();
         b.output_bundle(&z).unwrap();
         let mut c = b.finish();
@@ -834,7 +834,9 @@ mod bundle {
         println!("n={} q={}", n, q);
 
         let mut b = CircuitBuilder::new();
-        let (xs, _) = b.crt_init(&itertools::repeat_n(q, n).collect_vec(), &[], &[]).unwrap();
+        let (xs, _) = b
+            .crt_init(&itertools::repeat_n(q, n).collect_vec(), &[], &[])
+            .unwrap();
         let z = b.crt_max(&xs, "100%").unwrap();
         b.output_bundle(&z).unwrap();
         let mut c = b.finish();

@@ -45,7 +45,7 @@ pub trait BinaryGadgets: Fancy + BundleGadgets {
         &mut self,
         garbler_nbits: &[usize],
         evaluator_nbits: &[usize],
-        reused_deltas: &[(u16, Self::Item)],
+        reused_deltas: &[Self::Item],
     ) -> Result<(Vec<BinaryBundle<Self::Item>>, Vec<BinaryBundle<Self::Item>>), Self::Error> {
         let gb_ms = garbler_nbits.iter().map(|n| vec![2_u16; *n]).collect_vec();
         let ev_ms = evaluator_nbits
