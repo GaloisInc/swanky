@@ -5,6 +5,7 @@
 
 use crate::error::{DummyError, FancyError};
 use crate::fancy::{Fancy, HasModulus};
+use itertools::Itertools;
 
 /// Simple struct that performs the fancy computation over `u16`.
 pub struct Dummy {
@@ -48,11 +49,19 @@ impl Fancy for Dummy {
 
     fn init(
         &mut self,
-        garbler_input_moduli: &[u16],
-        evaluator_input_moduli: &[u16],
-        reused_deltas: &[Self::Item],
+        gb_input_moduli: &[u16],
+        ev_input_moduli: &[u16],
+        _reused_deltas: &[Self::Item],
     ) -> Result<(Vec<Self::Item>, Vec<Self::Item>), Self::Error> {
-        unimplemented!()
+        if self.garbler_inputs.len() != gb_input_moduli.len() {
+            return Err(DummyError::NotEnoughGarblerInputs);
+        }
+        if self.evaluator_inputs.len() != ev_input_moduli.len() {
+            return Err(DummyError::NotEnoughEvaluatorInputs);
+        }
+        let gb = gb_input_moduli.iter().zip(self.garbler_inputs.iter()).map(|(&modulus, &val)| DummyVal { val, modulus }).collect_vec();
+        let ev = ev_input_moduli.iter().zip(self.evaluator_inputs.iter()).map(|(&modulus, &val)| DummyVal { val, modulus }).collect_vec();
+        Ok((gb, ev))
     }
 
     fn constant(&mut self, val: u16, modulus: u16) -> Result<DummyVal, Self::Error> {
@@ -257,8 +266,8 @@ mod bundle {
                 .collect_vec();
             let mut d = Dummy::new(&enc_inps, &[]);
             {
-                let (xs, ys) = d.bin_init(&[nbits], &[nbits], &[]).unwrap();
-                let (z, overflow) = d.bin_addition(&xs[0], &ys[0]).unwrap();
+                let (xs, _) = d.bin_init(&[nbits, nbits], &[], &[]).unwrap();
+                let (z, overflow) = d.bin_addition(&xs[0], &xs[1]).unwrap();
                 d.output(&overflow).unwrap();
                 d.output_bundle(&z).unwrap();
             }
@@ -289,8 +298,8 @@ mod bundle {
                 .collect_vec();
             let mut d = Dummy::new(&enc_inps, &[]);
             {
-                let (xs, ys) = d.bin_init(&[nbits], &[nbits], &[]).unwrap();
-                let (z, overflow) = d.bin_subtraction(&xs[0], &ys[0]).unwrap();
+                let (xs, _) = d.bin_init(&[nbits, nbits], &[], &[]).unwrap();
+                let (z, overflow) = d.bin_subtraction(&xs[0], &xs[1]).unwrap();
                 d.output(&overflow).unwrap();
                 d.output_bundle(&z).unwrap();
             }
@@ -321,8 +330,8 @@ mod bundle {
                 .collect_vec();
             let mut d = Dummy::new(&enc_inps, &[]);
             {
-                let (xs, ys) = d.bin_init(&[nbits], &[nbits], &[]).unwrap();
-                let z = d.bin_lt(&xs[0], &ys[0]).unwrap();
+                let (xs, _) = d.bin_init(&[nbits, nbits], &[], &[]).unwrap();
+                let z = d.bin_lt(&xs[0], &xs[1]).unwrap();
                 d.output(&z).unwrap();
             }
             let z = d.get_output()[0] > 0;

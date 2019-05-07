@@ -99,15 +99,23 @@ pub trait BundleGadgets: Fancy {
 
         let gb = garbler_bundle_moduli
             .iter()
-            .map(|ms| Bundle::new(xs.split_off(ms.len())))
+            .map(|ms| {
+                let rest = xs.split_off(ms.len());
+                let b = Bundle::new(xs.clone());
+                xs = rest;
+                b
+            })
             .collect_vec();
 
         let ev = evaluator_bundle_moduli
             .iter()
-            .map(|ms| Bundle::new(ys.split_off(ms.len())))
+            .map(|ms| {
+                let rest = ys.split_off(ms.len());
+                let b = Bundle::new(ys.clone());
+                ys = rest;
+                b
+            })
             .collect_vec();
-
-        assert!(xs.is_empty() && ys.is_empty());
 
         Ok((gb, ev))
     }
