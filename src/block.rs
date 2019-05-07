@@ -68,7 +68,7 @@ impl Block {
 
     /// Hash an elliptic curve point `pt` and tweak `tweak`.
     ///
-    /// Computes the hash by computing `E_{pt}(tweak)`, where `E` is AES-128.
+    /// Computes the hash by computing `E_{pt}(tweak)`, where `E` is AES-256.
     #[cfg(all(feature = "curve25519-dalek", feature = "nightly"))]
     #[inline]
     pub fn hash_pt(tweak: usize, pt: &RistrettoPoint) -> Self {
@@ -80,7 +80,7 @@ impl Block {
 
     /// Hash an elliptic curve point `pt` and tweak `tweak`.
     ///
-    /// Computes the hash by computing `E_{pt}(tweak)`, where `E` is AES-128.
+    /// Computes the hash by computing `E_{pt}(tweak)`, where `E` is AES-256.
     #[cfg(all(feature = "curve25519-dalek", not(feature = "nightly")))]
     #[inline]
     pub fn hash_pt(tweak: usize, pt: &RistrettoPoint) -> Self {
