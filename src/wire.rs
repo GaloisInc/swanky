@@ -174,7 +174,8 @@ impl Wire {
         self.clone().plus_mov(other)
     }
 
-    /// Add another wire into this one, digit-wise mod q.
+    /// Add another wire digit-wise into this one. Assumes that both wires have
+    /// the same modulus.
     #[inline]
     pub fn plus_eq<'a>(&'a mut self, other: &Wire) -> &'a mut Wire {
         match (&mut *self, other) {
