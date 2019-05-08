@@ -20,7 +20,9 @@ pub enum Wire {
     /// stored as follows: the least-significant bits of each element are stored
     /// in `lsb` and the most-significant bits of each element are stored in
     /// `msb`. This representation allows for efficient addition and
-    /// multiplication as described here:
+    /// multiplication as described here by the paper "Hardware Implementation
+    /// of Finite Fields of Characteristic Three." D. Page, N.P. Smart. CHES
+    /// 2002. Link:
     /// <https://link.springer.com/content/pdf/10.1007/3-540-36400-5_38.pdf>.
     Mod3 {
         /// The least-significant bits of each `mod-3` element.
@@ -150,6 +152,9 @@ impl Wire {
                 ref mut lsb,
                 ref mut msb,
             } => {
+                // We want the color digit to be `1`, which requires setting the
+                // appropriate `lsb` element to `1` and the appropriate `msb`
+                // element to `0`.
                 *lsb |= 1;
                 *msb &= 0xFFFF_FFFF_FFFF_FFFE;
             }
@@ -189,6 +194,8 @@ impl Wire {
                 },
                 Wire::Mod3 { lsb: b1, msb: b2 },
             ) => {
+                // As explained in the cited paper above, the following
+                // operations do element-wise addition.
                 let t = (*a1 | b2) ^ (*a2 | b1);
                 let c1 = (*a2 | b2) ^ t;
                 let c2 = (*a1 | b1) ^ t;
@@ -247,9 +254,9 @@ impl Wire {
                 }
                 1 => {}
                 2 => {
-                    let tmp = *msb;
-                    *msb = *lsb;
-                    *lsb = tmp;
+                    // Multiplication by two is the same as negation in `mod-3`,
+                    // which just involves swapping `lsb` and `msb`.
+                    std::mem::swap(lsb, msb);
                 }
                 c => {
                     self.cmul_eq(c % 3);
@@ -282,9 +289,8 @@ impl Wire {
         match self {
             Wire::Mod2 { val } => *val = val.flip(),
             Wire::Mod3 { lsb, msb } => {
-                let tmp = *msb;
-                *msb = *lsb;
-                *lsb = tmp;
+                // Negation just involves swapping `lsb` and `msb`.
+                std::mem::swap(lsb, msb);
             }
             Wire::ModN { q, ds } => {
                 ds.iter_mut().for_each(|d| {
@@ -334,11 +340,13 @@ impl Wire {
         if q == 2 {
             Wire::Mod2 { val: rng.gen() }
         } else if q == 3 {
+            // Generate 64 mod-three values and then embed them into `lsb` and
+            // `msb`.
             let mut lsb = 0u64;
             let mut msb = 0u64;
             for (i, v) in (0..64).map(|_| rng.gen::<u8>() % 3).enumerate() {
                 lsb |= ((v & 1) as u64) << i;
-                msb |= (((v & 2) >> 1) as u64) << i;
+                msb |= (((v >> 1) & 1) as u64) << i;
             }
             debug_assert_eq!(lsb & msb, 0);
             Wire::Mod3 { lsb, msb }
@@ -365,13 +373,17 @@ impl Wire {
     pub fn hashback(&self, tweak: Block, q: u16) -> Wire {
         if q == 3 {
             let block = self.hash(tweak);
+            // We now have to convert `block` into a valid `Mod3` encoding. We
+            // do this by using the `base_conversion` lookup capabilities to
+            // build a `ModN` encoding, and then map this `ModN` encoding to a
+            // `Mod3` encoding.
             let mut lsb = 0u64;
             let mut msb = 0u64;
             match Self::_from_block_lookup(block, q) {
                 Wire::ModN { ds, .. } => {
                     for (i, v) in ds.iter().enumerate() {
                         lsb |= ((v & 1) as u64) << i;
-                        msb |= (((v & 2) >> 1) as u64) << i;
+                        msb |= (((v >> 1) & 1u16) as u64) << i;
                     }
                     Wire::Mod3 { lsb, msb }
                 }
