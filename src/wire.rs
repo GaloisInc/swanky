@@ -93,7 +93,8 @@ impl Wire {
         Wire::ModN { q, ds }
     }
 
-    /// Unpack the wire represented by a `Block` with modulus `q`.
+    /// Unpack the wire represented by a `Block` with modulus `q`. Assumes that
+    /// the block was constructed through the `Wire` API.
     #[inline]
     pub fn from_block(inp: Block, q: u16) -> Self {
         if q == 2 {
@@ -102,6 +103,7 @@ impl Wire {
             let inp = u128::from(inp);
             let lsb = inp as u64;
             let msb = (inp >> 64) as u64;
+            debug_assert_eq!(lsb & msb, 0);
             Wire::Mod3 { lsb, msb }
         } else if q < 256 && base_conversion::lookup_defined_for_mod(q) {
             Self::_from_block_lookup(inp, q)

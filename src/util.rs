@@ -51,18 +51,7 @@ pub fn output_tweak(i: usize, k: u16) -> Block {
 ////////////////////////////////////////////////////////////////////////////////
 // mixed radix stuff
 
-/// Add two base q numbers together.
-// #[inline]
-// pub(crate) fn base_q_add(xs: &[u16], ys: &[u16], q: u16) -> Vec<u16> {
-//     if ys.len() > xs.len() {
-//         return base_q_add(ys, xs, q);
-//     }
-//     let mut ret = xs.to_vec();
-//     base_q_add_eq(&mut ret, ys, q);
-//     ret
-// }
-
-/// Add a base q number into the first one.
+/// Add a base `q` slice `ys` into `xs`.
 #[inline]
 pub fn base_q_add_eq(xs: &mut [u16], ys: &[u16], q: u16) {
     debug_assert!(
