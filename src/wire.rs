@@ -74,6 +74,23 @@ impl Wire {
         }
     }
 
+    fn _from_block_lookup(inp: Block, q: u16) -> Self {
+        debug_assert!(q < 256);
+        debug_assert!(base_conversion::lookup_defined_for_mod(q));
+        let bytes: [u8; 16] = inp.into();
+        // The digits in position 15 will be the longest, so we can use stateful
+        // (fast) base `q` addition.
+        let mut ds = base_conversion::lookup_digits_mod_at_position(bytes[15], q, 15).to_vec();
+        for i in 0..15 {
+            let cs = base_conversion::lookup_digits_mod_at_position(bytes[i], q, i);
+            util::base_q_add_eq(&mut ds, &cs, q);
+        }
+        // Drop the digits we won't be able to pack back in again, especially if
+        // they get multiplied.
+        ds.truncate(util::digits_per_u128(q));
+        Wire::ModN { q, ds }
+    }
+
     /// Unpack the wire represented by a `Block` with modulus `q`.
     #[inline]
     pub fn from_block(inp: Block, q: u16) -> Self {
@@ -85,20 +102,7 @@ impl Wire {
             let msb = (inp >> 64) as u64;
             Wire::Mod3 { lsb, msb }
         } else if q < 256 && base_conversion::lookup_defined_for_mod(q) {
-            let bytes: [u8; 16] = inp.into();
-
-            // the digits in position 15 will be the longest, so we can use stateful
-            // (fast) base_q_addition
-            let mut ds = base_conversion::lookup_digits_mod_at_position(bytes[15], q, 15).to_vec();
-            for i in 0..15 {
-                let cs = base_conversion::lookup_digits_mod_at_position(bytes[i], q, i);
-                util::base_q_add_eq(&mut ds, &cs, q);
-            }
-
-            // drop the digits we won't be able to pack back in again, especially if
-            // they get multiplied
-            ds.truncate(util::digits_per_u128(q));
-            Wire::ModN { q, ds }
+            Self::_from_block_lookup(inp, q)
         } else {
             Wire::ModN {
                 q,
@@ -335,14 +339,13 @@ impl Wire {
                 lsb |= ((v & 1) as u64) << i;
                 msb |= (((v & 2) >> 1) as u64) << i;
             }
-            assert_eq!(lsb & msb, 0);
+            debug_assert_eq!(lsb & msb, 0);
             Wire::Mod3 { lsb, msb }
         } else {
             let ds = (0..util::digits_per_u128(q))
                 .map(|_| rng.gen::<u16>() % q)
                 .collect();
             Wire::ModN { q, ds }
-            // Self::from_block(rng.gen::<Block>(), q)
         }
     }
 
@@ -361,26 +364,18 @@ impl Wire {
     pub fn hashback(&self, tweak: Block, q: u16) -> Wire {
         if q == 3 {
             let block = self.hash(tweak);
-            let bytes: [u8; 16] = block.into();
-
-            // the digits in position 15 will be the longest, so we can use stateful
-            // (fast) base_q_addition
-            let mut ds = base_conversion::lookup_digits_mod_at_position(bytes[15], q, 15).to_vec();
-            for i in 0..15 {
-                let cs = base_conversion::lookup_digits_mod_at_position(bytes[i], q, i);
-                util::base_q_add_eq(&mut ds, &cs, q);
-            }
-
-            // drop the digits we won't be able to pack back in again, especially if
-            // they get multiplied
-            ds.truncate(util::digits_per_u128(q));
             let mut lsb = 0u64;
             let mut msb = 0u64;
-            for (i, v) in ds.iter().enumerate() {
-                lsb |= ((v & 1) as u64) << i;
-                msb |= (((v & 2) >> 1) as u64) << i;
+            match Self::_from_block_lookup(block, q) {
+                Wire::ModN { ds, .. } => {
+                    for (i, v) in ds.iter().enumerate() {
+                        lsb |= ((v & 1) as u64) << i;
+                        msb |= (((v & 2) >> 1) as u64) << i;
+                    }
+                    Wire::Mod3 { lsb, msb }
+                }
+                _ => panic!("[Wire::hashback] should never get here!"),
             }
-            Wire::Mod3 { lsb, msb }
         } else {
             Self::from_block(self.hash(tweak), q)
         }
