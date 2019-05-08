@@ -109,7 +109,8 @@ fn as_base_q(x: u128, q: u16, n: usize) -> Vec<u16> {
     as_mixed_radix(x, &ms)
 }
 
-/// Determine how many `mod q` digits fit into a `u128`.
+/// Determine how many `mod q` digits fit into a `u128` (includes the color
+/// digit).
 #[inline]
 pub(crate) fn digits_per_u128(modulus: u16) -> usize {
     debug_assert_ne!(modulus, 1);
