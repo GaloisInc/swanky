@@ -4,14 +4,12 @@
 //! creating any circuits.
 
 use crate::error::{DummyError, FancyError};
-use crate::fancy::{Fancy, HasModulus};
+use crate::fancy::{Fancy, HasModulus, CrtBundle, BinaryBundle};
 use itertools::Itertools;
 
 /// Simple struct that performs the fancy computation over `u16`.
 pub struct Dummy {
     outputs: Vec<u16>,
-    garbler_inputs: Vec<u16>,
-    evaluator_inputs: Vec<u16>,
 }
 
 /// Wrapper around `u16`.
@@ -27,12 +25,32 @@ impl HasModulus for DummyVal {
     }
 }
 
+impl DummyVal {
+    /// Create a new DummyVal.
+    pub fn new(val: u16, modulus: u16) -> Self {
+        Self { val, modulus }
+    }
+
+    /// Create a CrtBundle of DummyVal consisting of the CRT factorization of x using
+    /// composite modulus q.
+    pub fn crt_factor(x: u128, q: u128) -> CrtBundle<DummyVal> {
+        let ms = crate::util::factor(q);
+        let xs = crate::util::crt(x, &ms);
+        CrtBundle::new(xs.into_iter().zip(ms.into_iter()).map(|(x,q)| {
+            DummyVal::new(x,q)
+        }).collect())
+    }
+
+    /// Create a BinaryBundle of DummyVal consisting of the `n` least significant bits of x.
+    pub fn u128_to_bits(x: u128, n: usize) -> BinaryBundle<DummyVal> {
+        BinaryBundle::new(crate::util::u128_to_bits(x, n).into_iter().map(|b| DummyVal::new(b,2)).collect())
+    }
+}
+
 impl Dummy {
     /// Create a new Dummy.
-    pub fn new(garbler_inputs: &[u16], evaluator_inputs: &[u16]) -> Dummy {
+    pub fn new() -> Dummy {
         Dummy {
-            garbler_inputs: garbler_inputs.to_vec(),
-            evaluator_inputs: evaluator_inputs.to_vec(),
             outputs: Vec::new(),
         }
     }
@@ -122,10 +140,11 @@ mod bundle {
             let q = rng.gen_usable_composite_modulus();
             let x = rng.gen_u128() % q;
             let y = rng.gen_u128() % q;
-            let mut d = Dummy::new(&crt_factor(x, q), &crt_factor(y, q));
+            let mut d = Dummy::new();
             {
-                let (xs, ys) = d.crt_init(&[q], &[q], &[]).unwrap();
-                let z = d.crt_add(&xs[0], &ys[0]).unwrap();
+                let x = DummyVal::crt_factor(x, q);
+                let y = DummyVal::crt_factor(y, q);
+                let z = d.crt_add(&x, &y).unwrap();
                 d.output_bundle(&z).unwrap();
             }
             let z = crt_inv_factor(&d.get_output(), q);
@@ -140,10 +159,11 @@ mod bundle {
             let q = rng.gen_usable_composite_modulus();
             let x = rng.gen_u128() % q;
             let y = rng.gen_u128() % q;
-            let mut d = Dummy::new(&crt_factor(x, q), &crt_factor(y, q));
+            let mut d = Dummy::new();
             {
-                let (xs, ys) = d.crt_init(&[q], &[q], &[]).unwrap();
-                let z = d.sub_bundles(&xs[0], &ys[0]).unwrap();
+                let x = DummyVal::crt_factor(x, q);
+                let y = DummyVal::crt_factor(y, q);
+                let z = d.sub_bundles(&x, &y).unwrap();
                 d.output_bundle(&z).unwrap();
             }
             let z = crt_inv_factor(&d.get_output(), q);
@@ -159,10 +179,10 @@ mod bundle {
             let q = 1 << nbits;
             let x = rng.gen_u128() % q;
             let c = 1 + rng.gen_u128() % q;
-            let mut d = Dummy::new(&util::u128_to_bits(x, nbits), &[]);
+            let mut d = Dummy::new();
             {
-                let (xs, _) = d.bin_init(&[nbits], &[], &[]).unwrap();
-                let z = d.bin_cmul(&xs[0], c, nbits).unwrap();
+                let x = DummyVal::u128_to_bits(x, nbits);
+                let z = d.bin_cmul(&x, c, nbits).unwrap();
                 d.output_bundle(&z).unwrap();
             }
             let z = util::u128_from_bits(&d.get_output());
@@ -178,10 +198,11 @@ mod bundle {
             let q = 1 << nbits;
             let x = rng.gen_u128() % q;
             let y = rng.gen_u128() % q;
-            let mut d = Dummy::new(&util::u128_to_bits(x, nbits), &util::u128_to_bits(y, nbits));
+            let mut d = Dummy::new();
             {
-                let (xs, ys) = d.bin_init(&[nbits], &[nbits], &[]).unwrap();
-                let z = d.bin_multiplication_lower_half(&xs[0], &ys[0]).unwrap();
+                let x = DummyVal::u128_to_bits(x, nbits);
+                let y = DummyVal::u128_to_bits(y, nbits);
+                let z = d.bin_multiplication_lower_half(&x, &y).unwrap();
                 d.output_bundle(&z).unwrap();
             }
             let z = util::u128_from_bits(&d.get_output());
@@ -197,15 +218,9 @@ mod bundle {
         for _ in 0..NITERS {
             let inps = (0..n).map(|_| rng.gen_u128() % (q / 2)).collect_vec();
             let should_be = *inps.iter().max().unwrap();
-            let enc_inps = inps
-                .into_iter()
-                .flat_map(|x| crt_factor(x, q))
-                .collect_vec();
-            let mut d = Dummy::new(&enc_inps, &[]);
+            let mut d = Dummy::new();
             {
-                let (xs, _) = d
-                    .crt_init(&itertools::repeat_n(q, n).collect_vec(), &[], &[])
-                    .unwrap();
+                let xs = inps.into_iter().map(|x| DummyVal::crt_factor(x, q)).collect_vec();
                 let z = d.crt_max(&xs, "100%").unwrap();
                 d.output_bundle(&z).unwrap();
             }
@@ -222,10 +237,10 @@ mod bundle {
         for _ in 0..NITERS {
             let x = rng.gen_u128() % q;
             let should_be = (!x + 1) % q;
-            let mut d = Dummy::new(&util::u128_to_bits(x, nbits), &[]);
+            let mut d = Dummy::new();
             {
-                let (xs, _) = d.bin_init(&[nbits], &[], &[]).unwrap();
-                let y = d.bin_twos_complement(&xs[0]).unwrap();
+                let x = DummyVal::u128_to_bits(x, nbits);
+                let y = d.bin_twos_complement(&x).unwrap();
                 d.output_bundle(&y).unwrap();
             }
             let outs = d.get_output();
@@ -243,14 +258,11 @@ mod bundle {
             let x = rng.gen_u128() % q;
             let y = rng.gen_u128() % q;
             let should_be = (x + y) % q;
-            let enc_inps = [x, y]
-                .into_iter()
-                .flat_map(|&x| util::u128_to_bits(x, nbits))
-                .collect_vec();
-            let mut d = Dummy::new(&enc_inps, &[]);
+            let mut d = Dummy::new();
             {
-                let (xs, _) = d.bin_init(&[nbits, nbits], &[], &[]).unwrap();
-                let (z, overflow) = d.bin_addition(&xs[0], &xs[1]).unwrap();
+                let x = DummyVal::u128_to_bits(x,nbits);
+                let y = DummyVal::u128_to_bits(y,nbits);
+                let (z, overflow) = d.bin_addition(&x, &y).unwrap();
                 d.output(&overflow).unwrap();
                 d.output_bundle(&z).unwrap();
             }
@@ -275,14 +287,11 @@ mod bundle {
             let x = rng.gen_u128() % q;
             let y = rng.gen_u128() % q;
             let should_be = (x - y) % q;
-            let enc_inps = [x, y]
-                .into_iter()
-                .flat_map(|&x| util::u128_to_bits(x, nbits))
-                .collect_vec();
-            let mut d = Dummy::new(&enc_inps, &[]);
+            let mut d = Dummy::new();
             {
-                let (xs, _) = d.bin_init(&[nbits, nbits], &[], &[]).unwrap();
-                let (z, overflow) = d.bin_subtraction(&xs[0], &xs[1]).unwrap();
+                let x = DummyVal::u128_to_bits(x, nbits);
+                let y = DummyVal::u128_to_bits(y, nbits);
+                let (z, overflow) = d.bin_subtraction(&x, &y).unwrap();
                 d.output(&overflow).unwrap();
                 d.output_bundle(&z).unwrap();
             }
@@ -307,14 +316,11 @@ mod bundle {
             let x = rng.gen_u128() % q;
             let y = rng.gen_u128() % q;
             let should_be = x < y;
-            let enc_inps = [x, y]
-                .into_iter()
-                .flat_map(|&x| util::u128_to_bits(x, nbits))
-                .collect_vec();
-            let mut d = Dummy::new(&enc_inps, &[]);
+            let mut d = Dummy::new();
             {
-                let (xs, _) = d.bin_init(&[nbits, nbits], &[], &[]).unwrap();
-                let z = d.bin_lt(&xs[0], &xs[1]).unwrap();
+                let x = DummyVal::u128_to_bits(x, nbits);
+                let y = DummyVal::u128_to_bits(y, nbits);
+                let z = d.bin_lt(&x,&y).unwrap();
                 d.output(&z).unwrap();
             }
             let z = d.get_output()[0] > 0;
@@ -331,15 +337,12 @@ mod bundle {
         for _ in 0..NITERS {
             let inps = (0..n).map(|_| rng.gen_u128() % q).collect_vec();
             let should_be = *inps.iter().max().unwrap();
-            let enc_inps = inps
-                .into_iter()
-                .flat_map(|x| util::u128_to_bits(x, nbits))
-                .collect_vec();
-            let mut d = Dummy::new(&enc_inps, &[]);
+            let mut d = Dummy::new();
             {
-                let (xs, _) = d
-                    .bin_init(&itertools::repeat_n(nbits, n).collect_vec(), &[], &[])
-                    .unwrap();
+                let xs = inps
+                    .into_iter()
+                    .map(|x| DummyVal::u128_to_bits(x, nbits))
+                    .collect_vec();
                 let z = d.bin_max(&xs).unwrap();
                 d.output_bundle(&z).unwrap();
             }
@@ -354,10 +357,10 @@ mod bundle {
         for _ in 0..NITERS {
             let q = crate::util::modulus_with_nprimes(4 + rng.gen_usize() % 7); // exact relu supports up to 11 primes
             let x = rng.gen_u128() % q;
-            let mut d = Dummy::new(&crt_factor(x, q), &[]);
+            let mut d = Dummy::new();
             {
-                let (xs, _) = d.crt_init(&[q], &[], &[]).unwrap();
-                let z = d.crt_relu(&xs[0], "100%", None).unwrap();
+                let x = DummyVal::crt_factor(x, q);
+                let z = d.crt_relu(&x, "100%", None).unwrap();
                 d.output_bundle(&z).unwrap();
             }
             let z = crt_inv_factor(&d.get_output(), q);
@@ -376,10 +379,10 @@ mod bundle {
             let nbits = 64;
             let q = 1 << nbits;
             let x = rng.gen_u128() % q;
-            let mut d = Dummy::new(&util::u128_to_bits(x, nbits), &[]);
+            let mut d = Dummy::new();
             {
-                let (xs, _) = d.bin_init(&[nbits], &[], &[]).unwrap();
-                let z = d.bin_abs(&xs[0]).unwrap();
+                let x = DummyVal::u128_to_bits(x, nbits);
+                let z = d.bin_abs(&x).unwrap();
                 d.output_bundle(&z).unwrap();
             }
             let z = util::u128_from_bits(&d.get_output());
@@ -408,7 +411,6 @@ mod bundle {
                 ds.extend(util::as_mixed_radix(Q - 1, &mods).iter());
             }
 
-            let mut b = Dummy::new(&ds, &[]);
             let (xs, _) = b
                 .init_bundles(&itertools::repeat_n(mods.clone(), nargs).collect_vec(), &[], &[])
                 .unwrap();

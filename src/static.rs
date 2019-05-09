@@ -105,16 +105,8 @@ pub fn garble(c: &mut Circuit) -> Result<(Encoder, GarbledCircuit), GarblerError
     let gb_inputs_ = gb_inputs.clone();
     let ev_inputs_ = ev_inputs.clone();
     let deltas = {
-        let callback = move |m| {
-            match m {
-                Message::UnencodedGarblerInput { zero, .. } => gb_inputs_.borrow_mut().push(zero),
-                Message::UnencodedEvaluatorInput { zero, .. } => ev_inputs_.borrow_mut().push(zero),
-            }
-            Ok(())
-        };
-
         let rng = AesRng::new();
-        let mut garbler = Garbler::new(writer_, callback, rng);
+        let mut garbler = Garbler::new(writer_, rng, &[]);
         let outputs = c.eval(&mut garbler)?;
         c.process_outputs(&outputs, &mut garbler)?;
         garbler.get_deltas()

@@ -2,9 +2,11 @@
 //! where you create a circuit for a computation then garble it.
 
 use crate::error::{CircuitBuilderError, DummyError, FancyError, InformerError};
-use crate::fancy::{Fancy, HasModulus};
+use crate::fancy::{Fancy, HasModulus, Bundle, CrtBundle, BinaryBundle};
+use crate::dummy::{Dummy, DummyVal};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use itertools::Itertools;
 
 /// The index and modulus of a gate in a circuit.
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
@@ -116,7 +118,7 @@ impl Circuit {
     }
 
     /// Evaluate the circuit using fancy object `f`.
-    pub fn eval<F: Fancy>(&mut self, f: &mut F) -> Result<Vec<F::Item>, F::Error> {
+    pub fn eval<F: Fancy>(&mut self, f: &mut F, garbler_inputs: &[F::Item], evaluator_inputs: &[F::Item]) -> Result<Vec<F::Item>, F::Error> {
         let mut cache: Vec<Option<F::Item>> = vec![None; self.gates.len()];
         for (i, gate) in self.gates.iter().enumerate() {
             let q = self.modulus(i);
@@ -211,8 +213,17 @@ impl Circuit {
         garbler_inputs: &[u16],
         evaluator_inputs: &[u16],
     ) -> Result<Vec<u16>, DummyError> {
-        let mut dummy = crate::dummy::Dummy::new(garbler_inputs, evaluator_inputs);
-        let outputs = self.eval(&mut dummy)?;
+        let mut dummy = crate::dummy::Dummy::new();
+
+        // encode inputs as DummyVals
+        let gb = garbler_inputs.iter().zip(self.garbler_input_refs.iter()).map(|(x,r)| {
+            DummyVal::new(*x,r.modulus())
+        }).collect_vec();
+        let ev = evaluator_inputs.iter().zip(self.evaluator_input_refs.iter()).map(|(x,r)| {
+            DummyVal::new(*x,r.modulus())
+        }).collect_vec();
+
+        let outputs = self.eval(&mut dummy, &gb, &ev)?;
         self.process_outputs(&outputs, &mut dummy)?;
         Ok(dummy.get_output())
     }
@@ -220,7 +231,16 @@ impl Circuit {
     /// Print circuit info.
     pub fn print_info(&mut self) -> Result<(), InformerError> {
         let mut informer = crate::informer::Informer::new();
-        let outputs = self.eval(&mut informer)?;
+
+        // encode inputs as InformerVals
+        let gb = self.garbler_input_refs.iter().map(|r| {
+            crate::informer::InformerVal::new(r.modulus())
+        }).collect_vec();
+        let ev = self.evaluator_input_refs.iter().map(|r| {
+            crate::informer::InformerVal::new(r.modulus())
+        }).collect_vec();
+
+        let outputs = self.eval(&mut informer, &gb, &ev)?;
         self.process_outputs(&outputs, &mut informer)?;
         informer.print_info();
         Ok(())
@@ -413,6 +433,36 @@ impl CircuitBuilder {
         let ix = self.get_next_ref_ix();
         CircuitRef { ix, modulus }
     }
+
+    /// Get CircuitRefs for the input wires.
+    pub fn init(&mut self, garbler_inputs: &[u16], evaluator_inputs: &[u16]) ->
+        Result<(Vec<CircuitRef>, Vec<CircuitRef>), CircuitBuilderError>
+    {
+        unimplemented!()
+    }
+
+    /// Get CircuitRefs for the input wires as wire bundles.
+    pub fn init_bundles(&mut self, garbler_inputs: &[Vec<u16>], evaluator_inputs: &[Vec<u16>]) ->
+        Result<(Vec<Bundle<CircuitRef>>, Vec<Bundle<CircuitRef>>), CircuitBuilderError>
+    {
+        unimplemented!()
+    }
+
+    /// Get CircuitRefs for the input wires as CRT wire bundles - each value of the input
+    /// is the composite CRT modulus for that bundle.
+    pub fn crt_init(&mut self, garbler_inputs: &[u128], evaluator_inputs: &[u128]) ->
+        Result<(Vec<CrtBundle<CircuitRef>>, Vec<CrtBundle<CircuitRef>>), CircuitBuilderError>
+    {
+        unimplemented!()
+    }
+
+    /// Get CircuitRefs for the input wires as Binary wire bundles - the inputs take the
+    /// number of bits in each bundle.
+    pub fn bin_init(&mut self, garbler_inputs: &[usize], evaluator_inputs: &[usize]) ->
+        Result<(Vec<BinaryBundle<CircuitRef>>, Vec<BinaryBundle<CircuitRef>>), CircuitBuilderError>
+    {
+        unimplemented!()
+    }
 }
 
 #[cfg(test)]
@@ -428,7 +478,7 @@ mod basic {
 
         let mut b = CircuitBuilder::new();
         let n = 2 + (rng.gen_usize() % 200);
-        let (inps, _) = b.init(&[], &vec![2; n], &[]).unwrap();
+        let (inps, _) = b.init(&[], &vec![2; n]).unwrap();
         let z = b.and_many(&inps).unwrap();
         b.output(&z).unwrap();
         let mut c = b.finish();
@@ -452,7 +502,7 @@ mod basic {
         let mut rng = thread_rng();
         let mut b = CircuitBuilder::new();
         let n = 2 + (rng.gen_usize() % 200);
-        let (inps, _) = b.init(&[], &vec![2; n], &[]).unwrap();
+        let (inps, _) = b.init(&[], &vec![2; n]).unwrap();
         let z = b.or_many(&inps).unwrap();
         b.output(&z).unwrap();
         let mut c = b.finish();
@@ -476,7 +526,7 @@ mod basic {
         let mut rng = thread_rng();
         let mut b = CircuitBuilder::new();
         let q = rng.gen_prime();
-        let (xs, ys) = b.init(&[q], &[q], &[]).unwrap();
+        let (xs, ys) = b.init(&[q], &[q]).unwrap();
         let z = b.mul(&xs[0], &ys[0]).unwrap();
         b.output(&z).unwrap();
         let mut c = b.finish();
@@ -494,7 +544,7 @@ mod basic {
         let mut b = CircuitBuilder::new();
         let p = rng.gen_prime();
         let q = rng.gen_prime();
-        let (xs, _) = b.init(&[p], &[], &[]).unwrap();
+        let (xs, _) = b.init(&[p], &[]).unwrap();
         let y = b.mod_change(&xs[0], q).unwrap();
         let z = b.mod_change(&y, p).unwrap();
         b.output(&z).unwrap();
@@ -510,7 +560,7 @@ mod basic {
     fn add_many_mod_change() {
         let mut b = CircuitBuilder::new();
         let n = 113;
-        let (_, args) = b.init(&[], &vec![2; n], &[]).unwrap();
+        let (_, args) = b.init(&[], &vec![2; n]).unwrap();
         let wires = args
             .iter()
             .map(|x| b.mod_change(x, n as u16 + 1).unwrap())
@@ -539,7 +589,7 @@ mod basic {
         let q = rng.gen_modulus();
         let c = rng.gen_u16() % q;
 
-        let (_, xs) = b.init(&[], &[q], &[]).unwrap();
+        let (_, xs) = b.init(&[], &[q]).unwrap();
         let y = b.constant(c, q).unwrap();
         let z = b.add(&xs[0], &y).unwrap();
         b.output(&z).unwrap();
@@ -569,7 +619,7 @@ mod bundle {
         let q = rng.gen_usable_composite_modulus();
 
         let mut b = CircuitBuilder::new();
-        let (xs, ys) = b.crt_init(&[q], &[q], &[]).unwrap();
+        let (xs, ys) = b.crt_init(&[q], &[q]).unwrap();
         let z = b.crt_add(&xs[0], &ys[0]).unwrap();
         b.output_bundle(&z).unwrap();
         let mut c = b.finish();
@@ -589,7 +639,7 @@ mod bundle {
         let q = rng.gen_usable_composite_modulus();
 
         let mut b = CircuitBuilder::new();
-        let (xs, ys) = b.crt_init(&[q], &[q], &[]).unwrap();
+        let (xs, ys) = b.crt_init(&[q], &[q]).unwrap();
         let z = b.sub_bundles(&xs[0], &ys[0]).unwrap();
         b.output_bundle(&z).unwrap();
         let mut c = b.finish();
@@ -609,7 +659,7 @@ mod bundle {
         let q = util::modulus_with_width(16);
 
         let mut b = CircuitBuilder::new();
-        let (xs, _) = b.crt_init(&[q], &[], &[]).unwrap();
+        let (xs, _) = b.crt_init(&[q], &[]).unwrap();
         let y = rng.gen_u128() % q;
         let z = b.crt_cmul(&xs[0], y).unwrap();
         b.output_bundle(&z).unwrap();
@@ -629,7 +679,7 @@ mod bundle {
         let q = rng.gen_usable_composite_modulus();
 
         let mut b = CircuitBuilder::new();
-        let (xs, ys) = b.crt_init(&[q], &[q], &[]).unwrap();
+        let (xs, ys) = b.crt_init(&[q], &[q]).unwrap();
         let z = b.mul_bundles(&xs[0], &ys[0]).unwrap();
         b.output_bundle(&z).unwrap();
         let mut c = b.finish();
@@ -650,7 +700,7 @@ mod bundle {
         let y = rng.gen_u16() % 10;
 
         let mut b = CircuitBuilder::new();
-        let (xs, _) = b.crt_init(&[q], &[], &[]).unwrap();
+        let (xs, _) = b.crt_init(&[q], &[]).unwrap();
         let z = b.crt_cexp(&xs[0], y).unwrap();
         b.output_bundle(&z).unwrap();
         let mut c = b.finish();
@@ -672,7 +722,7 @@ mod bundle {
         let p = ps[rng.gen_u16() as usize % ps.len()];
 
         let mut b = CircuitBuilder::new();
-        let (xs, _) = b.crt_init(&[q], &[], &[]).unwrap();
+        let (xs, _) = b.crt_init(&[q], &[]).unwrap();
         let z = b.crt_rem(&xs[0], p).unwrap();
         b.output_bundle(&z).unwrap();
         let mut c = b.finish();
@@ -692,7 +742,7 @@ mod bundle {
         let q = rng.gen_usable_composite_modulus();
 
         let mut b = CircuitBuilder::new();
-        let (xs, ys) = b.crt_init(&[q], &[q], &[]).unwrap();
+        let (xs, ys) = b.crt_init(&[q], &[q]).unwrap();
         let z = b.eq_bundles(&xs[0], &ys[0]).unwrap();
         b.output(&z).unwrap();
         let mut c = b.finish();
@@ -719,7 +769,7 @@ mod bundle {
         let buns = itertools::repeat_n(mods.clone(), nargs).collect_vec();
 
         let mut b = CircuitBuilder::new();
-        let (_, xs) = b.init_bundles(&[], &buns, &[]).unwrap();
+        let (_, xs) = b.init_bundles(&[], &buns).unwrap();
         let z = b.mixed_radix_addition(&xs).unwrap();
         b.output_bundle(&z).unwrap();
         let mut circ = b.finish();
@@ -758,7 +808,7 @@ mod bundle {
         println!("q={}", q);
 
         let mut b = CircuitBuilder::new();
-        let (xs, _) = b.crt_init(&[q], &[], &[]).unwrap();
+        let (xs, _) = b.crt_init(&[q], &[]).unwrap();
         let z = b.crt_relu(&xs[0], "100%", None).unwrap();
         b.output_bundle(&z).unwrap();
         let mut c = b.finish();
@@ -779,7 +829,7 @@ mod bundle {
         println!("q={}", q);
 
         let mut b = CircuitBuilder::new();
-        let (xs, _) = b.crt_init(&[q], &[], &[]).unwrap();
+        let (xs, _) = b.crt_init(&[q], &[]).unwrap();
         let z = b.crt_sgn(&xs[0], "100%", None).unwrap();
         b.output_bundle(&z).unwrap();
         let mut c = b.finish();
@@ -799,7 +849,7 @@ mod bundle {
         let q = util::modulus_with_width(10);
 
         let mut b = CircuitBuilder::new();
-        let (xs, ys) = b.crt_init(&[q], &[q], &[]).unwrap();
+        let (xs, ys) = b.crt_init(&[q], &[q]).unwrap();
         let z = b.crt_lt(&xs[0], &ys[0], "100%").unwrap();
         b.output(&z).unwrap();
         let mut c = b.finish();
@@ -826,7 +876,7 @@ mod bundle {
 
         let mut b = CircuitBuilder::new();
         let (xs, _) = b
-            .crt_init(&itertools::repeat_n(q, n).collect_vec(), &[], &[])
+            .crt_init(&itertools::repeat_n(q, n).collect_vec(), &[])
             .unwrap();
         let z = b.crt_max(&xs, "100%").unwrap();
         b.output_bundle(&z).unwrap();
@@ -856,7 +906,7 @@ mod bundle {
         println!("n={} q={} Q={}", n, q, Q);
 
         let mut b = CircuitBuilder::new();
-        let (xs, ys) = b.bin_init(&[n], &[n], &[]).unwrap();
+        let (xs, ys) = b.bin_init(&[n], &[n]).unwrap();
         let (zs, carry) = b.bin_addition(&xs[0], &ys[0]).unwrap();
         b.output(&carry).unwrap();
         b.output_bundle(&zs).unwrap();

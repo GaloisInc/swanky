@@ -25,13 +25,13 @@ pub mod error;
 mod fancy;
 mod garble;
 pub mod informer;
-// mod parser;
-// pub mod r#static;
+mod parser;
+pub mod r#static;
 pub mod util;
 mod wire;
 
 pub use crate::error::FancyError;
 pub use crate::fancy::*;
 pub use crate::garble::*;
-// pub use crate::r#static::*;
+pub use crate::r#static::*;
 pub use crate::wire::*;

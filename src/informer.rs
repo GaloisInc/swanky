@@ -32,6 +32,12 @@ impl HasModulus for InformerVal {
     }
 }
 
+impl InformerVal {
+    pub fn new(modulus: u16) -> Self {
+        InformerVal(modulus)
+    }
+}
+
 impl Informer {
     /// Make a new `Informer`.
     pub fn new() -> Informer {
