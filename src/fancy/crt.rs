@@ -303,7 +303,8 @@ pub trait CrtGadgets: Fancy + BundleGadgets {
     }
 }
 
-/// Compute the ms needed for the number of CRT primes in `x`, with accuracy acc.
+/// Compute the `ms` needed for the number of CRT primes in `x`, with accuracy
+/// `accuracy`.
 ///
 /// Supported accuracy: ["100%", "99.9%", "99%"]
 fn get_ms<W: Clone + HasModulus>(x: &Bundle<W>, accuracy: &str) -> Vec<u16> {
