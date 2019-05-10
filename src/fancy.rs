@@ -255,12 +255,3 @@ pub trait Fancy {
         Ok(())
     }
 }
-
-pub(crate) fn to_vec_option<T>(opt_xs: Option<Vec<T>>, len: usize) -> Vec<Option<T>> {
-    opt_xs
-        .map(|vals| {
-            // transform option of slice into vec of options
-            vals.into_iter().map(Some).collect()
-        })
-        .unwrap_or_else(|| (0..len).map(|_| None).collect())
-}

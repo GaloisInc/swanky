@@ -14,7 +14,7 @@ mod classic {
     use crate::circuit::{Circuit, CircuitBuilder};
     use crate::dummy::Dummy;
     use crate::dummy::DummyVal;
-    use crate::fancy::{BundleGadgets, Fancy, Bundle};
+    use crate::fancy::{Bundle, BundleGadgets, Fancy};
     use crate::r#static::garble;
     use crate::util::{self, RngExt};
     use itertools::Itertools;
@@ -68,7 +68,7 @@ mod classic {
     fn add_many() {
         garble_test_helper(|q| {
             let mut b = CircuitBuilder::new();
-            let xs = b.evaluator_inputs(&vec![q;16]);
+            let xs = b.evaluator_inputs(&vec![q; 16]);
             let z = b.add_many(&xs).unwrap();
             b.output(&z).unwrap();
             b.finish()
@@ -79,7 +79,7 @@ mod classic {
     fn or_many() {
         garble_test_helper(|_| {
             let mut b = CircuitBuilder::new();
-            let xs = b.evaluator_inputs(&vec![2;16]);
+            let xs = b.evaluator_inputs(&vec![2; 16]);
             let z = b.or_many(&xs).unwrap();
             b.output(&z).unwrap();
             b.finish()
@@ -212,7 +212,9 @@ mod classic {
         let mods = vec![3, 7, 10, 2, 13];
 
         let mut b = CircuitBuilder::new();
-        let xs = (0..nargs).map(|_| Bundle::new(b.evaluator_inputs(&mods))).collect_vec();
+        let xs = (0..nargs)
+            .map(|_| Bundle::new(b.evaluator_inputs(&mods)))
+            .collect_vec();
         let z = b.mixed_radix_addition(&xs).unwrap();
         b.output_bundle(&z).unwrap();
         let mut circ = b.finish();
@@ -305,13 +307,14 @@ mod streaming {
     use std::os::unix::net::UnixStream;
     use std::rc::Rc;
 
-    type Reader = UnixStream;
-    type Writer = UnixStream;
-
     // helper - checks that Streaming evaluation of a fancy function equals Dummy
     // evaluation of the same function
-    fn streaming_test<FGB, FEV, FDU>(mut f_gb: FGB, mut f_ev: FEV, mut f_du: FDU, input_mods: &[u16])
-    where
+    fn streaming_test<FGB, FEV, FDU>(
+        mut f_gb: FGB,
+        mut f_ev: FEV,
+        mut f_du: FDU,
+        input_mods: &[u16],
+    ) where
         FGB: FnMut(&mut Garbler<UnixStream, AesRng>, &[Wire]) + Send + Sync + Copy + 'static,
         FEV: FnMut(&mut Evaluator<UnixStream>, &[Wire]) + Send + Sync + Copy + 'static,
         FDU: FnMut(&mut Dummy, &[DummyVal]) + Send + Sync + Copy + 'static,
@@ -463,7 +466,7 @@ mod complex {
     use std::rc::Rc;
 
     fn complex_gadget<F: Fancy>(b: &mut F, xs: &[CrtBundle<F::Item>]) {
-        let mut zs = xs
+        let zs = xs
             .iter()
             .map(|x| {
                 let c = b.crt_constant_bundle(1, x.composite_modulus()).unwrap();
@@ -481,16 +484,17 @@ mod complex {
         let qs = crate::util::primes_with_width(10);
         let Q = crate::util::product(&qs);
         for _ in 0..16 {
-            let input = (0..N)
-                .map(|_| rng.gen_u128() % Q)
-                .collect_vec();
+            let input = (0..N).map(|_| rng.gen_u128() % Q).collect_vec();
 
             // Compute the correct answer using `Dummy`.
             let mut dummy = Dummy::new();
-            let dinps = input.iter().map(|x| {
-                let xs = crate::util::crt(*x, &qs);
-                CrtBundle::new(Dummy::encode_inputs(&xs, &qs).unwrap())
-            }).collect_vec();
+            let dinps = input
+                .iter()
+                .map(|x| {
+                    let xs = crate::util::crt(*x, &qs);
+                    CrtBundle::new(Dummy::encode_inputs(&xs, &qs).unwrap())
+                })
+                .collect_vec();
             complex_gadget(&mut dummy, &dinps);
             let should_be = dummy.get_output();
 
@@ -568,7 +572,6 @@ mod reuse {
         let mods_ = mods.clone();
         std::thread::spawn(move || {
             let sender = Rc::new(RefCell::new(sender));
-            let sender_ = sender.clone();
             let mut gb1 = Garbler::new(sender.clone(), AesRng::new(), &[]);
 
             // get the input wirelabels
@@ -590,7 +593,10 @@ mod reuse {
         let receiver = Rc::new(RefCell::new(receiver));
         let mut ev1 = Evaluator::new(receiver.clone());
 
-        let xs = mods.iter().map(|q| ev1.read_wire(*q).unwrap()).collect_vec();
+        let xs = mods
+            .iter()
+            .map(|q| ev1.read_wire(*q).unwrap())
+            .collect_vec();
 
         let mut ev2 = Evaluator::new(receiver);
         ev2.outputs(&xs).unwrap();

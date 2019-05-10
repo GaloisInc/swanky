@@ -1,5 +1,5 @@
 use crate::error::{FancyError, GarblerError};
-use crate::fancy::{Fancy, HasModulus, CrtBundle};
+use crate::fancy::{CrtBundle, Fancy, HasModulus};
 use crate::util::{output_tweak, tweak, tweak2, RngExt};
 use crate::wire::Wire;
 use rand::{CryptoRng, RngCore};

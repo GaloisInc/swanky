@@ -130,9 +130,14 @@ impl Circuit {
             let (zref_, val) = match *gate {
                 Gate::GarblerInput { id } => (None, garbler_inputs[id].clone()),
                 Gate::EvaluatorInput { id } => {
-                    assert!(id < evaluator_inputs.len(), "id={} ev_inps.len()={}", id, evaluator_inputs.len());
+                    assert!(
+                        id < evaluator_inputs.len(),
+                        "id={} ev_inps.len()={}",
+                        id,
+                        evaluator_inputs.len()
+                    );
                     (None, evaluator_inputs[id].clone())
-                },
+                }
                 Gate::Constant { val } => (None, f.constant(val, q)?),
                 Gate::Add { xref, yref, out } => (
                     out,
@@ -518,7 +523,7 @@ mod basic {
 
         let mut b = CircuitBuilder::new();
         let n = 2 + (rng.gen_usize() % 200);
-        let inps = b.evaluator_inputs(&vec![2;n]);
+        let inps = b.evaluator_inputs(&vec![2; n]);
         let z = b.and_many(&inps).unwrap();
         b.output(&z).unwrap();
         let mut c = b.finish();
@@ -568,7 +573,7 @@ mod basic {
         let q = rng.gen_prime();
         let x = b.garbler_input(q);
         let y = b.evaluator_input(q);
-        let z = b.mul(&x,&y).unwrap();
+        let z = b.mul(&x, &y).unwrap();
         b.output(&z).unwrap();
         let mut c = b.finish();
         for _ in 0..16 {
@@ -601,7 +606,7 @@ mod basic {
     fn add_many_mod_change() {
         let mut b = CircuitBuilder::new();
         let n = 113;
-        let args = b.garbler_inputs(&vec![2;n]);
+        let args = b.garbler_inputs(&vec![2; n]);
         let wires = args
             .iter()
             .map(|x| b.mod_change(x, n as u16 + 1).unwrap())
@@ -662,7 +667,7 @@ mod bundle {
         let mut b = CircuitBuilder::new();
         let x = b.crt_garbler_input(q);
         let y = b.crt_evaluator_input(q);
-        let z = b.crt_add(&x,&y).unwrap();
+        let z = b.crt_add(&x, &y).unwrap();
         b.output_bundle(&z).unwrap();
         let mut c = b.finish();
 
@@ -813,9 +818,9 @@ mod bundle {
         let mods = (0..7).map(|_| rng.gen_modulus()).collect_vec();
 
         let mut b = CircuitBuilder::new();
-        let xs = (0..nargs).map(|_| {
-            Bundle::new(b.evaluator_inputs(&mods))
-        }).collect_vec();
+        let xs = (0..nargs)
+            .map(|_| Bundle::new(b.evaluator_inputs(&mods)))
+            .collect_vec();
         let z = b.mixed_radix_addition(&xs).unwrap();
         b.output_bundle(&z).unwrap();
         let mut circ = b.finish();
