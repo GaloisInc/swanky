@@ -128,8 +128,11 @@ impl Circuit {
         for (i, gate) in self.gates.iter().enumerate() {
             let q = self.modulus(i);
             let (zref_, val) = match *gate {
-                Gate::GarblerInput { .. } => unimplemented!(),
-                Gate::EvaluatorInput { .. } => unimplemented!(),
+                Gate::GarblerInput { id } => (None, garbler_inputs[id].clone()),
+                Gate::EvaluatorInput { id } => {
+                    assert!(id < evaluator_inputs.len(), "id={} ev_inps.len()={}", id, evaluator_inputs.len());
+                    (None, evaluator_inputs[id].clone())
+                },
                 Gate::Constant { val } => (None, f.constant(val, q)?),
                 Gate::Add { xref, yref, out } => (
                     out,
@@ -219,6 +222,14 @@ impl Circuit {
         evaluator_inputs: &[u16],
     ) -> Result<Vec<u16>, DummyError> {
         let mut dummy = crate::dummy::Dummy::new();
+
+        if garbler_inputs.len() != self.garbler_input_refs.len() {
+            return Err(DummyError::NotEnoughGarblerInputs);
+        }
+
+        if evaluator_inputs.len() != self.evaluator_input_refs.len() {
+            return Err(DummyError::NotEnoughEvaluatorInputs);
+        }
 
         // encode inputs as DummyVals
         let gb = garbler_inputs
@@ -450,13 +461,17 @@ impl CircuitBuilder {
     /// Get CircuitRef for a garbler input wire.
     pub fn garbler_input(&mut self, modulus: u16) -> CircuitRef {
         let id = self.get_next_garbler_input_id();
-        self.gate(Gate::GarblerInput { id }, modulus)
+        let r = self.gate(Gate::GarblerInput { id }, modulus);
+        self.circ.garbler_input_refs.push(r);
+        r
     }
 
     /// Get CircuitRef for an evaluator input wire.
     pub fn evaluator_input(&mut self, modulus: u16) -> CircuitRef {
         let id = self.get_next_evaluator_input_id();
-        self.gate(Gate::EvaluatorInput { id }, modulus)
+        let r = self.gate(Gate::EvaluatorInput { id }, modulus);
+        self.circ.evaluator_input_refs.push(r);
+        r
     }
 
     /// Get a vec of CircuitRefs for garbler inputs.
@@ -586,7 +601,7 @@ mod basic {
     fn add_many_mod_change() {
         let mut b = CircuitBuilder::new();
         let n = 113;
-        let args = b.evaluator_inputs(&vec![2;n]);
+        let args = b.garbler_inputs(&vec![2;n]);
         let wires = args
             .iter()
             .map(|x| b.mod_change(x, n as u16 + 1).unwrap())

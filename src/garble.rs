@@ -14,7 +14,7 @@ mod classic {
     use crate::circuit::{Circuit, CircuitBuilder};
     use crate::dummy::Dummy;
     use crate::dummy::DummyVal;
-    use crate::fancy::{BundleGadgets, Fancy};
+    use crate::fancy::{BundleGadgets, Fancy, Bundle};
     use crate::r#static::garble;
     use crate::util::{self, RngExt};
     use itertools::Itertools;
@@ -56,8 +56,9 @@ mod classic {
     fn add() {
         garble_test_helper(|q| {
             let mut b = CircuitBuilder::new();
-            let (_, xs) = b.init(&[], &[q, q]).unwrap();
-            let z = b.add(&xs[0], &xs[1]).unwrap();
+            let x = b.evaluator_input(q);
+            let y = b.evaluator_input(q);
+            let z = b.add(&x, &y).unwrap();
             b.output(&z).unwrap();
             b.finish()
         });
@@ -67,9 +68,7 @@ mod classic {
     fn add_many() {
         garble_test_helper(|q| {
             let mut b = CircuitBuilder::new();
-            let (_, xs) = b
-                .init(&[], &itertools::repeat_n(q, 16).collect_vec())
-                .unwrap();
+            let xs = b.evaluator_inputs(&vec![q;16]);
             let z = b.add_many(&xs).unwrap();
             b.output(&z).unwrap();
             b.finish()
@@ -80,9 +79,7 @@ mod classic {
     fn or_many() {
         garble_test_helper(|_| {
             let mut b = CircuitBuilder::new();
-            let (_, xs) = b
-                .init(&[], &itertools::repeat_n(2, 16).collect_vec())
-                .unwrap();
+            let xs = b.evaluator_inputs(&vec![2;16]);
             let z = b.or_many(&xs).unwrap();
             b.output(&z).unwrap();
             b.finish()
@@ -93,8 +90,9 @@ mod classic {
     fn sub() {
         garble_test_helper(|q| {
             let mut b = CircuitBuilder::new();
-            let (_, xs) = b.init(&[], &[q, q]).unwrap();
-            let z = b.sub(&xs[0], &xs[1]).unwrap();
+            let x = b.evaluator_input(q);
+            let y = b.evaluator_input(q);
+            let z = b.sub(&x, &y).unwrap();
             b.output(&z).unwrap();
             b.finish()
         });
@@ -104,12 +102,12 @@ mod classic {
     fn cmul() {
         garble_test_helper(|q| {
             let mut b = CircuitBuilder::new();
-            let (_, xs) = b.init(&[], &[q]).unwrap();
+            let x = b.evaluator_input(q);
             let z;
             if q > 2 {
-                z = b.cmul(&xs[0], 2).unwrap();
+                z = b.cmul(&x, 2).unwrap();
             } else {
-                z = b.cmul(&xs[0], 1).unwrap();
+                z = b.cmul(&x, 1).unwrap();
             }
             b.output(&z).unwrap();
             b.finish()
@@ -124,8 +122,8 @@ mod classic {
                 tab.push((i + 1) % q);
             }
             let mut b = CircuitBuilder::new();
-            let (_, xs) = b.init(&[], &[q]).unwrap();
-            let z = b.proj(&xs[0], q, Some(tab)).unwrap();
+            let x = b.evaluator_input(q);
+            let z = b.proj(&x, q, Some(tab)).unwrap();
             b.output(&z).unwrap();
             b.finish()
         });
@@ -140,8 +138,8 @@ mod classic {
                 tab.push(rng.gen_u16() % q);
             }
             let mut b = CircuitBuilder::new();
-            let (_, xs) = b.init(&[], &[q]).unwrap();
-            let z = b.proj(&xs[0], q, Some(tab)).unwrap();
+            let x = b.evaluator_input(q);
+            let z = b.proj(&x, q, Some(tab)).unwrap();
             b.output(&z).unwrap();
             b.finish()
         });
@@ -151,8 +149,8 @@ mod classic {
     fn mod_change() {
         garble_test_helper(|q| {
             let mut b = CircuitBuilder::new();
-            let (_, xs) = b.init(&[], &[q]).unwrap();
-            let z = b.mod_change(&xs[0], q * 2).unwrap();
+            let x = b.evaluator_input(q);
+            let z = b.mod_change(&x, q * 2).unwrap();
             b.output(&z).unwrap();
             b.finish()
         });
@@ -162,8 +160,9 @@ mod classic {
     fn half_gate() {
         garble_test_helper(|q| {
             let mut b = CircuitBuilder::new();
-            let (_, xs) = b.init(&[], &[q, q]).unwrap();
-            let z = b.mul(&xs[0], &xs[1]).unwrap();
+            let x = b.evaluator_input(q);
+            let y = b.evaluator_input(q);
+            let z = b.mul(&x, &y).unwrap();
             b.output(&z).unwrap();
             b.finish()
         });
@@ -176,8 +175,9 @@ mod classic {
             println!("\nTESTING MOD q={} ymod={}", q, ymod);
 
             let mut b = CircuitBuilder::new();
-            let (_, xs) = b.init(&[], &[q, ymod]).unwrap();
-            let z = b.mul(&xs[0], &xs[1]).unwrap();
+            let x = b.evaluator_input(q);
+            let y = b.evaluator_input(ymod);
+            let z = b.mul(&x, &y).unwrap();
             b.output(&z).unwrap();
             let mut c = b.finish();
 
@@ -209,13 +209,10 @@ mod classic {
         let mut rng = thread_rng();
 
         let nargs = 2 + rng.gen_usize() % 100;
-        // let mods = (0..7).map(|_| rng.gen_modulus()).collect_vec(); // slow
-        let mods = vec![3, 7, 10, 2, 13]; // fast
+        let mods = vec![3, 7, 10, 2, 13];
 
         let mut b = CircuitBuilder::new();
-        let (_, xs) = b
-            .init_bundles(&[], &itertools::repeat_n(mods.clone(), nargs).collect_vec())
-            .unwrap();
+        let xs = (0..nargs).map(|_| Bundle::new(b.evaluator_inputs(&mods))).collect_vec();
         let z = b.mixed_radix_addition(&xs).unwrap();
         b.output_bundle(&z).unwrap();
         let mut circ = b.finish();
@@ -272,9 +269,9 @@ mod classic {
         let q = rng.gen_modulus();
         let c = rng.gen_u16() % q;
 
-        let (_, xs) = b.init(&[], &[q]).unwrap();
+        let x = b.evaluator_input(q);
         let y = b.constant(c, q).unwrap();
-        let z = b.add(&xs[0], &y).unwrap();
+        let z = b.add(&x, &y).unwrap();
         b.output(&z).unwrap();
 
         let mut circ = b.finish();
