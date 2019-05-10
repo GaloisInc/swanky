@@ -500,26 +500,37 @@ mod complex {
             // test streaming garbler and evaluator
             let (sender, receiver) = UnixStream::pair().unwrap();
 
+            let input_ = input.clone();
             std::thread::spawn(move || {
                 let sender = Rc::new(RefCell::new(sender));
-                let mut garbler = Garbler::new(sender, AesRng::new());
+                let mut garbler = Garbler::new(sender, AesRng::new(), &[]);
+
                 // encode input and send it to the evaluator
-                let (gb_inp, ev_inp) = garbler.encode_many(&inputs, &input_mods_);
-                for w in ev_inp.iter() {
-                    gb.send_wire(w).unwrap();
+                let mut gb_inp = Vec::with_capacity(N);
+                for X in &input_ {
+                    let (zero, enc) = garbler.crt_encode(*X, Q);
+                    for w in enc.iter() {
+                        garbler.send_wire(w).unwrap();
+                    }
+                    gb_inp.push(zero);
                 }
-                complex_gadget(&mut garbler,
+                complex_gadget(&mut garbler, &gb_inp);
+            });
 
             let receiver = Rc::new(RefCell::new(receiver));
             let mut evaluator = Evaluator::new(receiver);
 
-            let ev_inp = input_mods
-                .iter()
-                .map(|q| ev.read_wire(*q).unwrap())
-                .collect_vec();
-                });
+            // receive encoded wires from the garbler thread
+            let mut ev_inp = Vec::with_capacity(N);
+            for _ in 0..N {
+                let ws = qs
+                    .iter()
+                    .map(|q| evaluator.read_wire(*q).unwrap())
+                    .collect_vec();
+                ev_inp.push(CrtBundle::new(ws));
+            }
 
-            complex_gadget(&mut evaluator, Q, N);
+            complex_gadget(&mut evaluator, &ev_inp);
             let result = evaluator.decode_output().unwrap();
             assert_eq!(result, should_be);
         }

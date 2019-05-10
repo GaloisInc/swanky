@@ -1,5 +1,5 @@
 use crate::error::{FancyError, GarblerError};
-use crate::fancy::{Fancy, HasModulus};
+use crate::fancy::{Fancy, HasModulus, CrtBundle};
 use crate::util::{output_tweak, tweak, tweak2, RngExt};
 use crate::wire::Wire;
 use rand::{CryptoRng, RngCore};
@@ -100,6 +100,15 @@ impl<W: Write + Debug, RNG: CryptoRng + RngCore> Garbler<W, RNG> {
             evs.push(ev);
         }
         (gbs, evs)
+    }
+
+    /// Encode a CrtBundle, producing the zero wires as well as the encoded values.
+    #[inline]
+    pub fn crt_encode(&mut self, val: u128, modulus: u128) -> (CrtBundle<Wire>, CrtBundle<Wire>) {
+        let ms = crate::util::factor(modulus);
+        let xs = crate::util::crt(val, &ms);
+        let (gbs, evs) = self.encode_many(&xs, &ms);
+        (CrtBundle::new(gbs), CrtBundle::new(evs))
     }
 }
 
