@@ -42,6 +42,8 @@ pub enum DummyError {
     NotEnoughGarblerInputs,
     /// Not enough evaluator inputs provided.
     NotEnoughEvaluatorInputs,
+    /// Encoding error.
+    EncodingError,
     /// A fancy error has occurred.
     FancyError(FancyError),
 }
@@ -128,6 +130,7 @@ impl Display for DummyError {
         match self {
             DummyError::NotEnoughGarblerInputs => "not enough garbler inputs".fmt(f),
             DummyError::NotEnoughEvaluatorInputs => "not enough evaluator inputs".fmt(f),
+            DummyError::EncodingError => "not enough inputs or moduli".fmt(f),
             DummyError::FancyError(e) => write!(f, "fancy error: {}", e),
         }
     }

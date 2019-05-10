@@ -4,8 +4,7 @@
 //! creating any circuits.
 
 use crate::error::{DummyError, FancyError};
-use crate::fancy::{Fancy, HasModulus, CrtBundle, BinaryBundle};
-use itertools::Itertools;
+use crate::fancy::{BinaryBundle, CrtBundle, Fancy, HasModulus};
 
 /// Simple struct that performs the fancy computation over `u16`.
 pub struct Dummy {
@@ -36,14 +35,22 @@ impl DummyVal {
     pub fn crt_factor(x: u128, q: u128) -> CrtBundle<DummyVal> {
         let ms = crate::util::factor(q);
         let xs = crate::util::crt(x, &ms);
-        CrtBundle::new(xs.into_iter().zip(ms.into_iter()).map(|(x,q)| {
-            DummyVal::new(x,q)
-        }).collect())
+        CrtBundle::new(
+            xs.into_iter()
+                .zip(ms.into_iter())
+                .map(|(x, q)| DummyVal::new(x, q))
+                .collect(),
+        )
     }
 
     /// Create a BinaryBundle of DummyVal consisting of the `n` least significant bits of x.
     pub fn u128_to_bits(x: u128, n: usize) -> BinaryBundle<DummyVal> {
-        BinaryBundle::new(crate::util::u128_to_bits(x, n).into_iter().map(|b| DummyVal::new(b,2)).collect())
+        BinaryBundle::new(
+            crate::util::u128_to_bits(x, n)
+                .into_iter()
+                .map(|b| DummyVal::new(b, 2))
+                .collect(),
+        )
     }
 }
 
@@ -58,6 +65,18 @@ impl Dummy {
     /// Get the output from the fancy computation, consuming the Dummy.
     pub fn get_output(self) -> Vec<u16> {
         self.outputs
+    }
+
+    /// Encode a slice of inputs and a slice of moduli as DummyVals.
+    pub fn encode_inputs(xs: &[u16], moduli: &[u16]) -> Result<Vec<DummyVal>, DummyError> {
+        if xs.len() != moduli.len() {
+            return Err(DummyError::EncodingError);
+        }
+        Ok(xs
+            .iter()
+            .zip(moduli.iter())
+            .map(|(x, q)| DummyVal::new(*x, *q))
+            .collect())
     }
 }
 
@@ -126,14 +145,14 @@ impl Fancy for Dummy {
 #[cfg(test)]
 mod bundle {
     use super::*;
-    use crate::fancy::{BinaryGadgets, BundleGadgets, CrtGadgets};
-    use crate::util::{self, crt_factor, crt_inv_factor, RngExt};
+    use crate::fancy::{BinaryGadgets, Bundle, BundleGadgets, CrtGadgets};
+    use crate::util::{self, crt_inv_factor, RngExt};
     use itertools::Itertools;
     use rand::thread_rng;
 
     const NITERS: usize = 1 << 10;
 
-    #[test] // bundle addition {{{
+    #[test]
     fn test_addition() {
         let mut rng = thread_rng();
         for _ in 0..NITERS {
@@ -151,8 +170,8 @@ mod bundle {
             assert_eq!(z, (x + y) % q);
         }
     }
-    //}}}
-    #[test] // bundle subtraction {{{
+
+    #[test]
     fn test_subtraction() {
         let mut rng = thread_rng();
         for _ in 0..NITERS {
@@ -170,8 +189,8 @@ mod bundle {
             assert_eq!(z, (x + q - y) % q);
         }
     }
-    //}}}
-    #[test] // binary cmul {{{
+
+    #[test]
     fn test_binary_cmul() {
         let mut rng = thread_rng();
         for _ in 0..NITERS {
@@ -189,8 +208,8 @@ mod bundle {
             assert_eq!(z, (x * c) % q);
         }
     }
-    //}}}
-    #[test] // binary multiplication {{{
+
+    #[test]
     fn test_binary_multiplication() {
         let mut rng = thread_rng();
         for _ in 0..NITERS {
@@ -209,8 +228,8 @@ mod bundle {
             assert_eq!(z, (x * y) & (q - 1));
         }
     }
-    //}}}
-    #[test] // bundle max {{{
+
+    #[test]
     fn max() {
         let mut rng = thread_rng();
         let q = util::modulus_with_width(10);
@@ -220,7 +239,10 @@ mod bundle {
             let should_be = *inps.iter().max().unwrap();
             let mut d = Dummy::new();
             {
-                let xs = inps.into_iter().map(|x| DummyVal::crt_factor(x, q)).collect_vec();
+                let xs = inps
+                    .into_iter()
+                    .map(|x| DummyVal::crt_factor(x, q))
+                    .collect_vec();
                 let z = d.crt_max(&xs, "100%").unwrap();
                 d.output_bundle(&z).unwrap();
             }
@@ -228,8 +250,8 @@ mod bundle {
             assert_eq!(z, should_be);
         }
     }
-    //}}}
-    #[test] // twos complement {{{
+
+    #[test]
     fn twos_complement() {
         let mut rng = thread_rng();
         let nbits = 16;
@@ -248,8 +270,8 @@ mod bundle {
             assert_eq!(y, should_be, "x={} y={} should_be={}", x, y, should_be);
         }
     }
-    //}}}
-    #[test] // binary addition {{{
+
+    #[test]
     fn binary_addition() {
         let mut rng = thread_rng();
         let nbits = 16;
@@ -260,8 +282,8 @@ mod bundle {
             let should_be = (x + y) % q;
             let mut d = Dummy::new();
             {
-                let x = DummyVal::u128_to_bits(x,nbits);
-                let y = DummyVal::u128_to_bits(y,nbits);
+                let x = DummyVal::u128_to_bits(x, nbits);
+                let y = DummyVal::u128_to_bits(y, nbits);
                 let (z, overflow) = d.bin_addition(&x, &y).unwrap();
                 d.output(&overflow).unwrap();
                 d.output_bundle(&z).unwrap();
@@ -277,8 +299,8 @@ mod bundle {
             assert_eq!(overflow, x + y >= q, "x={} y={}", x, y);
         }
     }
-    //}}}
-    #[test] // binary subtraction {{{
+
+    #[test]
     fn binary_subtraction() {
         let mut rng = thread_rng();
         let nbits = 16;
@@ -306,8 +328,8 @@ mod bundle {
             assert_eq!(overflow, (y != 0 && x >= y), "x={} y={}", x, y);
         }
     }
-    //}}}
-    #[test] // binary lt {{{
+
+    #[test]
     fn binary_lt() {
         let mut rng = thread_rng();
         let nbits = 16;
@@ -320,15 +342,15 @@ mod bundle {
             {
                 let x = DummyVal::u128_to_bits(x, nbits);
                 let y = DummyVal::u128_to_bits(y, nbits);
-                let z = d.bin_lt(&x,&y).unwrap();
+                let z = d.bin_lt(&x, &y).unwrap();
                 d.output(&z).unwrap();
             }
             let z = d.get_output()[0] > 0;
             assert_eq!(z, should_be, "x={} y={}", x, y);
         }
     }
-    //}}}
-    #[test] // binary max {{{
+
+    #[test]
     fn binary_max() {
         let mut rng = thread_rng();
         let n = 10;
@@ -350,8 +372,8 @@ mod bundle {
             assert_eq!(z, should_be);
         }
     }
-    //}}}
-    #[test] // bundle relu {{{
+
+    #[test] // bundle relu
     fn test_relu() {
         let mut rng = thread_rng();
         for _ in 0..NITERS {
@@ -371,8 +393,8 @@ mod bundle {
             }
         }
     }
-    //}}}
-    #[test] // abs {{{
+
+    #[test]
     fn binary_abs() {
         let mut rng = thread_rng();
         for _ in 0..NITERS {
@@ -394,8 +416,8 @@ mod bundle {
             assert_eq!(z, should_be);
         }
     }
-    //}}}
-    #[test] // bundle mixed_radix_addition MSB {{{
+
+    #[test]
     fn test_mixed_radix_addition_msb_only() {
         let mut rng = thread_rng();
         for _ in 0..NITERS {
@@ -406,17 +428,23 @@ mod bundle {
             println!("nargs={} mods={:?} Q={}", nargs, mods, Q);
 
             // test maximum overflow
-            let mut ds = Vec::new();
-            for _ in 0..nargs {
-                ds.extend(util::as_mixed_radix(Q - 1, &mods).iter());
-            }
+            let xs = (0..nargs)
+                .map(|_| {
+                    Bundle::new(
+                        util::as_mixed_radix(Q - 1, &mods)
+                            .into_iter()
+                            .zip(&mods)
+                            .map(|(x, q)| DummyVal::new(x, *q))
+                            .collect_vec(),
+                    )
+                })
+                .collect_vec();
 
-            let (xs, _) = b
-                .init_bundles(&itertools::repeat_n(mods.clone(), nargs).collect_vec(), &[], &[])
-                .unwrap();
-            let z = b.mixed_radix_addition_msb_only(&xs).unwrap();
-            b.output(&z).unwrap();
-            let res = b.get_output()[0];
+            let d = Dummy::new();
+
+            let z = d.mixed_radix_addition_msb_only(&xs).unwrap();
+            d.output(&z).unwrap();
+            let res = d.get_output()[0];
 
             let should_be = *util::as_mixed_radix((Q - 1) * (nargs as u128) % Q, &mods)
                 .last()
@@ -426,25 +454,30 @@ mod bundle {
             // test random values
             for _ in 0..4 {
                 let mut sum = 0;
-                let mut ds = Vec::new();
-                for _ in 0..nargs {
-                    let x = rng.gen_u128() % Q;
-                    sum = (sum + x) % Q;
-                    ds.extend(util::as_mixed_radix(x, &mods).iter());
-                }
 
-                let mut b = Dummy::new(&ds, &[]);
-                let (xs, _) = b
-                    .init_bundles(&itertools::repeat_n(mods.clone(), nargs).collect_vec(), &[], &[])
-                    .unwrap();
-                let z = b.mixed_radix_addition_msb_only(&xs).unwrap();
-                b.output(&z).unwrap();
-                let res = b.get_output()[0];
+                let xs = (0..nargs)
+                    .map(|_| {
+                        let x = rng.gen_u128() % Q;
+                        sum = (sum + x) % Q;
+                        Bundle::new(
+                            util::as_mixed_radix(x, &mods)
+                                .into_iter()
+                                .zip(&mods)
+                                .map(|(x, q)| DummyVal::new(x, *q))
+                                .collect_vec(),
+                        )
+                    })
+                    .collect_vec();
+
+                let mut d = Dummy::new();
+                let z = d.mixed_radix_addition_msb_only(&xs).unwrap();
+                d.output(&z).unwrap();
+                let res = d.get_output()[0];
 
                 let should_be = *util::as_mixed_radix(sum, &mods).last().unwrap();
                 assert_eq!(res, should_be);
             }
         }
     }
-    //}}}
+
 }

@@ -1,12 +1,12 @@
 //! DSL for creating circuits compatible with fancy-garbling in the old-fashioned way,
 //! where you create a circuit for a computation then garble it.
 
+use crate::dummy::DummyVal;
 use crate::error::{CircuitBuilderError, DummyError, FancyError, InformerError};
-use crate::fancy::{Fancy, HasModulus, Bundle, CrtBundle, BinaryBundle};
-use crate::dummy::{Dummy, DummyVal};
+use crate::fancy::{BinaryBundle, Bundle, CrtBundle, Fancy, HasModulus};
+use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use itertools::Itertools;
 
 /// The index and modulus of a gate in a circuit.
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
@@ -118,7 +118,12 @@ impl Circuit {
     }
 
     /// Evaluate the circuit using fancy object `f`.
-    pub fn eval<F: Fancy>(&mut self, f: &mut F, garbler_inputs: &[F::Item], evaluator_inputs: &[F::Item]) -> Result<Vec<F::Item>, F::Error> {
+    pub fn eval<F: Fancy>(
+        &mut self,
+        f: &mut F,
+        garbler_inputs: &[F::Item],
+        evaluator_inputs: &[F::Item],
+    ) -> Result<Vec<F::Item>, F::Error> {
         let mut cache: Vec<Option<F::Item>> = vec![None; self.gates.len()];
         for (i, gate) in self.gates.iter().enumerate() {
             let q = self.modulus(i);
@@ -216,12 +221,16 @@ impl Circuit {
         let mut dummy = crate::dummy::Dummy::new();
 
         // encode inputs as DummyVals
-        let gb = garbler_inputs.iter().zip(self.garbler_input_refs.iter()).map(|(x,r)| {
-            DummyVal::new(*x,r.modulus())
-        }).collect_vec();
-        let ev = evaluator_inputs.iter().zip(self.evaluator_input_refs.iter()).map(|(x,r)| {
-            DummyVal::new(*x,r.modulus())
-        }).collect_vec();
+        let gb = garbler_inputs
+            .iter()
+            .zip(self.garbler_input_refs.iter())
+            .map(|(x, r)| DummyVal::new(*x, r.modulus()))
+            .collect_vec();
+        let ev = evaluator_inputs
+            .iter()
+            .zip(self.evaluator_input_refs.iter())
+            .map(|(x, r)| DummyVal::new(*x, r.modulus()))
+            .collect_vec();
 
         let outputs = self.eval(&mut dummy, &gb, &ev)?;
         self.process_outputs(&outputs, &mut dummy)?;
@@ -233,12 +242,16 @@ impl Circuit {
         let mut informer = crate::informer::Informer::new();
 
         // encode inputs as InformerVals
-        let gb = self.garbler_input_refs.iter().map(|r| {
-            crate::informer::InformerVal::new(r.modulus())
-        }).collect_vec();
-        let ev = self.evaluator_input_refs.iter().map(|r| {
-            crate::informer::InformerVal::new(r.modulus())
-        }).collect_vec();
+        let gb = self
+            .garbler_input_refs
+            .iter()
+            .map(|r| crate::informer::InformerVal::new(r.modulus()))
+            .collect_vec();
+        let ev = self
+            .evaluator_input_refs
+            .iter()
+            .map(|r| crate::informer::InformerVal::new(r.modulus()))
+            .collect_vec();
 
         let outputs = self.eval(&mut informer, &gb, &ev)?;
         self.process_outputs(&outputs, &mut informer)?;
@@ -435,31 +448,40 @@ impl CircuitBuilder {
     }
 
     /// Get CircuitRefs for the input wires.
-    pub fn init(&mut self, garbler_inputs: &[u16], evaluator_inputs: &[u16]) ->
-        Result<(Vec<CircuitRef>, Vec<CircuitRef>), CircuitBuilderError>
-    {
+    pub fn init(
+        &mut self,
+        garbler_inputs: &[u16],
+        evaluator_inputs: &[u16],
+    ) -> Result<(Vec<CircuitRef>, Vec<CircuitRef>), CircuitBuilderError> {
         unimplemented!()
     }
 
     /// Get CircuitRefs for the input wires as wire bundles.
-    pub fn init_bundles(&mut self, garbler_inputs: &[Vec<u16>], evaluator_inputs: &[Vec<u16>]) ->
-        Result<(Vec<Bundle<CircuitRef>>, Vec<Bundle<CircuitRef>>), CircuitBuilderError>
-    {
+    pub fn init_bundles(
+        &mut self,
+        garbler_inputs: &[Vec<u16>],
+        evaluator_inputs: &[Vec<u16>],
+    ) -> Result<(Vec<Bundle<CircuitRef>>, Vec<Bundle<CircuitRef>>), CircuitBuilderError> {
         unimplemented!()
     }
 
     /// Get CircuitRefs for the input wires as CRT wire bundles - each value of the input
     /// is the composite CRT modulus for that bundle.
-    pub fn crt_init(&mut self, garbler_inputs: &[u128], evaluator_inputs: &[u128]) ->
-        Result<(Vec<CrtBundle<CircuitRef>>, Vec<CrtBundle<CircuitRef>>), CircuitBuilderError>
-    {
+    pub fn crt_init(
+        &mut self,
+        garbler_inputs: &[u128],
+        evaluator_inputs: &[u128],
+    ) -> Result<(Vec<CrtBundle<CircuitRef>>, Vec<CrtBundle<CircuitRef>>), CircuitBuilderError> {
         unimplemented!()
     }
 
     /// Get CircuitRefs for the input wires as Binary wire bundles - the inputs take the
     /// number of bits in each bundle.
-    pub fn bin_init(&mut self, garbler_inputs: &[usize], evaluator_inputs: &[usize]) ->
-        Result<(Vec<BinaryBundle<CircuitRef>>, Vec<BinaryBundle<CircuitRef>>), CircuitBuilderError>
+    pub fn bin_init(
+        &mut self,
+        garbler_inputs: &[usize],
+        evaluator_inputs: &[usize],
+    ) -> Result<(Vec<BinaryBundle<CircuitRef>>, Vec<BinaryBundle<CircuitRef>>), CircuitBuilderError>
     {
         unimplemented!()
     }

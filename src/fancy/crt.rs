@@ -21,6 +21,10 @@ impl<W: Clone + HasModulus> CrtBundle<W> {
     pub fn extract(self) -> Bundle<W> {
         self.0
     }
+
+    pub fn composite_modulus(&self) -> u128 {
+        util::product(&self.iter().map(|w| w.modulus()).collect_vec())
+    }
 }
 
 impl<W: Clone + HasModulus> Deref for CrtBundle<W> {

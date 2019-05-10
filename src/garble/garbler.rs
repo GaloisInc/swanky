@@ -22,11 +22,13 @@ pub struct Garbler<W: Write + Debug, RNG: CryptoRng + RngCore> {
 impl<W: Write + Debug, RNG: CryptoRng + RngCore> Garbler<W, RNG> {
     /// Create a new garbler.
     #[inline]
-    pub fn new(writer: Rc<RefCell<W>>, rng: RNG, reused_deltas: &[Wire]) -> Self
-    {
+    pub fn new(writer: Rc<RefCell<W>>, rng: RNG, reused_deltas: &[Wire]) -> Self {
         Garbler {
             writer,
-            deltas: reused_deltas.iter().map(|w| (w.modulus(), w.clone())).collect(),
+            deltas: reused_deltas
+                .iter()
+                .map(|w| (w.modulus(), w.clone()))
+                .collect(),
             current_gate: 0,
             current_output: 0,
             rng,
@@ -71,7 +73,7 @@ impl<W: Write + Debug, RNG: CryptoRng + RngCore> Garbler<W, RNG> {
 
     /// Send a wire using the Sender.
     #[inline]
-    fn send_wire(&mut self, wire: &Wire) -> Result<(), GarblerError> {
+    pub fn send_wire(&mut self, wire: &Wire) -> Result<(), GarblerError> {
         let mut writer = self.writer.borrow_mut();
         writer.write_all(wire.as_block().as_ref())?;
         Ok(())
@@ -80,10 +82,24 @@ impl<W: Write + Debug, RNG: CryptoRng + RngCore> Garbler<W, RNG> {
     /// Encode a wire, producing the zero wire as well as the encoded value.
     #[inline]
     pub fn encode(&mut self, val: u16, modulus: u16) -> (Wire, Wire) {
-        let zero  = Wire::rand(&mut self.rng, modulus);
+        let zero = Wire::rand(&mut self.rng, modulus);
         let delta = self.delta(modulus);
-        let enc   = zero.plus(&delta.cmul(val));
+        let enc = zero.plus(&delta.cmul(val));
         (zero, enc)
+    }
+
+    /// Encode many wires, producing zero wires as well as encoded values.
+    #[inline]
+    pub fn encode_many(&mut self, vals: &[u16], moduli: &[u16]) -> (Vec<Wire>, Vec<Wire>) {
+        assert!(vals.len() == moduli.len());
+        let gbs = Vec::with_capacity(vals.len());
+        let evs = Vec::with_capacity(vals.len());
+        for (x, q) in vals.iter().zip(moduli.iter()) {
+            let (gb, ev) = self.encode(x, q);
+            gbs.push(gb);
+            evs.push(ev);
+        }
+        (gbs, evs)
     }
 }
 

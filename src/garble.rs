@@ -1,8 +1,5 @@
 //! Structs and functions for creating, streaming, and evaluating garbled circuits.
 
-use crate::wire::Wire;
-use serde::{Deserialize, Serialize};
-
 mod evaluator;
 mod garbler;
 
@@ -16,13 +13,14 @@ pub use crate::garble::garbler::Garbler;
 mod classic {
     use crate::circuit::{Circuit, CircuitBuilder};
     use crate::dummy::Dummy;
+    use crate::dummy::DummyVal;
     use crate::fancy::{BundleGadgets, Fancy};
     use crate::r#static::garble;
     use crate::util::{self, RngExt};
     use itertools::Itertools;
     use rand::thread_rng;
 
-    // helper {{{
+    // helper
     fn garble_test_helper<F>(f: F)
     where
         F: Fn(u16) -> Circuit,
@@ -33,75 +31,80 @@ mod classic {
             let mut c = &mut f(q);
             let (en, ev) = garble(&mut c).unwrap();
             for _ in 0..16 {
-                let inps = (0..c.num_evaluator_inputs())
-                    .map(|i| rng.gen_u16() % c.evaluator_input_mod(i))
-                    .collect::<Vec<u16>>();
+                let mut inps = Vec::new();
+                let mut dinps = Vec::new();
+                for i in 0..c.num_evaluator_inputs() {
+                    let q = c.evaluator_input_mod(i);
+                    let x = rng.gen_u16() % q;
+                    inps.push(x);
+                    dinps.push(DummyVal::new(x, q));
+                }
                 // Run the garbled circuit evaluator.
                 let xs = &en.encode_evaluator_inputs(&inps);
                 let decoded = &ev.eval(&mut c, &[], xs).unwrap();
                 // Run the dummy evaluator.
-                let mut dummy = Dummy::new(&[], &inps);
-                let outputs = c.eval(&mut dummy).unwrap();
+                let mut dummy = Dummy::new();
+                let outputs = c.eval(&mut dummy, &[], &dinps).unwrap();
                 c.process_outputs(&outputs, &mut dummy).unwrap();
                 let should_be = dummy.get_output();
                 assert_eq!(decoded[0], should_be[0]);
             }
         }
     }
-    //}}}
-    #[test] // add {{{
+
+    #[test] // add
     fn add() {
         garble_test_helper(|q| {
             let mut b = CircuitBuilder::new();
-            let (_, xs) = b.init(&[], &[q, q], &[]).unwrap();
+            let (_, xs) = b.init(&[], &[q, q]).unwrap();
             let z = b.add(&xs[0], &xs[1]).unwrap();
             b.output(&z).unwrap();
             b.finish()
         });
     }
-    //}}}
-    #[test] // add_many {{{
+
+    #[test] // add_many
     fn add_many() {
         garble_test_helper(|q| {
             let mut b = CircuitBuilder::new();
             let (_, xs) = b
-                .init(&[], &itertools::repeat_n(q, 16).collect_vec(), &[])
+                .init(&[], &itertools::repeat_n(q, 16).collect_vec())
                 .unwrap();
             let z = b.add_many(&xs).unwrap();
             b.output(&z).unwrap();
             b.finish()
         });
     }
-    //}}}
-    #[test] // or_many {{{
+
+    #[test] // or_many
     fn or_many() {
         garble_test_helper(|_| {
             let mut b = CircuitBuilder::new();
             let (_, xs) = b
-                .init(&[], &itertools::repeat_n(2, 16).collect_vec(), &[])
+                .init(&[], &itertools::repeat_n(2, 16).collect_vec())
                 .unwrap();
             let z = b.or_many(&xs).unwrap();
             b.output(&z).unwrap();
             b.finish()
         });
     }
-    //}}}
-    #[test] // sub {{{
+
+    #[test] // sub
     fn sub() {
         garble_test_helper(|q| {
             let mut b = CircuitBuilder::new();
-            let (_, xs) = b.init(&[], &[q, q], &[]).unwrap();
+            let (_, xs) = b.init(&[], &[q, q]).unwrap();
             let z = b.sub(&xs[0], &xs[1]).unwrap();
             b.output(&z).unwrap();
             b.finish()
         });
     }
-    //}}}
-    #[test] // cmul {{{
+
+    #[test] // cmul
     fn cmul() {
         garble_test_helper(|q| {
             let mut b = CircuitBuilder::new();
-            let (_, xs) = b.init(&[], &[q], &[]).unwrap();
+            let (_, xs) = b.init(&[], &[q]).unwrap();
             let z;
             if q > 2 {
                 z = b.cmul(&xs[0], 2).unwrap();
@@ -112,8 +115,8 @@ mod classic {
             b.finish()
         });
     }
-    //}}}
-    #[test] // proj_cycle {{{
+
+    #[test] // proj_cycle
     fn proj_cycle() {
         garble_test_helper(|q| {
             let mut tab = Vec::new();
@@ -121,14 +124,14 @@ mod classic {
                 tab.push((i + 1) % q);
             }
             let mut b = CircuitBuilder::new();
-            let (_, xs) = b.init(&[], &[q], &[]).unwrap();
+            let (_, xs) = b.init(&[], &[q]).unwrap();
             let z = b.proj(&xs[0], q, Some(tab)).unwrap();
             b.output(&z).unwrap();
             b.finish()
         });
     }
-    //}}}
-    #[test] // proj_rand {{{
+
+    #[test] // proj_rand
     fn proj_rand() {
         garble_test_helper(|q| {
             let mut rng = thread_rng();
@@ -137,43 +140,43 @@ mod classic {
                 tab.push(rng.gen_u16() % q);
             }
             let mut b = CircuitBuilder::new();
-            let (_, xs) = b.init(&[], &[q], &[]).unwrap();
+            let (_, xs) = b.init(&[], &[q]).unwrap();
             let z = b.proj(&xs[0], q, Some(tab)).unwrap();
             b.output(&z).unwrap();
             b.finish()
         });
     }
-    //}}}
-    #[test] // mod_change {{{
+
+    #[test] // mod_change
     fn mod_change() {
         garble_test_helper(|q| {
             let mut b = CircuitBuilder::new();
-            let (_, xs) = b.init(&[], &[q], &[]).unwrap();
+            let (_, xs) = b.init(&[], &[q]).unwrap();
             let z = b.mod_change(&xs[0], q * 2).unwrap();
             b.output(&z).unwrap();
             b.finish()
         });
     }
-    //}}}
-    #[test] // half_gate {{{
+
+    #[test] // half_gate
     fn half_gate() {
         garble_test_helper(|q| {
             let mut b = CircuitBuilder::new();
-            let (_, xs) = b.init(&[], &[q, q], &[]).unwrap();
+            let (_, xs) = b.init(&[], &[q, q]).unwrap();
             let z = b.mul(&xs[0], &xs[1]).unwrap();
             b.output(&z).unwrap();
             b.finish()
         });
     }
-    //}}}
-    #[test] // half_gate_unequal_mods {{{
+
+    #[test] // half_gate_unequal_mods
     fn half_gate_unequal_mods() {
         for q in 3..16 {
             let ymod = 2 + thread_rng().gen_u16() % 6; // lower mod is capped at 8 for now
             println!("\nTESTING MOD q={} ymod={}", q, ymod);
 
             let mut b = CircuitBuilder::new();
-            let (_, xs) = b.init(&[], &[q, ymod], &[]).unwrap();
+            let (_, xs) = b.init(&[], &[q, ymod]).unwrap();
             let z = b.mul(&xs[0], &xs[1]).unwrap();
             b.output(&z).unwrap();
             let mut c = b.finish();
@@ -185,8 +188,14 @@ mod classic {
                     println!("TEST x={} y={}", x, y);
                     let xs = &en.encode_evaluator_inputs(&[x, y]);
                     let decoded = &ev.eval(&mut c, &[], xs).unwrap();
-                    let mut dummy = Dummy::new(&[], &[x, y]);
-                    let outputs = c.eval(&mut dummy).unwrap();
+                    let mut dummy = Dummy::new();
+                    let outputs = c
+                        .eval(
+                            &mut dummy,
+                            &[],
+                            &[DummyVal::new(x, q), DummyVal::new(y, ymod)],
+                        )
+                        .unwrap();
                     c.process_outputs(&outputs, &mut dummy).unwrap();
                     let should_be = dummy.get_output();
                     assert_eq!(decoded[0], should_be[0]);
@@ -194,8 +203,8 @@ mod classic {
             }
         }
     }
-    //}}}
-    #[test] // mixed_radix_addition {{{
+
+    #[test] // mixed_radix_addition
     fn mixed_radix_addition() {
         let mut rng = thread_rng();
 
@@ -205,7 +214,7 @@ mod classic {
 
         let mut b = CircuitBuilder::new();
         let (_, xs) = b
-            .init_bundles(&[], &itertools::repeat_n(mods.clone(), nargs).collect_vec(), &[])
+            .init_bundles(&[], &itertools::repeat_n(mods.clone(), nargs).collect_vec())
             .unwrap();
         let z = b.mixed_radix_addition(&xs).unwrap();
         b.output_bundle(&z).unwrap();
@@ -230,8 +239,8 @@ mod classic {
             assert_eq!(util::from_mixed_radix(&outputs, &mods), should_be);
         }
     }
-    //}}}
-    #[test] // basic constants {{{
+
+    #[test] // basic constants
     fn basic_constant() {
         let mut b = CircuitBuilder::new();
         let mut rng = thread_rng();
@@ -246,16 +255,16 @@ mod classic {
         let (_, ev) = garble(&mut circ).unwrap();
 
         for _ in 0..64 {
-            let mut dummy = Dummy::new(&[], &[]);
-            let outputs = circ.eval(&mut dummy).unwrap();
+            let mut dummy = Dummy::new();
+            let outputs = circ.eval(&mut dummy, &[], &[]).unwrap();
             circ.process_outputs(&outputs, &mut dummy).unwrap();
             assert_eq!(dummy.get_output()[0], c, "plaintext eval failed");
             let outputs = ev.eval(&mut circ, &[], &[]).unwrap();
             assert_eq!(outputs[0], c, "garbled eval failed");
         }
     }
-    //}}}
-    #[test] // constants {{{
+
+    #[test] // constants
     fn constants() {
         let mut b = CircuitBuilder::new();
         let mut rng = thread_rng();
@@ -263,7 +272,7 @@ mod classic {
         let q = rng.gen_modulus();
         let c = rng.gen_u16() % q;
 
-        let (_, xs) = b.init(&[], &[q], &[]).unwrap();
+        let (_, xs) = b.init(&[], &[q]).unwrap();
         let y = b.constant(c, q).unwrap();
         let z = b.add(&xs[0], &y).unwrap();
         b.output(&z).unwrap();
@@ -273,8 +282,8 @@ mod classic {
 
         for _ in 0..64 {
             let x = rng.gen_u16() % q;
-            let mut dummy = Dummy::new(&[], &[x]);
-            let outputs = circ.eval(&mut dummy).unwrap();
+            let mut dummy = Dummy::new();
+            let outputs = circ.eval(&mut dummy, &[], &[DummyVal::new(x, q)]).unwrap();
             circ.process_outputs(&outputs, &mut dummy).unwrap();
             assert_eq!(dummy.get_output()[0], (x + c) % q, "plaintext");
 
@@ -283,187 +292,161 @@ mod classic {
             assert_eq!(Y[0], (x + c) % q, "garbled");
         }
     }
-    //}}}
+
 }
 
 #[cfg(test)]
 mod streaming {
+    use crate::dummy::{Dummy, DummyVal};
     use crate::util::RngExt;
-    use crate::FancyError;
-    use crate::{Evaluator, Garbler};
-    use crate::{Fancy, HasModulus};
+    use crate::Fancy;
+    use crate::{Evaluator, Garbler, Wire};
     use itertools::Itertools;
     use rand::thread_rng;
     use scuttlebutt::AesRng;
     use std::cell::RefCell;
-    use std::fmt::{Debug, Display};
     use std::os::unix::net::UnixStream;
     use std::rc::Rc;
 
     type Reader = UnixStream;
     type Writer = UnixStream;
 
-    // helper
-    fn streaming_test<F, G>(
-        mut f_gb: F,
-        mut f_ev: G,
-        gb_inp: &[u16],
-        ev_inp: &[u16],
-        should_be: &[u16],
-    ) where
-        F: FnMut(&mut Garbler<Writer, AesRng>) + Send + Sync + Copy + 'static,
-        G: FnMut(&mut Evaluator<Reader>) + Send + Sync + Copy + 'static,
+    // helper - checks that Streaming evaluation of a fancy function equals Dummy
+    // evaluation of the same function
+    fn streaming_test<FGB, FEV, FDU>(f_gb: FGB, f_ev: FEV, f_du: FDU, input_mods: &[u16])
+    where
+        FGB: FnMut(&mut Garbler<UnixStream, AesRng>, &[Wire]) + Send + Sync + Copy + 'static,
+        FEV: FnMut(&mut Evaluator<UnixStream>, &[Wire]) + Send + Sync + Copy + 'static,
+        FDU: FnMut(&mut Dummy, &[DummyVal]) + Send + Sync + Copy + 'static,
     {
-        let rng = AesRng::new();
+        let mut rng = AesRng::new();
+
+        let inputs = input_mods.iter().map(|q| rng.gen_u16() % q).collect_vec();
+
+        // evaluate f_gb as a dummy
+        let dummy = Dummy::new();
+        let dinps = Dummy::encode_inputs(&inputs, input_mods).unwrap();
+        f_du(&mut dummy, &dinps);
+        let should_be = dummy.get_output();
+
         let (sender, receiver) = UnixStream::pair().unwrap();
 
-        let mut gb_inp_iter = gb_inp.to_vec().into_iter();
-        let mut ev_inp_iter = ev_inp.to_vec().into_iter();
-
+        let input_mods_ = input_mods.to_vec();
         std::thread::spawn(move || {
             let sender = Rc::new(RefCell::new(sender));
-            let sender_ = sender.clone();
-            let mut garbler = Garbler::new(sender, rng);
-            f_gb(&mut garbler);
+            let mut gb = Garbler::new(sender, rng, &[]);
+            let (gb_inp, ev_inp) = gb.encode_many(&inputs, &input_mods_);
+            for w in ev_inp.iter() {
+                gb.send_wire(w).unwrap();
+            }
+            f_gb(&mut gb, &gb_inp);
         });
 
         let receiver = Rc::new(RefCell::new(receiver));
         let mut ev = Evaluator::new(receiver);
-        f_ev(&mut ev);
+        let ev_inp = input_mods
+            .iter()
+            .map(|q| ev.read_wire(*q).unwrap())
+            .collect_vec();
+        f_ev(&mut ev, &ev_inp);
 
         let result = ev.decode_output().unwrap();
-        assert_eq!(result, should_be)
-    }
 
-    fn fancy_addition<
-        W: Clone + HasModulus,
-        E: Display + Debug + From<FancyError>,
-        F: Fancy<Item = W, Error = E>,
-    >(
-        b: &mut F,
-        q: u16,
-    ) {
-        let (xs, ys) = b.init(&[q], &[q], &[]).unwrap();
-        let z = b.add(&xs[0], &ys[0]).unwrap();
-        b.output(&z).unwrap();
+        assert_eq!(result, should_be)
     }
 
     #[test]
     fn addition() {
+        fn fancy_addition<F: Fancy>(b: &mut F, xs: &[F::Item]) {
+            let z = b.add(&xs[0], &xs[1]).unwrap();
+            b.output(&z).unwrap();
+        }
+
         let mut rng = thread_rng();
         for _ in 0..16 {
             let q = rng.gen_modulus();
-            let x = rng.gen_u16() % q;
-            let y = rng.gen_u16() % q;
             streaming_test(
-                move |b| fancy_addition(b, q.clone()),
-                move |b| fancy_addition(b, q.clone()),
-                &[x],
-                &[y],
-                &[(x + y) % q],
+                move |b, xs| fancy_addition(b, xs),
+                move |b, xs| fancy_addition(b, xs),
+                move |b, xs| fancy_addition(b, xs),
+                &[q, q],
             );
         }
-    }
-
-    fn fancy_subtraction<W: Clone + HasModulus, E: Display + Debug + From<FancyError>>(
-        b: &mut Fancy<Item = W, Error = E>,
-        q: u16,
-    ) {
-        let (xs, ys) = b.init(&[q], &[q], &[]).unwrap();
-        let z = b.sub(&xs[0], &ys[0]).unwrap();
-        b.output(&z).unwrap();
     }
 
     #[test]
     fn subtraction() {
+        fn fancy_subtraction<F: Fancy>(b: &mut F, xs: &[F::Item]) {
+            let z = b.sub(&xs[0], &xs[1]).unwrap();
+            b.output(&z).unwrap();
+        }
+
         let mut rng = thread_rng();
         for _ in 0..16 {
             let q = rng.gen_modulus();
-            let x = rng.gen_u16() % q;
-            let y = rng.gen_u16() % q;
             streaming_test(
-                move |b| fancy_subtraction(b, q),
-                move |b| fancy_subtraction(b, q),
-                &[x],
-                &[y],
-                &[(q + x - y) % q],
+                move |b, xs| fancy_subtraction(b, xs),
+                move |b, xs| fancy_subtraction(b, xs),
+                move |b, xs| fancy_subtraction(b, xs),
+                &[q, q],
             );
         }
-    }
-
-    fn fancy_multiplication<W: Clone + HasModulus, E: Debug + Display + From<FancyError>>(
-        b: &mut Fancy<Item = W, Error = E>,
-        q: u16,
-    ) {
-        let (xs, ys) = b.init(&[q], &[q], &[]).unwrap();
-        let z = b.mul(&xs[0], &ys[0]).unwrap();
-        b.output(&z).unwrap();
     }
 
     #[test]
     fn multiplication() {
+        fn fancy_multiplication<F: Fancy>(b: &mut F, xs: &[F::Item]) {
+            let z = b.mul(&xs[0], &xs[1]).unwrap();
+            b.output(&z).unwrap();
+        }
+
         let mut rng = thread_rng();
         for _ in 0..16 {
             let q = rng.gen_modulus();
-            let x = rng.gen_u16() % q;
-            let y = rng.gen_u16() % q;
             streaming_test(
-                move |b| fancy_multiplication(b, q),
-                move |b| fancy_multiplication(b, q),
-                &[x],
-                &[y],
-                &[(x * y) % q],
+                move |b, xs| fancy_multiplication(b, xs),
+                move |b, xs| fancy_multiplication(b, xs),
+                move |b, xs| fancy_multiplication(b, xs),
+                &[q, q],
             );
         }
-    }
-
-    fn fancy_cmul<W: Clone + HasModulus, E: Debug + Display + From<FancyError>>(
-        b: &mut Fancy<Item = W, Error = E>,
-        q: u16,
-    ) {
-        let (xs, _) = b.init(&[q], &[], &[]).unwrap();
-        let z = b.cmul(&xs[0], 5).unwrap();
-        b.output(&z).unwrap();
     }
 
     #[test]
     fn cmul() {
+        fn fancy_cmul<F: Fancy>(b: &mut F, xs: &[F::Item]) {
+            let z = b.cmul(&xs[0], 5).unwrap();
+            b.output(&z).unwrap();
+        }
+
         let mut rng = thread_rng();
         for _ in 0..16 {
             let q = rng.gen_modulus();
-            let x = rng.gen_u16() % q;
             streaming_test(
-                move |b| fancy_cmul(b, q),
-                move |b| fancy_cmul(b, q),
-                &[x],
-                &[],
-                &[(x * 5) % q],
+                move |b, xs| fancy_cmul(b, xs),
+                move |b, xs| fancy_cmul(b, xs),
+                move |b, xs| fancy_cmul(b, xs),
+                &[q],
             );
         }
     }
 
-    fn fancy_projection<W: Clone + HasModulus, E: Debug + Display + From<FancyError>>(
-        b: &mut Fancy<Item = W, Error = E>,
-        q: u16,
-    ) {
-        let (xs, _) = b.init(&[q], &[], &[]).unwrap();
-        let tab = (0..q).map(|i| (i + 1) % q).collect_vec();
-        let z = b.proj(&xs[0], q, Some(tab)).unwrap();
-        b.output(&z).unwrap();
-    }
-
     #[test]
     fn proj() {
+        fn fancy_projection<F: Fancy>(b: &mut F, xs: &[F::Item], q: u16) {
+            let tab = (0..q).map(|i| (i + 1) % q).collect_vec();
+            let z = b.proj(&xs[0], q, Some(tab)).unwrap();
+            b.output(&z).unwrap();
+        }
+
         let mut rng = thread_rng();
         for _ in 0..16 {
             let q = rng.gen_modulus();
-            let x = rng.gen_u16() % q;
             streaming_test(
-                move |b| fancy_projection(b, q),
-                move |b| fancy_projection(b, q),
-                &[x],
-                &[],
-                &[(x + 1) % q],
+                move |b, xs| fancy_projection(b, xs, q),
+                move |b, xs| fancy_projection(b, xs, q),
+                move |b, xs| fancy_projection(b, xs, q),
+                &[q],
             );
         }
     }
@@ -473,44 +456,24 @@ mod streaming {
 #[cfg(test)]
 mod complex {
     use crate::dummy::Dummy;
-    use crate::error::GarblerError;
     use crate::util::RngExt;
-    use crate::{CrtGadgets, Evaluator, Fancy, Garbler, HasModulus};
+    use crate::{CrtBundle, CrtGadgets, Evaluator, Fancy, Garbler};
+    use itertools::Itertools;
     use rand::thread_rng;
     use scuttlebutt::AesRng;
     use std::cell::RefCell;
     use std::os::unix::net::UnixStream;
     use std::rc::Rc;
 
-    fn complex_gadget<F, W>(b: &mut F, q: u128, n: usize)
-    where
-        W: Clone + HasModulus,
-        F: Fancy<Item = W>,
-    {
-        let mut zs = Vec::with_capacity(n);
-        for _ in 0..n {
-            let c = b.crt_constant_bundle(1, q).unwrap();
-            let (_, xs) = b.crt_init(&[], &[q], &[]).unwrap();
-            let x = b.crt_mul(&xs[0], &c).unwrap();
-            let z = b.crt_relu(&x, "100%", None).unwrap();
-            zs.push(z);
-        }
-        b.crt_outputs(&zs).unwrap();
-    }
-
-    fn complex_gadget_<F, W>(b: &mut F, q: u128, n: usize)
-    where
-        W: Clone + HasModulus,
-        F: Fancy<Item = W>,
-    {
-        let mut zs = Vec::with_capacity(n);
-        for _ in 0..n {
-            let c = b.crt_constant_bundle(1, q).unwrap();
-            let (_, xs) = b.crt_init(&[], &[q], &[]).unwrap();
-            let x = b.crt_mul(&xs[0], &c).unwrap();
-            let z = b.crt_relu(&x, "100%", None).unwrap();
-            zs.push(z);
-        }
+    fn complex_gadget<F: Fancy>(b: &mut F, xs: &[CrtBundle<F::Item>]) {
+        let mut zs = xs
+            .iter()
+            .map(|x| {
+                let c = b.crt_constant_bundle(1, x.composite_modulus()).unwrap();
+                let y = b.crt_mul(x, &c).unwrap();
+                b.crt_relu(&y, "100%", None).unwrap()
+            })
+            .collect_vec();
         b.crt_outputs(&zs).unwrap();
     }
 
@@ -518,44 +481,45 @@ mod complex {
     fn test_complex_gadgets() {
         let mut rng = thread_rng();
         let N = 10;
-        let Q = crate::util::modulus_with_width(10);
+        let qs = crate::util::primes_with_width(10);
+        let Q = crate::util::product(&qs);
         for _ in 0..16 {
             let input = (0..N)
-                .map(|_| crate::util::crt_factor(rng.gen_u128() % Q, Q))
-                .flatten()
-                .collect::<Vec<u16>>();
+                .map(|_| rng.gen_u128() % Q)
+                .collect_vec();
 
             // Compute the correct answer using `Dummy`.
-            let input_ = input.clone();
-            let mut dummy = Dummy::new(&input_, &[]);
-            complex_gadget(&mut dummy, Q, N);
+            let mut dummy = Dummy::new();
+            let dinps = input.iter().map(|x| {
+                let xs = crate::util::crt(*x, &qs);
+                CrtBundle::new(Dummy::encode_inputs(&xs, &qs).unwrap())
+            }).collect_vec();
+            complex_gadget(&mut dummy, &dinps);
             let should_be = dummy.get_output();
 
+            // test streaming garbler and evaluator
             let (sender, receiver) = UnixStream::pair().unwrap();
-            let mut input_ = input.clone();
-            std::thread::spawn(move || {
-                let sender = Rc::new(RefCell::new(sender));
-                let rng = AesRng::new();
-                let mut garbler = Garbler::new(sender, rng);
-                complex_gadget(&mut garbler, Q, N);
-            });
-            let receiver = Rc::new(RefCell::new(receiver));
-            let mut evaluator = Evaluator::new(receiver);
-            complex_gadget(&mut evaluator, Q, N);
-            let result = evaluator.decode_output().unwrap();
-            assert_eq!(result, should_be);
 
-            let (sender, receiver) = UnixStream::pair().unwrap();
-            let mut input_ = input.clone();
             std::thread::spawn(move || {
                 let sender = Rc::new(RefCell::new(sender));
-                let rng = AesRng::new();
-                let mut garbler = Garbler::new(sender, rng);
-                complex_gadget_(&mut garbler, Q, N);
-            });
+                let mut garbler = Garbler::new(sender, AesRng::new());
+                // encode input and send it to the evaluator
+                let (gb_inp, ev_inp) = garbler.encode_many(&inputs, &input_mods_);
+                for w in ev_inp.iter() {
+                    gb.send_wire(w).unwrap();
+                }
+                complex_gadget(&mut garbler,
+
             let receiver = Rc::new(RefCell::new(receiver));
             let mut evaluator = Evaluator::new(receiver);
-            complex_gadget_(&mut evaluator, Q, N);
+
+            let ev_inp = input_mods
+                .iter()
+                .map(|q| ev.read_wire(*q).unwrap())
+                .collect_vec();
+                });
+
+            complex_gadget(&mut evaluator, Q, N);
             let result = evaluator.decode_output().unwrap();
             assert_eq!(result, should_be);
         }

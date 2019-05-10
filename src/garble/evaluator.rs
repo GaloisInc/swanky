@@ -79,7 +79,7 @@ impl<R: Read + Debug> Evaluator<R> {
 
     /// Read a Wire from the reader.
     #[inline]
-    fn read_wire(&mut self, modulus: u16) -> Result<Wire, EvaluatorError> {
+    pub fn read_wire(&mut self, modulus: u16) -> Result<Wire, EvaluatorError> {
         let block = self.read_block()?;
         Ok(Wire::from_block(block, modulus))
     }
