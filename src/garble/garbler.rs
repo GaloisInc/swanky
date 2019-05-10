@@ -95,7 +95,7 @@ impl<W: Write + Debug, RNG: CryptoRng + RngCore> Garbler<W, RNG> {
         let gbs = Vec::with_capacity(vals.len());
         let evs = Vec::with_capacity(vals.len());
         for (x, q) in vals.iter().zip(moduli.iter()) {
-            let (gb, ev) = self.encode(x, q);
+            let (gb, ev) = self.encode(*x, *q);
             gbs.push(gb);
             evs.push(ev);
         }

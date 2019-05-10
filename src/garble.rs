@@ -566,31 +566,36 @@ mod reuse {
         }
 
         let (sender, receiver) = UnixStream::pair().unwrap();
-        let receiver = Rc::new(RefCell::new(receiver));
 
-        let mut inps_ = inps.clone();
+        let inps_ = inps.clone();
         let mods_ = mods.clone();
         std::thread::spawn(move || {
             let sender = Rc::new(RefCell::new(sender));
             let sender_ = sender.clone();
-            let mut gb1 = Garbler::new(sender.clone(), AesRng::new());
+            let mut gb1 = Garbler::new(sender.clone(), AesRng::new(), &[]);
 
-            // get the input wirelabels for the garbler
-            let (xs, _) = gb1.init(&mods_, &[], &[]).unwrap();
-            // also get deltas for those wires
-            let ds = xs.iter().map(|w| gb1.delta(w.modulus())).collect_vec();
+            // get the input wirelabels
+            let (gb_inps, ev_inps) = gb1.encode_many(&inps_, &mods_);
 
-            let mut gb2 = Garbler::new(sender.clone(), AesRng::new());
-            // initialize deltas from previous garbler
-            gb2.init(&[], &[], &ds).unwrap();
+            for w in ev_inps.iter() {
+                gb1.send_wire(w).unwrap()
+            }
+
+            // get deltas for input wires
+            let ds = mods_.into_iter().map(|q| gb1.delta(q)).collect_vec();
+
+            let mut gb2 = Garbler::new(sender, AesRng::new(), &ds);
+
             // output the input wires from the previous garbler
-            gb2.outputs(&xs).unwrap();
+            gb2.outputs(&gb_inps).unwrap();
         });
 
+        let receiver = Rc::new(RefCell::new(receiver));
         let mut ev1 = Evaluator::new(receiver.clone());
-        let (xs, _) = ev1.init(&mods, &[], &[]).unwrap();
 
-        let mut ev2 = Evaluator::new(receiver.clone());
+        let xs = mods.iter().map(|q| ev1.read_wire(*q).unwrap()).collect_vec();
+
+        let mut ev2 = Evaluator::new(receiver);
         ev2.outputs(&xs).unwrap();
 
         let result = ev2.decode_output().unwrap();
