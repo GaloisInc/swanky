@@ -447,43 +447,46 @@ impl CircuitBuilder {
         CircuitRef { ix, modulus }
     }
 
-    /// Get CircuitRefs for the input wires.
-    pub fn init(
-        &mut self,
-        garbler_inputs: &[u16],
-        evaluator_inputs: &[u16],
-    ) -> Result<(Vec<CircuitRef>, Vec<CircuitRef>), CircuitBuilderError> {
-        unimplemented!()
+    /// Get CircuitRef for a garbler input wire.
+    pub fn garbler_input(&mut self, modulus: u16) -> CircuitRef {
+        let id = self.get_next_garbler_input_id();
+        self.gate(Gate::GarblerInput { id }, modulus)
     }
 
-    /// Get CircuitRefs for the input wires as wire bundles.
-    pub fn init_bundles(
-        &mut self,
-        garbler_inputs: &[Vec<u16>],
-        evaluator_inputs: &[Vec<u16>],
-    ) -> Result<(Vec<Bundle<CircuitRef>>, Vec<Bundle<CircuitRef>>), CircuitBuilderError> {
-        unimplemented!()
+    /// Get CircuitRef for an evaluator input wire.
+    pub fn evaluator_input(&mut self, modulus: u16) -> CircuitRef {
+        let id = self.get_next_evaluator_input_id();
+        self.gate(Gate::EvaluatorInput { id }, modulus)
     }
 
-    /// Get CircuitRefs for the input wires as CRT wire bundles - each value of the input
-    /// is the composite CRT modulus for that bundle.
-    pub fn crt_init(
-        &mut self,
-        garbler_inputs: &[u128],
-        evaluator_inputs: &[u128],
-    ) -> Result<(Vec<CrtBundle<CircuitRef>>, Vec<CrtBundle<CircuitRef>>), CircuitBuilderError> {
-        unimplemented!()
+    /// Get a vec of CircuitRefs for garbler inputs.
+    pub fn garbler_inputs(&mut self, mods: &[u16]) -> Vec<CircuitRef> {
+        mods.iter().map(|q| self.garbler_input(*q)).collect()
     }
 
-    /// Get CircuitRefs for the input wires as Binary wire bundles - the inputs take the
-    /// number of bits in each bundle.
-    pub fn bin_init(
-        &mut self,
-        garbler_inputs: &[usize],
-        evaluator_inputs: &[usize],
-    ) -> Result<(Vec<BinaryBundle<CircuitRef>>, Vec<BinaryBundle<CircuitRef>>), CircuitBuilderError>
-    {
-        unimplemented!()
+    /// Get a vec of CircuitRefs for garbler inputs.
+    pub fn evaluator_inputs(&mut self, mods: &[u16]) -> Vec<CircuitRef> {
+        mods.iter().map(|q| self.evaluator_input(*q)).collect()
+    }
+
+    /// Get a CrtBundle for the garbler using composite modulus Q
+    pub fn crt_garbler_input(&mut self, modulus: u128) -> CrtBundle<CircuitRef> {
+        CrtBundle::new(self.garbler_inputs(&crate::util::factor(modulus)))
+    }
+
+    /// Get a CrtBundle for the evaluator using composite modulus Q
+    pub fn crt_evaluator_input(&mut self, modulus: u128) -> CrtBundle<CircuitRef> {
+        CrtBundle::new(self.evaluator_inputs(&crate::util::factor(modulus)))
+    }
+
+    /// Get a BinaryBundle for the garbler with n bits.
+    pub fn bin_garbler_input(&mut self, nbits: usize) -> BinaryBundle<CircuitRef> {
+        BinaryBundle::new(self.garbler_inputs(&vec![2; nbits]))
+    }
+
+    /// Get a BinaryBundle for the evaluator with n bits.
+    pub fn bin_evaluator_input(&mut self, nbits: usize) -> BinaryBundle<CircuitRef> {
+        BinaryBundle::new(self.evaluator_inputs(&vec![2; nbits]))
     }
 }
 
@@ -500,7 +503,7 @@ mod basic {
 
         let mut b = CircuitBuilder::new();
         let n = 2 + (rng.gen_usize() % 200);
-        let (inps, _) = b.init(&[], &vec![2; n]).unwrap();
+        let inps = b.evaluator_inputs(&vec![2;n]);
         let z = b.and_many(&inps).unwrap();
         b.output(&z).unwrap();
         let mut c = b.finish();
@@ -524,7 +527,7 @@ mod basic {
         let mut rng = thread_rng();
         let mut b = CircuitBuilder::new();
         let n = 2 + (rng.gen_usize() % 200);
-        let (inps, _) = b.init(&[], &vec![2; n]).unwrap();
+        let inps = b.evaluator_inputs(&vec![2; n]);
         let z = b.or_many(&inps).unwrap();
         b.output(&z).unwrap();
         let mut c = b.finish();
@@ -548,8 +551,9 @@ mod basic {
         let mut rng = thread_rng();
         let mut b = CircuitBuilder::new();
         let q = rng.gen_prime();
-        let (xs, ys) = b.init(&[q], &[q]).unwrap();
-        let z = b.mul(&xs[0], &ys[0]).unwrap();
+        let x = b.garbler_input(q);
+        let y = b.evaluator_input(q);
+        let z = b.mul(&x,&y).unwrap();
         b.output(&z).unwrap();
         let mut c = b.finish();
         for _ in 0..16 {
@@ -566,8 +570,8 @@ mod basic {
         let mut b = CircuitBuilder::new();
         let p = rng.gen_prime();
         let q = rng.gen_prime();
-        let (xs, _) = b.init(&[p], &[]).unwrap();
-        let y = b.mod_change(&xs[0], q).unwrap();
+        let x = b.garbler_input(p);
+        let y = b.mod_change(&x, q).unwrap();
         let z = b.mod_change(&y, p).unwrap();
         b.output(&z).unwrap();
         let mut c = b.finish();
@@ -582,7 +586,7 @@ mod basic {
     fn add_many_mod_change() {
         let mut b = CircuitBuilder::new();
         let n = 113;
-        let (_, args) = b.init(&[], &vec![2; n]).unwrap();
+        let args = b.evaluator_inputs(&vec![2;n]);
         let wires = args
             .iter()
             .map(|x| b.mod_change(x, n as u16 + 1).unwrap())
@@ -611,9 +615,9 @@ mod basic {
         let q = rng.gen_modulus();
         let c = rng.gen_u16() % q;
 
-        let (_, xs) = b.init(&[], &[q]).unwrap();
+        let x = b.evaluator_input(q);
         let y = b.constant(c, q).unwrap();
-        let z = b.add(&xs[0], &y).unwrap();
+        let z = b.add(&x, &y).unwrap();
         b.output(&z).unwrap();
 
         let mut circ = b.finish();
@@ -641,8 +645,9 @@ mod bundle {
         let q = rng.gen_usable_composite_modulus();
 
         let mut b = CircuitBuilder::new();
-        let (xs, ys) = b.crt_init(&[q], &[q]).unwrap();
-        let z = b.crt_add(&xs[0], &ys[0]).unwrap();
+        let x = b.crt_garbler_input(q);
+        let y = b.crt_evaluator_input(q);
+        let z = b.crt_add(&x,&y).unwrap();
         b.output_bundle(&z).unwrap();
         let mut c = b.finish();
 
@@ -661,8 +666,9 @@ mod bundle {
         let q = rng.gen_usable_composite_modulus();
 
         let mut b = CircuitBuilder::new();
-        let (xs, ys) = b.crt_init(&[q], &[q]).unwrap();
-        let z = b.sub_bundles(&xs[0], &ys[0]).unwrap();
+        let x = b.crt_garbler_input(q);
+        let y = b.crt_evaluator_input(q);
+        let z = b.sub_bundles(&x, &y).unwrap();
         b.output_bundle(&z).unwrap();
         let mut c = b.finish();
 
@@ -681,9 +687,9 @@ mod bundle {
         let q = util::modulus_with_width(16);
 
         let mut b = CircuitBuilder::new();
-        let (xs, _) = b.crt_init(&[q], &[]).unwrap();
+        let x = b.crt_garbler_input(q);
         let y = rng.gen_u128() % q;
-        let z = b.crt_cmul(&xs[0], y).unwrap();
+        let z = b.crt_cmul(&x, y).unwrap();
         b.output_bundle(&z).unwrap();
         let mut c = b.finish();
 
@@ -701,8 +707,9 @@ mod bundle {
         let q = rng.gen_usable_composite_modulus();
 
         let mut b = CircuitBuilder::new();
-        let (xs, ys) = b.crt_init(&[q], &[q]).unwrap();
-        let z = b.mul_bundles(&xs[0], &ys[0]).unwrap();
+        let x = b.crt_garbler_input(q);
+        let y = b.crt_evaluator_input(q);
+        let z = b.mul_bundles(&x, &y).unwrap();
         b.output_bundle(&z).unwrap();
         let mut c = b.finish();
 
@@ -722,8 +729,8 @@ mod bundle {
         let y = rng.gen_u16() % 10;
 
         let mut b = CircuitBuilder::new();
-        let (xs, _) = b.crt_init(&[q], &[]).unwrap();
-        let z = b.crt_cexp(&xs[0], y).unwrap();
+        let x = b.crt_garbler_input(q);
+        let z = b.crt_cexp(&x, y).unwrap();
         b.output_bundle(&z).unwrap();
         let mut c = b.finish();
 
@@ -744,8 +751,8 @@ mod bundle {
         let p = ps[rng.gen_u16() as usize % ps.len()];
 
         let mut b = CircuitBuilder::new();
-        let (xs, _) = b.crt_init(&[q], &[]).unwrap();
-        let z = b.crt_rem(&xs[0], p).unwrap();
+        let x = b.crt_garbler_input(q);
+        let z = b.crt_rem(&x, p).unwrap();
         b.output_bundle(&z).unwrap();
         let mut c = b.finish();
 
@@ -764,8 +771,9 @@ mod bundle {
         let q = rng.gen_usable_composite_modulus();
 
         let mut b = CircuitBuilder::new();
-        let (xs, ys) = b.crt_init(&[q], &[q]).unwrap();
-        let z = b.eq_bundles(&xs[0], &ys[0]).unwrap();
+        let x = b.crt_garbler_input(q);
+        let y = b.crt_evaluator_input(q);
+        let z = b.eq_bundles(&x, &y).unwrap();
         b.output(&z).unwrap();
         let mut c = b.finish();
 
@@ -788,10 +796,11 @@ mod bundle {
 
         let nargs = 2 + rng.gen_usize() % 100;
         let mods = (0..7).map(|_| rng.gen_modulus()).collect_vec();
-        let buns = itertools::repeat_n(mods.clone(), nargs).collect_vec();
 
         let mut b = CircuitBuilder::new();
-        let (_, xs) = b.init_bundles(&[], &buns).unwrap();
+        let xs = (0..nargs).map(|_| {
+            Bundle::new(b.evaluator_inputs(&mods))
+        }).collect_vec();
         let z = b.mixed_radix_addition(&xs).unwrap();
         b.output_bundle(&z).unwrap();
         let mut circ = b.finish();
@@ -830,8 +839,8 @@ mod bundle {
         println!("q={}", q);
 
         let mut b = CircuitBuilder::new();
-        let (xs, _) = b.crt_init(&[q], &[]).unwrap();
-        let z = b.crt_relu(&xs[0], "100%", None).unwrap();
+        let x = b.crt_garbler_input(q);
+        let z = b.crt_relu(&x, "100%", None).unwrap();
         b.output_bundle(&z).unwrap();
         let mut c = b.finish();
 
@@ -851,8 +860,8 @@ mod bundle {
         println!("q={}", q);
 
         let mut b = CircuitBuilder::new();
-        let (xs, _) = b.crt_init(&[q], &[]).unwrap();
-        let z = b.crt_sgn(&xs[0], "100%", None).unwrap();
+        let x = b.crt_garbler_input(q);
+        let z = b.crt_sgn(&x, "100%", None).unwrap();
         b.output_bundle(&z).unwrap();
         let mut c = b.finish();
 
@@ -871,8 +880,9 @@ mod bundle {
         let q = util::modulus_with_width(10);
 
         let mut b = CircuitBuilder::new();
-        let (xs, ys) = b.crt_init(&[q], &[q]).unwrap();
-        let z = b.crt_lt(&xs[0], &ys[0], "100%").unwrap();
+        let x = b.crt_garbler_input(q);
+        let y = b.crt_evaluator_input(q);
+        let z = b.crt_lt(&x, &y, "100%").unwrap();
         b.output(&z).unwrap();
         let mut c = b.finish();
 
@@ -897,9 +907,7 @@ mod bundle {
         println!("n={} q={}", n, q);
 
         let mut b = CircuitBuilder::new();
-        let (xs, _) = b
-            .crt_init(&itertools::repeat_n(q, n).collect_vec(), &[])
-            .unwrap();
+        let xs = (0..n).map(|_| b.crt_garbler_input(q)).collect_vec();
         let z = b.crt_max(&xs, "100%").unwrap();
         b.output_bundle(&z).unwrap();
         let mut c = b.finish();
@@ -928,8 +936,9 @@ mod bundle {
         println!("n={} q={} Q={}", n, q, Q);
 
         let mut b = CircuitBuilder::new();
-        let (xs, ys) = b.bin_init(&[n], &[n]).unwrap();
-        let (zs, carry) = b.bin_addition(&xs[0], &ys[0]).unwrap();
+        let x = b.bin_garbler_input(n);
+        let y = b.bin_evaluator_input(n);
+        let (zs, carry) = b.bin_addition(&x, &y).unwrap();
         b.output(&carry).unwrap();
         b.output_bundle(&zs).unwrap();
         let mut c = b.finish();
