@@ -3,7 +3,7 @@
 
 use crate::dummy::DummyVal;
 use crate::error::{CircuitBuilderError, DummyError, FancyError, InformerError};
-use crate::fancy::{BinaryBundle, Bundle, CrtBundle, Fancy, HasModulus};
+use crate::fancy::{BinaryBundle, CrtBundle, Fancy, HasModulus};
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -819,7 +819,7 @@ mod bundle {
 
         let mut b = CircuitBuilder::new();
         let xs = (0..nargs)
-            .map(|_| Bundle::new(b.evaluator_inputs(&mods)))
+            .map(|_| crate::fancy::Bundle::new(b.evaluator_inputs(&mods)))
             .collect_vec();
         let z = b.mixed_radix_addition(&xs).unwrap();
         b.output_bundle(&z).unwrap();

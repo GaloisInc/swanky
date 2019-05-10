@@ -33,6 +33,7 @@ impl HasModulus for InformerVal {
 }
 
 impl InformerVal {
+    /// Create a new InformerVal.
     pub fn new(modulus: u16) -> Self {
         InformerVal(modulus)
     }
