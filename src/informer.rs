@@ -1,7 +1,7 @@
 //! `Informer` runs a fancy computation and learns information from it.
 
 use crate::error::{FancyError, InformerError};
-use crate::fancy::{Fancy, HasModulus};
+use crate::fancy::{Fancy, HasModulus, Bundle};
 use std::collections::{HashMap, HashSet};
 
 /// Implements `Fancy`. Used to learn information about a `Fancy` computation in
@@ -36,6 +36,11 @@ impl InformerVal {
     /// Create a new InformerVal.
     pub fn new(modulus: u16) -> Self {
         InformerVal(modulus)
+    }
+
+    /// Create a new InformerVal bundle.
+    pub fn new_bundle(moduli: &[u16]) -> Bundle<Self> {
+        Bundle::new(moduli.iter().map(|q| InformerVal::new(*q)).collect())
     }
 }
 

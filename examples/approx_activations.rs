@@ -1,15 +1,11 @@
-use fancy_garbling::dummy::Dummy;
-use fancy_garbling::util::{crt_factor, crt_inv_factor, modulus_with_nprimes};
+use fancy_garbling::dummy::{Dummy, DummyVal};
+use fancy_garbling::util;
 use fancy_garbling::*;
 use itertools::Itertools;
 use rand::Rng;
 
-fn approx_relu<F, W>(b: &mut F, q: u128)
-where
-    F: Fancy<Item = W>,
-    W: HasModulus + Clone,
+fn approx_relu<F: Fancy>(b: &mut F, x: &CrtBundle<F::Item>)
 {
-    let x = b.crt_garbler_input_bundle(q, None).unwrap();
     let exact = b.crt_relu(&x, "100%", None).unwrap();
     let approx_999 = b.crt_relu(&x, "99.9%", None).unwrap();
     let approx_99 = b.crt_relu(&x, "99%", None).unwrap();
@@ -25,14 +21,16 @@ fn main() {
 
     for _ in 0..n {
         let nprimes = rng.gen_range(5, 9);
-        let q = modulus_with_nprimes(nprimes);
+        let ps = &util::PRIMES[0..nprimes];
+        let q = util::product(ps);
         let x = rand::random::<u128>() % q;
-        let mut d = Dummy::new(&crt_factor(x, q), &[]);
-        approx_relu(&mut d, q);
+
+        let mut d = Dummy::new();
+        approx_relu(&mut d, &DummyVal::crt_factor(x, q));
         let outs = d
             .get_output()
             .chunks(nprimes)
-            .map(|xs| crt_inv_factor(xs, q))
+            .map(|xs| util::crt_inv(xs, ps))
             .collect_vec();
 
         let should_be = if x >= q / 2 { 0 } else { x };

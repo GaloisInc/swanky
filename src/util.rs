@@ -101,7 +101,7 @@ fn as_base_q(x: u128, q: u16, n: usize) -> Vec<u16> {
 /// Determine how many `mod q` digits fit into a `u128` (includes the color
 /// digit).
 #[inline]
-pub(crate) fn digits_per_u128(modulus: u16) -> usize {
+pub fn digits_per_u128(modulus: u16) -> usize {
     debug_assert_ne!(modulus, 1);
     if modulus == 2 {
         128
@@ -130,7 +130,7 @@ pub fn as_base_q_u128(x: u128, q: u16) -> Vec<u16> {
 
 /// Convert `x` into mixed radix form using the provided `radii`.
 #[inline]
-pub(crate) fn as_mixed_radix(x: u128, radii: &[u16]) -> Vec<u16> {
+pub fn as_mixed_radix(x: u128, radii: &[u16]) -> Vec<u16> {
     let mut x = x;
     radii
         .iter()
@@ -229,7 +229,7 @@ pub fn factor(inp: u128) -> Vec<u16> {
 
 /// Compute the CRT representation of x with respect to the primes ps.
 #[inline]
-pub(crate) fn crt(x: u128, ps: &[u16]) -> Vec<u16> {
+pub fn crt(x: u128, ps: &[u16]) -> Vec<u16> {
     ps.iter().map(|&p| (x % p as u128) as u16).collect()
 }
 
@@ -242,7 +242,7 @@ pub fn crt_factor(x: u128, q: u128) -> Vec<u16> {
 
 /// Compute the value x given a list of CRT primes and residues.
 #[inline]
-pub(crate) fn crt_inv(xs: &[u16], ps: &[u16]) -> u128 {
+pub fn crt_inv(xs: &[u16], ps: &[u16]) -> u128 {
     let mut ret = 0;
     let M = ps.iter().fold(1, |acc, &x| x as i128 * acc);
     for (&p, &a) in ps.iter().zip(xs.iter()) {
@@ -263,7 +263,7 @@ pub fn crt_inv_factor(xs: &[u16], q: u128) -> u128 {
 /// Generic algorithm to invert inp_a mod inp_b. As ref so as to support BigInts without
 /// copying.
 #[inline]
-pub(crate) fn inv(inp_a: i128, inp_b: i128) -> i128 {
+pub fn inv(inp_a: i128, inp_b: i128) -> i128 {
     let mut a = inp_a;
     let mut b = inp_b;
     let mut q;
@@ -332,13 +332,13 @@ pub fn primes_with_width(n: u32) -> Vec<u16> {
 
 /// Generate a CRT modulus that support at least n-bit integers, using provided primes.
 #[inline]
-pub(crate) fn base_modulus_with_width(nbits: u32, primes: &[u16]) -> u128 {
+pub fn base_modulus_with_width(nbits: u32, primes: &[u16]) -> u128 {
     product(&base_primes_with_width(nbits, primes))
 }
 
 /// Generate the factors of a CRT modulus that support at least n-bit integers, using provided primes.
 #[inline]
-pub(crate) fn base_primes_with_width(nbits: u32, primes: &[u16]) -> Vec<u16> {
+pub fn base_primes_with_width(nbits: u32, primes: &[u16]) -> Vec<u16> {
     let mut res = 1;
     let mut ps = Vec::new();
     for &p in primes.iter() {
@@ -361,7 +361,7 @@ pub(crate) fn base_primes_with_width(nbits: u32, primes: &[u16]) -> Vec<u16> {
 
 /// Compute the product of some u16s as a u128.
 #[inline]
-pub(crate) fn product(xs: &[u16]) -> u128 {
+pub fn product(xs: &[u16]) -> u128 {
     xs.iter().fold(1, |acc, &x| acc * x as u128)
 }
 
@@ -385,7 +385,7 @@ pub(crate) fn product(xs: &[u16]) -> u128 {
 
 /// Returns true if x is a power of 2
 #[inline]
-pub(crate) fn is_power_of_2(x: u16) -> bool {
+pub fn is_power_of_2(x: u16) -> bool {
     (x & (x - 1)) == 0
 }
 
