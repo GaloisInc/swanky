@@ -313,7 +313,7 @@ mod streaming {
 
     // helper - checks that Streaming evaluation of a fancy function equals Dummy
     // evaluation of the same function
-    fn streaming_test<FGB, FEV, FDU>(f_gb: FGB, f_ev: FEV, f_du: FDU, input_mods: &[u16])
+    fn streaming_test<FGB, FEV, FDU>(mut f_gb: FGB, mut f_ev: FEV, mut f_du: FDU, input_mods: &[u16])
     where
         FGB: FnMut(&mut Garbler<UnixStream, AesRng>, &[Wire]) + Send + Sync + Copy + 'static,
         FEV: FnMut(&mut Evaluator<UnixStream>, &[Wire]) + Send + Sync + Copy + 'static,
@@ -324,7 +324,7 @@ mod streaming {
         let inputs = input_mods.iter().map(|q| rng.gen_u16() % q).collect_vec();
 
         // evaluate f_gb as a dummy
-        let dummy = Dummy::new();
+        let mut dummy = Dummy::new();
         let dinps = Dummy::encode_inputs(&inputs, input_mods).unwrap();
         f_du(&mut dummy, &dinps);
         let should_be = dummy.get_output();

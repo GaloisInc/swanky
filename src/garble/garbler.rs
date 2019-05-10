@@ -92,8 +92,8 @@ impl<W: Write + Debug, RNG: CryptoRng + RngCore> Garbler<W, RNG> {
     #[inline]
     pub fn encode_many(&mut self, vals: &[u16], moduli: &[u16]) -> (Vec<Wire>, Vec<Wire>) {
         assert!(vals.len() == moduli.len());
-        let gbs = Vec::with_capacity(vals.len());
-        let evs = Vec::with_capacity(vals.len());
+        let mut gbs = Vec::with_capacity(vals.len());
+        let mut evs = Vec::with_capacity(vals.len());
         for (x, q) in vals.iter().zip(moduli.iter()) {
             let (gb, ev) = self.encode(*x, *q);
             gbs.push(gb);

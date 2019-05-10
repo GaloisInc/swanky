@@ -7,12 +7,13 @@
 //! Provides objects and functions for statically garbling and evaluating a
 //! circuit.
 
+use crate::Fancy;
 use crate::circuit::Circuit;
 use crate::error::{EvaluatorError, GarblerError};
 use crate::fancy::HasModulus;
 use crate::garble::{Evaluator, Garbler};
 use crate::wire::Wire;
-use crate::Fancy;
+use itertools::Itertools;
 use scuttlebutt::{AesRng, Block};
 use serde::{Deserialize, Serialize};
 use std::cell::RefCell;
@@ -48,7 +49,7 @@ impl GarbledCircuit {
         evaluator_inputs: &[Wire],
     ) -> Result<Vec<u16>, EvaluatorError> {
         let mut evaluator = StaticEvaluator::new(garbler_inputs, evaluator_inputs, &self.blocks);
-        let outputs = c.eval(&mut evaluator)?;
+        let outputs = c.eval(&mut evaluator, garbler_inputs, evaluator_inputs)?;
         c.process_outputs(&outputs, &mut evaluator)?;
         evaluator.evaluator.decode_output()
     }
@@ -107,7 +108,22 @@ pub fn garble(c: &mut Circuit) -> Result<(Encoder, GarbledCircuit), GarblerError
     let deltas = {
         let rng = AesRng::new();
         let mut garbler = Garbler::new(writer_, rng, &[]);
-        let outputs = c.eval(&mut garbler)?;
+
+        // get input wires, ignoring encoded values
+        let gb_inps = (0..c.num_garbler_inputs()).map(|i| {
+            let q = c.garbler_input_mod(i);
+            let (zero,_) = garbler.encode(0,q);
+            zero
+        }).collect_vec();
+
+        let ev_inps = (0..c.num_evaluator_inputs()).map(|i| {
+            let q = c.evaluator_input_mod(i);
+            let (zero,_) = garbler.encode(0,q);
+            zero
+        }).collect_vec();
+
+        let outputs = c.eval(&mut garbler, &gb_inps, &ev_inps)?;
+
         c.process_outputs(&outputs, &mut garbler)?;
         garbler.get_deltas()
     };

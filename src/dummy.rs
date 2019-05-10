@@ -440,7 +440,7 @@ mod bundle {
                 })
                 .collect_vec();
 
-            let d = Dummy::new();
+            let mut d = Dummy::new();
 
             let z = d.mixed_radix_addition_msb_only(&xs).unwrap();
             d.output(&z).unwrap();
