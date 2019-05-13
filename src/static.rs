@@ -230,4 +230,3 @@ impl std::io::Write for GarbledWriter {
         Ok(())
     }
 }
-

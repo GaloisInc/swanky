@@ -1,9 +1,8 @@
 use fancy_garbling::informer::{Informer, InformerVal};
-use fancy_garbling::util::{modulus_with_nprimes, factor};
+use fancy_garbling::util::{factor, modulus_with_nprimes};
 use fancy_garbling::*;
 
-fn exact_sign<F: Fancy>(b: &mut F, x: &CrtBundle<F::Item>)
-{
+fn exact_sign<F: Fancy>(b: &mut F, x: &CrtBundle<F::Item>) {
     let z = b.crt_sign(x, "100%").unwrap();
     b.output(&z).unwrap();
 }

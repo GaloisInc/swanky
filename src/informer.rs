@@ -1,7 +1,7 @@
 //! `Informer` runs a fancy computation and learns information from it.
 
 use crate::error::{FancyError, InformerError};
-use crate::fancy::{Fancy, HasModulus, Bundle};
+use crate::fancy::{Bundle, Fancy, HasModulus};
 use std::collections::{HashMap, HashSet};
 
 /// Implements `Fancy`. Used to learn information about a `Fancy` computation in

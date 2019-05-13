@@ -4,8 +4,7 @@ use fancy_garbling::*;
 use itertools::Itertools;
 use rand::Rng;
 
-fn approx_relu<F: Fancy>(b: &mut F, x: &CrtBundle<F::Item>)
-{
+fn approx_relu<F: Fancy>(b: &mut F, x: &CrtBundle<F::Item>) {
     let exact = b.crt_relu(&x, "100%", None).unwrap();
     let approx_999 = b.crt_relu(&x, "99.9%", None).unwrap();
     let approx_99 = b.crt_relu(&x, "99%", None).unwrap();
