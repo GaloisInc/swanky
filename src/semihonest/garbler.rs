@@ -7,7 +7,7 @@
 use crate::comm;
 use crate::errors::Error;
 use fancy_garbling::error::GarblerError;
-use fancy_garbling::{Fancy, Garbler as Gb, Message, Wire};
+use fancy_garbling::{Fancy, Garbler as Gb, Wire};
 use ocelot::ot::Sender as OtSender;
 use rand::{CryptoRng, Rng, RngCore, SeedableRng};
 use scuttlebutt::{AesRng, Block, SemiHonest};
@@ -17,17 +17,19 @@ use std::io::{Read, Write};
 use std::rc::Rc;
 
 /// Semi-honest garbler.
-pub struct Garbler<
-    R: Read + Send,
-    W: Write + Send + Debug,
-    RNG: CryptoRng + RngCore,
-    OT: OtSender, // + SemiHonest
-> {
+pub struct Garbler< R, W, RNG, OT > {
     garbler: Gb<W, AesRng>,
     reader: Rc<RefCell<R>>,
     writer: Rc<RefCell<W>>,
     ot: OT,
     rng: RNG,
+}
+
+impl <R, W, OT, RNG> std::ops::Deref for Garbler<R,W,RNG,OT> {
+    type Target = Gb<W, AesRng>;
+    fn deref(&self) -> &Self::Target {
+        &self.garbler
+    }
 }
 
 impl<
@@ -41,29 +43,29 @@ impl<
     pub fn new(reader: Rc<RefCell<R>>, writer: Rc<RefCell<W>>, inputs: &[u16], mut rng: RNG) -> Result<Self, Error> {
         let ot = OT::init(&mut *reader.borrow_mut(), &mut *writer.borrow_mut(), &mut rng)?;
         let mut inputs = inputs.to_vec().into_iter();
-        let writer_ = writer.clone();
-        let callback = move |m| {
-            let mut writer = writer_.borrow_mut();
-            let res = match m {
-                Message::UnencodedGarblerInput { zero, delta } => {
-                    if let Some(input) = inputs.next() {
-                        comm::send_block(&mut *writer, &zero.plus(&delta.cmul(input)).as_block())
-                            .map_err(GarblerError::from)
-                    } else {
-                        Err(GarblerError::MessageError(
-                            "not enough garbler inputs".to_string(),
-                        ))
-                    }
-                }
-                m => Err(GarblerError::MessageError(format!("invalid message {}", m))),
-            };
-            writer.flush()?;
-            res
-        };
+        // let writer_ = writer.clone();
+        // let callback = move |m| {
+        //     let mut writer = writer_.borrow_mut();
+        //     let res = match m {
+        //         Message::UnencodedGarblerInput { zero, delta } => {
+        //             if let Some(input) = inputs.next() {
+        //                 comm::send_block(&mut *writer, &zero.plus(&delta.cmul(input)).as_block())
+        //                     .map_err(GarblerError::from)
+        //             } else {
+        //                 Err(GarblerError::MessageError(
+        //                     "not enough garbler inputs".to_string(),
+        //                 ))
+        //             }
+        //         }
+        //         m => Err(GarblerError::MessageError(format!("invalid message {}", m))),
+        //     };
+        //     writer.flush()?;
+        //     res
+        // };
         let garbler = Gb::new(
             writer.clone(),
-            callback,
             AesRng::from_seed(rng.gen::<Block>()),
+            &[],
         );
         Ok(Garbler {
             garbler,
@@ -100,31 +102,10 @@ impl<
             .collect::<Vec<(Block, Block)>>();
         (wire, inputs)
     }
-}
 
-impl<
-        R: Read + Send,
-        W: Write + Send + Debug + 'static,
-        RNG: CryptoRng + RngCore,
-        OT: OtSender<Msg = Block>, // + SemiHonest
-    > Fancy for Garbler<R, W, RNG, OT>
-{
-    type Item = Wire;
-    type Error = Error;
-
+    /// Perform OT and obtain wires for the evaluator's inputs.
     #[inline]
-    fn garbler_input(&mut self, q: u16, opt_x: Option<u16>) -> Result<Self::Item, Self::Error> {
-        self.garbler
-            .garbler_input(q, opt_x)
-            .map_err(Self::Error::from)
-    }
-    #[inline]
-    fn evaluator_input(&mut self, q: u16) -> Result<Self::Item, Self::Error> {
-        let wires = self.evaluator_inputs(&[q])?;
-        Ok(wires[0].clone())
-    }
-    #[inline]
-    fn evaluator_inputs(&mut self, qs: &[u16]) -> Result<Vec<Self::Item>, Self::Error> {
+    pub fn evaluator_inputs(&mut self, qs: &[u16]) -> Result<Vec<Wire>, Error> {
         let n = qs.len();
         let lens = qs.into_iter().map(|q| (*q as f32).log(2.0).ceil() as usize);
         let mut wires = Vec::with_capacity(n);
@@ -140,30 +121,48 @@ impl<
         self.run_ot(&inputs)?;
         Ok(wires)
     }
+}
+
+impl<
+        R: Read + Send,
+        W: Write + Send + Debug + 'static,
+        RNG: CryptoRng + RngCore,
+        OT: OtSender<Msg = Block>, // + SemiHonest
+    > Fancy for Garbler<R, W, RNG, OT>
+{
+    type Item = Wire;
+    type Error = Error;
+
     #[inline]
     fn constant(&mut self, x: u16, q: u16) -> Result<Self::Item, Self::Error> {
         self.garbler.constant(x, q).map_err(Self::Error::from)
     }
+
     #[inline]
     fn add(&mut self, x: &Wire, y: &Wire) -> Result<Self::Item, Self::Error> {
         self.garbler.add(x, y).map_err(Self::Error::from)
     }
+
     #[inline]
     fn sub(&mut self, x: &Wire, y: &Wire) -> Result<Self::Item, Self::Error> {
         self.garbler.sub(x, y).map_err(Self::Error::from)
     }
+
     #[inline]
     fn cmul(&mut self, x: &Wire, c: u16) -> Result<Self::Item, Self::Error> {
         self.garbler.cmul(x, c).map_err(Self::Error::from)
     }
+
     #[inline]
     fn mul(&mut self, x: &Wire, y: &Wire) -> Result<Self::Item, Self::Error> {
         self.garbler.mul(x, y).map_err(Self::Error::from)
     }
+
     #[inline]
     fn proj(&mut self, x: &Wire, q: u16, tt: Option<Vec<u16>>) -> Result<Self::Item, Self::Error> {
         self.garbler.proj(x, q, tt).map_err(Self::Error::from)
     }
+
     #[inline]
     fn output(&mut self, x: &Self::Item) -> Result<(), Self::Error> {
         self.garbler.output(x).map_err(Self::Error::from)
