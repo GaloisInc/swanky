@@ -11,7 +11,7 @@ use std::io::Write;
 use std::rc::Rc;
 
 /// Streams garbled circuit ciphertexts through a callback. Parallelizable.
-pub struct Garbler<W: Write + Debug, RNG: CryptoRng + RngCore> {
+pub struct Garbler<W, RNG> {
     writer: Rc<RefCell<W>>,
     deltas: HashMap<u16, Wire>, // map from modulus to associated delta wire-label.
     current_output: usize,

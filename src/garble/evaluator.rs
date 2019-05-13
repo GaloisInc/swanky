@@ -12,7 +12,7 @@ use std::rc::Rc;
 ///
 /// Evaluates a garbled circuit on the fly, using messages containing ciphertexts and
 /// wires. Parallelizable.
-pub struct Evaluator<R: Read + Debug> {
+pub struct Evaluator<R> {
     reader: Rc<RefCell<R>>,
     current_gate: usize,
     pub(crate) output_cts: Vec<Vec<Block>>,
