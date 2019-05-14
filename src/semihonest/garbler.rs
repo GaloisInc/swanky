@@ -32,10 +32,16 @@ impl<R, W, OT, RNG> std::ops::Deref for Garbler<R, W, RNG, OT> {
     }
 }
 
+impl<R, W, OT, RNG> std::ops::DerefMut for Garbler<R, W, RNG, OT> {
+    fn deref_mut(&mut self) -> &mut Gb<W, RNG> {
+        &mut self.garbler
+    }
+}
+
 impl<
         R: Read + Send,
         W: Write + Send + Debug + 'static,
-        RNG: CryptoRng + RngCore + SeedableRng<Seed=Block>,
+        RNG: CryptoRng + RngCore + SeedableRng<Seed = Block>,
         OT: OtSender<Msg = Block>, // + SemiHonest
     > Garbler<R, W, RNG, OT>
 {
@@ -66,9 +72,24 @@ impl<
     #[inline]
     pub fn garbler_input(&mut self, val: u16, modulus: u16) -> Result<Wire, Error> {
         let (mine, theirs) = self.garbler.encode(val, modulus);
-        let mut writer = self.writer.borrow_mut();
-        theirs.as_block().write(&mut *writer)?;
+        self.garbler.send_wire(&theirs)?;
+        self.writer.borrow_mut().flush()?;
         Ok(mine)
+    }
+
+    /// Encode and send many garbler input wires.
+    #[inline]
+    pub fn garbler_inputs(&mut self, vals: &[u16], moduli: &[u16]) -> Result<Vec<Wire>, Error> {
+        let ws = vals.iter()
+            .zip(moduli.iter())
+            .map(|(x, q)| {
+                let (mine, theirs) = self.garbler.encode(*x, *q);
+                self.garbler.send_wire(&theirs)?;
+                Ok(mine)
+            })
+            .collect();
+        self.writer.borrow_mut().flush()?;
+        ws
     }
 
     #[inline]

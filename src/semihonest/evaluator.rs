@@ -71,7 +71,8 @@ impl<
     /// Receive a garbler input wire.
     #[inline]
     pub fn garbler_input(&mut self, modulus: u16) -> Result<Wire, Error> {
-        self.evaluator.read_wire(modulus).map_err(Error::from)
+        let w = self.evaluator.read_wire(modulus)?;
+        Ok(w)
     }
 
     /// Receive garbler input wires.
@@ -85,7 +86,7 @@ impl<
     pub fn evaluator_inputs(&mut self, inputs: &[u16], moduli: &[u16]) -> Result<Vec<Wire>, Error> {
         let mut lens = Vec::new();
         let mut bs = Vec::new();
-        for (x,q) in inputs.iter().zip(moduli.iter()) {
+        for (x, q) in inputs.iter().zip(moduli.iter()) {
             let len = (*q as f32).log(2.0).ceil() as usize;
             for b in (0..len).into_iter().map(|i| x & (1 << i) != 0) {
                 bs.push(b);
