@@ -261,12 +261,12 @@ impl Circuit {
         let gb = self
             .garbler_input_refs
             .iter()
-            .map(|r| crate::informer::InformerVal::new(r.modulus()))
+            .map(|r| informer.garbler_input(r.modulus()))
             .collect_vec();
         let ev = self
             .evaluator_input_refs
             .iter()
-            .map(|r| crate::informer::InformerVal::new(r.modulus()))
+            .map(|r| informer.evaluator_input(r.modulus()))
             .collect_vec();
 
         let outputs = self.eval(&mut informer, &gb, &ev)?;

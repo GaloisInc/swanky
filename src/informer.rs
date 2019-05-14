@@ -32,18 +32,6 @@ impl HasModulus for InformerVal {
     }
 }
 
-impl InformerVal {
-    /// Create a new InformerVal.
-    pub fn new(modulus: u16) -> Self {
-        InformerVal(modulus)
-    }
-
-    /// Create a new InformerVal bundle.
-    pub fn new_bundle(moduli: &[u16]) -> Bundle<Self> {
-        Bundle::new(moduli.iter().map(|q| InformerVal::new(*q)).collect())
-    }
-}
-
 impl Informer {
     /// Make a new `Informer`.
     pub fn new() -> Informer {
@@ -61,6 +49,28 @@ impl Informer {
             nciphertexts: 0,
             moduli: HashMap::new(),
         }
+    }
+
+    /// Create a garbler input.
+    pub fn garbler_input(&mut self, modulus: u16) -> InformerVal {
+        self.garbler_input_moduli.push(modulus);
+        InformerVal(modulus)
+    }
+
+    /// Create an evaluator input.
+    pub fn evaluator_input(&mut self, modulus: u16) -> InformerVal {
+        self.evaluator_input_moduli.push(modulus);
+        InformerVal(modulus)
+    }
+
+    /// Create a garbler input bundle.
+    pub fn garbler_input_bundle(&mut self, moduli: &[u16]) -> Bundle<InformerVal> {
+        Bundle::new(moduli.iter().map(|q| self.garbler_input(*q)).collect())
+    }
+
+    /// Create an evaluator input bundle.
+    pub fn evalautor_input_bundle(&mut self, moduli: &[u16]) -> Bundle<InformerVal> {
+        Bundle::new(moduli.iter().map(|q| self.evaluator_input(*q)).collect())
     }
 
     /// Print information about the fancy computation.

@@ -1,4 +1,4 @@
-use fancy_garbling::informer::{Informer, InformerVal};
+use fancy_garbling::informer::Informer;
 use fancy_garbling::util::{factor, modulus_with_nprimes};
 use fancy_garbling::*;
 
@@ -11,7 +11,7 @@ fn main() {
     let nprimes = 10;
     let q = modulus_with_nprimes(nprimes);
     let mut i = Informer::new();
-    let x = CrtBundle::from(InformerVal::new_bundle(&factor(q)));
+    let x = CrtBundle::from(i.garbler_input_bundle(&factor(q)));
     exact_sign(&mut i, &x);
     i.print_info();
 }
