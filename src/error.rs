@@ -74,6 +74,8 @@ pub enum GarblerError {
     TruthTableRequired,
     /// Delta required for wire reuse.
     DeltaRequired,
+    /// Encoding error.
+    EncodingError,
     /// A fancy error has occurred.
     FancyError(FancyError),
 }
@@ -193,6 +195,9 @@ impl Display for GarblerError {
             GarblerError::DeltaRequired => {
                 "delta from previous execution of garbler must be provided with wire to reuse"
                     .fmt(f)
+            }
+            GarblerError::EncodingError => {
+                "encoding failed: unequal length input values and moduli".fmt(f)
             }
             GarblerError::FancyError(e) => write!(f, "{}", e),
         }

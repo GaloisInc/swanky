@@ -90,7 +90,14 @@ impl<W: Write + Debug, RNG: CryptoRng + RngCore> Garbler<W, RNG> {
 
     /// Encode many wires, producing zero wires as well as encoded values.
     #[inline]
-    pub fn encode_many(&mut self, vals: &[u16], moduli: &[u16]) -> (Vec<Wire>, Vec<Wire>) {
+    pub fn encode_many(
+        &mut self,
+        vals: &[u16],
+        moduli: &[u16],
+    ) -> Result<(Vec<Wire>, Vec<Wire>), GarblerError> {
+        if vals.len() != moduli.len() {
+            return Err(GarblerError::EncodingError);
+        }
         assert!(vals.len() == moduli.len());
         let mut gbs = Vec::with_capacity(vals.len());
         let mut evs = Vec::with_capacity(vals.len());
@@ -99,25 +106,33 @@ impl<W: Write + Debug, RNG: CryptoRng + RngCore> Garbler<W, RNG> {
             gbs.push(gb);
             evs.push(ev);
         }
-        (gbs, evs)
+        Ok((gbs, evs))
     }
 
     /// Encode a CrtBundle, producing the zero wires as well as the encoded values.
     #[inline]
-    pub fn crt_encode(&mut self, val: u128, modulus: u128) -> (CrtBundle<Wire>, CrtBundle<Wire>) {
+    pub fn crt_encode(
+        &mut self,
+        val: u128,
+        modulus: u128,
+    ) -> Result<(CrtBundle<Wire>, CrtBundle<Wire>), GarblerError> {
         let ms = crate::util::factor(modulus);
         let xs = crate::util::crt(val, &ms);
-        let (gbs, evs) = self.encode_many(&xs, &ms);
-        (CrtBundle::new(gbs), CrtBundle::new(evs))
+        let (gbs, evs) = self.encode_many(&xs, &ms)?;
+        Ok((CrtBundle::new(gbs), CrtBundle::new(evs)))
     }
 
     /// Encode a BinaryBundle, producing the zero wires as well as the encoded values.
     #[inline]
-    pub fn bin_encode(&mut self, val: u128, nbits: usize) -> (BinaryBundle<Wire>, BinaryBundle<Wire>) {
+    pub fn bin_encode(
+        &mut self,
+        val: u128,
+        nbits: usize,
+    ) -> Result<(BinaryBundle<Wire>, BinaryBundle<Wire>), GarblerError> {
         let xs = crate::util::u128_to_bits(val, nbits);
         let ms = vec![2; nbits];
-        let (gbs, evs) = self.encode_many(&xs, &ms);
-        (BinaryBundle::new(gbs), BinaryBundle::new(evs))
+        let (gbs, evs) = self.encode_many(&xs, &ms)?;
+        Ok((BinaryBundle::new(gbs), BinaryBundle::new(evs)))
     }
 }
 

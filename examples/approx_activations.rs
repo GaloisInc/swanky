@@ -25,7 +25,7 @@ fn main() {
         let x = rand::random::<u128>() % q;
 
         let mut d = Dummy::new();
-        let inp = d.crt_encode(x,q).unwrap();
+        let inp = d.crt_encode(x, q).unwrap();
         approx_relu(&mut d, &inp);
         let outs = d
             .get_output()

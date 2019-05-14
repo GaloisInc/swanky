@@ -24,7 +24,7 @@ impl<W: Clone + HasModulus> CrtBundle<W> {
 
     /// Return the product of all the wires' moduli.
     pub fn composite_modulus(&self) -> u128 {
-        util::product(&self.iter().map(|w| w.modulus()).collect_vec())
+        util::product(&self.iter().map(HasModulus::modulus).collect_vec())
     }
 }
 
