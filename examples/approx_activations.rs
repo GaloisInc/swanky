@@ -1,4 +1,4 @@
-use fancy_garbling::dummy::{Dummy, DummyVal};
+use fancy_garbling::dummy::Dummy;
 use fancy_garbling::util;
 use fancy_garbling::*;
 use itertools::Itertools;
@@ -25,7 +25,8 @@ fn main() {
         let x = rand::random::<u128>() % q;
 
         let mut d = Dummy::new();
-        approx_relu(&mut d, &DummyVal::crt_factor(x, q));
+        let inp = d.crt_encode(x,q).unwrap();
+        approx_relu(&mut d, &inp);
         let outs = d
             .get_output()
             .chunks(nprimes)

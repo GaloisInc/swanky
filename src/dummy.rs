@@ -29,29 +29,6 @@ impl DummyVal {
     pub fn new(val: u16, modulus: u16) -> Self {
         Self { val, modulus }
     }
-
-    /// Create a CrtBundle of DummyVal consisting of the CRT factorization of x using
-    /// composite modulus q.
-    pub fn crt_factor(x: u128, q: u128) -> CrtBundle<DummyVal> {
-        let ms = crate::util::factor(q);
-        let xs = crate::util::crt(x, &ms);
-        CrtBundle::new(
-            xs.into_iter()
-                .zip(ms.into_iter())
-                .map(|(x, q)| DummyVal::new(x, q))
-                .collect(),
-        )
-    }
-
-    /// Create a BinaryBundle of DummyVal consisting of the `n` least significant bits of x.
-    pub fn u128_to_bits(x: u128, n: usize) -> BinaryBundle<DummyVal> {
-        BinaryBundle::new(
-            crate::util::u128_to_bits(x, n)
-                .into_iter()
-                .map(|b| DummyVal::new(b, 2))
-                .collect(),
-        )
-    }
 }
 
 impl Dummy {
@@ -67,8 +44,13 @@ impl Dummy {
         self.outputs
     }
 
+    /// Encode a dummy value
+    pub fn encode(&self, value: u16, modulus: u16) -> Result<DummyVal, DummyError> {
+        Ok(DummyVal::new(value, modulus))
+    }
+
     /// Encode a slice of inputs and a slice of moduli as DummyVals.
-    pub fn encode_inputs(xs: &[u16], moduli: &[u16]) -> Result<Vec<DummyVal>, DummyError> {
+    pub fn encode_many(&self, xs: &[u16], moduli: &[u16]) -> Result<Vec<DummyVal>, DummyError> {
         if xs.len() != moduli.len() {
             return Err(DummyError::EncodingError);
         }
@@ -77,6 +59,29 @@ impl Dummy {
             .zip(moduli.iter())
             .map(|(x, q)| DummyVal::new(*x, *q))
             .collect())
+    }
+
+    /// Create a CrtBundle of DummyVal consisting of the CRT factorization of x using
+    /// composite modulus q.
+    pub fn crt_encode(&self, x: u128, q: u128) -> Result<CrtBundle<DummyVal>, DummyError> {
+        let ms = crate::util::factor(q);
+        let xs = crate::util::crt(x, &ms);
+        Ok(CrtBundle::new(
+            xs.into_iter()
+                .zip(ms.into_iter())
+                .map(|(x, q)| DummyVal::new(x, q))
+                .collect(),
+        ))
+    }
+
+    /// Create a BinaryBundle of DummyVal consisting of the `n` least significant bits of x.
+    pub fn bin_encode(&self, x: u128, n: usize) -> Result<BinaryBundle<DummyVal>, DummyError> {
+        Ok(BinaryBundle::new(
+            crate::util::u128_to_bits(x, n)
+                .into_iter()
+                .map(|b| DummyVal::new(b, 2))
+                .collect(),
+        ))
     }
 }
 
@@ -161,8 +166,8 @@ mod bundle {
             let y = rng.gen_u128() % q;
             let mut d = Dummy::new();
             {
-                let x = DummyVal::crt_factor(x, q);
-                let y = DummyVal::crt_factor(y, q);
+                let x = d.crt_encode(x, q).unwrap();
+                let y = d.crt_encode(y, q).unwrap();
                 let z = d.crt_add(&x, &y).unwrap();
                 d.output_bundle(&z).unwrap();
             }
@@ -180,8 +185,8 @@ mod bundle {
             let y = rng.gen_u128() % q;
             let mut d = Dummy::new();
             {
-                let x = DummyVal::crt_factor(x, q);
-                let y = DummyVal::crt_factor(y, q);
+                let x = d.crt_encode(x, q).unwrap();
+                let y = d.crt_encode(y, q).unwrap();
                 let z = d.sub_bundles(&x, &y).unwrap();
                 d.output_bundle(&z).unwrap();
             }
@@ -200,7 +205,7 @@ mod bundle {
             let c = 1 + rng.gen_u128() % q;
             let mut d = Dummy::new();
             {
-                let x = DummyVal::u128_to_bits(x, nbits);
+                let x = d.bin_encode(x, nbits).unwrap();
                 let z = d.bin_cmul(&x, c, nbits).unwrap();
                 d.output_bundle(&z).unwrap();
             }
@@ -219,8 +224,8 @@ mod bundle {
             let y = rng.gen_u128() % q;
             let mut d = Dummy::new();
             {
-                let x = DummyVal::u128_to_bits(x, nbits);
-                let y = DummyVal::u128_to_bits(y, nbits);
+                let x = d.bin_encode(x, nbits).unwrap();
+                let y = d.bin_encode(y, nbits).unwrap();
                 let z = d.bin_multiplication_lower_half(&x, &y).unwrap();
                 d.output_bundle(&z).unwrap();
             }
@@ -241,7 +246,7 @@ mod bundle {
             {
                 let xs = inps
                     .into_iter()
-                    .map(|x| DummyVal::crt_factor(x, q))
+                    .map(|x| d.crt_encode(x, q).unwrap())
                     .collect_vec();
                 let z = d.crt_max(&xs, "100%").unwrap();
                 d.output_bundle(&z).unwrap();
@@ -261,7 +266,7 @@ mod bundle {
             let should_be = (!x + 1) % q;
             let mut d = Dummy::new();
             {
-                let x = DummyVal::u128_to_bits(x, nbits);
+                let x = d.bin_encode(x, nbits).unwrap();
                 let y = d.bin_twos_complement(&x).unwrap();
                 d.output_bundle(&y).unwrap();
             }
@@ -282,8 +287,8 @@ mod bundle {
             let should_be = (x + y) % q;
             let mut d = Dummy::new();
             {
-                let x = DummyVal::u128_to_bits(x, nbits);
-                let y = DummyVal::u128_to_bits(y, nbits);
+                let x = d.bin_encode(x, nbits).unwrap();
+                let y = d.bin_encode(y, nbits).unwrap();
                 let (z, overflow) = d.bin_addition(&x, &y).unwrap();
                 d.output(&overflow).unwrap();
                 d.output_bundle(&z).unwrap();
@@ -311,8 +316,8 @@ mod bundle {
             let should_be = (x - y) % q;
             let mut d = Dummy::new();
             {
-                let x = DummyVal::u128_to_bits(x, nbits);
-                let y = DummyVal::u128_to_bits(y, nbits);
+                let x = d.bin_encode(x, nbits).unwrap();
+                let y = d.bin_encode(y, nbits).unwrap();
                 let (z, overflow) = d.bin_subtraction(&x, &y).unwrap();
                 d.output(&overflow).unwrap();
                 d.output_bundle(&z).unwrap();
@@ -340,8 +345,8 @@ mod bundle {
             let should_be = x < y;
             let mut d = Dummy::new();
             {
-                let x = DummyVal::u128_to_bits(x, nbits);
-                let y = DummyVal::u128_to_bits(y, nbits);
+                let x = d.bin_encode(x, nbits).unwrap();
+                let y = d.bin_encode(y, nbits).unwrap();
                 let z = d.bin_lt(&x, &y).unwrap();
                 d.output(&z).unwrap();
             }
@@ -363,7 +368,7 @@ mod bundle {
             {
                 let xs = inps
                     .into_iter()
-                    .map(|x| DummyVal::u128_to_bits(x, nbits))
+                    .map(|x| d.bin_encode(x, nbits).unwrap())
                     .collect_vec();
                 let z = d.bin_max(&xs).unwrap();
                 d.output_bundle(&z).unwrap();
@@ -381,7 +386,7 @@ mod bundle {
             let x = rng.gen_u128() % q;
             let mut d = Dummy::new();
             {
-                let x = DummyVal::crt_factor(x, q);
+                let x = d.crt_encode(x, q).unwrap();
                 let z = d.crt_relu(&x, "100%", None).unwrap();
                 d.output_bundle(&z).unwrap();
             }
@@ -403,7 +408,7 @@ mod bundle {
             let x = rng.gen_u128() % q;
             let mut d = Dummy::new();
             {
-                let x = DummyVal::u128_to_bits(x, nbits);
+                let x = d.bin_encode(x, nbits).unwrap();
                 let z = d.bin_abs(&x).unwrap();
                 d.output_bundle(&z).unwrap();
             }

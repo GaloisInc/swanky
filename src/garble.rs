@@ -325,7 +325,7 @@ mod streaming {
 
         // evaluate f_gb as a dummy
         let mut dummy = Dummy::new();
-        let dinps = Dummy::encode_inputs(&inputs, input_mods).unwrap();
+        let dinps = dummy.encode_many(&inputs, input_mods).unwrap();
         f_du(&mut dummy, &dinps);
         let should_be = dummy.get_output();
 
@@ -492,7 +492,7 @@ mod complex {
                 .iter()
                 .map(|x| {
                     let xs = crate::util::crt(*x, &qs);
-                    CrtBundle::new(Dummy::encode_inputs(&xs, &qs).unwrap())
+                    CrtBundle::new(dummy.encode_many(&xs, &qs).unwrap())
                 })
                 .collect_vec();
             complex_gadget(&mut dummy, &dinps);
