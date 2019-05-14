@@ -80,7 +80,8 @@ impl<
     /// Encode and send many garbler input wires.
     #[inline]
     pub fn garbler_inputs(&mut self, vals: &[u16], moduli: &[u16]) -> Result<Vec<Wire>, Error> {
-        let ws = vals.iter()
+        let ws = vals
+            .iter()
             .zip(moduli.iter())
             .map(|(x, q)| {
                 let (mine, theirs) = self.garbler.encode(*x, *q);
@@ -97,7 +98,6 @@ impl<
         let len = (q as f32).log(2.0).ceil() as u16;
         let mut wire = Wire::zero(q);
         let inputs = (0..len)
-            .into_iter()
             .map(|i| {
                 let zero = Wire::rand(&mut self.rng, q);
                 let one = zero.plus(&delta);
@@ -112,7 +112,7 @@ impl<
     #[inline]
     pub fn evaluator_inputs(&mut self, qs: &[u16]) -> Result<Vec<Wire>, Error> {
         let n = qs.len();
-        let lens = qs.into_iter().map(|q| (*q as f32).log(2.0).ceil() as usize);
+        let lens = qs.iter().map(|q| (*q as f32).log(2.0).ceil() as usize);
         let mut wires = Vec::with_capacity(n);
         let mut inputs = Vec::with_capacity(lens.sum());
 

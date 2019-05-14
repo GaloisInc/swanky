@@ -88,7 +88,7 @@ impl<
         let mut bs = Vec::new();
         for (x, q) in inputs.iter().zip(moduli.iter()) {
             let len = (*q as f32).log(2.0).ceil() as usize;
-            for b in (0..len).into_iter().map(|i| x & (1 << i) != 0) {
+            for b in (0..len).map(|i| x & (1 << i) != 0) {
                 bs.push(b);
             }
             lens.push(len);
@@ -97,11 +97,11 @@ impl<
         let mut start = 0;
         Ok(lens
             .into_iter()
-            .zip(moduli.into_iter())
+            .zip(moduli.iter())
             .map(|(len, q)| {
                 let range = start..start + len;
                 let chunk = &wires[range];
-                start = start + len;
+                start += len;
                 combine(chunk, *q)
             })
             .collect::<Vec<Wire>>())
@@ -109,13 +109,10 @@ impl<
 }
 
 fn combine(wires: &[Block], q: u16) -> Wire {
-    wires
-        .into_iter()
-        .enumerate()
-        .fold(Wire::zero(q), |acc, (i, w)| {
-            let w = Wire::from_block(*w, q);
-            acc.plus(&w.cmul(1 << i))
-        })
+    wires.iter().enumerate().fold(Wire::zero(q), |acc, (i, w)| {
+        let w = Wire::from_block(*w, q);
+        acc.plus(&w.cmul(1 << i))
+    })
 }
 
 impl<

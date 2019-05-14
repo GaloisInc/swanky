@@ -179,8 +179,15 @@ mod tests {
         )
         .unwrap();
         let xs = ev.garbler_inputs(&vec![2; 128]).unwrap();
-        let ys = ev.evaluator_inputs(&vec![0_u16; 128], &vec![2; 128]).unwrap();
+        let ys = ev
+            .evaluator_inputs(&vec![0_u16; 128], &vec![2; 128])
+            .unwrap();
         circ.eval(&mut ev, &xs, &ys).unwrap();
         handle.join().unwrap();
+    }
+
+    #[test]
+    fn reusable_wirelabels() {
+        unimplemented!()
     }
 }
