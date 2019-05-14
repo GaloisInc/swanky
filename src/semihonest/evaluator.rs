@@ -19,7 +19,6 @@ pub struct Evaluator<R, W, RNG, OT> {
     evaluator: Ev<R>,
     reader: Rc<RefCell<R>>,
     writer: Rc<RefCell<W>>,
-    inputs: Vec<u16>,
     ot: OT,
     rng: RNG,
 }
@@ -32,16 +31,21 @@ impl<
     > Evaluator<R, W, RNG, OT>
 {
     /// Make a new `Evaluator`.
-    pub fn new(reader: Rc<RefCell<R>>, writer: Rc<RefCell<W>>, inputs: &[u16], mut rng:
-               RNG) -> Result<Self, Error> {
-        let ot = OT::init(&mut *reader.borrow_mut(), &mut *writer.borrow_mut(), &mut rng)?;
+    pub fn new(
+        reader: Rc<RefCell<R>>,
+        writer: Rc<RefCell<W>>,
+        mut rng: RNG,
+    ) -> Result<Self, Error> {
+        let ot = OT::init(
+            &mut *reader.borrow_mut(),
+            &mut *writer.borrow_mut(),
+            &mut rng,
+        )?;
         let evaluator = Ev::new(reader.clone());
-        let inputs = inputs.to_vec();
         Ok(Evaluator {
             evaluator,
             reader,
             writer,
-            inputs,
             ot,
             rng,
         })
@@ -64,25 +68,35 @@ impl<
             .map_err(Error::from)
     }
 
+    /// Receive a garbler input wire.
+    #[inline]
+    pub fn garbler_input(&mut self, modulus: u16) -> Result<Wire, Error> {
+        self.evaluator.read_wire(modulus).map_err(Error::from)
+    }
+
+    /// Receive garbler input wires.
+    #[inline]
+    pub fn garbler_inputs(&mut self, moduli: &[u16]) -> Result<Vec<Wire>, Error> {
+        moduli.iter().map(|q| self.garbler_input(*q)).collect()
+    }
+
     /// Perform OT and obtain wires for the evaluator's inputs.
     #[inline]
-    pub fn evaluator_inputs(&mut self, qs: &[u16]) -> Result<Vec<Wire>, Error> {
-        let lens = qs
-            .into_iter()
-            .map(|q| (*q as f32).log(2.0).ceil() as usize)
-            .collect::<Vec<usize>>();
-        let mut bs = Vec::with_capacity(lens.iter().sum());
-        for len in lens.iter() {
-            let input = self.inputs.remove(0);
-            for b in (0..*len).into_iter().map(|i| input & (1 << i) != 0) {
+    pub fn evaluator_inputs(&mut self, inputs: &[u16], moduli: &[u16]) -> Result<Vec<Wire>, Error> {
+        let mut lens = Vec::new();
+        let mut bs = Vec::new();
+        for (x,q) in inputs.iter().zip(moduli.iter()) {
+            let len = (*q as f32).log(2.0).ceil() as usize;
+            for b in (0..len).into_iter().map(|i| x & (1 << i) != 0) {
                 bs.push(b);
             }
+            lens.push(len);
         }
         let wires = self.run_ot(&bs)?;
         let mut start = 0;
         Ok(lens
             .into_iter()
-            .zip(qs.into_iter())
+            .zip(moduli.into_iter())
             .map(|(len, q)| {
                 let range = start..start + len;
                 let chunk = &wires[range];

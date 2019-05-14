@@ -11,7 +11,6 @@
 
 //!
 
-mod comm;
 mod errors;
 
 pub use errors::Error;

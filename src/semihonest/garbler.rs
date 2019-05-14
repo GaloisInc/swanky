@@ -4,29 +4,29 @@
 // Copyright © 2019 Galois, Inc.
 // See LICENSE for licensing information.
 
-use crate::comm;
+// use crate::comm;
 use crate::errors::Error;
-use fancy_garbling::error::GarblerError;
+// use fancy_garbling::error::GarblerError;
 use fancy_garbling::{Fancy, Garbler as Gb, Wire};
 use ocelot::ot::Sender as OtSender;
 use rand::{CryptoRng, Rng, RngCore, SeedableRng};
-use scuttlebutt::{AesRng, Block, SemiHonest};
+use scuttlebutt::{Block, SemiHonest};
 use std::cell::RefCell;
 use std::fmt::Debug;
 use std::io::{Read, Write};
 use std::rc::Rc;
 
 /// Semi-honest garbler.
-pub struct Garbler< R, W, RNG, OT > {
-    garbler: Gb<W, AesRng>,
+pub struct Garbler<R, W, RNG, OT> {
+    garbler: Gb<W, RNG>,
     reader: Rc<RefCell<R>>,
     writer: Rc<RefCell<W>>,
     ot: OT,
     rng: RNG,
 }
 
-impl <R, W, OT, RNG> std::ops::Deref for Garbler<R,W,RNG,OT> {
-    type Target = Gb<W, AesRng>;
+impl<R, W, OT, RNG> std::ops::Deref for Garbler<R, W, RNG, OT> {
+    type Target = Gb<W, RNG>;
     fn deref(&self) -> &Self::Target {
         &self.garbler
     }
@@ -35,38 +35,24 @@ impl <R, W, OT, RNG> std::ops::Deref for Garbler<R,W,RNG,OT> {
 impl<
         R: Read + Send,
         W: Write + Send + Debug + 'static,
-        RNG: CryptoRng + RngCore,
+        RNG: CryptoRng + RngCore + SeedableRng<Seed=Block>,
         OT: OtSender<Msg = Block>, // + SemiHonest
     > Garbler<R, W, RNG, OT>
 {
-    /// Make a new `Garbler` with inputs `inputs`.
-    pub fn new(reader: Rc<RefCell<R>>, writer: Rc<RefCell<W>>, inputs: &[u16], mut rng: RNG) -> Result<Self, Error> {
-        let ot = OT::init(&mut *reader.borrow_mut(), &mut *writer.borrow_mut(), &mut rng)?;
-        let mut inputs = inputs.to_vec().into_iter();
-        // let writer_ = writer.clone();
-        // let callback = move |m| {
-        //     let mut writer = writer_.borrow_mut();
-        //     let res = match m {
-        //         Message::UnencodedGarblerInput { zero, delta } => {
-        //             if let Some(input) = inputs.next() {
-        //                 comm::send_block(&mut *writer, &zero.plus(&delta.cmul(input)).as_block())
-        //                     .map_err(GarblerError::from)
-        //             } else {
-        //                 Err(GarblerError::MessageError(
-        //                     "not enough garbler inputs".to_string(),
-        //                 ))
-        //             }
-        //         }
-        //         m => Err(GarblerError::MessageError(format!("invalid message {}", m))),
-        //     };
-        //     writer.flush()?;
-        //     res
-        // };
-        let garbler = Gb::new(
-            writer.clone(),
-            AesRng::from_seed(rng.gen::<Block>()),
-            &[],
-        );
+    /// Make a new `Garbler`.
+    pub fn new(
+        reader: Rc<RefCell<R>>,
+        writer: Rc<RefCell<W>>,
+        mut rng: RNG,
+    ) -> Result<Self, Error> {
+        let ot = OT::init(
+            &mut *reader.borrow_mut(),
+            &mut *writer.borrow_mut(),
+            &mut rng,
+        )?;
+
+        let garbler = Gb::new(writer.clone(), RNG::from_seed(rng.gen()), &[]);
+
         Ok(Garbler {
             garbler,
             reader,
@@ -76,15 +62,13 @@ impl<
         })
     }
 
-    fn run_ot(&mut self, inputs: &[(Block, Block)]) -> Result<(), Error> {
-        self.ot
-            .send(
-                &mut *self.reader.borrow_mut(),
-                &mut *self.writer.borrow_mut(),
-                inputs,
-                &mut self.rng,
-            )
-            .map_err(Error::from)
+    /// Encode and send a garbler input wire.
+    #[inline]
+    pub fn garbler_input(&mut self, val: u16, modulus: u16) -> Result<Wire, Error> {
+        let (mine, theirs) = self.garbler.encode(val, modulus);
+        let mut writer = self.writer.borrow_mut();
+        theirs.as_block().write(&mut *writer)?;
+        Ok(mine)
     }
 
     #[inline]
@@ -110,6 +94,7 @@ impl<
         let lens = qs.into_iter().map(|q| (*q as f32).log(2.0).ceil() as usize);
         let mut wires = Vec::with_capacity(n);
         let mut inputs = Vec::with_capacity(lens.sum());
+
         for q in qs.into_iter() {
             let delta = self.garbler.delta(*q);
             let (wire, input) = self._evaluator_input(&delta, *q);
@@ -118,7 +103,13 @@ impl<
                 inputs.push(i);
             }
         }
-        self.run_ot(&inputs)?;
+
+        self.ot.send(
+            &mut *self.reader.borrow_mut(),
+            &mut *self.writer.borrow_mut(),
+            &inputs,
+            &mut self.rng,
+        )?;
         Ok(wires)
     }
 }

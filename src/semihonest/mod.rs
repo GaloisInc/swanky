@@ -17,93 +17,79 @@ mod tests {
     use super::*;
     use fancy_garbling::dummy::Dummy;
     use fancy_garbling::util::RngExt;
-    use fancy_garbling::{CrtGadgets, Fancy, HasModulus, CrtBundle};
-    use ocelot::ot;
-    use scuttlebutt::{AesRng, Block, SemiHonest};
+    use fancy_garbling::{CrtBundle, CrtGadgets, Fancy};
+    use scuttlebutt::AesRng;
+    use std::cell::RefCell;
     use std::io::{BufReader, BufWriter};
     use std::os::unix::net::UnixStream;
     use std::rc::Rc;
-    use std::cell::RefCell;
-
+    use fancy_garbling::circuit::Circuit;
+    use ocelot::ot::{ChouOrlandiReceiver, ChouOrlandiSender};
+    use itertools::Itertools;
 
     type Reader = BufReader<UnixStream>;
     type Writer = BufWriter<UnixStream>;
 
-    fn c1<F: Fancy,>(f: &mut F, a: &F::Item, b: &F::Item) -> Result<(), F::Error> {
-        // let a = f.garbler_input(3, None)?;
-        // let b = f.evaluator_input(3)?;
+    fn addition<F: Fancy>(f: &mut F, a: &F::Item, b: &F::Item) -> Result<(), F::Error> {
         let c = f.add(&a, &b)?;
         f.output(&c)?;
         Ok(())
     }
 
-    fn test_c1<
-        OTSender: ot::Sender<Msg = Block> + SemiHonest,
-        OTReceiver: ot::Receiver<Msg = Block> + SemiHonest,
-    >(
-        a: u16,
-        b: u16,
-    ) {
-        let (sender, receiver) = UnixStream::pair().unwrap();
-        let (tx,rx) = std::sync::mpsc::channel();
-        std::thread::spawn(move || {
-            let rng = AesRng::new();
-            let reader = Rc::new(RefCell::new(BufReader::new(sender.try_clone().unwrap())));
-            let writer = Rc::new(RefCell::new(BufWriter::new(sender)));
-            let mut gb =
-                Garbler::<Reader, Writer, AesRng, OTSender>::new(reader, writer, &[a], rng)
-                    .unwrap();
-
-            // perform ot for the evaluator's input
-            let ev_inps = gb.evaluator_inputs(&[3]).unwrap();
-
-            // encode garbler's input and send it
-            let (b_gb, b_ev) = gb.encode(b, 3);
-            tx.send(b_ev).unwrap();
-
-            c1(&mut gb, &ev_inps[0], &b_gb).unwrap();
-        });
-        let rng = AesRng::new();
-        let reader = Rc::new(RefCell::new(BufReader::new(receiver.try_clone().unwrap())));
-        let writer = Rc::new(RefCell::new(BufWriter::new(receiver)));
-
-        let mut ev =
-            Evaluator::<Reader, Writer, AesRng, OTReceiver>::new(reader, writer, &[b], rng)
-                .unwrap();
-
-        // perform ot
-        let ev_inps = ev.evaluator_inputs(&[3]).unwrap();
-
-        // receive garbler's input
-        let b_ev = rx.recv().unwrap();
-
-        c1(&mut ev, &ev_inps[0], &b_ev).unwrap();
-
-        let output = ev.decode_output();
-        assert_eq!(vec![(a + b) % 3], output);
-    }
-
     #[test]
-    fn test_simple_circuits() {
-        test_c1::<ot::ChouOrlandiSender, ot::ChouOrlandiReceiver>(0, 0);
-        test_c1::<ot::ChouOrlandiSender, ot::ChouOrlandiReceiver>(1, 0);
-        test_c1::<ot::ChouOrlandiSender, ot::ChouOrlandiReceiver>(2, 0);
-        test_c1::<ot::ChouOrlandiSender, ot::ChouOrlandiReceiver>(0, 1);
-        test_c1::<ot::ChouOrlandiSender, ot::ChouOrlandiReceiver>(0, 2);
-        test_c1::<ot::ChouOrlandiSender, ot::ChouOrlandiReceiver>(1, 1);
-        test_c1::<ot::ChouOrlandiSender, ot::ChouOrlandiReceiver>(2, 1);
-        test_c1::<ot::ChouOrlandiSender, ot::ChouOrlandiReceiver>(1, 2);
-        test_c1::<ot::ChouOrlandiSender, ot::ChouOrlandiReceiver>(2, 2);
+    fn test_addition_circuit() {
+        for a in 0..2 {
+            for b in 0..2 {
+                let (sender, receiver) = UnixStream::pair().unwrap();
+                let (tx, rx) = std::sync::mpsc::channel();
+                std::thread::spawn(move || {
+                    let rng = AesRng::new();
+                    let reader = Rc::new(RefCell::new(BufReader::new(sender.try_clone().unwrap())));
+                    let writer = Rc::new(RefCell::new(BufWriter::new(sender)));
+                    let mut gb =
+                        Garbler::<Reader, Writer, AesRng, ChouOrlandiSender>::new(reader, writer, rng)
+                            .unwrap();
+
+                    // perform ot for the evaluator's input
+                    let ev_inps = gb.evaluator_inputs(&[3]).unwrap();
+
+                    // encode garbler's input and send it
+                    let (b_gb, b_ev) = gb.encode(b, 3);
+                    tx.send(b_ev).unwrap();
+
+                    addition(&mut gb, &ev_inps[0], &b_gb).unwrap();
+                });
+                let rng = AesRng::new();
+                let reader = Rc::new(RefCell::new(BufReader::new(receiver.try_clone().unwrap())));
+                let writer = Rc::new(RefCell::new(BufWriter::new(receiver)));
+
+                let mut ev =
+                    Evaluator::<Reader, Writer, AesRng, ChouOrlandiReceiver>::new(reader, writer, rng)
+                        .unwrap();
+
+                // perform ot
+                let ev_inps = ev.evaluator_inputs(&[b], &[3]).unwrap();
+
+                // receive garbler's input
+                let b_ev = rx.recv().unwrap();
+
+                addition(&mut ev, &ev_inps[0], &b_ev).unwrap();
+
+                let output = ev.decode_output().unwrap();
+                assert_eq!(vec![(a + b) % 3], output);
+            }
+        }
     }
 
-    fn relu<F: Fancy>(b: &mut F, xs: &[CrtBundle<F::Item>])
-    {
+    fn relu<F: Fancy>(b: &mut F, xs: &[CrtBundle<F::Item>]) {
         for x in xs.iter() {
             let q = x.composite_modulus();
             let c = b.crt_constant_bundle(1, q).unwrap();
             let y = b.crt_mul(&x, &c).unwrap();
             let z = b.crt_relu(&y, "100%", None).unwrap();
-            b.output(&z).unwrap();
+            for w in z.iter() {
+                b.output(w).unwrap();
+            }
         }
     }
 
@@ -111,22 +97,25 @@ mod tests {
     fn test_complex_circuit() {
         let mut rng = rand::thread_rng();
         let n = 10;
-        let q = fancy_garbling::util::modulus_with_width(10);
+        let ps = fancy_garbling::util::primes_with_width(10);
+        let q = fancy_garbling::util::product(&ps);
         let input = (0..n)
-            .map(|_| fancy_garbling::util::crt_factor(rng.gen_u128() % q, q))
-            .flatten()
-            .collect::<Vec<u16>>();
+            .map(|_| rng.gen_u128() % q)
+            .collect::<Vec<u128>>();
+
         // Run dummy version.
-        let mut dummy = Dummy::new(&input.clone(), &[]);
-        relu(&mut dummy, q, n);
+        let mut dummy = Dummy::new();
+        let dummy_input = input.iter().map(|x| fancy_garbling::dummy::DummyVal::crt_factor(*x,q)).collect_vec();
+        relu(&mut dummy, &dummy_input);
         let target = dummy.get_output();
+
         // Run 2PC version.
         let (sender, receiver) = UnixStream::pair().unwrap();
         std::thread::spawn(move || {
             let rng = AesRng::new();
             let reader = Rc::new(RefCell::new(BufReader::new(sender.try_clone().unwrap())));
             let writer = Rc::new(RefCell::new(BufWriter::new(sender)));
-            let mut gb = Garbler::<Reader, Writer, AesRng, ot::ChouOrlandiSender>::new(
+            let mut gb = Garbler::<Reader, Writer, AesRng, ChouOrlandiSender>::new(
                 reader, writer, &input, rng,
             )
             .unwrap();
@@ -135,7 +124,7 @@ mod tests {
         let rng = AesRng::new();
         let reader = BufReader::new(receiver.try_clone().unwrap());
         let writer = BufWriter::new(receiver);
-        let mut ev = Evaluator::<Reader, Writer, AesRng, ot::ChouOrlandiReceiver>::new(
+        let mut ev = Evaluator::<Reader, Writer, AesRng, ChouOrlandiReceiver>::new(
             Rc::new(RefCell::new(reader)),
             Rc::new(RefCell::new(writer)),
             &[],
@@ -147,10 +136,6 @@ mod tests {
         assert_eq!(target, result);
     }
 
-    use fancy_garbling::circuit::Circuit;
-    use ocelot::ot::{ChouOrlandiReceiver as OtReceiver, ChouOrlandiSender as OtSender};
-    // use ocelot::ot::{DummyReceiver as OtReceiver, DummySender as OtSender};
-
     #[test]
     fn test_aes() {
         let mut circ = Circuit::parse("circuits/AES-non-expanded.txt").unwrap();
@@ -160,7 +145,7 @@ mod tests {
             let rng = AesRng::new();
             let reader = Rc::new(RefCell::new(BufReader::new(sender.try_clone().unwrap())));
             let writer = Rc::new(RefCell::new(BufWriter::new(sender)));
-            let mut gb = Garbler::<Reader, Writer, AesRng, OtSender>::new(
+            let mut gb = Garbler::<Reader, Writer, AesRng, ChouOrlandiSender>::new(
                 reader,
                 writer,
                 &vec![0u16; 128],
@@ -172,7 +157,7 @@ mod tests {
         let rng = AesRng::new();
         let reader = BufReader::new(receiver.try_clone().unwrap());
         let writer = BufWriter::new(receiver);
-        let mut ev = Evaluator::<Reader, Writer, AesRng, OtReceiver>::new(
+        let mut ev = Evaluator::<Reader, Writer, AesRng, ChouOrlandiReceiver>::new(
             Rc::new(RefCell::new(reader)),
             Rc::new(RefCell::new(writer)),
             &vec![0u16; 128],
