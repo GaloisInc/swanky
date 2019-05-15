@@ -7,10 +7,11 @@
 //! Implementation of the Pinkas-Tkachenko-Yanai private set intersection
 //! protocol (cf. <https://eprint.iacr.org/2019/241>).
 
+use crate::Error;
 use crate::cuckoo::CuckooHash;
 use crate::stream;
 use crate::utils;
-use crate::Error;
+use fancy_garbling::{BundleGadgets, BinaryBundle, Fancy};
 use itertools::Itertools;
 use ocelot::oprf::kmprt;
 use ocelot::oprf::{ProgrammableReceiver, ProgrammableSender};
@@ -21,8 +22,6 @@ use std::cell::RefCell;
 use std::fmt::Debug;
 use std::io::{Read, Write};
 use std::rc::Rc;
-
-use fancy_garbling::{BinaryGadgets, BundleGadgets, Fancy, FancyError, HasModulus};
 
 const NHASHES: usize = 3;
 const HASH_SIZE: usize = 4; // how many bytes of the hash to use for the equality tests
@@ -107,22 +106,27 @@ impl<R: Read + Send + Debug + 'static, W: Write + Send + Debug + 'static> Sender
             &mut self.rng,
         )?;
 
-        let mpc_input_bits = ts
+        let mut gb = twopac::semihonest::Garbler::<R, W, AesRng, OtSender>::new(
+            self.reader.clone(),
+            self.writer.clone(),
+            self.rng.fork(),
+            &[],
+        )?;
+
+        let my_input_bits = ts
             .iter()
             .flat_map(|blk| {
-                blk.prefix(HASH_SIZE)
+                blk.prefix(HASH_SIZE) // iterate the first HASH_SIZE bytes of blk
                     .iter()
                     .flat_map(|byte| (0..8).map(|i| ((byte >> i) & 1_u8) as u16).collect_vec())
             })
             .collect::<Vec<u16>>();
 
-        let mut gb = twopac::semihonest::Garbler::<R, W, AesRng, OtSender>::new(
-            self.reader.clone(),
-            self.writer.clone(),
-            &mpc_input_bits,
-            self.rng.fork(),
-        )?;
-        compute_intersection(&mut gb, nbins, HASH_SIZE * 8)?;
+        let mods = vec![2; nbins * HASH_SIZE]; // all binary moduli
+        let sender_inputs = gb.garbler_inputs(&my_input_bits, &mods)?;
+        let receiver_inputs = gb.evaluator_inputs(&mods)?;
+        let outs = compute_intersection(&mut gb, &sender_inputs, &receiver_inputs)?;
+        gb.outputs(&outs)?;
 
         Ok(ts)
     }
@@ -175,8 +179,7 @@ impl<R: Read + Send + Debug + 'static, W: Write + Send + Debug> Receiver<R, W> {
             &mut self.rng,
         )?;
 
-        let n = opprf_outputs.len();
-        let mpc_input_bits = opprf_outputs
+        let my_input_bits = opprf_outputs
             .iter()
             .flat_map(|blk| {
                 blk.prefix(HASH_SIZE)
@@ -188,11 +191,16 @@ impl<R: Read + Send + Debug + 'static, W: Write + Send + Debug> Receiver<R, W> {
         let mut ev = twopac::semihonest::Evaluator::<R, W, AesRng, OtReceiver>::new(
             self.reader.clone(),
             self.writer.clone(),
-            &mpc_input_bits,
             self.rng.fork(),
         )?;
-        compute_intersection(&mut ev, n, HASH_SIZE * 8)?;
-        let mpc_outs = ev.decode_output();
+
+        let mods = vec![2; nbins * HASH_SIZE];
+        let sender_inputs = ev.garbler_inputs(&mods)?;
+        let receiver_inputs = ev.evaluator_inputs(&my_input_bits, &mods)?;
+
+        let outs = compute_intersection(&mut ev, &sender_inputs, &receiver_inputs)?;
+        ev.outputs(&outs)?;
+        let mpc_outs = ev.decode_output()?;
 
         let mut intersection = Vec::new();
 
@@ -209,23 +217,15 @@ impl<R: Read + Send + Debug + 'static, W: Write + Send + Debug> Receiver<R, W> {
 }
 
 /// Fancy function to compute the intersection and return encoded vector of 0/1 masks.
-fn compute_intersection<F, W, E>(f: &mut F, ninputs: usize, input_size: usize) -> Result<(), E>
-where
-    F: Fancy<Item = W, Error = E>,
-    W: Clone + HasModulus,
-    E: std::fmt::Debug + std::fmt::Display + From<FancyError>,
+fn compute_intersection<F: Fancy>(
+    f: &mut F,
+    sender_inputs: &[F::Item],
+    receiver_inputs: &[F::Item],
+) -> Result<Vec<F::Item>, F::Error>
 {
-    let p1_inps = f.bin_garbler_input_bundles(input_size, ninputs, None)?;
-    let p2_inps = f.bin_evaluator_input_bundles(input_size, ninputs)?;
-
-    let mut res = Vec::with_capacity(p1_inps.len());
-
-    for (p1, p2) in p1_inps.into_iter().zip(p2_inps.into_iter()) {
-        let eq = f.eq_bundles(p1.borrow(), p2.borrow())?;
-        res.push(eq);
-    }
-
-    f.outputs(&res)
+    sender_inputs.chunks(HASH_SIZE).zip(receiver_inputs.chunks(HASH_SIZE)).map(|(xs,ys)| {
+        f.eq_bundles(&BinaryBundle::new(xs.to_vec()), &BinaryBundle::new(ys.to_vec()))
+    }).collect()
 }
 
 #[cfg(test)]
