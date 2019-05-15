@@ -46,7 +46,7 @@ mod tests {
                     let reader = Rc::new(RefCell::new(BufReader::new(sender.try_clone().unwrap())));
                     let writer = Rc::new(RefCell::new(BufWriter::new(sender)));
                     let mut gb = Garbler::<Reader, Writer, AesRng, ChouOrlandiSender>::new(
-                        reader, writer, rng,
+                        reader, writer, rng, &[]
                     )
                     .unwrap();
 
@@ -118,7 +118,7 @@ mod tests {
             let reader = Rc::new(RefCell::new(BufReader::new(sender.try_clone().unwrap())));
             let writer = Rc::new(RefCell::new(BufWriter::new(sender)));
             let mut gb =
-                Garbler::<Reader, Writer, AesRng, ChouOrlandiSender>::new(reader, writer, rng)
+                Garbler::<Reader, Writer, AesRng, ChouOrlandiSender>::new(reader, writer, rng, &[])
                     .unwrap();
             let xs = input
                 .iter()
@@ -162,7 +162,7 @@ mod tests {
             let reader = Rc::new(RefCell::new(BufReader::new(sender.try_clone().unwrap())));
             let writer = Rc::new(RefCell::new(BufWriter::new(sender)));
             let mut gb =
-                Garbler::<Reader, Writer, AesRng, ChouOrlandiSender>::new(reader, writer, rng)
+                Garbler::<Reader, Writer, AesRng, ChouOrlandiSender>::new(reader, writer, rng, &[])
                     .unwrap();
             let xs = gb.garbler_inputs(&vec![0_u16; 128], &vec![2; 128]).unwrap();
             let ys = gb.evaluator_inputs(&vec![2; 128]).unwrap();
@@ -188,6 +188,50 @@ mod tests {
 
     #[test]
     fn reusable_wirelabels() {
-        unimplemented!()
+        let mut rng = AesRng::new();
+
+        let q = rng.gen_u16() % 100;
+        let a = rng.gen_u16() % q;
+        let b = rng.gen_u16() % q;
+
+        let (sender, receiver) = UnixStream::pair().unwrap();
+        std::thread::spawn(move || {
+            let reader = Rc::new(RefCell::new(BufReader::new(sender.try_clone().unwrap())));
+            let writer = Rc::new(RefCell::new(BufWriter::new(sender)));
+            let mut gb = Garbler::<Reader, Writer, AesRng, ChouOrlandiSender>::new(
+                reader.clone(), writer.clone(), AesRng::new(), &[]
+            ).unwrap();
+
+            let x = gb.garbler_input(a, q).unwrap();
+            let ys = gb.evaluator_inputs(&[q]).unwrap();
+            let z = gb.add(&x, &ys[0]).unwrap();
+
+            // new garbler instance, with mod 3 delta reused
+            let d = gb.delta(q);
+            let mut gb2 = Garbler::<Reader, Writer, AesRng, ChouOrlandiSender>::new(
+                reader, writer, AesRng::new(), &[d]
+            ).unwrap();
+
+            gb2.output(&z).unwrap();
+        });
+
+        let reader = Rc::new(RefCell::new(BufReader::new(receiver.try_clone().unwrap())));
+        let writer = Rc::new(RefCell::new(BufWriter::new(receiver)));
+        let mut ev = Evaluator::<Reader, Writer, AesRng, ChouOrlandiReceiver>::new(
+            reader.clone(), writer.clone(), AesRng::new(),
+        ).unwrap();
+
+        let x = ev.garbler_input(q).unwrap();
+        let ys = ev.evaluator_inputs(&[b], &[q]).unwrap();
+        let z = ev.add(&x, &ys[0]).unwrap();
+
+        let mut ev2 = Evaluator::<Reader, Writer, AesRng, ChouOrlandiReceiver>::new(
+            reader, writer, AesRng::new(),
+        ).unwrap();
+
+        ev2.output(&z).unwrap();
+
+        let output = ev2.decode_output().unwrap();
+        assert_eq!(vec![(a + b) % q], output);
     }
 }

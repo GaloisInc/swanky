@@ -50,6 +50,7 @@ impl<
         reader: Rc<RefCell<R>>,
         writer: Rc<RefCell<W>>,
         mut rng: RNG,
+        reused_deltas: &[Wire],
     ) -> Result<Self, Error> {
         let ot = OT::init(
             &mut *reader.borrow_mut(),
@@ -57,7 +58,7 @@ impl<
             &mut rng,
         )?;
 
-        let garbler = Gb::new(writer.clone(), RNG::from_seed(rng.gen()), &[]);
+        let garbler = Gb::new(writer.clone(), RNG::from_seed(rng.gen()), reused_deltas);
 
         Ok(Garbler {
             garbler,
