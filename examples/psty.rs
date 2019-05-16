@@ -6,7 +6,7 @@
 
 //! Private set intersection (PSTY) benchmarks using `criterion`.
 
-use popsicle::psty::{Sender, Receiver};
+use popsicle::psty::{Receiver, Sender};
 use scuttlebutt::comm::{TrackReader, TrackWriter};
 use std::cell::RefCell;
 use std::io::{BufReader, BufWriter};

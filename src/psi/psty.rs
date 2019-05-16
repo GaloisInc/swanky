@@ -7,11 +7,11 @@
 //! Implementation of the Pinkas-Tkachenko-Yanai private set intersection
 //! protocol (cf. <https://eprint.iacr.org/2019/241>).
 
-use crate::Error;
 use crate::cuckoo::CuckooHash;
 use crate::stream;
 use crate::utils;
-use fancy_garbling::{BundleGadgets, BinaryBundle, Fancy};
+use crate::Error;
+use fancy_garbling::{BinaryBundle, BundleGadgets, Fancy};
 use itertools::Itertools;
 use ocelot::oprf::kmprt;
 use ocelot::oprf::{ProgrammableReceiver, ProgrammableSender};
@@ -86,8 +86,9 @@ impl<R: Read + Send + Debug + 'static, W: Write + Send + Debug + 'static> Sender
 
         // select the target values
         let ts = (0..nbins)
-            .map(|_| self.rng.gen())
-            .collect::<Vec<Block512>>();
+            .map(|_| self.rng.gen::<Block512>())
+            .collect_vec();
+
         let points = table
             .into_iter()
             .zip(ts.iter())
@@ -95,7 +96,7 @@ impl<R: Read + Send + Debug + 'static, W: Write + Send + Debug + 'static> Sender
                 // map all the points in a bin to the same tag
                 bin.into_iter().map(move |item| (item, t.clone()))
             })
-            .collect::<Vec<(Block, Block512)>>();
+            .collect_vec();
 
         let _ = self.opprf.send(
             &mut *self.reader.borrow_mut(),
@@ -120,7 +121,7 @@ impl<R: Read + Send + Debug + 'static, W: Write + Send + Debug + 'static> Sender
                     .iter()
                     .flat_map(|byte| (0..8).map(|i| ((byte >> i) & 1_u8) as u16).collect_vec())
             })
-            .collect::<Vec<u16>>();
+            .collect_vec();
 
         let mods = vec![2; nbins * HASH_SIZE]; // all binary moduli
         let sender_inputs = gb.garbler_inputs(&my_input_bits, &mods)?;
@@ -165,11 +166,12 @@ impl<R: Read + Send + Debug + 'static, W: Write + Send + Debug> Receiver<R, W> {
         let table = cuckoo
             .items()
             .map(|opt_item| {
-                opt_item.as_ref().map_or(Block::default(), |item| {
-                    item.entry ^ Block::from(item.hash_index.unwrap() as u128)
-                })
+                match opt_item {
+                    Some(item) => item.entry ^ Block::from(item.hash_index.expect("cuckoo must be stash-less for this protocol") as u128),
+                    None => Block::default(),
+                }
             })
-            .collect::<Vec<Block>>();
+            .collect_vec();
 
         let opprf_outputs = self.opprf.receive(
             &mut *self.reader.borrow_mut(),
@@ -221,11 +223,17 @@ fn compute_intersection<F: Fancy>(
     f: &mut F,
     sender_inputs: &[F::Item],
     receiver_inputs: &[F::Item],
-) -> Result<Vec<F::Item>, F::Error>
-{
-    sender_inputs.chunks(HASH_SIZE).zip(receiver_inputs.chunks(HASH_SIZE)).map(|(xs,ys)| {
-        f.eq_bundles(&BinaryBundle::new(xs.to_vec()), &BinaryBundle::new(ys.to_vec()))
-    }).collect()
+) -> Result<Vec<F::Item>, F::Error> {
+    sender_inputs
+        .chunks(HASH_SIZE)
+        .zip(receiver_inputs.chunks(HASH_SIZE))
+        .map(|(xs, ys)| {
+            f.eq_bundles(
+                &BinaryBundle::new(xs.to_vec()),
+                &BinaryBundle::new(ys.to_vec()),
+            )
+        })
+        .collect()
 }
 
 #[cfg(test)]
@@ -240,7 +248,7 @@ mod tests {
     const SET_SIZE: usize = 1 << 4;
 
     #[test]
-    fn test_psi() {
+    fn full_protocol() {
         let (sender, receiver) = UnixStream::pair().unwrap();
         let sender_inputs = rand_vec_vec(SET_SIZE, ITEM_SIZE);
         let receiver_inputs = sender_inputs.clone();
@@ -302,7 +310,7 @@ mod tests {
     }
 
     #[test]
-    fn test_hashing() {
+    fn hashing() {
         let mut rng = AesRng::new();
         let inputs = rand_vec_vec(SET_SIZE, ITEM_SIZE);
 
@@ -327,7 +335,7 @@ mod tests {
             }
         }
 
-        // for each item matched to a cuckoo bin, it should also be in one of the bins
+        // each item in a cuckoo bin should also be in one of the table bins
         for (opt_item, bin) in cuckoo.items().zip(&table) {
             if let Some(item) = opt_item {
                 assert!(bin.iter().any(|bin_elem| *bin_elem
