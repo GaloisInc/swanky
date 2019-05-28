@@ -85,9 +85,7 @@ impl<R: Read + Send + Debug + 'static, W: Write + Send + Debug + 'static> Sender
         }
 
         // select the target values
-        let ts = (0..nbins)
-            .map(|_| self.rng.gen::<Block512>())
-            .collect_vec();
+        let ts = (0..nbins).map(|_| self.rng.gen::<Block512>()).collect_vec();
 
         let points = table
             .into_iter()
@@ -165,11 +163,16 @@ impl<R: Read + Send + Debug + 'static, W: Write + Send + Debug> Receiver<R, W> {
         // Fill in table with default values
         let table = cuckoo
             .items()
-            .map(|opt_item| {
-                match opt_item {
-                    Some(item) => item.entry ^ Block::from(item.hash_index.expect("cuckoo must be stash-less for this protocol") as u128),
-                    None => Block::default(),
+            .map(|opt_item| match opt_item {
+                Some(item) => {
+                    item.entry
+                        ^ Block::from(
+                            item.hash_index
+                                .expect("cuckoo must be stash-less for this protocol")
+                                as u128,
+                        )
                 }
+                None => self.rng.gen(),
             })
             .collect_vec();
 
