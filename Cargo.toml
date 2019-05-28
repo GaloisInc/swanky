@@ -20,9 +20,11 @@ curve25519-dalek = { version = "1.1", features = ["std"], optional = true }
 rand = "0.6"
 rand_core = "0.4"
 serde = { version = "1", features = ["derive"], optional = true }
+sha2 = "0.8"
 
 [dev-dependencies]
 criterion = "0.2"
+hex = "0.3"
 
 [profile.release]
 opt-level = 3
