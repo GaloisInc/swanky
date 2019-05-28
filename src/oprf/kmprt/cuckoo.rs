@@ -6,8 +6,15 @@
 
 use scuttlebutt::Block;
 
+#[derive(Clone)]
+pub struct Item {
+    pub entry: Block,
+    pub index: usize,
+    hindex: usize,
+}
+
 pub struct CuckooHash {
-    pub items: Vec<(Option<Block>, Option<usize>, Option<usize>)>,
+    pub items: Vec<Option<Item>>,
     hashkeys: Vec<Block>,
     ms: (usize, usize),
     hs: (usize, usize),
@@ -45,7 +52,7 @@ impl CuckooHash {
     }
 
     fn new(hashkeys: &[Block], ms: (usize, usize), hs: (usize, usize)) -> Self {
-        let items = vec![(None, None, None); ms.0 + ms.1];
+        let items = vec![None; ms.0 + ms.1];
         let hashkeys = hashkeys.to_vec();
         Self {
             items,
@@ -56,38 +63,51 @@ impl CuckooHash {
     }
 
     #[inline]
-    fn hash(&mut self, input: Block, idx: usize) -> Result<(), Error> {
-        let mut input = input;
-        let mut idx = idx;
-        let mut hidx = 0;
-        // Try to place in the first `m1` bins.
+    fn _hash(
+        &mut self,
+        entry: Block,
+        index: usize,
+        h: usize,
+        hoffset: usize,
+        m: usize,
+        moffset: usize,
+    ) -> Option<(Block, usize)> {
+        let mut entry = entry;
+        let mut index = index;
+        let mut hindex = 0;
         for _ in 0..N_ATTEMPTS {
-            let i = super::hash_input(input, self.hashkeys[hidx], self.ms.0);
-            let old = self.items[i];
-            self.items[i] = (Some(input), Some(idx), Some(hidx));
-            if let Some(item) = old.0 {
-                input = item;
-                idx = old.1.unwrap();
-                hidx = (old.2.unwrap() + 1) % self.hs.0;
+            let i = super::hash_input(entry, self.hashkeys[hoffset + hindex], m);
+            let new = Item {
+                entry,
+                index,
+                hindex,
+            };
+            if let Some(item) = &self.items[moffset + i] {
+                entry = item.entry;
+                index = item.index;
+                hindex = (item.hindex + 1) % h;
+                self.items[moffset + i] = Some(new);
             } else {
-                return Ok(());
+                self.items[moffset + i] = Some(new);
+                return None;
             }
         }
-        // Unable to place, so try to place in extra `m2` bins.
-        hidx = 0;
-        for _ in 0..N_ATTEMPTS {
-            let i = super::hash_input(input, self.hashkeys[hidx + self.hs.0], self.ms.1);
-            let old = self.items[self.ms.0 + i];
-            self.items[i] = (Some(input), Some(idx), Some(hidx));
-            if let Some(item) = old.0 {
-                input = item;
-                idx = old.1.unwrap();
-                hidx = (old.2.unwrap() + 1) % self.hs.1;
-            } else {
-                return Ok(());
+        return Some((entry, index));
+    }
+
+    #[inline]
+    fn hash(&mut self, entry: Block, index: usize) -> Result<(), Error> {
+        // Try to place in the first `m₁` bins.
+        match self._hash(entry, index, self.hs.0, 0, self.ms.0, 0) {
+            None => Ok(()),
+            // Unable to place, so try to place in extra `m₂` bins.
+            Some((entry, index)) => {
+                match self._hash(entry, index, self.hs.1, self.hs.0, self.ms.1, self.ms.0) {
+                    None => Ok(()),
+                    Some(..) => Err(Error::CuckooHashFull),
+                }
             }
         }
-        Err(Error::CuckooHashFull)
     }
 }
 

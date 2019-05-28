@@ -4,7 +4,7 @@
 // Copyright © 2019 Galois, Inc.
 // See LICENSE for licensing information.
 
-//! Implementations of the tabled-based one-time OPPRF and the hash-based
+//! Implementations of the table-based one-time OPPRF and the hash-based
 //! multi-use OPPRF of Kolesnikov, Matania, Pinkas, Rosulek, and Trieu (cf.
 //! <https://eprint.iacr.org/2017/799>).
 
@@ -44,22 +44,22 @@ fn hash_input_keyed(x: &Aes128, k: Block, range: usize) -> usize {
     (u128::from(h) % (range as u128)) as usize
 }
 
-// Hash `x`, using `k` as the hash "key", and output the result in the range
-// `[0..range]`.
+// Hash `y`, using `k` as the hash "key", and output the result in the range
+// `[0..range-1]`.
 #[inline]
-fn hash_output(x: &Block512, k: Block, range: usize) -> usize {
+fn hash_output(y: &Block512, k: Block, range: usize) -> usize {
     let aes = Aes128::new(k);
-    hash_output_keyed(x, &aes, range)
+    hash_output_keyed(y, &aes, range)
 }
 
 // XXX: IS THIS SECURE?!
 #[inline]
-fn hash_output_keyed(x: &Block512, aes: &Aes128, range: usize) -> usize {
-    let x: &[Block; 4] = x.into();
-    let h = aes.encrypt(x[0]) ^ x[0];
-    let h = aes.encrypt(h) ^ x[1];
-    let h = aes.encrypt(h) ^ x[2];
-    let h = aes.encrypt(h) ^ x[3];
+fn hash_output_keyed(y: &Block512, k: &Aes128, range: usize) -> usize {
+    let y: &[Block; 4] = y.into();
+    let h = k.encrypt(y[0]) ^ y[0];
+    let h = k.encrypt(h) ^ y[1];
+    let h = k.encrypt(h) ^ y[2];
+    let h = k.encrypt(h) ^ y[3];
     (u128::from(h) % (range as u128)) as usize
 }
 
@@ -144,6 +144,7 @@ impl<OPRF: OprfSender<Seed = Block512, Input = Block, Output = Block512> + SemiH
             },
             points.len()
         );
+        assert!(points.len() <= npoints);
         let m = table_size(npoints);
         let mut table = vec![Block512::default(); m];
         let seeds = self.oprf.send(reader, writer, 1, rng)?;
@@ -154,6 +155,7 @@ impl<OPRF: OprfSender<Seed = Block512, Input = Block, Output = Block512> + SemiH
         // Sample `v` until all values in `map` are distinct.
         for _ in 0..N_TABLE_LOOPS {
             for (x, _) in points.iter() {
+                // Compute `h = H(F(k, x_i) || v)`.
                 let y = self.oprf.compute(seed, *x);
                 let h = hash_output_keyed(&y, &aes, m);
                 if !map.insert(h) {
@@ -162,12 +164,11 @@ impl<OPRF: OprfSender<Seed = Block512, Input = Block, Output = Block512> + SemiH
             }
             if map.len() == points.len() {
                 break;
-            } else {
-                // Try again.
-                v = rng.gen::<Block>();
-                aes = Aes128::new(v);
-                map.clear();
             }
+            // Try again.
+            v = rng.gen::<Block>();
+            aes = Aes128::new(v);
+            map.clear();
         }
         if map.len() != points.len() {
             // XXX: return a better error than `Error::Other`.
@@ -183,11 +184,11 @@ impl<OPRF: OprfSender<Seed = Block512, Input = Block, Output = Block512> + SemiH
             table[h] = *y ^ y_;
         }
         // Fill rest of table with random elements.
-        for entry in table.iter_mut() {
-            if *entry == Block512::default() {
-                *entry = rng.gen::<Block512>();
-            }
-        }
+        // for entry in table.iter_mut() {
+        //     if *entry == Block512::default() {
+        //         *entry = rng.gen::<Block512>();
+        //     }
+        // }
         // Write `v` and `table` to the receiver.
         v.write(writer)?;
         for entry in table.iter() {
@@ -269,10 +270,12 @@ impl<OPRF: OprfReceiver<Seed = Block512, Input = Block, Output = Block512> + Sem
     }
 }
 
+// Compute `2^⌈log(npoints + 2)⌉`.
+//
+// NOTE: KMPRT gives `npoints + 1` here, but we use `+ 2` as otherwise we
+// can reach states where the table size is too small.
 fn table_size(npoints: usize) -> usize {
-    // NOTE: KMPRT gives `npoints + 1` here, but we use `+ 2` as otherwise we
-    // can reach states where the table size is too small.
-    (((npoints + 2) as f32).log2().ceil() + 1.0).exp2() as usize
+    (((npoints + 2) as f32).log2().ceil()).exp2() as usize
 }
 
 //
@@ -280,6 +283,7 @@ fn table_size(npoints: usize) -> usize {
 //
 
 // OPPRF parameters.
+#[derive(Debug)]
 struct Parameters {
     // The length of the "first" cuckoo hash table.
     m1: usize,
@@ -364,7 +368,7 @@ impl<T: OprfSender<Seed = Block512, Input = Block, Output = Block512> + SemiHone
         reader: &mut R,
         writer: &mut W,
         points: &[(Self::Input, Self::Output)],
-        _: usize,
+        _npoints: usize,
         ninputs: usize,
         rng: &mut RNG,
     ) -> Result<Vec<(Self::Seed, Self::Hint)>, Error>
@@ -376,10 +380,11 @@ impl<T: OprfSender<Seed = Block512, Input = Block, Output = Block512> + SemiHone
         let params = Parameters::new(ninputs)?;
         // Generate random values to be used for the hash functions.
         let seeds = (0..params.h1 + params.h2)
-            .map(|_| rng.gen::<Block>())
+            .map(|_| rng.gen())
             .collect::<Vec<Block>>();
         let hashkeys = cointoss::send(reader, writer, &seeds)?;
-
+        // `bins` contains `m = m₁ + m₂` vectors. The first `m₁` vectors are each of
+        // size `β₁`, and the second `m₂` vectors are each of size `β₂`.
         let mut bins = Vec::with_capacity(params.m1 + params.m2);
         for _ in 0..params.m1 {
             bins.push(Vec::with_capacity(params.beta1));
@@ -387,24 +392,22 @@ impl<T: OprfSender<Seed = Block512, Input = Block, Output = Block512> + SemiHone
         for _ in params.m1..params.m1 + params.m2 {
             bins.push(Vec::with_capacity(params.beta2));
         }
+        let insert = |bins: &mut Vec<Vec<(Block, Block512)>>, x: &Block, y: &Block512, h: usize| {
+            // Only add `(x, y)` if it is not already in the bin.
+            if bins[h].iter().find(|&&entry| entry == (*x, *y)).is_none() {
+                bins[h].push((*x, *y));
+            }
+        };
         // Place each point in the hash table, once for each hash function.
         for (x, y) in points.iter() {
             let aes = Aes128::new(*x);
             for key in hashkeys[0..params.h1].iter() {
                 let h = hash_input_keyed(&aes, *key, params.m1);
-                if bins[h].iter().find(|&&entry| entry == (*x, *y)).is_none() {
-                    bins[h].push((*x, *y));
-                }
+                insert(&mut bins, x, y, h);
             }
             for key in hashkeys[params.h1..params.h1 + params.h2].iter() {
                 let h = hash_input_keyed(&aes, *key, params.m2);
-                if bins[params.m1 + h]
-                    .iter()
-                    .find(|&&entry| entry == (*x, *y))
-                    .is_none()
-                {
-                    bins[params.m1 + h].push((*x, *y));
-                }
+                insert(&mut bins, x, y, params.m1 + h);
             }
         }
         // Run the one-time OPPRF on each bin.
@@ -416,13 +419,14 @@ impl<T: OprfSender<Seed = Block512, Input = Block, Output = Block512> + SemiHone
             } else {
                 params.beta2
             };
+
             let output = self.opprf.send(reader, writer, &bin, beta, 1, rng)?;
             outputs.push(output);
         }
         // XXX: this returns `m1 + m2` (seed, hint) pairs. But there doesn't
         // really seem to be a way to *use* this when computing the OPPRF.
         // Namely, this doesn't jive with the OPPRF API as specified in Figure 3
-        // of the paper. I believe this is okay in how its used to build PSI
+        // of the paper. I believe this is okay in how it's used to build PSI
         // (namely, the `compute` method is never used).
         Ok(outputs.into_iter().flatten().collect())
     }
@@ -476,7 +480,7 @@ impl<T: OprfReceiver<Seed = Block512, Input = Block, Output = Block512> + SemiHo
         &mut self,
         reader: &mut R,
         writer: &mut W,
-        _: usize,
+        _npoints: usize,
         inputs: &[Self::Input],
         rng: &mut RNG,
     ) -> Result<Vec<Self::Output>, Error>
@@ -488,7 +492,7 @@ impl<T: OprfReceiver<Seed = Block512, Input = Block, Output = Block512> + SemiHo
         let params = Parameters::new(inputs.len())?;
         // Generate random values to be used for the hash functions.
         let seeds = (0..params.h1 + params.h2)
-            .map(|_| rng.gen::<Block>())
+            .map(|_| rng.gen())
             .collect::<Vec<Block>>();
         let hashkeys = cointoss::receive(reader, writer, &seeds)?;
         // Build a cuckoo hash table using `hashkeys`.
@@ -504,21 +508,22 @@ impl<T: OprfReceiver<Seed = Block512, Input = Block, Output = Block512> + SemiHo
         // Run the one-time OPPRF for each table entry. For those where the
         // entry is a real input value, store the OPPRF output, otherwise use a
         // dummy value and ignore the output.
-        for (j, (item, idx, _)) in table.items.into_iter().enumerate() {
+        for (j, item) in table.items.into_iter().enumerate() {
             let beta = if j < params.m1 {
                 params.beta1
             } else {
                 params.beta2
             };
             if let Some(item) = item {
-                let idx = idx.unwrap();
-                assert_eq!(inputs[idx], item);
-                let out = self.opprf.receive(reader, writer, beta, &[item], rng)?;
-                assert_eq!(outputs[idx], Default::default());
-                outputs[idx] = out[0];
+                assert_eq!(inputs[item.index], item.entry);
+                assert_eq!(outputs[item.index], Default::default());
+                let out = self
+                    .opprf
+                    .receive(reader, writer, beta, &[item.entry], rng)?;
+                outputs[item.index] = out[0];
             } else {
-                let item = rng.gen::<Block>();
-                let _ = self.opprf.receive(reader, writer, beta, &[item], rng)?;
+                let entry = rng.gen::<Block>();
+                let _ = self.opprf.receive(reader, writer, beta, &[entry], rng)?;
             }
         }
         Ok(outputs)
@@ -565,6 +570,7 @@ mod tests {
     >(
         ninputs: usize,
         npoints: usize,
+        npoints_bound: usize,
     ) {
         let inputs = rand_block_vec(ninputs);
         let inputs_ = inputs.clone();
@@ -585,7 +591,7 @@ mod tests {
                     &mut reader,
                     &mut writer,
                     &points,
-                    npoints,
+                    npoints_bound,
                     ninputs,
                     &mut rng,
                 )
@@ -602,7 +608,7 @@ mod tests {
         let mut writer = BufWriter::new(receiver);
         let mut oprf = R::init(&mut reader, &mut writer, &mut rng).unwrap();
         let outputs = oprf
-            .receive(&mut reader, &mut writer, npoints, &inputs, &mut rng)
+            .receive(&mut reader, &mut writer, npoints_bound, &inputs, &mut rng)
             .unwrap();
         handle.join().unwrap();
         let results_ = results_.lock().unwrap();
@@ -617,8 +623,10 @@ mod tests {
     >(
         ninputs: usize,
         npoints: usize,
+        npoints_bound: usize,
     ) {
         assert!(ninputs <= npoints);
+        assert!(npoints <= npoints_bound);
         let mut rng = AesRng::new();
         let points = (0..npoints)
             .map(|_| (rng.gen::<Block>(), rng.gen()))
@@ -632,6 +640,7 @@ mod tests {
             .map(|(_, y)| *y)
             .collect::<Vec<Block512>>();
         let (sender, receiver) = UnixStream::pair().unwrap();
+        let points_ = points.clone();
         let handle = std::thread::spawn(move || {
             let mut rng = AesRng::new();
             let mut reader = BufReader::new(sender.try_clone().unwrap());
@@ -641,8 +650,8 @@ mod tests {
                 .send(
                     &mut reader,
                     &mut writer,
-                    &points,
-                    npoints,
+                    &points_,
+                    npoints_bound,
                     ninputs,
                     &mut rng,
                 )
@@ -653,23 +662,31 @@ mod tests {
         let mut writer = BufWriter::new(receiver);
         let mut oprf = R::init(&mut reader, &mut writer, &mut rng).unwrap();
         let outputs = oprf
-            .receive(&mut reader, &mut writer, npoints, &xs, &mut rng)
+            .receive(&mut reader, &mut writer, npoints_bound, &xs, &mut rng)
             .unwrap();
         handle.join().unwrap();
+        let mut okay = true;
         for j in 0..ninputs {
-            assert_eq!(ys[j], outputs[j]);
+            if ys[j] != outputs[j] {
+                okay = false;
+            }
         }
+        assert_eq!(okay, true);
     }
 
     #[test]
     fn test_single_opprf() {
-        _test_opprf::<KmprtSingleSender, KmprtSingleReceiver>(1, 8);
-        _test_opprf_points::<KmprtSingleSender, KmprtSingleReceiver>(1, 8);
+        _test_opprf::<KmprtSingleSender, KmprtSingleReceiver>(1, 8, 50);
+        _test_opprf::<KmprtSingleSender, KmprtSingleReceiver>(1, 100, 1000);
+        _test_opprf_points::<KmprtSingleSender, KmprtSingleReceiver>(1, 8, 50);
+        _test_opprf_points::<KmprtSingleSender, KmprtSingleReceiver>(1, 100, 1000);
     }
 
     #[test]
     fn test_opprf() {
-        _test_opprf_points::<KmprtSender, KmprtReceiver>(1, 8);
+        _test_opprf_points::<KmprtSender, KmprtReceiver>(1, 8, 8);
+        _test_opprf_points::<KmprtSender, KmprtReceiver>(10, 10, 10000);
+        _test_opprf_points::<KmprtSender, KmprtReceiver>(1000, 1000, 1000);
     }
 }
 
