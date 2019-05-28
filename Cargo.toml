@@ -1,6 +1,6 @@
 [package]
 name = "ocelot"
-version = "0.2.0"
+version = "0.2.1"
 authors = ["Alex J. Malozemoff <amaloz@galois.com>"]
 license = "MIT"
 readme = "README.md"
