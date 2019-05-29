@@ -184,11 +184,11 @@ impl<OPRF: OprfSender<Seed = Block512, Input = Block, Output = Block512> + SemiH
             table[h] = *y ^ y_;
         }
         // Fill rest of table with random elements.
-        // for entry in table.iter_mut() {
-        //     if *entry == Block512::default() {
-        //         *entry = rng.gen::<Block512>();
-        //     }
-        // }
+        for entry in table.iter_mut() {
+            if *entry == Block512::default() {
+                *entry = rng.gen::<Block512>();
+            }
+        }
         // Write `v` and `table` to the receiver.
         v.write(writer)?;
         for entry in table.iter() {
