@@ -423,6 +423,29 @@ mod bundle {
     }
 
     #[test]
+    fn binary_eq() {
+        let mut rng = thread_rng();
+        for _ in 0..NITERS {
+            let nbits = rng.gen_usize() % 100 + 2;
+            let q = 1 << nbits;
+            let x = rng.gen_u128() % q;
+            let y = if rng.gen_bool() {
+                x
+            } else {
+                rng.gen_u128() % q
+            };
+            let mut d = Dummy::new();
+            {
+                let x = d.bin_encode(x, nbits).unwrap();
+                let y = d.bin_encode(y, nbits).unwrap();
+                let z = d.eq_bundles(&x, &y).unwrap();
+                d.output(&z).unwrap();
+            }
+            assert_eq!(d.get_output()[0], (x == y) as u16);
+        }
+    }
+
+    #[test]
     fn test_mixed_radix_addition_msb_only() {
         let mut rng = thread_rng();
         for _ in 0..NITERS {
