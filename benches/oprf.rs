@@ -167,10 +167,21 @@ fn bench_opprf(c: &mut Criterion) {
             criterion::black_box(result);
         })
     });
+    c.bench_function("opprf::KMPRT (t = 2^8, n = 2^8)", move |bench| {
+        let inputs = rand_block_vec(1 << 8);
+        let points = rand_point_vec(1 << 8);
+        bench.iter(|| {
+            let result = _bench_opprf::<oprf::kmprt::KmprtSender, oprf::kmprt::KmprtReceiver>(
+                points.clone(),
+                inputs.clone(),
+            );
+            criterion::black_box(result);
+        })
+    });
 }
 #[cfg(feature = "unstable")]
 fn bench_opprf_compute(c: &mut Criterion) {
-    c.bench_function("opprf::KMPRT (compute)", move |bench| {
+    c.bench_function("opprf::KMPRT (t = 1, compute)", move |bench| {
         let (sender, receiver) = UnixStream::pair().unwrap();
         let handle = std::thread::spawn(move || {
             let mut rng = AesRng::new();
@@ -195,13 +206,13 @@ fn bench_opprf_compute(c: &mut Criterion) {
 #[cfg(not(feature = "unstable"))]
 criterion_group! {
     name = oprf;
-    config = Criterion::default().warm_up_time(Duration::from_millis(100));
+    config = Criterion::default().warm_up_time(Duration::from_millis(100)).sample_size(20);
     targets = bench_oprf, bench_oprf_compute
 }
 #[cfg(feature = "unstable")]
 criterion_group! {
     name = oprf;
-    config = Criterion::default().warm_up_time(Duration::from_millis(100)).sample_size(10);
+    config = Criterion::default().warm_up_time(Duration::from_millis(100)).sample_size(20);
     targets = bench_opprf, bench_opprf_compute, bench_oprf, bench_oprf_compute
 }
 
