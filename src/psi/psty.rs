@@ -207,9 +207,15 @@ impl<R: Read + Send + Debug + 'static, W: Write + Send + Debug> Receiver<R, W> {
         ev.outputs(&outs)?;
         let mpc_outs = ev.decode_output()?;
 
+        println!("{:?}", mpc_outs);
+
         let mut intersection = Vec::new();
 
-        for (opt_item, in_intersection) in cuckoo.items().zip(mpc_outs.into_iter()) {
+        let items = cuckoo.items().collect_vec();
+
+        assert_eq!(items.len(), mpc_outs.len());
+
+        for (opt_item, in_intersection) in items.into_iter().zip(mpc_outs.into_iter()) {
             if let Some(item) = opt_item {
                 if in_intersection == 1_u16 {
                     intersection.push(inputs[item.input_index].clone());
@@ -227,6 +233,8 @@ fn compute_intersection<F: Fancy>(
     sender_inputs: &[F::Item],
     receiver_inputs: &[F::Item],
 ) -> Result<Vec<F::Item>, F::Error> {
+    assert_eq!(sender_inputs.len(), receiver_inputs.len());
+
     sender_inputs
         .chunks(HASH_SIZE)
         .zip(receiver_inputs.chunks(HASH_SIZE))
@@ -247,7 +255,7 @@ mod tests {
     use std::os::unix::net::UnixStream;
     use std::time::SystemTime;
 
-    const ITEM_SIZE: usize = 4;
+    const ITEM_SIZE: usize = 8;
     const SET_SIZE: usize = 1 << 4;
 
     #[test]
