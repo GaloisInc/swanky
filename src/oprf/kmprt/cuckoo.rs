@@ -6,7 +6,7 @@
 
 use scuttlebutt::Block;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Item {
     pub entry: Block,
     pub index: usize,
@@ -29,7 +29,7 @@ impl std::fmt::Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
             Error::InvalidSetSize(s) => write!(f, "invalid set size {}", s),
-            Error::CuckooHashFull => write!(f, "cuckoo hash table is full"),
+            Error::CuckooHashFull => write!(f, "hash table is full"),
         }
     }
 }
@@ -82,17 +82,18 @@ impl CuckooHash {
                 index,
                 hindex,
             };
-            if let Some(item) = &self.items[moffset + i] {
-                entry = item.entry;
-                index = item.index;
-                hindex = (item.hindex + 1) % h;
-                self.items[moffset + i] = Some(new);
-            } else {
-                self.items[moffset + i] = Some(new);
-                return None;
+            match &self.items[moffset + i].replace(new) {
+                None => {
+                    return None;
+                }
+                Some(item) => {
+                    entry = item.entry;
+                    index = item.index;
+                    hindex = (item.hindex + 1) % h;
+                }
             }
         }
-        return Some((entry, index));
+        Some((entry, index))
     }
 
     #[inline]
