@@ -152,13 +152,15 @@ impl<OPRF: OprfSender<Seed = Block512, Input = Block, Output = Block512> + SemiH
         let mut v = rng.gen::<Block>();
         let mut aes = Aes128::new(v);
         let mut map = HashSet::with_capacity(points.len());
+        // Store compute `y`s and `h`s for later use.
+        let mut ys = vec![Self::Output::default(); points.len()];
+        let mut hs = vec![usize::default(); points.len()];
         // Sample `v` until all values in `map` are distinct.
         for _ in 0..N_TABLE_LOOPS {
-            for (x, _) in points.iter() {
-                // Compute `h = H(F(k, x_i) || v)`.
-                let y = self.oprf.compute(seed, *x);
-                let h = hash_output_keyed(&y, &aes, m);
-                if !map.insert(h) {
+            for (i, (x, _)) in points.iter().enumerate() {
+                ys[i] = self.oprf.compute(seed, *x);
+                hs[i] = hash_output_keyed(&ys[i], &aes, m);
+                if !map.insert(hs[i]) {
                     break;
                 }
             }
@@ -178,9 +180,7 @@ impl<OPRF: OprfSender<Seed = Block512, Input = Block, Output = Block512> + SemiH
             )));
         }
         // Place points in table based on the hash of their OPRF output.
-        for (x, y) in points.iter() {
-            let y_ = self.oprf.compute(seed, *x);
-            let h = hash_output_keyed(&y_, &aes, m);
+        for (h, (y_, (_, y))) in hs.into_iter().zip(ys.into_iter().zip(points.iter())) {
             table[h] = *y ^ y_;
         }
         // Fill rest of table with random elements.
@@ -685,6 +685,7 @@ mod tests {
     #[test]
     fn test_opprf() {
         _test_opprf_points::<KmprtSender, KmprtReceiver>(1, 8, 8);
+        _test_opprf_points::<KmprtSender, KmprtReceiver>(21, 48, 48);
         _test_opprf_points::<KmprtSender, KmprtReceiver>(10, 10, 10000);
         _test_opprf_points::<KmprtSender, KmprtReceiver>(1000, 1000, 1000);
     }
