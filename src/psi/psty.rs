@@ -115,7 +115,7 @@ impl<R: Read + Send + Debug + 'static, W: Write + Send + Debug + 'static> Sender
 
         let my_input_bits = encode_inputs(&ts);
 
-        let mods = vec![2; nbins * HASH_SIZE]; // all binary moduli
+        let mods = vec![2; nbins * HASH_SIZE * 8]; // all binary moduli
         let sender_inputs = gb.garbler_inputs(&my_input_bits, &mods)?;
         let receiver_inputs = gb.evaluator_inputs(&mods)?;
         let outs = compute_intersection(&mut gb, &sender_inputs, &receiver_inputs)?;
@@ -188,7 +188,7 @@ impl<R: Read + Send + Debug + 'static, W: Write + Send + Debug> Receiver<R, W> {
             RNG::from_seed(rng.gen()),
         )?;
 
-        let mods = vec![2; nbins * HASH_SIZE];
+        let mods = vec![2; nbins * HASH_SIZE * 8];
         let sender_inputs = ev.garbler_inputs(&mods)?;
         let receiver_inputs = ev.evaluator_inputs(&my_input_bits, &mods)?;
 
@@ -236,8 +236,8 @@ fn compute_intersection<F: Fancy>(
     assert_eq!(sender_inputs.len(), receiver_inputs.len());
 
     sender_inputs
-        .chunks(HASH_SIZE)
-        .zip_eq(receiver_inputs.chunks(HASH_SIZE))
+        .chunks(HASH_SIZE * 8)
+        .zip_eq(receiver_inputs.chunks(HASH_SIZE * 8))
         .map(|(xs, ys)| {
             f.eq_bundles(
                 &BinaryBundle::new(xs.to_vec()),
@@ -255,14 +255,14 @@ mod tests {
     use std::os::unix::net::UnixStream;
     use std::time::SystemTime;
 
-    const ITEM_SIZE: usize = 1;
-    const SET_SIZE: usize = 1 << 3;
+    const ITEM_SIZE: usize = 2;
+    const SET_SIZE: usize = 1 << 7;
 
     #[test]
     fn full_protocol() {
         let (sender, receiver) = UnixStream::pair().unwrap();
-        let sender_inputs = (0..SET_SIZE).map(|x| (0..ITEM_SIZE).map(|i| ((x >> i) & 0xff) as u8).collect_vec()).collect_vec();
-        // let sender_inputs = rand_vec_vec(SET_SIZE, ITEM_SIZE);
+        // let sender_inputs = (0..SET_SIZE).map(|x| (0..ITEM_SIZE).map(|i| ((x >> i) & 0xff) as u8).collect_vec()).collect_vec();
+        let sender_inputs = rand_vec_vec(SET_SIZE, ITEM_SIZE);
         let receiver_inputs = sender_inputs.clone();
 
         let handle = std::thread::spawn(move || {
