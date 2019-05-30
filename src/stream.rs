@@ -8,6 +8,21 @@ use crate::errors::Error;
 use curve25519_dalek::ristretto::{CompressedRistretto, RistrettoPoint};
 use std::io::{Read, Write};
 
+#[inline]
+pub fn read_usize<T: Read>(reader: &mut T) -> Result<usize, Error> {
+    let mut data = [0u8; 8];
+    reader.read_exact(&mut data)?;
+    let s = unsafe { std::mem::transmute(data) };
+    Ok(s)
+}
+
+#[inline]
+pub fn write_usize<T: Write>(writer: &mut T, s: usize) -> Result<(), Error> {
+    let data: [u8; 8] = unsafe { std::mem::transmute(s) };
+    writer.write_all(&data)?;
+    Ok(())
+}
+
 #[inline(always)]
 pub fn write_pt<T: Write>(stream: &mut T, pt: &RistrettoPoint) -> Result<usize, Error> {
     stream.write(pt.compress().as_bytes()).map_err(Error::from)

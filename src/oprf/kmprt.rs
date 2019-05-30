@@ -13,8 +13,9 @@ use crate::oprf::{
     ObliviousPprf, ObliviousPrf, ProgrammableReceiver as OpprfReceiver,
     ProgrammableSender as OpprfSender, Receiver as OprfReceiver, Sender as OprfSender,
 };
+use crate::stream;
 use rand::{CryptoRng, Rng, RngCore};
-use scuttlebutt::{cointoss, Aes128, Block, Block512, SemiHonest};
+use scuttlebutt::{Aes128, Block, Block512, SemiHonest};
 use std::collections::HashSet;
 use std::io::{Read, Write};
 
@@ -113,10 +114,6 @@ impl<OPRF: OprfSender<Seed = Block512, Input = Block, Output = Block512> + SemiH
     /// into the PRF. The value `npoints` is an upper-bound on the length of
     /// `points`. The value `t` must be set to `1`, otherwise we return
     /// `Error::InvalidInputLength`.
-    ///
-    /// Note that `npoints` often needs to be much larger than the length of
-    /// `points`, as otherwise the sender won't be able to uniquely map the `x`
-    /// values. If this is the case, we return `Error::Other`.
     fn send<R, W, RNG>(
         &mut self,
         reader: &mut R,
@@ -145,8 +142,6 @@ impl<OPRF: OprfSender<Seed = Block512, Input = Block, Output = Block512> + SemiH
             points.len()
         );
         assert!(points.len() <= npoints);
-        let m = table_size(npoints);
-        let mut table = vec![Block512::default(); m];
         let seeds = self.oprf.send(reader, writer, 1, rng)?;
         let seed = seeds[0];
         let mut v = rng.gen::<Block>();
@@ -155,30 +150,42 @@ impl<OPRF: OprfSender<Seed = Block512, Input = Block, Output = Block512> + SemiH
         // Store compute `y`s and `h`s for later use.
         let mut ys = vec![Self::Output::default(); points.len()];
         let mut hs = vec![usize::default(); points.len()];
-        // Sample `v` until all values in `map` are distinct.
-        for _ in 0..N_TABLE_LOOPS {
-            for (i, (x, _)) in points.iter().enumerate() {
-                ys[i] = self.oprf.compute(seed, *x);
-                hs[i] = hash_output_keyed(&ys[i], &aes, m);
-                if !map.insert(hs[i]) {
+        let mut offset = 0;
+        #[allow(unused_assignments)]
+        let mut m = 0;
+        loop {
+            // Guess a size for `table` using `offset`, and then try to fill
+            // `map` with points hashed into the space `[0..m-1]`. If this fails
+            // (because `m` is too small), we change `offset` and try again,
+            // looping until we choose an appropriate `m` such that we can find
+            // a `v` such that every entry in `map` is distinct.
+            m = table_size(npoints, offset);
+            // Sample `v` until all values in `map` are distinct.
+            for _ in 0..N_TABLE_LOOPS {
+                for (i, (x, _)) in points.iter().enumerate() {
+                    ys[i] = self.oprf.compute(seed, *x);
+                    hs[i] = hash_output_keyed(&ys[i], &aes, m);
+                    if !map.insert(hs[i]) {
+                        break;
+                    }
+                }
+                if map.len() == points.len() {
                     break;
                 }
+                // Try again.
+                v = rng.gen::<Block>();
+                aes = Aes128::new(v);
+                map.clear();
             }
             if map.len() == points.len() {
+                // Success! Send `m` to the receiver and exit the loop.
+                stream::write_usize(writer, m)?;
                 break;
             }
-            // Try again.
-            v = rng.gen::<Block>();
-            aes = Aes128::new(v);
-            map.clear();
+            // Failure :-(. Increment `offset` and try again.
+            offset += 1;
         }
-        if map.len() != points.len() {
-            // XXX: return a better error than `Error::Other`.
-            return Err(Error::Other(format!(
-                "unable to construct table after {} iterations",
-                N_TABLE_LOOPS
-            )));
-        }
+        let mut table = vec![Block512::default(); m];
         // Place points in table based on the hash of their OPRF output.
         for (h, (y_, (_, y))) in hs.into_iter().zip(ys.into_iter().zip(points.iter())) {
             table[h] = *y ^ y_;
@@ -189,7 +196,7 @@ impl<OPRF: OprfSender<Seed = Block512, Input = Block, Output = Block512> + SemiH
                 *entry = rng.gen::<Block512>();
             }
         }
-        // Write `v` and `table` to the receiver.
+        // Send `v` and `table` to the receiver.
         v.write(writer)?;
         for entry in table.iter() {
             entry.write(writer)?;
@@ -207,6 +214,15 @@ impl<OPRF: OprfSender<Seed = Block512, Input = Block, Output = Block512> + SemiH
         let h = hash_output(&y, *v, table.len());
         y ^ table[h]
     }
+}
+
+// Compute `2^⌈log(npoints + 2) + offset⌉`.
+//
+// NOTE: KMPRT uses `2^⌈log(npoints + 1)⌉` here, but that seems to produce too
+// many cases where we cannot find a `v` that will fill the table with distinct
+// entries.
+fn table_size(npoints: usize, offset: usize) -> usize {
+    (((npoints + 1) as f32).log2().ceil() + offset as f32).exp2() as usize
 }
 
 /// KMPRT oblivious programmable PRF receiver for a single input value.
@@ -245,7 +261,7 @@ impl<OPRF: OprfReceiver<Seed = Block512, Input = Block, Output = Block512> + Sem
         &mut self,
         reader: &mut R,
         writer: &mut W,
-        npoints: usize,
+        _npoints: usize,
         inputs: &[Self::Input],
         rng: &mut RNG,
     ) -> Result<Vec<Self::Output>, Error>
@@ -257,8 +273,8 @@ impl<OPRF: OprfReceiver<Seed = Block512, Input = Block, Output = Block512> + Sem
         if inputs.len() != 1 {
             return Err(Error::InvalidInputLength);
         }
-        let m = table_size(npoints);
         let mut outputs = self.oprf.receive(reader, writer, inputs, rng)?;
+        let m = stream::read_usize(reader)?;
         let v = Block::read(reader)?;
         let h = hash_output(&outputs[0], v, m);
         let zero = Block512::default();
@@ -268,15 +284,6 @@ impl<OPRF: OprfReceiver<Seed = Block512, Input = Block, Output = Block512> + Sem
         }
         Ok(outputs)
     }
-}
-
-// Compute `2^⌈log(npoints + 2) + 1⌉`.
-//
-// NOTE: KMPRT uses `2^⌈log(npoints + 1)⌉` here, but that seems to produce too
-// many cases where we cannot find a `v` that will fill the table with distinct
-// entries.
-fn table_size(npoints: usize) -> usize {
-    (((npoints + 2) as f32).log2().ceil() + 1.0).exp2() as usize
 }
 
 //
@@ -379,11 +386,12 @@ impl<T: OprfSender<Seed = Block512, Input = Block, Output = Block512> + SemiHone
         RNG: CryptoRng + RngCore,
     {
         let params = Parameters::new(ninputs)?;
-        // Generate random values to be used for the hash functions.
-        let seeds = (0..params.h1 + params.h2)
-            .map(|_| rng.gen())
-            .collect::<Vec<Block>>();
-        let hashkeys = cointoss::send(reader, writer, &seeds)?;
+        // Receive `hashkeys` from the receiver. These are used to fill `bins` below.
+        let mut hashkeys = Vec::with_capacity(params.h1 + params.h2);
+        for _ in 0..params.h1 + params.h2 {
+            let h = Block::read(reader)?;
+            hashkeys.push(h);
+        }
         // `bins` contains `m = m₁ + m₂` vectors. The first `m₁` vectors are each of
         // size `β₁`, and the second `m₂` vectors are each of size `β₂`.
         let mut bins = Vec::with_capacity(params.m1 + params.m2);
@@ -491,18 +499,34 @@ impl<T: OprfReceiver<Seed = Block512, Input = Block, Output = Block512> + SemiHo
         RNG: CryptoRng + RngCore,
     {
         let params = Parameters::new(inputs.len())?;
-        // Generate random values to be used for the hash functions.
-        let seeds = (0..params.h1 + params.h2)
-            .map(|_| rng.gen())
-            .collect::<Vec<Block>>();
-        let hashkeys = cointoss::receive(reader, writer, &seeds)?;
-        // Build a cuckoo hash table using `hashkeys`.
-        let table = cuckoo::CuckooHash::build(
-            inputs,
-            &hashkeys,
-            (params.m1, params.m2),
-            (params.h1, params.h2),
-        )?;
+        let mut table;
+        // Generate random values to be used for the hash functions. We loop,
+        // trying random `hashkeys` each time until we can successfully build
+        // the cuckoo hash. Once successful, we send `hashkeys` to the sender so
+        // they can build their own (non-cuckoo) table.
+        loop {
+            let hashkeys = (0..params.h1 + params.h2)
+                .map(|_| rng.gen())
+                .collect::<Vec<Block>>();
+            // let hashkeys = cointoss::receive(reader, writer, &seeds)?;
+            // Build a cuckoo hash table using `hashkeys`.
+            match cuckoo::CuckooHash::build(
+                inputs,
+                &hashkeys,
+                (params.m1, params.m2),
+                (params.h1, params.h2),
+            ) {
+                Ok(table_) => {
+                    table = table_;
+                    // Send `hashkeys` to the sender.
+                    for h in hashkeys.into_iter() {
+                        h.write(writer)?;
+                    }
+                    break;
+                }
+                Err(_) => (), // Let's try again!
+            };
+        }
         let mut outputs = (0..inputs.len())
             .map(|_| Default::default())
             .collect::<Vec<Block512>>();
