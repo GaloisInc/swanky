@@ -270,12 +270,13 @@ impl<OPRF: OprfReceiver<Seed = Block512, Input = Block, Output = Block512> + Sem
     }
 }
 
-// Compute `2^⌈log(npoints + 2)⌉`.
+// Compute `2^⌈log(npoints + 2) + 1⌉`.
 //
-// NOTE: KMPRT gives `npoints + 1` here, but we use `+ 2` as otherwise we
-// can reach states where the table size is too small.
+// NOTE: KMPRT uses `2^⌈log(npoints + 1)⌉` here, but that seems to produce too
+// many cases where we cannot find a `v` that will fill the table with distinct
+// entries.
 fn table_size(npoints: usize) -> usize {
-    (((npoints + 2) as f32).log2().ceil()).exp2() as usize
+    (((npoints + 2) as f32).log2().ceil() + 1.0).exp2() as usize
 }
 
 //
@@ -686,6 +687,7 @@ mod tests {
     fn test_opprf() {
         _test_opprf_points::<KmprtSender, KmprtReceiver>(1, 8, 8);
         _test_opprf_points::<KmprtSender, KmprtReceiver>(21, 48, 48);
+        _test_opprf_points::<KmprtSender, KmprtReceiver>(163, 384, 384);
         _test_opprf_points::<KmprtSender, KmprtReceiver>(10, 10, 10000);
         _test_opprf_points::<KmprtSender, KmprtReceiver>(1000, 1000, 1000);
     }
