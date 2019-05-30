@@ -22,6 +22,7 @@ use std::cell::RefCell;
 use std::fmt::Debug;
 use std::io::{Read, Write};
 use std::rc::Rc;
+use rand_core::SeedableRng;
 
 const NHASHES: usize = 3;
 const HASH_SIZE: usize = 4; // how many bytes of the hash to use for the equality tests
@@ -47,7 +48,7 @@ pub struct Receiver<R: Read + Send + Debug, W: Write + Send + Debug + 'static> {
 
 impl<R: Read + Send + Debug + 'static, W: Write + Send + Debug + 'static> Sender<R, W> {
     pub fn init(reader: Rc<RefCell<R>>, writer: Rc<RefCell<W>>) -> Result<Self, Error> {
-        let mut rng = AesRng::new();
+        let mut rng = AesRng::from_seed(Block::from(0));
         let opprf = kmprt::KmprtSender::init(
             &mut *reader.borrow_mut(),
             &mut *writer.borrow_mut(),
@@ -89,7 +90,7 @@ impl<R: Read + Send + Debug + 'static, W: Write + Send + Debug + 'static> Sender
 
         let points = table
             .into_iter()
-            .zip(ts.iter())
+            .zip_eq(ts.iter())
             .flat_map(|(bin, t)| {
                 // map all the points in a bin to the same tag
                 bin.into_iter().map(move |item| (item, t.clone()))
@@ -112,14 +113,7 @@ impl<R: Read + Send + Debug + 'static, W: Write + Send + Debug + 'static> Sender
             &[],
         )?;
 
-        let my_input_bits = ts
-            .iter()
-            .flat_map(|blk| {
-                blk.prefix(HASH_SIZE) // iterate the first HASH_SIZE bytes of blk
-                    .iter()
-                    .flat_map(|byte| (0..8).map(|i| ((byte >> i) & 1_u8) as u16).collect_vec())
-            })
-            .collect_vec();
+        let my_input_bits = encode_inputs(&ts);
 
         let mods = vec![2; nbins * HASH_SIZE]; // all binary moduli
         let sender_inputs = gb.garbler_inputs(&my_input_bits, &mods)?;
@@ -133,7 +127,7 @@ impl<R: Read + Send + Debug + 'static, W: Write + Send + Debug + 'static> Sender
 
 impl<R: Read + Send + Debug + 'static, W: Write + Send + Debug> Receiver<R, W> {
     pub fn init(reader: Rc<RefCell<R>>, writer: Rc<RefCell<W>>) -> Result<Self, Error> {
-        let mut rng = AesRng::new();
+        let mut rng = AesRng::from_seed(Block::from(0));
         let opprf = kmprt::KmprtReceiver::init(
             &mut *reader.borrow_mut(),
             &mut *writer.borrow_mut(),
@@ -184,14 +178,7 @@ impl<R: Read + Send + Debug + 'static, W: Write + Send + Debug> Receiver<R, W> {
             &mut self.rng,
         )?;
 
-        let my_input_bits = opprf_outputs
-            .iter()
-            .flat_map(|blk| {
-                blk.prefix(HASH_SIZE)
-                    .iter()
-                    .flat_map(|byte| (0..8).map(|i| ((byte >> i) & 1_u8) as u16).collect_vec())
-            })
-            .collect::<Vec<u16>>();
+        let my_input_bits = encode_inputs(&opprf_outputs);
 
         let mut ev = twopac::semihonest::Evaluator::<R, W, AesRng, OtReceiver>::new(
             self.reader.clone(),
@@ -215,7 +202,7 @@ impl<R: Read + Send + Debug + 'static, W: Write + Send + Debug> Receiver<R, W> {
 
         assert_eq!(items.len(), mpc_outs.len());
 
-        for (opt_item, in_intersection) in items.into_iter().zip(mpc_outs.into_iter()) {
+        for (opt_item, in_intersection) in items.into_iter().zip_eq(mpc_outs.into_iter()) {
             if let Some(item) = opt_item {
                 if in_intersection == 1_u16 {
                     intersection.push(inputs[item.input_index].clone());
@@ -225,6 +212,17 @@ impl<R: Read + Send + Debug + 'static, W: Write + Send + Debug> Receiver<R, W> {
 
         Ok((opprf_outputs, intersection))
     }
+}
+
+fn encode_inputs(opprf_outputs: &[Block512]) -> Vec<u16> {
+    opprf_outputs
+        .iter()
+        .flat_map(|blk| {
+            blk.prefix(HASH_SIZE)
+                .iter()
+                .flat_map(|byte| (0..8).map(|i| ((byte >> i) & 1_u8) as u16).collect_vec())
+        })
+        .collect()
 }
 
 /// Fancy function to compute the intersection and return encoded vector of 0/1 masks.
@@ -237,7 +235,7 @@ fn compute_intersection<F: Fancy>(
 
     sender_inputs
         .chunks(HASH_SIZE)
-        .zip(receiver_inputs.chunks(HASH_SIZE))
+        .zip_eq(receiver_inputs.chunks(HASH_SIZE))
         .map(|(xs, ys)| {
             f.eq_bundles(
                 &BinaryBundle::new(xs.to_vec()),
@@ -255,13 +253,14 @@ mod tests {
     use std::os::unix::net::UnixStream;
     use std::time::SystemTime;
 
-    const ITEM_SIZE: usize = 8;
+    const ITEM_SIZE: usize = 1;
     const SET_SIZE: usize = 1 << 4;
 
     #[test]
     fn full_protocol() {
         let (sender, receiver) = UnixStream::pair().unwrap();
-        let sender_inputs = rand_vec_vec(SET_SIZE, ITEM_SIZE);
+        let sender_inputs = (0..SET_SIZE).map(|x| (0..ITEM_SIZE).map(|i| ((x >> i) & 0xff) as u8).collect_vec()).collect_vec();
+        // let sender_inputs = rand_vec_vec(SET_SIZE, ITEM_SIZE);
         let receiver_inputs = sender_inputs.clone();
 
         let handle = std::thread::spawn(move || {
@@ -308,7 +307,7 @@ mod tests {
         let mut size = 0;
         for (s, r) in sender_opprf_outputs
             .into_iter()
-            .zip(receiver_opprf_outputs.into_iter())
+            .zip_eq(receiver_opprf_outputs.into_iter())
         {
             if s == r {
                 size += 1;
@@ -347,7 +346,7 @@ mod tests {
         }
 
         // each item in a cuckoo bin should also be in one of the table bins
-        for (opt_item, bin) in cuckoo.items().zip(&table) {
+        for (opt_item, bin) in cuckoo.items().zip_eq(&table) {
             if let Some(item) = opt_item {
                 assert!(bin.iter().any(|bin_elem| *bin_elem
                     == item.entry ^ Block::from(item.hash_index.unwrap() as u128)));
