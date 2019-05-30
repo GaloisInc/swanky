@@ -7,11 +7,13 @@
 //! Private set intersection (PSTY) benchmarks using `criterion`.
 
 use criterion::{criterion_group, criterion_main, Criterion};
-use popsicle::psty::{P1, P2};
-use scuttlebutt::{AesRng, Block512};
+use popsicle::psty::{Sender, Receiver};
+use scuttlebutt::AesRng;
 use std::io::{BufReader, BufWriter};
 use std::os::unix::net::UnixStream;
 use std::time::Duration;
+use std::cell::RefCell;
+use std::rc::Rc;
 
 const SIZE: usize = 15;
 
@@ -28,42 +30,35 @@ fn bench_psty_init() {
 
     let handle = std::thread::spawn(move || {
         let mut rng = AesRng::new();
-        let mut reader = BufReader::new(sender.try_clone().unwrap());
-        let mut writer = BufWriter::new(sender);
-        let _ = P1::init(&mut reader, &mut writer, &mut rng).unwrap();
+        let reader = Rc::new(RefCell::new(BufReader::new(sender.try_clone().unwrap())));
+        let writer = Rc::new(RefCell::new(BufWriter::new(sender)));
+        let _ = Sender::init(reader, writer, &mut rng).unwrap();
     });
 
     let mut rng = AesRng::new();
-    let mut reader = BufReader::new(receiver.try_clone().unwrap());
-    let mut writer = BufWriter::new(receiver);
-    let _ = P2::init(&mut reader, &mut writer, &mut rng).unwrap();
+    let reader = Rc::new(RefCell::new(BufReader::new(receiver.try_clone().unwrap())));
+    let writer = Rc::new(RefCell::new(BufWriter::new(receiver)));
+    let _ = Receiver::init(reader, writer, &mut rng).unwrap();
 
     handle.join().unwrap();
 }
 
-fn bench_psty(inputs1: Vec<Vec<u8>>, inputs2: Vec<Vec<u8>>) -> (Vec<Block512>, Vec<Block512>) {
+fn bench_psty(inputs1: Vec<Vec<u8>>, inputs2: Vec<Vec<u8>>) -> Vec<popsicle::psty::Msg> {
     let (sender, receiver) = UnixStream::pair().unwrap();
 
-    let handle = std::thread::spawn(move || {
+    std::thread::spawn(move || {
         let mut rng = AesRng::new();
-        let mut reader = BufReader::new(sender.try_clone().unwrap());
-        let mut writer = BufWriter::new(sender);
-        let mut p1 = P1::init(&mut reader, &mut writer, &mut rng).unwrap();
-        p1.send(&mut reader, &mut writer, &inputs1, &mut rng)
-            .unwrap()
+        let reader = Rc::new(RefCell::new(BufReader::new(sender.try_clone().unwrap())));
+        let writer = Rc::new(RefCell::new(BufWriter::new(sender)));
+        let mut p1 = Sender::init(reader, writer, &mut rng).unwrap();
+        p1.send(&inputs1, &mut rng).unwrap()
     });
 
     let mut rng = AesRng::new();
-    let mut reader = BufReader::new(receiver.try_clone().unwrap());
-    let mut writer = BufWriter::new(receiver);
-    let mut p2 = P2::init(&mut reader, &mut writer, &mut rng).unwrap();
-    let p2_out = p2
-        .send(&mut reader, &mut writer, &inputs2, &mut rng)
-        .unwrap();
-
-    let p1_out = handle.join().unwrap();
-
-    (p1_out, p2_out)
+    let reader = Rc::new(RefCell::new(BufReader::new(receiver.try_clone().unwrap())));
+    let writer = Rc::new(RefCell::new(BufWriter::new(receiver)));
+    let mut p2 = Receiver::init(reader, writer, &mut rng).unwrap();
+    p2.receive(&inputs2, &mut rng).unwrap()
 }
 
 fn bench_psi(c: &mut Criterion) {

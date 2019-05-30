@@ -17,7 +17,7 @@ use ocelot::oprf::kmprt;
 use ocelot::oprf::{ProgrammableReceiver, ProgrammableSender};
 use ocelot::ot::{ChouOrlandiReceiver, ChouOrlandiSender};
 use rand::Rng;
-use scuttlebutt::{AesRng, Block, Block512};
+use scuttlebutt::{Block, Block512};
 use std::cell::RefCell;
 use std::fmt::Debug;
 use std::io::{Read, Write};
@@ -60,7 +60,7 @@ impl<R: Read + Send + Debug + 'static, W: Write + Send + Debug + 'static> Sender
         })
     }
 
-    pub fn send<RNG>(&mut self, inputs: &[Msg], rng: &mut RNG) -> Result<Vec<Block512>, Error>
+    pub fn send<RNG>(&mut self, inputs: &[Msg], rng: &mut RNG) -> Result<(), Error>
         where RNG: RngCore + CryptoRng + SeedableRng<Seed=Block>
     {
         // receive cuckoo hash info from sender
@@ -121,7 +121,7 @@ impl<R: Read + Send + Debug + 'static, W: Write + Send + Debug + 'static> Sender
         let outs = compute_intersection(&mut gb, &sender_inputs, &receiver_inputs)?;
         gb.outputs(&outs)?;
 
-        Ok(ts)
+        Ok(())
     }
 }
 
@@ -141,7 +141,7 @@ impl<R: Read + Send + Debug + 'static, W: Write + Send + Debug> Receiver<R, W> {
         })
     }
 
-    pub fn receive<RNG>(&mut self, inputs: &[Msg], rng: &mut RNG) -> Result<(Vec<Block512>, Vec<Msg>), Error>
+    pub fn receive<RNG>(&mut self, inputs: &[Msg], rng: &mut RNG) -> Result<Vec<Msg>, Error>
         where RNG: RngCore + CryptoRng + SeedableRng<Seed=Block>
     {
         let key = rng.gen();
@@ -196,8 +196,6 @@ impl<R: Read + Send + Debug + 'static, W: Write + Send + Debug> Receiver<R, W> {
         ev.outputs(&outs)?;
         let mpc_outs = ev.decode_output()?;
 
-        println!("{:?}", mpc_outs);
-
         let mut intersection = Vec::new();
 
         let items = cuckoo.items().collect_vec();
@@ -212,7 +210,7 @@ impl<R: Read + Send + Debug + 'static, W: Write + Send + Debug> Receiver<R, W> {
             }
         }
 
-        Ok((opprf_outputs, intersection))
+        Ok(intersection)
     }
 }
 
@@ -254,9 +252,10 @@ mod tests {
     use std::io::{BufReader, BufWriter};
     use std::os::unix::net::UnixStream;
     use std::time::SystemTime;
+    use scuttlebutt::AesRng;
 
-    const ITEM_SIZE: usize = 2;
-    const SET_SIZE: usize = 1 << 7;
+    const ITEM_SIZE: usize = 8;
+    const SET_SIZE: usize = 1 << 6;
 
     #[test]
     fn full_protocol() {
@@ -265,7 +264,7 @@ mod tests {
         let sender_inputs = rand_vec_vec(SET_SIZE, ITEM_SIZE);
         let receiver_inputs = sender_inputs.clone();
 
-        let handle = std::thread::spawn(move || {
+        std::thread::spawn(move || {
             let mut rng = AesRng::from_seed(Block::from(1));
 
             let reader = Rc::new(RefCell::new(BufReader::new(sender.try_clone().unwrap())));
@@ -279,13 +278,12 @@ mod tests {
             );
 
             let start = SystemTime::now();
-            let sender_opprf_outputs = psi.send(&sender_inputs, &mut rng).unwrap();
+            psi.send(&sender_inputs, &mut rng).unwrap();
             println!(
                 "[{}] Send time: {} ms",
                 SET_SIZE,
                 start.elapsed().unwrap().as_millis()
             );
-            sender_opprf_outputs
         });
 
         let mut rng = AesRng::from_seed(Block::from(1));
@@ -301,26 +299,12 @@ mod tests {
         );
 
         let start = SystemTime::now();
-        let (receiver_opprf_outputs, intersection) = psi.receive(&receiver_inputs, &mut rng).unwrap();
+        let intersection = psi.receive(&receiver_inputs, &mut rng).unwrap();
         println!(
             "[{}] Receiver time: {} ms",
             SET_SIZE,
             start.elapsed().unwrap().as_millis()
         );
-
-        let sender_opprf_outputs = handle.join().unwrap();
-
-        let mut size = 0;
-        for (s, r) in sender_opprf_outputs
-            .into_iter()
-            .zip_eq(receiver_opprf_outputs.into_iter())
-        {
-            if s == r {
-                size += 1;
-            }
-        }
-
-        assert_eq!(size, SET_SIZE);
 
         assert_eq!(intersection.len(), SET_SIZE);
     }

@@ -7,7 +7,7 @@
 //! Private set intersection (PSTY) benchmarks using `criterion`.
 
 use popsicle::psty::{Receiver, Sender};
-use scuttlebutt::comm::{TrackReader, TrackWriter};
+use scuttlebutt::{AesRng, comm::{TrackReader, TrackWriter}};
 use std::cell::RefCell;
 use std::io::{BufReader, BufWriter};
 use std::os::unix::net::UnixStream;
@@ -29,19 +29,20 @@ fn psty(inputs1: Vec<Vec<u8>>, inputs2: Vec<Vec<u8>>) {
     let (sender, receiver) = UnixStream::pair().unwrap();
     let total = SystemTime::now();
     let handle = std::thread::spawn(move || {
+        let mut rng = AesRng::new();
         let reader = Rc::new(RefCell::new(TrackReader::new(BufReader::new(
             sender.try_clone().unwrap(),
         ))));
         let writer = Rc::new(RefCell::new(TrackWriter::new(BufWriter::new(sender))));
 
         let start = SystemTime::now();
-        let mut sender = Sender::init(reader.clone(), writer.clone()).unwrap();
+        let mut sender = Sender::init(reader.clone(), writer.clone(), &mut rng).unwrap();
         println!(
             "Sender init time: {} ms",
             start.elapsed().unwrap().as_millis()
         );
         let start = SystemTime::now();
-        sender.send(&inputs1).unwrap();
+        sender.send(&inputs1, &mut rng).unwrap();
         println!(
             "[{}] Send time: {} ms",
             NTIMES,
@@ -57,19 +58,20 @@ fn psty(inputs1: Vec<Vec<u8>>, inputs2: Vec<Vec<u8>>) {
         );
     });
 
+    let mut rng = AesRng::new();
     let reader = Rc::new(RefCell::new(TrackReader::new(BufReader::new(
         receiver.try_clone().unwrap(),
     ))));
     let writer = Rc::new(RefCell::new(TrackWriter::new(BufWriter::new(receiver))));
 
     let start = SystemTime::now();
-    let mut receiver = Receiver::init(reader.clone(), writer.clone()).unwrap();
+    let mut receiver = Receiver::init(reader.clone(), writer.clone(), &mut rng).unwrap();
     println!(
         "Receiver init time: {} ms",
         start.elapsed().unwrap().as_millis()
     );
     let start = SystemTime::now();
-    let _ = receiver.receive(&inputs2).unwrap();
+    let _ = receiver.receive(&inputs2, &mut rng).unwrap();
     println!(
         "[{}] Receiver time: {} ms",
         NTIMES,
