@@ -8,21 +8,17 @@
 //! protocol (cf. <https://eprint.iacr.org/2019/241>).
 
 use crate::cuckoo::CuckooHash;
-use crate::stream;
+use crate::errors::Error;
 use crate::utils;
-use crate::Error;
 use fancy_garbling::{BinaryBundle, BundleGadgets, Fancy};
 use itertools::Itertools;
-use ocelot::oprf::kmprt;
-use ocelot::oprf::{ProgrammableReceiver, ProgrammableSender};
+use ocelot::oprf::{kmprt, ProgrammableReceiver, ProgrammableSender};
 use ocelot::ot::{ChouOrlandiReceiver, ChouOrlandiSender};
 use rand::Rng;
-use scuttlebutt::{Block, Block512};
-use std::cell::RefCell;
+use rand_core::{CryptoRng, RngCore, SeedableRng};
+use scuttlebutt::{Block, Block512, Channel};
 use std::fmt::Debug;
 use std::io::{Read, Write};
-use std::rc::Rc;
-use rand_core::{CryptoRng, RngCore, SeedableRng};
 
 const NHASHES: usize = 3;
 const HASH_SIZE: usize = 4; // how many bytes of the hash to use for the equality tests
@@ -31,44 +27,43 @@ const HASH_SIZE: usize = 4; // how many bytes of the hash to use for the equalit
 pub type Msg = Vec<u8>;
 
 /// Private set intersection sender.
-pub struct Sender<R, W> {
+pub struct Sender {
     opprf: kmprt::KmprtSender,
-    reader: Rc<RefCell<R>>,
-    writer: Rc<RefCell<W>>,
 }
 
 /// Private set intersection receiver.
-pub struct Receiver<R, W> {
+pub struct Receiver {
     opprf: kmprt::KmprtReceiver,
-    reader: Rc<RefCell<R>>,
-    writer: Rc<RefCell<W>>,
 }
 
-impl<R: Read + Send + Debug + 'static, W: Write + Send + Debug + 'static> Sender<R, W> {
-    pub fn init<RNG>(reader: Rc<RefCell<R>>, writer: Rc<RefCell<W>>, rng: &mut RNG) -> Result<Self, Error>
-        where RNG: RngCore + CryptoRng + SeedableRng
+impl Sender {
+    pub fn init<R, W, RNG>(channel: &mut Channel<R, W>, rng: &mut RNG) -> Result<Self, Error>
+    where
+        R: Read,
+        W: Write,
+        RNG: RngCore + CryptoRng + SeedableRng,
     {
-        let opprf = kmprt::KmprtSender::init(
-            &mut *reader.borrow_mut(),
-            &mut *writer.borrow_mut(),
-            rng,
-        )?;
-        Ok(Self {
-            opprf,
-            reader,
-            writer,
-        })
+        let opprf = kmprt::KmprtSender::init(channel, rng)?;
+        Ok(Self { opprf })
     }
 
-    pub fn send<RNG>(&mut self, inputs: &[Msg], rng: &mut RNG) -> Result<(), Error>
-        where RNG: RngCore + CryptoRng + SeedableRng<Seed=Block>
+    pub fn send<R, W, RNG>(
+        &mut self,
+        mut channel: &mut Channel<R, W>,
+        inputs: &[Msg],
+        rng: &mut RNG,
+    ) -> Result<(), Error>
+    where
+        R: Read + Send + Debug,
+        W: Write + Send + Debug + 'static,
+        RNG: RngCore + CryptoRng + SeedableRng<Seed = Block>,
     {
         // receive cuckoo hash info from sender
-        let key = Block::read(&mut *self.reader.borrow_mut())?;
+        let key = channel.read_block()?;
         let hashes = utils::compress_and_hash_inputs(inputs, key);
 
         // map inputs to table using all hash functions
-        let nbins = stream::read_usize(&mut *self.reader.borrow_mut())?;
+        let nbins = channel.read_usize()?;
         let mut table = vec![Vec::new(); nbins];
 
         for &x in &hashes {
@@ -97,18 +92,12 @@ impl<R: Read + Send + Debug + 'static, W: Write + Send + Debug + 'static> Sender
             })
             .collect_vec();
 
-        let _ = self.opprf.send(
-            &mut *self.reader.borrow_mut(),
-            &mut *self.writer.borrow_mut(),
-            &points,
-            points.len(),
-            nbins,
-            rng
-        )?;
+        let _ = self
+            .opprf
+            .send(&mut channel, &points, points.len(), nbins, rng)?;
 
         let mut gb = twopac::semihonest::Garbler::<R, W, RNG, ChouOrlandiSender>::new(
-            self.reader.clone(),
-            self.writer.clone(),
+            channel.clone(),
             RNG::from_seed(rng.gen()),
             &[],
         )?;
@@ -125,24 +114,27 @@ impl<R: Read + Send + Debug + 'static, W: Write + Send + Debug + 'static> Sender
     }
 }
 
-impl<R: Read + Send + Debug + 'static, W: Write + Send + Debug> Receiver<R, W> {
-    pub fn init<RNG>(reader: Rc<RefCell<R>>, writer: Rc<RefCell<W>>, rng: &mut RNG) -> Result<Self, Error>
-        where RNG: RngCore + CryptoRng + SeedableRng<Seed=Block>
+impl Receiver {
+    pub fn init<R, W, RNG>(channel: &mut Channel<R, W>, rng: &mut RNG) -> Result<Self, Error>
+    where
+        R: Read,
+        W: Write,
+        RNG: RngCore + CryptoRng + SeedableRng<Seed = Block>,
     {
-        let opprf = kmprt::KmprtReceiver::init(
-            &mut *reader.borrow_mut(),
-            &mut *writer.borrow_mut(),
-            rng,
-        )?;
-        Ok(Self {
-            opprf,
-            reader,
-            writer,
-        })
+        let opprf = kmprt::KmprtReceiver::init(channel, rng)?;
+        Ok(Self { opprf })
     }
 
-    pub fn receive<RNG>(&mut self, inputs: &[Msg], rng: &mut RNG) -> Result<Vec<Msg>, Error>
-        where RNG: RngCore + CryptoRng + SeedableRng<Seed=Block>
+    pub fn receive<R, W, RNG>(
+        &mut self,
+        channel: &mut Channel<R, W>,
+        inputs: &[Msg],
+        rng: &mut RNG,
+    ) -> Result<Vec<Msg>, Error>
+    where
+        R: Read + Send + Debug + 'static,
+        W: Write + Send + Debug,
+        RNG: RngCore + CryptoRng + SeedableRng<Seed = Block>,
     {
         let key = rng.gen();
         let hashed_inputs = utils::compress_and_hash_inputs(inputs, key);
@@ -152,9 +144,9 @@ impl<R: Read + Send + Debug + 'static, W: Write + Send + Debug> Receiver<R, W> {
         assert_eq!(cuckoo.stashsize, 0);
 
         // Send cuckoo hash info to receiver.
-        key.write(&mut *self.writer.borrow_mut())?;
-        stream::write_usize(&mut *self.writer.borrow_mut(), nbins)?;
-        self.writer.borrow_mut().flush()?;
+        channel.write_block(&key)?;
+        channel.write_usize(nbins)?;
+        channel.flush()?;
 
         // Fill in table with default values
         let table = cuckoo
@@ -172,19 +164,12 @@ impl<R: Read + Send + Debug + 'static, W: Write + Send + Debug> Receiver<R, W> {
             })
             .collect_vec();
 
-        let opprf_outputs = self.opprf.receive(
-            &mut *self.reader.borrow_mut(),
-            &mut *self.writer.borrow_mut(),
-            0,
-            &table,
-            rng,
-        )?;
+        let opprf_outputs = self.opprf.receive(channel, 0, &table, rng)?;
 
         let my_input_bits = encode_inputs(&opprf_outputs);
 
         let mut ev = twopac::semihonest::Evaluator::<R, W, RNG, ChouOrlandiReceiver>::new(
-            self.reader.clone(),
-            self.writer.clone(),
+            channel.clone(),
             RNG::from_seed(rng.gen()),
         )?;
 
@@ -249,10 +234,10 @@ fn compute_intersection<F: Fancy>(
 mod tests {
     use super::*;
     use crate::utils::rand_vec_vec;
+    use scuttlebutt::AesRng;
     use std::io::{BufReader, BufWriter};
     use std::os::unix::net::UnixStream;
     use std::time::SystemTime;
-    use scuttlebutt::AesRng;
 
     const ITEM_SIZE: usize = 8;
     const SET_SIZE: usize = 1 << 6;
@@ -267,18 +252,19 @@ mod tests {
         std::thread::spawn(move || {
             let mut rng = AesRng::from_seed(Block::from(1));
 
-            let reader = Rc::new(RefCell::new(BufReader::new(sender.try_clone().unwrap())));
-            let writer = Rc::new(RefCell::new(BufWriter::new(sender)));
+            let reader = BufReader::new(sender.try_clone().unwrap());
+            let writer = BufWriter::new(sender);
+            let mut channel = Channel::new(reader, writer);
 
             let start = SystemTime::now();
-            let mut psi = Sender::init(reader, writer, &mut rng).unwrap();
+            let mut psi = Sender::init(&mut channel, &mut rng).unwrap();
             println!(
                 "Sender init time: {} ms",
                 start.elapsed().unwrap().as_millis()
             );
 
             let start = SystemTime::now();
-            psi.send(&sender_inputs, &mut rng).unwrap();
+            psi.send(&mut channel, &sender_inputs, &mut rng).unwrap();
             println!(
                 "[{}] Send time: {} ms",
                 SET_SIZE,
@@ -288,18 +274,21 @@ mod tests {
 
         let mut rng = AesRng::from_seed(Block::from(1));
 
-        let reader = Rc::new(RefCell::new(BufReader::new(receiver.try_clone().unwrap())));
-        let writer = Rc::new(RefCell::new(BufWriter::new(receiver)));
+        let reader = BufReader::new(receiver.try_clone().unwrap());
+        let writer = BufWriter::new(receiver);
+        let mut channel = Channel::new(reader, writer);
 
         let start = SystemTime::now();
-        let mut psi = Receiver::init(reader.clone(), writer.clone(), &mut rng).unwrap();
+        let mut psi = Receiver::init(&mut channel, &mut rng).unwrap();
         println!(
             "Receiver init time: {} ms",
             start.elapsed().unwrap().as_millis()
         );
 
         let start = SystemTime::now();
-        let intersection = psi.receive(&receiver_inputs, &mut rng).unwrap();
+        let intersection = psi
+            .receive(&mut channel, &receiver_inputs, &mut rng)
+            .unwrap();
         println!(
             "[{}] Receiver time: {} ms",
             SET_SIZE,

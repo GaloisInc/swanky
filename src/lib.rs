@@ -24,7 +24,6 @@
 mod cuckoo;
 mod errors;
 mod psi;
-mod stream;
 mod utils;
 
 pub use crate::errors::Error;

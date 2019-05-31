@@ -11,16 +11,12 @@
 //! The current implementation does not hash the output of the (relaxed) OPRF.
 
 use crate::cuckoo::{compute_masksize, CuckooHash};
-use crate::stream;
-use crate::utils;
-use crate::Error;
-use crate::{Receiver as PsiReceiver, Sender as PsiSender};
+use crate::{utils, Error};
 use ocelot::oprf::{self, Receiver as OprfReceiver, Sender as OprfSender};
 use rand::seq::SliceRandom;
-use rand::Rng;
-use rand::{CryptoRng, RngCore};
+use rand::{CryptoRng, Rng, RngCore};
 use scuttlebutt::utils as scutils;
-use scuttlebutt::{cointoss, Block, Block512, SemiHonest};
+use scuttlebutt::{cointoss, Block, Block512, Channel, SemiHonest};
 use std::collections::HashSet;
 use std::io::{Read, Write};
 
@@ -35,31 +31,27 @@ pub struct Receiver {
     oprf: oprf::KkrtReceiver,
 }
 
-impl PsiSender for Sender {
-    type Msg = Vec<u8>;
-
-    fn init<R: Read + Send, W: Write + Send, RNG: CryptoRng + RngCore>(
-        reader: &mut R,
-        writer: &mut W,
+impl Sender {
+    pub fn init<R: Read + Send, W: Write + Send, RNG: CryptoRng + RngCore>(
+        channel: &mut Channel<R, W>,
         rng: &mut RNG,
     ) -> Result<Self, Error> {
-        let oprf = oprf::KkrtSender::init(reader, writer, rng)?;
+        let oprf = oprf::KkrtSender::init(channel, rng)?;
         Ok(Self { oprf })
     }
 
-    fn send<R: Read + Send, W: Write + Send, RNG: CryptoRng + RngCore>(
+    pub fn send<R: Read + Send, W: Write + Send, RNG: CryptoRng + RngCore>(
         &mut self,
-        reader: &mut R,
-        writer: &mut W,
-        inputs: &[Self::Msg],
+        channel: &mut Channel<R, W>,
+        inputs: &[Vec<u8>],
         mut rng: &mut RNG,
     ) -> Result<(), Error> {
-        let keys = cointoss::send(reader, writer, &[rng.gen()])?;
+        let keys = cointoss::send(channel, &[rng.gen()])?;
         let mut inputs = utils::compress_and_hash_inputs(inputs, keys[0]);
         let masksize = compute_masksize(inputs.len())?;
-        let nbins = stream::read_usize(reader)?;
-        let stashsize = stream::read_usize(reader)?;
-        let seeds = self.oprf.send(reader, writer, nbins + stashsize, rng)?;
+        let nbins = channel.read_usize()?;
+        let stashsize = channel.read_usize()?;
+        let seeds = self.oprf.send(channel, nbins + stashsize, rng)?;
 
         // For each hash function `hᵢ`, construct set `Hᵢ = {F(k_{hᵢ(x)}, x ||
         // i) | x ∈ X)}`, randomly permute it, and send it to the receiver.
@@ -77,9 +69,9 @@ impl PsiSender for Sender {
                     &seeds[bin].prefix(masksize),
                     masksize,
                 );
-                writer.write_all(&encoded.prefix(masksize))?;
+                channel.write_bytes(&encoded.prefix(masksize))?;
             }
-            writer.flush()?;
+            channel.flush()?;
         }
         if stashsize > 0 {
             // For each `i ∈ {1, ..., stashsize}`, construct set `Sᵢ =
@@ -100,34 +92,30 @@ impl PsiSender for Sender {
                     let mut output = vec![0u8; masksize];
                     scutils::xor_inplace(&mut output, &encoded.prefix(masksize));
                     scutils::xor_inplace(&mut output, &seeds[nbins + i].prefix(masksize));
-                    writer.write_all(&output)?;
+                    channel.write_bytes(&output)?;
                 }
             }
-            writer.flush()?;
+            channel.flush()?;
         }
         Ok(())
     }
 }
 
-impl PsiReceiver for Receiver {
-    type Msg = Vec<u8>;
-
-    fn init<R: Read + Send, W: Write + Send, RNG: CryptoRng + RngCore>(
-        reader: &mut R,
-        writer: &mut W,
+impl Receiver {
+    pub fn init<R: Read + Send, W: Write + Send, RNG: CryptoRng + RngCore>(
+        channel: &mut Channel<R, W>,
         rng: &mut RNG,
     ) -> Result<Self, Error> {
-        let oprf = oprf::KkrtReceiver::init(reader, writer, rng)?;
+        let oprf = oprf::KkrtReceiver::init(channel, rng)?;
         Ok(Self { oprf })
     }
 
-    fn receive<R, W, RNG>(
+    pub fn receive<R, W, RNG>(
         &mut self,
-        reader: &mut R,
-        writer: &mut W,
-        inputs: &[Self::Msg],
+        channel: &mut Channel<R, W>,
+        inputs: &[Vec<u8>],
         rng: &mut RNG,
-    ) -> Result<Vec<Self::Msg>, Error>
+    ) -> Result<Vec<Vec<u8>>, Error>
     where
         R: Read + Send,
         W: Write + Send,
@@ -135,7 +123,7 @@ impl PsiReceiver for Receiver {
     {
         let n = inputs.len();
 
-        let keys = cointoss::receive(reader, writer, &[rng.gen()])?;
+        let keys = cointoss::receive(channel, &[rng.gen()])?;
         let inputs_ = utils::compress_and_hash_inputs(inputs, keys[0]);
 
         let tbl = CuckooHash::new(&inputs_, NHASHES)?;
@@ -149,9 +137,9 @@ impl PsiReceiver for Receiver {
             .collect::<Vec<Block>>();
 
         // Send cuckoo hash info to sender.
-        stream::write_usize(writer, nbins)?;
-        stream::write_usize(writer, stashsize)?;
-        writer.flush()?;
+        channel.write_usize(nbins)?;
+        channel.write_usize(stashsize)?;
+        channel.flush()?;
 
         // Set up inputs to use `x || i` or `x` depending on whether the input
         // is in a bin or the stash.
@@ -176,7 +164,7 @@ impl PsiReceiver for Receiver {
             .collect::<Vec<Block>>();
         assert_eq!(inputs_.len(), nbins + stashsize);
 
-        let outputs = self.oprf.receive(reader, writer, &inputs_, rng)?;
+        let outputs = self.oprf.receive(channel, &inputs_, rng)?;
 
         // Receive all the sets from the sender.
         let mut hs = (0..NHASHES)
@@ -190,7 +178,7 @@ impl PsiReceiver for Receiver {
         for h in hs.iter_mut() {
             for _ in 0..n {
                 let mut buf = vec![0u8; masksize];
-                reader.read_exact(&mut buf)?;
+                channel.read_bytes_inplace(&mut buf)?;
                 h.insert(buf);
             }
         }
@@ -198,7 +186,7 @@ impl PsiReceiver for Receiver {
         for s in ss.iter_mut() {
             for _ in 0..n {
                 let mut buf = vec![0u8; masksize];
-                reader.read_exact(&mut buf)?;
+                channel.read_bytes_inplace(&mut buf)?;
                 s.insert(buf);
             }
         }
@@ -255,17 +243,17 @@ mod tests {
         let receiver_inputs = sender_inputs.clone();
         let handle = std::thread::spawn(move || {
             let mut rng = AesRng::new();
-            let mut reader = BufReader::new(sender.try_clone().unwrap());
-            let mut writer = BufWriter::new(sender);
+            let reader = BufReader::new(sender.try_clone().unwrap());
+            let writer = BufWriter::new(sender);
+            let mut channel = Channel::new(reader, writer);
             let start = SystemTime::now();
-            let mut psi = PszSender::init(&mut reader, &mut writer, &mut rng).unwrap();
+            let mut psi = PszSender::init(&mut channel, &mut rng).unwrap();
             println!(
                 "Sender init time: {} ms",
                 start.elapsed().unwrap().as_millis()
             );
             let start = SystemTime::now();
-            psi.send(&mut reader, &mut writer, &sender_inputs, &mut rng)
-                .unwrap();
+            psi.send(&mut channel, &sender_inputs, &mut rng).unwrap();
             println!(
                 "[{}] Send time: {} ms",
                 NTIMES,
@@ -273,17 +261,18 @@ mod tests {
             );
         });
         let mut rng = AesRng::new();
-        let mut reader = BufReader::new(receiver.try_clone().unwrap());
-        let mut writer = BufWriter::new(receiver);
+        let reader = BufReader::new(receiver.try_clone().unwrap());
+        let writer = BufWriter::new(receiver);
+        let mut channel = Channel::new(reader, writer);
         let start = SystemTime::now();
-        let mut psi = PszReceiver::init(&mut reader, &mut writer, &mut rng).unwrap();
+        let mut psi = PszReceiver::init(&mut channel, &mut rng).unwrap();
         println!(
             "Receiver init time: {} ms",
             start.elapsed().unwrap().as_millis()
         );
         let start = SystemTime::now();
         let intersection = psi
-            .receive(&mut reader, &mut writer, &receiver_inputs, &mut rng)
+            .receive(&mut channel, &receiver_inputs, &mut rng)
             .unwrap();
         println!(
             "[{}] Receiver time: {} ms",

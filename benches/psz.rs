@@ -8,8 +8,7 @@
 
 use criterion::{criterion_group, criterion_main, Criterion};
 use popsicle::psz::{PszReceiver, PszSender};
-use popsicle::{Receiver, Sender};
-use scuttlebutt::AesRng;
+use scuttlebutt::{AesRng, Channel};
 use std::io::{BufReader, BufWriter};
 use std::os::unix::net::UnixStream;
 use std::time::Duration;
@@ -28,14 +27,16 @@ fn _bench_psz_init() {
     let (sender, receiver) = UnixStream::pair().unwrap();
     let handle = std::thread::spawn(move || {
         let mut rng = AesRng::new();
-        let mut reader = BufReader::new(sender.try_clone().unwrap());
-        let mut writer = BufWriter::new(sender);
-        let _ = PszSender::init(&mut reader, &mut writer, &mut rng).unwrap();
+        let reader = BufReader::new(sender.try_clone().unwrap());
+        let writer = BufWriter::new(sender);
+        let mut channel = Channel::new(reader, writer);
+        let _ = PszSender::init(&mut channel, &mut rng).unwrap();
     });
     let mut rng = AesRng::new();
-    let mut reader = BufReader::new(receiver.try_clone().unwrap());
-    let mut writer = BufWriter::new(receiver);
-    let _ = PszReceiver::init(&mut reader, &mut writer, &mut rng).unwrap();
+    let reader = BufReader::new(receiver.try_clone().unwrap());
+    let writer = BufWriter::new(receiver);
+    let mut channel = Channel::new(reader, writer);
+    let _ = PszReceiver::init(&mut channel, &mut rng).unwrap();
     handle.join().unwrap();
 }
 
@@ -43,19 +44,18 @@ fn _bench_psz(inputs1: Vec<Vec<u8>>, inputs2: Vec<Vec<u8>>) -> Vec<Vec<u8>> {
     let (sender, receiver) = UnixStream::pair().unwrap();
     let handle = std::thread::spawn(move || {
         let mut rng = AesRng::new();
-        let mut reader = BufReader::new(sender.try_clone().unwrap());
-        let mut writer = BufWriter::new(sender);
-        let mut psi = PszSender::init(&mut reader, &mut writer, &mut rng).unwrap();
-        psi.send(&mut reader, &mut writer, &inputs1, &mut rng)
-            .unwrap();
+        let reader = BufReader::new(sender.try_clone().unwrap());
+        let writer = BufWriter::new(sender);
+        let mut channel = Channel::new(reader, writer);
+        let mut psi = PszSender::init(&mut channel, &mut rng).unwrap();
+        psi.send(&mut channel, &inputs1, &mut rng).unwrap();
     });
     let mut rng = AesRng::new();
-    let mut reader = BufReader::new(receiver.try_clone().unwrap());
-    let mut writer = BufWriter::new(receiver);
-    let mut psi = PszReceiver::init(&mut reader, &mut writer, &mut rng).unwrap();
-    let intersection = psi
-        .receive(&mut reader, &mut writer, &inputs2, &mut rng)
-        .unwrap();
+    let reader = BufReader::new(receiver.try_clone().unwrap());
+    let writer = BufWriter::new(receiver);
+    let mut channel = Channel::new(reader, writer);
+    let mut psi = PszReceiver::init(&mut channel, &mut rng).unwrap();
+    let intersection = psi.receive(&mut channel, &inputs2, &mut rng).unwrap();
     handle.join().unwrap();
     intersection
 }

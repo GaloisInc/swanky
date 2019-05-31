@@ -7,11 +7,10 @@
 //! Private set intersection (PSTY) benchmarks using `criterion`.
 
 use popsicle::psty::{Receiver, Sender};
-use scuttlebutt::{AesRng, comm::{TrackReader, TrackWriter}};
-use std::cell::RefCell;
+// use scuttlebutt::comm::{TrackReader, TrackWriter};
+use scuttlebutt::{AesRng, Channel};
 use std::io::{BufReader, BufWriter};
 use std::os::unix::net::UnixStream;
-use std::rc::Rc;
 use std::time::SystemTime;
 
 const NBYTES: usize = 15;
@@ -30,62 +29,60 @@ fn psty(inputs1: Vec<Vec<u8>>, inputs2: Vec<Vec<u8>>) {
     let total = SystemTime::now();
     let handle = std::thread::spawn(move || {
         let mut rng = AesRng::new();
-        let reader = Rc::new(RefCell::new(TrackReader::new(BufReader::new(
-            sender.try_clone().unwrap(),
-        ))));
-        let writer = Rc::new(RefCell::new(TrackWriter::new(BufWriter::new(sender))));
+        let reader = BufReader::new(sender.try_clone().unwrap());
+        let writer = BufWriter::new(sender);
+        let mut channel = Channel::new(reader, writer);
 
         let start = SystemTime::now();
-        let mut sender = Sender::init(reader.clone(), writer.clone(), &mut rng).unwrap();
+        let mut sender = Sender::init(&mut channel, &mut rng).unwrap();
         println!(
             "Sender init time: {} ms",
             start.elapsed().unwrap().as_millis()
         );
         let start = SystemTime::now();
-        sender.send(&inputs1, &mut rng).unwrap();
+        sender.send(&mut channel, &inputs1, &mut rng).unwrap();
         println!(
             "[{}] Send time: {} ms",
             NTIMES,
             start.elapsed().unwrap().as_millis()
         );
-        println!(
-            "Sender communication (read): {:.2} Mb",
-            reader.borrow().kilobits() / 1000.0
-        );
-        println!(
-            "Sender communication (write): {:.2} Mb",
-            writer.borrow().kilobits() / 1000.0
-        );
+        // println!(
+        //     "Sender communication (read): {:.2} Mb",
+        //     reader.borrow().kilobits() / 1000.0
+        // );
+        // println!(
+        //     "Sender communication (write): {:.2} Mb",
+        //     writer.borrow().kilobits() / 1000.0
+        // );
     });
 
     let mut rng = AesRng::new();
-    let reader = Rc::new(RefCell::new(TrackReader::new(BufReader::new(
-        receiver.try_clone().unwrap(),
-    ))));
-    let writer = Rc::new(RefCell::new(TrackWriter::new(BufWriter::new(receiver))));
+    let reader = BufReader::new(receiver.try_clone().unwrap());
+    let writer = BufWriter::new(receiver);
+    let mut channel = Channel::new(reader, writer);
 
     let start = SystemTime::now();
-    let mut receiver = Receiver::init(reader.clone(), writer.clone(), &mut rng).unwrap();
+    let mut receiver = Receiver::init(&mut channel, &mut rng).unwrap();
     println!(
         "Receiver init time: {} ms",
         start.elapsed().unwrap().as_millis()
     );
     let start = SystemTime::now();
-    let _ = receiver.receive(&inputs2, &mut rng).unwrap();
+    let _ = receiver.receive(&mut channel, &inputs2, &mut rng).unwrap();
     println!(
         "[{}] Receiver time: {} ms",
         NTIMES,
         start.elapsed().unwrap().as_millis()
     );
     let _ = handle.join().unwrap();
-    println!(
-        "Receiver communication (read): {:.2} Mb",
-        reader.borrow().kilobits() / 1000.0
-    );
-    println!(
-        "Receiver communication (write): {:.2} Mb",
-        writer.borrow().kilobits() / 1000.0
-    );
+    // println!(
+    //     "Receiver communication (read): {:.2} Mb",
+    //     reader.borrow().kilobits() / 1000.0
+    // );
+    // println!(
+    //     "Receiver communication (write): {:.2} Mb",
+    //     writer.borrow().kilobits() / 1000.0
+    // );
     println!("Total time: {} ms", total.elapsed().unwrap().as_millis());
 }
 
