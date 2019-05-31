@@ -27,7 +27,7 @@ impl From<cuckoo::Error> for Error {
 }
 
 // Number of times to iterate when creating the sender's hash table.
-const N_TABLE_LOOPS: usize = 1000;
+const N_TABLE_LOOPS: usize = 128;
 
 // Hash `x` and `k`, producing a result in range `[0..range-1]`. We use the
 // Davies-Meyer single-block-length compression function under-the-hood.
@@ -149,15 +149,14 @@ impl<OPRF: OprfSender<Seed = Block512, Input = Block, Output = Block512> + SemiH
         let mut ys = vec![Self::Output::default(); points.len()];
         let mut hs = vec![usize::default(); points.len()];
         let mut offset = 0;
-        #[allow(unused_assignments)]
-        let mut m = 0;
+        // Guess a size for `table` using `offset`, and then try to fill
+        // `map` with points hashed into the space `[0..m-1]`. If this fails
+        // (because `m` is too small), we change `offset` and try again,
+        // looping until we choose an appropriate `m` such that we can find
+        // a `v` such that every entry in `map` is distinct.
+        let mut m = table_size(npoints, offset);
+        let increment = m;
         loop {
-            // Guess a size for `table` using `offset`, and then try to fill
-            // `map` with points hashed into the space `[0..m-1]`. If this fails
-            // (because `m` is too small), we change `offset` and try again,
-            // looping until we choose an appropriate `m` such that we can find
-            // a `v` such that every entry in `map` is distinct.
-            m = table_size(npoints, offset);
             // Sample `v` until all values in `map` are distinct.
             for _ in 0..N_TABLE_LOOPS {
                 for (i, (x, _)) in points.iter().enumerate() {
@@ -181,7 +180,8 @@ impl<OPRF: OprfSender<Seed = Block512, Input = Block, Output = Block512> + SemiH
                 break;
             }
             // Failure :-(. Increment `offset` and try again.
-            offset += 1;
+            offset += increment;
+            m = table_size(npoints, offset);
         }
         let mut table = vec![Block512::default(); m];
         // Place points in table based on the hash of their OPRF output.
@@ -214,13 +214,9 @@ impl<OPRF: OprfSender<Seed = Block512, Input = Block, Output = Block512> + SemiH
     }
 }
 
-// Compute `2^⌈log(npoints + 2) + offset⌉`.
-//
-// NOTE: KMPRT uses `2^⌈log(npoints + 1)⌉` here, but that seems to produce too
-// many cases where we cannot find a `v` that will fill the table with distinct
-// entries.
+// Compute `2^⌈log(npoints + 1)⌉ + offset`.
 fn table_size(npoints: usize, offset: usize) -> usize {
-    (((npoints + 1) as f32).log2().ceil() + offset as f32).exp2() as usize
+    (((npoints + 1) as f32).log2().ceil()).exp2() as usize + offset
 }
 
 /// KMPRT oblivious programmable PRF receiver for a single input value.
@@ -695,8 +691,12 @@ mod tests {
         _test_opprf_points::<KmprtSender, KmprtReceiver>(1, 8, 8);
         _test_opprf_points::<KmprtSender, KmprtReceiver>(21, 48, 48);
         _test_opprf_points::<KmprtSender, KmprtReceiver>(163, 384, 384);
-        _test_opprf_points::<KmprtSender, KmprtReceiver>(10, 10, 10000);
-        _test_opprf_points::<KmprtSender, KmprtReceiver>(1000, 1000, 1000);
+        // Settings for PSTY with `n = 2^8`.
+        _test_opprf_points::<KmprtSender, KmprtReceiver>(326, 768, 768);
+        // Settings for PSTY with `n = 2^12`.
+        _test_opprf_points::<KmprtSender, KmprtReceiver>(5202, 12288, 12288);
+        // Settings for PSTY with `n = 2^16`.
+        // _test_opprf_points::<KmprtSender, KmprtReceiver>(83231, 196608, 196608);
     }
 }
 

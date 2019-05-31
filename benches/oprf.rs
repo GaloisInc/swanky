@@ -65,28 +65,28 @@ fn _bench_oprf<S: OprfSender<Input = Block>, R: OprfReceiver<Input = Block>>(inp
 }
 
 fn bench_oprf(c: &mut Criterion) {
-    c.bench_function("oprf::KKRT (initialization)", move |bench| {
+    c.bench_function("oprf::kkrt (initialization)", move |bench| {
         bench.iter(|| {
             let result = _bench_oprf_init::<oprf::KkrtSender, oprf::KkrtReceiver>();
             criterion::black_box(result);
         })
     });
     let inputs = rand_block_vec(1 << 12);
-    c.bench_function("oprf::KKRT (n = 2^12)", move |bench| {
+    c.bench_function("oprf::kkrt (n = 2^12)", move |bench| {
         bench.iter(|| {
             let result = _bench_oprf::<oprf::KkrtSender, oprf::KkrtReceiver>(inputs.clone());
             criterion::black_box(result);
         })
     });
     let inputs = rand_block_vec(1 << 16);
-    c.bench_function("oprf::KKRT (n = 2^16)", move |bench| {
+    c.bench_function("oprf::kkrt (n = 2^16)", move |bench| {
         bench.iter(|| {
             let result = _bench_oprf::<oprf::KkrtSender, oprf::KkrtReceiver>(inputs.clone());
             criterion::black_box(result);
         })
     });
     let inputs = rand_block_vec(1 << 18);
-    c.bench_function("oprf::KKRT (n = 2^18)", move |bench| {
+    c.bench_function("oprf::kkrt (n = 2^18)", move |bench| {
         bench.iter(|| {
             let result = _bench_oprf::<oprf::KkrtSender, oprf::KkrtReceiver>(inputs.clone());
             criterion::black_box(result);
@@ -95,7 +95,7 @@ fn bench_oprf(c: &mut Criterion) {
 }
 
 fn bench_oprf_compute(c: &mut Criterion) {
-    c.bench_function("oprf::KKRT (compute)", move |bench| {
+    c.bench_function("oprf::kkrt (compute)", move |bench| {
         let (sender, receiver) = UnixStream::pair().unwrap();
         let handle = std::thread::spawn(move || {
             let mut rng = AesRng::new();
@@ -151,7 +151,7 @@ fn _bench_opprf<
 
 #[cfg(feature = "unstable")]
 fn bench_opprf(c: &mut Criterion) {
-    c.bench_function("opprf::KMPRT (t = 1, n = 2^2)", move |bench| {
+    c.bench_function("opprf::kmprt (t = 1, n = 2^2)", move |bench| {
         let inputs = rand_block_vec(1);
         let points = rand_point_vec(1 << 2);
         bench.iter(|| {
@@ -162,7 +162,7 @@ fn bench_opprf(c: &mut Criterion) {
             criterion::black_box(result);
         })
     });
-    c.bench_function("opprf::KMPRT (t = 2^4, n = 2^4)", move |bench| {
+    c.bench_function("opprf::kmprt (t = 2^4, n = 2^4)", move |bench| {
         let inputs = rand_block_vec(1 << 4);
         let points = rand_point_vec(1 << 4);
         bench.iter(|| {
@@ -173,7 +173,7 @@ fn bench_opprf(c: &mut Criterion) {
             criterion::black_box(result);
         })
     });
-    c.bench_function("opprf::KMPRT (t = 2^8, n = 2^8)", move |bench| {
+    c.bench_function("opprf::kmprt (t = 2^8, n = 2^8)", move |bench| {
         let inputs = rand_block_vec(1 << 8);
         let points = rand_point_vec(1 << 8);
         bench.iter(|| {
@@ -187,7 +187,7 @@ fn bench_opprf(c: &mut Criterion) {
 }
 #[cfg(feature = "unstable")]
 fn bench_opprf_compute(c: &mut Criterion) {
-    c.bench_function("opprf::KMPRT (t = 1, compute)", move |bench| {
+    c.bench_function("opprf::kmprt (t = 1, compute)", move |bench| {
         let (sender, receiver) = UnixStream::pair().unwrap();
         let handle = std::thread::spawn(move || {
             let mut rng = AesRng::new();
