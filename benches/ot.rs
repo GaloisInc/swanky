@@ -10,7 +10,7 @@ use criterion::{criterion_group, criterion_main, Criterion};
 use ocelot::ot::{
     self, CorrelatedReceiver, CorrelatedSender, RandomReceiver, RandomSender, Receiver, Sender,
 };
-use scuttlebutt::{AesRng, Block};
+use scuttlebutt::{AesRng, Block, Channel};
 use std::io::{BufReader, BufWriter};
 use std::os::unix::net::UnixStream;
 use std::time::Duration;
@@ -32,16 +32,18 @@ fn _bench_block_ot<OTSender: Sender<Msg = Block>, OTReceiver: Receiver<Msg = Blo
     let (sender, receiver) = UnixStream::pair().unwrap();
     let handle = std::thread::spawn(move || {
         let mut rng = AesRng::new();
-        let mut reader = BufReader::new(sender.try_clone().unwrap());
-        let mut writer = BufWriter::new(sender);
-        let mut ot = OTSender::init(&mut reader, &mut writer, &mut rng).unwrap();
-        ot.send(&mut reader, &mut writer, &ms, &mut rng).unwrap();
+        let reader = BufReader::new(sender.try_clone().unwrap());
+        let writer = BufWriter::new(sender);
+        let mut channel = Channel::new(reader, writer);
+        let mut ot = OTSender::init(&mut channel, &mut rng).unwrap();
+        ot.send(&mut channel, &ms, &mut rng).unwrap();
     });
     let mut rng = AesRng::new();
-    let mut reader = BufReader::new(receiver.try_clone().unwrap());
-    let mut writer = BufWriter::new(receiver);
-    let mut ot = OTReceiver::init(&mut reader, &mut writer, &mut rng).unwrap();
-    ot.receive(&mut reader, &mut writer, &bs, &mut rng).unwrap();
+    let reader = BufReader::new(receiver.try_clone().unwrap());
+    let writer = BufWriter::new(receiver);
+    let mut channel = Channel::new(reader, writer);
+    let mut ot = OTReceiver::init(&mut channel, &mut rng).unwrap();
+    ot.receive(&mut channel, &bs, &mut rng).unwrap();
     handle.join().unwrap();
 }
 
@@ -55,18 +57,18 @@ fn _bench_block_cot<
     let (sender, receiver) = UnixStream::pair().unwrap();
     let handle = std::thread::spawn(move || {
         let mut rng = AesRng::new();
-        let mut reader = BufReader::new(sender.try_clone().unwrap());
-        let mut writer = BufWriter::new(sender);
-        let mut ot = OTSender::init(&mut reader, &mut writer, &mut rng).unwrap();
-        ot.send_correlated(&mut reader, &mut writer, &deltas, &mut rng)
-            .unwrap();
+        let reader = BufReader::new(sender.try_clone().unwrap());
+        let writer = BufWriter::new(sender);
+        let mut channel = Channel::new(reader, writer);
+        let mut ot = OTSender::init(&mut channel, &mut rng).unwrap();
+        ot.send_correlated(&mut channel, &deltas, &mut rng).unwrap();
     });
     let mut rng = AesRng::new();
-    let mut reader = BufReader::new(receiver.try_clone().unwrap());
-    let mut writer = BufWriter::new(receiver);
-    let mut ot = OTReceiver::init(&mut reader, &mut writer, &mut rng).unwrap();
-    ot.receive_correlated(&mut reader, &mut writer, &bs, &mut rng)
-        .unwrap();
+    let reader = BufReader::new(receiver.try_clone().unwrap());
+    let writer = BufWriter::new(receiver);
+    let mut channel = Channel::new(reader, writer);
+    let mut ot = OTReceiver::init(&mut channel, &mut rng).unwrap();
+    ot.receive_correlated(&mut channel, &bs, &mut rng).unwrap();
     handle.join().unwrap();
 }
 
@@ -80,18 +82,18 @@ fn _bench_block_rot<
     let m = bs.len();
     let handle = std::thread::spawn(move || {
         let mut rng = AesRng::new();
-        let mut reader = BufReader::new(sender.try_clone().unwrap());
-        let mut writer = BufWriter::new(sender);
-        let mut ot = OTSender::init(&mut reader, &mut writer, &mut rng).unwrap();
-        ot.send_random(&mut reader, &mut writer, m, &mut rng)
-            .unwrap();
+        let reader = BufReader::new(sender.try_clone().unwrap());
+        let writer = BufWriter::new(sender);
+        let mut channel = Channel::new(reader, writer);
+        let mut ot = OTSender::init(&mut channel, &mut rng).unwrap();
+        ot.send_random(&mut channel, m, &mut rng).unwrap();
     });
     let mut rng = AesRng::new();
-    let mut reader = BufReader::new(receiver.try_clone().unwrap());
-    let mut writer = BufWriter::new(receiver);
-    let mut ot = OTReceiver::init(&mut reader, &mut writer, &mut rng).unwrap();
-    ot.receive_random(&mut reader, &mut writer, &bs, &mut rng)
-        .unwrap();
+    let reader = BufReader::new(receiver.try_clone().unwrap());
+    let writer = BufWriter::new(receiver);
+    let mut channel = Channel::new(reader, writer);
+    let mut ot = OTReceiver::init(&mut channel, &mut rng).unwrap();
+    ot.receive_random(&mut channel, &bs, &mut rng).unwrap();
     handle.join().unwrap();
 }
 

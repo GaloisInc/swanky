@@ -14,11 +14,10 @@ use super::prc::PseudorandomCode;
 use crate::errors::Error;
 use crate::oprf::{ObliviousPrf, Receiver as OprfReceiver, Sender as OprfSender};
 use crate::ot::{Receiver as OtReceiver, Sender as OtSender};
-use crate::{stream, utils};
+use crate::utils;
 use rand::Rng;
 use rand::{CryptoRng, RngCore, SeedableRng};
-use scuttlebutt::utils as scutils;
-use scuttlebutt::{cointoss, AesRng, Block, Block512, SemiHonest};
+use scuttlebutt::{cointoss, utils as scutils, AesRng, Block, Block512, Channel, SemiHonest};
 use std::convert::TryInto;
 use std::io::{Read, Write};
 use std::marker::PhantomData;
@@ -39,20 +38,20 @@ impl<OT: OtReceiver<Msg = Block> + SemiHonest> ObliviousPrf for Sender<OT> {
 }
 
 impl<OT: OtReceiver<Msg = Block> + SemiHonest> OprfSender for Sender<OT> {
-    fn init<R, W, RNG>(reader: &mut R, writer: &mut W, rng: &mut RNG) -> Result<Self, Error>
+    fn init<R, W, RNG>(channel: &mut Channel<R, W>, rng: &mut RNG) -> Result<Self, Error>
     where
         R: Read,
         W: Write,
         RNG: CryptoRng + RngCore,
     {
-        let mut ot = OT::init(reader, writer, rng)?;
+        let mut ot = OT::init(channel, rng)?;
         let mut s_ = [0u8; 64];
         rng.fill_bytes(&mut s_);
         let s = utils::u8vec_to_boolvec(&s_);
         let seeds = (0..4).map(|_| rng.gen()).collect::<Vec<Block>>();
-        let keys = cointoss::send(reader, writer, &seeds)?;
+        let keys = cointoss::send(channel, &seeds)?;
         let code = PseudorandomCode::new(keys[0], keys[1], keys[2], keys[3]);
-        let ks = ot.receive(reader, writer, &s, rng)?;
+        let ks = ot.receive(channel, &s, rng)?;
         let rngs = ks
             .into_iter()
             .map(AesRng::from_seed)
@@ -68,8 +67,7 @@ impl<OT: OtReceiver<Msg = Block> + SemiHonest> OprfSender for Sender<OT> {
 
     fn send<R, W, RNG>(
         &mut self,
-        reader: &mut R,
-        _: &mut W,
+        channel: &mut Channel<R, W>,
         m: usize,
         _: &mut RNG,
     ) -> Result<Vec<Self::Seed>, Error>
@@ -88,8 +86,8 @@ impl<OT: OtReceiver<Msg = Block> + SemiHonest> OprfSender for Sender<OT> {
             let range = j * nrows / 8..(j + 1) * nrows / 8;
             let mut q = &mut qs[range];
             self.rngs[j].fill_bytes(&mut q);
-            stream::read_bytes_inplace(reader, &mut t0)?;
-            stream::read_bytes_inplace(reader, &mut t1)?;
+            channel.read_bytes_inplace(&mut t0)?;
+            channel.read_bytes_inplace(&mut t1)?;
             scutils::xor_inplace(&mut q, if *b { &t1 } else { &t0 });
         }
         let qs = utils::transpose(&qs, ncols, nrows);
@@ -141,8 +139,7 @@ impl<OT: OtSender<Msg = Block> + SemiHonest> ObliviousPrf for Receiver<OT> {
 
 impl<OT: OtSender<Msg = Block> + SemiHonest> OprfReceiver for Receiver<OT> {
     fn init<R: Read, W: Write, RNG: CryptoRng + RngCore>(
-        reader: &mut R,
-        writer: &mut W,
+        channel: &mut Channel<R, W>,
         rng: &mut RNG,
     ) -> Result<Self, Error>
     where
@@ -150,9 +147,9 @@ impl<OT: OtSender<Msg = Block> + SemiHonest> OprfReceiver for Receiver<OT> {
         W: Write,
         RNG: CryptoRng + RngCore,
     {
-        let mut ot = OT::init(reader, writer, rng)?;
+        let mut ot = OT::init(channel, rng)?;
         let seeds = (0..4).map(|_| rng.gen()).collect::<Vec<Block>>();
-        let keys = cointoss::receive(reader, writer, &seeds)?;
+        let keys = cointoss::receive(channel, &seeds)?;
         let code = PseudorandomCode::new(keys[0], keys[1], keys[2], keys[3]);
         let mut ks = Vec::with_capacity(512);
         let mut k0 = Block::default();
@@ -162,7 +159,7 @@ impl<OT: OtSender<Msg = Block> + SemiHonest> OprfReceiver for Receiver<OT> {
             rng.fill_bytes(&mut k1.as_mut());
             ks.push((k0, k1));
         }
-        ot.send(reader, writer, &ks, rng)?;
+        ot.send(channel, &ks, rng)?;
         let rngs = ks
             .into_iter()
             .map(|(k0, k1)| (AesRng::from_seed(k0), AesRng::from_seed(k1)))
@@ -176,8 +173,7 @@ impl<OT: OtSender<Msg = Block> + SemiHonest> OprfReceiver for Receiver<OT> {
 
     fn receive<R: Read, W: Write, RNG: CryptoRng + RngCore>(
         &mut self,
-        _: &mut R,
-        writer: &mut W,
+        channel: &mut Channel<R, W>,
         inputs: &[Self::Input],
         rng: &mut RNG,
     ) -> Result<Vec<Self::Output>, Error> {
@@ -210,12 +206,12 @@ impl<OT: OtSender<Msg = Block> + SemiHonest> OprfReceiver for Receiver<OT> {
             let t1 = &t1s[range];
             self.rngs[j].0.fill_bytes(&mut t);
             scutils::xor_inplace(&mut t, &t0);
-            stream::write_bytes(writer, &t)?;
+            channel.write_bytes(&t)?;
             self.rngs[j].1.fill_bytes(&mut t);
             scutils::xor_inplace(&mut t, &t1);
-            stream::write_bytes(writer, &t)?;
+            channel.write_bytes(&t)?;
         }
-        writer.flush()?;
+        channel.flush()?;
         Ok(out[0..m].to_vec())
     }
 }
@@ -253,10 +249,11 @@ mod tests {
         let (sender, receiver) = UnixStream::pair().unwrap();
         let handle = std::thread::spawn(move || {
             let mut rng = AesRng::new();
-            let mut reader = BufReader::new(sender.try_clone().unwrap());
-            let mut writer = BufWriter::new(sender);
-            let mut oprf = oprf::KkrtSender::init(&mut reader, &mut writer, &mut rng).unwrap();
-            let seeds = oprf.send(&mut reader, &mut writer, n, &mut rng).unwrap();
+            let reader = BufReader::new(sender.try_clone().unwrap());
+            let writer = BufWriter::new(sender);
+            let mut channel = Channel::new(reader, writer);
+            let mut oprf = oprf::KkrtSender::init(&mut channel, &mut rng).unwrap();
+            let seeds = oprf.send(&mut channel, n, &mut rng).unwrap();
             let mut results = results.lock().unwrap();
             *results = selections_
                 .iter()
@@ -265,12 +262,11 @@ mod tests {
                 .collect::<Vec<Block512>>();
         });
         let mut rng = AesRng::new();
-        let mut reader = BufReader::new(receiver.try_clone().unwrap());
-        let mut writer = BufWriter::new(receiver);
-        let mut oprf = oprf::KkrtReceiver::init(&mut reader, &mut writer, &mut rng).unwrap();
-        let outputs = oprf
-            .receive(&mut reader, &mut writer, &selections, &mut rng)
-            .unwrap();
+        let reader = BufReader::new(receiver.try_clone().unwrap());
+        let writer = BufWriter::new(receiver);
+        let mut channel = Channel::new(reader, writer);
+        let mut oprf = oprf::KkrtReceiver::init(&mut channel, &mut rng).unwrap();
+        let outputs = oprf.receive(&mut channel, &selections, &mut rng).unwrap();
         handle.join().unwrap();
         let results_ = results_.lock().unwrap();
         for j in 0..n {

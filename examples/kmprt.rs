@@ -7,7 +7,7 @@
 use ocelot::oprf::kmprt::{KmprtSingleReceiver, KmprtSingleSender};
 use ocelot::oprf::{ProgrammableReceiver, ProgrammableSender};
 use rand::Rng;
-use scuttlebutt::{AesRng, Block, Block512};
+use scuttlebutt::{AesRng, Block, Block512, Channel};
 use std::io::{BufReader, BufWriter};
 use std::os::unix::net::UnixStream;
 
@@ -30,26 +30,21 @@ fn _test_opprf<
     let (sender, receiver) = UnixStream::pair().unwrap();
     let handle = std::thread::spawn(move || {
         let mut rng = AesRng::new();
-        let mut reader = BufReader::new(sender.try_clone().unwrap());
-        let mut writer = BufWriter::new(sender);
-        let mut oprf = S::init(&mut reader, &mut writer, &mut rng).unwrap();
+        let reader = BufReader::new(sender.try_clone().unwrap());
+        let writer = BufWriter::new(sender);
+        let mut channel = Channel::new(reader, writer);
+        let mut oprf = S::init(&mut channel, &mut rng).unwrap();
         let _ = oprf
-            .send(
-                &mut reader,
-                &mut writer,
-                &points,
-                npoints,
-                ninputs,
-                &mut rng,
-            )
+            .send(&mut channel, &points, npoints, ninputs, &mut rng)
             .unwrap();
     });
     let mut rng = AesRng::new();
-    let mut reader = BufReader::new(receiver.try_clone().unwrap());
-    let mut writer = BufWriter::new(receiver);
-    let mut oprf = R::init(&mut reader, &mut writer, &mut rng).unwrap();
+    let reader = BufReader::new(receiver.try_clone().unwrap());
+    let writer = BufWriter::new(receiver);
+    let mut channel = Channel::new(reader, writer);
+    let mut oprf = R::init(&mut channel, &mut rng).unwrap();
     let _ = oprf
-        .receive(&mut reader, &mut writer, npoints, &inputs, &mut rng)
+        .receive(&mut channel, npoints, &inputs, &mut rng)
         .unwrap();
     handle.join().unwrap();
 }

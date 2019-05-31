@@ -13,9 +13,8 @@ use crate::oprf::{
     ObliviousPprf, ObliviousPrf, ProgrammableReceiver as OpprfReceiver,
     ProgrammableSender as OpprfSender, Receiver as OprfReceiver, Sender as OprfSender,
 };
-use crate::stream;
 use rand::{CryptoRng, Rng, RngCore};
-use scuttlebutt::{Aes128, Block, Block512, SemiHonest};
+use scuttlebutt::{Aes128, Block, Block512, Channel, SemiHonest};
 use std::collections::HashSet;
 use std::io::{Read, Write};
 
@@ -100,13 +99,13 @@ impl<OPRF: OprfSender<Seed = Block512, Input = Block, Output = Block512> + SemiH
 impl<OPRF: OprfSender<Seed = Block512, Input = Block, Output = Block512> + SemiHonest> OpprfSender
     for SingleSender<OPRF>
 {
-    fn init<R, W, RNG>(reader: &mut R, writer: &mut W, rng: &mut RNG) -> Result<Self, Error>
+    fn init<R, W, RNG>(channel: &mut Channel<R, W>, rng: &mut RNG) -> Result<Self, Error>
     where
         R: Read,
         W: Write,
         RNG: CryptoRng + RngCore,
     {
-        let oprf = OPRF::init(reader, writer, rng)?;
+        let oprf = OPRF::init(channel, rng)?;
         Ok(Self { oprf })
     }
 
@@ -116,8 +115,7 @@ impl<OPRF: OprfSender<Seed = Block512, Input = Block, Output = Block512> + SemiH
     /// `Error::InvalidInputLength`.
     fn send<R, W, RNG>(
         &mut self,
-        reader: &mut R,
-        writer: &mut W,
+        channel: &mut Channel<R, W>,
         points: &[(Self::Input, Self::Output)],
         npoints: usize,
         t: usize,
@@ -142,7 +140,7 @@ impl<OPRF: OprfSender<Seed = Block512, Input = Block, Output = Block512> + SemiH
             points.len()
         );
         assert!(points.len() <= npoints);
-        let seeds = self.oprf.send(reader, writer, 1, rng)?;
+        let seeds = self.oprf.send(channel, 1, rng)?;
         let seed = seeds[0];
         let mut v = rng.gen::<Block>();
         let mut aes = Aes128::new(v);
@@ -179,7 +177,7 @@ impl<OPRF: OprfSender<Seed = Block512, Input = Block, Output = Block512> + SemiH
             }
             if map.len() == points.len() {
                 // Success! Send `m` to the receiver and exit the loop.
-                stream::write_usize(writer, m)?;
+                channel.write_usize(m)?;
                 break;
             }
             // Failure :-(. Increment `offset` and try again.
@@ -197,11 +195,11 @@ impl<OPRF: OprfSender<Seed = Block512, Input = Block, Output = Block512> + SemiH
             }
         }
         // Send `v` and `table` to the receiver.
-        v.write(writer)?;
+        channel.write_block(&v)?;
         for entry in table.iter() {
-            entry.write(writer)?;
+            channel.write_block512(entry)?;
         }
-        writer.flush()?;
+        channel.flush()?;
         let hint = Hint(v, table);
         let output = vec![(seed, hint)];
         Ok(output)
@@ -247,20 +245,19 @@ impl<OPRF: OprfReceiver<Seed = Block512, Input = Block, Output = Block512> + Sem
 impl<OPRF: OprfReceiver<Seed = Block512, Input = Block, Output = Block512> + SemiHonest>
     OpprfReceiver for SingleReceiver<OPRF>
 {
-    fn init<R, W, RNG>(reader: &mut R, writer: &mut W, rng: &mut RNG) -> Result<Self, Error>
+    fn init<R, W, RNG>(channel: &mut Channel<R, W>, rng: &mut RNG) -> Result<Self, Error>
     where
         R: Read,
         W: Write,
         RNG: CryptoRng + RngCore,
     {
-        let oprf = OPRF::init(reader, writer, rng)?;
+        let oprf = OPRF::init(channel, rng)?;
         Ok(Self { oprf })
     }
 
     fn receive<R, W, RNG>(
         &mut self,
-        reader: &mut R,
-        writer: &mut W,
+        channel: &mut Channel<R, W>,
         _npoints: usize,
         inputs: &[Self::Input],
         rng: &mut RNG,
@@ -273,13 +270,13 @@ impl<OPRF: OprfReceiver<Seed = Block512, Input = Block, Output = Block512> + Sem
         if inputs.len() != 1 {
             return Err(Error::InvalidInputLength);
         }
-        let mut outputs = self.oprf.receive(reader, writer, inputs, rng)?;
-        let m = stream::read_usize(reader)?;
-        let v = Block::read(reader)?;
+        let mut outputs = self.oprf.receive(channel, inputs, rng)?;
+        let m = channel.read_usize()?;
+        let v = channel.read_block()?;
         let h = hash_output(&outputs[0], v, m);
         let zero = Block512::default();
         for i in 0..m {
-            let entry = Block512::read(reader)?;
+            let entry = channel.read_block512()?;
             outputs[0] ^= if i == h { entry } else { zero };
         }
         Ok(outputs)
@@ -361,20 +358,19 @@ impl<T: OprfSender<Seed = Block512, Input = Block, Output = Block512> + SemiHone
 impl<T: OprfSender<Seed = Block512, Input = Block, Output = Block512> + SemiHonest> OpprfSender
     for Sender<T>
 {
-    fn init<R, W, RNG>(reader: &mut R, writer: &mut W, rng: &mut RNG) -> Result<Self, Error>
+    fn init<R, W, RNG>(channel: &mut Channel<R, W>, rng: &mut RNG) -> Result<Self, Error>
     where
         R: Read,
         W: Write,
         RNG: CryptoRng + RngCore,
     {
-        let opprf = SingleSender::<T>::init(reader, writer, rng)?;
+        let opprf = SingleSender::<T>::init(channel, rng)?;
         Ok(Self { opprf })
     }
 
     fn send<R, W, RNG>(
         &mut self,
-        reader: &mut R,
-        writer: &mut W,
+        channel: &mut Channel<R, W>,
         points: &[(Self::Input, Self::Output)],
         _npoints: usize,
         ninputs: usize,
@@ -389,7 +385,7 @@ impl<T: OprfSender<Seed = Block512, Input = Block, Output = Block512> + SemiHone
         // Receive `hashkeys` from the receiver. These are used to fill `bins` below.
         let mut hashkeys = Vec::with_capacity(params.h1 + params.h2);
         for _ in 0..params.h1 + params.h2 {
-            let h = Block::read(reader)?;
+            let h = channel.read_block()?;
             hashkeys.push(h);
         }
         // `bins` contains `m = m₁ + m₂` vectors. The first `m₁` vectors are each of
@@ -429,7 +425,7 @@ impl<T: OprfSender<Seed = Block512, Input = Block, Output = Block512> + SemiHone
                 params.beta2
             };
 
-            let output = self.opprf.send(reader, writer, &bin, beta, 1, rng)?;
+            let output = self.opprf.send(channel, &bin, beta, 1, rng)?;
             outputs.push(output);
         }
         // XXX: this returns `m1 + m2` (seed, hint) pairs. But there doesn't
@@ -475,20 +471,19 @@ impl<T: OprfReceiver<Seed = Block512, Input = Block, Output = Block512> + SemiHo
 impl<T: OprfReceiver<Seed = Block512, Input = Block, Output = Block512> + SemiHonest> OpprfReceiver
     for Receiver<T>
 {
-    fn init<R, W, RNG>(reader: &mut R, writer: &mut W, rng: &mut RNG) -> Result<Self, Error>
+    fn init<R, W, RNG>(channel: &mut Channel<R, W>, rng: &mut RNG) -> Result<Self, Error>
     where
         R: Read,
         W: Write,
         RNG: CryptoRng + RngCore,
     {
-        let opprf = SingleReceiver::<T>::init(reader, writer, rng)?;
+        let opprf = SingleReceiver::<T>::init(channel, rng)?;
         Ok(Self { opprf })
     }
 
     fn receive<R, W, RNG>(
         &mut self,
-        reader: &mut R,
-        writer: &mut W,
+        channel: &mut Channel<R, W>,
         _npoints: usize,
         inputs: &[Self::Input],
         rng: &mut RNG,
@@ -520,7 +515,7 @@ impl<T: OprfReceiver<Seed = Block512, Input = Block, Output = Block512> + SemiHo
                     table = table_;
                     // Send `hashkeys` to the sender.
                     for h in hashkeys.into_iter() {
-                        h.write(writer)?;
+                        channel.write_block(&h)?;
                     }
                     break;
                 }
@@ -542,13 +537,11 @@ impl<T: OprfReceiver<Seed = Block512, Input = Block, Output = Block512> + SemiHo
             if let Some(item) = item {
                 assert_eq!(inputs[item.index], item.entry);
                 assert_eq!(outputs[item.index], Default::default());
-                let out = self
-                    .opprf
-                    .receive(reader, writer, beta, &[item.entry], rng)?;
+                let out = self.opprf.receive(channel, beta, &[item.entry], rng)?;
                 outputs[item.index] = out[0];
             } else {
                 let entry = rng.gen::<Block>();
-                let _ = self.opprf.receive(reader, writer, beta, &[entry], rng)?;
+                let _ = self.opprf.receive(channel, beta, &[entry], rng)?;
             }
         }
         Ok(outputs)
@@ -608,18 +601,12 @@ mod tests {
         let (sender, receiver) = UnixStream::pair().unwrap();
         let handle = std::thread::spawn(move || {
             let mut rng = AesRng::new();
-            let mut reader = BufReader::new(sender.try_clone().unwrap());
-            let mut writer = BufWriter::new(sender);
-            let mut oprf = S::init(&mut reader, &mut writer, &mut rng).unwrap();
+            let reader = BufReader::new(sender.try_clone().unwrap());
+            let writer = BufWriter::new(sender);
+            let mut channel = Channel::new(reader, writer);
+            let mut oprf = S::init(&mut channel, &mut rng).unwrap();
             let outputs = oprf
-                .send(
-                    &mut reader,
-                    &mut writer,
-                    &points,
-                    npoints_bound,
-                    ninputs,
-                    &mut rng,
-                )
+                .send(&mut channel, &points, npoints_bound, ninputs, &mut rng)
                 .unwrap();
             let mut results = results.lock().unwrap();
             *results = inputs_
@@ -629,11 +616,12 @@ mod tests {
                 .collect::<Vec<Block512>>();
         });
         let mut rng = AesRng::new();
-        let mut reader = BufReader::new(receiver.try_clone().unwrap());
-        let mut writer = BufWriter::new(receiver);
-        let mut oprf = R::init(&mut reader, &mut writer, &mut rng).unwrap();
+        let reader = BufReader::new(receiver.try_clone().unwrap());
+        let writer = BufWriter::new(receiver);
+        let mut channel = Channel::new(reader, writer);
+        let mut oprf = R::init(&mut channel, &mut rng).unwrap();
         let outputs = oprf
-            .receive(&mut reader, &mut writer, npoints_bound, &inputs, &mut rng)
+            .receive(&mut channel, npoints_bound, &inputs, &mut rng)
             .unwrap();
         handle.join().unwrap();
         let results_ = results_.lock().unwrap();
@@ -668,26 +656,21 @@ mod tests {
         let points_ = points.clone();
         let handle = std::thread::spawn(move || {
             let mut rng = AesRng::new();
-            let mut reader = BufReader::new(sender.try_clone().unwrap());
-            let mut writer = BufWriter::new(sender);
-            let mut oprf = S::init(&mut reader, &mut writer, &mut rng).unwrap();
+            let reader = BufReader::new(sender.try_clone().unwrap());
+            let writer = BufWriter::new(sender);
+            let mut channel = Channel::new(reader, writer);
+            let mut oprf = S::init(&mut channel, &mut rng).unwrap();
             let _ = oprf
-                .send(
-                    &mut reader,
-                    &mut writer,
-                    &points_,
-                    npoints_bound,
-                    ninputs,
-                    &mut rng,
-                )
+                .send(&mut channel, &points_, npoints_bound, ninputs, &mut rng)
                 .unwrap();
         });
         let mut rng = AesRng::new();
-        let mut reader = BufReader::new(receiver.try_clone().unwrap());
-        let mut writer = BufWriter::new(receiver);
-        let mut oprf = R::init(&mut reader, &mut writer, &mut rng).unwrap();
+        let reader = BufReader::new(receiver.try_clone().unwrap());
+        let writer = BufWriter::new(receiver);
+        let mut channel = Channel::new(reader, writer);
+        let mut oprf = R::init(&mut channel, &mut rng).unwrap();
         let outputs = oprf
-            .receive(&mut reader, &mut writer, npoints_bound, &xs, &mut rng)
+            .receive(&mut channel, npoints_bound, &xs, &mut rng)
             .unwrap();
         handle.join().unwrap();
         let mut okay = true;

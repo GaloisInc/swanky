@@ -16,7 +16,7 @@ use crate::ot::{
 use crate::utils;
 use rand::CryptoRng;
 use rand_core::{RngCore, SeedableRng};
-use scuttlebutt::{cointoss, AesRng, Block, Malicious, SemiHonest};
+use scuttlebutt::{cointoss, AesRng, Block, Channel, Malicious, SemiHonest};
 use std::convert::TryInto;
 use std::io::{ErrorKind, Read, Write};
 
@@ -35,8 +35,7 @@ impl<OT: OtReceiver<Msg = Block> + Malicious> Sender<OT> {
     #[inline]
     fn send_setup<R: Read, W: Write, RNG: CryptoRng + RngCore>(
         &mut self,
-        reader: &mut R,
-        writer: &mut W,
+        channel: &mut Channel<R, W>,
         m: usize,
         rng: &mut RNG,
     ) -> Result<Vec<u8>, Error> {
@@ -47,11 +46,11 @@ impl<OT: OtReceiver<Msg = Block> + Malicious> Sender<OT> {
             )));
         }
         let ncols = m + 128 + SSP;
-        let qs = self.ot.send_setup(reader, ncols)?;
+        let qs = self.ot.send_setup(channel, ncols)?;
         // Check correlation
         let mut seed = Block::default();
         rng.fill_bytes(&mut seed.as_mut());
-        let seed = cointoss::send(reader, writer, &[seed])?;
+        let seed = cointoss::send(channel, &[seed])?;
         let mut rng = AesRng::from_seed(seed[0]);
         let mut check = (Block::default(), Block::default());
         let mut chi = Block::default();
@@ -63,9 +62,9 @@ impl<OT: OtReceiver<Msg = Block> + Malicious> Sender<OT> {
             let tmp = q.clmul(chi);
             check = utils::xor_two_blocks(&check, &tmp);
         }
-        let x = Block::read(reader)?;
-        let t0 = Block::read(reader)?;
-        let t1 = Block::read(reader)?;
+        let x = channel.read_block()?;
+        let t0 = channel.read_block()?;
+        let t1 = channel.read_block()?;
         let tmp = x.clmul(self.ot.s_);
         let check = utils::xor_two_blocks(&check, &tmp);
         if check != (t0, t1) {
@@ -83,23 +82,21 @@ impl<OT: OtReceiver<Msg = Block> + Malicious> OtSender for Sender<OT> {
     type Msg = Block;
 
     fn init<R: Read, W: Write, RNG: CryptoRng + RngCore>(
-        reader: &mut R,
-        writer: &mut W,
+        channel: &mut Channel<R, W>,
         rng: &mut RNG,
     ) -> Result<Self, Error> {
-        let ot = AlszSender::<OT>::init(reader, writer, rng)?;
+        let ot = AlszSender::<OT>::init(channel, rng)?;
         Ok(Self { ot })
     }
 
     fn send<R: Read, W: Write, RNG: CryptoRng + RngCore>(
         &mut self,
-        reader: &mut R,
-        mut writer: &mut W,
+        channel: &mut Channel<R, W>,
         inputs: &[(Block, Block)],
         rng: &mut RNG,
     ) -> Result<(), Error> {
         let m = inputs.len();
-        let qs = self.send_setup(reader, writer, m, rng)?;
+        let qs = self.send_setup(channel, m, rng)?;
         // Output result
         for (j, input) in inputs.iter().enumerate() {
             let q = &qs[j * 16..(j + 1) * 16];
@@ -108,10 +105,10 @@ impl<OT: OtReceiver<Msg = Block> + Malicious> OtSender for Sender<OT> {
             let y0 = self.ot.hash.tccr_hash(Block::from(j as u128), q) ^ input.0;
             let q = q ^ self.ot.s_;
             let y1 = self.ot.hash.tccr_hash(Block::from(j as u128), q) ^ input.1;
-            y0.write(&mut writer)?;
-            y1.write(&mut writer)?;
+            channel.write_block(&y0)?;
+            channel.write_block(&y1)?;
         }
-        writer.flush()?;
+        channel.flush()?;
         Ok(())
     }
 }
@@ -120,13 +117,12 @@ impl<OT: OtReceiver<Msg = Block> + Malicious> CorrelatedSender for Sender<OT> {
     #[inline]
     fn send_correlated<R: Read, W: Write, RNG: CryptoRng + RngCore>(
         &mut self,
-        reader: &mut R,
-        mut writer: &mut W,
+        channel: &mut Channel<R, W>,
         deltas: &[Self::Msg],
         rng: &mut RNG,
     ) -> Result<Vec<(Self::Msg, Self::Msg)>, Error> {
         let m = deltas.len();
-        let qs = self.send_setup(reader, writer, m, rng)?;
+        let qs = self.send_setup(channel, m, rng)?;
         let mut out = Vec::with_capacity(m);
         for (j, delta) in deltas.iter().enumerate() {
             let q = &qs[j * 16..(j + 1) * 16];
@@ -136,10 +132,10 @@ impl<OT: OtReceiver<Msg = Block> + Malicious> CorrelatedSender for Sender<OT> {
             let x1 = x0 ^ *delta;
             let q = q ^ self.ot.s_;
             let y = self.ot.hash.tccr_hash(Block::from(j as u128), q) ^ x1;
-            y.write(&mut writer)?;
+            channel.write_block(&y)?;
             out.push((x0, x1));
         }
-        writer.flush()?;
+        channel.flush()?;
         Ok(out)
     }
 }
@@ -148,12 +144,11 @@ impl<OT: OtReceiver<Msg = Block> + Malicious> RandomSender for Sender<OT> {
     #[inline]
     fn send_random<R: Read, W: Write, RNG: CryptoRng + RngCore>(
         &mut self,
-        reader: &mut R,
-        writer: &mut W,
+        channel: &mut Channel<R, W>,
         m: usize,
         rng: &mut RNG,
     ) -> Result<Vec<(Self::Msg, Self::Msg)>, Error> {
-        let qs = self.send_setup(reader, writer, m, rng)?;
+        let qs = self.send_setup(channel, m, rng)?;
         let mut out = Vec::with_capacity(m);
         for j in 0..m {
             let q = &qs[j * 16..(j + 1) * 16];
@@ -178,8 +173,7 @@ impl<OT: OtSender<Msg = Block> + Malicious> Receiver<OT> {
     #[inline]
     fn receive_setup<R: Read, W: Write, RNG: CryptoRng + RngCore>(
         &mut self,
-        reader: &mut R,
-        mut writer: &mut W,
+        channel: &mut Channel<R, W>,
         inputs: &[bool],
         rng: &mut RNG,
     ) -> Result<Vec<u8>, Error> {
@@ -187,11 +181,11 @@ impl<OT: OtSender<Msg = Block> + Malicious> Receiver<OT> {
         let m_ = m + 128 + SSP;
         let mut r = utils::boolvec_to_u8vec(inputs);
         r.extend((0..(m_ - m) / 8).map(|_| rand::random::<u8>()));
-        let ts = self.ot.receive_setup(writer, &r, m_)?;
+        let ts = self.ot.receive_setup(channel, &r, m_)?;
         // Check correlation
         let mut seed = Block::default();
         rng.fill_bytes(&mut seed.as_mut());
-        let seed = cointoss::receive(reader, writer, &[seed])?;
+        let seed = cointoss::receive(channel, &[seed])?;
         let mut rng = AesRng::from_seed(seed[0]);
         let mut x = Block::default();
         let mut t = (Block::default(), Block::default());
@@ -206,10 +200,10 @@ impl<OT: OtSender<Msg = Block> + Malicious> Receiver<OT> {
             let tmp = tj.clmul(chi);
             t = utils::xor_two_blocks(&t, &tmp);
         }
-        x.write(&mut writer)?;
-        t.0.write(&mut writer)?;
-        t.1.write(&mut writer)?;
-        writer.flush()?;
+        channel.write_block(&x)?;
+        channel.write_block(&t.0)?;
+        channel.write_block(&t.1)?;
+        channel.flush()?;
         Ok(ts)
     }
 }
@@ -218,29 +212,27 @@ impl<OT: OtSender<Msg = Block> + Malicious> OtReceiver for Receiver<OT> {
     type Msg = Block;
 
     fn init<R: Read, W: Write, RNG: CryptoRng + RngCore>(
-        reader: &mut R,
-        writer: &mut W,
+        channel: &mut Channel<R, W>,
         rng: &mut RNG,
     ) -> Result<Self, Error> {
-        let ot = AlszReceiver::<OT>::init(reader, writer, rng)?;
+        let ot = AlszReceiver::<OT>::init(channel, rng)?;
         Ok(Self { ot })
     }
 
     fn receive<R: Read, W: Write, RNG: CryptoRng + RngCore>(
         &mut self,
-        mut reader: &mut R,
-        writer: &mut W,
+        channel: &mut Channel<R, W>,
         inputs: &[bool],
         rng: &mut RNG,
     ) -> Result<Vec<Block>, Error> {
-        let ts = self.receive_setup(reader, writer, inputs, rng)?;
+        let ts = self.receive_setup(channel, inputs, rng)?;
         // Output result
         let mut out = Vec::with_capacity(inputs.len());
         for (j, b) in inputs.iter().enumerate() {
             let t = &ts[j * 16..(j + 1) * 16];
             let t: [u8; 16] = t.try_into().unwrap();
-            let y0 = Block::read(&mut reader)?;
-            let y1 = Block::read(&mut reader)?;
+            let y0 = channel.read_block()?;
+            let y1 = channel.read_block()?;
             let y = if *b { y1 } else { y0 };
             let y = y ^ self
                 .ot
@@ -255,17 +247,16 @@ impl<OT: OtSender<Msg = Block> + Malicious> OtReceiver for Receiver<OT> {
 impl<OT: OtSender<Msg = Block> + Malicious> CorrelatedReceiver for Receiver<OT> {
     fn receive_correlated<R: Read, W: Write, RNG: CryptoRng + RngCore>(
         &mut self,
-        reader: &mut R,
-        writer: &mut W,
+        channel: &mut Channel<R, W>,
         inputs: &[bool],
         rng: &mut RNG,
     ) -> Result<Vec<Self::Msg>, Error> {
-        let ts = self.receive_setup(reader, writer, inputs, rng)?;
+        let ts = self.receive_setup(channel, inputs, rng)?;
         let mut out = Vec::with_capacity(inputs.len());
         for (j, b) in inputs.iter().enumerate() {
             let t = &ts[j * 16..(j + 1) * 16];
             let t: [u8; 16] = t.try_into().unwrap();
-            let y = Block::read(reader)?;
+            let y = channel.read_block()?;
             let y = if *b { y } else { Block::default() };
             let h = self
                 .ot
@@ -280,12 +271,11 @@ impl<OT: OtSender<Msg = Block> + Malicious> CorrelatedReceiver for Receiver<OT> 
 impl<OT: OtSender<Msg = Block> + Malicious> RandomReceiver for Receiver<OT> {
     fn receive_random<R: Read, W: Write, RNG: CryptoRng + RngCore>(
         &mut self,
-        reader: &mut R,
-        writer: &mut W,
+        channel: &mut Channel<R, W>,
         inputs: &[bool],
         rng: &mut RNG,
     ) -> Result<Vec<Self::Msg>, Error> {
-        let ts = self.receive_setup(reader, writer, inputs, rng)?;
+        let ts = self.receive_setup(channel, inputs, rng)?;
         let mut out = Vec::with_capacity(inputs.len());
         for j in 0..inputs.len() {
             let t = &ts[j * 16..(j + 1) * 16];

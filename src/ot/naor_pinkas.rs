@@ -12,12 +12,11 @@
 
 use crate::errors::Error;
 use crate::ot::{Receiver as OtReceiver, Sender as OtSender};
-use crate::stream;
 use curve25519_dalek::constants::RISTRETTO_BASEPOINT_TABLE;
 use curve25519_dalek::ristretto::RistrettoPoint;
 use curve25519_dalek::scalar::Scalar;
 use rand::{CryptoRng, RngCore};
-use scuttlebutt::{Block, SemiHonest};
+use scuttlebutt::{Block, Channel, SemiHonest};
 use std::io::{Read, Write};
 
 /// Oblivious transfer sender.
@@ -29,8 +28,7 @@ impl OtSender for Sender {
     type Msg = Block;
 
     fn init<R: Read, W: Write, RNG: CryptoRng + RngCore>(
-        _: &mut R,
-        _: &mut W,
+        _: &mut Channel<R, W>,
         _: &mut RNG,
     ) -> Result<Self, Error> {
         Ok(Self {})
@@ -38,8 +36,7 @@ impl OtSender for Sender {
 
     fn send<R: Read, W: Write, RNG: CryptoRng + RngCore>(
         &mut self,
-        reader: &mut R,
-        writer: &mut W,
+        channel: &mut Channel<R, W>,
         inputs: &[(Block, Block)],
         mut rng: &mut RNG,
     ) -> Result<(), Error> {
@@ -48,12 +45,12 @@ impl OtSender for Sender {
         let mut pks = Vec::with_capacity(m);
         for _ in 0..m {
             let c = RistrettoPoint::random(&mut rng);
-            stream::write_pt(writer, &c)?;
+            channel.write_pt(&c)?;
             cs.push(c);
         }
-        writer.flush()?;
+        channel.flush()?;
         for c in cs.into_iter() {
-            let pk0 = stream::read_pt(reader)?;
+            let pk0 = channel.read_pt()?;
             pks.push((pk0, c - pk0));
         }
         for (i, (input, pk)) in inputs.iter().zip(pks.into_iter()).enumerate() {
@@ -65,12 +62,12 @@ impl OtSender for Sender {
             let e01 = h ^ input.0;
             let h = Block::hash_pt(i, &(pk.1 * r1));
             let e11 = h ^ input.1;
-            stream::write_pt(writer, &e00)?;
-            e01.write(writer)?;
-            stream::write_pt(writer, &e10)?;
-            e11.write(writer)?;
+            channel.write_pt(&e00)?;
+            channel.write_block(&e01)?;
+            channel.write_pt(&e10)?;
+            channel.write_block(&e11)?;
         }
-        writer.flush()?;
+        channel.flush()?;
         Ok(())
     }
 }
@@ -85,8 +82,7 @@ impl OtReceiver for Receiver {
     type Msg = Block;
 
     fn init<R: Read, W: Write, RNG: CryptoRng + RngCore>(
-        _: &mut R,
-        _: &mut W,
+        _: &mut Channel<R, W>,
         _: &mut RNG,
     ) -> Result<Self, Error> {
         Ok(Self {})
@@ -94,8 +90,7 @@ impl OtReceiver for Receiver {
 
     fn receive<R: Read, W: Write, RNG: CryptoRng + RngCore>(
         &mut self,
-        reader: &mut R,
-        writer: &mut W,
+        channel: &mut Channel<R, W>,
         inputs: &[bool],
         mut rng: &mut RNG,
     ) -> Result<Vec<Block>, Error> {
@@ -103,7 +98,7 @@ impl OtReceiver for Receiver {
         let mut cs = Vec::with_capacity(m);
         let mut ks = Vec::with_capacity(m);
         for _ in 0..m {
-            let c = stream::read_pt(reader)?;
+            let c = channel.read_pt()?;
             cs.push(c);
         }
         for (b, c) in inputs.iter().zip(cs.into_iter()) {
@@ -111,21 +106,21 @@ impl OtReceiver for Receiver {
             let pk = &k * &RISTRETTO_BASEPOINT_TABLE;
             let pk_ = c - pk;
             match b {
-                false => stream::write_pt(writer, &pk)?,
-                true => stream::write_pt(writer, &pk_)?,
+                false => channel.write_pt(&pk)?,
+                true => channel.write_pt(&pk_)?,
             };
             ks.push(k);
         }
-        writer.flush()?;
+        channel.flush()?;
         inputs
             .iter()
             .zip(ks.into_iter())
             .enumerate()
             .map(|(i, (b, k))| {
-                let e00 = stream::read_pt(reader)?;
-                let e01 = Block::read(reader)?;
-                let e10 = stream::read_pt(reader)?;
-                let e11 = Block::read(reader)?;
+                let e00 = channel.read_pt()?;
+                let e01 = channel.read_block()?;
+                let e10 = channel.read_pt()?;
+                let e11 = channel.read_block()?;
                 let (e0, e1) = match b {
                     false => (e00, e01),
                     true => (e10, e11),

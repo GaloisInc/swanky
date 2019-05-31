@@ -9,9 +9,8 @@
 
 use crate::errors::Error;
 use crate::ot::{Receiver as OtReceiver, Sender as OtSender};
-use crate::stream;
 use rand::{CryptoRng, RngCore};
-use scuttlebutt::Block;
+use scuttlebutt::{Block, Channel};
 use std::io::{Read, Write};
 
 /// Oblivious transfer sender.
@@ -23,8 +22,7 @@ impl OtSender for Sender {
     type Msg = Block;
 
     fn init<R: Read, W: Write, RNG: CryptoRng + RngCore>(
-        _: &mut R,
-        _: &mut W,
+        _: &mut Channel<R, W>,
         _: &mut RNG,
     ) -> Result<Self, Error> {
         Ok(Self {})
@@ -32,21 +30,20 @@ impl OtSender for Sender {
 
     fn send<R: Read, W: Write, RNG: CryptoRng + RngCore>(
         &mut self,
-        mut reader: &mut R,
-        mut writer: &mut W,
+        channel: &mut Channel<R, W>,
         inputs: &[(Block, Block)],
         _: &mut RNG,
     ) -> Result<(), Error> {
         let mut bs = Vec::with_capacity(inputs.len());
         for _ in 0..inputs.len() {
-            let b = stream::read_bool(&mut reader)?;
+            let b = channel.read_bool()?;
             bs.push(b);
         }
         for (b, m) in bs.into_iter().zip(inputs.iter()) {
             let m = if b { m.1 } else { m.0 };
-            m.write(&mut writer)?;
+            channel.write_block(&m)?;
         }
-        writer.flush()?;
+        channel.flush()?;
         Ok(())
     }
 }
@@ -61,8 +58,7 @@ impl OtReceiver for Receiver {
     type Msg = Block;
 
     fn init<R: Read, W: Write, RNG: CryptoRng + RngCore>(
-        _: &mut R,
-        _: &mut W,
+        _: &mut Channel<R, W>,
         _: &mut RNG,
     ) -> Result<Self, Error> {
         Ok(Self {})
@@ -70,18 +66,17 @@ impl OtReceiver for Receiver {
 
     fn receive<R: Read, W: Write, RNG: CryptoRng + RngCore>(
         &mut self,
-        reader: &mut R,
-        writer: &mut W,
+        channel: &mut Channel<R, W>,
         inputs: &[bool],
         _: &mut RNG,
     ) -> Result<Vec<Block>, Error> {
         for b in inputs.iter() {
-            stream::write_bool(writer, *b)?;
+            channel.write_bool(*b)?;
         }
-        writer.flush()?;
+        channel.flush()?;
         let mut out = Vec::with_capacity(inputs.len());
         for _ in 0..inputs.len() {
-            let m = Block::read(reader)?;
+            let m = channel.read_block()?;
             out.push(m);
         }
         Ok(out)

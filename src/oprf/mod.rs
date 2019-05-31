@@ -14,6 +14,7 @@ mod prc;
 use crate::errors::Error;
 use crate::ot;
 use rand::{CryptoRng, RngCore};
+use scuttlebutt::Channel;
 use std::io::{Read, Write};
 
 /// KKRT oblivious PRF sender using ALSZ OT extension with Chou-Orlandi as the base OT.
@@ -41,15 +42,13 @@ where
 {
     /// Runs any one-time initialization.
     fn init<R: Read, W: Write, RNG: CryptoRng + RngCore>(
-        reader: &mut R,
-        writer: &mut W,
+        channel: &mut Channel<R, W>,
         rng: &mut RNG,
     ) -> Result<Self, Error>;
     /// Runs `m` OPRF instances as the sender, returning the OPRF seeds.
     fn send<R: Read, W: Write, RNG: CryptoRng + RngCore>(
         &mut self,
-        reader: &mut R,
-        writer: &mut W,
+        channel: &mut Channel<R, W>,
         m: usize,
         rng: &mut RNG,
     ) -> Result<Vec<Self::Seed>, Error>;
@@ -64,15 +63,13 @@ where
 {
     /// Runs any one-time initialization.
     fn init<R: Read, W: Write, RNG: CryptoRng + RngCore>(
-        reader: &mut R,
-        writer: &mut W,
+        channel: &mut Channel<R, W>,
         rng: &mut RNG,
     ) -> Result<Self, Error>;
     /// Runs the oblivious PRF on inputs `inputs`, returning the OPRF outputs.
     fn receive<R: Read, W: Write, RNG: CryptoRng + RngCore>(
         &mut self,
-        reader: &mut R,
-        writer: &mut W,
+        channel: &mut Channel<R, W>,
         inputs: &[Self::Input],
         rng: &mut RNG,
     ) -> Result<Vec<Self::Output>, Error>;
@@ -90,15 +87,13 @@ pub trait ObliviousPprf: ObliviousPrf {
 pub trait ProgrammableSender: ObliviousPprf {
     /// Runs any one-time initialization.
     fn init<R: Read, W: Write, RNG: CryptoRng + RngCore>(
-        reader: &mut R,
-        writer: &mut W,
+        channel: &mut Channel<R, W>,
         rng: &mut RNG,
     ) -> Result<Self, Error>;
     /// Runs `m` OPRF instances as the sender, returning the OPRF seeds.
     fn send<R: Read, W: Write, RNG: CryptoRng + RngCore>(
         &mut self,
-        reader: &mut R,
-        writer: &mut W,
+        channel: &mut Channel<R, W>,
         points: &[(Self::Input, Self::Output)],
         // Max number of points allowed.
         npoints: usize,
@@ -114,15 +109,13 @@ pub trait ProgrammableSender: ObliviousPprf {
 pub trait ProgrammableReceiver: ObliviousPprf {
     /// Runs any one-time initialization.
     fn init<R: Read, W: Write, RNG: CryptoRng + RngCore>(
-        reader: &mut R,
-        writer: &mut W,
+        channel: &mut Channel<R, W>,
         rng: &mut RNG,
     ) -> Result<Self, Error>;
     /// Runs the oblivious PRF on inputs `inputs`, returning the OPRF outputs.
     fn receive<R: Read, W: Write, RNG: CryptoRng + RngCore>(
         &mut self,
-        reader: &mut R,
-        writer: &mut W,
+        channel: &mut Channel<R, W>,
         // Max number of points allowed.
         npoints: usize,
         inputs: &[Self::Input],

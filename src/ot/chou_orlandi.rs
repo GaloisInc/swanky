@@ -19,12 +19,11 @@
 
 use crate::errors::Error;
 use crate::ot::{Receiver as OtReceiver, Sender as OtSender};
-use crate::stream;
 use curve25519_dalek::constants::RISTRETTO_BASEPOINT_TABLE;
 use curve25519_dalek::ristretto::{RistrettoBasepointTable, RistrettoPoint};
 use curve25519_dalek::scalar::Scalar;
 use rand::{CryptoRng, RngCore};
-use scuttlebutt::{Block, Malicious, SemiHonest};
+use scuttlebutt::{Block, Channel, Malicious, SemiHonest};
 use std::io::{Read, Write};
 
 /// Oblivious transfer sender.
@@ -37,28 +36,26 @@ impl OtSender for Sender {
     type Msg = Block;
 
     fn init<R: Read, W: Write, RNG: CryptoRng + RngCore>(
-        _: &mut R,
-        writer: &mut W,
+        channel: &mut Channel<R, W>,
         mut rng: &mut RNG,
     ) -> Result<Self, Error> {
         let y = Scalar::random(&mut rng);
         let s = &y * &RISTRETTO_BASEPOINT_TABLE;
-        stream::write_pt(writer, &s)?;
-        writer.flush()?;
+        channel.write_pt(&s)?;
+        channel.flush()?;
         Ok(Self { y, s })
     }
 
     fn send<R: Read, W: Write, RNG: CryptoRng + RngCore>(
         &mut self,
-        reader: &mut R,
-        writer: &mut W,
+        channel: &mut Channel<R, W>,
         inputs: &[(Block, Block)],
         _: &mut RNG,
     ) -> Result<(), Error> {
         let ys = self.y * self.s;
         let ks = (0..inputs.len())
             .map(|i| {
-                let r = stream::read_pt(reader)?;
+                let r = channel.read_pt()?;
                 let yr = self.y * r;
                 let k0 = Block::hash_pt(i, &yr);
                 let k1 = Block::hash_pt(i, &(yr - ys));
@@ -68,10 +65,10 @@ impl OtSender for Sender {
         for (input, k) in inputs.iter().zip(ks.into_iter()) {
             let c0 = k.0 ^ input.0;
             let c1 = k.1 ^ input.1;
-            c0.write(writer)?;
-            c1.write(writer)?;
+            channel.write_block(&c0)?;
+            channel.write_block(&c1)?;
         }
-        writer.flush()?;
+        channel.flush()?;
         Ok(())
     }
 }
@@ -91,19 +88,17 @@ impl OtReceiver for Receiver {
     type Msg = Block;
 
     fn init<R: Read, W: Write, RNG: CryptoRng + RngCore>(
-        reader: &mut R,
-        _: &mut W,
+        channel: &mut Channel<R, W>,
         _: &mut RNG,
     ) -> Result<Self, Error> {
-        let s = stream::read_pt(reader)?;
+        let s = channel.read_pt()?;
         let s = RistrettoBasepointTable::create(&s);
         Ok(Self { s })
     }
 
     fn receive<R: Read, W: Write, RNG: CryptoRng + RngCore>(
         &mut self,
-        reader: &mut R,
-        writer: &mut W,
+        channel: &mut Channel<R, W>,
         inputs: &[bool],
         mut rng: &mut RNG,
     ) -> Result<Vec<Block>, Error> {
@@ -116,17 +111,17 @@ impl OtReceiver for Receiver {
                 let x = Scalar::random(&mut rng);
                 let c = if *b { one } else { zero };
                 let r = c + &x * &RISTRETTO_BASEPOINT_TABLE;
-                stream::write_pt(writer, &r)?;
+                channel.write_pt(&r)?;
                 Ok(Block::hash_pt(i, &(&x * &self.s)))
             })
             .collect::<Result<Vec<Block>, Error>>()?;
-        writer.flush()?;
+        channel.flush()?;
         inputs
             .iter()
             .zip(ks.into_iter())
             .map(|(b, k)| {
-                let c0 = Block::read(reader)?;
-                let c1 = Block::read(reader)?;
+                let c0 = channel.read_block()?;
+                let c1 = channel.read_block()?;
                 let c = k ^ if *b { c1 } else { c0 };
                 Ok(c)
             })

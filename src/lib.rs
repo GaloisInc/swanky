@@ -14,11 +14,9 @@
 
 //!
 
-mod stream;
+mod errors;
 mod utils;
 
-mod errors;
 pub use crate::errors::Error;
-
 pub mod oprf;
 pub mod ot;

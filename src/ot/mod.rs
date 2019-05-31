@@ -24,6 +24,7 @@ pub mod naor_pinkas;
 
 use crate::errors::Error;
 use rand::{CryptoRng, RngCore};
+use scuttlebutt::Channel;
 use std::io::{Read, Write};
 
 /// Instantiation of the Chou-Orlandi OT sender.
@@ -58,15 +59,13 @@ where
     /// Runs any one-time initialization to create the oblivious transfer
     /// object.
     fn init<R: Read, W: Write, RNG: CryptoRng + RngCore>(
-        reader: &mut R,
-        writer: &mut W,
+        channel: &mut Channel<R, W>,
         rng: &mut RNG,
     ) -> Result<Self, Error>;
     /// Sends messages.
     fn send<R: Read, W: Write, RNG: CryptoRng + RngCore>(
         &mut self,
-        reader: &mut R,
-        writer: &mut W,
+        channel: &mut Channel<R, W>,
         inputs: &[(Self::Msg, Self::Msg)],
         rng: &mut RNG,
     ) -> Result<(), Error>;
@@ -84,15 +83,13 @@ where
     /// Runs any one-time initialization to create the oblivious transfer
     /// object.
     fn init<R: Read, W: Write, RNG: CryptoRng + RngCore>(
-        reader: &mut R,
-        writer: &mut W,
+        channel: &mut Channel<R, W>,
         rng: &mut RNG,
     ) -> Result<Self, Error>;
     /// Receives messages.
     fn receive<R: Read, W: Write, RNG: CryptoRng + RngCore>(
         &mut self,
-        reader: &mut R,
-        writer: &mut W,
+        channel: &mut Channel<R, W>,
         inputs: &[bool],
         rng: &mut RNG,
     ) -> Result<Vec<Self::Msg>, Error>;
@@ -108,8 +105,7 @@ where
     /// which specifies the offset between the zero and one message.
     fn send_correlated<R: Read, W: Write, RNG: CryptoRng + RngCore>(
         &mut self,
-        reader: &mut R,
-        writer: &mut W,
+        channel: &mut Channel<R, W>,
         deltas: &[Self::Msg],
         rng: &mut RNG,
     ) -> Result<Vec<(Self::Msg, Self::Msg)>, Error>;
@@ -124,8 +120,7 @@ where
     /// Correlated oblivious transfer receive.
     fn receive_correlated<R: Read, W: Write, RNG: CryptoRng + RngCore>(
         &mut self,
-        reader: &mut R,
-        writer: &mut W,
+        channel: &mut Channel<R, W>,
         inputs: &[bool],
         rng: &mut RNG,
     ) -> Result<Vec<Self::Msg>, Error>;
@@ -141,8 +136,7 @@ where
     /// the two random messages.
     fn send_random<R: Read, W: Write, RNG: CryptoRng + RngCore>(
         &mut self,
-        reader: &mut R,
-        writer: &mut W,
+        channel: &mut Channel<R, W>,
         m: usize,
         rng: &mut RNG,
     ) -> Result<Vec<(Self::Msg, Self::Msg)>, Error>;
@@ -157,8 +151,7 @@ where
     /// Random oblivious transfer receive.
     fn receive_random<R: Read, W: Write, RNG: CryptoRng + RngCore>(
         &mut self,
-        reader: &mut R,
-        writer: &mut W,
+        channel: &mut Channel<R, W>,
         deltas: &[bool],
         rng: &mut RNG,
     ) -> Result<Vec<Self::Msg>, Error>;
@@ -169,7 +162,6 @@ mod tests {
     #[cfg(feature = "nightly")]
     extern crate test;
     use super::*;
-    use scuttlebutt::comm::{TrackReader, TrackWriter};
     use scuttlebutt::{AesRng, Block};
     use std::fmt::Display;
     use std::io::{BufReader, BufWriter};
@@ -195,27 +187,29 @@ mod tests {
         let (sender, receiver) = UnixStream::pair().unwrap();
         let handle = std::thread::spawn(move || {
             let mut rng = AesRng::new();
-            let mut reader = TrackReader::new(BufReader::new(sender.try_clone().unwrap()));
-            let mut writer = TrackWriter::new(BufWriter::new(sender));
-            let mut ot = OTSender::init(&mut reader, &mut writer, &mut rng).unwrap();
+            let reader = BufReader::new(sender.try_clone().unwrap());
+            let writer = BufWriter::new(sender);
+            let mut channel = Channel::new(reader, writer);
+            let mut ot = OTSender::init(&mut channel, &mut rng).unwrap();
             let ms = m0s
                 .into_iter()
                 .zip(m1s.into_iter())
                 .collect::<Vec<(Block, Block)>>();
-            ot.send(&mut reader, &mut writer, &ms, &mut rng).unwrap();
+            ot.send(&mut channel, &ms, &mut rng).unwrap();
         });
         let mut rng = AesRng::new();
-        let mut reader = TrackReader::new(BufReader::new(receiver.try_clone().unwrap()));
-        let mut writer = TrackWriter::new(BufWriter::new(receiver));
-        let mut ot = OTReceiver::init(&mut reader, &mut writer, &mut rng).unwrap();
-        let result = ot.receive(&mut reader, &mut writer, &bs, &mut rng).unwrap();
+        let reader = BufReader::new(receiver.try_clone().unwrap());
+        let writer = BufWriter::new(receiver);
+        let mut channel = Channel::new(reader, writer);
+        let mut ot = OTReceiver::init(&mut channel, &mut rng).unwrap();
+        let result = ot.receive(&mut channel, &bs, &mut rng).unwrap();
         handle.join().unwrap();
-        println!(
-            "{} [128 OTs]: read = {:2} Kb, written = {:2} Kb",
-            ot,
-            reader.kilobits(),
-            writer.kilobits()
-        );
+        // println!(
+        //     "{} [128 OTs]: read = {:2} Kb, written = {:2} Kb",
+        //     ot,
+        //     reader.kilobits(),
+        //     writer.kilobits()
+        // );
         for j in 0..128 {
             assert_eq!(result[j], if bs[j] { m1s_[j] } else { m0s_[j] });
         }
@@ -230,30 +224,30 @@ mod tests {
         let (sender, receiver) = UnixStream::pair().unwrap();
         let handle = std::thread::spawn(move || {
             let mut rng = AesRng::new();
-            let mut reader = TrackReader::new(BufReader::new(sender.try_clone().unwrap()));
-            let mut writer = TrackWriter::new(BufWriter::new(sender));
-            let mut otext = OTSender::init(&mut reader, &mut writer, &mut rng).unwrap();
+            let reader = BufReader::new(sender.try_clone().unwrap());
+            let writer = BufWriter::new(sender);
+            let mut channel = Channel::new(reader, writer);
+            let mut otext = OTSender::init(&mut channel, &mut rng).unwrap();
             let ms = m0s
                 .into_iter()
                 .zip(m1s.into_iter())
                 .collect::<Vec<(Block, Block)>>();
-            otext.send(&mut reader, &mut writer, &ms, &mut rng).unwrap();
+            otext.send(&mut channel, &ms, &mut rng).unwrap();
         });
         let mut rng = AesRng::new();
-        let mut reader = TrackReader::new(BufReader::new(receiver.try_clone().unwrap()));
-        let mut writer = TrackWriter::new(BufWriter::new(receiver));
-        let mut otext = OTReceiver::init(&mut reader, &mut writer, &mut rng).unwrap();
-        let results = otext
-            .receive(&mut reader, &mut writer, &bs, &mut rng)
-            .unwrap();
+        let reader = BufReader::new(receiver.try_clone().unwrap());
+        let writer = BufWriter::new(receiver);
+        let mut channel = Channel::new(reader, writer);
+        let mut otext = OTReceiver::init(&mut channel, &mut rng).unwrap();
+        let results = otext.receive(&mut channel, &bs, &mut rng).unwrap();
         handle.join().unwrap();
-        println!(
-            "{} [{} OTs]: read = {:2} Kb, written = {:2} Kb",
-            otext,
-            T,
-            reader.kilobits(),
-            writer.kilobits()
-        );
+        // println!(
+        //     "{} [{} OTs]: read = {:2} Kb, written = {:2} Kb",
+        //     otext,
+        //     T,
+        //     reader.kilobits(),
+        //     writer.kilobits()
+        // );
         for j in 0..T {
             assert_eq!(results[j], if bs[j] { m1s_[j] } else { m0s_[j] })
         }
@@ -270,30 +264,32 @@ mod tests {
         let (sender, receiver) = UnixStream::pair().unwrap();
         let handle = std::thread::spawn(move || {
             let mut rng = AesRng::new();
-            let mut reader = BufReader::new(sender.try_clone().unwrap());
-            let mut writer = BufWriter::new(sender);
-            let mut otext = OTSender::init(&mut reader, &mut writer, &mut rng).unwrap();
+            let reader = BufReader::new(sender.try_clone().unwrap());
+            let writer = BufWriter::new(sender);
+            let mut channel = Channel::new(reader, writer);
+            let mut otext = OTSender::init(&mut channel, &mut rng).unwrap();
             let mut out = out.lock().unwrap();
             *out = otext
-                .send_correlated(&mut reader, &mut writer, &deltas, &mut rng)
+                .send_correlated(&mut channel, &deltas, &mut rng)
                 .unwrap();
         });
         let mut rng = AesRng::new();
-        let mut reader = TrackReader::new(BufReader::new(receiver.try_clone().unwrap()));
-        let mut writer = TrackWriter::new(BufWriter::new(receiver));
-        let mut otext = OTReceiver::init(&mut reader, &mut writer, &mut rng).unwrap();
+        let reader = BufReader::new(receiver.try_clone().unwrap());
+        let writer = BufWriter::new(receiver);
+        let mut channel = Channel::new(reader, writer);
+        let mut otext = OTReceiver::init(&mut channel, &mut rng).unwrap();
         let results = otext
-            .receive_correlated(&mut reader, &mut writer, &bs, &mut rng)
+            .receive_correlated(&mut channel, &bs, &mut rng)
             .unwrap();
         handle.join().unwrap();
         let out_ = out_.lock().unwrap();
-        println!(
-            "{} [{} COTs]: read = {:2} Kb, written = {:2} Kb",
-            otext,
-            T,
-            reader.kilobits(),
-            writer.kilobits()
-        );
+        // println!(
+        //     "{} [{} COTs]: read = {:2} Kb, written = {:2} Kb",
+        //     otext,
+        //     T,
+        //     reader.kilobits(),
+        //     writer.kilobits()
+        // );
         for j in 0..T {
             assert_eq!(results[j], if bs[j] { out_[j].1 } else { out_[j].0 })
         }
@@ -309,30 +305,28 @@ mod tests {
         let (sender, receiver) = UnixStream::pair().unwrap();
         let handle = std::thread::spawn(move || {
             let mut rng = AesRng::new();
-            let mut reader = BufReader::new(sender.try_clone().unwrap());
-            let mut writer = BufWriter::new(sender);
-            let mut otext = OTSender::init(&mut reader, &mut writer, &mut rng).unwrap();
+            let reader = BufReader::new(sender.try_clone().unwrap());
+            let writer = BufWriter::new(sender);
+            let mut channel = Channel::new(reader, writer);
+            let mut otext = OTSender::init(&mut channel, &mut rng).unwrap();
             let mut out = out.lock().unwrap();
-            *out = otext
-                .send_random(&mut reader, &mut writer, T, &mut rng)
-                .unwrap();
+            *out = otext.send_random(&mut channel, T, &mut rng).unwrap();
         });
         let mut rng = AesRng::new();
-        let mut reader = TrackReader::new(BufReader::new(receiver.try_clone().unwrap()));
-        let mut writer = TrackWriter::new(BufWriter::new(receiver));
-        let mut otext = OTReceiver::init(&mut reader, &mut writer, &mut rng).unwrap();
-        let results = otext
-            .receive_random(&mut reader, &mut writer, &bs, &mut rng)
-            .unwrap();
+        let reader = BufReader::new(receiver.try_clone().unwrap());
+        let writer = BufWriter::new(receiver);
+        let mut channel = Channel::new(reader, writer);
+        let mut otext = OTReceiver::init(&mut channel, &mut rng).unwrap();
+        let results = otext.receive_random(&mut channel, &bs, &mut rng).unwrap();
         handle.join().unwrap();
         let out_ = out_.lock().unwrap();
-        println!(
-            "{} [{} ROTs]: read = {:2} Kb, written = {:2} Kb",
-            otext,
-            T,
-            reader.kilobits(),
-            writer.kilobits()
-        );
+        // println!(
+        //     "{} [{} ROTs]: read = {:2} Kb, written = {:2} Kb",
+        //     otext,
+        //     T,
+        //     reader.kilobits(),
+        //     writer.kilobits()
+        // );
         for j in 0..T {
             assert_eq!(results[j], if bs[j] { out_[j].1 } else { out_[j].0 })
         }
