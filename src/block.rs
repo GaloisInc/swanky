@@ -92,11 +92,13 @@ impl Block {
 
     /// Write a block to `stream`.
     #[inline]
+    #[deprecated(note = "please use `Channel` instead")]
     pub fn write<T: Write>(&self, stream: &mut T) -> Result<usize, std::io::Error> {
         stream.write(self.as_ref())
     }
     /// Read a block from `stream`.
     #[inline]
+    #[deprecated(note = "please use `Channel` instead")]
     pub fn read<T: Read>(stream: &mut T) -> Result<Block, std::io::Error> {
         let mut v = Block::default();
         stream.read_exact(v.as_mut())?;

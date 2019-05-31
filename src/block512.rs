@@ -14,16 +14,18 @@ use std::io::{Read, Write};
 
 /// A 512-bit value.
 #[derive(Clone, Copy)]
-pub struct Block512([Block; 4]);
+pub struct Block512(pub(crate) [Block; 4]);
 
 impl Block512 {
     /// Read a `Block512` from `reader`.
+    #[deprecated(note = "please use `Channel` instead")]
     pub fn read<R: Read>(reader: &mut R) -> Result<Self, std::io::Error> {
         let mut data = [0u8; 64];
         reader.read_exact(&mut data)?;
         Ok(Self::from(data))
     }
     /// Write a `Block512` to `writer`.
+    #[deprecated(note = "please use `Channel` instead")]
     pub fn write<W: Write>(&self, writer: &mut W) -> Result<(), std::io::Error> {
         for block in self.0.iter() {
             block.write(writer)?;

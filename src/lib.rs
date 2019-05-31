@@ -9,15 +9,16 @@
 #![cfg_attr(feature = "nightly", feature(test))]
 #![cfg_attr(feature = "nightly", feature(external_doc))]
 #![cfg_attr(feature = "nightly", doc(include = "../README.md"))]
-#![cfg_attr(feature = "nightly", deny(missing_docs))]
+// #![cfg_attr(feature = "nightly", deny(missing_docs))]
 
 //!
 
 mod aes;
 mod block;
 mod block512;
+mod channel;
 pub mod cointoss;
-pub mod comm;
+mod comm;
 pub mod commitment;
 mod hash_aes;
 mod rand_aes;
@@ -27,6 +28,7 @@ pub use crate::aes::aes128::{Aes128, FIXED_KEY_AES128};
 pub use crate::aes::aes256::Aes256;
 pub use crate::block::Block;
 pub use crate::block512::Block512;
+pub use crate::channel::Channel;
 pub use crate::hash_aes::{AesHash, AES_HASH};
 pub use crate::rand_aes::AesRng;
 

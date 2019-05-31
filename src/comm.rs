@@ -6,17 +6,15 @@
 
 //! A module for useful communication-related objects.
 
-use std::fmt::Debug;
 use std::io::{Read, Result, Write};
 
 /// An object for tracking the number of bits read from a stream.
-#[derive(Debug)]
-pub struct TrackReader<R: Read + Debug> {
+pub struct TrackReader<R: Read> {
     inner: R,
     nbits: usize,
 }
 
-impl<R: Read + Debug> TrackReader<R> {
+impl<R: Read> TrackReader<R> {
     /// Make a new `TrackReader` from an inner `Read` object.
     pub fn new(inner: R) -> Self {
         Self { inner, nbits: 0 }
@@ -35,7 +33,7 @@ impl<R: Read + Debug> TrackReader<R> {
     }
 }
 
-impl<R: Read + Debug> Read for TrackReader<R> {
+impl<R: Read> Read for TrackReader<R> {
     fn read(&mut self, buf: &mut [u8]) -> Result<usize> {
         self.nbits += buf.len() * 8;
         self.inner.read(buf)
@@ -43,13 +41,12 @@ impl<R: Read + Debug> Read for TrackReader<R> {
 }
 
 /// An object for tracking the number of bits written to a stream.
-#[derive(Debug)]
-pub struct TrackWriter<W: Write + Debug> {
+pub struct TrackWriter<W: Write> {
     inner: W,
     nbits: usize,
 }
 
-impl<W: Write + Debug> TrackWriter<W> {
+impl<W: Write> TrackWriter<W> {
     /// Make a new `TrackWriter` from an inner `Write` object.
     pub fn new(inner: W) -> Self {
         Self { inner, nbits: 0 }
@@ -68,7 +65,7 @@ impl<W: Write + Debug> TrackWriter<W> {
     }
 }
 
-impl<W: Write + Debug> Write for TrackWriter<W> {
+impl<W: Write> Write for TrackWriter<W> {
     fn write(&mut self, buf: &[u8]) -> Result<usize> {
         self.nbits += buf.len() * 8;
         self.inner.write(buf)

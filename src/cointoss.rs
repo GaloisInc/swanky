@@ -12,7 +12,7 @@
 //! seed_`. Likewise, on input `seed`, the receiver gets `r`, sends `seed` to
 //! the sender, and then receives `seed_`, checking that `PRG(seed_) = r`.
 
-use crate::{AesRng, Block};
+use crate::{AesRng, Block, Channel};
 use rand_core::{RngCore, SeedableRng};
 use std::io::{Read, Write};
 
@@ -43,8 +43,7 @@ impl std::fmt::Display for Error {
 /// Coin tossing sender.
 #[inline]
 pub fn send<R: Read, W: Write>(
-    mut reader: &mut R,
-    mut writer: &mut W,
+    channel: &mut Channel<R, W>,
     seeds: &[Block],
 ) -> Result<Vec<Block>, Error> {
     let mut out = Vec::with_capacity(seeds.len());
@@ -52,39 +51,38 @@ pub fn send<R: Read, W: Write>(
         let mut rng = AesRng::from_seed(*seed);
         let mut com = Block::default();
         rng.fill_bytes(&mut com.as_mut());
-        com.write(writer)?;
+        channel.write_block(&com)?;
     }
-    writer.flush()?;
+    channel.flush()?;
     for seed in seeds.iter() {
-        let seed_ = Block::read(&mut reader)?;
+        let seed_ = channel.read_block()?;
         out.push(*seed ^ seed_);
     }
     for seed in seeds.iter() {
-        seed.write(&mut writer)?;
+        channel.write_block(&seed)?;
     }
-    writer.flush()?;
+    channel.flush()?;
     Ok(out)
 }
 
 /// Coin tossing receiver.
 #[inline]
 pub fn receive<R: Read, W: Write>(
-    mut reader: &mut R,
-    mut writer: &mut W,
+    channel: &mut Channel<R, W>,
     seeds: &[Block],
 ) -> Result<Vec<Block>, Error> {
     let mut coms = Vec::with_capacity(seeds.len());
     let mut out = Vec::with_capacity(seeds.len());
     for _ in 0..seeds.len() {
-        let com = Block::read(&mut reader)?;
+        let com = channel.read_block()?;
         coms.push(com);
     }
     for seed in seeds.iter() {
-        seed.write(&mut writer)?;
+        channel.write_block(&seed)?;
     }
-    writer.flush()?;
+    channel.flush()?;
     for (seed, com) in seeds.iter().zip(coms.into_iter()) {
-        let seed_ = Block::read(&mut reader)?;
+        let seed_ = channel.read_block()?;
         let mut rng_ = AesRng::from_seed(seed_);
         let mut check = Block::default();
         rng_.fill_bytes(&mut check.as_mut());
@@ -110,14 +108,16 @@ mod tests {
         let seed = rand::random::<Block>();
         let seed_ = rand::random::<Block>();
         let handle = std::thread::spawn(move || {
-            let mut reader = BufReader::new(sender.try_clone().unwrap());
-            let mut writer = BufWriter::new(sender);
-            let output = send(&mut reader, &mut writer, &[seed]).unwrap();
+            let reader = BufReader::new(sender.try_clone().unwrap());
+            let writer = BufWriter::new(sender);
+            let mut channel = Channel::new(reader, writer);
+            let output = send(&mut channel, &[seed]).unwrap();
             assert_eq!(output[0], seed ^ seed_);
         });
-        let mut reader = BufReader::new(receiver.try_clone().unwrap());
-        let mut writer = BufWriter::new(receiver);
-        let output_ = receive(&mut reader, &mut writer, &[seed_]).unwrap();
+        let reader = BufReader::new(receiver.try_clone().unwrap());
+        let writer = BufWriter::new(receiver);
+        let mut channel = Channel::new(reader, writer);
+        let output_ = receive(&mut channel, &[seed_]).unwrap();
         assert_eq!(output_[0], seed ^ seed_);
         handle.join().unwrap();
     }
