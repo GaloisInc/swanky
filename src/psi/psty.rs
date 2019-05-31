@@ -13,7 +13,7 @@ use crate::utils;
 use fancy_garbling::{BinaryBundle, BundleGadgets, Fancy};
 use itertools::Itertools;
 use ocelot::oprf::{kmprt, ProgrammableReceiver, ProgrammableSender};
-use ocelot::ot::{ChouOrlandiReceiver, ChouOrlandiSender};
+use ocelot::ot::{KosSender as OtSender, KosReceiver as OtReceiver};
 use rand::Rng;
 use rand_core::{CryptoRng, RngCore, SeedableRng};
 use scuttlebutt::{Block, Block512, Channel};
@@ -96,7 +96,7 @@ impl Sender {
             .opprf
             .send(&mut channel, &points, points.len(), nbins, rng)?;
 
-        let mut gb = twopac::semihonest::Garbler::<R, W, RNG, ChouOrlandiSender>::new(
+        let mut gb = twopac::semihonest::Garbler::<R, W, RNG, OtSender>::new(
             channel.clone(),
             RNG::from_seed(rng.gen()),
             &[],
@@ -168,7 +168,7 @@ impl Receiver {
 
         let my_input_bits = encode_inputs(&opprf_outputs);
 
-        let mut ev = twopac::semihonest::Evaluator::<R, W, RNG, ChouOrlandiReceiver>::new(
+        let mut ev = twopac::semihonest::Evaluator::<R, W, RNG, OtReceiver>::new(
             channel.clone(),
             RNG::from_seed(rng.gen()),
         )?;

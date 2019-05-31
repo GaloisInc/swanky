@@ -35,11 +35,11 @@ debug = true
 debug-assertions = false
 overflow-checks = false
 
-[profile.dev]
-opt-level = 3
-debug = false
-debug-assertions = false
-overflow-checks = false
+# [profile.dev]
+# opt-level = 3
+# debug = false
+# debug-assertions = false
+# overflow-checks = false
 
 [profile.bench]
 opt-level = 3

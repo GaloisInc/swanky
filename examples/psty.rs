@@ -14,7 +14,7 @@ use std::os::unix::net::UnixStream;
 use std::time::SystemTime;
 
 const NBYTES: usize = 15;
-const NTIMES: usize = 1 << 16;
+const SET_SIZE: usize = 1 << 10;
 
 fn rand_vec(n: usize) -> Vec<u8> {
     (0..n).map(|_| rand::random::<u8>()).collect()
@@ -43,7 +43,7 @@ fn psty(inputs1: Vec<Vec<u8>>, inputs2: Vec<Vec<u8>>) {
         sender.send(&mut channel, &inputs1, &mut rng).unwrap();
         println!(
             "[{}] Send time: {} ms",
-            NTIMES,
+            SET_SIZE,
             start.elapsed().unwrap().as_millis()
         );
         // println!(
@@ -71,7 +71,7 @@ fn psty(inputs1: Vec<Vec<u8>>, inputs2: Vec<Vec<u8>>) {
     let _ = receiver.receive(&mut channel, &inputs2, &mut rng).unwrap();
     println!(
         "[{}] Receiver time: {} ms",
-        NTIMES,
+        SET_SIZE,
         start.elapsed().unwrap().as_millis()
     );
     let _ = handle.join().unwrap();
@@ -87,6 +87,6 @@ fn psty(inputs1: Vec<Vec<u8>>, inputs2: Vec<Vec<u8>>) {
 }
 
 fn main() {
-    let rs = rand_vec_vec(NTIMES);
+    let rs = rand_vec_vec(SET_SIZE);
     psty(rs.clone(), rs.clone());
 }
