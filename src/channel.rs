@@ -29,6 +29,16 @@ impl<R: Read, W: Write> Channel<R, W> {
         Self { reader, writer }
     }
 
+    /// Return a reader object wrapped in `Rc<RefCell>`.
+    pub fn reader(&mut self) -> Rc<RefCell<R>> {
+        self.reader.clone()
+    }
+
+    /// Return a writer object wrapped in `Rc<RefCell>`.
+    pub fn writer(&mut self) -> Rc<RefCell<W>> {
+        self.writer.clone()
+    }
+
     /// Write a `usize` to the channel.
     #[inline(always)]
     pub fn write_usize(&mut self, s: usize) -> Result<()> {
