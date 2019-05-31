@@ -34,6 +34,8 @@
 <span id="34">34</span>
 <span id="35">35</span>
 <span id="36">36</span>
+<span id="37">37</span>
+<span id="38">38</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// -*- mode: rust; -*-</span>
 <span class="comment">//</span>
@@ -53,8 +55,9 @@
 <span class="kw">mod</span> <span class="ident">aes</span>;
 <span class="kw">mod</span> <span class="ident">block</span>;
 <span class="kw">mod</span> <span class="ident">block512</span>;
+<span class="kw">mod</span> <span class="ident">channel</span>;
 <span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">cointoss</span>;
-<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">comm</span>;
+<span class="comment">// mod comm;</span>
 <span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">commitment</span>;
 <span class="kw">mod</span> <span class="ident">hash_aes</span>;
 <span class="kw">mod</span> <span class="ident">rand_aes</span>;
@@ -64,6 +67,7 @@
 <span class="kw">pub</span> <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">aes</span>::<span class="ident">aes256</span>::<span class="ident">Aes256</span>;
 <span class="kw">pub</span> <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">block</span>::<span class="ident">Block</span>;
 <span class="kw">pub</span> <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">block512</span>::<span class="ident">Block512</span>;
+<span class="kw">pub</span> <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">channel</span>::<span class="ident">Channel</span>;
 <span class="kw">pub</span> <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">hash_aes</span>::{<span class="ident">AesHash</span>, <span class="ident">AES_HASH</span>};
 <span class="kw">pub</span> <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">rand_aes</span>::<span class="ident">AesRng</span>;
 
