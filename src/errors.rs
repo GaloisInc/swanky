@@ -13,8 +13,6 @@ pub enum Error {
     IoError(std::io::Error),
     /// Some other error, given by `String`.
     Other(String),
-    /// Decompressing a elliptic curve point failed.
-    DecompressPoint,
     /// Coin tossing failed.
     CoinTossError(scuttlebutt::cointoss::Error),
 }
@@ -37,7 +35,6 @@ impl std::fmt::Display for Error {
             Error::InvalidInputLength => "invalid input length".fmt(f),
             Error::IoError(e) => write!(f, "IO error: {}", e),
             Error::Other(s) => write!(f, "other error: {}", s),
-            Error::DecompressPoint => "could not decompress point".fmt(f),
             Error::CoinTossError(e) => write!(f, "coin toss error: {}", e),
         }
     }
