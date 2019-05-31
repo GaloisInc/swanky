@@ -15,10 +15,18 @@ use std::rc::Rc;
 /// A wrapper struct for a reader and writer for managing I/O. `Channel`s are
 /// clonable, and provide basic read/write capabilities for both common and
 /// scuttlebutt-specific types.
-#[derive(Clone)]
 pub struct Channel<R, W> {
     reader: Rc<RefCell<R>>,
     writer: Rc<RefCell<W>>,
+}
+
+impl<R, W> Clone for Channel<R, W> {
+    fn clone(&self) -> Self {
+        Self {
+            reader: self.reader.clone(),
+            writer: self.writer.clone(),
+        }
+    }
 }
 
 impl<R: Read, W: Write> Channel<R, W> {
