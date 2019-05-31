@@ -12,10 +12,13 @@ use std::cell::RefCell;
 use std::io::{Read, Result, Write};
 use std::rc::Rc;
 
+/// A wrapper struct for a reader and writer for managing I/O. `Channel`s are
+/// clonable, and provide basic read/write capabilities for both common and
+/// scuttlebutt-specific types.
 #[derive(Clone)]
 pub struct Channel<R, W> {
-    pub reader: Rc<RefCell<R>>,
-    pub writer: Rc<RefCell<W>>,
+    reader: Rc<RefCell<R>>,
+    writer: Rc<RefCell<W>>,
 }
 
 impl<R: Read, W: Write> Channel<R, W> {

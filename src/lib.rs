@@ -9,7 +9,7 @@
 #![cfg_attr(feature = "nightly", feature(test))]
 #![cfg_attr(feature = "nightly", feature(external_doc))]
 #![cfg_attr(feature = "nightly", doc(include = "../README.md"))]
-// #![cfg_attr(feature = "nightly", deny(missing_docs))]
+#![cfg_attr(feature = "nightly", deny(missing_docs))]
 
 //!
 
@@ -18,7 +18,7 @@ mod block;
 mod block512;
 mod channel;
 pub mod cointoss;
-mod comm;
+// mod comm;
 pub mod commitment;
 mod hash_aes;
 mod rand_aes;

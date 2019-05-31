@@ -14,7 +14,6 @@ use std::arch::x86_64::*;
 #[cfg(feature = "serde")]
 use std::convert::TryInto;
 use std::hash::{Hash, Hasher};
-use std::io::{Read, Write};
 
 /// A 128-bit chunk.
 #[derive(Clone, Copy)]
@@ -90,20 +89,6 @@ impl Block {
         c.encrypt(Block::from(m))
     }
 
-    /// Write a block to `stream`.
-    #[inline]
-    #[deprecated(note = "please use `Channel` instead")]
-    pub fn write<T: Write>(&self, stream: &mut T) -> Result<usize, std::io::Error> {
-        stream.write(self.as_ref())
-    }
-    /// Read a block from `stream`.
-    #[inline]
-    #[deprecated(note = "please use `Channel` instead")]
-    pub fn read<T: Read>(stream: &mut T) -> Result<Block, std::io::Error> {
-        let mut v = Block::default();
-        stream.read_exact(v.as_mut())?;
-        Ok(v)
-    }
     /// Return the "color" bit (when viewing `Block` as a wire label).
     #[inline]
     pub fn color_bit(&self) -> bool {
