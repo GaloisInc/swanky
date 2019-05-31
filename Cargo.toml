@@ -18,9 +18,9 @@ nightly = ["rand/nightly", "scuttlebutt/nightly", "ocelot/nightly", "fancy-garbl
 [dependencies]
 # fancy-garbling = { git = "https://github.com/spaceships/fancy-garbling" }
 fancy-garbling = { path = "../fancy-garbling" }
-ocelot = { git = "https://github.com/amaloz/ocelot" }
+ocelot = { git = "https://github.com/amaloz/ocelot", branch = "dev" }
 rand = "0.6.5"
-scuttlebutt = { git = "https://github.com/amaloz/scuttlebutt" }
+scuttlebutt = { git = "https://github.com/amaloz/scuttlebutt", branch = "dev" }
 itertools = "0.8.0"
 
 [dev-dependencies]

@@ -8,17 +8,14 @@ use crate::errors::Error;
 use fancy_garbling::{Evaluator as Ev, Fancy, Wire};
 use ocelot::ot::Receiver as OtReceiver;
 use rand::{CryptoRng, RngCore};
-use scuttlebutt::Block;
-use std::cell::RefCell;
+use scuttlebutt::{Block, Channel};
 use std::fmt::Debug;
 use std::io::{Read, Write};
-use std::rc::Rc;
 
 /// Semi-honest evaluator.
 pub struct Evaluator<R, W, RNG, OT> {
     evaluator: Ev<R>,
-    reader: Rc<RefCell<R>>,
-    writer: Rc<RefCell<W>>,
+    channel: Channel<R, W>,
     ot: OT,
     rng: RNG,
 }
@@ -31,21 +28,12 @@ impl<
     > Evaluator<R, W, RNG, OT>
 {
     /// Make a new `Evaluator`.
-    pub fn new(
-        reader: Rc<RefCell<R>>,
-        writer: Rc<RefCell<W>>,
-        mut rng: RNG,
-    ) -> Result<Self, Error> {
-        let ot = OT::init(
-            &mut *reader.borrow_mut(),
-            &mut *writer.borrow_mut(),
-            &mut rng,
-        )?;
-        let evaluator = Ev::new(reader.clone());
+    pub fn new(mut channel: Channel<R, W>, mut rng: RNG) -> Result<Self, Error> {
+        let ot = OT::init(&mut channel, &mut rng)?;
+        let evaluator = Ev::new(channel.reader());
         Ok(Evaluator {
             evaluator,
-            reader,
-            writer,
+            channel,
             ot,
             rng,
         })
@@ -59,12 +47,7 @@ impl<
 
     fn run_ot(&mut self, inputs: &[bool]) -> Result<Vec<Block>, Error> {
         self.ot
-            .receive(
-                &mut *self.reader.borrow_mut(),
-                &mut *self.writer.borrow_mut(),
-                &inputs,
-                &mut self.rng,
-            )
+            .receive(&mut self.channel, &inputs, &mut self.rng)
             .map_err(Error::from)
     }
 

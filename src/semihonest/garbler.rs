@@ -10,17 +10,14 @@ use crate::errors::Error;
 use fancy_garbling::{Fancy, Garbler as Gb, Wire};
 use ocelot::ot::Sender as OtSender;
 use rand::{CryptoRng, Rng, RngCore, SeedableRng};
-use scuttlebutt::{Block, SemiHonest};
-use std::cell::RefCell;
+use scuttlebutt::{Block, Channel, SemiHonest};
 use std::fmt::Debug;
 use std::io::{Read, Write};
-use std::rc::Rc;
 
 /// Semi-honest garbler.
 pub struct Garbler<R, W, RNG, OT> {
     garbler: Gb<W, RNG>,
-    reader: Rc<RefCell<R>>,
-    writer: Rc<RefCell<W>>,
+    channel: Channel<R, W>,
     ot: OT,
     rng: RNG,
 }
@@ -47,23 +44,15 @@ impl<
 {
     /// Make a new `Garbler`.
     pub fn new(
-        reader: Rc<RefCell<R>>,
-        writer: Rc<RefCell<W>>,
+        mut channel: Channel<R, W>,
         mut rng: RNG,
         reused_deltas: &[Wire],
     ) -> Result<Self, Error> {
-        let ot = OT::init(
-            &mut *reader.borrow_mut(),
-            &mut *writer.borrow_mut(),
-            &mut rng,
-        )?;
-
-        let garbler = Gb::new(writer.clone(), RNG::from_seed(rng.gen()), reused_deltas);
-
+        let ot = OT::init(&mut channel, &mut rng)?;
+        let garbler = Gb::new(channel.writer(), RNG::from_seed(rng.gen()), reused_deltas);
         Ok(Garbler {
             garbler,
-            reader,
-            writer,
+            channel,
             ot,
             rng,
         })
@@ -74,7 +63,7 @@ impl<
     pub fn garbler_input(&mut self, val: u16, modulus: u16) -> Result<Wire, Error> {
         let (mine, theirs) = self.garbler.encode(val, modulus);
         self.garbler.send_wire(&theirs)?;
-        self.writer.borrow_mut().flush()?;
+        self.channel.flush()?;
         Ok(mine)
     }
 
@@ -90,7 +79,7 @@ impl<
                 Ok(mine)
             })
             .collect();
-        self.writer.borrow_mut().flush()?;
+        self.channel.flush()?;
         ws
     }
 
@@ -126,12 +115,7 @@ impl<
             }
         }
 
-        self.ot.send(
-            &mut *self.reader.borrow_mut(),
-            &mut *self.writer.borrow_mut(),
-            &inputs,
-            &mut self.rng,
-        )?;
+        self.ot.send(&mut self.channel, &inputs, &mut self.rng)?;
         Ok(wires)
     }
 }
