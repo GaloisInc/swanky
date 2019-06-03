@@ -48,8 +48,10 @@ impl<W: Clone + HasModulus> Bundle<W> {
     }
 
     /// Pad the Bundle with val, n times.
-    pub fn pad(&mut self, val: W) {
-        self.0.push(val);
+    pub fn pad(&mut self, val: W, n: usize) {
+        for _ in 0..n {
+            self.0.push(val);
+        }
     }
 
     /// Extract a wire from the Bundle, removing it and returning it.
