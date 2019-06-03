@@ -48,9 +48,9 @@ impl<W: Clone + HasModulus> Bundle<W> {
     }
 
     /// Pad the Bundle with val, n times.
-    pub fn pad(&mut self, val: W, n: usize) {
+    pub fn pad(&mut self, val: &W, n: usize) {
         for _ in 0..n {
-            self.0.push(val);
+            self.0.push(val.clone());
         }
     }
 
