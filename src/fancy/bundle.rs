@@ -330,6 +330,19 @@ pub trait BundleGadgets: Fancy {
             .map(Bundle)
     }
 
+    /// If b=0 then return 0, else return x.
+    fn mask(
+        &mut self,
+        b: &Self::Item,
+        x: &Bundle<Self::Item>,
+    ) -> Result<Bundle<Self::Item>, Self::Error> {
+        x.wires()
+            .iter()
+            .map(|xwire| self.mul(xwire, b))
+            .collect::<Result<Vec<Self::Item>, Self::Error>>()
+            .map(Bundle)
+    }
+
     /// Shift residues, replacing them with zeros in the modulus of the least signifigant residue.
     fn shift(
         &mut self,

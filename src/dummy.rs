@@ -400,6 +400,25 @@ mod bundle {
     }
 
     #[test]
+    fn test_mask() {
+        let mut rng = thread_rng();
+        for _ in 0..NITERS {
+            let q = crate::util::modulus_with_nprimes(4 + rng.gen_usize() % 7);
+            let x = rng.gen_u128() % q;
+            let b = rng.gen_bool();
+            let mut d = Dummy::new();
+            {
+                let b = d.encode(b as u16, 2).unwrap();
+                let x = d.crt_encode(x, q).unwrap();
+                let z = d.mask(&b, &x).unwrap();
+                d.output_bundle(&z).unwrap();
+            }
+            let z = crt_inv_factor(&d.get_output(), q);
+            assert!(if b { z == x } else { z == 0 }, "b={} x={} z={}", b, x, z);
+        }
+    }
+
+    #[test]
     fn binary_abs() {
         let mut rng = thread_rng();
         for _ in 0..NITERS {
