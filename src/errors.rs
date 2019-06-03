@@ -13,6 +13,7 @@ pub enum Error {
     CuckooStashOverflow,
     InvalidCuckooSetSize(usize),
     InvalidCuckooParameters { nitems: usize, nhashes: usize },
+    PstyProtocolError(String),
     TwopacError(twopac::Error),
 }
 
@@ -57,6 +58,7 @@ impl std::fmt::Display for Error {
                 "CuckooHash: no parameters set for {} items and {} hashes",
                 nitems, nhashes
             ),
+            Error::PstyProtocolError(s) => write!(f, "PSTY protocol error: {}", s),
             Error::TwopacError(e) => write!(f, "Twopac error: {}", e),
         }
     }

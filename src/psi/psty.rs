@@ -13,7 +13,7 @@ use crate::utils;
 use fancy_garbling::{BinaryBundle, BundleGadgets, Fancy};
 use itertools::Itertools;
 use ocelot::oprf::{kmprt, ProgrammableReceiver, ProgrammableSender};
-use ocelot::ot::{KosSender as OtSender, KosReceiver as OtReceiver};
+use ocelot::ot::{KosReceiver as OtReceiver, KosSender as OtSender};
 use rand::Rng;
 use rand_core::{CryptoRng, RngCore, SeedableRng};
 use scuttlebutt::{Block, Block512, Channel};
@@ -29,11 +29,23 @@ pub type Msg = Vec<u8>;
 /// Private set intersection sender.
 pub struct Sender {
     opprf: kmprt::KmprtSender,
+    state: Option<SenderState>,
+}
+
+struct SenderState {
+    opprf_outputs: Vec<Block512>,
 }
 
 /// Private set intersection receiver.
 pub struct Receiver {
     opprf: kmprt::KmprtReceiver,
+    state: Option<ReceiverState>,
+}
+
+struct ReceiverState {
+    opprf_outputs: Vec<Block512>,
+    cuckoo: CuckooHash,
+    inputs: Vec<Msg>,
 }
 
 impl Sender {
@@ -44,12 +56,15 @@ impl Sender {
         RNG: RngCore + CryptoRng + SeedableRng,
     {
         let opprf = kmprt::KmprtSender::init(channel, rng)?;
-        Ok(Self { opprf })
+        Ok(Self {
+            opprf,
+            state: None,
+        })
     }
 
     pub fn send<R, W, RNG>(
         &mut self,
-        mut channel: &mut Channel<R, W>,
+        channel: &mut Channel<R, W>,
         inputs: &[Msg],
         rng: &mut RNG,
     ) -> Result<(), Error>
@@ -94,7 +109,20 @@ impl Sender {
 
         let _ = self
             .opprf
-            .send(&mut channel, &points, points.len(), nbins, rng)?;
+            .send(channel, &points, points.len(), nbins, rng)?;
+
+        self.state = Some(SenderState { opprf_outputs: ts });
+
+        Ok(())
+    }
+
+    pub fn compute_intersection<R, W, RNG>(&mut self, channel: &mut Channel<R,W>, rng: &mut RNG) -> Result<(), Error>
+    where
+        R: Read + Send + Debug + 'static,
+        W: Write + Send + Debug + 'static,
+        RNG: RngCore + CryptoRng + SeedableRng<Seed = Block>,
+    {
+        let state = if let Some(s) = &self.state { s } else { return Err(Error::PstyProtocolError("send/receive must be called first".to_string())) };
 
         let mut gb = twopac::semihonest::Garbler::<R, W, RNG, OtSender>::new(
             channel.clone(),
@@ -102,12 +130,12 @@ impl Sender {
             &[],
         )?;
 
-        let my_input_bits = encode_inputs(&ts);
+        let my_input_bits = encode_inputs(&state.opprf_outputs);
 
-        let mods = vec![2; nbins * HASH_SIZE * 8]; // all binary moduli
+        let mods = vec![2; my_input_bits.len()]; // all binary moduli
         let sender_inputs = gb.garbler_inputs(&my_input_bits, &mods)?;
         let receiver_inputs = gb.evaluator_inputs(&mods)?;
-        let outs = compute_intersection(&mut gb, &sender_inputs, &receiver_inputs)?;
+        let outs = fancy_compute_intersection(&mut gb, &sender_inputs, &receiver_inputs)?;
         gb.outputs(&outs)?;
 
         Ok(())
@@ -122,7 +150,10 @@ impl Receiver {
         RNG: RngCore + CryptoRng + SeedableRng<Seed = Block>,
     {
         let opprf = kmprt::KmprtReceiver::init(channel, rng)?;
-        Ok(Self { opprf })
+        Ok(Self {
+            opprf,
+            state: None,
+        })
     }
 
     pub fn receive<R, W, RNG>(
@@ -130,7 +161,7 @@ impl Receiver {
         channel: &mut Channel<R, W>,
         inputs: &[Msg],
         rng: &mut RNG,
-    ) -> Result<Vec<Msg>, Error>
+    ) -> Result<(), Error>
     where
         R: Read + Send + Debug + 'static,
         W: Write + Send + Debug,
@@ -166,7 +197,25 @@ impl Receiver {
 
         let opprf_outputs = self.opprf.receive(channel, 0, &table, rng)?;
 
-        let my_input_bits = encode_inputs(&opprf_outputs);
+        self.state = Some(ReceiverState {
+            opprf_outputs,
+            cuckoo,
+            inputs: inputs.to_vec(),
+        });
+
+        Ok(())
+    }
+
+    pub fn compute_intersection<R, W, RNG>(&mut self, channel: &mut Channel<R,W>, rng: &mut RNG) -> Result<Vec<Msg>, Error>
+    where
+        R: Read + Send + Debug + 'static,
+        W: Write + Send + Debug,
+        RNG: RngCore + CryptoRng + SeedableRng<Seed = Block>,
+    {
+        let state = if let Some(s) = &self.state { s } else { return Err(Error::PstyProtocolError("send/receive must be called first".to_string())) };
+        let nbins = state.cuckoo.nbins;
+
+        let my_input_bits = encode_inputs(&state.opprf_outputs);
 
         let mut ev = twopac::semihonest::Evaluator::<R, W, RNG, OtReceiver>::new(
             channel.clone(),
@@ -177,20 +226,16 @@ impl Receiver {
         let sender_inputs = ev.garbler_inputs(&mods)?;
         let receiver_inputs = ev.evaluator_inputs(&my_input_bits, &mods)?;
 
-        let outs = compute_intersection(&mut ev, &sender_inputs, &receiver_inputs)?;
+        let outs = fancy_compute_intersection(&mut ev, &sender_inputs, &receiver_inputs)?;
         ev.outputs(&outs)?;
         let mpc_outs = ev.decode_output()?;
 
         let mut intersection = Vec::new();
 
-        let items = cuckoo.items().collect_vec();
-
-        assert_eq!(items.len(), mpc_outs.len());
-
-        for (opt_item, in_intersection) in items.into_iter().zip_eq(mpc_outs.into_iter()) {
+        for (opt_item, in_intersection) in state.cuckoo.items().into_iter().zip_eq(mpc_outs.into_iter()) {
             if let Some(item) = opt_item {
                 if in_intersection == 1_u16 {
-                    intersection.push(inputs[item.input_index].clone());
+                    intersection.push(state.inputs[item.input_index].clone());
                 }
             }
         }
@@ -211,7 +256,7 @@ fn encode_inputs(opprf_outputs: &[Block512]) -> Vec<u16> {
 }
 
 /// Fancy function to compute the intersection and return encoded vector of 0/1 masks.
-fn compute_intersection<F: Fancy>(
+fn fancy_compute_intersection<F: Fancy>(
     f: &mut F,
     sender_inputs: &[F::Item],
     receiver_inputs: &[F::Item],
@@ -265,6 +310,7 @@ mod tests {
 
             let start = SystemTime::now();
             psi.send(&mut channel, &sender_inputs, &mut rng).unwrap();
+            psi.compute_intersection(&mut channel, &mut rng).unwrap();
             println!(
                 "[{}] Send time: {} ms",
                 SET_SIZE,
@@ -286,9 +332,10 @@ mod tests {
         );
 
         let start = SystemTime::now();
-        let intersection = psi
-            .receive(&mut channel, &receiver_inputs, &mut rng)
+        psi.receive(&mut channel, &receiver_inputs, &mut rng)
             .unwrap();
+        let intersection = psi.compute_intersection(&mut channel, &mut rng).unwrap();
+
         println!(
             "[{}] Receiver time: {} ms",
             SET_SIZE,
