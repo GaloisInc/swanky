@@ -10,7 +10,7 @@
 use crate::cuckoo::CuckooHash;
 use crate::errors::Error;
 use crate::utils;
-use fancy_garbling::{BinaryBundle, BundleGadgets, Fancy};
+use fancy_garbling::{BinaryBundle, CrtBundle, CrtGadgets, BundleGadgets, Fancy};
 use itertools::Itertools;
 use ocelot::oprf::{kmprt, ProgrammableReceiver, ProgrammableSender};
 use ocelot::ot::{KosReceiver as OtReceiver, KosSender as OtSender};
@@ -140,6 +140,31 @@ impl Sender {
 
         Ok(())
     }
+
+    pub fn compute_cardinality<R, W, RNG>(&mut self, channel: &mut Channel<R,W>, rng: &mut RNG) -> Result<(), Error>
+    where
+        R: Read + Send + Debug + 'static,
+        W: Write + Send + Debug + 'static,
+        RNG: RngCore + CryptoRng + SeedableRng<Seed = Block>,
+    {
+        let state = if let Some(s) = &self.state { s } else { return Err(Error::PstyProtocolError("send/receive must be called first".to_string())) };
+
+        let mut gb = twopac::semihonest::Garbler::<R, W, RNG, OtSender>::new(
+            channel.clone(),
+            RNG::from_seed(rng.gen()),
+            &[],
+        )?;
+
+        let my_input_bits = encode_inputs(&state.opprf_outputs);
+
+        let mods = vec![2; my_input_bits.len()]; // all binary moduli
+        let sender_inputs = gb.garbler_inputs(&my_input_bits, &mods)?;
+        let receiver_inputs = gb.evaluator_inputs(&mods)?;
+        let (outs, _) = fancy_compute_cardinality(&mut gb, &sender_inputs, &receiver_inputs)?;
+        gb.outputs(&outs)?;
+
+        Ok(())
+    }
 }
 
 impl Receiver {
@@ -242,6 +267,35 @@ impl Receiver {
 
         Ok(intersection)
     }
+
+    pub fn compute_cardinality<R, W, RNG>(&mut self, channel: &mut Channel<R,W>, rng: &mut RNG) -> Result<usize, Error>
+    where
+        R: Read + Send + Debug + 'static,
+        W: Write + Send + Debug,
+        RNG: RngCore + CryptoRng + SeedableRng<Seed = Block>,
+    {
+        let state = if let Some(s) = &self.state { s } else { return Err(Error::PstyProtocolError("send/receive must be called first".to_string())) };
+        let nbins = state.cuckoo.nbins;
+
+        let my_input_bits = encode_inputs(&state.opprf_outputs);
+
+        let mut ev = twopac::semihonest::Evaluator::<R, W, RNG, OtReceiver>::new(
+            channel.clone(),
+            RNG::from_seed(rng.gen()),
+        )?;
+
+        let mods = vec![2; nbins * HASH_SIZE * 8];
+        let sender_inputs = ev.garbler_inputs(&mods)?;
+        let receiver_inputs = ev.evaluator_inputs(&my_input_bits, &mods)?;
+
+        let (outs, mods) = fancy_compute_cardinality(&mut ev, &sender_inputs, &receiver_inputs)?;
+        ev.outputs(&outs)?;
+        let mpc_outs = ev.decode_output()?;
+
+        let cardinality = fancy_garbling::util::crt_inv(&mpc_outs, &mods);
+
+        Ok(cardinality as usize)
+    }
 }
 
 fn encode_inputs(opprf_outputs: &[Block512]) -> Vec<u16> {
@@ -262,7 +316,6 @@ fn fancy_compute_intersection<F: Fancy>(
     receiver_inputs: &[F::Item],
 ) -> Result<Vec<F::Item>, F::Error> {
     assert_eq!(sender_inputs.len(), receiver_inputs.len());
-
     sender_inputs
         .chunks(HASH_SIZE * 8)
         .zip_eq(receiver_inputs.chunks(HASH_SIZE * 8))
@@ -273,6 +326,39 @@ fn fancy_compute_intersection<F: Fancy>(
             )
         })
         .collect()
+}
+
+/// Fancy function to compute the cardinaility and return CRT value containing the result
+/// along with the moduli of that value.
+fn fancy_compute_cardinality<F: Fancy>(
+    f: &mut F,
+    sender_inputs: &[F::Item],
+    receiver_inputs: &[F::Item],
+) -> Result<(Vec<F::Item>, Vec<u16>), F::Error> {
+    assert_eq!(sender_inputs.len(), receiver_inputs.len());
+
+    let eqs = sender_inputs
+        .chunks(HASH_SIZE * 8)
+        .zip_eq(receiver_inputs.chunks(HASH_SIZE * 8))
+        .map(|(xs, ys)| {
+            f.eq_bundles(
+                &BinaryBundle::new(xs.to_vec()),
+                &BinaryBundle::new(ys.to_vec()),
+            )
+        }).collect::<Result<Vec<F::Item>, F::Error>>()?;
+
+    let qs = fancy_garbling::util::primes_with_width(16);
+    let q = fancy_garbling::util::product(&qs);
+    let mut acc = f.crt_constant_bundle(0, q)?;
+    let one = f.crt_constant_bundle(1, q)?;
+
+    for b in eqs.into_iter() {
+        let b_ws = one.iter().map(|w| f.mul(w, &b)).collect::<Result<Vec<F::Item>, F::Error>>()?;
+        let b_crt = CrtBundle::new(b_ws);
+        acc = f.crt_add(&acc, &b_crt)?;
+    }
+
+    Ok((acc.wires().to_vec(), qs))
 }
 
 #[cfg(test)]
@@ -310,7 +396,8 @@ mod tests {
 
             let start = SystemTime::now();
             psi.send(&mut channel, &sender_inputs, &mut rng).unwrap();
-            psi.compute_intersection(&mut channel, &mut rng).unwrap();
+            psi.compute_cardinality(&mut channel, &mut rng).unwrap();
+            // psi.compute_intersection(&mut channel, &mut rng).unwrap();
             println!(
                 "[{}] Send time: {} ms",
                 SET_SIZE,
@@ -334,7 +421,8 @@ mod tests {
         let start = SystemTime::now();
         psi.receive(&mut channel, &receiver_inputs, &mut rng)
             .unwrap();
-        let intersection = psi.compute_intersection(&mut channel, &mut rng).unwrap();
+        let cardinality  = psi.compute_cardinality(&mut channel, &mut rng).unwrap();
+        // let intersection = psi.compute_intersection(&mut channel, &mut rng).unwrap();
 
         println!(
             "[{}] Receiver time: {} ms",
@@ -342,7 +430,8 @@ mod tests {
             start.elapsed().unwrap().as_millis()
         );
 
-        assert_eq!(intersection.len(), SET_SIZE);
+        // assert_eq!(intersection.len(), SET_SIZE);
+        assert_eq!(cardinality, SET_SIZE);
     }
 
     #[test]
