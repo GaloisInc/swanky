@@ -38,18 +38,18 @@ impl<R: Read, W: Write> Channel<R, W> {
     }
 
     /// Return a reader object wrapped in `Rc<RefCell>`.
-    pub fn reader(&self) -> Rc<RefCell<R>> {
+    pub fn reader(&mut self) -> Rc<RefCell<R>> {
         self.reader.clone()
     }
 
     /// Return a writer object wrapped in `Rc<RefCell>`.
-    pub fn writer(&self) -> Rc<RefCell<W>> {
+    pub fn writer(&mut self) -> Rc<RefCell<W>> {
         self.writer.clone()
     }
 
     /// Write a `usize` to the channel.
     #[inline(always)]
-    pub fn write_usize(&self, s: usize) -> Result<()> {
+    pub fn write_usize(&mut self, s: usize) -> Result<()> {
         let data: [u8; 8] = unsafe { std::mem::transmute(s) };
         self.writer.borrow_mut().write_all(&data)?;
         Ok(())
@@ -57,7 +57,7 @@ impl<R: Read, W: Write> Channel<R, W> {
 
     /// Read a `usize` from the channel.
     #[inline(always)]
-    pub fn read_usize(&self) -> Result<usize> {
+    pub fn read_usize(&mut self) -> Result<usize> {
         let mut data = [0u8; 8];
         self.reader.borrow_mut().read_exact(&mut data)?;
         let s = unsafe { std::mem::transmute(data) };
@@ -66,13 +66,13 @@ impl<R: Read, W: Write> Channel<R, W> {
 
     /// Write a `bool` to the channel.
     #[inline(always)]
-    pub fn write_bool(&self, b: bool) -> Result<usize> {
+    pub fn write_bool(&mut self, b: bool) -> Result<usize> {
         self.writer.borrow_mut().write(&[b as u8])
     }
 
     /// Read a `bool` from the channel.
     #[inline(always)]
-    pub fn read_bool(&self) -> Result<bool> {
+    pub fn read_bool(&mut self) -> Result<bool> {
         let mut data = [0u8; 1];
         self.reader.borrow_mut().read_exact(&mut data)?;
         Ok(data[0] != 0)
@@ -80,13 +80,13 @@ impl<R: Read, W: Write> Channel<R, W> {
 
     /// Write a `Block` to the channel.
     #[inline(always)]
-    pub fn write_block(&self, b: &Block) -> Result<usize> {
+    pub fn write_block(&mut self, b: &Block) -> Result<usize> {
         self.writer.borrow_mut().write(b.as_ref())
     }
 
     /// Read a `Block` from the channel.
     #[inline(always)]
-    pub fn read_block(&self) -> Result<Block> {
+    pub fn read_block(&mut self) -> Result<Block> {
         let mut v = Block::default();
         self.reader.borrow_mut().read_exact(v.as_mut())?;
         Ok(v)
@@ -94,7 +94,7 @@ impl<R: Read, W: Write> Channel<R, W> {
 
     /// Write a `Block512` to the channel.
     #[inline(always)]
-    pub fn write_block512(&self, b: &Block512) -> Result<usize> {
+    pub fn write_block512(&mut self, b: &Block512) -> Result<usize> {
         for block in b.0.iter() {
             self.write_block(block)?;
         }
@@ -103,7 +103,7 @@ impl<R: Read, W: Write> Channel<R, W> {
 
     /// Read a `Block512` from the channel.
     #[inline(always)]
-    pub fn read_block512(&self) -> Result<Block512> {
+    pub fn read_block512(&mut self) -> Result<Block512> {
         let mut data = [0u8; 64];
         self.reader.borrow_mut().read_exact(&mut data)?;
         Ok(Block512::from(data))
@@ -111,27 +111,27 @@ impl<R: Read, W: Write> Channel<R, W> {
 
     /// Write a slice of `u8`s to the channel.
     #[inline(always)]
-    pub fn write_bytes(&self, bytes: &[u8]) -> Result<usize> {
+    pub fn write_bytes(&mut self, bytes: &[u8]) -> Result<usize> {
         self.writer.borrow_mut().write(bytes)
     }
 
     /// Read a slice of `u8`s from the channel.
     #[inline(always)]
-    pub fn read_bytes_inplace(&self, mut bytes: &mut [u8]) -> Result<()> {
+    pub fn read_bytes_inplace(&mut self, mut bytes: &mut [u8]) -> Result<()> {
         self.reader.borrow_mut().read_exact(&mut bytes)
     }
 
     /// Write a `RistrettoPoint` to the channel.
     #[cfg(feature = "curve25519-dalek")]
     #[inline(always)]
-    pub fn write_pt(&self, pt: &RistrettoPoint) -> Result<usize> {
+    pub fn write_pt(&mut self, pt: &RistrettoPoint) -> Result<usize> {
         self.writer.borrow_mut().write(pt.compress().as_bytes())
     }
 
     /// Read a `RistrettoPoint` from the channel.
     #[cfg(feature = "curve25519-dalek")]
     #[inline(always)]
-    pub fn read_pt(&self) -> Result<RistrettoPoint> {
+    pub fn read_pt(&mut self) -> Result<RistrettoPoint> {
         let mut data = [0u8; 32];
         self.reader.borrow_mut().read_exact(&mut data)?;
         let pt = match CompressedRistretto::from_slice(&data).decompress() {
@@ -148,7 +148,7 @@ impl<R: Read, W: Write> Channel<R, W> {
 
     /// Flush the channel.
     #[inline(always)]
-    pub fn flush(&self) -> Result<()> {
+    pub fn flush(&mut self) -> Result<()> {
         self.writer.borrow_mut().flush()
     }
 }
