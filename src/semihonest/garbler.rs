@@ -5,10 +5,12 @@
 // See LICENSE for licensing information.
 
 use crate::errors::Error;
-use fancy_garbling::{Fancy, Garbler as Gb, Wire};
+use fancy_garbling::{Fancy, FancyInput, Garbler as Gb, Wire};
 use ocelot::ot::Sender as OtSender;
 use rand::{CryptoRng, Rng, RngCore, SeedableRng};
-use scuttlebutt::{AbstractChannel, Block, SemiHonest};
+use scuttlebutt::{AbstractChannel, Block, Channel, SemiHonest};
+use std::fmt::Debug;
+use std::io::{Read, Write};
 
 /// Semi-honest garbler.
 pub struct Garbler<C, RNG, OT> {
@@ -49,31 +51,6 @@ impl<
         })
     }
 
-    /// Encode and send a garbler input wire.
-    #[inline]
-    pub fn garbler_input(&mut self, val: u16, modulus: u16) -> Result<Wire, Error> {
-        let (mine, theirs) = self.garbler.encode_wire(val, modulus);
-        self.garbler.send_wire(&theirs)?;
-        self.channel.flush()?;
-        Ok(mine)
-    }
-
-    /// Encode and send many garbler input wires.
-    #[inline]
-    pub fn garbler_inputs(&mut self, vals: &[u16], moduli: &[u16]) -> Result<Vec<Wire>, Error> {
-        let ws = vals
-            .iter()
-            .zip(moduli.iter())
-            .map(|(x, q)| {
-                let (mine, theirs) = self.garbler.encode_wire(*x, *q);
-                self.garbler.send_wire(&theirs)?;
-                Ok(mine)
-            })
-            .collect();
-        self.channel.flush()?;
-        ws
-    }
-
     #[inline]
     fn _evaluator_input(&mut self, delta: &Wire, q: u16) -> (Wire, Vec<(Block, Block)>) {
         let len = (q as f32).log(2.0).ceil() as u16;
@@ -88,10 +65,37 @@ impl<
             .collect::<Vec<(Block, Block)>>();
         (wire, inputs)
     }
+}
 
-    /// Perform OT and obtain wires for the evaluator's inputs.
-    #[inline]
-    pub fn evaluator_inputs(&mut self, qs: &[u16]) -> Result<Vec<Wire>, Error> {
+impl<
+        R: Read + Send,
+        W: Write + Send + Debug + 'static,
+        RNG: CryptoRng + RngCore + SeedableRng<Seed = Block>,
+        OT: OtSender<Msg = Block>, // + SemiHonest
+    > FancyInput for Garbler<R, W, RNG, OT>
+{
+    fn encode(&mut self, val: u16, modulus: u16) -> Result<Wire, Error> {
+        let (mine, theirs) = self.garbler.encode_wire(val, modulus);
+        self.garbler.send_wire(&theirs)?;
+        self.channel.flush()?;
+        Ok(mine)
+    }
+
+    fn encode_many(&mut self, vals: &[u16], moduli: &[u16]) -> Result<Vec<Wire>, Error> {
+        let ws = vals
+            .iter()
+            .zip(moduli.iter())
+            .map(|(x, q)| {
+                let (mine, theirs) = self.garbler.encode_wire(*x, *q);
+                self.garbler.send_wire(&theirs)?;
+                Ok(mine)
+            })
+            .collect();
+        self.channel.flush()?;
+        ws
+    }
+
+    fn receive_many(&mut self, qs: &[u16]) -> Result<Vec<Wire>, Error> {
         let n = qs.len();
         let lens = qs.iter().map(|q| (*q as f32).log(2.0).ceil() as usize);
         let mut wires = Vec::with_capacity(n);
