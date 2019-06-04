@@ -15,7 +15,6 @@ use crate::wire::Wire;
 use itertools::Itertools;
 use scuttlebutt::{AbstractChannel, AesRng, Block, Channel};
 use serde::{Deserialize, Serialize};
-use std::cell::RefCell;
 use std::collections::HashMap;
 use std::convert::TryInto;
 use std::rc::Rc;
@@ -47,7 +46,8 @@ impl GarbledCircuit {
         garbler_inputs: &[Wire],
         evaluator_inputs: &[Wire],
     ) -> Result<Vec<u16>, EvaluatorError> {
-        let mut evaluator = Evaluator::new(Rc::new(RefCell::new(GarbledReader::new(&self.blocks))));
+        let channel = Channel::new(GarbledReader::new(&self.blocks), GarbledWriter::new(None));
+        let mut evaluator = Evaluator::new(channel);
         let outputs = c.eval(&mut evaluator, garbler_inputs, evaluator_inputs)?;
         c.process_outputs(&outputs, &mut evaluator)?;
         evaluator.decode_output()

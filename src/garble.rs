@@ -303,10 +303,8 @@ mod streaming {
     use itertools::Itertools;
     use rand::thread_rng;
     use scuttlebutt::{AesRng, Channel};
-    use std::cell::RefCell;
     use std::io::{BufReader, BufWriter};
     use std::os::unix::net::UnixStream;
-    use std::rc::Rc;
 
     type MyChannel = Channel<BufReader<UnixStream>, BufWriter<UnixStream>>;
 
@@ -319,7 +317,7 @@ mod streaming {
         input_mods: &[u16],
     ) where
         FGB: FnMut(&mut Garbler<MyChannel, AesRng>, &[Wire]) + Send + Sync + Copy + 'static,
-        FEV: FnMut(&mut Evaluator<UnixStream>, &[Wire]) + Send + Sync + Copy + 'static,
+        FEV: FnMut(&mut Evaluator<MyChannel>, &[Wire]) + Send + Sync + Copy + 'static,
         FDU: FnMut(&mut Dummy, &[DummyVal]) + Send + Sync + Copy + 'static,
     {
         let mut rng = AesRng::new();
@@ -346,9 +344,10 @@ mod streaming {
             }
             f_gb(&mut gb, &gb_inp);
         });
-
-        let receiver = Rc::new(RefCell::new(receiver));
-        let mut ev = Evaluator::new(receiver);
+        let reader = BufReader::new(receiver.try_clone().unwrap());
+        let writer = BufWriter::new(receiver);
+        let channel = Channel::new(reader, writer);
+        let mut ev = Evaluator::new(channel);
         let ev_inp = input_mods
             .iter()
             .map(|q| ev.read_wire(*q).unwrap())
@@ -466,10 +465,8 @@ mod complex {
     use itertools::Itertools;
     use rand::thread_rng;
     use scuttlebutt::{AesRng, Channel};
-    use std::cell::RefCell;
     use std::io::{BufReader, BufWriter};
     use std::os::unix::net::UnixStream;
-    use std::rc::Rc;
 
     fn complex_gadget<F: Fancy>(b: &mut F, xs: &[CrtBundle<F::Item>]) {
         let zs = xs
@@ -525,9 +522,10 @@ mod complex {
                 }
                 complex_gadget(&mut garbler, &gb_inp);
             });
-
-            let receiver = Rc::new(RefCell::new(receiver));
-            let mut evaluator = Evaluator::new(receiver);
+            let reader = BufReader::new(receiver.try_clone().unwrap());
+            let writer = BufWriter::new(receiver);
+            let channel = Channel::new(reader, writer);
+            let mut evaluator = Evaluator::new(channel);
 
             // receive encoded wires from the garbler thread
             let mut ev_inp = Vec::with_capacity(N);
@@ -554,10 +552,8 @@ mod reuse {
     use itertools::Itertools;
     use rand::random;
     use scuttlebutt::{AbstractChannel, AesRng, Channel};
-    use std::cell::RefCell;
     use std::io::{BufReader, BufWriter};
     use std::os::unix::net::UnixStream;
-    use std::rc::Rc;
 
     #[test]
     fn reuse_wirelabels() {
@@ -600,16 +596,17 @@ mod reuse {
             // output the input wires from the previous garbler
             gb2.outputs(&gb_inps).unwrap();
         });
-
-        let receiver = Rc::new(RefCell::new(receiver));
-        let mut ev1 = Evaluator::new(receiver.clone());
+        let reader = BufReader::new(receiver.try_clone().unwrap());
+        let writer = BufWriter::new(receiver);
+        let channel = Channel::new(reader, writer);
+        let mut ev1 = Evaluator::new(channel.clone());
 
         let xs = mods
             .iter()
             .map(|q| ev1.read_wire(*q).unwrap())
             .collect_vec();
 
-        let mut ev2 = Evaluator::new(receiver);
+        let mut ev2 = Evaluator::new(channel);
         ev2.outputs(&xs).unwrap();
 
         let result = ev2.decode_output().unwrap();
