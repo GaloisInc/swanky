@@ -102,7 +102,7 @@ pub trait FancyInput: Fancy {
     }
 
     /// Receive many CRT input bundles.
-    fn crt_receive_many(&mut self, modulus: u128, n: usize)
+    fn crt_receive_many(&mut self, n: usize, modulus: u128)
         -> Result<Vec<CrtBundle<Self::Item>>, Self::Error>
     {
         let mods = util::factor(modulus);
@@ -145,7 +145,7 @@ pub trait FancyInput: Fancy {
     }
 
     /// Receive many binary input bundles.
-    fn bin_receive_many(&mut self, nbits: usize, ninputs: usize)
+    fn bin_receive_many(&mut self, ninputs: usize, nbits: usize)
         -> Result<Vec<BinaryBundle<Self::Item>>, Self::Error>
     {
         let mut wires = self.receive_many(&vec![2; ninputs * nbits])?;
