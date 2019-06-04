@@ -11,7 +11,7 @@ fn main() {
     let nprimes = 10;
     let q = modulus_with_nprimes(nprimes);
     let mut i = Informer::new();
-    let x = CrtBundle::from(i.garbler_input_bundle(&factor(q)));
+    let x = i.crt_receive(q).unwrap();
     exact_sign(&mut i, &x);
     i.print_info();
 }
