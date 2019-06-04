@@ -81,7 +81,7 @@ impl<W: Write + Debug, RNG: CryptoRng + RngCore> Garbler<W, RNG> {
 
     /// Encode a wire, producing the zero wire as well as the encoded value.
     #[inline]
-    pub fn encode(&mut self, val: u16, modulus: u16) -> (Wire, Wire) {
+    pub fn encode_wire(&mut self, val: u16, modulus: u16) -> (Wire, Wire) {
         let zero = Wire::rand(&mut self.rng, modulus);
         let delta = self.delta(modulus);
         let enc = zero.plus(&delta.cmul(val));
@@ -90,7 +90,7 @@ impl<W: Write + Debug, RNG: CryptoRng + RngCore> Garbler<W, RNG> {
 
     /// Encode many wires, producing zero wires as well as encoded values.
     #[inline]
-    pub fn encode_many(
+    pub fn encode_many_wires(
         &mut self,
         vals: &[u16],
         moduli: &[u16],
@@ -102,7 +102,7 @@ impl<W: Write + Debug, RNG: CryptoRng + RngCore> Garbler<W, RNG> {
         let mut gbs = Vec::with_capacity(vals.len());
         let mut evs = Vec::with_capacity(vals.len());
         for (x, q) in vals.iter().zip(moduli.iter()) {
-            let (gb, ev) = self.encode(*x, *q);
+            let (gb, ev) = self.encode_wire(*x, *q);
             gbs.push(gb);
             evs.push(ev);
         }
@@ -111,27 +111,27 @@ impl<W: Write + Debug, RNG: CryptoRng + RngCore> Garbler<W, RNG> {
 
     /// Encode a CrtBundle, producing the zero wires as well as the encoded values.
     #[inline]
-    pub fn crt_encode(
+    pub fn crt_encode_wire(
         &mut self,
         val: u128,
         modulus: u128,
     ) -> Result<(CrtBundle<Wire>, CrtBundle<Wire>), GarblerError> {
         let ms = crate::util::factor(modulus);
         let xs = crate::util::crt(val, &ms);
-        let (gbs, evs) = self.encode_many(&xs, &ms)?;
+        let (gbs, evs) = self.encode_many_wires(&xs, &ms)?;
         Ok((CrtBundle::new(gbs), CrtBundle::new(evs)))
     }
 
     /// Encode a BinaryBundle, producing the zero wires as well as the encoded values.
     #[inline]
-    pub fn bin_encode(
+    pub fn bin_encode_wire(
         &mut self,
         val: u128,
         nbits: usize,
     ) -> Result<(BinaryBundle<Wire>, BinaryBundle<Wire>), GarblerError> {
         let xs = crate::util::u128_to_bits(val, nbits);
         let ms = vec![2; nbits];
-        let (gbs, evs) = self.encode_many(&xs, &ms)?;
+        let (gbs, evs) = self.encode_many_wires(&xs, &ms)?;
         Ok((BinaryBundle::new(gbs), BinaryBundle::new(evs)))
     }
 }

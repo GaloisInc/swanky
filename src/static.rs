@@ -66,7 +66,7 @@ pub fn garble(c: &mut Circuit) -> Result<(Encoder, GarbledCircuit), GarblerError
     let gb_inps = (0..c.num_garbler_inputs())
         .map(|i| {
             let q = c.garbler_input_mod(i);
-            let (zero, _) = garbler.encode(0, q);
+            let (zero, _) = garbler.encode_wire(0, q);
             zero
         })
         .collect_vec();
@@ -74,7 +74,7 @@ pub fn garble(c: &mut Circuit) -> Result<(Encoder, GarbledCircuit), GarblerError
     let ev_inps = (0..c.num_evaluator_inputs())
         .map(|i| {
             let q = c.evaluator_input_mod(i);
-            let (zero, _) = garbler.encode(0, q);
+            let (zero, _) = garbler.encode_wire(0, q);
             zero
         })
         .collect_vec();

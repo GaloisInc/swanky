@@ -1,5 +1,5 @@
 use fancy_garbling::informer::Informer;
-use fancy_garbling::util::{factor, modulus_with_nprimes};
+use fancy_garbling::util::modulus_with_nprimes;
 use fancy_garbling::*;
 
 fn exact_sign<F: Fancy>(b: &mut F, x: &CrtBundle<F::Item>) {

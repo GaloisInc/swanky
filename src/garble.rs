@@ -335,7 +335,7 @@ mod streaming {
         std::thread::spawn(move || {
             let sender = Rc::new(RefCell::new(sender));
             let mut gb = Garbler::new(sender, rng, &[]);
-            let (gb_inp, ev_inp) = gb.encode_many(&inputs, &input_mods_).unwrap();
+            let (gb_inp, ev_inp) = gb.encode_many_wires(&inputs, &input_mods_).unwrap();
             for w in ev_inp.iter() {
                 gb.send_wire(w).unwrap();
             }
@@ -509,7 +509,7 @@ mod complex {
                 // encode input and send it to the evaluator
                 let mut gb_inp = Vec::with_capacity(N);
                 for X in &input_ {
-                    let (zero, enc) = garbler.crt_encode(*X, Q).unwrap();
+                    let (zero, enc) = garbler.crt_encode_wire(*X, Q).unwrap();
                     for w in enc.iter() {
                         garbler.send_wire(w).unwrap();
                     }
@@ -575,7 +575,7 @@ mod reuse {
             let mut gb1 = Garbler::new(sender.clone(), AesRng::new(), &[]);
 
             // get the input wirelabels
-            let (gb_inps, ev_inps) = gb1.encode_many(&inps_, &mods_).unwrap();
+            let (gb_inps, ev_inps) = gb1.encode_many_wires(&inps_, &mods_).unwrap();
 
             for w in ev_inps.iter() {
                 gb1.send_wire(w).unwrap()
