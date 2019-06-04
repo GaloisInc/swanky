@@ -298,14 +298,17 @@ mod classic {
 mod streaming {
     use crate::dummy::{Dummy, DummyVal};
     use crate::util::RngExt;
-    use crate::{Fancy, FancyInput};
     use crate::{Evaluator, Garbler, Wire};
+    use crate::{Fancy, FancyInput};
     use itertools::Itertools;
     use rand::thread_rng;
-    use scuttlebutt::AesRng;
+    use scuttlebutt::{AesRng, Channel};
     use std::cell::RefCell;
+    use std::io::{BufReader, BufWriter};
     use std::os::unix::net::UnixStream;
     use std::rc::Rc;
+
+    type MyChannel = Channel<BufReader<UnixStream>, BufWriter<UnixStream>>;
 
     // helper - checks that Streaming evaluation of a fancy function equals Dummy
     // evaluation of the same function
@@ -315,7 +318,7 @@ mod streaming {
         mut f_du: FDU,
         input_mods: &[u16],
     ) where
-        FGB: FnMut(&mut Garbler<UnixStream, AesRng>, &[Wire]) + Send + Sync + Copy + 'static,
+        FGB: FnMut(&mut Garbler<MyChannel, AesRng>, &[Wire]) + Send + Sync + Copy + 'static,
         FEV: FnMut(&mut Evaluator<UnixStream>, &[Wire]) + Send + Sync + Copy + 'static,
         FDU: FnMut(&mut Dummy, &[DummyVal]) + Send + Sync + Copy + 'static,
     {
@@ -333,8 +336,10 @@ mod streaming {
 
         let input_mods_ = input_mods.to_vec();
         std::thread::spawn(move || {
-            let sender = Rc::new(RefCell::new(sender));
-            let mut gb = Garbler::new(sender, rng, &[]);
+            let reader = BufReader::new(sender.try_clone().unwrap());
+            let writer = BufWriter::new(sender);
+            let channel = Channel::new(reader, writer);
+            let mut gb = Garbler::new(channel, rng, &[]);
             let (gb_inp, ev_inp) = gb.encode_many_wires(&inputs, &input_mods_).unwrap();
             for w in ev_inp.iter() {
                 gb.send_wire(w).unwrap();
@@ -460,8 +465,9 @@ mod complex {
     use crate::{CrtBundle, CrtGadgets, Evaluator, Fancy, FancyInput, Garbler};
     use itertools::Itertools;
     use rand::thread_rng;
-    use scuttlebutt::AesRng;
+    use scuttlebutt::{AesRng, Channel};
     use std::cell::RefCell;
+    use std::io::{BufReader, BufWriter};
     use std::os::unix::net::UnixStream;
     use std::rc::Rc;
 
@@ -503,8 +509,10 @@ mod complex {
 
             let input_ = input.clone();
             std::thread::spawn(move || {
-                let sender = Rc::new(RefCell::new(sender));
-                let mut garbler = Garbler::new(sender, AesRng::new(), &[]);
+                let reader = BufReader::new(sender.try_clone().unwrap());
+                let writer = BufWriter::new(sender);
+                let channel = Channel::new(reader, writer);
+                let mut garbler = Garbler::new(channel, AesRng::new(), &[]);
 
                 // encode input and send it to the evaluator
                 let mut gb_inp = Vec::with_capacity(N);
@@ -545,8 +553,9 @@ mod reuse {
     use crate::*;
     use itertools::Itertools;
     use rand::random;
-    use scuttlebutt::AesRng;
+    use scuttlebutt::{AbstractChannel, AesRng, Channel};
     use std::cell::RefCell;
+    use std::io::{BufReader, BufWriter};
     use std::os::unix::net::UnixStream;
     use std::rc::Rc;
 
@@ -571,8 +580,10 @@ mod reuse {
         let inps_ = inps.clone();
         let mods_ = mods.clone();
         std::thread::spawn(move || {
-            let sender = Rc::new(RefCell::new(sender));
-            let mut gb1 = Garbler::new(sender.clone(), AesRng::new(), &[]);
+            let reader = BufReader::new(sender.try_clone().unwrap());
+            let writer = BufWriter::new(sender);
+            let channel = Channel::new(reader, writer);
+            let mut gb1 = Garbler::new(channel.clone(), AesRng::new(), &[]);
 
             // get the input wirelabels
             let (gb_inps, ev_inps) = gb1.encode_many_wires(&inps_, &mods_).unwrap();
@@ -584,7 +595,7 @@ mod reuse {
             // get deltas for input wires
             let ds = mods_.into_iter().map(|q| gb1.delta(q)).collect_vec();
 
-            let mut gb2 = Garbler::new(sender, AesRng::new(), &ds);
+            let mut gb2 = Garbler::new(channel, AesRng::new(), &ds);
 
             // output the input wires from the previous garbler
             gb2.outputs(&gb_inps).unwrap();

@@ -3,28 +3,24 @@ use crate::fancy::{BinaryBundle, CrtBundle, Fancy, HasModulus};
 use crate::util::{output_tweak, tweak, tweak2, RngExt};
 use crate::wire::Wire;
 use rand::{CryptoRng, RngCore};
-use scuttlebutt::Block;
-use std::cell::RefCell;
+use scuttlebutt::{AbstractChannel, Block};
 use std::collections::HashMap;
-use std::fmt::Debug;
-use std::io::Write;
-use std::rc::Rc;
 
 /// Streams garbled circuit ciphertexts through a callback. Parallelizable.
-pub struct Garbler<W, RNG> {
-    writer: Rc<RefCell<W>>,
+pub struct Garbler<C, RNG> {
+    channel: C,
     deltas: HashMap<u16, Wire>, // map from modulus to associated delta wire-label.
     current_output: usize,
     current_gate: usize,
     rng: RNG,
 }
 
-impl<W: Write + Debug, RNG: CryptoRng + RngCore> Garbler<W, RNG> {
+impl<C: AbstractChannel, RNG: CryptoRng + RngCore> Garbler<C, RNG> {
     /// Create a new garbler.
     #[inline]
-    pub fn new(writer: Rc<RefCell<W>>, rng: RNG, reused_deltas: &[Wire]) -> Self {
+    pub fn new(channel: C, rng: RNG, reused_deltas: &[Wire]) -> Self {
         Garbler {
-            writer,
+            channel,
             deltas: reused_deltas
                 .iter()
                 .map(|w| (w.modulus(), w.clone()))
@@ -74,8 +70,7 @@ impl<W: Write + Debug, RNG: CryptoRng + RngCore> Garbler<W, RNG> {
     /// Send a wire using the Sender.
     #[inline]
     pub fn send_wire(&mut self, wire: &Wire) -> Result<(), GarblerError> {
-        let mut writer = self.writer.borrow_mut();
-        writer.write_all(wire.as_block().as_ref())?;
+        self.channel.write_block(&wire.as_block())?;
         Ok(())
     }
 
@@ -136,7 +131,7 @@ impl<W: Write + Debug, RNG: CryptoRng + RngCore> Garbler<W, RNG> {
     }
 }
 
-impl<W: Write + Debug, RNG: CryptoRng + RngCore> Fancy for Garbler<W, RNG> {
+impl<C: AbstractChannel, RNG: CryptoRng + RngCore> Fancy for Garbler<C, RNG> {
     type Item = Wire;
     type Error = GarblerError;
 
@@ -279,9 +274,8 @@ impl<W: Write + Debug, RNG: CryptoRng + RngCore> Fancy for Garbler<W, RNG> {
             }
         }
 
-        let mut writer = self.writer.borrow_mut();
-        for block in gate.into_iter() {
-            writer.write_all(block.as_ref())?;
+        for block in gate.iter() {
+            self.channel.write_block(block)?;
         }
         Ok(X.plus_mov(&Y))
     }
@@ -334,9 +328,8 @@ impl<W: Write + Debug, RNG: CryptoRng + RngCore> Fancy for Garbler<W, RNG> {
             gate[ix - 1] = ct;
         }
 
-        let mut writer = self.writer.borrow_mut();
-        for block in gate.into_iter() {
-            writer.write_all(block.as_ref())?;
+        for block in gate.iter() {
+            self.channel.write_block(block)?;
         }
         Ok(C)
     }
@@ -351,9 +344,8 @@ impl<W: Write + Debug, RNG: CryptoRng + RngCore> Fancy for Garbler<W, RNG> {
             let t = output_tweak(i, k);
             cts.push(X.plus(&D.cmul(k)).hash(t));
         }
-        let mut writer = self.writer.borrow_mut();
-        for block in cts.into_iter() {
-            writer.write_all(block.as_ref())?;
+        for block in cts.iter() {
+            self.channel.write_block(block)?;
         }
         Ok(())
     }

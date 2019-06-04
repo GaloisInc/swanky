@@ -13,7 +13,7 @@ use crate::fancy::HasModulus;
 use crate::garble::{Evaluator, Garbler};
 use crate::wire::Wire;
 use itertools::Itertools;
-use scuttlebutt::{AesRng, Block};
+use scuttlebutt::{AbstractChannel, AesRng, Block, Channel};
 use serde::{Deserialize, Serialize};
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -56,11 +56,14 @@ impl GarbledCircuit {
 
 /// Garble a circuit without streaming.
 pub fn garble(c: &mut Circuit) -> Result<(Encoder, GarbledCircuit), GarblerError> {
-    let writer = Rc::new(RefCell::new(GarbledWriter::new(Some(c.num_nonfree_gates))));
-    let writer_ = writer.clone();
+    let channel = Channel::new(
+        GarbledReader::new(&[]),
+        GarbledWriter::new(Some(c.num_nonfree_gates)),
+    );
+    let channel_ = channel.clone();
 
     let rng = AesRng::new();
-    let mut garbler = Garbler::new(writer_, rng, &[]);
+    let mut garbler = Garbler::new(channel_, rng, &[]);
 
     // get input wires, ignoring encoded values
     let gb_inps = (0..c.num_garbler_inputs())
@@ -85,7 +88,12 @@ pub fn garble(c: &mut Circuit) -> Result<(Encoder, GarbledCircuit), GarblerError
 
     let en = Encoder::new(gb_inps, ev_inps, garbler.get_deltas());
 
-    let gc = GarbledCircuit::new(Rc::try_unwrap(writer).unwrap().into_inner().blocks);
+    let gc = GarbledCircuit::new(
+        Rc::try_unwrap(channel.writer())
+            .unwrap()
+            .into_inner()
+            .blocks,
+    );
 
     Ok((en, gc))
 }
