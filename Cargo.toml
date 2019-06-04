@@ -23,8 +23,7 @@ base_conversion = { path = "base_conversion" }
 itertools = "0.8.0"
 rand = "0.6.5"
 regex = "1.1.6"
-# scuttlebutt = { git = "https://github.com/amaloz/scuttlebutt", features = ["serde"], branch = "dev" }
-scuttlebutt = { path = "../scuttlebutt", features = ["serde"] }
+scuttlebutt = { git = "https://github.com/amaloz/scuttlebutt", features = ["serde"], branch = "dev" }
 serde = { version = "1.0.90", features = ["derive"] }
 
 [dev-dependencies]
