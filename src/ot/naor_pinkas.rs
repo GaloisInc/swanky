@@ -16,8 +16,7 @@ use curve25519_dalek::constants::RISTRETTO_BASEPOINT_TABLE;
 use curve25519_dalek::ristretto::RistrettoPoint;
 use curve25519_dalek::scalar::Scalar;
 use rand::{CryptoRng, RngCore};
-use scuttlebutt::{Block, Channel, SemiHonest};
-use std::io::{Read, Write};
+use scuttlebutt::{AbstractChannel, Block, SemiHonest};
 
 /// Oblivious transfer sender.
 pub struct Sender {}
@@ -27,16 +26,16 @@ pub struct Receiver {}
 impl OtSender for Sender {
     type Msg = Block;
 
-    fn init<R: Read, W: Write, RNG: CryptoRng + RngCore>(
-        _: &mut Channel<R, W>,
+    fn init<C: AbstractChannel, RNG: CryptoRng + RngCore>(
+        _: &mut C,
         _: &mut RNG,
     ) -> Result<Self, Error> {
         Ok(Self {})
     }
 
-    fn send<R: Read, W: Write, RNG: CryptoRng + RngCore>(
+    fn send<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         &mut self,
-        channel: &mut Channel<R, W>,
+        channel: &mut C,
         inputs: &[(Block, Block)],
         mut rng: &mut RNG,
     ) -> Result<(), Error> {
@@ -81,16 +80,16 @@ impl std::fmt::Display for Sender {
 impl OtReceiver for Receiver {
     type Msg = Block;
 
-    fn init<R: Read, W: Write, RNG: CryptoRng + RngCore>(
-        _: &mut Channel<R, W>,
+    fn init<C: AbstractChannel, RNG: CryptoRng + RngCore>(
+        _: &mut C,
         _: &mut RNG,
     ) -> Result<Self, Error> {
         Ok(Self {})
     }
 
-    fn receive<R: Read, W: Write, RNG: CryptoRng + RngCore>(
+    fn receive<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         &mut self,
-        channel: &mut Channel<R, W>,
+        channel: &mut C,
         inputs: &[bool],
         mut rng: &mut RNG,
     ) -> Result<Vec<Block>, Error> {

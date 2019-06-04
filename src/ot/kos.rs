@@ -16,9 +16,9 @@ use crate::ot::{
 use crate::utils;
 use rand::CryptoRng;
 use rand_core::{RngCore, SeedableRng};
-use scuttlebutt::{cointoss, AesRng, Block, Channel, Malicious, SemiHonest};
+use scuttlebutt::{cointoss, AbstractChannel, AesRng, Block, Malicious, SemiHonest};
 use std::convert::TryInto;
-use std::io::{ErrorKind, Read, Write};
+use std::io::ErrorKind;
 
 const SSP: usize = 40;
 
@@ -33,9 +33,9 @@ pub struct Receiver<OT: OtSender<Msg = Block> + Malicious> {
 
 impl<OT: OtReceiver<Msg = Block> + Malicious> Sender<OT> {
     #[inline]
-    fn send_setup<R: Read, W: Write, RNG: CryptoRng + RngCore>(
+    fn send_setup<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         &mut self,
-        channel: &mut Channel<R, W>,
+        channel: &mut C,
         m: usize,
         rng: &mut RNG,
     ) -> Result<Vec<u8>, Error> {
@@ -81,17 +81,17 @@ impl<OT: OtReceiver<Msg = Block> + Malicious> Sender<OT> {
 impl<OT: OtReceiver<Msg = Block> + Malicious> OtSender for Sender<OT> {
     type Msg = Block;
 
-    fn init<R: Read, W: Write, RNG: CryptoRng + RngCore>(
-        channel: &mut Channel<R, W>,
+    fn init<C: AbstractChannel, RNG: CryptoRng + RngCore>(
+        channel: &mut C,
         rng: &mut RNG,
     ) -> Result<Self, Error> {
         let ot = AlszSender::<OT>::init(channel, rng)?;
         Ok(Self { ot })
     }
 
-    fn send<R: Read, W: Write, RNG: CryptoRng + RngCore>(
+    fn send<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         &mut self,
-        channel: &mut Channel<R, W>,
+        channel: &mut C,
         inputs: &[(Block, Block)],
         rng: &mut RNG,
     ) -> Result<(), Error> {
@@ -115,9 +115,9 @@ impl<OT: OtReceiver<Msg = Block> + Malicious> OtSender for Sender<OT> {
 
 impl<OT: OtReceiver<Msg = Block> + Malicious> CorrelatedSender for Sender<OT> {
     #[inline]
-    fn send_correlated<R: Read, W: Write, RNG: CryptoRng + RngCore>(
+    fn send_correlated<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         &mut self,
-        channel: &mut Channel<R, W>,
+        channel: &mut C,
         deltas: &[Self::Msg],
         rng: &mut RNG,
     ) -> Result<Vec<(Self::Msg, Self::Msg)>, Error> {
@@ -142,9 +142,9 @@ impl<OT: OtReceiver<Msg = Block> + Malicious> CorrelatedSender for Sender<OT> {
 
 impl<OT: OtReceiver<Msg = Block> + Malicious> RandomSender for Sender<OT> {
     #[inline]
-    fn send_random<R: Read, W: Write, RNG: CryptoRng + RngCore>(
+    fn send_random<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         &mut self,
-        channel: &mut Channel<R, W>,
+        channel: &mut C,
         m: usize,
         rng: &mut RNG,
     ) -> Result<Vec<(Self::Msg, Self::Msg)>, Error> {
@@ -171,9 +171,9 @@ impl<OT: OtReceiver<Msg = Block> + Malicious> std::fmt::Display for Sender<OT> {
 
 impl<OT: OtSender<Msg = Block> + Malicious> Receiver<OT> {
     #[inline]
-    fn receive_setup<R: Read, W: Write, RNG: CryptoRng + RngCore>(
+    fn receive_setup<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         &mut self,
-        channel: &mut Channel<R, W>,
+        channel: &mut C,
         inputs: &[bool],
         rng: &mut RNG,
     ) -> Result<Vec<u8>, Error> {
@@ -211,17 +211,17 @@ impl<OT: OtSender<Msg = Block> + Malicious> Receiver<OT> {
 impl<OT: OtSender<Msg = Block> + Malicious> OtReceiver for Receiver<OT> {
     type Msg = Block;
 
-    fn init<R: Read, W: Write, RNG: CryptoRng + RngCore>(
-        channel: &mut Channel<R, W>,
+    fn init<C: AbstractChannel, RNG: CryptoRng + RngCore>(
+        channel: &mut C,
         rng: &mut RNG,
     ) -> Result<Self, Error> {
         let ot = AlszReceiver::<OT>::init(channel, rng)?;
         Ok(Self { ot })
     }
 
-    fn receive<R: Read, W: Write, RNG: CryptoRng + RngCore>(
+    fn receive<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         &mut self,
-        channel: &mut Channel<R, W>,
+        channel: &mut C,
         inputs: &[bool],
         rng: &mut RNG,
     ) -> Result<Vec<Block>, Error> {
@@ -245,9 +245,9 @@ impl<OT: OtSender<Msg = Block> + Malicious> OtReceiver for Receiver<OT> {
 }
 
 impl<OT: OtSender<Msg = Block> + Malicious> CorrelatedReceiver for Receiver<OT> {
-    fn receive_correlated<R: Read, W: Write, RNG: CryptoRng + RngCore>(
+    fn receive_correlated<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         &mut self,
-        channel: &mut Channel<R, W>,
+        channel: &mut C,
         inputs: &[bool],
         rng: &mut RNG,
     ) -> Result<Vec<Self::Msg>, Error> {
@@ -269,9 +269,9 @@ impl<OT: OtSender<Msg = Block> + Malicious> CorrelatedReceiver for Receiver<OT> 
 }
 
 impl<OT: OtSender<Msg = Block> + Malicious> RandomReceiver for Receiver<OT> {
-    fn receive_random<R: Read, W: Write, RNG: CryptoRng + RngCore>(
+    fn receive_random<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         &mut self,
-        channel: &mut Channel<R, W>,
+        channel: &mut C,
         inputs: &[bool],
         rng: &mut RNG,
     ) -> Result<Vec<Self::Msg>, Error> {

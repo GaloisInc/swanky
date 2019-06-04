@@ -17,9 +17,10 @@ use crate::ot::{Receiver as OtReceiver, Sender as OtSender};
 use crate::utils;
 use rand::Rng;
 use rand::{CryptoRng, RngCore, SeedableRng};
-use scuttlebutt::{cointoss, utils as scutils, AesRng, Block, Block512, Channel, SemiHonest};
+use scuttlebutt::{
+    cointoss, utils as scutils, AbstractChannel, AesRng, Block, Block512, SemiHonest,
+};
 use std::convert::TryInto;
-use std::io::{Read, Write};
 use std::marker::PhantomData;
 
 /// KKRT oblivious PRF sender.
@@ -38,10 +39,9 @@ impl<OT: OtReceiver<Msg = Block> + SemiHonest> ObliviousPrf for Sender<OT> {
 }
 
 impl<OT: OtReceiver<Msg = Block> + SemiHonest> OprfSender for Sender<OT> {
-    fn init<R, W, RNG>(channel: &mut Channel<R, W>, rng: &mut RNG) -> Result<Self, Error>
+    fn init<C, RNG>(channel: &mut C, rng: &mut RNG) -> Result<Self, Error>
     where
-        R: Read,
-        W: Write,
+        C: AbstractChannel,
         RNG: CryptoRng + RngCore,
     {
         let mut ot = OT::init(channel, rng)?;
@@ -65,15 +65,14 @@ impl<OT: OtReceiver<Msg = Block> + SemiHonest> OprfSender for Sender<OT> {
         })
     }
 
-    fn send<R, W, RNG>(
+    fn send<C, RNG>(
         &mut self,
-        channel: &mut Channel<R, W>,
+        channel: &mut C,
         m: usize,
         _: &mut RNG,
     ) -> Result<Vec<Self::Seed>, Error>
     where
-        R: Read,
-        W: Write,
+        C: AbstractChannel,
         RNG: CryptoRng + RngCore,
     {
         // Round up if necessary so that `m mod 16 ≡ 0`.
@@ -86,8 +85,8 @@ impl<OT: OtReceiver<Msg = Block> + SemiHonest> OprfSender for Sender<OT> {
             let range = j * nrows / 8..(j + 1) * nrows / 8;
             let mut q = &mut qs[range];
             self.rngs[j].fill_bytes(&mut q);
-            channel.read_bytes_inplace(&mut t0)?;
-            channel.read_bytes_inplace(&mut t1)?;
+            channel.read_bytes(&mut t0)?;
+            channel.read_bytes(&mut t1)?;
             scutils::xor_inplace(&mut q, if *b { &t1 } else { &t0 });
         }
         let qs = utils::transpose(&qs, ncols, nrows);
@@ -138,15 +137,10 @@ impl<OT: OtSender<Msg = Block> + SemiHonest> ObliviousPrf for Receiver<OT> {
 }
 
 impl<OT: OtSender<Msg = Block> + SemiHonest> OprfReceiver for Receiver<OT> {
-    fn init<R: Read, W: Write, RNG: CryptoRng + RngCore>(
-        channel: &mut Channel<R, W>,
+    fn init<C: AbstractChannel, RNG: CryptoRng + RngCore>(
+        channel: &mut C,
         rng: &mut RNG,
-    ) -> Result<Self, Error>
-    where
-        R: Read,
-        W: Write,
-        RNG: CryptoRng + RngCore,
-    {
+    ) -> Result<Self, Error> {
         let mut ot = OT::init(channel, rng)?;
         let seeds = (0..4).map(|_| rng.gen()).collect::<Vec<Block>>();
         let keys = cointoss::receive(channel, &seeds)?;
@@ -171,9 +165,9 @@ impl<OT: OtSender<Msg = Block> + SemiHonest> OprfReceiver for Receiver<OT> {
         })
     }
 
-    fn receive<R: Read, W: Write, RNG: CryptoRng + RngCore>(
+    fn receive<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         &mut self,
-        channel: &mut Channel<R, W>,
+        channel: &mut C,
         inputs: &[Self::Input],
         rng: &mut RNG,
     ) -> Result<Vec<Self::Output>, Error> {
@@ -223,7 +217,7 @@ impl<OT: OtSender<Msg = Block> + SemiHonest> SemiHonest for Receiver<OT> {}
 mod tests {
     use super::*;
     use crate::oprf;
-    use scuttlebutt::AesRng;
+    use scuttlebutt::{AesRng, Channel};
     use std::io::{BufReader, BufWriter};
     use std::os::unix::net::UnixStream;
     use std::sync::{Arc, Mutex};

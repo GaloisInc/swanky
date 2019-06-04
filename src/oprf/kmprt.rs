@@ -14,9 +14,8 @@ use crate::oprf::{
     ProgrammableSender as OpprfSender, Receiver as OprfReceiver, Sender as OprfSender,
 };
 use rand::{CryptoRng, Rng, RngCore};
-use scuttlebutt::{Aes128, Block, Block512, Channel, SemiHonest};
+use scuttlebutt::{AbstractChannel, Aes128, Block, Block512, SemiHonest};
 use std::collections::HashSet;
-use std::io::{Read, Write};
 
 mod cuckoo;
 
@@ -99,10 +98,9 @@ impl<OPRF: OprfSender<Seed = Block512, Input = Block, Output = Block512> + SemiH
 impl<OPRF: OprfSender<Seed = Block512, Input = Block, Output = Block512> + SemiHonest> OpprfSender
     for SingleSender<OPRF>
 {
-    fn init<R, W, RNG>(channel: &mut Channel<R, W>, rng: &mut RNG) -> Result<Self, Error>
+    fn init<C, RNG>(channel: &mut C, rng: &mut RNG) -> Result<Self, Error>
     where
-        R: Read,
-        W: Write,
+        C: AbstractChannel,
         RNG: CryptoRng + RngCore,
     {
         let oprf = OPRF::init(channel, rng)?;
@@ -113,17 +111,16 @@ impl<OPRF: OprfSender<Seed = Block512, Input = Block, Output = Block512> + SemiH
     /// into the PRF. The value `npoints` is an upper-bound on the length of
     /// `points`. The value `t` must be set to `1`, otherwise we return
     /// `Error::InvalidInputLength`.
-    fn send<R, W, RNG>(
+    fn send<C, RNG>(
         &mut self,
-        channel: &mut Channel<R, W>,
+        channel: &mut C,
         points: &[(Self::Input, Self::Output)],
         npoints: usize,
         t: usize,
         rng: &mut RNG,
     ) -> Result<Vec<(Self::Seed, Self::Hint)>, Error>
     where
-        R: Read,
-        W: Write,
+        C: AbstractChannel,
         RNG: CryptoRng + RngCore,
     {
         if t != 1 {
@@ -241,26 +238,24 @@ impl<OPRF: OprfReceiver<Seed = Block512, Input = Block, Output = Block512> + Sem
 impl<OPRF: OprfReceiver<Seed = Block512, Input = Block, Output = Block512> + SemiHonest>
     OpprfReceiver for SingleReceiver<OPRF>
 {
-    fn init<R, W, RNG>(channel: &mut Channel<R, W>, rng: &mut RNG) -> Result<Self, Error>
+    fn init<C, RNG>(channel: &mut C, rng: &mut RNG) -> Result<Self, Error>
     where
-        R: Read,
-        W: Write,
+        C: AbstractChannel,
         RNG: CryptoRng + RngCore,
     {
         let oprf = OPRF::init(channel, rng)?;
         Ok(Self { oprf })
     }
 
-    fn receive<R, W, RNG>(
+    fn receive<C, RNG>(
         &mut self,
-        channel: &mut Channel<R, W>,
+        channel: &mut C,
         _npoints: usize,
         inputs: &[Self::Input],
         rng: &mut RNG,
     ) -> Result<Vec<Self::Output>, Error>
     where
-        R: Read,
-        W: Write,
+        C: AbstractChannel,
         RNG: CryptoRng + RngCore,
     {
         if inputs.len() != 1 {
@@ -354,27 +349,25 @@ impl<T: OprfSender<Seed = Block512, Input = Block, Output = Block512> + SemiHone
 impl<T: OprfSender<Seed = Block512, Input = Block, Output = Block512> + SemiHonest> OpprfSender
     for Sender<T>
 {
-    fn init<R, W, RNG>(channel: &mut Channel<R, W>, rng: &mut RNG) -> Result<Self, Error>
+    fn init<C, RNG>(channel: &mut C, rng: &mut RNG) -> Result<Self, Error>
     where
-        R: Read,
-        W: Write,
+        C: AbstractChannel,
         RNG: CryptoRng + RngCore,
     {
         let opprf = SingleSender::<T>::init(channel, rng)?;
         Ok(Self { opprf })
     }
 
-    fn send<R, W, RNG>(
+    fn send<C, RNG>(
         &mut self,
-        channel: &mut Channel<R, W>,
+        channel: &mut C,
         points: &[(Self::Input, Self::Output)],
         _npoints: usize,
         ninputs: usize,
         rng: &mut RNG,
     ) -> Result<Vec<(Self::Seed, Self::Hint)>, Error>
     where
-        R: Read,
-        W: Write,
+        C: AbstractChannel,
         RNG: CryptoRng + RngCore,
     {
         let params = Parameters::new(ninputs)?;
@@ -467,26 +460,24 @@ impl<T: OprfReceiver<Seed = Block512, Input = Block, Output = Block512> + SemiHo
 impl<T: OprfReceiver<Seed = Block512, Input = Block, Output = Block512> + SemiHonest> OpprfReceiver
     for Receiver<T>
 {
-    fn init<R, W, RNG>(channel: &mut Channel<R, W>, rng: &mut RNG) -> Result<Self, Error>
+    fn init<C, RNG>(channel: &mut C, rng: &mut RNG) -> Result<Self, Error>
     where
-        R: Read,
-        W: Write,
+        C: AbstractChannel,
         RNG: CryptoRng + RngCore,
     {
         let opprf = SingleReceiver::<T>::init(channel, rng)?;
         Ok(Self { opprf })
     }
 
-    fn receive<R, W, RNG>(
+    fn receive<C, RNG>(
         &mut self,
-        channel: &mut Channel<R, W>,
+        channel: &mut C,
         _npoints: usize,
         inputs: &[Self::Input],
         rng: &mut RNG,
     ) -> Result<Vec<Self::Output>, Error>
     where
-        R: Read,
-        W: Write,
+        C: AbstractChannel,
         RNG: CryptoRng + RngCore,
     {
         let params = Parameters::new(inputs.len())?;
@@ -569,7 +560,7 @@ pub type KmprtReceiver = Receiver<oprf::KkrtReceiver>;
 mod tests {
     use super::*;
     use crate::oprf::{ProgrammableReceiver, ProgrammableSender};
-    use scuttlebutt::AesRng;
+    use scuttlebutt::{AesRng, Channel};
     use std::io::{BufReader, BufWriter};
     use std::os::unix::net::UnixStream;
     use std::sync::{Arc, Mutex};
