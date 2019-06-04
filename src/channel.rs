@@ -132,12 +132,12 @@ impl<R: Read, W: Write> Channel<R, W> {
     }
 
     /// Return a reader object wrapped in `Rc<RefCell>`.
-    pub fn reader(&mut self) -> Rc<RefCell<R>> {
+    pub fn reader(self) -> Rc<RefCell<R>> {
         self.reader.clone()
     }
 
     /// Return a writer object wrapped in `Rc<RefCell>`.
-    pub fn writer(&mut self) -> Rc<RefCell<W>> {
+    pub fn writer(self) -> Rc<RefCell<W>> {
         self.writer.clone()
     }
 }
