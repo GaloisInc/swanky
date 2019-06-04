@@ -12,9 +12,8 @@
 //! seed_`. Likewise, on input `seed`, the receiver gets `r`, sends `seed` to
 //! the sender, and then receives `seed_`, checking that `PRG(seed_) = r`.
 
-use crate::{AesRng, Block, Channel};
+use crate::{AbstractChannel, AesRng, Block};
 use rand_core::{RngCore, SeedableRng};
-use std::io::{Read, Write};
 
 /// Errors produced by the coin tossing protocol.
 #[derive(Debug)]
@@ -42,10 +41,7 @@ impl std::fmt::Display for Error {
 
 /// Coin tossing sender.
 #[inline]
-pub fn send<R: Read, W: Write>(
-    channel: &mut Channel<R, W>,
-    seeds: &[Block],
-) -> Result<Vec<Block>, Error> {
+pub fn send<C: AbstractChannel>(channel: &mut C, seeds: &[Block]) -> Result<Vec<Block>, Error> {
     let mut out = Vec::with_capacity(seeds.len());
     for seed in seeds.iter() {
         let mut rng = AesRng::from_seed(*seed);
@@ -67,10 +63,7 @@ pub fn send<R: Read, W: Write>(
 
 /// Coin tossing receiver.
 #[inline]
-pub fn receive<R: Read, W: Write>(
-    channel: &mut Channel<R, W>,
-    seeds: &[Block],
-) -> Result<Vec<Block>, Error> {
+pub fn receive<C: AbstractChannel>(channel: &mut C, seeds: &[Block]) -> Result<Vec<Block>, Error> {
     let mut coms = Vec::with_capacity(seeds.len());
     let mut out = Vec::with_capacity(seeds.len());
     for _ in 0..seeds.len() {
@@ -99,6 +92,7 @@ mod tests {
     #[cfg(feature = "nightly")]
     extern crate test;
     use super::*;
+    use crate::Channel;
     use std::io::{BufReader, BufWriter};
     use std::os::unix::net::UnixStream;
 
