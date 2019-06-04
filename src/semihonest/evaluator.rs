@@ -5,7 +5,7 @@
 // See LICENSE for licensing information.
 
 use crate::errors::Error;
-use fancy_garbling::{Evaluator as Ev, Fancy, Wire};
+use fancy_garbling::{FancyInput, Evaluator as Ev, Fancy, Wire};
 use ocelot::ot::Receiver as OtReceiver;
 use rand::{CryptoRng, RngCore};
 use scuttlebutt::{Block, Channel};
@@ -51,22 +51,28 @@ impl<
             .map_err(Error::from)
     }
 
+}
+
+impl<
+        R: Read + Send + Debug + 'static,
+        W: Write + Send + Debug,
+        RNG: CryptoRng + RngCore,
+        OT: OtReceiver<Msg = Block>,
+    > FancyInput for Evaluator<R, W, RNG, OT>
+{
     /// Receive a garbler input wire.
-    #[inline]
-    pub fn garbler_input(&mut self, modulus: u16) -> Result<Wire, Error> {
+    fn receive(&mut self, modulus: u16) -> Result<Wire, Error> {
         let w = self.evaluator.read_wire(modulus)?;
         Ok(w)
     }
 
     /// Receive garbler input wires.
-    #[inline]
-    pub fn garbler_inputs(&mut self, moduli: &[u16]) -> Result<Vec<Wire>, Error> {
-        moduli.iter().map(|q| self.garbler_input(*q)).collect()
+    fn receive_many(&mut self, moduli: &[u16]) -> Result<Vec<Wire>, Error> {
+        moduli.iter().map(|q| self.receive(*q)).collect()
     }
 
     /// Perform OT and obtain wires for the evaluator's inputs.
-    #[inline]
-    pub fn evaluator_inputs(&mut self, inputs: &[u16], moduli: &[u16]) -> Result<Vec<Wire>, Error> {
+    fn encode_many(&mut self, inputs: &[u16], moduli: &[u16]) -> Result<Vec<Wire>, Error> {
         let mut lens = Vec::new();
         let mut bs = Vec::new();
         for (x, q) in inputs.iter().zip(moduli.iter()) {
