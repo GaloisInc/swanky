@@ -8,29 +8,23 @@ use crate::errors::Error;
 use fancy_garbling::{Evaluator as Ev, Fancy, Wire};
 use ocelot::ot::Receiver as OtReceiver;
 use rand::{CryptoRng, RngCore};
-use scuttlebutt::{Block, Channel};
-use std::fmt::Debug;
-use std::io::{Read, Write};
+use scuttlebutt::{AbstractChannel, Block, SemiHonest};
 
 /// Semi-honest evaluator.
-pub struct Evaluator<R, W, RNG, OT> {
-    evaluator: Ev<R>,
-    channel: Channel<R, W>,
+pub struct Evaluator<C: AbstractChannel, RNG, OT> {
+    evaluator: Ev<C>,
+    channel: C,
     ot: OT,
     rng: RNG,
 }
 
-impl<
-        R: Read + Send + Debug + 'static,
-        W: Write + Send + Debug,
-        RNG: CryptoRng + RngCore,
-        OT: OtReceiver<Msg = Block>,
-    > Evaluator<R, W, RNG, OT>
+impl<C: AbstractChannel, RNG: CryptoRng + RngCore, OT: OtReceiver<Msg = Block>>
+    Evaluator<C, RNG, OT>
 {
     /// Make a new `Evaluator`.
-    pub fn new(mut channel: Channel<R, W>, mut rng: RNG) -> Result<Self, Error> {
+    pub fn new(mut channel: C, mut rng: RNG) -> Result<Self, Error> {
         let ot = OT::init(&mut channel, &mut rng)?;
-        let evaluator = Ev::new(channel.reader());
+        let evaluator = Ev::new(channel.clone());
         Ok(Evaluator {
             evaluator,
             channel,
@@ -98,12 +92,8 @@ fn combine(wires: &[Block], q: u16) -> Wire {
     })
 }
 
-impl<
-        R: Read + Send + Debug + 'static,
-        W: Write + Send + Debug,
-        RNG: CryptoRng + RngCore,
-        OT: OtReceiver<Msg = Block>,
-    > Fancy for Evaluator<R, W, RNG, OT>
+impl<C: AbstractChannel, RNG: CryptoRng + RngCore, OT: OtReceiver<Msg = Block>> Fancy
+    for Evaluator<C, RNG, OT>
 {
     type Item = Wire;
     type Error = Error;
@@ -143,3 +133,5 @@ impl<
         self.evaluator.output(&x).map_err(Self::Error::from)
     }
 }
+
+impl<C: AbstractChannel, RNG, OT> SemiHonest for Evaluator<C, RNG, OT> {}

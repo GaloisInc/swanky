@@ -18,15 +18,16 @@ mod tests {
     use fancy_garbling::circuit::Circuit;
     use fancy_garbling::dummy::Dummy;
     use fancy_garbling::util::RngExt;
-    use fancy_garbling::{CrtBundle, CrtGadgets, Fancy};
+    use fancy_garbling::{CrtBundle, CrtGadgets, Fancy, FancyInput};
     use itertools::Itertools;
     use ocelot::ot::{ChouOrlandiReceiver, ChouOrlandiSender};
-    use scuttlebutt::{AesRng, Channel};
+    use scuttlebutt::{AbstractChannel, AesRng, Channel};
     use std::io::{BufReader, BufWriter};
     use std::os::unix::net::UnixStream;
 
     type Reader = BufReader<UnixStream>;
     type Writer = BufWriter<UnixStream>;
+    type MyChannel = Channel<Reader, Writer>;
 
     fn addition<F: Fancy>(f: &mut F, a: &F::Item, b: &F::Item) -> Result<(), F::Error> {
         let c = f.add(&a, &b)?;
@@ -44,12 +45,9 @@ mod tests {
                     let reader = BufReader::new(sender.try_clone().unwrap());
                     let writer = BufWriter::new(sender);
                     let channel = Channel::new(reader, writer);
-                    let mut gb = Garbler::<Reader, Writer, AesRng, ChouOrlandiSender>::new(
-                        channel,
-                        rng,
-                        &[],
-                    )
-                    .unwrap();
+                    let mut gb =
+                        Garbler::<MyChannel, AesRng, ChouOrlandiSender>::new(channel, rng, &[])
+                            .unwrap();
                     let x = gb.garbler_input(a, 3).unwrap();
                     let ys = gb.evaluator_inputs(&[3]).unwrap();
                     addition(&mut gb, &x, &ys[0]).unwrap();
@@ -59,8 +57,7 @@ mod tests {
                 let writer = BufWriter::new(receiver);
                 let channel = Channel::new(reader, writer);
                 let mut ev =
-                    Evaluator::<Reader, Writer, AesRng, ChouOrlandiReceiver>::new(channel, rng)
-                        .unwrap();
+                    Evaluator::<MyChannel, AesRng, ChouOrlandiReceiver>::new(channel, rng).unwrap();
                 let x = ev.garbler_input(3).unwrap();
                 let ys = ev.evaluator_inputs(&[b], &[3]).unwrap();
                 addition(&mut ev, &x, &ys[0]).unwrap();
@@ -108,12 +105,11 @@ mod tests {
             let writer = BufWriter::new(sender);
             let channel = Channel::new(reader, writer);
             let mut gb =
-                Garbler::<Reader, Writer, AesRng, ChouOrlandiSender>::new(channel, rng, &[])
-                    .unwrap();
+                Garbler::<MyChannel, AesRng, ChouOrlandiSender>::new(channel, rng, &[]).unwrap();
             let xs = input
                 .iter()
                 .map(|x| {
-                    let (g, e) = gb.crt_encode(*x, q).unwrap();
+                    let (g, e) = gb.crt_encode_wire(*x, q).unwrap();
                     tx.send(e).unwrap();
                     g
                 })
@@ -126,7 +122,7 @@ mod tests {
         let writer = BufWriter::new(receiver);
         let channel = Channel::new(reader, writer);
         let mut ev =
-            Evaluator::<Reader, Writer, AesRng, ChouOrlandiReceiver>::new(channel, rng).unwrap();
+            Evaluator::<MyChannel, AesRng, ChouOrlandiReceiver>::new(channel, rng).unwrap();
         let xs = (0..n).map(|_| rx.recv().unwrap()).collect_vec();
         relu(&mut ev, &xs);
         let result = ev.decode_output().unwrap();
@@ -147,8 +143,7 @@ mod tests {
             let writer = BufWriter::new(sender);
             let channel = Channel::new(reader, writer);
             let mut gb =
-                Garbler::<Reader, Writer, AesRng, ChouOrlandiSender>::new(channel, rng, &[])
-                    .unwrap();
+                Garbler::<MyChannel, AesRng, ChouOrlandiSender>::new(channel, rng, &[]).unwrap();
             let xs = gb.garbler_inputs(&vec![0_u16; 128], &vec![2; 128]).unwrap();
             let ys = gb.evaluator_inputs(&vec![2; 128]).unwrap();
             circ_.eval(&mut gb, &xs, &ys).unwrap();
@@ -158,7 +153,7 @@ mod tests {
         let writer = BufWriter::new(receiver);
         let channel = Channel::new(reader, writer);
         let mut ev =
-            Evaluator::<Reader, Writer, AesRng, ChouOrlandiReceiver>::new(channel, rng).unwrap();
+            Evaluator::<MyChannel, AesRng, ChouOrlandiReceiver>::new(channel, rng).unwrap();
         let xs = ev.garbler_inputs(&vec![2; 128]).unwrap();
         let ys = ev
             .evaluator_inputs(&vec![0_u16; 128], &vec![2; 128])
@@ -180,7 +175,7 @@ mod tests {
             let reader = BufReader::new(sender.try_clone().unwrap());
             let writer = BufWriter::new(sender);
             let channel = Channel::new(reader, writer);
-            let mut gb = Garbler::<Reader, Writer, AesRng, ChouOrlandiSender>::new(
+            let mut gb = Garbler::<MyChannel, AesRng, ChouOrlandiSender>::new(
                 channel.clone(),
                 AesRng::new(),
                 &[],
@@ -192,12 +187,9 @@ mod tests {
 
             // new garbler instance, with mod 3 delta reused
             let d = gb.delta(q);
-            let mut gb2 = Garbler::<Reader, Writer, AesRng, ChouOrlandiSender>::new(
-                channel,
-                AesRng::new(),
-                &[d],
-            )
-            .unwrap();
+            let mut gb2 =
+                Garbler::<MyChannel, AesRng, ChouOrlandiSender>::new(channel, AesRng::new(), &[d])
+                    .unwrap();
 
             gb2.output(&z).unwrap();
         });
@@ -205,7 +197,7 @@ mod tests {
         let reader = BufReader::new(receiver.try_clone().unwrap());
         let writer = BufWriter::new(receiver);
         let channel = Channel::new(reader, writer);
-        let mut ev = Evaluator::<Reader, Writer, AesRng, ChouOrlandiReceiver>::new(
+        let mut ev = Evaluator::<MyChannel, AesRng, ChouOrlandiReceiver>::new(
             channel.clone(),
             AesRng::new(),
         )
@@ -215,7 +207,7 @@ mod tests {
         let z = ev.add(&x, &ys[0]).unwrap();
 
         let mut ev2 =
-            Evaluator::<Reader, Writer, AesRng, ChouOrlandiReceiver>::new(channel, AesRng::new())
+            Evaluator::<MyChannel, AesRng, ChouOrlandiReceiver>::new(channel, AesRng::new())
                 .unwrap();
         ev2.output(&z).unwrap();
 

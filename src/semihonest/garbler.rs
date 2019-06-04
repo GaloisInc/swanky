@@ -4,52 +4,43 @@
 // Copyright © 2019 Galois, Inc.
 // See LICENSE for licensing information.
 
-// use crate::comm;
 use crate::errors::Error;
-// use fancy_garbling::error::GarblerError;
 use fancy_garbling::{Fancy, Garbler as Gb, Wire};
 use ocelot::ot::Sender as OtSender;
 use rand::{CryptoRng, Rng, RngCore, SeedableRng};
-use scuttlebutt::{Block, Channel, SemiHonest};
-use std::fmt::Debug;
-use std::io::{Read, Write};
+use scuttlebutt::{AbstractChannel, Block, SemiHonest};
 
 /// Semi-honest garbler.
-pub struct Garbler<R, W, RNG, OT> {
-    garbler: Gb<W, RNG>,
-    channel: Channel<R, W>,
+pub struct Garbler<C, RNG, OT> {
+    garbler: Gb<C, RNG>,
+    channel: C,
     ot: OT,
     rng: RNG,
 }
 
-impl<R, W, OT, RNG> std::ops::Deref for Garbler<R, W, RNG, OT> {
-    type Target = Gb<W, RNG>;
+impl<C, OT, RNG> std::ops::Deref for Garbler<C, RNG, OT> {
+    type Target = Gb<C, RNG>;
     fn deref(&self) -> &Self::Target {
         &self.garbler
     }
 }
 
-impl<R, W, OT, RNG> std::ops::DerefMut for Garbler<R, W, RNG, OT> {
-    fn deref_mut(&mut self) -> &mut Gb<W, RNG> {
+impl<C, OT, RNG> std::ops::DerefMut for Garbler<C, RNG, OT> {
+    fn deref_mut(&mut self) -> &mut Gb<C, RNG> {
         &mut self.garbler
     }
 }
 
 impl<
-        R: Read + Send,
-        W: Write + Send + Debug + 'static,
+        C: AbstractChannel,
         RNG: CryptoRng + RngCore + SeedableRng<Seed = Block>,
         OT: OtSender<Msg = Block>, // + SemiHonest
-    > Garbler<R, W, RNG, OT>
+    > Garbler<C, RNG, OT>
 {
     /// Make a new `Garbler`.
-    pub fn new(
-        mut channel: Channel<R, W>,
-        mut rng: RNG,
-        reused_deltas: &[Wire],
-    ) -> Result<Self, Error> {
+    pub fn new(mut channel: C, mut rng: RNG, reused_deltas: &[Wire]) -> Result<Self, Error> {
         let ot = OT::init(&mut channel, &mut rng)?;
-        let garbler = Gb::new(channel.writer(), RNG::from_seed(rng.gen()), reused_deltas);
+        let garbler = Gb::new(channel.clone(), RNG::from_seed(rng.gen()), reused_deltas);
         Ok(Garbler {
             garbler,
             channel,
@@ -61,7 +52,7 @@ impl<
     /// Encode and send a garbler input wire.
     #[inline]
     pub fn garbler_input(&mut self, val: u16, modulus: u16) -> Result<Wire, Error> {
-        let (mine, theirs) = self.garbler.encode(val, modulus);
+        let (mine, theirs) = self.garbler.encode_wire(val, modulus);
         self.garbler.send_wire(&theirs)?;
         self.channel.flush()?;
         Ok(mine)
@@ -74,7 +65,7 @@ impl<
             .iter()
             .zip(moduli.iter())
             .map(|(x, q)| {
-                let (mine, theirs) = self.garbler.encode(*x, *q);
+                let (mine, theirs) = self.garbler.encode_wire(*x, *q);
                 self.garbler.send_wire(&theirs)?;
                 Ok(mine)
             })
@@ -121,11 +112,10 @@ impl<
 }
 
 impl<
-        R: Read + Send,
-        W: Write + Send + Debug + 'static,
+        C: AbstractChannel,
         RNG: CryptoRng + RngCore,
         OT: OtSender<Msg = Block>, // + SemiHonest
-    > Fancy for Garbler<R, W, RNG, OT>
+    > Fancy for Garbler<C, RNG, OT>
 {
     type Item = Wire;
     type Error = Error;
@@ -166,11 +156,4 @@ impl<
     }
 }
 
-impl<R, W, RNG, OT> SemiHonest for Garbler<R, W, RNG, OT>
-where
-    R: Read + Send,
-    W: Write + Send + Debug + 'static,
-    RNG: CryptoRng + RngCore,
-    OT: OtSender<Msg = Block>, // + SemiHonest
-{
-}
+impl<C, RNG, OT> SemiHonest for Garbler<C, RNG, OT> {}
