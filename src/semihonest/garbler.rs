@@ -8,9 +8,7 @@ use crate::errors::Error;
 use fancy_garbling::{Fancy, FancyInput, Garbler as Gb, Wire};
 use ocelot::ot::Sender as OtSender;
 use rand::{CryptoRng, Rng, RngCore, SeedableRng};
-use scuttlebutt::{AbstractChannel, Block, Channel, SemiHonest};
-use std::fmt::Debug;
-use std::io::{Read, Write};
+use scuttlebutt::{AbstractChannel, Block, SemiHonest};
 
 /// Semi-honest garbler.
 pub struct Garbler<C, RNG, OT> {
@@ -68,11 +66,10 @@ impl<
 }
 
 impl<
-        R: Read + Send,
-        W: Write + Send + Debug + 'static,
+        C: AbstractChannel,
         RNG: CryptoRng + RngCore + SeedableRng<Seed = Block>,
         OT: OtSender<Msg = Block>, // + SemiHonest
-    > FancyInput for Garbler<R, W, RNG, OT>
+    > FancyInput for Garbler<C, RNG, OT>
 {
     fn encode(&mut self, val: u16, modulus: u16) -> Result<Wire, Error> {
         let (mine, theirs) = self.garbler.encode_wire(val, modulus);

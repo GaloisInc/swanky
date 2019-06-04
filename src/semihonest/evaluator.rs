@@ -5,7 +5,7 @@
 // See LICENSE for licensing information.
 
 use crate::errors::Error;
-use fancy_garbling::{FancyInput, Evaluator as Ev, Fancy, Wire};
+use fancy_garbling::{Evaluator as Ev, Fancy, FancyInput, Wire};
 use ocelot::ot::Receiver as OtReceiver;
 use rand::{CryptoRng, RngCore};
 use scuttlebutt::{AbstractChannel, Block, SemiHonest};
@@ -44,15 +44,10 @@ impl<C: AbstractChannel, RNG: CryptoRng + RngCore, OT: OtReceiver<Msg = Block>>
             .receive(&mut self.channel, &inputs, &mut self.rng)
             .map_err(Error::from)
     }
-
 }
 
-impl<
-        R: Read + Send + Debug + 'static,
-        W: Write + Send + Debug,
-        RNG: CryptoRng + RngCore,
-        OT: OtReceiver<Msg = Block>,
-    > FancyInput for Evaluator<R, W, RNG, OT>
+impl<C: AbstractChannel, RNG: CryptoRng + RngCore, OT: OtReceiver<Msg = Block>> FancyInput
+    for Evaluator<C, RNG, OT>
 {
     /// Receive a garbler input wire.
     fn receive(&mut self, modulus: u16) -> Result<Wire, Error> {
