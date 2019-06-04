@@ -298,7 +298,7 @@ mod classic {
 mod streaming {
     use crate::dummy::{Dummy, DummyVal};
     use crate::util::RngExt;
-    use crate::Fancy;
+    use crate::{Fancy, FancyInput};
     use crate::{Evaluator, Garbler, Wire};
     use itertools::Itertools;
     use rand::thread_rng;
@@ -457,7 +457,7 @@ mod streaming {
 mod complex {
     use crate::dummy::Dummy;
     use crate::util::RngExt;
-    use crate::{CrtBundle, CrtGadgets, Evaluator, Fancy, Garbler};
+    use crate::{CrtBundle, CrtGadgets, Evaluator, Fancy, FancyInput, Garbler};
     use itertools::Itertools;
     use rand::thread_rng;
     use scuttlebutt::AesRng;

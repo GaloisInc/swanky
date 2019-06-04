@@ -9,9 +9,11 @@ use itertools::Itertools;
 mod binary;
 mod bundle;
 mod crt;
+mod input;
 pub use binary::{BinaryBundle, BinaryGadgets};
 pub use bundle::{Bundle, BundleGadgets};
 pub use crt::{CrtBundle, CrtGadgets};
+pub use input::FancyInput;
 
 /// An object that has some modulus. Basic object of `Fancy` computations.
 pub trait HasModulus {

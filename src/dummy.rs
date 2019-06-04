@@ -4,7 +4,7 @@
 //! creating any circuits.
 
 use crate::error::{DummyError, FancyError};
-use crate::fancy::{BinaryBundle, CrtBundle, Fancy, HasModulus};
+use crate::fancy::{FancyInput, Fancy, HasModulus};
 
 /// Simple struct that performs the fancy computation over `u16`.
 pub struct Dummy {
@@ -43,14 +43,16 @@ impl Dummy {
     pub fn get_output(self) -> Vec<u16> {
         self.outputs
     }
+}
 
-    /// Encode a dummy value
-    pub fn encode(&self, value: u16, modulus: u16) -> Result<DummyVal, DummyError> {
+impl FancyInput for Dummy {
+    /// Encode a single dummy value.
+    fn encode(&mut self, value: u16, modulus: u16) -> Result<DummyVal, DummyError> {
         Ok(DummyVal::new(value, modulus))
     }
 
     /// Encode a slice of inputs and a slice of moduli as DummyVals.
-    pub fn encode_many(&self, xs: &[u16], moduli: &[u16]) -> Result<Vec<DummyVal>, DummyError> {
+    fn encode_many(&mut self, xs: &[u16], moduli: &[u16]) -> Result<Vec<DummyVal>, DummyError> {
         if xs.len() != moduli.len() {
             return Err(DummyError::EncodingError);
         }
@@ -61,27 +63,9 @@ impl Dummy {
             .collect())
     }
 
-    /// Create a CrtBundle of DummyVal consisting of the CRT factorization of x using
-    /// composite modulus q.
-    pub fn crt_encode(&self, x: u128, q: u128) -> Result<CrtBundle<DummyVal>, DummyError> {
-        let ms = crate::util::factor(q);
-        let xs = crate::util::crt(x, &ms);
-        Ok(CrtBundle::new(
-            xs.into_iter()
-                .zip(ms.into_iter())
-                .map(|(x, q)| DummyVal::new(x, q))
-                .collect(),
-        ))
-    }
-
-    /// Create a BinaryBundle of DummyVal consisting of the `n` least significant bits of x.
-    pub fn bin_encode(&self, x: u128, n: usize) -> Result<BinaryBundle<DummyVal>, DummyError> {
-        Ok(BinaryBundle::new(
-            crate::util::u128_to_bits(x, n)
-                .into_iter()
-                .map(|b| DummyVal::new(b, 2))
-                .collect(),
-        ))
+    fn receive_many(&mut self, _moduli: &[u16]) -> Result<Vec<DummyVal>, DummyError> {
+        // Receive is undefined for Dummy which is a single party "protocol"
+        Err(DummyError::EncodingError)
     }
 }
 

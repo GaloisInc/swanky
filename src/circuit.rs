@@ -3,10 +3,11 @@
 
 use crate::dummy::DummyVal;
 use crate::error::{CircuitBuilderError, DummyError, FancyError, InformerError};
-use crate::fancy::{BinaryBundle, CrtBundle, Fancy, HasModulus};
+use crate::fancy::{BinaryBundle, CrtBundle, Fancy, FancyInput, HasModulus};
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use crate::informer::InformerVal;
 
 /// The index and modulus of a gate in a circuit.
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
@@ -261,13 +262,13 @@ impl Circuit {
         let gb = self
             .garbler_input_refs
             .iter()
-            .map(|r| informer.garbler_input(r.modulus()))
-            .collect_vec();
+            .map(|r| informer.receive(r.modulus()))
+            .collect::<Result<Vec<InformerVal>, InformerError>>()?;
         let ev = self
             .evaluator_input_refs
             .iter()
-            .map(|r| informer.evaluator_input(r.modulus()))
-            .collect_vec();
+            .map(|r| informer.receive(r.modulus()))
+            .collect::<Result<Vec<InformerVal>, InformerError>>()?;
 
         let outputs = self.eval(&mut informer, &gb, &ev)?;
         self.process_outputs(&outputs, &mut informer)?;

@@ -1,7 +1,7 @@
 //! `Informer` runs a fancy computation and learns information from it.
 
 use crate::error::{FancyError, InformerError};
-use crate::fancy::{Bundle, Fancy, HasModulus};
+use crate::fancy::{Fancy, FancyInput, HasModulus};
 use std::collections::{HashMap, HashSet};
 
 /// Implements `Fancy`. Used to learn information about a `Fancy` computation in
@@ -49,28 +49,6 @@ impl Informer {
             nciphertexts: 0,
             moduli: HashMap::new(),
         }
-    }
-
-    /// Create a garbler input.
-    pub fn garbler_input(&mut self, modulus: u16) -> InformerVal {
-        self.garbler_input_moduli.push(modulus);
-        InformerVal(modulus)
-    }
-
-    /// Create an evaluator input.
-    pub fn evaluator_input(&mut self, modulus: u16) -> InformerVal {
-        self.evaluator_input_moduli.push(modulus);
-        InformerVal(modulus)
-    }
-
-    /// Create a garbler input bundle.
-    pub fn garbler_input_bundle(&mut self, moduli: &[u16]) -> Bundle<InformerVal> {
-        Bundle::new(moduli.iter().map(|q| self.garbler_input(*q)).collect())
-    }
-
-    /// Create an evaluator input bundle.
-    pub fn evalautor_input_bundle(&mut self, moduli: &[u16]) -> Bundle<InformerVal> {
-        Bundle::new(moduli.iter().map(|q| self.evaluator_input(*q)).collect())
     }
 
     /// Print information about the fancy computation.
@@ -223,6 +201,25 @@ impl Informer {
     fn update_moduli(&mut self, q: u16) {
         let entry = self.moduli.entry(q).or_insert(0);
         *entry += 1;
+    }
+}
+
+impl FancyInput for Informer {
+    fn receive(&mut self, modulus: u16) -> Result<Self::Item, Self::Error> {
+        self.garbler_input_moduli.push(modulus);
+        Ok(InformerVal(modulus))
+    }
+
+    fn encode(&mut self, _value: u16, modulus: u16) -> Result<Self::Item, Self::Error> {
+        self.receive(modulus)
+    }
+
+    fn receive_many(&mut self, moduli: &[u16]) -> Result<Vec<Self::Item>, Self::Error> {
+        moduli.iter().map(|q| self.receive(*q)).collect()
+    }
+
+    fn encode_many(&mut self, _values: &[u16], moduli: &[u16]) -> Result<Vec<Self::Item>, Self::Error> {
+        moduli.iter().map(|q| self.receive(*q)).collect()
     }
 }
 
