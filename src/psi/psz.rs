@@ -142,7 +142,8 @@ impl Receiver {
         // Set up inputs to use `x || i` or `x` depending on whether the input
         // is in a bin or the stash.
         let inputs_ = tbl
-            .items()
+            .items
+            .iter()
             .map(|opt_item| {
                 if let Some(item) = opt_item {
                     if let Some(hidx) = item.hash_index {
@@ -192,7 +193,7 @@ impl Receiver {
         // Iterate through each input/output pair and see whether it exists in
         // the appropriate set.
         let mut intersection = Vec::with_capacity(n);
-        for (i, (opt_item, output)) in tbl.items().zip(outputs.into_iter()).enumerate() {
+        for (i, (opt_item, output)) in tbl.items.iter().zip(outputs.into_iter()).enumerate() {
             if let Some(item) = opt_item {
                 let prefix = output.prefix(masksize);
                 if let Some(hidx) = item.hash_index {
@@ -229,7 +230,6 @@ mod tests {
     use scuttlebutt::{AesRng, Channel};
     use std::io::{BufReader, BufWriter};
     use std::os::unix::net::UnixStream;
-    use std::time::SystemTime;
 
     const SIZE: usize = 16;
     const NTIMES: usize = 1 << 10;
@@ -244,39 +244,17 @@ mod tests {
             let reader = BufReader::new(sender.try_clone().unwrap());
             let writer = BufWriter::new(sender);
             let mut channel = Channel::new(reader, writer);
-            let start = SystemTime::now();
             let mut psi = PszSender::init(&mut channel, &mut rng).unwrap();
-            println!(
-                "Sender init time: {} ms",
-                start.elapsed().unwrap().as_millis()
-            );
-            let start = SystemTime::now();
             psi.send(&mut channel, &sender_inputs, &mut rng).unwrap();
-            println!(
-                "[{}] Send time: {} ms",
-                NTIMES,
-                start.elapsed().unwrap().as_millis()
-            );
         });
         let mut rng = AesRng::new();
         let reader = BufReader::new(receiver.try_clone().unwrap());
         let writer = BufWriter::new(receiver);
         let mut channel = Channel::new(reader, writer);
-        let start = SystemTime::now();
         let mut psi = PszReceiver::init(&mut channel, &mut rng).unwrap();
-        println!(
-            "Receiver init time: {} ms",
-            start.elapsed().unwrap().as_millis()
-        );
-        let start = SystemTime::now();
         let intersection = psi
             .receive(&mut channel, &receiver_inputs, &mut rng)
             .unwrap();
-        println!(
-            "[{}] Receiver time: {} ms",
-            NTIMES,
-            start.elapsed().unwrap().as_millis()
-        );
         handle.join().unwrap();
         assert_eq!(intersection.len(), NTIMES);
     }

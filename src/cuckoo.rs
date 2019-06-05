@@ -19,7 +19,7 @@ pub(crate) struct CuckooItem {
 }
 
 pub(crate) struct CuckooHash {
-    items: Vec<Option<CuckooItem>>,
+    pub(crate) items: Vec<Option<CuckooItem>>,
     pub(crate) nbins: usize,
     pub(crate) stashsize: usize,
     pub(crate) nhashes: usize,
@@ -154,11 +154,11 @@ impl CuckooHash {
     /// Output the bin number for a given hash output `hash` and hash index `hidx`.
     #[inline]
     pub fn bin(hash: Block, hidx: usize, nbins: usize) -> usize {
-        // The first 15 bytes are uniformly(-ish) random, so we use the hash
+        // The first 15 bytes of `hash` are uniformly(-ish) random, so we use it
         // directly to determine our bin by indexing the `hidx`th 32 bits of
-        // `hash` modulo `nbins`. We can't do this for more than three hash
-        // functions though, as the last byte is *not* uniformly(-ish) random.
-        // Instead, we run it through AES (slow!).
+        // `hash` then mod-ing it by `nbins`. We can't do this for more than
+        // three hash functions though, as the last byte is *not*
+        // uniformly(-ish) random. Instead, we run it through AES (slow!).
         if hidx < 3 {
             let mut array = [0u8; 4];
             let bytes: [u8; 16] = hash.into();
@@ -166,16 +166,11 @@ impl CuckooHash {
             let value = u32::from_le_bytes(array);
             (value as usize) % nbins
         } else {
-            // XXX: This is fine, right?!
+            // In this case, compute `AES_{hash}(hidx)`.
             let aes = Aes128::new(hash);
             let h = aes.encrypt(Block::from(hidx as u128));
             (u128::from(h) % (nbins as u128)) as usize
         }
-    }
-
-    #[inline]
-    pub fn items(&self) -> impl Iterator<Item = &Option<CuckooItem>> {
-        self.items.iter()
     }
 }
 

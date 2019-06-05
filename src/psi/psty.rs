@@ -206,21 +206,16 @@ impl Receiver {
         channel.write_usize(nbins)?;
         channel.flush()?;
 
-        // Fill in table with default values
+        // Build `table` to include a cuckoo hash entry xored with its hash
+        // index, if such a entry exists, or a random value.
         let table = cuckoo
-            .items()
+            .items
+            .iter()
             .map(|opt_item| match opt_item {
-                Some(item) => {
-                    item.entry
-                        ^ Block::from(
-                            item.hash_index
-                                .expect("cuckoo must be stash-less for this protocol")
-                                as u128,
-                        )
-                }
+                Some(item) => item.entry ^ Block::from(item.hash_index.unwrap() as u128),
                 None => rng.gen(),
             })
-            .collect_vec();
+            .collect::<Vec<Block>>();
 
         let opprf_outputs = self.opprf.receive(channel, 0, &table, rng)?;
 
@@ -269,12 +264,7 @@ impl Receiver {
 
         let mut intersection = Vec::new();
 
-        for (opt_item, in_intersection) in state
-            .cuckoo
-            .items()
-            .into_iter()
-            .zip_eq(mpc_outs.into_iter())
-        {
+        for (opt_item, in_intersection) in state.cuckoo.items.iter().zip_eq(mpc_outs.into_iter()) {
             if let Some(item) = opt_item {
                 if in_intersection == 1_u16 {
                     intersection.push(state.inputs[item.input_index].clone());
@@ -399,7 +389,6 @@ mod tests {
     use scuttlebutt::{AesRng, Channel};
     use std::io::{BufReader, BufWriter};
     use std::os::unix::net::UnixStream;
-    use std::time::SystemTime;
 
     const ITEM_SIZE: usize = 8;
     const SET_SIZE: usize = 1 << 6;
@@ -412,53 +401,26 @@ mod tests {
 
         std::thread::spawn(move || {
             let mut rng = AesRng::from_seed(Block::from(1));
-
             let reader = BufReader::new(sender.try_clone().unwrap());
             let writer = BufWriter::new(sender);
             let mut channel = Channel::new(reader, writer);
-
-            let start = SystemTime::now();
             let mut psi = Sender::init(&mut channel, &mut rng).unwrap();
-            println!(
-                "Sender init time: {} ms",
-                start.elapsed().unwrap().as_millis()
-            );
 
-            let start = SystemTime::now();
             psi.send(&mut channel, &sender_inputs, &mut rng).unwrap();
             psi.compute_cardinality(&mut channel, &mut rng).unwrap();
             // psi.compute_intersection(&mut channel, &mut rng).unwrap();
-            println!(
-                "[{}] Send time: {} ms",
-                SET_SIZE,
-                start.elapsed().unwrap().as_millis()
-            );
         });
 
         let mut rng = AesRng::from_seed(Block::from(1));
-
         let reader = BufReader::new(receiver.try_clone().unwrap());
         let writer = BufWriter::new(receiver);
         let mut channel = Channel::new(reader, writer);
-
-        let start = SystemTime::now();
         let mut psi = Receiver::init(&mut channel, &mut rng).unwrap();
-        println!(
-            "Receiver init time: {} ms",
-            start.elapsed().unwrap().as_millis()
-        );
 
-        let start = SystemTime::now();
         psi.receive(&mut channel, &receiver_inputs, &mut rng)
             .unwrap();
         let cardinality = psi.compute_cardinality(&mut channel, &mut rng).unwrap();
         // let intersection = psi.compute_intersection(&mut channel, &mut rng).unwrap();
-
-        println!(
-            "[{}] Receiver time: {} ms",
-            SET_SIZE,
-            start.elapsed().unwrap().as_millis()
-        );
 
         // assert_eq!(intersection.len(), SET_SIZE);
         assert_eq!(cardinality, SET_SIZE);
@@ -491,7 +453,7 @@ mod tests {
         }
 
         // each item in a cuckoo bin should also be in one of the table bins
-        for (opt_item, bin) in cuckoo.items().zip_eq(&table) {
+        for (opt_item, bin) in cuckoo.items.iter().zip_eq(&table) {
             if let Some(item) = opt_item {
                 assert!(bin.iter().any(|bin_elem| *bin_elem
                     == item.entry ^ Block::from(item.hash_index.unwrap() as u128)));
