@@ -13,8 +13,7 @@ use crate::ot::{
     Sender as OtSender,
 };
 use crate::utils;
-use rand::CryptoRng;
-use rand_core::{RngCore, SeedableRng};
+use rand::{CryptoRng, RngCore, SeedableRng};
 use scuttlebutt::utils as scutils;
 use scuttlebutt::{AbstractChannel, AesHash, AesRng, Block, SemiHonest, AES_HASH};
 use std::convert::TryInto;

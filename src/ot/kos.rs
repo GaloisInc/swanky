@@ -14,8 +14,7 @@ use crate::ot::{
     Sender as OtSender,
 };
 use crate::utils;
-use rand::CryptoRng;
-use rand_core::{RngCore, SeedableRng};
+use rand::{CryptoRng, RngCore, SeedableRng};
 use scuttlebutt::{cointoss, AbstractChannel, AesRng, Block, Malicious, SemiHonest};
 use std::convert::TryInto;
 use std::io::ErrorKind;

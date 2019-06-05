@@ -481,7 +481,7 @@ impl<T: OprfReceiver<Seed = Block512, Input = Block, Output = Block512> + SemiHo
         RNG: CryptoRng + RngCore,
     {
         let params = Parameters::new(inputs.len())?;
-        let mut table;
+        let table;
         // Generate random values to be used for the hash functions. We loop,
         // trying random `hashkeys` each time until we can successfully build
         // the cuckoo hash. Once successful, we send `hashkeys` to the sender so
@@ -492,22 +492,19 @@ impl<T: OprfReceiver<Seed = Block512, Input = Block, Output = Block512> + SemiHo
                 .collect::<Vec<Block>>();
             // let hashkeys = cointoss::receive(reader, writer, &seeds)?;
             // Build a cuckoo hash table using `hashkeys`.
-            match cuckoo::CuckooHash::build(
+            if let Ok(table_) = cuckoo::CuckooHash::build(
                 inputs,
                 &hashkeys,
                 (params.m1, params.m2),
                 (params.h1, params.h2),
             ) {
-                Ok(table_) => {
-                    table = table_;
-                    // Send `hashkeys` to the sender.
-                    for h in hashkeys.into_iter() {
-                        channel.write_block(&h)?;
-                    }
-                    break;
+                table = table_;
+                // Send `hashkeys` to the sender.
+                for h in hashkeys.into_iter() {
+                    channel.write_block(&h)?;
                 }
-                Err(_) => (), // Let's try again!
-            };
+                break;
+            }
         }
         let mut outputs = (0..inputs.len())
             .map(|_| Default::default())
