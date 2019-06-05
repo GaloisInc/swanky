@@ -74,50 +74,50 @@ where
     ) -> Result<Vec<Self::Output>, Error>;
 }
 
-/// Trait containing the associated types used by an oblivious programmable PRF.
-#[cfg(feature = "unstable")]
-pub trait ObliviousPprf: ObliviousPrf {
-    /// PRF hint.
-    type Hint: Sized;
-}
+// /// Trait containing the associated types used by an oblivious programmable PRF.
+// #[cfg(feature = "unstable")]
+// pub trait ObliviousPprf: ObliviousPrf {
+//     /// PRF hint.
+//     type Hint: Sized;
+// }
 
-/// Trait for an oblivious programmable PRF sender.
-#[cfg(feature = "unstable")]
-pub trait ProgrammableSender: ObliviousPprf {
-    /// Runs any one-time initialization.
-    fn init<C: AbstractChannel, RNG: CryptoRng + RngCore>(
-        channel: &mut C,
-        rng: &mut RNG,
-    ) -> Result<Self, Error>;
-    /// Runs `m` OPRF instances as the sender, returning the OPRF seeds.
-    fn send<C: AbstractChannel, RNG: CryptoRng + RngCore>(
-        &mut self,
-        channel: &mut C,
-        points: &[(Self::Input, Self::Output)],
-        // Max number of points allowed.
-        npoints: usize,
-        ninputs: usize,
-        rng: &mut RNG,
-    ) -> Result<Vec<(Self::Seed, Self::Hint)>, Error>;
-    /// Computes the oblivious PRF on seed `seed` and input `input`.
-    fn compute(&self, seed: &Self::Seed, hint: &Self::Hint, input: &Self::Input) -> Self::Output;
-}
+// /// Trait for an oblivious programmable PRF sender.
+// #[cfg(feature = "unstable")]
+// pub trait ProgrammableSender: ObliviousPprf {
+//     /// Runs any one-time initialization.
+//     fn init<C: AbstractChannel, RNG: CryptoRng + RngCore>(
+//         channel: &mut C,
+//         rng: &mut RNG,
+//     ) -> Result<Self, Error>;
+//     /// Runs `m` OPRF instances as the sender, returning the OPRF seeds.
+//     fn send<C: AbstractChannel, RNG: CryptoRng + RngCore>(
+//         &mut self,
+//         channel: &mut C,
+//         points: &[(Self::Input, Self::Output)],
+//         // Max number of points allowed.
+//         npoints: usize,
+//         ninputs: usize,
+//         rng: &mut RNG,
+//     ) -> Result<Vec<(Self::Seed, Self::Hint)>, Error>;
+//     /// Computes the oblivious PRF on seed `seed` and input `input`.
+//     fn compute(&self, seed: &Self::Seed, hint: &Self::Hint, input: &Self::Input) -> Self::Output;
+// }
 
-/// Trait for an oblivious programmable PRF receiver.
-#[cfg(feature = "unstable")]
-pub trait ProgrammableReceiver: ObliviousPprf {
-    /// Runs any one-time initialization.
-    fn init<C: AbstractChannel, RNG: CryptoRng + RngCore>(
-        channel: &mut C,
-        rng: &mut RNG,
-    ) -> Result<Self, Error>;
-    /// Runs the oblivious PRF on inputs `inputs`, returning the OPRF outputs.
-    fn receive<C: AbstractChannel, RNG: CryptoRng + RngCore>(
-        &mut self,
-        channel: &mut C,
-        // Max number of points allowed.
-        npoints: usize,
-        inputs: &[Self::Input],
-        rng: &mut RNG,
-    ) -> Result<Vec<Self::Output>, Error>;
-}
+// /// Trait for an oblivious programmable PRF receiver.
+// #[cfg(feature = "unstable")]
+// pub trait ProgrammableReceiver: ObliviousPprf {
+//     /// Runs any one-time initialization.
+//     fn init<C: AbstractChannel, RNG: CryptoRng + RngCore>(
+//         channel: &mut C,
+//         rng: &mut RNG,
+//     ) -> Result<Self, Error>;
+//     /// Runs the oblivious PRF on inputs `inputs`, returning the OPRF outputs.
+//     fn receive<C: AbstractChannel, RNG: CryptoRng + RngCore>(
+//         &mut self,
+//         channel: &mut C,
+//         // Max number of points allowed.
+//         npoints: usize,
+//         inputs: &[Self::Input],
+//         rng: &mut RNG,
+//     ) -> Result<Vec<Self::Output>, Error>;
+// }

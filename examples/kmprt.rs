@@ -4,24 +4,19 @@
 // Copyright © 2019 Galois, Inc.
 // See LICENSE for licensing information.
 
-use ocelot::oprf::kmprt::{KmprtSingleReceiver, KmprtSingleSender};
-use ocelot::oprf::{ProgrammableReceiver, ProgrammableSender};
+use ocelot::oprf::kmprt::{KmprtReceiver, KmprtSender};
 use rand::Rng;
-use scuttlebutt::{AesRng, Block, Block512, Channel};
+use scuttlebutt::{AesRng, Block, Block512, TrackChannel};
 use std::io::{BufReader, BufWriter};
 use std::os::unix::net::UnixStream;
+use std::time::SystemTime;
 
 fn rand_block_vec(size: usize) -> Vec<Block> {
     (0..size).map(|_| rand::random::<Block>()).collect()
 }
 
-fn _test_opprf<
-    S: ProgrammableSender<Seed = Block512, Input = Block, Output = Block512>,
-    R: ProgrammableReceiver<Seed = Block512, Input = Block, Output = Block512>,
->(
-    ninputs: usize,
-    npoints: usize,
-) {
+fn run(ninputs: usize, npoints: usize) {
+    println!("npoints = {}, ninputs = {}", npoints, ninputs);
     let inputs = rand_block_vec(ninputs);
     let mut rng = AesRng::new();
     let points = (0..npoints)
@@ -32,23 +27,59 @@ fn _test_opprf<
         let mut rng = AesRng::new();
         let reader = BufReader::new(sender.try_clone().unwrap());
         let writer = BufWriter::new(sender);
-        let mut channel = Channel::new(reader, writer);
-        let mut oprf = S::init(&mut channel, &mut rng).unwrap();
+        let mut channel = TrackChannel::new(reader, writer);
+        let start = SystemTime::now();
+        let mut oprf = KmprtSender::init(&mut channel, &mut rng).unwrap();
+        println!(
+            "Sender init time: {} ms",
+            start.elapsed().unwrap().as_millis()
+        );
+        let start = SystemTime::now();
         let _ = oprf
             .send(&mut channel, &points, npoints, ninputs, &mut rng)
             .unwrap();
+        println!(
+            "Sender send time: {} ms",
+            start.elapsed().unwrap().as_millis()
+        );
+        println!(
+            "Sender communication (read): {:.2} Mb",
+            channel.kilobits_read() / 1000.0
+        );
+        println!(
+            "Sender communication (write): {:.2} Mb",
+            channel.kilobits_written() / 1000.0
+        );
     });
     let mut rng = AesRng::new();
     let reader = BufReader::new(receiver.try_clone().unwrap());
     let writer = BufWriter::new(receiver);
-    let mut channel = Channel::new(reader, writer);
-    let mut oprf = R::init(&mut channel, &mut rng).unwrap();
+    let mut channel = TrackChannel::new(reader, writer);
+    let start = SystemTime::now();
+    let mut oprf = KmprtReceiver::init(&mut channel, &mut rng).unwrap();
+    println!(
+        "Receiver init time: {} ms",
+        start.elapsed().unwrap().as_millis()
+    );
+    let start = SystemTime::now();
     let _ = oprf
         .receive(&mut channel, npoints, &inputs, &mut rng)
         .unwrap();
+    println!(
+        "Receiver send time: {} ms",
+        start.elapsed().unwrap().as_millis()
+    );
     handle.join().unwrap();
+    println!(
+        "Receiver communication (read): {:.2} Mb",
+        channel.kilobits_read() / 1000.0
+    );
+    println!(
+        "Receiver communication (write): {:.2} Mb",
+        channel.kilobits_written() / 1000.0
+    );
 }
 
 fn main() {
-    _test_opprf::<KmprtSingleSender, KmprtSingleReceiver>(1, 8);
+    run(83231, 196608);
 }

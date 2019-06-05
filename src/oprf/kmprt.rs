@@ -9,13 +9,11 @@
 //! <https://eprint.iacr.org/2017/799>).
 
 use crate::errors::Error;
-use crate::oprf::{
-    ObliviousPprf, ObliviousPrf, ProgrammableReceiver as OpprfReceiver,
-    ProgrammableSender as OpprfSender, Receiver as OprfReceiver, Sender as OprfSender,
-};
+use crate::oprf::{Receiver as OprfReceiver, Sender as OprfSender};
 use rand::{CryptoRng, Rng, RngCore};
 use scuttlebutt::{AbstractChannel, Aes128, Block, Block512, SemiHonest};
 use std::collections::HashSet;
+use std::time::SystemTime;
 
 mod cuckoo;
 
@@ -62,41 +60,13 @@ fn hash_output_keyed(y: &Block512, k: &Aes128, range: usize) -> usize {
     (u128::from(h) % (range as u128)) as usize
 }
 
-/// The oblivious programmable PRF hint.
-#[derive(Clone)]
-pub struct Hint(Block, Vec<Block512>);
-
-impl Hint {
-    /// Generate a random hint with table size `n`.
-    #[inline]
-    pub fn rand<RNG: CryptoRng + RngCore>(rng: &mut RNG, n: usize) -> Self {
-        let block = rng.gen::<Block>();
-        let table = (0..n).map(|_| rng.gen()).collect::<Vec<Block512>>();
-        Hint(block, table)
-    }
-}
-
 /// KMPRT oblivious programmable PRF sender for a single input value.
 pub struct SingleSender<OPRF: OprfSender + SemiHonest> {
     oprf: OPRF,
 }
 
-impl<OPRF: OprfSender<Seed = Block512, Input = Block, Output = Block512> + SemiHonest> ObliviousPrf
-    for SingleSender<OPRF>
-{
-    type Seed = Block512;
-    type Input = Block;
-    type Output = Block512;
-}
-
-impl<OPRF: OprfSender<Seed = Block512, Input = Block, Output = Block512> + SemiHonest> ObliviousPprf
-    for SingleSender<OPRF>
-{
-    type Hint = Hint;
-}
-
-impl<OPRF: OprfSender<Seed = Block512, Input = Block, Output = Block512> + SemiHonest> OpprfSender
-    for SingleSender<OPRF>
+impl<OPRF: OprfSender<Seed = Block512, Input = Block, Output = Block512> + SemiHonest>
+    SingleSender<OPRF>
 {
     fn init<C, RNG>(channel: &mut C, rng: &mut RNG) -> Result<Self, Error>
     where
@@ -114,11 +84,11 @@ impl<OPRF: OprfSender<Seed = Block512, Input = Block, Output = Block512> + SemiH
     fn send<C, RNG>(
         &mut self,
         channel: &mut C,
-        points: &[(Self::Input, Self::Output)],
+        points: &[(Block, Block512)],
         npoints: usize,
         t: usize,
         rng: &mut RNG,
-    ) -> Result<Vec<(Self::Seed, Self::Hint)>, Error>
+    ) -> Result<(), Error>
     where
         C: AbstractChannel,
         RNG: CryptoRng + RngCore,
@@ -129,7 +99,7 @@ impl<OPRF: OprfSender<Seed = Block512, Input = Block, Output = Block512> + SemiH
         // Check that all input points are unique.
         debug_assert_eq!(
             {
-                let mut points = points.iter().map(|(x, _)| *x).collect::<Vec<Self::Input>>();
+                let mut points = points.iter().map(|(x, _)| *x).collect::<Vec<Block>>();
                 points.sort();
                 points.dedup();
                 points.len()
@@ -137,13 +107,20 @@ impl<OPRF: OprfSender<Seed = Block512, Input = Block, Output = Block512> + SemiH
             points.len()
         );
         assert!(points.len() <= npoints);
+        let total = SystemTime::now();
+        let start = SystemTime::now();
         let seeds = self.oprf.send(channel, 1, rng)?;
         let seed = seeds[0];
+        // println!(
+        //     "SingleSender :: OPRF send time: {} μs",
+        //     start.elapsed().unwrap().as_micros()
+        // );
+        let start = SystemTime::now();
         let mut v = rng.gen::<Block>();
         let mut aes = Aes128::new(v);
         let mut map = HashSet::with_capacity(points.len());
         // Store compute `y`s and `h`s for later use.
-        let mut ys = vec![Self::Output::default(); points.len()];
+        let mut ys = vec![Block512::default(); points.len()];
         let mut hs = vec![usize::default(); points.len()];
         let mut offset = 0;
         // Guess a size for `table` using `offset`, and then try to fill
@@ -180,6 +157,11 @@ impl<OPRF: OprfSender<Seed = Block512, Input = Block, Output = Block512> + SemiH
             offset += increment;
             m = table_size(npoints, offset);
         }
+        // println!(
+        //     "SingleSender :: init table time: {} μs",
+        //     start.elapsed().unwrap().as_micros()
+        // );
+        let start = SystemTime::now();
         let mut table = vec![Block512::default(); m];
         // Place points in table based on the hash of their OPRF output.
         for (h, (y_, (_, y))) in hs.into_iter().zip(ys.into_iter().zip(points.iter())) {
@@ -191,23 +173,21 @@ impl<OPRF: OprfSender<Seed = Block512, Input = Block, Output = Block512> + SemiH
                 *entry = rng.gen::<Block512>();
             }
         }
+        // println!(
+        //     "SingleSender :: table build time: {} μs",
+        //     start.elapsed().unwrap().as_micros()
+        // );
         // Send `v` and `table` to the receiver.
         channel.write_block(&v)?;
         for entry in table.iter() {
             channel.write_block512(entry)?;
         }
         channel.flush()?;
-        let hint = Hint(v, table);
-        let output = vec![(seed, hint)];
-        Ok(output)
-    }
-
-    #[inline]
-    fn compute(&self, seed: &Self::Seed, hint: &Self::Hint, input: &Self::Input) -> Self::Output {
-        let (v, table) = (&hint.0, &hint.1);
-        let y = self.oprf.compute(*seed, *input);
-        let h = hash_output(&y, *v, table.len());
-        y ^ table[h]
+        // println!(
+        //     "SingleSender :: total time: {} μs",
+        //     total.elapsed().unwrap().as_micros()
+        // );
+        Ok(())
     }
 }
 
@@ -222,21 +202,7 @@ pub struct SingleReceiver<OPRF: OprfReceiver + SemiHonest> {
 }
 
 impl<OPRF: OprfReceiver<Seed = Block512, Input = Block, Output = Block512> + SemiHonest>
-    ObliviousPrf for SingleReceiver<OPRF>
-{
-    type Seed = Block512;
-    type Input = Block;
-    type Output = Block512;
-}
-
-impl<OPRF: OprfReceiver<Seed = Block512, Input = Block, Output = Block512> + SemiHonest>
-    ObliviousPprf for SingleReceiver<OPRF>
-{
-    type Hint = Hint;
-}
-
-impl<OPRF: OprfReceiver<Seed = Block512, Input = Block, Output = Block512> + SemiHonest>
-    OpprfReceiver for SingleReceiver<OPRF>
+    SingleReceiver<OPRF>
 {
     fn init<C, RNG>(channel: &mut C, rng: &mut RNG) -> Result<Self, Error>
     where
@@ -251,9 +217,9 @@ impl<OPRF: OprfReceiver<Seed = Block512, Input = Block, Output = Block512> + Sem
         &mut self,
         channel: &mut C,
         _npoints: usize,
-        inputs: &[Self::Input],
+        inputs: &[Block],
         rng: &mut RNG,
-    ) -> Result<Vec<Self::Output>, Error>
+    ) -> Result<Block512, Error>
     where
         C: AbstractChannel,
         RNG: CryptoRng + RngCore,
@@ -261,16 +227,22 @@ impl<OPRF: OprfReceiver<Seed = Block512, Input = Block, Output = Block512> + Sem
         if inputs.len() != 1 {
             return Err(Error::InvalidInputLength);
         }
-        let mut outputs = self.oprf.receive(channel, inputs, rng)?;
+        let total = SystemTime::now();
+        let outputs = self.oprf.receive(channel, inputs, rng)?;
+        let mut output = outputs[0];
         let m = channel.read_usize()?;
         let v = channel.read_block()?;
-        let h = hash_output(&outputs[0], v, m);
+        let h = hash_output(&output, v, m);
         let zero = Block512::default();
         for i in 0..m {
             let entry = channel.read_block512()?;
-            outputs[0] ^= if i == h { entry } else { zero };
+            output ^= if i == h { entry } else { zero };
         }
-        Ok(outputs)
+        // println!(
+        //     "SingleReceiver :: total time: {} μs",
+        //     total.elapsed().unwrap().as_micros()
+        // );
+        Ok(output)
     }
 }
 
@@ -332,24 +304,8 @@ pub struct Sender<T: OprfSender + SemiHonest> {
     opprf: SingleSender<T>,
 }
 
-impl<T: OprfSender<Seed = Block512, Input = Block, Output = Block512> + SemiHonest> ObliviousPrf
-    for Sender<T>
-{
-    type Seed = Block512;
-    type Input = Block;
-    type Output = Block512;
-}
-
-impl<T: OprfSender<Seed = Block512, Input = Block, Output = Block512> + SemiHonest> ObliviousPprf
-    for Sender<T>
-{
-    type Hint = Hint;
-}
-
-impl<T: OprfSender<Seed = Block512, Input = Block, Output = Block512> + SemiHonest> OpprfSender
-    for Sender<T>
-{
-    fn init<C, RNG>(channel: &mut C, rng: &mut RNG) -> Result<Self, Error>
+impl<T: OprfSender<Seed = Block512, Input = Block, Output = Block512> + SemiHonest> Sender<T> {
+    pub fn init<C, RNG>(channel: &mut C, rng: &mut RNG) -> Result<Self, Error>
     where
         C: AbstractChannel,
         RNG: CryptoRng + RngCore,
@@ -358,18 +314,19 @@ impl<T: OprfSender<Seed = Block512, Input = Block, Output = Block512> + SemiHone
         Ok(Self { opprf })
     }
 
-    fn send<C, RNG>(
+    pub fn send<C, RNG>(
         &mut self,
         channel: &mut C,
-        points: &[(Self::Input, Self::Output)],
+        points: &[(Block, Block512)],
         _npoints: usize,
         ninputs: usize,
         rng: &mut RNG,
-    ) -> Result<Vec<(Self::Seed, Self::Hint)>, Error>
+    ) -> Result<(), Error>
     where
         C: AbstractChannel,
         RNG: CryptoRng + RngCore,
     {
+        let start = SystemTime::now();
         let params = Parameters::new(ninputs)?;
         // Receive `hashkeys` from the receiver. These are used to fill `bins` below.
         let mut hashkeys = Vec::with_capacity(params.h1 + params.h2);
@@ -404,8 +361,12 @@ impl<T: OprfSender<Seed = Block512, Input = Block, Output = Block512> + SemiHone
                 insert(&mut bins, x, y, params.m1 + h);
             }
         }
+        println!(
+            "Sender :: setup time: {} ms",
+            start.elapsed().unwrap().as_millis()
+        );
+        let start = SystemTime::now();
         // Run the one-time OPPRF on each bin.
-        let mut outputs = Vec::with_capacity(params.m1 + params.m2);
         for (j, bin) in bins.into_iter().enumerate() {
             // `beta` is the maximum number of entries a bin could have.
             let beta = if j < params.m1 {
@@ -413,24 +374,13 @@ impl<T: OprfSender<Seed = Block512, Input = Block, Output = Block512> + SemiHone
             } else {
                 params.beta2
             };
-
-            let output = self.opprf.send(channel, &bin, beta, 1, rng)?;
-            outputs.push(output);
+            let _ = self.opprf.send(channel, &bin, beta, 1, rng)?;
         }
-        // XXX: this returns `m1 + m2` (seed, hint) pairs. But there doesn't
-        // really seem to be a way to *use* this when computing the OPPRF.
-        // Namely, this doesn't jive with the OPPRF API as specified in Figure 3
-        // of the paper. I believe this is okay in how it's used to build PSI
-        // (namely, the `compute` method is never used).
-        Ok(outputs.into_iter().flatten().collect())
-    }
-
-    /// Unimplemented. The KMPRT OPPRF does not support the sender evaluating the OPPRF.
-    #[inline]
-    fn compute(&self, _: &Self::Seed, _: &Self::Hint, _: &Self::Input) -> Self::Output {
-        // This method doesn't work for the hash-based batched OPPRF, so let's panic for now.
-        // self.opprf.compute(seed, hint, input)
-        unimplemented!()
+        println!(
+            "Sender :: OPPRF send time: {} ms",
+            start.elapsed().unwrap().as_millis()
+        );
+        Ok(())
     }
 }
 
@@ -443,24 +393,8 @@ pub struct Receiver<T: OprfReceiver + SemiHonest> {
     opprf: SingleReceiver<T>,
 }
 
-impl<T: OprfReceiver<Seed = Block512, Input = Block, Output = Block512> + SemiHonest> ObliviousPrf
-    for Receiver<T>
-{
-    type Seed = Block512;
-    type Input = Block;
-    type Output = Block512;
-}
-
-impl<T: OprfReceiver<Seed = Block512, Input = Block, Output = Block512> + SemiHonest> ObliviousPprf
-    for Receiver<T>
-{
-    type Hint = Hint;
-}
-
-impl<T: OprfReceiver<Seed = Block512, Input = Block, Output = Block512> + SemiHonest> OpprfReceiver
-    for Receiver<T>
-{
-    fn init<C, RNG>(channel: &mut C, rng: &mut RNG) -> Result<Self, Error>
+impl<T: OprfReceiver<Seed = Block512, Input = Block, Output = Block512> + SemiHonest> Receiver<T> {
+    pub fn init<C, RNG>(channel: &mut C, rng: &mut RNG) -> Result<Self, Error>
     where
         C: AbstractChannel,
         RNG: CryptoRng + RngCore,
@@ -469,17 +403,18 @@ impl<T: OprfReceiver<Seed = Block512, Input = Block, Output = Block512> + SemiHo
         Ok(Self { opprf })
     }
 
-    fn receive<C, RNG>(
+    pub fn receive<C, RNG>(
         &mut self,
         channel: &mut C,
         _npoints: usize,
-        inputs: &[Self::Input],
+        inputs: &[Block],
         rng: &mut RNG,
-    ) -> Result<Vec<Self::Output>, Error>
+    ) -> Result<Vec<Block512>, Error>
     where
         C: AbstractChannel,
         RNG: CryptoRng + RngCore,
     {
+        let start = SystemTime::now();
         let params = Parameters::new(inputs.len())?;
         let table;
         // Generate random values to be used for the hash functions. We loop,
@@ -506,12 +441,18 @@ impl<T: OprfReceiver<Seed = Block512, Input = Block, Output = Block512> + SemiHo
                 break;
             }
         }
-        let mut outputs = (0..inputs.len())
-            .map(|_| Default::default())
-            .collect::<Vec<Block512>>();
+        println!(
+            "Receiver :: setup time: {} ms",
+            start.elapsed().unwrap().as_millis()
+        );
         // Run the one-time OPPRF for each table entry. For those where the
         // entry is a real input value, store the OPPRF output, otherwise use a
         // dummy value and ignore the output.
+        let start = SystemTime::now();
+        let mut outputs = (0..inputs.len())
+            .map(|_| Default::default())
+            .collect::<Vec<Block512>>();
+        let n = table.items.len();
         for (j, item) in table.items.into_iter().enumerate() {
             let beta = if j < params.m1 {
                 params.beta1
@@ -521,13 +462,18 @@ impl<T: OprfReceiver<Seed = Block512, Input = Block, Output = Block512> + SemiHo
             if let Some(item) = item {
                 assert_eq!(inputs[item.index], item.entry);
                 assert_eq!(outputs[item.index], Default::default());
-                let out = self.opprf.receive(channel, beta, &[item.entry], rng)?;
-                outputs[item.index] = out[0];
+                outputs[item.index] = self.opprf.receive(channel, beta, &[item.entry], rng)?;
             } else {
                 let entry = rng.gen::<Block>();
                 let _ = self.opprf.receive(channel, beta, &[entry], rng)?;
             }
         }
+        println!(
+            "Receiver :: OPPRF time [{}]: {} ms",
+            n,
+            start.elapsed().unwrap().as_millis()
+        );
+
         Ok(outputs)
     }
 }
@@ -556,72 +502,11 @@ pub type KmprtReceiver = Receiver<oprf::KkrtReceiver>;
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::oprf::{ProgrammableReceiver, ProgrammableSender};
     use scuttlebutt::{AesRng, Channel};
     use std::io::{BufReader, BufWriter};
     use std::os::unix::net::UnixStream;
-    use std::sync::{Arc, Mutex};
 
-    fn rand_block_vec(size: usize) -> Vec<Block> {
-        (0..size).map(|_| rand::random::<Block>()).collect()
-    }
-
-    fn _test_opprf<
-        S: ProgrammableSender<Seed = Block512, Input = Block, Output = Block512>,
-        R: ProgrammableReceiver<Seed = Block512, Input = Block, Output = Block512>,
-    >(
-        ninputs: usize,
-        npoints: usize,
-        npoints_bound: usize,
-    ) {
-        let inputs = rand_block_vec(ninputs);
-        let inputs_ = inputs.clone();
-        let results = Arc::new(Mutex::new(vec![]));
-        let results_ = results.clone();
-        let mut rng = AesRng::new();
-        let points = (0..npoints)
-            .map(|_| (rng.gen(), rng.gen()))
-            .collect::<Vec<(Block, Block512)>>();
-        let (sender, receiver) = UnixStream::pair().unwrap();
-        let handle = std::thread::spawn(move || {
-            let mut rng = AesRng::new();
-            let reader = BufReader::new(sender.try_clone().unwrap());
-            let writer = BufWriter::new(sender);
-            let mut channel = Channel::new(reader, writer);
-            let mut oprf = S::init(&mut channel, &mut rng).unwrap();
-            let outputs = oprf
-                .send(&mut channel, &points, npoints_bound, ninputs, &mut rng)
-                .unwrap();
-            let mut results = results.lock().unwrap();
-            *results = inputs_
-                .iter()
-                .zip(outputs.iter())
-                .map(|(inp, (seed, hint))| oprf.compute(seed, hint, inp))
-                .collect::<Vec<Block512>>();
-        });
-        let mut rng = AesRng::new();
-        let reader = BufReader::new(receiver.try_clone().unwrap());
-        let writer = BufWriter::new(receiver);
-        let mut channel = Channel::new(reader, writer);
-        let mut oprf = R::init(&mut channel, &mut rng).unwrap();
-        let outputs = oprf
-            .receive(&mut channel, npoints_bound, &inputs, &mut rng)
-            .unwrap();
-        handle.join().unwrap();
-        let results_ = results_.lock().unwrap();
-        for j in 0..ninputs {
-            assert_eq!(results_[j], outputs[j]);
-        }
-    }
-
-    fn _test_opprf_points<
-        S: ProgrammableSender<Seed = Block512, Input = Block, Output = Block512>,
-        R: ProgrammableReceiver<Seed = Block512, Input = Block, Output = Block512>,
-    >(
-        ninputs: usize,
-        npoints: usize,
-        npoints_bound: usize,
-    ) {
+    fn _test_opprf_points(ninputs: usize, npoints: usize, npoints_bound: usize) {
         assert!(ninputs <= npoints);
         assert!(npoints <= npoints_bound);
         let mut rng = AesRng::new();
@@ -643,7 +528,7 @@ mod tests {
             let reader = BufReader::new(sender.try_clone().unwrap());
             let writer = BufWriter::new(sender);
             let mut channel = Channel::new(reader, writer);
-            let mut oprf = S::init(&mut channel, &mut rng).unwrap();
+            let mut oprf = KmprtSender::init(&mut channel, &mut rng).unwrap();
             let _ = oprf
                 .send(&mut channel, &points_, npoints_bound, ninputs, &mut rng)
                 .unwrap();
@@ -652,7 +537,7 @@ mod tests {
         let reader = BufReader::new(receiver.try_clone().unwrap());
         let writer = BufWriter::new(receiver);
         let mut channel = Channel::new(reader, writer);
-        let mut oprf = R::init(&mut channel, &mut rng).unwrap();
+        let mut oprf = KmprtReceiver::init(&mut channel, &mut rng).unwrap();
         let outputs = oprf
             .receive(&mut channel, npoints_bound, &xs, &mut rng)
             .unwrap();
@@ -667,24 +552,16 @@ mod tests {
     }
 
     #[test]
-    fn test_single_opprf() {
-        _test_opprf::<KmprtSingleSender, KmprtSingleReceiver>(1, 8, 50);
-        _test_opprf::<KmprtSingleSender, KmprtSingleReceiver>(1, 100, 1000);
-        _test_opprf_points::<KmprtSingleSender, KmprtSingleReceiver>(1, 8, 50);
-        _test_opprf_points::<KmprtSingleSender, KmprtSingleReceiver>(1, 100, 1000);
-    }
-
-    #[test]
     fn test_opprf() {
-        _test_opprf_points::<KmprtSender, KmprtReceiver>(1, 8, 8);
-        _test_opprf_points::<KmprtSender, KmprtReceiver>(21, 48, 48);
-        _test_opprf_points::<KmprtSender, KmprtReceiver>(163, 384, 384);
+        _test_opprf_points(1, 8, 8);
+        _test_opprf_points(21, 48, 48);
+        _test_opprf_points(163, 384, 384);
         // Settings for PSTY with `n = 2^8`.
-        _test_opprf_points::<KmprtSender, KmprtReceiver>(326, 768, 768);
+        _test_opprf_points(326, 768, 768);
         // Settings for PSTY with `n = 2^12`.
-        _test_opprf_points::<KmprtSender, KmprtReceiver>(5202, 12288, 12288);
+        _test_opprf_points(5202, 12288, 12288);
         // Settings for PSTY with `n = 2^16`.
-        // _test_opprf_points::<KmprtSender, KmprtReceiver>(83231, 196608, 196608);
+        // _test_opprf_points(83231, 196608, 196608);
     }
 }
 
