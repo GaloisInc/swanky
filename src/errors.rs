@@ -7,14 +7,27 @@
 /// Errors produced by the private set intersection protocols.
 #[derive(Debug)]
 pub enum Error {
+    /// Coin tossing failed.
     CoinTossError(scuttlebutt::cointoss::Error),
+    /// The underlying oblivious PRF failed.
     OprfError(ocelot::Error),
+    /// An input/output error occurred.
     IoError(std::io::Error),
+    /// The cuckoo stash has overflown.
     CuckooStashOverflow,
+    /// The provided cuckoo hash set size is invalid.
     InvalidCuckooSetSize(usize),
-    InvalidCuckooParameters { nitems: usize, nhashes: usize },
-    PstyProtocolError(String),
-    TwopacError(twopac::Error),
+    /// The provided cuckoo hash parameters are invalid.
+    InvalidCuckooParameters {
+        /// Number of items.
+        nitems: usize,
+        /// Number of hashes.
+        nhashes: usize,
+    },
+    /// An error occurred in the PSI protocol.
+    PsiProtocolError(String),
+    /// An error occurred in the underlying 2PC protocol.
+    TwopcError(twopac::Error),
 }
 
 impl From<std::io::Error> for Error {
@@ -41,7 +54,7 @@ impl From<scuttlebutt::cointoss::Error> for Error {
 impl From<twopac::Error> for Error {
     #[inline]
     fn from(e: twopac::Error) -> Error {
-        Error::TwopacError(e)
+        Error::TwopcError(e)
     }
 }
 
@@ -58,8 +71,8 @@ impl std::fmt::Display for Error {
                 "CuckooHash: no parameters set for {} items and {} hashes",
                 nitems, nhashes
             ),
-            Error::PstyProtocolError(s) => write!(f, "PSTY protocol error: {}", s),
-            Error::TwopacError(e) => write!(f, "Twopac error: {}", e),
+            Error::PsiProtocolError(s) => write!(f, "PSI protocol error: {}", s),
+            Error::TwopcError(e) => write!(f, "2PC protocol error: {}", e),
         }
     }
 }

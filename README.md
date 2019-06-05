@@ -1,11 +1,15 @@
 # `popsicle`: A rust library for private set intersection
 
-`popsicle` is a library written in rust that provides traits and protocol
-implementations for private set intersection (PSI).
+`popsicle` is a rust library that provides protocol implementations for private
+set intersection (PSI).
 
-`popsicle` currently only implements the Pinkas-Schneider-Zohner PSI protocol
-based on the oblivious PRF of Kolesnikov-Kumaresan-Rosulek-Trieu. Hopefully more
-flavors of PSI will be added in the future.
+`popsicle` currently implements the following PSI protocols:
+
+* The Pinkas-Schneider-Zohner PSI protocol based on the oblivious PRF of
+Kolesnikov-Kumaresan-Rosulek-Trieu.
+
+* The Pinkas-Schnedier-Tkachenko-Yanai PSI protocol based on the oblivious
+  programmable PRF of Kolesnikov-Matania-Pinkas-Rosulek-Trieu.
 
 **`popsicle` should be considered unstable and under active development until
 version 1.0 is released**
@@ -18,6 +22,8 @@ benchmark the various protocols, and `cargo doc --open` to view documentation.
 `popsicle` also supports the following features:
 
 * `nightly`: Use nightly features from `rust` and the underlying libraries.
+
+* `unstable`: Enable unstable components of `popsicle`.
 
 # License
 

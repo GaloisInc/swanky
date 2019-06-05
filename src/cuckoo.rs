@@ -5,7 +5,6 @@
 // See LICENSE for licensing information.
 
 use crate::Error;
-use arrayref::array_ref;
 use scuttlebutt::{Aes128, Block};
 use std::fmt::Debug;
 
@@ -161,8 +160,10 @@ impl CuckooHash {
         // functions though, as the last byte is *not* uniformly(-ish) random.
         // Instead, we run it through AES (slow!).
         if hidx < 3 {
+            let mut array = [0u8; 4];
             let bytes: [u8; 16] = hash.into();
-            let value = u32::from_le_bytes(*array_ref![bytes[4 * hidx..4 * (hidx + 1)], 0, 4]);
+            array.copy_from_slice(&bytes[4 * hidx..4 * (hidx + 1)]);
+            let value = u32::from_le_bytes(array);
             (value as usize) % nbins
         } else {
             // XXX: This is fine, right?!

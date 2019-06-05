@@ -14,14 +14,14 @@ use fancy_garbling::{BinaryBundle, BundleGadgets, CrtBundle, CrtGadgets, Fancy, 
 use itertools::Itertools;
 use ocelot::oprf::{kmprt, ProgrammableReceiver, ProgrammableSender};
 use ocelot::ot::{KosReceiver as OtReceiver, KosSender as OtSender};
-use rand::Rng;
-use rand_core::{CryptoRng, RngCore, SeedableRng};
+use rand::{CryptoRng, Rng, RngCore, SeedableRng};
 use scuttlebutt::{AbstractChannel, Block, Block512};
 
 const NHASHES: usize = 3;
-const HASH_SIZE: usize = 4; // how many bytes of the hash to use for the equality tests
+// How many bytes of the hash to use for the equality tests.
+const HASH_SIZE: usize = 4;
 
-/// The type of values in the Sender & Receiver's sets.
+/// The type of values in the sender and receiver's sets.
 pub type Msg = Vec<u8>;
 
 /// Private set intersection sender.
@@ -47,6 +47,7 @@ struct ReceiverState {
 }
 
 impl Sender {
+    /// Initialize the PSI sender.
     pub fn init<C: AbstractChannel, RNG: RngCore + CryptoRng + SeedableRng>(
         channel: &mut C,
         rng: &mut RNG,
@@ -55,6 +56,7 @@ impl Sender {
         Ok(Self { opprf, state: None })
     }
 
+    /// Run the PSI protocol over `inputs`.
     pub fn send<C: AbstractChannel, RNG: RngCore + CryptoRng + SeedableRng>(
         &mut self,
         channel: &mut C,
@@ -104,6 +106,7 @@ impl Sender {
         Ok(())
     }
 
+    /// Compute the intersection.
     pub fn compute_intersection<C, RNG>(
         &mut self,
         channel: &mut C,
@@ -116,7 +119,7 @@ impl Sender {
         let state = if let Some(s) = &self.state {
             s
         } else {
-            return Err(Error::PstyProtocolError(
+            return Err(Error::PsiProtocolError(
                 "send/receive must be called first".to_string(),
             ));
         };
@@ -138,6 +141,7 @@ impl Sender {
         Ok(())
     }
 
+    /// Compute the cardinality of the intersection.
     pub fn compute_cardinality<C, RNG>(
         &mut self,
         channel: &mut C,
@@ -150,7 +154,7 @@ impl Sender {
         let state = if let Some(s) = &self.state {
             s
         } else {
-            return Err(Error::PstyProtocolError(
+            return Err(Error::PsiProtocolError(
                 "send/receive must be called first".to_string(),
             ));
         };
@@ -174,6 +178,7 @@ impl Sender {
 }
 
 impl Receiver {
+    /// Initialize the PSI receiver.
     pub fn init<C: AbstractChannel, RNG: RngCore + CryptoRng + SeedableRng>(
         channel: &mut C,
         rng: &mut RNG,
@@ -182,6 +187,7 @@ impl Receiver {
         Ok(Self { opprf, state: None })
     }
 
+    /// Run the PSI protocol over `inputs`.
     pub fn receive<C: AbstractChannel, RNG: RngCore + CryptoRng + SeedableRng>(
         &mut self,
         channel: &mut C,
@@ -227,6 +233,7 @@ impl Receiver {
         Ok(())
     }
 
+    /// Compute the intersection.
     pub fn compute_intersection<C, RNG>(
         &mut self,
         channel: &mut C,
@@ -239,7 +246,7 @@ impl Receiver {
         let state = if let Some(s) = &self.state {
             s
         } else {
-            return Err(Error::PstyProtocolError(
+            return Err(Error::PsiProtocolError(
                 "send/receive must be called first".to_string(),
             ));
         };
@@ -278,6 +285,7 @@ impl Receiver {
         Ok(intersection)
     }
 
+    /// Compute the cardinality of the intersection.
     pub fn compute_cardinality<C, RNG>(
         &mut self,
         channel: &mut C,
@@ -290,7 +298,7 @@ impl Receiver {
         let state = if let Some(s) = &self.state {
             s
         } else {
-            return Err(Error::PstyProtocolError(
+            return Err(Error::PsiProtocolError(
                 "send/receive must be called first".to_string(),
             ));
         };
@@ -399,7 +407,6 @@ mod tests {
     #[test]
     fn full_protocol() {
         let (sender, receiver) = UnixStream::pair().unwrap();
-        // let sender_inputs = (0..SET_SIZE).map(|x| (0..ITEM_SIZE).map(|i| ((x >> i) & 0xff) as u8).collect_vec()).collect_vec();
         let sender_inputs = rand_vec_vec(SET_SIZE, ITEM_SIZE);
         let receiver_inputs = sender_inputs.clone();
 

@@ -4,7 +4,7 @@ version = "0.3.0"
 authors = ["Alex J. Malozemoff <amaloz@galois.com>"]
 license = "MIT"
 readme = "README.md"
-description = "A library for private set intersection protocols"
+description = "A library for private set intersection"
 categories = ["cryptography"]
 keywords = ["cryptography", "private-set-intersection", "PSI"]
 edition = "2018"
@@ -16,18 +16,16 @@ nightly = ["rand/nightly", "scuttlebutt/nightly", "ocelot/nightly", "ocelot/nigh
 unstable = ["ocelot/unstable"]
 
 [dependencies]
-arrayref = "0.3.5"
 fancy-garbling = { git = "https://github.com/spaceships/fancy-garbling", tag = "0.3.0" }
 itertools = "0.8.0"
 ocelot = { git = "https://github.com/amaloz/ocelot", tag = "0.3.0" }
 rand = "0.6.5"
-rand_core = "0.4.0"
 scuttlebutt = { git = "https://github.com/amaloz/scuttlebutt", tag = "0.3.0" }
 sha2 = "0.8.0"
 twopac = { path = "../twopac" }
 
 [dev-dependencies]
-criterion = "0.2.10"
+criterion = "0.2.11"
 
 [profile.release]
 opt-level = 3
@@ -35,11 +33,11 @@ debug = true
 debug-assertions = false
 overflow-checks = false
 
-# [profile.dev]
-# opt-level = 3
-# debug = false
-# debug-assertions = false
-# overflow-checks = false
+[profile.dev]
+opt-level = 0
+debug = false
+debug-assertions = false
+overflow-checks = false
 
 [profile.bench]
 opt-level = 3

@@ -20,6 +20,11 @@
 //! **THIS IS STILL VERY MUCH RESEARCH CODE**, for now.
 
 #![cfg_attr(feature = "nightly", feature(test))]
+#![cfg_attr(feature = "nightly", feature(external_doc))]
+#![cfg_attr(feature = "nightly", doc(include = "../README.md"))]
+#![cfg_attr(feature = "nightly", deny(missing_docs))]
+
+//!
 
 mod cuckoo;
 mod errors;

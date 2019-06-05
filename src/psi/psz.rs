@@ -31,6 +31,7 @@ pub struct Receiver {
 }
 
 impl Sender {
+    /// Initialize the PSI sender.
     pub fn init<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         channel: &mut C,
         rng: &mut RNG,
@@ -39,6 +40,7 @@ impl Sender {
         Ok(Self { oprf })
     }
 
+    /// Run the PSI protocol over `inputs`.
     pub fn send<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         &mut self,
         channel: &mut C,
@@ -101,6 +103,7 @@ impl Sender {
 }
 
 impl Receiver {
+    /// Initialize the PSI receiver.
     pub fn init<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         channel: &mut C,
         rng: &mut RNG,
@@ -109,6 +112,7 @@ impl Receiver {
         Ok(Self { oprf })
     }
 
+    /// Run the PSI protocol over `inputs`.
     pub fn receive<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         &mut self,
         channel: &mut C,
