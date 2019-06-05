@@ -4,7 +4,10 @@
 // Copyright © 2019 Galois, Inc.
 // See LICENSE for licensing information.
 
-use crate::comm::{TrackReader, TrackWriter};
+mod track_channel;
+
+pub use track_channel::TrackChannel;
+
 use crate::{Block, Block512};
 #[cfg(feature = "curve25519-dalek")]
 use curve25519_dalek::ristretto::{CompressedRistretto, RistrettoPoint};
@@ -117,7 +120,7 @@ pub trait AbstractChannel {
     }
 }
 
-/// A standard read/write channel.
+/// A standard read/write channel that implements `AbstractChannel`.
 pub struct Channel<R, W> {
     reader: Rc<RefCell<R>>,
     writer: Rc<RefCell<W>>,
@@ -145,7 +148,7 @@ impl<R: Read, W: Write> Channel<R, W> {
 impl<R: Read, W: Write> AbstractChannel for Channel<R, W> {
     #[inline(always)]
     fn write_bytes(&mut self, bytes: &[u8]) -> Result<()> {
-        self.writer.borrow_mut().write(bytes)?;
+        self.writer.borrow_mut().write_all(bytes)?;
         Ok(())
     }
 
@@ -164,59 +167,6 @@ impl<R: Read, W: Write> AbstractChannel for Channel<R, W> {
         Self {
             reader: self.reader.clone(),
             writer: self.writer.clone(),
-        }
-    }
-}
-
-/// A channel for tracking the number of bits read/written.
-pub struct TrackChannel<R: Read, W: Write> {
-    channel: Channel<TrackReader<R>, TrackWriter<W>>,
-}
-
-impl<R: Read, W: Write> TrackChannel<R, W> {
-    /// Make a new `TrackChannel` from a `reader` and a `writer`.
-    pub fn new(reader: R, writer: W) -> Self {
-        let channel = Channel::new(TrackReader::new(reader), TrackWriter::new(writer));
-        Self { channel }
-    }
-
-    /// Clear the number of bits read/written.
-    pub fn clear(&self) {
-        self.channel.reader.borrow_mut().clear();
-        self.channel.writer.borrow_mut().clear();
-    }
-
-    /// Return the number of kilobits written to the channel.
-    pub fn write_kilobits(&self) -> f64 {
-        self.channel.writer.borrow().kilobits()
-    }
-
-    /// Return the number of kilobits read from the channel.
-    pub fn read_kilobits(&self) -> f64 {
-        self.channel.reader.borrow().kilobits()
-    }
-}
-
-impl<R: Read, W: Write> AbstractChannel for TrackChannel<R, W> {
-    #[inline(always)]
-    fn write_bytes(&mut self, bytes: &[u8]) -> Result<()> {
-        self.channel.write_bytes(bytes)
-    }
-
-    #[inline(always)]
-    fn read_bytes(&mut self, mut bytes: &mut [u8]) -> Result<()> {
-        self.channel.read_bytes(&mut bytes)
-    }
-
-    #[inline(always)]
-    fn flush(&mut self) -> Result<()> {
-        self.channel.flush()
-    }
-
-    #[inline(always)]
-    fn clone(&self) -> Self {
-        Self {
-            channel: self.channel.clone(),
         }
     }
 }

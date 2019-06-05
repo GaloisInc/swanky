@@ -18,7 +18,6 @@ mod block;
 mod block512;
 mod channel;
 pub mod cointoss;
-mod comm;
 pub mod commitment;
 mod hash_aes;
 mod rand_aes;
@@ -29,7 +28,6 @@ pub use crate::aes::aes256::Aes256;
 pub use crate::block::Block;
 pub use crate::block512::Block512;
 pub use crate::channel::{AbstractChannel, Channel, TrackChannel};
-pub use crate::comm::{TrackReader, TrackWriter};
 pub use crate::hash_aes::{AesHash, AES_HASH};
 pub use crate::rand_aes::AesRng;
 
