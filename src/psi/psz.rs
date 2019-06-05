@@ -16,7 +16,7 @@ use ocelot::oprf::{self, Receiver as OprfReceiver, Sender as OprfSender};
 use rand::seq::SliceRandom;
 use rand::{CryptoRng, Rng, RngCore};
 use scuttlebutt::utils as scutils;
-use scuttlebutt::{cointoss, AbstractChannel, Block, Block512, SemiHonest};
+use scuttlebutt::{cointoss, AbstractChannel, Block, SemiHonest};
 use std::collections::HashSet;
 
 const NHASHES: usize = 3;
@@ -51,8 +51,7 @@ impl Sender {
         let mut inputs = utils::compress_and_hash_inputs(inputs, keys[0]);
         let masksize = compute_masksize(inputs.len())?;
         let nbins = channel.read_usize()?;
-        let stashsize = channel.read_usize()?;
-        let seeds = self.oprf.send(channel, nbins + stashsize, rng)?;
+        let seeds = self.oprf.send(channel, nbins, rng)?;
 
         // For each hash function `hᵢ`, construct set `Hᵢ = {F(k_{hᵢ(x)}, x ||
         // i) | x ∈ X)}`, randomly permute it, and send it to the receiver.
@@ -71,30 +70,6 @@ impl Sender {
                     masksize,
                 );
                 channel.write_bytes(&encoded.prefix(masksize))?;
-            }
-            channel.flush()?;
-        }
-        if stashsize > 0 {
-            // For each `i ∈ {1, ..., stashsize}`, construct set `Sᵢ =
-            // {F(k_{nbins+i}, x) | x ∈ X}`, randomly permute it, and send it to the
-            // receiver.
-            let mut encoded = inputs
-                .iter()
-                .map(|input| {
-                    let mut out = Default::default();
-                    self.oprf.encode(*input, &mut out);
-                    out
-                })
-                .collect::<Vec<Block512>>();
-            for i in 0..stashsize {
-                encoded.shuffle(&mut rng);
-                for encoded in &encoded {
-                    // We don't need to append any hash index to OPRF inputs in the stash.
-                    let mut output = vec![0u8; masksize];
-                    scutils::xor_inplace(&mut output, &encoded.prefix(masksize));
-                    scutils::xor_inplace(&mut output, &seeds[nbins + i].prefix(masksize));
-                    channel.write_bytes(&output)?;
-                }
             }
             channel.flush()?;
         }
@@ -127,7 +102,6 @@ impl Receiver {
         let tbl = CuckooHash::new(&inputs_, NHASHES)?;
 
         let nbins = tbl.nbins;
-        let stashsize = tbl.stashsize;
         let masksize = compute_masksize(n)?;
 
         let hindices = (0..NHASHES)
@@ -136,7 +110,6 @@ impl Receiver {
 
         // Send cuckoo hash info to sender.
         channel.write_usize(nbins)?;
-        channel.write_usize(stashsize)?;
         channel.flush()?;
 
         // Set up inputs to use `x || i` or `x` depending on whether the input
@@ -146,31 +119,19 @@ impl Receiver {
             .iter()
             .map(|opt_item| {
                 if let Some(item) = opt_item {
-                    if let Some(hidx) = item.hash_index {
-                        // Item in bin. In this case, set the last byte to the
-                        // hash index.
-                        item.entry ^ hindices[hidx]
-                    } else {
-                        // Item in stash. No need to add the hash index in this
-                        // case.
-                        item.entry
-                    }
+                    item.entry ^ hindices[item.hash_index]
                 } else {
                     // No item found, so use the "default" item.
                     Default::default()
                 }
             })
             .collect::<Vec<Block>>();
-        assert_eq!(inputs_.len(), nbins + stashsize);
+        assert_eq!(inputs_.len(), nbins);
 
         let outputs = self.oprf.receive(channel, &inputs_, rng)?;
 
         // Receive all the sets from the sender.
         let mut hs = (0..NHASHES)
-            .map(|_| HashSet::with_capacity(n))
-            .collect::<Vec<HashSet<Vec<u8>>>>();
-
-        let mut ss = (0..stashsize)
             .map(|_| HashSet::with_capacity(n))
             .collect::<Vec<HashSet<Vec<u8>>>>();
 
@@ -182,31 +143,14 @@ impl Receiver {
             }
         }
 
-        for s in ss.iter_mut() {
-            for _ in 0..n {
-                let mut buf = vec![0u8; masksize];
-                channel.read_bytes(&mut buf)?;
-                s.insert(buf);
-            }
-        }
-
         // Iterate through each input/output pair and see whether it exists in
         // the appropriate set.
         let mut intersection = Vec::with_capacity(n);
-        for (i, (opt_item, output)) in tbl.items.iter().zip(outputs.into_iter()).enumerate() {
+        for (opt_item, output) in tbl.items.iter().zip(outputs.into_iter()) {
             if let Some(item) = opt_item {
                 let prefix = output.prefix(masksize);
-                if let Some(hidx) = item.hash_index {
-                    // We have a bin item.
-                    if hs[hidx].contains(prefix) {
-                        intersection.push(inputs[item.input_index].clone());
-                    }
-                } else {
-                    // We have a stash item.
-                    let j = i - nbins;
-                    if ss[j].contains(prefix) {
-                        intersection.push(inputs[item.input_index].clone());
-                    }
+                if hs[item.hash_index].contains(prefix) {
+                    intersection.push(inputs[item.input_index].clone());
                 }
             }
         }

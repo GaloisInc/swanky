@@ -13,8 +13,8 @@ pub enum Error {
     OprfError(ocelot::Error),
     /// An input/output error occurred.
     IoError(std::io::Error),
-    /// The cuckoo stash has overflown.
-    CuckooStashOverflow,
+    /// The cuckoo hash is full.
+    CuckooHashFull,
     /// The provided cuckoo hash set size is invalid.
     InvalidCuckooSetSize(usize),
     /// The provided cuckoo hash parameters are invalid.
@@ -64,11 +64,13 @@ impl std::fmt::Display for Error {
             Error::CoinTossError(e) => write!(f, "coin toss error: {}", e),
             Error::OprfError(e) => write!(f, "oblivious PRF error: {}", e),
             Error::IoError(e) => write!(f, "IO error: {}", e),
-            Error::CuckooStashOverflow => write!(f, "CuckooHash: overflowed stash"),
-            Error::InvalidCuckooSetSize(n) => write!(f, "CuckooHash: invalid size {}", n),
+            Error::CuckooHashFull => write!(f, "cuckoo hash error: table is full"),
+            Error::InvalidCuckooSetSize(n) => {
+                write!(f, "cuckoo hash error: invalid set size {}", n)
+            }
             Error::InvalidCuckooParameters { nitems, nhashes } => write!(
                 f,
-                "CuckooHash: no parameters set for {} items and {} hashes",
+                "cuckoo hash error: no parameters set for {} items and {} hashes",
                 nitems, nhashes
             ),
             Error::PsiProtocolError(s) => write!(f, "PSI protocol error: {}", s),

@@ -198,12 +198,9 @@ impl Receiver {
         let hashed_inputs = utils::compress_and_hash_inputs(inputs, key);
         let cuckoo = CuckooHash::new(&hashed_inputs, NHASHES)?;
 
-        let nbins = cuckoo.nbins;
-        assert_eq!(cuckoo.stashsize, 0);
-
         // Send cuckoo hash info to receiver.
         channel.write_block(&key)?;
-        channel.write_usize(nbins)?;
+        channel.write_usize(cuckoo.nbins)?;
         channel.flush()?;
 
         // Build `table` to include a cuckoo hash entry xored with its hash
@@ -212,7 +209,7 @@ impl Receiver {
             .items
             .iter()
             .map(|opt_item| match opt_item {
-                Some(item) => item.entry ^ Block::from(item.hash_index.unwrap() as u128),
+                Some(item) => item.entry ^ Block::from(item.hash_index as u128),
                 None => rng.gen(),
             })
             .collect::<Vec<Block>>();
@@ -455,8 +452,11 @@ mod tests {
         // each item in a cuckoo bin should also be in one of the table bins
         for (opt_item, bin) in cuckoo.items.iter().zip_eq(&table) {
             if let Some(item) = opt_item {
-                assert!(bin.iter().any(|bin_elem| *bin_elem
-                    == item.entry ^ Block::from(item.hash_index.unwrap() as u128)));
+                assert!(
+                    bin.iter()
+                        .any(|bin_elem| *bin_elem
+                            == item.entry ^ Block::from(item.hash_index as u128))
+                );
             }
         }
     }

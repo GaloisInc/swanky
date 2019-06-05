@@ -15,13 +15,12 @@ pub(crate) struct CuckooItem {
     // The input index associated with the entry.
     pub(crate) input_index: usize,
     // The hash index used. None for stash items.
-    pub(crate) hash_index: Option<usize>,
+    pub(crate) hash_index: usize,
 }
 
 pub(crate) struct CuckooHash {
     pub(crate) items: Vec<Option<CuckooItem>>,
     pub(crate) nbins: usize,
-    pub(crate) stashsize: usize,
     pub(crate) nhashes: usize,
 }
 
@@ -31,9 +30,7 @@ const NITERS: usize = 1000;
 #[inline]
 fn compute_nbins(n: usize, nhashes: usize) -> Result<usize, Error> {
     // Numbers taken from <https://thomaschneider.de/papers/PSZ18.pdf>, §3.2.2.
-    if nhashes == 2 {
-        Ok((2.4 * (n as f64)).ceil() as usize)
-    } else if nhashes == 3 {
+    if nhashes == 3 {
         Ok((1.27 * (n as f64)).ceil() as usize)
     } else if nhashes == 4 {
         Ok((1.09 * (n as f64)).ceil() as usize)
@@ -41,32 +38,6 @@ fn compute_nbins(n: usize, nhashes: usize) -> Result<usize, Error> {
         Ok((1.05 * (n as f64)).ceil() as usize)
     } else {
         Err(Error::InvalidCuckooParameters { nitems: n, nhashes })
-    }
-}
-
-#[inline]
-fn compute_stashsize(n: usize, nhashes: usize) -> Result<usize, Error> {
-    if nhashes == 1 {
-        Err(Error::InvalidCuckooParameters { nitems: n, nhashes })
-    } else if nhashes == 2 {
-        // Numbers taken from <https://thomaschneider.de/papers/PSZ18.pdf>,
-        // Table 5.
-        if n <= 1 << 8 {
-            Ok(12)
-        } else if n <= 1 << 12 {
-            Ok(6)
-        } else if n <= 1 << 16 {
-            Ok(4)
-        } else if n <= 1 << 20 {
-            Ok(3)
-        } else if n <= 1 << 24 {
-            Ok(2)
-        } else {
-            Err(Error::InvalidCuckooSetSize(n))
-        }
-    } else {
-        // No stash necessary when `nhashes > 2`.
-        Ok(0)
     }
 }
 
@@ -93,12 +64,10 @@ pub fn compute_masksize(n: usize) -> Result<usize, Error> {
 impl CuckooHash {
     pub fn new(inputs: &[Block], nhashes: usize) -> Result<CuckooHash, Error> {
         let nbins = compute_nbins(inputs.len(), nhashes)?;
-        let stashsize = compute_stashsize(inputs.len(), nhashes)?;
 
         let mut tbl = CuckooHash {
-            items: vec![None; nbins + stashsize],
+            items: vec![None; nbins],
             nbins,
-            stashsize,
             nhashes,
         };
 
@@ -117,38 +86,24 @@ impl CuckooHash {
         let mut item = CuckooItem {
             entry: input,
             input_index: idx,
-            hash_index: Some(0),
+            hash_index: 0,
         };
 
         for _ in 0..NITERS {
-            let i = CuckooHash::bin(item.entry, item.hash_index.unwrap(), self.nbins);
+            let i = CuckooHash::bin(item.entry, item.hash_index, self.nbins);
             let opt_item = self.items[i].replace(item);
             if let Some(x) = opt_item {
                 // If there is an item already in the bin, keep iterating,
                 // trying to place the new item.
                 item = x;
                 // Bump the hash index.
-                item.hash_index.iter_mut().for_each(|h| {
-                    *h += 1;
-                    *h %= self.nhashes;
-                });
+                item.hash_index = (item.hash_index + 1) % self.nhashes;
             } else {
                 return Ok(());
             }
         }
 
-        // Unable to place in bin, so place in stash. A hash index of `None`
-        // indicates stash placement.
-        item.hash_index = None;
-        for i in self.nbins..self.nbins + self.stashsize {
-            if self.items[i].is_none() {
-                self.items[i] = Some(item);
-                return Ok(());
-            }
-        }
-
-        // We overflowed the stash, so report an error.
-        return Err(Error::CuckooStashOverflow);
+        return Err(Error::CuckooHashFull);
     }
 
     /// Output the bin number for a given hash output `hash` and hash index `hidx`.
@@ -178,9 +133,6 @@ impl Debug for CuckooHash {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         for i in 0..self.nbins {
             writeln!(f, "{}: {:?}", i, self.items[i])?;
-        }
-        for i in self.nbins..self.nbins + self.stashsize {
-            writeln!(f, "[Stash] {}: {:?}", i, self.items[i])?;
         }
         Ok(())
     }
