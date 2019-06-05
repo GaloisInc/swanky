@@ -1,4 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source to the Rust file `src/fancy/binary.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>binary.rs.html -- source</title><link rel="stylesheet" type="text/css" href="../../../normalize.css"><link rel="stylesheet" type="text/css" href="../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../../dark.css"><link rel="stylesheet" type="text/css" href="../../../light.css" id="themeStyle"><script src="../../../storage.js"></script><noscript><link rel="stylesheet" href="../../../noscript.css"></noscript><link rel="shortcut icon" href="../../../favicon.ico"><style type="text/css">#crate-search{background-image:url("../../../down-arrow.svg");}</style></head><body class="rustdoc source"><!--[if lte IE 8]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu">&#9776;</div><a href='../../../fancy_garbling/index.html'><img src='../../../rust-logo.png' alt='logo' width='100'></a></nav><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!"><img src="../../../brush.svg" width="18" alt="Pick another theme!"></button><div id="theme-choices"></div></div><script src="../../../theme.js"></script><nav class="sub"><form class="search-form js-only"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><a id="settings-menu" href="../../../settings.html"><img src="../../../wheel.svg" width="18" alt="Change settings"></a></div></form></nav><section id="main" class="content"><pre class="line-numbers"><span id="1">  1</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source to the Rust file `src/fancy/binary.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>binary.rs.html -- source</title><link rel="stylesheet" type="text/css" href="../../../normalize.css"><link rel="stylesheet" type="text/css" href="../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../../dark.css"><link rel="stylesheet" type="text/css" href="../../../light.css" id="themeStyle"><script src="../../../storage.js"></script><noscript><link rel="stylesheet" href="../../../noscript.css"></noscript><link rel="shortcut icon" href="../../../favicon.ico"><style type="text/css">#crate-search{background-image:url("../../../down-arrow.svg");}</style></head><body class="rustdoc source"><!--[if lte IE 8]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu">&#9776;</div><a href='../../../fancy_garbling/index.html'><div class='logo-container'><img src='../../../rust-logo.png' alt='logo'></div></a></nav><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!"><img src="../../../brush.svg" width="18" alt="Pick another theme!"></button><div id="theme-choices"></div></div><script src="../../../theme.js"></script><nav class="sub"><form class="search-form js-only"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><a id="settings-menu" href="../../../settings.html"><img src="../../../wheel.svg" width="18" alt="Change settings"></a></div></form></nav><section id="main" class="content"><pre class="line-numbers"><span id="1">  1</span>
 <span id="2">  2</span>
 <span id="3">  3</span>
 <span id="4">  4</span>
@@ -301,48 +301,6 @@
 <span id="301">301</span>
 <span id="302">302</span>
 <span id="303">303</span>
-<span id="304">304</span>
-<span id="305">305</span>
-<span id="306">306</span>
-<span id="307">307</span>
-<span id="308">308</span>
-<span id="309">309</span>
-<span id="310">310</span>
-<span id="311">311</span>
-<span id="312">312</span>
-<span id="313">313</span>
-<span id="314">314</span>
-<span id="315">315</span>
-<span id="316">316</span>
-<span id="317">317</span>
-<span id="318">318</span>
-<span id="319">319</span>
-<span id="320">320</span>
-<span id="321">321</span>
-<span id="322">322</span>
-<span id="323">323</span>
-<span id="324">324</span>
-<span id="325">325</span>
-<span id="326">326</span>
-<span id="327">327</span>
-<span id="328">328</span>
-<span id="329">329</span>
-<span id="330">330</span>
-<span id="331">331</span>
-<span id="332">332</span>
-<span id="333">333</span>
-<span id="334">334</span>
-<span id="335">335</span>
-<span id="336">336</span>
-<span id="337">337</span>
-<span id="338">338</span>
-<span id="339">339</span>
-<span id="340">340</span>
-<span id="341">341</span>
-<span id="342">342</span>
-<span id="343">343</span>
-<span id="344">344</span>
-<span id="345">345</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">error</span>::<span class="ident">FancyError</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">fancy</span>::<span class="ident">bundle</span>::{<span class="ident">Bundle</span>, <span class="ident">BundleGadgets</span>};
@@ -361,9 +319,9 @@
         <span class="ident">BinaryBundle</span>(<span class="ident">Bundle</span>::<span class="ident">new</span>(<span class="ident">ws</span>))
     }
 
-    <span class="doccomment">/// Unwrap the underlying bundle from this binary bundle.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">unwrap</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> <span class="self">self</span>) <span class="op">-&gt;</span> <span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> <span class="ident">Bundle</span><span class="op">&lt;</span><span class="ident">W</span><span class="op">&gt;</span> {
-        <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="number">0</span>
+    <span class="doccomment">/// Extract the underlying bundle from this binary bundle.</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">extract</span>(<span class="self">self</span>) <span class="op">-&gt;</span> <span class="ident">Bundle</span><span class="op">&lt;</span><span class="ident">W</span><span class="op">&gt;</span> {
+        <span class="self">self</span>.<span class="number">0</span>
     }
 }
 
@@ -375,62 +333,17 @@
     }
 }
 
+<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">W</span>: <span class="ident">Clone</span> <span class="op">+</span> <span class="ident">HasModulus</span><span class="op">&gt;</span> <span class="ident">From</span><span class="op">&lt;</span><span class="ident">Bundle</span><span class="op">&lt;</span><span class="ident">W</span><span class="op">&gt;&gt;</span> <span class="kw">for</span> <span class="ident">BinaryBundle</span><span class="op">&lt;</span><span class="ident">W</span><span class="op">&gt;</span> {
+    <span class="kw">fn</span> <span class="ident">from</span>(<span class="ident">b</span>: <span class="ident">Bundle</span><span class="op">&lt;</span><span class="ident">W</span><span class="op">&gt;</span>) <span class="op">-&gt;</span> <span class="ident">BinaryBundle</span><span class="op">&lt;</span><span class="ident">W</span><span class="op">&gt;</span> {
+        <span class="macro">debug_assert</span><span class="macro">!</span>(<span class="ident">b</span>.<span class="ident">moduli</span>().<span class="ident">iter</span>().<span class="ident">all</span>(<span class="op">|</span><span class="kw-2">&amp;</span><span class="ident">p</span><span class="op">|</span> <span class="ident">p</span> <span class="op">==</span> <span class="number">2</span>));
+        <span class="ident">BinaryBundle</span>(<span class="ident">b</span>)
+    }
+}
+
 <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">F</span>: <span class="ident">Fancy</span><span class="op">&gt;</span> <span class="ident">BinaryGadgets</span> <span class="kw">for</span> <span class="ident">F</span> {}
 
 <span class="doccomment">/// Extension trait for `Fancy` providing gadgets that operate over bundles of mod2 wires.</span>
 <span class="kw">pub</span> <span class="kw">trait</span> <span class="ident">BinaryGadgets</span>: <span class="ident">Fancy</span> <span class="op">+</span> <span class="ident">BundleGadgets</span> {
-    <span class="doccomment">/// Create an input bundle for the garbler using `nbits` base 2 inputs and optional input `x`.</span>
-    <span class="kw">fn</span> <span class="ident">bin_garbler_input_bundle</span>(
-        <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>,
-        <span class="ident">nbits</span>: <span class="ident">usize</span>,
-        <span class="ident">opt_x</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">u128</span><span class="op">&gt;</span>,
-    ) <span class="op">-&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">BinaryBundle</span><span class="op">&lt;</span><span class="self">Self</span>::<span class="ident">Item</span><span class="op">&gt;</span>, <span class="self">Self</span>::<span class="ident">Error</span><span class="op">&gt;</span> {
-        <span class="self">self</span>.<span class="ident">garbler_input_bundle</span>(<span class="kw-2">&amp;</span><span class="macro">vec</span><span class="macro">!</span>[<span class="number">2</span>; <span class="ident">nbits</span>], <span class="ident">opt_x</span>.<span class="ident">map</span>(<span class="op">|</span><span class="ident">x</span><span class="op">|</span> <span class="ident">util</span>::<span class="ident">u128_to_bits</span>(<span class="ident">x</span>, <span class="ident">nbits</span>)))
-            .<span class="ident">map</span>(<span class="ident">BinaryBundle</span>)
-    }
-
-    <span class="doccomment">/// Create an input bundle for the evaluator using n base 2 inputs.</span>
-    <span class="kw">fn</span> <span class="ident">bin_evaluator_input_bundle</span>(
-        <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>,
-        <span class="ident">n</span>: <span class="ident">usize</span>,
-    ) <span class="op">-&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">BinaryBundle</span><span class="op">&lt;</span><span class="self">Self</span>::<span class="ident">Item</span><span class="op">&gt;</span>, <span class="self">Self</span>::<span class="ident">Error</span><span class="op">&gt;</span> {
-        <span class="self">self</span>.<span class="ident">evaluator_input_bundle</span>(<span class="kw-2">&amp;</span><span class="macro">vec</span><span class="macro">!</span>[<span class="number">2</span>; <span class="ident">n</span>]).<span class="ident">map</span>(<span class="ident">BinaryBundle</span>)
-    }
-
-    <span class="doccomment">/// Create `n` garbler input bundles, each with `nbits` bits and optional</span>
-    <span class="doccomment">/// inputs `xs`.</span>
-    <span class="kw">fn</span> <span class="ident">bin_garbler_input_bundles</span>(
-        <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>,
-        <span class="ident">nbits</span>: <span class="ident">usize</span>,
-        <span class="ident">n</span>: <span class="ident">usize</span>,
-        <span class="ident">opt_xs</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u128</span><span class="op">&gt;&gt;</span>,
-    ) <span class="op">-&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">BinaryBundle</span><span class="op">&lt;</span><span class="self">Self</span>::<span class="ident">Item</span><span class="op">&gt;&gt;</span>, <span class="self">Self</span>::<span class="ident">Error</span><span class="op">&gt;</span> {
-        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">xs</span>) <span class="op">=</span> <span class="ident">opt_xs</span> {
-            <span class="kw">if</span> <span class="ident">xs</span>.<span class="ident">len</span>() <span class="op">!=</span> <span class="ident">n</span> {
-                <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="self">Self</span>::<span class="ident">Error</span>::<span class="ident">from</span>(<span class="ident">FancyError</span>::<span class="ident">InvalidArgNum</span> {
-                    <span class="ident">got</span>: <span class="ident">xs</span>.<span class="ident">len</span>(),
-                    <span class="ident">needed</span>: <span class="ident">n</span>,
-                }));
-            }
-            <span class="ident">xs</span>.<span class="ident">into_iter</span>()
-                .<span class="ident">map</span>(<span class="op">|</span><span class="ident">x</span><span class="op">|</span> <span class="self">self</span>.<span class="ident">bin_garbler_input_bundle</span>(<span class="ident">nbits</span>, <span class="prelude-val">Some</span>(<span class="ident">x</span>)))
-                .<span class="ident">collect</span>()
-        } <span class="kw">else</span> {
-            (<span class="number">0</span>..<span class="ident">n</span>)
-                .<span class="ident">map</span>(<span class="op">|</span><span class="kw">_</span><span class="op">|</span> <span class="self">self</span>.<span class="ident">bin_garbler_input_bundle</span>(<span class="ident">nbits</span>, <span class="prelude-val">None</span>))
-                .<span class="ident">collect</span>()
-        }
-    }
-
-    <span class="doccomment">/// Create `n` evaluator input bundles, each with `nbits` bits.</span>
-    <span class="kw">fn</span> <span class="ident">bin_evaluator_input_bundles</span>(
-        <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>,
-        <span class="ident">nbits</span>: <span class="ident">usize</span>,
-        <span class="ident">n</span>: <span class="ident">usize</span>,
-    ) <span class="op">-&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">BinaryBundle</span><span class="op">&lt;</span><span class="self">Self</span>::<span class="ident">Item</span><span class="op">&gt;&gt;</span>, <span class="self">Self</span>::<span class="ident">Error</span><span class="op">&gt;</span> {
-        (<span class="number">0</span>..<span class="ident">n</span>).<span class="ident">map</span>(<span class="op">|</span><span class="kw">_</span><span class="op">|</span> <span class="self">self</span>.<span class="ident">bin_evaluator_input_bundle</span>(<span class="ident">nbits</span>)).<span class="ident">collect</span>()
-    }
-
     <span class="doccomment">/// Create a constant bundle using base 2 inputs.</span>
     <span class="kw">fn</span> <span class="ident">bin_constant_bundle</span>(
         <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>,
@@ -447,7 +360,7 @@
         <span class="ident">x</span>: <span class="kw-2">&amp;</span><span class="ident">BinaryBundle</span><span class="op">&lt;</span><span class="self">Self</span>::<span class="ident">Item</span><span class="op">&gt;</span>,
         <span class="ident">y</span>: <span class="kw-2">&amp;</span><span class="ident">BinaryBundle</span><span class="op">&lt;</span><span class="self">Self</span>::<span class="ident">Item</span><span class="op">&gt;</span>,
     ) <span class="op">-&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">BinaryBundle</span><span class="op">&lt;</span><span class="self">Self</span>::<span class="ident">Item</span><span class="op">&gt;</span>, <span class="self">Self</span>::<span class="ident">Error</span><span class="op">&gt;</span> {
-        <span class="self">self</span>.<span class="ident">add_bundles</span>(<span class="ident">x</span>.<span class="ident">unwrap</span>(), <span class="ident">y</span>.<span class="ident">unwrap</span>()).<span class="ident">map</span>(<span class="ident">BinaryBundle</span>)
+        <span class="self">self</span>.<span class="ident">add_bundles</span>(<span class="kw-2">&amp;</span><span class="ident">x</span>, <span class="kw-2">&amp;</span><span class="ident">y</span>).<span class="ident">map</span>(<span class="ident">BinaryBundle</span>)
     }
 
     <span class="doccomment">/// And the bits of two bundles together pairwise.</span>
@@ -456,7 +369,7 @@
         <span class="ident">x</span>: <span class="kw-2">&amp;</span><span class="ident">BinaryBundle</span><span class="op">&lt;</span><span class="self">Self</span>::<span class="ident">Item</span><span class="op">&gt;</span>,
         <span class="ident">y</span>: <span class="kw-2">&amp;</span><span class="ident">BinaryBundle</span><span class="op">&lt;</span><span class="self">Self</span>::<span class="ident">Item</span><span class="op">&gt;</span>,
     ) <span class="op">-&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">BinaryBundle</span><span class="op">&lt;</span><span class="self">Self</span>::<span class="ident">Item</span><span class="op">&gt;</span>, <span class="self">Self</span>::<span class="ident">Error</span><span class="op">&gt;</span> {
-        <span class="self">self</span>.<span class="ident">mul_bundles</span>(<span class="ident">x</span>.<span class="ident">unwrap</span>(), <span class="ident">y</span>.<span class="ident">unwrap</span>()).<span class="ident">map</span>(<span class="ident">BinaryBundle</span>)
+        <span class="self">self</span>.<span class="ident">mul_bundles</span>(<span class="kw-2">&amp;</span><span class="ident">x</span>, <span class="kw-2">&amp;</span><span class="ident">y</span>).<span class="ident">map</span>(<span class="ident">BinaryBundle</span>)
     }
 
     <span class="doccomment">/// Binary addition. Returns the result and the carry.</span>
@@ -614,7 +527,10 @@
     }
 
     <span class="doccomment">/// Compute the absolute value of a binary bundle.</span>
-    <span class="kw">fn</span> <span class="ident">bin_abs</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">x</span>: <span class="kw-2">&amp;</span><span class="ident">BinaryBundle</span><span class="op">&lt;</span><span class="self">Self</span>::<span class="ident">Item</span><span class="op">&gt;</span>) <span class="op">-&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">BinaryBundle</span><span class="op">&lt;</span><span class="self">Self</span>::<span class="ident">Item</span><span class="op">&gt;</span>, <span class="self">Self</span>::<span class="ident">Error</span><span class="op">&gt;</span> {
+    <span class="kw">fn</span> <span class="ident">bin_abs</span>(
+        <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>,
+        <span class="ident">x</span>: <span class="kw-2">&amp;</span><span class="ident">BinaryBundle</span><span class="op">&lt;</span><span class="self">Self</span>::<span class="ident">Item</span><span class="op">&gt;</span>,
+    ) <span class="op">-&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">BinaryBundle</span><span class="op">&lt;</span><span class="self">Self</span>::<span class="ident">Item</span><span class="op">&gt;</span>, <span class="self">Self</span>::<span class="ident">Error</span><span class="op">&gt;</span> {
         <span class="kw">let</span> <span class="ident">sign</span> <span class="op">=</span> <span class="ident">x</span>.<span class="ident">wires</span>().<span class="ident">last</span>().<span class="ident">unwrap</span>();
         <span class="kw">let</span> <span class="ident">negated</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">bin_twos_complement</span>(<span class="ident">x</span>)<span class="question-mark">?</span>;
         <span class="self">self</span>.<span class="ident">multiplex</span>(<span class="kw-2">&amp;</span><span class="ident">sign</span>, <span class="ident">x</span>, <span class="kw-2">&amp;</span><span class="ident">negated</span>).<span class="ident">map</span>(<span class="ident">BinaryBundle</span>)

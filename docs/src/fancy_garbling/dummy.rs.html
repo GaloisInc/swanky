@@ -1,4 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source to the Rust file `src/dummy.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>dummy.rs.html -- source</title><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../dark.css"><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script src="../../storage.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="shortcut icon" href="../../favicon.ico"><style type="text/css">#crate-search{background-image:url("../../down-arrow.svg");}</style></head><body class="rustdoc source"><!--[if lte IE 8]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu">&#9776;</div><a href='../../fancy_garbling/index.html'><img src='../../rust-logo.png' alt='logo' width='100'></a></nav><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!"><img src="../../brush.svg" width="18" alt="Pick another theme!"></button><div id="theme-choices"></div></div><script src="../../theme.js"></script><nav class="sub"><form class="search-form js-only"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><a id="settings-menu" href="../../settings.html"><img src="../../wheel.svg" width="18" alt="Change settings"></a></div></form></nav><section id="main" class="content"><pre class="line-numbers"><span id="1">  1</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source to the Rust file `src/dummy.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>dummy.rs.html -- source</title><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../dark.css"><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script src="../../storage.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="shortcut icon" href="../../favicon.ico"><style type="text/css">#crate-search{background-image:url("../../down-arrow.svg");}</style></head><body class="rustdoc source"><!--[if lte IE 8]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu">&#9776;</div><a href='../../fancy_garbling/index.html'><div class='logo-container'><img src='../../rust-logo.png' alt='logo'></div></a></nav><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!"><img src="../../brush.svg" width="18" alt="Pick another theme!"></button><div id="theme-choices"></div></div><script src="../../theme.js"></script><nav class="sub"><form class="search-form js-only"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><a id="settings-menu" href="../../settings.html"><img src="../../wheel.svg" width="18" alt="Change settings"></a></div></form></nav><section id="main" class="content"><pre class="line-numbers"><span id="1">  1</span>
 <span id="2">  2</span>
 <span id="3">  3</span>
 <span id="4">  4</span>
@@ -464,6 +464,54 @@
 <span id="464">464</span>
 <span id="465">465</span>
 <span id="466">466</span>
+<span id="467">467</span>
+<span id="468">468</span>
+<span id="469">469</span>
+<span id="470">470</span>
+<span id="471">471</span>
+<span id="472">472</span>
+<span id="473">473</span>
+<span id="474">474</span>
+<span id="475">475</span>
+<span id="476">476</span>
+<span id="477">477</span>
+<span id="478">478</span>
+<span id="479">479</span>
+<span id="480">480</span>
+<span id="481">481</span>
+<span id="482">482</span>
+<span id="483">483</span>
+<span id="484">484</span>
+<span id="485">485</span>
+<span id="486">486</span>
+<span id="487">487</span>
+<span id="488">488</span>
+<span id="489">489</span>
+<span id="490">490</span>
+<span id="491">491</span>
+<span id="492">492</span>
+<span id="493">493</span>
+<span id="494">494</span>
+<span id="495">495</span>
+<span id="496">496</span>
+<span id="497">497</span>
+<span id="498">498</span>
+<span id="499">499</span>
+<span id="500">500</span>
+<span id="501">501</span>
+<span id="502">502</span>
+<span id="503">503</span>
+<span id="504">504</span>
+<span id="505">505</span>
+<span id="506">506</span>
+<span id="507">507</span>
+<span id="508">508</span>
+<span id="509">509</span>
+<span id="510">510</span>
+<span id="511">511</span>
+<span id="512">512</span>
+<span id="513">513</span>
+<span id="514">514</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="doccomment">//! Dummy implementation of `Fancy`.</span>
 <span class="doccomment">//!</span>
@@ -471,13 +519,11 @@
 <span class="doccomment">//! creating any circuits.</span>
 
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">error</span>::{<span class="ident">DummyError</span>, <span class="ident">FancyError</span>};
-<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">fancy</span>::{<span class="ident">Fancy</span>, <span class="ident">HasModulus</span>};
+<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">fancy</span>::{<span class="ident">FancyInput</span>, <span class="ident">Fancy</span>, <span class="ident">HasModulus</span>};
 
 <span class="doccomment">/// Simple struct that performs the fancy computation over `u16`.</span>
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Dummy</span> {
     <span class="ident">outputs</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u16</span><span class="op">&gt;</span>,
-    <span class="ident">garbler_inputs</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u16</span><span class="op">&gt;</span>,
-    <span class="ident">evaluator_inputs</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u16</span><span class="op">&gt;</span>,
 }
 
 <span class="doccomment">/// Wrapper around `u16`.</span>
@@ -493,12 +539,17 @@
     }
 }
 
+<span class="kw">impl</span> <span class="ident">DummyVal</span> {
+    <span class="doccomment">/// Create a new DummyVal.</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">val</span>: <span class="ident">u16</span>, <span class="ident">modulus</span>: <span class="ident">u16</span>) <span class="op">-&gt;</span> <span class="self">Self</span> {
+        <span class="self">Self</span> { <span class="ident">val</span>, <span class="ident">modulus</span> }
+    }
+}
+
 <span class="kw">impl</span> <span class="ident">Dummy</span> {
     <span class="doccomment">/// Create a new Dummy.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">garbler_inputs</span>: <span class="kw-2">&amp;</span>[<span class="ident">u16</span>], <span class="ident">evaluator_inputs</span>: <span class="kw-2">&amp;</span>[<span class="ident">u16</span>]) <span class="op">-&gt;</span> <span class="ident">Dummy</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>() <span class="op">-&gt;</span> <span class="ident">Dummy</span> {
         <span class="ident">Dummy</span> {
-            <span class="ident">garbler_inputs</span>: <span class="ident">garbler_inputs</span>.<span class="ident">to_vec</span>(),
-            <span class="ident">evaluator_inputs</span>: <span class="ident">evaluator_inputs</span>.<span class="ident">to_vec</span>(),
             <span class="ident">outputs</span>: <span class="ident">Vec</span>::<span class="ident">new</span>(),
         }
     }
@@ -509,30 +560,33 @@
     }
 }
 
+<span class="kw">impl</span> <span class="ident">FancyInput</span> <span class="kw">for</span> <span class="ident">Dummy</span> {
+    <span class="doccomment">/// Encode a single dummy value.</span>
+    <span class="kw">fn</span> <span class="ident">encode</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">value</span>: <span class="ident">u16</span>, <span class="ident">modulus</span>: <span class="ident">u16</span>) <span class="op">-&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">DummyVal</span>, <span class="ident">DummyError</span><span class="op">&gt;</span> {
+        <span class="prelude-val">Ok</span>(<span class="ident">DummyVal</span>::<span class="ident">new</span>(<span class="ident">value</span>, <span class="ident">modulus</span>))
+    }
+
+    <span class="doccomment">/// Encode a slice of inputs and a slice of moduli as DummyVals.</span>
+    <span class="kw">fn</span> <span class="ident">encode_many</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">xs</span>: <span class="kw-2">&amp;</span>[<span class="ident">u16</span>], <span class="ident">moduli</span>: <span class="kw-2">&amp;</span>[<span class="ident">u16</span>]) <span class="op">-&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">DummyVal</span><span class="op">&gt;</span>, <span class="ident">DummyError</span><span class="op">&gt;</span> {
+        <span class="kw">if</span> <span class="ident">xs</span>.<span class="ident">len</span>() <span class="op">!=</span> <span class="ident">moduli</span>.<span class="ident">len</span>() {
+            <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">DummyError</span>::<span class="ident">EncodingError</span>);
+        }
+        <span class="prelude-val">Ok</span>(<span class="ident">xs</span>
+            .<span class="ident">iter</span>()
+            .<span class="ident">zip</span>(<span class="ident">moduli</span>.<span class="ident">iter</span>())
+            .<span class="ident">map</span>(<span class="op">|</span>(<span class="ident">x</span>, <span class="ident">q</span>)<span class="op">|</span> <span class="ident">DummyVal</span>::<span class="ident">new</span>(<span class="kw-2">*</span><span class="ident">x</span>, <span class="kw-2">*</span><span class="ident">q</span>))
+            .<span class="ident">collect</span>())
+    }
+
+    <span class="kw">fn</span> <span class="ident">receive_many</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">_moduli</span>: <span class="kw-2">&amp;</span>[<span class="ident">u16</span>]) <span class="op">-&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">DummyVal</span><span class="op">&gt;</span>, <span class="ident">DummyError</span><span class="op">&gt;</span> {
+        <span class="comment">// Receive is undefined for Dummy which is a single party &quot;protocol&quot;</span>
+        <span class="prelude-val">Err</span>(<span class="ident">DummyError</span>::<span class="ident">EncodingError</span>)
+    }
+}
+
 <span class="kw">impl</span> <span class="ident">Fancy</span> <span class="kw">for</span> <span class="ident">Dummy</span> {
     <span class="kw">type</span> <span class="ident">Item</span> <span class="op">=</span> <span class="ident">DummyVal</span>;
     <span class="kw">type</span> <span class="ident">Error</span> <span class="op">=</span> <span class="ident">DummyError</span>;
-
-    <span class="kw">fn</span> <span class="ident">garbler_input</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">modulus</span>: <span class="ident">u16</span>, <span class="ident">opt_x</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">u16</span><span class="op">&gt;</span>) <span class="op">-&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">DummyVal</span>, <span class="self">Self</span>::<span class="ident">Error</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">res</span> <span class="op">=</span> <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">val</span>) <span class="op">=</span> <span class="ident">opt_x</span> {
-            <span class="ident">DummyVal</span> { <span class="ident">val</span>, <span class="ident">modulus</span> }
-        } <span class="kw">else</span> {
-            <span class="kw">if</span> <span class="self">self</span>.<span class="ident">garbler_inputs</span>.<span class="ident">is_empty</span>() {
-                <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">DummyError</span>::<span class="ident">NotEnoughGarblerInputs</span>);
-            }
-            <span class="kw">let</span> <span class="ident">val</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">garbler_inputs</span>.<span class="ident">remove</span>(<span class="number">0</span>);
-            <span class="ident">DummyVal</span> { <span class="ident">val</span>, <span class="ident">modulus</span> }
-        };
-        <span class="prelude-val">Ok</span>(<span class="ident">res</span>)
-    }
-
-    <span class="kw">fn</span> <span class="ident">evaluator_input</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">modulus</span>: <span class="ident">u16</span>) <span class="op">-&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">DummyVal</span>, <span class="self">Self</span>::<span class="ident">Error</span><span class="op">&gt;</span> {
-        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">evaluator_inputs</span>.<span class="ident">is_empty</span>() {
-            <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">DummyError</span>::<span class="ident">NotEnoughEvaluatorInputs</span>);
-        }
-        <span class="kw">let</span> <span class="ident">val</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">evaluator_inputs</span>.<span class="ident">remove</span>(<span class="number">0</span>);
-        <span class="prelude-val">Ok</span>(<span class="ident">DummyVal</span> { <span class="ident">val</span>, <span class="ident">modulus</span> })
-    }
 
     <span class="kw">fn</span> <span class="ident">constant</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">val</span>: <span class="ident">u16</span>, <span class="ident">modulus</span>: <span class="ident">u16</span>) <span class="op">-&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">DummyVal</span>, <span class="self">Self</span>::<span class="ident">Error</span><span class="op">&gt;</span> {
         <span class="prelude-val">Ok</span>(<span class="ident">DummyVal</span> { <span class="ident">val</span>, <span class="ident">modulus</span> })
@@ -595,24 +649,24 @@
 <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">test</span>)]</span>
 <span class="kw">mod</span> <span class="ident">bundle</span> {
     <span class="kw">use</span> <span class="kw">super</span>::<span class="kw-2">*</span>;
-    <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">fancy</span>::{<span class="ident">BundleGadgets</span>, <span class="ident">CrtGadgets</span>, <span class="ident">BinaryGadgets</span>};
-    <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::{<span class="self">self</span>, <span class="ident">crt_factor</span>, <span class="ident">crt_inv_factor</span>, <span class="ident">RngExt</span>};
+    <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">fancy</span>::{<span class="ident">BinaryGadgets</span>, <span class="ident">Bundle</span>, <span class="ident">BundleGadgets</span>, <span class="ident">CrtGadgets</span>};
+    <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::{<span class="self">self</span>, <span class="ident">crt_inv_factor</span>, <span class="ident">RngExt</span>};
     <span class="kw">use</span> <span class="ident">itertools</span>::<span class="ident">Itertools</span>;
     <span class="kw">use</span> <span class="ident">rand</span>::<span class="ident">thread_rng</span>;
 
     <span class="kw">const</span> <span class="ident">NITERS</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">1</span> <span class="op">&lt;&lt;</span> <span class="number">10</span>;
 
-    <span class="attribute">#[<span class="ident">test</span>]</span> <span class="comment">// bundle addition {{{</span>
+    <span class="attribute">#[<span class="ident">test</span>]</span>
     <span class="kw">fn</span> <span class="ident">test_addition</span>() {
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">rng</span> <span class="op">=</span> <span class="ident">thread_rng</span>();
         <span class="kw">for</span> <span class="kw">_</span> <span class="kw">in</span> <span class="number">0</span>..<span class="ident">NITERS</span> {
             <span class="kw">let</span> <span class="ident">q</span> <span class="op">=</span> <span class="ident">rng</span>.<span class="ident">gen_usable_composite_modulus</span>();
             <span class="kw">let</span> <span class="ident">x</span> <span class="op">=</span> <span class="ident">rng</span>.<span class="ident">gen_u128</span>() <span class="op">%</span> <span class="ident">q</span>;
             <span class="kw">let</span> <span class="ident">y</span> <span class="op">=</span> <span class="ident">rng</span>.<span class="ident">gen_u128</span>() <span class="op">%</span> <span class="ident">q</span>;
-            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">d</span> <span class="op">=</span> <span class="ident">Dummy</span>::<span class="ident">new</span>(<span class="kw-2">&amp;</span><span class="ident">crt_factor</span>(<span class="ident">x</span>, <span class="ident">q</span>), <span class="kw-2">&amp;</span><span class="ident">crt_factor</span>(<span class="ident">y</span>, <span class="ident">q</span>));
+            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">d</span> <span class="op">=</span> <span class="ident">Dummy</span>::<span class="ident">new</span>();
             {
-                <span class="kw">let</span> <span class="ident">x</span> <span class="op">=</span> <span class="ident">d</span>.<span class="ident">crt_garbler_input_bundle</span>(<span class="ident">q</span>, <span class="prelude-val">None</span>).<span class="ident">unwrap</span>();
-                <span class="kw">let</span> <span class="ident">y</span> <span class="op">=</span> <span class="ident">d</span>.<span class="ident">crt_evaluator_input_bundle</span>(<span class="ident">q</span>).<span class="ident">unwrap</span>();
+                <span class="kw">let</span> <span class="ident">x</span> <span class="op">=</span> <span class="ident">d</span>.<span class="ident">crt_encode</span>(<span class="ident">x</span>, <span class="ident">q</span>).<span class="ident">unwrap</span>();
+                <span class="kw">let</span> <span class="ident">y</span> <span class="op">=</span> <span class="ident">d</span>.<span class="ident">crt_encode</span>(<span class="ident">y</span>, <span class="ident">q</span>).<span class="ident">unwrap</span>();
                 <span class="kw">let</span> <span class="ident">z</span> <span class="op">=</span> <span class="ident">d</span>.<span class="ident">crt_add</span>(<span class="kw-2">&amp;</span><span class="ident">x</span>, <span class="kw-2">&amp;</span><span class="ident">y</span>).<span class="ident">unwrap</span>();
                 <span class="ident">d</span>.<span class="ident">output_bundle</span>(<span class="kw-2">&amp;</span><span class="ident">z</span>).<span class="ident">unwrap</span>();
             }
@@ -620,18 +674,18 @@
             <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">z</span>, (<span class="ident">x</span> <span class="op">+</span> <span class="ident">y</span>) <span class="op">%</span> <span class="ident">q</span>);
         }
     }
-    <span class="comment">//}}}</span>
-    <span class="attribute">#[<span class="ident">test</span>]</span> <span class="comment">// bundle subtraction {{{</span>
+
+    <span class="attribute">#[<span class="ident">test</span>]</span>
     <span class="kw">fn</span> <span class="ident">test_subtraction</span>() {
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">rng</span> <span class="op">=</span> <span class="ident">thread_rng</span>();
         <span class="kw">for</span> <span class="kw">_</span> <span class="kw">in</span> <span class="number">0</span>..<span class="ident">NITERS</span> {
             <span class="kw">let</span> <span class="ident">q</span> <span class="op">=</span> <span class="ident">rng</span>.<span class="ident">gen_usable_composite_modulus</span>();
             <span class="kw">let</span> <span class="ident">x</span> <span class="op">=</span> <span class="ident">rng</span>.<span class="ident">gen_u128</span>() <span class="op">%</span> <span class="ident">q</span>;
             <span class="kw">let</span> <span class="ident">y</span> <span class="op">=</span> <span class="ident">rng</span>.<span class="ident">gen_u128</span>() <span class="op">%</span> <span class="ident">q</span>;
-            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">d</span> <span class="op">=</span> <span class="ident">Dummy</span>::<span class="ident">new</span>(<span class="kw-2">&amp;</span><span class="ident">crt_factor</span>(<span class="ident">x</span>, <span class="ident">q</span>), <span class="kw-2">&amp;</span><span class="ident">crt_factor</span>(<span class="ident">y</span>, <span class="ident">q</span>));
+            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">d</span> <span class="op">=</span> <span class="ident">Dummy</span>::<span class="ident">new</span>();
             {
-                <span class="kw">let</span> <span class="ident">x</span> <span class="op">=</span> <span class="ident">d</span>.<span class="ident">crt_garbler_input_bundle</span>(<span class="ident">q</span>, <span class="prelude-val">None</span>).<span class="ident">unwrap</span>();
-                <span class="kw">let</span> <span class="ident">y</span> <span class="op">=</span> <span class="ident">d</span>.<span class="ident">crt_evaluator_input_bundle</span>(<span class="ident">q</span>).<span class="ident">unwrap</span>();
+                <span class="kw">let</span> <span class="ident">x</span> <span class="op">=</span> <span class="ident">d</span>.<span class="ident">crt_encode</span>(<span class="ident">x</span>, <span class="ident">q</span>).<span class="ident">unwrap</span>();
+                <span class="kw">let</span> <span class="ident">y</span> <span class="op">=</span> <span class="ident">d</span>.<span class="ident">crt_encode</span>(<span class="ident">y</span>, <span class="ident">q</span>).<span class="ident">unwrap</span>();
                 <span class="kw">let</span> <span class="ident">z</span> <span class="op">=</span> <span class="ident">d</span>.<span class="ident">sub_bundles</span>(<span class="kw-2">&amp;</span><span class="ident">x</span>, <span class="kw-2">&amp;</span><span class="ident">y</span>).<span class="ident">unwrap</span>();
                 <span class="ident">d</span>.<span class="ident">output_bundle</span>(<span class="kw-2">&amp;</span><span class="ident">z</span>).<span class="ident">unwrap</span>();
             }
@@ -639,8 +693,8 @@
             <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">z</span>, (<span class="ident">x</span> <span class="op">+</span> <span class="ident">q</span> <span class="op">-</span> <span class="ident">y</span>) <span class="op">%</span> <span class="ident">q</span>);
         }
     }
-    <span class="comment">//}}}</span>
-    <span class="attribute">#[<span class="ident">test</span>]</span> <span class="comment">// binary cmul {{{</span>
+
+    <span class="attribute">#[<span class="ident">test</span>]</span>
     <span class="kw">fn</span> <span class="ident">test_binary_cmul</span>() {
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">rng</span> <span class="op">=</span> <span class="ident">thread_rng</span>();
         <span class="kw">for</span> <span class="kw">_</span> <span class="kw">in</span> <span class="number">0</span>..<span class="ident">NITERS</span> {
@@ -648,9 +702,9 @@
             <span class="kw">let</span> <span class="ident">q</span> <span class="op">=</span> <span class="number">1</span> <span class="op">&lt;&lt;</span> <span class="ident">nbits</span>;
             <span class="kw">let</span> <span class="ident">x</span> <span class="op">=</span> <span class="ident">rng</span>.<span class="ident">gen_u128</span>() <span class="op">%</span> <span class="ident">q</span>;
             <span class="kw">let</span> <span class="ident">c</span> <span class="op">=</span> <span class="number">1</span> <span class="op">+</span> <span class="ident">rng</span>.<span class="ident">gen_u128</span>() <span class="op">%</span> <span class="ident">q</span>;
-            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">d</span> <span class="op">=</span> <span class="ident">Dummy</span>::<span class="ident">new</span>(<span class="kw-2">&amp;</span><span class="ident">util</span>::<span class="ident">u128_to_bits</span>(<span class="ident">x</span>, <span class="ident">nbits</span>), <span class="kw-2">&amp;</span>[]);
+            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">d</span> <span class="op">=</span> <span class="ident">Dummy</span>::<span class="ident">new</span>();
             {
-                <span class="kw">let</span> <span class="ident">x</span> <span class="op">=</span> <span class="ident">d</span>.<span class="ident">bin_garbler_input_bundle</span>(<span class="ident">nbits</span>, <span class="prelude-val">None</span>).<span class="ident">unwrap</span>();
+                <span class="kw">let</span> <span class="ident">x</span> <span class="op">=</span> <span class="ident">d</span>.<span class="ident">bin_encode</span>(<span class="ident">x</span>, <span class="ident">nbits</span>).<span class="ident">unwrap</span>();
                 <span class="kw">let</span> <span class="ident">z</span> <span class="op">=</span> <span class="ident">d</span>.<span class="ident">bin_cmul</span>(<span class="kw-2">&amp;</span><span class="ident">x</span>, <span class="ident">c</span>, <span class="ident">nbits</span>).<span class="ident">unwrap</span>();
                 <span class="ident">d</span>.<span class="ident">output_bundle</span>(<span class="kw-2">&amp;</span><span class="ident">z</span>).<span class="ident">unwrap</span>();
             }
@@ -658,8 +712,8 @@
             <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">z</span>, (<span class="ident">x</span> <span class="op">*</span> <span class="ident">c</span>) <span class="op">%</span> <span class="ident">q</span>);
         }
     }
-    <span class="comment">//}}}</span>
-    <span class="attribute">#[<span class="ident">test</span>]</span> <span class="comment">// binary multiplication {{{</span>
+
+    <span class="attribute">#[<span class="ident">test</span>]</span>
     <span class="kw">fn</span> <span class="ident">test_binary_multiplication</span>() {
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">rng</span> <span class="op">=</span> <span class="ident">thread_rng</span>();
         <span class="kw">for</span> <span class="kw">_</span> <span class="kw">in</span> <span class="number">0</span>..<span class="ident">NITERS</span> {
@@ -667,10 +721,10 @@
             <span class="kw">let</span> <span class="ident">q</span> <span class="op">=</span> <span class="number">1</span> <span class="op">&lt;&lt;</span> <span class="ident">nbits</span>;
             <span class="kw">let</span> <span class="ident">x</span> <span class="op">=</span> <span class="ident">rng</span>.<span class="ident">gen_u128</span>() <span class="op">%</span> <span class="ident">q</span>;
             <span class="kw">let</span> <span class="ident">y</span> <span class="op">=</span> <span class="ident">rng</span>.<span class="ident">gen_u128</span>() <span class="op">%</span> <span class="ident">q</span>;
-            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">d</span> <span class="op">=</span> <span class="ident">Dummy</span>::<span class="ident">new</span>(<span class="kw-2">&amp;</span><span class="ident">util</span>::<span class="ident">u128_to_bits</span>(<span class="ident">x</span>, <span class="ident">nbits</span>), <span class="kw-2">&amp;</span><span class="ident">util</span>::<span class="ident">u128_to_bits</span>(<span class="ident">y</span>, <span class="ident">nbits</span>));
+            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">d</span> <span class="op">=</span> <span class="ident">Dummy</span>::<span class="ident">new</span>();
             {
-                <span class="kw">let</span> <span class="ident">x</span> <span class="op">=</span> <span class="ident">d</span>.<span class="ident">bin_garbler_input_bundle</span>(<span class="ident">nbits</span>, <span class="prelude-val">None</span>).<span class="ident">unwrap</span>();
-                <span class="kw">let</span> <span class="ident">y</span> <span class="op">=</span> <span class="ident">d</span>.<span class="ident">bin_evaluator_input_bundle</span>(<span class="ident">nbits</span>).<span class="ident">unwrap</span>();
+                <span class="kw">let</span> <span class="ident">x</span> <span class="op">=</span> <span class="ident">d</span>.<span class="ident">bin_encode</span>(<span class="ident">x</span>, <span class="ident">nbits</span>).<span class="ident">unwrap</span>();
+                <span class="kw">let</span> <span class="ident">y</span> <span class="op">=</span> <span class="ident">d</span>.<span class="ident">bin_encode</span>(<span class="ident">y</span>, <span class="ident">nbits</span>).<span class="ident">unwrap</span>();
                 <span class="kw">let</span> <span class="ident">z</span> <span class="op">=</span> <span class="ident">d</span>.<span class="ident">bin_multiplication_lower_half</span>(<span class="kw-2">&amp;</span><span class="ident">x</span>, <span class="kw-2">&amp;</span><span class="ident">y</span>).<span class="ident">unwrap</span>();
                 <span class="ident">d</span>.<span class="ident">output_bundle</span>(<span class="kw-2">&amp;</span><span class="ident">z</span>).<span class="ident">unwrap</span>();
             }
@@ -678,8 +732,8 @@
             <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">z</span>, (<span class="ident">x</span> <span class="op">*</span> <span class="ident">y</span>) <span class="op">&amp;</span> (<span class="ident">q</span> <span class="op">-</span> <span class="number">1</span>));
         }
     }
-    <span class="comment">//}}}</span>
-    <span class="attribute">#[<span class="ident">test</span>]</span> <span class="comment">// bundle max {{{</span>
+
+    <span class="attribute">#[<span class="ident">test</span>]</span>
     <span class="kw">fn</span> <span class="ident">max</span>() {
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">rng</span> <span class="op">=</span> <span class="ident">thread_rng</span>();
         <span class="kw">let</span> <span class="ident">q</span> <span class="op">=</span> <span class="ident">util</span>::<span class="ident">modulus_with_width</span>(<span class="number">10</span>);
@@ -687,13 +741,12 @@
         <span class="kw">for</span> <span class="kw">_</span> <span class="kw">in</span> <span class="number">0</span>..<span class="ident">NITERS</span> {
             <span class="kw">let</span> <span class="ident">inps</span> <span class="op">=</span> (<span class="number">0</span>..<span class="ident">n</span>).<span class="ident">map</span>(<span class="op">|</span><span class="kw">_</span><span class="op">|</span> <span class="ident">rng</span>.<span class="ident">gen_u128</span>() <span class="op">%</span> (<span class="ident">q</span> <span class="op">/</span> <span class="number">2</span>)).<span class="ident">collect_vec</span>();
             <span class="kw">let</span> <span class="ident">should_be</span> <span class="op">=</span> <span class="kw-2">*</span><span class="ident">inps</span>.<span class="ident">iter</span>().<span class="ident">max</span>().<span class="ident">unwrap</span>();
-            <span class="kw">let</span> <span class="ident">enc_inps</span> <span class="op">=</span> <span class="ident">inps</span>
-                .<span class="ident">into_iter</span>()
-                .<span class="ident">flat_map</span>(<span class="op">|</span><span class="ident">x</span><span class="op">|</span> <span class="ident">crt_factor</span>(<span class="ident">x</span>, <span class="ident">q</span>))
-                .<span class="ident">collect_vec</span>();
-            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">d</span> <span class="op">=</span> <span class="ident">Dummy</span>::<span class="ident">new</span>(<span class="kw-2">&amp;</span><span class="ident">enc_inps</span>, <span class="kw-2">&amp;</span>[]);
+            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">d</span> <span class="op">=</span> <span class="ident">Dummy</span>::<span class="ident">new</span>();
             {
-                <span class="kw">let</span> <span class="ident">xs</span> <span class="op">=</span> <span class="ident">d</span>.<span class="ident">crt_garbler_input_bundles</span>(<span class="ident">q</span>, <span class="ident">n</span>, <span class="prelude-val">None</span>).<span class="ident">unwrap</span>();
+                <span class="kw">let</span> <span class="ident">xs</span> <span class="op">=</span> <span class="ident">inps</span>
+                    .<span class="ident">into_iter</span>()
+                    .<span class="ident">map</span>(<span class="op">|</span><span class="ident">x</span><span class="op">|</span> <span class="ident">d</span>.<span class="ident">crt_encode</span>(<span class="ident">x</span>, <span class="ident">q</span>).<span class="ident">unwrap</span>())
+                    .<span class="ident">collect_vec</span>();
                 <span class="kw">let</span> <span class="ident">z</span> <span class="op">=</span> <span class="ident">d</span>.<span class="ident">crt_max</span>(<span class="kw-2">&amp;</span><span class="ident">xs</span>, <span class="string">&quot;100%&quot;</span>).<span class="ident">unwrap</span>();
                 <span class="ident">d</span>.<span class="ident">output_bundle</span>(<span class="kw-2">&amp;</span><span class="ident">z</span>).<span class="ident">unwrap</span>();
             }
@@ -701,8 +754,8 @@
             <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">z</span>, <span class="ident">should_be</span>);
         }
     }
-    <span class="comment">//}}}</span>
-    <span class="attribute">#[<span class="ident">test</span>]</span> <span class="comment">// twos complement {{{</span>
+
+    <span class="attribute">#[<span class="ident">test</span>]</span>
     <span class="kw">fn</span> <span class="ident">twos_complement</span>() {
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">rng</span> <span class="op">=</span> <span class="ident">thread_rng</span>();
         <span class="kw">let</span> <span class="ident">nbits</span> <span class="op">=</span> <span class="number">16</span>;
@@ -710,9 +763,9 @@
         <span class="kw">for</span> <span class="kw">_</span> <span class="kw">in</span> <span class="number">0</span>..<span class="ident">NITERS</span> {
             <span class="kw">let</span> <span class="ident">x</span> <span class="op">=</span> <span class="ident">rng</span>.<span class="ident">gen_u128</span>() <span class="op">%</span> <span class="ident">q</span>;
             <span class="kw">let</span> <span class="ident">should_be</span> <span class="op">=</span> (<span class="op">!</span><span class="ident">x</span> <span class="op">+</span> <span class="number">1</span>) <span class="op">%</span> <span class="ident">q</span>;
-            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">d</span> <span class="op">=</span> <span class="ident">Dummy</span>::<span class="ident">new</span>(<span class="kw-2">&amp;</span><span class="ident">util</span>::<span class="ident">u128_to_bits</span>(<span class="ident">x</span>, <span class="ident">nbits</span>), <span class="kw-2">&amp;</span>[]);
+            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">d</span> <span class="op">=</span> <span class="ident">Dummy</span>::<span class="ident">new</span>();
             {
-                <span class="kw">let</span> <span class="ident">x</span> <span class="op">=</span> <span class="ident">d</span>.<span class="ident">bin_garbler_input_bundle</span>(<span class="ident">nbits</span>, <span class="prelude-val">None</span>).<span class="ident">unwrap</span>();
+                <span class="kw">let</span> <span class="ident">x</span> <span class="op">=</span> <span class="ident">d</span>.<span class="ident">bin_encode</span>(<span class="ident">x</span>, <span class="ident">nbits</span>).<span class="ident">unwrap</span>();
                 <span class="kw">let</span> <span class="ident">y</span> <span class="op">=</span> <span class="ident">d</span>.<span class="ident">bin_twos_complement</span>(<span class="kw-2">&amp;</span><span class="ident">x</span>).<span class="ident">unwrap</span>();
                 <span class="ident">d</span>.<span class="ident">output_bundle</span>(<span class="kw-2">&amp;</span><span class="ident">y</span>).<span class="ident">unwrap</span>();
             }
@@ -721,8 +774,8 @@
             <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">y</span>, <span class="ident">should_be</span>, <span class="string">&quot;x={} y={} should_be={}&quot;</span>, <span class="ident">x</span>, <span class="ident">y</span>, <span class="ident">should_be</span>);
         }
     }
-    <span class="comment">//}}}</span>
-    <span class="attribute">#[<span class="ident">test</span>]</span> <span class="comment">// binary addition {{{</span>
+
+    <span class="attribute">#[<span class="ident">test</span>]</span>
     <span class="kw">fn</span> <span class="ident">binary_addition</span>() {
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">rng</span> <span class="op">=</span> <span class="ident">thread_rng</span>();
         <span class="kw">let</span> <span class="ident">nbits</span> <span class="op">=</span> <span class="number">16</span>;
@@ -731,14 +784,10 @@
             <span class="kw">let</span> <span class="ident">x</span> <span class="op">=</span> <span class="ident">rng</span>.<span class="ident">gen_u128</span>() <span class="op">%</span> <span class="ident">q</span>;
             <span class="kw">let</span> <span class="ident">y</span> <span class="op">=</span> <span class="ident">rng</span>.<span class="ident">gen_u128</span>() <span class="op">%</span> <span class="ident">q</span>;
             <span class="kw">let</span> <span class="ident">should_be</span> <span class="op">=</span> (<span class="ident">x</span> <span class="op">+</span> <span class="ident">y</span>) <span class="op">%</span> <span class="ident">q</span>;
-            <span class="kw">let</span> <span class="ident">enc_inps</span> <span class="op">=</span> [<span class="ident">x</span>, <span class="ident">y</span>]
-                .<span class="ident">into_iter</span>()
-                .<span class="ident">flat_map</span>(<span class="op">|</span><span class="kw-2">&amp;</span><span class="ident">x</span><span class="op">|</span> <span class="ident">util</span>::<span class="ident">u128_to_bits</span>(<span class="ident">x</span>, <span class="ident">nbits</span>))
-                .<span class="ident">collect_vec</span>();
-            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">d</span> <span class="op">=</span> <span class="ident">Dummy</span>::<span class="ident">new</span>(<span class="kw-2">&amp;</span><span class="ident">enc_inps</span>, <span class="kw-2">&amp;</span>[]);
+            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">d</span> <span class="op">=</span> <span class="ident">Dummy</span>::<span class="ident">new</span>();
             {
-                <span class="kw">let</span> <span class="ident">x</span> <span class="op">=</span> <span class="ident">d</span>.<span class="ident">bin_garbler_input_bundle</span>(<span class="ident">nbits</span>, <span class="prelude-val">None</span>).<span class="ident">unwrap</span>();
-                <span class="kw">let</span> <span class="ident">y</span> <span class="op">=</span> <span class="ident">d</span>.<span class="ident">bin_garbler_input_bundle</span>(<span class="ident">nbits</span>, <span class="prelude-val">None</span>).<span class="ident">unwrap</span>();
+                <span class="kw">let</span> <span class="ident">x</span> <span class="op">=</span> <span class="ident">d</span>.<span class="ident">bin_encode</span>(<span class="ident">x</span>, <span class="ident">nbits</span>).<span class="ident">unwrap</span>();
+                <span class="kw">let</span> <span class="ident">y</span> <span class="op">=</span> <span class="ident">d</span>.<span class="ident">bin_encode</span>(<span class="ident">y</span>, <span class="ident">nbits</span>).<span class="ident">unwrap</span>();
                 <span class="kw">let</span> (<span class="ident">z</span>, <span class="ident">overflow</span>) <span class="op">=</span> <span class="ident">d</span>.<span class="ident">bin_addition</span>(<span class="kw-2">&amp;</span><span class="ident">x</span>, <span class="kw-2">&amp;</span><span class="ident">y</span>).<span class="ident">unwrap</span>();
                 <span class="ident">d</span>.<span class="ident">output</span>(<span class="kw-2">&amp;</span><span class="ident">overflow</span>).<span class="ident">unwrap</span>();
                 <span class="ident">d</span>.<span class="ident">output_bundle</span>(<span class="kw-2">&amp;</span><span class="ident">z</span>).<span class="ident">unwrap</span>();
@@ -754,8 +803,8 @@
             <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">overflow</span>, <span class="ident">x</span> <span class="op">+</span> <span class="ident">y</span> <span class="op">&gt;=</span> <span class="ident">q</span>, <span class="string">&quot;x={} y={}&quot;</span>, <span class="ident">x</span>, <span class="ident">y</span>);
         }
     }
-    <span class="comment">//}}}</span>
-    <span class="attribute">#[<span class="ident">test</span>]</span> <span class="comment">// binary subtraction {{{</span>
+
+    <span class="attribute">#[<span class="ident">test</span>]</span>
     <span class="kw">fn</span> <span class="ident">binary_subtraction</span>() {
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">rng</span> <span class="op">=</span> <span class="ident">thread_rng</span>();
         <span class="kw">let</span> <span class="ident">nbits</span> <span class="op">=</span> <span class="number">16</span>;
@@ -764,14 +813,10 @@
             <span class="kw">let</span> <span class="ident">x</span> <span class="op">=</span> <span class="ident">rng</span>.<span class="ident">gen_u128</span>() <span class="op">%</span> <span class="ident">q</span>;
             <span class="kw">let</span> <span class="ident">y</span> <span class="op">=</span> <span class="ident">rng</span>.<span class="ident">gen_u128</span>() <span class="op">%</span> <span class="ident">q</span>;
             <span class="kw">let</span> <span class="ident">should_be</span> <span class="op">=</span> (<span class="ident">x</span> <span class="op">-</span> <span class="ident">y</span>) <span class="op">%</span> <span class="ident">q</span>;
-            <span class="kw">let</span> <span class="ident">enc_inps</span> <span class="op">=</span> [<span class="ident">x</span>, <span class="ident">y</span>]
-                .<span class="ident">into_iter</span>()
-                .<span class="ident">flat_map</span>(<span class="op">|</span><span class="kw-2">&amp;</span><span class="ident">x</span><span class="op">|</span> <span class="ident">util</span>::<span class="ident">u128_to_bits</span>(<span class="ident">x</span>, <span class="ident">nbits</span>))
-                .<span class="ident">collect_vec</span>();
-            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">d</span> <span class="op">=</span> <span class="ident">Dummy</span>::<span class="ident">new</span>(<span class="kw-2">&amp;</span><span class="ident">enc_inps</span>, <span class="kw-2">&amp;</span>[]);
+            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">d</span> <span class="op">=</span> <span class="ident">Dummy</span>::<span class="ident">new</span>();
             {
-                <span class="kw">let</span> <span class="ident">x</span> <span class="op">=</span> <span class="ident">d</span>.<span class="ident">bin_garbler_input_bundle</span>(<span class="ident">nbits</span>, <span class="prelude-val">None</span>).<span class="ident">unwrap</span>();
-                <span class="kw">let</span> <span class="ident">y</span> <span class="op">=</span> <span class="ident">d</span>.<span class="ident">bin_garbler_input_bundle</span>(<span class="ident">nbits</span>, <span class="prelude-val">None</span>).<span class="ident">unwrap</span>();
+                <span class="kw">let</span> <span class="ident">x</span> <span class="op">=</span> <span class="ident">d</span>.<span class="ident">bin_encode</span>(<span class="ident">x</span>, <span class="ident">nbits</span>).<span class="ident">unwrap</span>();
+                <span class="kw">let</span> <span class="ident">y</span> <span class="op">=</span> <span class="ident">d</span>.<span class="ident">bin_encode</span>(<span class="ident">y</span>, <span class="ident">nbits</span>).<span class="ident">unwrap</span>();
                 <span class="kw">let</span> (<span class="ident">z</span>, <span class="ident">overflow</span>) <span class="op">=</span> <span class="ident">d</span>.<span class="ident">bin_subtraction</span>(<span class="kw-2">&amp;</span><span class="ident">x</span>, <span class="kw-2">&amp;</span><span class="ident">y</span>).<span class="ident">unwrap</span>();
                 <span class="ident">d</span>.<span class="ident">output</span>(<span class="kw-2">&amp;</span><span class="ident">overflow</span>).<span class="ident">unwrap</span>();
                 <span class="ident">d</span>.<span class="ident">output_bundle</span>(<span class="kw-2">&amp;</span><span class="ident">z</span>).<span class="ident">unwrap</span>();
@@ -787,8 +832,8 @@
             <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">overflow</span>, (<span class="ident">y</span> <span class="op">!=</span> <span class="number">0</span> <span class="op">&amp;&amp;</span> <span class="ident">x</span> <span class="op">&gt;=</span> <span class="ident">y</span>), <span class="string">&quot;x={} y={}&quot;</span>, <span class="ident">x</span>, <span class="ident">y</span>);
         }
     }
-    <span class="comment">//}}}</span>
-    <span class="attribute">#[<span class="ident">test</span>]</span> <span class="comment">// binary lt {{{</span>
+
+    <span class="attribute">#[<span class="ident">test</span>]</span>
     <span class="kw">fn</span> <span class="ident">binary_lt</span>() {
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">rng</span> <span class="op">=</span> <span class="ident">thread_rng</span>();
         <span class="kw">let</span> <span class="ident">nbits</span> <span class="op">=</span> <span class="number">16</span>;
@@ -797,14 +842,10 @@
             <span class="kw">let</span> <span class="ident">x</span> <span class="op">=</span> <span class="ident">rng</span>.<span class="ident">gen_u128</span>() <span class="op">%</span> <span class="ident">q</span>;
             <span class="kw">let</span> <span class="ident">y</span> <span class="op">=</span> <span class="ident">rng</span>.<span class="ident">gen_u128</span>() <span class="op">%</span> <span class="ident">q</span>;
             <span class="kw">let</span> <span class="ident">should_be</span> <span class="op">=</span> <span class="ident">x</span> <span class="op">&lt;</span> <span class="ident">y</span>;
-            <span class="kw">let</span> <span class="ident">enc_inps</span> <span class="op">=</span> [<span class="ident">x</span>, <span class="ident">y</span>]
-                .<span class="ident">into_iter</span>()
-                .<span class="ident">flat_map</span>(<span class="op">|</span><span class="kw-2">&amp;</span><span class="ident">x</span><span class="op">|</span> <span class="ident">util</span>::<span class="ident">u128_to_bits</span>(<span class="ident">x</span>, <span class="ident">nbits</span>))
-                .<span class="ident">collect_vec</span>();
-            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">d</span> <span class="op">=</span> <span class="ident">Dummy</span>::<span class="ident">new</span>(<span class="kw-2">&amp;</span><span class="ident">enc_inps</span>, <span class="kw-2">&amp;</span>[]);
+            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">d</span> <span class="op">=</span> <span class="ident">Dummy</span>::<span class="ident">new</span>();
             {
-                <span class="kw">let</span> <span class="ident">x</span> <span class="op">=</span> <span class="ident">d</span>.<span class="ident">bin_garbler_input_bundle</span>(<span class="ident">nbits</span>, <span class="prelude-val">None</span>).<span class="ident">unwrap</span>();
-                <span class="kw">let</span> <span class="ident">y</span> <span class="op">=</span> <span class="ident">d</span>.<span class="ident">bin_garbler_input_bundle</span>(<span class="ident">nbits</span>, <span class="prelude-val">None</span>).<span class="ident">unwrap</span>();
+                <span class="kw">let</span> <span class="ident">x</span> <span class="op">=</span> <span class="ident">d</span>.<span class="ident">bin_encode</span>(<span class="ident">x</span>, <span class="ident">nbits</span>).<span class="ident">unwrap</span>();
+                <span class="kw">let</span> <span class="ident">y</span> <span class="op">=</span> <span class="ident">d</span>.<span class="ident">bin_encode</span>(<span class="ident">y</span>, <span class="ident">nbits</span>).<span class="ident">unwrap</span>();
                 <span class="kw">let</span> <span class="ident">z</span> <span class="op">=</span> <span class="ident">d</span>.<span class="ident">bin_lt</span>(<span class="kw-2">&amp;</span><span class="ident">x</span>, <span class="kw-2">&amp;</span><span class="ident">y</span>).<span class="ident">unwrap</span>();
                 <span class="ident">d</span>.<span class="ident">output</span>(<span class="kw-2">&amp;</span><span class="ident">z</span>).<span class="ident">unwrap</span>();
             }
@@ -812,8 +853,8 @@
             <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">z</span>, <span class="ident">should_be</span>, <span class="string">&quot;x={} y={}&quot;</span>, <span class="ident">x</span>, <span class="ident">y</span>);
         }
     }
-    <span class="comment">//}}}</span>
-    <span class="attribute">#[<span class="ident">test</span>]</span> <span class="comment">// binary max {{{</span>
+
+    <span class="attribute">#[<span class="ident">test</span>]</span>
     <span class="kw">fn</span> <span class="ident">binary_max</span>() {
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">rng</span> <span class="op">=</span> <span class="ident">thread_rng</span>();
         <span class="kw">let</span> <span class="ident">n</span> <span class="op">=</span> <span class="number">10</span>;
@@ -822,13 +863,12 @@
         <span class="kw">for</span> <span class="kw">_</span> <span class="kw">in</span> <span class="number">0</span>..<span class="ident">NITERS</span> {
             <span class="kw">let</span> <span class="ident">inps</span> <span class="op">=</span> (<span class="number">0</span>..<span class="ident">n</span>).<span class="ident">map</span>(<span class="op">|</span><span class="kw">_</span><span class="op">|</span> <span class="ident">rng</span>.<span class="ident">gen_u128</span>() <span class="op">%</span> <span class="ident">q</span>).<span class="ident">collect_vec</span>();
             <span class="kw">let</span> <span class="ident">should_be</span> <span class="op">=</span> <span class="kw-2">*</span><span class="ident">inps</span>.<span class="ident">iter</span>().<span class="ident">max</span>().<span class="ident">unwrap</span>();
-            <span class="kw">let</span> <span class="ident">enc_inps</span> <span class="op">=</span> <span class="ident">inps</span>
-                .<span class="ident">into_iter</span>()
-                .<span class="ident">flat_map</span>(<span class="op">|</span><span class="ident">x</span><span class="op">|</span> <span class="ident">util</span>::<span class="ident">u128_to_bits</span>(<span class="ident">x</span>, <span class="ident">nbits</span>))
-                .<span class="ident">collect_vec</span>();
-            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">d</span> <span class="op">=</span> <span class="ident">Dummy</span>::<span class="ident">new</span>(<span class="kw-2">&amp;</span><span class="ident">enc_inps</span>, <span class="kw-2">&amp;</span>[]);
+            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">d</span> <span class="op">=</span> <span class="ident">Dummy</span>::<span class="ident">new</span>();
             {
-                <span class="kw">let</span> <span class="ident">xs</span> <span class="op">=</span> <span class="ident">d</span>.<span class="ident">bin_garbler_input_bundles</span>(<span class="ident">nbits</span>, <span class="ident">n</span>, <span class="prelude-val">None</span>).<span class="ident">unwrap</span>();
+                <span class="kw">let</span> <span class="ident">xs</span> <span class="op">=</span> <span class="ident">inps</span>
+                    .<span class="ident">into_iter</span>()
+                    .<span class="ident">map</span>(<span class="op">|</span><span class="ident">x</span><span class="op">|</span> <span class="ident">d</span>.<span class="ident">bin_encode</span>(<span class="ident">x</span>, <span class="ident">nbits</span>).<span class="ident">unwrap</span>())
+                    .<span class="ident">collect_vec</span>();
                 <span class="kw">let</span> <span class="ident">z</span> <span class="op">=</span> <span class="ident">d</span>.<span class="ident">bin_max</span>(<span class="kw-2">&amp;</span><span class="ident">xs</span>).<span class="ident">unwrap</span>();
                 <span class="ident">d</span>.<span class="ident">output_bundle</span>(<span class="kw-2">&amp;</span><span class="ident">z</span>).<span class="ident">unwrap</span>();
             }
@@ -836,16 +876,16 @@
             <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">z</span>, <span class="ident">should_be</span>);
         }
     }
-    <span class="comment">//}}}</span>
-    <span class="attribute">#[<span class="ident">test</span>]</span> <span class="comment">// bundle relu {{{</span>
+
+    <span class="attribute">#[<span class="ident">test</span>]</span> <span class="comment">// bundle relu</span>
     <span class="kw">fn</span> <span class="ident">test_relu</span>() {
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">rng</span> <span class="op">=</span> <span class="ident">thread_rng</span>();
         <span class="kw">for</span> <span class="kw">_</span> <span class="kw">in</span> <span class="number">0</span>..<span class="ident">NITERS</span> {
             <span class="kw">let</span> <span class="ident">q</span> <span class="op">=</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">modulus_with_nprimes</span>(<span class="number">4</span> <span class="op">+</span> <span class="ident">rng</span>.<span class="ident">gen_usize</span>() <span class="op">%</span> <span class="number">7</span>); <span class="comment">// exact relu supports up to 11 primes</span>
             <span class="kw">let</span> <span class="ident">x</span> <span class="op">=</span> <span class="ident">rng</span>.<span class="ident">gen_u128</span>() <span class="op">%</span> <span class="ident">q</span>;
-            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">d</span> <span class="op">=</span> <span class="ident">Dummy</span>::<span class="ident">new</span>(<span class="kw-2">&amp;</span><span class="ident">crt_factor</span>(<span class="ident">x</span>, <span class="ident">q</span>), <span class="kw-2">&amp;</span>[]);
+            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">d</span> <span class="op">=</span> <span class="ident">Dummy</span>::<span class="ident">new</span>();
             {
-                <span class="kw">let</span> <span class="ident">x</span> <span class="op">=</span> <span class="ident">d</span>.<span class="ident">crt_garbler_input_bundle</span>(<span class="ident">q</span>, <span class="prelude-val">None</span>).<span class="ident">unwrap</span>();
+                <span class="kw">let</span> <span class="ident">x</span> <span class="op">=</span> <span class="ident">d</span>.<span class="ident">crt_encode</span>(<span class="ident">x</span>, <span class="ident">q</span>).<span class="ident">unwrap</span>();
                 <span class="kw">let</span> <span class="ident">z</span> <span class="op">=</span> <span class="ident">d</span>.<span class="ident">crt_relu</span>(<span class="kw-2">&amp;</span><span class="ident">x</span>, <span class="string">&quot;100%&quot;</span>, <span class="prelude-val">None</span>).<span class="ident">unwrap</span>();
                 <span class="ident">d</span>.<span class="ident">output_bundle</span>(<span class="kw-2">&amp;</span><span class="ident">z</span>).<span class="ident">unwrap</span>();
             }
@@ -857,17 +897,36 @@
             }
         }
     }
-    <span class="comment">//}}}</span>
-    <span class="attribute">#[<span class="ident">test</span>]</span> <span class="comment">// abs {{{</span>
+
+    <span class="attribute">#[<span class="ident">test</span>]</span>
+    <span class="kw">fn</span> <span class="ident">test_mask</span>() {
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">rng</span> <span class="op">=</span> <span class="ident">thread_rng</span>();
+        <span class="kw">for</span> <span class="kw">_</span> <span class="kw">in</span> <span class="number">0</span>..<span class="ident">NITERS</span> {
+            <span class="kw">let</span> <span class="ident">q</span> <span class="op">=</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">modulus_with_nprimes</span>(<span class="number">4</span> <span class="op">+</span> <span class="ident">rng</span>.<span class="ident">gen_usize</span>() <span class="op">%</span> <span class="number">7</span>);
+            <span class="kw">let</span> <span class="ident">x</span> <span class="op">=</span> <span class="ident">rng</span>.<span class="ident">gen_u128</span>() <span class="op">%</span> <span class="ident">q</span>;
+            <span class="kw">let</span> <span class="ident">b</span> <span class="op">=</span> <span class="ident">rng</span>.<span class="ident">gen_bool</span>();
+            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">d</span> <span class="op">=</span> <span class="ident">Dummy</span>::<span class="ident">new</span>();
+            {
+                <span class="kw">let</span> <span class="ident">b</span> <span class="op">=</span> <span class="ident">d</span>.<span class="ident">encode</span>(<span class="ident">b</span> <span class="kw">as</span> <span class="ident">u16</span>, <span class="number">2</span>).<span class="ident">unwrap</span>();
+                <span class="kw">let</span> <span class="ident">x</span> <span class="op">=</span> <span class="ident">d</span>.<span class="ident">crt_encode</span>(<span class="ident">x</span>, <span class="ident">q</span>).<span class="ident">unwrap</span>();
+                <span class="kw">let</span> <span class="ident">z</span> <span class="op">=</span> <span class="ident">d</span>.<span class="ident">mask</span>(<span class="kw-2">&amp;</span><span class="ident">b</span>, <span class="kw-2">&amp;</span><span class="ident">x</span>).<span class="ident">unwrap</span>();
+                <span class="ident">d</span>.<span class="ident">output_bundle</span>(<span class="kw-2">&amp;</span><span class="ident">z</span>).<span class="ident">unwrap</span>();
+            }
+            <span class="kw">let</span> <span class="ident">z</span> <span class="op">=</span> <span class="ident">crt_inv_factor</span>(<span class="kw-2">&amp;</span><span class="ident">d</span>.<span class="ident">get_output</span>(), <span class="ident">q</span>);
+            <span class="macro">assert</span><span class="macro">!</span>(<span class="kw">if</span> <span class="ident">b</span> { <span class="ident">z</span> <span class="op">==</span> <span class="ident">x</span> } <span class="kw">else</span> { <span class="ident">z</span> <span class="op">==</span> <span class="number">0</span> }, <span class="string">&quot;b={} x={} z={}&quot;</span>, <span class="ident">b</span>, <span class="ident">x</span>, <span class="ident">z</span>);
+        }
+    }
+
+    <span class="attribute">#[<span class="ident">test</span>]</span>
     <span class="kw">fn</span> <span class="ident">binary_abs</span>() {
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">rng</span> <span class="op">=</span> <span class="ident">thread_rng</span>();
         <span class="kw">for</span> <span class="kw">_</span> <span class="kw">in</span> <span class="number">0</span>..<span class="ident">NITERS</span> {
             <span class="kw">let</span> <span class="ident">nbits</span> <span class="op">=</span> <span class="number">64</span>;
             <span class="kw">let</span> <span class="ident">q</span> <span class="op">=</span> <span class="number">1</span> <span class="op">&lt;&lt;</span> <span class="ident">nbits</span>;
             <span class="kw">let</span> <span class="ident">x</span> <span class="op">=</span> <span class="ident">rng</span>.<span class="ident">gen_u128</span>() <span class="op">%</span> <span class="ident">q</span>;
-            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">d</span> <span class="op">=</span> <span class="ident">Dummy</span>::<span class="ident">new</span>(<span class="kw-2">&amp;</span><span class="ident">util</span>::<span class="ident">u128_to_bits</span>(<span class="ident">x</span>, <span class="ident">nbits</span>), <span class="kw-2">&amp;</span>[]);
+            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">d</span> <span class="op">=</span> <span class="ident">Dummy</span>::<span class="ident">new</span>();
             {
-                <span class="kw">let</span> <span class="ident">x</span> <span class="op">=</span> <span class="ident">d</span>.<span class="ident">bin_garbler_input_bundle</span>(<span class="ident">nbits</span>, <span class="prelude-val">None</span>).<span class="ident">unwrap</span>();
+                <span class="kw">let</span> <span class="ident">x</span> <span class="op">=</span> <span class="ident">d</span>.<span class="ident">bin_encode</span>(<span class="ident">x</span>, <span class="ident">nbits</span>).<span class="ident">unwrap</span>();
                 <span class="kw">let</span> <span class="ident">z</span> <span class="op">=</span> <span class="ident">d</span>.<span class="ident">bin_abs</span>(<span class="kw-2">&amp;</span><span class="ident">x</span>).<span class="ident">unwrap</span>();
                 <span class="ident">d</span>.<span class="ident">output_bundle</span>(<span class="kw-2">&amp;</span><span class="ident">z</span>).<span class="ident">unwrap</span>();
             }
@@ -880,8 +939,31 @@
             <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">z</span>, <span class="ident">should_be</span>);
         }
     }
-    <span class="comment">//}}}</span>
-    <span class="attribute">#[<span class="ident">test</span>]</span> <span class="comment">// bundle mixed_radix_addition MSB {{{</span>
+
+    <span class="attribute">#[<span class="ident">test</span>]</span>
+    <span class="kw">fn</span> <span class="ident">binary_eq</span>() {
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">rng</span> <span class="op">=</span> <span class="ident">thread_rng</span>();
+        <span class="kw">for</span> <span class="kw">_</span> <span class="kw">in</span> <span class="number">0</span>..<span class="ident">NITERS</span> {
+            <span class="kw">let</span> <span class="ident">nbits</span> <span class="op">=</span> <span class="ident">rng</span>.<span class="ident">gen_usize</span>() <span class="op">%</span> <span class="number">100</span> <span class="op">+</span> <span class="number">2</span>;
+            <span class="kw">let</span> <span class="ident">q</span> <span class="op">=</span> <span class="number">1</span> <span class="op">&lt;&lt;</span> <span class="ident">nbits</span>;
+            <span class="kw">let</span> <span class="ident">x</span> <span class="op">=</span> <span class="ident">rng</span>.<span class="ident">gen_u128</span>() <span class="op">%</span> <span class="ident">q</span>;
+            <span class="kw">let</span> <span class="ident">y</span> <span class="op">=</span> <span class="kw">if</span> <span class="ident">rng</span>.<span class="ident">gen_bool</span>() {
+                <span class="ident">x</span>
+            } <span class="kw">else</span> {
+                <span class="ident">rng</span>.<span class="ident">gen_u128</span>() <span class="op">%</span> <span class="ident">q</span>
+            };
+            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">d</span> <span class="op">=</span> <span class="ident">Dummy</span>::<span class="ident">new</span>();
+            {
+                <span class="kw">let</span> <span class="ident">x</span> <span class="op">=</span> <span class="ident">d</span>.<span class="ident">bin_encode</span>(<span class="ident">x</span>, <span class="ident">nbits</span>).<span class="ident">unwrap</span>();
+                <span class="kw">let</span> <span class="ident">y</span> <span class="op">=</span> <span class="ident">d</span>.<span class="ident">bin_encode</span>(<span class="ident">y</span>, <span class="ident">nbits</span>).<span class="ident">unwrap</span>();
+                <span class="kw">let</span> <span class="ident">z</span> <span class="op">=</span> <span class="ident">d</span>.<span class="ident">eq_bundles</span>(<span class="kw-2">&amp;</span><span class="ident">x</span>, <span class="kw-2">&amp;</span><span class="ident">y</span>).<span class="ident">unwrap</span>();
+                <span class="ident">d</span>.<span class="ident">output</span>(<span class="kw-2">&amp;</span><span class="ident">z</span>).<span class="ident">unwrap</span>();
+            }
+            <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">d</span>.<span class="ident">get_output</span>()[<span class="number">0</span>], (<span class="ident">x</span> <span class="op">==</span> <span class="ident">y</span>) <span class="kw">as</span> <span class="ident">u16</span>);
+        }
+    }
+
+    <span class="attribute">#[<span class="ident">test</span>]</span>
     <span class="kw">fn</span> <span class="ident">test_mixed_radix_addition_msb_only</span>() {
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">rng</span> <span class="op">=</span> <span class="ident">thread_rng</span>();
         <span class="kw">for</span> <span class="kw">_</span> <span class="kw">in</span> <span class="number">0</span>..<span class="ident">NITERS</span> {
@@ -892,16 +974,23 @@
             <span class="macro">println</span><span class="macro">!</span>(<span class="string">&quot;nargs={} mods={:?} Q={}&quot;</span>, <span class="ident">nargs</span>, <span class="ident">mods</span>, <span class="ident">Q</span>);
 
             <span class="comment">// test maximum overflow</span>
-            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">ds</span> <span class="op">=</span> <span class="ident">Vec</span>::<span class="ident">new</span>();
-            <span class="kw">for</span> <span class="kw">_</span> <span class="kw">in</span> <span class="number">0</span>..<span class="ident">nargs</span> {
-                <span class="ident">ds</span>.<span class="ident">extend</span>(<span class="ident">util</span>::<span class="ident">as_mixed_radix</span>(<span class="ident">Q</span> <span class="op">-</span> <span class="number">1</span>, <span class="kw-2">&amp;</span><span class="ident">mods</span>).<span class="ident">iter</span>());
-            }
+            <span class="kw">let</span> <span class="ident">xs</span> <span class="op">=</span> (<span class="number">0</span>..<span class="ident">nargs</span>)
+                .<span class="ident">map</span>(<span class="op">|</span><span class="kw">_</span><span class="op">|</span> {
+                    <span class="ident">Bundle</span>::<span class="ident">new</span>(
+                        <span class="ident">util</span>::<span class="ident">as_mixed_radix</span>(<span class="ident">Q</span> <span class="op">-</span> <span class="number">1</span>, <span class="kw-2">&amp;</span><span class="ident">mods</span>)
+                            .<span class="ident">into_iter</span>()
+                            .<span class="ident">zip</span>(<span class="kw-2">&amp;</span><span class="ident">mods</span>)
+                            .<span class="ident">map</span>(<span class="op">|</span>(<span class="ident">x</span>, <span class="ident">q</span>)<span class="op">|</span> <span class="ident">DummyVal</span>::<span class="ident">new</span>(<span class="ident">x</span>, <span class="kw-2">*</span><span class="ident">q</span>))
+                            .<span class="ident">collect_vec</span>(),
+                    )
+                })
+                .<span class="ident">collect_vec</span>();
 
-            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">b</span> <span class="op">=</span> <span class="ident">Dummy</span>::<span class="ident">new</span>(<span class="kw-2">&amp;</span><span class="ident">ds</span>, <span class="kw-2">&amp;</span>[]);
-            <span class="kw">let</span> <span class="ident">xs</span> <span class="op">=</span> <span class="ident">b</span>.<span class="ident">garbler_input_bundles</span>(<span class="kw-2">&amp;</span><span class="ident">mods</span>, <span class="ident">nargs</span>, <span class="prelude-val">None</span>).<span class="ident">unwrap</span>();
-            <span class="kw">let</span> <span class="ident">z</span> <span class="op">=</span> <span class="ident">b</span>.<span class="ident">mixed_radix_addition_msb_only</span>(<span class="kw-2">&amp;</span><span class="ident">xs</span>).<span class="ident">unwrap</span>();
-            <span class="ident">b</span>.<span class="ident">output</span>(<span class="kw-2">&amp;</span><span class="ident">z</span>).<span class="ident">unwrap</span>();
-            <span class="kw">let</span> <span class="ident">res</span> <span class="op">=</span> <span class="ident">b</span>.<span class="ident">get_output</span>()[<span class="number">0</span>];
+            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">d</span> <span class="op">=</span> <span class="ident">Dummy</span>::<span class="ident">new</span>();
+
+            <span class="kw">let</span> <span class="ident">z</span> <span class="op">=</span> <span class="ident">d</span>.<span class="ident">mixed_radix_addition_msb_only</span>(<span class="kw-2">&amp;</span><span class="ident">xs</span>).<span class="ident">unwrap</span>();
+            <span class="ident">d</span>.<span class="ident">output</span>(<span class="kw-2">&amp;</span><span class="ident">z</span>).<span class="ident">unwrap</span>();
+            <span class="kw">let</span> <span class="ident">res</span> <span class="op">=</span> <span class="ident">d</span>.<span class="ident">get_output</span>()[<span class="number">0</span>];
 
             <span class="kw">let</span> <span class="ident">should_be</span> <span class="op">=</span> <span class="kw-2">*</span><span class="ident">util</span>::<span class="ident">as_mixed_radix</span>((<span class="ident">Q</span> <span class="op">-</span> <span class="number">1</span>) <span class="op">*</span> (<span class="ident">nargs</span> <span class="kw">as</span> <span class="ident">u128</span>) <span class="op">%</span> <span class="ident">Q</span>, <span class="kw-2">&amp;</span><span class="ident">mods</span>)
                 .<span class="ident">last</span>()
@@ -911,25 +1000,32 @@
             <span class="comment">// test random values</span>
             <span class="kw">for</span> <span class="kw">_</span> <span class="kw">in</span> <span class="number">0</span>..<span class="number">4</span> {
                 <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">sum</span> <span class="op">=</span> <span class="number">0</span>;
-                <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">ds</span> <span class="op">=</span> <span class="ident">Vec</span>::<span class="ident">new</span>();
-                <span class="kw">for</span> <span class="kw">_</span> <span class="kw">in</span> <span class="number">0</span>..<span class="ident">nargs</span> {
-                    <span class="kw">let</span> <span class="ident">x</span> <span class="op">=</span> <span class="ident">rng</span>.<span class="ident">gen_u128</span>() <span class="op">%</span> <span class="ident">Q</span>;
-                    <span class="ident">sum</span> <span class="op">=</span> (<span class="ident">sum</span> <span class="op">+</span> <span class="ident">x</span>) <span class="op">%</span> <span class="ident">Q</span>;
-                    <span class="ident">ds</span>.<span class="ident">extend</span>(<span class="ident">util</span>::<span class="ident">as_mixed_radix</span>(<span class="ident">x</span>, <span class="kw-2">&amp;</span><span class="ident">mods</span>).<span class="ident">iter</span>());
-                }
 
-                <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">b</span> <span class="op">=</span> <span class="ident">Dummy</span>::<span class="ident">new</span>(<span class="kw-2">&amp;</span><span class="ident">ds</span>, <span class="kw-2">&amp;</span>[]);
-                <span class="kw">let</span> <span class="ident">xs</span> <span class="op">=</span> <span class="ident">b</span>.<span class="ident">garbler_input_bundles</span>(<span class="kw-2">&amp;</span><span class="ident">mods</span>, <span class="ident">nargs</span>, <span class="prelude-val">None</span>).<span class="ident">unwrap</span>();
-                <span class="kw">let</span> <span class="ident">z</span> <span class="op">=</span> <span class="ident">b</span>.<span class="ident">mixed_radix_addition_msb_only</span>(<span class="kw-2">&amp;</span><span class="ident">xs</span>).<span class="ident">unwrap</span>();
-                <span class="ident">b</span>.<span class="ident">output</span>(<span class="kw-2">&amp;</span><span class="ident">z</span>).<span class="ident">unwrap</span>();
-                <span class="kw">let</span> <span class="ident">res</span> <span class="op">=</span> <span class="ident">b</span>.<span class="ident">get_output</span>()[<span class="number">0</span>];
+                <span class="kw">let</span> <span class="ident">xs</span> <span class="op">=</span> (<span class="number">0</span>..<span class="ident">nargs</span>)
+                    .<span class="ident">map</span>(<span class="op">|</span><span class="kw">_</span><span class="op">|</span> {
+                        <span class="kw">let</span> <span class="ident">x</span> <span class="op">=</span> <span class="ident">rng</span>.<span class="ident">gen_u128</span>() <span class="op">%</span> <span class="ident">Q</span>;
+                        <span class="ident">sum</span> <span class="op">=</span> (<span class="ident">sum</span> <span class="op">+</span> <span class="ident">x</span>) <span class="op">%</span> <span class="ident">Q</span>;
+                        <span class="ident">Bundle</span>::<span class="ident">new</span>(
+                            <span class="ident">util</span>::<span class="ident">as_mixed_radix</span>(<span class="ident">x</span>, <span class="kw-2">&amp;</span><span class="ident">mods</span>)
+                                .<span class="ident">into_iter</span>()
+                                .<span class="ident">zip</span>(<span class="kw-2">&amp;</span><span class="ident">mods</span>)
+                                .<span class="ident">map</span>(<span class="op">|</span>(<span class="ident">x</span>, <span class="ident">q</span>)<span class="op">|</span> <span class="ident">DummyVal</span>::<span class="ident">new</span>(<span class="ident">x</span>, <span class="kw-2">*</span><span class="ident">q</span>))
+                                .<span class="ident">collect_vec</span>(),
+                        )
+                    })
+                    .<span class="ident">collect_vec</span>();
+
+                <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">d</span> <span class="op">=</span> <span class="ident">Dummy</span>::<span class="ident">new</span>();
+                <span class="kw">let</span> <span class="ident">z</span> <span class="op">=</span> <span class="ident">d</span>.<span class="ident">mixed_radix_addition_msb_only</span>(<span class="kw-2">&amp;</span><span class="ident">xs</span>).<span class="ident">unwrap</span>();
+                <span class="ident">d</span>.<span class="ident">output</span>(<span class="kw-2">&amp;</span><span class="ident">z</span>).<span class="ident">unwrap</span>();
+                <span class="kw">let</span> <span class="ident">res</span> <span class="op">=</span> <span class="ident">d</span>.<span class="ident">get_output</span>()[<span class="number">0</span>];
 
                 <span class="kw">let</span> <span class="ident">should_be</span> <span class="op">=</span> <span class="kw-2">*</span><span class="ident">util</span>::<span class="ident">as_mixed_radix</span>(<span class="ident">sum</span>, <span class="kw-2">&amp;</span><span class="ident">mods</span>).<span class="ident">last</span>().<span class="ident">unwrap</span>();
                 <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">res</span>, <span class="ident">should_be</span>);
             }
         }
     }
-    <span class="comment">//}}}</span>
+
 }
 </pre></div>
 </section><section id="search" class="content hidden"></section><section class="footer"></section><aside id="help" class="hidden"><div><h1 class="hidden">Help</h1><div class="shortcuts"><h2>Keyboard Shortcuts</h2><dl><dt><kbd>?</kbd></dt><dd>Show this help dialog</dd><dt><kbd>S</kbd></dt><dd>Focus the search field</dd><dt><kbd>↑</kbd></dt><dd>Move up in search results</dd><dt><kbd>↓</kbd></dt><dd>Move down in search results</dd><dt><kbd>↹</kbd></dt><dd>Switch tab</dd><dt><kbd>&#9166;</kbd></dt><dd>Go to active search result</dd><dt><kbd>+</kbd></dt><dd>Expand all sections</dd><dt><kbd>-</kbd></dt><dd>Collapse all sections</dd></dl></div><div class="infos"><h2>Search Tricks</h2><p>Prefix searches with a type followed by a colon (e.g., <code>fn:</code>) to restrict the search to a given type.</p><p>Accepted types are: <code>fn</code>, <code>mod</code>, <code>struct</code>, <code>enum</code>, <code>trait</code>, <code>type</code>, <code>macro</code>, and <code>const</code>.</p><p>Search functions by type signature (e.g., <code>vec -> usize</code> or <code>* -> vec</code>)</p><p>Search multiple things at once by splitting your query with comma (e.g., <code>str,u8</code> or <code>String,struct:Vec,test</code>)</p></div></div></aside><script>window.rootPath = "../../";window.currentCrate = "fancy_garbling";</script><script src="../../aliases.js"></script><script src="../../main.js"></script><script src="../../source-script.js"></script><script src="../../source-files.js"></script><script defer src="../../search-index.js"></script></body></html>
