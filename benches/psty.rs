@@ -43,7 +43,7 @@ fn bench_psty_init() {
     handle.join().unwrap();
 }
 
-fn bench_psty(inputs1: Vec<Vec<u8>>, inputs2: Vec<Vec<u8>>) -> Vec<popsicle::psty::Msg> {
+fn bench_psty(inputs1: Vec<Vec<u8>>, inputs2: Vec<Vec<u8>>) -> () {
     let (sender, receiver) = UnixStream::pair().unwrap();
 
     std::thread::spawn(move || {
@@ -60,7 +60,7 @@ fn bench_psty(inputs1: Vec<Vec<u8>>, inputs2: Vec<Vec<u8>>) -> Vec<popsicle::pst
     let writer = BufWriter::new(receiver);
     let mut channel = Channel::new(reader, writer);
     let mut p2 = Receiver::init(&mut channel, &mut rng).unwrap();
-    p2.receive(&mut channel, &inputs2, &mut rng).unwrap()
+    p2.receive(&mut channel, &inputs2, &mut rng).unwrap();
 }
 
 fn bench_psi(c: &mut Criterion) {

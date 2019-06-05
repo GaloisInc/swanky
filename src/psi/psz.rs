@@ -16,9 +16,8 @@ use ocelot::oprf::{self, Receiver as OprfReceiver, Sender as OprfSender};
 use rand::seq::SliceRandom;
 use rand::{CryptoRng, Rng, RngCore};
 use scuttlebutt::utils as scutils;
-use scuttlebutt::{cointoss, Block, Block512, Channel, SemiHonest};
+use scuttlebutt::{cointoss, AbstractChannel, Block, Block512, SemiHonest};
 use std::collections::HashSet;
-use std::io::{Read, Write};
 
 const NHASHES: usize = 3;
 
@@ -32,17 +31,17 @@ pub struct Receiver {
 }
 
 impl Sender {
-    pub fn init<R: Read + Send, W: Write + Send, RNG: CryptoRng + RngCore>(
-        channel: &mut Channel<R, W>,
+    pub fn init<C: AbstractChannel, RNG: CryptoRng + RngCore>(
+        channel: &mut C,
         rng: &mut RNG,
     ) -> Result<Self, Error> {
         let oprf = oprf::KkrtSender::init(channel, rng)?;
         Ok(Self { oprf })
     }
 
-    pub fn send<R: Read + Send, W: Write + Send, RNG: CryptoRng + RngCore>(
+    pub fn send<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         &mut self,
-        channel: &mut Channel<R, W>,
+        channel: &mut C,
         inputs: &[Vec<u8>],
         mut rng: &mut RNG,
     ) -> Result<(), Error> {
@@ -102,25 +101,20 @@ impl Sender {
 }
 
 impl Receiver {
-    pub fn init<R: Read + Send, W: Write + Send, RNG: CryptoRng + RngCore>(
-        channel: &mut Channel<R, W>,
+    pub fn init<C: AbstractChannel, RNG: CryptoRng + RngCore>(
+        channel: &mut C,
         rng: &mut RNG,
     ) -> Result<Self, Error> {
         let oprf = oprf::KkrtReceiver::init(channel, rng)?;
         Ok(Self { oprf })
     }
 
-    pub fn receive<R, W, RNG>(
+    pub fn receive<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         &mut self,
-        channel: &mut Channel<R, W>,
+        channel: &mut C,
         inputs: &[Vec<u8>],
         rng: &mut RNG,
-    ) -> Result<Vec<Vec<u8>>, Error>
-    where
-        R: Read + Send,
-        W: Write + Send,
-        RNG: CryptoRng + RngCore,
-    {
+    ) -> Result<Vec<Vec<u8>>, Error> {
         let n = inputs.len();
 
         let keys = cointoss::receive(channel, &[rng.gen()])?;
@@ -178,7 +172,7 @@ impl Receiver {
         for h in hs.iter_mut() {
             for _ in 0..n {
                 let mut buf = vec![0u8; masksize];
-                channel.read_bytes_inplace(&mut buf)?;
+                channel.read_bytes(&mut buf)?;
                 h.insert(buf);
             }
         }
@@ -186,7 +180,7 @@ impl Receiver {
         for s in ss.iter_mut() {
             for _ in 0..n {
                 let mut buf = vec![0u8; masksize];
-                channel.read_bytes_inplace(&mut buf)?;
+                channel.read_bytes(&mut buf)?;
                 s.insert(buf);
             }
         }
@@ -228,7 +222,7 @@ pub type PszReceiver = Receiver;
 mod tests {
     use super::*;
     use crate::utils::rand_vec_vec;
-    use scuttlebutt::AesRng;
+    use scuttlebutt::{AesRng, Channel};
     use std::io::{BufReader, BufWriter};
     use std::os::unix::net::UnixStream;
     use std::time::SystemTime;

@@ -10,15 +10,13 @@
 use crate::cuckoo::CuckooHash;
 use crate::errors::Error;
 use crate::utils;
-use fancy_garbling::{BinaryBundle, CrtBundle, CrtGadgets, BundleGadgets, Fancy};
+use fancy_garbling::{BinaryBundle, BundleGadgets, CrtBundle, CrtGadgets, Fancy, FancyInput};
 use itertools::Itertools;
 use ocelot::oprf::{kmprt, ProgrammableReceiver, ProgrammableSender};
 use ocelot::ot::{KosReceiver as OtReceiver, KosSender as OtSender};
 use rand::Rng;
 use rand_core::{CryptoRng, RngCore, SeedableRng};
-use scuttlebutt::{Block, Block512, Channel};
-use std::fmt::Debug;
-use std::io::{Read, Write};
+use scuttlebutt::{AbstractChannel, Block, Block512};
 
 const NHASHES: usize = 3;
 const HASH_SIZE: usize = 4; // how many bytes of the hash to use for the equality tests
@@ -49,30 +47,20 @@ struct ReceiverState {
 }
 
 impl Sender {
-    pub fn init<R, W, RNG>(channel: &mut Channel<R, W>, rng: &mut RNG) -> Result<Self, Error>
-    where
-        R: Read,
-        W: Write,
-        RNG: RngCore + CryptoRng + SeedableRng,
-    {
+    pub fn init<C: AbstractChannel, RNG: RngCore + CryptoRng + SeedableRng>(
+        channel: &mut C,
+        rng: &mut RNG,
+    ) -> Result<Self, Error> {
         let opprf = kmprt::KmprtSender::init(channel, rng)?;
-        Ok(Self {
-            opprf,
-            state: None,
-        })
+        Ok(Self { opprf, state: None })
     }
 
-    pub fn send<R, W, RNG>(
+    pub fn send<C: AbstractChannel, RNG: RngCore + CryptoRng + SeedableRng>(
         &mut self,
-        channel: &mut Channel<R, W>,
+        channel: &mut C,
         inputs: &[Msg],
         rng: &mut RNG,
-    ) -> Result<(), Error>
-    where
-        R: Read + Send + Debug,
-        W: Write + Send + Debug + 'static,
-        RNG: RngCore + CryptoRng + SeedableRng<Seed = Block>,
-    {
+    ) -> Result<(), Error> {
         // receive cuckoo hash info from sender
         let key = channel.read_block()?;
         let hashes = utils::compress_and_hash_inputs(inputs, key);
@@ -116,15 +104,24 @@ impl Sender {
         Ok(())
     }
 
-    pub fn compute_intersection<R, W, RNG>(&mut self, channel: &mut Channel<R,W>, rng: &mut RNG) -> Result<(), Error>
+    pub fn compute_intersection<C, RNG>(
+        &mut self,
+        channel: &mut C,
+        rng: &mut RNG,
+    ) -> Result<(), Error>
     where
-        R: Read + Send + Debug + 'static,
-        W: Write + Send + Debug + 'static,
+        C: AbstractChannel,
         RNG: RngCore + CryptoRng + SeedableRng<Seed = Block>,
     {
-        let state = if let Some(s) = &self.state { s } else { return Err(Error::PstyProtocolError("send/receive must be called first".to_string())) };
+        let state = if let Some(s) = &self.state {
+            s
+        } else {
+            return Err(Error::PstyProtocolError(
+                "send/receive must be called first".to_string(),
+            ));
+        };
 
-        let mut gb = twopac::semihonest::Garbler::<R, W, RNG, OtSender>::new(
+        let mut gb = twopac::semihonest::Garbler::<C, RNG, OtSender>::new(
             channel.clone(),
             RNG::from_seed(rng.gen()),
             &[],
@@ -133,23 +130,32 @@ impl Sender {
         let my_input_bits = encode_inputs(&state.opprf_outputs);
 
         let mods = vec![2; my_input_bits.len()]; // all binary moduli
-        let sender_inputs = gb.garbler_inputs(&my_input_bits, &mods)?;
-        let receiver_inputs = gb.evaluator_inputs(&mods)?;
+        let sender_inputs = gb.encode_many(&my_input_bits, &mods)?;
+        let receiver_inputs = gb.receive_many(&mods)?;
         let outs = fancy_compute_intersection(&mut gb, &sender_inputs, &receiver_inputs)?;
         gb.outputs(&outs)?;
 
         Ok(())
     }
 
-    pub fn compute_cardinality<R, W, RNG>(&mut self, channel: &mut Channel<R,W>, rng: &mut RNG) -> Result<(), Error>
+    pub fn compute_cardinality<C, RNG>(
+        &mut self,
+        channel: &mut C,
+        rng: &mut RNG,
+    ) -> Result<(), Error>
     where
-        R: Read + Send + Debug + 'static,
-        W: Write + Send + Debug + 'static,
+        C: AbstractChannel,
         RNG: RngCore + CryptoRng + SeedableRng<Seed = Block>,
     {
-        let state = if let Some(s) = &self.state { s } else { return Err(Error::PstyProtocolError("send/receive must be called first".to_string())) };
+        let state = if let Some(s) = &self.state {
+            s
+        } else {
+            return Err(Error::PstyProtocolError(
+                "send/receive must be called first".to_string(),
+            ));
+        };
 
-        let mut gb = twopac::semihonest::Garbler::<R, W, RNG, OtSender>::new(
+        let mut gb = twopac::semihonest::Garbler::<C, RNG, OtSender>::new(
             channel.clone(),
             RNG::from_seed(rng.gen()),
             &[],
@@ -158,8 +164,8 @@ impl Sender {
         let my_input_bits = encode_inputs(&state.opprf_outputs);
 
         let mods = vec![2; my_input_bits.len()]; // all binary moduli
-        let sender_inputs = gb.garbler_inputs(&my_input_bits, &mods)?;
-        let receiver_inputs = gb.evaluator_inputs(&mods)?;
+        let sender_inputs = gb.encode_many(&my_input_bits, &mods)?;
+        let receiver_inputs = gb.receive_many(&mods)?;
         let (outs, _) = fancy_compute_cardinality(&mut gb, &sender_inputs, &receiver_inputs)?;
         gb.outputs(&outs)?;
 
@@ -168,30 +174,20 @@ impl Sender {
 }
 
 impl Receiver {
-    pub fn init<R, W, RNG>(channel: &mut Channel<R, W>, rng: &mut RNG) -> Result<Self, Error>
-    where
-        R: Read,
-        W: Write,
-        RNG: RngCore + CryptoRng + SeedableRng<Seed = Block>,
-    {
+    pub fn init<C: AbstractChannel, RNG: RngCore + CryptoRng + SeedableRng>(
+        channel: &mut C,
+        rng: &mut RNG,
+    ) -> Result<Self, Error> {
         let opprf = kmprt::KmprtReceiver::init(channel, rng)?;
-        Ok(Self {
-            opprf,
-            state: None,
-        })
+        Ok(Self { opprf, state: None })
     }
 
-    pub fn receive<R, W, RNG>(
+    pub fn receive<C: AbstractChannel, RNG: RngCore + CryptoRng + SeedableRng>(
         &mut self,
-        channel: &mut Channel<R, W>,
+        channel: &mut C,
         inputs: &[Msg],
         rng: &mut RNG,
-    ) -> Result<(), Error>
-    where
-        R: Read + Send + Debug + 'static,
-        W: Write + Send + Debug,
-        RNG: RngCore + CryptoRng + SeedableRng<Seed = Block>,
-    {
+    ) -> Result<(), Error> {
         let key = rng.gen();
         let hashed_inputs = utils::compress_and_hash_inputs(inputs, key);
         let cuckoo = CuckooHash::new(&hashed_inputs, NHASHES)?;
@@ -231,25 +227,34 @@ impl Receiver {
         Ok(())
     }
 
-    pub fn compute_intersection<R, W, RNG>(&mut self, channel: &mut Channel<R,W>, rng: &mut RNG) -> Result<Vec<Msg>, Error>
+    pub fn compute_intersection<C, RNG>(
+        &mut self,
+        channel: &mut C,
+        rng: &mut RNG,
+    ) -> Result<Vec<Msg>, Error>
     where
-        R: Read + Send + Debug + 'static,
-        W: Write + Send + Debug,
+        C: AbstractChannel,
         RNG: RngCore + CryptoRng + SeedableRng<Seed = Block>,
     {
-        let state = if let Some(s) = &self.state { s } else { return Err(Error::PstyProtocolError("send/receive must be called first".to_string())) };
+        let state = if let Some(s) = &self.state {
+            s
+        } else {
+            return Err(Error::PstyProtocolError(
+                "send/receive must be called first".to_string(),
+            ));
+        };
         let nbins = state.cuckoo.nbins;
 
         let my_input_bits = encode_inputs(&state.opprf_outputs);
 
-        let mut ev = twopac::semihonest::Evaluator::<R, W, RNG, OtReceiver>::new(
+        let mut ev = twopac::semihonest::Evaluator::<C, RNG, OtReceiver>::new(
             channel.clone(),
             RNG::from_seed(rng.gen()),
         )?;
 
         let mods = vec![2; nbins * HASH_SIZE * 8];
-        let sender_inputs = ev.garbler_inputs(&mods)?;
-        let receiver_inputs = ev.evaluator_inputs(&my_input_bits, &mods)?;
+        let sender_inputs = ev.receive_many(&mods)?;
+        let receiver_inputs = ev.encode_many(&my_input_bits, &mods)?;
 
         let outs = fancy_compute_intersection(&mut ev, &sender_inputs, &receiver_inputs)?;
         ev.outputs(&outs)?;
@@ -257,7 +262,12 @@ impl Receiver {
 
         let mut intersection = Vec::new();
 
-        for (opt_item, in_intersection) in state.cuckoo.items().into_iter().zip_eq(mpc_outs.into_iter()) {
+        for (opt_item, in_intersection) in state
+            .cuckoo
+            .items()
+            .into_iter()
+            .zip_eq(mpc_outs.into_iter())
+        {
             if let Some(item) = opt_item {
                 if in_intersection == 1_u16 {
                     intersection.push(state.inputs[item.input_index].clone());
@@ -268,25 +278,34 @@ impl Receiver {
         Ok(intersection)
     }
 
-    pub fn compute_cardinality<R, W, RNG>(&mut self, channel: &mut Channel<R,W>, rng: &mut RNG) -> Result<usize, Error>
+    pub fn compute_cardinality<C, RNG>(
+        &mut self,
+        channel: &mut C,
+        rng: &mut RNG,
+    ) -> Result<usize, Error>
     where
-        R: Read + Send + Debug + 'static,
-        W: Write + Send + Debug,
+        C: AbstractChannel,
         RNG: RngCore + CryptoRng + SeedableRng<Seed = Block>,
     {
-        let state = if let Some(s) = &self.state { s } else { return Err(Error::PstyProtocolError("send/receive must be called first".to_string())) };
+        let state = if let Some(s) = &self.state {
+            s
+        } else {
+            return Err(Error::PstyProtocolError(
+                "send/receive must be called first".to_string(),
+            ));
+        };
         let nbins = state.cuckoo.nbins;
 
         let my_input_bits = encode_inputs(&state.opprf_outputs);
 
-        let mut ev = twopac::semihonest::Evaluator::<R, W, RNG, OtReceiver>::new(
+        let mut ev = twopac::semihonest::Evaluator::<C, RNG, OtReceiver>::new(
             channel.clone(),
             RNG::from_seed(rng.gen()),
         )?;
 
         let mods = vec![2; nbins * HASH_SIZE * 8];
-        let sender_inputs = ev.garbler_inputs(&mods)?;
-        let receiver_inputs = ev.evaluator_inputs(&my_input_bits, &mods)?;
+        let sender_inputs = ev.receive_many(&mods)?;
+        let receiver_inputs = ev.encode_many(&my_input_bits, &mods)?;
 
         let (outs, mods) = fancy_compute_cardinality(&mut ev, &sender_inputs, &receiver_inputs)?;
         ev.outputs(&outs)?;
@@ -345,7 +364,8 @@ fn fancy_compute_cardinality<F: Fancy>(
                 &BinaryBundle::new(xs.to_vec()),
                 &BinaryBundle::new(ys.to_vec()),
             )
-        }).collect::<Result<Vec<F::Item>, F::Error>>()?;
+        })
+        .collect::<Result<Vec<F::Item>, F::Error>>()?;
 
     let qs = fancy_garbling::util::primes_with_width(16);
     let q = fancy_garbling::util::product(&qs);
@@ -353,7 +373,10 @@ fn fancy_compute_cardinality<F: Fancy>(
     let one = f.crt_constant_bundle(1, q)?;
 
     for b in eqs.into_iter() {
-        let b_ws = one.iter().map(|w| f.mul(w, &b)).collect::<Result<Vec<F::Item>, F::Error>>()?;
+        let b_ws = one
+            .iter()
+            .map(|w| f.mul(w, &b))
+            .collect::<Result<Vec<F::Item>, F::Error>>()?;
         let b_crt = CrtBundle::new(b_ws);
         acc = f.crt_add(&acc, &b_crt)?;
     }
@@ -365,7 +388,7 @@ fn fancy_compute_cardinality<F: Fancy>(
 mod tests {
     use super::*;
     use crate::utils::rand_vec_vec;
-    use scuttlebutt::AesRng;
+    use scuttlebutt::{AesRng, Channel};
     use std::io::{BufReader, BufWriter};
     use std::os::unix::net::UnixStream;
     use std::time::SystemTime;
@@ -421,7 +444,7 @@ mod tests {
         let start = SystemTime::now();
         psi.receive(&mut channel, &receiver_inputs, &mut rng)
             .unwrap();
-        let cardinality  = psi.compute_cardinality(&mut channel, &mut rng).unwrap();
+        let cardinality = psi.compute_cardinality(&mut channel, &mut rng).unwrap();
         // let intersection = psi.compute_intersection(&mut channel, &mut rng).unwrap();
 
         println!(

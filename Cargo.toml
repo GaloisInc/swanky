@@ -1,6 +1,6 @@
 [package]
 name = "popsicle"
-version = "0.1.0"
+version = "0.3.0"
 authors = ["Alex J. Malozemoff <amaloz@galois.com>"]
 license = "MIT"
 readme = "README.md"
@@ -12,8 +12,8 @@ edition = "2018"
 [lib]
 
 [features]
-nightly = ["rand/nightly", "scuttlebutt/nightly", "ocelot/unstable", "ocelot/nightly"]
-unstable = []
+nightly = ["rand/nightly", "scuttlebutt/nightly", "ocelot/nightly", "ocelot/nightly"]
+unstable = ["ocelot/unstable"]
 
 [dependencies]
 arrayref = "0.3.5"
