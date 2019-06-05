@@ -276,12 +276,6 @@
 <span id="276">276</span>
 <span id="277">277</span>
 <span id="278">278</span>
-<span id="279">279</span>
-<span id="280">280</span>
-<span id="281">281</span>
-<span id="282">282</span>
-<span id="283">283</span>
-<span id="284">284</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// -*- mode: rust; -*-</span>
 <span class="comment">//</span>
@@ -302,9 +296,10 @@
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">utils</span>;
 <span class="kw">use</span> <span class="ident">rand</span>::<span class="ident">Rng</span>;
 <span class="kw">use</span> <span class="ident">rand</span>::{<span class="ident">CryptoRng</span>, <span class="ident">RngCore</span>, <span class="ident">SeedableRng</span>};
-<span class="kw">use</span> <span class="ident">scuttlebutt</span>::{<span class="ident">cointoss</span>, <span class="ident">utils</span> <span class="kw">as</span> <span class="ident">scutils</span>, <span class="ident">AesRng</span>, <span class="ident">Block</span>, <span class="ident">Block512</span>, <span class="ident">Channel</span>, <span class="ident">SemiHonest</span>};
+<span class="kw">use</span> <span class="ident">scuttlebutt</span>::{
+    <span class="ident">cointoss</span>, <span class="ident">utils</span> <span class="kw">as</span> <span class="ident">scutils</span>, <span class="ident">AbstractChannel</span>, <span class="ident">AesRng</span>, <span class="ident">Block</span>, <span class="ident">Block512</span>, <span class="ident">SemiHonest</span>,
+};
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">convert</span>::<span class="ident">TryInto</span>;
-<span class="kw">use</span> <span class="ident">std</span>::<span class="ident">io</span>::{<span class="ident">Read</span>, <span class="ident">Write</span>};
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">marker</span>::<span class="ident">PhantomData</span>;
 
 <span class="doccomment">/// KKRT oblivious PRF sender.</span>
@@ -323,10 +318,9 @@
 }
 
 <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">OT</span>: <span class="ident">OtReceiver</span><span class="op">&lt;</span><span class="ident">Msg</span> <span class="op">=</span> <span class="ident">Block</span><span class="op">&gt;</span> <span class="op">+</span> <span class="ident">SemiHonest</span><span class="op">&gt;</span> <span class="ident">OprfSender</span> <span class="kw">for</span> <span class="ident">Sender</span><span class="op">&lt;</span><span class="ident">OT</span><span class="op">&gt;</span> {
-    <span class="kw">fn</span> <span class="ident">init</span><span class="op">&lt;</span><span class="ident">R</span>, <span class="ident">W</span>, <span class="ident">RNG</span><span class="op">&gt;</span>(<span class="ident">channel</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">Channel</span><span class="op">&lt;</span><span class="ident">R</span>, <span class="ident">W</span><span class="op">&gt;</span>, <span class="ident">rng</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">RNG</span>) <span class="op">-&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="self">Self</span>, <span class="ident">Error</span><span class="op">&gt;</span>
+    <span class="kw">fn</span> <span class="ident">init</span><span class="op">&lt;</span><span class="ident">C</span>, <span class="ident">RNG</span><span class="op">&gt;</span>(<span class="ident">channel</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">C</span>, <span class="ident">rng</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">RNG</span>) <span class="op">-&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="self">Self</span>, <span class="ident">Error</span><span class="op">&gt;</span>
     <span class="kw">where</span>
-        <span class="ident">R</span>: <span class="ident">Read</span>,
-        <span class="ident">W</span>: <span class="ident">Write</span>,
+        <span class="ident">C</span>: <span class="ident">AbstractChannel</span>,
         <span class="ident">RNG</span>: <span class="ident">CryptoRng</span> <span class="op">+</span> <span class="ident">RngCore</span>,
     {
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">ot</span> <span class="op">=</span> <span class="ident">OT</span>::<span class="ident">init</span>(<span class="ident">channel</span>, <span class="ident">rng</span>)<span class="question-mark">?</span>;
@@ -350,15 +344,14 @@
         })
     }
 
-    <span class="kw">fn</span> <span class="ident">send</span><span class="op">&lt;</span><span class="ident">R</span>, <span class="ident">W</span>, <span class="ident">RNG</span><span class="op">&gt;</span>(
+    <span class="kw">fn</span> <span class="ident">send</span><span class="op">&lt;</span><span class="ident">C</span>, <span class="ident">RNG</span><span class="op">&gt;</span>(
         <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>,
-        <span class="ident">channel</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">Channel</span><span class="op">&lt;</span><span class="ident">R</span>, <span class="ident">W</span><span class="op">&gt;</span>,
+        <span class="ident">channel</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">C</span>,
         <span class="ident">m</span>: <span class="ident">usize</span>,
         <span class="kw">_</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">RNG</span>,
     ) <span class="op">-&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="self">Self</span>::<span class="ident">Seed</span><span class="op">&gt;</span>, <span class="ident">Error</span><span class="op">&gt;</span>
     <span class="kw">where</span>
-        <span class="ident">R</span>: <span class="ident">Read</span>,
-        <span class="ident">W</span>: <span class="ident">Write</span>,
+        <span class="ident">C</span>: <span class="ident">AbstractChannel</span>,
         <span class="ident">RNG</span>: <span class="ident">CryptoRng</span> <span class="op">+</span> <span class="ident">RngCore</span>,
     {
         <span class="comment">// Round up if necessary so that `m mod 16 ≡ 0`.</span>
@@ -371,8 +364,8 @@
             <span class="kw">let</span> <span class="ident">range</span> <span class="op">=</span> <span class="ident">j</span> <span class="op">*</span> <span class="ident">nrows</span> <span class="op">/</span> <span class="number">8</span>..(<span class="ident">j</span> <span class="op">+</span> <span class="number">1</span>) <span class="op">*</span> <span class="ident">nrows</span> <span class="op">/</span> <span class="number">8</span>;
             <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">q</span> <span class="op">=</span> <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">qs</span>[<span class="ident">range</span>];
             <span class="self">self</span>.<span class="ident">rngs</span>[<span class="ident">j</span>].<span class="ident">fill_bytes</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">q</span>);
-            <span class="ident">channel</span>.<span class="ident">read_bytes_inplace</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">t0</span>)<span class="question-mark">?</span>;
-            <span class="ident">channel</span>.<span class="ident">read_bytes_inplace</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">t1</span>)<span class="question-mark">?</span>;
+            <span class="ident">channel</span>.<span class="ident">read_bytes</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">t0</span>)<span class="question-mark">?</span>;
+            <span class="ident">channel</span>.<span class="ident">read_bytes</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">t1</span>)<span class="question-mark">?</span>;
             <span class="ident">scutils</span>::<span class="ident">xor_inplace</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">q</span>, <span class="kw">if</span> <span class="kw-2">*</span><span class="ident">b</span> { <span class="kw-2">&amp;</span><span class="ident">t1</span> } <span class="kw">else</span> { <span class="kw-2">&amp;</span><span class="ident">t0</span> });
         }
         <span class="kw">let</span> <span class="ident">qs</span> <span class="op">=</span> <span class="ident">utils</span>::<span class="ident">transpose</span>(<span class="kw-2">&amp;</span><span class="ident">qs</span>, <span class="ident">ncols</span>, <span class="ident">nrows</span>);
@@ -423,15 +416,10 @@
 }
 
 <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">OT</span>: <span class="ident">OtSender</span><span class="op">&lt;</span><span class="ident">Msg</span> <span class="op">=</span> <span class="ident">Block</span><span class="op">&gt;</span> <span class="op">+</span> <span class="ident">SemiHonest</span><span class="op">&gt;</span> <span class="ident">OprfReceiver</span> <span class="kw">for</span> <span class="ident">Receiver</span><span class="op">&lt;</span><span class="ident">OT</span><span class="op">&gt;</span> {
-    <span class="kw">fn</span> <span class="ident">init</span><span class="op">&lt;</span><span class="ident">R</span>: <span class="ident">Read</span>, <span class="ident">W</span>: <span class="ident">Write</span>, <span class="ident">RNG</span>: <span class="ident">CryptoRng</span> <span class="op">+</span> <span class="ident">RngCore</span><span class="op">&gt;</span>(
-        <span class="ident">channel</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">Channel</span><span class="op">&lt;</span><span class="ident">R</span>, <span class="ident">W</span><span class="op">&gt;</span>,
+    <span class="kw">fn</span> <span class="ident">init</span><span class="op">&lt;</span><span class="ident">C</span>: <span class="ident">AbstractChannel</span>, <span class="ident">RNG</span>: <span class="ident">CryptoRng</span> <span class="op">+</span> <span class="ident">RngCore</span><span class="op">&gt;</span>(
+        <span class="ident">channel</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">C</span>,
         <span class="ident">rng</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">RNG</span>,
-    ) <span class="op">-&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="self">Self</span>, <span class="ident">Error</span><span class="op">&gt;</span>
-    <span class="kw">where</span>
-        <span class="ident">R</span>: <span class="ident">Read</span>,
-        <span class="ident">W</span>: <span class="ident">Write</span>,
-        <span class="ident">RNG</span>: <span class="ident">CryptoRng</span> <span class="op">+</span> <span class="ident">RngCore</span>,
-    {
+    ) <span class="op">-&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="self">Self</span>, <span class="ident">Error</span><span class="op">&gt;</span> {
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">ot</span> <span class="op">=</span> <span class="ident">OT</span>::<span class="ident">init</span>(<span class="ident">channel</span>, <span class="ident">rng</span>)<span class="question-mark">?</span>;
         <span class="kw">let</span> <span class="ident">seeds</span> <span class="op">=</span> (<span class="number">0</span>..<span class="number">4</span>).<span class="ident">map</span>(<span class="op">|</span><span class="kw">_</span><span class="op">|</span> <span class="ident">rng</span>.<span class="ident">gen</span>()).<span class="ident">collect</span>::<span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Block</span><span class="op">&gt;&gt;</span>();
         <span class="kw">let</span> <span class="ident">keys</span> <span class="op">=</span> <span class="ident">cointoss</span>::<span class="ident">receive</span>(<span class="ident">channel</span>, <span class="kw-2">&amp;</span><span class="ident">seeds</span>)<span class="question-mark">?</span>;
@@ -456,9 +444,9 @@
         })
     }
 
-    <span class="kw">fn</span> <span class="ident">receive</span><span class="op">&lt;</span><span class="ident">R</span>: <span class="ident">Read</span>, <span class="ident">W</span>: <span class="ident">Write</span>, <span class="ident">RNG</span>: <span class="ident">CryptoRng</span> <span class="op">+</span> <span class="ident">RngCore</span><span class="op">&gt;</span>(
+    <span class="kw">fn</span> <span class="ident">receive</span><span class="op">&lt;</span><span class="ident">C</span>: <span class="ident">AbstractChannel</span>, <span class="ident">RNG</span>: <span class="ident">CryptoRng</span> <span class="op">+</span> <span class="ident">RngCore</span><span class="op">&gt;</span>(
         <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>,
-        <span class="ident">channel</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">Channel</span><span class="op">&lt;</span><span class="ident">R</span>, <span class="ident">W</span><span class="op">&gt;</span>,
+        <span class="ident">channel</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">C</span>,
         <span class="ident">inputs</span>: <span class="kw-2">&amp;</span>[<span class="self">Self</span>::<span class="ident">Input</span>],
         <span class="ident">rng</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">RNG</span>,
     ) <span class="op">-&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="self">Self</span>::<span class="ident">Output</span><span class="op">&gt;</span>, <span class="ident">Error</span><span class="op">&gt;</span> {
@@ -508,7 +496,7 @@
 <span class="kw">mod</span> <span class="ident">tests</span> {
     <span class="kw">use</span> <span class="kw">super</span>::<span class="kw-2">*</span>;
     <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">oprf</span>;
-    <span class="kw">use</span> <span class="ident">scuttlebutt</span>::<span class="ident">AesRng</span>;
+    <span class="kw">use</span> <span class="ident">scuttlebutt</span>::{<span class="ident">AesRng</span>, <span class="ident">Channel</span>};
     <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">io</span>::{<span class="ident">BufReader</span>, <span class="ident">BufWriter</span>};
     <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">os</span>::<span class="ident">unix</span>::<span class="ident">net</span>::<span class="ident">UnixStream</span>;
     <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">sync</span>::{<span class="ident">Arc</span>, <span class="ident">Mutex</span>};

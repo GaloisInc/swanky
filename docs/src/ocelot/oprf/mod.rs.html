@@ -121,7 +121,6 @@
 <span id="121">121</span>
 <span id="122">122</span>
 <span id="123">123</span>
-<span id="124">124</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// -*- mode: rust; -*-</span>
 <span class="comment">//</span>
@@ -139,8 +138,7 @@
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">errors</span>::<span class="ident">Error</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">ot</span>;
 <span class="kw">use</span> <span class="ident">rand</span>::{<span class="ident">CryptoRng</span>, <span class="ident">RngCore</span>};
-<span class="kw">use</span> <span class="ident">scuttlebutt</span>::<span class="ident">Channel</span>;
-<span class="kw">use</span> <span class="ident">std</span>::<span class="ident">io</span>::{<span class="ident">Read</span>, <span class="ident">Write</span>};
+<span class="kw">use</span> <span class="ident">scuttlebutt</span>::<span class="ident">AbstractChannel</span>;
 
 <span class="doccomment">/// KKRT oblivious PRF sender using ALSZ OT extension with Chou-Orlandi as the base OT.</span>
 <span class="kw">pub</span> <span class="kw">type</span> <span class="ident">KkrtSender</span> <span class="op">=</span> <span class="ident">kkrt</span>::<span class="ident">Sender</span><span class="op">&lt;</span><span class="ident">ot</span>::<span class="ident">AlszReceiver</span><span class="op">&gt;</span>;
@@ -166,14 +164,14 @@
     <span class="self">Self</span>: <span class="ident">Sized</span>,
 {
     <span class="doccomment">/// Runs any one-time initialization.</span>
-    <span class="kw">fn</span> <span class="ident">init</span><span class="op">&lt;</span><span class="ident">R</span>: <span class="ident">Read</span>, <span class="ident">W</span>: <span class="ident">Write</span>, <span class="ident">RNG</span>: <span class="ident">CryptoRng</span> <span class="op">+</span> <span class="ident">RngCore</span><span class="op">&gt;</span>(
-        <span class="ident">channel</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">Channel</span><span class="op">&lt;</span><span class="ident">R</span>, <span class="ident">W</span><span class="op">&gt;</span>,
+    <span class="kw">fn</span> <span class="ident">init</span><span class="op">&lt;</span><span class="ident">C</span>: <span class="ident">AbstractChannel</span>, <span class="ident">RNG</span>: <span class="ident">CryptoRng</span> <span class="op">+</span> <span class="ident">RngCore</span><span class="op">&gt;</span>(
+        <span class="ident">channel</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">C</span>,
         <span class="ident">rng</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">RNG</span>,
     ) <span class="op">-&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="self">Self</span>, <span class="ident">Error</span><span class="op">&gt;</span>;
     <span class="doccomment">/// Runs `m` OPRF instances as the sender, returning the OPRF seeds.</span>
-    <span class="kw">fn</span> <span class="ident">send</span><span class="op">&lt;</span><span class="ident">R</span>: <span class="ident">Read</span>, <span class="ident">W</span>: <span class="ident">Write</span>, <span class="ident">RNG</span>: <span class="ident">CryptoRng</span> <span class="op">+</span> <span class="ident">RngCore</span><span class="op">&gt;</span>(
+    <span class="kw">fn</span> <span class="ident">send</span><span class="op">&lt;</span><span class="ident">C</span>: <span class="ident">AbstractChannel</span>, <span class="ident">RNG</span>: <span class="ident">CryptoRng</span> <span class="op">+</span> <span class="ident">RngCore</span><span class="op">&gt;</span>(
         <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>,
-        <span class="ident">channel</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">Channel</span><span class="op">&lt;</span><span class="ident">R</span>, <span class="ident">W</span><span class="op">&gt;</span>,
+        <span class="ident">channel</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">C</span>,
         <span class="ident">m</span>: <span class="ident">usize</span>,
         <span class="ident">rng</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">RNG</span>,
     ) <span class="op">-&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="self">Self</span>::<span class="ident">Seed</span><span class="op">&gt;</span>, <span class="ident">Error</span><span class="op">&gt;</span>;
@@ -187,14 +185,14 @@
     <span class="self">Self</span>: <span class="ident">Sized</span>,
 {
     <span class="doccomment">/// Runs any one-time initialization.</span>
-    <span class="kw">fn</span> <span class="ident">init</span><span class="op">&lt;</span><span class="ident">R</span>: <span class="ident">Read</span>, <span class="ident">W</span>: <span class="ident">Write</span>, <span class="ident">RNG</span>: <span class="ident">CryptoRng</span> <span class="op">+</span> <span class="ident">RngCore</span><span class="op">&gt;</span>(
-        <span class="ident">channel</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">Channel</span><span class="op">&lt;</span><span class="ident">R</span>, <span class="ident">W</span><span class="op">&gt;</span>,
+    <span class="kw">fn</span> <span class="ident">init</span><span class="op">&lt;</span><span class="ident">C</span>: <span class="ident">AbstractChannel</span>, <span class="ident">RNG</span>: <span class="ident">CryptoRng</span> <span class="op">+</span> <span class="ident">RngCore</span><span class="op">&gt;</span>(
+        <span class="ident">channel</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">C</span>,
         <span class="ident">rng</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">RNG</span>,
     ) <span class="op">-&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="self">Self</span>, <span class="ident">Error</span><span class="op">&gt;</span>;
     <span class="doccomment">/// Runs the oblivious PRF on inputs `inputs`, returning the OPRF outputs.</span>
-    <span class="kw">fn</span> <span class="ident">receive</span><span class="op">&lt;</span><span class="ident">R</span>: <span class="ident">Read</span>, <span class="ident">W</span>: <span class="ident">Write</span>, <span class="ident">RNG</span>: <span class="ident">CryptoRng</span> <span class="op">+</span> <span class="ident">RngCore</span><span class="op">&gt;</span>(
+    <span class="kw">fn</span> <span class="ident">receive</span><span class="op">&lt;</span><span class="ident">C</span>: <span class="ident">AbstractChannel</span>, <span class="ident">RNG</span>: <span class="ident">CryptoRng</span> <span class="op">+</span> <span class="ident">RngCore</span><span class="op">&gt;</span>(
         <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>,
-        <span class="ident">channel</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">Channel</span><span class="op">&lt;</span><span class="ident">R</span>, <span class="ident">W</span><span class="op">&gt;</span>,
+        <span class="ident">channel</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">C</span>,
         <span class="ident">inputs</span>: <span class="kw-2">&amp;</span>[<span class="self">Self</span>::<span class="ident">Input</span>],
         <span class="ident">rng</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">RNG</span>,
     ) <span class="op">-&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="self">Self</span>::<span class="ident">Output</span><span class="op">&gt;</span>, <span class="ident">Error</span><span class="op">&gt;</span>;
@@ -211,14 +209,14 @@
 <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;unstable&quot;</span>)]</span>
 <span class="kw">pub</span> <span class="kw">trait</span> <span class="ident">ProgrammableSender</span>: <span class="ident">ObliviousPprf</span> {
     <span class="doccomment">/// Runs any one-time initialization.</span>
-    <span class="kw">fn</span> <span class="ident">init</span><span class="op">&lt;</span><span class="ident">R</span>: <span class="ident">Read</span>, <span class="ident">W</span>: <span class="ident">Write</span>, <span class="ident">RNG</span>: <span class="ident">CryptoRng</span> <span class="op">+</span> <span class="ident">RngCore</span><span class="op">&gt;</span>(
-        <span class="ident">channel</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">Channel</span><span class="op">&lt;</span><span class="ident">R</span>, <span class="ident">W</span><span class="op">&gt;</span>,
+    <span class="kw">fn</span> <span class="ident">init</span><span class="op">&lt;</span><span class="ident">C</span>: <span class="ident">AbstractChannel</span>, <span class="ident">RNG</span>: <span class="ident">CryptoRng</span> <span class="op">+</span> <span class="ident">RngCore</span><span class="op">&gt;</span>(
+        <span class="ident">channel</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">C</span>,
         <span class="ident">rng</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">RNG</span>,
     ) <span class="op">-&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="self">Self</span>, <span class="ident">Error</span><span class="op">&gt;</span>;
     <span class="doccomment">/// Runs `m` OPRF instances as the sender, returning the OPRF seeds.</span>
-    <span class="kw">fn</span> <span class="ident">send</span><span class="op">&lt;</span><span class="ident">R</span>: <span class="ident">Read</span>, <span class="ident">W</span>: <span class="ident">Write</span>, <span class="ident">RNG</span>: <span class="ident">CryptoRng</span> <span class="op">+</span> <span class="ident">RngCore</span><span class="op">&gt;</span>(
+    <span class="kw">fn</span> <span class="ident">send</span><span class="op">&lt;</span><span class="ident">C</span>: <span class="ident">AbstractChannel</span>, <span class="ident">RNG</span>: <span class="ident">CryptoRng</span> <span class="op">+</span> <span class="ident">RngCore</span><span class="op">&gt;</span>(
         <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>,
-        <span class="ident">channel</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">Channel</span><span class="op">&lt;</span><span class="ident">R</span>, <span class="ident">W</span><span class="op">&gt;</span>,
+        <span class="ident">channel</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">C</span>,
         <span class="ident">points</span>: <span class="kw-2">&amp;</span>[(<span class="self">Self</span>::<span class="ident">Input</span>, <span class="self">Self</span>::<span class="ident">Output</span>)],
         <span class="comment">// Max number of points allowed.</span>
         <span class="ident">npoints</span>: <span class="ident">usize</span>,
@@ -233,14 +231,14 @@
 <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;unstable&quot;</span>)]</span>
 <span class="kw">pub</span> <span class="kw">trait</span> <span class="ident">ProgrammableReceiver</span>: <span class="ident">ObliviousPprf</span> {
     <span class="doccomment">/// Runs any one-time initialization.</span>
-    <span class="kw">fn</span> <span class="ident">init</span><span class="op">&lt;</span><span class="ident">R</span>: <span class="ident">Read</span>, <span class="ident">W</span>: <span class="ident">Write</span>, <span class="ident">RNG</span>: <span class="ident">CryptoRng</span> <span class="op">+</span> <span class="ident">RngCore</span><span class="op">&gt;</span>(
-        <span class="ident">channel</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">Channel</span><span class="op">&lt;</span><span class="ident">R</span>, <span class="ident">W</span><span class="op">&gt;</span>,
+    <span class="kw">fn</span> <span class="ident">init</span><span class="op">&lt;</span><span class="ident">C</span>: <span class="ident">AbstractChannel</span>, <span class="ident">RNG</span>: <span class="ident">CryptoRng</span> <span class="op">+</span> <span class="ident">RngCore</span><span class="op">&gt;</span>(
+        <span class="ident">channel</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">C</span>,
         <span class="ident">rng</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">RNG</span>,
     ) <span class="op">-&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="self">Self</span>, <span class="ident">Error</span><span class="op">&gt;</span>;
     <span class="doccomment">/// Runs the oblivious PRF on inputs `inputs`, returning the OPRF outputs.</span>
-    <span class="kw">fn</span> <span class="ident">receive</span><span class="op">&lt;</span><span class="ident">R</span>: <span class="ident">Read</span>, <span class="ident">W</span>: <span class="ident">Write</span>, <span class="ident">RNG</span>: <span class="ident">CryptoRng</span> <span class="op">+</span> <span class="ident">RngCore</span><span class="op">&gt;</span>(
+    <span class="kw">fn</span> <span class="ident">receive</span><span class="op">&lt;</span><span class="ident">C</span>: <span class="ident">AbstractChannel</span>, <span class="ident">RNG</span>: <span class="ident">CryptoRng</span> <span class="op">+</span> <span class="ident">RngCore</span><span class="op">&gt;</span>(
         <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>,
-        <span class="ident">channel</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">Channel</span><span class="op">&lt;</span><span class="ident">R</span>, <span class="ident">W</span><span class="op">&gt;</span>,
+        <span class="ident">channel</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">C</span>,
         <span class="comment">// Max number of points allowed.</span>
         <span class="ident">npoints</span>: <span class="ident">usize</span>,
         <span class="ident">inputs</span>: <span class="kw-2">&amp;</span>[<span class="self">Self</span>::<span class="ident">Input</span>],

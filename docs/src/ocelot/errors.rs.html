@@ -39,9 +39,6 @@
 <span id="39">39</span>
 <span id="40">40</span>
 <span id="41">41</span>
-<span id="42">42</span>
-<span id="43">43</span>
-<span id="44">44</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// -*- mode: rust; -*-</span>
 <span class="comment">//</span>
@@ -58,8 +55,6 @@
     <span class="ident">IoError</span>(<span class="ident">std</span>::<span class="ident">io</span>::<span class="ident">Error</span>),
     <span class="doccomment">/// Some other error, given by `String`.</span>
     <span class="ident">Other</span>(<span class="ident">String</span>),
-    <span class="doccomment">/// Decompressing a elliptic curve point failed.</span>
-    <span class="ident">DecompressPoint</span>,
     <span class="doccomment">/// Coin tossing failed.</span>
     <span class="ident">CoinTossError</span>(<span class="ident">scuttlebutt</span>::<span class="ident">cointoss</span>::<span class="ident">Error</span>),
 }
@@ -82,7 +77,6 @@
             <span class="ident">Error</span>::<span class="ident">InvalidInputLength</span> <span class="op">=&gt;</span> <span class="string">&quot;invalid input length&quot;</span>.<span class="ident">fmt</span>(<span class="ident">f</span>),
             <span class="ident">Error</span>::<span class="ident">IoError</span>(<span class="ident">e</span>) <span class="op">=&gt;</span> <span class="macro">write</span><span class="macro">!</span>(<span class="ident">f</span>, <span class="string">&quot;IO error: {}&quot;</span>, <span class="ident">e</span>),
             <span class="ident">Error</span>::<span class="ident">Other</span>(<span class="ident">s</span>) <span class="op">=&gt;</span> <span class="macro">write</span><span class="macro">!</span>(<span class="ident">f</span>, <span class="string">&quot;other error: {}&quot;</span>, <span class="ident">s</span>),
-            <span class="ident">Error</span>::<span class="ident">DecompressPoint</span> <span class="op">=&gt;</span> <span class="string">&quot;could not decompress point&quot;</span>.<span class="ident">fmt</span>(<span class="ident">f</span>),
             <span class="ident">Error</span>::<span class="ident">CoinTossError</span>(<span class="ident">e</span>) <span class="op">=&gt;</span> <span class="macro">write</span><span class="macro">!</span>(<span class="ident">f</span>, <span class="string">&quot;coin toss error: {}&quot;</span>, <span class="ident">e</span>),
         }
     }
