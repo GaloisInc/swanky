@@ -28,7 +28,7 @@ union __U128 {
 const ONE: __m128i = unsafe { (__U128 { bytes: 1 }).vector };
 const ONES: __m128i = unsafe {
     (__U128 {
-        bytes: 0xFFFF_FFFF_FFFF_FFFF,
+        bytes: 0xFFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF,
     })
     .vector
 };
@@ -161,6 +161,21 @@ impl AsMut<[u8]> for Block {
     #[inline]
     fn as_mut(&mut self) -> &mut [u8] {
         unsafe { &mut *(self as *mut Block as *mut [u8; 16]) }
+    }
+}
+
+impl std::ops::BitAnd for Block {
+    type Output = Block;
+    #[inline]
+    fn bitand(self, rhs: Self) -> Self {
+        unsafe { Block(_mm_and_si128(self.0, rhs.0)) }
+    }
+}
+
+impl std::ops::BitAndAssign for Block {
+    #[inline]
+    fn bitand_assign(&mut self, rhs: Self) {
+        unsafe { self.0 = _mm_and_si128(self.0, rhs.0) }
     }
 }
 
@@ -317,6 +332,13 @@ mod tests {
         let z = x ^ y;
         let z = z ^ y;
         assert_eq!(x, z);
+    }
+
+    #[test]
+    fn test_and() {
+        let x = rand::random::<Block>();
+        let y = x & Block(ONES);
+        assert_eq!(x, y);
     }
 
     #[test]
