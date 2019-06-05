@@ -4,10 +4,9 @@ use crate::fancy::HasModulus;
 use crate::util;
 use rand::{CryptoRng, Rng, RngCore};
 use scuttlebutt::{Block, AES_HASH};
-use serde::{Deserialize, Serialize};
 
 /// The core wire-label type.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Wire {
     /// Representation of a `mod-2` wire.
     Mod2 {

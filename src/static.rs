@@ -14,7 +14,6 @@ use crate::garble::{Evaluator, Garbler};
 use crate::wire::Wire;
 use itertools::Itertools;
 use scuttlebutt::{AbstractChannel, AesRng, Block, Channel};
-use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::convert::TryInto;
 use std::rc::Rc;
@@ -22,7 +21,7 @@ use std::rc::Rc;
 /// Static evaluator for a circuit, created by the `garble` function.
 ///
 /// Uses `Evaluator` under the hood to actually implement the evaluation.
-#[derive(Serialize, Deserialize, PartialEq, Debug)]
+#[derive(Debug)]
 pub struct GarbledCircuit {
     blocks: Vec<Block>,
 }
@@ -102,7 +101,7 @@ pub fn garble(c: &mut Circuit) -> Result<(Encoder, GarbledCircuit), GarblerError
 // Encoder
 
 /// Encode inputs statically.
-#[derive(Serialize, Deserialize, PartialEq, Debug)]
+#[derive(Debug)]
 pub struct Encoder {
     garbler_inputs: Vec<Wire>,
     evaluator_inputs: Vec<Wire>,
