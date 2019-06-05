@@ -11,14 +11,14 @@ use rand::{CryptoRng, RngCore};
 use scuttlebutt::{AbstractChannel, Block, SemiHonest};
 
 /// Semi-honest evaluator.
-pub struct Evaluator<C: AbstractChannel, RNG, OT> {
+pub struct Evaluator<C, RNG, OT> {
     evaluator: Ev<C>,
     channel: C,
     ot: OT,
     rng: RNG,
 }
 
-impl<C: AbstractChannel, RNG: CryptoRng + RngCore, OT: OtReceiver<Msg = Block>>
+impl<C: AbstractChannel, RNG: CryptoRng + RngCore, OT: OtReceiver<Msg = Block> + SemiHonest>
     Evaluator<C, RNG, OT>
 {
     /// Make a new `Evaluator`.
@@ -46,8 +46,8 @@ impl<C: AbstractChannel, RNG: CryptoRng + RngCore, OT: OtReceiver<Msg = Block>>
     }
 }
 
-impl<C: AbstractChannel, RNG: CryptoRng + RngCore, OT: OtReceiver<Msg = Block>> FancyInput
-    for Evaluator<C, RNG, OT>
+impl<C: AbstractChannel, RNG: CryptoRng + RngCore, OT: OtReceiver<Msg = Block> + SemiHonest>
+    FancyInput for Evaluator<C, RNG, OT>
 {
     /// Receive a garbler input wire.
     fn receive(&mut self, modulus: u16) -> Result<Wire, Error> {
@@ -65,7 +65,7 @@ impl<C: AbstractChannel, RNG: CryptoRng + RngCore, OT: OtReceiver<Msg = Block>> 
         let mut lens = Vec::new();
         let mut bs = Vec::new();
         for (x, q) in inputs.iter().zip(moduli.iter()) {
-            let len = (*q as f32).log(2.0).ceil() as usize;
+            let len = f32::from(*q).log(2.0).ceil() as usize;
             for b in (0..len).map(|i| x & (1 << i) != 0) {
                 bs.push(b);
             }
@@ -93,9 +93,7 @@ fn combine(wires: &[Block], q: u16) -> Wire {
     })
 }
 
-impl<C: AbstractChannel, RNG: CryptoRng + RngCore, OT: OtReceiver<Msg = Block>> Fancy
-    for Evaluator<C, RNG, OT>
-{
+impl<C: AbstractChannel, RNG, OT> Fancy for Evaluator<C, RNG, OT> {
     type Item = Wire;
     type Error = Error;
 
@@ -135,4 +133,4 @@ impl<C: AbstractChannel, RNG: CryptoRng + RngCore, OT: OtReceiver<Msg = Block>> 
     }
 }
 
-impl<C: AbstractChannel, RNG, OT> SemiHonest for Evaluator<C, RNG, OT> {}
+impl<C, RNG, OT> SemiHonest for Evaluator<C, RNG, OT> {}

@@ -17,13 +17,13 @@ nightly = ["rand/nightly", "scuttlebutt/nightly", "ocelot/nightly", "fancy-garbl
 
 [dependencies]
 fancy-garbling = { git = "https://github.com/spaceships/fancy-garbling", tag = "0.3.0" }
-itertools = "0.8.0"
 ocelot = { git = "https://github.com/amaloz/ocelot", tag = "0.3.0" }
 rand = "0.6.5"
 scuttlebutt = { git = "https://github.com/amaloz/scuttlebutt", tag = "0.3.0" }
 
 [dev-dependencies]
 criterion = "0.2.11"
+itertools = "0.8.0"
 
 [profile.release]
 opt-level = 3

@@ -34,7 +34,7 @@ impl<C, OT, RNG> std::ops::DerefMut for Garbler<C, RNG, OT> {
 impl<
         C: AbstractChannel,
         RNG: CryptoRng + RngCore + SeedableRng<Seed = Block>,
-        OT: OtSender<Msg = Block>, // + SemiHonest
+        OT: OtSender<Msg = Block> + SemiHonest,
     > Garbler<C, RNG, OT>
 {
     /// Make a new `Garbler`.
@@ -51,7 +51,7 @@ impl<
 
     #[inline]
     fn _evaluator_input(&mut self, delta: &Wire, q: u16) -> (Wire, Vec<(Block, Block)>) {
-        let len = (q as f32).log(2.0).ceil() as u16;
+        let len = f32::from(q).log(2.0).ceil() as u16;
         let mut wire = Wire::zero(q);
         let inputs = (0..len)
             .map(|i| {
@@ -68,7 +68,7 @@ impl<
 impl<
         C: AbstractChannel,
         RNG: CryptoRng + RngCore + SeedableRng<Seed = Block>,
-        OT: OtSender<Msg = Block>, // + SemiHonest
+        OT: OtSender<Msg = Block> + SemiHonest,
     > FancyInput for Garbler<C, RNG, OT>
 {
     fn encode(&mut self, val: u16, modulus: u16) -> Result<Wire, Error> {
@@ -94,11 +94,11 @@ impl<
 
     fn receive_many(&mut self, qs: &[u16]) -> Result<Vec<Wire>, Error> {
         let n = qs.len();
-        let lens = qs.iter().map(|q| (*q as f32).log(2.0).ceil() as usize);
+        let lens = qs.iter().map(|q| f32::from(*q).log(2.0).ceil() as usize);
         let mut wires = Vec::with_capacity(n);
         let mut inputs = Vec::with_capacity(lens.sum());
 
-        for q in qs.into_iter() {
+        for q in qs.iter() {
             let delta = self.garbler.delta(*q);
             let (wire, input) = self._evaluator_input(&delta, *q);
             wires.push(wire);
@@ -112,12 +112,7 @@ impl<
     }
 }
 
-impl<
-        C: AbstractChannel,
-        RNG: CryptoRng + RngCore,
-        OT: OtSender<Msg = Block>, // + SemiHonest
-    > Fancy for Garbler<C, RNG, OT>
-{
+impl<C: AbstractChannel, RNG: CryptoRng + RngCore, OT> Fancy for Garbler<C, RNG, OT> {
     type Item = Wire;
     type Error = Error;
 
