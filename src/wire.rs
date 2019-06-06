@@ -148,7 +148,7 @@ impl Wire {
     pub fn rand_delta<R: CryptoRng + RngCore>(rng: &mut R, q: u16) -> Self {
         let mut w = Self::rand(rng, q);
         match w {
-            Wire::Mod2 { ref mut val } => *val = val.set_color_bit(),
+            Wire::Mod2 { ref mut val } => *val = val.set_lsb(),
             Wire::Mod3 {
                 ref mut lsb,
                 ref mut msb,
@@ -168,7 +168,7 @@ impl Wire {
     #[inline]
     pub fn color(&self) -> u16 {
         match self {
-            Wire::Mod2 { val } => val.color_bit() as u16,
+            Wire::Mod2 { val } => val.lsb() as u16,
             Wire::Mod3 { lsb, msb } => (((msb & 1) as u16) << 1) | ((lsb & 1) as u16),
             Wire::ModN { ref ds, .. } => ds[0],
         }
