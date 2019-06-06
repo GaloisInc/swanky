@@ -22,7 +22,8 @@ unstable = []
 curve25519-dalek = { version = "1.2", features = ["std"] }
 libc = "0.2"
 rand = "0.6"
-scuttlebutt = { git = "https://github.com/amaloz/scuttlebutt", features = ["curve25519-dalek"], branch = "dev" }
+# scuttlebutt = { git = "https://github.com/amaloz/scuttlebutt", features = ["curve25519-dalek"], branch = "dev" }
+scuttlebutt = { path = "../scuttlebutt", features = ["curve25519-dalek"] }
 
 [build-dependencies]
 cc = "1.0"

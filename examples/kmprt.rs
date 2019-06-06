@@ -35,9 +35,7 @@ fn run(ninputs: usize, npoints: usize) {
             start.elapsed().unwrap().as_millis()
         );
         let start = SystemTime::now();
-        let _ = oprf
-            .send(&mut channel, &points, npoints, ninputs, &mut rng)
-            .unwrap();
+        let _ = oprf.send(&mut channel, &points, ninputs, &mut rng).unwrap();
         println!(
             "Sender send time: {} ms",
             start.elapsed().unwrap().as_millis()
@@ -62,9 +60,7 @@ fn run(ninputs: usize, npoints: usize) {
         start.elapsed().unwrap().as_millis()
     );
     let start = SystemTime::now();
-    let _ = oprf
-        .receive(&mut channel, npoints, &inputs, &mut rng)
-        .unwrap();
+    let _ = oprf.receive(&mut channel, &inputs, &mut rng).unwrap();
     println!(
         "Receiver send time: {} ms",
         start.elapsed().unwrap().as_millis()
