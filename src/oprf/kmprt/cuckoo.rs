@@ -4,7 +4,7 @@
 // Copyright © 2019 Galois, Inc.
 // See LICENSE for licensing information.
 
-use scuttlebutt::Block;
+use scuttlebutt::{Aes128, Block};
 
 #[derive(Clone, Debug)]
 pub struct Item {
@@ -15,7 +15,6 @@ pub struct Item {
 
 pub struct CuckooHash {
     pub items: Vec<Option<Item>>,
-    hashkeys: Vec<Block>,
     ms: (usize, usize),
     hs: (usize, usize),
 }
@@ -43,28 +42,27 @@ impl CuckooHash {
         ms: (usize, usize),
         hs: (usize, usize),
     ) -> Result<Self, Error> {
-        let mut tbl = CuckooHash::new(hashkeys, ms, hs);
+        let mut tbl = CuckooHash::new(ms, hs);
+        let hashkeys = hashkeys
+            .iter()
+            .map(|k| Aes128::new(*k))
+            .collect::<Vec<Aes128>>();
         // Fill table with `inputs`
         for (j, input) in inputs.iter().enumerate() {
-            tbl.hash(*input, j)?;
+            tbl.hash(&hashkeys, *input, j)?;
         }
         Ok(tbl)
     }
 
-    fn new(hashkeys: &[Block], ms: (usize, usize), hs: (usize, usize)) -> Self {
+    fn new(ms: (usize, usize), hs: (usize, usize)) -> Self {
         let items = vec![None; ms.0 + ms.1];
-        let hashkeys = hashkeys.to_vec();
-        Self {
-            items,
-            hashkeys,
-            ms,
-            hs,
-        }
+        Self { items, ms, hs }
     }
 
     #[inline]
     fn _hash(
         &mut self,
+        hashkeys: &[Aes128],
         entry: Block,
         index: usize,
         h: usize,
@@ -76,7 +74,7 @@ impl CuckooHash {
         let mut index = index;
         let mut hindex = 0;
         for _ in 0..N_ATTEMPTS {
-            let i = super::hash_input(entry, self.hashkeys[hoffset + hindex], m);
+            let i = super::hash_input_keyed(&hashkeys[hoffset + hindex], entry, m);
             let new = Item {
                 entry,
                 index,
@@ -97,13 +95,15 @@ impl CuckooHash {
     }
 
     #[inline]
-    fn hash(&mut self, entry: Block, index: usize) -> Result<(), Error> {
+    fn hash(&mut self, hashkeys: &[Aes128], entry: Block, index: usize) -> Result<(), Error> {
         // Try to place in the first `m₁` bins.
-        match self._hash(entry, index, self.hs.0, 0, self.ms.0, 0) {
+        match self._hash(hashkeys, entry, index, self.hs.0, 0, self.ms.0, 0) {
             None => Ok(()),
             // Unable to place, so try to place in extra `m₂` bins.
             Some((entry, index)) => {
-                match self._hash(entry, index, self.hs.1, self.hs.0, self.ms.1, self.ms.0) {
+                match self._hash(
+                    hashkeys, entry, index, self.hs.1, self.hs.0, self.ms.1, self.ms.0,
+                ) {
                     None => Ok(()),
                     Some(..) => Err(Error::CuckooHashFull),
                 }

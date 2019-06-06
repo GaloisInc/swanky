@@ -26,32 +26,26 @@ impl From<cuckoo::Error> for Error {
 const N_TABLE_LOOPS: usize = 128;
 
 // Hash `x` and `k`, producing a result in range `[0..range-1]`. We use the
-// Davies-Meyer single-block-length compression function under-the-hood.
-#[inline]
-fn hash_input(x: Block, k: Block, range: usize) -> usize {
-    let aes = Aes128::new(x);
-    hash_input_keyed(&aes, k, range)
-}
-
-// Same as `hash_input`, but with a pre-keyed AES for `x`.
-#[inline]
-fn hash_input_keyed(x: &Aes128, k: Block, range: usize) -> usize {
-    let h = x.encrypt(k) ^ k;
+// Davies-Meyer single-block-length compression function under-the-hood, and
+// have `k` be pre-keyed.
+#[inline(always)]
+fn hash_input_keyed(k: &Aes128, x: Block, range: usize) -> usize {
+    let h = k.encrypt(x) ^ x;
     (u128::from(h) % (range as u128)) as usize
 }
 
 // Hash `y`, using `k` as the hash "key", and output the result in the range
 // `[0..range-1]`.
 #[inline]
-fn hash_output(y: &Block512, k: Block, range: usize) -> usize {
+fn hash_output(k: Block, y: Block512, range: usize) -> usize {
     let aes = Aes128::new(k);
-    hash_output_keyed(y, &aes, range)
+    hash_output_keyed(&aes, y, range)
 }
 
 // XXX: IS THIS SECURE?!
 #[inline]
-fn hash_output_keyed(y: &Block512, k: &Aes128, range: usize) -> usize {
-    let y: &[Block; 4] = y.into();
+fn hash_output_keyed(k: &Aes128, y: Block512, range: usize) -> usize {
+    let y: [Block; 4] = y.into();
     let h = k.encrypt(y[0]) ^ y[0];
     let h = k.encrypt(h) ^ y[1];
     let h = k.encrypt(h) ^ y[2];
@@ -142,7 +136,8 @@ impl<OPRF: OprfSender<Seed = Block512, Input = Block, Output = Block512> + SemiH
         let mut hashkeys = Vec::with_capacity(params.h1 + params.h2);
         for _ in 0..params.h1 + params.h2 {
             let h = channel.read_block()?;
-            hashkeys.push(h);
+            let aes = Aes128::new(h);
+            hashkeys.push(aes);
         }
         // `bins` contains `m = m₁ + m₂` vectors. The first `m₁` vectors are each of
         // size `β₁`, and the second `m₂` vectors are each of size `β₂`.
@@ -153,22 +148,27 @@ impl<OPRF: OprfSender<Seed = Block512, Input = Block, Output = Block512> + SemiH
         for _ in params.m1..params.m1 + params.m2 {
             bins.push(Vec::with_capacity(params.beta2));
         }
-        let insert = |bins: &mut Vec<Vec<(Block, Block512)>>, x: &Block, y: &Block512, h: usize| {
-            // Only add `(x, y)` if it is not already in the bin.
-            if bins[h].iter().find(|&&entry| entry == (*x, *y)).is_none() {
-                bins[h].push((*x, *y));
-            }
-        };
         // Place each point in the hash table, once for each hash function.
         for (x, y) in points.iter() {
-            let aes = Aes128::new(*x);
+            let mut hs = Vec::with_capacity(params.h1);
             for key in hashkeys[0..params.h1].iter() {
-                let h = hash_input_keyed(&aes, *key, params.m1);
-                insert(&mut bins, x, y, h);
+                let h = hash_input_keyed(key, *x, params.m1);
+                // Only add the point if it doesn't already exist in the `h`th
+                // bin.
+                if hs.iter().find(|&&h_| h_ == h).is_none() {
+                    bins[h].push((*x, *y));
+                    hs.push(h);
+                }
             }
+            let mut hs = Vec::with_capacity(params.h1);
             for key in hashkeys[params.h1..params.h1 + params.h2].iter() {
-                let h = hash_input_keyed(&aes, *key, params.m2);
-                insert(&mut bins, x, y, params.m1 + h);
+                let h = hash_input_keyed(key, *x, params.m2);
+                // Only add the point if it doesn't already exist in the `h`th
+                // bin.
+                if hs.iter().find(|&&h_| h_ == h).is_none() {
+                    bins[params.m1 + h].push((*x, *y));
+                    hs.push(h);
+                }
             }
         }
         println!(
@@ -246,7 +246,7 @@ impl<OPRF: OprfSender<Seed = Block512, Input = Block, Output = Block512> + SemiH
             for i in 0..N_TABLE_LOOPS {
                 for (i, (x, _)) in points.iter().enumerate() {
                     ys[i] = self.oprf.compute(seed, *x);
-                    hs[i] = hash_output_keyed(&ys[i], &aes, m);
+                    hs[i] = hash_output_keyed(&aes, ys[i], m);
                     if !map.insert(hs[i]) {
                         break;
                     }
@@ -383,6 +383,7 @@ impl<OPRF: OprfReceiver<Seed = Block512, Input = Block, Output = Block512> + Sem
                 for h in hashkeys.into_iter() {
                     channel.write_block(&h)?;
                 }
+                channel.flush()?;
                 break;
             }
         }
@@ -395,7 +396,6 @@ impl<OPRF: OprfReceiver<Seed = Block512, Input = Block, Output = Block512> + Sem
         let mut outputs = (0..inputs.len())
             .map(|_| Default::default())
             .collect::<Vec<Block512>>();
-        let n = table.items.len();
 
         let items = table
             .items
@@ -415,37 +415,25 @@ impl<OPRF: OprfReceiver<Seed = Block512, Input = Block, Output = Block512> + Sem
         );
 
         let start = SystemTime::now();
+        let zero = Block512::default();
         for (item, output) in table.items.into_iter().zip(oprf_outputs.into_iter()) {
+            let m = channel.read_usize()?;
+            let v = channel.read_block()?;
+            let h = hash_output(v, output, m);
+            let mut output = output;
+            for i in 0..m {
+                let entry = channel.read_block512()?;
+                output ^= if i == h { entry } else { zero };
+            }
             if let Some(item) = item {
-                outputs[item.index] = self.process_oprf_output(channel, output)?;
-            } else {
-                let _ = self.process_oprf_output(channel, output)?;
+                outputs[item.index] = output;
             }
         }
         println!(
-            "Receiver :: OPPRF time [{}]: {} ms",
-            n,
+            "Receiver :: OPPRF time: {} ms",
             start.elapsed().unwrap().as_millis()
         );
-
         Ok(outputs)
-    }
-
-    fn process_oprf_output<C: AbstractChannel>(
-        &mut self,
-        channel: &mut C,
-        oprf_output: Block512,
-    ) -> Result<Block512, Error> {
-        let mut output = oprf_output;
-        let m = channel.read_usize()?;
-        let v = channel.read_block()?;
-        let h = hash_output(&output, v, m);
-        let zero = Block512::default();
-        for i in 0..m {
-            let entry = channel.read_block512()?;
-            output ^= if i == h { entry } else { zero };
-        }
-        Ok(output)
     }
 }
 
@@ -453,12 +441,6 @@ use crate::oprf;
 
 // XXX: Move to `oprf/mod.rs` once deemed stable enough.
 
-/// Instantiation of the KMPRT one-time OPPRF sender, using KKRT as the
-/// underlying OPRF.
-// pub type KmprtSingleSender = SingleSender<oprf::KkrtSender>;
-/// Instantiation of the KMPRT one-time OPPRF receiver, using KKRT as the
-/// underlying OPRF.
-// pub type KmprtSingleReceiver = SingleReceiver<oprf::KkrtReceiver>;
 /// Instantiation of the KMPRT hash-based OPPRF sender, using KKRT as the
 /// underlying OPRF.
 pub type KmprtSender = Sender<oprf::KkrtSender>;
@@ -546,35 +528,35 @@ mod benchmarks {
 
     #[bench]
     fn bench_hash_output(b: &mut Bencher) {
-        let x = black_box(rand::random::<Block512>());
         let k = black_box(rand::random::<Block>());
+        let x = black_box(rand::random::<Block512>());
         let range = 15;
-        b.iter(|| super::hash_output(&x, k, range));
+        b.iter(|| super::hash_output(k, &x, range));
     }
 
     #[bench]
     fn bench_hash_output_keyed(b: &mut Bencher) {
-        let x = black_box(rand::random::<Block512>());
         let k = black_box(rand::random::<Block>());
+        let x = black_box(rand::random::<Block512>());
         let aes = Aes128::new(k);
         let range = 15;
-        b.iter(|| super::hash_output_keyed(&x, &aes, range));
+        b.iter(|| super::hash_output_keyed(&aes, &x, range));
     }
 
     #[bench]
     fn bench_hash_input(b: &mut Bencher) {
-        let x = black_box(rand::random::<Block>());
         let k = black_box(rand::random::<Block>());
+        let x = black_box(rand::random::<Block>());
         let range = 15;
-        b.iter(|| super::hash_input(x, k, range));
+        b.iter(|| super::hash_input(k, x, range));
     }
 
     #[bench]
     fn bench_hash_input_keyed(b: &mut Bencher) {
-        let x = black_box(rand::random::<Block>());
         let k = black_box(rand::random::<Block>());
+        let x = black_box(rand::random::<Block>());
         let aes = Aes128::new(x);
         let range = 15;
-        b.iter(|| super::hash_input_keyed(&aes, k, range));
+        b.iter(|| super::hash_input_keyed(k, &aes, range));
     }
 }
