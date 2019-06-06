@@ -102,14 +102,14 @@ impl Block {
         stream.read_exact(v.as_mut())?;
         Ok(v)
     }
-    /// Return the "color" bit (when viewing `Block` as a wire label).
+    /// Return the least significant bit.
     #[inline]
-    pub fn color_bit(&self) -> bool {
+    pub fn lsb(&self) -> bool {
         unsafe { _mm_extract_epi8(_mm_and_si128(self.0, ONE), 0) == 1 }
     }
-    /// Set the "color" bit (when viewing `Block` as a wire label).
+    /// Set the least significant bit.
     #[inline]
-    pub fn set_color_bit(&self) -> Block {
+    pub fn set_lsb(&self) -> Block {
         unsafe { Block::from(_mm_or_si128(self.0, ONE)) }
     }
     /// Flip all bits.
@@ -176,6 +176,21 @@ impl std::ops::BitAndAssign for Block {
     #[inline]
     fn bitand_assign(&mut self, rhs: Self) {
         unsafe { self.0 = _mm_and_si128(self.0, rhs.0) }
+    }
+}
+
+impl std::ops::BitOr for Block {
+    type Output = Block;
+    #[inline]
+    fn bitor(self, rhs: Self) -> Self {
+        unsafe { Block(_mm_or_si128(self.0, rhs.0)) }
+    }
+}
+
+impl std::ops::BitOrAssign for Block {
+    #[inline]
+    fn bitor_assign(&mut self, rhs: Self) {
+        unsafe { self.0 = _mm_or_si128(self.0, rhs.0) }
     }
 }
 
@@ -326,6 +341,22 @@ mod tests {
     use super::*;
 
     #[test]
+    fn test_and() {
+        let x = rand::random::<Block>();
+        let y = x & Block(ONES);
+        assert_eq!(x, y);
+    }
+
+    #[test]
+    fn test_or() {
+        let x = rand::random::<Block>();
+        let y = x | Block(ONES);
+        assert_eq!(y, Block(ONES));
+        let y = x | x;
+        assert_eq!(x, y);
+    }
+
+    #[test]
     fn test_xor() {
         let x = rand::random::<Block>();
         let y = rand::random::<Block>();
@@ -335,19 +366,12 @@ mod tests {
     }
 
     #[test]
-    fn test_and() {
+    fn test_lsb() {
         let x = rand::random::<Block>();
-        let y = x & Block(ONES);
-        assert_eq!(x, y);
-    }
-
-    #[test]
-    fn test_color_bit() {
-        let x = rand::random::<Block>();
-        let x = Block::from(unsafe { _mm_or_si128(x.0, ONE) });
-        assert!(x.color_bit());
-        let x = Block::from(unsafe { _mm_xor_si128(x.0, ONE) });
-        assert!(!x.color_bit());
+        let x = x | Block(ONE);
+        assert!(x.lsb());
+        let x = x ^ Block(ONE);
+        assert!(!x.lsb());
     }
 
     #[test]
