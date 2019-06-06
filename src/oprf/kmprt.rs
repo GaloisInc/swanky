@@ -110,6 +110,7 @@ pub struct Sender<OPRF> {
 impl<OPRF: OprfSender<Seed = Block512, Input = Block, Output = Block512> + SemiHonest>
     Sender<OPRF>
 {
+    /// Initialize the OPPRF sender.
     pub fn init<C, RNG>(channel: &mut C, rng: &mut RNG) -> Result<Self, Error>
     where
         C: AbstractChannel,
@@ -119,6 +120,8 @@ impl<OPRF: OprfSender<Seed = Block512, Input = Block, Output = Block512> + SemiH
         Ok(Self { oprf })
     }
 
+    /// Run the OPPRF for `ninputs` inputs with the pairs given in
+    /// `points` as the programmed points.
     pub fn send<C, RNG>(
         &mut self,
         channel: &mut C,
@@ -213,18 +216,16 @@ impl<OPRF: OprfSender<Seed = Block512, Input = Block, Output = Block512> + SemiH
         RNG: CryptoRng + RngCore,
     {
         // Check that all input points are unique.
-        // debug_assert_eq!(
-        //     {
-        //         let mut points = points.iter().map(|(x, _)| *x).collect::<Vec<Block>>();
-        //         points.sort();
-        //         points.dedup();
-        //         points.len()
-        //     },
-        //     points.len()
-        // );
-        // assert!(points.len() <= npoints);
-        let total = SystemTime::now();
-        let start = SystemTime::now();
+        debug_assert_eq!(
+            {
+                let mut points = points.iter().map(|(x, _)| *x).collect::<Vec<Block>>();
+                points.sort();
+                points.dedup();
+                points.len()
+            },
+            points.len()
+        );
+        assert!(points.len() <= npoints);
         let mut v = rng.gen::<Block>();
         let mut aes = Aes128::new(v);
         let mut map = HashSet::with_capacity(points.len());
@@ -243,7 +244,7 @@ impl<OPRF: OprfSender<Seed = Block512, Input = Block, Output = Block512> + SemiH
         let increment = m;
         loop {
             // Sample `v` until all values in `map` are distinct.
-            for i in 0..N_TABLE_LOOPS {
+            for _ in 0..N_TABLE_LOOPS {
                 for (i, (x, _)) in points.iter().enumerate() {
                     ys[i] = self.oprf.compute(seed, *x);
                     hs[i] = hash_output_keyed(&aes, ys[i], m);
@@ -252,13 +253,6 @@ impl<OPRF: OprfSender<Seed = Block512, Input = Block, Output = Block512> + SemiH
                     }
                 }
                 if map.len() == points.len() {
-                    // println!(
-                    //     "SingleSender :: [{}] [{}] [m = {}] # Loops = {}",
-                    //     points.len(),
-                    //     npoints,
-                    //     m,
-                    //     i
-                    // );
                     break;
                 }
                 // Try again.
@@ -272,14 +266,8 @@ impl<OPRF: OprfSender<Seed = Block512, Input = Block, Output = Block512> + SemiH
                 break;
             }
             // Failure :-(. Increment `offset` and try again.
-            // println!("SingleSender :: Incrementing... darn!");
             m += increment;
         }
-        // println!(
-        //     "SingleSender :: init table time: {} μs",
-        //     start.elapsed().unwrap().as_micros()
-        // );
-        let start = SystemTime::now();
         let mut table = vec![Block512::default(); m];
         // Place points in table based on the hash of their OPRF output.
         for (h, (y_, (_, y))) in hs.into_iter().zip(ys.into_iter().zip(points.into_iter())) {
@@ -291,25 +279,12 @@ impl<OPRF: OprfSender<Seed = Block512, Input = Block, Output = Block512> + SemiH
                 *entry = rng.gen::<Block512>();
             }
         }
-        // println!(
-        //     "SingleSender :: table build time: {} μs",
-        //     start.elapsed().unwrap().as_micros()
-        // );
         // Send `v` and `table` to the receiver.
-        let start = SystemTime::now();
         channel.write_block(&v)?;
         for entry in table.iter() {
             channel.write_block512(entry)?;
         }
         channel.flush()?;
-        // println!(
-        //     "SingleSender :: send time: {} μs",
-        //     start.elapsed().unwrap().as_micros()
-        // );
-        // println!(
-        //     "SingleSender :: total time: {} μs",
-        //     total.elapsed().unwrap().as_micros()
-        // );
         Ok(())
     }
 
@@ -340,6 +315,7 @@ pub struct Receiver<OPRF: OprfReceiver + SemiHonest> {
 impl<OPRF: OprfReceiver<Seed = Block512, Input = Block, Output = Block512> + SemiHonest>
     Receiver<OPRF>
 {
+    /// Initialize the OPPRF receiver.
     pub fn init<C, RNG>(channel: &mut C, rng: &mut RNG) -> Result<Self, Error>
     where
         C: AbstractChannel,
@@ -349,6 +325,7 @@ impl<OPRF: OprfReceiver<Seed = Block512, Input = Block, Output = Block512> + Sem
         Ok(Self { oprf })
     }
 
+    /// Run the OPPRF on inputs provided by the `inputs` slice.
     pub fn receive<C, RNG>(
         &mut self,
         channel: &mut C,
@@ -370,7 +347,6 @@ impl<OPRF: OprfReceiver<Seed = Block512, Input = Block, Output = Block512> + Sem
             let hashkeys = (0..params.h1 + params.h2)
                 .map(|_| rng.gen())
                 .collect::<Vec<Block>>();
-            // let hashkeys = cointoss::receive(reader, writer, &seeds)?;
             // Build a cuckoo hash table using `hashkeys`.
             if let Ok(table_) = cuckoo::CuckooHash::build(
                 inputs,
@@ -512,7 +488,7 @@ mod tests {
         // Settings for PSTY with `n = 2^12`.
         _test_opprf_points(5202, 12288, 12288);
         // Settings for PSTY with `n = 2^16`.
-        // _test_opprf_points(83231, 196608, 196608);
+        _test_opprf_points(83231, 196608, 196608);
     }
 }
 
@@ -531,7 +507,7 @@ mod benchmarks {
         let k = black_box(rand::random::<Block>());
         let x = black_box(rand::random::<Block512>());
         let range = 15;
-        b.iter(|| super::hash_output(k, &x, range));
+        b.iter(|| super::hash_output(k, x, range));
     }
 
     #[bench]
@@ -540,23 +516,15 @@ mod benchmarks {
         let x = black_box(rand::random::<Block512>());
         let aes = Aes128::new(k);
         let range = 15;
-        b.iter(|| super::hash_output_keyed(&aes, &x, range));
-    }
-
-    #[bench]
-    fn bench_hash_input(b: &mut Bencher) {
-        let k = black_box(rand::random::<Block>());
-        let x = black_box(rand::random::<Block>());
-        let range = 15;
-        b.iter(|| super::hash_input(k, x, range));
+        b.iter(|| super::hash_output_keyed(&aes, x, range));
     }
 
     #[bench]
     fn bench_hash_input_keyed(b: &mut Bencher) {
         let k = black_box(rand::random::<Block>());
         let x = black_box(rand::random::<Block>());
-        let aes = Aes128::new(x);
+        let aes = Aes128::new(k);
         let range = 15;
-        b.iter(|| super::hash_input_keyed(k, &aes, range));
+        b.iter(|| super::hash_input_keyed(&aes, x, range));
     }
 }

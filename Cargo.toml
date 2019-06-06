@@ -19,11 +19,10 @@ nightly = ["curve25519-dalek/simd_backend", "rand/nightly", "scuttlebutt/nightly
 unstable = []
 
 [dependencies]
-curve25519-dalek = { version = "1.2", features = ["std"] }
+curve25519-dalek = { version = "1.1", features = ["std"] }
 libc = "0.2"
 rand = "0.6"
-# scuttlebutt = { git = "https://github.com/amaloz/scuttlebutt", features = ["curve25519-dalek"], branch = "dev" }
-scuttlebutt = { path = "../scuttlebutt", features = ["curve25519-dalek"] }
+scuttlebutt = { git = "https://github.com/amaloz/scuttlebutt", features = ["curve25519-dalek"], branch = "dev" }
 
 [build-dependencies]
 cc = "1.0"
