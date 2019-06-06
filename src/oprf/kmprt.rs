@@ -12,7 +12,6 @@ use crate::oprf::{Receiver as OprfReceiver, Sender as OprfSender};
 use rand::{CryptoRng, Rng, RngCore};
 use scuttlebutt::{AbstractChannel, Aes128, Block, Block512, SemiHonest};
 use std::collections::HashSet;
-use std::time::SystemTime;
 
 mod cuckoo;
 
@@ -25,31 +24,35 @@ impl From<cuckoo::Error> for Error {
 // Number of times to iterate when creating the sender's hash table.
 const N_TABLE_LOOPS: usize = 128;
 
-// Hash `x` and `k`, producing a result in range `[0..range-1]`. We use the
-// Davies-Meyer single-block-length compression function under-the-hood, and
-// have `k` be pre-keyed.
+// Hash `x` with key `k`, producing a result in the range `[0..range-1]`. We use
+// the Davies-Meyer-esque single-block-length compression function
+// under-the-hood, and we pre-key `k`.
 #[inline(always)]
 fn hash_input_keyed(k: &Aes128, x: Block, range: usize) -> usize {
     let h = k.encrypt(x) ^ x;
     (u128::from(h) % (range as u128)) as usize
 }
 
-// Hash `y`, using `k` as the hash "key", and output the result in the range
-// `[0..range-1]`.
+// Hash `y` with key `k`, producing a result in the range `[0..range-1]`.
 #[inline]
 fn hash_output(k: Block, y: Block512, range: usize) -> usize {
     let aes = Aes128::new(k);
     hash_output_keyed(&aes, y, range)
 }
 
-// XXX: IS THIS SECURE?!
+// Hash `y` with pre-keyed `k`. Uses a Davies-Meyer-esque hash function.
+//
+// XXX: can we remove this re-keying? It'll speed things up a bunch.
 #[inline]
 fn hash_output_keyed(k: &Aes128, y: Block512, range: usize) -> usize {
-    let y: [Block; 4] = y.into();
-    let h = k.encrypt(y[0]) ^ y[0];
-    let h = k.encrypt(h) ^ y[1];
-    let h = k.encrypt(h) ^ y[2];
-    let h = k.encrypt(h) ^ y[3];
+    let ys: [Block; 4] = y.into();
+    let h = k.encrypt(ys[0]) ^ ys[0];
+    let k = Aes128::new(h);
+    let h = k.encrypt(ys[1]) ^ ys[1];
+    let k = Aes128::new(h);
+    let h = k.encrypt(ys[2]) ^ ys[2];
+    let k = Aes128::new(h);
+    let h = k.encrypt(ys[3]) ^ ys[3];
     (u128::from(h) % (range as u128)) as usize
 }
 
@@ -133,7 +136,6 @@ impl<OPRF: OprfSender<Seed = Block512, Input = Block, Output = Block512> + SemiH
         C: AbstractChannel,
         RNG: CryptoRng + RngCore,
     {
-        let start = SystemTime::now();
         let params = Parameters::new(ninputs)?;
         // Receive `hashkeys` from the receiver. These are used to fill `bins` below.
         let mut hashkeys = Vec::with_capacity(params.h1 + params.h2);
@@ -174,17 +176,7 @@ impl<OPRF: OprfSender<Seed = Block512, Input = Block, Output = Block512> + SemiH
                 }
             }
         }
-        println!(
-            "Sender :: setup time: {} ms",
-            start.elapsed().unwrap().as_millis()
-        );
-        let start = SystemTime::now();
         let seeds = self.oprf.send(channel, bins.len(), rng)?;
-        println!(
-            "Sender :: OPRF time: {} ms",
-            start.elapsed().unwrap().as_millis()
-        );
-        let start = SystemTime::now();
         // Run the one-time OPPRF on each bin.
         for (j, (bin, seed)) in bins.into_iter().zip(seeds.into_iter()).enumerate() {
             // `beta` is the maximum number of entries a bin could have.
@@ -196,10 +188,6 @@ impl<OPRF: OprfSender<Seed = Block512, Input = Block, Output = Block512> + SemiH
 
             let _ = self.process_oprf_output(channel, seed, bin, beta, rng)?;
         }
-        println!(
-            "Sender :: OPPRF processing time: {} ms",
-            start.elapsed().unwrap().as_millis()
-        );
         Ok(())
     }
 
@@ -336,7 +324,6 @@ impl<OPRF: OprfReceiver<Seed = Block512, Input = Block, Output = Block512> + Sem
         C: AbstractChannel,
         RNG: CryptoRng + RngCore,
     {
-        let start = SystemTime::now();
         let params = Parameters::new(inputs.len())?;
         let table;
         // Generate random values to be used for the hash functions. We loop,
@@ -363,12 +350,6 @@ impl<OPRF: OprfReceiver<Seed = Block512, Input = Block, Output = Block512> + Sem
                 break;
             }
         }
-        println!(
-            "Receiver :: setup time: {} ms",
-            start.elapsed().unwrap().as_millis()
-        );
-
-        let start = SystemTime::now();
         let mut outputs = (0..inputs.len())
             .map(|_| Default::default())
             .collect::<Vec<Block512>>();
@@ -385,12 +366,7 @@ impl<OPRF: OprfReceiver<Seed = Block512, Input = Block, Output = Block512> + Sem
             })
             .collect::<Vec<Block>>();
         let oprf_outputs = self.oprf.receive(channel, &items, rng)?;
-        println!(
-            "Receiver :: OPRF time: {} ms",
-            start.elapsed().unwrap().as_millis()
-        );
 
-        let start = SystemTime::now();
         let zero = Block512::default();
         for (item, output) in table.items.into_iter().zip(oprf_outputs.into_iter()) {
             let m = channel.read_usize()?;
@@ -405,24 +381,9 @@ impl<OPRF: OprfReceiver<Seed = Block512, Input = Block, Output = Block512> + Sem
                 outputs[item.index] = output;
             }
         }
-        println!(
-            "Receiver :: OPPRF time: {} ms",
-            start.elapsed().unwrap().as_millis()
-        );
         Ok(outputs)
     }
 }
-
-use crate::oprf;
-
-// XXX: Move to `oprf/mod.rs` once deemed stable enough.
-
-/// Instantiation of the KMPRT hash-based OPPRF sender, using KKRT as the
-/// underlying OPRF.
-pub type KmprtSender = Sender<oprf::KkrtSender>;
-/// Instantiation of the KMPRT hash-based OPPRF receiver, using KKRT as the
-/// underlying OPRF.
-pub type KmprtReceiver = Receiver<oprf::KkrtReceiver>;
 
 //
 // Tests.
@@ -431,6 +392,7 @@ pub type KmprtReceiver = Receiver<oprf::KkrtReceiver>;
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::oprf::{KmprtReceiver, KmprtSender};
     use scuttlebutt::{AesRng, Channel};
     use std::io::{BufReader, BufWriter};
     use std::os::unix::net::UnixStream;

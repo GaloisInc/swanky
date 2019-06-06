@@ -4,7 +4,7 @@
 // Copyright © 2019 Galois, Inc.
 // See LICENSE for licensing information.
 
-use ocelot::oprf::kmprt::{KmprtReceiver, KmprtSender};
+use ocelot::oprf::{KmprtReceiver, KmprtSender};
 use rand::Rng;
 use scuttlebutt::{AesRng, Block, Block512, TrackChannel};
 use std::io::{BufReader, BufWriter};
