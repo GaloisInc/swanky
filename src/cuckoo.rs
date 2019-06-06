@@ -62,6 +62,9 @@ pub fn compute_masksize(n: usize) -> Result<usize, Error> {
 }
 
 impl CuckooHash {
+    /// Build a new cuckoo hash table, hashing `inputs` in. We require that the
+    /// lower-order-bits of the values in `inputs` are zero-ed out, as those
+    /// bits will be used to store the hash index.
     pub fn new(inputs: &[Block], nhashes: usize) -> Result<CuckooHash, Error> {
         let nbins = compute_nbins(inputs.len(), nhashes)?;
 
@@ -90,7 +93,10 @@ impl CuckooHash {
         };
 
         for _ in 0..NITERS {
+            item.entry =
+                Block::from(u128::from(item.entry) & 0xFFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FF00);
             let i = CuckooHash::bin(item.entry, item.hash_index, self.nbins);
+            item.entry ^= Block::from(item.hash_index as u128);
             let opt_item = self.items[i].replace(item);
             if let Some(x) = opt_item {
                 // If there is an item already in the bin, keep iterating,
@@ -141,7 +147,13 @@ impl Debug for CuckooHash {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::utils;
+    use itertools::Itertools;
+    use rand::Rng;
+    use scuttlebutt::AesRng;
 
+    const NHASHES: usize = 3;
+    const ITEMSIZE: usize = 8;
     const SETSIZE: usize = 1 << 16;
 
     #[test]
@@ -152,6 +164,41 @@ mod tests {
         let tbl = CuckooHash::new(&inputs, 3);
         assert!(tbl.err().is_none());
     }
+
+    #[test]
+    fn hashing() {
+        let mut rng = AesRng::new();
+        let inputs = utils::rand_vec_vec(SETSIZE, ITEMSIZE, &mut rng);
+
+        let key = rng.gen();
+        let hashes = utils::compress_and_hash_inputs(&inputs, key);
+        let cuckoo = CuckooHash::new(&hashes, NHASHES).unwrap();
+
+        // map inputs to table using all hash functions
+        let mut table = vec![Vec::new(); cuckoo.nbins];
+
+        for &x in &hashes {
+            let mut bins = Vec::with_capacity(NHASHES);
+            for h in 0..NHASHES {
+                let bin = CuckooHash::bin(x, h, cuckoo.nbins);
+                table[bin].push(x ^ Block::from(h as u128));
+                bins.push(bin);
+            }
+            // if j = H1(y) = H2(y) for some y, then P2 adds a uniformly random element to
+            // table2[j].
+            if bins.iter().skip(1).all(|&x| x == bins[0]) {
+                table[bins[0]].push(rng.gen());
+            }
+        }
+
+        // each item in a cuckoo bin should also be in one of the table bins
+        for (opt_item, bin) in cuckoo.items.iter().zip_eq(&table) {
+            if let Some(item) = opt_item {
+                assert!(bin.iter().any(|bin_elem| *bin_elem == item.entry));
+            }
+        }
+    }
+
 }
 
 #[cfg(all(feature = "nightly", test))]

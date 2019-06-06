@@ -13,7 +13,7 @@ use std::os::unix::net::UnixStream;
 use std::time::SystemTime;
 
 const NBYTES: usize = 15;
-const SET_SIZE: usize = 1 << 12;
+const SET_SIZE: usize = 1 << 16;
 
 fn rand_vec(n: usize) -> Vec<u8> {
     (0..n).map(|_| rand::random::<u8>()).collect()
@@ -47,11 +47,11 @@ fn psty(inputs1: Vec<Vec<u8>>, inputs2: Vec<Vec<u8>>) {
         );
         println!(
             "Sender communication (read): {:.2} Mb",
-            channel.read_kilobits() / 1000.0
+            channel.kilobits_read() / 1000.0
         );
         println!(
             "Sender communication (write): {:.2} Mb",
-            channel.write_kilobits() / 1000.0
+            channel.kilobits_written() / 1000.0
         );
     });
 
@@ -76,11 +76,11 @@ fn psty(inputs1: Vec<Vec<u8>>, inputs2: Vec<Vec<u8>>) {
     let _ = handle.join().unwrap();
     println!(
         "Receiver communication (read): {:.2} Mb",
-        channel.read_kilobits() / 1000.0
+        channel.kilobits_read() / 1000.0
     );
     println!(
         "Receiver communication (write): {:.2} Mb",
-        channel.write_kilobits() / 1000.0
+        channel.kilobits_written() / 1000.0
     );
     println!("Total time: {} ms", total.elapsed().unwrap().as_millis());
 }

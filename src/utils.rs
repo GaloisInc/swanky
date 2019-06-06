@@ -4,6 +4,7 @@
 // Copyright © 2019 Galois, Inc.
 // See LICENSE for licensing information.
 
+use rand::{CryptoRng, Rng, RngCore};
 use scuttlebutt::{AesHash, Block};
 use sha2::{Digest, Sha256};
 
@@ -18,38 +19,42 @@ pub fn compress_and_hash_inputs(inputs: &[Vec<u8>], key: Block) -> Vec<Block> {
         .enumerate()
         .map(|(i, input)| {
             let mut digest = [0u8; 16];
-            if input.len() < 16 {
+            if input.len() <= 16 {
                 // Map `input` directly to a `Block`.
                 digest[0..input.len()].copy_from_slice(input);
             } else {
                 // Hash `input` first.
                 hasher.input(input);
                 let h = hasher.result_reset();
-                digest[0..15].copy_from_slice(&h[0..15]);
+                digest[0..16].copy_from_slice(&h[0..16]);
             }
-            aes.cr_hash(Block::from(i as u128), Block::from(digest))
+            let block = aes.cr_hash(Block::from(i as u128), Block::from(digest));
+            // XXX: update to use Block implementation of `&`
+            Block::from(u128::from(block) & 0xFFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FF00)
         })
         .collect::<Vec<Block>>()
 }
 
 #[allow(dead_code)] // used in tests
-pub fn rand_vec(n: usize) -> Vec<u8> {
-    (0..n).map(|_| rand::random::<u8>()).collect()
+pub fn rand_vec<RNG: CryptoRng + RngCore>(n: usize, rng: &mut RNG) -> Vec<u8> {
+    (0..n).map(|_| rng.gen()).collect()
 }
 
 #[allow(dead_code)] // used in tests
-pub fn rand_vec_vec(n: usize, m: usize) -> Vec<Vec<u8>> {
-    (0..n).map(|_| rand_vec(m)).collect()
+pub fn rand_vec_vec<RNG: CryptoRng + RngCore>(n: usize, m: usize, rng: &mut RNG) -> Vec<Vec<u8>> {
+    (0..n).map(|_| rand_vec(m, rng)).collect()
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use scuttlebutt::AesRng;
 
     #[test]
     fn test_compress_and_hash_inputs() {
-        let key = rand::random::<Block>();
-        let inputs = rand_vec_vec(13, 16);
+        let mut rng = AesRng::new();
+        let key = rng.gen::<Block>();
+        let inputs = rand_vec_vec(13, 16, &mut rng);
         let _ = compress_and_hash_inputs(&inputs, key);
     }
 }
@@ -62,18 +67,11 @@ mod benchmarks {
 
     const NTIMES: usize = 1 << 16;
 
-    fn rand_vec(n: usize) -> Vec<u8> {
-        (0..n).map(|_| rand::random::<u8>()).collect()
-    }
-
-    fn rand_vec_vec(n: usize, size: usize) -> Vec<Vec<u8>> {
-        (0..n).map(|_| rand_vec(size)).collect()
-    }
-
     #[bench]
     fn bench_compress_and_hash_inputs_small(b: &mut Bencher) {
-        let inputs = rand_vec_vec(NTIMES, 15);
-        let key = rand::random::<Block>();
+        let mut rng = AesRng::new();
+        let key = rng.gen::<Block>();
+        let inputs = rand_vec_vec(NTIMES, 15, &mut rng);
         b.iter(|| {
             let _ = compress_and_hash_inputs(&inputs, key);
         });
@@ -81,8 +79,9 @@ mod benchmarks {
 
     #[bench]
     fn bench_compress_and_hash_inputs_large(b: &mut Bencher) {
-        let inputs = rand_vec_vec(NTIMES, 32);
-        let key = rand::random::<Block>();
+        let mut rng = AesRng::new();
+        let key = rng.gen::<Block>();
+        let inputs = rand_vec_vec(NTIMES, 32, &mut rng);
         b.iter(|| {
             let _ = compress_and_hash_inputs(&inputs, key);
         });

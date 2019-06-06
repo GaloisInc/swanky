@@ -12,8 +12,8 @@ use crate::errors::Error;
 use crate::utils;
 use fancy_garbling::{BinaryBundle, BundleGadgets, CrtBundle, CrtGadgets, Fancy, FancyInput};
 use itertools::Itertools;
-use ocelot::oprf::{kmprt, ProgrammableReceiver, ProgrammableSender};
-use ocelot::ot::{KosReceiver as OtReceiver, KosSender as OtSender};
+use ocelot::oprf::kmprt;
+use ocelot::ot::{AlszReceiver as OtReceiver, AlszSender as OtSender};
 use rand::{CryptoRng, Rng, RngCore, SeedableRng};
 use scuttlebutt::{AbstractChannel, Block, Block512};
 
@@ -97,9 +97,9 @@ impl Sender {
             })
             .collect_vec();
 
-        let _ = self
-            .opprf
-            .send(channel, &points, points.len(), nbins, rng)?;
+        println!("points length = {}, nbins = {}", points.len(), nbins);
+
+        let _ = self.opprf.send(channel, &points, nbins, rng)?;
 
         self.state = Some(SenderState { opprf_outputs: ts });
 
@@ -120,7 +120,7 @@ impl Sender {
             s
         } else {
             return Err(Error::PsiProtocolError(
-                "send/receive must be called first".to_string(),
+                "send must be called first".to_string(),
             ));
         };
 
@@ -155,7 +155,7 @@ impl Sender {
             s
         } else {
             return Err(Error::PsiProtocolError(
-                "send/receive must be called first".to_string(),
+                "send must be called first".to_string(),
             ));
         };
 
@@ -209,12 +209,12 @@ impl Receiver {
             .items
             .iter()
             .map(|opt_item| match opt_item {
-                Some(item) => item.entry ^ Block::from(item.hash_index as u128),
+                Some(item) => item.entry,
                 None => rng.gen(),
             })
             .collect::<Vec<Block>>();
 
-        let opprf_outputs = self.opprf.receive(channel, 0, &table, rng)?;
+        let opprf_outputs = self.opprf.receive(channel, &table, rng)?;
 
         self.state = Some(ReceiverState {
             opprf_outputs,
@@ -239,7 +239,7 @@ impl Receiver {
             s
         } else {
             return Err(Error::PsiProtocolError(
-                "send/receive must be called first".to_string(),
+                "receive must be called first".to_string(),
             ));
         };
         let nbins = state.cuckoo.nbins;
@@ -286,7 +286,7 @@ impl Receiver {
             s
         } else {
             return Err(Error::PsiProtocolError(
-                "send/receive must be called first".to_string(),
+                "receive must be called first".to_string(),
             ));
         };
         let nbins = state.cuckoo.nbins;
@@ -392,12 +392,13 @@ mod tests {
 
     #[test]
     fn full_protocol() {
+        let mut rng = AesRng::new();
         let (sender, receiver) = UnixStream::pair().unwrap();
-        let sender_inputs = rand_vec_vec(SET_SIZE, ITEM_SIZE);
+        let sender_inputs = rand_vec_vec(SET_SIZE, ITEM_SIZE, &mut rng);
         let receiver_inputs = sender_inputs.clone();
 
         std::thread::spawn(move || {
-            let mut rng = AesRng::from_seed(Block::from(1));
+            let mut rng = AesRng::new();
             let reader = BufReader::new(sender.try_clone().unwrap());
             let writer = BufWriter::new(sender);
             let mut channel = Channel::new(reader, writer);
@@ -408,7 +409,7 @@ mod tests {
             // psi.compute_intersection(&mut channel, &mut rng).unwrap();
         });
 
-        let mut rng = AesRng::from_seed(Block::from(1));
+        let mut rng = AesRng::new();
         let reader = BufReader::new(receiver.try_clone().unwrap());
         let writer = BufWriter::new(receiver);
         let mut channel = Channel::new(reader, writer);
@@ -423,41 +424,4 @@ mod tests {
         assert_eq!(cardinality, SET_SIZE);
     }
 
-    #[test]
-    fn hashing() {
-        let mut rng = AesRng::new();
-        let inputs = rand_vec_vec(SET_SIZE, ITEM_SIZE);
-
-        let key = rng.gen();
-        let hashes = utils::compress_and_hash_inputs(&inputs, key);
-        let cuckoo = CuckooHash::new(&hashes, NHASHES).unwrap();
-
-        // map inputs to table using all hash functions
-        let mut table = vec![Vec::new(); cuckoo.nbins];
-
-        for &x in &hashes {
-            let mut bins = Vec::with_capacity(NHASHES);
-            for h in 0..NHASHES {
-                let bin = CuckooHash::bin(x, h, cuckoo.nbins);
-                table[bin].push(x ^ Block::from(h as u128));
-                bins.push(bin);
-            }
-            // if j = H1(y) = H2(y) for some y, then P2 adds a uniformly random element to
-            // table2[j].
-            if bins.iter().skip(1).all(|&x| x == bins[0]) {
-                table[bins[0]].push(rng.gen());
-            }
-        }
-
-        // each item in a cuckoo bin should also be in one of the table bins
-        for (opt_item, bin) in cuckoo.items.iter().zip_eq(&table) {
-            if let Some(item) = opt_item {
-                assert!(
-                    bin.iter()
-                        .any(|bin_elem| *bin_elem
-                            == item.entry ^ Block::from(item.hash_index as u128))
-                );
-            }
-        }
-    }
 }

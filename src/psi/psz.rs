@@ -104,22 +104,21 @@ impl Receiver {
         let nbins = tbl.nbins;
         let masksize = compute_masksize(n)?;
 
-        let hindices = (0..NHASHES)
-            .map(|i| Block::from(i as u128))
-            .collect::<Vec<Block>>();
+        // let hindices = (0..NHASHES)
+        //     .map(|i| Block::from(i as u128))
+        //     .collect::<Vec<Block>>();
 
         // Send cuckoo hash info to sender.
         channel.write_usize(nbins)?;
         channel.flush()?;
 
-        // Set up inputs to use `x || i` or `x` depending on whether the input
-        // is in a bin or the stash.
+        // Extract inputs from cuckoo hash.
         let inputs_ = tbl
             .items
             .iter()
             .map(|opt_item| {
                 if let Some(item) = opt_item {
-                    item.entry ^ hindices[item.hash_index]
+                    item.entry
                 } else {
                     // No item found, so use the "default" item.
                     Default::default()
@@ -176,12 +175,13 @@ mod tests {
     use std::os::unix::net::UnixStream;
 
     const SIZE: usize = 16;
-    const NTIMES: usize = 1 << 10;
+    const NTIMES: usize = 1 << 4;
 
     #[test]
     fn test_psi() {
+        let mut rng = AesRng::new();
         let (sender, receiver) = UnixStream::pair().unwrap();
-        let sender_inputs = rand_vec_vec(NTIMES, SIZE);
+        let sender_inputs = rand_vec_vec(NTIMES, SIZE, &mut rng);
         let receiver_inputs = sender_inputs.clone();
         let handle = std::thread::spawn(move || {
             let mut rng = AesRng::new();
