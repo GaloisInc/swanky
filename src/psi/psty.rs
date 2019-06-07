@@ -264,6 +264,7 @@ impl Receiver {
         let (outs, mods) = fancy_compute_cardinality(&mut ev, &x, &y)?;
         ev.outputs(&outs)?;
         let mpc_outs = ev.decode_output()?;
+
         let cardinality = fancy_garbling::util::crt_inv(&mpc_outs, &mods);
         Ok(cardinality as usize)
     }
@@ -277,20 +278,21 @@ fn encode_inputs_as_crt(opprf_outputs: &[Block512]) -> (Vec<u16>, Vec<u16>) {
         .iter()
         .flat_map(|blk| {
             let mut val = 0;
-            for (i,b) in blk.prefix(HASH_SIZE).iter().enumerate() {
-                val ^= (*b as u128) << i*8;
+            for (i, b) in blk.prefix(HASH_SIZE).iter().enumerate() {
+                val ^= (*b as u128) << i * 8;
             }
             fancy_garbling::util::crt(val, &qs)
         })
         .collect_vec();
 
-    let mods = itertools::repeat_n(qs, opprf_outputs.len()).flatten().collect_vec();
+    let mods = itertools::repeat_n(qs, opprf_outputs.len())
+        .flatten()
+        .collect_vec();
 
     debug_assert_eq!(inputs.len(), mods.len());
 
     (inputs, mods)
 }
-
 
 /// Fancy function to compute the intersection and return encoded vector of 0/1 masks.
 fn fancy_compute_intersection<F: Fancy>(
@@ -306,12 +308,7 @@ fn fancy_compute_intersection<F: Fancy>(
     sender_inputs
         .chunks(nprimes)
         .zip_eq(receiver_inputs.chunks(nprimes))
-        .map(|(xs, ys)| {
-            f.eq_bundles(
-                &CrtBundle::new(xs.to_vec()),
-                &CrtBundle::new(ys.to_vec()),
-            )
-        })
+        .map(|(xs, ys)| f.eq_bundles(&CrtBundle::new(xs.to_vec()), &CrtBundle::new(ys.to_vec())))
         .collect()
 }
 
@@ -330,12 +327,7 @@ fn fancy_compute_cardinality<F: Fancy>(
     let eqs = sender_inputs
         .chunks(nprimes)
         .zip_eq(receiver_inputs.chunks(nprimes))
-        .map(|(xs, ys)| {
-            f.eq_bundles(
-                &CrtBundle::new(xs.to_vec()),
-                &CrtBundle::new(ys.to_vec()),
-            )
-        })
+        .map(|(xs, ys)| f.eq_bundles(&CrtBundle::new(xs.to_vec()), &CrtBundle::new(ys.to_vec())))
         .collect::<Result<Vec<F::Item>, F::Error>>()?;
 
     // compute sum of equalities
