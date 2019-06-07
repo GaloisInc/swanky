@@ -64,6 +64,7 @@ mod benchmarks {
     extern crate test;
     use super::*;
     use test::Bencher;
+    use scuttlebutt::AesRng;
 
     const NTIMES: usize = 1 << 16;
 
