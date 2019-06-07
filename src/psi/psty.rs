@@ -4,18 +4,19 @@
 // Copyright © 2019 Galois, Inc.
 // See LICENSE for licensing information.
 
-//! Implementation of the Pinkas-Tkachenko-Yanai private set intersection
+//! Implementation of the Pinkas-Schneider-Tkachenko-Yanai private set intersection
 //! protocol (cf. <https://eprint.iacr.org/2019/241>).
 
 use crate::cuckoo::CuckooHash;
 use crate::errors::Error;
 use crate::utils;
-use fancy_garbling::{BinaryBundle, BundleGadgets, CrtBundle, CrtGadgets, Fancy, FancyInput};
+use fancy_garbling::{BinaryBundle, BundleGadgets, CrtBundle, CrtGadgets, Fancy, FancyInput, Wire};
 use itertools::Itertools;
-use ocelot::oprf::kmprt;
+use ocelot::oprf::{KmprtReceiver, KmprtSender};
 use ocelot::ot::{AlszReceiver as OtReceiver, AlszSender as OtSender};
 use rand::{CryptoRng, Rng, RngCore, SeedableRng};
 use scuttlebutt::{AbstractChannel, Block, Block512};
+use twopac::semihonest::{Evaluator, Garbler};
 
 const NHASHES: usize = 3;
 // How many bytes of the hash to use for the equality tests.
@@ -26,21 +27,19 @@ pub type Msg = Vec<u8>;
 
 /// Private set intersection sender.
 pub struct Sender {
-    opprf: kmprt::KmprtSender,
-    state: Option<SenderState>,
+    opprf: KmprtSender,
 }
 
-struct SenderState {
+pub struct SenderState {
     opprf_outputs: Vec<Block512>,
 }
 
 /// Private set intersection receiver.
 pub struct Receiver {
-    opprf: kmprt::KmprtReceiver,
-    state: Option<ReceiverState>,
+    opprf: KmprtReceiver,
 }
 
-struct ReceiverState {
+pub struct ReceiverState {
     opprf_outputs: Vec<Block512>,
     cuckoo: CuckooHash,
     inputs: Vec<Msg>,
@@ -52,8 +51,8 @@ impl Sender {
         channel: &mut C,
         rng: &mut RNG,
     ) -> Result<Self, Error> {
-        let opprf = kmprt::KmprtSender::init(channel, rng)?;
-        Ok(Self { opprf, state: None })
+        let opprf = KmprtSender::init(channel, rng)?;
+        Ok(Self { opprf })
     }
 
     /// Run the PSI protocol over `inputs`.
@@ -62,7 +61,7 @@ impl Sender {
         channel: &mut C,
         inputs: &[Msg],
         rng: &mut RNG,
-    ) -> Result<(), Error> {
+    ) -> Result<SenderState, Error> {
         // receive cuckoo hash info from sender
         let key = channel.read_block()?;
         let hashes = utils::compress_and_hash_inputs(inputs, key);
@@ -97,82 +96,58 @@ impl Sender {
             })
             .collect_vec();
 
-        println!("points length = {}, nbins = {}", points.len(), nbins);
-
         let _ = self.opprf.send(channel, &points, nbins, rng)?;
 
-        self.state = Some(SenderState { opprf_outputs: ts });
+        Ok(SenderState { opprf_outputs: ts })
+    }
 
-        Ok(())
+    pub fn compute_setup<C, RNG>(
+        channel: &mut C,
+        state: &SenderState,
+        rng: &mut RNG,
+    ) -> Result<(Garbler<C, RNG, OtSender>, Vec<Wire>, Vec<Wire>), Error>
+    where
+        C: AbstractChannel,
+        RNG: RngCore + CryptoRng + SeedableRng<Seed = Block>,
+    {
+        let mut gb =
+            Garbler::<C, RNG, OtSender>::new(channel.clone(), RNG::from_seed(rng.gen()), &[])?;
+        let my_input_bits = encode_inputs(&state.opprf_outputs);
+        let mods = vec![2; my_input_bits.len()]; // all binary moduli
+        let sender_inputs = gb.encode_many(&my_input_bits, &mods)?;
+        let receiver_inputs = gb.receive_many(&mods)?;
+        Ok((gb, sender_inputs, receiver_inputs))
     }
 
     /// Compute the intersection.
     pub fn compute_intersection<C, RNG>(
-        &mut self,
         channel: &mut C,
+        state: SenderState,
         rng: &mut RNG,
     ) -> Result<(), Error>
     where
         C: AbstractChannel,
         RNG: RngCore + CryptoRng + SeedableRng<Seed = Block>,
     {
-        let state = if let Some(s) = &self.state {
-            s
-        } else {
-            return Err(Error::PsiProtocolError(
-                "send must be called first".to_string(),
-            ));
-        };
-
-        let mut gb = twopac::semihonest::Garbler::<C, RNG, OtSender>::new(
-            channel.clone(),
-            RNG::from_seed(rng.gen()),
-            &[],
-        )?;
-
-        let my_input_bits = encode_inputs(&state.opprf_outputs);
-
-        let mods = vec![2; my_input_bits.len()]; // all binary moduli
-        let sender_inputs = gb.encode_many(&my_input_bits, &mods)?;
-        let receiver_inputs = gb.receive_many(&mods)?;
-        let outs = fancy_compute_intersection(&mut gb, &sender_inputs, &receiver_inputs)?;
+        let (mut gb, x, y) = Self::compute_setup(channel, &state, rng)?;
+        let outs = fancy_compute_intersection(&mut gb, &x, &y)?;
         gb.outputs(&outs)?;
-
         Ok(())
     }
 
     /// Compute the cardinality of the intersection.
     pub fn compute_cardinality<C, RNG>(
-        &mut self,
         channel: &mut C,
+        state: SenderState,
         rng: &mut RNG,
     ) -> Result<(), Error>
     where
         C: AbstractChannel,
         RNG: RngCore + CryptoRng + SeedableRng<Seed = Block>,
     {
-        let state = if let Some(s) = &self.state {
-            s
-        } else {
-            return Err(Error::PsiProtocolError(
-                "send must be called first".to_string(),
-            ));
-        };
-
-        let mut gb = twopac::semihonest::Garbler::<C, RNG, OtSender>::new(
-            channel.clone(),
-            RNG::from_seed(rng.gen()),
-            &[],
-        )?;
-
-        let my_input_bits = encode_inputs(&state.opprf_outputs);
-
-        let mods = vec![2; my_input_bits.len()]; // all binary moduli
-        let sender_inputs = gb.encode_many(&my_input_bits, &mods)?;
-        let receiver_inputs = gb.receive_many(&mods)?;
-        let (outs, _) = fancy_compute_cardinality(&mut gb, &sender_inputs, &receiver_inputs)?;
+        let (mut gb, x, y) = Self::compute_setup(channel, &state, rng)?;
+        let (outs, _) = fancy_compute_cardinality(&mut gb, &x, &y)?;
         gb.outputs(&outs)?;
-
         Ok(())
     }
 }
@@ -183,8 +158,8 @@ impl Receiver {
         channel: &mut C,
         rng: &mut RNG,
     ) -> Result<Self, Error> {
-        let opprf = kmprt::KmprtReceiver::init(channel, rng)?;
-        Ok(Self { opprf, state: None })
+        let opprf = KmprtReceiver::init(channel, rng)?;
+        Ok(Self { opprf })
     }
 
     /// Run the PSI protocol over `inputs`.
@@ -193,7 +168,7 @@ impl Receiver {
         channel: &mut C,
         inputs: &[Msg],
         rng: &mut RNG,
-    ) -> Result<(), Error> {
+    ) -> Result<ReceiverState, Error> {
         let key = rng.gen();
         let hashed_inputs = utils::compress_and_hash_inputs(inputs, key);
         let cuckoo = CuckooHash::new(&hashed_inputs, NHASHES)?;
@@ -216,51 +191,50 @@ impl Receiver {
 
         let opprf_outputs = self.opprf.receive(channel, &table, rng)?;
 
-        self.state = Some(ReceiverState {
+        Ok(ReceiverState {
             opprf_outputs,
             cuckoo,
             inputs: inputs.to_vec(),
-        });
+        })
+    }
 
-        Ok(())
+    pub fn compute_setup<C, RNG>(
+        channel: &mut C,
+        state: &ReceiverState,
+        rng: &mut RNG,
+    ) -> Result<(Evaluator<C, RNG, OtReceiver>, Vec<Wire>, Vec<Wire>), Error>
+    where
+        C: AbstractChannel,
+        RNG: CryptoRng + RngCore + SeedableRng<Seed = Block>,
+    {
+        let nbins = state.cuckoo.nbins;
+        let my_input_bits = encode_inputs(&state.opprf_outputs);
+
+        let mut ev =
+            Evaluator::<C, RNG, OtReceiver>::new(channel.clone(), RNG::from_seed(rng.gen()))?;
+
+        let mods = vec![2; nbins * HASH_SIZE * 8];
+        let sender_inputs = ev.receive_many(&mods)?;
+        let receiver_inputs = ev.encode_many(&my_input_bits, &mods)?;
+        Ok((ev, sender_inputs, receiver_inputs))
     }
 
     /// Compute the intersection.
     pub fn compute_intersection<C, RNG>(
-        &mut self,
         channel: &mut C,
+        state: ReceiverState,
         rng: &mut RNG,
     ) -> Result<Vec<Msg>, Error>
     where
         C: AbstractChannel,
         RNG: RngCore + CryptoRng + SeedableRng<Seed = Block>,
     {
-        let state = if let Some(s) = &self.state {
-            s
-        } else {
-            return Err(Error::PsiProtocolError(
-                "receive must be called first".to_string(),
-            ));
-        };
-        let nbins = state.cuckoo.nbins;
-
-        let my_input_bits = encode_inputs(&state.opprf_outputs);
-
-        let mut ev = twopac::semihonest::Evaluator::<C, RNG, OtReceiver>::new(
-            channel.clone(),
-            RNG::from_seed(rng.gen()),
-        )?;
-
-        let mods = vec![2; nbins * HASH_SIZE * 8];
-        let sender_inputs = ev.receive_many(&mods)?;
-        let receiver_inputs = ev.encode_many(&my_input_bits, &mods)?;
-
-        let outs = fancy_compute_intersection(&mut ev, &sender_inputs, &receiver_inputs)?;
+        let (mut ev, x, y) = Self::compute_setup(channel, &state, rng)?;
+        let outs = fancy_compute_intersection(&mut ev, &x, &y)?;
         ev.outputs(&outs)?;
         let mpc_outs = ev.decode_output()?;
 
         let mut intersection = Vec::new();
-
         for (opt_item, in_intersection) in state.cuckoo.items.iter().zip_eq(mpc_outs.into_iter()) {
             if let Some(item) = opt_item {
                 if in_intersection == 1_u16 {
@@ -268,46 +242,24 @@ impl Receiver {
                 }
             }
         }
-
         Ok(intersection)
     }
 
     /// Compute the cardinality of the intersection.
     pub fn compute_cardinality<C, RNG>(
-        &mut self,
         channel: &mut C,
+        state: ReceiverState,
         rng: &mut RNG,
     ) -> Result<usize, Error>
     where
         C: AbstractChannel,
         RNG: RngCore + CryptoRng + SeedableRng<Seed = Block>,
     {
-        let state = if let Some(s) = &self.state {
-            s
-        } else {
-            return Err(Error::PsiProtocolError(
-                "receive must be called first".to_string(),
-            ));
-        };
-        let nbins = state.cuckoo.nbins;
-
-        let my_input_bits = encode_inputs(&state.opprf_outputs);
-
-        let mut ev = twopac::semihonest::Evaluator::<C, RNG, OtReceiver>::new(
-            channel.clone(),
-            RNG::from_seed(rng.gen()),
-        )?;
-
-        let mods = vec![2; nbins * HASH_SIZE * 8];
-        let sender_inputs = ev.receive_many(&mods)?;
-        let receiver_inputs = ev.encode_many(&my_input_bits, &mods)?;
-
-        let (outs, mods) = fancy_compute_cardinality(&mut ev, &sender_inputs, &receiver_inputs)?;
+        let (mut ev, x, y) = Self::compute_setup(channel, &state, rng)?;
+        let (outs, mods) = fancy_compute_cardinality(&mut ev, &x, &y)?;
         ev.outputs(&outs)?;
         let mpc_outs = ev.decode_output()?;
-
         let cardinality = fancy_garbling::util::crt_inv(&mpc_outs, &mods);
-
         Ok(cardinality as usize)
     }
 }
@@ -404,9 +356,8 @@ mod tests {
             let mut channel = Channel::new(reader, writer);
             let mut psi = Sender::init(&mut channel, &mut rng).unwrap();
 
-            psi.send(&mut channel, &sender_inputs, &mut rng).unwrap();
-            psi.compute_cardinality(&mut channel, &mut rng).unwrap();
-            // psi.compute_intersection(&mut channel, &mut rng).unwrap();
+            let state = psi.send(&mut channel, &sender_inputs, &mut rng).unwrap();
+            Sender::compute_cardinality(&mut channel, state, &mut rng).unwrap();
         });
 
         let mut rng = AesRng::new();
@@ -415,12 +366,11 @@ mod tests {
         let mut channel = Channel::new(reader, writer);
         let mut psi = Receiver::init(&mut channel, &mut rng).unwrap();
 
-        psi.receive(&mut channel, &receiver_inputs, &mut rng)
+        let state = psi
+            .receive(&mut channel, &receiver_inputs, &mut rng)
             .unwrap();
-        let cardinality = psi.compute_cardinality(&mut channel, &mut rng).unwrap();
-        // let intersection = psi.compute_intersection(&mut channel, &mut rng).unwrap();
+        let cardinality = Receiver::compute_cardinality(&mut channel, state, &mut rng).unwrap();
 
-        // assert_eq!(intersection.len(), SET_SIZE);
         assert_eq!(cardinality, SET_SIZE);
     }
 
