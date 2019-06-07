@@ -341,6 +341,10 @@ mod tests {
         test_otext::<KosSender, KosReceiver>(ninputs);
         test_cotext::<KosSender, KosReceiver>(ninputs);
         test_rotext::<KosSender, KosReceiver>(ninputs);
+        let ninputs = (1 << 10) + 1;
+        test_otext::<KosSender, KosReceiver>(ninputs);
+        test_cotext::<KosSender, KosReceiver>(ninputs);
+        test_rotext::<KosSender, KosReceiver>(ninputs);
     }
 
 }
