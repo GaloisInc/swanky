@@ -237,7 +237,6 @@
 <span id="237">237</span>
 <span id="238">238</span>
 <span id="239">239</span>
-<span id="240">240</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// -*- mode: rust; -*-</span>
 <span class="comment">//</span>
@@ -255,7 +254,6 @@
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">wire</span>::<span class="ident">Wire</span>;
 <span class="kw">use</span> <span class="ident">itertools</span>::<span class="ident">Itertools</span>;
 <span class="kw">use</span> <span class="ident">scuttlebutt</span>::{<span class="ident">AbstractChannel</span>, <span class="ident">AesRng</span>, <span class="ident">Block</span>, <span class="ident">Channel</span>};
-<span class="kw">use</span> <span class="ident">serde</span>::{<span class="ident">Deserialize</span>, <span class="ident">Serialize</span>};
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">collections</span>::<span class="ident">HashMap</span>;
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">convert</span>::<span class="ident">TryInto</span>;
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">rc</span>::<span class="ident">Rc</span>;
@@ -263,7 +261,7 @@
 <span class="doccomment">/// Static evaluator for a circuit, created by the `garble` function.</span>
 <span class="doccomment">///</span>
 <span class="doccomment">/// Uses `Evaluator` under the hood to actually implement the evaluation.</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Serialize</span>, <span class="ident">Deserialize</span>, <span class="ident">PartialEq</span>, <span class="ident">Debug</span>)]</span>
+<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>)]</span>
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">GarbledCircuit</span> {
     <span class="ident">blocks</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Block</span><span class="op">&gt;</span>,
 }
@@ -343,7 +341,7 @@
 <span class="comment">// Encoder</span>
 
 <span class="doccomment">/// Encode inputs statically.</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Serialize</span>, <span class="ident">Deserialize</span>, <span class="ident">PartialEq</span>, <span class="ident">Debug</span>)]</span>
+<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>)]</span>
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Encoder</span> {
     <span class="ident">garbler_inputs</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Wire</span><span class="op">&gt;</span>,
     <span class="ident">evaluator_inputs</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Wire</span><span class="op">&gt;</span>,

@@ -978,7 +978,6 @@
 <span id="978">978</span>
 <span id="979">979</span>
 <span id="980">980</span>
-<span id="981">981</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="doccomment">//! DSL for creating circuits compatible with fancy-garbling in the old-fashioned way,</span>
 <span class="doccomment">//! where you create a circuit for a computation then garble it.</span>
@@ -986,13 +985,12 @@
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">dummy</span>::<span class="ident">DummyVal</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">error</span>::{<span class="ident">CircuitBuilderError</span>, <span class="ident">DummyError</span>, <span class="ident">FancyError</span>, <span class="ident">InformerError</span>};
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">fancy</span>::{<span class="ident">BinaryBundle</span>, <span class="ident">CrtBundle</span>, <span class="ident">Fancy</span>, <span class="ident">FancyInput</span>, <span class="ident">HasModulus</span>};
-<span class="kw">use</span> <span class="ident">itertools</span>::<span class="ident">Itertools</span>;
-<span class="kw">use</span> <span class="ident">serde</span>::{<span class="ident">Deserialize</span>, <span class="ident">Serialize</span>};
-<span class="kw">use</span> <span class="ident">std</span>::<span class="ident">collections</span>::<span class="ident">HashMap</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">informer</span>::<span class="ident">InformerVal</span>;
+<span class="kw">use</span> <span class="ident">itertools</span>::<span class="ident">Itertools</span>;
+<span class="kw">use</span> <span class="ident">std</span>::<span class="ident">collections</span>::<span class="ident">HashMap</span>;
 
 <span class="doccomment">/// The index and modulus of a gate in a circuit.</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Clone</span>, <span class="ident">Copy</span>, <span class="ident">Debug</span>, <span class="ident">PartialEq</span>, <span class="ident">Serialize</span>, <span class="ident">Deserialize</span>)]</span>
+<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Clone</span>, <span class="ident">Copy</span>, <span class="ident">Debug</span>, <span class="ident">PartialEq</span>)]</span>
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">CircuitRef</span> {
     <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="ident">ix</span>: <span class="ident">usize</span>,
     <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="ident">modulus</span>: <span class="ident">u16</span>,
@@ -1011,7 +1009,7 @@
 }
 
 <span class="doccomment">/// Static representation of the type of computation supported by fancy garbling.</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Clone</span>, <span class="ident">Debug</span>, <span class="ident">Serialize</span>, <span class="ident">Deserialize</span>, <span class="ident">PartialEq</span>)]</span>
+<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Clone</span>, <span class="ident">Debug</span>, <span class="ident">PartialEq</span>)]</span>
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Circuit</span> {
     <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="ident">gates</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Gate</span><span class="op">&gt;</span>,
     <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="ident">gate_moduli</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u16</span><span class="op">&gt;</span>,
@@ -1023,7 +1021,7 @@
 }
 
 <span class="doccomment">/// The most basic types of computation supported by fancy garbling.</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Clone</span>, <span class="ident">Debug</span>, <span class="ident">Serialize</span>, <span class="ident">Deserialize</span>, <span class="ident">PartialEq</span>)]</span>
+<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Clone</span>, <span class="ident">Debug</span>, <span class="ident">PartialEq</span>)]</span>
 <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">enum</span> <span class="ident">Gate</span> {
     <span class="ident">GarblerInput</span> {
         <span class="ident">id</span>: <span class="ident">usize</span>,

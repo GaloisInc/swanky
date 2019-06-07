@@ -557,7 +557,6 @@
 <span id="557">557</span>
 <span id="558">558</span>
 <span id="559">559</span>
-<span id="560">560</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="doccomment">//! Low-level operations on wire-labels, the basic building block of garbled circuits.</span>
 
@@ -565,10 +564,9 @@
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>;
 <span class="kw">use</span> <span class="ident">rand</span>::{<span class="ident">CryptoRng</span>, <span class="ident">Rng</span>, <span class="ident">RngCore</span>};
 <span class="kw">use</span> <span class="ident">scuttlebutt</span>::{<span class="ident">Block</span>, <span class="ident">AES_HASH</span>};
-<span class="kw">use</span> <span class="ident">serde</span>::{<span class="ident">Deserialize</span>, <span class="ident">Serialize</span>};
 
 <span class="doccomment">/// The core wire-label type.</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Clone</span>, <span class="ident">PartialEq</span>, <span class="ident">Serialize</span>, <span class="ident">Deserialize</span>)]</span>
+<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Clone</span>, <span class="ident">PartialEq</span>)]</span>
 <span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">Wire</span> {
     <span class="doccomment">/// Representation of a `mod-2` wire.</span>
     <span class="ident">Mod2</span> {
@@ -710,7 +708,7 @@
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">rand_delta</span><span class="op">&lt;</span><span class="ident">R</span>: <span class="ident">CryptoRng</span> <span class="op">+</span> <span class="ident">RngCore</span><span class="op">&gt;</span>(<span class="ident">rng</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">R</span>, <span class="ident">q</span>: <span class="ident">u16</span>) <span class="op">-&gt;</span> <span class="self">Self</span> {
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">w</span> <span class="op">=</span> <span class="self">Self</span>::<span class="ident">rand</span>(<span class="ident">rng</span>, <span class="ident">q</span>);
         <span class="kw">match</span> <span class="ident">w</span> {
-            <span class="ident">Wire</span>::<span class="ident">Mod2</span> { <span class="kw-2">ref</span> <span class="kw-2">mut</span> <span class="ident">val</span> } <span class="op">=&gt;</span> <span class="kw-2">*</span><span class="ident">val</span> <span class="op">=</span> <span class="ident">val</span>.<span class="ident">set_color_bit</span>(),
+            <span class="ident">Wire</span>::<span class="ident">Mod2</span> { <span class="kw-2">ref</span> <span class="kw-2">mut</span> <span class="ident">val</span> } <span class="op">=&gt;</span> <span class="kw-2">*</span><span class="ident">val</span> <span class="op">=</span> <span class="ident">val</span>.<span class="ident">set_lsb</span>(),
             <span class="ident">Wire</span>::<span class="ident">Mod3</span> {
                 <span class="kw-2">ref</span> <span class="kw-2">mut</span> <span class="ident">lsb</span>,
                 <span class="kw-2">ref</span> <span class="kw-2">mut</span> <span class="ident">msb</span>,
@@ -730,7 +728,7 @@
     <span class="attribute">#[<span class="ident">inline</span>]</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">color</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-&gt;</span> <span class="ident">u16</span> {
         <span class="kw">match</span> <span class="self">self</span> {
-            <span class="ident">Wire</span>::<span class="ident">Mod2</span> { <span class="ident">val</span> } <span class="op">=&gt;</span> <span class="ident">val</span>.<span class="ident">color_bit</span>() <span class="kw">as</span> <span class="ident">u16</span>,
+            <span class="ident">Wire</span>::<span class="ident">Mod2</span> { <span class="ident">val</span> } <span class="op">=&gt;</span> <span class="ident">val</span>.<span class="ident">lsb</span>() <span class="kw">as</span> <span class="ident">u16</span>,
             <span class="ident">Wire</span>::<span class="ident">Mod3</span> { <span class="ident">lsb</span>, <span class="ident">msb</span> } <span class="op">=&gt;</span> (((<span class="ident">msb</span> <span class="op">&amp;</span> <span class="number">1</span>) <span class="kw">as</span> <span class="ident">u16</span>) <span class="op">&lt;&lt;</span> <span class="number">1</span>) <span class="op">|</span> ((<span class="ident">lsb</span> <span class="op">&amp;</span> <span class="number">1</span>) <span class="kw">as</span> <span class="ident">u16</span>),
             <span class="ident">Wire</span>::<span class="ident">ModN</span> { <span class="kw-2">ref</span> <span class="ident">ds</span>, .. } <span class="op">=&gt;</span> <span class="ident">ds</span>[<span class="number">0</span>],
         }
