@@ -71,8 +71,8 @@ impl Sender {
                 );
                 channel.write_bytes(&encoded.prefix(masksize))?;
             }
-            channel.flush()?;
         }
+        channel.flush()?;
         Ok(())
     }
 }
@@ -95,18 +95,12 @@ impl Receiver {
         rng: &mut RNG,
     ) -> Result<Vec<Vec<u8>>, Error> {
         let n = inputs.len();
-
         let keys = cointoss::receive(channel, &[rng.gen()])?;
         let inputs_ = utils::compress_and_hash_inputs(inputs, keys[0]);
 
         let tbl = CuckooHash::new(&inputs_, NHASHES)?;
-
         let nbins = tbl.nbins;
         let masksize = compute_masksize(n)?;
-
-        // let hindices = (0..NHASHES)
-        //     .map(|i| Block::from(i as u128))
-        //     .collect::<Vec<Block>>();
 
         // Send cuckoo hash info to sender.
         channel.write_usize(nbins)?;
@@ -160,12 +154,6 @@ impl Receiver {
 impl SemiHonest for Sender {}
 impl SemiHonest for Receiver {}
 
-/// Private set intersection sender using the KKRT oblivious PRF under-the-hood.
-pub type PszSender = Sender;
-/// Private set intersection receiver using the KKRT oblivious PRF
-/// under-the-hood.
-pub type PszReceiver = Receiver;
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -188,14 +176,14 @@ mod tests {
             let reader = BufReader::new(sender.try_clone().unwrap());
             let writer = BufWriter::new(sender);
             let mut channel = Channel::new(reader, writer);
-            let mut psi = PszSender::init(&mut channel, &mut rng).unwrap();
+            let mut psi = Sender::init(&mut channel, &mut rng).unwrap();
             psi.send(&mut channel, &sender_inputs, &mut rng).unwrap();
         });
         let mut rng = AesRng::new();
         let reader = BufReader::new(receiver.try_clone().unwrap());
         let writer = BufWriter::new(receiver);
         let mut channel = Channel::new(reader, writer);
-        let mut psi = PszReceiver::init(&mut channel, &mut rng).unwrap();
+        let mut psi = Receiver::init(&mut channel, &mut rng).unwrap();
         let intersection = psi
             .receive(&mut channel, &receiver_inputs, &mut rng)
             .unwrap();

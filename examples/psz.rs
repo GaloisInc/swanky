@@ -4,7 +4,7 @@
 // Copyright © 2019 Galois, Inc.
 // See LICENSE for licensing information.
 
-use popsicle::psz::{PszReceiver, PszSender};
+use popsicle::psz::{Receiver, Sender};
 use scuttlebutt::{AesRng, TrackChannel};
 use std::io::{BufReader, BufWriter};
 use std::os::unix::net::UnixStream;
@@ -32,7 +32,7 @@ fn psi(ninputs: usize, nbytes: usize) {
         let writer = BufWriter::new(sender);
         let mut channel = TrackChannel::new(reader, writer);
         let start = SystemTime::now();
-        let mut psi = PszSender::init(&mut channel, &mut rng).unwrap();
+        let mut psi = Sender::init(&mut channel, &mut rng).unwrap();
         println!(
             "Sender :: init time: {} ms",
             start.elapsed().unwrap().as_millis()
@@ -57,7 +57,7 @@ fn psi(ninputs: usize, nbytes: usize) {
     let writer = BufWriter::new(receiver);
     let mut channel = TrackChannel::new(reader, writer);
     let start = SystemTime::now();
-    let mut psi = PszReceiver::init(&mut channel, &mut rng).unwrap();
+    let mut psi = Receiver::init(&mut channel, &mut rng).unwrap();
     println!(
         "Receiver :: init time: {} ms",
         start.elapsed().unwrap().as_millis()

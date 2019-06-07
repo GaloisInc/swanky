@@ -15,7 +15,7 @@ use itertools::Itertools;
 use ocelot::oprf::{KmprtReceiver, KmprtSender};
 use ocelot::ot::{AlszReceiver as OtReceiver, AlszSender as OtSender};
 use rand::{CryptoRng, Rng, RngCore, SeedableRng};
-use scuttlebutt::{AbstractChannel, Block, Block512};
+use scuttlebutt::{AbstractChannel, Block, Block512, SemiHonest};
 use twopac::semihonest::{Evaluator, Garbler};
 
 const NHASHES: usize = 3;
@@ -332,6 +332,9 @@ fn fancy_compute_cardinality<F: Fancy>(
 
     Ok((acc.wires().to_vec(), qs))
 }
+
+impl SemiHonest for Sender {}
+impl SemiHonest for Receiver {}
 
 #[cfg(test)]
 mod tests {
