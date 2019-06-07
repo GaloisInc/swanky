@@ -13,14 +13,14 @@ use std::os::unix::net::UnixStream;
 use std::time::SystemTime;
 
 const NBYTES: usize = 15;
-const SET_SIZE: usize = 1 << 16;
+const NINPUTS: usize = 1 << 16;
 
-fn rand_vec(n: usize) -> Vec<u8> {
-    (0..n).map(|_| rand::random::<u8>()).collect()
+fn rand_vec(nbytes: usize) -> Vec<u8> {
+    (0..nbytes).map(|_| rand::random::<u8>()).collect()
 }
 
-fn rand_vec_vec(size: usize) -> Vec<Vec<u8>> {
-    (0..size).map(|_| rand_vec(NBYTES)).collect()
+fn rand_vec_vec(ninputs: usize, nbytes: usize) -> Vec<Vec<u8>> {
+    (0..ninputs).map(|_| rand_vec(nbytes)).collect()
 }
 
 fn psty(inputs1: Vec<Vec<u8>>, inputs2: Vec<Vec<u8>>) {
@@ -41,9 +41,16 @@ fn psty(inputs1: Vec<Vec<u8>>, inputs2: Vec<Vec<u8>>) {
         let start = SystemTime::now();
         let state = sender.send(&mut channel, &inputs1, &mut rng).unwrap();
         println!(
-            "Sender :: send time [{}]: {} ms",
-            SET_SIZE,
+            "Sender :: send time: {} ms",
             start.elapsed().unwrap().as_millis()
+        );
+        println!(
+            "Sender :: pre-circuit communication (read): {:.2} Mb",
+            channel.kilobits_read() / 1000.0
+        );
+        println!(
+            "Sender :: pre-circuit communication (write): {:.2} Mb",
+            channel.kilobits_written() / 1000.0
         );
         let start = SystemTime::now();
         let _ = Sender::compute_intersection(&mut channel, state, &mut rng).unwrap();
@@ -52,11 +59,11 @@ fn psty(inputs1: Vec<Vec<u8>>, inputs2: Vec<Vec<u8>>) {
             start.elapsed().unwrap().as_millis()
         );
         println!(
-            "Sender :: communication (read): {:.2} Mb",
+            "Sender :: total communication (read): {:.2} Mb",
             channel.kilobits_read() / 1000.0
         );
         println!(
-            "Sender :: communication (write): {:.2} Mb",
+            "Sender :: total communication (write): {:.2} Mb",
             channel.kilobits_written() / 1000.0
         );
     });
@@ -75,8 +82,7 @@ fn psty(inputs1: Vec<Vec<u8>>, inputs2: Vec<Vec<u8>>) {
     let start = SystemTime::now();
     let state = receiver.receive(&mut channel, &inputs2, &mut rng).unwrap();
     println!(
-        "Receiver :: receive time [{}]: {} ms",
-        SET_SIZE,
+        "Receiver :: receive time: {} ms",
         start.elapsed().unwrap().as_millis()
     );
     let start = SystemTime::now();
@@ -98,6 +104,10 @@ fn psty(inputs1: Vec<Vec<u8>>, inputs2: Vec<Vec<u8>>) {
 }
 
 fn main() {
-    let rs = rand_vec_vec(SET_SIZE);
+    println!(
+        "* Running PSTY on {} inputs each of length {} bytes",
+        NINPUTS, NBYTES
+    );
+    let rs = rand_vec_vec(NINPUTS, NBYTES);
     psty(rs.clone(), rs.clone());
 }
