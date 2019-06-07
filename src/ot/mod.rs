@@ -167,8 +167,6 @@ mod tests {
     use std::os::unix::net::UnixStream;
     use std::sync::{Arc, Mutex};
 
-    const T: usize = 1 << 10;
-
     fn rand_block_vec(size: usize) -> Vec<Block> {
         (0..size).map(|_| rand::random::<Block>()).collect()
     }
@@ -203,21 +201,17 @@ mod tests {
         let mut ot = OTReceiver::init(&mut channel, &mut rng).unwrap();
         let result = ot.receive(&mut channel, &bs, &mut rng).unwrap();
         handle.join().unwrap();
-        // println!(
-        //     "{} [128 OTs]: read = {:2} Kb, written = {:2} Kb",
-        //     ot,
-        //     reader.kilobits(),
-        //     writer.kilobits()
-        // );
         for j in 0..128 {
             assert_eq!(result[j], if bs[j] { m1s_[j] } else { m0s_[j] });
         }
     }
 
-    fn test_otext<OTSender: Sender<Msg = Block>, OTReceiver: Receiver<Msg = Block> + Display>() {
-        let m0s = rand_block_vec(T);
-        let m1s = rand_block_vec(T);
-        let bs = rand_bool_vec(T);
+    fn test_otext<OTSender: Sender<Msg = Block>, OTReceiver: Receiver<Msg = Block> + Display>(
+        ninputs: usize,
+    ) {
+        let m0s = rand_block_vec(ninputs);
+        let m1s = rand_block_vec(ninputs);
+        let bs = rand_bool_vec(ninputs);
         let m0s_ = m0s.clone();
         let m1s_ = m1s.clone();
         let (sender, receiver) = UnixStream::pair().unwrap();
@@ -240,14 +234,7 @@ mod tests {
         let mut otext = OTReceiver::init(&mut channel, &mut rng).unwrap();
         let results = otext.receive(&mut channel, &bs, &mut rng).unwrap();
         handle.join().unwrap();
-        // println!(
-        //     "{} [{} OTs]: read = {:2} Kb, written = {:2} Kb",
-        //     otext,
-        //     T,
-        //     reader.kilobits(),
-        //     writer.kilobits()
-        // );
-        for j in 0..T {
+        for j in 0..ninputs {
             assert_eq!(results[j], if bs[j] { m1s_[j] } else { m0s_[j] })
         }
     }
@@ -255,9 +242,11 @@ mod tests {
     fn test_cotext<
         OTSender: CorrelatedSender<Msg = Block>,
         OTReceiver: CorrelatedReceiver<Msg = Block> + Display,
-    >() {
-        let deltas = rand_block_vec(T);
-        let bs = rand_bool_vec(T);
+    >(
+        ninputs: usize,
+    ) {
+        let deltas = rand_block_vec(ninputs);
+        let bs = rand_bool_vec(ninputs);
         let out = Arc::new(Mutex::new(vec![]));
         let out_ = out.clone();
         let (sender, receiver) = UnixStream::pair().unwrap();
@@ -282,14 +271,7 @@ mod tests {
             .unwrap();
         handle.join().unwrap();
         let out_ = out_.lock().unwrap();
-        // println!(
-        //     "{} [{} COTs]: read = {:2} Kb, written = {:2} Kb",
-        //     otext,
-        //     T,
-        //     reader.kilobits(),
-        //     writer.kilobits()
-        // );
-        for j in 0..T {
+        for j in 0..ninputs {
             assert_eq!(results[j], if bs[j] { out_[j].1 } else { out_[j].0 })
         }
     }
@@ -297,8 +279,10 @@ mod tests {
     fn test_rotext<
         OTSender: RandomSender<Msg = Block>,
         OTReceiver: RandomReceiver<Msg = Block> + Display,
-    >() {
-        let bs = rand_bool_vec(T);
+    >(
+        ninputs: usize,
+    ) {
+        let bs = rand_bool_vec(ninputs);
         let out = Arc::new(Mutex::new(vec![]));
         let out_ = out.clone();
         let (sender, receiver) = UnixStream::pair().unwrap();
@@ -309,7 +293,7 @@ mod tests {
             let mut channel = Channel::new(reader, writer);
             let mut otext = OTSender::init(&mut channel, &mut rng).unwrap();
             let mut out = out.lock().unwrap();
-            *out = otext.send_random(&mut channel, T, &mut rng).unwrap();
+            *out = otext.send_random(&mut channel, ninputs, &mut rng).unwrap();
         });
         let mut rng = AesRng::new();
         let reader = BufReader::new(receiver.try_clone().unwrap());
@@ -319,14 +303,7 @@ mod tests {
         let results = otext.receive_random(&mut channel, &bs, &mut rng).unwrap();
         handle.join().unwrap();
         let out_ = out_.lock().unwrap();
-        // println!(
-        //     "{} [{} ROTs]: read = {:2} Kb, written = {:2} Kb",
-        //     otext,
-        //     T,
-        //     reader.kilobits(),
-        //     writer.kilobits()
-        // );
-        for j in 0..T {
+        for j in 0..ninputs {
             assert_eq!(results[j], if bs[j] { out_[j].1 } else { out_[j].0 })
         }
     }
@@ -348,16 +325,22 @@ mod tests {
 
     #[test]
     fn test_alsz() {
-        test_otext::<AlszSender, AlszReceiver>();
-        test_cotext::<AlszSender, AlszReceiver>();
-        test_rotext::<AlszSender, AlszReceiver>();
+        let ninputs = 1 << 10;
+        test_otext::<AlszSender, AlszReceiver>(ninputs);
+        test_cotext::<AlszSender, AlszReceiver>(ninputs);
+        test_rotext::<AlszSender, AlszReceiver>(ninputs);
+        let ninputs = (1 << 10) + 1;
+        test_otext::<AlszSender, AlszReceiver>(ninputs);
+        test_cotext::<AlszSender, AlszReceiver>(ninputs);
+        test_rotext::<AlszSender, AlszReceiver>(ninputs);
     }
 
     #[test]
     fn test_kos() {
-        test_otext::<KosSender, KosReceiver>();
-        test_cotext::<KosSender, KosReceiver>();
-        test_rotext::<KosSender, KosReceiver>();
+        let ninputs = 1 << 10;
+        test_otext::<KosSender, KosReceiver>(ninputs);
+        test_cotext::<KosSender, KosReceiver>(ninputs);
+        test_rotext::<KosSender, KosReceiver>(ninputs);
     }
 
 }

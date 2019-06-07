@@ -7,6 +7,8 @@
 //! Implementation of the Asharov-Lindell-Schneider-Zohner oblivious transfer
 //! extension protocol (cf. <https://eprint.iacr.org/2016/602>, Protocol 4).
 
+#![allow(non_upper_case_globals)]
+
 use crate::errors::Error;
 use crate::ot::{
     CorrelatedReceiver, CorrelatedSender, RandomReceiver, RandomSender, Receiver as OtReceiver,
@@ -17,7 +19,6 @@ use rand::{CryptoRng, RngCore, SeedableRng};
 use scuttlebutt::utils as scutils;
 use scuttlebutt::{AbstractChannel, AesHash, AesRng, Block, SemiHonest, AES_HASH};
 use std::convert::TryInto;
-use std::io::ErrorKind;
 use std::marker::PhantomData;
 
 /// Oblivious transfer sender.
@@ -42,13 +43,8 @@ impl<OT: OtReceiver<Msg = Block> + SemiHonest> Sender<OT> {
         channel: &mut C,
         m: usize,
     ) -> Result<Vec<u8>, Error> {
-        if m % 8 != 0 {
-            return Err(Error::from(std::io::Error::new(
-                ErrorKind::InvalidInput,
-                "Number of inputs must be divisible by 8",
-            )));
-        }
-        let (nrows, ncols) = (128, m);
+        const nrows: usize = 128;
+        let ncols = if m % 8 != 0 { m + (8 - m % 8) } else { m };
         let mut qs = vec![0u8; nrows * ncols / 8];
         let mut u = vec![0u8; ncols / 8];
         let zero = vec![0u8; ncols / 8];
@@ -173,13 +169,8 @@ impl<OT: OtSender<Msg = Block> + SemiHonest> Receiver<OT> {
         r: &[u8],
         m: usize,
     ) -> Result<Vec<u8>, Error> {
-        if m % 8 != 0 {
-            return Err(Error::from(std::io::Error::new(
-                ErrorKind::InvalidInput,
-                "Number of inputs must be divisible by 8",
-            )));
-        }
-        let (nrows, ncols) = (128, m);
+        const nrows: usize = 128;
+        let ncols = if m % 8 != 0 { m + (8 - m % 8) } else { m };
         let mut ts = vec![0u8; nrows * ncols / 8];
         let mut g = vec![0u8; ncols / 8];
         for j in 0..self.rngs.len() {

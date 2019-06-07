@@ -146,7 +146,8 @@ extern "C" {
 
 #[inline]
 pub fn boolvec_to_u8vec(bv: &[bool]) -> Vec<u8> {
-    let mut v = vec![0u8; bv.len() / 8];
+    let offset = if bv.len() % 8 == 0 { 0 } else { 1 };
+    let mut v = vec![0u8; bv.len() / 8 + offset];
     for (i, b) in bv.iter().enumerate() {
         v[i / 8] |= (*b as u8) << (i % 8);
     }
