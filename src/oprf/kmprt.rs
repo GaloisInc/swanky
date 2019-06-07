@@ -186,7 +186,7 @@ impl<OPRF: OprfSender<Seed = Block512, Input = Block, Output = Block512> + SemiH
                 params.beta2
             };
 
-            let _ = self.process_oprf_output(channel, seed, bin, beta, rng)?;
+            self.process_oprf_output(channel, seed, bin, beta, rng)?;
         }
         Ok(())
     }
