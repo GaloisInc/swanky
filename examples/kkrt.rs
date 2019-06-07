@@ -6,8 +6,7 @@
 
 use ocelot::oprf::{KkrtReceiver, KkrtSender};
 use ocelot::oprf::{Receiver, Sender};
-// use scuttlebutt::comm::{TrackReader, TrackWriter};
-use scuttlebutt::{AesRng, Block, Channel};
+use scuttlebutt::{AesRng, Block, TrackChannel};
 use std::io::{BufReader, BufWriter};
 use std::os::unix::net::UnixStream;
 use std::time::SystemTime;
@@ -24,7 +23,7 @@ fn _test_oprf(n: usize) {
         let mut rng = AesRng::new();
         let reader = BufReader::new(sender.try_clone().unwrap());
         let writer = BufWriter::new(sender);
-        let mut channel = Channel::new(reader, writer);
+        let mut channel = TrackChannel::new(reader, writer);
         let start = SystemTime::now();
         let mut oprf = KkrtSender::init(&mut channel, &mut rng).unwrap();
         println!(
@@ -38,19 +37,19 @@ fn _test_oprf(n: usize) {
             n,
             start.elapsed().unwrap().as_millis()
         );
-        // println!(
-        //     "Sender communication (read): {:.2} Mb",
-        //     reader.kilobits() / 1000.0
-        // );
-        // println!(
-        //     "Sender communication (write): {:.2} Mb",
-        //     writer.kilobits() / 1000.0
-        // );
+        println!(
+            "Sender communication (read): {:.2} Mb",
+            channel.kilobits_read() / 1000.0
+        );
+        println!(
+            "Sender communication (write): {:.2} Mb",
+            channel.kilobits_written() / 1000.0
+        );
     });
     let mut rng = AesRng::new();
     let reader = BufReader::new(receiver.try_clone().unwrap());
     let writer = BufWriter::new(receiver);
-    let mut channel = Channel::new(reader, writer);
+    let mut channel = TrackChannel::new(reader, writer);
     let start = SystemTime::now();
     let mut oprf = KkrtReceiver::init(&mut channel, &mut rng).unwrap();
     println!(
@@ -65,14 +64,14 @@ fn _test_oprf(n: usize) {
         start.elapsed().unwrap().as_millis()
     );
     handle.join().unwrap();
-    // println!(
-    //     "Receiver communication (read): {:.2} Mb",
-    //     reader.kilobits() / 1000.0
-    // );
-    // println!(
-    //     "Receiver communication (write): {:.2} Mb",
-    //     writer.kilobits() / 1000.0
-    // );
+    println!(
+        "Receiver communication (read): {:.2} Mb",
+        channel.kilobits_read() / 1000.0
+    );
+    println!(
+        "Receiver communication (write): {:.2} Mb",
+        channel.kilobits_written() / 1000.0
+    );
     println!("Total time: {} ms", total.elapsed().unwrap().as_millis());
 }
 

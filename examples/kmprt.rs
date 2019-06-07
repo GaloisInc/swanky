@@ -23,6 +23,7 @@ fn run(ninputs: usize, npoints: usize) {
         .map(|_| (rng.gen(), rng.gen()))
         .collect::<Vec<(Block, Block512)>>();
     let (sender, receiver) = UnixStream::pair().unwrap();
+    let total = SystemTime::now();
     let handle = std::thread::spawn(move || {
         let mut rng = AesRng::new();
         let reader = BufReader::new(sender.try_clone().unwrap());
@@ -74,6 +75,7 @@ fn run(ninputs: usize, npoints: usize) {
         "Receiver communication (write): {:.2} Mb",
         channel.kilobits_written() / 1000.0
     );
+    println!("Total time: {} ms", total.elapsed().unwrap().as_millis());
 }
 
 fn main() {
