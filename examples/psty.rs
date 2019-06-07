@@ -35,22 +35,28 @@ fn psty(inputs1: Vec<Vec<u8>>, inputs2: Vec<Vec<u8>>) {
         let start = SystemTime::now();
         let mut sender = Sender::init(&mut channel, &mut rng).unwrap();
         println!(
-            "Sender init time: {} ms",
+            "Sender :: init time: {} ms",
             start.elapsed().unwrap().as_millis()
         );
         let start = SystemTime::now();
-        sender.send(&mut channel, &inputs1, &mut rng).unwrap();
+        let state = sender.send(&mut channel, &inputs1, &mut rng).unwrap();
         println!(
-            "[{}] Send time: {} ms",
+            "Sender :: send time [{}]: {} ms",
             SET_SIZE,
             start.elapsed().unwrap().as_millis()
         );
+        let start = SystemTime::now();
+        let _ = Sender::compute_intersection(&mut channel, state, &mut rng).unwrap();
         println!(
-            "Sender communication (read): {:.2} Mb",
+            "Sender :: intersection time: {} ms",
+            start.elapsed().unwrap().as_millis()
+        );
+        println!(
+            "Sender :: communication (read): {:.2} Mb",
             channel.kilobits_read() / 1000.0
         );
         println!(
-            "Sender communication (write): {:.2} Mb",
+            "Sender :: communication (write): {:.2} Mb",
             channel.kilobits_written() / 1000.0
         );
     });
@@ -63,23 +69,29 @@ fn psty(inputs1: Vec<Vec<u8>>, inputs2: Vec<Vec<u8>>) {
     let start = SystemTime::now();
     let mut receiver = Receiver::init(&mut channel, &mut rng).unwrap();
     println!(
-        "Receiver init time: {} ms",
+        "Receiver :: init time: {} ms",
         start.elapsed().unwrap().as_millis()
     );
     let start = SystemTime::now();
-    let _ = receiver.receive(&mut channel, &inputs2, &mut rng).unwrap();
+    let state = receiver.receive(&mut channel, &inputs2, &mut rng).unwrap();
     println!(
-        "[{}] Receiver time: {} ms",
+        "Receiver :: receive time [{}]: {} ms",
         SET_SIZE,
+        start.elapsed().unwrap().as_millis()
+    );
+    let start = SystemTime::now();
+    let _ = Receiver::compute_intersection(&mut channel, state, &mut rng).unwrap();
+    println!(
+        "Receiver :: intersection time: {} ms",
         start.elapsed().unwrap().as_millis()
     );
     let _ = handle.join().unwrap();
     println!(
-        "Receiver communication (read): {:.2} Mb",
+        "Receiver :: communication (read): {:.2} Mb",
         channel.kilobits_read() / 1000.0
     );
     println!(
-        "Receiver communication (write): {:.2} Mb",
+        "Receiver :: communication (write): {:.2} Mb",
         channel.kilobits_written() / 1000.0
     );
     println!("Total time: {} ms", total.elapsed().unwrap().as_millis());
