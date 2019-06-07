@@ -93,8 +93,7 @@ impl CuckooHash {
         };
 
         for _ in 0..NITERS {
-            item.entry =
-                Block::from(u128::from(item.entry) & 0xFFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FF00);
+            item.entry &= Block::from(0xFFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FF00);
             let i = CuckooHash::bin(item.entry, item.hash_index, self.nbins);
             item.entry ^= Block::from(item.hash_index as u128);
             let opt_item = self.items[i].replace(item);

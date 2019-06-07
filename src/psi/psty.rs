@@ -19,7 +19,9 @@ use scuttlebutt::{AbstractChannel, Block, Block512};
 use twopac::semihonest::{Evaluator, Garbler};
 
 const NHASHES: usize = 3;
-// How many bytes of the hash to use for the equality tests.
+// How many bytes of the hash to use for the equality tests. This affects
+// correctness, with a lower value increasing the likelihood of a false
+// positive.
 const HASH_SIZE: usize = 4;
 
 /// The type of values in the sender and receiver's sets.
