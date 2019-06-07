@@ -13,11 +13,11 @@ publish = false
 [lib]
 
 [features]
-nightly = ["curve25519-dalek/simd_backend", "rand/nightly"]
+nightly = ["curve25519-dalek/avx2_backend", "rand/nightly"]
 
 [dependencies]
-curve25519-dalek = { version = "1.1", features = ["std"], optional = true }
-rand = "0.6"
+curve25519-dalek = { version = "1.2.1", features = ["std"], optional = true }
+rand = "0.6.5"
 rand_core = "0.4"
 serde = { version = "1", features = ["derive"], optional = true }
 sha2 = "0.8"
