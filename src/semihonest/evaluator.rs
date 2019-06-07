@@ -7,7 +7,7 @@
 use crate::errors::Error;
 use fancy_garbling::{Evaluator as Ev, Fancy, FancyInput, Wire};
 use ocelot::ot::Receiver as OtReceiver;
-use rand::{CryptoRng, RngCore};
+use rand::{CryptoRng, Rng};
 use scuttlebutt::{AbstractChannel, Block, SemiHonest};
 
 /// Semi-honest evaluator.
@@ -18,7 +18,7 @@ pub struct Evaluator<C: AbstractChannel, RNG, OT> {
     rng: RNG,
 }
 
-impl<C: AbstractChannel, RNG: CryptoRng + RngCore, OT: OtReceiver<Msg = Block> + SemiHonest>
+impl<C: AbstractChannel, RNG: CryptoRng + Rng, OT: OtReceiver<Msg = Block> + SemiHonest>
     Evaluator<C, RNG, OT>
 {
     /// Make a new `Evaluator`.
@@ -46,8 +46,8 @@ impl<C: AbstractChannel, RNG: CryptoRng + RngCore, OT: OtReceiver<Msg = Block> +
     }
 }
 
-impl<C: AbstractChannel, RNG: CryptoRng + RngCore, OT: OtReceiver<Msg = Block> + SemiHonest>
-    FancyInput for Evaluator<C, RNG, OT>
+impl<C: AbstractChannel, RNG: CryptoRng + Rng, OT: OtReceiver<Msg = Block> + SemiHonest> FancyInput
+    for Evaluator<C, RNG, OT>
 {
     /// Receive a garbler input wire.
     fn receive(&mut self, modulus: u16) -> Result<Wire, Error> {

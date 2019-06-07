@@ -7,7 +7,7 @@
 use crate::errors::Error;
 use fancy_garbling::{Fancy, FancyInput, Garbler as Gb, Wire};
 use ocelot::ot::Sender as OtSender;
-use rand::{CryptoRng, Rng, RngCore, SeedableRng};
+use rand::{CryptoRng, Rng, SeedableRng};
 use scuttlebutt::{AbstractChannel, Block, SemiHonest};
 
 /// Semi-honest garbler.
@@ -33,7 +33,7 @@ impl<C, OT, RNG> std::ops::DerefMut for Garbler<C, RNG, OT> {
 
 impl<
         C: AbstractChannel,
-        RNG: CryptoRng + RngCore + SeedableRng<Seed = Block>,
+        RNG: CryptoRng + Rng + SeedableRng<Seed = Block>,
         OT: OtSender<Msg = Block> + SemiHonest,
     > Garbler<C, RNG, OT>
 {
@@ -67,7 +67,7 @@ impl<
 
 impl<
         C: AbstractChannel,
-        RNG: CryptoRng + RngCore + SeedableRng<Seed = Block>,
+        RNG: CryptoRng + Rng + SeedableRng<Seed = Block>,
         OT: OtSender<Msg = Block> + SemiHonest,
     > FancyInput for Garbler<C, RNG, OT>
 {
@@ -106,13 +106,12 @@ impl<
                 inputs.push(i);
             }
         }
-
         self.ot.send(&mut self.channel, &inputs, &mut self.rng)?;
         Ok(wires)
     }
 }
 
-impl<C: AbstractChannel, RNG: CryptoRng + RngCore, OT> Fancy for Garbler<C, RNG, OT> {
+impl<C: AbstractChannel, RNG: CryptoRng + Rng, OT> Fancy for Garbler<C, RNG, OT> {
     type Item = Wire;
     type Error = Error;
 
