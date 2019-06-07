@@ -15,11 +15,11 @@ autoexamples = true
 [lib]
 
 [features]
-nightly = ["curve25519-dalek/simd_backend", "rand/nightly", "scuttlebutt/nightly"]
+nightly = ["curve25519-dalek/avx2_backend", "rand/nightly", "scuttlebutt/nightly"]
 unstable = []
 
 [dependencies]
-curve25519-dalek = { version = "1.1", features = ["std"] }
+curve25519-dalek = { version = "1.2", features = ["std"] }
 libc = "0.2"
 rand = "0.6"
 scuttlebutt = { git = "https://github.com/amaloz/scuttlebutt", features = ["curve25519-dalek"], branch = "dev" }
