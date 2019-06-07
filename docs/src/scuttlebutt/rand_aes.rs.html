@@ -171,9 +171,9 @@
 <span class="doccomment">//! Fixed-key AES random number generator.</span>
 
 <span class="kw">use</span> <span class="kw">crate</span>::{<span class="ident">Aes128</span>, <span class="ident">Block</span>};
+<span class="kw">use</span> <span class="ident">rand</span>::<span class="ident">Rng</span>;
 <span class="kw">use</span> <span class="ident">rand_core</span>::<span class="ident">block</span>::{<span class="ident">BlockRng</span>, <span class="ident">BlockRngCore</span>};
 <span class="kw">use</span> <span class="ident">rand_core</span>::{<span class="ident">CryptoRng</span>, <span class="ident">Error</span>, <span class="ident">RngCore</span>, <span class="ident">SeedableRng</span>};
-<span class="kw">use</span> <span class="ident">rand</span>::<span class="ident">Rng</span>;
 
 <span class="doccomment">/// Implementation of a random number generator based on fixed-key AES.</span>
 <span class="doccomment">///</span>

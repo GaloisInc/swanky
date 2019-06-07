@@ -170,56 +170,6 @@
 <span id="170">170</span>
 <span id="171">171</span>
 <span id="172">172</span>
-<span id="173">173</span>
-<span id="174">174</span>
-<span id="175">175</span>
-<span id="176">176</span>
-<span id="177">177</span>
-<span id="178">178</span>
-<span id="179">179</span>
-<span id="180">180</span>
-<span id="181">181</span>
-<span id="182">182</span>
-<span id="183">183</span>
-<span id="184">184</span>
-<span id="185">185</span>
-<span id="186">186</span>
-<span id="187">187</span>
-<span id="188">188</span>
-<span id="189">189</span>
-<span id="190">190</span>
-<span id="191">191</span>
-<span id="192">192</span>
-<span id="193">193</span>
-<span id="194">194</span>
-<span id="195">195</span>
-<span id="196">196</span>
-<span id="197">197</span>
-<span id="198">198</span>
-<span id="199">199</span>
-<span id="200">200</span>
-<span id="201">201</span>
-<span id="202">202</span>
-<span id="203">203</span>
-<span id="204">204</span>
-<span id="205">205</span>
-<span id="206">206</span>
-<span id="207">207</span>
-<span id="208">208</span>
-<span id="209">209</span>
-<span id="210">210</span>
-<span id="211">211</span>
-<span id="212">212</span>
-<span id="213">213</span>
-<span id="214">214</span>
-<span id="215">215</span>
-<span id="216">216</span>
-<span id="217">217</span>
-<span id="218">218</span>
-<span id="219">219</span>
-<span id="220">220</span>
-<span id="221">221</span>
-<span id="222">222</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// -*- mode: rust; -*-</span>
 <span class="comment">//</span>
@@ -227,7 +177,10 @@
 <span class="comment">// Copyright © 2019 Galois, Inc.</span>
 <span class="comment">// See LICENSE for licensing information.</span>
 
-<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">comm</span>::{<span class="ident">TrackReader</span>, <span class="ident">TrackWriter</span>};
+<span class="kw">mod</span> <span class="ident">track_channel</span>;
+
+<span class="kw">pub</span> <span class="kw">use</span> <span class="ident">track_channel</span>::<span class="ident">TrackChannel</span>;
+
 <span class="kw">use</span> <span class="kw">crate</span>::{<span class="ident">Block</span>, <span class="ident">Block512</span>};
 <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;curve25519-dalek&quot;</span>)]</span>
 <span class="kw">use</span> <span class="ident">curve25519_dalek</span>::<span class="ident">ristretto</span>::{<span class="ident">CompressedRistretto</span>, <span class="ident">RistrettoPoint</span>};
@@ -340,7 +293,7 @@
     }
 }
 
-<span class="doccomment">/// A standard read/write channel.</span>
+<span class="doccomment">/// A standard read/write channel that implements `AbstractChannel`.</span>
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Channel</span><span class="op">&lt;</span><span class="ident">R</span>, <span class="ident">W</span><span class="op">&gt;</span> {
     <span class="ident">reader</span>: <span class="ident">Rc</span><span class="op">&lt;</span><span class="ident">RefCell</span><span class="op">&lt;</span><span class="ident">R</span><span class="op">&gt;&gt;</span>,
     <span class="ident">writer</span>: <span class="ident">Rc</span><span class="op">&lt;</span><span class="ident">RefCell</span><span class="op">&lt;</span><span class="ident">W</span><span class="op">&gt;&gt;</span>,
@@ -368,7 +321,7 @@
 <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">R</span>: <span class="ident">Read</span>, <span class="ident">W</span>: <span class="ident">Write</span><span class="op">&gt;</span> <span class="ident">AbstractChannel</span> <span class="kw">for</span> <span class="ident">Channel</span><span class="op">&lt;</span><span class="ident">R</span>, <span class="ident">W</span><span class="op">&gt;</span> {
     <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
     <span class="kw">fn</span> <span class="ident">write_bytes</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">bytes</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>]) <span class="op">-&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
-        <span class="self">self</span>.<span class="ident">writer</span>.<span class="ident">borrow_mut</span>().<span class="ident">write</span>(<span class="ident">bytes</span>)<span class="question-mark">?</span>;
+        <span class="self">self</span>.<span class="ident">writer</span>.<span class="ident">borrow_mut</span>().<span class="ident">write_all</span>(<span class="ident">bytes</span>)<span class="question-mark">?</span>;
         <span class="prelude-val">Ok</span>(())
     }
 
@@ -387,59 +340,6 @@
         <span class="self">Self</span> {
             <span class="ident">reader</span>: <span class="self">self</span>.<span class="ident">reader</span>.<span class="ident">clone</span>(),
             <span class="ident">writer</span>: <span class="self">self</span>.<span class="ident">writer</span>.<span class="ident">clone</span>(),
-        }
-    }
-}
-
-<span class="doccomment">/// A channel for tracking the number of bits read/written.</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">TrackChannel</span><span class="op">&lt;</span><span class="ident">R</span>: <span class="ident">Read</span>, <span class="ident">W</span>: <span class="ident">Write</span><span class="op">&gt;</span> {
-    <span class="ident">channel</span>: <span class="ident">Channel</span><span class="op">&lt;</span><span class="ident">TrackReader</span><span class="op">&lt;</span><span class="ident">R</span><span class="op">&gt;</span>, <span class="ident">TrackWriter</span><span class="op">&lt;</span><span class="ident">W</span><span class="op">&gt;&gt;</span>,
-}
-
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">R</span>: <span class="ident">Read</span>, <span class="ident">W</span>: <span class="ident">Write</span><span class="op">&gt;</span> <span class="ident">TrackChannel</span><span class="op">&lt;</span><span class="ident">R</span>, <span class="ident">W</span><span class="op">&gt;</span> {
-    <span class="doccomment">/// Make a new `TrackChannel` from a `reader` and a `writer`.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">reader</span>: <span class="ident">R</span>, <span class="ident">writer</span>: <span class="ident">W</span>) <span class="op">-&gt;</span> <span class="self">Self</span> {
-        <span class="kw">let</span> <span class="ident">channel</span> <span class="op">=</span> <span class="ident">Channel</span>::<span class="ident">new</span>(<span class="ident">TrackReader</span>::<span class="ident">new</span>(<span class="ident">reader</span>), <span class="ident">TrackWriter</span>::<span class="ident">new</span>(<span class="ident">writer</span>));
-        <span class="self">Self</span> { <span class="ident">channel</span> }
-    }
-
-    <span class="doccomment">/// Clear the number of bits read/written.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">clear</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) {
-        <span class="self">self</span>.<span class="ident">channel</span>.<span class="ident">reader</span>.<span class="ident">borrow_mut</span>().<span class="ident">clear</span>();
-        <span class="self">self</span>.<span class="ident">channel</span>.<span class="ident">writer</span>.<span class="ident">borrow_mut</span>().<span class="ident">clear</span>();
-    }
-
-    <span class="doccomment">/// Return the number of kilobits written to the channel.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">write_kilobits</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-&gt;</span> <span class="ident">f64</span> {
-        <span class="self">self</span>.<span class="ident">channel</span>.<span class="ident">writer</span>.<span class="ident">borrow</span>().<span class="ident">kilobits</span>()
-    }
-
-    <span class="doccomment">/// Return the number of kilobits read from the channel.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">read_kilobits</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-&gt;</span> <span class="ident">f64</span> {
-        <span class="self">self</span>.<span class="ident">channel</span>.<span class="ident">reader</span>.<span class="ident">borrow</span>().<span class="ident">kilobits</span>()
-    }
-}
-
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">R</span>: <span class="ident">Read</span>, <span class="ident">W</span>: <span class="ident">Write</span><span class="op">&gt;</span> <span class="ident">AbstractChannel</span> <span class="kw">for</span> <span class="ident">TrackChannel</span><span class="op">&lt;</span><span class="ident">R</span>, <span class="ident">W</span><span class="op">&gt;</span> {
-    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-    <span class="kw">fn</span> <span class="ident">write_bytes</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">bytes</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>]) <span class="op">-&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
-        <span class="self">self</span>.<span class="ident">channel</span>.<span class="ident">write_bytes</span>(<span class="ident">bytes</span>)
-    }
-
-    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-    <span class="kw">fn</span> <span class="ident">read_bytes</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="kw-2">mut</span> <span class="ident">bytes</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> [<span class="ident">u8</span>]) <span class="op">-&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
-        <span class="self">self</span>.<span class="ident">channel</span>.<span class="ident">read_bytes</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">bytes</span>)
-    }
-
-    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-    <span class="kw">fn</span> <span class="ident">flush</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) <span class="op">-&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
-        <span class="self">self</span>.<span class="ident">channel</span>.<span class="ident">flush</span>()
-    }
-
-    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-    <span class="kw">fn</span> <span class="ident">clone</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-&gt;</span> <span class="self">Self</span> {
-        <span class="self">Self</span> {
-            <span class="ident">channel</span>: <span class="self">self</span>.<span class="ident">channel</span>.<span class="ident">clone</span>(),
         }
     }
 }
