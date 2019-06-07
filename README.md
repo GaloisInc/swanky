@@ -1,7 +1,11 @@
 # `twopac`: A rust library for secure two-party computation
 
 The `twopac` library implements various garbled-circuit-based secure two-party
-computation protocols.
+computation (2PC) protocols:
+
+* The standard semi-honest 2PC protocol.
+* The publicly verifiable covert 2PC protocol of Hong-Katz-Kolesnikov-Lu-Wang (coming soon!).
+* The "authenticated garbling" malicious 2PC protocol of Wang-Ranellucci-Katz (coming soon!).
 
 **`twopac` should be considered unstable and under active development until
 version 1.0 is released**
