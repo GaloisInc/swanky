@@ -10,7 +10,7 @@ pub use crate::garble::garbler::Garbler;
 // tests
 
 #[cfg(test)]
-mod classic {
+mod nonstreaming {
     use crate::circuit::{Circuit, CircuitBuilder};
     use crate::dummy::Dummy;
     use crate::dummy::DummyVal;

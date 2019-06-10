@@ -511,7 +511,7 @@ impl CircuitBuilder {
 }
 
 #[cfg(test)]
-mod basic {
+mod plaintext {
     use super::*;
     use crate::util::RngExt;
     use itertools::Itertools;

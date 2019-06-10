@@ -84,11 +84,17 @@ impl Wire {
         let mut ds = base_conversion::lookup_digits_mod_at_position(bytes[15], q, 15).to_vec();
         for i in 0..15 {
             let cs = base_conversion::lookup_digits_mod_at_position(bytes[i], q, i);
-            util::base_q_add_eq(&mut ds, &cs, q);
+            // util::base_q_add_eq(&mut ds, &cs, q);
+            for (x,y) in ds.iter_mut().zip(cs.into_iter()) {
+                *x += y;
+                if *x >= q {
+                    *x -= q;
+                }
+            }
         }
         // Drop the digits we won't be able to pack back in again, especially if
         // they get multiplied.
-        ds.truncate(util::digits_per_u128(q));
+        // ds.truncate(util::digits_per_u128(q));
         Wire::ModN { q, ds }
     }
 

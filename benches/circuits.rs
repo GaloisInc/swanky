@@ -12,9 +12,9 @@ use fancy_garbling::garble;
 use std::time::Duration;
 
 fn circuit(fname: &str) -> Circuit {
-    let mut circ = Circuit::parse(fname).unwrap();
-    println!("{}", fname);
-    circ.print_info().unwrap();
+    let circ = Circuit::parse(fname).unwrap();
+    // println!("{}", fname);
+    // circ.print_info().unwrap();
     circ
 }
 
