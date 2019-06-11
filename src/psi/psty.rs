@@ -4,8 +4,8 @@
 // Copyright © 2019 Galois, Inc.
 // See LICENSE for licensing information.
 
-//! Implementation of the Pinkas-Schneider-Tkachenko-Yanai private set intersection
-//! protocol (cf. <https://eprint.iacr.org/2019/241>).
+//! Implementation of the Pinkas-Schneider-Tkachenko-Yanai "extended" private
+//! set intersection protocol (cf. <https://eprint.iacr.org/2019/241>).
 
 use crate::cuckoo::CuckooHash;
 use crate::errors::Error;
@@ -96,11 +96,11 @@ impl Sender {
             .zip_eq(ts.iter())
             .flat_map(|(bin, t)| {
                 // map all the points in a bin to the same tag
-                bin.into_iter().map(move |item| (item, t.clone()))
+                bin.into_iter().map(move |item| (item, *t))
             })
             .collect_vec();
 
-        let _ = self.opprf.send(channel, &points, nbins, rng)?;
+        self.opprf.send(channel, &points, nbins, rng)?;
 
         Ok(SenderState { opprf_outputs: ts })
     }
@@ -121,8 +121,6 @@ impl Sender {
         let (my_input_bits, mods) = encode_inputs_as_crt(&state.opprf_outputs);
         let sender_inputs = gb.encode_many(&my_input_bits, &mods)?;
         let receiver_inputs = gb.receive_many(&mods)?;
-
-        // println!("garbler inputs: {}\nevaluator inputs: {}", sender_inputs.len(), receiver_inputs.len());
         Ok((gb, sender_inputs, receiver_inputs))
     }
 
@@ -279,7 +277,7 @@ fn encode_inputs_as_crt(opprf_outputs: &[Block512]) -> (Vec<u16>, Vec<u16>) {
         .flat_map(|blk| {
             let mut val = 0;
             for (i, b) in blk.prefix(HASH_SIZE).iter().enumerate() {
-                val ^= (*b as u128) << i * 8;
+                val ^= u128::from(*b) << (i * 8);
             }
             fancy_garbling::util::crt(val, &qs)
         })

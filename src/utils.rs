@@ -4,7 +4,7 @@
 // Copyright © 2019 Galois, Inc.
 // See LICENSE for licensing information.
 
-use rand::{CryptoRng, Rng, RngCore};
+use rand::{CryptoRng, Rng};
 use scuttlebutt::{AesHash, Block};
 use sha2::{Digest, Sha256};
 
@@ -14,6 +14,7 @@ use sha2::{Digest, Sha256};
 pub fn compress_and_hash_inputs(inputs: &[Vec<u8>], key: Block) -> Vec<Block> {
     let mut hasher = Sha256::new(); // XXX can we do better than using SHA-256?
     let aes = AesHash::new(key);
+    let mask = Block::from(0xFFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FF00);
     inputs
         .iter()
         .enumerate()
@@ -29,19 +30,18 @@ pub fn compress_and_hash_inputs(inputs: &[Vec<u8>], key: Block) -> Vec<Block> {
                 digest[0..16].copy_from_slice(&h[0..16]);
             }
             let block = aes.cr_hash(Block::from(i as u128), Block::from(digest));
-            // XXX: update to use Block implementation of `&`
-            Block::from(u128::from(block) & 0xFFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FF00)
+            block & mask
         })
         .collect::<Vec<Block>>()
 }
 
 #[allow(dead_code)] // used in tests
-pub fn rand_vec<RNG: CryptoRng + RngCore>(n: usize, rng: &mut RNG) -> Vec<u8> {
+pub fn rand_vec<RNG: CryptoRng + Rng>(n: usize, rng: &mut RNG) -> Vec<u8> {
     (0..n).map(|_| rng.gen()).collect()
 }
 
 #[allow(dead_code)] // used in tests
-pub fn rand_vec_vec<RNG: CryptoRng + RngCore>(n: usize, m: usize, rng: &mut RNG) -> Vec<Vec<u8>> {
+pub fn rand_vec_vec<RNG: CryptoRng + Rng>(n: usize, m: usize, rng: &mut RNG) -> Vec<Vec<u8>> {
     (0..n).map(|_| rand_vec(m, rng)).collect()
 }
 
@@ -63,8 +63,8 @@ mod tests {
 mod benchmarks {
     extern crate test;
     use super::*;
-    use test::Bencher;
     use scuttlebutt::AesRng;
+    use test::Bencher;
 
     const NTIMES: usize = 1 << 16;
 

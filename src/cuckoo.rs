@@ -91,9 +91,10 @@ impl CuckooHash {
             input_index: idx,
             hash_index: 0,
         };
+        let mask = Block::from(0xFFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FF00);
 
         for _ in 0..NITERS {
-            item.entry &= Block::from(0xFFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FF00);
+            item.entry &= mask;
             let i = CuckooHash::bin(item.entry, item.hash_index, self.nbins);
             item.entry ^= Block::from(item.hash_index as u128);
             let opt_item = self.items[i].replace(item);
@@ -107,8 +108,7 @@ impl CuckooHash {
                 return Ok(());
             }
         }
-
-        return Err(Error::CuckooHashFull);
+        Err(Error::CuckooHashFull)
     }
 
     /// Output the bin number for a given hash output `hash` and hash index `hidx`.
