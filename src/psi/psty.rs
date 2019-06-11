@@ -10,7 +10,7 @@
 use crate::cuckoo::CuckooHash;
 use crate::errors::Error;
 use crate::utils;
-use fancy_garbling::{BundleGadgets, CrtBundle, CrtGadgets, Fancy, FancyInput, Wire};
+use fancy_garbling::{BinaryBundle, BundleGadgets, CrtBundle, CrtGadgets, Fancy, FancyInput, Wire};
 use itertools::Itertools;
 use ocelot::oprf::{KmprtReceiver, KmprtSender};
 use ocelot::ot::{AlszReceiver as OtReceiver, AlszSender as OtSender};
@@ -32,7 +32,6 @@ pub struct Sender {
     opprf: KmprtSender,
 }
 
-/// PSI state returned by send, used by the MPC computations.
 pub struct SenderState {
     opprf_outputs: Vec<Block512>,
 }
@@ -42,7 +41,6 @@ pub struct Receiver {
     opprf: KmprtReceiver,
 }
 
-/// PSI state returned by receive, used by the MPC computations.
 pub struct ReceiverState {
     opprf_outputs: Vec<Block512>,
     cuckoo: CuckooHash,
@@ -105,7 +103,6 @@ impl Sender {
         Ok(SenderState { opprf_outputs: ts })
     }
 
-    /// Set up a Garbler and encode the inputs using the State.
     pub fn compute_setup<C, RNG>(
         channel: &mut C,
         state: &SenderState,
@@ -117,8 +114,8 @@ impl Sender {
     {
         let mut gb =
             Garbler::<C, RNG, OtSender>::new(channel.clone(), RNG::from_seed(rng.gen()), &[])?;
-
-        let (my_input_bits, mods) = encode_inputs_as_crt(&state.opprf_outputs);
+        let my_input_bits = encode_inputs(&state.opprf_outputs);
+        let mods = vec![2; my_input_bits.len()]; // all binary moduli
         let sender_inputs = gb.encode_many(&my_input_bits, &mods)?;
         let receiver_inputs = gb.receive_many(&mods)?;
         Ok((gb, sender_inputs, receiver_inputs))
@@ -203,7 +200,6 @@ impl Receiver {
         })
     }
 
-    /// Set up a Evaluator and encode the inputs using the State.
     pub fn compute_setup<C, RNG>(
         channel: &mut C,
         state: &ReceiverState,
@@ -213,10 +209,13 @@ impl Receiver {
         C: AbstractChannel,
         RNG: CryptoRng + RngCore + SeedableRng<Seed = Block>,
     {
+        let nbins = state.cuckoo.nbins;
+        let my_input_bits = encode_inputs(&state.opprf_outputs);
+
         let mut ev =
             Evaluator::<C, RNG, OtReceiver>::new(channel.clone(), RNG::from_seed(rng.gen()))?;
 
-        let (my_input_bits, mods) = encode_inputs_as_crt(&state.opprf_outputs);
+        let mods = vec![2; nbins * HASH_SIZE * 8];
         let sender_inputs = ev.receive_many(&mods)?;
         let receiver_inputs = ev.encode_many(&my_input_bits, &mods)?;
         Ok((ev, sender_inputs, receiver_inputs))
@@ -268,28 +267,15 @@ impl Receiver {
     }
 }
 
-/// Encode the inputs in CRT, returning the input values as well as the moduli.
-fn encode_inputs_as_crt(opprf_outputs: &[Block512]) -> (Vec<u16>, Vec<u16>) {
-    let qs = fancy_garbling::util::primes_with_width((HASH_SIZE * 8) as u32);
-
-    let inputs = opprf_outputs
+fn encode_inputs(opprf_outputs: &[Block512]) -> Vec<u16> {
+    opprf_outputs
         .iter()
         .flat_map(|blk| {
-            let mut val = 0;
-            for (i, b) in blk.prefix(HASH_SIZE).iter().enumerate() {
-                val ^= u128::from(*b) << (i * 8);
-            }
-            fancy_garbling::util::crt(val, &qs)
+            blk.prefix(HASH_SIZE)
+                .iter()
+                .flat_map(|byte| (0..8).map(|i| ((byte >> i) & 1_u8) as u16).collect_vec())
         })
-        .collect_vec();
-
-    let mods = itertools::repeat_n(qs, opprf_outputs.len())
-        .flatten()
-        .collect_vec();
-
-    debug_assert_eq!(inputs.len(), mods.len());
-
-    (inputs, mods)
+        .collect()
 }
 
 /// Fancy function to compute the intersection and return encoded vector of 0/1 masks.
@@ -298,15 +284,16 @@ fn fancy_compute_intersection<F: Fancy>(
     sender_inputs: &[F::Item],
     receiver_inputs: &[F::Item],
 ) -> Result<Vec<F::Item>, F::Error> {
-    debug_assert_eq!(sender_inputs.len(), receiver_inputs.len());
-
-    let qs = fancy_garbling::util::primes_with_width((HASH_SIZE * 8) as u32);
-    let nprimes = qs.len();
-
+    assert_eq!(sender_inputs.len(), receiver_inputs.len());
     sender_inputs
-        .chunks(nprimes)
-        .zip_eq(receiver_inputs.chunks(nprimes))
-        .map(|(xs, ys)| f.eq_bundles(&CrtBundle::new(xs.to_vec()), &CrtBundle::new(ys.to_vec())))
+        .chunks(HASH_SIZE * 8)
+        .zip_eq(receiver_inputs.chunks(HASH_SIZE * 8))
+        .map(|(xs, ys)| {
+            f.eq_bundles(
+                &BinaryBundle::new(xs.to_vec()),
+                &BinaryBundle::new(ys.to_vec()),
+            )
+        })
         .collect()
 }
 
@@ -317,18 +304,19 @@ fn fancy_compute_cardinality<F: Fancy>(
     sender_inputs: &[F::Item],
     receiver_inputs: &[F::Item],
 ) -> Result<(Vec<F::Item>, Vec<u16>), F::Error> {
-    debug_assert_eq!(sender_inputs.len(), receiver_inputs.len());
-
-    let qs = fancy_garbling::util::primes_with_width((HASH_SIZE * 8) as u32);
-    let nprimes = qs.len();
+    assert_eq!(sender_inputs.len(), receiver_inputs.len());
 
     let eqs = sender_inputs
-        .chunks(nprimes)
-        .zip_eq(receiver_inputs.chunks(nprimes))
-        .map(|(xs, ys)| f.eq_bundles(&CrtBundle::new(xs.to_vec()), &CrtBundle::new(ys.to_vec())))
+        .chunks(HASH_SIZE * 8)
+        .zip_eq(receiver_inputs.chunks(HASH_SIZE * 8))
+        .map(|(xs, ys)| {
+            f.eq_bundles(
+                &BinaryBundle::new(xs.to_vec()),
+                &BinaryBundle::new(ys.to_vec()),
+            )
+        })
         .collect::<Result<Vec<F::Item>, F::Error>>()?;
 
-    // compute sum of equalities
     let qs = fancy_garbling::util::primes_with_width(16);
     let q = fancy_garbling::util::product(&qs);
     let mut acc = f.crt_constant_bundle(0, q)?;
