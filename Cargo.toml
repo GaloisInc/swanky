@@ -30,7 +30,7 @@ crossbeam = "0.7.1"
 
 [profile.release]
 opt-level = 3
-debug = false
+debug = true
 debug-assertions = false
 overflow-checks = false
 
@@ -42,7 +42,7 @@ overflow-checks = true
 
 [profile.bench]
 opt-level = 3
-debug = false
+debug = true
 debug-assertions = false
 overflow-checks = false
 

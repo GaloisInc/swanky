@@ -69,11 +69,8 @@ pub fn base_q_add_eq(xs: &mut [u16], ys: &[u16], q: u16) {
 
     while i < ys.len() {
         xs[i] += ys[i] + c;
-        c = 0;
-        if xs[i] >= q {
-            xs[i] -= q;
-            c = 1;
-        }
+        c = (xs[i] >= q) as u16;
+        xs[i] -= c * q;
         i += 1;
     }
 

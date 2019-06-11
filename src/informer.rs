@@ -218,7 +218,11 @@ impl FancyInput for Informer {
         moduli.iter().map(|q| self.receive(*q)).collect()
     }
 
-    fn encode_many(&mut self, _values: &[u16], moduli: &[u16]) -> Result<Vec<Self::Item>, Self::Error> {
+    fn encode_many(
+        &mut self,
+        _values: &[u16],
+        moduli: &[u16],
+    ) -> Result<Vec<Self::Item>, Self::Error> {
         moduli.iter().map(|q| self.receive(*q)).collect()
     }
 }

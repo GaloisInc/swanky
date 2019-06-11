@@ -86,10 +86,10 @@ impl Wire {
             let cs = base_conversion::lookup_digits_mod_at_position(bytes[i], q, i);
             util::base_q_add_eq(&mut ds, &cs, q);
             // for (x,y) in ds.iter_mut().zip(cs.into_iter()) {
-                // *x += y;
-                // if *x >= q {
-                    // *x -= q;
-                // }
+            // *x += y;
+            // if *x >= q {
+            // *x -= q;
+            // }
             // }
         }
         // Drop the digits we won't be able to pack back in again, especially if

@@ -4,7 +4,7 @@
 //! creating any circuits.
 
 use crate::error::{DummyError, FancyError};
-use crate::fancy::{FancyInput, Fancy, HasModulus};
+use crate::fancy::{Fancy, FancyInput, HasModulus};
 
 /// Simple struct that performs the fancy computation over `u16`.
 pub struct Dummy {
