@@ -12,7 +12,7 @@ use std::io::{BufReader, BufWriter};
 use std::os::unix::net::UnixStream;
 use std::time::SystemTime;
 
-const NBYTES: usize = 15;
+const NBYTES: usize = 16;
 const NINPUTS: usize = 1 << 16;
 
 fn rand_vec(nbytes: usize) -> Vec<u8> {

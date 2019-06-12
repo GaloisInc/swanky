@@ -119,7 +119,6 @@ impl Receiver {
                 }
             })
             .collect::<Vec<Block>>();
-        assert_eq!(inputs_.len(), nbins);
 
         let outputs = self.oprf.receive(channel, &inputs_, rng)?;
 

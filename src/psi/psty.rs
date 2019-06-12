@@ -4,8 +4,8 @@
 // Copyright © 2019 Galois, Inc.
 // See LICENSE for licensing information.
 
-//! Implementation of the Pinkas-Schneider-Tkachenko-Yanai private set intersection
-//! protocol (cf. <https://eprint.iacr.org/2019/241>).
+//! Implementation of the Pinkas-Schneider-Tkachenko-Yanai "extended" private
+//! set intersection protocol (cf. <https://eprint.iacr.org/2019/241>).
 
 use crate::cuckoo::CuckooHash;
 use crate::errors::Error;
@@ -96,11 +96,11 @@ impl Sender {
             .zip_eq(ts.iter())
             .flat_map(|(bin, t)| {
                 // map all the points in a bin to the same tag
-                bin.into_iter().map(move |item| (item, t.clone()))
+                bin.into_iter().map(move |item| (item, *t))
             })
             .collect_vec();
 
-        let _ = self.opprf.send(channel, &points, nbins, rng)?;
+        self.opprf.send(channel, &points, nbins, rng)?;
 
         Ok(SenderState { opprf_outputs: ts })
     }
