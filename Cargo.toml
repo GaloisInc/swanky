@@ -14,6 +14,7 @@ publish = false
 
 [features]
 nightly = ["rand/nightly", "scuttlebutt/nightly", "ocelot/nightly", "fancy-garbling/nightly"]
+unstable = []
 
 [dependencies]
 fancy-garbling = { git = "https://github.com/spaceships/fancy-garbling", branch = "dev" }
