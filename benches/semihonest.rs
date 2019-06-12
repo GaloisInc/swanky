@@ -8,9 +8,9 @@
 
 use criterion::{criterion_group, criterion_main, Criterion};
 use fancy_garbling::circuit::Circuit;
-// use ocelot::ot::{ChouOrlandiReceiver as OtReceiver, ChouOrlandiSender as OtSender};
-use ocelot::ot::{DummyReceiver as OtReceiver, DummySender as OtSender};
-use scuttlebutt::AesRng;
+use fancy_garbling::FancyInput;
+use ocelot::ot::{AlszReceiver as OtReceiver, AlszSender as OtSender};
+use scuttlebutt::{AesRng, Channel};
 use std::io::{BufReader, BufWriter};
 use std::os::unix::net::UnixStream;
 use std::time::Duration;
@@ -18,6 +18,7 @@ use twopac::semihonest::{Evaluator, Garbler};
 
 type Reader = BufReader<UnixStream>;
 type Writer = BufWriter<UnixStream>;
+type MyChannel = Channel<Reader, Writer>;
 
 fn circuit(fname: &str) -> Circuit {
     let mut circ = Circuit::parse(fname).unwrap();
@@ -29,22 +30,27 @@ fn circuit(fname: &str) -> Circuit {
 fn _bench_circuit(circ: &mut Circuit, gb_inputs: Vec<u16>, ev_inputs: Vec<u16>) {
     let mut circ_ = circ.clone();
     let (sender, receiver) = UnixStream::pair().unwrap();
+    let n_gb_inputs = gb_inputs.len();
     let handle = std::thread::spawn(move || {
         let rng = AesRng::new();
         let reader = BufReader::new(sender.try_clone().unwrap());
         let writer = BufWriter::new(sender);
-        let mut gb =
-            Garbler::<Reader, Writer, AesRng, OtSender>::new(reader, writer, &gb_inputs, rng)
-                .unwrap();
-        circ_.eval(&mut gb).unwrap();
+        let channel = Channel::new(reader, writer);
+        let mut gb = Garbler::<MyChannel, AesRng, OtSender>::new(channel, rng, &[]).unwrap();
+        let mods = vec![2; n_gb_inputs];
+        let xs = gb.encode_many(&gb_inputs, &mods).unwrap();
+        let ys = gb.receive_many(&mods).unwrap();
+        circ_.eval(&mut gb, &xs, &ys).unwrap();
     });
     let rng = AesRng::new();
     let reader = BufReader::new(receiver.try_clone().unwrap());
     let writer = BufWriter::new(receiver);
-    let mut ev =
-        Evaluator::<Reader, Writer, AesRng, OtReceiver>::new(reader, writer, &ev_inputs, rng)
-            .unwrap();
-    circ.eval(&mut ev).unwrap();
+    let channel = Channel::new(reader, writer);
+    let mut ev = Evaluator::<MyChannel, AesRng, OtReceiver>::new(channel, rng).unwrap();
+    let mods = vec![2; n_gb_inputs];
+    let xs = ev.receive_many(&mods).unwrap();
+    let ys = ev.encode_many(&ev_inputs, &mods).unwrap();
+    circ.eval(&mut ev, &xs, &ys).unwrap();
     handle.join().unwrap();
 }
 
