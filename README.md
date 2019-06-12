@@ -5,17 +5,20 @@ The `scuttlebutt` library provides a bunch of core primitives for building
 multi-party computation (MPC) related protocols, such as garbled circuits or
 oblivious transfer. In particular, `scuttlebutt` provides the following:
 
-* `Aes128` and `Aes256` provide AES encryption capabilities using AES-NI.
-* `AesHash`, which provides a correlation-robust hash function based on fixed-key AES (cf. <https://eprint.iacr.org/2019/074>).
+* `AbstractChannel`, which provides a trait for a read/write communication
+  channel. The library also includes two implementations of said trait:
+  `Channel` for your basic channel needs, and `TrackChannel` for additionally
+  recording the number of bytes read/written to the channel.
+* `Aes128` and `Aes256`, which provide AES encryption capabilities using AES-NI.
+* `AesHash`, which provides correlation-robust hash functions based on
+  fixed-key AES (cf. <https://eprint.iacr.org/2019/074>).
 * `AesRng`, which provides a random number generator based on fixed-key AES.
-* `Block`, which wraps a 128-bit value and provides methods useful when used as a garbled circuit wire label.
+* `Block`, which wraps a 128-bit value and provides methods operating on that value.
 * `Block512`, which wraps a 512-bit value and provides methods operating on that value.
 * A `cointoss` module, which implements a simple random-oracle-based coin-tossing protocol.
-* A `comm` module, which contains `Read`/`Write` objects for tracking the number of bits read/written.
+* A `commitment` module, which provides a `Commitment` trait and an
+  implementation `ShaCommitment` using SHA-256.
 * A `utils` module, which contains useful utility functions.
-
-**`scuttlebutt` should be considered unstable and under active development until
-version 1.0 is released**
 
 # Documentation
 
@@ -31,6 +34,7 @@ bench` to benchmark the various protocols.
 * `nightly`: Use nightly features from `rust` and the underlying libraries.
 * `curve25519-dalek`: Enable functions that use `curve25519-dalek`.
 * `serde`: Enable `serde` support.
+* `unstable`: Enable unstable features.
 
 # License
 
