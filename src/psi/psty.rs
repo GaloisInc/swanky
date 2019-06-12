@@ -32,6 +32,7 @@ pub struct Sender {
     opprf: KmprtSender,
 }
 
+/// State of the sender.
 pub struct SenderState {
     opprf_outputs: Vec<Block512>,
 }
@@ -41,6 +42,7 @@ pub struct Receiver {
     opprf: KmprtReceiver,
 }
 
+/// State of the receiver.
 pub struct ReceiverState {
     opprf_outputs: Vec<Block512>,
     cuckoo: CuckooHash,
@@ -103,6 +105,7 @@ impl Sender {
         Ok(SenderState { opprf_outputs: ts })
     }
 
+    /// Run the setup phase, producing a garbler for the next stage.
     pub fn compute_setup<C, RNG>(
         channel: &mut C,
         state: &SenderState,
@@ -200,6 +203,7 @@ impl Receiver {
         })
     }
 
+    /// Run the setup phase, producing an evaluator for the next stage.
     pub fn compute_setup<C, RNG>(
         channel: &mut C,
         state: &ReceiverState,
