@@ -65,7 +65,6 @@ mod benchmarks {
     use super::*;
     use scuttlebutt::AesRng;
     use test::Bencher;
-    use scuttlebutt::AesRng;
 
     const NTIMES: usize = 1 << 16;
 
