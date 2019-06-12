@@ -9,7 +9,7 @@
 
 use crate::errors::Error;
 use crate::ot::{Receiver as OtReceiver, Sender as OtSender};
-use rand::{CryptoRng, RngCore};
+use rand::{CryptoRng, Rng};
 use scuttlebutt::{AbstractChannel, Block};
 
 /// Oblivious transfer sender.
@@ -20,14 +20,14 @@ pub struct Receiver {}
 impl OtSender for Sender {
     type Msg = Block;
 
-    fn init<C: AbstractChannel, RNG: CryptoRng + RngCore>(
+    fn init<C: AbstractChannel, RNG: CryptoRng + Rng>(
         _: &mut C,
         _: &mut RNG,
     ) -> Result<Self, Error> {
         Ok(Self {})
     }
 
-    fn send<C: AbstractChannel, RNG: CryptoRng + RngCore>(
+    fn send<C: AbstractChannel, RNG: CryptoRng + Rng>(
         &mut self,
         channel: &mut C,
         inputs: &[(Block, Block)],
@@ -56,14 +56,14 @@ impl std::fmt::Display for Sender {
 impl OtReceiver for Receiver {
     type Msg = Block;
 
-    fn init<C: AbstractChannel, RNG: CryptoRng + RngCore>(
+    fn init<C: AbstractChannel, RNG: CryptoRng + Rng>(
         _: &mut C,
         _: &mut RNG,
     ) -> Result<Self, Error> {
         Ok(Self {})
     }
 
-    fn receive<C: AbstractChannel, RNG: CryptoRng + RngCore>(
+    fn receive<C: AbstractChannel, RNG: CryptoRng + Rng>(
         &mut self,
         channel: &mut C,
         inputs: &[bool],

@@ -15,7 +15,7 @@ use crate::ot::{
     Sender as OtSender,
 };
 use crate::utils;
-use rand::{CryptoRng, RngCore, SeedableRng};
+use rand::{CryptoRng, Rng, RngCore, SeedableRng};
 use scuttlebutt::utils as scutils;
 use scuttlebutt::{AbstractChannel, AesHash, AesRng, Block, SemiHonest, AES_HASH};
 use std::convert::TryInto;
@@ -62,7 +62,7 @@ impl<OT: OtReceiver<Msg = Block> + SemiHonest> Sender<OT> {
 impl<OT: OtReceiver<Msg = Block> + SemiHonest> OtSender for Sender<OT> {
     type Msg = Block;
 
-    fn init<C: AbstractChannel, RNG: CryptoRng + RngCore>(
+    fn init<C: AbstractChannel, RNG: CryptoRng + Rng>(
         channel: &mut C,
         rng: &mut RNG,
     ) -> Result<Self, Error> {
@@ -84,7 +84,7 @@ impl<OT: OtReceiver<Msg = Block> + SemiHonest> OtSender for Sender<OT> {
         })
     }
 
-    fn send<C: AbstractChannel, RNG: CryptoRng + RngCore>(
+    fn send<C: AbstractChannel, RNG: CryptoRng + Rng>(
         &mut self,
         channel: &mut C,
         inputs: &[(Self::Msg, Self::Msg)],
@@ -114,7 +114,7 @@ impl<OT: OtReceiver<Msg = Block> + SemiHonest> std::fmt::Display for Sender<OT> 
 }
 
 impl<OT: OtReceiver<Msg = Block> + SemiHonest> CorrelatedSender for Sender<OT> {
-    fn send_correlated<C: AbstractChannel, RNG: CryptoRng + RngCore>(
+    fn send_correlated<C: AbstractChannel, RNG: CryptoRng + Rng>(
         &mut self,
         channel: &mut C,
         deltas: &[Self::Msg],
@@ -140,7 +140,7 @@ impl<OT: OtReceiver<Msg = Block> + SemiHonest> CorrelatedSender for Sender<OT> {
 }
 
 impl<OT: OtReceiver<Msg = Block> + SemiHonest> RandomSender for Sender<OT> {
-    fn send_random<C: AbstractChannel, RNG: CryptoRng + RngCore>(
+    fn send_random<C: AbstractChannel, RNG: CryptoRng + Rng>(
         &mut self,
         channel: &mut C,
         m: usize,
@@ -190,7 +190,7 @@ impl<OT: OtSender<Msg = Block> + SemiHonest> Receiver<OT> {
 impl<OT: OtSender<Msg = Block> + SemiHonest> OtReceiver for Receiver<OT> {
     type Msg = Block;
 
-    fn init<C: AbstractChannel, RNG: CryptoRng + RngCore>(
+    fn init<C: AbstractChannel, RNG: CryptoRng + Rng>(
         channel: &mut C,
         rng: &mut RNG,
     ) -> Result<Self, Error> {
@@ -215,7 +215,7 @@ impl<OT: OtSender<Msg = Block> + SemiHonest> OtReceiver for Receiver<OT> {
         })
     }
 
-    fn receive<C: AbstractChannel, RNG: CryptoRng + RngCore>(
+    fn receive<C: AbstractChannel, RNG: CryptoRng + Rng>(
         &mut self,
         channel: &mut C,
         inputs: &[bool],
@@ -238,7 +238,7 @@ impl<OT: OtSender<Msg = Block> + SemiHonest> OtReceiver for Receiver<OT> {
 }
 
 impl<OT: OtSender<Msg = Block> + SemiHonest> CorrelatedReceiver for Receiver<OT> {
-    fn receive_correlated<C: AbstractChannel, RNG: CryptoRng + RngCore>(
+    fn receive_correlated<C: AbstractChannel, RNG: CryptoRng + Rng>(
         &mut self,
         channel: &mut C,
         inputs: &[bool],
@@ -260,7 +260,7 @@ impl<OT: OtSender<Msg = Block> + SemiHonest> CorrelatedReceiver for Receiver<OT>
 }
 
 impl<OT: OtSender<Msg = Block> + SemiHonest> RandomReceiver for Receiver<OT> {
-    fn receive_random<C: AbstractChannel, RNG: CryptoRng + RngCore>(
+    fn receive_random<C: AbstractChannel, RNG: CryptoRng + Rng>(
         &mut self,
         channel: &mut C,
         inputs: &[bool],

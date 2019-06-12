@@ -15,8 +15,7 @@ use crate::errors::Error;
 use crate::oprf::{ObliviousPrf, Receiver as OprfReceiver, Sender as OprfSender};
 use crate::ot::{Receiver as OtReceiver, Sender as OtSender};
 use crate::utils;
-use rand::Rng;
-use rand::{CryptoRng, RngCore, SeedableRng};
+use rand::{CryptoRng, Rng, RngCore, SeedableRng};
 use scuttlebutt::{
     cointoss, utils as scutils, AbstractChannel, AesRng, Block, Block512, SemiHonest,
 };
@@ -42,7 +41,7 @@ impl<OT: OtReceiver<Msg = Block> + SemiHonest> OprfSender for Sender<OT> {
     fn init<C, RNG>(channel: &mut C, rng: &mut RNG) -> Result<Self, Error>
     where
         C: AbstractChannel,
-        RNG: CryptoRng + RngCore,
+        RNG: CryptoRng + Rng,
     {
         let mut ot = OT::init(channel, rng)?;
         let mut s_ = [0u8; 64];
@@ -73,7 +72,7 @@ impl<OT: OtReceiver<Msg = Block> + SemiHonest> OprfSender for Sender<OT> {
     ) -> Result<Vec<Self::Seed>, Error>
     where
         C: AbstractChannel,
-        RNG: CryptoRng + RngCore,
+        RNG: CryptoRng + Rng,
     {
         // Round up if necessary so that `m mod 16 ≡ 0`.
         let nrows = if m % 16 != 0 { m + (16 - m % 16) } else { m };
@@ -137,7 +136,7 @@ impl<OT: OtSender<Msg = Block> + SemiHonest> ObliviousPrf for Receiver<OT> {
 }
 
 impl<OT: OtSender<Msg = Block> + SemiHonest> OprfReceiver for Receiver<OT> {
-    fn init<C: AbstractChannel, RNG: CryptoRng + RngCore>(
+    fn init<C: AbstractChannel, RNG: CryptoRng + Rng>(
         channel: &mut C,
         rng: &mut RNG,
     ) -> Result<Self, Error> {
@@ -165,7 +164,7 @@ impl<OT: OtSender<Msg = Block> + SemiHonest> OprfReceiver for Receiver<OT> {
         })
     }
 
-    fn receive<C: AbstractChannel, RNG: CryptoRng + RngCore>(
+    fn receive<C: AbstractChannel, RNG: CryptoRng + Rng>(
         &mut self,
         channel: &mut C,
         inputs: &[Self::Input],

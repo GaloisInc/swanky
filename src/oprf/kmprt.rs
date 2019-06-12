@@ -9,7 +9,7 @@
 
 use crate::errors::Error;
 use crate::oprf::{Receiver as OprfReceiver, Sender as OprfSender};
-use rand::{CryptoRng, Rng, RngCore};
+use rand::{CryptoRng, Rng};
 use scuttlebutt::{AbstractChannel, Aes128, Block, Block512, SemiHonest};
 use std::collections::HashSet;
 
@@ -117,7 +117,7 @@ impl<OPRF: OprfSender<Seed = Block512, Input = Block, Output = Block512> + SemiH
     pub fn init<C, RNG>(channel: &mut C, rng: &mut RNG) -> Result<Self, Error>
     where
         C: AbstractChannel,
-        RNG: CryptoRng + RngCore,
+        RNG: CryptoRng + Rng,
     {
         let oprf = OPRF::init(channel, rng)?;
         Ok(Self { oprf })
@@ -134,7 +134,7 @@ impl<OPRF: OprfSender<Seed = Block512, Input = Block, Output = Block512> + SemiH
     ) -> Result<(), Error>
     where
         C: AbstractChannel,
-        RNG: CryptoRng + RngCore,
+        RNG: CryptoRng + Rng,
     {
         let params = Parameters::new(ninputs)?;
         // Receive `hashkeys` from the receiver. These are used to fill `bins` below.
@@ -201,7 +201,7 @@ impl<OPRF: OprfSender<Seed = Block512, Input = Block, Output = Block512> + SemiH
     ) -> Result<(), Error>
     where
         C: AbstractChannel,
-        RNG: CryptoRng + RngCore,
+        RNG: CryptoRng + Rng,
     {
         // Check that all input points are unique.
         debug_assert_eq!(
@@ -307,7 +307,7 @@ impl<OPRF: OprfReceiver<Seed = Block512, Input = Block, Output = Block512> + Sem
     pub fn init<C, RNG>(channel: &mut C, rng: &mut RNG) -> Result<Self, Error>
     where
         C: AbstractChannel,
-        RNG: CryptoRng + RngCore,
+        RNG: CryptoRng + Rng,
     {
         let oprf = OPRF::init(channel, rng)?;
         Ok(Self { oprf })
@@ -322,7 +322,7 @@ impl<OPRF: OprfReceiver<Seed = Block512, Input = Block, Output = Block512> + Sem
     ) -> Result<Vec<Block512>, Error>
     where
         C: AbstractChannel,
-        RNG: CryptoRng + RngCore,
+        RNG: CryptoRng + Rng,
     {
         let params = Parameters::new(inputs.len())?;
         let table;

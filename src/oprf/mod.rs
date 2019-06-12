@@ -12,7 +12,7 @@ mod prc;
 
 use crate::errors::Error;
 use crate::ot;
-use rand::{CryptoRng, RngCore};
+use rand::{CryptoRng, Rng};
 use scuttlebutt::AbstractChannel;
 
 /// KKRT oblivious PRF sender using ALSZ OT extension with Chou-Orlandi as the base OT.
@@ -43,12 +43,12 @@ where
     Self: Sized,
 {
     /// Runs any one-time initialization.
-    fn init<C: AbstractChannel, RNG: CryptoRng + RngCore>(
+    fn init<C: AbstractChannel, RNG: CryptoRng + Rng>(
         channel: &mut C,
         rng: &mut RNG,
     ) -> Result<Self, Error>;
     /// Runs `m` OPRF instances as the sender, returning the OPRF seeds.
-    fn send<C: AbstractChannel, RNG: CryptoRng + RngCore>(
+    fn send<C: AbstractChannel, RNG: CryptoRng + Rng>(
         &mut self,
         channel: &mut C,
         m: usize,
@@ -64,12 +64,12 @@ where
     Self: Sized,
 {
     /// Runs any one-time initialization.
-    fn init<C: AbstractChannel, RNG: CryptoRng + RngCore>(
+    fn init<C: AbstractChannel, RNG: CryptoRng + Rng>(
         channel: &mut C,
         rng: &mut RNG,
     ) -> Result<Self, Error>;
     /// Runs the oblivious PRF on inputs `inputs`, returning the OPRF outputs.
-    fn receive<C: AbstractChannel, RNG: CryptoRng + RngCore>(
+    fn receive<C: AbstractChannel, RNG: CryptoRng + Rng>(
         &mut self,
         channel: &mut C,
         inputs: &[Self::Input],

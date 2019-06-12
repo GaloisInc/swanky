@@ -23,7 +23,7 @@ pub mod kos;
 pub mod naor_pinkas;
 
 use crate::errors::Error;
-use rand::{CryptoRng, RngCore};
+use rand::{CryptoRng, Rng};
 use scuttlebutt::AbstractChannel;
 
 /// Instantiation of the Chou-Orlandi OT sender.
@@ -57,12 +57,12 @@ where
     type Msg: Sized + AsMut<[u8]>;
     /// Runs any one-time initialization to create the oblivious transfer
     /// object.
-    fn init<C: AbstractChannel, RNG: CryptoRng + RngCore>(
+    fn init<C: AbstractChannel, RNG: CryptoRng + Rng>(
         channel: &mut C,
         rng: &mut RNG,
     ) -> Result<Self, Error>;
     /// Sends messages.
-    fn send<C: AbstractChannel, RNG: CryptoRng + RngCore>(
+    fn send<C: AbstractChannel, RNG: CryptoRng + Rng>(
         &mut self,
         channel: &mut C,
         inputs: &[(Self::Msg, Self::Msg)],
@@ -81,12 +81,12 @@ where
     type Msg: Sized + AsMut<[u8]>;
     /// Runs any one-time initialization to create the oblivious transfer
     /// object.
-    fn init<C: AbstractChannel, RNG: CryptoRng + RngCore>(
+    fn init<C: AbstractChannel, RNG: CryptoRng + Rng>(
         channel: &mut C,
         rng: &mut RNG,
     ) -> Result<Self, Error>;
     /// Receives messages.
-    fn receive<C: AbstractChannel, RNG: CryptoRng + RngCore>(
+    fn receive<C: AbstractChannel, RNG: CryptoRng + Rng>(
         &mut self,
         channel: &mut C,
         inputs: &[bool],
@@ -102,7 +102,7 @@ where
 {
     /// Correlated oblivious transfer send. Takes as input an array `deltas`
     /// which specifies the offset between the zero and one message.
-    fn send_correlated<C: AbstractChannel, RNG: CryptoRng + RngCore>(
+    fn send_correlated<C: AbstractChannel, RNG: CryptoRng + Rng>(
         &mut self,
         channel: &mut C,
         deltas: &[Self::Msg],
@@ -117,7 +117,7 @@ where
     Self: Sized,
 {
     /// Correlated oblivious transfer receive.
-    fn receive_correlated<C: AbstractChannel, RNG: CryptoRng + RngCore>(
+    fn receive_correlated<C: AbstractChannel, RNG: CryptoRng + Rng>(
         &mut self,
         channel: &mut C,
         inputs: &[bool],
@@ -133,7 +133,7 @@ where
 {
     /// Random oblivious transfer send. Returns a vector of tuples containing
     /// the two random messages.
-    fn send_random<C: AbstractChannel, RNG: CryptoRng + RngCore>(
+    fn send_random<C: AbstractChannel, RNG: CryptoRng + Rng>(
         &mut self,
         channel: &mut C,
         m: usize,
@@ -148,7 +148,7 @@ where
     Self: Sized,
 {
     /// Random oblivious transfer receive.
-    fn receive_random<C: AbstractChannel, RNG: CryptoRng + RngCore>(
+    fn receive_random<C: AbstractChannel, RNG: CryptoRng + Rng>(
         &mut self,
         channel: &mut C,
         deltas: &[bool],
