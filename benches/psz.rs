@@ -7,7 +7,7 @@
 //! Private set intersection (PSZ) benchmarks using `criterion`.
 
 use criterion::{criterion_group, criterion_main, Criterion};
-use popsicle::psz::{PszReceiver, PszSender};
+use popsicle::psz;
 use scuttlebutt::{AesRng, Channel};
 use std::io::{BufReader, BufWriter};
 use std::os::unix::net::UnixStream;
@@ -30,13 +30,13 @@ fn _bench_psz_init() {
         let reader = BufReader::new(sender.try_clone().unwrap());
         let writer = BufWriter::new(sender);
         let mut channel = Channel::new(reader, writer);
-        let _ = PszSender::init(&mut channel, &mut rng).unwrap();
+        let _ = psz::Sender::init(&mut channel, &mut rng).unwrap();
     });
     let mut rng = AesRng::new();
     let reader = BufReader::new(receiver.try_clone().unwrap());
     let writer = BufWriter::new(receiver);
     let mut channel = Channel::new(reader, writer);
-    let _ = PszReceiver::init(&mut channel, &mut rng).unwrap();
+    let _ = psz::Receiver::init(&mut channel, &mut rng).unwrap();
     handle.join().unwrap();
 }
 
@@ -47,14 +47,14 @@ fn _bench_psz(inputs1: Vec<Vec<u8>>, inputs2: Vec<Vec<u8>>) -> Vec<Vec<u8>> {
         let reader = BufReader::new(sender.try_clone().unwrap());
         let writer = BufWriter::new(sender);
         let mut channel = Channel::new(reader, writer);
-        let mut psi = PszSender::init(&mut channel, &mut rng).unwrap();
+        let mut psi = psz::Sender::init(&mut channel, &mut rng).unwrap();
         psi.send(&mut channel, &inputs1, &mut rng).unwrap();
     });
     let mut rng = AesRng::new();
     let reader = BufReader::new(receiver.try_clone().unwrap());
     let writer = BufWriter::new(receiver);
     let mut channel = Channel::new(reader, writer);
-    let mut psi = PszReceiver::init(&mut channel, &mut rng).unwrap();
+    let mut psi = psz::Receiver::init(&mut channel, &mut rng).unwrap();
     let intersection = psi.receive(&mut channel, &inputs2, &mut rng).unwrap();
     handle.join().unwrap();
     intersection
