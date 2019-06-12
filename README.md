@@ -14,20 +14,10 @@ protocols inspired by OT. It's the coolest cat in the oblivious transfer world.
 And the following oblivious (programmable) PRF protocols:
 
 * Kolesnikov-Kumaresan-Rosulek-Trieu OPRF
-* Kolesnikov-Matania-Pinkas-Rosulek-Trieu OPPRF (currently requires the `unstable` feature to use)
+* Kolesnikov-Matania-Pinkas-Rosulek-Trieu OPPRF
 
-It also exposes various traits for implementing your very own OT protocol:
-
-* `Sender` and `Receiver` are the "base" traits for OT. They include an `init`
-  function, which does any initial setup and outputs an OT object, and
-  `send`/`receive`, which runs the actual OT part. The `send` and `receive`
-  functions can be repeated without needing to re-run `init`.
-
-* `CorrelatedSender` / `CorrelatedReceiver` exposes a `send_correlated` /
-  `receive_correlated` method for correlated OT.
-
-* `RandomSender` / `RandomReceiver` exposes a `send_random` / `receive_random`
-  method for random OT.
+It also exposes various traits for implementing your very own OT or OPRF
+protocol.
 
 **`ocelot` should be considered unstable with potential API changes until
 version 1.0 is released**
