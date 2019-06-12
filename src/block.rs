@@ -14,7 +14,6 @@ use std::arch::x86_64::*;
 #[cfg(feature = "serde")]
 use std::convert::TryInto;
 use std::hash::{Hash, Hasher};
-use std::io::{Read, Write};
 
 /// A 128-bit chunk.
 #[derive(Clone, Copy)]
@@ -90,18 +89,6 @@ impl Block {
         c.encrypt(Block::from(m))
     }
 
-    /// Write a block to `stream`.
-    #[inline]
-    pub fn write<T: Write>(&self, stream: &mut T) -> Result<usize, std::io::Error> {
-        stream.write(self.as_ref())
-    }
-    /// Read a block from `stream`.
-    #[inline]
-    pub fn read<T: Read>(stream: &mut T) -> Result<Block, std::io::Error> {
-        let mut v = Block::default();
-        stream.read_exact(v.as_mut())?;
-        Ok(v)
-    }
     /// Return the least significant bit.
     #[inline]
     pub fn lsb(&self) -> bool {
@@ -110,12 +97,12 @@ impl Block {
     /// Set the least significant bit.
     #[inline]
     pub fn set_lsb(&self) -> Block {
-        unsafe { Block::from(_mm_or_si128(self.0, ONE)) }
+        unsafe { Block(_mm_or_si128(self.0, ONE)) }
     }
     /// Flip all bits.
     #[inline]
     pub fn flip(&self) -> Self {
-        unsafe { Block::from(_mm_xor_si128(self.0, ONES)) }
+        unsafe { Block(_mm_xor_si128(self.0, ONES)) }
     }
 }
 

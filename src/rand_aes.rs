@@ -7,9 +7,8 @@
 //! Fixed-key AES random number generator.
 
 use crate::{Aes128, Block};
-use rand::Rng;
+use rand::{CryptoRng, Error, Rng, RngCore, SeedableRng};
 use rand_core::block::{BlockRng, BlockRngCore};
-use rand_core::{CryptoRng, Error, RngCore, SeedableRng};
 
 /// Implementation of a random number generator based on fixed-key AES.
 ///
@@ -156,8 +155,6 @@ mod tests {
         let mut rng = AesRng::new();
         let a = rng.gen::<[Block; 8]>();
         let b = rng.gen::<[Block; 8]>();
-        println!("{:?}", a);
-        println!("{:?}", b);
         assert_ne!(a, b);
     }
 }

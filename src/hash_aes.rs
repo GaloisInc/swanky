@@ -62,28 +62,10 @@ impl AesHash {
     ///
     /// The function computes `π(π(x) ⊕ i) ⊕ π(x)`.
     #[inline]
-    #[cfg(feature = "nightly")]
     pub fn tccr_hash(&self, i: Block, x: Block) -> Block {
-        unsafe {
-            let y = self.aes.encrypt(x);
-            let t = _mm_xor_si128(y.into(), i.into());
-            let z = self.aes.encrypt(Block::from(t));
-            y ^ z
-        }
-    }
-
-    /// Tweakable circular correlation robust hash function (cf.
-    /// <https://eprint.iacr.org/2019/074>, §7.4).
-    ///
-    /// The function computes `π(π(x) ⊕ i) ⊕ π(x)`.
-    #[inline]
-    #[cfg(not(feature = "nightly"))]
-    pub fn tccr_hash(&self, i: Block, x: Block) -> Block {
-        unsafe {
-            let y = self.aes.encrypt(x);
-            let t = _mm_xor_si128(y.into(), i.into());
-            let z = self.aes.encrypt(Block::from(t));
-            y ^ z
-        }
+        let y = self.aes.encrypt(x);
+        let t = y ^ i;
+        let z = self.aes.encrypt(Block::from(t));
+        y ^ z
     }
 }
