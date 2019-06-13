@@ -10,15 +10,17 @@
 use crate::Error;
 use ocelot::oprf::{KmprtReceiver, KmprtSender};
 use rand::{CryptoRng, Rng, RngCore, SeedableRng};
-use scuttlebutt::{AbstractChannel, Block, Block512, SemiHonest};
+use scuttlebutt::{AbstractChannel, Block, Block512};
+
+/// The party number for each party.
+pub type PartyId = usize;
 
 /// KMPRT party - there can be many of these.
 pub struct Party {
+    id: PartyId,
     opprf_senders: Vec<KmprtSender>,
     opprf_receivers: Vec<KmprtReceiver>,
 }
-
-type PartyId = usize;
 
 impl Party {
     /// Initialize the PSI sender.
@@ -33,7 +35,7 @@ impl Party {
         // XXX: potential deadlock if channels are not consistently ordered among parties
         for (them, c) in channels.iter_mut() {
             // the party with the lowest PID gets to initialize their OPPRF sender first
-            if me < them {
+            if me < *them {
                 opprf_senders.push(KmprtSender::init(c, rng)?);
                 opprf_receivers.push(KmprtReceiver::init(c, rng)?);
             } else {
@@ -42,6 +44,24 @@ impl Party {
             }
         }
 
-        Ok(Self { opprf_senders, opprf_receivers })
+        Ok(Self { id: me, opprf_senders, opprf_receivers })
+    }
+
+    /// Send inputs to all parties and particpate in one party receiving the output.
+    pub fn send<C: AbstractChannel, RNG: RngCore + CryptoRng + SeedableRng>(
+        inputs: &[Block],
+        channels: &mut [(PartyId, C)],
+        rng: &mut RNG,
+    ) -> Result<Self, Error> {
+        unimplemented!()
+    }
+
+    /// Send inputs and receive result - only one party should call this.
+    pub fn receive<C: AbstractChannel, RNG: RngCore + CryptoRng + SeedableRng>(
+        inputs: &[Block],
+        channels: &mut [(PartyId, C)],
+        rng: &mut RNG,
+    ) -> Result<Self, Error> {
+        unimplemented!()
     }
 }
