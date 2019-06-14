@@ -7,123 +7,65 @@
 use crate::{AbstractChannel, Channel};
 use std::io::{Read, Result, Write};
 
-/// An object for tracking the number of bits read from a stream.
-struct TrackReader<R: Read> {
-    inner: R,
-    nbits: usize,
-}
-
-impl<R: Read> TrackReader<R> {
-    /// Make a new `TrackReader` from an inner `Read` object.
-    pub fn new(inner: R) -> Self {
-        Self { inner, nbits: 0 }
-    }
-    /// Clear the count of bits read.
-    pub fn clear(&mut self) {
-        self.nbits = 0;
-    }
-    /// Return the count of bits read.
-    pub fn count(&self) -> usize {
-        self.nbits
-    }
-    /// Return the count in kilobits.
-    pub fn kilobits(&self) -> f64 {
-        self.count() as f64 / 1000.0
-    }
-}
-
-impl<R: Read> Read for TrackReader<R> {
-    fn read(&mut self, buf: &mut [u8]) -> Result<usize> {
-        self.nbits += buf.len() * 8;
-        self.inner.read(buf)
-    }
-}
-
-/// An object for tracking the number of bits written to a stream.
-struct TrackWriter<W: Write> {
-    inner: W,
-    nbits: usize,
-}
-
-impl<W: Write> TrackWriter<W> {
-    /// Make a new `TrackWriter` from an inner `Write` object.
-    pub fn new(inner: W) -> Self {
-        Self { inner, nbits: 0 }
-    }
-    /// Clear the count of bits written.
-    pub fn clear(&mut self) {
-        self.nbits = 0;
-    }
-    /// Return the count of bits written.
-    pub fn count(&self) -> usize {
-        self.nbits
-    }
-    /// Return the count in kilobits.
-    pub fn kilobits(&self) -> f64 {
-        self.count() as f64 / 1000.0
-    }
-}
-
-impl<W: Write> Write for TrackWriter<W> {
-    fn write(&mut self, buf: &[u8]) -> Result<usize> {
-        self.nbits += buf.len() * 8;
-        self.inner.write(buf)
-    }
-
-    fn flush(&mut self) -> Result<()> {
-        self.inner.flush()
-    }
-}
-
 /// A channel for tracking the number of bits read/written.
-pub struct TrackChannel<R: Read, W: Write> {
-    channel: Channel<TrackReader<R>, TrackWriter<W>>,
+pub struct TrackChannel<R, W> {
+    channel: Channel<R, W>,
+    nbits_read: usize,
+    nbits_written: usize,
 }
 
 impl<R: Read, W: Write> TrackChannel<R, W> {
     /// Make a new `TrackChannel` from a `reader` and a `writer`.
     pub fn new(reader: R, writer: W) -> Self {
-        let channel = Channel::new(TrackReader::new(reader), TrackWriter::new(writer));
-        Self { channel }
+        let channel = Channel::new(reader, writer);
+        Self {
+            channel,
+            nbits_read: 0,
+            nbits_written: 0,
+        }
     }
 
     /// Clear the number of bits read/written.
-    pub fn clear(&self) {
-        self.channel.reader.borrow_mut().clear();
-        self.channel.writer.borrow_mut().clear();
+    pub fn clear(&mut self) {
+        self.nbits_read = 0;
+        self.nbits_written = 0;
     }
 
     /// Return the number of kilobits written to the channel.
     pub fn kilobits_written(&self) -> f64 {
-        self.channel.writer.borrow().kilobits()
+        self.nbits_written as f64 / 1000.0
     }
 
     /// Return the number of kilobits read from the channel.
     pub fn kilobits_read(&self) -> f64 {
-        self.channel.reader.borrow().kilobits()
+        self.nbits_read as f64 / 1000.0
     }
 }
 
 impl<R: Read, W: Write> AbstractChannel for TrackChannel<R, W> {
-    #[inline(always)]
+    #[inline]
     fn write_bytes(&mut self, bytes: &[u8]) -> Result<()> {
+        self.nbits_written += bytes.len() * 8;
         self.channel.write_bytes(bytes)
     }
 
-    #[inline(always)]
+    #[inline]
     fn read_bytes(&mut self, mut bytes: &mut [u8]) -> Result<()> {
+        self.nbits_read += bytes.len() * 8;
         self.channel.read_bytes(&mut bytes)
     }
 
-    #[inline(always)]
+    #[inline]
     fn flush(&mut self) -> Result<()> {
         self.channel.flush()
     }
 
-    #[inline(always)]
+    #[inline]
     fn clone(&self) -> Self {
         Self {
             channel: self.channel.clone(),
+            nbits_written: self.nbits_written,
+            nbits_read: self.nbits_read,
         }
     }
 }
