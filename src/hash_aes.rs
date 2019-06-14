@@ -65,7 +65,7 @@ impl AesHash {
     pub fn tccr_hash(&self, i: Block, x: Block) -> Block {
         let y = self.aes.encrypt(x);
         let t = y ^ i;
-        let z = self.aes.encrypt(Block::from(t));
+        let z = self.aes.encrypt(t);
         y ^ z
     }
 }
