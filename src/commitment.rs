@@ -66,7 +66,7 @@ impl Commitment for ShaCommitment {
 
     fn new(seed: Self::Seed) -> Self {
         let commit = Sha256::new();
-        ShaCommitment { seed, commit }
+        Self { seed, commit }
     }
 
     fn input(&mut self, input: &[u8]) {
