@@ -4,8 +4,10 @@
 // Copyright © 2019 Galois, Inc.
 // See LICENSE for licensing information.
 
+mod hash_channel;
 mod track_channel;
 
+pub use hash_channel::HashChannel;
 pub use track_channel::TrackChannel;
 
 use crate::{Block, Block512};
