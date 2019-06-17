@@ -21,6 +21,7 @@ pub struct Party {
     id: PartyId,
     opprf_senders: Vec<KmprtSender>,
     opprf_receivers: Vec<KmprtReceiver>,
+    s_hat: Vec<Block512>,
 }
 
 impl Party {
@@ -49,6 +50,7 @@ impl Party {
             id: me,
             opprf_senders,
             opprf_receivers,
+            s_hat: vec![Block512::default(); channels.len() + 1],
         })
     }
 
@@ -59,15 +61,18 @@ impl Party {
         channels: &mut [(PartyId, C)],
         rng: &mut RNG,
     ) -> Result<(), Error> {
+        self.share_secret_shares(inputs, channels, rng)?;
         unimplemented!()
     }
 
     /// Send inputs and receive result - only one party should call this.
     pub fn receive<C: AbstractChannel, RNG: RngCore + CryptoRng + SeedableRng>(
+        &mut self,
         inputs: &[Block],
         channels: &mut [(PartyId, C)],
         rng: &mut RNG,
     ) -> Result<Self, Error> {
+        self.share_secret_shares(inputs, channels, rng)?;
         unimplemented!()
     }
 
@@ -83,54 +88,68 @@ impl Party {
         let ninputs = inputs.len();
 
         let s = (0..ninputs)
-            .map(|_| secret_sharing_of_zero(nparties, rng))
+            .map(|i| {
+                let shares = secret_sharing_of_zero(nparties, rng);
+                self.s_hat[i] = shares[0];
+                shares
+            })
             .collect_vec();
 
-        for (channel_num, (other_id, c)) in channels.iter_mut().enumerate() {
+        for (channel_num, (other_id, channel)) in channels.iter_mut().enumerate() {
+            let points = inputs
+                .iter()
+                .enumerate()
+                .map(|(i, x)| {
+                    (*x, s[i][*other_id].clone())
+                })
+                .collect_vec();
+
+            let bs;
             if self.id < *other_id {
-                self.phase1_send(inputs, &s, *other_id, c, channel_num, rng)?;
-                self.phase1_recv(inputs, c, channel_num, rng)?;
+                self.opprf_senders[channel_num].send(channel, &points, inputs.len(), rng)?;
+                bs = self.opprf_receivers[channel_num].receive(channel, inputs, rng)?;
             } else {
-                self.phase1_recv(inputs, c, channel_num, rng)?;
-                self.phase1_send(inputs, &s, *other_id, c, channel_num, rng)?;
+                bs = self.opprf_receivers[channel_num].receive(channel, inputs, rng)?;
+                self.opprf_senders[channel_num].send(channel, &points, inputs.len(), rng)?;
+            }
+
+            for (i,b) in bs.into_iter().enumerate() {
+                self.s_hat[i] ^= b;
             }
         }
 
-        unimplemented!()
-    }
-
-    fn phase1_send<C: AbstractChannel, RNG: RngCore + CryptoRng + SeedableRng>(
-        &mut self,
-        inputs: &[Block],
-        s: &[Vec<Block512>],
-        other_id: PartyId,
-        channel: &mut C,
-        channel_num: usize,
-        rng: &mut RNG
-    ) -> Result<(), Error> {
-        let points = inputs
-            .iter()
-            .enumerate()
-            .map(|(i, x)| {
-                (*x, s[i][other_id].clone())
-            })
-            .collect_vec();
-        self.opprf_senders[channel_num].send(channel, &points, inputs.len(), rng)?;
         Ok(())
-    }
-
-    fn phase1_recv<C: AbstractChannel, RNG: RngCore + CryptoRng + SeedableRng>(
-        &mut self,
-        inputs: &[Block],
-        channel: &mut C,
-        channel_num: usize,
-        rng: &mut RNG
-    ) -> Result<Vec<Block512>, Error> {
-        let bs = self.opprf_receivers[channel_num].receive(channel, inputs, rng)?;
-        Ok(bs)
     }
 }
 
 fn secret_sharing_of_zero<R: Rng>(nparties: usize, rng: &mut R) -> Vec<Block512> {
-    unimplemented!()
+    let mut sum = Block512::default();
+    let mut shares = (0..nparties - 1).map(|_| {
+        let b = rng.gen();
+        sum ^= b;
+        b
+    }).collect_vec();
+    shares.push(sum);
+    shares
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use scuttlebutt::AesRng;
+    use rand::Rng;
+
+    #[test]
+    fn test_secret_sharing_of_zero() {
+        let mut rng = AesRng::new();
+        let nparties = (rng.gen::<usize>() % 98) + 2;
+        let shares = secret_sharing_of_zero(nparties, &mut rng);
+        assert!(shares.len() == nparties);
+        let mut sum = Block512::default();
+        for b in shares.into_iter() {
+            assert!(b != Block512::default());
+            sum ^= b;
+        }
+        assert_eq!(sum, Block512::default());
+    }
 }
