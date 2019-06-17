@@ -16,6 +16,7 @@ use curve25519_dalek::ristretto::{CompressedRistretto, RistrettoPoint};
 use std::cell::RefCell;
 use std::io::{Read, Result, Write};
 use std::rc::Rc;
+use std::sync::{Arc, Mutex};
 
 /// A trait for managing I/O. `AbstractChannel`s are clonable, and provide basic
 /// read/write capabilities for both common and scuttlebutt-specific types.
@@ -162,6 +163,57 @@ impl<R: Read, W: Write> AbstractChannel for Channel<R, W> {
     #[inline(always)]
     fn flush(&mut self) -> Result<()> {
         self.writer.borrow_mut().flush()
+    }
+
+    #[inline(always)]
+    fn clone(&self) -> Self {
+        Self {
+            reader: self.reader.clone(),
+            writer: self.writer.clone(),
+        }
+    }
+}
+
+/// A standard read/write channel that implements `AbstractChannel` as well as Send/Sync.
+pub struct SyncChannel<R, W> {
+    reader: Arc<Mutex<R>>,
+    writer: Arc<Mutex<W>>,
+}
+
+impl<R: Read, W: Write> SyncChannel<R, W> {
+    /// Make a new `Channel` from a `reader` and a `writer`.
+    pub fn new(reader: R, writer: W) -> Self {
+        let reader = Arc::new(Mutex::new(reader));
+        let writer = Arc::new(Mutex::new(writer));
+        Self { reader, writer }
+    }
+
+    /// Return a reader object wrapped in `Arc<Mutex<R>>`.
+    pub fn reader(self) -> Arc<Mutex<R>> {
+        self.reader.clone()
+    }
+
+    /// Return a writer object wrapped in `Arc<Mutex<W>>`.
+    pub fn writer(self) -> Arc<Mutex<W>> {
+        self.writer.clone()
+    }
+}
+
+impl<R: Read, W: Write> AbstractChannel for SyncChannel<R, W> {
+    #[inline(always)]
+    fn write_bytes(&mut self, bytes: &[u8]) -> Result<()> {
+        self.writer.lock().unwrap().write_all(bytes)?;
+        Ok(())
+    }
+
+    #[inline(always)]
+    fn read_bytes(&mut self, mut bytes: &mut [u8]) -> Result<()> {
+        self.reader.lock().unwrap().read_exact(&mut bytes)
+    }
+
+    #[inline(always)]
+    fn flush(&mut self) -> Result<()> {
+        self.writer.lock().unwrap().flush()
     }
 
     #[inline(always)]
