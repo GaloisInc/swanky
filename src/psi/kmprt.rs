@@ -21,7 +21,6 @@ pub struct Party {
     id: PartyId,
     opprf_senders: Vec<KmprtSender>,
     opprf_receivers: Vec<KmprtReceiver>,
-    s_hat: Vec<Block512>,
 }
 
 impl Party {
@@ -50,7 +49,6 @@ impl Party {
             id: me,
             opprf_senders,
             opprf_receivers,
-            s_hat: vec![Block512::default(); channels.len() + 1],
         })
     }
 
@@ -61,8 +59,13 @@ impl Party {
         channels: &mut [(PartyId, C)],
         rng: &mut RNG,
     ) -> Result<(), Error> {
-        self.share_secret_shares(inputs, channels, rng)?;
-        unimplemented!()
+        let s_hat = self.conditional_secret_sharing(inputs, channels, rng)?;
+
+        // conditional reconstruction
+        let points = inputs.iter().cloned().zip(s_hat.into_iter()).collect_vec();
+        self.opprf_senders[0].send(&mut channels[0].1, &points, inputs.len(), rng)?;
+
+        Ok(())
     }
 
     /// Send inputs and receive result - only one party should call this.
@@ -71,26 +74,46 @@ impl Party {
         inputs: &[Block],
         channels: &mut [(PartyId, C)],
         rng: &mut RNG,
-    ) -> Result<Self, Error> {
-        self.share_secret_shares(inputs, channels, rng)?;
-        unimplemented!()
+    ) -> Result<Vec<Block>, Error> {
+        let mut s_hat = self.conditional_secret_sharing(inputs, channels, rng)?;
+
+        // conditional reconstruction
+        for (channel_num, (_, channel)) in channels.iter_mut().enumerate() {
+            let shares = self.opprf_receivers[channel_num].receive(channel, inputs, rng)?;
+            for (i, share) in shares.into_iter().enumerate() {
+                s_hat[i] ^= share;
+            }
+        }
+
+        let intersection = inputs.iter().zip(s_hat.into_iter()).filter_map(|(x,s)| {
+            if s == Block512::default() {
+                Some(*x)
+            } else {
+                None
+            }
+        }).collect_vec();
+
+        Ok(intersection)
     }
 
-    /// Share secret shares of zero using OPPRF
-    fn share_secret_shares<C: AbstractChannel, RNG: RngCore + CryptoRng + SeedableRng>(
+    /// Share secret shares of zero using OPPRF, returning the xor of the OPPRF outputs -
+    /// this phase is common to both the senders and the receiver.
+    fn conditional_secret_sharing<C: AbstractChannel, RNG: RngCore + CryptoRng + SeedableRng>(
         &mut self,
         inputs: &[Block],
         channels: &mut [(PartyId, C)],
         rng: &mut RNG
-    ) -> Result<(), Error>
+    ) -> Result<Vec<Block512>, Error>
     {
         let nparties = channels.len() + 1;
         let ninputs = inputs.len();
 
+        let mut s_hat = vec![Block512::default(); ninputs];
+
         let s = (0..ninputs)
             .map(|i| {
                 let shares = secret_sharing_of_zero(nparties, rng);
-                self.s_hat[i] = shares[0];
+                s_hat[i] = shares[0];
                 shares
             })
             .collect_vec();
@@ -114,11 +137,11 @@ impl Party {
             }
 
             for (i,b) in bs.into_iter().enumerate() {
-                self.s_hat[i] ^= b;
+                s_hat[i] ^= b;
             }
         }
 
-        Ok(())
+        Ok(s_hat)
     }
 }
 
