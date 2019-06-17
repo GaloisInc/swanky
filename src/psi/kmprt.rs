@@ -78,6 +78,8 @@ impl Party {
         let mut s_hat = self.conditional_secret_sharing(inputs, channels, rng)?;
 
         // conditional reconstruction
+        assert_eq!(self.id, 0);
+
         for (channel_num, (_, channel)) in channels.iter_mut().enumerate() {
             let shares = self.opprf_receivers[channel_num].receive(channel, inputs, rng)?;
             for (i, share) in shares.into_iter().enumerate() {
@@ -158,9 +160,11 @@ fn secret_sharing_of_zero<R: Rng>(nparties: usize, rng: &mut R) -> Vec<Block512>
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use scuttlebutt::AesRng;
     use rand::Rng;
+    use scuttlebutt::{AesRng, Channel};
+    use std::io::{BufReader, BufWriter};
+    use std::os::unix::net::UnixStream;
+    use super::*;
 
     #[test]
     fn test_secret_sharing_of_zero() {
@@ -174,5 +178,38 @@ mod tests {
             sum ^= b;
         }
         assert_eq!(sum, Block512::default());
+    }
+
+    #[test]
+    fn test_protocol() {
+        let mut rng = AesRng::new();
+        let nparties = (rng.gen::<usize>() % 16) + 2;
+        let set_size = 1 << 10;
+        let item_size = 4;
+        let set = crate::utils::rand_vec_vec(set_size, item_size, &mut rng);
+
+        // create channels
+        let mut channel_pairs = (0..nparties).map(|i| {
+            (i+1..nparties).map(|_| {
+                let (s,r) = UnixStream::pair().unwrap();
+                let left  = Channel::new(BufReader::new(s.try_clone().unwrap()), BufWriter::new(s));
+                let right = Channel::new(BufReader::new(r.try_clone().unwrap()), BufWriter::new(r));
+                (Some(left), Some(right))
+            }).collect_vec()
+        }).collect_vec();
+
+        let mut channels = (0..nparties).map(|i| {
+            (i+1..nparties).map(|j| {
+                let other_index = j - (i+1);
+                let c = if channel_pairs[i][other_index].0.is_some() {
+                    channel_pairs[i][other_index].0.take().unwrap()
+                } else {
+                    channel_pairs[i][other_index].1.take().unwrap()
+                };
+                (j, c)
+            }).collect_vec()
+        }).collect_vec();
+
+        // let parties = (0..nparties).map(|pid| Party::init(pid, &mut channels[pid], &mut rng)).collect_vec();
     }
 }
