@@ -16,16 +16,91 @@ use scuttlebutt::{AbstractChannel, Block, Block512};
 /// The party number for each party.
 pub type PartyId = usize;
 
-/// KMPRT party - there can be many of these.
-pub struct Party {
+/// Base KMPRT Party.
+struct Party {
     id: PartyId,
     opprf_senders: Vec<KmprtSender>,
     opprf_receivers: Vec<KmprtReceiver>,
 }
 
-impl Party {
-    /// Initialize the PSI sender.
+/// KMPRT sender - there can be many of these.
+pub struct Sender(Party);
+
+/// KMPRT receiver - there can only be one of these.
+pub struct Receiver(Party);
+
+impl Sender {
+    /// Initialize a PSI sender.
     pub fn init<C: AbstractChannel, RNG: RngCore + CryptoRng + SeedableRng>(
+        me: PartyId,
+        channels: &mut [(PartyId, C)],
+        rng: &mut RNG,
+    ) -> Result<Self, Error> {
+        Party::init(me, channels, rng).map(Self)
+    }
+
+    /// Send inputs to all parties and particpate in one party receiving the output.
+    pub fn send<C: AbstractChannel, RNG: RngCore + CryptoRng + SeedableRng>(
+        &mut self,
+        inputs: &[Block],
+        channels: &mut [(PartyId, C)],
+        rng: &mut RNG,
+    ) -> Result<(), Error> {
+        assert!(self.0.id != 0);
+
+        let s_hat = self.0.conditional_secret_sharing(inputs, channels, rng)?;
+
+        // conditional reconstruction
+        let points = inputs.iter().cloned().zip(s_hat.into_iter()).collect_vec();
+        self.0.opprf_senders[0].send(&mut channels[0].1, &points, inputs.len(), rng)?;
+
+        Ok(())
+    }
+}
+
+impl Receiver {
+    /// Initialize the PSI receiver.
+    pub fn init<C: AbstractChannel, RNG: RngCore + CryptoRng + SeedableRng>(
+        me: PartyId,
+        channels: &mut [(PartyId, C)],
+        rng: &mut RNG,
+    ) -> Result<Self, Error> {
+        Party::init(me, channels, rng).map(Self)
+    }
+
+    /// Send inputs and receive result - only one party should call this.
+    pub fn receive<C: AbstractChannel, RNG: RngCore + CryptoRng + SeedableRng>(
+        &mut self,
+        inputs: &[Block],
+        channels: &mut [(PartyId, C)],
+        rng: &mut RNG,
+    ) -> Result<Vec<Block>, Error> {
+        assert_eq!(self.0.id, 0);
+
+        let mut s_hat = self.0.conditional_secret_sharing(inputs, channels, rng)?;
+
+        // conditional reconstruction
+        for (channel_num, (_, channel)) in channels.iter_mut().enumerate() {
+            let shares = self.0.opprf_receivers[channel_num].receive(channel, inputs, rng)?;
+            for (i, share) in shares.into_iter().enumerate() {
+                s_hat[i] ^= share;
+            }
+        }
+
+        let intersection = inputs.iter().zip(s_hat.into_iter()).filter_map(|(x,s)| {
+            if s == Block512::default() {
+                Some(*x)
+            } else {
+                None
+            }
+        }).collect_vec();
+
+        Ok(intersection)
+    }
+}
+
+impl Party {
+    fn init<C: AbstractChannel, RNG: RngCore + CryptoRng + SeedableRng>(
         me: PartyId,
         channels: &mut [(PartyId, C)],
         rng: &mut RNG,
@@ -49,54 +124,6 @@ impl Party {
             opprf_senders,
             opprf_receivers,
         })
-    }
-
-    /// Send inputs to all parties and particpate in one party receiving the output.
-    pub fn send<C: AbstractChannel, RNG: RngCore + CryptoRng + SeedableRng>(
-        &mut self,
-        inputs: &[Block],
-        channels: &mut [(PartyId, C)],
-        rng: &mut RNG,
-    ) -> Result<(), Error> {
-        assert!(self.id != 0);
-
-        let s_hat = self.conditional_secret_sharing(inputs, channels, rng)?;
-
-        // conditional reconstruction
-        let points = inputs.iter().cloned().zip(s_hat.into_iter()).collect_vec();
-        self.opprf_senders[0].send(&mut channels[0].1, &points, inputs.len(), rng)?;
-
-        Ok(())
-    }
-
-    /// Send inputs and receive result - only one party should call this.
-    pub fn receive<C: AbstractChannel, RNG: RngCore + CryptoRng + SeedableRng>(
-        &mut self,
-        inputs: &[Block],
-        channels: &mut [(PartyId, C)],
-        rng: &mut RNG,
-    ) -> Result<Vec<Block>, Error> {
-        assert_eq!(self.id, 0);
-
-        let mut s_hat = self.conditional_secret_sharing(inputs, channels, rng)?;
-
-        // conditional reconstruction
-        for (channel_num, (_, channel)) in channels.iter_mut().enumerate() {
-            let shares = self.opprf_receivers[channel_num].receive(channel, inputs, rng)?;
-            for (i, share) in shares.into_iter().enumerate() {
-                s_hat[i] ^= share;
-            }
-        }
-
-        let intersection = inputs.iter().zip(s_hat.into_iter()).filter_map(|(x,s)| {
-            if s == Block512::default() {
-                Some(*x)
-            } else {
-                None
-            }
-        }).collect_vec();
-
-        Ok(intersection)
     }
 
     /// Share secret shares of zero using OPPRF, returning the xor of the OPPRF outputs -
@@ -182,11 +209,11 @@ mod tests {
     }
 
     #[test]
-    fn test_protocol() {
+    fn test_protocol_full_set() {
         let mut rng = AesRng::new();
-        // let nparties = (rng.gen::<usize>() % 16) + 2;
-        let nparties = 4;
-        let set_size = 1 << 10;
+
+        let nparties = 3;
+        let set_size = 1 << 6;
         let set = (0..set_size).map(|_| rng.gen::<Block>()).collect_vec();
 
         // create channels
@@ -212,20 +239,63 @@ mod tests {
             let my_set = set.clone();
             std::thread::spawn(move || {
                 let mut rng = AesRng::new();
-                let mut sender = Party::init(pid, &mut channels, &mut rng).unwrap();
-                println!("[sender {}] init finished", pid);
+                let mut sender = Sender::init(pid, &mut channels, &mut rng).unwrap();
                 sender.send(&my_set, &mut channels, &mut rng).unwrap();
-                println!("[sender {}] send finished", pid);
             });
         }
 
-
         // create and run receiver
-        let mut receiver = Party::init(0, &mut receiver_channels, &mut rng).unwrap();
-        println!("[receiver] init finished");
+        let mut receiver = Receiver::init(0, &mut receiver_channels, &mut rng).unwrap();
         let intersection = receiver.receive(&set, &mut receiver_channels, &mut rng).unwrap();
-        println!("[receiver] receive finished");
 
         assert_eq!(intersection, set);
+    }
+
+    #[test]
+    fn test_protocol_partial_set() {
+        let mut rng = AesRng::new();
+
+        let nparties = 3;
+        let set_size = 1 << 6;
+        let intersection_size = 10;
+        let intersection = (0..intersection_size).map(|_| rng.gen::<Block>()).collect_vec();
+        let mut set1 = intersection.clone();
+        let mut set2 = intersection.clone();
+        set1.extend((intersection_size..set_size).map(|_| rng.gen::<Block>()));
+        set2.extend((intersection_size..set_size).map(|_| rng.gen::<Block>()));
+
+        // create channels
+        let mut channels = (0..nparties).map(|_| (0..nparties).map(|_| None).collect_vec()).collect_vec();
+        for i in 0..nparties {
+            for j in 0..nparties {
+                if i != j {
+                    let (s,r) = UnixStream::pair().unwrap();
+                    let left  = SyncChannel::new(BufReader::new(s.try_clone().unwrap()), BufWriter::new(s));
+                    let right = SyncChannel::new(BufReader::new(r.try_clone().unwrap()), BufWriter::new(r));
+                    channels[i][j] = Some((j, left));
+                    channels[j][i] = Some((i, right));
+                }
+            }
+        }
+        let mut channels = channels.into_iter().map(|cs| cs.into_iter().flatten().collect_vec()).collect_vec();
+
+        let mut receiver_channels = channels.remove(0);
+
+        for (i, mut channels) in channels.into_iter().enumerate() {
+            // create and fork senders
+            let pid = i + 1;
+            let my_set = set1.clone();
+            std::thread::spawn(move || {
+                let mut rng = AesRng::new();
+                let mut sender = Sender::init(pid, &mut channels, &mut rng).unwrap();
+                sender.send(&my_set, &mut channels, &mut rng).unwrap();
+            });
+        }
+
+        // create and run receiver
+        let mut receiver = Receiver::init(0, &mut receiver_channels, &mut rng).unwrap();
+        let res = receiver.receive(&set2, &mut receiver_channels, &mut rng).unwrap();
+
+        assert_eq!(res, intersection);
     }
 }
