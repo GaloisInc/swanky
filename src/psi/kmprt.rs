@@ -209,55 +209,12 @@ mod tests {
     }
 
     #[test]
-    fn test_protocol_full_set() {
+    fn test_protocol() {
         let mut rng = AesRng::new();
 
         let nparties = 3;
         let set_size = 1 << 6;
-        let set = (0..set_size).map(|_| rng.gen::<Block>()).collect_vec();
-
-        // create channels
-        let mut channels = (0..nparties).map(|_| (0..nparties).map(|_| None).collect_vec()).collect_vec();
-        for i in 0..nparties {
-            for j in 0..nparties {
-                if i != j {
-                    let (s,r) = UnixStream::pair().unwrap();
-                    let left  = SyncChannel::new(BufReader::new(s.try_clone().unwrap()), BufWriter::new(s));
-                    let right = SyncChannel::new(BufReader::new(r.try_clone().unwrap()), BufWriter::new(r));
-                    channels[i][j] = Some((j, left));
-                    channels[j][i] = Some((i, right));
-                }
-            }
-        }
-        let mut channels = channels.into_iter().map(|cs| cs.into_iter().flatten().collect_vec()).collect_vec();
-
-        let mut receiver_channels = channels.remove(0);
-
-        for (i, mut channels) in channels.into_iter().enumerate() {
-            // create and fork senders
-            let pid = i + 1;
-            let my_set = set.clone();
-            std::thread::spawn(move || {
-                let mut rng = AesRng::new();
-                let mut sender = Sender::init(pid, &mut channels, &mut rng).unwrap();
-                sender.send(&my_set, &mut channels, &mut rng).unwrap();
-            });
-        }
-
-        // create and run receiver
-        let mut receiver = Receiver::init(0, &mut receiver_channels, &mut rng).unwrap();
-        let intersection = receiver.receive(&set, &mut receiver_channels, &mut rng).unwrap();
-
-        assert_eq!(intersection, set);
-    }
-
-    #[test]
-    fn test_protocol_partial_set() {
-        let mut rng = AesRng::new();
-
-        let nparties = 3;
-        let set_size = 1 << 6;
-        let intersection_size = 10;
+        let intersection_size = rng.gen::<usize>() % set_size;
         let intersection = (0..intersection_size).map(|_| rng.gen::<Block>()).collect_vec();
         let mut set1 = intersection.clone();
         let mut set2 = intersection.clone();
