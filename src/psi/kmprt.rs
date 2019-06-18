@@ -33,7 +33,6 @@ impl Party {
         let mut opprf_senders = Vec::with_capacity(channels.len());
         let mut opprf_receivers = Vec::with_capacity(channels.len());
 
-        // XXX: potential deadlock if channels are not consistently ordered among parties
         for (them, c) in channels.iter_mut() {
             // the party with the lowest PID gets to initialize their OPPRF sender first
             if me < *them {
@@ -59,6 +58,8 @@ impl Party {
         channels: &mut [(PartyId, C)],
         rng: &mut RNG,
     ) -> Result<(), Error> {
+        assert!(self.id != 0);
+
         let s_hat = self.conditional_secret_sharing(inputs, channels, rng)?;
 
         // conditional reconstruction
@@ -75,11 +76,11 @@ impl Party {
         channels: &mut [(PartyId, C)],
         rng: &mut RNG,
     ) -> Result<Vec<Block>, Error> {
+        assert_eq!(self.id, 0);
+
         let mut s_hat = self.conditional_secret_sharing(inputs, channels, rng)?;
 
         // conditional reconstruction
-        assert_eq!(self.id, 0);
-
         for (channel_num, (_, channel)) in channels.iter_mut().enumerate() {
             let shares = self.opprf_receivers[channel_num].receive(channel, inputs, rng)?;
             for (i, share) in shares.into_iter().enumerate() {
@@ -161,7 +162,7 @@ fn secret_sharing_of_zero<R: Rng>(nparties: usize, rng: &mut R) -> Vec<Block512>
 #[cfg(test)]
 mod tests {
     use rand::Rng;
-    use scuttlebutt::{AesRng, Channel};
+    use scuttlebutt::{AesRng, SyncChannel};
     use std::io::{BufReader, BufWriter};
     use std::os::unix::net::UnixStream;
     use super::*;
@@ -183,33 +184,42 @@ mod tests {
     #[test]
     fn test_protocol() {
         let mut rng = AesRng::new();
-        let nparties = (rng.gen::<usize>() % 16) + 2;
+        // let nparties = (rng.gen::<usize>() % 16) + 2;
+        let nparties = 2;
         let set_size = 1 << 10;
-        let item_size = 4;
-        let set = crate::utils::rand_vec_vec(set_size, item_size, &mut rng);
+        let set = (0..set_size).map(|_| rng.gen::<Block>()).collect_vec();
 
         // create channels
-        let mut channel_pairs = (0..nparties).map(|i| {
-            (i+1..nparties).map(|_| {
+        let mut channels = (0..nparties).map(|_| (0..nparties).map(|_| None).collect_vec()).collect_vec();
+        for i in 0..nparties {
+            for j in 0..nparties {
                 let (s,r) = UnixStream::pair().unwrap();
-                let left  = Channel::new(BufReader::new(s.try_clone().unwrap()), BufWriter::new(s));
-                let right = Channel::new(BufReader::new(r.try_clone().unwrap()), BufWriter::new(r));
-                (Some(left), Some(right))
-            }).collect_vec()
-        }).collect_vec();
+                let left  = SyncChannel::new(BufReader::new(s.try_clone().unwrap()), BufWriter::new(s));
+                let right = SyncChannel::new(BufReader::new(r.try_clone().unwrap()), BufWriter::new(r));
+                channels[i][j] = Some((j, left));
+                channels[j][i] = Some((i, right));
+            }
+        }
+        let mut channels = channels.into_iter().map(|cs| cs.into_iter().flatten().collect_vec()).collect_vec();
 
-        let mut channels = (0..nparties).map(|i| {
-            (i+1..nparties).map(|j| {
-                let other_index = j - (i+1);
-                let c = if channel_pairs[i][other_index].0.is_some() {
-                    channel_pairs[i][other_index].0.take().unwrap()
-                } else {
-                    channel_pairs[i][other_index].1.take().unwrap()
-                };
-                (j, c)
-            }).collect_vec()
-        }).collect_vec();
+        let mut receiver_channels = channels.remove(0);
 
-        // let parties = (0..nparties).map(|pid| Party::init(pid, &mut channels[pid], &mut rng)).collect_vec();
+        for (i, mut channels) in channels.into_iter().enumerate() {
+            // create and fork senders
+            let pid = i + 1;
+            let my_set = set.clone();
+            std::thread::spawn(move || {
+                let mut rng = AesRng::new();
+                let mut sender = Party::init(pid, &mut channels, &mut rng).unwrap();
+                sender.send(&my_set, &mut channels, &mut rng).unwrap();
+            });
+        }
+
+
+        // create and run receiver
+        let mut receiver = Party::init(0, &mut receiver_channels, &mut rng).unwrap();
+        let intersection = receiver.receive(&set, &mut receiver_channels, &mut rng).unwrap();
+
+        assert_eq!(intersection, set);
     }
 }
