@@ -27,6 +27,9 @@ twopac = { path = "../twopac" }
 
 [dev-dependencies]
 criterion = "0.2.11"
+clap = "2.33.0"
+serde = { version = "1.0.92", features = ["derive"] }
+serde_yaml = "0.8.9"
 
 [profile.release]
 opt-level = 3
@@ -57,5 +60,10 @@ required-features = ["unstable"]
 
 [[example]]
 name = "psty"
+harness = false
+required-features = ["unstable"]
+
+[[example]]
+name = "secretsister"
 harness = false
 required-features = ["unstable"]

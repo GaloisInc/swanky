@@ -87,13 +87,17 @@ impl Receiver {
             }
         }
 
-        let intersection = inputs.iter().zip(s_hat.into_iter()).filter_map(|(x,s)| {
-            if s == Block512::default() {
-                Some(*x)
-            } else {
-                None
-            }
-        }).collect_vec();
+        let intersection = inputs
+            .iter()
+            .zip(s_hat.into_iter())
+            .filter_map(|(x, s)| {
+                if s == Block512::default() {
+                    Some(*x)
+                } else {
+                    None
+                }
+            })
+            .collect_vec();
 
         Ok(intersection)
     }
@@ -132,9 +136,8 @@ impl Party {
         &mut self,
         inputs: &[Block],
         channels: &mut [(PartyId, C)],
-        rng: &mut RNG
-    ) -> Result<Vec<Block512>, Error>
-    {
+        rng: &mut RNG,
+    ) -> Result<Vec<Block512>, Error> {
         let nparties = channels.len() + 1;
         let ninputs = inputs.len();
 
@@ -152,9 +155,7 @@ impl Party {
             let points = inputs
                 .iter()
                 .enumerate()
-                .map(|(i, x)| {
-                    (*x, s[i][*other_id].clone())
-                })
+                .map(|(i, x)| (*x, s[i][*other_id].clone()))
                 .collect_vec();
 
             let bs;
@@ -166,7 +167,7 @@ impl Party {
                 self.opprf_senders[channel_num].send(channel, &points, inputs.len(), rng)?;
             }
 
-            for (i,b) in bs.into_iter().enumerate() {
+            for (i, b) in bs.into_iter().enumerate() {
                 s_hat[i] ^= b;
             }
         }
@@ -177,22 +178,24 @@ impl Party {
 
 fn secret_sharing_of_zero<R: Rng>(nparties: usize, rng: &mut R) -> Vec<Block512> {
     let mut sum = Block512::default();
-    let mut shares = (0..nparties - 1).map(|_| {
-        let b = rng.gen();
-        sum ^= b;
-        b
-    }).collect_vec();
+    let mut shares = (0..nparties - 1)
+        .map(|_| {
+            let b = rng.gen();
+            sum ^= b;
+            b
+        })
+        .collect_vec();
     shares.push(sum);
     shares
 }
 
 #[cfg(test)]
 mod tests {
+    use super::*;
     use rand::Rng;
     use scuttlebutt::{AesRng, SyncChannel};
     use std::io::{BufReader, BufWriter};
     use std::os::unix::net::UnixStream;
-    use super::*;
 
     #[test]
     fn test_secret_sharing_of_zero() {
@@ -215,26 +218,35 @@ mod tests {
         let nparties = 3;
         let set_size = 1 << 6;
         let intersection_size = rng.gen::<usize>() % set_size;
-        let intersection = (0..intersection_size).map(|_| rng.gen::<Block>()).collect_vec();
+        let intersection = (0..intersection_size)
+            .map(|_| rng.gen::<Block>())
+            .collect_vec();
         let mut set1 = intersection.clone();
         let mut set2 = intersection.clone();
         set1.extend((intersection_size..set_size).map(|_| rng.gen::<Block>()));
         set2.extend((intersection_size..set_size).map(|_| rng.gen::<Block>()));
 
         // create channels
-        let mut channels = (0..nparties).map(|_| (0..nparties).map(|_| None).collect_vec()).collect_vec();
+        let mut channels = (0..nparties)
+            .map(|_| (0..nparties).map(|_| None).collect_vec())
+            .collect_vec();
         for i in 0..nparties {
             for j in 0..nparties {
                 if i != j {
-                    let (s,r) = UnixStream::pair().unwrap();
-                    let left  = SyncChannel::new(BufReader::new(s.try_clone().unwrap()), BufWriter::new(s));
-                    let right = SyncChannel::new(BufReader::new(r.try_clone().unwrap()), BufWriter::new(r));
+                    let (s, r) = UnixStream::pair().unwrap();
+                    let left =
+                        SyncChannel::new(BufReader::new(s.try_clone().unwrap()), BufWriter::new(s));
+                    let right =
+                        SyncChannel::new(BufReader::new(r.try_clone().unwrap()), BufWriter::new(r));
                     channels[i][j] = Some((j, left));
                     channels[j][i] = Some((i, right));
                 }
             }
         }
-        let mut channels = channels.into_iter().map(|cs| cs.into_iter().flatten().collect_vec()).collect_vec();
+        let mut channels = channels
+            .into_iter()
+            .map(|cs| cs.into_iter().flatten().collect_vec())
+            .collect_vec();
 
         let mut receiver_channels = channels.remove(0);
 
@@ -251,7 +263,9 @@ mod tests {
 
         // create and run receiver
         let mut receiver = Receiver::init(0, &mut receiver_channels, &mut rng).unwrap();
-        let res = receiver.receive(&set2, &mut receiver_channels, &mut rng).unwrap();
+        let res = receiver
+            .receive(&set2, &mut receiver_channels, &mut rng)
+            .unwrap();
 
         assert_eq!(res, intersection);
     }

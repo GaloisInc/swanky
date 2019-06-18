@@ -25,3 +25,11 @@ pub type ExtendPsiSender = psty::Sender;
 #[cfg(feature = "unstable")]
 /// Extended private set intersection receiver.
 pub type ExtendPsiReceiver = psty::Receiver;
+
+#[cfg(feature = "unstable")]
+/// Multi-party private set intersection sender.
+pub type MultiPartySender = kmprt::Sender;
+
+#[cfg(feature = "unstable")]
+/// Multi-party private set intersection receiver.
+pub type MultiPartyReceiver = kmprt::Receiver;
