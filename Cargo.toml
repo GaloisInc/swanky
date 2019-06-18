@@ -39,7 +39,7 @@ overflow-checks = false
 
 [profile.dev]
 opt-level = 0
-debug = false
+debug = true
 debug-assertions = false
 overflow-checks = false
 
