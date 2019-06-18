@@ -269,6 +269,13 @@ impl From<[u8; 16]> for Block {
     }
 }
 
+impl From<[u16; 8]> for Block {
+    #[inline]
+    fn from(m: [u16; 8]) -> Self {
+        unsafe { std::mem::transmute(m) }
+    }
+}
+
 impl From<Block> for [u32; 4] {
     #[inline]
     fn from(m: Block) -> Self {
