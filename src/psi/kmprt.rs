@@ -34,6 +34,7 @@ impl Party {
         let mut opprf_receivers = Vec::with_capacity(channels.len());
 
         for (them, c) in channels.iter_mut() {
+            println!("[party {}] initializing with party {}", me, them);
             // the party with the lowest PID gets to initialize their OPPRF sender first
             if me < *them {
                 opprf_senders.push(KmprtSender::init(c, rng)?);
@@ -185,19 +186,21 @@ mod tests {
     fn test_protocol() {
         let mut rng = AesRng::new();
         // let nparties = (rng.gen::<usize>() % 16) + 2;
-        let nparties = 2;
-        let set_size = 1 << 10;
+        let nparties = 3;
+        let set_size = 1 << 4;
         let set = (0..set_size).map(|_| rng.gen::<Block>()).collect_vec();
 
         // create channels
         let mut channels = (0..nparties).map(|_| (0..nparties).map(|_| None).collect_vec()).collect_vec();
         for i in 0..nparties {
             for j in 0..nparties {
-                let (s,r) = UnixStream::pair().unwrap();
-                let left  = SyncChannel::new(BufReader::new(s.try_clone().unwrap()), BufWriter::new(s));
-                let right = SyncChannel::new(BufReader::new(r.try_clone().unwrap()), BufWriter::new(r));
-                channels[i][j] = Some((j, left));
-                channels[j][i] = Some((i, right));
+                if i != j {
+                    let (s,r) = UnixStream::pair().unwrap();
+                    let left  = SyncChannel::new(BufReader::new(s.try_clone().unwrap()), BufWriter::new(s));
+                    let right = SyncChannel::new(BufReader::new(r.try_clone().unwrap()), BufWriter::new(r));
+                    channels[i][j] = Some((j, left));
+                    channels[j][i] = Some((i, right));
+                }
             }
         }
         let mut channels = channels.into_iter().map(|cs| cs.into_iter().flatten().collect_vec()).collect_vec();
@@ -210,15 +213,21 @@ mod tests {
             let my_set = set.clone();
             std::thread::spawn(move || {
                 let mut rng = AesRng::new();
+                println!("[sender {}] begin init", pid);
                 let mut sender = Party::init(pid, &mut channels, &mut rng).unwrap();
+                println!("[sender {}] init finished", pid);
                 sender.send(&my_set, &mut channels, &mut rng).unwrap();
+                println!("[sender {}] send finished", pid);
             });
         }
 
 
         // create and run receiver
+        println!("[receiver] begin init");
         let mut receiver = Party::init(0, &mut receiver_channels, &mut rng).unwrap();
+        println!("[receiver] init finished");
         let intersection = receiver.receive(&set, &mut receiver_channels, &mut rng).unwrap();
+        println!("[receiver] receive finished");
 
         assert_eq!(intersection, set);
     }
