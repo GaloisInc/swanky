@@ -4,13 +4,29 @@ use popsicle::{MultiPartyReceiver, MultiPartySender};
 use serde::Deserialize;
 use std::net::{TcpListener, TcpStream};
 use std::io::{BufReader, BufRead};
-use scuttlebutt::Block;
+use scuttlebutt::{Block, SyncChannel};
 
 #[allow(non_camel_case_types)]
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 enum PartyConfig {
     sender { address: String, port: String },
     receiver { address: String, port: String },
+}
+
+impl PartyConfig {
+    fn address(&self) -> String {
+        match self {
+            PartyConfig::sender { address, .. } => address.clone(),
+            PartyConfig::receiver { address, .. } => address.clone(),
+        }
+    }
+
+    fn port(&self) -> String {
+        match self {
+            PartyConfig::sender { port, .. } => port.clone(),
+            PartyConfig::receiver { port, .. } => port.clone(),
+        }
+    }
 }
 
 fn main() {
@@ -40,7 +56,7 @@ fn main() {
     )
     .unwrap();
 
-    let my_id = matches.value_of("PARTY_ID").unwrap();
+    let my_id = usize::from_str_radix(&matches.value_of("PARTY_ID").unwrap(), 10).unwrap();
 
     let input_file = std::fs::File::open(matches.value_of("INPUT_FILE").unwrap()).unwrap();
     let inputs = BufReader::new(input_file).lines().map(|s| {
@@ -48,6 +64,27 @@ fn main() {
     }).collect_vec();
 
     println!("{:?}", config);
+
+    wrangle_connections(my_id, &config);
+}
+
+fn wrangle_connections(my_id: usize, config: &[PartyConfig]) -> Vec<SyncChannel<TcpStream, TcpStream>> {
+    // spawn a thread to accept connections
+    let my_config = config[my_id].clone();
+    let num_other_parties = config.len() - 1;
+    let listener_thread = std::thread::spawn(move || {
+        let listener = std::net::TcpListener::bind(format!("localhost:{}", my_config.port())).unwrap();
+        listener.incoming().take(num_other_parties).map(Result::unwrap).collect_vec()
+    });
+
+    // let channels = config.into_iter().enumerate().map(|(other_id, party_config)| {
+    //     if other_id < my_id {
+    //         listener.accept()
+    //     }
+    // }).collect_vec();
+    listener_thread.join();
+
+    unimplemented!()
 }
 
 fn ipv6_to_block(addr: &str) -> Block {
