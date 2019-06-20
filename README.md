@@ -1,4 +1,4 @@
-# The `scuttlebutt` multi-party computation utilities toolkit [![](https://travis-ci.org/amaloz/scuttlebutt.svg?branch=master)](https://travis-ci.org/amaloz/scuttlebutt)
+# The `scuttlebutt` multi-party computation utilities toolkit [![](https://travis-ci.org/GaloisInc/scuttlebutt.svg?branch=master)](https://travis-ci.org/GaloisInc/scuttlebutt)
 Or: "Where rust MPC libraries come to drink"
 
 The `scuttlebutt` library provides a bunch of core primitives for building
@@ -16,10 +16,6 @@ oblivious transfer. In particular, `scuttlebutt` provides the following:
 
 **`scuttlebutt` should be considered unstable and under active development until
 version 1.0 is released**
-
-# Documentation
-
-The documentation can be found here: <https://amaloz.github.io/scuttlebutt/scuttlebutt/>.
 
 # Building
 
