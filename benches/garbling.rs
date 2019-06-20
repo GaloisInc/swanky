@@ -39,7 +39,7 @@ where
 fn proj(q: u16) -> Circuit {
     let tt = (0..q).map(|i| (i + 1) % q).collect::<Vec<u16>>();
     let mut b = CircuitBuilder::new();
-    let x = b.garbler_input(q, None).unwrap();
+    let x = b.garbler_input(q);
     for _ in 0..1000 {
         let _ = b.proj(&x, q, Some(tt.clone())).unwrap();
     }
@@ -48,7 +48,7 @@ fn proj(q: u16) -> Circuit {
 
 fn mul(q: u16) -> Circuit {
     let mut b = CircuitBuilder::new();
-    let x = b.garbler_input(q, None).unwrap();
+    let x = b.garbler_input(q);
     for _ in 0..1000 {
         let _ = b.mul(&x, &x).unwrap();
     }

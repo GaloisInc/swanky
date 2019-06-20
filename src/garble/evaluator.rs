@@ -2,31 +2,24 @@ use crate::error::{EvaluatorError, FancyError};
 use crate::fancy::{Fancy, HasModulus};
 use crate::util::{output_tweak, tweak, tweak2};
 use crate::wire::Wire;
-use scuttlebutt::Block;
-use std::cell::RefCell;
-use std::fmt::Debug;
-use std::io::Read;
-use std::rc::Rc;
+use scuttlebutt::{AbstractChannel, Block};
 
 /// Streaming evaluator using a callback to receive ciphertexts as needed.
 ///
 /// Evaluates a garbled circuit on the fly, using messages containing ciphertexts and
 /// wires. Parallelizable.
-pub struct Evaluator<R: Read + Debug> {
-    reader: Rc<RefCell<R>>,
+pub struct Evaluator<C> {
+    channel: C,
     current_gate: usize,
     pub(crate) output_cts: Vec<Vec<Block>>,
     pub(crate) output_wires: Vec<Wire>,
 }
 
-impl<R: Read + Debug> Evaluator<R> {
+impl<C: AbstractChannel> Evaluator<C> {
     /// Create a new `Evaluator`.
-    ///
-    /// `callback` enables streaming by producing messages during the `Fancy`
-    /// computation, which contain ciphertexts and wire-labels.
-    pub fn new(reader: Rc<RefCell<R>>) -> Self {
+    pub fn new(channel: C) -> Self {
         Evaluator {
-            reader,
+            channel,
             current_gate: 0,
             output_cts: Vec::new(),
             output_wires: Vec::new(),
@@ -34,7 +27,7 @@ impl<R: Read + Debug> Evaluator<R> {
     }
 
     /// Decode the output received during the Fancy computation.
-    pub fn decode_output(&self) -> Vec<u16> {
+    pub fn decode_output(&self) -> Result<Vec<u16>, EvaluatorError> {
         debug_assert_eq!(
             self.output_wires.len(),
             self.output_cts.len(),
@@ -55,14 +48,10 @@ impl<R: Read + Debug> Evaluator<R> {
                 }
             }
         }
-        debug_assert_eq!(
-            self.output_wires.len(),
-            outs.len(),
-            "decoding failed! decoded {} out of {} wires",
-            outs.len(),
-            self.output_wires.len()
-        );
-        outs
+        if self.output_wires.len() != outs.len() {
+            return Err(EvaluatorError::DecodingFailed);
+        }
+        Ok(outs)
     }
 
     /// The current non-free gate index of the garbling computation.
@@ -72,30 +61,24 @@ impl<R: Read + Debug> Evaluator<R> {
         self.current_gate += 1;
         current
     }
+
+    /// Read a Wire from the reader.
+    #[inline]
+    pub fn read_wire(&mut self, modulus: u16) -> Result<Wire, EvaluatorError> {
+        let block = self.channel.read_block()?;
+        Ok(Wire::from_block(block, modulus))
+    }
 }
 
-impl<R: Read + Debug> Fancy for Evaluator<R> {
+impl<C: AbstractChannel> Fancy for Evaluator<C> {
     type Item = Wire;
     type Error = EvaluatorError;
 
     #[inline]
-    fn garbler_input(&mut self, q: u16, _: Option<u16>) -> Result<Self::Item, Self::Error> {
-        let mut reader = self.reader.borrow_mut();
-        let block = Block::read(&mut *reader)?;
-        Ok(Wire::from_block(block, q))
-    }
-    #[inline]
-    fn evaluator_input(&mut self, q: u16) -> Result<Self::Item, Self::Error> {
-        let mut reader = self.reader.borrow_mut();
-        let block = Block::read(&mut *reader)?;
-        Ok(Wire::from_block(block, q))
-    }
-    #[inline]
     fn constant(&mut self, _: u16, q: u16) -> Result<Wire, EvaluatorError> {
-        let mut reader = self.reader.borrow_mut();
-        let block = Block::read(&mut *reader)?;
-        Ok(Wire::from_block(block, q))
+        self.read_wire(q)
     }
+
     #[inline]
     fn add(&mut self, x: &Wire, y: &Wire) -> Result<Wire, EvaluatorError> {
         if x.modulus() != y.modulus() {
@@ -103,6 +86,7 @@ impl<R: Read + Debug> Fancy for Evaluator<R> {
         }
         Ok(x.plus(y))
     }
+
     #[inline]
     fn sub(&mut self, x: &Wire, y: &Wire) -> Result<Wire, EvaluatorError> {
         if x.modulus() != y.modulus() {
@@ -110,10 +94,12 @@ impl<R: Read + Debug> Fancy for Evaluator<R> {
         }
         Ok(x.minus(y))
     }
+
     #[inline]
     fn cmul(&mut self, x: &Wire, c: u16) -> Result<Wire, EvaluatorError> {
         Ok(x.cmul(c))
     }
+
     #[inline]
     fn mul(&mut self, A: &Wire, B: &Wire) -> Result<Wire, EvaluatorError> {
         if A.modulus() < B.modulus() {
@@ -125,9 +111,8 @@ impl<R: Read + Debug> Fancy for Evaluator<R> {
         let ngates = q as usize + qb as usize - 2 + unequal as usize;
         let mut gate = Vec::with_capacity(ngates);
         {
-            let mut reader = self.reader.borrow_mut();
             for _ in 0..ngates {
-                let block = Block::read(&mut *reader)?;
+                let block = self.channel.read_block()?;
                 gate.push(block);
             }
         }
@@ -163,16 +148,14 @@ impl<R: Read + Debug> Fancy for Evaluator<R> {
         let res = L.plus_mov(&R.plus_mov(&A.cmul(new_b_color)));
         Ok(res)
     }
+
     #[inline]
     fn proj(&mut self, x: &Wire, q: u16, _: Option<Vec<u16>>) -> Result<Wire, EvaluatorError> {
         let ngates = (x.modulus() - 1) as usize;
         let mut gate = Vec::with_capacity(ngates);
-        {
-            let mut reader = self.reader.borrow_mut();
-            for _ in 0..ngates {
-                let block = Block::read(&mut *reader)?;
-                gate.push(block);
-            }
+        for _ in 0..ngates {
+            let block = self.channel.read_block()?;
+            gate.push(block);
         }
         let t = tweak(self.current_gate());
         if x.color() == 0 {
@@ -182,13 +165,13 @@ impl<R: Read + Debug> Fancy for Evaluator<R> {
             Ok(Wire::from_block(ct ^ x.hash(t), q))
         }
     }
+
     #[inline]
     fn output(&mut self, x: &Wire) -> Result<(), EvaluatorError> {
         let noutputs = x.modulus() as usize;
-        let mut reader = self.reader.borrow_mut();
         let mut blocks = Vec::with_capacity(noutputs);
         for _ in 0..noutputs {
-            let block = Block::read(&mut *reader)?;
+            let block = self.channel.read_block()?;
             blocks.push(block);
         }
         self.output_cts.push(blocks);

@@ -1,5 +1,5 @@
 use crate::error::FancyError;
-use crate::fancy::{to_vec_option, Fancy, HasModulus};
+use crate::fancy::{Fancy, HasModulus};
 use itertools::Itertools;
 use std::ops::Index;
 
@@ -48,8 +48,10 @@ impl<W: Clone + HasModulus> Bundle<W> {
     }
 
     /// Pad the Bundle with val, n times.
-    pub fn pad(&mut self, val: W) {
-        self.0.push(val);
+    pub fn pad(&mut self, val: &W, n: usize) {
+        for _ in 0..n {
+            self.0.push(val.clone());
+        }
     }
 
     /// Extract a wire from the Bundle, removing it and returning it.
@@ -76,28 +78,6 @@ impl<F: Fancy> BundleGadgets for F {}
 /// Extension trait for Fancy which provides Bundle constructions which are not
 /// necessarily CRT nor binary-based.
 pub trait BundleGadgets: Fancy {
-    /// Crate an input bundle for the garbler using moduli `ps` and optional inputs `xs`.
-    fn garbler_input_bundle(
-        &mut self,
-        ps: &[u16],
-        opt_xs: Option<Vec<u16>>,
-    ) -> Result<Bundle<Self::Item>, Self::Error> {
-        let xs = to_vec_option(opt_xs, ps.len());
-        ps.iter()
-            .zip(xs)
-            .map(|(&p, x)| self.garbler_input(p, x))
-            .collect::<Result<Vec<Self::Item>, Self::Error>>()
-            .map(Bundle)
-    }
-
-    /// Crate an input bundle for the evaluator using moduli `ps`.
-    fn evaluator_input_bundle(&mut self, ps: &[u16]) -> Result<Bundle<Self::Item>, Self::Error> {
-        ps.iter()
-            .map(|&p| self.evaluator_input(p))
-            .collect::<Result<Vec<Self::Item>, Self::Error>>()
-            .map(Bundle)
-    }
-
     /// Creates a bundle of constant wires using moduli `ps`.
     fn constant_bundle(
         &mut self,
@@ -109,39 +89,6 @@ pub trait BundleGadgets: Fancy {
             .map(|(&x, &p)| self.constant(x, p))
             .collect::<Result<Vec<Self::Item>, Self::Error>>()
             .map(Bundle)
-    }
-
-    /// Create `n` garbler input bundles, using moduli `ps` and optional inputs `xs`.
-    fn garbler_input_bundles(
-        &mut self,
-        ps: &[u16],
-        n: usize,
-        opt_xs: Option<Vec<Vec<u16>>>,
-    ) -> Result<Vec<Bundle<Self::Item>>, Self::Error> {
-        if let Some(inps) = opt_xs {
-            if inps.len() != n {
-                return Err(Self::Error::from(FancyError::InvalidArgNum {
-                    got: inps.len(),
-                    needed: n,
-                }));
-            }
-            inps.into_iter()
-                .map(|xs| self.garbler_input_bundle(ps, Some(xs)))
-                .collect()
-        } else {
-            (0..n)
-                .map(|_| self.garbler_input_bundle(ps, None))
-                .collect()
-        }
-    }
-
-    /// Create `n` evaluator input bundles, using moduli `ps`.
-    fn evaluator_input_bundles(
-        &mut self,
-        ps: &[u16],
-        n: usize,
-    ) -> Result<Vec<Bundle<Self::Item>>, Self::Error> {
-        (0..n).map(|_| self.evaluator_input_bundle(ps)).collect()
     }
 
     /// Output the wires that make up a bundle.
@@ -379,6 +326,19 @@ pub trait BundleGadgets: Fancy {
             .iter()
             .zip(y.wires().iter())
             .map(|(xwire, ywire)| self.mux(b, xwire, ywire))
+            .collect::<Result<Vec<Self::Item>, Self::Error>>()
+            .map(Bundle)
+    }
+
+    /// If b=0 then return 0, else return x.
+    fn mask(
+        &mut self,
+        b: &Self::Item,
+        x: &Bundle<Self::Item>,
+    ) -> Result<Bundle<Self::Item>, Self::Error> {
+        x.wires()
+            .iter()
+            .map(|xwire| self.mul(xwire, b))
             .collect::<Result<Vec<Self::Item>, Self::Error>>()
             .map(Bundle)
     }

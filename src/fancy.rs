@@ -9,9 +9,11 @@ use itertools::Itertools;
 mod binary;
 mod bundle;
 mod crt;
+mod input;
 pub use binary::{BinaryBundle, BinaryGadgets};
 pub use bundle::{Bundle, BundleGadgets};
 pub use crt::{CrtBundle, CrtGadgets};
+pub use input::FancyInput;
 
 /// An object that has some modulus. Basic object of `Fancy` computations.
 pub trait HasModulus {
@@ -26,12 +28,6 @@ pub trait Fancy {
 
     /// Errors which may be thrown by the users of Fancy.
     type Error: std::fmt::Debug + std::fmt::Display + std::convert::From<FancyError>;
-
-    /// Create an input for the garbler with modulus `q` and optional garbler-private value `opt_x`.
-    fn garbler_input(&mut self, q: u16, opt_x: Option<u16>) -> Result<Self::Item, Self::Error>;
-
-    /// Create an input for the evaluator with modulus `q`.
-    fn evaluator_input(&mut self, q: u16) -> Result<Self::Item, Self::Error>;
 
     /// Create a constant `x` with modulus `q`.
     fn constant(&mut self, x: u16, q: u16) -> Result<Self::Item, Self::Error>;
@@ -63,24 +59,6 @@ pub trait Fancy {
 
     ////////////////////////////////////////////////////////////////////////////////
     // Functions built on top of basic fancy operations.
-
-    /// Create `n` garbler inputs with the moduli `qs` and optional inputs `xs`.
-    fn garbler_inputs(
-        &mut self,
-        qs: &[u16],
-        opt_xs: Option<Vec<u16>>,
-    ) -> Result<Vec<Self::Item>, Self::Error> {
-        let xs = to_vec_option(opt_xs, qs.len());
-        qs.iter()
-            .zip(xs)
-            .map(|(&q, x)| self.garbler_input(q, x))
-            .collect()
-    }
-
-    /// Create `n` evaluator inputs with the moduli `qs`.
-    fn evaluator_inputs(&mut self, qs: &[u16]) -> Result<Vec<Self::Item>, Self::Error> {
-        qs.iter().map(|&q| self.evaluator_input(q)).collect()
-    }
 
     /// Sum up a slice of wires.
     fn add_many(&mut self, args: &[Self::Item]) -> Result<Self::Item, Self::Error> {
@@ -278,13 +256,4 @@ pub trait Fancy {
         }
         Ok(())
     }
-}
-
-pub(crate) fn to_vec_option<T>(opt_xs: Option<Vec<T>>, len: usize) -> Vec<Option<T>> {
-    opt_xs
-        .map(|vals| {
-            // transform option of slice into vec of options
-            vals.into_iter().map(Some).collect()
-        })
-        .unwrap_or_else(|| (0..len).map(|_| None).collect())
 }

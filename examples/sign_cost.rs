@@ -2,13 +2,8 @@ use fancy_garbling::informer::Informer;
 use fancy_garbling::util::modulus_with_nprimes;
 use fancy_garbling::*;
 
-fn exact_sign<F, W>(b: &mut F, q: u128)
-where
-    F: Fancy<Item = W>,
-    W: HasModulus + Clone,
-{
-    let x = b.crt_garbler_input_bundle(q, None).unwrap();
-    let z = b.crt_sign(&x, "100%").unwrap();
+fn exact_sign<F: Fancy>(b: &mut F, x: &CrtBundle<F::Item>) {
+    let z = b.crt_sign(x, "100%").unwrap();
     b.output(&z).unwrap();
 }
 
@@ -16,6 +11,7 @@ fn main() {
     let nprimes = 10;
     let q = modulus_with_nprimes(nprimes);
     let mut i = Informer::new();
-    exact_sign(&mut i, q);
+    let x = i.crt_receive(q).unwrap();
+    exact_sign(&mut i, &x);
     i.print_info();
 }

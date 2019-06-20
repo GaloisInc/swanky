@@ -1,4 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source to the Rust file `src/garble/evaluator.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>evaluator.rs.html -- source</title><link rel="stylesheet" type="text/css" href="../../../normalize.css"><link rel="stylesheet" type="text/css" href="../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../../dark.css"><link rel="stylesheet" type="text/css" href="../../../light.css" id="themeStyle"><script src="../../../storage.js"></script><noscript><link rel="stylesheet" href="../../../noscript.css"></noscript><link rel="shortcut icon" href="../../../favicon.ico"><style type="text/css">#crate-search{background-image:url("../../../down-arrow.svg");}</style></head><body class="rustdoc source"><!--[if lte IE 8]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu">&#9776;</div><a href='../../../fancy_garbling/index.html'><img src='../../../rust-logo.png' alt='logo' width='100'></a></nav><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!"><img src="../../../brush.svg" width="18" alt="Pick another theme!"></button><div id="theme-choices"></div></div><script src="../../../theme.js"></script><nav class="sub"><form class="search-form js-only"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><a id="settings-menu" href="../../../settings.html"><img src="../../../wheel.svg" width="18" alt="Change settings"></a></div></form></nav><section id="main" class="content"><pre class="line-numbers"><span id="1">  1</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source to the Rust file `src/garble/evaluator.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>evaluator.rs.html -- source</title><link rel="stylesheet" type="text/css" href="../../../normalize.css"><link rel="stylesheet" type="text/css" href="../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../../dark.css"><link rel="stylesheet" type="text/css" href="../../../light.css" id="themeStyle"><script src="../../../storage.js"></script><noscript><link rel="stylesheet" href="../../../noscript.css"></noscript><link rel="shortcut icon" href="../../../favicon.ico"><style type="text/css">#crate-search{background-image:url("../../../down-arrow.svg");}</style></head><body class="rustdoc source"><!--[if lte IE 8]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu">&#9776;</div><a href='../../../fancy_garbling/index.html'><div class='logo-container'><img src='../../../rust-logo.png' alt='logo'></div></a></nav><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!"><img src="../../../brush.svg" width="18" alt="Pick another theme!"></button><div id="theme-choices"></div></div><script src="../../../theme.js"></script><nav class="sub"><form class="search-form js-only"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><a id="settings-menu" href="../../../settings.html"><img src="../../../wheel.svg" width="18" alt="Change settings"></a></div></form></nav><section id="main" class="content"><pre class="line-numbers"><span id="1">  1</span>
 <span id="2">  2</span>
 <span id="3">  3</span>
 <span id="4">  4</span>
@@ -179,53 +179,29 @@
 <span id="179">179</span>
 <span id="180">180</span>
 <span id="181">181</span>
-<span id="182">182</span>
-<span id="183">183</span>
-<span id="184">184</span>
-<span id="185">185</span>
-<span id="186">186</span>
-<span id="187">187</span>
-<span id="188">188</span>
-<span id="189">189</span>
-<span id="190">190</span>
-<span id="191">191</span>
-<span id="192">192</span>
-<span id="193">193</span>
-<span id="194">194</span>
-<span id="195">195</span>
-<span id="196">196</span>
-<span id="197">197</span>
-<span id="198">198</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">error</span>::{<span class="ident">EvaluatorError</span>, <span class="ident">FancyError</span>};
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">fancy</span>::{<span class="ident">Fancy</span>, <span class="ident">HasModulus</span>};
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::{<span class="ident">output_tweak</span>, <span class="ident">tweak</span>, <span class="ident">tweak2</span>};
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">wire</span>::<span class="ident">Wire</span>;
-<span class="kw">use</span> <span class="ident">scuttlebutt</span>::<span class="ident">Block</span>;
-<span class="kw">use</span> <span class="ident">std</span>::<span class="ident">cell</span>::<span class="ident">RefCell</span>;
-<span class="kw">use</span> <span class="ident">std</span>::<span class="ident">fmt</span>::<span class="ident">Debug</span>;
-<span class="kw">use</span> <span class="ident">std</span>::<span class="ident">io</span>::<span class="ident">Read</span>;
-<span class="kw">use</span> <span class="ident">std</span>::<span class="ident">rc</span>::<span class="ident">Rc</span>;
+<span class="kw">use</span> <span class="ident">scuttlebutt</span>::{<span class="ident">AbstractChannel</span>, <span class="ident">Block</span>};
 
 <span class="doccomment">/// Streaming evaluator using a callback to receive ciphertexts as needed.</span>
 <span class="doccomment">///</span>
 <span class="doccomment">/// Evaluates a garbled circuit on the fly, using messages containing ciphertexts and</span>
 <span class="doccomment">/// wires. Parallelizable.</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Evaluator</span><span class="op">&lt;</span><span class="ident">R</span>: <span class="ident">Read</span> <span class="op">+</span> <span class="ident">Debug</span><span class="op">&gt;</span> {
-    <span class="ident">reader</span>: <span class="ident">Rc</span><span class="op">&lt;</span><span class="ident">RefCell</span><span class="op">&lt;</span><span class="ident">R</span><span class="op">&gt;&gt;</span>,
+<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Evaluator</span><span class="op">&lt;</span><span class="ident">C</span><span class="op">&gt;</span> {
+    <span class="ident">channel</span>: <span class="ident">C</span>,
     <span class="ident">current_gate</span>: <span class="ident">usize</span>,
     <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="ident">output_cts</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Block</span><span class="op">&gt;&gt;</span>,
     <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="ident">output_wires</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Wire</span><span class="op">&gt;</span>,
 }
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">R</span>: <span class="ident">Read</span> <span class="op">+</span> <span class="ident">Debug</span><span class="op">&gt;</span> <span class="ident">Evaluator</span><span class="op">&lt;</span><span class="ident">R</span><span class="op">&gt;</span> {
+<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">C</span>: <span class="ident">AbstractChannel</span><span class="op">&gt;</span> <span class="ident">Evaluator</span><span class="op">&lt;</span><span class="ident">C</span><span class="op">&gt;</span> {
     <span class="doccomment">/// Create a new `Evaluator`.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// `callback` enables streaming by producing messages during the `Fancy`</span>
-    <span class="doccomment">/// computation, which contain ciphertexts and wire-labels.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">reader</span>: <span class="ident">Rc</span><span class="op">&lt;</span><span class="ident">RefCell</span><span class="op">&lt;</span><span class="ident">R</span><span class="op">&gt;&gt;</span>) <span class="op">-&gt;</span> <span class="self">Self</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">channel</span>: <span class="ident">C</span>) <span class="op">-&gt;</span> <span class="self">Self</span> {
         <span class="ident">Evaluator</span> {
-            <span class="ident">reader</span>,
+            <span class="ident">channel</span>,
             <span class="ident">current_gate</span>: <span class="number">0</span>,
             <span class="ident">output_cts</span>: <span class="ident">Vec</span>::<span class="ident">new</span>(),
             <span class="ident">output_wires</span>: <span class="ident">Vec</span>::<span class="ident">new</span>(),
@@ -233,7 +209,7 @@
     }
 
     <span class="doccomment">/// Decode the output received during the Fancy computation.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">decode_output</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-&gt;</span> <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u16</span><span class="op">&gt;</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">decode_output</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u16</span><span class="op">&gt;</span>, <span class="ident">EvaluatorError</span><span class="op">&gt;</span> {
         <span class="macro">debug_assert_eq</span><span class="macro">!</span>(
             <span class="self">self</span>.<span class="ident">output_wires</span>.<span class="ident">len</span>(),
             <span class="self">self</span>.<span class="ident">output_cts</span>.<span class="ident">len</span>(),
@@ -254,14 +230,10 @@
                 }
             }
         }
-        <span class="macro">debug_assert_eq</span><span class="macro">!</span>(
-            <span class="self">self</span>.<span class="ident">output_wires</span>.<span class="ident">len</span>(),
-            <span class="ident">outs</span>.<span class="ident">len</span>(),
-            <span class="string">&quot;decoding failed! decoded {} out of {} wires&quot;</span>,
-            <span class="ident">outs</span>.<span class="ident">len</span>(),
-            <span class="self">self</span>.<span class="ident">output_wires</span>.<span class="ident">len</span>()
-        );
-        <span class="ident">outs</span>
+        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">output_wires</span>.<span class="ident">len</span>() <span class="op">!=</span> <span class="ident">outs</span>.<span class="ident">len</span>() {
+            <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">EvaluatorError</span>::<span class="ident">DecodingFailed</span>);
+        }
+        <span class="prelude-val">Ok</span>(<span class="ident">outs</span>)
     }
 
     <span class="doccomment">/// The current non-free gate index of the garbling computation.</span>
@@ -271,30 +243,24 @@
         <span class="self">self</span>.<span class="ident">current_gate</span> <span class="op">+=</span> <span class="number">1</span>;
         <span class="ident">current</span>
     }
+
+    <span class="doccomment">/// Read a Wire from the reader.</span>
+    <span class="attribute">#[<span class="ident">inline</span>]</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">read_wire</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">modulus</span>: <span class="ident">u16</span>) <span class="op">-&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Wire</span>, <span class="ident">EvaluatorError</span><span class="op">&gt;</span> {
+        <span class="kw">let</span> <span class="ident">block</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">channel</span>.<span class="ident">read_block</span>()<span class="question-mark">?</span>;
+        <span class="prelude-val">Ok</span>(<span class="ident">Wire</span>::<span class="ident">from_block</span>(<span class="ident">block</span>, <span class="ident">modulus</span>))
+    }
 }
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">R</span>: <span class="ident">Read</span> <span class="op">+</span> <span class="ident">Debug</span><span class="op">&gt;</span> <span class="ident">Fancy</span> <span class="kw">for</span> <span class="ident">Evaluator</span><span class="op">&lt;</span><span class="ident">R</span><span class="op">&gt;</span> {
+<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">C</span>: <span class="ident">AbstractChannel</span><span class="op">&gt;</span> <span class="ident">Fancy</span> <span class="kw">for</span> <span class="ident">Evaluator</span><span class="op">&lt;</span><span class="ident">C</span><span class="op">&gt;</span> {
     <span class="kw">type</span> <span class="ident">Item</span> <span class="op">=</span> <span class="ident">Wire</span>;
     <span class="kw">type</span> <span class="ident">Error</span> <span class="op">=</span> <span class="ident">EvaluatorError</span>;
 
     <span class="attribute">#[<span class="ident">inline</span>]</span>
-    <span class="kw">fn</span> <span class="ident">garbler_input</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">q</span>: <span class="ident">u16</span>, <span class="kw">_</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">u16</span><span class="op">&gt;</span>) <span class="op">-&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="self">Self</span>::<span class="ident">Item</span>, <span class="self">Self</span>::<span class="ident">Error</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">reader</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">reader</span>.<span class="ident">borrow_mut</span>();
-        <span class="kw">let</span> <span class="ident">block</span> <span class="op">=</span> <span class="ident">Block</span>::<span class="ident">read</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="kw-2">*</span><span class="ident">reader</span>)<span class="question-mark">?</span>;
-        <span class="prelude-val">Ok</span>(<span class="ident">Wire</span>::<span class="ident">from_block</span>(<span class="ident">block</span>, <span class="ident">q</span>))
-    }
-    <span class="attribute">#[<span class="ident">inline</span>]</span>
-    <span class="kw">fn</span> <span class="ident">evaluator_input</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">q</span>: <span class="ident">u16</span>) <span class="op">-&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="self">Self</span>::<span class="ident">Item</span>, <span class="self">Self</span>::<span class="ident">Error</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">reader</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">reader</span>.<span class="ident">borrow_mut</span>();
-        <span class="kw">let</span> <span class="ident">block</span> <span class="op">=</span> <span class="ident">Block</span>::<span class="ident">read</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="kw-2">*</span><span class="ident">reader</span>)<span class="question-mark">?</span>;
-        <span class="prelude-val">Ok</span>(<span class="ident">Wire</span>::<span class="ident">from_block</span>(<span class="ident">block</span>, <span class="ident">q</span>))
-    }
-    <span class="attribute">#[<span class="ident">inline</span>]</span>
     <span class="kw">fn</span> <span class="ident">constant</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="kw">_</span>: <span class="ident">u16</span>, <span class="ident">q</span>: <span class="ident">u16</span>) <span class="op">-&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Wire</span>, <span class="ident">EvaluatorError</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">reader</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">reader</span>.<span class="ident">borrow_mut</span>();
-        <span class="kw">let</span> <span class="ident">block</span> <span class="op">=</span> <span class="ident">Block</span>::<span class="ident">read</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="kw-2">*</span><span class="ident">reader</span>)<span class="question-mark">?</span>;
-        <span class="prelude-val">Ok</span>(<span class="ident">Wire</span>::<span class="ident">from_block</span>(<span class="ident">block</span>, <span class="ident">q</span>))
+        <span class="self">self</span>.<span class="ident">read_wire</span>(<span class="ident">q</span>)
     }
+
     <span class="attribute">#[<span class="ident">inline</span>]</span>
     <span class="kw">fn</span> <span class="ident">add</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">x</span>: <span class="kw-2">&amp;</span><span class="ident">Wire</span>, <span class="ident">y</span>: <span class="kw-2">&amp;</span><span class="ident">Wire</span>) <span class="op">-&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Wire</span>, <span class="ident">EvaluatorError</span><span class="op">&gt;</span> {
         <span class="kw">if</span> <span class="ident">x</span>.<span class="ident">modulus</span>() <span class="op">!=</span> <span class="ident">y</span>.<span class="ident">modulus</span>() {
@@ -302,6 +268,7 @@
         }
         <span class="prelude-val">Ok</span>(<span class="ident">x</span>.<span class="ident">plus</span>(<span class="ident">y</span>))
     }
+
     <span class="attribute">#[<span class="ident">inline</span>]</span>
     <span class="kw">fn</span> <span class="ident">sub</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">x</span>: <span class="kw-2">&amp;</span><span class="ident">Wire</span>, <span class="ident">y</span>: <span class="kw-2">&amp;</span><span class="ident">Wire</span>) <span class="op">-&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Wire</span>, <span class="ident">EvaluatorError</span><span class="op">&gt;</span> {
         <span class="kw">if</span> <span class="ident">x</span>.<span class="ident">modulus</span>() <span class="op">!=</span> <span class="ident">y</span>.<span class="ident">modulus</span>() {
@@ -309,10 +276,12 @@
         }
         <span class="prelude-val">Ok</span>(<span class="ident">x</span>.<span class="ident">minus</span>(<span class="ident">y</span>))
     }
+
     <span class="attribute">#[<span class="ident">inline</span>]</span>
     <span class="kw">fn</span> <span class="ident">cmul</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">x</span>: <span class="kw-2">&amp;</span><span class="ident">Wire</span>, <span class="ident">c</span>: <span class="ident">u16</span>) <span class="op">-&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Wire</span>, <span class="ident">EvaluatorError</span><span class="op">&gt;</span> {
         <span class="prelude-val">Ok</span>(<span class="ident">x</span>.<span class="ident">cmul</span>(<span class="ident">c</span>))
     }
+
     <span class="attribute">#[<span class="ident">inline</span>]</span>
     <span class="kw">fn</span> <span class="ident">mul</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">A</span>: <span class="kw-2">&amp;</span><span class="ident">Wire</span>, <span class="ident">B</span>: <span class="kw-2">&amp;</span><span class="ident">Wire</span>) <span class="op">-&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Wire</span>, <span class="ident">EvaluatorError</span><span class="op">&gt;</span> {
         <span class="kw">if</span> <span class="ident">A</span>.<span class="ident">modulus</span>() <span class="op">&lt;</span> <span class="ident">B</span>.<span class="ident">modulus</span>() {
@@ -324,9 +293,8 @@
         <span class="kw">let</span> <span class="ident">ngates</span> <span class="op">=</span> <span class="ident">q</span> <span class="kw">as</span> <span class="ident">usize</span> <span class="op">+</span> <span class="ident">qb</span> <span class="kw">as</span> <span class="ident">usize</span> <span class="op">-</span> <span class="number">2</span> <span class="op">+</span> <span class="ident">unequal</span> <span class="kw">as</span> <span class="ident">usize</span>;
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">gate</span> <span class="op">=</span> <span class="ident">Vec</span>::<span class="ident">with_capacity</span>(<span class="ident">ngates</span>);
         {
-            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">reader</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">reader</span>.<span class="ident">borrow_mut</span>();
             <span class="kw">for</span> <span class="kw">_</span> <span class="kw">in</span> <span class="number">0</span>..<span class="ident">ngates</span> {
-                <span class="kw">let</span> <span class="ident">block</span> <span class="op">=</span> <span class="ident">Block</span>::<span class="ident">read</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="kw-2">*</span><span class="ident">reader</span>)<span class="question-mark">?</span>;
+                <span class="kw">let</span> <span class="ident">block</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">channel</span>.<span class="ident">read_block</span>()<span class="question-mark">?</span>;
                 <span class="ident">gate</span>.<span class="ident">push</span>(<span class="ident">block</span>);
             }
         }
@@ -362,16 +330,14 @@
         <span class="kw">let</span> <span class="ident">res</span> <span class="op">=</span> <span class="ident">L</span>.<span class="ident">plus_mov</span>(<span class="kw-2">&amp;</span><span class="ident">R</span>.<span class="ident">plus_mov</span>(<span class="kw-2">&amp;</span><span class="ident">A</span>.<span class="ident">cmul</span>(<span class="ident">new_b_color</span>)));
         <span class="prelude-val">Ok</span>(<span class="ident">res</span>)
     }
+
     <span class="attribute">#[<span class="ident">inline</span>]</span>
     <span class="kw">fn</span> <span class="ident">proj</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">x</span>: <span class="kw-2">&amp;</span><span class="ident">Wire</span>, <span class="ident">q</span>: <span class="ident">u16</span>, <span class="kw">_</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u16</span><span class="op">&gt;&gt;</span>) <span class="op">-&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Wire</span>, <span class="ident">EvaluatorError</span><span class="op">&gt;</span> {
         <span class="kw">let</span> <span class="ident">ngates</span> <span class="op">=</span> (<span class="ident">x</span>.<span class="ident">modulus</span>() <span class="op">-</span> <span class="number">1</span>) <span class="kw">as</span> <span class="ident">usize</span>;
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">gate</span> <span class="op">=</span> <span class="ident">Vec</span>::<span class="ident">with_capacity</span>(<span class="ident">ngates</span>);
-        {
-            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">reader</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">reader</span>.<span class="ident">borrow_mut</span>();
-            <span class="kw">for</span> <span class="kw">_</span> <span class="kw">in</span> <span class="number">0</span>..<span class="ident">ngates</span> {
-                <span class="kw">let</span> <span class="ident">block</span> <span class="op">=</span> <span class="ident">Block</span>::<span class="ident">read</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="kw-2">*</span><span class="ident">reader</span>)<span class="question-mark">?</span>;
-                <span class="ident">gate</span>.<span class="ident">push</span>(<span class="ident">block</span>);
-            }
+        <span class="kw">for</span> <span class="kw">_</span> <span class="kw">in</span> <span class="number">0</span>..<span class="ident">ngates</span> {
+            <span class="kw">let</span> <span class="ident">block</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">channel</span>.<span class="ident">read_block</span>()<span class="question-mark">?</span>;
+            <span class="ident">gate</span>.<span class="ident">push</span>(<span class="ident">block</span>);
         }
         <span class="kw">let</span> <span class="ident">t</span> <span class="op">=</span> <span class="ident">tweak</span>(<span class="self">self</span>.<span class="ident">current_gate</span>());
         <span class="kw">if</span> <span class="ident">x</span>.<span class="ident">color</span>() <span class="op">==</span> <span class="number">0</span> {
@@ -381,13 +347,13 @@
             <span class="prelude-val">Ok</span>(<span class="ident">Wire</span>::<span class="ident">from_block</span>(<span class="ident">ct</span> <span class="op">^</span> <span class="ident">x</span>.<span class="ident">hash</span>(<span class="ident">t</span>), <span class="ident">q</span>))
         }
     }
+
     <span class="attribute">#[<span class="ident">inline</span>]</span>
     <span class="kw">fn</span> <span class="ident">output</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">x</span>: <span class="kw-2">&amp;</span><span class="ident">Wire</span>) <span class="op">-&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="ident">EvaluatorError</span><span class="op">&gt;</span> {
         <span class="kw">let</span> <span class="ident">noutputs</span> <span class="op">=</span> <span class="ident">x</span>.<span class="ident">modulus</span>() <span class="kw">as</span> <span class="ident">usize</span>;
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">reader</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">reader</span>.<span class="ident">borrow_mut</span>();
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">blocks</span> <span class="op">=</span> <span class="ident">Vec</span>::<span class="ident">with_capacity</span>(<span class="ident">noutputs</span>);
         <span class="kw">for</span> <span class="kw">_</span> <span class="kw">in</span> <span class="number">0</span>..<span class="ident">noutputs</span> {
-            <span class="kw">let</span> <span class="ident">block</span> <span class="op">=</span> <span class="ident">Block</span>::<span class="ident">read</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="kw-2">*</span><span class="ident">reader</span>)<span class="question-mark">?</span>;
+            <span class="kw">let</span> <span class="ident">block</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">channel</span>.<span class="ident">read_block</span>()<span class="question-mark">?</span>;
             <span class="ident">blocks</span>.<span class="ident">push</span>(<span class="ident">block</span>);
         }
         <span class="self">self</span>.<span class="ident">output_cts</span>.<span class="ident">push</span>(<span class="ident">blocks</span>);

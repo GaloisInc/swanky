@@ -1,7 +1,7 @@
 //! `Informer` runs a fancy computation and learns information from it.
 
 use crate::error::{FancyError, InformerError};
-use crate::fancy::{Fancy, HasModulus};
+use crate::fancy::{Fancy, FancyInput, HasModulus};
 use std::collections::{HashMap, HashSet};
 
 /// Implements `Fancy`. Used to learn information about a `Fancy` computation in
@@ -10,6 +10,7 @@ pub struct Informer {
     garbler_input_moduli: Vec<u16>,
     evaluator_input_moduli: Vec<u16>,
     constants: HashSet<(u16, u16)>,
+    nreuses: usize,
     outputs: Vec<u16>,
     nadds: usize,
     nsubs: usize,
@@ -38,6 +39,7 @@ impl Informer {
             garbler_input_moduli: Vec::new(),
             evaluator_input_moduli: Vec::new(),
             constants: HashSet::new(),
+            nreuses: 0,
             outputs: Vec::new(),
             nadds: 0,
             nsubs: 0,
@@ -56,6 +58,7 @@ impl Informer {
     /// computation info:
     ///   garbler inputs:                  128 // comms cost: 16 Kb
     ///   evaluator inputs:                128 // comms cost: 48 Kb
+    ///   reused values:                    12
     ///   outputs:                         128
     ///   output ciphertexts:              256 // comms cost: 32 Kb
     ///   constants:                         1 // comms cost: 0.125 Kb
@@ -71,6 +74,7 @@ impl Informer {
         let mut total = 0.0;
         println!("computation info:");
         let comm = self.num_garbler_inputs() as f64 * 128.0 / 1000.0;
+
         println!(
             "  garbler inputs:     {:16} // communication: {:.2} Kb",
             self.num_garbler_inputs(),
@@ -83,6 +87,7 @@ impl Informer {
         let comm = self.evaluator_input_moduli.iter().fold(0.0, |acc, q| {
             acc + (*q as f64).log2().ceil() * 384.0 / 1000.0
         });
+
         println!(
             "  evaluator inputs:   {:16} // communication: {:.2} Kb",
             self.num_evaluator_inputs(),
@@ -90,6 +95,9 @@ impl Informer {
         );
         total += comm;
         let comm = self.num_output_ciphertexts() as f64 * 128.0 / 1000.0;
+
+        println!("  reused values:      {:16}", self.nreuses);
+
         println!("  outputs:            {:16}", self.num_outputs());
         println!(
             "  output ciphertexts: {:16} // communication: {:.2} Kb",
@@ -98,6 +106,7 @@ impl Informer {
         );
         total += comm;
         let comm = self.num_consts() as f64 * 128.0 / 1000.0;
+
         println!(
             "  constants:          {:16} // communication: {:.2} Kb",
             self.num_consts(),
@@ -195,21 +204,28 @@ impl Informer {
     }
 }
 
+impl FancyInput for Informer {
+    fn receive(&mut self, modulus: u16) -> Result<Self::Item, Self::Error> {
+        self.garbler_input_moduli.push(modulus);
+        Ok(InformerVal(modulus))
+    }
+
+    fn encode(&mut self, _value: u16, modulus: u16) -> Result<Self::Item, Self::Error> {
+        self.receive(modulus)
+    }
+
+    fn receive_many(&mut self, moduli: &[u16]) -> Result<Vec<Self::Item>, Self::Error> {
+        moduli.iter().map(|q| self.receive(*q)).collect()
+    }
+
+    fn encode_many(&mut self, _values: &[u16], moduli: &[u16]) -> Result<Vec<Self::Item>, Self::Error> {
+        moduli.iter().map(|q| self.receive(*q)).collect()
+    }
+}
+
 impl Fancy for Informer {
     type Item = InformerVal;
     type Error = InformerError;
-
-    fn garbler_input(&mut self, q: u16, _: Option<u16>) -> Result<InformerVal, InformerError> {
-        self.garbler_input_moduli.push(q);
-        self.update_moduli(q);
-        Ok(InformerVal(q))
-    }
-
-    fn evaluator_input(&mut self, q: u16) -> Result<InformerVal, InformerError> {
-        self.evaluator_input_moduli.push(q);
-        self.update_moduli(q);
-        Ok(InformerVal(q))
-    }
 
     fn constant(&mut self, val: u16, q: u16) -> Result<InformerVal, InformerError> {
         self.constants.insert((val, q));

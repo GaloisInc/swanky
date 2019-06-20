@@ -1,51 +1,34 @@
-use super::Message;
 use crate::error::{FancyError, GarblerError};
-use crate::fancy::{Fancy, HasModulus};
+use crate::fancy::{BinaryBundle, CrtBundle, Fancy, HasModulus};
 use crate::util::{output_tweak, tweak, tweak2, RngExt};
 use crate::wire::Wire;
 use rand::{CryptoRng, RngCore};
-use scuttlebutt::Block;
-use std::cell::RefCell;
+use scuttlebutt::{AbstractChannel, Block};
 use std::collections::HashMap;
-use std::fmt::Debug;
-use std::io::Write;
-use std::rc::Rc;
 
 /// Streams garbled circuit ciphertexts through a callback. Parallelizable.
-pub struct Garbler<W: Write + Debug, RNG: CryptoRng + RngCore> {
-    writer: Rc<RefCell<W>>,
-    callback: Box<FnMut(Message) -> Result<(), GarblerError>>,
-    // Hash map containing modulus -> associated delta wire-label.
-    deltas: HashMap<u16, Wire>,
+pub struct Garbler<C, RNG> {
+    channel: C,
+    deltas: HashMap<u16, Wire>, // map from modulus to associated delta wire-label.
     current_output: usize,
     current_gate: usize,
     rng: RNG,
 }
 
-impl<W: Write + Debug, RNG: CryptoRng + RngCore> Garbler<W, RNG> {
+impl<C: AbstractChannel, RNG: CryptoRng + RngCore> Garbler<C, RNG> {
     /// Create a new garbler.
-    ///
-    /// `callback` is a function that enables streaming. It gets called as the
-    /// garbler generates ciphertext information such as garbled gates or input
-    /// wire-labels.
-    pub fn new<F>(writer: Rc<RefCell<W>>, callback: F, rng: RNG) -> Self
-    where
-        F: FnMut(Message) -> Result<(), GarblerError> + 'static,
-    {
+    #[inline]
+    pub fn new(channel: C, rng: RNG, reused_deltas: &[Wire]) -> Self {
         Garbler {
-            writer,
-            callback: Box::new(callback),
-            deltas: HashMap::new(),
+            channel,
+            deltas: reused_deltas
+                .iter()
+                .map(|w| (w.modulus(), w.clone()))
+                .collect(),
             current_gate: 0,
             current_output: 0,
             rng,
         }
-    }
-
-    /// Output some information from the garbling.
-    #[inline]
-    fn send(&mut self, m: Message) -> Result<(), GarblerError> {
-        (self.callback)(m)
     }
 
     /// The current non-free gate index of the garbling computation
@@ -69,6 +52,7 @@ impl<W: Write + Debug, RNG: CryptoRng + RngCore> Garbler<W, RNG> {
     }
 
     /// The current output index of the garbling computation.
+    #[inline]
     fn current_output(&mut self) -> usize {
         let current = self.current_output;
         self.current_output += 1;
@@ -76,49 +60,89 @@ impl<W: Write + Debug, RNG: CryptoRng + RngCore> Garbler<W, RNG> {
     }
 
     /// Get the deltas, consuming the Garbler.
-    pub(crate) fn get_deltas(self) -> HashMap<u16, Wire> {
+    ///
+    /// This is useful for reusing wires in multiple garbled circuit instances.
+    #[inline]
+    pub fn get_deltas(self) -> HashMap<u16, Wire> {
         self.deltas
+    }
+
+    /// Send a wire using the Sender.
+    #[inline]
+    pub fn send_wire(&mut self, wire: &Wire) -> Result<(), GarblerError> {
+        self.channel.write_block(&wire.as_block())?;
+        Ok(())
+    }
+
+    /// Encode a wire, producing the zero wire as well as the encoded value.
+    #[inline]
+    pub fn encode_wire(&mut self, val: u16, modulus: u16) -> (Wire, Wire) {
+        let zero = Wire::rand(&mut self.rng, modulus);
+        let delta = self.delta(modulus);
+        let enc = zero.plus(&delta.cmul(val));
+        (zero, enc)
+    }
+
+    /// Encode many wires, producing zero wires as well as encoded values.
+    #[inline]
+    pub fn encode_many_wires(
+        &mut self,
+        vals: &[u16],
+        moduli: &[u16],
+    ) -> Result<(Vec<Wire>, Vec<Wire>), GarblerError> {
+        if vals.len() != moduli.len() {
+            return Err(GarblerError::EncodingError);
+        }
+        assert!(vals.len() == moduli.len());
+        let mut gbs = Vec::with_capacity(vals.len());
+        let mut evs = Vec::with_capacity(vals.len());
+        for (x, q) in vals.iter().zip(moduli.iter()) {
+            let (gb, ev) = self.encode_wire(*x, *q);
+            gbs.push(gb);
+            evs.push(ev);
+        }
+        Ok((gbs, evs))
+    }
+
+    /// Encode a CrtBundle, producing the zero wires as well as the encoded values.
+    #[inline]
+    pub fn crt_encode_wire(
+        &mut self,
+        val: u128,
+        modulus: u128,
+    ) -> Result<(CrtBundle<Wire>, CrtBundle<Wire>), GarblerError> {
+        let ms = crate::util::factor(modulus);
+        let xs = crate::util::crt(val, &ms);
+        let (gbs, evs) = self.encode_many_wires(&xs, &ms)?;
+        Ok((CrtBundle::new(gbs), CrtBundle::new(evs)))
+    }
+
+    /// Encode a BinaryBundle, producing the zero wires as well as the encoded values.
+    #[inline]
+    pub fn bin_encode_wire(
+        &mut self,
+        val: u128,
+        nbits: usize,
+    ) -> Result<(BinaryBundle<Wire>, BinaryBundle<Wire>), GarblerError> {
+        let xs = crate::util::u128_to_bits(val, nbits);
+        let ms = vec![2; nbits];
+        let (gbs, evs) = self.encode_many_wires(&xs, &ms)?;
+        Ok((BinaryBundle::new(gbs), BinaryBundle::new(evs)))
     }
 }
 
-impl<W: Write + Debug, RNG: CryptoRng + RngCore> Fancy for Garbler<W, RNG> {
+impl<C: AbstractChannel, RNG: CryptoRng + RngCore> Fancy for Garbler<C, RNG> {
     type Item = Wire;
     type Error = GarblerError;
 
     #[inline]
-    fn garbler_input(&mut self, q: u16, opt_x: Option<u16>) -> Result<Wire, GarblerError> {
-        let w = Wire::rand(&mut self.rng, q);
-        let d = self.delta(q);
-        if let Some(x) = opt_x {
-            let wire = w.plus(&d.cmul(x));
-            let mut writer = self.writer.borrow_mut();
-            writer.write_all(wire.as_block().as_ref())?;
-        } else {
-            self.send(Message::UnencodedGarblerInput {
-                zero: w.clone(),
-                delta: d,
-            })?;
-        }
-        Ok(w)
-    }
-    #[inline]
-    fn evaluator_input(&mut self, q: u16) -> Result<Wire, GarblerError> {
-        let w = Wire::rand(&mut self.rng, q);
-        let d = self.delta(q);
-        self.send(Message::UnencodedEvaluatorInput {
-            zero: w.clone(),
-            delta: d,
-        })?;
-        Ok(w)
-    }
-    #[inline]
     fn constant(&mut self, x: u16, q: u16) -> Result<Wire, GarblerError> {
         let zero = Wire::rand(&mut self.rng, q);
         let wire = zero.plus(&self.delta(q).cmul_eq(x));
-        let mut writer = self.writer.borrow_mut();
-        writer.write_all(wire.as_block().as_ref())?;
+        self.send_wire(&wire)?;
         Ok(zero)
     }
+
     #[inline]
     fn add(&mut self, x: &Wire, y: &Wire) -> Result<Wire, GarblerError> {
         if x.modulus() != y.modulus() {
@@ -126,6 +150,7 @@ impl<W: Write + Debug, RNG: CryptoRng + RngCore> Fancy for Garbler<W, RNG> {
         }
         Ok(x.plus(y))
     }
+
     #[inline]
     fn sub(&mut self, x: &Wire, y: &Wire) -> Result<Wire, GarblerError> {
         if x.modulus() != y.modulus() {
@@ -133,10 +158,12 @@ impl<W: Write + Debug, RNG: CryptoRng + RngCore> Fancy for Garbler<W, RNG> {
         }
         Ok(x.minus(y))
     }
+
     #[inline]
     fn cmul(&mut self, x: &Wire, c: u16) -> Result<Wire, GarblerError> {
         Ok(x.cmul(c))
     }
+
     #[inline]
     fn mul(&mut self, A: &Wire, B: &Wire) -> Result<Wire, GarblerError> {
         if A.modulus() < B.modulus() {
@@ -247,12 +274,12 @@ impl<W: Write + Debug, RNG: CryptoRng + RngCore> Fancy for Garbler<W, RNG> {
             }
         }
 
-        let mut writer = self.writer.borrow_mut();
-        for block in gate.into_iter() {
-            writer.write_all(block.as_ref())?;
+        for block in gate.iter() {
+            self.channel.write_block(block)?;
         }
         Ok(X.plus_mov(&Y))
     }
+
     #[inline]
     fn proj(&mut self, A: &Wire, q_out: u16, tt: Option<Vec<u16>>) -> Result<Wire, GarblerError> {
         let tt = tt.ok_or(GarblerError::TruthTableRequired)?;
@@ -301,12 +328,12 @@ impl<W: Write + Debug, RNG: CryptoRng + RngCore> Fancy for Garbler<W, RNG> {
             gate[ix - 1] = ct;
         }
 
-        let mut writer = self.writer.borrow_mut();
-        for block in gate.into_iter() {
-            writer.write_all(block.as_ref())?;
+        for block in gate.iter() {
+            self.channel.write_block(block)?;
         }
         Ok(C)
     }
+
     #[inline]
     fn output(&mut self, X: &Wire) -> Result<(), GarblerError> {
         let q = X.modulus();
@@ -317,9 +344,8 @@ impl<W: Write + Debug, RNG: CryptoRng + RngCore> Fancy for Garbler<W, RNG> {
             let t = output_tweak(i, k);
             cts.push(X.plus(&D.cmul(k)).hash(t));
         }
-        let mut writer = self.writer.borrow_mut();
-        for block in cts.into_iter() {
-            writer.write_all(block.as_ref())?;
+        for block in cts.iter() {
+            self.channel.write_block(block)?;
         }
         Ok(())
     }

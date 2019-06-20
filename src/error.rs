@@ -1,6 +1,5 @@
 //! Errors that may be output by this library.
 
-use crate::garble::Message;
 use scuttlebutt::Block;
 use std::fmt::{self, Display, Formatter};
 
@@ -43,6 +42,8 @@ pub enum DummyError {
     NotEnoughGarblerInputs,
     /// Not enough evaluator inputs provided.
     NotEnoughEvaluatorInputs,
+    /// Encoding error.
+    EncodingError,
     /// A fancy error has occurred.
     FancyError(FancyError),
 }
@@ -54,6 +55,8 @@ pub enum EvaluatorError {
     NotEnoughGarblerInputs,
     /// Not enough evaluator inputs provided.
     NotEnoughEvaluatorInputs,
+    /// Decoding failed.
+    DecodingFailed,
     /// A communication error has occurred.
     CommunicationError(String),
     /// A fancy error has occurred.
@@ -64,13 +67,15 @@ pub enum EvaluatorError {
 #[derive(Debug)]
 pub enum GarblerError {
     /// An error occurred while processing a message.
-    MessageError(String),
-    /// A communication error has occurred.
     CommunicationError(String),
     /// Asymmetric moduli error.
     AsymmetricHalfGateModuliMax8(u16),
     /// A truth table was missing.
     TruthTableRequired,
+    /// Delta required for wire reuse.
+    DeltaRequired,
+    /// Encoding error.
+    EncodingError,
     /// A fancy error has occurred.
     FancyError(FancyError),
 }
@@ -78,6 +83,8 @@ pub enum GarblerError {
 /// Errors emitted when building a circuit.
 #[derive(Debug)]
 pub enum CircuitBuilderError {
+    /// Reuse not supported.
+    ReuseUndefined,
     /// A fancy error has occurred.
     FancyError(FancyError),
 }
@@ -125,6 +132,7 @@ impl Display for DummyError {
         match self {
             DummyError::NotEnoughGarblerInputs => "not enough garbler inputs".fmt(f),
             DummyError::NotEnoughEvaluatorInputs => "not enough evaluator inputs".fmt(f),
+            DummyError::EncodingError => "not enough inputs or moduli".fmt(f),
             DummyError::FancyError(e) => write!(f, "fancy error: {}", e),
         }
     }
@@ -144,6 +152,7 @@ impl Display for EvaluatorError {
         match self {
             EvaluatorError::NotEnoughGarblerInputs => "not enough garbler inputs".fmt(f),
             EvaluatorError::NotEnoughEvaluatorInputs => "not enough evaluator inputs".fmt(f),
+            EvaluatorError::DecodingFailed => write!(f, "decodiing failed"),
             EvaluatorError::CommunicationError(s) => write!(f, "communication error: {}", s),
             EvaluatorError::FancyError(e) => write!(f, "fancy error: {}", e),
         }
@@ -174,7 +183,6 @@ impl From<std::sync::mpsc::RecvError> for EvaluatorError {
 impl Display for GarblerError {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         match self {
-            GarblerError::MessageError(s) => write!(f, "{}", s),
             GarblerError::CommunicationError(s) => write!(f, "{}", s),
             GarblerError::AsymmetricHalfGateModuliMax8(q) => write!(
                 f,
@@ -183,6 +191,13 @@ impl Display for GarblerError {
             ),
             GarblerError::TruthTableRequired => {
                 "truth table required for garbler projection gates".fmt(f)
+            }
+            GarblerError::DeltaRequired => {
+                "delta from previous execution of garbler must be provided with wire to reuse"
+                    .fmt(f)
+            }
+            GarblerError::EncodingError => {
+                "encoding failed: unequal length input values and moduli".fmt(f)
             }
             GarblerError::FancyError(e) => write!(f, "{}", e),
         }
@@ -201,12 +216,6 @@ impl From<std::io::Error> for GarblerError {
     }
 }
 
-impl From<std::sync::mpsc::SendError<Message>> for GarblerError {
-    fn from(e: std::sync::mpsc::SendError<Message>) -> Self {
-        GarblerError::CommunicationError(e.to_string())
-    }
-}
-
 impl From<std::sync::mpsc::SendError<Vec<Block>>> for GarblerError {
     fn from(e: std::sync::mpsc::SendError<Vec<Block>>) -> Self {
         GarblerError::CommunicationError(e.to_string())
@@ -220,6 +229,11 @@ impl Display for CircuitBuilderError {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         match self {
             CircuitBuilderError::FancyError(e) => write!(f, "fancy error: {}", e),
+            CircuitBuilderError::ReuseUndefined => write!(
+                f,
+                "reuse is undefined for circuits. it is unclear what it means to reuse a
+                CircuitRef from a previous circuit."
+            ),
         }
     }
 }

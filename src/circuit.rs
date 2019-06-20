@@ -1,13 +1,15 @@
 //! DSL for creating circuits compatible with fancy-garbling in the old-fashioned way,
 //! where you create a circuit for a computation then garble it.
 
+use crate::dummy::DummyVal;
 use crate::error::{CircuitBuilderError, DummyError, FancyError, InformerError};
-use crate::fancy::{Fancy, HasModulus};
-use serde::{Deserialize, Serialize};
+use crate::fancy::{BinaryBundle, CrtBundle, Fancy, FancyInput, HasModulus};
+use crate::informer::InformerVal;
+use itertools::Itertools;
 use std::collections::HashMap;
 
 /// The index and modulus of a gate in a circuit.
-#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub struct CircuitRef {
     pub(crate) ix: usize,
     pub(crate) modulus: u16,
@@ -26,7 +28,7 @@ impl HasModulus for CircuitRef {
 }
 
 /// Static representation of the type of computation supported by fancy garbling.
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Circuit {
     pub(crate) gates: Vec<Gate>,
     pub(crate) gate_moduli: Vec<u16>,
@@ -38,7 +40,7 @@ pub struct Circuit {
 }
 
 /// The most basic types of computation supported by fancy garbling.
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub(crate) enum Gate {
     GarblerInput {
         id: usize,
@@ -116,13 +118,26 @@ impl Circuit {
     }
 
     /// Evaluate the circuit using fancy object `f`.
-    pub fn eval<F: Fancy>(&mut self, f: &mut F) -> Result<Vec<F::Item>, F::Error> {
+    pub fn eval<F: Fancy>(
+        &mut self,
+        f: &mut F,
+        garbler_inputs: &[F::Item],
+        evaluator_inputs: &[F::Item],
+    ) -> Result<Vec<F::Item>, F::Error> {
         let mut cache: Vec<Option<F::Item>> = vec![None; self.gates.len()];
         for (i, gate) in self.gates.iter().enumerate() {
             let q = self.modulus(i);
             let (zref_, val) = match *gate {
-                Gate::GarblerInput { .. } => (None, f.garbler_input(q, None)?),
-                Gate::EvaluatorInput { .. } => (None, f.evaluator_input(q)?),
+                Gate::GarblerInput { id } => (None, garbler_inputs[id].clone()),
+                Gate::EvaluatorInput { id } => {
+                    assert!(
+                        id < evaluator_inputs.len(),
+                        "id={} ev_inps.len()={}",
+                        id,
+                        evaluator_inputs.len()
+                    );
+                    (None, evaluator_inputs[id].clone())
+                }
                 Gate::Constant { val } => (None, f.constant(val, q)?),
                 Gate::Add { xref, yref, out } => (
                     out,
@@ -211,8 +226,29 @@ impl Circuit {
         garbler_inputs: &[u16],
         evaluator_inputs: &[u16],
     ) -> Result<Vec<u16>, DummyError> {
-        let mut dummy = crate::dummy::Dummy::new(garbler_inputs, evaluator_inputs);
-        let outputs = self.eval(&mut dummy)?;
+        let mut dummy = crate::dummy::Dummy::new();
+
+        if garbler_inputs.len() != self.garbler_input_refs.len() {
+            return Err(DummyError::NotEnoughGarblerInputs);
+        }
+
+        if evaluator_inputs.len() != self.evaluator_input_refs.len() {
+            return Err(DummyError::NotEnoughEvaluatorInputs);
+        }
+
+        // encode inputs as DummyVals
+        let gb = garbler_inputs
+            .iter()
+            .zip(self.garbler_input_refs.iter())
+            .map(|(x, r)| DummyVal::new(*x, r.modulus()))
+            .collect_vec();
+        let ev = evaluator_inputs
+            .iter()
+            .zip(self.evaluator_input_refs.iter())
+            .map(|(x, r)| DummyVal::new(*x, r.modulus()))
+            .collect_vec();
+
+        let outputs = self.eval(&mut dummy, &gb, &ev)?;
         self.process_outputs(&outputs, &mut dummy)?;
         Ok(dummy.get_output())
     }
@@ -220,37 +256,56 @@ impl Circuit {
     /// Print circuit info.
     pub fn print_info(&mut self) -> Result<(), InformerError> {
         let mut informer = crate::informer::Informer::new();
-        let outputs = self.eval(&mut informer)?;
+
+        // encode inputs as InformerVals
+        let gb = self
+            .garbler_input_refs
+            .iter()
+            .map(|r| informer.receive(r.modulus()))
+            .collect::<Result<Vec<InformerVal>, InformerError>>()?;
+        let ev = self
+            .evaluator_input_refs
+            .iter()
+            .map(|r| informer.receive(r.modulus()))
+            .collect::<Result<Vec<InformerVal>, InformerError>>()?;
+
+        let outputs = self.eval(&mut informer, &gb, &ev)?;
         self.process_outputs(&outputs, &mut informer)?;
         informer.print_info();
         Ok(())
     }
+
     /// Return the number of garbler inputs.
     #[inline]
     pub fn num_garbler_inputs(&self) -> usize {
         self.garbler_input_refs.len()
     }
+
     /// Return the number of evaluator inputs.
     #[inline]
     pub fn num_evaluator_inputs(&self) -> usize {
         self.evaluator_input_refs.len()
     }
+
     /// Return the number of outputs.
     #[inline]
     pub fn noutputs(&self) -> usize {
         self.output_refs.len()
     }
+
     /// Return the modulus of the gate indexed by `i`.
     #[inline]
     pub fn modulus(&self, i: usize) -> u16 {
         self.gate_moduli[i]
     }
+
     /// Return the modulus of the garbler input indexed by `i`.
     #[inline]
     pub fn garbler_input_mod(&self, i: usize) -> u16 {
         let r = self.garbler_input_refs[i];
         r.modulus()
     }
+
     /// Return the modulus of the evaluator input indexed by `i`.
     #[inline]
     pub fn evaluator_input_mod(&self, i: usize) -> u16 {
@@ -271,28 +326,6 @@ pub struct CircuitBuilder {
 impl Fancy for CircuitBuilder {
     type Item = CircuitRef;
     type Error = CircuitBuilderError;
-
-    fn garbler_input(
-        &mut self,
-        modulus: u16,
-        _opt_x: Option<u16>,
-    ) -> Result<CircuitRef, Self::Error> {
-        let gate = Gate::GarblerInput {
-            id: self.get_next_garbler_input_id(),
-        };
-        let r = self.gate(gate, modulus);
-        self.circ.garbler_input_refs.push(r);
-        Ok(r)
-    }
-
-    fn evaluator_input(&mut self, modulus: u16) -> Result<CircuitRef, Self::Error> {
-        let gate = Gate::EvaluatorInput {
-            id: self.get_next_evaluator_input_id(),
-        };
-        let r = self.gate(gate, modulus);
-        self.circ.evaluator_input_refs.push(r);
-        Ok(r)
-    }
 
     fn constant(&mut self, val: u16, modulus: u16) -> Result<CircuitRef, Self::Error> {
         match self.const_map.get(&(val, modulus)) {
@@ -429,6 +462,52 @@ impl CircuitBuilder {
         let ix = self.get_next_ref_ix();
         CircuitRef { ix, modulus }
     }
+
+    /// Get CircuitRef for a garbler input wire.
+    pub fn garbler_input(&mut self, modulus: u16) -> CircuitRef {
+        let id = self.get_next_garbler_input_id();
+        let r = self.gate(Gate::GarblerInput { id }, modulus);
+        self.circ.garbler_input_refs.push(r);
+        r
+    }
+
+    /// Get CircuitRef for an evaluator input wire.
+    pub fn evaluator_input(&mut self, modulus: u16) -> CircuitRef {
+        let id = self.get_next_evaluator_input_id();
+        let r = self.gate(Gate::EvaluatorInput { id }, modulus);
+        self.circ.evaluator_input_refs.push(r);
+        r
+    }
+
+    /// Get a vec of CircuitRefs for garbler inputs.
+    pub fn garbler_inputs(&mut self, mods: &[u16]) -> Vec<CircuitRef> {
+        mods.iter().map(|q| self.garbler_input(*q)).collect()
+    }
+
+    /// Get a vec of CircuitRefs for garbler inputs.
+    pub fn evaluator_inputs(&mut self, mods: &[u16]) -> Vec<CircuitRef> {
+        mods.iter().map(|q| self.evaluator_input(*q)).collect()
+    }
+
+    /// Get a CrtBundle for the garbler using composite modulus Q
+    pub fn crt_garbler_input(&mut self, modulus: u128) -> CrtBundle<CircuitRef> {
+        CrtBundle::new(self.garbler_inputs(&crate::util::factor(modulus)))
+    }
+
+    /// Get a CrtBundle for the evaluator using composite modulus Q
+    pub fn crt_evaluator_input(&mut self, modulus: u128) -> CrtBundle<CircuitRef> {
+        CrtBundle::new(self.evaluator_inputs(&crate::util::factor(modulus)))
+    }
+
+    /// Get a BinaryBundle for the garbler with n bits.
+    pub fn bin_garbler_input(&mut self, nbits: usize) -> BinaryBundle<CircuitRef> {
+        BinaryBundle::new(self.garbler_inputs(&vec![2; nbits]))
+    }
+
+    /// Get a BinaryBundle for the evaluator with n bits.
+    pub fn bin_evaluator_input(&mut self, nbits: usize) -> BinaryBundle<CircuitRef> {
+        BinaryBundle::new(self.evaluator_inputs(&vec![2; nbits]))
+    }
 }
 
 #[cfg(test)]
@@ -444,7 +523,7 @@ mod basic {
 
         let mut b = CircuitBuilder::new();
         let n = 2 + (rng.gen_usize() % 200);
-        let inps = b.evaluator_inputs(&vec![2; n]).unwrap();
+        let inps = b.evaluator_inputs(&vec![2; n]);
         let z = b.and_many(&inps).unwrap();
         b.output(&z).unwrap();
         let mut c = b.finish();
@@ -468,7 +547,7 @@ mod basic {
         let mut rng = thread_rng();
         let mut b = CircuitBuilder::new();
         let n = 2 + (rng.gen_usize() % 200);
-        let inps = b.evaluator_inputs(&vec![2; n]).unwrap();
+        let inps = b.evaluator_inputs(&vec![2; n]);
         let z = b.or_many(&inps).unwrap();
         b.output(&z).unwrap();
         let mut c = b.finish();
@@ -492,8 +571,8 @@ mod basic {
         let mut rng = thread_rng();
         let mut b = CircuitBuilder::new();
         let q = rng.gen_prime();
-        let x = b.garbler_input(q, None).unwrap();
-        let y = b.evaluator_input(q).unwrap();
+        let x = b.garbler_input(q);
+        let y = b.evaluator_input(q);
         let z = b.mul(&x, &y).unwrap();
         b.output(&z).unwrap();
         let mut c = b.finish();
@@ -511,7 +590,7 @@ mod basic {
         let mut b = CircuitBuilder::new();
         let p = rng.gen_prime();
         let q = rng.gen_prime();
-        let x = b.garbler_input(p, None).unwrap();
+        let x = b.garbler_input(p);
         let y = b.mod_change(&x, q).unwrap();
         let z = b.mod_change(&y, p).unwrap();
         b.output(&z).unwrap();
@@ -527,7 +606,7 @@ mod basic {
     fn add_many_mod_change() {
         let mut b = CircuitBuilder::new();
         let n = 113;
-        let args = b.garbler_inputs(&vec![2; n], None).unwrap();
+        let args = b.garbler_inputs(&vec![2; n]);
         let wires = args
             .iter()
             .map(|x| b.mod_change(x, n as u16 + 1).unwrap())
@@ -556,7 +635,7 @@ mod basic {
         let q = rng.gen_modulus();
         let c = rng.gen_u16() % q;
 
-        let x = b.evaluator_input(q).unwrap();
+        let x = b.evaluator_input(q);
         let y = b.constant(c, q).unwrap();
         let z = b.add(&x, &y).unwrap();
         b.output(&z).unwrap();
@@ -586,8 +665,8 @@ mod bundle {
         let q = rng.gen_usable_composite_modulus();
 
         let mut b = CircuitBuilder::new();
-        let x = b.crt_garbler_input_bundle(q, None).unwrap();
-        let y = b.crt_evaluator_input_bundle(q).unwrap();
+        let x = b.crt_garbler_input(q);
+        let y = b.crt_evaluator_input(q);
         let z = b.crt_add(&x, &y).unwrap();
         b.output_bundle(&z).unwrap();
         let mut c = b.finish();
@@ -607,8 +686,8 @@ mod bundle {
         let q = rng.gen_usable_composite_modulus();
 
         let mut b = CircuitBuilder::new();
-        let x = b.crt_garbler_input_bundle(q, None).unwrap();
-        let y = b.crt_evaluator_input_bundle(q).unwrap();
+        let x = b.crt_garbler_input(q);
+        let y = b.crt_evaluator_input(q);
         let z = b.sub_bundles(&x, &y).unwrap();
         b.output_bundle(&z).unwrap();
         let mut c = b.finish();
@@ -628,7 +707,7 @@ mod bundle {
         let q = util::modulus_with_width(16);
 
         let mut b = CircuitBuilder::new();
-        let x = b.crt_garbler_input_bundle(q, None).unwrap();
+        let x = b.crt_garbler_input(q);
         let y = rng.gen_u128() % q;
         let z = b.crt_cmul(&x, y).unwrap();
         b.output_bundle(&z).unwrap();
@@ -648,8 +727,8 @@ mod bundle {
         let q = rng.gen_usable_composite_modulus();
 
         let mut b = CircuitBuilder::new();
-        let x = b.crt_garbler_input_bundle(q, None).unwrap();
-        let y = b.crt_evaluator_input_bundle(q).unwrap();
+        let x = b.crt_garbler_input(q);
+        let y = b.crt_evaluator_input(q);
         let z = b.mul_bundles(&x, &y).unwrap();
         b.output_bundle(&z).unwrap();
         let mut c = b.finish();
@@ -670,7 +749,7 @@ mod bundle {
         let y = rng.gen_u16() % 10;
 
         let mut b = CircuitBuilder::new();
-        let x = b.crt_garbler_input_bundle(q, None).unwrap();
+        let x = b.crt_garbler_input(q);
         let z = b.crt_cexp(&x, y).unwrap();
         b.output_bundle(&z).unwrap();
         let mut c = b.finish();
@@ -692,7 +771,7 @@ mod bundle {
         let p = ps[rng.gen_u16() as usize % ps.len()];
 
         let mut b = CircuitBuilder::new();
-        let x = b.crt_garbler_input_bundle(q, None).unwrap();
+        let x = b.crt_garbler_input(q);
         let z = b.crt_rem(&x, p).unwrap();
         b.output_bundle(&z).unwrap();
         let mut c = b.finish();
@@ -712,8 +791,8 @@ mod bundle {
         let q = rng.gen_usable_composite_modulus();
 
         let mut b = CircuitBuilder::new();
-        let x = b.crt_garbler_input_bundle(q, None).unwrap();
-        let y = b.crt_evaluator_input_bundle(q).unwrap();
+        let x = b.crt_garbler_input(q);
+        let y = b.crt_evaluator_input(q);
         let z = b.eq_bundles(&x, &y).unwrap();
         b.output(&z).unwrap();
         let mut c = b.finish();
@@ -739,7 +818,9 @@ mod bundle {
         let mods = (0..7).map(|_| rng.gen_modulus()).collect_vec();
 
         let mut b = CircuitBuilder::new();
-        let xs = b.evaluator_input_bundles(&mods, nargs).unwrap();
+        let xs = (0..nargs)
+            .map(|_| crate::fancy::Bundle::new(b.evaluator_inputs(&mods)))
+            .collect_vec();
         let z = b.mixed_radix_addition(&xs).unwrap();
         b.output_bundle(&z).unwrap();
         let mut circ = b.finish();
@@ -778,7 +859,7 @@ mod bundle {
         println!("q={}", q);
 
         let mut b = CircuitBuilder::new();
-        let x = b.crt_garbler_input_bundle(q, None).unwrap();
+        let x = b.crt_garbler_input(q);
         let z = b.crt_relu(&x, "100%", None).unwrap();
         b.output_bundle(&z).unwrap();
         let mut c = b.finish();
@@ -799,7 +880,7 @@ mod bundle {
         println!("q={}", q);
 
         let mut b = CircuitBuilder::new();
-        let x = b.crt_garbler_input_bundle(q, None).unwrap();
+        let x = b.crt_garbler_input(q);
         let z = b.crt_sgn(&x, "100%", None).unwrap();
         b.output_bundle(&z).unwrap();
         let mut c = b.finish();
@@ -819,8 +900,8 @@ mod bundle {
         let q = util::modulus_with_width(10);
 
         let mut b = CircuitBuilder::new();
-        let x = b.crt_garbler_input_bundle(q, None).unwrap();
-        let y = b.crt_evaluator_input_bundle(q).unwrap();
+        let x = b.crt_garbler_input(q);
+        let y = b.crt_evaluator_input(q);
         let z = b.crt_lt(&x, &y, "100%").unwrap();
         b.output(&z).unwrap();
         let mut c = b.finish();
@@ -846,7 +927,7 @@ mod bundle {
         println!("n={} q={}", n, q);
 
         let mut b = CircuitBuilder::new();
-        let xs = b.crt_garbler_input_bundles(q, n, None).unwrap();
+        let xs = (0..n).map(|_| b.crt_garbler_input(q)).collect_vec();
         let z = b.crt_max(&xs, "100%").unwrap();
         b.output_bundle(&z).unwrap();
         let mut c = b.finish();
@@ -875,9 +956,9 @@ mod bundle {
         println!("n={} q={} Q={}", n, q, Q);
 
         let mut b = CircuitBuilder::new();
-        let xs = b.bin_garbler_input_bundle(n, None).unwrap();
-        let ys = b.bin_evaluator_input_bundle(n).unwrap();
-        let (zs, carry) = b.bin_addition(&xs, &ys).unwrap();
+        let x = b.bin_garbler_input(n);
+        let y = b.bin_evaluator_input(n);
+        let (zs, carry) = b.bin_addition(&x, &y).unwrap();
         b.output(&carry).unwrap();
         b.output_bundle(&zs).unwrap();
         let mut c = b.finish();

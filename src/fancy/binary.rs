@@ -15,16 +15,6 @@ impl<W: Clone + HasModulus> BinaryBundle<W> {
         BinaryBundle(Bundle::new(ws))
     }
 
-    /// Mark a regular bundle as Binary.
-    pub fn from_bundle(b: Bundle<W>) -> BinaryBundle<W> {
-        BinaryBundle(b)
-    }
-
-    /// Unwrap the underlying bundle from this binary bundle.
-    pub fn borrow<'a>(&'a self) -> &'a Bundle<W> {
-        &self.0
-    }
-
     /// Extract the underlying bundle from this binary bundle.
     pub fn extract(self) -> Bundle<W> {
         self.0
@@ -50,60 +40,6 @@ impl<F: Fancy> BinaryGadgets for F {}
 
 /// Extension trait for `Fancy` providing gadgets that operate over bundles of mod2 wires.
 pub trait BinaryGadgets: Fancy + BundleGadgets {
-    /// Create an input bundle for the garbler using `nbits` base 2 inputs and optional input `x`.
-    fn bin_garbler_input_bundle(
-        &mut self,
-        nbits: usize,
-        opt_x: Option<u128>,
-    ) -> Result<BinaryBundle<Self::Item>, Self::Error> {
-        self.garbler_input_bundle(&vec![2; nbits], opt_x.map(|x| util::u128_to_bits(x, nbits)))
-            .map(BinaryBundle)
-    }
-
-    /// Create an input bundle for the evaluator using n base 2 inputs.
-    fn bin_evaluator_input_bundle(
-        &mut self,
-        n: usize,
-    ) -> Result<BinaryBundle<Self::Item>, Self::Error> {
-        self.evaluator_input_bundle(&vec![2; n]).map(BinaryBundle)
-    }
-
-    /// Create `n` garbler input bundles, each with `nbits` bits and optional
-    /// inputs `xs`.
-    fn bin_garbler_input_bundles(
-        &mut self,
-        nbits: usize,
-        n: usize,
-        opt_xs: Option<Vec<u128>>,
-    ) -> Result<Vec<BinaryBundle<Self::Item>>, Self::Error> {
-        if let Some(xs) = opt_xs {
-            if xs.len() != n {
-                return Err(Self::Error::from(FancyError::InvalidArgNum {
-                    got: xs.len(),
-                    needed: n,
-                }));
-            }
-            xs.into_iter()
-                .map(|x| self.bin_garbler_input_bundle(nbits, Some(x)))
-                .collect()
-        } else {
-            (0..n)
-                .map(|_| self.bin_garbler_input_bundle(nbits, None))
-                .collect()
-        }
-    }
-
-    /// Create `n` evaluator input bundles, each with `nbits` bits.
-    fn bin_evaluator_input_bundles(
-        &mut self,
-        nbits: usize,
-        n: usize,
-    ) -> Result<Vec<BinaryBundle<Self::Item>>, Self::Error> {
-        (0..n)
-            .map(|_| self.bin_evaluator_input_bundle(nbits))
-            .collect()
-    }
-
     /// Create a constant bundle using base 2 inputs.
     fn bin_constant_bundle(
         &mut self,
@@ -120,7 +56,7 @@ pub trait BinaryGadgets: Fancy + BundleGadgets {
         x: &BinaryBundle<Self::Item>,
         y: &BinaryBundle<Self::Item>,
     ) -> Result<BinaryBundle<Self::Item>, Self::Error> {
-        self.add_bundles(x.borrow(), y.borrow()).map(BinaryBundle)
+        self.add_bundles(&x, &y).map(BinaryBundle)
     }
 
     /// And the bits of two bundles together pairwise.
@@ -129,7 +65,7 @@ pub trait BinaryGadgets: Fancy + BundleGadgets {
         x: &BinaryBundle<Self::Item>,
         y: &BinaryBundle<Self::Item>,
     ) -> Result<BinaryBundle<Self::Item>, Self::Error> {
-        self.mul_bundles(x.borrow(), y.borrow()).map(BinaryBundle)
+        self.mul_bundles(&x, &y).map(BinaryBundle)
     }
 
     /// Or the bits of two bundles together pairwise.
