@@ -132,6 +132,20 @@ pub trait BinaryGadgets: Fancy + BundleGadgets {
         self.mul_bundles(x.borrow(), y.borrow()).map(BinaryBundle)
     }
 
+    /// Or the bits of two bundles together pairwise.
+    fn bin_or(
+        &mut self,
+        x: &BinaryBundle<Self::Item>,
+        y: &BinaryBundle<Self::Item>,
+    ) -> Result<BinaryBundle<Self::Item>, Self::Error> {
+        x.wires()
+            .iter()
+            .zip(y.wires().iter())
+            .map(|(x, y)| self.or(x, y))
+            .collect::<Result<Vec<Self::Item>, Self::Error>>()
+            .map(BinaryBundle::new)
+    }
+
     /// Binary addition. Returns the result and the carry.
     fn bin_addition(
         &mut self,
