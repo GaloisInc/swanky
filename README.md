@@ -1,4 +1,4 @@
-# The `scuttlebutt` multi-party computation utilities toolkit [![](https://travis-ci.org/amaloz/scuttlebutt.svg?branch=master)](https://travis-ci.org/amaloz/scuttlebutt)
+# The `scuttlebutt` multi-party computation utilities toolkit [![](https://travis-ci.org/GaloisInc/scuttlebutt.svg?branch=master)](https://travis-ci.org/GaloisInc/scuttlebutt)
 Or: "Where rust MPC libraries come to drink"
 
 The `scuttlebutt` library provides a bunch of core primitives for building
@@ -19,10 +19,6 @@ oblivious transfer. In particular, `scuttlebutt` provides the following:
 * A `commitment` module, which provides a `Commitment` trait and an
   implementation `ShaCommitment` using SHA-256.
 * A `utils` module, which contains useful utility functions.
-
-# Documentation
-
-The documentation can be found here: <https://amaloz.github.io/scuttlebutt/scuttlebutt/>.
 
 # Building
 
