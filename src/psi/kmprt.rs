@@ -61,11 +61,10 @@ impl Sender {
 impl Receiver {
     /// Initialize the PSI receiver.
     pub fn init<C: AbstractChannel, RNG: RngCore + CryptoRng + SeedableRng>(
-        me: PartyId,
         channels: &mut [(PartyId, C)],
         rng: &mut RNG,
     ) -> Result<Self, Error> {
-        Party::init(me, channels, rng).map(Self)
+        Party::init(0, channels, rng).map(Self)
     }
 
     /// Send inputs and receive result - only one party should call this.
@@ -75,8 +74,6 @@ impl Receiver {
         channels: &mut [(PartyId, C)],
         rng: &mut RNG,
     ) -> Result<Vec<Block>, Error> {
-        assert_eq!(self.0.id, 0);
-
         let mut s_hat = self.0.conditional_secret_sharing(inputs, channels, rng)?;
 
         // conditional reconstruction

@@ -1,9 +1,9 @@
 use clap::{App, Arg};
 use itertools::Itertools;
 use popsicle::{MultiPartyReceiver, MultiPartySender};
-use scuttlebutt::{Block, SyncChannel};
+use scuttlebutt::{AesRng, Block, SyncChannel};
 use serde::Deserialize;
-use std::io::{BufRead, BufReader, Read, Write};
+use std::io::{BufRead, BufReader, BufWriter, Read, Write};
 use std::net::ToSocketAddrs;
 use std::net::{TcpListener, TcpStream};
 
@@ -48,6 +48,11 @@ fn main() {
                 .help("Sets the input file to use.")
                 .required(true),
         )
+        .arg(
+            Arg::with_name("OUTPUT_FILE")
+                .short("o")
+                .help("Sets the input file to use.")
+        )
         .setting(clap::AppSettings::ColorAlways)
         .get_matches();
 
@@ -64,53 +69,96 @@ fn main() {
         .map(|s| ipv6_to_block(&s.unwrap()))
         .collect_vec();
 
-    println!("{:?}", config);
+    let mut cons = connect_to_parties(my_id, &config);
+    let mut rng = AesRng::new();
 
-    wrangle_connections(my_id, &config);
+    if my_id == 0 {
+        println!("[receiver] init");
+        let mut receiver = MultiPartyReceiver::init(&mut cons, &mut rng).unwrap();
+        println!("[receiver] receive");
+        let intersection = receiver.receive(&inputs, &mut cons, &mut rng).unwrap();
+        println!("[receiver] intersection size: {}", intersection.len());
+
+        if let Some(filename) = matches.value_of("OUTPUT_FILE") {
+            let mut f = std::fs::File::open(filename).unwrap();
+            for blk in intersection {
+                writeln!(f, "{}", block_to_ipv6(blk)).unwrap();
+            }
+        }
+    } else {
+        println!("[sender] init");
+        let mut sender = MultiPartySender::init(my_id, &mut cons, &mut rng).unwrap();
+        println!("[sender] send");
+        sender.send(&inputs, &mut cons, &mut rng).unwrap();
+    }
 }
 
-fn wrangle_connections(
+fn connect_to_parties(
     my_id: usize,
     config: &[PartyConfig],
-) -> Vec<SyncChannel<TcpStream, TcpStream>> {
+) -> Vec<(
+    usize,
+    SyncChannel<BufReader<TcpStream>, BufWriter<TcpStream>>,
+)> {
+    println!("[connect_to_parties party {}]", my_id);
     // listen for connections from parties with ids less than me
     // spawn a thread to accept connections
     let my_config = config[my_id].clone();
     let nparties = config.len();
     let listener_thread = std::thread::spawn(move || {
         let listener =
-            std::net::TcpListener::bind(format!("localhost:{}", my_config.port())).unwrap();
+            TcpListener::bind(format!("localhost:{}", my_config.port())).unwrap();
         listener
             .incoming()
-            .take(nparties - my_id)
+            .take(my_id)
             .map(|stream| {
                 let mut stream = stream.unwrap();
                 let id = read_usize(&mut stream);
+                println!("[{}] party {} connected to me", my_id, id);
                 (id, stream)
             })
             .collect_vec()
     });
 
     // connect to parties with ids greater than me
-    config
-        .iter().enumerate()
-        .skip(my_id + 1)
-        .map(|(id, party)| {
-            let addr = format!("{}:{}", party.address(), party.port())
-                .to_socket_addrs()
-                .unwrap()
-                .next()
-                .unwrap();
-            // XXX: wait for connection somehow
-            let mut stream = TcpStream::connect(&addr).unwrap();
-            write_usize(my_id, &mut stream);
-            (id, stream)
+    let mut cons = (0..nparties).map(|_| None).collect_vec();
+    for (id, party) in config.iter().enumerate().skip(my_id + 1) {
+        let addr = format!("{}:{}", party.address(), party.port())
+            .to_socket_addrs()
+            .unwrap()
+            .next()
+            .unwrap();
+        // wait for connection
+        let mut stream;
+        loop {
+            if let Ok(s) = TcpStream::connect(&addr) {
+                stream = s;
+                break;
+            } else {
+                std::thread::sleep(std::time::Duration::from_millis(10));
+            }
+        }
+        write_usize(my_id, &mut stream);
+        println!("[{}] connected to party {}", my_id, id);
+        cons[id] = Some((id, stream));
+    }
+
+    for (id, con) in listener_thread.join().unwrap().into_iter() {
+        cons[id] = Some((id, con))
+    }
+
+    cons.into_iter()
+        .flatten()
+        .map(|(id, stream)| {
+            (
+                id,
+                SyncChannel::new(
+                    BufReader::new(stream.try_clone().unwrap()),
+                    BufWriter::new(stream),
+                ),
+            )
         })
-        .collect_vec();
-
-    listener_thread.join();
-
-    unimplemented!()
+        .collect()
 }
 
 fn ipv6_to_block(addr: &str) -> Block {
