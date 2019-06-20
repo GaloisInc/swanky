@@ -1,4 +1,4 @@
-# `ocelot`: A rust library for oblivious transfer [![](https://travis-ci.org/amaloz/ocelot.svg?branch=master)](https://travis-ci.org/amaloz/ocelot)
+# `ocelot`: A rust library for oblivious transfer [![](https://travis-ci.org/GaloisInc/ocelot.svg?branch=master)](https://travis-ci.org/GaloisInc/ocelot)
 
 The `ocelot` library implements various one-out-of-two oblivious transfer (+
 extension) protocols in rust, alongside oblivious pseudorandom function
@@ -52,10 +52,6 @@ Chou-Orlandi as the base OT) when running the benchmarks with `1 << 18` OPRFs:
 All results use unix streams and were run on a 2.7 GHz machine with 16 GB RAM,
 with the sender and receiver run on different threads (see `benches/ot.rs` for
 details), using the `nightly` feature (see below).
-
-# Documentation
-
-The documentation can be found here: <https://amaloz.github.com/ocelot/ocelot/>.
 
 # Building
 
