@@ -20,6 +20,9 @@ oblivious transfer. In particular, `scuttlebutt` provides the following:
   implementation `ShaCommitment` using SHA-256.
 * A `utils` module, which contains useful utility functions.
 
+**`scuttlebutt` should be considered unstable and under active development until
+version 1.0 is released**
+
 # Building
 
 Use `cargo build` to build, `cargo test` to run the test suite, and `cargo
