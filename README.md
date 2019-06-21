@@ -6,9 +6,10 @@ multi-party computation (MPC) related protocols, such as garbled circuits or
 oblivious transfer. In particular, `scuttlebutt` provides the following:
 
 * `AbstractChannel`, which provides a trait for a read/write communication
-  channel. The library also includes two implementations of said trait:
-  `Channel` for your basic channel needs, and `TrackChannel` for additionally
-  recording the number of bytes read/written to the channel.
+  channel. The library also includes several implementations of said trait:
+  `Channel` for your basic channel needs, `TrackChannel` for additionally
+  recording the number of bytes read/written to the channel, and `SyncChannel`
+  for a channel that supports the `Send` and `Sync` traits.
 * `Aes128` and `Aes256`, which provide AES encryption capabilities using AES-NI.
 * `AesHash`, which provides correlation-robust hash functions based on
   fixed-key AES (cf. <https://eprint.iacr.org/2019/074>).
@@ -19,6 +20,8 @@ oblivious transfer. In particular, `scuttlebutt` provides the following:
 * A `commitment` module, which provides a `Commitment` trait and an
   implementation `ShaCommitment` using SHA-256.
 * A `utils` module, which contains useful utility functions.
+* Marker traits `SemiHonest` and `Malicious` for enforcing security properties
+  on specific implementations.
 
 **`scuttlebutt` should be considered unstable and under active development until
 version 1.0 is released**
