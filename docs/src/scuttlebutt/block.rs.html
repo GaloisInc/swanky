@@ -382,12 +382,6 @@
 <span id="382">382</span>
 <span id="383">383</span>
 <span id="384">384</span>
-<span id="385">385</span>
-<span id="386">386</span>
-<span id="387">387</span>
-<span id="388">388</span>
-<span id="389">389</span>
-<span id="390">390</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// -*- mode: rust; -*-</span>
 <span class="comment">//</span>
@@ -405,7 +399,6 @@
 <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;serde&quot;</span>)]</span>
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">convert</span>::<span class="ident">TryInto</span>;
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">hash</span>::{<span class="ident">Hash</span>, <span class="ident">Hasher</span>};
-<span class="kw">use</span> <span class="ident">std</span>::<span class="ident">io</span>::{<span class="ident">Read</span>, <span class="ident">Write</span>};
 
 <span class="doccomment">/// A 128-bit chunk.</span>
 <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Clone</span>, <span class="ident">Copy</span>)]</span>
@@ -481,18 +474,6 @@
         <span class="ident">c</span>.<span class="ident">encrypt</span>(<span class="ident">Block</span>::<span class="ident">from</span>(<span class="ident">m</span>))
     }
 
-    <span class="doccomment">/// Write a block to `stream`.</span>
-    <span class="attribute">#[<span class="ident">inline</span>]</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">write</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">Write</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">stream</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">T</span>) <span class="op">-&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">usize</span>, <span class="ident">std</span>::<span class="ident">io</span>::<span class="ident">Error</span><span class="op">&gt;</span> {
-        <span class="ident">stream</span>.<span class="ident">write</span>(<span class="self">self</span>.<span class="ident">as_ref</span>())
-    }
-    <span class="doccomment">/// Read a block from `stream`.</span>
-    <span class="attribute">#[<span class="ident">inline</span>]</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">read</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">Read</span><span class="op">&gt;</span>(<span class="ident">stream</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">T</span>) <span class="op">-&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Block</span>, <span class="ident">std</span>::<span class="ident">io</span>::<span class="ident">Error</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">v</span> <span class="op">=</span> <span class="ident">Block</span>::<span class="ident">default</span>();
-        <span class="ident">stream</span>.<span class="ident">read_exact</span>(<span class="ident">v</span>.<span class="ident">as_mut</span>())<span class="question-mark">?</span>;
-        <span class="prelude-val">Ok</span>(<span class="ident">v</span>)
-    }
     <span class="doccomment">/// Return the least significant bit.</span>
     <span class="attribute">#[<span class="ident">inline</span>]</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">lsb</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-&gt;</span> <span class="ident">bool</span> {
@@ -501,12 +482,12 @@
     <span class="doccomment">/// Set the least significant bit.</span>
     <span class="attribute">#[<span class="ident">inline</span>]</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">set_lsb</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-&gt;</span> <span class="ident">Block</span> {
-        <span class="kw">unsafe</span> { <span class="ident">Block</span>::<span class="ident">from</span>(<span class="ident">_mm_or_si128</span>(<span class="self">self</span>.<span class="number">0</span>, <span class="ident">ONE</span>)) }
+        <span class="kw">unsafe</span> { <span class="ident">Block</span>(<span class="ident">_mm_or_si128</span>(<span class="self">self</span>.<span class="number">0</span>, <span class="ident">ONE</span>)) }
     }
     <span class="doccomment">/// Flip all bits.</span>
     <span class="attribute">#[<span class="ident">inline</span>]</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">flip</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-&gt;</span> <span class="self">Self</span> {
-        <span class="kw">unsafe</span> { <span class="ident">Block</span>::<span class="ident">from</span>(<span class="ident">_mm_xor_si128</span>(<span class="self">self</span>.<span class="number">0</span>, <span class="ident">ONES</span>)) }
+        <span class="kw">unsafe</span> { <span class="ident">Block</span>(<span class="ident">_mm_xor_si128</span>(<span class="self">self</span>.<span class="number">0</span>, <span class="ident">ONES</span>)) }
     }
 }
 
@@ -670,6 +651,13 @@
         <span class="kw">unsafe</span> { <span class="ident">std</span>::<span class="ident">mem</span>::<span class="ident">transmute</span>(<span class="ident">m</span>) }
         <span class="comment">// XXX: the below doesn&#39;t work due to pointer-alignment issues.</span>
         <span class="comment">// unsafe { *(&amp;m as *const _ as *const Block) }</span>
+    }
+}
+
+<span class="kw">impl</span> <span class="ident">From</span><span class="op">&lt;</span>[<span class="ident">u16</span>; <span class="number">8</span>]<span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">Block</span> {
+    <span class="attribute">#[<span class="ident">inline</span>]</span>
+    <span class="kw">fn</span> <span class="ident">from</span>(<span class="ident">m</span>: [<span class="ident">u16</span>; <span class="number">8</span>]) <span class="op">-&gt;</span> <span class="self">Self</span> {
+        <span class="kw">unsafe</span> { <span class="ident">std</span>::<span class="ident">mem</span>::<span class="ident">transmute</span>(<span class="ident">m</span>) }
     }
 }
 

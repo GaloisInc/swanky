@@ -170,6 +170,10 @@
 <span id="170">170</span>
 <span id="171">171</span>
 <span id="172">172</span>
+<span id="173">173</span>
+<span id="174">174</span>
+<span id="175">175</span>
+<span id="176">176</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// -*- mode: rust; -*-</span>
 <span class="comment">//</span>
@@ -177,8 +181,12 @@
 <span class="comment">// Copyright © 2019 Galois, Inc.</span>
 <span class="comment">// See LICENSE for licensing information.</span>
 
+<span class="kw">mod</span> <span class="ident">hash_channel</span>;
+<span class="kw">mod</span> <span class="ident">sync_channel</span>;
 <span class="kw">mod</span> <span class="ident">track_channel</span>;
 
+<span class="kw">pub</span> <span class="kw">use</span> <span class="ident">hash_channel</span>::<span class="ident">HashChannel</span>;
+<span class="kw">pub</span> <span class="kw">use</span> <span class="ident">sync_channel</span>::<span class="ident">SyncChannel</span>;
 <span class="kw">pub</span> <span class="kw">use</span> <span class="ident">track_channel</span>::<span class="ident">TrackChannel</span>;
 
 <span class="kw">use</span> <span class="kw">crate</span>::{<span class="ident">Block</span>, <span class="ident">Block512</span>};

@@ -158,9 +158,6 @@
 <span id="158">158</span>
 <span id="159">159</span>
 <span id="160">160</span>
-<span id="161">161</span>
-<span id="162">162</span>
-<span id="163">163</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// -*- mode: rust; -*-</span>
 <span class="comment">//</span>
@@ -171,9 +168,8 @@
 <span class="doccomment">//! Fixed-key AES random number generator.</span>
 
 <span class="kw">use</span> <span class="kw">crate</span>::{<span class="ident">Aes128</span>, <span class="ident">Block</span>};
-<span class="kw">use</span> <span class="ident">rand</span>::<span class="ident">Rng</span>;
+<span class="kw">use</span> <span class="ident">rand</span>::{<span class="ident">CryptoRng</span>, <span class="ident">Error</span>, <span class="ident">Rng</span>, <span class="ident">RngCore</span>, <span class="ident">SeedableRng</span>};
 <span class="kw">use</span> <span class="ident">rand_core</span>::<span class="ident">block</span>::{<span class="ident">BlockRng</span>, <span class="ident">BlockRngCore</span>};
-<span class="kw">use</span> <span class="ident">rand_core</span>::{<span class="ident">CryptoRng</span>, <span class="ident">Error</span>, <span class="ident">RngCore</span>, <span class="ident">SeedableRng</span>};
 
 <span class="doccomment">/// Implementation of a random number generator based on fixed-key AES.</span>
 <span class="doccomment">///</span>
@@ -320,8 +316,6 @@
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">rng</span> <span class="op">=</span> <span class="ident">AesRng</span>::<span class="ident">new</span>();
         <span class="kw">let</span> <span class="ident">a</span> <span class="op">=</span> <span class="ident">rng</span>.<span class="ident">gen</span>::<span class="op">&lt;</span>[<span class="ident">Block</span>; <span class="number">8</span>]<span class="op">&gt;</span>();
         <span class="kw">let</span> <span class="ident">b</span> <span class="op">=</span> <span class="ident">rng</span>.<span class="ident">gen</span>::<span class="op">&lt;</span>[<span class="ident">Block</span>; <span class="number">8</span>]<span class="op">&gt;</span>();
-        <span class="macro">println</span><span class="macro">!</span>(<span class="string">&quot;{:?}&quot;</span>, <span class="ident">a</span>);
-        <span class="macro">println</span><span class="macro">!</span>(<span class="string">&quot;{:?}&quot;</span>, <span class="ident">b</span>);
         <span class="macro">assert_ne</span><span class="macro">!</span>(<span class="ident">a</span>, <span class="ident">b</span>);
     }
 }
