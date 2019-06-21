@@ -348,19 +348,6 @@
 <span id="348">348</span>
 <span id="349">349</span>
 <span id="350">350</span>
-<span id="351">351</span>
-<span id="352">352</span>
-<span id="353">353</span>
-<span id="354">354</span>
-<span id="355">355</span>
-<span id="356">356</span>
-<span id="357">357</span>
-<span id="358">358</span>
-<span id="359">359</span>
-<span id="360">360</span>
-<span id="361">361</span>
-<span id="362">362</span>
-<span id="363">363</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// -*- mode: rust; -*-</span>
 <span class="comment">//</span>
@@ -387,7 +374,7 @@
 <span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">naor_pinkas</span>;
 
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">errors</span>::<span class="ident">Error</span>;
-<span class="kw">use</span> <span class="ident">rand</span>::{<span class="ident">CryptoRng</span>, <span class="ident">RngCore</span>};
+<span class="kw">use</span> <span class="ident">rand</span>::{<span class="ident">CryptoRng</span>, <span class="ident">Rng</span>};
 <span class="kw">use</span> <span class="ident">scuttlebutt</span>::<span class="ident">AbstractChannel</span>;
 
 <span class="doccomment">/// Instantiation of the Chou-Orlandi OT sender.</span>
@@ -421,12 +408,12 @@
     <span class="kw">type</span> <span class="ident">Msg</span>: <span class="ident">Sized</span> <span class="op">+</span> <span class="ident">AsMut</span><span class="op">&lt;</span>[<span class="ident">u8</span>]<span class="op">&gt;</span>;
     <span class="doccomment">/// Runs any one-time initialization to create the oblivious transfer</span>
     <span class="doccomment">/// object.</span>
-    <span class="kw">fn</span> <span class="ident">init</span><span class="op">&lt;</span><span class="ident">C</span>: <span class="ident">AbstractChannel</span>, <span class="ident">RNG</span>: <span class="ident">CryptoRng</span> <span class="op">+</span> <span class="ident">RngCore</span><span class="op">&gt;</span>(
+    <span class="kw">fn</span> <span class="ident">init</span><span class="op">&lt;</span><span class="ident">C</span>: <span class="ident">AbstractChannel</span>, <span class="ident">RNG</span>: <span class="ident">CryptoRng</span> <span class="op">+</span> <span class="ident">Rng</span><span class="op">&gt;</span>(
         <span class="ident">channel</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">C</span>,
         <span class="ident">rng</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">RNG</span>,
     ) <span class="op">-&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="self">Self</span>, <span class="ident">Error</span><span class="op">&gt;</span>;
     <span class="doccomment">/// Sends messages.</span>
-    <span class="kw">fn</span> <span class="ident">send</span><span class="op">&lt;</span><span class="ident">C</span>: <span class="ident">AbstractChannel</span>, <span class="ident">RNG</span>: <span class="ident">CryptoRng</span> <span class="op">+</span> <span class="ident">RngCore</span><span class="op">&gt;</span>(
+    <span class="kw">fn</span> <span class="ident">send</span><span class="op">&lt;</span><span class="ident">C</span>: <span class="ident">AbstractChannel</span>, <span class="ident">RNG</span>: <span class="ident">CryptoRng</span> <span class="op">+</span> <span class="ident">Rng</span><span class="op">&gt;</span>(
         <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>,
         <span class="ident">channel</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">C</span>,
         <span class="ident">inputs</span>: <span class="kw-2">&amp;</span>[(<span class="self">Self</span>::<span class="ident">Msg</span>, <span class="self">Self</span>::<span class="ident">Msg</span>)],
@@ -445,12 +432,12 @@
     <span class="kw">type</span> <span class="ident">Msg</span>: <span class="ident">Sized</span> <span class="op">+</span> <span class="ident">AsMut</span><span class="op">&lt;</span>[<span class="ident">u8</span>]<span class="op">&gt;</span>;
     <span class="doccomment">/// Runs any one-time initialization to create the oblivious transfer</span>
     <span class="doccomment">/// object.</span>
-    <span class="kw">fn</span> <span class="ident">init</span><span class="op">&lt;</span><span class="ident">C</span>: <span class="ident">AbstractChannel</span>, <span class="ident">RNG</span>: <span class="ident">CryptoRng</span> <span class="op">+</span> <span class="ident">RngCore</span><span class="op">&gt;</span>(
+    <span class="kw">fn</span> <span class="ident">init</span><span class="op">&lt;</span><span class="ident">C</span>: <span class="ident">AbstractChannel</span>, <span class="ident">RNG</span>: <span class="ident">CryptoRng</span> <span class="op">+</span> <span class="ident">Rng</span><span class="op">&gt;</span>(
         <span class="ident">channel</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">C</span>,
         <span class="ident">rng</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">RNG</span>,
     ) <span class="op">-&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="self">Self</span>, <span class="ident">Error</span><span class="op">&gt;</span>;
     <span class="doccomment">/// Receives messages.</span>
-    <span class="kw">fn</span> <span class="ident">receive</span><span class="op">&lt;</span><span class="ident">C</span>: <span class="ident">AbstractChannel</span>, <span class="ident">RNG</span>: <span class="ident">CryptoRng</span> <span class="op">+</span> <span class="ident">RngCore</span><span class="op">&gt;</span>(
+    <span class="kw">fn</span> <span class="ident">receive</span><span class="op">&lt;</span><span class="ident">C</span>: <span class="ident">AbstractChannel</span>, <span class="ident">RNG</span>: <span class="ident">CryptoRng</span> <span class="op">+</span> <span class="ident">Rng</span><span class="op">&gt;</span>(
         <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>,
         <span class="ident">channel</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">C</span>,
         <span class="ident">inputs</span>: <span class="kw-2">&amp;</span>[<span class="ident">bool</span>],
@@ -466,7 +453,7 @@
 {
     <span class="doccomment">/// Correlated oblivious transfer send. Takes as input an array `deltas`</span>
     <span class="doccomment">/// which specifies the offset between the zero and one message.</span>
-    <span class="kw">fn</span> <span class="ident">send_correlated</span><span class="op">&lt;</span><span class="ident">C</span>: <span class="ident">AbstractChannel</span>, <span class="ident">RNG</span>: <span class="ident">CryptoRng</span> <span class="op">+</span> <span class="ident">RngCore</span><span class="op">&gt;</span>(
+    <span class="kw">fn</span> <span class="ident">send_correlated</span><span class="op">&lt;</span><span class="ident">C</span>: <span class="ident">AbstractChannel</span>, <span class="ident">RNG</span>: <span class="ident">CryptoRng</span> <span class="op">+</span> <span class="ident">Rng</span><span class="op">&gt;</span>(
         <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>,
         <span class="ident">channel</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">C</span>,
         <span class="ident">deltas</span>: <span class="kw-2">&amp;</span>[<span class="self">Self</span>::<span class="ident">Msg</span>],
@@ -481,7 +468,7 @@
     <span class="self">Self</span>: <span class="ident">Sized</span>,
 {
     <span class="doccomment">/// Correlated oblivious transfer receive.</span>
-    <span class="kw">fn</span> <span class="ident">receive_correlated</span><span class="op">&lt;</span><span class="ident">C</span>: <span class="ident">AbstractChannel</span>, <span class="ident">RNG</span>: <span class="ident">CryptoRng</span> <span class="op">+</span> <span class="ident">RngCore</span><span class="op">&gt;</span>(
+    <span class="kw">fn</span> <span class="ident">receive_correlated</span><span class="op">&lt;</span><span class="ident">C</span>: <span class="ident">AbstractChannel</span>, <span class="ident">RNG</span>: <span class="ident">CryptoRng</span> <span class="op">+</span> <span class="ident">Rng</span><span class="op">&gt;</span>(
         <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>,
         <span class="ident">channel</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">C</span>,
         <span class="ident">inputs</span>: <span class="kw-2">&amp;</span>[<span class="ident">bool</span>],
@@ -497,7 +484,7 @@
 {
     <span class="doccomment">/// Random oblivious transfer send. Returns a vector of tuples containing</span>
     <span class="doccomment">/// the two random messages.</span>
-    <span class="kw">fn</span> <span class="ident">send_random</span><span class="op">&lt;</span><span class="ident">C</span>: <span class="ident">AbstractChannel</span>, <span class="ident">RNG</span>: <span class="ident">CryptoRng</span> <span class="op">+</span> <span class="ident">RngCore</span><span class="op">&gt;</span>(
+    <span class="kw">fn</span> <span class="ident">send_random</span><span class="op">&lt;</span><span class="ident">C</span>: <span class="ident">AbstractChannel</span>, <span class="ident">RNG</span>: <span class="ident">CryptoRng</span> <span class="op">+</span> <span class="ident">Rng</span><span class="op">&gt;</span>(
         <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>,
         <span class="ident">channel</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">C</span>,
         <span class="ident">m</span>: <span class="ident">usize</span>,
@@ -512,7 +499,7 @@
     <span class="self">Self</span>: <span class="ident">Sized</span>,
 {
     <span class="doccomment">/// Random oblivious transfer receive.</span>
-    <span class="kw">fn</span> <span class="ident">receive_random</span><span class="op">&lt;</span><span class="ident">C</span>: <span class="ident">AbstractChannel</span>, <span class="ident">RNG</span>: <span class="ident">CryptoRng</span> <span class="op">+</span> <span class="ident">RngCore</span><span class="op">&gt;</span>(
+    <span class="kw">fn</span> <span class="ident">receive_random</span><span class="op">&lt;</span><span class="ident">C</span>: <span class="ident">AbstractChannel</span>, <span class="ident">RNG</span>: <span class="ident">CryptoRng</span> <span class="op">+</span> <span class="ident">Rng</span><span class="op">&gt;</span>(
         <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>,
         <span class="ident">channel</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">C</span>,
         <span class="ident">deltas</span>: <span class="kw-2">&amp;</span>[<span class="ident">bool</span>],
@@ -530,8 +517,6 @@
     <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">io</span>::{<span class="ident">BufReader</span>, <span class="ident">BufWriter</span>};
     <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">os</span>::<span class="ident">unix</span>::<span class="ident">net</span>::<span class="ident">UnixStream</span>;
     <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">sync</span>::{<span class="ident">Arc</span>, <span class="ident">Mutex</span>};
-
-    <span class="kw">const</span> <span class="ident">T</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">1</span> <span class="op">&lt;&lt;</span> <span class="number">10</span>;
 
     <span class="kw">fn</span> <span class="ident">rand_block_vec</span>(<span class="ident">size</span>: <span class="ident">usize</span>) <span class="op">-&gt;</span> <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Block</span><span class="op">&gt;</span> {
         (<span class="number">0</span>..<span class="ident">size</span>).<span class="ident">map</span>(<span class="op">|</span><span class="kw">_</span><span class="op">|</span> <span class="ident">rand</span>::<span class="ident">random</span>::<span class="op">&lt;</span><span class="ident">Block</span><span class="op">&gt;</span>()).<span class="ident">collect</span>()
@@ -567,21 +552,17 @@
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">ot</span> <span class="op">=</span> <span class="ident">OTReceiver</span>::<span class="ident">init</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">channel</span>, <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">rng</span>).<span class="ident">unwrap</span>();
         <span class="kw">let</span> <span class="ident">result</span> <span class="op">=</span> <span class="ident">ot</span>.<span class="ident">receive</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">channel</span>, <span class="kw-2">&amp;</span><span class="ident">bs</span>, <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">rng</span>).<span class="ident">unwrap</span>();
         <span class="ident">handle</span>.<span class="ident">join</span>().<span class="ident">unwrap</span>();
-        <span class="comment">// println!(</span>
-        <span class="comment">//     &quot;{} [128 OTs]: read = {:2} Kb, written = {:2} Kb&quot;,</span>
-        <span class="comment">//     ot,</span>
-        <span class="comment">//     reader.kilobits(),</span>
-        <span class="comment">//     writer.kilobits()</span>
-        <span class="comment">// );</span>
         <span class="kw">for</span> <span class="ident">j</span> <span class="kw">in</span> <span class="number">0</span>..<span class="number">128</span> {
             <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">result</span>[<span class="ident">j</span>], <span class="kw">if</span> <span class="ident">bs</span>[<span class="ident">j</span>] { <span class="ident">m1s_</span>[<span class="ident">j</span>] } <span class="kw">else</span> { <span class="ident">m0s_</span>[<span class="ident">j</span>] });
         }
     }
 
-    <span class="kw">fn</span> <span class="ident">test_otext</span><span class="op">&lt;</span><span class="ident">OTSender</span>: <span class="ident">Sender</span><span class="op">&lt;</span><span class="ident">Msg</span> <span class="op">=</span> <span class="ident">Block</span><span class="op">&gt;</span>, <span class="ident">OTReceiver</span>: <span class="ident">Receiver</span><span class="op">&lt;</span><span class="ident">Msg</span> <span class="op">=</span> <span class="ident">Block</span><span class="op">&gt;</span> <span class="op">+</span> <span class="ident">Display</span><span class="op">&gt;</span>() {
-        <span class="kw">let</span> <span class="ident">m0s</span> <span class="op">=</span> <span class="ident">rand_block_vec</span>(<span class="ident">T</span>);
-        <span class="kw">let</span> <span class="ident">m1s</span> <span class="op">=</span> <span class="ident">rand_block_vec</span>(<span class="ident">T</span>);
-        <span class="kw">let</span> <span class="ident">bs</span> <span class="op">=</span> <span class="ident">rand_bool_vec</span>(<span class="ident">T</span>);
+    <span class="kw">fn</span> <span class="ident">test_otext</span><span class="op">&lt;</span><span class="ident">OTSender</span>: <span class="ident">Sender</span><span class="op">&lt;</span><span class="ident">Msg</span> <span class="op">=</span> <span class="ident">Block</span><span class="op">&gt;</span>, <span class="ident">OTReceiver</span>: <span class="ident">Receiver</span><span class="op">&lt;</span><span class="ident">Msg</span> <span class="op">=</span> <span class="ident">Block</span><span class="op">&gt;</span> <span class="op">+</span> <span class="ident">Display</span><span class="op">&gt;</span>(
+        <span class="ident">ninputs</span>: <span class="ident">usize</span>,
+    ) {
+        <span class="kw">let</span> <span class="ident">m0s</span> <span class="op">=</span> <span class="ident">rand_block_vec</span>(<span class="ident">ninputs</span>);
+        <span class="kw">let</span> <span class="ident">m1s</span> <span class="op">=</span> <span class="ident">rand_block_vec</span>(<span class="ident">ninputs</span>);
+        <span class="kw">let</span> <span class="ident">bs</span> <span class="op">=</span> <span class="ident">rand_bool_vec</span>(<span class="ident">ninputs</span>);
         <span class="kw">let</span> <span class="ident">m0s_</span> <span class="op">=</span> <span class="ident">m0s</span>.<span class="ident">clone</span>();
         <span class="kw">let</span> <span class="ident">m1s_</span> <span class="op">=</span> <span class="ident">m1s</span>.<span class="ident">clone</span>();
         <span class="kw">let</span> (<span class="ident">sender</span>, <span class="ident">receiver</span>) <span class="op">=</span> <span class="ident">UnixStream</span>::<span class="ident">pair</span>().<span class="ident">unwrap</span>();
@@ -604,14 +585,7 @@
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">otext</span> <span class="op">=</span> <span class="ident">OTReceiver</span>::<span class="ident">init</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">channel</span>, <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">rng</span>).<span class="ident">unwrap</span>();
         <span class="kw">let</span> <span class="ident">results</span> <span class="op">=</span> <span class="ident">otext</span>.<span class="ident">receive</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">channel</span>, <span class="kw-2">&amp;</span><span class="ident">bs</span>, <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">rng</span>).<span class="ident">unwrap</span>();
         <span class="ident">handle</span>.<span class="ident">join</span>().<span class="ident">unwrap</span>();
-        <span class="comment">// println!(</span>
-        <span class="comment">//     &quot;{} [{} OTs]: read = {:2} Kb, written = {:2} Kb&quot;,</span>
-        <span class="comment">//     otext,</span>
-        <span class="comment">//     T,</span>
-        <span class="comment">//     reader.kilobits(),</span>
-        <span class="comment">//     writer.kilobits()</span>
-        <span class="comment">// );</span>
-        <span class="kw">for</span> <span class="ident">j</span> <span class="kw">in</span> <span class="number">0</span>..<span class="ident">T</span> {
+        <span class="kw">for</span> <span class="ident">j</span> <span class="kw">in</span> <span class="number">0</span>..<span class="ident">ninputs</span> {
             <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">results</span>[<span class="ident">j</span>], <span class="kw">if</span> <span class="ident">bs</span>[<span class="ident">j</span>] { <span class="ident">m1s_</span>[<span class="ident">j</span>] } <span class="kw">else</span> { <span class="ident">m0s_</span>[<span class="ident">j</span>] })
         }
     }
@@ -619,9 +593,11 @@
     <span class="kw">fn</span> <span class="ident">test_cotext</span><span class="op">&lt;</span>
         <span class="ident">OTSender</span>: <span class="ident">CorrelatedSender</span><span class="op">&lt;</span><span class="ident">Msg</span> <span class="op">=</span> <span class="ident">Block</span><span class="op">&gt;</span>,
         <span class="ident">OTReceiver</span>: <span class="ident">CorrelatedReceiver</span><span class="op">&lt;</span><span class="ident">Msg</span> <span class="op">=</span> <span class="ident">Block</span><span class="op">&gt;</span> <span class="op">+</span> <span class="ident">Display</span>,
-    <span class="op">&gt;</span>() {
-        <span class="kw">let</span> <span class="ident">deltas</span> <span class="op">=</span> <span class="ident">rand_block_vec</span>(<span class="ident">T</span>);
-        <span class="kw">let</span> <span class="ident">bs</span> <span class="op">=</span> <span class="ident">rand_bool_vec</span>(<span class="ident">T</span>);
+    <span class="op">&gt;</span>(
+        <span class="ident">ninputs</span>: <span class="ident">usize</span>,
+    ) {
+        <span class="kw">let</span> <span class="ident">deltas</span> <span class="op">=</span> <span class="ident">rand_block_vec</span>(<span class="ident">ninputs</span>);
+        <span class="kw">let</span> <span class="ident">bs</span> <span class="op">=</span> <span class="ident">rand_bool_vec</span>(<span class="ident">ninputs</span>);
         <span class="kw">let</span> <span class="ident">out</span> <span class="op">=</span> <span class="ident">Arc</span>::<span class="ident">new</span>(<span class="ident">Mutex</span>::<span class="ident">new</span>(<span class="macro">vec</span><span class="macro">!</span>[]));
         <span class="kw">let</span> <span class="ident">out_</span> <span class="op">=</span> <span class="ident">out</span>.<span class="ident">clone</span>();
         <span class="kw">let</span> (<span class="ident">sender</span>, <span class="ident">receiver</span>) <span class="op">=</span> <span class="ident">UnixStream</span>::<span class="ident">pair</span>().<span class="ident">unwrap</span>();
@@ -646,14 +622,7 @@
             .<span class="ident">unwrap</span>();
         <span class="ident">handle</span>.<span class="ident">join</span>().<span class="ident">unwrap</span>();
         <span class="kw">let</span> <span class="ident">out_</span> <span class="op">=</span> <span class="ident">out_</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>();
-        <span class="comment">// println!(</span>
-        <span class="comment">//     &quot;{} [{} COTs]: read = {:2} Kb, written = {:2} Kb&quot;,</span>
-        <span class="comment">//     otext,</span>
-        <span class="comment">//     T,</span>
-        <span class="comment">//     reader.kilobits(),</span>
-        <span class="comment">//     writer.kilobits()</span>
-        <span class="comment">// );</span>
-        <span class="kw">for</span> <span class="ident">j</span> <span class="kw">in</span> <span class="number">0</span>..<span class="ident">T</span> {
+        <span class="kw">for</span> <span class="ident">j</span> <span class="kw">in</span> <span class="number">0</span>..<span class="ident">ninputs</span> {
             <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">results</span>[<span class="ident">j</span>], <span class="kw">if</span> <span class="ident">bs</span>[<span class="ident">j</span>] { <span class="ident">out_</span>[<span class="ident">j</span>].<span class="number">1</span> } <span class="kw">else</span> { <span class="ident">out_</span>[<span class="ident">j</span>].<span class="number">0</span> })
         }
     }
@@ -661,8 +630,10 @@
     <span class="kw">fn</span> <span class="ident">test_rotext</span><span class="op">&lt;</span>
         <span class="ident">OTSender</span>: <span class="ident">RandomSender</span><span class="op">&lt;</span><span class="ident">Msg</span> <span class="op">=</span> <span class="ident">Block</span><span class="op">&gt;</span>,
         <span class="ident">OTReceiver</span>: <span class="ident">RandomReceiver</span><span class="op">&lt;</span><span class="ident">Msg</span> <span class="op">=</span> <span class="ident">Block</span><span class="op">&gt;</span> <span class="op">+</span> <span class="ident">Display</span>,
-    <span class="op">&gt;</span>() {
-        <span class="kw">let</span> <span class="ident">bs</span> <span class="op">=</span> <span class="ident">rand_bool_vec</span>(<span class="ident">T</span>);
+    <span class="op">&gt;</span>(
+        <span class="ident">ninputs</span>: <span class="ident">usize</span>,
+    ) {
+        <span class="kw">let</span> <span class="ident">bs</span> <span class="op">=</span> <span class="ident">rand_bool_vec</span>(<span class="ident">ninputs</span>);
         <span class="kw">let</span> <span class="ident">out</span> <span class="op">=</span> <span class="ident">Arc</span>::<span class="ident">new</span>(<span class="ident">Mutex</span>::<span class="ident">new</span>(<span class="macro">vec</span><span class="macro">!</span>[]));
         <span class="kw">let</span> <span class="ident">out_</span> <span class="op">=</span> <span class="ident">out</span>.<span class="ident">clone</span>();
         <span class="kw">let</span> (<span class="ident">sender</span>, <span class="ident">receiver</span>) <span class="op">=</span> <span class="ident">UnixStream</span>::<span class="ident">pair</span>().<span class="ident">unwrap</span>();
@@ -673,7 +644,7 @@
             <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">channel</span> <span class="op">=</span> <span class="ident">Channel</span>::<span class="ident">new</span>(<span class="ident">reader</span>, <span class="ident">writer</span>);
             <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">otext</span> <span class="op">=</span> <span class="ident">OTSender</span>::<span class="ident">init</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">channel</span>, <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">rng</span>).<span class="ident">unwrap</span>();
             <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">out</span> <span class="op">=</span> <span class="ident">out</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>();
-            <span class="kw-2">*</span><span class="ident">out</span> <span class="op">=</span> <span class="ident">otext</span>.<span class="ident">send_random</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">channel</span>, <span class="ident">T</span>, <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">rng</span>).<span class="ident">unwrap</span>();
+            <span class="kw-2">*</span><span class="ident">out</span> <span class="op">=</span> <span class="ident">otext</span>.<span class="ident">send_random</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">channel</span>, <span class="ident">ninputs</span>, <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">rng</span>).<span class="ident">unwrap</span>();
         });
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">rng</span> <span class="op">=</span> <span class="ident">AesRng</span>::<span class="ident">new</span>();
         <span class="kw">let</span> <span class="ident">reader</span> <span class="op">=</span> <span class="ident">BufReader</span>::<span class="ident">new</span>(<span class="ident">receiver</span>.<span class="ident">try_clone</span>().<span class="ident">unwrap</span>());
@@ -683,14 +654,7 @@
         <span class="kw">let</span> <span class="ident">results</span> <span class="op">=</span> <span class="ident">otext</span>.<span class="ident">receive_random</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">channel</span>, <span class="kw-2">&amp;</span><span class="ident">bs</span>, <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">rng</span>).<span class="ident">unwrap</span>();
         <span class="ident">handle</span>.<span class="ident">join</span>().<span class="ident">unwrap</span>();
         <span class="kw">let</span> <span class="ident">out_</span> <span class="op">=</span> <span class="ident">out_</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>();
-        <span class="comment">// println!(</span>
-        <span class="comment">//     &quot;{} [{} ROTs]: read = {:2} Kb, written = {:2} Kb&quot;,</span>
-        <span class="comment">//     otext,</span>
-        <span class="comment">//     T,</span>
-        <span class="comment">//     reader.kilobits(),</span>
-        <span class="comment">//     writer.kilobits()</span>
-        <span class="comment">// );</span>
-        <span class="kw">for</span> <span class="ident">j</span> <span class="kw">in</span> <span class="number">0</span>..<span class="ident">T</span> {
+        <span class="kw">for</span> <span class="ident">j</span> <span class="kw">in</span> <span class="number">0</span>..<span class="ident">ninputs</span> {
             <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">results</span>[<span class="ident">j</span>], <span class="kw">if</span> <span class="ident">bs</span>[<span class="ident">j</span>] { <span class="ident">out_</span>[<span class="ident">j</span>].<span class="number">1</span> } <span class="kw">else</span> { <span class="ident">out_</span>[<span class="ident">j</span>].<span class="number">0</span> })
         }
     }
@@ -712,16 +676,26 @@
 
     <span class="attribute">#[<span class="ident">test</span>]</span>
     <span class="kw">fn</span> <span class="ident">test_alsz</span>() {
-        <span class="ident">test_otext</span>::<span class="op">&lt;</span><span class="ident">AlszSender</span>, <span class="ident">AlszReceiver</span><span class="op">&gt;</span>();
-        <span class="ident">test_cotext</span>::<span class="op">&lt;</span><span class="ident">AlszSender</span>, <span class="ident">AlszReceiver</span><span class="op">&gt;</span>();
-        <span class="ident">test_rotext</span>::<span class="op">&lt;</span><span class="ident">AlszSender</span>, <span class="ident">AlszReceiver</span><span class="op">&gt;</span>();
+        <span class="kw">let</span> <span class="ident">ninputs</span> <span class="op">=</span> <span class="number">1</span> <span class="op">&lt;&lt;</span> <span class="number">10</span>;
+        <span class="ident">test_otext</span>::<span class="op">&lt;</span><span class="ident">AlszSender</span>, <span class="ident">AlszReceiver</span><span class="op">&gt;</span>(<span class="ident">ninputs</span>);
+        <span class="ident">test_cotext</span>::<span class="op">&lt;</span><span class="ident">AlszSender</span>, <span class="ident">AlszReceiver</span><span class="op">&gt;</span>(<span class="ident">ninputs</span>);
+        <span class="ident">test_rotext</span>::<span class="op">&lt;</span><span class="ident">AlszSender</span>, <span class="ident">AlszReceiver</span><span class="op">&gt;</span>(<span class="ident">ninputs</span>);
+        <span class="kw">let</span> <span class="ident">ninputs</span> <span class="op">=</span> (<span class="number">1</span> <span class="op">&lt;&lt;</span> <span class="number">10</span>) <span class="op">+</span> <span class="number">1</span>;
+        <span class="ident">test_otext</span>::<span class="op">&lt;</span><span class="ident">AlszSender</span>, <span class="ident">AlszReceiver</span><span class="op">&gt;</span>(<span class="ident">ninputs</span>);
+        <span class="ident">test_cotext</span>::<span class="op">&lt;</span><span class="ident">AlszSender</span>, <span class="ident">AlszReceiver</span><span class="op">&gt;</span>(<span class="ident">ninputs</span>);
+        <span class="ident">test_rotext</span>::<span class="op">&lt;</span><span class="ident">AlszSender</span>, <span class="ident">AlszReceiver</span><span class="op">&gt;</span>(<span class="ident">ninputs</span>);
     }
 
     <span class="attribute">#[<span class="ident">test</span>]</span>
     <span class="kw">fn</span> <span class="ident">test_kos</span>() {
-        <span class="ident">test_otext</span>::<span class="op">&lt;</span><span class="ident">KosSender</span>, <span class="ident">KosReceiver</span><span class="op">&gt;</span>();
-        <span class="ident">test_cotext</span>::<span class="op">&lt;</span><span class="ident">KosSender</span>, <span class="ident">KosReceiver</span><span class="op">&gt;</span>();
-        <span class="ident">test_rotext</span>::<span class="op">&lt;</span><span class="ident">KosSender</span>, <span class="ident">KosReceiver</span><span class="op">&gt;</span>();
+        <span class="kw">let</span> <span class="ident">ninputs</span> <span class="op">=</span> <span class="number">1</span> <span class="op">&lt;&lt;</span> <span class="number">10</span>;
+        <span class="ident">test_otext</span>::<span class="op">&lt;</span><span class="ident">KosSender</span>, <span class="ident">KosReceiver</span><span class="op">&gt;</span>(<span class="ident">ninputs</span>);
+        <span class="ident">test_cotext</span>::<span class="op">&lt;</span><span class="ident">KosSender</span>, <span class="ident">KosReceiver</span><span class="op">&gt;</span>(<span class="ident">ninputs</span>);
+        <span class="ident">test_rotext</span>::<span class="op">&lt;</span><span class="ident">KosSender</span>, <span class="ident">KosReceiver</span><span class="op">&gt;</span>(<span class="ident">ninputs</span>);
+        <span class="kw">let</span> <span class="ident">ninputs</span> <span class="op">=</span> (<span class="number">1</span> <span class="op">&lt;&lt;</span> <span class="number">10</span>) <span class="op">+</span> <span class="number">1</span>;
+        <span class="ident">test_otext</span>::<span class="op">&lt;</span><span class="ident">KosSender</span>, <span class="ident">KosReceiver</span><span class="op">&gt;</span>(<span class="ident">ninputs</span>);
+        <span class="ident">test_cotext</span>::<span class="op">&lt;</span><span class="ident">KosSender</span>, <span class="ident">KosReceiver</span><span class="op">&gt;</span>(<span class="ident">ninputs</span>);
+        <span class="ident">test_rotext</span>::<span class="op">&lt;</span><span class="ident">KosSender</span>, <span class="ident">KosReceiver</span><span class="op">&gt;</span>(<span class="ident">ninputs</span>);
     }
 
 }

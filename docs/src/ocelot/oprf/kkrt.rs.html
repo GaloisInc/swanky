@@ -275,7 +275,6 @@
 <span id="275">275</span>
 <span id="276">276</span>
 <span id="277">277</span>
-<span id="278">278</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// -*- mode: rust; -*-</span>
 <span class="comment">//</span>
@@ -294,8 +293,7 @@
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">oprf</span>::{<span class="ident">ObliviousPrf</span>, <span class="ident">Receiver</span> <span class="kw">as</span> <span class="ident">OprfReceiver</span>, <span class="ident">Sender</span> <span class="kw">as</span> <span class="ident">OprfSender</span>};
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">ot</span>::{<span class="ident">Receiver</span> <span class="kw">as</span> <span class="ident">OtReceiver</span>, <span class="ident">Sender</span> <span class="kw">as</span> <span class="ident">OtSender</span>};
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">utils</span>;
-<span class="kw">use</span> <span class="ident">rand</span>::<span class="ident">Rng</span>;
-<span class="kw">use</span> <span class="ident">rand</span>::{<span class="ident">CryptoRng</span>, <span class="ident">RngCore</span>, <span class="ident">SeedableRng</span>};
+<span class="kw">use</span> <span class="ident">rand</span>::{<span class="ident">CryptoRng</span>, <span class="ident">Rng</span>, <span class="ident">RngCore</span>, <span class="ident">SeedableRng</span>};
 <span class="kw">use</span> <span class="ident">scuttlebutt</span>::{
     <span class="ident">cointoss</span>, <span class="ident">utils</span> <span class="kw">as</span> <span class="ident">scutils</span>, <span class="ident">AbstractChannel</span>, <span class="ident">AesRng</span>, <span class="ident">Block</span>, <span class="ident">Block512</span>, <span class="ident">SemiHonest</span>,
 };
@@ -321,7 +319,7 @@
     <span class="kw">fn</span> <span class="ident">init</span><span class="op">&lt;</span><span class="ident">C</span>, <span class="ident">RNG</span><span class="op">&gt;</span>(<span class="ident">channel</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">C</span>, <span class="ident">rng</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">RNG</span>) <span class="op">-&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="self">Self</span>, <span class="ident">Error</span><span class="op">&gt;</span>
     <span class="kw">where</span>
         <span class="ident">C</span>: <span class="ident">AbstractChannel</span>,
-        <span class="ident">RNG</span>: <span class="ident">CryptoRng</span> <span class="op">+</span> <span class="ident">RngCore</span>,
+        <span class="ident">RNG</span>: <span class="ident">CryptoRng</span> <span class="op">+</span> <span class="ident">Rng</span>,
     {
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">ot</span> <span class="op">=</span> <span class="ident">OT</span>::<span class="ident">init</span>(<span class="ident">channel</span>, <span class="ident">rng</span>)<span class="question-mark">?</span>;
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">s_</span> <span class="op">=</span> [<span class="number">0u8</span>; <span class="number">64</span>];
@@ -352,7 +350,7 @@
     ) <span class="op">-&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="self">Self</span>::<span class="ident">Seed</span><span class="op">&gt;</span>, <span class="ident">Error</span><span class="op">&gt;</span>
     <span class="kw">where</span>
         <span class="ident">C</span>: <span class="ident">AbstractChannel</span>,
-        <span class="ident">RNG</span>: <span class="ident">CryptoRng</span> <span class="op">+</span> <span class="ident">RngCore</span>,
+        <span class="ident">RNG</span>: <span class="ident">CryptoRng</span> <span class="op">+</span> <span class="ident">Rng</span>,
     {
         <span class="comment">// Round up if necessary so that `m mod 16 ≡ 0`.</span>
         <span class="kw">let</span> <span class="ident">nrows</span> <span class="op">=</span> <span class="kw">if</span> <span class="ident">m</span> <span class="op">%</span> <span class="number">16</span> <span class="op">!=</span> <span class="number">0</span> { <span class="ident">m</span> <span class="op">+</span> (<span class="number">16</span> <span class="op">-</span> <span class="ident">m</span> <span class="op">%</span> <span class="number">16</span>) } <span class="kw">else</span> { <span class="ident">m</span> };
@@ -416,7 +414,7 @@
 }
 
 <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">OT</span>: <span class="ident">OtSender</span><span class="op">&lt;</span><span class="ident">Msg</span> <span class="op">=</span> <span class="ident">Block</span><span class="op">&gt;</span> <span class="op">+</span> <span class="ident">SemiHonest</span><span class="op">&gt;</span> <span class="ident">OprfReceiver</span> <span class="kw">for</span> <span class="ident">Receiver</span><span class="op">&lt;</span><span class="ident">OT</span><span class="op">&gt;</span> {
-    <span class="kw">fn</span> <span class="ident">init</span><span class="op">&lt;</span><span class="ident">C</span>: <span class="ident">AbstractChannel</span>, <span class="ident">RNG</span>: <span class="ident">CryptoRng</span> <span class="op">+</span> <span class="ident">RngCore</span><span class="op">&gt;</span>(
+    <span class="kw">fn</span> <span class="ident">init</span><span class="op">&lt;</span><span class="ident">C</span>: <span class="ident">AbstractChannel</span>, <span class="ident">RNG</span>: <span class="ident">CryptoRng</span> <span class="op">+</span> <span class="ident">Rng</span><span class="op">&gt;</span>(
         <span class="ident">channel</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">C</span>,
         <span class="ident">rng</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">RNG</span>,
     ) <span class="op">-&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="self">Self</span>, <span class="ident">Error</span><span class="op">&gt;</span> {
@@ -444,7 +442,7 @@
         })
     }
 
-    <span class="kw">fn</span> <span class="ident">receive</span><span class="op">&lt;</span><span class="ident">C</span>: <span class="ident">AbstractChannel</span>, <span class="ident">RNG</span>: <span class="ident">CryptoRng</span> <span class="op">+</span> <span class="ident">RngCore</span><span class="op">&gt;</span>(
+    <span class="kw">fn</span> <span class="ident">receive</span><span class="op">&lt;</span><span class="ident">C</span>: <span class="ident">AbstractChannel</span>, <span class="ident">RNG</span>: <span class="ident">CryptoRng</span> <span class="op">+</span> <span class="ident">Rng</span><span class="op">&gt;</span>(
         <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>,
         <span class="ident">channel</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">C</span>,
         <span class="ident">inputs</span>: <span class="kw-2">&amp;</span>[<span class="self">Self</span>::<span class="ident">Input</span>],
