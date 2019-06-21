@@ -19,7 +19,7 @@ unstable = []
 [dependencies]
 fancy-garbling = { git = "https://github.com/spaceships/fancy-garbling" }
 ocelot = { git = "https://github.com/GaloisInc/ocelot" }
-scuttlebutt = { git = "https://github.com/GaloisInc/scuttlebutt", tag="0.3.1" }
+scuttlebutt = { git = "https://github.com/GaloisInc/scuttlebutt", branch="dev" }
 rand = "0.6.5"
 
 [dev-dependencies]
