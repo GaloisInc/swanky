@@ -426,6 +426,29 @@ mod bundle {
     }
 
     #[test]
+    fn binary_demux() {
+        let mut rng = thread_rng();
+        for _ in 0..NITERS {
+            let nbits = 64;
+            let q = 1 << nbits;
+            let x = rng.gen_u128() % q;
+            let mut d = Dummy::new();
+            {
+                let x = d.bin_encode(x, nbits).unwrap();
+                let zs = d.bin_demux(&x).unwrap();
+                d.outputs(&zs).unwrap();
+            }
+            for (i,z) in d.get_output().into_iter().enumerate() {
+                if i as u128 == x {
+                    assert_eq!(z, 1);
+                } else {
+                    assert_eq!(z, 0);
+                }
+            }
+        }
+    }
+
+    #[test]
     fn binary_eq() {
         let mut rng = thread_rng();
         for _ in 0..NITERS {

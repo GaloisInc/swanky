@@ -314,4 +314,33 @@ pub trait BinaryGadgets: Fancy + BundleGadgets {
             })?
         })
     }
+
+    /// Demux a binary bundle into a unary vector.
+    fn bin_demux(
+        &mut self,
+        x: &BinaryBundle<Self::Item>
+    ) -> Result<Vec<Self::Item>, Self::Error> {
+        let wires = x.wires();
+        let nbits = wires.len();
+
+        let mut outs = Vec::with_capacity(1<<nbits);
+
+        for ix in 0 .. 1<<nbits {
+            let mut acc = wires[0].clone();
+            if (ix & 1) == 0 {
+                acc = self.negate(&acc)?;
+            }
+            for (i,w) in wires.iter().enumerate().skip(1) {
+                if ((ix >> i) & 1) > 0 {
+                    acc = self.and(&acc, w)?;
+                } else {
+                    let not_w = self.negate(w)?;
+                    acc = self.and(&acc, &not_w)?;
+                }
+            }
+            outs.push(acc);
+        }
+
+        Ok(outs)
+    }
 }
