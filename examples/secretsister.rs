@@ -1,11 +1,12 @@
 use clap::{App, Arg};
 use itertools::Itertools;
 use popsicle::{MultiPartyReceiver, MultiPartySender};
-use scuttlebutt::{AesRng, Block, SyncChannel};
+use scuttlebutt::{AesRng, Block, TrackChannel};
 use serde::Deserialize;
 use std::io::{BufRead, BufReader, BufWriter, Read, Write};
 use std::net::ToSocketAddrs;
 use std::net::{TcpListener, TcpStream};
+use std::time::SystemTime;
 
 #[derive(Debug, Deserialize, Clone)]
 enum PartyConfig {
@@ -73,11 +74,34 @@ fn main() {
     let mut rng = AesRng::new();
 
     if my_id == 0 {
+        let total_time = SystemTime::now();
+
         println!("[receiver] init");
+        let init_time = SystemTime::now();
         let mut receiver = MultiPartyReceiver::init(&mut cons, &mut rng).unwrap();
+        println!("- init time: {} ms", init_time.elapsed().unwrap().as_millis());
+
         println!("[receiver] receive");
+        let receive_time = SystemTime::now();
         let intersection = receiver.receive(&inputs, &mut cons, &mut rng).unwrap();
+        println!("- receive time: {} ms", receive_time.elapsed().unwrap().as_millis());
         println!("[receiver] intersection size: {}", intersection.len());
+
+        println!("[receiver] communication info:");
+        let mut total = 0.0;
+        for (id, c) in cons {
+            println!(
+                "\tparty {:.2}: sent {:.2} mb, received {:.2} mb",
+                id,
+                c.kilobits_written() / 1000.0,
+                c.kilobits_read() / 1000.0
+            );
+            total += c.kilobits_written();
+            total += c.kilobits_read();
+        }
+
+        println!("\ttotal: {:.2} mb", total / 1000.0);
+        println!("- total time: {} ms", total_time.elapsed().unwrap().as_millis());
 
         if let Some(filename) = matches.value_of("OUTPUT_FILE") {
             let mut f = std::fs::File::open(filename).unwrap();
@@ -98,7 +122,7 @@ fn connect_to_parties(
     config: &[PartyConfig],
 ) -> Vec<(
     usize,
-    SyncChannel<BufReader<TcpStream>, BufWriter<TcpStream>>,
+    TrackChannel<BufReader<TcpStream>, BufWriter<TcpStream>>,
 )> {
     println!("[connect_to_parties party {}]", my_id);
     // listen for connections from parties with ids less than me
@@ -151,7 +175,7 @@ fn connect_to_parties(
         .map(|(id, stream)| {
             (
                 id,
-                SyncChannel::new(
+                TrackChannel::new(
                     BufReader::new(stream.try_clone().unwrap()),
                     BufWriter::new(stream),
                 ),
