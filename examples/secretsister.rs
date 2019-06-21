@@ -51,7 +51,7 @@ fn main() {
         .arg(
             Arg::with_name("OUTPUT_FILE")
                 .short("o")
-                .help("Sets the input file to use.")
+                .help("Sets the input file to use."),
         )
         .setting(clap::AppSettings::ColorAlways)
         .get_matches();
@@ -106,8 +106,7 @@ fn connect_to_parties(
     let my_config = config[my_id].clone();
     let nparties = config.len();
     let listener_thread = std::thread::spawn(move || {
-        let listener =
-            TcpListener::bind(format!("localhost:{}", my_config.port())).unwrap();
+        let listener = TcpListener::bind(format!("localhost:{}", my_config.port())).unwrap();
         listener
             .incoming()
             .take(my_id)

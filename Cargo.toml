@@ -17,13 +17,13 @@ nightly = ["rand/nightly", "scuttlebutt/nightly", "ocelot/nightly", "ocelot/nigh
 unstable = []
 
 [dependencies]
-fancy-garbling = { git = "https://github.com/spaceships/fancy-garbling", branch = "dev" }
-itertools = "0.8.0"
-ocelot = { git = "https://github.com/amaloz/ocelot", branch = "dev" }
-rand = "0.6.5"
-scuttlebutt = { git = "https://github.com/amaloz/scuttlebutt", branch = "dev" }
-sha2 = "0.8.0"
-twopac = { path = "../twopac" }
+fancy-garbling = { git   = "https://github.com/spaceships/fancy-garbling", branch = "dev" }
+ocelot         = { git   = "https://github.com/GaloisInc/ocelot", branch          = "dev" }
+scuttlebutt    = { git   = "https://github.com/GaloisInc/scuttlebutt", branch     = "dev" }
+twopac         = { path  = "../twopac" }
+itertools      = "0.8.0"
+rand           = "0.6.5"
+sha2           = "0.8.0"
 
 [dev-dependencies]
 criterion = "0.2.11"

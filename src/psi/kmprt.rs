@@ -259,7 +259,7 @@ mod tests {
         }
 
         // create and run receiver
-        let mut receiver = Receiver::init(0, &mut receiver_channels, &mut rng).unwrap();
+        let mut receiver = Receiver::init(&mut receiver_channels, &mut rng).unwrap();
         let res = receiver
             .receive(&set2, &mut receiver_channels, &mut rng)
             .unwrap();
