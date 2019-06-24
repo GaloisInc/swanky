@@ -25,7 +25,7 @@ impl<C: AbstractChannel, RNG: CryptoRng + Rng, OT: OtReceiver<Msg = Block> + Sem
     pub fn new(mut channel: C, mut rng: RNG) -> Result<Self, Error> {
         let ot = OT::init(&mut channel, &mut rng)?;
         let evaluator = Ev::new(channel.clone());
-        Ok(Evaluator {
+        Ok(Self {
             evaluator,
             channel,
             ot,
