@@ -17,9 +17,9 @@ nightly = ["rand/nightly", "scuttlebutt/nightly", "ocelot/nightly", "ocelot/nigh
 unstable = []
 
 [dependencies]
-fancy-garbling = { git   = "https://github.com/spaceships/fancy-garbling", branch = "dev" }
-ocelot         = { git   = "https://github.com/GaloisInc/ocelot", branch          = "dev" }
-scuttlebutt    = { git   = "https://github.com/GaloisInc/scuttlebutt", branch     = "dev" }
+fancy-garbling = { git   = "https://github.com/GaloisInc/fancy-garbling", branch = "dev" }
+ocelot         = { git   = "https://github.com/GaloisInc/ocelot", branch         = "dev" }
+scuttlebutt    = { git   = "https://github.com/GaloisInc/scuttlebutt", branch    = "dev" }
 twopac         = { path  = "../twopac" }
 itertools      = "0.8.0"
 rand           = "0.6.5"
