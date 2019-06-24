@@ -11,7 +11,7 @@ development (and research!)**
 
 # Documentation
 
-[Documentation is here](https://spaceships.github.io/fancy-garbling/fancy_garbling/index.html).
+[Documentation is here](https://galoisinc.github.io/fancy-garbling/fancy_garbling/).
 Currently, the best usage examples are the tests in [garble.rs](src/garble.rs).
 
 # Building
@@ -51,4 +51,4 @@ W911NF-15-C-0227.
 Any opinions, findings and conclusions or recommendations expressed in this material are
 those of the author(s) and do not necessarily reflect the views of the ARO and DARPA.
 
-Copyright © 2018-2019 Brent Carmer
+Copyright © 2019 Galois, Inc.
