@@ -26,6 +26,10 @@ oblivious transfer. In particular, `scuttlebutt` provides the following:
 **`scuttlebutt` should be considered unstable and under active development until
 version 1.0 is released**
 
+# Documentation
+
+The documentation can be found here: https://galoisinc.github.io/scuttlebutt/scuttlebutt/
+
 # Building
 
 Use `cargo build` to build, `cargo test` to run the test suite, and `cargo
