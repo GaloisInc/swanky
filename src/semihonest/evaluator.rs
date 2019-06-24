@@ -11,7 +11,7 @@ use rand::{CryptoRng, Rng};
 use scuttlebutt::{AbstractChannel, Block, SemiHonest};
 
 /// Semi-honest evaluator.
-pub struct Evaluator<C: AbstractChannel, RNG, OT> {
+pub struct Evaluator<C, RNG, OT> {
     evaluator: Ev<C>,
     channel: C,
     ot: OT,
