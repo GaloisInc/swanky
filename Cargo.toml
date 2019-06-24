@@ -20,11 +20,11 @@ unstable = []
 fancy-garbling = { git = "https://github.com/spaceships/fancy-garbling", branch = "dev" }
 ocelot = { git = "https://github.com/GaloisInc/ocelot", branch = "dev" }
 scuttlebutt = { git = "https://github.com/GaloisInc/scuttlebutt", branch = "dev" }
-rand = "0.6.5"
+rand = "0.6"
 
 [dev-dependencies]
-criterion = "0.2.11"
-itertools = "0.8.0"
+criterion = "0.2"
+itertools = "0.8"
 
 [profile.release]
 opt-level = 3

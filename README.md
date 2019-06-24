@@ -9,6 +9,10 @@ computation (2PC) protocols:
 **`twopac` should be considered unstable and under active development until
 version 1.0 is released**
 
+# Documentation
+
+The documentation can be found here: https://galoisinc.github.io/twopac/twopac/
+
 # Building
 
 Use `cargo build` to build, `cargo test` to run the test suite, and `cargo
@@ -17,7 +21,6 @@ bench` to benchmark the various protocols.
 `twopac` also supports the following features:
 
 * `nightly`: Use nightly features from `rust` and the underlying libraries.
-
 * `unstable`: Enable unstable components of `twopac`.
 
 # License
