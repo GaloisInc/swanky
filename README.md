@@ -22,6 +22,10 @@ protocol.
 **`ocelot` should be considered unstable with potential API changes until
 version 1.0 is released**
 
+# Documentation
+
+The documentation can be found here: https://galoisinc.github.io/ocelot/ocelot/
+
 # Performance
 
 `ocelot` seems to be close in performance with the latest and greatest OT
