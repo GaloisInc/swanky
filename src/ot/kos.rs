@@ -19,6 +19,7 @@ use scuttlebutt::{cointoss, AbstractChannel, AesRng, Block, Malicious, SemiHones
 use std::convert::TryInto;
 use std::io::ErrorKind;
 
+// The statistical security parameter.
 const SSP: usize = 40;
 
 /// Oblivious transfer extension sender.
@@ -62,7 +63,6 @@ impl<OT: OtReceiver<Msg = Block> + Malicious> Sender<OT> {
         let tmp = x.clmul(self.ot.s_);
         let check = utils::xor_two_blocks(&check, &tmp);
         if check != (t0, t1) {
-            println!("Consistency check failed!");
             return Err(Error::from(std::io::Error::new(
                 ErrorKind::InvalidData,
                 "Consistency check failed",
