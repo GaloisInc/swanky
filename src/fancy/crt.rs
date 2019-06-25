@@ -9,7 +9,7 @@ use std::ops::Deref;
 
 /// Bundle which is explicitly CRT-representation.
 #[derive(Clone)]
-pub struct CrtBundle<W: Clone + HasModulus>(Bundle<W>);
+pub struct CrtBundle<W>(Bundle<W>);
 
 impl<W: Clone + HasModulus> CrtBundle<W> {
     /// Create a new CRT bundle from a vector of wires.

@@ -7,7 +7,7 @@ use std::ops::Deref;
 
 /// Bundle which is explicitly binary representation.
 #[derive(Clone)]
-pub struct BinaryBundle<W: Clone + HasModulus>(Bundle<W>);
+pub struct BinaryBundle<W>(Bundle<W>);
 
 impl<W: Clone + HasModulus> BinaryBundle<W> {
     /// Create a new binary bundle from a vector of wires.

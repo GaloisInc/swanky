@@ -5,7 +5,7 @@ use std::ops::Index;
 
 /// A collection of wires, useful for the garbled gadgets defined by `BundleGadgets`.
 #[derive(Clone)]
-pub struct Bundle<W: Clone + HasModulus>(Vec<W>);
+pub struct Bundle<W>(Vec<W>);
 
 impl<W: Clone + HasModulus> Bundle<W> {
     /// Create a new bundle from some wires.

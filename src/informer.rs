@@ -205,6 +205,9 @@ impl Informer {
 }
 
 impl FancyInput for Informer {
+    type Item = InformerVal;
+    type Error = InformerError;
+
     fn receive(&mut self, modulus: u16) -> Result<Self::Item, Self::Error> {
         self.garbler_input_moduli.push(modulus);
         Ok(InformerVal(modulus))
