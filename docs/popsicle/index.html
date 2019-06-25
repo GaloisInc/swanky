@@ -1,36 +1,33 @@
 <!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="API documentation for the Rust `popsicle` crate."><meta name="keywords" content="rust, rustlang, rust-lang, popsicle"><title>popsicle - Rust</title><link rel="stylesheet" type="text/css" href="../normalize.css"><link rel="stylesheet" type="text/css" href="../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../dark.css"><link rel="stylesheet" type="text/css" href="../light.css" id="themeStyle"><script src="../storage.js"></script><noscript><link rel="stylesheet" href="../noscript.css"></noscript><link rel="shortcut icon" href="../favicon.ico"><style type="text/css">#crate-search{background-image:url("../down-arrow.svg");}</style></head><body class="rustdoc mod"><!--[if lte IE 8]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu">&#9776;</div><a href='../popsicle/index.html'><div class='logo-container'><img src='../rust-logo.png' alt='logo'></div></a><p class='location'>Crate popsicle</p><div class="sidebar-elems"><a id='all-types' href='all.html'><p>See all popsicle's items</p></a><div class="block items"><ul><li><a href="#modules">Modules</a></li><li><a href="#enums">Enums</a></li><li><a href="#types">Type Definitions</a></li></ul></div><p class='location'></p><script>window.sidebarCurrent = {name: 'popsicle', ty: 'mod', relpath: '../'};</script></div></nav><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!"><img src="../brush.svg" width="18" alt="Pick another theme!"></button><div id="theme-choices"></div></div><script src="../theme.js"></script><nav class="sub"><form class="search-form js-only"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><a id="settings-menu" href="../settings.html"><img src="../wheel.svg" width="18" alt="Change settings"></a></div></form></nav><section id="main" class="content"><h1 class='fqn'><span class='out-of-band'><span id='render-detail'><a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">[<span class='inner'>&#x2212;</span>]</a></span><a class='srclink' href='../src/popsicle/lib.rs.html#7-20' title='goto source code'>[src]</a></span><span class='in-band'>Crate <a class="mod" href=''>popsicle</a></span></h1><div class='docblock'><h1 id="popsicle-a-rust-library-for-private-set-intersection" class="section-header"><a href="#popsicle-a-rust-library-for-private-set-intersection"><code>popsicle</code>: A rust library for private set intersection</a></h1>
-<p><code>popsicle</code> is a rust library that provides protocol implementations for private
-set intersection (PSI).</p>
+<p><code>popsicle</code> is a rust library that provides implementations for private
+set intersection (PSI) protocols.</p>
 <p><code>popsicle</code> currently implements the following PSI protocols:</p>
 <ul>
-<li>
-<p>The Pinkas-Schneider-Zohner PSI protocol based on the oblivious PRF of
-Kolesnikov-Kumaresan-Rosulek-Trieu.</p>
-</li>
-<li>
-<p>The Pinkas-Schnedier-Tkachenko-Yanai PSI protocol based on the oblivious
-programmable PRF of Kolesnikov-Matania-Pinkas-Rosulek-Trieu.</p>
-</li>
+<li>The Pinkas-Schneider-Zohner semi-honest two-party PSI protocol based on the
+oblivious PRF of Kolesnikov-Kumaresan-Rosulek-Trieu.</li>
+<li>[Unstable] The Pinkas-Schnedier-Tkachenko-Yanai semi-honest two-party PSI
+protocol based on the oblivious programmable PRF of
+Kolesnikov-Matania-Pinkas-Rosulek-Trieu.</li>
+<li>[Unstable] The Kolesnikov-Matania-Pinkas-Rosulek-Trieu semi-honest multi-party
+PSI protocol.</li>
 </ul>
 <p><strong><code>popsicle</code> should be considered unstable and under active development until
 version 1.0 is released</strong></p>
+<h1 id="documentation" class="section-header"><a href="#documentation">Documentation</a></h1>
+<p>The documentation can be found here: <a href="https://galoisinc.github.io/popsicle/popsicle/">https://galoisinc.github.io/popsicle/popsicle/</a></p>
 <h1 id="building" class="section-header"><a href="#building">Building</a></h1>
-<p>Use <code>cargo build</code> to build, <code>cargo test</code> to run the test suite, <code>cargo bench</code> to
-benchmark the various protocols, and <code>cargo doc --open</code> to view documentation.</p>
+<p>Use <code>cargo build</code> to build, <code>cargo test</code> to run the test suite, and <code>cargo bench</code> to benchmark the various protocols.</p>
 <p><code>popsicle</code> also supports the following features:</p>
 <ul>
-<li>
-<p><code>nightly</code>: Use nightly features from <code>rust</code> and the underlying libraries.</p>
-</li>
-<li>
-<p><code>unstable</code>: Enable unstable components of <code>popsicle</code>.</p>
-</li>
+<li><code>nightly</code>: Use nightly features from <code>rust</code> and the underlying libraries.</li>
+<li><code>unstable</code>: Enable unstable components of <code>popsicle</code>.</li>
 </ul>
 <h1 id="license" class="section-header"><a href="#license">License</a></h1>
 <p>MIT License</p>
 <h1 id="authors" class="section-header"><a href="#authors">Authors</a></h1>
 <ul>
 <li>Alex J. Malozemoff <a href="mailto:amaloz@galois.com">amaloz@galois.com</a></li>
+<li>Brent Carmer <a href="mailto:bcarmer@galois.com">bcarmer@galois.com</a></li>
 </ul>
 <h1 id="acknowledgments" class="section-header"><a href="#acknowledgments">Acknowledgments</a></h1>
 <p>This material is based upon work supported by the ARO and DARPA under Contract
@@ -50,10 +47,10 @@ Kolesnikov-Kumaresan-Rosulek-Trieu (cf. <a href="https://eprint.iacr.org/2016/79
 </td></tr></table><h2 id='enums' class='section-header'><a href="#enums">Enums</a></h2>
 <table><tr class='module-item'><td><a class="enum" href="enum.Error.html" title='popsicle::Error enum'>Error</a></td><td class='docblock-short'><p>Errors produced by the private set intersection protocols.</p>
 </td></tr></table><h2 id='types' class='section-header'><a href="#types">Type Definitions</a></h2>
-<table><tr class='module-item'><td><a class="type" href="type.ExtendPsiReceiver.html" title='popsicle::ExtendPsiReceiver type'>ExtendPsiReceiver</a></td><td class='docblock-short'><p>Extended private set intersection receiver.</p>
-</td></tr><tr class='module-item'><td><a class="type" href="type.ExtendPsiSender.html" title='popsicle::ExtendPsiSender type'>ExtendPsiSender</a></td><td class='docblock-short'><p>Extended private set intersection sender.</p>
+<table><tr class='module-item'><td><a class="type" href="type.ExtendedReceiver.html" title='popsicle::ExtendedReceiver type'>ExtendedReceiver</a></td><td class='docblock-short'><p>Extended private set intersection receiver.</p>
+</td></tr><tr class='module-item'><td><a class="type" href="type.ExtendedSender.html" title='popsicle::ExtendedSender type'>ExtendedSender</a></td><td class='docblock-short'><p>Extended private set intersection sender.</p>
 </td></tr><tr class='module-item'><td><a class="type" href="type.MultiPartyReceiver.html" title='popsicle::MultiPartyReceiver type'>MultiPartyReceiver</a></td><td class='docblock-short'><p>Multi-party private set intersection receiver.</p>
 </td></tr><tr class='module-item'><td><a class="type" href="type.MultiPartySender.html" title='popsicle::MultiPartySender type'>MultiPartySender</a></td><td class='docblock-short'><p>Multi-party private set intersection sender.</p>
-</td></tr><tr class='module-item'><td><a class="type" href="type.PsiReceiver.html" title='popsicle::PsiReceiver type'>PsiReceiver</a></td><td class='docblock-short'><p>Private set intersection receiver.</p>
-</td></tr><tr class='module-item'><td><a class="type" href="type.PsiSender.html" title='popsicle::PsiSender type'>PsiSender</a></td><td class='docblock-short'><p>Private set intersection sender.</p>
+</td></tr><tr class='module-item'><td><a class="type" href="type.Receiver.html" title='popsicle::Receiver type'>Receiver</a></td><td class='docblock-short'><p>Private set intersection receiver.</p>
+</td></tr><tr class='module-item'><td><a class="type" href="type.Sender.html" title='popsicle::Sender type'>Sender</a></td><td class='docblock-short'><p>Private set intersection sender.</p>
 </td></tr></table></section><section id="search" class="content hidden"></section><section class="footer"></section><aside id="help" class="hidden"><div><h1 class="hidden">Help</h1><div class="shortcuts"><h2>Keyboard Shortcuts</h2><dl><dt><kbd>?</kbd></dt><dd>Show this help dialog</dd><dt><kbd>S</kbd></dt><dd>Focus the search field</dd><dt><kbd>↑</kbd></dt><dd>Move up in search results</dd><dt><kbd>↓</kbd></dt><dd>Move down in search results</dd><dt><kbd>↹</kbd></dt><dd>Switch tab</dd><dt><kbd>&#9166;</kbd></dt><dd>Go to active search result</dd><dt><kbd>+</kbd></dt><dd>Expand all sections</dd><dt><kbd>-</kbd></dt><dd>Collapse all sections</dd></dl></div><div class="infos"><h2>Search Tricks</h2><p>Prefix searches with a type followed by a colon (e.g., <code>fn:</code>) to restrict the search to a given type.</p><p>Accepted types are: <code>fn</code>, <code>mod</code>, <code>struct</code>, <code>enum</code>, <code>trait</code>, <code>type</code>, <code>macro</code>, and <code>const</code>.</p><p>Search functions by type signature (e.g., <code>vec -> usize</code> or <code>* -> vec</code>)</p><p>Search multiple things at once by splitting your query with comma (e.g., <code>str,u8</code> or <code>String,struct:Vec,test</code>)</p></div></div></aside><script>window.rootPath = "../";window.currentCrate = "popsicle";</script><script src="../aliases.js"></script><script src="../main.js"></script><script defer src="../search-index.js"></script></body></html>

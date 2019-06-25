@@ -28,11 +28,6 @@
 <span id="28">28</span>
 <span id="29">29</span>
 <span id="30">30</span>
-<span id="31">31</span>
-<span id="32">32</span>
-<span id="33">33</span>
-<span id="34">34</span>
-<span id="35">35</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// -*- mode: rust; -*-</span>
 <span class="comment">//</span>
@@ -40,32 +35,27 @@
 <span class="comment">// Copyright © 2019 Galois, Inc.</span>
 <span class="comment">// See LICENSE for licensing information.</span>
 
-<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">psz</span>;
-
-<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;unstable&quot;</span>)]</span>
-<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">psty</span>;
-
 <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;unstable&quot;</span>)]</span>
 <span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">kmprt</span>;
+<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;unstable&quot;</span>)]</span>
+<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">psty</span>;
+<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">psz</span>;
 
 <span class="doccomment">/// Private set intersection sender.</span>
-<span class="kw">pub</span> <span class="kw">type</span> <span class="ident">PsiSender</span> <span class="op">=</span> <span class="ident">psz</span>::<span class="ident">Sender</span>;
-
+<span class="kw">pub</span> <span class="kw">type</span> <span class="ident">Sender</span> <span class="op">=</span> <span class="ident">psz</span>::<span class="ident">Sender</span>;
 <span class="doccomment">/// Private set intersection receiver.</span>
-<span class="kw">pub</span> <span class="kw">type</span> <span class="ident">PsiReceiver</span> <span class="op">=</span> <span class="ident">psz</span>::<span class="ident">Receiver</span>;
+<span class="kw">pub</span> <span class="kw">type</span> <span class="ident">Receiver</span> <span class="op">=</span> <span class="ident">psz</span>::<span class="ident">Receiver</span>;
 
 <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;unstable&quot;</span>)]</span>
 <span class="doccomment">/// Extended private set intersection sender.</span>
-<span class="kw">pub</span> <span class="kw">type</span> <span class="ident">ExtendPsiSender</span> <span class="op">=</span> <span class="ident">psty</span>::<span class="ident">Sender</span>;
-
+<span class="kw">pub</span> <span class="kw">type</span> <span class="ident">ExtendedSender</span> <span class="op">=</span> <span class="ident">psty</span>::<span class="ident">Sender</span>;
 <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;unstable&quot;</span>)]</span>
 <span class="doccomment">/// Extended private set intersection receiver.</span>
-<span class="kw">pub</span> <span class="kw">type</span> <span class="ident">ExtendPsiReceiver</span> <span class="op">=</span> <span class="ident">psty</span>::<span class="ident">Receiver</span>;
+<span class="kw">pub</span> <span class="kw">type</span> <span class="ident">ExtendedReceiver</span> <span class="op">=</span> <span class="ident">psty</span>::<span class="ident">Receiver</span>;
 
 <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;unstable&quot;</span>)]</span>
 <span class="doccomment">/// Multi-party private set intersection sender.</span>
 <span class="kw">pub</span> <span class="kw">type</span> <span class="ident">MultiPartySender</span> <span class="op">=</span> <span class="ident">kmprt</span>::<span class="ident">Sender</span>;
-
 <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;unstable&quot;</span>)]</span>
 <span class="doccomment">/// Multi-party private set intersection receiver.</span>
 <span class="kw">pub</span> <span class="kw">type</span> <span class="ident">MultiPartyReceiver</span> <span class="op">=</span> <span class="ident">kmprt</span>::<span class="ident">Receiver</span>;

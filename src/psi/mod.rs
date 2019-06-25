@@ -4,32 +4,27 @@
 // Copyright © 2019 Galois, Inc.
 // See LICENSE for licensing information.
 
-pub mod psz;
-
-#[cfg(feature = "unstable")]
-pub mod psty;
-
 #[cfg(feature = "unstable")]
 pub mod kmprt;
+#[cfg(feature = "unstable")]
+pub mod psty;
+pub mod psz;
 
 /// Private set intersection sender.
-pub type PsiSender = psz::Sender;
-
+pub type Sender = psz::Sender;
 /// Private set intersection receiver.
-pub type PsiReceiver = psz::Receiver;
+pub type Receiver = psz::Receiver;
 
 #[cfg(feature = "unstable")]
 /// Extended private set intersection sender.
-pub type ExtendPsiSender = psty::Sender;
-
+pub type ExtendedSender = psty::Sender;
 #[cfg(feature = "unstable")]
 /// Extended private set intersection receiver.
-pub type ExtendPsiReceiver = psty::Receiver;
+pub type ExtendedReceiver = psty::Receiver;
 
 #[cfg(feature = "unstable")]
 /// Multi-party private set intersection sender.
 pub type MultiPartySender = kmprt::Sender;
-
 #[cfg(feature = "unstable")]
 /// Multi-party private set intersection receiver.
 pub type MultiPartyReceiver = kmprt::Receiver;

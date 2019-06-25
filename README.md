@@ -18,17 +18,16 @@ version 1.0 is released**
 
 # Documentation
 
-The documentation can be found here: https://galoisinc.github.io/popsicle/popsicle/
+The documentation can be found here: <https://galoisinc.github.io/popsicle/popsicle/>
 
 # Building
 
-Use `cargo build` to build, `cargo test` to run the test suite, `cargo bench` to
-benchmark the various protocols, and `cargo doc --open` to view documentation.
+Use `cargo build` to build, `cargo test` to run the test suite, and `cargo
+bench` to benchmark the various protocols.
 
 `popsicle` also supports the following features:
 
 * `nightly`: Use nightly features from `rust` and the underlying libraries.
-
 * `unstable`: Enable unstable components of `popsicle`.
 
 # License
