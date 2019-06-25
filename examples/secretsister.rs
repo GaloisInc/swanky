@@ -1,3 +1,9 @@
+// -*- mode: rust; -*-
+//
+// This file is part of `popsicle`.
+// Copyright © 2019 Galois, Inc.
+// See LICENSE for licensing information.
+
 use clap::{App, Arg};
 use itertools::Itertools;
 use popsicle::{MultiPartyReceiver, MultiPartySender};
@@ -79,12 +85,18 @@ fn main() {
         println!("[receiver] init");
         let init_time = SystemTime::now();
         let mut receiver = MultiPartyReceiver::init(&mut cons, &mut rng).unwrap();
-        println!("- init time: {} ms", init_time.elapsed().unwrap().as_millis());
+        println!(
+            "- init time: {} ms",
+            init_time.elapsed().unwrap().as_millis()
+        );
 
         println!("[receiver] receive");
         let receive_time = SystemTime::now();
         let intersection = receiver.receive(&inputs, &mut cons, &mut rng).unwrap();
-        println!("- receive time: {} ms", receive_time.elapsed().unwrap().as_millis());
+        println!(
+            "- receive time: {} ms",
+            receive_time.elapsed().unwrap().as_millis()
+        );
         println!("[receiver] intersection size: {}", intersection.len());
 
         println!("[receiver] communication info:");
@@ -101,7 +113,10 @@ fn main() {
         }
 
         println!("\ttotal: {:.2} mb", total / 1000.0);
-        println!("- total time: {} ms", total_time.elapsed().unwrap().as_millis());
+        println!(
+            "- total time: {} ms",
+            total_time.elapsed().unwrap().as_millis()
+        );
 
         if let Some(filename) = matches.value_of("OUTPUT_FILE") {
             let mut f = std::fs::File::open(filename).unwrap();
