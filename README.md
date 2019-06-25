@@ -11,7 +11,7 @@ version 1.0 is released**
 
 # Documentation
 
-The documentation can be found here: https://galoisinc.github.io/twopac/twopac/
+The documentation can be found here: <https://galoisinc.github.io/twopac/twopac/>
 
 # Building
 
