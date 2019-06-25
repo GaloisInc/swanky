@@ -24,7 +24,7 @@ version 1.0 is released**
 
 # Documentation
 
-The documentation can be found here: https://galoisinc.github.io/ocelot/ocelot/
+The documentation can be found here: <https://galoisinc.github.io/ocelot/ocelot/>
 
 # Performance
 
