@@ -29,6 +29,11 @@ impl DummyVal {
     pub fn new(val: u16, modulus: u16) -> Self {
         Self { val, modulus }
     }
+
+    /// Extract the value.
+    pub fn val(&self) -> u16 {
+        self.val
+    }
 }
 
 impl Dummy {
