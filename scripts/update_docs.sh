@@ -1,8 +1,11 @@
-#!/bin/bash -e
+#!/usr/bin/env bash
 
+set -e
+
+cargo doc --all-features --no-deps --target-dir tmp
 rm -rf docs
-cargo doc --no-deps --target-dir tmp
 mv tmp/doc docs
 rm -rf tmp
+
 git add docs
 git commit -m "update docs"
