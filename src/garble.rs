@@ -1,3 +1,9 @@
+// -*- mode: rust; -*-
+//
+// This file is part of `fancy-garbling`.
+// Copyright © 2019 Galois, Inc.
+// See LICENSE for licensing information.
+
 //! Structs and functions for creating, streaming, and evaluating garbled circuits.
 
 mod evaluator;

@@ -1,3 +1,9 @@
+// -*- mode: rust; -*-
+//
+// This file is part of `fancy-garbling`.
+// Copyright © 2019 Galois, Inc.
+// See LICENSE for licensing information.
+
 //! Dummy implementation of `Fancy`.
 //!
 //! Useful for evaluating the circuits produced by `Fancy` without actually
@@ -438,7 +444,7 @@ mod bundle {
                 let zs = d.bin_demux(&x).unwrap();
                 d.outputs(&zs).unwrap();
             }
-            for (i,z) in d.get_output().into_iter().enumerate() {
+            for (i, z) in d.get_output().into_iter().enumerate() {
                 if i as u128 == x {
                     assert_eq!(z, 1);
                 } else {

@@ -1,3 +1,9 @@
+// -*- mode: rust; -*-
+//
+// This file is part of `fancy-garbling`.
+// Copyright © 2019 Galois, Inc.
+// See LICENSE for licensing information.
+
 //! Tools useful for interacting with `fancy-garbling`.
 //!
 //! Note: all number representations in this library are little-endian.

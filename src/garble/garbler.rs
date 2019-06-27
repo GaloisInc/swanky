@@ -1,3 +1,9 @@
+// -*- mode: rust; -*-
+//
+// This file is part of `fancy-garbling`.
+// Copyright © 2019 Galois, Inc.
+// See LICENSE for licensing information.
+
 use crate::error::{FancyError, GarblerError};
 use crate::fancy::{BinaryBundle, CrtBundle, Fancy, HasModulus};
 use crate::util::{output_tweak, tweak, tweak2, RngExt};
@@ -337,14 +343,14 @@ impl<C: AbstractChannel, RNG: CryptoRng + RngCore> Fancy for Garbler<C, RNG> {
     #[inline]
     fn output(&mut self, X: &Wire) -> Result<(), GarblerError> {
         let q = X.modulus();
-        let mut cts = Vec::with_capacity(q as usize);
+        let mut blocks = Vec::with_capacity(q as usize);
         let i = self.current_output();
         let D = self.delta(q);
         for k in 0..q {
             let t = output_tweak(i, k);
-            cts.push(X.plus(&D.cmul(k)).hash(t));
+            blocks.push(X.plus(&D.cmul(k)).hash(t));
         }
-        for block in cts.iter() {
+        for block in blocks.iter() {
             self.channel.write_block(block)?;
         }
         Ok(())

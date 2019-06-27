@@ -1,3 +1,9 @@
+// -*- mode: rust; -*-
+//
+// This file is part of `fancy-garbling`.
+// Copyright © 2019 Galois, Inc.
+// See LICENSE for licensing information.
+
 use crate::error::{EvaluatorError, FancyError};
 use crate::fancy::{Fancy, HasModulus};
 use crate::util::{output_tweak, tweak, tweak2};
@@ -11,7 +17,7 @@ use scuttlebutt::{AbstractChannel, Block};
 pub struct Evaluator<C> {
     channel: C,
     current_gate: usize,
-    pub(crate) output_cts: Vec<Vec<Block>>,
+    pub(crate) output_blocks: Vec<Vec<Block>>,
     pub(crate) output_wires: Vec<Wire>,
 }
 
@@ -21,7 +27,7 @@ impl<C: AbstractChannel> Evaluator<C> {
         Evaluator {
             channel,
             current_gate: 0,
-            output_cts: Vec::new(),
+            output_blocks: Vec::new(),
             output_wires: Vec::new(),
         }
     }
@@ -30,19 +36,19 @@ impl<C: AbstractChannel> Evaluator<C> {
     pub fn decode_output(&self) -> Result<Vec<u16>, EvaluatorError> {
         debug_assert_eq!(
             self.output_wires.len(),
-            self.output_cts.len(),
+            self.output_blocks.len(),
             "got {} wires, but have {} output ciphertexts",
             self.output_wires.len(),
-            self.output_cts.len()
+            self.output_blocks.len()
         );
 
         let mut outs = Vec::with_capacity(self.output_wires.len());
         for i in 0..self.output_wires.len() {
             let q = self.output_wires[i].modulus();
-            debug_assert_eq!(q as usize, self.output_cts[i].len());
+            debug_assert_eq!(q as usize, self.output_blocks[i].len());
             for k in 0..q {
                 let h = self.output_wires[i].hash(output_tweak(i, k));
-                if h == self.output_cts[i][k as usize] {
+                if h == self.output_blocks[i][k as usize] {
                     outs.push(k);
                     break;
                 }
@@ -174,7 +180,7 @@ impl<C: AbstractChannel> Fancy for Evaluator<C> {
             let block = self.channel.read_block()?;
             blocks.push(block);
         }
-        self.output_cts.push(blocks);
+        self.output_blocks.push(blocks);
         self.output_wires.push(x.clone());
         Ok(())
     }

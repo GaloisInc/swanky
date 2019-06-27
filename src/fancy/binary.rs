@@ -1,3 +1,9 @@
+// -*- mode: rust; -*-
+//
+// This file is part of `fancy-garbling`.
+// Copyright © 2019 Galois, Inc.
+// See LICENSE for licensing information.
+
 use crate::error::FancyError;
 use crate::fancy::bundle::{Bundle, BundleGadgets};
 use crate::fancy::{Fancy, HasModulus};
@@ -316,21 +322,18 @@ pub trait BinaryGadgets: Fancy + BundleGadgets {
     }
 
     /// Demux a binary bundle into a unary vector.
-    fn bin_demux(
-        &mut self,
-        x: &BinaryBundle<Self::Item>
-    ) -> Result<Vec<Self::Item>, Self::Error> {
+    fn bin_demux(&mut self, x: &BinaryBundle<Self::Item>) -> Result<Vec<Self::Item>, Self::Error> {
         let wires = x.wires();
         let nbits = wires.len();
 
-        let mut outs = Vec::with_capacity(1<<nbits);
+        let mut outs = Vec::with_capacity(1 << nbits);
 
-        for ix in 0 .. 1<<nbits {
+        for ix in 0..1 << nbits {
             let mut acc = wires[0].clone();
             if (ix & 1) == 0 {
                 acc = self.negate(&acc)?;
             }
-            for (i,w) in wires.iter().enumerate().skip(1) {
+            for (i, w) in wires.iter().enumerate().skip(1) {
                 if ((ix >> i) & 1) > 0 {
                     acc = self.and(&acc, w)?;
                 } else {
