@@ -35,6 +35,11 @@ impl DummyVal {
     pub fn new(val: u16, modulus: u16) -> Self {
         Self { val, modulus }
     }
+
+    /// Extract the value.
+    pub fn val(&self) -> u16 {
+        self.val
+    }
 }
 
 impl Dummy {
@@ -52,6 +57,9 @@ impl Dummy {
 }
 
 impl FancyInput for Dummy {
+    type Item = DummyVal;
+    type Error = DummyError;
+
     /// Encode a single dummy value.
     fn encode(&mut self, value: u16, modulus: u16) -> Result<DummyVal, DummyError> {
         Ok(DummyVal::new(value, modulus))

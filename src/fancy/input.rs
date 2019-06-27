@@ -9,7 +9,13 @@ use crate::util;
 use itertools::Itertools;
 
 /// Convenience functions for encoding input to Fancy objects.
-pub trait FancyInput: Fancy {
+pub trait FancyInput {
+    /// The type that this Fancy object operates over.
+    type Item: Clone + HasModulus;
+
+    /// The type of error that this Fancy object emits.
+    type Error: From<FancyError>;
+
     ////////////////////////////////////////////////////////////////////////////////
     // required methods
 
