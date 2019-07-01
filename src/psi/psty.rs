@@ -104,11 +104,13 @@ impl Sender {
 
         Ok(SenderState { opprf_outputs: ts })
     }
+}
 
+impl SenderState {
     /// Run the setup phase, producing a garbler for the next stage.
     pub fn compute_setup<C, RNG>(
+        &self,
         channel: &mut C,
-        state: &SenderState,
         rng: &mut RNG,
     ) -> Result<(Garbler<C, RNG, OtSender>, Vec<Wire>, Vec<Wire>), Error>
     where
@@ -117,7 +119,7 @@ impl Sender {
     {
         let mut gb =
             Garbler::<C, RNG, OtSender>::new(channel.clone(), RNG::from_seed(rng.gen()), &[])?;
-        let my_input_bits = encode_inputs(&state.opprf_outputs);
+        let my_input_bits = encode_inputs(&self.opprf_outputs);
         let mods = vec![2; my_input_bits.len()]; // all binary moduli
         let sender_inputs = gb.encode_many(&my_input_bits, &mods)?;
         let receiver_inputs = gb.receive_many(&mods)?;
@@ -126,15 +128,15 @@ impl Sender {
 
     /// Compute the intersection.
     pub fn compute_intersection<C, RNG>(
+        &self,
         channel: &mut C,
-        state: SenderState,
         rng: &mut RNG,
     ) -> Result<(), Error>
     where
         C: AbstractChannel,
         RNG: RngCore + CryptoRng + SeedableRng<Seed = Block>,
     {
-        let (mut gb, x, y) = Self::compute_setup(channel, &state, rng)?;
+        let (mut gb, x, y) = self.compute_setup(channel, rng)?;
         let outs = fancy_compute_intersection(&mut gb, &x, &y)?;
         gb.outputs(&outs)?;
         Ok(())
@@ -142,15 +144,15 @@ impl Sender {
 
     /// Compute the cardinality of the intersection.
     pub fn compute_cardinality<C, RNG>(
+        &self,
         channel: &mut C,
-        state: SenderState,
         rng: &mut RNG,
     ) -> Result<(), Error>
     where
         C: AbstractChannel,
         RNG: RngCore + CryptoRng + SeedableRng<Seed = Block>,
     {
-        let (mut gb, x, y) = Self::compute_setup(channel, &state, rng)?;
+        let (mut gb, x, y) = self.compute_setup(channel, rng)?;
         let (outs, _) = fancy_compute_cardinality(&mut gb, &x, &y)?;
         gb.outputs(&outs)?;
         Ok(())
@@ -202,19 +204,21 @@ impl Receiver {
             inputs: inputs.to_vec(),
         })
     }
+}
 
+impl ReceiverState {
     /// Run the setup phase, producing an evaluator for the next stage.
     pub fn compute_setup<C, RNG>(
+        &self,
         channel: &mut C,
-        state: &ReceiverState,
         rng: &mut RNG,
     ) -> Result<(Evaluator<C, RNG, OtReceiver>, Vec<Wire>, Vec<Wire>), Error>
     where
         C: AbstractChannel,
         RNG: CryptoRng + RngCore + SeedableRng<Seed = Block>,
     {
-        let nbins = state.cuckoo.nbins;
-        let my_input_bits = encode_inputs(&state.opprf_outputs);
+        let nbins = self.cuckoo.nbins;
+        let my_input_bits = encode_inputs(&self.opprf_outputs);
 
         let mut ev =
             Evaluator::<C, RNG, OtReceiver>::new(channel.clone(), RNG::from_seed(rng.gen()))?;
@@ -227,24 +231,24 @@ impl Receiver {
 
     /// Compute the intersection.
     pub fn compute_intersection<C, RNG>(
+        &self,
         channel: &mut C,
-        state: ReceiverState,
         rng: &mut RNG,
     ) -> Result<Vec<Msg>, Error>
     where
         C: AbstractChannel,
         RNG: RngCore + CryptoRng + SeedableRng<Seed = Block>,
     {
-        let (mut ev, x, y) = Self::compute_setup(channel, &state, rng)?;
+        let (mut ev, x, y) = self.compute_setup(channel, rng)?;
         let outs = fancy_compute_intersection(&mut ev, &x, &y)?;
         ev.outputs(&outs)?;
         let mpc_outs = ev.decode_output()?;
 
         let mut intersection = Vec::new();
-        for (opt_item, in_intersection) in state.cuckoo.items.iter().zip_eq(mpc_outs.into_iter()) {
+        for (opt_item, in_intersection) in self.cuckoo.items.iter().zip_eq(mpc_outs.into_iter()) {
             if let Some(item) = opt_item {
                 if in_intersection == 1_u16 {
-                    intersection.push(state.inputs[item.input_index].clone());
+                    intersection.push(self.inputs[item.input_index].clone());
                 }
             }
         }
@@ -253,15 +257,15 @@ impl Receiver {
 
     /// Compute the cardinality of the intersection.
     pub fn compute_cardinality<C, RNG>(
+        &self,
         channel: &mut C,
-        state: ReceiverState,
         rng: &mut RNG,
     ) -> Result<usize, Error>
     where
         C: AbstractChannel,
         RNG: RngCore + CryptoRng + SeedableRng<Seed = Block>,
     {
-        let (mut ev, x, y) = Self::compute_setup(channel, &state, rng)?;
+        let (mut ev, x, y) = self.compute_setup(channel, rng)?;
         let (outs, mods) = fancy_compute_cardinality(&mut ev, &x, &y)?;
         ev.outputs(&outs)?;
         let mpc_outs = ev.decode_output()?;
@@ -367,7 +371,7 @@ mod tests {
             let mut psi = Sender::init(&mut channel, &mut rng).unwrap();
 
             let state = psi.send(&mut channel, &sender_inputs, &mut rng).unwrap();
-            Sender::compute_cardinality(&mut channel, state, &mut rng).unwrap();
+            state.compute_cardinality(&mut channel, &mut rng).unwrap();
         });
 
         let mut rng = AesRng::new();
@@ -379,7 +383,7 @@ mod tests {
         let state = psi
             .receive(&mut channel, &receiver_inputs, &mut rng)
             .unwrap();
-        let cardinality = Receiver::compute_cardinality(&mut channel, state, &mut rng).unwrap();
+        let cardinality = state.compute_cardinality(&mut channel, &mut rng).unwrap();
 
         assert_eq!(cardinality, SET_SIZE);
     }

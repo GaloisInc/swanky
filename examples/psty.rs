@@ -53,7 +53,7 @@ fn psty(inputs1: Vec<Vec<u8>>, inputs2: Vec<Vec<u8>>) {
             channel.kilobits_written() / 1000.0
         );
         let start = SystemTime::now();
-        let _ = Sender::compute_intersection(&mut channel, state, &mut rng).unwrap();
+        let _ = state.compute_intersection(&mut channel, &mut rng).unwrap();
         println!(
             "Sender :: intersection time: {} ms",
             start.elapsed().unwrap().as_millis()
@@ -86,7 +86,7 @@ fn psty(inputs1: Vec<Vec<u8>>, inputs2: Vec<Vec<u8>>) {
         start.elapsed().unwrap().as_millis()
     );
     let start = SystemTime::now();
-    let _ = Receiver::compute_intersection(&mut channel, state, &mut rng).unwrap();
+    let _ = state.compute_intersection(&mut channel, &mut rng).unwrap();
     println!(
         "Receiver :: intersection time: {} ms",
         start.elapsed().unwrap().as_millis()
