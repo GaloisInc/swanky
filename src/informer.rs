@@ -16,7 +16,6 @@ pub struct Informer {
     garbler_input_moduli: Vec<u16>,
     evaluator_input_moduli: Vec<u16>,
     constants: HashSet<(u16, u16)>,
-    nreuses: usize,
     outputs: Vec<u16>,
     nadds: usize,
     nsubs: usize,
@@ -45,7 +44,6 @@ impl Informer {
             garbler_input_moduli: Vec::new(),
             evaluator_input_moduli: Vec::new(),
             constants: HashSet::new(),
-            nreuses: 0,
             outputs: Vec::new(),
             nadds: 0,
             nsubs: 0,
@@ -64,7 +62,6 @@ impl Informer {
     /// computation info:
     ///   garbler inputs:                  128 // comms cost: 16 Kb
     ///   evaluator inputs:                128 // comms cost: 48 Kb
-    ///   reused values:                    12
     ///   outputs:                         128
     ///   output ciphertexts:              256 // comms cost: 32 Kb
     ///   constants:                         1 // comms cost: 0.125 Kb
@@ -101,8 +98,6 @@ impl Informer {
         );
         total += comm;
         let comm = self.num_output_ciphertexts() as f64 * 128.0 / 1000.0;
-
-        println!("  reused values:      {:16}", self.nreuses);
 
         println!("  outputs:            {:16}", self.num_outputs());
         println!(
