@@ -17,12 +17,17 @@ use ocelot::ot::{AlszReceiver as OtReceiver, AlszSender as OtSender};
 use rand::{CryptoRng, Rng, RngCore, SeedableRng};
 use scuttlebutt::{AbstractChannel, Block, Block512, SemiHonest};
 use twopac::semihonest::{Evaluator, Garbler};
+use openssl::symm::{encrypt, decrypt, Cipher};
 
 const NHASHES: usize = 3;
 // How many bytes of the hash to use for the equality tests. This affects
 // correctness, with a lower value increasing the likelihood of a false
 // positive.
 const HASH_SIZE: usize = 4;
+
+// How many bytes to use to determine whether decryption succeeded in the send/recv
+// payload methods.
+const PAD_LEN: usize = 16;
 
 /// The type of values in the sender and receiver's sets.
 pub type Msg = Vec<u8>;
@@ -62,8 +67,8 @@ impl Sender {
     /// Run the PSI protocol over `inputs`.
     pub fn send<C: AbstractChannel, RNG: RngCore + CryptoRng + SeedableRng>(
         &mut self,
-        channel: &mut C,
         inputs: &[Msg],
+        channel: &mut C,
         rng: &mut RNG,
     ) -> Result<SenderState, Error> {
         // receive cuckoo hash info from sender
@@ -157,6 +162,26 @@ impl SenderState {
         gb.outputs(&outs)?;
         Ok(())
     }
+
+    /// Receive encrypted payloads from the Sender.
+    pub fn receive_payloads<C>(&self, payload_len: usize, channel: &mut C)
+        -> Result<Vec<Vec<u8>>, Error>
+    where
+        C: AbstractChannel
+    {
+        let mut payloads = Vec::new();
+        for opprf_output in self.opprf_outputs.iter() {
+            let iv = channel.read_vec(16)?;
+            let ct = channel.read_vec(payload_len + PAD_LEN)?;
+            let key = opprf_output.prefix(16);
+            let mut dec = decrypt(Cipher::aes_128_ctr(), key, Some(&iv), &ct)?;
+            let payload = dec.split_off(PAD_LEN);
+            if dec.into_iter().all(|x| x == 0) {
+                payloads.push(payload)
+            }
+        }
+        Ok(payloads)
+    }
 }
 
 impl Receiver {
@@ -172,8 +197,8 @@ impl Receiver {
     /// Run the PSI protocol over `inputs`.
     pub fn receive<C: AbstractChannel, RNG: RngCore + CryptoRng + SeedableRng>(
         &mut self,
-        channel: &mut C,
         inputs: &[Msg],
+        channel: &mut C,
         rng: &mut RNG,
     ) -> Result<ReceiverState, Error> {
         let key = rng.gen();
@@ -273,6 +298,39 @@ impl ReceiverState {
         let cardinality = fancy_garbling::util::crt_inv(&mpc_outs, &mods);
         Ok(cardinality as usize)
     }
+
+    /// Send encrypted payloads to the Receiver, who can only decrypt a payload if they
+    /// share the associated element in the intersection.
+    pub fn send_payloads<C, RNG>(&self, payloads: &[Vec<u8>], channel: &mut C, rng: &mut RNG) -> Result<(), Error>
+    where
+        C: AbstractChannel,
+        RNG: RngCore + CryptoRng + SeedableRng<Seed = Block>,
+    {
+        let payload_len = payloads[0].len();
+        if !(payloads.iter().all(|p| p.len() == payload_len)) {
+            return Err(Error::InvalidPayloadsLength);
+        }
+        let dummy_payload = vec![0; payload_len];
+
+        for (opt_item, opprf_output) in self.cuckoo.items.iter().zip_eq(self.opprf_outputs.iter()) {
+            let mut payload = vec![0; PAD_LEN];
+            if let Some(item) = opt_item {
+                if item.input_index >= payloads.len() {
+                    return Err(Error::InvalidPayloadsLength);
+                }
+                payload.extend_from_slice(&payloads[item.input_index]);
+            } else {
+                payload.extend_from_slice(&dummy_payload);
+            };
+            let iv: [u8; 16] = rng.gen();
+            let key = opprf_output.prefix(16);
+            let ct = encrypt(Cipher::aes_128_ctr(), &key, Some(&iv), &payload)?;
+            channel.write_bytes(&iv)?;
+            channel.write_bytes(&ct)?;
+        }
+        channel.flush()?;
+        Ok(())
+    }
 }
 
 fn encode_inputs(opprf_outputs: &[Block512]) -> Vec<u16> {
@@ -354,7 +412,7 @@ mod tests {
     use std::os::unix::net::UnixStream;
 
     const ITEM_SIZE: usize = 8;
-    const SET_SIZE: usize = 1 << 6;
+    const SET_SIZE: usize = 1 << 8;
 
     #[test]
     fn full_protocol() {
@@ -370,7 +428,7 @@ mod tests {
             let mut channel = Channel::new(reader, writer);
             let mut psi = Sender::init(&mut channel, &mut rng).unwrap();
 
-            let state = psi.send(&mut channel, &sender_inputs, &mut rng).unwrap();
+            let state = psi.send(&sender_inputs, &mut channel, &mut rng).unwrap();
             state.compute_cardinality(&mut channel, &mut rng).unwrap();
         });
 
@@ -381,11 +439,46 @@ mod tests {
         let mut psi = Receiver::init(&mut channel, &mut rng).unwrap();
 
         let state = psi
-            .receive(&mut channel, &receiver_inputs, &mut rng)
+            .receive(&receiver_inputs, &mut channel, &mut rng)
             .unwrap();
         let cardinality = state.compute_cardinality(&mut channel, &mut rng).unwrap();
 
         assert_eq!(cardinality, SET_SIZE);
     }
 
+    #[test]
+    fn payloads() {
+        let payload_size = 16;
+
+        let mut rng = AesRng::new();
+        let (sender, receiver) = UnixStream::pair().unwrap();
+        let sender_inputs = rand_vec_vec(SET_SIZE, ITEM_SIZE, &mut rng);
+        let receiver_inputs = sender_inputs.clone();
+        let payloads = rand_vec_vec(SET_SIZE, payload_size, &mut rng);
+
+        let handle = std::thread::spawn(move || {
+            let mut rng = AesRng::new();
+            let reader = BufReader::new(sender.try_clone().unwrap());
+            let writer = BufWriter::new(sender);
+            let mut channel = Channel::new(reader, writer);
+            let mut psi = Sender::init(&mut channel, &mut rng).unwrap();
+            let state = psi.send(&sender_inputs, &mut channel, &mut rng).unwrap();
+            state.receive_payloads(payload_size, &mut channel).unwrap()
+        });
+
+        let mut rng = AesRng::new();
+        let reader = BufReader::new(receiver.try_clone().unwrap());
+        let writer = BufWriter::new(receiver);
+        let mut channel = Channel::new(reader, writer);
+        let mut psi = Receiver::init(&mut channel, &mut rng).unwrap();
+
+        let state = psi.receive(&receiver_inputs, &mut channel, &mut rng).unwrap();
+        state.send_payloads(&payloads, &mut channel, &mut rng).unwrap();
+
+        let received_payloads = handle.join().unwrap();
+
+        for payload in payloads.iter() {
+            assert!(received_payloads.contains(payload));
+        }
+    }
 }

@@ -26,8 +26,19 @@ pub enum Error {
     },
     /// An error occurred in the PSI protocol.
     PsiProtocolError(String),
+    /// Not enough payloads.
+    InvalidPayloadsLength,
+    /// SSL Error
+    SSLError(openssl::error::ErrorStack),
     /// An error occurred in the underlying 2PC protocol.
     TwopcError(twopac::Error),
+}
+
+impl From<openssl::error::ErrorStack> for Error {
+    #[inline]
+    fn from(e: openssl::error::ErrorStack) -> Error {
+        Error::SSLError(e)
+    }
 }
 
 impl From<std::io::Error> for Error {
@@ -74,6 +85,8 @@ impl std::fmt::Display for Error {
                 nitems, nhashes
             ),
             Error::PsiProtocolError(s) => write!(f, "PSI protocol error: {}", s),
+            Error::InvalidPayloadsLength => write!(f, "Invalid length of payloads!"),
+            Error::SSLError(e) => write!(f, "SSL Error: {}", e),
             Error::TwopcError(e) => write!(f, "2PC protocol error: {}", e),
         }
     }
