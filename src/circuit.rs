@@ -46,6 +46,9 @@ pub struct Circuit {
 }
 
 /// The most basic types of computation supported by fancy garbling.
+///
+/// `id` represents the gate number. `out` gives the output wire index; if `out
+/// = None`, then we use the gate index as the output wire index.
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) enum Gate {
     GarblerInput {
@@ -77,13 +80,13 @@ pub(crate) enum Gate {
         yref: CircuitRef,
         id: usize,
         out: Option<usize>,
-    }, // id is the gate number
+    },
     Proj {
         xref: CircuitRef,
         tt: Vec<u16>,
         id: usize,
         out: Option<usize>,
-    }, // id is the gate number
+    },
 }
 
 impl std::fmt::Display for Gate {
