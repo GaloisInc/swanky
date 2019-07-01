@@ -33,6 +33,13 @@ pub trait AbstractChannel {
     where
         Self: Sized;
 
+    /// Read `nbytes` from the channel, and return it as a `Vec`.
+    fn read_vec(&mut self, nbytes: usize) -> Result<Vec<u8>> {
+        let mut data = vec![0; nbytes];
+        self.read_bytes(&mut data)?;
+        Ok(data)
+    }
+
     /// Write a `bool` to the channel.
     #[inline(always)]
     fn write_bool(&mut self, b: bool) -> Result<()> {
