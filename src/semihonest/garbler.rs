@@ -71,6 +71,9 @@ impl<
         OT: OtSender<Msg = Block> + SemiHonest,
     > FancyInput for Garbler<C, RNG, OT>
 {
+    type Item = Wire;
+    type Error = Error;
+
     fn encode(&mut self, val: u16, modulus: u16) -> Result<Wire, Error> {
         let (mine, theirs) = self.garbler.encode_wire(val, modulus);
         self.garbler.send_wire(&theirs)?;

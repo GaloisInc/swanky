@@ -49,6 +49,9 @@ impl<C: AbstractChannel, RNG: CryptoRng + Rng, OT: OtReceiver<Msg = Block> + Sem
 impl<C: AbstractChannel, RNG: CryptoRng + Rng, OT: OtReceiver<Msg = Block> + SemiHonest> FancyInput
     for Evaluator<C, RNG, OT>
 {
+    type Item = Wire;
+    type Error = Error;
+
     /// Receive a garbler input wire.
     fn receive(&mut self, modulus: u16) -> Result<Wire, Error> {
         let w = self.evaluator.read_wire(modulus)?;
