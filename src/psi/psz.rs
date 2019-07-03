@@ -47,6 +47,25 @@ impl Sender {
         inputs: &[Vec<u8>],
         rng: &mut RNG,
     ) -> Result<(), Error> {
+        self.send_payloads(channel, inputs, &[], rng)
+    }
+
+    /// Run the PSI protocol over `inputs` with payloads.
+    pub fn send_payloads<C: AbstractChannel, RNG: CryptoRng + RngCore>(
+        &mut self,
+        channel: &mut C,
+        inputs: &[Vec<u8>],
+        payloads: &[Vec<u8>],
+        rng: &mut RNG,
+    ) -> Result<(), Error> {
+        // send the length of the payloads
+        let payload_len = payloads.first().map_or(0, Vec::len);
+        if payload_len > 0 {
+            assert!(payloads.iter().all(|p| p.len() == payload_len));
+            assert_eq!(payloads.len(), inputs.len());
+        }
+        channel.write_usize(payload_len)?;
+
         let key = cointoss::send(channel, &[rng.gen()])?[0];
         let mut inputs = utils::compress_and_hash_inputs(inputs, key);
         let masksize = compute_masksize(inputs.len())?;
@@ -94,7 +113,26 @@ impl Receiver {
         inputs: &[Vec<u8>],
         rng: &mut RNG,
     ) -> Result<Vec<Vec<u8>>, Error> {
+        let res = self.receive_payloads(channel, inputs, rng)?;
+        Ok(res.into_iter().map(|(x, _)| x).collect())
+    }
+
+    /// Run the PSI protocol over `inputs`, receiving a vector of tuples consisting of
+    /// the intersection items and associated payloads.
+    fn receive_payloads<C: AbstractChannel, RNG: CryptoRng + RngCore>(
+        &mut self,
+        channel: &mut C,
+        inputs: &[Vec<u8>],
+        rng: &mut RNG,
+    ) -> Result<
+        Vec<(
+            Vec<u8>, // Intersection item
+            Vec<u8>, // Payload
+        )>,
+        Error,
+    > {
         let n = inputs.len();
+        let payload_len = channel.read_usize()?;
         let key = cointoss::receive(channel, &[rng.gen()])?[0];
 
         let tbl = CuckooHash::new(&utils::compress_and_hash_inputs(inputs, key), NHASHES)?;
@@ -137,10 +175,12 @@ impl Receiver {
             if let Some(item) = opt_item {
                 let prefix = output.prefix(masksize);
                 if hs[item.hash_index].contains(prefix) {
-                    intersection.push(inputs[item.input_index].clone());
+                    let val = inputs[item.input_index].clone();
+                    intersection.push((val, Vec::new()));
                 }
             }
         }
+
         Ok(intersection)
     }
 }
