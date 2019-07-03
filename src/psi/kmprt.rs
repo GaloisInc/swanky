@@ -152,7 +152,7 @@ impl Party {
             let points = inputs
                 .iter()
                 .enumerate()
-                .map(|(i, x)| (*x, s[i][*other_id].clone()))
+                .map(|(i, x)| (*x, s[i][*other_id]))
                 .collect_vec();
 
             let bs;

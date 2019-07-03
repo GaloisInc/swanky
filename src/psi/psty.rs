@@ -339,7 +339,7 @@ fn encode_inputs(opprf_outputs: &[Block512]) -> Vec<u16> {
         .flat_map(|blk| {
             blk.prefix(HASH_SIZE)
                 .iter()
-                .flat_map(|byte| (0..8).map(|i| ((byte >> i) & 1_u8) as u16).collect_vec())
+                .flat_map(|byte| (0..8).map(|i| u16::from((byte >> i) & 1_u8)).collect_vec())
         })
         .collect()
 }

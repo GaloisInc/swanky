@@ -16,7 +16,7 @@ use ocelot::oprf::{self, Receiver as OprfReceiver, Sender as OprfSender};
 use rand::seq::SliceRandom;
 use rand::{CryptoRng, Rng, RngCore};
 use scuttlebutt::utils as scutils;
-use scuttlebutt::{cointoss, AbstractChannel, Block, SemiHonest};
+use scuttlebutt::{Block512, cointoss, AbstractChannel, Block, SemiHonest};
 use std::collections::HashSet;
 
 const NHASHES: usize = 3;
@@ -45,19 +45,19 @@ impl Sender {
         &mut self,
         channel: &mut C,
         inputs: &[Vec<u8>],
-        mut rng: &mut RNG,
+        rng: &mut RNG,
     ) -> Result<(), Error> {
-        let keys = cointoss::send(channel, &[rng.gen()])?;
-        let mut inputs = utils::compress_and_hash_inputs(inputs, keys[0]);
+        let key = cointoss::send(channel, &[rng.gen()])?[0];
+        let mut inputs = utils::compress_and_hash_inputs(inputs, key);
         let masksize = compute_masksize(inputs.len())?;
         let nbins = channel.read_usize()?;
         let seeds = self.oprf.send(channel, nbins, rng)?;
 
         // For each hash function `hᵢ`, construct set `Hᵢ = {F(k_{hᵢ(x)}, x ||
         // i) | x ∈ X)}`, randomly permute it, and send it to the receiver.
-        let mut encoded = Default::default();
+        let mut encoded = Block512::default();
         for i in 0..NHASHES {
-            inputs.shuffle(&mut rng);
+            inputs.shuffle(rng);
             let hidx = Block::from(i as u128);
             for input in &inputs {
                 // Compute `bin := hᵢ(x)`.
@@ -95,10 +95,9 @@ impl Receiver {
         rng: &mut RNG,
     ) -> Result<Vec<Vec<u8>>, Error> {
         let n = inputs.len();
-        let keys = cointoss::receive(channel, &[rng.gen()])?;
-        let inputs_ = utils::compress_and_hash_inputs(inputs, keys[0]);
+        let key = cointoss::receive(channel, &[rng.gen()])?[0];
 
-        let tbl = CuckooHash::new(&inputs_, NHASHES)?;
+        let tbl = CuckooHash::new(&utils::compress_and_hash_inputs(inputs, key), NHASHES)?;
         let nbins = tbl.nbins;
         let masksize = compute_masksize(n)?;
 
@@ -107,7 +106,7 @@ impl Receiver {
         channel.flush()?;
 
         // Extract inputs from cuckoo hash.
-        let inputs_ = tbl
+        let oprf_inputs = tbl
             .items
             .iter()
             .map(|opt_item| {
@@ -115,22 +114,18 @@ impl Receiver {
                     item.entry
                 } else {
                     // No item found, so use the "default" item.
-                    Default::default()
+                    Block::default()
                 }
             })
             .collect::<Vec<Block>>();
 
-        let outputs = self.oprf.receive(channel, &inputs_, rng)?;
+        let outputs = self.oprf.receive(channel, &oprf_inputs, rng)?;
 
         // Receive all the sets from the sender.
-        let mut hs = (0..NHASHES)
-            .map(|_| HashSet::with_capacity(n))
-            .collect::<Vec<HashSet<Vec<u8>>>>();
-
+        let mut hs = vec![HashSet::with_capacity(n); NHASHES];
         for h in hs.iter_mut() {
             for _ in 0..n {
-                let mut buf = vec![0u8; masksize];
-                channel.read_bytes(&mut buf)?;
+                let buf = channel.read_vec(masksize)?;
                 h.insert(buf);
             }
         }
