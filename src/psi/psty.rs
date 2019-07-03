@@ -14,10 +14,10 @@ use fancy_garbling::{BinaryBundle, BundleGadgets, CrtBundle, CrtGadgets, Fancy, 
 use itertools::Itertools;
 use ocelot::oprf::{KmprtReceiver, KmprtSender};
 use ocelot::ot::{AlszReceiver as OtReceiver, AlszSender as OtSender};
+use openssl::symm::{decrypt, encrypt, Cipher};
 use rand::{CryptoRng, Rng, RngCore, SeedableRng};
 use scuttlebutt::{AbstractChannel, Block, Block512, SemiHonest};
 use twopac::semihonest::{Evaluator, Garbler};
-use openssl::symm::{encrypt, decrypt, Cipher};
 
 const NHASHES: usize = 3;
 // How many bytes of the hash to use for the equality tests. This affects
@@ -132,11 +132,7 @@ impl SenderState {
     }
 
     /// Compute the intersection.
-    pub fn compute_intersection<C, RNG>(
-        &self,
-        channel: &mut C,
-        rng: &mut RNG,
-    ) -> Result<(), Error>
+    pub fn compute_intersection<C, RNG>(&self, channel: &mut C, rng: &mut RNG) -> Result<(), Error>
     where
         C: AbstractChannel,
         RNG: RngCore + CryptoRng + SeedableRng<Seed = Block>,
@@ -148,11 +144,7 @@ impl SenderState {
     }
 
     /// Compute the cardinality of the intersection.
-    pub fn compute_cardinality<C, RNG>(
-        &self,
-        channel: &mut C,
-        rng: &mut RNG,
-    ) -> Result<(), Error>
+    pub fn compute_cardinality<C, RNG>(&self, channel: &mut C, rng: &mut RNG) -> Result<(), Error>
     where
         C: AbstractChannel,
         RNG: RngCore + CryptoRng + SeedableRng<Seed = Block>,
@@ -164,10 +156,13 @@ impl SenderState {
     }
 
     /// Receive encrypted payloads from the Sender.
-    pub fn receive_payloads<C>(&self, payload_len: usize, channel: &mut C)
-        -> Result<Vec<Vec<u8>>, Error>
+    pub fn receive_payloads<C>(
+        &self,
+        payload_len: usize,
+        channel: &mut C,
+    ) -> Result<Vec<Vec<u8>>, Error>
     where
-        C: AbstractChannel
+        C: AbstractChannel,
     {
         let mut payloads = Vec::new();
         for opprf_output in self.opprf_outputs.iter() {
@@ -301,7 +296,12 @@ impl ReceiverState {
 
     /// Send encrypted payloads to the Receiver, who can only decrypt a payload if they
     /// share the associated element in the intersection.
-    pub fn send_payloads<C, RNG>(&self, payloads: &[Vec<u8>], channel: &mut C, rng: &mut RNG) -> Result<(), Error>
+    pub fn send_payloads<C, RNG>(
+        &self,
+        payloads: &[Vec<u8>],
+        channel: &mut C,
+        rng: &mut RNG,
+    ) -> Result<(), Error>
     where
         C: AbstractChannel,
         RNG: RngCore + CryptoRng + SeedableRng<Seed = Block>,
@@ -472,8 +472,12 @@ mod tests {
         let mut channel = Channel::new(reader, writer);
         let mut psi = Receiver::init(&mut channel, &mut rng).unwrap();
 
-        let state = psi.receive(&receiver_inputs, &mut channel, &mut rng).unwrap();
-        state.send_payloads(&payloads, &mut channel, &mut rng).unwrap();
+        let state = psi
+            .receive(&receiver_inputs, &mut channel, &mut rng)
+            .unwrap();
+        state
+            .send_payloads(&payloads, &mut channel, &mut rng)
+            .unwrap();
 
         let received_payloads = handle.join().unwrap();
 

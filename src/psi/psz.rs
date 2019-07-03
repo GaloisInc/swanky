@@ -16,7 +16,7 @@ use ocelot::oprf::{self, Receiver as OprfReceiver, Sender as OprfSender};
 use rand::seq::SliceRandom;
 use rand::{CryptoRng, Rng, RngCore};
 use scuttlebutt::utils as scutils;
-use scuttlebutt::{Block512, cointoss, AbstractChannel, Block, SemiHonest};
+use scuttlebutt::{cointoss, AbstractChannel, Block, Block512, SemiHonest};
 use std::collections::HashSet;
 
 const NHASHES: usize = 3;

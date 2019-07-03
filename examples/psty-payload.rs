@@ -86,7 +86,9 @@ fn psty_payload(inputs1: Vec<Vec<u8>>, inputs2: Vec<Vec<u8>>, payloads: Vec<Vec<
         start.elapsed().unwrap().as_millis()
     );
     let start = SystemTime::now();
-    state.send_payloads(&payloads, &mut channel, &mut rng).unwrap();
+    state
+        .send_payloads(&payloads, &mut channel, &mut rng)
+        .unwrap();
     println!(
         "Receiver :: payload intersection time: {} ms",
         start.elapsed().unwrap().as_millis()
