@@ -4,6 +4,8 @@
 // Copyright © 2019 Galois, Inc.
 // See LICENSE for licensing information.
 
+// Frontend for KMPRT multi-party PSI over sets of IPV6 addresses
+
 use clap::{App, Arg};
 use itertools::Itertools;
 use popsicle::{MultiPartyReceiver, MultiPartySender};
