@@ -19,7 +19,7 @@ use rand::seq::SliceRandom;
 use rand::{CryptoRng, Rng, RngCore};
 use scuttlebutt::{cointoss, AbstractChannel, Block, Block512, SemiHonest};
 use sha2::Sha256;
-use std::collections::{HashSet, HashMap};
+use std::collections::{HashMap, HashSet};
 
 const NHASHES: usize = 3;
 
@@ -194,7 +194,7 @@ impl Receiver {
         for h in hs.iter_mut() {
             for _ in 0..n {
                 let mut tag = [0_u8; 32];
-                let mut iv  = [0_u8; 16];
+                let mut iv = [0_u8; 16];
                 channel.read_bytes(&mut tag)?;
                 channel.read_bytes(&mut iv)?;
                 let ct = channel.read_vec(payload_len)?;
@@ -209,12 +209,17 @@ impl Receiver {
         for (opt_item, output) in tbl.items.iter().zip(outputs.into_iter()) {
             if let Some(item) = opt_item {
                 // compute tag = H(F(x))
-                let tag: [u8;32] = Sha256::digest(output.prefix(masksize)).into();
+                let tag: [u8; 32] = Sha256::digest(output.prefix(masksize)).into();
 
                 // if the tag is present, decrypt the payload using F(x).
                 if let Some((iv, ct)) = hs[item.hash_index].get(&tag) {
                     let val = inputs[item.input_index].clone();
-                    let payload = openssl::symm::decrypt(openssl::symm::Cipher::aes_128_ctr(), output.prefix(16), Some(iv), ct)?;
+                    let payload = openssl::symm::decrypt(
+                        openssl::symm::Cipher::aes_128_ctr(),
+                        output.prefix(16),
+                        Some(iv),
+                        ct,
+                    )?;
                     intersection.push((val, payload));
                 }
             }
