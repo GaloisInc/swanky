@@ -87,6 +87,12 @@ pub trait AbstractChannel {
         Ok(v)
     }
 
+    /// Read `n` `Block`s from the channel.
+    #[inline(always)]
+    fn read_blocks(&mut self, n: usize) -> Result<Vec<Block>> {
+        (0..n).map(|_| self.read_block()).collect()
+    }
+
     /// Write a `Block512` to the channel.
     #[inline(always)]
     fn write_block512(&mut self, b: &Block512) -> Result<()> {
