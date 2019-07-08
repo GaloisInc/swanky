@@ -132,7 +132,7 @@ impl Circuit {
         f: &mut F,
         garbler_inputs: &[F::Item],
         evaluator_inputs: &[F::Item],
-    ) -> Result<Vec<F::Item>, F::Error> {
+    ) -> Result<Option<Vec<u16>>, F::Error> {
         let mut cache: Vec<Option<F::Item>> = vec![None; self.gates.len()];
         for (i, gate) in self.gates.iter().enumerate() {
             let q = self.modulus(i);
@@ -209,24 +209,13 @@ impl Circuit {
         }
         let mut outputs = Vec::with_capacity(self.output_refs.len());
         for r in self.output_refs.iter() {
-            let out = cache[r.ix]
-                .clone()
+            let r = cache[r.ix]
+                .as_ref()
                 .ok_or_else(|| F::Error::from(FancyError::UninitializedValue))?;
+            let out = f.output(r)?;
             outputs.push(out);
         }
-        Ok(outputs)
-    }
-
-    /// Process the outputs provided by `outputs` using fancy object `f`.
-    pub fn process_outputs<F: Fancy>(
-        &mut self,
-        outputs: &[F::Item],
-        f: &mut F,
-    ) -> Result<(), F::Error> {
-        for r in outputs.iter() {
-            f.output(r)?;
-        }
-        Ok(())
+        Ok(outputs.into_iter().collect())
     }
 
     /// Evaluate the circuit in plaintext.
@@ -258,8 +247,7 @@ impl Circuit {
             .collect_vec();
 
         let outputs = self.eval(&mut dummy, &gb, &ev)?;
-        self.process_outputs(&outputs, &mut dummy)?;
-        Ok(dummy.get_output())
+        Ok(outputs.expect("dummy will always return Some(u16) output"))
     }
 
     /// Print circuit info.
@@ -278,8 +266,7 @@ impl Circuit {
             .map(|r| informer.receive(r.modulus()))
             .collect::<Result<Vec<InformerVal>, InformerError>>()?;
 
-        let outputs = self.eval(&mut informer, &gb, &ev)?;
-        self.process_outputs(&outputs, &mut informer)?;
+        let _outputs = self.eval(&mut informer, &gb, &ev)?;
         informer.print_info();
         Ok(())
     }
@@ -418,9 +405,9 @@ impl Fancy for CircuitBuilder {
         Ok(self.gate(gate, xref.modulus()))
     }
 
-    fn output(&mut self, xref: &CircuitRef) -> Result<(), Self::Error> {
+    fn output(&mut self, xref: &CircuitRef) -> Result<Option<u16>, Self::Error> {
         self.circ.output_refs.push(xref.clone());
-        Ok(())
+        Ok(None)
     }
 }
 

@@ -173,7 +173,7 @@ impl<C: AbstractChannel> Fancy for Evaluator<C> {
     }
 
     #[inline]
-    fn output(&mut self, x: &Wire) -> Result<(), EvaluatorError> {
+    fn output(&mut self, x: &Wire) -> Result<Option<u16>, EvaluatorError> {
         let noutputs = x.modulus() as usize;
         let mut blocks = Vec::with_capacity(noutputs);
         for _ in 0..noutputs {
@@ -182,6 +182,6 @@ impl<C: AbstractChannel> Fancy for Evaluator<C> {
         }
         self.output_cts.push(blocks);
         self.output_wires.push(x.clone());
-        Ok(())
+        unimplemented!()
     }
 }

@@ -291,8 +291,8 @@ impl Fancy for Informer {
         Ok(InformerVal(q))
     }
 
-    fn output(&mut self, x: &InformerVal) -> Result<(), InformerError> {
+    fn output(&mut self, x: &InformerVal) -> Result<Option<u16>, InformerError> {
         self.outputs.push(x.modulus());
-        Ok(())
+        Ok(None)
     }
 }

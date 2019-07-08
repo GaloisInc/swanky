@@ -64,12 +64,15 @@ pub trait CrtGadgets: Fancy + BundleGadgets {
         self.constant_bundle(&xs, &ps).map(CrtBundle)
     }
 
-    /// Output a slice of CRT bundles.
-    fn crt_outputs(&mut self, xs: &[CrtBundle<Self::Item>]) -> Result<(), Self::Error> {
-        for x in xs.iter() {
-            self.output_bundle(x)?;
-        }
-        Ok(())
+    /// Output a CRT bundle and interpret it mod Q.
+    fn crt_output(&mut self, x: &CrtBundle<Self::Item>) -> Result<Option<u128>, Self::Error> {
+        let q = x.composite_modulus();
+        Ok(self.output_bundle(x)?.map(|xs| util::crt_inv_factor(&xs, q)))
+    }
+
+    /// Output a slice of CRT bundles and interpret the outputs mod Q.
+    fn crt_outputs(&mut self, xs: &[CrtBundle<Self::Item>]) -> Result<Option<Vec<u128>>, Self::Error> {
+        xs.iter().map(|x| self.crt_output(x)).collect()
     }
 
     ////////////////////////////////////////////////////////////////////////////////

@@ -98,19 +98,13 @@ pub trait BundleGadgets: Fancy {
     }
 
     /// Output the wires that make up a bundle.
-    fn output_bundle(&mut self, x: &Bundle<Self::Item>) -> Result<(), Self::Error> {
-        for w in x.wires() {
-            self.output(w)?;
-        }
-        Ok(())
+    fn output_bundle(&mut self, x: &Bundle<Self::Item>) -> Result<Option<Vec<u16>>, Self::Error> {
+        x.wires().iter().map(|w| self.output(w)).collect()
     }
 
     /// Output a slice of bundles.
-    fn output_bundles(&mut self, xs: &[Bundle<Self::Item>]) -> Result<(), Self::Error> {
-        for x in xs.iter() {
-            self.output_bundle(x)?;
-        }
-        Ok(())
+    fn output_bundles(&mut self, xs: &[Bundle<Self::Item>]) -> Result<Option<Vec<Vec<u16>>>, Self::Error> {
+        xs.iter().map(|x| self.output_bundle(x)).collect()
     }
 
     ////////////////////////////////////////////////////////////////////////////////

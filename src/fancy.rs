@@ -60,8 +60,9 @@ pub trait Fancy {
         tt: Option<Vec<u16>>,
     ) -> Result<Self::Item, Self::Error>;
 
-    /// Process this wire as output.
-    fn output(&mut self, x: &Self::Item) -> Result<(), Self::Error>;
+    /// Process this wire as output. Some `Fancy` implementors dont actually *return*
+    /// output, but they need to be involved in the process, so they can return `None`.
+    fn output(&mut self, x: &Self::Item) -> Result<Option<u16>, Self::Error>;
 
     ////////////////////////////////////////////////////////////////////////////////
     // Functions built on top of basic fancy operations.
@@ -256,10 +257,7 @@ pub trait Fancy {
     }
 
     /// Output a slice of wires.
-    fn outputs(&mut self, xs: &[Self::Item]) -> Result<(), Self::Error> {
-        for x in xs.iter() {
-            self.output(x)?;
-        }
-        Ok(())
+    fn outputs(&mut self, xs: &[Self::Item]) -> Result<Option<Vec<u16>>, Self::Error> {
+        xs.iter().map(|x| self.output(x)).collect()
     }
 }

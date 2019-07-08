@@ -56,6 +56,18 @@ pub trait BinaryGadgets: Fancy + BundleGadgets {
             .map(BinaryBundle)
     }
 
+    /// Output a binary bundle and interpret the result as a `u128`.
+    fn bin_output(&mut self, x: &BinaryBundle<Self::Item>) -> Result<Option<u128>, Self::Error>
+    {
+        Ok(self.output_bundle(x)?.map(|bs| util::u128_from_bits(&bs)))
+    }
+
+    /// Output a slice of binary bundles and interpret the results as a `u128`.
+    fn bin_outputs(&mut self, xs: &[BinaryBundle<Self::Item>]) -> Result<Option<Vec<u128>>, Self::Error>
+    {
+        xs.iter().map(|x| self.bin_output(x)).collect()
+    }
+
     /// Xor the bits of two bundles together pairwise.
     fn bin_xor(
         &mut self,

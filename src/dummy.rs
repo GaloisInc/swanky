@@ -13,9 +13,7 @@ use crate::error::{DummyError, FancyError};
 use crate::fancy::{Fancy, FancyInput, HasModulus};
 
 /// Simple struct that performs the fancy computation over `u16`.
-pub struct Dummy {
-    outputs: Vec<u16>,
-}
+pub struct Dummy { }
 
 /// Wrapper around `u16`.
 #[derive(Clone, Debug)]
@@ -45,14 +43,7 @@ impl DummyVal {
 impl Dummy {
     /// Create a new Dummy.
     pub fn new() -> Dummy {
-        Dummy {
-            outputs: Vec::new(),
-        }
-    }
-
-    /// Get the output from the fancy computation, consuming the Dummy.
-    pub fn get_output(self) -> Vec<u16> {
-        self.outputs
+        Dummy { }
     }
 }
 
@@ -139,9 +130,8 @@ impl Fancy for Dummy {
         Ok(DummyVal { val, modulus })
     }
 
-    fn output(&mut self, x: &DummyVal) -> Result<(), Self::Error> {
-        self.outputs.push(x.val);
-        Ok(())
+    fn output(&mut self, x: &DummyVal) -> Result<Option<u16>, Self::Error> {
+        Ok(Some(x.val))
     }
 }
 
@@ -149,7 +139,7 @@ impl Fancy for Dummy {
 mod bundle {
     use super::*;
     use crate::fancy::{BinaryGadgets, Bundle, BundleGadgets, CrtGadgets};
-    use crate::util::{self, crt_inv_factor, RngExt};
+    use crate::util::{self, RngExt};
     use itertools::Itertools;
     use rand::thread_rng;
 
@@ -163,14 +153,14 @@ mod bundle {
             let x = rng.gen_u128() % q;
             let y = rng.gen_u128() % q;
             let mut d = Dummy::new();
+            let out;
             {
                 let x = d.crt_encode(x, q).unwrap();
                 let y = d.crt_encode(y, q).unwrap();
                 let z = d.crt_add(&x, &y).unwrap();
-                d.output_bundle(&z).unwrap();
+                out = d.crt_output(&z).unwrap().unwrap();
             }
-            let z = crt_inv_factor(&d.get_output(), q);
-            assert_eq!(z, (x + y) % q);
+            assert_eq!(out, (x + y) % q);
         }
     }
 
@@ -182,14 +172,14 @@ mod bundle {
             let x = rng.gen_u128() % q;
             let y = rng.gen_u128() % q;
             let mut d = Dummy::new();
+            let out;
             {
                 let x = d.crt_encode(x, q).unwrap();
                 let y = d.crt_encode(y, q).unwrap();
-                let z = d.sub_bundles(&x, &y).unwrap();
-                d.output_bundle(&z).unwrap();
+                let z = d.crt_sub(&x, &y).unwrap();
+                out = d.crt_output(&z).unwrap().unwrap();
             }
-            let z = crt_inv_factor(&d.get_output(), q);
-            assert_eq!(z, (x + q - y) % q);
+            assert_eq!(out, (x + q - y) % q);
         }
     }
 
@@ -202,13 +192,13 @@ mod bundle {
             let x = rng.gen_u128() % q;
             let c = 1 + rng.gen_u128() % q;
             let mut d = Dummy::new();
+            let out;
             {
                 let x = d.bin_encode(x, nbits).unwrap();
                 let z = d.bin_cmul(&x, c, nbits).unwrap();
-                d.output_bundle(&z).unwrap();
+                out = d.bin_output(&z).unwrap().unwrap();
             }
-            let z = util::u128_from_bits(&d.get_output());
-            assert_eq!(z, (x * c) % q);
+            assert_eq!(out, (x * c) % q);
         }
     }
 
@@ -221,14 +211,14 @@ mod bundle {
             let x = rng.gen_u128() % q;
             let y = rng.gen_u128() % q;
             let mut d = Dummy::new();
+            let out;
             {
                 let x = d.bin_encode(x, nbits).unwrap();
                 let y = d.bin_encode(y, nbits).unwrap();
                 let z = d.bin_multiplication_lower_half(&x, &y).unwrap();
-                d.output_bundle(&z).unwrap();
+                out = d.bin_output(&z).unwrap().unwrap();
             }
-            let z = util::u128_from_bits(&d.get_output());
-            assert_eq!(z, (x * y) & (q - 1));
+            assert_eq!(out, (x * y) & (q - 1));
         }
     }
 
@@ -241,16 +231,16 @@ mod bundle {
             let inps = (0..n).map(|_| rng.gen_u128() % (q / 2)).collect_vec();
             let should_be = *inps.iter().max().unwrap();
             let mut d = Dummy::new();
+            let out;
             {
                 let xs = inps
                     .into_iter()
                     .map(|x| d.crt_encode(x, q).unwrap())
                     .collect_vec();
                 let z = d.crt_max(&xs, "100%").unwrap();
-                d.output_bundle(&z).unwrap();
+                out = d.crt_output(&z).unwrap().unwrap();
             }
-            let z = crt_inv_factor(&d.get_output(), q);
-            assert_eq!(z, should_be);
+            assert_eq!(out, should_be);
         }
     }
 
@@ -263,14 +253,13 @@ mod bundle {
             let x = rng.gen_u128() % q;
             let should_be = (!x + 1) % q;
             let mut d = Dummy::new();
+            let out;
             {
                 let x = d.bin_encode(x, nbits).unwrap();
                 let y = d.bin_twos_complement(&x).unwrap();
-                d.output_bundle(&y).unwrap();
+                out = d.bin_output(&y).unwrap().unwrap();
             }
-            let outs = d.get_output();
-            let y = util::u128_from_bits(&outs);
-            assert_eq!(y, should_be, "x={} y={} should_be={}", x, y, should_be);
+            assert_eq!(out, should_be, "x={} y={} should_be={}", x, out, should_be);
         }
     }
 
@@ -284,22 +273,17 @@ mod bundle {
             let y = rng.gen_u128() % q;
             let should_be = (x + y) % q;
             let mut d = Dummy::new();
+            let out;
+            let overflow;
             {
                 let x = d.bin_encode(x, nbits).unwrap();
                 let y = d.bin_encode(y, nbits).unwrap();
-                let (z, overflow) = d.bin_addition(&x, &y).unwrap();
-                d.output(&overflow).unwrap();
-                d.output_bundle(&z).unwrap();
+                let (z, _overflow) = d.bin_addition(&x, &y).unwrap();
+                overflow = d.output(&_overflow).unwrap().unwrap();
+                out = d.bin_output(&z).unwrap().unwrap();
             }
-            let outs = d.get_output();
-            let overflow = outs[0] > 0;
-            let z = util::u128_from_bits(&outs[1..]);
-            assert_eq!(
-                z, should_be,
-                "x={} y={} z={} should_be={}",
-                x, y, z, should_be
-            );
-            assert_eq!(overflow, x + y >= q, "x={} y={}", x, y);
+            assert_eq!(out, should_be);
+            assert_eq!(overflow > 0, x + y >= q);
         }
     }
 
@@ -313,22 +297,17 @@ mod bundle {
             let y = rng.gen_u128() % q;
             let should_be = (x - y) % q;
             let mut d = Dummy::new();
+            let overflow;
+            let out;
             {
                 let x = d.bin_encode(x, nbits).unwrap();
                 let y = d.bin_encode(y, nbits).unwrap();
-                let (z, overflow) = d.bin_subtraction(&x, &y).unwrap();
-                d.output(&overflow).unwrap();
-                d.output_bundle(&z).unwrap();
+                let (z, _overflow) = d.bin_subtraction(&x, &y).unwrap();
+                overflow = d.output(&_overflow).unwrap().unwrap();
+                out = d.bin_output(&z).unwrap().unwrap();
             }
-            let outs = d.get_output();
-            let overflow = outs[0] > 0;
-            let z = util::u128_from_bits(&outs[1..]);
-            assert_eq!(
-                z, should_be,
-                "x={} y={} z={} should_be={}",
-                x, y, z, should_be
-            );
-            assert_eq!(overflow, (y != 0 && x >= y), "x={} y={}", x, y);
+            assert_eq!( out, should_be);
+            assert_eq!(overflow > 0, (y != 0 && x >= y), "x={} y={}", x, y);
         }
     }
 
@@ -342,14 +321,14 @@ mod bundle {
             let y = rng.gen_u128() % q;
             let should_be = x < y;
             let mut d = Dummy::new();
+            let out;
             {
                 let x = d.bin_encode(x, nbits).unwrap();
                 let y = d.bin_encode(y, nbits).unwrap();
                 let z = d.bin_lt(&x, &y).unwrap();
-                d.output(&z).unwrap();
+                out = d.output(&z).unwrap().unwrap();
             }
-            let z = d.get_output()[0] > 0;
-            assert_eq!(z, should_be, "x={} y={}", x, y);
+            assert_eq!(out > 0, should_be, "x={} y={}", x, y);
         }
     }
 
@@ -363,16 +342,16 @@ mod bundle {
             let inps = (0..n).map(|_| rng.gen_u128() % q).collect_vec();
             let should_be = *inps.iter().max().unwrap();
             let mut d = Dummy::new();
+            let out;
             {
                 let xs = inps
                     .into_iter()
                     .map(|x| d.bin_encode(x, nbits).unwrap())
                     .collect_vec();
                 let z = d.bin_max(&xs).unwrap();
-                d.output_bundle(&z).unwrap();
+                out = d.bin_output(&z).unwrap().unwrap();
             }
-            let z = util::u128_from_bits(&d.get_output());
-            assert_eq!(z, should_be);
+            assert_eq!(out, should_be);
         }
     }
 
@@ -383,16 +362,16 @@ mod bundle {
             let q = crate::util::modulus_with_nprimes(4 + rng.gen_usize() % 7); // exact relu supports up to 11 primes
             let x = rng.gen_u128() % q;
             let mut d = Dummy::new();
+            let out;
             {
                 let x = d.crt_encode(x, q).unwrap();
                 let z = d.crt_relu(&x, "100%", None).unwrap();
-                d.output_bundle(&z).unwrap();
+                out = d.crt_output(&z).unwrap().unwrap();
             }
-            let z = crt_inv_factor(&d.get_output(), q);
             if x >= q / 2 {
-                assert_eq!(z, 0);
+                assert_eq!(out, 0);
             } else {
-                assert_eq!(z, x);
+                assert_eq!(out, x);
             }
         }
     }
@@ -405,14 +384,14 @@ mod bundle {
             let x = rng.gen_u128() % q;
             let b = rng.gen_bool();
             let mut d = Dummy::new();
+            let out;
             {
                 let b = d.encode(b as u16, 2).unwrap();
                 let x = d.crt_encode(x, q).unwrap();
-                let z = d.mask(&b, &x).unwrap();
-                d.output_bundle(&z).unwrap();
+                let z = d.mask(&b, &x).unwrap().into();
+                out = d.crt_output(&z).unwrap().unwrap();
             }
-            let z = crt_inv_factor(&d.get_output(), q);
-            assert!(if b { z == x } else { z == 0 }, "b={} x={} z={}", b, x, z);
+            assert!(if b { out == x } else { out == 0 }, "b={} x={} z={}", b, x, out);
         }
     }
 
@@ -424,18 +403,18 @@ mod bundle {
             let q = 1 << nbits;
             let x = rng.gen_u128() % q;
             let mut d = Dummy::new();
+            let out;
             {
                 let x = d.bin_encode(x, nbits).unwrap();
                 let z = d.bin_abs(&x).unwrap();
-                d.output_bundle(&z).unwrap();
+                out = d.bin_output(&z).unwrap().unwrap();
             }
-            let z = util::u128_from_bits(&d.get_output());
             let should_be = if x >> (nbits - 1) > 0 {
                 ((!x) + 1) & ((1 << nbits) - 1)
             } else {
                 x
             };
-            assert_eq!(z, should_be);
+            assert_eq!(out, should_be);
         }
     }
 
@@ -447,12 +426,13 @@ mod bundle {
             let q = 1 << nbits;
             let x = rng.gen_u128() % q;
             let mut d = Dummy::new();
+            let outs;
             {
                 let x = d.bin_encode(x, nbits).unwrap();
                 let zs = d.bin_demux(&x).unwrap();
-                d.outputs(&zs).unwrap();
+                outs = d.outputs(&zs).unwrap().unwrap();
             }
-            for (i, z) in d.get_output().into_iter().enumerate() {
+            for (i, z) in outs.into_iter().enumerate() {
                 if i as u128 == x {
                     assert_eq!(z, 1);
                 } else {
@@ -475,13 +455,14 @@ mod bundle {
                 rng.gen_u128() % q
             };
             let mut d = Dummy::new();
+            let out;
             {
                 let x = d.bin_encode(x, nbits).unwrap();
                 let y = d.bin_encode(y, nbits).unwrap();
                 let z = d.eq_bundles(&x, &y).unwrap();
-                d.output(&z).unwrap();
+                out = d.output(&z).unwrap().unwrap();
             }
-            assert_eq!(d.get_output()[0], (x == y) as u16);
+            assert_eq!(out, (x == y) as u16);
         }
     }
 
@@ -511,8 +492,7 @@ mod bundle {
             let mut d = Dummy::new();
 
             let z = d.mixed_radix_addition_msb_only(&xs).unwrap();
-            d.output(&z).unwrap();
-            let res = d.get_output()[0];
+            let res = d.output(&z).unwrap().unwrap();
 
             let should_be = *util::as_mixed_radix((Q - 1) * (nargs as u128) % Q, &mods)
                 .last()
@@ -539,8 +519,7 @@ mod bundle {
 
                 let mut d = Dummy::new();
                 let z = d.mixed_radix_addition_msb_only(&xs).unwrap();
-                d.output(&z).unwrap();
-                let res = d.get_output()[0];
+                let res = d.output(&z).unwrap().unwrap();
 
                 let should_be = *util::as_mixed_radix(sum, &mods).last().unwrap();
                 assert_eq!(res, should_be);

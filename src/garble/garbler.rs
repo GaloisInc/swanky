@@ -341,7 +341,7 @@ impl<C: AbstractChannel, RNG: CryptoRng + RngCore> Fancy for Garbler<C, RNG> {
     }
 
     #[inline]
-    fn output(&mut self, X: &Wire) -> Result<(), GarblerError> {
+    fn output(&mut self, X: &Wire) -> Result<Option<u16>, GarblerError> {
         let q = X.modulus();
         let mut blocks = Vec::with_capacity(q as usize);
         let i = self.current_output();
@@ -353,6 +353,6 @@ impl<C: AbstractChannel, RNG: CryptoRng + RngCore> Fancy for Garbler<C, RNG> {
         for block in blocks.iter() {
             self.channel.write_block(block)?;
         }
-        Ok(())
+        unimplemented!()
     }
 }
