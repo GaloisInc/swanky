@@ -38,7 +38,7 @@ fn psi(ninputs: usize, nbytes: usize) {
             start.elapsed().unwrap().as_millis()
         );
         let start = SystemTime::now();
-        psi.send(&mut channel, &sender_inputs, &mut rng).unwrap();
+        psi.send(&sender_inputs, &mut channel, &mut rng).unwrap();
         println!(
             "Sender :: send time: {} ms",
             start.elapsed().unwrap().as_millis()
@@ -64,7 +64,7 @@ fn psi(ninputs: usize, nbytes: usize) {
     );
     let start = SystemTime::now();
     let _ = psi
-        .receive(&mut channel, &receiver_inputs, &mut rng)
+        .receive(&receiver_inputs, &mut channel, &mut rng)
         .unwrap();
     println!(
         "Receiver :: receive time: {} ms",

@@ -45,19 +45,19 @@ impl Sender {
     /// Run the PSI protocol over `inputs`.
     pub fn send<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         &mut self,
-        channel: &mut C,
         inputs: &[Vec<u8>],
+        channel: &mut C,
         rng: &mut RNG,
     ) -> Result<(), Error> {
-        self.send_payloads(channel, inputs, &[], rng)
+        self.send_payloads(inputs, &[], channel, rng)
     }
 
     /// Run the PSI protocol over `inputs` with payloads.
     pub fn send_payloads<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         &mut self,
-        channel: &mut C,
         inputs: &[Vec<u8>],
         payloads: &[Vec<u8>],
+        channel: &mut C,
         rng: &mut RNG,
     ) -> Result<(), Error> {
         // send the length of the payloads
@@ -134,14 +134,14 @@ impl Receiver {
     /// Run the PSI protocol over `inputs`.
     pub fn receive<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         &mut self,
-        channel: &mut C,
         inputs: &[Vec<u8>],
+        channel: &mut C,
         rng: &mut RNG,
     ) -> Result<Vec<Vec<u8>>, Error> {
         let n = inputs.len();
         let masksize = compute_masksize(n)?;
 
-        let (tbl, outputs) = self.perform_oprfs(channel, inputs, rng)?;
+        let (tbl, outputs) = self.perform_oprfs(inputs, channel, rng)?;
 
         // Receive all the sets from the sender.
         let mut hs = vec![HashSet::with_capacity(n); NHASHES];
@@ -172,8 +172,8 @@ impl Receiver {
     /// the intersection items and associated payloads.
     pub fn receive_payloads<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         &mut self,
-        channel: &mut C,
         inputs: &[Vec<u8>],
+        channel: &mut C,
         rng: &mut RNG,
     ) -> Result<
         Vec<(
@@ -183,7 +183,7 @@ impl Receiver {
         Error,
     > {
         let payload_len = channel.read_usize()?;
-        let (tbl, outputs) = self.perform_oprfs(channel, inputs, rng)?;
+        let (tbl, outputs) = self.perform_oprfs(inputs, channel, rng)?;
         let n = inputs.len();
         let masksize = compute_masksize(n)?;
 
@@ -231,8 +231,8 @@ impl Receiver {
     // Helper to do computation common to both receive and receive_payloads
     fn perform_oprfs<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         &mut self,
-        channel: &mut C,
         inputs: &[Vec<u8>],
+        channel: &mut C,
         rng: &mut RNG,
     ) -> Result<
         (
@@ -296,7 +296,7 @@ mod tests {
             let writer = BufWriter::new(sender);
             let mut channel = Channel::new(reader, writer);
             let mut psi = Sender::init(&mut channel, &mut rng).unwrap();
-            psi.send(&mut channel, &sender_inputs, &mut rng).unwrap();
+            psi.send(&sender_inputs, &mut channel, &mut rng).unwrap();
         });
         let mut rng = AesRng::new();
         let reader = BufReader::new(receiver.try_clone().unwrap());
@@ -304,7 +304,7 @@ mod tests {
         let mut channel = Channel::new(reader, writer);
         let mut psi = Receiver::init(&mut channel, &mut rng).unwrap();
         let intersection = psi
-            .receive(&mut channel, &receiver_inputs, &mut rng)
+            .receive(&receiver_inputs, &mut channel, &mut rng)
             .unwrap();
         handle.join().unwrap();
         assert_eq!(intersection.len(), SET_SIZE);
@@ -324,7 +324,7 @@ mod tests {
             let writer = BufWriter::new(sender);
             let mut channel = Channel::new(reader, writer);
             let mut psi = Sender::init(&mut channel, &mut rng).unwrap();
-            psi.send_payloads(&mut channel, &sender_inputs, &payloads, &mut rng)
+            psi.send_payloads(&sender_inputs, &payloads, &mut channel, &mut rng)
                 .unwrap();
         });
 
@@ -334,7 +334,7 @@ mod tests {
         let mut channel = Channel::new(reader, writer);
         let mut psi = Receiver::init(&mut channel, &mut rng).unwrap();
         let payloads = psi
-            .receive_payloads(&mut channel, &receiver_inputs, &mut rng)
+            .receive_payloads(&receiver_inputs, &mut channel, &mut rng)
             .unwrap();
         handle.join().unwrap();
         assert_eq!(payloads.len(), SET_SIZE);
