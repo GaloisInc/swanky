@@ -257,7 +257,23 @@
 <span id="257">257</span>
 <span id="258">258</span>
 <span id="259">259</span>
+<span id="260">260</span>
+<span id="261">261</span>
+<span id="262">262</span>
+<span id="263">263</span>
+<span id="264">264</span>
+<span id="265">265</span>
+<span id="266">266</span>
+<span id="267">267</span>
+<span id="268">268</span>
+<span id="269">269</span>
 </pre><div class="example-wrap"><pre class="rust ">
+<span class="comment">// -*- mode: rust; -*-</span>
+<span class="comment">//</span>
+<span class="comment">// This file is part of `fancy-garbling`.</span>
+<span class="comment">// Copyright © 2019 Galois, Inc.</span>
+<span class="comment">// See LICENSE for licensing information.</span>
+
 <span class="doccomment">//! The `Fancy` trait represents the kinds of computations possible in `fancy-garbling`.</span>
 <span class="doccomment">//!</span>
 <span class="doccomment">//! An implementer must be able to create inputs, constants, do modular arithmetic, and</span>
@@ -270,10 +286,12 @@
 <span class="kw">mod</span> <span class="ident">bundle</span>;
 <span class="kw">mod</span> <span class="ident">crt</span>;
 <span class="kw">mod</span> <span class="ident">input</span>;
+<span class="kw">mod</span> <span class="ident">reveal</span>;
 <span class="kw">pub</span> <span class="kw">use</span> <span class="ident">binary</span>::{<span class="ident">BinaryBundle</span>, <span class="ident">BinaryGadgets</span>};
 <span class="kw">pub</span> <span class="kw">use</span> <span class="ident">bundle</span>::{<span class="ident">Bundle</span>, <span class="ident">BundleGadgets</span>};
 <span class="kw">pub</span> <span class="kw">use</span> <span class="ident">crt</span>::{<span class="ident">CrtBundle</span>, <span class="ident">CrtGadgets</span>};
 <span class="kw">pub</span> <span class="kw">use</span> <span class="ident">input</span>::<span class="ident">FancyInput</span>;
+<span class="kw">pub</span> <span class="kw">use</span> <span class="ident">reveal</span>::<span class="ident">FancyReveal</span>;
 
 <span class="doccomment">/// An object that has some modulus. Basic object of `Fancy` computations.</span>
 <span class="kw">pub</span> <span class="kw">trait</span> <span class="ident">HasModulus</span> {
@@ -314,8 +332,9 @@
         <span class="ident">tt</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u16</span><span class="op">&gt;&gt;</span>,
     ) <span class="op">-&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="self">Self</span>::<span class="ident">Item</span>, <span class="self">Self</span>::<span class="ident">Error</span><span class="op">&gt;</span>;
 
-    <span class="doccomment">/// Process this wire as output.</span>
-    <span class="kw">fn</span> <span class="ident">output</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">x</span>: <span class="kw-2">&amp;</span><span class="self">Self</span>::<span class="ident">Item</span>) <span class="op">-&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="self">Self</span>::<span class="ident">Error</span><span class="op">&gt;</span>;
+    <span class="doccomment">/// Process this wire as output. Some `Fancy` implementors dont actually *return*</span>
+    <span class="doccomment">/// output, but they need to be involved in the process, so they can return `None`.</span>
+    <span class="kw">fn</span> <span class="ident">output</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">x</span>: <span class="kw-2">&amp;</span><span class="self">Self</span>::<span class="ident">Item</span>) <span class="op">-&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">u16</span><span class="op">&gt;</span>, <span class="self">Self</span>::<span class="ident">Error</span><span class="op">&gt;</span>;
 
     <span class="comment">////////////////////////////////////////////////////////////////////////////////</span>
     <span class="comment">// Functions built on top of basic fancy operations.</span>
@@ -510,11 +529,12 @@
     }
 
     <span class="doccomment">/// Output a slice of wires.</span>
-    <span class="kw">fn</span> <span class="ident">outputs</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">xs</span>: <span class="kw-2">&amp;</span>[<span class="self">Self</span>::<span class="ident">Item</span>]) <span class="op">-&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="self">Self</span>::<span class="ident">Error</span><span class="op">&gt;</span> {
+    <span class="kw">fn</span> <span class="ident">outputs</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">xs</span>: <span class="kw-2">&amp;</span>[<span class="self">Self</span>::<span class="ident">Item</span>]) <span class="op">-&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u16</span><span class="op">&gt;&gt;</span>, <span class="self">Self</span>::<span class="ident">Error</span><span class="op">&gt;</span> {
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">zs</span> <span class="op">=</span> <span class="ident">Vec</span>::<span class="ident">with_capacity</span>(<span class="ident">xs</span>.<span class="ident">len</span>());
         <span class="kw">for</span> <span class="ident">x</span> <span class="kw">in</span> <span class="ident">xs</span>.<span class="ident">iter</span>() {
-            <span class="self">self</span>.<span class="ident">output</span>(<span class="ident">x</span>)<span class="question-mark">?</span>;
+            <span class="ident">zs</span>.<span class="ident">push</span>(<span class="self">self</span>.<span class="ident">output</span>(<span class="ident">x</span>)<span class="question-mark">?</span>);
         }
-        <span class="prelude-val">Ok</span>(())
+        <span class="prelude-val">Ok</span>(<span class="ident">zs</span>.<span class="ident">into_iter</span>().<span class="ident">collect</span>())
     }
 }
 </pre></div>
