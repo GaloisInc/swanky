@@ -22,7 +22,7 @@ fn rand_vec_vec(ninputs: usize, nbytes: usize) -> Vec<Vec<u8>> {
     (0..ninputs).map(|_| rand_vec(nbytes)).collect()
 }
 
-fn psz_payload(inputs1: Vec<Vec<u8>>, inputs2: Vec<Vec<u8>>, payloads: Vec<Vec<u8>>) {
+fn psz_payload(inputs1: Vec<Vec<u8>>, inputs2: Vec<Vec<u8>>) {
     let (sender, receiver) = UnixStream::pair().unwrap();
     let total = SystemTime::now();
     std::thread::spawn(move || {
@@ -38,7 +38,7 @@ fn psz_payload(inputs1: Vec<Vec<u8>>, inputs2: Vec<Vec<u8>>, payloads: Vec<Vec<u
             start.elapsed().unwrap().as_millis()
         );
         let start = SystemTime::now();
-        sender.send_payloads(&inputs1, &payloads, &mut channel, &mut rng).unwrap();
+        sender.send_payloads(&inputs1, &mut channel, &mut rng).unwrap();
         println!(
             "Sender :: send time: {} ms",
             start.elapsed().unwrap().as_millis()
@@ -91,6 +91,5 @@ fn main() {
         NINPUTS, NBYTES, PAYLOAD_SIZE
     );
     let rs = rand_vec_vec(NINPUTS, NBYTES);
-    let payloads = rand_vec_vec(NINPUTS, PAYLOAD_SIZE);
-    psz_payload(rs.clone(), rs.clone(), payloads);
+    psz_payload(rs.clone(), rs.clone());
 }

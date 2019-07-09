@@ -12,13 +12,11 @@
 
 use crate::cuckoo::{compute_masksize, CuckooHash};
 use crate::{utils, Error};
-use digest::Digest;
 use itertools::Itertools;
 use ocelot::oprf::{self, Receiver as OprfReceiver, Sender as OprfSender};
 use rand::seq::SliceRandom;
 use rand::{CryptoRng, Rng, RngCore};
 use scuttlebutt::{cointoss, AbstractChannel, Block, Block512, SemiHonest};
-use sha2::Sha256;
 use std::collections::{HashMap, HashSet};
 
 const NHASHES: usize = 3;
@@ -49,25 +47,6 @@ impl Sender {
         channel: &mut C,
         rng: &mut RNG,
     ) -> Result<(), Error> {
-        self.send_payloads(inputs, &[], channel, rng)
-    }
-
-    /// Run the PSI protocol over `inputs` with payloads.
-    pub fn send_payloads<C: AbstractChannel, RNG: CryptoRng + RngCore>(
-        &mut self,
-        inputs: &[Vec<u8>],
-        payloads: &[Vec<u8>],
-        channel: &mut C,
-        rng: &mut RNG,
-    ) -> Result<(), Error> {
-        // send the length of the payloads
-        let payload_len = payloads.first().map_or(0, Vec::len);
-        if payload_len > 0 {
-            assert!(payloads.iter().all(|p| p.len() == payload_len));
-            assert_eq!(payloads.len(), inputs.len());
-            channel.write_usize(payload_len)?;
-        }
-
         let key = cointoss::send(channel, &[rng.gen()])?[0];
         let inputs = utils::compress_and_hash_inputs(inputs, key);
         let masksize = compute_masksize(inputs.len())?;
@@ -91,33 +70,58 @@ impl Sender {
                 self.oprf.encode(inputs[j] ^ hidx, &mut encoded);
                 encoded ^= seeds[bin];
 
-                // If payloads are not present, use the original protocol.
-                // Otherwise, use the new protocol and send payloads encrypted under
-                // F(...), tagged by H(F(...)).
-                if payload_len == 0 {
-                    channel.write_bytes(&encoded.prefix(masksize))?;
-                } else {
-                    // compute and send tag
-                    let tag: [u8; 32] = Sha256::digest(encoded.prefix(masksize)).into();
-
-                    // encrypt payload
-                    let iv: [u8; 16] = rng.gen();
-                    let key = encoded.prefix(16);
-                    let ct = openssl::symm::encrypt(
-                        openssl::symm::Cipher::aes_128_ctr(),
-                        &key,
-                        Some(&iv),
-                        &payloads[j],
-                    )?;
-
-                    channel.write_bytes(&tag)?;
-                    channel.write_bytes(&iv)?;
-                    channel.write_bytes(&ct)?;
-                }
+                channel.write_bytes(&encoded.prefix(masksize))?;
             }
         }
         channel.flush()?;
         Ok(())
+    }
+
+    /// Run the PSI protocol over `inputs`. Returns a random key for each input which can
+    /// be used to encrypt payloads.
+    pub fn send_payloads<C: AbstractChannel, RNG: CryptoRng + RngCore>(
+        &mut self,
+        inputs: &[Vec<u8>],
+        channel: &mut C,
+        rng: &mut RNG,
+    ) -> Result<Vec<Block>, Error> {
+        let key = cointoss::send(channel, &[rng.gen()])?[0];
+        let masksize = compute_masksize(inputs.len())?;
+        let inputs = utils::compress_and_hash_inputs(inputs, key);
+        let nbins = channel.read_usize()?;
+        let seeds = self.oprf.send(channel, nbins, rng)?;
+        let payloads = (0..inputs.len()).map(|_| rng.gen::<Block>()).collect_vec();
+
+        // For each hash function `hᵢ`, construct set `Hᵢ = {F(k_{hᵢ(x)}, x ||
+        // i) | x ∈ X)}`, randomly permute it, and send it to the receiver.
+        let mut encoded = Block512::default();
+        let mut indices = (0..inputs.len()).collect_vec();
+        for i in 0..NHASHES {
+            // shuffle the indices in order to send out of order
+            indices.shuffle(rng);
+
+            let hidx = Block::from(i as u128);
+            for &j in &indices {
+                // Compute `bin := hᵢ(x)`.
+                let bin = CuckooHash::bin(inputs[j], i, nbins);
+
+                // Compute `F(k_{hᵢ(x)}, x || i)` and chop off extra bytes.
+                self.oprf.encode(inputs[j] ^ hidx, &mut encoded);
+                encoded ^= seeds[bin];
+
+                let tag = &encoded.as_ref()[0..masksize];
+                let key = &encoded.as_ref()[masksize..masksize+16];
+
+                // encrypt payload
+                let mut ct = payloads[j].clone();
+                scuttlebutt::utils::xor_inplace(ct.as_mut(), key);
+
+                channel.write_bytes(&tag[0..masksize])?;
+                channel.write_bytes(ct.as_ref())?;
+            }
+        }
+        channel.flush()?;
+        Ok(payloads)
     }
 }
 
@@ -178,11 +182,10 @@ impl Receiver {
     ) -> Result<
         Vec<(
             Vec<u8>, // Intersection item
-            Vec<u8>, // Payload
+            Block, // Payload
         )>,
         Error,
     > {
-        let payload_len = channel.read_usize()?;
         let (tbl, outputs) = self.perform_oprfs(inputs, channel, rng)?;
         let n = inputs.len();
         let masksize = compute_masksize(n)?;
@@ -193,12 +196,10 @@ impl Receiver {
         let mut hs = vec![HashMap::with_capacity(n); NHASHES];
         for h in hs.iter_mut() {
             for _ in 0..n {
-                let mut tag = [0_u8; 32];
-                let mut iv = [0_u8; 16];
+                let mut tag = vec![0; masksize];
                 channel.read_bytes(&mut tag)?;
-                channel.read_bytes(&mut iv)?;
-                let ct = channel.read_vec(payload_len)?;
-                h.insert(tag, (iv, ct));
+                let ct = channel.read_block()?;
+                h.insert(tag, ct);
             }
         }
 
@@ -208,18 +209,14 @@ impl Receiver {
 
         for (opt_item, output) in tbl.items.iter().zip(outputs.into_iter()) {
             if let Some(item) = opt_item {
-                // compute tag = H(F(x))
-                let tag: [u8; 32] = Sha256::digest(output.prefix(masksize)).into();
+                let tag = &output.as_ref()[0..masksize];
 
                 // if the tag is present, decrypt the payload using F(x).
-                if let Some((iv, ct)) = hs[item.hash_index].get(&tag) {
+                if let Some(ct) = hs[item.hash_index].get(tag) {
                     let val = inputs[item.input_index].clone();
-                    let payload = openssl::symm::decrypt(
-                        openssl::symm::Cipher::aes_128_ctr(),
-                        output.prefix(16),
-                        Some(iv),
-                        ct,
-                    )?;
+                    let key = &output.as_ref()[masksize..masksize+16];
+                    let payload_bytes = scuttlebutt::utils::xor(ct.as_ref(), key);
+                    let payload = Block::try_from_slice(&payload_bytes).expect("it is exactly 16 bytes long");
                     intersection.push((val, payload));
                 }
             }
@@ -322,7 +319,6 @@ mod tests {
         let (sender, receiver) = UnixStream::pair().unwrap();
         let sender_inputs = rand_vec_vec(SET_SIZE, ITEM_SIZE, &mut rng);
         let receiver_inputs = sender_inputs.clone();
-        let payloads = rand_vec_vec(SET_SIZE, 32, &mut rng);
 
         let handle = std::thread::spawn(move || {
             let mut rng = AesRng::new();
@@ -330,7 +326,7 @@ mod tests {
             let writer = BufWriter::new(sender);
             let mut channel = Channel::new(reader, writer);
             let mut psi = Sender::init(&mut channel, &mut rng).unwrap();
-            psi.send_payloads(&sender_inputs, &payloads, &mut channel, &mut rng)
+            psi.send_payloads(&sender_inputs, &mut channel, &mut rng)
                 .unwrap();
         });
 
@@ -343,6 +339,7 @@ mod tests {
             .receive_payloads(&receiver_inputs, &mut channel, &mut rng)
             .unwrap();
         handle.join().unwrap();
+
         assert_eq!(payloads.len(), SET_SIZE);
     }
 
