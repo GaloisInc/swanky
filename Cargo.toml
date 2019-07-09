@@ -32,6 +32,8 @@ criterion = "0.2.11"
 clap = "2.33.0"
 serde = { version = "1.0.92", features = ["derive"] }
 serde_yaml = "0.8.9"
+quickcheck = "0.8"
+quickcheck_macros = "0.8"
 
 [profile.release]
 opt-level = 3

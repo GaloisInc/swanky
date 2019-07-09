@@ -277,15 +277,21 @@ impl SemiHonest for Receiver {}
 mod tests {
     use super::*;
     use crate::utils::rand_vec_vec;
+    use quickcheck::{Arbitrary, Gen, TestResult};
+    use quickcheck_macros::quickcheck;
+    use rand::Rng;
+    use rand::SeedableRng;
     use scuttlebutt::{AesRng, Channel};
+    use std::collections::{BTreeMap, BTreeSet};
     use std::io::{BufReader, BufWriter};
+    use std::iter::FromIterator;
     use std::os::unix::net::UnixStream;
 
     const ITEM_SIZE: usize = 16;
     const SET_SIZE: usize = 1 << 4;
 
     #[test]
-    fn test_psi() {
+    fn test_psi_complete_intersection() {
         let mut rng = AesRng::new();
         let (sender, receiver) = UnixStream::pair().unwrap();
         let sender_inputs = rand_vec_vec(SET_SIZE, ITEM_SIZE, &mut rng);
@@ -338,5 +344,69 @@ mod tests {
             .unwrap();
         handle.join().unwrap();
         assert_eq!(payloads.len(), SET_SIZE);
+    }
+
+    #[derive(Debug, PartialEq, Eq, Clone, Copy)]
+    enum Where {
+        Sender,
+        Receiver,
+        Both,
+    }
+
+    impl Arbitrary for Where {
+        fn arbitrary<G: Gen>(g: &mut G) -> Self {
+            match g.gen_range(0, 3) {
+                0 => Where::Sender,
+                1 => Where::Receiver,
+                2 => Where::Both,
+                _ => panic!("out of range"),
+            }
+        }
+    }
+
+    #[quickcheck]
+    fn test_psi_incomplete_intersection(items: BTreeMap<u32, Where>) -> TestResult {
+        if items.is_empty() {
+            return TestResult::discard();
+        }
+        let (sender, receiver) = UnixStream::pair().unwrap();
+        let mut sender_inputs = Vec::new();
+        let mut receiver_inputs = Vec::new();
+        let mut expected_intersection: BTreeSet<Vec<u8>> = BTreeSet::new();
+        for (x, w) in items.into_iter() {
+            let v = x.to_le_bytes().to_vec();
+            if w == Where::Both || w == Where::Sender {
+                sender_inputs.push(v.clone());
+            }
+            if w == Where::Both || w == Where::Receiver {
+                receiver_inputs.push(v.clone());
+            }
+            if w == Where::Both {
+                expected_intersection.insert(v);
+            }
+        }
+        if sender_inputs.is_empty() || receiver_inputs.is_empty() {
+            return TestResult::discard();
+        }
+        let handle = std::thread::spawn(move || {
+            let mut rng = AesRng::from_seed((0 as u128).into());
+            let reader = BufReader::new(sender.try_clone().unwrap());
+            let writer = BufWriter::new(sender);
+            let mut channel = Channel::new(reader, writer);
+            let mut psi = Sender::init(&mut channel, &mut rng).unwrap();
+            psi.send(&sender_inputs, &mut channel, &mut rng).unwrap();
+        });
+        let mut rng = AesRng::from_seed((1 as u128).into());
+        let reader = BufReader::new(receiver.try_clone().unwrap());
+        let writer = BufWriter::new(receiver);
+        let mut channel = Channel::new(reader, writer);
+        let mut psi = Receiver::init(&mut channel, &mut rng).unwrap();
+        let intersection = psi
+            .receive(&receiver_inputs, &mut channel, &mut rng)
+            .unwrap();
+        handle.join().unwrap();
+        let actual_intersection: BTreeSet<Vec<u8>> = BTreeSet::from_iter(intersection.into_iter());
+        assert_eq!(actual_intersection, expected_intersection);
+        TestResult::from_bool(true)
     }
 }
