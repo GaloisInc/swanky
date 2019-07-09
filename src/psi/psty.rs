@@ -261,8 +261,7 @@ impl ReceiverState {
     {
         let (mut ev, x, y) = self.compute_setup(channel, rng)?;
         let outs = fancy_compute_intersection(&mut ev, &x, &y)?;
-        ev.outputs(&outs)?;
-        let mpc_outs = ev.decode_output()?;
+        let mpc_outs = ev.outputs(&outs)?.expect("evaluator should produce outputs");
 
         let mut intersection = Vec::new();
         for (opt_item, in_intersection) in self.cuckoo.items.iter().zip_eq(mpc_outs.into_iter()) {
@@ -287,8 +286,7 @@ impl ReceiverState {
     {
         let (mut ev, x, y) = self.compute_setup(channel, rng)?;
         let (outs, mods) = fancy_compute_cardinality(&mut ev, &x, &y)?;
-        ev.outputs(&outs)?;
-        let mpc_outs = ev.decode_output()?;
+        let mpc_outs = ev.outputs(&outs)?.expect("evaluator should produce outputs");
 
         let cardinality = fancy_garbling::util::crt_inv(&mpc_outs, &mods);
         Ok(cardinality as usize)
