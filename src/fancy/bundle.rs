@@ -108,7 +108,10 @@ pub trait BundleGadgets: Fancy {
     }
 
     /// Output a slice of bundles.
-    fn output_bundles(&mut self, xs: &[Bundle<Self::Item>]) -> Result<Option<Vec<Vec<u16>>>, Self::Error> {
+    fn output_bundles(
+        &mut self,
+        xs: &[Bundle<Self::Item>],
+    ) -> Result<Option<Vec<Vec<u16>>>, Self::Error> {
         let mut zs = Vec::with_capacity(xs.len());
         for x in xs.iter() {
             let z = self.output_bundle(x)?;

@@ -188,7 +188,7 @@ mod nonstreaming {
                     println!("TEST x={} y={}", x, y);
                     let xs = &en.encode_evaluator_inputs(&[x, y]);
                     let decoded = &ev.eval(&mut c, &[], xs).unwrap();
-                    let should_be = c.eval_plain( &[], &[x, y]).unwrap();
+                    let should_be = c.eval_plain(&[], &[x, y]).unwrap();
                     assert_eq!(decoded[0], should_be[0]);
                 }
             }
@@ -303,8 +303,13 @@ mod streaming {
         mut f_du: FDU,
         input_mods: &[u16],
     ) where
-        FGB: FnMut(&mut Garbler<MyChannel, AesRng>, &[Wire]) -> Option<u16> + Send + Sync + Copy + 'static,
-        FEV: FnMut(&mut Evaluator<MyChannel>, &[Wire]) -> Option<u16> + Send + Sync + Copy + 'static,
+        FGB: FnMut(&mut Garbler<MyChannel, AesRng>, &[Wire]) -> Option<u16>
+            + Send
+            + Sync
+            + Copy
+            + 'static,
+        FEV:
+            FnMut(&mut Evaluator<MyChannel>, &[Wire]) -> Option<u16> + Send + Sync + Copy + 'static,
         FDU: FnMut(&mut Dummy, &[DummyVal]) -> Option<u16> + Send + Sync + Copy + 'static,
     {
         let mut rng = AesRng::new();
@@ -452,7 +457,10 @@ mod complex {
     use std::io::{BufReader, BufWriter};
     use std::os::unix::net::UnixStream;
 
-    fn complex_gadget<F: Fancy>(b: &mut F, xs: &[CrtBundle<F::Item>]) -> Result<Option<Vec<u128>>, F::Error> {
+    fn complex_gadget<F: Fancy>(
+        b: &mut F,
+        xs: &[CrtBundle<F::Item>],
+    ) -> Result<Option<Vec<u128>>, F::Error> {
         let mut zs = Vec::with_capacity(xs.len());
         for x in xs.iter() {
             let c = b.crt_constant_bundle(1, x.composite_modulus())?;

@@ -137,7 +137,7 @@ impl<C: AbstractChannel, RNG: CryptoRng + RngCore> Garbler<C, RNG> {
     }
 }
 
-impl <C: AbstractChannel, RNG: RngCore + CryptoRng> FancyReveal for Garbler<C, RNG> {
+impl<C: AbstractChannel, RNG: RngCore + CryptoRng> FancyReveal for Garbler<C, RNG> {
     fn reveal(&mut self, _x: &Wire) -> Result<u16, GarblerError> {
         let val = self.channel.read_u16()?;
         Ok(val)
@@ -353,7 +353,7 @@ impl<C: AbstractChannel, RNG: RngCore + CryptoRng> Fancy for Garbler<C, RNG> {
         let i = self.current_output();
         let D = self.delta(q);
         for k in 0..q {
-            let block = X.plus(&D.cmul(k)).hash(output_tweak(i,k));
+            let block = X.plus(&D.cmul(k)).hash(output_tweak(i, k));
             self.channel.write_block(&block)?;
         }
         Ok(None)

@@ -4,14 +4,13 @@
 // Copyright © 2019 Galois, Inc.
 // See LICENSE for licensing information.
 
-//! Trait to describe Fancy objects which can reveal outputs to both parties. For many
-//! simple Fancy objects in this library such as Dummy, this is simply output. For Garbler
-//! and Evaluator, it is more complicated since the BMR16 protocol outputs to the
-//! Evaluator only.
-
 use super::*;
 use crate::util;
 
+/// Trait to describe Fancy objects which can reveal outputs to both parties. For many
+/// simple Fancy objects in this library such as Dummy, this is simply output. For Garbler
+/// and Evaluator, it is more complicated since the BMR16 protocol outputs to the
+/// Evaluator only.
 pub trait FancyReveal: Fancy {
     /// Reveal the contents of `x` to all parties.
     fn reveal(&mut self, x: &Self::Item) -> Result<u16, Self::Error>;
@@ -31,7 +30,10 @@ pub trait FancyReveal: Fancy {
     }
 
     /// Reveal many bundles to all parties.
-    fn reveal_many_bundles(&mut self, xs: &[Bundle<Self::Item>]) -> Result<Vec<Vec<u16>>, Self::Error> {
+    fn reveal_many_bundles(
+        &mut self,
+        xs: &[Bundle<Self::Item>],
+    ) -> Result<Vec<Vec<u16>>, Self::Error> {
         let mut zs = Vec::with_capacity(xs.len());
         for x in xs.iter() {
             zs.push(self.reveal_bundle(x)?);
@@ -62,7 +64,10 @@ pub trait FancyReveal: Fancy {
     }
 
     /// Reveal many binary bundles to all parties.
-    fn bin_reveal_many(&mut self, xs: &[BinaryBundle<Self::Item>]) -> Result<Vec<u128>, Self::Error> {
+    fn bin_reveal_many(
+        &mut self,
+        xs: &[BinaryBundle<Self::Item>],
+    ) -> Result<Vec<u128>, Self::Error> {
         let mut zs = Vec::with_capacity(xs.len());
         for x in xs.iter() {
             zs.push(self.bin_reveal(x)?);

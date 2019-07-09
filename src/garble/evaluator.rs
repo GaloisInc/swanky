@@ -54,7 +54,7 @@ impl<C: AbstractChannel> Evaluator<C> {
     }
 }
 
-impl <C: AbstractChannel> FancyReveal for Evaluator<C> {
+impl<C: AbstractChannel> FancyReveal for Evaluator<C> {
     fn reveal(&mut self, x: &Wire) -> Result<u16, EvaluatorError> {
         let val = self.output(x)?.expect("Evaluator always outputs Some(u16)");
         self.channel.write_u16(val)?;

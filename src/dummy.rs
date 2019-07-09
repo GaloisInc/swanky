@@ -13,7 +13,7 @@ use crate::error::{DummyError, FancyError};
 use crate::fancy::{Fancy, FancyInput, FancyReveal, HasModulus};
 
 /// Simple struct that performs the fancy computation over `u16`.
-pub struct Dummy { }
+pub struct Dummy {}
 
 /// Wrapper around `u16`.
 #[derive(Clone, Debug)]
@@ -43,7 +43,7 @@ impl DummyVal {
 impl Dummy {
     /// Create a new Dummy.
     pub fn new() -> Dummy {
-        Dummy { }
+        Dummy {}
     }
 }
 
@@ -312,7 +312,7 @@ mod bundle {
                 overflow = d.output(&_overflow).unwrap().unwrap();
                 out = d.bin_output(&z).unwrap().unwrap();
             }
-            assert_eq!( out, should_be);
+            assert_eq!(out, should_be);
             assert_eq!(overflow > 0, (y != 0 && x >= y), "x={} y={}", x, y);
         }
     }
@@ -397,7 +397,13 @@ mod bundle {
                 let z = d.mask(&b, &x).unwrap().into();
                 out = d.crt_output(&z).unwrap().unwrap();
             }
-            assert!(if b { out == x } else { out == 0 }, "b={} x={} z={}", b, x, out);
+            assert!(
+                if b { out == x } else { out == 0 },
+                "b={} x={} z={}",
+                b,
+                x,
+                out
+            );
         }
     }
 
