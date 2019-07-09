@@ -29,10 +29,9 @@ mod tests {
     type Writer = BufWriter<UnixStream>;
     type MyChannel = Channel<Reader, Writer>;
 
-    fn addition<F: Fancy>(f: &mut F, a: &F::Item, b: &F::Item) -> Result<(), F::Error> {
+    fn addition<F: Fancy>(f: &mut F, a: &F::Item, b: &F::Item) -> Result<Option<u16>, F::Error> {
         let c = f.add(&a, &b)?;
-        f.output(&c)?;
-        Ok(())
+        f.output(&c)
     }
 
     #[test]
@@ -60,23 +59,22 @@ mod tests {
                     Evaluator::<MyChannel, AesRng, ChouOrlandiReceiver>::new(channel, rng).unwrap();
                 let x = ev.receive(3).unwrap();
                 let ys = ev.encode_many(&[b], &[3]).unwrap();
-                addition(&mut ev, &x, &ys[0]).unwrap();
-                let output = ev.decode_output().unwrap();
-                assert_eq!(vec![(a + b) % 3], output);
+                let output = addition(&mut ev, &x, &ys[0]).unwrap().unwrap();
+                assert_eq!((a + b) % 3, output);
             }
         }
     }
 
-    fn relu<F: Fancy>(b: &mut F, xs: &[CrtBundle<F::Item>]) {
+    fn relu<F: Fancy>(b: &mut F, xs: &[CrtBundle<F::Item>]) -> Option<Vec<u128>> {
+        let mut outputs = Vec::new();
         for x in xs.iter() {
             let q = x.composite_modulus();
             let c = b.crt_constant_bundle(1, q).unwrap();
             let y = b.crt_mul(&x, &c).unwrap();
             let z = b.crt_relu(&y, "100%", None).unwrap();
-            for w in z.iter() {
-                b.output(w).unwrap();
-            }
+            outputs.push(b.crt_output(&z).unwrap());
         }
+        outputs.into_iter().collect()
     }
 
     #[test]
@@ -93,8 +91,7 @@ mod tests {
             .iter()
             .map(|x| dummy.crt_encode(*x, q).unwrap())
             .collect_vec();
-        relu(&mut dummy, &dummy_input);
-        let target = dummy.get_output();
+        let target = relu(&mut dummy, &dummy_input).unwrap();
 
         // Run 2PC version.
         let (sender, receiver) = UnixStream::pair().unwrap();
@@ -116,8 +113,7 @@ mod tests {
         let mut ev =
             Evaluator::<MyChannel, AesRng, ChouOrlandiReceiver>::new(channel, rng).unwrap();
         let xs = ev.crt_receive_many(n, q).unwrap();
-        relu(&mut ev, &xs);
-        let result = ev.decode_output().unwrap();
+        let result = relu(&mut ev, &xs).unwrap();
         assert_eq!(target, result);
     }
 
@@ -199,9 +195,8 @@ mod tests {
         let mut ev2 =
             Evaluator::<MyChannel, AesRng, ChouOrlandiReceiver>::new(channel, AesRng::new())
                 .unwrap();
-        ev2.output(&z).unwrap();
+        let output = ev2.output(&z).unwrap().unwrap();
 
-        let output = ev2.decode_output().unwrap();
-        assert_eq!(vec![(a + b) % q], output);
+        assert_eq!((a + b) % q, output);
     }
 }

@@ -149,7 +149,7 @@ impl<C: AbstractChannel, RNG: CryptoRng + Rng, OT> Fancy for Garbler<C, RNG, OT>
     }
 
     #[inline]
-    fn output(&mut self, x: &Self::Item) -> Result<(), Self::Error> {
+    fn output(&mut self, x: &Self::Item) -> Result<Option<u16>, Self::Error> {
         self.garbler.output(x).map_err(Self::Error::from)
     }
 }

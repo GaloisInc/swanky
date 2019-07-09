@@ -33,12 +33,6 @@ impl<C: AbstractChannel, RNG: CryptoRng + Rng, OT: OtReceiver<Msg = Block> + Sem
         })
     }
 
-    /// Decode the output post-evaluation.
-    pub fn decode_output(&self) -> Result<Vec<u16>, Error> {
-        let outs = self.evaluator.decode_output()?;
-        Ok(outs)
-    }
-
     fn run_ot(&mut self, inputs: &[bool]) -> Result<Vec<Block>, Error> {
         self.ot
             .receive(&mut self.channel, &inputs, &mut self.rng)
@@ -131,7 +125,7 @@ impl<C: AbstractChannel, RNG, OT> Fancy for Evaluator<C, RNG, OT> {
     }
 
     #[inline]
-    fn output(&mut self, x: &Wire) -> Result<(), Self::Error> {
+    fn output(&mut self, x: &Wire) -> Result<Option<u16>, Self::Error> {
         self.evaluator.output(&x).map_err(Self::Error::from)
     }
 }
