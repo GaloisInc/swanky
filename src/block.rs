@@ -105,15 +105,15 @@ impl Block {
         unsafe { Block(_mm_xor_si128(self.0, ONES)) }
     }
 
-    /// Try to create a Block from a Vec of bytes. The vec must have exactly 16 bytes.
+    /// Try to create a Block from a slice of bytes. The slice must have exactly 16 bytes.
     #[inline]
-    pub fn try_from_vec(bytes_vec: Vec<u8>) -> Option<Self> {
-        if bytes_vec.len() != 16 {
+    pub fn try_from_slice(bytes_slice: &[u8]) -> Option<Self> {
+        if bytes_slice.len() != 16 {
             return None;
         }
         let mut bytes = [0; 16];
         for i in 0..16 {
-            bytes[i] = bytes_vec[i];
+            bytes[i] = bytes_slice[i];
         }
         Some(Block::from(bytes))
     }
