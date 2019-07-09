@@ -10,7 +10,7 @@
 //! creating any circuits.
 
 use crate::error::{DummyError, FancyError};
-use crate::fancy::{Fancy, FancyInput, HasModulus};
+use crate::fancy::{Fancy, FancyInput, FancyReveal, HasModulus};
 
 /// Simple struct that performs the fancy computation over `u16`.
 pub struct Dummy { }
@@ -132,6 +132,12 @@ impl Fancy for Dummy {
 
     fn output(&mut self, x: &DummyVal) -> Result<Option<u16>, Self::Error> {
         Ok(Some(x.val))
+    }
+}
+
+impl FancyReveal for Dummy {
+    fn reveal(&mut self, x: &DummyVal) -> Result<u16, DummyError> {
+        Ok(x.val)
     }
 }
 

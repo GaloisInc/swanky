@@ -5,7 +5,7 @@
 // See LICENSE for licensing information.
 
 use crate::error::{FancyError, GarblerError};
-use crate::fancy::{BinaryBundle, CrtBundle, Fancy, HasModulus};
+use crate::fancy::{BinaryBundle, CrtBundle, Fancy, FancyReveal, HasModulus};
 use crate::util::{output_tweak, tweak, tweak2, RngExt};
 use crate::wire::Wire;
 use rand::{CryptoRng, RngCore};
@@ -137,7 +137,14 @@ impl<C: AbstractChannel, RNG: CryptoRng + RngCore> Garbler<C, RNG> {
     }
 }
 
-impl<C: AbstractChannel, RNG: CryptoRng + RngCore> Fancy for Garbler<C, RNG> {
+impl <C: AbstractChannel, RNG: RngCore + CryptoRng> FancyReveal for Garbler<C, RNG> {
+    fn reveal(&mut self, _x: &Wire) -> Result<u16, GarblerError> {
+        let val = self.channel.read_u16()?;
+        Ok(val)
+    }
+}
+
+impl<C: AbstractChannel, RNG: RngCore + CryptoRng> Fancy for Garbler<C, RNG> {
     type Item = Wire;
     type Error = GarblerError;
 

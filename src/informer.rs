@@ -7,7 +7,7 @@
 //! `Informer` runs a fancy computation and learns information from it.
 
 use crate::error::{FancyError, InformerError};
-use crate::fancy::{Fancy, FancyInput, HasModulus};
+use crate::fancy::{Fancy, FancyInput, FancyReveal, HasModulus};
 use std::collections::{HashMap, HashSet};
 
 /// Implements `Fancy`. Used to learn information about a `Fancy` computation in
@@ -294,5 +294,12 @@ impl Fancy for Informer {
     fn output(&mut self, x: &InformerVal) -> Result<Option<u16>, InformerError> {
         self.outputs.push(x.modulus());
         Ok(None)
+    }
+}
+
+impl FancyReveal for Informer {
+    fn reveal(&mut self, x: &InformerVal) -> Result<u16, InformerError> {
+        self.output(x)?;
+        Ok(0)
     }
 }

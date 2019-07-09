@@ -5,7 +5,7 @@
 // See LICENSE for licensing information.
 
 use crate::error::{EvaluatorError, FancyError};
-use crate::fancy::{Fancy, HasModulus};
+use crate::fancy::{Fancy, FancyReveal, HasModulus};
 use crate::util::{output_tweak, tweak, tweak2};
 use crate::wire::Wire;
 use scuttlebutt::AbstractChannel;
@@ -51,6 +51,14 @@ impl<C: AbstractChannel> Evaluator<C> {
     pub fn read_wire(&mut self, modulus: u16) -> Result<Wire, EvaluatorError> {
         let block = self.channel.read_block()?;
         Ok(Wire::from_block(block, modulus))
+    }
+}
+
+impl <C: AbstractChannel> FancyReveal for Evaluator<C> {
+    fn reveal(&mut self, x: &Wire) -> Result<u16, EvaluatorError> {
+        let val = self.output(x)?.expect("Evaluator always outputs Some(u16)");
+        self.channel.write_u16(val)?;
+        Ok(val)
     }
 }
 

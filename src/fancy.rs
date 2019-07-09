@@ -16,10 +16,12 @@ mod binary;
 mod bundle;
 mod crt;
 mod input;
+mod reveal;
 pub use binary::{BinaryBundle, BinaryGadgets};
 pub use bundle::{Bundle, BundleGadgets};
 pub use crt::{CrtBundle, CrtGadgets};
 pub use input::FancyInput;
+pub use reveal::FancyReveal;
 
 /// An object that has some modulus. Basic object of `Fancy` computations.
 pub trait HasModulus {
