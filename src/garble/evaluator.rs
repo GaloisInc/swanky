@@ -8,7 +8,7 @@ use crate::error::{EvaluatorError, FancyError};
 use crate::fancy::{Fancy, HasModulus};
 use crate::util::{output_tweak, tweak, tweak2};
 use crate::wire::Wire;
-use scuttlebutt::{AbstractChannel, Block};
+use scuttlebutt::AbstractChannel;
 
 /// Streaming evaluator using a callback to receive ciphertexts as needed.
 ///
@@ -17,8 +17,7 @@ use scuttlebutt::{AbstractChannel, Block};
 pub struct Evaluator<C> {
     channel: C,
     current_gate: usize,
-    pub(crate) output_cts: Vec<Vec<Block>>,
-    pub(crate) output_wires: Vec<Wire>,
+    current_output: usize,
 }
 
 impl<C: AbstractChannel> Evaluator<C> {
@@ -27,37 +26,8 @@ impl<C: AbstractChannel> Evaluator<C> {
         Evaluator {
             channel,
             current_gate: 0,
-            output_cts: Vec::new(),
-            output_wires: Vec::new(),
+            current_output: 0,
         }
-    }
-
-    /// Decode the output received during the Fancy computation.
-    pub fn decode_output(&self) -> Result<Vec<u16>, EvaluatorError> {
-        debug_assert_eq!(
-            self.output_wires.len(),
-            self.output_cts.len(),
-            "got {} wires, but have {} output ciphertexts",
-            self.output_wires.len(),
-            self.output_cts.len()
-        );
-
-        let mut outs = Vec::with_capacity(self.output_wires.len());
-        for i in 0..self.output_wires.len() {
-            let q = self.output_wires[i].modulus();
-            debug_assert_eq!(q as usize, self.output_cts[i].len());
-            for k in 0..q {
-                let h = self.output_wires[i].hash(output_tweak(i, k));
-                if h == self.output_cts[i][k as usize] {
-                    outs.push(k);
-                    break;
-                }
-            }
-        }
-        if self.output_wires.len() != outs.len() {
-            return Err(EvaluatorError::DecodingFailed);
-        }
-        Ok(outs)
     }
 
     /// The current non-free gate index of the garbling computation.
@@ -65,6 +35,14 @@ impl<C: AbstractChannel> Evaluator<C> {
     fn current_gate(&mut self) -> usize {
         let current = self.current_gate;
         self.current_gate += 1;
+        current
+    }
+
+    /// The current output index of the garbling computation.
+    #[inline]
+    fn current_output(&mut self) -> usize {
+        let current = self.current_output;
+        self.current_output += 1;
         current
     }
 
@@ -174,14 +152,26 @@ impl<C: AbstractChannel> Fancy for Evaluator<C> {
 
     #[inline]
     fn output(&mut self, x: &Wire) -> Result<Option<u16>, EvaluatorError> {
-        let noutputs = x.modulus() as usize;
-        let mut blocks = Vec::with_capacity(noutputs);
-        for _ in 0..noutputs {
-            let block = self.channel.read_block()?;
-            blocks.push(block);
+        let q = x.modulus();
+        let i = self.current_output();
+
+        // Receive the output ciphertext from the garbler
+        let ct = self.channel.read_blocks(q as usize)?;
+
+        // Attempt to brute force x using the output ciphertext
+        let mut decoded = None;
+        for k in 0..q {
+            let hashed_wire = x.hash(output_tweak(i, k));
+            if hashed_wire == ct[k as usize] {
+                decoded = Some(k);
+                break;
+            }
         }
-        self.output_cts.push(blocks);
-        self.output_wires.push(x.clone());
-        unimplemented!()
+
+        if let Some(output) = decoded {
+            Ok(Some(output))
+        } else {
+            Err(EvaluatorError::DecodingFailed)
+        }
     }
 }

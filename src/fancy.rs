@@ -258,6 +258,10 @@ pub trait Fancy {
 
     /// Output a slice of wires.
     fn outputs(&mut self, xs: &[Self::Item]) -> Result<Option<Vec<u16>>, Self::Error> {
-        xs.iter().map(|x| self.output(x)).collect()
+        let mut zs = Vec::with_capacity(xs.len());
+        for x in xs.iter() {
+            zs.push(self.output(x)?);
+        }
+        Ok(zs.into_iter().collect())
     }
 }

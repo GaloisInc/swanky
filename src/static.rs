@@ -48,8 +48,7 @@ impl GarbledCircuit {
         let channel = Channel::new(GarbledReader::new(&self.blocks), GarbledWriter::new(None));
         let mut evaluator = Evaluator::new(channel);
         let outputs = c.eval(&mut evaluator, garbler_inputs, evaluator_inputs)?;
-        c.process_outputs(&outputs, &mut evaluator)?;
-        evaluator.decode_output()
+        Ok(outputs.expect("evaluator outputs always are Some(u16)"))
     }
 }
 
@@ -81,9 +80,7 @@ pub fn garble(c: &mut Circuit) -> Result<(Encoder, GarbledCircuit), GarblerError
         })
         .collect_vec();
 
-    let outputs = c.eval(&mut garbler, &gb_inps, &ev_inps)?;
-
-    c.process_outputs(&outputs, &mut garbler)?;
+    c.eval(&mut garbler, &gb_inps, &ev_inps)?;
 
     let en = Encoder::new(gb_inps, ev_inps, garbler.get_deltas());
 

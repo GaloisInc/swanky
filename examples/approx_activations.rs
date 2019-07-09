@@ -1,14 +1,13 @@
 use fancy_garbling::dummy::Dummy;
 use fancy_garbling::util;
 use fancy_garbling::*;
-use itertools::Itertools;
 use rand::Rng;
 
-fn approx_relu<F: Fancy>(b: &mut F, x: &CrtBundle<F::Item>) {
+fn approx_relu<F: Fancy>(b: &mut F, x: &CrtBundle<F::Item>) -> Option<Vec<u128>> {
     let exact = b.crt_relu(&x, "100%", None).unwrap();
     let approx_999 = b.crt_relu(&x, "99.9%", None).unwrap();
     let approx_99 = b.crt_relu(&x, "99%", None).unwrap();
-    b.crt_outputs(&[exact, approx_999, approx_99]).unwrap();
+    b.crt_outputs(&[exact, approx_999, approx_99]).unwrap()
 }
 
 fn main() {
@@ -26,12 +25,7 @@ fn main() {
 
         let mut d = Dummy::new();
         let inp = d.crt_encode(x, q).unwrap();
-        approx_relu(&mut d, &inp);
-        let outs = d
-            .get_output()
-            .chunks(nprimes)
-            .map(|xs| util::crt_inv(xs, ps))
-            .collect_vec();
+        let outs = approx_relu(&mut d, &inp).unwrap();
 
         let should_be = if x >= q / 2 { 0 } else { x };
         assert_eq!(outs[0], should_be);

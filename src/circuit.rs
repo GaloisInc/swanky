@@ -406,6 +406,7 @@ impl Fancy for CircuitBuilder {
     }
 
     fn output(&mut self, xref: &CircuitRef) -> Result<Option<u16>, Self::Error> {
+        println!("output called");
         self.circ.output_refs.push(xref.clone());
         Ok(None)
     }
@@ -655,6 +656,29 @@ mod bundle {
     use itertools::Itertools;
     use rand::thread_rng;
 
+    #[test] // bundle input and output {{{
+    fn test_bundle_input_output() {
+        let mut rng = thread_rng();
+        let q = rng.gen_usable_composite_modulus();
+
+        let mut b = CircuitBuilder::new();
+        let x = b.crt_garbler_input(q);
+        println!("{:?} wires", x.wires().len());
+        b.output_bundle(&x).unwrap();
+        let mut c = b.finish();
+
+        println!("{:?}", c.output_refs);
+
+        for _ in 0..16 {
+            let x = rng.gen_u128() % q;
+            let res = c.eval_plain(&crt_factor(x, q), &[]).unwrap();
+            println!("{:?}", res);
+            let z = crt_inv_factor(&res, q);
+            assert_eq!(x, z);
+        }
+    }
+
+    //}}}
     #[test] // bundle addition {{{
     fn test_addition() {
         let mut rng = thread_rng();
@@ -970,6 +994,36 @@ mod bundle {
                 .unwrap();
             assert_eq!(util::u128_from_bits(&res[1..]), res_should_be);
             assert_eq!(res[0], carry_should_be);
+        }
+    }
+    //}}}
+    #[test] // binary demux {{{
+    fn test_bin_demux() {
+        let mut rng = thread_rng();
+        let nbits = 1 + (rng.gen_usize() % 10);
+        let Q = 1 << nbits as u128;
+
+        let mut b = CircuitBuilder::new();
+        let x = b.bin_garbler_input(nbits);
+        let d = b.bin_demux(&x).unwrap();
+        b.outputs(&d).unwrap();
+        let mut c = b.finish();
+
+        for _ in 0..16 {
+            let x = rng.gen_u128() % Q;
+            println!("x={}", x);
+            let mut should_be = vec![0; Q as usize];
+            should_be[x as usize] = 1;
+
+            let res = c.eval_plain(&util::u128_to_bits(x, nbits), &[]).unwrap();
+
+            for (i, y) in res.into_iter().enumerate() {
+                if i as u128 == x {
+                    assert_eq!(y, 1);
+                } else {
+                    assert_eq!(y, 0);
+                }
+            }
         }
     }
     //}}}

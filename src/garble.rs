@@ -18,8 +18,6 @@ pub use crate::garble::garbler::Garbler;
 #[cfg(test)]
 mod nonstreaming {
     use crate::circuit::{Circuit, CircuitBuilder};
-    use crate::dummy::Dummy;
-    use crate::dummy::DummyVal;
     use crate::fancy::{Bundle, BundleGadgets, Fancy};
     use crate::r#static::garble;
     use crate::util::{self, RngExt};
@@ -38,21 +36,17 @@ mod nonstreaming {
             let (en, ev) = garble(&mut c).unwrap();
             for _ in 0..16 {
                 let mut inps = Vec::new();
-                let mut dinps = Vec::new();
                 for i in 0..c.num_evaluator_inputs() {
                     let q = c.evaluator_input_mod(i);
                     let x = rng.gen_u16() % q;
                     inps.push(x);
-                    dinps.push(DummyVal::new(x, q));
                 }
                 // Run the garbled circuit evaluator.
                 let xs = &en.encode_evaluator_inputs(&inps);
                 let decoded = &ev.eval(&mut c, &[], xs).unwrap();
+
                 // Run the dummy evaluator.
-                let mut dummy = Dummy::new();
-                let outputs = c.eval(&mut dummy, &[], &dinps).unwrap();
-                c.process_outputs(&outputs, &mut dummy).unwrap();
-                let should_be = dummy.get_output();
+                let should_be = c.eval_plain(&[], &inps).unwrap();
                 assert_eq!(decoded[0], should_be[0]);
             }
         }
@@ -194,16 +188,7 @@ mod nonstreaming {
                     println!("TEST x={} y={}", x, y);
                     let xs = &en.encode_evaluator_inputs(&[x, y]);
                     let decoded = &ev.eval(&mut c, &[], xs).unwrap();
-                    let mut dummy = Dummy::new();
-                    let outputs = c
-                        .eval(
-                            &mut dummy,
-                            &[],
-                            &[DummyVal::new(x, q), DummyVal::new(y, ymod)],
-                        )
-                        .unwrap();
-                    c.process_outputs(&outputs, &mut dummy).unwrap();
-                    let should_be = dummy.get_output();
+                    let should_be = c.eval_plain( &[], &[x, y]).unwrap();
                     assert_eq!(decoded[0], should_be[0]);
                 }
             }
@@ -260,10 +245,8 @@ mod nonstreaming {
         let (_, ev) = garble(&mut circ).unwrap();
 
         for _ in 0..64 {
-            let mut dummy = Dummy::new();
-            let outputs = circ.eval(&mut dummy, &[], &[]).unwrap();
-            circ.process_outputs(&outputs, &mut dummy).unwrap();
-            assert_eq!(dummy.get_output()[0], c, "plaintext eval failed");
+            let outputs = circ.eval_plain(&[], &[]).unwrap();
+            assert_eq!(outputs[0], c, "plaintext eval failed");
             let outputs = ev.eval(&mut circ, &[], &[]).unwrap();
             assert_eq!(outputs[0], c, "garbled eval failed");
         }
@@ -287,10 +270,8 @@ mod nonstreaming {
 
         for _ in 0..64 {
             let x = rng.gen_u16() % q;
-            let mut dummy = Dummy::new();
-            let outputs = circ.eval(&mut dummy, &[], &[DummyVal::new(x, q)]).unwrap();
-            circ.process_outputs(&outputs, &mut dummy).unwrap();
-            assert_eq!(dummy.get_output()[0], (x + c) % q, "plaintext");
+            let outputs = circ.eval_plain(&[], &[x]).unwrap();
+            assert_eq!(outputs[0], (x + c) % q, "plaintext");
 
             let X = en.encode_evaluator_inputs(&[x]);
             let Y = ev.eval(&mut circ, &[], &X).unwrap();
@@ -322,9 +303,9 @@ mod streaming {
         mut f_du: FDU,
         input_mods: &[u16],
     ) where
-        FGB: FnMut(&mut Garbler<MyChannel, AesRng>, &[Wire]) + Send + Sync + Copy + 'static,
-        FEV: FnMut(&mut Evaluator<MyChannel>, &[Wire]) + Send + Sync + Copy + 'static,
-        FDU: FnMut(&mut Dummy, &[DummyVal]) + Send + Sync + Copy + 'static,
+        FGB: FnMut(&mut Garbler<MyChannel, AesRng>, &[Wire]) -> Option<u16> + Send + Sync + Copy + 'static,
+        FEV: FnMut(&mut Evaluator<MyChannel>, &[Wire]) -> Option<u16> + Send + Sync + Copy + 'static,
+        FDU: FnMut(&mut Dummy, &[DummyVal]) -> Option<u16> + Send + Sync + Copy + 'static,
     {
         let mut rng = AesRng::new();
 
@@ -333,8 +314,7 @@ mod streaming {
         // evaluate f_gb as a dummy
         let mut dummy = Dummy::new();
         let dinps = dummy.encode_many(&inputs, input_mods).unwrap();
-        f_du(&mut dummy, &dinps);
-        let should_be = dummy.get_output();
+        let should_be = f_du(&mut dummy, &dinps).unwrap();
 
         let (sender, receiver) = UnixStream::pair().unwrap();
 
@@ -358,18 +338,16 @@ mod streaming {
             .iter()
             .map(|q| ev.read_wire(*q).unwrap())
             .collect_vec();
-        f_ev(&mut ev, &ev_inp);
-
-        let result = ev.decode_output().unwrap();
+        let result = f_ev(&mut ev, &ev_inp).unwrap();
 
         assert_eq!(result, should_be)
     }
 
     #[test]
     fn addition() {
-        fn fancy_addition<F: Fancy>(b: &mut F, xs: &[F::Item]) {
+        fn fancy_addition<F: Fancy>(b: &mut F, xs: &[F::Item]) -> Option<u16> {
             let z = b.add(&xs[0], &xs[1]).unwrap();
-            b.output(&z).unwrap();
+            b.output(&z).unwrap()
         }
 
         let mut rng = thread_rng();
@@ -386,9 +364,9 @@ mod streaming {
 
     #[test]
     fn subtraction() {
-        fn fancy_subtraction<F: Fancy>(b: &mut F, xs: &[F::Item]) {
+        fn fancy_subtraction<F: Fancy>(b: &mut F, xs: &[F::Item]) -> Option<u16> {
             let z = b.sub(&xs[0], &xs[1]).unwrap();
-            b.output(&z).unwrap();
+            b.output(&z).unwrap()
         }
 
         let mut rng = thread_rng();
@@ -405,9 +383,9 @@ mod streaming {
 
     #[test]
     fn multiplication() {
-        fn fancy_multiplication<F: Fancy>(b: &mut F, xs: &[F::Item]) {
+        fn fancy_multiplication<F: Fancy>(b: &mut F, xs: &[F::Item]) -> Option<u16> {
             let z = b.mul(&xs[0], &xs[1]).unwrap();
-            b.output(&z).unwrap();
+            b.output(&z).unwrap()
         }
 
         let mut rng = thread_rng();
@@ -424,9 +402,9 @@ mod streaming {
 
     #[test]
     fn cmul() {
-        fn fancy_cmul<F: Fancy>(b: &mut F, xs: &[F::Item]) {
+        fn fancy_cmul<F: Fancy>(b: &mut F, xs: &[F::Item]) -> Option<u16> {
             let z = b.cmul(&xs[0], 5).unwrap();
-            b.output(&z).unwrap();
+            b.output(&z).unwrap()
         }
 
         let mut rng = thread_rng();
@@ -443,10 +421,10 @@ mod streaming {
 
     #[test]
     fn proj() {
-        fn fancy_projection<F: Fancy>(b: &mut F, xs: &[F::Item], q: u16) {
+        fn fancy_projection<F: Fancy>(b: &mut F, xs: &[F::Item], q: u16) -> Option<u16> {
             let tab = (0..q).map(|i| (i + 1) % q).collect_vec();
             let z = b.proj(&xs[0], q, Some(tab)).unwrap();
-            b.output(&z).unwrap();
+            b.output(&z).unwrap()
         }
 
         let mut rng = thread_rng();
@@ -474,16 +452,15 @@ mod complex {
     use std::io::{BufReader, BufWriter};
     use std::os::unix::net::UnixStream;
 
-    fn complex_gadget<F: Fancy>(b: &mut F, xs: &[CrtBundle<F::Item>]) {
-        let zs = xs
-            .iter()
-            .map(|x| {
-                let c = b.crt_constant_bundle(1, x.composite_modulus()).unwrap();
-                let y = b.crt_mul(x, &c).unwrap();
-                b.crt_relu(&y, "100%", None).unwrap()
-            })
-            .collect_vec();
-        b.crt_outputs(&zs).unwrap();
+    fn complex_gadget<F: Fancy>(b: &mut F, xs: &[CrtBundle<F::Item>]) -> Result<Option<Vec<u128>>, F::Error> {
+        let mut zs = Vec::with_capacity(xs.len());
+        for x in xs.iter() {
+            let c = b.crt_constant_bundle(1, x.composite_modulus())?;
+            let y = b.crt_mul(x, &c)?;
+            let z = b.crt_relu(&y, "100%", None)?;
+            zs.push(z);
+        }
+        b.crt_outputs(&zs)
     }
 
     #[test]
@@ -504,8 +481,7 @@ mod complex {
                     CrtBundle::new(dummy.encode_many(&xs, &qs).unwrap())
                 })
                 .collect_vec();
-            complex_gadget(&mut dummy, &dinps);
-            let should_be = dummy.get_output();
+            let should_be = complex_gadget(&mut dummy, &dinps).unwrap();
 
             // test streaming garbler and evaluator
             let (sender, receiver) = UnixStream::pair().unwrap();
@@ -526,7 +502,7 @@ mod complex {
                     }
                     gb_inp.push(zero);
                 }
-                complex_gadget(&mut garbler, &gb_inp);
+                complex_gadget(&mut garbler, &gb_inp).unwrap();
             });
             let reader = BufReader::new(receiver.try_clone().unwrap());
             let writer = BufWriter::new(receiver);
@@ -543,8 +519,7 @@ mod complex {
                 ev_inp.push(CrtBundle::new(ws));
             }
 
-            complex_gadget(&mut evaluator, &ev_inp);
-            let result = evaluator.decode_output().unwrap();
+            let result = complex_gadget(&mut evaluator, &ev_inp).unwrap();
             assert_eq!(result, should_be);
         }
     }
@@ -613,9 +588,8 @@ mod reuse {
             .collect_vec();
 
         let mut ev2 = Evaluator::new(channel);
-        ev2.outputs(&xs).unwrap();
+        let result = ev2.outputs(&xs).unwrap().unwrap();
 
-        let result = ev2.decode_output().unwrap();
         assert_eq!(result, should_be);
     }
 }

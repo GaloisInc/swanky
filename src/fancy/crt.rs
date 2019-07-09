@@ -72,7 +72,12 @@ pub trait CrtGadgets: Fancy + BundleGadgets {
 
     /// Output a slice of CRT bundles and interpret the outputs mod Q.
     fn crt_outputs(&mut self, xs: &[CrtBundle<Self::Item>]) -> Result<Option<Vec<u128>>, Self::Error> {
-        xs.iter().map(|x| self.crt_output(x)).collect()
+        let mut zs = Vec::with_capacity(xs.len());
+        for x in xs.iter() {
+            let z = self.crt_output(x)?;
+            zs.push(z);
+        }
+        Ok(zs.into_iter().collect())
     }
 
     ////////////////////////////////////////////////////////////////////////////////
