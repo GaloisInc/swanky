@@ -1,0 +1,1 @@
+initSidebarItems({"enum":[["Error","Errors produced by `twopac`."]],"mod":[["semihonest","Implementation of semi-honest two-party computation."]]});
