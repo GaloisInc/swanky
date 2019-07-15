@@ -1,0 +1,32 @@
+[workspace]
+members = [
+    "fancy-garbling",
+    "ocelot",
+    "popsicle",
+    "scuttlebutt",
+    "twopac",
+]
+
+[profile.release]
+opt-level = 3
+debug = true
+debug-assertions = false
+overflow-checks = false
+
+[profile.dev]
+opt-level = 0
+debug = true
+debug-assertions = true
+overflow-checks = true
+
+[profile.bench]
+opt-level = 3
+debug = true
+debug-assertions = false
+overflow-checks = false
+
+[profile.test]
+opt-level = 0
+debug = true
+debug-assertions = true
+overflow-checks = true

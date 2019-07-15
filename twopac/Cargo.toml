@@ -17,32 +17,16 @@ nightly = ["rand/nightly", "scuttlebutt/nightly", "ocelot/nightly", "fancy-garbl
 unstable = []
 
 [dependencies]
-fancy-garbling = { git="https://github.com/GaloisInc/fancy-garbling", branch="dev" }
-ocelot         = { git="https://github.com/GaloisInc/ocelot",         branch="dev" }
-scuttlebutt    = { git="https://github.com/GaloisInc/scuttlebutt",    branch="dev" }
-rand           = "0.6.5"
+fancy-garbling = { path = "../fancy-garbling" }
+ocelot         = { path = "../ocelot"         }
+scuttlebutt    = { path = "../scuttlebutt"    }
+rand           = "0.6"
 
 [dev-dependencies]
 criterion = "0.2"
 itertools = "0.8"
 
-[profile.release]
-opt-level = 3
-debug = false
-debug-assertions = false
-overflow-checks = false
 
-[profile.dev]
-opt-level = 0
-debug = true
-debug-assertions = true
-overflow-checks = true
-
-[profile.bench]
-opt-level = 3
-debug = false
-debug-assertions = false
-overflow-checks = false
 
 [[bench]]
 name = "semihonest"

@@ -17,8 +17,8 @@ nightly = ["curve25519-dalek/avx2_backend", "rand/nightly"]
 unstable = []
 
 [dependencies]
-curve25519-dalek = { version = "1.2.1", features = ["std"], optional = true }
-rand = "0.6.5"
+curve25519-dalek = { version = "1.2", features = ["std"], optional = true }
+rand = "0.6"
 rand_core = "0.4"
 serde = { version = "1", features = ["derive"], optional = true }
 sha2 = "0.8"
@@ -27,23 +27,7 @@ sha2 = "0.8"
 criterion = "0.2"
 hex = "0.3"
 
-[profile.release]
-opt-level = 3
-debug = false
-debug-assertions = false
-overflow-checks = false
 
-[profile.dev]
-opt-level = 0
-debug = true
-debug-assertions = true
-overflow-checks = true
-
-[profile.bench]
-opt-level = 3
-debug = false
-debug-assertions = false
-overflow-checks = false
 
 [[bench]]
 name = "aes128"

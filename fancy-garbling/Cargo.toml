@@ -22,29 +22,11 @@ base_conversion = { path = "base_conversion" }
 itertools = "0.8.0"
 rand = "0.6.5"
 regex = "1.1.7"
-scuttlebutt = { git = "https://github.com/GaloisInc/scuttlebutt", branch="dev" }
+scuttlebutt = { path = "../scuttlebutt" }
 
 [dev-dependencies]
 criterion = "0.2.11"
 crossbeam = "0.7.1"
-
-[profile.release]
-opt-level = 3
-debug = true
-debug-assertions = false
-overflow-checks = false
-
-[profile.dev]
-opt-level = 0
-debug = true
-debug-assertions = true
-overflow-checks = true
-
-[profile.bench]
-opt-level = 3
-debug = true
-debug-assertions = false
-overflow-checks = false
 
 [[bench]]
 name = "wire_operations"

@@ -17,9 +17,9 @@ nightly = ["rand/nightly", "scuttlebutt/nightly", "ocelot/nightly", "ocelot/nigh
 unstable = []
 
 [dependencies]
-fancy-garbling = { git   = "https://github.com/GaloisInc/fancy-garbling", branch = "dev" }
-ocelot         = { git   = "https://github.com/GaloisInc/ocelot", branch         = "dev" }
-scuttlebutt    = { git   = "https://github.com/GaloisInc/scuttlebutt", branch    = "dev" }
+fancy-garbling = { path = "../fancy-garbling" }
+ocelot         = { path = "../ocelot" }
+scuttlebutt    = { path = "../scuttlebutt" }
 twopac         = { path  = "../twopac" }
 itertools      = "0.8.0"
 rand           = "0.6.5"
@@ -33,24 +33,6 @@ serde = { version = "1.0.92", features = ["derive"] }
 serde_yaml = "0.8.9"
 quickcheck = "0.8"
 quickcheck_macros = "0.8"
-
-[profile.release]
-opt-level = 3
-debug = true
-debug-assertions = false
-overflow-checks = false
-
-[profile.dev]
-opt-level = 0
-debug = true
-debug-assertions = false
-overflow-checks = false
-
-[profile.bench]
-opt-level = 3
-debug = false
-debug-assertions = false
-overflow-checks = false
 
 [[bench]]
 name = "psz"
