@@ -1,0 +1,28 @@
+[package]
+name = "base_conversion"
+version = "0.1.0"
+authors = ["Brent Carmer <bcarmer@galois.com>"]
+edition = "2018"
+
+[dependencies]
+
+[build-dependencies]
+cc = "^1.0"
+
+[profile.release]
+opt-level = 3
+debug = false
+debug-assertions = false
+overflow-checks = false
+
+[profile.dev]
+opt-level = 0
+debug = true
+debug-assertions = true
+overflow-checks = true
+
+[profile.bench]
+opt-level = 3
+debug = false
+debug-assertions = false
+overflow-checks = false
