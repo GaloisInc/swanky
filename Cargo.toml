@@ -1,0 +1,74 @@
+[package]
+name = "scuttlebutt"
+version = "0.3.2"
+authors = ["Alex J. Malozemoff <amaloz@galois.com>"]
+license = "MIT"
+readme = "README.md"
+description = "A library of useful multi-party computation utilities"
+keywords = ["cryptography", "MPC", "secure-computation"]
+categories = ["cryptography"]
+edition = "2018"
+publish = false
+
+[lib]
+
+[features]
+nightly = ["curve25519-dalek/avx2_backend", "rand/nightly"]
+unstable = []
+
+[dependencies]
+curve25519-dalek = { version = "1.2.1", features = ["std"], optional = true }
+rand = "0.6.5"
+rand_core = "0.4"
+serde = { version = "1", features = ["derive"], optional = true }
+sha2 = "0.8"
+
+[dev-dependencies]
+criterion = "0.2"
+hex = "0.3"
+
+[profile.release]
+opt-level = 3
+debug = false
+debug-assertions = false
+overflow-checks = false
+
+[profile.dev]
+opt-level = 0
+debug = true
+debug-assertions = true
+overflow-checks = true
+
+[profile.bench]
+opt-level = 3
+debug = false
+debug-assertions = false
+overflow-checks = false
+
+[[bench]]
+name = "aes128"
+harness = false
+
+[[bench]]
+name = "aes256"
+harness = false
+
+[[bench]]
+name = "block"
+harness = false
+
+[[bench]]
+name = "block512"
+harness = false
+
+[[bench]]
+name = "commitment"
+harness = false
+
+[[bench]]
+name = "hash_aes"
+harness = false
+
+[[bench]]
+name = "rand_aes"
+harness = false
