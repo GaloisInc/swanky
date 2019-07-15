@@ -1,0 +1,77 @@
+[package]
+name = "popsicle"
+version = "0.3.0"
+authors = ["Alex J. Malozemoff <amaloz@galois.com>"]
+license = "MIT"
+readme = "README.md"
+description = "A library for private set intersection"
+categories = ["cryptography"]
+keywords = ["cryptography", "private-set-intersection", "PSI"]
+edition = "2018"
+publish = false
+
+[lib]
+
+[features]
+nightly = ["rand/nightly", "scuttlebutt/nightly", "ocelot/nightly", "ocelot/nightly"]
+unstable = []
+
+[dependencies]
+fancy-garbling = { git   = "https://github.com/GaloisInc/fancy-garbling", branch = "dev" }
+ocelot         = { git   = "https://github.com/GaloisInc/ocelot", branch         = "dev" }
+scuttlebutt    = { git   = "https://github.com/GaloisInc/scuttlebutt", branch    = "dev" }
+twopac         = { path  = "../twopac" }
+itertools      = "0.8.0"
+rand           = "0.6.5"
+sha2           = "0.8.0"
+openssl        = "0.10.23"
+
+[dev-dependencies]
+criterion = "0.2.11"
+clap = "2.33.0"
+serde = { version = "1.0.92", features = ["derive"] }
+serde_yaml = "0.8.9"
+quickcheck = "0.8"
+quickcheck_macros = "0.8"
+
+[profile.release]
+opt-level = 3
+debug = true
+debug-assertions = false
+overflow-checks = false
+
+[profile.dev]
+opt-level = 0
+debug = true
+debug-assertions = false
+overflow-checks = false
+
+[profile.bench]
+opt-level = 3
+debug = false
+debug-assertions = false
+overflow-checks = false
+
+[[bench]]
+name = "psz"
+harness = false
+
+[[bench]]
+name = "psty"
+harness = false
+required-features = ["unstable"]
+
+[[example]]
+name = "psty"
+harness = false
+required-features = ["unstable"]
+
+[[example]]
+name = "psty-payload"
+harness = false
+required-features = ["unstable"]
+
+[[example]]
+name = "secretsister"
+harness = false
+required-features = ["unstable"]
