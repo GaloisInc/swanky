@@ -1,0 +1,5 @@
+[build]
+rustflags = ["-C", "target-feature=+aes,+sse4.1,+avx2",
+             "-C", "target-cpu=native",
+             "-C", "opt-level=3"]
+rustdocflags = ["-C", "target-feature=+aes,+sse4.1"]
