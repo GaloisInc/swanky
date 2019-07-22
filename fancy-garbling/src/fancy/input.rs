@@ -20,6 +20,9 @@ pub trait FancyInput {
     // required methods
 
     /// Encode many values where the actual input is known.
+    ///
+    /// When writing a garbler, the return value must correspond to the zero
+    /// wire label.
     fn encode_many(
         &mut self,
         values: &[u16],
@@ -33,6 +36,9 @@ pub trait FancyInput {
     // optional methods
 
     /// Encode a single value.
+    ///
+    /// When writing a garbler, the return value must correspond to the zero
+    /// wire label.
     fn encode(&mut self, value: u16, modulus: u16) -> Result<Self::Item, Self::Error> {
         let mut xs = self.encode_many(&[value], &[modulus])?;
         Ok(xs.remove(0))

@@ -12,7 +12,7 @@ use rand::{CryptoRng, RngCore};
 use scuttlebutt::{AbstractChannel, Block};
 use std::collections::HashMap;
 
-/// Streams garbled circuit ciphertexts through a callback. Parallelizable.
+/// Streams garbled circuit ciphertexts through a callback.
 pub struct Garbler<C, RNG> {
     channel: C,
     deltas: HashMap<u16, Wire>, // map from modulus to associated delta wire-label.
