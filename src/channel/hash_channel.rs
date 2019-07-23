@@ -40,8 +40,8 @@ impl<R: Read, W: Write> AbstractChannel for HashChannel<R, W> {
 
     #[inline]
     fn read_bytes(&mut self, mut bytes: &mut [u8]) -> Result<()> {
-        self.channel.read_bytes(&mut bytes);
-        self.hash.input(&bytes)
+        self.channel.read_bytes(&mut bytes)?;
+        Ok(self.hash.input(&bytes))
     }
 
     #[inline]
