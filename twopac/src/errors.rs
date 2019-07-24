@@ -21,6 +21,8 @@ pub enum Error {
     FancyError(FancyError),
 }
 
+impl std::error::Error for Error {}
+
 impl From<ocelot::Error> for Error {
     fn from(e: ocelot::Error) -> Error {
         Error::OtError(e)
