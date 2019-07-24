@@ -5,7 +5,7 @@
 // See LICENSE for licensing information.
 
 use crate::errors::Error;
-use fancy_garbling::{Fancy, FancyInput, Garbler as Gb, Wire};
+use fancy_garbling::{Fancy, FancyInput, FancyReveal, Garbler as Gb, Wire};
 use ocelot::ot::Sender as OtSender;
 use rand::{CryptoRng, Rng, SeedableRng};
 use scuttlebutt::{AbstractChannel, Block, SemiHonest};
@@ -151,6 +151,12 @@ impl<C: AbstractChannel, RNG: CryptoRng + Rng, OT> Fancy for Garbler<C, RNG, OT>
     #[inline]
     fn output(&mut self, x: &Self::Item) -> Result<Option<u16>, Self::Error> {
         self.garbler.output(x).map_err(Self::Error::from)
+    }
+}
+
+impl<C: AbstractChannel, RNG: CryptoRng + Rng, OT> FancyReveal for Garbler<C, RNG, OT> {
+    fn reveal(&mut self, x: &Self::Item) -> Result<u16, Self::Error> {
+        self.garbler.reveal(x).map_err(Self::Error::from)
     }
 }
 
