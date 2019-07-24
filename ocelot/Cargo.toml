@@ -16,13 +16,13 @@ autoexamples = true
 
 [features]
 nightly = ["curve25519-dalek/avx2_backend", "rand/nightly", "scuttlebutt/nightly"]
-unstable = []
 
 [dependencies]
 curve25519-dalek = { version = "1.2", features = ["std"] }
 libc = "0.2"
 rand = "0.6"
 scuttlebutt = { path = "../scuttlebutt", features = ["curve25519-dalek"] }
+itertools = "0.8.0"
 
 [build-dependencies]
 cc = "1.0"

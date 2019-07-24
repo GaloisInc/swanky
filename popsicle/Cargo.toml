@@ -14,7 +14,6 @@ publish = false
 
 [features]
 nightly = ["rand/nightly", "scuttlebutt/nightly", "ocelot/nightly", "ocelot/nightly"]
-unstable = []
 
 [dependencies]
 fancy-garbling = { path = "../fancy-garbling" }
@@ -43,19 +42,11 @@ harness = false
 [[bench]]
 name = "psty"
 harness = false
-required-features = ["unstable"]
-
-[[example]]
-name = "psty"
-harness = false
-required-features = ["unstable"]
 
 [[example]]
 name = "psty-payload"
 harness = false
-required-features = ["unstable"]
 
 [[example]]
 name = "secretsister"
 harness = false
-required-features = ["unstable"]

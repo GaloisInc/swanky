@@ -52,7 +52,7 @@ fn bench_psty(inputs1: Vec<Vec<u8>>, inputs2: Vec<Vec<u8>>) -> () {
         let writer = BufWriter::new(sender);
         let mut channel = Channel::new(reader, writer);
         let mut p1 = Sender::init(&mut channel, &mut rng).unwrap();
-        p1.send(&mut channel, &inputs1, &mut rng).unwrap()
+        p1.send(&inputs1, &mut channel, &mut rng).unwrap()
     });
 
     let mut rng = AesRng::new();
@@ -60,7 +60,7 @@ fn bench_psty(inputs1: Vec<Vec<u8>>, inputs2: Vec<Vec<u8>>) -> () {
     let writer = BufWriter::new(receiver);
     let mut channel = Channel::new(reader, writer);
     let mut p2 = Receiver::init(&mut channel, &mut rng).unwrap();
-    p2.receive(&mut channel, &inputs2, &mut rng).unwrap();
+    p2.receive(&inputs2, &mut channel, &mut rng).unwrap();
 }
 
 fn bench_psi(c: &mut Criterion) {
