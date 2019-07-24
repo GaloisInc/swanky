@@ -38,7 +38,9 @@ fn psz_payload(inputs1: Vec<Vec<u8>>, inputs2: Vec<Vec<u8>>) {
             start.elapsed().unwrap().as_millis()
         );
         let start = SystemTime::now();
-        sender.send_payloads(&inputs1, &mut channel, &mut rng).unwrap();
+        sender
+            .send_payloads(&inputs1, &mut channel, &mut rng)
+            .unwrap();
         println!(
             "Sender :: send time: {} ms",
             start.elapsed().unwrap().as_millis()
@@ -65,7 +67,9 @@ fn psz_payload(inputs1: Vec<Vec<u8>>, inputs2: Vec<Vec<u8>>) {
         start.elapsed().unwrap().as_millis()
     );
     let start = SystemTime::now();
-    let _intersection = receiver.receive_payloads(&inputs2, &mut channel, &mut rng).unwrap();
+    let _intersection = receiver
+        .receive_payloads(&inputs2, &mut channel, &mut rng)
+        .unwrap();
     println!(
         "Receiver :: receive time: {} ms",
         start.elapsed().unwrap().as_millis()

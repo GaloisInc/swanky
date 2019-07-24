@@ -110,7 +110,7 @@ impl Sender {
                 encoded ^= seeds[bin];
 
                 let tag = &encoded.as_ref()[0..masksize];
-                let key = &encoded.as_ref()[masksize..masksize+16];
+                let key = &encoded.as_ref()[masksize..masksize + 16];
 
                 // encrypt payload
                 let mut ct = payloads[j].clone();
@@ -182,7 +182,7 @@ impl Receiver {
     ) -> Result<
         Vec<(
             Vec<u8>, // Intersection item
-            Block, // Payload
+            Block,   // Payload
         )>,
         Error,
     > {
@@ -214,9 +214,10 @@ impl Receiver {
                 // if the tag is present, decrypt the payload using F(x).
                 if let Some(ct) = hs[item.hash_index].get(tag) {
                     let val = inputs[item.input_index].clone();
-                    let key = &output.as_ref()[masksize..masksize+16];
+                    let key = &output.as_ref()[masksize..masksize + 16];
                     let payload_bytes = scuttlebutt::utils::xor(ct.as_ref(), key);
-                    let payload = Block::try_from_slice(&payload_bytes).expect("it is exactly 16 bytes long");
+                    let payload =
+                        Block::try_from_slice(&payload_bytes).expect("it is exactly 16 bytes long");
                     intersection.push((val, payload));
                 }
             }

@@ -27,7 +27,7 @@ pub use crate::aes::aes128::{Aes128, FIXED_KEY_AES128};
 pub use crate::aes::aes256::Aes256;
 pub use crate::block::Block;
 pub use crate::block512::Block512;
-pub use crate::channel::{AbstractChannel, Channel, SyncChannel, HashChannel, TrackChannel};
+pub use crate::channel::{AbstractChannel, Channel, HashChannel, SyncChannel, TrackChannel};
 pub use crate::hash_aes::{AesHash, AES_HASH};
 pub use crate::rand_aes::AesRng;
 
