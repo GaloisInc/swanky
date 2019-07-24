@@ -25,6 +25,8 @@ itertools      = "0.8.0"
 rand           = "0.6.5"
 sha2           = "0.8.0"
 openssl        = "0.10.23"
+rustyline = "5.0.0"
+pbr = "1.0.1"
 
 [dev-dependencies]
 criterion = "0.2.11"

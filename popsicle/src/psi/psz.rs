@@ -275,14 +275,10 @@ impl SemiHonest for Receiver {}
 mod tests {
     use super::*;
     use crate::utils::rand_vec_vec;
-    use quickcheck::{Arbitrary, Gen, TestResult};
-    use quickcheck_macros::quickcheck;
+    use quickcheck::{Arbitrary, Gen};
     use rand::Rng;
-    use rand::SeedableRng;
     use scuttlebutt::{AesRng, Channel};
-    use std::collections::{BTreeMap, BTreeSet};
     use std::io::{BufReader, BufWriter};
-    use std::iter::FromIterator;
     use std::os::unix::net::UnixStream;
 
     const ITEM_SIZE: usize = 16;
