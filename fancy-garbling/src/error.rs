@@ -95,13 +95,6 @@ pub enum CircuitBuilderError {
     FancyError(FancyError),
 }
 
-/// Errors emitted when running the informer.
-#[derive(Debug)]
-pub enum InformerError {
-    /// A fancy error has occurred.
-    FancyError(FancyError),
-}
-
 ////////////////////////////////////////////////////////////////////////////////
 // fancy error
 
@@ -247,23 +240,6 @@ impl Display for CircuitBuilderError {
 impl From<FancyError> for CircuitBuilderError {
     fn from(e: FancyError) -> Self {
         CircuitBuilderError::FancyError(e)
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////
-// informer error
-
-impl Display for InformerError {
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        match self {
-            InformerError::FancyError(e) => write!(f, "fancy error: {}", e),
-        }
-    }
-}
-
-impl From<FancyError> for InformerError {
-    fn from(e: FancyError) -> InformerError {
-        InformerError::FancyError(e)
     }
 }
 

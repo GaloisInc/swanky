@@ -10,8 +10,8 @@ fn exact_sign<F: Fancy>(b: &mut F, x: &CrtBundle<F::Item>) {
 fn main() {
     let nprimes = 10;
     let q = modulus_with_nprimes(nprimes);
-    let mut i = Informer::new();
-    let x = i.crt_receive(q).unwrap();
+    let mut i = Informer::new(dummy::Dummy::new());
+    let x = i.crt_encode(2, q).unwrap();
     exact_sign(&mut i, &x);
-    i.print_info();
+    println!("{}", i.stats());
 }
