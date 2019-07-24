@@ -8,7 +8,10 @@
 
 use criterion::{criterion_group, criterion_main, Criterion};
 use ocelot::oprf::{self, Receiver as OprfReceiver, Sender as OprfSender};
-use ocelot::{ot::chou_orlandi, oprf::{kkrt, kmprt}};
+use ocelot::{
+    oprf::{kkrt, kmprt},
+    ot::chou_orlandi,
+};
 use scuttlebutt::{AesRng, Block, Block512, Channel};
 use std::io::{BufReader, BufWriter};
 use std::os::unix::net::UnixStream;
@@ -119,10 +122,7 @@ fn bench_oprf_compute(c: &mut Criterion) {
     });
 }
 
-fn _bench_opprf(
-    points: Vec<(Block, Block512)>,
-    inputs: Vec<Block>,
-) {
+fn _bench_opprf(points: Vec<(Block, Block512)>, inputs: Vec<Block>) {
     let (sender, receiver) = UnixStream::pair().unwrap();
     let handle = std::thread::spawn(move || {
         let mut rng = AesRng::new();
@@ -156,10 +156,7 @@ fn bench_opprf(c: &mut Criterion) {
         let inputs = rand_block_vec(1 << 4);
         let points = rand_point_vec(1 << 4);
         bench.iter(|| {
-            let result = _bench_opprf(
-                points.clone(),
-                inputs.clone(),
-            );
+            let result = _bench_opprf(points.clone(), inputs.clone());
             criterion::black_box(result);
         })
     });
@@ -167,10 +164,7 @@ fn bench_opprf(c: &mut Criterion) {
         let inputs = rand_block_vec(1 << 8);
         let points = rand_point_vec(1 << 8);
         bench.iter(|| {
-            let result = _bench_opprf(
-                points.clone(),
-                inputs.clone(),
-            );
+            let result = _bench_opprf(points.clone(), inputs.clone());
             criterion::black_box(result);
         })
     });

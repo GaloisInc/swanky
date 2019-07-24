@@ -142,6 +142,7 @@ impl<C: AbstractChannel, RNG: RngCore + CryptoRng> FancyReveal for Garbler<C, RN
         // The evaluator needs our cooperation in order to see the output.
         // Hence, we call output() ourselves.
         self.output(x)?;
+        self.channel.flush()?;
         let val = self.channel.read_u16()?;
         Ok(val)
     }
