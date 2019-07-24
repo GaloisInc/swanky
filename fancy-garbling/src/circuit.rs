@@ -7,10 +7,9 @@
 //! DSL for creating circuits compatible with fancy-garbling in the old-fashioned way,
 //! where you create a circuit for a computation then garble it.
 
-use crate::dummy::DummyVal;
-use crate::error::{CircuitBuilderError, DummyError, FancyError, InformerError};
+use crate::dummy::{Dummy, DummyVal};
+use crate::error::{CircuitBuilderError, DummyError, FancyError};
 use crate::fancy::{BinaryBundle, CrtBundle, Fancy, FancyInput, HasModulus};
-use crate::informer::InformerVal;
 use itertools::Itertools;
 use std::collections::HashMap;
 
@@ -251,23 +250,23 @@ impl Circuit {
     }
 
     /// Print circuit info.
-    pub fn print_info(&mut self) -> Result<(), InformerError> {
-        let mut informer = crate::informer::Informer::new();
+    pub fn print_info(&mut self) -> Result<(), DummyError> {
+        let mut informer = crate::informer::Informer::new(Dummy::new());
 
         // encode inputs as InformerVals
         let gb = self
             .garbler_input_refs
             .iter()
             .map(|r| informer.receive(r.modulus()))
-            .collect::<Result<Vec<InformerVal>, InformerError>>()?;
+            .collect::<Result<Vec<DummyVal>, DummyError>>()?;
         let ev = self
             .evaluator_input_refs
             .iter()
             .map(|r| informer.receive(r.modulus()))
-            .collect::<Result<Vec<InformerVal>, InformerError>>()?;
+            .collect::<Result<Vec<DummyVal>, DummyError>>()?;
 
         let _outputs = self.eval(&mut informer, &gb, &ev)?;
-        informer.print_info();
+        println!("{}", informer.stats());
         Ok(())
     }
 
