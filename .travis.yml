@@ -1,0 +1,13 @@
+language: rust
+matrix:
+  include:
+    - rust: stable
+      env:
+        - FEATURES='curve25519-dalek serde'
+    - rust: nightly
+      env:
+        - FEATURES='nightly curve25519-dalek serde'
+script:
+  - |
+    cargo build --verbose --all --examples --tests --benches --features "$FEATURES" &&
+    cargo test --verbose --features "$FEATURES"
