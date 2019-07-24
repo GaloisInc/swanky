@@ -138,7 +138,10 @@ impl<C: AbstractChannel, RNG: CryptoRng + RngCore> Garbler<C, RNG> {
 }
 
 impl<C: AbstractChannel, RNG: RngCore + CryptoRng> FancyReveal for Garbler<C, RNG> {
-    fn reveal(&mut self, _x: &Wire) -> Result<u16, GarblerError> {
+    fn reveal(&mut self, x: &Wire) -> Result<u16, GarblerError> {
+        // The evaluator needs our cooperation in order to see the output.
+        // Hence, we call output() ourselves.
+        self.output(x)?;
         let val = self.channel.read_u16()?;
         Ok(val)
     }
