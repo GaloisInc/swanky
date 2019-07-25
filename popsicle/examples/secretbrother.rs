@@ -144,7 +144,8 @@ fn receiver(rl: &mut Editor<()>, rng: &mut AesRng) {
         let encrypted_payload = channel.read_vec(payload_len).unwrap();
         if let Some(key) = payload_keys.get(input) {
             let payload = decrypt(&key, &iv, &encrypted_payload);
-            write_output_line(&mut output_file, &input, &payload);
+            let s = format_output_line(&input, &payload);
+            write!(output_file, "{}", s).unwrap();
         }
     }
 
@@ -155,8 +156,14 @@ fn read_inputs(filename: &str) -> Vec<Vec<u8>> {
     BufReader::new(std::fs::File::open(filename).unwrap())
         .lines()
         .map(|line| {
-            let val = line.unwrap().parse().unwrap();
-            u64_to_bytes(val)
+            let val = line.unwrap();
+            assert_eq!(
+                val.len(),
+                12,
+                "ssn should be of the form \"123-45-6789\", got {}",
+                val
+            );
+            val.as_bytes().to_vec()
         })
         .collect()
 }
@@ -175,10 +182,21 @@ fn read_inputs_and_payloads(
             .split(",")
             .map(|s| s.trim().to_string())
             .collect();
-        assert_eq!(vals.len(), 3);
-        inputs.push(u64_to_bytes(vals[0].parse().unwrap()));
+        assert_eq!(vals.len(), 5);
+        assert_eq!(
+            vals[0].len(),
+            12,
+            "ssn should be of the form \"123-45-6789\", got {}",
+            vals[0]
+        );
+        inputs.push(vals[0].as_bytes().to_vec());
         let mut payload = i64_to_bytes(vals[1].parse().unwrap());
         payload.extend(i64_to_bytes(vals[2].parse().unwrap()));
+        payload.extend(i64_to_bytes(vals[3].parse().unwrap()));
+        let mut p4 = vals[4].as_bytes().to_vec();
+        assert!(p4.len() <= 24, "final payload should be at most 24 bytes");
+        p4.resize(24, 0); // pad with 0s for final payloads less than 24 bytes.
+        payload.extend(p4);
         payloads.push(payload);
     }
     (inputs, payloads)
@@ -206,30 +224,18 @@ fn decrypt(key: &Block, iv: &Block, data: &[u8]) -> Vec<u8> {
     .unwrap()
 }
 
-fn write_output_line(output_file: &mut std::fs::File, input: &[u8], payload: &[u8]) {
-    let val = bytes_to_u64(input);
+fn format_output_line(input: &[u8], payload: &[u8]) -> String {
+    let tag = std::str::from_utf8(input).unwrap();
     let p1 = bytes_to_i64(&payload[0..8]);
-    let p2 = bytes_to_i64(&payload[8..]);
-    writeln!(output_file, "{}, {}, {}", val, p1, p2).unwrap();
-}
-
-fn u64_to_bytes(val: u64) -> Vec<u8> {
-    let input_array: [u8; 8] = unsafe { std::mem::transmute(val) };
-    input_array.to_vec()
+    let p2 = bytes_to_i64(&payload[8..16]);
+    let p3 = bytes_to_i64(&payload[16..24]);
+    let p4 = std::str::from_utf8(&payload[24..]).unwrap();
+    format!("{}, {}, {}, {}, {}", tag, p1, p2, p3, p4)
 }
 
 fn i64_to_bytes(val: i64) -> Vec<u8> {
     let input_array: [u8; 8] = unsafe { std::mem::transmute(val) };
     input_array.to_vec()
-}
-
-fn bytes_to_u64(bytes: &[u8]) -> u64 {
-    assert_eq!(bytes.len(), 8);
-    let mut bytes_array = [0; 8];
-    for (x, y) in bytes.iter().zip(bytes_array.iter_mut()) {
-        *y = *x;
-    }
-    unsafe { std::mem::transmute(bytes_array) }
 }
 
 fn bytes_to_i64(bytes: &[u8]) -> i64 {
@@ -249,11 +255,6 @@ mod tests {
     #[test]
     fn test_conversion() {
         for _ in 0..1024 {
-            // test u64 conversion
-            let x = random();
-            let bs = u64_to_bytes(x);
-            assert_eq!(x, bytes_to_u64(&bs));
-
             // test i64 conversion
             let x = random();
             let bs = i64_to_bytes(x);
@@ -265,8 +266,7 @@ mod tests {
     fn test_encryption() {
         for _ in 0..1024 {
             let mut rng = AesRng::new();
-            let x = rng.gen();
-            let bs = u64_to_bytes(x);
+            let bs = (0..128).map(|_| rng.gen()).collect::<Vec<_>>();
             let key = rng.gen();
             let (iv, ct) = encrypt(&key, &bs, &mut rng);
             assert_eq!(decrypt(&key, &iv, &ct), bs);
