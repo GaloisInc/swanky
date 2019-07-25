@@ -40,6 +40,11 @@ impl<R: Read, W: Write> TrackChannel<R, W> {
     pub fn kilobits_read(&self) -> f64 {
         self.nbits_read as f64 / 1000.0
     }
+
+    /// Return the total amount of communication on the channel.
+    pub fn total_kilobits(&self) -> f64 {
+        self.kilobits_written() + self.kilobits_read()
+    }
 }
 
 impl<R: Read, W: Write> AbstractChannel for TrackChannel<R, W> {
