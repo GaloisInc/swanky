@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 
-use v5.30;
+use v5.16;
 
 my $party = $ARGV[0];
 my $nrecords = $ARGV[1];
