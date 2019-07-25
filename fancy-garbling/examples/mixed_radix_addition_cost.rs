@@ -1,8 +1,8 @@
-use fancy_garbling::*;
 use fancy_garbling::{
     dummy::{Dummy, DummyVal},
     error::DummyError,
     informer::Informer,
+    *,
 };
 
 fn main() {

@@ -4,10 +4,15 @@
 // Copyright © 2019 Galois, Inc.
 // See LICENSE for licensing information.
 
-use crate::error::FancyError;
-use crate::fancy::bundle::{Bundle, BundleGadgets};
-use crate::fancy::{Fancy, HasModulus};
-use crate::util;
+use crate::{
+    error::FancyError,
+    fancy::{
+        bundle::{Bundle, BundleGadgets},
+        Fancy,
+        HasModulus,
+    },
+    util,
+};
 use itertools::Itertools;
 use std::ops::Deref;
 

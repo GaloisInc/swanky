@@ -1,6 +1,5 @@
 use criterion::{criterion_group, criterion_main, Criterion};
-use fancy_garbling::util::RngExt;
-use fancy_garbling::Wire;
+use fancy_garbling::{util::RngExt, Wire};
 use scuttlebutt::{AesRng, Block};
 use std::time::Duration;
 

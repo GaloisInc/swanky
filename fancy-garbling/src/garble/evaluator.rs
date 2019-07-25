@@ -4,10 +4,12 @@
 // Copyright © 2019 Galois, Inc.
 // See LICENSE for licensing information.
 
-use crate::error::{EvaluatorError, FancyError};
-use crate::fancy::{Fancy, FancyReveal, HasModulus};
-use crate::util::{output_tweak, tweak, tweak2};
-use crate::wire::Wire;
+use crate::{
+    error::{EvaluatorError, FancyError},
+    fancy::{Fancy, FancyReveal, HasModulus},
+    util::{output_tweak, tweak, tweak2},
+    wire::Wire,
+};
 use scuttlebutt::AbstractChannel;
 
 /// Streaming evaluator using a callback to receive ciphertexts as needed.

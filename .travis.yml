@@ -10,4 +10,5 @@ matrix:
 script:
   - |
     cargo build --verbose --all --examples --tests --benches --features "$FEATURES" &&
-    cargo test --verbose --features "$FEATURES"
+    cargo test --all --verbose --features "$FEATURES" &&
+    cargo fmt --all -- --check

@@ -9,9 +9,11 @@
 use criterion::{criterion_group, criterion_main, Criterion};
 use popsicle::psz;
 use scuttlebutt::{AesRng, Channel};
-use std::io::{BufReader, BufWriter};
-use std::os::unix::net::UnixStream;
-use std::time::Duration;
+use std::{
+    io::{BufReader, BufWriter},
+    os::unix::net::UnixStream,
+    time::Duration,
+};
 
 const SIZE: usize = 15;
 

@@ -6,8 +6,7 @@
 
 //! Low-level operations on wire-labels, the basic building block of garbled circuits.
 
-use crate::fancy::HasModulus;
-use crate::util;
+use crate::{fancy::HasModulus, util};
 use rand::{CryptoRng, Rng, RngCore};
 use scuttlebutt::{Block, AES_HASH};
 

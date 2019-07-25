@@ -4,10 +4,12 @@
 // Copyright © 2019 Galois, Inc.
 // See LICENSE for licensing information.
 
-use crate::error::{FancyError, GarblerError};
-use crate::fancy::{BinaryBundle, CrtBundle, Fancy, FancyReveal, HasModulus};
-use crate::util::{output_tweak, tweak, tweak2, RngExt};
-use crate::wire::Wire;
+use crate::{
+    error::{FancyError, GarblerError},
+    fancy::{BinaryBundle, CrtBundle, Fancy, FancyReveal, HasModulus},
+    util::{output_tweak, tweak, tweak2, RngExt},
+    wire::Wire,
+};
 use rand::{CryptoRng, RngCore};
 use scuttlebutt::{AbstractChannel, Block};
 use std::collections::HashMap;

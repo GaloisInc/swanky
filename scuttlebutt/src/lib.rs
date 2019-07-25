@@ -23,13 +23,17 @@ mod hash_aes;
 mod rand_aes;
 pub mod utils;
 
-pub use crate::aes::aes128::{Aes128, FIXED_KEY_AES128};
-pub use crate::aes::aes256::Aes256;
-pub use crate::block::Block;
-pub use crate::block512::Block512;
-pub use crate::channel::{AbstractChannel, Channel, HashChannel, SyncChannel, TrackChannel};
-pub use crate::hash_aes::{AesHash, AES_HASH};
-pub use crate::rand_aes::AesRng;
+pub use crate::{
+    aes::{
+        aes128::{Aes128, FIXED_KEY_AES128},
+        aes256::Aes256,
+    },
+    block::Block,
+    block512::Block512,
+    channel::{AbstractChannel, Channel, HashChannel, SyncChannel, TrackChannel},
+    hash_aes::{AesHash, AES_HASH},
+    rand_aes::AesRng,
+};
 
 /// A marker trait denoting that the given scheme is semi-honest secure.
 pub trait SemiHonest {}

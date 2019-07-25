@@ -7,9 +7,11 @@
 //! DSL for creating circuits compatible with fancy-garbling in the old-fashioned way,
 //! where you create a circuit for a computation then garble it.
 
-use crate::dummy::{Dummy, DummyVal};
-use crate::error::{CircuitBuilderError, DummyError, FancyError};
-use crate::fancy::{BinaryBundle, CrtBundle, Fancy, FancyInput, HasModulus};
+use crate::{
+    dummy::{Dummy, DummyVal},
+    error::{CircuitBuilderError, DummyError, FancyError},
+    fancy::{BinaryBundle, CrtBundle, Fancy, FancyInput, HasModulus},
+};
 use itertools::Itertools;
 use std::collections::HashMap;
 
@@ -650,8 +652,10 @@ mod plaintext {
 #[cfg(test)]
 mod bundle {
     use super::*;
-    use crate::fancy::{BinaryGadgets, BundleGadgets, CrtGadgets};
-    use crate::util::{self, crt_factor, crt_inv_factor, RngExt};
+    use crate::{
+        fancy::{BinaryGadgets, BundleGadgets, CrtGadgets},
+        util::{self, crt_factor, crt_inv_factor, RngExt},
+    };
     use itertools::Itertools;
     use rand::thread_rng;
 

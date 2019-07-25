@@ -7,9 +7,11 @@
 //! Defines a 512-bit value.
 
 use crate::Block;
-use std::arch::x86_64::*;
-use std::convert::TryFrom;
-use std::hash::{Hash, Hasher};
+use std::{
+    arch::x86_64::*,
+    convert::TryFrom,
+    hash::{Hash, Hasher},
+};
 
 /// A 512-bit value.
 #[derive(Clone, Copy)]

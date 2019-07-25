@@ -9,17 +9,29 @@
 
 #![allow(non_upper_case_globals)]
 
-use crate::errors::Error;
-use crate::ot::{
-    CorrelatedReceiver, CorrelatedSender, RandomReceiver, RandomSender, Receiver as OtReceiver,
-    Sender as OtSender,
+use crate::{
+    errors::Error,
+    ot::{
+        CorrelatedReceiver,
+        CorrelatedSender,
+        RandomReceiver,
+        RandomSender,
+        Receiver as OtReceiver,
+        Sender as OtSender,
+    },
+    utils,
 };
-use crate::utils;
 use rand::{CryptoRng, Rng, RngCore, SeedableRng};
-use scuttlebutt::utils as scutils;
-use scuttlebutt::{AbstractChannel, AesHash, AesRng, Block, SemiHonest, AES_HASH};
-use std::convert::TryInto;
-use std::marker::PhantomData;
+use scuttlebutt::{
+    utils as scutils,
+    AbstractChannel,
+    AesHash,
+    AesRng,
+    Block,
+    SemiHonest,
+    AES_HASH,
+};
+use std::{convert::TryInto, marker::PhantomData};
 
 /// Oblivious transfer sender.
 pub struct Sender<OT: OtReceiver<Msg = Block> + SemiHonest> {

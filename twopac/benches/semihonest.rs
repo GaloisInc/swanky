@@ -7,13 +7,14 @@
 //! Benchmarks for semi-honest 2PC using `fancy-garbling`.
 
 use criterion::{criterion_group, criterion_main, Criterion};
-use fancy_garbling::circuit::Circuit;
-use fancy_garbling::FancyInput;
+use fancy_garbling::{circuit::Circuit, FancyInput};
 use ocelot::ot::{AlszReceiver as OtReceiver, AlszSender as OtSender};
 use scuttlebutt::{AesRng, Channel};
-use std::io::{BufReader, BufWriter};
-use std::os::unix::net::UnixStream;
-use std::time::Duration;
+use std::{
+    io::{BufReader, BufWriter},
+    os::unix::net::UnixStream,
+    time::Duration,
+};
 use twopac::semihonest::{Evaluator, Garbler};
 
 type Reader = BufReader<UnixStream>;

@@ -191,8 +191,10 @@ mod tests {
     use super::*;
     use rand::Rng;
     use scuttlebutt::{AesRng, SyncChannel};
-    use std::io::{BufReader, BufWriter};
-    use std::os::unix::net::UnixStream;
+    use std::{
+        io::{BufReader, BufWriter},
+        os::unix::net::UnixStream,
+    };
 
     #[test]
     fn test_secret_sharing_of_zero() {

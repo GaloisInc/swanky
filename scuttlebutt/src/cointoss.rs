@@ -93,8 +93,10 @@ mod tests {
     extern crate test;
     use super::*;
     use crate::Channel;
-    use std::io::{BufReader, BufWriter};
-    use std::os::unix::net::UnixStream;
+    use std::{
+        io::{BufReader, BufWriter},
+        os::unix::net::UnixStream,
+    };
 
     #[test]
     fn test() {

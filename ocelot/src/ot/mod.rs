@@ -162,10 +162,12 @@ mod tests {
     extern crate test;
     use super::*;
     use scuttlebutt::{AesRng, Block, Channel};
-    use std::fmt::Display;
-    use std::io::{BufReader, BufWriter};
-    use std::os::unix::net::UnixStream;
-    use std::sync::{Arc, Mutex};
+    use std::{
+        fmt::Display,
+        io::{BufReader, BufWriter},
+        os::unix::net::UnixStream,
+        sync::{Arc, Mutex},
+    };
 
     fn rand_block_vec(size: usize) -> Vec<Block> {
         (0..size).map(|_| rand::random::<Block>()).collect()

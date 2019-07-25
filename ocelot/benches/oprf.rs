@@ -7,15 +7,16 @@
 //! Oblivious pseudorandom function benchmarks using `criterion`.
 
 use criterion::{criterion_group, criterion_main, Criterion};
-use ocelot::oprf::{self, Receiver as OprfReceiver, Sender as OprfSender};
 use ocelot::{
-    oprf::{kkrt, kmprt},
+    oprf::{self, kkrt, kmprt, Receiver as OprfReceiver, Sender as OprfSender},
     ot::chou_orlandi,
 };
 use scuttlebutt::{AesRng, Block, Block512, Channel};
-use std::io::{BufReader, BufWriter};
-use std::os::unix::net::UnixStream;
-use std::time::Duration;
+use std::{
+    io::{BufReader, BufWriter},
+    os::unix::net::UnixStream,
+    time::Duration,
+};
 
 type OpprfSender = kmprt::Sender<kkrt::Sender<chou_orlandi::Receiver>>;
 type OpprfReceiver = kmprt::Receiver<kkrt::Receiver<chou_orlandi::Sender>>;

@@ -10,11 +10,15 @@
 //! This implementation uses the Ristretto prime order elliptic curve group from
 //! the `curve25519-dalek` library.
 
-use crate::errors::Error;
-use crate::ot::{Receiver as OtReceiver, Sender as OtSender};
-use curve25519_dalek::constants::RISTRETTO_BASEPOINT_TABLE;
-use curve25519_dalek::ristretto::RistrettoPoint;
-use curve25519_dalek::scalar::Scalar;
+use crate::{
+    errors::Error,
+    ot::{Receiver as OtReceiver, Sender as OtSender},
+};
+use curve25519_dalek::{
+    constants::RISTRETTO_BASEPOINT_TABLE,
+    ristretto::RistrettoPoint,
+    scalar::Scalar,
+};
 use rand::{CryptoRng, Rng};
 use scuttlebutt::{AbstractChannel, Block, SemiHonest};
 

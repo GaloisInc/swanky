@@ -7,9 +7,11 @@
 //! Module containing `CrtGadgets`, which are the CRT-based gadgets for `Fancy`.
 
 use super::{Fancy, HasModulus};
-use crate::error::FancyError;
-use crate::fancy::bundle::{Bundle, BundleGadgets};
-use crate::util;
+use crate::{
+    error::FancyError,
+    fancy::bundle::{Bundle, BundleGadgets},
+    util,
+};
 use itertools::Itertools;
 use std::ops::Deref;
 

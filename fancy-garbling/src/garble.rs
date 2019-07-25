@@ -9,18 +9,19 @@
 mod evaluator;
 mod garbler;
 
-pub use crate::garble::evaluator::Evaluator;
-pub use crate::garble::garbler::Garbler;
+pub use crate::garble::{evaluator::Evaluator, garbler::Garbler};
 
 ////////////////////////////////////////////////////////////////////////////////
 // tests
 
 #[cfg(test)]
 mod nonstreaming {
-    use crate::circuit::{Circuit, CircuitBuilder};
-    use crate::fancy::{Bundle, BundleGadgets, Fancy};
-    use crate::r#static::garble;
-    use crate::util::{self, RngExt};
+    use crate::{
+        circuit::{Circuit, CircuitBuilder},
+        fancy::{Bundle, BundleGadgets, Fancy},
+        r#static::garble,
+        util::{self, RngExt},
+    };
     use itertools::Itertools;
     use rand::thread_rng;
 
@@ -283,15 +284,22 @@ mod nonstreaming {
 
 #[cfg(test)]
 mod streaming {
-    use crate::dummy::{Dummy, DummyVal};
-    use crate::util::RngExt;
-    use crate::{Evaluator, Garbler, Wire};
-    use crate::{Fancy, FancyInput};
+    use crate::{
+        dummy::{Dummy, DummyVal},
+        util::RngExt,
+        Evaluator,
+        Fancy,
+        FancyInput,
+        Garbler,
+        Wire,
+    };
     use itertools::Itertools;
     use rand::thread_rng;
     use scuttlebutt::{AesRng, Channel};
-    use std::io::{BufReader, BufWriter};
-    use std::os::unix::net::UnixStream;
+    use std::{
+        io::{BufReader, BufWriter},
+        os::unix::net::UnixStream,
+    };
 
     type MyChannel = Channel<BufReader<UnixStream>, BufWriter<UnixStream>>;
 
@@ -448,14 +456,23 @@ mod streaming {
 
 #[cfg(test)]
 mod complex {
-    use crate::dummy::Dummy;
-    use crate::util::RngExt;
-    use crate::{CrtBundle, CrtGadgets, Evaluator, Fancy, FancyInput, Garbler};
+    use crate::{
+        dummy::Dummy,
+        util::RngExt,
+        CrtBundle,
+        CrtGadgets,
+        Evaluator,
+        Fancy,
+        FancyInput,
+        Garbler,
+    };
     use itertools::Itertools;
     use rand::thread_rng;
     use scuttlebutt::{AesRng, Channel};
-    use std::io::{BufReader, BufWriter};
-    use std::os::unix::net::UnixStream;
+    use std::{
+        io::{BufReader, BufWriter},
+        os::unix::net::UnixStream,
+    };
 
     fn complex_gadget<F: Fancy>(
         b: &mut F,
@@ -541,8 +558,10 @@ mod reuse {
     use itertools::Itertools;
     use rand::random;
     use scuttlebutt::{AbstractChannel, AesRng, Channel};
-    use std::io::{BufReader, BufWriter};
-    use std::os::unix::net::UnixStream;
+    use std::{
+        io::{BufReader, BufWriter},
+        os::unix::net::UnixStream,
+    };
 
     #[test]
     fn reuse_wirelabels() {

@@ -7,12 +7,16 @@
 //! Functions for parsing and running a circuit file based on the format given
 //! here: <https://homes.esat.kuleuven.be/~nsmart/MPC/>.
 
-use crate::circuit::{Circuit, CircuitRef, Gate};
-use crate::error::CircuitParserError as Error;
+use crate::{
+    circuit::{Circuit, CircuitRef, Gate},
+    error::CircuitParserError as Error,
+};
 use regex::{Captures, Regex};
-use std::fs::File;
-use std::io::{BufRead, BufReader};
-use std::str::FromStr;
+use std::{
+    fs::File,
+    io::{BufRead, BufReader},
+    str::FromStr,
+};
 
 enum GateType {
     AndGate,
@@ -172,8 +176,7 @@ impl Circuit {
 
 #[cfg(test)]
 mod tests {
-    use crate::circuit::Circuit;
-    use crate::garble;
+    use crate::{circuit::Circuit, garble};
 
     #[test]
     fn test_parser() {

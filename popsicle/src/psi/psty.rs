@@ -7,13 +7,13 @@
 //! Implementation of the Pinkas-Schneider-Tkachenko-Yanai "extended" private
 //! set intersection protocol (cf. <https://eprint.iacr.org/2019/241>).
 
-use crate::cuckoo::CuckooHash;
-use crate::errors::Error;
-use crate::utils;
+use crate::{cuckoo::CuckooHash, errors::Error, utils};
 use fancy_garbling::{BinaryBundle, BundleGadgets, CrtBundle, CrtGadgets, Fancy, FancyInput, Wire};
 use itertools::Itertools;
-use ocelot::oprf::{KmprtReceiver, KmprtSender};
-use ocelot::ot::{AlszReceiver as OtReceiver, AlszSender as OtSender};
+use ocelot::{
+    oprf::{KmprtReceiver, KmprtSender},
+    ot::{AlszReceiver as OtReceiver, AlszSender as OtSender},
+};
 use openssl::symm::{decrypt, encrypt, Cipher};
 use rand::{CryptoRng, Rng, RngCore, SeedableRng};
 use scuttlebutt::{AbstractChannel, Block, Block512, SemiHonest};
@@ -410,8 +410,10 @@ mod tests {
     use super::*;
     use crate::utils::rand_vec_vec;
     use scuttlebutt::{AesRng, Channel};
-    use std::io::{BufReader, BufWriter};
-    use std::os::unix::net::UnixStream;
+    use std::{
+        io::{BufReader, BufWriter},
+        os::unix::net::UnixStream,
+    };
 
     const ITEM_SIZE: usize = 8;
     const SET_SIZE: usize = 1 << 8;

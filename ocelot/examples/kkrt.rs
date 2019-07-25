@@ -4,12 +4,13 @@
 // Copyright © 2019 Galois, Inc.
 // See LICENSE for licensing information.
 
-use ocelot::oprf::{KkrtReceiver, KkrtSender};
-use ocelot::oprf::{Receiver, Sender};
+use ocelot::oprf::{KkrtReceiver, KkrtSender, Receiver, Sender};
 use scuttlebutt::{AesRng, Block, TrackChannel};
-use std::io::{BufReader, BufWriter};
-use std::os::unix::net::UnixStream;
-use std::time::SystemTime;
+use std::{
+    io::{BufReader, BufWriter},
+    os::unix::net::UnixStream,
+    time::SystemTime,
+};
 
 fn rand_block_vec(size: usize) -> Vec<Block> {
     (0..size).map(|_| rand::random::<Block>()).collect()

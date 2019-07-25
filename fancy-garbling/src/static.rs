@@ -7,16 +7,16 @@
 //! Provides objects and functions for statically garbling and evaluating a
 //! circuit.
 
-use crate::circuit::Circuit;
-use crate::error::{EvaluatorError, GarblerError};
-use crate::fancy::HasModulus;
-use crate::garble::{Evaluator, Garbler};
-use crate::wire::Wire;
+use crate::{
+    circuit::Circuit,
+    error::{EvaluatorError, GarblerError},
+    fancy::HasModulus,
+    garble::{Evaluator, Garbler},
+    wire::Wire,
+};
 use itertools::Itertools;
 use scuttlebutt::{AbstractChannel, AesRng, Block, Channel};
-use std::collections::HashMap;
-use std::convert::TryInto;
-use std::rc::Rc;
+use std::{collections::HashMap, convert::TryInto, rc::Rc};
 
 /// Static evaluator for a circuit, created by the `garble` function.
 ///

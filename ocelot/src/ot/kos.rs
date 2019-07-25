@@ -7,17 +7,22 @@
 //! Implementation of the Keller-Orsini-Scholl oblivious transfer extension
 //! protocol (cf. <https://eprint.iacr.org/2015/546>).
 
-use crate::errors::Error;
-use crate::ot::alsz::{Receiver as AlszReceiver, Sender as AlszSender};
-use crate::ot::{
-    CorrelatedReceiver, CorrelatedSender, RandomReceiver, RandomSender, Receiver as OtReceiver,
-    Sender as OtSender,
+use crate::{
+    errors::Error,
+    ot::{
+        alsz::{Receiver as AlszReceiver, Sender as AlszSender},
+        CorrelatedReceiver,
+        CorrelatedSender,
+        RandomReceiver,
+        RandomSender,
+        Receiver as OtReceiver,
+        Sender as OtSender,
+    },
+    utils,
 };
-use crate::utils;
 use rand::{CryptoRng, Rng, RngCore, SeedableRng};
 use scuttlebutt::{cointoss, AbstractChannel, AesRng, Block, Malicious, SemiHonest};
-use std::convert::TryInto;
-use std::io::ErrorKind;
+use std::{convert::TryInto, io::ErrorKind};
 
 // The statistical security parameter.
 const SSP: usize = 40;

@@ -7,8 +7,7 @@
 //! Benchmark code of garbling / evaluating using Nigel's circuits.
 
 use criterion::{criterion_group, criterion_main, Criterion};
-use fancy_garbling::circuit::Circuit;
-use fancy_garbling::garble;
+use fancy_garbling::{circuit::Circuit, garble};
 use std::time::Duration;
 
 fn circuit(fname: &str) -> Circuit {

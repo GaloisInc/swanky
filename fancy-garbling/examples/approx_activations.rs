@@ -1,6 +1,4 @@
-use fancy_garbling::dummy::Dummy;
-use fancy_garbling::util;
-use fancy_garbling::*;
+use fancy_garbling::{dummy::Dummy, util, *};
 use rand::Rng;
 
 fn approx_relu<F: Fancy>(b: &mut F, x: &CrtBundle<F::Item>) -> Option<Vec<u128>> {

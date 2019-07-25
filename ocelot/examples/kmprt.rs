@@ -7,9 +7,11 @@
 use ocelot::oprf::{KmprtReceiver, KmprtSender};
 use rand::Rng;
 use scuttlebutt::{AesRng, Block, Block512, TrackChannel};
-use std::io::{BufReader, BufWriter};
-use std::os::unix::net::UnixStream;
-use std::time::SystemTime;
+use std::{
+    io::{BufReader, BufWriter},
+    os::unix::net::UnixStream,
+    time::SystemTime,
+};
 
 fn rand_block_vec(size: usize) -> Vec<Block> {
     (0..size).map(|_| rand::random::<Block>()).collect()

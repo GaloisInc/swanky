@@ -4,8 +4,10 @@
 // Copyright © 2019 Galois, Inc.
 // See LICENSE for licensing information.
 
-use crate::error::FancyError;
-use crate::fancy::{Fancy, HasModulus};
+use crate::{
+    error::FancyError,
+    fancy::{Fancy, HasModulus},
+};
 use itertools::Itertools;
 use std::ops::Index;
 

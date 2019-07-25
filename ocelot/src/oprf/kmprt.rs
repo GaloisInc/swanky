@@ -7,8 +7,10 @@
 //! Implementation of the hash-based multi-use OPPRF of Kolesnikov, Matania,
 //! Pinkas, Rosulek, and Trieu (cf. <https://eprint.iacr.org/2017/799>).
 
-use crate::errors::Error;
-use crate::oprf::{Receiver as OprfReceiver, Sender as OprfSender};
+use crate::{
+    errors::Error,
+    oprf::{Receiver as OprfReceiver, Sender as OprfSender},
+};
 use rand::{CryptoRng, Rng};
 use scuttlebutt::{AbstractChannel, Aes128, Block, Block512, SemiHonest};
 use std::collections::HashSet;
@@ -394,8 +396,10 @@ mod tests {
     use super::*;
     use crate::oprf::{KmprtReceiver, KmprtSender};
     use scuttlebutt::{AesRng, Channel};
-    use std::io::{BufReader, BufWriter};
-    use std::os::unix::net::UnixStream;
+    use std::{
+        io::{BufReader, BufWriter},
+        os::unix::net::UnixStream,
+    };
 
     fn _test_opprf_points(ninputs: usize, npoints: usize, npoints_bound: usize) {
         assert!(ninputs <= npoints);

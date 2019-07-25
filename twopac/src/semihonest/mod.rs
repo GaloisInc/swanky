@@ -15,15 +15,22 @@ pub use garbler::Garbler;
 #[cfg(test)]
 mod tests {
     use super::*;
-    use fancy_garbling::circuit::Circuit;
-    use fancy_garbling::dummy::Dummy;
-    use fancy_garbling::util::RngExt;
-    use fancy_garbling::{CrtBundle, CrtGadgets, Fancy, FancyInput};
+    use fancy_garbling::{
+        circuit::Circuit,
+        dummy::Dummy,
+        util::RngExt,
+        CrtBundle,
+        CrtGadgets,
+        Fancy,
+        FancyInput,
+    };
     use itertools::Itertools;
     use ocelot::ot::{ChouOrlandiReceiver, ChouOrlandiSender};
     use scuttlebutt::{AbstractChannel, AesRng, Channel};
-    use std::io::{BufReader, BufWriter};
-    use std::os::unix::net::UnixStream;
+    use std::{
+        io::{BufReader, BufWriter},
+        os::unix::net::UnixStream,
+    };
 
     type Reader = BufReader<UnixStream>;
     type Writer = BufWriter<UnixStream>;

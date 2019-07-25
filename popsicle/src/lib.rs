@@ -16,5 +16,4 @@ mod errors;
 mod psi;
 mod utils;
 
-pub use crate::errors::Error;
-pub use crate::psi::*;
+pub use crate::{errors::Error, psi::*};

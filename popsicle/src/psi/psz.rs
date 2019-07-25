@@ -10,12 +10,14 @@
 //!
 //! The current implementation does not hash the output of the (relaxed) OPRF.
 
-use crate::cuckoo::{compute_masksize, CuckooHash};
-use crate::{utils, Error};
+use crate::{
+    cuckoo::{compute_masksize, CuckooHash},
+    utils,
+    Error,
+};
 use itertools::Itertools;
 use ocelot::oprf::{self, Receiver as OprfReceiver, Sender as OprfSender};
-use rand::seq::SliceRandom;
-use rand::{CryptoRng, Rng, RngCore};
+use rand::{seq::SliceRandom, CryptoRng, Rng, RngCore};
 use scuttlebutt::{cointoss, AbstractChannel, Block, Block512, SemiHonest};
 use std::collections::{HashMap, HashSet};
 
@@ -278,8 +280,10 @@ mod tests {
     use quickcheck::{Arbitrary, Gen};
     use rand::Rng;
     use scuttlebutt::{AesRng, Channel};
-    use std::io::{BufReader, BufWriter};
-    use std::os::unix::net::UnixStream;
+    use std::{
+        io::{BufReader, BufWriter},
+        os::unix::net::UnixStream,
+    };
 
     const ITEM_SIZE: usize = 16;
     const SET_SIZE: usize = 1 << 4;

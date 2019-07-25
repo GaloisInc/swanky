@@ -6,9 +6,11 @@
 
 use popsicle::psty::{Receiver, Sender};
 use scuttlebutt::{AesRng, TrackChannel};
-use std::io::{BufReader, BufWriter};
-use std::os::unix::net::UnixStream;
-use std::time::SystemTime;
+use std::{
+    io::{BufReader, BufWriter},
+    os::unix::net::UnixStream,
+    time::SystemTime,
+};
 
 const NBYTES: usize = 16;
 const NINPUTS: usize = 1 << 20;

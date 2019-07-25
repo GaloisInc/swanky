@@ -28,8 +28,7 @@
 // SOFTWARE.
 
 use crate::Block;
-use core::arch::x86_64::*;
-use core::mem;
+use core::{arch::x86_64::*, mem};
 
 /// AES-256, encryption only.
 #[derive(Clone)]

@@ -11,10 +11,11 @@ use itertools::Itertools;
 use popsicle::{MultiPartyReceiver, MultiPartySender};
 use scuttlebutt::{AesRng, Block, TrackChannel};
 use serde::Deserialize;
-use std::io::{BufRead, BufReader, BufWriter, Read, Write};
-use std::net::ToSocketAddrs;
-use std::net::{TcpListener, TcpStream};
-use std::time::SystemTime;
+use std::{
+    io::{BufRead, BufReader, BufWriter, Read, Write},
+    net::{TcpListener, TcpStream, ToSocketAddrs},
+    time::SystemTime,
+};
 
 #[derive(Debug, Deserialize, Clone)]
 enum PartyConfig {

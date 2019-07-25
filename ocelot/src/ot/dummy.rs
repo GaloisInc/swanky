@@ -7,8 +7,10 @@
 //! Implementation of an **entirely insecure** oblivious transfer protocol for
 //! testing purposes.
 
-use crate::errors::Error;
-use crate::ot::{Receiver as OtReceiver, Sender as OtSender};
+use crate::{
+    errors::Error,
+    ot::{Receiver as OtReceiver, Sender as OtSender},
+};
 use rand::{CryptoRng, Rng};
 use scuttlebutt::{AbstractChannel, Block};
 

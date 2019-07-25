@@ -10,10 +10,12 @@
 use crate::Aes256;
 #[cfg(feature = "curve25519-dalek")]
 use curve25519_dalek::ristretto::RistrettoPoint;
-use std::arch::x86_64::*;
 #[cfg(feature = "serde")]
 use std::convert::TryInto;
-use std::hash::{Hash, Hasher};
+use std::{
+    arch::x86_64::*,
+    hash::{Hash, Hasher},
+};
 
 /// A 128-bit chunk.
 #[derive(Clone, Copy)]

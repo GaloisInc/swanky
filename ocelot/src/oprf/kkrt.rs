@@ -11,16 +11,23 @@
 #![allow(non_upper_case_globals)]
 
 use super::prc::PseudorandomCode;
-use crate::errors::Error;
-use crate::oprf::{ObliviousPrf, Receiver as OprfReceiver, Sender as OprfSender};
-use crate::ot::{Receiver as OtReceiver, Sender as OtSender};
-use crate::utils;
+use crate::{
+    errors::Error,
+    oprf::{ObliviousPrf, Receiver as OprfReceiver, Sender as OprfSender},
+    ot::{Receiver as OtReceiver, Sender as OtSender},
+    utils,
+};
 use rand::{CryptoRng, Rng, RngCore, SeedableRng};
 use scuttlebutt::{
-    cointoss, utils as scutils, AbstractChannel, AesRng, Block, Block512, SemiHonest,
+    cointoss,
+    utils as scutils,
+    AbstractChannel,
+    AesRng,
+    Block,
+    Block512,
+    SemiHonest,
 };
-use std::convert::TryInto;
-use std::marker::PhantomData;
+use std::{convert::TryInto, marker::PhantomData};
 
 /// KKRT oblivious PRF sender.
 pub struct Sender<OT: OtReceiver + SemiHonest> {
@@ -217,9 +224,11 @@ mod tests {
     use super::*;
     use crate::oprf;
     use scuttlebutt::{AesRng, Channel};
-    use std::io::{BufReader, BufWriter};
-    use std::os::unix::net::UnixStream;
-    use std::sync::{Arc, Mutex};
+    use std::{
+        io::{BufReader, BufWriter},
+        os::unix::net::UnixStream,
+        sync::{Arc, Mutex},
+    };
 
     #[test]
     fn test_seed() {

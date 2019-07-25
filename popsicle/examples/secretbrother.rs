@@ -4,9 +4,11 @@ use popsicle::psz;
 use rand::Rng;
 use rustyline::Editor;
 use scuttlebutt::{AbstractChannel, AesRng, Block, TrackChannel};
-use std::collections::HashMap;
-use std::io::{BufRead, BufReader, BufWriter, Read, Write};
-use std::net::{TcpListener, TcpStream};
+use std::{
+    collections::HashMap,
+    io::{BufRead, BufReader, BufWriter, Read, Write},
+    net::{TcpListener, TcpStream},
+};
 
 fn main() {
     let matches = App::new("secretborther")

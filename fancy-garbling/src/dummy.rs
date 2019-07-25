@@ -9,8 +9,10 @@
 //! Useful for evaluating the circuits produced by `Fancy` without actually
 //! creating any circuits.
 
-use crate::error::{DummyError, FancyError};
-use crate::fancy::{Fancy, FancyInput, FancyReveal, HasModulus};
+use crate::{
+    error::{DummyError, FancyError},
+    fancy::{Fancy, FancyInput, FancyReveal, HasModulus},
+};
 
 /// Simple struct that performs the fancy computation over `u16`.
 pub struct Dummy {}
@@ -144,8 +146,10 @@ impl FancyReveal for Dummy {
 #[cfg(test)]
 mod bundle {
     use super::*;
-    use crate::fancy::{BinaryGadgets, Bundle, BundleGadgets, CrtGadgets};
-    use crate::util::{self, RngExt};
+    use crate::{
+        fancy::{BinaryGadgets, Bundle, BundleGadgets, CrtGadgets},
+        util::{self, RngExt},
+    };
     use itertools::Itertools;
     use rand::thread_rng;
 

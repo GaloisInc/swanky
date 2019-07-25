@@ -30,8 +30,4 @@ pub mod r#static;
 pub mod util;
 mod wire;
 
-pub use crate::error::FancyError;
-pub use crate::fancy::*;
-pub use crate::garble::*;
-pub use crate::r#static::*;
-pub use crate::wire::*;
+pub use crate::{error::FancyError, fancy::*, garble::*, r#static::*, wire::*};

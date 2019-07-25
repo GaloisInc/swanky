@@ -5,8 +5,10 @@
 // See LICENSE for licensing information.
 
 use crate::AbstractChannel;
-use std::io::{Read, Result, Write};
-use std::sync::{Arc, Mutex};
+use std::{
+    io::{Read, Result, Write},
+    sync::{Arc, Mutex},
+};
 
 /// A channel that implements `AbstractChannel` as well as `Send` and `Sync`.
 pub struct SyncChannel<R, W> {
