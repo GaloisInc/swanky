@@ -319,17 +319,25 @@ mod tests {
     fn test_payloads() {
         let mut rng = AesRng::new();
         let (sender, receiver) = UnixStream::pair().unwrap();
-        let sender_inputs = rand_vec_vec(SET_SIZE, ITEM_SIZE, &mut rng);
-        let receiver_inputs = sender_inputs.clone();
 
+        let intersection_size = SET_SIZE / 2;
+
+        let intersection = rand_vec_vec(intersection_size, ITEM_SIZE, &mut rng);
+
+        let mut sender_inputs   = rand_vec_vec(SET_SIZE - intersection_size, ITEM_SIZE, &mut rng);
+        let mut receiver_inputs = rand_vec_vec(SET_SIZE - intersection_size, ITEM_SIZE, &mut rng);
+        sender_inputs.extend(intersection.clone());
+        receiver_inputs.extend(intersection.clone());
+
+        let thread_sender_inputs = sender_inputs.clone();
         let handle = std::thread::spawn(move || {
             let mut rng = AesRng::new();
             let reader = BufReader::new(sender.try_clone().unwrap());
             let writer = BufWriter::new(sender);
             let mut channel = Channel::new(reader, writer);
             let mut psi = Sender::init(&mut channel, &mut rng).unwrap();
-            psi.send_payloads(&sender_inputs, &mut channel, &mut rng)
-                .unwrap();
+            psi.send_payloads(&thread_sender_inputs, &mut channel, &mut rng)
+                .unwrap()
         });
 
         let mut rng = AesRng::new();
@@ -337,12 +345,20 @@ mod tests {
         let writer = BufWriter::new(receiver);
         let mut channel = Channel::new(reader, writer);
         let mut psi = Receiver::init(&mut channel, &mut rng).unwrap();
-        let payloads = psi
+
+        let receiver_payloads = psi
             .receive_payloads(&receiver_inputs, &mut channel, &mut rng)
             .unwrap();
-        handle.join().unwrap();
 
-        assert_eq!(payloads.len(), SET_SIZE);
+        let sender_payloads = handle.join().unwrap();
+
+        assert_eq!(receiver_payloads.len(), intersection_size);
+
+        for (item, payload) in sender_inputs.iter().zip(sender_payloads.iter()) {
+            if let Some(other_payload) = receiver_payloads.get(item) {
+                assert_eq!(payload, other_payload);
+            }
+        }
     }
 
     #[derive(Debug, PartialEq, Eq, Clone, Copy)]
