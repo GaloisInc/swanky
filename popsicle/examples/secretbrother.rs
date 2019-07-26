@@ -33,10 +33,18 @@ fn main() {
 }
 
 fn sender(rl: &mut Editor<()>, rng: &mut AesRng) {
-    let addr = rl.readline("Address? >> ").unwrap();
-    let port = rl.readline("Port? >> ").unwrap();
+    // let addr = rl.readline("Address? >> ").unwrap();
+    // let port = rl.readline("Port? >> ").unwrap();
+    let addr = "localhost";
+    let port = "12345";
 
-    let stream = TcpStream::connect(&format!("{}:{}", addr, port)).unwrap();
+    let stream = loop {
+        match TcpStream::connect(&format!("{}:{}", addr, port)) {
+            Ok(stream) => break stream,
+            _ => std::thread::sleep(std::time::Duration::from_millis(10)),
+        }
+    };
+
     let mut channel = TrackChannel::new(
         BufReader::new(stream.try_clone().unwrap()),
         BufWriter::new(stream),
@@ -46,7 +54,8 @@ fn sender(rl: &mut Editor<()>, rng: &mut AesRng) {
     println!("Initializing PSI sender.");
     let mut sender = psz::Sender::init(&mut channel, rng).unwrap();
 
-    let input_filename = rl.readline("Input csv file? >> ").unwrap();
+    // let input_filename = rl.readline("Input csv file? >> ").unwrap();
+    let input_filename = "sender.csv";
     println!("Reading input CSV file.");
     let (inputs, payloads) = read_inputs_and_payloads(&input_filename);
 
@@ -63,7 +72,8 @@ fn sender(rl: &mut Editor<()>, rng: &mut AesRng) {
         );
         std::io::stdout().flush().unwrap();
 
-        std::io::stdin().lock().read_exact(&mut bytes).unwrap();
+        // std::io::stdin().lock().read_exact(&mut bytes).unwrap();
+        bytes[0] = b'y';
         println!("");
 
         match bytes[0] {
@@ -82,6 +92,7 @@ fn sender(rl: &mut Editor<()>, rng: &mut AesRng) {
             }
         }
     }
+    channel.flush().unwrap();
 
     println!("Sending encrypted payloads.");
 
@@ -96,7 +107,8 @@ fn sender(rl: &mut Editor<()>, rng: &mut AesRng) {
 }
 
 fn receiver(rl: &mut Editor<()>, rng: &mut AesRng) {
-    let port = rl.readline("Port? >> ").unwrap();
+    // let port = rl.readline("Port? >> ").unwrap();
+    let port = "12345";
 
     println!("Waiting for connection from sender.");
     let (stream, addr) = TcpListener::bind(format!("localhost:{}", port))
@@ -112,8 +124,10 @@ fn receiver(rl: &mut Editor<()>, rng: &mut AesRng) {
     println!("Initializing PSI receiver.");
     let mut receiver = psz::Receiver::init(&mut channel, rng).unwrap();
 
-    let input_filename = rl.readline("Input CSV file? >> ").unwrap();
-    let output_filename = rl.readline("Output CSV file? >> ").unwrap();
+    // let input_filename = rl.readline("Input CSV file? >> ").unwrap();
+    // let output_filename = rl.readline("Output CSV file? >> ").unwrap();
+    let input_filename = "receiver.csv";
+    let output_filename = "output.csv";
     println!("Reading input CSV file.");
     let inputs = read_inputs(&input_filename);
 
@@ -127,6 +141,7 @@ fn receiver(rl: &mut Editor<()>, rng: &mut AesRng) {
 
     println!("Sending cardinality to Sender.");
     channel.write_usize(payload_keys.len()).unwrap();
+    channel.flush().unwrap();
 
     let approved = channel.read_bool().unwrap();
     if approved {
@@ -161,7 +176,7 @@ fn read_inputs(filename: &str) -> Vec<Vec<u8>> {
             let val = line.unwrap();
             assert_eq!(
                 val.len(),
-                12,
+                11,
                 "ssn should be of the form \"123-45-6789\", got {}",
                 val
             );
@@ -187,14 +202,14 @@ fn read_inputs_and_payloads(
         assert_eq!(vals.len(), 5);
         assert_eq!(
             vals[0].len(),
-            12,
+            11,
             "ssn should be of the form \"123-45-6789\", got {}",
             vals[0]
         );
         inputs.push(vals[0].as_bytes().to_vec());
-        let mut payload = i64_to_bytes(vals[1].parse().unwrap());
-        payload.extend(i64_to_bytes(vals[2].parse().unwrap()));
-        payload.extend(i64_to_bytes(vals[3].parse().unwrap()));
+        let mut payload = f64_to_bytes(vals[1].parse().unwrap());
+        payload.extend(f64_to_bytes(vals[2].parse().unwrap()));
+        payload.extend(f64_to_bytes(vals[3].parse().unwrap()));
         let mut p4 = vals[4].as_bytes().to_vec();
         assert!(p4.len() <= 24, "final payload should be at most 24 bytes");
         p4.resize(24, 0); // pad with 0s for final payloads less than 24 bytes.
@@ -228,19 +243,19 @@ fn decrypt(key: &Block, iv: &Block, data: &[u8]) -> Vec<u8> {
 
 fn format_output_line(input: &[u8], payload: &[u8]) -> String {
     let tag = std::str::from_utf8(input).unwrap();
-    let p1 = bytes_to_i64(&payload[0..8]);
-    let p2 = bytes_to_i64(&payload[8..16]);
-    let p3 = bytes_to_i64(&payload[16..24]);
+    let p1 = bytes_to_f64(&payload[0..8]);
+    let p2 = bytes_to_f64(&payload[8..16]);
+    let p3 = bytes_to_f64(&payload[16..24]);
     let p4 = std::str::from_utf8(&payload[24..]).unwrap();
     format!("{}, {}, {}, {}, {}", tag, p1, p2, p3, p4)
 }
 
-fn i64_to_bytes(val: i64) -> Vec<u8> {
+fn f64_to_bytes(val: f64) -> Vec<u8> {
     let input_array: [u8; 8] = unsafe { std::mem::transmute(val) };
     input_array.to_vec()
 }
 
-fn bytes_to_i64(bytes: &[u8]) -> i64 {
+fn bytes_to_f64(bytes: &[u8]) -> f64 {
     assert_eq!(bytes.len(), 8);
     let mut bytes_array = [0; 8];
     for (x, y) in bytes.iter().zip(bytes_array.iter_mut()) {
@@ -259,8 +274,8 @@ mod tests {
         for _ in 0..1024 {
             // test i64 conversion
             let x = random();
-            let bs = i64_to_bytes(x);
-            assert_eq!(x, bytes_to_i64(&bs));
+            let bs = f64_to_bytes(x);
+            assert_eq!(x, bytes_to_f64(&bs));
         }
     }
 
