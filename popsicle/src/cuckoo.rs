@@ -53,6 +53,8 @@ pub fn compute_masksize(n: usize) -> Result<usize, Error> {
         10
     } else if n <= 1 << 24 {
         11
+    } else if n <= 1 << 28 {
+        12
     } else {
         return Err(Error::InvalidCuckooSetSize(n));
     };

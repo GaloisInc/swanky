@@ -21,8 +21,7 @@ use rand::{seq::SliceRandom, CryptoRng, Rng, RngCore};
 use scuttlebutt::{cointoss, AbstractChannel, Block, Block512, SemiHonest};
 use std::collections::{HashMap, HashSet};
 
-// XXX NHASHES=3 should work, but seems to fail for set sizes > 100,000
-const NHASHES: usize = 4;
+const NHASHES: usize = 3;
 
 /// Private set intersection sender.
 pub struct Sender {
@@ -183,10 +182,10 @@ impl Receiver {
         channel: &mut C,
         rng: &mut RNG,
     ) -> Result<
-        Vec<(
+        HashMap<
             Vec<u8>, // Intersection item
             Block,   // Payload
-        )>,
+        >,
         Error,
     > {
         let (tbl, outputs) = self.perform_oprfs(inputs, channel, rng)?;
@@ -208,7 +207,7 @@ impl Receiver {
 
         // Iterate through each input/output pair and see whether it exists in
         // the appropriate set.
-        let mut intersection = Vec::with_capacity(n);
+        let mut intersection = HashMap::with_capacity(n);
 
         for (opt_item, output) in tbl.items.iter().zip(outputs.into_iter()) {
             if let Some(item) = opt_item {
@@ -221,7 +220,7 @@ impl Receiver {
                     let payload_bytes = scuttlebutt::utils::xor(ct.as_ref(), key);
                     let payload =
                         Block::try_from_slice(&payload_bytes).expect("it is exactly 16 bytes long");
-                    intersection.push((val, payload));
+                    intersection.insert(val, payload);
                 }
             }
         }
@@ -286,8 +285,9 @@ mod tests {
         os::unix::net::UnixStream,
     };
 
-    const ITEM_SIZE: usize = 16;
-    const SET_SIZE: usize = 1 << 4;
+    const ITEM_SIZE: usize = 8;
+    const SET_SIZE: usize = 1 << 20;
+    // const SET_SIZE: usize = 100000;
 
     #[test]
     fn test_psi_complete_intersection() {
