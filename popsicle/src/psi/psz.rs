@@ -21,7 +21,8 @@ use rand::{seq::SliceRandom, CryptoRng, Rng, RngCore};
 use scuttlebutt::{cointoss, AbstractChannel, Block, Block512, SemiHonest};
 use std::collections::{HashMap, HashSet};
 
-const NHASHES: usize = 3;
+// XXX NHASHES=3 should work, but seems to fail for set sizes > 100,000
+const NHASHES: usize = 4;
 
 /// Private set intersection sender.
 pub struct Sender {

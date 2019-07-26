@@ -104,6 +104,8 @@ fn sender(rl: &mut Editor<()>, rng: &mut AesRng) {
         channel.write_block(&iv).unwrap();
         channel.write_bytes(&encrypted_payload).unwrap();
     }
+
+    let _done = channel.read_bool().unwrap();
 }
 
 fn receiver(rl: &mut Editor<()>, rng: &mut AesRng) {
@@ -167,6 +169,9 @@ fn receiver(rl: &mut Editor<()>, rng: &mut AesRng) {
     }
 
     println!("Wrote payloads to {}.", output_filename);
+
+    channel.write_bool(true).unwrap();
+    channel.flush().unwrap();
 }
 
 fn read_inputs(filename: &str) -> Vec<Vec<u8>> {
@@ -180,7 +185,7 @@ fn read_inputs(filename: &str) -> Vec<Vec<u8>> {
                 "ssn should be of the form \"123-45-6789\", got {}",
                 val
             );
-            val.as_bytes().to_vec()
+            process_ssn(&val)
         })
         .collect()
 }
@@ -206,7 +211,7 @@ fn read_inputs_and_payloads(
             "ssn should be of the form \"123-45-6789\", got {}",
             vals[0]
         );
-        inputs.push(vals[0].as_bytes().to_vec());
+        inputs.push(process_ssn(&vals[0]));
         let mut payload = f64_to_bytes(vals[1].parse().unwrap());
         payload.extend(f64_to_bytes(vals[2].parse().unwrap()));
         payload.extend(f64_to_bytes(vals[3].parse().unwrap()));
@@ -242,7 +247,7 @@ fn decrypt(key: &Block, iv: &Block, data: &[u8]) -> Vec<u8> {
 }
 
 fn format_output_line(input: &[u8], payload: &[u8]) -> String {
-    let tag = std::str::from_utf8(input).unwrap();
+    let tag = format_ssn(input);
     let p1 = bytes_to_f64(&payload[0..8]);
     let p2 = bytes_to_f64(&payload[8..16]);
     let p3 = bytes_to_f64(&payload[16..24]);
@@ -262,6 +267,32 @@ fn bytes_to_f64(bytes: &[u8]) -> f64 {
         *y = *x;
     }
     unsafe { std::mem::transmute(bytes_array) }
+}
+
+fn process_ssn(ssn: &str) -> Vec<u8> {
+    // parse it as a u64, then output the bytes of it
+    let mut no_formatting = String::new();
+    for c in ssn.chars() {
+        match c {
+            '-' => (),
+            _ => no_formatting.push(c),
+        }
+    }
+    let val = no_formatting.parse::<u64>().unwrap();
+    let bs: [u8;8] = unsafe { std::mem::transmute(val) };
+    bs.to_vec()
+}
+
+fn format_ssn(bs: &[u8]) -> String {
+    let mut bs_arr = [0; 8];
+    for (from, to) in bs.iter().zip(bs_arr.iter_mut()) {
+        *to = *from;
+    }
+    let val: u64 = unsafe { std::mem::transmute(bs_arr) };
+    let mut s = format!("{:09}", val);
+    s.insert(3, '-');
+    s.insert(6, '-');
+    s
 }
 
 #[cfg(test)]
@@ -287,6 +318,30 @@ mod tests {
             let key = rng.gen();
             let (iv, ct) = encrypt(&key, &bs, &mut rng);
             assert_eq!(decrypt(&key, &iv, &ct), bs);
+        }
+    }
+
+    #[test]
+    fn test_ssn_processing() {
+        for _ in 0..1024 {
+            let mut rng = AesRng::new();
+            let mut tag = String::new();
+            let chars = (b'0' ..= b'9').map(char::from).collect::<Vec<char>>();
+            for _ in 0..3 {
+                let i = rng.gen::<usize>() % 10;
+                tag.push(chars[i]);
+            }
+            tag.push('-');
+            for _ in 0..2 {
+                let i = rng.gen::<usize>() % 10;
+                tag.push(chars[i]);
+            }
+            tag.push('-');
+            for _ in 0..4 {
+                let i = rng.gen::<usize>() % 10;
+                tag.push(chars[i]);
+            }
+            assert_eq!(format_ssn(&process_ssn(&tag)), tag);
         }
     }
 }

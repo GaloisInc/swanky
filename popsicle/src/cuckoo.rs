@@ -27,7 +27,6 @@ pub(crate) struct CuckooHash {
 /// The number of times to loop when trying to place an entry in a bin.
 const NITERS: usize = 1000;
 
-#[inline]
 fn compute_nbins(n: usize, nhashes: usize) -> Result<usize, Error> {
     // Numbers taken from <https://thomaschneider.de/papers/PSZ18.pdf>, §3.2.2.
     if nhashes == 3 {
@@ -41,7 +40,6 @@ fn compute_nbins(n: usize, nhashes: usize) -> Result<usize, Error> {
     }
 }
 
-#[inline]
 pub fn compute_masksize(n: usize) -> Result<usize, Error> {
     // Numbers taken from <https://eprint.iacr.org/2016/799>, Table 2 (the `v`
     // column).
@@ -84,7 +82,6 @@ impl CuckooHash {
 
     /// Place `input`, alongside the input index `idx` it corresponds to, in the
     /// hash table.
-    #[inline]
     pub fn hash(&mut self, input: Block, idx: usize) -> Result<(), Error> {
         let mut item = CuckooItem {
             entry: input,
@@ -112,7 +109,6 @@ impl CuckooHash {
     }
 
     /// Output the bin number for a given hash output `hash` and hash index `hidx`.
-    #[inline]
     pub fn bin(hash: Block, hidx: usize, nbins: usize) -> usize {
         // The first 15 bytes of `hash` are uniformly(-ish) random, so we use it
         // directly to determine our bin by indexing the `hidx`th 32 bits of
