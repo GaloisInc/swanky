@@ -16,7 +16,7 @@ for (my $i=0; $i < $nrecords; $i++) {
     print ", ";
     print join ", ", rand(1000), rand(1000), rand(1000);
     print ", ";
-    my @letters = ('a'..'z', 'A'..'Z', ' '); 
+    my @letters = ('a'..'z', 'A'..'Z', '0'..'9');
     print $letters[rand(@letters)] for 0..23;
     say;
 }

@@ -269,7 +269,7 @@ fn format_output_line(input: &[u8], payload: &[u8]) -> String {
     let p2 = bytes_to_f64(&payload[8..16]);
     let p3 = bytes_to_f64(&payload[16..24]);
     // let p4 = std::str::from_utf8(&payload[24..]).unwrap();
-    let p4 = payload[24..].as_ascii_str().unwrap();
+    let p4 = payload[24..].as_ascii_str().expect(&format!("couldn't parse {:?} as ascii", &payload[24..]));
     format!("{}, {}, {}, {}, {}", tag, p1, p2, p3, p4)
 }
 
