@@ -1,3 +1,5 @@
+#![allow(unused_variables, unused_imports)]
+
 use clap::{App, SubCommand};
 use pbr::PbIter;
 use popsicle::psz;

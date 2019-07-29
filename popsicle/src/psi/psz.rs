@@ -277,7 +277,6 @@ impl SemiHonest for Receiver {}
 mod tests {
     use super::*;
     use crate::utils::rand_vec_vec;
-    use rand::Rng;
     use scuttlebutt::{AesRng, Channel};
     use std::{
         io::{BufReader, BufWriter},
@@ -285,8 +284,7 @@ mod tests {
     };
 
     const ITEM_SIZE: usize = 8;
-    const SET_SIZE: usize = 1 << 20;
-    // const SET_SIZE: usize = 100000;
+    const SET_SIZE: usize = 1 << 16;
 
     #[test]
     fn test_psi_complete_intersection() {
