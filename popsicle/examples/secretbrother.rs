@@ -37,7 +37,6 @@ fn main() {
 }
 
 fn sender(rl: &mut Editor<()>, rng: &mut AesRng) {
-    let start = std::time::SystemTime::now();
     // let addr = rl.readline("Address? >> ").unwrap();
     // let port = rl.readline("Port? >> ").unwrap();
     let addr = "localhost";
@@ -55,6 +54,8 @@ fn sender(rl: &mut Editor<()>, rng: &mut AesRng) {
         BufWriter::new(stream),
     );
     println!("Connected to {}:{}.", addr, port);
+
+    let start = std::time::SystemTime::now();
 
     println!("Initializing PSI sender.");
     let mut sender = psz::Sender::init(&mut channel, rng).unwrap();
@@ -106,13 +107,17 @@ fn sender(rl: &mut Editor<()>, rng: &mut AesRng) {
     channel.write_usize(payloads[0].len()).unwrap();
     assert!(payloads.iter().all(|p| p.len() == payloads[0].len()));
 
-    for ((input, payload), payload_key) in PbIter::new(inputs.iter().zip(payloads.iter()).zip(payload_keys.iter())) {
+    let mut pb = pbr::ProgressBar::new(inputs.len() as u64);
+    pb.set_max_refresh_rate(Some(std::time::Duration::from_millis(1000)));
+
+    for ((input, payload), payload_key) in inputs.iter().zip(payloads.iter()).zip(payload_keys.iter()) {
         let tag: [u8;32] = sha256(input);
         let (iv, encrypted_payload) = encrypt(payload_key, payload, rng);
         channel.write_bytes(&tag).unwrap();
         channel.write_block(&iv).unwrap();
         channel.write_bytes(&encrypted_payload).unwrap();
         channel.flush().unwrap();
+        pb.inc();
     }
 
     println!("Total time: {:.2} seconds", start.elapsed().unwrap().as_secs());
@@ -120,8 +125,6 @@ fn sender(rl: &mut Editor<()>, rng: &mut AesRng) {
 }
 
 fn receiver(rl: &mut Editor<()>, rng: &mut AesRng) {
-    let start = std::time::SystemTime::now();
-
     // let port = rl.readline("Port? >> ").unwrap();
     let port = "12345";
 
@@ -135,6 +138,7 @@ fn receiver(rl: &mut Editor<()>, rng: &mut AesRng) {
         BufWriter::new(stream),
     );
     println!("Connected to {}.", addr);
+    let start = std::time::SystemTime::now();
 
     println!("Initializing PSI receiver.");
     let mut receiver = psz::Receiver::init(&mut channel, rng).unwrap();
@@ -177,7 +181,10 @@ fn receiver(rl: &mut Editor<()>, rng: &mut AesRng) {
     let sender_set_size = channel.read_usize().unwrap();
     let payload_len = channel.read_usize().unwrap();
 
-    for _ in PbIter::new(0..sender_set_size) {
+    let mut pb = pbr::ProgressBar::new(inputs.len() as u64);
+    pb.set_max_refresh_rate(Some(std::time::Duration::from_millis(1000)));
+
+    for _ in 0..sender_set_size {
         let tag = channel.read_vec(32).unwrap();
         let iv = channel.read_block().unwrap();
         let encrypted_payload = channel.read_vec(payload_len).unwrap();
@@ -186,6 +193,7 @@ fn receiver(rl: &mut Editor<()>, rng: &mut AesRng) {
             let s = format_output_line(&item, &payload);
             writeln!(output_file, "{}", s).unwrap();
         }
+        pb.inc();
     }
 
     println!("Wrote payloads to {}.", output_filename);
