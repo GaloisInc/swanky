@@ -9,6 +9,7 @@ use std::{
     io::{BufRead, BufReader, BufWriter, Read, Write},
     net::{TcpListener, TcpStream},
 };
+use openssl::sha::sha256;
 
 fn main() {
     let matches = App::new("secretborther")
@@ -33,6 +34,7 @@ fn main() {
 }
 
 fn sender(rl: &mut Editor<()>, rng: &mut AesRng) {
+    let start = std::time::SystemTime::now();
     // let addr = rl.readline("Address? >> ").unwrap();
     // let port = rl.readline("Port? >> ").unwrap();
     let addr = "localhost";
@@ -93,22 +95,30 @@ fn sender(rl: &mut Editor<()>, rng: &mut AesRng) {
         }
     }
     channel.flush().unwrap();
+    println!("PSI took {} seconds.", start.elapsed().unwrap().as_secs());
 
     println!("Sending encrypted payloads.");
 
-    // send payload length
+    channel.write_usize(inputs.len()).unwrap();
     channel.write_usize(payloads[0].len()).unwrap();
+    assert!(payloads.iter().all(|p| p.len() == payloads[0].len()));
 
-    for (payload, payload_key) in PbIter::new(payloads.iter().zip(payload_keys.iter())) {
+    for ((input, payload), payload_key) in PbIter::new(inputs.iter().zip(payloads.iter()).zip(payload_keys.iter())) {
+        let tag: [u8;32] = sha256(input);
         let (iv, encrypted_payload) = encrypt(payload_key, payload, rng);
+        channel.write_bytes(&tag).unwrap();
         channel.write_block(&iv).unwrap();
         channel.write_bytes(&encrypted_payload).unwrap();
+        channel.flush().unwrap();
     }
 
-    let _done = channel.read_bool().unwrap();
+    println!("Total time: {:.2} seconds", start.elapsed().unwrap().as_secs());
+    println!("Total communication: {:.2} megabytes", channel.total_kilobytes() / 1024.0);
 }
 
 fn receiver(rl: &mut Editor<()>, rng: &mut AesRng) {
+    let start = std::time::SystemTime::now();
+
     // let port = rl.readline("Port? >> ").unwrap();
     let port = "12345";
 
@@ -134,12 +144,16 @@ fn receiver(rl: &mut Editor<()>, rng: &mut AesRng) {
     let inputs = read_inputs(&input_filename);
 
     println!("Performing private set intersection.");
-    let payload_keys: HashMap<Vec<u8>, Block> = receiver
+    let payload_keys: HashMap<_,_> = receiver
         .receive_payloads(&inputs, &mut channel, rng)
         .unwrap()
         .into_iter()
-        .collect();
+        .map(|(item, key) | {
+            let tag = sha256(&item).to_vec();
+            (tag, (item, key))
+        }).collect();
     println!("Intersection size: {}.", payload_keys.len());
+    println!("PSI took {} seconds.", start.elapsed().unwrap().as_secs());
 
     println!("Sending cardinality to Sender.");
     channel.write_usize(payload_keys.len()).unwrap();
@@ -156,22 +170,24 @@ fn receiver(rl: &mut Editor<()>, rng: &mut AesRng) {
     println!("Receiving encrypted payloads.");
 
     let mut output_file = std::fs::File::create(&output_filename).unwrap();
+
+    let sender_set_size = channel.read_usize().unwrap();
     let payload_len = channel.read_usize().unwrap();
 
-    for input in PbIter::new(inputs.iter()) {
+    for _ in PbIter::new(0..sender_set_size) {
+        let tag = channel.read_vec(32).unwrap();
         let iv = channel.read_block().unwrap();
         let encrypted_payload = channel.read_vec(payload_len).unwrap();
-        if let Some(key) = payload_keys.get(input) {
+        if let Some((item, key)) = payload_keys.get(&tag) {
             let payload = decrypt(&key, &iv, &encrypted_payload);
-            let s = format_output_line(&input, &payload);
-            write!(output_file, "{}", s).unwrap();
+            let s = format_output_line(&item, &payload);
+            writeln!(output_file, "{}", s).unwrap();
         }
     }
 
     println!("Wrote payloads to {}.", output_filename);
-
-    channel.write_bool(true).unwrap();
-    channel.flush().unwrap();
+    println!("Total time: {:.2} seconds", start.elapsed().unwrap().as_secs());
+    println!("Total communication: {:.2} megabytes", channel.total_kilobytes() / 1024.0);
 }
 
 fn read_inputs(filename: &str) -> Vec<Vec<u8>> {
@@ -227,7 +243,7 @@ fn read_inputs_and_payloads(
 fn encrypt(key: &Block, data: &[u8], rng: &mut AesRng) -> (Block, Vec<u8>) {
     let iv = rng.gen::<Block>();
     let ct = openssl::symm::encrypt(
-        openssl::symm::Cipher::aes_128_cbc(),
+        openssl::symm::Cipher::aes_128_ctr(),
         key.as_ref(),
         Some(iv.as_ref()),
         data,
@@ -238,7 +254,7 @@ fn encrypt(key: &Block, data: &[u8], rng: &mut AesRng) -> (Block, Vec<u8>) {
 
 fn decrypt(key: &Block, iv: &Block, data: &[u8]) -> Vec<u8> {
     openssl::symm::decrypt(
-        openssl::symm::Cipher::aes_128_cbc(),
+        openssl::symm::Cipher::aes_128_ctr(),
         key.as_ref(),
         Some(iv.as_ref()),
         data,
