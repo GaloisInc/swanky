@@ -151,7 +151,7 @@ mod tests {
 
     const NHASHES: usize = 3;
     const ITEMSIZE: usize = 8;
-    const SETSIZE: usize = 1 << 21;
+    const SETSIZE: usize = 1 << 16;
 
     #[test]
     fn test_build() {
