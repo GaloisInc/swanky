@@ -151,14 +151,15 @@ mod tests {
 
     const NHASHES: usize = 3;
     const ITEMSIZE: usize = 8;
-    const SETSIZE: usize = 1 << 16;
+    const SETSIZE: usize = 1 << 24;
 
     #[test]
     fn test_build() {
-        let inputs = (0..SETSIZE)
-            .map(|_| Block::from(rand::random::<u128>()))
-            .collect::<Vec<Block>>();
-        let tbl = CuckooHash::new(&inputs, 3);
+        let mut rng = AesRng::new();
+        let inputs = utils::rand_vec_vec(SETSIZE, ITEMSIZE, &mut rng);
+        let key = rng.gen();
+        let hashes = utils::compress_and_hash_inputs(&inputs, key);
+        let tbl = CuckooHash::new(&hashes, NHASHES);
         assert!(tbl.err().is_none());
     }
 
@@ -204,7 +205,7 @@ mod benchmarks {
     use super::*;
     use test::Bencher;
 
-    const SETSIZE: usize = 1 << 24;
+    const SETSIZE: usize = 1 << 16;
 
     #[bench]
     fn bench_build(b: &mut Bencher) {
