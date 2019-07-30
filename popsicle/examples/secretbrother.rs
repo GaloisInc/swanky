@@ -39,7 +39,8 @@ fn main() {
 fn sender(rl: &mut Editor<()>, rng: &mut AesRng) {
     // let addr = rl.readline("Address? >> ").unwrap();
     // let port = rl.readline("Port? >> ").unwrap();
-    let addr = "[::1]";
+    // let addr = "[::1]";
+    let addr = "[fe80::266e:96ff:fe0e:3404]";
     let port = "12345";
 
     let stream = loop {
@@ -129,7 +130,7 @@ fn receiver(rl: &mut Editor<()>, rng: &mut AesRng) {
     let port = "12345";
 
     println!("Waiting for connection from sender.");
-    let (stream, addr) = TcpListener::bind(format!("[::1]:{}", port))
+    let (stream, addr) = TcpListener::bind(format!("192.168.41.102:{}", port))
         .unwrap()
         .accept()
         .unwrap();
