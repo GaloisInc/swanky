@@ -39,7 +39,9 @@ fn main() {
 fn sender(rl: &mut Editor<()>, rng: &mut AesRng) {
     // let addr = rl.readline("Address? >> ").unwrap();
     // let port = rl.readline("Port? >> ").unwrap();
-    let addr = "localhost";
+    // let addr = "[::1]";
+    // let addr = "[fe80::266e:96ff:fe0e:3404]";
+    let addr = "[::1]";
     let port = "12345";
 
     let stream = loop {
@@ -134,10 +136,11 @@ fn sender(rl: &mut Editor<()>, rng: &mut AesRng) {
 
 fn receiver(rl: &mut Editor<()>, rng: &mut AesRng) {
     // let port = rl.readline("Port? >> ").unwrap();
+    let addr = "[::1]";
     let port = "12345";
 
     println!("Waiting for connection from sender.");
-    let (stream, addr) = TcpListener::bind(format!("localhost:{}", port))
+    let (stream, addr) = TcpListener::bind(format!("{}:{}", addr, port))
         .unwrap()
         .accept()
         .unwrap();
@@ -157,9 +160,11 @@ fn receiver(rl: &mut Editor<()>, rng: &mut AesRng) {
     let output_filename = "output.csv";
     println!("Reading input CSV file.");
     let inputs = read_inputs(&input_filename);
+    println!("{} inputs read.", inputs.len());
 
     println!("Performing private set intersection.");
-    let payload_keys: HashMap<_, _> = receiver
+
+    let payload_keys: HashMap<_,_> = receiver
         .receive_payloads(&inputs, &mut channel, rng)
         .unwrap()
         .into_iter()
@@ -312,29 +317,11 @@ fn bytes_to_f64(bytes: &[u8]) -> f64 {
 }
 
 fn process_ssn(ssn: &str) -> Vec<u8> {
-    // parse it as a u64, then output the bytes of it
-    let mut no_formatting = String::new();
-    for c in ssn.chars() {
-        match c {
-            '-' => (),
-            _ => no_formatting.push(c),
-        }
-    }
-    let val = no_formatting.parse::<u64>().unwrap();
-    let bs: [u8; 8] = unsafe { std::mem::transmute(val) };
-    bs.to_vec()
+    ssn.bytes().collect()
 }
 
 fn format_ssn(bs: &[u8]) -> String {
-    let mut bs_arr = [0; 8];
-    for (from, to) in bs.iter().zip(bs_arr.iter_mut()) {
-        *to = *from;
-    }
-    let val: u64 = unsafe { std::mem::transmute(bs_arr) };
-    let mut s = format!("{:09}", val);
-    s.insert(3, '-');
-    s.insert(6, '-');
-    s
+    String::from_utf8(bs.to_vec()).unwrap()
 }
 
 #[cfg(test)]

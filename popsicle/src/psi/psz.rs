@@ -243,7 +243,9 @@ impl Receiver {
     > {
         let key = cointoss::receive(channel, &[rng.gen()])?[0];
 
-        let tbl = CuckooHash::new(&utils::compress_and_hash_inputs(inputs, key), NHASHES)?;
+        let hashed = utils::compress_and_hash_inputs(inputs, key);
+
+        let tbl = CuckooHash::new(&hashed, NHASHES)?;
         let nbins = tbl.nbins;
 
         // Send cuckoo hash info to sender.

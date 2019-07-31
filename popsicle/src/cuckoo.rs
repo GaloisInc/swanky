@@ -30,7 +30,11 @@ const NITERS: usize = 1000;
 fn compute_nbins(n: usize, nhashes: usize) -> Result<usize, Error> {
     // Numbers taken from <https://thomaschneider.de/papers/PSZ18.pdf>, §3.2.2.
     if nhashes == 3 {
-        Ok((1.30 * (n as f64)).ceil() as usize)
+        if n < 1<<27 {
+            Ok((1.27 * (n as f64)).ceil() as usize) // good up to set size 2^26
+        } else {
+            Ok((1.62 * (n as f64)).ceil() as usize) // required for 2^27
+        }
     } else if nhashes == 4 {
         Ok((1.09 * (n as f64)).ceil() as usize)
     } else if nhashes == 5 {
@@ -151,14 +155,15 @@ mod tests {
 
     const NHASHES: usize = 3;
     const ITEMSIZE: usize = 8;
-    const SETSIZE: usize = 1 << 21;
+    const SETSIZE: usize = 1 << 28;
 
     #[test]
     fn test_build() {
-        let inputs = (0..SETSIZE)
-            .map(|_| Block::from(rand::random::<u128>()))
-            .collect::<Vec<Block>>();
-        let tbl = CuckooHash::new(&inputs, 3);
+        let mut rng = AesRng::new();
+        let inputs = utils::rand_vec_vec(SETSIZE, ITEMSIZE, &mut rng);
+        let key = rng.gen();
+        let hashes = utils::compress_and_hash_inputs(&inputs, key);
+        let tbl = CuckooHash::new(&hashes, NHASHES);
         assert!(tbl.err().is_none());
     }
 
@@ -203,7 +208,7 @@ mod benchmarks {
     use super::*;
     use test::Bencher;
 
-    const SETSIZE: usize = 1 << 24;
+    const SETSIZE: usize = 1 << 16;
 
     #[bench]
     fn bench_build(b: &mut Bencher) {
