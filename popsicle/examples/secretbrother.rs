@@ -1,6 +1,8 @@
 #![allow(unused_variables, unused_imports)]
 
+use ascii::AsAsciiStr;
 use clap::{App, SubCommand};
+use openssl::sha::sha256;
 use pbr::PbIter;
 use popsicle::psz;
 use rand::Rng;
@@ -11,8 +13,6 @@ use std::{
     io::{BufRead, BufReader, BufWriter, Read, Write},
     net::{TcpListener, TcpStream},
 };
-use openssl::sha::sha256;
-use ascii::AsAsciiStr;
 
 fn main() {
     let matches = App::new("secretborther")
@@ -110,8 +110,10 @@ fn sender(rl: &mut Editor<()>, rng: &mut AesRng) {
     let mut pb = pbr::ProgressBar::new(inputs.len() as u64);
     pb.set_max_refresh_rate(Some(std::time::Duration::from_millis(1000)));
 
-    for ((input, payload), payload_key) in inputs.iter().zip(payloads.iter()).zip(payload_keys.iter()) {
-        let tag: [u8;32] = sha256(input);
+    for ((input, payload), payload_key) in
+        inputs.iter().zip(payloads.iter()).zip(payload_keys.iter())
+    {
+        let tag: [u8; 32] = sha256(input);
         let (iv, encrypted_payload) = encrypt(payload_key, payload, rng);
         channel.write_bytes(&tag).unwrap();
         channel.write_block(&iv).unwrap();
@@ -120,8 +122,14 @@ fn sender(rl: &mut Editor<()>, rng: &mut AesRng) {
         pb.inc();
     }
 
-    println!("Total time: {:.2} seconds", start.elapsed().unwrap().as_secs());
-    println!("Total communication: {:.2} megabytes", channel.total_kilobytes() / 1024.0);
+    println!(
+        "Total time: {:.2} seconds",
+        start.elapsed().unwrap().as_secs()
+    );
+    println!(
+        "Total communication: {:.2} megabytes",
+        channel.total_kilobytes() / 1024.0
+    );
 }
 
 fn receiver(rl: &mut Editor<()>, rng: &mut AesRng) {
@@ -151,14 +159,15 @@ fn receiver(rl: &mut Editor<()>, rng: &mut AesRng) {
     let inputs = read_inputs(&input_filename);
 
     println!("Performing private set intersection.");
-    let payload_keys: HashMap<_,_> = receiver
+    let payload_keys: HashMap<_, _> = receiver
         .receive_payloads(&inputs, &mut channel, rng)
         .unwrap()
         .into_iter()
-        .map(|(item, key) | {
+        .map(|(item, key)| {
             let tag = sha256(&item).to_vec();
             (tag, (item, key))
-        }).collect();
+        })
+        .collect();
     println!("Intersection size: {}.", payload_keys.len());
     println!("PSI took {} seconds.", start.elapsed().unwrap().as_secs());
 
@@ -197,8 +206,14 @@ fn receiver(rl: &mut Editor<()>, rng: &mut AesRng) {
     }
 
     println!("Wrote payloads to {}.", output_filename);
-    println!("Total time: {:.2} seconds", start.elapsed().unwrap().as_secs());
-    println!("Total communication: {:.2} megabytes", channel.total_kilobytes() / 1024.0);
+    println!(
+        "Total time: {:.2} seconds",
+        start.elapsed().unwrap().as_secs()
+    );
+    println!(
+        "Total communication: {:.2} megabytes",
+        channel.total_kilobytes() / 1024.0
+    );
 }
 
 fn read_inputs(filename: &str) -> Vec<Vec<u8>> {
@@ -306,7 +321,7 @@ fn process_ssn(ssn: &str) -> Vec<u8> {
         }
     }
     let val = no_formatting.parse::<u64>().unwrap();
-    let bs: [u8;8] = unsafe { std::mem::transmute(val) };
+    let bs: [u8; 8] = unsafe { std::mem::transmute(val) };
     bs.to_vec()
 }
 
@@ -353,7 +368,7 @@ mod tests {
         for _ in 0..1024 {
             let mut rng = AesRng::new();
             let mut tag = String::new();
-            let chars = (b'0' ..= b'9').map(char::from).collect::<Vec<char>>();
+            let chars = (b'0'..=b'9').map(char::from).collect::<Vec<char>>();
             for _ in 0..3 {
                 let i = rng.gen::<usize>() % 10;
                 tag.push(chars[i]);

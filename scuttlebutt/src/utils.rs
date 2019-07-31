@@ -103,5 +103,4 @@ mod benchmarks {
         let y = (0..128).map(|_| rand::random::<u8>()).collect::<Vec<u8>>();
         b.iter(|| and_inplace(&mut x, &y));
     }
-
 }

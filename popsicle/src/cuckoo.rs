@@ -195,7 +195,6 @@ mod tests {
             }
         }
     }
-
 }
 
 #[cfg(all(feature = "nightly", test))]

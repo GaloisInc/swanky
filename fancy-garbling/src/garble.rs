@@ -279,7 +279,6 @@ mod nonstreaming {
             assert_eq!(Y[0], (x + c) % q, "garbled");
         }
     }
-
 }
 
 #[cfg(test)]
@@ -451,7 +450,6 @@ mod streaming {
             );
         }
     }
-
 }
 
 #[cfg(test)]

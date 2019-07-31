@@ -87,5 +87,4 @@ mod benchmarks {
             let _ = compress_and_hash_inputs(&inputs, key);
         });
     }
-
 }

@@ -321,7 +321,7 @@ mod tests {
 
         let intersection = rand_vec_vec(intersection_size, ITEM_SIZE, &mut rng);
 
-        let mut sender_inputs   = rand_vec_vec(SET_SIZE - intersection_size, ITEM_SIZE, &mut rng);
+        let mut sender_inputs = rand_vec_vec(SET_SIZE - intersection_size, ITEM_SIZE, &mut rng);
         let mut receiver_inputs = rand_vec_vec(SET_SIZE - intersection_size, ITEM_SIZE, &mut rng);
         sender_inputs.extend(intersection.clone());
         receiver_inputs.extend(intersection.clone());

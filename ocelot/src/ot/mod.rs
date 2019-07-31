@@ -348,5 +348,4 @@ mod tests {
         test_cotext::<KosSender, KosReceiver>(ninputs);
         test_rotext::<KosSender, KosReceiver>(ninputs);
     }
-
 }
