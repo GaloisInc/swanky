@@ -37,12 +37,12 @@ fn main() {
 }
 
 fn sender(rl: &mut Editor<()>, rng: &mut AesRng) {
-    // let addr = rl.readline("Address? >> ").unwrap();
-    // let port = rl.readline("Port? >> ").unwrap();
-    // let addr = "[::1]";
-    // let addr = "[fe80::266e:96ff:fe0e:3404]";
+    let addr = rl.readline("Address? >> ").unwrap();
+    let port = rl.readline("Port? >> ").unwrap();
     let addr = "[::1]";
-    let port = "12345";
+    // let addr = "[fe80::266e:96ff:fe0e:3404]";
+    // let addr = "[::1]";
+    // let port = "12345";
 
     let stream = loop {
         match TcpStream::connect(&format!("{}:{}", addr, port)) {
@@ -75,14 +75,14 @@ fn sender(rl: &mut Editor<()>, rng: &mut AesRng) {
     let mut bytes = [0; 1];
     loop {
         print!(
-            "Receiver reports cardinality {}. Accept? [yn] ",
-            cardinality
+            "Records uploaded: {}. Matched {}. Not matched: {}. Accept? [yn] ",
+            inputs.len(), cardinality, inputs.len() - cardinality,
         );
         std::io::stdout().flush().unwrap();
 
-        // std::io::stdin().lock().read_exact(&mut bytes).unwrap();
-        bytes[0] = b'y';
-        println!("");
+        std::io::stdin().lock().read_exact(&mut bytes).unwrap();
+        // bytes[0] = b'y';
+        // println!("");
 
         match bytes[0] {
             b'y' => {
@@ -298,7 +298,7 @@ fn format_output_line(input: &[u8], payload: &[u8]) -> String {
     let p1 = bytes_to_f64(&payload[0..8]);
     let p2 = bytes_to_f64(&payload[8..16]);
     let p3 = bytes_to_f64(&payload[16..24]);
-    let p4 = unsafe { payload[24..].as_ascii_str_unchecked() }; // XXX
+    let p4 = String::from_utf8(payload[24..].to_vec()).unwrap();
     format!("{}, {}, {}, {}, {}", tag, p1, p2, p3, p4)
 }
 

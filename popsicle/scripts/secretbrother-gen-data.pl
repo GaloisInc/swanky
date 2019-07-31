@@ -27,7 +27,7 @@ for (my $i=0; $i < $nrecords; $i++) {
     my $pl3 = rand(1000);
 
     my @letters = ('a'..'z', 'A'..'Z', '0'..'9');
-    my $pl4 = $letters[rand(@letters)] for 0..23;
+    my $pl4 = join '', map { $letters[rand(@letters)] } 0..23;
 
     say "$ssn, $pl1, $pl2, $pl3, $pl4";
 }
