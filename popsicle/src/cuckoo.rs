@@ -30,7 +30,11 @@ const NITERS: usize = 1000;
 fn compute_nbins(n: usize, nhashes: usize) -> Result<usize, Error> {
     // Numbers taken from <https://thomaschneider.de/papers/PSZ18.pdf>, §3.2.2.
     if nhashes == 3 {
-        Ok((1.30 * (n as f64)).ceil() as usize)
+        if n < 1<<27 {
+            Ok((1.27 * (n as f64)).ceil() as usize) // good up to set size 2^26
+        } else {
+            Ok((1.62 * (n as f64)).ceil() as usize) // required for 2^27
+        }
     } else if nhashes == 4 {
         Ok((1.09 * (n as f64)).ceil() as usize)
     } else if nhashes == 5 {
@@ -151,7 +155,7 @@ mod tests {
 
     const NHASHES: usize = 3;
     const ITEMSIZE: usize = 8;
-    const SETSIZE: usize = 1 << 24;
+    const SETSIZE: usize = 1 << 28;
 
     #[test]
     fn test_build() {
