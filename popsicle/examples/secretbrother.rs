@@ -69,6 +69,7 @@ fn sender(rl: &mut Editor<()>, rng: &mut AesRng) {
 
     println!("Performing private set intersection.");
     let payload_keys = sender.send_payloads(&inputs, &mut channel, rng).unwrap();
+    println!("PSI took {} seconds.", start.elapsed().unwrap().as_secs());
 
     let cardinality = channel.read_usize().unwrap();
 
@@ -101,7 +102,6 @@ fn sender(rl: &mut Editor<()>, rng: &mut AesRng) {
         }
     }
     channel.flush().unwrap();
-    println!("PSI took {} seconds.", start.elapsed().unwrap().as_secs());
 
     println!("Sending encrypted payloads.");
 
@@ -110,7 +110,7 @@ fn sender(rl: &mut Editor<()>, rng: &mut AesRng) {
     assert!(payloads.iter().all(|p| p.len() == payloads[0].len()));
 
     let mut pb = pbr::ProgressBar::new(inputs.len() as u64);
-    pb.set_max_refresh_rate(Some(std::time::Duration::from_millis(1000)));
+    pb.set_max_refresh_rate(Some(std::time::Duration::from_millis(10)));
 
     for ((input, payload), payload_key) in
         inputs.iter().zip(payloads.iter()).zip(payload_keys.iter())
@@ -123,6 +123,7 @@ fn sender(rl: &mut Editor<()>, rng: &mut AesRng) {
         channel.flush().unwrap();
         pb.inc();
     }
+    pb.finish();
 
     println!(
         "Total time: {:.2} seconds",
@@ -196,7 +197,7 @@ fn receiver(rl: &mut Editor<()>, rng: &mut AesRng) {
     let payload_len = channel.read_usize().unwrap();
 
     let mut pb = pbr::ProgressBar::new(inputs.len() as u64);
-    pb.set_max_refresh_rate(Some(std::time::Duration::from_millis(1000)));
+    pb.set_max_refresh_rate(Some(std::time::Duration::from_millis(10)));
 
     for _ in 0..sender_set_size {
         let tag = channel.read_vec(32).unwrap();
@@ -209,6 +210,7 @@ fn receiver(rl: &mut Editor<()>, rng: &mut AesRng) {
         }
         pb.inc();
     }
+    pb.finish();
 
     println!("Wrote payloads to {}.", output_filename);
     println!(
