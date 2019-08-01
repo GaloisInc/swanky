@@ -1,14 +1,14 @@
-# `swanky`: A suite of rust libraries for secure multi-party computation
+# **swanky**: A suite of rust libraries for secure multi-party computation
 
-`swanky` provides a suite of rust libraries for doing secure multi-party
+**swanky** provides a suite of rust libraries for doing secure multi-party
 computation (MPC):
 
-* `scuttlebutt`: Core MPC-related primitives used by various `swanky`
+* **scuttlebutt**: Core MPC-related primitives used by various **swanky**
   libraries.
-* `ocelot`: Oblivious transfer and oblivious PRFs.
-* `popsicle`: Private-set intersection.
-* `fancy-garbling`: Boolean and arithmetic garbled circuits.
-* `twopac`: Two-party garbled-circuit-based secure computation.
+* **ocelot**: Oblivious transfer and oblivious PRFs.
+* **popsicle**: Private-set intersection.
+* **fancy-garbling**: Boolean and arithmetic garbled circuits.
+* **twopac**: Two-party garbled-circuit-based secure computation.
 
 # License
 
