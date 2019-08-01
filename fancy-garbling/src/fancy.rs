@@ -228,10 +228,15 @@ pub trait Fancy {
         x: &Self::Item,
         y: &Self::Item,
     ) -> Result<Self::Item, Self::Error> {
-        let notb = self.negate(b)?;
-        let xsel = self.mul(&notb, x)?;
-        let ysel = self.mul(b, y)?;
-        self.add(&xsel, &ysel)
+        if x.modulus() == 2 && y.modulus() == 2 {
+            let difference = self.sub(y, x)?;
+            self.mul(b, &difference)
+        } else {
+            let notb = self.negate(b)?;
+            let xsel = self.mul(&notb, x)?;
+            let ysel = self.mul(b, y)?;
+            self.add(&xsel, &ysel)
+        }
     }
 
     /// If `x = 0` returns the constant `b1` else return `b2`. Folds constants if possible.
