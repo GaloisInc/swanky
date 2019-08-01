@@ -1,0 +1,52 @@
+\documentclass{standalone}
+
+\usepackage{tikz}
+
+\usetikzlibrary{positioning}
+
+\begin{document}
+
+\begin{tikzpicture}
+    [every node/.style={draw, align=center, rounded corners=.1cm, fill=black!2},
+     arr/.style={draw=black!80, thick, >=stealth, ->},
+    ]
+    \node (scuttlebutt) {
+        \textsf{scuttlebutt}\\
+        \scriptsize
+        Core MPC primitives.
+    };
+    \node (ocelot) [above=of scuttlebutt] {
+        \textsf{ocelot}\\
+        \scriptsize
+        Oblivious transfer and oblivious PRFs.
+    };
+    \node (fancy-garbling) [above left=2cm and 2cm of scuttlebutt] {
+        \textsf{fancy-garbling}\\
+        \scriptsize
+        Boolean and arithmetic garbled circuits.
+    };
+    \node (popsicle) [above right=2cm and 2cm of scuttlebutt] {
+        \textsf{popsicle}\\
+        \scriptsize
+        Private-set intersection protocols.
+    };
+    \node (twopac) [below=of fancy-garbling] {
+        \textsf{twopac}\\
+        \scriptsize
+        Two-party garbled circuits computation.
+    };
+
+    \draw [arr] (scuttlebutt) -- (fancy-garbling);
+    \draw [arr] (scuttlebutt) -- (twopac);
+    \draw [arr] (scuttlebutt) -- (popsicle);
+    \draw [arr] (scuttlebutt) -- (ocelot);
+
+    \draw [arr] (ocelot) -- (popsicle);
+    \draw [arr] (ocelot) -- (twopac);
+
+    \draw [arr] (fancy-garbling) -- (twopac);
+    \draw [arr, dotted] (fancy-garbling) -- (popsicle);
+
+\end{tikzpicture}
+
+\end{document}
