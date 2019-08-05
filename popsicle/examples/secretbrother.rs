@@ -40,9 +40,6 @@ fn sender(rl: &mut Editor<()>, rng: &mut AesRng) {
     let addr = rl.readline("Address? >> ").unwrap();
     let port = rl.readline("Port? >> ").unwrap();
     let addr = "[::1]";
-    // let addr = "[fe80::266e:96ff:fe0e:3404]";
-    // let addr = "[::1]";
-    // let port = "12345";
 
     let stream = loop {
         match TcpStream::connect(&format!("{}:{}", addr, port)) {
