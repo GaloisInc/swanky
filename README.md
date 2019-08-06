@@ -6,9 +6,9 @@ computation (MPC).
 ![library diagram](diagram.png)
 
 * **fancy-garbling**: Boolean and arithmetic garbled circuits.
-* **popsicle**: Private-set intersection.
-* **twopac**: Two-party garbled-circuit-based secure computation.
+  * **twopac**: Two-party garbled-circuit-based secure computation.
 * **ocelot**: Oblivious transfer and oblivious PRFs.
+* **popsicle**: Private-set intersection.
 * **scuttlebutt**: Core MPC-related primitives used by various **swanky**
   libraries.
 
