@@ -1,7 +1,7 @@
 use criterion::{criterion_group, criterion_main, Criterion};
 use fancy_garbling::{
     circuit::{Circuit, CircuitBuilder},
-    garble,
+    classic::garble,
     util::RngExt,
     Fancy,
 };

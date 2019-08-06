@@ -20,14 +20,15 @@
 #![cfg_attr(feature = "nightly", deny(missing_docs))]
 
 pub mod circuit;
+pub mod classic;
 pub mod dummy;
-pub mod error;
+pub mod errors;
 mod fancy;
 mod garble;
 pub mod informer;
 mod parser;
-pub mod r#static;
+pub mod twopac;
 pub mod util;
 mod wire;
 
-pub use crate::{error::FancyError, fancy::*, garble::*, r#static::*, wire::*};
+pub use crate::{errors::FancyError, fancy::*, garble::*, wire::*};

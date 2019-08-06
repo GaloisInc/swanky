@@ -9,7 +9,7 @@
 
 use crate::{
     dummy::{Dummy, DummyVal},
-    error::{CircuitBuilderError, DummyError, FancyError},
+    errors::{CircuitBuilderError, DummyError, FancyError},
     fancy::{BinaryBundle, CrtBundle, Fancy, FancyInput, HasModulus},
 };
 use itertools::Itertools;

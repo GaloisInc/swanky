@@ -19,10 +19,11 @@ nightly = ["rand/nightly", "scuttlebutt/nightly"]
 
 [dependencies]
 base_conversion = { path = "base_conversion" }
+scuttlebutt = { path = "../scuttlebutt" }
+ocelot = { path = "../ocelot" }
 itertools = "0.8.0"
 rand = "0.6.5"
 regex = "1.1.7"
-scuttlebutt = { path = "../scuttlebutt" }
 
 [dev-dependencies]
 criterion = "0.2.11"
@@ -43,3 +44,8 @@ harness = false
 [[bench]]
 name = "util"
 harness = false
+
+[[bench]]
+name = "semihonest_2pc"
+harness = false
+

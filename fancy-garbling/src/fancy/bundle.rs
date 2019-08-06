@@ -5,7 +5,7 @@
 // See LICENSE for licensing information.
 
 use crate::{
-    error::FancyError,
+    errors::FancyError,
     fancy::{Fancy, HasModulus},
 };
 use itertools::Itertools;

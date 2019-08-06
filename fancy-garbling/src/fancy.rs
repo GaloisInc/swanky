@@ -9,7 +9,7 @@
 //! An implementer must be able to create inputs, constants, do modular arithmetic, and
 //! create projections.
 
-use crate::error::FancyError;
+use crate::errors::FancyError;
 use itertools::Itertools;
 
 mod binary;

@@ -5,7 +5,7 @@
 // See LICENSE for licensing information.
 
 use crate::{
-    error::FancyError,
+    errors::FancyError,
     fancy::{
         bundle::{Bundle, BundleGadgets},
         Fancy,

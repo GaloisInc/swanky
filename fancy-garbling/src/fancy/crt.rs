@@ -8,7 +8,7 @@
 
 use super::{Fancy, HasModulus};
 use crate::{
-    error::FancyError,
+    errors::FancyError,
     fancy::bundle::{Bundle, BundleGadgets},
     util,
 };

@@ -9,7 +9,7 @@
 
 use crate::{
     circuit::{Circuit, CircuitRef, Gate},
-    error::CircuitParserError as Error,
+    errors::CircuitParserError as Error,
 };
 use regex::{Captures, Regex};
 use std::{
@@ -176,7 +176,7 @@ impl Circuit {
 
 #[cfg(test)]
 mod tests {
-    use crate::{circuit::Circuit, garble};
+    use crate::{circuit::Circuit, classic::garble};
 
     #[test]
     fn test_parser() {

@@ -17,7 +17,7 @@ use ocelot::{
 use openssl::symm::{decrypt, encrypt, Cipher};
 use rand::{CryptoRng, Rng, RngCore, SeedableRng};
 use scuttlebutt::{AbstractChannel, Block, Block512, SemiHonest};
-use twopac::semihonest::{Evaluator, Garbler};
+use fancy_garbling::twopac::semihonest::{Evaluator, Garbler};
 
 const NHASHES: usize = 3;
 // How many bytes of the hash to use for the equality tests. This affects

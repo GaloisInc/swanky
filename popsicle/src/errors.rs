@@ -31,7 +31,7 @@ pub enum Error {
     /// SSL Error
     SSLError(openssl::error::ErrorStack),
     /// An error occurred in the underlying 2PC protocol.
-    TwopcError(twopac::Error),
+    TwopcError(fancy_garbling::errors::TwopacError),
 }
 
 impl From<openssl::error::ErrorStack> for Error {
@@ -62,9 +62,9 @@ impl From<scuttlebutt::cointoss::Error> for Error {
     }
 }
 
-impl From<twopac::Error> for Error {
+impl From<fancy_garbling::errors::TwopacError> for Error {
     #[inline]
-    fn from(e: twopac::Error) -> Error {
+    fn from(e: fancy_garbling::errors::TwopacError) -> Error {
         Error::TwopcError(e)
     }
 }

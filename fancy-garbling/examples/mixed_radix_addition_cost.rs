@@ -1,6 +1,6 @@
 use fancy_garbling::{
     dummy::{Dummy, DummyVal},
-    error::DummyError,
+    errors::DummyError,
     informer::Informer,
     *,
 };

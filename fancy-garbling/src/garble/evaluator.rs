@@ -5,7 +5,7 @@
 // See LICENSE for licensing information.
 
 use crate::{
-    error::{EvaluatorError, FancyError},
+    errors::{EvaluatorError, FancyError},
     fancy::{Fancy, FancyReveal, HasModulus},
     util::{output_tweak, tweak, tweak2},
     wire::Wire,

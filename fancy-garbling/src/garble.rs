@@ -18,8 +18,8 @@ pub use crate::garble::{evaluator::Evaluator, garbler::Garbler};
 mod nonstreaming {
     use crate::{
         circuit::{Circuit, CircuitBuilder},
+        classic::garble,
         fancy::{Bundle, BundleGadgets, Fancy},
-        r#static::garble,
         util::{self, RngExt},
     };
     use itertools::Itertools;

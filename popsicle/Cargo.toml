@@ -19,7 +19,6 @@ nightly = ["rand/nightly", "scuttlebutt/nightly", "ocelot/nightly", "ocelot/nigh
 fancy-garbling = { path = "../fancy-garbling" }
 ocelot         = { path = "../ocelot" }
 scuttlebutt    = { path = "../scuttlebutt" }
-twopac         = { path  = "../twopac" }
 itertools      = "0.8.0"
 rand           = "0.6.5"
 openssl        = "0.10.23"

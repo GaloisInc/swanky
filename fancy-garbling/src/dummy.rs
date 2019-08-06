@@ -10,7 +10,7 @@
 //! creating any circuits.
 
 use crate::{
-    error::{DummyError, FancyError},
+    errors::{DummyError, FancyError},
     fancy::{Fancy, FancyInput, FancyReveal, HasModulus},
 };
 

@@ -5,7 +5,7 @@
 // See LICENSE for licensing information.
 
 use crate::{
-    error::{FancyError, GarblerError},
+    errors::{FancyError, GarblerError},
     fancy::{BinaryBundle, CrtBundle, Fancy, FancyReveal, HasModulus},
     util::{output_tweak, tweak, tweak2, RngExt},
     wire::Wire,
