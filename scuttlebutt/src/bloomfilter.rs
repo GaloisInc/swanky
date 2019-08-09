@@ -1,5 +1,10 @@
+//! Implementation of a bloom filter.
+
 use sha2::{Digest, Sha256};
 
+/// Simple implementation of a Bloom Filter. Which is guaranteed to return 1 if an element
+/// is in the set, but returns 1 with probability p (settable) if an item is not in the
+/// set. Does not reveal what is in the set.
 #[derive(Debug, PartialEq, PartialOrd)]
 pub struct BloomFilter {
     bits: Vec<bool>,
@@ -7,6 +12,7 @@ pub struct BloomFilter {
 }
 
 impl BloomFilter {
+    /// Create a new BloomFilter with `size` entries, using `nhashes` hash functions.
     pub fn new(size: usize, nhashes: usize) -> Self {
         BloomFilter {
             bits: vec![false; size],
@@ -14,10 +20,35 @@ impl BloomFilter {
         }
     }
 
+    /// Compute required expansion for false positive probability `p`.
+    ///
+    /// That is - if you plan to insert `n` items into the BloomFilter, and want a false
+    /// positive probability of `p`, then you should set the BloomFilter size to
+    /// `compute_expansion(p) * n`.
+    pub fn compute_expansion(p: f64) -> f64 {
+        -1.44 * p.log2()
+    }
+
+    /// Compute required number of hash functions for false positive probability `p`.
+    pub fn compute_nhashes(p: f64) -> usize {
+        (-p.log2()).ceil() as usize
+    }
+
+    /// Create a new BloomFilter with false positive probability `p` which can support up
+    /// to `n` insertions.
+    pub fn with_false_positive_prob(p: f64, n: usize) -> Self {
+        Self::new((Self::compute_expansion(p) * n as f64).ceil() as usize, Self::compute_nhashes(p))
+    }
+
+    /// Get the number of bins in this BloomFilter.
     pub fn len(&self) -> usize {
         self.bits.len()
     }
 
+    /// Compute the bin that this value would go to in a BloomFilter.
+    ///
+    /// Result must be modded by the actual size of the bloom filter to avoid out of
+    /// bounds errors.
     pub fn bin<V: AsRef<[u8]>>(value: &V, hash_index: usize) -> usize {
         let mut bytes = unsafe { std::mem::transmute::<usize, [u8; 8]>(hash_index) }.to_vec();
         bytes.extend(value.as_ref());
@@ -29,6 +60,7 @@ impl BloomFilter {
         unsafe { std::mem::transmute::<[u8; 8], usize>(index_bytes) }
     }
 
+    /// Insert an item into the BloomFilter.
     pub fn insert<V: AsRef<[u8]>>(&mut self, value: &V) {
         for hash_index in 0..self.nhashes {
             let i = Self::bin(value, hash_index) % self.len();
@@ -36,6 +68,7 @@ impl BloomFilter {
         }
     }
 
+    /// Check whether an item exists in the BloomFilter.
     pub fn contains<V: AsRef<[u8]>>(&mut self, value: &V) -> bool {
         (0..self.nhashes).all(|hash_index| {
             let i = Self::bin(value, hash_index) % self.len();
