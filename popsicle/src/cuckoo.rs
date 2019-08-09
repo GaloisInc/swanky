@@ -30,7 +30,7 @@ const NITERS: usize = 1000;
 fn compute_nbins(n: usize, nhashes: usize) -> Result<usize, Error> {
     // Numbers taken from <https://thomaschneider.de/papers/PSZ18.pdf>, §3.2.2.
     if nhashes == 3 {
-        if n < 1<<27 {
+        if n < 1 << 27 {
             Ok((1.27 * (n as f64)).ceil() as usize) // good up to set size 2^26
         } else {
             Ok((1.62 * (n as f64)).ceil() as usize) // required for 2^27

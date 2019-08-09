@@ -74,7 +74,9 @@ fn sender(rl: &mut Editor<()>, rng: &mut AesRng) {
     loop {
         print!(
             "Records uploaded: {}. Matched {}. Not matched: {}. Accept? [yn] ",
-            inputs.len(), cardinality, inputs.len() - cardinality,
+            inputs.len(),
+            cardinality,
+            inputs.len() - cardinality,
         );
         std::io::stdout().flush().unwrap();
 
@@ -162,7 +164,7 @@ fn receiver(rl: &mut Editor<()>, rng: &mut AesRng) {
 
     println!("Performing private set intersection.");
 
-    let payload_keys: HashMap<_,_> = receiver
+    let payload_keys: HashMap<_, _> = receiver
         .receive_payloads(&inputs, &mut channel, rng)
         .unwrap()
         .into_iter()

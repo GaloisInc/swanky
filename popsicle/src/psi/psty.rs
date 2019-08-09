@@ -8,7 +8,16 @@
 //! set intersection protocol (cf. <https://eprint.iacr.org/2019/241>).
 
 use crate::{cuckoo::CuckooHash, errors::Error, utils};
-use fancy_garbling::{BinaryBundle, BundleGadgets, CrtBundle, CrtGadgets, Fancy, FancyInput, Wire};
+use fancy_garbling::{
+    twopac::semihonest::{Evaluator, Garbler},
+    BinaryBundle,
+    BundleGadgets,
+    CrtBundle,
+    CrtGadgets,
+    Fancy,
+    FancyInput,
+    Wire,
+};
 use itertools::Itertools;
 use ocelot::{
     oprf::{KmprtReceiver, KmprtSender},
@@ -17,7 +26,6 @@ use ocelot::{
 use openssl::symm::{decrypt, encrypt, Cipher};
 use rand::{CryptoRng, Rng, RngCore, SeedableRng};
 use scuttlebutt::{AbstractChannel, Block, Block512, SemiHonest};
-use fancy_garbling::twopac::semihonest::{Evaluator, Garbler};
 
 const NHASHES: usize = 3;
 // How many bytes of the hash to use for the equality tests. This affects

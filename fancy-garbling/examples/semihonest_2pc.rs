@@ -4,7 +4,11 @@
 // Copyright © 2019 Galois, Inc.
 // See LICENSE for licensing information.
 
-use fancy_garbling::{circuit::Circuit, FancyInput};
+use fancy_garbling::{
+    circuit::Circuit,
+    twopac::semihonest::{Evaluator, Garbler},
+    FancyInput,
+};
 use ocelot::ot::{AlszReceiver as OtReceiver, AlszSender as OtSender};
 use scuttlebutt::{AesRng, Channel};
 use std::{
@@ -12,7 +16,6 @@ use std::{
     os::unix::net::UnixStream,
     time::SystemTime,
 };
-use fancy_garbling::twopac::semihonest::{Evaluator, Garbler};
 
 type Reader = BufReader<UnixStream>;
 type Writer = BufWriter<UnixStream>;

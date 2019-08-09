@@ -47,9 +47,8 @@ impl BloomFilter {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::AesRng;
+    use crate::{AesRng, Block};
     use rand::Rng;
-    use crate::Block;
 
     #[test]
     fn test_bloom_filter_membership() {
