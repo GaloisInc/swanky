@@ -1,7 +1,7 @@
 use sha2::{Digest, Sha256};
 
 #[derive(Debug, PartialEq, PartialOrd)]
-struct BloomFilter {
+pub struct BloomFilter {
     bits: Vec<bool>,
     nhashes: usize,
 }
