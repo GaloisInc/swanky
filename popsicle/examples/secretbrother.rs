@@ -39,7 +39,6 @@ fn main() {
 fn sender(rl: &mut Editor<()>, rng: &mut AesRng) {
     let addr = rl.readline("Address? >> ").unwrap();
     let port = rl.readline("Port? >> ").unwrap();
-    let addr = "[::1]";
 
     let stream = loop {
         match TcpStream::connect(&format!("{}:{}", addr, port)) {
@@ -67,6 +66,10 @@ fn sender(rl: &mut Editor<()>, rng: &mut AesRng) {
     println!("Performing private set intersection.");
     let payload_keys = sender.send_payloads(&inputs, &mut channel, rng).unwrap();
     println!("PSI took {} seconds.", start.elapsed().unwrap().as_secs());
+    println!(
+        "PSI communication: {:.2} megabytes",
+        channel.total_kilobytes() / 1024.0
+    );
 
     let cardinality = channel.read_usize().unwrap();
 
@@ -135,9 +138,8 @@ fn sender(rl: &mut Editor<()>, rng: &mut AesRng) {
 }
 
 fn receiver(rl: &mut Editor<()>, rng: &mut AesRng) {
-    // let port = rl.readline("Port? >> ").unwrap();
+    let port = rl.readline("Port? >> ").unwrap();
     let addr = "[::1]";
-    let port = "12345";
 
     println!("Waiting for connection from sender.");
     let (stream, addr) = TcpListener::bind(format!("{}:{}", addr, port))
@@ -175,6 +177,10 @@ fn receiver(rl: &mut Editor<()>, rng: &mut AesRng) {
         .collect();
     println!("Intersection size: {}.", payload_keys.len());
     println!("PSI took {} seconds.", start.elapsed().unwrap().as_secs());
+    println!(
+        "PSI communication: {:.2} megabytes",
+        channel.total_kilobytes() / 1024.0
+    );
 
     println!("Sending cardinality to Sender.");
     channel.write_usize(payload_keys.len()).unwrap();
