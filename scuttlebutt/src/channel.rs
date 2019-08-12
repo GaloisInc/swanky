@@ -57,6 +57,22 @@ pub trait AbstractChannel {
         Ok(data[0] != 0)
     }
 
+    /// Write a `u8` to the channel.
+    #[inline(always)]
+    fn write_u8(&mut self, s: u8) -> Result<()> {
+        let data = [s];
+        self.write_bytes(&data)?;
+        Ok(())
+    }
+
+    /// Read a `u8` from the channel.
+    #[inline(always)]
+    fn read_u8(&mut self) -> Result<u8> {
+        let mut data = [0];
+        self.read_bytes(&mut data)?;
+        Ok(data[0])
+    }
+
     /// Write a `u16` to the channel.
     #[inline(always)]
     fn write_u16(&mut self, s: u16) -> Result<()> {
