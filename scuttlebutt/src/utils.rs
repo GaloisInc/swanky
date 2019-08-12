@@ -6,13 +6,40 @@
 
 //! Useful utility functions.
 
-#[inline]
+/// Pack a bit slice into bytes.
+pub fn pack_bits(bits: &[bool]) -> Vec<u8> {
+    let nbytes = (bits.len() as f64 / 8.0).ceil() as usize;
+    let mut bytes = vec![0; nbytes];
+    for i in 0..nbytes {
+        for j in 0..8 {
+            if 8*i + j >= bits.len() {
+                break;
+            }
+            bytes[i] |= (bits[8*i + j] as u8) << j;
+        }
+    }
+    bytes
+}
+
+/// Unpack a bit vec from a slice of bytes.
+pub fn unpack_bits(bytes: &[u8], size: usize) -> Vec<bool> {
+    let mut bits = Vec::with_capacity(size);
+    for i in 0..bytes.len() {
+        for j in 0..8 {
+            if 8*i + j >= size {
+                break;
+            }
+            bits.push(((bytes[i] >> j) & 1) != 0);
+        }
+    }
+    bits
+}
+
 /// XOR two byte arrays, outputting the result.
 pub fn xor(a: &[u8], b: &[u8]) -> Vec<u8> {
     a.iter().zip(b.iter()).map(|(a, b)| a ^ b).collect()
 }
 
-#[inline]
 /// XOR two byte arrays up to `n` bytes, outputting the result.
 pub fn xor_n(a: &[u8], b: &[u8], n: usize) -> Vec<u8> {
     a[0..n]
@@ -23,14 +50,12 @@ pub fn xor_n(a: &[u8], b: &[u8], n: usize) -> Vec<u8> {
 }
 
 /// XOR two byte arrays in place.
-#[inline]
 pub fn xor_inplace(a: &mut [u8], b: &[u8]) {
     for (a, b) in a.iter_mut().zip(b.iter()) {
         *a ^= *b;
     }
 }
 
-#[inline]
 /// XOR two byte arrays up to `n` bytes in place.
 pub fn xor_inplace_n(a: &mut [u8], b: &[u8], n: usize) {
     for (a, b) in a[0..n].iter_mut().zip(b.iter()) {
@@ -38,13 +63,11 @@ pub fn xor_inplace_n(a: &mut [u8], b: &[u8], n: usize) {
     }
 }
 
-#[inline]
 /// AND two byte arrays, outputting the result.
 pub fn and(a: &[u8], b: &[u8]) -> Vec<u8> {
     a.iter().zip(b.iter()).map(|(a, b)| a & b).collect()
 }
 
-#[inline]
 /// AND two byte arrays in place.
 pub fn and_inplace(a: &mut [u8], b: &[u8]) {
     for (a, b) in a.iter_mut().zip(b.iter()) {

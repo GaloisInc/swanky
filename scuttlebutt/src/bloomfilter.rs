@@ -57,30 +57,12 @@ impl BloomFilter {
 
     /// Get bloom filter bins packed in bytes.
     pub fn as_bytes(&self) -> Vec<u8> {
-        let nbytes = (self.len() as f64 / 8.0).ceil() as usize;
-        let mut bytes = vec![0; nbytes];
-        for i in 0..bytes.len() {
-            for j in 0..8 {
-                if 8*i + j >= self.len() {
-                    break;
-                }
-                bytes[i] |= (self.bits[8*i + j] as u8) << j;
-            }
-        }
-        bytes
+        crate::utils::pack_bits(self.bins())
     }
 
     /// Create bloom filter from bytes.
     pub fn from_bytes(bytes: &[u8], size: usize, nhashes: usize) -> Self {
-        let mut bits = vec![false; size];
-        for i in 0..bytes.len() {
-            for j in 0..8 {
-                if 8*i + j >= size {
-                    break;
-                }
-                bits[8*i + j] = ((bytes[i] >> j) & 1) != 0;
-            }
-        }
+        let bits = crate::utils::unpack_bits(bytes, size);
         BloomFilter { bits, nhashes }
     }
 
