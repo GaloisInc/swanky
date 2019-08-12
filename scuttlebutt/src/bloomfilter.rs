@@ -57,36 +57,28 @@ impl BloomFilter {
 
     /// Get bloom filter bins packed in bytes.
     pub fn as_bytes(&self) -> Vec<u8> {
-        let mut bytes = unsafe { std::mem::transmute::<u64, [u8;8]>( self.len() as u64 ) }.to_vec();
         let nbytes = (self.len() as f64 / 8.0).ceil() as usize;
-        bytes.resize(8 + nbytes, 0);
-        for i in 0..bytes.len() - 8 {
+        let mut bytes = vec![0; nbytes];
+        for i in 0..bytes.len() {
             for j in 0..8 {
                 if 8*i + j >= self.len() {
                     break;
                 }
-                bytes[8 + i] |= (self.bits[8*i + j] as u8) << j;
+                bytes[i] |= (self.bits[8*i + j] as u8) << j;
             }
         }
         bytes
     }
 
     /// Create bloom filter from bytes.
-    pub fn from_bytes(bytes: &[u8], nhashes: usize) -> Self {
-        let mut size_bytes = [0; 8];
-        for i in 0..8 {
-            size_bytes[i] = bytes[i];
-        }
-        let (_, rest) = bytes.split_at(8);
-        let size = unsafe { std::mem::transmute::<[u8;8], u64>(size_bytes) } as usize;
-        println!("size={}", size);
+    pub fn from_bytes(bytes: &[u8], size: usize, nhashes: usize) -> Self {
         let mut bits = vec![false; size];
-        for i in 0..rest.len() {
+        for i in 0..bytes.len() {
             for j in 0..8 {
                 if 8*i + j >= size {
                     break;
                 }
-                bits[8*i + j] = ((rest[i] >> j) & 1) != 0;
+                bits[8*i + j] = ((bytes[i] >> j) & 1) != 0;
             }
         }
         BloomFilter { bits, nhashes }
@@ -141,6 +133,6 @@ mod tests {
             filter.insert(&x);
             assert!(filter.contains(&x));
         }
-        assert_eq!(filter, BloomFilter::from_bytes(&filter.as_bytes(), nhashes));
+        assert_eq!(filter, BloomFilter::from_bytes(&filter.as_bytes(), n, nhashes));
     }
 }
