@@ -74,6 +74,40 @@ pub trait AbstractChannel {
         Ok(s)
     }
 
+    /// Write a `u32` to the channel.
+    #[inline(always)]
+    fn write_u32(&mut self, s: u32) -> Result<()> {
+        let data: [u8; 4] = unsafe { std::mem::transmute(s) };
+        self.write_bytes(&data)?;
+        Ok(())
+    }
+
+    /// Read a `u32` from the channel.
+    #[inline(always)]
+    fn read_u32(&mut self) -> Result<u32> {
+        let mut data = [0u8; 4];
+        self.read_bytes(&mut data)?;
+        let s = unsafe { std::mem::transmute(data) };
+        Ok(s)
+    }
+
+    /// Write a `u64` to the channel.
+    #[inline(always)]
+    fn write_u64(&mut self, s: u64) -> Result<()> {
+        let data: [u8; 8] = unsafe { std::mem::transmute(s) };
+        self.write_bytes(&data)?;
+        Ok(())
+    }
+
+    /// Read a `u64` from the channel.
+    #[inline(always)]
+    fn read_u64(&mut self) -> Result<u64> {
+        let mut data = [0u8; 8];
+        self.read_bytes(&mut data)?;
+        let s = unsafe { std::mem::transmute(data) };
+        Ok(s)
+    }
+
     /// Write a `usize` to the channel.
     #[inline(always)]
     fn write_usize(&mut self, s: usize) -> Result<()> {
