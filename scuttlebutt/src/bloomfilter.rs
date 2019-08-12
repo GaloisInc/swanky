@@ -45,6 +45,53 @@ impl BloomFilter {
         self.bits.len()
     }
 
+    /// Get the number of hash functions in this BloomFilter.
+    pub fn nhashes(&self) -> usize {
+        self.nhashes
+    }
+
+    /// Get bloom filter bins.
+    pub fn bins(&self) -> Vec<bool> {
+        self.bits.clone()
+    }
+
+    /// Get bloom filter bins packed in bytes.
+    pub fn as_bytes(&self) -> Vec<u8> {
+        let mut bytes = unsafe { std::mem::transmute::<u64, [u8;8]>( self.len() as u64 ) }.to_vec();
+        let nbytes = (self.len() as f64 / 8.0).ceil() as usize;
+        bytes.resize(8 + nbytes, 0);
+        for i in 0..bytes.len() - 8 {
+            for j in 0..8 {
+                if 8*i + j >= self.len() {
+                    break;
+                }
+                bytes[8 + i] |= (self.bits[8*i + j] as u8) << j;
+            }
+        }
+        bytes
+    }
+
+    /// Create bloom filter from bytes.
+    pub fn from_bytes(bytes: &[u8], nhashes: usize) -> Self {
+        let mut size_bytes = [0; 8];
+        for i in 0..8 {
+            size_bytes[i] = bytes[i];
+        }
+        let (_, rest) = bytes.split_at(8);
+        let size = unsafe { std::mem::transmute::<[u8;8], u64>(size_bytes) } as usize;
+        println!("size={}", size);
+        let mut bits = vec![false; size];
+        for i in 0..rest.len() {
+            for j in 0..8 {
+                if 8*i + j >= size {
+                    break;
+                }
+                bits[8*i + j] = ((rest[i] >> j) & 1) != 0;
+            }
+        }
+        BloomFilter { bits, nhashes }
+    }
+
     /// Compute the bin that this value would go to in a BloomFilter.
     ///
     /// Result must be modded by the actual size of the bloom filter to avoid out of
@@ -86,11 +133,14 @@ mod tests {
     #[test]
     fn test_bloom_filter_membership() {
         let mut rng = AesRng::new();
-        let mut filter = BloomFilter::new(1000, 3);
+        let n = 1000;
+        let nhashes = 3;
+        let mut filter = BloomFilter::new(n, nhashes);
         for _ in 0..128 {
             let x = rng.gen::<Block>();
             filter.insert(&x);
             assert!(filter.contains(&x));
         }
+        assert_eq!(filter, BloomFilter::from_bytes(&filter.as_bytes(), nhashes));
     }
 }
