@@ -30,6 +30,7 @@ pub enum Error {
     InvalidPayloadsLength,
     /// SSL Error
     SSLError(openssl::error::ErrorStack),
+    #[cfg(feature = "psty")]
     /// An error occurred in the underlying 2PC protocol.
     TwopcError(fancy_garbling::errors::TwopacError),
 }
@@ -62,6 +63,7 @@ impl From<scuttlebutt::cointoss::Error> for Error {
     }
 }
 
+#[cfg(feature = "psty")]
 impl From<fancy_garbling::errors::TwopacError> for Error {
     #[inline]
     fn from(e: fancy_garbling::errors::TwopacError) -> Error {
@@ -87,6 +89,7 @@ impl std::fmt::Display for Error {
             Error::PsiProtocolError(s) => write!(f, "PSI protocol error: {}", s),
             Error::InvalidPayloadsLength => write!(f, "Invalid length of payloads!"),
             Error::SSLError(e) => write!(f, "SSL Error: {}", e),
+            #[cfg(feature = "psty")]
             Error::TwopcError(e) => write!(f, "2PC protocol error: {}", e),
         }
     }

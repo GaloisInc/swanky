@@ -5,6 +5,7 @@
 // See LICENSE for licensing information.
 
 pub mod kmprt;
+#[cfg(feature = "psty")]
 pub mod psty;
 pub mod psz;
 
@@ -13,8 +14,10 @@ pub type Sender = psz::Sender;
 /// Private set intersection receiver.
 pub type Receiver = psz::Receiver;
 
+#[cfg(feature = "psty")]
 /// Extended private set intersection sender.
 pub type ExtendedSender = psty::Sender;
+#[cfg(feature = "psty")]
 /// Extended private set intersection receiver.
 pub type ExtendedReceiver = psty::Receiver;
 

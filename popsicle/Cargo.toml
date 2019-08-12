@@ -14,15 +14,16 @@ publish = false
 
 [features]
 nightly = ["rand/nightly", "scuttlebutt/nightly", "ocelot/nightly", "ocelot/nightly"]
+psty = ["fancy-garbling"]
 
 [dependencies]
-fancy-garbling = { path = "../fancy-garbling" }
 ocelot         = { path = "../ocelot" }
 scuttlebutt    = { path = "../scuttlebutt" }
 itertools      = "0.8.0"
 rand           = "0.6.5"
 openssl        = "0.10.23"
 sha2           = "0.8.0"
+fancy-garbling = { path = "../fancy-garbling", optional=true }
 
 [dev-dependencies]
 criterion  = "0.2.11"
@@ -40,11 +41,12 @@ harness = false
 [[bench]]
 name = "psty"
 harness = false
+required-features = ["psty"]
+
+[[example]]
+name = "psty"
+required-features = ["psty"]
 
 [[example]]
 name = "psty-payload"
-harness = false
-
-[[example]]
-name = "secretsister"
-harness = false
+required-features = ["psty"]
