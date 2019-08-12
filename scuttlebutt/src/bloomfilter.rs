@@ -51,8 +51,8 @@ impl BloomFilter {
     }
 
     /// Get bloom filter bins.
-    pub fn bins(&self) -> Vec<bool> {
-        self.bits.clone()
+    pub fn bins(&self) -> &[bool] {
+        &self.bits
     }
 
     /// Get bloom filter bins packed in bytes.
