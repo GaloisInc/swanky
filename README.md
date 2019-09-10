@@ -12,6 +12,9 @@ computation (MPC).
 * **scuttlebutt**: Core MPC-related primitives used by various **swanky**
   libraries.
 
+# A Note on Security
+**swanky** is still **prototype** software. Do not deploy it in production, or trust it with sensitive data.
+
 # License
 
 MIT License
