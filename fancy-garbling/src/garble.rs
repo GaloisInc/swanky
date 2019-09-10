@@ -24,6 +24,8 @@ mod nonstreaming {
     };
     use itertools::Itertools;
     use rand::thread_rng;
+    use rand::SeedableRng;
+    use scuttlebutt::{AesRng, Block};
 
     // helper
     fn garble_test_helper<F>(f: F)
@@ -171,8 +173,9 @@ mod nonstreaming {
 
     #[test] // half_gate_unequal_mods
     fn half_gate_unequal_mods() {
+        let mut rng = AesRng::from_seed(Block::from(0 as u128));
         for q in 3..16 {
-            let ymod = 2 + thread_rng().gen_u16() % 6; // lower mod is capped at 8 for now
+            let ymod = 2 + rng.gen_u16() % 6; // lower mod is capped at 8 for now
             println!("\nTESTING MOD q={} ymod={}", q, ymod);
 
             let mut b = CircuitBuilder::new();
