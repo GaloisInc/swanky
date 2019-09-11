@@ -373,7 +373,7 @@ impl Wire {
     /// Compute the hash of this wire.
     ///
     /// Uses fixed-key AES.
-    #[inline]
+    #[inline(never)]
     pub fn hash(&self, tweak: Block) -> Block {
         AES_HASH.tccr_hash(tweak, self.as_block())
     }
