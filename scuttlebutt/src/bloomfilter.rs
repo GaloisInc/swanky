@@ -37,7 +37,10 @@ impl BloomFilter {
     /// Create a new BloomFilter with false positive probability `p` which can support up
     /// to `n` insertions.
     pub fn with_false_positive_prob(p: f64, n: usize) -> Self {
-        Self::new((Self::compute_expansion(p) * n as f64).ceil() as usize, Self::compute_nhashes(p))
+        Self::new(
+            (Self::compute_expansion(p) * n as f64).ceil() as usize,
+            Self::compute_nhashes(p),
+        )
     }
 
     /// Get the number of bins in this BloomFilter.
@@ -115,6 +118,9 @@ mod tests {
             filter.insert(&x);
             assert!(filter.contains(&x));
         }
-        assert_eq!(filter, BloomFilter::from_bytes(&filter.as_bytes(), n, nhashes));
+        assert_eq!(
+            filter,
+            BloomFilter::from_bytes(&filter.as_bytes(), n, nhashes)
+        );
     }
 }

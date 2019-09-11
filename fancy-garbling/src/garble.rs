@@ -23,8 +23,7 @@ mod nonstreaming {
         util::{self, RngExt},
     };
     use itertools::Itertools;
-    use rand::thread_rng;
-    use rand::SeedableRng;
+    use rand::{thread_rng, SeedableRng};
     use scuttlebutt::{AesRng, Block};
 
     // helper

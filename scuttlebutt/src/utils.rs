@@ -12,10 +12,10 @@ pub fn pack_bits(bits: &[bool]) -> Vec<u8> {
     let mut bytes = vec![0; nbytes];
     for i in 0..nbytes {
         for j in 0..8 {
-            if 8*i + j >= bits.len() {
+            if 8 * i + j >= bits.len() {
                 break;
             }
-            bytes[i] |= (bits[8*i + j] as u8) << j;
+            bytes[i] |= (bits[8 * i + j] as u8) << j;
         }
     }
     bytes
@@ -26,7 +26,7 @@ pub fn unpack_bits(bytes: &[u8], size: usize) -> Vec<bool> {
     let mut bits = Vec::with_capacity(size);
     for i in 0..bytes.len() {
         for j in 0..8 {
-            if 8*i + j >= size {
+            if 8 * i + j >= size {
                 break;
             }
             bits.push(((bytes[i] >> j) & 1) != 0);
