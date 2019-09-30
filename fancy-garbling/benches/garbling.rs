@@ -12,9 +12,9 @@ where
     F: Fn(u16) -> Circuit,
 {
     c.bench_function(&format!("garbling::{}_gb ({})", name, q), move |bench| {
-        let mut c = make_circuit(q);
+        let c = make_circuit(q);
         bench.iter(|| {
-            let gb = garble(&mut c).unwrap();
+            let gb = garble(&c).unwrap();
             criterion::black_box(gb);
         });
     });
@@ -26,14 +26,14 @@ where
 {
     c.bench_function(&format!("garbling::{}_ev ({})", name, q), move |bench| {
         let mut rng = rand::thread_rng();
-        let mut c = make_circuit(q);
-        let (en, ev) = garble(&mut c).unwrap();
+        let c = make_circuit(q);
+        let (en, ev) = garble(&c).unwrap();
         let inps = (0..c.num_garbler_inputs())
             .map(|i| rng.gen_u16() % c.garbler_input_mod(i))
             .collect::<Vec<u16>>();
         let xs = en.encode_garbler_inputs(&inps);
         bench.iter(|| {
-            let ys = ev.eval(&mut c, &xs, &[]).unwrap();
+            let ys = ev.eval(&c, &xs, &[]).unwrap();
             criterion::black_box(ys);
         });
     });

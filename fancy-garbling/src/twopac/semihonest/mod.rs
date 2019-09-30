@@ -126,11 +126,11 @@ mod tests {
 
     #[test]
     fn test_aes() {
-        let mut circ = Circuit::parse("circuits/AES-non-expanded.txt").unwrap();
+        let circ = Circuit::parse("circuits/AES-non-expanded.txt").unwrap();
 
         circ.print_info().unwrap();
 
-        let mut circ_ = circ.clone();
+        let circ_ = circ.clone();
         let (sender, receiver) = UnixStream::pair().unwrap();
         let handle = std::thread::spawn(move || {
             let rng = AesRng::new();

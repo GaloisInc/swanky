@@ -180,7 +180,7 @@ mod tests {
 
     #[test]
     fn test_parser() {
-        let mut circ = Circuit::parse("circuits/AES-non-expanded.txt").unwrap();
+        let circ = Circuit::parse("circuits/AES-non-expanded.txt").unwrap();
         let key = vec![0u16; 128];
         let pt = vec![0u16; 128];
         let output = circ.eval_plain(&pt, &key).unwrap();

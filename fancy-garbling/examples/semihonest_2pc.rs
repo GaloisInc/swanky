@@ -27,7 +27,7 @@ fn circuit(fname: &str) -> Circuit {
 }
 
 fn run_circuit(circ: &mut Circuit, gb_inputs: Vec<u16>, ev_inputs: Vec<u16>) {
-    let mut circ_ = circ.clone();
+    let circ_ = circ.clone();
     let (sender, receiver) = UnixStream::pair().unwrap();
     let n_gb_inputs = gb_inputs.len();
     let n_ev_inputs = ev_inputs.len();

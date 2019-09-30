@@ -41,7 +41,7 @@ impl GarbledCircuit {
     /// Evaluate the garbled circuit.
     pub fn eval(
         &self,
-        c: &mut Circuit,
+        c: &Circuit,
         garbler_inputs: &[Wire],
         evaluator_inputs: &[Wire],
     ) -> Result<Vec<u16>, EvaluatorError> {
@@ -53,7 +53,7 @@ impl GarbledCircuit {
 }
 
 /// Garble a circuit without streaming.
-pub fn garble(c: &mut Circuit) -> Result<(Encoder, GarbledCircuit), GarblerError> {
+pub fn garble(c: &Circuit) -> Result<(Encoder, GarbledCircuit), GarblerError> {
     let channel = Channel::new(
         GarbledReader::new(&[]),
         GarbledWriter::new(Some(c.num_nonfree_gates)),

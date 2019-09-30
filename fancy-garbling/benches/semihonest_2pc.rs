@@ -28,8 +28,8 @@ fn circuit(fname: &str) -> Circuit {
     Circuit::parse(fname).unwrap()
 }
 
-fn _bench_circuit(circ: &mut Circuit, gb_inputs: Vec<u16>, ev_inputs: Vec<u16>) {
-    let mut circ_ = circ.clone();
+fn _bench_circuit(circ: &Circuit, gb_inputs: Vec<u16>, ev_inputs: Vec<u16>) {
+    let circ_ = circ.clone();
     let (sender, receiver) = UnixStream::pair().unwrap();
     let n_gb_inputs = gb_inputs.len();
     let n_ev_inputs = ev_inputs.len();
@@ -55,23 +55,23 @@ fn _bench_circuit(circ: &mut Circuit, gb_inputs: Vec<u16>, ev_inputs: Vec<u16>) 
 }
 
 fn bench_aes(c: &mut Criterion) {
-    let mut circ = circuit("circuits/AES-non-expanded.txt");
+    let circ = circuit("circuits/AES-non-expanded.txt");
     c.bench_function("twopac::semi-honest (AES)", move |bench| {
-        bench.iter(|| _bench_circuit(&mut circ, vec![0u16; 128], vec![0u16; 128]))
+        bench.iter(|| _bench_circuit(&circ, vec![0u16; 128], vec![0u16; 128]))
     });
 }
 
 fn bench_sha_1(c: &mut Criterion) {
-    let mut circ = circuit("circuits/sha-1.txt");
+    let circ = circuit("circuits/sha-1.txt");
     c.bench_function("twopac::semi-honest (SHA-1)", move |bench| {
-        bench.iter(|| _bench_circuit(&mut circ, vec![0u16; 512], vec![]))
+        bench.iter(|| _bench_circuit(&circ, vec![0u16; 512], vec![]))
     });
 }
 
 fn bench_sha_256(c: &mut Criterion) {
-    let mut circ = circuit("circuits/sha-256.txt");
+    let circ = circuit("circuits/sha-256.txt");
     c.bench_function("twopac::semi-honest (SHA-256)", move |bench| {
-        bench.iter(|| _bench_circuit(&mut circ, vec![0u16; 512], vec![]))
+        bench.iter(|| _bench_circuit(&circ, vec![0u16; 512], vec![]))
     });
 }
 

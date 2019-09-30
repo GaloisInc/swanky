@@ -129,7 +129,7 @@ impl Circuit {
 
     /// Evaluate the circuit using fancy object `f`.
     pub fn eval<F: Fancy>(
-        &mut self,
+        &self,
         f: &mut F,
         garbler_inputs: &[F::Item],
         evaluator_inputs: &[F::Item],
@@ -221,7 +221,7 @@ impl Circuit {
 
     /// Evaluate the circuit in plaintext.
     pub fn eval_plain(
-        &mut self,
+        &self,
         garbler_inputs: &[u16],
         evaluator_inputs: &[u16],
     ) -> Result<Vec<u16>, DummyError> {
@@ -252,7 +252,7 @@ impl Circuit {
     }
 
     /// Print circuit info.
-    pub fn print_info(&mut self) -> Result<(), DummyError> {
+    pub fn print_info(&self) -> Result<(), DummyError> {
         let mut informer = crate::informer::Informer::new(Dummy::new());
 
         // encode inputs as InformerVals
@@ -524,7 +524,7 @@ mod plaintext {
         let inps = b.evaluator_inputs(&vec![2; n]);
         let z = b.and_many(&inps).unwrap();
         b.output(&z).unwrap();
-        let mut c = b.finish();
+        let c = b.finish();
 
         for _ in 0..16 {
             let mut inps: Vec<u16> = Vec::new();
@@ -548,7 +548,7 @@ mod plaintext {
         let inps = b.evaluator_inputs(&vec![2; n]);
         let z = b.or_many(&inps).unwrap();
         b.output(&z).unwrap();
-        let mut c = b.finish();
+        let c = b.finish();
 
         for _ in 0..16 {
             let mut inps: Vec<u16> = Vec::new();
@@ -573,7 +573,7 @@ mod plaintext {
         let y = b.evaluator_input(q);
         let z = b.mul(&x, &y).unwrap();
         b.output(&z).unwrap();
-        let mut c = b.finish();
+        let c = b.finish();
         for _ in 0..16 {
             let x = rng.gen_u16() % q;
             let y = rng.gen_u16() % q;
@@ -592,7 +592,7 @@ mod plaintext {
         let y = b.mod_change(&x, q).unwrap();
         let z = b.mod_change(&y, p).unwrap();
         b.output(&z).unwrap();
-        let mut c = b.finish();
+        let c = b.finish();
         for _ in 0..16 {
             let x = rng.gen_u16() % p;
             let out = c.eval_plain(&[x], &[]).unwrap();
@@ -611,7 +611,7 @@ mod plaintext {
             .collect_vec();
         let s = b.add_many(&wires).unwrap();
         b.output(&s).unwrap();
-        let mut c = b.finish();
+        let c = b.finish();
 
         let mut rng = thread_rng();
         for _ in 0..64 {
@@ -638,7 +638,7 @@ mod plaintext {
         let z = b.add(&x, &y).unwrap();
         b.output(&z).unwrap();
 
-        let mut circ = b.finish();
+        let circ = b.finish();
 
         for _ in 0..64 {
             let x = rng.gen_u16() % q;
@@ -668,7 +668,7 @@ mod bundle {
         let x = b.crt_garbler_input(q);
         println!("{:?} wires", x.wires().len());
         b.output_bundle(&x).unwrap();
-        let mut c = b.finish();
+        let c = b.finish();
 
         println!("{:?}", c.output_refs);
 
@@ -692,7 +692,7 @@ mod bundle {
         let y = b.crt_evaluator_input(q);
         let z = b.crt_add(&x, &y).unwrap();
         b.output_bundle(&z).unwrap();
-        let mut c = b.finish();
+        let c = b.finish();
 
         for _ in 0..16 {
             let x = rng.gen_u128() % q;
@@ -713,7 +713,7 @@ mod bundle {
         let y = b.crt_evaluator_input(q);
         let z = b.sub_bundles(&x, &y).unwrap();
         b.output_bundle(&z).unwrap();
-        let mut c = b.finish();
+        let c = b.finish();
 
         for _ in 0..16 {
             let x = rng.gen_u128() % q;
@@ -734,7 +734,7 @@ mod bundle {
         let y = rng.gen_u128() % q;
         let z = b.crt_cmul(&x, y).unwrap();
         b.output_bundle(&z).unwrap();
-        let mut c = b.finish();
+        let c = b.finish();
 
         for _ in 0..16 {
             let x = rng.gen_u128() % q;
@@ -754,7 +754,7 @@ mod bundle {
         let y = b.crt_evaluator_input(q);
         let z = b.mul_bundles(&x, &y).unwrap();
         b.output_bundle(&z).unwrap();
-        let mut c = b.finish();
+        let c = b.finish();
 
         for _ in 0..16 {
             let x = rng.gen_u64() as u128 % q;
@@ -775,7 +775,7 @@ mod bundle {
         let x = b.crt_garbler_input(q);
         let z = b.crt_cexp(&x, y).unwrap();
         b.output_bundle(&z).unwrap();
-        let mut c = b.finish();
+        let c = b.finish();
 
         for _ in 0..64 {
             let x = rng.gen_u16() as u128 % q;
@@ -797,7 +797,7 @@ mod bundle {
         let x = b.crt_garbler_input(q);
         let z = b.crt_rem(&x, p).unwrap();
         b.output_bundle(&z).unwrap();
-        let mut c = b.finish();
+        let c = b.finish();
 
         for _ in 0..64 {
             let x = rng.gen_u128() % q;
@@ -818,7 +818,7 @@ mod bundle {
         let y = b.crt_evaluator_input(q);
         let z = b.eq_bundles(&x, &y).unwrap();
         b.output(&z).unwrap();
-        let mut c = b.finish();
+        let c = b.finish();
 
         // lets have at least one test where they are surely equal
         let x = rng.gen_u128() % q;
@@ -846,7 +846,7 @@ mod bundle {
             .collect_vec();
         let z = b.mixed_radix_addition(&xs).unwrap();
         b.output_bundle(&z).unwrap();
-        let mut circ = b.finish();
+        let circ = b.finish();
 
         let Q: u128 = mods.iter().map(|&q| q as u128).product();
 
@@ -885,7 +885,7 @@ mod bundle {
         let x = b.crt_garbler_input(q);
         let z = b.crt_relu(&x, "100%", None).unwrap();
         b.output_bundle(&z).unwrap();
-        let mut c = b.finish();
+        let c = b.finish();
 
         for _ in 0..128 {
             let pt = rng.gen_u128() % q;
@@ -906,7 +906,7 @@ mod bundle {
         let x = b.crt_garbler_input(q);
         let z = b.crt_sgn(&x, "100%", None).unwrap();
         b.output_bundle(&z).unwrap();
-        let mut c = b.finish();
+        let c = b.finish();
 
         for _ in 0..128 {
             let pt = rng.gen_u128() % q;
@@ -927,7 +927,7 @@ mod bundle {
         let y = b.crt_evaluator_input(q);
         let z = b.crt_lt(&x, &y, "100%").unwrap();
         b.output(&z).unwrap();
-        let mut c = b.finish();
+        let c = b.finish();
 
         // lets have at least one test where they are surely equal
         let x = rng.gen_u128() % q / 2;
@@ -953,7 +953,7 @@ mod bundle {
         let xs = (0..n).map(|_| b.crt_garbler_input(q)).collect_vec();
         let z = b.crt_max(&xs, "100%").unwrap();
         b.output_bundle(&z).unwrap();
-        let mut c = b.finish();
+        let c = b.finish();
 
         for _ in 0..16 {
             let inps = (0..n).map(|_| rng.gen_u128() % (q / 2)).collect_vec();
@@ -984,7 +984,7 @@ mod bundle {
         let (zs, carry) = b.bin_addition(&x, &y).unwrap();
         b.output(&carry).unwrap();
         b.output_bundle(&zs).unwrap();
-        let mut c = b.finish();
+        let c = b.finish();
 
         for _ in 0..16 {
             let x = rng.gen_u128() % Q;
@@ -1010,7 +1010,7 @@ mod bundle {
         let x = b.bin_garbler_input(nbits);
         let d = b.bin_demux(&x).unwrap();
         b.outputs(&d).unwrap();
-        let mut c = b.finish();
+        let c = b.finish();
 
         for _ in 0..16 {
             let x = rng.gen_u128() % Q;
