@@ -77,7 +77,7 @@ fn run_circuit(circ: &mut Circuit, gb_inputs: Vec<u16>, ev_inputs: Vec<u16>) {
     let start = SystemTime::now();
     circ.eval(&mut ev, &xs, &ys).unwrap();
     println!(
-        "Garbler :: Circuit evaluation: {} ms",
+        "Evaluator :: Circuit evaluation: {} ms",
         start.elapsed().unwrap().as_millis()
     );
     handle.join().unwrap();
