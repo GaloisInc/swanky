@@ -1,18 +1,12 @@
 ![fancy garbling logo](logo.png)
 
 # `fancy-garbling`: Library for garbling boolean (+ arithmetic!) circuits
-[![](https://travis-ci.org/GaloisInc/fancy-garbling.svg?branch=master)](https://travis-ci.org/GaloisInc/fancy-garbling)
 
 `fancy-garbling` implements the [BMR16](https://eprint.iacr.org/2016/969)
 arithmetic garbling scheme, plus some additional bonus features.
 
 **`fancy-garbling` should be considered extremely unstable and under active
 development (and research!)**
-
-# Documentation
-
-[Documentation is here](https://galoisinc.github.io/fancy-garbling/fancy_garbling/).
-Currently, the best usage examples are the tests in [garble.rs](src/garble.rs).
 
 # Building
 
@@ -32,7 +26,7 @@ To use `fancy-garbling` in your project, add the following line to the
 `[dependencies]` entry in `Cargo.toml`:
 
 ```
-fancy_garbling = { git = "https://github.com/spaceships/fancy-garbling" }
+fancy_garbling = { git = "https://github.com/GaloisInc/fancy-garbling" }
 ```
 
 # License
