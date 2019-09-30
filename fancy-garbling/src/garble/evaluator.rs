@@ -33,7 +33,6 @@ impl<C: AbstractChannel> Evaluator<C> {
     }
 
     /// The current non-free gate index of the garbling computation.
-    #[inline]
     fn current_gate(&mut self) -> usize {
         let current = self.current_gate;
         self.current_gate += 1;
@@ -41,7 +40,6 @@ impl<C: AbstractChannel> Evaluator<C> {
     }
 
     /// The current output index of the garbling computation.
-    #[inline]
     fn current_output(&mut self) -> usize {
         let current = self.current_output;
         self.current_output += 1;
@@ -49,7 +47,6 @@ impl<C: AbstractChannel> Evaluator<C> {
     }
 
     /// Read a Wire from the reader.
-    #[inline]
     pub fn read_wire(&mut self, modulus: u16) -> Result<Wire, EvaluatorError> {
         let block = self.channel.read_block()?;
         Ok(Wire::from_block(block, modulus))
@@ -69,12 +66,10 @@ impl<C: AbstractChannel> Fancy for Evaluator<C> {
     type Item = Wire;
     type Error = EvaluatorError;
 
-    #[inline]
     fn constant(&mut self, _: u16, q: u16) -> Result<Wire, EvaluatorError> {
         self.read_wire(q)
     }
 
-    #[inline]
     fn add(&mut self, x: &Wire, y: &Wire) -> Result<Wire, EvaluatorError> {
         if x.modulus() != y.modulus() {
             return Err(EvaluatorError::FancyError(FancyError::UnequalModuli));
@@ -82,7 +77,6 @@ impl<C: AbstractChannel> Fancy for Evaluator<C> {
         Ok(x.plus(y))
     }
 
-    #[inline]
     fn sub(&mut self, x: &Wire, y: &Wire) -> Result<Wire, EvaluatorError> {
         if x.modulus() != y.modulus() {
             return Err(EvaluatorError::FancyError(FancyError::UnequalModuli));
@@ -90,12 +84,10 @@ impl<C: AbstractChannel> Fancy for Evaluator<C> {
         Ok(x.minus(y))
     }
 
-    #[inline]
     fn cmul(&mut self, x: &Wire, c: u16) -> Result<Wire, EvaluatorError> {
         Ok(x.cmul(c))
     }
 
-    #[inline]
     fn mul(&mut self, A: &Wire, B: &Wire) -> Result<Wire, EvaluatorError> {
         if A.modulus() < B.modulus() {
             return self.mul(B, A);
@@ -144,7 +136,6 @@ impl<C: AbstractChannel> Fancy for Evaluator<C> {
         Ok(res)
     }
 
-    #[inline]
     fn proj(&mut self, x: &Wire, q: u16, _: Option<Vec<u16>>) -> Result<Wire, EvaluatorError> {
         let ngates = (x.modulus() - 1) as usize;
         let mut gate = Vec::with_capacity(ngates);
@@ -161,7 +152,6 @@ impl<C: AbstractChannel> Fancy for Evaluator<C> {
         }
     }
 
-    #[inline]
     fn output(&mut self, x: &Wire) -> Result<Option<u16>, EvaluatorError> {
         let q = x.modulus();
         let i = self.current_output();

@@ -99,7 +99,7 @@ impl Wire {
         }
         // Drop the digits we won't be able to pack back in again, especially if
         // they get multiplied.
-        ds.truncate(util::digits_per_u128(q));
+        // ds.truncate(util::digits_per_u128(q));
         Wire::ModN { q, ds }
     }
 

@@ -85,7 +85,7 @@ mod tests {
     }
 
     #[test]
-    fn test_complex_circuit() {
+    fn test_relu() {
         let mut rng = rand::thread_rng();
         let n = 10;
         let ps = crate::util::primes_with_width(10);

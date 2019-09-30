@@ -201,6 +201,9 @@ pub trait CrtGadgets: Fancy + BundleGadgets {
                 }
             }
 
+            println!("tabs = {:?}", tabs);
+            println!("ms = {:?}", ms);
+
             let new_ds = tabs
                 .into_iter()
                 .enumerate()
