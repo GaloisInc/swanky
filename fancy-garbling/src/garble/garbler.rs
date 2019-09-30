@@ -75,7 +75,7 @@ impl<C: AbstractChannel, RNG: CryptoRng + RngCore> Garbler<C, RNG> {
         self.deltas
     }
 
-    /// Send a wire using the Sender.
+    /// Send a wire over the established channel.
     #[inline]
     pub fn send_wire(&mut self, wire: &Wire) -> Result<(), GarblerError> {
         self.channel.write_block(&wire.as_block())?;
@@ -112,7 +112,7 @@ impl<C: AbstractChannel, RNG: CryptoRng + RngCore> Garbler<C, RNG> {
         Ok((gbs, evs))
     }
 
-    /// Encode a CrtBundle, producing the zero wires as well as the encoded values.
+    /// Encode a `CrtBundle`, producing zero wires as well as encoded values.
     #[inline]
     pub fn crt_encode_wire(
         &mut self,
@@ -125,7 +125,7 @@ impl<C: AbstractChannel, RNG: CryptoRng + RngCore> Garbler<C, RNG> {
         Ok((CrtBundle::new(gbs), CrtBundle::new(evs)))
     }
 
-    /// Encode a BinaryBundle, producing the zero wires as well as the encoded values.
+    /// Encode a `BinaryBundle`, producing zero wires as well as encoded values.
     #[inline]
     pub fn bin_encode_wire(
         &mut self,
