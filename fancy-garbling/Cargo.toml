@@ -24,10 +24,9 @@ ocelot = { path = "../ocelot" }
 itertools = "0.8.0"
 rand = "0.6.5"
 regex = "1.1.7"
-bigint = "4.4.1"
 
 [dev-dependencies]
-criterion = "0.2.11"
+criterion = "0.3.0"
 crossbeam = "0.7.1"
 
 [[bench]]
@@ -49,4 +48,3 @@ harness = false
 [[bench]]
 name = "semihonest_2pc"
 harness = false
-
