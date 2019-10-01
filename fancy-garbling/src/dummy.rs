@@ -305,7 +305,8 @@ mod bundle {
         for _ in 0..NITERS {
             let x = rng.gen_u128() % q;
             let y = rng.gen_u128() % q;
-            let should_be = (x - y) % q;
+            let (should_be, _) = x.overflowing_sub(y);
+            let should_be = should_be % q;
             let mut d = Dummy::new();
             let overflow;
             let out;
@@ -438,7 +439,7 @@ mod bundle {
     fn binary_demux() {
         let mut rng = thread_rng();
         for _ in 0..NITERS {
-            let nbits = 64;
+            let nbits = 8;
             let q = 1 << nbits;
             let x = rng.gen_u128() % q;
             let mut d = Dummy::new();

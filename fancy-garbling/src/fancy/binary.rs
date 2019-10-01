@@ -348,6 +348,11 @@ pub trait BinaryGadgets: Fancy + BundleGadgets {
     fn bin_demux(&mut self, x: &BinaryBundle<Self::Item>) -> Result<Vec<Self::Item>, Self::Error> {
         let wires = x.wires();
         let nbits = wires.len();
+        if nbits > 8 {
+            return Err(Self::Error::from(FancyError::InvalidArg(
+                "wire bitlength too large".to_string(),
+            )));
+        }
 
         let mut outs = Vec::with_capacity(1 << nbits);
 

@@ -55,7 +55,6 @@ impl std::default::Default for Wire {
 }
 
 impl HasModulus for Wire {
-    #[inline]
     fn modulus(&self) -> u16 {
         match self {
             Wire::Mod2 { .. } => 2,
@@ -67,7 +66,6 @@ impl HasModulus for Wire {
 
 impl Wire {
     /// Get the digits of the wire.
-    #[inline]
     pub fn digits(&self) -> Vec<u16> {
         match self {
             Wire::Mod2 { val } => (0..128)
@@ -80,6 +78,7 @@ impl Wire {
         }
     }
 
+    #[inline]
     fn _from_block_lookup(inp: Block, q: u16) -> Self {
         debug_assert!(q < 256);
         debug_assert!(base_conversion::lookup_defined_for_mod(q));
@@ -90,22 +89,15 @@ impl Wire {
         for i in 0..15 {
             let cs = base_conversion::lookup_digits_mod_at_position(bytes[i], q, i);
             util::base_q_add_eq(&mut ds, &cs, q);
-            // for (x,y) in ds.iter_mut().zip(cs.into_iter()) {
-            // *x += y;
-            // if *x >= q {
-            // *x -= q;
-            // }
-            // }
         }
         // Drop the digits we won't be able to pack back in again, especially if
         // they get multiplied.
-        // ds.truncate(util::digits_per_u128(q));
+        ds.truncate(util::digits_per_u128(q));
         Wire::ModN { q, ds }
     }
 
     /// Unpack the wire represented by a `Block` with modulus `q`. Assumes that
     /// the block was constructed through the `Wire` API.
-    #[inline]
     pub fn from_block(inp: Block, q: u16) -> Self {
         if q == 2 {
             Wire::Mod2 { val: inp }
@@ -113,7 +105,7 @@ impl Wire {
             let inp = u128::from(inp);
             let lsb = inp as u64;
             let msb = (inp >> 64) as u64;
-            debug_assert_eq!(lsb & msb, 0);
+            // debug_assert_eq!(lsb & msb, 0);
             Wire::Mod3 { lsb, msb }
         } else if q < 256 && base_conversion::lookup_defined_for_mod(q) {
             Self::_from_block_lookup(inp, q)
@@ -126,7 +118,6 @@ impl Wire {
     }
 
     /// Pack the wire into a `Block`.
-    #[inline]
     pub fn as_block(&self) -> Block {
         match self {
             Wire::Mod2 { val } => *val,
@@ -136,7 +127,6 @@ impl Wire {
     }
 
     /// The zero wire with modulus `q`.
-    #[inline]
     pub fn zero(q: u16) -> Self {
         match q {
             1 => panic!("[Wire::zero] mod 1 not allowed!"),
@@ -155,7 +145,6 @@ impl Wire {
     }
 
     /// Get a random wire label mod `q`, with the first digit set to `1`.
-    #[inline]
     pub fn rand_delta<R: CryptoRng + RngCore>(rng: &mut R, q: u16) -> Self {
         let mut w = Self::rand(rng, q);
         match w {
@@ -176,7 +165,6 @@ impl Wire {
     }
 
     /// Get the color digit of the wire.
-    #[inline]
     pub fn color(&self) -> u16 {
         match self {
             Wire::Mod2 { val } => val.lsb() as u16,
@@ -186,14 +174,12 @@ impl Wire {
     }
 
     /// Add two wires digit-wise, returning a new wire.
-    #[inline]
     pub fn plus(&self, other: &Self) -> Self {
         self.clone().plus_mov(other)
     }
 
     /// Add another wire digit-wise into this one. Assumes that both wires have
     /// the same modulus.
-    #[inline]
     pub fn plus_eq<'a>(&'a mut self, other: &Wire) -> &'a mut Wire {
         match (&mut *self, other) {
             (Wire::Mod2 { val: ref mut x }, Wire::Mod2 { val: ref y }) => {
@@ -238,20 +224,17 @@ impl Wire {
     }
 
     /// Add another wire into this one, consuming it for chained computations.
-    #[inline]
     pub fn plus_mov(mut self, other: &Wire) -> Wire {
         self.plus_eq(other);
         self
     }
 
     /// Multiply each digit by a constant `c mod q`, returning a new wire.
-    #[inline]
     pub fn cmul(&self, c: u16) -> Self {
         self.clone().cmul_mov(c)
     }
 
     /// Multiply each digit by a constant `c mod q`.
-    #[inline]
     pub fn cmul_eq(&mut self, c: u16) -> &mut Wire {
         match self {
             Wire::Mod2 { val } => {
@@ -283,20 +266,17 @@ impl Wire {
     }
 
     /// Multiply each digit by a constant `c mod q`, consuming it for chained computations.
-    #[inline]
     pub fn cmul_mov(mut self, c: u16) -> Wire {
         self.cmul_eq(c);
         self
     }
 
     /// Negate all the digits `mod q`, returning a new wire.
-    #[inline]
     pub fn negate(&self) -> Self {
         self.clone().negate_mov()
     }
 
     /// Negate all the digits mod q.
-    #[inline]
     pub fn negate_eq(&mut self) -> &mut Wire {
         match self {
             Wire::Mod2 { val } => *val = val.flip(),
@@ -318,20 +298,17 @@ impl Wire {
     }
 
     /// Negate all the digits `mod q`, consuming it for chained computations.
-    #[inline]
     pub fn negate_mov(mut self) -> Wire {
         self.negate_eq();
         self
     }
 
     /// Subtract two wires, returning the result.
-    #[inline]
     pub fn minus(&self, other: &Wire) -> Wire {
         self.clone().minus_mov(other)
     }
 
     /// Subtract a wire from this one.
-    #[inline]
     pub fn minus_eq<'a>(&'a mut self, other: &Wire) -> &'a mut Wire {
         match *self {
             Wire::Mod2 { .. } => self.plus_eq(&other),
@@ -340,14 +317,12 @@ impl Wire {
     }
 
     /// Subtract a wire from this one, consuming it for chained computations.
-    #[inline]
     pub fn minus_mov(mut self, other: &Wire) -> Wire {
         self.minus_eq(other);
         self
     }
 
     /// Get a random wire `mod q`.
-    #[inline]
     pub fn rand<R: CryptoRng + RngCore>(rng: &mut R, q: u16) -> Wire {
         if q == 2 {
             Wire::Mod2 { val: rng.gen() }
@@ -381,7 +356,6 @@ impl Wire {
     /// Compute the hash of this wire, converting the result back to a wire.
     ///
     /// Uses fixed-key AES.
-    #[inline]
     pub fn hashback(&self, tweak: Block, q: u16) -> Wire {
         if q == 3 {
             let block = self.hash(tweak);
@@ -392,8 +366,8 @@ impl Wire {
             let mut lsb = 0u64;
             let mut msb = 0u64;
             match Self::_from_block_lookup(block, q) {
-                Wire::ModN { ds, .. } => {
-                    for (i, v) in ds.iter().enumerate() {
+                Wire::ModN { mut ds, .. } => {
+                    for (i, v) in ds.drain(..64).enumerate() {
                         lsb |= ((v & 1) as u64) << i;
                         msb |= (((v >> 1) & 1u16) as u64) << i;
                     }
