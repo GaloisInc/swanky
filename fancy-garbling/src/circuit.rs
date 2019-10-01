@@ -1003,7 +1003,7 @@ mod bundle {
     #[test] // binary demux {{{
     fn test_bin_demux() {
         let mut rng = thread_rng();
-        let nbits = 1 + (rng.gen_usize() % 10);
+        let nbits = 1 + (rng.gen_usize() % 7);
         let Q = 1 << nbits as u128;
 
         let mut b = CircuitBuilder::new();
