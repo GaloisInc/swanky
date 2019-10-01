@@ -12,7 +12,7 @@ use scuttlebutt::{AbstractChannel, Block, SemiHonest};
 /// Semi-honest garbler.
 pub struct Garbler<C, RNG, OT> {
     garbler: Gb<C, RNG>,
-    channel: C,
+    pub channel: C,
     ot: OT,
     rng: RNG,
 }
@@ -48,7 +48,11 @@ impl<
         })
     }
 
-    #[inline]
+    /// Get a reference to the internal channel.
+    pub fn get_channel(&mut self) -> &mut C {
+        &mut self.channel
+    }
+
     fn _evaluator_input(&mut self, delta: &Wire, q: u16) -> (Wire, Vec<(Block, Block)>) {
         let len = f32::from(q).log(2.0).ceil() as u16;
         let mut wire = Wire::zero(q);
@@ -117,37 +121,30 @@ impl<C: AbstractChannel, RNG: CryptoRng + Rng, OT> Fancy for Garbler<C, RNG, OT>
     type Item = Wire;
     type Error = TwopacError;
 
-    #[inline]
     fn constant(&mut self, x: u16, q: u16) -> Result<Self::Item, Self::Error> {
         self.garbler.constant(x, q).map_err(Self::Error::from)
     }
 
-    #[inline]
     fn add(&mut self, x: &Wire, y: &Wire) -> Result<Self::Item, Self::Error> {
         self.garbler.add(x, y).map_err(Self::Error::from)
     }
 
-    #[inline]
     fn sub(&mut self, x: &Wire, y: &Wire) -> Result<Self::Item, Self::Error> {
         self.garbler.sub(x, y).map_err(Self::Error::from)
     }
 
-    #[inline]
     fn cmul(&mut self, x: &Wire, c: u16) -> Result<Self::Item, Self::Error> {
         self.garbler.cmul(x, c).map_err(Self::Error::from)
     }
 
-    #[inline]
     fn mul(&mut self, x: &Wire, y: &Wire) -> Result<Self::Item, Self::Error> {
         self.garbler.mul(x, y).map_err(Self::Error::from)
     }
 
-    #[inline]
     fn proj(&mut self, x: &Wire, q: u16, tt: Option<Vec<u16>>) -> Result<Self::Item, Self::Error> {
         self.garbler.proj(x, q, tt).map_err(Self::Error::from)
     }
 
-    #[inline]
     fn output(&mut self, x: &Self::Item) -> Result<Option<u16>, Self::Error> {
         self.garbler.output(x).map_err(Self::Error::from)
     }
