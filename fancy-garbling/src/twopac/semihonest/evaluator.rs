@@ -17,6 +17,9 @@ pub struct Evaluator<C, RNG, OT> {
     rng: RNG,
 }
 
+impl<C, RNG, OT> Evaluator<C, RNG, OT> {
+}
+
 impl<C: AbstractChannel, RNG: CryptoRng + Rng, OT: OtReceiver<Msg = Block> + SemiHonest>
     Evaluator<C, RNG, OT>
 {
@@ -30,6 +33,11 @@ impl<C: AbstractChannel, RNG: CryptoRng + Rng, OT: OtReceiver<Msg = Block> + Sem
             ot,
             rng,
         })
+    }
+
+    /// Get a reference to the internal channel.
+    pub fn get_channel(&mut self) -> &mut C {
+        &mut self.channel
     }
 
     fn run_ot(&mut self, inputs: &[bool]) -> Result<Vec<Block>, TwopacError> {
@@ -93,37 +101,30 @@ impl<C: AbstractChannel, RNG, OT> Fancy for Evaluator<C, RNG, OT> {
     type Item = Wire;
     type Error = TwopacError;
 
-    #[inline]
     fn constant(&mut self, x: u16, q: u16) -> Result<Self::Item, Self::Error> {
         self.evaluator.constant(x, q).map_err(Self::Error::from)
     }
 
-    #[inline]
     fn add(&mut self, x: &Wire, y: &Wire) -> Result<Self::Item, Self::Error> {
         self.evaluator.add(&x, &y).map_err(Self::Error::from)
     }
 
-    #[inline]
     fn sub(&mut self, x: &Wire, y: &Wire) -> Result<Self::Item, Self::Error> {
         self.evaluator.sub(&x, &y).map_err(Self::Error::from)
     }
 
-    #[inline]
     fn cmul(&mut self, x: &Wire, c: u16) -> Result<Self::Item, Self::Error> {
         self.evaluator.cmul(&x, c).map_err(Self::Error::from)
     }
 
-    #[inline]
     fn mul(&mut self, x: &Wire, y: &Wire) -> Result<Self::Item, Self::Error> {
         self.evaluator.mul(&x, &y).map_err(Self::Error::from)
     }
 
-    #[inline]
     fn proj(&mut self, x: &Wire, q: u16, tt: Option<Vec<u16>>) -> Result<Self::Item, Self::Error> {
         self.evaluator.proj(&x, q, tt).map_err(Self::Error::from)
     }
 
-    #[inline]
     fn output(&mut self, x: &Wire) -> Result<Option<u16>, Self::Error> {
         self.evaluator.output(&x).map_err(Self::Error::from)
     }
