@@ -54,12 +54,12 @@ impl<R: Read, W: Write> TrackChannel<R, W> {
 
     /// Return the number of kilobytes written to the channel.
     pub fn kilobytes_written(&self) -> f64 {
-        self.nbits_written as f64 / 8192.0
+        self.0.lock().unwrap().nbits_written as f64 / 8192.0
     }
 
     /// Return the number of kilobytes read from the channel.
     pub fn kilobytes_read(&self) -> f64 {
-        self.nbits_read as f64 / 8192.0
+        self.0.lock().unwrap().nbits_read as f64 / 8192.0
     }
 
     /// Return the total amount of communication on the channel as kilobytes.
