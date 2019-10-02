@@ -19,7 +19,7 @@ fn bench_sha_commitment(c: &mut Criterion) {
 
     c.bench_function("ShaCommitment::commit", |b| {
         let seed = rand::random::<[u8; 32]>();
-        let input = rand::random::<[u8; 32]>();;
+        let input = rand::random::<[u8; 32]>();
         b.iter(|| {
             let mut commit = ShaCommitment::new(seed);
             commit.input(&input);

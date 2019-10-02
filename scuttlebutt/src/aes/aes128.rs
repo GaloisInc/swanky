@@ -194,7 +194,7 @@ macro_rules! expand_round {
 #[inline(always)]
 fn expand(key: __m128i) -> [__m128i; 11] {
     unsafe {
-        let mut keys: [__m128i; 11] = std::mem::uninitialized();
+        let mut keys: [__m128i; 11] = std::mem::MaybeUninit::uninit().assume_init();
         _mm_store_si128(keys.as_mut_ptr(), key);
         expand_round!(keys, 1, 0x01);
         expand_round!(keys, 2, 0x02);
