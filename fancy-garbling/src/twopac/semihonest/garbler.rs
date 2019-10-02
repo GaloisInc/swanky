@@ -12,7 +12,7 @@ use scuttlebutt::{AbstractChannel, Block, SemiHonest};
 /// Semi-honest garbler.
 pub struct Garbler<C, RNG, OT> {
     garbler: Gb<C, RNG>,
-    pub channel: C,
+    channel: C,
     ot: OT,
     rng: RNG,
 }
