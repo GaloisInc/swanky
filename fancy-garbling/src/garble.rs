@@ -337,7 +337,7 @@ mod streaming {
             let reader = BufReader::new(sender.try_clone().unwrap());
             let writer = BufWriter::new(sender);
             let channel = Channel::new(reader, writer);
-            let mut gb = Garbler::new(channel, rng, &[]);
+            let mut gb = Garbler::new(channel, rng);
             let (gb_inp, ev_inp) = gb.encode_many_wires(&inputs, &input_mods_).unwrap();
             for w in ev_inp.iter() {
                 gb.send_wire(w).unwrap();
@@ -516,7 +516,7 @@ mod complex {
                 let reader = BufReader::new(sender.try_clone().unwrap());
                 let writer = BufWriter::new(sender);
                 let channel = Channel::new(reader, writer);
-                let mut garbler = Garbler::new(channel, AesRng::new(), &[]);
+                let mut garbler = Garbler::new(channel, AesRng::new());
 
                 // encode input and send it to the evaluator
                 let mut gb_inp = Vec::with_capacity(N);
@@ -547,76 +547,5 @@ mod complex {
             let result = complex_gadget(&mut evaluator, &ev_inp).unwrap();
             assert_eq!(result, should_be);
         }
-    }
-}
-
-// testing reused wirelabels
-#[cfg(test)]
-mod reuse {
-    use super::*;
-    use crate::*;
-    use itertools::Itertools;
-    use rand::random;
-    use scuttlebutt::{AbstractChannel, AesRng, Channel};
-    use std::{
-        io::{BufReader, BufWriter},
-        os::unix::net::UnixStream,
-    };
-
-    #[test]
-    fn reuse_wirelabels() {
-        let n = 16;
-
-        let mut should_be = Vec::new();
-        let mut inps = Vec::new();
-        let mut mods = Vec::new();
-
-        for _ in 0..n {
-            let q = 2 + random::<u16>() % 100;
-            let x = random::<u16>() % q;
-            inps.push(x);
-            mods.push(q);
-            should_be.push(x);
-        }
-
-        let (sender, receiver) = UnixStream::pair().unwrap();
-
-        let inps_ = inps.clone();
-        let mods_ = mods.clone();
-        std::thread::spawn(move || {
-            let reader = BufReader::new(sender.try_clone().unwrap());
-            let writer = BufWriter::new(sender);
-            let channel = Channel::new(reader, writer);
-            let mut gb1 = Garbler::new(channel.clone(), AesRng::new(), &[]);
-
-            // get the input wirelabels
-            let (gb_inps, ev_inps) = gb1.encode_many_wires(&inps_, &mods_).unwrap();
-
-            for w in ev_inps.iter() {
-                gb1.send_wire(w).unwrap()
-            }
-
-            // get deltas for input wires
-            let ds = mods_.into_iter().map(|q| gb1.delta(q)).collect_vec();
-
-            let mut gb2 = Garbler::new(channel, AesRng::new(), &ds);
-
-            // output the input wires from the previous garbler
-            gb2.outputs(&gb_inps).unwrap();
-        });
-        let reader = BufReader::new(receiver.try_clone().unwrap());
-        let writer = BufWriter::new(receiver);
-        let channel = Channel::new(reader, writer);
-        let mut ev1 = Evaluator::new(channel.clone());
-
-        let xs = mods
-            .iter()
-            .map(|q| ev1.read_wire(*q).unwrap())
-            .collect_vec();
-
-        let mut ev2 = Evaluator::new(channel);
-        let result = ev2.outputs(&xs).unwrap().unwrap();
-
-        assert_eq!(result, should_be);
     }
 }

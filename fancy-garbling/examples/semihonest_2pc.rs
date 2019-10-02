@@ -38,7 +38,7 @@ fn run_circuit(circ: &mut Circuit, gb_inputs: Vec<u16>, ev_inputs: Vec<u16>) {
         let writer = BufWriter::new(sender);
         let channel = Channel::new(reader, writer);
         let start = SystemTime::now();
-        let mut gb = Garbler::<MyChannel, AesRng, OtSender>::new(channel, rng, &[]).unwrap();
+        let mut gb = Garbler::<MyChannel, AesRng, OtSender>::new(channel, rng).unwrap();
         println!(
             "Garbler :: Initialization: {} ms",
             start.elapsed().unwrap().as_millis()

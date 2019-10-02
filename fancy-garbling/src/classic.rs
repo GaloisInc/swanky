@@ -61,7 +61,7 @@ pub fn garble(c: &Circuit) -> Result<(Encoder, GarbledCircuit), GarblerError> {
     let channel_ = channel.clone();
 
     let rng = AesRng::new();
-    let mut garbler = Garbler::new(channel_, rng, &[]);
+    let mut garbler = Garbler::new(channel_, rng);
 
     // get input wires, ignoring encoded values
     let gb_inps = (0..c.num_garbler_inputs())

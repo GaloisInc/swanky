@@ -37,9 +37,9 @@ impl<
     > Garbler<C, RNG, OT>
 {
     /// Make a new `Garbler`.
-    pub fn new(mut channel: C, mut rng: RNG, reused_deltas: &[Wire]) -> Result<Self, TwopacError> {
+    pub fn new(mut channel: C, mut rng: RNG) -> Result<Self, TwopacError> {
         let ot = OT::init(&mut channel, &mut rng)?;
-        let garbler = Gb::new(channel.clone(), RNG::from_seed(rng.gen()), reused_deltas);
+        let garbler = Gb::new(channel.clone(), RNG::from_seed(rng.gen()));
         Ok(Garbler {
             garbler,
             channel,

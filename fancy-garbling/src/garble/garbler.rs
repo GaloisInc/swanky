@@ -26,13 +26,10 @@ pub struct Garbler<C, RNG> {
 impl<C: AbstractChannel, RNG: CryptoRng + RngCore> Garbler<C, RNG> {
     /// Create a new garbler.
     #[inline]
-    pub fn new(channel: C, rng: RNG, reused_deltas: &[Wire]) -> Self {
+    pub fn new(channel: C, rng: RNG) -> Self {
         Garbler {
             channel,
-            deltas: reused_deltas
-                .iter()
-                .map(|w| (w.modulus(), w.clone()))
-                .collect(),
+            deltas: HashMap::new(),
             current_gate: 0,
             current_output: 0,
             rng,

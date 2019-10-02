@@ -38,7 +38,7 @@ fn _bench_circuit(circ: &Circuit, gb_inputs: Vec<u16>, ev_inputs: Vec<u16>) {
         let reader = BufReader::new(sender.try_clone().unwrap());
         let writer = BufWriter::new(sender);
         let channel = Channel::new(reader, writer);
-        let mut gb = Garbler::<MyChannel, AesRng, OtSender>::new(channel, rng, &[]).unwrap();
+        let mut gb = Garbler::<MyChannel, AesRng, OtSender>::new(channel, rng).unwrap();
         let xs = gb.encode_many(&gb_inputs, &vec![2; n_gb_inputs]).unwrap();
         let ys = gb.receive_many(&vec![2; n_ev_inputs]).unwrap();
         circ_.eval(&mut gb, &xs, &ys).unwrap();
