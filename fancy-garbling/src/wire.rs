@@ -107,6 +107,16 @@ impl Wire {
             let msb = (inp >> 64) as u64;
             // debug_assert_eq!(lsb & msb, 0);
             Wire::Mod3 { lsb, msb }
+        } else if util::is_power_of_2(q) {
+            // its a power of 2, just split the digits
+            let ndigits = util::digits_per_u128(q);
+            let width = 128 / ndigits;
+            let mask = (1 << width) - 1;
+            let x = u128::from(inp);
+            let ds = (0..ndigits).map(|i| {
+                ((x >> (width * i)) & mask) as u16
+            }).collect::<Vec<u16>>();
+            Wire::ModN { q, ds }
         } else if q < 256 && base_conversion::lookup_defined_for_mod(q) {
             Self::_from_block_lookup(inp, q)
         } else {

@@ -182,6 +182,7 @@ fn digits(c: &mut Criterion) {
 fn unpack(c: &mut Criterion) {
     bench_unpack(c, 2);
     bench_unpack(c, 3);
+    bench_unpack(c, 4);
     bench_unpack(c, 5);
     bench_unpack(c, 17);
 }
