@@ -18,7 +18,7 @@ fn bench_digits(c: &mut Criterion, p: u16) {
 fn bench_unpack(c: &mut Criterion, p: u16) {
     c.bench_function(&format!("wire::from_block ({})", p), move |b| {
         let rng = &mut rand::thread_rng();
-        let x = Block::from(rng.gen_u128());
+        let x = rng.gen_usable_block(p);
         b.iter(|| {
             let w = Wire::from_block(x, p);
             criterion::black_box(w);
@@ -184,7 +184,9 @@ fn unpack(c: &mut Criterion) {
     bench_unpack(c, 3);
     bench_unpack(c, 4);
     bench_unpack(c, 5);
+    bench_unpack(c, 7);
     bench_unpack(c, 17);
+    bench_unpack(c, 113);
 }
 fn pack(c: &mut Criterion) {
     bench_pack(c, 2);

@@ -78,7 +78,6 @@ impl Wire {
         }
     }
 
-    #[inline]
     fn _from_block_lookup(inp: Block, q: u16) -> Self {
         debug_assert!(q < 256);
         debug_assert!(base_conversion::lookup_defined_for_mod(q));
@@ -95,6 +94,41 @@ impl Wire {
         ds.truncate(util::digits_per_u128(q));
         Wire::ModN { q, ds }
     }
+
+    fn _unrank(mut x: u128, q: u16) -> Vec<u16> {
+        let ndigits = util::digits_per_u128(q);
+        let mut npaths_tab = vec![1; ndigits];
+        for i in 1..ndigits {
+            npaths_tab[i] = npaths_tab[i-1] * q as u128;
+        }
+        x %= npaths_tab[ndigits-1] * q as u128;
+
+        let mut ds = vec![0; ndigits];
+        for i in (0..ndigits).rev() {
+            let npaths = npaths_tab[i];
+
+            let mut low  = 0;
+            let mut high = q;
+            loop {
+                let cur = (low + high) / 2;
+                let l = npaths * cur as u128;
+                let r = npaths * (cur as u128 + 1);
+                if x >= l && x < r {
+                    x -= l;
+                    ds[i] = cur;
+                    break;
+                }
+                if x < l {
+                    high = cur;
+                } else { // x >= r
+                    low = cur;
+                }
+            }
+        }
+
+        ds
+    }
+
 
     /// Unpack the wire represented by a `Block` with modulus `q`. Assumes that
     /// the block was constructed through the `Wire` API.
@@ -120,11 +154,16 @@ impl Wire {
         } else if q < 256 && base_conversion::lookup_defined_for_mod(q) {
             Self::_from_block_lookup(inp, q)
         } else {
-            Wire::ModN {
-                q,
-                ds: util::as_base_q_u128(u128::from(inp), q),
-            }
+            let ds = Self::_unrank(u128::from(inp), q);
+            Wire::ModN { q, ds }
         }
+        // } else {
+        // old method - dividing off by q
+        //     Wire::ModN {
+        //         q,
+        //         ds: util::as_base_q_u128(u128::from(inp), q),
+        //     }
+        // }
     }
 
     /// Pack the wire into a `Block`.
@@ -404,14 +443,11 @@ mod tests {
     #[test]
     fn packing() {
         let ref mut rng = thread_rng();
-        for _ in 0..100 {
-            let q = 2 + (rng.gen_u16() % 111);
-            let w = rng.gen_usable_block(q);
-            let x = Wire::from_block(w, q);
-            let y = x.as_block();
-            assert_eq!(w, y);
-            let z = Wire::from_block(y, q);
-            assert_eq!(x, z);
+        for q in 2 .. 256 {
+            for _ in 0..1000 {
+                let w = Wire::rand(rng, q);
+                assert_eq!(w, Wire::from_block(w.as_block(), q));
+            }
         }
     }
 
