@@ -97,6 +97,7 @@ fn as_base_q(x: u128, q: u16, n: usize) -> Vec<u16> {
 /// Determine how many `mod q` digits fit into a `u128` (includes the color
 /// digit).
 pub fn digits_per_u128(modulus: u16) -> usize {
+    debug_assert_ne!(modulus, 0);
     debug_assert_ne!(modulus, 1);
     if modulus == 2 {
         128
@@ -112,6 +113,10 @@ pub fn digits_per_u128(modulus: u16) -> usize {
         21
     } else if modulus <= 128 {
         18
+    } else if modulus <= 256 {
+        16
+    } else if modulus <= 512 {
+        14
     } else {
         (128.0 / (modulus as f64).log2().ceil()).floor() as usize
     }

@@ -10,6 +10,8 @@ use crate::{fancy::HasModulus, util};
 use rand::{CryptoRng, Rng, RngCore};
 use scuttlebutt::{Block, AES_HASH};
 
+mod npaths_tab;
+
 /// The core wire-label type.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Wire {
@@ -98,49 +100,48 @@ impl Wire {
     fn _unrank(inp: u128, q: u16) -> Vec<u16> {
         let mut x = inp;
         let ndigits = util::digits_per_u128(q);
-        let mut npaths_tab = vec![1; ndigits];
-        for i in 1..ndigits {
-            npaths_tab[i] = npaths_tab[i - 1] * q as u128;
-        }
+        let npaths_tab = npaths_tab::lookup(q);
         x %= npaths_tab[ndigits - 1] * q as u128;
 
         let mut ds = vec![0; ndigits];
         for i in (0..ndigits).rev() {
             let npaths = npaths_tab[i];
 
-            // // naive division
+            // naive division
             // let d = x / npaths;
             // ds[i] = d as u16;
             // x -= d * npaths;
 
-            // // linear search
-            // let mut acc = 0;
-            // for j in 0..q {
-            // acc += npaths;
-            // if acc >= x {
-            // x -= acc - npaths;
-            // ds[i] = j;
-            // break;
-            // }
-            // }
-
-            // binary search
-            let mut low = 0;
-            let mut high = q;
-            loop {
-                let cur = (low + high) / 2;
-                let l = npaths * cur as u128;
-                let r = npaths * (cur as u128 + 1);
-                if x >= l && x < r {
-                    x -= l;
-                    ds[i] = cur;
-                    break;
+            if q < 16 {
+                // linear search
+                let mut acc = 0;
+                for j in 0..q {
+                    acc += npaths;
+                    if acc >= x {
+                        x -= acc - npaths;
+                        ds[i] = j;
+                        break;
+                    }
                 }
-                if x < l {
-                    high = cur;
-                } else {
-                    // x >= r
-                    low = cur;
+            } else {
+                // binary search
+                let mut low = 0;
+                let mut high = q;
+                loop {
+                    let cur = (low + high) / 2;
+                    let l = npaths * cur as u128;
+                    let r = npaths * (cur as u128 + 1);
+                    if x >= l && x < r {
+                        x -= l;
+                        ds[i] = cur;
+                        break;
+                    }
+                    if x < l {
+                        high = cur;
+                    } else {
+                        // x >= r
+                        low = cur;
+                    }
                 }
             }
         }
