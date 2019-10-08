@@ -23,12 +23,11 @@ enum GateType {
     XorGate,
 }
 
-#[inline]
 fn cap2int(cap: &Captures, idx: usize) -> Result<usize, Error> {
     let s = cap.get(idx).ok_or(Error::ParseIntError)?;
     FromStr::from_str(s.as_str()).map_err(Error::from)
 }
-#[inline]
+
 fn cap2typ(cap: &Captures, idx: usize) -> Result<GateType, Error> {
     let s = cap.get(idx).ok_or(Error::ParseIntError)?;
     let s = s.as_str();
@@ -38,7 +37,7 @@ fn cap2typ(cap: &Captures, idx: usize) -> Result<GateType, Error> {
         s => Err(Error::ParseGateError(s.to_string())),
     }
 }
-#[inline]
+
 fn regex2captures<'t>(re: &Regex, line: &'t str) -> Result<Captures<'t>, Error> {
     re.captures(&line)
         .ok_or_else(|| Error::ParseLineError(line.to_string()))

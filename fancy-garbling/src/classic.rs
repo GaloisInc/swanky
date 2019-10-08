@@ -33,7 +33,6 @@ impl GarbledCircuit {
     }
 
     /// The number of garbled rows and constant wires in the garbled circuit.
-    #[inline]
     pub fn size(&self) -> usize {
         self.blocks.len()
     }

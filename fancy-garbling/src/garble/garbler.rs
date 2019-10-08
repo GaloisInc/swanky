@@ -25,7 +25,6 @@ pub struct Garbler<C, RNG> {
 
 impl<C: AbstractChannel, RNG: CryptoRng + RngCore> Garbler<C, RNG> {
     /// Create a new garbler.
-    #[inline]
     pub fn new(channel: C, rng: RNG) -> Self {
         Garbler {
             channel,
@@ -37,7 +36,6 @@ impl<C: AbstractChannel, RNG: CryptoRng + RngCore> Garbler<C, RNG> {
     }
 
     /// The current non-free gate index of the garbling computation
-    #[inline]
     fn current_gate(&mut self) -> usize {
         let current = self.current_gate;
         self.current_gate += 1;
@@ -46,7 +44,6 @@ impl<C: AbstractChannel, RNG: CryptoRng + RngCore> Garbler<C, RNG> {
 
     /// Create a delta if it has not been created yet for this modulus, otherwise just
     /// return the existing one.
-    #[inline]
     pub fn delta(&mut self, q: u16) -> Wire {
         if let Some(delta) = self.deltas.get(&q) {
             return delta.clone();
@@ -57,7 +54,6 @@ impl<C: AbstractChannel, RNG: CryptoRng + RngCore> Garbler<C, RNG> {
     }
 
     /// The current output index of the garbling computation.
-    #[inline]
     fn current_output(&mut self) -> usize {
         let current = self.current_output;
         self.current_output += 1;
@@ -67,20 +63,17 @@ impl<C: AbstractChannel, RNG: CryptoRng + RngCore> Garbler<C, RNG> {
     /// Get the deltas, consuming the Garbler.
     ///
     /// This is useful for reusing wires in multiple garbled circuit instances.
-    #[inline]
     pub fn get_deltas(self) -> HashMap<u16, Wire> {
         self.deltas
     }
 
     /// Send a wire over the established channel.
-    #[inline]
     pub fn send_wire(&mut self, wire: &Wire) -> Result<(), GarblerError> {
         self.channel.write_block(&wire.as_block())?;
         Ok(())
     }
 
     /// Encode a wire, producing the zero wire as well as the encoded value.
-    #[inline]
     pub fn encode_wire(&mut self, val: u16, modulus: u16) -> (Wire, Wire) {
         let zero = Wire::rand(&mut self.rng, modulus);
         let delta = self.delta(modulus);
@@ -89,7 +82,6 @@ impl<C: AbstractChannel, RNG: CryptoRng + RngCore> Garbler<C, RNG> {
     }
 
     /// Encode many wires, producing zero wires as well as encoded values.
-    #[inline]
     pub fn encode_many_wires(
         &mut self,
         vals: &[u16],
@@ -110,7 +102,6 @@ impl<C: AbstractChannel, RNG: CryptoRng + RngCore> Garbler<C, RNG> {
     }
 
     /// Encode a `CrtBundle`, producing zero wires as well as encoded values.
-    #[inline]
     pub fn crt_encode_wire(
         &mut self,
         val: u128,
@@ -123,7 +114,6 @@ impl<C: AbstractChannel, RNG: CryptoRng + RngCore> Garbler<C, RNG> {
     }
 
     /// Encode a `BinaryBundle`, producing zero wires as well as encoded values.
-    #[inline]
     pub fn bin_encode_wire(
         &mut self,
         val: u128,
@@ -151,7 +141,6 @@ impl<C: AbstractChannel, RNG: RngCore + CryptoRng> Fancy for Garbler<C, RNG> {
     type Item = Wire;
     type Error = GarblerError;
 
-    #[inline]
     fn constant(&mut self, x: u16, q: u16) -> Result<Wire, GarblerError> {
         let zero = Wire::rand(&mut self.rng, q);
         let wire = zero.plus(&self.delta(q).cmul_eq(x));
@@ -159,7 +148,6 @@ impl<C: AbstractChannel, RNG: RngCore + CryptoRng> Fancy for Garbler<C, RNG> {
         Ok(zero)
     }
 
-    #[inline]
     fn add(&mut self, x: &Wire, y: &Wire) -> Result<Wire, GarblerError> {
         if x.modulus() != y.modulus() {
             return Err(GarblerError::FancyError(FancyError::UnequalModuli));
@@ -167,7 +155,6 @@ impl<C: AbstractChannel, RNG: RngCore + CryptoRng> Fancy for Garbler<C, RNG> {
         Ok(x.plus(y))
     }
 
-    #[inline]
     fn sub(&mut self, x: &Wire, y: &Wire) -> Result<Wire, GarblerError> {
         if x.modulus() != y.modulus() {
             return Err(GarblerError::FancyError(FancyError::UnequalModuli));
@@ -175,12 +162,10 @@ impl<C: AbstractChannel, RNG: RngCore + CryptoRng> Fancy for Garbler<C, RNG> {
         Ok(x.minus(y))
     }
 
-    #[inline]
     fn cmul(&mut self, x: &Wire, c: u16) -> Result<Wire, GarblerError> {
         Ok(x.cmul(c))
     }
 
-    #[inline]
     fn mul(&mut self, A: &Wire, B: &Wire) -> Result<Wire, GarblerError> {
         if A.modulus() < B.modulus() {
             return self.mul(B, A);
@@ -296,7 +281,6 @@ impl<C: AbstractChannel, RNG: RngCore + CryptoRng> Fancy for Garbler<C, RNG> {
         Ok(X.plus_mov(&Y))
     }
 
-    #[inline]
     fn proj(&mut self, A: &Wire, q_out: u16, tt: Option<Vec<u16>>) -> Result<Wire, GarblerError> {
         let tt = tt.ok_or(GarblerError::TruthTableRequired)?;
 
@@ -350,7 +334,6 @@ impl<C: AbstractChannel, RNG: RngCore + CryptoRng> Fancy for Garbler<C, RNG> {
         Ok(C)
     }
 
-    #[inline]
     fn output(&mut self, X: &Wire) -> Result<Option<u16>, GarblerError> {
         let q = X.modulus();
         let i = self.current_output();
