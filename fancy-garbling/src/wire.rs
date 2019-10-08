@@ -104,7 +104,8 @@ impl Wire {
         x %= npaths_tab[ndigits - 1] * q as u128;
 
         let mut ds = vec![0; ndigits];
-        for (i, npaths) in npaths_tab.iter().rev().enumerate() {
+        for i in (0..ndigits).rev() {
+            let npaths = npaths_tab[i];
             // naive division
             // let d = x / npaths;
             // ds[i] = d as u16;
