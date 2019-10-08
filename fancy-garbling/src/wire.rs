@@ -80,7 +80,7 @@ impl Wire {
         }
     }
 
-    fn _from_block_lookup(inp: Block, q: u16) -> Self {
+    fn _from_block_lookup(inp: Block, q: u16) -> Vec<u16> {
         debug_assert!(q < 256);
         debug_assert!(base_conversion::lookup_defined_for_mod(q));
         let bytes: [u8; 16] = inp.into();
@@ -94,7 +94,7 @@ impl Wire {
         // Drop the digits we won't be able to pack back in again, especially if
         // they get multiplied.
         ds.truncate(util::digits_per_u128(q));
-        Wire::ModN { q, ds }
+        ds
     }
 
     fn _unrank(inp: u128, q: u16) -> Vec<u16> {
@@ -158,27 +158,25 @@ impl Wire {
             let msb = (inp >> 64) as u64;
             debug_assert_eq!(lsb & msb, 0);
             Wire::Mod3 { lsb, msb }
-        } else if util::is_power_of_2(q) {
-            // its a power of 2, just split the digits
-            let ndigits = util::digits_per_u128(q);
-            let width = 128 / ndigits;
-            let mask = (1 << width) - 1;
-            let x = u128::from(inp);
-            let ds = (0..ndigits)
-                .map(|i| ((x >> (width * i)) & mask) as u16)
-                .collect::<Vec<u16>>();
-            Wire::ModN { q, ds }
-        } else if q < 24 {
-            let ds = Self::_unrank(u128::from(inp), q);
-            Wire::ModN { q, ds }
-        } else if base_conversion::lookup_defined_for_mod(q) {
-            Self::_from_block_lookup(inp, q)
         } else {
-            // old method - dividing off by q
-            Wire::ModN {
-                q,
-                ds: util::as_base_q_u128(u128::from(inp), q),
-            }
+            let ds = if util::is_power_of_2(q) {
+                // It's a power of 2, just split the digits.
+                let ndigits = util::digits_per_u128(q);
+                let width = 128 / ndigits;
+                let mask = (1 << width) - 1;
+                let x = u128::from(inp);
+                (0..ndigits)
+                    .map(|i| ((x >> (width * i)) & mask) as u16)
+                    .collect::<Vec<u16>>()
+            } else if q < 24 {
+                Self::_unrank(u128::from(inp), q)
+            } else if base_conversion::lookup_defined_for_mod(q) {
+                Self::_from_block_lookup(inp, q)
+            } else {
+                // Last resort: dividing off by q.
+                util::as_base_q_u128(u128::from(inp), q)
+            };
+            Wire::ModN { q, ds }
         }
     }
 
@@ -194,6 +192,7 @@ impl Wire {
     /// The zero wire with modulus `q`.
     pub fn zero(q: u16) -> Self {
         match q {
+            0 => panic!("[Wire::zero] mod 0 not allowed!"),
             1 => panic!("[Wire::zero] mod 1 not allowed!"),
             2 => Wire::Mod2 {
                 val: Default::default(),
@@ -210,7 +209,7 @@ impl Wire {
     }
 
     /// Get a random wire label mod `q`, with the first digit set to `1`.
-    pub fn rand_delta<R: CryptoRng + RngCore>(rng: &mut R, q: u16) -> Self {
+    pub fn rand_delta<R: CryptoRng + Rng>(rng: &mut R, q: u16) -> Self {
         let mut w = Self::rand(rng, q);
         match w {
             Wire::Mod2 { ref mut val } => *val = val.set_lsb(),
@@ -233,8 +232,16 @@ impl Wire {
     pub fn color(&self) -> u16 {
         match self {
             Wire::Mod2 { val } => val.lsb() as u16,
-            Wire::Mod3 { lsb, msb } => (((msb & 1) as u16) << 1) | ((lsb & 1) as u16),
-            Wire::ModN { ref ds, .. } => ds[0],
+            Wire::Mod3 { lsb, msb } => {
+                let color = (((msb & 1) as u16) << 1) | ((lsb & 1) as u16);
+                debug_assert_ne!(color, 3);
+                color
+            }
+            Wire::ModN { q, ref ds } => {
+                let color = ds[0];
+                debug_assert!(color < *q);
+                color
+            }
         }
     }
 
@@ -422,11 +429,11 @@ impl Wire {
     ///
     /// Uses fixed-key AES.
     pub fn hashback(&self, tweak: Block, q: u16) -> Wire {
+        let block = self.hash(tweak);
         if q == 3 {
-            let block = self.hash(tweak);
-            // We now have to convert `block` into a valid `Mod3` encoding. We
-            // do this by computing the `Mod3` digits, and then map these to a
-            // `Mod3` encoding.
+            // We have to convert `block` into a valid `Mod3` encoding. We do
+            // this by computing the `Mod3` digits using `_unrank`, and then map
+            // these to a `Mod3` encoding.
             let mut lsb = 0u64;
             let mut msb = 0u64;
             let mut ds = Self::_unrank(u128::from(block), q);
@@ -437,7 +444,7 @@ impl Wire {
             debug_assert_eq!(lsb & msb, 0);
             Wire::Mod3 { lsb, msb }
         } else {
-            Self::from_block(self.hash(tweak), q)
+            Self::from_block(block, q)
         }
     }
 }

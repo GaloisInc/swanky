@@ -88,7 +88,7 @@ pub fn base_q_add_eq(xs: &mut [u16], ys: &[u16], q: u16) {
     }
 }
 
-/// Convert `x` into base `q`.
+/// Convert `x` into base `q`, building a vector of length `n`.
 fn as_base_q(x: u128, q: u16, n: usize) -> Vec<u16> {
     let ms = std::iter::repeat(q).take(n).collect_vec();
     as_mixed_radix(x, &ms)
@@ -155,15 +155,6 @@ pub fn from_base_q(ds: &[u16], q: u16) -> u128 {
         x = xp + d as u128;
     }
     x
-    // let mut x = bigint::uint::U256::zero();
-    // for &d in ds.iter().rev() {
-    //     let (xp, overflow) = x.overflowing_mul(bigint::uint::U256::from(q));
-    //     debug_assert_eq!(overflow, false, "overflow!!!! x={}", x);
-    //     x = xp + bigint::uint::U256::from(d);
-    // }
-    // let b0 = x.0[0] as u128;
-    // let b1 = x.0[1] as u128;
-    // (b1 << 64) + b0
 }
 
 /// Convert little-endian mixed radix digits into u128.
