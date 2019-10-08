@@ -111,38 +111,39 @@ impl Wire {
             // ds[i] = d as u16;
             // x -= d * npaths;
 
-            // if q < 16 {
-            //     // linear search
-            //     let mut acc = 0;
-            //     for j in 0..q {
-            //         acc += npaths;
-            //         if acc >= x {
-            //             x -= acc - npaths;
-            //             ds[i] = j;
-            //             break;
-            //         }
-            //     }
-            // } else {
-            // binary search
-            let mut low = 0;
-            let mut high = q;
-            loop {
-                let cur = (low + high) / 2;
-                let l = npaths * cur as u128;
-                let r = npaths * (cur as u128 + 1);
-                if x >= l && x < r {
-                    x -= l;
-                    ds[i] = cur;
-                    break;
+            if q < 16 {
+                // linear search
+                let mut acc = 0;
+                for j in 0..q {
+                    acc += npaths;
+                    if acc > x {
+                        x -= acc - npaths;
+                        ds[i] = j;
+                        break;
+                    }
                 }
-                if x < l {
-                    high = cur;
-                } else {
-                    // x >= r
-                    low = cur;
+            } else {
+                // binary search
+                let mut low = 0;
+                let mut high = q;
+                loop {
+                    let cur = (low + high) / 2;
+                    let l = npaths * cur as u128;
+                    let r = npaths * (cur as u128 + 1);
+                    if x >= l && x < r {
+                        x -= l;
+                        ds[i] = cur;
+                        break;
+                    }
+                    if x < l {
+                        high = cur;
+                    } else {
+                        // x >= r
+                        low = cur;
+                    }
                 }
             }
-            // }
+
         }
         ds
     }
