@@ -95,10 +95,15 @@ def write_num_digits_function(f):
     print("    }", file=f)
     print("}\n", file=f)
 
+def is_power_of_two(base):
+    base & (base - 1) == 0
+
 with open('base_conversion/cbits/lookup_tables.c', 'w') as f:
     write_header(f)
 
-    for base in range(3,114):
+    for base in range(5, 114):
+        if is_power_of_two(base):
+            continue
         write_tables_for_base(base, f)
 
     write_get_table_function(f)

@@ -363,7 +363,7 @@ pub fn product(xs: &[u16]) -> u128 {
 //     z as u16
 // }
 
-/// Returns true if x is a power of 2
+/// Returns `true` if `x` is a power of 2.
 pub fn is_power_of_2(x: u16) -> bool {
     (x & (x - 1)) == 0
 }

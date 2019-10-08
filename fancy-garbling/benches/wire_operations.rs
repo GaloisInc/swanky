@@ -196,6 +196,7 @@ fn unpack(c: &mut Criterion) {
         bench_unpack(c, q);
     }
     bench_unpack(c, 113);
+    bench_unpack(c, 257);
 }
 fn pack(c: &mut Criterion) {
     bench_pack(c, 2);

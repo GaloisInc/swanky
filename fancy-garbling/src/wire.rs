@@ -111,39 +111,38 @@ impl Wire {
             // ds[i] = d as u16;
             // x -= d * npaths;
 
-            if q < 16 {
-                // linear search
-                let mut acc = 0;
-                for j in 0..q {
-                    acc += npaths;
-                    if acc > x {
-                        x -= acc - npaths;
-                        ds[i] = j;
-                        break;
-                    }
-                }
-            } else {
-                // binary search
-                let mut low = 0;
-                let mut high = q;
-                loop {
-                    let cur = (low + high) / 2;
-                    let l = npaths * cur as u128;
-                    let r = npaths * (cur as u128 + 1);
-                    if x >= l && x < r {
-                        x -= l;
-                        ds[i] = cur;
-                        break;
-                    }
-                    if x < l {
-                        high = cur;
-                    } else {
-                        // x >= r
-                        low = cur;
-                    }
+            // if q <= 23 {
+            // linear search
+            let mut acc = 0;
+            for j in 0..q {
+                acc += npaths;
+                if acc > x {
+                    x -= acc - npaths;
+                    ds[i] = j;
+                    break;
                 }
             }
-
+            // } else {
+            //     // binary search
+            //     let mut low = 0;
+            //     let mut high = q;
+            //     loop {
+            //         let cur = (low + high) / 2;
+            //         let l = npaths * cur as u128;
+            //         let r = npaths * (cur as u128 + 1);
+            //         if x >= l && x < r {
+            //             x -= l;
+            //             ds[i] = cur;
+            //             break;
+            //         }
+            //         if x < l {
+            //             high = cur;
+            //         } else {
+            //             // x >= r
+            //             low = cur;
+            //         }
+            //     }
+            // }
         }
         ds
     }
@@ -169,7 +168,7 @@ impl Wire {
                 (0..ndigits)
                     .map(|i| ((x >> (width * i)) & mask) as u16)
                     .collect::<Vec<u16>>()
-            } else if q < 24 {
+            } else if q <= 23 {
                 Self::_unrank(u128::from(inp), q)
             } else if base_conversion::lookup_defined_for_mod(q) {
                 Self::_from_block_lookup(inp, q)
