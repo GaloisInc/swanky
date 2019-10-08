@@ -107,6 +107,23 @@ impl Wire {
         for i in (0..ndigits).rev() {
             let npaths = npaths_tab[i];
 
+            // // naive division
+            // let d = x / npaths;
+            // ds[i] = d as u16;
+            // x -= d * npaths;
+
+            // // linear search
+            // let mut acc = 0;
+            // for j in 0..q {
+                // acc += npaths;
+                // if acc >= x {
+                    // x -= acc - npaths;
+                    // ds[i] = j;
+                    // break;
+                // }
+            // }
+
+            // binary search
             let mut low  = 0;
             let mut high = q;
             loop {
