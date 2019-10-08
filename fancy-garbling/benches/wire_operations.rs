@@ -184,7 +184,17 @@ fn unpack(c: &mut Criterion) {
     bench_unpack(c, 3);
     bench_unpack(c, 4);
     bench_unpack(c, 5);
+    bench_unpack(c, 6);
     bench_unpack(c, 7);
+    bench_unpack(c, 8);
+    bench_unpack(c, 9);
+    bench_unpack(c, 10);
+    bench_unpack(c, 11);
+    bench_unpack(c, 12);
+    bench_unpack(c, 13);
+    bench_unpack(c, 14);
+    bench_unpack(c, 15);
+    bench_unpack(c, 16);
     bench_unpack(c, 17);
     bench_unpack(c, 113);
 }
