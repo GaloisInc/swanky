@@ -106,21 +106,23 @@ impl Wire {
         let mut ds = vec![0; ndigits];
         for i in (0..ndigits).rev() {
             let npaths = npaths_tab[i];
-            // naive division
-            // let d = x / npaths;
-            // ds[i] = d as u16;
-            // x -= d * npaths;
 
-            // if q <= 23 {
-            // linear search
-            let mut acc = 0;
-            for j in 0..q {
-                acc += npaths;
-                if acc > x {
-                    x -= acc - npaths;
-                    ds[i] = j;
-                    break;
+            if q <= 23 {
+                // linear search
+                let mut acc = 0;
+                for j in 0..q {
+                    acc += npaths;
+                    if acc > x {
+                        x -= acc - npaths;
+                        ds[i] = j;
+                        break;
+                    }
                 }
+            } else {
+                // naive division
+                let d = x / npaths;
+                ds[i] = d as u16;
+                x -= d * npaths;
             }
             // } else {
             //     // binary search
@@ -173,8 +175,8 @@ impl Wire {
             } else if base_conversion::lookup_defined_for_mod(q) {
                 Self::_from_block_lookup(inp, q)
             } else {
-                // Last resort: dividing off by q.
-                util::as_base_q_u128(u128::from(inp), q)
+                // If all else fails, do unrank using naive division.
+                Self::_unrank(u128::from(inp), q)
             };
             Wire::ModN { q, ds }
         }
