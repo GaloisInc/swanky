@@ -100,17 +100,11 @@ impl Wire {
     fn _unrank(inp: u128, q: u16) -> Vec<u16> {
         let mut x = inp;
         let ndigits = util::digits_per_u128(q);
-        // let mut npaths_tab = vec![1; ndigits];
-        // for i in 1..ndigits {
-        //     npaths_tab[i] = npaths_tab[i - 1] * q as u128;
-        // }
         let npaths_tab = npaths_tab::lookup(q);
         x %= npaths_tab[ndigits - 1] * q as u128;
 
         let mut ds = vec![0; ndigits];
-        for i in (0..ndigits).rev() {
-            let npaths = npaths_tab[i];
-
+        for (i, npaths) in npaths_tab.iter().rev().enumerate() {
             // naive division
             // let d = x / npaths;
             // ds[i] = d as u16;
@@ -173,19 +167,18 @@ impl Wire {
                 .map(|i| ((x >> (width * i)) & mask) as u16)
                 .collect::<Vec<u16>>();
             Wire::ModN { q, ds }
-        // } else if q < 256 && base_conversion::lookup_defined_for_mod(q) {
-        //     Self::_from_block_lookup(inp, q)
-        } else {
+        } else if q < 24 {
             let ds = Self::_unrank(u128::from(inp), q);
             Wire::ModN { q, ds }
+        } else if base_conversion::lookup_defined_for_mod(q) {
+            Self::_from_block_lookup(inp, q)
+        } else {
+            // old method - dividing off by q
+            Wire::ModN {
+                q,
+                ds: util::as_base_q_u128(u128::from(inp), q),
+            }
         }
-        // } else {
-        // old method - dividing off by q
-        //     Wire::ModN {
-        //         q,
-        //         ds: util::as_base_q_u128(u128::from(inp), q),
-        //     }
-        // }
     }
 
     /// Pack the wire into a `Block`.
