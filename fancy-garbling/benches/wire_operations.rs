@@ -143,6 +143,18 @@ fn bench_hash(c: &mut Criterion, p: u16) {
     });
 }
 
+fn bench_hashback(c: &mut Criterion, q: u16) {
+    c.bench_function(&format!("wire::hashback ({})", q), move |b| {
+        let rng = &mut rand::thread_rng();
+        let tweak = rand::random::<Block>();
+        let wire = Wire::rand(rng, q);
+        b.iter(|| {
+            let z = wire.hashback(tweak, q);
+            criterion::black_box(z);
+        });
+    });
+}
+
 fn bench_zero(c: &mut Criterion, p: u16) {
     c.bench_function(&format!("wire::zero ({})", p), move |b| {
         b.iter(|| {
@@ -258,6 +270,12 @@ fn hash(c: &mut Criterion) {
     bench_hash(c, 5);
     bench_hash(c, 17);
 }
+fn hashback(c: &mut Criterion) {
+    bench_hashback(c, 2);
+    bench_hashback(c, 3);
+    bench_hashback(c, 5);
+    bench_hashback(c, 17);
+}
 fn zero(c: &mut Criterion) {
     bench_zero(c, 2);
     bench_zero(c, 3);
@@ -280,7 +298,7 @@ fn rand_delta(c: &mut Criterion) {
 criterion_group! {
     name = wire_benches;
     config = Criterion::default().warm_up_time(Duration::from_millis(100));
-    targets = digits, unpack, pack, plus, plus_eq, minus, minus_eq, cmul, cmul_eq, negate, negate_eq, hash, zero, rand, rand_delta
+    targets = digits, unpack, pack, plus, plus_eq, minus, minus_eq, cmul, cmul_eq, negate, negate_eq, hash, hashback, zero, rand, rand_delta
 }
 
 criterion_main!(wire_benches);
