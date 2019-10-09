@@ -7,6 +7,7 @@
 mod hash_channel;
 mod sync_channel;
 mod track_channel;
+pub mod unix_channel;
 
 pub use hash_channel::HashChannel;
 pub use sync_channel::SyncChannel;

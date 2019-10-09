@@ -10,16 +10,9 @@ use fancy_garbling::{
     FancyInput,
 };
 use ocelot::ot::{AlszReceiver as OtReceiver, AlszSender as OtSender};
-use scuttlebutt::{AesRng, Channel};
-use std::{
-    io::{BufReader, BufWriter},
-    os::unix::net::UnixStream,
-    time::SystemTime,
-};
-
-type Reader = BufReader<UnixStream>;
-type Writer = BufWriter<UnixStream>;
-type MyChannel = Channel<Reader, Writer>;
+use scuttlebutt::AesRng;
+use scuttlebutt::channel::unix_channel::{UnixChannel, unix_channel_pair};
+use std::time::SystemTime;
 
 fn circuit(fname: &str) -> Circuit {
     println!("* Circuit: {}", fname);
@@ -28,17 +21,14 @@ fn circuit(fname: &str) -> Circuit {
 
 fn run_circuit(circ: &mut Circuit, gb_inputs: Vec<u16>, ev_inputs: Vec<u16>) {
     let circ_ = circ.clone();
-    let (sender, receiver) = UnixStream::pair().unwrap();
+    let (sender, receiver) = unix_channel_pair();
     let n_gb_inputs = gb_inputs.len();
     let n_ev_inputs = ev_inputs.len();
     let total = SystemTime::now();
     let handle = std::thread::spawn(move || {
         let rng = AesRng::new();
-        let reader = BufReader::new(sender.try_clone().unwrap());
-        let writer = BufWriter::new(sender);
-        let channel = Channel::new(reader, writer);
         let start = SystemTime::now();
-        let mut gb = Garbler::<MyChannel, AesRng, OtSender>::new(channel, rng).unwrap();
+        let mut gb = Garbler::<UnixChannel, AesRng, OtSender>::new(sender, rng).unwrap();
         println!(
             "Garbler :: Initialization: {} ms",
             start.elapsed().unwrap().as_millis()
@@ -58,11 +48,8 @@ fn run_circuit(circ: &mut Circuit, gb_inputs: Vec<u16>, ev_inputs: Vec<u16>) {
         );
     });
     let rng = AesRng::new();
-    let reader = BufReader::new(receiver.try_clone().unwrap());
-    let writer = BufWriter::new(receiver);
-    let channel = Channel::new(reader, writer);
     let start = SystemTime::now();
-    let mut ev = Evaluator::<MyChannel, AesRng, OtReceiver>::new(channel, rng).unwrap();
+    let mut ev = Evaluator::<UnixChannel, AesRng, OtReceiver>::new(receiver, rng).unwrap();
     println!(
         "Evaluator :: Initialization: {} ms",
         start.elapsed().unwrap().as_millis()

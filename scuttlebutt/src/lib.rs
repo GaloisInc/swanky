@@ -17,7 +17,7 @@ mod aes;
 mod block;
 mod block512;
 pub mod bloomfilter;
-mod channel;
+pub mod channel;
 pub mod cointoss;
 pub mod commitment;
 mod hash_aes;
