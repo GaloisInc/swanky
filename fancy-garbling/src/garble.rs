@@ -296,13 +296,7 @@ mod streaming {
     };
     use itertools::Itertools;
     use rand::thread_rng;
-    use scuttlebutt::{AesRng, Channel};
-    use std::{
-        io::{BufReader, BufWriter},
-        os::unix::net::UnixStream,
-    };
-
-    type MyChannel = Channel<BufReader<UnixStream>, BufWriter<UnixStream>>;
+    use scuttlebutt::{AesRng, UnixChannel, unix_channel_pair};
 
     // helper - checks that Streaming evaluation of a fancy function equals Dummy
     // evaluation of the same function
@@ -312,17 +306,11 @@ mod streaming {
         mut f_du: FDU,
         input_mods: &[u16],
     ) where
-        FGB: FnMut(&mut Garbler<MyChannel, AesRng>, &[Wire]) -> Option<u16>
-            + Send
-            + Sync
-            + Copy
-            + 'static,
-        FEV:
-            FnMut(&mut Evaluator<MyChannel>, &[Wire]) -> Option<u16> + Send + Sync + Copy + 'static,
-        FDU: FnMut(&mut Dummy, &[DummyVal]) -> Option<u16> + Send + Sync + Copy + 'static,
+        FGB: FnMut(&mut Garbler<UnixChannel, AesRng>, &[Wire]) -> Option<u16> + Send + Sync,
+        FEV: FnMut(&mut Evaluator<UnixChannel>, &[Wire]) -> Option<u16>,
+        FDU: FnMut(&mut Dummy, &[DummyVal]) -> Option<u16>,
     {
         let mut rng = AesRng::new();
-
         let inputs = input_mods.iter().map(|q| rng.gen_u16() % q).collect_vec();
 
         // evaluate f_gb as a dummy
@@ -330,31 +318,27 @@ mod streaming {
         let dinps = dummy.encode_many(&inputs, input_mods).unwrap();
         let should_be = f_du(&mut dummy, &dinps).unwrap();
 
-        let (sender, receiver) = UnixStream::pair().unwrap();
+        let (sender, receiver) = unix_channel_pair();
 
-        let input_mods_ = input_mods.to_vec();
-        std::thread::spawn(move || {
-            let reader = BufReader::new(sender.try_clone().unwrap());
-            let writer = BufWriter::new(sender);
-            let channel = Channel::new(reader, writer);
-            let mut gb = Garbler::new(channel, rng);
-            let (gb_inp, ev_inp) = gb.encode_many_wires(&inputs, &input_mods_).unwrap();
-            for w in ev_inp.iter() {
-                gb.send_wire(w).unwrap();
-            }
-            f_gb(&mut gb, &gb_inp);
-        });
-        let reader = BufReader::new(receiver.try_clone().unwrap());
-        let writer = BufWriter::new(receiver);
-        let channel = Channel::new(reader, writer);
-        let mut ev = Evaluator::new(channel);
-        let ev_inp = input_mods
-            .iter()
-            .map(|q| ev.read_wire(*q).unwrap())
-            .collect_vec();
-        let result = f_ev(&mut ev, &ev_inp).unwrap();
+        crossbeam::scope(|s| {
+            s.spawn(move |_| {
+                let mut gb = Garbler::new(sender, rng);
+                let (gb_inp, ev_inp) = gb.encode_many_wires(&inputs, &input_mods).unwrap();
+                for w in ev_inp.iter() {
+                    gb.send_wire(w).unwrap();
+                }
+                f_gb(&mut gb, &gb_inp);
+            });
 
-        assert_eq!(result, should_be)
+            let mut ev = Evaluator::new(receiver);
+            let ev_inp = input_mods
+                .iter()
+                .map(|q| ev.read_wire(*q).unwrap())
+                .collect_vec();
+            let result = f_ev(&mut ev, &ev_inp).unwrap();
+
+            assert_eq!(result, should_be)
+        }).unwrap();
     }
 
     #[test]
@@ -468,11 +452,7 @@ mod complex {
     };
     use itertools::Itertools;
     use rand::thread_rng;
-    use scuttlebutt::{AesRng, Channel};
-    use std::{
-        io::{BufReader, BufWriter},
-        os::unix::net::UnixStream,
-    };
+    use scuttlebutt::{AesRng, unix_channel_pair};
 
     fn complex_gadget<F: Fancy>(
         b: &mut F,
@@ -509,43 +489,39 @@ mod complex {
             let should_be = complex_gadget(&mut dummy, &dinps).unwrap();
 
             // test streaming garbler and evaluator
-            let (sender, receiver) = UnixStream::pair().unwrap();
+            let (sender, receiver) = unix_channel_pair();
 
-            let input_ = input.clone();
-            std::thread::spawn(move || {
-                let reader = BufReader::new(sender.try_clone().unwrap());
-                let writer = BufWriter::new(sender);
-                let channel = Channel::new(reader, writer);
-                let mut garbler = Garbler::new(channel, AesRng::new());
+            crossbeam::scope(|s| {
+                s.spawn(move |_| {
+                    let mut garbler = Garbler::new(sender, AesRng::new());
 
-                // encode input and send it to the evaluator
-                let mut gb_inp = Vec::with_capacity(N);
-                for X in &input_ {
-                    let (zero, enc) = garbler.crt_encode_wire(*X, Q).unwrap();
-                    for w in enc.iter() {
-                        garbler.send_wire(w).unwrap();
+                    // encode input and send it to the evaluator
+                    let mut gb_inp = Vec::with_capacity(N);
+                    for X in &input {
+                        let (zero, enc) = garbler.crt_encode_wire(*X, Q).unwrap();
+                        for w in enc.iter() {
+                            garbler.send_wire(w).unwrap();
+                        }
+                        gb_inp.push(zero);
                     }
-                    gb_inp.push(zero);
+                    complex_gadget(&mut garbler, &gb_inp).unwrap();
+                });
+
+                let mut evaluator = Evaluator::new(receiver);
+
+                // receive encoded wires from the garbler thread
+                let mut ev_inp = Vec::with_capacity(N);
+                for _ in 0..N {
+                    let ws = qs
+                        .iter()
+                        .map(|q| evaluator.read_wire(*q).unwrap())
+                        .collect_vec();
+                    ev_inp.push(CrtBundle::new(ws));
                 }
-                complex_gadget(&mut garbler, &gb_inp).unwrap();
-            });
-            let reader = BufReader::new(receiver.try_clone().unwrap());
-            let writer = BufWriter::new(receiver);
-            let channel = Channel::new(reader, writer);
-            let mut evaluator = Evaluator::new(channel);
 
-            // receive encoded wires from the garbler thread
-            let mut ev_inp = Vec::with_capacity(N);
-            for _ in 0..N {
-                let ws = qs
-                    .iter()
-                    .map(|q| evaluator.read_wire(*q).unwrap())
-                    .collect_vec();
-                ev_inp.push(CrtBundle::new(ws));
-            }
-
-            let result = complex_gadget(&mut evaluator, &ev_inp).unwrap();
-            assert_eq!(result, should_be);
+                let result = complex_gadget(&mut evaluator, &ev_inp).unwrap();
+                assert_eq!(result, should_be);
+            }).unwrap();
         }
     }
 }

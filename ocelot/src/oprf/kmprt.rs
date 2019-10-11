@@ -36,7 +36,6 @@ fn hash_input_keyed(k: &Aes128, x: Block, range: usize) -> usize {
 }
 
 // Hash `y` with key `k`, producing a result in the range `[0..range-1]`.
-#[inline]
 fn hash_output(k: Block, y: Block512, range: usize) -> usize {
     let aes = Aes128::new(k);
     hash_output_keyed(&aes, y, range)
@@ -45,7 +44,6 @@ fn hash_output(k: Block, y: Block512, range: usize) -> usize {
 // Hash `y` with pre-keyed `k`. Uses a Davies-Meyer-esque hash function.
 //
 // XXX: can we remove this re-keying? It'll speed things up a bunch.
-#[inline]
 fn hash_output_keyed(k: &Aes128, y: Block512, range: usize) -> usize {
     let ys: [Block; 4] = y.into();
     let h = k.encrypt(ys[0]) ^ ys[0];

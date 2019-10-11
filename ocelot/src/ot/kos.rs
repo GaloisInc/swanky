@@ -37,7 +37,6 @@ pub struct Receiver<OT: OtSender<Msg = Block> + Malicious> {
 }
 
 impl<OT: OtReceiver<Msg = Block> + Malicious> Sender<OT> {
-    #[inline]
     fn send_setup<C: AbstractChannel, RNG: CryptoRng + Rng>(
         &mut self,
         channel: &mut C,
@@ -113,7 +112,6 @@ impl<OT: OtReceiver<Msg = Block> + Malicious> OtSender for Sender<OT> {
 }
 
 impl<OT: OtReceiver<Msg = Block> + Malicious> CorrelatedSender for Sender<OT> {
-    #[inline]
     fn send_correlated<C: AbstractChannel, RNG: CryptoRng + Rng>(
         &mut self,
         channel: &mut C,
@@ -140,7 +138,6 @@ impl<OT: OtReceiver<Msg = Block> + Malicious> CorrelatedSender for Sender<OT> {
 }
 
 impl<OT: OtReceiver<Msg = Block> + Malicious> RandomSender for Sender<OT> {
-    #[inline]
     fn send_random<C: AbstractChannel, RNG: CryptoRng + Rng>(
         &mut self,
         channel: &mut C,
@@ -169,7 +166,6 @@ impl<OT: OtReceiver<Msg = Block> + Malicious> std::fmt::Display for Sender<OT> {
 }
 
 impl<OT: OtSender<Msg = Block> + Malicious> Receiver<OT> {
-    #[inline]
     fn receive_setup<C: AbstractChannel, RNG: CryptoRng + Rng>(
         &mut self,
         channel: &mut C,

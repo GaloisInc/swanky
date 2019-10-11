@@ -26,15 +26,7 @@ mod tests {
     };
     use itertools::Itertools;
     use ocelot::ot::{ChouOrlandiReceiver, ChouOrlandiSender};
-    use scuttlebutt::{AesRng, Channel};
-    use std::{
-        io::{BufReader, BufWriter},
-        os::unix::net::UnixStream,
-    };
-
-    type Reader = BufReader<UnixStream>;
-    type Writer = BufWriter<UnixStream>;
-    type MyChannel = Channel<Reader, Writer>;
+    use scuttlebutt::{AesRng, UnixChannel, unix_channel_pair};
 
     fn addition<F: Fancy>(f: &mut F, a: &F::Item, b: &F::Item) -> Result<Option<u16>, F::Error> {
         let c = f.add(&a, &b)?;
@@ -45,25 +37,19 @@ mod tests {
     fn test_addition_circuit() {
         for a in 0..2 {
             for b in 0..2 {
-                let (sender, receiver) = UnixStream::pair().unwrap();
+                let (sender, receiver) = unix_channel_pair();
                 std::thread::spawn(move || {
                     let rng = AesRng::new();
-                    let reader = BufReader::new(sender.try_clone().unwrap());
-                    let writer = BufWriter::new(sender);
-                    let channel = Channel::new(reader, writer);
                     let mut gb =
-                        Garbler::<MyChannel, AesRng, ChouOrlandiSender>::new(channel, rng)
+                        Garbler::<UnixChannel, AesRng, ChouOrlandiSender>::new(sender, rng)
                             .unwrap();
                     let x = gb.encode(a, 3).unwrap();
                     let ys = gb.receive_many(&[3]).unwrap();
                     addition(&mut gb, &x, &ys[0]).unwrap();
                 });
                 let rng = AesRng::new();
-                let reader = BufReader::new(receiver.try_clone().unwrap());
-                let writer = BufWriter::new(receiver);
-                let channel = Channel::new(reader, writer);
                 let mut ev =
-                    Evaluator::<MyChannel, AesRng, ChouOrlandiReceiver>::new(channel, rng).unwrap();
+                    Evaluator::<UnixChannel, AesRng, ChouOrlandiReceiver>::new(receiver, rng).unwrap();
                 let x = ev.receive(3).unwrap();
                 let ys = ev.encode_many(&[b], &[3]).unwrap();
                 let output = addition(&mut ev, &x, &ys[0]).unwrap().unwrap();
@@ -101,24 +87,18 @@ mod tests {
         let target = relu(&mut dummy, &dummy_input).unwrap();
 
         // Run 2PC version.
-        let (sender, receiver) = UnixStream::pair().unwrap();
+        let (sender, receiver) = unix_channel_pair();
         std::thread::spawn(move || {
             let rng = AesRng::new();
-            let reader = BufReader::new(sender.try_clone().unwrap());
-            let writer = BufWriter::new(sender);
-            let channel = Channel::new(reader, writer);
             let mut gb =
-                Garbler::<MyChannel, AesRng, ChouOrlandiSender>::new(channel, rng).unwrap();
+                Garbler::<UnixChannel, AesRng, ChouOrlandiSender>::new(sender, rng).unwrap();
             let xs = gb.crt_encode_many(&input, q).unwrap();
             relu(&mut gb, &xs);
         });
 
         let rng = AesRng::new();
-        let reader = BufReader::new(receiver.try_clone().unwrap());
-        let writer = BufWriter::new(receiver);
-        let channel = Channel::new(reader, writer);
         let mut ev =
-            Evaluator::<MyChannel, AesRng, ChouOrlandiReceiver>::new(channel, rng).unwrap();
+            Evaluator::<UnixChannel, AesRng, ChouOrlandiReceiver>::new(receiver, rng).unwrap();
         let xs = ev.crt_receive_many(n, q).unwrap();
         let result = relu(&mut ev, &xs).unwrap();
         assert_eq!(target, result);
@@ -131,24 +111,18 @@ mod tests {
         circ.print_info().unwrap();
 
         let circ_ = circ.clone();
-        let (sender, receiver) = UnixStream::pair().unwrap();
+        let (sender, receiver) = unix_channel_pair();
         let handle = std::thread::spawn(move || {
             let rng = AesRng::new();
-            let reader = BufReader::new(sender.try_clone().unwrap());
-            let writer = BufWriter::new(sender);
-            let channel = Channel::new(reader, writer);
             let mut gb =
-                Garbler::<MyChannel, AesRng, ChouOrlandiSender>::new(channel, rng).unwrap();
+                Garbler::<UnixChannel, AesRng, ChouOrlandiSender>::new(sender, rng).unwrap();
             let xs = gb.encode_many(&vec![0_u16; 128], &vec![2; 128]).unwrap();
             let ys = gb.receive_many(&vec![2; 128]).unwrap();
             circ_.eval(&mut gb, &xs, &ys).unwrap();
         });
         let rng = AesRng::new();
-        let reader = BufReader::new(receiver.try_clone().unwrap());
-        let writer = BufWriter::new(receiver);
-        let channel = Channel::new(reader, writer);
         let mut ev =
-            Evaluator::<MyChannel, AesRng, ChouOrlandiReceiver>::new(channel, rng).unwrap();
+            Evaluator::<UnixChannel, AesRng, ChouOrlandiReceiver>::new(receiver, rng).unwrap();
         let xs = ev.receive_many(&vec![2; 128]).unwrap();
         let ys = ev.encode_many(&vec![0_u16; 128], &vec![2; 128]).unwrap();
         circ.eval(&mut ev, &xs, &ys).unwrap();

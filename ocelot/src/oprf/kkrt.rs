@@ -103,7 +103,6 @@ impl<OT: OtReceiver<Msg = Block> + SemiHonest> OprfSender for Sender<OT> {
         Ok(seeds[0..m].to_vec())
     }
 
-    #[inline]
     fn compute(&self, seed: Self::Seed, input: Self::Input) -> Self::Output {
         let mut output = Self::Output::default();
         self.encode(input, &mut output);
@@ -118,7 +117,6 @@ impl<OT: OtReceiver<Msg = Block> + SemiHonest> Sender<OT> {
     /// method as it does not integrate the OPRF seed. However, it is useful for
     /// optimization purposes (e.g., when the same seed is used on multiple
     /// encoded inputs).
-    #[inline]
     pub fn encode(
         &self,
         input: <Sender<OT> as ObliviousPrf>::Input,

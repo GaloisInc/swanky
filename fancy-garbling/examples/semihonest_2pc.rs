@@ -11,7 +11,7 @@ use fancy_garbling::{
 };
 use ocelot::ot::{AlszReceiver as OtReceiver, AlszSender as OtSender};
 use scuttlebutt::AesRng;
-use scuttlebutt::channel::unix_channel::{UnixChannel, unix_channel_pair};
+use scuttlebutt::{UnixChannel, unix_channel_pair};
 use std::time::SystemTime;
 
 fn circuit(fname: &str) -> Circuit {

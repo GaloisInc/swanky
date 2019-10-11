@@ -49,7 +49,6 @@ pub struct Receiver<OT: OtSender<Msg = Block> + SemiHonest> {
 }
 
 impl<OT: OtReceiver<Msg = Block> + SemiHonest> Sender<OT> {
-    #[inline]
     pub(super) fn send_setup<C: AbstractChannel>(
         &mut self,
         channel: &mut C,
@@ -174,7 +173,6 @@ impl<OT: OtReceiver<Msg = Block> + SemiHonest> RandomSender for Sender<OT> {
 }
 
 impl<OT: OtSender<Msg = Block> + SemiHonest> Receiver<OT> {
-    #[inline]
     pub(super) fn receive_setup<C: AbstractChannel>(
         &mut self,
         channel: &mut C,

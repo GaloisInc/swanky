@@ -27,7 +27,6 @@ impl PseudorandomCode {
         }
     }
 
-    #[inline]
     pub fn encode(&self, m: Block, out: &mut [Block; 4]) {
         out[0] = self.cipher1.encrypt(m);
         out[1] = self.cipher2.encrypt(m);

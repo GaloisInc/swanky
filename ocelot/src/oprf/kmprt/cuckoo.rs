@@ -59,7 +59,6 @@ impl CuckooHash {
         Self { items, ms, hs }
     }
 
-    #[inline]
     fn _hash(
         &mut self,
         hashkeys: &[Aes128],
@@ -94,7 +93,6 @@ impl CuckooHash {
         Some((entry, index))
     }
 
-    #[inline]
     fn hash(&mut self, hashkeys: &[Aes128], entry: Block, index: usize) -> Result<(), Error> {
         // Try to place in the first `m₁` bins.
         match self._hash(hashkeys, entry, index, self.hs.0, 0, self.ms.0, 0) {

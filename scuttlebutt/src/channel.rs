@@ -7,11 +7,12 @@
 mod hash_channel;
 mod sync_channel;
 mod track_channel;
-pub mod unix_channel;
+mod unix_channel;
 
 pub use hash_channel::HashChannel;
 pub use sync_channel::SyncChannel;
 pub use track_channel::TrackChannel;
+pub use unix_channel::{UnixChannel, TrackUnixChannel, unix_channel_pair, track_unix_channel_pair};
 
 use crate::{Block, Block512};
 #[cfg(feature = "curve25519-dalek")]
