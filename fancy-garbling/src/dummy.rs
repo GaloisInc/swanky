@@ -261,7 +261,7 @@ mod bundle {
         let q = 1 << nbits;
         for _ in 0..NITERS {
             let x = rng.gen_u128() % q;
-            let should_be = (!x + 1) % q;
+            let should_be = (((!x) % q) + 1) % q;
             let mut d = Dummy::new();
             let out;
             {
