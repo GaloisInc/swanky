@@ -4,6 +4,8 @@
 // Copyright © 2019 Galois, Inc.
 // See LICENSE for licensing information.
 
+#![allow(clippy::unreadable_literal)]
+
 use crate::util;
 
 pub fn lookup(q: u16) -> Vec<u128> {

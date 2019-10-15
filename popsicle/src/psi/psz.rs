@@ -115,7 +115,7 @@ impl Sender {
                 let key = &encoded.as_ref()[masksize..masksize + 16];
 
                 // encrypt payload
-                let mut ct = payloads[j].clone();
+                let mut ct = payloads[j];
                 scuttlebutt::utils::xor_inplace(ct.as_mut(), key);
 
                 channel.write_bytes(&tag[0..masksize])?;

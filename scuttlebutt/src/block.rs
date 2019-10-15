@@ -107,16 +107,14 @@ impl Block {
         unsafe { Block(_mm_xor_si128(self.0, ONES)) }
     }
 
-    /// Try to create a Block from a slice of bytes. The slice must have exactly 16 bytes.
+    /// Try to create a `Block` from a slice of bytes. The slice must have exactly 16 bytes.
     #[inline]
     pub fn try_from_slice(bytes_slice: &[u8]) -> Option<Self> {
         if bytes_slice.len() != 16 {
             return None;
         }
         let mut bytes = [0; 16];
-        for i in 0..16 {
-            bytes[i] = bytes_slice[i];
-        }
+        bytes[..16].clone_from_slice(&bytes_slice[..16]);
         Some(Block::from(bytes))
     }
 }

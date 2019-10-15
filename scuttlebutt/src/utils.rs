@@ -21,15 +21,15 @@ pub fn pack_bits(bits: &[bool]) -> Vec<u8> {
     bytes
 }
 
-/// Unpack a bit vec from a slice of bytes.
+/// Unpack a bit vector from a slice of bytes.
 pub fn unpack_bits(bytes: &[u8], size: usize) -> Vec<bool> {
     let mut bits = Vec::with_capacity(size);
-    for i in 0..bytes.len() {
+    for (i, byte) in bytes.iter().enumerate() {
         for j in 0..8 {
             if 8 * i + j >= size {
                 break;
             }
-            bits.push(((bytes[i] >> j) & 1) != 0);
+            bits.push(((byte >> j) & 1) != 0);
         }
     }
     bits

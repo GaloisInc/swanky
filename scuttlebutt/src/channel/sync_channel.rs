@@ -26,12 +26,12 @@ impl<R: Read, W: Write> SyncChannel<R, W> {
 
     /// Return a reader object wrapped in `Arc<Mutex<R>>`.
     pub fn reader(self) -> Arc<Mutex<R>> {
-        self.reader.clone()
+        self.reader
     }
 
     /// Return a writer object wrapped in `Arc<Mutex<W>>`.
     pub fn writer(self) -> Arc<Mutex<W>> {
-        self.writer.clone()
+        self.writer
     }
 }
 

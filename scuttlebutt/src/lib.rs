@@ -17,6 +17,7 @@ mod aes;
 mod block;
 mod block512;
 pub mod bloomfilter;
+/// Module for encapsulating communication channels for `swanky`.
 pub mod channel;
 pub mod cointoss;
 pub mod commitment;
@@ -32,8 +33,15 @@ pub use crate::{
     block::Block,
     block512::Block512,
     channel::{
-        AbstractChannel, Channel, HashChannel, SyncChannel, TrackChannel, UnixChannel,
-        TrackUnixChannel, unix_channel_pair, track_unix_channel_pair
+        track_unix_channel_pair,
+        unix_channel_pair,
+        AbstractChannel,
+        Channel,
+        HashChannel,
+        SyncChannel,
+        TrackChannel,
+        TrackUnixChannel,
+        UnixChannel,
     },
     hash_aes::{AesHash, AES_HASH},
     rand_aes::AesRng,

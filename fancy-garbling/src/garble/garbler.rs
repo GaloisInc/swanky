@@ -185,7 +185,7 @@ impl<C: AbstractChannel, RNG: RngCore + CryptoRng> Fancy for Garbler<C, RNG> {
         if q != qb {
             // would need to pack minitable into more than one u128 to support qb > 8
             if qb > 8 {
-                return Err(GarblerError::AsymmetricHalfGateModuliMax8(qb))?;
+                return Err(GarblerError::AsymmetricHalfGateModuliMax8(qb));
             }
 
             r = self.rng.gen_u16() % q;

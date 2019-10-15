@@ -12,7 +12,7 @@ mod unix_channel;
 pub use hash_channel::HashChannel;
 pub use sync_channel::SyncChannel;
 pub use track_channel::TrackChannel;
-pub use unix_channel::{UnixChannel, TrackUnixChannel, unix_channel_pair, track_unix_channel_pair};
+pub use unix_channel::{track_unix_channel_pair, unix_channel_pair, TrackUnixChannel, UnixChannel};
 
 use crate::{Block, Block512};
 #[cfg(feature = "curve25519-dalek")]
@@ -224,12 +224,12 @@ impl<R: Read, W: Write> Channel<R, W> {
 
     /// Return a reader object wrapped in `Rc<RefCell>`.
     pub fn reader(self) -> Rc<RefCell<R>> {
-        self.reader.clone()
+        self.reader
     }
 
     /// Return a writer object wrapped in `Rc<RefCell>`.
     pub fn writer(self) -> Rc<RefCell<W>> {
-        self.writer.clone()
+        self.writer
     }
 }
 

@@ -73,9 +73,9 @@ pub trait FancyInput {
         let qs = moduli.iter().flatten().cloned().collect_vec();
         let xs = values.iter().flatten().cloned().collect_vec();
         if xs.len() != qs.len() {
-            Err(FancyError::InvalidArg(
-                "unequal number of values and moduli".to_string(),
-            ))?;
+            return Err(
+                FancyError::InvalidArg("unequal number of values and moduli".to_string()).into(),
+            );
         }
         let mut wires = self.encode_many(&xs, &qs)?;
         let buns = moduli
