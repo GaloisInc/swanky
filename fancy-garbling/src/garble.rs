@@ -296,7 +296,7 @@ mod streaming {
     };
     use itertools::Itertools;
     use rand::thread_rng;
-    use scuttlebutt::{AesRng, UnixChannel, unix_channel_pair};
+    use scuttlebutt::{unix_channel_pair, AesRng, UnixChannel};
 
     // helper - checks that Streaming evaluation of a fancy function equals Dummy
     // evaluation of the same function
@@ -338,7 +338,8 @@ mod streaming {
             let result = f_ev(&mut ev, &ev_inp).unwrap();
 
             assert_eq!(result, should_be)
-        }).unwrap();
+        })
+        .unwrap();
     }
 
     #[test]
@@ -452,7 +453,7 @@ mod complex {
     };
     use itertools::Itertools;
     use rand::thread_rng;
-    use scuttlebutt::{AesRng, unix_channel_pair};
+    use scuttlebutt::{unix_channel_pair, AesRng};
 
     fn complex_gadget<F: Fancy>(
         b: &mut F,
@@ -521,7 +522,8 @@ mod complex {
 
                 let result = complex_gadget(&mut evaluator, &ev_inp).unwrap();
                 assert_eq!(result, should_be);
-            }).unwrap();
+            })
+            .unwrap();
         }
     }
 }

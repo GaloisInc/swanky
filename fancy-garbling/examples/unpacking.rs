@@ -1,6 +1,6 @@
+use criterion::black_box;
 use fancy_garbling::Wire;
 use rand;
-use criterion::black_box;
 use std::time::SystemTime;
 
 fn main() {
@@ -11,8 +11,5 @@ fn main() {
         let w = Wire::from_block(b, q);
         black_box(w);
     }
-    println!(
-        "Time: {} ms",
-        start.elapsed().unwrap().as_millis()
-    );
+    println!("Time: {} ms", start.elapsed().unwrap().as_millis());
 }
