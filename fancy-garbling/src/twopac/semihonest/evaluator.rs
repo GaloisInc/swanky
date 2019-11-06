@@ -17,8 +17,7 @@ pub struct Evaluator<C, RNG, OT> {
     rng: RNG,
 }
 
-impl<C, RNG, OT> Evaluator<C, RNG, OT> {
-}
+impl<C, RNG, OT> Evaluator<C, RNG, OT> {}
 
 impl<C: AbstractChannel, RNG: CryptoRng + Rng, OT: OtReceiver<Msg = Block> + SemiHonest>
     Evaluator<C, RNG, OT>

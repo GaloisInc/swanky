@@ -5,11 +5,13 @@
 // See LICENSE for licensing information.
 
 use crate::{AbstractChannel, Channel};
-use std::io::{Read, Result, Write};
-use std::sync::{Arc, Mutex};
+use std::{
+    io::{Read, Result, Write},
+    sync::{Arc, Mutex},
+};
 
 /// A channel for tracking the number of bits read/written.
-pub struct TrackChannel<R, W>(Arc<Mutex<InternalTrackChannel<R,W>>>);
+pub struct TrackChannel<R, W>(Arc<Mutex<InternalTrackChannel<R, W>>>);
 
 struct InternalTrackChannel<R, W> {
     channel: Channel<R, W>,

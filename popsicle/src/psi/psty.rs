@@ -130,8 +130,7 @@ impl SenderState {
         C: AbstractChannel,
         RNG: RngCore + CryptoRng + SeedableRng<Seed = Block>,
     {
-        let mut gb =
-            Garbler::<C, RNG, OtSender>::new(channel.clone(), RNG::from_seed(rng.gen()))?;
+        let mut gb = Garbler::<C, RNG, OtSender>::new(channel.clone(), RNG::from_seed(rng.gen()))?;
         let my_input_bits = encode_inputs(&self.opprf_outputs);
         let mods = vec![2; my_input_bits.len()]; // all binary moduli
         let sender_inputs = gb.encode_many(&my_input_bits, &mods)?;

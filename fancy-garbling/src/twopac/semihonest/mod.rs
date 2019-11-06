@@ -26,7 +26,7 @@ mod tests {
     };
     use itertools::Itertools;
     use ocelot::ot::{ChouOrlandiReceiver, ChouOrlandiSender};
-    use scuttlebutt::{AesRng, UnixChannel, unix_channel_pair};
+    use scuttlebutt::{unix_channel_pair, AesRng, UnixChannel};
 
     fn addition<F: Fancy>(f: &mut F, a: &F::Item, b: &F::Item) -> Result<Option<u16>, F::Error> {
         let c = f.add(&a, &b)?;
@@ -49,7 +49,8 @@ mod tests {
                 });
                 let rng = AesRng::new();
                 let mut ev =
-                    Evaluator::<UnixChannel, AesRng, ChouOrlandiReceiver>::new(receiver, rng).unwrap();
+                    Evaluator::<UnixChannel, AesRng, ChouOrlandiReceiver>::new(receiver, rng)
+                        .unwrap();
                 let x = ev.receive(3).unwrap();
                 let ys = ev.encode_many(&[b], &[3]).unwrap();
                 let output = addition(&mut ev, &x, &ys[0]).unwrap().unwrap();

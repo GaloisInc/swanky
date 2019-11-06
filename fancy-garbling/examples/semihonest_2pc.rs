@@ -10,8 +10,7 @@ use fancy_garbling::{
     FancyInput,
 };
 use ocelot::ot::{AlszReceiver as OtReceiver, AlszSender as OtSender};
-use scuttlebutt::AesRng;
-use scuttlebutt::{UnixChannel, unix_channel_pair};
+use scuttlebutt::{unix_channel_pair, AesRng, UnixChannel};
 use std::time::SystemTime;
 
 fn circuit(fname: &str) -> Circuit {

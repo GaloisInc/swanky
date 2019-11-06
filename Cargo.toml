@@ -9,6 +9,7 @@ members = [
 [profile.release]
 opt-level = 3
 debug = true
+lto = true
 debug-assertions = false
 overflow-checks = false
 
