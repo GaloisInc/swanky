@@ -353,7 +353,9 @@ impl Wire {
     /// Negate all the digits mod q.
     pub fn negate_eq(&mut self) -> &mut Wire {
         match self {
-            Wire::Mod2 { val } => *val = val.flip(),
+            Wire::Mod2 { .. } => {
+                // Do nothing. Additive inverse is a no-op for mod 2.
+            }
             Wire::Mod3 { lsb, msb } => {
                 // Negation just involves swapping `lsb` and `msb`.
                 std::mem::swap(lsb, msb);
@@ -384,10 +386,7 @@ impl Wire {
 
     /// Subtract a wire from this one.
     pub fn minus_eq<'a>(&'a mut self, other: &Wire) -> &'a mut Wire {
-        match *self {
-            Wire::Mod2 { .. } => self.plus_eq(&other),
-            _ => self.plus_eq(&other.negate()),
-        }
+        self.plus_eq(&other.negate())
     }
 
     /// Subtract a wire from this one, consuming it for chained computations.
@@ -507,7 +506,9 @@ mod tests {
             let q = rng.gen_modulus();
             let x = Wire::rand(rng, q);
             let xneg = x.negate();
-            assert!(x != xneg);
+            if q != 2 {
+                assert!(x != xneg);
+            }
             let y = xneg.negate();
             assert_eq!(x, y);
         }
