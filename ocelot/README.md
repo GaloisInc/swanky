@@ -1,4 +1,4 @@
-# `ocelot`: A rust library for oblivious transfer [![](https://travis-ci.org/GaloisInc/ocelot.svg?branch=master)](https://travis-ci.org/GaloisInc/ocelot)
+# `ocelot`: A rust library for oblivious transfer
 
 The `ocelot` library implements various one-out-of-two oblivious transfer (+
 extension) protocols in rust, alongside oblivious pseudorandom function
@@ -24,7 +24,7 @@ version 1.0 is released**
 
 # Documentation
 
-The documentation can be found here: <https://galoisinc.github.io/ocelot/ocelot/>
+The documentation can be found here: <https://galoisinc.github.io/swanky/ocelot/ocelot/>
 
 # Performance
 

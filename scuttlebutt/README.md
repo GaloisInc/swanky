@@ -1,4 +1,4 @@
-# The `scuttlebutt` multi-party computation utilities toolkit [![](https://travis-ci.org/GaloisInc/scuttlebutt.svg?branch=master)](https://travis-ci.org/GaloisInc/scuttlebutt)
+# The `scuttlebutt` multi-party computation utilities toolkit
 Or: "Where rust MPC libraries come to drink"
 
 The `scuttlebutt` library provides a bunch of core primitives for building
@@ -28,7 +28,7 @@ version 1.0 is released**
 
 # Documentation
 
-The documentation can be found here: https://galoisinc.github.io/scuttlebutt/scuttlebutt/
+The documentation can be found here: https://galoisinc.github.io/swanky/scuttlebutt/scuttlebutt/
 
 # Building
 
