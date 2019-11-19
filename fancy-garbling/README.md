@@ -8,6 +8,10 @@ arithmetic garbling scheme, plus some additional bonus features.
 **`fancy-garbling` should be considered extremely unstable and under active
 development (and research!)**
 
+# Documentation
+
+The documentation can be found here: <https://galoisinc.github.io/swanky/fancy_garbling/>
+
 # Building
 
 `fancy-garbling` requires at least `rustc 1.31.0`.

@@ -28,7 +28,7 @@ version 1.0 is released**
 
 # Documentation
 
-The documentation can be found here: https://galoisinc.github.io/swanky/scuttlebutt/scuttlebutt/
+The documentation can be found here: <https://galoisinc.github.io/swanky/scuttlebutt/>
 
 # Building
 
