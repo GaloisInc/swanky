@@ -7,18 +7,17 @@ set intersection (PSI) protocols.
 
 * The Pinkas-Schneider-Zohner semi-honest two-party PSI protocol based on the
   oblivious PRF of Kolesnikov-Kumaresan-Rosulek-Trieu.
-* [Unstable] The Pinkas-Schnedier-Tkachenko-Yanai semi-honest two-party PSI
-  protocol based on the oblivious programmable PRF of
-  Kolesnikov-Matania-Pinkas-Rosulek-Trieu.
-* [Unstable] The Kolesnikov-Matania-Pinkas-Rosulek-Trieu semi-honest multi-party
-  PSI protocol.
+* The Pinkas-Schnedier-Tkachenko-Yanai semi-honest two-party PSI protocol based
+  on the oblivious programmable PRF of Kolesnikov-Matania-Pinkas-Rosulek-Trieu.
+* The Kolesnikov-Matania-Pinkas-Rosulek-Trieu semi-honest multi-party PSI
+  protocol.
 
 **`popsicle` should be considered unstable and under active development until
 version 1.0 is released**
 
 # Documentation
 
-The documentation can be found here: <https://galoisinc.github.io/swanky/popsicle/popsicle/>
+The documentation can be found here: <https://galoisinc.github.io/swanky/popsicle/>
 
 # Building
 

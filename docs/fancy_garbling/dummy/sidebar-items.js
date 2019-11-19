@@ -1,0 +1,1 @@
+initSidebarItems({"struct":[["Dummy","Simple struct that performs the fancy computation over `u16`."],["DummyVal","Wrapper around `u16`."]]});

@@ -1,7 +1,7 @@
 # **swanky**: A suite of rust libraries for secure multi-party computation
 
 **swanky** provides a suite of rust libraries for doing secure multi-party
-computation (MPC). [![pipeline status](https://github.com/GaloisInc/swanky/badges/dev/pipeline.svg)](https://github.com/GaloisInc/swanky/commits/master)
+computation (MPC).
 
 ![library diagram](diagram.png)
 
