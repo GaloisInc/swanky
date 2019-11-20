@@ -1,9 +1,9 @@
 language: rust
 cache: cargo
 
-before_install:
-  - rustup component add rustfmt
-  - rustup component add clippy
+# before_install:
+#   - rustup component add rustfmt
+#   - rustup component add clippy
 
 matrix:
   include:
@@ -17,5 +17,5 @@ script:
   - |
     cargo build --verbose --all --examples --tests --benches "$FEATURES" &&
     cargo test --all --verbose "$FEATURES" &&
-    cargo fmt --all -- --check
+    # cargo fmt --all -- --check
     # cargo clippy --all -- -D all
