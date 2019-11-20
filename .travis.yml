@@ -15,7 +15,7 @@ matrix:
         - FEATURES='--all-features'
 script:
   - |
-    cargo build --verbose --all --examples --tests --benches "$FEATURES" &&
-    cargo test --all --verbose "$FEATURES" &&
+    cargo build --verbose --all --examples --tests --benches $FEATURES &&
+    cargo test --all --verbose $FEATURES # &&
     # cargo fmt --all -- --check
     # cargo clippy --all -- -D all
