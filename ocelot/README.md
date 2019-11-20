@@ -79,10 +79,11 @@ MIT License
 # Acknowledgments
 
 This material is based upon work supported by the ARO and DARPA under Contract
-No. W911NF-15-C-0227.
+No. W911NF-15-C-0227 and by DARPA and SSC Pacific under Contract No.
+N66001-15-C-4070.
 
 Any opinions, findings and conclusions or recommendations expressed in this
 material are those of the author(s) and do not necessarily reflect the views of
-the ARO and DARPA.
+the ARO, SSC Pacific, and DARPA.
 
 Copyright © 2019 Galois, Inc.
