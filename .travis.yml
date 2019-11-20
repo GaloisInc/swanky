@@ -1,14 +1,21 @@
 language: rust
+cache: cargo
+
+before_install:
+  - rustup component add rustfmt
+  - rustup component add clippy
+
 matrix:
   include:
     - rust: stable
       env:
-        - FEATURES='curve25519-dalek serde'
-    # - rust: nightly
-    #   env:
-    #     - FEATURES='nightly curve25519-dalek serde'
+        - FEATURES='--features curve25519-dalek serde'
+    - rust: nightly
+      env:
+        - FEATURES='--all-features'
 script:
   - |
-    cargo build --verbose --all --examples --tests --benches --features "$FEATURES" &&
-    cargo test --all --verbose --features "$FEATURES" &&
+    cargo build --verbose --all --examples --tests --benches "$FEATURES" &&
+    cargo test --all --verbose "$FEATURES" &&
     cargo fmt --all -- --check
+    # cargo clippy --all -- -D all
