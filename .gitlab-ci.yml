@@ -1,0 +1,57 @@
+image: "rust:latest"
+
+variables:
+  GIT_STRATEGY: clone
+  RUST_BACKTRACE: 1
+  CARGO_INCREMENTAL: 0
+
+before_script:
+  - apt-get update -yqq
+  - apt-get install -yqq --no-install-recommends build-essential git
+  - rustup toolchain add $toolchain
+  - rustup default $toolchain
+
+stages:
+  - checkfmt
+  - test
+
+checkfmt:rustfmt:
+  stage: checkfmt
+  variables:
+    toolchain: nightly
+  script:
+    - rustup component add rustfmt --toolchain $toolchain
+    - cargo fmt --all -- --check
+
+.test:
+  stage: test
+  script:
+    - rustc --version && cargo --version  # Print version info for debugging
+    - etc/test_workspace.py "$features"
+
+# Until the '-Z package-features' cargo argument is stabilized, there isn't an
+# easy way to test every package with given features. As a result, we test
+# on stable, without any features, but also on nightly without the nightly
+# feature
+
+test:stable:
+  stage: test
+  variables:
+    toolchain: stable
+  script:
+    - rustc --version && cargo --version  # Print version info for debugging
+    - cargo build --verbose --all --examples --tests --benches
+    - cargo test --all --verbose
+
+test:without-stable-feature:
+  extends: .test
+  variables:
+    toolchain: nightly
+    features: curve25519-dalek serde
+
+test:nightly:
+  extends: .test
+  variables:
+    toolchain: nightly
+    features: curve25519-dalek serde nightly
+
