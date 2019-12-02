@@ -21,9 +21,9 @@ nightly = ["rand/nightly", "scuttlebutt/nightly"]
 base_conversion = { path = "base_conversion" }
 scuttlebutt = { path = "../scuttlebutt" }
 ocelot = { path = "../ocelot" }
-itertools = "0.8.0"
-rand = "0.6.5"
-regex = "1.1.7"
+itertools = "0.8"
+rand = "0.7"
+regex = "1.1"
 
 [dev-dependencies]
 criterion = "0.3.0"

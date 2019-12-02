@@ -214,7 +214,7 @@ fn ipv6_to_block(addr: &str) -> Block {
 
 fn block_to_ipv6(b: Block) -> String {
     let bs = <[u8; 16]>::from(b)
-        .into_iter()
+        .iter()
         .map(|byte| format!("{:02X}", byte))
         .collect_vec();
     bs.chunks(2).map(|pair| pair.concat()).join(":")
