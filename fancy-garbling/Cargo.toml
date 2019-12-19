@@ -16,6 +16,7 @@ doctest = false
 
 [features]
 nightly = ["rand/nightly", "scuttlebutt/nightly"]
+serde1 = ["serde", "scuttlebutt/serde1"]
 
 [dependencies]
 base_conversion = { path = "base_conversion" }
@@ -24,6 +25,7 @@ ocelot = { path = "../ocelot" }
 itertools = "0.8"
 rand = "0.7"
 regex = "1.1"
+serde = { version = "1", features = ["derive"], optional = true }
 
 [dev-dependencies]
 criterion = "0.3.0"
