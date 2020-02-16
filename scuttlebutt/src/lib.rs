@@ -33,18 +33,24 @@ pub use crate::{
     block::Block,
     block512::Block512,
     channel::{
-        track_unix_channel_pair,
-        unix_channel_pair,
         AbstractChannel,
         Channel,
         HashChannel,
         SyncChannel,
-        TrackChannel,
-        TrackUnixChannel,
-        UnixChannel,
+        TrackChannel
     },
     hash_aes::{AesHash, AES_HASH},
     rand_aes::AesRng,
+};
+
+#[cfg(feature = "unix")]
+pub use crate::{
+    channel::{
+        UnixChannel,
+        TrackUnixChannel,
+        track_unix_channel_pair,
+        unix_channel_pair,
+    }
 };
 
 /// A marker trait denoting that the given scheme is semi-honest secure.

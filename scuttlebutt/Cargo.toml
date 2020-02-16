@@ -16,6 +16,7 @@ publish = false
 nightly = ["curve25519-dalek/avx2_backend", "rand/nightly"]
 unstable = []
 serde1 = ["serde"]
+unix = []
 
 [dependencies]
 curve25519-dalek = { version = "2", features = ["std"], optional = true }
