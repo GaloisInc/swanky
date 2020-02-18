@@ -21,9 +21,11 @@ ocelot         = { path = "../ocelot" }
 scuttlebutt    = { path = "../scuttlebutt" }
 itertools      = "0.8"
 rand           = "0.7"
-openssl        = "0.10"
 sha2           = "0.8"
 fancy-garbling = { path = "../fancy-garbling", optional = true }
+
+[target.'cfg(feature = "psty")'.dependencies]
+openssl        = "0.10"
 
 [dev-dependencies]
 criterion  = "0.2.11"

@@ -43,7 +43,7 @@ pub use crate::{
     rand_aes::AesRng,
 };
 
-#[cfg(feature = "unix")]
+#[cfg(unix)]
 pub use crate::{
     channel::{
         UnixChannel,

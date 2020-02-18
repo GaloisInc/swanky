@@ -29,12 +29,14 @@ pub enum Error {
     /// Not enough payloads.
     InvalidPayloadsLength,
     /// SSL Error
-    SSLError(openssl::error::ErrorStack),
     #[cfg(feature = "psty")]
+    SSLError(openssl::error::ErrorStack),
     /// An error occurred in the underlying 2PC protocol.
+    #[cfg(feature = "psty")]
     TwopcError(fancy_garbling::errors::TwopacError),
 }
 
+#[cfg(feature = "psty")]
 impl From<openssl::error::ErrorStack> for Error {
     #[inline]
     fn from(e: openssl::error::ErrorStack) -> Error {
@@ -88,6 +90,7 @@ impl std::fmt::Display for Error {
             ),
             Error::PsiProtocolError(s) => write!(f, "PSI protocol error: {}", s),
             Error::InvalidPayloadsLength => write!(f, "Invalid length of payloads!"),
+            #[cfg(feature = "psty")]
             Error::SSLError(e) => write!(f, "SSL Error: {}", e),
             #[cfg(feature = "psty")]
             Error::TwopcError(e) => write!(f, "2PC protocol error: {}", e),
