@@ -14,7 +14,7 @@ publish = false
 
 [features]
 nightly = ["rand/nightly", "scuttlebutt/nightly", "ocelot/nightly", "ocelot/nightly"]
-psty = ["fancy-garbling"]
+psty = ["fancy-garbling", "openssl"]
 
 [dependencies]
 ocelot         = { path = "../ocelot" }
@@ -23,9 +23,7 @@ itertools      = "0.8"
 rand           = "0.7"
 sha2           = "0.8"
 fancy-garbling = { path = "../fancy-garbling", optional = true }
-
-[target.'cfg(feature = "psty")'.dependencies]
-openssl        = "0.10"
+openssl        = { version = "0.10", optional = true }
 
 [dev-dependencies]
 criterion  = "0.2.11"
