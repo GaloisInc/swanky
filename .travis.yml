@@ -9,7 +9,7 @@ matrix:
   include:
     - rust: stable
       env:
-        - FEATURES='--features curve25519-dalek,serde'
+        - FEATURES=
     - rust: nightly
       env:
         - FEATURES='--all-features'
