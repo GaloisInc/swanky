@@ -7,11 +7,14 @@
 mod hash_channel;
 mod sync_channel;
 mod track_channel;
+#[cfg(unix)]
 mod unix_channel;
 
 pub use hash_channel::HashChannel;
 pub use sync_channel::SyncChannel;
 pub use track_channel::TrackChannel;
+
+#[cfg(unix)]
 pub use unix_channel::{track_unix_channel_pair, unix_channel_pair, TrackUnixChannel, UnixChannel};
 
 use crate::{Block, Block512};
