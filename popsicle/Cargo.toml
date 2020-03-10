@@ -23,7 +23,7 @@ itertools      = "0.8"
 rand           = "0.7"
 sha2           = "0.8"
 fancy-garbling = { path = "../fancy-garbling", optional = true }
-openssl        = { version = "0.10", optional = true }
+openssl        = { version = "0.10.28", optional = true }
 
 [dev-dependencies]
 criterion  = "0.2.11"
