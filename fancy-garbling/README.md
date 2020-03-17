@@ -17,10 +17,11 @@ wire, which can be used recursively to evaluate the whole circuit.
 In order to fully evaluate a circuit, the parties need a way for the evaluator to receive
 the correct input wires for its input without telling the garbler what those values are.
 That is what oblivious transfer (OT) is for, and we implement many versions of oblivious
-transfer in our [ocelot](https://github.com/GaloisInc/swanky/ocelot) library.
+transfer in our [ocelot](https://github.com/GaloisInc/swanky/tree/master/ocelot) library.
 A simple protocol which includes both OT and garbled circuits can be considered semi-honest
-secure. We implement this, and other security levels, in our
-[twopac](https://github.com/GaloisInc/swanky/twopac) library.
+secure. We implement this in the
+[twopac](https://github.com/GaloisInc/swanky/tree/master/fancy-garbling/src/twopac) module
+of this crate.
 
 Traditionally, garbled circuits operate over *boolean* circuits, where the values on
 wires are either 0 or 1. This means the function you want to evaluate must be written in
