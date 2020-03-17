@@ -23,7 +23,7 @@ A simple protocol which includes both OT and garbled circuits can be considered 
 secure. We implement this, and other security levels, in our
 [twopac](https://github.com/GaloisInc/swanky/twopac) library.
 
-Transitionally, garbled circuits operate over *boolean* circuits, where the values on
+Traditionally, garbled circuits operate over *boolean* circuits, where the values on
 wires are either 0 or 1. This means the function you want to evaluate must be written in
 terms of boolean logic - ANDs, NOTs, XORs, etc. The costs of the garbled circuit are then
 in terms of how expensive each gate is to garble. For Boolean garbled circuits, the state
