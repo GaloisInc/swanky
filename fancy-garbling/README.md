@@ -49,7 +49,7 @@ development (and research!)**
 
 # API Documentation
 
-The documentation can be found here: <https://galoisinc.github.io/swanky/fancy_garbling/>
+[The documentation can be found here](https://galoisinc.github.io/swanky/fancy_garbling)
 
 # Building
 
