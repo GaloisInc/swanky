@@ -83,12 +83,19 @@ MIT License
 
 # Acknowledgments
 
-This material is based upon work supported by the ARO and DARPA under Contract
-No. W911NF-15-C-0227 and by DARPA and SSC Pacific under Contract No.
-N66001-15-C-4070.
+This research is based upon work supported in part by the Office of the Director of
+National Intelligence (ODNI), Intelligence Advanced Research Projects Activity (IARPA) via
+Contract No. 2019-1902070006. The views and conclusions contained herein are those of the
+authors and should not be interpreted as necessarily representing the official policies,
+either express or implied, of ODNI, IARPA, or the U.S. Government. The U.S. Government is
+authorized to reproduce and distribute reprints for governmental purposes notwithstanding
+any copyright annotation therein.
 
-Any opinions, findings and conclusions or recommendations expressed in this
-material are those of the author(s) and do not necessarily reflect the views of
-the ARO, SSC Pacific, and DARPA.
+This material is also based upon work supported by the ARO and DARPA under Contract No.
+W911NF-15-C-0227 and by DARPA and SSC Pacific under Contract No. N66001-15-C-4070.
+
+Any opinions, findings and conclusions or recommendations expressed in this material are
+those of the author(s) and do not necessarily reflect the views of the ARO, SSC Pacific,
+and DARPA.
 
 Copyright © 2019 Galois, Inc.
