@@ -7,12 +7,12 @@ arithmetic garbling scheme, plus some additional bonus features.
 
 In general garbled circuits are a way for two mutually distrusting parties to compute a
 function on their inputs, *without revealing their inputs to each other*.  The basic idea
-is that if express the function they want to compute as a circuit, one party "garbles" the
-circuit, producing encrypted truth tables for each gate in the circuit. These are then
-given to the other party who evolutes the circuit using encrypted wires. Each encrypted
-wire (called a wirelabel) contains a secret value and can be used to open exactly one
-ciphertext in the garbled gates given by the evaluator. This new ciphertext is the output
-wire, which can be used recursively to evaluate the whole circuit.
+is as follows: first express the function to compute as a circuit.  Then, one party
+"garbles" the circuit, producing encrypted truth tables for each gate in the circuit.
+These are then given to the other party who evaluates the circuit using encrypted wires.
+Each encrypted wire (called a wirelabel) contains a secret value and can be used to open
+exactly one ciphertext in the garbled gates given by the evaluator. This new ciphertext is
+the output wire, which can be used recursively to evaluate the whole circuit.
 
 In order to fully evaluate a circuit, the parties need a way for the evaluator to receive
 the correct input wires for its input without telling the garbler what those values are.
@@ -42,7 +42,8 @@ Essentially, to use our library you must be able to construct your function in t
 our `Fancy` DSL. Then, your function will be garbled and evaluated immediately as the DSL
 is evaluated. Wires will be conveniently dropped as they go out of scope of your DSL's
 functions. A full circuit representation is not necessary to construct, analyze, or hold
-in memory. See the API docs for details.
+in memory. See the [API docs](https://galoisinc.github.io/swanky/fancy_garbling) for
+details.
 
 **`fancy-garbling` should be considered extremely unstable and under active
 development (and research!)**
