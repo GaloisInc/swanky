@@ -1,11 +1,9 @@
-![fancy garbling logo](logo.png)
-
-# `fancy-garbling`: Library for garbling boolean (+ arithmetic!) circuits
+# `fancy-garbling`: Library for garbling boolean and arithmetic circuits
 
 `fancy-garbling` implements the [BMR16](https://eprint.iacr.org/2016/969)
-arithmetic garbling scheme, plus some additional bonus features.
+arithmetic garbling scheme, plus some additional features.
 
-In general garbled circuits are a way for two mutually distrusting parties to compute a
+Garbled circuits are a way for two mutually distrusting parties to compute a
 function on their inputs, *without revealing their inputs to each other*.  The basic idea
 is as follows: first express the function to compute as a circuit.  Then, one party
 "garbles" the circuit, producing encrypted truth tables for each gate in the circuit.
@@ -45,8 +43,8 @@ functions. A full circuit representation is not necessary to construct, analyze,
 in memory. See the [API docs](https://galoisinc.github.io/swanky/fancy_garbling) for
 details.
 
-**`fancy-garbling` should be considered extremely unstable and under active
-development (and research!)**
+**`fancy-garbling` should be considered unstable and under active development
+(and research!)**
 
 # API Documentation
 
@@ -98,4 +96,4 @@ Any opinions, findings and conclusions or recommendations expressed in this mate
 those of the author(s) and do not necessarily reflect the views of the ARO, SSC Pacific,
 and DARPA.
 
-Copyright © 2019 Galois, Inc.
+Copyright © 2019-2020 Galois, Inc.
