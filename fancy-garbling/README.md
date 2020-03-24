@@ -1,4 +1,4 @@
-# `fancy-garbling`: Library for garbling boolean and arithmetic circuits
+# `fancy-garbling`: garbling boolean and arithmetic circuits
 
 `fancy-garbling` implements the [BMR16](https://eprint.iacr.org/2016/969)
 arithmetic garbling scheme, plus some additional features.
