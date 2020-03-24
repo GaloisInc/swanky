@@ -35,7 +35,7 @@ stems from this choice.  Streaming means that garbled gates are encrypted (and s
 the wire) immediately as they are produced by the garbler.  They do not need to be
 retained in memory. This allows us to evaluate extremely large circuits that would not fit
 in any modern computer, such as the ones that we create in our [neural network
-experiments](https://github.com/spaceships/garbled-neural-network-experiments).
+experiments](https://github.com/GaloisInc/garbled-neural-network-experiments).
 Essentially, to use our library you must be able to construct your function in terms of
 our `Fancy` DSL. Then, your function will be garbled and evaluated immediately as the DSL
 is evaluated. Wires will be conveniently dropped as they go out of scope of your DSL's
