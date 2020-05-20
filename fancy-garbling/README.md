@@ -68,7 +68,7 @@ To use `fancy-garbling` in your project, add the following line to the
 `[dependencies]` entry in `Cargo.toml`:
 
 ```
-fancy_garbling = { git = "https://github.com/GaloisInc/swanky/fancy-garbling" }
+fancy-garbling = { git = "https://github.com/GaloisInc/swanky" }
 ```
 
 # License
