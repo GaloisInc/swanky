@@ -6,15 +6,19 @@ protocols inspired by OT. It's the coolest cat in the oblivious transfer world.
 
 `ocelot` implements the following oblivious transfer (OT) protocols:
 
-* Naor-Pinkas semi-honest OT
-* Chou-Orlandi malicious OT (including a fix for a security flaw in the existing protocol write-up)
-* Asharov-Lindell-Schneider-Zohner semi-honest OT extension (+ correlated and random OT)
-* Keller-Orsini-Scholl malicious OT extension (+ correlated and random OT)
+* [Naor-Pinkas](https://dl.acm.org/doi/pdf/10.1145/301250.301312) semi-honest OT.
+* [Chou-Orlandi](https://eprint.iacr.org/2015/267) malicious OT (including a fix
+  for a security flaw in the existing protocol write-up).
+* [Asharov-Lindell-Schneider-Zohner](https://eprint.iacr.org/2016/602)
+  semi-honest OT extension (+ correlated and random OT).
+* [Keller-Orsini-Scholl](https://eprint.iacr.org/2015/546) malicious OT
+  extension (+ correlated and random OT).
 
 And the following oblivious (programmable) PRF protocols:
 
-* Kolesnikov-Kumaresan-Rosulek-Trieu OPRF
-* Kolesnikov-Matania-Pinkas-Rosulek-Trieu OPPRF
+* [Kolesnikov-Kumaresan-Rosulek-Trieu](https://eprint.iacr.org/2016/799) OPRF.
+* [Kolesnikov-Matania-Pinkas-Rosulek-Trieu](https://eprint.iacr.org/2017/799)
+  OPPRF.
 
 It also exposes various traits for implementing your very own OT or OPRF
 protocol.
