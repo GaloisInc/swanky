@@ -20,3 +20,4 @@ mod utils;
 pub use crate::errors::Error;
 pub mod oprf;
 pub mod ot;
+pub mod pprf;
