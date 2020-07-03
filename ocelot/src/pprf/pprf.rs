@@ -25,6 +25,7 @@ use rand::distributions::{Distribution, Uniform};
 use scuttlebutt::{AbstractChannel, Block, Malicious, SemiHonest};
 //#[allow(unused_imports)]
 //pub use crate::{pprf::{PprfSender, BitVec, Fpr, Fpr2}};
+extern crate byteorder;
 
 
 
@@ -37,7 +38,6 @@ pub struct Params {
 }
 
 
- 
 /// Sender
 #[derive(Clone, Debug)]
 struct Sender {
@@ -53,23 +53,24 @@ struct Receiver {
 #[allow(dead_code)]
 type PprfRange = (Fpr2, BitVec);
 
+/// security parameter
+pub const LAMBDA:usize = 128;
+
 /// legnth-doubling PRG G
 #[allow(dead_code)]
-fn prg_g (x:BitVec) -> BitVec {
-    //TODO complete the definition
-    let bv = BitVec::with_capacity(2*(x.len()));
-    bv
+fn prg_g (x:BitVec) -> (BitVec, BitVec) {
+    //TODO optimize the code later
+    assert_eq!(x.len(), LAMBDA);
+    let mut rng = rand::thread_rng();
+    let ks = Uniform::from(0..2^LAMBDA);
+    let sample1 = ks.sample(&mut rng).to_le_bytes();
+    let bv1 = BitVec::from_bytes(&sample1);
+    let sample2 = ks.sample(&mut rng).to_le_bytes();
+    let bv2 = BitVec::from_bytes(&sample2);
+    assert_eq!(bv1.len(), LAMBDA);
+    assert_eq!(bv2.len(), LAMBDA);
+    (bv1, bv2)
  }
-
-/// GGM Puncturable PRF constructed using prg_g
-#[allow(dead_code)]
-fn pprf_ggm (_x: BitVec, k:BitVec) -> PprfRange { 
-    //TODO complete the definition
-    let bv = BitVec::from_elem(k.len(), false);
-    let x = (0,0);
-    (x, bv)
-}
-
 /// PRG G': used to compute the PRF outputs on the last level of the tree
 #[allow(dead_code)]
 fn prg_gprime (x:BitVec) -> PprfRange {
@@ -80,6 +81,17 @@ fn prg_gprime (x:BitVec) -> PprfRange {
     let z = (0,0);
     (z, bv)
 }
+
+/// GGM Puncturable PRF constructed using prg_g
+#[allow(dead_code)]
+fn pprf_ggm (_x: BitVec, k:BitVec) -> PprfRange { 
+    //TODO complete the definition
+    let bv = BitVec::from_elem(k.len(), false);
+    let x = (0,0);
+    (x, bv)
+}
+
+
 
 
 /// A trait for PPRF Sender
@@ -105,9 +117,6 @@ where
     ) -> Result<(), errors::Error> ;
 }
 
-/// A trait for PPRF Receiver
-pub trait PprfReceiver{    
-}
 
 /// implement PprfSender for Sender
 
@@ -152,3 +161,7 @@ impl PprfSender for Sender {
 
 
 
+/// A trait for PPRF Receiver
+pub trait PprfReceiver{    
+   
+}
