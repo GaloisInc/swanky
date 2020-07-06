@@ -3,15 +3,11 @@ pub mod pprf;
 extern crate byteorder;
 use byteorder::{LittleEndian, WriteBytesExt};
 use std::mem;
+use pprf::pprf::Params;
 
 fn main(){
-    let params = pprf::pprf::Params {
-        lambda: 10,
-        l: 10,
-        p:5,
-        r:3
-    };
-    let ks:pprf::BitVec = pprf::BitVec::with_capacity(params.lambda as usize);
+    
+    let ks:pprf::BitVec = pprf::BitVec::with_capacity(Params::LAMBDA as usize);
     let i: u128 = 12345;
     let mut bs = [0u8; mem::size_of::<u128>()];
     bs.as_mut()

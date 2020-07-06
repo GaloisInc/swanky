@@ -28,14 +28,15 @@ use scuttlebutt::{AbstractChannel, Block, Malicious, SemiHonest};
 extern crate byteorder;
 
 
-
 /// Parameters for the mal-PPRF protocol
-pub struct Params {
-    pub lambda : u32,
-    pub l : u32,
-    pub p : u32,
-    pub r : u32 
+pub struct Params; 
+impl Params {
+    pub const LAMBDA: usize = 128;
+    pub const ELL: usize = 5;
+    pub const PRIME: usize = 7;
+    pub const POWR: usize = 2;
 }
+
 
 
 /// Sender
@@ -45,6 +46,7 @@ struct Sender {
     kpprf: BitVec
 }
 
+
 /// Receiver 
 #[derive(Clone, Debug)]
 struct Receiver {
@@ -53,22 +55,19 @@ struct Receiver {
 #[allow(dead_code)]
 type PprfRange = (Fpr2, BitVec);
 
-/// security parameter
-pub const LAMBDA:usize = 128;
-
 /// legnth-doubling PRG G
 #[allow(dead_code)]
 fn prg_g (x:BitVec) -> (BitVec, BitVec) {
     //TODO optimize the code later
-    assert_eq!(x.len(), LAMBDA);
+    assert_eq!(x.len(), Params::LAMBDA);
     let mut rng = rand::thread_rng();
-    let ks = Uniform::from(0..2^LAMBDA);
+    let ks = Uniform::from(0..2^(Params::LAMBDA));
     let sample1 = ks.sample(&mut rng).to_le_bytes();
     let bv1 = BitVec::from_bytes(&sample1);
     let sample2 = ks.sample(&mut rng).to_le_bytes();
     let bv2 = BitVec::from_bytes(&sample2);
-    assert_eq!(bv1.len(), LAMBDA);
-    assert_eq!(bv2.len(), LAMBDA);
+    assert_eq!(bv1.len(), Params::LAMBDA);
+    assert_eq!(bv2.len(), Params::LAMBDA);
     (bv1, bv2)
  }
 /// PRG G': used to compute the PRF outputs on the last level of the tree
@@ -135,10 +134,58 @@ impl PprfSender for Sender {
         bv
     }
     
-    fn compute(_x: BitVec)-> (BitVec, Fpr2){
+    fn compute(x: BitVec)-> (BitVec, Fpr2){
         //TODO fix this definition later
+        assert_eq!(x.len(), Params::LAMBDA);
+        let mut v:Vec<BitVec> = vec![x];
+        let mut b:Vec<PprfRange> = Vec::new();
+        for i in 1..Params::ELL+1{
+            for j in 0..2^(i-1){
+                let temp = v[i-1+j].clone();
+                let (s0, s1) = prg_g(temp);
+                v.push(s0);
+                v.push(s1);
+            }
+            
+            for j in 0..2^(Params::ELL+1){
+                let temp = v[Params::ELL+j].clone();
+                let pair = prg_gprime(temp);
+                b.push(pair);
+            }
+
+        }
+        // compute the left and right halves
+        let mut k0:Vec<BitVec> = Vec::new();
+        let mut k1:Vec<BitVec> = Vec::new();
+        for i in 1..Params::ELL+1 {
+            let mut temp1 = BitVec::new();
+            let mut temp2 = BitVec::new();
+            for j in 0..2^(i-1){
+                temp1.xor(&v[i+j].clone());
+                temp2.xor(&v[i+j+1].clone());
+            }
+            k0.push(temp1);
+            k1.push(temp2);
+        }
+         // compute right half for i = ELL+1
+         let mut temp = BitVec::new();
+         for j in b.iter(){
+             temp.xor(&j.1);
+         }
+            k1.push(temp);
+         //step5: Parallel OT calls
+         for i in 1..Params::ELL+1{
+
+         }
+         // compute correlation value
+         let s1 = Sender{beta:(10,10), kpprf:BitVec::new()};
+         // use unzip
+         let (left, _):(Vec<Fpr2>, Vec<_>) = b.iter().cloned().unzip();
+         let (left1, _):(Vec<_>, Vec<_>) = left.iter().cloned().unzip(); 
+         let sum:u32= left1.iter().sum();
+         let c:u32 = s1.beta.0-sum;
         let x = BitVec::new();
-        (x, (0, 0))
+        (k1.pop(), (c, c));
     }
     
     fn send<C: AbstractChannel, RNG: CryptoRng + Rng>(
