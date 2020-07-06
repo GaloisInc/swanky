@@ -22,10 +22,14 @@ use crate::{
 use rand::{CryptoRng, Rng, thread_rng};
 use rand::distributions::{Distribution, Uniform};
 #[allow(unused_imports)]
-use scuttlebutt::{AbstractChannel, Block, Malicious, SemiHonest};
+use scuttlebutt::{AbstractChannel, Block, Block512, Malicious, SemiHonest};
 //#[allow(unused_imports)]
 //pub use crate::{pprf::{PprfSender, BitVec, Fpr, Fpr2}};
 extern crate byteorder;
+use blake2::{Blake2b, Blake2s, Digest};
+use hex_literal::hex;
+use std::convert::TryInto;
+
 
 
 /// Parameters for the mal-PPRF protocol
@@ -54,6 +58,7 @@ struct Receiver {
 }
 #[allow(dead_code)]
 type PprfRange = (Fpr2, BitVec);
+
 
 /// legnth-doubling PRG G
 #[allow(dead_code)]
@@ -104,7 +109,7 @@ where
     /// samples a random seed
     fn sample_rand_seed(x:u32) -> BitVec;
     /// compute a pair of messages
-    fn compute (x:BitVec) -> (BitVec, Fpr2);
+    fn compute (x:BitVec) -> (BitVec, Fpr2, &[u8]);
 
     // send a triple consists of key, c values, and the Gamma
      
@@ -134,7 +139,7 @@ impl PprfSender for Sender {
         bv
     }
     
-    fn compute(x: BitVec)-> (BitVec, Fpr2){
+    fn compute(x: BitVec)-> (BitVec, Fpr2, &[u8]){
         //TODO fix this definition later
         assert_eq!(x.len(), Params::LAMBDA);
         let mut v:Vec<BitVec> = vec![x];
@@ -184,8 +189,16 @@ impl PprfSender for Sender {
          let (left1, _):(Vec<_>, Vec<_>) = left.iter().cloned().unzip(); 
          let sum:u32= left1.iter().sum();
          let c:u32 = s1.beta.0-sum;
-        let x = BitVec::new();
-        (k1.remove(Params::ELL+1), (c, c))
+        // apply hash function
+        let mut hasher = Blake2b::new();
+        let (l, r):(Vec<_>, Vec<_>) = b.iter().cloned().unzip();
+        for i in 0..2^(Params::ELL){
+            hasher.update(r[i].to_bytes());
+        }
+        let hash = hasher.finalize();
+        let gamma = hash.as_slice();
+        (k1.remove(Params::ELL+1), (c, c), gamma)
+
     }
     
     fn send<C: AbstractChannel, RNG: CryptoRng + Rng>(
