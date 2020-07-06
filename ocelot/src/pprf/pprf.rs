@@ -185,7 +185,7 @@ impl PprfSender for Sender {
          let sum:u32= left1.iter().sum();
          let c:u32 = s1.beta.0-sum;
         let x = BitVec::new();
-        (k1.pop(), (c, c));
+        (k1.remove(Params::ELL+1), (c, c))
     }
     
     fn send<C: AbstractChannel, RNG: CryptoRng + Rng>(
