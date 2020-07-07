@@ -9,7 +9,11 @@ fn main(){
     
     let ks:pprf::BitVec = pprf::BitVec::with_capacity(Params::LAMBDA as usize);
     let i: u128 = 12345;
+    let mut u:Vec<bool> = Vec::new();
+    u.push(true);
+    u.push(false);
     let mut bs = [0u8; mem::size_of::<u128>()];
+    println!("{}", u[0]);
     bs.as_mut()
         .write_u128::<LittleEndian>(i)
         .expect("Unable to write");
