@@ -7,10 +7,11 @@
 //! This is an implementation of the Puncturable Pseudo-Random Function (PPRF) protocol
 //! under malicious setting via GGM trees presented in (<https://eprint.iacr.org/2019/1159>, Fig.13 page 25)
 //#[allow(unused_imports)]
-#[path = "../errors.rs"]
-mod errors;
+//#[path = "../errors.rs"]
+//mod errors;
 //use crate ::errors::Error;
-use crate::pprf::{BitVec, Fpr2};
+use crate:: pprf::{
+    BitVec, Fpr2, PPRF, PprfSender, PprfReceiver, errors::Error};
 
 //use ocelot;
 //pub use bit_vec::BitVec;
@@ -18,9 +19,10 @@ use crate::pprf::{BitVec, Fpr2};
 //use rand::*;
 use rand::distributions::{Distribution, Uniform};
 #[allow(unused_imports)]
-use rand::{thread_rng, CryptoRng, Rng};
+use rand::{CryptoRng, Rng, RngCore, SeedableRng};
+//use rand_core::block::{BlockRng, BlockRngCore};
 #[allow(unused_imports)]
-use scuttlebutt::{AbstractChannel, Block, Block512, Malicious, SemiHonest};
+use scuttlebutt::{AbstractChannel, Block, Block512, Malicious, SemiHonest, AesRng};
 //#[allow(unused_imports)]
 //pub use crate::{pprf::{PprfSender, BitVec, Fpr, Fpr2}};
 extern crate byteorder;
@@ -28,6 +30,7 @@ use blake2::{Blake2b, Blake2s, Digest};
 use hex_literal::hex;
 use std::convert::TryInto;
 use generic_array::{ArrayLength, GenericArray};
+use std::arch::x86_64::*;
 
 /// Parameters for the mal-PPRF protocol
 pub struct Params;
@@ -41,161 +44,135 @@ impl Params {
 
 /// Sender
 #[derive(Clone, Debug)]
-struct Sender {
+pub struct Sender {
     beta: Fpr2,
-    kpprf: BitVec,
+    kpprf: Block,
+    c: Fpr2,
+    k1: Block,
+    // Change this to Block512 later
+    hash: Block512,
 }
 
 /// Receiver
 #[derive(Clone, Debug)]
 struct Receiver {
-    alpha: BitVec,
+    alpha: Block,
+    kstar: Block,
+    w: Fpr2,
 }
 #[allow(dead_code)]
-type PprfRange = (Fpr2, BitVec);
+type PprfRange = (Fpr2, Block);
 
 /// legnth-doubling PRG G
 #[allow(dead_code)]
-fn prg_g(x: BitVec) -> (BitVec, BitVec) {
-    //TODO optimize the code later
-    assert_eq!(x.len(), Params::LAMBDA);
-    let mut rng = rand::thread_rng();
-    let ks = Uniform::from(0..2 ^ (Params::LAMBDA));
-    let sample1 = ks.sample(&mut rng).to_le_bytes();
-    let bv1 = BitVec::from_bytes(&sample1);
-    let sample2 = ks.sample(&mut rng).to_le_bytes();
-    let bv2 = BitVec::from_bytes(&sample2);
-    assert_eq!(bv1.len(), Params::LAMBDA);
-    assert_eq!(bv2.len(), Params::LAMBDA);
-    (bv1, bv2)
+fn prg_g(seed: Block) -> (Block, Block) {
+    /// generates new random generator from seed.
+    let mut rng = AesRng::from_seed(seed);
+    let s1 = rng.gen::<Block>();
+    let s2 = rng.gen::<Block>();
+    (s1, s2)
 }
 /// PRG G': used to compute the PRF outputs on the last level of the tree
 #[allow(dead_code)]
-fn prg_gprime(x: BitVec) -> PprfRange {
+fn prg_gprime(seed: Block) -> PprfRange {
     //TODO complete the definition
-    let mut bv = BitVec::from_bytes(&[0b00000000]);
+    /*let mut bv = BitVec::from_bytes(&[0b00000000]);
     #[allow(deprecated)]
     bv.union(&x);
     let z = (0, 0);
-    (z, bv)
+    (z, bv)*/
+    let (s0, s1) = rand::random::<(Block, Block)>();
+    let s = rand::random::<Block>();
+    ((s0, s1), s)
 }
 
-/// GGM Puncturable PRF constructed using prg_g
-#[allow(dead_code)]
-fn pprf_ggm(_x: BitVec, k: BitVec) -> PprfRange {
-    //TODO complete the definition
-    let bv = BitVec::from_elem(k.len(), false);
-    let x = (0, 0);
-    (x, bv)
-}
 
-/// A trait for PPRF Sender
-pub trait PprfSender
-where
-    Self: Sized,
-{
-    /// Message type, restricted to types that are mutably-dereferencable as
-    /// `u8` arrays.
-    type Msg: Sized + AsMut<[u8]>;
-    /// samples a random seed
-    fn sample_rand_seed(x: u32) -> BitVec;
-    /// compute a pair of messages
-    fn compute(x: BitVec) -> (BitVec, Fpr2);
-
-    // send a triple consists of key, c values, and the Gamma
-
-    fn send<C: AbstractChannel, RNG: CryptoRng + Rng>(
-        &mut self,
-        channel: &mut C,
-        inputs: &[(Block, Block, Block)],
-        _: &mut RNG,
-    ) -> Result<(), errors::Error>;
-}
 
 /// implement PprfSender for Sender
 
 impl PprfSender for Sender {
     type Msg = Block;
-
-    fn sample_rand_seed(_lamda: u32) -> BitVec<u32> {
-        //TODO fix this definition later
-        let mut rng = rand::thread_rng();
-        const TEMP: u32 = 10; //lambda
-        let kspace = Uniform::from(0..2 ^ (TEMP) - 1);
+    fn init<C: AbstractChannel, RNG: CryptoRng + Rng>(
+        &mut self,
+        channel: &mut C,
+        mut rng: &mut RNG,
+    ) -> Result<Self, Error> {
+        // Sampling the key kpprf
+        let seed = rand::random::<Block>();
+        // chose input beta uniformly
+        let beta = rand::random::<Fpr2>();
+        /// To store the intermediate evaluations of the GGM tree
+        let mut v: Vec<Block> = vec![seed];
+        /// To store the evaluations on the last level of the tree
+        let mut b: Vec<PprfRange> = Vec::new();
+        //TODO: optimize it later
+       /* let kspace = Uniform::from(0..2 ^ (Params::LAMBDA) - 1);
         let res = kspace.sample(&mut rng) as f32;
         let ns = res.log(2.0) as usize;
-        let bv = BitVec::with_capacity(ns);
-        let _s = res as u32;
-        bv
-    }
-
-    fn compute(x: BitVec) -> (BitVec, Fpr2) {
-        //TODO fix this definition later
-        assert_eq!(x.len(), Params::LAMBDA);
-        let mut v: Vec<BitVec> = vec![x];
-        let mut b: Vec<PprfRange> = Vec::new();
+        let s0 = BitVec::with_capacity(ns);*/
+        /// 2.b compute (s^i_{2j}, s^i_{2j+1}) = G(s^{i-1}_j)
         for i in 1..Params::ELL + 1 {
             for j in 0..2 ^ (i - 1) {
-                let temp = v[i - 1 + j].clone();
-                let (s0, s1) = prg_g(temp);
+                let s = v[i - 1 + j].clone();
+                let (s0, s1) = prg_g(s);
                 v.push(s0);
                 v.push(s1);
             }
-
-            for j in 0..2 ^ (Params::ELL + 1) {
-                let temp = v[Params::ELL + j].clone();
-                let pair = prg_gprime(temp);
-                b.push(pair);
-            }
         }
-        // compute the left and right halves
-        let mut k0: Vec<BitVec> = Vec::new();
-        let mut k1: Vec<BitVec> = Vec::new();
+        /// 2.c compute (s^{l+1}_{2j}, s^{l+1}_{2j+1})
+        for j in 0..2 ^ (Params::ELL + 1) {
+            let temp = v[Params::ELL + j].clone();
+            let pair = prg_gprime(temp);
+            b.push(pair);
+        }
+        /// compute the left and right halves of intermediate levels
+        let mut k0: Vec<Block> = Vec::new();
+        let mut k1: Vec<Block> = Vec::new();
+        let mut temp1 =  Block(unsafe {_mm_setzero_si128()});
+        let mut temp2 =  Block(unsafe {_mm_setzero_si128()});
         for i in 1..Params::ELL + 1 {
-            let mut temp1 = BitVec::new();
-            let mut temp2 = BitVec::new();
             for j in 0..2 ^ (i - 1) {
-                temp1.xor(&v[i + j].clone());
-                temp2.xor(&v[i + j + 1].clone());
+               let temp1 = temp1^v[i + j];
+               let temp2 = temp2^v[i + j + 1];
             }
             k0.push(temp1);
             k1.push(temp2);
         }
-        // compute right half for i = ELL+1
-        let mut temp = BitVec::new();
+        ///4. compute right half for the last level l+1.
+        let mut temp = Block(unsafe {_mm_setzero_si128()});
         for j in b.iter() {
-            temp.xor(&j.1);
+            let temp=temp^j.1;
         }
-        k1.push(temp);
-        //step5: Parallel OT calls
+        ///5. Parallel OT calls
         for i in 1..Params::ELL + 1 {}
-        // compute correlation value
-        let s1 = Sender {
-            beta: (10, 10),
-            kpprf: BitVec::new(),
-        };
-        // use unzip
+        ///6. compute correction value
         let (left, _): (Vec<Fpr2>, Vec<_>) = b.iter().cloned().unzip();
-        let (left1, _): (Vec<_>, Vec<_>) = left.iter().cloned().unzip();
-        let sum: u32 = left1.iter().sum();
-        let c: u32 = s1.beta.0 - sum;
-        // apply hash function
+        let (left1, right1): (Vec<_>, Vec<_>) = left.iter().cloned().unzip();
+        //TODO: fix the following
+        //let l: Block = (self.beta.0).0-left1.iter().sum();
+        //let r: Block = self.beta.1-right1.iter().sum();
+         let l: Block = Block ((self.beta.0).0);
+        let r: Block = Block ((self.beta.1).0);
+        let c = (l, r);
+        /// 7. apply hash function.
         let mut hasher = Blake2b::new();
         let (l, r): (Vec<_>, Vec<_>) = b.iter().cloned().unzip();
         for i in 0..2 ^ (Params::ELL) {
-            hasher.update(r[i].to_bytes());
+            hasher.update(r[i]);
         }
         let hash = hasher.finalize();
-        let gamma = hash.as_slice();
-        (k1.remove(Params::ELL + 1), (c, c))
+        let gamma = hash.as_slice().try_into().unwrap();
+
+        Ok(Self{kpprf:seed, beta:beta, c:c, k1:temp, hash:gamma})
     }
+   
 
     fn send<C: AbstractChannel, RNG: CryptoRng + Rng>(
         &mut self,
         channel: &mut C,
         inputs: &[(Block, Block, Block)],
         _: &mut RNG,
-    ) -> Result<(), errors::Error> {
+    ) -> Result<(), Error> {
         for (k, c, gamma) in inputs.iter() {
             channel.write_block(&k)?;
             channel.write_block(&c)?;
@@ -206,28 +183,17 @@ impl PprfSender for Sender {
     }
 }
 
-/// A trait for PPRF Receiver
-pub trait PprfReceiver
-where
-    Self: Sized,
-{
-    /// Message type, restricted to types that are mutably-dereferencable as
-    /// `u8` arrays.
-    type Msg: Sized + AsMut<[u8]>;
-    fn receive<C: AbstractChannel, RNG: CryptoRng + Rng>(
-        &mut self,
-        channel: &mut C,
-        inputs: &[bool],
-        rng: &mut RNG,
-    ) -> Result<Vec<Self::Msg>, errors::Error>;
-    fn puncture(keys: Vec<BitVec>, alpha: bool) -> BitVec;
-    fn fulleval(pkey: BitVec, alpha:bool) -> Vec<BitVec>;
-    fn verify(gamma: &[u8], alpha:u32) -> Option<u32>;
-}
+
 
 impl PprfReceiver for Receiver{
     type Msg = Block;
-
+    fn init<C: AbstractChannel, RNG: CryptoRng + Rng>(
+        channel: &mut C,
+        rng: &mut RNG,
+    ) -> Result<Self, Error>{
+        // TODO: implement this later
+        Err(Error::InvalidInputLength)
+    }
     fn puncture(keys: Vec<BitVec>, alpha: bool)-> BitVec{
         let kstar = BitVec::new();
         kstar
@@ -276,7 +242,7 @@ impl PprfReceiver for Receiver{
         channel: &mut C,
         inputs: &[bool],
         mut rng: &mut RNG,
-    ) -> Result<Vec<Block>, errors::Error> {
+    ) -> Result<Vec<Block>, Error> {
         //TODO: complete this definition
        inputs.iter().map(|_x| {
            let c = channel.read_block()?;
