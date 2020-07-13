@@ -7,7 +7,7 @@ pub mod pprf;
 #[allow(unused_imports)]
 use rand::{CryptoRng, Rng};
 #[allow(unused_imports)]
-use scuttlebutt::{AbstractChannel, Block};
+use scuttlebutt::{AbstractChannel, Block, Block512};
 pub use bit_vec::BitVec;
 //TODO: change this type to field type later
 pub type Fpr = Block;
@@ -43,7 +43,6 @@ where
     fn send<C: AbstractChannel, RNG: CryptoRng + Rng>(
         &mut self,
         channel: &mut C,
-        inputs: &[(Block, Block, Block)],
         _: &mut RNG,
     ) -> Result<(), Error>;
 }
@@ -63,10 +62,9 @@ where
     fn receive<C: AbstractChannel, RNG: CryptoRng + Rng>(
         &mut self,
         channel: &mut C,
-        inputs: &[bool],
+        input1: &[(Block, Block)],
+        input2: &(Block, Block),
+        input3: &Block512,
         rng: &mut RNG,
-    ) -> Result<Vec<Self::Msg>, Error>;
-    fn puncture(keys: Vec<BitVec>, alpha: bool) -> BitVec;
-    fn fulleval(pkey: BitVec, alpha:bool) -> Vec<BitVec>;
-    fn verify(gamma: &[u8], alpha:u32) -> Option<u32>;
+    ) -> Option<(Vec<Block>, (Block, Block))>;
 }
