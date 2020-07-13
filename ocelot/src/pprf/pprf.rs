@@ -10,8 +10,10 @@
 //#[path = "../errors.rs"]
 //mod errors;
 //use crate ::errors::Error;
-use crate:: pprf::{
-    BitVec, Fpr2, PPRF, PprfSender, PprfReceiver, errors::Error};
+use crate:: { pprf::{
+    BitVec, Fpr2, PPRF, PprfSender, PprfReceiver, errors::Error},
+    ot::{Sender as OtSender, Receiver as OtReceiver, ChouOrlandiSender, ChouOrlandiReceiver}
+};
 
 //use ocelot;
 //pub use bit_vec::BitVec;
@@ -22,7 +24,7 @@ use rand::distributions::{Distribution, Uniform};
 use rand::{CryptoRng, Rng, RngCore, SeedableRng};
 //use rand_core::block::{BlockRng, BlockRngCore};
 #[allow(unused_imports)]
-use scuttlebutt::{AbstractChannel, Block, Block512, Malicious, SemiHonest, AesRng};
+use scuttlebutt::{AbstractChannel, Block, Block512, Malicious, SemiHonest, AesRng, Channel};
 //#[allow(unused_imports)]
 //pub use crate::{pprf::{PprfSender, BitVec, Fpr, Fpr2}};
 extern crate byteorder;
@@ -67,7 +69,7 @@ type PprfRange = (Fpr2, Block);
 /// legnth-doubling PRG G
 #[allow(dead_code)]
 fn prg_g(seed: Block) -> (Block, Block) {
-    /// generates new random generator from seed.
+    /// generates new random generator from seed
     let mut rng = AesRng::from_seed(seed);
     let pair = rng.gen::<(Block, Block)>();
     pair
@@ -125,7 +127,7 @@ impl PprfSender for Sender {
             let pair = prg_gprime(temp);
             b.push(pair);
         }
-        /// compute the left and right halves of intermediate levels
+        /// 3. compute the left and right halves of intermediate levels
         let mut k0: Vec<Block> = Vec::new();
         let mut k1: Vec<Block> = Vec::new();
         let mut temp1 =  Block(unsafe {_mm_setzero_si128()});
@@ -144,8 +146,34 @@ impl PprfSender for Sender {
             let temp=temp^j.1;
         }
         ///5. Parallel OT calls
-        for i in 1..Params::ELL + 1 {
-            
+        use std::{os::unix::net::UnixStream, 
+                io::{BufReader, BufWriter},
+        };
+        let m0s_ = k0.clone();
+        let m1s_ = k1.clone();
+        let (sender, receiver) = UnixStream::pair().unwrap();
+        let handle = std::thread::spawn(move || {
+            let mut rng = AesRng::new();
+            let reader = BufReader::new(sender.try_clone().unwrap());
+            let writer = BufWriter::new(sender);
+            let mut channel = Channel::new(reader, writer);
+            let mut ot = ChouOrlandiSender::init(&mut channel, &mut rng).unwrap();
+            let ms = k0
+                .into_iter()
+                .zip(k1.into_iter())
+                .collect::<Vec<(Block, Block)>>();
+            ot.send(&mut channel, &ms, &mut rng).unwrap();
+        });
+        let mut rng = AesRng::new();
+        let reader = BufReader::new(receiver.try_clone().unwrap());
+        let writer = BufWriter::new(receiver);
+        let mut channel = Channel::new(reader, writer);
+        let mut ot = ChouOrlandiReceiver::init(&mut channel, &mut rng).unwrap();
+        let bs:Vec<bool> = (0..Params::ELL).map(|_| rand::random::<bool>()).collect();
+        let result = ot.receive(&mut channel, &bs, &mut rng).unwrap();
+        handle.join().unwrap();
+        for j in 0..Params::ELL {
+            assert_eq!(result[j], if bs[j] { m0s_[j] } else { m1s_[j] });
         }
         ///6. compute correction value
         let (left, _): (Vec<Fpr2>, Vec<_>) = b.iter().cloned().unzip();
