@@ -15,7 +15,7 @@ pub type Fpr2 = (Fpr, Fpr);
 #[path = "../errors.rs"]
 pub mod errors;
 use crate::pprf::errors::Error;
-
+use crate::ot;
 // PPRF 
 pub trait PPRF{
     /// Key generation.

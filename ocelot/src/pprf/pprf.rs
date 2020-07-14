@@ -12,9 +12,10 @@
 //use crate ::errors::Error;
 use crate:: { pprf::{
     BitVec, Fpr2, PPRF, PprfSender, PprfReceiver, errors::Error},
-    ot::{Sender as OtSender, Receiver as OtReceiver, ChouOrlandiSender, ChouOrlandiReceiver}
+    
 };
-
+#[path = "../"]
+use crate::pprf::ot::{Sender as OtSender, Receiver as OtReceiver, ChouOrlandiSender, ChouOrlandiReceiver};
 //use ocelot;
 //pub use bit_vec::BitVec;
 //use galois_2p8;
@@ -69,7 +70,7 @@ type PprfRange = (Fpr2, Block);
 /// legnth-doubling PRG G
 #[allow(dead_code)]
 fn prg_g(seed: Block) -> (Block, Block) {
-    /// generates new random generator from seed
+    // Generate RNG using seed.
     let mut rng = AesRng::from_seed(seed);
     let pair = rng.gen::<(Block, Block)>();
     pair
@@ -99,20 +100,20 @@ impl PprfSender for Sender {
         channel: &mut C,
         mut rng: &mut RNG,
     ) -> Result<Self, Error> {
-        // Sampling the key kpprf
+        //! Sampling the key kpprf.
         let seed = rand::random::<Block>();
         // chose input beta uniformly
         let beta = rand::random::<Fpr2>();
-        /// To store the intermediate evaluations of the GGM tree
+        //To store the intermediate evaluations of the GGM tree
         let mut v: Vec<Block> = vec![seed];
-        /// To store the evaluations on the last level of the tree
+        // To store the evaluations on the last level of the tree
         let mut b: Vec<PprfRange> = Vec::new();
         //TODO: optimize it later
        /* let kspace = Uniform::from(0..2 ^ (Params::LAMBDA) - 1);
         let res = kspace.sample(&mut rng) as f32;
         let ns = res.log(2.0) as usize;
         let s0 = BitVec::with_capacity(ns);*/
-        /// 2.b compute (s^i_{2j}, s^i_{2j+1}) = G(s^{i-1}_j)
+        // 2.b compute (s^i_{2j}, s^i_{2j+1}) = G(s^{i-1}_j)
         for i in 1..Params::ELL + 1 {
             for j in 0..2 ^ (i - 1) {
                 let s = v[i - 1 + j].clone();
@@ -121,17 +122,19 @@ impl PprfSender for Sender {
                 v.push(s1);
             }
         }
-        /// 2.c compute (s^{l+1}_{2j}, s^{l+1}_{2j+1})
-        for j in 0..2 ^ (Params::ELL + 1) {
+        // 2.c compute (s^{l+1}_{2j}, s^{l+1}_{2j+1})
+        for j in 0..2 ^ (Params::ELL) {
             let temp = v[Params::ELL + j].clone();
             let pair = prg_gprime(temp);
             b.push(pair);
         }
-        /// 3. compute the left and right halves of intermediate levels
+        // 3. compute the left and right halves of intermediate levels
         let mut k0: Vec<Block> = Vec::new();
         let mut k1: Vec<Block> = Vec::new();
-        let mut temp1 =  Block(unsafe {_mm_setzero_si128()});
-        let mut temp2 =  Block(unsafe {_mm_setzero_si128()});
+        let temp1 =  Block(unsafe {_mm_setzero_si128()});
+        let temp2 =  Block(unsafe {_mm_setzero_si128()});
+        //let _kt0:Block = v.iter().step_by(2).fold(temp1, |sum, &x| sum^x);
+        // TODO: check this if works as desired.
         for i in 1..Params::ELL + 1 {
             for j in 0..2 ^ (i - 1) {
                let temp1 = temp1^v[i + j];
@@ -140,11 +143,8 @@ impl PprfSender for Sender {
             k0.push(temp1);
             k1.push(temp2);
         }
-        ///4. compute right half for the last level l+1.
-        let mut temp = Block(unsafe {_mm_setzero_si128()});
-        for j in b.iter() {
-            let temp=temp^j.1;
-        }
+        // 4. compute right half for the last level l+1.
+        let k1lp1 = b.iter().fold(Block(unsafe {_mm_setzero_si128()}), |sum, &x| sum^x.1);
         ///5. Parallel OT calls
         use std::{os::unix::net::UnixStream, 
                 io::{BufReader, BufWriter},
@@ -175,16 +175,16 @@ impl PprfSender for Sender {
         for j in 0..Params::ELL {
             assert_eq!(result[j], if bs[j] { m0s_[j] } else { m1s_[j] });
         }
-        ///6. compute correction value
-        let (left, _): (Vec<Fpr2>, Vec<_>) = b.iter().cloned().unzip();
-        let (left1, right1): (Vec<_>, Vec<_>) = left.iter().cloned().unzip();
-        //TODO: fix the following
-        //let l: Block = (self.beta.0).0-left1.iter().sum();
-        //let r: Block = self.beta.1-right1.iter().sum();
-         let l: Block = Block ((self.beta.0).0);
-        let r: Block = Block ((self.beta.1).0);
+        //6. compute correction value c
+        let (s2j, _): (Vec<Fpr2>, Vec<_>) = b.iter().cloned().unzip();
+        //let t = s2j.iter().map(|(l, r)| (fold(temp1, |sum, &l| sum^l), r.fold(temp1, |sum, &x| sum^x)));
+        let (left1, right1): (Vec<_>, Vec<_>) = s2j.iter().cloned().unzip();
+        let lsum:Block = left1.iter().fold(Block(unsafe {_mm_setzero_si128()}), |sum, &x| Block(unsafe {_mm_add_epi64(sum.0, x.0)}));
+        let rsum:Block = right1.iter().fold(Block(unsafe {_mm_setzero_si128()}), |sum, &x| Block(unsafe {_mm_add_epi64(sum.0, x.0)}));
+        let l: Block = Block (unsafe {_mm_subs_epi16((self.beta.0).0, lsum.0)});
+        let r: Block = Block (unsafe {_mm_subs_epi16((self.beta.1).0, rsum.0)});
         let c = (l, r);
-        /// 7. apply hash function.
+        // 7. apply hash function.
         let mut hasher = Blake2b::new();
         let (l, r): (Vec<_>, Vec<_>) = b.iter().cloned().unzip();
         for i in 0..2 ^ (Params::ELL) {
@@ -192,8 +192,7 @@ impl PprfSender for Sender {
         }
         let hash = hasher.finalize();
         let gamma = hash.as_slice().try_into().unwrap();
-
-        Ok(Self{kpprf:seed, beta:beta, c:c, k1:temp, hash:gamma})
+        Ok(Self{kpprf:seed, beta:beta, c:c, k1:k1lp1, hash:gamma})
     }
    
 
@@ -230,9 +229,7 @@ impl PprfReceiver for Receiver{
         let alpha = rand::random::<Block>();
         Ok(Self {alpha:alpha, key_vec:kv, w:c, gamma_prime:hash})
     }
-
-   
-
+    
     fn receive<C: AbstractChannel, RNG: CryptoRng + Rng>(
         &mut self,
         channel: &mut C,
@@ -242,7 +239,7 @@ impl PprfReceiver for Receiver{
         mut rng: &mut RNG,
     ) -> Option<(Vec<Block>, (Block, Block))> {
         //TODO: complete this definition
-        let w = input2;
+        let c = input2;
         let hash = input3;
         let ks = (0..input1.len())
         .map(|i| {
@@ -251,19 +248,21 @@ impl PprfReceiver for Receiver{
             Ok((k0, k1))
         })
         .collect::<Result<Vec<(Block, Block)>, Error>>();
-        let alpha = Block(unsafe {_mm_setzero_si128()});
-        let mut kstar = puncturestar(ks.unwrap(), alpha);
+        let zero = Block(unsafe {_mm_setzero_si128()});
+        // 8.(a)
+        let mut kstar = puncturestar(ks.unwrap(), self.alpha);
         let kp = kstar.clone();
-        let sv = fulleval(kstar, alpha);
-        let (svl, svr):(Vec<Block>, Vec<Block>) = sv.iter().cloned().unzip();
-        /// compute w = c- sum s2j
-        let mut rvl = unsafe {_mm_setzero_si128()};
-        for j in 1..Params::N+1 {
-            if Block(unsafe{_mm_set_epi32(0, 0, 0, j as i32)}) == alpha{
-                continue;
-            }
-           rvl= unsafe {_mm_add_epi64(rvl, svl[2*j].0)};
-        }
+        // TODO: check if it is acually alpha || 0
+        // 8.(b)
+        let sv = fulleval(kstar, self.alpha|zero);
+        // 8.(c) compute w = c- sum s2j
+        let (svl, svr) = (1..Params::N+1).filter(|&x| 
+            Block(unsafe{_mm_set_epi32(0, 0, 0, x as i32)}) != self.alpha)
+            .map(|i| sv[2*i]).unzip();
+        let sum:Vec<Block>= vec![svl, svr].into_iter()
+        .map(|x:Vec<Block>| x.into_iter().fold(zero, |sum, x| {Block(unsafe {_mm_add_epi64(sum.0, x.0)})})).collect();
+        let w = (Block(unsafe {_mm_subs_epi16((c.0).0, sum[0].0)}), Block(unsafe {_mm_subs_epi16((c.1).0, sum[1].0)}));
+        // 8.(d) compute hash function
         let mut hasher = Blake2b::new();
         let (l, r): (Vec<_>, Vec<_>) = sv.iter().cloned().unzip();
         for i in 0..2 ^ (Params::ELL) {
@@ -271,9 +270,10 @@ impl PprfReceiver for Receiver{
         }
         let hash = hasher.finalize();
         let gamma:Block512 = hash.as_slice().try_into().unwrap();
+        //9. Check if hash values match. If yes, send out the puncture key kp and correction value w else abort.
         if *input3 == gamma {
-            Some ((kp, *w))
-        } else {None}
+            Some ((kp, w))
+        } else { None }
     }
 }
 
@@ -285,7 +285,7 @@ pub fn keygen(lambda: Block) -> Block{
     seed
 }
 pub fn puncturestar (keys: Vec<(Block, Block)>, alpha: Block) -> Vec<Block> {
-    /// Given set of keys and alpha, outputs a punctured key.
+    // Given set of keys and alpha, outputs a punctured key.
     // TODO: fix this later
     let mut kstar:Vec<Block> = Vec::new();
     for i in 1..Params::ELL+2{
