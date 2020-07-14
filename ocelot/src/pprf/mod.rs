@@ -4,6 +4,11 @@
 //! This module provides traits for PPRF
 
 pub mod pprf;
+use crate::Error;
+//#[path = "../errors.rs"]
+//pub mod errors;
+//use crate::pprf::errors::Error;
+
 #[allow(unused_imports)]
 use rand::{CryptoRng, Rng};
 #[allow(unused_imports)]
@@ -12,10 +17,7 @@ pub use bit_vec::BitVec;
 //TODO: change this type to field type later
 pub type Fpr = Block;
 pub type Fpr2 = (Fpr, Fpr);
-#[path = "../errors.rs"]
-pub mod errors;
-use crate::pprf::errors::Error;
-use crate::ot;
+
 // PPRF 
 pub trait PPRF{
     /// Key generation.

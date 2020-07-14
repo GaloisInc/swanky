@@ -9,13 +9,14 @@
 //#[allow(unused_imports)]
 //#[path = "../errors.rs"]
 //mod errors;
-//use crate ::errors::Error;
-use crate:: { pprf::{
-    BitVec, Fpr2, PPRF, PprfSender, PprfReceiver, errors::Error},
-    
-};
-#[path = "../"]
-use crate::pprf::ot::{Sender as OtSender, Receiver as OtReceiver, ChouOrlandiSender, ChouOrlandiReceiver};
+//use crate::ot;
+use crate::errors::Error;
+use crate::ot::{Receiver as OtReceiver, Sender as OtSender, ChouOrlandiSender, ChouOrlandiReceiver};
+//use crate:: { pprf::{
+ //   BitVec, Fpr2, PPRF, PprfSender, PprfReceiver, errors::Error},
+//};
+//#[path = "../"]
+//extern crate ot;
 //use ocelot;
 //pub use bit_vec::BitVec;
 //use galois_2p8;
@@ -27,14 +28,15 @@ use rand::{CryptoRng, Rng, RngCore, SeedableRng};
 #[allow(unused_imports)]
 use scuttlebutt::{AbstractChannel, Block, Block512, Malicious, SemiHonest, AesRng, Channel};
 //#[allow(unused_imports)]
-//pub use crate::{pprf::{PprfSender, BitVec, Fpr, Fpr2}};
+pub use crate::{pprf::{PprfSender, BitVec, Fpr, Fpr2, PprfReceiver}};
 extern crate byteorder;
 use blake2::{Blake2b, Blake2s, Digest};
 use hex_literal::hex;
 use std::convert::TryInto;
 use generic_array::{ArrayLength, GenericArray};
 use std::arch::x86_64::*;
-
+//pub type Fpr = Block;
+//pub type Fpr2 = (Fpr, Fpr);
 /// Parameters for the mal-PPRF protocol
 pub struct Params;
 impl Params {
