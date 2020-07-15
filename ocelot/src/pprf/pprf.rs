@@ -1,43 +1,33 @@
 // -*- mode: rust; -*-
 //
 // This file is part of ocelot.
+
 // Copyright © 2020 Galois, Inc.
 // See LICENSE for licensing information.
 
 //! This is an implementation of the Puncturable Pseudo-Random Function (PPRF) protocol
 //! under malicious setting via GGM trees presented in (<https://eprint.iacr.org/2019/1159>, Fig.13 page 25)
 //#[allow(unused_imports)]
-//#[path = "../errors.rs"]
-//mod errors;
-//use crate::ot;
-use crate::pprf::errors::Error;
-//use crate::pprf::chou_orlandi;
-//use crate::ot::{Receiver as OtReceiver, Sender as OtSender, ChouOrlandiSender, ChouOrlandiReceiver};
-use crate:: { pprf::{
-    BitVec, Fpr2, PprfSender, PprfReceiver},
+
+use crate::{
+    errors::Error,
+    ot::{Sender as OtSender, Receiver as OtReceiver, ChouOrlandiSender, ChouOrlandiReceiver},
+    pprf::{BitVec, PprfSender, PprfReceiver, Fpr2}
 };
-//#[path = "../"]
-//extern crate ot;
-//use ocelot;
-//pub use bit_vec::BitVec;
-//use galois_2p8;
-//use rand::*;
-use rand::distributions::{Distribution, Uniform};
+
 #[allow(unused_imports)]
 use rand::{CryptoRng, Rng, RngCore, SeedableRng};
 //use rand_core::block::{BlockRng, BlockRngCore};
 #[allow(unused_imports)]
 use scuttlebutt::{AbstractChannel, Block, Block512, Malicious, SemiHonest, AesRng, Channel};
-//#[allow(unused_imports)]
-//pub use crate::{pprf::{PprfSender, BitVec, Fpr, Fpr2, PprfReceiver}};
+#[allow(unused_imports)]
 extern crate byteorder;
 use blake2::{Blake2b, Blake2s, Digest};
 use hex_literal::hex;
 use std::convert::TryInto;
 use generic_array::{ArrayLength, GenericArray};
 use std::arch::x86_64::*;
-//pub type Fpr = Block;
-//pub type Fpr2 = (Fpr, Fpr);
+
 /// Parameters for the mal-PPRF protocol
 pub struct Params;
 impl Params {
@@ -48,18 +38,17 @@ impl Params {
     pub const N: usize = 2^Params::ELL;
 }
 
-/// Sender
+/// PPRF Sender
 #[derive(Debug)]
 pub struct Sender {
     beta: Fpr2,
     kpprf: Block,
     c: Fpr2,
     k1: Block,
-    // Change this to Block512 later
     hash: Block512,
 }
 
-/// Receiver
+/// PPRF Receiver
 #[derive(Debug)]
 struct Receiver {
     alpha: Block,
@@ -83,12 +72,6 @@ fn prg_g(seed: Block) -> (Block, Block) {
 /// PRG G': used to compute the PRF outputs on the last level of the tree
 #[allow(dead_code)]
 fn prg_gprime(seed: Block) -> PprfRange {
-    //TODO complete the definition
-    /*let mut bv = BitVec::from_bytes(&[0b00000000]);
-    #[allow(deprecated)]
-    bv.union(&x);
-    let z = (0, 0);
-    (z, bv)*/
     let mut rng = AesRng::from_seed(seed);
     let triple = rng.gen::<PprfRange>();
     triple
@@ -113,11 +96,6 @@ impl PprfSender for Sender {
         let mut v: Vec<Block> = vec![seed];
         // To store the evaluations on the last level of the tree
         let mut b: Vec<PprfRange> = Vec::new();
-        //TODO: optimize it later
-       /* let kspace = Uniform::from(0..2 ^ (Params::LAMBDA) - 1);
-        let res = kspace.sample(&mut rng) as f32;
-        let ns = res.log(2.0) as usize;
-        let s0 = BitVec::with_capacity(ns);*/
         // 2.b compute (s^i_{2j}, s^i_{2j+1}) = G(s^{i-1}_j)
         for i in 1..Params::ELL + 1 {
             for j in 0..2 ^ (i - 1) {
@@ -154,10 +132,7 @@ impl PprfSender for Sender {
         use std::{os::unix::net::UnixStream, 
                 io::{BufReader, BufWriter},
         };
-       /* /// Instantiation of the Chou-Orlandi OT sender.
-        pub type ChouOrlandiSender = chou_orlandi::Sender;
-        /// Instantiation of the Chou-Orlandi OT receiver.
-        pub type ChouOrlandiReceiver = chou_orlandi::Receiver;  
+
         use crate::ot::Sender;
         let m0s_ = k0.clone();
         let m1s_ = k1.clone();
@@ -184,7 +159,7 @@ impl PprfSender for Sender {
         handle.join().unwrap();
         for j in 0..Params::ELL {
             assert_eq!(result[j], if bs[j] { m0s_[j] } else { m1s_[j] });
-        } */
+        } 
         //6. compute correction value c
         let (s2j, _): (Vec<Fpr2>, Vec<_>) = b.iter().cloned().unzip();
         //let t = s2j.iter().map(|(l, r)| (fold(temp1, |sum, &l| sum^l), r.fold(temp1, |sum, &x| sum^x)));
@@ -214,10 +189,10 @@ impl PprfSender for Sender {
         let hash = self.hash;
         let k1lp1 = self.k1;
         let c = self.c;
-        channel.write_block(&k1lp1);
-        channel.write_block(&c.0);
-        channel.write_block(&c.1);
-        channel.write_block512(&hash);
+        channel.write_block(&k1lp1)?;
+        channel.write_block(&c.0)?;
+        channel.write_block(&c.1)?;
+        channel.write_block512(&hash)?;
         channel.flush()?;
         Ok(())
     }
@@ -314,5 +289,4 @@ pub fn fulleval (kstar: Vec<Block>, alpha: Block) -> Vec<(Block, Block)> {
         s.push(rand::random::<(Block, Block)>());
     }
     s
-
 }

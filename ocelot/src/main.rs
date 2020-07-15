@@ -1,13 +1,13 @@
 //#[path = "pprf/pprf.rs"]
-pub mod pprf;
+//pub mod pprf;
 extern crate byteorder;
 use byteorder::{LittleEndian, WriteBytesExt};
 use std::mem;
-use pprf::pprf::Params;
+//use pprf::pprf::Params;
 
 fn main(){
     
-    let ks:pprf::BitVec = pprf::BitVec::with_capacity(Params::LAMBDA as usize);
+    //let ks:pprf::BitVec = pprf::BitVec::with_capacity(Params::LAMBDA as usize);
     let i: u128 = 12345;
     let mut u:Vec<bool> = Vec::new();
     u.push(true);
@@ -24,3 +24,4 @@ fn main(){
  
 
 }
+

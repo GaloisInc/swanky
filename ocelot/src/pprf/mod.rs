@@ -5,13 +5,9 @@
 
 pub mod pprf;
 pub mod tpprf;
-//use crate::Error;
-#[path = "../errors.rs"]
-pub mod errors;
-use crate::pprf::errors::Error;
-//#[path = "../ot/chou_orlandi.rs"]
-//pub mod chou_orlandi;
-//use crate::pprf::chou_orlandi;
+
+use crate::errors::Error;
+
 #[allow(unused_imports)]
 use rand::{CryptoRng, Rng};
 #[allow(unused_imports)]

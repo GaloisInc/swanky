@@ -3,22 +3,18 @@ use scuttlebutt::{AbstractChannel, Block};
 use rand::{CryptoRng, Rng};
 
 pub mod rev_vole;
-
+pub type Fpr = Block;
+pub type Fp = Block;
 /// A trait for Reverse VOLE sender
 pub trait Rvolesender 
 where 
     Self: Sized,
 {
-    fn init<C: AbstractChannel, RNG: CryptoRng + Rng>(
-        &mut self,
-        channel: &mut C,
-        rng: &mut RNG,
-    ) -> Result<Self, Error>;
+    fn init() -> Result<Self, Error>;
 
-    fn send<C: AbstractChannel, RNG: CryptoRng + Rng>(
+    fn send<C: AbstractChannel>(
         &mut self,
-        channel: &mut C,
-        _: &mut RNG,
+        channel: &mut C
     ) -> Result<(), Error>;
 }
 
@@ -26,22 +22,15 @@ pub trait Rvolereceiver
 where 
     Self: Sized,
     {
-    fn init<C: AbstractChannel, RNG: CryptoRng + Rng>(
+    fn init<C: AbstractChannel>(
         &mut self,
         channel: &mut C,
-        rng: &mut RNG,
     ) -> Result<Self, Error>;
 
-    fn send<C: AbstractChannel, RNG: CryptoRng + Rng>(
+    fn receive<C: AbstractChannel>(
         &mut self,
         channel: &mut C,
-        _: &mut RNG,
-    ) -> Result<(), Error>;
-
-    fn receive<C: AbstractChannel, RNG: CryptoRng + Rng>(
-        &mut self,
-        channel: &mut C,
-        rng: &mut RNG,
-    ) -> Result<(Vec<Block>, Vec<Block>), Error>;
+        input: &Vec<Fpr>
+    ) -> Result<(Vec<Fpr>, Vec<Fpr>), Error>;
 }
     
