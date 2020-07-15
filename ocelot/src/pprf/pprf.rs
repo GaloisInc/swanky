@@ -10,11 +10,12 @@
 //#[path = "../errors.rs"]
 //mod errors;
 //use crate::ot;
-use crate::errors::Error;
-use crate::ot::{Receiver as OtReceiver, Sender as OtSender, ChouOrlandiSender, ChouOrlandiReceiver};
-//use crate:: { pprf::{
- //   BitVec, Fpr2, PPRF, PprfSender, PprfReceiver, errors::Error},
-//};
+use crate::pprf::errors::Error;
+//use crate::pprf::chou_orlandi;
+//use crate::ot::{Receiver as OtReceiver, Sender as OtSender, ChouOrlandiSender, ChouOrlandiReceiver};
+use crate:: { pprf::{
+    BitVec, Fpr2, PprfSender, PprfReceiver},
+};
 //#[path = "../"]
 //extern crate ot;
 //use ocelot;
@@ -28,7 +29,7 @@ use rand::{CryptoRng, Rng, RngCore, SeedableRng};
 #[allow(unused_imports)]
 use scuttlebutt::{AbstractChannel, Block, Block512, Malicious, SemiHonest, AesRng, Channel};
 //#[allow(unused_imports)]
-pub use crate::{pprf::{PprfSender, BitVec, Fpr, Fpr2, PprfReceiver}};
+//pub use crate::{pprf::{PprfSender, BitVec, Fpr, Fpr2, PprfReceiver}};
 extern crate byteorder;
 use blake2::{Blake2b, Blake2s, Digest};
 use hex_literal::hex;
@@ -48,7 +49,7 @@ impl Params {
 }
 
 /// Sender
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct Sender {
     beta: Fpr2,
     kpprf: Block,
@@ -59,7 +60,7 @@ pub struct Sender {
 }
 
 /// Receiver
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 struct Receiver {
     alpha: Block,
     key_vec: Vec<Block>,
@@ -77,6 +78,8 @@ fn prg_g(seed: Block) -> (Block, Block) {
     let pair = rng.gen::<(Block, Block)>();
     pair
 }
+
+
 /// PRG G': used to compute the PRF outputs on the last level of the tree
 #[allow(dead_code)]
 fn prg_gprime(seed: Block) -> PprfRange {
@@ -151,6 +154,11 @@ impl PprfSender for Sender {
         use std::{os::unix::net::UnixStream, 
                 io::{BufReader, BufWriter},
         };
+       /* /// Instantiation of the Chou-Orlandi OT sender.
+        pub type ChouOrlandiSender = chou_orlandi::Sender;
+        /// Instantiation of the Chou-Orlandi OT receiver.
+        pub type ChouOrlandiReceiver = chou_orlandi::Receiver;  
+        use crate::ot::Sender;
         let m0s_ = k0.clone();
         let m1s_ = k1.clone();
         let (sender, receiver) = UnixStream::pair().unwrap();
@@ -176,7 +184,7 @@ impl PprfSender for Sender {
         handle.join().unwrap();
         for j in 0..Params::ELL {
             assert_eq!(result[j], if bs[j] { m0s_[j] } else { m1s_[j] });
-        }
+        } */
         //6. compute correction value c
         let (s2j, _): (Vec<Fpr2>, Vec<_>) = b.iter().cloned().unzip();
         //let t = s2j.iter().map(|(l, r)| (fold(temp1, |sum, &l| sum^l), r.fold(temp1, |sum, &x| sum^x)));

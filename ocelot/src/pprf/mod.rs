@@ -4,21 +4,27 @@
 //! This module provides traits for PPRF
 
 pub mod pprf;
-use crate::Error;
-//#[path = "../errors.rs"]
-//pub mod errors;
-//use crate::pprf::errors::Error;
-
+pub mod tpprf;
+//use crate::Error;
+#[path = "../errors.rs"]
+pub mod errors;
+use crate::pprf::errors::Error;
+//#[path = "../ot/chou_orlandi.rs"]
+//pub mod chou_orlandi;
+//use crate::pprf::chou_orlandi;
 #[allow(unused_imports)]
 use rand::{CryptoRng, Rng};
 #[allow(unused_imports)]
 use scuttlebutt::{AbstractChannel, Block, Block512};
 pub use bit_vec::BitVec;
+// finite fields
+//use ff::*;
 //TODO: change this type to field type later
+//pub type Fpr = BitIterator<Block>;
 pub type Fpr = Block;
 pub type Fpr2 = (Fpr, Fpr);
 
-// PPRF 
+/*// PPRF 
 pub trait PPRF{
     /// Key generation.
     fn keygen(lambda:BitVec) -> BitVec;
@@ -26,7 +32,7 @@ pub trait PPRF{
     fn puncture(k:BitVec, x:BitVec) -> Vec <BitVec>;
     /// Evaluate at a point x given the punctured key.
     fn eval(pk: Vec<BitVec>, z:BitVec) -> Option<Vec<BitVec>>;
-}
+}*/
 
 /// A trait for PPRF Sender
 pub trait PprfSender
