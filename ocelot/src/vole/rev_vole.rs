@@ -82,7 +82,9 @@ impl Rvolesender for Sender{
         channel: &mut C,
         _: &mut RNG,
     ) -> Result<(), Error>{
-    let si = ((self.beta, self.chi), (self.b, self.x));
+    let beta = self.beta.clone();
+    let b = self.b.clone();
+    let mut si = ((beta, self.chi), (b, self.x));
     write_pair_pair_vec_blocks(channel, si);
     Ok(())
     }
@@ -103,7 +105,8 @@ fn init<C: AbstractChannel, RNG: CryptoRng + Rng>(& mut self,
         channel: &mut C,
         _: &mut RNG,
     ) -> Result<(), Error>{
-        write_blocks(channel, self.y);
+        let y = self.y.clone();
+        write_blocks(channel, y);
         Ok (())
     }
 
@@ -116,7 +119,10 @@ fn init<C: AbstractChannel, RNG: CryptoRng + Rng>(& mut self,
         let b = channel.read_blocks(Params::T);
         let chi = channel.read_block().unwrap();
         let x = channel.read_block();
-        let gamma = self.y.iter().map(|x| x.clmul(chi).0).collect();
+        //let y = self.y.clone();
+        let gamma1 = self.y.iter().map(|x| x.clmul(chi).0).collect();
+        let gamma2 = self.y.iter().map(|x| x.clmul(chi).0).collect();
+        Ok((gamma1, gamma2))
     }
 
 }
