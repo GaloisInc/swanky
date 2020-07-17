@@ -13,7 +13,7 @@ use rand::{CryptoRng, Rng};
 #[allow(unused_imports)]
 use scuttlebutt::{AbstractChannel, Block, Block512};
 pub use bit_vec::BitVec;
-// finite fields
+//finite fields
 //use ff::*;
 //TODO: change this type to field type later
 //pub type Fpr = BitIterator<Block>;
@@ -38,16 +38,13 @@ where
     /// Message type, restricted to types that are mutably-dereferencable as
     /// `u8` arrays.
     type Msg: Sized + AsMut<[u8]>;
-    fn init<C: AbstractChannel, RNG: CryptoRng + Rng>(
-        &mut self,
-        channel: &mut C,
-        rng: &mut RNG,
-    ) -> Result<Self, Error>;
+    fn init(&mut self) -> Result<(), Error>;
 
-    fn send<C: AbstractChannel, RNG: CryptoRng + Rng>(
+    fn send<C: AbstractChannel>(
         &mut self,
         channel: &mut C,
-        _: &mut RNG,
+        beta: (Fpr, Fpr),
+        kpprf: Block
     ) -> Result<(), Error>;
 }
 
@@ -59,16 +56,30 @@ where
     /// Message type, restricted to types that are mutably-dereferencable as
     /// `u8` arrays.
     type Msg: Sized + AsMut<[u8]>;
-    fn init<C: AbstractChannel, RNG: CryptoRng + Rng>(
-        channel: &mut C,
-        rng: &mut RNG,
+    fn init<C: AbstractChannel>(
+        &mut self, 
+        channel: &mut C
     ) -> Result<Self, Error>;
-    fn receive<C: AbstractChannel, RNG: CryptoRng + Rng>(
+    fn receive<C: AbstractChannel>(
         &mut self,
         channel: &mut C,
-        input1: &[(Block, Block)],
-        input2: &(Block, Block),
-        input3: &Block512,
-        rng: &mut RNG,
+        alpha: Block
     ) -> Option<(Vec<Block>, (Block, Block))>;
 }
+
+/// A trait for tPPRF Sender
+pub trait Tpprfsender
+where 
+    Self: Sized,
+    {
+        fn init() -> Result<Self, Error>;
+        fn send() -> Result<(), Error>;
+    }
+
+/// A trait for tPPRF Receiver
+pub trait Tpprfreceiver
+where 
+    Self: Sized
+ {
+    fn init() -> Result<(), Error>;
+ }

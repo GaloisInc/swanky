@@ -12,9 +12,10 @@ use crate::{
     ot::{Sender as OtSender, Receiver as OtReceiver, ChouOrlandiSender, ChouOrlandiReceiver, chou_orlandi},
     pprf::{BitVec, PprfSender, PprfReceiver, Fpr, Fpr2}
 };
+use rand::{CryptoRng, Rng, RngCore, SeedableRng};
 
 use scuttlebutt::{AbstractChannel, Block, Block512, Malicious, AesRng, Channel};
-
+use crate::pprf::{Tpprfsender, Tpprfreceiver};
 /// tpprf parameters
 pub struct Params;
 /// intialize the parameters
@@ -24,14 +25,46 @@ impl Params {
     pub const PRIME: usize = 7;
     pub const POWR: usize = 2;
     pub const N: usize = 2^Params::ELL;
+    pub const T: usize = 10;
     }
 /// tpprf sender
 pub struct Sender{
-    x: Fpr
+    x: Fpr,
+    beta: Vec<Fpr>,
+    b: Vec<Fpr>,
+    chi: Fpr,
 }
+
+use crate::vole::*;
+
+impl Tpprfsender for Sender {
+    // add code here
+    fn init()-> Result<Self, Error>{
+        let seed = rand::random::<Block>();
+        let mut rng = AesRng::from_seed(seed);
+        let beta: Vec<Fpr> = (0..Params::T).map(|_| rng.gen::<Fpr>()).collect();
+        let b: Vec<Fpr> = (0..Params::T).map(|_| rng.gen::<Fpr>()).collect();
+        let chi: Fpr = rng.gen::<Fpr>();
+        let x:Fpr = rng.gen::<Fpr>();
+        Ok(Self{x, beta, b, chi})
+    }
+
+    fn send() -> Result<(), Error>{
+        Ok(())
+    }
+}
+
 type Fprstar = Block;
 /// tpprf Receiver 
 pub struct Receiver{
     s: Vec<Block>,
     y: Vec<Fprstar>
+}
+
+
+impl Tpprfreceiver for Receiver {
+    // add code here
+    fn init()-> Result<(), Error>{
+        Ok(())
+    }
 }

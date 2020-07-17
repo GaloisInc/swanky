@@ -13,6 +13,8 @@
 #![cfg_attr(feature = "nightly", deny(missing_docs))]
 
 //!
+#[macro_use]
+extern crate lazy_static; 
 
 mod errors;
 mod utils;
