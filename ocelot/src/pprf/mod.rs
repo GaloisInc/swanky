@@ -5,6 +5,7 @@
 
 pub mod pprf;
 pub mod tpprf;
+//pub mod field;
 
 use crate::errors::Error;
 
@@ -16,9 +17,12 @@ pub use bit_vec::BitVec;
 //finite fields
 //use ff::*;
 //TODO: change this type to field type later
-//pub type Fpr = BitIterator<Block>;
-pub type Fpr = Block;
-pub type Fpr2 = (Fpr, Fpr);
+//pub type Fp = BitIterator<Block>;
+//use crate::field::Fp;
+extern crate rand;
+
+pub type Fp = Block;
+pub type Fp2 = (Fp, Fp);
 
 /*// PPRF 
 pub trait PPRF{
@@ -43,7 +47,7 @@ where
     fn send<C: AbstractChannel>(
         &mut self,
         channel: &mut C,
-        beta: (Fpr, Fpr),
+        beta: (Fp, Fp),
         kpprf: Block
     ) -> Result<(), Error>;
 }

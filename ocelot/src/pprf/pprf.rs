@@ -9,11 +9,11 @@
 //! under malicious setting via GGM trees presented in (<https://eprint.iacr.org/2019/1159>, Fig.13 page 25)
 //#[allow(unused_imports)]
 
-
+extern crate rand;
 use crate::{
     errors::Error,
     ot::{Sender as OtSender, Receiver as OtReceiver, ChouOrlandiSender, ChouOrlandiReceiver},
-    pprf::{BitVec, PprfSender, PprfReceiver, Fpr, Fpr2}
+    pprf::{BitVec, PprfSender, PprfReceiver, Fp, Fp2}
 };
 
 #[allow(unused_imports)]
@@ -28,6 +28,8 @@ use hex_literal::hex;
 use std::convert::TryInto;
 use generic_array::{ArrayLength, GenericArray};
 use std::arch::x86_64::*;
+//use crate::field::Fp;
+
 
 /// Parameters for the mal-PPRF protocol
 pub struct Params;
@@ -40,12 +42,15 @@ impl Params {
 }
 
 #[allow(dead_code)]
-type PprfRange = (Fpr2, Block);
+type PprfRange = (Fp2, Block);
+
 
 // Define static variable
 lazy_static! {
 static ref ZERO:__m128i = unsafe { _mm_setzero_si128() };
 }
+
+
 
 /// PPRF Sender
 #[derive(Debug)]
@@ -107,7 +112,7 @@ impl PprfSender for Sender {
         //! Sampling the key kpprf.
         let seed = rand::random::<Block>();
         // chose input beta uniformly
-        //let beta = rand::random::<Fpr2>();
+        //let beta = rand::random::<Fp2>();
         //To store the intermediate evaluations of the GGM tree
         //let mut v: Vec<Block> = vec![seed];
         self.sv1.push(seed);
@@ -135,7 +140,7 @@ impl PprfSender for Sender {
     fn send<C: AbstractChannel>(
         &mut self,
         channel: &mut C,
-        beta: (Fpr, Fpr),
+        beta: (Fp, Fp),
         kpprf: Block
     ) -> Result<(), Error> {
     // 3. compute the left and right halves of intermediate levels
@@ -188,7 +193,7 @@ impl PprfSender for Sender {
     assert_eq!(result[j], if bs[j] { m0s_[j] } else { m1s_[j] });
     } 
     //6. compute correction value c
-    let (s2j, _): (Vec<Fpr2>, Vec<_>) = self.sv2.iter().cloned().unzip();
+    let (s2j, _): (Vec<Fp2>, Vec<_>) = self.sv2.iter().cloned().unzip();
     //let t = s2j.iter().map(|(l, r)| (fold(temp1, |sum, &l| sum^l), r.fold(temp1, |sum, &x| sum^x)));
     let (left1, right1): (Vec<_>, Vec<_>) = s2j.iter().cloned().unzip();
     let lsum:Block = left1.iter().fold(Block(*ZERO), |sum, &x| Block(unsafe {_mm_add_epi64(sum.0, x.0)}));

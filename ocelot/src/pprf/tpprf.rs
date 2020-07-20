@@ -10,7 +10,7 @@
 use crate::{
     errors::Error,
     ot::{Sender as OtSender, Receiver as OtReceiver, ChouOrlandiSender, ChouOrlandiReceiver, chou_orlandi},
-    pprf::{BitVec, PprfSender, PprfReceiver, Fpr, Fpr2}
+    pprf::{BitVec, PprfSender, PprfReceiver, Fp, Fp2}
 };
 use rand::{CryptoRng, Rng, RngCore, SeedableRng};
 
