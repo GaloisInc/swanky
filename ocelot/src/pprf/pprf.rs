@@ -7,21 +7,20 @@
 
 //! This is an implementation of the Puncturable Pseudo-Random Function (PPRF) protocol
 //! under malicious setting via GGM trees presented in (<https://eprint.iacr.org/2019/1159>, Fig.13 page 25)
-//#[allow(unused_imports)]
 
+#![allow(unused_imports)]
+#![allow(unused_variables)]
+#![allow(unused_mut)]
+#![allow(dead_code)]
 extern crate rand;
 use crate::{
     errors::Error,
     ot::{Sender as OtSender, Receiver as OtReceiver, ChouOrlandiSender, ChouOrlandiReceiver},
     pprf::{BitVec, PprfSender, PprfReceiver, Fp, Fp2}
 };
-
-#[allow(unused_imports)]
 use rand::{CryptoRng, Rng, RngCore, SeedableRng};
 //use rand_core::block::{BlockRng, BlockRngCore};
-#[allow(unused_imports)]
 use scuttlebutt::{AbstractChannel, Block, Block512, Malicious, SemiHonest, AesRng, Channel};
-#[allow(unused_imports)]
 extern crate byteorder;
 use blake2::{Blake2b, Blake2s, Digest};
 use hex_literal::hex;

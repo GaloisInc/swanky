@@ -6,6 +6,9 @@
 
 //! This is an implementation of reverse VOLE functionality presented in 
 //! (<https://eprint.iacr.org/2019/1159>, Fig.14 page 25)
+
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 use rand::{CryptoRng, Rng, RngCore, SeedableRng};
 use scuttlebutt::{AbstractChannel, Block, Block512, Malicious, AesRng};
 use crate::{

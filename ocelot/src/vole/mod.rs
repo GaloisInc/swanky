@@ -1,3 +1,4 @@
+#![allow(unused_imports)]
 use crate::errors::Error;
 use scuttlebutt::{AbstractChannel, Block};
 use rand::{CryptoRng, Rng};

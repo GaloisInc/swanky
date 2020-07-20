@@ -7,6 +7,8 @@
 //! This is an implementation of the Puncturable Pseudo-Random Function (PPRF) protocol
 //! under malicious setting via GGM trees presented in (<https://eprint.iacr.org/2019/1159>, Fig.16 page 26)
 
+#![allow(unused_imports)]
+#![allow(dead_code)]
 use crate::{
     errors::Error,
     ot::{Sender as OtSender, Receiver as OtReceiver, ChouOrlandiSender, ChouOrlandiReceiver, chou_orlandi},
