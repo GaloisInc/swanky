@@ -17,7 +17,7 @@
 use crate::{
     errors::Error,
     ot::{ChouOrlandiReceiver, ChouOrlandiSender, Receiver as OtReceiver, Sender as OtSender},
-    pprf::{BitVec, Fp2, PprfReceiver, PprfSender},
+    pprf::{Fp2, PprfReceiver, PprfSender},
 };
 use rand::{CryptoRng, Rng, RngCore, SeedableRng};
 use scuttlebutt::{AbstractChannel, AesRng, Block, Block512, Channel, Malicious, SemiHonest};
@@ -316,3 +316,4 @@ pub fn fulleval(kstar: Vec<Block>, alpha: Block) -> Vec<PprfRange> {
     }
     s
 }
+

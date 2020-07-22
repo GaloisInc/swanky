@@ -80,3 +80,11 @@ where
  {
     fn init() -> Result<(), Error>;
  }
+
+#[cfg(test)]
+mod tests{
+    #[cfg(feature = "nightly")]
+    extern crate test;
+    use super::*;
+    use scuttlebutt::{AesRng, Block, Channel};
+}
