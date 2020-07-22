@@ -5,6 +5,7 @@ extern crate byteorder;
 use byteorder::{LittleEndian, WriteBytesExt};
 use std::mem;
 //use pprf::pprf::Params;
+use ocelot::field::*;
 
 
 fn main(){
@@ -23,7 +24,12 @@ fn main(){
     for i in &bs {
         println!("{:b}", i);
     }
- 
+    let xp:Fp = Fp (FpRepr([3, 4, 5,6]));
 
-}
+        for i in 0..4{
+            println!("{}", ((xp.0).0)[i]);
+            //println!("{:?}", (xp.0).);
+        }
+      
+    }
 

@@ -4,24 +4,14 @@
 //! This module provides traits for PPRF
 
 pub mod pprf;
-pub mod tpprf;
-//pub mod field;
+//pub mod tpprf;
 
+#[allow(unused_imports)]
 use crate::errors::Error;
-
-#[allow(unused_imports)]
-use rand::{CryptoRng, Rng};
-#[allow(unused_imports)]
-use scuttlebutt::{AbstractChannel, Block, Block512};
+use scuttlebutt::{AbstractChannel, Block};
 pub use bit_vec::BitVec;
-//finite fields
-//use ff::*;
-//TODO: change this type to field type later
-//pub type Fp = BitIterator<Block>;
-//use crate::field::Fp;
-extern crate rand;
+use crate::field::Fp;
 
-pub type Fp = Block;
 pub type Fp2 = (Fp, Fp);
 
 /*// PPRF 

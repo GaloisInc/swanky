@@ -15,14 +15,16 @@
 
 //#[macro_use]
 //extern crate ff;
+
+
+
 #[macro_use]
 extern crate lazy_static; 
 
 
-mod field;
-//pub use field::Fp;
-mod errors;
-mod utils;
+pub mod field;
+pub mod errors;
+pub mod utils;
 
 
 pub use crate::errors::Error;
