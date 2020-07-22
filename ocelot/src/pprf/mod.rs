@@ -7,9 +7,12 @@ pub mod pprf;
 //pub mod tpprf;
 
 #[allow(unused_imports)]
-use crate::errors::Error;
+use crate::{
+    errors::Error,
+    ot::{Receiver as OtReceiver, Sender as OtSender},
+};
 use scuttlebutt::{AbstractChannel, Block};
-pub use bit_vec::BitVec;
+//pub use bit_vec::BitVec;
 use crate::field::Fp;
 
 pub type Fp2 = (Fp, Fp);
@@ -58,7 +61,7 @@ where
         &mut self,
         channel: &mut C,
         alpha: Block
-    ) -> Option<(Vec<Block>, (Block, Block))>;
+    ) -> Option<(Vec<Block>, (Fp, Fp))>;
 }
 
 /// A trait for tPPRF Sender

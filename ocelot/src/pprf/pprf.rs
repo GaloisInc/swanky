@@ -12,6 +12,7 @@
 #![allow(unused_variables)]
 #![allow(unused_mut)]
 #![allow(dead_code)]
+#![allow(unused_doc_comments)]
 
 use crate::{
     errors::Error,
@@ -19,12 +20,9 @@ use crate::{
     pprf::{BitVec, Fp2, PprfReceiver, PprfSender},
 };
 use rand::{CryptoRng, Rng, RngCore, SeedableRng};
-//use rand_core::block::{BlockRng, BlockRngCore};
 use scuttlebutt::{AbstractChannel, AesRng, Block, Block512, Channel, Malicious, SemiHonest};
-extern crate byteorder;
 use super::Fp;
 use blake2::{Blake2b, Blake2s, Digest};
-use generic_array::{ArrayLength, GenericArray};
 use hex_literal::hex;
 use std::{arch::x86_64::*, convert::TryInto};
 
@@ -46,12 +44,12 @@ lazy_static! {
     static ref ZERO: __m128i = unsafe { _mm_setzero_si128() };
 }
 
-/// PPRF Sender
+/// A PPRF Sender.
 #[derive(Debug)]
 pub struct Sender {
-    // To store partial evaluations of the intermediate levels
+    /// To store partial evaluations of the intermediate levels.
     sv1: Vec<Block>,
-    // To store partial evaluation of the last level l+1
+    /// To store partial evaluation of the last level l+1.
     sv2: Vec<PprfRange>,
 }
 
@@ -64,25 +62,17 @@ impl Sender {
     }
 }
 
-/// PPRF Receiver
+/// A PPRF Receiver.
 #[derive(Debug)]
 struct Receiver {
-    // A vector to store all the evaluations s_j suchthat j is not equal to alpha||0
+    /// A vector to store all the evaluations s_j suchthat j is not equal to alpha||0.
     rv: Vec<Block>,
 }
 
-/*impl Receiver{
-    pub fn new() -> Receiver{
-        Receiver {
-            rv: Vec::new()
-        }
-    }
-}*/
-
-/// legnth-doubling PRG G
+/// legnth-doubling PRG G.
 #[allow(dead_code)]
 fn prg_g(seed: Block) -> (Block, Block) {
-    // Generate RNG using seed.
+    /// Generate RNG using seed.
     let mut rng = AesRng::from_seed(seed);
     let pair = rng.gen::<(Block, Block)>();
     pair
@@ -124,21 +114,26 @@ fn write_fp<C:AbstractChannel>(channel: &mut C, s: Fp) -> std::io::Result<()> {
     Ok(())
 }
 
+/// Read a `Fp` from the channel.
+#[inline(always)]
+fn read_fp<C:AbstractChannel>(channel: &mut C) -> std::io::Result<Fp> {
+    let mut data = [0u64; 4];
+    for i in 0..4{
+        data[i]=channel.read_u64()?;
+    }
+    Ok(Fp(FpRepr(data)))
+}
+
+
 /// implement PprfSender for Sender
 
 impl PprfSender for Sender {
     type Msg = Block;
     fn init(&mut self) -> Result<(), Error> {
-        //! Sampling the key kpprf.
+        /// Sampling the key kpprf.
         let seed = rand::random::<Block>();
-        // chose input beta uniformly
-        //let beta = rand::random::<Fp2>();
-        //To store the intermediate evaluations of the GGM tree
-        //let mut v: Vec<Block> = vec![seed];
         self.sv1.push(seed);
-        // To store the evaluations on the last level of the tree
-        //let mut b: Vec<PprfRange> = Vec::new();
-        // 2.b compute (s^i_{2j}, s^i_{2j+1}) = G(s^{i-1}_j)
+        /// 2.b compute (s^i_{2j}, s^i_{2j+1}) = G(s^{i-1}_j).
         for i in 1..Params::ELL + 1 {
             for j in 0..2 ^ (i - 1) {
                 let s = self.sv1[i - 1 + j].clone();
@@ -147,7 +142,7 @@ impl PprfSender for Sender {
                 self.sv1.push(s1);
             }
         }
-        // 2.c compute (s^{l+1}_{2j}, s^{l+1}_{2j+1})
+        /// 2.c compute (s^{l+1}_{2j}, s^{l+1}_{2j+1}).
         for j in 0..2 ^ (Params::ELL) {
             let temp = self.sv1[Params::ELL + j].clone();
             let pair = prg_gprime(temp);
@@ -162,7 +157,7 @@ impl PprfSender for Sender {
         beta: (Fp, Fp),
         kpprf: Block,
     ) -> Result<(), Error> {
-        // 3. compute the left and right halves of intermediate levels
+        /// 3. compute the left and right halves of intermediate levels.
         let mut k0: Vec<Block> = Vec::new();
         let mut k1: Vec<Block> = Vec::new();
         let temp1 = Block(*ZERO);
@@ -177,7 +172,7 @@ impl PprfSender for Sender {
             k0.push(temp1);
             k1.push(temp2);
         }
-        // 4. compute right half for the last level l+1.
+        /// 4. compute right half for the last level l+1.
         let k1lp1 = self.sv2.iter().fold(Block(*ZERO), |sum, &x| sum ^ x.1);
         ///5. Parallel OT calls
         use std::{
@@ -212,10 +207,10 @@ impl PprfSender for Sender {
         for j in 0..Params::ELL {
             assert_eq!(result[j], if bs[j] { m0s_[j] } else { m1s_[j] });
         }
-        //6. compute correction value c
-        let (s2j, _): (Vec<Fp2>, Vec<_>) = self.sv2.iter().cloned().unzip();
+        /// 6. compute correction value c.
+        let (s2j, _): (Vec<Fp2>, Vec<Block>) = self.sv2.iter().cloned().unzip();
         //let t = s2j.iter().map(|(l, r)| (fold(temp1, |sum, &l| sum^l), r.fold(temp1, |sum, &x| sum^x)));
-        let (left1, right1): (Vec<_>, Vec<_>) = s2j.iter().cloned().unzip();
+        let (left1, right1): (Vec<Fp>, Vec<Fp>) = s2j.iter().cloned().unzip();
 
         use ff::*;
         let fpzero: Fp = Fp(FpRepr([0, 0, 0, 0]));
@@ -225,16 +220,15 @@ impl PprfSender for Sender {
         let l: Fp = sub_fp(beta.0, lsum);
         let r: Fp = sub_fp(beta.1, rsum);
         let c = (l, r);
-        // 7. apply hash function.
+        /// 7. apply hash function.
         let mut hasher = Blake2b::new();
-        let (l, r): (Vec<_>, Vec<_>) = self.sv2.iter().cloned().unzip();
+        let (_, r): (Vec<Fp2>, Vec<Block>) = self.sv2.iter().cloned().unzip();
         for i in 0..2 ^ (Params::ELL) {
             hasher.update(r[i]);
         }
         let hash = hasher.finalize();
         let gamma = hash.as_slice().try_into().unwrap();
         channel.write_block(&k1lp1)?;
-        
         write_fp(&mut channel, c.0)?;
         write_fp(&mut channel, c.1)?;
         channel.write_block512(&gamma)?;
@@ -247,12 +241,6 @@ impl PprfSender for Sender {
 impl PprfReceiver for Receiver {
     type Msg = Block;
     fn init<C: AbstractChannel>(&mut self, channel: &mut C) -> Result<Self, Error> {
-        // Read hash value from the sender
-        //let k1 = channel.read_block();
-        //let kv = channel.read_blocks(Params::ELL+1).unwrap();
-        //let hash = channel.read_block512().unwrap();
-        //let c = (channel.read_block().unwrap(), channel.read_block().unwrap());
-        //let alpha = rand::random::<Block>();
         let v = Vec::new();
         Ok(Self { rv: v })
     }
@@ -261,43 +249,28 @@ impl PprfReceiver for Receiver {
         &mut self,
         channel: &mut C,
         alpha: Block,
-    ) -> Option<(Vec<Block>, (Block, Block))> {
-        //TODO: complete this definition
-        //let kv = channel.read_blocks(Params::ELL+1).unwrap();
-        let gamma = channel.read_block512().unwrap();
-        let c = (channel.read_block().unwrap(), channel.read_block().unwrap());
+    ) -> Option<(Vec<Block>, (Fp, Fp))> {
+        let gamma:Block512 = channel.read_block512().unwrap();
+        let c:(Fp, Fp) = (read_fp(channel).unwrap(), read_fp(channel).unwrap());
         let k1lp1: Block = channel.read_block().unwrap();
         self.rv.push(k1lp1);
-        /*let ks = (0..input1.len())
-        .map(|i| {
-            let k0 = input1[i].0;
-            let k1 = input1[i].1;
-            Ok((k0, k1))
-        })
-        .collect::<Result<Vec<(Block, Block)>, Error>>();*/
-        // 8.(a)
+        
+        /// 8.(a) Apply puncturestar on the Kis and alpha.
         let mut kstar = puncturestar(self.rv.clone(), alpha);
         let kp = kstar.clone();
-        // TODO: check if it is acually alpha || 0
-        // 8.(b)
+        /// 8.(b) Apply fulleval on kstar and alpha||0.
         let sv = fulleval(kstar, alpha);
         // 8.(c) compute w = c- sum s2j
-        let (svl, svr) = (1..Params::N + 1)
+        let (svl, svr):(Vec<Fp2>, Vec<Block>) = (1..Params::N + 1)
             .filter(|&x| Block(unsafe { _mm_set_epi32(0, 0, 0, x as i32) }) != alpha)
             .map(|i| sv[2 * i])
             .unzip();
-        let sum: Vec<Block> = vec![svl, svr]
-            .into_iter()
-            .map(|x: Vec<Block>| {
-                x.into_iter().fold(Block(*ZERO), |sum, x| {
-                    Block(unsafe { _mm_add_epi64(sum.0, x.0) })
-                })
-            })
-            .collect();
-        let w = (
-            Block(unsafe { _mm_subs_epi16((c.0).0, sum[0].0) }),
-            Block(unsafe { _mm_subs_epi16((c.1).0, sum[1].0) }),
-        );
+        let (svl0, svl1):(Vec<Fp>, Vec<Fp>) = svl.into_iter().unzip();
+        let fpzero: Fp = Fp(FpRepr([0, 0, 0, 0]));
+        let lsum:Fp = svl0.iter().fold(fpzero, |sum, &x| add_fp(sum, x));
+        let rsum:Fp = svl1.iter().fold(fpzero, |sum, &x| add_fp(sum, x));
+    
+        let w = (sub_fp(c.0, lsum), sub_fp(c.1, rsum));
         // 8.(d) compute hash function
         let mut hasher = Blake2b::new();
         let (l, r): (Vec<_>, Vec<_>) = sv.iter().cloned().unzip();
@@ -323,7 +296,7 @@ pub fn keygen(lambda: Block) -> Block {
 }
 pub fn puncturestar(keys: Vec<Block>, alpha: Block) -> Vec<Block> {
     // Given set of keys and alpha, outputs a punctured key.
-    // TODO: fix this later
+    // TODO: Replace this with the actual definition.
     let mut kstar: Vec<Block> = Vec::new();
     for i in 1..Params::ELL + 2 {
         let s = rand::random::<Block>();
@@ -332,13 +305,14 @@ pub fn puncturestar(keys: Vec<Block>, alpha: Block) -> Vec<Block> {
     kstar
 }
 
-pub fn fulleval(kstar: Vec<Block>, alpha: Block) -> Vec<(Block, Block)> {
-    let mut s: Vec<(Block, Block)> = Vec::new();
+pub fn fulleval(kstar: Vec<Block>, alpha: Block) -> Vec<PprfRange> {
+    let mut s: Vec<PprfRange> = Vec::new();
     for i in 1..kstar.len() {
         if Block(unsafe { _mm_set_epi32(0, 0, 0, i as i32) }) == alpha {
             continue;
         }
-        s.push(rand::random::<(Block, Block)>());
+        //TODO: replace this with the actual definition.
+        s.push(rand::random::<PprfRange>());
     }
     s
 }
