@@ -62,7 +62,7 @@ struct Receiver<OT: OtReceiver + Malicious, PPRF:PPRFTrait> {
 
 /// Write a `Fp` to the channel.
 #[inline(always)]
-fn write_fp<C:AbstractChannel>(channel: &mut C, s: Fp) -> std::io::Result<()> {
+pub fn write_fp<C:AbstractChannel>(channel: &mut C, s: Fp) -> std::io::Result<()> {
     for i in 0..((s.0).0).len(){
         channel.write_u64(((s.0).0)[i])?;
     }
@@ -71,7 +71,7 @@ fn write_fp<C:AbstractChannel>(channel: &mut C, s: Fp) -> std::io::Result<()> {
 
 /// Read a `Fp` from the channel.
 #[inline(always)]
-fn read_fp<C:AbstractChannel>(channel: &mut C) -> std::io::Result<Fp> {
+pub fn read_fp<C:AbstractChannel>(channel: &mut C) -> std::io::Result<Fp> {
     let mut data = [0u64; 4];
     for i in 0..4{
         data[i]=channel.read_u64()?;
