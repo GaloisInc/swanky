@@ -6,6 +6,7 @@ use rand::{CryptoRng, Rng};
 pub mod rev_vole;
 pub type Fpr = Block;
 pub type Fp = Block;
+
 /// A trait for Reverse VOLE sender
 pub trait Rvolesender 
 where 

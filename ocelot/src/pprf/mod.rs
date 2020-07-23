@@ -15,19 +15,23 @@ use scuttlebutt::{AbstractChannel, Block};
 //pub use bit_vec::BitVec;
 use crate::field::Fp;
 
-pub type Fp2 = (Fp, Fp);
 
-/*// PPRF 
+pub type Fp2 = (Fp, Fp);
+pub type PprfRange = (Fp2, Block);
+
+/// A PPRF trait. 
 pub trait PPRF{
     /// Key generation.
-    fn keygen(lambda:BitVec) -> BitVec;
+    fn keygen(lambda:Block) -> Block;
     /// Compute puncture key at a point x.
-    fn puncture(k:BitVec, x:BitVec) -> Vec <BitVec>;
+    fn puncture(k:Block, x:Block) -> Vec<Block>;
     /// Evaluate at a point x given the punctured key.
-    fn eval(pk: Vec<BitVec>, z:BitVec) -> Option<Vec<BitVec>>;
-}*/
+    fn eval(pk:Vec<Block>, z:Block) -> Option<Vec<Block>>;
+    fn fulleval(kstar: Vec<Block>, alpha: Block) -> Vec<PprfRange>;
+}
 
-/// A trait for PPRF Sender
+
+/// A trait for PPRF Sender.
 pub trait PprfSender
 where
     Self: Sized,
@@ -35,7 +39,6 @@ where
     /// Message type, restricted to types that are mutably-dereferencable as
     /// `u8` arrays.
     type Msg: Sized + AsMut<[u8]>;
-    fn init(&mut self) -> Result<(), Error>;
 
     fn send<C: AbstractChannel>(
         &mut self,
@@ -57,11 +60,11 @@ where
         &mut self, 
         channel: &mut C
     ) -> Result<Self, Error>;
-    fn receive<C: AbstractChannel>(
+    fn receive<C:AbstractChannel>(
         &mut self,
         channel: &mut C,
         alpha: Block
-    ) -> Option<(Vec<Block>, (Fp, Fp))>;
+    ) -> Option<(Vec<Block>, (Fp, Fp))> ;
 }
 
 /// A trait for tPPRF Sender
@@ -80,6 +83,8 @@ where
  {
     fn init() -> Result<(), Error>;
  }
+
+ 
 
 #[cfg(test)]
 mod tests{
