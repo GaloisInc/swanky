@@ -62,10 +62,6 @@ where
     /// Message type, restricted to types that are mutably-dereferencable as
     /// `u8` arrays.
     type Msg: Sized + AsMut<[u8]>;
-    fn init<C: AbstractChannel>(
-        &mut self, 
-        channel: &mut C
-    ) -> Result<Self, Error>;
     fn receive<C:AbstractChannel>(
         &mut self,
         channel: &mut C,
