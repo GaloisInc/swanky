@@ -14,7 +14,7 @@ use crate::{
 use scuttlebutt::{AbstractChannel, Block};
 //pub use bit_vec::BitVec;
 use crate::field::Fp;
-
+use rand::{CryptoRng, Rng};
 
 pub type Fp2 = (Fp, Fp);
 pub type PprfRange = (Fp2, Block);
@@ -25,9 +25,15 @@ pub trait PPRF{
     fn keygen(lambda:Block) -> Block;
     /// Compute puncture key at a point x.
     fn puncture(k:Block, x:Block) -> Vec<Block>;
+    /// length doubling PRG G
+    fn prg_g<RNG: CryptoRng + Rng>(seed:Block, rng:&mut RNG) -> (Block, Block);
+    /// PRG G': used to compute the PRF outputs on the last level of the tree.
+    fn prg_gprime<RNG: CryptoRng + Rng>(seed:Block, rng:&mut RNG) -> PprfRange;
     /// Evaluate at a point x given the punctured key.
     fn eval(pk:Vec<Block>, z:Block) -> Option<Vec<Block>>;
-    fn fulleval(kstar: Vec<Block>, alpha: Block) -> Vec<PprfRange>;
+    /// Puncturestar
+    fn puncture_star(keys:Vec<Block>, alpha:Block) -> Vec<Block>;
+    fn full_eval(kstar: Vec<Block>, alpha: Block) -> Vec<PprfRange>;
 }
 
 

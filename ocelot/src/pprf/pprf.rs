@@ -48,8 +48,9 @@ lazy_static! {
 
 /// A PPRF Sender.
 #[derive(Debug)]
-pub struct Sender<OT: OtSender + Malicious> {
+pub struct Sender<OT: OtSender + Malicious, PPRF:PPRFTrait> {
     _ot: PhantomData<OT>,
+    _pprf: PhantomData<PPRF>,
     /// To store partial evaluations of the intermediate levels.
     sv1: Vec<Block>,
     /// To store partial evaluation of the last level l+1.
@@ -59,27 +60,11 @@ pub struct Sender<OT: OtSender + Malicious> {
 
 /// A PPRF Receiver.
 #[derive(Debug)]
-struct Receiver<OT: OtReceiver + Malicious> {
+struct Receiver<OT: OtReceiver + Malicious, PPRF:PPRFTrait> {
     _ot: PhantomData<OT>,
+    _pprf: PhantomData<PPRF>,
     /// A vector to store all the evaluations s_j suchthat j is not equal to alpha||0.
     rv: Vec<Block>,
-}
-
-/// legnth-doubling PRG G.
-#[allow(dead_code)]
-fn prg_g(seed: Block) -> (Block, Block) {
-    /// Generate RNG using seed.
-    let mut rng = AesRng::from_seed(seed);
-    let pair = rng.gen::<(Block, Block)>();
-    pair
-}
-
-/// PRG G': used to compute the PRF outputs on the last level of the tree.
-#[allow(dead_code)]
-fn prg_gprime(seed: Block) -> PprfRange {
-    let mut rng = AesRng::from_seed(seed);
-    let triple = rng.gen::<PprfRange>();
-    triple
 }
 
 /// Write a `Fp` to the channel.
@@ -104,7 +89,7 @@ fn read_fp<C:AbstractChannel>(channel: &mut C) -> std::io::Result<Fp> {
 
 /// implement PprfSender for Sender
 
-impl <OT: OtSender<Msg=Block> + Malicious> PprfSender for Sender<OT>{
+impl <OT: OtSender<Msg=Block> + Malicious, PPRF:PPRFTrait> PprfSender for Sender<OT, PPRF>{
     type Msg = Block;
 
     fn send<C: AbstractChannel>(
@@ -115,11 +100,13 @@ impl <OT: OtSender<Msg=Block> + Malicious> PprfSender for Sender<OT>{
     ) -> Result<(), Error> {
          /// 1. set s0 = kpprf
          self.sv1.push(kpprf);
+         /// use kpprf as a security parameter lambda
+         let mut rng = AesRng::from_seed(kpprf);
          /// 2.b compute (s^i_{2j}, s^i_{2j+1}) = G(s^{i-1}_j).
          for i in 1..Params::ELL + 1 {
              for j in 0..2 ^ (i - 1) {
                  let s = self.sv1[i - 1 + j].clone();
-                 let (s0, s1) = prg_g(s);
+                 let (s0, s1) = PPRF::prg_g(s, &mut rng);
                  self.sv1.push(s0);
                  self.sv1.push(s1);
              }
@@ -127,7 +114,7 @@ impl <OT: OtSender<Msg=Block> + Malicious> PprfSender for Sender<OT>{
          /// 2.c compute (s^{l+1}_{2j}, s^{l+1}_{2j+1}).
          for j in 0..2 ^ (Params::ELL) {
              let temp = self.sv1[Params::ELL + j].clone();
-             let pair = prg_gprime(temp);
+             let pair = PPRF::prg_gprime(temp, &mut rng);
              self.sv2.push(pair);
          }
         /// 3. compute the left and right halves of intermediate levels.
@@ -184,12 +171,13 @@ impl <OT: OtSender<Msg=Block> + Malicious> PprfSender for Sender<OT>{
 
 /// Implement PPRF Receiver for Receiver
 
-impl <OT: OtReceiver<Msg = Block> + Malicious> PprfReceiver for Receiver<OT> {
+impl <OT: OtReceiver<Msg = Block> + Malicious, PPRF:PPRFTrait> PprfReceiver for Receiver<OT, PPRF> {
     type Msg = Block;
     fn init<C: AbstractChannel>(&mut self, channel: &mut C) -> Result<Self, Error> {
         let v = Vec::new();
         Ok(Self {
              _ot: PhantomData::<OT>, 
+             _pprf: PhantomData::<PPRF>,
              rv: v })
     }
 
@@ -210,10 +198,10 @@ impl <OT: OtReceiver<Msg = Block> + Malicious> PprfReceiver for Receiver<OT> {
         self.rv.push(k1lp1);
         
         /// 8.(a) Apply puncturestar on the Kis and alpha.
-        let mut kstar = puncturestar(self.rv.clone(), alpha);
+        let mut kstar = PPRF::puncture_star(self.rv.clone(), alpha);
         let kp = kstar.clone();
         /// 8.(b) Apply fulleval on kstar and alpha||0.
-        let sv = fulleval(kstar, alpha);
+        let sv = PPRF::full_eval(kstar, alpha);
         // 8.(c) compute w = c- sum s2j
         let (svl, svr):(Vec<Fp2>, Vec<Block>) = (1..Params::N + 1)
             .filter(|&x| Block(unsafe { _mm_set_epi32(0, 0, 0, x as i32) }) != alpha)
@@ -239,37 +227,5 @@ impl <OT: OtReceiver<Msg = Block> + Malicious> PprfReceiver for Receiver<OT> {
             None
         }
     }
-}
-
-// PPRF related functions
-pub fn keygen(lambda: Block) -> Block {
-    let mut rng = AesRng::from_seed(lambda);
-    let seed = rng.gen::<Block>();
-    seed
-}
-
-/// PPRF puncturestar
-pub fn puncturestar(keys: Vec<Block>, alpha: Block) -> Vec<Block> {
-    // Given set of keys and alpha, outputs a punctured key.
-    // TODO: Replace this with the actual definition.
-    let mut kstar: Vec<Block> = Vec::new();
-    for i in 1..Params::ELL + 2 {
-        let s = rand::random::<Block>();
-        kstar.push(s);
-    }
-    kstar
-}
-
-/// PPRF fulleval
-pub fn fulleval(kstar: Vec<Block>, alpha: Block) -> Vec<PprfRange> {
-    let mut s: Vec<PprfRange> = Vec::new();
-    for i in 1..kstar.len() {
-        if Block(unsafe { _mm_set_epi32(0, 0, 0, i as i32) }) == alpha {
-            continue;
-        }
-        //TODO: replace this with the actual definition.
-        s.push(rand::random::<PprfRange>());
-    }
-    s
 }
 
