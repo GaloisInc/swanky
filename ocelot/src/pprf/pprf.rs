@@ -15,11 +15,11 @@ use crate::{
     pprf::{Fp2, PprfReceiver, PprfSender, PPRF as PPRFTrait},
 };
 use rand::{Rng, SeedableRng};
-use scuttlebutt::{AbstractChannel, AesRng, Block, Block512, Malicious};
+use scuttlebutt::{AbstractChannel, AesRng, Block, Block512, Malicious, SemiHonest};
 use blake2::{Blake2b, Digest};
 use std::{arch::x86_64::*, convert::TryInto, marker::PhantomData};
 use ff::{Field};
-
+use std::ops::BitXor;
 
 /// Parameters for the mal-PPRF protocol
 pub struct Params;
@@ -113,24 +113,22 @@ impl <OT: OtSender<Msg=Block> + Malicious, PPRF:PPRFTrait> PprfSender for Sender
              self.sv2.push(pair);
          }
         /// 3. Compute the left and right halves of the intermediate levels.
+        self.sv1.pop();
+        let elts_even: Vec<Block> = (0..self.sv1.len()).into_iter().step_by(2).map(|i| self.sv1[i]).collect();
+        let elts_odd: Vec<Block> = (0..self.sv1.len()).into_iter().skip(1).step_by(2).map(|i| self.sv1[i]).collect();
+        let zipevals: Vec<(Block, Block)> = elts_even.into_iter().zip(elts_odd).collect();
         let mut k0: Vec<Block> = Vec::new();
         let mut k1: Vec<Block> = Vec::new();
-        //let _kt0:Block = v.iter().step_by(2).fold(temp1, |sum, &x| sum^x);
-        (1..Params::ELL + 1).into_iter().fold(Block(*ZERO), |sum, i| 
-            {for j in 0..2 ^ (i - 1) {
-                sum ^ self.sv1[i + j];
+        for i in 1..Params::ELL + 1{
+            let mut res0 = Block(*ZERO);
+            let mut res1 = Block(*ZERO); 
+            for j in 0..2 ^ (i - 1){
+              res0= res0^zipevals[j+2 ^ (i - 1)-1].0;
+              res1= res1^zipevals[j+2 ^ (i - 1)-1].1;
             }
-            k0.push(sum);
-            sum
-             });
-        (1..Params::ELL + 1).into_iter().fold(Block(*ZERO), |sum, i| 
-        {for j in 0..2 ^ (i - 1) {
-            sum ^ self.sv1[i + j + 1];
+            k0.push(res0);
+            k1.push(res1);
         }
-        k1.push(sum);
-        sum
-        });
-    
         /// 4. Compute right half for the last level l+1.
         let k1lp1 = self.sv2.iter().fold(Block(*ZERO), |sum, &x| sum ^ x.1);
         /// 5. 
@@ -220,3 +218,9 @@ impl <OT: OtReceiver<Msg = Block> + Malicious, PPRF:PPRFTrait> PprfReceiver for 
     }
 }
 
+
+
+//impl <OT: OtSender<Msg=Block> + SemiHonest, PPRF:PPRFTrait> SemiHonest for Sender<OT,PPRF> {}
+//impl <OT: OtSender<Msg=Block> + Malicious, PPRF:PPRFTrait> Malicious for Sender<OT,PPRF> {}
+//impl <OT: OtSender<Msg=Block> + SemiHonest, PPRF:PPRFTrait> SemiHonest for Receiver<OT,PPRF> {}
+//impl <OT: OtSender<Msg=Block> + Malicious, PPRF:PPRFTrait> Malicious for Receiver<OT,PPRF> {}
