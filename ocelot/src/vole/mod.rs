@@ -16,7 +16,6 @@ where
 {
     
     fn send<C: AbstractChannel>(
-        &mut self,
         channel: &mut C,
         input: SenderDom
     ) -> Result<(), Error>;
@@ -28,7 +27,6 @@ where
     {
     
     fn receive<C: AbstractChannel>(
-        &mut self,
         channel: &mut C,
         input: ReceiverDom
     ) -> Result<(Vec<Fp>, Vec<Fp>), Error>;

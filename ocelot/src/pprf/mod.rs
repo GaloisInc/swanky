@@ -4,7 +4,7 @@
 //! This module provides traits for PPRF
 
 pub mod pprf;
-//pub mod tpprf;
+pub mod tpprf;
 
 #[allow(unused_imports)]
 use crate::{
@@ -16,8 +16,10 @@ use scuttlebutt::{AbstractChannel, Block};
 use crate::field::Fp;
 use rand::{CryptoRng, Rng};
 
+
 pub type Fp2 = (Fp, Fp);
 pub type PprfRange = (Fp2, Block);
+pub type Fpstar = Fp;
 
 /// A PPRF trait. 
 pub trait PPRF{
@@ -45,7 +47,7 @@ where
     /// Message type, restricted to types that are mutably-dereferencable as
     /// `u8` arrays.
     type Msg: Sized + AsMut<[u8]>;
-
+    fn init() -> Result<Self, Error>;
     fn send<C: AbstractChannel>(
         &mut self,
         channel: &mut C,
@@ -62,6 +64,8 @@ where
     /// Message type, restricted to types that are mutably-dereferencable as
     /// `u8` arrays.
     type Msg: Sized + AsMut<[u8]>;
+    fn init() -> Result<Self, Error>;
+    
     fn receive<C:AbstractChannel>(
         &mut self,
         channel: &mut C,
@@ -75,7 +79,11 @@ where
     Self: Sized,
     {
         fn init() -> Result<Self, Error>;
-        fn send() -> Result<(), Error>;
+        fn send<C: AbstractChannel>(
+            &mut self,
+            channel: &mut C,
+            x:Fp
+        ) -> Result<(), Error>;
     }
 
 /// A trait for tPPRF Receiver
@@ -83,7 +91,13 @@ pub trait Tpprfreceiver
 where 
     Self: Sized
  {
-    fn init() -> Result<(), Error>;
+    fn init() -> Result<Self, Error>;
+    fn receive<C:AbstractChannel>(
+        &mut self,
+        channel: &mut C,
+        s: Vec<Block>,
+        y: Vec<Fpstar>
+    ) -> Option <(Vec<Block>, Vec<Block>, Vec<Block>, Vec<Fpstar>)>;
  }
 
  

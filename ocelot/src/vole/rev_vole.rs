@@ -44,7 +44,6 @@ use crate::vole::Rvolesender;
 impl Rvolesender for Sender {
    
     fn send<C: AbstractChannel>(
-        &mut self,
         channel: &mut C,
         input: SenderDom
     ) -> Result<(), Error> {
@@ -67,7 +66,6 @@ use crate::vole::Rvolereceiver;
 impl Rvolereceiver for Receiver {
 
     fn receive<C: AbstractChannel>(
-        &mut self,
         channel: &mut C,
         input: ReceiverDom
     ) -> Result<(Vec<Fp>, Vec<Fp>), Error> {

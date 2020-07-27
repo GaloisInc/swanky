@@ -15,11 +15,11 @@ use crate::{
     pprf::{Fp2, PprfReceiver, PprfSender, PPRF as PPRFTrait},
 };
 use rand::{Rng, SeedableRng};
-use scuttlebutt::{AbstractChannel, AesRng, Block, Block512, Malicious, SemiHonest};
+use scuttlebutt::{AbstractChannel, AesRng, Block, Block512, Malicious};
 use blake2::{Blake2b, Digest};
 use std::{arch::x86_64::*, convert::TryInto, marker::PhantomData};
 use ff::{Field};
-use std::ops::BitXor;
+
 
 /// Parameters for the mal-PPRF protocol
 pub struct Params;
@@ -84,6 +84,11 @@ pub fn read_fp<C:AbstractChannel>(channel: &mut C) -> std::io::Result<Fp> {
 
 impl <OT: OtSender<Msg=Block> + Malicious, PPRF:PPRFTrait> PprfSender for Sender<OT, PPRF>{
     type Msg = Block;
+    fn init() -> Result<Self, Error>{
+        let v0 = Vec::new();
+        let v1 = Vec::new();
+      Ok( Self{_ot:PhantomData::<OT>, _pprf:PhantomData::<PPRF>, sv1:v0, sv2:v1})
+    }
 
     fn send<C: AbstractChannel>(
         &mut self,
@@ -168,6 +173,10 @@ impl <OT: OtSender<Msg=Block> + Malicious, PPRF:PPRFTrait> PprfSender for Sender
 
 impl <OT: OtReceiver<Msg = Block> + Malicious, PPRF:PPRFTrait> PprfReceiver for Receiver<OT, PPRF> {
     type Msg = Block;
+    fn init() -> Result<Self, Error>{
+        let v0 = Vec::new();
+      Ok( Self{_ot:PhantomData::<OT>, _pprf:PhantomData::<PPRF>, rv:v0})
+    }
 
     fn receive<C:AbstractChannel>(
         &mut self,
