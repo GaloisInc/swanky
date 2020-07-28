@@ -32,3 +32,23 @@ where
     ) -> Result<(Vec<Fp>, Vec<Fp>), Error>;
 }
     
+
+pub trait VoleSender 
+where 
+    Self: Sized,
+{
+    fn init()->Result<Self, Error>;
+    fn send<C: AbstractChannel>(
+        channel: &mut C
+    ) -> Result<(), Error>;
+}
+
+pub trait VoleReceiver
+where 
+    Self: Sized,
+    {
+        fn init()->Result<Self, Error>;
+    fn receive<C: AbstractChannel>(
+        channel: &mut C
+    ) -> Result<(Vec<Fp>, Vec<Fp>), Error>;
+}

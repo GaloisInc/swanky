@@ -1,7 +1,13 @@
 
-//! Puncturable Pseudo-Random Function (PPRF) traits
+// -*- mode: rust; -*-
+//
+// This file is part of ocelot.
+// Copyright © 2020 Galois, Inc.
+// See LICENSE for licensing information.
+
+//! Puncturable PRF (PPRF) Traits
 //!
-//! This module provides traits for PPRF
+//! This module provides traits for Puncturable Pseudo-Random Functions
 
 pub mod pprf;
 pub mod tpprf;
@@ -12,7 +18,6 @@ use crate::{
     ot::{Receiver as OtReceiver, Sender as OtSender},
 };
 use scuttlebutt::{AbstractChannel, Block};
-//pub use bit_vec::BitVec;
 use crate::field::Fp;
 use rand::{CryptoRng, Rng};
 
@@ -52,8 +57,7 @@ where
         &mut self,
         channel: &mut C,
         beta: (Fp, Fp),
-        kpprf: Block
-    ) -> Result<(), Error>;
+    ) -> Result<Block, Error>;
 }
 
 /// A trait for PPRF Receiver
@@ -101,11 +105,3 @@ where
  }
 
  
-
-#[cfg(test)]
-mod tests{
-    #[cfg(feature = "nightly")]
-    extern crate test;
-    use super::*;
-    use scuttlebutt::{AesRng, Block, Channel};
-}

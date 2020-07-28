@@ -158,9 +158,9 @@ impl <RVOLE:Rvolereceiver, PR:PprfReceiver, PT:PPRFTrait>Tpprfreceiver for Recei
         let zj: Vec<Block> = (0..Params::T).map(|_| rng.gen::<Block>()).collect();
         for j in 0..Params::T {
             for i in 0..Params::N {
-                   //let s = ks[i].clone();
+                   let s = s[i].clone();
                    // TODO: Fix this later pprfeval (kj, i)
-                   //let (s0, s1) = PPRF::prg_g::<CryptoRng>(s, &mut rng);
+                   let (s0, s1) = PT::prg_g(s, &mut rng);
                    //vs.push(s0);
                    rv.push(rng.gen::<(Fp, Fp)>());
                }

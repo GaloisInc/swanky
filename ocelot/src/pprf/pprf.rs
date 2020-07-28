@@ -7,6 +7,7 @@
 
 //! This is an implementation of the Puncturable Pseudo-Random Function (PPRF) protocol
 //! under malicious setting via GGM trees presented in (<https://eprint.iacr.org/2019/1159>, Fig.13 page 25)
+
 #![allow(unused_doc_comments)]
 use crate::{
     errors::Error,
@@ -14,8 +15,8 @@ use crate::{
     ot::{Receiver as OtReceiver, Sender as OtSender},
     pprf::{Fp2, PprfReceiver, PprfSender, PPRF as PPRFTrait},
 };
-use rand::{Rng, SeedableRng};
-use scuttlebutt::{AbstractChannel, AesRng, Block, Block512, Malicious};
+use rand::{Rng, SeedableRng, RngCore};
+use scuttlebutt::{AbstractChannel, AesRng, Block, Block512, Malicious, SemiHonest};
 use blake2::{Blake2b, Digest};
 use std::{arch::x86_64::*, convert::TryInto, marker::PhantomData};
 use ff::{Field};
@@ -24,7 +25,7 @@ use ff::{Field};
 /// Parameters for the mal-PPRF protocol
 pub struct Params;
 impl Params {
-   // pub const LAMBDA: Block = Block(unsafe { _mm_setzero_si128() });
+    pub const LAMBDA: usize = 128;
     pub const ELL: usize = 5;
     pub const PRIME: usize = 7;
     pub const POWR: usize = 2;
@@ -94,9 +95,9 @@ impl <OT: OtSender<Msg=Block> + Malicious, PPRF:PPRFTrait> PprfSender for Sender
         &mut self,
         channel: &mut C,
         mut beta: (Fp, Fp),
-        kpprf: Block,
-    ) -> Result<(), Error> {
-         /// 1. Set the initial seed to kpprf
+    ) -> Result<Block, Error> {
+         /// 1. Set the initial seed to kpprf.
+         let kpprf = rand::random::<Block>();
          self.sv1.push(kpprf);
          /// Use kpprf as a security parameter
          let mut rng = AesRng::from_seed(kpprf);
@@ -165,7 +166,7 @@ impl <OT: OtSender<Msg=Block> + Malicious, PPRF:PPRFTrait> PprfSender for Sender
         write_fp(channel, beta.1)?;
         channel.write_block512(&gamma)?;
         channel.flush()?;
-        Ok(())
+        Ok(kpprf)
     }
 }
 
@@ -193,7 +194,6 @@ impl <OT: OtReceiver<Msg = Block> + Malicious, PPRF:PPRFTrait> PprfReceiver for 
         let k1lp1: Block = channel.read_block().unwrap();
         self.rv.append(&mut ks);
         self.rv.push(k1lp1);
-        
         /// 8.(a) Apply puncturestar on the Kis and alpha.
         let kstar = PPRF::puncture_star(self.rv.clone(), alpha);
         let kp = kstar.clone();
@@ -227,9 +227,71 @@ impl <OT: OtReceiver<Msg = Block> + Malicious, PPRF:PPRFTrait> PprfReceiver for 
     }
 }
 
+impl <OT:OtSender+Malicious, PPRF:PPRFTrait> std::fmt::Display for Sender<OT, PPRF> {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "PPRF Sender")
+    }
+}
+
+impl <OT:OtReceiver+Malicious, PPRF:PPRFTrait> std::fmt::Display for Receiver<OT, PPRF> {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result{
+        write!(f, "PPRF Receiver")
+    }
+}
 
 
 //impl <OT: OtSender<Msg=Block> + SemiHonest, PPRF:PPRFTrait> SemiHonest for Sender<OT,PPRF> {}
 //impl <OT: OtSender<Msg=Block> + Malicious, PPRF:PPRFTrait> Malicious for Sender<OT,PPRF> {}
 //impl <OT: OtSender<Msg=Block> + SemiHonest, PPRF:PPRFTrait> SemiHonest for Receiver<OT,PPRF> {}
 //impl <OT: OtSender<Msg=Block> + Malicious, PPRF:PPRFTrait> Malicious for Receiver<OT,PPRF> {}
+
+/// Add few test cases
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::pprf::*;
+    use scuttlebutt::{AesRng, Channel};
+    use crate::ot::{ChouOrlandiSender, chou_orlandi::Sender, chou_orlandi::Receiver, ChouOrlandiReceiver};
+    use std::{
+        fmt::Display,
+        io::{BufReader, BufWriter},
+        os::unix::net::UnixStream,
+        sync::{Arc, Mutex},
+    };
+
+    
+    fn rand_block_vec(size: usize) -> Vec<Block> {
+        (0..size).map(|_| rand::random::<Block>()).collect()
+    }
+
+    fn test_ot<OTSender: OtSender<Msg=Block>+ Malicious, OTReceiver: OtReceiver<Msg=Block>+ Malicious, PPRF:PPRFTrait>() {
+        let alphas = rand::random::<Block>();
+        let beta = rand::random::<(Fp, Fp)>();
+        let _alphas = alphas.clone();
+        let _beta = beta.clone();
+        let (sender, receiver) = UnixStream::pair().unwrap();
+        let handle = std::thread::spawn(move || {
+            let mut rng = AesRng::new();
+            let reader = BufReader::new(sender.try_clone().unwrap());
+            let writer = BufWriter::new(sender);
+            let mut channel = Channel::new(reader, writer);
+            let mut pprf:pprf::Sender<OTSender, PPRF> = PprfSender::init().unwrap();
+            let key:Block = pprf.send(&mut channel, _beta).unwrap();
+        });
+        let mut rng = AesRng::new();
+        let reader = BufReader::new(receiver.try_clone().unwrap());
+        let writer = BufWriter::new(receiver);
+        let mut channel = Channel::new(reader, writer);
+        let mut pprf:pprf::Receiver<OTReceiver, PPRF> = PprfReceiver::init().unwrap();
+        let result = pprf.receive(&mut channel, _alphas).unwrap();
+        handle.join().unwrap();
+        // TODO: Fix this after an instantiation of PPRF Trait
+       assert_eq!(result.1, _beta)
+    }
+
+    #[test]
+    fn test_pprf() {
+        //test_ot<chou_orlandi::Sender::<Msg=Block>,chou_orlandi::Receiver::<Msg=Block>,PPRF>();
+    }
+}
