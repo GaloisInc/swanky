@@ -30,6 +30,7 @@ impl Params {
     pub const POWR: usize = 2;
     pub const N: usize = 2 ^ Params::ELL;
     pub const T: usize = 10;
+    pub const LAMBDA: usize = 128;
 }
 
 /// A VOLE Sender.
@@ -51,8 +52,8 @@ impl <TPPRF: Tpprfreceiver> VoleSender for Sender<TPPRF>{
         channel: &mut C
     ) -> Result<(), Error>{
         //TODO: Fix this later
-        let LAMBDA = rand::random::<Block>();
-        let mut rng = AesRng::from_seed(LAMBDA);
+        let seed = rand::random::<Block>();
+        let mut rng = AesRng::from_seed(seed);
         let x = rng.gen::<Fp>();
         let kpprf = rng.gen::<Block>();
         let receiver = TPPRF::init();
@@ -68,8 +69,8 @@ impl <TPPRF: Tpprfsender> VoleReceiver for Receiver<TPPRF>{
     fn receive<C: AbstractChannel>(
         channel: &mut C
     ) -> Result<(), Error>{
-        let LAMBDA = rand::random::<Block>();
-        let mut rng = AesRng::from_seed(LAMBDA);
+        let seed = rand::random::<Block>();
+        let mut rng = AesRng::from_seed(seed);
         let ev = (0..Params::N).map(|i| rng.gen::<Fpstar>());
         let alphas = (0..Params::T).map(|_| rng.gen::<Block>());
 

@@ -61,8 +61,8 @@ impl <RVOLE:Rvolesender, PS:PprfSender, PT:PPRFTrait> Tpprfsender for Sender<RVO
         x: Fp
     ) -> Result<(), Error>{
      //TODO: Fix the security parameter
-     let lambda = rand::random::<Block>();
-     let mut rng = AesRng::from_seed(lambda);
+     let seed = rand::random::<Block>();
+     let mut rng = AesRng::from_seed(seed);
      let beta: Vec<Fp> = (0..Params::T).map(|_| rng.gen::<Fp>()).collect();
      let _beta = beta.clone();
      let b: Vec<Fp> = (0..Params::T).map(|_| rng.gen::<Fp>()).collect();
@@ -77,7 +77,7 @@ impl <RVOLE:Rvolesender, PS:PprfSender, PT:PPRFTrait> Tpprfsender for Sender<RVO
      /// let temp:PPRF = PPRF::new();
      let mut sender= PS::init().unwrap();
      for i in 0..Params::T{
-     sender.send( channel, (_beta[i], _b[i]), lambda).unwrap();
+     sender.send( channel, (_beta[i], _b[i])).unwrap();
      }
      /// 5. computes (vjs,2i, vjs,2i+1)
      let tau_vec:Vec<Fp> = (0..Params::N+2).map(|_| read_fp(channel).unwrap()).collect();
@@ -129,8 +129,8 @@ impl <RVOLE:Rvolereceiver, PR:PprfReceiver, PT:PPRFTrait>Tpprfreceiver for Recei
         s: Vec<Block>,
         y: Vec<Fpstar>
     ) -> Option <(Vec<Block>, Vec<Block>, Vec<Block>, Vec<Fpstar>)>{
-        let lambda = rand::random::<Block>();
-        let mut rng = AesRng::from_seed(lambda);
+        let seed = rand::random::<Block>();
+        let mut rng = AesRng::from_seed(seed);
         let mut _y = y.clone();
         /// RVOLE call
         let (gamma, c) = RVOLE::receive(channel, y).unwrap();    
