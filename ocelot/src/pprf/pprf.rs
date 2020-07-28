@@ -79,8 +79,87 @@ pub fn read_fp<C:AbstractChannel>(channel: &mut C) -> std::io::Result<Fp> {
     }
     Ok(Fp(FpRepr(data)))
 }
+/// implement PPRFTrait for Sender.
 
+impl <OT: OtSender<Msg=Block> + Malicious, PPRF:PPRFTrait> PPRFTrait for Sender<OT, PPRF>{
+    fn prg_g(seed: Block) -> (Block, Block) {
+        let mut rng = AesRng::from_seed(seed);
+        let pair = rng.gen::<(Block, Block)>();
+        pair
+    }
 
+    fn prg_gprime(seed: Block) -> PprfRange {
+        let mut rng = AesRng::from_seed(seed);
+        let triple = rng.gen::<PprfRange>();
+        triple
+    }
+
+    fn puncture_star(keys:Vec<Block>, alpha:Block) -> Vec<Block>{
+    // Given set of keys and alpha, outputs a punctured key.
+    // TODO: Replace this with the actual definition.
+    let mut kstar: Vec<Block> = Vec::new();
+    for i in 1..Params::ELL + 2 {
+        let s = rand::random::<Block>();
+        kstar.push(s);
+    }
+    kstar
+
+    }
+    
+    fn full_eval(kstar: Vec<Block>, alpha: Block) -> Vec<PprfRange>{
+        let mut s: Vec<PprfRange> = Vec::new();
+        for i in 1..kstar.len() {
+            if Block(unsafe { _mm_set_epi32(0, 0, 0, i as i32) }) == alpha {
+                continue;
+            }
+            //TODO: replace this with the actual definition.
+            s.push(rand::random::<PprfRange>());
+        }
+        s
+    
+    }
+}
+
+/// implement PPRFTrait for Receiver.
+
+impl <OT: OtReceiver<Msg=Block> + Malicious, PPRF:PPRFTrait> PPRFTrait for Receiver<OT, PPRF>{
+    fn prg_g(seed: Block) -> (Block, Block) {
+        let mut rng = AesRng::from_seed(seed);
+        let pair = rng.gen::<(Block, Block)>();
+        pair
+    }
+
+    fn prg_gprime(seed: Block) -> PprfRange {
+        let mut rng = AesRng::from_seed(seed);
+        let triple = rng.gen::<PprfRange>();
+        triple
+    }
+
+    fn puncture_star(keys:Vec<Block>, alpha:Block) -> Vec<Block>{
+    // Given set of keys and alpha, outputs a punctured key.
+    // TODO: Replace this with the actual definition.
+    let mut kstar: Vec<Block> = Vec::new();
+    for i in 1..Params::ELL + 2 {
+        let s = rand::random::<Block>();
+        kstar.push(s);
+    }
+    kstar
+
+    }
+    
+    fn full_eval(kstar: Vec<Block>, alpha: Block) -> Vec<PprfRange>{
+        let mut s: Vec<PprfRange> = Vec::new();
+        for i in 1..kstar.len() {
+            if Block(unsafe { _mm_set_epi32(0, 0, 0, i as i32) }) == alpha {
+                continue;
+            }
+            //TODO: replace this with the actual definition.
+            s.push(rand::random::<PprfRange>());
+        }
+        s
+    
+    }
+}
 /// implement PprfSender for Sender
 
 impl <OT: OtSender<Msg=Block> + Malicious, PPRF:PPRFTrait> PprfSender for Sender<OT, PPRF>{
@@ -106,7 +185,7 @@ impl <OT: OtSender<Msg=Block> + Malicious, PPRF:PPRFTrait> PprfSender for Sender
          for i in 1..Params::ELL + 1 {
              for j in 0..2 ^ (i - 1) {
                  let s = self.sv1[i - 1 + j].clone();
-                 let (s0, s1) = PPRF::prg_g(s, &mut rng);
+                 let (s0, s1) = PPRF::prg_g(s);
                  self.sv1.push(s0);
                  self.sv1.push(s1);
              }
@@ -115,7 +194,7 @@ impl <OT: OtSender<Msg=Block> + Malicious, PPRF:PPRFTrait> PprfSender for Sender
          /// (s^{l+1}_{2j}, s^{l+1}_{2j+1}).
          for j in 0..2 ^ (Params::ELL) {
              let temp = self.sv1[Params::ELL + j].clone();
-             let pair = PPRF::prg_gprime(temp, &mut rng);
+             let pair = PPRF::prg_gprime(temp);
              self.sv2.push(pair);
          }
         /// 3. Compute the left and right halves of the intermediate levels.

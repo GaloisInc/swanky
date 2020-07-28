@@ -29,15 +29,15 @@ pub type Fpstar = Fp;
 /// A PPRF trait. 
 pub trait PPRF{
     /// Key generation.
-    fn keygen(lambda:Block) -> Block;
+    //fn keygen(seed:Block) -> Block;
     /// Compute puncture key at a point x.
-    fn puncture(k:Block, x:Block) -> Vec<Block>;
+    //fn puncture(k:Block, x:Block) -> Vec<Block>;
     /// length doubling PRG G
-    fn prg_g<RNG: CryptoRng + Rng>(seed:Block, rng:&mut RNG) -> (Block, Block);
+    fn prg_g(seed:Block) -> (Block, Block);
     /// PRG G': used to compute the PRF outputs on the last level of the tree.
-    fn prg_gprime<RNG: CryptoRng + Rng>(seed:Block, rng:&mut RNG) -> PprfRange;
+    fn prg_gprime(seed:Block) -> PprfRange;
     /// Evaluate at a point x given the punctured key.
-    fn eval(pk:Vec<Block>, z:Block) -> Option<Vec<Block>>;
+    //fn eval(pk:Vec<Block>, z:Block) -> Option<Vec<Block>>;
     /// Puncturestar
     fn puncture_star(keys:Vec<Block>, alpha:Block) -> Vec<Block>;
     fn full_eval(kstar: Vec<Block>, alpha: Block) -> Vec<PprfRange>;
