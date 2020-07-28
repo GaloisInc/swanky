@@ -35,7 +35,6 @@ const ONES: __m128i = unsafe {
 };
 
  /// Left shift one bit
-// TODO: double check this
 #[inline]
 pub fn mm_bitshift_left1(x:__m128i) -> __m128i
 {
@@ -415,5 +414,6 @@ mod tests {
         let x = rand::random::<Block>();
         let x_ = x.bitshift_left();
         assert_eq!(u128::from(x_), u128::from(x)*2);
+
     }
 }
