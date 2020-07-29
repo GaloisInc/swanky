@@ -137,7 +137,18 @@ impl <OT: OtReceiver<Msg=Block> + Malicious, PPRF:PPRFTrait> PPRFTrait for Recei
 
     fn puncture_star(keys:Vec<Block>, alpha:Block) -> Vec<Block>{
     // Given set of keys and alpha, outputs a punctured key.
+    /// the number of levels L actually depends on the security parameter LAMBDA
+    /// In other words, L cannot be more than LAMBDA =128
     // TODO: Replace this with the actual definition.
+    assert_eq!(keys.len(), Params::ELL+1);
+    let mut alpha_star:Vec<Block> = Vec::new();
+    let alpha_lp1:Block = Block(*ZERO);
+    for i in 1..Params::ELL+1{
+        let alpha1 = alpha.lsb();
+        let a = Block::from(u128::from(!alpha.lsb()));
+        alpha_star.push(value: T)
+        
+    }
     let mut kstar: Vec<Block> = Vec::new();
     for i in 1..Params::ELL + 2 {
         let s = rand::random::<Block>();
@@ -167,7 +178,7 @@ impl <OT: OtSender<Msg=Block> + Malicious, PPRF:PPRFTrait> PprfSender for Sender
     fn init() -> Result<Self, Error>{
         let v0 = Vec::new();
         let v1 = Vec::new();
-      Ok( Self{_ot:PhantomData::<OT>, _pprf:PhantomData::<PPRF>, sv1:v0, sv2:v1})
+      Ok(Self{_ot:PhantomData::<OT>, _pprf:PhantomData::<PPRF>, sv1:v0, sv2:v1})
     }
 
     fn send<C: AbstractChannel>(

@@ -44,6 +44,15 @@ pub fn mm_bitshift_left1(x:__m128i) -> __m128i
     unsafe{ _mm_or_si128(x, c) } 
 }
 
+/// Right shift one bit
+#[inline]
+pub fn mm_bitshift_right1(x:__m128i) -> __m128i
+{
+    let carry:__m128i = unsafe {_mm_bsrli_si128(x, 8)};
+    let c = unsafe{ _mm_slli_epi64(carry, 64-1) };  
+    let x = unsafe {_mm_srli_epi64(x, 1)};
+    unsafe{ _mm_or_si128(x, c) } 
+}
 impl Block {
     /// Convert into a pointer.
     #[inline]
@@ -116,12 +125,18 @@ impl Block {
     pub fn flip(&self) -> Self {
         unsafe { Block(_mm_xor_si128(self.0, ONES)) }
     }
-    /// left shift block by one bit.
+    /// Left shift by one bit.
     #[inline]
     pub fn bitshift_left (&self) -> Self {
          Block( mm_bitshift_left1(self.0)) 
     }
    
+    /// Right shift by one bit.
+    #[inline]
+    pub fn bitshift_right (&self) -> Self {
+         Block( mm_bitshift_right1(self.0)) 
+    }
+
     /// Try to create a `Block` from a slice of bytes. The slice must have exactly 16 bytes.
     #[inline]
     pub fn try_from_slice(bytes_slice: &[u8]) -> Option<Self> {
@@ -266,6 +281,7 @@ impl From<u128> for Block {
         // unsafe { *(&m as *const _ as *const Block) }
     }
 }
+
 
 impl From<Block> for __m128i {
     #[inline]
@@ -414,6 +430,13 @@ mod tests {
         let x = rand::random::<Block>();
         let x_ = x.bitshift_left();
         assert_eq!(u128::from(x_), u128::from(x)*2);
+
+    }
+    #[test]
+    fn test_rightshift(){
+        let x = rand::random::<Block>();
+        let x_ = x.bitshift_right();
+        assert_eq!(u128::from(x_), u128::from(x)/2);
 
     }
 }
