@@ -1,5 +1,0 @@
-imports_layout = "HorizontalVertical"
-merge_imports = true
-newline_style = "Unix"
-reorder_modules = true
-
