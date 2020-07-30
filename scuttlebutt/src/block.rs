@@ -34,24 +34,22 @@ const ONES: __m128i = unsafe {
     .vector
 };
 
- /// Left shift one bit
+/// Left shift one bit
 #[inline]
-pub fn mm_bitshift_left1(x:__m128i) -> __m128i
-{
-    let carry:__m128i = unsafe {_mm_bslli_si128(x, 8)};
-    let c = unsafe{ _mm_srli_epi64(carry, 64-1) };  
-    let x = unsafe {_mm_slli_epi64(x, 1)};
-    unsafe{ _mm_or_si128(x, c) } 
+pub fn mm_bitshift_left1(x: __m128i) -> __m128i {
+    let carry: __m128i = unsafe { _mm_bslli_si128(x, 8) };
+    let c = unsafe { _mm_srli_epi64(carry, 64 - 1) };
+    let x = unsafe { _mm_slli_epi64(x, 1) };
+    unsafe { _mm_or_si128(x, c) }
 }
 
 /// Right shift one bit
 #[inline]
-pub fn mm_bitshift_right1(x:__m128i) -> __m128i
-{
-    let carry:__m128i = unsafe {_mm_bsrli_si128(x, 8)};
-    let c = unsafe{ _mm_slli_epi64(carry, 64-1) };  
-    let x = unsafe {_mm_srli_epi64(x, 1)};
-    unsafe{ _mm_or_si128(x, c) } 
+pub fn mm_bitshift_right1(x: __m128i) -> __m128i {
+    let carry: __m128i = unsafe { _mm_bsrli_si128(x, 8) };
+    let c = unsafe { _mm_slli_epi64(carry, 64 - 1) };
+    let x = unsafe { _mm_srli_epi64(x, 1) };
+    unsafe { _mm_or_si128(x, c) }
 }
 impl Block {
     /// Convert into a pointer.
@@ -127,14 +125,14 @@ impl Block {
     }
     /// Left shift by one bit.
     #[inline]
-    pub fn bitshift_left (&self) -> Self {
-         Block( mm_bitshift_left1(self.0)) 
+    pub fn bitshift_left(&self) -> Self {
+        Block(mm_bitshift_left1(self.0))
     }
-   
+
     /// Right shift by one bit.
     #[inline]
-    pub fn bitshift_right (&self) -> Self {
-         Block( mm_bitshift_right1(self.0)) 
+    pub fn bitshift_right(&self) -> Self {
+        Block(mm_bitshift_right1(self.0))
     }
 
     /// Try to create a `Block` from a slice of bytes. The slice must have exactly 16 bytes.
@@ -282,7 +280,6 @@ impl From<u128> for Block {
     }
 }
 
-
 impl From<Block> for __m128i {
     #[inline]
     fn from(m: Block) -> __m128i {
@@ -426,17 +423,15 @@ mod tests {
         assert_eq!(x, x_);
     }
     #[test]
-    fn test_leftshift(){
+    fn test_leftshift() {
         let x = rand::random::<Block>();
         let x_ = x.bitshift_left();
-        assert_eq!(u128::from(x_), u128::from(x)*2);
-
+        assert_eq!(u128::from(x_), u128::from(x) * 2);
     }
     #[test]
-    fn test_rightshift(){
+    fn test_rightshift() {
         let x = rand::random::<Block>();
         let x_ = x.bitshift_right();
-        assert_eq!(u128::from(x_), u128::from(x)/2);
-
+        assert_eq!(u128::from(x_), u128::from(x) / 2);
     }
 }

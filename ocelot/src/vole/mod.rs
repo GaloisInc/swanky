@@ -1,8 +1,10 @@
 #![allow(unused_imports)]
-use crate::errors::Error;
-use scuttlebutt::{AbstractChannel, Block};
+use crate::{
+    errors::Error,
+    field::{Fp, FpRepr},
+};
 use rand::{CryptoRng, Rng};
-use crate::field::{Fp, FpRepr};
+use scuttlebutt::{AbstractChannel, Block};
 pub mod rev_vole;
 
 /// Sender inputs ((beta, chi), (b, x)).
@@ -10,45 +12,35 @@ type SenderDom = ((Vec<Fp>, Fp), (Vec<Fp>, Fp));
 /// Receiver input is a vector y.
 type ReceiverDom = Vec<Fp>;
 /// A trait for Reverse VOLE sender
-pub trait Rvolesender 
-where 
+pub trait Rvolesender
+where
     Self: Sized,
 {
-    
-    fn send<C: AbstractChannel>(
-        channel: &mut C,
-        input: SenderDom
-    ) -> Result<(), Error>;
+    fn send<C: AbstractChannel>(channel: &mut C, input: SenderDom) -> Result<(), Error>;
 }
 
 pub trait Rvolereceiver
-where 
-    Self: Sized,
-    {
-    
-    fn receive<C: AbstractChannel>(
-        channel: &mut C,
-        input: ReceiverDom
-    ) -> Result<(Vec<Fp>, Vec<Fp>), Error>;
-}
-    
-
-pub trait VoleSender 
-where 
+where
     Self: Sized,
 {
-    fn init()->Result<Self, Error>;
-    fn send<C: AbstractChannel>(
-        channel: &mut C
-    ) -> Result<(), Error>;
+    fn receive<C: AbstractChannel>(
+        channel: &mut C,
+        input: ReceiverDom,
+    ) -> Result<(Vec<Fp>, Vec<Fp>), Error>;
+}
+
+pub trait VoleSender
+where
+    Self: Sized,
+{
+    fn init() -> Result<Self, Error>;
+    fn send<C: AbstractChannel>(channel: &mut C) -> Result<(), Error>;
 }
 
 pub trait VoleReceiver
-where 
+where
     Self: Sized,
-    {
-        fn init()->Result<Self, Error>;
-    fn receive<C: AbstractChannel>(
-        channel: &mut C
-    ) -> Result<(Vec<Fp>, Vec<Fp>), Error>;
+{
+    fn init() -> Result<Self, Error>;
+    fn receive<C: AbstractChannel>(channel: &mut C) -> Result<(Vec<Fp>, Vec<Fp>), Error>;
 }
