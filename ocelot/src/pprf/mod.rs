@@ -37,6 +37,7 @@ pub trait PPRF {
     /// Evaluate at a point x given the punctured key.
     //fn eval(pk:Vec<Block>, z:Block) -> Option<Vec<Block>>;
     /// Puncturestar
+    fn eval(k: Block, x: Block) -> Block;
     fn puncture_star(keys: Vec<Block>, alpha: Block) -> Vec<Block>;
     fn full_eval(kstar: Vec<Block>, alpha: Block) -> Vec<PprfRange>;
 }

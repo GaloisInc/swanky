@@ -91,6 +91,10 @@ impl<OT: OtSender<Msg = Block> + Malicious, PPRF: PPRFTrait> PPRFTrait for Sende
         rng.gen::<PprfRange>()
     }
 
+    fn eval(k: Block, x: Block) -> Block {
+        rand::random::<Block>()
+    }
+
     fn puncture_star(_keys: Vec<Block>, _alpha: Block) -> Vec<Block> {
         // Given set of keys and alpha, outputs a punctured key.
         // TODO: Replace this with the actual definition.
@@ -122,7 +126,9 @@ impl<OT: OtReceiver<Msg = Block> + Malicious, PPRF: PPRFTrait> PPRFTrait for Rec
         let mut rng = AesRng::from_seed(seed);
         rng.gen::<PprfRange>()
     }
-
+    fn eval(k: Block, x: Block) -> Block {
+        rand::random::<Block>()
+    }
     fn puncture_star(keys: Vec<Block>, alpha: Block) -> Vec<Block> {
         // Given set of keys and alpha, outputs a punctured key.
         /// the number of levels L actually depends on the security parameter LAMBDA
