@@ -14,9 +14,7 @@ pub use hash_channel::HashChannel;
 pub use sync_channel::SyncChannel;
 pub use track_channel::TrackChannel;
 
-#[cfg(unix)]
-pub use unix_channel::{track_unix_channel_pair, unix_channel_pair, TrackUnixChannel, UnixChannel};
-
+use crate::ff_derive::{Fp, FpRepr};
 use crate::{Block, Block512};
 #[cfg(feature = "curve25519-dalek")]
 use curve25519_dalek::ristretto::{CompressedRistretto, RistrettoPoint};
@@ -25,6 +23,8 @@ use std::{
     io::{Read, Result, Write},
     rc::Rc,
 };
+#[cfg(unix)]
+pub use unix_channel::{track_unix_channel_pair, unix_channel_pair, TrackUnixChannel, UnixChannel};
 
 /// A trait for managing I/O. `AbstractChannel`s are clonable, and provide basic
 /// read/write capabilities for both common and scuttlebutt-specific types.
@@ -190,6 +190,27 @@ pub trait AbstractChannel {
     fn write_pt(&mut self, pt: &RistrettoPoint) -> Result<()> {
         self.write_bytes(pt.compress().as_bytes())?;
         Ok(())
+    }
+
+    /// Write a `Fp` to the channel.
+    //#[cfg(feature = "ff")]
+    #[inline(always)]
+    fn write_fp(&mut self, s: Fp) -> Result<()> {
+        for i in 0..((s.0).0).len() {
+            self.write_u64(((s.0).0)[i])?;
+        }
+        Ok(())
+    }
+
+    /// Read a `Fp` from the channel.
+    //#[cfg(feature = "ff")]
+    #[inline(always)]
+    fn read_fp(&mut self) -> Result<Fp> {
+        let mut data = [0u64; 4];
+        for item in &mut data {
+            *item = self.read_u64()?;
+        }
+        Ok(Fp(FpRepr(data)))
     }
 
     /// Read a `RistrettoPoint` from the channel.
