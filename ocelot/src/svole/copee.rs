@@ -29,12 +29,15 @@ use std::marker::PhantomData;
 #[derive(Debug)]
 pub struct Sender<OT: OtSender + Malicious> {
     _ot: PhantomData<OT>,
+    sv: Vec<(Block, Block)>,
 }
 
 /// A COPEe Receiver.
 #[derive(Debug)]
 struct Receiver<OT: OtReceiver + Malicious> {
     _ot: PhantomData<OT>,
+    choices: Vec<bool>,
+    mv: Vec<Block>,
 }
 
 pub fn g_dotprod(x: Vec<Fp>) -> Fp {
@@ -55,18 +58,7 @@ pub fn g_dotprod(x: Vec<Fp>) -> Fp {
 /// Implement CopeeSender for Sender
 impl<OT: OtSender<Msg = Block> + Malicious> CopeeSender for Sender<OT> {
     type Msg = Block;
-    fn init() -> Result<Self, Error> {
-        Ok(Self {
-            _ot: PhantomData::<OT>,
-        })
-    }
-    /// The input can be a vector: the following procedure can be executed as many times as the vector length.
-    fn send<C: AbstractChannel, PRF: Prf>(
-        &mut self,
-        channel: &mut C,
-        prf: &mut PRF,
-        input: Fp,
-    ) -> Result<Fpr, Error> {
+    fn init<C: AbstractChannel>(channel: &mut C) -> Result<Self, Error> {
         //Step 1.
         let seed = rand::random::<Block>();
         let mut rng = AesRng::from_seed(seed);
@@ -77,12 +69,24 @@ impl<OT: OtSender<Msg = Block> + Malicious> CopeeSender for Sender<OT> {
         // Step 2.
         let mut ot = OT::init(channel, &mut rng).unwrap();
         ot.send(channel, &samples, &mut rng)?;
+        Ok(Self {
+            _ot: PhantomData::<OT>,
+            sv: samples,
+        })
+    }
+    /// The input can be a vector: the following procedure can be executed as many times as the vector length.
+    fn send<C: AbstractChannel, PRF: Prf>(
+        &mut self,
+        channel: &mut C,
+        prf: &mut PRF,
+        input: Fp,
+    ) -> Result<Fpr, Error> {
         // Step 3.
         let mut wv: Vec<(Fp, Fp)> = Vec::new();
         for i in 1..Params::M * Params::POWR {
             let jb = Block::from(1 as u128);
-            let mut w0 = prf.compute(samples[i - 1].0, jb);
-            let w1 = prf.compute(samples[i - 1].1, jb);
+            let mut w0 = prf.compute(self.sv[i - 1].0, jb);
+            let w1 = prf.compute(self.sv[i - 1].1, jb);
             wv.push((w0, w1));
             (w0.sub_assign(&w1));
             w0.sub_assign(&input);
@@ -96,9 +100,18 @@ impl<OT: OtSender<Msg = Block> + Malicious> CopeeSender for Sender<OT> {
 /// Implement CopeeReceiver for Receiver
 impl<OT: OtReceiver<Msg = Block> + Malicious> CopeeReceiver for Receiver<OT> {
     type Msg = Block;
-    fn init() -> Result<Self, Error> {
+    fn init<C: AbstractChannel>(channel: &mut C) -> Result<Self, Error> {
+        let seed = rand::random::<Block>();
+        let mut rng = AesRng::from_seed(seed);
+        let mut ot = OT::init(channel, &mut rng).unwrap();
+        let deltab: Vec<bool> = (0..Params::POWR * Params::M)
+            .map(|_| rng.gen::<bool>())
+            .collect();
+        let ots = ot.receive(channel, &deltab, &mut rng).unwrap();
         Ok(Self {
             _ot: PhantomData::<OT>,
+            choices: deltab,
+            mv: ots,
         })
     }
 
@@ -108,19 +121,12 @@ impl<OT: OtReceiver<Msg = Block> + Malicious> CopeeReceiver for Receiver<OT> {
         prf: &mut PRF,
     ) -> Result<Fpr, Error> {
         //let u: Vec<Fp> = (1..Params::POWR*Params::M+1).map(|_| channel.read_fp().unwrap()).collect();
-        let seed = rand::random::<Block>();
-        let mut rng = AesRng::from_seed(seed);
-        let mut ot = OT::init(channel, &mut rng).unwrap();
-        let deltab: Vec<bool> = (0..Params::POWR * Params::M)
-            .map(|_| rng.gen::<bool>())
-            .collect();
-        let ots = ot.receive(channel, &deltab, &mut rng).unwrap();
-        assert_eq!(ots.len(), Params::M * Params::POWR);
+        assert_eq!(self.mv.len(), Params::M * Params::POWR);
         let mut v: Vec<Fp> = Vec::new();
         for i in 1..Params::M * Params::POWR {
-            let mut w_delta = prf.compute(ots[i - 1], Block::from(1 as u128));
+            let mut w_delta = prf.compute(self.mv[i - 1], Block::from(1 as u128));
             let mut tau = channel.read_fp()?;
-            let dfp: Fp = PrimeField::from_str(&deltab[i - 1].to_string()).unwrap();
+            let dfp: Fp = PrimeField::from_str(&self.choices[i - 1].to_string()).unwrap();
             tau.mul_assign(&dfp);
             w_delta.add_assign(&tau);
             v.push(w_delta);

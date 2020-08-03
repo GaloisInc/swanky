@@ -49,7 +49,7 @@ where
     /// Message type, restricted to types that are mutably-dereferencable as
     /// `u8` arrays.
     type Msg: Sized + AsMut<[u8]>;
-    fn init() -> Result<Self, Error>;
+    fn init<C: AbstractChannel>(channel: &mut C) -> Result<Self, Error>;
     fn send<C: AbstractChannel, PRF: Prf>(
         &mut self,
         channel: &mut C,
@@ -60,6 +60,40 @@ where
 
 /// A trait for Copee Receiver
 pub trait CopeeReceiver
+where
+    Self: Sized,
+{
+    /// Message type, restricted to types that are mutably-dereferencable as
+    /// `u8` arrays.
+    type Msg: Sized + AsMut<[u8]>;
+    fn init<C: AbstractChannel>(channel: &mut C) -> Result<Self, Error>;
+
+    fn receive<C: AbstractChannel, PRF: Prf>(
+        &mut self,
+        channel: &mut C,
+        prf: &mut PRF,
+    ) -> Result<Fpr, Error>;
+}
+
+/// A trait for sVole Sender.
+pub trait SVoleSender
+where
+    Self: Sized,
+{
+    /// Message type, restricted to types that are mutably-dereferencable as
+    /// `u8` arrays.
+    type Msg: Sized + AsMut<[u8]>;
+    fn init() -> Result<Self, Error>;
+    fn send<C: AbstractChannel, PRF: Prf>(
+        &mut self,
+        channel: &mut C,
+        prf: &mut PRF,
+        input: Fp,
+    ) -> Result<Fpr, Error>;
+}
+
+/// A trait for Copee Receiver
+pub trait SVoleReceiver
 where
     Self: Sized,
 {
