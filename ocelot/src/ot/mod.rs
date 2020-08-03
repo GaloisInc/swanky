@@ -20,6 +20,7 @@ pub mod alsz;
 pub mod chou_orlandi;
 pub mod dummy;
 pub mod kos;
+pub mod kos_delta;
 pub mod naor_pinkas;
 
 use crate::errors::Error;
@@ -46,6 +47,10 @@ pub type AlszReceiver = alsz::Receiver<ChouOrlandiSender>;
 pub type KosSender = kos::Sender<ChouOrlandiReceiver>;
 /// Instantiation of the KOS OT extension receiver, using Chou-Orlandi as the base OT.
 pub type KosReceiver = kos::Receiver<ChouOrlandiSender>;
+/// Instantiation of the KOS Delta-OT extension sender, using Chou-Orlandi as the base OT.
+pub type KosDeltaSender = kos_delta::Sender<ChouOrlandiReceiver>;
+/// Instantiation of the KOS Delta-OT extension receiver, using Chou-Orlandi as the base OT.
+pub type KosDeltaReceiver = kos_delta::Receiver<ChouOrlandiSender>;
 
 /// Trait for one-out-of-two oblivious transfer from the sender's point-of-view.
 pub trait Sender
@@ -347,5 +352,17 @@ mod tests {
         test_otext::<KosSender, KosReceiver>(ninputs);
         test_cotext::<KosSender, KosReceiver>(ninputs);
         test_rotext::<KosSender, KosReceiver>(ninputs);
+    }
+
+    #[test]
+    fn test_kos_delta() {
+        let ninputs = 1 << 10;
+        test_otext::<KosDeltaSender, KosDeltaReceiver>(ninputs);
+        test_cotext::<KosDeltaSender, KosDeltaReceiver>(ninputs);
+        test_rotext::<KosDeltaSender, KosDeltaReceiver>(ninputs);
+        let ninputs = (1 << 10) + 1;
+        test_otext::<KosDeltaSender, KosDeltaReceiver>(ninputs);
+        test_cotext::<KosDeltaSender, KosDeltaReceiver>(ninputs);
+        test_rotext::<KosDeltaSender, KosDeltaReceiver>(ninputs);
     }
 }
