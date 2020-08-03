@@ -29,15 +29,15 @@ const SSP: usize = 40;
 
 /// Oblivious transfer extension sender.
 pub struct Sender<OT: OtReceiver<Msg = Block> + Malicious> {
-    ot: AlszSender<OT>,
+    pub(super) ot: AlszSender<OT>,
 }
 /// Oblivious transfer extension receiver.
 pub struct Receiver<OT: OtSender<Msg = Block> + Malicious> {
-    ot: AlszReceiver<OT>,
+    pub(super) ot: AlszReceiver<OT>,
 }
 
 impl<OT: OtReceiver<Msg = Block> + Malicious> Sender<OT> {
-    fn send_setup<C: AbstractChannel, RNG: CryptoRng + Rng>(
+    pub(super) fn send_setup<C: AbstractChannel, RNG: CryptoRng + Rng>(
         &mut self,
         channel: &mut C,
         m: usize,
@@ -166,7 +166,7 @@ impl<OT: OtReceiver<Msg = Block> + Malicious> std::fmt::Display for Sender<OT> {
 }
 
 impl<OT: OtSender<Msg = Block> + Malicious> Receiver<OT> {
-    fn receive_setup<C: AbstractChannel, RNG: CryptoRng + Rng>(
+    pub(super) fn receive_setup<C: AbstractChannel, RNG: CryptoRng + Rng>(
         &mut self,
         channel: &mut C,
         inputs: &[bool],
