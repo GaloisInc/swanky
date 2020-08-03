@@ -19,6 +19,7 @@ use crate::{
     ot::{Receiver as OtReceiver, Sender as OtSender},
 };
 use scuttlebutt::{AbstractChannel, Block};
+use num::pow;
 
 /// A trait for PPRF Sender.
 pub trait PprfSender
@@ -57,6 +58,6 @@ where
 
 /// convert bool vector to u128
 pub fn vec_bool_u128(x: Vec<bool>) -> u128 {
-    let res: u128 = (0..(x.len())).fold(0, |sum, i| sum + (2 ^ (i as u128)) * (u128::from(x[i])));
+    let res: u128 = (0..(x.len())).fold(0, |sum, i| sum + (pow(2, (i as u128)) * (u128::from(x[i]))));
     res
 }

@@ -35,7 +35,7 @@ type Fpr = Fp;
 
 /// A trait for Pseudorandom Function (PRF)
 pub trait Prf {
-    fn compute(&self, k: Block, x: Block) -> Fp {
+    fn compute(&self, k: Block, _x: Block) -> Fp {
         let mut rng = AesRng::from_seed(k);
         rng.gen::<Fp>()
     }
@@ -50,7 +50,12 @@ where
     /// `u8` arrays.
     type Msg: Sized + AsMut<[u8]>;
     fn init() -> Result<Self, Error>;
-    fn send<C: AbstractChannel>(&mut self, channel: &mut C, u: Fp) -> Result<Fpr, Error>;
+    fn send<C: AbstractChannel, PRF: Prf>(
+        &mut self,
+        channel: &mut C,
+        prf: &mut PRF,
+        input: Fp,
+    ) -> Result<Fpr, Error>;
 }
 
 /// A trait for Copee Receiver
@@ -63,5 +68,9 @@ where
     type Msg: Sized + AsMut<[u8]>;
     fn init() -> Result<Self, Error>;
 
-    fn receive<C: AbstractChannel>(&mut self, channel: &mut C) -> Result<Fpr, Error>;
+    fn receive<C: AbstractChannel, PRF: Prf>(
+        &mut self,
+        channel: &mut C,
+        prf: &mut PRF,
+    ) -> Result<Fpr, Error>;
 }
