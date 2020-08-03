@@ -11,11 +11,7 @@ use crate::{
     errors::Error,
     ot::{
         alsz::{Receiver as AlszReceiver, Sender as AlszSender},
-        CorrelatedReceiver,
-        CorrelatedSender,
-        RandomReceiver,
-        RandomSender,
-        Receiver as OtReceiver,
+        CorrelatedReceiver, CorrelatedSender, RandomReceiver, RandomSender, Receiver as OtReceiver,
         Sender as OtSender,
     },
     utils,
@@ -33,7 +29,7 @@ pub struct Sender<OT: OtReceiver<Msg = Block> + Malicious> {
 }
 /// Oblivious transfer extension receiver.
 pub struct Receiver<OT: OtSender<Msg = Block> + Malicious> {
-    pub(super) ot: AlszReceiver<OT>,
+    ot: AlszReceiver<OT>,
 }
 
 impl<OT: OtReceiver<Msg = Block> + Malicious> Sender<OT> {
