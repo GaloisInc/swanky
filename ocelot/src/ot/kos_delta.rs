@@ -14,14 +14,10 @@ use crate::{
         CorrelatedReceiver, CorrelatedSender, RandomReceiver, RandomSender, Receiver as OtReceiver,
         Sender as OtSender,
     },
-    utils,
 };
-use rand::{CryptoRng, Rng, RngCore, SeedableRng};
-use scuttlebutt::{cointoss, AbstractChannel, AesRng, Block, Malicious, SemiHonest};
-use std::{convert::TryInto, io::ErrorKind};
-
-// The statistical security parameter.
-const SSP: usize = 40;
+use rand::{CryptoRng, Rng};
+use scuttlebutt::{AbstractChannel, Block, Malicious, SemiHonest};
+use std::convert::TryInto;
 
 /// Oblivious transfer extension sender.
 pub struct Sender<OT: OtReceiver<Msg = Block> + Malicious> {
