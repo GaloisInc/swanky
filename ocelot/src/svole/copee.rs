@@ -17,7 +17,6 @@ use crate::{
     svole::{CopeeReceiver, CopeeSender, Fp, Fpr, Params},
 };
 use ff::*;
-use num::pow;
 //#[cfg(feature = "derive")]
 //pub use ff_derive::*;
 use ff::PrimeField;
@@ -41,16 +40,23 @@ struct Receiver<ROT: ROTReceiver + Malicious> {
     mv: Vec<Block>,
 }
 
+pub fn g_gen() -> Fp {
+    PrimeField::from_str("5").unwrap()
+}
+
 pub fn g_dotprod(x: Vec<Fp>) -> Fp {
     let mut res: Fp = Field::zero();
     for i in 0..Params::POWR {
         let mut sum: Fp = Field::zero();
         for j in 0..Params::M {
-            let mut temp: Fp = PrimeField::from_str(&pow(2, j).to_string()).unwrap();
-            temp.add_assign(&x[i * Params::M + j]);
-            sum.add_assign(&temp);
+            let mut two: Fp = Field::one();
+            two.add_assign(&Field::one());
+            let mut two_to_j: Fp = two.pow([j as u64]);
+            two_to_j.add_assign(&x[i * Params::M + j]);
+            sum.add_assign(&two_to_j);
         }
-        sum.mul_assign(&PrimeField::from_str(&pow(7, i).to_string()).unwrap());
+        let g_to_i: Fp = g_gen().pow([i as u64]);
+        sum.mul_assign(&g_to_i);
         res.add_assign(&sum);
     }
     res
@@ -84,7 +90,7 @@ impl<ROT: ROTSender<Msg = Block> + Malicious> CopeeSender for Sender<ROT> {
         input: Vec<Fp>,
     ) -> Result<Vec<Fpr>, Error> {
         let mut output: Vec<Fpr> = Vec::new();
-        assert_eq!(Params::IPLENGTH, input.len());
+        assert_eq!(Params::N, input.len());
         for _j in 0..input.len() {
             // Step 3.
             let mut wv: Vec<(Fp, Fp)> = Vec::new();
@@ -130,10 +136,14 @@ impl<ROT: ROTReceiver<Msg = Block> + Malicious> CopeeReceiver for Receiver<ROT> 
         ))
     }
 
-    fn receive<C: AbstractChannel>(&mut self, channel: &mut C) -> Result<Vec<Fpr>, Error> {
+    fn receive<C: AbstractChannel>(
+        &mut self,
+        channel: &mut C,
+        len: usize,
+    ) -> Result<Vec<Fpr>, Error> {
         //let u: Vec<Fp> = (1..Params::POWR*Params::M+1).map(|_| channel.read_fp().unwrap()).collect();
         let mut output: Vec<Fp> = Vec::new();
-        for _j in 0..Params::IPLENGTH {
+        for _j in 0..len {
             assert_eq!(self.mv.len(), Params::M * Params::POWR);
             let mut v: Vec<Fp> = Vec::new();
             for i in 1..Params::M * Params::POWR {
