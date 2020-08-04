@@ -206,7 +206,7 @@ pub trait AbstractChannel {
     //#[cfg(feature = "ff")]
     #[inline(always)]
     fn read_fp(&mut self) -> Result<Fp> {
-        let mut data = [0u64; 4];
+        let mut data = [0u64; 3];
         for item in &mut data {
             *item = self.read_u64()?;
         }
