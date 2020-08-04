@@ -12,8 +12,8 @@
 use crate::{
     errors::Error,
     ot::{
-        CorrelatedReceiver, CorrelatedSender, RandomReceiver, RandomSender, Receiver as OtReceiver,
-        Sender as OtSender, FixedKeyInitializer
+        CorrelatedReceiver, CorrelatedSender, FixedKeyInitializer, RandomReceiver, RandomSender,
+        Receiver as OtReceiver, Sender as OtSender,
     },
     utils,
 };

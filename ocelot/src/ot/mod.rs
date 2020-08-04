@@ -75,6 +75,7 @@ where
     ) -> Result<(), Error>;
 }
 
+/// Trait for initializing an oblivious transfer object with a fixed key.
 pub trait FixedKeyInitializer
 where
     Self: Sized,
