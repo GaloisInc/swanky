@@ -10,9 +10,10 @@
 use crate::{
     errors::Error,
     ot::{
-        alsz::{Receiver as AlszReceiver, Sender as AlszSender},
         CorrelatedReceiver, CorrelatedSender, RandomReceiver, RandomSender, Receiver as OtReceiver,
-        Sender as OtSender,
+        Sender as OtSender, FixedKeyInitializer,
+        alsz::{Receiver as AlszReceiver, Sender as AlszSender},
+
     },
     utils,
 };
@@ -27,6 +28,7 @@ const SSP: usize = 40;
 pub struct Sender<OT: OtReceiver<Msg = Block> + Malicious> {
     pub(super) ot: AlszSender<OT>,
 }
+
 /// Oblivious transfer extension receiver.
 pub struct Receiver<OT: OtSender<Msg = Block> + Malicious> {
     ot: AlszReceiver<OT>,
@@ -69,6 +71,17 @@ impl<OT: OtReceiver<Msg = Block> + Malicious> Sender<OT> {
             )));
         }
         Ok(qs)
+    }
+}
+
+impl<OT: OtReceiver<Msg = Block> + Malicious> FixedKeyInitializer for Sender<OT> {
+    fn init_fixed_key<C: AbstractChannel, RNG: CryptoRng + Rng>(
+        channel: &mut C,
+        s_: [u8; 16],
+        rng: &mut RNG,
+    ) -> Result<Self, Error> {
+        let ot = AlszSender::<OT>::init_fixed_key(channel, s_, rng)?;
+        Ok(Self { ot })
     }
 }
 

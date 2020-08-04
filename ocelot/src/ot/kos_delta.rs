@@ -12,7 +12,7 @@ use crate::{
     ot::{
         kos::{Receiver as KosReceiver, Sender as KosSender},
         CorrelatedReceiver, CorrelatedSender, RandomReceiver, RandomSender, Receiver as OtReceiver,
-        Sender as OtSender,
+        Sender as OtSender, FixedKeyInitializer
     },
 };
 use rand::{CryptoRng, Rng};
@@ -36,6 +36,17 @@ impl<OT: OtReceiver<Msg = Block> + Malicious> Sender<OT> {
         rng: &mut RNG,
     ) -> Result<Vec<u8>, Error> {
         self.ot.send_setup(channel, m, rng)
+    }
+}
+
+impl<OT: OtReceiver<Msg = Block> + Malicious> FixedKeyInitializer for Sender<OT> {
+    fn init_fixed_key<C: AbstractChannel, RNG: CryptoRng + Rng>(
+        channel: &mut C,
+        s_: [u8; 16],
+        rng: &mut RNG,
+    ) -> Result<Self, Error> {
+        let ot = KosSender::init_fixed_key(channel, s_, rng)?;
+        Ok(Self { ot })
     }
 }
 

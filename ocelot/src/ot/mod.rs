@@ -75,6 +75,19 @@ where
     ) -> Result<(), Error>;
 }
 
+pub trait FixedKeyInitializer
+where
+    Self: Sized,
+{
+    /// Runs any one-time initialization to create the oblivious transfer
+    /// object with a fixed key.
+    fn init_fixed_key<C: AbstractChannel, RNG: CryptoRng + Rng>(
+        channel: &mut C,
+        s_: [u8; 16],
+        rng: &mut RNG,
+    ) -> Result<Self, Error>;
+}
+
 /// Trait for one-out-of-two oblivious transfer from the receiver's
 /// point-of-view.
 pub trait Receiver
@@ -315,6 +328,42 @@ mod tests {
         }
     }
 
+    fn test_rotext_fixed_key<
+        OTSender: RandomSender<Msg = Block> + FixedKeyInitializer,
+        OTReceiver: RandomReceiver<Msg = Block> + Display,
+    >(
+        ninputs: usize,
+    ) {
+        let bs = rand_bool_vec(ninputs);
+        let out = Arc::new(Mutex::new(vec![]));
+        let out_ = out.clone();
+        let (sender, receiver) = UnixStream::pair().unwrap();
+
+        let key = [1u8; 16];
+        let key_ = key.clone();
+
+        let handle = std::thread::spawn(move || {
+            let mut rng = AesRng::new();
+            let reader = BufReader::new(sender.try_clone().unwrap());
+            let writer = BufWriter::new(sender);
+            let mut channel = Channel::new(reader, writer);
+            let mut otext = OTSender::init_fixed_key(&mut channel, key_, &mut rng).unwrap();
+            let mut out = out.lock().unwrap();
+            *out = otext.send_random(&mut channel, ninputs, &mut rng).unwrap();
+        });
+        let mut rng = AesRng::new();
+        let reader = BufReader::new(receiver.try_clone().unwrap());
+        let writer = BufWriter::new(receiver);
+        let mut channel = Channel::new(reader, writer);
+        let mut otext = OTReceiver::init(&mut channel, &mut rng).unwrap();
+        let results = otext.receive_random(&mut channel, &bs, &mut rng).unwrap();
+        handle.join().unwrap();
+        let out_ = out_.lock().unwrap();
+        for j in 0..ninputs {
+            assert_eq!(results[j], if bs[j] { out_[j].1 } else { out_[j].0 })
+        }
+    }
+
     #[test]
     fn test_dummy() {
         test_ot::<DummySender, DummyReceiver>();
@@ -360,9 +409,11 @@ mod tests {
         test_otext::<KosDeltaSender, KosDeltaReceiver>(ninputs);
         test_cotext::<KosDeltaSender, KosDeltaReceiver>(ninputs);
         test_rotext::<KosDeltaSender, KosDeltaReceiver>(ninputs);
+        test_rotext_fixed_key::<KosDeltaSender, KosDeltaReceiver>(ninputs);
         let ninputs = (1 << 10) + 1;
         test_otext::<KosDeltaSender, KosDeltaReceiver>(ninputs);
         test_cotext::<KosDeltaSender, KosDeltaReceiver>(ninputs);
         test_rotext::<KosDeltaSender, KosDeltaReceiver>(ninputs);
+        test_rotext_fixed_key::<KosDeltaSender, KosDeltaReceiver>(ninputs);
     }
 }
