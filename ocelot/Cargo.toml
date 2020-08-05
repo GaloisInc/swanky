@@ -32,7 +32,7 @@ hex-literal = "0.2.1"
 generic-array = "0.14.2"
 lazy_static = "1.4.0"
 rand_core = "0.5"
-
+num = "0.1.42"
 
 
 [build-dependencies]
