@@ -10,6 +10,9 @@
 
 pub mod base_svole;
 pub mod copee;
+pub mod field;
+
+use crate::svole::field::Fp;
 #[allow(unused_imports)]
 use crate::{
     errors::Error,
@@ -19,7 +22,7 @@ use crate::{
     },
 };
 //use rand::{Rng, SeedableRng};
-use scuttlebutt::{ff_derive::*, AbstractChannel, Block};
+use scuttlebutt::{AbstractChannel, Block};
 
 /// A type for security parameters
 pub struct Params;
@@ -48,7 +51,7 @@ where
     /// Message type, restricted to types that are mutably-dereferencable as
     /// `u8` arrays.
     type Msg: Sized + AsMut<[u8]>;
-    fn init<C: AbstractChannel>(channel: &mut C) -> Result<(Self, Vec<(Block, Block)>), Error>;
+    fn init<C: AbstractChannel>(channel: &mut C) -> Result<Self, Error>;
     fn send<C: AbstractChannel>(
         &mut self,
         channel: &mut C,
@@ -64,7 +67,7 @@ where
     /// Message type, restricted to types that are mutably-dereferencable as
     /// `u8` arrays.
     type Msg: Sized + AsMut<[u8]>;
-    fn init<C: AbstractChannel>(channel: &mut C) -> Result<(Self, Fpr, Vec<Block>), Error>;
+    fn init<C: AbstractChannel>(channel: &mut C) -> Result<Self, Error>;
 
     fn receive<C: AbstractChannel>(
         &mut self,
@@ -93,8 +96,7 @@ where
     /// Message type, restricted to types that are mutably-dereferencable as
     /// `u8` arrays.
     type Msg: Sized + AsMut<[u8]>;
-    fn init() -> Result<Self, Error>;
-
+    fn init<C: AbstractChannel>(channel: &mut C) -> Result<Self, Error>;
     fn receive<C: AbstractChannel>(&mut self, channel: &mut C) -> Option<Vec<Fpr>>;
 }
 

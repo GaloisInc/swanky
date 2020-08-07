@@ -51,6 +51,7 @@ pub fn mm_bitshift_right1(x: __m128i) -> __m128i {
     let x = unsafe { _mm_srli_epi64(x, 1) };
     unsafe { _mm_or_si128(x, c) }
 }
+
 impl Block {
     /// Convert into a pointer.
     #[inline]

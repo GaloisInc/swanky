@@ -33,13 +33,12 @@ pub struct Sender<ROT: ROTSender + Malicious> {
 #[derive(Debug)]
 pub struct Receiver<ROT: ROTReceiver + Malicious> {
     _ot: PhantomData<ROT>,
-    delta: Fp,
+    pub delta: Fp,
     choices: Vec<bool>,
     mv: Vec<Block>,
 }
 
 /// Compute <g, x>.
-
 pub fn g_dotprod(x: Vec<Fp>) -> Fp {
     let g: Fp = PrimeField::multiplicative_generator();
     let mut res: Fp = Field::zero();
@@ -62,7 +61,7 @@ pub fn g_dotprod(x: Vec<Fp>) -> Fp {
 /// Implement CopeeSender for Sender
 impl<ROT: ROTSender<Msg = Block> + Malicious> CopeeSender for Sender<ROT> {
     type Msg = Block;
-    fn init<C: AbstractChannel>(channel: &mut C) -> Result<(Self, Vec<(Block, Block)>), Error> {
+    fn init<C: AbstractChannel>(channel: &mut C) -> Result<Self, Error> {
         //Step 1.
         let seed = rand::random::<Block>();
         let mut rng = AesRng::from_seed(seed);
@@ -77,13 +76,10 @@ impl<ROT: ROTSender<Msg = Block> + Malicious> CopeeSender for Sender<ROT> {
             .unwrap();
         //assert_eq!(samples.len(), 128);
         let _samples = samples.clone();
-        Ok((
-            Self {
-                _ot: PhantomData::<ROT>,
-                sv: samples,
-            },
-            _samples,
-        ))
+        Ok(Self {
+            _ot: PhantomData::<ROT>,
+            sv: samples,
+        })
     }
     /// The following procedure represent the sender computations of the extend procedure of the protocol.
     fn send<C: AbstractChannel>(
@@ -108,7 +104,9 @@ impl<ROT: ROTSender<Msg = Block> + Malicious> CopeeSender for Sender<ROT> {
                 wv.push((w0, w1));
                 (w0.sub_assign(&w1));
                 w0.sub_assign(&input[i - 1]);
-                channel.write_fp(w0)?;
+                for i in 0..2 {
+                    channel.write_u64(((w0.0).0)[i])?;
+                }
             }
             v.push(g_dotprod(wv.into_iter().map(|x| x.0).collect()));
         }
@@ -119,7 +117,7 @@ impl<ROT: ROTSender<Msg = Block> + Malicious> CopeeSender for Sender<ROT> {
 /// Implement CopeeReceiver for Receiver
 impl<ROT: ROTReceiver<Msg = Block> + Malicious> CopeeReceiver for Receiver<ROT> {
     type Msg = Block;
-    fn init<C: AbstractChannel>(channel: &mut C) -> Result<(Self, Fpr, Vec<Block>), Error> {
+    fn init<C: AbstractChannel>(channel: &mut C) -> Result<Self, Error> {
         let seed = rand::random::<Block>();
         let mut rng = AesRng::from_seed(seed);
         let mut ot = ROT::init(channel, &mut rng).unwrap();
@@ -172,16 +170,12 @@ impl<ROT: ROTReceiver<Msg = Block> + Malicious> CopeeReceiver for Receiver<ROT> 
         assert_eq!(deltab.len(), Params::M * Params::R);
         let ots = ot.receive_random(channel, &deltab, &mut rng).unwrap();
         let _ots = ots.clone();
-        Ok((
-            Self {
-                _ot: PhantomData::<ROT>,
-                delta,
-                choices: deltab,
-                mv: ots,
-            },
+        Ok(Self {
+            _ot: PhantomData::<ROT>,
             delta,
-            _ots,
-        ))
+            choices: deltab,
+            mv: ots,
+        })
     }
 
     fn receive<C: AbstractChannel>(
@@ -198,7 +192,13 @@ impl<ROT: ROTReceiver<Msg = Block> + Malicious> CopeeReceiver for Receiver<ROT> 
                 //let mut w_delta = prf.compute(self.mv[i - 1], Block::from(j as u128));
                 let mut rng = AesRng::from_seed(self.mv[i - 1]);
                 let mut w_delta = rng.gen::<Fp>();
-                let mut tau = channel.read_fp()?;
+                let mut tau = {
+                    let mut arr: [u64; 2] = [0; 2];
+                    for item in &mut arr {
+                        *item = channel.read_u64().unwrap();
+                    }
+                    Fp::from(arr)
+                };
                 let dfp: Fp = PrimeField::from_str(&self.choices[i - 1].to_string()).unwrap();
                 tau.mul_assign(&dfp);
                 w_delta.add_assign(&tau);
