@@ -55,9 +55,12 @@ impl Fp {
         .unwrap()
     }
 
+    /// The zero element of the field
     pub fn zero() -> Self {
         Fp(0)
     }
+
+    /// The one element of the field
     pub fn one() -> Self {
         Fp(1)
     }
