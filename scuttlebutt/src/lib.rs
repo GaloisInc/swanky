@@ -21,6 +21,7 @@ pub mod bloomfilter;
 pub mod channel;
 pub mod cointoss;
 pub mod commitment;
+pub mod field;
 mod hash_aes;
 mod rand_aes;
 pub mod utils;
