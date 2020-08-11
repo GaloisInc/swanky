@@ -1,16 +1,31 @@
 use ff::*;
 use rand::*;
+use scuttlebutt::Block;
 
 #[derive(PrimeField)]
-#[PrimeFieldModulus = "340282366920938463463374607431768211297"]
+//#[PrimeFieldModulus = "340282366920938463463374607431768211297"]
+#[PrimeFieldModulus = "35742549198872617291353508656626642567"]
 #[PrimeFieldGenerator = "5"]
 pub struct Fp(pub FpRepr);
 
-impl Fp {}
+impl FpRepr {
+    #[inline]
+    pub fn to_u128(&self) -> u128 {
+        let arr: [u64; 2] = self.0;
+        u128::from((arr[1] as u128) << 64 | arr[0] as u128)
+    }
+}
+
+impl Fp {
+    #[inline]
+    pub fn to_block(&self) -> Block {
+        Block::from(self.0.to_u128())
+    }
+}
 
 impl rand::distributions::Distribution<Fp> for rand::distributions::Standard {
     fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> Fp {
-        Fp(FpRepr(rng.gen::<[u64; 3]>()))
+        Fp(FpRepr(rng.gen::<[u64; 2]>()))
     }
 }
 
@@ -28,13 +43,6 @@ impl AsMut<[u8]> for Fp {
     }
 }
 
-/*impl From<Fp> for [u8; 24] {
-    #[inline]
-    fn from(m: Fp) -> [u8; 24] {
-        unsafe { *(&((m.0).0) as *const _ as *const [u8; 24]) }
-    }
-}*/
-
 impl From<Fp> for [u8; 16] {
     #[inline]
     fn from(m: Fp) -> [u8; 16] {
@@ -42,17 +50,17 @@ impl From<Fp> for [u8; 16] {
     }
 }
 
-impl From<[u64; 3]> for Fp {
-    #[inline]
-    fn from(m: [u64; 3]) -> Self {
-        Fp(FpRepr(m))
-    }
-}
 impl From<[u64; 2]> for Fp {
     #[inline]
     fn from(m: [u64; 2]) -> Self {
-        let m_: [u64; 3] = [m[0], m[1], 0u64];
-        Fp(FpRepr(m_))
+        Fp(FpRepr(m))
+    }
+}
+
+impl From<Block> for Fp {
+    #[inline]
+    fn from(m: Block) -> Self {
+        PrimeField::from_str(&u128::from(m).to_string()).unwrap()
     }
 }
 
@@ -68,26 +76,28 @@ impl Serialize for Fp {
     }
 }
 
-/*
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-/// Write a `Fp` to the channel.
-   //#[cfg(feature = "ff")]
-   #[inline(always)]
-   fn write_fp(&mut self, s: Fp) -> Result<()> {
-       for i in 0..((s.0).0).len() {
-           self.write_u64(((s.0).0)[i])?;
-       }
-       Ok(())
-   }
+    #[test]
+    fn to_block() {
+        let x = rand::random::<Fp>();
+        let y = u128::from(x.to_block());
+        assert_eq!(x, PrimeField::from_str(&y.to_string()).unwrap());
+    }
 
-   /// Read a `Fp` from the channel.
-   //#[cfg(feature = "ff")]
-   #[inline(always)]
-   fn read_fp(&mut self) -> Result<Fp> {
-       let mut data = [0u64; 3];
-       for item in &mut data {
-           *item = self.read_u64()?;
-       }
-       Ok(Fp(FpRepr(data)))
-   }
-   */
+    #[test]
+    fn to_u128() {
+        let a = rand::random::<u128>();
+        let x: Fp = PrimeField::from_str(&a.to_string()).unwrap();
+        assert_eq!(a, (x.0).to_u128());
+    }
+
+    #[test]
+    fn from_block() {
+        let x = rand::random::<Block>();
+        let y = Fp::from(x);
+        assert_eq!(x, y.to_block());
+    }
+}

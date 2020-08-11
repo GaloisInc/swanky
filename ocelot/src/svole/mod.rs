@@ -8,11 +8,11 @@
 //!
 //! This module provides traits COPEe
 
-pub mod base_svole;
+//pub mod base_svole;
 pub mod copee;
-pub mod field;
+//pub mod field;
 
-use crate::svole::field::Fp;
+//use crate::svole::field::Fp;
 #[allow(unused_imports)]
 use crate::{
     errors::Error,
@@ -22,7 +22,7 @@ use crate::{
     },
 };
 //use rand::{Rng, SeedableRng};
-use scuttlebutt::{AbstractChannel, Block};
+use scuttlebutt::{field::Fp, AbstractChannel, Block};
 
 /// A type for security parameters
 pub struct Params;
@@ -67,7 +67,7 @@ where
     /// Message type, restricted to types that are mutably-dereferencable as
     /// `u8` arrays.
     type Msg: Sized + AsMut<[u8]>;
-    fn init<C: AbstractChannel>(channel: &mut C) -> Result<Self, Error>;
+    fn init<C: AbstractChannel>(channel: &mut C) -> Result<(Self, Fpr), Error>;
 
     fn receive<C: AbstractChannel>(
         &mut self,
@@ -99,7 +99,7 @@ where
     fn init<C: AbstractChannel>(channel: &mut C) -> Result<Self, Error>;
     fn receive<C: AbstractChannel>(&mut self, channel: &mut C) -> Option<Vec<Fpr>>;
 }
-
+/*
 #[cfg(test)]
 mod tests {
     #[cfg(feature = "nightly")]
@@ -157,9 +157,9 @@ mod tests {
         //let results = otext.receive_random(&mut channel, &bs, &mut rng).unwrap();
         handle.join().unwrap();
         let out_ = out_.lock().unwrap();
-        /* for j in 0..Params::R*Params::M{
+        for j in 0..Params::R*Params::M{
             assert_eq!(results[j], if bs[j] { out_[j].1 } else { out_[j].0 })
-        }*/
+        }
     }
 
     #[test]
@@ -212,4 +212,4 @@ mod tests {
         let x: Fp = rand::random::<Fp>();
         (x.0).write_le(writer);
     }
-}
+}*/

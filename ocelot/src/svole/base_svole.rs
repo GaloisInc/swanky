@@ -15,13 +15,14 @@ use crate::{
     errors::Error,
     ot::{Receiver as OtReceiver, Sender as OtSender},
     svole::copee::{Receiver as Creceiver, Sender as Csender},
-    svole::{CopeeReceiver, CopeeSender, Fp, Fpr, Params, SVoleReceiver, SVoleSender},
+    svole::{CopeeReceiver, CopeeSender, Fpr, Params, SVoleReceiver, SVoleSender},
 };
+
 use ff::*;
 //#[cfg(feature = "derive")]
 //pub use ff_derive::*;
 use rand::{Rng, SeedableRng};
-use scuttlebutt::{AbstractChannel, AesRng, Block, Malicious};
+use scuttlebutt::{AbstractChannel, AesRng, Block, Malicious, field::Fp};
 use std::marker::PhantomData;
 
 //use scuttlebutt::ff_derive::Fp as PrimeField;
@@ -123,12 +124,12 @@ impl<OT: OtReceiver<Msg = Block> + Malicious, CP: CopeeReceiver> SVoleReceiver
 {
     type Msg = Block;
     fn init<C: AbstractChannel>(channel: &mut C) -> Result<Self, Error> {
-        let cp: CP = CP::init(channel).unwrap();
+        let (cp, delta) = CP::init(channel).unwrap();
         Ok(Self {
             _ot: PhantomData::<OT>,
             _cp: PhantomData::<CP>,
             copee: cp,
-            choice: rand::random::<Fp>(),
+            choice: delta,
         })
     }
 
@@ -136,9 +137,9 @@ impl<OT: OtReceiver<Msg = Block> + Malicious, CP: CopeeReceiver> SVoleReceiver
         let seed = rand::random::<Block>();
         let mut rng = AesRng::from_seed(seed);
         let mut chiv: Vec<Fpr> = (0..Params::N).map(|_| rng.gen::<Fpr>()).collect();
-        let mut cp_receiver = CP::init(channel).unwrap();
-        let v: Vec<Fp> = cp_receiver.receive(channel, Params::N).unwrap();
-        let mut b: Vec<Fp> = cp_receiver.receive(channel, Params::R).unwrap();
+        //let mut (cp_receiver = CP::init(channel).unwrap();
+        let v: Vec<Fp> = self.copee.receive(channel, Params::N).unwrap();
+        let mut b: Vec<Fp> = self.copee.receive(channel, Params::R).unwrap();
         let mut x: Fp = {
             let mut arr: [u64; 2] = [0; 2];
             for item in &mut arr {
