@@ -86,28 +86,22 @@ impl Fp {
         ((a >> 64) as u64, a as u64)
     }
 
-    pub fn bit_composition(&self) -> Vec<bool> {
-        let mut res = Vec::new();
-        let b = Block::from(self.0);
-        for _i in 0..128 {
-            res.push(b.lsb());
-            b.bitshift_right();
-        }
-        res
-    }
-
-    pub fn pow(&self, exp: Self) -> Self {
-        if exp.0 == 0 {
-            Fp::one()
-        } else if exp.0 == 1 {
-            *self
-        } else {
-            let mut res = Fp::one();
-            for _i in 0..exp.0 {
-                res.mul_assign(self)
+    /// Computing `pow` using Montgomery's ladder technique.
+    pub fn pow(&self, n: Fp) -> Self {
+        let mut x1 = *self;
+        let mut x2 = *self;
+        x2.mul_assign(self);
+        let exp = format!("{:b}", u128::from(n)).split_off(1);
+        for c in exp.chars() {
+            if c == '0' {
+                x2.mul_assign(x1);
+                x1.mul_assign(x1);
+            } else {
+                x1.mul_assign(x2);
+                x2.mul_assign(x2);
             }
-            res
         }
+        x1
     }
 }
 
@@ -259,47 +253,41 @@ impl Neg for Fp {
     }
 }
 
-macro_rules! test_binop {
-    ($name:ident, $op:ident) => {
-        #[cfg(test)]
-        #[quickcheck_macros::quickcheck]
-        fn $name(a: u128, b: u128) -> bool {
-            use num_bigint::BigUint;
-            let mut a = Fp::try_from(a % Fp::MODULUS).unwrap();
-            let b = Fp::try_from(b % Fp::MODULUS).unwrap();
-            let mut x = BigUint::from(a.0);
-            let y = BigUint::from(b.0);
-            a.$op(&b);
-            // This is a hack! That's okay, this is a test!
-            if stringify!($op) == "sub_assign" {
-                x += BigUint::from(Fp::MODULUS);
-            }
-            x.$op(&y);
-            x = x % BigUint::from(Fp::MODULUS);
-            BigUint::from(a.0) == x
-        }
-    };
-}
-
-test_binop!(test_add, add_assign);
-test_binop!(test_sub, sub_assign);
-test_binop!(test_mul, mul_assign);
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::AesRng;
     use rand::SeedableRng;
+
+    macro_rules! test_binop {
+        ($name:ident, $op:ident) => {
+            #[cfg(test)]
+            #[quickcheck_macros::quickcheck]
+            fn $name(a: u128, b: u128) -> bool {
+                use num_bigint::BigUint;
+                let mut a = Fp::try_from(a % Fp::MODULUS).unwrap();
+                let b = Fp::try_from(b % Fp::MODULUS).unwrap();
+                let mut x = BigUint::from(a.0);
+                let y = BigUint::from(b.0);
+                a.$op(&b);
+                // This is a hack! That's okay, this is a test!
+                if stringify!($op) == "sub_assign" {
+                    x += BigUint::from(Fp::MODULUS);
+                }
+                x.$op(&y);
+                x = x % BigUint::from(Fp::MODULUS);
+                BigUint::from(a.0) == x
+            }
+        };
+    }
+    test_binop!(test_add, add_assign);
+    test_binop!(test_sub, sub_assign);
+    test_binop!(test_mul, mul_assign);
+
     #[test]
     fn test_pow() {
-        let seed = rand::random::<Block>();
-        let mut rng = AesRng::from_seed(seed);
-        let x = Fp::random(&mut rng);
-        let exp = Fp::random(&mut rng);
-        let res = (0..exp.0).fold(Fp::zero(), |mut sum, _i| {
-            sum.add_assign(x);
-            sum
-        });
-        assert_eq!(x.pow(exp), res);
+        let x = Fp::try_from(Fp::GEN).unwrap();
+        let exp = Fp::try_from(Fp::MODULUS - 1).unwrap();
+        assert_eq!(x.pow(exp), Fp::one());
     }
 }

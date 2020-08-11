@@ -58,6 +58,17 @@ pub fn g_dotprod(x: Vec<Fp>) -> Fp {
     res
 }
 
+/// Convert Fp into a bit vector.
+pub fn bit_composition(x: Fp) -> Vec<bool> {
+    let mut res = Vec::new();
+    let b = Block::from(u128::from(x));
+    for _i in 0..128 {
+        res.push(b.lsb());
+        b.bitshift_right();
+    }
+    res
+}
+
 /// Implement CopeeSender for Sender type
 impl<ROT: ROTSender<Msg = Block> + Malicious> CopeeSender for Sender<ROT> {
     type Msg = Block;
@@ -111,7 +122,7 @@ impl<ROT: ROTReceiver<Msg = Block> + Malicious> CopeeReceiver for Receiver<ROT> 
         let mut rng = AesRng::from_seed(seed);
         let mut ot = ROT::init(channel, &mut rng).unwrap();
         let delta: Fp = Fp::random(&mut rng);
-        let deltab: Vec<bool> = delta.bit_composition();
+        let deltab: Vec<bool> = bit_composition(delta);
         let ots = ot.receive_random(channel, &deltab, &mut rng).unwrap();
         Ok(Self {
             _ot: PhantomData::<ROT>,
@@ -129,7 +140,7 @@ impl<ROT: ROTReceiver<Msg = Block> + Malicious> CopeeReceiver for Receiver<ROT> 
         len: usize,
     ) -> Result<Vec<Fpr>, Error> {
         let mut output: Vec<Fp> = Vec::new();
-        for j in 0..Params::N {
+        for j in 0..len {
             let mut v: Vec<Fp> = Vec::new();
             for i in 0..Params::M * Params::R {
                 let pt = Block::from(j as u128);
