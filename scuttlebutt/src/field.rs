@@ -3,6 +3,7 @@
 //! # Security Warning
 //! TODO: this might not be constant-time in all cases.
 
+use crate::Block;
 use primitive_types::{U128, U256};
 use rand_core::{CryptoRng, RngCore};
 use std::{
@@ -41,7 +42,10 @@ impl Hash for Fp {
 
 impl Fp {
     /// The prime field modulus: $2^{128} - 159$
-    pub const MODULUS: u128 = 340282366920938463463374607431768211297;
+    pub const MODULUS: u128 = 340_282_366_920_938_463_463_374_607_431_768_211_297;
+
+    /// A prime field generator: $5$
+    pub const GEN: u128 = 5;
 
     /// Generate an almost uniformly random field element.
     ///
@@ -81,6 +85,30 @@ impl Fp {
     const fn split_u128(a: u128) -> (u64, u64) {
         ((a >> 64) as u64, a as u64)
     }
+
+    pub fn bit_composition(&self) -> Vec<bool> {
+        let mut res = Vec::new();
+        let b = Block::from(self.0);
+        for _i in 0..128 {
+            res.push(b.lsb());
+            b.bitshift_right();
+        }
+        res
+    }
+
+    pub fn pow(&self, exp: Self) -> Self {
+        if exp.0 == 0 {
+            Fp::one()
+        } else if exp.0 == 1 {
+            *self
+        } else {
+            let mut res = Fp::one();
+            for _i in 0..exp.0 {
+                res.mul_assign(self)
+            }
+            res
+        }
+    }
 }
 
 /// The error which occurs if the inputted `u128` or bit pattern doesn't correspond to a field
@@ -103,6 +131,15 @@ impl TryFrom<u128> for Fp {
         } else {
             Err(BiggerThanModulus)
         }
+    }
+}
+
+impl TryFrom<Block> for Fp {
+    type Error = BiggerThanModulus;
+
+    fn try_from(value: Block) -> Result<Self, Self::Error> {
+        let val = u128::from(value);
+        Fp::try_from(val)
     }
 }
 
@@ -247,3 +284,22 @@ macro_rules! test_binop {
 test_binop!(test_add, add_assign);
 test_binop!(test_sub, sub_assign);
 test_binop!(test_mul, mul_assign);
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::AesRng;
+    use rand::SeedableRng;
+    #[test]
+    fn test_pow() {
+        let seed = rand::random::<Block>();
+        let mut rng = AesRng::from_seed(seed);
+        let x = Fp::random(&mut rng);
+        let exp = Fp::random(&mut rng);
+        let res = (0..exp.0).fold(Fp::zero(), |mut sum, _i| {
+            sum.add_assign(x);
+            sum
+        });
+        assert_eq!(x.pow(exp), res);
+    }
+}
