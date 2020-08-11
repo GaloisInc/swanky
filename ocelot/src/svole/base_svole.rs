@@ -14,17 +14,17 @@ use crate::{
     ot::{Receiver as OtReceiver, Sender as OtSender},
     svole::{CopeeReceiver, CopeeSender, Fpr, Params, SVoleReceiver, SVoleSender},
 };
-
-
 use rand::SeedableRng;
 use scuttlebutt::{field::Fp, AbstractChannel, AesRng, Block, Malicious};
-use std::convert::TryFrom;
-use std::marker::PhantomData;
-use std::ops::{AddAssign, MulAssign};
+use std::{
+    convert::TryFrom,
+    marker::PhantomData,
+    ops::{AddAssign, MulAssign},
+};
 
 //use scuttlebutt::ff_derive::Fp as PrimeField;
 /// A SVOLE Sender.
-#[derive(Debug)]
+#[derive(Clone)]
 pub struct Sender<OT: OtSender + Malicious, CP: CopeeSender> {
     _ot: PhantomData<OT>,
     _cp: PhantomData<CP>,
@@ -32,14 +32,15 @@ pub struct Sender<OT: OtSender + Malicious, CP: CopeeSender> {
 }
 
 /// A SVOLE Receiver.
-#[derive(Debug)]
-struct Receiver<OT: OtReceiver + Malicious, CP: CopeeReceiver> {
+#[derive(Clone)]
+pub struct Receiver<OT: OtReceiver + Malicious, CP: CopeeReceiver> {
     _ot: PhantomData<OT>,
     _cp: PhantomData<CP>,
     delta: Fp,
     copee: CP,
 }
 
+/// Implement SVoleSender for Sender type.
 impl<OT: OtSender<Msg = Block> + Malicious, CP: CopeeSender> SVoleSender for Sender<OT, CP> {
     type Msg = Block;
     fn init<C: AbstractChannel>(channel: &mut C) -> Result<Self, Error> {
@@ -98,18 +99,24 @@ impl<OT: OtSender<Msg = Block> + Malicious, CP: CopeeSender> SVoleSender for Sen
     }
 }
 
+/// Implement SVoleReceiver for Receiver type.
 impl<OT: OtReceiver<Msg = Block> + Malicious, CP: CopeeReceiver> SVoleReceiver
     for Receiver<OT, CP>
 {
     type Msg = Block;
     fn init<C: AbstractChannel>(channel: &mut C) -> Result<Self, Error> {
-        let (cp, delta) = CP::init(channel).unwrap();
+        let cp = CP::init(channel).unwrap();
+        let delta = cp.get_delta();
         Ok(Self {
             _ot: PhantomData::<OT>,
             _cp: PhantomData::<CP>,
             copee: cp,
-             delta,
+            delta,
         })
+    }
+
+    fn get_delta(&self) -> Fp {
+        self.delta
     }
 
     fn receive<C: AbstractChannel>(&mut self, channel: &mut C) -> Option<Vec<Fpr>> {

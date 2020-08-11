@@ -14,13 +14,13 @@ use crate::{
     ot::{RandomReceiver as ROTReceiver, RandomSender as ROTSender},
     svole::{CopeeReceiver, CopeeSender, Fpr, Params},
 };
-//use ff::*;
 use rand::SeedableRng;
 use scuttlebutt::{field::Fp, AbstractChannel, Aes128, AesRng, Block, Malicious};
-use std::convert::TryFrom;
-use std::marker::PhantomData;
-use std::ops::{AddAssign, MulAssign, SubAssign};
-//use num::pow;
+use std::{
+    convert::TryFrom,
+    marker::PhantomData,
+    ops::{AddAssign, MulAssign, SubAssign},
+};
 
 /// A COPEe Sender.
 #[derive(Clone)]
@@ -33,7 +33,7 @@ pub struct Sender<ROT: ROTSender + Malicious> {
 #[derive(Clone)]
 pub struct Receiver<ROT: ROTReceiver + Malicious> {
     _ot: PhantomData<ROT>,
-    pub delta: Fp,
+    delta: Fp,
     choices: Vec<bool>,
     mv: Vec<Block>,
 }
@@ -48,7 +48,7 @@ pub fn g_dotprod(x: Vec<Fp>) -> Fp {
             let mut two: Fp = Fp::one();
             two.add_assign(&Fp::one());
             let mut two_to_j: Fp = two.pow(Fp::try_from(j as u128).unwrap());
-            two_to_j.add_assign(&x[i * Params::M + j]);
+            two_to_j.add_assign(&x[(i * Params::M) + j]);
             sum.add_assign(&two_to_j);
         }
         let g_to_i: Fp = g.pow(Fp::try_from(i as u128).unwrap());
@@ -58,11 +58,11 @@ pub fn g_dotprod(x: Vec<Fp>) -> Fp {
     res
 }
 
-/// Implement CopeeSender for Sender
+/// Implement CopeeSender for Sender type
 impl<ROT: ROTSender<Msg = Block> + Malicious> CopeeSender for Sender<ROT> {
     type Msg = Block;
     fn init<C: AbstractChannel>(channel: &mut C) -> Result<Self, Error> {
-        /// Combine step 1 and 2 and call ROT.
+        /// Combine step 1 and 2 and by calling ROT.
         let seed = rand::random::<Block>();
         let mut rng = AesRng::from_seed(seed);
         let mut ot = ROT::init(channel, &mut rng).unwrap();
@@ -74,7 +74,6 @@ impl<ROT: ROTSender<Msg = Block> + Malicious> CopeeSender for Sender<ROT> {
             sv: samples,
         })
     }
-    /// The following procedure represent the sender computations of the extend procedure of the protocol.
     fn send<C: AbstractChannel>(
         &mut self,
         channel: &mut C,
@@ -84,18 +83,18 @@ impl<ROT: ROTSender<Msg = Block> + Malicious> CopeeSender for Sender<ROT> {
         for j in 0..input.len() {
             /// Step 3.
             let mut wv: Vec<(Fp, Fp)> = Vec::new();
-            for i in 1..Params::M * Params::R {
+            for i in 0..Params::M * Params::R {
                 /// Aes encryption as a PRF
                 let pt = Block::from(j as u128);
-                let key0 = Block::from(self.sv[i - 1].0);
+                let key0 = Block::from(self.sv[i].0);
                 let cipher0 = Aes128::new(key0);
                 let mut w0 = Fp::try_from(u128::from(cipher0.encrypt(pt))).unwrap();
-                let key1 = Block::from(self.sv[i - 1].1);
+                let key1 = Block::from(self.sv[i].1);
                 let cipher1 = Aes128::new(key1);
                 let w1 = Fp::try_from(u128::from(cipher1.encrypt(pt))).unwrap();
                 wv.push((w0, w1));
                 (w0.sub_assign(&w1));
-                w0.sub_assign(&input[i - 1]);
+                w0.sub_assign(&input[j]);
                 channel.write_block(&Block::from(u128::from(w0)))?;
             }
             w.push(g_dotprod(wv.into_iter().map(|x| x.0).collect()));
@@ -104,40 +103,37 @@ impl<ROT: ROTSender<Msg = Block> + Malicious> CopeeSender for Sender<ROT> {
     }
 }
 
-/// Implement CopeeReceiver for Receiver
+/// Implement CopeeReceiver for Receiver type.
 impl<ROT: ROTReceiver<Msg = Block> + Malicious> CopeeReceiver for Receiver<ROT> {
     type Msg = Block;
-    fn init<C: AbstractChannel>(channel: &mut C) -> Result<(Self, Fpr), Error> {
+    fn init<C: AbstractChannel>(channel: &mut C) -> Result<Self, Error> {
         let seed = rand::random::<Block>();
         let mut rng = AesRng::from_seed(seed);
         let mut ot = ROT::init(channel, &mut rng).unwrap();
-        //TODO: Fix this later
         let delta: Fp = Fp::random(&mut rng);
         let deltab: Vec<bool> = delta.bit_composition();
         let ots = ot.receive_random(channel, &deltab, &mut rng).unwrap();
-        Ok((
-            Self {
-                _ot: PhantomData::<ROT>,
-                delta,
-                choices: deltab,
-                mv: ots,
-            },
+        Ok(Self {
+            _ot: PhantomData::<ROT>,
             delta,
-        ))
+            choices: deltab,
+            mv: ots,
+        })
     }
-
+    fn get_delta(&self) -> Fp {
+        self.delta
+    }
     fn receive<C: AbstractChannel>(
         &mut self,
         channel: &mut C,
         len: usize,
     ) -> Result<Vec<Fpr>, Error> {
         let mut output: Vec<Fp> = Vec::new();
-        for j in 0..len {
-            assert_eq!(self.mv.len(), Params::M * Params::R);
+        for j in 0..Params::N {
             let mut v: Vec<Fp> = Vec::new();
-            for i in 1..Params::M * Params::R {
+            for i in 0..Params::M * Params::R {
                 let pt = Block::from(j as u128);
-                let key = Block::from(self.mv[i - 1]);
+                let key = Block::from(self.mv[i]);
                 let cipher = Aes128::new(key);
                 let mut w_delta = Fp::try_from(cipher.encrypt(pt)).unwrap();
                 let mut tau = Fp::try_from(channel.read_block().unwrap()).unwrap();

@@ -19,7 +19,6 @@ use crate::{
         Sender as OtSender,
     },
 };
-//use rand::{Rng, SeedableRng};
 use scuttlebutt::{field::Fp, AbstractChannel};
 
 /// A type for security parameters
@@ -65,8 +64,9 @@ where
     /// Message type, restricted to types that are mutably-dereferencable as
     /// `u8` arrays.
     type Msg: Sized + AsMut<[u8]>;
-    fn init<C: AbstractChannel>(channel: &mut C) -> Result<(Self, Fpr), Error>;
-
+    fn init<C: AbstractChannel>(channel: &mut C) -> Result<Self, Error>;
+    /// To retrieve delta from the receiver type.
+    fn get_delta(&self) -> Fpr;
     fn receive<C: AbstractChannel>(
         &mut self,
         channel: &mut C,
@@ -95,23 +95,24 @@ where
     /// `u8` arrays.
     type Msg: Sized + AsMut<[u8]>;
     fn init<C: AbstractChannel>(channel: &mut C) -> Result<Self, Error>;
+    /// To retrieve delta from the receiver type.
+    fn get_delta(&self) -> Fpr;
     fn receive<C: AbstractChannel>(&mut self, channel: &mut C) -> Option<Vec<Fpr>>;
 }
 
-/*
 #[cfg(test)]
 mod tests {
     #[cfg(feature = "nightly")]
     extern crate test;
     use super::*;
     use crate::ot::*;
-    use crate::svole::*;
-    use num::pow;
+    use crate::svole::{base_svole::Receiver as VoleReceiver, base_svole::Sender as VoleSender};
     use rand::SeedableRng;
-    use scuttlebutt::{AesRng, Block, Channel, Malicious, field::Fp};
+    use scuttlebutt::{field::Fp, AesRng, Block, Channel, Malicious};
     use std::{
         fmt::Display,
         io::{BufReader, BufWriter},
+        ops::{AddAssign, MulAssign},
         os::unix::net::UnixStream,
         sync::{Arc, Mutex},
     };
@@ -129,35 +130,44 @@ mod tests {
         ROTR: ROTReceiver + Malicious,
         CPSender: CopeeSender<Msg = Block>,
         CPReceiver: CopeeReceiver<Msg = Block>,
-    >(// ninputs: usize,
-    ) {
+        BVSender: SVoleSender<Msg = Block>,
+        BVReceiver: SVoleReceiver<Msg = Block>,
+    >() {
         let seed = rand::random::<Block>();
         let mut rng = AesRng::from_seed(seed);
         let delta: Fp = Fp::random(&mut rng);
         let bs: Vec<bool> = delta.bit_composition();
-        let out = Arc::new(Mutex::new(vec![]));
-        let out_ = out.clone();
+        let u = Arc::new(Mutex::new(vec![]));
+        let mut u_ = u.clone();
+        let w = Arc::new(Mutex::new(vec![]));
+        let w_ = u.clone();
         let (sender, receiver) = UnixStream::pair().unwrap();
         let handle = std::thread::spawn(move || {
             let mut rng = AesRng::new();
             let reader = BufReader::new(sender.try_clone().unwrap());
             let writer = BufWriter::new(sender);
             let mut channel = Channel::new(reader, writer);
-            let
-            assert_eq!(samples.len(), 128);
-            let mut out = out.lock().unwrap();
-            *out = samples;
+            let mut vole = BVSender::init(&mut channel).unwrap();
+            let mut u = u.lock().unwrap();
+            let mut w = w.lock().unwrap();
+            let (t1, t2) = vole.send(&mut channel).unwrap();
+            *u = t1;
+            *w = t2;
         });
         let mut rng = AesRng::new();
         let reader = BufReader::new(receiver.try_clone().unwrap());
         let writer = BufWriter::new(receiver);
         let mut channel = Channel::new(reader, writer);
-        let (_, _, results): (_, _, Vec<Block>) = CPReceiver::init(&mut channel).unwrap();
-        //let results = otext.receive_random(&mut channel, &bs, &mut rng).unwrap();
+        let mut rvole = BVReceiver::init(&mut channel).unwrap();
+        let mut v = rvole.receive(&mut channel).unwrap();
+        let delta = rvole.get_delta();
         handle.join().unwrap();
-        let out_ = out_.lock().unwrap();
-        for j in 0..Params::R*Params::M{
-            assert_eq!(results[j], if bs[j] { out_[j].1 } else { out_[j].0 })
+        let mut u_ = u_.lock().unwrap();
+        let w_ = w_.lock().unwrap();
+        for i in 0..Params::N {
+            u_[i].mul_assign(&delta);
+            v[i].add_assign(&u_[i]);
+            assert_eq!(w_[i], v[i])
         }
     }
 
@@ -168,8 +178,8 @@ mod tests {
             KosReceiver,
             copee::Sender<KosSender>,
             copee::Receiver<KosReceiver>,
+            VoleSender<KosSender, copee::Sender<KosSender>>,
+            VoleReceiver<KosReceiver, copee::Receiver<KosReceiver>>,
         >();
     }
-    
 }
-*/
