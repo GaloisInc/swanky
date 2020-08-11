@@ -8,22 +8,19 @@
 //!
 //! This module provides implementations of SVOLE Traits.
 
-
-
 #![allow(unused_doc_comments)]
 use crate::{
     errors::Error,
     ot::{Receiver as OtReceiver, Sender as OtSender},
-    svole::copee::{Receiver as Creceiver, Sender as Csender},
     svole::{CopeeReceiver, CopeeSender, Fpr, Params, SVoleReceiver, SVoleSender},
 };
 
-use ff::*;
-//#[cfg(feature = "derive")]
-//pub use ff_derive::*;
-use rand::{Rng, SeedableRng};
-use scuttlebutt::{AbstractChannel, AesRng, Block, Malicious, field::Fp};
+
+use rand::SeedableRng;
+use scuttlebutt::{field::Fp, AbstractChannel, AesRng, Block, Malicious};
+use std::convert::TryFrom;
 use std::marker::PhantomData;
+use std::ops::{AddAssign, MulAssign};
 
 //use scuttlebutt::ff_derive::Fp as PrimeField;
 /// A SVOLE Sender.
@@ -39,83 +36,65 @@ pub struct Sender<OT: OtSender + Malicious, CP: CopeeSender> {
 struct Receiver<OT: OtReceiver + Malicious, CP: CopeeReceiver> {
     _ot: PhantomData<OT>,
     _cp: PhantomData<CP>,
-    choice: Fp,
+    delta: Fp,
     copee: CP,
 }
 
 impl<OT: OtSender<Msg = Block> + Malicious, CP: CopeeSender> SVoleSender for Sender<OT, CP> {
     type Msg = Block;
     fn init<C: AbstractChannel>(channel: &mut C) -> Result<Self, Error> {
-        let _csender = CP::init(channel).unwrap();
+        let csender = CP::init(channel).unwrap();
         Ok(Self {
             _ot: PhantomData::<OT>,
             _cp: PhantomData::<CP>,
-            copee: _csender,
+            copee: csender,
         })
     }
 
     fn send<C: AbstractChannel>(&mut self, channel: &mut C) -> Result<(Vec<Fpr>, Vec<Fpr>), Error> {
         let seed = rand::random::<Block>();
         let mut rng = AesRng::from_seed(seed);
-        let mut u: Vec<Fp> = Vec::new();
-        for _i in 0..Params::N {
-            u.push(rng.gen::<Fp>())
-        }
-        let _u = u.clone();
-        let mut a: Vec<Fp> = Vec::new();
-        for _i in 0..Params::R {
-            a.push(rng.gen::<Fp>());
-        }
-        let _a = a.clone();
-        //let mut sender = CP::init(channel)?;
-        let wv = self.copee.send(channel, u)?;
-        let mut _wv = wv.clone();
-        /// Calling COPEe on the vector a
-        let cv = self.copee.send(channel, a)?;
-        let mut _cv = cv;
-        /// Step3. Sender receives chi vector from the receiver
-        let mut chiv: Vec<Fp> = (0..Params::N)
-            .map(|_| {
-                let mut arr: [u64; 2] = [0; 2];
-                for item in &mut arr {
-                    *item = channel.read_u64().unwrap();
-                }
-                Fp::from(arr)
-            })
-            .collect();
 
-        let mut _chiv = chiv.clone();
+        /// Sampling `ui`s i in `[n]`.
+        let u: Vec<Fp> = (0..Params::N).map(|_| Fp::random(&mut rng)).collect();
+        /// Sampling `ah`s h in `[r]`.
+        let a: Vec<Fp> = (0..Params::R).map(|_| Fp::random(&mut rng)).collect();
+        /// Calling COPEe extend on vector `u`.
+        let w = self.copee.send(channel, u.clone())?;
+        /// Calling COPEe on the vector `a`
+        let mut c = self.copee.send(channel, a.clone())?;
+
+        /// Sender receives `chi`s from the receiver
+        let mut chi: Vec<Fp> = (0..Params::N)
+            .map(|_| Fp::try_from(channel.read_block().unwrap()).unwrap())
+            .collect();
         /// Sender computes x
-        let temp1: Fp = (0..Params::N).fold(Field::zero(), |sum, i| {
-            _chiv[i].mul_assign(&_u[i]);
-            chiv[i].add_assign(&sum);
-            chiv[i]
+        let temp1: Fp = (0..Params::N).fold(Fp::zero(), |sum, i| {
+            chi[i].mul_assign(&u[i]);
+            chi[i].add_assign(&sum);
+            chi[i]
         });
         let x: Fp = (0..Params::R).fold(temp1, |mut sum, i| {
-            sum.add_assign(&_a[i]);
+            sum.add_assign(&a[i]);
             sum
         });
         /// Sender computes z
-        let temp2: Fp = (0..Params::N).fold(Field::zero(), |mut sum, i| {
-            _chiv[i].mul_assign(&_wv[i]);
-            sum.add_assign(&_chiv[i]);
+        let temp2: Fp = (0..Params::N).fold(Fp::zero(), |mut sum, i| {
+            chi[i].mul_assign(&w[i]);
+            sum.add_assign(&chi[i]);
             sum
         });
-        let g: Fp = PrimeField::multiplicative_generator();
+        let g: Fp = Fp::try_from(Fp::GEN).unwrap();
         let z: Fp = (0..Params::R).fold(temp2, |mut sum, i| {
-            _cv[i].mul_assign(&g.pow([i as u64 - 1]));
-            sum.add_assign(&_cv[i]);
+            c[i].mul_assign(&g.pow(Fp::try_from(i as u128 - 1).unwrap()));
+            sum.add_assign(&c[i]);
             sum
         });
-        /// Write x into the channel
-        for i in 0..2 {
-            channel.write_u64(((x.0).0)[i])?;
-        }
-        /// Write z into the channel
-        for i in 0..2 {
-            channel.write_u64(((z.0).0)[i])?;
-        }
-        Ok((_u, wv))
+
+        /// Sends out (x, z) to the Receiver.
+        channel.write_block(&Block::from(u128::from(x)))?;
+        channel.write_block(&Block::from(u128::from(z)))?;
+        Ok((u, w))
     }
 }
 
@@ -129,45 +108,42 @@ impl<OT: OtReceiver<Msg = Block> + Malicious, CP: CopeeReceiver> SVoleReceiver
             _ot: PhantomData::<OT>,
             _cp: PhantomData::<CP>,
             copee: cp,
-            choice: delta,
+             delta,
         })
     }
 
     fn receive<C: AbstractChannel>(&mut self, channel: &mut C) -> Option<Vec<Fpr>> {
-        let seed = rand::random::<Block>();
-        let mut rng = AesRng::from_seed(seed);
-        let mut chiv: Vec<Fpr> = (0..Params::N).map(|_| rng.gen::<Fpr>()).collect();
-        //let mut (cp_receiver = CP::init(channel).unwrap();
         let v: Vec<Fp> = self.copee.receive(channel, Params::N).unwrap();
         let mut b: Vec<Fp> = self.copee.receive(channel, Params::R).unwrap();
-        let mut x: Fp = {
-            let mut arr: [u64; 2] = [0; 2];
-            for item in &mut arr {
-                *item = channel.read_u64().unwrap();
-            }
-            Fp::from(arr)
-        };
-        let z: Fp = {
-            let mut arr: [u64; 2] = [0; 2];
-            for item in &mut arr {
-                *item = channel.read_u64().unwrap();
-            }
-            Fp::from(arr)
-        };
+        /// Sampling `chi`s.
+        let seed = rand::random::<Block>();
+        let mut rng = AesRng::from_seed(seed);
+        let mut chi: Vec<Fpr> = (0..Params::N).map(|_| Fp::random(&mut rng)).collect();
+        /// Send `chi`s to the Sender.
+        for item in &mut chi {
+            channel
+                .write_block(&Block::from(u128::from(*item)))
+                .unwrap();
+        }
+        /// Receive (x, z) from the Sender.
+        let (mut x, z) = (
+            Fp::try_from(channel.read_block().unwrap()).unwrap(),
+            Fp::try_from(channel.read_block().unwrap()).unwrap(),
+        );
         /// compute y
-        let mut y: Fp = (0..Params::N).fold(Field::zero(), |sum, i| {
-            chiv[i].mul_assign(&v[i]);
-            chiv[i].add_assign(&sum);
-            chiv[i]
+        let mut y: Fp = (0..Params::N).fold(Fp::zero(), |sum, i| {
+            chi[i].mul_assign(&v[i]);
+            chi[i].add_assign(&sum);
+            chi[i]
         });
-        let g: Fp = PrimeField::multiplicative_generator();
-        let temp: Fp = (0..Params::R).fold(Field::zero(), |sum, i| {
-            b[i].mul_assign(&g.pow([i as u64 - 1]));
+        let g: Fp = Fp::try_from(Fp::GEN).unwrap();
+        let temp: Fp = (0..Params::R).fold(Fp::zero(), |sum, i| {
+            b[i].mul_assign(&g.pow(Fp::try_from(i as u128 - 1).unwrap()));
             b[i].add_assign(&sum);
             b[i]
         });
         y.add_assign(&temp);
-        x.mul_assign(&self.choice);
+        x.mul_assign(&self.delta);
         y.add_assign(&x);
         if z == y {
             Some(v)

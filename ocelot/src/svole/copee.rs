@@ -15,7 +15,7 @@ use crate::{
     svole::{CopeeReceiver, CopeeSender, Fpr, Params},
 };
 //use ff::*;
-use rand::{Rng, SeedableRng};
+use rand::SeedableRng;
 use scuttlebutt::{field::Fp, AbstractChannel, Aes128, AesRng, Block, Malicious};
 use std::convert::TryFrom;
 use std::marker::PhantomData;
@@ -47,11 +47,11 @@ pub fn g_dotprod(x: Vec<Fp>) -> Fp {
         for j in 0..Params::M {
             let mut two: Fp = Fp::one();
             two.add_assign(&Fp::one());
-            let mut two_to_j: Fp = two.pow([j as u64]);
+            let mut two_to_j: Fp = two.pow(Fp::try_from(j as u128).unwrap());
             two_to_j.add_assign(&x[i * Params::M + j]);
             sum.add_assign(&two_to_j);
         }
-        let g_to_i: Fp = g.pow([i as u64]);
+        let g_to_i: Fp = g.pow(Fp::try_from(i as u128).unwrap());
         sum.mul_assign(&g_to_i);
         res.add_assign(&sum);
     }
@@ -80,7 +80,7 @@ impl<ROT: ROTSender<Msg = Block> + Malicious> CopeeSender for Sender<ROT> {
         channel: &mut C,
         input: Vec<Fp>,
     ) -> Result<Vec<Fpr>, Error> {
-        let mut v: Vec<Fpr> = Vec::new();
+        let mut w: Vec<Fpr> = Vec::new();
         for j in 0..input.len() {
             /// Step 3.
             let mut wv: Vec<(Fp, Fp)> = Vec::new();
@@ -96,13 +96,11 @@ impl<ROT: ROTSender<Msg = Block> + Malicious> CopeeSender for Sender<ROT> {
                 wv.push((w0, w1));
                 (w0.sub_assign(&w1));
                 w0.sub_assign(&input[i - 1]);
-                for i in 0..2 {
-                    channel.write_u64(((w0.0).0)[i])?;
-                }
+                channel.write_block(&Block::from(u128::from(w0)))?;
             }
-            v.push(g_dotprod(wv.into_iter().map(|x| x.0).collect()));
+            w.push(g_dotprod(wv.into_iter().map(|x| x.0).collect()));
         }
-        Ok(v)
+        Ok(w)
     }
 }
 
@@ -115,7 +113,7 @@ impl<ROT: ROTReceiver<Msg = Block> + Malicious> CopeeReceiver for Receiver<ROT> 
         let mut ot = ROT::init(channel, &mut rng).unwrap();
         //TODO: Fix this later
         let delta: Fp = Fp::random(&mut rng);
-        let mut deltab: Vec<bool> = delta.bit_composition();
+        let deltab: Vec<bool> = delta.bit_composition();
         let ots = ot.receive_random(channel, &deltab, &mut rng).unwrap();
         Ok((
             Self {
@@ -133,7 +131,6 @@ impl<ROT: ROTReceiver<Msg = Block> + Malicious> CopeeReceiver for Receiver<ROT> 
         channel: &mut C,
         len: usize,
     ) -> Result<Vec<Fpr>, Error> {
-        //let u: Vec<Fp> = (1..Params::R*Params::M+1).map(|_| channel.read_fp().unwrap()).collect();
         let mut output: Vec<Fp> = Vec::new();
         for j in 0..len {
             assert_eq!(self.mv.len(), Params::M * Params::R);
@@ -143,7 +140,7 @@ impl<ROT: ROTReceiver<Msg = Block> + Malicious> CopeeReceiver for Receiver<ROT> 
                 let key = Block::from(self.mv[i - 1]);
                 let cipher = Aes128::new(key);
                 let mut w_delta = Fp::try_from(cipher.encrypt(pt)).unwrap();
-                let mut tau = Fp::try_from(channel.read_block()).unwrap();
+                let mut tau = Fp::try_from(channel.read_block().unwrap()).unwrap();
                 tau.mul_assign(self.delta);
                 w_delta.add_assign(&tau);
                 v.push(w_delta);

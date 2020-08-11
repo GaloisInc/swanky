@@ -8,11 +8,9 @@
 //!
 //! This module provides traits COPEe
 
-//pub mod base_svole;
+pub mod base_svole;
 pub mod copee;
-//pub mod field;
 
-//use crate::svole::field::Fp;
 #[allow(unused_imports)]
 use crate::{
     errors::Error,
@@ -22,7 +20,7 @@ use crate::{
     },
 };
 //use rand::{Rng, SeedableRng};
-use scuttlebutt::{field::Fp, AbstractChannel, Block};
+use scuttlebutt::{field::Fp, AbstractChannel};
 
 /// A type for security parameters
 pub struct Params;
@@ -99,6 +97,7 @@ where
     fn init<C: AbstractChannel>(channel: &mut C) -> Result<Self, Error>;
     fn receive<C: AbstractChannel>(&mut self, channel: &mut C) -> Option<Vec<Fpr>>;
 }
+
 /*
 #[cfg(test)]
 mod tests {
@@ -107,9 +106,9 @@ mod tests {
     use super::*;
     use crate::ot::*;
     use crate::svole::*;
-    use ff::*;
     use num::pow;
-    use scuttlebutt::{AesRng, Block, Channel, Malicious};
+    use rand::SeedableRng;
+    use scuttlebutt::{AesRng, Block, Channel, Malicious, field::Fp};
     use std::{
         fmt::Display,
         io::{BufReader, BufWriter},
@@ -132,9 +131,10 @@ mod tests {
         CPReceiver: CopeeReceiver<Msg = Block>,
     >(// ninputs: usize,
     ) {
-        //let bs = rand_bool_vec(Params::R*Params::);
-        let delta: Fp = rand::random::<Fp>();
-        let bs: Vec<bool> = unsafe { std::mem::transmute::<Fp, Vec<bool>>(delta) };
+        let seed = rand::random::<Block>();
+        let mut rng = AesRng::from_seed(seed);
+        let delta: Fp = Fp::random(&mut rng);
+        let bs: Vec<bool> = delta.bit_composition();
         let out = Arc::new(Mutex::new(vec![]));
         let out_ = out.clone();
         let (sender, receiver) = UnixStream::pair().unwrap();
@@ -143,8 +143,7 @@ mod tests {
             let reader = BufReader::new(sender.try_clone().unwrap());
             let writer = BufWriter::new(sender);
             let mut channel = Channel::new(reader, writer);
-            let (mut otext, samples): (_, Vec<(Block, Block)>) =
-                CPSender::init(&mut channel).unwrap();
+            let
             assert_eq!(samples.len(), 128);
             let mut out = out.lock().unwrap();
             *out = samples;
@@ -171,45 +170,6 @@ mod tests {
             copee::Receiver<KosReceiver>,
         >();
     }
-    #[test]
-    fn check_gen() {
-        let g: Fp = PrimeField::multiplicative_generator();
-        assert_eq!(g, PrimeField::from_str("5").unwrap());
-    }
-    #[test]
-    fn fp_to_vec() {
-        let delta: Fp = rand::random::<Fp>();
-        let mut deltab: Vec<bool> = Vec::new();
-        let temp_vec = ((delta.0).0).to_vec();
-        for i in 0..2 {
-            //for e in format!("{:b}", (delta.0).0)[i].chars(){
-            for e in format!("{:b}", temp_vec[i]).chars() {
-                if e == '1' {
-                    deltab.push(true);
-                } else {
-                    deltab.push(false);
-                }
-            }
-        }
-
-        if deltab.len() > Params::M {
-            (Params::M..deltab.len() + 1).map(|_| deltab.pop());
-        } else {
-            (deltab.len()..Params::M + 1).map(|_| deltab.push(false));
-        }
-        //println!("{:?}", deltab);
-        //assert_eq!(deltab.len(), 128);
-        let temp: u128 = (0..(deltab.len())).fold(0, |sum, i| {
-            sum + (pow(2, i as usize) * (u128::from(deltab[i])))
-        });
-        assert_eq!(((delta.0).0)[0] as u128 + ((delta.0).0)[1] as u128, temp);
-    }
-    #[test]
-
-    fn test_repr() {
-        let (sender, receiver) = UnixStream::pair().unwrap();
-        let writer = BufWriter::new(receiver);
-        let x: Fp = rand::random::<Fp>();
-        (x.0).write_le(writer);
-    }
-}*/
+    
+}
+*/
