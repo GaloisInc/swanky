@@ -151,13 +151,6 @@ impl std::iter::Sum for Fp {
     }
 }
 
-impl AsMut<[u8]> for Fp {
-    #[inline]
-    fn as_mut(&mut self) -> &mut [u8] {
-        unsafe { &mut *(self as *mut Fp as *mut [u8; 16]) }
-    }
-}
-
 macro_rules! binop {
     ($trait:ident, $name:ident, $assign:ident) => {
         impl $trait<Fp> for Fp {
