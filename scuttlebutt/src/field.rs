@@ -5,7 +5,7 @@
 
 use crate::Block;
 use primitive_types::{U128, U256};
-use rand_core::{CryptoRng, RngCore};
+use rand_core::RngCore;
 use std::{
     convert::TryFrom,
     hash::{Hash, Hasher},
@@ -51,7 +51,7 @@ impl Fp {
     ///
     /// There is a slight bias towards the range $[0,158]$.
     /// There is a $\frac{159}{2^128} \approx 4.6 \times 10^{-37}$ chance of seeing this bias.
-    pub fn random(rng: &mut (impl RngCore)) -> Self {
+    pub fn random(rng: &mut impl RngCore) -> Self {
         // The backend::Fp::random(rng) function panics, so we don't use it.
         Self::try_from(
             ((u128::from(rng.next_u64()) << 64) | u128::from(rng.next_u64())) % Self::MODULUS,
