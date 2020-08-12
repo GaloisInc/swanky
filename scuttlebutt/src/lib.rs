@@ -12,6 +12,11 @@
 #![cfg_attr(feature = "nightly", deny(missing_docs))]
 
 //!
+#[cfg(test)]
+extern crate quickcheck;
+#[cfg(test)]
+#[macro_use(quickcheck)]
+extern crate quickcheck_macros;
 
 mod aes;
 mod block;
