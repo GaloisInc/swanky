@@ -48,17 +48,16 @@ pub fn g_dotprod(x: Vec<Fp>) -> Fp {
         for j in 0..Params::M {
             let mut two: Fp = Fp::one();
             two.add_assign(&Fp::one());
-            let mut two_to_j: Fp = two.pow(Fp::try_from(j as u128).unwrap());
+            let mut two_to_j: Fp = two.pow(j as u128);
             two_to_j.add_assign(&x[(i * Params::M) + j]);
             sum.add_assign(&two_to_j);
         }
-        let g_to_i: Fp = g.pow(Fp::try_from(i as u128).unwrap());
+        let g_to_i: Fp = g.pow(i as u128);
         sum.mul_assign(&g_to_i);
         res.add_assign(&sum);
     }
     res
 }
-
 
 /// Implement CopeeSender for Sender type
 impl<ROT: ROTSender<Msg = Block> + Malicious> CopeeSender for Sender<ROT> {

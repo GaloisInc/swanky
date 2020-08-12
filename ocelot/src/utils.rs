@@ -4,7 +4,7 @@
 // Copyright © 2019 Galois, Inc.
 // See LICENSE for licensing information.
 
-use scuttlebutt::{Block, field::Fp};
+use scuttlebutt::{field::Fp, Block};
 
 /// Convert Fp into a bit vector.
 #[inline]
@@ -185,8 +185,8 @@ pub fn xor_two_blocks(x: &(Block, Block), y: &(Block, Block)) -> (Block, Block) 
 mod tests {
     use super::*;
     use num::pow;
-    use scuttlebutt::AesRng;
     use rand::SeedableRng;
+    use scuttlebutt::AesRng;
     use std::convert::TryFrom;
 
     fn _transpose(nrows: usize, ncols: usize) {
@@ -233,12 +233,12 @@ mod tests {
     }
 
     #[test]
-    fn test_bit_composition(){
+    fn test_bit_composition() {
         let seed = rand::random::<Block>();
         let mut rng = AesRng::from_seed(seed);
         let x = Fp::random(&mut rng);
         let bv = bit_composition(x);
-        let y:u128 = (0..(bv.len())).fold(0, |sum, i| sum + (pow(2, i) * (u128::from(bv[i]))));
+        let y: u128 = (0..(bv.len())).fold(0, |sum, i| sum + (pow(2, i) * (u128::from(bv[i]))));
         assert_eq!(u128::from(x), y);
     }
 }

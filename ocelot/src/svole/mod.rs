@@ -37,7 +37,6 @@ impl Params {
     pub const R: usize = 1; //
 }
 
-
 /// A trait for COPEe Sender.
 pub trait CopeeSender
 where
@@ -81,7 +80,10 @@ where
     /// `u8` arrays.
     type Msg: Sized + AsMut<[u8]>;
     fn init<C: AbstractChannel>(channel: &mut C) -> Result<Self, Error>;
-    fn send<C: AbstractChannel>(&mut self, channel: &mut C) -> Result<(Vec<Self::Msg>, Vec<Self::Msg>), Error>;
+    fn send<C: AbstractChannel>(
+        &mut self,
+        channel: &mut C,
+    ) -> Result<(Vec<Self::Msg>, Vec<Self::Msg>), Error>;
 }
 
 /// A trait for Copee Receiver
@@ -104,10 +106,8 @@ mod tests {
     extern crate test;
     use super::*;
     use crate::ot::*;
+    use crate::svole::base_svole::{Receiver as VoleReceiver, Sender as VoleSender};
     use crate::utils::bit_composition;
-    use crate::svole::{
-        base_svole::{Receiver as VoleReceiver, Sender as VoleSender},
-    };
     use scuttlebutt::{field::Fp, Channel, Malicious};
     use std::{
         io::{BufReader, BufWriter},
@@ -115,7 +115,6 @@ mod tests {
         os::unix::net::UnixStream,
         sync::{Arc, Mutex},
     };
-
 
     fn test_copee_init<
         ROTS: ROTSender + Malicious,
@@ -153,9 +152,8 @@ mod tests {
         let w_ = w_.lock().unwrap();
         for i in 0..Params::N {
             if bs[i] == true {
-            u_[i].mul_assign(&Fp::one());
-            }
-            else {
+                u_[i].mul_assign(&Fp::one());
+            } else {
                 u_[i].mul_assign(&Fp::zero());
             }
             v[i].add_assign(&u_[i]);

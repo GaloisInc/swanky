@@ -51,7 +51,7 @@ impl Fp {
     ///
     /// There is a slight bias towards the range $[0,158]$.
     /// There is a $\frac{159}{2^128} \approx 4.6 \times 10^{-37}$ chance of seeing this bias.
-    pub fn random(rng: &mut (impl RngCore + CryptoRng)) -> Self {
+    pub fn random(rng: &mut (impl RngCore)) -> Self {
         // The backend::Fp::random(rng) function panics, so we don't use it.
         Self::try_from(
             ((u128::from(rng.next_u64()) << 64) | u128::from(rng.next_u64())) % Self::MODULUS,
@@ -87,21 +87,19 @@ impl Fp {
     }
 
     /// Computing `pow` using Montgomery's ladder technique.
-    pub fn pow(&self, n: Fp) -> Self {
-        let mut x1 = *self;
-        let mut x2 = *self;
-        x2.mul_assign(self);
-        let exp = format!("{:b}", u128::from(n)).split_off(1);
-        for c in exp.chars() {
-            if c == '0' {
-                x2.mul_assign(x1);
-                x1.mul_assign(x1);
+    pub fn pow(&self, n: u128) -> Self {
+        let mut r0 = Self::one();
+        let mut r1 = *self;
+        for i in (0..128).rev() {
+            if n & (1 << i) == 0 {
+                r1.mul_assign(r0);
+                r0.mul_assign(r0);
             } else {
-                x1.mul_assign(x2);
-                x2.mul_assign(x2);
+                r0.mul_assign(r1);
+                r1.mul_assign(r1);
             }
         }
-        x1
+        r0
     }
 }
 
@@ -113,6 +111,13 @@ impl std::error::Error for BiggerThanModulus {}
 impl std::fmt::Display for BiggerThanModulus {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "{:?}", self)
+    }
+}
+
+impl AsMut<[u8]> for Fp {
+    #[inline]
+    fn as_mut(&mut self) -> &mut [u8] {
+        unsafe { &mut *(self as *mut Fp as *mut [u8; 16]) }
     }
 }
 
@@ -148,13 +153,6 @@ impl From<Fp> for u128 {
 impl std::iter::Sum for Fp {
     fn sum<I: Iterator<Item = Self>>(iter: I) -> Self {
         iter.fold(Fp::zero(), |a, b| a + b)
-    }
-}
-
-impl AsMut<[u8]> for Fp {
-    #[inline]
-    fn as_mut(&mut self) -> &mut [u8] {
-        unsafe { &mut *(self as *mut Fp as *mut [u8; 16]) }
     }
 }
 
@@ -265,6 +263,13 @@ mod tests {
     use super::*;
     use crate::AesRng;
     use rand::SeedableRng;
+    extern crate quickcheck;
+    //extern crate quickcheck_macros;
+    use num::pow;
+    use num::BigUint;
+    use quickcheck::quickcheck;
+    use std::convert::TryInto;
+    use std::str::FromStr;
 
     macro_rules! test_binop {
         ($name:ident, $op:ident) => {
@@ -290,11 +295,17 @@ mod tests {
     test_binop!(test_add, add_assign);
     test_binop!(test_sub, sub_assign);
     test_binop!(test_mul, mul_assign);
-
-    #[test]
-    fn test_pow() {
-        let x = Fp::try_from(Fp::GEN).unwrap();
-        let exp = Fp::try_from(Fp::MODULUS - 1).unwrap();
-        assert_eq!(x.pow(exp), Fp::one());
+    impl quickcheck::Arbitrary for Fp {
+        fn arbitrary<RNG: RngCore>(mut g: &mut RNG) -> Fp {
+            Fp::random(&mut g)
+        }
+    }
+    #[quickcheck]
+    fn check_pow(x: Fp, n: u128) -> bool {
+        BigUint::from_str(&u128::from(x.pow(n)).to_string()).unwrap()
+            == pow(
+                BigUint::from_str(&u128::from(x).to_string()).unwrap(),
+                n as usize,
+            ) % BigUint::from_str(&(Fp::MODULUS).to_string()).unwrap()
     }
 }

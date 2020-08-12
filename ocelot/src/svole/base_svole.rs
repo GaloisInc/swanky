@@ -41,7 +41,9 @@ pub struct Receiver<OT: OtReceiver + Malicious, CP: CopeeReceiver> {
 }
 
 /// Implement SVoleSender for Sender type.
-impl<OT: OtSender<Msg = Block> + Malicious, CP: CopeeSender<Msg = Fp>> SVoleSender for Sender<OT, CP> {
+impl<OT: OtSender<Msg = Block> + Malicious, CP: CopeeSender<Msg = Fp>> SVoleSender
+    for Sender<OT, CP>
+{
     type Msg = Fp;
     fn init<C: AbstractChannel>(channel: &mut C) -> Result<Self, Error> {
         let csender = CP::init(channel).unwrap();
@@ -87,7 +89,7 @@ impl<OT: OtSender<Msg = Block> + Malicious, CP: CopeeSender<Msg = Fp>> SVoleSend
         });
         let g: Fp = Fp::try_from(Fp::GEN).unwrap();
         let z: Fp = (0..Params::R).fold(temp2, |mut sum, i| {
-            c[i].mul_assign(&g.pow(Fp::try_from(i as u128 - 1).unwrap()));
+            c[i].mul_assign(&g.pow(i as u128 - 1));
             sum.add_assign(&c[i]);
             sum
         });
@@ -145,7 +147,7 @@ impl<OT: OtReceiver<Msg = Block> + Malicious, CP: CopeeReceiver<Msg = Fp>> SVole
         });
         let g: Fp = Fp::try_from(Fp::GEN).unwrap();
         let temp: Fp = (0..Params::R).fold(Fp::zero(), |sum, i| {
-            b[i].mul_assign(&g.pow(Fp::try_from(i as u128 - 1).unwrap()));
+            b[i].mul_assign(&g.pow(i as u128 - 1));
             b[i].add_assign(&sum);
             b[i]
         });
