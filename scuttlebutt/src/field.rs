@@ -114,13 +114,6 @@ impl std::fmt::Display for BiggerThanModulus {
     }
 }
 
-impl AsMut<[u8]> for Fp {
-    #[inline]
-    fn as_mut(&mut self) -> &mut [u8] {
-        unsafe { &mut *(self as *mut Fp as *mut [u8; 16]) }
-    }
-}
-
 impl TryFrom<u128> for Fp {
     type Error = BiggerThanModulus;
 
@@ -265,11 +258,9 @@ mod tests {
     use rand::SeedableRng;
     extern crate quickcheck;
     //extern crate quickcheck_macros;
-    use num::pow;
-    use num::BigUint;
+    use num::{pow, BigUint};
     use quickcheck::quickcheck;
-    use std::convert::TryInto;
-    use std::str::FromStr;
+    use std::{convert::TryInto, str::FromStr};
 
     macro_rules! test_binop {
         ($name:ident, $op:ident) => {

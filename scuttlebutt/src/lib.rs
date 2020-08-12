@@ -12,11 +12,6 @@
 #![cfg_attr(feature = "nightly", deny(missing_docs))]
 
 //!
-#[cfg(test)]
-extern crate quickcheck;
-#[cfg(test)]
-#[macro_use(quickcheck)]
-extern crate quickcheck_macros;
 
 mod aes;
 mod block;
@@ -45,7 +40,10 @@ pub use crate::{
 
 #[cfg(unix)]
 pub use crate::channel::{
-    track_unix_channel_pair, unix_channel_pair, TrackUnixChannel, UnixChannel,
+    track_unix_channel_pair,
+    unix_channel_pair,
+    TrackUnixChannel,
+    UnixChannel,
 };
 
 /// A marker trait denoting that the given scheme is semi-honest secure.
