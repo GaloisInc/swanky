@@ -294,6 +294,6 @@ mod tests {
         let exp = BigUint::from_str(&n.to_string()).unwrap();
         let a = BigUint::from_str(&u128::from(x).to_string()).unwrap();
         let left = BigUint::from_str(&u128::from(x.pow(n)).to_string()).unwrap();
-         left == a.modpow(&exp, &m)
+        left == a.modpow(&exp, &m)
     }
 }
