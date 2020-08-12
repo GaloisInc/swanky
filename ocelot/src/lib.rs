@@ -12,15 +12,10 @@
 #![cfg_attr(feature = "nightly", doc(include = "../README.md"))]
 #![cfg_attr(feature = "nightly", deny(missing_docs))]
 
-//#[macro_use]
-//extern crate ff;
 
-#[macro_use]
-extern crate lazy_static;
 pub mod errors;
 pub mod utils;
 pub use crate::errors::Error;
 pub mod oprf;
 pub mod ot;
-//pub mod pprf;
 pub mod svole;
