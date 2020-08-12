@@ -12,7 +12,8 @@
 use crate::{
     errors::Error,
     ot::{RandomReceiver as ROTReceiver, RandomSender as ROTSender},
-    svole::{CopeeReceiver, CopeeSender, Fpr, Params},
+    svole::{CopeeReceiver, CopeeSender, Params},
+    utils::bit_composition,
 };
 use rand::SeedableRng;
 use scuttlebutt::{field::Fp, AbstractChannel, Aes128, AesRng, Block, Malicious};
@@ -58,20 +59,10 @@ pub fn g_dotprod(x: Vec<Fp>) -> Fp {
     res
 }
 
-/// Convert Fp into a bit vector.
-pub fn bit_composition(x: Fp) -> Vec<bool> {
-    let mut res = Vec::new();
-    let b = Block::from(u128::from(x));
-    for _i in 0..128 {
-        res.push(b.lsb());
-        b.bitshift_right();
-    }
-    res
-}
 
 /// Implement CopeeSender for Sender type
 impl<ROT: ROTSender<Msg = Block> + Malicious> CopeeSender for Sender<ROT> {
-    type Msg = Block;
+    type Msg = Fp;
     fn init<C: AbstractChannel>(channel: &mut C) -> Result<Self, Error> {
         /// Combine step 1 and 2 and by calling ROT.
         let seed = rand::random::<Block>();
@@ -89,8 +80,8 @@ impl<ROT: ROTSender<Msg = Block> + Malicious> CopeeSender for Sender<ROT> {
         &mut self,
         channel: &mut C,
         input: Vec<Fp>,
-    ) -> Result<Vec<Fpr>, Error> {
-        let mut w: Vec<Fpr> = Vec::new();
+    ) -> Result<Vec<Fp>, Error> {
+        let mut w: Vec<Fp> = Vec::new();
         for j in 0..input.len() {
             /// Step 3.
             let mut wv: Vec<(Fp, Fp)> = Vec::new();
@@ -116,7 +107,7 @@ impl<ROT: ROTSender<Msg = Block> + Malicious> CopeeSender for Sender<ROT> {
 
 /// Implement CopeeReceiver for Receiver type.
 impl<ROT: ROTReceiver<Msg = Block> + Malicious> CopeeReceiver for Receiver<ROT> {
-    type Msg = Block;
+    type Msg = Fp;
     fn init<C: AbstractChannel>(channel: &mut C) -> Result<Self, Error> {
         let seed = rand::random::<Block>();
         let mut rng = AesRng::from_seed(seed);
@@ -138,7 +129,7 @@ impl<ROT: ROTReceiver<Msg = Block> + Malicious> CopeeReceiver for Receiver<ROT> 
         &mut self,
         channel: &mut C,
         len: usize,
-    ) -> Result<Vec<Fpr>, Error> {
+    ) -> Result<Vec<Fp>, Error> {
         let mut output: Vec<Fp> = Vec::new();
         for j in 0..len {
             let mut v: Vec<Fp> = Vec::new();

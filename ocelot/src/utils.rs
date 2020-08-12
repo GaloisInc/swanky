@@ -4,7 +4,19 @@
 // Copyright © 2019 Galois, Inc.
 // See LICENSE for licensing information.
 
-use scuttlebutt::Block;
+use scuttlebutt::{Block, field::Fp};
+
+/// Convert Fp into a bit vector.
+#[inline]
+pub fn bit_composition(x: Fp) -> Vec<bool> {
+    let mut res = Vec::new();
+    let b = Block::from(u128::from(x));
+    for _i in 0..128 {
+        res.push(b.lsb());
+        b.bitshift_right();
+    }
+    res
+}
 
 #[inline]
 pub fn transpose(m: &[u8], nrows: usize, ncols: usize) -> Vec<u8> {
@@ -172,6 +184,10 @@ pub fn xor_two_blocks(x: &(Block, Block), y: &(Block, Block)) -> (Block, Block) 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use num::pow;
+    use scuttlebutt::AesRng;
+    use rand::SeedableRng;
+    use std::convert::TryFrom;
 
     fn _transpose(nrows: usize, ncols: usize) {
         let m = (0..nrows * ncols / 8)
@@ -214,6 +230,16 @@ mod tests {
         let v_ = u8vec_to_boolvec(&v);
         let v__ = boolvec_to_u8vec(&v_);
         assert_eq!(v, v__);
+    }
+
+    #[test]
+    fn test_bit_composition(){
+        let seed = rand::random::<Block>();
+        let mut rng = AesRng::from_seed(seed);
+        let x = Fp::random(&mut rng);
+        let bv = bit_composition(x);
+        let y:u128 = (0..(bv.len())).fold(0, |sum, i| sum + (pow(2, i) * (u128::from(bv[i]))));
+        assert_eq!(u128::from(x), y);
     }
 }
 

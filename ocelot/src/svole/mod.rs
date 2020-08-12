@@ -19,7 +19,7 @@ use crate::{
         Sender as OtSender,
     },
 };
-use scuttlebutt::{field::Fp, AbstractChannel};
+use scuttlebutt::AbstractChannel;
 
 /// A type for security parameters
 pub struct Params;
@@ -37,8 +37,6 @@ impl Params {
     pub const R: usize = 1; //
 }
 
-/// Aliasing Fp to be consistant with the notation of the algorithm(s).
-type Fpr = Fp;
 
 /// A trait for COPEe Sender.
 pub trait CopeeSender
@@ -52,8 +50,8 @@ where
     fn send<C: AbstractChannel>(
         &mut self,
         channel: &mut C,
-        input: Vec<Fp>,
-    ) -> Result<Vec<Fpr>, Error>;
+        input: Vec<Self::Msg>,
+    ) -> Result<Vec<Self::Msg>, Error>;
 }
 
 /// A trait for Copee Receiver.
@@ -66,12 +64,12 @@ where
     type Msg: Sized + AsMut<[u8]>;
     fn init<C: AbstractChannel>(channel: &mut C) -> Result<Self, Error>;
     /// To retrieve delta from the receiver type.
-    fn get_delta(&self) -> Fpr;
+    fn get_delta(&self) -> Self::Msg;
     fn receive<C: AbstractChannel>(
         &mut self,
         channel: &mut C,
         len: usize,
-    ) -> Result<Vec<Fpr>, Error>;
+    ) -> Result<Vec<Self::Msg>, Error>;
 }
 
 /// A trait for sVole Sender.
@@ -83,7 +81,7 @@ where
     /// `u8` arrays.
     type Msg: Sized + AsMut<[u8]>;
     fn init<C: AbstractChannel>(channel: &mut C) -> Result<Self, Error>;
-    fn send<C: AbstractChannel>(&mut self, channel: &mut C) -> Result<(Vec<Fpr>, Vec<Fpr>), Error>;
+    fn send<C: AbstractChannel>(&mut self, channel: &mut C) -> Result<(Vec<Self::Msg>, Vec<Self::Msg>), Error>;
 }
 
 /// A trait for Copee Receiver
@@ -96,8 +94,8 @@ where
     type Msg: Sized + AsMut<[u8]>;
     fn init<C: AbstractChannel>(channel: &mut C) -> Result<Self, Error>;
     /// To retrieve delta from the receiver type.
-    fn get_delta(&self) -> Fpr;
-    fn receive<C: AbstractChannel>(&mut self, channel: &mut C) -> Option<Vec<Fpr>>;
+    fn get_delta(&self) -> Self::Msg;
+    fn receive<C: AbstractChannel>(&mut self, channel: &mut C) -> Option<Vec<Self::Msg>>;
 }
 
 #[cfg(test)]
@@ -106,44 +104,33 @@ mod tests {
     extern crate test;
     use super::*;
     use crate::ot::*;
-    use crate::svole::{base_svole::Receiver as VoleReceiver, base_svole::Sender as VoleSender};
-    use rand::SeedableRng;
-    use scuttlebutt::{field::Fp, AesRng, Block, Channel, Malicious};
+    use crate::utils::bit_composition;
+    use crate::svole::{
+        base_svole::{Receiver as VoleReceiver, Sender as VoleSender},
+    };
+    use scuttlebutt::{field::Fp, Channel, Malicious};
     use std::{
-        fmt::Display,
         io::{BufReader, BufWriter},
         ops::{AddAssign, MulAssign},
         os::unix::net::UnixStream,
         sync::{Arc, Mutex},
     };
 
-    fn rand_block_vec(size: usize) -> Vec<Block> {
-        (0..size).map(|_| rand::random::<Block>()).collect()
-    }
 
-    fn rand_bool_vec(size: usize) -> Vec<bool> {
-        (0..size).map(|_| rand::random::<bool>()).collect()
-    }
-
-    fn test_Copee_init<
+    fn test_copee_init<
         ROTS: ROTSender + Malicious,
         ROTR: ROTReceiver + Malicious,
-        CPSender: CopeeSender<Msg = Block>,
-        CPReceiver: CopeeReceiver<Msg = Block>,
-        BVSender: SVoleSender<Msg = Block>,
-        BVReceiver: SVoleReceiver<Msg = Block>,
+        CPSender: CopeeSender<Msg = Fp>,
+        CPReceiver: CopeeReceiver<Msg = Fp>,
+        BVSender: SVoleSender<Msg = Fp>,
+        BVReceiver: SVoleReceiver<Msg = Fp>,
     >() {
-        let seed = rand::random::<Block>();
-        let mut rng = AesRng::from_seed(seed);
-        let delta: Fp = Fp::random(&mut rng);
-        let bs: Vec<bool> = delta.bit_composition();
         let u = Arc::new(Mutex::new(vec![]));
-        let mut u_ = u.clone();
+        let u_ = u.clone();
         let w = Arc::new(Mutex::new(vec![]));
         let w_ = u.clone();
         let (sender, receiver) = UnixStream::pair().unwrap();
         let handle = std::thread::spawn(move || {
-            let mut rng = AesRng::new();
             let reader = BufReader::new(sender.try_clone().unwrap());
             let writer = BufWriter::new(sender);
             let mut channel = Channel::new(reader, writer);
@@ -154,18 +141,23 @@ mod tests {
             *u = t1;
             *w = t2;
         });
-        let mut rng = AesRng::new();
         let reader = BufReader::new(receiver.try_clone().unwrap());
         let writer = BufWriter::new(receiver);
         let mut channel = Channel::new(reader, writer);
         let mut rvole = BVReceiver::init(&mut channel).unwrap();
         let mut v = rvole.receive(&mut channel).unwrap();
         let delta = rvole.get_delta();
+        let bs = bit_composition(delta);
         handle.join().unwrap();
         let mut u_ = u_.lock().unwrap();
         let w_ = w_.lock().unwrap();
         for i in 0..Params::N {
-            u_[i].mul_assign(&delta);
+            if bs[i] == true {
+            u_[i].mul_assign(&Fp::one());
+            }
+            else {
+                u_[i].mul_assign(&Fp::zero());
+            }
             v[i].add_assign(&u_[i]);
             assert_eq!(w_[i], v[i])
         }
@@ -173,7 +165,7 @@ mod tests {
 
     #[test]
     fn test_init() {
-        test_Copee_init::<
+        test_copee_init::<
             KosSender,
             KosReceiver,
             copee::Sender<KosSender>,

@@ -12,7 +12,7 @@
 use crate::{
     errors::Error,
     ot::{Receiver as OtReceiver, Sender as OtSender},
-    svole::{CopeeReceiver, CopeeSender, Fpr, Params, SVoleReceiver, SVoleSender},
+    svole::{CopeeReceiver, CopeeSender, Params, SVoleReceiver, SVoleSender},
 };
 use rand::SeedableRng;
 use scuttlebutt::{field::Fp, AbstractChannel, AesRng, Block, Malicious};
@@ -41,8 +41,8 @@ pub struct Receiver<OT: OtReceiver + Malicious, CP: CopeeReceiver> {
 }
 
 /// Implement SVoleSender for Sender type.
-impl<OT: OtSender<Msg = Block> + Malicious, CP: CopeeSender> SVoleSender for Sender<OT, CP> {
-    type Msg = Block;
+impl<OT: OtSender<Msg = Block> + Malicious, CP: CopeeSender<Msg = Fp>> SVoleSender for Sender<OT, CP> {
+    type Msg = Fp;
     fn init<C: AbstractChannel>(channel: &mut C) -> Result<Self, Error> {
         let csender = CP::init(channel).unwrap();
         Ok(Self {
@@ -52,7 +52,7 @@ impl<OT: OtSender<Msg = Block> + Malicious, CP: CopeeSender> SVoleSender for Sen
         })
     }
 
-    fn send<C: AbstractChannel>(&mut self, channel: &mut C) -> Result<(Vec<Fpr>, Vec<Fpr>), Error> {
+    fn send<C: AbstractChannel>(&mut self, channel: &mut C) -> Result<(Vec<Fp>, Vec<Fp>), Error> {
         let seed = rand::random::<Block>();
         let mut rng = AesRng::from_seed(seed);
 
@@ -100,10 +100,10 @@ impl<OT: OtSender<Msg = Block> + Malicious, CP: CopeeSender> SVoleSender for Sen
 }
 
 /// Implement SVoleReceiver for Receiver type.
-impl<OT: OtReceiver<Msg = Block> + Malicious, CP: CopeeReceiver> SVoleReceiver
+impl<OT: OtReceiver<Msg = Block> + Malicious, CP: CopeeReceiver<Msg = Fp>> SVoleReceiver
     for Receiver<OT, CP>
 {
-    type Msg = Block;
+    type Msg = Fp;
     fn init<C: AbstractChannel>(channel: &mut C) -> Result<Self, Error> {
         let cp = CP::init(channel).unwrap();
         let delta = cp.get_delta();
@@ -119,13 +119,13 @@ impl<OT: OtReceiver<Msg = Block> + Malicious, CP: CopeeReceiver> SVoleReceiver
         self.delta
     }
 
-    fn receive<C: AbstractChannel>(&mut self, channel: &mut C) -> Option<Vec<Fpr>> {
+    fn receive<C: AbstractChannel>(&mut self, channel: &mut C) -> Option<Vec<Fp>> {
         let v: Vec<Fp> = self.copee.receive(channel, Params::N).unwrap();
         let mut b: Vec<Fp> = self.copee.receive(channel, Params::R).unwrap();
         /// Sampling `chi`s.
         let seed = rand::random::<Block>();
         let mut rng = AesRng::from_seed(seed);
-        let mut chi: Vec<Fpr> = (0..Params::N).map(|_| Fp::random(&mut rng)).collect();
+        let mut chi: Vec<Fp> = (0..Params::N).map(|_| Fp::random(&mut rng)).collect();
         /// Send `chi`s to the Sender.
         for item in &mut chi {
             channel
