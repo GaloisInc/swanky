@@ -27,6 +27,7 @@ subtle = "2.2"
 primitive-types = "0.7"
 uint = "0.8"
 
+
 [dev-dependencies]
 criterion = "0.2"
 hex = "0.3"

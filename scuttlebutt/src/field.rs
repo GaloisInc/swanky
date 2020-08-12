@@ -254,13 +254,10 @@ impl Neg for Fp {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::AesRng;
-    use rand::SeedableRng;
     extern crate quickcheck;
-    //extern crate quickcheck_macros;
-    use num::{pow, BigUint};
+    use num_bigint::BigUint;
     use quickcheck::quickcheck;
-    use std::{convert::TryInto, str::FromStr};
+    use std::str::FromStr;
 
     macro_rules! test_binop {
         ($name:ident, $op:ident) => {
@@ -293,10 +290,10 @@ mod tests {
     }
     #[quickcheck]
     fn check_pow(x: Fp, n: u128) -> bool {
-        BigUint::from_str(&u128::from(x.pow(n)).to_string()).unwrap()
-            == pow(
-                BigUint::from_str(&u128::from(x).to_string()).unwrap(),
-                n as usize,
-            ) % BigUint::from_str(&(Fp::MODULUS).to_string()).unwrap()
+        let m = BigUint::from_str(&(Fp::MODULUS).to_string()).unwrap();
+        let exp = BigUint::from_str(&n.to_string()).unwrap();
+        let a = BigUint::from_str(&u128::from(x).to_string()).unwrap();
+        let left = BigUint::from_str(&u128::from(x.pow(n)).to_string()).unwrap();
+         left == a.modpow(&exp, &m)
     }
 }
