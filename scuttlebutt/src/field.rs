@@ -3,8 +3,9 @@
 //! # Security Warning
 //! TODO: this might not be constant-time in all cases.
 
+use crate::Block;
 use primitive_types::{U128, U256};
-use rand_core::{CryptoRng, RngCore};
+use rand_core::RngCore;
 use std::{
     convert::TryFrom,
     hash::{Hash, Hasher},
@@ -41,13 +42,16 @@ impl Hash for Fp {
 
 impl Fp {
     /// The prime field modulus: $2^{128} - 159$
-    pub const MODULUS: u128 = 340282366920938463463374607431768211297;
+    pub const MODULUS: u128 = 340_282_366_920_938_463_463_374_607_431_768_211_297;
+
+    /// A prime field generator: $5$
+    pub const GEN: u128 = 5;
 
     /// Generate an almost uniformly random field element.
     ///
     /// There is a slight bias towards the range $[0,158]$.
     /// There is a $\frac{159}{2^128} \approx 4.6 \times 10^{-37}$ chance of seeing this bias.
-    pub fn random(rng: &mut (impl RngCore + CryptoRng)) -> Self {
+    pub fn random(rng: &mut impl RngCore) -> Self {
         // The backend::Fp::random(rng) function panics, so we don't use it.
         Self::try_from(
             ((u128::from(rng.next_u64()) << 64) | u128::from(rng.next_u64())) % Self::MODULUS,
@@ -81,6 +85,22 @@ impl Fp {
     const fn split_u128(a: u128) -> (u64, u64) {
         ((a >> 64) as u64, a as u64)
     }
+
+    /// Computing `pow` using Montgomery's ladder technique.
+    pub fn pow(&self, n: u128) -> Self {
+        let mut r0 = Self::one();
+        let mut r1 = *self;
+        for i in (0..128).rev() {
+            if n & (1 << i) == 0 {
+                r1.mul_assign(r0);
+                r0.mul_assign(r0);
+            } else {
+                r0.mul_assign(r1);
+                r1.mul_assign(r1);
+            }
+        }
+        r0
+    }
 }
 
 /// The error which occurs if the inputted `u128` or bit pattern doesn't correspond to a field
@@ -103,6 +123,15 @@ impl TryFrom<u128> for Fp {
         } else {
             Err(BiggerThanModulus)
         }
+    }
+}
+
+impl TryFrom<Block> for Fp {
+    type Error = BiggerThanModulus;
+
+    fn try_from(value: Block) -> Result<Self, Self::Error> {
+        let val = u128::from(value);
+        Fp::try_from(val)
     }
 }
 
@@ -222,28 +251,48 @@ impl Neg for Fp {
     }
 }
 
-macro_rules! test_binop {
-    ($name:ident, $op:ident) => {
-        #[cfg(test)]
-        #[quickcheck_macros::quickcheck]
-        fn $name(a: u128, b: u128) -> bool {
-            use num_bigint::BigUint;
-            let mut a = Fp::try_from(a % Fp::MODULUS).unwrap();
-            let b = Fp::try_from(b % Fp::MODULUS).unwrap();
-            let mut x = BigUint::from(a.0);
-            let y = BigUint::from(b.0);
-            a.$op(&b);
-            // This is a hack! That's okay, this is a test!
-            if stringify!($op) == "sub_assign" {
-                x += BigUint::from(Fp::MODULUS);
-            }
-            x.$op(&y);
-            x = x % BigUint::from(Fp::MODULUS);
-            BigUint::from(a.0) == x
-        }
-    };
-}
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use num_bigint::BigUint;
+    use quickcheck_macros::quickcheck;
+    use std::str::FromStr;
 
-test_binop!(test_add, add_assign);
-test_binop!(test_sub, sub_assign);
-test_binop!(test_mul, mul_assign);
+    macro_rules! test_binop {
+        ($name:ident, $op:ident) => {
+            #[cfg(test)]
+            #[quickcheck_macros::quickcheck]
+            fn $name(a: u128, b: u128) -> bool {
+                use num_bigint::BigUint;
+                let mut a = Fp::try_from(a % Fp::MODULUS).unwrap();
+                let b = Fp::try_from(b % Fp::MODULUS).unwrap();
+                let mut x = BigUint::from(a.0);
+                let y = BigUint::from(b.0);
+                a.$op(&b);
+                // This is a hack! That's okay, this is a test!
+                if stringify!($op) == "sub_assign" {
+                    x += BigUint::from(Fp::MODULUS);
+                }
+                x.$op(&y);
+                x = x % BigUint::from(Fp::MODULUS);
+                BigUint::from(a.0) == x
+            }
+        };
+    }
+    test_binop!(test_add, add_assign);
+    test_binop!(test_sub, sub_assign);
+    test_binop!(test_mul, mul_assign);
+    impl quickcheck::Arbitrary for Fp {
+        fn arbitrary<RNG: RngCore>(mut g: &mut RNG) -> Fp {
+            Fp::random(&mut g)
+        }
+    }
+    #[quickcheck]
+    fn check_pow(x: Fp, n: u128) -> bool {
+        let m = BigUint::from_str(&(Fp::MODULUS).to_string()).unwrap();
+        let exp = BigUint::from_str(&n.to_string()).unwrap();
+        let a = BigUint::from_str(&u128::from(x).to_string()).unwrap();
+        let left = BigUint::from_str(&u128::from(x.pow(n)).to_string()).unwrap();
+        left == a.modpow(&exp, &m)
+    }
+}
