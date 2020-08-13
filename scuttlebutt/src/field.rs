@@ -254,9 +254,8 @@ impl Neg for Fp {
 #[cfg(test)]
 mod tests {
     use super::*;
-    extern crate quickcheck;
     use num_bigint::BigUint;
-    use quickcheck::quickcheck;
+    use quickcheck_macros::quickcheck;
     use std::str::FromStr;
 
     macro_rules! test_binop {
