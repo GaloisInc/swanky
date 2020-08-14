@@ -22,6 +22,7 @@ overflow-checks = true
 [profile.bench]
 opt-level = 3
 debug = true
+lto = true
 debug-assertions = false
 overflow-checks = false
 
