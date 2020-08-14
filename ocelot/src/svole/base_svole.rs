@@ -15,7 +15,10 @@ use crate::{
     svole::{CopeeReceiver, CopeeSender, Params, SVoleReceiver, SVoleSender},
 };
 use rand::SeedableRng;
-use scuttlebutt::{field::Fp, AbstractChannel, AesRng, Block, Malicious};
+use scuttlebutt::{
+    field::{FiniteField as FF, Fp},
+    AbstractChannel, AesRng, Block, Malicious,
+};
 use std::{
     convert::TryFrom,
     marker::PhantomData,
@@ -59,9 +62,9 @@ impl<OT: OtSender<Msg = Block> + Malicious, CP: CopeeSender<Msg = Fp>> SVoleSend
         let mut rng = AesRng::from_seed(seed);
 
         /// Sampling `ui`s i in `[n]`.
-        let u: Vec<Fp> = (0..Params::N).map(|_| Fp::random(&mut rng)).collect();
+        let u: Vec<Fp> = (0..Params::N).map(|_| FF::random(&mut rng)).collect();
         /// Sampling `ah`s h in `[r]`.
-        let a: Vec<Fp> = (0..Params::R).map(|_| Fp::random(&mut rng)).collect();
+        let a: Vec<Fp> = (0..Params::R).map(|_| FF::random(&mut rng)).collect();
         /// Calling COPEe extend on vector `u`.
         let w = self.copee.send(channel, u.clone())?;
         /// Calling COPEe on the vector `a`
@@ -72,7 +75,7 @@ impl<OT: OtSender<Msg = Block> + Malicious, CP: CopeeSender<Msg = Fp>> SVoleSend
             .map(|_| Fp::try_from(channel.read_block().unwrap()).unwrap())
             .collect();
         /// Sender computes x
-        let temp1: Fp = (0..Params::N).fold(Fp::zero(), |sum, i| {
+        let temp1: Fp = (0..Params::N).fold(FF::zero(), |sum, i| {
             chi[i].mul_assign(&u[i]);
             chi[i].add_assign(&sum);
             chi[i]
@@ -82,12 +85,12 @@ impl<OT: OtSender<Msg = Block> + Malicious, CP: CopeeSender<Msg = Fp>> SVoleSend
             sum
         });
         /// Sender computes z
-        let temp2: Fp = (0..Params::N).fold(Fp::zero(), |mut sum, i| {
+        let temp2: Fp = (0..Params::N).fold(FF::zero(), |mut sum, i| {
             chi[i].mul_assign(&w[i]);
             sum.add_assign(&chi[i]);
             sum
         });
-        let g: Fp = Fp::try_from(Fp::GEN).unwrap();
+        let g: Fp = FF::generator();
         let z: Fp = (0..Params::R).fold(temp2, |mut sum, i| {
             c[i].mul_assign(&g.pow(i as u128 - 1));
             sum.add_assign(&c[i]);
@@ -127,7 +130,7 @@ impl<OT: OtReceiver<Msg = Block> + Malicious, CP: CopeeReceiver<Msg = Fp>> SVole
         /// Sampling `chi`s.
         let seed = rand::random::<Block>();
         let mut rng = AesRng::from_seed(seed);
-        let mut chi: Vec<Fp> = (0..Params::N).map(|_| Fp::random(&mut rng)).collect();
+        let mut chi: Vec<Fp> = (0..Params::N).map(|_| FF::random(&mut rng)).collect();
         /// Send `chi`s to the Sender.
         for item in &mut chi {
             channel
@@ -140,13 +143,13 @@ impl<OT: OtReceiver<Msg = Block> + Malicious, CP: CopeeReceiver<Msg = Fp>> SVole
             Fp::try_from(channel.read_block().unwrap()).unwrap(),
         );
         /// compute y
-        let mut y: Fp = (0..Params::N).fold(Fp::zero(), |sum, i| {
+        let mut y: Fp = (0..Params::N).fold(FF::zero(), |sum, i| {
             chi[i].mul_assign(&v[i]);
             chi[i].add_assign(&sum);
             chi[i]
         });
-        let g: Fp = Fp::try_from(Fp::GEN).unwrap();
-        let temp: Fp = (0..Params::R).fold(Fp::zero(), |sum, i| {
+        let g: Fp = FF::generator();
+        let temp: Fp = (0..Params::R).fold(FF::zero(), |sum, i| {
             b[i].mul_assign(&g.pow(i as u128 - 1));
             b[i].add_assign(&sum);
             b[i]

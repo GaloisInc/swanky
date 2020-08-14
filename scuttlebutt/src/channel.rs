@@ -14,6 +14,9 @@ pub use hash_channel::HashChannel;
 pub use sync_channel::SyncChannel;
 pub use track_channel::TrackChannel;
 
+#[cfg(unix)]
+pub use unix_channel::{track_unix_channel_pair, unix_channel_pair, TrackUnixChannel, UnixChannel};
+
 use crate::{Block, Block512};
 #[cfg(feature = "curve25519-dalek")]
 use curve25519_dalek::ristretto::{CompressedRistretto, RistrettoPoint};
@@ -22,8 +25,6 @@ use std::{
     io::{Read, Result, Write},
     rc::Rc,
 };
-#[cfg(unix)]
-pub use unix_channel::{track_unix_channel_pair, unix_channel_pair, TrackUnixChannel, UnixChannel};
 
 /// A trait for managing I/O. `AbstractChannel`s are clonable, and provide basic
 /// read/write capabilities for both common and scuttlebutt-specific types.

@@ -26,7 +26,8 @@ sha2 = "0.8"
 subtle = "2.2"
 primitive-types = "0.7"
 uint = "0.8"
-num = "0.1.42"
+generic-array = "0.14"
+
 
 [dev-dependencies]
 criterion = "0.2"
@@ -62,3 +63,12 @@ harness = false
 [[bench]]
 name = "rand_aes"
 harness = false
+
+[[bench]]
+name = "prime_field"
+harness = false
+
+[[bench]]
+name = "gf_2_128"
+harness = false
+

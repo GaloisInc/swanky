@@ -13,10 +13,15 @@ use crate::{
     errors::Error,
     ot::{RandomReceiver as ROTReceiver, RandomSender as ROTSender},
     svole::{CopeeReceiver, CopeeSender, Params},
-    utils::bit_composition,
 };
 use rand::SeedableRng;
-use scuttlebutt::{field::Fp, AbstractChannel, Aes128, AesRng, Block, Malicious};
+use scuttlebutt::{
+    field::{Fp, FiniteField as FF}, 
+    AbstractChannel, Aes128, AesRng, Block, Malicious
+};
+use num::pow;
+use subtle::{Choice, ConditionallySelectable};
+
 use std::{
     convert::TryFrom,
     marker::PhantomData,
@@ -39,17 +44,62 @@ pub struct Receiver<ROT: ROTReceiver + Malicious> {
     mv: Vec<Block>,
 }
 
+/// Convert Fp into a bit-vector.
+#[inline]
+pub fn fp_to_bv(x: Fp) -> Vec<bool> {
+    let n = u128::from(x);
+    (0..128).map(|i| {!(n & (1<<i) == 0)}).collect()
+}
+
+/// Convert bit-vector into a Fp.
+#[inline]
+pub fn bv_to_fp(bv: Vec<bool>) -> Fp {
+    let res = (0..128).fold(0, |sum, i| sum + (pow(2, i) * (u128::from(bv[i]))));
+    Fp::try_from(res).unwrap()
+}
+
+/// Convert Vec<bool> into a Vec<Fp>.
+#[inline]
+pub fn fp_to_bvfp(x:Fp) -> Vec<Fp> {
+    let mut res = Vec::new();
+    let r0 = FF::zero();
+    let r1 = FF::one();
+    let n = u128::from(x);
+    for i in 0..128{
+    let choice = Choice::from(!(n & (1<<i) == 0) as u8);
+    let value = Fp::conditional_select(&r0, &r1, choice);
+    res.push(value);
+    }
+    res
+}
+
+/// Convert Vec<Fp> into a Fp
+#[inline]
+pub fn bvfp_to_fp(x:Vec<Fp>) -> Fp {
+    let mut two:Fp = FF::one();
+    two.add_assign(&FF::one());
+    let mut sum:Fp = FF::zero();
+    for i in 0..128{
+    let mut temp = two.clone();
+    temp.pow(i as u128);
+    temp.mul_assign(&x[i]);
+    sum.add_assign(&two);
+    }
+    sum
+}
+
 /// Compute <g, x>.
 pub fn g_dotprod(x: Vec<Fp>) -> Fp {
-    let g: Fp = Fp::try_from(Fp::GEN).unwrap();
-    let mut res: Fp = Fp::zero();
+    let g:Fp = FF::generator();
+    let mut res:Fp = FF::zero();
+    let mut two:Fp = FF::one();
+    two.mul_assign(&FF::one());
     for i in 0..Params::R {
-        let mut sum: Fp = Fp::zero();
+        let mut sum: Fp = FF::zero();
         for j in 0..Params::M {
-            let mut two: Fp = Fp::one();
-            two.add_assign(&Fp::one());
-            let mut two_to_j: Fp = two.pow(j as u128);
-            two_to_j.add_assign(&x[(i * Params::M) + j]);
+            let temp = two.clone();
+            let mut two_to_j: Fp = temp.pow(j as u128);
+            two_to_j.mul_assign(&x[(i * Params::M) + j]);
             sum.add_assign(&two_to_j);
         }
         let g_to_i: Fp = g.pow(i as u128);
@@ -112,7 +162,7 @@ impl<ROT: ROTReceiver<Msg = Block> + Malicious> CopeeReceiver for Receiver<ROT> 
         let mut rng = AesRng::from_seed(seed);
         let mut ot = ROT::init(channel, &mut rng).unwrap();
         let delta: Fp = Fp::random(&mut rng);
-        let deltab: Vec<bool> = bit_composition(delta);
+        let deltab: Vec<bool> = fp_to_bv(delta);
         let ots = ot.receive_random(channel, &deltab, &mut rng).unwrap();
         Ok(Self {
             _ot: PhantomData::<ROT>,
@@ -146,4 +196,28 @@ impl<ROT: ROTReceiver<Msg = Block> + Malicious> CopeeReceiver for Receiver<ROT> 
         }
         Ok(output)
     }
+}
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use rand::SeedableRng;
+    use scuttlebutt::AesRng;
+    use scuttlebutt::field::{Fp, FiniteField as FF};
+
+#[test]
+    fn test_bit_composition() {
+        let seed = rand::random::<Block>();
+        let mut rng = AesRng::from_seed(seed);
+        let x:Fp = FF::random(&mut rng);
+        let bv = fp_to_bv(x);
+        assert_eq!(bv_to_fp(bv), x);
+    }
+#[test]
+fn test_bvfp_to_fp(){
+    let seed = rand::random::<Block>();
+    let mut rng = AesRng::from_seed(seed);
+    let x:Fp = FF::random(&mut rng);
+    let bv = fp_to_bv(x);
+    //assert_eq!(bvfp_to_fp(fp_to_bvfp(x)), x);
+}
 }

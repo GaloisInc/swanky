@@ -12,7 +12,6 @@
 #![cfg_attr(feature = "nightly", doc(include = "../README.md"))]
 #![cfg_attr(feature = "nightly", deny(missing_docs))]
 
-
 pub mod errors;
 pub mod utils;
 pub use crate::errors::Error;
