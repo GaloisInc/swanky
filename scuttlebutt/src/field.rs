@@ -3,6 +3,7 @@
 use generic_array::{ArrayLength, GenericArray};
 use rand_core::RngCore;
 use std::{
+    fmt::Debug,
     hash::Hash,
     ops::{Add, AddAssign, Mul, MulAssign, Neg, Sub, SubAssign},
 };
@@ -10,7 +11,9 @@ use subtle::{Choice, ConditionallySelectable, ConstantTimeEq};
 
 /// Types that implement this trait are finite field elements.
 pub trait FiniteField:
-    Hash
+    'static
+    + Hash
+    + Debug
     + PartialEq
     + Eq
     + ConstantTimeEq
@@ -20,17 +23,20 @@ pub trait FiniteField:
     + AddAssign<Self>
     + SubAssign<Self>
     + MulAssign<Self>
-    + Add<Self>
-    + Sub<Self>
-    + Mul<Self>
-    + Neg
+    + Add<Self, Output = Self>
+    + Sub<Self, Output = Self>
+    + Mul<Self, Output = Self>
+    + Neg<Output = Self>
     + std::iter::Sum
 {
     /// The number of bytes in the byte representation for this field element.
     type ByteReprLen: ArrayLength<u8>;
     /// The error that can result from trying to decode an invalid byte sequence.
-    type FromBytesError: std::error::Error;
+    type FromBytesError: std::error::Error + Send + Sync + 'static;
     /// Deserialize a field element from a byte array.
+    ///
+    /// NOTE: for security purposes, this function will accept exactly one byte sequence for each
+    /// field element.
     fn from_bytes(
         bytes: &GenericArray<u8, Self::ByteReprLen>,
     ) -> Result<Self, Self::FromBytesError>;
