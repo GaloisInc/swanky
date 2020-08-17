@@ -14,12 +14,12 @@ use crate::{
     ot::{RandomReceiver as ROTReceiver, RandomSender as ROTSender},
     svole::{CopeeReceiver, CopeeSender, Params},
 };
+use num::pow;
 use rand::SeedableRng;
 use scuttlebutt::{
-    field::{Fp, FiniteField as FF}, 
-    AbstractChannel, Aes128, AesRng, Block, Malicious
+    field::{FiniteField as FF, Fp},
+    AbstractChannel, Aes128, AesRng, Block, Malicious,
 };
-use num::pow;
 use subtle::{Choice, ConditionallySelectable};
 
 use std::{
@@ -48,7 +48,7 @@ pub struct Receiver<ROT: ROTReceiver + Malicious> {
 #[inline]
 pub fn fp_to_bv(x: Fp) -> Vec<bool> {
     let n = u128::from(x);
-    (0..128).map(|i| {!(n & (1<<i) == 0)}).collect()
+    (0..128).map(|i| !(n & (1 << i) == 0)).collect()
 }
 
 /// Convert bit-vector into a Fp.
@@ -60,50 +60,46 @@ pub fn bv_to_fp(bv: Vec<bool>) -> Fp {
 
 /// Convert Vec<bool> into a Vec<Fp>.
 #[inline]
-pub fn fp_to_bvfp(x:Fp) -> Vec<Fp> {
+pub fn fp_to_bvfp(x: Fp) -> Vec<Fp> {
     let mut res = Vec::new();
     let r0 = FF::zero();
     let r1 = FF::one();
     let n = u128::from(x);
-    for i in 0..128{
-    let choice = Choice::from(!(n & (1<<i) == 0) as u8);
-    let value = Fp::conditional_select(&r0, &r1, choice);
-    res.push(value);
+    for i in 0..128 {
+        let choice = Choice::from(!(n & (1 << i) == 0) as u8);
+        let value = Fp::conditional_select(&r0, &r1, choice);
+        res.push(value);
     }
     res
 }
 
 /// Convert Vec<Fp> into a Fp
 #[inline]
-pub fn bvfp_to_fp(x:Vec<Fp>) -> Fp {
-    let mut two:Fp = FF::one();
-    two.add_assign(&FF::one());
-    let mut sum:Fp = FF::zero();
-    for i in 0..128{
-    let mut temp = two.clone();
-    temp.pow(i as u128);
-    temp.mul_assign(&x[i]);
-    sum.add_assign(&two);
+pub fn bvfp_to_fp(x: Vec<Fp>) -> Fp {
+    let mut sum: Fp = FF::zero();
+    for i in 0..128 {
+        let two = Fp::try_from(2).unwrap();
+        let mut powr = two.pow(i as u128);
+        powr.mul_assign(&x[i]);
+        sum.add_assign(&powr);
     }
     sum
 }
 
 /// Compute <g, x>.
 pub fn g_dotprod(x: Vec<Fp>) -> Fp {
-    let g:Fp = FF::generator();
-    let mut res:Fp = FF::zero();
-    let mut two:Fp = FF::one();
-    two.mul_assign(&FF::one());
+    let g: Fp = FF::generator();
+    let mut res: Fp = FF::zero();
     for i in 0..Params::R {
         let mut sum: Fp = FF::zero();
         for j in 0..Params::M {
-            let temp = two.clone();
-            let mut two_to_j: Fp = temp.pow(j as u128);
-            two_to_j.mul_assign(&x[(i * Params::M) + j]);
-            sum.add_assign(&two_to_j);
+            let two = Fp::try_from(2).unwrap();
+            let mut powr = two.pow(j as u128);
+            powr.mul_assign(&x[(i * Params::M) + j]);
+            sum.add_assign(&powr);
         }
-        let g_to_i: Fp = g.pow(i as u128);
-        sum.mul_assign(&g_to_i);
+        let powg = g.pow(i as u128);
+        sum.mul_assign(&powg);
         res.add_assign(&sum);
     }
     res
@@ -146,7 +142,7 @@ impl<ROT: ROTSender<Msg = Block> + Malicious> CopeeSender for Sender<ROT> {
                 wv.push((w0, w1));
                 (w0.sub_assign(&w1));
                 w0.sub_assign(&input[j]);
-                channel.write_block(&Block::from(u128::from(w0)))?;
+                channel.write_bytes(w0.to_bytes().as_slice())?;
             }
             w.push(g_dotprod(wv.into_iter().map(|x| x.0).collect()));
         }
@@ -180,6 +176,7 @@ impl<ROT: ROTReceiver<Msg = Block> + Malicious> CopeeReceiver for Receiver<ROT> 
         len: usize,
     ) -> Result<Vec<Fp>, Error> {
         let mut output: Vec<Fp> = Vec::new();
+        let delta_fp = fp_to_bvfp(self.delta);
         for j in 0..len {
             let mut v: Vec<Fp> = Vec::new();
             for i in 0..Params::M * Params::R {
@@ -187,8 +184,10 @@ impl<ROT: ROTReceiver<Msg = Block> + Malicious> CopeeReceiver for Receiver<ROT> 
                 let key = Block::from(self.mv[i]);
                 let cipher = Aes128::new(key);
                 let mut w_delta = Fp::try_from(cipher.encrypt(pt)).unwrap();
-                let mut tau = Fp::try_from(channel.read_block().unwrap()).unwrap();
-                tau.mul_assign(self.delta);
+                let mut data = [0u8; 16];
+                channel.read_bytes(&mut data)?;
+                let mut tau = Fp::try_from(u128::from_le_bytes(data)).unwrap();
+                tau.mul_assign(&delta_fp[i]);
                 w_delta.add_assign(&tau);
                 v.push(w_delta);
             }
@@ -201,23 +200,29 @@ impl<ROT: ROTReceiver<Msg = Block> + Malicious> CopeeReceiver for Receiver<ROT> 
 mod tests {
     use super::*;
     use rand::SeedableRng;
+    use scuttlebutt::field::{FiniteField as FF, Fp};
     use scuttlebutt::AesRng;
-    use scuttlebutt::field::{Fp, FiniteField as FF};
 
-#[test]
+    #[test]
     fn test_bit_composition() {
         let seed = rand::random::<Block>();
         let mut rng = AesRng::from_seed(seed);
-        let x:Fp = FF::random(&mut rng);
+        let x: Fp = FF::random(&mut rng);
         let bv = fp_to_bv(x);
         assert_eq!(bv_to_fp(bv), x);
     }
-#[test]
-fn test_bvfp_to_fp(){
-    let seed = rand::random::<Block>();
-    let mut rng = AesRng::from_seed(seed);
-    let x:Fp = FF::random(&mut rng);
-    let bv = fp_to_bv(x);
-    //assert_eq!(bvfp_to_fp(fp_to_bvfp(x)), x);
-}
+    #[test]
+    fn test_bvfp_to_fp() {
+        let seed = rand::random::<Block>();
+        let mut rng = AesRng::from_seed(seed);
+        let x: Fp = FF::random(&mut rng);
+        assert_eq!(bvfp_to_fp(fp_to_bvfp(x)), x);
+    }
+    #[test]
+    fn test_g_dotproduct() {
+        let seed = rand::random::<Block>();
+        let mut rng = AesRng::from_seed(seed);
+        let x: Fp = FF::random(&mut rng);
+        assert_eq!(g_dotprod(fp_to_bvfp(x)), x)
+    }
 }

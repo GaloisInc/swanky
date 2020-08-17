@@ -74,17 +74,17 @@ pub trait FiniteField:
         let mut r1 = *self;
         for i in (0..128).rev() {
             // This is equivalent to the following code, but constant-time:
-            /*if n & (1 << i) == 0 {
+            if n & (1 << i) == 0 {
                 r1.mul_assign(r0);
                 r0.mul_assign(r0);
             } else {
                 r0.mul_assign(r1);
                 r1.mul_assign(r1);
-            }*/
-            let bit_is_high = Choice::from((n & (1 << i) != 0) as u8);
+            }
+            /*let bit_is_high = Choice::from((n & (1 << i) != 0) as u8);
             let operand = Self::conditional_select(&r0, &r1, bit_is_high);
             r0 *= operand;
-            r1 *= operand;
+            r1 *= operand;*/
         }
         r0
     }

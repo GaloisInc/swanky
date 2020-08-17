@@ -8,7 +8,7 @@
 //!
 //! This module provides traits COPEe
 
-pub mod base_svole;
+//pub mod base_svole;
 pub mod copee;
 
 #[allow(unused_imports)]
@@ -106,8 +106,7 @@ mod tests {
     extern crate test;
     use super::*;
     use crate::ot::*;
-    use crate::svole::base_svole::{Receiver as VoleReceiver, Sender as VoleSender};
-    use copee::*;
+    //use crate::svole::base_svole::{Receiver as VoleReceiver, Sender as VoleSender};
     use rand::SeedableRng;
     use scuttlebutt::{
         field::{FiniteField as FF, Fp},
@@ -126,64 +125,45 @@ mod tests {
         CPSender: CopeeSender<Msg = Fp>,
         CPReceiver: CopeeReceiver<Msg = Fp>,
     >() {
-        //let u = Arc::new(Mutex::new(vec![]));
-        //let u_ = u.clone();
         let w = Arc::new(Mutex::new(vec![]));
         let w_ = w.clone();
         let seed = rand::random::<Block>();
         let mut rng = AesRng::from_seed(seed);
         let input = vec![FF::random(&mut rng)];
-        let tmp = input.clone();
+        let u = input.clone();
         let (sender, receiver) = UnixStream::pair().unwrap();
         let handle = std::thread::spawn(move || {
             let reader = BufReader::new(sender.try_clone().unwrap());
             let writer = BufWriter::new(sender);
             let mut channel = Channel::new(reader, writer);
             let mut copee_sender = CPSender::init(&mut channel).unwrap();
-            //let mut u = u.lock().unwrap();
             let mut w = w.lock().unwrap();
-            let t = copee_sender.send(&mut channel, input).unwrap();
-            // *u = t1;
-            *w = t;
+            let gw = copee_sender.send(&mut channel, input).unwrap();
+            *w = gw;
         });
         let reader = BufReader::new(receiver.try_clone().unwrap());
         let writer = BufWriter::new(receiver);
         let mut channel = Channel::new(reader, writer);
         let mut copee_receiver = CPReceiver::init(&mut channel).unwrap();
-        let v = copee_receiver.receive(&mut channel, 1).unwrap();
+        let gv = copee_receiver.receive(&mut channel, u.len()).unwrap();
         let delta = copee_receiver.get_delta();
-        let bs = fp_to_bv(delta);
-        let bvf = fp_to_bvfp(delta);
         handle.join().unwrap();
-        //let mut u_ = u_.lock().unwrap();
         let w_ = w_.lock().unwrap();
-        let mut gp = g_dotprod(bvf);
-        gp.mul_assign(&tmp[0]);
-        gp.add_assign(&v[0]);
-        assert_eq!(w_[0], v[0]);
-
-        /*for i in 0..Params::N {
-            if bs[i] == true {
-                u_[i].mul_assign(&Fp::one());
-            } else {
-                u_[i].mul_assign(&Fp::zero());
-            }
-            v[i].add_assign(&u_[i]);
-            assert_eq!(w_[i], v[i])
-        }*/
+        for i in 0..u.len() {
+            let mut temp = delta.clone();
+            temp.mul_assign(&u[i]);
+            temp.add_assign(&gv[i]);
+            assert_eq!(w_[i], temp);
+        }
     }
 
-    /*#[test]
+    #[test]
     fn test_copee_init() {
-        test_copee::<
-            KosSender,
-            KosReceiver,
-            copee::Sender<KosSender>,
-            copee::Receiver<KosReceiver>,
-        >();
-    }*/
+        test_copee::<KosSender, KosReceiver, copee::Sender<KosSender>, copee::Receiver<KosReceiver>>(
+        );
+    }
 
-    fn test_svole<
+    /* fn test_svole<
         ROTS: ROTSender + Malicious,
         ROTR: ROTReceiver + Malicious,
         CPSender: CopeeSender<Msg = Fp>,
@@ -228,7 +208,7 @@ mod tests {
         }
     }
 
-    /*#[test]
+    #[test]
     fn test_base_svole() {
         test_svole::<
             KosSender,
