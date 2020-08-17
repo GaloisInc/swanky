@@ -72,7 +72,11 @@ impl<OT: OtSender<Msg = Block> + Malicious, CP: CopeeSender<Msg = Fp>> SVoleSend
 
         /// Sender receives `chi`s from the receiver
         let mut chi: Vec<Fp> = (0..Params::N)
-            .map(|_| Fp::try_from(channel.read_block().unwrap()).unwrap())
+            .map(|_| {
+                let mut data = [0u8; 16];
+                channel.read_bytes(&mut data).unwrap();
+                Fp::try_from(u128::from_le_bytes(data)).unwrap()
+            })
             .collect();
         /// Sender computes x
         let temp1: Fp = (0..Params::N).fold(FF::zero(), |sum, i| {

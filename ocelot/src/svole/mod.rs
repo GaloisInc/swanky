@@ -8,7 +8,7 @@
 //!
 //! This module provides traits COPEe
 
-//pub mod base_svole;
+pub mod base_svole;
 pub mod copee;
 
 #[allow(unused_imports)]
