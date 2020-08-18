@@ -35,6 +35,8 @@ rand_core = "0.5"
 num = "0.1.42"
 rustc_version = "0.2.3"
 subtle = "2.2"
+digest = "0.9.0"
+
 
 [build-dependencies]
 cc = "1.0"

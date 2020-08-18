@@ -8,7 +8,7 @@
 //!
 //! This module provides traits COPEe
 
-pub mod base_svole;
+//pub mod base_svole;
 pub mod copee;
 
 #[allow(unused_imports)]
@@ -19,22 +19,22 @@ use crate::{
         Sender as OtSender,
     },
 };
-use scuttlebutt::{field::FiniteField, AbstractChannel};
+use scuttlebutt::{field::FiniteField as FF, AbstractChannel};
 
 /// A type for security parameters
 pub struct Params;
 
 impl Params {
     /// Security parameter kappa.
-    pub const KAPPA: usize = 128;
+    /*pub const KAPPA: usize = 128;
     /// Prime field modulus.
-    pub const PRIME: u128 = 340_282_366_920_938_463_463_374_607_431_768_211_297; // 2^128-159
+    pub const PRIME: u128 = 340_282_366_920_938_463_463_374_607_431_768_211_297; // 2^128-159*/
     /// The number of bits required to represent a field element
-    pub const M: usize = 128; // log PRIME
+    //pub const M: usize = 128;
     /// Input length
-    pub const N: usize = 1; // Input length
-    /// The exponent of the modulus
-    pub const R: usize = 1; //
+    pub const N: usize = 1;
+    /// The exponent `r` when field is of the form `F(p^r)`.
+    pub const R: usize = 1;
 }
 
 /// A trait for COPEe Sender.
@@ -44,7 +44,7 @@ where
 {
     /// Message type, restricted to types that are mutably-dereferencable as
     /// `u8` arrays.
-    type Msg: Sized + FiniteField;
+    type Msg: Sized + FF;
     fn init<C: AbstractChannel>(channel: &mut C) -> Result<Self, Error>;
     fn send<C: AbstractChannel>(
         &mut self,
@@ -60,7 +60,7 @@ where
 {
     /// Message type, restricted to types that are mutably-dereferencable as
     /// `u8` arrays.
-    type Msg: Sized + FiniteField;
+    type Msg: Sized + FF;
     fn init<C: AbstractChannel>(channel: &mut C) -> Result<Self, Error>;
     /// To retrieve delta from the receiver type.
     fn get_delta(&self) -> Self::Msg;
@@ -78,7 +78,7 @@ where
 {
     /// Message type, restricted to types that are mutably-dereferencable as
     /// `u8` arrays.
-    type Msg: Sized + FiniteField;
+    type Msg: Sized + FF;
     fn init<C: AbstractChannel>(channel: &mut C) -> Result<Self, Error>;
     fn send<C: AbstractChannel>(
         &mut self,
@@ -93,7 +93,7 @@ where
 {
     /// Message type, restricted to types that are mutably-dereferencable as
     /// `u8` arrays.
-    type Msg: Sized + FiniteField;
+    type Msg: Sized + FF;
     fn init<C: AbstractChannel>(channel: &mut C) -> Result<Self, Error>;
     /// To retrieve delta from the receiver type.
     fn get_delta(&self) -> Self::Msg;
@@ -106,7 +106,6 @@ mod tests {
     extern crate test;
     use super::*;
     use crate::ot::*;
-    //use crate::svole::base_svole::{Receiver as VoleReceiver, Sender as VoleSender};
     use rand::SeedableRng;
     use scuttlebutt::{
         field::{FiniteField as FF, Fp},
@@ -122,14 +121,15 @@ mod tests {
     fn test_copee<
         ROTS: ROTSender + Malicious,
         ROTR: ROTReceiver + Malicious,
-        CPSender: CopeeSender<Msg = Fp>,
-        CPReceiver: CopeeReceiver<Msg = Fp>,
+        FE: FF + Send + Sync,
+        CPSender: CopeeSender<Msg = FE>,
+        CPReceiver: CopeeReceiver<Msg = FE>,
     >() {
         let w = Arc::new(Mutex::new(vec![]));
         let w_ = w.clone();
         let seed = rand::random::<Block>();
         let mut rng = AesRng::from_seed(seed);
-        let input = vec![FF::random(&mut rng)];
+        let input = vec![FE::random(&mut rng)];
         let u = input.clone();
         let (sender, receiver) = UnixStream::pair().unwrap();
         let handle = std::thread::spawn(move || {
@@ -151,72 +151,20 @@ mod tests {
         let w_ = w_.lock().unwrap();
         for i in 0..u.len() {
             let mut temp = delta.clone();
-            temp.mul_assign(&u[i]);
-            temp.add_assign(&gv[i]);
+            temp.mul_assign(u[i]);
+            temp.add_assign(gv[i]);
             assert_eq!(w_[i], temp);
         }
     }
 
     #[test]
     fn test_copee_init() {
-        test_copee::<KosSender, KosReceiver, copee::Sender<KosSender>, copee::Receiver<KosReceiver>>(
-        );
-    }
-
-    /* fn test_svole<
-        ROTS: ROTSender + Malicious,
-        ROTR: ROTReceiver + Malicious,
-        CPSender: CopeeSender<Msg = Fp>,
-        CPReceiver: CopeeReceiver<Msg = Fp>,
-        BVSender: SVoleSender<Msg = Fp>,
-        BVReceiver: SVoleReceiver<Msg = Fp>,
-    >() {
-        let u = Arc::new(Mutex::new(vec![]));
-        let u_ = u.clone();
-        let w = Arc::new(Mutex::new(vec![]));
-        let w_ = u.clone();
-        let (sender, receiver) = UnixStream::pair().unwrap();
-        let handle = std::thread::spawn(move || {
-            let reader = BufReader::new(sender.try_clone().unwrap());
-            let writer = BufWriter::new(sender);
-            let mut channel = Channel::new(reader, writer);
-            let mut vole = BVSender::init(&mut channel).unwrap();
-            let mut u = u.lock().unwrap();
-            let mut w = w.lock().unwrap();
-            let (t1, t2) = vole.send(&mut channel).unwrap();
-            *u = t1;
-            *w = t2;
-        });
-        let reader = BufReader::new(receiver.try_clone().unwrap());
-        let writer = BufWriter::new(receiver);
-        let mut channel = Channel::new(reader, writer);
-        let mut rvole = BVReceiver::init(&mut channel).unwrap();
-        let mut v = rvole.receive(&mut channel).unwrap();
-        let delta = rvole.get_delta();
-        let bs = fp_to_bv(delta);
-        handle.join().unwrap();
-        let mut u_ = u_.lock().unwrap();
-        let w_ = w_.lock().unwrap();
-        for i in 0..Params::N {
-            if bs[i] == true {
-                u_[i].mul_assign(&Fp::one());
-            } else {
-                u_[i].mul_assign(&Fp::zero());
-            }
-            v[i].add_assign(&u_[i]);
-            assert_eq!(w_[i], v[i])
-        }
-    }
-
-    #[test]
-    fn test_base_svole() {
-        test_svole::<
+        test_copee::<
             KosSender,
             KosReceiver,
-            copee::Sender<KosSender>,
-            copee::Receiver<KosReceiver>,
-            VoleSender<KosSender, copee::Sender<KosSender>>,
-            VoleReceiver<KosReceiver, copee::Receiver<KosReceiver>>,
+            Fp,
+            copee::Sender<KosSender, Fp>,
+            copee::Receiver<KosReceiver, Fp>,
         >();
-    }*/
+    }
 }

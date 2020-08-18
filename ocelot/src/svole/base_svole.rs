@@ -8,7 +8,7 @@
 //!
 //! This module provides implementations of SVOLE Traits.
 
-#![allow(unused_doc_comments)]
+//#![allow(unused_doc_comments)]
 use crate::{
     errors::Error,
     ot::{Receiver as OtReceiver, Sender as OtSender},
@@ -58,18 +58,19 @@ impl<OT: OtSender<Msg = Block> + Malicious, CP: CopeeSender<Msg = Fp>> SVoleSend
     }
 
     fn send<C: AbstractChannel>(&mut self, channel: &mut C) -> Result<(Vec<Fp>, Vec<Fp>), Error> {
+        let g:Fp = FF::generator();
         let seed = rand::random::<Block>();
         let mut rng = AesRng::from_seed(seed);
-
         /// Sampling `ui`s i in `[n]`.
         let u: Vec<Fp> = (0..Params::N).map(|_| FF::random(&mut rng)).collect();
+        assert_eq!(u.len(), Params::N);
         /// Sampling `ah`s h in `[r]`.
         let a: Vec<Fp> = (0..Params::R).map(|_| FF::random(&mut rng)).collect();
-        /// Calling COPEe extend on vector `u`.
+        assert_eq!(a.len(), Params::R);
+        /// Calling COPEe extend on the vector `u`.
         let w = self.copee.send(channel, u.clone())?;
         /// Calling COPEe on the vector `a`
         let mut c = self.copee.send(channel, a.clone())?;
-
         /// Sender receives `chi`s from the receiver
         let mut chi: Vec<Fp> = (0..Params::N)
             .map(|_| {
@@ -79,31 +80,34 @@ impl<OT: OtSender<Msg = Block> + Malicious, CP: CopeeSender<Msg = Fp>> SVoleSend
             })
             .collect();
         /// Sender computes x
-        let temp1: Fp = (0..Params::N).fold(FF::zero(), |sum, i| {
+        let x_sum: Fp = (0..Params::N).fold(FF::zero(), |sum, i| {
             chi[i].mul_assign(&u[i]);
             chi[i].add_assign(&sum);
             chi[i]
         });
-        let x: Fp = (0..Params::R).fold(temp1, |mut sum, i| {
-            sum.add_assign(&a[i]);
+        let x: Fp = (0..Params::R).fold(x_sum, |mut sum, h| {
+            let mut g_h = g.pow(h as u128);
+            g_h.mul_assign(&a[h]);
+            sum.add_assign(&g_h);
             sum
         });
+
         /// Sender computes z
-        let temp2: Fp = (0..Params::N).fold(FF::zero(), |mut sum, i| {
+        let z_sum: Fp = (0..Params::N).fold(FF::zero(), |mut sum, i| {
             chi[i].mul_assign(&w[i]);
             sum.add_assign(&chi[i]);
             sum
         });
-        let g: Fp = FF::generator();
-        let z: Fp = (0..Params::R).fold(temp2, |mut sum, i| {
-            c[i].mul_assign(&g.pow(i as u128 - 1));
-            sum.add_assign(&c[i]);
+        let z: Fp = (0..Params::R).fold(z_sum, |mut sum, h| {
+            let g_h = g.pow(h as u128);
+            c[h].mul_assign(&g_h);
+            sum.add_assign(&c[h]);
             sum
         });
 
         /// Sends out (x, z) to the Receiver.
-        channel.write_block(&Block::from(u128::from(x)))?;
-        channel.write_block(&Block::from(u128::from(z)))?;
+        channel.write_bytes(x.to_bytes().as_slice())?;
+        channel.write_bytes(z.to_bytes().as_slice())?;
         Ok((u, w))
     }
 }
@@ -138,30 +142,33 @@ impl<OT: OtReceiver<Msg = Block> + Malicious, CP: CopeeReceiver<Msg = Fp>> SVole
         /// Send `chi`s to the Sender.
         for item in &mut chi {
             channel
-                .write_block(&Block::from(u128::from(*item)))
+                .write_bytes(item.to_bytes().as_slice())
                 .unwrap();
         }
         /// Receive (x, z) from the Sender.
-        let (mut x, z) = (
-            Fp::try_from(channel.read_block().unwrap()).unwrap(),
-            Fp::try_from(channel.read_block().unwrap()).unwrap(),
-        );
+        let mut data_x = [0u8; 16];
+        channel.read_bytes(&mut data_x).unwrap();
+        let x = Fp::try_from(u128::from_le_bytes(data_x)).unwrap();
+        let mut data_z = [0u8; 16];
+        channel.read_bytes(&mut data_z).unwrap();
+        let z = Fp::try_from(u128::from_le_bytes(data_z)).unwrap();
         /// compute y
-        let mut y: Fp = (0..Params::N).fold(FF::zero(), |sum, i| {
+        let y_sum: Fp = (0..Params::N).fold(FF::zero(), |sum, i| {
             chi[i].mul_assign(&v[i]);
             chi[i].add_assign(&sum);
             chi[i]
         });
         let g: Fp = FF::generator();
-        let temp: Fp = (0..Params::R).fold(FF::zero(), |sum, i| {
-            b[i].mul_assign(&g.pow(i as u128 - 1));
-            b[i].add_assign(&sum);
-            b[i]
+        let y: Fp = (0..Params::R).fold(y_sum, |sum, h| {
+            let powr = g.pow(h as u128);
+            b[h].mul_assign(&powr);
+            b[h].add_assign(&sum);
+            b[h]
         });
-        y.add_assign(&temp);
-        x.mul_assign(&self.delta);
-        y.add_assign(&x);
-        if z == y {
+        let mut delta_ = self.delta.clone();
+        delta_.mul_assign(&x);
+        delta_.add_assign(&y);
+        if z == delta_ {
             Some(v)
         } else {
             None
