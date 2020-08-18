@@ -15,21 +15,12 @@ use crate::{
     svole::{CopeeReceiver, CopeeSender, Params},
 };
 use digest::generic_array::typenum::Unsigned;
-use generic_array::{ArrayLength, GenericArray};
-use num::pow;
+use generic_array::GenericArray;
 use rand::SeedableRng;
 use scuttlebutt::utils::unpack_bits;
-use scuttlebutt::{
-    field::{FiniteField as FF, Fp},
-    AbstractChannel, Aes128, AesRng, Block, Malicious,
-};
-use std::convert::TryInto;
-use std::{
-    convert::TryFrom,
-    marker::PhantomData,
-    ops::{AddAssign, MulAssign, SubAssign},
-};
-use subtle::{Choice, ConditionallySelectable};
+use scuttlebutt::{field::FiniteField as FF, AbstractChannel, Aes128, AesRng, Block, Malicious};
+use std::marker::PhantomData;
+use subtle::Choice;
 
 /// A COPEe Sender.
 #[derive(Clone)]
@@ -46,30 +37,12 @@ pub struct Receiver<ROT: ROTReceiver + Malicious, FE: FF> {
     _fe: PhantomData<FE>,
     _ot: PhantomData<ROT>,
     delta: FE,
-    nbits: usize,
     choices: Vec<bool>,
     mv: Vec<Block>,
 }
 
-/// Convert Fp into a bit-vector.
-/*#[inline]
-pub fn fp_to_bv<FE:FF>(x: FE) -> Vec<bool> {
-    let n = x.to_bytes();
-    let nbits = FE::ByteReprLen::to_u64()*8;
-    for i in n.iter(){
-        !(n & (1 << i) == 0)
-    }
-    (0..nbits).map(|i| !(n & (1 << i) == 0)).collect()
-}
-
-/// Convert bit-vector into a Fp.
-#[inline]
-pub fn bv_to_fp(bv: Vec<bool>) -> Fp {
-    let res = (0..128).fold(0, |sum, i| sum + (pow(2, i) * (u128::from(bv[i]))));
-    Fp::try_from(res).unwrap()
-}
-*/
-/// Convert Fp into a Vec<Fp>.
+/// Pack FE into a Vec<FE> whose entries are either `FE::zero()` or
+/// `FE::one()`.
 #[inline]
 pub fn pack_bits_fps<FE: FF>(x: FE) -> Vec<FE> {
     let mut res = Vec::new();
@@ -84,7 +57,7 @@ pub fn pack_bits_fps<FE: FF>(x: FE) -> Vec<FE> {
     res
 }
 
-/// Convert Vec<Fp> into a Fp
+/// Unpack Vec<FE> into a FE.
 #[inline]
 pub fn unpack_bits_fps<FE: FF>(x: Vec<FE>) -> FE {
     let mut sum = FE::zero();
@@ -100,7 +73,7 @@ pub fn unpack_bits_fps<FE: FF>(x: Vec<FE>) -> FE {
     sum
 }
 
-/// Compute <g, x>.
+/// Compute dot product `<g,x>`
 pub fn g_dotprod<FE: FF>(x: Vec<FE>) -> FE {
     let g = FE::generator();
     let mut res = FE::zero();
@@ -126,21 +99,21 @@ pub fn g_dotprod<FE: FF>(x: Vec<FE>) -> FE {
 impl<ROT: ROTSender<Msg = Block> + Malicious, FE: FF> CopeeSender for Sender<ROT, FE> {
     type Msg = FE;
     fn init<C: AbstractChannel>(channel: &mut C) -> Result<Self, Error> {
-        /// Combine step 1 and 2 and by calling ROT.
         let seed = rand::random::<Block>();
         let mut rng = AesRng::from_seed(seed);
-        let nbits = FE::ByteReprLen::to_usize() * 8;
         let mut ot = ROT::init(channel, &mut rng).unwrap();
+        let nbytes = FE::ByteReprLen::to_usize();
         let samples = ot
-            .send_random(channel, nbits * Params::R, &mut rng)
+            .send_random(channel, nbytes * 8 * Params::R, &mut rng)
             .unwrap();
         Ok(Self {
             _fe: PhantomData::<FE>,
             _ot: PhantomData::<ROT>,
             sv: samples,
-            nbits,
+            nbits: nbytes * 8,
         })
     }
+
     fn send<C: AbstractChannel>(
         &mut self,
         channel: &mut C,
@@ -148,9 +121,8 @@ impl<ROT: ROTSender<Msg = Block> + Malicious, FE: FF> CopeeSender for Sender<ROT
     ) -> Result<Vec<FE>, Error> {
         let mut w: Vec<FE> = Vec::new();
         for j in 0..input.len() {
-            /// Step 3.
             let mut wv: Vec<(FE, FE)> = Vec::new();
-            for i in 0..self.nbits * Params::R {
+            for i in 0..128 * Params::R {
                 /// Aes encryption as a PRF
                 let pt = Block::from(j as u128);
                 let key0 = Block::from(self.sv[i].0);
@@ -183,21 +155,21 @@ impl<ROT: ROTReceiver<Msg = Block> + Malicious, FE: FF> CopeeReceiver for Receiv
         let mut rng = AesRng::from_seed(seed);
         let mut ot = ROT::init(channel, &mut rng).unwrap();
         let delta = FE::random(&mut rng);
-        let deltab = unpack_bits(delta.to_bytes().as_slice(), nbytes);
+        let deltab = unpack_bits(delta.to_bytes().as_slice(), nbytes * 8);
         let ots = ot.receive_random(channel, &deltab, &mut rng).unwrap();
-        let nbits = FE::ByteReprLen::to_usize() * 8;
         Ok(Self {
             _fe: PhantomData::<FE>,
             _ot: PhantomData::<ROT>,
             delta,
             choices: deltab,
             mv: ots,
-            nbits,
         })
     }
+
     fn get_delta(&self) -> FE {
         self.delta
     }
+
     fn receive<C: AbstractChannel>(
         &mut self,
         channel: &mut C,
@@ -208,7 +180,7 @@ impl<ROT: ROTReceiver<Msg = Block> + Malicious, FE: FF> CopeeReceiver for Receiv
         let nbytes = FE::ByteReprLen::to_usize();
         for j in 0..len {
             let mut v: Vec<FE> = Vec::new();
-            for i in 0..self.nbits * Params::R {
+            for i in 0..128 * Params::R {
                 let pt = Block::from(j as u128);
                 let key = Block::from(self.mv[i]);
                 let cipher = Aes128::new(key);
@@ -231,7 +203,7 @@ impl<ROT: ROTReceiver<Msg = Block> + Malicious, FE: FF> CopeeReceiver for Receiv
 mod tests {
     use super::*;
     use rand::SeedableRng;
-    use scuttlebutt::field::{FiniteField as FF, Fp, Gf128};
+    use scuttlebutt::field::{FiniteField as FF, Fp};
     use scuttlebutt::AesRng;
     fn bit_composition<FE: FF>() {
         let seed = rand::random::<Block>();
@@ -240,6 +212,7 @@ mod tests {
         let bv = pack_bits_fps(x);
         assert_eq!(unpack_bits_fps(bv), x);
     }
+
     #[test]
     fn test_bit_composition() {
         bit_composition::<Fp>();
@@ -249,6 +222,7 @@ mod tests {
     fn test_g_dotproduct() {
         g_dotproduct::<Fp>();
     }
+
     fn g_dotproduct<FE: FF>() {
         let seed = rand::random::<Block>();
         let mut rng = AesRng::from_seed(seed);

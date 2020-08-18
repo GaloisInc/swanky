@@ -113,15 +113,15 @@ mod tests {
     };
     use std::{
         io::{BufReader, BufWriter},
-        ops::{AddAssign, MulAssign},
         os::unix::net::UnixStream,
         sync::{Arc, Mutex},
     };
 
-    fn test_copee<
+    /// Test copee protocol
+    fn test_copee_<
         ROTS: ROTSender + Malicious,
         ROTR: ROTReceiver + Malicious,
-        FE: FF + Send + Sync,
+        FE: FF + Send,
         CPSender: CopeeSender<Msg = FE>,
         CPReceiver: CopeeReceiver<Msg = FE>,
     >() {
@@ -129,7 +129,7 @@ mod tests {
         let w_ = w.clone();
         let seed = rand::random::<Block>();
         let mut rng = AesRng::from_seed(seed);
-        let input = vec![FE::random(&mut rng)];
+        let input = vec![FF::random(&mut rng)];
         let u = input.clone();
         let (sender, receiver) = UnixStream::pair().unwrap();
         let handle = std::thread::spawn(move || {
@@ -158,8 +158,8 @@ mod tests {
     }
 
     #[test]
-    fn test_copee_init() {
-        test_copee::<
+    fn test_copee() {
+        test_copee_::<
             KosSender,
             KosReceiver,
             Fp,
