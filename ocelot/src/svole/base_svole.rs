@@ -62,10 +62,12 @@ impl<OT: OtSender<Msg = Block> + Malicious, FE: FF, CP: CopeeSender<Msg = FE>> S
         /// Sampling `ui`s i for in `[n]`.
         let u: Vec<FE> = (0..Params::N).map(|_| FE::random(&mut rng)).collect();
         assert_eq!(u.len(), Params::N);
+        let u_ = u.clone();
         /// Sampling `ah`s h in `[r]`.
-        let a: Vec<FE> = (0..Params::N).map(|_| FE::random(&mut rng)).collect();
+        let a: Vec<FE> = (0..Params::R).map(|_| FE::random(&mut rng)).collect();
         /// Calling COPEe extend on the vector `u`.
         let w = self.copee.send(channel, u.clone())?;
+        let w_ = w.clone();
         /// Calling COPEe on the vector `a`
         let mut c = self.copee.send(channel, a.clone())?;
         let nbytes = FE::ByteReprLen::to_usize();
@@ -79,9 +81,10 @@ impl<OT: OtSender<Msg = Block> + Malicious, FE: FF, CP: CopeeSender<Msg = FE>> S
             .collect();
         /// Sender computes x
         let x_sum = (0..Params::N).fold(FE::zero(), |sum, i| {
-            chi[i].mul_assign(u[i]);
-            chi[i].add_assign(sum);
-            chi[i]
+            let mut chi_ = chi[i].clone();
+            chi_.mul_assign(u[i]);
+            chi_.add_assign(sum);
+            chi_
         });
         let x = (0..Params::R).fold(x_sum, |mut sum, h| {
             let mut g_h = g.pow(h as u128);
@@ -107,7 +110,7 @@ impl<OT: OtSender<Msg = Block> + Malicious, FE: FF, CP: CopeeSender<Msg = FE>> S
         channel.write_bytes(x.to_bytes().as_slice())?;
         channel.write_bytes(z.to_bytes().as_slice())?;
         channel.flush()?;
-        Ok((a, c))
+        Ok((u_, w_))
     }
 }
 
@@ -134,6 +137,7 @@ impl<OT: OtReceiver<Msg = Block> + Malicious, FE: FF, CP: CopeeReceiver<Msg = FE
 
     fn receive<C: AbstractChannel>(&mut self, channel: &mut C) -> Result<Option<Vec<FE>>, Error> {
         let v: Vec<FE> = self.copee.receive(channel, Params::N).unwrap();
+        let v_ = v.clone();
         let mut b: Vec<FE> = self.copee.receive(channel, Params::N).unwrap();
         let nbytes = FE::ByteReprLen::to_usize();
         /// Sampling `chi`s.
@@ -169,7 +173,7 @@ impl<OT: OtReceiver<Msg = Block> + Malicious, FE: FF, CP: CopeeReceiver<Msg = FE
         delta_.mul_assign(x);
         delta_.add_assign(y);
         if z == delta_ {
-            Ok(Some(v))
+            Ok(Some(v_))
         } else {
             Ok(None)
         }

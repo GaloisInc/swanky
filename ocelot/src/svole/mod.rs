@@ -219,15 +219,15 @@ mod tests {
         assert_eq!(delta, delta);
         for i in 0..Params::N {
             let mut right = delta.clone();
-            if let Some(x) = v.as_ref() {
-                right *= x[i];
-            }
             right.mul_assign(u_[i]);
+            if let Some(x) = v.as_ref() {
+                right += x[i];
+            }
             assert_eq!(w_[i], right);
         }
     }
 
-    /* #[test]
+    #[test]
     fn test_base_svole() {
         test_svole::<
             KosSender,
@@ -238,5 +238,5 @@ mod tests {
             VoleSender<KosSender, copee::Sender<KosSender, Fp>, Fp>,
             VoleReceiver<KosReceiver, copee::Receiver<KosReceiver, Fp>, Fp>,
         >();
-    }*/
+    }
 }
