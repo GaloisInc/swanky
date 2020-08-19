@@ -227,7 +227,7 @@ mod tests {
         }
     }
 
-    #[test]
+    /* #[test]
     fn test_base_svole() {
         test_svole::<
             KosSender,
@@ -238,5 +238,5 @@ mod tests {
             VoleSender<KosSender, copee::Sender<KosSender, Fp>, Fp>,
             VoleReceiver<KosReceiver, copee::Receiver<KosReceiver, Fp>, Fp>,
         >();
-    }
+    }*/
 }
