@@ -8,7 +8,6 @@
 //!
 //! This module provides implementations of COPEe Traits.
 
-#![allow(unused_doc_comments)]
 use crate::{
     errors::Error,
     ot::{RandomReceiver as ROTReceiver, RandomSender as ROTSender},
@@ -130,7 +129,7 @@ impl<ROT: ROTSender<Msg = Block> + Malicious, FE: FF> CopeeSender for Sender<ROT
         for j in 0..input.len() {
             let mut wv: Vec<(FE, FE)> = Vec::new();
             for i in 0..self.nbits * Params::R {
-                /// Aes encryption as a PRF
+                // Aes encryption as a PRF
                 let pt = Block::from(j as u128);
                 let key0 = Block::from(self.sv[i].0);
                 let cipher0 = Aes128::new(key0);

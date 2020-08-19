@@ -8,7 +8,6 @@
 //!
 //! This module provides implementations of SVOLE Traits.
 
-#![allow(unused_doc_comments)]
 use crate::{
     errors::Error,
     ot::{Receiver as OtReceiver, Sender as OtSender},
@@ -59,19 +58,19 @@ impl<OT: OtSender<Msg = Block> + Malicious, FE: FF, CP: CopeeSender<Msg = FE>> S
         let g = FE::generator();
         let seed = rand::random::<Block>();
         let mut rng = AesRng::from_seed(seed);
-        /// Sampling `ui`s i for in `[n]`.
+        // Sampling `ui`s i for in `[n]`.
         let u: Vec<FE> = (0..Params::N).map(|_| FE::random(&mut rng)).collect();
         assert_eq!(u.len(), Params::N);
         let u_ = u.clone();
-        /// Sampling `ah`s h in `[r]`.
+        // Sampling `ah`s h in `[r]`.
         let a: Vec<FE> = (0..Params::R).map(|_| FE::random(&mut rng)).collect();
-        /// Calling COPEe extend on the vector `u`.
+        //Calling COPEe extend on the vector `u`.
         let w = self.copee.send(channel, u.clone())?;
         let w_ = w.clone();
-        /// Calling COPEe on the vector `a`
+        // Calling COPEe on the vector `a`
         let mut c = self.copee.send(channel, a.clone())?;
         let nbytes = FE::ByteReprLen::to_usize();
-        /// Sender receives `chi`s from the receiver
+        // Sender receives `chi`s from the receiver
         let mut chi: Vec<FE> = (0..Params::N)
             .map(|_| {
                 let mut data = vec![0u8; nbytes];
@@ -79,7 +78,7 @@ impl<OT: OtSender<Msg = Block> + Malicious, FE: FF, CP: CopeeSender<Msg = FE>> S
                 FE::from_bytes(GenericArray::from_slice(&data)).unwrap()
             })
             .collect();
-        /// Sender computes x
+        // Sender computes x
         let x_sum = (0..Params::N).fold(FE::zero(), |sum, i| {
             let mut chi_ = chi[i].clone();
             chi_.mul_assign(u[i]);
@@ -93,7 +92,7 @@ impl<OT: OtSender<Msg = Block> + Malicious, FE: FF, CP: CopeeSender<Msg = FE>> S
             sum
         });
 
-        /// Sender computes z
+        // Sender computes z
         let z_sum = (0..Params::N).fold(FE::zero(), |mut sum, i| {
             chi[i].mul_assign(w[i]);
             sum.add_assign(chi[i]);
@@ -106,7 +105,7 @@ impl<OT: OtSender<Msg = Block> + Malicious, FE: FF, CP: CopeeSender<Msg = FE>> S
             sum
         });
 
-        /// Sends out (x, z) to the Receiver.
+        // Send out (x, z) to the Receiver.
         channel.write_bytes(x.to_bytes().as_slice())?;
         channel.write_bytes(z.to_bytes().as_slice())?;
         channel.flush()?;
@@ -140,23 +139,23 @@ impl<OT: OtReceiver<Msg = Block> + Malicious, FE: FF, CP: CopeeReceiver<Msg = FE
         let v_ = v.clone();
         let mut b: Vec<FE> = self.copee.receive(channel, Params::N).unwrap();
         let nbytes = FE::ByteReprLen::to_usize();
-        /// Sampling `chi`s.
+        // Sampling `chi`s.
         let seed = rand::random::<Block>();
         let mut rng = AesRng::from_seed(seed);
         let mut chi: Vec<FE> = (0..Params::N).map(|_| FE::random(&mut rng)).collect();
-        /// Send `chi`s to the Sender.
+        // Send `chi`s to the Sender.
         for i in 0..Params::N {
             channel.write_bytes(chi[i].to_bytes().as_slice()).unwrap();
         }
         channel.flush()?;
-        /// Receive (x, z) from the Sender.
+        // Receive (x, z) from the Sender.
         let mut data_x = vec![0u8; nbytes];
         channel.read_bytes(&mut data_x).unwrap();
         let x = FE::from_bytes(GenericArray::from_slice(&data_x)).unwrap();
         let mut data_z = vec![0u8; nbytes];
         channel.read_bytes(&mut data_z).unwrap();
         let z = FE::from_bytes(GenericArray::from_slice(&data_z)).unwrap();
-        /// compute y
+        // compute y
         let y_sum = (0..Params::N).fold(FE::zero(), |sum, i| {
             chi[i].mul_assign(v[i]);
             chi[i].add_assign(sum);

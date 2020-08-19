@@ -9,18 +9,9 @@
 //! This module provides traits COPEe
 
 pub mod base_svole;
-pub mod copee;
+mod copee;
 
-#[allow(unused_imports)]
-use crate::{
-    errors::Error,
-    ot::{
-        RandomReceiver as ROTReceiver,
-        RandomSender as ROTSender,
-        Receiver as OtReceiver,
-        Sender as OtSender,
-    },
-};
+use crate::errors::Error;
 use scuttlebutt::{field::FiniteField as FF, AbstractChannel};
 
 /// A type for security parameters
@@ -108,11 +99,18 @@ where
 #[cfg(test)]
 mod tests {
     #[cfg(feature = "nightly")]
-    extern crate test;
     use super::*;
     use crate::{
-        ot::*,
-        svole::base_svole::{Receiver as VoleReceiver, Sender as VoleSender},
+        ot::{KosReceiver, KosSender, RandomReceiver as ROTReceiver, RandomSender as ROTSender},
+        svole::{
+            base_svole::{Receiver as VoleReceiver, Sender as VoleSender},
+            copee::{Receiver as CpReceiver, Sender as CpSender},
+            CopeeReceiver,
+            CopeeSender,
+            Params,
+            SVoleReceiver,
+            SVoleSender,
+        },
     };
     use rand::SeedableRng;
     use scuttlebutt::{
@@ -174,8 +172,8 @@ mod tests {
             KosSender,
             KosReceiver,
             Fp,
-            copee::Sender<KosSender, Fp>,
-            copee::Receiver<KosReceiver, Fp>,
+            CpSender<KosSender, Fp>,
+            CpReceiver<KosReceiver, Fp>,
         >();
     }
 
@@ -233,10 +231,10 @@ mod tests {
             KosSender,
             KosReceiver,
             Fp,
-            copee::Sender<KosSender, Fp>,
-            copee::Receiver<KosReceiver, Fp>,
-            VoleSender<KosSender, copee::Sender<KosSender, Fp>, Fp>,
-            VoleReceiver<KosReceiver, copee::Receiver<KosReceiver, Fp>, Fp>,
+            CpSender<KosSender, Fp>,
+            CpReceiver<KosReceiver, Fp>,
+            VoleSender<KosSender, CpSender<KosSender, Fp>, Fp>,
+            VoleReceiver<KosReceiver, CpReceiver<KosReceiver, Fp>, Fp>,
         >();
     }
 }
