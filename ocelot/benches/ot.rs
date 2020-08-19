@@ -8,7 +8,13 @@
 
 use criterion::{criterion_group, criterion_main, Criterion};
 use ocelot::ot::{
-    self, CorrelatedReceiver, CorrelatedSender, RandomReceiver, RandomSender, Receiver, Sender,
+    self,
+    CorrelatedReceiver,
+    CorrelatedSender,
+    RandomReceiver,
+    RandomSender,
+    Receiver,
+    Sender,
 };
 use scuttlebutt::{AesRng, Block, Channel};
 use std::{

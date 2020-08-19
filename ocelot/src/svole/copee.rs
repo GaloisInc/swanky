@@ -17,8 +17,15 @@ use crate::{
 use digest::generic_array::typenum::Unsigned;
 use generic_array::GenericArray;
 use rand::SeedableRng;
-use scuttlebutt::utils::unpack_bits;
-use scuttlebutt::{field::FiniteField as FF, AbstractChannel, Aes128, AesRng, Block, Malicious};
+use scuttlebutt::{
+    field::FiniteField as FF,
+    utils::unpack_bits,
+    AbstractChannel,
+    Aes128,
+    AesRng,
+    Block,
+    Malicious,
+};
 use std::marker::PhantomData;
 use subtle::Choice;
 
@@ -205,8 +212,10 @@ impl<ROT: ROTReceiver<Msg = Block> + Malicious, FE: FF> CopeeReceiver for Receiv
 mod tests {
     use super::*;
     use rand::SeedableRng;
-    use scuttlebutt::field::{FiniteField as FF, Fp};
-    use scuttlebutt::AesRng;
+    use scuttlebutt::{
+        field::{FiniteField as FF, Fp},
+        AesRng,
+    };
     fn bit_composition<FE: FF>() {
         let seed = rand::random::<Block>();
         let mut rng = AesRng::from_seed(seed);

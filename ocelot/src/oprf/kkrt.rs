@@ -19,7 +19,13 @@ use crate::{
 };
 use rand::{CryptoRng, Rng, RngCore, SeedableRng};
 use scuttlebutt::{
-    cointoss, utils as scutils, AbstractChannel, AesRng, Block, Block512, SemiHonest,
+    cointoss,
+    utils as scutils,
+    AbstractChannel,
+    AesRng,
+    Block,
+    Block512,
+    SemiHonest,
 };
 use std::{convert::TryInto, marker::PhantomData};
 

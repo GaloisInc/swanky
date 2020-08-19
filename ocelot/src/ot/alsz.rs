@@ -12,14 +12,24 @@
 use crate::{
     errors::Error,
     ot::{
-        CorrelatedReceiver, CorrelatedSender, RandomReceiver, RandomSender, Receiver as OtReceiver,
+        CorrelatedReceiver,
+        CorrelatedSender,
+        RandomReceiver,
+        RandomSender,
+        Receiver as OtReceiver,
         Sender as OtSender,
     },
     utils,
 };
 use rand::{CryptoRng, Rng, RngCore, SeedableRng};
 use scuttlebutt::{
-    utils as scutils, AbstractChannel, AesHash, AesRng, Block, SemiHonest, AES_HASH,
+    utils as scutils,
+    AbstractChannel,
+    AesHash,
+    AesRng,
+    Block,
+    SemiHonest,
+    AES_HASH,
 };
 use std::{convert::TryInto, marker::PhantomData};
 

@@ -10,7 +10,13 @@
 use crate::{cuckoo::CuckooHash, errors::Error, utils};
 use fancy_garbling::{
     twopac::semihonest::{Evaluator, Garbler},
-    BinaryBundle, BundleGadgets, CrtBundle, CrtGadgets, Fancy, FancyInput, Wire,
+    BinaryBundle,
+    BundleGadgets,
+    CrtBundle,
+    CrtGadgets,
+    Fancy,
+    FancyInput,
+    Wire,
 };
 use itertools::Itertools;
 use ocelot::{

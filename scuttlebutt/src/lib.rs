@@ -38,7 +38,10 @@ pub use crate::{
 
 #[cfg(unix)]
 pub use crate::channel::{
-    track_unix_channel_pair, unix_channel_pair, TrackUnixChannel, UnixChannel,
+    track_unix_channel_pair,
+    unix_channel_pair,
+    TrackUnixChannel,
+    UnixChannel,
 };
 
 /// A marker trait denoting that the given scheme is semi-honest secure.

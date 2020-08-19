@@ -15,7 +15,9 @@ use crate::{
     ot::{Receiver as OtReceiver, Sender as OtSender},
 };
 use curve25519_dalek::{
-    constants::RISTRETTO_BASEPOINT_TABLE, ristretto::RistrettoPoint, scalar::Scalar,
+    constants::RISTRETTO_BASEPOINT_TABLE,
+    ristretto::RistrettoPoint,
+    scalar::Scalar,
 };
 use rand::{CryptoRng, Rng};
 use scuttlebutt::{AbstractChannel, Block, SemiHonest};

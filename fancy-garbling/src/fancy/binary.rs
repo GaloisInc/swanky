@@ -8,7 +8,8 @@ use crate::{
     errors::FancyError,
     fancy::{
         bundle::{Bundle, BundleGadgets},
-        Fancy, HasModulus,
+        Fancy,
+        HasModulus,
     },
     util,
 };

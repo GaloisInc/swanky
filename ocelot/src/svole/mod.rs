@@ -15,7 +15,9 @@ pub mod copee;
 use crate::{
     errors::Error,
     ot::{
-        RandomReceiver as ROTReceiver, RandomSender as ROTSender, Receiver as OtReceiver,
+        RandomReceiver as ROTReceiver,
+        RandomSender as ROTSender,
+        Receiver as OtReceiver,
         Sender as OtSender,
     },
 };
@@ -108,12 +110,17 @@ mod tests {
     #[cfg(feature = "nightly")]
     extern crate test;
     use super::*;
-    use crate::ot::*;
-    use crate::svole::base_svole::{Receiver as VoleReceiver, Sender as VoleSender};
+    use crate::{
+        ot::*,
+        svole::base_svole::{Receiver as VoleReceiver, Sender as VoleSender},
+    };
     use rand::SeedableRng;
     use scuttlebutt::{
         field::{FiniteField as FF, Fp},
-        AesRng, Block, Channel, Malicious,
+        AesRng,
+        Block,
+        Channel,
+        Malicious,
     };
     use std::{
         io::{BufReader, BufWriter},
@@ -212,8 +219,8 @@ mod tests {
         assert_eq!(delta, delta);
         for i in 0..Params::N {
             let mut right = delta.clone();
-            if let Some(x) = v.as_ref(){
-            right.mul_assign(x[i]);
+            if let Some(x) = v.as_ref() {
+                right *= x[i];
             }
             right.mul_assign(u_[i]);
             assert_eq!(w_[i], right);
