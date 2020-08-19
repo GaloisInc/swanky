@@ -122,7 +122,7 @@ impl<ROT: ROTSender<Msg = Block> + Malicious, FE: FF> CopeeSender for Sender<ROT
         let mut w: Vec<FE> = Vec::new();
         for j in 0..input.len() {
             let mut wv: Vec<(FE, FE)> = Vec::new();
-            for i in 0..128 * Params::R {
+            for i in 0..self.nbits * Params::R {
                 /// Aes encryption as a PRF
                 let pt = Block::from(j as u128);
                 let key0 = Block::from(self.sv[i].0);
@@ -140,6 +140,7 @@ impl<ROT: ROTSender<Msg = Block> + Malicious, FE: FF> CopeeSender for Sender<ROT
                 w0.sub_assign(input[j]);
                 channel.write_bytes(w0.to_bytes().as_slice())?;
             }
+            channel.flush()?;
             w.push(g_dotprod(wv.into_iter().map(|x| x.0).collect()));
         }
         Ok(w)
@@ -180,7 +181,7 @@ impl<ROT: ROTReceiver<Msg = Block> + Malicious, FE: FF> CopeeReceiver for Receiv
         let nbytes = FE::ByteReprLen::to_usize();
         for j in 0..len {
             let mut v: Vec<FE> = Vec::new();
-            for i in 0..128 * Params::R {
+            for i in 0..nbytes * 8 * Params::R {
                 let pt = Block::from(j as u128);
                 let key = Block::from(self.mv[i]);
                 let cipher = Aes128::new(key);
@@ -199,6 +200,7 @@ impl<ROT: ROTReceiver<Msg = Block> + Malicious, FE: FF> CopeeReceiver for Receiv
         Ok(output)
     }
 }
+
 #[cfg(test)]
 mod tests {
     use super::*;
