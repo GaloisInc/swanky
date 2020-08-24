@@ -3,12 +3,12 @@
 //! # Security Warning
 //! TODO: this might not be constant-time in all cases.
 
-use crate::{field::FiniteField, Block};
+use crate::field::FiniteField;
 use generic_array::GenericArray;
-use primitive_types::{U128, U256};
+use rand::Rng;
 use rand_core::RngCore;
 use std::{
-    convert::TryFrom,
+    convert::{TryFrom, TryInto},
     hash::Hash,
     ops::{Add, AddAssign, Mul, MulAssign, Neg, Sub, SubAssign},
 };
@@ -16,75 +16,66 @@ use subtle::{Choice, ConditionallySelectable, ConstantTimeEq};
 
 /// A field element in the prime-order finite field $\textsf{GF}(2^{128} - 159)$
 ///
-/// This is called `Fp` because it is our "common" prime-order finite field.
+/// This is called `F2` because it is our "common" prime-order finite field.
 #[derive(Debug, Eq, Clone, Copy, Hash)]
-pub struct Fp(u128);
+pub struct F2(u8);
 
-impl ConstantTimeEq for Fp {
+impl ConstantTimeEq for F2 {
     fn ct_eq(&self, other: &Self) -> Choice {
         self.0.ct_eq(&other.0)
     }
 }
-impl ConditionallySelectable for Fp {
+impl ConditionallySelectable for F2 {
     fn conditional_select(a: &Self, b: &Self, choice: Choice) -> Self {
-        Fp(u128::conditional_select(&a.0, &b.0, choice))
+        F2(u8::conditional_select(&a.0, &b.0, choice))
     }
 }
-impl PartialEq for Fp {
+impl PartialEq for F2 {
     fn eq(&self, other: &Self) -> bool {
         self.ct_eq(other).into()
     }
 }
 
-impl Fp {
+impl F2 {
     /// The prime field modulus: $2^{128} - 159$
-    pub const MODULUS: u128 = 340_282_366_920_938_463_463_374_607_431_768_211_297;
-
-    // This function is required by the uint_full_mul_reg macro
-    #[inline(always)]
-    const fn split_u128(a: u128) -> (u64, u64) {
-        ((a >> 64) as u64, a as u64)
-    }
+    pub const MODULUS: u8 = 2;
 }
 
-impl FiniteField for Fp {
+impl FiniteField for F2 {
     /// There is a slight bias towards the range $[0,158]$.
     /// There is a $\frac{159}{2^128} \approx 4.6 \times 10^{-37}$ chance of seeing this bias.
     fn random<R: RngCore>(rng: &mut R) -> Self {
-        // The backend::Fp::random(rng) function panics, so we don't use it.
-        Self::try_from(
-            ((u128::from(rng.next_u64()) << 64) | u128::from(rng.next_u64())) % Self::MODULUS,
-        )
-        .unwrap()
+        // The backend::F2::random(rng) function panics, so we don't use it.
+        F2(u8::from(rng.gen::<bool>()))
     }
 
     fn zero() -> Self {
-        Fp(0)
+        F2(0)
     }
 
     fn one() -> Self {
-        Fp(1)
+        F2(1)
     }
-    type R = generic_array::typenum::U16;
-    type PrimeSubField = Fp;
-    type ByteReprLen = generic_array::typenum::U16;
+    type R = generic_array::typenum::U1;
+    type PrimeSubField = F2;
+    type ByteReprLen = generic_array::typenum::U1;
     type FromBytesError = BiggerThanModulus;
 
     /// If you put random bytes into here, while it's _technically_ biased, there's only a tiny
     /// chance that you'll get biased output.
     fn from_bytes(buf: &GenericArray<u8, Self::ByteReprLen>) -> Result<Self, BiggerThanModulus> {
-        Fp::try_from(u128::from_le_bytes(*buf.as_ref()))
+        F2::try_from(u8::from_le_bytes(*buf.as_ref()))
     }
 
     /// Return the canonical byte representation (byte representation of the reduced field element).
     fn to_bytes(&self) -> GenericArray<u8, Self::ByteReprLen> {
-        u128::from(*self).to_le_bytes().into()
+        u8::from(*self).to_le_bytes().into()
     }
 
-    const MULTIPLICATIVE_GROUP_ORDER: u128 = Self::MODULUS - 1;
+    const MULTIPLICATIVE_GROUP_ORDER: u128 = Self::MODULUS as u128 - 1;
 
     fn generator() -> Self {
-        Fp(5)
+        F2(1)
     }
 }
 
@@ -99,76 +90,67 @@ impl std::fmt::Display for BiggerThanModulus {
     }
 }
 
-impl TryFrom<u128> for Fp {
+impl TryFrom<u8> for F2 {
     type Error = BiggerThanModulus;
 
-    fn try_from(value: u128) -> Result<Self, Self::Error> {
+    fn try_from(value: u8) -> Result<Self, Self::Error> {
         if value < Self::MODULUS {
-            Ok(Fp(value))
+            Ok(F2(value))
         } else {
             Err(BiggerThanModulus)
         }
     }
 }
 
-impl TryFrom<Block> for Fp {
-    type Error = BiggerThanModulus;
-
-    fn try_from(value: Block) -> Result<Self, Self::Error> {
-        let val = u128::from(value);
-        Fp::try_from(val)
-    }
-}
-
 /// This returns a canonical/reduced form of the field element.
-impl From<Fp> for u128 {
+impl From<F2> for u8 {
     #[inline]
-    fn from(x: Fp) -> Self {
+    fn from(x: F2) -> Self {
         x.0
     }
 }
 
-impl std::iter::Sum for Fp {
+impl std::iter::Sum for F2 {
     fn sum<I: Iterator<Item = Self>>(iter: I) -> Self {
-        iter.fold(Fp::zero(), |a, b| a + b)
+        iter.fold(F2::zero(), |a, b| a + b)
     }
 }
 
 macro_rules! binop {
     ($trait:ident, $name:ident, $assign:ident) => {
-        impl $trait<Fp> for Fp {
-            type Output = Fp;
+        impl $trait<F2> for F2 {
+            type Output = F2;
 
             #[inline]
-            fn $name(mut self, rhs: Fp) -> Self::Output {
+            fn $name(mut self, rhs: F2) -> Self::Output {
                 self.$assign(rhs);
                 self
             }
         }
-        impl<'a> $trait<Fp> for &'a Fp {
-            type Output = Fp;
+        impl<'a> $trait<F2> for &'a F2 {
+            type Output = F2;
 
             #[inline]
-            fn $name(self, rhs: Fp) -> Self::Output {
+            fn $name(self, rhs: F2) -> Self::Output {
                 let mut this = self.clone();
                 this.$assign(rhs);
                 this
             }
         }
-        impl<'a> $trait<&'a Fp> for Fp {
-            type Output = Fp;
+        impl<'a> $trait<&'a F2> for F2 {
+            type Output = F2;
 
             #[inline]
-            fn $name(mut self, rhs: &'a Fp) -> Self::Output {
+            fn $name(mut self, rhs: &'a F2) -> Self::Output {
                 self.$assign(rhs);
                 self
             }
         }
-        impl<'a> $trait<&'a Fp> for &'a Fp {
-            type Output = Fp;
+        impl<'a> $trait<&'a F2> for &'a F2 {
+            type Output = F2;
 
             #[inline]
-            fn $name(self, rhs: &'a Fp) -> Self::Output {
+            fn $name(self, rhs: &'a F2) -> Self::Output {
                 let mut this = self.clone();
                 this.$assign(rhs);
                 this
@@ -181,44 +163,37 @@ binop!(Add, add, add_assign);
 binop!(Sub, sub, sub_assign);
 binop!(Mul, mul, mul_assign);
 // TODO: there's definitely room for optimization. We don't need to use the full mod algorithm here.
-impl AddAssign<&Fp> for Fp {
-    fn add_assign(&mut self, rhs: &Fp) {
-        let mut raw_sum = U256::from(self.0).checked_add(U256::from(rhs.0)).unwrap();
-        if raw_sum >= U256::from(Self::MODULUS) {
-            raw_sum -= U256::from(Self::MODULUS);
+impl AddAssign<&F2> for F2 {
+    fn add_assign(&mut self, rhs: &F2) {
+        let mut raw_sum = (self.0).checked_add(rhs.0).unwrap();
+        if raw_sum >= Self::MODULUS {
+            raw_sum -= Self::MODULUS;
         }
-        self.0 = raw_sum.as_u128();
+        self.0 = raw_sum;
     }
 }
 
-impl SubAssign<&Fp> for Fp {
-    fn sub_assign(&mut self, rhs: &Fp) {
-        let mut raw_diff = (U256::from(self.0) + U256::from(Self::MODULUS))
-            .checked_sub(U256::from(rhs.0))
-            .unwrap();
-        if raw_diff >= U256::from(Self::MODULUS) {
-            raw_diff -= U256::from(Self::MODULUS);
+impl SubAssign<&F2> for F2 {
+    fn sub_assign(&mut self, rhs: &F2) {
+        let mut raw_diff = self.0 + Self::MODULUS.checked_sub(rhs.0).unwrap();
+        if raw_diff >= Self::MODULUS {
+            raw_diff -= Self::MODULUS;
         }
-        debug_assert!(raw_diff < U256::from(Self::MODULUS));
-        self.0 = raw_diff.as_u128();
+        debug_assert!(raw_diff < Self::MODULUS);
+        self.0 = raw_diff.to_be().try_into().unwrap();
     }
 }
 
-impl MulAssign<&Fp> for Fp {
-    fn mul_assign(&mut self, rhs: &Fp) {
-        let raw_prod = U256(uint::uint_full_mul_reg!(
-            U128,
-            2,
-            U128::from(self.0),
-            U128::from(rhs.0)
-        ));
-        self.0 = (raw_prod % U256::from(Self::MODULUS)).as_u128();
+impl MulAssign<&F2> for F2 {
+    fn mul_assign(&mut self, rhs: &F2) {
+        let raw_prod = (self.0) * rhs.0;
+        self.0 = raw_prod % Self::MODULUS;
     }
 }
 macro_rules! assign_op {
     ($tr:ident, $op:ident) => {
-        impl $tr<Fp> for Fp {
-            fn $op(&mut self, rhs: Fp) {
+        impl $tr<F2> for F2 {
+            fn $op(&mut self, rhs: F2) {
                 self.$op(&rhs)
             }
         }
@@ -228,11 +203,11 @@ assign_op!(AddAssign, add_assign);
 assign_op!(SubAssign, sub_assign);
 assign_op!(MulAssign, mul_assign);
 
-impl Neg for Fp {
-    type Output = Fp;
+impl Neg for F2 {
+    type Output = F2;
 
     fn neg(self) -> Self::Output {
-        Fp::zero() - self
+        F2::zero() - self
     }
 }
 
@@ -242,9 +217,9 @@ mod tests {
     use num_bigint::BigUint;
     use quickcheck_macros::quickcheck;
 
-    impl quickcheck::Arbitrary for Fp {
-        fn arbitrary<RNG: RngCore>(mut g: &mut RNG) -> Fp {
-            Fp::random(&mut g)
+    impl quickcheck::Arbitrary for F2 {
+        fn arbitrary<RNG: RngCore>(mut g: &mut RNG) -> F2 {
+            F2::random(&mut g)
         }
     }
 
@@ -252,17 +227,17 @@ mod tests {
         ($name:ident, $op:ident) => {
             #[cfg(test)]
             #[quickcheck]
-            fn $name(mut a: Fp, b: Fp) -> bool {
-                let mut x = BigUint::from(a.0);
-                let y = BigUint::from(b.0);
+            fn $name(mut a: F2, b: F2) -> bool {
+                let mut x = a.0;
+                let y = b.0;
                 a.$op(&b);
                 // This is a hack! That's okay, this is a test!
                 if stringify!($op) == "sub_assign" {
-                    x += BigUint::from(Fp::MODULUS);
+                    x += F2::MODULUS;
                 }
                 x.$op(&y);
-                x = x % BigUint::from(Fp::MODULUS);
-                BigUint::from(a.0) == x
+                x = x % F2::MODULUS;
+                a.0 == x
             }
         };
     }
@@ -272,14 +247,13 @@ mod tests {
     test_binop!(test_mul, mul_assign);
 
     #[cfg(test)]
-    test_field!(test_fp, Fp);
-
+    test_field!(test_f2, F2);
     #[quickcheck]
-    fn check_pow(x: Fp, n: u128) -> bool {
-        let m = BigUint::from(Fp::MODULUS);
+    fn check_pow(x: F2, n: u128) -> bool {
+        let m = BigUint::from(F2::MODULUS);
         let exp = BigUint::from(n);
-        let a = BigUint::from(u128::from(x));
-        let left = BigUint::from(u128::from(x.pow(n)));
+        let a = BigUint::from(u8::from(x));
+        let left = BigUint::from(u8::from(x.pow(n)));
         left == a.modpow(&exp, &m)
     }
 }

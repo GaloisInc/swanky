@@ -112,7 +112,11 @@ macro_rules! test_field {
             #[quickcheck]
             fn test_power(a: ArbitraryF) {
                 assert_eq!(a.0.pow(0), <$f>::one());
-                assert_eq!(a.0.pow(<$f>::MULTIPLICATIVE_GROUP_ORDER), <$f>::one());
+                if a.0 != <$f>::zero() {
+                    assert_eq!(a.0.pow(<$f>::MULTIPLICATIVE_GROUP_ORDER), <$f>::one());
+                } else {
+                    assert_eq!(a.0.pow(<$f>::MULTIPLICATIVE_GROUP_ORDER), <$f>::zero());
+                }
             }
         }
     };
