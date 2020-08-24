@@ -1,4 +1,4 @@
-//! This module has implementations for a specific prime finite field.
+//! This module has implementations for a finite field with modulus 2.
 //!
 //! # Security Warning
 //! TODO: this might not be constant-time in all cases.
@@ -8,15 +8,13 @@ use generic_array::GenericArray;
 use rand::Rng;
 use rand_core::RngCore;
 use std::{
-    convert::{TryFrom, TryInto},
+    convert::TryFrom,
     hash::Hash,
     ops::{Add, AddAssign, Mul, MulAssign, Neg, Sub, SubAssign},
 };
 use subtle::{Choice, ConditionallySelectable, ConstantTimeEq};
 
-/// A field element in the prime-order finite field $\textsf{GF}(2^{128} - 159)$
-///
-/// This is called `F2` because it is our "common" prime-order finite field.
+/// A field element in the prime-order finite field $\textsf{GF}(2).$
 #[derive(Debug, Eq, Clone, Copy, Hash)]
 pub struct F2(u8);
 
@@ -37,15 +35,13 @@ impl PartialEq for F2 {
 }
 
 impl F2 {
-    /// The prime field modulus: $2^{128} - 159$
+    /// The prime field modulus: $2$
     pub const MODULUS: u8 = 2;
 }
 
 impl FiniteField for F2 {
-    /// There is a slight bias towards the range $[0,158]$.
-    /// There is a $\frac{159}{2^128} \approx 4.6 \times 10^{-37}$ chance of seeing this bias.
+    /// This uniformly generates a field element either 0 or 1 for `F2` type.
     fn random<R: RngCore>(rng: &mut R) -> Self {
-        // The backend::F2::random(rng) function panics, so we don't use it.
         F2(u8::from(rng.gen::<bool>()))
     }
 
@@ -56,13 +52,9 @@ impl FiniteField for F2 {
     fn one() -> Self {
         F2(1)
     }
-    type R = generic_array::typenum::U1;
-    type PrimeSubField = F2;
     type ByteReprLen = generic_array::typenum::U1;
     type FromBytesError = BiggerThanModulus;
 
-    /// If you put random bytes into here, while it's _technically_ biased, there's only a tiny
-    /// chance that you'll get biased output.
     fn from_bytes(buf: &GenericArray<u8, Self::ByteReprLen>) -> Result<Self, BiggerThanModulus> {
         F2::try_from(u8::from_le_bytes(*buf.as_ref()))
     }
@@ -79,7 +71,7 @@ impl FiniteField for F2 {
     }
 }
 
-/// The error which occurs if the inputted `u128` or bit pattern doesn't correspond to a field
+/// The error which occurs if the inputted `u8` or bit pattern doesn't correspond to a field
 /// element.
 #[derive(Debug, Clone, Copy)]
 pub struct BiggerThanModulus;
@@ -162,25 +154,16 @@ macro_rules! binop {
 binop!(Add, add, add_assign);
 binop!(Sub, sub, sub_assign);
 binop!(Mul, mul, mul_assign);
-// TODO: there's definitely room for optimization. We don't need to use the full mod algorithm here.
+
 impl AddAssign<&F2> for F2 {
     fn add_assign(&mut self, rhs: &F2) {
-        let mut raw_sum = (self.0).checked_add(rhs.0).unwrap();
-        if raw_sum >= Self::MODULUS {
-            raw_sum -= Self::MODULUS;
-        }
-        self.0 = raw_sum;
+        self.0 = (self.0) ^ (rhs.0);
     }
 }
 
 impl SubAssign<&F2> for F2 {
     fn sub_assign(&mut self, rhs: &F2) {
-        let mut raw_diff = self.0 + Self::MODULUS.checked_sub(rhs.0).unwrap();
-        if raw_diff >= Self::MODULUS {
-            raw_diff -= Self::MODULUS;
-        }
-        debug_assert!(raw_diff < Self::MODULUS);
-        self.0 = raw_diff.to_be().try_into().unwrap();
+        self.add_assign(rhs);
     }
 }
 

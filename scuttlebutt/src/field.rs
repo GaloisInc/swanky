@@ -28,10 +28,6 @@ pub trait FiniteField:
     + Neg<Output = Self>
     + std::iter::Sum
 {
-    /// Prime Field
-    type PrimeSubField: FiniteField;
-    /// R
-    type R: ArrayLength<Self::PrimeSubField>;
     /// The number of bytes in the byte representation for this field element.
     type ByteReprLen: ArrayLength<u8>;
     /// The error that can result from trying to decode an invalid byte sequence.
@@ -101,7 +97,7 @@ mod fp;
 pub use fp::{BiggerThanModulus, Fp};
 
 mod f2;
-pub use f2::F2;
+pub use f2::{BiggerThanModulus as F2BiggerThanModulus, F2};
 
 mod gf_2_128;
 pub use gf_2_128::{Gf128, Gf128BytesDeserializationCannotFail};
