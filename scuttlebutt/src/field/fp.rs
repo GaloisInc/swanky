@@ -65,7 +65,6 @@ impl FiniteField for Fp {
     fn one() -> Self {
         Fp(1)
     }
-
     type ByteReprLen = generic_array::typenum::U16;
     type FromBytesError = BiggerThanModulus;
 
