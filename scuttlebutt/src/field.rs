@@ -8,7 +8,6 @@ use std::{
     ops::{Add, AddAssign, Mul, MulAssign, Neg, Sub, SubAssign},
 };
 use subtle::{Choice, ConditionallySelectable, ConstantTimeEq};
-
 /// Types that implement this trait are finite field elements.
 pub trait FiniteField:
     'static
@@ -96,6 +95,9 @@ mod test_utils;
 
 mod fp;
 pub use fp::{BiggerThanModulus, Fp};
+
+mod f2;
+pub use f2::{BiggerThanModulus as F2BiggerThanModulus, F2};
 
 mod gf_2_128;
 pub use gf_2_128::{Gf128, Gf128BytesDeserializationCannotFail};

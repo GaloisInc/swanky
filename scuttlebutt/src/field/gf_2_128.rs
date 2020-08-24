@@ -1,4 +1,4 @@
-use crate::field::FiniteField;
+use crate::field::{f2::F2, FiniteField};
 use generic_array::GenericArray;
 use rand_core::RngCore;
 use std::ops::{Add, AddAssign, Mul, MulAssign, Neg, Sub, SubAssign};
