@@ -101,7 +101,11 @@ mod fp;
 pub use fp::{BiggerThanModulus, Fp};
 
 mod f2;
+<<<<<<< HEAD
 pub use f2::F2;
+=======
+pub use f2::{BiggerThanModulus as F2BiggerThanModulus, F2};
+>>>>>>> cea9eb57c80a3ecd4fb5365a4533784c12ab288c
 
 mod gf_2_128;
 pub use gf_2_128::{Gf128, Gf128BytesDeserializationCannotFail};

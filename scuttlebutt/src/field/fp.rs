@@ -65,8 +65,11 @@ impl FiniteField for Fp {
     fn one() -> Self {
         Fp(1)
     }
+<<<<<<< HEAD
     type R = generic_array::typenum::U16;
     type PrimeSubField = Fp;
+=======
+>>>>>>> cea9eb57c80a3ecd4fb5365a4533784c12ab288c
     type ByteReprLen = generic_array::typenum::U16;
     type FromBytesError = BiggerThanModulus;
 
