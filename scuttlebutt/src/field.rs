@@ -8,7 +8,6 @@ use std::{
     ops::{Add, AddAssign, Mul, MulAssign, Neg, Sub, SubAssign},
 };
 use subtle::{Choice, ConditionallySelectable, ConstantTimeEq};
-
 /// Types that implement this trait are finite field elements.
 pub trait FiniteField:
     'static
@@ -29,6 +28,10 @@ pub trait FiniteField:
     + Neg<Output = Self>
     + std::iter::Sum
 {
+    /// Prime Field
+    type PrimeSubField: FiniteField;
+    /// R
+    type R: ArrayLength<Self::PrimeSubField>;
     /// The number of bytes in the byte representation for this field element.
     type ByteReprLen: ArrayLength<u8>;
     /// The error that can result from trying to decode an invalid byte sequence.
@@ -96,6 +99,9 @@ mod test_utils;
 
 mod fp;
 pub use fp::{BiggerThanModulus, Fp};
+
+mod f2;
+pub use f2::F2;
 
 mod gf_2_128;
 pub use gf_2_128::{Gf128, Gf128BytesDeserializationCannotFail};

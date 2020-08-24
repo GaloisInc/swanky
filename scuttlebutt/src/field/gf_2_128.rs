@@ -1,4 +1,4 @@
-use crate::field::FiniteField;
+use crate::field::{f2::F2, FiniteField};
 use generic_array::GenericArray;
 use rand_core::RngCore;
 use std::ops::{Add, AddAssign, Mul, MulAssign, Neg, Sub, SubAssign};
@@ -145,6 +145,8 @@ impl std::fmt::Display for Gf128BytesDeserializationCannotFail {
 impl std::error::Error for Gf128BytesDeserializationCannotFail {}
 
 impl FiniteField for Gf128 {
+    type R = generic_array::typenum::U16;
+    type PrimeSubField = F2;
     type ByteReprLen = generic_array::typenum::U16;
     type FromBytesError = Gf128BytesDeserializationCannotFail;
 
