@@ -1,13 +1,20 @@
-use crate::field::{f2::F2, FiniteField};
+use crate::field::{f2::F2, polynomial::Polynomial, FiniteField};
 use generic_array::GenericArray;
 use rand_core::RngCore;
-use std::ops::{Add, AddAssign, Mul, MulAssign, Neg, Sub, SubAssign};
+use smallvec::smallvec;
+use std::{
+    convert::TryFrom,
+    iter::FromIterator,
+    ops::{AddAssign, MulAssign, SubAssign},
+};
 use subtle::{Choice, ConditionallySelectable, ConstantTimeEq};
 
-/// An element of the finite field $\textsf{GF}(2^{128})$ reduced over $x^{128} + x^{127} + x^{126} +x^{121} + 1$
+/// An element of the finite field $\textsf{GF}(2^{128})$ reduced over $x^{128} + x^{127} + x^{126} + x^{121} + 1$
 #[derive(Debug, Clone, Copy, Hash, Eq)]
 // We use a u128 since Rust will pass it in registers, unlike a __m128i
-pub struct Gf128(u128);
+pub struct Gf128(pub(crate) u128);
+
+// We use the same GF from Polyval. See https://tools.ietf.org/html/rfc8452#appendix-A for more info
 
 impl ConstantTimeEq for Gf128 {
     fn ct_eq(&self, other: &Self) -> Choice {
@@ -19,57 +26,23 @@ impl ConditionallySelectable for Gf128 {
         Gf128(u128::conditional_select(&a.0, &b.0, choice))
     }
 }
-impl PartialEq for Gf128 {
-    fn eq(&self, other: &Self) -> bool {
-        self.ct_eq(other).into()
-    }
-}
 
-impl Add for Gf128 {
-    type Output = Self;
-
-    fn add(mut self, rhs: Self) -> Self::Output {
-        self.add_assign(rhs);
-        self
-    }
-}
-impl Sub for Gf128 {
-    type Output = Self;
-
-    fn sub(mut self, rhs: Self) -> Self::Output {
-        self.sub_assign(rhs);
-        self
-    }
-}
-impl Mul for Gf128 {
-    type Output = Self;
-
-    fn mul(mut self, rhs: Self) -> Self::Output {
-        self.mul_assign(rhs);
-        self
-    }
-}
-impl AddAssign for Gf128 {
-    fn add_assign(&mut self, rhs: Self) {
+impl<'a> AddAssign<&'a Gf128> for Gf128 {
+    #[inline]
+    fn add_assign(&mut self, rhs: &'a Gf128) {
         self.0 ^= rhs.0;
     }
 }
-impl Neg for Gf128 {
-    type Output = Self;
-
-    fn neg(self) -> Self::Output {
+impl<'a> SubAssign<&'a Gf128> for Gf128 {
+    #[inline]
+    fn sub_assign(&mut self, rhs: &'a Gf128) {
         // The additive inverse of GF(2^128) is the identity
-        self
+        *self += rhs;
     }
 }
-impl SubAssign for Gf128 {
-    fn sub_assign(&mut self, rhs: Self) {
-        // The additive inverse of GF(2^128) is the identity
-        self.0 ^= rhs.0;
-    }
-}
-impl MulAssign for Gf128 {
-    fn mul_assign(&mut self, rhs: Self) {
+impl<'a> MulAssign<&'a Gf128> for Gf128 {
+    #[inline]
+    fn mul_assign(&mut self, rhs: &'a Gf128) {
         use std::arch::x86_64::*;
         // This function is based on https://github.com/RustCrypto/universal-hashes/blob/663295cfcc4a0aa263fc63589953d5cc59856a22/polyval/src/field/pclmulqdq.rs
         // The original code is MIT/Apache 2.0 dual-licensed.
@@ -128,12 +101,6 @@ impl MulAssign for Gf128 {
     }
 }
 
-impl std::iter::Sum for Gf128 {
-    fn sum<I: Iterator<Item = Gf128>>(iter: I) -> Self {
-        iter.fold(Gf128::zero(), |a, b| a + b)
-    }
-}
-
 /// An error with no inhabitants. Gf128 cannot fail to deserialize.
 #[derive(Clone, Copy, Debug)]
 pub enum Gf128BytesDeserializationCannotFail {}
@@ -145,6 +112,8 @@ impl std::fmt::Display for Gf128BytesDeserializationCannotFail {
 impl std::error::Error for Gf128BytesDeserializationCannotFail {}
 
 impl FiniteField for Gf128 {
+    type PrimeSubField = F2;
+    type R = generic_array::typenum::U1;
     type ByteReprLen = generic_array::typenum::U16;
     type FromBytesError = Gf128BytesDeserializationCannotFail;
 
@@ -158,8 +127,42 @@ impl FiniteField for Gf128 {
         self.0.to_le_bytes().into()
     }
 
-    fn random<R: RngCore>(rng: &mut R) -> Self {
-        Gf128((u128::from(rng.next_u64()) << 64) | u128::from(rng.next_u64()))
+    type PrimeField = F2;
+    type PolynomialFormNumCoefficients = generic_array::typenum::U128;
+
+    fn from_polynomial_coefficients(
+        coeff: GenericArray<Self::PrimeField, Self::PolynomialFormNumCoefficients>,
+    ) -> Self {
+        Gf128(coeff.iter().enumerate().fold(0u128, |acu, (idx, value)| {
+            acu | ((u8::from(*value) as u128) << ((127 - idx) as u128))
+        })) * Gf128(1<<127).inverse()
+    }
+
+    fn to_polynomial_coefficients(
+        &self,
+    ) -> GenericArray<Self::PrimeField, Self::PolynomialFormNumCoefficients> {
+        let out = self * Gf128(1<<127);
+        GenericArray::from_iter(
+            (0..128).map(|idx| F2::try_from(((out.0 >> (127 - idx)) & 0b1) as u8).unwrap()),
+        )
+    }
+
+    fn reduce_multiplication_over() -> Polynomial<Self::PrimeField> {
+        let mut coefficients = smallvec![F2::zero(); 128];
+        coefficients[128 - 1] = F2::one();
+        coefficients[127 - 1] = F2::one();
+        coefficients[126 - 1] = F2::one();
+        coefficients[121 - 1] = F2::one();
+        Polynomial {
+            constant: F2::one(),
+            coefficients,
+        }
+    }
+
+    fn random<R: RngCore + ?Sized>(rng: &mut R) -> Self {
+        let mut bytes = [0; 16];
+        rng.fill_bytes(&mut bytes[..]);
+        Gf128(u128::from_le_bytes(bytes))
     }
 
     const MULTIPLICATIVE_GROUP_ORDER: u128 = u128::max_value();
@@ -176,6 +179,16 @@ impl FiniteField for Gf128 {
         Gf128(1 << 127 | 1 << 126 | 1 << 121 | 1)
     }
 }
+
+#[test]
+fn rfc_8542_test_vector() {
+    let a = Gf128(0x66e94bd4ef8a2c3b884cfa59ca342b2e);
+    let b = Gf128(0xff000000000000000000000000000000);
+    let product = a * b;
+    assert_eq!(product, Gf128(0x37856175e9dc9df26ebc6d6171aa0ae9));
+}
+
+field_ops!(Gf128);
 
 #[cfg(test)]
 test_field!(test_gf128, Gf128);

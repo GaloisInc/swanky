@@ -9,6 +9,7 @@
 //! This module provides traits COPEe
 
 pub mod base_svole;
+pub mod svole_ext;
 mod copee;
 
 use crate::errors::Error;

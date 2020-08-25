@@ -1,3 +1,5 @@
+use crate::field::{polynomial::Polynomial, FiniteField};
+use generic_array::{ArrayLength, GenericArray};
 macro_rules! test_associativity {
     ($name:ident, $arbitrary_f:ty, $op:ident) => {
         #[quickcheck]
@@ -44,13 +46,33 @@ macro_rules! test_assign {
     };
 }
 
+pub(crate) fn make_polynomial<FE: FiniteField>(x: impl AsRef<[FE]>) -> Polynomial<FE> {
+    let x = x.as_ref();
+    Polynomial {
+        constant: x[0],
+        coefficients: x[1..].iter().cloned().collect(),
+    }
+}
+
+pub(crate) fn make_polynomial_coefficients<FE: FiniteField, L: ArrayLength<FE>>(
+    poly: &Polynomial<FE>,
+) -> GenericArray<FE, L> {
+    let mut slice = vec![FE::zero(); L::USIZE];
+    slice[0] = poly.constant;
+    for (a, b) in slice[1..].iter_mut().zip(poly.coefficients.iter()) {
+        *a = *b;
+    }
+    GenericArray::<FE, L>::from_slice(&slice[..]).clone()
+}
+
 macro_rules! test_field {
     ($tests_name:ident, $f:ty) => {
         mod $tests_name {
             use super::*;
+            use crate::field::test_utils::{make_polynomial, make_polynomial_coefficients};
             use quickcheck::Arbitrary;
             use quickcheck_macros::quickcheck;
-            use std::ops::{Add, Mul};
+            use std::ops::{Add, Mul, Sub};
             #[derive(Clone, Debug)]
             struct ArbitraryF($f);
             impl Arbitrary for ArbitraryF {
@@ -117,6 +139,47 @@ macro_rules! test_field {
                 } else {
                     assert_eq!(a.0.pow(<$f>::MULTIPLICATIVE_GROUP_ORDER), <$f>::zero());
                 }
+            }
+
+            #[quickcheck]
+            fn polynomial_roundtrip(a: ArbitraryF) -> bool {
+                <$f>::from_polynomial_coefficients(a.0.to_polynomial_coefficients()) == a.0
+            }
+
+            fn prop_polynomial_add(a: $f, b: $f) -> bool {
+                let mut poly = make_polynomial(a.to_polynomial_coefficients());
+                poly += &make_polynomial(b.to_polynomial_coefficients());
+                <$f>::from_polynomial_coefficients(make_polynomial_coefficients(&poly)) == a + b
+            }
+
+            #[quickcheck]
+            fn polynomial_add(a: ArbitraryF, b: ArbitraryF) -> bool {
+                prop_polynomial_add(a.0, b.0)
+            }
+
+            fn prop_polynomial_mul(a: $f, b: $f) -> bool {
+                let mut poly = make_polynomial(a.to_polynomial_coefficients());
+                poly *= &make_polynomial(b.to_polynomial_coefficients());
+                let (_, remainder) = poly.divmod(&<$f>::reduce_multiplication_over());
+                <$f>::from_polynomial_coefficients(make_polynomial_coefficients(&remainder))
+                    == a * b
+            }
+
+            #[quickcheck]
+            fn polynomial_mul(a: ArbitraryF, b: ArbitraryF) -> bool {
+                prop_polynomial_mul(a.0, b.0)
+            }
+
+            #[test]
+            fn polynomial_constants() {
+                assert_eq!(
+                    make_polynomial(<$f>::zero().to_polynomial_coefficients()),
+                    Polynomial::zero()
+                );
+                assert_eq!(
+                    make_polynomial(<$f>::one().to_polynomial_coefficients()),
+                    Polynomial::one()
+                );
             }
         }
     };

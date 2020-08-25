@@ -3,14 +3,14 @@
 //! # Security Warning
 //! TODO: this might not be constant-time in all cases.
 
-use crate::field::FiniteField;
+use crate::field::{polynomial::Polynomial, FiniteField};
 use generic_array::GenericArray;
 use rand::Rng;
 use rand_core::RngCore;
 use std::{
     convert::TryFrom,
     hash::Hash,
-    ops::{Add, AddAssign, Mul, MulAssign, Neg, Sub, SubAssign},
+    ops::{AddAssign, MulAssign, SubAssign},
 };
 use subtle::{Choice, ConditionallySelectable, ConstantTimeEq};
 
@@ -28,11 +28,6 @@ impl ConditionallySelectable for F2 {
         F2(u8::conditional_select(&a.0, &b.0, choice))
     }
 }
-impl PartialEq for F2 {
-    fn eq(&self, other: &Self) -> bool {
-        self.ct_eq(other).into()
-    }
-}
 
 impl F2 {
     /// The prime field modulus: $2$
@@ -40,8 +35,11 @@ impl F2 {
 }
 
 impl FiniteField for F2 {
+    type PrimeSubField = Self;
+    type R = generic_array::typenum::U1;
+
     /// This uniformly generates a field element either 0 or 1 for `F2` type.
-    fn random<R: RngCore>(rng: &mut R) -> Self {
+    fn random<R: RngCore + ?Sized>(rng: &mut R) -> Self {
         F2(u8::from(rng.gen::<bool>()))
     }
 
@@ -68,6 +66,46 @@ impl FiniteField for F2 {
 
     fn generator() -> Self {
         F2(1)
+    }
+
+    type PrimeField = Self;
+    type PolynomialFormNumCoefficients = generic_array::typenum::U1;
+
+    fn from_polynomial_coefficients(
+        coeff: GenericArray<Self::PrimeField, Self::PolynomialFormNumCoefficients>,
+    ) -> Self {
+        coeff[0]
+    }
+
+    fn to_polynomial_coefficients(
+        &self,
+    ) -> GenericArray<Self::PrimeField, Self::PolynomialFormNumCoefficients> {
+        GenericArray::from([*self])
+    }
+
+    fn reduce_multiplication_over() -> Polynomial<Self::PrimeField> {
+        Polynomial::one()
+    }
+}
+
+impl AddAssign<&F2> for F2 {
+    #[inline]
+    fn add_assign(&mut self, rhs: &F2) {
+        self.0 ^= rhs.0;
+    }
+}
+
+impl SubAssign<&F2> for F2 {
+    #[inline]
+    fn sub_assign(&mut self, rhs: &F2) {
+        self.add_assign(rhs);
+    }
+}
+
+impl MulAssign<&F2> for F2 {
+    #[inline]
+    fn mul_assign(&mut self, rhs: &F2) {
+        self.0 &= rhs.0;
     }
 }
 
@@ -102,97 +140,7 @@ impl From<F2> for u8 {
     }
 }
 
-impl std::iter::Sum for F2 {
-    fn sum<I: Iterator<Item = Self>>(iter: I) -> Self {
-        iter.fold(F2::zero(), |a, b| a + b)
-    }
-}
-
-macro_rules! binop {
-    ($trait:ident, $name:ident, $assign:ident) => {
-        impl $trait<F2> for F2 {
-            type Output = F2;
-
-            #[inline]
-            fn $name(mut self, rhs: F2) -> Self::Output {
-                self.$assign(rhs);
-                self
-            }
-        }
-        impl<'a> $trait<F2> for &'a F2 {
-            type Output = F2;
-
-            #[inline]
-            fn $name(self, rhs: F2) -> Self::Output {
-                let mut this = self.clone();
-                this.$assign(rhs);
-                this
-            }
-        }
-        impl<'a> $trait<&'a F2> for F2 {
-            type Output = F2;
-
-            #[inline]
-            fn $name(mut self, rhs: &'a F2) -> Self::Output {
-                self.$assign(rhs);
-                self
-            }
-        }
-        impl<'a> $trait<&'a F2> for &'a F2 {
-            type Output = F2;
-
-            #[inline]
-            fn $name(self, rhs: &'a F2) -> Self::Output {
-                let mut this = self.clone();
-                this.$assign(rhs);
-                this
-            }
-        }
-    };
-}
-
-binop!(Add, add, add_assign);
-binop!(Sub, sub, sub_assign);
-binop!(Mul, mul, mul_assign);
-
-impl AddAssign<&F2> for F2 {
-    fn add_assign(&mut self, rhs: &F2) {
-        self.0 = (self.0) ^ (rhs.0);
-    }
-}
-
-impl SubAssign<&F2> for F2 {
-    fn sub_assign(&mut self, rhs: &F2) {
-        self.add_assign(rhs);
-    }
-}
-
-impl MulAssign<&F2> for F2 {
-    fn mul_assign(&mut self, rhs: &F2) {
-        let raw_prod = (self.0) * rhs.0;
-        self.0 = raw_prod % Self::MODULUS;
-    }
-}
-macro_rules! assign_op {
-    ($tr:ident, $op:ident) => {
-        impl $tr<F2> for F2 {
-            fn $op(&mut self, rhs: F2) {
-                self.$op(&rhs)
-            }
-        }
-    };
-}
-assign_op!(AddAssign, add_assign);
-assign_op!(SubAssign, sub_assign);
-assign_op!(MulAssign, mul_assign);
-
-impl Neg for F2 {
-    type Output = F2;
-
-    fn neg(self) -> Self::Output {
-        F2::zero() - self
-    }
-}
+field_ops!(F2);
 
 #[cfg(test)]
 mod tests {

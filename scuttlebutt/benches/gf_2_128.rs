@@ -1,4 +1,4 @@
-use criterion::{criterion_group, criterion_main, Criterion};
+/*use criterion::{criterion_group, criterion_main, Criterion};
 use scuttlebutt::field::{FiniteField, Gf128};
 
 fn gf_2_128_add(c: &mut Criterion) {
@@ -25,4 +25,6 @@ fn gf_2_128_inverse(c: &mut Criterion) {
 }
 
 criterion_group!(gf_2_128, gf_2_128_add, gf_2_128_mul, gf_2_128_inverse);
-criterion_main!(gf_2_128);
+criterion_main!(gf_2_128);*/
+
+fn main() {}

@@ -4,15 +4,19 @@
 // Copyright © 2020 Galois, Inc.
 // See LICENSE for licensing information.
 
-//! Single-point Subfield Vector Oblivious Linear-function Evaluation (SpSVOLE)
+//! Single-point Subfield Vector Oblivious Linear-function Evaluation (SpsVole)
 //!
 //! This module provides implementations of SpsVole Traits.
 
 use crate::{
     errors::Error,
     ot::{Receiver as OtReceiver, Sender as OtSender},
-    svole::{CopeeReceiver, CopeeSender, Params, SVoleReceiver, SVoleSender},
+    svole::{
+        CopeeReceiver, CopeeSender, Params, SVoleReceiver, SVoleSender,
+        svole_ext::{SpsVoleSender, SpsVoleReceiver},
+    },
 };
+use rand::Rng;
 use digest::generic_array::typenum::Unsigned;
 use generic_array::GenericArray;
 use rand::SeedableRng;
@@ -21,42 +25,59 @@ use std::marker::PhantomData;
 
 /// A SpsVole Sender.
 #[derive(Clone)]
-pub struct Sender<OT: OtSender + Malicious, CP: CopeeSender, FE: FF> {
+pub struct Sender<OT: OtSender + Malicious, CP: CopeeSender, FE: FF, SV:SVoleSender> {
     _ot: PhantomData<OT>,
     _cp: PhantomData<CP>,
     _fe: PhantomData<FE>,
-    copee: CP,
+    _sv: PhantomData<SV>,
+    svole: SV,
 }
 
-/// A SVOLE Receiver.
+/// A SpsVole Receiver.
 #[derive(Clone)]
-pub struct Receiver<OT: OtReceiver + Malicious, CP: CopeeReceiver, FE: FF> {
+pub struct Receiver<OT: OtReceiver + Malicious, CP: CopeeReceiver, FE: FF, SV:SVoleReceiver> {
     _ot: PhantomData<OT>,
     _cp: PhantomData<CP>,
     _fe: PhantomData<FE>,
+    _sv: PhantomData<SV>,
     delta: FE,
-    copee: CP,
+    svole: SV,
 }
 
-/// Implement SVoleSender for Sender type.
-impl<OT: OtSender<Msg = Block> + Malicious, FE: FF, CP: CopeeSender<Msg = FE>> SVoleSender
-    for Sender<OT, CP, FE>
+/// Implement SpsVole for Sender type.
+impl<OT: OtSender<Msg = Block> + Malicious, 
+    FE: FF, CP: CopeeSender<Msg = FE>, 
+    SV: SVoleSender<Msg = FE>> SpsVoleSender
+    for Sender<OT, CP, FE, SV>
 {
     type Msg = FE;
     fn init<C: AbstractChannel>(channel: &mut C) -> Result<Self, Error> {
-        let csender = CP::init(channel).unwrap();
+        let vsender = SV::init(channel).unwrap();
         Ok(Self {
             _ot: PhantomData::<OT>,
             _cp: PhantomData::<CP>,
             _fe: PhantomData::<FE>,
-            copee: csender,
+            _sv: PhantomData::<SV>,
+            svole: vsender,
         })
     }
 
     fn send<C: AbstractChannel>(&mut self, channel: &mut C) -> Result<(Vec<FE>, Vec<FE>), Error> {
+        let (a, c) = self.svole.send(channel).unwrap();
         let g = FE::generator();
         let seed = rand::random::<Block>();
         let mut rng = AesRng::from_seed(seed);
+        let mut two = FE::one();
+        two.add_assign(FE::one());
+        let beta = two.pow(rng.gen_range(0, FE::MULTIPLICATIVE_GROUP_ORDER));
+        // Sends out a'=\beta-a
+        let a_prime = beta.clone();
+        a_prime.sub_assign(a[0]);
+        channel.write_bytes(a_prime.to_bytes().as_slice())?;
+        // Samples \alpha in [0,n)
+        let alpha = rng.gen_range(0, Params::N);
+        let mut u = vec![FE::zero(); Params::N];
+        u[alpha] = beta;
         // Sampling `ui`s i for in `[n]`.
         let u: Vec<FE> = (0..Params::N).map(|_| FE::random(&mut rng)).collect();
         assert_eq!(u.len(), Params::N);
@@ -113,18 +134,19 @@ impl<OT: OtSender<Msg = Block> + Malicious, FE: FF, CP: CopeeSender<Msg = FE>> S
 }
 
 /// Implement SVoleReceiver for Receiver type.
-impl<OT: OtReceiver<Msg = Block> + Malicious, FE: FF, CP: CopeeReceiver<Msg = FE>> SVoleReceiver
-    for Receiver<OT, CP, FE>
+impl<OT: OtReceiver<Msg = Block> + Malicious, FE: FF, CP: CopeeReceiver<Msg = FE>, SV: SVoleReceiver<Msg = FE>> SVoleReceiver
+    for Receiver<OT, CP, FE, SV>
 {
     type Msg = FE;
     fn init<C: AbstractChannel>(channel: &mut C) -> Result<Self, Error> {
-        let cp = CP::init(channel).unwrap();
-        let delta = cp.get_delta();
+        let sv = SV::init(channel).unwrap();
+        let delta = sv.get_delta();
         Ok(Self {
             _ot: PhantomData::<OT>,
             _cp: PhantomData::<CP>,
             _fe: PhantomData::<FE>,
-            copee: cp,
+            _sv: PhantomData::<SV>,
+            svole: sv,
             delta,
         })
     }
@@ -134,6 +156,9 @@ impl<OT: OtReceiver<Msg = Block> + Malicious, FE: FF, CP: CopeeReceiver<Msg = FE
     }
 
     fn receive<C: AbstractChannel>(&mut self, channel: &mut C) -> Result<Option<Vec<FE>>, Error> {
+        let Some(b) = self.svole.receive(channel).unwrap();
+        // Sample `s` from `\{0,1\}`
+        let seed = rand::random::<Block>();
         let v: Vec<FE> = self.copee.receive(channel, Params::N).unwrap();
         let v_ = v.clone();
         let mut b: Vec<FE> = self.copee.receive(channel, Params::N).unwrap();

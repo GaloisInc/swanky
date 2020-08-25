@@ -3,14 +3,17 @@
 //! # Security Warning
 //! TODO: this might not be constant-time in all cases.
 
-use crate::{field::FiniteField, Block};
+use crate::{
+    field::{polynomial::Polynomial, FiniteField},
+    Block,
+};
 use generic_array::GenericArray;
 use primitive_types::{U128, U256};
 use rand_core::RngCore;
 use std::{
     convert::TryFrom,
     hash::Hash,
-    ops::{Add, AddAssign, Mul, MulAssign, Neg, Sub, SubAssign},
+    ops::{AddAssign, MulAssign, SubAssign},
 };
 use subtle::{Choice, ConditionallySelectable, ConstantTimeEq};
 
@@ -30,11 +33,6 @@ impl ConditionallySelectable for Fp {
         Fp(u128::conditional_select(&a.0, &b.0, choice))
     }
 }
-impl PartialEq for Fp {
-    fn eq(&self, other: &Self) -> bool {
-        self.ct_eq(other).into()
-    }
-}
 
 impl Fp {
     /// The prime field modulus: $2^{128} - 159$
@@ -48,14 +46,14 @@ impl Fp {
 }
 
 impl FiniteField for Fp {
+    type PrimeSubField = Self;
+    type R = generic_array::typenum::U1;
     /// There is a slight bias towards the range $[0,158]$.
     /// There is a $\frac{159}{2^128} \approx 4.6 \times 10^{-37}$ chance of seeing this bias.
-    fn random<R: RngCore>(rng: &mut R) -> Self {
-        // The backend::Fp::random(rng) function panics, so we don't use it.
-        Self::try_from(
-            ((u128::from(rng.next_u64()) << 64) | u128::from(rng.next_u64())) % Self::MODULUS,
-        )
-        .unwrap()
+    fn random<R: RngCore + ?Sized>(rng: &mut R) -> Self {
+        let mut bytes = [0; 16];
+        rng.fill_bytes(&mut bytes[..]);
+        Self::try_from(u128::from_le_bytes(bytes) % Self::MODULUS).unwrap()
     }
 
     fn zero() -> Self {
@@ -83,6 +81,25 @@ impl FiniteField for Fp {
 
     fn generator() -> Self {
         Fp(5)
+    }
+
+    type PrimeField = Self;
+    type PolynomialFormNumCoefficients = generic_array::typenum::U1;
+
+    fn from_polynomial_coefficients(
+        coeff: GenericArray<Self::PrimeField, Self::PolynomialFormNumCoefficients>,
+    ) -> Self {
+        coeff[0]
+    }
+
+    fn to_polynomial_coefficients(
+        &self,
+    ) -> GenericArray<Self::PrimeField, Self::PolynomialFormNumCoefficients> {
+        GenericArray::from([*self])
+    }
+
+    fn reduce_multiplication_over() -> Polynomial<Self::PrimeField> {
+        Polynomial::one()
     }
 }
 
@@ -126,58 +143,6 @@ impl From<Fp> for u128 {
     }
 }
 
-impl std::iter::Sum for Fp {
-    fn sum<I: Iterator<Item = Self>>(iter: I) -> Self {
-        iter.fold(Fp::zero(), |a, b| a + b)
-    }
-}
-
-macro_rules! binop {
-    ($trait:ident, $name:ident, $assign:ident) => {
-        impl $trait<Fp> for Fp {
-            type Output = Fp;
-
-            #[inline]
-            fn $name(mut self, rhs: Fp) -> Self::Output {
-                self.$assign(rhs);
-                self
-            }
-        }
-        impl<'a> $trait<Fp> for &'a Fp {
-            type Output = Fp;
-
-            #[inline]
-            fn $name(self, rhs: Fp) -> Self::Output {
-                let mut this = self.clone();
-                this.$assign(rhs);
-                this
-            }
-        }
-        impl<'a> $trait<&'a Fp> for Fp {
-            type Output = Fp;
-
-            #[inline]
-            fn $name(mut self, rhs: &'a Fp) -> Self::Output {
-                self.$assign(rhs);
-                self
-            }
-        }
-        impl<'a> $trait<&'a Fp> for &'a Fp {
-            type Output = Fp;
-
-            #[inline]
-            fn $name(self, rhs: &'a Fp) -> Self::Output {
-                let mut this = self.clone();
-                this.$assign(rhs);
-                this
-            }
-        }
-    };
-}
-
-binop!(Add, add, add_assign);
-binop!(Sub, sub, sub_assign);
-binop!(Mul, mul, mul_assign);
 // TODO: there's definitely room for optimization. We don't need to use the full mod algorithm here.
 impl AddAssign<&Fp> for Fp {
     fn add_assign(&mut self, rhs: &Fp) {
@@ -213,26 +178,8 @@ impl MulAssign<&Fp> for Fp {
         self.0 = (raw_prod % U256::from(Self::MODULUS)).as_u128();
     }
 }
-macro_rules! assign_op {
-    ($tr:ident, $op:ident) => {
-        impl $tr<Fp> for Fp {
-            fn $op(&mut self, rhs: Fp) {
-                self.$op(&rhs)
-            }
-        }
-    };
-}
-assign_op!(AddAssign, add_assign);
-assign_op!(SubAssign, sub_assign);
-assign_op!(MulAssign, mul_assign);
 
-impl Neg for Fp {
-    type Output = Fp;
-
-    fn neg(self) -> Self::Output {
-        Fp::zero() - self
-    }
-}
+field_ops!(Fp);
 
 #[cfg(test)]
 mod tests {
