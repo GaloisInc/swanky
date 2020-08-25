@@ -27,6 +27,7 @@ subtle = "2.2"
 primitive-types = "0.7"
 uint = "0.8"
 generic-array = "0.14"
+smallvec = "1.4"
 
 
 [dev-dependencies]
