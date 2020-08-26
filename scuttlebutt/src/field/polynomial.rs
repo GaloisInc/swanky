@@ -85,7 +85,7 @@ impl<FE: FiniteField> Polynomial<FE> {
         let mut q = Self::zero();
         let mut r = self.clone();
         let d = divisor.degree();
-        while r != Self::zero() && r.degree() > divisor.degree() {
+        while r != Self::zero() && r.degree() >= divisor.degree() {
             // The leading term is lead(r) / lead(divisor).
             // Let lead(r) = a * x ^ b.
             // Let lead(divisor) = c * x ^ d
@@ -246,7 +246,9 @@ impl<FE: FiniteField> Debug for Polynomial<FE> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "P(x) = {:?}", self.constant)?;
         for (i, coeff) in self.coefficients.iter().enumerate() {
-            write!(f, " + {:?} * x^{}", coeff, i + 1)?;
+            if *coeff != FE::zero() {
+                write!(f, " + {:?} * x^{}", coeff, i + 1)?;
+            }
         }
         Ok(())
     }
@@ -392,6 +394,7 @@ mod tests {
                 }
             }
         }
+        // We don't want collisions between x values.
         call_with_big_finite_fields!(f);
     }
 
@@ -408,6 +411,12 @@ mod tests {
                     continue;
                 }
                 let (q, r) = a.divmod(&b);
+                assert!(
+                    r == Polynomial::zero() || r.degree() < b.degree(),
+                    "{:?} {:?}",
+                    r,
+                    b
+                );
                 b *= &q;
                 b += &r;
                 // a = b*q + r

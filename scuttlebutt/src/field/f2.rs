@@ -81,7 +81,7 @@ impl FiniteField for F2 {
     }
 
     fn reduce_multiplication_over() -> Polynomial<Self::PrimeField> {
-        Polynomial::one()
+        Polynomial::x()
     }
 }
 
@@ -143,29 +143,35 @@ field_ops!(F2);
 mod tests {
     use super::*;
     use num_bigint::BigUint;
-    use quickcheck_macros::quickcheck;
+    use proptest::prelude::*;
 
-    impl quickcheck::Arbitrary for F2 {
-        fn arbitrary<RNG: RngCore>(mut g: &mut RNG) -> F2 {
-            F2::random(&mut g)
+    impl Arbitrary for F2 {
+        type Parameters = ();
+        type Strategy = BoxedStrategy<Self>;
+
+        fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
+            any::<bool>()
+                .prop_map(|x| F2(if x { 1 } else { 0 }))
+                .boxed()
         }
     }
 
     macro_rules! test_binop {
         ($name:ident, $op:ident) => {
-            #[cfg(test)]
-            #[quickcheck]
-            fn $name(mut a: F2, b: F2) -> bool {
-                let mut x = a.0;
-                let y = b.0;
-                a.$op(&b);
-                // This is a hack! That's okay, this is a test!
-                if stringify!($op) == "sub_assign" {
-                    x += F2::MODULUS;
+            proptest! {
+                #[test]
+                fn $name(mut a in any::<F2>(), b in any::<F2>()) {
+                    let mut x = a.0;
+                    let y = b.0;
+                    a.$op(&b);
+                    // This is a hack! That's okay, this is a test!
+                    if stringify!($op) == "sub_assign" {
+                        x += F2::MODULUS;
+                    }
+                    x.$op(&y);
+                    x = x % F2::MODULUS;
+                    assert_eq!(a.0, x);
                 }
-                x.$op(&y);
-                x = x % F2::MODULUS;
-                a.0 == x
             }
         };
     }
@@ -174,14 +180,16 @@ mod tests {
     test_binop!(test_sub, sub_assign);
     test_binop!(test_mul, mul_assign);
 
-    #[cfg(test)]
     test_field!(test_f2, F2);
-    #[quickcheck]
-    fn check_pow(x: F2, n: u128) -> bool {
-        let m = BigUint::from(F2::MODULUS);
-        let exp = BigUint::from(n);
-        let a = BigUint::from(u8::from(x));
-        let left = BigUint::from(u8::from(x.pow(n)));
-        left == a.modpow(&exp, &m)
+
+    proptest! {
+        #[test]
+        fn check_pow(x in any::<F2>(), n in any::<u128>()) {
+            let m = BigUint::from(F2::MODULUS);
+            let exp = BigUint::from(n);
+            let a = BigUint::from(u8::from(x));
+            let left = BigUint::from(u8::from(x.pow(n)));
+            assert_eq!(left, a.modpow(&exp, &m));
+        }
     }
 }
