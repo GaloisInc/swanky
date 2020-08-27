@@ -6,29 +6,21 @@
 
 //! Correlated Oblivious Product Evaluation with errors (COPEe)
 //!
-//! This module provides traits COPEe
+//! This module provides traits for COPEe
 
 pub mod base_svole;
-pub mod svole_ext;
 mod copee;
+pub mod svole_ext;
 
 use crate::errors::Error;
 use scuttlebutt::{field::FiniteField as FF, AbstractChannel};
 
-/// A type for security parameters
+/// A type for parameters such as input length.
 pub struct Params;
 
 impl Params {
-    /// Security parameter kappa.
-    /*pub const KAPPA: usize = 128;
-    /// Prime field modulus.
-    pub const PRIME: u128 = 340_282_366_920_938_463_463_374_607_431_768_211_297; // 2^128-159*/
-    /// The number of bits required to represent a field element
-    //pub const M: usize = 128;
     /// Input length
     pub const N: usize = 1;
-    /// The exponent `r` when field is of the form `F(p^r)`.
-    pub const R: usize = 1;
 }
 
 /// A trait for COPEe Sender.
@@ -43,7 +35,7 @@ where
     fn send<C: AbstractChannel>(
         &mut self,
         channel: &mut C,
-        input: Vec<Self::Msg>,
+        input: Vec<<Self::Msg as FF>::PrimeField>,
     ) -> Result<Vec<Self::Msg>, Error>;
 }
 
@@ -77,7 +69,7 @@ where
     fn send<C: AbstractChannel>(
         &mut self,
         channel: &mut C,
-    ) -> Result<(Vec<Self::Msg>, Vec<Self::Msg>), Error>;
+    ) -> Result<(Vec<<Self::Msg as FF>::PrimeField>, Vec<Self::Msg>), Error>;
 }
 
 /// A trait for Copee Receiver
@@ -105,7 +97,7 @@ mod tests {
         ot::{KosReceiver, KosSender, RandomReceiver as ROTReceiver, RandomSender as ROTSender},
         svole::{
             base_svole::{Receiver as VoleReceiver, Sender as VoleSender},
-            copee::{Receiver as CpReceiver, Sender as CpSender},
+            copee::{to_fpr, Receiver as CpReceiver, Sender as CpSender},
             CopeeReceiver,
             CopeeSender,
             Params,
@@ -139,7 +131,7 @@ mod tests {
         let w_ = w.clone();
         let seed = rand::random::<Block>();
         let mut rng = AesRng::from_seed(seed);
-        let input = vec![FF::random(&mut rng)];
+        let input = vec![FE::PrimeField::random(&mut rng)];
         let u = input.clone();
         let (sender, receiver) = UnixStream::pair().unwrap();
         let handle = std::thread::spawn(move || {
@@ -161,7 +153,7 @@ mod tests {
         let w_ = w_.lock().unwrap();
         for i in 0..u.len() {
             let mut temp = delta.clone();
-            temp.mul_assign(u[i]);
+            temp.mul_assign(to_fpr(u[i]));
             temp.add_assign(gv[i]);
             assert_eq!(w_[i], temp);
         }
@@ -178,7 +170,7 @@ mod tests {
         >();
     }
 
-    /// Testing svole protocol
+    // Testing svole protocol
 
     fn test_svole<
         ROTS: ROTSender + Malicious,
@@ -218,7 +210,7 @@ mod tests {
         assert_eq!(delta, delta);
         for i in 0..Params::N {
             let mut right = delta.clone();
-            right.mul_assign(u_[i]);
+            right.mul_assign(to_fpr(u_[i]));
             if let Some(x) = v.as_ref() {
                 right += x[i];
             }

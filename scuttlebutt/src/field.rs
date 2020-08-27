@@ -35,10 +35,6 @@ pub trait FiniteField:
     + std::iter::Sum
     + std::iter::Product
 {
-    /// A type for prime sub-field.
-    type PrimeSubField: FiniteField;
-    /// A type to represent vector length of $GF(p^r)$.
-    type R: ArrayLength<Self::PrimeSubField>;
     /// The number of bytes in the byte representation for this field element.
     type ByteReprLen: ArrayLength<u8>;
     /// The error that can result from trying to decode an invalid byte sequence.
@@ -248,8 +244,7 @@ pub use fp::{BiggerThanModulus, Fp};
 mod f2;
 pub use f2::{BiggerThanModulus as F2BiggerThanModulus, F2};
 
-// Temporarily disabling GF(2^128)
-//mod gf_2_128;
-//pub use gf_2_128::{Gf128, Gf128BytesDeserializationCannotFail};
+mod gf_2_128;
+pub use gf_2_128::{Gf128, Gf128BytesDeserializationCannotFail};
 
 pub mod polynomial;

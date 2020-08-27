@@ -46,8 +46,6 @@ impl Fp {
 }
 
 impl FiniteField for Fp {
-    type PrimeSubField = Self;
-    type R = generic_array::typenum::U1;
     /// There is a slight bias towards the range $[0,158]$.
     /// There is a $\frac{159}{2^128} \approx 4.6 \times 10^{-37}$ chance of seeing this bias.
     fn random<R: RngCore + ?Sized>(rng: &mut R) -> Self {
@@ -99,7 +97,7 @@ impl FiniteField for Fp {
     }
 
     fn reduce_multiplication_over() -> Polynomial<Self::PrimeField> {
-        Polynomial::one()
+        Polynomial::x()
     }
 }
 
@@ -185,29 +183,28 @@ field_ops!(Fp);
 mod tests {
     use super::*;
     use num_bigint::BigUint;
-    use quickcheck_macros::quickcheck;
+    use proptest::prelude::*;
 
-    impl quickcheck::Arbitrary for Fp {
-        fn arbitrary<RNG: RngCore>(mut g: &mut RNG) -> Fp {
-            Fp::random(&mut g)
-        }
+    fn any_f() -> impl Strategy<Value = Fp> {
+        any::<u128>().prop_map(|x| Fp(x % Fp::MODULUS))
     }
 
     macro_rules! test_binop {
         ($name:ident, $op:ident) => {
-            #[cfg(test)]
-            #[quickcheck]
-            fn $name(mut a: Fp, b: Fp) -> bool {
-                let mut x = BigUint::from(a.0);
-                let y = BigUint::from(b.0);
-                a.$op(&b);
-                // This is a hack! That's okay, this is a test!
-                if stringify!($op) == "sub_assign" {
-                    x += BigUint::from(Fp::MODULUS);
+            proptest! {
+                #[test]
+                fn $name(mut a in any_f(), b in any_f()) {
+                    let mut x = BigUint::from(a.0);
+                    let y = BigUint::from(b.0);
+                    a.$op(&b);
+                    // This is a hack! That's okay, this is a test!
+                    if stringify!($op) == "sub_assign" {
+                        x += BigUint::from(Fp::MODULUS);
+                    }
+                    x.$op(&y);
+                    x = x % BigUint::from(Fp::MODULUS);
+                    assert_eq!(BigUint::from(a.0), x);
                 }
-                x.$op(&y);
-                x = x % BigUint::from(Fp::MODULUS);
-                BigUint::from(a.0) == x
             }
         };
     }
@@ -219,12 +216,14 @@ mod tests {
     #[cfg(test)]
     test_field!(test_fp, Fp);
 
-    #[quickcheck]
-    fn check_pow(x: Fp, n: u128) -> bool {
-        let m = BigUint::from(Fp::MODULUS);
-        let exp = BigUint::from(n);
-        let a = BigUint::from(u128::from(x));
-        let left = BigUint::from(u128::from(x.pow(n)));
-        left == a.modpow(&exp, &m)
+    proptest! {
+        #[test]
+        fn check_pow(x in any_f(), n in any::<u128>()) {
+            let m = BigUint::from(Fp::MODULUS);
+            let exp = BigUint::from(n);
+            let a = BigUint::from(u128::from(x));
+            let left = BigUint::from(u128::from(x.pow(n)));
+            assert_eq!(left, a.modpow(&exp, &m));
+        }
     }
 }

@@ -24,9 +24,9 @@ impl Params {
     /// The number of bits required to represent a field element
     //pub const M: usize = 128;
     /// Input length
-    pub const N: usize = 1;
+    pub const H: usize = 3;
     /// The exponent `r` when field is of the form `F(p^r)`.
-    pub const R: usize = 1;
+    pub const N: usize = 2 ^ (Params::H);
 }
 
 /// A trait for SpsVole Sender.
@@ -41,7 +41,7 @@ where
     fn send<C: AbstractChannel>(
         &mut self,
         channel: &mut C,
-    ) -> Result<(Vec<Self::Msg>, Vec<Self::Msg>), Error>;
+    ) -> Result<(Vec<FE::PrimeField>, Vec<FE>), Error>;
 }
 
 /// A trait for SpsVole Sender.
@@ -60,4 +60,3 @@ where
         channel: &mut C,
     ) -> Result<Option<Vec<Self::Msg>>, Error>;
 }
-
