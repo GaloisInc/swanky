@@ -244,8 +244,7 @@ pub use fp::{BiggerThanModulus, Fp};
 mod f2;
 pub use f2::{BiggerThanModulus as F2BiggerThanModulus, F2};
 
-// Temporarily disabling GF(2^128)
-//mod gf_2_128;
-//pub use gf_2_128::{Gf128, Gf128BytesDeserializationCannotFail};
+mod gf_2_128;
+pub use gf_2_128::{Gf128, Gf128BytesDeserializationCannotFail};
 
 pub mod polynomial;
