@@ -6,9 +6,9 @@
 
 //! Correlated Oblivious Product Evaluation with errors (COPEe)
 //!
-//! This module provides traits COPEe
+//! This module provides traits for COPEe
 
-pub mod base_svole;
+//pub mod base_svole;
 mod copee;
 
 use crate::errors::Error;
@@ -18,16 +18,8 @@ use scuttlebutt::{field::FiniteField as FF, AbstractChannel};
 pub struct Params;
 
 impl Params {
-    /// Security parameter kappa.
-    /*pub const KAPPA: usize = 128;
-    /// Prime field modulus.
-    pub const PRIME: u128 = 340_282_366_920_938_463_463_374_607_431_768_211_297; // 2^128-159*/
-    /// The number of bits required to represent a field element
-    //pub const M: usize = 128;
     /// Input length
     pub const N: usize = 1;
-    /// The exponent `r` when field is of the form `F(p^r)`.
-    pub const R: usize = 1;
 }
 
 /// A trait for COPEe Sender.
@@ -42,7 +34,7 @@ where
     fn send<C: AbstractChannel>(
         &mut self,
         channel: &mut C,
-        input: Vec<Self::Msg>,
+        input: Vec<<Self::Msg as FF>::PrimeField>,
     ) -> Result<Vec<Self::Msg>, Error>;
 }
 
@@ -103,13 +95,10 @@ mod tests {
     use crate::{
         ot::{KosReceiver, KosSender, RandomReceiver as ROTReceiver, RandomSender as ROTSender},
         svole::{
-            base_svole::{Receiver as VoleReceiver, Sender as VoleSender},
-            copee::{Receiver as CpReceiver, Sender as CpSender},
+            copee::{to_fpr, Receiver as CpReceiver, Sender as CpSender},
             CopeeReceiver,
             CopeeSender,
             Params,
-            SVoleReceiver,
-            SVoleSender,
         },
     };
     use rand::SeedableRng;
@@ -138,7 +127,7 @@ mod tests {
         let w_ = w.clone();
         let seed = rand::random::<Block>();
         let mut rng = AesRng::from_seed(seed);
-        let input = vec![FF::random(&mut rng)];
+        let input = vec![FE::PrimeField::random(&mut rng)];
         let u = input.clone();
         let (sender, receiver) = UnixStream::pair().unwrap();
         let handle = std::thread::spawn(move || {
@@ -160,7 +149,7 @@ mod tests {
         let w_ = w_.lock().unwrap();
         for i in 0..u.len() {
             let mut temp = delta.clone();
-            temp.mul_assign(u[i]);
+            temp.mul_assign(to_fpr(u[i]));
             temp.add_assign(gv[i]);
             assert_eq!(w_[i], temp);
         }
@@ -177,9 +166,9 @@ mod tests {
         >();
     }
 
-    /// Testing svole protocol
+    // Testing svole protocol
 
-    fn test_svole<
+    /*fn test_svole<
         ROTS: ROTSender + Malicious,
         ROTR: ROTReceiver + Malicious,
         FE: FF + Sync + Send,
@@ -236,5 +225,5 @@ mod tests {
             VoleSender<KosSender, CpSender<KosSender, Fp>, Fp>,
             VoleReceiver<KosReceiver, CpReceiver<KosReceiver, Fp>, Fp>,
         >();
-    }
+    }*/
 }

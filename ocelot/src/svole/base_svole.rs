@@ -63,7 +63,9 @@ impl<OT: OtSender<Msg = Block> + Malicious, FE: FF, CP: CopeeSender<Msg = FE>> S
         assert_eq!(u.len(), Params::N);
         let u_ = u.clone();
         // Sampling `ah`s h in `[r]`.
-        let a: Vec<FE> = (0..Params::R).map(|_| FE::random(&mut rng)).collect();
+        let a: Vec<FE> = (0..FE::PolynomialFormNumCoefficients::to_usize())
+            .map(|_| FE::random(&mut rng))
+            .collect();
         //Calling COPEe extend on the vector `u`.
         let w = self.copee.send(channel, u.clone())?;
         let w_ = w.clone();
@@ -85,7 +87,7 @@ impl<OT: OtSender<Msg = Block> + Malicious, FE: FF, CP: CopeeSender<Msg = FE>> S
             chi_.add_assign(sum);
             chi_
         });
-        let x = (0..Params::R).fold(x_sum, |mut sum, h| {
+        let x = (0..FE::PolynomialFormNumCoefficients::to_usize()).fold(x_sum, |mut sum, h| {
             let mut g_h = g.pow(h as u128);
             g_h.mul_assign(a[h]);
             sum.add_assign(g_h);
@@ -98,7 +100,7 @@ impl<OT: OtSender<Msg = Block> + Malicious, FE: FF, CP: CopeeSender<Msg = FE>> S
             sum.add_assign(chi[i]);
             sum
         });
-        let z = (0..Params::R).fold(z_sum, |mut sum, h| {
+        let z = (0..FE::PolynomialFormNumCoefficients::to_usize()).fold(z_sum, |mut sum, h| {
             let g_h = g.pow(h as u128);
             c[h].mul_assign(g_h);
             sum.add_assign(c[h]);
@@ -162,7 +164,7 @@ impl<OT: OtReceiver<Msg = Block> + Malicious, FE: FF, CP: CopeeReceiver<Msg = FE
             chi[i]
         });
         let g = FE::generator();
-        let y = (0..Params::R).fold(y_sum, |sum, h| {
+        let y = (0..FE::PolynomialFormNumCoefficients::to_usize()).fold(y_sum, |sum, h| {
             let powr = g.pow(h as u128);
             b[h].mul_assign(powr);
             b[h].add_assign(sum);
