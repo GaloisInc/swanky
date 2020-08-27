@@ -8,13 +8,13 @@
 //!
 //! This module provides traits for COPEe
 
-//pub mod base_svole;
+pub mod base_svole;
 mod copee;
 
 use crate::errors::Error;
 use scuttlebutt::{field::FiniteField as FF, AbstractChannel};
 
-/// A type for security parameters
+/// A type for parameters such as input length.
 pub struct Params;
 
 impl Params {
@@ -68,7 +68,7 @@ where
     fn send<C: AbstractChannel>(
         &mut self,
         channel: &mut C,
-    ) -> Result<(Vec<Self::Msg>, Vec<Self::Msg>), Error>;
+    ) -> Result<(Vec<<Self::Msg as FF>::PrimeField>, Vec<Self::Msg>), Error>;
 }
 
 /// A trait for Copee Receiver
@@ -95,10 +95,13 @@ mod tests {
     use crate::{
         ot::{KosReceiver, KosSender, RandomReceiver as ROTReceiver, RandomSender as ROTSender},
         svole::{
+            base_svole::{Receiver as VoleReceiver, Sender as VoleSender},
             copee::{to_fpr, Receiver as CpReceiver, Sender as CpSender},
             CopeeReceiver,
             CopeeSender,
             Params,
+            SVoleReceiver,
+            SVoleSender,
         },
     };
     use rand::SeedableRng;
@@ -168,7 +171,7 @@ mod tests {
 
     // Testing svole protocol
 
-    /*fn test_svole<
+    fn test_svole<
         ROTS: ROTSender + Malicious,
         ROTR: ROTReceiver + Malicious,
         FE: FF + Sync + Send,
@@ -206,7 +209,7 @@ mod tests {
         assert_eq!(delta, delta);
         for i in 0..Params::N {
             let mut right = delta.clone();
-            right.mul_assign(u_[i]);
+            right.mul_assign(to_fpr(u_[i]));
             if let Some(x) = v.as_ref() {
                 right += x[i];
             }
@@ -225,5 +228,5 @@ mod tests {
             VoleSender<KosSender, CpSender<KosSender, Fp>, Fp>,
             VoleReceiver<KosReceiver, CpReceiver<KosReceiver, Fp>, Fp>,
         >();
-    }*/
+    }
 }
