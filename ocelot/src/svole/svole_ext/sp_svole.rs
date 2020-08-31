@@ -263,7 +263,7 @@ impl<
             })
             .collect();
         let mut y = y_star.clone();
-        for i in 0..r{
+        for i in 0..r {
             x_star[i].mul_assign(self.delta);
             y[i].sub_assign(x_star[i]);
         }
