@@ -4,182 +4,154 @@
 // Copyright © 2020 Galois, Inc.
 // See LICENSE for licensing information.
 
-//! Subfield Vector Oblivious Linear-function Evaluation (SVOLE)
-//!
-//! This module provides implementations of SVOLE Traits.
+//! Implementation of the Weng-Yang-Katz-Wang base SVOLE protocol (cf.
+//! <https://eprint.iacr.org/2020/925>, Figure 13).
 
 use crate::{
     errors::Error,
-    ot::{Receiver as OtReceiver, Sender as OtSender},
-    svole::{copee::to_fpr, CopeeReceiver, CopeeSender, Params, SVoleReceiver, SVoleSender},
+    svole::{copee::to_fpr, CopeeReceiver, CopeeSender, SVoleReceiver, SVoleSender},
 };
 use digest::generic_array::typenum::Unsigned;
 use generic_array::GenericArray;
-use rand::SeedableRng;
-use scuttlebutt::{field::FiniteField as FF, AbstractChannel, AesRng, Block, Malicious};
+use rand::{CryptoRng, Rng};
+use scuttlebutt::{field::FiniteField as FF, AbstractChannel};
 use std::marker::PhantomData;
 
-//use scuttlebutt::ff_derive::FE as PrimeField;
-/// A SVOLE Sender.
+/// SVOLE sender.
 #[derive(Clone)]
-pub struct Sender<OT: OtSender + Malicious, CP: CopeeSender, FE: FF> {
-    _ot: PhantomData<OT>,
-    _cp: PhantomData<CP>,
+pub struct Sender<CP: CopeeSender, FE: FF> {
     _fe: PhantomData<FE>,
     copee: CP,
 }
 
-/// A SVOLE Receiver.
+/// SVOLE receiver.
 #[derive(Clone)]
-pub struct Receiver<OT: OtReceiver + Malicious, CP: CopeeReceiver, FE: FF> {
-    _ot: PhantomData<OT>,
-    _cp: PhantomData<CP>,
+pub struct Receiver<CP: CopeeReceiver, FE: FF> {
     _fe: PhantomData<FE>,
-    delta: FE,
     copee: CP,
 }
 
-/// Implement SVoleSender for Sender type.
-impl<OT: OtSender<Msg = Block> + Malicious, FE: FF, CP: CopeeSender<Msg = FE>> SVoleSender
-    for Sender<OT, CP, FE>
-{
+impl<FE: FF, CP: CopeeSender<Msg = FE>> SVoleSender for Sender<CP, FE> {
     type Msg = FE;
-    fn init<C: AbstractChannel>(channel: &mut C) -> Result<Self, Error> {
-        let csender = CP::init(channel).unwrap();
+    fn init<C: AbstractChannel, RNG: CryptoRng + Rng>(
+        channel: &mut C,
+        rng: &mut RNG,
+    ) -> Result<Self, Error> {
+        let copee = CP::init(channel, rng).unwrap();
         Ok(Self {
-            _ot: PhantomData::<OT>,
-            _cp: PhantomData::<CP>,
             _fe: PhantomData::<FE>,
-            copee: csender,
+            copee,
         })
     }
 
-    fn send<C: AbstractChannel>(
+    fn send<C: AbstractChannel, RNG: CryptoRng + Rng>(
         &mut self,
         channel: &mut C,
+        len: usize,
+        mut rng: &mut RNG,
     ) -> Result<(Vec<FE::PrimeField>, Vec<FE>), Error> {
         let g = FE::generator();
-        let seed = rand::random::<Block>();
-        let mut rng = AesRng::from_seed(seed);
-        // Sampling `ui`s i for in `[n]`.
-        let u: Vec<FE::PrimeField> = (0..Params::N)
-            .map(|_| FE::PrimeField::random(&mut rng))
-            .collect();
-        assert_eq!(u.len(), Params::N);
-        let u_ = u.clone();
-        // Sampling `ah`s h in `[r]`.
-        let a: Vec<FE::PrimeField> = (0..FE::PolynomialFormNumCoefficients::to_usize())
-            .map(|_| FE::PrimeField::random(&mut rng))
-            .collect();
-        //Calling COPEe extend on the vector `u`.
-        let w = self.copee.send(channel, u.clone())?;
-        let w_ = w.clone();
-        // Calling COPEe on the vector `a`
-        let mut c = self.copee.send(channel, a.clone())?;
+        let r = FE::PolynomialFormNumCoefficients::to_usize();
+        let u: Vec<FE::PrimeField> = (0..len).map(|_| FE::PrimeField::random(&mut rng)).collect();
+        let a: Vec<FE::PrimeField> = (0..r).map(|_| FE::PrimeField::random(&mut rng)).collect();
+        let w = self.copee.send(channel, &u)?;
+        let c = self.copee.send(channel, &a)?;
         let nbytes = FE::ByteReprLen::to_usize();
-        // Sender receives `chi`s from the receiver
-        let mut chi: Vec<FE> = (0..Params::N)
+        let mut chi: Vec<FE> = (0..len)
             .map(|_| {
+                // XXX: turn into function
                 let mut data = vec![0u8; nbytes];
                 channel.read_bytes(&mut data).unwrap();
                 FE::from_bytes(GenericArray::from_slice(&data)).unwrap()
             })
             .collect();
-        // Sender computes x
-        let x_sum = (0..Params::N).fold(FE::zero(), |sum, i| {
-            let mut chi_ = chi[i].clone();
-            chi_.mul_assign(to_fpr(u[i]));
+        let x = chi.iter().zip(u.iter()).fold(FE::zero(), |sum, (chi, u)| {
+            let mut chi_ = chi.clone();
+            chi_.mul_assign(to_fpr(*u));
             chi_.add_assign(sum);
             chi_
         });
-        let x = (0..FE::PolynomialFormNumCoefficients::to_usize()).fold(x_sum, |mut sum, h| {
+        let x = (0..r).fold(x, |mut sum, h| {
             let mut g_h = g.pow(h as u128);
             g_h.mul_assign(to_fpr(a[h]));
             sum.add_assign(g_h);
             sum
         });
-
-        // Sender computes z
-        let z_sum = (0..Params::N).fold(FE::zero(), |mut sum, i| {
+        let z = (0..len).fold(FE::zero(), |mut sum, i| {
             chi[i].mul_assign(w[i]);
             sum.add_assign(chi[i]);
             sum
         });
-        let z = (0..FE::PolynomialFormNumCoefficients::to_usize()).fold(z_sum, |mut sum, h| {
-            let g_h = g.pow(h as u128);
-            c[h].mul_assign(g_h);
-            sum.add_assign(c[h]);
+        let z = (0..r).fold(z, |mut sum, h| {
+            let mut g_h = g.pow(h as u128);
+            g_h.mul_assign(c[h]);
+            sum.add_assign(g_h);
             sum
         });
-
-        // Send out (x, z) to the Receiver.
+        // XXX add a channel.write_field function?
         channel.write_bytes(x.to_bytes().as_slice())?;
         channel.write_bytes(z.to_bytes().as_slice())?;
         channel.flush()?;
-        Ok((u_, w_))
+        Ok((u, w))
     }
 }
 
-/// Implement SVoleReceiver for Receiver type.
-impl<OT: OtReceiver<Msg = Block> + Malicious, FE: FF, CP: CopeeReceiver<Msg = FE>> SVoleReceiver
-    for Receiver<OT, CP, FE>
-{
+impl<FE: FF, CP: CopeeReceiver<Msg = FE>> SVoleReceiver for Receiver<CP, FE> {
     type Msg = FE;
-    fn init<C: AbstractChannel>(channel: &mut C) -> Result<Self, Error> {
-        let cp = CP::init(channel).unwrap();
-        let delta = cp.get_delta();
+    fn init<C: AbstractChannel, RNG: CryptoRng + Rng>(
+        channel: &mut C,
+        rng: &mut RNG,
+    ) -> Result<Self, Error> {
+        let cp = CP::init(channel, rng).unwrap();
         Ok(Self {
-            _ot: PhantomData::<OT>,
-            _cp: PhantomData::<CP>,
             _fe: PhantomData::<FE>,
             copee: cp,
-            delta,
         })
     }
 
-    fn get_delta(&self) -> FE {
-        self.delta
+    fn delta(&self) -> FE {
+        self.copee.delta()
     }
 
-    fn receive<C: AbstractChannel>(&mut self, channel: &mut C) -> Result<Option<Vec<FE>>, Error> {
-        let v: Vec<FE> = self.copee.receive(channel, Params::N).unwrap();
-        let v_ = v.clone();
-        let mut b: Vec<FE> = self.copee.receive(channel, Params::N).unwrap();
+    fn receive<C: AbstractChannel, RNG: CryptoRng + Rng>(
+        &mut self,
+        channel: &mut C,
+        len: usize,
+        mut rng: &mut RNG,
+    ) -> Result<Option<Vec<FE>>, Error> {
+        let g = FE::generator();
+        let r = FE::PolynomialFormNumCoefficients::to_usize();
+        let v: Vec<FE> = self.copee.receive(channel, len).unwrap();
+        let b: Vec<FE> = self.copee.receive(channel, r).unwrap();
         let nbytes = FE::ByteReprLen::to_usize();
-        // Sampling `chi`s.
-        let seed = rand::random::<Block>();
-        let mut rng = AesRng::from_seed(seed);
-        let mut chi: Vec<FE> = (0..Params::N).map(|_| FE::random(&mut rng)).collect();
-        // Send `chi`s to the Sender.
-        for i in 0..Params::N {
+        let chi: Vec<FE> = (0..len).map(|_| FE::random(&mut rng)).collect();
+        for i in 0..len {
             channel.write_bytes(chi[i].to_bytes().as_slice()).unwrap();
         }
         channel.flush()?;
-        // Receive (x, z) from the Sender.
         let mut data_x = vec![0u8; nbytes];
         channel.read_bytes(&mut data_x).unwrap();
         let x = FE::from_bytes(GenericArray::from_slice(&data_x)).unwrap();
         let mut data_z = vec![0u8; nbytes];
         channel.read_bytes(&mut data_z).unwrap();
         let z = FE::from_bytes(GenericArray::from_slice(&data_z)).unwrap();
-        // compute y
-        let y_sum = (0..Params::N).fold(FE::zero(), |sum, i| {
-            chi[i].mul_assign(v[i]);
-            chi[i].add_assign(sum);
-            chi[i]
+        let y = (0..len).fold(FE::zero(), |sum, i| {
+            let mut chi_ = chi[i].clone();
+            chi_.mul_assign(v[i]);
+            chi_.add_assign(sum);
+            chi_
         });
-        let g = FE::generator();
-        let y = (0..FE::PolynomialFormNumCoefficients::to_usize()).fold(y_sum, |sum, h| {
-            let powr = g.pow(h as u128);
-            b[h].mul_assign(powr);
-            b[h].add_assign(sum);
-            b[h]
+        let y = (0..r).fold(y, |sum, h| {
+            let mut powr = g.pow(h as u128);
+            powr.mul_assign(b[h]);
+            powr.add_assign(sum);
+            powr
         });
-        let mut delta_ = self.delta.clone();
+        let mut delta_ = self.copee.delta().clone();
         delta_.mul_assign(x);
         delta_.add_assign(y);
         if z == delta_ {
-            Ok(Some(v_))
+            Ok(Some(v))
         } else {
             Ok(None)
         }
