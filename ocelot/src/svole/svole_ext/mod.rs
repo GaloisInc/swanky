@@ -41,7 +41,7 @@ where
     fn send<C: AbstractChannel>(
         &mut self,
         channel: &mut C,
-    ) -> Result<(Vec<FE::PrimeField>, Vec<FE>), Error>;
+    ) -> Result<(Vec<<Self::Msg as FF>::PrimeField>, Vec<Self::Msg>), Error>;
 }
 
 /// A trait for SpsVole Sender.

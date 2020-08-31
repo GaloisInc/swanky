@@ -71,7 +71,7 @@ pub fn ggm<FE: FF>(kappa: usize, seed: Block) -> (Vec<FE>, Vec<(Block, Block)>) 
 
 pub fn ggm_prime<FE: FF>(alpha: usize, ots: Vec<Block>) -> Vec<FE> {
     // TODO: fix this later
-    let v: Vec<FE> = (0..Params::N)
+    let mut v: Vec<FE> = (0..Params::N)
         .map(|i| {
             let mut rng = AesRng::from_seed(ots[i]);
             FE::random(&mut rng)
@@ -80,6 +80,9 @@ pub fn ggm_prime<FE: FF>(alpha: usize, ots: Vec<Block>) -> Vec<FE> {
     v.remove(alpha - 1);
     v
 }
+
+/// dot product
+
 /// Implement SpsVole for Sender type.
 impl<
         OT: OtReceiver<Msg = Block> + Malicious,
@@ -100,14 +103,18 @@ impl<
         })
     }
 
-    fn send<C: AbstractChannel>(&mut self, channel: &mut C) -> Result<(Vec<FE>, Vec<FE>), Error> {
+    fn send<C: AbstractChannel>(
+        &mut self,
+        channel: &mut C,
+    ) -> Result<(Vec<FE::PrimeField>, Vec<FE>), Error> {
+        let r = FE::PolynomialFormNumCoefficients::to_usize();
         let (a, c) = self.svole.send(channel).unwrap();
         let g = FE::PrimeField::generator();
         let seed = rand::random::<Block>();
         let mut rng = AesRng::from_seed(seed);
         let beta = g.pow(rng.gen_range(0, FE::MULTIPLICATIVE_GROUP_ORDER));
         // Sends out a'=\beta-a
-        let a_prime = beta.clone();
+        let mut a_prime = beta.clone();
         a_prime.sub_assign(a[0]);
         channel.write_bytes(a_prime.to_bytes().as_slice())?;
         // Samples \alpha in [0,n)
@@ -115,36 +122,66 @@ impl<
         let mut u = vec![FE::PrimeField::zero(); Params::N];
         u[alpha] = beta;
         // bool vec for alpha
-        let alpha_bv = unpack_bits(&alpha.to_le_bytes(), Params::H);
+        let mut alpha_bv = unpack_bits(&alpha.to_le_bytes(), Params::H);
         // flip bits
-        for item in &mut alpha_bv.iter() {
-            *item = !*item
+        for i in 0..alpha_bv.len() {
+            alpha_bv[i] = !alpha_bv[i];
         }
-        let ot_receiver = OT::init(channel, &mut rng).unwrap();
+        let mut ot_receiver = OT::init(channel, &mut rng).unwrap();
         let ots = ot_receiver.receive(channel, &alpha_bv, &mut rng).unwrap();
-        let v:Vec<FE> = ggm_prime(alpha, ots);
+        let v: Vec<FE> = ggm_prime(alpha, ots);
         let delta_ = c[0];
         let nbytes = FE::ByteReprLen::to_usize();
         let mut data = vec![0u8; nbytes];
         channel.read_bytes(&mut data).unwrap();
-        let d = FE::from_bytes(GenericArray::from_slice(&data)).unwrap();
-        let mut w:Vec<FE> = (0..Params::N)
-            .map(|i| {
-                if i != alpha {
-                v[i]
-                } else {
-                 FE::zero()
-                }
-            })
+        let mut d = FE::from_bytes(GenericArray::from_slice(&data)).unwrap();
+        let mut w: Vec<FE> = (0..Params::N)
+            .map(|i| if i != alpha { v[i] } else { FE::zero() })
             .collect();
-        let sum_w = (0..Params::N).filter(|i| *i != alpha).fold(FE::zero(), |mut sum:FE, i| {
-            sum.add_assign(w[i]);
-            sum});
+        let sum_w = (0..Params::N)
+            .filter(|i| *i != alpha)
+            .fold(FE::zero(), |mut sum: FE, i| {
+                sum.add_assign(w[i]);
+                sum
+            });
         d.add_assign(sum_w);
         w[alpha] = delta_;
         w[alpha].sub_assign(d);
-        let (x, z) = self.svole.send(channel).unwrap();
-        
+        /// Both parties send (extend, r), gets (x, z)
+        let (x, z): (Vec<_>, Vec<FE>) = self.svole.send(channel).unwrap();
+        // Sampling `chi`s.
+        let seed = rand::random::<Block>();
+        let mut rng = AesRng::from_seed(seed);
+        let mut chi: Vec<FE> = (0..Params::N).map(|_| FE::random(&mut rng)).collect();
+        let mut chi_poly_coeffs = chi[alpha].to_polynomial_coefficients();
+        let x_star: Vec<FE> = (0..r)
+            .map(|i| {
+                chi_poly_coeffs[i].mul_assign(beta);
+                chi_poly_coeffs[i].sub_assign(x[i]);
+                to_fpr(chi_poly_coeffs[i])
+            })
+            .collect();
+        // Sends chis and x_star
+        for item in chi.iter() {
+            channel.write_bytes(item.to_bytes().as_slice())?;
+        }
+        for item in x_star.iter() {
+            channel.write_bytes(item.to_bytes().as_slice())?;
+        }
+        let zee = (0..r).fold(FE::zero(), |mut sum, i| {
+            let g_i = g.pow(i as u128);
+            let mut temp = z[i].clone();
+            temp.mul_assign(to_fpr(g_i));
+            sum.add_assign(temp);
+            sum
+        });
+        let mut va = (0..Params::N).fold(FE::zero(), |mut sum, i| {
+            chi[i].mul_assign(w[i]);
+            sum.add_assign(chi[i]);
+            sum
+        });
+        va.sub_assign(zee);
+        Ok((u, w))
     }
 }
 /// Implement SVoleReceiver for Receiver type.
@@ -174,7 +211,10 @@ impl<
     }
 
     fn receive<C: AbstractChannel>(&mut self, channel: &mut C) -> Result<Option<Vec<FE>>, Error> {
-        let Some(b) = self.svole.receive(channel).unwrap();
+        let mut b = Vec::default();
+        if let Some(b_) = self.svole.receive(channel).unwrap() {
+            b = b_;
+        }
         let nbytes =
             <<FE as scuttlebutt::field::FiniteField>::PrimeField as FF>::ByteReprLen::to_usize();
         // receive a_prime from the sender
@@ -190,7 +230,7 @@ impl<
         let seed = rand::random::<Block>();
         let (v, ot_pairs) = ggm(2 ^ (Params::N) - 1, seed);
         let mut rng = AesRng::from_seed(seed);
-        let ot_sender = OT::init(channel, &mut rng).unwrap();
+        let mut ot_sender = OT::init(channel, &mut rng).unwrap();
         ot_sender.send(channel, &ot_pairs, &mut rng)?;
         channel.flush()?;
         // compute d and sends out
@@ -203,7 +243,10 @@ impl<
         channel.write_bytes(a_prime.to_bytes().as_slice())?;
         channel.flush()?;
         let r = FE::ByteReprLen::to_usize();
-        let Some(y_star) = self.svole.receive(channel).unwrap();
+        let mut y_star = Vec::default();
+        if let Some(y) = self.svole.receive(channel).unwrap() {
+            y_star = y;
+        }
         // Receives `chi`s from the Sender
         let mut chi: Vec<FE> = (0..Params::N)
             .map(|_| {
@@ -220,8 +263,10 @@ impl<
             })
             .collect();
         let mut y = y_star.clone();
-        (0..x_star.len()).map(|i| x_star[i].mul_assign(self.delta));
-        (0..y.len()).map(|i| y[i].sub_assign(x_star[i]));
+        for i in 0..r{
+            x_star[i].mul_assign(self.delta);
+            y[i].sub_assign(x_star[i]);
+        }
         // sets Y
         let g = FE::generator();
         let y_ = (0..r).fold(FE::zero(), |mut sum, i| {
@@ -230,11 +275,12 @@ impl<
             sum.add_assign(y[i]);
             sum
         });
-        let vb = (0..Params::N).fold(FE::zero(), |mut sum, i| {
+        let mut vb = (0..Params::N).fold(FE::zero(), |mut sum, i| {
             chi[i].mul_assign(v[i]);
             sum.add_assign(chi[i]);
             sum
         });
         vb.sub_assign(y_);
+        Ok(None)
     }
 }
