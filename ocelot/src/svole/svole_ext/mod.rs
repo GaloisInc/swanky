@@ -17,15 +17,9 @@ use scuttlebutt::{field::FiniteField as FF, AbstractChannel};
 pub struct Params;
 
 impl Params {
-    /// Security parameter kappa.
-    /*pub const KAPPA: usize = 128;
-    /// Prime field modulus.
-    pub const PRIME: u128 = 340_282_366_920_938_463_463_374_607_431_768_211_297; // 2^128-159*/
-    /// The number of bits required to represent a field element
-    //pub const M: usize = 128;
-    /// Input length
+    /// The exponent in the input vector length `n = 2^h`.
     pub const H: usize = 3;
-    /// The exponent `r` when field is of the form `F(p^r)`.
+    /// The input vector length `n = 2^h`.
     pub const N: usize = 2 ^ (Params::H);
 }
 
@@ -35,9 +29,12 @@ where
     Self: Sized,
 {
     /// Message type, restricted to types that are mutably-dereferencable as
-    /// `u8` arrays.
+    /// `u8` arrays, and implements Finite Field trait.
     type Msg: Sized + FF;
+    /// Runs any one-time initialization.
     fn init<C: AbstractChannel>(channel: &mut C) -> Result<Self, Error>;
+    /// Runs single-point svole and outputs pair of vectors `(u, w)` such that
+    /// the correlation $w = u\Delta+v$ holds.
     fn send<C: AbstractChannel>(
         &mut self,
         channel: &mut C,
@@ -50,10 +47,12 @@ where
     Self: Sized,
 {
     /// Message type, restricted to types that are mutably-dereferencable as
-    /// `u8` arrays.
+    /// `u8` arrays, and implements Finite Field trait.
     type Msg: Sized + FF;
+    /// Runs any one-time initialization.
     fn init<C: AbstractChannel>(channel: &mut C) -> Result<Self, Error>;
-    /// To retrieve delta from the receiver type.
+    /// Runs single-point svole and outputs a vector `v` such that
+    /// the correlation $w = u\Delta+v$ holds.
     fn get_delta(&self) -> Self::Msg;
     fn receive<C: AbstractChannel>(
         &mut self,

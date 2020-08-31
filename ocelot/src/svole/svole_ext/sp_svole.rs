@@ -12,7 +12,7 @@ use crate::{
     errors::Error,
     ot::{Receiver as OtReceiver, Sender as OtSender},
     svole::{
-        copee::{to_fp, to_fpr},
+        copee::to_fpr,
         svole_ext::{Params, SpsVoleReceiver, SpsVoleSender},
         CopeeReceiver,
         CopeeSender,
@@ -147,7 +147,7 @@ impl<
         d.add_assign(sum_w);
         w[alpha] = delta_;
         w[alpha].sub_assign(d);
-        /// Both parties send (extend, r), gets (x, z)
+        // Both parties send (extend, r), gets (x, z)
         let (x, z): (Vec<_>, Vec<FE>) = self.svole.send(channel).unwrap();
         // Sampling `chi`s.
         let seed = rand::random::<Block>();
@@ -190,7 +190,7 @@ impl<
         FE: FF,
         CP: CopeeReceiver<Msg = FE>,
         SV: SVoleReceiver<Msg = FE>,
-    > SVoleReceiver for Receiver<OT, CP, FE, SV>
+    > SpsVoleReceiver for Receiver<OT, CP, FE, SV>
 {
     type Msg = FE;
     fn init<C: AbstractChannel>(channel: &mut C) -> Result<Self, Error> {
