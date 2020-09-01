@@ -5,7 +5,7 @@
 // See LICENSE for licensing information.
 
 //! Implementation of the Weng-Yang-Katz-Wang COPEe protocol (cf.
-//! <https://eprint.iacr.org/2020/925>).
+//! <https://eprint.iacr.org/2020/925>, Figure 12).
 
 use crate::{
     errors::Error,
@@ -16,13 +16,7 @@ use digest::generic_array::typenum::Unsigned;
 use generic_array::GenericArray;
 use rand::{CryptoRng, Rng, SeedableRng};
 use scuttlebutt::{
-    field::FiniteField as FF,
-    utils::unpack_bits,
-    AbstractChannel,
-    Aes128,
-    AesRng,
-    Block,
-    Malicious,
+    field::FiniteField as FF, utils::unpack_bits, AbstractChannel, Aes128, AesRng, Block, Malicious,
 };
 use std::{
     marker::PhantomData,
@@ -33,9 +27,10 @@ use subtle::{Choice, ConditionallySelectable};
 /// COPEe sender.
 #[derive(Clone)]
 pub struct Sender<ROT: ROTSender + Malicious, FE: FF> {
-    _fe: PhantomData<FE>,
     _ot: PhantomData<ROT>,
-    sv: Vec<(Block, Block)>,
+    keys: Vec<(Block, Block)>,
+    pows: Vec<FE>,
+    twos: Vec<FE>,
     nbits: usize,
 }
 
@@ -46,7 +41,10 @@ pub struct Receiver<ROT: ROTReceiver + Malicious, FE: FF> {
     _ot: PhantomData<ROT>,
     delta: FE,
     choices: Vec<bool>,
-    mv: Vec<Block>,
+    keys: Vec<Block>,
+    pows: Vec<FE>,
+    twos: Vec<FE>,
+    nbits: usize,
 }
 
 /// Convert `Fp` to `F(p^r)`
@@ -77,12 +75,18 @@ impl<ROT: ROTSender<Msg = Block> + Malicious, FE: FF> CopeeSender for Sender<ROT
         let mut ot = ROT::init(channel, &mut rng).unwrap();
         let nbits = FE::MODULUS_NBITS as usize;
         let r = FE::PolynomialFormNumCoefficients::to_usize();
-        let samples = ot.send_random(channel, nbits * r, &mut rng).unwrap();
+        let keys = ot.send_random(channel, nbits * r, &mut rng).unwrap();
+        let g = FE::generator();
+        let pows = (0..r).map(|j| g.pow(j as u128)).collect();
+        let mut two = FE::one();
+        two.add_assign(FE::one());
+        let twos = (0..nbits).map(|j| two.pow(j as u128)).collect();
         Ok(Self {
-            _fe: PhantomData::<FE>,
             _ot: PhantomData::<ROT>,
-            sv: samples,
+            keys,
             nbits,
+            pows,
+            twos,
         })
     }
 
@@ -91,39 +95,29 @@ impl<ROT: ROTSender<Msg = Block> + Malicious, FE: FF> CopeeSender for Sender<ROT
         channel: &mut C,
         input: &[FE::PrimeField],
     ) -> Result<Vec<FE>, Error> {
-        let mut w = Vec::default();
-        let r = FE::PolynomialFormNumCoefficients::to_usize();
-        let g = FE::generator();
-        let mut two = FE::one();
-        two.add_assign(FE::one());
+        let mut w = vec![];
         for (i, u) in input.iter().enumerate() {
+            let pt = Block::from(i as u128);
             let mut res = FE::zero();
-            for j in 0..r {
+            for (j, pow) in self.pows.iter().enumerate() {
                 let mut sum = FE::zero();
-                for k in 0..self.nbits {
-                    // Aes encryption as a PRF
-                    let pt = Block::from(i as u128);
-                    let mut w0 = prf::<FE>(self.sv[j * self.nbits + k].0, pt);
-                    let w1 = prf::<FE>(self.sv[j * self.nbits + k].1, pt);
-                    let tmp = two.pow(k as u128);
-                    let mut powr = FE::conditional_select(
-                        &tmp,
-                        &FE::one(),
-                        Choice::from((self.nbits == 1) as u8),
-                    );
-                    powr.mul_assign(to_fpr(w0));
-                    sum.add_assign(powr);
+                for (k, two) in self.twos.iter().enumerate() {
+                    let (k0, k1) = self.keys[j * self.nbits + k];
+                    let mut w0 = prf::<FE>(k0, pt);
+                    let w1 = prf::<FE>(k1, pt);
+                    let mut tmp = to_fpr::<FE>(w0);
+                    tmp.mul_assign(*two);
+                    sum.add_assign(tmp);
                     w0.sub_assign(w1);
                     w0.sub_assign(*u);
                     channel.write_bytes(&w0.to_bytes())?;
-                    channel.flush()?;
                 }
-                let powg = g.pow(j as u128);
-                sum.mul_assign(powg);
+                sum.mul_assign(*pow);
                 res.add_assign(sum);
             }
             w.push(res);
         }
+        channel.flush()?;
         Ok(w)
     }
 }
@@ -136,17 +130,25 @@ impl<ROT: ROTReceiver<Msg = Block> + Malicious, FE: FF> CopeeReceiver for Receiv
         mut rng: &mut RNG,
     ) -> Result<Self, Error> {
         let nbits = FE::MODULUS_NBITS as usize;
+        let g = FE::generator();
         let r = FE::PolynomialFormNumCoefficients::to_usize();
         let mut ot = ROT::init(channel, &mut rng).unwrap();
         let delta = FE::random(&mut rng);
         let choices = unpack_bits(delta.to_bytes().as_slice(), nbits * r);
-        let mv = ot.receive_random(channel, &choices, &mut rng).unwrap();
+        let pows = (0..r).map(|j| g.pow(j as u128)).collect();
+        let mut two = FE::one();
+        two.add_assign(FE::one());
+        let twos = (0..nbits).map(|j| two.pow(j as u128)).collect();
+        let keys = ot.receive_random(channel, &choices, &mut rng).unwrap();
         Ok(Self {
             _fe: PhantomData::<FE>,
             _ot: PhantomData::<ROT>,
             delta,
             choices,
-            mv,
+            pows,
+            twos,
+            keys,
+            nbits,
         })
     }
 
@@ -160,30 +162,22 @@ impl<ROT: ROTReceiver<Msg = Block> + Malicious, FE: FF> CopeeReceiver for Receiv
         len: usize,
     ) -> Result<Vec<FE>, Error> {
         let mut output = Vec::default();
-        let nbits = FE::MODULUS_NBITS as usize;
-        let r = FE::PolynomialFormNumCoefficients::to_usize();
-        let mut two = FE::one();
-        two.add_assign(FE::one());
-        let g = FE::generator();
         for i in 0..len {
+            let pt = Block::from(i as u128);
             let mut res = FE::zero();
-            for j in 0..r {
+            for (j, pow) in self.pows.iter().enumerate() {
                 let mut sum = FE::zero();
-                for k in 0..nbits {
-                    let pt = Block::from(i as u128);
-                    let w_delta = prf::<FE>(self.mv[j * nbits + k], pt);
-                    let mut tau: FE::PrimeField = channel.read_sub_fe::<FE>().unwrap();
-                    let choice = Choice::from(self.choices[j * nbits + k] as u8);
-                    tau.add_assign(w_delta);
-                    let v = FE::PrimeField::conditional_select(&w_delta, &tau, choice);
-                    let tmp = two.pow(k as u128);
-                    let mut powr =
-                        FE::conditional_select(&tmp, &FE::one(), Choice::from((nbits == 1) as u8));
-                    powr.mul_assign(to_fpr(v));
-                    sum.add_assign(powr);
+                for (k, two) in self.twos.iter().enumerate() {
+                    let w = prf::<FE>(self.keys[j * self.nbits + k], pt);
+                    let mut tau = channel.read_sub_fe::<FE>()?;
+                    let choice = Choice::from(self.choices[j + k] as u8);
+                    tau.add_assign(w);
+                    let v = FE::PrimeField::conditional_select(&w, &tau, choice);
+                    let mut tmp = to_fpr::<FE>(v);
+                    tmp.mul_assign(*two);
+                    sum.add_assign(tmp);
                 }
-                let powg = g.pow(j as u128);
-                sum.mul_assign(powg);
+                sum.mul_assign(*pow);
                 res.add_assign(sum);
             }
             output.push(res);

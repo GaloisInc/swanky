@@ -12,19 +12,13 @@ use ocelot::{
     svole::{
         base_svole::{Receiver as VoleReceiver, Sender as VoleSender},
         copee::{Receiver as CpReceiver, Sender as CpSender},
-        CopeeReceiver,
-        CopeeSender,
-        SVoleReceiver,
-        SVoleSender,
+        CopeeReceiver, CopeeSender, SVoleReceiver, SVoleSender,
     },
 };
 use rand::SeedableRng;
 use scuttlebutt::{
-    field::{FiniteField as FF, Fp, Gf128},
-    AesRng,
-    Block,
-    Channel,
-    Malicious,
+    field::{FiniteField as FF, Fp},
+    AesRng, Block, Channel, Malicious,
 };
 use std::{
     io::{BufReader, BufWriter},
@@ -33,7 +27,7 @@ use std::{
 };
 
 /// Specifies length of the input vector `u`
-const T: usize = 1 << 18;
+const T: usize = 1 << 10;
 
 fn _bench_svole<
     ROTS: ROTSender + Malicious,
