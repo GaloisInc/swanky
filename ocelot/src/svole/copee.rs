@@ -109,8 +109,8 @@ impl<ROT: ROTSender<Msg = Block> + Malicious, FE: FF> CopeeSender for Sender<ROT
                 for k in 0..self.nbits {
                     // Aes encryption as a PRF
                     let pt = Block::from(i as u128);
-                    let mut w0 = prf::<FE>(self.sv[j + k].0, pt);
-                    let w1 = prf::<FE>(self.sv[j + k].1, pt);
+                    let mut w0 = prf::<FE>(self.sv[j * self.nbits + k].0, pt);
+                    let w1 = prf::<FE>(self.sv[j * self.nbits + k].1, pt);
                     let tmp = two.pow(k as u128);
                     let mut powr = FE::conditional_select(
                         &tmp,
@@ -180,9 +180,9 @@ impl<ROT: ROTReceiver<Msg = Block> + Malicious, FE: FF> CopeeReceiver for Receiv
                 let mut sum = FE::zero();
                 for k in 0..nbits {
                     let pt = Block::from(i as u128);
-                    let w_delta = prf::<FE>(self.mv[j + k], pt);
+                    let w_delta = prf::<FE>(self.mv[j * nbits + k], pt);
                     let mut tau = to_fp::<FE>(channel.read_fe().unwrap());
-                    let choice = Choice::from(self.choices[j + k] as u8);
+                    let choice = Choice::from(self.choices[j * nbits + k] as u8);
                     tau.add_assign(w_delta);
                     let v = FE::PrimeField::conditional_select(&w_delta, &tau, choice);
                     let tmp = two.pow(k as u128);

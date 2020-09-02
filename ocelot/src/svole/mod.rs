@@ -188,7 +188,7 @@ mod tests {
             CpSender<KosSender, Fp>,
             CpReceiver<KosReceiver, Fp>,
         >();
-        /* test_copee_::<
+        /*test_copee_::<
             KosSender,
             KosReceiver,
             Gf128,
