@@ -1,7 +1,7 @@
 // -*- mode: rust; -*-
 //
 // This file is part of `scuttlebutt`.
-// Copyright © 2019 Galois, Inc.
+// Copyright © 2020 Galois, Inc.
 // See LICENSE for licensing information.
 
 mod hash_channel;
@@ -17,9 +17,10 @@ pub use track_channel::TrackChannel;
 #[cfg(unix)]
 pub use unix_channel::{track_unix_channel_pair, unix_channel_pair, TrackUnixChannel, UnixChannel};
 
-use crate::{Block, Block512};
+use crate::{field::FiniteField, Block, Block512};
 #[cfg(feature = "curve25519-dalek")]
 use curve25519_dalek::ristretto::{CompressedRistretto, RistrettoPoint};
+use generic_array::GenericArray;
 use std::{
     cell::RefCell,
     io::{Read, Result, Write},
@@ -208,6 +209,36 @@ pub trait AbstractChannel {
             }
         };
         Ok(pt)
+    }
+    /// Read a field element from the channel.
+    fn read_fe<FE: FiniteField>(&mut self) -> Result<FE> {
+        let mut buf = GenericArray::<u8, FE::ByteReprLen>::default();
+        self.read_bytes(&mut buf[..])?;
+        let fe = match FE::from_bytes(&buf) {
+            Ok(fe) => fe,
+            Err(e) => return Err(std::io::Error::new(std::io::ErrorKind::Other, e)),
+        };
+        Ok(fe)
+    }
+
+    /// Read a prime field element from the channel.
+    fn read_sub_fe<FE: FiniteField>(&mut self) -> Result<FE::PrimeField> {
+        let mut buf = GenericArray::<
+            u8,
+            <<FE as FiniteField>::PrimeField as FiniteField>::ByteReprLen,
+        >::default();
+        self.read_bytes(&mut buf[..])?;
+        let fe = match FE::PrimeField::from_bytes(&buf) {
+            Ok(fe) => fe,
+            Err(e) => return Err(std::io::Error::new(std::io::ErrorKind::Other, e)),
+        };
+        Ok(fe)
+    }
+
+    /// Write a field element to the channel.
+    fn write_fe<FE: FiniteField>(&mut self, x: FE) -> Result<()> {
+        self.write_bytes(&x.to_bytes())?;
+        Ok(())
     }
 }
 

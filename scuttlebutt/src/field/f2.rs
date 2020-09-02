@@ -29,11 +29,6 @@ impl ConditionallySelectable for F2 {
     }
 }
 
-impl F2 {
-    /// The prime field modulus: $2$
-    pub const MODULUS: u8 = 2;
-}
-
 impl FiniteField for F2 {
     /// This uniformly generates a field element either 0 or 1 for `F2` type.
     fn random<R: RngCore + ?Sized>(rng: &mut R) -> Self {
@@ -73,6 +68,8 @@ impl FiniteField for F2 {
     ) -> Self {
         coeff[0]
     }
+    /// The prime field modulus: $2$
+    const MODULUS: u128 = 2;
 
     fn to_polynomial_coefficients(
         &self,
@@ -121,7 +118,7 @@ impl TryFrom<u8> for F2 {
     type Error = BiggerThanModulus;
 
     fn try_from(value: u8) -> Result<Self, Self::Error> {
-        if value < Self::MODULUS {
+        if value < Self::MODULUS as u8 {
             Ok(F2(value))
         } else {
             Err(BiggerThanModulus)
@@ -166,10 +163,10 @@ mod tests {
                     a.$op(&b);
                     // This is a hack! That's okay, this is a test!
                     if stringify!($op) == "sub_assign" {
-                        x += F2::MODULUS;
+                        x += F2::MODULUS as u8;
                     }
                     x.$op(&y);
-                    x = x % F2::MODULUS;
+                    x = x % F2::MODULUS as u8;
                     assert_eq!(a.0, x);
                 }
             }
