@@ -79,11 +79,7 @@ impl<ROT: ROTSender<Msg = Block> + Malicious, FE: FF> CopeeSender for Sender<ROT
         mut rng: &mut RNG,
     ) -> Result<Self, Error> {
         let mut ot = ROT::init(channel, &mut rng).unwrap();
-        let nbits = (u32::conditional_select(
-            &(128 - FE::MODULUS.leading_zeros()),
-            &1,
-            Choice::from((FE::MODULUS == 2) as u8),
-        )) as usize;
+        let nbits = 128 - (FE::MODULUS - 1).leading_zeros() as usize;
         let r = FE::PolynomialFormNumCoefficients::to_usize();
         let keys = ot.send_random(channel, nbits * r, &mut rng).unwrap();
         let g = FE::generator();
@@ -139,11 +135,7 @@ impl<ROT: ROTReceiver<Msg = Block> + Malicious, FE: FF> CopeeReceiver for Receiv
         channel: &mut C,
         mut rng: &mut RNG,
     ) -> Result<Self, Error> {
-        let nbits = (u32::conditional_select(
-            &(128 - FE::MODULUS.leading_zeros()),
-            &1,
-            Choice::from((FE::MODULUS == 2) as u8),
-        )) as usize;
+        let nbits = 128 - (FE::MODULUS - 1).leading_zeros() as usize;
         let g = FE::generator();
         let r = FE::PolynomialFormNumCoefficients::to_usize();
         let mut ot = ROT::init(channel, &mut rng).unwrap();
