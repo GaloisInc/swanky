@@ -215,13 +215,8 @@ pub trait AbstractChannel {
         let mut buf = GenericArray::<u8, FE::ByteReprLen>::default();
         self.read_bytes(&mut buf[..])?;
         let fe = match FE::from_bytes(&buf) {
-            Ok(x) => x,
-            _ => {
-                return Err(std::io::Error::new(
-                    std::io::ErrorKind::InvalidData,
-                    "unable read field element",
-                ));
-            }
+            Ok(fe) => fe,
+            Err(e) => return Err(std::io::Error::new(std::io::ErrorKind::Other, e)),
         };
         Ok(fe)
     }
@@ -235,12 +230,7 @@ pub trait AbstractChannel {
         self.read_bytes(&mut buf[..])?;
         let fe = match FE::PrimeField::from_bytes(&buf) {
             Ok(fe) => fe,
-            _ => {
-                return Err(std::io::Error::new(
-                    std::io::ErrorKind::InvalidData,
-                    "unable to read prime field element",
-                ));
-            }
+            Err(e) => return Err(std::io::Error::new(std::io::ErrorKind::Other, e)),
         };
         Ok(fe)
     }
