@@ -118,12 +118,17 @@ mod tests {
         svole::{
             base_svole::{Receiver as VoleReceiver, Sender as VoleSender},
             copee::{to_fpr, Receiver as CpReceiver, Sender as CpSender},
-            CopeeReceiver, CopeeSender, SVoleReceiver, SVoleSender,
+            CopeeReceiver,
+            CopeeSender,
+            SVoleReceiver,
+            SVoleSender,
         },
     };
     use scuttlebutt::{
         field::{FiniteField as FF, Fp, Gf128, F2},
-        AesRng, Channel, Malicious,
+        AesRng,
+        Channel,
+        Malicious,
     };
     use std::{
         io::{BufReader, BufWriter},

@@ -35,9 +35,6 @@ impl ConditionallySelectable for Fp {
 }
 
 impl Fp {
-    /// The prime field modulus: $2^{128} - 159$
-    pub const MODULUS: u128 = 340_282_366_920_938_463_463_374_607_431_768_211_297;
-
     // This function is required by the uint_full_mul_reg macro
     #[inline(always)]
     const fn split_u128(a: u128) -> (u64, u64) {
@@ -76,7 +73,9 @@ impl FiniteField for Fp {
     }
 
     const MULTIPLICATIVE_GROUP_ORDER: u128 = Self::MODULUS - 1;
-    const MODULUS_NBITS: u128 = 128;
+
+    /// The prime field modulus: $2^{128} - 159$
+    const MODULUS: u128 = 340_282_366_920_938_463_463_374_607_431_768_211_297;
 
     fn generator() -> Self {
         Fp(5)

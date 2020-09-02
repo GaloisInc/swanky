@@ -12,13 +12,19 @@ use ocelot::{
     svole::{
         base_svole::{Receiver as VoleReceiver, Sender as VoleSender},
         copee::{Receiver as CpReceiver, Sender as CpSender},
-        CopeeReceiver, CopeeSender, SVoleReceiver, SVoleSender,
+        CopeeReceiver,
+        CopeeSender,
+        SVoleReceiver,
+        SVoleSender,
     },
 };
 use rand::SeedableRng;
 use scuttlebutt::{
     field::{FiniteField as FF, Fp},
-    AesRng, Block, Channel, Malicious,
+    AesRng,
+    Block,
+    Channel,
+    Malicious,
 };
 use std::{
     io::{BufReader, BufWriter},
