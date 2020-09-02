@@ -60,11 +60,6 @@ pub fn to_fpr<FE: FF>(x: FE::PrimeField) -> FE {
     FE::from_polynomial_coefficients(g_arr)
 }
 
-/// Convert `F(p^r)` to `F(p)`
-fn to_fp<FE: FF>(x: FE) -> FE::PrimeField {
-    FE::to_polynomial_coefficients(&x)[0]
-}
-
 fn prf<FE: FF>(key: Block, pt: Block) -> FE::PrimeField {
     let aes = Aes128::new(key);
     let seed = aes.encrypt(pt);
@@ -80,15 +75,14 @@ impl<ROT: ROTSender<Msg = Block> + Malicious, FE: FF> CopeeSender for Sender<ROT
         mut rng: &mut RNG,
     ) -> Result<Self, Error> {
         let mut ot = ROT::init(channel, &mut rng).unwrap();
-        let nbytes =
-            <<FE as scuttlebutt::field::FiniteField>::PrimeField as FF>::ByteReprLen::to_usize();
+        let nbits = FE::MODULUS_NBITS as usize;
         let r = FE::PolynomialFormNumCoefficients::to_usize();
-        let samples = ot.send_random(channel, nbytes * 8 * r, &mut rng).unwrap();
+        let samples = ot.send_random(channel, nbits * r, &mut rng).unwrap();
         Ok(Self {
             _fe: PhantomData::<FE>,
             _ot: PhantomData::<ROT>,
             sv: samples,
-            nbits: nbytes * 8,
+            nbits,
         })
     }
 
@@ -141,12 +135,11 @@ impl<ROT: ROTReceiver<Msg = Block> + Malicious, FE: FF> CopeeReceiver for Receiv
         channel: &mut C,
         mut rng: &mut RNG,
     ) -> Result<Self, Error> {
-        let nbytes =
-            <<FE as scuttlebutt::field::FiniteField>::PrimeField as FF>::ByteReprLen::to_usize();
+        let nbits = FE::MODULUS_NBITS as usize;
         let r = FE::PolynomialFormNumCoefficients::to_usize();
         let mut ot = ROT::init(channel, &mut rng).unwrap();
         let delta = FE::random(&mut rng);
-        let choices = unpack_bits(delta.to_bytes().as_slice(), nbytes * 8 * r);
+        let choices = unpack_bits(delta.to_bytes().as_slice(), nbits * r);
         let mv = ot.receive_random(channel, &choices, &mut rng).unwrap();
         Ok(Self {
             _fe: PhantomData::<FE>,
@@ -167,13 +160,11 @@ impl<ROT: ROTReceiver<Msg = Block> + Malicious, FE: FF> CopeeReceiver for Receiv
         len: usize,
     ) -> Result<Vec<FE>, Error> {
         let mut output = Vec::default();
-        let nbytes =
-            <<FE as scuttlebutt::field::FiniteField>::PrimeField as FF>::ByteReprLen::to_usize();
-        let nbits = nbytes * 8;
+        let nbits = FE::MODULUS_NBITS as usize;
         let r = FE::PolynomialFormNumCoefficients::to_usize();
         let mut two = FE::one();
         two.add_assign(FE::one());
-        let g = FE::PrimeField::generator();
+        let g = FE::generator();
         for i in 0..len {
             let mut res = FE::zero();
             for j in 0..r {
@@ -181,7 +172,7 @@ impl<ROT: ROTReceiver<Msg = Block> + Malicious, FE: FF> CopeeReceiver for Receiv
                 for k in 0..nbits {
                     let pt = Block::from(i as u128);
                     let w_delta = prf::<FE>(self.mv[j * nbits + k], pt);
-                    let mut tau = to_fp::<FE>(channel.read_fe().unwrap());
+                    let mut tau: FE::PrimeField = channel.read_sub_fe::<FE>().unwrap();
                     let choice = Choice::from(self.choices[j * nbits + k] as u8);
                     tau.add_assign(w_delta);
                     let v = FE::PrimeField::conditional_select(&w_delta, &tau, choice);
@@ -191,34 +182,12 @@ impl<ROT: ROTReceiver<Msg = Block> + Malicious, FE: FF> CopeeReceiver for Receiv
                     powr.mul_assign(to_fpr(v));
                     sum.add_assign(powr);
                 }
-                let powg = to_fpr::<FE>(g).pow(j as u128);
+                let powg = g.pow(j as u128);
                 sum.mul_assign(powg);
                 res.add_assign(sum);
             }
             output.push(res);
         }
         Ok(output)
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use scuttlebutt::{
-        field::{FiniteField as FF, Fp, Gf128},
-        AesRng,
-    };
-
-    fn to_type_fpr<FE: FF>() {
-        let mut rng = AesRng::new();
-        let x = FE::random(&mut rng);
-        assert_eq!(to_fpr::<FE>(to_fp(x)), x);
-    }
-
-    #[test]
-    fn test_to_fpr() {
-        to_type_fpr::<Fp>();
-        //TODO: the following test fails at the moment.
-        //to_type_fpr::<Gf128>();
     }
 }

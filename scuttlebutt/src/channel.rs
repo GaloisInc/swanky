@@ -225,6 +225,25 @@ pub trait AbstractChannel {
         };
         Ok(fe)
     }
+
+    fn read_sub_fe<FE: FiniteField>(&mut self) -> Result<FE::PrimeField> {
+        let mut buf = GenericArray::<
+            u8,
+            <<FE as FiniteField>::PrimeField as FiniteField>::ByteReprLen,
+        >::default();
+        self.read_bytes(&mut buf[..])?;
+        let fe = match FE::PrimeField::from_bytes(&buf) {
+            Ok(fe) => fe,
+            _ => {
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    "unable to get a field elt",
+                ));
+            }
+        };
+        Ok(fe)
+    }
+
     /// Write a field element to the channel.
     fn write_fe<FE: FiniteField>(&mut self, x: FE) -> Result<()> {
         self.write_bytes(&x.to_bytes())?;

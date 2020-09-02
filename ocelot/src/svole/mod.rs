@@ -126,7 +126,7 @@ mod tests {
     };
     use rand::SeedableRng;
     use scuttlebutt::{
-        field::{FiniteField as FF, Fp, Gf128},
+        field::{FiniteField as FF, Fp, Gf128, F2},
         AesRng,
         Block,
         Channel,
@@ -188,13 +188,20 @@ mod tests {
             CpSender<KosSender, Fp>,
             CpReceiver<KosReceiver, Fp>,
         >();
-        /*test_copee_::<
+        test_copee_::<
             KosSender,
             KosReceiver,
             Gf128,
             CpSender<KosSender, Gf128>,
             CpReceiver<KosReceiver, Gf128>,
-        >();*/
+        >();
+        test_copee_::<
+            KosSender,
+            KosReceiver,
+            F2,
+            CpSender<KosSender, F2>,
+            CpReceiver<KosReceiver, F2>,
+        >();
     }
 
     fn test_svole<
@@ -256,6 +263,24 @@ mod tests {
             CpReceiver<KosReceiver, Fp>,
             VoleSender<CpSender<KosSender, Fp>, Fp>,
             VoleReceiver<CpReceiver<KosReceiver, Fp>, Fp>,
+        >();
+        test_svole::<
+            KosSender,
+            KosReceiver,
+            Gf128,
+            CpSender<KosSender, Gf128>,
+            CpReceiver<KosReceiver, Gf128>,
+            VoleSender<CpSender<KosSender, Gf128>, Gf128>,
+            VoleReceiver<CpReceiver<KosReceiver, Gf128>, Gf128>,
+        >();
+        test_svole::<
+            KosSender,
+            KosReceiver,
+            F2,
+            CpSender<KosSender, F2>,
+            CpReceiver<KosReceiver, F2>,
+            VoleSender<CpSender<KosSender, F2>, F2>,
+            VoleReceiver<CpReceiver<KosReceiver, F2>, F2>,
         >();
     }
 }

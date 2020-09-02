@@ -71,6 +71,7 @@ pub trait FiniteField:
     /// The order of the multiplicative group
     // TODO: we'll want a better number type than u128 if the fields get bigger.
     const MULTIPLICATIVE_GROUP_ORDER: u128;
+    const MODULUS_NBITS: u128;
     /// Return a generator for the multiplicative group.
     fn generator() -> Self;
     /// Return the additive identity element.

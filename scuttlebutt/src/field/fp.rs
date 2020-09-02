@@ -76,6 +76,7 @@ impl FiniteField for Fp {
     }
 
     const MULTIPLICATIVE_GROUP_ORDER: u128 = Self::MODULUS - 1;
+    const MODULUS_NBITS: u128 = 128;
 
     fn generator() -> Self {
         Fp(5)

@@ -73,6 +73,7 @@ impl FiniteField for F2 {
     ) -> Self {
         coeff[0]
     }
+    const MODULUS_NBITS: u128 = 1;
 
     fn to_polynomial_coefficients(
         &self,

@@ -298,6 +298,7 @@ impl FiniteField for Gf128 {
     }
 
     const MULTIPLICATIVE_GROUP_ORDER: u128 = u128::max_value();
+    const MODULUS_NBITS: u128 = 1;
 
     fn generator() -> Self {
         // See the conversation here: https://mattermost.galois.com/galwegians/pl/63smzhk9qbnrbbsb1hi6xpejmc
