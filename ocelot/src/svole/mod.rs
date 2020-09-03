@@ -27,8 +27,10 @@ where
         channel: &mut C,
         rng: &mut RNG,
     ) -> Result<Self, Error>;
-    /// Runs COPEe extend on input vector `u` and returns vector `w` such that
-    /// the correlation `w = uΔ + v` holds.
+    ///Runs COPEe extend on input vector `u`, where each element is from `FE::PrimeField` of length `len`
+    /// and returns vector `w` of the same length such that the correlation `w = u'Δ + v` holds.
+    ///  Note that `u'` is the resulted vector from converting `u` to a vector of elements of extended field `FE`.
+    /// The vector length `len` should match with the Receiver's input length, otherwise, the program hangs.
     fn send<C: AbstractChannel>(
         &mut self,
         channel: &mut C,
@@ -51,8 +53,10 @@ where
     ) -> Result<Self, Error>;
     /// Returns the receiver choice `Δ`.
     fn delta(&self) -> Self::Msg;
-    /// Runs COPEe extend on input size `len` and returns vector `v` such that
-    /// the correlation `w = uΔ + v` holds.
+    ///Runs COPEe extend on input `u` (elements from `FE::PrimeField`) of size `len` and
+    ///returns a vector `v` of the same length such that the correlation `w = u'Δ + v` holds.
+    /// Note that `u'` is the resulted vector from converting `u` to a vector of elements of extended field `FE`.
+    /// Again, the vector length `len` should match with Sender's input vector length, otherwise, the program hangs.
     fn receive<C: AbstractChannel>(
         &mut self,
         channel: &mut C,
@@ -74,8 +78,9 @@ where
         rng: &mut RNG,
     ) -> Result<Self, Error>;
     /// Runs sVole extend on input length `len` and returns `(u, w)`, where `u`
-    /// is a randomly generated input vector of length `len`, such that
-    /// the correlation $w = u\Delta+v$ holds.
+    /// is a randomly generated input vector from `FE::PrimeField` of length `len` such that
+    /// the correlation `w = u'Δ + v`, `u'` is the converted vector of `u` to the vector of type `FE`, holds.
+    /// The vector length `len` should match with the Receiver's input length, otherwise, the program runs forever.
     fn send<C: AbstractChannel, RNG: CryptoRng + Rng>(
         &mut self,
         channel: &mut C,
@@ -97,10 +102,12 @@ where
         channel: &mut C,
         rng: &mut RNG,
     ) -> Result<Self, Error>;
-    /// Returns Receiver's choice $\Delta$.
+    /// Returns the receiver choice `Δ`.
     fn delta(&self) -> Self::Msg;
     /// Runs sVole extend on input length `len` and returns `v` such that
-    /// the correlation $w = u\Delta+v$ holds.
+    /// the correlation `w = u'Δ + v`, `u'` is the converted vector from
+    /// `u` to the vector of elements of the extended field `FE`, holds.
+    /// The vector length `len` should match with the Sender's input `len`, otherwise it never terminates.
     fn receive<C: AbstractChannel, RNG: CryptoRng + Rng>(
         &mut self,
         channel: &mut C,
@@ -111,8 +118,6 @@ where
 
 #[cfg(test)]
 mod tests {
-    #[cfg(feature = "nightly")]
-    use super::*;
     use crate::{
         ot::{KosReceiver, KosSender, RandomReceiver as ROTReceiver, RandomSender as ROTSender},
         svole::{
