@@ -36,7 +36,7 @@ impl<FE: FF, CP: CopeeSender<Msg = FE>> SVoleSender for Sender<CP, FE> {
         channel: &mut C,
         rng: &mut RNG,
     ) -> Result<Self, Error> {
-        let copee = CP::init(channel, rng).unwrap();
+        let copee = CP::init(channel, rng)?;
         Ok(Self {
             _fe: PhantomData::<FE>,
             copee,
@@ -92,7 +92,7 @@ impl<FE: FF, CP: CopeeReceiver<Msg = FE>> SVoleReceiver for Receiver<CP, FE> {
         channel: &mut C,
         rng: &mut RNG,
     ) -> Result<Self, Error> {
-        let cp = CP::init(channel, rng).unwrap();
+        let cp = CP::init(channel, rng)?;
         Ok(Self {
             _fe: PhantomData::<FE>,
             copee: cp,
@@ -111,15 +111,15 @@ impl<FE: FF, CP: CopeeReceiver<Msg = FE>> SVoleReceiver for Receiver<CP, FE> {
     ) -> Result<Option<Vec<FE>>, Error> {
         let g = FE::generator();
         let r = FE::PolynomialFormNumCoefficients::to_usize();
-        let v: Vec<FE> = self.copee.receive(channel, len).unwrap();
-        let b: Vec<FE> = self.copee.receive(channel, r).unwrap();
+        let v: Vec<FE> = self.copee.receive(channel, len)?;
+        let b: Vec<FE> = self.copee.receive(channel, r)?;
         let chi: Vec<FE> = (0..len).map(|_| FE::random(&mut rng)).collect();
         for x in chi.iter() {
             channel.write_fe(*x)?;
         }
         channel.flush()?;
         let x = channel.read_fe()?;
-        let z: FE = channel.read_fe().unwrap();
+        let z: FE = channel.read_fe()?;
         let y = (0..len).fold(FE::zero(), |sum, i| {
             let mut chi_ = chi[i].clone();
             chi_.mul_assign(v[i]);

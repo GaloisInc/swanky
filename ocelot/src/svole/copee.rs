@@ -80,14 +80,24 @@ impl<ROT: ROTSender<Msg = Block> + Malicious, FE: FF> CopeeSender for Sender<ROT
         channel: &mut C,
         mut rng: &mut RNG,
     ) -> Result<Self, Error> {
-        let mut ot = ROT::init(channel, &mut rng).unwrap();
+        let mut ot = ROT::init(channel, &mut rng)?;
         let nbits = 128 - (FE::MODULUS - 1).leading_zeros() as usize;
         let r = FE::PolynomialFormNumCoefficients::to_usize();
-        let keys = ot.send_random(channel, nbits * r, &mut rng).unwrap();
+        let keys = ot.send_random(channel, nbits * r, &mut rng)?;
         let g = FE::generator();
-        let pows = (0..r).map(|j| g.pow(j as u128)).collect();
+        let mut acc = FE::one();
+        let mut pows = vec![FE::zero(); r];
+        for i in 0..r {
+            pows[i] = acc;
+            acc *= g;
+        }
+        acc = FE::one();
         let two = FE::one() + FE::one();
-        let twos = (0..nbits).map(|j| two.pow(j as u128)).collect();
+        let mut twos = vec![FE::zero(); nbits];
+        for i in 0..nbits {
+            twos[i] = acc;
+            acc *= two;
+        }
         Ok(Self {
             _ot: PhantomData::<ROT>,
             keys,
@@ -139,14 +149,25 @@ impl<ROT: ROTReceiver<Msg = Block> + Malicious, FE: FF> CopeeReceiver for Receiv
         let nbits = 128 - (FE::MODULUS - 1).leading_zeros() as usize;
         let g = FE::generator();
         let r = FE::PolynomialFormNumCoefficients::to_usize();
-        let mut ot = ROT::init(channel, &mut rng).unwrap();
+        let mut ot = ROT::init(channel, &mut rng)?;
         let delta = FE::random(&mut rng);
         let choices = unpack_bits(delta.to_bytes().as_slice(), nbits * r);
-        let pows = (0..r).map(|j| g.pow(j as u128)).collect();
-        let mut two = FE::one();
-        two.add_assign(FE::one());
-        let twos = (0..nbits).map(|j| two.pow(j as u128)).collect();
-        let keys = ot.receive_random(channel, &choices, &mut rng).unwrap();
+        let mut acc = FE::one();
+        let mut pows = vec![FE::zero(); r];
+        for i in 0..r {
+            pows[i] = acc;
+            acc *= g;
+        }
+        acc = FE::one();
+        // `two` is an element from the finite field. For example, `two` becomes `FE::zero()`
+        //  when FE is equal to either `F2` or `Gf128`.
+        let two = FE::one() + FE::one();
+        let mut twos = vec![FE::zero(); nbits];
+        for i in 0..nbits {
+            twos[i] = acc;
+            acc *= two;
+        }
+        let keys = ot.receive_random(channel, &choices, &mut rng)?;
         Ok(Self {
             _fe: PhantomData::<FE>,
             _ot: PhantomData::<ROT>,
