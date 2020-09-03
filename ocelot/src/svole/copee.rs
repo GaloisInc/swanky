@@ -12,8 +12,8 @@ use crate::{
     ot::{RandomReceiver as ROTReceiver, RandomSender as ROTSender},
     svole::{CopeeReceiver, CopeeSender},
 };
-use digest::generic_array::typenum::Unsigned;
-use generic_array::GenericArray;
+//use digest::generic_array::typenum::Unsigned;
+use generic_array::{typenum::Unsigned, GenericArray};
 use rand::{CryptoRng, Rng, SeedableRng};
 use scuttlebutt::{
     field::FiniteField as FF,
@@ -25,6 +25,7 @@ use scuttlebutt::{
     Malicious,
 };
 use std::{
+    iter::FromIterator,
     marker::PhantomData,
     ops::{AddAssign, SubAssign},
 };
@@ -56,12 +57,13 @@ pub struct Receiver<ROT: ROTReceiver + Malicious, FE: FF> {
 /// Convert `Fp` to `F(p^r)`
 pub fn to_fpr<FE: FF>(x: FE::PrimeField) -> FE {
     let r = FE::PolynomialFormNumCoefficients::to_usize();
-    let mut data = vec![FE::PrimeField::zero(); r];
-    data[0] = x;
-    let g_arr =
-        GenericArray::<FE::PrimeField, FE::PolynomialFormNumCoefficients>::from_exact_iter(data)
-            .unwrap();
-    FE::from_polynomial_coefficients(g_arr)
+    FE::from_polynomial_coefficients(GenericArray::from_iter((0..r).map(|i| {
+        FE::PrimeField::conditional_select(
+            &FE::PrimeField::zero(),
+            &x,
+            Choice::from((i == 0) as u8),
+        )
+    })))
 }
 
 fn prf<FE: FF>(key: Block, pt: Block) -> FE::PrimeField {
@@ -84,8 +86,7 @@ impl<ROT: ROTSender<Msg = Block> + Malicious, FE: FF> CopeeSender for Sender<ROT
         let keys = ot.send_random(channel, nbits * r, &mut rng).unwrap();
         let g = FE::generator();
         let pows = (0..r).map(|j| g.pow(j as u128)).collect();
-        let mut two = FE::one();
-        two.add_assign(FE::one());
+        let two = FE::one() + FE::one();
         let twos = (0..nbits).map(|j| two.pow(j as u128)).collect();
         Ok(Self {
             _ot: PhantomData::<ROT>,
@@ -175,7 +176,7 @@ impl<ROT: ROTReceiver<Msg = Block> + Malicious, FE: FF> CopeeReceiver for Receiv
                 let mut sum = FE::zero();
                 for (k, two) in self.twos.iter().enumerate() {
                     let w = prf::<FE>(self.keys[j * self.nbits + k], pt);
-                    let mut tau = channel.read_sub_fe::<FE>()?;
+                    let mut tau = channel.read_fe::<FE::PrimeField>()?;
                     let choice = Choice::from(self.choices[j + k] as u8);
                     tau.add_assign(w);
                     let v = FE::PrimeField::conditional_select(&w, &tau, choice);

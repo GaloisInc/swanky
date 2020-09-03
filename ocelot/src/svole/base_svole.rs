@@ -11,7 +11,7 @@ use crate::{
     errors::Error,
     svole::{copee::to_fpr, CopeeReceiver, CopeeSender, SVoleReceiver, SVoleSender},
 };
-use digest::generic_array::typenum::Unsigned;
+use generic_array::typenum::Unsigned;
 use rand::{CryptoRng, Rng};
 use scuttlebutt::{field::FiniteField as FF, AbstractChannel};
 use std::marker::PhantomData;

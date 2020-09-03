@@ -21,7 +21,7 @@ where
 {
     /// Message type, restricted to types that implement the `FiniteField`
     /// trait.
-    type Msg: Sized + FF;
+    type Msg: FF;
     /// Runs any one-time initialization.
     fn init<C: AbstractChannel, RNG: CryptoRng + Rng>(
         channel: &mut C,
@@ -43,7 +43,7 @@ where
 {
     /// Message type, restricted to types that implement the `FiniteField`
     /// trait.
-    type Msg: Sized + FF;
+    type Msg: FF;
     /// Runs any one-time initialization.
     fn init<C: AbstractChannel, RNG: CryptoRng + Rng>(
         channel: &mut C,
@@ -67,7 +67,7 @@ where
 {
     /// Message type, restricted to types that implement the `FiniteField`
     /// trait.
-    type Msg: Sized + FF;
+    type Msg: FF;
     /// Runs any one-time initialization.
     fn init<C: AbstractChannel, RNG: CryptoRng + Rng>(
         channel: &mut C,
@@ -91,7 +91,7 @@ where
 {
     /// Message type, restricted to types that implement the `FiniteField`
     /// trait.
-    type Msg: Sized + FF;
+    type Msg: FF;
     /// Runs any one-time initialization.
     fn init<C: AbstractChannel, RNG: CryptoRng + Rng>(
         channel: &mut C,
