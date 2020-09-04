@@ -141,7 +141,6 @@ impl From<Fp> for u128 {
     }
 }
 
-/// Implement Default for `Fp`
 impl Default for Fp {
     fn default() -> Self {
         Fp::zero()
