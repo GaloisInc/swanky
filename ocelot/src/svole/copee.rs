@@ -117,8 +117,6 @@ impl<ROT: ROTSender<Msg = Block> + Malicious, FE: FF> CopeeSender for Sender<ROT
         channel: &mut C,
         input: &FE::PrimeField,
     ) -> Result<FE, Error> {
-        // let mut w = vec![];
-        //for (_i, u) in input.iter().enumerate() {
         let pt = Block::from(self.counter as u128);
         let mut w = FE::zero();
         for (j, pow) in self.pows.iter().enumerate() {

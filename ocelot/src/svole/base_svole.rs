@@ -53,14 +53,14 @@ impl<FE: FF, CP: CopeeSender<Msg = FE>> SVoleSender for Sender<CP, FE> {
         let r = FE::PolynomialFormNumCoefficients::to_usize();
         let u: Vec<FE::PrimeField> = (0..len).map(|_| FE::PrimeField::random(&mut rng)).collect();
         let a: Vec<FE::PrimeField> = (0..r).map(|_| FE::PrimeField::random(&mut rng)).collect();
-        let w: Vec<FE> = u
-            .iter()
-            .map(|u_i| self.copee.send(channel, u_i).unwrap())
-            .collect();
-        let c: Vec<FE> = a
-            .iter()
-            .map(|a_i| self.copee.send(channel, a_i).unwrap())
-            .collect();
+        let mut w = vec![FE::zero(); len];
+        for i in 0..len {
+            w[i] = self.copee.send(channel, &u[i])?;
+        }
+        let mut c = vec![FE::zero(); r];
+        for i in 0..r {
+            c[i] = self.copee.send(channel, &a[i])?;
+        }
         let mut chi: Vec<FE> = (0..len).map(|_| channel.read_fe().unwrap()).collect();
         let x = chi.iter().zip(u.iter()).fold(FE::zero(), |sum, (chi, u)| {
             let mut chi_ = chi.clone();
