@@ -21,10 +21,8 @@ nightly = ["curve25519-dalek/avx2_backend", "rand/nightly", "scuttlebutt/nightly
 curve25519-dalek = { version = "2", features = ["std"] }
 rand = "0.7"
 scuttlebutt = { path = "../scuttlebutt", features = ["curve25519-dalek"] }
-generic-array = "0.14.2"
+generic-array = "0.14"
 subtle = "2.2"
-digest = "0.9.0"
-ethereum-bigint = "0.2.9"
 
 
 [build-dependencies]

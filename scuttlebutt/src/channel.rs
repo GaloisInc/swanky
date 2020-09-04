@@ -210,7 +210,9 @@ pub trait AbstractChannel {
         };
         Ok(pt)
     }
-    /// Read a field element from the channel.
+
+    /// Read a `Field element` from the channel.
+    #[inline(always)]
     fn read_fe<FE: FiniteField>(&mut self) -> Result<FE> {
         let mut buf = GenericArray::<u8, FE::ByteReprLen>::default();
         self.read_bytes(&mut buf[..])?;
@@ -221,21 +223,8 @@ pub trait AbstractChannel {
         Ok(fe)
     }
 
-    /// Read a prime field element from the channel.
-    fn read_sub_fe<FE: FiniteField>(&mut self) -> Result<FE::PrimeField> {
-        let mut buf = GenericArray::<
-            u8,
-            <<FE as FiniteField>::PrimeField as FiniteField>::ByteReprLen,
-        >::default();
-        self.read_bytes(&mut buf[..])?;
-        let fe = match FE::PrimeField::from_bytes(&buf) {
-            Ok(fe) => fe,
-            Err(e) => return Err(std::io::Error::new(std::io::ErrorKind::Other, e)),
-        };
-        Ok(fe)
-    }
-
-    /// Write a field element to the channel.
+    /// Write a `Field element` to the channel.
+    #[inline(always)]
     fn write_fe<FE: FiniteField>(&mut self, x: FE) -> Result<()> {
         self.write_bytes(&x.to_bytes())?;
         Ok(())

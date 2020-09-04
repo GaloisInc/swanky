@@ -17,8 +17,7 @@ use crate::{
         SVoleSender,
     },
 };
-use digest::generic_array::typenum::Unsigned;
-//use generic_array::GenericArray;
+use generic_array::typenum::Unsigned;
 use rand::{CryptoRng, Rng, SeedableRng};
 use scuttlebutt::{
     field::FiniteField as FF,
@@ -59,15 +58,35 @@ pub struct Receiver<OT: OtSender + Malicious, FE: FF, SV: SVoleReceiver> {
 }
 
 /// The input vector length `n` may be included in the arguments
-pub fn ggm<FE: FF>(kappa: usize, seed: Block) -> (Vec<FE>, Vec<(Block, Block)>) {
-    let mut rng = AesRng::from_seed(seed);
-    let n = (kappa as f32 + 1.0).log(2.0);
-    let v = (0..n as usize).map(|_| FE::random(&mut rng)).collect();
-    let h = n.log(2.0);
-    let pair_blocks = (0..h as usize)
-        .map(|_| rand::random::<(Block, Block)>())
-        .collect();
-    (v, pair_blocks)
+pub fn ggm<FE: FF, RNG: CryptoRng + Rng>(kappa: u128, seed: Block, mut rng:&mut RNG) -> (Vec<FE>, Vec<(Block, Block)>) {
+    let sv = Vec::new();
+    sv.push(seed);
+    let h = 128 - (kappa - 1).leading_zeros() as usize;
+    for i in 1..h{
+        for j in 0..2 ^ (i - 1) {
+            let s = sv[i - 1 + j].clone();
+            //PRG G
+            let mut rng = AesRng::from_seed(s);
+            let (s0, s1) = rng.gen::<(Block, Block)>();
+            sv.push(s0);
+            sv.push(s1);
+        }
+    }
+    let v = Vec::new();
+    // compute vector `v` at last level 
+    for j in 0..2 ^ (h-1) {
+        let temp = sv[h + j].clone();
+        // PRG G'
+        let mut rng = AesRng::from_seed(temp);
+        let (fe0, fe1) = (FE::random(&mut rng), FE::random(&mut rng));
+        v.push(fe0);
+        v.push(fe1);
+    }
+    // remove first seed from sv
+    sv.remove(0);
+    // TODO: optimize this later
+   let (even, odd): (Vec<_>, Vec<_>) =  sv.into_iter().partition(|&e| e%2 == 0);
+   (v, even.iter().zip(odd.iter()))
 }
 
 pub fn ggm_prime<FE: FF>(alpha: usize, ots: Vec<Block>) -> Vec<FE> {
