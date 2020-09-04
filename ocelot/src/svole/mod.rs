@@ -27,15 +27,13 @@ where
         channel: &mut C,
         rng: &mut RNG,
     ) -> Result<Self, Error>;
-    ///Runs COPEe extend on input vector `u`, where each element is from `FE::PrimeField` of length `len`
-    /// and returns vector `w` of the same length such that the correlation `w = u'Δ + v` holds.
-    ///  Note that `u'` is the resulted vector from converting `u` to a vector of elements of extended field `FE`.
-    /// The vector length `len` should match with the Receiver's input length, otherwise, the program hangs.
+    /// Runs COPEe extend on a prime field element `u` and returns an extended field element `w`
+    /// such that `w = u'Δ + v` holds, where `u'` is result of the conversion from `u` to the extended field element.
     fn send<C: AbstractChannel>(
         &mut self,
         channel: &mut C,
-        input: &[<Self::Msg as FF>::PrimeField],
-    ) -> Result<Vec<Self::Msg>, Error>;
+        input: &<Self::Msg as FF>::PrimeField,
+    ) -> Result<Self::Msg, Error>;
 }
 
 /// A trait for COPEe Receiver.
@@ -53,15 +51,8 @@ where
     ) -> Result<Self, Error>;
     /// Returns the receiver choice `Δ`.
     fn delta(&self) -> Self::Msg;
-    ///Runs COPEe extend on input `u` (elements from `FE::PrimeField`) of size `len` and
-    ///returns a vector `v` of the same length such that the correlation `w = u'Δ + v` holds.
-    /// Note that `u'` is the resulted vector from converting `u` to a vector of elements of extended field `FE`.
-    /// Again, the vector length `len` should match with Sender's input vector length, otherwise, the program hangs.
-    fn receive<C: AbstractChannel>(
-        &mut self,
-        channel: &mut C,
-        len: usize,
-    ) -> Result<Vec<Self::Msg>, Error>;
+    /// Runs COPEe extend and returns a field element `v` such that `w = u'Δ + v` holds.
+    fn receive<C: AbstractChannel>(&mut self, channel: &mut C) -> Result<Self::Msg, Error>;
 }
 
 /// A trait for sVole Sender.
@@ -78,7 +69,7 @@ where
         rng: &mut RNG,
     ) -> Result<Self, Error>;
     /// Runs sVole extend on input length `len` and returns `(u, w)`, where `u`
-    /// is a randomly generated input vector from `FE::PrimeField` of length `len` such that
+    /// is a randomly generated input vector of length `len` from `FE::PrimeField` such that
     /// the correlation `w = u'Δ + v`, `u'` is the converted vector of `u` to the vector of type `FE`, holds.
     /// The vector length `len` should match with the Receiver's input length, otherwise, the program runs forever.
     fn send<C: AbstractChannel, RNG: CryptoRng + Rng>(
@@ -104,9 +95,9 @@ where
     ) -> Result<Self, Error>;
     /// Returns the receiver choice `Δ`.
     fn delta(&self) -> Self::Msg;
-    /// Runs sVole extend on input length `len` and returns `v` such that
-    /// the correlation `w = u'Δ + v`, `u'` is the converted vector from
-    /// `u` to the vector of elements of the extended field `FE`, holds.
+    /// Runs sVole extend on input length `len` and returns a vector `v` such that
+    /// the correlation `w = u'Δ + v` holds. Note that `u'` is the converted vector from
+    /// `u` to the vector of elements of the extended field `FE`.
     /// The vector length `len` should match with the Sender's input `len`, otherwise it never terminates.
     fn receive<C: AbstractChannel, RNG: CryptoRng + Rng>(
         &mut self,
@@ -146,13 +137,10 @@ mod tests {
         FE: FF + Send,
         CPSender: CopeeSender<Msg = FE>,
         CPReceiver: CopeeReceiver<Msg = FE>,
-    >(
-        len: usize,
-    ) {
+    >() {
         let mut rng = AesRng::new();
-        let input: Vec<FE::PrimeField> =
-            (0..len).map(|_| FE::PrimeField::random(&mut rng)).collect();
-        let us = input.clone();
+        let input = FE::PrimeField::random(&mut rng);
+        let u = input.clone();
         let (sender, receiver) = UnixStream::pair().unwrap();
         let handle = std::thread::spawn(move || {
             let mut rng = AesRng::new();
@@ -166,15 +154,12 @@ mod tests {
         let writer = BufWriter::new(receiver);
         let mut channel = Channel::new(reader, writer);
         let mut copee_receiver = CPReceiver::init(&mut channel, &mut rng).unwrap();
-        let vs = copee_receiver.receive(&mut channel, us.len()).unwrap();
-        let delta = copee_receiver.delta();
-        let ws = handle.join().unwrap();
-        for i in 0..us.len() {
-            let mut temp = delta.clone();
-            temp.mul_assign(to_fpr(us[i]));
-            temp.add_assign(vs[i]);
-            assert_eq!(ws[i], temp);
-        }
+        let v = copee_receiver.receive(&mut channel).unwrap();
+        let mut delta = copee_receiver.delta();
+        let w = handle.join().unwrap();
+        delta.mul_assign(to_fpr(u));
+        delta.add_assign(v);
+        assert_eq!(w, delta);
     }
 
     #[test]
@@ -185,21 +170,21 @@ mod tests {
             Fp,
             CpSender<KosSender, Fp>,
             CpReceiver<KosReceiver, Fp>,
-        >(1024);
+        >();
         test_copee_::<
             KosSender,
             KosReceiver,
             Gf128,
             CpSender<KosSender, Gf128>,
             CpReceiver<KosReceiver, Gf128>,
-        >(1024);
+        >();
         test_copee_::<
             KosSender,
             KosReceiver,
             F2,
             CpSender<KosSender, F2>,
             CpReceiver<KosReceiver, F2>,
-        >(1024);
+        >();
     }
 
     fn test_svole<
