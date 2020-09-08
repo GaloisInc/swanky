@@ -270,6 +270,10 @@ impl FiniteField for Gf128 {
         Gf128(out)
     }
 
+    fn from_uniform_bytes(x: &[u8; 16]) -> Self {
+        Gf128(u128::from_le_bytes(*x))
+    }
+
     fn to_polynomial_coefficients(
         &self,
     ) -> GenericArray<Self::PrimeField, Self::PolynomialFormNumCoefficients> {

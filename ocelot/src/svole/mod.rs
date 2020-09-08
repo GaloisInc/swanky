@@ -11,7 +11,8 @@ pub mod base_svole;
 pub mod copee;
 
 use crate::errors::Error;
-use rand::{CryptoRng, Rng};
+use rand::CryptoRng;
+use rand_core::RngCore;
 use scuttlebutt::{field::FiniteField as FF, AbstractChannel};
 
 /// A trait for COPEe Sender.
@@ -23,7 +24,7 @@ where
     /// trait.
     type Msg: FF;
     /// Runs any one-time initialization.
-    fn init<C: AbstractChannel, RNG: CryptoRng + Rng>(
+    fn init<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         channel: &mut C,
         rng: &mut RNG,
     ) -> Result<Self, Error>;
@@ -45,7 +46,7 @@ where
     /// trait.
     type Msg: FF;
     /// Runs any one-time initialization.
-    fn init<C: AbstractChannel, RNG: CryptoRng + Rng>(
+    fn init<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         channel: &mut C,
         rng: &mut RNG,
     ) -> Result<Self, Error>;
@@ -64,7 +65,7 @@ where
     /// trait.
     type Msg: FF;
     /// Runs any one-time initialization.
-    fn init<C: AbstractChannel, RNG: CryptoRng + Rng>(
+    fn init<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         channel: &mut C,
         rng: &mut RNG,
     ) -> Result<Self, Error>;
@@ -72,12 +73,12 @@ where
     /// is a randomly generated input vector of length `len` from `FE::PrimeField` such that
     /// the correlation `w = u'Δ + v`, `u'` is the converted vector of `u` to the vector of type `FE`, holds.
     /// The vector length `len` should match with the Receiver's input length, otherwise, the program runs forever.
-    fn send<C: AbstractChannel, RNG: CryptoRng + Rng>(
+    fn send<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         &mut self,
         channel: &mut C,
         len: usize,
         rng: &mut RNG,
-    ) -> Result<(Vec<<Self::Msg as FF>::PrimeField>, Vec<Self::Msg>), Error>;
+    ) -> Result<Vec<(<Self::Msg as FF>::PrimeField, Self::Msg)>, Error>;
 }
 
 /// A trait for sVole Receiver
@@ -89,7 +90,7 @@ where
     /// trait.
     type Msg: FF;
     /// Runs any one-time initialization.
-    fn init<C: AbstractChannel, RNG: CryptoRng + Rng>(
+    fn init<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         channel: &mut C,
         rng: &mut RNG,
     ) -> Result<Self, Error>;
@@ -99,12 +100,12 @@ where
     /// the correlation `w = u'Δ + v` holds. Note that `u'` is the converted vector from
     /// `u` to the vector of elements of the extended field `FE`.
     /// The vector length `len` should match with the Sender's input `len`, otherwise it never terminates.
-    fn receive<C: AbstractChannel, RNG: CryptoRng + Rng>(
+    fn receive<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         &mut self,
         channel: &mut C,
         len: usize,
         rng: &mut RNG,
-    ) -> Result<Option<Vec<Self::Msg>>, Error>;
+    ) -> Result<Vec<Self::Msg>, Error>;
 }
 
 #[cfg(test)]
@@ -214,13 +215,12 @@ mod tests {
         let mut rvole = BVReceiver::init(&mut channel, &mut rng).unwrap();
         let vs = rvole.receive(&mut channel, len, &mut rng).unwrap();
         let delta = rvole.delta();
-        let (us, ws) = handle.join().unwrap();
-        let vs = vs.unwrap();
+        let uw_s = handle.join().unwrap();
         for i in 0..len {
             let mut right = delta.clone();
-            right.mul_assign(to_fpr(us[i]));
+            right.mul_assign(to_fpr(uw_s[i].0));
             right.add_assign(vs[i]);
-            assert_eq!(ws[i], right);
+            assert_eq!(uw_s[i].1, right);
         }
     }
 
@@ -232,8 +232,8 @@ mod tests {
             Fp,
             CpSender<KosSender, Fp>,
             CpReceiver<KosReceiver, Fp>,
-            VoleSender<CpSender<KosSender, Fp>, Fp>,
-            VoleReceiver<CpReceiver<KosReceiver, Fp>, Fp>,
+            VoleSender<CpSender<KosSender, Fp>>,
+            VoleReceiver<CpReceiver<KosReceiver, Fp>>,
         >(1024);
         test_svole::<
             KosSender,
@@ -241,8 +241,8 @@ mod tests {
             Gf128,
             CpSender<KosSender, Gf128>,
             CpReceiver<KosReceiver, Gf128>,
-            VoleSender<CpSender<KosSender, Gf128>, Gf128>,
-            VoleReceiver<CpReceiver<KosReceiver, Gf128>, Gf128>,
+            VoleSender<CpSender<KosSender, Gf128>>,
+            VoleReceiver<CpReceiver<KosReceiver, Gf128>>,
         >(1024);
         test_svole::<
             KosSender,
@@ -250,8 +250,8 @@ mod tests {
             F2,
             CpSender<KosSender, F2>,
             CpReceiver<KosReceiver, F2>,
-            VoleSender<CpSender<KosSender, F2>, F2>,
-            VoleReceiver<CpReceiver<KosReceiver, F2>, F2>,
+            VoleSender<CpSender<KosSender, F2>>,
+            VoleReceiver<CpReceiver<KosReceiver, F2>>,
         >(1024);
     }
 }

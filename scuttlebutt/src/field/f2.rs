@@ -68,6 +68,15 @@ impl FiniteField for F2 {
     ) -> Self {
         coeff[0]
     }
+
+    fn from_uniform_bytes(x: &[u8; 16]) -> Self {
+        let mut value = u128::from_le_bytes(*x);
+        if value > Self::MODULUS {
+            value %= Self::MODULUS;
+        }
+        F2(value as u8)
+    }
+
     /// The prime field modulus: $2$
     const MODULUS: u128 = 2;
 
