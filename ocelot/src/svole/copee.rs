@@ -39,6 +39,7 @@ pub struct Sender<ROT: ROTSender + Malicious, FE: FF> {
     pows: Vec<FE>,
     twos: Vec<FE>,
     nbits: usize,
+    counter: usize,
 }
 
 /// COPEe receiver.
@@ -52,6 +53,7 @@ pub struct Receiver<ROT: ROTReceiver + Malicious, FE: FF> {
     pows: Vec<FE>,
     twos: Vec<FE>,
     nbits: usize,
+    counter: usize,
 }
 
 /// Converts an element of `Fp` to `F(p^r)`.
@@ -106,37 +108,35 @@ impl<ROT: ROTSender<Msg = Block> + Malicious, FE: FF> CopeeSender for Sender<ROT
             nbits,
             pows,
             twos,
+            counter: 0,
         })
     }
 
     fn send<C: AbstractChannel>(
         &mut self,
         channel: &mut C,
-        input: &[FE::PrimeField],
-    ) -> Result<Vec<FE>, Error> {
-        let mut w = vec![];
-        for (i, u) in input.iter().enumerate() {
-            let pt = Block::from(i as u128);
-            let mut res = FE::zero();
-            for (j, pow) in self.pows.iter().enumerate() {
-                let mut sum = FE::zero();
-                for (k, two) in self.twos.iter().enumerate() {
-                    let (k0, k1) = self.keys[j * self.nbits + k];
-                    let mut w0 = prf::<FE>(k0, pt);
-                    let w1 = prf::<FE>(k1, pt);
-                    let mut tmp = to_fpr::<FE>(w0);
-                    tmp.mul_assign(*two);
-                    sum.add_assign(tmp);
-                    w0.sub_assign(w1);
-                    w0.sub_assign(*u);
-                    channel.write_bytes(&w0.to_bytes())?;
-                }
-                sum.mul_assign(*pow);
-                res.add_assign(sum);
+        input: &FE::PrimeField,
+    ) -> Result<FE, Error> {
+        let pt = Block::from(self.counter as u128);
+        let mut w = FE::zero();
+        for (j, pow) in self.pows.iter().enumerate() {
+            let mut sum = FE::zero();
+            for (k, two) in self.twos.iter().enumerate() {
+                let (k0, k1) = self.keys[j * self.nbits + k];
+                let mut w0 = prf::<FE>(k0, pt);
+                let w1 = prf::<FE>(k1, pt);
+                let mut tmp = to_fpr::<FE>(w0);
+                tmp.mul_assign(*two);
+                sum.add_assign(tmp);
+                w0.sub_assign(w1);
+                w0.sub_assign(*input);
+                channel.write_fe(w0)?;
+                channel.flush()?;
             }
-            w.push(res);
+            sum.mul_assign(*pow);
+            w.add_assign(sum);
         }
-        channel.flush()?;
+        self.counter += 1;
         Ok(w)
     }
 }
@@ -179,6 +179,7 @@ impl<ROT: ROTReceiver<Msg = Block> + Malicious, FE: FF> CopeeReceiver for Receiv
             twos,
             keys,
             nbits,
+            counter: 0,
         })
     }
 
@@ -186,32 +187,25 @@ impl<ROT: ROTReceiver<Msg = Block> + Malicious, FE: FF> CopeeReceiver for Receiv
         self.delta
     }
 
-    fn receive<C: AbstractChannel>(
-        &mut self,
-        channel: &mut C,
-        len: usize,
-    ) -> Result<Vec<FE>, Error> {
-        let mut output = Vec::default();
-        for i in 0..len {
-            let pt = Block::from(i as u128);
-            let mut res = FE::zero();
-            for (j, pow) in self.pows.iter().enumerate() {
-                let mut sum = FE::zero();
-                for (k, two) in self.twos.iter().enumerate() {
-                    let w = prf::<FE>(self.keys[j * self.nbits + k], pt);
-                    let mut tau = channel.read_fe::<FE::PrimeField>()?;
-                    let choice = Choice::from(self.choices[j + k] as u8);
-                    tau.add_assign(w);
-                    let v = FE::PrimeField::conditional_select(&w, &tau, choice);
-                    let mut tmp = to_fpr::<FE>(v);
-                    tmp.mul_assign(*two);
-                    sum.add_assign(tmp);
-                }
-                sum.mul_assign(*pow);
-                res.add_assign(sum);
+    fn receive<C: AbstractChannel>(&mut self, channel: &mut C) -> Result<FE, Error> {
+        let pt = Block::from(self.counter as u128);
+        let mut res = FE::zero();
+        for (j, pow) in self.pows.iter().enumerate() {
+            let mut sum = FE::zero();
+            for (k, two) in self.twos.iter().enumerate() {
+                let w = prf::<FE>(self.keys[j * self.nbits + k], pt);
+                let mut tau = channel.read_fe::<FE::PrimeField>()?;
+                let choice = Choice::from(self.choices[j + k] as u8);
+                tau.add_assign(w);
+                let v = FE::PrimeField::conditional_select(&w, &tau, choice);
+                let mut tmp = to_fpr::<FE>(v);
+                tmp.mul_assign(*two);
+                sum.add_assign(tmp);
             }
-            output.push(res);
+            sum.mul_assign(*pow);
+            res.add_assign(sum);
         }
-        Ok(output)
+        self.counter += 1;
+        Ok(res)
     }
 }

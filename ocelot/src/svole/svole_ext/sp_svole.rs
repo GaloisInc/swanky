@@ -32,6 +32,11 @@ use std::{
     ops::{MulAssign, SubAssign},
 };
 
+// Define static variable
+lazy_static! {
+    static ref ZERO: __m128i = unsafe { _mm_setzero_si128() };
+}
+
 /// SpsVole Sender.
 #[derive(Clone)]
 pub struct Sender<OT: OtReceiver + Malicious, FE: FF, SV: SVoleSender> {
@@ -85,8 +90,23 @@ pub fn ggm<FE: FF, RNG: CryptoRng + Rng>(kappa: u128, seed: Block, mut rng:&mut 
     // remove first seed from sv
     sv.remove(0);
     // TODO: optimize this later
-   let (even, odd): (Vec<_>, Vec<_>) =  sv.into_iter().partition(|&e| e%2 == 0);
-   (v, even.iter().zip(odd.iter()))
+   let vec_even: Vec<Block> = sv.iter().step_by(2).map(|u| u).collect(); 
+   let vec_odd = sv.iter().skip(1).step_by(2).map(|u| u).collect(); 
+   let zip_seeds = vec_even.iter().zip(vec_odd.iter());
+   let mut k0: Vec<Block> = Vec::new();
+   let mut k1: Vec<Block> = Vec::new();
+   for i in 1..h+1{
+    let mut res0 = Block(*ZERO);
+    let mut res1 = Block(*ZERO); 
+    for j in 0..2 ^ (i - 1){
+      res0 ^= zip_seeds[j+2 ^ (i - 1)-1].0;
+      res1 ^= zip_seeds[j+2 ^ (i - 1)-1].1;
+    }
+    k0.push(res0);
+    k1.push(res1);
+}
+let keys = k0.iter().zip(k1.iter());
+(v, keys)
 }
 
 pub fn ggm_prime<FE: FF>(alpha: usize, ots: Vec<Block>) -> Vec<FE> {
