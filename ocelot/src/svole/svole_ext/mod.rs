@@ -7,7 +7,7 @@
 //! Single-point Subfield Vector Oblivious Linear Evaluation (SpsVOLE) and
 //! LPN based Subfield Vector Oblivious Linear Evaluation (SVOLE) traits.
 
-//mod eq;
+mod eq;
 //mod sp_svole;
 //mod svole_lpn;
 
@@ -26,15 +26,12 @@ where
     /// `u8` arrays, and implements Finite Field trait.
     type Msg: FF;
     /// Runs any one-time initialization.
-    fn init<C: AbstractChannel, RNG: CryptoRng + RngCore>(
-        channel: &mut C,
-        rng: &mut RNG,
-    ) -> Result<Self, Error>;
-    
-    fn send<C: AbstractChannel, RNG: CryptoRng + RngCore>(
+    fn init() -> Result<Self, Error>;
+    /// Returns either a bool value or error on inputting a field element.
+    fn send<C: AbstractChannel>(
         &mut self,
         channel: &mut C,
-        rng: &mut RNG,
+        input: &Self::Msg,
     ) -> Result<bool, Error>;
 }
 
@@ -46,15 +43,14 @@ where
     /// `u8` arrays, and implements Finite Field trait.
     type Msg: FF;
     /// Runs any one-time initialization.
-    fn init<C: AbstractChannel, RNG: CryptoRng + RngCore>(
-        channel: &mut C,
-        rng: &mut RNG,
-    ) -> Result<Self, Error>;
-   fn receive<C: AbstractChannel, RNG: CryptoRng + RngCore>(
+    fn init()-> Result<Self, Error>;
+    /// Returns either a bool value or error on inputting a field element.
+    fn receive<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         &mut self,
         channel: &mut C,
         rng: &mut RNG,
-    ) -> Result<(bool, Self::Msg), Error>;
+        input: &Self::Msg,
+    ) -> Result<bool, Error>;
 }
 
 /// A trait for SpsVole Sender.

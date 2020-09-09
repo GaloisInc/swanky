@@ -9,56 +9,52 @@
 
 use crate::{
     errors::Error,
-    ot::{Receiver as OtReceiver, Sender as OtSender},
-    svole::{
-        copee::to_fpr,
-        svole_ext::{EqSender, EqReceiver},
-        SVoleReceiver,
-        SVoleSender,
-    },
+    svole::svole_ext::{EqSender, EqReceiver}
 };
-use generic_array::typenum::Unsigned;
-use rand::{CryptoRng, Rng, SeedableRng};
-use rand_core::RngCore;
+use rand_core::{CryptoRng, RngCore};
+use rand::Rng;
 use scuttlebutt::{
-    field::FiniteField as FF,
-    utils::unpack_bits,
+    field::FiniteField,
     AbstractChannel,
-    AesRng,
-    Block,
-    Malicious,
     commitment::{Commitment, ShaCommitment}
 };
-use std::{
-    marker::PhantomData,
-    ops::{MulAssign, SubAssign},
-};
+use std::marker::PhantomData;
 
 /// Eq Sender.
 #[derive(Clone)]
-pub struct Sender<FE:FF>{
+pub struct Sender<FE: FiniteField>{
     _fe: PhantomData<FE>
 }
 
-impl <FE:FF> EqSender for Sender<FE>{
+impl <FE: FiniteField> EqSender for Sender<FE>{
     type Msg = FE;
-    fn init<C: AbstractChannel, RNG: CryptoRng + RngCore>(
-        channel: &mut C,
-        rng: &mut RNG,
-    ) -> Result<Self, Error>{
+    fn init() -> Result<Self, Error>{
         Ok(Self {_fe: PhantomData::<FE>})
     }
-    fn send<C: AbstractChannel, RNG: CryptoRng + RngCore>(
+    fn send<C: AbstractChannel>(&mut self,
         channel: &mut C,
-        rng: &mut RNG,
+        input: &FE,
     ) -> Result<bool, Error>{
-        let va = FE::random(&mut rng);
+        let mut comm_vb = [0u8; 32];
+        channel.read_bytes(&mut comm_vb)?;
+        let va = *input;
         channel.write_fe(va)?;
-        channel.flush()?;
-        let vb = channel.read_fe()?;
-        match vb {
-            Ok(x) => channel.write_fe(va == x)?,
-            Err(e) => return Error::Other("EqSender aborting")
+        let mut seed = [0u8; 32];
+        channel.read_bytes(&mut seed)?;
+        let vb_: Result<FE, _> = channel.read_fe();
+        match vb_ {
+            Ok(fe) => {
+                let mut commit = ShaCommitment::new(seed);
+                commit.input(&fe.to_bytes());
+                let res = commit.finish();
+                if res == comm_vb {
+                Ok(va == fe)
+                }
+                else{
+                    Err(Error::Other("Failed Opening commitments".to_string()))
+                }
+            }
+            Err(e) => Err(Error::Other(e.to_string()))
         }
 
     }    
@@ -66,38 +62,36 @@ impl <FE:FF> EqSender for Sender<FE>{
 
 /// Eq Receiver.
 #[derive(Clone)]
-pub struct Receiver<FE:FF> {
+pub struct Receiver<FE: FiniteField> {
     _fe: PhantomData<FE>
 }
 
-impl <FE:FF> EqReceiver for Receiver<FE>{
+impl <FE: FiniteField> EqReceiver for Receiver<FE>{
     type Msg = FE;
-    fn init<C: AbstractChannel, RNG: CryptoRng + RngCore>(
-        channel: &mut C,
-        rng: &mut RNG,
-    ) -> Result<Self, Error>{
+    fn init() -> Result<Self, Error>{
         Ok(Self {
             _fe: PhantomData::<FE>
         })
     }
-    fn send<C: AbstractChannel, RNG: CryptoRng + RngCore>(
+    fn receive<C: AbstractChannel, RNG: CryptoRng + RngCore>(&mut self,
         channel: &mut C,
         rng: &mut RNG,
+        input:&FE,
     ) -> Result<bool, Error>{
-        let vb = FE::random(&mut rng);
+        let vb = *input;
         let seed = rng.gen::<[u8;32]>();
-        let commit = ShaCommitment::new(seed);
-        commit.input(vb.to_bytes());
+        let mut commit = ShaCommitment::new(seed);
+        commit.input(&vb.to_bytes());
         let result = commit.finish();
-        channel.write_bytes(result.to_le_bytes());
-        let va = channel.read_fe()?;
-        if va != vb {
-            Error::Other("EqReceiver aborts")
-        }
-        else {
-            channel.write_bytes(seed)?;
-            channel.write_fe(vb)?;
-            Ok(va == vb)
+        channel.write_bytes(&result)?;
+        let va: Result<FE, _> = channel.read_fe();
+        match va {
+            Ok(fe) => {
+                channel.write_bytes(&seed)?;
+                channel.write_fe(vb)?;
+                Ok(fe == vb)
+            }
+            Err(e) => Err(Error::Other(e.to_string()))
         }
     }    
 }
