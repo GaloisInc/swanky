@@ -35,7 +35,7 @@ use std::{
     marker::PhantomData,
     ops::{MulAssign, SubAssign},
 };
-
+use rand_core::RngCore;
 /// A LpnsVole sender.
 #[derive(Clone)]
 pub struct Sender<FE: FF, SV: SVoleSender, SPS: SpsVoleSender> {
@@ -83,7 +83,7 @@ pub fn dot_product<FE:FF>(x:Vec<FE>, y:Vec<FE>) -> FE{
 
 impl <FE: FF, SV: SVoleSender<Msg = FE>, SPS: SpsVoleSender> LpnsVoleSender for Sender<FE, SV, SPS>{
     type Msg = FE;
-    fn init<C: AbstractChannel, RNG: CryptoRng + Rng>(channel: &mut C,
+    fn init<C: AbstractChannel, RNG: CryptoRng + RngCore>(channel: &mut C,
         rng: &mut RNG,) -> Result<Self, Error>{
         let svole_sender = SV::init(channel).unwrap();
         let (u, w) = svole_sender.send(channel).unwrap();
@@ -99,7 +99,7 @@ impl <FE: FF, SV: SVoleSender<Msg = FE>, SPS: SpsVoleSender> LpnsVoleSender for 
         })
 
     }
-    fn send<C: AbstractChannel, RNG: CryptoRng + Rng>(
+    fn send<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         &mut self,
         channel: &mut C,
         rng: &mut RNG,,

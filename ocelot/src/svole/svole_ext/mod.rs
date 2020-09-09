@@ -2,17 +2,60 @@
 //
 // This file is part of ocelot.
 // Copyright © 2020 Galois, Inc.
-// See LICENSE for licensing information.
+// See LICENSE for licfensing information.
 
 //! Single-point Subfield Vector Oblivious Linear Evaluation (SpsVOLE) and
 //! LPN based Subfield Vector Oblivious Linear Evaluation (SVOLE) traits.
 
-mod sp_svole;
+//mod eq;
+//mod sp_svole;
 //mod svole_lpn;
 
 use crate::errors::Error;
-use rand::{CryptoRng, Rng};
+//use rand::{CryptoRng, Rng};
+use rand_core::{CryptoRng, RngCore};
 use scuttlebutt::{field::FiniteField as FF, AbstractChannel};
+
+/// A trait for EqSender.
+
+pub trait EqSender
+where
+    Self: Sized,
+{
+    /// Message type, restricted to types that are mutably-dereferencable as
+    /// `u8` arrays, and implements Finite Field trait.
+    type Msg: FF;
+    /// Runs any one-time initialization.
+    fn init<C: AbstractChannel, RNG: CryptoRng + RngCore>(
+        channel: &mut C,
+        rng: &mut RNG,
+    ) -> Result<Self, Error>;
+    
+    fn send<C: AbstractChannel, RNG: CryptoRng + RngCore>(
+        &mut self,
+        channel: &mut C,
+        rng: &mut RNG,
+    ) -> Result<bool, Error>;
+}
+
+pub trait EqReceiver
+where
+    Self: Sized,
+{
+    /// Message type, restricted to types that are mutably-dereferencable as
+    /// `u8` arrays, and implements Finite Field trait.
+    type Msg: FF;
+    /// Runs any one-time initialization.
+    fn init<C: AbstractChannel, RNG: CryptoRng + RngCore>(
+        channel: &mut C,
+        rng: &mut RNG,
+    ) -> Result<Self, Error>;
+   fn receive<C: AbstractChannel, RNG: CryptoRng + RngCore>(
+        &mut self,
+        channel: &mut C,
+        rng: &mut RNG,
+    ) -> Result<(bool, Self::Msg), Error>;
+}
 
 /// A trait for SpsVole Sender.
 pub trait SpsVoleSender
@@ -23,14 +66,14 @@ where
     /// `u8` arrays, and implements Finite Field trait.
     type Msg: FF;
     /// Runs any one-time initialization.
-    fn init<C: AbstractChannel, RNG: CryptoRng + Rng>(
+    fn init<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         channel: &mut C,
         rng: &mut RNG,
     ) -> Result<Self, Error>;
     /// Runs single-point svole and outputs pair of vectors `(u, w)` such that
-    /// the correlation $w = u\Delta+v$ holds. For simplicity, the vector length `len` assumed to be power of `2` and 
+    /// the correlation $w = u\Delta+v$ holds. For simplicity, the vector length `len` assumed to be power of `2` and
     /// match with the receiver input length.
-    fn send<C: AbstractChannel, RNG: CryptoRng + Rng>(
+    fn send<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         &mut self,
         channel: &mut C,
         rng: &mut RNG,
@@ -47,7 +90,7 @@ where
     /// `u8` arrays, and implements Finite Field trait.
     type Msg: FF;
     /// Runs any one-time initialization.
-    fn init<C: AbstractChannel, RNG: CryptoRng + Rng>(
+    fn init<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         channel: &mut C,
         rng: &mut RNG,
     ) -> Result<Self, Error>;
@@ -55,7 +98,7 @@ where
     fn delta(&self) -> Self::Msg;
     /// Runs single-point svole and outputs a vector `v` such that
     /// the correlation $w = u\Delta+v$ holds.
-    fn receive<C: AbstractChannel, RNG: CryptoRng + Rng>(
+    fn receive<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         &mut self,
         channel: &mut C,
         rng: &mut RNG,
@@ -72,13 +115,13 @@ where
     /// `u8` arrays, and implements Finite Field trait.
     type Msg: FF;
     /// Runs any one-time initialization.
-    fn init<C: AbstractChannel, RNG: CryptoRng + Rng>(
+    fn init<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         channel: &mut C,
         rng: &mut RNG,
     ) -> Result<Self, Error>;
     /// This procedure can be run multiple times and produces `L` sVole correlations,
     /// i.e, outputs `u` and `w` such that $w = u\Delta+v$, each iteration.
-    fn send<C: AbstractChannel, RNG: CryptoRng + Rng>(
+    fn send<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         &mut self,
         channel: &mut C,
         rng: &mut RNG,
@@ -94,7 +137,7 @@ where
     /// `u8` arrays, and implements Finite Field trait.
     type Msg: FF;
     /// Runs any one-time initialization.
-    fn init<C: AbstractChannel, RNG: CryptoRng + Rng>(
+    fn init<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         channel: &mut C,
         rng: &mut RNG,
     ) -> Result<Self, Error>;
@@ -102,7 +145,7 @@ where
     fn delta(&self) -> Self::Msg;
     /// This procedure can be run multiple times and produces `L` sVole correlations,
     /// i.e, outputs `v` such that $w = u\Delta+v$, each iteration.
-    fn receive<C: AbstractChannel, RNG: CryptoRng + Rng>(
+    fn receive<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         &mut self,
         channel: &mut C,
         rng: &mut RNG,

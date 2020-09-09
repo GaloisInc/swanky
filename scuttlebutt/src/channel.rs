@@ -212,7 +212,6 @@ pub trait AbstractChannel {
     }
 
     /// Read a `Field element` from the channel.
-    #[inline(always)]
     fn read_fe<FE: FiniteField>(&mut self) -> Result<FE> {
         let mut buf = GenericArray::<u8, FE::ByteReprLen>::default();
         self.read_bytes(&mut buf[..])?;
@@ -224,7 +223,6 @@ pub trait AbstractChannel {
     }
 
     /// Write a `Field element` to the channel.
-    #[inline(always)]
     fn write_fe<FE: FiniteField>(&mut self, x: FE) -> Result<()> {
         self.write_bytes(&x.to_bytes())?;
         Ok(())

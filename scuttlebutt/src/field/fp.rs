@@ -61,6 +61,16 @@ impl FiniteField for Fp {
     type ByteReprLen = generic_array::typenum::U16;
     type FromBytesError = BiggerThanModulus;
 
+    /// If the given value is greater than the modulus, then reduce the value by the modulus. Although,
+    /// the output of this function is biased in that case, it is less probability that the number greater than the
+    /// modulus.
+    fn from_uniform_bytes(x: &[u8; 16]) -> Self {
+        let mut value = u128::from_le_bytes(*x);
+        if value > Self::MODULUS {
+            value %= Self::MODULUS
+        }
+        Fp(value)
+    }
     /// If you put random bytes into here, while it's _technically_ biased, there's only a tiny
     /// chance that you'll get biased output.
     fn from_bytes(buf: &GenericArray<u8, Self::ByteReprLen>) -> Result<Self, BiggerThanModulus> {

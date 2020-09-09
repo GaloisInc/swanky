@@ -19,6 +19,7 @@ use crate::{
 };
 use generic_array::typenum::Unsigned;
 use rand::{CryptoRng, Rng, SeedableRng};
+use rand_core::RngCore;
 use scuttlebutt::{
     field::FiniteField as FF,
     utils::unpack_bits,
@@ -63,11 +64,15 @@ pub struct Receiver<OT: OtSender + Malicious, FE: FF, SV: SVoleReceiver> {
 }
 
 /// The input vector length `n` may be included in the arguments
-pub fn ggm<FE: FF, RNG: CryptoRng + Rng>(kappa: u128, seed: Block, mut rng:&mut RNG) -> (Vec<FE>, Vec<(Block, Block)>) {
+pub fn ggm<FE: FF, RNG: CryptoRng + RngCore>(
+    kappa: u128,
+    seed: Block,
+    mut rng: &mut RNG,
+) -> (Vec<FE>, Vec<(Block, Block)>) {
     let sv = Vec::new();
     sv.push(seed);
     let h = 128 - (kappa - 1).leading_zeros() as usize;
-    for i in 1..h{
+    for i in 1..h {
         for j in 0..2 ^ (i - 1) {
             let s = sv[i - 1 + j].clone();
             //PRG G
@@ -78,8 +83,8 @@ pub fn ggm<FE: FF, RNG: CryptoRng + Rng>(kappa: u128, seed: Block, mut rng:&mut 
         }
     }
     let v = Vec::new();
-    // compute vector `v` at last level 
-    for j in 0..2 ^ (h-1) {
+    // compute vector `v` at last level
+    for j in 0..2 ^ (h - 1) {
         let temp = sv[h + j].clone();
         // PRG G'
         let mut rng = AesRng::from_seed(temp);
@@ -90,23 +95,23 @@ pub fn ggm<FE: FF, RNG: CryptoRng + Rng>(kappa: u128, seed: Block, mut rng:&mut 
     // remove first seed from sv
     sv.remove(0);
     // TODO: optimize this later
-   let vec_even: Vec<Block> = sv.iter().step_by(2).map(|u| u).collect(); 
-   let vec_odd = sv.iter().skip(1).step_by(2).map(|u| u).collect(); 
-   let zip_seeds = vec_even.iter().zip(vec_odd.iter());
-   let mut k0: Vec<Block> = Vec::new();
-   let mut k1: Vec<Block> = Vec::new();
-   for i in 1..h+1{
-    let mut res0 = Block(*ZERO);
-    let mut res1 = Block(*ZERO); 
-    for j in 0..2 ^ (i - 1){
-      res0 ^= zip_seeds[j+2 ^ (i - 1)-1].0;
-      res1 ^= zip_seeds[j+2 ^ (i - 1)-1].1;
+    let vec_even: Vec<Block> = sv.iter().step_by(2).map(|u| u).collect();
+    let vec_odd = sv.iter().skip(1).step_by(2).map(|u| u).collect();
+    let zip_seeds = vec_even.iter().zip(vec_odd.iter());
+    let mut k0: Vec<Block> = Vec::new();
+    let mut k1: Vec<Block> = Vec::new();
+    for i in 1..h + 1 {
+        let mut res0 = Block(*ZERO);
+        let mut res1 = Block(*ZERO);
+        for j in 0..2 ^ (i - 1) {
+            res0 ^= zip_seeds[j + 2 ^ (i - 1) - 1].0;
+            res1 ^= zip_seeds[j + 2 ^ (i - 1) - 1].1;
+        }
+        k0.push(res0);
+        k1.push(res1);
     }
-    k0.push(res0);
-    k1.push(res1);
-}
-let keys = k0.iter().zip(k1.iter());
-(v, keys)
+    let keys = k0.iter().zip(k1.iter());
+    (v, keys)
 }
 
 pub fn ggm_prime<FE: FF>(alpha: usize, ots: Vec<Block>) -> Vec<FE> {
@@ -128,7 +133,7 @@ impl<OT: OtReceiver<Msg = Block> + Malicious, FE: FF, SV: SVoleSender<Msg = FE>>
     for Sender<OT, FE, SV>
 {
     type Msg = FE;
-    fn init<C: AbstractChannel, RNG: CryptoRng + Rng>(
+    fn init<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         channel: &mut C,
         rng: &mut RNG,
     ) -> Result<Self, Error> {
@@ -149,7 +154,7 @@ impl<OT: OtReceiver<Msg = Block> + Malicious, FE: FF, SV: SVoleSender<Msg = FE>>
         })
     }
 
-    fn send<C: AbstractChannel, RNG: CryptoRng + Rng>(
+    fn send<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         &mut self,
         channel: &mut C,
         rng: &mut RNG,
@@ -229,7 +234,7 @@ impl<OT: OtSender<Msg = Block> + Malicious, FE: FF, SV: SVoleReceiver<Msg = FE>>
     for Receiver<OT, FE, SV>
 {
     type Msg = FE;
-    fn init<C: AbstractChannel, RNG: CryptoRng + Rng>(
+    fn init<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         channel: &mut C,
         rng: &mut RNG,
     ) -> Result<Self, Error> {
@@ -256,7 +261,7 @@ impl<OT: OtSender<Msg = Block> + Malicious, FE: FF, SV: SVoleReceiver<Msg = FE>>
         self.delta
     }
 
-    fn receive<C: AbstractChannel, RNG: CryptoRng + Rng>(
+    fn receive<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         &mut self,
         channel: &mut C,
         rng: &mut RNG,
