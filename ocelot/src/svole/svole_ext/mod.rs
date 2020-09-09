@@ -43,7 +43,7 @@ where
     /// `u8` arrays, and implements Finite Field trait.
     type Msg: FF;
     /// Runs any one-time initialization.
-    fn init()-> Result<Self, Error>;
+    fn init() -> Result<Self, Error>;
     /// Returns either a bool value or error on inputting a field element.
     fn receive<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         &mut self,
