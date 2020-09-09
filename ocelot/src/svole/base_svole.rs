@@ -12,8 +12,7 @@ use crate::{
     svole::{copee::to_fpr, CopeeReceiver, CopeeSender, SVoleReceiver, SVoleSender},
 };
 use generic_array::typenum::Unsigned;
-use rand::CryptoRng;
-use rand_core::RngCore;
+use rand_core::{CryptoRng, RngCore};
 use scuttlebutt::{field::FiniteField as FF, AbstractChannel};
 
 /// sVOLE sender.

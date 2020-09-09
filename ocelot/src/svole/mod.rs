@@ -11,8 +11,7 @@ pub mod base_svole;
 pub mod copee;
 
 use crate::errors::Error;
-use rand::CryptoRng;
-use rand_core::RngCore;
+use rand_core::{CryptoRng, RngCore};
 use scuttlebutt::{field::FiniteField as FF, AbstractChannel};
 
 /// A trait for COPEe Sender.

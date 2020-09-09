@@ -12,10 +12,8 @@ use crate::{
     ot::{RandomReceiver as ROTReceiver, RandomSender as ROTSender},
     svole::{CopeeReceiver, CopeeSender},
 };
-//use digest::generic_array::typenum::Unsigned;
 use generic_array::{typenum::Unsigned, GenericArray};
-use rand::CryptoRng;
-use rand_core::RngCore;
+use rand_core::{CryptoRng, RngCore};
 use scuttlebutt::{
     field::FiniteField as FF,
     utils::unpack_bits,
