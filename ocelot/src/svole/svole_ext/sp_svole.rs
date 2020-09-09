@@ -12,7 +12,7 @@ use crate::{
     ot::{Receiver as OtReceiver, Sender as OtSender},
     svole::{
         copee::to_fpr,
-        svole_ext::{SpsVoleReceiver, SpsVoleSender},
+        svole_ext::{SpsVoleReceiver, SpsVoleSender, EqSender, EqReceiver},
         SVoleReceiver,
         SVoleSender,
     },

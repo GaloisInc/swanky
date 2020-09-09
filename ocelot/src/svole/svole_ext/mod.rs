@@ -17,7 +17,6 @@ use rand_core::{CryptoRng, RngCore};
 use scuttlebutt::{field::FiniteField as FF, AbstractChannel};
 
 /// A trait for EqSender.
-
 pub trait EqSender
 where
     Self: Sized,
@@ -35,6 +34,7 @@ where
     ) -> Result<bool, Error>;
 }
 
+/// A trait for EqReceiver.
 pub trait EqReceiver
 where
     Self: Sized,
