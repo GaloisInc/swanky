@@ -24,6 +24,7 @@ rand_core = "0.5"
 scuttlebutt = { path = "../scuttlebutt", features = ["curve25519-dalek"] }
 generic-array = "0.14"
 subtle = "2.2"
+num = "0.1"
 
 
 [build-dependencies]

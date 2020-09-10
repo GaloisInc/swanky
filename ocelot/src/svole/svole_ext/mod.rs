@@ -8,7 +8,7 @@
 //! LPN based Subfield Vector Oblivious Linear Evaluation (SVOLE) traits.
 
 mod eq;
-//mod sp_svole;
+mod sp_svole;
 //mod svole_lpn;
 
 use crate::errors::Error;
@@ -67,14 +67,14 @@ where
         rng: &mut RNG,
     ) -> Result<Self, Error>;
     /// Runs single-point svole and outputs pair of vectors `(u, w)` such that
-    /// the correlation $w = u\Delta+v$ holds. For simplicity, the vector length `len` assumed to be power of `2` and
-    /// match with the receiver input length.
+    /// the correlation $w = u\Delta+v$ holds. For simplicity, the vector length `len` assumed to be power of `2` as it represents
+    /// the number of leaves in the GGM tree and match with the receiver input length.
     fn send<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         &mut self,
         channel: &mut C,
         rng: &mut RNG,
         len: u128,
-    ) -> Result<(Vec<<Self::Msg as FF>::PrimeField>, Vec<Self::Msg>), Error>;
+    ) -> Result<Vec<(<Self::Msg as FF>::PrimeField, Self::Msg)>, Error>;
 }
 
 /// A trait for SpsVole Receiver.
@@ -99,7 +99,7 @@ where
         channel: &mut C,
         rng: &mut RNG,
         len: u128,
-    ) -> Result<Option<Vec<Self::Msg>>, Error>;
+    ) -> Result<Vec<Self::Msg>, Error>;
 }
 
 /// A trait for LpnsVole Sender.
