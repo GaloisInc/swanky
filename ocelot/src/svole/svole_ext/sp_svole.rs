@@ -59,15 +59,12 @@ pub struct Receiver<OT: OtSender + Malicious, FE: FF, SV: SVoleReceiver, EQ: EqR
     pows: Vec<FE>,
 }
 
-/// The input vector length `n` may be included in the arguments
-pub fn ggm<FE: FF>(
-    len: u128,
-    seed: Block,
-) -> (Vec<FE>, Vec<(Block, Block)>) {
+/// compute GGM tree with `h-1` levels.
+fn prg (depth: usize, seed: Block) -> Vec<Block>{
+    let h = depth;
     let mut sv = Vec::new();
     sv.push(seed);
-    let h = 128 - (len - 1).leading_zeros() as usize;
-    for i in 1..h {
+    for i in 1..h{
         let exp = pow(2, i - 1);
         for j in 0..exp {
             let s = sv[j + exp - 1].clone();
@@ -78,17 +75,34 @@ pub fn ggm<FE: FF>(
             sv.push(s1);
         }
     }
-    // compute vector `v` at last level
-    let mut exp = pow(2, h - 1);
-    let mut v = Vec::new();
-    for j in 0..exp {
-        let temp = sv[h + j].clone();
-        // PRG G'
-        let mut rng = AesRng::from_seed(temp);
-        let (fe0, fe1) = (FE::random(&mut rng), FE::random(&mut rng));
-        v.push(fe0);
-        v.push(fe1);
-    }
+    sv
+}
+
+/// computing vector `v` at leaves.
+fn prg_prime<FE:FF> (depth: usize, sv: Vec<Block>) -> Vec<FE>{ 
+let h = depth as usize;
+let mut exp = pow(2, h - 1);
+let mut v = Vec::new();
+for j in 0..exp {
+    let temp = sv[h-1 + j].clone();
+    // PRG G'
+    let mut rng = AesRng::from_seed(temp);
+    let (fe0, fe1) = (FE::random(&mut rng), FE::random(&mut rng));
+    v.push(fe0);
+    v.push(fe1);
+}
+v
+}
+
+
+/// The input vector length `n` may be included in the arguments
+pub fn ggm<FE: FF>(
+    len: u128,
+    seed: Block,
+) -> (Vec<FE>, Vec<(Block, Block)>) {
+    let h = 128 - (len - 1).leading_zeros() as usize;
+    let sv = prg(h, seed);
+    let v = prg_prime(h, sv);
     // remove first seed from sv
     sv.remove(0);
     // TODO: optimize this later
@@ -105,7 +119,7 @@ pub fn ggm<FE: FF>(
     for i in 1..h + 1 {
         let mut res0 = Block(zero);
         let mut res1 = Block(zero);
-        exp = pow(2, i - 1);
+        let exp = pow(2, i - 1);
         for j in 0..exp {
             res0 ^= zip_seeds[j + exp - 1].0;
             res1 ^= zip_seeds[j + exp - 1].1;
@@ -117,43 +131,68 @@ pub fn ggm<FE: FF>(
     (v, keys)
 }
 
-pub fn ggm_prime<FE: FF>(alpha_bv: &Vec<bool>, keys: Vec<Block>) -> Vec<Option<FE>> {
-    // TODO: finish this later
-    let h = keys.len();
-    let exp = pow(2, h);
-    let alpha_ = &*alpha_bv;
-    let mut v = Vec::new();
-    //let vec_other_half = Vec::new();
-    if alpha_[0]{
-        v.push(value: T)
+pub fn bool_vec_usize (v: &Vec<bool>) -> {
+    v.iter().enumerate().map(|(i, &v)| pow(2, i)*v as usize).sum()
+}
+// minimal bit vector to represent a number 
+pub fn usize_to_bv (n: usize) -> Vec<bool>{
+    let nbits = 32 - (alpha - 1).leading_zeros() as usize;
+    let res = Vec::new();
+    for i in 0..nbits{
+        res.push(alpha << i & 1);
     }
-    v.push(Some(keys[0]));
-    let zero: __m128i = unsafe { _mm_setzero_si128() };
-    for i in 1..h - 1 {
-        let exp = pow(2, i - 1);
-        for j in 0..exp {
-            let s = v[j + exp - 1].clone();
-            if let Some(s_) = s {
-                let mut rng = AesRng::from_seed(s_);
-                let (s0, s1) = rng.gen::<(Block, Block)>();
-                if alpha_[i]{
-                    v.push(None);
-                    v.push(None);
-                }
-                else{
-                    v.push(Some(s0));
-                    v.push(Some(s1));
-                }
-            }
-            else
-            //PRG G'
-           
-        }
-    }
-    vec![FE::zero()]
+    res
 }
 
-/// dot product
+pub fn ggm_prime<FE: FF>(alpha: &u32, keys: Vec<Block>, k: FE) -> Vec<FE> {
+    let nbits = 32 - (alpha - 1).leading_zeros() as usize;
+    let a = usize_to_bv(alpha.clone());
+    let h = keys.len();
+    let sv: Vec<Block>  = Vec::new();
+    let zero: __m128i = unsafe { _mm_setzero_si128() };
+    sv.push(keys[0]);
+    for i in 2..h{
+        let exp = pow(2, i - 1) as usize;
+        let tmp = a.clone().truncate(i-1);
+        for j in 0..exp {
+            if j != bool_vec_usize(tmp) {
+            let s = sv[j + exp - 1].clone();
+            //PRG G
+            let mut rng = AesRng::from_seed(s);
+            let (s0, s1) = rng.gen::<(Block, Block)>();
+            sv.push(s0);
+            sv.push(s1);
+        }
+        let mut alpha_star = a.clone().truncate(i);
+        let a_i_comp = !alpha_star[i];
+        alpha_star[i] = a_i_comp;
+        let a_i_star = bool_vec_usize(alpha_star);
+        let s_alpha = (0..exp).filter(|j| *j != a_i_star).fold(Block(zero), |mut sum, j| { sum ^= sv[h+j+a_i_comp]; sum});
+        sv.insert(a_i_star+h, s_alpha);
+    }
+    }
+    let tmp = a.clone().truncate(h-1);
+    let exp = pow(2, h - 1) as usize;
+    for j in 0..exp {
+        let temp = sv[h-2 + j].clone();
+        if j == tmp {
+            continue;
+        }
+        // PRG G'
+        let mut rng = AesRng::from_seed(temp);
+        let (fe0, fe1) = (FE::random(&mut rng), FE::random(&mut rng));
+        v.push(fe0);
+        v.push(fe1);
+    }
+    let a_l = !a[h];
+        a[h] = a_l;
+        ind = bool_vec_usize(a);
+       sum = (0..exp).filter(|j| *j != alpha).map(|i| v[h-1+j+a_l]).sum();
+       sum += k;
+       v.insert(h+ind, sum);
+       v
+    
+}
 
 /// Implement SpsVole for Sender type.
 impl<
@@ -211,7 +250,7 @@ impl<
         u[alpha] = beta;
         let choices = unpack_bits(&(!alpha).to_le_bytes(), levels);
         let keys = self.ot.receive(channel, &choices, rng).unwrap();
-        let v: Vec<FE> = ggm_prime(&choices, keys);
+        let v: Vec<FE> = ggm_prime(&alpha, keys);
         let delta_ = c[0];
         let mut d: FE = channel.read_fe().unwrap();
         let mut w: Vec<FE> = v;
