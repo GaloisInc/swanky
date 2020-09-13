@@ -479,7 +479,7 @@ mod tests {
         // Runs for a while if the range is over 20.
         let depth = rand::thread_rng().gen_range(1, 18);
         let (v, keys) = ggm::<Gf128>(depth, x);
-        let mut k: Vec<Block> = keys.iter().map(|k| k.0).collect();
+        let k: Vec<Block> = keys.iter().map(|k| k.0).collect();
         let leaves = pow(2, depth);
         let alpha = leaves - 1;
         let v1 = ggm_prime::<Gf128>(alpha, &k);
