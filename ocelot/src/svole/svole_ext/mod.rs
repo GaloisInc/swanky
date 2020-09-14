@@ -73,8 +73,8 @@ where
     fn send<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         &mut self,
         channel: &mut C,
-        rng: &mut RNG,
         len: u128,
+        rng: &mut RNG,
     ) -> Result<Vec<(<Self::Msg as FF>::PrimeField, Self::Msg)>, Error>;
 }
 
@@ -98,8 +98,8 @@ where
     fn receive<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         &mut self,
         channel: &mut C,
-        rng: &mut RNG,
         len: u128,
+        rng: &mut RNG,
     ) -> Result<Vec<Self::Msg>, Error>;
 }
 
@@ -114,6 +114,7 @@ where
     /// Runs any one-time initialization.
     fn init<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         channel: &mut C,
+        rows: usize,
         rng: &mut RNG,
     ) -> Result<Self, Error>;
     /// This procedure can be run multiple times and produces `L` sVole correlations,
@@ -121,6 +122,8 @@ where
     fn send<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         &mut self,
         channel: &mut C,
+        cols: usize,
+        weight: usize,
         rng: &mut RNG,
     ) -> Result<(Vec<<Self::Msg as FF>::PrimeField>, Vec<Self::Msg>), Error>;
 }
@@ -136,6 +139,7 @@ where
     /// Runs any one-time initialization.
     fn init<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         channel: &mut C,
+        rows: usize,
         rng: &mut RNG,
     ) -> Result<Self, Error>;
     /// Returns the receiver's choice during the OT call.
@@ -145,6 +149,112 @@ where
     fn receive<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         &mut self,
         channel: &mut C,
+        cols: usize,
+        weight: usize,
         rng: &mut RNG,
     ) -> Result<Option<Vec<Self::Msg>>, Error>;
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::{
+        ot::{
+            ChouOrlandiReceiver,
+            ChouOrlandiSender,
+            KosReceiver,
+            KosSender,
+            RandomReceiver as ROTReceiver,
+            RandomSender as ROTSender,
+            Receiver as OtReceiver,
+            Sender as OtSender,
+        },
+        svole::{
+            base_svole::{Receiver as VoleReceiver, Sender as VoleSender},
+            copee::{to_fpr, Receiver as CpReceiver, Sender as CpSender},
+            svole_ext::{
+                eq::{Receiver as eqReceiver, Sender as eqSender},
+                sp_svole::{Receiver as SpsReceiver, Sender as SpsSender},
+                EqReceiver,
+                EqSender,
+                SpsVoleReceiver,
+                SpsVoleSender,
+            },
+            CopeeReceiver,
+            CopeeSender,
+            SVoleReceiver,
+            SVoleSender,
+        },
+    };
+    use num::pow;
+    use rand::*;
+    use scuttlebutt::{
+        field::{FiniteField as FF, Fp, Gf128, F2},
+        AesRng,
+        Channel,
+        Malicious,
+    };
+    use std::{
+        io::{BufReader, BufWriter},
+        os::unix::net::UnixStream,
+    };
+
+    fn test_spsvole<
+        FE: FF + Sync + Send,
+        SPSender: SpsVoleSender<Msg = FE>,
+        SPReceiver: SpsVoleReceiver<Msg = FE>,
+    >(
+        len: u128,
+    ) {
+        println!("leaves={:?}", len);
+        let (sender, receiver) = UnixStream::pair().unwrap();
+        let mut rng = AesRng::new();
+        let reader = BufReader::new(receiver.try_clone().unwrap());
+        let writer = BufWriter::new(receiver);
+        let mut channel = Channel::new(reader, writer);
+        let handle = std::thread::spawn(move || {
+            let mut rng = AesRng::new();
+            let reader = BufReader::new(sender.try_clone().unwrap());
+            let writer = BufWriter::new(sender);
+            let mut channel = Channel::new(reader, writer);
+            let mut vole = SPSender::init(&mut channel, &mut rng).unwrap();
+            vole.send(&mut channel, len, &mut rng).unwrap()
+        });
+        //println!("vole={")
+        let mut rvole = SPReceiver::init(&mut channel, &mut rng).unwrap();
+        println!("Im here in testing");
+        let vs = rvole.receive(&mut channel, len, &mut rng).unwrap();
+        let delta = rvole.delta();
+        println!("delta={:?}", delta);
+        let uw_s = handle.join().unwrap();
+        /*for i in 0..len as usize {
+            let mut right = delta.clone();
+            right.mul_assign(to_fpr(uw_s[i].0));
+            right.add_assign(vs[i]);
+            assert_eq!(uw_s[i].1, right);
+        }*/
+        // assert_eq!(true, false);
+    }
+
+    #[test]
+    fn test_sp_svole() {
+        let depth = rand::thread_rng().gen_range(1, 5);
+        println!("depth_in_test={:?}", depth);
+        let leaves = pow(2, depth);
+        let alpha = leaves - 1;
+        test_spsvole::<
+            Gf128,
+            SpsSender<
+                ChouOrlandiReceiver,
+                Gf128,
+                VoleSender<CpSender<KosSender, Gf128>>,
+                eqSender<Gf128>,
+            >,
+            SpsReceiver<
+                ChouOrlandiSender,
+                Gf128,
+                VoleReceiver<CpReceiver<KosReceiver, Gf128>>,
+                eqReceiver<Gf128>,
+            >,
+        >(leaves);
+    }
 }

@@ -6,14 +6,8 @@
 
 use num::pow;
 use rand::{CryptoRng, Rng, SeedableRng};
-use scuttlebutt::{
-    field::FiniteField as FF,
-    utils::unpack_bits,
-    AesRng,
-    Block,
-    };
+use scuttlebutt::{field::FiniteField as FF, utils::unpack_bits, AesRng, Block};
 use std::arch::x86_64::*;
-
 
 /// Constructing GGM tree with `h-1` levels.
 fn prg(depth: usize, seed: Block) -> Vec<Block> {

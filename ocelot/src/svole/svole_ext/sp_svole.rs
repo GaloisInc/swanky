@@ -12,8 +12,12 @@ use crate::{
     ot::{Receiver as OtReceiver, Sender as OtSender},
     svole::{
         copee::to_fpr,
-        svole_ext::{EqReceiver, EqSender, SpsVoleReceiver, SpsVoleSender,
-        ggm_utils::{ggm, ggm_prime}
+        svole_ext::{
+            ggm_utils::{ggm, ggm_prime},
+            EqReceiver,
+            EqSender,
+            SpsVoleReceiver,
+            SpsVoleSender,
         },
         SVoleReceiver,
         SVoleSender,
@@ -61,8 +65,6 @@ pub struct Receiver<OT: OtSender + Malicious, FE: FF, SV: SVoleReceiver, EQ: EqR
     pows: Vec<FE>,
 }
 
-
-
 /// Implement SpsVole for Sender type.
 impl<
         OT: OtReceiver<Msg = Block> + Malicious,
@@ -78,14 +80,14 @@ impl<
     ) -> Result<Self, Error> {
         let g = FE::generator();
         let r = FE::PolynomialFormNumCoefficients::to_usize();
-        let ot_receiver = OT::init(channel, rng).unwrap();
+        let ot_receiver = OT::init(channel, rng)?;
         let mut acc = FE::one();
         let mut pows = vec![FE::zero(); r];
         for i in 0..r {
             pows[i] = acc;
             acc *= g;
         }
-        let svole_sender = SV::init(channel, rng).unwrap();
+        let svole_sender = SV::init(channel, rng)?;
         Ok(Self {
             _ot: PhantomData::<OT>,
             _fe: PhantomData::<FE>,
@@ -100,28 +102,38 @@ impl<
     fn send<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         &mut self,
         channel: &mut C,
-        mut rng: &mut RNG,
         len: u128,
+        mut rng: &mut RNG,
     ) -> Result<Vec<(FE::PrimeField, FE)>, Error> {
         let r = FE::PolynomialFormNumCoefficients::to_usize();
         let depth = 128 - (len - 1).leading_zeros() as usize;
         let n = len as usize;
-        let ac = self.svole.send(channel, 1, rng).unwrap();
+        let ac = self.svole.send(channel, 1, rng)?;
         let (a, c): (Vec<FE::PrimeField>, Vec<FE>) = ac.iter().cloned().unzip();
-        let g = FE::PrimeField::generator();
-        let beta = g.pow(rng.gen_range(0, FE::MULTIPLICATIVE_GROUP_ORDER));
+        let g = FE::generator();
+        let beta = g.clone();
+        beta.pow(rng.gen_range(0, FE::MULTIPLICATIVE_GROUP_ORDER));
+        println!("beta={:?}", beta);
         let _delta_ = c.clone();
+        // a_prime = beta - a
         let mut a_prime = beta.clone();
         a_prime.sub_assign(a[0]);
+        println!("a_prime={:?}", a_prime);
         channel.write_fe(a_prime)?;
+        channel.flush()?;
         let alpha = rng.gen_range(0, n);
         let mut u = vec![FE::PrimeField::zero(); n];
         u[alpha] = beta;
         let choices = unpack_bits(&(!alpha).to_le_bytes(), depth);
+        println!("choices_len={}", choices.len());
+        println!("computed depth={}", 128 - (len - 1).leading_zeros());
+        //channel.flush().unwrap();
         let keys = self.ot.receive(channel, &choices, rng).unwrap();
+        channel.flush()?;
+        //println!("keys={:?}", keys);
         let v: Vec<FE> = ggm_prime(alpha, &keys);
         let delta_ = c[0];
-        let mut d: FE = channel.read_fe().unwrap();
+        let mut d: FE = channel.read_fe()?;
         let mut w: Vec<FE> = v;
         let sum_w = w.iter().enumerate().filter(|(i, _w)| *i != alpha).fold(
             FE::zero(),
@@ -134,7 +146,7 @@ impl<
         w[alpha] = delta_;
         w[alpha].sub_assign(d);
         // Both parties send (extend, r), gets (x, z)
-        let xz = self.svole.send(channel, r, rng).unwrap();
+        let xz = self.svole.send(channel, r, rng)?;
         let (x, z): (Vec<FE::PrimeField>, Vec<FE>) = xz.iter().cloned().unzip();
         // Sampling `chi`s.
         let chi: Vec<FE> = (0..n).map(|_| FE::random(&mut rng)).collect();
@@ -174,6 +186,7 @@ impl<
                 sum
             });
         va.sub_assign(z_);
+        println!("u={:?}", u);
         let mut eq_sender = EQ::init()?;
         let res = eq_sender.send(channel, &va);
         match res {
@@ -203,7 +216,7 @@ impl<
         channel: &mut C,
         mut rng: &mut RNG,
     ) -> Result<Self, Error> {
-        let ot_sender = OT::init(channel, &mut rng).unwrap();
+        let ot_sender = OT::init(channel, &mut rng)?;
         let r = FE::PolynomialFormNumCoefficients::to_usize();
         let g = FE::generator();
         let mut acc = FE::one();
@@ -212,7 +225,7 @@ impl<
             pows[i] = acc;
             acc *= g;
         }
-        let sv_receiver = SV::init(channel, rng).unwrap();
+        let sv_receiver = SV::init(channel, rng)?;
         let delta = sv_receiver.delta();
         Ok(Self {
             _ot: PhantomData::<OT>,
@@ -233,21 +246,25 @@ impl<
     fn receive<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         &mut self,
         channel: &mut C,
-        rng: &mut RNG,
         len: u128,
+        rng: &mut RNG,
     ) -> Result<Vec<FE>, Error> {
         let n = len as usize;
-        let depth = 128 - (n - 1).leading_zeros();
+        let depth = 128 - (len - 1).leading_zeros();
         let b = self.svole.receive(channel, 1, rng)?;
-        let mut a_prime: FE = channel.read_fe()?;
+        println!("depth_at_receiver={:?}", b);
+        let mut a_prime = channel.read_fe()?;
+        println!("a_prime ={:?}", a_prime);
+        //println!("a_prime={:?}", a_prime);
         let mut gamma = b[0];
         a_prime.mul_assign(self.delta);
         gamma.sub_assign(a_prime);
         // Sample `s` from `$\{0,1\}$`
         let seed = rand::random::<Block>();
-        let (v, keys) = ggm(depth as usize, seed);
+        let (v, keys) = ggm::<FE>(depth as usize, seed);
+        println!("\nkeys={:?}", keys);
+        println!("\nv={:?}", v);
         self.ot.send(channel, &keys, rng)?;
-        channel.flush()?;
         // compute d and sends out
         let sum = v.iter().fold(FE::zero(), |mut sum, v| {
             sum.add_assign(*v);
@@ -258,10 +275,16 @@ impl<
         channel.write_fe(a_prime)?;
         channel.flush()?;
         let r = FE::ByteReprLen::to_usize();
-        let y_star = self.svole.receive(channel, r, rng).unwrap();
+        let y_star = self.svole.receive(channel, r, rng)?;
         // Receives `chi`s from the Sender
-        let chi: Vec<FE> = (0..n).map(|_| channel.read_fe().unwrap()).collect();
-        let x_star: Vec<FE> = (0..r).map(|_| channel.read_fe().unwrap()).collect();
+        let mut chi: Vec<FE> = vec![FE::zero(); n];
+        for i in 0..n {
+            chi[i] = channel.read_fe()?;
+        }
+        let mut x_star: Vec<FE> = vec![FE::zero(); r];
+        for i in 0..r {
+            x_star[i] = channel.read_fe()?;
+        }
         let y = y_star.clone();
         for (y, mut x) in y.iter().zip(x_star.iter().cloned()) {
             x.mul_assign(self.delta);
@@ -287,7 +310,7 @@ impl<
                 sum
             });
         vb.sub_assign(y_);
-        let mut eq_receiver = EQ::init().unwrap();
+        let mut eq_receiver = EQ::init()?;
         let res = eq_receiver.receive(channel, rng, &vb);
         match res {
             Ok(b) => {
@@ -301,4 +324,3 @@ impl<
         }
     }
 }
-
