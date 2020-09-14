@@ -8,6 +8,7 @@
 //! LPN based Subfield Vector Oblivious Linear Evaluation (SVOLE) traits.
 
 mod eq;
+mod ggm_utils;
 mod sp_svole;
 //mod svole_lpn;
 
