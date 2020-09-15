@@ -141,7 +141,7 @@ impl<FE: FF, CP: CopeeReceiver<Msg = FE>> SVoleReceiver for Receiver<CP, FE> {
             Ok(v)
         } else {
             return Err(Error::Other(
-                "The sender is cheating. Hence, aborting the protocol".to_string(),
+                "Correlation check fails in base vole protocol, i.e, w != u'Δ + v".to_string(),
             ));
         }
     }

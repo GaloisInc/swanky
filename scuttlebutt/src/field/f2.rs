@@ -71,7 +71,7 @@ impl FiniteField for F2 {
 
     fn from_uniform_bytes(x: &[u8; 16]) -> Self {
         let mut value = u128::from_le_bytes(*x);
-        value <<= 127;
+        value &= 1;
         F2(value as u8)
     }
 
