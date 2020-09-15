@@ -70,7 +70,6 @@ impl<FE: FF, CP: CopeeSender<Msg = FE>> SVoleSender for Sender<CP, FE> {
         for i in 0..r {
             c[i] = self.copee.send(channel, &a[i])?;
         }
-        channel.flush()?;
         let mut chi: Vec<FE> = vec![FE::zero(); len];
         for i in 0..len {
             chi[i] = channel.read_fe()?;
