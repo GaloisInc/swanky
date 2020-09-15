@@ -9,7 +9,13 @@
 
 use crate::{
     errors::Error,
-    svole::{copee::to_fpr, CopeeReceiver, CopeeSender, SVoleReceiver, SVoleSender},
+    svole::{
+        svole_utils::{dot_prod, to_fpr},
+        CopeeReceiver,
+        CopeeSender,
+        SVoleReceiver,
+        SVoleSender,
+    },
 };
 use generic_array::typenum::Unsigned;
 use rand_core::{CryptoRng, RngCore};
@@ -17,24 +23,34 @@ use scuttlebutt::{field::FiniteField as FF, AbstractChannel};
 
 /// sVOLE sender.
 #[derive(Clone)]
-pub struct Sender<CP: CopeeSender> {
+pub struct Sender<CP: CopeeSender, FE: FF> {
     copee: CP,
+    pows: Vec<FE>,
 }
 
 /// sVOLE receiver.
 #[derive(Clone)]
-pub struct Receiver<CP: CopeeReceiver> {
+pub struct Receiver<CP: CopeeReceiver, FE: FF> {
     copee: CP,
+    pows: Vec<FE>,
 }
 
-impl<FE: FF, CP: CopeeSender<Msg = FE>> SVoleSender for Sender<CP> {
+impl<FE: FF, CP: CopeeSender<Msg = FE>> SVoleSender for Sender<CP, FE> {
     type Msg = FE;
     fn init<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         channel: &mut C,
         rng: &mut RNG,
     ) -> Result<Self, Error> {
+        let r = FE::PolynomialFormNumCoefficients::to_usize();
+        let g = FE::generator();
+        let mut acc = FE::one();
+        let mut pows = vec![FE::zero(); r];
+        for i in 0..r {
+            pows[i] = acc;
+            acc *= g;
+        }
         let copee = CP::init(channel, rng)?;
-        Ok(Self { copee })
+        Ok(Self { copee, pows })
     }
 
     fn send<C: AbstractChannel, RNG: CryptoRng + RngCore>(
@@ -43,7 +59,6 @@ impl<FE: FF, CP: CopeeSender<Msg = FE>> SVoleSender for Sender<CP> {
         len: usize,
         mut rng: &mut RNG,
     ) -> Result<Vec<(FE::PrimeField, FE)>, Error> {
-        let g = FE::generator();
         let r = FE::PolynomialFormNumCoefficients::to_usize();
         let u: Vec<FE::PrimeField> = (0..len).map(|_| FE::PrimeField::random(&mut rng)).collect();
         let a: Vec<FE::PrimeField> = (0..r).map(|_| FE::PrimeField::random(&mut rng)).collect();
@@ -55,52 +70,39 @@ impl<FE: FF, CP: CopeeSender<Msg = FE>> SVoleSender for Sender<CP> {
         for i in 0..r {
             c[i] = self.copee.send(channel, &a[i])?;
         }
-        channel.flush()?;
         let mut chi: Vec<FE> = vec![FE::zero(); len];
         for i in 0..len {
             chi[i] = channel.read_fe()?;
         }
-        let x = chi.iter().zip(u.iter()).fold(FE::zero(), |sum, (chi, u)| {
-            let mut chi_ = chi.clone();
-            chi_.mul_assign(to_fpr(*u));
-            chi_.add_assign(sum);
-            chi_
-        });
-        let x = (0..r).fold(x, |mut sum, h| {
-            let mut g_h = g.pow(h as u128);
-            g_h.mul_assign(to_fpr(a[h]));
-            sum.add_assign(g_h);
-            sum
-        });
-        let z: FE = chi
-            .iter()
-            .cloned()
-            .zip(w.iter().cloned())
-            .map(|(chi, w)| chi * w)
-            .sum();
-
-        let z = (0..r).fold(z, |mut sum, h| {
-            let mut g_h = g.pow(h as u128);
-            g_h.mul_assign(c[h]);
-            sum.add_assign(g_h);
-            sum
-        });
+        let u_prime: Vec<FE> = u.iter().map(|x| to_fpr(*x)).collect();
+        let mut x = dot_prod(&chi, &u_prime);
+        let a_prime: Vec<FE> = a.iter().map(|x| to_fpr(*x)).collect();
+        x += dot_prod(&a_prime, &self.pows);
+        let mut z: FE = dot_prod(&chi, &w);
+        z += dot_prod(&c, &self.pows);
         channel.write_fe(x)?;
         channel.write_fe(z)?;
-        channel.flush()?;
         let res = u.iter().zip(w.iter()).map(|(u, w)| (*u, *w)).collect();
         Ok(res)
     }
 }
 
-impl<FE: FF, CP: CopeeReceiver<Msg = FE>> SVoleReceiver for Receiver<CP> {
+impl<FE: FF, CP: CopeeReceiver<Msg = FE>> SVoleReceiver for Receiver<CP, FE> {
     type Msg = FE;
     fn init<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         channel: &mut C,
         rng: &mut RNG,
     ) -> Result<Self, Error> {
+        let r = FE::PolynomialFormNumCoefficients::to_usize();
+        let g = FE::generator();
+        let mut acc = FE::one();
+        let mut pows = vec![FE::zero(); r];
+        for i in 0..r {
+            pows[i] = acc;
+            acc *= g;
+        }
         let cp = CP::init(channel, rng)?;
-        Ok(Self { copee: cp })
+        Ok(Self { copee: cp, pows })
     }
 
     fn delta(&self) -> FE {
@@ -113,14 +115,15 @@ impl<FE: FF, CP: CopeeReceiver<Msg = FE>> SVoleReceiver for Receiver<CP> {
         len: usize,
         mut rng: &mut RNG,
     ) -> Result<Vec<FE>, Error> {
-        let g = FE::generator();
         let r = FE::PolynomialFormNumCoefficients::to_usize();
-        let v: Vec<FE> = (0..len)
-            .map(|_| self.copee.receive(channel).unwrap())
-            .collect();
-        let b: Vec<FE> = (0..r)
-            .map(|_| self.copee.receive(channel).unwrap())
-            .collect();
+        let mut v: Vec<FE> = vec![FE::zero(); len];
+        for i in 0..len {
+            v[i] = self.copee.receive(channel)?;
+        }
+        let mut b: Vec<FE> = vec![FE::zero(); r];
+        for i in 0..r {
+            b[i] = self.copee.receive(channel)?;
+        }
         let chi: Vec<FE> = (0..len).map(|_| FE::random(&mut rng)).collect();
         for x in chi.iter() {
             channel.write_fe(*x)?;
@@ -128,26 +131,16 @@ impl<FE: FF, CP: CopeeReceiver<Msg = FE>> SVoleReceiver for Receiver<CP> {
         channel.flush()?;
         let x = channel.read_fe()?;
         let z: FE = channel.read_fe()?;
-        let y = (0..len).fold(FE::zero(), |sum, i| {
-            let mut chi_ = chi[i].clone();
-            chi_.mul_assign(v[i]);
-            chi_.add_assign(sum);
-            chi_
-        });
-        let y = (0..r).fold(y, |sum, h| {
-            let mut powr = g.pow(h as u128);
-            powr.mul_assign(b[h]);
-            powr.add_assign(sum);
-            powr
-        });
+        let mut y = dot_prod(&chi, &v);
+        y += dot_prod(&b, &self.pows);
         let mut delta_ = self.copee.delta().clone();
-        delta_.mul_assign(x);
-        delta_.add_assign(y);
+        delta_ *= x;
+        delta_ += y;
         if z == delta_ {
             Ok(v)
         } else {
             return Err(Error::Other(
-                "The sender is cheating. Hence, aborting the protocol".to_string(),
+                "Correlation check fails in base vole protocol, i.e, w != u'Δ + v".to_string(),
             ));
         }
     }

@@ -11,7 +11,6 @@ use crate::{
     errors::Error,
     ot::{Receiver as OtReceiver, Sender as OtSender},
     svole::{
-        copee::to_fpr,
         svole_ext::{
             ggm_utils::{ggm, ggm_prime},
             EqReceiver,
@@ -19,6 +18,7 @@ use crate::{
             SpsVoleReceiver,
             SpsVoleSender,
         },
+        svole_utils::to_fpr,
         SVoleReceiver,
         SVoleSender,
     },
@@ -110,14 +110,14 @@ impl<
         let n = len as usize;
         let ac = self.svole.send(channel, 1, rng)?;
         let (a, c): (Vec<FE::PrimeField>, Vec<FE>) = ac.iter().cloned().unzip();
-        let g = FE::generator();
+        let g = FE::PrimeField::generator();
         let beta = g.clone();
         beta.pow(rng.gen_range(0, FE::MULTIPLICATIVE_GROUP_ORDER));
         println!("beta={:?}", beta);
         let _delta_ = c.clone();
         // a_prime = beta - a
-        let mut a_prime = beta.clone();
-        a_prime.sub_assign(a[0]);
+        let mut a_prime: FE::PrimeField = beta.clone();
+        a_prime -= a[0];
         println!("a_prime={:?}", a_prime);
         channel.write_fe(a_prime)?;
         channel.flush()?;
@@ -253,12 +253,13 @@ impl<
         let depth = 128 - (len - 1).leading_zeros();
         let b = self.svole.receive(channel, 1, rng)?;
         println!("depth_at_receiver={:?}", b);
-        let mut a_prime = channel.read_fe()?;
+        let a_prime = channel.read_fe::<FE::PrimeField>()?;
         println!("a_prime ={:?}", a_prime);
         //println!("a_prime={:?}", a_prime);
         let mut gamma = b[0];
-        a_prime.mul_assign(self.delta);
-        gamma.sub_assign(a_prime);
+        let mut delta_ = self.delta;
+        delta_ *= to_fpr(a_prime);
+        gamma -= delta_;
         // Sample `s` from `$\{0,1\}$`
         let seed = rand::random::<Block>();
         let (v, keys) = ggm::<FE>(depth as usize, seed);

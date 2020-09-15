@@ -170,7 +170,7 @@ mod tests {
         },
         svole::{
             base_svole::{Receiver as VoleReceiver, Sender as VoleSender},
-            copee::{to_fpr, Receiver as CpReceiver, Sender as CpSender},
+            copee::{Receiver as CpReceiver, Sender as CpSender},
             svole_ext::{
                 eq::{Receiver as eqReceiver, Sender as eqSender},
                 sp_svole::{Receiver as SpsReceiver, Sender as SpsSender},
@@ -179,6 +179,7 @@ mod tests {
                 SpsVoleReceiver,
                 SpsVoleSender,
             },
+            svole_utils::{dot_prod, to_fpr},
             CopeeReceiver,
             CopeeSender,
             SVoleReceiver,
@@ -246,13 +247,13 @@ mod tests {
             SpsSender<
                 ChouOrlandiReceiver,
                 Gf128,
-                VoleSender<CpSender<KosSender, Gf128>>,
+                VoleSender<CpSender<KosSender, Gf128>, Gf128>,
                 eqSender<Gf128>,
             >,
             SpsReceiver<
                 ChouOrlandiSender,
                 Gf128,
-                VoleReceiver<CpReceiver<KosReceiver, Gf128>>,
+                VoleReceiver<CpReceiver<KosReceiver, Gf128>, Gf128>,
                 eqReceiver<Gf128>,
             >,
         >(leaves);
