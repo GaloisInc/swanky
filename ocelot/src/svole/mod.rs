@@ -6,6 +6,7 @@
 
 //! Correlated Oblivious Product Evaluation with errors (COPEe) and Subfield
 //! Vector Oblivious Linear Evaluation (SVOLE) traits.
+//!
 pub mod base_svole;
 pub mod copee;
 pub mod svole_utils;
