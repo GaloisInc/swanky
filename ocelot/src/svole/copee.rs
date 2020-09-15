@@ -118,8 +118,9 @@ impl<ROT: ROTSender<Msg = Block> + Malicious, FE: FF> CopeeSender for Sender<ROT
                 w0 -= *input;
                 channel.write_fe(w0)?;
             }
-            sum.mul_assign(*pow);
-            w.add_assign(sum);
+            channel.flush()?;
+            sum *= *pow;
+            w += sum;
         }
         self.counter += 1;
         Ok(w)
