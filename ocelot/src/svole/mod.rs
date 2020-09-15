@@ -9,6 +9,7 @@
 //!
 pub mod base_svole;
 pub mod copee;
+/// sVole related helper functions.
 pub mod svole_utils;
 
 use crate::errors::Error;
