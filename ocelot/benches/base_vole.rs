@@ -74,8 +74,8 @@ fn bench_svole(c: &mut Criterion) {
                 Fp,
                 CpSender<KosSender, Fp>,
                 CpReceiver<KosReceiver, Fp>,
-                VoleSender<CpSender<KosSender, Fp>>,
-                VoleReceiver<CpReceiver<KosReceiver, Fp>>,
+                VoleSender<CpSender<KosSender, Fp>, Fp>,
+                VoleReceiver<CpReceiver<KosReceiver, Fp>, Fp>,
             >(T);
             bench_svole_::<
                 KosSender,
@@ -83,8 +83,8 @@ fn bench_svole(c: &mut Criterion) {
                 Gf128,
                 CpSender<KosSender, Gf128>,
                 CpReceiver<KosReceiver, Gf128>,
-                VoleSender<CpSender<KosSender, Gf128>>,
-                VoleReceiver<CpReceiver<KosReceiver, Gf128>>,
+                VoleSender<CpSender<KosSender, Gf128>, Gf128>,
+                VoleReceiver<CpReceiver<KosReceiver, Gf128>, Gf128>,
             >(T);
         })
     });

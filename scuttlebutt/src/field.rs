@@ -64,7 +64,7 @@ pub trait FiniteField:
     ) -> GenericArray<Self::PrimeField, Self::PolynomialFormNumCoefficients>;
     /// Multiplication over field elements should be reduced over this polynomial.
     fn reduce_multiplication_over() -> Polynomial<Self::PrimeField>;
-    /// Construct a field element from the given bytes.
+    /// Construct a field element from the given uniformly chosen random bytes.
     fn from_uniform_bytes(x: &[u8; 16]) -> Self;
     /// Generate a random field element.
     fn random<R: RngCore + ?Sized>(rng: &mut R) -> Self;

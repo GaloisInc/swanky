@@ -6,9 +6,9 @@
 
 //! Correlated Oblivious Product Evaluation with errors (COPEe) and Subfield
 //! Vector Oblivious Linear Evaluation (SVOLE) traits.
-
 pub mod base_svole;
 pub mod copee;
+pub mod svole_utils;
 
 use crate::errors::Error;
 use rand_core::{CryptoRng, RngCore};
@@ -113,7 +113,8 @@ mod tests {
         ot::{KosReceiver, KosSender, RandomReceiver as ROTReceiver, RandomSender as ROTSender},
         svole::{
             base_svole::{Receiver as VoleReceiver, Sender as VoleSender},
-            copee::{to_fpr, Receiver as CpReceiver, Sender as CpSender},
+            copee::{Receiver as CpReceiver, Sender as CpSender},
+            svole_utils::to_fpr,
             CopeeReceiver,
             CopeeSender,
             SVoleReceiver,
@@ -137,29 +138,33 @@ mod tests {
         FE: FF + Send,
         CPSender: CopeeSender<Msg = FE>,
         CPReceiver: CopeeReceiver<Msg = FE>,
-    >() {
+    >(
+        len: usize,
+    ) {
         let mut rng = AesRng::new();
-        let input = FE::PrimeField::random(&mut rng);
-        let u = input.clone();
-        let (sender, receiver) = UnixStream::pair().unwrap();
-        let handle = std::thread::spawn(move || {
-            let mut rng = AesRng::new();
-            let reader = BufReader::new(sender.try_clone().unwrap());
-            let writer = BufWriter::new(sender);
+        for _i in 0..len {
+            let input = FE::PrimeField::random(&mut rng);
+            let u = input.clone();
+            let (sender, receiver) = UnixStream::pair().unwrap();
+            let handle = std::thread::spawn(move || {
+                let mut rng = AesRng::new();
+                let reader = BufReader::new(sender.try_clone().unwrap());
+                let writer = BufWriter::new(sender);
+                let mut channel = Channel::new(reader, writer);
+                let mut copee_sender = CPSender::init(&mut channel, &mut rng).unwrap();
+                copee_sender.send(&mut channel, &input).unwrap()
+            });
+            let reader = BufReader::new(receiver.try_clone().unwrap());
+            let writer = BufWriter::new(receiver);
             let mut channel = Channel::new(reader, writer);
-            let mut copee_sender = CPSender::init(&mut channel, &mut rng).unwrap();
-            copee_sender.send(&mut channel, &input).unwrap()
-        });
-        let reader = BufReader::new(receiver.try_clone().unwrap());
-        let writer = BufWriter::new(receiver);
-        let mut channel = Channel::new(reader, writer);
-        let mut copee_receiver = CPReceiver::init(&mut channel, &mut rng).unwrap();
-        let v = copee_receiver.receive(&mut channel).unwrap();
-        let mut delta = copee_receiver.delta();
-        let w = handle.join().unwrap();
-        delta.mul_assign(to_fpr(u));
-        delta.add_assign(v);
-        assert_eq!(w, delta);
+            let mut copee_receiver = CPReceiver::init(&mut channel, &mut rng).unwrap();
+            let v = copee_receiver.receive(&mut channel).unwrap();
+            let mut delta = copee_receiver.delta();
+            let w = handle.join().unwrap();
+            delta.mul_assign(to_fpr(u));
+            delta.add_assign(v);
+            assert_eq!(w, delta);
+        }
     }
 
     #[test]
@@ -170,21 +175,21 @@ mod tests {
             Fp,
             CpSender<KosSender, Fp>,
             CpReceiver<KosReceiver, Fp>,
-        >();
+        >(128);
         test_copee_::<
             KosSender,
             KosReceiver,
             Gf128,
             CpSender<KosSender, Gf128>,
             CpReceiver<KosReceiver, Gf128>,
-        >();
+        >(128);
         test_copee_::<
             KosSender,
             KosReceiver,
             F2,
             CpSender<KosSender, F2>,
             CpReceiver<KosReceiver, F2>,
-        >();
+        >(128);
     }
 
     fn test_svole<
@@ -231,8 +236,8 @@ mod tests {
             Fp,
             CpSender<KosSender, Fp>,
             CpReceiver<KosReceiver, Fp>,
-            VoleSender<CpSender<KosSender, Fp>>,
-            VoleReceiver<CpReceiver<KosReceiver, Fp>>,
+            VoleSender<CpSender<KosSender, Fp>, Fp>,
+            VoleReceiver<CpReceiver<KosReceiver, Fp>, Fp>,
         >(1024);
         test_svole::<
             KosSender,
@@ -240,8 +245,8 @@ mod tests {
             Gf128,
             CpSender<KosSender, Gf128>,
             CpReceiver<KosReceiver, Gf128>,
-            VoleSender<CpSender<KosSender, Gf128>>,
-            VoleReceiver<CpReceiver<KosReceiver, Gf128>>,
+            VoleSender<CpSender<KosSender, Gf128>, Gf128>,
+            VoleReceiver<CpReceiver<KosReceiver, Gf128>, Gf128>,
         >(1024);
         test_svole::<
             KosSender,
@@ -249,8 +254,8 @@ mod tests {
             F2,
             CpSender<KosSender, F2>,
             CpReceiver<KosReceiver, F2>,
-            VoleSender<CpSender<KosSender, F2>>,
-            VoleReceiver<CpReceiver<KosReceiver, F2>>,
+            VoleSender<CpSender<KosSender, F2>, F2>,
+            VoleReceiver<CpReceiver<KosReceiver, F2>, F2>,
         >(1024);
     }
 }

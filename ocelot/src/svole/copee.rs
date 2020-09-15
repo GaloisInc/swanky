@@ -10,9 +10,9 @@
 use crate::{
     errors::Error,
     ot::{RandomReceiver as ROTReceiver, RandomSender as ROTSender},
-    svole::{CopeeReceiver, CopeeSender},
+    svole::{svole_utils::to_fpr, CopeeReceiver, CopeeSender},
 };
-use generic_array::{typenum::Unsigned, GenericArray};
+use generic_array::typenum::Unsigned;
 use rand_core::{CryptoRng, RngCore};
 use scuttlebutt::{
     field::FiniteField as FF,
@@ -22,11 +22,8 @@ use scuttlebutt::{
     Block,
     Malicious,
 };
-use std::{
-    iter::FromIterator,
-    marker::PhantomData,
-    ops::{AddAssign, SubAssign},
-};
+use std::marker::PhantomData;
+
 use subtle::{Choice, ConditionallySelectable};
 
 /// COPEe sender.
@@ -54,20 +51,7 @@ pub struct Receiver<ROT: ROTReceiver + Malicious, FE: FF> {
     counter: u64,
 }
 
-/// Converts an element of `Fp` to `F(p^r)`.
-/// Note that the converted element has the input element as the first component
-/// while other components are being `FE::PrimeField::zero()`.
-pub fn to_fpr<FE: FF>(x: FE::PrimeField) -> FE {
-    let r = FE::PolynomialFormNumCoefficients::to_usize();
-    FE::from_polynomial_coefficients(GenericArray::from_iter((0..r).map(|i| {
-        if i == 0 {
-            x
-        } else {
-            FE::PrimeField::zero()
-        }
-    })))
-}
-
+/// `Aes128` as a pseudo-random function.
 fn prf<FE: FF>(aes: &Aes128, pt: Block) -> FE::PrimeField {
     let seed = aes.encrypt(pt);
     FE::PrimeField::from_uniform_bytes(&<[u8; 16]>::from(seed))
@@ -128,12 +112,11 @@ impl<ROT: ROTSender<Msg = Block> + Malicious, FE: FF> CopeeSender for Sender<ROT
                 let mut w0 = prf::<FE>(prf0, pt);
                 let w1 = prf::<FE>(prf1, pt);
                 let mut tmp = to_fpr::<FE>(w0);
-                tmp.mul_assign(*two);
-                sum.add_assign(tmp);
-                w0.sub_assign(w1);
-                w0.sub_assign(*input);
+                tmp *= *two;
+                sum += tmp;
+                w0 -= w1;
+                w0 -= *input;
                 channel.write_fe(w0)?;
-                channel.flush()?;
             }
             sum.mul_assign(*pow);
             w.add_assign(sum);
@@ -163,6 +146,8 @@ impl<ROT: ROTReceiver<Msg = Block> + Malicious, FE: FF> CopeeReceiver for Receiv
             acc *= g;
         }
         acc = FE::one();
+        // `two` can be computed by adding `FE::one()` to itself. For example, the field `F2` has only two elements `0` and `1`
+        // and `two` becomes `0` as `1 + 1 = 0` in this field.
         let two = FE::one() + FE::one();
         let mut twos = vec![FE::zero(); nbits];
         for i in 0..nbits {
@@ -197,14 +182,14 @@ impl<ROT: ROTReceiver<Msg = Block> + Malicious, FE: FF> CopeeReceiver for Receiv
                 let w = prf::<FE>(&self.aes_objs[j * self.nbits + k], pt);
                 let mut tau = channel.read_fe::<FE::PrimeField>()?;
                 let choice = Choice::from(self.choices[j + k] as u8);
-                tau.add_assign(w);
+                tau += w;
                 let v = FE::PrimeField::conditional_select(&w, &tau, choice);
                 let mut tmp = to_fpr::<FE>(v);
-                tmp.mul_assign(*two);
-                sum.add_assign(tmp);
+                tmp *= *two;
+                sum += tmp;
             }
-            sum.mul_assign(*pow);
-            res.add_assign(sum);
+            sum *= *pow;
+            res += sum;
         }
         self.counter += 1;
         Ok(res)
