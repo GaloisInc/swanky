@@ -10,10 +10,10 @@
 mod eq;
 mod ggm_utils;
 mod sp_svole;
+//mod dummy;
 //mod svole_lpn;
 
 use crate::errors::Error;
-//use rand::{CryptoRng, Rng};
 use rand_core::{CryptoRng, RngCore};
 use scuttlebutt::{field::FiniteField as FF, AbstractChannel};
 
@@ -152,13 +152,14 @@ where
         cols: usize,
         weight: usize,
         rng: &mut RNG,
-    ) -> Result<Option<Vec<Self::Msg>>, Error>;
+    ) -> Result<Vec<Self::Msg>, Error>;
 }
 
 #[cfg(test)]
 mod tests {
     use crate::{
-        ot::{
+        ot::{DummySender,
+            DummyReceiver,
             ChouOrlandiReceiver,
             ChouOrlandiSender,
             KosReceiver,
@@ -224,9 +225,11 @@ mod tests {
         let mut rvole = SPReceiver::init(&mut channel, &mut rng).unwrap();
         println!("Im here in testing");
         let vs = rvole.receive(&mut channel, len, &mut rng).unwrap();
+        println!("v={:?}", vs);
         let delta = rvole.delta();
         println!("delta={:?}", delta);
         let uw_s = handle.join().unwrap();
+        println!("uw_s={:?}", uw_s);
         /*for i in 0..len as usize {
             let mut right = delta.clone();
             right.mul_assign(to_fpr(uw_s[i].0));
@@ -238,7 +241,7 @@ mod tests {
 
     #[test]
     fn test_sp_svole() {
-        let depth = rand::thread_rng().gen_range(1, 5);
+        let depth = rand::thread_rng().gen_range(1, 3);
         println!("depth_in_test={:?}", depth);
         let leaves = pow(2, depth);
         let alpha = leaves - 1;

@@ -4,8 +4,8 @@
 // Copyright © 2020 Galois, Inc.
 // See LICENSE for licensing information.
 
-//! Implementation of the Weng-Yang-Katz-Wang SpsVole protocol (cf.
-//! <https://eprint.iacr.org/2020/925>, Figure 5).
+//! Implementation of an **entirely insecure** single-point svole protocol for
+//! testing purposes.
 
 use crate::{
     errors::Error,
@@ -34,9 +34,10 @@ use scuttlebutt::{
     Malicious,
 };
 use std::{arch::x86_64::*, marker::PhantomData};
+
 /// SpsVole Sender.
 #[derive(Clone)]
-pub struct Sender<OT: OtReceiver + Malicious, FE: FF, SV: SVoleSender, EQ: EqSender> {
+pub struct Sender<OT: OtReceiver, FE: FF, SV: SVoleSender, EQ: EqSender> {
     _fe: PhantomData<FE>,
     _sv: PhantomData<SV>,
     _eq: PhantomData<EQ>,
@@ -47,7 +48,7 @@ pub struct Sender<OT: OtReceiver + Malicious, FE: FF, SV: SVoleSender, EQ: EqSen
 
 /// SpsVole Receiver.
 #[derive(Clone)]
-pub struct Receiver<OT: OtSender + Malicious, FE: FF, SV: SVoleReceiver, EQ: EqReceiver> {
+pub struct Receiver<OT: OtSender, FE: FF, SV: SVoleReceiver, EQ: EqReceiver> {
     _fe: PhantomData<FE>,
     _sv: PhantomData<SV>,
     _eq: PhantomData<EQ>,
@@ -59,7 +60,7 @@ pub struct Receiver<OT: OtSender + Malicious, FE: FF, SV: SVoleReceiver, EQ: EqR
 
 /// Implement SpsVole for Sender type.
 impl<
-        OT: OtReceiver<Msg = Block> + Malicious,
+        OT: OtReceiver<Msg = Block>,
         FE: FF,
         SV: SVoleSender<Msg = FE>,
         EQ: EqSender<Msg = FE>,
@@ -117,15 +118,15 @@ impl<
         let choices = unpack_bits(&(!alpha).to_le_bytes(), depth);
         println!("choices_len={}", choices.len());
         println!("computed depth={}", 128 - (len - 1).leading_zeros());
+        //channel.flush().unwrap();
         let keys = self.ot.receive(channel, &choices, rng).unwrap();
         println!("keys={:?}", keys);
         let v: Vec<FE> = ggm_prime(alpha, &keys);
         let delta_ = c[0];
         println!("v={:?}", v);
-        println!("alpha={}", alpha);
-        println!("u={:?}", u);
-        let mut d: FE = channel.read_fe::<FE>()?;
-        let mut w: Vec<FE> = v;
+        //channel.flush()?;
+        let mut x: FE = channel.read_fe::<FE>()?;
+        /*let mut w: Vec<FE> = v;
         let sum_w = w
             .iter()
             .enumerate()
@@ -135,12 +136,11 @@ impl<
         w[alpha] = delta_;
         d += sum_w;
         w[alpha] -= d;
-        println!("w={:?}", w);
         // Both parties send (extend, r), gets (x, z)
         let xz = self.svole.send(channel, r, rng)?;
         let (x, z): (Vec<FE::PrimeField>, Vec<FE>) = xz.iter().cloned().unzip();
         // Sampling `chi`s.
-        let chi: Vec<FE> = (0..n).map(|_| FE::random(rng)).collect();
+        let chi: Vec<FE> = (0..n).map(|_| FE::random(&mut rng)).collect();
         let chi_alpha = chi[alpha].to_polynomial_coefficients();
         let mut x_star: Vec<FE::PrimeField> = chi_alpha.iter().map(|&chi| chi * beta).collect();
         x_star = x_star
@@ -152,16 +152,13 @@ impl<
         for item in chi.iter() {
             channel.write_fe(*item)?;
         }
-        channel.flush()?;
         for item in x_star.iter() {
             channel.write_fe(*item)?;
         }
-        channel.flush()?;
-        println!("x_star_in sender= {:?}", x_star);
         let z_ = dot_prod(&z, &self.pows);
         let mut va = dot_prod(&chi, &w);
         va -= z_;
-        println!("va in sender= {:?}", va);
+        println!("u={:?}", u);
         let mut eq_sender = EQ::init()?;
         let res = eq_sender.send(channel, &va);
         match res {
@@ -174,13 +171,14 @@ impl<
                 }
             }
             Err(e) => Err(e),
-        }
+        }*/
+        Ok(vec![])
     }
 }
 
 /// Implement SVoleReceiver for Receiver type.
 impl<
-        OT: OtSender<Msg = Block> + Malicious,
+        OT: OtSender<Msg = Block>,
         FE: FF,
         SV: SVoleReceiver<Msg = FE>,
         EQ: EqReceiver<Msg = FE>,
@@ -237,11 +235,11 @@ impl<
         self.ot.send(channel, &keys, rng)?;
         println!("ajay");
         // compute d and sends out
-        let mut d = gamma.clone();
-        d -= v.iter().map(|&u| u).sum();
-        channel.write_fe::<FE>(d)?;
-        channel.flush()?;
-        let r = FE::PolynomialFormNumCoefficients::to_usize();
+        //let mut d = gamma.clone();
+       // d -= v.iter().map(|&u| u).sum();
+        channel.write_fe::<FE>(FE::zero())?;
+        /*channel.flush()?;
+        let r = FE::ByteReprLen::to_usize();
         let y_star = self.svole.receive(channel, r, rng)?;
         // Receives `chi`s from the Sender
         let mut chi: Vec<FE> = vec![FE::zero(); n];
@@ -252,8 +250,6 @@ impl<
         for i in 0..r {
             x_star[i] = channel.read_fe()?;
         }
-        println!("v={:?}", v);
-        println!("delta={:?}", self.delta);
         let x_delta: Vec<FE> = x_star.iter().map(|&x| to_fpr::<FE>(x) * self.delta).collect();
         let y: Vec<FE> = y_star
             .iter()
@@ -261,11 +257,12 @@ impl<
             .zip(x_star.iter().cloned())
             .map(|(y, xd)| y - to_fpr(xd))
             .collect();
+
         // sets Y
         let y_ = dot_prod(&y, &self.pows);
         let mut vb = dot_prod(&chi, &v);
         vb -= y_;
-        println!("vb rec= {:?}", vb);
+
         let mut eq_receiver = EQ::init()?;
         let res = eq_receiver.receive(channel, rng, &vb);
         match res {
@@ -278,5 +275,7 @@ impl<
             }
             Err(e) => Err(e),
         }
+        */
+        Ok(vec![])
     }
 }

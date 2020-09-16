@@ -12,12 +12,12 @@ use crate::{
     errors::Error,
     ot::{Receiver as OtReceiver, Sender as OtSender},
     svole::{
-        copee::to_fpr,
         svole_ext::{LpnsVoleReceiver, LpnsVoleSender, SpsVoleReceiver, SpsVoleSender},
         CopeeReceiver,
         CopeeSender,
         SVoleReceiver,
         SVoleSender,
+        svole_utils::{to_fpr, dot_prod}
     },
 };
 use generic_array::GenericArray;
@@ -55,6 +55,7 @@ pub struct Receiver<FE: FF, SV: SVoleReceiver, SPS: SpsVoleReceiver> {
     _sps: PhantomData<SPS>,
     svole: SV,
     spsvole: SPS,
+    delta: FE,
     rows: usize,
     v: Vec<FE>,
 }
@@ -72,17 +73,7 @@ pub fn code_gen<FE: FF>(rows: usize, cols: usize) -> Vec<Vec<FE>> {
     res
 }
 
-/// Compute dot product of two vectors
-pub fn dot_product<FE: FF>(x: &mut [FE], y: &[FE]) -> FE {
-    assert_eq!(x.len(), y.len());
-    
-    let mut sum = FE::zero();
-    for i in 0..x.len() {
-        x[i].mul_assign(y[i]);
-        sum.add_assign(x[i]);
-    }
-    sum
-}
+
 
 impl<FE: FF, SV: SVoleSender<Msg = FE>, SPS: SpsVoleSender> LpnsVoleSender for Sender<FE, SV, SPS> {
     type Msg = FE;
@@ -102,6 +93,7 @@ impl<FE: FF, SV: SVoleSender<Msg = FE>, SPS: SpsVoleSender> LpnsVoleSender for S
             _sps: PhantomData::<SPS>,
             svole: svole_sender,
             spsvole: sp_svole_sender,
+            rows: k,
             u,
             w
         })
@@ -118,16 +110,20 @@ impl<FE: FF, SV: SVoleSender<Msg = FE>, SPS: SpsVoleSender> LpnsVoleSender for S
         let mut e = vec![FE::PrimeField::zero(); cols];
         let mut t = vec![FE::PrimeField::zero(); weight];
         // Sample error vector `e` with hamming weight `t`
-        for j in 0..weight {
-            let rand_ind = rng.gen_range(0, weight);
-            e[rand_ind] = FE::PrimeField::one();
-            t[rand_ind] = FE::one();
-        }
-        let a = code_gen(self.rows, cols);
-        let x = (0..self.rows).map(|i| dot_product(&self.u, &a[i])).sum();
-        x.sum_assign(e);
-        let z = (0..self.rows).map(|i| dot_product(&self.w, &a[i])).sum();
-        z.sum_assign(t);
+        for i in 0..weight {
+            let ind = rng.gen_range(0, weight);
+            e[i*weight+ind] = FE::PrimeField::one();
+    }
+    for i in 0..weight {
+        let ind = rng.gen_range(0, weight);
+        t[i*weight+ind] = FE::PrimeField::one();
+}
+        let a = code_gen::<FE::PrimeField>(self.rows, cols);
+        let a_prime: Vec<Vec<FE>> = a.iter().map(|&u| u.iter().map(|&u| to_fpr::<FE>(u).collect())).collect();
+        let x: Vec<FE::PrimeField> = (0..self.rows).map(|i| dot_prod(&self.u, &a[i])).collect();
+        x = x.iter().zip(e.iter()).map(|(&x_, &e_)| x_ + e_).collect();
+        let z = (0..self.rows).map(|i| dot_prod::<FE>(&self.w, &a[i])).sum();
+        z += t;
         let u = vec![FE::PrimeField::zero(); cols];
         let w = vec![FE::zero(); cols];
         Ok((u, w))
@@ -144,15 +140,21 @@ impl<FE: FF, SV: SVoleReceiver<Msg = FE>, SPS: SpsVoleReceiver> LpnsVoleReceiver
         let mut svole_receiver = SV::init(channel, rng).unwrap();
         let v = svole_receiver.receive(channel, k, rng)?;
         let sp_svole_receiver = SPS::init(channel, rng).unwrap();
+        let delta = FE::random(&rng);
         Ok(Self {
             _fe: PhantomData::<FE>,
             _sv: PhantomData::<SV>,
             _sps: PhantomData::<SPS>,
             svole: svole_receiver,
             spsvole: sp_svole_receiver,
+            delta,
             v,
         })
     }
+        fn delta(&self) -> FE{
+            self.delta
+        }
+    
     fn receive<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         &mut self,
         channel: &mut C,

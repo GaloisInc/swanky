@@ -84,7 +84,7 @@ pub fn ggm<FE: FF>(h: usize, seed: Block) -> (Vec<FE>, Vec<(Block, Block)>) {
 /// GGM prime is used compute the vector of field elements except one entry at `alpha`.
 //TODO: this can be fixed and optimized later.
 pub fn ggm_prime<FE: FF>(alpha: usize, keys: &[Block]) -> Vec<FE> {
-    let nbits = 128 - (alpha as u128 - 1).leading_zeros() as usize;
+    //let nbits = 128 - (alpha as u128 - 1).leading_zeros() as usize;
     let h = keys.len();
     let mut a = unpack_bits(&alpha.to_le_bytes(), h);
     a.reverse();
@@ -166,11 +166,7 @@ fn bv_to_u128(v: &[bool]) -> u128 {
         .map(|(i, &v)| pow(2, i) * v as u128)
         .sum()
 }
-/// Minimal bit-vector representation of a number.
-fn u128_to_bv(n: u128) -> Vec<bool> {
-    let nbits = 128 - (n - 1).leading_zeros() as usize;
-    (0..nbits).map(|i| ((n >> i) & 1) != 0).collect()
-}
+
 
 #[cfg(test)]
 mod tests {

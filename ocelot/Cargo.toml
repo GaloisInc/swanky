@@ -44,8 +44,8 @@ name = "oprf"
 harness = false
 
 [[bench]]
-path = "benches/base_vole.rs"
-name = "svole"
+path = "benches/base_svole.rs"
+name = "base_svole"
 harness = false
 
 [[example]]

@@ -10,6 +10,7 @@
 pub mod base_svole;
 pub mod copee;
 pub mod svole_ext;
+/// sVole related helper functions.
 pub mod svole_utils;
 use crate::errors::Error;
 use rand_core::{CryptoRng, RngCore};
