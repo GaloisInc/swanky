@@ -4,7 +4,7 @@
 // Copyright © 2020 Galois, Inc.
 // See LICENSE for licensing information.
 
-//! Implementation of an **entirely insecure** single-point svole protocol for
+//! Implementation of single-point svole protocol using dummy ggm_prime
 //! testing purposes.
 
 use crate::{
@@ -18,12 +18,12 @@ use crate::{
             SpsVoleReceiver,
             SpsVoleSender,
         },
-        svole_utils::{dot_prod, to_fpr},
+        svole_utils::{dot_prod, to_fpr, to_fpr_vec},
         SVoleReceiver,
         SVoleSender,
     },
 };
-use generic_array::typenum::Unsigned;
+use generic_array::{typenum::Unsigned, GenericArray};
 use rand::{CryptoRng, Rng};
 use rand_core::RngCore;
 use scuttlebutt::{
@@ -33,7 +33,7 @@ use scuttlebutt::{
     Block,
     Malicious,
 };
-use std::{arch::x86_64::*, marker::PhantomData};
+use std::marker::PhantomData;
 
 /// SpsVole Sender.
 #[derive(Clone)]
@@ -60,7 +60,7 @@ pub struct Receiver<OT: OtSender, FE: FF, SV: SVoleReceiver, EQ: EqReceiver> {
 
 /// Implement SpsVole for Sender type.
 impl<
-        OT: OtReceiver<Msg = Block>,
+        OT: OtReceiver<Msg = Block> + Malicious,
         FE: FF,
         SV: SVoleSender<Msg = FE>,
         EQ: EqSender<Msg = FE>,
@@ -105,28 +105,29 @@ impl<
         let g = FE::PrimeField::generator();
         let beta = g.clone();
         beta.pow(rng.gen_range(0, FE::MULTIPLICATIVE_GROUP_ORDER));
-        println!("beta={:?}", beta);
         let _delta_ = c.clone();
         // a_prime = beta - a
         let mut a_prime: FE::PrimeField = beta.clone();
         a_prime -= a[0];
-        println!("a_prime={:?}", a_prime);
         channel.write_fe::<FE::PrimeField>(a_prime)?;
         let alpha = rng.gen_range(0, n);
         let mut u = vec![FE::PrimeField::zero(); n];
         u[alpha] = beta;
         let choices = unpack_bits(&(!alpha).to_le_bytes(), depth);
-        println!("choices_len={}", choices.len());
-        println!("computed depth={}", 128 - (len - 1).leading_zeros());
-        //channel.flush().unwrap();
         let keys = self.ot.receive(channel, &choices, rng).unwrap();
-        println!("keys={:?}", keys);
-        let v: Vec<FE> = ggm_prime(alpha, &keys);
+        /**************************/
+        //let v: Vec<FE> = ggm_prime(alpha, &keys);
+        // getting this vector from the receiver is completely insecure, I'm just doing this for
+        // testing purposes.
+        let mut v: Vec<FE> = vec![FE::zero(); n];
+        for i in 0..n {
+            v[i] = channel.read_fe()?;
+        }
+
+        /*************************/
         let delta_ = c[0];
-        println!("v={:?}", v);
-        //channel.flush()?;
-        let mut x: FE = channel.read_fe::<FE>()?;
-        /*let mut w: Vec<FE> = v;
+        let mut d: FE = channel.read_fe::<FE>()?;
+        let mut w: Vec<FE> = v;
         let sum_w = w
             .iter()
             .enumerate()
@@ -140,25 +141,36 @@ impl<
         let xz = self.svole.send(channel, r, rng)?;
         let (x, z): (Vec<FE::PrimeField>, Vec<FE>) = xz.iter().cloned().unzip();
         // Sampling `chi`s.
-        let chi: Vec<FE> = (0..n).map(|_| FE::random(&mut rng)).collect();
-        let chi_alpha = chi[alpha].to_polynomial_coefficients();
-        let mut x_star: Vec<FE::PrimeField> = chi_alpha.iter().map(|&chi| chi * beta).collect();
+        let chi: Vec<FE> = (0..n).map(|_| FE::random(rng)).collect();
+        let chi_alpha_vec: Vec<GenericArray<FE::PrimeField, FE::PolynomialFormNumCoefficients>> =
+            (0..n)
+                .map(|i| chi[i].to_polynomial_coefficients())
+                .collect();
+        let chi_alpha: Vec<FE> = (0..n)
+            .map(|i| dot_prod(&to_fpr_vec(&chi_alpha_vec[i].to_vec()), &self.pows))
+            .collect();
+        let mut x_star: Vec<FE::PrimeField> = chi_alpha_vec[alpha]
+            .to_vec()
+            .iter()
+            .map(|&x| x * beta)
+            .collect();
         x_star = x_star
             .iter()
             .zip(x.iter().cloned())
             .map(|(&x_s, x)| x_s - x)
             .collect();
         // Sends chis and x_star
-        for item in chi.iter() {
+        for item in chi_alpha.iter() {
             channel.write_fe(*item)?;
         }
+        channel.flush()?;
         for item in x_star.iter() {
             channel.write_fe(*item)?;
         }
+        channel.flush()?;
         let z_ = dot_prod(&z, &self.pows);
-        let mut va = dot_prod(&chi, &w);
+        let mut va = dot_prod(&chi_alpha, &w);
         va -= z_;
-        println!("u={:?}", u);
         let mut eq_sender = EQ::init()?;
         let res = eq_sender.send(channel, &va);
         match res {
@@ -171,14 +183,13 @@ impl<
                 }
             }
             Err(e) => Err(e),
-        }*/
-        Ok(vec![])
+        }
     }
 }
 
 /// Implement SVoleReceiver for Receiver type.
 impl<
-        OT: OtSender<Msg = Block>,
+        OT: OtSender<Msg = Block> + Malicious,
         FE: FF,
         SV: SVoleReceiver<Msg = FE>,
         EQ: EqReceiver<Msg = FE>,
@@ -233,36 +244,43 @@ impl<
         let seed = rand::random::<Block>();
         let (v, keys) = ggm::<FE>(depth as usize, seed);
         self.ot.send(channel, &keys, rng)?;
-        println!("ajay");
+        /******************************/
+        //Sending this to the other party is completely insecure.
+        for i in 0..n {
+            channel.write_fe(v[i])?;
+        }
+        channel.flush()?;
+        /*****************************/
         // compute d and sends out
-        //let mut d = gamma.clone();
-       // d -= v.iter().map(|&u| u).sum();
-        channel.write_fe::<FE>(FE::zero())?;
-        /*channel.flush()?;
-        let r = FE::ByteReprLen::to_usize();
+        let mut d = gamma.clone();
+        d -= v.iter().map(|&u| u).sum();
+        channel.write_fe::<FE>(d)?;
+        channel.flush()?;
+        let r = FE::PolynomialFormNumCoefficients::to_usize();
         let y_star = self.svole.receive(channel, r, rng)?;
         // Receives `chi`s from the Sender
         let mut chi: Vec<FE> = vec![FE::zero(); n];
         for i in 0..n {
-            chi[i] = channel.read_fe()?;
+            chi[i] = channel.read_fe::<FE>()?;
         }
         let mut x_star: Vec<FE::PrimeField> = vec![FE::PrimeField::zero(); r];
         for i in 0..r {
             x_star[i] = channel.read_fe()?;
         }
-        let x_delta: Vec<FE> = x_star.iter().map(|&x| to_fpr::<FE>(x) * self.delta).collect();
+        let x_delta: Vec<FE> = x_star
+            .iter()
+            .map(|&x| to_fpr::<FE>(x) * self.delta)
+            .collect();
         let y: Vec<FE> = y_star
             .iter()
             .cloned()
-            .zip(x_star.iter().cloned())
-            .map(|(y, xd)| y - to_fpr(xd))
+            .zip(x_delta.iter().cloned())
+            .map(|(y, xd)| y - xd)
             .collect();
-
         // sets Y
         let y_ = dot_prod(&y, &self.pows);
         let mut vb = dot_prod(&chi, &v);
         vb -= y_;
-
         let mut eq_receiver = EQ::init()?;
         let res = eq_receiver.receive(channel, rng, &vb);
         match res {
@@ -275,7 +293,5 @@ impl<
             }
             Err(e) => Err(e),
         }
-        */
-        Ok(vec![])
     }
 }

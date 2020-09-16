@@ -29,3 +29,7 @@ pub fn to_fpr<FE: FiniteField>(x: FE::PrimeField) -> FE {
         }
     })))
 }
+
+pub fn to_fpr_vec<FE: FiniteField>(x: &[FE::PrimeField]) -> Vec<FE> {
+    x.iter().map(|&x| to_fpr(x)).collect()
+}

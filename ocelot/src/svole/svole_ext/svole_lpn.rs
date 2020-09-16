@@ -10,31 +10,17 @@
 
 use crate::{
     errors::Error,
-    ot::{Receiver as OtReceiver, Sender as OtSender},
     svole::{
         svole_ext::{LpnsVoleReceiver, LpnsVoleSender, SpsVoleReceiver, SpsVoleSender},
-        CopeeReceiver,
-        CopeeSender,
+        svole_utils::{dot_prod, to_fpr, to_fpr_vec},
         SVoleReceiver,
         SVoleSender,
-        svole_utils::{to_fpr, dot_prod}
     },
 };
-use generic_array::GenericArray;
 use rand::{Rng, SeedableRng};
 use rand_core::{CryptoRng, RngCore};
-use scuttlebutt::{
-    field::FiniteField as FF,
-    utils::unpack_bits,
-    AbstractChannel,
-    AesRng,
-    Block,
-    Malicious,
-};
-use std::{
-    marker::PhantomData,
-    ops::{MulAssign, SubAssign},
-};
+use scuttlebutt::{field::FiniteField as FF, AbstractChannel, AesRng, Block};
+use std::marker::PhantomData;
 
 /// A LpnsVole sender.
 #[derive(Clone)]
@@ -45,8 +31,10 @@ pub struct Sender<FE: FF, SV: SVoleSender, SPS: SpsVoleSender> {
     svole: SV,
     spsvole: SPS,
     rows: usize,
+    cols: usize,
     u: Vec<FE::PrimeField>,
     w: Vec<FE>,
+    matrix: Vec<Vec<FE::PrimeField>>,
 }
 /// A LpnsVole receiver.
 pub struct Receiver<FE: FF, SV: SVoleReceiver, SPS: SpsVoleReceiver> {
@@ -57,11 +45,13 @@ pub struct Receiver<FE: FF, SV: SVoleReceiver, SPS: SpsVoleReceiver> {
     spsvole: SPS,
     delta: FE,
     rows: usize,
+    cols: usize,
     v: Vec<FE>,
+    matrix: Vec<Vec<FE::PrimeField>>,
 }
 
 /// Code generator G that outputs matrix A for the given dimension `k` by `n`.
-pub fn code_gen<FE: FF>(rows: usize, cols: usize) -> Vec<Vec<FE>> {
+pub fn code_gen<FE: FF>(rows: usize, cols: usize, d: usize) -> Vec<Vec<FE>> {
     let seed = rand::random::<Block>();
     let mut rng = AesRng::from_seed(seed);
     let mut res: Vec<Vec<_>> = Vec::new();
@@ -73,74 +63,87 @@ pub fn code_gen<FE: FF>(rows: usize, cols: usize) -> Vec<Vec<FE>> {
     res
 }
 
-
-
 impl<FE: FF, SV: SVoleSender<Msg = FE>, SPS: SpsVoleSender> LpnsVoleSender for Sender<FE, SV, SPS> {
     type Msg = FE;
     fn init<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         channel: &mut C,
-        k: usize,
+        rows: usize,
+        cols: usize,
+        d: usize,
         rng: &mut RNG,
     ) -> Result<Self, Error> {
         let mut svole_sender = SV::init(channel, rng).unwrap();
+        let k = rows;
+        let n = cols;
         let uw = svole_sender.send(channel, k, rng)?;
         let u = uw.iter().map(|&uw| uw.0).collect();
         let w = uw.iter().map(|&uw| uw.1).collect();
         let sp_svole_sender = SPS::init(channel, rng).unwrap();
+        let matrix = code_gen(k, n, d);
         Ok(Self {
             _fe: PhantomData::<FE>,
             _sv: PhantomData::<SV>,
             _sps: PhantomData::<SPS>,
             svole: svole_sender,
             spsvole: sp_svole_sender,
-            rows: k,
+            rows,
+            cols,
             u,
-            w
+            w,
+            matrix,
         })
     }
     fn send<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         &mut self,
         channel: &mut C,
-        cols: usize,
         weight: usize,
         rng: &mut RNG,
-    ) -> Result<(Vec<FE::PrimeField>, Vec<FE>), Error> {
-        let m = cols / weight;
+    ) -> Result<Vec<(FE::PrimeField, FE)>, Error> {
+        let m = self.cols / weight;
         let ac = self.spsvole.send(channel, m as u128, rng).unwrap();
-        let mut e = vec![FE::PrimeField::zero(); cols];
-        let mut t = vec![FE::PrimeField::zero(); weight];
+        let mut e = vec![FE::PrimeField::zero(); self.cols];
+        let mut t = vec![FE::zero(); self.cols];
         // Sample error vector `e` with hamming weight `t`
         for i in 0..weight {
             let ind = rng.gen_range(0, weight);
-            e[i*weight+ind] = FE::PrimeField::one();
-    }
-    for i in 0..weight {
-        let ind = rng.gen_range(0, weight);
-        t[i*weight+ind] = FE::PrimeField::one();
-}
-        let a = code_gen::<FE::PrimeField>(self.rows, cols);
-        let a_prime: Vec<Vec<FE>> = a.iter().map(|&u| u.iter().map(|&u| to_fpr::<FE>(u).collect())).collect();
-        let x: Vec<FE::PrimeField> = (0..self.rows).map(|i| dot_prod(&self.u, &a[i])).collect();
+            e[i * weight + ind] = FE::PrimeField::one();
+        }
+        for i in 0..weight {
+            let ind = rng.gen_range(0, weight);
+            t[i * weight + ind] = FE::one();
+        }
+        let a = &self.matrix;
+        let mut x: Vec<FE::PrimeField> = (0..self.rows).map(|i| dot_prod(&self.u, &a[i])).collect();
         x = x.iter().zip(e.iter()).map(|(&x_, &e_)| x_ + e_).collect();
-        let z = (0..self.rows).map(|i| dot_prod::<FE>(&self.w, &a[i])).sum();
-        z += t;
-        let u = vec![FE::PrimeField::zero(); cols];
-        let w = vec![FE::zero(); cols];
-        Ok((u, w))
+        let mut z: Vec<FE> = (0..self.rows)
+            .map(|i| dot_prod::<FE>(&self.w, &to_fpr_vec(&a[i])))
+            .collect();
+        z = z.iter().zip(t.iter()).map(|(&z, &t)| z + t).collect();
+        for i in 0..self.rows {
+            self.u[i] = x[i];
+            self.w[i] = z[i];
+        }
+        let output = (self.rows..self.cols).map(|i| (x[i], z[i])).collect();
+        Ok(output)
     }
 }
 
-impl<FE: FF, SV: SVoleReceiver<Msg = FE>, SPS: SpsVoleReceiver> LpnsVoleReceiver for Receiver<FE, SV, SPS> {
+impl<FE: FF, SV: SVoleReceiver<Msg = FE>, SPS: SpsVoleReceiver> LpnsVoleReceiver
+    for Receiver<FE, SV, SPS>
+{
     type Msg = FE;
     fn init<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         channel: &mut C,
-        k: usize,
+        rows: usize,
+        cols: usize,
+        d: usize,
         rng: &mut RNG,
     ) -> Result<Self, Error> {
         let mut svole_receiver = SV::init(channel, rng).unwrap();
-        let v = svole_receiver.receive(channel, k, rng)?;
+        let v = svole_receiver.receive(channel, rows, rng)?;
         let sp_svole_receiver = SPS::init(channel, rng).unwrap();
-        let delta = FE::random(&rng);
+        let delta = FE::random(rng);
+        let matrix = code_gen(rows, cols, d);
         Ok(Self {
             _fe: PhantomData::<FE>,
             _sv: PhantomData::<SV>,
@@ -148,33 +151,35 @@ impl<FE: FF, SV: SVoleReceiver<Msg = FE>, SPS: SpsVoleReceiver> LpnsVoleReceiver
             svole: svole_receiver,
             spsvole: sp_svole_receiver,
             delta,
+            rows,
+            cols,
             v,
+            matrix,
         })
     }
-        fn delta(&self) -> FE{
-            self.delta
-        }
-    
+    fn delta(&self) -> FE {
+        self.delta
+    }
+
     fn receive<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         &mut self,
         channel: &mut C,
-        cols: usize,
         weight: usize,
         rng: &mut RNG,
     ) -> Result<Vec<FE>, Error> {
-        let m = cols / weight;
+        let m = self.cols / weight;
         let b = self.spsvole.receive(channel, m as u128, rng)?;
-        let mut s = vec![FE::zero(); weight];
-       // define the vectors e and t.
+        let mut s = vec![FE::zero(); self.cols];
+        // define the vectors e and t.
         for _i in 0..weight {
             let rand_ind = rng.gen_range(0, weight);
             s[rand_ind] = FE::one();
         }
-        let y = (0..self.rows).map(|i| dot_product(&self.v, &a[i])).sum();
-        y.add_assign(s);
-       
-        let v = vec![FE::zero(); cols];
-        Ok(v)
+        let mut y: Vec<FE> = (0..self.rows)
+            .map(|i| dot_prod(&self.v, &to_fpr_vec(&self.matrix[i])))
+            .collect();
+        y = y.iter().zip(s.iter()).map(|(&y, &s)| y + s).collect();
+        let output = (self.rows..self.cols).map(|i| y[i]).collect();
+        Ok(output)
     }
 }
-

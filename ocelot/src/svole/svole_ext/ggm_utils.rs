@@ -167,7 +167,6 @@ fn bv_to_u128(v: &[bool]) -> u128 {
         .sum()
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -176,7 +175,7 @@ mod tests {
     #[test]
     fn test_bv_to_u128() {
         let x = rand::random::<u128>();
-        let bv = u128_to_bv(x);
+        let bv = unpack_bits(&x.to_le_bytes(), 128);
         assert_eq!(bv_to_u128(&bv), x);
     }
 

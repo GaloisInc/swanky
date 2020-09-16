@@ -7,11 +7,11 @@
 //! Single-point Subfield Vector Oblivious Linear Evaluation (SpsVOLE) and
 //! LPN based Subfield Vector Oblivious Linear Evaluation (SVOLE) traits.
 
+mod dummy;
 mod eq;
 mod ggm_utils;
 mod sp_svole;
-//mod dummy;
-//mod svole_lpn;
+mod svole_lpn;
 
 use crate::errors::Error;
 use rand_core::{CryptoRng, RngCore};
@@ -115,6 +115,8 @@ where
     fn init<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         channel: &mut C,
         rows: usize,
+        cols: usize,
+        d: usize,
         rng: &mut RNG,
     ) -> Result<Self, Error>;
     /// This procedure can be run multiple times and produces `L` sVole correlations,
@@ -122,10 +124,9 @@ where
     fn send<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         &mut self,
         channel: &mut C,
-        cols: usize,
         weight: usize,
         rng: &mut RNG,
-    ) -> Result<(Vec<<Self::Msg as FF>::PrimeField>, Vec<Self::Msg>), Error>;
+    ) -> Result<Vec<(<Self::Msg as FF>::PrimeField, Self::Msg)>, Error>;
 }
 
 /// A trait for LpnsVole Sender.
@@ -140,6 +141,8 @@ where
     fn init<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         channel: &mut C,
         rows: usize,
+        cols: usize,
+        d: usize,
         rng: &mut RNG,
     ) -> Result<Self, Error>;
     /// Returns the receiver's choice during the OT call.
@@ -149,7 +152,6 @@ where
     fn receive<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         &mut self,
         channel: &mut C,
-        cols: usize,
         weight: usize,
         rng: &mut RNG,
     ) -> Result<Vec<Self::Msg>, Error>;
@@ -158,8 +160,7 @@ where
 #[cfg(test)]
 mod tests {
     use crate::{
-        ot::{DummySender,
-            DummyReceiver,
+        ot::{
             ChouOrlandiReceiver,
             ChouOrlandiSender,
             KosReceiver,
@@ -173,6 +174,7 @@ mod tests {
             base_svole::{Receiver as VoleReceiver, Sender as VoleSender},
             copee::{Receiver as CpReceiver, Sender as CpSender},
             svole_ext::{
+                dummy::{Receiver as DummyReceiver, Sender as DummySender},
                 eq::{Receiver as eqReceiver, Sender as eqSender},
                 sp_svole::{Receiver as SpsReceiver, Sender as SpsSender},
                 EqReceiver,
@@ -221,31 +223,24 @@ mod tests {
             let mut vole = SPSender::init(&mut channel, &mut rng).unwrap();
             vole.send(&mut channel, len, &mut rng).unwrap()
         });
-        //println!("vole={")
         let mut rvole = SPReceiver::init(&mut channel, &mut rng).unwrap();
-        println!("Im here in testing");
         let vs = rvole.receive(&mut channel, len, &mut rng).unwrap();
-        println!("v={:?}", vs);
         let delta = rvole.delta();
-        println!("delta={:?}", delta);
         let uw_s = handle.join().unwrap();
-        println!("uw_s={:?}", uw_s);
-        /*for i in 0..len as usize {
+        for i in 0..len as usize {
             let mut right = delta.clone();
             right.mul_assign(to_fpr(uw_s[i].0));
             right.add_assign(vs[i]);
             assert_eq!(uw_s[i].1, right);
-        }*/
-        // assert_eq!(true, false);
+        }
     }
 
     #[test]
     fn test_sp_svole() {
         let depth = rand::thread_rng().gen_range(1, 3);
-        println!("depth_in_test={:?}", depth);
         let leaves = pow(2, depth);
         let alpha = leaves - 1;
-        test_spsvole::<
+        /*test_spsvole::<
             Gf128,
             SpsSender<
                 ChouOrlandiReceiver,
@@ -254,6 +249,21 @@ mod tests {
                 eqSender<Gf128>,
             >,
             SpsReceiver<
+                ChouOrlandiSender,
+                Gf128,
+                VoleReceiver<CpReceiver<KosReceiver, Gf128>, Gf128>,
+                eqReceiver<Gf128>,
+            >,
+        >(leaves);*/
+        test_spsvole::<
+            Gf128,
+            DummySender<
+                ChouOrlandiReceiver,
+                Gf128,
+                VoleSender<CpSender<KosSender, Gf128>, Gf128>,
+                eqSender<Gf128>,
+            >,
+            DummyReceiver<
                 ChouOrlandiSender,
                 Gf128,
                 VoleReceiver<CpReceiver<KosReceiver, Gf128>, Gf128>,
