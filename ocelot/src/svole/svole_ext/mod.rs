@@ -165,8 +165,6 @@ mod tests {
             ChouOrlandiSender,
             KosReceiver,
             KosSender,
-            RandomReceiver as ROTReceiver,
-            RandomSender as ROTSender,
             Receiver as OtReceiver,
             Sender as OtSender,
         },
@@ -177,8 +175,11 @@ mod tests {
                 dummy::{Receiver as DummyReceiver, Sender as DummySender},
                 eq::{Receiver as eqReceiver, Sender as eqSender},
                 sp_svole::{Receiver as SpsReceiver, Sender as SpsSender},
+                svole_lpn::{Receiver as LpnReceiver, Sender as LpnSender},
                 EqReceiver,
                 EqSender,
+                LpnsVoleReceiver,
+                LpnsVoleSender,
                 SpsVoleReceiver,
                 SpsVoleSender,
             },
@@ -209,7 +210,6 @@ mod tests {
     >(
         len: u128,
     ) {
-        println!("leaves={:?}", len);
         let (sender, receiver) = UnixStream::pair().unwrap();
         let mut rng = AesRng::new();
         let reader = BufReader::new(receiver.try_clone().unwrap());
@@ -237,10 +237,10 @@ mod tests {
 
     #[test]
     fn test_sp_svole() {
-        let depth = rand::thread_rng().gen_range(1, 3);
+        let depth = rand::thread_rng().gen_range(1, 20);
         let leaves = pow(2, depth);
-        let alpha = leaves - 1;
-        /*test_spsvole::<
+        /*let alpha = leaves - 1;
+        test_spsvole::<
             Gf128,
             SpsSender<
                 ChouOrlandiReceiver,
@@ -270,5 +270,67 @@ mod tests {
                 eqReceiver<Gf128>,
             >,
         >(leaves);
+    }
+
+    fn test_svole_lpn<
+        FE: FF + Sync + Send,
+        Lpnsender: LpnsVoleSender<Msg = FE>,
+        Lpnreciever: LpnsVoleReceiver<Msg = FE>,
+    >() {
+        println!("Hello");
+        let (sender, receiver) = UnixStream::pair().unwrap();
+        let mut rng = AesRng::new();
+        let reader = BufReader::new(receiver.try_clone().unwrap());
+        let writer = BufWriter::new(receiver);
+        let mut channel = Channel::new(reader, writer);
+        let handle = std::thread::spawn(move || {
+            let mut rng = AesRng::new();
+            let reader = BufReader::new(sender.try_clone().unwrap());
+            let writer = BufWriter::new(sender);
+            let mut channel = Channel::new(reader, writer);
+            let mut svole_lpn_sender = Lpnsender::init(&mut channel, 2, 3, 1, &mut rng).unwrap();
+            //svole_lpn_sender.send(&mut channel, 2, &mut rng).unwrap()
+        });
+        //assert_eq!(0, 1);
+        println!("Im here in testing");
+        //let mut svole_lpn_receiver = Lpnreciever::init(&mut channel, 2, 3, 2, &mut rng).unwrap();
+        /* let vs = svole_lpn_receiver
+            .receive(&mut channel, 2, &mut rng)
+            .unwrap();
+        let delta = svole_lpn_receiver.delta();
+        let uw_s = handle.join().unwrap();*/
+        /*for i in 0..len as usize {
+            let mut right = delta.clone();
+            right.mul_assign(to_fpr(uw_s[i].0));
+            right.add_assign(vs[i]);
+            assert_eq!(uw_s[i].1, right);
+        }*/
+    }
+
+    #[test]
+    fn test_svole_lpn_() {
+        test_svole_lpn::<
+            Gf128,
+            LpnSender<
+                Gf128,
+                VoleSender<CpSender<KosSender, Gf128>, Gf128>,
+                DummySender<
+                    ChouOrlandiReceiver,
+                    Gf128,
+                    VoleSender<CpSender<KosSender, Gf128>, Gf128>,
+                    eqSender<Gf128>,
+                >,
+            >,
+            LpnReceiver<
+                Gf128,
+                VoleReceiver<CpReceiver<KosReceiver, Gf128>, Gf128>,
+                DummyReceiver<
+                    ChouOrlandiSender,
+                    Gf128,
+                    VoleReceiver<CpReceiver<KosReceiver, Gf128>, Gf128>,
+                    eqReceiver<Gf128>,
+                >,
+            >,
+        >();
     }
 }

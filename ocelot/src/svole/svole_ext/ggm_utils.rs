@@ -9,7 +9,7 @@ use rand::{Rng, SeedableRng};
 use scuttlebutt::{field::FiniteField as FF, utils::unpack_bits, AesRng, Block};
 use std::collections::VecDeque;
 
-/// Constructing GGM tree with `h-1` levels.
+/// Constructing GGM tree with `h` levels.
 fn prg(depth: usize, seed: Block) -> Vec<Block> {
     let h = depth;
     let mut sv = Vec::new();
@@ -129,7 +129,7 @@ fn bv_to_u128(v: &[bool]) -> u128 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use scuttlebutt::field::Gf128;
+    use scuttlebutt::field::{Fp, Gf128};
 
     #[test]
     fn test_bv_to_u128() {
@@ -170,4 +170,21 @@ mod tests {
             }
         }
     }
+    // The following test fails for some reason.
+    /* #[test]
+    fn test_ggm_fp() {
+        let x = rand::random::<Block>();
+        // Runs for a while if the range is over 20.
+        let depth = rand::thread_rng().gen_range(1, 18);
+        let (v, keys) = ggm::<Fp>(depth, x);
+        let k: Vec<Block> = keys.iter().map(|k| k.0).collect();
+        let leaves = pow(2, depth);
+        let alpha = leaves - 1;
+        let v1 = ggm_prime::<Fp>(alpha, &k);
+        for i in 0..leaves {
+            if i != alpha {
+                assert_eq!(v[i], v1[i]);
+            }
+        }
+    }*/
 }

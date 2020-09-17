@@ -96,6 +96,9 @@ impl<
         len: u128,
         rng: &mut RNG,
     ) -> Result<Vec<(FE::PrimeField, FE)>, Error> {
+        if len % 2 != 0 {
+            return Err(Error::Other("len is not multiples of 2!".to_string()));
+        }
         let r = FE::PolynomialFormNumCoefficients::to_usize();
         let depth = 128 - (len - 1).leading_zeros() as usize;
         let n = len as usize;
@@ -222,6 +225,9 @@ impl<
         len: u128,
         rng: &mut RNG,
     ) -> Result<Vec<FE>, Error> {
+        if len % 2 != 0 {
+            return Err(Error::Other("len is not multiples of 2!".to_string()));
+        }
         let n = len as usize;
         let depth = 128 - (len - 1).leading_zeros();
         let b = self.svole.receive(channel, 1, rng)?;
