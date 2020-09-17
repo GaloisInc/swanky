@@ -12,14 +12,14 @@ use crate::{
     errors::Error,
     svole::{
         svole_ext::{LpnsVoleReceiver, LpnsVoleSender, SpsVoleReceiver, SpsVoleSender},
-        svole_utils::{dot_prod, to_fpr, to_fpr_vec},
+        svole_utils::{dot_prod, to_fpr_vec},
         SVoleReceiver,
         SVoleSender,
     },
 };
-use rand::{Rng, SeedableRng};
+use rand::Rng;
 use rand_core::{CryptoRng, RngCore};
-use scuttlebutt::{field::FiniteField as FF, AbstractChannel, AesRng, Block};
+use scuttlebutt::{field::FiniteField as FF, AbstractChannel};
 use std::marker::PhantomData;
 
 /// A LpnsVole sender.
@@ -51,13 +51,20 @@ pub struct Receiver<FE: FF, SV: SVoleReceiver, SPS: SpsVoleReceiver> {
 }
 
 /// Code generator G that outputs matrix A for the given dimension `k` by `n`.
-pub fn code_gen<FE: FF>(rows: usize, cols: usize, d: usize) -> Vec<Vec<FE>> {
-    let seed = rand::random::<Block>();
-    let mut rng = AesRng::from_seed(seed);
-    let mut res: Vec<Vec<_>> = Vec::new();
+pub fn code_gen<FE: FF, RNG: CryptoRng + RngCore>(
+    rows: usize,
+    cols: usize,
+    d: usize,
+    rng: &mut RNG,
+) -> Vec<Vec<FE>> {
+    let mut res: Vec<Vec<FE>> = vec![vec![FE::zero(); cols]; rows];
+    let g = FE::generator();
     for i in 0..rows {
-        for j in 0..cols {
-            res[i][j] = FE::random(&mut rng);
+        for _j in 0..d {
+            let rand_ind = rng.gen_range(0, cols);
+            let nz_elt = g;
+            let fe = nz_elt.pow(rng.gen_range(0, FE::MULTIPLICATIVE_GROUP_ORDER));
+            res[i][rand_ind] = fe;
         }
     }
     res
@@ -72,6 +79,15 @@ impl<FE: FF, SV: SVoleSender<Msg = FE>, SPS: SpsVoleSender> LpnsVoleSender for S
         d: usize,
         rng: &mut RNG,
     ) -> Result<Self, Error> {
+        if rows % 2 != 0 {
+            return Err(Error::Other(
+                "The number of rows of the LPN matrix is not multiple of 2!".to_string(),
+            ));
+        }
+        if (rows >= cols) | (d >= cols) {
+            return Err(Error::Other("Either the number of rows or constant d used in the LPN matrix construction
+            is greater than the number of columns. Please make sure these values less than the no. of columns!".to_string()));
+        }
         let mut svole_sender = SV::init(channel, rng).unwrap();
         let k = rows;
         let n = cols;
@@ -79,7 +95,13 @@ impl<FE: FF, SV: SVoleSender<Msg = FE>, SPS: SpsVoleSender> LpnsVoleSender for S
         let u = uw.iter().map(|&uw| uw.0).collect();
         let w = uw.iter().map(|&uw| uw.1).collect();
         let sp_svole_sender = SPS::init(channel, rng).unwrap();
-        let matrix = code_gen(k, n, d);
+        let matrix = code_gen::<FE::PrimeField, _>(k, n, d, rng);
+        for i in 0..k {
+            for j in 0..n {
+                channel.write_fe::<FE::PrimeField>(matrix[i][j])?;
+            }
+        }
+        channel.flush()?;
         Ok(Self {
             _fe: PhantomData::<FE>,
             _sv: PhantomData::<SV>,
@@ -99,6 +121,13 @@ impl<FE: FF, SV: SVoleSender<Msg = FE>, SPS: SpsVoleSender> LpnsVoleSender for S
         weight: usize,
         rng: &mut RNG,
     ) -> Result<Vec<(FE::PrimeField, FE)>, Error> {
+        if weight >= self.cols {
+            return Err(Error::Other(
+                "The hamming weight of the error vector is greater than or equal 
+            to the length of the error vector `e`"
+                    .to_string(),
+            ));
+        }
         let m = self.cols / weight;
         let ac = self.spsvole.send(channel, m as u128, rng).unwrap();
         let mut e = vec![FE::PrimeField::zero(); self.cols];
@@ -139,11 +168,25 @@ impl<FE: FF, SV: SVoleReceiver<Msg = FE>, SPS: SpsVoleReceiver> LpnsVoleReceiver
         d: usize,
         rng: &mut RNG,
     ) -> Result<Self, Error> {
+        if rows % 2 != 0 {
+            return Err(Error::Other(
+                "The number of rows of the LPN matrix is not multiple of 2!".to_string(),
+            ));
+        }
+        if (rows >= cols) | (d >= cols) {
+            return Err(Error::Other("Either the number of rows or constant d used in the LPN matrix construction
+            is greater than the number of columns. Please make sure these values less than the no. of columns!".to_string()));
+        }
         let mut svole_receiver = SV::init(channel, rng).unwrap();
         let v = svole_receiver.receive(channel, rows, rng)?;
         let sp_svole_receiver = SPS::init(channel, rng).unwrap();
         let delta = FE::random(rng);
-        let matrix = code_gen(rows, cols, d);
+        let mut matrix: Vec<Vec<FE::PrimeField>> = vec![vec![FE::PrimeField::zero(); cols]; rows];
+        for i in 0..rows {
+            for j in 0..cols {
+                matrix[i][j] = channel.read_fe::<FE::PrimeField>()?;
+            }
+        }
         Ok(Self {
             _fe: PhantomData::<FE>,
             _sv: PhantomData::<SV>,
