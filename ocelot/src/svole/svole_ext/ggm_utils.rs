@@ -5,9 +5,8 @@
 // See LICENSE for licensing information.
 
 use num::pow;
-use rand::{CryptoRng, Rng, SeedableRng};
+use rand::{Rng, SeedableRng};
 use scuttlebutt::{field::FiniteField as FF, utils::unpack_bits, AesRng, Block};
-use std::arch::x86_64::*;
 
 /// Constructing GGM tree with `h-1` levels.
 fn prg(depth: usize, seed: Block) -> Vec<Block> {
@@ -46,65 +45,50 @@ fn prg(depth: usize, seed: Block) -> Vec<Block> {
 
 /// The input vector length `n` may be included in the arguments.
 pub fn ggm<FE: FF>(h: usize, seed: Block) -> (Vec<FE>, Vec<(Block, Block)>) {
-    //let len: u128 = pow(2, nbits) - 1;
-    //let h = 128 - (len - 1).leading_zeros() as usize;
-    println!("h={}", h);
-    let mut sv = prg(h, seed);
-    println!("sv={:?}", sv);
-    let zero: __m128i = unsafe { _mm_setzero_si128() };
-    let vec_even: Vec<&Block> = sv.iter().skip(1).step_by(2).collect();
-    let vec_odd: Vec<&Block> = sv.iter().skip(2).step_by(2).collect();
-    let zip_seeds: Vec<(Block, Block)> = vec_even
-        .iter()
-        .zip(vec_odd.iter())
-        .map(|(&s, &t)| (*s, *t))
-        .collect();
-    let mut k0: Vec<Block> = Vec::new();
-    let mut k1: Vec<Block> = Vec::new();
-    for i in 1..h + 1 {
-        let mut res0 = Block(zero);
-        let mut res1 = Block(zero);
-        let exp = pow(2, i - 1);
+    let sv = prg(h, seed); // XXX what does `sv` stand for?
+    let mut keys: Vec<(Block, Block)> = vec![Default::default(); h];
+    for i in 0..h {
+        let mut k0 = Default::default();
+        let mut k1 = Default::default();
+        let exp = 1 << i;
         for j in 0..exp {
-            res0 ^= zip_seeds[j + exp - 1].0;
-            res1 ^= zip_seeds[j + exp - 1].1;
+            k0 ^= sv[2 + j + exp - 1]; // Even keys
+            k1 ^= sv[1 + j + exp - 1]; // Odd keys
         }
-        k0.push(res0);
-        k1.push(res1);
+        keys[i] = (k0, k1);
     }
-    let exp = pow(2, h);
-    let mut v: Vec<FE> = vec![FE::zero(); exp];
+    let exp = 1 << h;
+    let mut vs = vec![FE::zero(); exp];
     for j in 0..exp {
-        v[j] = FE::from_uniform_bytes(&<[u8; 16]>::from(sv[j + exp - 1]));
+        vs[j] = FE::from_uniform_bytes(&<[u8; 16]>::from(sv[j + exp - 1]));
     }
-    let keys: Vec<(Block, Block)> = k0.iter().zip(k1.iter()).map(|(&k, &l)| (k, l)).collect();
-    (v, keys)
+    (vs, keys)
 }
 
 /// GGM prime is used compute the vector of field elements except one entry at `alpha`.
 //TODO: this can be fixed and optimized later.
 pub fn ggm_prime<FE: FF>(alpha: usize, keys: &[Block]) -> Vec<FE> {
-    //let nbits = 128 - (alpha as u128 - 1).leading_zeros() as usize;
     let h = keys.len();
+    println!("alpha = {}", alpha);
     let mut a = unpack_bits(&alpha.to_le_bytes(), h);
     a.reverse();
-    let zero: __m128i = unsafe { _mm_setzero_si128() };
-    let mut sv: Vec<Block> = vec![Block(zero); pow(2, h)];
+    println!("alpha bits = {:?}", a);
+    let zero = Block::default();
+    let mut sv: Vec<Block> = vec![Default::default(); 1 << h];
     sv.insert(1 + !a[0] as usize, keys[0]);
     for i in 2..h {
-        let exp = pow(2, i - 1) as usize;
+        let exp = 2 << (i - 1);
         let mut tmp = a.clone();
         tmp.truncate(i - 1);
         for j in 0..exp - 1 {
+            // XXX why to u128? convert to usize directly
             if j == bv_to_u128(&tmp) as usize {
                 continue;
             } else {
-                let s = sv[j + exp - 1];
-                //PRG G
-                let mut rng = AesRng::from_seed(s);
+                let mut rng = AesRng::from_seed(sv[j + exp - 1]);
                 let (s0, s1) = rng.gen::<(Block, Block)>();
-                sv.insert(2 * j + pow(2, i) - 1, s0);
-                sv.insert(2 * j + pow(2, i), s1);
+                sv.insert(2 * j + (1 << i) - 1, s0);
+                sv.insert(2 * j + (1 << i), s1);
             }
         }
         let mut tmp = a.clone();
@@ -112,13 +96,12 @@ pub fn ggm_prime<FE: FF>(alpha: usize, keys: &[Block]) -> Vec<FE> {
         let a_i_comp = !a[i - 1];
         tmp.push(a_i_comp);
         let a_i_star = bv_to_u128(&tmp);
-        let s_alpha =
-            (0..exp - 1)
-                .filter(|j| *j != a_i_star as usize)
-                .fold(Block(zero), |mut sum, j| {
-                    sum ^= sv[pow(2, i) + 2 * j + a_i_comp as usize - 1];
-                    sum
-                });
+        let s_alpha = (0..exp - 1)
+            .filter(|j| *j != a_i_star as usize)
+            .fold(zero, |mut sum, j| {
+                sum ^= sv[pow(2, i) + 2 * j + a_i_comp as usize - 1];
+                sum
+            });
         sv.insert((a_i_star + pow(2, i)) as usize - 2, s_alpha ^ keys[i - 1]);
     }
     let mut tmp = a.clone();
@@ -126,16 +109,15 @@ pub fn ggm_prime<FE: FF>(alpha: usize, keys: &[Block]) -> Vec<FE> {
     let exp = pow(2, h - 1) as usize;
     let len = pow(2, h);
     let mut v = Vec::with_capacity(len);
-    for i in 0..len {
+    for _ in 0..len {
         v.push(FE::zero());
     }
     for j in 0..exp {
-        let temp = sv[exp + j - 1];
         if j == bv_to_u128(&tmp) as usize {
             continue;
         } else {
             // PRG G'
-            let mut rng = AesRng::from_seed(temp);
+            let mut rng = AesRng::from_seed(sv[exp + j - 1]);
             let (fe0, fe1) = (FE::random(&mut rng), FE::random(&mut rng));
             v.insert(2 * j, fe0);
             v.insert(2 * j + 1, fe1);
@@ -147,7 +129,6 @@ pub fn ggm_prime<FE: FF>(alpha: usize, keys: &[Block]) -> Vec<FE> {
     tmp.push(!a_l);
     tmp.reverse();
     let ind = bv_to_u128(&tmp);
-    let exp = pow(2, h - 1);
     let mut sum = FE::zero();
     if a_l {
         sum = v.iter().step_by(2).map(|u| *u).sum();
@@ -181,17 +162,25 @@ mod tests {
 
     #[test]
     fn test_ggm() {
-        let x = rand::random::<Block>();
-        // Runs for a while if the range is over 20.
-        let depth = rand::thread_rng().gen_range(1, 18);
-        let (v, keys) = ggm::<Gf128>(depth, x);
-        let k: Vec<Block> = keys.iter().map(|k| k.0).collect();
-        let leaves = pow(2, depth);
-        let alpha = leaves - 1;
-        let v1 = ggm_prime::<Gf128>(alpha, &k);
-        for i in 0..leaves {
-            if i != alpha {
-                assert_eq!(v[i], v1[i]);
+        for _ in 0..10 {
+            let x = rand::random::<Block>();
+            // Runs for a while if the range is over 20.
+            // let depth = rand::thread_rng().gen_range(1, 18);
+            let depth = 3;
+            let (v, keys) = ggm::<Gf128>(depth, x);
+            let alpha = 2;
+            // let alpha = rand::thread_rng().gen_range(0, leaves);
+            // XXX This seems wrong? Keys should depend on `alpha`
+            let alpha_keys: Vec<Block> = keys.iter().skip(1).map(|k| k.0).collect();
+            let leaves = 1 << depth;
+
+            let v_ = ggm_prime::<Gf128>(alpha, &alpha_keys);
+            for i in 0..leaves {
+                if i != alpha {
+                    assert_eq!(v[i], v_[i]);
+                } else {
+                    assert!(v[i] != v_[i]);
+                }
             }
         }
     }
