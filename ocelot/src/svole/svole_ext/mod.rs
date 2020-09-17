@@ -288,16 +288,17 @@ mod tests {
             let reader = BufReader::new(sender.try_clone().unwrap());
             let writer = BufWriter::new(sender);
             let mut channel = Channel::new(reader, writer);
-            let mut svole_lpn_sender = Lpnsender::init(&mut channel, 2, 3, 2, &mut rng).unwrap();
-            svole_lpn_sender.send(&mut channel, 2, &mut rng).unwrap()
+            let mut svole_lpn_sender = Lpnsender::init(&mut channel, 2, 3, 1, &mut rng).unwrap();
+            //svole_lpn_sender.send(&mut channel, 2, &mut rng).unwrap()
         });
+        //assert_eq!(0, 1);
         println!("Im here in testing");
-        let mut svole_lpn_receiver = Lpnreciever::init(&mut channel, 2, 3, 2, &mut rng).unwrap();
-        let vs = svole_lpn_receiver
+        //let mut svole_lpn_receiver = Lpnreciever::init(&mut channel, 2, 3, 2, &mut rng).unwrap();
+        /* let vs = svole_lpn_receiver
             .receive(&mut channel, 2, &mut rng)
             .unwrap();
         let delta = svole_lpn_receiver.delta();
-        let uw_s = handle.join().unwrap();
+        let uw_s = handle.join().unwrap();*/
         /*for i in 0..len as usize {
             let mut right = delta.clone();
             right.mul_assign(to_fpr(uw_s[i].0));
