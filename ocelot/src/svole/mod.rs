@@ -144,28 +144,37 @@ mod tests {
         len: usize,
     ) {
         let mut rng = AesRng::new();
-        for _i in 0..len {
-            let input = FE::PrimeField::random(&mut rng);
-            let u = input.clone();
-            let (sender, receiver) = UnixStream::pair().unwrap();
-            let handle = std::thread::spawn(move || {
-                let mut rng = AesRng::new();
-                let reader = BufReader::new(sender.try_clone().unwrap());
-                let writer = BufWriter::new(sender);
-                let mut channel = Channel::new(reader, writer);
-                let mut copee_sender = CPSender::init(&mut channel, &mut rng).unwrap();
-                copee_sender.send(&mut channel, &input).unwrap()
-            });
-            let reader = BufReader::new(receiver.try_clone().unwrap());
-            let writer = BufWriter::new(receiver);
+        let input = FE::PrimeField::random(&mut rng);
+        let u = input.clone();
+        let (sender, receiver) = UnixStream::pair().unwrap();
+        let handle = std::thread::spawn(move || {
+            let mut rng = AesRng::new();
+            let reader = BufReader::new(sender.try_clone().unwrap());
+            let writer = BufWriter::new(sender);
             let mut channel = Channel::new(reader, writer);
-            let mut copee_receiver = CPReceiver::init(&mut channel, &mut rng).unwrap();
+            let mut copee_sender = CPSender::init(&mut channel, &mut rng).unwrap();
+            let mut ws = vec![];
+            for _ in 0..len {
+                let w = copee_sender.send(&mut channel, &input).unwrap();
+                ws.push(w);
+            }
+            ws
+        });
+        let reader = BufReader::new(receiver.try_clone().unwrap());
+        let writer = BufWriter::new(receiver);
+        let mut channel = Channel::new(reader, writer);
+        let mut copee_receiver = CPReceiver::init(&mut channel, &mut rng).unwrap();
+        let mut vs = vec![];
+        for _ in 0..len {
             let v = copee_receiver.receive(&mut channel).unwrap();
+            vs.push(v);
+        }
+        let ws = handle.join().unwrap();
+        for (w, v) in ws.iter().zip(vs.iter()) {
             let mut delta = copee_receiver.delta();
-            let w = handle.join().unwrap();
             delta.mul_assign(to_fpr(u));
-            delta.add_assign(v);
-            assert_eq!(w, delta);
+            delta.add_assign(*v);
+            assert_eq!(*w, delta);
         }
     }
 

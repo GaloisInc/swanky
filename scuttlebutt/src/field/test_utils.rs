@@ -58,7 +58,7 @@ pub(crate) fn make_polynomial<FE: FiniteField>(x: impl AsRef<[FE]>) -> Polynomia
 pub(crate) fn make_polynomial_coefficients<FE: FiniteField, L: ArrayLength<FE>>(
     poly: &Polynomial<FE>,
 ) -> GenericArray<FE, L> {
-    let mut slice = vec![FE::zero(); L::USIZE];
+    let mut slice = vec![FE::ZERO; L::USIZE];
     slice[0] = poly.constant;
     for (a, b) in slice[1..].iter_mut().zip(poly.coefficients.iter()) {
         *a = *b;
@@ -88,8 +88,8 @@ macro_rules! test_field {
             test_commutativity!(additive_commutativity, any_fe, add);
             test_commutativity!(multiplicative_commutativity, any_fe, mul);
 
-            test_identity!(additive_identity, any_fe, add, <$f>::zero());
-            test_identity!(multiplicative_identity, any_fe, mul, <$f>::one());
+            test_identity!(additive_identity, any_fe, add, <$f>::ZERO);
+            test_identity!(multiplicative_identity, any_fe, mul, <$f>::ONE);
 
             test_assign!(add_assign, any_fe, add, add_assign);
             test_assign!(sub_assign, any_fe, sub, sub_assign);
@@ -99,15 +99,15 @@ macro_rules! test_field {
                 #[test]
                 fn additive_inverse(a in any_fe()) {
                     let b = -a;
-                    assert_eq!(a + b, <$f>::zero());
+                    assert_eq!(a + b, <$f>::ZERO);
                 }
             }
             proptest! {
                 #[test]
                 fn multiplicative_inverse(a in any_fe()) {
-                    if a != <$f>::zero() {
+                    if a != <$f>::ZERO {
                         let b = a.inverse();
-                        assert_eq!(a * b, <$f>::one());
+                        assert_eq!(a * b, <$f>::ONE);
                     }
                 }
             }
@@ -133,11 +133,11 @@ macro_rules! test_field {
             proptest! {
                 #[test]
                 fn test_power(a in any_fe()) {
-                    assert_eq!(a.pow(0), <$f>::one());
-                    if a != <$f>::zero() {
-                        assert_eq!(a.pow(<$f>::MULTIPLICATIVE_GROUP_ORDER), <$f>::one());
+                    assert_eq!(a.pow(0), <$f>::ONE);
+                    if a != <$f>::ZERO {
+                        assert_eq!(a.pow(<$f>::MULTIPLICATIVE_GROUP_ORDER), <$f>::ONE);
                     } else {
-                        assert_eq!(a.pow(<$f>::MULTIPLICATIVE_GROUP_ORDER), <$f>::zero());
+                        assert_eq!(a.pow(<$f>::MULTIPLICATIVE_GROUP_ORDER), <$f>::ZERO);
                     }
                 }
             }
@@ -171,11 +171,11 @@ macro_rules! test_field {
             #[test]
             fn polynomial_constants() {
                 assert_eq!(
-                    make_polynomial(<$f>::zero().to_polynomial_coefficients()),
+                    make_polynomial(<$f>::ZERO.to_polynomial_coefficients()),
                     Polynomial::zero()
                 );
                 assert_eq!(
-                    make_polynomial(<$f>::one().to_polynomial_coefficients()),
+                    make_polynomial(<$f>::ONE.to_polynomial_coefficients()),
                     Polynomial::one()
                 );
             }

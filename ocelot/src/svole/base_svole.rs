@@ -10,7 +10,7 @@
 use crate::{
     errors::Error,
     svole::{
-        svole_utils::{dot_prod, to_fpr},
+        svole_utils::{dot_product, to_fpr},
         CopeeReceiver,
         CopeeSender,
         SVoleReceiver,
@@ -42,9 +42,9 @@ impl<FE: FF, CP: CopeeSender<Msg = FE>> SVoleSender for Sender<CP, FE> {
         rng: &mut RNG,
     ) -> Result<Self, Error> {
         let r = FE::PolynomialFormNumCoefficients::to_usize();
-        let g = FE::generator();
-        let mut acc = FE::one();
-        let mut pows = vec![FE::zero(); r];
+        let g = FE::GENERATOR;
+        let mut acc = FE::ONE;
+        let mut pows = vec![FE::ZERO; r];
         for i in 0..r {
             pows[i] = acc;
             acc *= g;
@@ -62,28 +62,39 @@ impl<FE: FF, CP: CopeeSender<Msg = FE>> SVoleSender for Sender<CP, FE> {
         let r = FE::PolynomialFormNumCoefficients::to_usize();
         let u: Vec<FE::PrimeField> = (0..len).map(|_| FE::PrimeField::random(&mut rng)).collect();
         let a: Vec<FE::PrimeField> = (0..r).map(|_| FE::PrimeField::random(&mut rng)).collect();
-        let mut w = vec![FE::zero(); len];
+        let mut w = vec![FE::ZERO; len];
         for i in 0..len {
             w[i] = self.copee.send(channel, &u[i])?;
         }
-        let mut c = vec![FE::zero(); r];
+        let mut c = vec![FE::ZERO; r];
         for i in 0..r {
             c[i] = self.copee.send(channel, &a[i])?;
         }
         channel.flush()?;
-        let mut chi: Vec<FE> = vec![FE::zero(); len];
+        let mut chi: Vec<FE> = vec![FE::ZERO; len];
         for i in 0..len {
             chi[i] = channel.read_fe()?;
         }
-        let u_prime: Vec<FE> = u.iter().map(|x| to_fpr(*x)).collect();
-        let mut x = dot_prod(&chi, &u_prime);
-        let a_prime: Vec<FE> = a.iter().map(|x| to_fpr(*x)).collect();
-        x += dot_prod(&a_prime, &self.pows);
-        let mut z: FE = dot_prod(&chi, &w);
-        z += dot_prod(&c, &self.pows);
+
+        let mut x: FE = chi
+            .iter()
+            .zip(u.iter())
+            .map(|(&chi, &u)| chi * to_fpr(u))
+            .sum();
+        x += a
+            .iter()
+            .zip(self.pows.iter())
+            .map(|(&a, &pow)| to_fpr::<FE>(a) * pow)
+            .sum();
+        let mut z: FE = dot_product(chi.into_iter(), w.clone().into_iter());
+        z += dot_product(c.into_iter(), self.pows.clone().into_iter());
         channel.write_fe(x)?;
         channel.write_fe(z)?;
-        let res = u.iter().zip(w.iter()).map(|(u, w)| (*u, *w)).collect();
+        let res = u
+            .iter()
+            .zip(w.clone().iter())
+            .map(|(u, w)| (*u, *w))
+            .collect();
         Ok(res)
     }
 }
@@ -95,9 +106,9 @@ impl<FE: FF, CP: CopeeReceiver<Msg = FE>> SVoleReceiver for Receiver<CP, FE> {
         rng: &mut RNG,
     ) -> Result<Self, Error> {
         let r = FE::PolynomialFormNumCoefficients::to_usize();
-        let g = FE::generator();
-        let mut acc = FE::one();
-        let mut pows = vec![FE::zero(); r];
+        let g = FE::GENERATOR;
+        let mut acc = FE::ONE;
+        let mut pows = vec![FE::ZERO; r];
         for i in 0..r {
             pows[i] = acc;
             acc *= g;
@@ -117,11 +128,11 @@ impl<FE: FF, CP: CopeeReceiver<Msg = FE>> SVoleReceiver for Receiver<CP, FE> {
         mut rng: &mut RNG,
     ) -> Result<Vec<FE>, Error> {
         let r = FE::PolynomialFormNumCoefficients::to_usize();
-        let mut v: Vec<FE> = vec![FE::zero(); len];
+        let mut v: Vec<FE> = vec![FE::ZERO; len];
         for i in 0..len {
             v[i] = self.copee.receive(channel)?;
         }
-        let mut b: Vec<FE> = vec![FE::zero(); r];
+        let mut b: Vec<FE> = vec![FE::ZERO; r];
         for i in 0..r {
             b[i] = self.copee.receive(channel)?;
         }
@@ -132,12 +143,12 @@ impl<FE: FF, CP: CopeeReceiver<Msg = FE>> SVoleReceiver for Receiver<CP, FE> {
         channel.flush()?;
         let x = channel.read_fe()?;
         let z: FE = channel.read_fe()?;
-        let mut y = dot_prod(&chi, &v);
-        y += dot_prod(&b, &self.pows);
-        let mut delta_ = self.copee.delta().clone();
-        delta_ *= x;
-        delta_ += y;
-        if z == delta_ {
+        let mut y = dot_product(chi.into_iter(), v.clone().into_iter());
+        y += dot_product(b.into_iter(), self.pows.clone().into_iter());
+        let mut delta = self.copee.delta().clone();
+        delta *= x;
+        delta += y;
+        if z == delta {
             Ok(v)
         } else {
             return Err(Error::Other(
