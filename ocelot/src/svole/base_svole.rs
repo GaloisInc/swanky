@@ -9,13 +9,7 @@
 
 use crate::{
     errors::Error,
-    svole::{
-        svole_utils::{dot_product, to_fpr},
-        CopeeReceiver,
-        CopeeSender,
-        SVoleReceiver,
-        SVoleSender,
-    },
+    svole::{svole_utils::to_fpr, CopeeReceiver, CopeeSender, SVoleReceiver, SVoleSender},
 };
 use generic_array::typenum::Unsigned;
 use rand_core::{CryptoRng, RngCore};
@@ -66,28 +60,23 @@ impl<FE: FF, CP: CopeeSender<Msg = FE>> SVoleSender for Sender<CP, FE> {
         for i in 0..len {
             w[i] = self.copee.send(channel, &u[i])?;
         }
-        let mut c = vec![FE::ZERO; r];
+        let mut z: FE = FE::ZERO;
         for i in 0..r {
-            c[i] = self.copee.send(channel, &a[i])?;
+            let c = self.copee.send(channel, &a[i])?;
+            z += c * self.pows[i];
         }
         channel.flush()?;
-        let mut chi: Vec<FE> = vec![FE::ZERO; len];
+        let mut x: FE = FE::ZERO;
         for i in 0..len {
-            chi[i] = channel.read_fe()?;
+            let chi = channel.read_fe::<FE>()?;
+            z += chi * w[i];
+            x += chi * (to_fpr(u[i]));
         }
-
-        let mut x: FE = chi
-            .iter()
-            .zip(u.iter())
-            .map(|(&chi, &u)| chi * to_fpr(u))
-            .sum();
         x += a
             .iter()
             .zip(self.pows.iter())
             .map(|(&a, &pow)| to_fpr::<FE>(a) * pow)
             .sum();
-        let mut z: FE = dot_product(chi.into_iter(), w.clone().into_iter());
-        z += dot_product(c.into_iter(), self.pows.clone().into_iter());
         channel.write_fe(x)?;
         channel.write_fe(z)?;
         let res = u
@@ -129,22 +118,22 @@ impl<FE: FF, CP: CopeeReceiver<Msg = FE>> SVoleReceiver for Receiver<CP, FE> {
     ) -> Result<Vec<FE>, Error> {
         let r = FE::PolynomialFormNumCoefficients::to_usize();
         let mut v: Vec<FE> = vec![FE::ZERO; len];
+        let chi: Vec<FE> = (0..len).map(|_| FE::random(&mut rng)).collect();
+        let mut y: FE = FE::ZERO;
         for i in 0..len {
             v[i] = self.copee.receive(channel)?;
+            y += chi[i] * v[i];
         }
-        let mut b: Vec<FE> = vec![FE::ZERO; r];
         for i in 0..r {
-            b[i] = self.copee.receive(channel)?;
+            let b = self.copee.receive(channel)?;
+            y += self.pows[i] * b
         }
-        let chi: Vec<FE> = (0..len).map(|_| FE::random(&mut rng)).collect();
         for x in chi.iter() {
             channel.write_fe(*x)?;
         }
         channel.flush()?;
         let x = channel.read_fe()?;
         let z: FE = channel.read_fe()?;
-        let mut y = dot_product(chi.into_iter(), v.clone().into_iter());
-        y += dot_product(b.into_iter(), self.pows.clone().into_iter());
         let mut delta = self.copee.delta().clone();
         delta *= x;
         delta += y;
