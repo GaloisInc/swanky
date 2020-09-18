@@ -4,8 +4,9 @@
 // Copyright © 2020 Galois, Inc.
 // See LICENSE for licensing information.
 
-//! Implementation of the Weng-Yang-Katz-Wang SpsVole protocol (cf.
-//! <https://eprint.iacr.org/2020/925>, Figure 5).
+//! Implementation of the EQ protocol based on the functionality presented in Figure 10
+//! and the description below in the Weng et als work (cf.
+//! <https://eprint.iacr.org/2020/925>, page no. 29).
 
 use crate::{
     errors::Error,
@@ -50,7 +51,9 @@ impl<FE: FiniteField> EqSender for Sender<FE> {
                 if res == comm_vb {
                     Ok(va == fe)
                 } else {
-                    Err(Error::Other("Failed Opening commitments".to_string()))
+                    Err(Error::Other(
+                        "Failed Opening commitments in EQ protocol.".to_string(),
+                    ))
                 }
             }
             Err(e) => Err(Error::Other(e.to_string())),
@@ -88,7 +91,6 @@ impl<FE: FiniteField> EqReceiver for Receiver<FE> {
             Ok(fe) => {
                 channel.write_bytes(&seed)?;
                 channel.write_fe(vb)?;
-                channel.flush()?;
                 Ok(fe == vb)
             }
             Err(e) => Err(Error::Other(e.to_string())),

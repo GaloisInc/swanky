@@ -9,12 +9,12 @@ use rand::{Rng, SeedableRng};
 use scuttlebutt::{field::FiniteField as FF, utils::unpack_bits, AesRng, Block};
 use std::collections::VecDeque;
 
-/// Construct GGM tree with `h` levels and return the node values (a.k.a seeds). Although, the 
-/// last level seeds to be of type `FE`, we keep them in the form of `Block` type as we need to 
+/// Construct GGM tree with `h` levels and return the node values (a.k.a seeds). Although, the
+/// last level seeds to be of type `FE`, we keep them in the form of `Block` type as we need to
 /// call do OT calls on them.
 fn prg(depth: usize, seed: Block) -> Vec<Block> {
     let h = depth;
-    let mut sv = Vec::new(); // seed vector 
+    let mut sv = Vec::new(); // seed vector
     sv.push(seed);
     for i in 1..h + 1 {
         let exp = 1 << (i - 1);
@@ -46,7 +46,7 @@ fn prg(depth: usize, seed: Block) -> Vec<Block> {
     v
 }*/
 
-/// Given a depth and a seed, `ggm` returns OT keys along with a vector of field 
+/// Given a depth and a seed, `ggm` returns OT keys along with a vector of field
 /// elements that represent seeds of the last level.
 pub fn ggm<FE: FF>(depth: usize, seed: Block) -> (Vec<FE>, Vec<(Block, Block)>) {
     let seeds = prg(depth, seed);
@@ -72,7 +72,7 @@ pub fn ggm<FE: FF>(depth: usize, seed: Block) -> (Vec<FE>, Vec<(Block, Block)>) 
 }
 
 /// Given alpha and OTs (received based on the choice vector representing alpha complement),
-/// GGM prime outputs the vector of field elements which supposed have the length equal to 
+/// GGM prime outputs the vector of field elements which supposed have the length equal to
 /// the number of OTs minus 1.
 //TODO: this can be fixed and optimized later.
 pub fn ggm_prime<FE: FF>(alpha: usize, keys: &[Block]) -> Vec<FE> {
