@@ -4,7 +4,7 @@
 // Copyright © 2020 Galois, Inc.
 // See LICENSE for licensing information.
 
-//! Implementation of single-point svole protocol using dummy ggm_prime
+//! Implementation of single-point svole protocol using dummy ggm_prime for
 //! testing purposes.
 
 use crate::{
@@ -12,7 +12,7 @@ use crate::{
     ot::{Receiver as OtReceiver, Sender as OtSender},
     svole::{
         svole_ext::{
-            ggm_utils::{ggm, ggm_prime},
+            ggm_utils::ggm,
             EqReceiver,
             EqSender,
             SpsVoleReceiver,
@@ -38,7 +38,6 @@ use std::marker::PhantomData;
 /// SpsVole Sender.
 #[derive(Clone)]
 pub struct Sender<OT: OtReceiver, FE: FF, SV: SVoleSender, EQ: EqSender> {
-    _fe: PhantomData<FE>,
     _sv: PhantomData<SV>,
     _eq: PhantomData<EQ>,
     svole: SV,
@@ -49,7 +48,6 @@ pub struct Sender<OT: OtReceiver, FE: FF, SV: SVoleSender, EQ: EqSender> {
 /// SpsVole Receiver.
 #[derive(Clone)]
 pub struct Receiver<OT: OtSender, FE: FF, SV: SVoleReceiver, EQ: EqReceiver> {
-    _fe: PhantomData<FE>,
     _sv: PhantomData<SV>,
     _eq: PhantomData<EQ>,
     svole: SV,
@@ -58,7 +56,7 @@ pub struct Receiver<OT: OtSender, FE: FF, SV: SVoleReceiver, EQ: EqReceiver> {
     pows: Vec<FE>,
 }
 
-/// Implement SpsVole for Sender type.
+/// Implement SpsVoleSender for Sender type.
 impl<
         OT: OtReceiver<Msg = Block> + Malicious,
         FE: FF,
@@ -82,7 +80,6 @@ impl<
         }
         let svole_sender = SV::init(channel, rng)?;
         Ok(Self {
-            _fe: PhantomData::<FE>,
             _sv: PhantomData::<SV>,
             _eq: PhantomData::<EQ>,
             pows,
@@ -105,8 +102,6 @@ impl<
         let g = FE::PrimeField::generator();
         let beta = g.clone();
         beta.pow(rng.gen_range(0, FE::MULTIPLICATIVE_GROUP_ORDER));
-        let _delta_ = c.clone();
-        // a_prime = beta - a
         let mut a_prime: FE::PrimeField = beta.clone();
         a_prime -= a[0];
         channel.write_fe::<FE::PrimeField>(a_prime)?;
@@ -131,7 +126,7 @@ impl<
         let sum_w = w
             .iter()
             .enumerate()
-            .filter(|(i, _w)| *i != alpha)
+            .filter(|(i, _)| *i != alpha)
             .map(|(_, &x)| x)
             .sum();
         w[alpha] = delta_;
@@ -163,11 +158,11 @@ impl<
         for item in chi_alpha.iter() {
             channel.write_fe(*item)?;
         }
-        channel.flush()?;
+        //channel.flush()?;
         for item in x_star.iter() {
             channel.write_fe(*item)?;
         }
-        channel.flush()?;
+        //channel.flush()?;
         let z_ = dot_prod(&z, &self.pows);
         let mut va = dot_prod(&chi_alpha, &w);
         va -= z_;
@@ -187,7 +182,7 @@ impl<
     }
 }
 
-/// Implement SVoleReceiver for Receiver type.
+/// Implement SpsVoleReceiver for Receiver type.
 impl<
         OT: OtSender<Msg = Block> + Malicious,
         FE: FF,
@@ -212,7 +207,6 @@ impl<
         let sv_receiver = SV::init(channel, rng)?;
         let delta = sv_receiver.delta();
         Ok(Self {
-            _fe: PhantomData::<FE>,
             _sv: PhantomData::<SV>,
             _eq: PhantomData::<EQ>,
             pows,

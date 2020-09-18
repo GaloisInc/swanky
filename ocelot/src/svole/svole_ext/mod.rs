@@ -27,7 +27,8 @@ where
     type Msg: FF;
     /// Runs any one-time initialization.
     fn init() -> Result<Self, Error>;
-    /// Returns either a bool value or error on inputting a field element.
+    /// Returns either a bool value or error on inputting a field element indicating that the 
+    /// it doesn't match with the receiver input element. 
     fn send<C: AbstractChannel>(
         &mut self,
         channel: &mut C,
@@ -45,7 +46,8 @@ where
     type Msg: FF;
     /// Runs any one-time initialization.
     fn init() -> Result<Self, Error>;
-    /// Returns either a bool value or error on inputting a field element.
+    /// Returns either a bool value or error on inputting a field element indicating that the 
+    /// it doesn't match with the sender input element. 
     fn receive<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         &mut self,
         channel: &mut C,
@@ -68,8 +70,10 @@ where
         rng: &mut RNG,
     ) -> Result<Self, Error>;
     /// Runs single-point svole and outputs pair of vectors `(u, w)` such that
-    /// the correlation $w = u\Delta+v$ holds. For simplicity, the vector length `len` assumed to be power of `2` as it represents
-    /// the number of leaves in the GGM tree and match with the receiver input length.
+    /// the correlation `w = u'Δ + v` holds. Note that `u'` is the converted vector from
+    /// `u` to the vector of elements of the extended field `FE`. For simplicity, the vector 
+    /// length `len` assumed to be power of `2` as it represents the number of leaves in the GGM tree 
+    /// and should match with the receiver input length.
     fn send<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         &mut self,
         channel: &mut C,
@@ -94,7 +98,10 @@ where
     /// Returns the receiver's choice during the OT call.
     fn delta(&self) -> Self::Msg;
     /// Runs single-point svole and outputs a vector `v` such that
-    /// the correlation $w = u\Delta+v$ holds.
+    /// the correlation `w = u'Δ + v` holds. Again, `u'` is the converted vector from
+    /// `u` to the vector of elements of the extended field `FE`. Of course, the vector 
+    /// length `len` is suppose to be in multiples of `2` as it represents the number of 
+    /// leaves in the GGM tree and should match with the sender input length.
     fn receive<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         &mut self,
         channel: &mut C,
@@ -119,8 +126,11 @@ where
         d: usize,
         rng: &mut RNG,
     ) -> Result<Self, Error>;
-    /// This procedure can be run multiple times and produces `L` sVole correlations,
-    /// i.e, outputs `u` and `w` such that $w = u\Delta+v$, each iteration.
+    /// This procedure can be run multiple times and produces `cols - rows` sVole correlations,
+    /// i.e, outputs `u` and `w` such that `w = u'Δ + v` holds. Note that `u'` is the converted vector from
+    /// `u` to the vector of elements of the extended field `FE`. `weight` represents the hamming weight of the 
+    /// error vecor `e` used in the LPN assumption and is suppose to be less than `cols`. Of course, it should also 
+    /// match with receiver input.
     fn send<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         &mut self,
         channel: &mut C,
@@ -137,7 +147,9 @@ where
     /// Message type, restricted to types that are mutably-dereferencable as
     /// `u8` arrays, and implements Finite Field trait.
     type Msg: FF;
-    /// Runs any one-time initialization.
+    /// Runs any one-time initialization. `rows` and `cols` represent the the number of rows and columns of the 
+    /// matrix used in the LPN assumption, and `d` represent small constant used in `d-local linear codes` where each
+    /// column of the matrix holds `d` non-zero entries uniformly. Also note that it is assumed, `rows < cols` and `d < cols`.
     fn init<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         channel: &mut C,
         rows: usize,
@@ -147,8 +159,11 @@ where
     ) -> Result<Self, Error>;
     /// Returns the receiver's choice during the OT call.
     fn delta(&self) -> Self::Msg;
-    /// This procedure can be run multiple times and produces `L` sVole correlations,
-    /// i.e, outputs `v` such that $w = u\Delta+v$, each iteration.
+    /// This procedure can be run multiple times and produces `cols - rows` sVole correlations,
+    /// i.e, outputs `u` and `w` such that `w = u'Δ + v` holds. Note that `u'` is the converted vector from
+    /// `u` to the vector of elements of the extended field `FE`. `weight` represents the hamming weight of the 
+    /// error vecor `e` used in the LPN assumption and is suppose to be less than `cols`. Of course, it should also 
+    /// match with sender input.
     fn receive<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         &mut self,
         channel: &mut C,
