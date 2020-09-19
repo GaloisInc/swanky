@@ -35,13 +35,10 @@ impl FiniteField for F2 {
         F2(u8::from(rng.gen::<bool>()))
     }
 
-    fn zero() -> Self {
-        F2(0)
-    }
+    const ZERO: Self = F2(0);
 
-    fn one() -> Self {
-        F2(1)
-    }
+    const ONE: Self = F2(1);
+
     type ByteReprLen = generic_array::typenum::U1;
     type FromBytesError = BiggerThanModulus;
 
@@ -56,9 +53,7 @@ impl FiniteField for F2 {
 
     const MULTIPLICATIVE_GROUP_ORDER: u128 = Self::MODULUS as u128 - 1;
 
-    fn generator() -> Self {
-        F2(1)
-    }
+    const GENERATOR: Self = F2(1);
 
     type PrimeField = Self;
     type PolynomialFormNumCoefficients = generic_array::typenum::U1;

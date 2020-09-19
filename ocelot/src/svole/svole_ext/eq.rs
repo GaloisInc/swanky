@@ -91,6 +91,7 @@ impl<FE: FiniteField> EqReceiver for Receiver<FE> {
             Ok(fe) => {
                 channel.write_bytes(&seed)?;
                 channel.write_fe(vb)?;
+                channel.flush()?;
                 Ok(fe == vb)
             }
             Err(e) => Err(Error::Other(e.to_string())),

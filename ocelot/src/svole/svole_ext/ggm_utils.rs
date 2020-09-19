@@ -63,7 +63,7 @@ pub fn ggm<FE: FF>(depth: usize, seed: Block) -> (Vec<FE>, Vec<(Block, Block)>) 
         keys[i] = (k0, k1);
     }
     let exp = 1 << depth;
-    let mut vs = vec![FE::zero(); exp];
+    let mut vs = vec![FE::ZERO; exp];
     for j in 0..exp {
         println!("seed -> v: {}", seeds[j + exp - 1]);
         vs[j] = FE::from_uniform_bytes(&<[u8; 16]>::from(seeds[j + exp - 1]));
@@ -83,7 +83,7 @@ pub fn ggm_prime<FE: FF>(alpha: usize, keys: &[Block]) -> Vec<FE> {
     alpha_bits.reverse();
     println!("alpha bits = {:?}", alpha_bits);
     let mut seeds = VecDeque::new();
-    let mut vs = vec![FE::zero(); 1 << h];
+    let mut vs = vec![FE::ZERO; 1 << h];
     for (i, (bit, key)) in alpha_bits.iter().zip(keys.iter()).enumerate() {
         println!("i = {} : {} | bit = {}, XORed key = {}", i, h, bit, key);
         let mut xor = Default::default();
@@ -177,7 +177,7 @@ mod tests {
     }
     // The following test fails for some reason.
     /* #[test]
-    fn test_ggm_fp() {
+    fn test_ggm_Gf128() {
         let x = rand::random::<Block>();
         // Runs for a while if the range is over 20.
         let depth = rand::thread_rng().gen_range(1, 18);

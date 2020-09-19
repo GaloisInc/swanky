@@ -51,13 +51,10 @@ impl FiniteField for Fp {
         Self::try_from(u128::from_le_bytes(bytes) % Self::MODULUS).unwrap()
     }
 
-    fn zero() -> Self {
-        Fp(0)
-    }
+    const ZERO: Self = Fp(0);
 
-    fn one() -> Self {
-        Fp(1)
-    }
+    const ONE: Self = Fp(1);
+
     type ByteReprLen = generic_array::typenum::U16;
     type FromBytesError = BiggerThanModulus;
 
@@ -87,9 +84,7 @@ impl FiniteField for Fp {
     /// The prime field modulus: $2^{128} - 159$
     const MODULUS: u128 = 340_282_366_920_938_463_463_374_607_431_768_211_297;
 
-    fn generator() -> Self {
-        Fp(5)
-    }
+    const GENERATOR: Self = Fp(5);
 
     type PrimeField = Self;
     type PolynomialFormNumCoefficients = generic_array::typenum::U1;
@@ -153,7 +148,7 @@ impl From<Fp> for u128 {
 
 impl Default for Fp {
     fn default() -> Self {
-        Fp::zero()
+        Fp::ZERO
     }
 }
 

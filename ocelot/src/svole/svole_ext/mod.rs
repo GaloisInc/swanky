@@ -7,10 +7,10 @@
 //! Single-point Subfield Vector Oblivious Linear Evaluation (SpsVOLE) and
 //! LPN based Subfield Vector Oblivious Linear Evaluation (SVOLE) traits.
 
-mod dummy;
+
 mod eq;
 mod ggm_utils;
-mod sp_svole;
+mod sp_svole_dummy_ggmprime;
 mod svole_lpn;
 
 use crate::errors::Error;
@@ -187,9 +187,9 @@ mod tests {
             base_svole::{Receiver as VoleReceiver, Sender as VoleSender},
             copee::{Receiver as CpReceiver, Sender as CpSender},
             svole_ext::{
-                dummy::{Receiver as DummyReceiver, Sender as DummySender},
+                //dummy::{Receiver as DummyReceiver, Sender as DummySender},
                 eq::{Receiver as eqReceiver, Sender as eqSender},
-                sp_svole::{Receiver as SpsReceiver, Sender as SpsSender},
+                sp_svole_dummy_ggmprime::{Receiver as SpsReceiver, Sender as SpsSender},
                 svole_lpn::{Receiver as LpnReceiver, Sender as LpnSender},
                 EqReceiver,
                 EqSender,
@@ -198,7 +198,7 @@ mod tests {
                 SpsVoleReceiver,
                 SpsVoleSender,
             },
-            svole_utils::{dot_prod, to_fpr},
+            svole_utils::{dot_product, to_fpr},
             CopeeReceiver,
             CopeeSender,
             SVoleReceiver,
@@ -272,13 +272,13 @@ mod tests {
         >(leaves);*/
         test_spsvole::<
             Gf128,
-            DummySender<
+            SpsSender<
                 ChouOrlandiReceiver,
                 Gf128,
                 VoleSender<CpSender<KosSender, Gf128>, Gf128>,
                 eqSender<Gf128>,
             >,
-            DummyReceiver<
+            SpsReceiver<
                 ChouOrlandiSender,
                 Gf128,
                 VoleReceiver<CpReceiver<KosReceiver, Gf128>, Gf128>,

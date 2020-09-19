@@ -40,7 +40,6 @@ pub struct Sender<ROT: ROTSender + Malicious, FE: FF> {
 /// COPEe receiver.
 #[derive(Clone)]
 pub struct Receiver<ROT: ROTReceiver + Malicious, FE: FF> {
-    _fe: PhantomData<FE>,
     _ot: PhantomData<ROT>,
     delta: FE,
     choices: Vec<bool>,
@@ -72,18 +71,18 @@ impl<ROT: ROTSender<Msg = Block> + Malicious, FE: FF> CopeeSender for Sender<ROT
             .iter()
             .map(|(k0, k1)| (Aes128::new(*k0), Aes128::new(*k1)))
             .collect();
-        let g = FE::generator();
-        let mut acc = FE::one();
-        let mut pows = vec![FE::zero(); r];
+        let g = FE::GENERATOR;
+        let mut acc = FE::ONE;
+        let mut pows = vec![FE::ZERO; r];
         for i in 0..r {
             pows[i] = acc;
             acc *= g;
         }
-        acc = FE::one();
-        // `two` can be computed by adding `FE::one()` to itself. For example, the field `F2` has only two elements `0` and `1`
+        acc = FE::ONE;
+        // `two` can be computed by adding `FE::ONE` to itself. For example, the field `F2` has only two elements `0` and `1`
         // and `two` becomes `0` as `1 + 1 = 0` in this field.
-        let two = FE::one() + FE::one();
-        let mut twos = vec![FE::zero(); nbits];
+        let two = FE::ONE + FE::ONE;
+        let mut twos = vec![FE::ZERO; nbits];
         for i in 0..nbits {
             twos[i] = acc;
             acc *= two;
@@ -104,9 +103,9 @@ impl<ROT: ROTSender<Msg = Block> + Malicious, FE: FF> CopeeSender for Sender<ROT
         input: &FE::PrimeField,
     ) -> Result<FE, Error> {
         let pt = Block::from(self.counter as u128);
-        let mut w = FE::zero();
+        let mut w = FE::ZERO;
         for (j, pow) in self.pows.iter().enumerate() {
-            let mut sum = FE::zero();
+            let mut sum = FE::ZERO;
             for (k, two) in self.twos.iter().enumerate() {
                 let (prf0, prf1) = &self.aes_objs[j * self.nbits + k];
                 let mut w0 = prf::<FE>(prf0, pt);
@@ -135,22 +134,22 @@ impl<ROT: ROTReceiver<Msg = Block> + Malicious, FE: FF> CopeeReceiver for Receiv
         mut rng: &mut RNG,
     ) -> Result<Self, Error> {
         let nbits = 128 - (FE::MODULUS - 1).leading_zeros() as usize;
-        let g = FE::generator();
+        let g = FE::GENERATOR;
         let r = FE::PolynomialFormNumCoefficients::to_usize();
         let mut ot = ROT::init(channel, &mut rng)?;
         let delta = FE::random(&mut rng);
         let choices = unpack_bits(delta.to_bytes().as_slice(), nbits * r);
-        let mut acc = FE::one();
-        let mut pows = vec![FE::zero(); r];
+        let mut acc = FE::ONE;
+        let mut pows = vec![FE::ZERO; r];
         for i in 0..r {
             pows[i] = acc;
             acc *= g;
         }
-        acc = FE::one();
-        // `two` can be computed by adding `FE::one()` to itself. For example, the field `F2` has only two elements `0` and `1`
+        acc = FE::ONE;
+        // `two` can be computed by adding `FE::ONE` to itself. For example, the field `F2` has only two elements `0` and `1`
         // and `two` becomes `0` as `1 + 1 = 0` in this field.
-        let two = FE::one() + FE::one();
-        let mut twos = vec![FE::zero(); nbits];
+        let two = FE::ONE + FE::ONE;
+        let mut twos = vec![FE::ZERO; nbits];
         for i in 0..nbits {
             twos[i] = acc;
             acc *= two;
@@ -158,7 +157,6 @@ impl<ROT: ROTReceiver<Msg = Block> + Malicious, FE: FF> CopeeReceiver for Receiv
         let keys = ot.receive_random(channel, &choices, &mut rng)?;
         let aes_objs = keys.iter().map(|k| Aes128::new(*k)).collect();
         Ok(Self {
-            _fe: PhantomData::<FE>,
             _ot: PhantomData::<ROT>,
             delta,
             choices,
@@ -176,9 +174,9 @@ impl<ROT: ROTReceiver<Msg = Block> + Malicious, FE: FF> CopeeReceiver for Receiv
 
     fn receive<C: AbstractChannel>(&mut self, channel: &mut C) -> Result<FE, Error> {
         let pt = Block::from(self.counter as u128);
-        let mut res = FE::zero();
+        let mut res = FE::ZERO;
         for (j, pow) in self.pows.iter().enumerate() {
-            let mut sum = FE::zero();
+            let mut sum = FE::ZERO;
             for (k, two) in self.twos.iter().enumerate() {
                 let w = prf::<FE>(&self.aes_objs[j * self.nbits + k], pt);
                 let mut tau = channel.read_fe::<FE::PrimeField>()?;
