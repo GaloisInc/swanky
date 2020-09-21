@@ -28,9 +28,6 @@ use std::{
     time::Duration,
 };
 
-/// Specifies the number of SVOLEs to generate.
-const N: usize = 1 << 10;
-
 type BVSender<FE> = VoleSender<CpSender<KosSender, FE>, FE>;
 type BVReceiver<FE> = VoleReceiver<CpReceiver<KosReceiver, FE>, FE>;
 
@@ -85,19 +82,19 @@ fn bench_svole<
 }
 
 fn bench_svole_fp(c: &mut Criterion) {
-    c.bench_function("base_svole::extend::Fp", move |bench| {
+    c.bench_function("base_svole::extend::Fp (N = 1024)", move |bench| {
         let (vole_sender, vole_receiver) = svole_init();
         bench.iter(move || {
-            bench_svole::<BVSender<Fp>, BVReceiver<Fp>>(&vole_sender, &vole_receiver, N);
+            bench_svole::<BVSender<Fp>, BVReceiver<Fp>>(&vole_sender, &vole_receiver, 1024);
         })
     });
 }
 
 fn bench_svole_gf128(c: &mut Criterion) {
-    c.bench_function("base_svole::extend::Gf128", move |bench| {
+    c.bench_function("base_svole::extend::Gf128 (N = 1024)", move |bench| {
         let (vole_sender, vole_receiver) = svole_init();
         bench.iter(move || {
-            bench_svole::<BVSender<Gf128>, BVReceiver<Gf128>>(&vole_sender, &vole_receiver, N);
+            bench_svole::<BVSender<Gf128>, BVReceiver<Gf128>>(&vole_sender, &vole_receiver, 1024);
         })
     });
 }
