@@ -23,7 +23,6 @@ use scuttlebutt::{
     Malicious,
 };
 use std::marker::PhantomData;
-
 use subtle::{Choice, ConditionallySelectable};
 
 /// COPEe sender.

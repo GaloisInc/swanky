@@ -4,6 +4,8 @@
 // Copyright © 2020 Galois, Inc.
 // See LICENSE for licensing information.
 
+//! SVOLE utility functions.
+
 use generic_array::{typenum::Unsigned, GenericArray};
 use scuttlebutt::field::FiniteField;
 use std::iter::FromIterator;

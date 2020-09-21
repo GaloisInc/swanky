@@ -9,7 +9,7 @@
 //!
 pub mod base_svole;
 pub mod copee;
-pub mod utils;
+mod utils;
 
 use crate::errors::Error;
 use rand_core::{CryptoRng, RngCore};
