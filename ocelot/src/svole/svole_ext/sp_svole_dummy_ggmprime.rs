@@ -133,7 +133,12 @@ impl<
                 .map(|i| chi[i].to_polynomial_coefficients())
                 .collect();
         let chi_alpha: Vec<FE> = (0..n)
-            .map(|i| dot_product(&to_fpr_vec(&chi_alpha_vec[i].to_vec()), &self.pows))
+            .map(|i| {
+                dot_product(
+                    to_fpr_vec(&chi_alpha_vec[i].to_vec()).into_iter(),
+                    self.pows.clone().into_iter(),
+                )
+            })
             .collect();
         let mut x_star: Vec<FE::PrimeField> = chi_alpha_vec[alpha]
             .to_vec()
@@ -154,15 +159,20 @@ impl<
             channel.write_fe(*item)?;
         }
         //channel.flush()?;
-        let z_ = dot_product(&z, &self.pows);
-        let mut va = dot_product(&chi_alpha, &w);
+        let z_ = dot_product(z.into_iter(), self.pows.clone().into_iter());
+        let mut va = dot_product(chi_alpha.clone().into_iter(), w.clone().into_iter());
         va -= z_;
         let mut eq_sender = EQ::init()?;
         let res = eq_sender.send(channel, &va);
         match res {
             Ok(b) => {
                 if b {
-                    let uw = u.iter().zip(w.iter()).map(|(u, w)| (*u, *w)).collect();
+                    let uw = u
+                        .clone()
+                        .iter()
+                        .zip(w.clone().iter())
+                        .map(|(&u, &w)| (u, w))
+                        .collect();
                     Ok(uw)
                 } else {
                     return Err(Error::Other("EQ check fails".to_string()));
@@ -262,8 +272,8 @@ impl<
             .map(|(y, xd)| y - xd)
             .collect();
         // sets Y
-        let y_ = dot_product(&y, &self.pows);
-        let mut vb = dot_product(&chi, &v);
+        let y_ = dot_product(y.into_iter(), self.pows.clone().into_iter());
+        let mut vb = dot_product(chi.into_iter(), v.clone().into_iter());
         vb -= y_;
         let mut eq_receiver = EQ::init()?;
         let res = eq_receiver.receive(channel, rng, &vb);
