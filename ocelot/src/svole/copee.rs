@@ -23,6 +23,7 @@ use scuttlebutt::{
     Malicious,
 };
 use std::marker::PhantomData;
+
 use subtle::{Choice, ConditionallySelectable};
 
 /// COPEe sender.
@@ -49,48 +50,43 @@ pub struct Receiver<ROT: ROTReceiver + Malicious, FE: FF> {
     counter: u64,
 }
 
-// `Aes128` as a pseudo-random function.
+/// `Aes128` as a pseudo-random function.
 fn prf<FE: FF>(aes: &Aes128, pt: Block) -> FE::PrimeField {
     let seed = aes.encrypt(pt);
     FE::PrimeField::from_uniform_bytes(&<[u8; 16]>::from(seed))
 }
 
-fn pows_and_twos<FE: FF>(r: usize, nbits: usize) -> (Vec<FE>, Vec<FE>) {
-    let g = FE::GENERATOR;
-    let mut acc = FE::ONE;
-    let mut pows = vec![FE::ZERO; r];
-    for i in 0..r {
-        pows[i] = acc;
-        acc *= g;
-    }
-    acc = FE::ONE;
-    // `two` can be computed by adding `FE::ONE` to itself. For example, the
-    // field `F2` has only two elements `0` and `1` and `two` becomes `0` as
-    // `1 + 1 = 0` in this field.
-    let two = FE::ONE + FE::ONE;
-    let mut twos = vec![FE::ZERO; nbits];
-    for i in 0..nbits {
-        twos[i] = acc;
-        acc *= two;
-    }
-    (pows, twos)
-}
-
+/// Implement CopeeSender for Sender type
 impl<ROT: ROTSender<Msg = Block> + Malicious, FE: FF> CopeeSender for Sender<ROT, FE> {
     type Msg = FE;
     fn init<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         channel: &mut C,
         mut rng: &mut RNG,
     ) -> Result<Self, Error> {
-        let r = FE::PolynomialFormNumCoefficients::to_usize();
-        let nbits = 128 - (FE::MODULUS - 1).leading_zeros() as usize;
         let mut ot = ROT::init(channel, &mut rng)?;
+        let nbits = 128 - (FE::MODULUS - 1).leading_zeros() as usize;
+        let r = FE::PolynomialFormNumCoefficients::to_usize();
         let keys = ot.send_random(channel, nbits * r, &mut rng)?;
         let aes_objs: Vec<(Aes128, Aes128)> = keys
             .iter()
             .map(|(k0, k1)| (Aes128::new(*k0), Aes128::new(*k1)))
             .collect();
-        let (pows, twos) = pows_and_twos(r, nbits);
+        let g = FE::GENERATOR;
+        let mut acc = FE::ONE;
+        let mut pows = vec![FE::ZERO; r];
+        for item in pows.iter_mut().take(r) {
+            *item = acc;
+            acc *= g;
+        }
+        acc = FE::ONE;
+        // `two` can be computed by adding `FE::ONE` to itself. For example, the field `F2` has only two elements `0` and `1`
+        // and `two` becomes `0` as `1 + 1 = 0` in this field.
+        let two = FE::ONE + FE::ONE;
+        let mut twos = vec![FE::ZERO; nbits];
+        for item in twos.iter_mut().take(nbits) {
+            *item = acc;
+            acc *= two;
+        }
         Ok(Self {
             _ot: PhantomData::<ROT>,
             aes_objs,
@@ -121,6 +117,7 @@ impl<ROT: ROTSender<Msg = Block> + Malicious, FE: FF> CopeeSender for Sender<ROT
                 w0 -= *input;
                 channel.write_fe(w0)?;
             }
+            //channel.flush()?;
             sum *= *pow;
             w += sum;
         }
@@ -136,13 +133,28 @@ impl<ROT: ROTReceiver<Msg = Block> + Malicious, FE: FF> CopeeReceiver for Receiv
         channel: &mut C,
         mut rng: &mut RNG,
     ) -> Result<Self, Error> {
-        let r = FE::PolynomialFormNumCoefficients::to_usize();
         let nbits = 128 - (FE::MODULUS - 1).leading_zeros() as usize;
+        let g = FE::GENERATOR;
+        let r = FE::PolynomialFormNumCoefficients::to_usize();
+        let mut ot = ROT::init(channel, &mut rng)?;
         let delta = FE::random(&mut rng);
         let choices = unpack_bits(delta.to_bytes().as_slice(), nbits * r);
-        let mut ot = ROT::init(channel, &mut rng)?;
+        let mut acc = FE::ONE;
+        let mut pows = vec![FE::ZERO; r];
+        for item in pows.iter_mut().take(r) {
+            *item = acc;
+            acc *= g;
+        }
+        acc = FE::ONE;
+        // `two` can be computed by adding `FE::ONE` to itself. For example, the field `F2` has only two elements `0` and `1`
+        // and `two` becomes `0` as `1 + 1 = 0` in this field.
+        let two = FE::ONE + FE::ONE;
+        let mut twos = vec![FE::ZERO; nbits];
+        for item in twos.iter_mut().take(nbits) {
+            *item = acc;
+            acc *= two;
+        }
         let keys = ot.receive_random(channel, &choices, &mut rng)?;
-        let (pows, twos) = pows_and_twos(r, nbits);
         let aes_objs = keys.iter().map(|k| Aes128::new(*k)).collect();
         Ok(Self {
             _ot: PhantomData::<ROT>,

@@ -31,7 +31,6 @@ pub struct Receiver<CP: CopeeReceiver, FE: FF> {
 
 impl<FE: FF, CP: CopeeSender<Msg = FE>> SVoleSender for Sender<CP, FE> {
     type Msg = FE;
-
     fn init<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         channel: &mut C,
         rng: &mut RNG,
@@ -40,8 +39,8 @@ impl<FE: FF, CP: CopeeSender<Msg = FE>> SVoleSender for Sender<CP, FE> {
         let g = FE::GENERATOR;
         let mut acc = FE::ONE;
         let mut pows = vec![FE::ZERO; r];
-        for i in 0..r {
-            pows[i] = acc;
+        for item in pows.iter_mut().take(r) {
+            *item = acc;
             acc *= g;
         }
         let copee = CP::init(channel, rng)?;
@@ -62,8 +61,8 @@ impl<FE: FF, CP: CopeeSender<Msg = FE>> SVoleSender for Sender<CP, FE> {
             w[i] = self.copee.send(channel, &u[i])?;
         }
         let mut z: FE = FE::ZERO;
-        for i in 0..r {
-            let c = self.copee.send(channel, &a[i])?;
+        for (i, x) in a.iter().enumerate().take(r) {
+            let c = self.copee.send(channel, x)?;
             z += c * self.pows[i];
         }
         channel.flush()?;
@@ -80,18 +79,13 @@ impl<FE: FF, CP: CopeeSender<Msg = FE>> SVoleSender for Sender<CP, FE> {
             .sum();
         channel.write_fe(x)?;
         channel.write_fe(z)?;
-        let res = u
-            .iter()
-            .zip(w.clone().iter())
-            .map(|(u, w)| (*u, *w))
-            .collect();
+        let res = u.iter().zip(w.iter()).map(|(u, w)| (*u, *w)).collect();
         Ok(res)
     }
 }
 
 impl<FE: FF, CP: CopeeReceiver<Msg = FE>> SVoleReceiver for Receiver<CP, FE> {
     type Msg = FE;
-
     fn init<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         channel: &mut C,
         rng: &mut RNG,
@@ -100,12 +94,12 @@ impl<FE: FF, CP: CopeeReceiver<Msg = FE>> SVoleReceiver for Receiver<CP, FE> {
         let g = FE::GENERATOR;
         let mut acc = FE::ONE;
         let mut pows = vec![FE::ZERO; r];
-        for i in 0..r {
-            pows[i] = acc;
+        for item in pows.iter_mut().take(r) {
+            *item = acc;
             acc *= g;
         }
-        let copee = CP::init(channel, rng)?;
-        Ok(Self { copee, pows })
+        let cp = CP::init(channel, rng)?;
+        Ok(Self { copee: cp, pows })
     }
 
     fn delta(&self) -> FE {
@@ -136,13 +130,15 @@ impl<FE: FF, CP: CopeeReceiver<Msg = FE>> SVoleReceiver for Receiver<CP, FE> {
         channel.flush()?;
         let x = channel.read_fe()?;
         let z: FE = channel.read_fe()?;
-        let mut delta = self.copee.delta().clone();
+        let mut delta = self.copee.delta();
         delta *= x;
         delta += y;
         if z == delta {
             Ok(v)
         } else {
-            Err(Error::CorrelationCheckError("w ≠ uΔ + v".to_string()))
+            Err(Error::Other(
+                "Correlation check fails in base vole protocol, i.e, w != u'Δ + v".to_string(),
+            ))
         }
     }
 }
