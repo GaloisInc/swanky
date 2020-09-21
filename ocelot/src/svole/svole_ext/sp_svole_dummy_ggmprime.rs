@@ -66,8 +66,8 @@ impl<
         let ot_receiver = OT::init(channel, rng)?;
         let mut acc = FE::ONE;
         let mut pows = vec![FE::ZERO; r];
-        for i in 0..r {
-            pows[i] = acc;
+        for item in pows.iter_mut().take(r) {
+            *item = acc;
             acc *= g;
         }
         let svole_sender = SV::init(channel, rng)?;
@@ -91,25 +91,24 @@ impl<
         let ac = self.svole.send(channel, 1, rng)?;
         let (a, c): (Vec<FE::PrimeField>, Vec<FE>) = ac.iter().cloned().unzip();
         let g = FE::PrimeField::GENERATOR;
-        let beta = g.clone();
+        let beta = g;
         beta.pow(rng.gen_range(0, FE::MULTIPLICATIVE_GROUP_ORDER));
-        let mut a_prime: FE::PrimeField = beta.clone();
+        let mut a_prime: FE::PrimeField = beta;
         a_prime -= a[0];
         channel.write_fe::<FE::PrimeField>(a_prime)?;
         let alpha = rng.gen_range(0, n);
         let mut u = vec![FE::PrimeField::ZERO; n];
         u[alpha] = beta;
         let choices = unpack_bits(&(!alpha).to_le_bytes(), depth);
-        let keys = self.ot.receive(channel, &choices, rng).unwrap();
+        let _keys = self.ot.receive(channel, &choices, rng).unwrap();
         /**************************/
         //let v: Vec<FE> = ggm_prime(alpha, &keys);
         // getting this vector from the receiver is completely insecure, I'm just doing this for
         // testing purposes.
         let mut v: Vec<FE> = vec![FE::ZERO; n];
-        for i in 0..n {
-            v[i] = channel.read_fe()?;
+        for item in v.iter_mut().take(n) {
+            *item = channel.read_fe()?;
         }
-
         /*************************/
         let delta_ = c[0];
         let mut d: FE = channel.read_fe::<FE>()?;
@@ -160,22 +159,17 @@ impl<
         }
         //channel.flush()?;
         let z_ = dot_product(z.into_iter(), self.pows.clone().into_iter());
-        let mut va = dot_product(chi_alpha.clone().into_iter(), w.clone().into_iter());
+        let mut va = dot_product(chi_alpha.into_iter(), w.clone().into_iter());
         va -= z_;
         let mut eq_sender = EQ::init()?;
         let res = eq_sender.send(channel, &va);
         match res {
             Ok(b) => {
                 if b {
-                    let uw = u
-                        .clone()
-                        .iter()
-                        .zip(w.clone().iter())
-                        .map(|(&u, &w)| (u, w))
-                        .collect();
+                    let uw = u.iter().zip(w.iter()).map(|(&u, &w)| (u, w)).collect();
                     Ok(uw)
                 } else {
-                    return Err(Error::Other("EQ check fails".to_string()));
+                    Err(Error::Other("EQ check fails".to_string()))
                 }
             }
             Err(e) => Err(e),
@@ -201,8 +195,8 @@ impl<
         let g = FE::GENERATOR;
         let mut acc = FE::ONE;
         let mut pows = vec![FE::ZERO; r];
-        for i in 0..r {
-            pows[i] = acc;
+        for item in pows.iter_mut().take(r) {
+            *item = acc;
             acc *= g;
         }
         let sv_receiver = SV::init(channel, rng)?;
@@ -240,26 +234,26 @@ impl<
         self.ot.send(channel, &keys, rng)?;
         /******************************/
         //Sending this to the other party is completely insecure.
-        for i in 0..n {
-            channel.write_fe(v[i])?;
+        for item in v.iter().take(n) {
+            channel.write_fe(*item)?;
         }
         channel.flush()?;
         /*****************************/
         // compute d and sends out
-        let mut d = gamma.clone();
-        d -= v.iter().map(|&u| u).sum();
+        let mut d = gamma;
+        d -= v.iter().copied().sum();
         channel.write_fe::<FE>(d)?;
         channel.flush()?;
         let r = FE::PolynomialFormNumCoefficients::to_usize();
         let y_star = self.svole.receive(channel, r, rng)?;
         // Receives `chi`s from the Sender
         let mut chi: Vec<FE> = vec![FE::ZERO; n];
-        for i in 0..n {
-            chi[i] = channel.read_fe::<FE>()?;
+        for item in chi.iter_mut().take(n) {
+            *item = channel.read_fe::<FE>()?;
         }
         let mut x_star: Vec<FE::PrimeField> = vec![FE::PrimeField::ZERO; r];
-        for i in 0..r {
-            x_star[i] = channel.read_fe()?;
+        for item in x_star.iter_mut().take(r) {
+            *item = channel.read_fe()?;
         }
         let x_delta: Vec<FE> = x_star
             .iter()
@@ -282,7 +276,7 @@ impl<
                 if b {
                     Ok(v)
                 } else {
-                    return Err(Error::Other("EQ check fails".to_string()));
+                    Err(Error::Other("EQ check fails".to_string()))
                 }
             }
             Err(e) => Err(e),

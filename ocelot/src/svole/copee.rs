@@ -74,8 +74,8 @@ impl<ROT: ROTSender<Msg = Block> + Malicious, FE: FF> CopeeSender for Sender<ROT
         let g = FE::GENERATOR;
         let mut acc = FE::ONE;
         let mut pows = vec![FE::ZERO; r];
-        for i in 0..r {
-            pows[i] = acc;
+        for item in pows.iter_mut().take(r) {
+            *item = acc;
             acc *= g;
         }
         acc = FE::ONE;
@@ -83,8 +83,8 @@ impl<ROT: ROTSender<Msg = Block> + Malicious, FE: FF> CopeeSender for Sender<ROT
         // and `two` becomes `0` as `1 + 1 = 0` in this field.
         let two = FE::ONE + FE::ONE;
         let mut twos = vec![FE::ZERO; nbits];
-        for i in 0..nbits {
-            twos[i] = acc;
+        for item in twos.iter_mut().take(nbits) {
+            *item = acc;
             acc *= two;
         }
         Ok(Self {
@@ -141,8 +141,8 @@ impl<ROT: ROTReceiver<Msg = Block> + Malicious, FE: FF> CopeeReceiver for Receiv
         let choices = unpack_bits(delta.to_bytes().as_slice(), nbits * r);
         let mut acc = FE::ONE;
         let mut pows = vec![FE::ZERO; r];
-        for i in 0..r {
-            pows[i] = acc;
+        for item in pows.iter_mut().take(r) {
+            *item = acc;
             acc *= g;
         }
         acc = FE::ONE;
@@ -150,8 +150,8 @@ impl<ROT: ROTReceiver<Msg = Block> + Malicious, FE: FF> CopeeReceiver for Receiv
         // and `two` becomes `0` as `1 + 1 = 0` in this field.
         let two = FE::ONE + FE::ONE;
         let mut twos = vec![FE::ZERO; nbits];
-        for i in 0..nbits {
-            twos[i] = acc;
+        for item in twos.iter_mut().take(nbits) {
+            *item = acc;
             acc *= two;
         }
         let keys = ot.receive_random(channel, &choices, &mut rng)?;

@@ -249,8 +249,8 @@ mod tests {
             eqReceiver<FE>,
         >;
 
-        test_spsvole::<Fp, SPSender<Fp>, SPReceiver<Fp>> (leaves);
-        test_spsvole::<Gf128, SPSender<Gf128>, SPReceiver<Gf128>> (leaves);
-        test_spsvole::<F2, SPSender<F2>, SPReceiver<F2>> (leaves);
+        test_spsvole::<Fp, SPSender<Fp>, SPReceiver<Fp>>(leaves);
+        test_spsvole::<Gf128, SPSender<Gf128>, SPReceiver<Gf128>>(leaves);
+        test_spsvole::<F2, SPSender<F2>, SPReceiver<F2>>(leaves);
     }
 }

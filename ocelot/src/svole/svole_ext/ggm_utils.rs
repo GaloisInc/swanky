@@ -52,7 +52,7 @@ pub fn ggm<FE: FF>(depth: usize, seed: Block) -> (Vec<FE>, Vec<(Block, Block)>) 
     let seeds = prg(depth, seed);
     println!("seeds = {:?}", seeds);
     let mut keys: Vec<(Block, Block)> = vec![Default::default(); depth];
-    for i in 0..depth {
+    for (i, item) in keys.iter_mut().enumerate().take(depth) {
         let mut k0 = Default::default();
         let mut k1 = Default::default();
         let exp = 1 << i;
@@ -60,7 +60,7 @@ pub fn ggm<FE: FF>(depth: usize, seed: Block) -> (Vec<FE>, Vec<(Block, Block)>) 
             k0 ^= seeds[1 + j + exp - 1]; // Even keys
             k1 ^= seeds[2 + j + exp - 1]; // Odd keys
         }
-        keys[i] = (k0, k1);
+        *item = (k0, k1);
     }
     let exp = 1 << depth;
     let mut vs = vec![FE::ZERO; exp];
