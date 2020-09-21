@@ -21,7 +21,6 @@ use rand::Rng;
 use rand_core::{CryptoRng, RngCore};
 use scuttlebutt::{field::FiniteField as FF, AbstractChannel};
 
-
 /// A LpnsVole sender.
 #[derive(Clone)]
 pub struct Sender<FE: FF, SV: SVoleSender, SPS: SpsVoleSender> {
@@ -139,7 +138,9 @@ impl<FE: FF, SV: SVoleSender<Msg = FE>, SPS: SpsVoleSender> LpnsVoleSender for S
             t[i * weight + ind] = FE::ONE;
         }
         let a = &self.matrix;
-        let mut x: Vec<FE::PrimeField> = (0..self.rows).map(|i| dot_product(&self.u, &a[i])).collect();
+        let mut x: Vec<FE::PrimeField> = (0..self.rows)
+            .map(|i| dot_product(&self.u, &a[i]))
+            .collect();
         x = x.iter().zip(e.iter()).map(|(&x_, &e_)| x_ + e_).collect();
         let mut z: Vec<FE> = (0..self.rows)
             .map(|i| dot_product::<FE>(&self.w, &to_fpr_vec(&a[i])))

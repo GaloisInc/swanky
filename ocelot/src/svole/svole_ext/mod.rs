@@ -7,10 +7,9 @@
 //! Single-point Subfield Vector Oblivious Linear Evaluation (SpsVOLE) and
 //! LPN based Subfield Vector Oblivious Linear Evaluation (SVOLE) traits.
 
-
-mod eq;
+pub mod eq;
 mod ggm_utils;
-mod sp_svole_dummy_ggmprime;
+pub mod sp_svole_dummy_ggmprime;
 mod svole_lpn;
 
 use crate::errors::Error;
@@ -187,7 +186,6 @@ mod tests {
             base_svole::{Receiver as VoleReceiver, Sender as VoleSender},
             copee::{Receiver as CpReceiver, Sender as CpSender},
             svole_ext::{
-                //dummy::{Receiver as DummyReceiver, Sender as DummySender},
                 eq::{Receiver as eqReceiver, Sender as eqSender},
                 sp_svole_dummy_ggmprime::{Receiver as SpsReceiver, Sender as SpsSender},
                 svole_lpn::{Receiver as LpnReceiver, Sender as LpnSender},
@@ -322,7 +320,7 @@ mod tests {
         }*/
     }
 
-    #[test]
+    /*#[test]
     fn test_svole_lpn_() {
         test_svole_lpn::<
             Gf128,
@@ -347,5 +345,5 @@ mod tests {
                 >,
             >,
         >();
-    }
+    }*/
 }

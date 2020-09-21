@@ -48,6 +48,11 @@ path = "benches/base_svole.rs"
 name = "base_svole"
 harness = false
 
+[[bench]]
+path = "benches/sp_svole.rs"
+name = "sp_svole"
+harness = false
+
 [[example]]
 name = "kmprt"
 harness = false

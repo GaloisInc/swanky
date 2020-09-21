@@ -8,11 +8,8 @@ use scuttlebutt::field::FiniteField;
 use std::iter::FromIterator;
 
 /// Returns dot product of two vectors `x` and `y`.
-pub fn dot_product<FE: FiniteField, A: Iterator<Item = FE>, B: Iterator<Item = FE>>(
-    x: A,
-    y: B,
-) -> FE {
-    x.zip(y).map(|(x_, y_)| x_ * y_).sum()
+pub fn dot_product<FE: FiniteField>(x: &[FE], y: &[FE]) -> FE {
+    x.iter().zip(y.iter()).map(|(&x, &y)| x * y).sum()
 }
 
 /// Converts an element of `Fp` to `F(p^r)`.
