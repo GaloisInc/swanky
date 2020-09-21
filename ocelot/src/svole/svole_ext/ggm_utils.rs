@@ -6,8 +6,16 @@
 
 use num::pow;
 use rand::{Rng, SeedableRng};
-use scuttlebutt::{field::FiniteField as FF, utils::unpack_bits, AesRng, Block};
+use scuttlebutt::{field::FiniteField, utils::unpack_bits, AesRng, Block};
 use std::collections::VecDeque;
+
+/// Returns dot product of two vectors.
+pub fn dot_product<FE: FiniteField, A: Iterator<Item = FE>, B: Iterator<Item = FE>>(
+    x: A,
+    y: B,
+) -> FE {
+    x.zip(y).map(|(x_, y_)| x_ * y_).sum()
+}
 
 /// Construct GGM tree with `h` levels and return the node values (a.k.a seeds). Although, the
 /// last level seeds to be of type `FE`, we keep them in the form of `Block` type as we need to
@@ -31,7 +39,7 @@ fn prg(depth: usize, seed: Block) -> Vec<Block> {
 }
 
 /// constructing leaves.
-/*pub fn prg_prime<FE: FF>(depth: usize, sv: &[Block]) -> Vec<FE> {
+/*pub fn prg_prime<FE: FiniteField>(depth: usize, sv: &[Block]) -> Vec<FE> {
     let h = depth as usize;
     let exp = pow(2, h - 1);
     let mut v = Vec::new();
@@ -48,7 +56,7 @@ fn prg(depth: usize, seed: Block) -> Vec<Block> {
 
 /// Given a depth and a seed, `ggm` returns OT keys along with a vector of field
 /// elements that represent seeds of the last level.
-pub fn ggm<FE: FF>(depth: usize, seed: Block) -> (Vec<FE>, Vec<(Block, Block)>) {
+pub fn ggm<FE: FiniteField>(depth: usize, seed: Block) -> (Vec<FE>, Vec<(Block, Block)>) {
     let seeds = prg(depth, seed);
     println!("seeds = {:?}", seeds);
     let mut keys: Vec<(Block, Block)> = vec![Default::default(); depth];
@@ -75,7 +83,7 @@ pub fn ggm<FE: FF>(depth: usize, seed: Block) -> (Vec<FE>, Vec<(Block, Block)>) 
 /// GGM prime outputs the vector of field elements which supposed have the length equal to
 /// the number of OTs minus 1.
 //TODO: this can be fixed and optimized later.
-pub fn ggm_prime<FE: FF>(alpha: usize, keys: &[Block]) -> Vec<FE> {
+pub fn ggm_prime<FE: FiniteField>(alpha: usize, keys: &[Block]) -> Vec<FE> {
     let h = keys.len();
     println!("h = {}", h);
     println!("alpha = {}", alpha);

@@ -11,8 +11,14 @@ use crate::{
     errors::Error,
     ot::{Receiver as OtReceiver, Sender as OtSender},
     svole::{
-        svole_ext::{ggm_utils::ggm, EqReceiver, EqSender, SpsVoleReceiver, SpsVoleSender},
-        svole_utils::{dot_product, to_fpr, to_fpr_vec},
+        svole_ext::{
+            ggm_utils::{dot_product, ggm},
+            EqReceiver,
+            EqSender,
+            SpsVoleReceiver,
+            SpsVoleSender,
+        },
+        utils::{to_fpr, to_fpr_vec},
         SVoleReceiver,
         SVoleSender,
     },

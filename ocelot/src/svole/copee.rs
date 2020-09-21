@@ -10,7 +10,7 @@
 use crate::{
     errors::Error,
     ot::{RandomReceiver as ROTReceiver, RandomSender as ROTSender},
-    svole::{svole_utils::to_fpr, CopeeReceiver, CopeeSender},
+    svole::{utils::to_fpr, CopeeReceiver, CopeeSender},
 };
 use generic_array::typenum::Unsigned;
 use rand_core::{CryptoRng, RngCore};

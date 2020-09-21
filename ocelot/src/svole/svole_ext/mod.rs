@@ -184,7 +184,7 @@ mod tests {
                 SpsVoleReceiver,
                 SpsVoleSender,
             },
-            svole_utils::to_fpr,
+            utils::to_fpr,
         },
     };
     use num::pow;
