@@ -9,7 +9,7 @@
 //!
 pub mod base_svole;
 pub mod copee;
-mod svole_ext;
+pub mod svole_ext;
 mod utils;
 
 use crate::errors::Error;
@@ -122,16 +122,12 @@ mod tests {
             base_svole::{Receiver as VoleReceiver, Sender as VoleSender},
             copee::{Receiver as CpReceiver, Sender as CpSender},
             utils::to_fpr,
-            CopeeReceiver,
-            CopeeSender,
-            SVoleReceiver,
-            SVoleSender,
+            CopeeReceiver, CopeeSender, SVoleReceiver, SVoleSender,
         },
     };
     use scuttlebutt::{
         field::{FiniteField as FF, Fp, Gf128, F2},
-        AesRng,
-        Channel,
+        AesRng, Channel,
     };
     use std::{
         io::{BufReader, BufWriter},
