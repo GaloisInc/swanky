@@ -4,7 +4,7 @@
 // Copyright © 2019 Galois, Inc.
 // See LICENSE for licensing information.
 
-use criterion::{criterion_group, criterion_main, Criterion};
+use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use scuttlebutt::commitment::{Commitment, ShaCommitment};
 use std::time::Duration;
 
@@ -12,8 +12,8 @@ fn bench_sha_commitment(c: &mut Criterion) {
     c.bench_function("ShaCommitment::new", |b| {
         let seed = rand::random::<[u8; 32]>();
         b.iter(|| {
-            let c = ShaCommitment::new(seed);
-            criterion::black_box(c)
+            let c = ShaCommitment::new(black_box(seed));
+            black_box(c)
         });
     });
 
@@ -21,10 +21,10 @@ fn bench_sha_commitment(c: &mut Criterion) {
         let seed = rand::random::<[u8; 32]>();
         let input = rand::random::<[u8; 32]>();
         b.iter(|| {
-            let mut commit = ShaCommitment::new(seed);
-            commit.input(&input);
+            let mut commit = ShaCommitment::new(black_box(seed));
+            commit.input(black_box(&input));
             let c = commit.finish();
-            criterion::black_box(c)
+            black_box(c)
         });
     });
 }
