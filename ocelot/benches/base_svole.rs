@@ -12,12 +12,14 @@ use ocelot::{
     svole::{
         base_svole::{Receiver as VoleReceiver, Sender as VoleSender},
         copee::{Receiver as CpReceiver, Sender as CpSender},
-        SVoleReceiver, SVoleSender,
+        SVoleReceiver,
+        SVoleSender,
     },
 };
 use scuttlebutt::{
     field::{Fp, Gf128, F2},
-    AesRng, Channel,
+    AesRng,
+    Channel,
 };
 use std::{
     io::{BufReader, BufWriter},
