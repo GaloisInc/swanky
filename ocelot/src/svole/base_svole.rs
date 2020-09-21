@@ -9,7 +9,7 @@
 
 use crate::{
     errors::Error,
-    svole::{svole_utils::to_fpr, CopeeReceiver, CopeeSender, SVoleReceiver, SVoleSender},
+    svole::{utils::to_fpr, CopeeReceiver, CopeeSender, SVoleReceiver, SVoleSender},
 };
 use generic_array::typenum::Unsigned;
 use rand_core::{CryptoRng, RngCore};
@@ -31,6 +31,7 @@ pub struct Receiver<CP: CopeeReceiver, FE: FF> {
 
 impl<FE: FF, CP: CopeeSender<Msg = FE>> SVoleSender for Sender<CP, FE> {
     type Msg = FE;
+
     fn init<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         channel: &mut C,
         rng: &mut RNG,
@@ -90,6 +91,7 @@ impl<FE: FF, CP: CopeeSender<Msg = FE>> SVoleSender for Sender<CP, FE> {
 
 impl<FE: FF, CP: CopeeReceiver<Msg = FE>> SVoleReceiver for Receiver<CP, FE> {
     type Msg = FE;
+
     fn init<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         channel: &mut C,
         rng: &mut RNG,
@@ -102,8 +104,8 @@ impl<FE: FF, CP: CopeeReceiver<Msg = FE>> SVoleReceiver for Receiver<CP, FE> {
             pows[i] = acc;
             acc *= g;
         }
-        let cp = CP::init(channel, rng)?;
-        Ok(Self { copee: cp, pows })
+        let copee = CP::init(channel, rng)?;
+        Ok(Self { copee, pows })
     }
 
     fn delta(&self) -> FE {
@@ -140,9 +142,7 @@ impl<FE: FF, CP: CopeeReceiver<Msg = FE>> SVoleReceiver for Receiver<CP, FE> {
         if z == delta {
             Ok(v)
         } else {
-            return Err(Error::Other(
-                "Correlation check fails in base vole protocol, i.e, w != u'Δ + v".to_string(),
-            ));
+            Err(Error::CorrelationCheckError("w ≠ uΔ + v".to_string()))
         }
     }
 }
