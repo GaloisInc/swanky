@@ -4,7 +4,7 @@
 // Copyright © 2019 Galois, Inc.
 // See LICENSE for licensing information.
 
-use criterion::{criterion_group, criterion_main, Criterion};
+use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use rand::Rng;
 use scuttlebutt::{AesRng, Block512};
 use std::time::Duration;
@@ -14,7 +14,7 @@ fn bench_rand(c: &mut Criterion) {
         let mut rng = AesRng::new();
         b.iter(|| {
             let block = rng.gen::<Block512>();
-            criterion::black_box(block)
+            black_box(block)
         });
     });
 }
@@ -24,8 +24,8 @@ fn bench_xor(c: &mut Criterion) {
         let x = rand::random::<Block512>();
         let y = rand::random::<Block512>();
         b.iter(|| {
-            let z = x ^ y;
-            criterion::black_box(z)
+            let z = black_box(x) ^ black_box(y);
+            black_box(z)
         });
     });
 }
@@ -33,8 +33,8 @@ fn bench_xor(c: &mut Criterion) {
 fn bench_default(c: &mut Criterion) {
     c.bench_function("Block512::default", |b| {
         b.iter(|| {
-            let z = Block512::default();
-            criterion::black_box(z)
+            let z = black_box(Block512::default());
+            black_box(z)
         })
     });
 }
