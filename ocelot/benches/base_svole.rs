@@ -99,6 +99,15 @@ fn bench_svole_gf128(c: &mut Criterion) {
     });
 }
 
+fn bench_svole_f2(c: &mut Criterion) {
+    c.bench_function("base_svole::extend::F2 (N = 1024)", move |bench| {
+        let (vole_sender, vole_receiver) = svole_init();
+        bench.iter(move || {
+            bench_svole::<BVSender<F2>, BVReceiver<F2>>(&vole_sender, &vole_receiver, 1024);
+        })
+    });
+}
+
 fn bench_svole_init<BVSender: SVoleSender + Sync + Send + 'static, BVReceiver: SVoleReceiver>() {
     let mut rng = AesRng::new();
     let (sender, receiver) = UnixStream::pair().unwrap();
@@ -142,6 +151,6 @@ fn bench_svole_init_f2(c: &mut Criterion) {
 criterion_group! {
     name = svole;
     config = Criterion::default().warm_up_time(Duration::from_millis(100));
-    targets = bench_svole_fp, bench_svole_gf128, bench_svole_init_gf128, bench_svole_init_fp, bench_svole_init_f2
+    targets = bench_svole_fp, bench_svole_gf128, bench_svole_f2, bench_svole_init_gf128, bench_svole_init_fp, bench_svole_init_f2
 }
 criterion_main!(svole);
