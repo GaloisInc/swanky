@@ -174,11 +174,14 @@ mod tests {
         }
     }
 
+    type CPSender<FE> = CpSender<KosSender, FE>;
+    type CPReceiver<FE> = CpReceiver<KosReceiver, FE>;
+
     #[test]
     fn test_copee() {
-        test_copee_::<Fp, CpSender<KosSender, Fp>, CpReceiver<KosReceiver, Fp>>(128);
-        test_copee_::<Gf128, CpSender<KosSender, Gf128>, CpReceiver<KosReceiver, Gf128>>(128);
-        test_copee_::<F2, CpSender<KosSender, F2>, CpReceiver<KosReceiver, F2>>(128);
+        test_copee_::<Fp, CPSender<Fp>, CPReceiver<Fp>>(128);
+        test_copee_::<Gf128, CPSender<Gf128>, CPReceiver<Gf128>>(128);
+        test_copee_::<F2, CPSender<F2>, CPReceiver<F2>>(128);
     }
 
     fn test_svole<FE: FF, BVSender: SVoleSender<Msg = FE>, BVReceiver: SVoleReceiver<Msg = FE>>(
@@ -209,22 +212,13 @@ mod tests {
         }
     }
 
+    type BVSender<FE> = VoleSender<CPSender<FE>, FE>;
+    type BVReceiver<FE> = VoleReceiver<CPReceiver<FE>, FE>;
+
     #[test]
     fn test_base_svole() {
-        test_svole::<
-            Fp,
-            VoleSender<CpSender<KosSender, Fp>, Fp>,
-            VoleReceiver<CpReceiver<KosReceiver, Fp>, Fp>,
-        >(1024);
-        test_svole::<
-            Gf128,
-            VoleSender<CpSender<KosSender, Gf128>, Gf128>,
-            VoleReceiver<CpReceiver<KosReceiver, Gf128>, Gf128>,
-        >(1024);
-        test_svole::<
-            F2,
-            VoleSender<CpSender<KosSender, F2>, F2>,
-            VoleReceiver<CpReceiver<KosReceiver, F2>, F2>,
-        >(1024);
+        test_svole::<Fp, BVSender<Fp>, BVReceiver<Fp>>(1024);
+        test_svole::<Gf128, BVSender<Gf128>, BVReceiver<Gf128>>(1024);
+        test_svole::<F2, BVSender<F2>, BVReceiver<F2>>(1024);
     }
 }
