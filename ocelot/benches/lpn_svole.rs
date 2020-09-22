@@ -8,14 +8,14 @@
 
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use ocelot::{
-    ot::{KosReceiver, KosSender, ChouOrlandiSender, ChouOrlandiReceiver},
+    ot::{ChouOrlandiReceiver, ChouOrlandiSender, KosReceiver, KosSender},
     svole::{
         base_svole::{Receiver as VoleReceiver, Sender as VoleSender},
         copee::{Receiver as CpReceiver, Sender as CpSender},
         svole_ext::{
             eq::{Receiver as EQReceiver, Sender as EQSender},
             sp_svole_dummy_ggmprime::{Receiver as SpVoleReceiver, Sender as SpVoleSender},
-            svole_lpn::{Sender as LpnVoleSender, Receiver as LpnVoleReceiver},
+            svole_lpn::{Receiver as LpnVoleReceiver, Sender as LpnVoleSender},
             LpnsVoleReceiver,
             LpnsVoleSender,
         },
@@ -33,7 +33,7 @@ use std::{
     time::Duration,
 };
 
-/// Specifies the LPN parameters such as number of rows, columns, the constant d of the `d-linear codes`. 
+/// Specifies the LPN parameters such as number of rows, columns, the constant d of the `d-linear codes`.
 const ROWS: usize = 1 << 7;
 const COLS: usize = 1 << 8;
 const D: usize = 8;

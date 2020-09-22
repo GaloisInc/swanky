@@ -151,7 +151,7 @@ mod tests {
     }
 
     #[test]
-   fn test_ggm() {
+    fn test_ggm() {
         for _ in 0..10 {
             let seed = Default::default();
             // Runs for a while if the range is over 20.

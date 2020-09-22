@@ -26,11 +26,12 @@ use crate::{
 use rand::Rng;
 use rand_core::{CryptoRng, RngCore, SeedableRng};
 use scuttlebutt::{field::FiniteField, AbstractChannel, AesRng, Block};
+use std::marker::PhantomData;
 
 /// A LpnsVole sender.
 #[derive(Clone)]
 pub struct Sender<FE: FiniteField, SV: SVoleSender, SPS: SpsVoleSender> {
-    svole: SV,
+    _sv: PhantomData<SV>,
     spvole: SPS,
     rows: usize,
     cols: usize,
@@ -40,7 +41,7 @@ pub struct Sender<FE: FiniteField, SV: SVoleSender, SPS: SpsVoleSender> {
 }
 /// A LpnsVole receiver.
 pub struct Receiver<FE: FiniteField, SV: SVoleReceiver, SPS: SpsVoleReceiver> {
-    svole: SV,
+    _sv: PhantomData<SV>,
     spvole: SPS,
     delta: FE,
     rows: usize,
@@ -98,7 +99,7 @@ impl<FE: FiniteField, SV: SVoleSender<Msg = FE>, SPS: SpsVoleSender<Msg = FE>> L
         channel.flush()?;
         let spvole_sender = SPS::init(channel, rng)?;
         Ok(Self {
-            svole: svole_sender,
+            _sv: PhantomData::<SV>,
             spvole: spvole_sender,
             rows,
             cols,
@@ -175,7 +176,7 @@ impl<FE: FiniteField, SV: SVoleReceiver<Msg = FE>, SPS: SpsVoleReceiver<Msg = FE
         let matrix = code_gen::<FE::PrimeField>(rows, cols, d, matrix_seed);
         let spvole_receiver = SPS::init(channel, rng)?;
         Ok(Self {
-            svole: svole_receiver,
+            _sv: PhantomData::<SV>,
             spvole: spvole_receiver,
             delta,
             rows,
