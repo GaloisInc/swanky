@@ -73,7 +73,6 @@ pub fn ggm<FE: FiniteField>(depth: usize, seed: Block) -> (Vec<FE>, Vec<(Block, 
     let exp = 1 << depth;
     let mut vs = vec![FE::ZERO; exp];
     for j in 0..exp {
-        println!("seed -> v: {}", seeds[j + exp - 1]);
         vs[j] = FE::from_uniform_bytes(&<[u8; 16]>::from(seeds[j + exp - 1]));
     }
     (vs, keys)
