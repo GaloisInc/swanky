@@ -8,9 +8,9 @@
 //! LPN based Subfield Vector Oblivious Linear Evaluation (SVOLE) traits.
 
 pub mod eq;
-mod ggm_utils;
+pub mod ggm_utils;
 pub mod sp_svole_dummy_ggmprime;
-//mod svole_lpn;
+mod svole_lpn;
 
 use crate::errors::Error;
 use rand_core::{CryptoRng, RngCore};
