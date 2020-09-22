@@ -179,16 +179,17 @@ mod tests {
             base_svole::{Receiver as VoleReceiver, Sender as VoleSender},
             copee::{Receiver as CpReceiver, Sender as CpSender},
             svole_ext::{
-                eq::{Receiver as eqReceiver, Sender as eqSender},
+                eq::{Receiver as EqReceiver, Sender as EqSender},
                 sp_svole_dummy_ggmprime::{Receiver as SpsReceiver, Sender as SpsSender},
+                svole_lpn::{Receiver as LpnVoleReceiver, Sender as LpnVoleSender},
+                LpnsVoleReceiver,
+                LpnsVoleSender,
                 SpsVoleReceiver,
                 SpsVoleSender,
             },
             utils::to_fpr,
         },
     };
-    use num::pow;
-    use rand::*;
     use scuttlebutt::{
         field::{FiniteField as FF, Fp, Gf128, F2},
         AesRng,
@@ -200,17 +201,13 @@ mod tests {
     };
 
     fn test_spsvole<
-        FE: FF + Sync + Send,
+        FE: FF,
         SPSender: SpsVoleSender<Msg = FE>,
         SPReceiver: SpsVoleReceiver<Msg = FE>,
     >(
         len: u128,
     ) {
         let (sender, receiver) = UnixStream::pair().unwrap();
-        let mut rng = AesRng::new();
-        let reader = BufReader::new(receiver.try_clone().unwrap());
-        let writer = BufWriter::new(receiver);
-        let mut channel = Channel::new(reader, writer);
         let handle = std::thread::spawn(move || {
             let mut rng = AesRng::new();
             let reader = BufReader::new(sender.try_clone().unwrap());
@@ -219,38 +216,83 @@ mod tests {
             let mut vole = SPSender::init(&mut channel, &mut rng).unwrap();
             vole.send(&mut channel, len, &mut rng).unwrap()
         });
-        let mut rvole = SPReceiver::init(&mut channel, &mut rng).unwrap();
-        let vs = rvole.receive(&mut channel, len, &mut rng).unwrap();
-        let delta = rvole.delta();
-        let uw_s = handle.join().unwrap();
+        let mut rng = AesRng::new();
+        let reader = BufReader::new(receiver.try_clone().unwrap());
+        let writer = BufWriter::new(receiver);
+        let mut channel = Channel::new(reader, writer);
+        let mut vole = SPReceiver::init(&mut channel, &mut rng).unwrap();
+        let vs = vole.receive(&mut channel, len, &mut rng).unwrap();
+        let uws = handle.join().unwrap();
         for i in 0..len as usize {
-            let mut right = delta.clone();
-            right.mul_assign(to_fpr(uw_s[i].0));
-            right.add_assign(vs[i]);
-            assert_eq!(uw_s[i].1, right);
+            let right = vole.delta() * to_fpr(uws[i].0) + vs[i];
+            assert_eq!(uws[i].1, right);
         }
     }
 
+    type CPSender<FE> = CpSender<KosSender, FE>;
+    type CPReceiver<FE> = CpReceiver<KosReceiver, FE>;
+
+    type BVSender<FE> = VoleSender<CPSender<FE>, FE>;
+    type BVReceiver<FE> = VoleReceiver<CPReceiver<FE>, FE>;
+
+    type SPSender<FE> = SpsSender<ChouOrlandiReceiver, FE, BVSender<FE>, EqSender<FE>>;
+    type SPReceiver<FE> = SpsReceiver<ChouOrlandiSender, FE, BVReceiver<FE>, EqReceiver<FE>>;
+
     #[test]
     fn test_sp_svole() {
-        let depth = rand::thread_rng().gen_range(1, 20);
-        let leaves = pow(2, depth);
-        type SPSender<FE> = SpsSender<
-            ChouOrlandiReceiver,
-            FE,
-            VoleSender<CpSender<KosSender, FE>, FE>,
-            eqSender<FE>,
-        >;
+        for i in 1..10 {
+            let leaves = 1 << i;
+            test_spsvole::<Fp, SPSender<Fp>, SPReceiver<Fp>>(leaves);
+            test_spsvole::<Gf128, SPSender<Gf128>, SPReceiver<Gf128>>(leaves);
+            test_spsvole::<F2, SPSender<F2>, SPReceiver<F2>>(leaves);
+        }
+    }
 
-        type SPReceiver<FE> = SpsReceiver<
-            ChouOrlandiSender,
-            FE,
-            VoleReceiver<CpReceiver<KosReceiver, FE>, FE>,
-            eqReceiver<FE>,
-        >;
+    fn test_lpnvole<
+        FE: FF,
+        VSender: LpnsVoleSender<Msg = FE>,
+        VReceiver: LpnsVoleReceiver<Msg = FE>,
+    >(
+        rows: usize,
+        cols: usize,
+        d: usize,
+    ) {
+        let (sender, receiver) = UnixStream::pair().unwrap();
+        let len = cols - rows;
+        debug_assert!(cols % 2 == 0);
+        let handle = std::thread::spawn(move || {
+            let mut rng = AesRng::new();
+            let reader = BufReader::new(sender.try_clone().unwrap());
+            let writer = BufWriter::new(sender);
+            let mut channel = Channel::new(reader, writer);
+            let mut vole = VSender::init(&mut channel, rows, cols, d, &mut rng).unwrap();
+            vole.send(&mut channel, len, &mut rng).unwrap()
+        });
+        let mut rng = AesRng::new();
+        let reader = BufReader::new(receiver.try_clone().unwrap());
+        let writer = BufWriter::new(receiver);
+        let mut channel = Channel::new(reader, writer);
+        let mut vole = VReceiver::init(&mut channel, rows, cols, d, &mut rng).unwrap();
+        let vs = vole.receive(&mut channel, len, &mut rng).unwrap();
+        let uws = handle.join().unwrap();
+        for i in 0..len as usize {
+            let right = vole.delta() * to_fpr(uws[i].0) + vs[i];
+            assert_eq!(uws[i].1, right);
+        }
+    }
 
-        test_spsvole::<Fp, SPSender<Fp>, SPReceiver<Fp>>(leaves);
-        test_spsvole::<Gf128, SPSender<Gf128>, SPReceiver<Gf128>>(leaves);
-        test_spsvole::<F2, SPSender<F2>, SPReceiver<F2>>(leaves);
+    type VSender<FE> = LpnVoleSender<FE, BVSender<FE>, SPSender<FE>>;
+    type VReceiver<FE> = LpnVoleReceiver<FE, BVReceiver<FE>, SPReceiver<FE>>;
+
+    #[test]
+    fn test_lpn_svole() {
+        for i in 1..10 {
+            let cols = 1 << i;
+            let rows = 1 << (i - 1);
+            let d = i - 1;
+            test_lpnvole::<Fp, VSender<Fp>, VReceiver<Fp>>(rows, cols, d);
+            test_lpnvole::<Gf128, VSender<Gf128>, VReceiver<Gf128>>(rows, cols, d);
+            test_lpnvole::<F2, VSender<F2>, VReceiver<F2>>(rows, cols, d);
+        }
     }
 }
