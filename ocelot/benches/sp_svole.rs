@@ -33,6 +33,7 @@ use std::{
 };
 type BVSender<FE> = VoleSender<CpSender<KosSender, FE>, FE>;
 type BVReceiver<FE> = VoleReceiver<CpReceiver<KosReceiver, FE>, FE>;
+
 type SPSender<FE> = SpVoleSender<ChouOrlandiReceiver, FE, BVSender<FE>, EQSender<FE>>;
 type SPReceiver<FE> = SpVoleReceiver<ChouOrlandiSender, FE, BVReceiver<FE>, EQReceiver<FE>>;
 
@@ -104,6 +105,15 @@ fn bench_sp_gf128(c: &mut Criterion) {
     });
 }
 
+fn bench_sp_f2(c: &mut Criterion) {
+    c.bench_function("sp_svole::extend::F2 (N = 1024)", move |bench| {
+        let (vole_sender, vole_receiver) = sp_svole_init();
+        bench.iter(move || {
+            bench_svole::<SPSender<Gf128>, SPReceiver<Gf128>>(&vole_sender, &vole_receiver, 1024);
+        })
+    });
+}
+
 fn bench_sp_init<SPSender: SpsVoleSender + Sync + Send + 'static, SPReceiver: SpsVoleReceiver>() {
     let mut rng = AesRng::new();
     let (sender, receiver) = UnixStream::pair().unwrap();
@@ -147,6 +157,6 @@ fn bench_sp_init_f2(c: &mut Criterion) {
 criterion_group! {
     name = svole;
     config = Criterion::default().warm_up_time(Duration::from_millis(100));
-    targets = bench_sp_fp, bench_sp_gf128, bench_sp_init_gf128, bench_sp_init_fp, bench_sp_init_f2
+    targets = bench_sp_fp, bench_sp_gf128, bench_sp_f2, bench_sp_init_gf128, bench_sp_init_fp, bench_sp_init_f2
 }
 criterion_main!(svole);

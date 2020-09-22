@@ -10,7 +10,7 @@
 pub mod eq;
 pub mod ggm_utils;
 pub mod sp_svole_dummy_ggmprime;
-mod svole_lpn;
+pub mod svole_lpn;
 
 use crate::errors::Error;
 use rand_core::{CryptoRng, RngCore};

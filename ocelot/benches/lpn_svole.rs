@@ -4,16 +4,21 @@
 // Copyright © 2020 Galois, Inc.
 // See LICENSE for licensing information.
 
-//! Subfield Vector OLE benchmarks using `criterion`.
+//! Subfield Vector OLE (LPN-based) benchmarks using `criterion`.
 
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use ocelot::{
-    ot::{KosReceiver, KosSender},
+    ot::{KosReceiver, KosSender, ChouOrlandiSender, ChouOrlandiReceiver},
     svole::{
         base_svole::{Receiver as VoleReceiver, Sender as VoleSender},
         copee::{Receiver as CpReceiver, Sender as CpSender},
-        SVoleReceiver,
-        SVoleSender,
+        svole_ext::{
+            eq::{Receiver as EQReceiver, Sender as EQSender},
+            sp_svole_dummy_ggmprime::{Receiver as SpVoleReceiver, Sender as SpVoleSender},
+            svole_lpn::{Sender as LpnVoleSender, Receiver as LpnVoleReceiver},
+            LpnsVoleReceiver,
+            LpnsVoleSender,
+        },
     },
 };
 use scuttlebutt::{
@@ -28,26 +33,45 @@ use std::{
     time::Duration,
 };
 
-type BVSender<FE> = VoleSender<CpSender<KosSender, FE>, FE>;
-type BVReceiver<FE> = VoleReceiver<CpReceiver<KosReceiver, FE>, FE>;
+/// Specifies the LPN parameters such as number of rows, columns, the constant d of the `d-linear codes`. 
+const ROWS: usize = 1 << 7;
+const COLS: usize = 1 << 8;
+const D: usize = 8;
+const LEN: usize = COLS - ROWS;
+
+type CPSender<FE> = CpSender<KosSender, FE>;
+type CPReceiver<FE> = CpReceiver<KosReceiver, FE>;
+
+type BVSender<FE> = VoleSender<CPSender<FE>, FE>;
+type BVReceiver<FE> = VoleReceiver<CPReceiver<FE>, FE>;
+
+type SPSender<FE> = SpVoleSender<ChouOrlandiReceiver, FE, BVSender<FE>, EQSender<FE>>;
+type SPReceiver<FE> = SpVoleReceiver<ChouOrlandiSender, FE, BVReceiver<FE>, EQReceiver<FE>>;
+
+type VSender<FE> = LpnVoleSender<FE, BVSender<FE>, SPSender<FE>>;
+type VReceiver<FE> = LpnVoleReceiver<FE, BVReceiver<FE>, SPReceiver<FE>>;
 
 fn svole_init<
-    BVSender: SVoleSender + Sync + Send + 'static,
-    BVReceiver: SVoleReceiver + Sync + Send,
->() -> (Arc<Mutex<BVSender>>, Arc<Mutex<BVReceiver>>) {
+    VSender: LpnsVoleSender + Sync + Send + 'static,
+    VReceiver: LpnsVoleReceiver + Sync + Send,
+>(
+    rows: usize,
+    cols: usize,
+    d: usize,
+) -> (Arc<Mutex<VSender>>, Arc<Mutex<VReceiver>>) {
     let (sender, receiver) = UnixStream::pair().unwrap();
     let handle = std::thread::spawn(move || {
         let mut rng = AesRng::new();
         let reader = BufReader::new(sender.try_clone().unwrap());
         let writer = BufWriter::new(sender);
         let mut channel = Channel::new(reader, writer);
-        BVSender::init(&mut channel, &mut rng).unwrap()
+        VSender::init(&mut channel, rows, cols, d, &mut rng).unwrap()
     });
     let mut rng = AesRng::new();
     let reader = BufReader::new(receiver.try_clone().unwrap());
     let writer = BufWriter::new(receiver);
     let mut channel = Channel::new(reader, writer);
-    let vole_receiver = BVReceiver::init(&mut channel, &mut rng).unwrap();
+    let vole_receiver = VReceiver::init(&mut channel, rows, cols, d, &mut rng).unwrap();
     let vole_sender = handle.join().unwrap();
     let vole_sender = Arc::new(Mutex::new(vole_sender));
     let vole_receiver = Arc::new(Mutex::new(vole_receiver));
@@ -55,11 +79,11 @@ fn svole_init<
 }
 
 fn bench_svole<
-    BVSender: SVoleSender + Sync + Send + 'static,
-    BVReceiver: SVoleReceiver + Sync + Send,
+    VSender: LpnsVoleSender + Sync + Send + 'static,
+    VReceiver: LpnsVoleReceiver + Sync + Send,
 >(
-    vole_sender: &Arc<Mutex<BVSender>>,
-    vole_receiver: &Arc<Mutex<BVReceiver>>,
+    vole_sender: &Arc<Mutex<VSender>>,
+    vole_receiver: &Arc<Mutex<VReceiver>>,
     len: usize,
 ) {
     let (sender, receiver) = UnixStream::pair().unwrap();
@@ -82,33 +106,40 @@ fn bench_svole<
 }
 
 fn bench_svole_fp(c: &mut Criterion) {
-    c.bench_function("base_svole::extend::Fp (N = 1024)", move |bench| {
-        let (vole_sender, vole_receiver) = svole_init();
+    c.bench_function("lpn_svole::extend::Fp", move |bench| {
+        let (vole_sender, vole_receiver) = svole_init(ROWS, COLS, D);
         bench.iter(move || {
-            bench_svole::<BVSender<Fp>, BVReceiver<Fp>>(&vole_sender, &vole_receiver, 1024);
+            bench_svole::<VSender<Fp>, VReceiver<Fp>>(&vole_sender, &vole_receiver, LEN);
         })
     });
 }
 
 fn bench_svole_gf128(c: &mut Criterion) {
-    c.bench_function("base_svole::extend::Gf128 (N = 1024)", move |bench| {
-        let (vole_sender, vole_receiver) = svole_init();
+    c.bench_function("lpn_svole::extend::Gf128", move |bench| {
+        let (vole_sender, vole_receiver) = svole_init(ROWS, COLS, D);
         bench.iter(move || {
-            bench_svole::<BVSender<Gf128>, BVReceiver<Gf128>>(&vole_sender, &vole_receiver, 1024);
+            bench_svole::<VSender<Gf128>, VReceiver<Gf128>>(&vole_sender, &vole_receiver, LEN);
         })
     });
 }
 
 fn bench_svole_f2(c: &mut Criterion) {
-    c.bench_function("base_svole::extend::F2 (N = 1024)", move |bench| {
-        let (vole_sender, vole_receiver) = svole_init();
+    c.bench_function("lpn_svole::extend::F2", move |bench| {
+        let (vole_sender, vole_receiver) = svole_init(ROWS, COLS, D);
         bench.iter(move || {
-            bench_svole::<BVSender<F2>, BVReceiver<F2>>(&vole_sender, &vole_receiver, 1024);
+            bench_svole::<VSender<F2>, VReceiver<F2>>(&vole_sender, &vole_receiver, LEN);
         })
     });
 }
 
-fn bench_svole_init<BVSender: SVoleSender + Sync + Send + 'static, BVReceiver: SVoleReceiver>() {
+fn bench_svole_init<
+    VSender: LpnsVoleSender + Sync + Send + 'static,
+    VReceiver: LpnsVoleReceiver,
+>(
+    rows: usize,
+    cols: usize,
+    d: usize,
+) {
     let mut rng = AesRng::new();
     let (sender, receiver) = UnixStream::pair().unwrap();
     let handle = std::thread::spawn(move || {
@@ -116,35 +147,35 @@ fn bench_svole_init<BVSender: SVoleSender + Sync + Send + 'static, BVReceiver: S
         let reader = BufReader::new(sender.try_clone().unwrap());
         let writer = BufWriter::new(sender);
         let mut channel = Channel::new(reader, writer);
-        black_box(BVSender::init(&mut channel, &mut rng).unwrap())
+        black_box(VSender::init(&mut channel, rows, cols, d, &mut rng).unwrap())
     });
     let reader = BufReader::new(receiver.try_clone().unwrap());
     let writer = BufWriter::new(receiver);
     let mut channel = Channel::new(reader, writer);
-    black_box(BVReceiver::init(&mut channel, &mut rng).unwrap());
+    black_box(VReceiver::init(&mut channel, rows, cols, d, &mut rng).unwrap());
     handle.join().unwrap();
 }
 
 fn bench_svole_init_gf128(c: &mut Criterion) {
-    c.bench_function("base_svole::init::Gf128", move |bench| {
+    c.bench_function("lpn_svole::init::Gf128", move |bench| {
         bench.iter(move || {
-            bench_svole_init::<BVSender<Gf128>, BVReceiver<Gf128>>();
+            bench_svole_init::<VSender<Gf128>, VReceiver<Gf128>>(ROWS, COLS, D);
         });
     });
 }
 
 fn bench_svole_init_fp(c: &mut Criterion) {
-    c.bench_function("base_svole::init::Fp", move |bench| {
+    c.bench_function("lpn_svole::init::Fp", move |bench| {
         bench.iter(move || {
-            bench_svole_init::<BVSender<Fp>, BVReceiver<Fp>>();
+            bench_svole_init::<VSender<Fp>, VReceiver<Fp>>(ROWS, COLS, D);
         });
     });
 }
 
 fn bench_svole_init_f2(c: &mut Criterion) {
-    c.bench_function("base_svole::init::F2", move |bench| {
+    c.bench_function("lpn_svole::init::F2", move |bench| {
         bench.iter(move || {
-            bench_svole_init::<BVSender<F2>, BVReceiver<F2>>();
+            bench_svole_init::<VSender<F2>, VReceiver<F2>>(ROWS, COLS, D);
         });
     });
 }
