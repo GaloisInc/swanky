@@ -19,10 +19,12 @@ nightly = ["curve25519-dalek/avx2_backend", "rand/nightly", "scuttlebutt/nightly
 
 [dependencies]
 curve25519-dalek = { version = "2", features = ["std"] }
-libc = "0.2"
 rand = "0.7"
+rand_core = "0.5"
 scuttlebutt = { path = "../scuttlebutt", features = ["curve25519-dalek"] }
-itertools = "0.8.0"
+generic-array = "0.14"
+subtle = "2.2"
+
 
 [build-dependencies]
 cc = "1.0"
@@ -30,12 +32,18 @@ cc = "1.0"
 [dev-dependencies]
 criterion = "0.2"
 
+
 [[bench]]
 name = "ot"
 harness = false
 
 [[bench]]
 name = "oprf"
+harness = false
+
+[[bench]]
+path = "benches/base_svole.rs"
+name = "base_svole"
 harness = false
 
 [[example]]

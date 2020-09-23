@@ -36,7 +36,7 @@ impl<FE: FiniteField> Polynomial<FE> {
     /// Return the zero polynomial.
     pub fn zero() -> Self {
         Polynomial {
-            constant: FE::zero(),
+            constant: FE::ZERO,
             coefficients: Default::default(),
         }
     }
@@ -44,7 +44,7 @@ impl<FE: FiniteField> Polynomial<FE> {
     /// Return the polynomial `P(x)=1`
     pub fn one() -> Self {
         Polynomial {
-            constant: FE::one(),
+            constant: FE::ONE,
             coefficients: Default::default(),
         }
     }
@@ -52,8 +52,8 @@ impl<FE: FiniteField> Polynomial<FE> {
     /// Return the polynomial `P(x)=x`
     pub fn x() -> Self {
         Polynomial {
-            constant: FE::zero(),
-            coefficients: smallvec![FE::one()],
+            constant: FE::ZERO,
+            coefficients: smallvec![FE::ONE],
         }
     }
 
@@ -64,7 +64,7 @@ impl<FE: FiniteField> Polynomial<FE> {
                 .coefficients
                 .iter()
                 .rev()
-                .take_while(|x| **x == FE::zero())
+                .take_while(|x| **x == FE::ZERO)
                 .count()
     }
 
@@ -93,8 +93,8 @@ impl<FE: FiniteField> Polynomial<FE> {
             // lead(r) / lead(divisor) = (a/c) * x ^ (b-d)
             let b = r.degree();
             let mut t = Polynomial {
-                constant: FE::zero(),
-                coefficients: smallvec![FE::zero(); b.checked_sub(d).unwrap()],
+                constant: FE::ZERO,
+                coefficients: smallvec![FE::ZERO; b.checked_sub(d).unwrap()],
             };
             t[b - d] = r[b] / divisor[d];
             q += &t;
@@ -111,8 +111,8 @@ impl<FE: FiniteField> Polynomial<FE> {
     pub fn interpolate(points: &[(FE, FE)]) -> Self {
         assert!(!points.is_empty());
         let mut out = Polynomial {
-            constant: FE::zero(),
-            coefficients: smallvec![FE::zero(); points.len() - 1],
+            constant: FE::ZERO,
+            coefficients: smallvec![FE::ZERO; points.len() - 1],
         };
         for (j, (xj, yj)) in points.iter().enumerate() {
             let mut l = Polynomial::one();
@@ -139,7 +139,7 @@ impl<'a, FE: FiniteField> AddAssign<&'a Polynomial<FE>> for Polynomial<FE> {
     fn add_assign(&mut self, rhs: &'a Polynomial<FE>) {
         self.coefficients.resize(
             self.coefficients.len().max(rhs.coefficients.len()),
-            FE::zero(),
+            FE::ZERO,
         );
         self.constant += rhs.constant;
         for (a, b) in self.coefficients.iter_mut().zip(rhs.coefficients.iter()) {
@@ -152,7 +152,7 @@ impl<'a, FE: FiniteField> SubAssign<&'a Polynomial<FE>> for Polynomial<FE> {
     fn sub_assign(&mut self, rhs: &'a Polynomial<FE>) {
         self.coefficients.resize(
             self.coefficients.len().max(rhs.coefficients.len()),
-            FE::zero(),
+            FE::ZERO,
         );
         self.constant -= rhs.constant;
         for (a, b) in self.coefficients.iter_mut().zip(rhs.coefficients.iter()) {
@@ -199,12 +199,12 @@ impl<'a, FE: FiniteField> MulAssign<&'a Polynomial<FE>> for Polynomial<FE> {
         // TODO: this is the most naive, most simple, and slowest implementation of multiplication.
         // If this is a bottleneck, then pick a faster algorithm.
         let tmp = self.clone();
-        self.constant = FE::zero();
+        self.constant = FE::ZERO;
         for x in self.coefficients.iter_mut() {
-            *x = FE::zero();
+            *x = FE::ZERO;
         }
         self.coefficients
-            .resize(tmp.degree() + rhs.degree() + 1, FE::zero());
+            .resize(tmp.degree() + rhs.degree() + 1, FE::ZERO);
         for i in 0..tmp.degree() + 1 {
             for j in 0..rhs.degree() + 1 {
                 self[i + j] += tmp[i] * rhs[j];
@@ -226,13 +226,13 @@ impl<FE: FiniteField> ConstantTimeEq for Polynomial<FE> {
             .coefficients
             .iter()
             .cloned()
-            .chain(std::iter::repeat(FE::zero()))
+            .chain(std::iter::repeat(FE::ZERO))
             .zip(
                 other
                     .coefficients
                     .iter()
                     .cloned()
-                    .chain(std::iter::repeat(FE::zero())),
+                    .chain(std::iter::repeat(FE::ZERO)),
             )
             .take(self.coefficients.len().max(other.coefficients.len()))
         {
@@ -246,7 +246,7 @@ impl<FE: FiniteField> Debug for Polynomial<FE> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "P(x) = {:?}", self.constant)?;
         for (i, coeff) in self.coefficients.iter().enumerate() {
-            if *coeff != FE::zero() {
+            if *coeff != FE::ZERO {
                 write!(f, " + {:?} * x^{}", coeff, i + 1)?;
             }
         }
@@ -269,22 +269,22 @@ mod tests {
             assert_eq!(Polynomial::<FE>::x().degree(), 1);
             assert_eq!(
                 (Polynomial {
-                    constant: FE::zero(),
-                    coefficients: smallvec![FE::zero(), FE::zero()],
+                    constant: FE::ZERO,
+                    coefficients: smallvec![FE::ZERO, FE::ZERO],
                 })
                 .degree(),
                 0
             );
             assert_eq!(
                 (Polynomial {
-                    constant: FE::zero(),
+                    constant: FE::ZERO,
                     coefficients: smallvec![
-                        FE::zero(),
-                        FE::zero(),
-                        FE::one(),
-                        FE::zero(),
-                        FE::zero(),
-                        FE::zero()
+                        FE::ZERO,
+                        FE::ZERO,
+                        FE::ONE,
+                        FE::ZERO,
+                        FE::ZERO,
+                        FE::ZERO
                     ],
                 })
                 .degree(),
@@ -371,14 +371,13 @@ mod tests {
         fn f<FE: FiniteField>() {
             let mut rng = AesRng::from_seed(Block::default());
             {
-                let poly =
-                    Polynomial::interpolate(&[(FE::zero(), FE::zero()), (FE::one(), FE::one())]);
-                assert_eq!(poly.eval(FE::zero()), FE::zero());
-                assert_eq!(poly.eval(FE::one()), FE::one());
+                let poly = Polynomial::interpolate(&[(FE::ZERO, FE::ZERO), (FE::ONE, FE::ONE)]);
+                assert_eq!(poly.eval(FE::ZERO), FE::ZERO);
+                assert_eq!(poly.eval(FE::ONE), FE::ONE);
             }
             {
-                let poly = Polynomial::interpolate(&[(FE::zero(), FE::one())]);
-                assert_eq!(poly.eval(FE::zero()), FE::one());
+                let poly = Polynomial::interpolate(&[(FE::ZERO, FE::ONE)]);
+                assert_eq!(poly.eval(FE::ZERO), FE::ONE);
             }
             for _ in 0..1000 {
                 let n_points = 5;
