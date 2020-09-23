@@ -8,6 +8,7 @@
 //! LPN based Subfield Vector Oblivious Linear Evaluation (SVOLE) traits.
 
 pub mod eq;
+/// GGM related helper functions.
 pub mod ggm_utils;
 pub mod sp_svole_dummy_ggmprime;
 pub mod svole_lpn;
