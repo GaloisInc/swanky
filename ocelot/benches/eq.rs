@@ -4,7 +4,7 @@
 // Copyright © 2020 Galois, Inc.
 // See LICENSE for licensing information.
 
-//! Subfield Vector OLE benchmarks using `criterion`.
+//! EQ protocol benchmarks using `criterion`.
 
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use ocelot::svole::svole_ext::{

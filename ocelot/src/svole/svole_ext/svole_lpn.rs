@@ -28,7 +28,7 @@ use rand_core::{CryptoRng, RngCore, SeedableRng};
 use scuttlebutt::{field::FiniteField, AbstractChannel, AesRng, Block};
 use std::marker::PhantomData;
 
-/// A LpnsVole sender.
+/// LpnsVole sender.
 #[derive(Clone)]
 pub struct Sender<FE: FiniteField, SV: SVoleSender, SPS: SpsVoleSender> {
     _sv: PhantomData<SV>,
@@ -39,7 +39,7 @@ pub struct Sender<FE: FiniteField, SV: SVoleSender, SPS: SpsVoleSender> {
     w: Vec<FE>,
     matrix: Vec<Vec<FE::PrimeField>>,
 }
-/// A LpnsVole receiver.
+/// LpnsVole receiver.
 pub struct Receiver<FE: FiniteField, SV: SVoleReceiver, SPS: SpsVoleReceiver> {
     _sv: PhantomData<SV>,
     spvole: SPS,
@@ -50,7 +50,7 @@ pub struct Receiver<FE: FiniteField, SV: SVoleReceiver, SPS: SpsVoleReceiver> {
     matrix: Vec<Vec<FE::PrimeField>>,
 }
 
-/// Code generator G that outputs matrix A for the given dimension `k` by `n`.
+/// Code generator that outputs matrix A for the given dimension `k` by `n` that each column of it has uniform `d` non-zero entries.
 pub fn code_gen<FE: FiniteField>(rows: usize, cols: usize, d: usize, seed: Block) -> Vec<Vec<FE>> {
     let g = FE::GENERATOR;
     let mut rng = AesRng::from_seed(seed);

@@ -33,7 +33,9 @@ use std::{
     time::Duration,
 };
 
-/// Specifies the LPN parameters such as number of rows, columns, the constant d of the `d-linear codes`.
+/// Specifies the LPN parameters such as number of rows, columns of the matrix that each column of it is uniform subjective to have
+///  `d` number of non-zero entries.
+
 const ROWS: usize = 1 << 7;
 const COLS: usize = 1 << 8;
 const D: usize = 8;
