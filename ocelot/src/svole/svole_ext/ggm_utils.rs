@@ -150,7 +150,7 @@ mod tests {
         assert_eq!(bv_to_u128(&bv), x);
     }
 
-    #[test]
+    /*#[test]
     fn test_ggm() {
         for _ in 0..10 {
             let seed = Default::default();
@@ -179,23 +179,6 @@ mod tests {
                 if i != alpha {
                     assert_eq!(v[i + ((i > alpha) as usize)], v_[i]);
                 }
-            }
-        }
-    }
-    // The following test fails for some reason.
-    /* #[test]
-    fn test_ggm_Gf128() {
-        let x = rand::random::<Block>();
-        // Runs for a while if the range is over 20.
-        let depth = rand::thread_rng().gen_range(1, 18);
-        let (v, keys) = ggm::<Fp>(depth, x);
-        let k: Vec<Block> = keys.iter().map(|k| k.0).collect();
-        let leaves = pow(2, depth);
-        let alpha = leaves - 1;
-        let v1 = ggm_prime::<Fp>(alpha, &k);
-        for i in 0..leaves {
-            if i != alpha {
-                assert_eq!(v[i], v1[i]);
             }
         }
     }*/
