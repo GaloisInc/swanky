@@ -29,24 +29,16 @@ impl ConditionallySelectable for F2 {
     }
 }
 
-impl F2 {
-    /// The prime field modulus: $2$
-    pub const MODULUS: u8 = 2;
-}
-
 impl FiniteField for F2 {
     /// This uniformly generates a field element either 0 or 1 for `F2` type.
     fn random<R: RngCore + ?Sized>(rng: &mut R) -> Self {
         F2(u8::from(rng.gen::<bool>()))
     }
 
-    fn zero() -> Self {
-        F2(0)
-    }
+    const ZERO: Self = F2(0);
 
-    fn one() -> Self {
-        F2(1)
-    }
+    const ONE: Self = F2(1);
+
     type ByteReprLen = generic_array::typenum::U1;
     type FromBytesError = BiggerThanModulus;
 
@@ -61,9 +53,7 @@ impl FiniteField for F2 {
 
     const MULTIPLICATIVE_GROUP_ORDER: u128 = Self::MODULUS as u128 - 1;
 
-    fn generator() -> Self {
-        F2(1)
-    }
+    const GENERATOR: Self = F2(1);
 
     type PrimeField = Self;
     type PolynomialFormNumCoefficients = generic_array::typenum::U1;
@@ -73,6 +63,15 @@ impl FiniteField for F2 {
     ) -> Self {
         coeff[0]
     }
+
+    fn from_uniform_bytes(x: &[u8; 16]) -> Self {
+        let mut value = u128::from_le_bytes(*x);
+        value &= 1;
+        F2(value as u8)
+    }
+
+    /// The prime field modulus: $2$
+    const MODULUS: u128 = 2;
 
     fn to_polynomial_coefficients(
         &self,
@@ -121,7 +120,7 @@ impl TryFrom<u8> for F2 {
     type Error = BiggerThanModulus;
 
     fn try_from(value: u8) -> Result<Self, Self::Error> {
-        if value < Self::MODULUS {
+        if value < Self::MODULUS as u8 {
             Ok(F2(value))
         } else {
             Err(BiggerThanModulus)
@@ -166,10 +165,10 @@ mod tests {
                     a.$op(&b);
                     // This is a hack! That's okay, this is a test!
                     if stringify!($op) == "sub_assign" {
-                        x += F2::MODULUS;
+                        x += F2::MODULUS as u8;
                     }
                     x.$op(&y);
-                    x = x % F2::MODULUS;
+                    x = x % F2::MODULUS as u8;
                     assert_eq!(a.0, x);
                 }
             }

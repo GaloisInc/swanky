@@ -15,6 +15,8 @@ pub enum Error {
     Other(String),
     /// Coin tossing failed.
     CoinTossError(scuttlebutt::cointoss::Error),
+    /// Correlation check failed.
+    CorrelationCheckError(String),
 }
 
 impl From<std::io::Error> for Error {
@@ -36,6 +38,7 @@ impl std::fmt::Display for Error {
             Error::IoError(e) => write!(f, "IO error: {}", e),
             Error::Other(s) => write!(f, "other error: {}", s),
             Error::CoinTossError(e) => write!(f, "coin toss error: {}", e),
+            Error::CorrelationCheckError(e) => write!(f, "correlation check error: {}", e),
         }
     }
 }
