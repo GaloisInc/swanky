@@ -310,6 +310,10 @@ impl FiniteField for Gf128 {
     const ZERO: Self = Gf128(0);
 
     const ONE: Self = Gf128(1);
+
+    fn multiply_by_prime_subfield(&self, pf: Self::PrimeField) -> Self {
+        Self::conditional_select(&Self::ZERO, &self, pf.ct_eq(&F2::ONE))
+    }
 }
 
 field_ops!(Gf128);
