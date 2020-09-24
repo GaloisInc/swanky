@@ -104,6 +104,10 @@ impl FiniteField for Fp {
     fn reduce_multiplication_over() -> Polynomial<Self::PrimeField> {
         Polynomial::x()
     }
+
+    fn multiply_by_prime_subfield(&self, pf: Self::PrimeField) -> Self {
+        self * pf
+    }
 }
 
 /// The error which occurs if the inputted `u128` or bit pattern doesn't correspond to a field

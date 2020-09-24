@@ -10,7 +10,7 @@
 use crate::{
     errors::Error,
     ot::{RandomReceiver as ROTReceiver, RandomSender as ROTSender},
-    svole::{utils::to_fpr, CopeeReceiver, CopeeSender},
+    svole::{CopeeReceiver, CopeeSender},
 };
 use generic_array::typenum::Unsigned;
 use rand_core::{CryptoRng, RngCore};
@@ -108,14 +108,10 @@ impl<ROT: ROTSender<Msg = Block> + Malicious, FE: FF> CopeeSender for Sender<ROT
             let mut sum = FE::ZERO;
             for (k, two) in self.twos.iter().enumerate() {
                 let (prf0, prf1) = &self.aes_objs[j * self.nbits + k];
-                let mut w0 = prf::<FE>(prf0, pt);
+                let w0 = prf::<FE>(prf0, pt);
                 let w1 = prf::<FE>(prf1, pt);
-                let mut tmp = to_fpr::<FE>(w0);
-                tmp *= *two;
-                sum += tmp;
-                w0 -= w1;
-                w0 -= *input;
-                channel.write_fe(w0)?;
+                sum += two.multiply_by_prime_subfield(w0);
+                channel.write_fe(w0 - w1 - *input)?;
             }
             //channel.flush()?;
             sum *= *pow;
@@ -183,9 +179,7 @@ impl<ROT: ROTReceiver<Msg = Block> + Malicious, FE: FF> CopeeReceiver for Receiv
                 let choice = Choice::from(self.choices[j + k] as u8);
                 tau += w;
                 let v = FE::PrimeField::conditional_select(&w, &tau, choice);
-                let mut tmp = to_fpr::<FE>(v);
-                tmp *= *two;
-                sum += tmp;
+                sum += two.multiply_by_prime_subfield(v);
             }
             sum *= *pow;
             res += sum;
