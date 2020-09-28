@@ -75,11 +75,13 @@ macro_rules! test_field {
             use proptest::prelude::*;
             use std::ops::{Add, Mul, Sub};
             fn any_fe() -> impl Strategy<Value=$f> {
-                // TODO: this is _totally_ cheating, and we should probably do something more proper.
                 any::<u128>().prop_map(|seed| {
-                    use rand::SeedableRng;
-                    let mut rng = crate::AesRng::from_seed(crate::Block::from(seed));
-                    <$f>::random(&mut rng)
+                    <$f>::from_uniform_bytes(&seed.to_le_bytes())
+                })
+            }
+            fn any_prime_fe() -> impl Strategy<Value=<$f as FiniteField>::PrimeField> {
+                any::<u128>().prop_map(|seed| {
+                    <$f as FiniteField>::PrimeField::from_uniform_bytes(&seed.to_le_bytes())
                 })
             }
             test_associativity!(additive_associativity, any_fe, add);
@@ -164,6 +166,19 @@ macro_rules! test_field {
                     assert_eq!(
                         <$f>::from_polynomial_coefficients(make_polynomial_coefficients(&remainder)),
                         a * b,
+                    );
+                }
+            }
+
+            proptest! {
+                #[test]
+                fn lifted_polynomial_mul(a in any_fe(), b in any_prime_fe()) {
+                    let mut poly = make_polynomial(a.to_polynomial_coefficients());
+                    poly *= &make_polynomial(b.to_polynomial_coefficients());
+                    let (_, remainder) = poly.divmod(&<$f>::reduce_multiplication_over());
+                    assert_eq!(
+                        <$f>::from_polynomial_coefficients(make_polynomial_coefficients(&remainder)),
+                        a.multiply_by_prime_subfield(b),
                     );
                 }
             }

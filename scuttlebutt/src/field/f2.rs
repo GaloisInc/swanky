@@ -82,6 +82,10 @@ impl FiniteField for F2 {
     fn reduce_multiplication_over() -> Polynomial<Self::PrimeField> {
         Polynomial::x()
     }
+
+    fn multiply_by_prime_subfield(&self, pf: Self::PrimeField) -> Self {
+        self * pf
+    }
 }
 
 impl AddAssign<&F2> for F2 {

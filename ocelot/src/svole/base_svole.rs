@@ -9,7 +9,7 @@
 
 use crate::{
     errors::Error,
-    svole::{utils::to_fpr, CopeeReceiver, CopeeSender, SVoleReceiver, SVoleSender},
+    svole::{CopeeReceiver, CopeeSender, SVoleReceiver, SVoleSender},
 };
 use generic_array::typenum::Unsigned;
 use rand_core::{CryptoRng, RngCore};
@@ -70,12 +70,12 @@ impl<FE: FF, CP: CopeeSender<Msg = FE>> SVoleSender for Sender<CP, FE> {
         for i in 0..len {
             let chi = channel.read_fe::<FE>()?;
             z += chi * w[i];
-            x += chi * (to_fpr(u[i]));
+            x += chi.multiply_by_prime_subfield(u[i]);
         }
         x += a
             .iter()
             .zip(self.pows.iter())
-            .map(|(&a, &pow)| to_fpr::<FE>(a) * pow)
+            .map(|(&a, &pow)| pow.multiply_by_prime_subfield(a))
             .sum();
         channel.write_fe(x)?;
         channel.write_fe(z)?;

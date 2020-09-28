@@ -24,16 +24,12 @@ rand_core = "0.5"
 scuttlebutt = { path = "../scuttlebutt", features = ["curve25519-dalek"] }
 generic-array = "0.14"
 subtle = "2.2"
-num = "0.1"
-
 
 [build-dependencies]
 cc = "1.0"
 
 [dev-dependencies]
 criterion = "0.2"
-
-
 
 [[bench]]
 name = "ot"
@@ -62,7 +58,6 @@ harness = false
 path = "benches/eq.rs"
 name = "eq"
 harness = false
-
 
 [[example]]
 name = "kmprt"

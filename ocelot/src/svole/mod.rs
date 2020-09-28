@@ -122,16 +122,12 @@ mod tests {
             base_svole::{Receiver as VoleReceiver, Sender as VoleSender},
             copee::{Receiver as CpReceiver, Sender as CpSender},
             utils::to_fpr,
-            CopeeReceiver,
-            CopeeSender,
-            SVoleReceiver,
-            SVoleSender,
+            CopeeReceiver, CopeeSender, SVoleReceiver, SVoleSender,
         },
     };
     use scuttlebutt::{
         field::{FiniteField as FF, Fp, Gf128, F2},
-        AesRng,
-        Channel,
+        AesRng, Channel,
     };
     use std::{
         io::{BufReader, BufWriter},
@@ -168,8 +164,7 @@ mod tests {
             .collect();
         let ws = handle.join().unwrap();
         for (w, v) in ws.iter().zip(vs.iter()) {
-            let mut delta = copee_receiver.delta();
-            delta *= to_fpr(input);
+            let mut delta = copee_receiver.delta().multiply_by_prime_subfield(input);
             delta += *v;
             assert_eq!(*w, delta);
         }
@@ -206,8 +201,7 @@ mod tests {
         let delta = vole.delta();
         let uw_s = handle.join().unwrap();
         for i in 0..len {
-            let mut right = delta.clone();
-            right *= to_fpr(uw_s[i].0);
+            let mut right = delta.multiply_by_prime_subfield(uw_s[i].0);
             right += vs[i];
             assert_eq!(uw_s[i].1, right);
         }
