@@ -139,7 +139,6 @@ impl<FE: FiniteField, SV: SVoleSender<Msg = FE>, SPS: SpsVoleSender<Msg = FE>> L
             let ac = self.spvole.send(channel, m, rng)?;
             let a: Vec<FE::PrimeField> = ac.iter().map(|&ac| ac.0).collect();
             let c: Vec<FE> = ac.iter().map(|&ac| ac.1).collect();
-            let (a, c) = ac.iter().cloned().unzip();
             e = [e, a].concat();
             t = [t, c].concat();
         }
