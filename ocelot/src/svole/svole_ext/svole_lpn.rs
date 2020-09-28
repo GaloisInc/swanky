@@ -56,7 +56,7 @@ pub fn code_gen<FE: FiniteField, RNG: CryptoRng + RngCore>(
     d: usize,
     rng: &mut RNG,
 ) -> Vec<Vec<FE>> {
-    let g = FE::GENERATOR;
+    //let g = FE::GENERATOR;
     let mut res: Vec<Vec<FE>> = vec![vec![FE::ZERO; cols]; rows];
     for i in 0..cols {
         for _j in 0..d {
@@ -64,9 +64,9 @@ pub fn code_gen<FE: FiniteField, RNG: CryptoRng + RngCore>(
             while (res[rand_ind])[i] != FE::ZERO {
                 rand_ind = rng.gen_range(0, rows);
             }
-            let nz_elt = g;
-            let fe = nz_elt.pow(rng.gen_range(0, FE::MULTIPLICATIVE_GROUP_ORDER));
-            (res[rand_ind])[i] = fe;
+            //let nz_elt = g;
+            //let fe = nz_elt.pow(rng.gen_range(0, FE::MULTIPLICATIVE_GROUP_ORDER));
+            (res[rand_ind])[i] = FE::ONE;
         }
     }
     res
@@ -137,6 +137,8 @@ impl<FE: FiniteField, SV: SVoleSender<Msg = FE>, SPS: SpsVoleSender<Msg = FE>> L
         let mut t = vec![FE::ZERO; self.cols];
         for _i in 0..weight {
             let ac = self.spvole.send(channel, m, rng)?;
+            let a: Vec<FE::PrimeField> = ac.iter().map(|&ac| ac.0).collect();
+            let c: Vec<FE> = ac.iter().map(|&ac| ac.1).collect();
             let (a, c) = ac.iter().cloned().unzip();
             e = [e, a].concat();
             t = [t, c].concat();
