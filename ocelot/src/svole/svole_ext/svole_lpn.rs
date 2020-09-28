@@ -18,7 +18,6 @@ use crate::{
             SpsVoleReceiver,
             SpsVoleSender,
         },
-        utils::to_fpr_vec,
         SVoleReceiver,
         SVoleSender,
     },
@@ -58,7 +57,6 @@ pub fn code_gen<FE: FiniteField, RNG: CryptoRng + RngCore>(
     rng: &mut RNG,
 ) -> Vec<Vec<FE>> {
     let g = FE::GENERATOR;
-    //let mut rng = AesRng::from_seed(seed);
     let mut res: Vec<Vec<FE>> = vec![vec![FE::ZERO; cols]; rows];
     for i in 0..cols {
         for _j in 0..d {
@@ -72,6 +70,13 @@ pub fn code_gen<FE: FiniteField, RNG: CryptoRng + RngCore>(
         }
     }
     res
+}
+
+fn matrix_mult<FE: FiniteField>(mat: &[FE::PrimeField], x: &[FE]) -> FE {
+    x.iter()
+        .zip(mat.iter())
+        .map(|(&x, &m)| x.multiply_by_prime_subfield(m))
+        .sum()
 }
 
 impl<FE: FiniteField, SV: SVoleSender<Msg = FE>, SPS: SpsVoleSender<Msg = FE>> LpnsVoleSender
@@ -142,7 +147,7 @@ impl<FE: FiniteField, SV: SVoleSender<Msg = FE>, SPS: SpsVoleSender<Msg = FE>> L
             .collect();
         x = x.iter().zip(e.iter()).map(|(&x, &e)| x + e).collect();
         let mut z: Vec<FE> = (0..self.rows)
-            .map(|i| dot_product(self.w.iter(), to_fpr_vec(&a[i]).iter()))
+            .map(|i| matrix_mult(&a[i], &self.w))
             .collect();
         z = z.iter().zip(t.iter()).map(|(&z, &t)| z + t).collect();
         for i in 0..self.rows {
@@ -209,7 +214,7 @@ impl<FE: FiniteField, SV: SVoleReceiver<Msg = FE>, SPS: SpsVoleReceiver<Msg = FE
             s = [s, b].concat();
         }
         let mut y: Vec<FE> = (0..self.rows)
-            .map(|i| dot_product(self.v.iter(), to_fpr_vec(&self.matrix[i]).iter()))
+            .map(|i| matrix_mult(&self.matrix[i], &self.v))
             .collect();
         y = y.iter().zip(s.iter()).map(|(&y, &s)| y + s).collect();
         let output = y.iter().take(self.cols - self.rows).copied().collect();
