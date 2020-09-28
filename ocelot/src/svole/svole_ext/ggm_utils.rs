@@ -4,7 +4,6 @@
 // Copyright © 2020 Galois, Inc.
 // See LICENSE for licensing information.
 
-use num::pow;
 use rand::{Rng, SeedableRng};
 use scuttlebutt::{field::FiniteField, utils::unpack_bits, AesRng, Block};
 use std::collections::VecDeque;
@@ -134,7 +133,7 @@ pub fn ggm_prime<FE: FiniteField>(alpha: usize, keys: &[Block]) -> Vec<FE> {
 fn bv_to_u128(v: &[bool]) -> u128 {
     v.iter()
         .enumerate()
-        .map(|(i, &v)| pow(2, i) * v as u128)
+        .map(|(i, &v)| (1 << i) * v as u128)
         .sum()
 }
 
