@@ -57,7 +57,7 @@ fn prg(depth: usize, seed: Block) -> Vec<Block> {
 /// elements that represent seeds of the last level.
 pub fn ggm<FE: FiniteField>(depth: usize, seed: Block) -> (Vec<FE>, Vec<(Block, Block)>) {
     let seeds = prg(depth, seed);
-    println!("seeds = {:?}", seeds);
+    // println!("seeds = {:?}", seeds);
     let mut keys: Vec<(Block, Block)> = vec![Default::default(); depth];
     for (i, item) in keys.iter_mut().enumerate().take(depth) {
         let mut k0 = Default::default();

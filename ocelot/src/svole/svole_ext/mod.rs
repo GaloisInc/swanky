@@ -188,7 +188,6 @@ mod tests {
                 SpsVoleReceiver,
                 SpsVoleSender,
             },
-            utils::to_fpr,
         },
     };
     use scuttlebutt::{
@@ -225,7 +224,7 @@ mod tests {
         let vs = vole.receive(&mut channel, len, &mut rng).unwrap();
         let uws = handle.join().unwrap();
         for i in 0..len as usize {
-            let right = vole.delta() * to_fpr(uws[i].0) + vs[i];
+            let right = vole.delta().multiply_by_prime_subfield(uws[i].0) + vs[i];
             assert_eq!(uws[i].1, right);
         }
     }
@@ -277,7 +276,7 @@ mod tests {
         let vs = vole.receive(&mut channel, len, &mut rng).unwrap();
         let uws = handle.join().unwrap();
         for i in 0..len as usize {
-            let right = vole.delta() * to_fpr(uws[i].0) + vs[i];
+            let right = vole.delta().multiply_by_prime_subfield(uws[i].0) + vs[i];
             assert_eq!(uws[i].1, right);
         }
     }

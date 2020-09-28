@@ -15,7 +15,12 @@ use crate::{
 use generic_array::typenum::Unsigned;
 use rand_core::{CryptoRng, RngCore};
 use scuttlebutt::{
-    field::FiniteField as FF, utils::unpack_bits, AbstractChannel, Aes128, Block, Malicious,
+    field::FiniteField as FF,
+    utils::unpack_bits,
+    AbstractChannel,
+    Aes128,
+    Block,
+    Malicious,
 };
 use std::marker::PhantomData;
 

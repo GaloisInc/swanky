@@ -18,7 +18,6 @@ use crate::{
             SpsVoleReceiver,
             SpsVoleSender,
         },
-        utils::to_fpr,
         SVoleReceiver,
         SVoleSender,
     },
@@ -199,7 +198,7 @@ impl<
         let n = len as usize;
         let b = self.svole.receive(channel, 1, rng)?[0];
         let a_prime = channel.read_fe::<FE::PrimeField>()?;
-        let gamma = b - self.delta * to_fpr(a_prime);
+        let gamma = b - self.delta.multiply_by_prime_subfield(a_prime);
         let seed = rand::random::<Block>();
         let (vs, keys) = ggm::<FE>(depth as usize, seed);
         self.ot.send(channel, &keys, rng)?;
@@ -225,7 +224,7 @@ impl<
         let ys: Vec<FE> = y_star
             .into_iter()
             .zip(x_star.into_iter())
-            .map(|(y, x)| y - self.delta * to_fpr::<FE>(x))
+            .map(|(y, x)| y - self.delta.multiply_by_prime_subfield(x))
             .collect();
         // sets Y
         let y = dot_product(ys.into_iter(), self.pows.clone().into_iter());
