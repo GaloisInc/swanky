@@ -4,7 +4,7 @@
 // Copyright © 2019 Galois, Inc.
 // See LICENSE for licensing information.
 
-use criterion::{criterion_group, criterion_main, Criterion};
+use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use scuttlebutt::{AesHash, Block};
 use std::time::Duration;
 
@@ -14,8 +14,8 @@ fn bench_cr_hash(c: &mut Criterion) {
         let x = rand::random::<Block>();
         let i = rand::random::<Block>();
         b.iter(|| {
-            let z = hash.cr_hash(i, x);
-            criterion::black_box(z)
+            let z = hash.cr_hash(black_box(i), black_box(x));
+            black_box(z)
         });
     });
 }
@@ -26,8 +26,8 @@ fn bench_ccr_hash(c: &mut Criterion) {
         let x = rand::random::<Block>();
         let i = rand::random::<Block>();
         b.iter(|| {
-            let z = hash.ccr_hash(i, x);
-            criterion::black_box(z)
+            let z = hash.ccr_hash(black_box(i), black_box(x));
+            black_box(z)
         });
     });
 }
@@ -38,8 +38,8 @@ fn bench_tccr_hash(c: &mut Criterion) {
         let x = rand::random::<Block>();
         let i = rand::random::<Block>();
         b.iter(|| {
-            let z = hash.tccr_hash(i, x);
-            criterion::black_box(z)
+            let z = hash.tccr_hash(black_box(i), black_box(x));
+            black_box(z)
         });
     });
 }

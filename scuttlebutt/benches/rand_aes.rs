@@ -4,7 +4,7 @@
 // Copyright © 2019 Galois, Inc.
 // See LICENSE for licensing information.
 
-use criterion::{criterion_group, criterion_main, Criterion};
+use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use rand_core::RngCore;
 use scuttlebutt::AesRng;
 use std::time::Duration;
@@ -15,7 +15,7 @@ fn bench_aes_rand(c: &mut Criterion) {
         let mut x = (0..16 * 1024)
             .map(|_| rand::random::<u8>())
             .collect::<Vec<u8>>();
-        b.iter(|| rng.fill_bytes(&mut x));
+        b.iter(|| rng.fill_bytes(black_box(&mut x)));
     });
 }
 
