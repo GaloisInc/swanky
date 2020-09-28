@@ -9,11 +9,11 @@ use scuttlebutt::{field::FiniteField, utils::unpack_bits, AesRng, Block};
 use std::collections::VecDeque;
 
 /// Returns dot product of two vectors.
-pub fn dot_product<FE: FiniteField, A: Iterator<Item = FE>, B: Iterator<Item = FE>>(
+pub fn dot_product<'a, FE: FiniteField, A: Iterator<Item = &'a FE>, B: Iterator<Item = &'a FE>>(
     x: A,
     y: B,
 ) -> FE {
-    x.zip(y).map(|(x_, y_)| x_ * y_).sum()
+    x.zip(y).map(|(u, v)| *u * *v).sum()
 }
 
 /// Construct GGM tree with `h` levels and return the node values (a.k.a seeds). Although, the
@@ -149,7 +149,7 @@ mod tests {
         assert_eq!(bv_to_u128(&bv), x);
     }
 
-    /*#[test]
+    #[test]
     fn test_ggm() {
         for _ in 0..10 {
             let seed = Default::default();
@@ -180,5 +180,5 @@ mod tests {
                 }
             }
         }
-    }*/
+    }
 }

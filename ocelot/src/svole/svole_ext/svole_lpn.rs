@@ -51,9 +51,14 @@ pub struct Receiver<FE: FiniteField, SV: SVoleReceiver, SPS: SpsVoleReceiver> {
 }
 
 /// Code generator that outputs matrix A for the given dimension `k` by `n` that each column of it has uniform `d` non-zero entries.
-pub fn code_gen<FE: FiniteField>(rows: usize, cols: usize, d: usize, seed: Block) -> Vec<Vec<FE>> {
+pub fn code_gen<FE: FiniteField, RNG: CryptoRng + RngCore>(
+    rows: usize,
+    cols: usize,
+    d: usize,
+    rng: &mut RNG,
+) -> Vec<Vec<FE>> {
     let g = FE::GENERATOR;
-    let mut rng = AesRng::from_seed(seed);
+    //let mut rng = AesRng::from_seed(seed);
     let mut res: Vec<Vec<FE>> = vec![vec![FE::ZERO; cols]; rows];
     for i in 0..cols {
         for _j in 0..d {
@@ -94,7 +99,8 @@ impl<FE: FiniteField, SV: SVoleSender<Msg = FE>, SPS: SpsVoleSender<Msg = FE>> L
         let u = uw.iter().map(|&uw| uw.0).collect();
         let w = uw.iter().map(|&uw| uw.1).collect();
         let matrix_seed = rand::random::<Block>();
-        let matrix = code_gen::<FE::PrimeField>(rows, cols, d, matrix_seed);
+        let mut mat_rng = AesRng::from_seed(matrix_seed);
+        let matrix = code_gen::<FE::PrimeField, _>(rows, cols, d, &mut mat_rng);
         channel.write_block(&matrix_seed)?;
         channel.flush()?;
         let spvole_sender = SPS::init(channel, rng)?;
@@ -125,18 +131,18 @@ impl<FE: FiniteField, SV: SVoleSender<Msg = FE>, SPS: SpsVoleSender<Msg = FE>> L
         let mut e = vec![FE::PrimeField::ZERO; self.cols];
         let mut t = vec![FE::ZERO; self.cols];
         for _i in 0..weight {
-            let ac = self.spvole.send(channel, m as u128, rng)?;
+            let ac = self.spvole.send(channel, m, rng)?;
             let (a, c) = ac.iter().cloned().unzip();
             e = [e, a].concat();
             t = [t, c].concat();
         }
         let a = &self.matrix;
         let mut x: Vec<FE::PrimeField> = (0..self.rows)
-            .map(|i| dot_product(self.u.clone().into_iter(), a[i].clone().into_iter()))
+            .map(|i| dot_product(self.u.iter(), a[i].iter()))
             .collect();
-        x = x.iter().zip(e.iter()).map(|(&x_, &e_)| x_ + e_).collect();
+        x = x.iter().zip(e.iter()).map(|(&x, &e)| x + e).collect();
         let mut z: Vec<FE> = (0..self.rows)
-            .map(|i| dot_product(self.w.clone().into_iter(), to_fpr_vec(&a[i]).into_iter()))
+            .map(|i| dot_product(self.w.iter(), to_fpr_vec(&a[i]).iter()))
             .collect();
         z = z.iter().zip(t.iter()).map(|(&z, &t)| z + t).collect();
         for i in 0..self.rows {
@@ -173,7 +179,8 @@ impl<FE: FiniteField, SV: SVoleReceiver<Msg = FE>, SPS: SpsVoleReceiver<Msg = FE
         let v = svole_receiver.receive(channel, rows, rng)?;
         let delta = svole_receiver.delta();
         let matrix_seed = channel.read_block()?;
-        let matrix = code_gen::<FE::PrimeField>(rows, cols, d, matrix_seed);
+        let mut mat_rng = AesRng::from_seed(matrix_seed);
+        let matrix = code_gen::<FE::PrimeField, _>(rows, cols, d, &mut mat_rng);
         let spvole_receiver = SPS::init(channel, rng)?;
         Ok(Self {
             _sv: PhantomData::<SV>,
@@ -198,16 +205,11 @@ impl<FE: FiniteField, SV: SVoleReceiver<Msg = FE>, SPS: SpsVoleReceiver<Msg = FE
         let m = self.cols / weight;
         let mut s = vec![FE::ZERO; self.cols];
         for _i in 0..weight {
-            let b = self.spvole.receive(channel, m as u128, rng)?;
+            let b = self.spvole.receive(channel, m, rng)?;
             s = [s, b].concat();
         }
         let mut y: Vec<FE> = (0..self.rows)
-            .map(|i| {
-                dot_product(
-                    self.v.clone().into_iter(),
-                    to_fpr_vec(&self.matrix[i]).into_iter(),
-                )
-            })
+            .map(|i| dot_product(self.v.iter(), to_fpr_vec(&self.matrix[i]).iter()))
             .collect();
         y = y.iter().zip(s.iter()).map(|(&y, &s)| y + s).collect();
         let output = y.iter().take(self.cols - self.rows).copied().collect();

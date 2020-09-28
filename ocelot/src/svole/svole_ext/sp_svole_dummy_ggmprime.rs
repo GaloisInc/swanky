@@ -68,31 +68,31 @@ impl<
     ) -> Result<Self, Error> {
         let g = FE::GENERATOR;
         let r = FE::PolynomialFormNumCoefficients::to_usize();
-        let ot_receiver = OT::init(channel, rng)?;
+        let ot = OT::init(channel, rng)?;
         let mut acc = FE::ONE;
         let mut pows = vec![FE::ZERO; r];
         for item in pows.iter_mut().take(r) {
             *item = acc;
             acc *= g;
         }
-        let svole_sender = SV::init(channel, rng)?;
+        let svole = SV::init(channel, rng)?;
         Ok(Self {
             _eq: PhantomData::<EQ>,
             pows,
-            svole: svole_sender,
-            ot: ot_receiver,
+            svole,
+            ot,
         })
     }
 
     fn send<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         &mut self,
         channel: &mut C,
-        len: u128,
+        len: usize,
         rng: &mut RNG,
     ) -> Result<Vec<(FE::PrimeField, FE)>, Error> {
         let r = FE::PolynomialFormNumCoefficients::to_usize();
-        let depth = 128 - (len - 1).leading_zeros() as usize;
-        let n = len as usize;
+        let depth = 128 - (len as u128 - 1).leading_zeros() as usize;
+        let n = len;
         let (a, delta) = self.svole.send(channel, 1, rng)?[0];
         let g = FE::PrimeField::GENERATOR;
         let beta = g;
@@ -123,13 +123,14 @@ impl<
         ws[alpha] = delta - (d + sum);
         // Consistency check
         let xz = self.svole.send(channel, r, rng)?;
-        let (xs, zs): (Vec<FE::PrimeField>, Vec<FE>) = xz.iter().cloned().unzip();
+        let xs: Vec<FE::PrimeField> = xz.iter().map(|&x| x.0).collect();
+        let zs: Vec<FE> = xz.iter().map(|&x| x.1).collect();
         let chis: Vec<FE> = (0..n).map(|_| FE::random(rng)).collect();
         let chi_alpha: Vec<FE::PrimeField> = chis[alpha].to_polynomial_coefficients().to_vec();
         let x_stars: Vec<FE::PrimeField> = chi_alpha
             .iter()
-            .zip(xs.iter().cloned())
-            .map(|(&chi_alpha, x)| chi_alpha * beta - x)
+            .zip(xs.iter())
+            .map(|(&chi_alpha, x)| chi_alpha * beta - *x)
             .collect();
         for chi in chis.iter() {
             channel.write_fe(*chi)?;
@@ -137,15 +138,15 @@ impl<
         for x in x_stars.iter() {
             channel.write_fe(*x)?;
         }
-        let z = dot_product(zs.into_iter(), self.pows.clone().into_iter());
-        let va = dot_product(chis.into_iter(), ws.clone().into_iter()) - z;
+        let z = dot_product(zs.iter(), self.pows.iter());
+        let va = dot_product(chis.iter(), ws.iter()) - z;
         let mut sender = EQ::init()?;
         let b = sender.send(channel, &va)?;
         if b {
             let res = us.iter().zip(ws.iter()).map(|(&u, &w)| (u, w)).collect();
             Ok(res)
         } else {
-            Err(Error::Other("EQ check fails".to_string()))
+            Err(Error::EqCheckFailed)
         }
     }
 }
@@ -163,7 +164,7 @@ impl<
         channel: &mut C,
         mut rng: &mut RNG,
     ) -> Result<Self, Error> {
-        let ot_sender = OT::init(channel, &mut rng)?;
+        let ot = OT::init(channel, &mut rng)?;
         let r = FE::PolynomialFormNumCoefficients::to_usize();
         let g = FE::GENERATOR;
         let mut acc = FE::ONE;
@@ -172,14 +173,14 @@ impl<
             *item = acc;
             acc *= g;
         }
-        let sv_receiver = SV::init(channel, rng)?;
-        let delta = sv_receiver.delta();
+        let svole = SV::init(channel, rng)?;
+        let delta = svole.delta();
         Ok(Self {
             _eq: PhantomData::<EQ>,
             pows,
             delta,
-            ot: ot_sender,
-            svole: sv_receiver,
+            ot,
+            svole,
         })
     }
 
@@ -190,12 +191,12 @@ impl<
     fn receive<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         &mut self,
         channel: &mut C,
-        len: u128,
+        len: usize,
         rng: &mut RNG,
     ) -> Result<Vec<FE>, Error> {
         let r = FE::PolynomialFormNumCoefficients::to_usize();
-        let depth = 128 - (len - 1).leading_zeros();
-        let n = len as usize;
+        let depth = 128 - (len as u128 - 1).leading_zeros();
+        let n = len;
         let b = self.svole.receive(channel, 1, rng)?[0];
         let a_prime = channel.read_fe::<FE::PrimeField>()?;
         let gamma = b - self.delta.multiply_by_prime_subfield(a_prime);
@@ -227,14 +228,14 @@ impl<
             .map(|(y, x)| y - self.delta.multiply_by_prime_subfield(x))
             .collect();
         // sets Y
-        let y = dot_product(ys.into_iter(), self.pows.clone().into_iter());
-        let vb = dot_product(chi.into_iter(), vs.clone().into_iter()) - y;
+        let y = dot_product(ys.iter(), self.pows.iter());
+        let vb = dot_product(chi.iter(), vs.iter()) - y;
         let mut receiver = EQ::init()?;
         let res = receiver.receive(channel, rng, &vb)?;
         if res {
             Ok(vs)
         } else {
-            Err(Error::Other("EQ check fails".to_string()))
+            Err(Error::EqCheckFailed)
         }
     }
 }

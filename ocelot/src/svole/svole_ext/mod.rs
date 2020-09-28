@@ -9,7 +9,7 @@
 
 pub mod eq;
 /// GGM related helper functions.
-pub mod ggm_utils;
+mod ggm_utils;
 pub mod sp_svole_dummy_ggmprime;
 pub mod svole_lpn;
 
@@ -77,7 +77,7 @@ where
     fn send<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         &mut self,
         channel: &mut C,
-        len: u128,
+        len: usize,
         rng: &mut RNG,
     ) -> Result<Vec<(<Self::Msg as FF>::PrimeField, Self::Msg)>, Error>;
 }
@@ -105,7 +105,7 @@ where
     fn receive<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         &mut self,
         channel: &mut C,
-        len: u128,
+        len: usize,
         rng: &mut RNG,
     ) -> Result<Vec<Self::Msg>, Error>;
 }
@@ -205,7 +205,7 @@ mod tests {
         SPSender: SpsVoleSender<Msg = FE>,
         SPReceiver: SpsVoleReceiver<Msg = FE>,
     >(
-        len: u128,
+        len: usize,
     ) {
         let (sender, receiver) = UnixStream::pair().unwrap();
         let handle = std::thread::spawn(move || {

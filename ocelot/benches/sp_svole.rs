@@ -66,7 +66,7 @@ fn bench_svole<
 >(
     spvole_sender: &Arc<Mutex<SPSender>>,
     spvole_receiver: &Arc<Mutex<SPReceiver>>,
-    len: u128,
+    len: usize,
 ) {
     let (sender, receiver) = UnixStream::pair().unwrap();
     let spvole_sender = spvole_sender.clone();
