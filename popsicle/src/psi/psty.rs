@@ -43,21 +43,30 @@ pub type Msg = Vec<u8>;
 /// Private set intersection sender.
 pub struct Sender {
     opprf: KmprtSender,
+    opprf_payload: KmprtSender,
 }
 
 /// State of the sender.
 pub struct SenderState {
     opprf_outputs: Vec<Block512>,
+    opprf_payload_outputs: Vec<Block512>,
+    table: Vec<Vec<Block>>,
+    mapping: Vec<Vec<usize>>,
+    input_size: usize,
+    payload_size: usize,
 }
 
 /// Private set intersection receiver.
 pub struct Receiver {
     opprf: KmprtReceiver,
+    opprf_payload: KmprtReceiver,
 }
 
 /// State of the receiver.
 pub struct ReceiverState {
     opprf_outputs: Vec<Block512>,
+    opprf_payload_outputs: Vec<Block512>,
+    table: Vec<Block>,
     cuckoo: CuckooHash,
     inputs: Vec<Msg>,
 }
@@ -69,7 +78,9 @@ impl Sender {
         rng: &mut RNG,
     ) -> Result<Self, Error> {
         let opprf = KmprtSender::init(channel, rng)?;
-        Ok(Self { opprf })
+        let opprf_payload = KmprtSender::init(channel, rng)?;
+
+        Ok(Self { opprf, opprf_payload })
     }
 
     /// Run the PSI protocol over `inputs`.
@@ -79,6 +90,7 @@ impl Sender {
         channel: &mut C,
         rng: &mut RNG,
     ) -> Result<SenderState, Error> {
+
         // receive cuckoo hash info from sender
         let key = channel.read_block()?;
         let hashes = utils::compress_and_hash_inputs(inputs, key);
@@ -87,24 +99,30 @@ impl Sender {
         let nbins = channel.read_usize()?;
         let mut table = vec![Vec::new(); nbins];
 
-        for &x in &hashes {
+        // stores how elements are mapped to bin for
+        // later use in payload computation
+        let mut mapping = vec![Vec::new(); nbins];
+
+        for (index, &x) in hashes.iter().enumerate()  {
             let mut bins = Vec::with_capacity(NHASHES);
             for h in 0..NHASHES {
                 let bin = CuckooHash::bin(x, h, nbins);
                 table[bin].push(x ^ Block::from(h as u128));
                 bins.push(bin);
+                mapping[bin].push(index);
             }
+
             // if j = H1(y) = H2(y) for some y, then P2 adds a uniformly random element to
             // table2[j].
             if bins.iter().skip(1).all(|&x| x == bins[0]) {
                 table[bins[0]].push(rng.gen());
+                mapping[bins[0]].push(index);
             }
         }
 
         // select the target values
         let ts = (0..nbins).map(|_| rng.gen::<Block512>()).collect_vec();
-
-        let points = table
+        let points = table.clone()
             .into_iter()
             .zip_eq(ts.iter())
             .flat_map(|(bin, t)| {
@@ -112,17 +130,26 @@ impl Sender {
                 bin.into_iter().map(move |item| (item, *t))
             })
             .collect_vec();
-
+            // println!("ts {:?}", ts);
+            // println!("table {:?}", points);
+        // println!("points {:?}", points);
         self.opprf.send(channel, &points, nbins, rng)?;
 
-        Ok(SenderState { opprf_outputs: ts })
+        Ok(SenderState {
+            opprf_outputs: ts,
+            opprf_payload_outputs: Vec::new(),
+            table,
+            mapping,
+            input_size: hashes.len(),
+            payload_size: 0,
+        })
     }
 }
 
 impl SenderState {
     /// Run the setup phase, producing a garbler for the next stage.
     pub fn compute_setup<C, RNG>(
-        &self,
+        & self,
         channel: &mut C,
         rng: &mut RNG,
     ) -> Result<(Garbler<C, RNG, OtSender>, Vec<Wire>, Vec<Wire>), Error>
@@ -131,7 +158,33 @@ impl SenderState {
         RNG: RngCore + CryptoRng + SeedableRng<Seed = Block>,
     {
         let mut gb = Garbler::<C, RNG, OtSender>::new(channel.clone(), RNG::from_seed(rng.gen()))?;
-        let my_input_bits = encode_inputs(&self.opprf_outputs);
+
+        let mut my_input_bits = encode_inputs(&self.opprf_outputs);
+
+        let mods = vec![2; my_input_bits.len()]; // all binary moduli
+        let sender_inputs = gb.encode_many(&my_input_bits, &mods)?;
+        let receiver_inputs = gb.receive_many(&mods)?;
+        Ok((gb, sender_inputs, receiver_inputs))
+    }
+
+    pub fn compute_payloads_setup<C, RNG>(
+        &mut self,
+        channel: &mut C,
+        rng: &mut RNG,
+    ) -> Result<(Garbler<C, RNG, OtSender>, Vec<Wire>, Vec<Wire>), Error>
+    where
+        C: AbstractChannel,
+        RNG: RngCore + CryptoRng + SeedableRng<Seed = Block>,
+    {
+        let mut gb = Garbler::<C, RNG, OtSender>::new(channel.clone(), RNG::from_seed(rng.gen()))?;
+
+        let mut my_input_bits = encode_inputs(&self.opprf_outputs);
+        let mut my_payload_bits = encode_inputs(&self.opprf_payload_outputs);
+        self.input_size = my_input_bits.len();
+        self.payload_size = my_payload_bits.len();
+
+        my_input_bits.append(&mut my_payload_bits);
+
         let mods = vec![2; my_input_bits.len()]; // all binary moduli
         let sender_inputs = gb.encode_many(&my_input_bits, &mods)?;
         let receiver_inputs = gb.receive_many(&mods)?;
@@ -184,6 +237,53 @@ impl SenderState {
         }
         Ok(payloads)
     }
+
+    pub fn prepare_payload<C, RNG>(
+        &self,
+        sender: &mut Sender,
+        payloads: &[Block512],
+        channel: &mut C,
+        rng: &mut RNG,
+    ) -> Result<(), Error>
+    where
+        C: AbstractChannel,
+        RNG: RngCore + CryptoRng + SeedableRng<Seed = Block>,
+    {
+        let nbins = self.mapping.len();
+
+        let mut payload_table = vec![Vec::new(); nbins];
+        let ts = (0..nbins).map(|_| rng.gen::<Block512>()).collect_vec();
+
+        for (index, bin) in self.mapping.iter().enumerate(){
+            let mut prev_element = bin.len();
+            for element in bin{
+                let mut payload_byte;
+                if *element == prev_element {
+                    payload_byte = payloads[*element];
+                }else{ // j = H1(y) = H2(y) append a random payload
+                    payload_byte = rng.gen::<Block512>();
+                }
+                let p = payload_byte ^ ts[index];
+                payload_table[index].push(p);
+                prev_element = *element;
+            }
+        }
+
+        let mut points = Vec::new();
+        for (row, bin) in self.table.iter().enumerate() {
+            for (col, item) in bin.iter().enumerate() {
+                points.push((*item, payload_table[row][col]));
+            }
+        }
+
+        // println!("{:?}",points);
+
+        sender.opprf_payload.send(channel, &points, nbins, rng)?;
+        // println!("payload_table size {:?}", payload_table[0].len());
+        // println!("payload_table {:?}", points);
+        // println!("points {:?}", payload_table);
+        Ok(())
+    }
 }
 
 impl Receiver {
@@ -193,8 +293,9 @@ impl Receiver {
         rng: &mut RNG,
     ) -> Result<Self, Error> {
         let opprf = KmprtReceiver::init(channel, rng)?;
-        Ok(Self { opprf })
-    }
+        let opprf_payload = KmprtReceiver::init(channel, rng)?;
+
+        Ok(Self { opprf, opprf_payload })}
 
     /// Run the PSI protocol over `inputs`.
     pub fn receive<C: AbstractChannel, RNG: RngCore + CryptoRng + SeedableRng>(
@@ -227,6 +328,8 @@ impl Receiver {
 
         Ok(ReceiverState {
             opprf_outputs,
+            opprf_payload_outputs: Vec::new(),
+            table,
             cuckoo,
             inputs: inputs.to_vec(),
         })
@@ -246,6 +349,7 @@ impl ReceiverState {
     {
         let nbins = self.cuckoo.nbins;
         let my_input_bits = encode_inputs(&self.opprf_outputs);
+        let my_payload_bits = encode_inputs(&self.opprf_payload_outputs);
 
         let mut ev =
             Evaluator::<C, RNG, OtReceiver>::new(channel.clone(), RNG::from_seed(rng.gen()))?;
@@ -340,6 +444,21 @@ impl ReceiverState {
         channel.flush()?;
         Ok(())
     }
+
+    pub fn prepare_payload<C, RNG>(
+        &self,
+        receiver: &mut Receiver,
+        payloads: &[Block512],
+        channel: &mut C,
+        rng: &mut RNG,
+    ) -> Result<(), Error>
+    where
+        C: AbstractChannel,
+        RNG: RngCore + CryptoRng + SeedableRng<Seed = Block>,
+    {
+        receiver.opprf.receive(channel, &self.table, rng)?;
+        Ok(())
+    }
 }
 
 fn encode_inputs(opprf_outputs: &[Block512]) -> Vec<u16> {
@@ -370,6 +489,7 @@ fn fancy_compute_intersection<F: Fancy>(
             )
         })
         .collect()
+
 }
 
 /// Fancy function to compute the cardinaility and return CRT value containing the result
