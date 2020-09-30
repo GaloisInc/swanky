@@ -35,11 +35,12 @@ use std::{
 
 /// Specifies the LPN parameters such as number of rows, columns of the matrix that each column of it is uniform subjective to have
 ///  `d` number of non-zero entries.
-
-const ROWS: usize = 1 << 7;
+/// `COLS`, `WEIGHT` should be power of `2` and `COLS >> ROWS`, `COLS >> WEIGHT` such that `COLS % WEIGHT == 0`.
+const ROWS: usize = 1 << 1; // not necessarily power of `2`
 const COLS: usize = 1 << 8;
-const D: usize = 8;
-const LEN: usize = COLS - ROWS;
+const WEIGHT: usize = COLS >> 7;
+/// This value suggested in the Table 2 (cf. <https://eprint.iacr.org/2020/924>, page 20).
+const D: usize = 10;
 
 type CPSender<FE> = CpSender<KosSender, FE>;
 type CPReceiver<FE> = CpReceiver<KosReceiver, FE>;
@@ -86,7 +87,7 @@ fn bench_svole<
 >(
     vole_sender: &Arc<Mutex<VSender>>,
     vole_receiver: &Arc<Mutex<VReceiver>>,
-    len: usize,
+    weight: usize,
 ) {
     let (sender, receiver) = UnixStream::pair().unwrap();
     let vole_sender = vole_sender.clone();
@@ -96,14 +97,14 @@ fn bench_svole<
         let writer = BufWriter::new(sender);
         let mut channel = Channel::new(reader, writer);
         let mut vole_sender = vole_sender.lock().unwrap();
-        black_box(vole_sender.send(&mut channel, len, &mut rng)).unwrap();
+        black_box(vole_sender.send(&mut channel, weight, &mut rng)).unwrap();
     });
     let mut rng = AesRng::new();
     let reader = BufReader::new(receiver.try_clone().unwrap());
     let writer = BufWriter::new(receiver);
     let mut channel = Channel::new(reader, writer);
     let mut vole_receiver = vole_receiver.lock().unwrap();
-    black_box(vole_receiver.receive(&mut channel, len, &mut rng)).unwrap();
+    black_box(vole_receiver.receive(&mut channel, weight, &mut rng)).unwrap();
     handle.join().unwrap();
 }
 
@@ -111,7 +112,7 @@ fn bench_svole_fp(c: &mut Criterion) {
     c.bench_function("lpn_svole::extend::Fp", move |bench| {
         let (vole_sender, vole_receiver) = svole_init(ROWS, COLS, D);
         bench.iter(move || {
-            bench_svole::<VSender<Fp>, VReceiver<Fp>>(&vole_sender, &vole_receiver, LEN);
+            bench_svole::<VSender<Fp>, VReceiver<Fp>>(&vole_sender, &vole_receiver, WEIGHT);
         })
     });
 }
@@ -120,7 +121,7 @@ fn bench_svole_gf128(c: &mut Criterion) {
     c.bench_function("lpn_svole::extend::Gf128", move |bench| {
         let (vole_sender, vole_receiver) = svole_init(ROWS, COLS, D);
         bench.iter(move || {
-            bench_svole::<VSender<Gf128>, VReceiver<Gf128>>(&vole_sender, &vole_receiver, LEN);
+            bench_svole::<VSender<Gf128>, VReceiver<Gf128>>(&vole_sender, &vole_receiver, WEIGHT);
         })
     });
 }
@@ -129,7 +130,7 @@ fn bench_svole_f2(c: &mut Criterion) {
     c.bench_function("lpn_svole::extend::F2", move |bench| {
         let (vole_sender, vole_receiver) = svole_init(ROWS, COLS, D);
         bench.iter(move || {
-            bench_svole::<VSender<F2>, VReceiver<F2>>(&vole_sender, &vole_receiver, LEN);
+            bench_svole::<VSender<F2>, VReceiver<F2>>(&vole_sender, &vole_receiver, WEIGHT);
         })
     });
 }

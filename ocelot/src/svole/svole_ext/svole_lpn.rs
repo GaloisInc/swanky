@@ -18,11 +18,11 @@ use crate::{
             SpsVoleReceiver,
             SpsVoleSender,
         },
+        utils::{code_gen, dot_product_with_subfield},
         SVoleReceiver,
         SVoleSender,
     },
 };
-use rand::Rng;
 use rand_core::{CryptoRng, RngCore, SeedableRng};
 use scuttlebutt::{field::FiniteField, AbstractChannel, AesRng, Block};
 use std::marker::PhantomData;
@@ -47,36 +47,6 @@ pub struct Receiver<FE: FiniteField, SV: SVoleReceiver, SPS: SpsVoleReceiver> {
     cols: usize,
     v: Vec<FE>,
     matrix: Vec<Vec<FE::PrimeField>>,
-}
-
-/// Code generator that outputs matrix A for the given dimension `k` by `n` that each column of it has uniform `d` non-zero entries.
-pub fn code_gen<FE: FiniteField, RNG: CryptoRng + RngCore>(
-    rows: usize,
-    cols: usize,
-    d: usize,
-    rng: &mut RNG,
-) -> Vec<Vec<FE>> {
-    //let g = FE::GENERATOR;
-    let mut res: Vec<Vec<FE>> = vec![vec![FE::ZERO; cols]; rows];
-    for i in 0..cols {
-        for _j in 0..d {
-            let mut rand_ind = rng.gen_range(0, rows);
-            while (res[rand_ind])[i] != FE::ZERO {
-                rand_ind = rng.gen_range(0, rows);
-            }
-            //let nz_elt = g;
-            //let fe = nz_elt.pow(rng.gen_range(0, FE::MULTIPLICATIVE_GROUP_ORDER));
-            (res[rand_ind])[i] = FE::ONE;
-        }
-    }
-    res
-}
-
-fn matrix_mult<FE: FiniteField>(mat: &[FE::PrimeField], x: &[FE]) -> FE {
-    x.iter()
-        .zip(mat.iter())
-        .map(|(&x, &m)| x.multiply_by_prime_subfield(m))
-        .sum()
 }
 
 impl<FE: FiniteField, SV: SVoleSender<Msg = FE>, SPS: SpsVoleSender<Msg = FE>> LpnsVoleSender
@@ -125,14 +95,14 @@ impl<FE: FiniteField, SV: SVoleSender<Msg = FE>, SPS: SpsVoleSender<Msg = FE>> L
         weight: usize,
         rng: &mut RNG,
     ) -> Result<Vec<(FE::PrimeField, FE)>, Error> {
-        if weight >= self.cols {
+        if self.cols % weight != 0 {
             return Err(Error::Other(
-                "The hamming weight of the error vector is greater than or equal 
-            to the length of the error vector `e`"
+                "The hamming weight of the error vector doesn't divide the error vector length `e`"
                     .to_string(),
             ));
         }
         let m = self.cols / weight;
+        let len = self.cols - self.rows;
         let mut e = vec![FE::PrimeField::ZERO; self.cols];
         let mut t = vec![FE::ZERO; self.cols];
         for _i in 0..weight {
@@ -143,19 +113,19 @@ impl<FE: FiniteField, SV: SVoleSender<Msg = FE>, SPS: SpsVoleSender<Msg = FE>> L
             t = [t, c].concat();
         }
         let a = &self.matrix;
-        let mut x: Vec<FE::PrimeField> = (0..self.rows)
+        let mut x: Vec<FE::PrimeField> = (0..self.cols)
             .map(|i| dot_product(self.u.iter(), a[i].iter()))
             .collect();
         x = x.iter().zip(e.iter()).map(|(&x, &e)| x + e).collect();
-        let mut z: Vec<FE> = (0..self.rows)
-            .map(|i| matrix_mult(&a[i], &self.w))
+        debug_assert!(x.len() == self.cols);
+        let mut z: Vec<FE> = (0..self.cols)
+            .map(|i| dot_product_with_subfield(&a[i], &self.w))
             .collect();
         z = z.iter().zip(t.iter()).map(|(&z, &t)| z + t).collect();
         for i in 0..self.rows {
             self.u[i] = x[i];
             self.w[i] = z[i];
         }
-        let len = self.cols - self.rows;
         let output = (0..len).map(|i| (x[i], z[i])).collect();
         Ok(output)
     }
@@ -208,16 +178,23 @@ impl<FE: FiniteField, SV: SVoleReceiver<Msg = FE>, SPS: SpsVoleReceiver<Msg = FE
         weight: usize,
         rng: &mut RNG,
     ) -> Result<Vec<FE>, Error> {
+        if self.cols % weight != 0 {
+            return Err(Error::Other(
+                "The hamming weight of the error vector doesn't divide the error vector length `e`"
+                    .to_string(),
+            ));
+        }
         let m = self.cols / weight;
         let mut s = vec![FE::ZERO; self.cols];
         for _i in 0..weight {
             let b = self.spvole.receive(channel, m, rng)?;
             s = [s, b].concat();
         }
-        let mut y: Vec<FE> = (0..self.rows)
-            .map(|i| matrix_mult(&self.matrix[i], &self.v))
+        let mut y: Vec<FE> = (0..self.cols)
+            .map(|i| dot_product_with_subfield(&self.matrix[i], &self.v))
             .collect();
         y = y.iter().zip(s.iter()).map(|(&y, &s)| y + s).collect();
+        debug_assert!(y.len() == self.cols);
         let output = y.iter().take(self.cols - self.rows).copied().collect();
         Ok(output)
     }

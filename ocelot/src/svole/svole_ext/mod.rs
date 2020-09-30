@@ -256,26 +256,26 @@ mod tests {
         rows: usize,
         cols: usize,
         d: usize,
+        weight: usize,
     ) {
         let (sender, receiver) = UnixStream::pair().unwrap();
-        let len = cols - rows;
-        debug_assert!(cols % 2 == 0);
+        debug_assert!(cols % weight == 0);
         let handle = std::thread::spawn(move || {
             let mut rng = AesRng::new();
             let reader = BufReader::new(sender.try_clone().unwrap());
             let writer = BufWriter::new(sender);
             let mut channel = Channel::new(reader, writer);
             let mut vole = VSender::init(&mut channel, rows, cols, d, &mut rng).unwrap();
-            vole.send(&mut channel, len, &mut rng).unwrap()
+            vole.send(&mut channel, weight, &mut rng).unwrap()
         });
         let mut rng = AesRng::new();
         let reader = BufReader::new(receiver.try_clone().unwrap());
         let writer = BufWriter::new(receiver);
         let mut channel = Channel::new(reader, writer);
         let mut vole = VReceiver::init(&mut channel, rows, cols, d, &mut rng).unwrap();
-        let vs = vole.receive(&mut channel, len, &mut rng).unwrap();
+        let vs = vole.receive(&mut channel, weight, &mut rng).unwrap();
         let uws = handle.join().unwrap();
-        for i in 0..len as usize {
+        for i in 0..weight as usize {
             let right = vole.delta().multiply_by_prime_subfield(uws[i].0) + vs[i];
             assert_eq!(uws[i].1, right);
         }
@@ -284,15 +284,27 @@ mod tests {
     type VSender<FE> = LpnVoleSender<FE, BVSender<FE>, SPSender<FE>>;
     type VReceiver<FE> = LpnVoleReceiver<FE, BVReceiver<FE>, SPReceiver<FE>>;
 
+    /// These parameters are set based on the Table 2 (cf. <https://eprint.iacr.org/2020/924>, page 20).
+    /*#[derive(Debug)]
+    pub struct LpnParams;
+    impl LpnParams {
+        const N: [usize; 2] = 10_616_092;
+        const K: [usize; 2] = 588_160;
+        const T: [usize; 2] = 1324;
+        const D: usize = 10;
+    }*/
     #[test]
     fn test_lpn_svole() {
-        for i in 1..10 {
+        // it takes longer if it is more than 15.
+        // make sure weight and cols are power of `2` and `cols % weight == 0`
+        for i in 9..16 {
             let cols = 1 << i;
-            let rows = 1 << (i - 1);
-            let d = i - 1;
-            test_lpnvole::<Fp, VSender<Fp>, VReceiver<Fp>>(rows, cols, d);
-            test_lpnvole::<Gf128, VSender<Gf128>, VReceiver<Gf128>>(rows, cols, d);
-            test_lpnvole::<F2, VSender<F2>, VReceiver<F2>>(rows, cols, d);
+            let weight = cols >> (i - 1); // cols % weight == 0 should hold.
+            let rows = i; // can be any value less than cols
+            let d = 10; // ideal value given in the Xios paper
+            test_lpnvole::<Fp, VSender<Fp>, VReceiver<Fp>>(rows, cols, d, weight);
+            test_lpnvole::<Gf128, VSender<Gf128>, VReceiver<Gf128>>(rows, cols, d, weight);
+            test_lpnvole::<F2, VSender<F2>, VReceiver<F2>>(rows, cols, d, weight);
         }
     }
 }
