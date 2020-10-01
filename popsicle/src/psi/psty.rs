@@ -11,6 +11,7 @@ use crate::{cuckoo::CuckooHash, errors::Error, utils};
 use fancy_garbling::{
     twopac::semihonest::{Evaluator, Garbler},
     BinaryBundle,
+    Bundle,
     BundleGadgets,
     CrtBundle,
     CrtGadgets,
@@ -251,7 +252,7 @@ impl SenderState {
         }
 
         sender.opprf_payload.send(channel, &points, nbins, rng)?;
-        self.opprf_payload_outputs = payload_table.clone().into_iter().flatten().collect();
+        self.opprf_payload_outputs = ts;
         Ok(())
     }
 
@@ -281,11 +282,10 @@ impl SenderState {
         // 1. it's input for the intersection
         // 2. it's payload
         // 3. the opprf's output
-        let mods = vec![2; 3*self.input_size];
-        println!("SX self.input_size {:?}", self.input_size );
-        println!("SX payload_size{:?}", payload_size);
+        let placeholder = vec![2; 3*self.input_size];
+        let mods = vec![2; my_input_bits.len()];
         let sender_inputs = gb.encode_many(&my_input_bits, &mods)?;
-        let receiver_inputs = gb.receive_many(&mods)?;
+        let receiver_inputs = gb.receive_many(&placeholder)?;
         Ok((gb, sender_inputs, receiver_inputs))
     }
 
@@ -307,6 +307,7 @@ impl SenderState {
         let n = y_payload.len();
         let y_opprf_output= y_payload.split_off(n/2);
         let (outs, _) = fancy_compute_payload_aggregate(&mut gb, &x, &y, &x_payload, &y_payload, &y_opprf_output)?;
+        println!("hellosx");
         gb.outputs(&outs)?;
         Ok(())
     }
@@ -519,9 +520,11 @@ impl ReceiverState {
         let mut ev =
             Evaluator::<C, RNG, OtReceiver>::new(channel.clone(), RNG::from_seed(rng.gen()))?;
 
-        let mods = vec![2; 3*self.input_size];
-        let sender_inputs = ev.receive_many(&mods)?;
+        let placeholder = vec![2; 2*self.input_size];
+        let mods = vec![2; my_input_bits.len()];
+        let sender_inputs = ev.receive_many(&placeholder)?;
         let receiver_inputs = ev.encode_many(&my_input_bits, &mods)?;
+
 
         Ok((ev, sender_inputs, receiver_inputs))
     }
@@ -531,33 +534,24 @@ impl ReceiverState {
         channel: &mut C,
         rng: &mut RNG,
         payload_size: usize,
-    ) -> Result<(), Error>
+    ) -> Result<usize, Error>
     where
         C: AbstractChannel,
         RNG: RngCore + CryptoRng + SeedableRng<Seed = Block>,
     {
 
         let (mut ev, mut x, mut y) = self.compute_payload_setup(channel, rng, payload_size)?;
-
         let x_payload = x.split_off(self.input_size);
         let mut y_payload = y.split_off(self.input_size);
         let n = y_payload.len();
         let y_opprf_output= y_payload.split_off(n/2);
-        let (outs, _) = fancy_compute_payload_aggregate(&mut ev, &x, &y, &x_payload, &y_payload, &y_opprf_output)?;
 
+        let (outs, mods) = fancy_compute_payload_aggregate(&mut ev, &x, &y, &x_payload, &y_payload, &y_opprf_output)?;
         let mpc_outs = ev
             .outputs(&outs)?
             .expect("evaluator should produce outputs");
-
-        let mut intersection = Vec::new();
-        for (opt_item, in_intersection) in self.cuckoo.items.iter().zip_eq(mpc_outs.into_iter()) {
-            if let Some(item) = opt_item {
-                if in_intersection == 1_u16 {
-                    intersection.push(self.inputs[item.input_index].clone());
-                }
-            }
-        }
-        Ok(())
+        let aggregate = fancy_garbling::util::crt_inv(&mpc_outs, &mods);
+        Ok(aggregate as usize)
     }
 }
 
@@ -642,8 +636,9 @@ fn fancy_compute_payload_aggregate<F: Fancy>(
 ) -> Result<(Vec<F::Item>, Vec<u16>), F::Error> {
 
     let payload_size = 64;
+
     assert_eq!(sender_inputs.len(), receiver_inputs.len());
-    // assert_eq!(sender_payloads.len(), receiver_payloads.len());
+    assert_eq!(sender_payloads.len(), receiver_opprf_output.len());
 
     let qs = fancy_garbling::util::primes_with_width(16);
     let q = fancy_garbling::util::product(&qs);
@@ -658,20 +653,29 @@ fn fancy_compute_payload_aggregate<F: Fancy>(
         })
         .collect::<Result<Vec<F::Item>, F::Error>>()?;
 
-    let weighted_payloads = sender_payloads
-        .chunks(payload_size * 8)
-        .zip_eq(receiver_payloads.chunks(payload_size * 8))
-        .map(|(xp, yp)| {f.crt_mul(
-            &CrtBundle::new(xp.to_vec()),
-            &CrtBundle::new(yp.to_vec())
+    let reconstructed_payloadsx = sender_payloads
+        .chunks(HASH_SIZE * 8)
+        .zip_eq(receiver_opprf_output.chunks(HASH_SIZE * 8))
+        .map(|(xp, tp)| {
+            f.add_bundles(
+                &BinaryBundle::new(xp.to_vec()),
+                &BinaryBundle::new(tp.to_vec()),
             )
         })
-        .collect::<Result<Vec<CrtBundle<F::Item>>, F::Error>>()?;
+        .collect::<Result<Vec<Bundle<F::Item>>, F::Error>>()?;
 
-    let mut acc = f.crt_constant_bundle(0, q)?;
+    let mut weighted_payloads = Vec::new();
+    for it in reconstructed_payloadsx.into_iter().zip_eq(receiver_payloads.chunks(HASH_SIZE * 8)){
+        let (psx, prx) = it;
+        let psx_crt = CrtBundle::from(psx);
+        let prx_crt = CrtBundle::new(prx.to_vec());
+
+        let weighted = f.crt_add(&psx_crt, &prx_crt)?;
+        weighted_payloads.push(weighted);
+    }
+
     let one = f.crt_constant_bundle(1, q)?;
-
-    // assert_eq!(weighted_payloads.len(), eqs.len());
+    let mut acc = f.crt_constant_bundle(0, q)?;
     for it in eqs.into_iter().zip_eq(weighted_payloads.into_iter()){
         let (b, p) = it;
         let b_ws = one
@@ -682,7 +686,7 @@ fn fancy_compute_payload_aggregate<F: Fancy>(
         let mux = f.crt_mul(&b_crt, &p)?;
         acc = f.crt_add(&acc, &mux)?;
     }
-
+    //
     Ok((acc.wires().to_vec(), qs))
 }
 
