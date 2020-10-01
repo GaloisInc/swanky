@@ -281,7 +281,9 @@ impl SenderState {
         // 1. it's input for the intersection
         // 2. it's payload
         // 3. the opprf's output
-        let mods = vec![2; self.input_size];
+        let mods = vec![2; 3*self.input_size];
+        println!("SX self.input_size {:?}", self.input_size );
+        println!("SX payload_size{:?}", payload_size);
         let sender_inputs = gb.encode_many(&my_input_bits, &mods)?;
         let receiver_inputs = gb.receive_many(&mods)?;
         Ok((gb, sender_inputs, receiver_inputs))
@@ -347,7 +349,6 @@ impl Receiver {
                 None => rng.gen(),
             })
             .collect::<Vec<Block>>();
-
         let opprf_outputs = self.opprf.receive(channel, &table, rng)?;
         // let opprf_payload_outputs = self.opprf_payload.receive(channel, &table, rng)?;
         Ok(ReceiverState {
@@ -483,8 +484,14 @@ impl ReceiverState {
         RNG: RngCore + CryptoRng + SeedableRng<Seed = Block>,
     {
         self.opprf_payload_outputs = receiver.opprf_payload.receive(channel, &self.table, rng)?;
-        self.payload = payloads.to_vec();
-        // println!("receiver {:?}", self.opprf_payload_outputs);
+        self.payload = self.cuckoo
+                            .items
+                            .iter()
+                            .map(|opt_item| match opt_item {
+                                Some(item) => payloads[item.input_index],
+                                None => Block512::from([0; 64]),
+                            })
+                            .collect::<Vec<Block512>>();
         Ok(())
     }
 
@@ -503,6 +510,7 @@ impl ReceiverState {
         let mut my_payload_bits = encode_inputs(&self.payload);
 
         let payload_size = my_payload_bits.len();
+        let opprf_size = my_opprf_output.len();
         self.input_size = my_input_bits.len();
 
         my_input_bits.append(&mut my_payload_bits);
@@ -511,9 +519,10 @@ impl ReceiverState {
         let mut ev =
             Evaluator::<C, RNG, OtReceiver>::new(channel.clone(), RNG::from_seed(rng.gen()))?;
 
-        let mods = vec![2; self.input_size + payload_size];
+        let mods = vec![2; 3*self.input_size];
         let sender_inputs = ev.receive_many(&mods)?;
         let receiver_inputs = ev.encode_many(&my_input_bits, &mods)?;
+
         Ok((ev, sender_inputs, receiver_inputs))
     }
 
@@ -634,7 +643,7 @@ fn fancy_compute_payload_aggregate<F: Fancy>(
 
     let payload_size = 64;
     assert_eq!(sender_inputs.len(), receiver_inputs.len());
-    assert_eq!(sender_payloads.len(), receiver_payloads.len());
+    // assert_eq!(sender_payloads.len(), receiver_payloads.len());
 
     let qs = fancy_garbling::util::primes_with_width(16);
     let q = fancy_garbling::util::product(&qs);
@@ -662,7 +671,7 @@ fn fancy_compute_payload_aggregate<F: Fancy>(
     let mut acc = f.crt_constant_bundle(0, q)?;
     let one = f.crt_constant_bundle(1, q)?;
 
-    assert_eq!(weighted_payloads.len(), eqs.len());
+    // assert_eq!(weighted_payloads.len(), eqs.len());
     for it in eqs.into_iter().zip_eq(weighted_payloads.into_iter()){
         let (b, p) = it;
         let b_ws = one
