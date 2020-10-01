@@ -50,7 +50,7 @@ pub struct Sender {
 /// State of the sender.
 pub struct SenderState {
     opprf_outputs: Vec<Block512>,
-    opprf_payload_outputs: Vec<Block512>,
+    pub opprf_payload_outputs: Vec<Block512>,
     table: Vec<Vec<Block>>,
     mapping: Vec<Vec<usize>>,
     input_size: usize,
@@ -65,7 +65,7 @@ pub struct Receiver {
 /// State of the receiver.
 pub struct ReceiverState {
     opprf_outputs: Vec<Block512>,
-    opprf_payload_outputs: Vec<Block512>,
+    pub opprf_payload_outputs: Vec<Block512>,
     table: Vec<Block>,
     cuckoo: CuckooHash,
     inputs: Vec<Msg>,
@@ -132,7 +132,7 @@ impl Sender {
                 bin.into_iter().map(move |item| (item, *t))
             })
             .collect_vec();
-        // println!("points {:?}", points);
+
         self.opprf.send(channel, &points, nbins, rng)?;
 
         Ok(SenderState {
@@ -253,6 +253,7 @@ impl SenderState {
 
         sender.opprf_payload.send(channel, &points, nbins, rng)?;
         self.opprf_payload_outputs = ts;
+        channel.flush()?;
         Ok(())
     }
 
@@ -262,7 +263,6 @@ impl SenderState {
         &mut self,
         channel: &mut C,
         rng: &mut RNG,
-        payload_size: usize,
     ) -> Result<(Garbler<C, RNG, OtSender>, Vec<Wire>, Vec<Wire>), Error>
     where
         C: AbstractChannel,
@@ -273,7 +273,6 @@ impl SenderState {
         let mut my_input_bits = encode_inputs(&self.opprf_outputs);
         let mut my_payload_bits = encode_inputs(&self.opprf_payload_outputs);
 
-        let payload_size = my_payload_bits.len();
         self.input_size = my_input_bits.len();
 
         my_input_bits.append(&mut my_payload_bits);
@@ -294,20 +293,17 @@ impl SenderState {
         &mut self,
         channel: &mut C,
         rng: &mut RNG,
-        payload_size: usize,
     ) -> Result<(), Error>
     where
         C: AbstractChannel,
         RNG: RngCore + CryptoRng + SeedableRng<Seed = Block>,
     {
-        let (mut gb, mut x, mut y) = self.compute_payload_setup(channel, rng, payload_size)?;
-
+        let (mut gb, mut x, mut y) = self.compute_payload_setup(channel, rng)?;
         let x_payload = x.split_off(self.input_size);
         let mut y_payload = y.split_off(self.input_size);
         let n = y_payload.len();
         let y_opprf_output= y_payload.split_off(n/2);
         let (outs, _) = fancy_compute_payload_aggregate(&mut gb, &x, &y, &x_payload, &y_payload, &y_opprf_output)?;
-        println!("hellosx");
         gb.outputs(&outs)?;
         Ok(())
     }
@@ -492,6 +488,7 @@ impl ReceiverState {
                                 Some(item) => payloads[item.input_index],
                                 None => Block512::from([0; 64]),
                             })
+
                             .collect::<Vec<Block512>>();
         Ok(())
     }
@@ -500,7 +497,6 @@ impl ReceiverState {
         &mut self,
         channel: &mut C,
         rng: &mut RNG,
-        payload_size: usize,
     ) -> Result<(Evaluator<C, RNG, OtReceiver>, Vec<Wire>, Vec<Wire>), Error>
     where
         C: AbstractChannel,
@@ -510,8 +506,6 @@ impl ReceiverState {
         let mut my_opprf_output = encode_inputs(&self.opprf_payload_outputs);
         let mut my_payload_bits = encode_inputs(&self.payload);
 
-        let payload_size = my_payload_bits.len();
-        let opprf_size = my_opprf_output.len();
         self.input_size = my_input_bits.len();
 
         my_input_bits.append(&mut my_payload_bits);
@@ -525,7 +519,6 @@ impl ReceiverState {
         let sender_inputs = ev.receive_many(&placeholder)?;
         let receiver_inputs = ev.encode_many(&my_input_bits, &mods)?;
 
-
         Ok((ev, sender_inputs, receiver_inputs))
     }
 
@@ -533,14 +526,13 @@ impl ReceiverState {
         &mut self,
         channel: &mut C,
         rng: &mut RNG,
-        payload_size: usize,
     ) -> Result<usize, Error>
     where
         C: AbstractChannel,
         RNG: RngCore + CryptoRng + SeedableRng<Seed = Block>,
     {
 
-        let (mut ev, mut x, mut y) = self.compute_payload_setup(channel, rng, payload_size)?;
+        let (mut ev, mut x, mut y) = self.compute_payload_setup(channel, rng)?;
         let x_payload = x.split_off(self.input_size);
         let mut y_payload = y.split_off(self.input_size);
         let n = y_payload.len();
@@ -592,7 +584,7 @@ fn fancy_compute_cardinality<F: Fancy>(
     f: &mut F,
     sender_inputs: &[F::Item],
     receiver_inputs: &[F::Item],
-) -> Result<(Vec<F::Item>, Vec<u16>), F::Error> {
+) -> Result< (Vec<F::Item>, Vec<u16>), F::Error> {
     assert_eq!(sender_inputs.len(), receiver_inputs.len());
 
     let eqs = sender_inputs
@@ -635,8 +627,6 @@ fn fancy_compute_payload_aggregate<F: Fancy>(
     receiver_opprf_output: &[F::Item],
 ) -> Result<(Vec<F::Item>, Vec<u16>), F::Error> {
 
-    let payload_size = 64;
-
     assert_eq!(sender_inputs.len(), receiver_inputs.len());
     assert_eq!(sender_payloads.len(), receiver_opprf_output.len());
 
@@ -653,7 +643,7 @@ fn fancy_compute_payload_aggregate<F: Fancy>(
         })
         .collect::<Result<Vec<F::Item>, F::Error>>()?;
 
-    let reconstructed_payloadsx = sender_payloads
+    let reconstructed_payload = sender_payloads
         .chunks(HASH_SIZE * 8)
         .zip_eq(receiver_opprf_output.chunks(HASH_SIZE * 8))
         .map(|(xp, tp)| {
@@ -665,12 +655,12 @@ fn fancy_compute_payload_aggregate<F: Fancy>(
         .collect::<Result<Vec<Bundle<F::Item>>, F::Error>>()?;
 
     let mut weighted_payloads = Vec::new();
-    for it in reconstructed_payloadsx.into_iter().zip_eq(receiver_payloads.chunks(HASH_SIZE * 8)){
-        let (psx, prx) = it;
-        let psx_crt = CrtBundle::from(psx);
-        let prx_crt = CrtBundle::new(prx.to_vec());
+    for it in reconstructed_payload.into_iter().zip_eq(receiver_payloads.chunks(HASH_SIZE * 8)){
+        let (ps, pr) = it;
+        let ps_crt = CrtBundle::from(ps);
+        let pr_crt = CrtBundle::new(pr.to_vec());
 
-        let weighted = f.crt_add(&psx_crt, &prx_crt)?;
+        let weighted = f.crt_mul(&ps_crt, &pr_crt)?;
         weighted_payloads.push(weighted);
     }
 
@@ -686,7 +676,7 @@ fn fancy_compute_payload_aggregate<F: Fancy>(
         let mux = f.crt_mul(&b_crt, &p)?;
         acc = f.crt_add(&acc, &mux)?;
     }
-    //
+
     Ok((acc.wires().to_vec(), qs))
 }
 

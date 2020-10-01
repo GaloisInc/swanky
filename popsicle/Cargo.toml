@@ -54,3 +54,7 @@ required-features = ["psty"]
 [[example]]
 name = "secretsister"
 required-features = ["psty"]
+
+[[example]]
+name = "match-compute"
+required-features = ["psty"]
