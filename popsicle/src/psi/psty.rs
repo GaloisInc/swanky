@@ -233,7 +233,7 @@ impl SenderState {
             let mut prev_element = bin.len();
             for element in bin{
                 let payload_byte;
-                if *element == prev_element {
+                if *element != prev_element {
                     payload_byte = payloads[*element];
                 }else{ // j = H1(y) = H2(y) append a random payload
                     payload_byte = rng.gen::<Block512>();
@@ -243,17 +243,17 @@ impl SenderState {
                 prev_element = *element;
             }
         }
-
         let mut points = Vec::new();
         for (row, bin) in self.table.iter().enumerate() {
             for (col, item) in bin.iter().enumerate() {
                 points.push((*item, payload_table[row][col]));
             }
         }
-
         sender.opprf_payload.send(channel, &points, nbins, rng)?;
-        self.opprf_payload_outputs = ts;
+        self.opprf_payload_outputs = ts.clone();
+        channel.write_block512(&ts[0]);
         channel.flush()?;
+        println!("Sender {:?}", ts);
         Ok(())
     }
 
@@ -481,6 +481,7 @@ impl ReceiverState {
         RNG: RngCore + CryptoRng + SeedableRng<Seed = Block>,
     {
         self.opprf_payload_outputs = receiver.opprf_payload.receive(channel, &self.table, rng)?;
+        println!("Receiver {:?}", self.opprf_payload_outputs);
         self.payload = self.cuckoo
                             .items
                             .iter()
@@ -490,6 +491,7 @@ impl ReceiverState {
                             })
 
                             .collect::<Vec<Block512>>();
+
         Ok(())
     }
 
@@ -502,6 +504,8 @@ impl ReceiverState {
         C: AbstractChannel,
         RNG: CryptoRng + RngCore + SeedableRng<Seed = Block>,
     {
+        let y = channel.read_block512()?;
+        println!("xor {:?}", y^self.opprf_payload_outputs[0]);
         let mut my_input_bits = encode_inputs(&self.opprf_outputs);
         let mut my_opprf_output = encode_inputs(&self.opprf_payload_outputs);
         let mut my_payload_bits = encode_inputs(&self.payload);
