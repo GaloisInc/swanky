@@ -9,8 +9,6 @@ use ocelot::{
     svole::{
         base_svole::{Receiver as VoleReceiver, Sender as VoleSender},
         copee::{Receiver as CpReceiver, Sender as CpSender},
-        CopeeReceiver,
-        CopeeSender,
         SVoleReceiver,
         SVoleSender,
     },
@@ -18,7 +16,6 @@ use ocelot::{
 use scuttlebutt::{
     field::{FiniteField as FF, Fp, Gf128, F2},
     AesRng,
-    Block,
     TrackChannel,
 };
 use std::{
@@ -73,7 +70,7 @@ fn _test_svole<FE: FF, BVSender: SVoleSender<Msg = FE>, BVReceiver: SVoleReceive
         start.elapsed().unwrap().as_millis()
     );
     let start = SystemTime::now();
-    let vs = vole.receive(&mut channel, len, &mut rng).unwrap();
+    let _ = vole.receive(&mut channel, len, &mut rng).unwrap();
     println!(
         "[{}] Receiver time: {} ms",
         len,
@@ -95,6 +92,8 @@ type BVSender<FE> = VoleSender<CPSender<FE>, FE>;
 type BVReceiver<FE> = VoleReceiver<CPReceiver<FE>, FE>;
 
 fn main() {
+    /// This is called in LPN-svole once at initialization with the
+    /// secure k (rows) used in the LPN matrix
     _test_svole::<F2, BVSender<F2>, BVReceiver<F2>>(588_160);
     _test_svole::<Gf128, BVSender<Gf128>, BVReceiver<Gf128>>(588_160);
     _test_svole::<Fp, BVSender<Fp>, BVReceiver<Fp>>(588_160);

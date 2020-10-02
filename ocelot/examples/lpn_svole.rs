@@ -32,10 +32,6 @@ use std::{
     time::SystemTime,
 };
 
-fn rand_block_vec(size: usize) -> Vec<Block> {
-    (0..size).map(|_| rand::random::<Block>()).collect()
-}
-
 fn _test_lpnvole<
     FE: FF,
     VSender: LpnsVoleSender<Msg = FE>,
@@ -121,7 +117,7 @@ fn main() {
     let cols = (1 << 13) * weight; //cols >> (i - 1); // cols % weight == 0 should hold.
     let rows = 588_160; // can be any value less than cols
     let d = 10; // ideal value given in the Xios paper
-    _test_lpnvole::<Gf128, VSender<Gf128>, VReceiver<Gf128>>(rows, cols, d, weight);
     _test_lpnvole::<F2, VSender<F2>, VReceiver<F2>>(rows, cols, d, weight);
+    _test_lpnvole::<Gf128, VSender<Gf128>, VReceiver<Gf128>>(rows, cols, d, weight);
     _test_lpnvole::<Fp, VSender<Fp>, VReceiver<Fp>>(rows, cols, d, weight);
 }

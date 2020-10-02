@@ -20,7 +20,6 @@ use ocelot::{
 use scuttlebutt::{
     field::{FiniteField as FF, Fp, Gf128, F2},
     AesRng,
-    Block,
     TrackChannel,
 };
 use std::{
@@ -104,8 +103,13 @@ type SPSender<FE> = SpsSender<ChouOrlandiReceiver, FE, BVSender<FE>, EqSender<FE
 type SPReceiver<FE> = SpsReceiver<ChouOrlandiSender, FE, BVReceiver<FE>, EqReceiver<FE>>;
 
 fn main() {
-    let leaves = 1 << 13;
-    _test_spsvole::<Fp, SPSender<Fp>, SPReceiver<Fp>>(leaves);
-    _test_spsvole::<Gf128, SPSender<Gf128>, SPReceiver<Gf128>>(leaves);
-    _test_spsvole::<F2, SPSender<F2>, SPReceiver<F2>>(leaves);
+    /// This is called in LPN-svole iteratively with secure `t = 1324` number of times each with
+    /// `1 << 14`.
+    let splen = 1 << 14;
+    let t = 1394;
+    for _i in 0..t {
+        //_test_spsvole::<F2, SPSender<F2>, SPReceiver<F2>>(splen);
+        //_test_spsvole::<Gf128, SPSender<Gf128>, SPReceiver<Gf128>>(splen);
+        _test_spsvole::<Fp, SPSender<Fp>, SPReceiver<Fp>>(splen);
+    }
 }
