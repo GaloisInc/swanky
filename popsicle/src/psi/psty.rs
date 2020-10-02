@@ -97,7 +97,7 @@ impl Sender {
         // receive cuckoo hash info from sender
         let key = channel.read_block()?;
         let hashes = utils::compress_and_hash_inputs(inputs, key);
-
+        let total = hashes.len();
         // map inputs to table using all hash functions
         let nbins = channel.read_usize()?;
         let mut table = vec![Vec::new(); nbins];
@@ -119,7 +119,7 @@ impl Sender {
             // table2[j].
             if bins.iter().skip(1).all(|&x| x == bins[0]) {
                 table[bins[0]].push(rng.gen());
-                mapping[bins[0]].push(index);
+                mapping[bins[0]].push(total);
             }
         }
 
@@ -229,19 +229,18 @@ impl SenderState {
 
         let mut payload_table = vec![Vec::new(); nbins];
         let ts = (0..nbins).map(|_| rng.gen::<Block512>()).collect_vec();
+        let total = payloads.len();
 
         for (index, bin) in self.mapping.iter().enumerate(){
-            let mut prev_element = bin.len();
             for element in bin{
                 let payload_byte;
-                if *element != prev_element {
+                if *element < total {
                     payload_byte = payloads[*element];
                 }else{ // j = H1(y) = H2(y) append a random payload
-                    payload_byte = Block512::from([0; 64]);
+                    payload_byte = rng.gen::<Block512>();
                 }
                 let p = payload_byte ^ ts[index];
                 payload_table[index].push(p);
-                prev_element = *element;
             }
         }
         let mut points = Vec::new();
@@ -330,7 +329,6 @@ impl Receiver {
         let key = rng.gen();
         let hashed_inputs = utils::compress_and_hash_inputs(inputs, key);
         let cuckoo = CuckooHash::new(&hashed_inputs, NHASHES)?;
-
         // Send cuckoo hash info to receiver.
         channel.write_block(&key)?;
         channel.write_usize(cuckoo.nbins)?;
@@ -487,7 +485,7 @@ impl ReceiverState {
                             .iter()
                             .map(|opt_item| match opt_item {
                                 Some(item) => payloads[item.input_index],
-                                None => Block512::from([0; 64]),
+                                None => rng.gen::<Block512>(),
                             })
 
                             .collect::<Vec<Block512>>();
