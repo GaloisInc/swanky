@@ -15,15 +15,12 @@ use ocelot::{
             svole_lpn::{Receiver as LpnVoleReceiver, Sender as LpnVoleSender},
             LpnsVoleReceiver,
             LpnsVoleSender,
-            SpsVoleReceiver,
-            SpsVoleSender,
         },
     },
 };
 use scuttlebutt::{
     field::{FiniteField as FF, Fp, Gf128, F2},
     AesRng,
-    Block,
     TrackChannel,
 };
 use std::{
