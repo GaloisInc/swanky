@@ -284,15 +284,6 @@ mod tests {
     type VSender<FE> = LpnVoleSender<FE, BVSender<FE>, SPSender<FE>>;
     type VReceiver<FE> = LpnVoleReceiver<FE, BVReceiver<FE>, SPReceiver<FE>>;
 
-    /// These parameters are set based on the Table 2 (cf. <https://eprint.iacr.org/2020/924>, page 20).
-    /*#[derive(Debug)]
-    pub struct LpnParams;
-    impl LpnParams {
-        const N: [usize; 2] = 10_616_092;
-        const K: [usize; 2] = 588_160;
-        const T: [usize; 2] = 1324;
-        const D: usize = 10;
-    }*/
     #[test]
     fn test_lpn_svole() {
         // it takes longer if it is more than 15.

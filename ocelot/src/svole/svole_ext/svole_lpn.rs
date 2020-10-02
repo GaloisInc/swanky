@@ -101,6 +101,7 @@ impl<FE: FiniteField, SV: SVoleSender<Msg = FE>, SPS: SpsVoleSender<Msg = FE>> L
                     .to_string(),
             ));
         }
+        //let m = (self.cols as f64 / weight as f64).floor() as usize;
         let m = self.cols / weight;
         let len = self.cols - self.rows;
         let mut e = vec![FE::PrimeField::ZERO; self.cols];

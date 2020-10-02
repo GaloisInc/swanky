@@ -33,13 +33,20 @@ use std::{
     time::Duration,
 };
 
+/// This value suggested in the Table 2 (cf. <https://eprint.iacr.org/2020/924>, page 20).
+/// LPN parameters for the error vector with uniform distribution.
+
+//const N: usize = 10_616_092; // COLS
+//const K: usize = 588_160; // ROWS
+//const T: usize = 1324; // WEIGHT
+//const D: usize = 10; // const `d` in d-linear code
+
 /// Specifies the LPN parameters such as number of rows, columns of the matrix that each column of it is uniform subjective to have
 ///  `d` number of non-zero entries.
 /// `COLS`, `WEIGHT` should be power of `2` and `COLS >> ROWS`, `COLS >> WEIGHT` such that `COLS % WEIGHT == 0`.
-const ROWS: usize = 1 << 1; // not necessarily power of `2`
-const COLS: usize = 1 << 8;
-const WEIGHT: usize = COLS >> 7;
-/// This value suggested in the Table 2 (cf. <https://eprint.iacr.org/2020/924>, page 20).
+const ROWS: usize = 588_160; //1 << 1; // not necessarily power of `2`
+const COLS: usize = 10_616_832; // 2^^13 * 1296; 1 << 12;
+const WEIGHT: usize = 1296; // COLS >> 11;
 const D: usize = 10;
 
 type CPSender<FE> = CpSender<KosSender, FE>;
