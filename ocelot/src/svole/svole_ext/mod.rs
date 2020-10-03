@@ -288,14 +288,15 @@ mod tests {
     fn test_lpn_svole() {
         // it takes longer if it is more than 15.
         // make sure weight and cols are power of `2` and `cols % weight == 0`
-        for i in 9..16 {
-            let cols = 1 << i;
-            let weight = cols >> (i - 1); // cols % weight == 0 should hold.
-            let rows = i; // can be any value less than cols
-            let d = 10; // ideal value given in the Xios paper
-            test_lpnvole::<Fp, VSender<Fp>, VReceiver<Fp>>(rows, cols, d, weight);
-            test_lpnvole::<Gf128, VSender<Gf128>, VReceiver<Gf128>>(rows, cols, d, weight);
-            test_lpnvole::<F2, VSender<F2>, VReceiver<F2>>(rows, cols, d, weight);
-        }
+        //for i in 9..23 {
+        let weight = 1296; // cols >> (i - 1); // cols % weight == 0 should hold.
+        let cols = (1 << 13) * weight; //1 << i;
+        let rows = 588_160; //i; // can be any value less than cols
+        let d = 10; // ideal value given in the Xios paper
+        test_lpnvole::<F2, VSender<F2>, VReceiver<F2>>(rows, cols, d, weight);
+        test_lpnvole::<Gf128, VSender<Gf128>, VReceiver<Gf128>>(rows, cols, d, weight);
+        test_lpnvole::<Fp, VSender<Fp>, VReceiver<Fp>>(rows, cols, d, weight);
+
+        //}
     }
 }

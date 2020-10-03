@@ -8,6 +8,16 @@
 //!
 //! This module provides implementations of LPN sVole Traits.
 
+// -*- mode: rust; -*-
+//
+// This file is part of ocelot.
+// Copyright © 2020 Galois, Inc.
+// See LICENSE for licensing information.
+
+//! LPN based Subfield Vector Oblivious Linear-function Evaluation (sVole)
+//!
+//! This module provides implementations of LPN sVole Traits.
+
 use crate::{
     errors::Error,
     svole::{
@@ -18,7 +28,7 @@ use crate::{
             SpsVoleReceiver,
             SpsVoleSender,
         },
-        utils::{code_gen, dot_product_with_subfield},
+        utils::dot_product_with_access_cell,
         SVoleReceiver,
         SVoleSender,
     },
@@ -36,7 +46,8 @@ pub struct Sender<FE: FiniteField, SV: SVoleSender, SPS: SpsVoleSender> {
     cols: usize,
     u: Vec<FE::PrimeField>,
     w: Vec<FE>,
-    matrix: Vec<Vec<FE::PrimeField>>,
+    // matrix: Vec<Vec<FE::PrimeField>>,
+    d: usize,
 }
 /// LpnsVole receiver.
 pub struct Receiver<FE: FiniteField, SV: SVoleReceiver, SPS: SpsVoleReceiver> {
@@ -46,7 +57,8 @@ pub struct Receiver<FE: FiniteField, SV: SVoleReceiver, SPS: SpsVoleReceiver> {
     rows: usize,
     cols: usize,
     v: Vec<FE>,
-    matrix: Vec<Vec<FE::PrimeField>>,
+    // matrix: Vec<Vec<FE::PrimeField>>,
+    d: usize,
 }
 
 impl<FE: FiniteField, SV: SVoleSender<Msg = FE>, SPS: SpsVoleSender<Msg = FE>> LpnsVoleSender
@@ -73,10 +85,11 @@ impl<FE: FiniteField, SV: SVoleSender<Msg = FE>, SPS: SpsVoleSender<Msg = FE>> L
         let uw = svole_sender.send(channel, rows, rng)?;
         let u = uw.iter().map(|&uw| uw.0).collect();
         let w = uw.iter().map(|&uw| uw.1).collect();
-        let matrix_seed = rand::random::<Block>();
+        /*let matrix_seed = rand::random::<Block>();
         let mut mat_rng = AesRng::from_seed(matrix_seed);
         let matrix = code_gen::<FE::PrimeField, _>(rows, cols, d, &mut mat_rng);
-        channel.write_block(&matrix_seed)?;
+        channel.write_block(&matrix_seed)?;*/
+        // This flush statement is needed, otherwise, it hangs on.
         channel.flush()?;
         let spvole_sender = SPS::init(channel, rng)?;
         Ok(Self {
@@ -86,7 +99,8 @@ impl<FE: FiniteField, SV: SVoleSender<Msg = FE>, SPS: SpsVoleSender<Msg = FE>> L
             cols,
             u,
             w,
-            matrix,
+            // matrix,
+            d,
         })
     }
     fn send<C: AbstractChannel, RNG: CryptoRng + RngCore>(
@@ -113,14 +127,14 @@ impl<FE: FiniteField, SV: SVoleSender<Msg = FE>, SPS: SpsVoleSender<Msg = FE>> L
             e = [e, a].concat();
             t = [t, c].concat();
         }
-        let a = &self.matrix;
+        //let a = &self.matrix;
         let mut x: Vec<FE::PrimeField> = (0..self.cols)
-            .map(|i| dot_product(self.u.iter(), a[i].iter()))
+            .map(|i| dot_product_with_access_cell::<FE::PrimeField>(self.rows, self.d, &self.u)) //dot_product(self.u.iter(), a[i].iter()))
             .collect();
         x = x.iter().zip(e.iter()).map(|(&x, &e)| x + e).collect();
         debug_assert!(x.len() == self.cols);
         let mut z: Vec<FE> = (0..self.cols)
-            .map(|i| dot_product_with_subfield(&a[i], &self.w))
+            .map(|i| dot_product_with_access_cell::<FE>(self.rows, self.d, &self.w)) //dot_product_with_subfield(&a[i], &self.w))
             .collect();
         z = z.iter().zip(t.iter()).map(|(&z, &t)| z + t).collect();
         for i in 0..self.rows {
@@ -155,9 +169,9 @@ impl<FE: FiniteField, SV: SVoleReceiver<Msg = FE>, SPS: SpsVoleReceiver<Msg = FE
         let mut svole_receiver = SV::init(channel, rng)?;
         let v = svole_receiver.receive(channel, rows, rng)?;
         let delta = svole_receiver.delta();
-        let matrix_seed = channel.read_block()?;
+        /*let matrix_seed = channel.read_block()?;
         let mut mat_rng = AesRng::from_seed(matrix_seed);
-        let matrix = code_gen::<FE::PrimeField, _>(rows, cols, d, &mut mat_rng);
+        let matrix = code_gen::<FE::PrimeField, _>(rows, cols, d, &mut mat_rng);*/
         let spvole_receiver = SPS::init(channel, rng)?;
         Ok(Self {
             _sv: PhantomData::<SV>,
@@ -166,7 +180,8 @@ impl<FE: FiniteField, SV: SVoleReceiver<Msg = FE>, SPS: SpsVoleReceiver<Msg = FE
             rows,
             cols,
             v,
-            matrix,
+            //matrix,
+            d,
         })
     }
     fn delta(&self) -> FE {
@@ -192,7 +207,7 @@ impl<FE: FiniteField, SV: SVoleReceiver<Msg = FE>, SPS: SpsVoleReceiver<Msg = FE
             s = [s, b].concat();
         }
         let mut y: Vec<FE> = (0..self.cols)
-            .map(|i| dot_product_with_subfield(&self.matrix[i], &self.v))
+            .map(|i| dot_product_with_access_cell::<FE>(self.rows, self.d, &self.v)) //dot_product_with_subfield(&self.matrix[i], &self.v))
             .collect();
         y = y.iter().zip(s.iter()).map(|(&y, &s)| y + s).collect();
         debug_assert!(y.len() == self.cols);

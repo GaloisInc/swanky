@@ -7,10 +7,10 @@
 //! SVOLE utility functions.
 
 //use generic_array::{typenum::Unsigned, GenericArray};
-use scuttlebutt::field::FiniteField;
+use scuttlebutt::{field::FiniteField, AesRng, Block};
 //use std::iter::FromIterator;
 use rand::Rng;
-use rand_core::{CryptoRng, RngCore};
+use rand_core::{CryptoRng, RngCore, SeedableRng};
 use subtle::{Choice, ConditionallySelectable};
 /// Converts an element of `Fp` to `F(p^r)`.
 /// Note that the converted element has the input element as the first component
@@ -38,8 +38,19 @@ pub fn dot_product_with_subfield<FE: FiniteField>(mat: &[FE::PrimeField], x: &[F
         .sum()
 }
 
+pub fn dot_product_with_access_cell<FE: FiniteField>(rows: usize, d: usize, x: &[FE]) -> FE {
+    let ds = d_uniform_indices(rows, d);
+    let mut sum = FE::ZERO;
+    for i in 0..x.len() {
+        let fe = access_cell::<FE>(i, &ds);
+        x[i].multiply_by_prime_subfield(fe);
+        sum += x[i];
+    }
+    sum
+}
+
 /// Code generator that outputs matrix A for the given dimension `k` by `n` that each column of it has uniform `d` non-zero entries.
-pub fn code_gen<FE: FiniteField, RNG: CryptoRng + RngCore>(
+/*pub fn code_gen<FE: FiniteField, RNG: CryptoRng + RngCore>(
     rows: usize,
     cols: usize,
     d: usize,
@@ -49,16 +60,16 @@ pub fn code_gen<FE: FiniteField, RNG: CryptoRng + RngCore>(
     let mut res: Vec<Vec<FE>> = vec![vec![FE::ZERO; rows]; cols];
     for item in res.iter_mut().take(cols) {
         for _j in 0..d {
-            let rand_ind: usize = rng.gen_range(0, rows);
-            // This goes forever
-            /*loop {
-                rand_ind = rng.gen_range(0, rows);
-                if (res[i])[rand_ind] == FE::ZERO {
-                    break;
-                }
-            }*/
-            // This is not the perfect solution to make sure if the rand_ind has not already been chosen.
-            let choice = Choice::from(((*item)[rand_ind] == FE::ZERO) as u8);
+            let rand_ind: usize = rng.gen_range(0, rows);*/
+// This goes forever
+/*loop {
+    rand_ind = rng.gen_range(0, rows);
+    if (res[i])[rand_ind] == FE::ZERO {
+        break;
+    }
+}*/
+// This is not the perfect solution to make sure if the rand_ind has not already been chosen.
+/*let choice = Choice::from(((*item)[rand_ind] == FE::ZERO) as u8);
             let index = u128::conditional_select(
                 &(rng.gen_range(0, rows) as u128),
                 &(rand_ind as u128),
@@ -70,4 +81,24 @@ pub fn code_gen<FE: FiniteField, RNG: CryptoRng + RngCore>(
         }
     }
     res
+}*/
+
+pub fn d_uniform_indices(rows: usize, d: usize) -> Vec<usize> {
+    let mut res = Vec::default();
+    for i in 0..d {
+        let seed = Block::from(i as u128);
+        let mut rng = AesRng::from_seed(seed);
+        let rand_idx = rng.gen_range(0, rows);
+        res.push(rand_idx);
+    }
+    debug_assert!(res.len() == d);
+    res
+}
+
+pub fn access_cell<FE: FiniteField>(row_idx: usize, ds: &[usize]) -> FE::PrimeField {
+    if ds.iter().any(|&x| x == row_idx) {
+        FE::PrimeField::ONE
+    } else {
+        FE::PrimeField::ZERO
+    }
 }
