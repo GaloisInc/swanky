@@ -17,46 +17,70 @@ pub fn rand_vec_vec<RNG: CryptoRng + Rng>(n: usize, m: usize, rng: &mut RNG) -> 
 }
 
 
-pub fn vec8_to_block512(vec: Vec<u8>, item_size: usize) -> Block512{
-    let mut res_block = [0 as u8; 64];
-    for i in 0..item_size{
-        res_block[i] = vec[i];
+pub fn int_vec_block512(values: Vec<u32>) -> Vec<Block512> {
+    values.into_iter()
+          .map(|item|{
+            let value_bytes = item.to_le_bytes();
+            let mut res_block = [0 as u8; 64];
+            for i in 0..4{
+                res_block[i] = value_bytes[i];
+            }
+            Block512::from(res_block)
+         }).collect()
+}
+
+pub fn rand_u32_vec<RNG: CryptoRng + Rng>(n: usize, modulus: u32, rng: &mut RNG) -> Vec<u32>{
+    (0..n).map(|_| rng.gen::<u32>()%modulus).collect()
+}
+
+pub fn small_change<RNG: CryptoRng + Rng>(vec: &mut Vec<Vec<u8>>, n: usize, rng: &mut RNG)->(){
+    for i in 0..n {
+        let coin:u8 = rng.gen::<u8>()%2;
+        if coin == 0{
+            vec[i][0] ^= 1;
+        }
     }
-    Block512::from(res_block)
 }
 
-pub fn rand_vec_block512<RNG: CryptoRng + Rng>(n: usize, m: usize, rng: &mut RNG) -> Vec<Block512> {
-    let res = rand_vec_vec(n, m , rng);
-    res.into_iter().map(|item| vec8_to_block512(item, m)).collect()
-}
+pub fn shuffle_with_index<RNG: CryptoRng + Rng>(vec: &mut Vec<Vec<u8>>, n: usize, rng: &mut RNG)-> Vec<usize>{
+    let mut original_indeces: Vec<usize> = (0..n).collect();
 
-pub fn i64_to_block512(value: i64)-> Block512{
-    let value_bytes = value.to_le_bytes();
-    let mut res_block = [0 as u8; 64];
-    for i in 0..8{
-        res_block[i] = value_bytes[i];
+    for i in 0..n{
+        let new_index = rng.gen::<usize>()%n;
+
+        let temp = vec[i].clone();
+        vec[i] = vec[new_index].clone();
+        vec[new_index] = temp;
+
+        let temp = original_indeces[i];
+        original_indeces[i] = original_indeces[new_index];
+        original_indeces[new_index] = temp;
     }
-    Block512::from(res_block)
+
+    original_indeces
 }
 
-pub fn int_vec_block512(values: Vec<i64>) -> Vec<Block512> {
-    values.into_iter().map(|item| i64_to_block512(item)).collect()
-}
-
-fn protocol(){
-    const ITEM_SIZE: usize = 8;
-    const SET_SIZE: usize = 2;
-    const PAYLOAD_SIZE: usize = 64;
+fn protocol(i: i32){
+    const ITEM_SIZE: usize = 2;
+    const SET_SIZE: usize = 10;
 
     let mut rng = AesRng::new();
     let (sender, receiver) = UnixStream::pair().unwrap();
-    let sender_inputs = rand_vec_vec(SET_SIZE, ITEM_SIZE, &mut rng);
-    let receiver_inputs = sender_inputs.clone();
 
+    let mut ids_sender = rand_vec_vec(SET_SIZE, ITEM_SIZE,&mut rng);
+    let mut ids_receiver = ids_sender.clone();
 
-    let values = vec![1 as i64, 1 as i64];
-    let payloads_sender = int_vec_block512(values.clone());
-    let payloads_receiver =  payloads_sender.clone();
+    small_change(&mut ids_sender, SET_SIZE, &mut rng);
+    let original_indeces = shuffle_with_index(&mut ids_receiver, SET_SIZE, &mut rng);
+
+    let sender_inputs = ids_sender.clone();
+    let receiver_inputs = ids_receiver.clone();
+
+    let payloads = rand_u32_vec(SET_SIZE, 1000000, &mut rng);
+    let weights = rand_u32_vec(SET_SIZE, 1000, &mut rng);
+
+    let payloads_sender = int_vec_block512(payloads.clone());
+    let payloads_receiver =  int_vec_block512(weights.clone());
 
     let handle = std::thread::spawn(move || {
         let mut rng = AesRng::new();
@@ -68,6 +92,7 @@ fn protocol(){
         let mut state = psi.send(&sender_inputs, &mut channel, &mut rng).unwrap();
         state.prepare_payload(&mut psi, &payloads_sender, &mut channel, &mut rng).unwrap();
         state.compute_payload_aggregate(&mut channel, &mut rng).unwrap();
+        // state.compute_cardinality(&mut channel, &mut rng).unwrap();
     });
 
     let mut rng = AesRng::new();
@@ -79,15 +104,30 @@ fn protocol(){
     let mut state = psi
         .receive(&receiver_inputs, &mut channel, &mut rng)
         .unwrap();
+    // let cardinality = state.compute_cardinality(&mut channel, &mut rng).unwrap();
     state.prepare_payload(&mut psi, &payloads_receiver, &mut channel, &mut rng).unwrap();
-    // let cardinality = state.compute_intersection(&mut channel, &mut rng).unwrap();
     let output = state.compute_payload_aggregate(&mut channel, &mut rng).unwrap();
     handle.join().unwrap();
-    println!("output {:?}", output);
-    println!("expected output {:?}", values[0]*values[0] + values[1]*values[1]);
-    // assert_eq!(cardinality, SET_SIZE);
+
+    let mut expected_result: u64= 0;
+    for i in 0..SET_SIZE{
+        if ids_sender[original_indeces[i]] == ids_receiver[i]{
+            let ps = payloads[original_indeces[i]] as u64;
+            let pr = weights[i] as u64;
+            expected_result += ps*pr;
+        }
+    }
+    
+    assert_eq!(output as u64, expected_result);
+    let normalized_out = output as f64;
+    println!("output {:?}", normalized_out /1000.0);
+
+    println!("Trial number {:?} / 10 succeeded.....", i+1);
 }
 
 fn main() {
-    protocol();
+    for i in 0..10{
+        protocol(i);
+    }
+    println!("Success!");
 }

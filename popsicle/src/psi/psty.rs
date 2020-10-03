@@ -252,8 +252,6 @@ impl SenderState {
         sender.opprf_payload.send(channel, &points, nbins, rng)?;
         self.opprf_payload_outputs = ts.clone();
 
-        channel.write_block512(&ts[1]);
-        channel.flush()?;
         Ok(())
     }
 
@@ -502,8 +500,7 @@ impl ReceiverState {
         C: AbstractChannel,
         RNG: CryptoRng + RngCore + SeedableRng<Seed = Block>,
     {
-        let y = channel.read_block512()?;
-        println!("xor {:?}", y^self.opprf_payload_outputs[1]);
+
         let mut my_input_bits = encode_inputs(&self.opprf_outputs);
         let mut my_opprf_output = encode_inputs(&self.opprf_payload_outputs);
         let mut my_payload_bits = encode_inputs(&self.payload);
@@ -540,7 +537,7 @@ impl ReceiverState {
         let y_opprf_output= y_payload.split_off(n/2);
 
 
-        let (outs, mods) = fancy_compute_payload_aggregate(&mut ev, &x, &y, &x_payload, &y_payload, &y_opprf_output)?;
+        let (outs, _) = fancy_compute_payload_aggregate(&mut ev, &x, &y, &x_payload, &y_payload, &y_opprf_output)?;
         let mpc_outs = ev
             .outputs(&outs)?
             .expect("evaluator should produce outputs");
@@ -636,7 +633,7 @@ fn fancy_compute_payload_aggregate<F: Fancy>(
     assert_eq!(sender_payloads.len(), receiver_opprf_output.len());
 
     let qs = fancy_garbling::util::primes_with_width(16);
-    let q = fancy_garbling::util::product(&qs);
+
     let eqs = sender_inputs
         .chunks(HASH_SIZE * 8)
         .zip_eq(receiver_inputs.chunks(HASH_SIZE * 8))
