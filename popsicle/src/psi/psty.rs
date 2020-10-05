@@ -114,7 +114,6 @@ impl Sender {
                 bins.push(bin);
                 mapping[bin].push(index);
             }
-
             // if j = H1(y) = H2(y) for some y, then P2 adds a uniformly random element to
             // table2[j].
             if bins.iter().skip(1).all(|&x| x == bins[0]) {
@@ -268,8 +267,8 @@ impl SenderState {
     {
         let mut gb = Garbler::<C, RNG, OtSender>::new(channel.clone(), RNG::from_seed(rng.gen()))?;
 
-        let mut my_input_bits = encode_inputs(&self.opprf_outputs);
-        let mut my_payload_bits = encode_inputs(&self.opprf_payload_outputs);
+        let mut my_input_bits = encode_payloads(&self.opprf_outputs);
+        let mut my_payload_bits = encode_payloads(&self.opprf_payload_outputs);
         self.input_size = my_input_bits.len();
 
         my_input_bits.append(&mut my_payload_bits);
@@ -343,7 +342,7 @@ impl Receiver {
             })
             .collect::<Vec<Block>>();
         let opprf_outputs = self.opprf.receive(channel, &table, rng)?;
-        // let opprf_payload_outputs = self.opprf_payload.receive(channel, &table, rng)?;
+
         Ok(ReceiverState {
             opprf_outputs,
             opprf_payload_outputs:Vec::new(),
@@ -501,9 +500,10 @@ impl ReceiverState {
         RNG: CryptoRng + RngCore + SeedableRng<Seed = Block>,
     {
 
-        let mut my_input_bits = encode_inputs(&self.opprf_outputs);
-        let mut my_opprf_output = encode_inputs(&self.opprf_payload_outputs);
-        let mut my_payload_bits = encode_inputs(&self.payload);
+        let mut my_input_bits = encode_payloads(&self.opprf_outputs);
+        let mut my_opprf_output = encode_payloads(&self.opprf_payload_outputs);
+        let mut my_payload_bits = encode_payloads(&self.payload);
+
         self.input_size = my_input_bits.len();
 
         my_input_bits.append(&mut my_payload_bits);
@@ -536,7 +536,6 @@ impl ReceiverState {
         let n = y_payload.len();
         let y_opprf_output= y_payload.split_off(n/2);
 
-
         let (outs, _) = fancy_compute_payload_aggregate(&mut ev, &x, &y, &x_payload, &y_payload, &y_opprf_output)?;
         let mpc_outs = ev
             .outputs(&outs)?
@@ -553,6 +552,17 @@ fn encode_inputs(opprf_outputs: &[Block512]) -> Vec<u16> {
             blk.prefix(HASH_SIZE)
                 .iter()
                 .flat_map(|byte| (0..8).map(|i| u16::from((byte >> i) & 1_u8)).collect_vec())
+        })
+        .collect()
+}
+
+fn encode_payloads(opprf_outputs: &[Block512]) -> Vec<u16> {
+    opprf_outputs
+        .iter()
+        .flat_map(|blk| {
+            blk.prefix(64)
+            .iter()
+            .flat_map(|byte| (0..8).map(|i| u16::from((byte >> i) & 1_u8)).collect_vec())
         })
         .collect()
 }
@@ -632,11 +642,11 @@ fn fancy_compute_payload_aggregate<F: Fancy>(
     assert_eq!(sender_inputs.len(), receiver_inputs.len());
     assert_eq!(sender_payloads.len(), receiver_opprf_output.len());
 
-    let qs = fancy_garbling::util::primes_with_width(16);
+    let qs = fancy_garbling::util::primes_with_width(64);
 
     let eqs = sender_inputs
-        .chunks(HASH_SIZE * 8)
-        .zip_eq(receiver_inputs.chunks(HASH_SIZE * 8))
+        .chunks(64 * 8)
+        .zip_eq(receiver_inputs.chunks(64 * 8))
         .map(|(xs, ys)| {
             f.eq_bundles(
                 &BinaryBundle::new(xs.to_vec()),
@@ -646,8 +656,8 @@ fn fancy_compute_payload_aggregate<F: Fancy>(
         .collect::<Result<Vec<F::Item>, F::Error>>()?;
 
     let reconstructed_payload = sender_payloads
-        .chunks(HASH_SIZE * 8)
-        .zip_eq(receiver_opprf_output.chunks(HASH_SIZE * 8))
+        .chunks(64 * 8)
+        .zip_eq(receiver_opprf_output.chunks(64 * 8))
         .map(|(xp, tp)| {
             f.add_bundles(
                 &BinaryBundle::new(xp.to_vec()),
@@ -657,19 +667,29 @@ fn fancy_compute_payload_aggregate<F: Fancy>(
         .collect::<Result<Vec<Bundle<F::Item>>, F::Error>>()?;
 
     let mut weighted_payloads = Vec::new();
-    for it in reconstructed_payload.into_iter().zip_eq(receiver_payloads.chunks(HASH_SIZE * 8)){
+    for it in reconstructed_payload.into_iter().zip_eq(receiver_payloads.chunks(64 * 8)){
         let (ps, pr) = it;
         let ps_crt = &BinaryBundle::from(ps);
         let pr_crt = &BinaryBundle::new(pr.to_vec());
 
-        let weighted = f.bin_multiplication_lower_half(&ps_crt, &pr_crt)?;
+        let mut weighted = f.bin_multiplication_lower_half(&ps_crt, &pr_crt)?;
         weighted_payloads.push(weighted);
     }
+
+    assert_eq!(weighted_payloads.len(), eqs.len());
 
     let mut acc = BinaryBundle::from(f.mask(&eqs[0], &weighted_payloads[0])?);
     for (i, b) in eqs.iter().enumerate(){
         if i > 0 {
-            let mux = BinaryBundle::from(f.mask(&b, &weighted_payloads[i])?);
+            let mut mux = BinaryBundle::from(f.mask(&b, &weighted_payloads[i])?);
+
+            if mux.moduli().len() != acc.moduli().len() {
+                let pad_len = acc.moduli().len() - mux.moduli().len();
+                let mut w = mux.extract();
+                let zero = f.constant(0, 2)?;
+                w.pad(&zero, pad_len);
+                mux = BinaryBundle::from(w);
+            }
             acc = f.bin_addition_no_carry(&acc, &mux)?;
         }
     }

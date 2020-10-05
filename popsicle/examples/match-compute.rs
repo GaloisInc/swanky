@@ -75,23 +75,22 @@ pub fn shuffle_with_index<RNG: CryptoRng + Rng>(vec: &mut Vec<Vec<u8>>, n: usize
 }
 
 fn protocol(i: i32){
-    const ITEM_SIZE: usize = 3;
-    const SET_SIZE: usize = 100000;
+    const ITEM_SIZE: usize = 16;
+    const SET_SIZE: usize = 2;
 
     let mut rng = AesRng::new();
     let (sender, receiver) = UnixStream::pair().unwrap();
-    let mut unique_ids: HashSet<Vec<u8>> = HashSet::new();
 
-    let mut ids_sender = rand_vec_vec_unique(SET_SIZE, ITEM_SIZE,&mut rng,&mut unique_ids);
-    let mut ids_receiver = ids_sender.clone();
+    let ids_sender = rand_vec_vec(SET_SIZE, ITEM_SIZE,&mut rng);
+    let ids_receiver = ids_sender.clone();
 
-    small_change(&mut ids_sender, SET_SIZE, &mut rng);
-    let original_indeces = shuffle_with_index(&mut ids_receiver, SET_SIZE, &mut rng);
+    // small_change(&mut ids_sender, SET_SIZE, &mut rng);
+    // let original_indeces = shuffle_with_index(&mut ids_receiver, SET_SIZE, &mut rng);
 
     let sender_inputs = ids_sender.clone();
     let receiver_inputs = ids_receiver.clone();
 
-    let payloads = rand_u64_vec(SET_SIZE, 500000, &mut rng);
+    let payloads = rand_u64_vec(SET_SIZE, 50000000, &mut rng);
     let weights = rand_u64_vec(SET_SIZE, 1000, &mut rng);
 
     let payloads_sender = int_vec_block512(payloads.clone());
@@ -125,8 +124,8 @@ fn protocol(i: i32){
 
     let mut expected_result: u128= 0;
     for i in 0..SET_SIZE{
-        if ids_sender[original_indeces[i]] == ids_receiver[i]{
-            let ps = payloads[original_indeces[i]] as u128;
+        if ids_sender[i] == ids_receiver[i]{
+            let ps = payloads[i] as u128;
             let pr = weights[i] as u128;
             expected_result += ps*pr;
         }
