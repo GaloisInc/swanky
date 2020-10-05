@@ -6,6 +6,7 @@ use scuttlebutt::{Channel, AesRng, Block512};
 use std::{
     io::{BufReader, BufWriter},
     os::unix::net::UnixStream,
+    collections::HashSet,
 };
 
 pub fn rand_vec<RNG: CryptoRng + Rng>(n: usize, rng: &mut RNG) -> Vec<u8> {
@@ -16,21 +17,34 @@ pub fn rand_vec_vec<RNG: CryptoRng + Rng>(n: usize, m: usize, rng: &mut RNG) -> 
     (0..n).map(|_| rand_vec(m, rng)).collect()
 }
 
+pub fn rand_vec_vec_unique<RNG: CryptoRng + Rng>(n: usize, m: usize, rng: &mut RNG, unique:&mut HashSet<Vec<u8>>) -> Vec<Vec<u8>> {
+    (0..n).map(|_|{
+        let mut r = rand_vec(m, rng);
+        while unique.contains(&r) {
+            r = rand_vec(m, rng);
+        }
+        unique.insert(r.clone());
+        r
+    }).collect()
 
-pub fn int_vec_block512(values: Vec<u32>) -> Vec<Block512> {
+
+}
+
+
+pub fn int_vec_block512(values: Vec<u64>) -> Vec<Block512> {
     values.into_iter()
           .map(|item|{
             let value_bytes = item.to_le_bytes();
             let mut res_block = [0 as u8; 64];
-            for i in 0..4{
+            for i in 0..8{
                 res_block[i] = value_bytes[i];
             }
             Block512::from(res_block)
          }).collect()
 }
 
-pub fn rand_u32_vec<RNG: CryptoRng + Rng>(n: usize, modulus: u32, rng: &mut RNG) -> Vec<u32>{
-    (0..n).map(|_| rng.gen::<u32>()%modulus).collect()
+pub fn rand_u64_vec<RNG: CryptoRng + Rng>(n: usize, modulus: u64, rng: &mut RNG) -> Vec<u64>{
+    (0..n).map(|_| rng.gen::<u64>()%modulus).collect()
 }
 
 pub fn small_change<RNG: CryptoRng + Rng>(vec: &mut Vec<Vec<u8>>, n: usize, rng: &mut RNG)->(){
@@ -61,13 +75,14 @@ pub fn shuffle_with_index<RNG: CryptoRng + Rng>(vec: &mut Vec<Vec<u8>>, n: usize
 }
 
 fn protocol(i: i32){
-    const ITEM_SIZE: usize = 2;
-    const SET_SIZE: usize = 10;
+    const ITEM_SIZE: usize = 3;
+    const SET_SIZE: usize = 100000;
 
     let mut rng = AesRng::new();
     let (sender, receiver) = UnixStream::pair().unwrap();
+    let mut unique_ids: HashSet<Vec<u8>> = HashSet::new();
 
-    let mut ids_sender = rand_vec_vec(SET_SIZE, ITEM_SIZE,&mut rng);
+    let mut ids_sender = rand_vec_vec_unique(SET_SIZE, ITEM_SIZE,&mut rng,&mut unique_ids);
     let mut ids_receiver = ids_sender.clone();
 
     small_change(&mut ids_sender, SET_SIZE, &mut rng);
@@ -76,8 +91,8 @@ fn protocol(i: i32){
     let sender_inputs = ids_sender.clone();
     let receiver_inputs = ids_receiver.clone();
 
-    let payloads = rand_u32_vec(SET_SIZE, 1000000, &mut rng);
-    let weights = rand_u32_vec(SET_SIZE, 1000, &mut rng);
+    let payloads = rand_u64_vec(SET_SIZE, 500000, &mut rng);
+    let weights = rand_u64_vec(SET_SIZE, 1000, &mut rng);
 
     let payloads_sender = int_vec_block512(payloads.clone());
     let payloads_receiver =  int_vec_block512(weights.clone());
@@ -92,7 +107,6 @@ fn protocol(i: i32){
         let mut state = psi.send(&sender_inputs, &mut channel, &mut rng).unwrap();
         state.prepare_payload(&mut psi, &payloads_sender, &mut channel, &mut rng).unwrap();
         state.compute_payload_aggregate(&mut channel, &mut rng).unwrap();
-        // state.compute_cardinality(&mut channel, &mut rng).unwrap();
     });
 
     let mut rng = AesRng::new();
@@ -104,29 +118,30 @@ fn protocol(i: i32){
     let mut state = psi
         .receive(&receiver_inputs, &mut channel, &mut rng)
         .unwrap();
-    // let cardinality = state.compute_cardinality(&mut channel, &mut rng).unwrap();
+
     state.prepare_payload(&mut psi, &payloads_receiver, &mut channel, &mut rng).unwrap();
     let output = state.compute_payload_aggregate(&mut channel, &mut rng).unwrap();
     handle.join().unwrap();
 
-    let mut expected_result: u64= 0;
+    let mut expected_result: u128= 0;
     for i in 0..SET_SIZE{
         if ids_sender[original_indeces[i]] == ids_receiver[i]{
-            let ps = payloads[original_indeces[i]] as u64;
-            let pr = weights[i] as u64;
+            let ps = payloads[original_indeces[i]] as u128;
+            let pr = weights[i] as u128;
             expected_result += ps*pr;
         }
     }
-    
-    assert_eq!(output as u64, expected_result);
-    let normalized_out = output as f64;
-    println!("output {:?}", normalized_out /1000.0);
+
+    assert_eq!(output as u128, expected_result);
+    // let normalized_out = output as f128;
+    // println!("output {:?}", normalized_out /1000.0);
 
     println!("Trial number {:?} / 10 succeeded.....", i+1);
 }
 
 fn main() {
-    for i in 0..10{
+    let number_trial = 1;
+    for i in 0..number_trial{
         protocol(i);
     }
     println!("Success!");
