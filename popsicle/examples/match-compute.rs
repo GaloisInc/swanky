@@ -47,15 +47,6 @@ pub fn rand_u64_vec<RNG: CryptoRng + Rng>(n: usize, modulus: u64, rng: &mut RNG)
     (0..n).map(|_| rng.gen::<u64>()%modulus).collect()
 }
 
-pub fn small_change<RNG: CryptoRng + Rng>(vec: &mut Vec<Vec<u8>>, n: usize, rng: &mut RNG)->(){
-    for i in 0..n {
-        let coin:u8 = rng.gen::<u8>()%2;
-        if coin == 0{
-            vec[i][0] ^= 1;
-        }
-    }
-}
-
 pub fn shuffle_with_index<RNG: CryptoRng + Rng>(vec: &mut Vec<Vec<u8>>, n: usize, rng: &mut RNG)-> Vec<usize>{
     let mut original_indeces: Vec<usize> = (0..n).collect();
 
@@ -74,24 +65,30 @@ pub fn shuffle_with_index<RNG: CryptoRng + Rng>(vec: &mut Vec<Vec<u8>>, n: usize
     original_indeces
 }
 
+pub fn enum_ids(n: usize, id_size: usize) ->Vec<Vec<u8>>{
+    let mut ids = Vec::with_capacity(n);
+    for i in 0..n as u64{
+        let v:Vec<u8> = i.to_le_bytes().iter().take(id_size).cloned().collect();
+        ids.push(v);
+    }
+    ids
+}
+
 fn protocol(i: i32){
-    const ITEM_SIZE: usize = 16;
-    const SET_SIZE: usize = 2;
+    const ITEM_SIZE: usize = 32;
+    const SET_SIZE: usize = 1 << 18;
 
     let mut rng = AesRng::new();
     let (sender, receiver) = UnixStream::pair().unwrap();
 
-    let ids_sender = rand_vec_vec(SET_SIZE, ITEM_SIZE,&mut rng);
+    let ids_sender = enum_ids(SET_SIZE, ITEM_SIZE);
     let ids_receiver = ids_sender.clone();
-
-    // small_change(&mut ids_sender, SET_SIZE, &mut rng);
-    // let original_indeces = shuffle_with_index(&mut ids_receiver, SET_SIZE, &mut rng);
 
     let sender_inputs = ids_sender.clone();
     let receiver_inputs = ids_receiver.clone();
 
-    let payloads = rand_u64_vec(SET_SIZE, 50000000, &mut rng);
-    let weights = rand_u64_vec(SET_SIZE, 1000, &mut rng);
+    let payloads = rand_u64_vec(SET_SIZE, 50000, &mut rng);
+    let weights = rand_u64_vec(SET_SIZE, 100, &mut rng);
 
     let payloads_sender = int_vec_block512(payloads.clone());
     let payloads_receiver =  int_vec_block512(weights.clone());
@@ -102,10 +99,13 @@ fn protocol(i: i32){
         let writer = BufWriter::new(sender);
         let mut channel = Channel::new(reader, writer);
         let mut psi = Sender::init(&mut channel, &mut rng).unwrap();
-
+        println!("SX done init");
         let mut state = psi.send(&sender_inputs, &mut channel, &mut rng).unwrap();
+        println!("SX done sending");
         state.prepare_payload(&mut psi, &payloads_sender, &mut channel, &mut rng).unwrap();
+        println!("SX done preparing");
         state.compute_payload_aggregate(&mut channel, &mut rng).unwrap();
+        println!("SX done computing");
     });
 
     let mut rng = AesRng::new();
@@ -113,15 +113,18 @@ fn protocol(i: i32){
     let writer = BufWriter::new(receiver);
     let mut channel = Channel::new(reader, writer);
     let mut psi = Receiver::init(&mut channel, &mut rng).unwrap();
-
+    println!("RX done init");
     let mut state = psi
         .receive(&receiver_inputs, &mut channel, &mut rng)
         .unwrap();
-
+    println!("RX done receiving");
     state.prepare_payload(&mut psi, &payloads_receiver, &mut channel, &mut rng).unwrap();
+    println!("RX done preparing");
     let output = state.compute_payload_aggregate(&mut channel, &mut rng).unwrap();
-    handle.join().unwrap();
+    println!("RX done computing");
 
+    handle.join().unwrap();
+    println!("Computing Expected Result");
     let mut expected_result: u128= 0;
     for i in 0..SET_SIZE{
         if ids_sender[i] == ids_receiver[i]{

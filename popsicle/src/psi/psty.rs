@@ -279,8 +279,10 @@ impl SenderState {
         // 3. the opprf's output
         let placeholder = vec![2; 3*self.input_size];
         let mods = vec![2; my_input_bits.len()];
+        println!("encoding");
         let sender_inputs = gb.encode_many(&my_input_bits, &mods)?;
         let receiver_inputs = gb.receive_many(&placeholder)?;
+        println!("encoding done");
         Ok((gb, sender_inputs, receiver_inputs))
     }
 
@@ -294,11 +296,14 @@ impl SenderState {
         C: AbstractChannel,
         RNG: RngCore + CryptoRng + SeedableRng<Seed = Block>,
     {
+        println!("hello");
         let (mut gb, mut x, mut y) = self.compute_payload_setup(channel, rng)?;
+        println!("compute_payload_setup");
         let x_payload = x.split_off(self.input_size);
         let mut y_payload = y.split_off(self.input_size);
         let n = y_payload.len();
         let y_opprf_output= y_payload.split_off(n/2);
+        println!("entering fancy");
         let (outs, _) = fancy_compute_payload_aggregate(&mut gb, &x, &y, &x_payload, &y_payload, &y_opprf_output)?;
         gb.outputs(&outs)?;
         Ok(())
@@ -326,6 +331,7 @@ impl Receiver {
         let key = rng.gen();
         let hashed_inputs = utils::compress_and_hash_inputs(inputs, key);
         let cuckoo = CuckooHash::new(&hashed_inputs, NHASHES)?;
+
         // Send cuckoo hash info to receiver.
         channel.write_block(&key)?;
         channel.write_usize(cuckoo.nbins)?;
@@ -341,6 +347,7 @@ impl Receiver {
                 None => rng.gen(),
             })
             .collect::<Vec<Block>>();
+
         let opprf_outputs = self.opprf.receive(channel, &table, rng)?;
 
         Ok(ReceiverState {
@@ -514,8 +521,10 @@ impl ReceiverState {
 
         let placeholder = vec![2; 2*self.input_size];
         let mods = vec![2; my_input_bits.len()];
+
         let sender_inputs = ev.receive_many(&placeholder)?;
         let receiver_inputs = ev.encode_many(&my_input_bits, &mods)?;
+
 
         Ok((ev, sender_inputs, receiver_inputs))
     }
@@ -531,6 +540,7 @@ impl ReceiverState {
     {
 
         let (mut ev, mut x, mut y) = self.compute_payload_setup(channel, rng)?;
+
         let x_payload = x.split_off(self.input_size);
         let mut y_payload = y.split_off(self.input_size);
         let n = y_payload.len();
@@ -672,10 +682,10 @@ fn fancy_compute_payload_aggregate<F: Fancy>(
         let ps_crt = &BinaryBundle::from(ps);
         let pr_crt = &BinaryBundle::new(pr.to_vec());
 
-        let mut weighted = f.bin_multiplication_lower_half(&ps_crt, &pr_crt)?;
+        let weighted = f.bin_multiplication_lower_half(&ps_crt, &pr_crt)?;
         weighted_payloads.push(weighted);
     }
-
+    println!("Computed weighted payloads");
     assert_eq!(weighted_payloads.len(), eqs.len());
 
     let mut acc = BinaryBundle::from(f.mask(&eqs[0], &weighted_payloads[0])?);
