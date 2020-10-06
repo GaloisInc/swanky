@@ -1,12 +1,13 @@
 use popsicle::psty::{Sender, Receiver};
 
 use rand::{CryptoRng, Rng};
-use scuttlebutt::{Channel, AesRng, Block512};
+use scuttlebutt::{AesRng, Block512, TrackChannel};
 
 use std::{
     io::{BufReader, BufWriter},
     os::unix::net::UnixStream,
     collections::HashSet,
+    time::SystemTime,
 };
 
 pub fn rand_vec<RNG: CryptoRng + Rng>(n: usize, rng: &mut RNG) -> Vec<u8> {
@@ -31,20 +32,20 @@ pub fn rand_vec_vec_unique<RNG: CryptoRng + Rng>(n: usize, m: usize, rng: &mut R
 }
 
 
-pub fn int_vec_block512(values: Vec<u64>) -> Vec<Block512> {
+pub fn int_vec_block512(values: Vec<u32>) -> Vec<Block512> {
     values.into_iter()
           .map(|item|{
             let value_bytes = item.to_le_bytes();
             let mut res_block = [0 as u8; 64];
-            for i in 0..8{
+            for i in 0..4{
                 res_block[i] = value_bytes[i];
             }
             Block512::from(res_block)
          }).collect()
 }
 
-pub fn rand_u64_vec<RNG: CryptoRng + Rng>(n: usize, modulus: u64, rng: &mut RNG) -> Vec<u64>{
-    (0..n).map(|_| rng.gen::<u64>()%modulus).collect()
+pub fn rand_u32_vec<RNG: CryptoRng + Rng>(n: usize, modulus: u32, rng: &mut RNG) -> Vec<u32>{
+    (0..n).map(|_| rng.gen::<u32>()%modulus).collect()
 }
 
 pub fn shuffle_with_index<RNG: CryptoRng + Rng>(vec: &mut Vec<Vec<u8>>, n: usize, rng: &mut RNG)-> Vec<usize>{
@@ -74,9 +75,9 @@ pub fn enum_ids(n: usize, id_size: usize) ->Vec<Vec<u8>>{
     ids
 }
 
-fn protocol(i: i32){
-    const ITEM_SIZE: usize = 32;
-    const SET_SIZE: usize = 1 << 18;
+fn protocol(i: i32, total: i32){
+    const ITEM_SIZE: usize = 3;
+    const SET_SIZE: usize = 1 << 19;
 
     let mut rng = AesRng::new();
     let (sender, receiver) = UnixStream::pair().unwrap();
@@ -87,8 +88,8 @@ fn protocol(i: i32){
     let sender_inputs = ids_sender.clone();
     let receiver_inputs = ids_receiver.clone();
 
-    let payloads = rand_u64_vec(SET_SIZE, 50000, &mut rng);
-    let weights = rand_u64_vec(SET_SIZE, 100, &mut rng);
+    let payloads = rand_u32_vec(SET_SIZE, 50000, &mut rng);
+    let weights = rand_u32_vec(SET_SIZE, 100, &mut rng);
 
     let payloads_sender = int_vec_block512(payloads.clone());
     let payloads_receiver =  int_vec_block512(weights.clone());
@@ -97,31 +98,122 @@ fn protocol(i: i32){
         let mut rng = AesRng::new();
         let reader = BufReader::new(sender.try_clone().unwrap());
         let writer = BufWriter::new(sender);
-        let mut channel = Channel::new(reader, writer);
+        let mut channel = TrackChannel::new(reader, writer);
+
+        let start = SystemTime::now();
         let mut psi = Sender::init(&mut channel, &mut rng).unwrap();
-        println!("SX done init");
+        println!(
+            "Sender :: init time: {} ms",
+            start.elapsed().unwrap().as_millis()
+        );
+
+        let start = SystemTime::now();
         let mut state = psi.send(&sender_inputs, &mut channel, &mut rng).unwrap();
-        println!("SX done sending");
+        println!(
+            "Sender :: send time: {} ms",
+            start.elapsed().unwrap().as_millis()
+        );
+        println!(
+            "Sender :: pre-payload communication (read): {:.2} Mb",
+            channel.kilobits_read() / 1000.0
+        );
+        println!(
+            "Sender :: pre-payloads communication (write): {:.2} Mb",
+            channel.kilobits_written() / 1000.0
+        );
+
+        let start = SystemTime::now();
         state.prepare_payload(&mut psi, &payloads_sender, &mut channel, &mut rng).unwrap();
-        println!("SX done preparing");
+        println!(
+            "Sender :: payload preparation time: {} ms",
+            start.elapsed().unwrap().as_millis()
+        );
+        println!(
+            "Sender :: total setup communication (read): {:.2} Mb",
+            channel.kilobits_read() / 1000.0
+        );
+        println!(
+            "Sender :: total setup communication (write): {:.2} Mb",
+            channel.kilobits_written() / 1000.0
+        );
+
+        let start = SystemTime::now();
         state.compute_payload_aggregate(&mut channel, &mut rng).unwrap();
-        println!("SX done computing");
+        println!(
+            "Sender :: total computation and intersection time: {} ms",
+            start.elapsed().unwrap().as_millis()
+        );
+        println!(
+            "Sender :: total computation and intersection (read): {:.2} Mb",
+            channel.kilobits_read() / 1000.0
+        );
+        println!(
+            "Sender :: total computation and intersection (write): {:.2} Mb",
+            channel.kilobits_written() / 1000.0
+        );
+
     });
 
     let mut rng = AesRng::new();
     let reader = BufReader::new(receiver.try_clone().unwrap());
     let writer = BufWriter::new(receiver);
-    let mut channel = Channel::new(reader, writer);
+    let mut channel = TrackChannel::new(reader, writer);
+
+    let start = SystemTime::now();
     let mut psi = Receiver::init(&mut channel, &mut rng).unwrap();
-    println!("RX done init");
+    println!(
+        "Receiver :: init time: {} ms",
+        start.elapsed().unwrap().as_millis()
+    );
+
+    let start = SystemTime::now();
     let mut state = psi
         .receive(&receiver_inputs, &mut channel, &mut rng)
         .unwrap();
-    println!("RX done receiving");
+    println!(
+        "Receiver :: send time: {} ms",
+        start.elapsed().unwrap().as_millis()
+    );
+    println!(
+        "Receiver :: pre-payload communication (read): {:.2} Mb",
+        channel.kilobits_read() / 1000.0
+    );
+    println!(
+        "Receiver :: pre-payloads communication (write): {:.2} Mb",
+        channel.kilobits_written() / 1000.0
+    );
+
+    let start = SystemTime::now();
     state.prepare_payload(&mut psi, &payloads_receiver, &mut channel, &mut rng).unwrap();
-    println!("RX done preparing");
+    println!(
+        "Receiver :: payload preparation time: {} ms",
+        start.elapsed().unwrap().as_millis()
+    );
+    println!(
+        "Receiver :: total setup communication (read): {:.2} Mb",
+        channel.kilobits_read() / 1000.0
+    );
+    println!(
+        "Receiver :: total setup communication (write): {:.2} Mb",
+        channel.kilobits_written() / 1000.0
+    );
+
+
+    let start = SystemTime::now();
     let output = state.compute_payload_aggregate(&mut channel, &mut rng).unwrap();
-    println!("RX done computing");
+
+    println!(
+        "Receiver :: toal computation and intersection time: {} ms",
+        start.elapsed().unwrap().as_millis()
+    );
+    println!(
+        "Receiver :: total computation and intersection (read): {:.2} Mb",
+        channel.kilobits_read() / 1000.0
+    );
+    println!(
+        "Receiver :: total computation and intersection (write): {:.2} Mb",
+        channel.kilobits_written() / 1000.0
+    );
 
     handle.join().unwrap();
     println!("Computing Expected Result");
@@ -138,13 +230,13 @@ fn protocol(i: i32){
     // let normalized_out = output as f128;
     // println!("output {:?}", normalized_out /1000.0);
 
-    println!("Trial number {:?} / 10 succeeded.....", i+1);
+    println!("Trial number {:?} / {:?} succeeded.....", i+1, total);
 }
 
 fn main() {
     let number_trial = 1;
     for i in 0..number_trial{
-        protocol(i);
+        protocol(i, number_trial);
     }
     println!("Success!");
 }
