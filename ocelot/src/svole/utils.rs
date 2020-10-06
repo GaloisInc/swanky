@@ -7,11 +7,13 @@
 //! SVOLE utility functions.
 
 //use generic_array::{typenum::Unsigned, GenericArray};
-use scuttlebutt::{field::FiniteField, AesRng, Block};
+use scuttlebutt::{
+    field::FiniteField,
+    AesRng,
+    Block,
+};
 //use std::iter::FromIterator;
-use rand::Rng;
-use rand_core::{CryptoRng, RngCore, SeedableRng};
-use subtle::{Choice, ConditionallySelectable};
+use rand::Rng;use rand_core::SeedableRng;
 /// Converts an element of `Fp` to `F(p^r)`.
 /// Note that the converted element has the input element as the first component
 /// while other components are being `FE::PrimeField::ZERO`.
@@ -29,30 +31,67 @@ use subtle::{Choice, ConditionallySelectable};
 pub fn to_fpr_vec<FE: FiniteField>(x: &[FE::PrimeField]) -> Vec<FE> {
     x.iter().map(|&x| to_fpr(x)).collect()
 }*/
+use std::any::type_name;
+use subtle::Choice; //ConditionallySelectable;
 
-/// Dot product using `FE::multiply_by_prime_subfield`.
-pub fn dot_product_with_subfield<FE: FiniteField>(mat: &[FE::PrimeField], x: &[FE]) -> FE {
-    x.iter()
-        .zip(mat.iter())
-        .map(|(&x, &m)| x.multiply_by_prime_subfield(m))
-        .sum()
+fn type_of<T>(_: T) -> &'static str {
+    type_name::<T>()
 }
 
-pub fn dot_product_with_access_cell<FE: FiniteField>(
+pub fn dot_product_with_lpn_mtx<FE: FiniteField>(
     col_idx: usize,
     rows: usize,
     d: usize,
-    x: &[FE],
+    u: &[FE],
+) -> FE {
+    let x = FE::PrimeField::ZERO;
+    let choice = Choice::from((type_of(x) == "F2") as u8);
+    let fe = FE::conditional_select(
+        &dot_product_with_lpn_mtx_fp(col_idx, rows, d, u),
+        &dot_product_with_lpn_mtx_bin(col_idx, rows, d, u),
+        choice,
+    );
+    fe
+}
+
+pub fn dot_product_with_lpn_mtx_fp<FE: FiniteField>(
+    col_idx: usize,
+    rows: usize,
+    d: usize,
+    u: &[FE],
 ) -> FE {
     let mut sum = FE::ZERO;
-    for row_idx in 0..x.len() {
+    for row_idx in 0..u.len() {
         let fe = access_cell::<FE>(col_idx, row_idx, rows, d);
-        x[row_idx].multiply_by_prime_subfield(fe);
-        sum += x[row_idx];
+        u[row_idx].multiply_by_prime_subfield(fe);
+        sum += u[row_idx];
     }
     sum
 }
 
+pub fn dot_product_with_lpn_mtx_bin<FE: FiniteField>(
+    col_idx: usize,
+    rows: usize,
+    d: usize,
+    u: &[FE],
+) -> FE {
+    let mut sum = FE::ZERO;
+    let seed = Block::from(col_idx as u128);
+    let mut rng = AesRng::from_seed(seed);
+    let mut ds = vec![0; 10];
+    for _j in 0..d {
+        let mut rand_idx: usize = rng.gen_range(0, rows);
+        loop {
+            if ds.iter().any(|&x| x != rand_idx) {
+                ds.push(rand_idx);
+                sum += u[rand_idx];
+                break;
+            }
+            rand_idx = rng.gen_range(0, rows);
+        }
+    }
+    sum
+}
 /// Code generator that outputs matrix A for the given dimension `k` by `n` that each column of it has uniform `d` non-zero entries.
 /*pub fn code_gen<FE: FiniteField, RNG: CryptoRng + RngCore>(
     rows: usize,
@@ -95,9 +134,17 @@ pub fn access_cell<FE: FiniteField>(
 ) -> FE::PrimeField {
     let seed = Block::from(col_idx as u128);
     let mut rng = AesRng::from_seed(seed);
-    let ds = (0..d)
-        .map(|_| rng.gen_range(0, rows))
-        .collect::<Vec<usize>>();
+    let mut ds = vec![0; 10];
+    for _j in 0..d {
+        let mut rand_idx: usize = rng.gen_range(0, rows);
+        loop {
+            if ds.iter().any(|&x| x != rand_idx) {
+                ds.push(rand_idx);
+                break;
+            }
+            rand_idx = rng.gen_range(0, rows);
+        }
+    }
     let mut seed2 = row_idx as u128;
     seed2 <<= 64;
     seed2 ^= col_idx as u128;

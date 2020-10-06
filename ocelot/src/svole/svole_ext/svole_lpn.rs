@@ -28,7 +28,7 @@ use crate::{
             SpsVoleReceiver,
             SpsVoleSender,
         },
-        utils::dot_product_with_access_cell,
+        utils::dot_product_with_lpn_mtx,
         SVoleReceiver,
         SVoleSender,
     },
@@ -129,12 +129,12 @@ impl<FE: FiniteField, SV: SVoleSender<Msg = FE>, SPS: SpsVoleSender<Msg = FE>> L
         }
         //let a = &self.matrix;
         let mut x: Vec<FE::PrimeField> = (0..self.cols)
-            .map(|i| dot_product_with_access_cell::<FE::PrimeField>(i, self.rows, self.d, &self.u)) //dot_product(self.u.iter(), a[i].iter()))
+            .map(|i| dot_product_with_lpn_mtx::<FE::PrimeField>(i, self.rows, self.d, &self.u)) //dot_product(self.u.iter(), a[i].iter()))
             .collect();
         x = x.iter().zip(e.iter()).map(|(&x, &e)| x + e).collect();
         debug_assert!(x.len() == self.cols);
         let mut z: Vec<FE> = (0..self.cols)
-            .map(|i| dot_product_with_access_cell::<FE>(i, self.rows, self.d, &self.w)) //dot_product_with_subfield(&a[i], &self.w))
+            .map(|i| dot_product_with_lpn_mtx::<FE>(i, self.rows, self.d, &self.w)) //dot_product_with_subfield(&a[i], &self.w))
             .collect();
         z = z.iter().zip(t.iter()).map(|(&z, &t)| z + t).collect();
         for i in 0..self.rows {
@@ -207,7 +207,7 @@ impl<FE: FiniteField, SV: SVoleReceiver<Msg = FE>, SPS: SpsVoleReceiver<Msg = FE
             s = [s, b].concat();
         }
         let mut y: Vec<FE> = (0..self.cols)
-            .map(|i| dot_product_with_access_cell::<FE>(i, self.rows, self.d, &self.v)) //dot_product_with_subfield(&self.matrix[i], &self.v))
+            .map(|i| dot_product_with_lpn_mtx::<FE>(i, self.rows, self.d, &self.v)) //dot_product_with_subfield(&self.matrix[i], &self.v))
             .collect();
         y = y.iter().zip(s.iter()).map(|(&y, &s)| y + s).collect();
         debug_assert!(y.len() == self.cols);

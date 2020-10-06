@@ -115,13 +115,13 @@ fn main() {
     const WEIGHTS: [usize; 2] = [1295, 1269];
     const EXPS: [usize; 2] = [13, 9]; // exponents
     const D: usize = 10;
-    let cols = 1 << 23;
-    let weight = cols >> (23 - 10); // cols % weight == 0 should hold.
-    let rows = 589824;
-    let d = 2; // ideal value given in the Xios paper
-    for _i in 0..1 {
-        _test_lpnvole::<F2, VSender<F2>, VReceiver<F2>>(rows, cols, d, weight);
-        //_test_lpnvole::<Gf128, VSender<Gf128>, VReceiver<Gf128>>(rows, cols, d, weight);
-        //_test_lpnvole::<Fp, VSender<Fp>, VReceiver<Fp>>(rows, cols, d, weight);
-    }
+    let cols = (1 << EXPS[0]) * WEIGHTS[0];
+    let weight = WEIGHTS[0]; // cols % weight == 0 should hold.
+    let rows = ROWS[0];
+    let d = 10; // ideal value given in the Xios paper
+                //for _i in 0..1 {
+                //_test_lpnvole::<F2, VSender<F2>, VReceiver<F2>>(rows, cols, d, weight);
+    _test_lpnvole::<Gf128, VSender<Gf128>, VReceiver<Gf128>>(rows, cols, d, weight);
+    //_test_lpnvole::<Fp, VSender<Fp>, VReceiver<Fp>>(rows, cols, d, weight);
+    //}
 }

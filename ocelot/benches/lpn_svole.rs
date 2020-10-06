@@ -44,9 +44,9 @@ use std::{
 /// Specifies the LPN parameters such as number of rows, columns of the matrix that each column of it is uniform subjective to have
 ///  `d` number of non-zero entries.
 /// `COLS`, `WEIGHT` should be power of `2` and `COLS >> ROWS`, `COLS >> WEIGHT` such that `COLS % WEIGHT == 0`.
-const ROWS: usize = 588_160; //1 << 1; // not necessarily power of `2`
-const COLS: usize = 10_616_832; // 2^^13 * 1296; 1 << 12;
-const WEIGHT: usize = 1296; // COLS >> 11;
+const ROWS: usize = 589824; //1 << 1; // not necessarily power of `2`
+const COLS: usize = 10608640; // 2^^13 * 1296; 1 << 12;
+const WEIGHT: usize = 1295; // COLS >> 11;
 const D: usize = 10;
 
 type CPSender<FE> = CpSender<KosSender, FE>;

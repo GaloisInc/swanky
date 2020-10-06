@@ -290,19 +290,18 @@ mod tests {
     const EXPS: [usize; 2] = [13, 9]; // exponents
     const D: usize = 10;
 
-
     #[test]
     fn test_lpn_svole() {
         // it takes longer if it is more than 15.
         // make sure weight and cols are power of `2` and `cols % weight == 0`
         //for i in 9..23 {
-        let cols = 1 << 23;
-        let weight = cols >> (23 - 13); // cols % weight == 0 should hold.
-        let rows = 589824;
+        let cols = (1 << EXPS[0]) * WEIGHTS[0];
+        let weight = WEIGHTS[0]; // cols % weight == 0 should hold.
+        let rows = ROWS[0];
         let d = 10; // ideal value given in the Xios paper
         test_lpnvole::<F2, VSender<F2>, VReceiver<F2>>(rows, cols, d, weight);
         test_lpnvole::<Gf128, VSender<Gf128>, VReceiver<Gf128>>(rows, cols, d, weight);
-        test_lpnvole::<Fp, VSender<Fp>, VReceiver<Fp>>(rows, cols, d, weight);
+        //test_lpnvole::<Fp, VSender<Fp>, VReceiver<Fp>>(rows, cols, d, weight);
         //}
     }
 }
