@@ -38,13 +38,17 @@ pub fn dot_product_with_subfield<FE: FiniteField>(mat: &[FE::PrimeField], x: &[F
         .sum()
 }
 
-pub fn dot_product_with_access_cell<FE: FiniteField>(rows: usize, d: usize, x: &[FE]) -> FE {
-    let ds = d_uniform_indices(rows, d);
+pub fn dot_product_with_access_cell<FE: FiniteField>(
+    col_idx: usize,
+    rows: usize,
+    d: usize,
+    x: &[FE],
+) -> FE {
     let mut sum = FE::ZERO;
-    for i in 0..x.len() {
-        let fe = access_cell::<FE>(i, &ds);
-        x[i].multiply_by_prime_subfield(fe);
-        sum += x[i];
+    for row_idx in 0..x.len() {
+        let fe = access_cell::<FE>(col_idx, row_idx, rows, d);
+        x[row_idx].multiply_by_prime_subfield(fe);
+        sum += x[row_idx];
     }
     sum
 }
@@ -83,21 +87,23 @@ pub fn dot_product_with_access_cell<FE: FiniteField>(rows: usize, d: usize, x: &
     res
 }*/
 
-pub fn d_uniform_indices(rows: usize, d: usize) -> Vec<usize> {
-    let mut res = Vec::default();
-    for i in 0..d {
-        let seed = Block::from(i as u128);
-        let mut rng = AesRng::from_seed(seed);
-        let rand_idx = rng.gen_range(0, rows);
-        res.push(rand_idx);
-    }
-    debug_assert!(res.len() == d);
-    res
-}
-
-pub fn access_cell<FE: FiniteField>(row_idx: usize, ds: &[usize]) -> FE::PrimeField {
+pub fn access_cell<FE: FiniteField>(
+    col_idx: usize,
+    row_idx: usize,
+    rows: usize,
+    d: usize,
+) -> FE::PrimeField {
+    let seed = Block::from(col_idx as u128);
+    let mut rng = AesRng::from_seed(seed);
+    let ds = (0..d)
+        .map(|_| rng.gen_range(0, rows))
+        .collect::<Vec<usize>>();
+    let mut seed2 = row_idx as u128;
+    seed2 <<= 64;
+    seed2 ^= col_idx as u128;
+    let mut rng2 = AesRng::from_seed(Block::from(seed2));
     if ds.iter().any(|&x| x == row_idx) {
-        FE::PrimeField::ONE
+        FE::PrimeField::random(&mut rng2)
     } else {
         FE::PrimeField::ZERO
     }

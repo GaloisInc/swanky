@@ -110,12 +110,18 @@ fn main() {
     type VSender<FE> = LpnVoleSender<FE, BVSender<FE>, SPSender<FE>>;
     type VReceiver<FE> = LpnVoleReceiver<FE, BVReceiver<FE>, SPReceiver<FE>>;
 
-    println!("Hello World\n");
-    let weight = 1296;
-    let cols = (1 << 13) * weight; // cols % weight == 0 should hold
-    let rows = 588_160; // can be any value less than cols
-    let d = 10; // ideal value given in the Xios paper
-                //_test_lpnvole::<F2, VSender<F2>, VReceiver<F2>>(rows, cols, d, weight);
-                //_test_lpnvole::<Gf128, VSender<Gf128>, VReceiver<Gf128>>(rows, cols, d, weight);
-                //_test_lpnvole::<Fp, VSender<Fp>, VReceiver<Fp>>(rows, cols, d, weight);
+    const COLS: [usize; 2] = [10608640, 649728];
+    const ROWS: [usize; 2] = [589824, 36288];
+    const WEIGHTS: [usize; 2] = [1295, 1269];
+    const EXPS: [usize; 2] = [13, 9]; // exponents
+    const D: usize = 10;
+    let cols = 1 << 23;
+    let weight = cols >> (23 - 10); // cols % weight == 0 should hold.
+    let rows = 589824;
+    let d = 2; // ideal value given in the Xios paper
+    for _i in 0..1 {
+        _test_lpnvole::<F2, VSender<F2>, VReceiver<F2>>(rows, cols, d, weight);
+        //_test_lpnvole::<Gf128, VSender<Gf128>, VReceiver<Gf128>>(rows, cols, d, weight);
+        //_test_lpnvole::<Fp, VSender<Fp>, VReceiver<Fp>>(rows, cols, d, weight);
+    }
 }
