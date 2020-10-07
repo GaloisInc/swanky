@@ -10,6 +10,7 @@
 pub mod eq;
 /// GGM related helper functions.
 mod ggm_utils;
+pub mod lpn_params;
 pub mod sp_svole_dummy_ggmprime;
 pub mod svole_lpn;
 
@@ -181,6 +182,7 @@ mod tests {
             copee::{Receiver as CpReceiver, Sender as CpSender},
             svole_ext::{
                 eq::{Receiver as EqReceiver, Sender as EqSender},
+                lpn_params::{LpnExtendParams, LpnSetupParams},
                 sp_svole_dummy_ggmprime::{Receiver as SpsReceiver, Sender as SpsSender},
                 svole_lpn::{Receiver as LpnVoleReceiver, Sender as LpnVoleSender},
                 LpnsVoleReceiver,
@@ -284,24 +286,14 @@ mod tests {
     type VSender<FE> = LpnVoleSender<FE, BVSender<FE>, SPSender<FE>>;
     type VReceiver<FE> = LpnVoleReceiver<FE, BVReceiver<FE>, SPReceiver<FE>>;
 
-    const COLS: [usize; 2] = [10608640, 649728];
-    const ROWS: [usize; 2] = [589824, 36288];
-    const WEIGHTS: [usize; 2] = [1295, 1269];
-    const EXPS: [usize; 2] = [13, 9]; // exponents
-    const D: usize = 10;
-
     #[test]
     fn test_lpn_svole() {
-        // it takes longer if it is more than 15.
-        // make sure weight and cols are power of `2` and `cols % weight == 0`
-        //for i in 9..23 {
-        let cols = (1 << EXPS[0]) * WEIGHTS[0];
-        let weight = WEIGHTS[0]; // cols % weight == 0 should hold.
-        let rows = ROWS[0];
-        let d = 10; // ideal value given in the Xios paper
+        let cols = LpnSetupParams::COLS;
+        let rows = LpnSetupParams::ROWS;
+        let weight = LpnSetupParams::WEIGHT;
+        let d = LpnSetupParams::D;
         test_lpnvole::<F2, VSender<F2>, VReceiver<F2>>(rows, cols, d, weight);
         test_lpnvole::<Gf128, VSender<Gf128>, VReceiver<Gf128>>(rows, cols, d, weight);
-        //test_lpnvole::<Fp, VSender<Fp>, VReceiver<Fp>>(rows, cols, d, weight);
-        //}
+        test_lpnvole::<Fp, VSender<Fp>, VReceiver<Fp>>(rows, cols, d, weight);
     }
 }

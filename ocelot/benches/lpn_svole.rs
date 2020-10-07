@@ -14,6 +14,7 @@ use ocelot::{
         copee::{Receiver as CpReceiver, Sender as CpSender},
         svole_ext::{
             eq::{Receiver as EQReceiver, Sender as EQSender},
+            lpn_params::{LpnExtendParams, LpnSetupParams},
             sp_svole_dummy_ggmprime::{Receiver as SpVoleReceiver, Sender as SpVoleSender},
             svole_lpn::{Receiver as LpnVoleReceiver, Sender as LpnVoleSender},
             LpnsVoleReceiver,
@@ -33,21 +34,13 @@ use std::{
     time::Duration,
 };
 
-/// This value suggested in the Table 2 (cf. <https://eprint.iacr.org/2020/924>, page 20).
-/// LPN parameters for the error vector with uniform distribution.
-
-//const N: usize = 10_616_092; // COLS
-//const K: usize = 588_160; // ROWS
-//const T: usize = 1324; // WEIGHT
-//const D: usize = 10; // const `d` in d-linear code
-
 /// Specifies the LPN parameters such as number of rows, columns of the matrix that each column of it is uniform subjective to have
 ///  `d` number of non-zero entries.
 /// `COLS`, `WEIGHT` should be power of `2` and `COLS >> ROWS`, `COLS >> WEIGHT` such that `COLS % WEIGHT == 0`.
-const ROWS: usize = 589824; //1 << 1; // not necessarily power of `2`
-const COLS: usize = 10608640; // 2^^13 * 1296; 1 << 12;
-const WEIGHT: usize = 1295; // COLS >> 11;
-const D: usize = 10;
+const ROWS: usize = LpnSetupParams::ROWS;
+const COLS: usize = LpnSetupParams::COLS;
+const WEIGHT: usize = LpnSetupParams::WEIGHT;
+const D: usize = LpnSetupParams::D;
 
 type CPSender<FE> = CpSender<KosSender, FE>;
 type CPReceiver<FE> = CpReceiver<KosReceiver, FE>;

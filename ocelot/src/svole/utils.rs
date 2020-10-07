@@ -7,13 +7,10 @@
 //! SVOLE utility functions.
 
 //use generic_array::{typenum::Unsigned, GenericArray};
-use scuttlebutt::{
-    field::FiniteField,
-    AesRng,
-    Block,
-};
+use scuttlebutt::{field::FiniteField, AesRng, Block};
 //use std::iter::FromIterator;
-use rand::Rng;use rand_core::SeedableRng;
+use rand::Rng;
+use rand_core::SeedableRng;
 /// Converts an element of `Fp` to `F(p^r)`.
 /// Note that the converted element has the input element as the first component
 /// while other components are being `FE::PrimeField::ZERO`.
@@ -45,7 +42,8 @@ pub fn dot_product_with_lpn_mtx<FE: FiniteField>(
     u: &[FE],
 ) -> FE {
     let x = FE::PrimeField::ZERO;
-    let choice = Choice::from((type_of(x) == "F2") as u8);
+    let choice = Choice::from((type_of(x) == "scuttlebutt::field::f2::F2") as u8);
+    //println!("type_of(x) ?= F2:{}", type_of(x) == "scuttlebutt::field::f2::F2");
     let fe = FE::conditional_select(
         &dot_product_with_lpn_mtx_fp(col_idx, rows, d, u),
         &dot_product_with_lpn_mtx_bin(col_idx, rows, d, u),
@@ -61,10 +59,25 @@ pub fn dot_product_with_lpn_mtx_fp<FE: FiniteField>(
     u: &[FE],
 ) -> FE {
     let mut sum = FE::ZERO;
-    for row_idx in 0..u.len() {
-        let fe = access_cell::<FE>(col_idx, row_idx, rows, d);
-        u[row_idx].multiply_by_prime_subfield(fe);
-        sum += u[row_idx];
+    let mut ds = vec![0; 10];
+    let seed = Block::from(col_idx as u128);
+    let mut rng = AesRng::from_seed(seed);
+    for _j in 0..d {
+        let mut rand_idx: usize = rng.gen_range(0, rows);
+        loop {
+            if ds.iter().any(|&x| x != rand_idx) {
+                ds.push(rand_idx);
+                let nz_elt = FE::PrimeField::GENERATOR;
+                let mut seed2 = rand_idx as u128;
+                seed2 <<= 64;
+                seed2 ^= col_idx as u128;
+                let mut rng2 = AesRng::from_seed(Block::from(seed2));
+                nz_elt.pow(rng2.gen_range(0, FE::MULTIPLICATIVE_GROUP_ORDER));
+                sum += u[rand_idx].multiply_by_prime_subfield(nz_elt);
+                break;
+            }
+            rand_idx = rng.gen_range(0, rows);
+        }
     }
     sum
 }
@@ -92,7 +105,8 @@ pub fn dot_product_with_lpn_mtx_bin<FE: FiniteField>(
     }
     sum
 }
-/// Code generator that outputs matrix A for the given dimension `k` by `n` that each column of it has uniform `d` non-zero entries.
+
+//Code generator that outputs matrix A for the given dimension `k` by `n` that each column of it has uniform `d` non-zero entries.
 /*pub fn code_gen<FE: FiniteField, RNG: CryptoRng + RngCore>(
     rows: usize,
     cols: usize,
@@ -126,7 +140,7 @@ pub fn dot_product_with_lpn_mtx_bin<FE: FiniteField>(
     res
 }*/
 
-pub fn access_cell<FE: FiniteField>(
+/*pub fn access_cell<FE: FiniteField>(
     col_idx: usize,
     row_idx: usize,
     rows: usize,
@@ -150,8 +164,10 @@ pub fn access_cell<FE: FiniteField>(
     seed2 ^= col_idx as u128;
     let mut rng2 = AesRng::from_seed(Block::from(seed2));
     if ds.iter().any(|&x| x == row_idx) {
-        FE::PrimeField::random(&mut rng2)
+        let nz_elt = FE::PrimeField::GENERATOR;
+        nz_elt.pow(rng2.gen_range(0, FE::MULTIPLICATIVE_GROUP_ORDER));
+        nz_elt
     } else {
         FE::PrimeField::ZERO
     }
-}
+}*/

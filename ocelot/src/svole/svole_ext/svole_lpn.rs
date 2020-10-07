@@ -21,20 +21,14 @@
 use crate::{
     errors::Error,
     svole::{
-        svole_ext::{
-            ggm_utils::dot_product,
-            LpnsVoleReceiver,
-            LpnsVoleSender,
-            SpsVoleReceiver,
-            SpsVoleSender,
-        },
+        svole_ext::{LpnsVoleReceiver, LpnsVoleSender, SpsVoleReceiver, SpsVoleSender},
         utils::dot_product_with_lpn_mtx,
         SVoleReceiver,
         SVoleSender,
     },
 };
-use rand_core::{CryptoRng, RngCore, SeedableRng};
-use scuttlebutt::{field::FiniteField, AbstractChannel, AesRng, Block};
+use rand_core::{CryptoRng, RngCore};
+use scuttlebutt::{field::FiniteField, AbstractChannel};
 use std::marker::PhantomData;
 
 /// LpnsVole sender.
@@ -46,7 +40,7 @@ pub struct Sender<FE: FiniteField, SV: SVoleSender, SPS: SpsVoleSender> {
     cols: usize,
     u: Vec<FE::PrimeField>,
     w: Vec<FE>,
-    matrix_seed: Block, // matrix: Vec<Vec<FE::PrimeField>>,
+    //matrix_seed: Block, // matrix: Vec<Vec<FE::PrimeField>>,
     d: usize,
 }
 /// LpnsVole receiver.
@@ -57,7 +51,7 @@ pub struct Receiver<FE: FiniteField, SV: SVoleReceiver, SPS: SpsVoleReceiver> {
     rows: usize,
     cols: usize,
     v: Vec<FE>,
-    matrix_seed: Block, // matrix: Vec<Vec<FE::PrimeField>>,
+    //matrix_seed: Block, // matrix: Vec<Vec<FE::PrimeField>>,
     d: usize,
 }
 
@@ -85,10 +79,10 @@ impl<FE: FiniteField, SV: SVoleSender<Msg = FE>, SPS: SpsVoleSender<Msg = FE>> L
         let uw = svole_sender.send(channel, rows, rng)?;
         let u = uw.iter().map(|&uw| uw.0).collect();
         let w = uw.iter().map(|&uw| uw.1).collect();
-        let matrix_seed = rand::random::<Block>();
+        //let matrix_seed = rand::random::<Block>();
         //let mut mat_rng = AesRng::from_seed(matrix_seed);
         //let matrix = code_gen::<FE::PrimeField, _>(rows, cols, d, &mut mat_rng);
-        channel.write_block(&matrix_seed)?;
+        //channel.write_block(&matrix_seed)?;
         // This flush statement is needed, otherwise, it hangs on.
         channel.flush()?;
         let spvole_sender = SPS::init(channel, rng)?;
@@ -99,7 +93,7 @@ impl<FE: FiniteField, SV: SVoleSender<Msg = FE>, SPS: SpsVoleSender<Msg = FE>> L
             cols,
             u,
             w,
-            matrix_seed, // matrix,
+            //matrix_seed, // matrix,
             d,
         })
     }
@@ -115,7 +109,6 @@ impl<FE: FiniteField, SV: SVoleSender<Msg = FE>, SPS: SpsVoleSender<Msg = FE>> L
                     .to_string(),
             ));
         }
-        //let m = (self.cols as f64 / weight as f64).floor() as usize;
         let m = self.cols / weight;
         let len = self.cols - self.rows;
         let mut e = vec![FE::PrimeField::ZERO; self.cols];
@@ -127,7 +120,6 @@ impl<FE: FiniteField, SV: SVoleSender<Msg = FE>, SPS: SpsVoleSender<Msg = FE>> L
             e = [e, a].concat();
             t = [t, c].concat();
         }
-        //let a = &self.matrix;
         let mut x: Vec<FE::PrimeField> = (0..self.cols)
             .map(|i| dot_product_with_lpn_mtx::<FE::PrimeField>(i, self.rows, self.d, &self.u)) //dot_product(self.u.iter(), a[i].iter()))
             .collect();
@@ -169,7 +161,7 @@ impl<FE: FiniteField, SV: SVoleReceiver<Msg = FE>, SPS: SpsVoleReceiver<Msg = FE
         let mut svole_receiver = SV::init(channel, rng)?;
         let v = svole_receiver.receive(channel, rows, rng)?;
         let delta = svole_receiver.delta();
-        let matrix_seed = channel.read_block()?;
+        //let matrix_seed = channel.read_block()?;
         /*let mut mat_rng = AesRng::from_seed(matrix_seed);
         let matrix = code_gen::<FE::PrimeField, _>(rows, cols, d, &mut mat_rng);*/
         let spvole_receiver = SPS::init(channel, rng)?;
@@ -180,7 +172,7 @@ impl<FE: FiniteField, SV: SVoleReceiver<Msg = FE>, SPS: SpsVoleReceiver<Msg = FE
             rows,
             cols,
             v,
-            matrix_seed, //matrix,
+            //matrix_seed, //matrix,
             d,
         })
     }

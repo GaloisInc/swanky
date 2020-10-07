@@ -11,6 +11,7 @@ use ocelot::{
         copee::{Receiver as CpReceiver, Sender as CpSender},
         svole_ext::{
             eq::{Receiver as EqReceiver, Sender as EqSender},
+            lpn_params::{LpnExtendParams, LpnSetupParams},
             sp_svole_dummy_ggmprime::{Receiver as SpsReceiver, Sender as SpsSender},
             svole_lpn::{Receiver as LpnVoleReceiver, Sender as LpnVoleSender},
             LpnsVoleReceiver,
@@ -110,18 +111,14 @@ fn main() {
     type VSender<FE> = LpnVoleSender<FE, BVSender<FE>, SPSender<FE>>;
     type VReceiver<FE> = LpnVoleReceiver<FE, BVReceiver<FE>, SPReceiver<FE>>;
 
-    const COLS: [usize; 2] = [10608640, 649728];
-    const ROWS: [usize; 2] = [589824, 36288];
-    const WEIGHTS: [usize; 2] = [1295, 1269];
-    const EXPS: [usize; 2] = [13, 9]; // exponents
-    const D: usize = 10;
-    let cols = (1 << EXPS[0]) * WEIGHTS[0];
-    let weight = WEIGHTS[0]; // cols % weight == 0 should hold.
-    let rows = ROWS[0];
-    let d = 10; // ideal value given in the Xios paper
-                //for _i in 0..1 {
-                //_test_lpnvole::<F2, VSender<F2>, VReceiver<F2>>(rows, cols, d, weight);
-    _test_lpnvole::<Gf128, VSender<Gf128>, VReceiver<Gf128>>(rows, cols, d, weight);
-    //_test_lpnvole::<Fp, VSender<Fp>, VReceiver<Fp>>(rows, cols, d, weight);
-    //}
+    let rows = LpnExtendParams::ROWS;
+    let cols = LpnExtendParams::COLS;
+    let weight = LpnExtendParams::WEIGHT;
+    let d = LpnExtendParams::D;
+    // println!("\nField: F2 \n");
+    //_test_lpnvole::<F2, VSender<F2>, VReceiver<F2>>(rows, cols, d, weight);
+    //println!("\nField: Gf128 \n");
+    //_test_lpnvole::<Gf128, VSender<Gf128>, VReceiver<Gf128>>(rows, cols, d, weight);
+    println!("\nField: Fp \n");
+    _test_lpnvole::<Fp, VSender<Fp>, VReceiver<Fp>>(rows, cols, d, weight);
 }
