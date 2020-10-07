@@ -28,26 +28,17 @@ use rand_core::SeedableRng;
 pub fn to_fpr_vec<FE: FiniteField>(x: &[FE::PrimeField]) -> Vec<FE> {
     x.iter().map(|&x| to_fpr(x)).collect()
 }*/
-use std::any::type_name;
 use subtle::Choice; //ConditionallySelectable;
-
-fn type_of<T>(_: T) -> &'static str {
-    type_name::<T>()
-}
-
 pub fn dot_product_with_lpn_mtx<FE: FiniteField>(
     col_idx: usize,
     rows: usize,
     d: usize,
     u: &[FE],
 ) -> FE {
-    let x = FE::PrimeField::ZERO;
-    let choice = Choice::from((type_of(x) == "scuttlebutt::field::f2::F2") as u8);
-    //println!("type_of(x) ?= F2:{}", type_of(x) == "scuttlebutt::field::f2::F2");
     let fe = FE::conditional_select(
         &dot_product_with_lpn_mtx_fp(col_idx, rows, d, u),
         &dot_product_with_lpn_mtx_bin(col_idx, rows, d, u),
-        choice,
+        Choice::from((FE::PrimeField::MODULUS == 2) as u8),
     );
     fe
 }
@@ -59,7 +50,7 @@ pub fn dot_product_with_lpn_mtx_fp<FE: FiniteField>(
     u: &[FE],
 ) -> FE {
     let mut sum = FE::ZERO;
-    let mut ds = vec![0; 10];
+    let mut ds = Vec::new();
     let seed = Block::from(col_idx as u128);
     let mut rng = AesRng::from_seed(seed);
     for _j in 0..d {
@@ -91,7 +82,7 @@ pub fn dot_product_with_lpn_mtx_bin<FE: FiniteField>(
     let mut sum = FE::ZERO;
     let seed = Block::from(col_idx as u128);
     let mut rng = AesRng::from_seed(seed);
-    let mut ds = vec![0; 10];
+    let mut ds = Vec::new();
     for _j in 0..d {
         let mut rand_idx: usize = rng.gen_range(0, rows);
         loop {
