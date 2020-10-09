@@ -22,7 +22,7 @@ use crate::{
     errors::Error,
     svole::{
         svole_ext::{LpnsVoleReceiver, LpnsVoleSender, SpsVoleReceiver, SpsVoleSender},
-        utils::dot_product_with_lpn_mtx,
+        utils::{dot_product_with_lpn_mtx, dot_product_with_lpn_mtx_bin},
         SVoleReceiver,
         SVoleSender,
     },
@@ -117,8 +117,8 @@ impl<FE: FiniteField, SV: SVoleSender<Msg = FE>, SPS: SpsVoleSender<Msg = FE>> L
             let ac = self.spvole.send(channel, m, rng)?;
             let a: Vec<FE::PrimeField> = ac.iter().map(|&ac| ac.0).collect();
             let c: Vec<FE> = ac.iter().map(|&ac| ac.1).collect();
-            e = [e, a].concat();
-            t = [t, c].concat();
+            e.extend(a.iter());//e = [e, a].concat();
+            t.extend(c.iter());//t = [t, c].concat();
         }
         let mut x: Vec<FE::PrimeField> = (0..self.cols)
             .map(|i| dot_product_with_lpn_mtx::<FE::PrimeField>(i, self.rows, self.d, &self.u)) //dot_product(self.u.iter(), a[i].iter()))
@@ -196,7 +196,8 @@ impl<FE: FiniteField, SV: SVoleReceiver<Msg = FE>, SPS: SpsVoleReceiver<Msg = FE
         let mut s = vec![FE::ZERO; self.cols];
         for _i in 0..weight {
             let b = self.spvole.receive(channel, m, rng)?;
-            s = [s, b].concat();
+            //s = [s, b].concat();
+            s.extend(b.iter());
         }
         let mut y: Vec<FE> = (0..self.cols)
             .map(|i| dot_product_with_lpn_mtx::<FE>(i, self.rows, self.d, &self.v)) //dot_product_with_subfield(&self.matrix[i], &self.v))

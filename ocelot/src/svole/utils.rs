@@ -7,7 +7,7 @@
 //! SVOLE utility functions.
 
 //use generic_array::{typenum::Unsigned, GenericArray};
-use scuttlebutt::{field::FiniteField, AesRng, Block};
+use scuttlebutt::{field::FiniteField, AesRng, Block, Aes128};
 //use std::iter::FromIterator;
 use rand::Rng;
 use rand_core::SeedableRng;
@@ -50,25 +50,14 @@ pub fn dot_product_with_lpn_mtx_fp<FE: FiniteField>(
     u: &[FE],
 ) -> FE {
     let mut sum = FE::ZERO;
-    let mut ds = Vec::new();
     let seed = Block::from(col_idx as u128);
-    let mut rng = AesRng::from_seed(seed);
-    for _j in 0..d {
-        let mut rand_idx: usize = rng.gen_range(0, rows);
-        loop {
-            if ds.iter().any(|&x| x != rand_idx) {
-                ds.push(rand_idx);
-                let nz_elt = FE::PrimeField::GENERATOR;
-                let mut seed2 = rand_idx as u128;
-                seed2 <<= 64;
-                seed2 ^= col_idx as u128;
-                let mut rng2 = AesRng::from_seed(Block::from(seed2));
-                nz_elt.pow(rng2.gen_range(0, FE::MULTIPLICATIVE_GROUP_ORDER));
-                sum += u[rand_idx].multiply_by_prime_subfield(nz_elt);
-                break;
-            }
-            rand_idx = rng.gen_range(0, rows);
-        }
+    let cipher = Aes128::new(seed);
+    for i in 0..d {
+        let rand_idx = u128::from(cipher.encrypt(Block::from(i as u128))) % rows as u128;
+        let exp = u128::from(cipher.encrypt(Block::from(rand_idx))) % FE::MULTIPLICATIVE_GROUP_ORDER;
+        let nz_elt = FE::PrimeField::GENERATOR;
+        nz_elt.pow(exp);
+        sum += u[rand_idx as usize].multiply_by_prime_subfield(nz_elt);
     }
     sum
 }
@@ -81,18 +70,21 @@ pub fn dot_product_with_lpn_mtx_bin<FE: FiniteField>(
 ) -> FE {
     let mut sum = FE::ZERO;
     let seed = Block::from(col_idx as u128);
-    let mut rng = AesRng::from_seed(seed);
-    let mut ds = Vec::new();
-    for _j in 0..d {
-        let mut rand_idx: usize = rng.gen_range(0, rows);
-        loop {
+    let cipher = Aes128::new(seed);
+    //let mut rng = AesRng::from_seed(seed);
+    //let ds: Vec<u128> = (0..d).map(|i| u128::from(cipher.encrypt(Block::from(i as u128))) % rows as u128).collect();
+    for i in 0..d {
+        let rand_idx = u128::from(cipher.encrypt(Block::from(i as u128))) % rows as u128; //rng.gen_range(0, rows);
+        // Without replacement is expensive
+       /* loop {
             if ds.iter().any(|&x| x != rand_idx) {
                 ds.push(rand_idx);
-                sum += u[rand_idx];
+                sum += u[rand_idx as usize];
                 break;
             }
-            rand_idx = rng.gen_range(0, rows);
-        }
+            rand_idx = u128::from(cipher.encrypt(Block::from((i + d + 1) as u128))) % rows as u128;
+        }*/
+        sum += u[rand_idx as usize];
     }
     sum
 }
