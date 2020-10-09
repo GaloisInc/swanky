@@ -18,14 +18,14 @@ pub struct TcpChannel<TcpStream>{
 
 impl TcpChannel<TcpStream> {
     pub fn new(stream: TcpStream) -> Self {
-        Self{stream, nbits_read: 0, nbits_written: 0 }
+        Self{stream, nbits_read: 0, nbits_written: 0}
     }
 }
 
 impl AbstractChannel for TcpChannel<TcpStream>{
     #[inline(always)]
     fn write_bytes(&mut self, bytes: &[u8]) -> Result<()> {
-        self.nbits_written = self.stream.write(bytes)?;
+        self.nbits_written = self.stream.write(bytes)?*8;
         Ok(())
     }
 
