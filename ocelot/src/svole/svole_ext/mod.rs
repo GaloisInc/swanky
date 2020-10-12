@@ -185,17 +185,13 @@ mod tests {
                 lpn_params::{LpnExtendParams, LpnSetupParams},
                 sp_svole_dummy_ggmprime::{Receiver as SpsReceiver, Sender as SpsSender},
                 svole_lpn::{Receiver as LpnVoleReceiver, Sender as LpnVoleSender},
-                LpnsVoleReceiver,
-                LpnsVoleSender,
-                SpsVoleReceiver,
-                SpsVoleSender,
+                LpnsVoleReceiver, LpnsVoleSender, SpsVoleReceiver, SpsVoleSender,
             },
         },
     };
     use scuttlebutt::{
         field::{FiniteField as FF, Fp, Gf128, F2},
-        AesRng,
-        Channel,
+        AesRng, Channel,
     };
     use std::{
         io::{BufReader, BufWriter},
@@ -296,7 +292,7 @@ mod tests {
         test_lpnvole::<Gf128, VSender<Gf128>, VReceiver<Gf128>>(rows, cols, d, weight);
         //test_lpnvole::<Fp, VSender<Fp>, VReceiver<Fp>>(rows, cols, d, weight);
     }
-    
+
     #[test]
     fn test_lpn_svole_extend() {
         let cols = LpnExtendParams::COLS;
@@ -307,5 +303,4 @@ mod tests {
         test_lpnvole::<Gf128, VSender<Gf128>, VReceiver<Gf128>>(rows, cols, d, weight);
         //test_lpnvole::<Fp, VSender<Fp>, VReceiver<Fp>>(rows, cols, d, weight);
     }
-
 }
