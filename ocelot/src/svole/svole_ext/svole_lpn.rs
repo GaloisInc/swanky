@@ -22,9 +22,8 @@ use crate::{
     errors::Error,
     svole::{
         svole_ext::{LpnsVoleReceiver, LpnsVoleSender, SpsVoleReceiver, SpsVoleSender},
-        utils::{dot_product_with_lpn_mtx, dot_product_with_lpn_mtx_bin},
-        SVoleReceiver,
-        SVoleSender,
+        utils::lpn_mtx_indices,
+        SVoleReceiver, SVoleSender,
     },
 };
 use rand_core::{CryptoRng, RngCore};
@@ -110,30 +109,44 @@ impl<FE: FiniteField, SV: SVoleSender<Msg = FE>, SPS: SpsVoleSender<Msg = FE>> L
             ));
         }
         let m = self.cols / weight;
-        let len = self.cols - self.rows;
-        let mut e = vec![FE::PrimeField::ZERO; self.cols];
-        let mut t = vec![FE::ZERO; self.cols];
-        for _i in 0..weight {
+        let mut es = vec![];
+        let mut ts = vec![];
+        for _ in 0..weight {
             let ac = self.spvole.send(channel, m, rng)?;
-            let a: Vec<FE::PrimeField> = ac.iter().map(|&ac| ac.0).collect();
-            let c: Vec<FE> = ac.iter().map(|&ac| ac.1).collect();
-            e.extend(a.iter());//e = [e, a].concat();
-            t.extend(c.iter());//t = [t, c].concat();
+            es.extend(ac.iter().map(|(a, _)| a));
+            ts.extend(ac.iter().map(|(_, c)| c));
         }
-        let mut x: Vec<FE::PrimeField> = (0..self.cols)
-            .map(|i| dot_product_with_lpn_mtx::<FE::PrimeField>(i, self.rows, self.d, &self.u)) //dot_product(self.u.iter(), a[i].iter()))
+        let indices: Vec<Vec<(usize, FE::PrimeField)>> = (0..self.cols)
+            .map(|i| lpn_mtx_indices::<FE>(i, self.rows, self.d))
             .collect();
-        x = x.iter().zip(e.iter()).map(|(&x, &e)| x + e).collect();
-        debug_assert!(x.len() == self.cols);
-        let mut z: Vec<FE> = (0..self.cols)
-            .map(|i| dot_product_with_lpn_mtx::<FE>(i, self.rows, self.d, &self.w)) //dot_product_with_subfield(&a[i], &self.w))
+        let xs: Vec<FE::PrimeField> = indices
+            .iter()
+            .zip(es.into_iter())
+            .map(|(ds, e)| {
+                ds.into_iter()
+                    .fold(FE::PrimeField::ZERO, |acc, (i, e)| acc + self.u[*i] * *e)
+                    + e
+            })
             .collect();
-        z = z.iter().zip(t.iter()).map(|(&z, &t)| z + t).collect();
-        for i in 0..self.rows {
-            self.u[i] = x[i];
-            self.w[i] = z[i];
-        }
-        let output = (0..len).map(|i| (x[i], z[i])).collect();
+        debug_assert!(xs.len() == self.cols);
+        let zs: Vec<FE> = indices
+            .into_iter()
+            .zip(ts.into_iter())
+            .map(|(ds, t)| {
+                ds.into_iter().fold(FE::ZERO, |acc, (i, e)| {
+                    acc + self.w[i].multiply_by_prime_subfield(e)
+                }) + t
+            })
+            .collect();
+        // for i in 0..self.rows {
+        //     self.u[i] = xs[i];
+        //     self.w[i] = zs[i];
+        // }
+        let output = xs
+            .into_iter()
+            .zip(zs.into_iter())
+            .take(self.cols - self.rows)
+            .collect();
         Ok(output)
     }
 }
@@ -193,18 +206,25 @@ impl<FE: FiniteField, SV: SVoleReceiver<Msg = FE>, SPS: SpsVoleReceiver<Msg = FE
             ));
         }
         let m = self.cols / weight;
-        let mut s = vec![FE::ZERO; self.cols];
+        let mut ss = vec![];
         for _i in 0..weight {
-            let b = self.spvole.receive(channel, m, rng)?;
-            //s = [s, b].concat();
-            s.extend(b.iter());
+            let bs = self.spvole.receive(channel, m, rng)?;
+            ss.extend(bs.iter());
         }
-        let mut y: Vec<FE> = (0..self.cols)
-            .map(|i| dot_product_with_lpn_mtx::<FE>(i, self.rows, self.d, &self.v)) //dot_product_with_subfield(&self.matrix[i], &self.v))
+        let indices: Vec<Vec<(usize, FE::PrimeField)>> = (0..self.cols)
+            .map(|i| lpn_mtx_indices::<FE>(i, self.rows, self.d))
             .collect();
-        y = y.iter().zip(s.iter()).map(|(&y, &s)| y + s).collect();
-        debug_assert!(y.len() == self.cols);
-        let output = y.iter().take(self.cols - self.rows).copied().collect();
+        let ys: Vec<FE> = indices
+            .iter()
+            .zip(ss.iter())
+            .map(|(ds, s)| {
+                ds.iter().fold(FE::ZERO, |acc, (i, e)| {
+                    acc + self.v[*i].multiply_by_prime_subfield(*e)
+                }) + *s
+            })
+            .collect();
+        debug_assert!(ys.len() == self.cols);
+        let output = ys.into_iter().take(self.cols - self.rows).collect();
         Ok(output)
     }
 }
