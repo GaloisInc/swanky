@@ -1,4 +1,4 @@
-use popsicle::psty::{Sender, Receiver};
+use popsicle::psty_payload::{Sender, Receiver};
 
 use rand::{CryptoRng, Rng};
 use scuttlebutt::{AesRng, Block512, TrackChannel};
@@ -31,13 +31,12 @@ pub fn rand_vec_vec_unique<RNG: CryptoRng + Rng>(n: usize, m: usize, rng: &mut R
 
 }
 
-
 pub fn int_vec_block512(values: Vec<u32>) -> Vec<Block512> {
     values.into_iter()
           .map(|item|{
             let value_bytes = item.to_le_bytes();
             let mut res_block = [0 as u8; 64];
-            for i in 0..4{
+            for i in 0..2{
                 res_block[i] = value_bytes[i];
             }
             Block512::from(res_block)
@@ -45,7 +44,8 @@ pub fn int_vec_block512(values: Vec<u32>) -> Vec<Block512> {
 }
 
 pub fn rand_u32_vec<RNG: CryptoRng + Rng>(n: usize, modulus: u32, rng: &mut RNG) -> Vec<u32>{
-    (0..n).map(|_| rng.gen::<u32>()%modulus).collect()
+    (0..n).map(|_| 100).collect()
+    // rng.gen::<u32>()%modulus
 }
 
 pub fn shuffle_with_index<RNG: CryptoRng + Rng>(vec: &mut Vec<Vec<u8>>, n: usize, rng: &mut RNG)-> Vec<usize>{
@@ -76,8 +76,8 @@ pub fn enum_ids(n: usize, id_size: usize) ->Vec<Vec<u8>>{
 }
 
 fn protocol(i: i32, total: i32){
-    const ITEM_SIZE: usize = 3;
-    const SET_SIZE: usize = 1 << 19;
+    const ITEM_SIZE: usize = 2;
+    const SET_SIZE: usize = 1;
 
     let mut rng = AesRng::new();
     let (sender, receiver) = UnixStream::pair().unwrap();
@@ -88,8 +88,8 @@ fn protocol(i: i32, total: i32){
     let sender_inputs = ids_sender.clone();
     let receiver_inputs = ids_receiver.clone();
 
-    let payloads = rand_u32_vec(SET_SIZE, 50000, &mut rng);
-    let weights = rand_u32_vec(SET_SIZE, 100, &mut rng);
+    let payloads = rand_u32_vec(SET_SIZE, 1000, &mut rng);
+    let weights = rand_u32_vec(SET_SIZE, 10, &mut rng);
 
     let payloads_sender = int_vec_block512(payloads.clone());
     let payloads_receiver =  int_vec_block512(weights.clone());
