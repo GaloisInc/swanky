@@ -7,7 +7,7 @@
 //! SVOLE utility functions.
 
 //use generic_array::{typenum::Unsigned, GenericArray};
-use scuttlebutt::{field::FiniteField, AesRng, Block, Aes128};
+use scuttlebutt::{field::FiniteField, Aes128, AesRng, Block};
 //use std::iter::FromIterator;
 use rand::Rng;
 use rand_core::SeedableRng;
@@ -29,64 +29,64 @@ pub fn to_fpr_vec<FE: FiniteField>(x: &[FE::PrimeField]) -> Vec<FE> {
     x.iter().map(|&x| to_fpr(x)).collect()
 }*/
 use subtle::Choice; //ConditionallySelectable;
-pub fn dot_product_with_lpn_mtx<FE: FiniteField>(
+pub fn lpn_mtx_indices<FE: FiniteField>(
     col_idx: usize,
     rows: usize,
     d: usize,
-    u: &[FE],
-) -> FE {
-    let fe = FE::conditional_select(
-        &dot_product_with_lpn_mtx_fp(col_idx, rows, d, u),
-        &dot_product_with_lpn_mtx_bin(col_idx, rows, d, u),
-        Choice::from((FE::PrimeField::MODULUS == 2) as u8),
-    );
-    fe
+) -> Vec<(usize, FE::PrimeField)> {
+    if FE::PrimeField::MODULUS == 2 {
+        lpn_mtx_indices_bin::<FE>(col_idx, rows, d)
+    } else {
+        lpn_mtx_indices_fp::<FE>(col_idx, rows, d)
+    }
 }
 
-pub fn dot_product_with_lpn_mtx_fp<FE: FiniteField>(
+pub fn lpn_mtx_indices_fp<FE: FiniteField>(
     col_idx: usize,
     rows: usize,
     d: usize,
-    u: &[FE],
-) -> FE {
-    let mut sum = FE::ZERO;
+) -> Vec<(usize, FE::PrimeField)> {
     let seed = Block::from(col_idx as u128);
     let cipher = Aes128::new(seed);
+    let mut indices = vec![(0usize, FE::PrimeField::ZERO); d];
     for i in 0..d {
         let rand_idx = u128::from(cipher.encrypt(Block::from(i as u128))) % rows as u128;
-        let exp = u128::from(cipher.encrypt(Block::from(rand_idx))) % FE::MULTIPLICATIVE_GROUP_ORDER;
+        let exp =
+            u128::from(cipher.encrypt(Block::from(rand_idx))) % FE::MULTIPLICATIVE_GROUP_ORDER;
         let nz_elt = FE::PrimeField::GENERATOR;
         nz_elt.pow(exp);
-        sum += u[rand_idx as usize].multiply_by_prime_subfield(nz_elt);
+        indices[i] = (rand_idx as usize, nz_elt);
+        // sum += u[rand_idx as usize].multiply_by_prime_subfield(nz_elt);
     }
-    sum
+    indices
 }
 
-pub fn dot_product_with_lpn_mtx_bin<FE: FiniteField>(
+pub fn lpn_mtx_indices_bin<FE: FiniteField>(
     col_idx: usize,
     rows: usize,
     d: usize,
-    u: &[FE],
-) -> FE {
-    let mut sum = FE::ZERO;
+) -> Vec<(usize, FE::PrimeField)> {
     let seed = Block::from(col_idx as u128);
     let cipher = Aes128::new(seed);
+    let mut indices = vec![(0usize, FE::PrimeField::ONE); d];
     //let mut rng = AesRng::from_seed(seed);
     //let ds: Vec<u128> = (0..d).map(|i| u128::from(cipher.encrypt(Block::from(i as u128))) % rows as u128).collect();
     for i in 0..d {
-        let rand_idx = u128::from(cipher.encrypt(Block::from(i as u128))) % rows as u128; //rng.gen_range(0, rows);
+        let rand_idx = (u128::from(cipher.encrypt(Block::from(i as u128))) % rows as u128) as usize; //rng.gen_range(0, rows);
+
         // Without replacement is expensive
-       /* loop {
-            if ds.iter().any(|&x| x != rand_idx) {
-                ds.push(rand_idx);
-                sum += u[rand_idx as usize];
-                break;
-            }
-            rand_idx = u128::from(cipher.encrypt(Block::from((i + d + 1) as u128))) % rows as u128;
+        /* loop {
+                if ds.iter().any(|&x| x != rand_idx) {
+                    ds.push(rand_idx);
+                    sum += u[rand_idx as usize];
+                    break;
+                }
+                rand_idx = u128::from(cipher.encrypt(Block::from((i + d + 1) as u128))) % rows as u128;
         }*/
-        sum += u[rand_idx as usize];
+        indices[i].0 = rand_idx;
+        // sum += u[rand_idx as usize];
     }
-    sum
+    indices
 }
 
 //Code generator that outputs matrix A for the given dimension `k` by `n` that each column of it has uniform `d` non-zero entries.
