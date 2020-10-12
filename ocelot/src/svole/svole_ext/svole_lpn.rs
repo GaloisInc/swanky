@@ -74,8 +74,8 @@ impl<FE: FiniteField, SV: SVoleSender<Msg = FE>, SPS: SpsVoleSender<Msg = FE>> L
             return Err(Error::Other("Either the number of rows or constant d used in the LPN matrix construction
             is greater than the number of columns. Please make sure these values less than the no. of columns!".to_string()));
         }
-        let mut svole_sender = SV::init(channel, rng)?;
-        let uw = svole_sender.send(channel, rows, rng)?;
+        let mut svole = SV::init(channel, rng)?;
+        let uw = svole.send(channel, rows, rng)?;
         let u = uw.iter().map(|&uw| uw.0).collect();
         let w = uw.iter().map(|&uw| uw.1).collect();
         //let matrix_seed = rand::random::<Block>();
@@ -84,10 +84,10 @@ impl<FE: FiniteField, SV: SVoleSender<Msg = FE>, SPS: SpsVoleSender<Msg = FE>> L
         //channel.write_block(&matrix_seed)?;
         // This flush statement is needed, otherwise, it hangs on.
         channel.flush()?;
-        let spvole_sender = SPS::init(channel, rng)?;
+        let spvole = SPS::init(channel, rng)?;
         Ok(Self {
             _sv: PhantomData::<SV>,
-            spvole: spvole_sender,
+            spvole,
             rows,
             cols,
             u,
@@ -124,7 +124,7 @@ impl<FE: FiniteField, SV: SVoleSender<Msg = FE>, SPS: SpsVoleSender<Msg = FE>> L
             .zip(es.into_iter())
             .map(|(ds, e)| {
                 ds.into_iter()
-                    .fold(FE::PrimeField::ZERO, |acc, (i, e)| acc + self.u[*i] * *e)
+                    .fold(FE::PrimeField::ZERO, |acc, (i, a)| acc + self.u[*i] * *a)
                     + e
             })
             .collect();
@@ -133,19 +133,19 @@ impl<FE: FiniteField, SV: SVoleSender<Msg = FE>, SPS: SpsVoleSender<Msg = FE>> L
             .into_iter()
             .zip(ts.into_iter())
             .map(|(ds, t)| {
-                ds.into_iter().fold(FE::ZERO, |acc, (i, e)| {
-                    acc + self.w[i].multiply_by_prime_subfield(e)
+                ds.into_iter().fold(FE::ZERO, |acc, (i, a)| {
+                    acc + self.w[i].multiply_by_prime_subfield(a)
                 }) + t
             })
             .collect();
-        // for i in 0..self.rows {
-        //     self.u[i] = xs[i];
-        //     self.w[i] = zs[i];
-        // }
+        for i in 0..self.rows {
+            self.u[i] = xs[i];
+            self.w[i] = zs[i];
+        }
         let output = xs
             .into_iter()
-            .zip(zs.into_iter())
-            .take(self.cols - self.rows)
+            .skip(self.rows)
+            .zip(zs.into_iter().skip(self.rows))
             .collect();
         Ok(output)
     }
@@ -171,16 +171,16 @@ impl<FE: FiniteField, SV: SVoleReceiver<Msg = FE>, SPS: SpsVoleReceiver<Msg = FE
             return Err(Error::Other("Either the number of rows or constant d used in the LPN matrix construction
             is greater than the number of columns. Please make sure these values less than the no. of columns!".to_string()));
         }
-        let mut svole_receiver = SV::init(channel, rng)?;
-        let v = svole_receiver.receive(channel, rows, rng)?;
-        let delta = svole_receiver.delta();
+        let mut svole = SV::init(channel, rng)?;
+        let v = svole.receive(channel, rows, rng)?;
+        let delta = svole.delta();
         //let matrix_seed = channel.read_block()?;
         /*let mut mat_rng = AesRng::from_seed(matrix_seed);
         let matrix = code_gen::<FE::PrimeField, _>(rows, cols, d, &mut mat_rng);*/
-        let spvole_receiver = SPS::init(channel, rng)?;
+        let spvole = SPS::init(channel, rng)?;
         Ok(Self {
             _sv: PhantomData::<SV>,
-            spvole: spvole_receiver,
+            spvole,
             delta,
             rows,
             cols,
@@ -207,7 +207,7 @@ impl<FE: FiniteField, SV: SVoleReceiver<Msg = FE>, SPS: SpsVoleReceiver<Msg = FE
         }
         let m = self.cols / weight;
         let mut ss = vec![];
-        for _i in 0..weight {
+        for _ in 0..weight {
             let bs = self.spvole.receive(channel, m, rng)?;
             ss.extend(bs.iter());
         }
@@ -215,16 +215,19 @@ impl<FE: FiniteField, SV: SVoleReceiver<Msg = FE>, SPS: SpsVoleReceiver<Msg = FE
             .map(|i| lpn_mtx_indices::<FE>(i, self.rows, self.d))
             .collect();
         let ys: Vec<FE> = indices
-            .iter()
-            .zip(ss.iter())
+            .into_iter()
+            .zip(ss.into_iter())
             .map(|(ds, s)| {
-                ds.iter().fold(FE::ZERO, |acc, (i, e)| {
-                    acc + self.v[*i].multiply_by_prime_subfield(*e)
-                }) + *s
+                ds.into_iter().fold(FE::ZERO, |acc, (i, e)| {
+                    acc + self.v[i].multiply_by_prime_subfield(e)
+                }) + s
             })
             .collect();
         debug_assert!(ys.len() == self.cols);
-        let output = ys.into_iter().take(self.cols - self.rows).collect();
+        for i in 0..self.rows {
+            self.v[i] = ys[i];
+        }
+        let output = ys.into_iter().skip(self.rows).collect();
         Ok(output)
     }
 }
