@@ -33,7 +33,7 @@ use std::marker::PhantomData;
 
 /// LpnsVole sender.
 #[derive(Clone)]
-pub struct Sender<FE: FiniteField, SV: SVoleSender, SPS: SpsVoleSender> {
+pub struct Sender<FE: FiniteField, SV: SVoleSender<Msg = FE>, SPS: SpsVoleSender<SV, Msg = FE>> {
     _sv: PhantomData<SV>,
     spvole: SPS,
     rows: usize,
@@ -44,7 +44,11 @@ pub struct Sender<FE: FiniteField, SV: SVoleSender, SPS: SpsVoleSender> {
     d: usize,
 }
 /// LpnsVole receiver.
-pub struct Receiver<FE: FiniteField, SV: SVoleReceiver, SPS: SpsVoleReceiver> {
+pub struct Receiver<
+    FE: FiniteField,
+    SV: SVoleReceiver<Msg = FE>,
+    SPS: SpsVoleReceiver<SV, Msg = FE>,
+> {
     _sv: PhantomData<SV>,
     spvole: SPS,
     delta: FE,
@@ -55,7 +59,7 @@ pub struct Receiver<FE: FiniteField, SV: SVoleReceiver, SPS: SpsVoleReceiver> {
     d: usize,
 }
 
-impl<FE: FiniteField, SV: SVoleSender<Msg = FE>, SPS: SpsVoleSender<Msg = FE>> LpnsVoleSender
+impl<FE: FiniteField, SV: SVoleSender<Msg = FE>, SPS: SpsVoleSender<SV, Msg = FE>> LpnsVoleSender
     for Sender<FE, SV, SPS>
 {
     type Msg = FE;
@@ -85,7 +89,9 @@ impl<FE: FiniteField, SV: SVoleSender<Msg = FE>, SPS: SpsVoleSender<Msg = FE>> L
         //channel.write_block(&matrix_seed)?;
         // This flush statement is needed, otherwise, it hangs on.
         channel.flush()?;
-        let spvole = SPS::init(channel, rng)?;
+        let spvole = SPS::init(channel, rng, svole)?;
+        //println!("u={:?}", u);
+        //println!("w={:?}", w);
         Ok(Self {
             _sv: PhantomData::<SV>,
             spvole,
@@ -117,11 +123,15 @@ impl<FE: FiniteField, SV: SVoleSender<Msg = FE>, SPS: SpsVoleSender<Msg = FE>> L
             es.extend(ac.iter().map(|(a, _)| a));
             ts.extend(ac.iter().map(|(_, c)| c));
         }
-        //println!("es={:?}", es);
-        //println!("ts={:?}", ts);
+        debug_assert!(es.len() == self.cols);
+        debug_assert!(ts.len() == self.cols);
+        //println!("es={:?}\n", es);
+        //println!("ts={:?}\n", ts);
+
         let indices: Vec<Vec<(usize, FE::PrimeField)>> = (0..self.cols)
             .map(|i| lpn_mtx_indices::<FE>(i, self.rows, self.d))
             .collect();
+        //println!("indices_sender={:?}", indices);
         let xs: Vec<FE::PrimeField> = indices
             .iter()
             .zip(es.into_iter())
@@ -131,6 +141,7 @@ impl<FE: FiniteField, SV: SVoleSender<Msg = FE>, SPS: SpsVoleSender<Msg = FE>> L
                     + e
             })
             .collect();
+        //println!("xs={:?}", xs);
         debug_assert!(xs.len() == self.cols);
         let zs: Vec<FE> = indices
             .into_iter()
@@ -141,6 +152,7 @@ impl<FE: FiniteField, SV: SVoleSender<Msg = FE>, SPS: SpsVoleSender<Msg = FE>> L
                 }) + t
             })
             .collect();
+        //println!("zs={:?}", zs);
         for i in 0..self.rows {
             self.u[i] = xs[i];
             self.w[i] = zs[i];
@@ -155,8 +167,8 @@ impl<FE: FiniteField, SV: SVoleSender<Msg = FE>, SPS: SpsVoleSender<Msg = FE>> L
     }
 }
 
-impl<FE: FiniteField, SV: SVoleReceiver<Msg = FE>, SPS: SpsVoleReceiver<Msg = FE>> LpnsVoleReceiver
-    for Receiver<FE, SV, SPS>
+impl<FE: FiniteField, SV: SVoleReceiver<Msg = FE>, SPS: SpsVoleReceiver<SV, Msg = FE>>
+    LpnsVoleReceiver for Receiver<FE, SV, SPS>
 {
     type Msg = FE;
     fn init<C: AbstractChannel, RNG: CryptoRng + RngCore>(
@@ -177,15 +189,20 @@ impl<FE: FiniteField, SV: SVoleReceiver<Msg = FE>, SPS: SpsVoleReceiver<Msg = FE
         }
         let mut svole = SV::init(channel, rng)?;
         let v = svole.receive(channel, rows, rng)?;
-        let delta = svole.delta();
+        let svole_delta = svole.delta();
         //let matrix_seed = channel.read_block()?;
         /*let mut mat_rng = AesRng::from_seed(matrix_seed);
         let matrix = code_gen::<FE::PrimeField, _>(rows, cols, d, &mut mat_rng);*/
-        let spvole = SPS::init(channel, rng)?;
+        let spvole = SPS::init(channel, rng, svole)?;
+        //println!("v={:?}", v);
+        let spvole_delta = spvole.delta();
+        debug_assert!(spvole_delta == svole_delta);
+        //println!("svole_delta = {:?}", svole_delta);
+        //println!("sp_vole_delta = {:?}", spvole_delta);
         Ok(Self {
             _sv: PhantomData::<SV>,
             spvole,
-            delta,
+            delta: spvole_delta,
             rows,
             cols,
             v,
@@ -215,10 +232,12 @@ impl<FE: FiniteField, SV: SVoleReceiver<Msg = FE>, SPS: SpsVoleReceiver<Msg = FE
             let bs = self.spvole.receive(channel, m, rng)?;
             ss.extend(bs.iter());
         }
-        //println!("ss={:?}", ss);
+        debug_assert!(ss.len() == self.cols);
+        //println!("ss={:?}\n", ss);
         let indices: Vec<Vec<(usize, FE::PrimeField)>> = (0..self.cols)
             .map(|i| lpn_mtx_indices::<FE>(i, self.rows, self.d))
             .collect();
+        //println!("indices_receiver={:?}", indices);
         let ys: Vec<FE> = indices
             .into_iter()
             .zip(ss.into_iter())
@@ -229,6 +248,7 @@ impl<FE: FiniteField, SV: SVoleReceiver<Msg = FE>, SPS: SpsVoleReceiver<Msg = FE
             })
             .collect();
         debug_assert!(ys.len() == self.cols);
+        //println!("ys={:?}", ys);
         for i in 0..self.rows {
             self.v[i] = ys[i];
         }

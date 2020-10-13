@@ -115,10 +115,10 @@ fn main() {
     let cols = LpnExtendParams::COLS;
     let weight = LpnExtendParams::WEIGHT;
     let d = LpnExtendParams::D;
-    println!("\nField: F2 \n");
+    /*println!("\nField: F2 \n");
     _test_lpnvole::<F2, VSender<F2>, VReceiver<F2>>(rows, cols, d, weight);
-    //println!("\nField: Gf128 \n");
-    //_test_lpnvole::<Gf128, VSender<Gf128>, VReceiver<Gf128>>(rows, cols, d, weight);
-    /*println!("\nField: Fp \n");
-    _test_lpnvole::<Fp, VSender<Fp>, VReceiver<Fp>>(rows, cols, d, weight);*/
+    println!("\nField: Gf128 \n");
+    _test_lpnvole::<Gf128, VSender<Gf128>, VReceiver<Gf128>>(rows, cols, d, weight);*/
+    println!("\nField: Fp \n");
+    _test_lpnvole::<Fp, VSender<Fp>, VReceiver<Fp>>(rows, cols, d, weight);
 }

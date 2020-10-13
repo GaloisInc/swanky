@@ -15,6 +15,8 @@ use ocelot::{
             SpsVoleReceiver,
             SpsVoleSender,
         },
+        SVoleReceiver,
+        SVoleSender,
     },
 };
 use scuttlebutt::{
@@ -30,8 +32,10 @@ use std::{
 
 fn _test_spsvole<
     FE: FF,
-    SPSender: SpsVoleSender<Msg = FE>,
-    SPReceiver: SpsVoleReceiver<Msg = FE>,
+    BVSender: SVoleSender<Msg = FE>,
+    BVReceiver: SVoleReceiver<Msg = FE>,
+    SPSender: SpsVoleSender<BVSender, Msg = FE>,
+    SPReceiver: SpsVoleReceiver<BVReceiver, Msg = FE>,
 >(
     len: usize,
 ) {
@@ -43,7 +47,8 @@ fn _test_spsvole<
         let writer = BufWriter::new(sender);
         let mut channel = TrackChannel::new(reader, writer);
         let start = SystemTime::now();
-        let mut vole = SPSender::init(&mut channel, &mut rng).unwrap();
+        let base_vole = BVSender::init(&mut channel, &mut rng).unwrap();
+        let mut vole = SPSender::init(&mut channel, &mut rng, base_vole).unwrap();
         println!(
             "Sender init time: {} ms",
             start.elapsed().unwrap().as_millis()
@@ -69,7 +74,8 @@ fn _test_spsvole<
     let writer = BufWriter::new(receiver);
     let mut channel = TrackChannel::new(reader, writer);
     let start = SystemTime::now();
-    let mut vole = SPReceiver::init(&mut channel, &mut rng).unwrap();
+    let base_vole = BVReceiver::init(&mut channel, &mut rng).unwrap();
+    let mut vole = SPReceiver::init(&mut channel, &mut rng, base_vole).unwrap();
     println!(
         "Receiver init time: {} ms",
         start.elapsed().unwrap().as_millis()
@@ -108,8 +114,8 @@ fn main() {
     let splen = 1 << 14;
     let t = 1394;
     for _i in 0..t {
-        //_test_spsvole::<F2, SPSender<F2>, SPReceiver<F2>>(splen);
+        //_test_spsvole::<F2, BVSender<F2>, BVReceiver<F2>, SPSender<F2>, SPReceiver<F2>>(splen);
         //_test_spsvole::<Gf128, SPSender<Gf128>, SPReceiver<Gf128>>(splen);
-        _test_spsvole::<Fp, SPSender<Fp>, SPReceiver<Fp>>(splen);
+        _test_spsvole::<Fp, BVSender<Fp>, BVReceiver<Fp>, SPSender<Fp>, SPReceiver<Fp>>(splen);
     }
 }

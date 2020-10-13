@@ -14,7 +14,11 @@ pub mod lpn_params;
 pub mod sp_svole_dummy_ggmprime;
 pub mod svole_lpn;
 
-use crate::errors::Error;
+use crate::{
+    errors::Error,
+    svole::{SVoleReceiver, SVoleSender},
+};
+
 use rand_core::{CryptoRng, RngCore};
 use scuttlebutt::{field::FiniteField as FF, AbstractChannel};
 
@@ -58,7 +62,7 @@ where
 }
 
 /// A trait for SpsVole Sender.
-pub trait SpsVoleSender
+pub trait SpsVoleSender<SV: SVoleSender<Msg = Self::Msg>>
 where
     Self: Sized,
 {
@@ -69,6 +73,7 @@ where
     fn init<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         channel: &mut C,
         rng: &mut RNG,
+        base_svole: SV,
     ) -> Result<Self, Error>;
     /// Runs single-point svole and outputs pair of vectors `(u, w)` such that
     /// the correlation `w = u'Δ + v` holds. Note that `u'` is the converted vector from
@@ -84,7 +89,7 @@ where
 }
 
 /// A trait for SpsVole Receiver.
-pub trait SpsVoleReceiver
+pub trait SpsVoleReceiver<SV: SVoleReceiver<Msg = Self::Msg>>
 where
     Self: Sized,
 {
@@ -95,6 +100,7 @@ where
     fn init<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         channel: &mut C,
         rng: &mut RNG,
+        base_svole: SV,
     ) -> Result<Self, Error>;
     /// Returns the receiver's choice during the OT call.
     fn delta(&self) -> Self::Msg;
@@ -190,6 +196,8 @@ mod tests {
                 SpsVoleReceiver,
                 SpsVoleSender,
             },
+            SVoleReceiver,
+            SVoleSender,
         },
     };
     use scuttlebutt::{
@@ -204,8 +212,10 @@ mod tests {
 
     fn test_spsvole<
         FE: FF,
-        SPSender: SpsVoleSender<Msg = FE>,
-        SPReceiver: SpsVoleReceiver<Msg = FE>,
+        BVSender: SVoleSender<Msg = FE>,
+        BVReceiver: SVoleReceiver<Msg = FE>,
+        SPSender: SpsVoleSender<BVSender, Msg = FE>,
+        SPReceiver: SpsVoleReceiver<BVReceiver, Msg = FE>,
     >(
         len: usize,
     ) {
@@ -215,14 +225,16 @@ mod tests {
             let reader = BufReader::new(sender.try_clone().unwrap());
             let writer = BufWriter::new(sender);
             let mut channel = Channel::new(reader, writer);
-            let mut vole = SPSender::init(&mut channel, &mut rng).unwrap();
+            let bv_sender = BVSender::init(&mut channel, &mut rng).unwrap();
+            let mut vole = SPSender::init(&mut channel, &mut rng, bv_sender).unwrap();
             vole.send(&mut channel, len, &mut rng).unwrap()
         });
         let mut rng = AesRng::new();
         let reader = BufReader::new(receiver.try_clone().unwrap());
         let writer = BufWriter::new(receiver);
         let mut channel = Channel::new(reader, writer);
-        let mut vole = SPReceiver::init(&mut channel, &mut rng).unwrap();
+        let bv_receiver = BVReceiver::init(&mut channel, &mut rng).unwrap();
+        let mut vole = SPReceiver::init(&mut channel, &mut rng, bv_receiver).unwrap();
         let vs = vole.receive(&mut channel, len, &mut rng).unwrap();
         let uws = handle.join().unwrap();
         for i in 0..len as usize {
@@ -244,9 +256,15 @@ mod tests {
     fn test_sp_svole() {
         for i in 1..14 {
             let leaves = 1 << i;
-            test_spsvole::<Fp, SPSender<Fp>, SPReceiver<Fp>>(leaves);
-            test_spsvole::<Gf128, SPSender<Gf128>, SPReceiver<Gf128>>(leaves);
-            test_spsvole::<F2, SPSender<F2>, SPReceiver<F2>>(leaves);
+            test_spsvole::<Fp, BVSender<Fp>, BVReceiver<Fp>, SPSender<Fp>, SPReceiver<Fp>>(leaves);
+            test_spsvole::<
+                Gf128,
+                BVSender<Gf128>,
+                BVReceiver<Gf128>,
+                SPSender<Gf128>,
+                SPReceiver<Gf128>,
+            >(leaves);
+            test_spsvole::<F2, BVSender<F2>, BVReceiver<F2>, SPSender<F2>, SPReceiver<F2>>(leaves);
         }
     }
 
@@ -292,12 +310,12 @@ mod tests {
         let cols = LpnSetupParams::COLS;
         let rows = LpnSetupParams::ROWS;
         let d = LpnSetupParams::D;
-        //test_lpnvole::<F2, VSender<F2>, VReceiver<F2>>(rows, cols, d, weight);
-        //test_lpnvole::<Gf128, VSender<Gf128>, VReceiver<Gf128>>(rows, cols, d, weight);
+        test_lpnvole::<F2, VSender<F2>, VReceiver<F2>>(rows, cols, d, weight);
+        test_lpnvole::<Gf128, VSender<Gf128>, VReceiver<Gf128>>(rows, cols, d, weight);
         test_lpnvole::<Fp, VSender<Fp>, VReceiver<Fp>>(rows, cols, d, weight);
     }
 
-    /*#[test]
+    #[test]
     fn test_lpn_svole_params2() {
         let cols = LpnExtendParams::COLS;
         let rows = LpnExtendParams::ROWS;
@@ -305,6 +323,6 @@ mod tests {
         let d = LpnExtendParams::D;
         test_lpnvole::<F2, VSender<F2>, VReceiver<F2>>(rows, cols, d, weight);
         test_lpnvole::<Gf128, VSender<Gf128>, VReceiver<Gf128>>(rows, cols, d, weight);
-        //test_lpnvole::<Fp, VSender<Fp>, VReceiver<Fp>>(rows, cols, d, weight);
-    }*/
+        test_lpnvole::<Fp, VSender<Fp>, VReceiver<Fp>>(rows, cols, d, weight);
+    }
 }

@@ -59,12 +59,13 @@ impl<
         FE: FF,
         SV: SVoleSender<Msg = FE>,
         EQ: EqSender<Msg = FE>,
-    > SpsVoleSender for Sender<OT, FE, SV, EQ>
+    > SpsVoleSender<SV> for Sender<OT, FE, SV, EQ>
 {
     type Msg = FE;
     fn init<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         channel: &mut C,
         rng: &mut RNG,
+        base_svole: SV,
     ) -> Result<Self, Error> {
         let g = FE::GENERATOR;
         let r = FE::PolynomialFormNumCoefficients::to_usize();
@@ -75,11 +76,11 @@ impl<
             *item = acc;
             acc *= g;
         }
-        let svole = SV::init(channel, rng)?;
+        //let svole = SV::init(channel, rng)?;
         Ok(Self {
             _eq: PhantomData::<EQ>,
             pows,
-            svole,
+            svole: base_svole,
             ot,
         })
     }
@@ -157,12 +158,13 @@ impl<
         FE: FF,
         SV: SVoleReceiver<Msg = FE>,
         EQ: EqReceiver<Msg = FE>,
-    > SpsVoleReceiver for Receiver<OT, FE, SV, EQ>
+    > SpsVoleReceiver<SV> for Receiver<OT, FE, SV, EQ>
 {
     type Msg = FE;
     fn init<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         channel: &mut C,
         mut rng: &mut RNG,
+        base_svole: SV,
     ) -> Result<Self, Error> {
         let ot = OT::init(channel, &mut rng)?;
         let r = FE::PolynomialFormNumCoefficients::to_usize();
@@ -173,14 +175,14 @@ impl<
             *item = acc;
             acc *= g;
         }
-        let svole = SV::init(channel, rng)?;
-        let delta = svole.delta();
+        //let svole = SV::init(channel, rng)?;
+        let delta = base_svole.delta();
         Ok(Self {
             _eq: PhantomData::<EQ>,
             pows,
             delta,
             ot,
-            svole,
+            svole: base_svole,
         })
     }
 

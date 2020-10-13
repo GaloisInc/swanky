@@ -18,10 +18,12 @@ use ocelot::{
             SpsVoleReceiver,
             SpsVoleSender,
         },
+        SVoleReceiver,
+        SVoleSender,
     },
 };
 use scuttlebutt::{
-    field::{Fp, Gf128, F2},
+    field::{FiniteField, Fp, Gf128, F2},
     AesRng,
     Channel,
 };
@@ -38,8 +40,11 @@ type SPSender<FE> = SpVoleSender<ChouOrlandiReceiver, FE, BVSender<FE>, EQSender
 type SPReceiver<FE> = SpVoleReceiver<ChouOrlandiSender, FE, BVReceiver<FE>, EQReceiver<FE>>;
 
 fn sp_svole_init<
-    SPSender: SpsVoleSender + Sync + Send + 'static,
-    SPReceiver: SpsVoleReceiver + Sync + Send,
+    FE: FiniteField,
+    BVSender: SVoleSender<Msg = FE>,
+    BVReceiver: SVoleReceiver<Msg = FE>,
+    SPSender: SpsVoleSender<BVSender, Msg = FE> + Sync + Send + 'static,
+    SPReceiver: SpsVoleReceiver<BVReceiver, Msg = FE> + Sync + Send,
 >() -> (Arc<Mutex<SPSender>>, Arc<Mutex<SPReceiver>>) {
     let (sender, receiver) = UnixStream::pair().unwrap();
     let handle = std::thread::spawn(move || {
@@ -47,13 +52,15 @@ fn sp_svole_init<
         let reader = BufReader::new(sender.try_clone().unwrap());
         let writer = BufWriter::new(sender);
         let mut channel = Channel::new(reader, writer);
-        SPSender::init(&mut channel, &mut rng).unwrap()
+        let base_vole = BVSender::init(&mut channel, &mut rng).unwrap();
+        SPSender::init(&mut channel, &mut rng, base_vole).unwrap()
     });
     let mut rng = AesRng::new();
     let reader = BufReader::new(receiver.try_clone().unwrap());
     let writer = BufWriter::new(receiver);
     let mut channel = Channel::new(reader, writer);
-    let spvole_receiver = SPReceiver::init(&mut channel, &mut rng).unwrap();
+    let base_vole = BVReceiver::init(&mut channel, &mut rng).unwrap();
+    let spvole_receiver = SPReceiver::init(&mut channel, &mut rng, base_vole).unwrap();
     let spvole_sender = handle.join().unwrap();
     let spvole_sender = Arc::new(Mutex::new(spvole_sender));
     let spvole_receiver = Arc::new(Mutex::new(spvole_receiver));
@@ -61,8 +68,11 @@ fn sp_svole_init<
 }
 
 fn bench_svole<
-    SPSender: SpsVoleSender + Sync + Send + 'static,
-    SPReceiver: SpsVoleReceiver + Sync + Send,
+    FE: FiniteField,
+    BVSender: SVoleSender<Msg = FE>,
+    BVReceiver: SVoleReceiver<Msg = FE>,
+    SPSender: SpsVoleSender<BVSender, Msg = FE> + Sync + Send + 'static,
+    SPReceiver: SpsVoleReceiver<BVReceiver, Msg = FE> + Sync + Send,
 >(
     spvole_sender: &Arc<Mutex<SPSender>>,
     spvole_receiver: &Arc<Mutex<SPReceiver>>,
@@ -91,7 +101,11 @@ fn bench_sp_fp(c: &mut Criterion) {
     c.bench_function("sp_svole::extend::Fp (N = 1024)", move |bench| {
         let (vole_sender, vole_receiver) = sp_svole_init();
         bench.iter(move || {
-            bench_svole::<SPSender<Fp>, SPReceiver<Fp>>(&vole_sender, &vole_receiver, 1024);
+            bench_svole::<Fp, BVSender<Fp>, BVReceiver<Fp>, SPSender<Fp>, SPReceiver<Fp>>(
+                &vole_sender,
+                &vole_receiver,
+                1024,
+            );
         })
     });
 }
@@ -100,7 +114,13 @@ fn bench_sp_gf128(c: &mut Criterion) {
     c.bench_function("sp_svole::extend::Gf128 (N = 1024)", move |bench| {
         let (vole_sender, vole_receiver) = sp_svole_init();
         bench.iter(move || {
-            bench_svole::<SPSender<Gf128>, SPReceiver<Gf128>>(&vole_sender, &vole_receiver, 1024);
+            bench_svole::<
+                Gf128,
+                BVSender<Gf128>,
+                BVReceiver<Gf128>,
+                SPSender<Gf128>,
+                SPReceiver<Gf128>,
+            >(&vole_sender, &vole_receiver, 1024);
         })
     });
 }
@@ -109,12 +129,22 @@ fn bench_sp_f2(c: &mut Criterion) {
     c.bench_function("sp_svole::extend::F2 (N = 1024)", move |bench| {
         let (vole_sender, vole_receiver) = sp_svole_init();
         bench.iter(move || {
-            bench_svole::<SPSender<Gf128>, SPReceiver<Gf128>>(&vole_sender, &vole_receiver, 1024);
+            bench_svole::<F2, BVSender<F2>, BVReceiver<F2>, SPSender<F2>, SPReceiver<F2>>(
+                &vole_sender,
+                &vole_receiver,
+                1024,
+            );
         })
     });
 }
 
-fn bench_sp_init<SPSender: SpsVoleSender + Sync + Send + 'static, SPReceiver: SpsVoleReceiver>() {
+fn bench_sp_init<
+    FE: FiniteField,
+    BVSender: SVoleSender<Msg = FE>,
+    BVReceiver: SVoleReceiver<Msg = FE>,
+    SPSender: SpsVoleSender<BVSender, Msg = FE> + Sync + Send + 'static,
+    SPReceiver: SpsVoleReceiver<BVReceiver, Msg = FE> + Sync + Send,
+>() {
     let mut rng = AesRng::new();
     let (sender, receiver) = UnixStream::pair().unwrap();
     let handle = std::thread::spawn(move || {
@@ -122,19 +152,27 @@ fn bench_sp_init<SPSender: SpsVoleSender + Sync + Send + 'static, SPReceiver: Sp
         let reader = BufReader::new(sender.try_clone().unwrap());
         let writer = BufWriter::new(sender);
         let mut channel = Channel::new(reader, writer);
-        black_box(SPSender::init(&mut channel, &mut rng).unwrap())
+        let base_vole = BVSender::init(&mut channel, &mut rng).unwrap();
+        black_box(SPSender::init(&mut channel, &mut rng, base_vole).unwrap())
     });
     let reader = BufReader::new(receiver.try_clone().unwrap());
     let writer = BufWriter::new(receiver);
     let mut channel = Channel::new(reader, writer);
-    black_box(SPReceiver::init(&mut channel, &mut rng).unwrap());
+    let base_vole = BVReceiver::init(&mut channel, &mut rng).unwrap();
+    black_box(SPReceiver::init(&mut channel, &mut rng, base_vole).unwrap());
     handle.join().unwrap();
 }
 
 fn bench_sp_init_gf128(c: &mut Criterion) {
     c.bench_function("sp_svole::init::Gf128", move |bench| {
         bench.iter(move || {
-            bench_sp_init::<SPSender<Gf128>, SPReceiver<Gf128>>();
+            bench_sp_init::<
+                Gf128,
+                BVSender<Gf128>,
+                BVReceiver<Gf128>,
+                SPSender<Gf128>,
+                SPReceiver<Gf128>,
+            >();
         });
     });
 }
@@ -142,7 +180,7 @@ fn bench_sp_init_gf128(c: &mut Criterion) {
 fn bench_sp_init_fp(c: &mut Criterion) {
     c.bench_function("sp_svole::init::Fp", move |bench| {
         bench.iter(move || {
-            bench_sp_init::<SPSender<Fp>, SPReceiver<Fp>>();
+            bench_sp_init::<Fp, BVSender<Fp>, BVReceiver<Fp>, SPSender<Fp>, SPReceiver<Fp>>();
         });
     });
 }
@@ -150,7 +188,7 @@ fn bench_sp_init_fp(c: &mut Criterion) {
 fn bench_sp_init_f2(c: &mut Criterion) {
     c.bench_function("sp_svole::init::F2", move |bench| {
         bench.iter(move || {
-            bench_sp_init::<SPSender<F2>, SPReceiver<F2>>();
+            bench_sp_init::<F2, BVSender<F2>, BVReceiver<F2>, SPSender<F2>, SPReceiver<F2>>();
         });
     });
 }
