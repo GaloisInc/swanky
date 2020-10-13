@@ -11,6 +11,7 @@ use crate::{cuckoo::CuckooHash, errors::Error, utils};
 use fancy_garbling::{
     twopac::semihonest::{Evaluator, Garbler},
     BinaryBundle,
+    Bundle,
     BundleGadgets,
     CrtBundle,
     CrtGadgets,
@@ -40,9 +41,9 @@ const PAYLOAD_PRIME_SIZE: usize = 7;
 
 // Upper bound on the number of bytes allocated for the payload
 // computation's output
-const OUTPUT_SIZE: usize = PAYLOAD_SIZE*2;
+const OUTPUT_SIZE: usize = PAYLOAD_SIZE*2 + 1;
 // How many u16's  are used for the CRT representation
-const OUTPUT_PRIME_SIZE: usize = 10;
+const OUTPUT_PRIME_SIZE: usize = 11;
 
 // How many bytes to use to determine whether decryption succeeded in the send/recv
 // payload methods.
@@ -397,6 +398,7 @@ fn encode_inputs(opprf_outputs: &[Block512]) -> Vec<u16> {
 }
 
 fn encode_payloads(opprf_outputs: &[Block512]) -> Vec<u16> {
+    let qs = fancy_garbling::util::primes_with_width(OUTPUT_SIZE as u32 * 8);
     opprf_outputs
         .iter()
         .flat_map(|blk| {
@@ -408,6 +410,7 @@ fn encode_payloads(opprf_outputs: &[Block512]) -> Vec<u16> {
              b_16
         })
         .collect()
+
 }
 
 fn block512_to_crt(b: Block512) -> Vec<u16>{
@@ -437,11 +440,13 @@ fn mask_payload_crt(x: Block512, y: Block512) -> Block512{
 
     let x_crt = block512_to_crt(x);
     let y_crt = block512_to_crt(y);
+
     let q = fancy_garbling::util::primes_with_width(PAYLOAD_SIZE as u32 * 8);
     let mut res = Vec::new();
     for i in 0..q.len(){
         res.push((x_crt[i]+y_crt[i]) % q[i]);
     }
+
     crt_to_block512(res)
 }
 
@@ -461,9 +466,9 @@ fn fancy_compute_payload_aggregate<F: fancy_garbling::FancyReveal + Fancy>(
     assert_eq!(sender_payloads.len(), receiver_payloads.len());
     assert_eq!(receiver_payloads.len(), receiver_masks.len());
 
-    let qs = fancy_garbling::util::primes_with_width(OUTPUT_SIZE as u32 * 8);
+    let qs = fancy_garbling::util::primes_with_width(PAYLOAD_SIZE as u32 * 8);
     let q = fancy_garbling::util::product(&qs);
-    println!("qs {:?}", qs);
+
     let eqs = sender_inputs
         .chunks(HASH_SIZE * 8)
         .zip_eq(receiver_inputs.chunks(HASH_SIZE * 8))
@@ -479,13 +484,16 @@ fn fancy_compute_payload_aggregate<F: fancy_garbling::FancyReveal + Fancy>(
         .chunks(OUTPUT_PRIME_SIZE)
         .zip_eq(receiver_masks.chunks(OUTPUT_PRIME_SIZE))
         .map(|(xp, tp)| {
+            let b_x = Bundle::new(xp.to_vec());
+            let b_t = Bundle::new(tp.to_vec());
+            let a = f.reveal_bundle(&b_x)?;
             f.crt_sub(
-                &CrtBundle::new(xp.to_vec()),
-                &CrtBundle::new(tp.to_vec()),
+                &CrtBundle::from(b_t),
+                &CrtBundle::from(b_x),
             )
         })
         .collect::<Result<Vec<CrtBundle<F::Item>>, F::Error>>()?;
-    let a = f.crt_reveal(&reconstructed_payload[0])?;
+
 
     let mut weighted_payloads = Vec::new();
     for it in reconstructed_payload.into_iter().zip_eq(receiver_payloads.chunks(OUTPUT_PRIME_SIZE)){
