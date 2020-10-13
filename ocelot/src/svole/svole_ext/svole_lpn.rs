@@ -125,7 +125,7 @@ impl<FE: FiniteField, SV: SVoleSender<Msg = FE>, SPS: SpsVoleSender<SV, Msg = FE
         }
         debug_assert!(es.len() == self.cols);
         debug_assert!(ts.len() == self.cols);
-        //println!("es={:?}\n", es);
+        println!("es={:?}\n", es);
         //println!("ts={:?}\n", ts);
 
         let indices: Vec<Vec<(usize, FE::PrimeField)>> = (0..self.cols)

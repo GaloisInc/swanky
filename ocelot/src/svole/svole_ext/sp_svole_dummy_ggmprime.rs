@@ -76,7 +76,6 @@ impl<
             *item = acc;
             acc *= g;
         }
-        //let svole = SV::init(channel, rng)?;
         Ok(Self {
             _eq: PhantomData::<EQ>,
             pows,
@@ -89,18 +88,20 @@ impl<
         &mut self,
         channel: &mut C,
         len: usize,
-        rng: &mut RNG,
+        mut rng: &mut RNG,
     ) -> Result<Vec<(FE::PrimeField, FE)>, Error> {
         let r = FE::PolynomialFormNumCoefficients::to_usize();
         let depth = 128 - (len as u128 - 1).leading_zeros() as usize;
         let n = len;
         let (a, delta) = self.svole.send(channel, 1, rng)?[0];
-        let g = FE::PrimeField::GENERATOR;
-        let beta = g;
-        beta.pow(rng.gen_range(0, FE::MULTIPLICATIVE_GROUP_ORDER));
+        let mut beta = FE::PrimeField::random(&mut rng);
+        while beta == FE::PrimeField::ZERO {
+            beta = FE::PrimeField::random(&mut rng);
+        }
         let a_prime = beta - a;
         channel.write_fe(a_prime)?;
         let alpha = rng.gen_range(0, n);
+        println!("alpha={}", alpha);
         let mut us = vec![FE::PrimeField::ZERO; n];
         us[alpha] = beta;
         let choices = unpack_bits(&(!alpha).to_le_bytes(), depth);
@@ -175,7 +176,6 @@ impl<
             *item = acc;
             acc *= g;
         }
-        //let svole = SV::init(channel, rng)?;
         let delta = base_svole.delta();
         Ok(Self {
             _eq: PhantomData::<EQ>,

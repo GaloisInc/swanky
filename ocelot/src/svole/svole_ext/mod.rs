@@ -306,12 +306,12 @@ mod tests {
 
     #[test]
     fn test_lpn_svole_params1() {
-        let weight = LpnSetupParams::WEIGHT;
-        let cols = LpnSetupParams::COLS;
-        let rows = LpnSetupParams::ROWS;
-        let d = LpnSetupParams::D;
-        test_lpnvole::<F2, VSender<F2>, VReceiver<F2>>(rows, cols, d, weight);
-        test_lpnvole::<Gf128, VSender<Gf128>, VReceiver<Gf128>>(rows, cols, d, weight);
+        let weight = 3; //LpnSetupParams::WEIGHT;
+        let cols = (1 << 2) * weight; //LpnSetupParams::COLS;
+        let rows = 3; // LpnSetupParams::ROWS;
+        let d = 2; //LpnSetupParams::D;
+                   //test_lpnvole::<F2, VSender<F2>, VReceiver<F2>>(rows, cols, d, weight);
+                   //test_lpnvole::<Gf128, VSender<Gf128>, VReceiver<Gf128>>(rows, cols, d, weight);
         test_lpnvole::<Fp, VSender<Fp>, VReceiver<Fp>>(rows, cols, d, weight);
     }
 
