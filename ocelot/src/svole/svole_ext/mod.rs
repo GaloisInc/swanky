@@ -242,7 +242,7 @@ mod tests {
 
     #[test]
     fn test_sp_svole() {
-        for i in 1..10 {
+        for i in 1..14 {
             let leaves = 1 << i;
             test_spsvole::<Fp, SPSender<Fp>, SPReceiver<Fp>>(leaves);
             test_spsvole::<Gf128, SPSender<Gf128>, SPReceiver<Gf128>>(leaves);
@@ -287,18 +287,18 @@ mod tests {
     type VReceiver<FE> = LpnVoleReceiver<FE, BVReceiver<FE>, SPReceiver<FE>>;
 
     #[test]
-    fn test_lpn_svole_setup() {
+    fn test_lpn_svole_params1() {
+        let weight = LpnSetupParams::WEIGHT;
         let cols = LpnSetupParams::COLS;
         let rows = LpnSetupParams::ROWS;
-        let weight = LpnSetupParams::WEIGHT;
         let d = LpnSetupParams::D;
-        test_lpnvole::<F2, VSender<F2>, VReceiver<F2>>(rows, cols, d, weight);
-        test_lpnvole::<Gf128, VSender<Gf128>, VReceiver<Gf128>>(rows, cols, d, weight);
-        //test_lpnvole::<Fp, VSender<Fp>, VReceiver<Fp>>(rows, cols, d, weight);
+        //test_lpnvole::<F2, VSender<F2>, VReceiver<F2>>(rows, cols, d, weight);
+        //test_lpnvole::<Gf128, VSender<Gf128>, VReceiver<Gf128>>(rows, cols, d, weight);
+        test_lpnvole::<Fp, VSender<Fp>, VReceiver<Fp>>(rows, cols, d, weight);
     }
-    
-    #[test]
-    fn test_lpn_svole_extend() {
+
+    /*#[test]
+    fn test_lpn_svole_params2() {
         let cols = LpnExtendParams::COLS;
         let rows = LpnExtendParams::ROWS;
         let weight = LpnExtendParams::WEIGHT;
@@ -306,6 +306,5 @@ mod tests {
         test_lpnvole::<F2, VSender<F2>, VReceiver<F2>>(rows, cols, d, weight);
         test_lpnvole::<Gf128, VSender<Gf128>, VReceiver<Gf128>>(rows, cols, d, weight);
         //test_lpnvole::<Fp, VSender<Fp>, VReceiver<Fp>>(rows, cols, d, weight);
-    }
-
+    }*/
 }
