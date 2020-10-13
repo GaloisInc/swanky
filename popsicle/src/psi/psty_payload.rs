@@ -35,15 +35,10 @@ const NHASHES: usize = 3;
 const HASH_SIZE: usize = 3;
 
 // How many bytes are used for payloads
-const PAYLOAD_SIZE: usize = 2;
+const PAYLOAD_SIZE: usize = 5;
 // How many u16's are used for the CRT representation
-const PAYLOAD_PRIME_SIZE: usize = 7;
+const PAYLOAD_PRIME_SIZE: usize = 12;
 
-// Upper bound on the number of bytes allocated for the payload
-// computation's output
-const OUTPUT_SIZE: usize = PAYLOAD_SIZE*2 + 1;
-// How many u16's  are used for the CRT representation
-const OUTPUT_PRIME_SIZE: usize = 11;
 
 // How many bytes to use to determine whether decryption succeeded in the send/recv
 // payload methods.
@@ -221,7 +216,7 @@ impl SenderState {
         let sender_inputs = gb.encode_many(&my_input_bits, &mods_bits)?;
         let receiver_inputs = gb.receive_many(&mods_bits)?;
 
-        let qs = fancy_garbling::util::primes_with_width(OUTPUT_SIZE as u32 * 8);
+        let qs = fancy_garbling::util::primes_with_width(PAYLOAD_SIZE as u32 * 8);
         let mut mods_crt = Vec::new();
         for i in 0..self.opprf_payload_outputs.len(){
             mods_crt.append(&mut qs.clone());
@@ -356,7 +351,7 @@ impl ReceiverState {
         let sender_inputs = ev.receive_many(&mods_bits)?;
         let receiver_inputs = ev.encode_many(&my_input_bits, &mods_bits)?;
 
-        let qs = fancy_garbling::util::primes_with_width(OUTPUT_SIZE as u32 * 8);
+        let qs = fancy_garbling::util::primes_with_width(PAYLOAD_SIZE as u32 * 8);
         let mut mods_crt = Vec::new();
         for i in 0..self.payload.len(){
             mods_crt.append(&mut qs.clone());
@@ -398,12 +393,12 @@ fn encode_inputs(opprf_outputs: &[Block512]) -> Vec<u16> {
 }
 
 fn encode_payloads(opprf_outputs: &[Block512]) -> Vec<u16> {
-    let qs = fancy_garbling::util::primes_with_width(OUTPUT_SIZE as u32 * 8);
+    let qs = fancy_garbling::util::primes_with_width(PAYLOAD_SIZE as u32 * 8);
     opprf_outputs
         .iter()
         .flat_map(|blk| {
              let mut b = blk.prefix(PAYLOAD_PRIME_SIZE*2);
-             let mut b_16 =  vec![0 as u16; OUTPUT_PRIME_SIZE];
+             let mut b_16 =  vec![0 as u16; PAYLOAD_PRIME_SIZE];
              for i in 0..b.len()/2{
                  b_16[i] = u16::from_le_bytes([b[2*i], b[2*i+1]]);
              }
@@ -467,6 +462,7 @@ fn fancy_compute_payload_aggregate<F: fancy_garbling::FancyReveal + Fancy>(
     assert_eq!(receiver_payloads.len(), receiver_masks.len());
 
     let qs = fancy_garbling::util::primes_with_width(PAYLOAD_SIZE as u32 * 8);
+    println!("qs len {:?}", qs.len());
     let q = fancy_garbling::util::product(&qs);
 
     let eqs = sender_inputs
@@ -481,12 +477,11 @@ fn fancy_compute_payload_aggregate<F: fancy_garbling::FancyReveal + Fancy>(
         .collect::<Result<Vec<F::Item>, F::Error>>()?;
 
     let reconstructed_payload = sender_payloads
-        .chunks(OUTPUT_PRIME_SIZE)
-        .zip_eq(receiver_masks.chunks(OUTPUT_PRIME_SIZE))
+        .chunks(PAYLOAD_PRIME_SIZE)
+        .zip_eq(receiver_masks.chunks(PAYLOAD_PRIME_SIZE))
         .map(|(xp, tp)| {
             let b_x = Bundle::new(xp.to_vec());
             let b_t = Bundle::new(tp.to_vec());
-            let a = f.reveal_bundle(&b_x)?;
             f.crt_sub(
                 &CrtBundle::from(b_t),
                 &CrtBundle::from(b_x),
@@ -496,7 +491,7 @@ fn fancy_compute_payload_aggregate<F: fancy_garbling::FancyReveal + Fancy>(
 
 
     let mut weighted_payloads = Vec::new();
-    for it in reconstructed_payload.into_iter().zip_eq(receiver_payloads.chunks(OUTPUT_PRIME_SIZE)){
+    for it in reconstructed_payload.into_iter().zip_eq(receiver_payloads.chunks(PAYLOAD_PRIME_SIZE)){
         let (ps, pr) = it;
         let weighted = f.crt_mul(&ps, &CrtBundle::new(pr.to_vec()))?;
         weighted_payloads.push(weighted);
