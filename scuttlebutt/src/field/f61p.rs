@@ -75,14 +75,18 @@ impl FiniteField for F61p {
         self * pf
     }
 
+    /// This has a 2^-61 probability of being a biased draw.
     #[inline]
     fn from_uniform_bytes(x: &[u8; 16]) -> Self {
-        F61p(u64::from_le_bytes(<[u8; 8]>::try_from(&x[0..8]).unwrap()) & Self::MODULUS as u64)
+        F61p(reduce(
+            u64::from_le_bytes(<[u8; 8]>::try_from(&x[0..8]).unwrap()) as u128,
+        ))
     }
 
+    /// This has a 2^-61 probability of being a biased draw.
     #[inline]
     fn random<R: RngCore + ?Sized>(rng: &mut R) -> Self {
-        F61p(rng.next_u64() & Self::MODULUS as u64)
+        F61p(reduce(rng.next_u64() as u128))
     }
 
     const MULTIPLICATIVE_GROUP_ORDER: u128 = Self::MODULUS - 1;
