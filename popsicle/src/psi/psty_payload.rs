@@ -35,14 +35,13 @@ const NHASHES: usize = 3;
 const HASH_SIZE: usize = 3;
 
 // How many bytes are used for payloads
-const PAYLOAD_SIZE: usize = 5;
+const PAYLOAD_SIZE: usize = 8;
 // How many u16's are used for the CRT representation
-const PAYLOAD_PRIME_SIZE: usize = 12;
+const PAYLOAD_PRIME_SIZE: usize = 16;
 
 
 // How many bytes to use to determine whether decryption succeeded in the send/recv
 // payload methods.
-const PAD_LEN: usize = 16;
 
 /// The type of values in the sender and receiver's sets.
 pub type Msg = Vec<u8>;
@@ -59,7 +58,6 @@ pub struct SenderState {
     pub opprf_payload_outputs: Vec<Block512>,
     table: Vec<Vec<Block>>,
     mapping: Vec<Vec<usize>>,
-    input_size: usize,
 }
 
 /// Private set intersection receiver.
@@ -74,7 +72,6 @@ pub struct ReceiverState {
     pub opprf_payload_outputs: Vec<Block512>,
     table: Vec<Block>,
     cuckoo: CuckooHash,
-    input_size: usize,
     payload: Vec<Block512>,
 }
 
@@ -144,7 +141,6 @@ impl Sender {
             opprf_payload_outputs: Vec::new(),
             table,
             mapping,
-            input_size: 0,
         })
     }
 }
@@ -176,8 +172,7 @@ impl SenderState {
                     payload_byte = rng.gen::<Block512>();
                 }
 
-                let p = mask_payload_crt(payload_byte, ts[index]);
-
+                let p = mask_payload_crt(payload_byte, ts[index], rng);
                 payload_table[index].push(p);
             }
         }
@@ -189,8 +184,7 @@ impl SenderState {
         }
         sender.opprf_payload.send(channel, &points, nbins, rng)?;
 
-        self.opprf_payload_outputs = ts.into_iter()
-                                        .map(|x| crt_to_block512(block512_to_crt(x))).collect_vec();
+        self.opprf_payload_outputs = ts;
 
         Ok(())
     }
@@ -208,9 +202,9 @@ impl SenderState {
     {
         let mut gb = Garbler::<C, RNG, OtSender>::new(channel.clone(), RNG::from_seed(rng.gen()))?;
 
-        let mut my_input_bits = encode_inputs(&self.opprf_outputs);
-        let mut my_payload_bits = encode_payloads(&self.opprf_payload_outputs);
-
+        let my_input_bits = encode_inputs(&self.opprf_outputs);
+        let my_payload_bits = encode_payloads(&self.opprf_payload_outputs);
+        println!("my_payload_bits {:?}", my_payload_bits);
         let mods_bits = vec![2; my_input_bits.len()];
 
         let sender_inputs = gb.encode_many(&my_input_bits, &mods_bits)?;
@@ -218,7 +212,7 @@ impl SenderState {
 
         let qs = fancy_garbling::util::primes_with_width(PAYLOAD_SIZE as u32 * 8);
         let mut mods_crt = Vec::new();
-        for i in 0..self.opprf_payload_outputs.len(){
+        for _i in 0..self.opprf_payload_outputs.len(){
             mods_crt.append(&mut qs.clone());
         }
 
@@ -292,7 +286,6 @@ impl Receiver {
             opprf_payload_outputs:Vec::new(),
             table,
             cuckoo,
-            input_size: 0,
             payload: Vec::new(),
         })
     }
@@ -318,11 +311,8 @@ impl ReceiverState {
                             .items
                             .iter()
                             .map(|opt_item| match opt_item {
-                                Some(item) => { let b = block512_to_crt(payloads[item.input_index]);
-                                    let q = fancy_garbling::util::primes_with_width(PAYLOAD_SIZE as u32 * 8);
-                                    crt_to_block512(b)
-                                    },
-                                None => {rng.gen::<Block512>()},
+                                Some(item) => payloads[item.input_index],
+                                None => rng.gen::<Block512>(),
                             })
 
                             .collect::<Vec<Block512>>();
@@ -340,9 +330,9 @@ impl ReceiverState {
         RNG: CryptoRng + RngCore + SeedableRng<Seed = Block>,
     {
 
-        let mut my_input_bits = encode_inputs(&self.opprf_outputs);
-        let mut my_opprf_output = encode_payloads(&self.opprf_payload_outputs);
-        let mut my_payload_bits = encode_payloads(&self.payload);
+        let my_input_bits = encode_inputs(&self.opprf_outputs);
+        let my_opprf_output = encode_opprf_payload(&self.opprf_payload_outputs);
+        let my_payload_bits = encode_payloads(&self.payload);
 
         let mut ev =
             Evaluator::<C, RNG, OtReceiver>::new(channel.clone(), RNG::from_seed(rng.gen()))?;
@@ -353,7 +343,7 @@ impl ReceiverState {
 
         let qs = fancy_garbling::util::primes_with_width(PAYLOAD_SIZE as u32 * 8);
         let mut mods_crt = Vec::new();
-        for i in 0..self.payload.len(){
+        for _i in 0..self.payload.len(){
             mods_crt.append(&mut qs.clone());
         }
         let sender_payloads = ev.receive_many(&mods_crt)?;
@@ -392,20 +382,57 @@ fn encode_inputs(opprf_outputs: &[Block512]) -> Vec<u16> {
         .collect()
 }
 
-fn encode_payloads(opprf_outputs: &[Block512]) -> Vec<u16> {
-    let qs = fancy_garbling::util::primes_with_width(PAYLOAD_SIZE as u32 * 8);
+fn encode_payloads(payload: &[Block512]) -> Vec<u16> {
+    let q = fancy_garbling::util::primes_with_width(PAYLOAD_SIZE as u32 * 8);
+    payload
+        .iter()
+        .flat_map(|blk| {
+             let b = blk.prefix(PAYLOAD_SIZE);
+             let mut b_8 = [0 as u8; 16];
+             for i in 0..PAYLOAD_SIZE{
+                 b_8[i] = b[i];
+             }
+             fancy_garbling::util::crt(u128::from_le_bytes(b_8), &q)
+        })
+        .collect()
+}
+
+fn encode_opprf_payload(opprf_outputs: &[Block512]) -> Vec<u16> {
+let q = fancy_garbling::util::primes_with_width(PAYLOAD_SIZE as u32 * 8);
     opprf_outputs
         .iter()
         .flat_map(|blk| {
-             let mut b = blk.prefix(PAYLOAD_PRIME_SIZE*2);
-             let mut b_16 =  vec![0 as u16; PAYLOAD_PRIME_SIZE];
-             for i in 0..b.len()/2{
-                 b_16[i] = u16::from_le_bytes([b[2*i], b[2*i+1]]);
+             let b = blk.prefix(PAYLOAD_PRIME_SIZE);
+             let mut b_8 = [0 as u8; 16];
+             for i in 0..PAYLOAD_PRIME_SIZE{
+                 b_8[i] = b[i];
              }
-             b_16
+             fancy_garbling::util::crt(u128::from_le_bytes(b_8), &q)
         })
         .collect()
+}
 
+
+fn mask_payload_crt<RNG>(x: Block512, y: Block512, rng:&mut RNG) -> Block512
+                        where RNG: RngCore + CryptoRng + SeedableRng<Seed = Block>{
+
+    let x_crt = block512_to_crt(x);
+    let y_crt = block512_to_crt(y);
+    let q = fancy_garbling::util::primes_with_width(PAYLOAD_SIZE as u32 * 8);
+    let mut res_crt = Vec::new();
+    for i in 0..q.len(){
+        res_crt.push((x_crt[i]+y_crt[i]) % q[i]);
+    }
+    let res = fancy_garbling::util::crt_inv(&res_crt, &q).to_le_bytes();
+    let mut block = [0 as u8; 64];
+    for i in 0..64{
+        if i < PAYLOAD_PRIME_SIZE{
+            block[i] = res[i];
+        }else{
+            block[i] = rng.gen::<u8>();
+        }
+    }
+    Block512::from(block)
 }
 
 fn block512_to_crt(b: Block512) -> Vec<u16>{
@@ -419,30 +446,6 @@ fn block512_to_crt(b: Block512) -> Vec<u16>{
     let q = fancy_garbling::util::primes_with_width(PAYLOAD_SIZE as u32 * 8);
     let b_crt = fancy_garbling::util::crt(u128::from_le_bytes(b_128), &q);
     b_crt
-}
-
-fn crt_to_block512(c: Vec<u16>) -> Block512{
-    let mut block = [0 as u8; 64];
-    for i in 0..c.len(){
-        let b = c[i].to_le_bytes();
-        block[2*i] = b[0];
-        block[2*i + 1] = b[1];
-    }
-    Block512::from(block)
-}
-
-fn mask_payload_crt(x: Block512, y: Block512) -> Block512{
-
-    let x_crt = block512_to_crt(x);
-    let y_crt = block512_to_crt(y);
-
-    let q = fancy_garbling::util::primes_with_width(PAYLOAD_SIZE as u32 * 8);
-    let mut res = Vec::new();
-    for i in 0..q.len(){
-        res.push((x_crt[i]+y_crt[i]) % q[i]);
-    }
-
-    crt_to_block512(res)
 }
 
 /// Fancy function to compute a weighted average
@@ -462,7 +465,6 @@ fn fancy_compute_payload_aggregate<F: fancy_garbling::FancyReveal + Fancy>(
     assert_eq!(receiver_payloads.len(), receiver_masks.len());
 
     let qs = fancy_garbling::util::primes_with_width(PAYLOAD_SIZE as u32 * 8);
-    println!("qs len {:?}", qs.len());
     let q = fancy_garbling::util::product(&qs);
 
     let eqs = sender_inputs
