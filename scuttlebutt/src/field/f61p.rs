@@ -78,7 +78,9 @@ impl FiniteField for F61p {
     /// This has a 2^-61 probability of being a biased draw.
     #[inline]
     fn from_uniform_bytes(x: &[u8; 16]) -> Self {
-        F61p(reduce(u64::from_le_bytes(<[u8; 8]>::try_from(&x[0..8]).unwrap()) as u128))
+        F61p(reduce(
+            u64::from_le_bytes(<[u8; 8]>::try_from(&x[0..8]).unwrap()) as u128,
+        ))
     }
 
     /// This has a 2^-61 probability of being a biased draw.
