@@ -136,7 +136,7 @@ impl<FE: FF, CP: CopeeReceiver<Msg = FE>> SVoleReceiver for Receiver<CP, FE> {
         if z == delta {
             Ok(v)
         } else {
-            Err(Error::Other(
+            Err(Error::CorrelationCheckError(
                 "Correlation check fails in base vole protocol, i.e, w != u'Δ + v".to_string(),
             ))
         }

@@ -23,7 +23,7 @@ use ocelot::{
     },
 };
 use scuttlebutt::{
-    field::{FiniteField, Fp, Gf128, F2},
+    field::{F61p, FiniteField, Fp, Gf128, F2},
     AesRng,
     Channel,
 };
@@ -98,20 +98,20 @@ fn bench_svole<
 }
 
 fn bench_sp_fp(c: &mut Criterion) {
-    c.bench_function("sp_svole::extend::Fp (N = 1024)", move |bench| {
+    c.bench_function("sp_svole::extend::Fp (splen = 1 << 13)", move |bench| {
         let (vole_sender, vole_receiver) = sp_svole_init();
         bench.iter(move || {
             bench_svole::<Fp, BVSender<Fp>, BVReceiver<Fp>, SPSender<Fp>, SPReceiver<Fp>>(
                 &vole_sender,
                 &vole_receiver,
-                1024,
+                1 << 13,
             );
         })
     });
 }
 
 fn bench_sp_gf128(c: &mut Criterion) {
-    c.bench_function("sp_svole::extend::Gf128 (N = 1024)", move |bench| {
+    c.bench_function("sp_svole::extend::Gf128 (splen = 1 << 13)", move |bench| {
         let (vole_sender, vole_receiver) = sp_svole_init();
         bench.iter(move || {
             bench_svole::<
@@ -120,19 +120,32 @@ fn bench_sp_gf128(c: &mut Criterion) {
                 BVReceiver<Gf128>,
                 SPSender<Gf128>,
                 SPReceiver<Gf128>,
-            >(&vole_sender, &vole_receiver, 1024);
+            >(&vole_sender, &vole_receiver, 1 << 13);
         })
     });
 }
 
 fn bench_sp_f2(c: &mut Criterion) {
-    c.bench_function("sp_svole::extend::F2 (N = 1024)", move |bench| {
+    c.bench_function("sp_svole::extend::F2 (splen = 1 << 13)", move |bench| {
         let (vole_sender, vole_receiver) = sp_svole_init();
         bench.iter(move || {
             bench_svole::<F2, BVSender<F2>, BVReceiver<F2>, SPSender<F2>, SPReceiver<F2>>(
                 &vole_sender,
                 &vole_receiver,
-                1024,
+                1 << 13,
+            );
+        })
+    });
+}
+
+fn bench_sp_f61p(c: &mut Criterion) {
+    c.bench_function("sp_svole::extend::F2 (splen = 1 << 13)", move |bench| {
+        let (vole_sender, vole_receiver) = sp_svole_init();
+        bench.iter(move || {
+            bench_svole::<F61p, BVSender<F61p>, BVReceiver<F61p>, SPSender<F61p>, SPReceiver<F61p>>(
+                &vole_sender,
+                &vole_receiver,
+                1 << 13,
             );
         })
     });
@@ -192,9 +205,18 @@ fn bench_sp_init_f2(c: &mut Criterion) {
         });
     });
 }
+
+fn bench_sp_init_f61p(c: &mut Criterion) {
+    c.bench_function("sp_svole::init::F61p", move |bench| {
+        bench.iter(move || {
+            bench_sp_init::<F61p, BVSender<F61p>, BVReceiver<F61p>, SPSender<F61p>, SPReceiver<F61p>>();
+        });
+    });
+}
+
 criterion_group! {
     name = svole;
     config = Criterion::default().warm_up_time(Duration::from_millis(100));
-    targets = bench_sp_fp, bench_sp_gf128, bench_sp_f2, bench_sp_init_gf128, bench_sp_init_fp, bench_sp_init_f2
+    targets = bench_sp_fp, bench_sp_gf128, bench_sp_f2, bench_sp_f61p, bench_sp_init_gf128, bench_sp_init_fp, bench_sp_init_f61p, bench_sp_init_f2
 }
 criterion_main!(svole);

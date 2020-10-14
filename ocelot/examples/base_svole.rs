@@ -9,12 +9,13 @@ use ocelot::{
     svole::{
         base_svole::{Receiver as VoleReceiver, Sender as VoleSender},
         copee::{Receiver as CpReceiver, Sender as CpSender},
+        svole_ext::lpn_params::{LpnExtendParams, LpnSetupParams},
         SVoleReceiver,
         SVoleSender,
     },
 };
 use scuttlebutt::{
-    field::{FiniteField as FF, Fp, Gf128, F2},
+    field::{F61p, FiniteField as FF, Fp, Gf128, F2},
     AesRng,
     TrackChannel,
 };
@@ -92,9 +93,26 @@ type BVSender<FE> = VoleSender<CPSender<FE>, FE>;
 type BVReceiver<FE> = VoleReceiver<CPReceiver<FE>, FE>;
 
 fn main() {
-    /// This is called in LPN-svole once at initialization with the
-    /// secure k (rows) used in the LPN matrix
-    _test_svole::<F2, BVSender<F2>, BVReceiver<F2>>(588_160);
-    _test_svole::<Gf128, BVSender<Gf128>, BVReceiver<Gf128>>(588_160);
-    _test_svole::<Fp, BVSender<Fp>, BVReceiver<Fp>>(588_160);
+    let len_setup_params = LpnSetupParams::ROWS;
+    let len_extend_params = LpnExtendParams::ROWS;
+
+    println!("Using LPN parameters for Init phase");
+    println!("\nField: F2 \n");
+    _test_svole::<F2, BVSender<F2>, BVReceiver<F2>>(len_setup_params);
+    println!("\nField: Gf128 \n");
+    _test_svole::<Gf128, BVSender<Gf128>, BVReceiver<Gf128>>(len_setup_params);
+    println!("\nField: Fp \n");
+    _test_svole::<Fp, BVSender<Fp>, BVReceiver<Fp>>(len_setup_params);
+    println!("\nField: F61p \n");
+    _test_svole::<F61p, BVSender<F61p>, BVReceiver<F61p>>(len_setup_params);
+
+    println!("Using LPN parameters for Extend phase");
+    println!("\nField: F2 \n");
+    _test_svole::<F2, BVSender<F2>, BVReceiver<F2>>(len_extend_params);
+    println!("\nField: Gf128 \n");
+    _test_svole::<Gf128, BVSender<Gf128>, BVReceiver<Gf128>>(len_extend_params);
+    println!("\nField: Fp \n");
+    _test_svole::<Fp, BVSender<Fp>, BVReceiver<Fp>>(len_extend_params);
+    println!("\nField: F61p \n");
+    _test_svole::<F61p, BVSender<F61p>, BVReceiver<F61p>>(len_extend_params);
 }

@@ -201,7 +201,7 @@ mod tests {
         },
     };
     use scuttlebutt::{
-        field::{FiniteField as FF, Fp, Gf128, F2},
+        field::{F61p, FiniteField as FF, Fp, Gf128, F2},
         AesRng,
         Channel,
     };
@@ -265,6 +265,9 @@ mod tests {
                 SPReceiver<Gf128>,
             >(leaves);
             test_spsvole::<F2, BVSender<F2>, BVReceiver<F2>, SPSender<F2>, SPReceiver<F2>>(leaves);
+            test_spsvole::<F61p, BVSender<F61p>, BVReceiver<F61p>, SPSender<F61p>, SPReceiver<F61p>>(
+                leaves,
+            );
         }
     }
 
@@ -310,9 +313,10 @@ mod tests {
         let cols = (1 << 2) * weight; //LpnSetupParams::COLS;
         let rows = 3; // LpnSetupParams::ROWS;
         let d = 2; //LpnSetupParams::D;
-                   //test_lpnvole::<F2, VSender<F2>, VReceiver<F2>>(rows, cols, d, weight);
-                   //test_lpnvole::<Gf128, VSender<Gf128>, VReceiver<Gf128>>(rows, cols, d, weight);
+        test_lpnvole::<F2, VSender<F2>, VReceiver<F2>>(rows, cols, d, weight);
+        test_lpnvole::<Gf128, VSender<Gf128>, VReceiver<Gf128>>(rows, cols, d, weight);
         test_lpnvole::<Fp, VSender<Fp>, VReceiver<Fp>>(rows, cols, d, weight);
+        test_lpnvole::<F61p, VSender<F61p>, VReceiver<F61p>>(rows, cols, d, weight);
     }
 
     #[test]
@@ -324,5 +328,6 @@ mod tests {
         test_lpnvole::<F2, VSender<F2>, VReceiver<F2>>(rows, cols, d, weight);
         test_lpnvole::<Gf128, VSender<Gf128>, VReceiver<Gf128>>(rows, cols, d, weight);
         test_lpnvole::<Fp, VSender<Fp>, VReceiver<Fp>>(rows, cols, d, weight);
+        test_lpnvole::<F61p, VSender<F61p>, VReceiver<F61p>>(rows, cols, d, weight);
     }
 }

@@ -20,7 +20,7 @@ use ocelot::{
     },
 };
 use scuttlebutt::{
-    field::{FiniteField as FF, Fp, Gf128, F2},
+    field::{F61p, FiniteField as FF, Fp, Gf128, F2},
     AesRng,
     TrackChannel,
 };
@@ -115,10 +115,13 @@ fn main() {
     let cols = LpnExtendParams::COLS;
     let weight = LpnExtendParams::WEIGHT;
     let d = LpnExtendParams::D;
-    /*println!("\nField: F2 \n");
+
+    println!("\nField: F2 \n");
     _test_lpnvole::<F2, VSender<F2>, VReceiver<F2>>(rows, cols, d, weight);
     println!("\nField: Gf128 \n");
-    _test_lpnvole::<Gf128, VSender<Gf128>, VReceiver<Gf128>>(rows, cols, d, weight);*/
+    _test_lpnvole::<Gf128, VSender<Gf128>, VReceiver<Gf128>>(rows, cols, d, weight);
     println!("\nField: Fp \n");
     _test_lpnvole::<Fp, VSender<Fp>, VReceiver<Fp>>(rows, cols, d, weight);
+    println!("\nField: F61p \n");
+    _test_lpnvole::<F61p, VSender<F61p>, VReceiver<F61p>>(rows, cols, d, weight);
 }

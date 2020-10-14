@@ -121,6 +121,7 @@ mod tests {
         svole::{
             base_svole::{Receiver as VoleReceiver, Sender as VoleSender},
             copee::{Receiver as CpReceiver, Sender as CpSender},
+            svole_ext::lpn_params::{LpnExtendParams, LpnSetupParams},
             CopeeReceiver,
             CopeeSender,
             SVoleReceiver,
@@ -128,7 +129,7 @@ mod tests {
         },
     };
     use scuttlebutt::{
-        field::{FiniteField as FF, Fp, Gf128, F2},
+        field::{F61p, FiniteField as FF, Fp, Gf128, F2},
         AesRng,
         Channel,
     };
@@ -181,6 +182,7 @@ mod tests {
         test_copee_::<Fp, CPSender<Fp>, CPReceiver<Fp>>(128);
         test_copee_::<Gf128, CPSender<Gf128>, CPReceiver<Gf128>>(128);
         test_copee_::<F2, CPSender<F2>, CPReceiver<F2>>(128);
+        test_copee_::<F61p, CPSender<F61p>, CPReceiver<F61p>>(128);
     }
 
     fn test_svole<FE: FF, BVSender: SVoleSender<Msg = FE>, BVReceiver: SVoleReceiver<Msg = FE>>(
@@ -214,9 +216,20 @@ mod tests {
     type BVReceiver<FE> = VoleReceiver<CPReceiver<FE>, FE>;
 
     #[test]
-    fn test_base_svole() {
-        test_svole::<Fp, BVSender<Fp>, BVReceiver<Fp>>(1024);
-        test_svole::<Gf128, BVSender<Gf128>, BVReceiver<Gf128>>(1024);
-        test_svole::<F2, BVSender<F2>, BVReceiver<F2>>(1024);
+    fn test_base_svole_setup_params() {
+        let len = LpnSetupParams::ROWS;
+        test_svole::<Fp, BVSender<Fp>, BVReceiver<Fp>>(len);
+        test_svole::<Gf128, BVSender<Gf128>, BVReceiver<Gf128>>(len);
+        test_svole::<F2, BVSender<F2>, BVReceiver<F2>>(len);
+        test_svole::<F61p, BVSender<F61p>, BVReceiver<F61p>>(len);
+    }
+
+    #[test]
+    fn test_base_svole_extend_params() {
+        let len = LpnExtendParams::ROWS;
+        test_svole::<Fp, BVSender<Fp>, BVReceiver<Fp>>(len);
+        test_svole::<Gf128, BVSender<Gf128>, BVReceiver<Gf128>>(len);
+        test_svole::<F2, BVSender<F2>, BVReceiver<F2>>(len);
+        test_svole::<F61p, BVSender<F61p>, BVReceiver<F61p>>(len);
     }
 }

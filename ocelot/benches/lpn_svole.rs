@@ -23,7 +23,7 @@ use ocelot::{
     },
 };
 use scuttlebutt::{
-    field::{Fp, Gf128, F2},
+    field::{F61p, Fp, Gf128, F2},
     AesRng,
     Channel,
 };
@@ -135,6 +135,14 @@ fn bench_svole_f2(c: &mut Criterion) {
     });
 }
 
+fn bench_svole_f61p(c: &mut Criterion) {
+    c.bench_function("lpn_svole::extend::F61p", move |bench| {
+        let (vole_sender, vole_receiver) = svole_init(ROWS, COLS, D);
+        bench.iter(move || {
+            bench_svole::<VSender<F61p>, VReceiver<F61p>>(&vole_sender, &vole_receiver, WEIGHT);
+        })
+    });
+}
 fn bench_svole_init<
     VSender: LpnsVoleSender + Sync + Send + 'static,
     VReceiver: LpnsVoleReceiver,
@@ -182,9 +190,18 @@ fn bench_svole_init_f2(c: &mut Criterion) {
         });
     });
 }
+
+fn bench_svole_init_f61p(c: &mut Criterion) {
+    c.bench_function("lpn_svole::init::F61p", move |bench| {
+        bench.iter(move || {
+            bench_svole_init::<VSender<F61p>, VReceiver<F61p>>(ROWS, COLS, D);
+        });
+    });
+}
+
 criterion_group! {
     name = svole;
     config = Criterion::default().warm_up_time(Duration::from_millis(100));
-    targets = bench_svole_fp, bench_svole_gf128, bench_svole_f2, bench_svole_init_gf128, bench_svole_init_fp, bench_svole_init_f2
+    targets = bench_svole_fp, bench_svole_gf128, bench_svole_f2, bench_svole_f61p, bench_svole_init_gf128, bench_svole_init_f61p, bench_svole_init_fp, bench_svole_init_f2
 }
 criterion_main!(svole);
