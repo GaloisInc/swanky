@@ -250,4 +250,7 @@ pub use f2::{BiggerThanModulus as F2BiggerThanModulus, F2};
 mod gf_2_128;
 pub use gf_2_128::{Gf128, Gf128BytesDeserializationCannotFail};
 
+mod f61p;
+pub use f61p::F61p;
+
 pub mod polynomial;
