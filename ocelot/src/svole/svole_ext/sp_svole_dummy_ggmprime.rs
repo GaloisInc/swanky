@@ -101,7 +101,6 @@ impl<
         let a_prime = beta - a;
         channel.write_fe(a_prime)?;
         let alpha = rng.gen_range(0, n);
-        println!("alpha={}", alpha);
         let mut us = vec![FE::PrimeField::ZERO; n];
         us[alpha] = beta;
         let choices = unpack_bits(&(!alpha).to_le_bytes(), depth);

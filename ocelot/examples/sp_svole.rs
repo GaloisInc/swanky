@@ -111,11 +111,16 @@ type SPReceiver<FE> = SpsReceiver<ChouOrlandiSender, FE, BVReceiver<FE>, EqRecei
 fn main() {
     /// This is called in LPN-svole iteratively with secure `t = 1324` number of times each with
     /// `1 << 14`.
-    let splen = 1 << 14;
+    let splen = 1 << 13;
     let t = 1394;
-    for _i in 0..t {
-        //_test_spsvole::<F2, BVSender<F2>, BVReceiver<F2>, SPSender<F2>, SPReceiver<F2>>(splen);
-        //_test_spsvole::<Gf128, SPSender<Gf128>, SPReceiver<Gf128>>(splen);
-        _test_spsvole::<Fp, BVSender<Fp>, BVReceiver<Fp>, SPSender<Fp>, SPReceiver<Fp>>(splen);
-    }
+    //for _i in 0..t {
+    println!("\nField: F2 \n");
+    _test_spsvole::<F2, BVSender<F2>, BVReceiver<F2>, SPSender<F2>, SPReceiver<F2>>(splen);
+    println!("\nField: Gf128 \n");
+    _test_spsvole::<Gf128, BVSender<Gf128>, BVReceiver<Gf128>, SPSender<Gf128>, SPReceiver<Gf128>>(
+        splen,
+    );
+    println!("\nField: Fp \n");
+    _test_spsvole::<Fp, BVSender<Fp>, BVReceiver<Fp>, SPSender<Fp>, SPReceiver<Fp>>(splen);
+    //}
 }

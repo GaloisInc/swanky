@@ -71,13 +71,13 @@ impl<FE: FiniteField, SV: SVoleSender<Msg = FE>, SPS: SpsVoleSender<SV, Msg = FE
         rng: &mut RNG,
     ) -> Result<Self, Error> {
         if cols % 2 != 0 {
-            return Err(Error::Other(
-                "The number of columns of the LPN matrix is not multiple of 2!".to_string(),
-            ));
+            return Err(Error::InvalidColumns);
         }
-        if (rows >= cols) | (d >= cols) {
-            return Err(Error::Other("Either the number of rows or constant d used in the LPN matrix construction
-            is greater than the number of columns. Please make sure these values less than the no. of columns!".to_string()));
+        if rows >= cols {
+            return Err(Error::InvalidRows);
+        }
+        if d >= rows {
+            return Err(Error::InvalidD);
         }
         let mut svole = SV::init(channel, rng)?;
         let uw = svole.send(channel, rows, rng)?;
@@ -110,10 +110,7 @@ impl<FE: FiniteField, SV: SVoleSender<Msg = FE>, SPS: SpsVoleSender<SV, Msg = FE
         rng: &mut RNG,
     ) -> Result<Vec<(FE::PrimeField, FE)>, Error> {
         if self.cols % weight != 0 {
-            return Err(Error::Other(
-                "The hamming weight of the error vector doesn't divide the error vector length `e`"
-                    .to_string(),
-            ));
+            return Err(Error::InvalidWeight);
         }
         let m = self.cols / weight;
         let mut es = vec![];
@@ -125,7 +122,7 @@ impl<FE: FiniteField, SV: SVoleSender<Msg = FE>, SPS: SpsVoleSender<SV, Msg = FE
         }
         debug_assert!(es.len() == self.cols);
         debug_assert!(ts.len() == self.cols);
-        println!("es={:?}\n", es);
+        //println!("es={:?}\n", es);
         //println!("ts={:?}\n", ts);
 
         let indices: Vec<Vec<(usize, FE::PrimeField)>> = (0..self.cols)
@@ -179,13 +176,13 @@ impl<FE: FiniteField, SV: SVoleReceiver<Msg = FE>, SPS: SpsVoleReceiver<SV, Msg 
         rng: &mut RNG,
     ) -> Result<Self, Error> {
         if cols % 2 != 0 {
-            return Err(Error::Other(
-                "The number of columns of the LPN matrix is not multiple of 2!".to_string(),
-            ));
+            return Err(Error::InvalidColumns);
         }
-        if (rows >= cols) | (d >= cols) {
-            return Err(Error::Other("Either the number of rows or constant d used in the LPN matrix construction
-            is greater than the number of columns. Please make sure these values less than the no. of columns!".to_string()));
+        if rows >= cols {
+            return Err(Error::InvalidRows);
+        }
+        if d >= rows {
+            return Err(Error::InvalidD);
         }
         let mut svole = SV::init(channel, rng)?;
         let v = svole.receive(channel, rows, rng)?;
@@ -221,10 +218,7 @@ impl<FE: FiniteField, SV: SVoleReceiver<Msg = FE>, SPS: SpsVoleReceiver<SV, Msg 
         rng: &mut RNG,
     ) -> Result<Vec<FE>, Error> {
         if self.cols % weight != 0 {
-            return Err(Error::Other(
-                "The hamming weight of the error vector doesn't divide the error vector length `e`"
-                    .to_string(),
-            ));
+            return Err(Error::InvalidWeight);
         }
         let m = self.cols / weight;
         let mut ss = vec![];

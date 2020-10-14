@@ -49,9 +49,7 @@ impl<FE: FiniteField> EqSender for Sender<FE> {
         if res == comm_vb {
             Ok(va == vb)
         } else {
-            Err(Error::Other(
-                "Failed Opening commitments in EQ protocol.".to_string(),
-            ))
+            Err(Error::InvalidOpening)
         }
     }
 }
