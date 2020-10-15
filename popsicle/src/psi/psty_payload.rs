@@ -217,9 +217,10 @@ impl SenderState {
         }
 
         let sender_payloads = gb.encode_many(&my_payload_bits, &mods_crt)?;
+        println!("sent sender payloads");
         let receiver_payloads = gb.receive_many(&mods_crt)?;
         let receiver_masks = gb.receive_many(&mods_crt)?;
-
+        println!("received receiver payloads");
 
         Ok((gb, sender_inputs, receiver_inputs, sender_payloads, receiver_payloads, receiver_masks))
     }
@@ -347,9 +348,10 @@ impl ReceiverState {
             mods_crt.append(&mut qs.clone());
         }
         let sender_payloads = ev.receive_many(&mods_crt)?;
+        println!("received sender payloads");
         let receiver_payloads = ev.encode_many(&my_payload_bits, &mods_crt)?;
         let receiver_masks = ev.encode_many(&my_opprf_output, &mods_crt)?;
-
+        println!("sent receiver payloads");
         Ok((ev, sender_inputs, receiver_inputs, sender_payloads, receiver_payloads, receiver_masks))
     }
 
@@ -459,7 +461,7 @@ fn fancy_compute_payload_aggregate<F: fancy_garbling::FancyReveal + Fancy>(
     receiver_payloads: &[F::Item],
     receiver_masks: &[F::Item],
 ) -> Result<(Vec<F::Item>, Vec<u16>), F::Error> {
-
+    println!("reached circuit");
     assert_eq!(sender_inputs.len(), receiver_inputs.len());
     assert_eq!(sender_payloads.len(), receiver_payloads.len());
     assert_eq!(receiver_payloads.len(), receiver_masks.len());
@@ -477,7 +479,7 @@ fn fancy_compute_payload_aggregate<F: fancy_garbling::FancyReveal + Fancy>(
             )
         })
         .collect::<Result<Vec<F::Item>, F::Error>>()?;
-
+    println!("equality done");
     let reconstructed_payload = sender_payloads
         .chunks(PAYLOAD_PRIME_SIZE)
         .zip_eq(receiver_masks.chunks(PAYLOAD_PRIME_SIZE))
@@ -491,6 +493,8 @@ fn fancy_compute_payload_aggregate<F: fancy_garbling::FancyReveal + Fancy>(
         })
         .collect::<Result<Vec<CrtBundle<F::Item>>, F::Error>>()?;
 
+    println!("reconstructed sender payload done");
+
 
     let mut weighted_payloads = Vec::new();
     for it in reconstructed_payload.into_iter().zip_eq(receiver_payloads.chunks(PAYLOAD_PRIME_SIZE)){
@@ -500,6 +504,7 @@ fn fancy_compute_payload_aggregate<F: fancy_garbling::FancyReveal + Fancy>(
     }
     //
     //
+    println!("weighted payloads done");
     assert_eq!(eqs.len(), weighted_payloads.len());
 
     let mut acc = f.crt_constant_bundle(0, q)?;
@@ -513,6 +518,6 @@ fn fancy_compute_payload_aggregate<F: fancy_garbling::FancyReveal + Fancy>(
         let mux = f.crt_mul(&b_crt, &weighted_payloads[i])?;
         acc = f.crt_add(&acc, &mux)?;
     }
-
+    println!("aggregate done");
     Ok((acc.wires().to_vec(), qs))
 }
