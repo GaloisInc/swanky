@@ -10,33 +10,12 @@ use std::{
     time::SystemTime,
 };
 
-pub fn rand_vec<RNG: CryptoRng + Rng>(n: usize, rng: &mut RNG) -> Vec<u8> {
-    (0..n).map(|_| rng.gen()).collect()
-}
-
-pub fn rand_vec_vec<RNG: CryptoRng + Rng>(n: usize, m: usize, rng: &mut RNG) -> Vec<Vec<u8>> {
-    (0..n).map(|_| rand_vec(m, rng)).collect()
-}
-
-pub fn rand_vec_vec_unique<RNG: CryptoRng + Rng>(n: usize, m: usize, rng: &mut RNG, unique:&mut HashSet<Vec<u8>>) -> Vec<Vec<u8>> {
-    (0..n).map(|_|{
-        let mut r = rand_vec(m, rng);
-        while unique.contains(&r) {
-            r = rand_vec(m, rng);
-        }
-        unique.insert(r.clone());
-        r
-    }).collect()
-
-
-}
-
 pub fn int_vec_block512(values: Vec<u32>) -> Vec<Block512> {
     values.into_iter()
           .map(|item|{
             let value_bytes = item.to_le_bytes();
             let mut res_block = [0 as u8; 64];
-            for i in 0..2{
+            for i in 0..4{
                 res_block[i] = value_bytes[i];
             }
             Block512::from(res_block)
@@ -44,27 +23,9 @@ pub fn int_vec_block512(values: Vec<u32>) -> Vec<Block512> {
 }
 
 pub fn rand_u32_vec<RNG: CryptoRng + Rng>(n: usize, modulus: u32, rng: &mut RNG) -> Vec<u32>{
-    (0..n).map(|_| 100).collect()
-    // rng.gen::<u32>()%modulus
+    (0..n).map(|_| rng.gen::<u32>()%modulus).collect()
 }
 
-pub fn shuffle_with_index<RNG: CryptoRng + Rng>(vec: &mut Vec<Vec<u8>>, n: usize, rng: &mut RNG)-> Vec<usize>{
-    let mut original_indeces: Vec<usize> = (0..n).collect();
-
-    for i in 0..n{
-        let new_index = rng.gen::<usize>()%n;
-
-        let temp = vec[i].clone();
-        vec[i] = vec[new_index].clone();
-        vec[new_index] = temp;
-
-        let temp = original_indeces[i];
-        original_indeces[i] = original_indeces[new_index];
-        original_indeces[new_index] = temp;
-    }
-
-    original_indeces
-}
 
 pub fn enum_ids(n: usize, id_size: usize) ->Vec<Vec<u8>>{
     let mut ids = Vec::with_capacity(n);
@@ -76,8 +37,8 @@ pub fn enum_ids(n: usize, id_size: usize) ->Vec<Vec<u8>>{
 }
 
 fn protocol(i: i32, total: i32){
-    const ITEM_SIZE: usize = 2;
-    const SET_SIZE: usize = 1;
+    const ITEM_SIZE: usize = 3;
+    const SET_SIZE: usize = 1 << 17;
 
     let mut rng = AesRng::new();
     let (sender, receiver) = UnixStream::pair().unwrap();
@@ -88,8 +49,8 @@ fn protocol(i: i32, total: i32){
     let sender_inputs = ids_sender.clone();
     let receiver_inputs = ids_receiver.clone();
 
-    let payloads = rand_u32_vec(SET_SIZE, 1000, &mut rng);
-    let weights = rand_u32_vec(SET_SIZE, 10, &mut rng);
+    let payloads = rand_u32_vec(SET_SIZE, 65535, &mut rng);
+    let weights = rand_u32_vec(SET_SIZE, 1000000, &mut rng);
 
     let payloads_sender = int_vec_block512(payloads.clone());
     let payloads_receiver =  int_vec_block512(weights.clone());
@@ -228,7 +189,7 @@ fn protocol(i: i32, total: i32){
 
     assert_eq!(output as u128, expected_result);
     // let normalized_out = output as f128;
-    // println!("output {:?}", normalized_out /1000.0);
+    println!("output {:?}", output);
 
     println!("Trial number {:?} / {:?} succeeded.....", i+1, total);
 }

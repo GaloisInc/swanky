@@ -45,7 +45,7 @@ pub fn enum_ids(n: usize, id_size: usize) ->Vec<Vec<u8>>{
 
 fn server_protocol(mut stream: TcpChannel<TcpStream>) {
     const ITEM_SIZE: usize = 3;
-    const SET_SIZE: usize = 1 << 6;
+    const SET_SIZE: usize = 1 << 16;
 
     let mut rng = AesRng::new();
     let sender_inputs = enum_ids(SET_SIZE, ITEM_SIZE);
@@ -64,14 +64,6 @@ fn server_protocol(mut stream: TcpChannel<TcpStream>) {
         "Sender :: send time: {} ms",
         start.elapsed().unwrap().as_millis()
     );
-    println!(
-        "Sender :: pre-payload communication (read): {:.2} Mb",
-        stream.kilobits_read() / 1000.0
-    );
-    println!(
-        "Sender :: pre-payloads communication (write): {:.2} Mb",
-        stream.kilobits_written() / 1000.0
-    );
     let start = SystemTime::now();
     state.prepare_payload(&mut psi, &weights, &mut stream, &mut rng).unwrap();
     println!(
@@ -84,25 +76,13 @@ fn server_protocol(mut stream: TcpChannel<TcpStream>) {
         "Sender :: computing time: {} ms",
         start.elapsed().unwrap().as_millis()
     );
-    println!(
-        "Sender :: payload intersection time: {} ms",
-        start.elapsed().unwrap().as_millis()
-    );
-    println!(
-        "Sender :: total communication (read): {:.2} Mb",
-        stream.kilobits_read() / 1000.0
-    );
-    println!(
-        "Sender :: total communication (write): {:.2} Mb",
-        stream.kilobits_written() / 1000.0
-    );
 
 }
 
 fn main() {
-    let listener = TcpListener::bind("0.0.0.0:3333").unwrap();
+    let listener = TcpListener::bind("0.0.0.0:3000").unwrap();
     // accept connections and process them, spawning a new thread for each one
-    println!("Server listening on port 3333");
+    println!("Server listening on port 3000");
     for stream in listener.incoming() {
         match stream {
             Ok(stream) => {

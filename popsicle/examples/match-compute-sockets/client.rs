@@ -1,4 +1,4 @@
-use popsicle::psty::{Sender, Receiver};
+use popsicle::psty_payload::{Sender, Receiver};
 
 use rand::{CryptoRng, Rng};
 use scuttlebutt::{AesRng, Block512, TcpChannel};
@@ -32,23 +32,21 @@ pub fn rand_vec_vec_unique<RNG: CryptoRng + Rng>(n: usize, m: usize, rng: &mut R
 
 }
 
-
-pub fn int_vec_block512(values: Vec<u16>) -> Vec<Block512> {
+pub fn int_vec_block512(values: Vec<u32>) -> Vec<Block512> {
     values.into_iter()
           .map(|item|{
             let value_bytes = item.to_le_bytes();
             let mut res_block = [0 as u8; 64];
-            for i in 0..2{
+            for i in 0..4{
                 res_block[i] = value_bytes[i];
             }
             Block512::from(res_block)
          }).collect()
 }
 
-pub fn rand_u16_vec<RNG: CryptoRng + Rng>(n: usize, modulus: u16, rng: &mut RNG) -> Vec<u16>{
-    (0..n).map(|_| rng.gen::<u16>()%modulus).collect()
+pub fn rand_u32_vec<RNG: CryptoRng + Rng>(n: usize, modulus: u32, rng: &mut RNG) -> Vec<u32>{
+    (0..n).map(|_| rng.gen::<u32>()%modulus).collect()
 }
-
 
 
 pub fn enum_ids(n: usize, id_size: usize) ->Vec<Vec<u8>>{
@@ -61,12 +59,12 @@ pub fn enum_ids(n: usize, id_size: usize) ->Vec<Vec<u8>>{
 }
 
 fn client_protocol(mut stream: TcpChannel<TcpStream>){
-    const ITEM_SIZE: usize = 1;
-    const SET_SIZE: usize = 1;
+    const ITEM_SIZE: usize = 3;
+    const SET_SIZE: usize = 1 << 16;
 
     let mut rng = AesRng::new();
     let receiver_inputs = enum_ids(SET_SIZE, ITEM_SIZE);
-    let payloads = int_vec_block512(rand_u16_vec(SET_SIZE, u16::MAX, &mut rng));
+    let payloads = int_vec_block512(rand_u32_vec(SET_SIZE, 65535, &mut rng));
 
     let mut psi = Receiver::init(&mut stream, &mut rng).unwrap();
     println!("receiving");
@@ -82,7 +80,7 @@ fn client_protocol(mut stream: TcpChannel<TcpStream>){
 }
 
 fn main() {
-    match TcpStream::connect("localhost:3333") {
+    match TcpStream::connect("localhost:3000") {
         Ok(mut stream) => {
             let channel = TcpChannel::new(stream);
             client_protocol(channel);

@@ -204,7 +204,7 @@ impl SenderState {
 
         let my_input_bits = encode_inputs(&self.opprf_outputs);
         let my_payload_bits = encode_payloads(&self.opprf_payload_outputs);
-        println!("my_payload_bits {:?}", my_payload_bits);
+
         let mods_bits = vec![2; my_input_bits.len()];
 
         let sender_inputs = gb.encode_many(&my_input_bits, &mods_bits)?;

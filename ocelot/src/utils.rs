@@ -31,6 +31,7 @@ extern "C" {
     fn sse_trans(out: *mut u8, inp: *const u8, nrows: u64, ncols: u64);
 }
 
+
 // The hypothesis that a rust implementation of matrix transpose would be faster
 // than the C implementation appears to be false... But let's leave this code
 // here for now just in case.
