@@ -1,4 +1,4 @@
-use popsicle::psty::{Sender, Receiver};
+use popsicle::psty_payload::{Sender, Receiver};
 
 use rand::{CryptoRng, Rng};
 use scuttlebutt::{AesRng, Block512, TcpChannel};
@@ -64,17 +64,44 @@ fn server_protocol(mut stream: TcpChannel<TcpStream>) {
         "Sender :: send time: {} ms",
         start.elapsed().unwrap().as_millis()
     );
+    println!(
+        "Sender :: intersection setup communication (read): {:.2} Mb",
+        stream.kilobits_read() / 1000.0
+    );
+    println!(
+        "Sender :: intersection setup communication (write): {:.2} Mb",
+        stream.kilobits_written() / 1000.0
+    );
+
     let start = SystemTime::now();
     state.prepare_payload(&mut psi, &weights, &mut stream, &mut rng).unwrap();
     println!(
-        "Sender :: prepare time: {} ms",
+        "Sender :: payload setup time: {} ms",
         start.elapsed().unwrap().as_millis()
     );
+    println!(
+        "Sender :: payload setup communication (read): {:.2} Mb",
+        stream.kilobits_read() / 1000.0
+    );
+    println!(
+        "Sender :: payload setup communication (write): {:.2} Mb",
+        stream.kilobits_written() / 1000.0
+    );
+
+
     let start = SystemTime::now();
     state.compute_payload_aggregate(&mut stream, &mut rng).unwrap();
     println!(
-        "Sender :: computing time: {} ms",
+        "Sender :: circuit computation time: {} ms",
         start.elapsed().unwrap().as_millis()
+    );
+    println!(
+        "Sender :: total computation and intersection (read): {:.2} Mb",
+        stream.kilobits_read() / 1000.0
+    );
+    println!(
+        "Sender :: total computation and intersection (write): {:.2} Mb",
+        stream.kilobits_written() / 1000.0
     );
 
 }
