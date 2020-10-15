@@ -6,7 +6,7 @@ use scuttlebutt::{AesRng, Block512, TcpChannel};
 use std::{
     net::{TcpListener, TcpStream},
     thread,
-    collections::HashSet,
+    time::SystemTime,
 };
 
 pub fn rand_vec<RNG: CryptoRng + Rng>(n: usize, rng: &mut RNG) -> Vec<u8> {
@@ -17,32 +17,20 @@ pub fn rand_vec_vec<RNG: CryptoRng + Rng>(n: usize, m: usize, rng: &mut RNG) -> 
     (0..n).map(|_| rand_vec(m, rng)).collect()
 }
 
-pub fn rand_vec_vec_unique<RNG: CryptoRng + Rng>(n: usize, m: usize, rng: &mut RNG, unique:&mut HashSet<Vec<u8>>) -> Vec<Vec<u8>> {
-    (0..n).map(|_|{
-        let mut r = rand_vec(m, rng);
-        while unique.contains(&r) {
-            r = rand_vec(m, rng);
-        }
-        unique.insert(r.clone());
-        r
-    }).collect()
-
-}
-
-pub fn int_vec_block512(values: Vec<u16>) -> Vec<Block512> {
+pub fn int_vec_block512(values: Vec<u32>) -> Vec<Block512> {
     values.into_iter()
           .map(|item|{
             let value_bytes = item.to_le_bytes();
             let mut res_block = [0 as u8; 64];
-            for i in 0..2{
+            for i in 0..4{
                 res_block[i] = value_bytes[i];
             }
             Block512::from(res_block)
          }).collect()
 }
 
-pub fn rand_u16_vec<RNG: CryptoRng + Rng>(n: usize, modulus: u16, rng: &mut RNG) -> Vec<u16>{
-    (0..n).map(|_| rng.gen::<u16>()%modulus).collect()
+pub fn rand_u32_vec<RNG: CryptoRng + Rng>(n: usize, modulus: u32, rng: &mut RNG) -> Vec<u32>{
+    (0..n).map(|_| rng.gen::<u32>()%modulus).collect()
 }
 
 pub fn enum_ids(n: usize, id_size: usize) ->Vec<Vec<u8>>{
@@ -56,21 +44,58 @@ pub fn enum_ids(n: usize, id_size: usize) ->Vec<Vec<u8>>{
 
 
 fn server_protocol(mut stream: TcpChannel<TcpStream>) {
-    const ITEM_SIZE: usize = 1;
-    const SET_SIZE: usize = 1;
+    const ITEM_SIZE: usize = 3;
+    const SET_SIZE: usize = 1 << 6;
 
     let mut rng = AesRng::new();
     let sender_inputs = enum_ids(SET_SIZE, ITEM_SIZE);
-    let weights = int_vec_block512(rand_u16_vec(SET_SIZE, 100, &mut rng));
+    let weights_vec = rand_u32_vec(SET_SIZE, 1000000, &mut rng);
+    let weights = int_vec_block512(weights_vec);
 
+    let start = SystemTime::now();
     let mut psi = Sender::init(&mut stream, &mut rng).unwrap();
-        println!("sending");
+    println!(
+        "Sender :: init time: {} ms",
+        start.elapsed().unwrap().as_millis()
+    );
+    let start = SystemTime::now();
     let mut state = psi.send(&sender_inputs, &mut stream, &mut rng).unwrap();
-        println!("done sx");
+    println!(
+        "Sender :: send time: {} ms",
+        start.elapsed().unwrap().as_millis()
+    );
+    println!(
+        "Sender :: pre-payload communication (read): {:.2} Mb",
+        stream.kilobits_read() / 1000.0
+    );
+    println!(
+        "Sender :: pre-payloads communication (write): {:.2} Mb",
+        stream.kilobits_written() / 1000.0
+    );
+    let start = SystemTime::now();
     state.prepare_payload(&mut psi, &weights, &mut stream, &mut rng).unwrap();
-    println!("done preparing sx");
+    println!(
+        "Sender :: prepare time: {} ms",
+        start.elapsed().unwrap().as_millis()
+    );
+    let start = SystemTime::now();
     state.compute_payload_aggregate(&mut stream, &mut rng).unwrap();
-    println!("done computing sx");
+    println!(
+        "Sender :: computing time: {} ms",
+        start.elapsed().unwrap().as_millis()
+    );
+    println!(
+        "Sender :: payload intersection time: {} ms",
+        start.elapsed().unwrap().as_millis()
+    );
+    println!(
+        "Sender :: total communication (read): {:.2} Mb",
+        stream.kilobits_read() / 1000.0
+    );
+    println!(
+        "Sender :: total communication (write): {:.2} Mb",
+        stream.kilobits_written() / 1000.0
+    );
 
 }
 
@@ -84,8 +109,8 @@ fn main() {
                 println!("New connection: {}", stream.peer_addr().unwrap());
                 thread::spawn(move|| {
                     // connection succeeded
-                    let channel = TcpChannel::new(stream);
-                    server_protocol(channel)
+                    let stream = TcpChannel::new(stream);
+                    server_protocol(stream)
                 });
             }
             Err(e) => {
