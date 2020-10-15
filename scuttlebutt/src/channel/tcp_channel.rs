@@ -60,13 +60,13 @@ impl TcpChannel<TcpStream> {
 impl AbstractChannel for TcpChannel<TcpStream>{
     #[inline(always)]
     fn write_bytes(&mut self, bytes: &[u8]) -> Result<()> {
-        self.nbits_written = self.stream.write(bytes)?*8;
+        self.nbits_written += self.stream.write(bytes)?*8;
         Ok(())
     }
 
     #[inline(always)]
     fn read_bytes(&mut self, mut bytes: &mut [u8]) -> Result<()> {
-        self.nbits_written = bytes.len()*8;
+        self.nbits_written += bytes.len()*8;
         self.stream.read_exact(&mut bytes)?;
         Ok(())
     }
