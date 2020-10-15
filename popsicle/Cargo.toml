@@ -58,3 +58,13 @@ required-features = ["psty"]
 [[example]]
 name = "match-compute"
 required-features = ["psty"]
+
+[[example]]
+name = "client"
+path = "examples/match-compute-sockets/client.rs"
+required-features = ["psty"]
+
+[[example]]
+name = "server"
+path = "examples/match-compute-sockets/server.rs"
+required-features = ["psty"]
