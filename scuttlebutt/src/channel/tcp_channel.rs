@@ -20,6 +20,41 @@ impl TcpChannel<TcpStream> {
     pub fn new(stream: TcpStream) -> Self {
         Self{stream, nbits_read: 0, nbits_written: 0}
     }
+    /// Clear the number of bits read/written.
+    pub fn clear(&mut self) {
+        self.nbits_read = 0;
+        self.nbits_written = 0;
+    }
+
+    /// Return the number of kilobits written to the channel.
+    pub fn kilobits_written(&self) -> f64 {
+        self.nbits_written as f64 / 1000.0
+    }
+
+    /// Return the number of kilobits read from the channel.
+    pub fn kilobits_read(&self) -> f64 {
+        self.nbits_read as f64 / 1000.0
+    }
+
+    /// Return the total amount of communication on the channel.
+    pub fn total_kilobits(&self) -> f64 {
+        (self.nbits_written + self.nbits_read) as f64 / 1000.0
+    }
+
+    /// Return the number of kilobytes written to the channel.
+    pub fn kilobytes_written(&self) -> f64 {
+        self.nbits_written as f64 / 8192.0
+    }
+
+    /// Return the number of kilobytes read from the channel.
+    pub fn kilobytes_read(&self) -> f64 {
+        self.nbits_read as f64 / 8192.0
+    }
+
+    /// Return the total amount of communication on the channel as kilobytes.
+    pub fn total_kilobytes(&self) -> f64 {
+        self.kilobytes_written() + self.kilobytes_read()
+    }
 }
 
 impl AbstractChannel for TcpChannel<TcpStream>{
