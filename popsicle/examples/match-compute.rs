@@ -4,9 +4,9 @@ use rand::{CryptoRng, Rng};
 use scuttlebutt::{AesRng, Block512, TrackChannel};
 
 use std::{
-    io::{BufReader, BufWriter},
+    io::{BufRead, BufReader, BufWriter},
+    fs::File,
     os::unix::net::UnixStream,
-    collections::HashSet,
     time::SystemTime,
 };
 
@@ -36,9 +36,18 @@ pub fn enum_ids(n: usize, id_size: usize) ->Vec<Vec<u8>>{
     ids
 }
 
-fn protocol(i: i32, total: i32){
+pub fn read_from_file(file_name: String) -> Vec<Vec<u32>>{
+    let mut file = BufReader::new(File::open(file_name).unwrap());
+    file.lines()
+        .map(|l| l.unwrap().split(",")
+                 .map(|number| number.parse().unwrap())
+                 .collect())
+        .collect()
+}
+
+fn protocol(){
     const ITEM_SIZE: usize = 3;
-    const SET_SIZE: usize = 1 << 17;
+    const SET_SIZE: usize = 1 << 6;
 
     let mut rng = AesRng::new();
     let (sender, receiver) = UnixStream::pair().unwrap();
@@ -190,14 +199,10 @@ fn protocol(i: i32, total: i32){
     assert_eq!(output as u128, expected_result);
     // let normalized_out = output as f128;
     println!("output {:?}", output);
-
-    println!("Trial number {:?} / {:?} succeeded.....", i+1, total);
 }
 
 fn main() {
-    let number_trial = 1;
-    for i in 0..number_trial{
-        protocol(i, number_trial);
-    }
+    // read_from_file("values.txt".to_string());
+    protocol();
     println!("Success!");
 }
