@@ -6,7 +6,6 @@
 
 use rand::{Rng, SeedableRng};
 use scuttlebutt::{field::FiniteField, utils::unpack_bits, AesRng, Block};
-use std::{arch::x86_64::*, collections::VecDeque};
 
 /// Returns dot product of two vectors.
 pub fn dot_product<'a, FE: FiniteField, A: Iterator<Item = &'a FE>, B: Iterator<Item = &'a FE>>(
@@ -94,17 +93,19 @@ pub fn ggm<FE: FiniteField>(depth: usize, seed: Block) -> (Vec<FE>, Vec<(Block, 
         let mut k1 = Default::default();
         let exp = 1 << i;
         for j in 0..exp {
-            k0 ^= even_seeds[j + exp - 1];
-            k1 ^= odd_seeds[j + exp - 1];
+            k0 ^= even_seeds[exp + j - 1];
+            k1 ^= odd_seeds[exp + j - 1];
         }
         *item = (k0, k1);
     }
     let exp = 1 << depth;
-    let mut v: Vec<FE> = vec![FE::ZERO; exp];
+    println!("sv_in_ggm={:?}", sv);
+    let mut vs: Vec<FE> = vec![FE::ZERO; exp];
     for j in 0..exp {
-        v[j] = FE::from_uniform_bytes(&<[u8; 16]>::from(sv[exp + j - 1]));
+        println!("sv[exp + j - 1]={:?}", sv[exp + j - 1]);
+        vs[j] = FE::from_uniform_bytes(&<[u8; 16]>::from(sv[exp + j - 1]));
     }
-    (v, keys)
+    (vs, keys)
 }
 
 /// Given alpha and OTs (received based on the choice vector representing alpha complement),
@@ -160,82 +161,45 @@ pub fn ggm<FE: FiniteField>(depth: usize, seed: Block) -> (Vec<FE>, Vec<(Block, 
     vs
 }*/
 
-/// GGM prime is used compute the vector of field elements except one entry at `alpha`.
-//TODO: this can be fixed and optimized later.
+/// GGM prime is used compute the vector of field elements except a path b1..bn where b1 represents msb of alpha.
 pub fn ggm_prime<FE: FiniteField>(alpha: usize, keys: &[Block]) -> Vec<FE> {
     let depth = keys.len();
     let mut alpha_bits = unpack_bits(&alpha.to_le_bytes(), depth);
-    // To get the first bit as msb and so on.
+    // To get MSB as first elt.
     alpha_bits.reverse();
-    println!("a_rev={:?}", alpha_bits);
     let leaves = 1 << depth;
-    let mut sv: Vec<Block> = vec![Default::default(); leaves - 1]; // to store all seeds up to level depth - 1.
+    let mut sv: Vec<Block> = vec![Default::default(); 2 * leaves - 1]; // to store all seeds up to level depth
     let mut vs = vec![FE::ZERO; leaves];
     sv[1 + !alpha_bits[0] as usize] = keys[0];
-    for i in 2..depth {
-        let exp = 1 << (i - 1) as usize;
-        let exp_idx = 2 * exp;
-        let mut tmp = alpha_bits.clone();
-        tmp.truncate(i - 1);
+    for i in 2..depth + 1 {
+        let exp = 1 << (i - 1) as usize; // number of nodes in the prev. level.
+        let exp_idx = 1 << i; // starting insertion position at the currrent level.
         for j in 0..exp {
-            if j == bv_to_num(&tmp) {
-                continue;
-            } else {
+            if sv[exp + j - 1] != Default::default() {
                 let s = sv[exp + j - 1];
-                //PRG G
                 let mut rng = AesRng::from_seed(s);
                 let (s0, s1) = rng.gen::<(Block, Block)>();
-                let odd_idx = 2 * j + exp_idx - 1;
-                let even_idx = 2 * j + exp_idx;
-                sv[odd_idx] = s0;
-                sv[even_idx] = s1;
-                println!("sv_in_for_loop = {:?}", sv);
+                sv[2 * j + exp_idx - 1] = s0; // Even node
+                sv[2 * j + exp_idx] = s1; // Odd node
             }
         }
+        // let b1..bi-1 (b1 is MSB) be the bit representation of alpha up to the previous level
+        // Then the insertion node at the current node would be b1..bi-1comp(bi).
         let mut tmp = alpha_bits.clone();
         tmp.truncate(i - 1);
         let ai_comp = !alpha_bits[i - 1];
         tmp.push(ai_comp);
         tmp.reverse();
-        let ai_star = bv_to_num(&tmp);
-        let s_alpha = (0..exp).filter(|j| *j != ai_star as usize).fold(
-            Default::default(),
-            |mut sum: Block, j| {
-                sum ^= sv[exp_idx + 2 * j + ai_comp as usize - 1];
-                sum
-            },
-        );
+        let ai_star = bv_to_num(&tmp); // node number at the current level
+        let s_alpha = (0..exp).fold(Default::default(), |mut sum: Block, j| {
+            sum ^= sv[exp_idx + 2 * j + ai_comp as usize - 1];
+            sum
+        });
         sv[exp_idx + ai_star as usize - 1] = s_alpha ^ keys[i - 1];
     }
-    let mut tmp = alpha_bits.clone();
-    tmp.truncate(depth - 1);
-    tmp.reverse();
-    let exp = leaves >> 1 as usize;
-    for j in 0..exp {
-        let temp = sv[exp + j - 1];
-        if j == bv_to_num(&tmp) {
-            continue;
-        } else {
-            // PRG G'
-            let mut rng = AesRng::from_seed(temp);
-            let (fe0, fe1) = (FE::random(&mut rng), FE::random(&mut rng));
-            vs[2 * j] = fe0;
-            vs[2 * j + 1] = fe1;
-        }
+    for j in 0..leaves {
+        vs[j] = FE::from_uniform_bytes(&<[u8; 16]>::from(sv[leaves + j - 1]));
     }
-    let al = alpha_bits[depth - 1];
-    tmp = alpha_bits;
-    tmp.truncate(depth - 1);
-    tmp.push(!al);
-    tmp.reverse();
-    let idx = bv_to_num(&tmp);
-    let mut sum = FE::ZERO;
-    if al {
-        sum = vs.iter().step_by(2).copied().sum(); // sum up even elts
-    } else {
-        sum = vs.iter().skip(1).step_by(2).copied().sum(); // sum up odd elts
-    }
-    vs[idx as usize] = sum + FE::from_uniform_bytes(&<[u8; 16]>::from(keys[depth - 1]));
     vs
 }
 
@@ -250,7 +214,7 @@ fn bv_to_num(v: &[bool]) -> usize {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use scuttlebutt::field::{Fp, Gf128};
+    use scuttlebutt::field::{F61p, Fp, Gf128, F2};
 
     #[test]
     fn test_bv_to_num() {
@@ -260,36 +224,142 @@ mod tests {
     }
 
     #[test]
-    fn test_ggm() {
-        for _ in 1..10 {
-            let seed = rand::random::<Block>();
-            // Runs for a while if the range is over 20.
-            // let depth = rand::thread_rng().gen_range(1, 18);
-            let depth = 10;
-            let (v, keys) = ggm::<Gf128>(depth, seed);
-            println!("keys = {:?}", keys);
-            println!("v = {:?}", v);
-            let alpha: usize = (1 << 10) - 2;
-            // let alpha = rand::thread_rng().gen_range(0, leaves);
-            let mut alpha_bits = unpack_bits(&alpha.to_le_bytes(), keys.len());
-            println!("alpha_bits = {:?}", alpha_bits);
-            alpha_bits.reverse();
-            println!("alpha_bits_rev = {:?}", alpha_bits);
-            let alpha_keys: Vec<Block> = alpha_bits
-                .iter()
-                .zip(keys.iter())
-                .map(|(b, k)| if *b { k.0 } else { k.1 })
-                .collect();
-            println!("alpha keys = {:?}", alpha_keys);
-            let leaves = 1 << depth;
-            let v_ = ggm_prime::<Gf128>(alpha, &alpha_keys);
-            println!("v_ = {:?}", v_);
-            println!("leaves = {}", leaves);
-            for i in 0..v_.len() {
-                println!("i = {}", i);
-                if i != alpha {
-                    assert_eq!(v[i], v_[i]);
-                }
+    fn test_ggm_gf128() {
+        let seed = rand::random::<Block>();
+        // Runs for a while if the range is over 20.
+        // depth has to be atleast 2.
+        let depth = rand::thread_rng().gen_range(2, 14);
+        let (v, keys) = ggm::<Gf128>(depth, seed);
+        println!("keys = {:?}", keys);
+        println!("v = {:?}", v);
+        let leaves = (1 << depth) - 1;
+        println!("leaves={}", leaves);
+        let alpha: usize = rand::thread_rng().gen_range(1, leaves);
+        println!("alpha={}", alpha);
+        let mut alpha_bits = unpack_bits(&alpha.to_le_bytes(), keys.len());
+        println!("alpha_bits = {:?}", alpha_bits);
+        alpha_bits.reverse();
+        println!("alpha_bits_rev = {:?}", alpha_bits);
+        let alpha_keys: Vec<Block> = alpha_bits
+            .iter()
+            .zip(keys.iter())
+            .map(|(b, k)| if !*b { k.1 } else { k.0 })
+            .collect();
+        println!("alpha keys = {:?}", alpha_keys);
+        let leaves = 1 << depth;
+        let v_ = ggm_prime::<Gf128>(alpha, &alpha_keys);
+        println!("v_ = {:?}", v_);
+        println!("leaves = {}", leaves);
+        for i in 0..v_.len() {
+            println!("i = {}", i);
+            if i != alpha {
+                assert_eq!(v[i], v_[i]);
+            }
+        }
+    }
+
+    #[test]
+    fn test_ggm_f2() {
+        let seed = rand::random::<Block>();
+        // Runs for a while if the range is over 20.
+        // depth has to be atleast 2.
+        let depth = rand::thread_rng().gen_range(2, 14);
+        let (v, keys) = ggm::<F2>(depth, seed);
+        println!("keys = {:?}", keys);
+        println!("v = {:?}", v);
+        let leaves = (1 << depth) - 1;
+        println!("leaves={}", leaves);
+        let alpha: usize = rand::thread_rng().gen_range(1, leaves);
+        println!("alpha={}", alpha);
+        let mut alpha_bits = unpack_bits(&alpha.to_le_bytes(), keys.len());
+        println!("alpha_bits = {:?}", alpha_bits);
+        alpha_bits.reverse();
+        println!("alpha_bits_rev = {:?}", alpha_bits);
+        let alpha_keys: Vec<Block> = alpha_bits
+            .iter()
+            .zip(keys.iter())
+            .map(|(b, k)| if !*b { k.1 } else { k.0 })
+            .collect();
+        println!("alpha keys = {:?}", alpha_keys);
+        let leaves = 1 << depth;
+        let v_ = ggm_prime::<F2>(alpha, &alpha_keys);
+        println!("v_ = {:?}", v_);
+        println!("leaves = {}", leaves);
+        for i in 0..v_.len() {
+            println!("i = {}", i);
+            if i != alpha {
+                assert_eq!(v[i], v_[i]);
+            }
+        }
+    }
+
+    #[test]
+    fn test_ggm_fp() {
+        let seed = rand::random::<Block>();
+        // Runs for a while if the range is over 20.
+        // depth has to be atleast 2.
+        let depth = rand::thread_rng().gen_range(2, 10);
+        //let depth = 2;
+        let (v, keys) = ggm::<Fp>(depth, seed);
+        println!("keys = {:?}", keys);
+        println!("v = {:?}", v);
+        let leaves = (1 << depth) - 1;
+        println!("leaves={}", leaves);
+        let alpha: usize = rand::thread_rng().gen_range(1, leaves);
+        println!("alpha={}", alpha);
+        let mut alpha_bits = unpack_bits(&alpha.to_le_bytes(), keys.len());
+        println!("alpha_bits = {:?}", alpha_bits);
+        alpha_bits.reverse();
+        println!("alpha_bits_rev = {:?}", alpha_bits);
+        let alpha_keys: Vec<Block> = alpha_bits
+            .iter()
+            .zip(keys.iter())
+            .map(|(b, k)| if !*b { k.1 } else { k.0 })
+            .collect();
+        println!("alpha keys = {:?}", alpha_keys);
+        let leaves = 1 << depth;
+        let v_ = ggm_prime::<Fp>(alpha, &alpha_keys);
+        println!("v_ = {:?}", v_);
+        println!("leaves = {}", leaves);
+        for i in 0..v_.len() {
+            println!("i = {}", i);
+            if i != alpha {
+                assert_eq!(v[i], v_[i]);
+            }
+        }
+    }
+
+    #[test]
+    fn test_ggm_f61p() {
+        let seed = rand::random::<Block>();
+        // Runs for a while if the range is over 20.
+        // depth has to be atleast 2.
+        let depth = rand::thread_rng().gen_range(2, 14);
+        let (v, keys) = ggm::<F61p>(depth, seed);
+        println!("keys = {:?}", keys);
+        println!("v = {:?}", v);
+        let leaves = (1 << depth) - 1;
+        println!("leaves={}", leaves);
+        let alpha: usize = rand::thread_rng().gen_range(1, leaves);
+        println!("alpha={}", alpha);
+        let mut alpha_bits = unpack_bits(&alpha.to_le_bytes(), keys.len());
+        println!("alpha_bits = {:?}", alpha_bits);
+        alpha_bits.reverse();
+        println!("alpha_bits_rev = {:?}", alpha_bits);
+        let alpha_keys: Vec<Block> = alpha_bits
+            .iter()
+            .zip(keys.iter())
+            .map(|(b, k)| if !*b { k.1 } else { k.0 })
+            .collect();
+        println!("alpha keys = {:?}", alpha_keys);
+        let leaves = 1 << depth;
+        let v_ = ggm_prime::<F61p>(alpha, &alpha_keys);
+        println!("v_ = {:?}", v_);
+        println!("leaves = {}", leaves);
+        for i in 0..v_.len() {
+            println!("i = {}", i);
+            if i != alpha {
+                assert_eq!(v[i], v_[i]);
             }
         }
     }

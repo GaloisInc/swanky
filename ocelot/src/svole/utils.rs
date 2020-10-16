@@ -7,7 +7,7 @@
 //! SVOLE utility functions.
 
 //use generic_array::{typenum::Unsigned, GenericArray};
-use scuttlebutt::{field::FiniteField, Aes128, AesRng, Block};
+use scuttlebutt::{field::FiniteField, AesRng, Block};
 //use std::iter::FromIterator;
 use rand::Rng;
 use rand_core::SeedableRng;
