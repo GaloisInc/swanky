@@ -122,7 +122,7 @@ impl<
             .sum();
         ws[alpha] = delta - (d + sum);
         // Consistency check
-        let xz = self.svole.send(channel, r, rng)?;
+        /*let xz = self.svole.send(channel, r, rng)?;
         let xs: Vec<FE::PrimeField> = xz.iter().map(|&x| x.0).collect();
         let zs: Vec<FE> = xz.iter().map(|&x| x.1).collect();
         let chis: Vec<FE> = (0..n).map(|_| FE::random(rng)).collect();
@@ -147,7 +147,9 @@ impl<
             Ok(res)
         } else {
             Err(Error::EqCheckFailed)
-        }
+        }*/
+        let res = us.iter().zip(ws.iter()).map(|(&u, &w)| (u, w)).collect();
+        Ok(res)
     }
 }
 
@@ -207,6 +209,7 @@ impl<
         let d = gamma - vs.clone().into_iter().sum();
         channel.write_fe(d)?;
         channel.flush()?;
+        /*
         let y_star = self.svole.receive(channel, r, rng)?;
         let mut chi: Vec<FE> = vec![FE::ZERO; n];
         for item in chi.iter_mut() {
@@ -230,6 +233,7 @@ impl<
             Ok(vs)
         } else {
             Err(Error::EqCheckFailed)
-        }
+        }*/
+        Ok(vs)
     }
 }

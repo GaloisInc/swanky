@@ -254,7 +254,7 @@ mod tests {
 
     #[test]
     fn test_sp_svole() {
-        for i in 1..10 {
+        for i in 1..13 {
             let leaves = 1 << i;
             test_spsvole::<Fp, BVSender<Fp>, BVReceiver<Fp>, SPSender<Fp>, SPReceiver<Fp>>(leaves);
             test_spsvole::<
