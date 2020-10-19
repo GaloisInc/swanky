@@ -12,7 +12,7 @@ use crate::{
     ot::{Receiver as OtReceiver, Sender as OtSender},
     svole::{
         svole_ext::{
-            ggm_utils::{dot_product, ggm},
+            ggm_utils::{dot_product, ggm, ggm_prime},
             EqReceiver,
             EqSender,
             SpsVoleReceiver,
@@ -103,17 +103,16 @@ impl<
         let alpha = rng.gen_range(0, n);
         let mut us = vec![FE::PrimeField::ZERO; n];
         us[alpha] = beta;
-        let choices = unpack_bits(&(!alpha).to_le_bytes(), depth);
-        let _keys = self.ot.receive(channel, &choices, rng).unwrap();
-        /**************************/
-        //let v: Vec<FE> = ggm_prime(alpha, &keys);
-        // getting this vector from the receiver is completely insecure, I'm just doing this for
-        // testing purposes.
+        let mut choices = unpack_bits(&(!alpha).to_le_bytes(), depth);
+        choices.reverse(); // to get the first bit as MSB.
+        let keys = self.ot.receive(channel, &choices, rng).unwrap();
+        let vs: Vec<FE> = ggm_prime::<FE>(alpha, &keys);
         let mut ws = vec![FE::ZERO; n];
-        for item in ws.iter_mut().take(n) {
-            *item = channel.read_fe()?;
+        for i in 0..n {
+            if i != alpha {
+                ws[i] = vs[i];
+            }
         }
-        /*************************/
         let d: FE = channel.read_fe()?;
         let sum = ws
             .iter()
@@ -204,12 +203,6 @@ impl<
         let seed = rand::random::<Block>();
         let (vs, keys) = ggm::<FE>(depth as usize, seed);
         self.ot.send(channel, &keys, rng)?;
-        /******************************/
-        //Sending this to the other party is completely insecure.
-        for item in vs.iter().take(n) {
-            channel.write_fe(*item)?;
-        }
-        /*****************************/
         // compute d and sends out
         let d = gamma - vs.clone().into_iter().sum();
         channel.write_fe(d)?;

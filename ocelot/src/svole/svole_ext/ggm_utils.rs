@@ -82,9 +82,9 @@ fn prg(depth: usize, seed: Block) -> Vec<Block> {
 }*/
 
 pub fn ggm<FE: FiniteField>(depth: usize, seed: Block) -> (Vec<FE>, Vec<(Block, Block)>) {
-    println!("h={}", depth);
+    //println!("h={}", depth);
     let sv = prg(depth, seed);
-    println!("sv={:?}", sv);
+    //println!("sv={:?}", sv);
     let even_seeds: Vec<Block> = sv.iter().skip(1).step_by(2).copied().collect(); // skip root node
     let odd_seeds: Vec<Block> = sv.iter().skip(2).step_by(2).copied().collect(); // skip root node
     let mut keys: Vec<(Block, Block)> = vec![Default::default(); depth];
@@ -99,10 +99,10 @@ pub fn ggm<FE: FiniteField>(depth: usize, seed: Block) -> (Vec<FE>, Vec<(Block, 
         *item = (k0, k1);
     }
     let exp = 1 << depth;
-    println!("sv_in_ggm={:?}", sv);
+    //println!("sv_in_ggm={:?}", sv);
     let mut vs: Vec<FE> = vec![FE::ZERO; exp];
     for j in 0..exp {
-        println!("sv[exp + j - 1]={:?}", sv[exp + j - 1]);
+        //println!("sv[exp + j - 1]={:?}", sv[exp + j - 1]);
         vs[j] = FE::from_uniform_bytes(&<[u8; 16]>::from(sv[exp + j - 1]));
     }
     (vs, keys)
@@ -226,149 +226,149 @@ mod tests {
     #[test]
     fn test_ggm_gf128() {
         for _ in 0..10 {
-        let seed = rand::random::<Block>();
-        // Runs for a while if the range is over 20.
-        // depth has to be atleast 2.
-        let depth = rand::thread_rng().gen_range(2, 14);
-        let (v, keys) = ggm::<Gf128>(depth, seed);
-        println!("keys = {:?}", keys);
-        println!("v = {:?}", v);
-        let leaves = (1 << depth) - 1;
-        println!("leaves={}", leaves);
-        let alpha: usize = rand::thread_rng().gen_range(1, leaves);
-        println!("alpha={}", alpha);
-        let mut alpha_bits = unpack_bits(&alpha.to_le_bytes(), keys.len());
-        println!("alpha_bits = {:?}", alpha_bits);
-        alpha_bits.reverse();
-        println!("alpha_bits_rev = {:?}", alpha_bits);
-        let alpha_keys: Vec<Block> = alpha_bits
-            .iter()
-            .zip(keys.iter())
-            .map(|(b, k)| if !*b { k.1 } else { k.0 })
-            .collect();
-        println!("alpha keys = {:?}", alpha_keys);
-        let leaves = 1 << depth;
-        let v_ = ggm_prime::<Gf128>(alpha, &alpha_keys);
-        println!("v_ = {:?}", v_);
-        println!("leaves = {}", leaves);
-        for i in 0..v_.len() {
-            println!("i = {}", i);
-            if i != alpha {
-                assert_eq!(v[i], v_[i]);
+            let seed = rand::random::<Block>();
+            // Runs for a while if the range is over 20.
+            // depth has to be atleast 2.
+            let depth = rand::thread_rng().gen_range(2, 14);
+            let (v, keys) = ggm::<Gf128>(depth, seed);
+            println!("keys = {:?}", keys);
+            println!("v = {:?}", v);
+            let leaves = (1 << depth) - 1;
+            println!("leaves={}", leaves);
+            let alpha: usize = rand::thread_rng().gen_range(1, leaves);
+            println!("alpha={}", alpha);
+            let mut alpha_bits = unpack_bits(&alpha.to_le_bytes(), keys.len());
+            println!("alpha_bits = {:?}", alpha_bits);
+            alpha_bits.reverse();
+            println!("alpha_bits_rev = {:?}", alpha_bits);
+            let alpha_keys: Vec<Block> = alpha_bits
+                .iter()
+                .zip(keys.iter())
+                .map(|(b, k)| if !*b { k.1 } else { k.0 })
+                .collect();
+            println!("alpha keys = {:?}", alpha_keys);
+            let leaves = 1 << depth;
+            let v_ = ggm_prime::<Gf128>(alpha, &alpha_keys);
+            println!("v_ = {:?}", v_);
+            println!("leaves = {}", leaves);
+            for i in 0..v_.len() {
+                println!("i = {}", i);
+                if i != alpha {
+                    assert_eq!(v[i], v_[i]);
+                }
             }
         }
-    }
     }
 
     #[test]
     fn test_ggm_f2() {
         for _ in 0..10 {
-        let seed = rand::random::<Block>();
-        // Runs for a while if the range is over 20.
-        // depth has to be atleast 2.
-        let depth = rand::thread_rng().gen_range(2, 14);
-        let (v, keys) = ggm::<F2>(depth, seed);
-        println!("keys = {:?}", keys);
-        println!("v = {:?}", v);
-        let leaves = (1 << depth) - 1;
-        println!("leaves={}", leaves);
-        let alpha: usize = rand::thread_rng().gen_range(1, leaves);
-        println!("alpha={}", alpha);
-        let mut alpha_bits = unpack_bits(&alpha.to_le_bytes(), keys.len());
-        println!("alpha_bits = {:?}", alpha_bits);
-        alpha_bits.reverse();
-        println!("alpha_bits_rev = {:?}", alpha_bits);
-        let alpha_keys: Vec<Block> = alpha_bits
-            .iter()
-            .zip(keys.iter())
-            .map(|(b, k)| if !*b { k.1 } else { k.0 })
-            .collect();
-        println!("alpha keys = {:?}", alpha_keys);
-        let leaves = 1 << depth;
-        let v_ = ggm_prime::<F2>(alpha, &alpha_keys);
-        println!("v_ = {:?}", v_);
-        println!("leaves = {}", leaves);
-        for i in 0..v_.len() {
-            println!("i = {}", i);
-            if i != alpha {
-                assert_eq!(v[i], v_[i]);
+            let seed = rand::random::<Block>();
+            // Runs for a while if the range is over 20.
+            // depth has to be atleast 2.
+            let depth = rand::thread_rng().gen_range(2, 14);
+            let (v, keys) = ggm::<F2>(depth, seed);
+            println!("keys = {:?}", keys);
+            println!("v = {:?}", v);
+            let leaves = (1 << depth) - 1;
+            println!("leaves={}", leaves);
+            let alpha: usize = rand::thread_rng().gen_range(1, leaves);
+            println!("alpha={}", alpha);
+            let mut alpha_bits = unpack_bits(&alpha.to_le_bytes(), keys.len());
+            println!("alpha_bits = {:?}", alpha_bits);
+            alpha_bits.reverse();
+            println!("alpha_bits_rev = {:?}", alpha_bits);
+            let alpha_keys: Vec<Block> = alpha_bits
+                .iter()
+                .zip(keys.iter())
+                .map(|(b, k)| if !*b { k.1 } else { k.0 })
+                .collect();
+            println!("alpha keys = {:?}", alpha_keys);
+            let leaves = 1 << depth;
+            let v_ = ggm_prime::<F2>(alpha, &alpha_keys);
+            println!("v_ = {:?}", v_);
+            println!("leaves = {}", leaves);
+            for i in 0..v_.len() {
+                println!("i = {}", i);
+                if i != alpha {
+                    assert_eq!(v[i], v_[i]);
+                }
             }
         }
-    }
     }
 
     #[test]
     fn test_ggm_fp() {
         for _ in 0..10 {
-        let seed = rand::random::<Block>();
-        // Runs for a while if the range is over 20.
-        // depth has to be atleast 2.
-        let depth = rand::thread_rng().gen_range(2, 10);
-        //let depth = 2;
-        let (v, keys) = ggm::<Fp>(depth, seed);
-        println!("keys = {:?}", keys);
-        println!("v = {:?}", v);
-        let leaves = (1 << depth) - 1;
-        println!("leaves={}", leaves);
-        let alpha: usize = rand::thread_rng().gen_range(1, leaves);
-        println!("alpha={}", alpha);
-        let mut alpha_bits = unpack_bits(&alpha.to_le_bytes(), keys.len());
-        println!("alpha_bits = {:?}", alpha_bits);
-        alpha_bits.reverse();
-        println!("alpha_bits_rev = {:?}", alpha_bits);
-        let alpha_keys: Vec<Block> = alpha_bits
-            .iter()
-            .zip(keys.iter())
-            .map(|(b, k)| if !*b { k.1 } else { k.0 })
-            .collect();
-        println!("alpha keys = {:?}", alpha_keys);
-        let leaves = 1 << depth;
-        let v_ = ggm_prime::<Fp>(alpha, &alpha_keys);
-        println!("v_ = {:?}", v_);
-        println!("leaves = {}", leaves);
-        for i in 0..v_.len() {
-            println!("i = {}", i);
-            if i != alpha {
-                assert_eq!(v[i], v_[i]);
+            let seed = rand::random::<Block>();
+            // Runs for a while if the range is over 20.
+            // depth has to be atleast 2.
+            let depth = rand::thread_rng().gen_range(2, 10);
+            //let depth = 2;
+            let (v, keys) = ggm::<Fp>(depth, seed);
+            println!("keys = {:?}", keys);
+            println!("v = {:?}", v);
+            let leaves = (1 << depth) - 1;
+            println!("leaves={}", leaves);
+            let alpha: usize = rand::thread_rng().gen_range(1, leaves);
+            println!("alpha={}", alpha);
+            let mut alpha_bits = unpack_bits(&alpha.to_le_bytes(), keys.len());
+            println!("alpha_bits = {:?}", alpha_bits);
+            alpha_bits.reverse();
+            println!("alpha_bits_rev = {:?}", alpha_bits);
+            let alpha_keys: Vec<Block> = alpha_bits
+                .iter()
+                .zip(keys.iter())
+                .map(|(b, k)| if !*b { k.1 } else { k.0 })
+                .collect();
+            println!("alpha keys = {:?}", alpha_keys);
+            let leaves = 1 << depth;
+            let v_ = ggm_prime::<Fp>(alpha, &alpha_keys);
+            println!("v_ = {:?}", v_);
+            println!("leaves = {}", leaves);
+            for i in 0..v_.len() {
+                println!("i = {}", i);
+                if i != alpha {
+                    assert_eq!(v[i], v_[i]);
+                }
             }
         }
-    }
     }
 
     #[test]
     fn test_ggm_f61p() {
         for _ in 0..10 {
-        let seed = rand::random::<Block>();
-        // Runs for a while if the range is over 20.
-        // depth has to be atleast 2.
-        let depth = rand::thread_rng().gen_range(2, 14);
-        let (v, keys) = ggm::<F61p>(depth, seed);
-        println!("keys = {:?}", keys);
-        println!("v = {:?}", v);
-        let leaves = (1 << depth) - 1;
-        println!("leaves={}", leaves);
-        let alpha: usize = rand::thread_rng().gen_range(1, leaves);
-        println!("alpha={}", alpha);
-        let mut alpha_bits = unpack_bits(&alpha.to_le_bytes(), keys.len());
-        println!("alpha_bits = {:?}", alpha_bits);
-        alpha_bits.reverse();
-        println!("alpha_bits_rev = {:?}", alpha_bits);
-        let alpha_keys: Vec<Block> = alpha_bits
-            .iter()
-            .zip(keys.iter())
-            .map(|(b, k)| if !*b { k.1 } else { k.0 })
-            .collect();
-        println!("alpha keys = {:?}", alpha_keys);
-        let leaves = 1 << depth;
-        let v_ = ggm_prime::<F61p>(alpha, &alpha_keys);
-        println!("v_ = {:?}", v_);
-        println!("leaves = {}", leaves);
-        for i in 0..v_.len() {
-            println!("i = {}", i);
-            if i != alpha {
-                assert_eq!(v[i], v_[i]);
+            let seed = rand::random::<Block>();
+            // Runs for a while if the range is over 20.
+            // depth has to be atleast 2.
+            let depth = rand::thread_rng().gen_range(2, 14);
+            let (v, keys) = ggm::<F61p>(depth, seed);
+            println!("keys = {:?}", keys);
+            println!("v = {:?}", v);
+            let leaves = (1 << depth) - 1;
+            println!("leaves={}", leaves);
+            let alpha: usize = rand::thread_rng().gen_range(1, leaves);
+            println!("alpha={}", alpha);
+            let mut alpha_bits = unpack_bits(&alpha.to_le_bytes(), keys.len());
+            println!("alpha_bits = {:?}", alpha_bits);
+            alpha_bits.reverse();
+            println!("alpha_bits_rev = {:?}", alpha_bits);
+            let alpha_keys: Vec<Block> = alpha_bits
+                .iter()
+                .zip(keys.iter())
+                .map(|(b, k)| if !*b { k.1 } else { k.0 })
+                .collect();
+            println!("alpha keys = {:?}", alpha_keys);
+            let leaves = 1 << depth;
+            let v_ = ggm_prime::<F61p>(alpha, &alpha_keys);
+            println!("v_ = {:?}", v_);
+            println!("leaves = {}", leaves);
+            for i in 0..v_.len() {
+                println!("i = {}", i);
+                if i != alpha {
+                    assert_eq!(v[i], v_[i]);
+                }
             }
         }
-    }
     }
 }

@@ -14,7 +14,7 @@ use ocelot::{
         copee::{Receiver as CpReceiver, Sender as CpSender},
         svole_ext::{
             eq::{Receiver as EQReceiver, Sender as EQSender},
-            sp_svole_dummy_ggmprime::{Receiver as SpVoleReceiver, Sender as SpVoleSender},
+            sp_svole::{Receiver as SpVoleReceiver, Sender as SpVoleSender},
             SpsVoleReceiver,
             SpsVoleSender,
         },

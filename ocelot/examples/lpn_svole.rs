@@ -12,7 +12,7 @@ use ocelot::{
         svole_ext::{
             eq::{Receiver as EqReceiver, Sender as EqSender},
             lpn_params::{LpnExtendParams, LpnSetupParams},
-            sp_svole_dummy_ggmprime::{Receiver as SpsReceiver, Sender as SpsSender},
+            sp_svole::{Receiver as SpsReceiver, Sender as SpsSender},
             svole_lpn::{Receiver as LpnVoleReceiver, Sender as LpnVoleSender},
             LpnsVoleReceiver,
             LpnsVoleSender,

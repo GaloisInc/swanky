@@ -11,7 +11,7 @@ pub mod eq;
 /// GGM related helper functions.
 mod ggm_utils;
 pub mod lpn_params;
-pub mod sp_svole_dummy_ggmprime;
+pub mod sp_svole;
 pub mod svole_lpn;
 
 use crate::{
@@ -189,7 +189,7 @@ mod tests {
             svole_ext::{
                 eq::{Receiver as EqReceiver, Sender as EqSender},
                 lpn_params::{LpnExtendParams, LpnSetupParams},
-                sp_svole_dummy_ggmprime::{Receiver as SpsReceiver, Sender as SpsSender},
+                sp_svole::{Receiver as SpsReceiver, Sender as SpsSender},
                 svole_lpn::{Receiver as LpnVoleReceiver, Sender as LpnVoleSender},
                 LpnsVoleReceiver,
                 LpnsVoleSender,
@@ -257,7 +257,7 @@ mod tests {
         for i in 1..10 {
             let leaves = 1 << i;
             test_spsvole::<Fp, BVSender<Fp>, BVReceiver<Fp>, SPSender<Fp>, SPReceiver<Fp>>(leaves);
-            /*test_spsvole::<
+            test_spsvole::<
                 Gf128,
                 BVSender<Gf128>,
                 BVReceiver<Gf128>,
@@ -267,7 +267,7 @@ mod tests {
             test_spsvole::<F2, BVSender<F2>, BVReceiver<F2>, SPSender<F2>, SPReceiver<F2>>(leaves);
             test_spsvole::<F61p, BVSender<F61p>, BVReceiver<F61p>, SPSender<F61p>, SPReceiver<F61p>>(
                 leaves,
-            );*/
+            );
         }
     }
 
