@@ -225,6 +225,7 @@ mod tests {
 
     #[test]
     fn test_ggm_gf128() {
+        for _ in 0..10 {
         let seed = rand::random::<Block>();
         // Runs for a while if the range is over 20.
         // depth has to be atleast 2.
@@ -257,9 +258,11 @@ mod tests {
             }
         }
     }
+    }
 
     #[test]
     fn test_ggm_f2() {
+        for _ in 0..10 {
         let seed = rand::random::<Block>();
         // Runs for a while if the range is over 20.
         // depth has to be atleast 2.
@@ -292,9 +295,11 @@ mod tests {
             }
         }
     }
+    }
 
     #[test]
     fn test_ggm_fp() {
+        for _ in 0..10 {
         let seed = rand::random::<Block>();
         // Runs for a while if the range is over 20.
         // depth has to be atleast 2.
@@ -328,9 +333,11 @@ mod tests {
             }
         }
     }
+    }
 
     #[test]
     fn test_ggm_f61p() {
+        for _ in 0..10 {
         let seed = rand::random::<Block>();
         // Runs for a while if the range is over 20.
         // depth has to be atleast 2.
@@ -362,5 +369,6 @@ mod tests {
                 assert_eq!(v[i], v_[i]);
             }
         }
+    }
     }
 }
