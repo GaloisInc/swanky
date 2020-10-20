@@ -115,16 +115,19 @@ impl<FE: FiniteField, SV: SVoleSender<Msg = FE>, SPS: SpsVoleSender<SV, Msg = FE
         let m = self.cols / weight;
         let mut es = vec![];
         let mut ts = vec![];
+        let mut uws = vec![vec![]];
         for _ in 0..weight {
             let ac = self.spvole.send(channel, m, rng)?;
             es.extend(ac.iter().map(|(a, _)| a));
             ts.extend(ac.iter().map(|(_, c)| c));
+            uws.push(ac);
         }
         debug_assert!(es.len() == self.cols);
         debug_assert!(ts.len() == self.cols);
+        let b = self.spvole.send_batch_consistancy_check(channel, weight, uws, rng)?;
+        if b == true {
         //println!("es={:?}\n", es);
         //println!("ts={:?}\n", ts);
-
         let indices: Vec<Vec<(usize, FE::PrimeField)>> = (0..self.cols)
             .map(|i| lpn_mtx_indices::<FE>(i, self.rows, self.d))
             .collect();
@@ -161,6 +164,10 @@ impl<FE: FiniteField, SV: SVoleSender<Msg = FE>, SPS: SpsVoleSender<SV, Msg = FE
             .collect();
         debug_assert!(output.len() == self.cols - self.rows);
         Ok(output)
+    }
+    else {
+        Err(Error::EqCheckFailed)
+    }
     }
 }
 
@@ -222,11 +229,15 @@ impl<FE: FiniteField, SV: SVoleReceiver<Msg = FE>, SPS: SpsVoleReceiver<SV, Msg 
         }
         let m = self.cols / weight;
         let mut ss = vec![];
+        let mut vs = vec![vec![]];
         for _ in 0..weight {
             let bs = self.spvole.receive(channel, m, rng)?;
             ss.extend(bs.iter());
+            vs.push(bs);
         }
+        let b = self.spvole.receive_batch_consistancy_check(channel, weight, vs, rng)?;
         debug_assert!(ss.len() == self.cols);
+        if b == true{ 
         //println!("ss={:?}\n", ss);
         let indices: Vec<Vec<(usize, FE::PrimeField)>> = (0..self.cols)
             .map(|i| lpn_mtx_indices::<FE>(i, self.rows, self.d))
@@ -249,5 +260,9 @@ impl<FE: FiniteField, SV: SVoleReceiver<Msg = FE>, SPS: SpsVoleReceiver<SV, Msg 
         let output: Vec<FE> = ys.into_iter().skip(self.rows).collect();
         debug_assert!(output.len() == self.cols - self.rows);
         Ok(output)
+    }
+    else {
+       Err(Error::EqCheckFailed)
+    }
     }
 }

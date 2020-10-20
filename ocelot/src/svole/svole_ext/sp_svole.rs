@@ -151,6 +151,57 @@ impl<
         let res = us.iter().zip(ws.iter()).map(|(&u, &w)| (u, w)).collect();
         Ok(res)
     }
+    fn send_batch_consistancy_check<C: AbstractChannel, RNG: CryptoRng + RngCore>(
+        &mut self,
+        channel: &mut C,
+        len: usize,
+        uws: Vec<Vec<(FE::PrimeField, FE)>>,
+        rng: &mut RNG) -> Result<bool, Error> {
+            let r = FE::PolynomialFormNumCoefficients::to_usize();
+            let xzs = self.svole.send(channel, r, rng)?;
+            let xs: Vec<FE::PrimeField> = xzs.iter().map(|&x| x.0).collect();
+        let zs: Vec<FE> = xzs.iter().map(|&x| x.1).collect();
+            let n = len;
+            let t = uws.len();
+            let mut alphas = vec![0; t];
+            let mut betas = vec![FE::PrimeField::ZERO; t];
+            let mut chi_alphas = vec![vec![FE::PrimeField::ZERO]; t];
+            let mut chis = vec![vec![FE::ZERO; n]; t];
+            let ws: Vec<Vec<FE>> = uws.iter().map(|x| x.iter().map(|(_,w)| *w).collect()).collect();
+            for j in 0..t {
+                chis[j] = (0..n).map(|_| FE::random(rng)).collect();
+                for (i, (u, _)) in uws[j].iter().enumerate(){
+                    if *u != FE::PrimeField::ZERO
+                    {
+                        alphas[j] = i;
+                        betas[j] = *u;
+                    }
+                }
+                chi_alphas[j] = ((chis[j])[alphas[j]]).to_polynomial_coefficients().to_vec();
+               }
+           let x_stars: Vec<FE::PrimeField> = chi_alphas
+            .iter().cloned()
+            .zip(xs.iter())
+            .enumerate().map(|(j, (chi_alpha, x))| chi_alpha[j] * betas[j] - *x)
+            .collect();
+            for i in 0..n {
+                for j in 0..t {
+                    channel.write_fe((chis[j])[i])?;
+                }
+            }
+            for x in x_stars.iter() {
+                channel.write_fe(*x)?;
+            }
+            let z = dot_product(zs.iter(), self.pows.iter());
+            let va =(0..t).map(|j| dot_product(chis[j].iter(), ws[j].iter())).sum::<FE>() - z;
+            let mut sender = EQ::init()?;
+            let b = sender.send(channel, &va)?;
+            if b {
+                Ok(true)
+            } else {
+                Err(Error::EqCheckFailed)
+            }
+        }
 }
 
 /// Implement SpsVoleReceiver for Receiver type.
@@ -236,4 +287,39 @@ impl<
         }*/
         Ok(vs)
     }
+    fn receive_batch_consistancy_check<C: AbstractChannel, RNG: CryptoRng + RngCore>(
+        &mut self,
+        channel: &mut C,
+        len: usize,
+        vs: Vec<Vec<FE>>,
+        rng: &mut RNG) -> Result<bool, Error>{
+            let r = FE::PolynomialFormNumCoefficients::to_usize();
+            let y_stars = self.svole.receive(channel, r, rng)?;
+            let n = len;
+            let t = vs.len();
+            let mut chis = vec![vec![FE::ZERO; n]; t];
+            for i in 0..n {
+                for j in 0..t {
+                    (chis[j])[i] = channel.read_fe()?;
+                }
+            }
+            let mut x_star: Vec<FE::PrimeField> = vec![FE::PrimeField::ZERO; r];
+            for item in x_star.iter_mut() {
+                *item = channel.read_fe()?;
+            }
+            let ys: Vec<FE> = y_stars
+            .into_iter()
+            .zip(x_star.into_iter())
+            .map(|(y, x)| y - self.delta.multiply_by_prime_subfield(x))
+            .collect();
+            let y = dot_product(ys.iter(), self.pows.iter());
+            let vb = (0..t).map(|j| dot_product(chis[j].iter(), vs[j].iter())).sum::<FE>() - y;
+            let mut receiver = EQ::init()?;
+        let res = receiver.receive(channel, rng, &vb)?;
+        if res {
+            Ok(true)
+        } else {
+            Err(Error::EqCheckFailed)
+        }
+        }
 }
