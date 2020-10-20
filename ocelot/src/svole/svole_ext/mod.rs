@@ -86,7 +86,7 @@ where
         len: usize,
         rng: &mut RNG,
     ) -> Result<Vec<(<Self::Msg as FF>::PrimeField, Self::Msg)>, Error>;
-
+    /// Batch consistency check that can be called after bunch of send calls.
     fn send_batch_consistency_check<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         &mut self,
         channel: &mut C,
@@ -122,6 +122,7 @@ where
         len: usize,
         rng: &mut RNG,
     ) -> Result<Vec<Self::Msg>, Error>;
+    /// Batch consistency check that can be called after bunch of receive calls.
     fn receive_batch_consistency_check<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         &mut self,
         channel: &mut C,

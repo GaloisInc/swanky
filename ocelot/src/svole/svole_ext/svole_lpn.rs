@@ -81,14 +81,14 @@ impl<FE: FiniteField, SV: SVoleSender<Msg = FE>, SPS: SpsVoleSender<SV, Msg = FE
         }
         let mut svole = SV::init(channel, rng)?;
         let uw = svole.send(channel, rows, rng)?;
+        // This flush statement is needed, otherwise, it hangs on.
+        channel.flush()?;
         let u = uw.iter().map(|&uw| uw.0).collect();
         let w = uw.iter().map(|&uw| uw.1).collect();
         //let matrix_seed = rand::random::<Block>();
         //let mut mat_rng = AesRng::from_seed(matrix_seed);
         //let matrix = code_gen::<FE::PrimeField, _>(rows, cols, d, &mut mat_rng);
         //channel.write_block(&matrix_seed)?;
-        // This flush statement is needed, otherwise, it hangs on.
-        channel.flush()?;
         let spvole = SPS::init(channel, rng, svole)?;
         //println!("u={:?}", u);
         //println!("w={:?}", w);

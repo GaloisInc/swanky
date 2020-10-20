@@ -90,7 +90,7 @@ impl<
         len: usize,
         mut rng: &mut RNG,
     ) -> Result<Vec<(FE::PrimeField, FE)>, Error> {
-        let r = FE::PolynomialFormNumCoefficients::to_usize();
+        //let r = FE::PolynomialFormNumCoefficients::to_usize();
         let depth = 128 - (len as u128 - 1).leading_zeros() as usize;
         let n = len;
         let (a, delta) = self.svole.send(channel, 1, rng)?[0];
@@ -164,11 +164,9 @@ impl<
         let zs: Vec<FE> = xzs.iter().map(|&x| x.1).collect();
         let n = len;
         let t = uws.len();
-        let mut chis: Vec<Vec<FE>> = (0..t)
+        let chis: Vec<Vec<FE>> = (0..t)
             .map(|_| (0..n).map(|_| FE::random(rng)).collect())
             .collect();
-
-        //println!("chis_sender={:?}", chis);
         for i in 0..t {
             for j in 0..n {
                 channel.write_fe((chis[i])[j])?;
@@ -176,7 +174,7 @@ impl<
         }
         let mut alphas = vec![0; t];
         let mut betas = vec![FE::PrimeField::ZERO; t];
-        let mut chi_alphas = vec![vec![FE::PrimeField::ZERO]; t];
+        let mut chi_alphas = vec![vec![FE::PrimeField::ZERO; r]; t];
         let ws: Vec<Vec<FE>> = uws
             .iter()
             .map(|x| x.iter().map(|(_, w)| *w).collect())
@@ -268,9 +266,9 @@ impl<
         len: usize,
         rng: &mut RNG,
     ) -> Result<Vec<FE>, Error> {
-        let r = FE::PolynomialFormNumCoefficients::to_usize();
+        //let r = FE::PolynomialFormNumCoefficients::to_usize();
         let depth = 128 - (len as u128 - 1).leading_zeros();
-        let n = len;
+        //let n = len;
         let b = self.svole.receive(channel, 1, rng)?[0];
         let a_prime = channel.read_fe::<FE::PrimeField>()?;
         let gamma = b - self.delta.multiply_by_prime_subfield(a_prime);
@@ -326,7 +324,6 @@ impl<
             }
         }
         let mut x_stars: Vec<FE::PrimeField> = vec![FE::PrimeField::ZERO; r];
-
         for item in x_stars.iter_mut() {
             *item = channel.read_fe()?;
         }
