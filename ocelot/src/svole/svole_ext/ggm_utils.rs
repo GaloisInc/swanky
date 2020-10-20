@@ -15,6 +15,24 @@ pub fn dot_product<'a, FE: FiniteField, A: Iterator<Item = &'a FE>, B: Iterator<
     x.zip(y).map(|(u, v)| *u * *v).sum()
 }
 
+/// Returns point-wise addition of two vectors.
+pub fn point_wise_addition<
+    'a,
+    FE: FiniteField,
+    A: Iterator<Item = &'a FE>,
+    B: Iterator<Item = &'a FE>,
+>(
+    x: A,
+    y: B,
+) -> Vec<FE> {
+    x.zip(y).map(|(u, v)| *u + *v).collect()
+}
+
+/// Scalar multiplication
+pub fn scalar_multiplication<FE: FiniteField>(x: FE, v: &[FE]) -> Vec<FE> {
+    v.iter().map(|&y| x * y).collect()
+}
+
 /// Construct GGM tree with `h` levels and return the node values (a.k.a seeds). Although, the
 /// last level seeds to be of type `FE`, we keep them in the form of `Block` type as we need to
 /// call do OT calls on them.

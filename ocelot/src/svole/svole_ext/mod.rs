@@ -87,13 +87,13 @@ where
         rng: &mut RNG,
     ) -> Result<Vec<(<Self::Msg as FF>::PrimeField, Self::Msg)>, Error>;
 
-    fn send_batch_consistancy_check<C: AbstractChannel, RNG: CryptoRng + RngCore>(
+    fn send_batch_consistency_check<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         &mut self,
         channel: &mut C,
         len: usize,
         uws: Vec<Vec<(<Self::Msg as FF>::PrimeField, Self::Msg)>>,
         rng: &mut RNG,
-    ) -> Result<bool, Error>;
+    ) -> Result<(), Error>;
 }
 /// A trait for SpsVole Receiver.
 pub trait SpsVoleReceiver<SV: SVoleReceiver<Msg = Self::Msg>>
@@ -122,13 +122,13 @@ where
         len: usize,
         rng: &mut RNG,
     ) -> Result<Vec<Self::Msg>, Error>;
-    fn receive_batch_consistancy_check<C: AbstractChannel, RNG: CryptoRng + RngCore>(
+    fn receive_batch_consistency_check<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         &mut self,
         channel: &mut C,
         len: usize,
         vs: Vec<Vec<Self::Msg>>,
         rng: &mut RNG,
-    ) -> Result<bool, Error>;
+    ) -> Result<(), Error>;
 }
 
 /// A trait for LpnsVole Sender.
