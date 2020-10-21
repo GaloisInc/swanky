@@ -36,8 +36,8 @@ use std::{
 type BVSender<FE> = VoleSender<CpSender<KosSender, FE>, FE>;
 type BVReceiver<FE> = VoleReceiver<CpReceiver<KosReceiver, FE>, FE>;
 
-type SPSender<FE> = SpVoleSender<ChouOrlandiReceiver, FE, BVSender<FE>, EQSender<FE>>;
-type SPReceiver<FE> = SpVoleReceiver<ChouOrlandiSender, FE, BVReceiver<FE>, EQReceiver<FE>>;
+type SPSender<FE> = SpVoleSender<ChouOrlandiReceiver, FE, EQSender<FE>>;
+type SPReceiver<FE> = SpVoleReceiver<ChouOrlandiSender, FE, EQReceiver<FE>>;
 
 fn sp_svole_init<
     FE: FiniteField,
@@ -52,15 +52,15 @@ fn sp_svole_init<
         let reader = BufReader::new(sender.try_clone().unwrap());
         let writer = BufWriter::new(sender);
         let mut channel = Channel::new(reader, writer);
-        let base_vole = BVSender::init(&mut channel, &mut rng).unwrap();
-        SPSender::init(&mut channel, &mut rng, base_vole).unwrap()
+        let mut base_vole = BVSender::init(&mut channel, &mut rng).unwrap();
+        SPSender::init(&mut channel, &mut rng, &mut base_vole, 1).unwrap()
     });
     let mut rng = AesRng::new();
     let reader = BufReader::new(receiver.try_clone().unwrap());
     let writer = BufWriter::new(receiver);
     let mut channel = Channel::new(reader, writer);
-    let base_vole = BVReceiver::init(&mut channel, &mut rng).unwrap();
-    let spvole_receiver = SPReceiver::init(&mut channel, &mut rng, base_vole).unwrap();
+    let mut base_vole = BVReceiver::init(&mut channel, &mut rng).unwrap();
+    let spvole_receiver = SPReceiver::init(&mut channel, &mut rng, &mut base_vole, 1).unwrap();
     let spvole_sender = handle.join().unwrap();
     let spvole_sender = Arc::new(Mutex::new(spvole_sender));
     let spvole_receiver = Arc::new(Mutex::new(spvole_receiver));
@@ -99,7 +99,8 @@ fn bench_svole<
 
 fn bench_sp_fp(c: &mut Criterion) {
     c.bench_function("sp_svole::extend::Fp (splen = 1 << 13)", move |bench| {
-        let (vole_sender, vole_receiver) = sp_svole_init();
+        let (vole_sender, vole_receiver) =
+            sp_svole_init::<Fp, BVSender<Fp>, BVReceiver<Fp>, SPSender<Fp>, SPReceiver<Fp>>();
         bench.iter(move || {
             bench_svole::<Fp, BVSender<Fp>, BVReceiver<Fp>, SPSender<Fp>, SPReceiver<Fp>>(
                 &vole_sender,
@@ -112,7 +113,13 @@ fn bench_sp_fp(c: &mut Criterion) {
 
 fn bench_sp_gf128(c: &mut Criterion) {
     c.bench_function("sp_svole::extend::Gf128 (splen = 1 << 13)", move |bench| {
-        let (vole_sender, vole_receiver) = sp_svole_init();
+        let (vole_sender, vole_receiver) = sp_svole_init::<
+            Gf128,
+            BVSender<Gf128>,
+            BVReceiver<Gf128>,
+            SPSender<Gf128>,
+            SPReceiver<Gf128>,
+        >();
         bench.iter(move || {
             bench_svole::<
                 Gf128,
@@ -127,7 +134,8 @@ fn bench_sp_gf128(c: &mut Criterion) {
 
 fn bench_sp_f2(c: &mut Criterion) {
     c.bench_function("sp_svole::extend::F2 (splen = 1 << 13)", move |bench| {
-        let (vole_sender, vole_receiver) = sp_svole_init();
+        let (vole_sender, vole_receiver) =
+            sp_svole_init::<F2, BVSender<F2>, BVReceiver<F2>, SPSender<F2>, SPReceiver<F2>>();
         bench.iter(move || {
             bench_svole::<F2, BVSender<F2>, BVReceiver<F2>, SPSender<F2>, SPReceiver<F2>>(
                 &vole_sender,
@@ -140,7 +148,13 @@ fn bench_sp_f2(c: &mut Criterion) {
 
 fn bench_sp_f61p(c: &mut Criterion) {
     c.bench_function("sp_svole::extend::F2 (splen = 1 << 13)", move |bench| {
-        let (vole_sender, vole_receiver) = sp_svole_init();
+        let (vole_sender, vole_receiver) = sp_svole_init::<
+            F61p,
+            BVSender<F61p>,
+            BVReceiver<F61p>,
+            SPSender<F61p>,
+            SPReceiver<F61p>,
+        >();
         bench.iter(move || {
             bench_svole::<F61p, BVSender<F61p>, BVReceiver<F61p>, SPSender<F61p>, SPReceiver<F61p>>(
                 &vole_sender,
@@ -165,14 +179,14 @@ fn bench_sp_init<
         let reader = BufReader::new(sender.try_clone().unwrap());
         let writer = BufWriter::new(sender);
         let mut channel = Channel::new(reader, writer);
-        let base_vole = BVSender::init(&mut channel, &mut rng).unwrap();
-        black_box(SPSender::init(&mut channel, &mut rng, base_vole).unwrap())
+        let mut base_vole = BVSender::init(&mut channel, &mut rng).unwrap();
+        black_box(SPSender::init(&mut channel, &mut rng, &mut base_vole, 1).unwrap())
     });
     let reader = BufReader::new(receiver.try_clone().unwrap());
     let writer = BufWriter::new(receiver);
     let mut channel = Channel::new(reader, writer);
-    let base_vole = BVReceiver::init(&mut channel, &mut rng).unwrap();
-    black_box(SPReceiver::init(&mut channel, &mut rng, base_vole).unwrap());
+    let mut base_vole = BVReceiver::init(&mut channel, &mut rng).unwrap();
+    black_box(SPReceiver::init(&mut channel, &mut rng, &mut base_vole, 1).unwrap());
     handle.join().unwrap();
 }
 

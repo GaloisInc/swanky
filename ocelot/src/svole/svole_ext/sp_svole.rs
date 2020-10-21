@@ -37,21 +37,25 @@ use std::marker::PhantomData;
 
 /// SpsVole Sender.
 #[derive(Clone)]
-pub struct Sender<OT: OtReceiver, FE: FF, SV: SVoleSender, EQ: EqSender> {
+pub struct Sender<OT: OtReceiver, FE: FF, EQ: EqSender> {
     _eq: PhantomData<EQ>,
-    svole: SV,
     ot: OT,
     pows: Vec<FE>,
+    uws: Vec<(FE::PrimeField, FE)>,
+    counter: usize,
+    iters: usize,
 }
 
 /// SpsVole Receiver.
 #[derive(Clone)]
-pub struct Receiver<OT: OtSender, FE: FF, SV: SVoleReceiver, EQ: EqReceiver> {
+pub struct Receiver<OT: OtSender, FE: FF, EQ: EqReceiver> {
     _eq: PhantomData<EQ>,
-    svole: SV,
     ot: OT,
     delta: FE,
     pows: Vec<FE>,
+    vs: Vec<FE>,
+    counter: usize,
+    iters: usize,
 }
 
 /// Implement SpsVoleSender for Sender type.
@@ -60,13 +64,14 @@ impl<
         FE: FF,
         SV: SVoleSender<Msg = FE>,
         EQ: EqSender<Msg = FE>,
-    > SpsVoleSender<SV> for Sender<OT, FE, SV, EQ>
+    > SpsVoleSender<SV> for Sender<OT, FE, EQ>
 {
     type Msg = FE;
     fn init<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         channel: &mut C,
         rng: &mut RNG,
-        base_svole: SV,
+        base_svole: &mut SV,
+        iters: usize,
     ) -> Result<Self, Error> {
         let g = FE::GENERATOR;
         let r = FE::PolynomialFormNumCoefficients::to_usize();
@@ -77,11 +82,14 @@ impl<
             *item = acc;
             acc *= g;
         }
+        let uws = base_svole.send(channel, iters + r, rng)?;
         Ok(Self {
             _eq: PhantomData::<EQ>,
             pows,
-            svole: base_svole,
             ot,
+            uws,
+            counter: 0,
+            iters,
         })
     }
 
@@ -92,9 +100,16 @@ impl<
         mut rng: &mut RNG,
     ) -> Result<Vec<(FE::PrimeField, FE)>, Error> {
         //let r = FE::PolynomialFormNumCoefficients::to_usize();
+        if self.counter >= self.iters {
+            return Err(Error::Other(
+                "The number of iterations allowed exhausted!".to_string(),
+            ));
+        }
         let depth = 128 - (len as u128 - 1).leading_zeros() as usize;
         let n = len;
-        let (a, delta) = self.svole.send(channel, 1, rng)?[0];
+        //let (a, delta) = self.svole.send(channel, 1, rng)?[0];
+        let (a, delta) = self.uws[self.counter];
+        self.counter += 1;
         let mut beta = FE::PrimeField::random(&mut rng);
         while beta == FE::PrimeField::ZERO {
             beta = FE::PrimeField::random(&mut rng);
@@ -122,35 +137,11 @@ impl<
             .map(|(_, &x)| x)
             .sum();
         ws[alpha] = delta - (d + sum);
-        // Consistency check
-        /*let xz = self.svole.send(channel, r, rng)?;
-        let xs: Vec<FE::PrimeField> = xz.iter().map(|&x| x.0).collect();
-        let zs: Vec<FE> = xz.iter().map(|&x| x.1).collect();
-        let chis: Vec<FE> = (0..n).map(|_| FE::random(rng)).collect();
-        let chi_alpha: Vec<FE::PrimeField> = chis[alpha].to_polynomial_coefficients().to_vec();
-        let x_stars: Vec<FE::PrimeField> = chi_alpha
-            .iter()
-            .zip(xs.iter())
-            .map(|(&chi_alpha, x)| chi_alpha * beta - *x)
-            .collect();
-        for chi in chis.iter() {
-            channel.write_fe(*chi)?;
-        }
-        for x in x_stars.iter() {
-            channel.write_fe(*x)?;
-        }
-        let z = dot_product(zs.iter(), self.pows.iter());
-        let va = dot_product(chis.iter(), ws.iter()) - z;
-        let mut sender = EQ::init()?;
-        let b = sender.send(channel, &va)?;
-        if b {
-            let res = us.iter().zip(ws.iter()).map(|(&u, &w)| (u, w)).collect();
-            Ok(res)
-        } else {
-            Err(Error::EqCheckFailed)
-        }*/
         let res = us.iter().zip(ws.iter()).map(|(&u, &w)| (u, w)).collect();
         Ok(res)
+    }
+    fn voles(&self) -> Vec<(FE::PrimeField, FE)> {
+        self.uws.clone()
     }
     fn send_batch_consistency_check<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         &mut self,
@@ -160,11 +151,15 @@ impl<
         rng: &mut RNG,
     ) -> Result<(), Error> {
         let r = FE::PolynomialFormNumCoefficients::to_usize();
-        let xzs = self.svole.send(channel, r, rng)?;
+        if self.counter >= self.iters + r {
+            return Err(Error::Other("No more consistency checks!".to_string()));
+        }
+        //let xzs = self.svole.send(channel, r, rng)?;
+        let xzs: Vec<(FE::PrimeField, FE)> = (0..r).map(|i| self.uws[self.counter + i]).collect();
+        self.counter += r;
         let xs: Vec<FE::PrimeField> = xzs.iter().map(|&x| x.0).collect();
         let zs: Vec<FE> = xzs.iter().map(|&x| x.1).collect();
         let n = len;
-        //println!("n={}", n);
         let t = uws.len();
         let seed = rand::random::<Block>();
         let mut rng_chi = AesRng::from_seed(seed);
@@ -173,11 +168,6 @@ impl<
             .collect();
         debug_assert!(chis.len() == t);
         debug_assert!(chis[0].len() == n);
-        /*for i in 0..t {
-            for j in 0..n {
-                channel.write_fe((chis[i])[j])?;
-            }
-        }*/
         channel.write_block(&seed)?;
         let mut alphas = vec![0; t];
         let mut betas = vec![FE::PrimeField::ZERO; t];
@@ -195,7 +185,6 @@ impl<
             }
             chi_alphas[j] = ((chis[j])[alphas[j]]).to_polynomial_coefficients().to_vec();
         }
-        //println!("alphas={:?}", alphas);
         let x_tmp: Vec<Vec<_>> = (0..t)
             .map(|i| scalar_multiplication(betas[i], &chi_alphas[i]))
             .collect();
@@ -237,13 +226,14 @@ impl<
         FE: FF,
         SV: SVoleReceiver<Msg = FE>,
         EQ: EqReceiver<Msg = FE>,
-    > SpsVoleReceiver<SV> for Receiver<OT, FE, SV, EQ>
+    > SpsVoleReceiver<SV> for Receiver<OT, FE, EQ>
 {
     type Msg = FE;
     fn init<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         channel: &mut C,
         mut rng: &mut RNG,
-        base_svole: SV,
+        base_svole: &mut SV,
+        iters: usize,
     ) -> Result<Self, Error> {
         let ot = OT::init(channel, &mut rng)?;
         let r = FE::PolynomialFormNumCoefficients::to_usize();
@@ -255,17 +245,24 @@ impl<
             acc *= g;
         }
         let delta = base_svole.delta();
+        let vs = base_svole.receive(channel, iters + r, rng)?;
         Ok(Self {
             _eq: PhantomData::<EQ>,
             pows,
             delta,
             ot,
-            svole: base_svole,
+            vs,
+            counter: 0,
+            iters,
         })
     }
 
     fn delta(&self) -> FE {
         self.delta
+    }
+
+    fn voles(&self) -> Vec<FE> {
+        self.vs.clone()
     }
 
     fn receive<C: AbstractChannel, RNG: CryptoRng + RngCore>(
@@ -274,10 +271,16 @@ impl<
         len: usize,
         rng: &mut RNG,
     ) -> Result<Vec<FE>, Error> {
-        //let r = FE::PolynomialFormNumCoefficients::to_usize();
+        if self.counter >= self.iters {
+            return Err(Error::Other(
+                "The number of iterations allowed exhausted!".to_string(),
+            ));
+        }
         let depth = 128 - (len as u128 - 1).leading_zeros();
         //let n = len;
-        let b = self.svole.receive(channel, 1, rng)?[0];
+        //let b = self.svole.receive(channel, 1, rng)?[0];
+        let b = self.vs[self.counter];
+        self.counter += 1;
         let a_prime = channel.read_fe::<FE::PrimeField>()?;
         let gamma = b - self.delta.multiply_by_prime_subfield(a_prime);
         let seed = rand::random::<Block>();
@@ -287,31 +290,6 @@ impl<
         let d = gamma - vs.clone().into_iter().sum();
         channel.write_fe(d)?;
         channel.flush()?;
-        /* consistency check
-        let y_star = self.svole.receive(channel, r, rng)?;
-        let mut chi: Vec<FE> = vec![FE::ZERO; n];
-        for item in chi.iter_mut() {
-            *item = channel.read_fe::<FE>()?;
-        }
-        let mut x_star: Vec<FE::PrimeField> = vec![FE::PrimeField::ZERO; r];
-        for item in x_star.iter_mut() {
-            *item = channel.read_fe()?;
-        }
-        let ys: Vec<FE> = y_star
-            .into_iter()
-            .zip(x_star.into_iter())
-            .map(|(y, x)| y - self.delta.multiply_by_prime_subfield(x))
-            .collect();
-        // sets Y
-        let y = dot_product(ys.iter(), self.pows.iter());
-        let vb = dot_product(chi.iter(), vs.iter()) - y;
-        let mut receiver = EQ::init()?;
-        let res = receiver.receive(channel, rng, &vb)?;
-        if res {
-            Ok(vs)
-        } else {
-            Err(Error::EqCheckFailed)
-        }*/
         Ok(vs)
     }
     fn receive_batch_consistency_check<C: AbstractChannel, RNG: CryptoRng + RngCore>(
@@ -322,15 +300,14 @@ impl<
         rng: &mut RNG,
     ) -> Result<(), Error> {
         let r = FE::PolynomialFormNumCoefficients::to_usize();
-        let y_stars = self.svole.receive(channel, r, rng)?;
+        if self.counter >= self.iters + r {
+            return Err(Error::Other("No more consistency checks!".to_string()));
+        }
+        //let y_stars = self.svole.receive(channel, r, rng)?;
+        let y_stars: Vec<FE> = (0..r).map(|i| self.vs[self.counter + i]).collect();
+        self.counter += r;
         let n = len;
         let t = vs.len();
-        //let mut chis = vec![vec![FE::ZERO; n]; t];
-        /*for i in 0..t {
-            for j in 0..n {
-                (chis[i])[j] = channel.read_fe()?;
-            }
-        }*/
         let seed = channel.read_block()?;
         let mut rng_chi = AesRng::from_seed(seed);
         let chis: Vec<Vec<FE>> = (0..t)

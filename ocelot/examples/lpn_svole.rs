@@ -48,7 +48,7 @@ fn _test_lpnvole<
         let writer = BufWriter::new(sender);
         let mut channel = TrackChannel::new(reader, writer);
         let start = SystemTime::now();
-        let mut vole = VSender::init(&mut channel, rows, cols, d, &mut rng).unwrap();
+        let mut vole = VSender::init(&mut channel, rows, cols, d, weight, &mut rng).unwrap();
         println!(
             "Sender init time: {} ms",
             start.elapsed().unwrap().as_millis()
@@ -62,7 +62,7 @@ fn _test_lpnvole<
             channel.kilobits_written() / 1000.0
         );
         let start = SystemTime::now();
-        let _ = vole.send(&mut channel, weight, &mut rng).unwrap();
+        let _ = vole.send(&mut channel, &mut rng).unwrap();
         println!(
             "[{}] Send time: {} ms",
             cols - rows,
@@ -82,7 +82,7 @@ fn _test_lpnvole<
     let writer = BufWriter::new(receiver);
     let mut channel = TrackChannel::new(reader, writer);
     let start = SystemTime::now();
-    let mut vole = VReceiver::init(&mut channel, rows, cols, d, &mut rng).unwrap();
+    let mut vole = VReceiver::init(&mut channel, rows, cols, d, weight, &mut rng).unwrap();
     println!(
         "Receiver init time: {} ms",
         start.elapsed().unwrap().as_millis()
@@ -96,7 +96,7 @@ fn _test_lpnvole<
         channel.kilobits_written() / 1000.0
     );
     let start = SystemTime::now();
-    let _ = vole.receive(&mut channel, weight, &mut rng).unwrap();
+    let _ = vole.receive(&mut channel, &mut rng).unwrap();
     println!(
         "[{}] Receiver time: {} ms",
         cols - rows,
@@ -121,16 +121,16 @@ fn main() {
     type BVSender<FE> = VoleSender<CPSender<FE>, FE>;
     type BVReceiver<FE> = VoleReceiver<CPReceiver<FE>, FE>;
 
-    type SPSender<FE> = SpsSender<ChouOrlandiReceiver, FE, BVSender<FE>, EqSender<FE>>;
-    type SPReceiver<FE> = SpsReceiver<ChouOrlandiSender, FE, BVReceiver<FE>, EqReceiver<FE>>;
+    type SPSender<FE> = SpsSender<ChouOrlandiReceiver, FE, EqSender<FE>>;
+    type SPReceiver<FE> = SpsReceiver<ChouOrlandiSender, FE, EqReceiver<FE>>;
 
     type VSender<FE> = LpnVoleSender<FE, BVSender<FE>, SPSender<FE>>;
     type VReceiver<FE> = LpnVoleReceiver<FE, BVReceiver<FE>, SPReceiver<FE>>;
 
-    let rows = LpnExtendParams::ROWS;
-    let cols = LpnExtendParams::COLS;
-    let weight = LpnExtendParams::WEIGHT;
-    let d = LpnExtendParams::D;
+    let rows = LpnSetupParams::ROWS;
+    let cols = LpnSetupParams::COLS;
+    let weight = LpnSetupParams::WEIGHT;
+    let d = LpnSetupParams::D;
 
     println!("\nField: F2 \n");
     _test_lpnvole::<F2, VSender<F2>, VReceiver<F2>>(rows, cols, d, weight);

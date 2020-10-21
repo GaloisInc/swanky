@@ -47,8 +47,8 @@ fn _test_spsvole<
         let writer = BufWriter::new(sender);
         let mut channel = TrackChannel::new(reader, writer);
         let start = SystemTime::now();
-        let base_vole = BVSender::init(&mut channel, &mut rng).unwrap();
-        let mut vole = SPSender::init(&mut channel, &mut rng, base_vole).unwrap();
+        let mut base_vole = BVSender::init(&mut channel, &mut rng).unwrap();
+        let mut vole = SPSender::init(&mut channel, &mut rng, &mut base_vole, 1).unwrap();
         println!(
             "Sender init time: {} ms",
             start.elapsed().unwrap().as_millis()
@@ -74,8 +74,8 @@ fn _test_spsvole<
     let writer = BufWriter::new(receiver);
     let mut channel = TrackChannel::new(reader, writer);
     let start = SystemTime::now();
-    let base_vole = BVReceiver::init(&mut channel, &mut rng).unwrap();
-    let mut vole = SPReceiver::init(&mut channel, &mut rng, base_vole).unwrap();
+    let mut base_vole = BVReceiver::init(&mut channel, &mut rng).unwrap();
+    let mut vole = SPReceiver::init(&mut channel, &mut rng, &mut base_vole, 1).unwrap();
     println!(
         "Receiver init time: {} ms",
         start.elapsed().unwrap().as_millis()
@@ -105,8 +105,8 @@ type CPReceiver<FE> = CpReceiver<KosReceiver, FE>;
 type BVSender<FE> = VoleSender<CPSender<FE>, FE>;
 type BVReceiver<FE> = VoleReceiver<CPReceiver<FE>, FE>;
 
-type SPSender<FE> = SpsSender<ChouOrlandiReceiver, FE, BVSender<FE>, EqSender<FE>>;
-type SPReceiver<FE> = SpsReceiver<ChouOrlandiSender, FE, BVReceiver<FE>, EqReceiver<FE>>;
+type SPSender<FE> = SpsSender<ChouOrlandiReceiver, FE, EqSender<FE>>;
+type SPReceiver<FE> = SpsReceiver<ChouOrlandiSender, FE, EqReceiver<FE>>;
 
 fn main() {
     let splen = 1 << 13;

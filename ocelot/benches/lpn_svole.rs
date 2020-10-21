@@ -48,8 +48,8 @@ type CPReceiver<FE> = CpReceiver<KosReceiver, FE>;
 type BVSender<FE> = VoleSender<CPSender<FE>, FE>;
 type BVReceiver<FE> = VoleReceiver<CPReceiver<FE>, FE>;
 
-type SPSender<FE> = SpVoleSender<ChouOrlandiReceiver, FE, BVSender<FE>, EQSender<FE>>;
-type SPReceiver<FE> = SpVoleReceiver<ChouOrlandiSender, FE, BVReceiver<FE>, EQReceiver<FE>>;
+type SPSender<FE> = SpVoleSender<ChouOrlandiReceiver, FE, EQSender<FE>>;
+type SPReceiver<FE> = SpVoleReceiver<ChouOrlandiSender, FE, EQReceiver<FE>>;
 
 type VSender<FE> = LpnVoleSender<FE, BVSender<FE>, SPSender<FE>>;
 type VReceiver<FE> = LpnVoleReceiver<FE, BVReceiver<FE>, SPReceiver<FE>>;
@@ -61,6 +61,7 @@ fn svole_init<
     rows: usize,
     cols: usize,
     d: usize,
+    weight: usize,
 ) -> (Arc<Mutex<VSender>>, Arc<Mutex<VReceiver>>) {
     let (sender, receiver) = UnixStream::pair().unwrap();
     let handle = std::thread::spawn(move || {
@@ -68,13 +69,13 @@ fn svole_init<
         let reader = BufReader::new(sender.try_clone().unwrap());
         let writer = BufWriter::new(sender);
         let mut channel = Channel::new(reader, writer);
-        VSender::init(&mut channel, rows, cols, d, &mut rng).unwrap()
+        VSender::init(&mut channel, rows, cols, d, weight, &mut rng).unwrap()
     });
     let mut rng = AesRng::new();
     let reader = BufReader::new(receiver.try_clone().unwrap());
     let writer = BufWriter::new(receiver);
     let mut channel = Channel::new(reader, writer);
-    let vole_receiver = VReceiver::init(&mut channel, rows, cols, d, &mut rng).unwrap();
+    let vole_receiver = VReceiver::init(&mut channel, rows, cols, d, weight, &mut rng).unwrap();
     let vole_sender = handle.join().unwrap();
     let vole_sender = Arc::new(Mutex::new(vole_sender));
     let vole_receiver = Arc::new(Mutex::new(vole_receiver));
@@ -97,20 +98,20 @@ fn bench_svole<
         let writer = BufWriter::new(sender);
         let mut channel = Channel::new(reader, writer);
         let mut vole_sender = vole_sender.lock().unwrap();
-        black_box(vole_sender.send(&mut channel, weight, &mut rng)).unwrap();
+        black_box(vole_sender.send(&mut channel, &mut rng)).unwrap();
     });
     let mut rng = AesRng::new();
     let reader = BufReader::new(receiver.try_clone().unwrap());
     let writer = BufWriter::new(receiver);
     let mut channel = Channel::new(reader, writer);
     let mut vole_receiver = vole_receiver.lock().unwrap();
-    black_box(vole_receiver.receive(&mut channel, weight, &mut rng)).unwrap();
+    black_box(vole_receiver.receive(&mut channel, &mut rng)).unwrap();
     handle.join().unwrap();
 }
 
 fn bench_svole_fp(c: &mut Criterion) {
     c.bench_function("lpn_svole::extend::Fp", move |bench| {
-        let (vole_sender, vole_receiver) = svole_init(ROWS, COLS, D);
+        let (vole_sender, vole_receiver) = svole_init(ROWS, COLS, D, WEIGHT);
         bench.iter(move || {
             bench_svole::<VSender<Fp>, VReceiver<Fp>>(&vole_sender, &vole_receiver, WEIGHT);
         })
@@ -119,7 +120,7 @@ fn bench_svole_fp(c: &mut Criterion) {
 
 fn bench_svole_gf128(c: &mut Criterion) {
     c.bench_function("lpn_svole::extend::Gf128", move |bench| {
-        let (vole_sender, vole_receiver) = svole_init(ROWS, COLS, D);
+        let (vole_sender, vole_receiver) = svole_init(ROWS, COLS, D, WEIGHT);
         bench.iter(move || {
             bench_svole::<VSender<Gf128>, VReceiver<Gf128>>(&vole_sender, &vole_receiver, WEIGHT);
         })
@@ -128,7 +129,7 @@ fn bench_svole_gf128(c: &mut Criterion) {
 
 fn bench_svole_f2(c: &mut Criterion) {
     c.bench_function("lpn_svole::extend::F2", move |bench| {
-        let (vole_sender, vole_receiver) = svole_init(ROWS, COLS, D);
+        let (vole_sender, vole_receiver) = svole_init(ROWS, COLS, D, WEIGHT);
         bench.iter(move || {
             bench_svole::<VSender<F2>, VReceiver<F2>>(&vole_sender, &vole_receiver, WEIGHT);
         })
@@ -137,7 +138,7 @@ fn bench_svole_f2(c: &mut Criterion) {
 
 fn bench_svole_f61p(c: &mut Criterion) {
     c.bench_function("lpn_svole::extend::F61p", move |bench| {
-        let (vole_sender, vole_receiver) = svole_init(ROWS, COLS, D);
+        let (vole_sender, vole_receiver) = svole_init(ROWS, COLS, D, WEIGHT);
         bench.iter(move || {
             bench_svole::<VSender<F61p>, VReceiver<F61p>>(&vole_sender, &vole_receiver, WEIGHT);
         })
@@ -150,6 +151,7 @@ fn bench_svole_init<
     rows: usize,
     cols: usize,
     d: usize,
+    weight: usize,
 ) {
     let mut rng = AesRng::new();
     let (sender, receiver) = UnixStream::pair().unwrap();
@@ -158,19 +160,19 @@ fn bench_svole_init<
         let reader = BufReader::new(sender.try_clone().unwrap());
         let writer = BufWriter::new(sender);
         let mut channel = Channel::new(reader, writer);
-        black_box(VSender::init(&mut channel, rows, cols, d, &mut rng).unwrap())
+        black_box(VSender::init(&mut channel, rows, cols, d, weight, &mut rng).unwrap())
     });
     let reader = BufReader::new(receiver.try_clone().unwrap());
     let writer = BufWriter::new(receiver);
     let mut channel = Channel::new(reader, writer);
-    black_box(VReceiver::init(&mut channel, rows, cols, d, &mut rng).unwrap());
+    black_box(VReceiver::init(&mut channel, rows, cols, d, weight, &mut rng).unwrap());
     handle.join().unwrap();
 }
 
 fn bench_svole_init_gf128(c: &mut Criterion) {
     c.bench_function("lpn_svole::init::Gf128", move |bench| {
         bench.iter(move || {
-            bench_svole_init::<VSender<Gf128>, VReceiver<Gf128>>(ROWS, COLS, D);
+            bench_svole_init::<VSender<Gf128>, VReceiver<Gf128>>(ROWS, COLS, D, WEIGHT);
         });
     });
 }
@@ -178,7 +180,7 @@ fn bench_svole_init_gf128(c: &mut Criterion) {
 fn bench_svole_init_fp(c: &mut Criterion) {
     c.bench_function("lpn_svole::init::Fp", move |bench| {
         bench.iter(move || {
-            bench_svole_init::<VSender<Fp>, VReceiver<Fp>>(ROWS, COLS, D);
+            bench_svole_init::<VSender<Fp>, VReceiver<Fp>>(ROWS, COLS, D, WEIGHT);
         });
     });
 }
@@ -186,7 +188,7 @@ fn bench_svole_init_fp(c: &mut Criterion) {
 fn bench_svole_init_f2(c: &mut Criterion) {
     c.bench_function("lpn_svole::init::F2", move |bench| {
         bench.iter(move || {
-            bench_svole_init::<VSender<F2>, VReceiver<F2>>(ROWS, COLS, D);
+            bench_svole_init::<VSender<F2>, VReceiver<F2>>(ROWS, COLS, D, WEIGHT);
         });
     });
 }
@@ -194,7 +196,7 @@ fn bench_svole_init_f2(c: &mut Criterion) {
 fn bench_svole_init_f61p(c: &mut Criterion) {
     c.bench_function("lpn_svole::init::F61p", move |bench| {
         bench.iter(move || {
-            bench_svole_init::<VSender<F61p>, VReceiver<F61p>>(ROWS, COLS, D);
+            bench_svole_init::<VSender<F61p>, VReceiver<F61p>>(ROWS, COLS, D, WEIGHT);
         });
     });
 }

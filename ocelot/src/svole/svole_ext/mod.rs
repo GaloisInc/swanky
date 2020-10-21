@@ -73,7 +73,8 @@ where
     fn init<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         channel: &mut C,
         rng: &mut RNG,
-        base_svole: SV,
+        base_svole: &mut SV,
+        iters: usize,
     ) -> Result<Self, Error>;
     /// Runs single-point svole and outputs pair of vectors `(u, w)` such that
     /// the correlation `w = u'Δ + v` holds. Note that `u'` is the converted vector from
@@ -86,6 +87,8 @@ where
         len: usize,
         rng: &mut RNG,
     ) -> Result<Vec<(<Self::Msg as FF>::PrimeField, Self::Msg)>, Error>;
+    /// Returns voles, `(u, w)`s, generated using `base_svole`.
+    fn voles(&self) -> Vec<(<Self::Msg as FF>::PrimeField, Self::Msg)>;
     /// Batch consistency check that can be called after bunch of send calls.
     fn send_batch_consistency_check<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         &mut self,
@@ -107,10 +110,13 @@ where
     fn init<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         channel: &mut C,
         rng: &mut RNG,
-        base_svole: SV,
+        base_svole: &mut SV,
+        iters: usize,
     ) -> Result<Self, Error>;
     /// Returns the receiver's choice during the OT call.
     fn delta(&self) -> Self::Msg;
+    /// Returns voles, `v`s, generated using `base_svole`.
+    fn voles(&self) -> Vec<Self::Msg>;
     /// Runs single-point svole and outputs a vector `v` such that
     /// the correlation `w = u'Δ + v` holds. Again, `u'` is the converted vector from
     /// `u` to the vector of elements of the extended field `FE`. Of course, the vector
@@ -146,6 +152,7 @@ where
         rows: usize,
         cols: usize,
         d: usize,
+        weight: usize,
         rng: &mut RNG,
     ) -> Result<Self, Error>;
     /// This procedure can be run multiple times and produces `cols - rows` sVole correlations,
@@ -156,7 +163,6 @@ where
     fn send<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         &mut self,
         channel: &mut C,
-        weight: usize,
         rng: &mut RNG,
     ) -> Result<Vec<(<Self::Msg as FF>::PrimeField, Self::Msg)>, Error>;
 }
@@ -177,6 +183,7 @@ where
         rows: usize,
         cols: usize,
         d: usize,
+        weight: usize,
         rng: &mut RNG,
     ) -> Result<Self, Error>;
     /// Returns the receiver's choice during the OT call.
@@ -189,7 +196,6 @@ where
     fn receive<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         &mut self,
         channel: &mut C,
-        weight: usize,
         rng: &mut RNG,
     ) -> Result<Vec<Self::Msg>, Error>;
 }
@@ -240,16 +246,16 @@ mod tests {
             let reader = BufReader::new(sender.try_clone().unwrap());
             let writer = BufWriter::new(sender);
             let mut channel = Channel::new(reader, writer);
-            let bv_sender = BVSender::init(&mut channel, &mut rng).unwrap();
-            let mut vole = SPSender::init(&mut channel, &mut rng, bv_sender).unwrap();
+            let mut bv_sender = BVSender::init(&mut channel, &mut rng).unwrap();
+            let mut vole = SPSender::init(&mut channel, &mut rng, &mut bv_sender, 1).unwrap();
             vole.send(&mut channel, len, &mut rng).unwrap()
         });
         let mut rng = AesRng::new();
         let reader = BufReader::new(receiver.try_clone().unwrap());
         let writer = BufWriter::new(receiver);
         let mut channel = Channel::new(reader, writer);
-        let bv_receiver = BVReceiver::init(&mut channel, &mut rng).unwrap();
-        let mut vole = SPReceiver::init(&mut channel, &mut rng, bv_receiver).unwrap();
+        let mut bv_receiver = BVReceiver::init(&mut channel, &mut rng).unwrap();
+        let mut vole = SPReceiver::init(&mut channel, &mut rng, &mut bv_receiver, 1).unwrap();
         let vs = vole.receive(&mut channel, len, &mut rng).unwrap();
         let uws = handle.join().unwrap();
         for i in 0..len as usize {
@@ -264,8 +270,8 @@ mod tests {
     type BVSender<FE> = VoleSender<CPSender<FE>, FE>;
     type BVReceiver<FE> = VoleReceiver<CPReceiver<FE>, FE>;
 
-    type SPSender<FE> = SpsSender<ChouOrlandiReceiver, FE, BVSender<FE>, EqSender<FE>>;
-    type SPReceiver<FE> = SpsReceiver<ChouOrlandiSender, FE, BVReceiver<FE>, EqReceiver<FE>>;
+    type SPSender<FE> = SpsSender<ChouOrlandiReceiver, FE, EqSender<FE>>;
+    type SPReceiver<FE> = SpsReceiver<ChouOrlandiSender, FE, EqReceiver<FE>>;
 
     #[test]
     fn test_sp_svole() {
@@ -303,15 +309,15 @@ mod tests {
             let reader = BufReader::new(sender.try_clone().unwrap());
             let writer = BufWriter::new(sender);
             let mut channel = Channel::new(reader, writer);
-            let mut vole = VSender::init(&mut channel, rows, cols, d, &mut rng).unwrap();
-            vole.send(&mut channel, weight, &mut rng).unwrap()
+            let mut vole = VSender::init(&mut channel, rows, cols, d, weight, &mut rng).unwrap();
+            vole.send(&mut channel, &mut rng).unwrap()
         });
         let mut rng = AesRng::new();
         let reader = BufReader::new(receiver.try_clone().unwrap());
         let writer = BufWriter::new(receiver);
         let mut channel = Channel::new(reader, writer);
-        let mut vole = VReceiver::init(&mut channel, rows, cols, d, &mut rng).unwrap();
-        let vs = vole.receive(&mut channel, weight, &mut rng).unwrap();
+        let mut vole = VReceiver::init(&mut channel, rows, cols, d, weight, &mut rng).unwrap();
+        let vs = vole.receive(&mut channel, &mut rng).unwrap();
         let uws = handle.join().unwrap();
         for i in 0..weight as usize {
             let right = vole.delta().multiply_by_prime_subfield(uws[i].0) + vs[i];

@@ -27,6 +27,7 @@ use crate::{
         SVoleSender,
     },
 };
+use generic_array::typenum::Unsigned;
 use rand_core::{CryptoRng, RngCore};
 use scuttlebutt::{field::FiniteField, AbstractChannel};
 use std::marker::PhantomData;
@@ -38,10 +39,9 @@ pub struct Sender<FE: FiniteField, SV: SVoleSender<Msg = FE>, SPS: SpsVoleSender
     spvole: SPS,
     rows: usize,
     cols: usize,
-    u: Vec<FE::PrimeField>,
-    w: Vec<FE>,
-    //matrix_seed: Block, // matrix: Vec<Vec<FE::PrimeField>>,
+    uws: Vec<(FE::PrimeField, FE)>,
     d: usize,
+    weight: usize,
 }
 /// LpnsVole receiver.
 pub struct Receiver<
@@ -54,9 +54,9 @@ pub struct Receiver<
     delta: FE,
     rows: usize,
     cols: usize,
-    v: Vec<FE>,
-    //matrix_seed: Block, // matrix: Vec<Vec<FE::PrimeField>>,
+    vs: Vec<FE>,
     d: usize,
+    weight: usize,
 }
 
 impl<FE: FiniteField, SV: SVoleSender<Msg = FE>, SPS: SpsVoleSender<SV, Msg = FE>> LpnsVoleSender
@@ -68,6 +68,7 @@ impl<FE: FiniteField, SV: SVoleSender<Msg = FE>, SPS: SpsVoleSender<SV, Msg = FE
         rows: usize,
         cols: usize,
         d: usize,
+        weight: usize,
         rng: &mut RNG,
     ) -> Result<Self, Error> {
         if cols % 2 != 0 {
@@ -80,43 +81,36 @@ impl<FE: FiniteField, SV: SVoleSender<Msg = FE>, SPS: SpsVoleSender<SV, Msg = FE
             return Err(Error::InvalidD);
         }
         let mut svole = SV::init(channel, rng)?;
-        let uw = svole.send(channel, rows, rng)?;
+        let mut uws = svole.send(channel, rows, rng)?;
         // This flush statement is needed, otherwise, it hangs on.
         channel.flush()?;
-        let u = uw.iter().map(|&uw| uw.0).collect();
-        let w = uw.iter().map(|&uw| uw.1).collect();
-        //let matrix_seed = rand::random::<Block>();
-        //let mut mat_rng = AesRng::from_seed(matrix_seed);
-        //let matrix = code_gen::<FE::PrimeField, _>(rows, cols, d, &mut mat_rng);
-        //channel.write_block(&matrix_seed)?;
-        let spvole = SPS::init(channel, rng, svole)?;
-        //println!("u={:?}", u);
-        //println!("w={:?}", w);
+        let spvole = SPS::init(channel, rng, &mut svole, weight)?;
+        uws.extend(spvole.voles());
+        let r = FE::PolynomialFormNumCoefficients::to_usize();
+        debug_assert!(uws.len() == rows + weight + r);
         Ok(Self {
             _sv: PhantomData::<SV>,
             spvole,
-            rows,
+            rows: rows + weight + r,
             cols,
-            u,
-            w,
-            //matrix_seed, // matrix,
+            uws,
             d,
+            weight,
         })
     }
     fn send<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         &mut self,
         channel: &mut C,
-        weight: usize,
         rng: &mut RNG,
     ) -> Result<Vec<(FE::PrimeField, FE)>, Error> {
-        if self.cols % weight != 0 {
+        if self.cols % self.weight != 0 {
             return Err(Error::InvalidWeight);
         }
-        let m = self.cols / weight;
+        let m = self.cols / self.weight;
         let mut es = vec![];
         let mut ts = vec![];
         let mut uws = vec![vec![]];
-        for _ in 0..weight {
+        for _ in 0..self.weight {
             let ac = self.spvole.send(channel, m, rng)?;
             es.extend(ac.iter().map(|(a, _)| a));
             ts.extend(ac.iter().map(|(_, c)| c));
@@ -127,36 +121,32 @@ impl<FE: FiniteField, SV: SVoleSender<Msg = FE>, SPS: SpsVoleSender<SV, Msg = FE
         //consistency check
         self.spvole
             .send_batch_consistency_check(channel, m, uws, rng)?;
-        //println!("es={:?}\n", es);
-        //println!("ts={:?}\n", ts);
         let indices: Vec<Vec<(usize, FE::PrimeField)>> = (0..self.cols)
             .map(|i| lpn_mtx_indices::<FE>(i, self.rows, self.d))
             .collect();
-        //println!("indices_sender={:?}", indices);
+        let us: Vec<FE::PrimeField> = self.uws.iter().map(|(u, _)| *u).collect();
+        let ws: Vec<FE> = self.uws.iter().map(|(_, w)| *w).collect();
         let xs: Vec<FE::PrimeField> = indices
             .iter()
             .zip(es.into_iter())
             .map(|(ds, e)| {
                 ds.into_iter()
-                    .fold(FE::PrimeField::ZERO, |acc, (i, a)| acc + self.u[*i] * *a)
+                    .fold(FE::PrimeField::ZERO, |acc, (i, a)| acc + us[*i] * *a)
                     + e
             })
             .collect();
-        //println!("xs={:?}", xs);
         debug_assert!(xs.len() == self.cols);
         let zs: Vec<FE> = indices
             .into_iter()
             .zip(ts.into_iter())
             .map(|(ds, t)| {
                 ds.into_iter().fold(FE::ZERO, |acc, (i, a)| {
-                    acc + self.w[i].multiply_by_prime_subfield(a)
+                    acc + ws[i].multiply_by_prime_subfield(a)
                 }) + t
             })
             .collect();
-        //println!("zs={:?}", zs);
         for i in 0..self.rows {
-            self.u[i] = xs[i];
-            self.w[i] = zs[i];
+            self.uws[i] = (xs[i], zs[i]);
         }
         let output: Vec<(FE::PrimeField, FE)> = xs
             .into_iter()
@@ -177,6 +167,7 @@ impl<FE: FiniteField, SV: SVoleReceiver<Msg = FE>, SPS: SpsVoleReceiver<SV, Msg 
         rows: usize,
         cols: usize,
         d: usize,
+        weight: usize,
         rng: &mut RNG,
     ) -> Result<Self, Error> {
         if cols % 2 != 0 {
@@ -189,26 +180,23 @@ impl<FE: FiniteField, SV: SVoleReceiver<Msg = FE>, SPS: SpsVoleReceiver<SV, Msg 
             return Err(Error::InvalidD);
         }
         let mut svole = SV::init(channel, rng)?;
-        let v = svole.receive(channel, rows, rng)?;
+        let r = FE::PolynomialFormNumCoefficients::to_usize();
+        let mut vs = svole.receive(channel, rows, rng)?;
         let svole_delta = svole.delta();
-        //let matrix_seed = channel.read_block()?;
-        /*let mut mat_rng = AesRng::from_seed(matrix_seed);
-        let matrix = code_gen::<FE::PrimeField, _>(rows, cols, d, &mut mat_rng);*/
-        let spvole = SPS::init(channel, rng, svole)?;
-        //println!("v={:?}", v);
+        let spvole = SPS::init(channel, rng, &mut svole, weight)?;
         let spvole_delta = spvole.delta();
+        vs.extend(spvole.voles());
         debug_assert!(spvole_delta == svole_delta);
-        //println!("svole_delta = {:?}", svole_delta);
-        //println!("sp_vole_delta = {:?}", spvole_delta);
+        debug_assert!(vs.len() == rows + weight + r);
         Ok(Self {
             _sv: PhantomData::<SV>,
             spvole,
             delta: spvole_delta,
-            rows,
+            rows: rows + weight + r,
             cols,
-            v,
-            //matrix_seed, //matrix,
+            vs,
             d,
+            weight,
         })
     }
     fn delta(&self) -> FE {
@@ -218,16 +206,15 @@ impl<FE: FiniteField, SV: SVoleReceiver<Msg = FE>, SPS: SpsVoleReceiver<SV, Msg 
     fn receive<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         &mut self,
         channel: &mut C,
-        weight: usize,
         rng: &mut RNG,
     ) -> Result<Vec<FE>, Error> {
-        if self.cols % weight != 0 {
+        if self.cols % self.weight != 0 {
             return Err(Error::InvalidWeight);
         }
-        let m = self.cols / weight;
+        let m = self.cols / self.weight;
         let mut ss = vec![];
         let mut vs = vec![vec![]];
-        for _ in 0..weight {
+        for _ in 0..self.weight {
             let bs = self.spvole.receive(channel, m, rng)?;
             ss.extend(bs.iter());
             vs.push(bs);
@@ -235,24 +222,21 @@ impl<FE: FiniteField, SV: SVoleReceiver<Msg = FE>, SPS: SpsVoleReceiver<SV, Msg 
         self.spvole
             .receive_batch_consistency_check(channel, m, vs, rng)?;
         debug_assert!(ss.len() == self.cols);
-        //println!("ss={:?}\n", ss);
         let indices: Vec<Vec<(usize, FE::PrimeField)>> = (0..self.cols)
             .map(|i| lpn_mtx_indices::<FE>(i, self.rows, self.d))
             .collect();
-        //println!("indices_receiver={:?}", indices);
         let ys: Vec<FE> = indices
             .into_iter()
             .zip(ss.into_iter())
             .map(|(ds, s)| {
                 ds.into_iter().fold(FE::ZERO, |acc, (i, e)| {
-                    acc + self.v[i].multiply_by_prime_subfield(e)
+                    acc + self.vs[i].multiply_by_prime_subfield(e)
                 }) + s
             })
             .collect();
         debug_assert!(ys.len() == self.cols);
-        //println!("ys={:?}", ys);
         for i in 0..self.rows {
-            self.v[i] = ys[i];
+            self.vs[i] = ys[i];
         }
         let output: Vec<FE> = ys.into_iter().skip(self.rows).collect();
         debug_assert!(output.len() == self.cols - self.rows);
