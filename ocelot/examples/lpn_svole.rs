@@ -53,6 +53,14 @@ fn _test_lpnvole<
             "Sender init time: {} ms",
             start.elapsed().unwrap().as_millis()
         );
+        println!(
+            "Sender init communication (read): {:.2} Mb",
+            channel.kilobits_read() / 1000.0
+        );
+        println!(
+            "Sender init communication (write): {:.2} Mb",
+            channel.kilobits_written() / 1000.0
+        );
         let start = SystemTime::now();
         let _ = vole.send(&mut channel, weight, &mut rng).unwrap();
         println!(
@@ -61,11 +69,11 @@ fn _test_lpnvole<
             start.elapsed().unwrap().as_millis()
         );
         println!(
-            "Sender communication (read): {:.2} Mb",
+            "Sender extend communication (read): {:.2} Mb",
             channel.kilobits_read() / 1000.0
         );
         println!(
-            "Sender communication (write): {:.2} Mb",
+            "Sender extend communication (write): {:.2} Mb",
             channel.kilobits_written() / 1000.0
         );
     });
@@ -79,6 +87,14 @@ fn _test_lpnvole<
         "Receiver init time: {} ms",
         start.elapsed().unwrap().as_millis()
     );
+    println!(
+        "Receiver init communication (read): {:.2} Mb",
+        channel.kilobits_read() / 1000.0
+    );
+    println!(
+        "Receiver init communication (write): {:.2} Mb",
+        channel.kilobits_written() / 1000.0
+    );
     let start = SystemTime::now();
     let _ = vole.receive(&mut channel, weight, &mut rng).unwrap();
     println!(
@@ -88,11 +104,11 @@ fn _test_lpnvole<
     );
     handle.join().unwrap();
     println!(
-        "Receiver communication (read): {:.2} Mb",
+        "Receiver extend communication (read): {:.2} Mb",
         channel.kilobits_read() / 1000.0
     );
     println!(
-        "Receiver communication (write): {:.2} Mb",
+        "Receiver extend communication (write): {:.2} Mb",
         channel.kilobits_written() / 1000.0
     );
     println!("Total time: {} ms", total.elapsed().unwrap().as_millis());

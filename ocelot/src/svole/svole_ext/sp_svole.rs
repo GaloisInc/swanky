@@ -23,12 +23,13 @@ use crate::{
     },
 };
 use generic_array::typenum::Unsigned;
-use rand::{CryptoRng, Rng};
+use rand::{CryptoRng, Rng, SeedableRng};
 use rand_core::RngCore;
 use scuttlebutt::{
     field::FiniteField as FF,
     utils::unpack_bits,
     AbstractChannel,
+    AesRng,
     Block,
     Malicious,
 };
@@ -165,16 +166,19 @@ impl<
         let n = len;
         //println!("n={}", n);
         let t = uws.len();
+        let seed = rand::random::<Block>();
+        let mut rng_chi = AesRng::from_seed(seed);
         let chis: Vec<Vec<FE>> = (0..t)
-            .map(|_| (0..n).map(|_| FE::random(rng)).collect())
+            .map(|_| (0..n).map(|_| FE::random(&mut rng_chi)).collect())
             .collect();
-        debug_assert!(chis.len() == t); 
+        debug_assert!(chis.len() == t);
         debug_assert!(chis[0].len() == n);
-        for i in 0..t {
+        /*for i in 0..t {
             for j in 0..n {
                 channel.write_fe((chis[i])[j])?;
             }
-        }
+        }*/
+        channel.write_block(&seed)?;
         let mut alphas = vec![0; t];
         let mut betas = vec![FE::PrimeField::ZERO; t];
         let mut chi_alphas = vec![vec![FE::PrimeField::ZERO; r]; t];
@@ -198,8 +202,8 @@ impl<
         debug_assert!(x_tmp[0].len() == r);
         debug_assert!(x_tmp.len() == t);
         let mut x_stars = vec![FE::PrimeField::ZERO; r];
-        for i in 0..t {
-            x_stars = point_wise_addition(x_stars.iter(), x_tmp[i].iter());
+        for item in x_tmp.iter().take(t) {
+            x_stars = point_wise_addition(x_stars.iter(), item.iter());
         }
         debug_assert!(x_stars.len() == r);
         x_stars = x_stars
@@ -321,12 +325,17 @@ impl<
         let y_stars = self.svole.receive(channel, r, rng)?;
         let n = len;
         let t = vs.len();
-        let mut chis = vec![vec![FE::ZERO; n]; t];
-        for i in 0..t {
+        //let mut chis = vec![vec![FE::ZERO; n]; t];
+        /*for i in 0..t {
             for j in 0..n {
                 (chis[i])[j] = channel.read_fe()?;
             }
-        }
+        }*/
+        let seed = channel.read_block()?;
+        let mut rng_chi = AesRng::from_seed(seed);
+        let chis: Vec<Vec<FE>> = (0..t)
+            .map(|_| (0..n).map(|_| FE::random(&mut rng_chi)).collect())
+            .collect();
         let mut x_stars: Vec<FE::PrimeField> = vec![FE::PrimeField::ZERO; r];
         for item in x_stars.iter_mut() {
             *item = channel.read_fe()?;

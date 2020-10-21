@@ -34,7 +34,7 @@ impl LpnExtendParams {
     /// Number of columns `n` in the LPN matrix.
     pub const COLS: usize = (1 << Self::EXP) * Self::WEIGHT; // 10,805,248
     /// Number of rows `k` in the LPN matrix.
-    pub const ROWS: usize = 589760;
+    pub const ROWS: usize = 589_760;
     /// Small constant `d` used in the `liner codes` useful in acheiving efficient matrix multiplication.
     pub const D: usize = 10;
 }
