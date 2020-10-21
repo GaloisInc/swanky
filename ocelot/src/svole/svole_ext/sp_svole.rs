@@ -163,10 +163,13 @@ impl<
         let xs: Vec<FE::PrimeField> = xzs.iter().map(|&x| x.0).collect();
         let zs: Vec<FE> = xzs.iter().map(|&x| x.1).collect();
         let n = len;
+        //println!("n={}", n);
         let t = uws.len();
         let chis: Vec<Vec<FE>> = (0..t)
             .map(|_| (0..n).map(|_| FE::random(rng)).collect())
             .collect();
+        debug_assert!(chis.len() == t); 
+        debug_assert!(chis[0].len() == n);
         for i in 0..t {
             for j in 0..n {
                 channel.write_fe((chis[i])[j])?;
@@ -188,6 +191,7 @@ impl<
             }
             chi_alphas[j] = ((chis[j])[alphas[j]]).to_polynomial_coefficients().to_vec();
         }
+        //println!("alphas={:?}", alphas);
         let x_tmp: Vec<Vec<_>> = (0..t)
             .map(|i| scalar_multiplication(betas[i], &chi_alphas[i]))
             .collect();

@@ -126,7 +126,7 @@ impl<FE: FiniteField, SV: SVoleSender<Msg = FE>, SPS: SpsVoleSender<SV, Msg = FE
         debug_assert!(ts.len() == self.cols);
         //consistency check
         self.spvole
-            .send_batch_consistency_check(channel, weight, uws, rng)?;
+            .send_batch_consistency_check(channel, m, uws, rng)?;
         //println!("es={:?}\n", es);
         //println!("ts={:?}\n", ts);
         let indices: Vec<Vec<(usize, FE::PrimeField)>> = (0..self.cols)
@@ -233,7 +233,7 @@ impl<FE: FiniteField, SV: SVoleReceiver<Msg = FE>, SPS: SpsVoleReceiver<SV, Msg 
             vs.push(bs);
         }
         self.spvole
-            .receive_batch_consistency_check(channel, weight, vs, rng)?;
+            .receive_batch_consistency_check(channel, m, vs, rng)?;
         debug_assert!(ss.len() == self.cols);
         //println!("ss={:?}\n", ss);
         let indices: Vec<Vec<(usize, FE::PrimeField)>> = (0..self.cols)
