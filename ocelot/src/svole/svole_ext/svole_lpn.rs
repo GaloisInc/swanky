@@ -55,7 +55,6 @@ pub struct Receiver<
     rows: usize,
     cols: usize,
     vs: Vec<FE>,
-    d: usize,
     weight: usize,
 }
 
@@ -121,8 +120,8 @@ impl<FE: FiniteField, SV: SVoleSender<Msg = FE>, SPS: SpsVoleSender<SV, Msg = FE
         //consistency check
         self.spvole
             .send_batch_consistency_check(channel, m, uws, rng)?;
-        let indices: Vec<Vec<(usize, FE::PrimeField)>> = (0..self.cols)
-            .map(|i| lpn_mtx_indices::<FE>(i, self.rows, self.d))
+        let indices: Vec<[(usize, FE::PrimeField); 10]> = (0..self.cols)
+            .map(|i| lpn_mtx_indices::<FE>(i, self.rows))
             .collect();
         let us: Vec<FE::PrimeField> = self.uws.iter().map(|(u, _)| *u).collect();
         let ws: Vec<FE> = self.uws.iter().map(|(_, w)| *w).collect();
@@ -130,7 +129,7 @@ impl<FE: FiniteField, SV: SVoleSender<Msg = FE>, SPS: SpsVoleSender<SV, Msg = FE
             .iter()
             .zip(es.into_iter())
             .map(|(ds, e)| {
-                ds.into_iter()
+                ds.iter()
                     .fold(FE::PrimeField::ZERO, |acc, (i, a)| acc + us[*i] * *a)
                     + e
             })
@@ -140,8 +139,8 @@ impl<FE: FiniteField, SV: SVoleSender<Msg = FE>, SPS: SpsVoleSender<SV, Msg = FE
             .into_iter()
             .zip(ts.into_iter())
             .map(|(ds, t)| {
-                ds.into_iter().fold(FE::ZERO, |acc, (i, a)| {
-                    acc + ws[i].multiply_by_prime_subfield(a)
+                ds.iter().fold(FE::ZERO, |acc, (i, a)| {
+                    acc + ws[*i].multiply_by_prime_subfield(*a)
                 }) + t
             })
             .collect();
@@ -195,7 +194,6 @@ impl<FE: FiniteField, SV: SVoleReceiver<Msg = FE>, SPS: SpsVoleReceiver<SV, Msg 
             rows: rows + weight + r,
             cols,
             vs,
-            d,
             weight,
         })
     }
@@ -222,21 +220,19 @@ impl<FE: FiniteField, SV: SVoleReceiver<Msg = FE>, SPS: SpsVoleReceiver<SV, Msg 
         self.spvole
             .receive_batch_consistency_check(channel, m, vs, rng)?;
         debug_assert!(ss.len() == self.cols);
-        let indices: Vec<Vec<(usize, FE::PrimeField)>> = (0..self.cols)
-            .map(|i| lpn_mtx_indices::<FE>(i, self.rows, self.d))
-            .collect();
-        let ys: Vec<FE> = indices
-            .into_iter()
-            .zip(ss.into_iter())
-            .map(|(ds, s)| {
-                ds.into_iter().fold(FE::ZERO, |acc, (i, e)| {
-                    acc + self.vs[i].multiply_by_prime_subfield(e)
-                }) + s
+        let ys: Vec<FE> = (0..self.cols)
+            .map(|i| {
+                lpn_mtx_indices::<FE>(i, self.rows)
+                    .iter()
+                    .fold(FE::ZERO, |acc, (j, e)| {
+                        acc + self.vs[*j].multiply_by_prime_subfield(*e)
+                    })
+                    + ss[i]
             })
             .collect();
         debug_assert!(ys.len() == self.cols);
-        for i in 0..self.rows {
-            self.vs[i] = ys[i];
+        for (i, item) in ys.iter().enumerate().take(self.rows) {
+            self.vs[i] = *item;
         }
         let output: Vec<FE> = ys.into_iter().skip(self.rows).collect();
         debug_assert!(output.len() == self.cols - self.rows);

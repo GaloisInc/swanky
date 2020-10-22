@@ -110,14 +110,14 @@ type SPReceiver<FE> = SpsReceiver<ChouOrlandiSender, FE, EqReceiver<FE>>;
 
 fn main() {
     let splen = 1 << 13;
-    println!("\nField: F2 \n");
+    /*println!("\nField: F2 \n");
     _test_spsvole::<F2, BVSender<F2>, BVReceiver<F2>, SPSender<F2>, SPReceiver<F2>>(splen);
     println!("\nField: Gf128 \n");
     _test_spsvole::<Gf128, BVSender<Gf128>, BVReceiver<Gf128>, SPSender<Gf128>, SPReceiver<Gf128>>(
         splen,
     );
     println!("\nField: Fp \n");
-    _test_spsvole::<Fp, BVSender<Fp>, BVReceiver<Fp>, SPSender<Fp>, SPReceiver<Fp>>(splen);
+    _test_spsvole::<Fp, BVSender<Fp>, BVReceiver<Fp>, SPSender<Fp>, SPReceiver<Fp>>(splen);*/
     println!("\nField: F61p \n");
     _test_spsvole::<F61p, BVSender<F61p>, BVReceiver<F61p>, SPSender<F61p>, SPReceiver<F61p>>(
         splen,
