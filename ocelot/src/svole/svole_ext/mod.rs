@@ -7,7 +7,6 @@
 //! Single-point Subfield Vector Oblivious Linear Evaluation (SpsVOLE) and
 //! LPN based Subfield Vector Oblivious Linear Evaluation (SVOLE) traits.
 
-pub mod eq;
 /// GGM related helper functions.
 mod ggm_utils;
 pub mod lpn_params;
@@ -21,45 +20,6 @@ use crate::{
 
 use rand_core::{CryptoRng, RngCore};
 use scuttlebutt::{field::FiniteField as FF, AbstractChannel};
-
-/// A trait for EqSender.
-pub trait EqSender
-where
-    Self: Sized,
-{
-    /// Message type, restricted to types that are mutably-dereferencable as
-    /// `u8` arrays, and implements Finite Field trait.
-    type Msg: FF;
-    /// Runs any one-time initialization.
-    fn init() -> Result<Self, Error>;
-    /// Returns either a bool value or error on inputting a field element indicating that the
-    /// it doesn't match with the receiver input element.
-    fn send<C: AbstractChannel>(
-        &mut self,
-        channel: &mut C,
-        input: &Self::Msg,
-    ) -> Result<bool, Error>;
-}
-
-/// A trait for EqReceiver.
-pub trait EqReceiver
-where
-    Self: Sized,
-{
-    /// Message type, restricted to types that are mutably-dereferencable as
-    /// `u8` arrays, and implements Finite Field trait.
-    type Msg: FF;
-    /// Runs any one-time initialization.
-    fn init() -> Result<Self, Error>;
-    /// Returns either a bool value or error on inputting a field element indicating that the
-    /// it doesn't match with the sender input element.
-    fn receive<C: AbstractChannel, RNG: CryptoRng + RngCore>(
-        &mut self,
-        channel: &mut C,
-        rng: &mut RNG,
-        input: &Self::Msg,
-    ) -> Result<bool, Error>;
-}
 
 /// A trait for SpsVole Sender.
 pub trait SpsVoleSender<SV: SVoleSender<Msg = Self::Msg>>
@@ -208,7 +168,6 @@ mod tests {
             base_svole::{Receiver as VoleReceiver, Sender as VoleSender},
             copee::{Receiver as CpReceiver, Sender as CpSender},
             svole_ext::{
-                eq::{Receiver as EqReceiver, Sender as EqSender},
                 lpn_params::{LpnExtendParams, LpnSetupParams},
                 sp_svole::{Receiver as SpsReceiver, Sender as SpsSender},
                 svole_lpn::{Receiver as LpnVoleReceiver, Sender as LpnVoleSender},
@@ -270,8 +229,8 @@ mod tests {
     type BVSender<FE> = VoleSender<CPSender<FE>, FE>;
     type BVReceiver<FE> = VoleReceiver<CPReceiver<FE>, FE>;
 
-    type SPSender<FE> = SpsSender<ChouOrlandiReceiver, FE, EqSender<FE>>;
-    type SPReceiver<FE> = SpsReceiver<ChouOrlandiSender, FE, EqReceiver<FE>>;
+    type SPSender<FE> = SpsSender<ChouOrlandiReceiver, FE>;
+    type SPReceiver<FE> = SpsReceiver<ChouOrlandiSender, FE>;
 
     #[test]
     fn test_sp_svole() {

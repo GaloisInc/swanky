@@ -55,11 +55,6 @@ path = "benches/lpn_svole.rs"
 name = "lpn_svole"
 harness = false
 
-[[bench]]
-path = "benches/eq.rs"
-name = "eq"
-harness = false
-
 [[example]]
 name = "kmprt"
 harness = false

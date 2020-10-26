@@ -10,7 +10,6 @@ use ocelot::{
         base_svole::{Receiver as VoleReceiver, Sender as VoleSender},
         copee::{Receiver as CpReceiver, Sender as CpSender},
         svole_ext::{
-            eq::{Receiver as EqReceiver, Sender as EqSender},
             sp_svole::{Receiver as SpsReceiver, Sender as SpsSender},
             SpsVoleReceiver,
             SpsVoleSender,
@@ -105,8 +104,8 @@ type CPReceiver<FE> = CpReceiver<KosReceiver, FE>;
 type BVSender<FE> = VoleSender<CPSender<FE>, FE>;
 type BVReceiver<FE> = VoleReceiver<CPReceiver<FE>, FE>;
 
-type SPSender<FE> = SpsSender<ChouOrlandiReceiver, FE, EqSender<FE>>;
-type SPReceiver<FE> = SpsReceiver<ChouOrlandiSender, FE, EqReceiver<FE>>;
+type SPSender<FE> = SpsSender<ChouOrlandiReceiver, FE>;
+type SPReceiver<FE> = SpsReceiver<ChouOrlandiSender, FE>;
 
 fn main() {
     let splen = 1 << 13;

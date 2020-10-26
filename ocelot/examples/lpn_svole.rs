@@ -10,7 +10,6 @@ use ocelot::{
         base_svole::{Receiver as VoleReceiver, Sender as VoleSender},
         copee::{Receiver as CpReceiver, Sender as CpSender},
         svole_ext::{
-            eq::{Receiver as EqReceiver, Sender as EqSender},
             lpn_params::{LpnExtendParams, LpnSetupParams},
             sp_svole::{Receiver as SpsReceiver, Sender as SpsSender},
             svole_lpn::{Receiver as LpnVoleReceiver, Sender as LpnVoleSender},
@@ -121,8 +120,8 @@ fn main() {
     type BVSender<FE> = VoleSender<CPSender<FE>, FE>;
     type BVReceiver<FE> = VoleReceiver<CPReceiver<FE>, FE>;
 
-    type SPSender<FE> = SpsSender<ChouOrlandiReceiver, FE, EqSender<FE>>;
-    type SPReceiver<FE> = SpsReceiver<ChouOrlandiSender, FE, EqReceiver<FE>>;
+    type SPSender<FE> = SpsSender<ChouOrlandiReceiver, FE>;
+    type SPReceiver<FE> = SpsReceiver<ChouOrlandiSender, FE>;
 
     type VSender<FE> = LpnVoleSender<FE, BVSender<FE>, SPSender<FE>>;
     type VReceiver<FE> = LpnVoleReceiver<FE, BVReceiver<FE>, SPReceiver<FE>>;
@@ -131,13 +130,16 @@ fn main() {
     let cols = LpnSetupParams::COLS;
     let weight = LpnSetupParams::WEIGHT;
     let d = LpnSetupParams::D;
+    let rows1 = LpnExtendParams::ROWS;
+    let cols1 = LpnExtendParams::COLS;
+    let weight1 = LpnExtendParams::WEIGHT;
 
-    /* println!("\nField: F2 \n");
+    /*println!("\nField: F2 \n");
     _test_lpnvole::<F2, VSender<F2>, VReceiver<F2>>(rows, cols, d, weight);
     println!("\nField: Gf128 \n");
     _test_lpnvole::<Gf128, VSender<Gf128>, VReceiver<Gf128>>(rows, cols, d, weight);
     println!("\nField: Fp \n");
     _test_lpnvole::<Fp, VSender<Fp>, VReceiver<Fp>>(rows, cols, d, weight);*/
     println!("\nField: F61p \n");
-    _test_lpnvole::<F61p, VSender<F61p>, VReceiver<F61p>>(rows, cols, d, weight);
+    _test_lpnvole::<F61p, VSender<F61p>, VReceiver<F61p>>(rows1, cols1, d, weight1);
 }

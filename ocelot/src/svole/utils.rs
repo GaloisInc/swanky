@@ -12,6 +12,7 @@ use scuttlebutt::{field::FiniteField, Aes128, AesRng, Block};
 use crate::svole::svole_ext::lpn_params::LpnSetupParams;
 use rand::Rng;
 use rand_core::SeedableRng;
+
 /// Converts an element of `Fp` to `F(p^r)`.
 /// Note that the converted element has the input element as the first component
 /// while other components are being `FE::PrimeField::ZERO`.

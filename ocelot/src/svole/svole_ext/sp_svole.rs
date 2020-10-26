@@ -13,8 +13,6 @@ use crate::{
     svole::{
         svole_ext::{
             ggm_utils::{dot_product, ggm, ggm_prime, point_wise_addition, scalar_multiplication},
-            EqReceiver,
-            EqSender,
             SpsVoleReceiver,
             SpsVoleSender,
         },
@@ -26,6 +24,7 @@ use generic_array::typenum::Unsigned;
 use rand::{CryptoRng, Rng, SeedableRng};
 use rand_core::RngCore;
 use scuttlebutt::{
+    commitment::{Commitment, ShaCommitment},
     field::FiniteField as FF,
     utils::unpack_bits,
     AbstractChannel,
@@ -33,12 +32,10 @@ use scuttlebutt::{
     Block,
     Malicious,
 };
-use std::marker::PhantomData;
 
 /// SpsVole Sender.
 #[derive(Clone)]
-pub struct Sender<OT: OtReceiver, FE: FF, EQ: EqSender> {
-    _eq: PhantomData<EQ>,
+pub struct Sender<OT: OtReceiver, FE: FF> {
     ot: OT,
     pows: Vec<FE>,
     uws: Vec<(FE::PrimeField, FE)>,
@@ -48,8 +45,7 @@ pub struct Sender<OT: OtReceiver, FE: FF, EQ: EqSender> {
 
 /// SpsVole Receiver.
 #[derive(Clone)]
-pub struct Receiver<OT: OtSender, FE: FF, EQ: EqReceiver> {
-    _eq: PhantomData<EQ>,
+pub struct Receiver<OT: OtSender, FE: FF> {
     ot: OT,
     delta: FE,
     pows: Vec<FE>,
@@ -58,13 +54,46 @@ pub struct Receiver<OT: OtSender, FE: FF, EQ: EqReceiver> {
     iters: usize,
 }
 
+fn eq_send<C: AbstractChannel, FE: FF>(channel: &mut C, input: &FE) -> Result<bool, Error> {
+    let va = *input;
+    channel.write_fe(va)?;
+    channel.flush()?;
+    let mut comm_vb = [0u8; 32];
+    channel.read_bytes(&mut comm_vb)?;
+    let mut seed = [0u8; 32];
+    channel.read_bytes(&mut seed)?;
+    let vb = channel.read_fe::<FE>()?;
+    let mut commit = ShaCommitment::new(seed);
+    commit.input(&vb.to_bytes());
+    let res = commit.finish();
+    if res == comm_vb {
+        Ok(va == vb)
+    } else {
+        Err(Error::InvalidOpening)
+    }
+}
+
+fn eq_receive<C: AbstractChannel, RNG: CryptoRng + RngCore, FE: FF>(
+    channel: &mut C,
+    rng: &mut RNG,
+    input: &FE,
+) -> Result<bool, Error> {
+    let vb = *input;
+    let va = channel.read_fe::<FE>()?;
+    let seed = rng.gen::<[u8; 32]>();
+    let mut commit = ShaCommitment::new(seed);
+    commit.input(&vb.to_bytes());
+    let result = commit.finish();
+    channel.write_bytes(&result)?;
+    channel.write_bytes(&seed)?;
+    channel.write_fe(vb)?;
+    channel.flush()?;
+    Ok(va == vb)
+}
+
 /// Implement SpsVoleSender for Sender type.
-impl<
-        OT: OtReceiver<Msg = Block> + Malicious,
-        FE: FF,
-        SV: SVoleSender<Msg = FE>,
-        EQ: EqSender<Msg = FE>,
-    > SpsVoleSender<SV> for Sender<OT, FE, EQ>
+impl<OT: OtReceiver<Msg = Block> + Malicious, FE: FF, SV: SVoleSender<Msg = FE>> SpsVoleSender<SV>
+    for Sender<OT, FE>
 {
     type Msg = FE;
     fn init<C: AbstractChannel, RNG: CryptoRng + RngCore>(
@@ -84,7 +113,6 @@ impl<
         }
         let uws = base_svole.send(channel, iters + r, rng)?;
         Ok(Self {
-            _eq: PhantomData::<EQ>,
             pows,
             ot,
             uws,
@@ -210,8 +238,9 @@ impl<
             .map(|j| dot_product(chis[j].iter(), ws[j].iter()))
             .sum::<FE>()
             - z;
-        let mut sender = EQ::init()?;
-        let b = sender.send(channel, &va)?;
+        //let mut sender = EQ::init()?;
+        //let b = sender.send(channel, &va)?;
+        let b = eq_send(channel, &va)?;
         if b {
             Ok(())
         } else {
@@ -221,12 +250,8 @@ impl<
 }
 
 /// Implement SpsVoleReceiver for Receiver type.
-impl<
-        OT: OtSender<Msg = Block> + Malicious,
-        FE: FF,
-        SV: SVoleReceiver<Msg = FE>,
-        EQ: EqReceiver<Msg = FE>,
-    > SpsVoleReceiver<SV> for Receiver<OT, FE, EQ>
+impl<OT: OtSender<Msg = Block> + Malicious, FE: FF, SV: SVoleReceiver<Msg = FE>> SpsVoleReceiver<SV>
+    for Receiver<OT, FE>
 {
     type Msg = FE;
     fn init<C: AbstractChannel, RNG: CryptoRng + RngCore>(
@@ -247,7 +272,6 @@ impl<
         let delta = base_svole.delta();
         let vs = base_svole.receive(channel, iters + r, rng)?;
         Ok(Self {
-            _eq: PhantomData::<EQ>,
             pows,
             delta,
             ot,
@@ -327,8 +351,9 @@ impl<
             .map(|j| dot_product(chis[j].iter(), vs[j].iter()))
             .sum::<FE>()
             - y;
-        let mut receiver = EQ::init()?;
-        let res = receiver.receive(channel, rng, &vb)?;
+        //let mut receiver = EQ::init()?;
+        //let res = receiver.receive(channel, rng, &vb)?;
+        let res = eq_receive(channel, rng, &vb)?;
         if res {
             Ok(())
         } else {
