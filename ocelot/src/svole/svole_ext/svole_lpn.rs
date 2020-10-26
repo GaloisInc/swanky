@@ -23,8 +23,7 @@ use crate::{
     svole::{
         svole_ext::{LpnsVoleReceiver, LpnsVoleSender, SpsVoleReceiver, SpsVoleSender},
         utils::lpn_mtx_indices,
-        SVoleReceiver,
-        SVoleSender,
+        SVoleReceiver, SVoleSender,
     },
 };
 use generic_array::typenum::Unsigned;
@@ -106,41 +105,36 @@ impl<FE: FiniteField, SV: SVoleSender<Msg = FE>, SPS: SpsVoleSender<SV, Msg = FE
             return Err(Error::InvalidWeight);
         }
         let m = self.cols / self.weight;
-        let mut es = vec![];
-        let mut ts = vec![];
+        let mut ets = vec![];
         let mut uws = vec![vec![]];
         for _ in 0..self.weight {
             let ac = self.spvole.send(channel, m, rng)?;
-            es.extend(ac.iter().map(|(a, _)| a));
-            ts.extend(ac.iter().map(|(_, c)| c));
+            // XXX remove this extra clone.
+            ets.extend(ac.clone());
             uws.push(ac);
         }
-        debug_assert!(es.len() == self.cols);
-        debug_assert!(ts.len() == self.cols);
-        //consistency check
+        debug_assert!(ets.len() == self.cols);
         self.spvole
             .send_batch_consistency_check(channel, m, uws, rng)?;
         let indices: Vec<[(usize, FE::PrimeField); 10]> = (0..self.cols)
             .map(|i| lpn_mtx_indices::<FE>(i, self.rows))
             .collect();
-        let us: Vec<FE::PrimeField> = self.uws.iter().map(|(u, _)| *u).collect();
-        let ws: Vec<FE> = self.uws.iter().map(|(_, w)| *w).collect();
         let xs: Vec<FE::PrimeField> = indices
             .iter()
-            .zip(es.into_iter())
-            .map(|(ds, e)| {
-                ds.iter()
-                    .fold(FE::PrimeField::ZERO, |acc, (i, a)| acc + us[*i] * *a)
-                    + e
+            .zip(ets.iter())
+            .map(|(ds, (e, _))| {
+                ds.iter().fold(FE::PrimeField::ZERO, |acc, (i, a)| {
+                    acc + self.uws[*i].0 * *a
+                }) + *e
             })
             .collect();
         debug_assert!(xs.len() == self.cols);
         let zs: Vec<FE> = indices
             .into_iter()
-            .zip(ts.into_iter())
-            .map(|(ds, t)| {
+            .zip(ets.into_iter())
+            .map(|(ds, (_, t))| {
                 ds.iter().fold(FE::ZERO, |acc, (i, a)| {
-                    acc + ws[*i].multiply_by_prime_subfield(*a)
+                    acc + self.uws[*i].1.multiply_by_prime_subfield(*a)
                 }) + t
             })
             .collect();

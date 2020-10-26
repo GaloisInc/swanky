@@ -13,11 +13,9 @@ use crate::{
     svole::{
         svole_ext::{
             ggm_utils::{dot_product, ggm, ggm_prime, point_wise_addition, scalar_multiplication},
-            SpsVoleReceiver,
-            SpsVoleSender,
+            SpsVoleReceiver, SpsVoleSender,
         },
-        SVoleReceiver,
-        SVoleSender,
+        SVoleReceiver, SVoleSender,
     },
 };
 use generic_array::typenum::Unsigned;
@@ -27,10 +25,7 @@ use scuttlebutt::{
     commitment::{Commitment, ShaCommitment},
     field::FiniteField as FF,
     utils::unpack_bits,
-    AbstractChannel,
-    AesRng,
-    Block,
-    Malicious,
+    AbstractChannel, AesRng, Block, Malicious,
 };
 
 /// SpsVole Sender.
@@ -182,20 +177,13 @@ impl<OT: OtReceiver<Msg = Block> + Malicious, FE: FF, SV: SVoleSender<Msg = FE>>
         if self.counter >= self.iters + r {
             return Err(Error::Other("No more consistency checks!".to_string()));
         }
-        //let xzs = self.svole.send(channel, r, rng)?;
         let xzs: Vec<(FE::PrimeField, FE)> = (0..r).map(|i| self.uws[self.counter + i]).collect();
         self.counter += r;
-        let xs: Vec<FE::PrimeField> = xzs.iter().map(|&x| x.0).collect();
-        let zs: Vec<FE> = xzs.iter().map(|&x| x.1).collect();
         let n = len;
         let t = uws.len();
-        let seed = rand::random::<Block>();
+        let seed = rng.gen::<Block>();
         let mut rng_chi = AesRng::from_seed(seed);
-        let chis: Vec<Vec<FE>> = (0..t)
-            .map(|_| (0..n).map(|_| FE::random(&mut rng_chi)).collect())
-            .collect();
-        debug_assert!(chis.len() == t);
-        debug_assert!(chis[0].len() == n);
+        let chis: Vec<FE> = (0..n * t).map(|_| FE::random(&mut rng_chi)).collect();
         channel.write_block(&seed)?;
         let mut alphas = vec![0; t];
         let mut betas = vec![FE::PrimeField::ZERO; t];
@@ -211,7 +199,9 @@ impl<OT: OtReceiver<Msg = Block> + Malicious, FE: FF, SV: SVoleSender<Msg = FE>>
                     betas[j] = *u;
                 }
             }
-            chi_alphas[j] = ((chis[j])[alphas[j]]).to_polynomial_coefficients().to_vec();
+            chi_alphas[j] = (chis[n * j + alphas[j]])
+                .to_polynomial_coefficients()
+                .to_vec();
         }
         let x_tmp: Vec<Vec<_>> = (0..t)
             .map(|i| scalar_multiplication(betas[i], &chi_alphas[i]))
@@ -226,20 +216,18 @@ impl<OT: OtReceiver<Msg = Block> + Malicious, FE: FF, SV: SVoleSender<Msg = FE>>
         x_stars = x_stars
             .iter()
             .cloned()
-            .zip(xs.iter())
-            .map(|(y, x)| y - *x)
+            .zip(xzs.iter())
+            .map(|(y, (x, _))| y - *x)
             .collect();
         debug_assert!(x_stars.len() == r);
         for x in x_stars.iter() {
             channel.write_fe(*x)?;
         }
-        let z = dot_product(zs.iter(), self.pows.iter());
+        let z = dot_product(xzs.iter().map(|(_, z)| z), self.pows.iter());
         let va = (0..t)
-            .map(|j| dot_product(chis[j].iter(), ws[j].iter()))
+            .map(|j| dot_product(chis[n * j..n * (j + 1)].iter(), ws[j].iter()))
             .sum::<FE>()
             - z;
-        //let mut sender = EQ::init()?;
-        //let b = sender.send(channel, &va)?;
         let b = eq_send(channel, &va)?;
         if b {
             Ok(())
@@ -301,8 +289,6 @@ impl<OT: OtSender<Msg = Block> + Malicious, FE: FF, SV: SVoleReceiver<Msg = FE>>
             ));
         }
         let depth = 128 - (len as u128 - 1).leading_zeros();
-        //let n = len;
-        //let b = self.svole.receive(channel, 1, rng)?[0];
         let b = self.vs[self.counter];
         self.counter += 1;
         let a_prime = channel.read_fe::<FE::PrimeField>()?;
@@ -310,7 +296,6 @@ impl<OT: OtSender<Msg = Block> + Malicious, FE: FF, SV: SVoleReceiver<Msg = FE>>
         let seed = rand::random::<Block>();
         let (vs, keys) = ggm::<FE>(depth as usize, seed);
         self.ot.send(channel, &keys, rng)?;
-        // compute d and sends out
         let d = gamma - vs.clone().into_iter().sum();
         channel.write_fe(d)?;
         channel.flush()?;
@@ -327,16 +312,13 @@ impl<OT: OtSender<Msg = Block> + Malicious, FE: FF, SV: SVoleReceiver<Msg = FE>>
         if self.counter >= self.iters + r {
             return Err(Error::Other("No more consistency checks!".to_string()));
         }
-        //let y_stars = self.svole.receive(channel, r, rng)?;
         let y_stars: Vec<FE> = (0..r).map(|i| self.vs[self.counter + i]).collect();
         self.counter += r;
         let n = len;
         let t = vs.len();
         let seed = channel.read_block()?;
         let mut rng_chi = AesRng::from_seed(seed);
-        let chis: Vec<Vec<FE>> = (0..t)
-            .map(|_| (0..n).map(|_| FE::random(&mut rng_chi)).collect())
-            .collect();
+        let chis: Vec<FE> = (0..t * n).map(|_| FE::random(&mut rng_chi)).collect();
         let mut x_stars: Vec<FE::PrimeField> = vec![FE::PrimeField::ZERO; r];
         for item in x_stars.iter_mut() {
             *item = channel.read_fe()?;
@@ -348,11 +330,9 @@ impl<OT: OtSender<Msg = Block> + Malicious, FE: FF, SV: SVoleReceiver<Msg = FE>>
             .collect();
         let y = dot_product(ys.iter(), self.pows.iter());
         let vb = (0..t)
-            .map(|j| dot_product(chis[j].iter(), vs[j].iter()))
+            .map(|j| dot_product(chis[n * j..n * (j + 1)].iter(), vs[j].iter()))
             .sum::<FE>()
             - y;
-        //let mut receiver = EQ::init()?;
-        //let res = receiver.receive(channel, rng, &vb)?;
         let res = eq_receive(channel, rng, &vb)?;
         if res {
             Ok(())
