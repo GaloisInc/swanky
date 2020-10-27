@@ -4,15 +4,9 @@
 // Copyright © 2020 Galois, Inc.
 // See LICENSE for licensing information.
 
-use ocelot::{
-    ot::{ChouOrlandiReceiver, ChouOrlandiSender},
-    svole::{
-        base_svole::{BaseReceiver, BaseSender},
-        svole_ext::{
-            sp_svole::{Receiver as SpsReceiver, Sender as SpsSender},
-            SpsVoleReceiver, SpsVoleSender,
-        },
-    },
+use ocelot::svole::{
+    base_svole::{BaseReceiver, BaseSender},
+    svole_ext::sp_svole::{SpsReceiver, SpsSender},
 };
 use scuttlebutt::{
     field::{F61p, FiniteField as FF, Fp, Gf128, F2},
@@ -24,13 +18,7 @@ use std::{
     time::SystemTime,
 };
 
-fn _test_spsvole<
-    FE: FF,
-    SPSender: SpsVoleSender<Msg = FE>,
-    SPReceiver: SpsVoleReceiver<Msg = FE>,
->(
-    len: usize,
-) {
+fn test_spsvole<FE: FF>(len: usize) {
     let (sender, receiver) = UnixStream::pair().unwrap();
     let total = SystemTime::now();
     let handle = std::thread::spawn(move || {
@@ -40,7 +28,7 @@ fn _test_spsvole<
         let mut channel = TrackChannel::new(reader, writer);
         let start = SystemTime::now();
         let mut base_vole = BaseSender::<FE>::init(&mut channel, &mut rng).unwrap();
-        let mut vole = SPSender::init(&mut channel, &mut rng, &mut base_vole, 1).unwrap();
+        let mut vole = SpsSender::<FE>::init(&mut channel, &mut rng, &mut base_vole, 1).unwrap();
         println!(
             "Sender init time: {} ms",
             start.elapsed().unwrap().as_millis()
@@ -67,7 +55,7 @@ fn _test_spsvole<
     let mut channel = TrackChannel::new(reader, writer);
     let start = SystemTime::now();
     let mut base_vole = BaseReceiver::<FE>::init(&mut channel, &mut rng).unwrap();
-    let mut vole = SPReceiver::init(&mut channel, &mut rng, &mut base_vole, 1).unwrap();
+    let mut vole = SpsReceiver::<FE>::init(&mut channel, &mut rng, &mut base_vole, 1).unwrap();
     println!(
         "Receiver init time: {} ms",
         start.elapsed().unwrap().as_millis()
@@ -91,9 +79,6 @@ fn _test_spsvole<
     println!("Total time: {} ms", total.elapsed().unwrap().as_millis());
 }
 
-type SPSender<FE> = SpsSender<ChouOrlandiReceiver, FE>;
-type SPReceiver<FE> = SpsReceiver<ChouOrlandiSender, FE>;
-
 fn main() {
     let splen = 1 << 13;
     /*println!("\nField: F2 \n");
@@ -105,5 +90,5 @@ fn main() {
     println!("\nField: Fp \n");
     _test_spsvole::<Fp, BVSender<Fp>, BVReceiver<Fp>, SPSender<Fp>, SPReceiver<Fp>>(splen);*/
     println!("\nField: F61p \n");
-    _test_spsvole::<F61p, SPSender<F61p>, SPReceiver<F61p>>(splen);
+    test_spsvole::<F61p>(splen);
 }

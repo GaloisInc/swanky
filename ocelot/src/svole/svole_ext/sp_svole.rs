@@ -4,16 +4,14 @@
 // Copyright © 2020 Galois, Inc.
 // See LICENSE for licensing information.
 
-//! Implementation of single-point svole protocol using dummy ggm_prime for
-//! testing purposes.
+//! Implementation of single-point svole protocol.
 
 use crate::{
     errors::Error,
-    ot::{Receiver as OtReceiver, Sender as OtSender},
+    ot::{KosReceiver, KosSender, Receiver as OtReceiver, Sender as OtSender},
     svole::base_svole::{BaseReceiver, BaseSender},
-    svole::svole_ext::{
-        ggm_utils::{dot_product, ggm, ggm_prime, point_wise_addition, scalar_multiplication},
-        SpsVoleReceiver, SpsVoleSender,
+    svole::svole_ext::ggm_utils::{
+        dot_product, ggm, ggm_prime, point_wise_addition, scalar_multiplication,
     },
 };
 use generic_array::typenum::Unsigned;
@@ -27,7 +25,6 @@ use scuttlebutt::{
 };
 
 /// SpsVole Sender.
-#[derive(Clone)]
 pub struct Sender<OT: OtReceiver, FE: FF> {
     ot: OT,
     pows: Vec<FE>,
@@ -37,7 +34,6 @@ pub struct Sender<OT: OtReceiver, FE: FF> {
 }
 
 /// SpsVole Receiver.
-#[derive(Clone)]
 pub struct Receiver<OT: OtSender, FE: FF> {
     ot: OT,
     delta: FE,
@@ -46,6 +42,9 @@ pub struct Receiver<OT: OtSender, FE: FF> {
     counter: usize,
     iters: usize,
 }
+
+pub type SpsSender<FE> = Sender<KosReceiver, FE>;
+pub type SpsReceiver<FE> = Receiver<KosSender, FE>;
 
 fn eq_send<C: AbstractChannel, FE: FF>(channel: &mut C, input: &FE) -> Result<bool, Error> {
     let va = *input;
@@ -85,9 +84,8 @@ fn eq_receive<C: AbstractChannel, RNG: CryptoRng + RngCore, FE: FF>(
 }
 
 /// Implement SpsVoleSender for Sender type.
-impl<OT: OtReceiver<Msg = Block> + Malicious, FE: FF> SpsVoleSender for Sender<OT, FE> {
-    type Msg = FE;
-    fn init<C: AbstractChannel, RNG: CryptoRng + RngCore>(
+impl<OT: OtReceiver<Msg = Block> + Malicious, FE: FF> Sender<OT, FE> {
+    pub fn init<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         channel: &mut C,
         rng: &mut RNG,
         base_svole: &mut BaseSender<FE>,
@@ -112,7 +110,7 @@ impl<OT: OtReceiver<Msg = Block> + Malicious, FE: FF> SpsVoleSender for Sender<O
         })
     }
 
-    fn send<C: AbstractChannel, RNG: CryptoRng + RngCore>(
+    pub fn send<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         &mut self,
         channel: &mut C,
         len: usize,
@@ -158,10 +156,10 @@ impl<OT: OtReceiver<Msg = Block> + Malicious, FE: FF> SpsVoleSender for Sender<O
         let res = us.iter().zip(ws.iter()).map(|(&u, &w)| (u, w)).collect();
         Ok(res)
     }
-    fn voles(&self) -> Vec<(FE::PrimeField, FE)> {
+    pub fn voles(&self) -> Vec<(FE::PrimeField, FE)> {
         self.uws.clone()
     }
-    fn send_batch_consistency_check<C: AbstractChannel, RNG: CryptoRng + RngCore>(
+    pub fn send_batch_consistency_check<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         &mut self,
         channel: &mut C,
         len: usize,
@@ -233,9 +231,8 @@ impl<OT: OtReceiver<Msg = Block> + Malicious, FE: FF> SpsVoleSender for Sender<O
 }
 
 /// Implement SpsVoleReceiver for Receiver type.
-impl<OT: OtSender<Msg = Block> + Malicious, FE: FF> SpsVoleReceiver for Receiver<OT, FE> {
-    type Msg = FE;
-    fn init<C: AbstractChannel, RNG: CryptoRng + RngCore>(
+impl<OT: OtSender<Msg = Block> + Malicious, FE: FF> Receiver<OT, FE> {
+    pub fn init<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         channel: &mut C,
         mut rng: &mut RNG,
         base_svole: &mut BaseReceiver<FE>,
@@ -262,15 +259,15 @@ impl<OT: OtSender<Msg = Block> + Malicious, FE: FF> SpsVoleReceiver for Receiver
         })
     }
 
-    fn delta(&self) -> FE {
+    pub fn delta(&self) -> FE {
         self.delta
     }
 
-    fn voles(&self) -> Vec<FE> {
+    pub fn voles(&self) -> Vec<FE> {
         self.vs.clone()
     }
 
-    fn receive<C: AbstractChannel, RNG: CryptoRng + RngCore>(
+    pub fn receive<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         &mut self,
         channel: &mut C,
         len: usize,
@@ -294,7 +291,8 @@ impl<OT: OtSender<Msg = Block> + Malicious, FE: FF> SpsVoleReceiver for Receiver
         channel.flush()?;
         Ok(vs)
     }
-    fn receive_batch_consistency_check<C: AbstractChannel, RNG: CryptoRng + RngCore>(
+
+    pub fn receive_batch_consistency_check<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         &mut self,
         channel: &mut C,
         len: usize,
@@ -331,6 +329,60 @@ impl<OT: OtSender<Msg = Block> + Malicious, FE: FF> SpsVoleReceiver for Receiver
             Ok(())
         } else {
             Err(Error::EqCheckFailed)
+        }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use crate::svole::{
+        base_svole::{BaseReceiver, BaseSender},
+        svole_ext::sp_svole::{SpsReceiver, SpsSender},
+    };
+    use scuttlebutt::{
+        field::{F61p, FiniteField as FF, Fp, Gf128, F2},
+        AesRng, Channel,
+    };
+    use std::{
+        io::{BufReader, BufWriter},
+        os::unix::net::UnixStream,
+    };
+
+    fn test_spsvole<FE: FF>(len: usize) {
+        let (sender, receiver) = UnixStream::pair().unwrap();
+        let handle = std::thread::spawn(move || {
+            let mut rng = AesRng::new();
+            let reader = BufReader::new(sender.try_clone().unwrap());
+            let writer = BufWriter::new(sender);
+            let mut channel = Channel::new(reader, writer);
+            let mut bv_sender = BaseSender::<FE>::init(&mut channel, &mut rng).unwrap();
+            let mut vole =
+                SpsSender::<FE>::init(&mut channel, &mut rng, &mut bv_sender, 1).unwrap();
+            vole.send(&mut channel, len, &mut rng).unwrap()
+        });
+        let mut rng = AesRng::new();
+        let reader = BufReader::new(receiver.try_clone().unwrap());
+        let writer = BufWriter::new(receiver);
+        let mut channel = Channel::new(reader, writer);
+        let mut bv_receiver = BaseReceiver::<FE>::init(&mut channel, &mut rng).unwrap();
+        let mut vole =
+            SpsReceiver::<FE>::init(&mut channel, &mut rng, &mut bv_receiver, 1).unwrap();
+        let vs = vole.receive(&mut channel, len, &mut rng).unwrap();
+        let uws = handle.join().unwrap();
+        for i in 0..len as usize {
+            let right = vole.delta().multiply_by_prime_subfield(uws[i].0) + vs[i];
+            assert_eq!(uws[i].1, right);
+        }
+    }
+
+    #[test]
+    fn test_sp_svole() {
+        for i in 1..14 {
+            let leaves = 1 << i;
+            test_spsvole::<Fp>(leaves);
+            test_spsvole::<Gf128>(leaves);
+            test_spsvole::<F2>(leaves);
+            test_spsvole::<F61p>(leaves);
         }
     }
 }
