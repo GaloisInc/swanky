@@ -9,25 +9,17 @@
 
 use crate::{
     errors::Error,
-    ot::{RandomReceiver as ROTReceiver, RandomSender as ROTSender},
-    svole::{CopeeReceiver, CopeeSender},
+    ot::{KosReceiver, KosSender, RandomReceiver as ROTReceiver, RandomSender as ROTSender},
 };
 use generic_array::typenum::Unsigned;
 use rand_core::{CryptoRng, RngCore};
 use scuttlebutt::{
-    field::FiniteField as FF,
-    utils::unpack_bits,
-    AbstractChannel,
-    Aes128,
-    Block,
-    Malicious,
+    field::FiniteField as FF, utils::unpack_bits, AbstractChannel, Aes128, Block, Malicious,
 };
 use std::marker::PhantomData;
-
 use subtle::{Choice, ConditionallySelectable};
 
 /// COPEe sender.
-#[derive(Clone)]
 pub struct Sender<ROT: ROTSender + Malicious, FE: FF> {
     _ot: PhantomData<ROT>,
     aes_objs: Vec<(Aes128, Aes128)>,
@@ -38,7 +30,6 @@ pub struct Sender<ROT: ROTSender + Malicious, FE: FF> {
 }
 
 /// COPEe receiver.
-#[derive(Clone)]
 pub struct Receiver<ROT: ROTReceiver + Malicious, FE: FF> {
     _ot: PhantomData<ROT>,
     delta: FE,
@@ -50,6 +41,9 @@ pub struct Receiver<ROT: ROTReceiver + Malicious, FE: FF> {
     counter: u64,
 }
 
+pub type CopeeSender<FE> = Sender<KosSender, FE>;
+pub type CopeeReceiver<FE> = Receiver<KosReceiver, FE>;
+
 /// `Aes128` as a pseudo-random function.
 fn prf<FE: FF>(aes: &Aes128, pt: Block) -> FE::PrimeField {
     let seed = aes.encrypt(pt);
@@ -57,9 +51,8 @@ fn prf<FE: FF>(aes: &Aes128, pt: Block) -> FE::PrimeField {
 }
 
 /// Implement CopeeSender for Sender type
-impl<ROT: ROTSender<Msg = Block> + Malicious, FE: FF> CopeeSender for Sender<ROT, FE> {
-    type Msg = FE;
-    fn init<C: AbstractChannel, RNG: CryptoRng + RngCore>(
+impl<ROT: ROTSender<Msg = Block> + Malicious, FE: FF> Sender<ROT, FE> {
+    pub fn init<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         channel: &mut C,
         mut rng: &mut RNG,
     ) -> Result<Self, Error> {
@@ -97,7 +90,7 @@ impl<ROT: ROTSender<Msg = Block> + Malicious, FE: FF> CopeeSender for Sender<ROT
         })
     }
 
-    fn send<C: AbstractChannel>(
+    pub fn send<C: AbstractChannel>(
         &mut self,
         channel: &mut C,
         input: &FE::PrimeField,
@@ -123,9 +116,8 @@ impl<ROT: ROTSender<Msg = Block> + Malicious, FE: FF> CopeeSender for Sender<ROT
 }
 
 /// Implement CopeeReceiver for Receiver type.
-impl<ROT: ROTReceiver<Msg = Block> + Malicious, FE: FF> CopeeReceiver for Receiver<ROT, FE> {
-    type Msg = FE;
-    fn init<C: AbstractChannel, RNG: CryptoRng + RngCore>(
+impl<ROT: ROTReceiver<Msg = Block> + Malicious, FE: FF> Receiver<ROT, FE> {
+    pub fn init<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         channel: &mut C,
         mut rng: &mut RNG,
     ) -> Result<Self, Error> {
@@ -164,11 +156,11 @@ impl<ROT: ROTReceiver<Msg = Block> + Malicious, FE: FF> CopeeReceiver for Receiv
         })
     }
 
-    fn delta(&self) -> FE {
+    pub fn delta(&self) -> FE {
         self.delta
     }
 
-    fn receive<C: AbstractChannel>(&mut self, channel: &mut C) -> Result<FE, Error> {
+    pub fn receive<C: AbstractChannel>(&mut self, channel: &mut C) -> Result<FE, Error> {
         let pt = Block::from(self.counter as u128);
         let mut res = FE::ZERO;
         for (j, pow) in self.pows.iter().enumerate() {
@@ -186,5 +178,56 @@ impl<ROT: ROTReceiver<Msg = Block> + Malicious, FE: FF> CopeeReceiver for Receiv
         }
         self.counter += 1;
         Ok(res)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::svole::copee::{CopeeReceiver, CopeeSender};
+    use scuttlebutt::{
+        field::{F61p, FiniteField as FF, Fp, Gf128, F2},
+        AesRng, Channel,
+    };
+    use std::{
+        io::{BufReader, BufWriter},
+        os::unix::net::UnixStream,
+    };
+
+    fn test_copee_<FE: FF + Send>(len: usize) {
+        let mut rng = AesRng::new();
+        let input = FE::PrimeField::random(&mut rng);
+        let (sender, receiver) = UnixStream::pair().unwrap();
+        let handle = std::thread::spawn(move || {
+            let mut rng = AesRng::new();
+            let reader = BufReader::new(sender.try_clone().unwrap());
+            let writer = BufWriter::new(sender);
+            let mut channel = Channel::new(reader, writer);
+            let mut copee_sender = CopeeSender::<FE>::init(&mut channel, &mut rng).unwrap();
+            let ws: Vec<FE> = (0..len)
+                .map(|_| copee_sender.send(&mut channel, &input).unwrap())
+                .collect();
+            ws
+        });
+        let reader = BufReader::new(receiver.try_clone().unwrap());
+        let writer = BufWriter::new(receiver);
+        let mut channel = Channel::new(reader, writer);
+        let mut copee_receiver = CopeeReceiver::<FE>::init(&mut channel, &mut rng).unwrap();
+        let vs: Vec<FE> = (0..len)
+            .map(|_| copee_receiver.receive(&mut channel).unwrap())
+            .collect();
+        let ws = handle.join().unwrap();
+        for (w, v) in ws.iter().zip(vs.iter()) {
+            let mut delta = copee_receiver.delta().multiply_by_prime_subfield(input);
+            delta += *v;
+            assert_eq!(*w, delta);
+        }
+    }
+
+    #[test]
+    fn test_copee() {
+        test_copee_::<Fp>(128);
+        test_copee_::<Gf128>(128);
+        test_copee_::<F2>(128);
+        test_copee_::<F61p>(128);
     }
 }

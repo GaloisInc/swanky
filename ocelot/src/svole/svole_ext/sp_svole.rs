@@ -4,20 +4,14 @@
 // Copyright © 2020 Galois, Inc.
 // See LICENSE for licensing information.
 
-//! Implementation of single-point svole protocol using dummy ggm_prime for
-//! testing purposes.
+//! Implementation of single-point svole protocol.
 
 use crate::{
     errors::Error,
-    ot::{Receiver as OtReceiver, Sender as OtSender},
-    svole::{
-        svole_ext::{
-            ggm_utils::{dot_product, ggm, ggm_prime, point_wise_addition, scalar_multiplication},
-            SpsVoleReceiver,
-            SpsVoleSender,
-        },
-        SVoleReceiver,
-        SVoleSender,
+    ot::{KosReceiver, KosSender, Receiver as OtReceiver, Sender as OtSender},
+    svole::base_svole::{BaseReceiver, BaseSender},
+    svole::svole_ext::ggm_utils::{
+        dot_product, ggm, ggm_prime, point_wise_addition, scalar_multiplication,
     },
 };
 use generic_array::typenum::Unsigned;
@@ -27,14 +21,10 @@ use scuttlebutt::{
     commitment::{Commitment, ShaCommitment},
     field::FiniteField as FF,
     utils::unpack_bits,
-    AbstractChannel,
-    AesRng,
-    Block,
-    Malicious,
+    AbstractChannel, AesRng, Block, Malicious,
 };
 
 /// SpsVole Sender.
-#[derive(Clone)]
 pub struct Sender<OT: OtReceiver, FE: FF> {
     ot: OT,
     pows: Vec<FE>,
@@ -44,7 +34,6 @@ pub struct Sender<OT: OtReceiver, FE: FF> {
 }
 
 /// SpsVole Receiver.
-#[derive(Clone)]
 pub struct Receiver<OT: OtSender, FE: FF> {
     ot: OT,
     delta: FE,
@@ -53,6 +42,9 @@ pub struct Receiver<OT: OtSender, FE: FF> {
     counter: usize,
     iters: usize,
 }
+
+pub type SpsSender<FE> = Sender<KosReceiver, FE>;
+pub type SpsReceiver<FE> = Receiver<KosSender, FE>;
 
 fn eq_send<C: AbstractChannel, FE: FF>(channel: &mut C, input: &FE) -> Result<bool, Error> {
     let va = *input;
@@ -92,14 +84,11 @@ fn eq_receive<C: AbstractChannel, RNG: CryptoRng + RngCore, FE: FF>(
 }
 
 /// Implement SpsVoleSender for Sender type.
-impl<OT: OtReceiver<Msg = Block> + Malicious, FE: FF, SV: SVoleSender<Msg = FE>> SpsVoleSender<SV>
-    for Sender<OT, FE>
-{
-    type Msg = FE;
-    fn init<C: AbstractChannel, RNG: CryptoRng + RngCore>(
+impl<OT: OtReceiver<Msg = Block> + Malicious, FE: FF> Sender<OT, FE> {
+    pub fn init<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         channel: &mut C,
         rng: &mut RNG,
-        base_svole: &mut SV,
+        base_svole: &mut BaseSender<FE>,
         iters: usize,
     ) -> Result<Self, Error> {
         let g = FE::GENERATOR;
@@ -121,13 +110,12 @@ impl<OT: OtReceiver<Msg = Block> + Malicious, FE: FF, SV: SVoleSender<Msg = FE>>
         })
     }
 
-    fn send<C: AbstractChannel, RNG: CryptoRng + RngCore>(
+    pub fn send<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         &mut self,
         channel: &mut C,
         len: usize,
         mut rng: &mut RNG,
     ) -> Result<Vec<(FE::PrimeField, FE)>, Error> {
-        //let r = FE::PolynomialFormNumCoefficients::to_usize();
         if self.counter >= self.iters {
             return Err(Error::Other(
                 "The number of iterations allowed exhausted!".to_string(),
@@ -168,10 +156,10 @@ impl<OT: OtReceiver<Msg = Block> + Malicious, FE: FF, SV: SVoleSender<Msg = FE>>
         let res = us.iter().zip(ws.iter()).map(|(&u, &w)| (u, w)).collect();
         Ok(res)
     }
-    fn voles(&self) -> Vec<(FE::PrimeField, FE)> {
+    pub fn voles(&self) -> Vec<(FE::PrimeField, FE)> {
         self.uws.clone()
     }
-    fn send_batch_consistency_check<C: AbstractChannel, RNG: CryptoRng + RngCore>(
+    pub fn send_batch_consistency_check<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         &mut self,
         channel: &mut C,
         len: usize,
@@ -182,20 +170,13 @@ impl<OT: OtReceiver<Msg = Block> + Malicious, FE: FF, SV: SVoleSender<Msg = FE>>
         if self.counter >= self.iters + r {
             return Err(Error::Other("No more consistency checks!".to_string()));
         }
-        //let xzs = self.svole.send(channel, r, rng)?;
         let xzs: Vec<(FE::PrimeField, FE)> = (0..r).map(|i| self.uws[self.counter + i]).collect();
         self.counter += r;
-        let xs: Vec<FE::PrimeField> = xzs.iter().map(|&x| x.0).collect();
-        let zs: Vec<FE> = xzs.iter().map(|&x| x.1).collect();
         let n = len;
         let t = uws.len();
-        let seed = rand::random::<Block>();
+        let seed = rng.gen::<Block>();
         let mut rng_chi = AesRng::from_seed(seed);
-        let chis: Vec<Vec<FE>> = (0..t)
-            .map(|_| (0..n).map(|_| FE::random(&mut rng_chi)).collect())
-            .collect();
-        debug_assert!(chis.len() == t);
-        debug_assert!(chis[0].len() == n);
+        let chis: Vec<FE> = (0..n * t).map(|_| FE::random(&mut rng_chi)).collect();
         channel.write_block(&seed)?;
         let mut alphas = vec![0; t];
         let mut betas = vec![FE::PrimeField::ZERO; t];
@@ -211,7 +192,9 @@ impl<OT: OtReceiver<Msg = Block> + Malicious, FE: FF, SV: SVoleSender<Msg = FE>>
                     betas[j] = *u;
                 }
             }
-            chi_alphas[j] = ((chis[j])[alphas[j]]).to_polynomial_coefficients().to_vec();
+            chi_alphas[j] = (chis[n * j + alphas[j]])
+                .to_polynomial_coefficients()
+                .to_vec();
         }
         let x_tmp: Vec<Vec<_>> = (0..t)
             .map(|i| scalar_multiplication(betas[i], &chi_alphas[i]))
@@ -226,20 +209,18 @@ impl<OT: OtReceiver<Msg = Block> + Malicious, FE: FF, SV: SVoleSender<Msg = FE>>
         x_stars = x_stars
             .iter()
             .cloned()
-            .zip(xs.iter())
-            .map(|(y, x)| y - *x)
+            .zip(xzs.iter())
+            .map(|(y, (x, _))| y - *x)
             .collect();
         debug_assert!(x_stars.len() == r);
         for x in x_stars.iter() {
             channel.write_fe(*x)?;
         }
-        let z = dot_product(zs.iter(), self.pows.iter());
+        let z = dot_product(xzs.iter().map(|(_, z)| z), self.pows.iter());
         let va = (0..t)
-            .map(|j| dot_product(chis[j].iter(), ws[j].iter()))
+            .map(|j| dot_product(chis[n * j..n * (j + 1)].iter(), ws[j].iter()))
             .sum::<FE>()
             - z;
-        //let mut sender = EQ::init()?;
-        //let b = sender.send(channel, &va)?;
         let b = eq_send(channel, &va)?;
         if b {
             Ok(())
@@ -250,14 +231,11 @@ impl<OT: OtReceiver<Msg = Block> + Malicious, FE: FF, SV: SVoleSender<Msg = FE>>
 }
 
 /// Implement SpsVoleReceiver for Receiver type.
-impl<OT: OtSender<Msg = Block> + Malicious, FE: FF, SV: SVoleReceiver<Msg = FE>> SpsVoleReceiver<SV>
-    for Receiver<OT, FE>
-{
-    type Msg = FE;
-    fn init<C: AbstractChannel, RNG: CryptoRng + RngCore>(
+impl<OT: OtSender<Msg = Block> + Malicious, FE: FF> Receiver<OT, FE> {
+    pub fn init<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         channel: &mut C,
         mut rng: &mut RNG,
-        base_svole: &mut SV,
+        base_svole: &mut BaseReceiver<FE>,
         iters: usize,
     ) -> Result<Self, Error> {
         let ot = OT::init(channel, &mut rng)?;
@@ -281,15 +259,15 @@ impl<OT: OtSender<Msg = Block> + Malicious, FE: FF, SV: SVoleReceiver<Msg = FE>>
         })
     }
 
-    fn delta(&self) -> FE {
+    pub fn delta(&self) -> FE {
         self.delta
     }
 
-    fn voles(&self) -> Vec<FE> {
+    pub fn voles(&self) -> Vec<FE> {
         self.vs.clone()
     }
 
-    fn receive<C: AbstractChannel, RNG: CryptoRng + RngCore>(
+    pub fn receive<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         &mut self,
         channel: &mut C,
         len: usize,
@@ -301,8 +279,6 @@ impl<OT: OtSender<Msg = Block> + Malicious, FE: FF, SV: SVoleReceiver<Msg = FE>>
             ));
         }
         let depth = 128 - (len as u128 - 1).leading_zeros();
-        //let n = len;
-        //let b = self.svole.receive(channel, 1, rng)?[0];
         let b = self.vs[self.counter];
         self.counter += 1;
         let a_prime = channel.read_fe::<FE::PrimeField>()?;
@@ -310,13 +286,13 @@ impl<OT: OtSender<Msg = Block> + Malicious, FE: FF, SV: SVoleReceiver<Msg = FE>>
         let seed = rand::random::<Block>();
         let (vs, keys) = ggm::<FE>(depth as usize, seed);
         self.ot.send(channel, &keys, rng)?;
-        // compute d and sends out
         let d = gamma - vs.clone().into_iter().sum();
         channel.write_fe(d)?;
         channel.flush()?;
         Ok(vs)
     }
-    fn receive_batch_consistency_check<C: AbstractChannel, RNG: CryptoRng + RngCore>(
+
+    pub fn receive_batch_consistency_check<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         &mut self,
         channel: &mut C,
         len: usize,
@@ -327,16 +303,13 @@ impl<OT: OtSender<Msg = Block> + Malicious, FE: FF, SV: SVoleReceiver<Msg = FE>>
         if self.counter >= self.iters + r {
             return Err(Error::Other("No more consistency checks!".to_string()));
         }
-        //let y_stars = self.svole.receive(channel, r, rng)?;
         let y_stars: Vec<FE> = (0..r).map(|i| self.vs[self.counter + i]).collect();
         self.counter += r;
         let n = len;
         let t = vs.len();
         let seed = channel.read_block()?;
         let mut rng_chi = AesRng::from_seed(seed);
-        let chis: Vec<Vec<FE>> = (0..t)
-            .map(|_| (0..n).map(|_| FE::random(&mut rng_chi)).collect())
-            .collect();
+        let chis: Vec<FE> = (0..t * n).map(|_| FE::random(&mut rng_chi)).collect();
         let mut x_stars: Vec<FE::PrimeField> = vec![FE::PrimeField::ZERO; r];
         for item in x_stars.iter_mut() {
             *item = channel.read_fe()?;
@@ -348,16 +321,68 @@ impl<OT: OtSender<Msg = Block> + Malicious, FE: FF, SV: SVoleReceiver<Msg = FE>>
             .collect();
         let y = dot_product(ys.iter(), self.pows.iter());
         let vb = (0..t)
-            .map(|j| dot_product(chis[j].iter(), vs[j].iter()))
+            .map(|j| dot_product(chis[n * j..n * (j + 1)].iter(), vs[j].iter()))
             .sum::<FE>()
             - y;
-        //let mut receiver = EQ::init()?;
-        //let res = receiver.receive(channel, rng, &vb)?;
         let res = eq_receive(channel, rng, &vb)?;
         if res {
             Ok(())
         } else {
             Err(Error::EqCheckFailed)
+        }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use crate::svole::{
+        base_svole::{BaseReceiver, BaseSender},
+        svole_ext::sp_svole::{SpsReceiver, SpsSender},
+    };
+    use scuttlebutt::{
+        field::{F61p, FiniteField as FF, Fp, Gf128, F2},
+        AesRng, Channel,
+    };
+    use std::{
+        io::{BufReader, BufWriter},
+        os::unix::net::UnixStream,
+    };
+
+    fn test_spsvole<FE: FF>(len: usize) {
+        let (sender, receiver) = UnixStream::pair().unwrap();
+        let handle = std::thread::spawn(move || {
+            let mut rng = AesRng::new();
+            let reader = BufReader::new(sender.try_clone().unwrap());
+            let writer = BufWriter::new(sender);
+            let mut channel = Channel::new(reader, writer);
+            let mut bv_sender = BaseSender::<FE>::init(&mut channel, &mut rng).unwrap();
+            let mut vole =
+                SpsSender::<FE>::init(&mut channel, &mut rng, &mut bv_sender, 1).unwrap();
+            vole.send(&mut channel, len, &mut rng).unwrap()
+        });
+        let mut rng = AesRng::new();
+        let reader = BufReader::new(receiver.try_clone().unwrap());
+        let writer = BufWriter::new(receiver);
+        let mut channel = Channel::new(reader, writer);
+        let mut bv_receiver = BaseReceiver::<FE>::init(&mut channel, &mut rng).unwrap();
+        let mut vole =
+            SpsReceiver::<FE>::init(&mut channel, &mut rng, &mut bv_receiver, 1).unwrap();
+        let vs = vole.receive(&mut channel, len, &mut rng).unwrap();
+        let uws = handle.join().unwrap();
+        for i in 0..len as usize {
+            let right = vole.delta().multiply_by_prime_subfield(uws[i].0) + vs[i];
+            assert_eq!(uws[i].1, right);
+        }
+    }
+
+    #[test]
+    fn test_sp_svole() {
+        for i in 1..14 {
+            let leaves = 1 << i;
+            test_spsvole::<Fp>(leaves);
+            test_spsvole::<Gf128>(leaves);
+            test_spsvole::<F2>(leaves);
+            test_spsvole::<F61p>(leaves);
         }
     }
 }

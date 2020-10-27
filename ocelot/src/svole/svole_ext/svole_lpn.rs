@@ -21,22 +21,19 @@
 use crate::{
     errors::Error,
     svole::{
-        svole_ext::{LpnsVoleReceiver, LpnsVoleSender, SpsVoleReceiver, SpsVoleSender},
+        base_svole::{BaseReceiver, BaseSender},
+        svole_ext::sp_svole::{SpsReceiver, SpsSender},
+        svole_ext::{LpnsVoleReceiver, LpnsVoleSender},
         utils::lpn_mtx_indices,
-        SVoleReceiver,
-        SVoleSender,
     },
 };
 use generic_array::typenum::Unsigned;
 use rand_core::{CryptoRng, RngCore};
 use scuttlebutt::{field::FiniteField, AbstractChannel};
-use std::marker::PhantomData;
 
 /// LpnsVole sender.
-#[derive(Clone)]
-pub struct Sender<FE: FiniteField, SV: SVoleSender<Msg = FE>, SPS: SpsVoleSender<SV, Msg = FE>> {
-    _sv: PhantomData<SV>,
-    spvole: SPS,
+pub struct Sender<FE: FiniteField> {
+    spvole: SpsSender<FE>,
     rows: usize,
     cols: usize,
     uws: Vec<(FE::PrimeField, FE)>,
@@ -44,13 +41,8 @@ pub struct Sender<FE: FiniteField, SV: SVoleSender<Msg = FE>, SPS: SpsVoleSender
     weight: usize,
 }
 /// LpnsVole receiver.
-pub struct Receiver<
-    FE: FiniteField,
-    SV: SVoleReceiver<Msg = FE>,
-    SPS: SpsVoleReceiver<SV, Msg = FE>,
-> {
-    _sv: PhantomData<SV>,
-    spvole: SPS,
+pub struct Receiver<FE: FiniteField> {
+    spvole: SpsReceiver<FE>,
     delta: FE,
     rows: usize,
     cols: usize,
@@ -58,9 +50,7 @@ pub struct Receiver<
     weight: usize,
 }
 
-impl<FE: FiniteField, SV: SVoleSender<Msg = FE>, SPS: SpsVoleSender<SV, Msg = FE>> LpnsVoleSender
-    for Sender<FE, SV, SPS>
-{
+impl<FE: FiniteField> LpnsVoleSender for Sender<FE> {
     type Msg = FE;
     fn init<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         channel: &mut C,
@@ -79,16 +69,15 @@ impl<FE: FiniteField, SV: SVoleSender<Msg = FE>, SPS: SpsVoleSender<SV, Msg = FE
         if d >= rows {
             return Err(Error::InvalidD);
         }
-        let mut svole = SV::init(channel, rng)?;
+        let mut svole = BaseSender::<FE>::init(channel, rng)?;
         let mut uws = svole.send(channel, rows, rng)?;
         // This flush statement is needed, otherwise, it hangs on.
         channel.flush()?;
-        let spvole = SPS::init(channel, rng, &mut svole, weight)?;
+        let spvole = SpsSender::<FE>::init(channel, rng, &mut svole, weight)?;
         uws.extend(spvole.voles());
         let r = FE::PolynomialFormNumCoefficients::to_usize();
         debug_assert!(uws.len() == rows + weight + r);
         Ok(Self {
-            _sv: PhantomData::<SV>,
             spvole,
             rows: rows + weight + r,
             cols,
@@ -106,41 +95,36 @@ impl<FE: FiniteField, SV: SVoleSender<Msg = FE>, SPS: SpsVoleSender<SV, Msg = FE
             return Err(Error::InvalidWeight);
         }
         let m = self.cols / self.weight;
-        let mut es = vec![];
-        let mut ts = vec![];
+        let mut ets = vec![];
         let mut uws = vec![vec![]];
         for _ in 0..self.weight {
             let ac = self.spvole.send(channel, m, rng)?;
-            es.extend(ac.iter().map(|(a, _)| a));
-            ts.extend(ac.iter().map(|(_, c)| c));
+            // XXX remove this extra clone.
+            ets.extend(ac.clone());
             uws.push(ac);
         }
-        debug_assert!(es.len() == self.cols);
-        debug_assert!(ts.len() == self.cols);
-        //consistency check
+        debug_assert!(ets.len() == self.cols);
         self.spvole
             .send_batch_consistency_check(channel, m, uws, rng)?;
         let indices: Vec<[(usize, FE::PrimeField); 10]> = (0..self.cols)
             .map(|i| lpn_mtx_indices::<FE>(i, self.rows))
             .collect();
-        let us: Vec<FE::PrimeField> = self.uws.iter().map(|(u, _)| *u).collect();
-        let ws: Vec<FE> = self.uws.iter().map(|(_, w)| *w).collect();
         let xs: Vec<FE::PrimeField> = indices
             .iter()
-            .zip(es.into_iter())
-            .map(|(ds, e)| {
-                ds.iter()
-                    .fold(FE::PrimeField::ZERO, |acc, (i, a)| acc + us[*i] * *a)
-                    + e
+            .zip(ets.iter())
+            .map(|(ds, (e, _))| {
+                ds.iter().fold(FE::PrimeField::ZERO, |acc, (i, a)| {
+                    acc + self.uws[*i].0 * *a
+                }) + *e
             })
             .collect();
         debug_assert!(xs.len() == self.cols);
         let zs: Vec<FE> = indices
             .into_iter()
-            .zip(ts.into_iter())
-            .map(|(ds, t)| {
+            .zip(ets.into_iter())
+            .map(|(ds, (_, t))| {
                 ds.iter().fold(FE::ZERO, |acc, (i, a)| {
-                    acc + ws[*i].multiply_by_prime_subfield(*a)
+                    acc + self.uws[*i].1.multiply_by_prime_subfield(*a)
                 }) + t
             })
             .collect();
@@ -157,9 +141,7 @@ impl<FE: FiniteField, SV: SVoleSender<Msg = FE>, SPS: SpsVoleSender<SV, Msg = FE
     }
 }
 
-impl<FE: FiniteField, SV: SVoleReceiver<Msg = FE>, SPS: SpsVoleReceiver<SV, Msg = FE>>
-    LpnsVoleReceiver for Receiver<FE, SV, SPS>
-{
+impl<FE: FiniteField> LpnsVoleReceiver for Receiver<FE> {
     type Msg = FE;
     fn init<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         channel: &mut C,
@@ -178,17 +160,16 @@ impl<FE: FiniteField, SV: SVoleReceiver<Msg = FE>, SPS: SpsVoleReceiver<SV, Msg 
         if d >= rows {
             return Err(Error::InvalidD);
         }
-        let mut svole = SV::init(channel, rng)?;
+        let mut svole = BaseReceiver::<FE>::init(channel, rng)?;
         let r = FE::PolynomialFormNumCoefficients::to_usize();
         let mut vs = svole.receive(channel, rows, rng)?;
         let svole_delta = svole.delta();
-        let spvole = SPS::init(channel, rng, &mut svole, weight)?;
+        let spvole = SpsReceiver::<FE>::init(channel, rng, &mut svole, weight)?;
         let spvole_delta = spvole.delta();
         vs.extend(spvole.voles());
         debug_assert!(spvole_delta == svole_delta);
         debug_assert!(vs.len() == rows + weight + r);
         Ok(Self {
-            _sv: PhantomData::<SV>,
             spvole,
             delta: spvole_delta,
             rows: rows + weight + r,

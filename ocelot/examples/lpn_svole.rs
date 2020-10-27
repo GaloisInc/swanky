@@ -4,24 +4,14 @@
 // Copyright © 2020 Galois, Inc.
 // See LICENSE for licensing information.
 
-use ocelot::{
-    ot::{ChouOrlandiReceiver, ChouOrlandiSender, KosReceiver, KosSender},
-    svole::{
-        base_svole::{Receiver as VoleReceiver, Sender as VoleSender},
-        copee::{Receiver as CpReceiver, Sender as CpSender},
-        svole_ext::{
-            lpn_params::{LpnExtendParams, LpnSetupParams},
-            sp_svole::{Receiver as SpsReceiver, Sender as SpsSender},
-            svole_lpn::{Receiver as LpnVoleReceiver, Sender as LpnVoleSender},
-            LpnsVoleReceiver,
-            LpnsVoleSender,
-        },
-    },
+use ocelot::svole::svole_ext::{
+    lpn_params::{LpnExtendParams, LpnSetupParams},
+    svole_lpn::{Receiver as LpnVoleReceiver, Sender as LpnVoleSender},
+    LpnsVoleReceiver, LpnsVoleSender,
 };
 use scuttlebutt::{
     field::{F61p, FiniteField as FF, Fp, Gf128, F2},
-    AesRng,
-    TrackChannel,
+    AesRng, TrackChannel,
 };
 use std::{
     io::{BufReader, BufWriter},
@@ -114,17 +104,8 @@ fn _test_lpnvole<
 }
 
 fn main() {
-    type CPSender<FE> = CpSender<KosSender, FE>;
-    type CPReceiver<FE> = CpReceiver<KosReceiver, FE>;
-
-    type BVSender<FE> = VoleSender<CPSender<FE>, FE>;
-    type BVReceiver<FE> = VoleReceiver<CPReceiver<FE>, FE>;
-
-    type SPSender<FE> = SpsSender<ChouOrlandiReceiver, FE>;
-    type SPReceiver<FE> = SpsReceiver<ChouOrlandiSender, FE>;
-
-    type VSender<FE> = LpnVoleSender<FE, BVSender<FE>, SPSender<FE>>;
-    type VReceiver<FE> = LpnVoleReceiver<FE, BVReceiver<FE>, SPReceiver<FE>>;
+    type VSender<FE> = LpnVoleSender<FE>;
+    type VReceiver<FE> = LpnVoleReceiver<FE>;
 
     let rows = LpnSetupParams::ROWS;
     let cols = LpnSetupParams::COLS;
