@@ -141,12 +141,7 @@ impl<OT: OtReceiver<Msg = Block> + Malicious, FE: FF> Sender<OT, FE> {
                 uws[i].1 = vs[i];
             }
         }
-        let sum = uws
-            .iter()
-            // .enumerate()
-            // .filter(|(i, _)| *i != alpha)
-            .map(|(_, w)| *w)
-            .sum();
+        let sum = uws.iter().map(|(_, w)| *w).sum();
         uws[alpha].1 = delta - (d + sum);
         Ok(uws)
     }
@@ -155,7 +150,7 @@ impl<OT: OtReceiver<Msg = Block> + Malicious, FE: FF> Sender<OT, FE> {
         &mut self,
         channel: &mut C,
         len: usize,
-        uws: Vec<Vec<(FE::PrimeField, FE)>>,
+        uws: &[Vec<(FE::PrimeField, FE)>],
         rng: &mut RNG,
     ) -> Result<(), Error> {
         let r = FE::PolynomialFormNumCoefficients::to_usize();
@@ -171,36 +166,26 @@ impl<OT: OtReceiver<Msg = Block> + Malicious, FE: FF> Sender<OT, FE> {
         channel.write_block(&seed)?;
         let mut rng_chi = AesRng::from_seed(seed);
         let chis: Vec<FE> = (0..n * t).map(|_| FE::random(&mut rng_chi)).collect();
-        let mut alphas = vec![0; t];
-        let mut betas = vec![FE::PrimeField::ZERO; t];
-        let mut chi_alphas = vec![vec![FE::PrimeField::ZERO; r]; t];
+        let mut chi_alphas = Vec::with_capacity(r * t);
         for j in 0..t {
             for (i, (u, _)) in uws[j].iter().enumerate() {
+                // There will be one, and exactly one, `u` (= `β`) which is
+                // non-zero. Don't `break` after we hit this one to avoid a
+                // potential side-channel attack.
                 if *u != FE::PrimeField::ZERO {
-                    alphas[j] = i;
-                    betas[j] = *u;
+                    chi_alphas.extend(scalar_multiplication(
+                        *u,
+                        &chis[n * j + i].to_polynomial_coefficients(),
+                    ));
                 }
             }
-            chi_alphas[j] = (chis[n * j + alphas[j]])
-                .to_polynomial_coefficients()
-                .to_vec();
         }
-        let x_tmp: Vec<Vec<_>> = (0..t)
-            .map(|i| scalar_multiplication(betas[i], &chi_alphas[i]))
-            .collect();
-        debug_assert!(x_tmp[0].len() == r);
-        debug_assert!(x_tmp.len() == t);
         let mut x_stars = vec![FE::PrimeField::ZERO; r];
-        for item in x_tmp.iter() {
-            x_stars = point_wise_addition(x_stars.iter(), item.iter());
+        for i in 0..t {
+            x_stars = point_wise_addition(x_stars.iter(), chi_alphas[i * r..(i + 1) * r].iter());
         }
-        let x_stars: Vec<FE::PrimeField> = x_stars
-            .into_iter()
-            .zip(xzs.iter())
-            .map(|(y, (x, _))| y - *x)
-            .collect();
-        for x in x_stars.iter() {
-            channel.write_fe(*x)?;
+        for (x_star, (x, _)) in x_stars.iter().zip(xzs.iter()) {
+            channel.write_fe(*x_star - *x)?;
         }
         let z = dot_product(xzs.iter().map(|(_, z)| z), self.pows.iter());
         let va = (0..t)

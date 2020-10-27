@@ -94,8 +94,8 @@ impl<FE: FiniteField> LpnsVoleSender for Sender<FE> {
             return Err(Error::InvalidWeight);
         }
         let m = self.cols / self.weight;
-        let mut ets = vec![];
-        let mut uws = vec![vec![]];
+        let mut ets = Vec::with_capacity(self.cols);
+        let mut uws = vec![];
         for _ in 0..self.weight {
             let ac = self.spvole.send(channel, m, rng)?;
             // XXX remove this extra clone.
@@ -104,7 +104,7 @@ impl<FE: FiniteField> LpnsVoleSender for Sender<FE> {
         }
         debug_assert!(ets.len() == self.cols);
         self.spvole
-            .send_batch_consistency_check(channel, m, uws, rng)?;
+            .send_batch_consistency_check(channel, m, &uws, rng)?;
         let indices: Vec<[(usize, FE::PrimeField); 10]> = (0..self.cols)
             .map(|i| lpn_mtx_indices::<FE>(i, self.rows))
             .collect();
@@ -189,7 +189,7 @@ impl<FE: FiniteField> LpnsVoleReceiver for Receiver<FE> {
         }
         let m = self.cols / self.weight;
         let mut ss = vec![];
-        let mut vs = vec![vec![]];
+        let mut vs = vec![];
         for _ in 0..self.weight {
             let bs = self.spvole.receive(channel, m, rng)?;
             ss.extend(bs.iter());
