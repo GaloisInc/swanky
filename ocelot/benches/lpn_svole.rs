@@ -13,7 +13,6 @@ use ocelot::{
         base_svole::{Receiver as VoleReceiver, Sender as VoleSender},
         copee::{Receiver as CpReceiver, Sender as CpSender},
         svole_ext::{
-            eq::{Receiver as EQReceiver, Sender as EQSender},
             lpn_params::{LpnExtendParams, LpnSetupParams},
             sp_svole::{Receiver as SpVoleReceiver, Sender as SpVoleSender},
             svole_lpn::{Receiver as LpnVoleReceiver, Sender as LpnVoleSender},
@@ -45,14 +44,14 @@ const D: usize = LpnSetupParams::D;
 type CPSender<FE> = CpSender<KosSender, FE>;
 type CPReceiver<FE> = CpReceiver<KosReceiver, FE>;
 
-type BVSender<FE> = VoleSender<CPSender<FE>, FE>;
-type BVReceiver<FE> = VoleReceiver<CPReceiver<FE>, FE>;
+type BVSender<FE> = VoleSender<CPSender<FE>>;
+type BVReceiver<FE> = VoleReceiver<CPReceiver<FE>>;
 
-type SPSender<FE> = SpVoleSender<ChouOrlandiReceiver, FE, EQSender<FE>>;
-type SPReceiver<FE> = SpVoleReceiver<ChouOrlandiSender, FE, EQReceiver<FE>>;
+type SPSender<FE> = SpVoleSender<ChouOrlandiReceiver, FE>;
+type SPReceiver<FE> = SpVoleReceiver<ChouOrlandiSender, FE>;
 
-type VSender<FE> = LpnVoleSender<FE, BVSender<FE>, SPSender<FE>>;
-type VReceiver<FE> = LpnVoleReceiver<FE, BVReceiver<FE>, SPReceiver<FE>>;
+type VSender<FE> = LpnVoleSender<FE>;
+type VReceiver<FE> = LpnVoleReceiver<FE>;
 
 fn svole_init<
     VSender: LpnsVoleSender + Sync + Send + 'static,

@@ -7,11 +7,13 @@
 use ocelot::svole::svole_ext::{
     lpn_params::{LpnExtendParams, LpnSetupParams},
     svole_lpn::{Receiver as LpnVoleReceiver, Sender as LpnVoleSender},
-    LpnsVoleReceiver, LpnsVoleSender,
+    LpnsVoleReceiver,
+    LpnsVoleSender,
 };
 use scuttlebutt::{
     field::{F61p, FiniteField as FF, Fp, Gf128, F2},
-    AesRng, TrackChannel,
+    AesRng,
+    TrackChannel,
 };
 use std::{
     io::{BufReader, BufWriter},

@@ -41,16 +41,6 @@ name = "oprf"
 harness = false
 
 [[bench]]
-path = "benches/base_svole.rs"
-name = "base_svole"
-harness = false
-
-[[bench]]
-path = "benches/sp_svole.rs"
-name = "sp_svole"
-harness = false
-
-[[bench]]
 path = "benches/lpn_svole.rs"
 name = "lpn_svole"
 harness = false

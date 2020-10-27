@@ -9,9 +9,15 @@
 use crate::{
     errors::Error,
     ot::{KosReceiver, KosSender, Receiver as OtReceiver, Sender as OtSender},
-    svole::base_svole::{BaseReceiver, BaseSender},
-    svole::svole_ext::ggm_utils::{
-        dot_product, ggm, ggm_prime, point_wise_addition, scalar_multiplication,
+    svole::{
+        base_svole::{BaseReceiver, BaseSender},
+        svole_ext::ggm_utils::{
+            dot_product,
+            ggm,
+            ggm_prime,
+            point_wise_addition,
+            scalar_multiplication,
+        },
     },
 };
 use generic_array::typenum::Unsigned;
@@ -21,7 +27,10 @@ use scuttlebutt::{
     commitment::{Commitment, ShaCommitment},
     field::FiniteField as FF,
     utils::unpack_bits,
-    AbstractChannel, AesRng, Block, Malicious,
+    AbstractChannel,
+    AesRng,
+    Block,
+    Malicious,
 };
 
 /// SpsVole Sender.
@@ -87,9 +96,9 @@ fn eq_receive<C: AbstractChannel, RNG: CryptoRng + RngCore, FE: FF>(
 impl<OT: OtReceiver<Msg = Block> + Malicious, FE: FF> Sender<OT, FE> {
     pub fn init<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         channel: &mut C,
-        rng: &mut RNG,
-        base_svole: &mut BaseSender<FE>,
+        uws: &[(FE::PrimeField, FE)],
         iters: usize,
+        rng: &mut RNG,
     ) -> Result<Self, Error> {
         let g = FE::GENERATOR;
         let r = FE::PolynomialFormNumCoefficients::to_usize();
@@ -100,11 +109,10 @@ impl<OT: OtReceiver<Msg = Block> + Malicious, FE: FF> Sender<OT, FE> {
             *item = acc;
             acc *= g;
         }
-        let uws = base_svole.send(channel, iters + r, rng)?;
         Ok(Self {
             pows,
             ot,
-            uws,
+            uws: uws.to_vec(), // XXX remove clone
             counter: 0,
             iters,
         })
@@ -156,9 +164,7 @@ impl<OT: OtReceiver<Msg = Block> + Malicious, FE: FF> Sender<OT, FE> {
         let res = us.iter().zip(ws.iter()).map(|(&u, &w)| (u, w)).collect();
         Ok(res)
     }
-    pub fn voles(&self) -> Vec<(FE::PrimeField, FE)> {
-        self.uws.clone()
-    }
+
     pub fn send_batch_consistency_check<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         &mut self,
         channel: &mut C,
@@ -234,9 +240,10 @@ impl<OT: OtReceiver<Msg = Block> + Malicious, FE: FF> Sender<OT, FE> {
 impl<OT: OtSender<Msg = Block> + Malicious, FE: FF> Receiver<OT, FE> {
     pub fn init<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         channel: &mut C,
-        mut rng: &mut RNG,
-        base_svole: &mut BaseReceiver<FE>,
+        vs: &[FE],
+        delta: FE,
         iters: usize,
+        mut rng: &mut RNG,
     ) -> Result<Self, Error> {
         let ot = OT::init(channel, &mut rng)?;
         let r = FE::PolynomialFormNumCoefficients::to_usize();
@@ -247,13 +254,11 @@ impl<OT: OtSender<Msg = Block> + Malicious, FE: FF> Receiver<OT, FE> {
             *item = acc;
             acc *= g;
         }
-        let delta = base_svole.delta();
-        let vs = base_svole.receive(channel, iters + r, rng)?;
         Ok(Self {
             pows,
             delta,
             ot,
-            vs,
+            vs: vs.to_vec(), // XXX remove clone
             counter: 0,
             iters,
         })
@@ -261,10 +266,6 @@ impl<OT: OtSender<Msg = Block> + Malicious, FE: FF> Receiver<OT, FE> {
 
     pub fn delta(&self) -> FE {
         self.delta
-    }
-
-    pub fn voles(&self) -> Vec<FE> {
-        self.vs.clone()
     }
 
     pub fn receive<C: AbstractChannel, RNG: CryptoRng + RngCore>(
@@ -341,7 +342,8 @@ mod test {
     };
     use scuttlebutt::{
         field::{F61p, FiniteField as FF, Fp, Gf128, F2},
-        AesRng, Channel,
+        AesRng,
+        Channel,
     };
     use std::{
         io::{BufReader, BufWriter},
@@ -355,18 +357,19 @@ mod test {
             let reader = BufReader::new(sender.try_clone().unwrap());
             let writer = BufWriter::new(sender);
             let mut channel = Channel::new(reader, writer);
-            let mut bv_sender = BaseSender::<FE>::init(&mut channel, &mut rng).unwrap();
-            let mut vole =
-                SpsSender::<FE>::init(&mut channel, &mut rng, &mut bv_sender, 1).unwrap();
+            let mut base = BaseSender::<FE>::init(&mut channel, &mut rng).unwrap();
+            let uws = base.send(&mut channel, 1024, &mut rng).unwrap();
+            let mut vole = SpsSender::<FE>::init(&mut channel, &uws, 1, &mut rng).unwrap();
             vole.send(&mut channel, len, &mut rng).unwrap()
         });
         let mut rng = AesRng::new();
         let reader = BufReader::new(receiver.try_clone().unwrap());
         let writer = BufWriter::new(receiver);
         let mut channel = Channel::new(reader, writer);
-        let mut bv_receiver = BaseReceiver::<FE>::init(&mut channel, &mut rng).unwrap();
+        let mut base = BaseReceiver::<FE>::init(&mut channel, &mut rng).unwrap();
+        let vs = base.receive(&mut channel, 1024, &mut rng).unwrap();
         let mut vole =
-            SpsReceiver::<FE>::init(&mut channel, &mut rng, &mut bv_receiver, 1).unwrap();
+            SpsReceiver::<FE>::init(&mut channel, &vs, base.delta(), 1024, &mut rng).unwrap();
         let vs = vole.receive(&mut channel, len, &mut rng).unwrap();
         let uws = handle.join().unwrap();
         for i in 0..len as usize {

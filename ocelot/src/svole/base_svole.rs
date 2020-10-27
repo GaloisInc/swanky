@@ -146,10 +146,15 @@ impl<FE: FF> Receiver<FE> {
 mod tests {
     use super::{BaseReceiver, BaseSender};
     use crate::svole::svole_ext::lpn_params::{LpnExtendParams, LpnSetupParams};
-    use scuttlebutt::field::{F61p, FiniteField as FF, Fp, Gf128, F2};
-    use scuttlebutt::{AesRng, Channel};
-    use std::io::{BufReader, BufWriter};
-    use std::os::unix::net::UnixStream;
+    use scuttlebutt::{
+        field::{F61p, FiniteField as FF, Fp, Gf128, F2},
+        AesRng,
+        Channel,
+    };
+    use std::{
+        io::{BufReader, BufWriter},
+        os::unix::net::UnixStream,
+    };
 
     fn test_base_svole<FE: FF>(len: usize) {
         let (sender, receiver) = UnixStream::pair().unwrap();

@@ -13,7 +13,8 @@ use ocelot::{
 };
 use scuttlebutt::{
     field::{F61p, FiniteField as FF, Fp, Gf128, F2},
-    AesRng, TrackChannel,
+    AesRng,
+    TrackChannel,
 };
 use std::{
     io::{BufReader, BufWriter},
