@@ -10,12 +10,10 @@
 use crate::{
     errors::Error,
     ot::{Receiver as OtReceiver, Sender as OtSender},
-    svole::{
-        svole_ext::{
-            ggm_utils::{dot_product, ggm, ggm_prime, point_wise_addition, scalar_multiplication},
-            SpsVoleReceiver, SpsVoleSender,
-        },
-        SVoleReceiver, SVoleSender,
+    svole::base_svole::{BaseReceiver, BaseSender},
+    svole::svole_ext::{
+        ggm_utils::{dot_product, ggm, ggm_prime, point_wise_addition, scalar_multiplication},
+        SpsVoleReceiver, SpsVoleSender,
     },
 };
 use generic_array::typenum::Unsigned;
@@ -87,14 +85,12 @@ fn eq_receive<C: AbstractChannel, RNG: CryptoRng + RngCore, FE: FF>(
 }
 
 /// Implement SpsVoleSender for Sender type.
-impl<OT: OtReceiver<Msg = Block> + Malicious, FE: FF, SV: SVoleSender<Msg = FE>> SpsVoleSender<SV>
-    for Sender<OT, FE>
-{
+impl<OT: OtReceiver<Msg = Block> + Malicious, FE: FF> SpsVoleSender for Sender<OT, FE> {
     type Msg = FE;
     fn init<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         channel: &mut C,
         rng: &mut RNG,
-        base_svole: &mut SV,
+        base_svole: &mut BaseSender<FE>,
         iters: usize,
     ) -> Result<Self, Error> {
         let g = FE::GENERATOR;
@@ -122,7 +118,6 @@ impl<OT: OtReceiver<Msg = Block> + Malicious, FE: FF, SV: SVoleSender<Msg = FE>>
         len: usize,
         mut rng: &mut RNG,
     ) -> Result<Vec<(FE::PrimeField, FE)>, Error> {
-        //let r = FE::PolynomialFormNumCoefficients::to_usize();
         if self.counter >= self.iters {
             return Err(Error::Other(
                 "The number of iterations allowed exhausted!".to_string(),
@@ -238,14 +233,12 @@ impl<OT: OtReceiver<Msg = Block> + Malicious, FE: FF, SV: SVoleSender<Msg = FE>>
 }
 
 /// Implement SpsVoleReceiver for Receiver type.
-impl<OT: OtSender<Msg = Block> + Malicious, FE: FF, SV: SVoleReceiver<Msg = FE>> SpsVoleReceiver<SV>
-    for Receiver<OT, FE>
-{
+impl<OT: OtSender<Msg = Block> + Malicious, FE: FF> SpsVoleReceiver for Receiver<OT, FE> {
     type Msg = FE;
     fn init<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         channel: &mut C,
         mut rng: &mut RNG,
-        base_svole: &mut SV,
+        base_svole: &mut BaseReceiver<FE>,
         iters: usize,
     ) -> Result<Self, Error> {
         let ot = OT::init(channel, &mut rng)?;

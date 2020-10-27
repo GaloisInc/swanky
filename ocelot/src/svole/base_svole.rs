@@ -9,29 +9,29 @@
 
 use crate::{
     errors::Error,
-    svole::{CopeeReceiver, CopeeSender, SVoleReceiver, SVoleSender},
+    svole::copee::{CopeeReceiver, CopeeSender},
 };
 use generic_array::typenum::Unsigned;
 use rand_core::{CryptoRng, RngCore};
 use scuttlebutt::{field::FiniteField as FF, AbstractChannel};
 
 /// sVOLE sender.
-#[derive(Clone)]
-pub struct Sender<CP: CopeeSender, FE: FF> {
-    copee: CP,
+pub struct Sender<FE: FF> {
+    copee: CopeeSender<FE>,
     pows: Vec<FE>,
 }
 
 /// sVOLE receiver.
-#[derive(Clone)]
-pub struct Receiver<CP: CopeeReceiver, FE: FF> {
-    copee: CP,
+pub struct Receiver<FE: FF> {
+    copee: CopeeReceiver<FE>,
     pows: Vec<FE>,
 }
 
-impl<FE: FF, CP: CopeeSender<Msg = FE>> SVoleSender for Sender<CP, FE> {
-    type Msg = FE;
-    fn init<C: AbstractChannel, RNG: CryptoRng + RngCore>(
+pub type BaseSender<FE> = Sender<FE>;
+pub type BaseReceiver<FE> = Receiver<FE>;
+
+impl<FE: FF> Sender<FE> {
+    pub fn init<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         channel: &mut C,
         rng: &mut RNG,
     ) -> Result<Self, Error> {
@@ -43,11 +43,11 @@ impl<FE: FF, CP: CopeeSender<Msg = FE>> SVoleSender for Sender<CP, FE> {
             *item = acc;
             acc *= g;
         }
-        let copee = CP::init(channel, rng)?;
+        let copee = CopeeSender::<FE>::init(channel, rng)?;
         Ok(Self { copee, pows })
     }
 
-    fn send<C: AbstractChannel, RNG: CryptoRng + RngCore>(
+    pub fn send<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         &mut self,
         channel: &mut C,
         len: usize,
@@ -84,9 +84,8 @@ impl<FE: FF, CP: CopeeSender<Msg = FE>> SVoleSender for Sender<CP, FE> {
     }
 }
 
-impl<FE: FF, CP: CopeeReceiver<Msg = FE>> SVoleReceiver for Receiver<CP, FE> {
-    type Msg = FE;
-    fn init<C: AbstractChannel, RNG: CryptoRng + RngCore>(
+impl<FE: FF> Receiver<FE> {
+    pub fn init<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         channel: &mut C,
         rng: &mut RNG,
     ) -> Result<Self, Error> {
@@ -98,15 +97,15 @@ impl<FE: FF, CP: CopeeReceiver<Msg = FE>> SVoleReceiver for Receiver<CP, FE> {
             *item = acc;
             acc *= g;
         }
-        let cp = CP::init(channel, rng)?;
+        let cp = CopeeReceiver::<FE>::init(channel, rng)?;
         Ok(Self { copee: cp, pows })
     }
 
-    fn delta(&self) -> FE {
+    pub fn delta(&self) -> FE {
         self.copee.delta()
     }
 
-    fn receive<C: AbstractChannel, RNG: CryptoRng + RngCore>(
+    pub fn receive<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         &mut self,
         channel: &mut C,
         len: usize,
@@ -140,5 +139,58 @@ impl<FE: FF, CP: CopeeReceiver<Msg = FE>> SVoleReceiver for Receiver<CP, FE> {
                 "Correlation check fails in base vole protocol, i.e, w != u'Δ + v".to_string(),
             ))
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{BaseReceiver, BaseSender};
+    use crate::svole::svole_ext::lpn_params::{LpnExtendParams, LpnSetupParams};
+    use scuttlebutt::field::{F61p, FiniteField as FF, Fp, Gf128, F2};
+    use scuttlebutt::{AesRng, Channel};
+    use std::io::{BufReader, BufWriter};
+    use std::os::unix::net::UnixStream;
+
+    fn test_base_svole<FE: FF>(len: usize) {
+        let (sender, receiver) = UnixStream::pair().unwrap();
+        let handle = std::thread::spawn(move || {
+            let mut rng = AesRng::new();
+            let reader = BufReader::new(sender.try_clone().unwrap());
+            let writer = BufWriter::new(sender);
+            let mut channel = Channel::new(reader, writer);
+            let mut vole = BaseSender::<FE>::init(&mut channel, &mut rng).unwrap();
+            vole.send(&mut channel, len, &mut rng).unwrap()
+        });
+        let mut rng = AesRng::new();
+        let reader = BufReader::new(receiver.try_clone().unwrap());
+        let writer = BufWriter::new(receiver);
+        let mut channel = Channel::new(reader, writer);
+        let mut vole = BaseReceiver::<FE>::init(&mut channel, &mut rng).unwrap();
+        let vs = vole.receive(&mut channel, len, &mut rng).unwrap();
+        let delta = vole.delta();
+        let uw_s = handle.join().unwrap();
+        for i in 0..len {
+            let mut right = delta.multiply_by_prime_subfield(uw_s[i].0);
+            right += vs[i];
+            assert_eq!(uw_s[i].1, right);
+        }
+    }
+
+    #[test]
+    fn test_base_svole_setup_params() {
+        let len = LpnSetupParams::ROWS;
+        test_base_svole::<Fp>(len);
+        test_base_svole::<Gf128>(len);
+        test_base_svole::<F2>(len);
+        test_base_svole::<F61p>(len);
+    }
+
+    #[test]
+    fn test_base_svole_extend_params() {
+        let len = LpnExtendParams::ROWS;
+        test_base_svole::<Fp>(len);
+        test_base_svole::<Gf128>(len);
+        test_base_svole::<F2>(len);
+        test_base_svole::<F61p>(len);
     }
 }

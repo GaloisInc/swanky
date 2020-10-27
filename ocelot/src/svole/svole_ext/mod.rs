@@ -15,14 +15,14 @@ pub mod svole_lpn;
 
 use crate::{
     errors::Error,
-    svole::{SVoleReceiver, SVoleSender},
+    svole::base_svole::{BaseReceiver, BaseSender},
 };
 
 use rand_core::{CryptoRng, RngCore};
 use scuttlebutt::{field::FiniteField as FF, AbstractChannel};
 
 /// A trait for SpsVole Sender.
-pub trait SpsVoleSender<SV: SVoleSender<Msg = Self::Msg>>
+pub trait SpsVoleSender
 where
     Self: Sized,
 {
@@ -33,7 +33,7 @@ where
     fn init<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         channel: &mut C,
         rng: &mut RNG,
-        base_svole: &mut SV,
+        base_svole: &mut BaseSender<Self::Msg>,
         iters: usize,
     ) -> Result<Self, Error>;
     /// Runs single-point svole and outputs pair of vectors `(u, w)` such that
@@ -59,7 +59,7 @@ where
     ) -> Result<(), Error>;
 }
 /// A trait for SpsVole Receiver.
-pub trait SpsVoleReceiver<SV: SVoleReceiver<Msg = Self::Msg>>
+pub trait SpsVoleReceiver
 where
     Self: Sized,
 {
@@ -70,7 +70,7 @@ where
     fn init<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         channel: &mut C,
         rng: &mut RNG,
-        base_svole: &mut SV,
+        base_svole: &mut BaseReceiver<Self::Msg>,
         iters: usize,
     ) -> Result<Self, Error>;
     /// Returns the receiver's choice during the OT call.
@@ -165,25 +165,18 @@ mod tests {
     use crate::{
         ot::{ChouOrlandiReceiver, ChouOrlandiSender, KosReceiver, KosSender},
         svole::{
-            base_svole::{Receiver as VoleReceiver, Sender as VoleSender},
-            copee::{Receiver as CpReceiver, Sender as CpSender},
+            base_svole::{BaseReceiver, BaseSender},
             svole_ext::{
                 lpn_params::{LpnExtendParams, LpnSetupParams},
                 sp_svole::{Receiver as SpsReceiver, Sender as SpsSender},
                 svole_lpn::{Receiver as LpnVoleReceiver, Sender as LpnVoleSender},
-                LpnsVoleReceiver,
-                LpnsVoleSender,
-                SpsVoleReceiver,
-                SpsVoleSender,
+                LpnsVoleReceiver, LpnsVoleSender, SpsVoleReceiver, SpsVoleSender,
             },
-            SVoleReceiver,
-            SVoleSender,
         },
     };
     use scuttlebutt::{
         field::{F61p, FiniteField as FF, Fp, Gf128, F2},
-        AesRng,
-        Channel,
+        AesRng, Channel,
     };
     use std::{
         io::{BufReader, BufWriter},
@@ -192,10 +185,8 @@ mod tests {
 
     fn test_spsvole<
         FE: FF,
-        BVSender: SVoleSender<Msg = FE>,
-        BVReceiver: SVoleReceiver<Msg = FE>,
-        SPSender: SpsVoleSender<BVSender, Msg = FE>,
-        SPReceiver: SpsVoleReceiver<BVReceiver, Msg = FE>,
+        SPSender: SpsVoleSender<Msg = FE>,
+        SPReceiver: SpsVoleReceiver<Msg = FE>,
     >(
         len: usize,
     ) {
@@ -205,7 +196,7 @@ mod tests {
             let reader = BufReader::new(sender.try_clone().unwrap());
             let writer = BufWriter::new(sender);
             let mut channel = Channel::new(reader, writer);
-            let mut bv_sender = BVSender::init(&mut channel, &mut rng).unwrap();
+            let mut bv_sender = BaseSender::<FE>::init(&mut channel, &mut rng).unwrap();
             let mut vole = SPSender::init(&mut channel, &mut rng, &mut bv_sender, 1).unwrap();
             vole.send(&mut channel, len, &mut rng).unwrap()
         });
@@ -213,7 +204,7 @@ mod tests {
         let reader = BufReader::new(receiver.try_clone().unwrap());
         let writer = BufWriter::new(receiver);
         let mut channel = Channel::new(reader, writer);
-        let mut bv_receiver = BVReceiver::init(&mut channel, &mut rng).unwrap();
+        let mut bv_receiver = BaseReceiver::<FE>::init(&mut channel, &mut rng).unwrap();
         let mut vole = SPReceiver::init(&mut channel, &mut rng, &mut bv_receiver, 1).unwrap();
         let vs = vole.receive(&mut channel, len, &mut rng).unwrap();
         let uws = handle.join().unwrap();
@@ -222,13 +213,6 @@ mod tests {
             assert_eq!(uws[i].1, right);
         }
     }
-
-    type CPSender<FE> = CpSender<KosSender, FE>;
-    type CPReceiver<FE> = CpReceiver<KosReceiver, FE>;
-
-    type BVSender<FE> = VoleSender<CPSender<FE>, FE>;
-    type BVReceiver<FE> = VoleReceiver<CPReceiver<FE>, FE>;
-
     type SPSender<FE> = SpsSender<ChouOrlandiReceiver, FE>;
     type SPReceiver<FE> = SpsReceiver<ChouOrlandiSender, FE>;
 
@@ -236,18 +220,10 @@ mod tests {
     fn test_sp_svole() {
         for i in 1..14 {
             let leaves = 1 << i;
-            test_spsvole::<Fp, BVSender<Fp>, BVReceiver<Fp>, SPSender<Fp>, SPReceiver<Fp>>(leaves);
-            test_spsvole::<
-                Gf128,
-                BVSender<Gf128>,
-                BVReceiver<Gf128>,
-                SPSender<Gf128>,
-                SPReceiver<Gf128>,
-            >(leaves);
-            test_spsvole::<F2, BVSender<F2>, BVReceiver<F2>, SPSender<F2>, SPReceiver<F2>>(leaves);
-            test_spsvole::<F61p, BVSender<F61p>, BVReceiver<F61p>, SPSender<F61p>, SPReceiver<F61p>>(
-                leaves,
-            );
+            test_spsvole::<Fp, SPSender<Fp>, SPReceiver<Fp>>(leaves);
+            test_spsvole::<Gf128, SPSender<Gf128>, SPReceiver<Gf128>>(leaves);
+            test_spsvole::<F2, SPSender<F2>, SPReceiver<F2>>(leaves);
+            test_spsvole::<F61p, SPSender<F61p>, SPReceiver<F61p>>(leaves);
         }
     }
 
@@ -284,8 +260,8 @@ mod tests {
         }
     }
 
-    type VSender<FE> = LpnVoleSender<FE, BVSender<FE>, SPSender<FE>>;
-    type VReceiver<FE> = LpnVoleReceiver<FE, BVReceiver<FE>, SPReceiver<FE>>;
+    type VSender<FE> = LpnVoleSender<FE, SPSender<FE>>;
+    type VReceiver<FE> = LpnVoleReceiver<FE, SPReceiver<FE>>;
 
     #[test]
     fn test_lpn_svole_params1() {

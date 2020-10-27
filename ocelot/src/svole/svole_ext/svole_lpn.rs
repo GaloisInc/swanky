@@ -21,20 +21,18 @@
 use crate::{
     errors::Error,
     svole::{
+        base_svole::{BaseReceiver, BaseSender},
         svole_ext::{LpnsVoleReceiver, LpnsVoleSender, SpsVoleReceiver, SpsVoleSender},
         utils::lpn_mtx_indices,
-        SVoleReceiver, SVoleSender,
     },
 };
 use generic_array::typenum::Unsigned;
 use rand_core::{CryptoRng, RngCore};
 use scuttlebutt::{field::FiniteField, AbstractChannel};
-use std::marker::PhantomData;
 
 /// LpnsVole sender.
 #[derive(Clone)]
-pub struct Sender<FE: FiniteField, SV: SVoleSender<Msg = FE>, SPS: SpsVoleSender<SV, Msg = FE>> {
-    _sv: PhantomData<SV>,
+pub struct Sender<FE: FiniteField, SPS: SpsVoleSender<Msg = FE>> {
     spvole: SPS,
     rows: usize,
     cols: usize,
@@ -43,12 +41,7 @@ pub struct Sender<FE: FiniteField, SV: SVoleSender<Msg = FE>, SPS: SpsVoleSender
     weight: usize,
 }
 /// LpnsVole receiver.
-pub struct Receiver<
-    FE: FiniteField,
-    SV: SVoleReceiver<Msg = FE>,
-    SPS: SpsVoleReceiver<SV, Msg = FE>,
-> {
-    _sv: PhantomData<SV>,
+pub struct Receiver<FE: FiniteField, SPS: SpsVoleReceiver<Msg = FE>> {
     spvole: SPS,
     delta: FE,
     rows: usize,
@@ -57,9 +50,7 @@ pub struct Receiver<
     weight: usize,
 }
 
-impl<FE: FiniteField, SV: SVoleSender<Msg = FE>, SPS: SpsVoleSender<SV, Msg = FE>> LpnsVoleSender
-    for Sender<FE, SV, SPS>
-{
+impl<FE: FiniteField, SPS: SpsVoleSender<Msg = FE>> LpnsVoleSender for Sender<FE, SPS> {
     type Msg = FE;
     fn init<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         channel: &mut C,
@@ -78,7 +69,7 @@ impl<FE: FiniteField, SV: SVoleSender<Msg = FE>, SPS: SpsVoleSender<SV, Msg = FE
         if d >= rows {
             return Err(Error::InvalidD);
         }
-        let mut svole = SV::init(channel, rng)?;
+        let mut svole = BaseSender::<FE>::init(channel, rng)?;
         let mut uws = svole.send(channel, rows, rng)?;
         // This flush statement is needed, otherwise, it hangs on.
         channel.flush()?;
@@ -87,7 +78,6 @@ impl<FE: FiniteField, SV: SVoleSender<Msg = FE>, SPS: SpsVoleSender<SV, Msg = FE
         let r = FE::PolynomialFormNumCoefficients::to_usize();
         debug_assert!(uws.len() == rows + weight + r);
         Ok(Self {
-            _sv: PhantomData::<SV>,
             spvole,
             rows: rows + weight + r,
             cols,
@@ -151,9 +141,7 @@ impl<FE: FiniteField, SV: SVoleSender<Msg = FE>, SPS: SpsVoleSender<SV, Msg = FE
     }
 }
 
-impl<FE: FiniteField, SV: SVoleReceiver<Msg = FE>, SPS: SpsVoleReceiver<SV, Msg = FE>>
-    LpnsVoleReceiver for Receiver<FE, SV, SPS>
-{
+impl<FE: FiniteField, SPS: SpsVoleReceiver<Msg = FE>> LpnsVoleReceiver for Receiver<FE, SPS> {
     type Msg = FE;
     fn init<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         channel: &mut C,
@@ -172,7 +160,7 @@ impl<FE: FiniteField, SV: SVoleReceiver<Msg = FE>, SPS: SpsVoleReceiver<SV, Msg 
         if d >= rows {
             return Err(Error::InvalidD);
         }
-        let mut svole = SV::init(channel, rng)?;
+        let mut svole = BaseReceiver::<FE>::init(channel, rng)?;
         let r = FE::PolynomialFormNumCoefficients::to_usize();
         let mut vs = svole.receive(channel, rows, rng)?;
         let svole_delta = svole.delta();
@@ -182,7 +170,6 @@ impl<FE: FiniteField, SV: SVoleReceiver<Msg = FE>, SPS: SpsVoleReceiver<SV, Msg 
         debug_assert!(spvole_delta == svole_delta);
         debug_assert!(vs.len() == rows + weight + r);
         Ok(Self {
-            _sv: PhantomData::<SV>,
             spvole,
             delta: spvole_delta,
             rows: rows + weight + r,
