@@ -75,7 +75,6 @@ impl<FE: FiniteField> LpnsVoleSender for Sender<FE> {
         // This flush statement is needed, otherwise, it hangs on.
         channel.flush()?;
         let spvole = SpsSender::<FE>::init(channel, &uws[rows..], weight, rng)?;
-        let r = FE::PolynomialFormNumCoefficients::to_usize();
         debug_assert!(uws.len() == rows + weight + r);
         Ok(Self {
             spvole,
