@@ -70,11 +70,11 @@ impl<FE: FiniteField> LpnsVoleSender for Sender<FE> {
             return Err(Error::InvalidD);
         }
         let mut svole = BaseSender::<FE>::init(channel, rng)?;
-        let mut uws = svole.send(channel, rows, rng)?;
+        let r = FE::PolynomialFormNumCoefficients::to_usize();
+        let uws = svole.send(channel, rows + weight + r, rng)?;
         // This flush statement is needed, otherwise, it hangs on.
         channel.flush()?;
-        let spvole = SpsSender::<FE>::init(channel, rng, &mut svole, weight)?;
-        uws.extend(spvole.voles());
+        let spvole = SpsSender::<FE>::init(channel, &uws[rows..], weight, rng)?;
         let r = FE::PolynomialFormNumCoefficients::to_usize();
         debug_assert!(uws.len() == rows + weight + r);
         Ok(Self {
@@ -162,22 +162,20 @@ impl<FE: FiniteField> LpnsVoleReceiver for Receiver<FE> {
         }
         let mut svole = BaseReceiver::<FE>::init(channel, rng)?;
         let r = FE::PolynomialFormNumCoefficients::to_usize();
-        let mut vs = svole.receive(channel, rows, rng)?;
-        let svole_delta = svole.delta();
-        let spvole = SpsReceiver::<FE>::init(channel, rng, &mut svole, weight)?;
-        let spvole_delta = spvole.delta();
-        vs.extend(spvole.voles());
-        debug_assert!(spvole_delta == svole_delta);
+        let vs = svole.receive(channel, rows + weight + r, rng)?;
+        let delta = svole.delta();
+        let spvole = SpsReceiver::<FE>::init(channel, &vs[rows..], delta, weight, rng)?;
         debug_assert!(vs.len() == rows + weight + r);
         Ok(Self {
             spvole,
-            delta: spvole_delta,
+            delta,
             rows: rows + weight + r,
             cols,
             vs,
             weight,
         })
     }
+
     fn delta(&self) -> FE {
         self.delta
     }
