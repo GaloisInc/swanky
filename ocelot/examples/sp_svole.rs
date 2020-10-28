@@ -31,13 +31,13 @@ fn test_spsvole<FE: FF>(len: usize) {
         let mut base = BaseSender::<FE>::init(&mut channel, &mut rng).unwrap();
         let uws = base.send(&mut channel, 1024, &mut rng).unwrap();
         let pows = base.pows();
-        let mut vole = SpsSender::<FE>::init(&mut channel, &uws, pows, len, &mut rng).unwrap();
+        let mut vole = SpsSender::<FE>::init(&mut channel, pows, len, &mut rng).unwrap();
         println!(
             "Sender init time: {} ms",
             start.elapsed().unwrap().as_millis()
         );
         let start = SystemTime::now();
-        let _ = vole.send(&mut channel, len, &mut rng).unwrap();
+        let _ = vole.send(&mut channel, len, &uws[0], &mut rng).unwrap();
         println!(
             "[{}] Send time: {} ms",
             len,
@@ -60,14 +60,13 @@ fn test_spsvole<FE: FF>(len: usize) {
     let mut base = BaseReceiver::<FE>::init(&mut channel, &mut rng).unwrap();
     let vs = base.receive(&mut channel, 1024, &mut rng).unwrap();
     let mut vole =
-        SpsReceiver::<FE>::init(&mut channel, &vs, base.pows(), base.delta(), len, &mut rng)
-            .unwrap();
+        SpsReceiver::<FE>::init(&mut channel, base.pows(), base.delta(), len, &mut rng).unwrap();
     println!(
         "Receiver init time: {} ms",
         start.elapsed().unwrap().as_millis()
     );
     let start = SystemTime::now();
-    let _ = vole.receive(&mut channel, len, &mut rng).unwrap();
+    let _ = vole.receive(&mut channel, len, &vs[0], &mut rng).unwrap();
     println!(
         "[{}] Receiver time: {} ms",
         len,
