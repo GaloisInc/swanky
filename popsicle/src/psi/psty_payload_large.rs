@@ -401,7 +401,7 @@ impl ReceiverState {
         &mut self,
         channel: &mut C,
         rng: &mut RNG,
-    ) -> Result<(), Error>
+    ) -> Result<usize, Error>
     where
         C: AbstractChannel,
         RNG: RngCore + CryptoRng + SeedableRng<Seed = Block>,
@@ -412,7 +412,7 @@ impl ReceiverState {
             .outputs(&outs)?
             .expect("evaluator should produce outputs");
         let aggregate = fancy_garbling::util::crt_inv(&mpc_outs, &mods);
-        Ok(())
+        Ok(aggregate as usize)
     }
 }
 
