@@ -220,7 +220,7 @@ impl<OT: OtSender<Msg = Block> + Malicious, FE: FF> Receiver<OT, FE> {
         let b = *v;
         let a_prime = channel.read_fe::<FE::PrimeField>()?;
         let gamma = b - self.delta.multiply_by_prime_subfield(a_prime);
-        let seed = rand::random::<Block>();
+        let seed = rng.gen::<Block>();
         let (vs, keys) = ggm::<FE>(depth as usize, seed);
         self.ot.send(channel, &keys, rng)?;
         let d = gamma - vs.clone().into_iter().sum();

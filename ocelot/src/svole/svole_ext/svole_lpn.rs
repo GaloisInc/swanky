@@ -42,6 +42,7 @@ pub struct Sender<FE: FiniteField> {
     cols: usize,
     uws: Vec<(FE::PrimeField, FE)>,
     weight: usize,
+    r: usize
 }
 /// LpnsVole receiver.
 pub struct Receiver<FE: FiniteField> {
@@ -86,6 +87,7 @@ impl<FE: FiniteField> LpnsVoleSender for Sender<FE> {
             cols,
             uws,
             weight,
+            r
         })
     }
     fn send<C: AbstractChannel, RNG: CryptoRng + RngCore>(
@@ -139,15 +141,16 @@ impl<FE: FiniteField> LpnsVoleSender for Sender<FE> {
                 }) + t
             })
             .collect();
-        for i in 0..self.rows {
+        let nb = self.rows + self.weight + self.r;
+        for i in 0..nb {
             self.uws[i] = (xs[i], zs[i]);
         }
         let output: Vec<(FE::PrimeField, FE)> = xs
             .into_iter()
-            .skip(self.rows)
-            .zip(zs.into_iter().skip(self.rows))
+            .skip(nb)
+            .zip(zs.into_iter().skip(nb))
             .collect();
-        debug_assert!(output.len() == self.cols - self.rows);
+        debug_assert!(output.len() == self.cols - nb);
         Ok(output)
     }
 }
@@ -232,14 +235,15 @@ impl<FE: FiniteField> LpnsVoleReceiver for Receiver<FE> {
             })
             .collect();
         debug_assert!(ys.len() == self.cols);
-        for (i, item) in ys.iter().enumerate().take(self.rows + self.weight + self.r) {
+        let nb = self.rows + self.weight + self.r;
+        for (i, item) in ys.iter().enumerate().take(nb) {
             self.vs[i] = *item;
         }
         let output: Vec<FE> = ys
             .into_iter()
-            .skip(self.rows + self.weight + self.r)
+            .skip(nb)
             .collect();
-        debug_assert!(output.len() == self.cols - (self.rows + self.weight + self.r));
+        debug_assert!(output.len() == self.cols - nb);
         Ok(output)
     }
 }
