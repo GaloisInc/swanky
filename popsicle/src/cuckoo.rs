@@ -18,7 +18,17 @@ pub(crate) struct CuckooItem {
     pub(crate) hash_index: usize,
 }
 
-pub(crate) struct CuckooHash {
+#[derive(Clone)]
+pub(crate) struct CuckooHashLarge{
+    pub(crate) items: Vec<CuckooHash>,
+    pub(crate) nbins: usize, // total number of bins
+    pub(crate) nmegabins: usize,
+    pub(crate) megasize: usize,
+    pub(crate) nhashes: usize,
+}
+
+#[derive(Clone)]
+pub(crate) struct CuckooHash{
     pub(crate) items: Vec<Option<CuckooItem>>,
     pub(crate) nbins: usize,
     pub(crate) nhashes: usize,
@@ -136,10 +146,93 @@ impl CuckooHash {
     }
 }
 
+
 impl Debug for CuckooHash {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         for i in 0..self.nbins {
             writeln!(f, "{}: {:?}", i, self.items[i])?;
+        }
+        Ok(())
+    }
+}
+
+impl CuckooHashLarge{
+    /// Build a new cuckoo hash table, hashing `inputs` in. We require that the
+    /// lower-order-bits of the values in `inputs` are zero-ed out, as those
+    /// bits will be used to store the hash index.
+    pub fn new(inputs: &[Block], nhashes: usize, megasize: usize) -> Result<CuckooHashLarge, Error> {
+        let nbins = compute_nbins(inputs.len(), nhashes)?;
+        let nmegabins = ((nbins as f32)/(megasize as f32)).ceil() as usize;
+        let last_bin = nbins % megasize;
+
+        let mut items: Vec<CuckooHash> = Vec::new();
+        for i in 0..nmegabins{
+            let mut binsize = megasize;
+            if i == (nmegabins - 1) && last_bin != 0{
+                binsize = last_bin;
+            }
+            items.push(
+                CuckooHash{
+                        items: vec![None; binsize],
+                        nbins: binsize,
+                        nhashes,
+                }
+            );
+        }
+
+
+        let mut tbl = CuckooHashLarge {
+            items,
+            nbins,
+            nmegabins,
+            megasize,
+            nhashes,
+        };
+
+        // Fill table with `inputs`.
+        for (j, input) in inputs.iter().enumerate() {
+            tbl.hash(*input, j)?;
+        }
+        Ok(tbl)
+    }
+
+    /// Place `input`, alongside the input index `idx` it corresponds to, in the
+    /// hash table.
+    pub fn hash(&mut self, input: Block, idx: usize) -> Result<(), Error> {
+        let mut item = CuckooItem {
+            entry: input,
+            input_index: idx,
+            hash_index: 0,
+        };
+        let mask = Block::from(0xFFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FF00);
+
+        for _ in 0..NITERS {
+            item.entry &= mask;
+
+            let mut i = CuckooHash::bin(item.entry, item.hash_index, self.nbins);
+            let small_i = i % self.megasize;
+            let megabin_i = i / self.megasize;
+
+            item.entry ^= Block::from(item.hash_index as u128);
+            let opt_item = self.items[megabin_i].items[small_i].replace(item);
+            if let Some(x) = opt_item {
+                // If there is an item already in the bin, keep iterating,
+                // trying to place the new item.
+                item = x;
+                // Bump the hash index.
+                item.hash_index = (item.hash_index + 1) % self.nhashes;
+            } else {
+                return Ok(());
+            }
+        }
+        Err(Error::CuckooHashFull)
+    }
+}
+
+impl Debug for CuckooHashLarge {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        for i in 0..self.nmegabins {
+            println!("Megabin{}: {:?}", i, self.items[i]);
         }
         Ok(())
     }
