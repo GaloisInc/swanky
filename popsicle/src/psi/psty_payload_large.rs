@@ -118,8 +118,6 @@ impl Sender {
 
         let (ts_id, ts_payload, table, payload)= self.bucketize_data(inputs, payloads, megasize, nmegabins, nbins, key, rng)?;
 
-
-
         for i in 0..nmegabins{
             let mut binsize = megasize;
             if i == (nmegabins - 1) && last_bin != 0{
@@ -135,6 +133,7 @@ impl Sender {
             state.build_compute_circuit(channel, rng);
             channel.flush()?;
         }
+        println!("sender done");
         Ok(())
     }
 
@@ -166,10 +165,10 @@ impl Sender {
             if i == (nmegabins - 1) && last_bin != 0{
                 binsize = last_bin;
             }
-            table[i] = vec![Vec::new(); megasize];
-            payload[i] = vec![Vec::new(); megasize];
-            ts_id[i] = (0..megasize).map(|_| rng.gen::<Block512>()).collect_vec();
-            ts_payload[i] = (0..megasize).map(|_| rng.gen::<Block512>()).collect_vec();
+            table[i] = vec![Vec::new(); binsize];
+            payload[i] = vec![Vec::new(); binsize];
+            ts_id[i] = (0..binsize).map(|_| rng.gen::<Block512>()).collect_vec();
+            ts_payload[i] = (0..binsize).map(|_| rng.gen::<Block512>()).collect_vec();
         }
 
         // let ts_id_total = (0..nbins).map(|_| rng.gen::<Block512>()).collect_vec();
@@ -242,12 +241,11 @@ impl SenderState {
         C: AbstractChannel,
         RNG: RngCore + CryptoRng + SeedableRng<Seed = Block>,
     {
-        println!("sx: encoding");
+
         let mut gb = Garbler::<C, RNG, OtSender>::new(channel.clone(), RNG::from_seed(rng.gen()))?;
         let my_input_bits = encode_inputs(&self.opprf_ids);
         let my_payload_bits = encode_payloads(&self.opprf_payloads);
-        println!("sx: expecting ids of len {:?}", my_input_bits.len());
-        println!("sx: expecting payloads of len {:?}", self.opprf_payloads.len());
+
         let mods_bits = vec![2; my_input_bits.len()];
         let sender_inputs = gb.encode_many(&my_input_bits, &mods_bits)?;
         let receiver_inputs = gb.receive_many(&mods_bits)?;
@@ -257,12 +255,10 @@ impl SenderState {
         for _i in 0..self.opprf_payloads.len(){
             mods_crt.append(&mut qs.clone());
         }
-        println!("sx: expecting payloads of len {:?}", mods_crt.len());
+
         let sender_payloads = gb.encode_many(&my_payload_bits, &mods_crt)?;
         let receiver_payloads = gb.receive_many(&mods_crt)?;
         let receiver_masks = gb.receive_many(&mods_crt)?;
-        println!("received many sx");
-
 
         Ok((gb, sender_inputs, receiver_inputs, sender_payloads, receiver_payloads, receiver_masks))
     }
@@ -315,7 +311,6 @@ impl Receiver {
             // // index, if such a entry exists, or a random value.
             // println!("number of mega{:?}", cuckoo.nmegabins);
             for i in 0..cuckoo.nmegabins{
-                println!("i{:?}", i);
                 let mut state =  ReceiverState{
                     opprf_ids: Vec::new(),
                     opprf_payloads: Vec::new(),
@@ -328,6 +323,7 @@ impl Receiver {
                 let aggregate = state.build_compute_circuit(channel, rng).unwrap();
                 channel.flush()?;
             }
+            println!("receiver done");
             Ok(())
         }
     pub(crate) fn bucketize_data<RNG: RngCore + CryptoRng + SeedableRng>(
@@ -399,12 +395,11 @@ impl ReceiverState {
         C: AbstractChannel,
         RNG: CryptoRng + RngCore + SeedableRng<Seed = Block>,
     {
-        println!("rx: encoding");
+
         let my_input_bits = encode_inputs(&self.opprf_ids);
         let my_opprf_output = encode_opprf_payload(&self.opprf_payloads);
         let my_payload_bits = encode_payloads(&self.payload);
-        println!("rx: expecting ids of len {:?}", my_input_bits.len());
-        println!("rx: expecting payloads of len {:?}", self.payload.len());
+
         let mut ev =
             Evaluator::<C, RNG, OtReceiver>::new(channel.clone(), RNG::from_seed(rng.gen()))?;
 
@@ -436,7 +431,7 @@ impl ReceiverState {
     {
         channel.flush()?;
         let (mut ev, x, y, x_payload, y_payload, masks) = self.encode_circuit_inputs(channel, rng)?;
-        println!("done encoding");
+
         let (outs, mods) = fancy_compute_payload_aggregate(&mut ev, &x, &y, &x_payload, &y_payload, &masks)?;
         let mpc_outs = ev
             .outputs(&outs)?
