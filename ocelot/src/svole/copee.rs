@@ -46,7 +46,9 @@ pub struct Receiver<ROT: ROTReceiver + Malicious, FE: FF> {
     counter: u64,
 }
 
+/// Aliasing COPEe sender.
 pub type CopeeSender<FE> = Sender<KosSender, FE>;
+/// Aliasing COPEe receiver.
 pub type CopeeReceiver<FE> = Receiver<KosReceiver, FE>;
 
 /// `Aes128` as a pseudo-random function.
@@ -57,6 +59,7 @@ fn prf<FE: FF>(aes: &Aes128, pt: Block) -> FE::PrimeField {
 
 /// Implement CopeeSender for Sender type
 impl<ROT: ROTSender<Msg = Block> + Malicious, FE: FF> Sender<ROT, FE> {
+    /// Runs any one-time initialization.
     pub fn init<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         channel: &mut C,
         mut rng: &mut RNG,
@@ -95,10 +98,14 @@ impl<ROT: ROTSender<Msg = Block> + Malicious, FE: FF> Sender<ROT, FE> {
         })
     }
 
+    /// Returns the exponents.
     pub fn pows(&self) -> Vec<FE> {
         self.pows.clone()
     }
 
+    /// Runs COPEe extend on a prime field element `u` and returns an extended
+    /// field element `w` such that `w = u'Δ + v` holds, where `u'` is result of
+    /// the conversion from `u` to the extended field element.
     pub fn send<C: AbstractChannel>(
         &mut self,
         channel: &mut C,
@@ -126,6 +133,7 @@ impl<ROT: ROTSender<Msg = Block> + Malicious, FE: FF> Sender<ROT, FE> {
 
 /// Implement CopeeReceiver for Receiver type.
 impl<ROT: ROTReceiver<Msg = Block> + Malicious, FE: FF> Receiver<ROT, FE> {
+    /// Runs any one-time initialization.
     pub fn init<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         channel: &mut C,
         mut rng: &mut RNG,
@@ -164,15 +172,17 @@ impl<ROT: ROTReceiver<Msg = Block> + Malicious, FE: FF> Receiver<ROT, FE> {
             counter: 0,
         })
     }
-
+    /// Returns the receiver choice `Δ`.
     pub fn delta(&self) -> FE {
         self.delta
     }
 
+    /// Returns the exponents.
     pub fn pows(&self) -> Vec<FE> {
         self.pows.clone()
     }
 
+    /// Runs COPEe extend and returns a field element `v` such that `w = u'Δ + v` holds.
     pub fn receive<C: AbstractChannel>(&mut self, channel: &mut C) -> Result<FE, Error> {
         let pt = Block::from(self.counter as u128);
         let mut res = FE::ZERO;

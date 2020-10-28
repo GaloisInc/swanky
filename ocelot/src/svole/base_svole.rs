@@ -27,10 +27,13 @@ pub struct Receiver<FE: FF> {
     pows: Vec<FE>,
 }
 
+/// Base svole sender.
 pub type BaseSender<FE> = Sender<FE>;
+/// Base svole receiver.
 pub type BaseReceiver<FE> = Receiver<FE>;
 
 impl<FE: FF> Sender<FE> {
+    /// Runs any one-time initialization.
     pub fn init<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         channel: &mut C,
         rng: &mut RNG,
@@ -39,9 +42,16 @@ impl<FE: FF> Sender<FE> {
         let pows = copee.pows();
         Ok(Self { copee, pows })
     }
+    /// Returns the exponents.
     pub fn pows(&self) -> Vec<FE> {
         self.pows.clone()
     }
+    /// Runs SVOLE extend on input length `len` and returns `(u, w)`, where `u`
+    /// is a randomly generated input vector of length `len` from
+    /// `FE::PrimeField` such that the correlation `w = u'Δ + v`, `u'` is the
+    /// converted vector of `u` to the vector of type `FE`, holds. The vector
+    /// length `len` should match with the Receiver's input length, otherwise,
+    /// the program runs forever.
     pub fn send<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         &mut self,
         channel: &mut C,
@@ -80,6 +90,7 @@ impl<FE: FF> Sender<FE> {
 }
 
 impl<FE: FF> Receiver<FE> {
+    /// Runs any one-time initialization.
     pub fn init<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         channel: &mut C,
         rng: &mut RNG,
@@ -88,15 +99,19 @@ impl<FE: FF> Receiver<FE> {
         let pows = cp.pows();
         Ok(Self { copee: cp, pows })
     }
-
+    /// Returns the receiver choice `Δ`.
     pub fn delta(&self) -> FE {
         self.copee.delta()
     }
-
+    /// Returns the exponents.
     pub fn pows(&self) -> Vec<FE> {
         self.pows.clone()
     }
-
+    /// Runs SVOLE extend on input length `len` and returns a vector `v` such
+    /// that the correlation `w = u'Δ + v` holds. Note that `u'` is the
+    /// converted vector from `u` to the vector of elements of the extended
+    /// field `FE`. The vector length `len` should match with the Sender's input
+    /// `len`, otherwise it never terminates.
     pub fn receive<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         &mut self,
         channel: &mut C,
