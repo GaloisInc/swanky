@@ -95,6 +95,10 @@ impl<ROT: ROTSender<Msg = Block> + Malicious, FE: FF> Sender<ROT, FE> {
         })
     }
 
+    pub fn pows(&self) -> Vec<FE> {
+        self.pows.clone()
+    }
+
     pub fn send<C: AbstractChannel>(
         &mut self,
         channel: &mut C,
@@ -163,6 +167,10 @@ impl<ROT: ROTReceiver<Msg = Block> + Malicious, FE: FF> Receiver<ROT, FE> {
 
     pub fn delta(&self) -> FE {
         self.delta
+    }
+
+    pub fn pows(&self) -> Vec<FE> {
+        self.pows.clone()
     }
 
     pub fn receive<C: AbstractChannel>(&mut self, channel: &mut C) -> Result<FE, Error> {

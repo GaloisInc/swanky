@@ -35,15 +35,8 @@ impl<FE: FF> Sender<FE> {
         channel: &mut C,
         rng: &mut RNG,
     ) -> Result<Self, Error> {
-        let r = FE::PolynomialFormNumCoefficients::to_usize();
-        let g = FE::GENERATOR;
-        let mut acc = FE::ONE;
-        let mut pows = vec![FE::ZERO; r];
-        for item in pows.iter_mut().take(r) {
-            *item = acc;
-            acc *= g;
-        }
         let copee = CopeeSender::<FE>::init(channel, rng)?;
+        let pows = copee.pows();
         Ok(Self { copee, pows })
     }
     pub fn pows(&self) -> Vec<FE> {
@@ -91,15 +84,8 @@ impl<FE: FF> Receiver<FE> {
         channel: &mut C,
         rng: &mut RNG,
     ) -> Result<Self, Error> {
-        let r = FE::PolynomialFormNumCoefficients::to_usize();
-        let g = FE::GENERATOR;
-        let mut acc = FE::ONE;
-        let mut pows = vec![FE::ZERO; r];
-        for item in pows.iter_mut().take(r) {
-            *item = acc;
-            acc *= g;
-        }
         let cp = CopeeReceiver::<FE>::init(channel, rng)?;
+        let pows = cp.pows();
         Ok(Self { copee: cp, pows })
     }
 
