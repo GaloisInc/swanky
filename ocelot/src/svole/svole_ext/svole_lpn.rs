@@ -24,15 +24,15 @@ use crate::{
         base_svole::{BaseReceiver, BaseSender},
         svole_ext::{
             sp_svole::{SpsReceiver, SpsSender},
-            LpnsVoleReceiver,
-            LpnsVoleSender,
+            LpnsVoleReceiver, LpnsVoleSender,
         },
         utils::lpn_mtx_indices,
     },
 };
 use generic_array::typenum::Unsigned;
-use rand_core::{CryptoRng, RngCore};
-use scuttlebutt::{field::FiniteField, AbstractChannel};
+use rand::Rng;
+use rand_core::{CryptoRng, RngCore, SeedableRng};
+use scuttlebutt::{field::FiniteField, AbstractChannel, AesRng, Block};
 
 /// LpnsVole sender.
 pub struct Sender<FE: FiniteField> {
@@ -110,8 +110,12 @@ impl<FE: FiniteField> LpnsVoleSender for Sender<FE> {
         debug_assert!(ets.len() == self.cols);
         self.spvole
             .send_batch_consistency_check(channel, m, &uws, rng)?;
+        let seed = rng.gen::<Block>();
+        let mut lpn_rng = AesRng::from_seed(seed);
+        channel.write_block(&seed)?;
+        channel.flush()?;
         let indices: Vec<[(usize, FE::PrimeField); 10]> = (0..self.cols)
-            .map(|i| lpn_mtx_indices::<FE>(i, self.rows))
+            .map(|i| lpn_mtx_indices::<FE>(i, self.rows, &mut lpn_rng))
             .collect();
         let xs: Vec<FE::PrimeField> = indices
             .iter()
@@ -122,7 +126,6 @@ impl<FE: FiniteField> LpnsVoleSender for Sender<FE> {
                 }) + *e
             })
             .collect();
-        debug_assert!(xs.len() == self.cols);
         let zs: Vec<FE> = indices
             .into_iter()
             .zip(ets.into_iter())
@@ -207,9 +210,11 @@ impl<FE: FiniteField> LpnsVoleReceiver for Receiver<FE> {
         self.spvole
             .receive_batch_consistency_check(channel, m, vs, rng)?;
         debug_assert!(ss.len() == self.cols);
+        let seed = channel.read_block()?;
+        let mut lpn_rng = AesRng::from_seed(seed);
         let ys: Vec<FE> = (0..self.cols)
             .map(|i| {
-                lpn_mtx_indices::<FE>(i, self.rows)
+                lpn_mtx_indices::<FE>(i, self.rows, &mut lpn_rng)
                     .iter()
                     .fold(FE::ZERO, |acc, (j, e)| {
                         acc + self.vs[*j].multiply_by_prime_subfield(*e)
