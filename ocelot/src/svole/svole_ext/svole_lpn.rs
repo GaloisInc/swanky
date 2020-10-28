@@ -40,7 +40,6 @@ pub struct Sender<FE: FiniteField> {
     rows: usize,
     cols: usize,
     uws: Vec<(FE::PrimeField, FE)>,
-    d: usize,
     weight: usize,
 }
 /// LpnsVole receiver.
@@ -75,17 +74,16 @@ impl<FE: FiniteField> LpnsVoleSender for Sender<FE> {
         let mut svole = BaseSender::<FE>::init(channel, rng)?;
         let r = FE::PolynomialFormNumCoefficients::to_usize();
         let uws = svole.send(channel, rows + weight + r, rng)?;
+        let pows = svole.pows();
         // This flush statement is needed, otherwise, it hangs on.
         channel.flush()?;
-        let spvole = SpsSender::<FE>::init(channel, &uws[rows..], weight, rng)?;
-        let r = FE::PolynomialFormNumCoefficients::to_usize();
+        let spvole = SpsSender::<FE>::init(channel, &uws[rows..], pows, weight, rng)?;
         debug_assert!(uws.len() == rows + weight + r);
         Ok(Self {
             spvole,
             rows: rows + weight + r,
             cols,
             uws,
-            d,
             weight,
         })
     }
@@ -98,8 +96,11 @@ impl<FE: FiniteField> LpnsVoleSender for Sender<FE> {
             return Err(Error::InvalidWeight);
         }
         let m = self.cols / self.weight;
-        let mut ets = vec![];
-        let mut uws = vec![vec![]];
+        let mut ets = Vec::with_capacity(self.cols);
+        let mut uws = vec![];
+        if self.spvole.counter != 0 {
+            self.spvole.counter = 0;
+        }
         for _ in 0..self.weight {
             let ac = self.spvole.send(channel, m, rng)?;
             // XXX remove this extra clone.
@@ -108,7 +109,7 @@ impl<FE: FiniteField> LpnsVoleSender for Sender<FE> {
         }
         debug_assert!(ets.len() == self.cols);
         self.spvole
-            .send_batch_consistency_check(channel, m, uws, rng)?;
+            .send_batch_consistency_check(channel, m, &uws, rng)?;
         let indices: Vec<[(usize, FE::PrimeField); 10]> = (0..self.cols)
             .map(|i| lpn_mtx_indices::<FE>(i, self.rows))
             .collect();
@@ -167,7 +168,8 @@ impl<FE: FiniteField> LpnsVoleReceiver for Receiver<FE> {
         let r = FE::PolynomialFormNumCoefficients::to_usize();
         let vs = svole.receive(channel, rows + weight + r, rng)?;
         let delta = svole.delta();
-        let spvole = SpsReceiver::<FE>::init(channel, &vs[rows..], delta, weight, rng)?;
+        let pows = svole.pows();
+        let spvole = SpsReceiver::<FE>::init(channel, &vs[rows..], pows, delta, weight, rng)?;
         debug_assert!(vs.len() == rows + weight + r);
         Ok(Self {
             spvole,
@@ -193,7 +195,10 @@ impl<FE: FiniteField> LpnsVoleReceiver for Receiver<FE> {
         }
         let m = self.cols / self.weight;
         let mut ss = vec![];
-        let mut vs = vec![vec![]];
+        let mut vs = vec![];
+        if self.spvole.counter != 0 {
+            self.spvole.counter = 0;
+        }
         for _ in 0..self.weight {
             let bs = self.spvole.receive(channel, m, rng)?;
             ss.extend(bs.iter());

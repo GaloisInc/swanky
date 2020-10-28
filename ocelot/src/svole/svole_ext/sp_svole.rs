@@ -9,15 +9,12 @@
 use crate::{
     errors::Error,
     ot::{KosReceiver, KosSender, Receiver as OtReceiver, Sender as OtSender},
-    svole::{
-        base_svole::{BaseReceiver, BaseSender},
-        svole_ext::ggm_utils::{
-            dot_product,
-            ggm,
-            ggm_prime,
-            point_wise_addition,
-            scalar_multiplication,
-        },
+    svole::svole_ext::ggm_utils::{
+        dot_product,
+        ggm,
+        ggm_prime,
+        point_wise_addition,
+        scalar_multiplication,
     },
 };
 use generic_array::typenum::Unsigned;
@@ -38,8 +35,8 @@ pub struct Sender<OT: OtReceiver, FE: FF> {
     ot: OT,
     pows: Vec<FE>,
     uws: Vec<(FE::PrimeField, FE)>,
-    counter: usize,
-    iters: usize,
+    pub counter: usize,
+    weight: usize,
 }
 
 /// SpsVole Receiver.
@@ -48,7 +45,7 @@ pub struct Receiver<OT: OtSender, FE: FF> {
     delta: FE,
     pows: Vec<FE>,
     vs: Vec<FE>,
-    counter: usize,
+    pub counter: usize,
     iters: usize,
 }
 
@@ -97,41 +94,32 @@ impl<OT: OtReceiver<Msg = Block> + Malicious, FE: FF> Sender<OT, FE> {
     pub fn init<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         channel: &mut C,
         uws: &[(FE::PrimeField, FE)],
-        iters: usize,
+        pows: Vec<FE>,
+        weight: usize,
         rng: &mut RNG,
     ) -> Result<Self, Error> {
-        let g = FE::GENERATOR;
-        let r = FE::PolynomialFormNumCoefficients::to_usize();
         let ot = OT::init(channel, rng)?;
-        let mut acc = FE::ONE;
-        let mut pows = vec![FE::ZERO; r];
-        for item in pows.iter_mut().take(r) {
-            *item = acc;
-            acc *= g;
-        }
         Ok(Self {
             pows,
             ot,
-            uws: uws.to_vec(), // XXX remove clone
+            uws: uws.to_vec(),
             counter: 0,
-            iters,
+            weight,
         })
     }
 
     pub fn send<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         &mut self,
         channel: &mut C,
-        len: usize,
+        n: usize,
         mut rng: &mut RNG,
     ) -> Result<Vec<(FE::PrimeField, FE)>, Error> {
-        if self.counter >= self.iters {
+        if self.counter >= self.weight {
             return Err(Error::Other(
                 "The number of iterations allowed exhausted!".to_string(),
             ));
         }
-        let depth = 128 - (len as u128 - 1).leading_zeros() as usize;
-        let n = len;
-        //let (a, delta) = self.svole.send(channel, 1, rng)?[0];
+        let depth = 128 - (n as u128 - 1).leading_zeros() as usize;
         let (a, delta) = self.uws[self.counter];
         self.counter += 1;
         let mut beta = FE::PrimeField::random(&mut rng);
@@ -141,90 +129,72 @@ impl<OT: OtReceiver<Msg = Block> + Malicious, FE: FF> Sender<OT, FE> {
         let a_prime = beta - a;
         channel.write_fe(a_prime)?;
         let alpha = rng.gen_range(0, n);
-        let mut us = vec![FE::PrimeField::ZERO; n];
-        us[alpha] = beta;
+        let mut uws = vec![(FE::PrimeField::ZERO, FE::ZERO); n];
+        uws[alpha].0 = beta;
         let mut choices = unpack_bits(&(!alpha).to_le_bytes(), depth);
         choices.reverse(); // to get the first bit as MSB.
-        let keys = self.ot.receive(channel, &choices, rng).unwrap();
+        let keys = self.ot.receive(channel, &choices, rng)?;
+        let d: FE = channel.read_fe()?;
         let vs: Vec<FE> = ggm_prime::<FE>(alpha, &keys);
-        let mut ws = vec![FE::ZERO; n];
         for i in 0..n {
             if i != alpha {
-                ws[i] = vs[i];
+                uws[i].1 = vs[i];
             }
         }
-        let d: FE = channel.read_fe()?;
-        let sum = ws
-            .iter()
-            .enumerate()
-            .filter(|(i, _)| *i != alpha)
-            .map(|(_, &x)| x)
-            .sum();
-        ws[alpha] = delta - (d + sum);
-        let res = us.iter().zip(ws.iter()).map(|(&u, &w)| (u, w)).collect();
-        Ok(res)
+        let sum = uws.iter().map(|(_, w)| *w).sum();
+        uws[alpha].1 = delta - (d + sum);
+        Ok(uws)
     }
 
     pub fn send_batch_consistency_check<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         &mut self,
         channel: &mut C,
         len: usize,
-        uws: Vec<Vec<(FE::PrimeField, FE)>>,
+        uws: &[Vec<(FE::PrimeField, FE)>],
         rng: &mut RNG,
     ) -> Result<(), Error> {
         let r = FE::PolynomialFormNumCoefficients::to_usize();
-        if self.counter >= self.iters + r {
+        if self.counter >= self.weight + r {
             return Err(Error::Other("No more consistency checks!".to_string()));
         }
-        let xzs: Vec<(FE::PrimeField, FE)> = (0..r).map(|i| self.uws[self.counter + i]).collect();
+        let xzs = &self.uws[self.counter..self.counter + r];
         self.counter += r;
         let n = len;
-        let t = uws.len();
+        let t = self.weight;
+        // Generate `chis` from seed and send seed to receiver.
         let seed = rng.gen::<Block>();
+        channel.write_block(&seed)?;
         let mut rng_chi = AesRng::from_seed(seed);
         let chis: Vec<FE> = (0..n * t).map(|_| FE::random(&mut rng_chi)).collect();
-        channel.write_block(&seed)?;
-        let mut alphas = vec![0; t];
-        let mut betas = vec![FE::PrimeField::ZERO; t];
-        let mut chi_alphas = vec![vec![FE::PrimeField::ZERO; r]; t];
-        let ws: Vec<Vec<FE>> = uws
-            .iter()
-            .map(|x| x.iter().map(|(_, w)| *w).collect())
-            .collect();
+        let mut chi_alphas = Vec::with_capacity(r * t);
         for j in 0..t {
             for (i, (u, _)) in uws[j].iter().enumerate() {
+                // There will be one, and exactly one, `u` (= `β`) which is
+                // non-zero. Don't `break` after we hit this one to avoid a
+                // potential side-channel attack.
                 if *u != FE::PrimeField::ZERO {
-                    alphas[j] = i;
-                    betas[j] = *u;
+                    chi_alphas.extend(scalar_multiplication(
+                        *u,
+                        &chis[n * j + i].to_polynomial_coefficients(),
+                    ));
                 }
             }
-            chi_alphas[j] = (chis[n * j + alphas[j]])
-                .to_polynomial_coefficients()
-                .to_vec();
         }
-        let x_tmp: Vec<Vec<_>> = (0..t)
-            .map(|i| scalar_multiplication(betas[i], &chi_alphas[i]))
-            .collect();
-        debug_assert!(x_tmp[0].len() == r);
-        debug_assert!(x_tmp.len() == t);
         let mut x_stars = vec![FE::PrimeField::ZERO; r];
-        for item in x_tmp.iter().take(t) {
-            x_stars = point_wise_addition(x_stars.iter(), item.iter());
+        for i in 0..t {
+            x_stars = point_wise_addition(x_stars.iter(), chi_alphas[i * r..(i + 1) * r].iter());
         }
-        debug_assert!(x_stars.len() == r);
-        x_stars = x_stars
-            .iter()
-            .cloned()
-            .zip(xzs.iter())
-            .map(|(y, (x, _))| y - *x)
-            .collect();
-        debug_assert!(x_stars.len() == r);
-        for x in x_stars.iter() {
-            channel.write_fe(*x)?;
+        for (x_star, (x, _)) in x_stars.iter().zip(xzs.iter()) {
+            channel.write_fe(*x_star - *x)?;
         }
         let z = dot_product(xzs.iter().map(|(_, z)| z), self.pows.iter());
         let va = (0..t)
-            .map(|j| dot_product(chis[n * j..n * (j + 1)].iter(), ws[j].iter()))
+            .map(|j| {
+                dot_product(
+                    chis[n * j..n * (j + 1)].iter(),
+                    uws[j].iter().map(|(_, w)| w),
+                )
+            })
             .sum::<FE>()
             - z;
         let b = eq_send(channel, &va)?;
@@ -241,24 +211,17 @@ impl<OT: OtSender<Msg = Block> + Malicious, FE: FF> Receiver<OT, FE> {
     pub fn init<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         channel: &mut C,
         vs: &[FE],
+        pows: Vec<FE>,
         delta: FE,
         iters: usize,
         mut rng: &mut RNG,
     ) -> Result<Self, Error> {
         let ot = OT::init(channel, &mut rng)?;
-        let r = FE::PolynomialFormNumCoefficients::to_usize();
-        let g = FE::GENERATOR;
-        let mut acc = FE::ONE;
-        let mut pows = vec![FE::ZERO; r];
-        for item in pows.iter_mut().take(r) {
-            *item = acc;
-            acc *= g;
-        }
         Ok(Self {
             pows,
             delta,
             ot,
-            vs: vs.to_vec(), // XXX remove clone
+            vs: vs.to_vec(),
             counter: 0,
             iters,
         })
@@ -304,10 +267,10 @@ impl<OT: OtSender<Msg = Block> + Malicious, FE: FF> Receiver<OT, FE> {
         if self.counter >= self.iters + r {
             return Err(Error::Other("No more consistency checks!".to_string()));
         }
-        let y_stars: Vec<FE> = (0..r).map(|i| self.vs[self.counter + i]).collect();
+        let y_stars = &self.vs[self.counter..self.counter + r];
         self.counter += r;
         let n = len;
-        let t = vs.len();
+        let t = self.iters;
         let seed = channel.read_block()?;
         let mut rng_chi = AesRng::from_seed(seed);
         let chis: Vec<FE> = (0..t * n).map(|_| FE::random(&mut rng_chi)).collect();
@@ -316,9 +279,9 @@ impl<OT: OtSender<Msg = Block> + Malicious, FE: FF> Receiver<OT, FE> {
             *item = channel.read_fe()?;
         }
         let ys: Vec<FE> = y_stars
-            .into_iter()
+            .iter()
             .zip(x_stars.into_iter())
-            .map(|(y, x)| y - self.delta.multiply_by_prime_subfield(x))
+            .map(|(y, x)| *y - self.delta.multiply_by_prime_subfield(x))
             .collect();
         let y = dot_product(ys.iter(), self.pows.iter());
         let vb = (0..t)
@@ -359,7 +322,8 @@ mod test {
             let mut channel = Channel::new(reader, writer);
             let mut base = BaseSender::<FE>::init(&mut channel, &mut rng).unwrap();
             let uws = base.send(&mut channel, 1024, &mut rng).unwrap();
-            let mut vole = SpsSender::<FE>::init(&mut channel, &uws, 1, &mut rng).unwrap();
+            let pows = base.pows();
+            let mut vole = SpsSender::<FE>::init(&mut channel, &uws, pows, 1, &mut rng).unwrap();
             vole.send(&mut channel, len, &mut rng).unwrap()
         });
         let mut rng = AesRng::new();
@@ -368,8 +332,9 @@ mod test {
         let mut channel = Channel::new(reader, writer);
         let mut base = BaseReceiver::<FE>::init(&mut channel, &mut rng).unwrap();
         let vs = base.receive(&mut channel, 1024, &mut rng).unwrap();
+        let pows = base.pows();
         let mut vole =
-            SpsReceiver::<FE>::init(&mut channel, &vs, base.delta(), 1024, &mut rng).unwrap();
+            SpsReceiver::<FE>::init(&mut channel, &vs, pows, base.delta(), 1024, &mut rng).unwrap();
         let vs = vole.receive(&mut channel, len, &mut rng).unwrap();
         let uws = handle.join().unwrap();
         for i in 0..len as usize {

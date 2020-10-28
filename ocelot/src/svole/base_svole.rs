@@ -46,7 +46,9 @@ impl<FE: FF> Sender<FE> {
         let copee = CopeeSender::<FE>::init(channel, rng)?;
         Ok(Self { copee, pows })
     }
-
+    pub fn pows(&self) -> Vec<FE> {
+        self.pows.clone()
+    }
     pub fn send<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         &mut self,
         channel: &mut C,
@@ -103,6 +105,10 @@ impl<FE: FF> Receiver<FE> {
 
     pub fn delta(&self) -> FE {
         self.copee.delta()
+    }
+
+    pub fn pows(&self) -> Vec<FE> {
+        self.pows.clone()
     }
 
     pub fn receive<C: AbstractChannel, RNG: CryptoRng + RngCore>(

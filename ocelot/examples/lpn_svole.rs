@@ -109,9 +109,9 @@ fn main() {
     type VSender<FE> = LpnVoleSender<FE>;
     type VReceiver<FE> = LpnVoleReceiver<FE>;
 
-    let rows = LpnSetupParams::ROWS;
-    let cols = LpnSetupParams::COLS;
-    let weight = LpnSetupParams::WEIGHT;
+    let _rows = LpnSetupParams::ROWS;
+    let _cols = LpnSetupParams::COLS;
+    let _weight = LpnSetupParams::WEIGHT;
     let d = LpnSetupParams::D;
     let rows1 = LpnExtendParams::ROWS;
     let cols1 = LpnExtendParams::COLS;

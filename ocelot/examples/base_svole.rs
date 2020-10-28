@@ -4,12 +4,9 @@
 // Copyright © 2020 Galois, Inc.
 // See LICENSE for licensing information.
 
-use ocelot::{
-    ot::{KosReceiver, KosSender},
-    svole::{
-        base_svole::{BaseReceiver, BaseSender},
-        svole_ext::lpn_params::{LpnExtendParams, LpnSetupParams},
-    },
+use ocelot::svole::{
+    base_svole::{BaseReceiver, BaseSender},
+    svole_ext::lpn_params::{LpnExtendParams, LpnSetupParams},
 };
 use scuttlebutt::{
     field::{F61p, FiniteField as FF, Fp, Gf128, F2},
