@@ -65,7 +65,7 @@ pub struct SenderState {
     opprf_ids: Vec<Block512>,
     opprf_payloads: Vec<Block512>,
     table: Vec<Vec<Block>>,
-    payload_table: Vec<Vec<Block512>>,
+    payload: Vec<Vec<Block512>>,
 }
 
 /// Private set intersection receiver.
@@ -103,7 +103,7 @@ impl Sender {
         Ok(Self { opprf, opprf_payload })
     }
 
-    pub fn compute_payload_large<C: AbstractChannel, RNG: RngCore + CryptoRng + SeedableRng<Seed = Block>>(
+    pub fn compute_payload_large<C: AbstractChannel , RNG: RngCore + CryptoRng + SeedableRng<Seed = Block>>(
         &mut self,
         inputs: &[Msg],
         payloads: &[Block512],
@@ -116,25 +116,24 @@ impl Sender {
         let nbins = channel.read_usize()?;
         let last_bin = nbins % megasize;
 
-        let mut state = self.bucketize_data(inputs, payloads, nbins, key, rng)?;
-        let mut ts_id: Vec<&[Block512]>= state.opprf_ids.chunks(megasize).collect();
-        let mut ts_payload: Vec<&[Block512]>= state.opprf_payloads.chunks(megasize).collect();
-        let mut table:Vec<&[Vec<Block>]> = state.table.chunks(megasize).collect();
-        let mut payload_table: Vec<&[Vec<Block512>]>= state.payload_table.chunks(megasize).collect();
+        let (ts_id, ts_payload, table, payload)= self.bucketize_data(inputs, payloads, megasize, nmegabins, nbins, key, rng)?;
+
+
 
         for i in 0..nmegabins{
-            let mut mbins = megasize;
-            if i == nmegabins - 1{
-                mbins = last_bin;
+            let mut binsize = megasize;
+            if i == (nmegabins - 1) && last_bin != 0{
+                binsize = last_bin;
             }
             let mut state = SenderState{
-                opprf_ids: ts_id[i].to_vec(),
-                opprf_payloads: ts_payload[i].to_vec(),
-                table: table[i].to_vec(),
-                payload_table: payload_table[i].to_vec(),
+                opprf_ids: ts_id[i].clone(),
+                opprf_payloads: ts_payload[i].clone(),
+                table: table[i].clone(),
+                payload: payload[i].clone(),
             };
-            self.send_data(&mut state, mbins, channel, rng);
+            self.send_data(&mut state, binsize, channel, rng);
             state.build_compute_circuit(channel, rng);
+            channel.flush()?;
         }
         Ok(())
     }
@@ -143,42 +142,62 @@ impl Sender {
         &mut self,
         inputs: &[Msg],
         payloads: &[Block512],
+        megasize: usize,
+        nmegabins: usize,
         nbins: usize,
         key: Block,
         rng: &mut RNG,
-    ) -> Result<SenderState, Error>{
+    ) -> Result<(Vec<Vec<Block512>>, Vec<Vec<Block512>>, Vec<Vec<Vec<Block>>>, Vec<Vec<Vec<Block512>>>),
+            Error>{
         // receive cuckoo hash info from sender
         let hashes = utils::compress_and_hash_inputs(inputs, key);
         let total = hashes.len();
 
-        let mut table = vec![Vec::new(); nbins];
-        let mut payload_table = vec![Vec::new(); nbins];
+        let nmegabins = ((nbins as f32)/(megasize as f32)).ceil() as usize;
+        let last_bin = nbins % megasize;
 
-        let ts_id = (0..nbins).map(|_| rng.gen::<Block512>()).collect_vec();
-        let ts_payload = (0..nbins).map(|_| rng.gen::<Block512>()).collect_vec();
+        let mut table: Vec<Vec<Vec<Block>>> = vec![Vec::new(); nmegabins];
+        let mut payload: Vec<Vec<Vec<Block512>>> = vec![Vec::new(); nmegabins];
+        let mut ts_id: Vec<Vec<Block512>> =  vec![Vec::new(); nmegabins];
+        let mut ts_payload: Vec<Vec<Block512>> =  vec![Vec::new(); nmegabins];
+
+        for i in 0..nmegabins{
+            let mut binsize = megasize;
+            if i == (nmegabins - 1) && last_bin != 0{
+                binsize = last_bin;
+            }
+            table[i] = vec![Vec::new(); megasize];
+            payload[i] = vec![Vec::new(); megasize];
+            ts_id[i] = (0..megasize).map(|_| rng.gen::<Block512>()).collect_vec();
+            ts_payload[i] = (0..megasize).map(|_| rng.gen::<Block512>()).collect_vec();
+        }
+
+        // let ts_id_total = (0..nbins).map(|_| rng.gen::<Block512>()).collect_vec();
+        // let ts_payload_total = (0..nbins).map(|_| rng.gen::<Block512>()).collect_vec();
 
         for (x, p) in hashes.into_iter().zip_eq(payloads.into_iter()){
             let mut bins = Vec::with_capacity(NHASHES);
             for h in 0..NHASHES {
                 let bin = CuckooHash::bin(x, h, nbins);
-                table[bin].push(x ^ Block::from(h as u128));
-                payload_table[bin].push(mask_payload_crt(*p, ts_payload[bin], rng));
+                let small_i = bin % megasize;
+                let megabin_i = bin / megasize;
+
+                table[megabin_i][small_i].push(x ^ Block::from(h as u128));
+                payload[megabin_i][small_i].push(mask_payload_crt(*p, ts_payload[megabin_i][small_i], rng));
+
                 bins.push(bin);
             }
             // if j = H1(y) = H2(y) for some y, then P2 adds a uniformly random element to
             // table2[j].
             if bins.iter().skip(1).all(|&x| x == bins[0]) {
-                table[bins[0]].push(rng.gen());
-                payload_table[bins[0]].push(rng.gen());
+                let small_i = bins[0] % megasize;
+                let megabin_i = bins[0] / megasize;
+
+                table[megabin_i][small_i].push(rng.gen());
+                payload[megabin_i][small_i].push(rng.gen());
             }
         }
-
-        Ok(SenderState {
-            opprf_ids: ts_id,
-            opprf_payloads: ts_payload,
-            table,
-            payload_table,
-        })
+        Ok((ts_id, ts_payload, table, payload))
     }
 
     /// Run the PSI protocol over `inputs`.
@@ -202,7 +221,7 @@ impl Sender {
         let mut points_data = Vec::new();
         for (row, bin) in state.table.iter().enumerate() {
             for (col, item) in bin.iter().enumerate() {
-                points_data.push((*item, state.payload_table[row][col]));
+                points_data.push((*item, state.payload[row][col]));
             }
         }
 
@@ -223,11 +242,12 @@ impl SenderState {
         C: AbstractChannel,
         RNG: RngCore + CryptoRng + SeedableRng<Seed = Block>,
     {
+        println!("sx: encoding");
         let mut gb = Garbler::<C, RNG, OtSender>::new(channel.clone(), RNG::from_seed(rng.gen()))?;
-
         let my_input_bits = encode_inputs(&self.opprf_ids);
         let my_payload_bits = encode_payloads(&self.opprf_payloads);
-
+        println!("sx: expecting ids of len {:?}", my_input_bits.len());
+        println!("sx: expecting payloads of len {:?}", self.opprf_payloads.len());
         let mods_bits = vec![2; my_input_bits.len()];
         let sender_inputs = gb.encode_many(&my_input_bits, &mods_bits)?;
         let receiver_inputs = gb.receive_many(&mods_bits)?;
@@ -237,10 +257,11 @@ impl SenderState {
         for _i in 0..self.opprf_payloads.len(){
             mods_crt.append(&mut qs.clone());
         }
-
+        println!("sx: expecting payloads of len {:?}", mods_crt.len());
         let sender_payloads = gb.encode_many(&my_payload_bits, &mods_crt)?;
         let receiver_payloads = gb.receive_many(&mods_crt)?;
         let receiver_masks = gb.receive_many(&mods_crt)?;
+        println!("received many sx");
 
 
         Ok((gb, sender_inputs, receiver_inputs, sender_payloads, receiver_payloads, receiver_masks))
@@ -289,10 +310,12 @@ impl Receiver {
             channel.write_usize(cuckoo.nbins)?;
             channel.flush()?;
 
-
-            // Build `table` to include a cuckoo hash entry xored with its hash
-            // index, if such a entry exists, or a random value.
+            // println!("cuckoo {:?}", cuckoo);
+            // // Build `table` to include a cuckoo hash entry xored with its hash
+            // // index, if such a entry exists, or a random value.
+            // println!("number of mega{:?}", cuckoo.nmegabins);
             for i in 0..cuckoo.nmegabins{
+                println!("i{:?}", i);
                 let mut state =  ReceiverState{
                     opprf_ids: Vec::new(),
                     opprf_payloads: Vec::new(),
@@ -300,8 +323,10 @@ impl Receiver {
                     table: table[i].clone(),
                     payload: payload[i].clone(),
                 };
+
                 self.receive_data(&mut state, channel, rng);
-                state.build_compute_circuit(channel, rng);
+                let aggregate = state.build_compute_circuit(channel, rng).unwrap();
+                channel.flush()?;
             }
             Ok(())
         }
@@ -325,7 +350,7 @@ impl Receiver {
                             .iter()
                             .map(|opt_item| match opt_item {
                                 Some(item) => item.entry,
-                                None => rng.gen(),
+                                None => rng.gen::<Block>(),
                             })
                             .collect::<Vec<Block>>()).collect();
 
@@ -374,11 +399,12 @@ impl ReceiverState {
         C: AbstractChannel,
         RNG: CryptoRng + RngCore + SeedableRng<Seed = Block>,
     {
-
+        println!("rx: encoding");
         let my_input_bits = encode_inputs(&self.opprf_ids);
         let my_opprf_output = encode_opprf_payload(&self.opprf_payloads);
         let my_payload_bits = encode_payloads(&self.payload);
-
+        println!("rx: expecting ids of len {:?}", my_input_bits.len());
+        println!("rx: expecting payloads of len {:?}", self.payload.len());
         let mut ev =
             Evaluator::<C, RNG, OtReceiver>::new(channel.clone(), RNG::from_seed(rng.gen()))?;
 
@@ -391,7 +417,9 @@ impl ReceiverState {
         for _i in 0..self.payload.len(){
             mods_crt.append(&mut qs.clone());
         }
+
         let sender_payloads = ev.receive_many(&mods_crt)?;
+
         let receiver_payloads = ev.encode_many(&my_payload_bits, &mods_crt)?;
         let receiver_masks = ev.encode_many(&my_opprf_output, &mods_crt)?;
         Ok((ev, sender_inputs, receiver_inputs, sender_payloads, receiver_payloads, receiver_masks))
@@ -406,12 +434,15 @@ impl ReceiverState {
         C: AbstractChannel,
         RNG: RngCore + CryptoRng + SeedableRng<Seed = Block>,
     {
+        channel.flush()?;
         let (mut ev, x, y, x_payload, y_payload, masks) = self.encode_circuit_inputs(channel, rng)?;
+        println!("done encoding");
         let (outs, mods) = fancy_compute_payload_aggregate(&mut ev, &x, &y, &x_payload, &y_payload, &masks)?;
         let mpc_outs = ev
             .outputs(&outs)?
             .expect("evaluator should produce outputs");
         let aggregate = fancy_garbling::util::crt_inv(&mpc_outs, &mods);
+        println!("aggregate {:?}", aggregate as usize);
         Ok(aggregate as usize)
     }
 }
