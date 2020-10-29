@@ -1,4 +1,4 @@
-use popsicle::psty_payload::{Sender, Receiver};
+use popsicle::psty_payload_large::{Sender, Receiver};
 
 use rand::{CryptoRng, Rng};
 use scuttlebutt::{AesRng, Block512, TcpChannel};
@@ -9,28 +9,21 @@ use std::{
     time::SystemTime,
 };
 
-pub fn rand_vec<RNG: CryptoRng + Rng>(n: usize, rng: &mut RNG) -> Vec<u8> {
-    (0..n).map(|_| rng.gen()).collect()
-}
 
-pub fn rand_vec_vec<RNG: CryptoRng + Rng>(n: usize, m: usize, rng: &mut RNG) -> Vec<Vec<u8>> {
-    (0..n).map(|_| rand_vec(m, rng)).collect()
-}
-
-pub fn int_vec_block512(values: Vec<u32>) -> Vec<Block512> {
+pub fn int_vec_block512(values: Vec<u64>) -> Vec<Block512> {
     values.into_iter()
           .map(|item|{
             let value_bytes = item.to_le_bytes();
             let mut res_block = [0 as u8; 64];
-            for i in 0..4{
+            for i in 0..8{
                 res_block[i] = value_bytes[i];
             }
             Block512::from(res_block)
          }).collect()
 }
 
-pub fn rand_u32_vec<RNG: CryptoRng + Rng>(n: usize, modulus: u32, rng: &mut RNG) -> Vec<u32>{
-    (0..n).map(|_| rng.gen::<u32>()%modulus).collect()
+pub fn rand_u64_vec<RNG: CryptoRng + Rng>(n: usize, modulus: u64, rng: &mut RNG) -> Vec<u64>{
+    (0..n).map(|_| rng.gen::<u64>()%modulus).collect()
 }
 
 pub fn enum_ids(n: usize, id_size: usize) ->Vec<Vec<u8>>{
@@ -44,65 +37,16 @@ pub fn enum_ids(n: usize, id_size: usize) ->Vec<Vec<u8>>{
 
 
 fn server_protocol(mut stream: TcpChannel<TcpStream>) {
-    const ITEM_SIZE: usize = 3;
-    const SET_SIZE: usize = 1 << 16;
+    const ITEM_SIZE: usize = 16;
+    const SET_SIZE: usize = 1 << 26;
 
     let mut rng = AesRng::new();
     let sender_inputs = enum_ids(SET_SIZE, ITEM_SIZE);
-    let weights_vec = rand_u32_vec(SET_SIZE, 1000000, &mut rng);
+    let weights_vec = rand_u64_vec(SET_SIZE, u64::pow(10,10), &mut rng);
     let weights = int_vec_block512(weights_vec);
 
-    let start = SystemTime::now();
     let mut psi = Sender::init(&mut stream, &mut rng).unwrap();
-    println!(
-        "Sender :: init time: {} ms",
-        start.elapsed().unwrap().as_millis()
-    );
-    let start = SystemTime::now();
-    let mut state = psi.send(&sender_inputs, &mut stream, &mut rng).unwrap();
-    println!(
-        "Sender :: send time: {} ms",
-        start.elapsed().unwrap().as_millis()
-    );
-    println!(
-        "Sender :: intersection setup communication (read): {:.2} Mb",
-        stream.kilobits_read() / 1000.0
-    );
-    println!(
-        "Sender :: intersection setup communication (write): {:.2} Mb",
-        stream.kilobits_written() / 1000.0
-    );
-
-    let start = SystemTime::now();
-    state.prepare_payload(&mut psi, &weights, &mut stream, &mut rng).unwrap();
-    println!(
-        "Sender :: payload setup time: {} ms",
-        start.elapsed().unwrap().as_millis()
-    );
-    println!(
-        "Sender :: payload setup communication (read): {:.2} Mb",
-        stream.kilobits_read() / 1000.0
-    );
-    println!(
-        "Sender :: payload setup communication (write): {:.2} Mb",
-        stream.kilobits_written() / 1000.0
-    );
-
-
-    let start = SystemTime::now();
-    state.compute_payload_aggregate(&mut stream, &mut rng).unwrap();
-    println!(
-        "Sender :: circuit computation time: {} ms",
-        start.elapsed().unwrap().as_millis()
-    );
-    println!(
-        "Sender :: total computation and intersection (read): {:.2} Mb",
-        stream.kilobits_read() / 1000.0
-    );
-    println!(
-        "Sender :: total computation and intersection (write): {:.2} Mb",
-        stream.kilobits_written() / 1000.0
-    );
+    let mut state = psi.compute_payload_large(&sender_inputs, &weights, &mut stream, &mut rng).unwrap();
 
 }
 
