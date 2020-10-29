@@ -75,6 +75,7 @@ struct Parameters {
 
 impl Parameters {
     pub fn new(n: usize) -> Result<Self, Error> {
+
         let (m1, m2, beta1, beta2, h1, h2) = if n <= 1 << 12 {
             (1.17, 0.15, 27, 63, 3, 2)
         } else if n <= 1 << 14 {
@@ -85,7 +86,9 @@ impl Parameters {
             (1.13, 0.17, 30, 63, 3, 2)
         } else if n <= 1 << 24 {
             (1.12, 0.17, 31, 63, 3, 2)
-        } else {
+        } else if n <= 1 << 28 {
+            (1.11, 0.18, 32, 63, 3, 2)
+        }else {
             return Err(Error::InvalidInputLength);
         };
         let m1 = ((n as f32) * m1).ceil() as usize;
@@ -144,6 +147,7 @@ impl<OPRF: OprfSender<Seed = Block512, Input = Block, Output = Block512> + SemiH
             let aes = Aes128::new(h);
             hashkeys.push(aes);
         }
+
         // `bins` contains `m = m₁ + m₂` vectors. The first `m₁` vectors are each of
         // size `β₁`, and the second `m₂` vectors are each of size `β₂`.
         let mut bins = Vec::with_capacity(params.m1 + params.m2);
@@ -153,6 +157,7 @@ impl<OPRF: OprfSender<Seed = Block512, Input = Block, Output = Block512> + SemiH
         for _ in params.m1..params.m1 + params.m2 {
             bins.push(Vec::with_capacity(params.beta2));
         }
+
         // Place each point in the hash table, once for each hash function.
         for (x, y) in points.iter() {
             let mut hs = Vec::with_capacity(params.h1);
@@ -176,6 +181,7 @@ impl<OPRF: OprfSender<Seed = Block512, Input = Block, Output = Block512> + SemiH
                 }
             }
         }
+
         let seeds = self.oprf.send(channel, bins.len(), rng)?;
         // Run the one-time OPPRF on each bin.
         for (j, (bin, seed)) in bins.into_iter().zip(seeds.into_iter()).enumerate() {
@@ -213,7 +219,9 @@ impl<OPRF: OprfSender<Seed = Block512, Input = Block, Output = Block512> + SemiH
             },
             points.len()
         );
+        
         assert!(points.len() <= npoints);
+
         let mut v = rng.gen::<Block>();
         let mut aes = Aes128::new(v);
         let mut map = HashSet::with_capacity(points.len());
@@ -324,12 +332,14 @@ impl<OPRF: OprfReceiver<Seed = Block512, Input = Block, Output = Block512> + Sem
         C: AbstractChannel,
         RNG: CryptoRng + Rng,
     {
+
         let params = Parameters::new(inputs.len())?;
         let table;
         // Generate random values to be used for the hash functions. We loop,
         // trying random `hashkeys` each time until we can successfully build
         // the cuckoo hash. Once successful, we send `hashkeys` to the sender so
         // they can build their own (non-cuckoo) table.
+
         loop {
             let hashkeys = (0..params.h1 + params.h2)
                 .map(|_| rng.gen())
@@ -350,6 +360,7 @@ impl<OPRF: OprfReceiver<Seed = Block512, Input = Block, Output = Block512> + Sem
                 break;
             }
         }
+
         let mut outputs = (0..inputs.len())
             .map(|_| Default::default())
             .collect::<Vec<Block512>>();
