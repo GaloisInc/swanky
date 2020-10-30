@@ -115,7 +115,13 @@ impl Sender {
         let nbins = channel.read_usize()?;
         let last_bin = nbins % megasize;
 
-        let (ts_id, ts_payload, table, payload)= self.bucketize_data(inputs, payloads, megasize, nmegabins, nbins, key, rng)?;
+        let state = self.bucketize_data(inputs, payloads, nbins, key, rng)?;
+
+        let mut ts_id: Vec<&[Block512]>= state.opprf_ids.chunks(megasize).collect();
+        let mut ts_payload: Vec<&[Block512]>= state.opprf_payloads.chunks(megasize).collect();
+        let mut table:Vec<&[Vec<Block>]> = state.table.chunks(megasize).collect();
+        let mut payload: Vec<&[Vec<Block512>]>= state.payload.chunks(megasize).collect();
+
         let mut gb = Garbler::<C, RNG, OtSender>::new(channel.clone(), RNG::from_seed(rng.gen()))?;
 
         let qs = fancy_garbling::util::primes_with_width(PAYLOAD_SIZE as u32 * 8);
@@ -123,19 +129,17 @@ impl Sender {
         let mut acc = gb.crt_constant_bundle(0, q)?;
 
         for i in 0..nmegabins{
-            let mut binsize = megasize;
-            if i == (nmegabins - 1) && last_bin != 0{
-                binsize = last_bin;
-            }
-
+            let nbins = ts_id[i].len();
             let mut state = SenderState{
-                opprf_ids: ts_id[i].clone(),
-                opprf_payloads: ts_payload[i].clone(),
-                table: table[i].clone(),
-                payload: payload[i].clone(),
+                opprf_ids: ts_id[i].to_vec(),
+                opprf_payloads: ts_payload[i].to_vec(),
+                table: table[i].to_vec(),
+                payload: payload[i].to_vec(),
             };
-            self.send_data(&mut state, binsize, channel, rng);
+
+            self.send_data(&mut state, nbins, channel, rng);
             let partial: CrtBundle<fancy_garbling::Wire> = state.build_compute_circuit(&mut gb, channel, rng)?;
+
             acc = gb.crt_add(&acc, &partial)?;
             channel.flush()?;
         }
@@ -148,62 +152,43 @@ impl Sender {
         &mut self,
         inputs: &[Msg],
         payloads: &[Block512],
-        megasize: usize,
-        nmegabins: usize,
         nbins: usize,
         key: Block,
         rng: &mut RNG,
-    ) -> Result<(Vec<Vec<Block512>>, Vec<Vec<Block512>>, Vec<Vec<Vec<Block>>>, Vec<Vec<Vec<Block512>>>),
+    ) -> Result<SenderState,
             Error>{
-        // receive cuckoo hash info from sender
-        let hashes = utils::compress_and_hash_inputs(inputs, key);
-        let total = hashes.len();
+                // receive cuckoo hash info from sender
+       let hashes = utils::compress_and_hash_inputs(inputs, key);
+       let total = hashes.len();
 
-        let nmegabins = ((nbins as f32)/(megasize as f32)).ceil() as usize;
-        let last_bin = nbins % megasize;
+       let mut table = vec![Vec::new(); nbins];
+       let mut payload = vec![Vec::new(); nbins];
 
-        let mut table: Vec<Vec<Vec<Block>>> = vec![Vec::new(); nmegabins];
-        let mut payload: Vec<Vec<Vec<Block512>>> = vec![Vec::new(); nmegabins];
-        let mut ts_id: Vec<Vec<Block512>> =  vec![Vec::new(); nmegabins];
-        let mut ts_payload: Vec<Vec<Block512>> =  vec![Vec::new(); nmegabins];
+       let ts_id = (0..nbins).map(|_| rng.gen::<Block512>()).collect_vec();
+       let ts_payload = (0..nbins).map(|_| rng.gen::<Block512>()).collect_vec();
 
-        for i in 0..nmegabins{
-            let mut binsize = megasize;
-            if i == (nmegabins - 1) && last_bin != 0{
-                binsize = last_bin;
-            }
-            table[i] = vec![Vec::new(); binsize];
-            payload[i] = vec![Vec::new(); binsize];
-            ts_id[i] = (0..binsize).map(|_| rng.gen::<Block512>()).collect_vec();
-            ts_payload[i] = (0..binsize).map(|_| rng.gen::<Block512>()).collect_vec();
-        }
+       for (x, p) in hashes.into_iter().zip_eq(payloads.into_iter()){
+           let mut bins = Vec::with_capacity(NHASHES);
+           for h in 0..NHASHES {
+               let bin = CuckooHash::bin(x, h, nbins);
+               table[bin].push(x ^ Block::from(h as u128));
+               payload[bin].push(mask_payload_crt(*p, ts_payload[bin], rng));
+               bins.push(bin);
+           }
+           // if j = H1(y) = H2(y) for some y, then P2 adds a uniformly random element to
+           // table2[j].
+           if bins.iter().skip(1).all(|&x| x == bins[0]) {
+               table[bins[0]].push(rng.gen());
+               payload[bins[0]].push(rng.gen());
+           }
+       }
 
-        // let ts_id_total = (0..nbins).map(|_| rng.gen::<Block512>()).collect_vec();
-        // let ts_payload_total = (0..nbins).map(|_| rng.gen::<Block512>()).collect_vec();
-
-        for (x, p) in hashes.into_iter().zip_eq(payloads.into_iter()){
-            let mut bins = Vec::with_capacity(NHASHES);
-            for h in 0..NHASHES {
-                let bin = CuckooHash::bin(x, h, nbins);
-                let small_i = bin % megasize;
-                let megabin_i = bin / megasize;
-
-                table[megabin_i][small_i].push(x ^ Block::from(h as u128));
-                payload[megabin_i][small_i].push(mask_payload_crt(*p, ts_payload[megabin_i][small_i], rng));
-
-                bins.push(bin);
-            }
-            // if j = H1(y) = H2(y) for some y, then P2 adds a uniformly random element to
-            // table2[j].
-            if bins.iter().skip(1).all(|&x| x == bins[0]) {
-                let small_i = bins[0] % megasize;
-                let megabin_i = bins[0] / megasize;
-
-                table[megabin_i][small_i].push(rng.gen());
-                payload[megabin_i][small_i].push(rng.gen());
-            }
-        }
-        Ok((ts_id, ts_payload, table, payload))
+       Ok(SenderState {
+           opprf_ids: ts_id,
+           opprf_payloads: ts_payload,
+           table,
+           payload,
+       })
     }
 
     /// Run the PSI protocol over `inputs`.
