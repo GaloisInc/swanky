@@ -5,13 +5,13 @@
 // See LICENSE for licensing information.
 
 //! Defines a 512-bit value.
-
 use crate::Block;
 use std::{
     arch::x86_64::*,
     convert::TryFrom,
     hash::{Hash, Hasher},
 };
+
 
 /// A 512-bit value.
 #[derive(Clone, Copy)]
@@ -215,5 +215,34 @@ impl TryFrom<&[u8]> for Block512 {
         let arr: &mut [u8; 64] = (&mut block).into();
         arr.clone_from_slice(u);
         Ok(block)
+    }
+}
+
+
+#[cfg(feature = "serde")]
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
+
+#[derive(Serialize, Deserialize)]
+struct Helper {
+    pub blocks:[Block; 4]
+}
+
+#[cfg(feature = "serde")]
+impl Serialize for Block512 {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where S: Serializer
+    {
+        let helper = Helper {blocks: self.0};
+        helper.serialize(serializer)
+    }
+}
+
+#[cfg(feature = "serde")]
+impl<'de> Deserialize<'de> for Block512 {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+        where D: Deserializer<'de>
+    {
+        let helper = Helper::deserialize(deserializer)?;
+        Ok(Block512::from(helper.blocks))
     }
 }
