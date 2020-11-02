@@ -121,16 +121,22 @@ impl<FE: FiniteField> LpnsVoleSender for Sender<FE> {
             return Err(Error::InvalidWeight);
         }
         let m = self.cols / self.weight;
-        let mut ets = Vec::with_capacity(self.cols);
-        let mut uws = vec![];
-        for i in 0..self.weight {
-            let ac = self
-                .spsvole
-                .send(channel, m, &self.uws[self.rows + i], rng)?;
-            ets.extend(ac.iter());
-            uws.push(ac);
-        }
-        debug_assert!(ets.len() == self.cols);
+        // let mut ets = Vec::with_capacity(self.cols);
+        // let mut uws = vec![];
+        let uws = self.spsvole.send(
+            channel,
+            m,
+            &self.uws[self.rows..self.rows + self.weight],
+            rng,
+        )?;
+        // for i in 0..self.weight {
+        //     let ac = self
+        //         .spsvole
+        //         .send(channel, m, &self.uws[self.rows + i], rng)?;
+        //     ets.extend(ac.iter());
+        //     uws.push(ac);
+        // }
+        // debug_assert!(ets.len() == self.cols);
         self.spsvole.send_batch_consistency_check(
             channel,
             m,
@@ -147,7 +153,7 @@ impl<FE: FiniteField> LpnsVoleSender for Sender<FE> {
             .collect();
         let xs: Vec<FE::PrimeField> = indices
             .iter()
-            .zip(ets.iter())
+            .zip(uws.iter().flatten())
             .map(|(ds, (e, _))| {
                 ds.iter().fold(FE::PrimeField::ZERO, |acc, (i, a)| {
                     acc + self.uws[*i].0 * *a
@@ -156,7 +162,7 @@ impl<FE: FiniteField> LpnsVoleSender for Sender<FE> {
             .collect();
         let zs: Vec<FE> = indices
             .into_iter()
-            .zip(ets.into_iter())
+            .zip(uws.into_iter().flatten())
             .map(|(ds, (_, t))| {
                 ds.iter().fold(FE::ZERO, |acc, (i, a)| {
                     acc + self.uws[*i].1.multiply_by_prime_subfield(*a)
@@ -227,33 +233,42 @@ impl<FE: FiniteField> LpnsVoleReceiver for Receiver<FE> {
             return Err(Error::InvalidWeight);
         }
         let m = self.cols / self.weight;
-        let mut ss = vec![];
-        let mut vs = vec![];
-        for i in 0..self.weight {
-            let bs = self
-                .spsvole
-                .receive(channel, m, &self.vs[self.rows + i], rng)?;
-            ss.extend(bs.iter());
-            vs.push(bs);
-        }
+        let vs = self.spsvole.receive(
+            channel,
+            m,
+            &self.vs[self.rows..self.rows + self.weight],
+            rng,
+        )?;
+        // let mut ss = vec![];
+        // let mut vs = vec![];
+        // for i in 0..self.weight {
+        //     let bs = self
+        //         .spsvole
+        //         .receive(channel, m, &self.vs[self.rows + i], rng)?;
+        //     ss.extend(bs.iter());
+        //     vs.push(bs);
+        // }
         self.spsvole.receive_batch_consistency_check(
             channel,
             m,
-            vs,
+            &vs,
             &self.vs[self.rows + self.weight..],
             rng,
         )?;
-        debug_assert!(ss.len() == self.cols);
+        // debug_assert!(ss.len() == self.cols);
         let seed = channel.read_block()?;
         let mut lpn_rng = AesRng::from_seed(seed);
-        let ys: Vec<FE> = (0..self.cols)
-            .map(|i| {
+        let ys: Vec<FE> = vs
+            .iter()
+            .flatten()
+            .enumerate()
+            .map(|(i, s)| {
                 lpn_mtx_indices::<FE>(i, self.rows, &mut lpn_rng)
                     .iter()
                     .fold(FE::ZERO, |acc, (j, e)| {
                         acc + self.vs[*j].multiply_by_prime_subfield(*e)
                     })
-                    + ss[i]
+                    + *s
             })
             .collect();
         debug_assert!(ys.len() == self.cols);
