@@ -7,14 +7,12 @@
 //! Single-point Subfield Vector Oblivious Linear Evaluation (SpsVOLE) and
 //! LPN based Subfield Vector Oblivious Linear Evaluation (SVOLE) traits.
 
-/// GGM related helper functions.
 mod ggm_utils;
 pub mod lpn_params;
 pub mod sp_svole;
 pub mod svole_lpn;
 
 use crate::errors::Error;
-
 use rand_core::{CryptoRng, RngCore};
 use scuttlebutt::{field::FiniteField as FF, AbstractChannel};
 
@@ -85,13 +83,11 @@ mod tests {
     use crate::svole::svole_ext::{
         lpn_params::{LpnExtendParams, LpnSetupParams},
         svole_lpn::{Receiver as LpnVoleReceiver, Sender as LpnVoleSender},
-        LpnsVoleReceiver,
-        LpnsVoleSender,
+        LpnsVoleReceiver, LpnsVoleSender,
     };
     use scuttlebutt::{
         field::{F61p, FiniteField as FF, Fp, Gf128, F2},
-        AesRng,
-        Channel,
+        AesRng, Channel,
     };
     use std::{
         io::{BufReader, BufWriter},

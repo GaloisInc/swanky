@@ -14,42 +14,37 @@ use crate::{
 use generic_array::typenum::Unsigned;
 use rand_core::{CryptoRng, RngCore};
 use scuttlebutt::{
-    field::FiniteField as FF,
-    utils::unpack_bits,
-    AbstractChannel,
-    Aes128,
-    Block,
-    Malicious,
+    field::FiniteField as FF, utils::unpack_bits, AbstractChannel, Aes128, Block, Malicious,
 };
 use std::marker::PhantomData;
 use subtle::{Choice, ConditionallySelectable};
 
 /// COPEe sender.
-pub struct Sender<ROT: ROTSender + Malicious, FE: FF> {
+pub struct Sender<'a, ROT: ROTSender + Malicious, FE: FF> {
     _ot: PhantomData<ROT>,
     aes_objs: Vec<(Aes128, Aes128)>,
-    pows: Vec<FE>,
+    pows: &'a [FE],
     twos: Vec<FE>,
     nbits: usize,
     counter: u64,
 }
 
 /// COPEe receiver.
-pub struct Receiver<ROT: ROTReceiver + Malicious, FE: FF> {
+pub struct Receiver<'a, ROT: ROTReceiver + Malicious, FE: FF> {
     _ot: PhantomData<ROT>,
     delta: FE,
     choices: Vec<bool>,
     aes_objs: Vec<Aes128>,
-    pows: Vec<FE>,
+    pows: &'a [FE],
     twos: Vec<FE>,
     nbits: usize,
     counter: u64,
 }
 
 /// Aliasing COPEe sender.
-pub type CopeeSender<FE> = Sender<KosSender, FE>;
+pub type CopeeSender<'a, FE> = Sender<'a, KosSender, FE>;
 /// Aliasing COPEe receiver.
-pub type CopeeReceiver<FE> = Receiver<KosReceiver, FE>;
+pub type CopeeReceiver<'a, FE> = Receiver<'a, KosReceiver, FE>;
 
 /// `Aes128` as a pseudo-random function.
 fn prf<FE: FF>(aes: &Aes128, pt: Block) -> FE::PrimeField {
@@ -58,10 +53,11 @@ fn prf<FE: FF>(aes: &Aes128, pt: Block) -> FE::PrimeField {
 }
 
 /// Implement CopeeSender for Sender type
-impl<ROT: ROTSender<Msg = Block> + Malicious, FE: FF> Sender<ROT, FE> {
+impl<'a, ROT: ROTSender<Msg = Block> + Malicious, FE: FF> Sender<'a, ROT, FE> {
     /// Runs any one-time initialization.
     pub fn init<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         channel: &mut C,
+        pows: &'a [FE],
         mut rng: &mut RNG,
     ) -> Result<Self, Error> {
         let mut ot = ROT::init(channel, &mut rng)?;
@@ -72,16 +68,10 @@ impl<ROT: ROTSender<Msg = Block> + Malicious, FE: FF> Sender<ROT, FE> {
             .iter()
             .map(|(k0, k1)| (Aes128::new(*k0), Aes128::new(*k1)))
             .collect();
-        let g = FE::GENERATOR;
         let mut acc = FE::ONE;
-        let mut pows = vec![FE::ZERO; r];
-        for item in pows.iter_mut().take(r) {
-            *item = acc;
-            acc *= g;
-        }
-        acc = FE::ONE;
-        // `two` can be computed by adding `FE::ONE` to itself. For example, the field `F2` has only two elements `0` and `1`
-        // and `two` becomes `0` as `1 + 1 = 0` in this field.
+        // `two` can be computed by adding `FE::ONE` to itself. For example, the
+        // field `F2` has only two elements `0` and `1` and `two` becomes `0` as
+        // `1 + 1 = 0` in this field.
         let two = FE::ONE + FE::ONE;
         let mut twos = vec![FE::ZERO; nbits];
         for item in twos.iter_mut().take(nbits) {
@@ -96,11 +86,6 @@ impl<ROT: ROTSender<Msg = Block> + Malicious, FE: FF> Sender<ROT, FE> {
             twos,
             counter: 0,
         })
-    }
-
-    /// Returns the exponents.
-    pub fn pows(&self) -> Vec<FE> {
-        self.pows.clone()
     }
 
     /// Runs COPEe extend on a prime field element `u` and returns an extended
@@ -132,25 +117,19 @@ impl<ROT: ROTSender<Msg = Block> + Malicious, FE: FF> Sender<ROT, FE> {
 }
 
 /// Implement CopeeReceiver for Receiver type.
-impl<ROT: ROTReceiver<Msg = Block> + Malicious, FE: FF> Receiver<ROT, FE> {
+impl<'a, ROT: ROTReceiver<Msg = Block> + Malicious, FE: FF> Receiver<'a, ROT, FE> {
     /// Runs any one-time initialization.
     pub fn init<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         channel: &mut C,
+        pows: &'a [FE],
         mut rng: &mut RNG,
     ) -> Result<Self, Error> {
         let nbits = 128 - (FE::MODULUS - 1).leading_zeros() as usize;
-        let g = FE::GENERATOR;
         let r = FE::PolynomialFormNumCoefficients::to_usize();
         let mut ot = ROT::init(channel, &mut rng)?;
         let delta = FE::random(&mut rng);
         let choices = unpack_bits(delta.to_bytes().as_slice(), nbits * r);
         let mut acc = FE::ONE;
-        let mut pows = vec![FE::ZERO; r];
-        for item in pows.iter_mut().take(r) {
-            *item = acc;
-            acc *= g;
-        }
-        acc = FE::ONE;
         // `two` can be computed by adding `FE::ONE` to itself. For example, the field `F2` has only two elements `0` and `1`
         // and `two` becomes `0` as `1 + 1 = 0` in this field.
         let two = FE::ONE + FE::ONE;
@@ -175,11 +154,6 @@ impl<ROT: ROTReceiver<Msg = Block> + Malicious, FE: FF> Receiver<ROT, FE> {
     /// Returns the receiver choice `Δ`.
     pub fn delta(&self) -> FE {
         self.delta
-    }
-
-    /// Returns the exponents.
-    pub fn pows(&self) -> Vec<FE> {
-        self.pows.clone()
     }
 
     /// Runs COPEe extend and returns a field element `v` such that `w = u'Δ + v` holds.
@@ -209,8 +183,7 @@ mod tests {
     use crate::svole::copee::{CopeeReceiver, CopeeSender};
     use scuttlebutt::{
         field::{F61p, FiniteField as FF, Fp, Gf128, F2},
-        AesRng,
-        Channel,
+        AesRng, Channel,
     };
     use std::{
         io::{BufReader, BufWriter},
@@ -226,7 +199,8 @@ mod tests {
             let reader = BufReader::new(sender.try_clone().unwrap());
             let writer = BufWriter::new(sender);
             let mut channel = Channel::new(reader, writer);
-            let mut copee_sender = CopeeSender::<FE>::init(&mut channel, &mut rng).unwrap();
+            let pows = crate::svole::utils::gen_pows();
+            let mut copee_sender = CopeeSender::<FE>::init(&mut channel, &pows, &mut rng).unwrap();
             let ws: Vec<FE> = (0..len)
                 .map(|_| copee_sender.send(&mut channel, &input).unwrap())
                 .collect();
@@ -235,7 +209,8 @@ mod tests {
         let reader = BufReader::new(receiver.try_clone().unwrap());
         let writer = BufWriter::new(receiver);
         let mut channel = Channel::new(reader, writer);
-        let mut copee_receiver = CopeeReceiver::<FE>::init(&mut channel, &mut rng).unwrap();
+        let pows = crate::svole::utils::gen_pows();
+        let mut copee_receiver = CopeeReceiver::<FE>::init(&mut channel, &pows, &mut rng).unwrap();
         let vs: Vec<FE> = (0..len)
             .map(|_| copee_receiver.receive(&mut channel).unwrap())
             .collect();

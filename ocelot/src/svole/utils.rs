@@ -4,30 +4,16 @@
 // Copyright © 2020 Galois, Inc.
 // See LICENSE for licensing information.
 
-//! SVOLE utility functions.
+use generic_array::typenum::Unsigned;
+use scuttlebutt::field::FiniteField;
 
-use crate::svole::svole_ext::lpn_params::LpnSetupParams;
-use rand::Rng;
-use scuttlebutt::{field::FiniteField, AesRng, Block};
-
-pub fn lpn_mtx_indices<FE: FiniteField>(
-    _col_idx: usize,
-    rows: usize,
-    rng: &mut AesRng,
-) -> [(usize, FE::PrimeField); LpnSetupParams::D] {
-    let mut indices = [(0usize, FE::PrimeField::ONE); LpnSetupParams::D];
-    for i in 0..LpnSetupParams::D {
-        let mut rand_idx = rng.gen_range(0, rows);
-        while indices.iter().any(|&x| x.0 == rand_idx) {
-            rand_idx = rng.gen_range(0, rows);
-        }
-        if FE::PrimeField::MODULUS == 2 {
-            indices[i].0 = rand_idx as usize;
-        } else {
-            let rand_elt: FE::PrimeField =
-                FE::PrimeField::from_uniform_bytes(&<[u8; 16]>::from(rng.gen::<Block>()));
-            indices[i] = (rand_idx as usize, rand_elt);
-        }
+pub fn gen_pows<FE: FiniteField>() -> Vec<FE> {
+    let mut acc = FE::ONE;
+    let r = FE::PolynomialFormNumCoefficients::to_usize();
+    let mut pows = vec![FE::ZERO; r];
+    for item in pows.iter_mut() {
+        *item = acc;
+        acc *= FE::GENERATOR;
     }
-    indices
+    pows
 }

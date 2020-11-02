@@ -10,11 +10,7 @@ use crate::{
     errors::Error,
     ot::{KosReceiver, KosSender, Receiver as OtReceiver, Sender as OtSender},
     svole::svole_ext::ggm_utils::{
-        dot_product,
-        ggm,
-        ggm_prime,
-        point_wise_addition,
-        scalar_multiplication,
+        dot_product, ggm, ggm_prime, point_wise_addition, scalar_multiplication,
     },
 };
 use generic_array::typenum::Unsigned;
@@ -24,10 +20,7 @@ use scuttlebutt::{
     commitment::{Commitment, ShaCommitment},
     field::FiniteField as FF,
     utils::unpack_bits,
-    AbstractChannel,
-    AesRng,
-    Block,
-    Malicious,
+    AbstractChannel, AesRng, Block, Malicious,
 };
 
 /// SpsVole Sender.
@@ -101,7 +94,7 @@ impl<OT: OtReceiver<Msg = Block> + Malicious, FE: FF> Sender<OT, FE> {
     /// Runs single-point svole and outputs pair of vectors `(u, w)` such that
     /// the correlation `w = u'Δ + v` holds. Note that `u'` is the converted vector from
     /// `u` to the vector of elements of the extended field `FE`. For simplicity, the vector
-    /// length `len` assumed to be power of `2` as it represents the number of leaves in the GGM tree
+    /// length `n` assumed to be power of `2` as it represents the number of leaves in the GGM tree
     /// and should match with the receiver input length.
     pub fn send<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         &mut self,
@@ -286,8 +279,7 @@ mod test {
     };
     use scuttlebutt::{
         field::{F61p, FiniteField as FF, Fp, Gf128, F2},
-        AesRng,
-        Channel,
+        AesRng, Channel,
     };
     use std::{
         io::{BufReader, BufWriter},
@@ -301,9 +293,9 @@ mod test {
             let reader = BufReader::new(sender.try_clone().unwrap());
             let writer = BufWriter::new(sender);
             let mut channel = Channel::new(reader, writer);
-            let mut base = BaseSender::<FE>::init(&mut channel, &mut rng).unwrap();
+            let pows = crate::svole::utils::gen_pows();
+            let mut base = BaseSender::<FE>::init(&mut channel, &pows, &mut rng).unwrap();
             let uw = base.send(&mut channel, 1, &mut rng).unwrap();
-            let pows = base.pows();
             let mut vole = SpsSender::<FE>::init(&mut channel, pows, 1, &mut rng).unwrap();
             vole.send(&mut channel, len, &uw[0], &mut rng).unwrap()
         });
@@ -311,11 +303,11 @@ mod test {
         let reader = BufReader::new(receiver.try_clone().unwrap());
         let writer = BufWriter::new(receiver);
         let mut channel = Channel::new(reader, writer);
-        let mut base = BaseReceiver::<FE>::init(&mut channel, &mut rng).unwrap();
+        let pows = crate::svole::utils::gen_pows();
+        let mut base = BaseReceiver::<FE>::init(&mut channel, &pows, &mut rng).unwrap();
         let v = base.receive(&mut channel, 1, &mut rng).unwrap();
-        let pows = base.pows();
         let mut vole =
-            SpsReceiver::<FE>::init(&mut channel, pows, base.delta(), 1, &mut rng).unwrap();
+            SpsReceiver::<FE>::init(&mut channel, pows.clone(), base.delta(), 1, &mut rng).unwrap();
         let vs = vole.receive(&mut channel, len, &v[0], &mut rng).unwrap();
         let uws = handle.join().unwrap();
         for i in 0..len as usize {

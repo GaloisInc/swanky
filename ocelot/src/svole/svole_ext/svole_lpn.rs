@@ -24,10 +24,8 @@ use crate::{
         base_svole::{BaseReceiver, BaseSender},
         svole_ext::{
             sp_svole::{SpsReceiver, SpsSender},
-            LpnsVoleReceiver,
-            LpnsVoleSender,
+            LpnsVoleReceiver, LpnsVoleSender,
         },
-        utils::lpn_mtx_indices,
     },
 };
 use generic_array::typenum::Unsigned;
@@ -35,9 +33,32 @@ use rand::Rng;
 use rand_core::{CryptoRng, RngCore, SeedableRng};
 use scuttlebutt::{field::FiniteField, AbstractChannel, AesRng, Block};
 
+const LPN_PARAMS_D: usize = 10;
+
+fn lpn_mtx_indices<FE: FiniteField>(
+    _col_idx: usize,
+    rows: usize,
+    rng: &mut AesRng,
+) -> [(usize, FE::PrimeField); LPN_PARAMS_D] {
+    let mut indices = [(0usize, FE::PrimeField::ONE); LPN_PARAMS_D];
+    for i in 0..LPN_PARAMS_D {
+        let mut rand_idx = rng.gen_range(0, rows);
+        while indices.iter().any(|&x| x.0 == rand_idx) {
+            rand_idx = rng.gen_range(0, rows);
+        }
+        indices[i].0 = rand_idx as usize;
+        if FE::PrimeField::MODULUS != 2 {
+            let rand_elt: FE::PrimeField =
+                FE::PrimeField::from_uniform_bytes(&<[u8; 16]>::from(rng.gen::<Block>()));
+            indices[i].1 = rand_elt;
+        }
+    }
+    indices
+}
+
 /// LpnsVole sender.
 pub struct Sender<FE: FiniteField> {
-    spvole: SpsSender<FE>,
+    spsvole: SpsSender<FE>,
     rows: usize,
     cols: usize,
     uws: Vec<(FE::PrimeField, FE)>,
@@ -46,7 +67,7 @@ pub struct Sender<FE: FiniteField> {
 }
 /// LpnsVole receiver.
 pub struct Receiver<FE: FiniteField> {
-    spvole: SpsReceiver<FE>,
+    spsvole: SpsReceiver<FE>,
     delta: FE,
     rows: usize,
     cols: usize,
@@ -74,15 +95,16 @@ impl<FE: FiniteField> LpnsVoleSender for Sender<FE> {
         if d >= rows {
             return Err(Error::InvalidD);
         }
-        let mut svole = BaseSender::<FE>::init(channel, rng)?;
+        let pows = crate::svole::utils::gen_pows();
+        let mut svole = BaseSender::<FE>::init(channel, &pows, rng)?;
         let r = FE::PolynomialFormNumCoefficients::to_usize();
         let uws = svole.send(channel, rows + weight + r, rng)?;
         // This flush statement is needed, otherwise, it hangs on.
         channel.flush()?;
-        let spvole = SpsSender::<FE>::init(channel, svole.pows(), weight, rng)?;
+        let spsvole = SpsSender::<FE>::init(channel, pows, weight, rng)?;
         debug_assert!(uws.len() == rows + weight + r);
         Ok(Self {
-            spvole,
+            spsvole,
             rows,
             cols,
             uws,
@@ -103,13 +125,13 @@ impl<FE: FiniteField> LpnsVoleSender for Sender<FE> {
         let mut uws = vec![];
         for i in 0..self.weight {
             let ac = self
-                .spvole
+                .spsvole
                 .send(channel, m, &self.uws[self.rows + i], rng)?;
             ets.extend(ac.iter());
             uws.push(ac);
         }
         debug_assert!(ets.len() == self.cols);
-        self.spvole.send_batch_consistency_check(
+        self.spsvole.send_batch_consistency_check(
             channel,
             m,
             &uws,
@@ -174,15 +196,15 @@ impl<FE: FiniteField> LpnsVoleReceiver for Receiver<FE> {
         if d >= rows {
             return Err(Error::InvalidD);
         }
-        let mut svole = BaseReceiver::<FE>::init(channel, rng)?;
+        let pows = crate::svole::utils::gen_pows();
+        let mut svole = BaseReceiver::<FE>::init(channel, &pows, rng)?;
         let r = FE::PolynomialFormNumCoefficients::to_usize();
         let vs = svole.receive(channel, rows + weight + r, rng)?;
         let delta = svole.delta();
-        let pows = svole.pows();
-        let spvole = SpsReceiver::<FE>::init(channel, pows, delta, weight, rng)?;
+        let spsvole = SpsReceiver::<FE>::init(channel, pows, delta, weight, rng)?;
         debug_assert!(vs.len() == rows + weight + r);
         Ok(Self {
-            spvole,
+            spsvole,
             delta,
             rows,
             cols,
@@ -209,12 +231,12 @@ impl<FE: FiniteField> LpnsVoleReceiver for Receiver<FE> {
         let mut vs = vec![];
         for i in 0..self.weight {
             let bs = self
-                .spvole
+                .spsvole
                 .receive(channel, m, &self.vs[self.rows + i], rng)?;
             ss.extend(bs.iter());
             vs.push(bs);
         }
-        self.spvole.receive_batch_consistency_check(
+        self.spsvole.receive_batch_consistency_check(
             channel,
             m,
             vs,

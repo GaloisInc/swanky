@@ -4,20 +4,32 @@
 // Copyright © 2020 Galois, Inc.
 // See LICENSE for licensing information.
 
+use generic_array::typenum::Unsigned;
 use ocelot::svole::{
     base_svole::{BaseReceiver, BaseSender},
     svole_ext::sp_svole::{SpsReceiver, SpsSender},
 };
 use scuttlebutt::{
     field::{F61p, FiniteField as FF, Fp, Gf128, F2},
-    AesRng,
-    TrackChannel,
+    AesRng, TrackChannel,
 };
 use std::{
     io::{BufReader, BufWriter},
     os::unix::net::UnixStream,
     time::SystemTime,
 };
+
+// XXX copied here for now
+fn gen_pows<FE: FF>() -> Vec<FE> {
+    let mut acc = FE::ONE;
+    let r = FE::PolynomialFormNumCoefficients::to_usize();
+    let mut pows = vec![FE::ZERO; r];
+    for item in pows.iter_mut() {
+        *item = acc;
+        acc *= FE::GENERATOR;
+    }
+    pows
+}
 
 fn test_spsvole<FE: FF>(len: usize) {
     let (sender, receiver) = UnixStream::pair().unwrap();
@@ -27,10 +39,10 @@ fn test_spsvole<FE: FF>(len: usize) {
         let reader = BufReader::new(sender.try_clone().unwrap());
         let writer = BufWriter::new(sender);
         let mut channel = TrackChannel::new(reader, writer);
+        let pows = gen_pows();
         let start = SystemTime::now();
-        let mut base = BaseSender::<FE>::init(&mut channel, &mut rng).unwrap();
+        let mut base = BaseSender::<FE>::init(&mut channel, &pows, &mut rng).unwrap();
         let uws = base.send(&mut channel, 1024, &mut rng).unwrap();
-        let pows = base.pows();
         let mut vole = SpsSender::<FE>::init(&mut channel, pows, len, &mut rng).unwrap();
         println!(
             "Sender init time: {} ms",
@@ -56,11 +68,12 @@ fn test_spsvole<FE: FF>(len: usize) {
     let reader = BufReader::new(receiver.try_clone().unwrap());
     let writer = BufWriter::new(receiver);
     let mut channel = TrackChannel::new(reader, writer);
+    let pows = gen_pows();
     let start = SystemTime::now();
-    let mut base = BaseReceiver::<FE>::init(&mut channel, &mut rng).unwrap();
+    let mut base = BaseReceiver::<FE>::init(&mut channel, &pows, &mut rng).unwrap();
     let vs = base.receive(&mut channel, 1024, &mut rng).unwrap();
     let mut vole =
-        SpsReceiver::<FE>::init(&mut channel, base.pows(), base.delta(), len, &mut rng).unwrap();
+        SpsReceiver::<FE>::init(&mut channel, pows.clone(), base.delta(), len, &mut rng).unwrap();
     println!(
         "Receiver init time: {} ms",
         start.elapsed().unwrap().as_millis()

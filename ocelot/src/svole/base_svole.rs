@@ -16,36 +16,33 @@ use rand_core::{CryptoRng, RngCore};
 use scuttlebutt::{field::FiniteField as FF, AbstractChannel};
 
 /// sVOLE sender.
-pub struct Sender<FE: FF> {
-    copee: CopeeSender<FE>,
-    pows: Vec<FE>,
+pub struct Sender<'a, FE: FF> {
+    copee: CopeeSender<'a, FE>,
+    pows: &'a [FE],
 }
 
 /// sVOLE receiver.
-pub struct Receiver<FE: FF> {
-    copee: CopeeReceiver<FE>,
-    pows: Vec<FE>,
+pub struct Receiver<'a, FE: FF> {
+    copee: CopeeReceiver<'a, FE>,
+    pows: &'a [FE],
 }
 
 /// Base svole sender.
-pub type BaseSender<FE> = Sender<FE>;
+pub type BaseSender<'a, FE> = Sender<'a, FE>;
 /// Base svole receiver.
-pub type BaseReceiver<FE> = Receiver<FE>;
+pub type BaseReceiver<'a, FE> = Receiver<'a, FE>;
 
-impl<FE: FF> Sender<FE> {
+impl<'a, FE: FF> Sender<'a, FE> {
     /// Runs any one-time initialization.
     pub fn init<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         channel: &mut C,
+        pows: &'a [FE],
         rng: &mut RNG,
     ) -> Result<Self, Error> {
-        let copee = CopeeSender::<FE>::init(channel, rng)?;
-        let pows = copee.pows();
+        let copee = CopeeSender::<FE>::init(channel, pows, rng)?;
         Ok(Self { copee, pows })
     }
-    /// Returns the exponents.
-    pub fn pows(&self) -> Vec<FE> {
-        self.pows.clone()
-    }
+
     /// Runs SVOLE extend on input length `len` and returns `(u, w)`, where `u`
     /// is a randomly generated input vector of length `len` from
     /// `FE::PrimeField` such that the correlation `w = u'Δ + v`, `u'` is the
@@ -89,23 +86,19 @@ impl<FE: FF> Sender<FE> {
     }
 }
 
-impl<FE: FF> Receiver<FE> {
+impl<'a, FE: FF> Receiver<'a, FE> {
     /// Runs any one-time initialization.
     pub fn init<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         channel: &mut C,
+        pows: &'a [FE],
         rng: &mut RNG,
     ) -> Result<Self, Error> {
-        let cp = CopeeReceiver::<FE>::init(channel, rng)?;
-        let pows = cp.pows();
+        let cp = CopeeReceiver::<FE>::init(channel, pows, rng)?;
         Ok(Self { copee: cp, pows })
     }
     /// Returns the receiver choice `Δ`.
     pub fn delta(&self) -> FE {
         self.copee.delta()
-    }
-    /// Returns the exponents.
-    pub fn pows(&self) -> Vec<FE> {
-        self.pows.clone()
     }
     /// Runs SVOLE extend on input length `len` and returns a vector `v` such
     /// that the correlation `w = u'Δ + v` holds. Note that `u'` is the
@@ -155,8 +148,7 @@ mod tests {
     use crate::svole::svole_ext::lpn_params::{LpnExtendParams, LpnSetupParams};
     use scuttlebutt::{
         field::{F61p, FiniteField as FF, Fp, Gf128, F2},
-        AesRng,
-        Channel,
+        AesRng, Channel,
     };
     use std::{
         io::{BufReader, BufWriter},
@@ -170,14 +162,16 @@ mod tests {
             let reader = BufReader::new(sender.try_clone().unwrap());
             let writer = BufWriter::new(sender);
             let mut channel = Channel::new(reader, writer);
-            let mut vole = BaseSender::<FE>::init(&mut channel, &mut rng).unwrap();
+            let pows = crate::svole::utils::gen_pows();
+            let mut vole = BaseSender::<FE>::init(&mut channel, &pows, &mut rng).unwrap();
             vole.send(&mut channel, len, &mut rng).unwrap()
         });
         let mut rng = AesRng::new();
         let reader = BufReader::new(receiver.try_clone().unwrap());
         let writer = BufWriter::new(receiver);
         let mut channel = Channel::new(reader, writer);
-        let mut vole = BaseReceiver::<FE>::init(&mut channel, &mut rng).unwrap();
+        let pows = crate::svole::utils::gen_pows();
+        let mut vole = BaseReceiver::<FE>::init(&mut channel, &pows, &mut rng).unwrap();
         let vs = vole.receive(&mut channel, len, &mut rng).unwrap();
         let delta = vole.delta();
         let uw_s = handle.join().unwrap();
