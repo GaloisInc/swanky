@@ -104,27 +104,37 @@ impl<OT: OtReceiver<Msg = Block> + Malicious, FE: FF> Sender<OT, FE> {
         mut rng: &mut RNG,
     ) -> Result<Vec<Vec<(FE::PrimeField, FE)>>, Error> {
         let depth = 128 - (n as u128 - 1).leading_zeros() as usize;
-        let mut result = vec![vec![(FE::PrimeField::ZERO, FE::ZERO); n]; uws.len()];
-        for (i, (a, delta)) in uws.iter().enumerate() {
+        let len = uws.len();
+        let mut result = vec![vec![(FE::PrimeField::ZERO, FE::ZERO); n]; len];
+        let mut betas = Vec::with_capacity(len);
+        for (a, _) in uws.iter() {
             let mut beta = FE::PrimeField::random(&mut rng);
             while beta == FE::PrimeField::ZERO {
                 beta = FE::PrimeField::random(&mut rng);
             }
             let a_prime = beta - *a;
             channel.write_fe(a_prime)?;
+            betas.push(beta);
+        }
+        channel.flush()?;
+        let mut tmps = Vec::with_capacity(len);
+        for (i, beta) in betas.into_iter().enumerate() {
             let alpha = rng.gen_range(0, n);
             result[i][alpha].0 = beta;
-            let mut choices = unpack_bits(&(!alpha).to_le_bytes(), depth);
-            choices.reverse(); // to get the first bit as MSB.
-            let keys = self.ot.receive(channel, &choices, rng)?;
-            let d: FE = channel.read_fe()?;
-            let vs: Vec<FE> = ggm_prime::<FE>(alpha, &keys);
-            let sum = vs.iter().map(|v| *v).sum();
+            let mut choices_ = unpack_bits(&(!alpha).to_le_bytes(), depth);
+            choices_.reverse(); // to get the first bit as MSB.
+            let keys = self.ot.receive(channel, &choices_, rng)?;
+            let vs: Vec<FE> = ggm_prime(alpha, &keys);
             for j in 0..n {
                 if j != alpha {
                     result[i][j].1 = vs[j];
                 }
             }
+            let sum = vs.iter().map(|v| *v).sum();
+            tmps.push((alpha, sum));
+        }
+        for (i, ((_, delta), (alpha, sum))) in uws.iter().zip(tmps.into_iter()).enumerate() {
+            let d: FE = channel.read_fe()?;
             result[i][alpha].1 = *delta - (d + sum);
         }
         Ok(result)
@@ -217,23 +227,34 @@ impl<OT: OtSender<Msg = Block> + Malicious, FE: FF> Receiver<OT, FE> {
     pub fn receive<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         &mut self,
         channel: &mut C,
-        len: usize,
+        nleaves: usize,
         vs: &[FE],
         rng: &mut RNG,
     ) -> Result<Vec<Vec<FE>>, Error> {
-        let depth = 128 - (len as u128 - 1).leading_zeros();
+        let depth = 128 - (nleaves as u128 - 1).leading_zeros() as usize;
+        let len = vs.len();
+        let mut gammas = Vec::with_capacity(len);
+        let mut ds = Vec::with_capacity(len);
         let mut result = vec![];
-        for b in vs.iter() {
+        for (_, b) in vs.iter().enumerate() {
             let a_prime = channel.read_fe::<FE::PrimeField>()?;
             let gamma = *b - self.delta.multiply_by_prime_subfield(a_prime);
-            let seed = rng.gen::<Block>();
-            let (vs_, keys) = ggm::<FE>(depth as usize, seed);
-            self.ot.send(channel, &keys, rng)?;
+            gammas.push(gamma);
+        }
+        for gamma in gammas.into_iter() {
+            let (vs_, keys_) = ggm(depth as usize, rng);
+            // XXX hmm I would have thought batching OTs would make things more
+            // efficient, but that doesn't seem to be the case. Probably needs
+            // further investigation.
+            self.ot.send(channel, &keys_, rng)?;
             let d = gamma - vs_.iter().map(|v| *v).sum();
-            channel.write_fe(d)?;
-            channel.flush()?;
+            ds.push(d);
             result.push(vs_);
         }
+        for d in ds.into_iter() {
+            channel.write_fe(d)?;
+        }
+        channel.flush()?;
         Ok(result)
     }
     /// Batch consistency check that can be called after bunch of iterations.
