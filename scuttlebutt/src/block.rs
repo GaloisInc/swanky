@@ -308,38 +308,28 @@ use serde::de::Visitor;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
+#[derive(Serialize, Deserialize)]
+struct Helperb {
+    pub block: u128,
+}
+
 #[cfg(feature = "serde")]
 impl Serialize for Block {
-    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        serializer.serialize_bytes(&unsafe { std::mem::transmute::<__m128i, [u8; 16]>(self.0) })
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where S: Serializer
+    {
+        let helper = Helperb {block: <u128>::from(*self)};
+        helper.serialize(serializer)
     }
 }
 
 #[cfg(feature = "serde")]
 impl<'de> Deserialize<'de> for Block {
-    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        struct BlockVisitor;
-        impl<'de> Visitor<'de> for BlockVisitor {
-            type Value = Block;
-
-            fn expecting(&self, formatter: &mut ::core::fmt::Formatter) -> ::core::fmt::Result {
-                formatter.write_str("a 128-bit chunk")
-            }
-
-            fn visit_bytes<E: serde::de::Error>(self, v: &[u8]) -> Result<Block, E> {
-                if v.len() == 16 {
-                    let bytes: [u8; 16] = match v.try_into() {
-                        Ok(bytes) => bytes,
-                        Err(_) => return Err(serde::de::Error::invalid_length(v.len(), &self)),
-                    };
-                    Ok(Block::from(bytes))
-                } else {
-                    Err(serde::de::Error::invalid_length(v.len(), &self))
-                }
-            }
-        }
-
-        deserializer.deserialize_bytes(BlockVisitor)
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+        where D: Deserializer<'de>
+    {
+        let helper = Helperb::deserialize(deserializer)?;
+        Ok(Block::from(helper.block.to_le_bytes()))
     }
 }
 
