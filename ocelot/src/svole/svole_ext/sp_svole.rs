@@ -117,6 +117,14 @@ impl<OT: OtReceiver<Msg = Block> + Malicious, FE: FF> Sender<OT, FE> {
             betas.push(beta);
         }
         channel.flush()?;
+        // Generate seeds for GGM "PRGs" and send them over the wire.
+        //
+        // XXX is this secure? I think so, assuming AES as no weak keys....
+        // might be better to do coin flipping here though...
+        let seed0 = rng.gen::<Block>();
+        let seed1 = rng.gen::<Block>();
+        channel.write_block(&seed0)?;
+        channel.write_block(&seed1)?;
         let mut tmps = Vec::with_capacity(len);
         for (i, beta) in betas.into_iter().enumerate() {
             let alpha = rng.gen_range(0, n);
@@ -124,7 +132,7 @@ impl<OT: OtReceiver<Msg = Block> + Malicious, FE: FF> Sender<OT, FE> {
             let mut choices_ = unpack_bits(&(!alpha).to_le_bytes(), depth);
             choices_.reverse(); // to get the first bit as MSB.
             let keys = self.ot.receive(channel, &choices_, rng)?;
-            let vs: Vec<FE> = ggm_prime(alpha, &keys);
+            let vs: Vec<FE> = ggm_prime(alpha, &keys, (seed0, seed1));
             for j in 0..n {
                 if j != alpha {
                     result[i][j].1 = vs[j];
@@ -241,8 +249,11 @@ impl<OT: OtSender<Msg = Block> + Malicious, FE: FF> Receiver<OT, FE> {
             let gamma = *b - self.delta.multiply_by_prime_subfield(a_prime);
             gammas.push(gamma);
         }
+        let seed0 = channel.read_block()?;
+        let seed1 = channel.read_block()?;
         for gamma in gammas.into_iter() {
-            let (vs_, keys_) = ggm(depth as usize, rng);
+            let seed = rng.gen::<Block>();
+            let (vs_, keys_) = ggm(depth as usize, seed, (seed0, seed1));
             // XXX hmm I would have thought batching OTs would make things more
             // efficient, but that doesn't seem to be the case. Probably needs
             // further investigation.
