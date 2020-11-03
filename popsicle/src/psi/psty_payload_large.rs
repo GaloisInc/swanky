@@ -19,7 +19,7 @@ use fancy_garbling::{
     FancyInput,
     Wire,
 };
-use std::sync::{Arc, Barrier};
+
 use itertools::Itertools;
 use ocelot::{
     oprf::{KmprtReceiver, KmprtSender},
@@ -28,6 +28,7 @@ use ocelot::{
 
 use rand::{CryptoRng, Rng, RngCore, SeedableRng};
 use scuttlebutt::{AbstractChannel, Block, Block512};
+
 
 const NHASHES: usize = 3;
 // How many bytes of the hash to use for the equality tests. This affects
@@ -47,46 +48,34 @@ const PAYLOAD_PRIME_SIZE: usize = 16;
 pub type Msg = Vec<u8>;
 
 /// Private set intersection sender.
-pub struct MegaBin {
-    bins_id: Vec<Block>,
-    bins_payload: Vec<usize>,
-    mega_index: usize,
-    mega_size: usize,
-}
-
-/// Private set intersection sender.
 pub struct Sender {
+    key: Block,
     opprf: KmprtSender,
     opprf_payload: KmprtSender,
 }
 
 /// State of the sender.
 pub struct SenderState {
-    opprf_ids: Vec<Block512>,
-    opprf_payloads: Vec<Block512>,
-    table: Vec<Vec<Block>>,
-    payload: Vec<Vec<Block512>>,
+    pub opprf_ids: Vec<Block512>,
+    pub opprf_payloads: Vec<Block512>,
+    pub table: Vec<Vec<Block>>,
+    pub payload: Vec<Vec<Block512>>,
 }
 
 /// Private set intersection receiver.
 pub struct Receiver {
+    key: Block,
     opprf: KmprtReceiver,
     opprf_payload: KmprtReceiver,
 }
 
-// /// State of the receiver.
-// pub struct ReceiverState {
-//     cuckoo: CuckooHashLarge,
-//     table: Vec<Vec<Block>>,
-//     payload: Vec<Vec<Block512>>,
-// }
 
 /// State of the receiver.
 pub struct ReceiverState{
-    opprf_ids: Vec<Block512>,
-    opprf_payloads: Vec<Block512>,
-    table: Vec<Block>,
-    payload: Vec<Block512>,
+    pub opprf_ids: Vec<Block512>,
+    pub opprf_payloads: Vec<Block512>,
+    pub table: Vec<Block>,
+    pub payload: Vec<Block512>,
 }
 
 
@@ -96,10 +85,11 @@ impl Sender {
         channel: &mut C,
         rng: &mut RNG,
     ) -> Result<Self, Error> {
+        let key = channel.read_block()?;
         let opprf = KmprtSender::init(channel, rng)?;
         let opprf_payload = KmprtSender::init(channel, rng)?;
 
-        Ok(Self { opprf, opprf_payload })
+        Ok(Self { key, opprf, opprf_payload })
     }
 
     pub fn compute_payload_large<C: AbstractChannel , RNG: RngCore + CryptoRng + SeedableRng<Seed = Block>>(
@@ -109,18 +99,13 @@ impl Sender {
         channel: &mut C,
         rng: &mut RNG,
     ) -> Result<(), Error> {
-        let key = channel.read_block()?;
-        let megasize = channel.read_usize()?;
-        let nmegabins = channel.read_usize()?;
-        let nbins = channel.read_usize()?;
-        let last_bin = nbins % megasize;
 
-        let state = self.bucketize_data(inputs, payloads, nbins, key, rng)?;
-
-        let mut ts_id: Vec<&[Block512]>= state.opprf_ids.chunks(megasize).collect();
-        let mut ts_payload: Vec<&[Block512]>= state.opprf_payloads.chunks(megasize).collect();
-        let mut table:Vec<&[Vec<Block>]> = state.table.chunks(megasize).collect();
-        let mut payload: Vec<&[Vec<Block512>]>= state.payload.chunks(megasize).collect();
+        let (state, nbins, nmegabins, megasize) = self.bucketize_data(inputs, payloads, channel, rng)?;
+        let _last_bin = nbins % megasize;
+        let ts_id: Vec<&[Block512]>= state.opprf_ids.chunks(megasize).collect();
+        let ts_payload: Vec<&[Block512]>= state.opprf_payloads.chunks(megasize).collect();
+        let table:Vec<&[Vec<Block>]> = state.table.chunks(megasize).collect();
+        let payload: Vec<&[Vec<Block512>]>= state.payload.chunks(megasize).collect();
 
         let mut gb = Garbler::<C, RNG, OtSender>::new(channel.clone(), RNG::from_seed(rng.gen()))?;
 
@@ -138,7 +123,7 @@ impl Sender {
             };
 
             self.send_data(&mut state, nbins, channel, rng);
-            let partial: CrtBundle<fancy_garbling::Wire> = state.build_compute_circuit(&mut gb, channel, rng)?;
+            let partial: CrtBundle<fancy_garbling::Wire> = state.build_and_compute_circuit(&mut gb, channel, rng)?;
 
             acc = gb.crt_add(&acc, &partial)?;
             channel.flush()?;
@@ -148,18 +133,19 @@ impl Sender {
         Ok(())
     }
 
-    pub fn bucketize_data<RNG: RngCore + CryptoRng + SeedableRng>(
+    pub fn bucketize_data<C: AbstractChannel, RNG: RngCore + CryptoRng + SeedableRng>(
         &mut self,
         inputs: &[Msg],
         payloads: &[Block512],
-        nbins: usize,
-        key: Block,
+        channel: &mut C,
         rng: &mut RNG,
-    ) -> Result<SenderState,
+    ) -> Result<(SenderState, usize, usize, usize),
             Error>{
                 // receive cuckoo hash info from sender
-       let hashes = utils::compress_and_hash_inputs(inputs, key);
-       let total = hashes.len();
+       let megasize = channel.read_usize()?;
+       let nmegabins = channel.read_usize()?;
+       let nbins = channel.read_usize()?;
+       let hashes = utils::compress_and_hash_inputs(inputs, self.key);
 
        let mut table = vec![Vec::new(); nbins];
        let mut payload = vec![Vec::new(); nbins];
@@ -182,13 +168,17 @@ impl Sender {
                payload[bins[0]].push(rng.gen());
            }
        }
+       let state = SenderState {
+                   opprf_ids: ts_id,
+                   opprf_payloads: ts_payload,
+                   table,
+                   payload,
+               };
 
-       Ok(SenderState {
-           opprf_ids: ts_id,
-           opprf_payloads: ts_payload,
-           table,
-           payload,
-       })
+       Ok((state,
+        nbins,
+        nmegabins,
+        megasize))
     }
 
     /// Run the PSI protocol over `inputs`.
@@ -254,7 +244,7 @@ impl SenderState {
         Ok((sender_inputs, receiver_inputs, sender_payloads, receiver_payloads, receiver_masks))
     }
 
-    pub fn build_compute_circuit<C, RNG>(
+    pub fn build_and_compute_circuit<C, RNG>(
         &mut self,
         gb: &mut Garbler<C, RNG, OtSender>,
         channel: &mut C,
@@ -266,7 +256,7 @@ impl SenderState {
     {
         let (x, y, x_payload, y_payload, masks) = self.encode_circuit_inputs(gb, channel, rng)?;
         let outs = fancy_compute_payload_aggregate(gb, &x, &y, &x_payload, &y_payload, &masks)?;
-        Ok((outs))
+        Ok(outs)
     }
 }
 
@@ -276,10 +266,12 @@ impl Receiver {
         channel: &mut C,
         rng: &mut RNG,
     ) -> Result<Self, Error> {
+        let key = rng.gen();
+        channel.write_block(&key)?;
         let opprf = KmprtReceiver::init(channel, rng)?;
         let opprf_payload = KmprtReceiver::init(channel, rng)?;
 
-        Ok(Self { opprf, opprf_payload })}
+        Ok(Self { key, opprf, opprf_payload })}
 
         pub fn compute_payload_large<C: AbstractChannel, RNG: RngCore + CryptoRng + SeedableRng<Seed = Block>>(
             &mut self,
@@ -288,19 +280,9 @@ impl Receiver {
             channel: &mut C,
             rng: &mut RNG,
         ) -> Result<(), Error> {
-            let key = rng.gen();
-            let (cuckoo, table, payload) = self.bucketize_data(inputs, payloads, key, rng)?;
-            // Send cuckoo hash info to receiver.
-            channel.write_block(&key)?;
-            channel.write_usize(cuckoo.megasize)?;
-            channel.write_usize(cuckoo.nmegabins)?;
-            channel.write_usize(cuckoo.nbins)?;
-            channel.flush()?;
+            let megasize =  10 ;
+            let (cuckoo, table, payload) = self.bucketize_data(inputs, payloads, megasize, channel, rng)?;
 
-            // println!("cuckoo {:?}", cuckoo);
-            // // Build `table` to include a cuckoo hash entry xored with its hash
-            // // index, if such a entry exists, or a random value.
-            // println!("number of mega{:?}", cuckoo.nmegabins);
             let mut ev =
                 Evaluator::<C, RNG, OtReceiver>::new(channel.clone(), RNG::from_seed(rng.gen()))?;
             let qs = fancy_garbling::util::primes_with_width(PAYLOAD_SIZE as u32 * 8);
@@ -316,7 +298,7 @@ impl Receiver {
                 };
 
                 self.receive_data(&mut state, channel, rng);
-                let partial: CrtBundle<fancy_garbling::Wire> = state.build_compute_circuit(&mut ev, channel, rng).unwrap();
+                let partial: CrtBundle<fancy_garbling::Wire> = state.build_and_compute_circuit(&mut ev, channel, rng).unwrap();
                 acc = ev.crt_add(&acc, &partial)?;
                 channel.flush()?;
             }
@@ -327,16 +309,21 @@ impl Receiver {
             println!("aggregate {:?}", aggregate as usize);
             Ok(())
         }
-    pub(crate) fn bucketize_data<RNG: RngCore + CryptoRng + SeedableRng>(
+    pub fn bucketize_data<C: AbstractChannel, RNG: RngCore + CryptoRng + SeedableRng>(
         &mut self,
         inputs: &[Msg],
         payloads: &[Block512],
-        key: Block,
+        megasize: usize,
+        channel: &mut C,
         rng: &mut RNG,
     ) -> Result<(CuckooHashLarge, Vec<Vec<Block>>, Vec<Vec<Block512>>), Error>{
 
-        let hashed_inputs = utils::compress_and_hash_inputs(inputs, key);
-        let cuckoo_large = CuckooHashLarge::new(&hashed_inputs, NHASHES, 10)?;
+        let hashed_inputs = utils::compress_and_hash_inputs(inputs, self.key);
+        let cuckoo_large = CuckooHashLarge::new(&hashed_inputs, NHASHES, megasize)?;
+        channel.write_usize(cuckoo_large.megasize)?;
+        channel.write_usize(cuckoo_large.nmegabins)?;
+        channel.write_usize(cuckoo_large.nbins)?;
+        channel.flush()?;
 
         let table = cuckoo_large
                     .items
@@ -372,7 +359,7 @@ impl Receiver {
         ))
     }
     // Run the PSI protocol over `inputs`.
-    pub(crate) fn receive_data<C: AbstractChannel, RNG: RngCore + CryptoRng + SeedableRng>(
+    pub fn receive_data<C: AbstractChannel, RNG: RngCore + CryptoRng + SeedableRng>(
         &mut self,
         state:&mut ReceiverState,
         channel: &mut C,
@@ -419,7 +406,7 @@ impl ReceiverState {
         Ok((sender_inputs, receiver_inputs, sender_payloads, receiver_payloads, receiver_masks))
     }
 
-    pub fn build_compute_circuit<C, RNG>(
+    pub fn build_and_compute_circuit<C, RNG>(
         &mut self,
         ev: &mut Evaluator<C, RNG, OtReceiver>,
         channel: &mut C,

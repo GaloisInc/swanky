@@ -15,13 +15,16 @@ publish = false
 [features]
 nightly = ["rand/nightly", "scuttlebutt/nightly", "ocelot/nightly", "ocelot/nightly"]
 psty = ["fancy-garbling", "openssl"]
+serde1 = ["serde", "serde_json"]
 
 [dependencies]
 ocelot         = { path = "../ocelot" }
-scuttlebutt    = { path = "../scuttlebutt" }
+scuttlebutt    = { path = "../scuttlebutt",  features = ["serde1"]}
 itertools      = "0.8"
 rand           = "0.7"
 sha2           = "0.8"
+serde          = {version = "1.0.117", optional = true }
+serde_json     = {version = "1.0.59", optional = true }
 fancy-garbling = { path = "../fancy-garbling", optional = true }
 openssl        = { version = "0.10.28", optional = true }
 
@@ -68,3 +71,23 @@ required-features = ["psty"]
 name = "server"
 path = "examples/match-compute-sockets/server.rs"
 required-features = ["psty"]
+
+[[example]]
+name = "prepare_files_server"
+path = "examples/match-compute-parallel/server/prepare_files_server.rs"
+required-features = ["psty", "serde1"]
+
+[[example]]
+name = "prepare_files_client"
+path = "examples/match-compute-parallel/client/prepare_files_client.rs"
+required-features = ["psty", "serde1"]
+
+[[example]]
+name = "server_thread"
+path = "examples/match-compute-parallel/server/server_thread.rs"
+required-features = ["psty", "serde1"]
+
+[[example]]
+name = "client_thread"
+path = "examples/match-compute-parallel/client/client_thread.rs"
+required-features = ["psty", "serde1"]
