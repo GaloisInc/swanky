@@ -7,7 +7,8 @@ use scuttlebutt::{AesRng, TcpChannel};
 
 use std::{
     env,
-    fs::{read_to_string},
+    fs::{File, read_to_string},
+    io::Write,
     net::{TcpStream},
 };
 use serde_json;
@@ -30,7 +31,11 @@ fn client_protocol(mut stream: TcpChannel<TcpStream>, nthreads: usize) {
     }
 
     let mut psi = Receiver::init(&mut stream, &mut rng).unwrap();
-    let output = psi.compute_aggregates(aggregates, &mut stream,&mut rng);
+    let output = psi.compute_aggregates(aggregates, &mut stream,&mut rng).unwrap();
+
+    let path_result = "./result.txt".to_owned();
+    let mut file_result = File::create(path_result).unwrap();
+    file_result.write(&output.to_le_bytes()).unwrap();
 
     println!("output {:?}", output);
 }
