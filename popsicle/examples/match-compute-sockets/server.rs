@@ -23,7 +23,8 @@ pub fn int_vec_block512(values: Vec<u64>) -> Vec<Block512> {
 }
 
 pub fn rand_u64_vec<RNG: CryptoRng + Rng>(n: usize, modulus: u64, rng: &mut RNG) -> Vec<u64>{
-    (0..n).map(|_| rng.gen::<u64>()%modulus).collect()
+    (0..n).map(|_| 100).collect()
+    // rng.gen::<u64>()%modulus
 }
 
 pub fn enum_ids(n: usize, id_size: usize) ->Vec<Vec<u8>>{
@@ -38,7 +39,7 @@ pub fn enum_ids(n: usize, id_size: usize) ->Vec<Vec<u8>>{
 
 fn server_protocol(mut stream: TcpChannel<TcpStream>) {
     const ITEM_SIZE: usize = 16;
-    const SET_SIZE: usize = 1 << 26;
+    const SET_SIZE: usize = 1 << 7;
 
     let mut rng = AesRng::new();
     let sender_inputs = enum_ids(SET_SIZE, ITEM_SIZE);
@@ -51,7 +52,7 @@ fn server_protocol(mut stream: TcpChannel<TcpStream>) {
 }
 
 fn main() {
-    let listener = TcpListener::bind("0.0.0.0:3000").unwrap();
+    let listener = TcpListener::bind("localhost:3000").unwrap();
     // accept connections and process them, spawning a new thread for each one
     println!("Server listening on port 3000");
     for stream in listener.incoming() {

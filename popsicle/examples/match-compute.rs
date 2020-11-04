@@ -1,31 +1,30 @@
-use popsicle::psty_payload::{Sender, Receiver};
+use popsicle::psty_payload_large::{Sender, Receiver};
 
 use rand::{CryptoRng, Rng};
 use scuttlebutt::{AesRng, Block512, TrackChannel};
 
 use std::{
-    io::{BufRead, BufReader, BufWriter},
-    fs::File,
+    io::{BufReader, BufWriter},
+    // fs::File,
     os::unix::net::UnixStream,
     time::SystemTime,
 };
 
-pub fn int_vec_block512(values: Vec<u32>) -> Vec<Block512> {
+pub fn int_vec_block512(values: Vec<u64>) -> Vec<Block512> {
     values.into_iter()
           .map(|item|{
             let value_bytes = item.to_le_bytes();
             let mut res_block = [0 as u8; 64];
-            for i in 0..4{
+            for i in 0..8{
                 res_block[i] = value_bytes[i];
             }
             Block512::from(res_block)
          }).collect()
 }
 
-pub fn rand_u32_vec<RNG: CryptoRng + Rng>(n: usize, modulus: u32, rng: &mut RNG) -> Vec<u32>{
-    (0..n).map(|_| rng.gen::<u32>()%modulus).collect()
+pub fn rand_u64_vec<RNG: CryptoRng + Rng>(n: usize, modulus: u64, rng: &mut RNG) -> Vec<u64>{
+    (0..n).map(|_| rng.gen::<u64>()%modulus).collect()
 }
-
 
 pub fn enum_ids(n: usize, id_size: usize) ->Vec<Vec<u8>>{
     let mut ids = Vec::with_capacity(n);
@@ -36,30 +35,24 @@ pub fn enum_ids(n: usize, id_size: usize) ->Vec<Vec<u8>>{
     ids
 }
 
-pub fn read_from_file(file_name: String) -> Vec<Vec<u32>>{
-    let mut file = BufReader::new(File::open(file_name).unwrap());
-    file.lines()
-        .map(|l| l.unwrap().split(",")
-                 .map(|number| number.parse().unwrap())
-                 .collect())
-        .collect()
-}
 
 fn protocol(){
-    const ITEM_SIZE: usize = 3;
-    const SET_SIZE: usize = 1 << 6;
+
+    const ITEM_SIZE: usize = 1;
+    const SET_SIZE: usize = 1<<3;
+    const SET_SIZE_RX: usize = 1<<3;
 
     let mut rng = AesRng::new();
     let (sender, receiver) = UnixStream::pair().unwrap();
 
     let ids_sender = enum_ids(SET_SIZE, ITEM_SIZE);
-    let ids_receiver = ids_sender.clone();
+    let ids_receiver = enum_ids(SET_SIZE_RX, ITEM_SIZE);
 
     let sender_inputs = ids_sender.clone();
     let receiver_inputs = ids_receiver.clone();
 
-    let payloads = rand_u32_vec(SET_SIZE, 65535, &mut rng);
-    let weights = rand_u32_vec(SET_SIZE, 1000000, &mut rng);
+    let payloads = rand_u64_vec(SET_SIZE, u64::pow(10,1), &mut rng);
+    let weights = rand_u64_vec(SET_SIZE_RX, u64::pow(10,1), &mut rng);
 
     let payloads_sender = int_vec_block512(payloads.clone());
     let payloads_receiver =  int_vec_block512(weights.clone());
