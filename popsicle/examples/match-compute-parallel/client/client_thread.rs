@@ -1,36 +1,47 @@
-use popsicle::psty_payload_large::{Sender, Receiver};
+use popsicle::psty_payload_large::{Receiver};
 
-use rand::{CryptoRng, Rng};
-use scuttlebutt::{AesRng, Block512, TcpChannel};
+use scuttlebutt::{AesRng, Block, Block512, TcpChannel};
 
 use std::{
     env,
     fs::{File, read_to_string},
-    io::{Read, Write},
-    net::{TcpListener, TcpStream},
-    thread,
-    time::SystemTime,
+    io::{Write},
+    net::{TcpStream},
 };
-use serde_json::{Result, Value};
+use serde_json;
+
+fn read_from_file(path: &str, file_name: &str)-> String{
+    let data_path = format!("{}{}", path, file_name);
+    read_to_string(data_path).unwrap()
+}
+
 
 fn client_protocol(mut stream: TcpChannel<TcpStream>, thread_id: usize) {
+    let mut rng = AesRng::new();
 
-    let mut path = "./examples/match-compute-parallel/client/thread".to_owned();
+    let mut path = "./thread".to_owned();
     path.push_str(&thread_id.to_string());
 
-    let t_path = format!("{}{}", path,"/table.txt");
-    let table = read_to_string(t_path).expect("Something went wrong reading the file");
-    let table: Value = serde_json::from_str(&table).unwrap();
+    let payload: Vec<Vec<Block512>> = serde_json::from_str(&read_from_file(&path, "/payload.txt")).unwrap();
+    let table: Vec<Vec<Block>> = serde_json::from_str(&&read_from_file(&path, "/table.txt")).unwrap();
 
-    println!("table {:?}", table);
+    let mut psi = Receiver::init(&mut stream, &mut rng).unwrap();
+    let acc = psi.compute_payload(table, payload, &mut stream, &mut rng).unwrap();
+
+    path.push_str("/output.txt");
+    let mut file_output = File::create(path).unwrap();
+    let output_json = serde_json::to_string(&acc.wires()).unwrap();
+    file_output.write(output_json.as_bytes()).unwrap();
 }
 
 fn main() {
     let args: Vec<String> = env::args().collect();
     let thread_id = args[1].parse::<usize>().unwrap();
+    let port_prefix = "0.0.0.0:800".to_owned();
+    let port = format!("{}{}", port_prefix, thread_id.to_string());
 
-    match TcpStream::connect("0.0.0.0:3000") {
-        Ok(mut stream) => {
+    match TcpStream::connect(port) {
+        Ok(stream) => {
             let channel = TcpChannel::new(stream);
             client_protocol(channel, thread_id);
         },

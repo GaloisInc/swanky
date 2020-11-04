@@ -1,15 +1,12 @@
-use popsicle::psty_payload_large::{Sender, Receiver};
+use popsicle::psty_payload_large::{Receiver};
 
 use rand::{CryptoRng, Rng};
-use serde::{Serialize, Deserialize};
 use scuttlebutt::{AesRng, Block512, Block, TcpChannel};
 
 use std::{
-    fs::{File, create_dir, create_dir_all},
+    fs::{File, create_dir_all},
     io::{Write},
-    net::{TcpListener, TcpStream},
-    thread,
-    time::SystemTime,
+    net::{TcpStream},
 };
 
 pub fn int_vec_block512(values: Vec<u64>) -> Vec<Block512> {
@@ -25,8 +22,9 @@ pub fn int_vec_block512(values: Vec<u64>) -> Vec<Block512> {
 }
 
 pub fn rand_u64_vec<RNG: CryptoRng + Rng>(n: usize, modulus: u64, rng: &mut RNG) -> Vec<u64>{
+    let _ = rng.gen::<u64>()%modulus;
     (0..n).map(|_| 100).collect()
-    // rng.gen::<u64>()%modulus
+    //
 }
 
 pub fn enum_ids(n: usize, id_size: usize) ->Vec<Vec<u8>>{
@@ -55,15 +53,14 @@ fn client_protocol(mut stream: TcpChannel<TcpStream>){
     let (cuckoo, table, payload) = psi.bucketize_data(&receiver_inputs, &payloads, MEGA_SIZE, &mut stream, &mut rng).unwrap();
 
     let megabin_per_thread = ((cuckoo.nmegabins as f32)/(N_THREADS as f32)).ceil() as usize;
-    let megabin_last_thread = cuckoo.nmegabins % N_THREADS;
 
     let table:Vec<&[Vec<Block>]> = table.chunks(megabin_per_thread).collect();
     let payload: Vec<&[Vec<Block512>]>= payload.chunks(megabin_per_thread).collect();
 
     for i in 0 ..N_THREADS{
-        let mut path = "./examples/match-compute-parallel/client/thread".to_owned();
+        let mut path = "./thread".to_owned();
         path.push_str(&i.to_string());
-        create_dir_all(path.clone());
+        let _ = create_dir_all(path.clone());
 
         let mut file_table = File::create(format!("{}{}", path,"/table.txt")).unwrap();
         let mut file_payload = File::create(format!("{}{}", path,"/payload.txt")).unwrap();
@@ -79,7 +76,7 @@ fn client_protocol(mut stream: TcpChannel<TcpStream>){
 
 fn main() {
     match TcpStream::connect("0.0.0.0:3000") {
-        Ok(mut stream) => {
+        Ok(stream) => {
             let channel = TcpChannel::new(stream);
             client_protocol(channel);
         },
