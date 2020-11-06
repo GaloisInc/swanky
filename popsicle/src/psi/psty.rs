@@ -103,6 +103,7 @@ impl Sender {
         let total = hashes.len();
         // map inputs to table using all hash functions
         let nbins = channel.read_usize()?;
+        println!("bin {:?}", nbins);
         let mut table = vec![Vec::new(); nbins];
 
         // stores how elements are mapped to bin for

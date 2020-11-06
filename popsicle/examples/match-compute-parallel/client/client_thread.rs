@@ -30,7 +30,7 @@ fn client_protocol(mut stream: TcpChannel<TcpStream>, thread_id: usize) {
 
     path.push_str("/output.txt");
     let mut file_output = File::create(path).unwrap();
-    let output_json = serde_json::to_string(&acc.wires()).unwrap();
+    let output_json = serde_json::to_string(&acc.wires().to_vec()).unwrap();
     file_output.write(output_json.as_bytes()).unwrap();
 }
 

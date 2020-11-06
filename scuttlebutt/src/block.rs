@@ -10,8 +10,6 @@
 use crate::Aes256;
 #[cfg(feature = "curve25519-dalek")]
 use curve25519_dalek::ristretto::RistrettoPoint;
-#[cfg(feature = "serde")]
-use std::convert::TryInto;
 use std::{
     arch::x86_64::*,
     hash::{Hash, Hasher},
@@ -303,8 +301,6 @@ impl Hash for Block {
     }
 }
 
-#[cfg(feature = "serde")]
-use serde::de::Visitor;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 

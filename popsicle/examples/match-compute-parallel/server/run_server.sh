@@ -1,3 +1,4 @@
+set -e
 echo "\n"
 echo "*******************Starting Files Preparation*******************"
 echo "\n"

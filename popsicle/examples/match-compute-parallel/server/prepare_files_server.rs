@@ -12,6 +12,7 @@ use std::{
     process::{exit},
     collections::HashMap,
 };
+use serde;
 use serde_json;
 
 pub fn int_vec_block512(values: Vec<u64>) -> Vec<Block512> {
@@ -27,9 +28,7 @@ pub fn int_vec_block512(values: Vec<u64>) -> Vec<Block512> {
 }
 
 pub fn rand_u64_vec<RNG: CryptoRng + Rng>(n: usize, modulus: u64, rng: &mut RNG) -> Vec<u64>{
-    let _ = rng.gen::<u64>()%modulus;
-    (0..n).map(|_| 100).collect()
-    //
+    (0..n).map(|_| rng.gen::<u64>()%modulus).collect()
 }
 
 pub fn enum_ids(n: usize, id_size: usize) ->Vec<Vec<u8>>{

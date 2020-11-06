@@ -1,3 +1,4 @@
+set -e
 echo "*******************Starting Files Preparation*******************"
 echo "\n"
 cargo run --example prepare_files_client  --features="psty serde1"

@@ -101,6 +101,7 @@ impl Sender {
         let total = hashes.len();
         // map inputs to table using all hash functions
         let nbins = channel.read_usize()?;
+
         let mut table = vec![Vec::new(); nbins];
 
         // stores how elements are mapped to bin for
@@ -271,6 +272,7 @@ impl Receiver {
 
         // Build `table` to include a cuckoo hash entry xored with its hash
         // index, if such a entry exists, or a random value.
+
         let table = cuckoo
             .items
             .iter()
@@ -428,7 +430,7 @@ fn mask_payload_crt<RNG>(x: Block512, y: Block512, rng:&mut RNG) -> Block512
     let res = fancy_garbling::util::crt_inv(&res_crt, &q).to_le_bytes();
     let mut block = [0 as u8; 64];
     for i in 0..64{
-        if i < PAYLOAD_PRIME_SIZE{
+        if i < res.len(){
             block[i] = res[i];
         }else{
             block[i] = rng.gen::<u8>();

@@ -15,7 +15,7 @@ publish = false
 [features]
 nightly = ["rand/nightly", "scuttlebutt/nightly", "ocelot/nightly", "ocelot/nightly"]
 psty = ["fancy-garbling", "openssl"]
-serde1 = ["serde", "serde_json"]
+serde1 = ["serde", "serde_json", "fancy-garbling/serde1"]
 
 [dependencies]
 ocelot         = { path = "../ocelot" }
@@ -23,9 +23,9 @@ scuttlebutt    = { path = "../scuttlebutt",  features = ["serde1"]}
 itertools      = "0.8"
 rand           = "0.7"
 sha2           = "0.8"
-serde          = {version = "1.0.117", optional = true }
+serde          = {version = "1.0.117", features = ["derive"], optional = true }
 serde_json     = {version = "1.0.59", optional = true }
-fancy-garbling = { path = "../fancy-garbling", optional = true }
+fancy-garbling = { path = "../fancy-garbling", features = ["serde1"], optional = true }
 openssl        = { version = "0.10.28", optional = true }
 
 [dev-dependencies]
@@ -90,4 +90,14 @@ required-features = ["psty", "serde1"]
 [[example]]
 name = "client_thread"
 path = "examples/match-compute-parallel/client/client_thread.rs"
+required-features = ["psty", "serde1"]
+
+[[example]]
+name = "join_aggregates_server"
+path = "examples/match-compute-parallel/server/join_aggregates_server.rs"
+required-features = ["psty", "serde1"]
+
+[[example]]
+name = "join_aggregates_client"
+path = "examples/match-compute-parallel/client/join_aggregates_client.rs"
 required-features = ["psty", "serde1"]

@@ -19,12 +19,12 @@ pub(crate) struct CuckooItem {
 }
 
 #[derive(Clone)]
-pub(crate) struct CuckooHashLarge{
+pub struct CuckooHashLarge{
     pub(crate) items: Vec<CuckooHash>,
-    pub(crate) nbins: usize, // total number of bins
-    pub(crate) nmegabins: usize,
-    pub(crate) megasize: usize,
-    pub(crate) nhashes: usize,
+    pub nbins: usize, // total number of bins
+    pub nmegabins: usize,
+    pub megasize: usize,
+    pub nhashes: usize,
 }
 
 #[derive(Clone)]
@@ -209,7 +209,7 @@ impl CuckooHashLarge{
         for _ in 0..NITERS {
             item.entry &= mask;
 
-            let mut i = CuckooHash::bin(item.entry, item.hash_index, self.nbins);
+            let i = CuckooHash::bin(item.entry, item.hash_index, self.nbins);
             let small_i = i % self.megasize;
             let megabin_i = i / self.megasize;
 
@@ -226,15 +226,6 @@ impl CuckooHashLarge{
             }
         }
         Err(Error::CuckooHashFull)
-    }
-}
-
-impl Debug for CuckooHashLarge {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        for i in 0..self.nmegabins {
-            println!("Megabin{}: {:?}", i, self.items[i]);
-        }
-        Ok(())
     }
 }
 
