@@ -195,6 +195,7 @@ mod tests {
                 .zip(m1s.into_iter())
                 .collect::<Vec<(Block, Block)>>();
             ot.send(&mut channel, &ms, &mut rng).unwrap();
+            ot.send(&mut channel, &ms, &mut rng).unwrap();
         });
         let mut rng = AesRng::new();
         let reader = BufReader::new(receiver.try_clone().unwrap());
@@ -202,10 +203,14 @@ mod tests {
         let mut channel = Channel::new(reader, writer);
         let mut ot = OTReceiver::init(&mut channel, &mut rng).unwrap();
         let result = ot.receive(&mut channel, &bs, &mut rng).unwrap();
-        handle.join().unwrap();
         for j in 0..128 {
             assert_eq!(result[j], if bs[j] { m1s_[j] } else { m0s_[j] });
         }
+        let result = ot.receive(&mut channel, &bs, &mut rng).unwrap();
+        for j in 0..128 {
+            assert_eq!(result[j], if bs[j] { m1s_[j] } else { m0s_[j] });
+        }
+        handle.join().unwrap();
     }
 
     fn test_otext<OTSender: Sender<Msg = Block>, OTReceiver: Receiver<Msg = Block> + Display>(

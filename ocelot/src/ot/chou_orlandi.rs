@@ -33,6 +33,7 @@ use scuttlebutt::{AbstractChannel, Block, Malicious, SemiHonest};
 pub struct Sender {
     y: Scalar,
     s: RistrettoPoint,
+    counter: u128,
 }
 
 impl OtSender for Sender {
@@ -46,7 +47,7 @@ impl OtSender for Sender {
         let s = &y * &RISTRETTO_BASEPOINT_TABLE;
         channel.write_pt(&s)?;
         channel.flush()?;
-        Ok(Self { y, s })
+        Ok(Self { y, s, counter: 0 })
     }
 
     fn send<C: AbstractChannel, RNG: CryptoRng + Rng>(
@@ -60,11 +61,12 @@ impl OtSender for Sender {
             .map(|i| {
                 let r = channel.read_pt()?;
                 let yr = self.y * r;
-                let k0 = Block::hash_pt(i, &yr);
-                let k1 = Block::hash_pt(i, &(yr - ys));
+                let k0 = Block::hash_pt(self.counter + i as u128, &yr);
+                let k1 = Block::hash_pt(self.counter + i as u128, &(yr - ys));
                 Ok((k0, k1))
             })
             .collect::<Result<Vec<(Block, Block)>, Error>>()?;
+        self.counter += inputs.len() as u128;
         for (input, k) in inputs.iter().zip(ks.into_iter()) {
             let c0 = k.0 ^ input.0;
             let c1 = k.1 ^ input.1;
@@ -85,6 +87,7 @@ impl std::fmt::Display for Sender {
 /// Oblivious transfer receiver.
 pub struct Receiver {
     s: RistrettoBasepointTable,
+    counter: u128,
 }
 
 impl OtReceiver for Receiver {
@@ -96,7 +99,7 @@ impl OtReceiver for Receiver {
     ) -> Result<Self, Error> {
         let s = channel.read_pt()?;
         let s = RistrettoBasepointTable::create(&s);
-        Ok(Self { s })
+        Ok(Self { s, counter: 0 })
     }
 
     fn receive<C: AbstractChannel, RNG: CryptoRng + Rng>(
@@ -115,10 +118,11 @@ impl OtReceiver for Receiver {
                 let c = if *b { one } else { zero };
                 let r = c + &x * &RISTRETTO_BASEPOINT_TABLE;
                 channel.write_pt(&r)?;
-                Ok(Block::hash_pt(i, &(&x * &self.s)))
+                Ok(Block::hash_pt(self.counter + i as u128, &(&x * &self.s)))
             })
             .collect::<Result<Vec<Block>, Error>>()?;
         channel.flush()?;
+        self.counter += inputs.len() as u128;
         inputs
             .iter()
             .zip(ks.into_iter())
