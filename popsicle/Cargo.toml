@@ -23,6 +23,7 @@ scuttlebutt    = { path = "../scuttlebutt",  features = ["serde1"]}
 itertools      = "0.8"
 rand           = "0.7"
 sha2           = "0.8"
+bincode = "1.3.1"
 serde          = {version = "1.0.117", features = ["derive"], optional = true }
 serde_json     = {version = "1.0.59", optional = true }
 fancy-garbling = { path = "../fancy-garbling", features = ["serde1"], optional = true }
@@ -100,4 +101,16 @@ required-features = ["psty", "serde1"]
 [[example]]
 name = "join_aggregates_client"
 path = "examples/match-compute-parallel/client/join_aggregates_client.rs"
+required-features = ["psty", "serde1"]
+
+
+[[example]]
+name = "run_server"
+path = "examples/match-compute-parallel/server/run_server.rs"
+required-features = ["psty", "serde1"]
+
+
+[[example]]
+name = "run_client"
+path = "examples/match-compute-parallel/client/run_client.rs"
 required-features = ["psty", "serde1"]

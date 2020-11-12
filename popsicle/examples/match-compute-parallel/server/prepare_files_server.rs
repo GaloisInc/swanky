@@ -11,7 +11,9 @@ use std::{
     net::{TcpListener, TcpStream},
     process::{exit},
     collections::HashMap,
+    time::SystemTime,
 };
+use bincode;
 use serde;
 use serde_json;
 
@@ -28,7 +30,9 @@ pub fn int_vec_block512(values: Vec<u64>) -> Vec<Block512> {
 }
 
 pub fn rand_u64_vec<RNG: CryptoRng + Rng>(n: usize, modulus: u64, rng: &mut RNG) -> Vec<u64>{
-    (0..n).map(|_| rng.gen::<u64>()%modulus).collect()
+    (0..n).map(|_| 1000000).collect()
+    // rng.gen::<u64>()%modulus
+
 }
 
 pub fn enum_ids(n: usize, id_size: usize) ->Vec<Vec<u8>>{
@@ -50,9 +54,10 @@ pub fn generate_deltas(primes: &[u16]) -> HashMap<u16, Wire> {
 }
 
 fn server_protocol(mut stream: TcpChannel<TcpStream>) {
-    const ITEM_SIZE: usize = 2;
-    const SET_SIZE: usize = 1 << 2;
-    const N_THREADS: usize = 2;
+    let start = SystemTime::now();
+    const ITEM_SIZE: usize = 16;
+    const SET_SIZE: usize = 1 << 5;
+    const N_THREADS: usize = 4;
     const ELEMENT_SIZES: usize = 64;
 
     let mut rng = AesRng::new();
@@ -74,7 +79,7 @@ fn server_protocol(mut stream: TcpChannel<TcpStream>) {
     let mut psi = Sender::init(&mut stream, &mut rng).unwrap();
 
     let (state, _, nmegabins, megasize) = psi.bucketize_data(&sender_inputs, &weights, &mut stream, &mut rng).unwrap();
-
+    println!("dobne buckets");
     let megabin_per_thread = ((nmegabins as f32)/(N_THREADS as f32)).ceil() as usize;
 
     let ts_id: Vec<&[Block512]>= state.opprf_ids.chunks(megasize).collect();
@@ -97,21 +102,34 @@ fn server_protocol(mut stream: TcpChannel<TcpStream>) {
         let mut file_table = File::create(format!("{}{}", path,"/table.txt")).unwrap();
         let mut file_payload = File::create(format!("{}{}", path,"/payload.txt")).unwrap();
 
-        let ts_id_json = serde_json::to_string(&ts_id[i]).unwrap();
-        let ts_payload_json = serde_json::to_string(&ts_payload[i]).unwrap();
-        let table_json = serde_json::to_string(&table[i]).unwrap();
-        let payload_json = serde_json::to_string(&payload[i]).unwrap();
+        let ts_id_json = bincode::serialize(&ts_id[i]).unwrap();
+        let ts_payload_json = bincode::serialize(&ts_payload[i]).unwrap();
+        let table_json = bincode::serialize(&table[i]).unwrap();
+        let payload_json = bincode::serialize(&payload[i]).unwrap();
 
-        file_ts_id.write(ts_id_json.as_bytes()).unwrap();
-        file_ts_payload.write(ts_payload_json.as_bytes()).unwrap();
-        file_table.write(table_json.as_bytes()).unwrap();
-        file_payload.write(payload_json.as_bytes()).unwrap();
+        file_ts_id.write(&ts_id_json).unwrap();
+        file_ts_payload.write(&ts_payload_json).unwrap();
+        file_table.write(&table_json).unwrap();
+        file_payload.write(&payload_json).unwrap();
     }
+
+    println!(
+        "Sender :: Bucketization time: {} ms",
+        start.elapsed().unwrap().as_millis()
+    );
+    println!(
+        "Sender :: Bucketization time (read): {:.2} Mb",
+        stream.kilobits_read() / 1000.0
+    );
+    println!(
+        "Sender :: Bucketization time  (write): {:.2} Mb",
+        stream.kilobits_written() / 1000.0
+    );
 
 }
 
-fn main() {
-    let listener = TcpListener::bind("localhost:3000").unwrap();
+pub fn prepare_files(){
+    let listener = TcpListener::bind("0.0.0.0:3000").unwrap();
     // accept connections and process them, spawning a new thread for each one
     println!("Server listening on port 3000");
     for stream in listener.incoming() {
@@ -120,7 +138,7 @@ fn main() {
                 println!("New connection: {}", stream.peer_addr().unwrap());
                     let channel = TcpChannel::new(stream);
                     server_protocol(channel);
-                    exit(0);
+                    return;
 
             }
             Err(e) => {

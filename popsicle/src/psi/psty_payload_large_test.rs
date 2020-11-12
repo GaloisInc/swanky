@@ -26,10 +26,14 @@ use ocelot::{
     ot::{AlszReceiver as OtReceiver, AlszSender as OtSender},
 };
 
-use std::time::SystemTime;
-use std::process::{exit};
+use std::{
+    time::SystemTime,
+    process::exit,
+    net::TcpStream,
+};
+
 use rand::{CryptoRng, Rng, RngCore, SeedableRng};
-use scuttlebutt::{AbstractChannel, Block, Block512};
+use scuttlebutt::{AbstractChannel, TcpChannel, Block, Block512};
 
 
 const NHASHES: usize = 3;
@@ -304,8 +308,8 @@ impl SenderState {
 
 impl Receiver {
     /// Initialize the PSI receiver.
-    pub fn init<C: AbstractChannel, RNG: RngCore + CryptoRng + SeedableRng>(
-        channel: &mut C,
+    pub fn init<RNG: RngCore + CryptoRng + SeedableRng>(
+        channel:&mut TcpChannel<TcpStream>,
         rng: &mut RNG,
     ) -> Result<Self, Error> {
         let key = rng.gen();
@@ -319,7 +323,7 @@ impl Receiver {
         //     &mut self,
         //     inputs: &[Msg],
         //     payloads: &[Block512],
-        //     channel: &mut C,
+        //     channel:&mut TcpChannel<TcpStream>,
         //     rng: &mut RNG,
         // ) -> Result<(), Error> {
         //     let megasize =  10 ;
@@ -333,17 +337,17 @@ impl Receiver {
         //     Ok(())
         // }
 
-    pub fn compute_payload<C: AbstractChannel, RNG: RngCore + CryptoRng + SeedableRng<Seed = Block>>(
+    pub fn compute_payload<RNG: RngCore + CryptoRng + SeedableRng<Seed = Block>>(
         &mut self,
         table: Vec<Vec<Block>>,
         payload: Vec<Vec<Block512>>,
         thread_id: usize,
-        channel: &mut C,
+        channel:&mut TcpChannel<TcpStream>,
         rng: &mut RNG,
     ) -> Result<CrtBundle<fancy_garbling::Wire>, Error> {
 
         let mut ev =
-            Evaluator::<C, RNG, OtReceiver>::new(channel.clone(), RNG::from_seed(rng.gen()))?;
+            Evaluator::<TcpChannel<TcpStream>, RNG, OtReceiver>::new(channel.clone(), RNG::from_seed(rng.gen()))?;
         let qs = fancy_garbling::util::primes_with_width(PAYLOAD_SIZE as u32 * 8);
         let q = fancy_garbling::util::product(&qs);
         let mut acc = ev.crt_constant_bundle(0, q)?;
@@ -377,19 +381,27 @@ impl Receiver {
                 "Receiver :: Computation time: {} ms",
                 start.elapsed().unwrap().as_millis()
             );
+            println!(
+                "Receiver Thread {} :: computation (read): {:.2} Mb",thread_id,
+                channel.kilobits_read() / 1000.0
+            );
+            println!(
+                "Receiver Thread {} :: computation (write): {:.2} Mb",thread_id,
+                channel.kilobits_written() / 1000.0
+            );
 
         }
         Ok(acc)
     }
 
-    pub fn compute_aggregates<C: AbstractChannel , RNG: RngCore + CryptoRng + SeedableRng<Seed = Block>>(
+    pub fn compute_aggregates<RNG: RngCore + CryptoRng + SeedableRng<Seed = Block>>(
         &mut self,
         aggregates: Vec<Vec<Wire>>,
-        channel: &mut C,
+        channel:&mut TcpChannel<TcpStream>,
         rng: &mut RNG,
     ) -> Result<u64, Error> {
         let mut ev =
-            Evaluator::<C, RNG, OtReceiver>::new(channel.clone(), RNG::from_seed(rng.gen()))?;
+            Evaluator::<TcpChannel<TcpStream>, RNG, OtReceiver>::new(channel.clone(), RNG::from_seed(rng.gen()))?;
         let qs = fancy_garbling::util::primes_with_width(PAYLOAD_SIZE as u32 * 8);
 
         let mut acc = CrtBundle::new(aggregates[0].clone());
@@ -404,12 +416,12 @@ impl Receiver {
         Ok(aggregate as u64)
     }
 
-    pub fn bucketize_data<C: AbstractChannel, RNG: RngCore + CryptoRng + SeedableRng>(
+    pub fn bucketize_data<RNG: RngCore + CryptoRng + SeedableRng>(
         &mut self,
         inputs: &[Msg],
         payloads: &[Block512],
         megasize: usize,
-        channel: &mut C,
+        channel:&mut TcpChannel<TcpStream>,
         rng: &mut RNG,
     ) -> Result<(CuckooHashLarge, Vec<Vec<Block>>, Vec<Vec<Block512>>), Error>{
 
@@ -454,10 +466,10 @@ impl Receiver {
         ))
     }
     // Run the PSI protocol over `inputs`.
-    pub fn receive_data<C: AbstractChannel, RNG: RngCore + CryptoRng + SeedableRng>(
+    pub fn receive_data<RNG: RngCore + CryptoRng + SeedableRng>(
         &mut self,
         state:&mut ReceiverState,
-        channel: &mut C,
+        channel:&mut TcpChannel<TcpStream>,
         rng: &mut RNG,
     ) -> Result<(), Error>{
         state.opprf_ids = self.opprf.receive(channel, &state.table, rng)?;

@@ -9,6 +9,8 @@ pub mod kmprt;
 pub mod psty_payload;
 #[cfg(feature = "psty")]
 pub mod psty_payload_large;
+#[cfg(feature = "psty")]
+pub mod psty_payload_large_test;
 
 #[cfg(feature = "psty")]
 pub mod psty;
@@ -39,6 +41,13 @@ pub type ExtendedSenderPayloadLarge = psty_payload_large::Sender;
 #[cfg(feature = "psty")]
 /// Extended private set intersection receiver.
 pub type ExtendedReceiverPayloadLarge  = psty_payload_large::Receiver;
+
+#[cfg(feature = "psty")]
+/// Extended private set intersection sender.
+pub type SenderTest = psty_payload_large_test::Sender;
+#[cfg(feature = "psty")]
+/// Extended private set intersection receiver.
+pub type ReceiverTest  = psty_payload_large_test::Receiver;
 
 
 

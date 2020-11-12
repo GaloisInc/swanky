@@ -10,6 +10,7 @@ use std::{
     fs::{read_to_string},
     net::{TcpListener, TcpStream},
     process::{exit},
+    time::SystemTime,
 };
 use serde_json;
 
@@ -19,6 +20,7 @@ fn read_from_file(path: &str, file_name: &str)-> String{
 }
 
 fn server_protocol(mut stream: TcpChannel<TcpStream>, nthreads: usize) {
+    let start = SystemTime::now();
     let mut rng = AesRng::new();
 
     let mut aggregates= Vec::new();
@@ -35,13 +37,23 @@ fn server_protocol(mut stream: TcpChannel<TcpStream>, nthreads: usize) {
     let output = psi.compute_aggregates(aggregates, &path_delta, &mut stream,&mut rng);
 
     println!("output {:?}", output);
+
+    println!(
+        "Sender :: Joining threads results time: {} ms",
+        start.elapsed().unwrap().as_millis()
+    );
+    println!(
+        "Sender :: Joining threads results time (read): {:.2} Mb",
+        stream.kilobits_read() / 1000.0
+    );
+    println!(
+        "Sender :: Joining threads results time  (write): {:.2} Mb",
+        stream.kilobits_written() / 1000.0
+    );
 }
 
-fn main() {
-    let args: Vec<String> = env::args().collect();
-    let nthreads = args[1].parse::<usize>().unwrap();
-
-    let listener = TcpListener::bind("localhost:3000").unwrap();
+pub fn join_aggregates(nthreads: usize) {
+    let listener = TcpListener::bind("0.0.0.0:3000").unwrap();
     // accept connections and process them, spawning a new thread for each one
     println!("Server listening on port 3000");
     for stream in listener.incoming() {
@@ -50,7 +62,7 @@ fn main() {
                 println!("New connection: {}", stream.peer_addr().unwrap());
                 let stream = TcpChannel::new(stream);
                 server_protocol(stream, nthreads);
-                exit(0);
+                return;
             }
             Err(e) => {
                 println!("Error: {}", e);

@@ -106,7 +106,7 @@ impl CuckooHash {
         };
         let mask = Block::from(0xFFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FF00);
 
-        for _ in 0..NITERS {
+        for _ in 0..NITERS{
             item.entry &= mask;
             let i = CuckooHash::bin(item.entry, item.hash_index, self.nbins);
             item.entry ^= Block::from(item.hash_index as u128);
@@ -211,7 +211,7 @@ impl CuckooHashLarge{
 
             let i = CuckooHash::bin(item.entry, item.hash_index, self.nbins);
             let small_i = i % self.megasize;
-            let megabin_i = i / self.megasize;
+            let megabin_i =  i / self.megasize;
 
             item.entry ^= Block::from(item.hash_index as u128);
             let opt_item = self.items[megabin_i].items[small_i].replace(item);

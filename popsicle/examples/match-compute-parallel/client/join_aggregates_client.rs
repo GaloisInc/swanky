@@ -10,6 +10,7 @@ use std::{
     fs::{File, read_to_string},
     io::Write,
     net::{TcpStream},
+    time::SystemTime,
 };
 use serde_json;
 
@@ -19,6 +20,7 @@ fn read_from_file(path: &str, file_name: &str)-> String{
 }
 
 fn client_protocol(mut stream: TcpChannel<TcpStream>, nthreads: usize) {
+    let start = SystemTime::now();
     let mut rng = AesRng::new();
 
     let mut aggregates= Vec::new();
@@ -38,12 +40,21 @@ fn client_protocol(mut stream: TcpChannel<TcpStream>, nthreads: usize) {
     file_result.write(&output.to_le_bytes()).unwrap();
 
     println!("output {:?}", output);
+    println!(
+        "Receiver :: Joining threads results time: {} ms",
+        start.elapsed().unwrap().as_millis()
+    );
+    println!(
+        "Receiver :: Joining threads results time (read): {:.2} Mb",
+        stream.kilobits_read() / 1000.0
+    );
+    println!(
+        "Receiver :: Joining threads results time  (write): {:.2} Mb",
+        stream.kilobits_written() / 1000.0
+    );
 }
 
-fn main() {
-    let args: Vec<String> = env::args().collect();
-    let nthreads = args[1].parse::<usize>().unwrap();
-
+pub fn join_aggregates(nthreads: usize) {
     match TcpStream::connect("0.0.0.0:3000") {
         Ok(stream) => {
             let channel = TcpChannel::new(stream);
