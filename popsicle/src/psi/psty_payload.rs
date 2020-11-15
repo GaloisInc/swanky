@@ -89,11 +89,8 @@ impl Sender {
         channel: &mut C,
         rng: &mut RNG,
     ) -> Result<Self, Error> {
-        println!("yo01");
         let key = channel.read_block()?;
-        println!("yo31");
         let opprf = KmprtSender::init(channel, rng)?;
-        println!("yo21");
         let opprf_payload = KmprtSender::init(channel, rng)?;
         Ok(Self { key, opprf, opprf_payload })
     }
@@ -192,10 +189,14 @@ impl Sender {
                 "Sender :: Computation time: {} ms",
                 start.elapsed().unwrap().as_millis()
             );
-            gb.outputs(&acc.wires().to_vec()).unwrap();
+
+            // For tesint purposes, output partial states:
+            //
+            // gb.outputs(&acc.wires().to_vec()).unwrap();
+            
             channel.flush()?;
         }
-        println!("sender done");
+        println!("Sender done");
         Ok(acc)
     }
 
@@ -246,7 +247,7 @@ impl Sender {
            for h in 0..NHASHES {
                let bin = CuckooHash::bin(x, h, nbins);
                table[bin].push(x ^ Block::from(h as u128));
-               payload[bin].push(mask_payload_crt(*p, ts_payload[bin], rng));
+               payload[bin].push(utils::mask_payload_crt(*p, ts_payload[bin], rng));
                bins.push(bin);
            }
            // if j = H1(y) = H2(y) for some y, then P2 adds a uniformly random element to
@@ -353,14 +354,11 @@ impl Receiver {
         channel: &mut C,
         rng: &mut RNG,
     ) -> Result<Self, Error> {
-        println!("yorx0");
         let key = rng.gen();
         channel.write_block(&key)?;
-        println!("yorx");
+
         let opprf = KmprtReceiver::init(channel, rng)?;
-        println!("yorx1");
         let opprf_payload = KmprtReceiver::init(channel, rng)?;
-        println!("hala");
         Ok(Self { key, opprf, opprf_payload })
     }
 
@@ -459,15 +457,14 @@ impl Receiver {
             let partial: CrtBundle<fancy_garbling::Wire> = state.build_and_compute_circuit(&mut ev, channel).unwrap();
             acc = ev.crt_add(&acc, &partial).unwrap();
 
-            let mpc_outs = ev
-                .outputs(&acc.wires().to_vec()).unwrap()
-                .expect("evaluator should produce outputs");
-            let aggregate = fancy_garbling::util::crt_inv(&mpc_outs, &qs);
-            if(aggregate as u64 > u64::pow(2,63)){
-                println!("megabin{:?}", i);
-                println!("bad thread {:?}", thread_id);
-            }
-            println!("Partial output = {:?}", aggregate);
+            // For testing purposes, output partial states:
+            //
+            // let mpc_outs = ev
+            //     .outputs(&acc.wires().to_vec()).unwrap()
+            //     .expect("evaluator should produce outputs");
+            // let aggregate = fancy_garbling::util::crt_inv(&mpc_outs, &qs);
+            // println!("Partial output = {:?}", aggregate);
+
             channel.flush()?;
             println!(
                 "Receiver :: Computation time: {} ms",
@@ -651,6 +648,47 @@ impl ReceiverState {
     }
 }
 
+fn encode_inputs(opprf_ids: &[Block512]) -> Vec<u16> {
+    opprf_ids
+        .iter()
+        .flat_map(|blk| {
+            blk.prefix(HASH_SIZE)
+                .iter()
+                .flat_map(|byte| (0..8).map(|i| u16::from((byte >> i) & 1_u8)).collect_vec())
+        })
+        .collect()
+}
+
+
+fn encode_payloads(payload: &[Block512]) -> Vec<u16> {
+    let q = fancy_garbling::util::primes_with_width(PAYLOAD_SIZE as u32 * 8);
+    payload
+        .iter()
+        .flat_map(|blk| {
+             let b = blk.prefix(PAYLOAD_SIZE);
+             let mut b_8 = [0 as u8; 16];
+             for i in 0..PAYLOAD_SIZE{
+                 b_8[i] = b[i];
+             }
+             fancy_garbling::util::crt(u128::from_le_bytes(b_8), &q)
+        })
+        .collect()
+}
+
+fn encode_opprf_payload(opprf_ids: &[Block512]) -> Vec<u16> {
+let q = fancy_garbling::util::primes_with_width(PAYLOAD_SIZE as u32 * 8);
+    opprf_ids
+        .iter()
+        .flat_map(|blk| {
+             let b = blk.prefix(PAYLOAD_PRIME_SIZE);
+             let mut b_8 = [0 as u8; 16];
+             for i in 0..PAYLOAD_PRIME_SIZE{
+                 b_8[i] = b[i];
+             }
+             fancy_garbling::util::crt(u128::from_le_bytes(b_8), &q)
+        })
+        .collect()
+}
 /// Fancy function to compute a weighted average
 /// where one party provides the weights and the other
 //  the values
@@ -722,81 +760,4 @@ fn fancy_compute_payload_aggregate<F: fancy_garbling::FancyReveal + Fancy>(
     }
     println!("done with circuit");
     Ok(acc)
-}
-fn encode_inputs(opprf_ids: &[Block512]) -> Vec<u16> {
-    opprf_ids
-        .iter()
-        .flat_map(|blk| {
-            blk.prefix(HASH_SIZE)
-                .iter()
-                .flat_map(|byte| (0..8).map(|i| u16::from((byte >> i) & 1_u8)).collect_vec())
-        })
-        .collect()
-}
-
-
-fn encode_payloads(payload: &[Block512]) -> Vec<u16> {
-    let q = fancy_garbling::util::primes_with_width(PAYLOAD_SIZE as u32 * 8);
-    payload
-        .iter()
-        .flat_map(|blk| {
-             let b = blk.prefix(PAYLOAD_SIZE);
-             let mut b_8 = [0 as u8; 16];
-             for i in 0..PAYLOAD_SIZE{
-                 b_8[i] = b[i];
-             }
-             fancy_garbling::util::crt(u128::from_le_bytes(b_8), &q)
-        })
-        .collect()
-}
-
-fn encode_opprf_payload(opprf_ids: &[Block512]) -> Vec<u16> {
-let q = fancy_garbling::util::primes_with_width(PAYLOAD_SIZE as u32 * 8);
-    opprf_ids
-        .iter()
-        .flat_map(|blk| {
-             let b = blk.prefix(PAYLOAD_PRIME_SIZE);
-             let mut b_8 = [0 as u8; 16];
-             for i in 0..PAYLOAD_PRIME_SIZE{
-                 b_8[i] = b[i];
-             }
-             fancy_garbling::util::crt(u128::from_le_bytes(b_8), &q)
-        })
-        .collect()
-}
-
-
-fn mask_payload_crt<RNG>(x: Block512, y: Block512, rng:&mut RNG) -> Block512
-                        where RNG: RngCore + CryptoRng{
-
-    let x_crt = block512_to_crt(x);
-    let y_crt = block512_to_crt(y);
-    let q = fancy_garbling::util::primes_with_width(PAYLOAD_SIZE as u32 * 8);
-    let mut res_crt = Vec::new();
-    for i in 0..q.len(){
-        res_crt.push((x_crt[i]+y_crt[i]) % q[i]);
-    }
-    let res = fancy_garbling::util::crt_inv(&res_crt, &q).to_le_bytes();
-    let mut block = [0 as u8; 64];
-    for i in 0..64{
-        if i < res.len(){
-            block[i] = res[i];
-        }else{
-            block[i] = rng.gen::<u8>();
-        }
-    }
-    Block512::from(block)
-}
-
-fn block512_to_crt(b: Block512) -> Vec<u16>{
-    let b_val = b.prefix(PAYLOAD_SIZE);
-
-    let mut b_128 = [0 as u8; 16];
-    for i in 0..PAYLOAD_SIZE{
-        b_128[i] = b_val[i];
-    }
-
-    let q = fancy_garbling::util::primes_with_width(PAYLOAD_SIZE as u32 * 8);
-    let b_crt = fancy_garbling::util::crt(u128::from_le_bytes(b_128), &q);
-    b_crt
 }

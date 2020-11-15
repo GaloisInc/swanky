@@ -82,6 +82,47 @@ pub fn generate_deltas(primes: &[u16]) -> HashMap<u16, Wire> {
     deltas
 }
 
+
+//Assumes payloads are up to 64bit long
+pub fn mask_payload_crt<RNG: Rng + CryptoRng>(x: Block512, y: Block512, rng:&mut RNG)
+        -> Block512{
+
+    let x_crt = block512_to_crt(x);
+    let y_crt = block512_to_crt(y);
+    let q = fancy_garbling::util::primes_with_width(64);
+    let mut res_crt = Vec::new();
+    for i in 0..q.len(){
+        res_crt.push((x_crt[i]+y_crt[i]) % q[i]);
+    }
+    let res = fancy_garbling::util::crt_inv(&res_crt, &q).to_le_bytes();
+    let mut block = [0 as u8; 64];
+    for i in 0..64{
+        if i < res.len(){
+            block[i] = res[i];
+        }else{
+            block[i] = rng.gen::<u8>();
+        }
+    }
+    Block512::from(block)
+}
+
+//Assumes payloads are up to 64bit long i.e 8 bytes
+fn block512_to_crt(b: Block512) -> Vec<u16>{
+    let b_val = b.prefix(8);
+
+    let mut b_128 = [0 as u8; 16];
+
+    // Loop over the 8 bytes of 64b b_val
+    for i in 0..8{
+        b_128[i] = b_val[i];
+    }
+
+    let q = fancy_garbling::util::primes_with_width(64);
+    let b_crt = fancy_garbling::util::crt(u128::from_le_bytes(b_128), &q);
+    b_crt
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
