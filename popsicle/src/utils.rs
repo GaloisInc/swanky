@@ -5,8 +5,11 @@
 // See LICENSE for licensing information.
 
 use rand::{CryptoRng, Rng};
-use scuttlebutt::{AesHash, Block};
+use scuttlebutt::{AesHash, Block, Block512};
 use sha2::{Digest, Sha256};
+use itertools::Itertools;
+use fancy_garbling::Wire;
+use std::collections::HashMap;
 
 // Compress an arbitrary vector into a 128-bit chunk, leaving the final 8-bits
 // as zero. We need to leave 8 bits free in order to add in the hash index when
@@ -43,6 +46,40 @@ pub fn rand_vec<RNG: CryptoRng + Rng>(n: usize, rng: &mut RNG) -> Vec<u8> {
 #[allow(dead_code)] // used in tests
 pub fn rand_vec_vec<RNG: CryptoRng + Rng>(n: usize, m: usize, rng: &mut RNG) -> Vec<Vec<u8>> {
     (0..n).map(|_| rand_vec(m, rng)).collect()
+}
+
+pub fn int_vec_block512(values: Vec<u64>) -> Vec<Block512> {
+    values.into_iter()
+          .map(|item|{
+            let value_bytes = item.to_le_bytes();
+            let mut res_block = [0 as u8; 64];
+            for i in 0..8{
+                res_block[i] = value_bytes[i];
+            }
+            Block512::from(res_block)
+         }).collect()
+}
+
+pub fn rand_u64_vec<RNG: CryptoRng + Rng>(n: usize, modulus: u64, rng: &mut RNG) -> Vec<u64>{
+    (0..n).map(|_| rng.gen::<u64>()%modulus).collect()
+}
+
+pub fn enum_ids(n: usize, id_size: usize) ->Vec<Vec<u8>>{
+    let mut ids = Vec::with_capacity(n);
+    for i in 0..n as u64{
+        let v:Vec<u8> = i.to_le_bytes().iter().take(id_size).cloned().collect();
+        ids.push(v);
+    }
+    ids
+}
+
+pub fn generate_deltas(primes: &[u16]) -> HashMap<u16, Wire> {
+    let mut deltas = HashMap::new();
+    let mut rng = rand::thread_rng();
+    for q in primes{
+        deltas.insert(*q, Wire::rand_delta(&mut rng, *q));
+    }
+    deltas
 }
 
 #[cfg(test)]

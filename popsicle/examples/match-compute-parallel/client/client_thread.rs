@@ -1,4 +1,4 @@
-use popsicle::psty_payload_large::{Receiver};
+use popsicle::psty_payload::{Receiver};
 
 use scuttlebutt::{AesRng, Block, Block512, TcpChannel};
 

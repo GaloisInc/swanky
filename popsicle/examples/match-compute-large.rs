@@ -45,44 +45,43 @@ fn test(vec: Vec<u64>)-> u64{
 
 fn protocol(){
     const ITEM_SIZE: usize = 8;
-    const SET_SIZE: usize = 1 << 8;
+    const SET_SIZE: usize = 1 << 15;
+    const MEGASIZE: usize = 1000;
 
     let mut rng = AesRng::new();
     let (sender, receiver) = UnixStream::pair().unwrap();
+    let values = rand_u64_vec(SET_SIZE, u64::pow(10,6), &mut rng);
 
-    let mut values = rand_u64_vec(SET_SIZE, u64::pow(10,6), &mut rng);
     let sender_ids = enum_ids(SET_SIZE, ITEM_SIZE);
-    let sender_payloads = int_vec_block512(values.clone());
+    let sender_payloads = int_vec_block512(values);
 
-    let receiver_ids = sender_ids.clone();
+    let receiver_ids = sender_inputs.clone();
     let receiver_payloads = sender_payloads.clone();
-    println!("yo0");
-    let handle = std::thread::spawn(move || {
+
+    std::thread::spawn(move || {
         let mut rng = AesRng::new();
         let reader = BufReader::new(sender.try_clone().unwrap());
         let writer = BufWriter::new(sender);
-        let mut channel = TrackChannel::new(reader, writer);
-        println!("yo1");
+        let mut channel = Channel::new(reader, writer);
+
         let mut psi = Sender::init(&mut channel, &mut rng).unwrap();
-        println!("yo2");
-        let _ = psi.full_protocol(&sender_ids, &sender_payloads, &mut channel, &mut rng).unwrap();
+        let _ = psi.full_protocol_large(&sender_ids, &sender_payloads, &mut channel, &mut rng).unwrap();
     });
 
     let mut rng = AesRng::new();
     let reader = BufReader::new(receiver.try_clone().unwrap());
     let writer = BufWriter::new(receiver);
-    let mut channel = TrackChannel::new(reader, writer);
+    let mut channel = Channel::new(reader, writer);
     let mut psi = Receiver::init(&mut channel, &mut rng).unwrap();
 
     let aggregate = psi
-        .full_protocol(&receiver_ids, &receiver_payloads, &mut channel, &mut rng)
+        .full_protocol_large(&receiver_ids, &receiver_payloads, MEGASIZE, &mut channel, &mut rng)
         .unwrap();
-
-    let _ = handle.join().unwrap();
     assert_eq!(aggregate, test(values));
 }
 
 fn main() {
+    // read_from_file("values.txt".to_string());
     protocol();
     println!("Success!");
 }

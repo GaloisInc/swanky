@@ -1,4 +1,4 @@
-use popsicle::psty_payload_large::{Sender, Receiver};
+use popsicle::psty_payload::{Sender, Receiver};
 
 use rand::{CryptoRng, Rng};
 use scuttlebutt::{AesRng, Block512, TcpChannel};
@@ -41,6 +41,7 @@ pub fn enum_ids(n: usize, id_size: usize) ->Vec<Vec<u8>>{
 fn client_protocol(mut stream: TcpChannel<TcpStream>){
     const ITEM_SIZE: usize = 16;
     const SET_SIZE: usize = 1<<10;
+    const MEGASIZE: usize = 1000;
 
     let mut rng = AesRng::new();
     let receiver_inputs = enum_ids(SET_SIZE, ITEM_SIZE);
@@ -48,7 +49,7 @@ fn client_protocol(mut stream: TcpChannel<TcpStream>){
 
     let mut psi = Receiver::init(&mut stream, &mut rng).unwrap();
     let mut state = psi
-        .compute_payload_large(&receiver_inputs, &payloads, &mut stream, &mut rng)
+        .full_protocol_large(&receiver_inputs, &payloads, MEGASIZE, &mut stream, &mut rng)
         .unwrap();
 }
 

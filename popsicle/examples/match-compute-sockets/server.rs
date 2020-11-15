@@ -1,9 +1,14 @@
-use popsicle::psty_payload_large::{Sender, Receiver};
+use popsicle::psty_payload::{Sender, Receiver};
 
 use rand::{CryptoRng, Rng};
 use scuttlebutt::{AesRng, Block512, TcpChannel};
+extern crate fancy_garbling;
+use fancy_garbling::Wire;
 
 use std::{
+    collections::HashMap,
+    fs::{File, create_dir_all},
+    io::{Write},
     net::{TcpListener, TcpStream},
     thread,
     time::SystemTime,
@@ -36,6 +41,14 @@ pub fn enum_ids(n: usize, id_size: usize) ->Vec<Vec<u8>>{
     ids
 }
 
+pub fn generate_deltas(primes: &[u16]) -> HashMap<u16, Wire> {
+    let mut deltas = HashMap::new();
+    let mut rng = rand::thread_rng();
+    for q in primes{
+        deltas.insert(*q, Wire::rand_delta(&mut rng, *q));
+    }
+    deltas
+}
 
 fn server_protocol(mut stream: TcpChannel<TcpStream>) {
     const ITEM_SIZE: usize = 16;
@@ -46,24 +59,34 @@ fn server_protocol(mut stream: TcpChannel<TcpStream>) {
     let weights_vec = rand_u64_vec(SET_SIZE, u64::pow(10,10), &mut rng);
     let weights = int_vec_block512(weights_vec);
 
+    let qs = fancy_garbling::util::primes_with_width(64);
+    let q = fancy_garbling::util::product(&qs);
+
+    let deltas = generate_deltas(&qs);
+    let deltas_json = serde_json::to_string(&deltas).unwrap();
+
+    let path_delta = "./deltas.txt".to_owned();
+    let mut file_deltas = File::create(&path_delta).unwrap();
+    file_deltas.write(deltas_json.as_bytes()).unwrap();
+
     let mut psi = Sender::init(&mut stream, &mut rng).unwrap();
-    let mut state = psi.compute_payload_large(&sender_inputs, &weights, &mut stream, &mut rng).unwrap();
+    let mut state = psi.full_protocol_large(&sender_inputs, &weights, &path_delta, &mut stream, &mut rng).unwrap();
 
 }
 
-fn main() {
-    let listener = TcpListener::bind("localhost:3000").unwrap();
+
+pub fn main(){
+    let listener = TcpListener::bind("0.0.0.0:3000").unwrap();
     // accept connections and process them, spawning a new thread for each one
     println!("Server listening on port 3000");
     for stream in listener.incoming() {
         match stream {
             Ok(stream) => {
                 println!("New connection: {}", stream.peer_addr().unwrap());
-                thread::spawn(move|| {
-                    // connection succeeded
-                    let stream = TcpChannel::new(stream);
-                    server_protocol(stream)
-                });
+                    let channel = TcpChannel::new(stream);
+                    server_protocol(channel);
+                    return;
+
             }
             Err(e) => {
                 println!("Error: {}", e);

@@ -11,8 +11,6 @@ use crate::{cuckoo::CuckooHash, errors::Error, utils};
 use fancy_garbling::{
     twopac::semihonest::{Evaluator, Garbler},
     BinaryBundle,
-    BinaryGadgets,
-    Bundle,
     BundleGadgets,
     CrtBundle,
     CrtGadgets,
@@ -33,10 +31,7 @@ const NHASHES: usize = 3;
 // How many bytes of the hash to use for the equality tests. This affects
 // correctness, with a lower value increasing the likelihood of a false
 // positive.
-const HASH_SIZE: usize = 3;
-
-// How many bytes are used for payloads
-const PAYLOAD_SIZE: usize = 8;
+const HASH_SIZE: usize = 4;
 
 // How many bytes to use to determine whether decryption succeeded in the send/recv
 // payload methods.
@@ -48,33 +43,23 @@ pub type Msg = Vec<u8>;
 /// Private set intersection sender.
 pub struct Sender {
     opprf: KmprtSender,
-    opprf_payload: KmprtSender,
 }
 
 /// State of the sender.
 pub struct SenderState {
     opprf_outputs: Vec<Block512>,
-    pub opprf_payload_outputs: Vec<Block512>,
-    table: Vec<Vec<Block>>,
-    mapping: Vec<Vec<usize>>,
-    input_size: usize,
 }
 
 /// Private set intersection receiver.
 pub struct Receiver {
     opprf: KmprtReceiver,
-    opprf_payload: KmprtReceiver,
 }
 
 /// State of the receiver.
 pub struct ReceiverState {
     opprf_outputs: Vec<Block512>,
-    pub opprf_payload_outputs: Vec<Block512>,
-    table: Vec<Block>,
     cuckoo: CuckooHash,
     inputs: Vec<Msg>,
-    input_size: usize,
-    payload: Vec<Block512>,
 }
 
 impl Sender {
@@ -84,9 +69,7 @@ impl Sender {
         rng: &mut RNG,
     ) -> Result<Self, Error> {
         let opprf = KmprtSender::init(channel, rng)?;
-        let opprf_payload = KmprtSender::init(channel, rng)?;
-
-        Ok(Self { opprf, opprf_payload })
+        Ok(Self { opprf })
     }
 
     /// Run the PSI protocol over `inputs`.
@@ -96,39 +79,32 @@ impl Sender {
         channel: &mut C,
         rng: &mut RNG,
     ) -> Result<SenderState, Error> {
-
         // receive cuckoo hash info from sender
         let key = channel.read_block()?;
         let hashes = utils::compress_and_hash_inputs(inputs, key);
-        let total = hashes.len();
+
         // map inputs to table using all hash functions
         let nbins = channel.read_usize()?;
-        println!("bin {:?}", nbins);
         let mut table = vec![Vec::new(); nbins];
 
-        // stores how elements are mapped to bin for
-        // later use in payload computation
-        let mut mapping = vec![Vec::new(); nbins];
-
-        for (index, &x) in hashes.iter().enumerate()  {
+        for &x in &hashes {
             let mut bins = Vec::with_capacity(NHASHES);
             for h in 0..NHASHES {
                 let bin = CuckooHash::bin(x, h, nbins);
                 table[bin].push(x ^ Block::from(h as u128));
                 bins.push(bin);
-                mapping[bin].push(index);
             }
             // if j = H1(y) = H2(y) for some y, then P2 adds a uniformly random element to
             // table2[j].
             if bins.iter().skip(1).all(|&x| x == bins[0]) {
                 table[bins[0]].push(rng.gen());
-                mapping[bins[0]].push(total);
             }
         }
 
         // select the target values
         let ts = (0..nbins).map(|_| rng.gen::<Block512>()).collect_vec();
-        let points = table.clone()
+
+        let points = table
             .into_iter()
             .zip_eq(ts.iter())
             .flat_map(|(bin, t)| {
@@ -139,20 +115,14 @@ impl Sender {
 
         self.opprf.send(channel, &points, nbins, rng)?;
 
-        Ok(SenderState {
-            opprf_outputs: ts,
-            opprf_payload_outputs: Vec::new(),
-            table,
-            mapping,
-            input_size: 0,
-        })
+        Ok(SenderState { opprf_outputs: ts })
     }
 }
 
 impl SenderState {
     /// Run the setup phase, producing a garbler for the next stage.
     pub fn compute_setup<C, RNG>(
-        & self,
+        &self,
         channel: &mut C,
         rng: &mut RNG,
     ) -> Result<(Garbler<C, RNG, OtSender>, Vec<Wire>, Vec<Wire>), Error>
@@ -161,9 +131,7 @@ impl SenderState {
         RNG: RngCore + CryptoRng + SeedableRng<Seed = Block>,
     {
         let mut gb = Garbler::<C, RNG, OtSender>::new(channel.clone(), RNG::from_seed(rng.gen()))?;
-
         let my_input_bits = encode_inputs(&self.opprf_outputs);
-
         let mods = vec![2; my_input_bits.len()]; // all binary moduli
         let sender_inputs = gb.encode_many(&my_input_bits, &mods)?;
         let receiver_inputs = gb.receive_many(&mods)?;
@@ -216,102 +184,6 @@ impl SenderState {
         }
         Ok(payloads)
     }
-
-    pub fn prepare_payload<C, RNG>(
-        &mut self,
-        sender: &mut Sender,
-        payloads: &[Block512],
-        channel: &mut C,
-        rng: &mut RNG,
-    ) -> Result<(), Error>
-    where
-        C: AbstractChannel,
-        RNG: RngCore + CryptoRng + SeedableRng<Seed = Block>,
-    {
-        let nbins = self.mapping.len();
-
-        let mut payload_table = vec![Vec::new(); nbins];
-        let ts = (0..nbins).map(|_| rng.gen::<Block512>()).collect_vec();
-        let total = payloads.len();
-
-        for (index, bin) in self.mapping.iter().enumerate(){
-            for element in bin{
-                let payload_byte;
-                if *element < total {
-                    payload_byte = payloads[*element];
-                }else{ // j = H1(y) = H2(y) append a random payload
-                    payload_byte = rng.gen::<Block512>();
-                }
-                let p = payload_byte ^ ts[index];
-                payload_table[index].push(p);
-            }
-        }
-        let mut points = Vec::new();
-        for (row, bin) in self.table.iter().enumerate() {
-            for (col, item) in bin.iter().enumerate() {
-                points.push((*item, payload_table[row][col]));
-            }
-        }
-        sender.opprf_payload.send(channel, &points, nbins, rng)?;
-        self.opprf_payload_outputs = ts.clone();
-
-        Ok(())
-    }
-
- // todo: figure out how to pre-allocate wires for the receivers payload
- //       the issue being that that depends on the set size
-    pub fn compute_payload_setup<C, RNG>(
-        &mut self,
-        channel: &mut C,
-        rng: &mut RNG,
-    ) -> Result<(Garbler<C, RNG, OtSender>, Vec<Wire>, Vec<Wire>), Error>
-    where
-        C: AbstractChannel,
-        RNG: RngCore + CryptoRng + SeedableRng<Seed = Block>,
-    {
-        let mut gb = Garbler::<C, RNG, OtSender>::new(channel.clone(), RNG::from_seed(rng.gen()))?;
-
-        let mut my_input_bits = encode_inputs(&self.opprf_outputs);
-        let mut my_payload_bits = encode_payloads(&self.opprf_payload_outputs);
-        self.input_size = my_input_bits.len();
-        let payload_len = my_payload_bits.len();
-
-        my_input_bits.append(&mut my_payload_bits);
-
-        // the receiver inputs 3 thing
-        // 1. it's input for the intersection
-        // 2. it's payload
-        // 3. the opprf's output
-        let placeholder = vec![2; self.input_size + 2*payload_len];
-        let mods = vec![2; my_input_bits.len()];
-
-        let sender_inputs = gb.encode_many(&my_input_bits, &mods)?;
-        let receiver_inputs = gb.receive_many(&placeholder)?;
-
-        Ok((gb, sender_inputs, receiver_inputs))
-    }
-
-    /// Compute the intersection.
-    pub fn compute_payload_aggregate<C, RNG>(
-        &mut self,
-        channel: &mut C,
-        rng: &mut RNG,
-    ) -> Result<(), Error>
-    where
-        C: AbstractChannel,
-        RNG: RngCore + CryptoRng + SeedableRng<Seed = Block>,
-    {
-        let (mut gb, mut x, mut y) = self.compute_payload_setup(channel, rng)?;
-
-        let x_payload = x.split_off(self.input_size);
-        let mut y_payload = y.split_off(self.input_size);
-        let n = y_payload.len();
-        let y_opprf_output= y_payload.split_off(n/2);
-
-        let (outs, _) = fancy_compute_payload_aggregate(&mut gb, &x, &y, &x_payload, &y_payload, &y_opprf_output)?;
-        gb.outputs(&outs)?;
-        Ok(())
-    }
 }
 
 impl Receiver {
@@ -321,9 +193,8 @@ impl Receiver {
         rng: &mut RNG,
     ) -> Result<Self, Error> {
         let opprf = KmprtReceiver::init(channel, rng)?;
-        let opprf_payload = KmprtReceiver::init(channel, rng)?;
-
-        Ok(Self { opprf, opprf_payload })}
+        Ok(Self { opprf })
+    }
 
     /// Run the PSI protocol over `inputs`.
     pub fn receive<C: AbstractChannel, RNG: RngCore + CryptoRng + SeedableRng>(
@@ -356,12 +227,8 @@ impl Receiver {
 
         Ok(ReceiverState {
             opprf_outputs,
-            opprf_payload_outputs:Vec::new(),
-            table,
             cuckoo,
             inputs: inputs.to_vec(),
-            input_size: 0,
-            payload: Vec::new(),
         })
     }
 }
@@ -473,91 +340,6 @@ impl ReceiverState {
         channel.flush()?;
         Ok(())
     }
-
-    // prepare the enviornment for payload computation seperately
-    pub fn prepare_payload<C, RNG>(
-        &mut self,
-        receiver: &mut Receiver,
-        payloads: &[Block512],
-        channel: &mut C,
-        rng: &mut RNG,
-    ) -> Result<(), Error>
-    where
-        C: AbstractChannel,
-        RNG: RngCore + CryptoRng + SeedableRng<Seed = Block>,
-    {
-        self.opprf_payload_outputs = receiver.opprf_payload.receive(channel, &self.table, rng)?;
-
-        self.payload = self.cuckoo
-                            .items
-                            .iter()
-                            .map(|opt_item| match opt_item {
-                                Some(item) => payloads[item.input_index],
-                                None => rng.gen::<Block512>(),
-                            })
-
-                            .collect::<Vec<Block512>>();
-
-        Ok(())
-    }
-
-    pub fn compute_payload_setup<C, RNG>(
-        &mut self,
-        channel: &mut C,
-        rng: &mut RNG,
-    ) -> Result<(Evaluator<C, RNG, OtReceiver>, Vec<Wire>, Vec<Wire>), Error>
-    where
-        C: AbstractChannel,
-        RNG: CryptoRng + RngCore + SeedableRng<Seed = Block>,
-    {
-
-        let mut my_input_bits = encode_inputs(&self.opprf_outputs);
-        let mut my_opprf_output = encode_payloads(&self.opprf_payload_outputs);
-        let mut my_payload_bits = encode_payloads(&self.payload);
-
-        self.input_size = my_input_bits.len();
-        let payload_len = my_payload_bits.len();
-
-        my_input_bits.append(&mut my_payload_bits);
-        my_input_bits.append(&mut my_opprf_output);
-
-        let mut ev =
-            Evaluator::<C, RNG, OtReceiver>::new(channel.clone(), RNG::from_seed(rng.gen()))?;
-
-        let placeholder = vec![2; self.input_size + payload_len];
-        let mods = vec![2; my_input_bits.len()];
-
-        let sender_inputs = ev.receive_many(&placeholder)?;
-        let receiver_inputs = ev.encode_many(&my_input_bits, &mods)?;
-
-
-        Ok((ev, sender_inputs, receiver_inputs))
-    }
-
-    pub fn compute_payload_aggregate<C, RNG>(
-        &mut self,
-        channel: &mut C,
-        rng: &mut RNG,
-    ) -> Result<usize, Error>
-    where
-        C: AbstractChannel,
-        RNG: RngCore + CryptoRng + SeedableRng<Seed = Block>,
-    {
-
-        let (mut ev, mut x, mut y) = self.compute_payload_setup(channel, rng)?;
-
-        let x_payload = x.split_off(self.input_size);
-        let mut y_payload = y.split_off(self.input_size);
-        let n = y_payload.len();
-        let y_opprf_output= y_payload.split_off(n/2);
-
-        let (outs, _) = fancy_compute_payload_aggregate(&mut ev, &x, &y, &x_payload, &y_payload, &y_opprf_output)?;
-        let mpc_outs = ev
-            .outputs(&outs)?
-            .expect("evaluator should produce outputs");
-        let aggregate = fancy_garbling::util::u128_from_bits(&mpc_outs);
-        Ok(aggregate as usize)
-    }
 }
 
 fn encode_inputs(opprf_outputs: &[Block512]) -> Vec<u16> {
@@ -567,17 +349,6 @@ fn encode_inputs(opprf_outputs: &[Block512]) -> Vec<u16> {
             blk.prefix(HASH_SIZE)
                 .iter()
                 .flat_map(|byte| (0..8).map(|i| u16::from((byte >> i) & 1_u8)).collect_vec())
-        })
-        .collect()
-}
-
-fn encode_payloads(opprf_outputs: &[Block512]) -> Vec<u16> {
-    opprf_outputs
-        .iter()
-        .flat_map(|blk| {
-            blk.prefix(PAYLOAD_SIZE)
-            .iter()
-            .flat_map(|byte| (0..8).map(|i| u16::from((byte >> i) & 1_u8)).collect_vec())
         })
         .collect()
 }
@@ -599,7 +370,6 @@ fn fancy_compute_intersection<F: Fancy>(
             )
         })
         .collect()
-
 }
 
 /// Fancy function to compute the cardinaility and return CRT value containing the result
@@ -608,7 +378,7 @@ fn fancy_compute_cardinality<F: Fancy>(
     f: &mut F,
     sender_inputs: &[F::Item],
     receiver_inputs: &[F::Item],
-) -> Result< (Vec<F::Item>, Vec<u16>), F::Error> {
+) -> Result<(Vec<F::Item>, Vec<u16>), F::Error> {
     assert_eq!(sender_inputs.len(), receiver_inputs.len());
 
     let eqs = sender_inputs
@@ -634,79 +404,6 @@ fn fancy_compute_cardinality<F: Fancy>(
             .collect::<Result<Vec<F::Item>, F::Error>>()?;
         let b_crt = CrtBundle::new(b_ws);
         acc = f.crt_add(&acc, &b_crt)?;
-    }
-
-    Ok((acc.wires().to_vec(), qs))
-}
-
-/// Fancy function to compute a weighted average
-/// where one party provides the weights and the other
-//  the values
-fn fancy_compute_payload_aggregate<F: Fancy>(
-    f: &mut F,
-    sender_inputs: &[F::Item],
-    receiver_inputs: &[F::Item],
-    sender_payloads: &[F::Item],
-    receiver_payloads: &[F::Item],
-    receiver_opprf_output: &[F::Item],
-) -> Result<(Vec<F::Item>, Vec<u16>), F::Error> {
-
-    assert_eq!(sender_inputs.len(), receiver_inputs.len());
-    assert_eq!(sender_payloads.len(), receiver_opprf_output.len());
-
-    assert_eq!(sender_inputs.len(), receiver_inputs.len());
-    assert_eq!(sender_payloads.len(), receiver_opprf_output.len());
-
-    let qs = fancy_garbling::util::primes_with_width(8);
-
-    let eqs = sender_inputs
-        .chunks(HASH_SIZE * 8)
-        .zip_eq(receiver_inputs.chunks(HASH_SIZE * 8))
-        .map(|(xs, ys)| {
-            f.eq_bundles(
-                &BinaryBundle::new(xs.to_vec()),
-                &BinaryBundle::new(ys.to_vec()),
-            )
-        })
-        .collect::<Result<Vec<F::Item>, F::Error>>()?;
-
-    let reconstructed_payload = sender_payloads
-        .chunks(PAYLOAD_SIZE * 8)
-        .zip_eq(receiver_opprf_output.chunks(PAYLOAD_SIZE * 8))
-        .map(|(xp, tp)| {
-            f.add_bundles(
-                &BinaryBundle::new(xp.to_vec()),
-                &BinaryBundle::new(tp.to_vec()),
-            )
-        })
-        .collect::<Result<Vec<Bundle<F::Item>>, F::Error>>()?;
-
-    let mut weighted_payloads = Vec::new();
-    for it in reconstructed_payload.into_iter().zip_eq(receiver_payloads.chunks(PAYLOAD_SIZE * 8)){
-        let (ps, pr) = it;
-        let ps_crt = &BinaryBundle::from(ps);
-        let pr_crt = &BinaryBundle::new(pr.to_vec());
-
-        let weighted = f.bin_multiplication_lower_half(&ps_crt, &pr_crt)?;
-        weighted_payloads.push(weighted);
-    }
-
-    assert_eq!(weighted_payloads.len(), eqs.len());
-
-    let mut acc = BinaryBundle::from(f.mask(&eqs[0], &weighted_payloads[0])?);
-    for (i, b) in eqs.iter().enumerate(){
-        if i > 0 {
-            let mut mux = BinaryBundle::from(f.mask(&b, &weighted_payloads[i])?);
-
-            if mux.moduli().len() != acc.moduli().len() {
-                let pad_len = acc.moduli().len() - mux.moduli().len();
-                let mut w = mux.extract();
-                let zero = f.constant(0, 2)?;
-                w.pad(&zero, pad_len);
-                mux = BinaryBundle::from(w);
-            }
-            acc = f.bin_addition_no_carry(&acc, &mux)?;
-        }
     }
 
     Ok((acc.wires().to_vec(), qs))

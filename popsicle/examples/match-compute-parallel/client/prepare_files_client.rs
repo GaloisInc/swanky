@@ -1,4 +1,4 @@
-use popsicle::psty_payload_large::{Receiver};
+use popsicle::psty_payload::{Receiver};
 
 use rand::{CryptoRng, Rng};
 use scuttlebutt::{AesRng, Block512, Block, TcpChannel};
@@ -53,7 +53,7 @@ fn client_protocol(mut stream: TcpChannel<TcpStream>){
     let payloads = int_vec_block512(rand_u64_vec(SET_SIZE, u64::pow(10,6), &mut rng));
 
     let mut psi = Receiver::init(&mut stream, &mut rng).unwrap();
-    let (cuckoo, table, payload) = psi.bucketize_data(&receiver_inputs, &payloads, MEGA_SIZE, &mut stream, &mut rng).unwrap();
+    let (table, payload) = psi.bucketize_data_large(&receiver_inputs, &payloads, MEGA_SIZE, &mut stream, &mut rng).unwrap();
 
     let megabin_per_thread = ((cuckoo.nmegabins as f32)/(N_THREADS as f32)).ceil() as usize;
     println!("Number of megabins {:?}", megabin_per_thread);

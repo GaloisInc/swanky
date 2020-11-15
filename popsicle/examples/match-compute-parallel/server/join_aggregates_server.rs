@@ -1,4 +1,4 @@
-use popsicle::psty_payload_large::{Sender};
+use popsicle::psty_payload::{Sender};
 
 use fancy_garbling::{
     Wire,

@@ -14,8 +14,9 @@ publish = false
 
 [features]
 nightly = ["rand/nightly", "scuttlebutt/nightly", "ocelot/nightly", "ocelot/nightly"]
-psty = ["fancy-garbling", "openssl"]
-serde1 = ["serde", "serde_json", "fancy-garbling/serde1"]
+fancy = ["fancy-garbling"]
+psty = ["fancy", "openssl"]
+psty_payload = ["fancy","serde", "serde_json", "fancy-garbling/serde1"]
 
 [dependencies]
 ocelot         = { path = "../ocelot" }
@@ -52,65 +53,29 @@ name = "psty"
 required-features = ["psty"]
 
 [[example]]
-name = "psty-payload"
-required-features = ["psty"]
-
-[[example]]
 name = "secretsister"
 required-features = ["psty"]
 
 [[example]]
 name = "match-compute"
-required-features = ["psty"]
+required-features = ["psty_payload"]
 
 [[example]]
 name = "client"
 path = "examples/match-compute-sockets/client.rs"
-required-features = ["psty"]
+required-features = ["psty_payload"]
 
 [[example]]
 name = "server"
 path = "examples/match-compute-sockets/server.rs"
-required-features = ["psty"]
-
-[[example]]
-name = "prepare_files_server"
-path = "examples/match-compute-parallel/server/prepare_files_server.rs"
-required-features = ["psty", "serde1"]
-
-[[example]]
-name = "prepare_files_client"
-path = "examples/match-compute-parallel/client/prepare_files_client.rs"
-required-features = ["psty", "serde1"]
-
-[[example]]
-name = "server_thread"
-path = "examples/match-compute-parallel/server/server_thread.rs"
-required-features = ["psty", "serde1"]
-
-[[example]]
-name = "client_thread"
-path = "examples/match-compute-parallel/client/client_thread.rs"
-required-features = ["psty", "serde1"]
-
-[[example]]
-name = "join_aggregates_server"
-path = "examples/match-compute-parallel/server/join_aggregates_server.rs"
-required-features = ["psty", "serde1"]
-
-[[example]]
-name = "join_aggregates_client"
-path = "examples/match-compute-parallel/client/join_aggregates_client.rs"
-required-features = ["psty", "serde1"]
-
+required-features = ["psty_payload"]
 
 [[example]]
 name = "run_server"
 path = "examples/match-compute-parallel/server/run_server.rs"
-required-features = ["psty", "serde1"]
-
+required-features = ["psty_payload"]
 
 [[example]]
 name = "run_client"
 path = "examples/match-compute-parallel/client/run_client.rs"
-required-features = ["psty", "serde1"]
+required-features = ["psty_payload"]

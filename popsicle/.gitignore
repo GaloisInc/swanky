@@ -6,3 +6,4 @@ test_inputs
 test_outputs
 thread*/
 result.txt
+psty_payload_test.rs

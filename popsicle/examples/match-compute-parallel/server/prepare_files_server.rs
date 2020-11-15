@@ -1,4 +1,4 @@
-use popsicle::psty_payload_large::{Sender};
+use popsicle::psty_payload::{Sender};
 
 use rand::{CryptoRng, Rng};
 use scuttlebutt::{AesRng, Block512, Block, TcpChannel};

@@ -5,13 +5,9 @@
 // See LICENSE for licensing information.
 
 pub mod kmprt;
-#[cfg(feature = "psty")]
-pub mod psty_payload;
-#[cfg(feature = "psty")]
-pub mod psty_payload_large;
-#[cfg(feature = "psty")]
-pub mod psty_payload_large_test;
 
+#[cfg(feature = "psty_payload")]
+pub mod psty_payload;
 #[cfg(feature = "psty")]
 pub mod psty;
 pub mod psz;
@@ -22,33 +18,19 @@ pub type Sender = psz::Sender;
 pub type Receiver = psz::Receiver;
 
 #[cfg(feature = "psty")]
-/// Extended private set intersection sender.
+/// Extended private psty intersection sender.
 pub type ExtendedSender = psty::Sender;
 #[cfg(feature = "psty")]
 /// Extended private set intersection receiver.
 pub type ExtendedReceiver = psty::Receiver;
 
-#[cfg(feature = "psty")]
-/// Extended private set intersection sender.
-pub type ExtendedSenderPayload = psty_payload::Sender;
-#[cfg(feature = "psty")]
-/// Extended private set intersection receiver.
-pub type ExtendedReceiverPayload = psty_payload::Receiver;
 
-#[cfg(feature = "psty")]
-/// Extended private set intersection sender.
-pub type ExtendedSenderPayloadLarge = psty_payload_large::Sender;
-#[cfg(feature = "psty")]
-/// Extended private set intersection receiver.
-pub type ExtendedReceiverPayloadLarge  = psty_payload_large::Receiver;
-
-#[cfg(feature = "psty")]
-/// Extended private set intersection sender.
-pub type SenderTest = psty_payload_large_test::Sender;
-#[cfg(feature = "psty")]
-/// Extended private set intersection receiver.
-pub type ReceiverTest  = psty_payload_large_test::Receiver;
-
+#[cfg(feature = "psty_payload")]
+/// Private set intersection with associated payloads sender.
+pub type SenderPayload = psty_payload::Sender;
+#[cfg(feature = "psty_payload")]
+/// Private set intersection with associated payloads receiver.
+pub type ReceiverPayload  = psty_payload::Receiver;
 
 
 /// Multi-party private set intersection sender.
