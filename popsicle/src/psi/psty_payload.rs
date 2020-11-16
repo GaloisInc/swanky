@@ -430,7 +430,7 @@ impl Receiver {
         let qs = fancy_garbling::util::primes_with_width(PAYLOAD_SIZE as u32 * 8);
         let q = fancy_garbling::util::product(&qs);
 
-        let (mut table, mut payload) = self.bucketize_data_large(table, payloads, megasize, channel, rng)?;
+        let (_, mut table, mut payload) = self.bucketize_data_large(table, payloads, megasize, channel, rng)?;
 
 
         let aggregate = self.compute_payload(table, payload, 0, channel, rng).unwrap();
@@ -574,7 +574,7 @@ impl Receiver {
         megasize: usize,
         channel: &mut C,
         rng: &mut RNG,
-    ) -> Result<(Vec<Vec<Block>>, Vec<Vec<Block512>>), Error>{
+    ) -> Result<(CuckooHashLarge, Vec<Vec<Block>>, Vec<Vec<Block512>>), Error>{
 
         let hashed_inputs = utils::compress_and_hash_inputs(inputs, self.key);
         let cuckoo_large = CuckooHashLarge::new(&hashed_inputs, NHASHES, megasize)?;
@@ -611,6 +611,7 @@ impl Receiver {
 
 
         Ok((
+            cuckoo_large,
             table,
             payload,
         ))
