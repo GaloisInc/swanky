@@ -95,6 +95,8 @@ impl Sender {
         Ok(Self { key, opprf, opprf_payload })
     }
 
+    // PSI with associated payloads for small to moderately sized sets without any parallelization
+    // features.
     pub fn full_protocol<C: AbstractChannel , RNG: RngCore + CryptoRng + SeedableRng<Seed = Block>>(
         &mut self,
         table: &[Msg],
@@ -123,6 +125,10 @@ impl Sender {
         Ok(())
     }
 
+    // PSI with associated payloads for large sized sets. Batched OPPRF + GC computation is performed
+    // on a Megabin instead of the entirety of the hashed data. The number of Megabin is pre-agreed
+    // on during the bucketization. Users have to specify the GC deltas. If the computation is run
+    // in parallel, the deltas must be synced accross threads.
     pub fn full_protocol_large<C: AbstractChannel , RNG: RngCore + CryptoRng + SeedableRng<Seed = Block>>(
         &mut self,
         table: &[Msg],
@@ -147,7 +153,7 @@ impl Sender {
         Ok(())
     }
 
-    // PSI computation designed sepecifically for very large sets. Assumes the bucketization stage
+    // PSI computation designed sepecifically for large sets. Assumes the bucketization stage
     // has already been done, bins were seperated into megabins and that deltas for the circuit
     // were precomputed.
     // Returns a garbled output over given megabins that the user can open or join with other
@@ -248,11 +254,18 @@ impl Sender {
            for h in 0..NHASHES {
                let bin = CuckooHash::bin(x, h, nbins);
                table[bin].push(x ^ Block::from(h as u128));
+               // In the case of CRT representations: the payload must be appropriately
+               // added to the target vector according to the CRT moduluses. The result
+               // is randomly padded to get a Block512.
+               // Note: mask_payload_crt assumes that inputs and outputs of GC are 64bit
+               // long.
+               // In the case of a binary representation: the payload can be simply XORed
+               // with the target vector, the appropriately padded if need be.
                payload[bin].push(utils::mask_payload_crt(*p, ts_payload[bin], rng));
                bins.push(bin);
            }
            // if j = H1(y) = H2(y) for some y, then P2 adds a uniformly random element to
-           // table2[j].
+           // table2[j] & payload[j]
            if bins.iter().skip(1).all(|&x| x == bins[0]) {
                table[bins[0]].push(rng.gen());
                payload[bins[0]].push(rng.gen());
@@ -290,6 +303,7 @@ impl Sender {
             })
             .collect_vec();
 
+        // Orders payload data similarly to how ID's were hashed into bins
         let mut points_data = Vec::new();
         for (row, bin) in state.table.iter().enumerate() {
             for (col, item) in bin.iter().enumerate() {
@@ -305,7 +319,7 @@ impl Sender {
 //
 impl SenderState {
 
-    // Encodes circuit inputs as CRT
+    // Encodes circuit inputs before passing them to GC
     pub fn encode_circuit_inputs<C, RNG>(
         &mut self,
         gb: &mut Garbler<C, RNG, OtSender>,
@@ -321,6 +335,10 @@ impl SenderState {
         let sender_inputs = gb.encode_many(&my_input_bits, &mods_bits).unwrap();
         let receiver_inputs = gb.receive_many(&mods_bits).unwrap();
 
+        // Build appropriate modulus in order to encode as CRT.
+        // CRT representation assumes that inputs and outputs of the
+        // circuit are PAYLOAD_SIZE bytes long: this helps avoid carry
+        // handling in GC computation.
         let qs = fancy_garbling::util::primes_with_width(PAYLOAD_SIZE as u32 * 8);
         let mut mods_crt = Vec::new();
         for _i in 0..self.opprf_payloads.len(){
@@ -477,6 +495,8 @@ impl Receiver {
         Ok(acc)
     }
 
+    // Aggregates partial grabled outputs encoded as CRTs. Uses the same deltas used by partial
+    // circuits.
     pub fn compute_aggregates<C: AbstractChannel , RNG: RngCore + CryptoRng + SeedableRng<Seed = Block>>(
         &mut self,
         aggregates: Vec<Vec<Wire>>,
@@ -499,6 +519,7 @@ impl Receiver {
         Ok(aggregate as u64)
     }
 
+    // For small to moderate sized sets, bucketizes using Cuckoo Hashing
     pub fn bucketize_data<C: AbstractChannel, RNG: RngCore + CryptoRng + SeedableRng>(
         &mut self,
         inputs: &[Msg],
@@ -523,6 +544,7 @@ impl Receiver {
             })
             .collect::<Vec<Block>>();
 
+        // Bucketizes payloads similarly to IDs
         let payload = cuckoo
             .items
             .iter()
@@ -539,6 +561,12 @@ impl Receiver {
         ))
     }
 
+    // For Large sets, bucketizes using Cuckoo Hashing while mapping to Megabins. The Megabin index
+    // is computed from the regular CH index:
+    //            new_bin_id = ch_id % megabin_size; // the bin within the megabin
+    //            megabin_id =  ch_id / megabin_size;
+    // A megabin is a collection of bins, typically specified by the total number of elements that
+    // can be handled at a time (megabin_size).
     pub fn bucketize_data_large<C: AbstractChannel, RNG: RngCore + CryptoRng + SeedableRng>(
         &mut self,
         inputs: &[Msg],
@@ -587,7 +615,7 @@ impl Receiver {
             payload,
         ))
     }
-    // Run the PSI protocol over `inputs`.
+    // Receive outputs of the OPPRF
     pub fn receive_data<C: AbstractChannel, RNG: RngCore + CryptoRng + SeedableRng>(
         &mut self,
         state:&mut ReceiverState,
@@ -650,6 +678,9 @@ impl ReceiverState {
     }
 }
 
+// Encoding ID's before passing them to GC.
+// Note that we are only looking at HASH_SIZE bytes
+// of the IDs.
 fn encode_inputs(opprf_ids: &[Block512]) -> Vec<u16> {
     opprf_ids
         .iter()
@@ -661,7 +692,9 @@ fn encode_inputs(opprf_ids: &[Block512]) -> Vec<u16> {
         .collect()
 }
 
-
+// Encoding Payloads's before passing them to GC.
+// Note that we are only looking at PAYLOAD_SIZE bytes
+// of the payloads.
 fn encode_payloads(payload: &[Block512]) -> Vec<u16> {
     let q = fancy_garbling::util::primes_with_width(PAYLOAD_SIZE as u32 * 8);
     payload
@@ -677,6 +710,9 @@ fn encode_payloads(payload: &[Block512]) -> Vec<u16> {
         .collect()
 }
 
+// Encoding OPPRF output associated with the payloads's before passing them to GC.
+// Note that we are only looking at PAYLOAD_PRIME_SIZE bytes of the opprf_payload:
+// the size we get after masking the payloads with the target vectors as CRT
 fn encode_opprf_payload(opprf_ids: &[Block512]) -> Vec<u16> {
 let q = fancy_garbling::util::primes_with_width(PAYLOAD_SIZE as u32 * 8);
     opprf_ids
@@ -691,7 +727,7 @@ let q = fancy_garbling::util::primes_with_width(PAYLOAD_SIZE as u32 * 8);
         })
         .collect()
 }
-/// Fancy function to compute a weighted average
+/// Fancy function to compute a weighted average for matching ID's
 /// where one party provides the weights and the other
 //  the values
 fn fancy_compute_payload_aggregate<F: fancy_garbling::FancyReveal + Fancy>(
@@ -720,6 +756,7 @@ fn fancy_compute_payload_aggregate<F: fancy_garbling::FancyReveal + Fancy>(
             )
         })
         .collect::<Result<Vec<F::Item>, F::Error>>()?;
+
     println!("equality done");
     let reconstructed_payload = sender_payloads
         .chunks(PAYLOAD_PRIME_SIZE)
