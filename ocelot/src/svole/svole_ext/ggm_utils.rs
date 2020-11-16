@@ -134,9 +134,11 @@ fn bv_to_num(v: &[bool]) -> usize {
 mod tests {
     use super::{bv_to_num, ggm, ggm_prime};
     use rand::Rng;
-    use scuttlebutt::field::{F61p, FiniteField, Fp, Gf128, F2};
-    use scuttlebutt::utils::unpack_bits;
-    use scuttlebutt::Block;
+    use scuttlebutt::{
+        field::{F61p, FiniteField, Fp, Gf128, F2},
+        utils::unpack_bits,
+        Block,
+    };
 
     #[test]
     fn test_bv_to_num() {

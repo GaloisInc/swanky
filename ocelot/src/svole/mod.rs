@@ -9,4 +9,4 @@
 pub mod base_svole;
 mod copee;
 pub mod svole_ext;
-mod utils;
+pub mod utils;

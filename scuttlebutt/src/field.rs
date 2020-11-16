@@ -54,11 +54,11 @@ pub trait FiniteField:
     /// When elements of this field are represented as a polynomial over the prime field,
     /// how many coefficients are needed?
     type PolynomialFormNumCoefficients: ArrayLength<Self::PrimeField>;
-    /// Convert the field element into (coefficients of) a polynomial over the prime field.
+    /// Convert a polynomial over the prime field into a field element of the finite field.
     fn from_polynomial_coefficients(
         coeff: GenericArray<Self::PrimeField, Self::PolynomialFormNumCoefficients>,
     ) -> Self;
-    /// Convert a polynomial over the prime field into a field element of the finite field.
+    /// Convert the field element into (coefficients of) a polynomial over the prime field.
     fn to_polynomial_coefficients(
         &self,
     ) -> GenericArray<Self::PrimeField, Self::PolynomialFormNumCoefficients>;

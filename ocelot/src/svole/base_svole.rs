@@ -148,7 +148,8 @@ mod tests {
     use crate::svole::svole_ext::lpn_params::{LpnExtendParams, LpnSetupParams};
     use scuttlebutt::{
         field::{F61p, FiniteField as FF, Fp, Gf128, F2},
-        AesRng, Channel,
+        AesRng,
+        Channel,
     };
     use std::{
         io::{BufReader, BufWriter},

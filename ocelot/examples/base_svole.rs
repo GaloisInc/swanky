@@ -8,7 +8,8 @@ use generic_array::typenum::Unsigned;
 use ocelot::svole::base_svole::{BaseReceiver, BaseSender};
 use scuttlebutt::{
     field::{F61p, FiniteField as FF, Fp, Gf128, F2},
-    AesRng, TrackChannel,
+    AesRng,
+    TrackChannel,
 };
 use std::{
     io::{BufReader, BufWriter},
