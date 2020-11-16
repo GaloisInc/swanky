@@ -145,7 +145,7 @@ impl<OT: OtReceiver<Msg = Block> + Malicious, FE: FF> Sender<OT, FE> {
                     result[i][j].1 = vs[j];
                 }
             }
-            let sum = vs.iter().map(|v| *v).sum();
+            let sum = vs.into_iter().sum();
             tmps.push((alpha, sum));
         }
         for (i, ((_, delta), (alpha, sum))) in uws.iter().zip(tmps.into_iter()).enumerate() {
