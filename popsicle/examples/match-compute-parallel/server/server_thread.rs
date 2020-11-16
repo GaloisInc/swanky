@@ -49,7 +49,7 @@ fn server_protocol(mut stream: TcpChannel<TcpStream>, thread_id: usize) {
 
     let path_delta = "./deltas.txt".to_owned();
     let mut psi = Sender::init(&mut stream, &mut rng).unwrap();
-    let acc = psi.compute_payload(ts_id, ts_payload, table, payload, &path_delta, &mut stream, &mut rng).unwrap();
+    let (acc, card) = psi.compute_payload(ts_id, ts_payload, table, payload, &path_delta, &mut stream, &mut rng).unwrap();
 
     println!(
         "Sender Thread {} :: circuit building & computation time: {} ms", thread_id,
@@ -64,10 +64,14 @@ fn server_protocol(mut stream: TcpChannel<TcpStream>, thread_id: usize) {
         stream.kilobits_written() / 1000.0
     );
 
-    path.push_str("/output.txt");
-    let mut file_output = File::create(path).unwrap();
-    let output_json = serde_json::to_string(&acc.wires().to_vec()).unwrap();
-    file_output.write(output_json.as_bytes()).unwrap();
+    let mut file_aggregate = File::create(format!("{}{}", path, "/output_aggregate.txt")).unwrap();
+    let mut file_cardinality = File::create(format!("{}{}", path, "/output_cardinality.txt")).unwrap();
+
+    let aggregate_json = serde_json::to_string(&acc.wires().to_vec()).unwrap();
+    let cardinality_json = serde_json::to_string(&card.wires().to_vec()).unwrap();
+
+    file_aggregate.write(aggregate_json.as_bytes()).unwrap();
+    file_cardinality.write(cardinality_json.as_bytes()).unwrap();
 }
 
 pub fn server_thread(thread_id: usize) {

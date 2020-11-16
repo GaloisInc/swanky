@@ -117,9 +117,11 @@ impl Sender {
 
         self.send_data(&mut state, nbins, channel, rng)?;
         channel.flush()?;
-        let aggregate = state.build_and_compute_circuit(&mut gb).unwrap();
+        let (aggregate, card) = state.build_and_compute_circuit(&mut gb).unwrap();
 
         gb.outputs(&aggregate.wires().to_vec()).unwrap();
+        gb.outputs(&card.wires().to_vec()).unwrap();
+
         channel.flush()?;
 
         Ok(())
@@ -147,9 +149,10 @@ impl Sender {
         let table:Vec<Vec<Vec<Block>>> = state.table.chunks(megasize).map(|x| x.to_vec()).collect();
         let payload: Vec<Vec<Vec<Block512>>>= state.payload.chunks(megasize).map(|x| x.to_vec()).collect();
 
-        let aggregate = self.compute_payload(ts_id, ts_payload, table, payload, &path_deltas, channel, rng).unwrap();
+        let (aggregate, card) = self.compute_payload(ts_id, ts_payload, table, payload, &path_deltas, channel, rng).unwrap();
 
         gb.outputs(&aggregate.wires().to_vec()).unwrap();
+        gb.outputs(&card.wires().to_vec()).unwrap();
         Ok(())
     }
 
@@ -167,7 +170,7 @@ impl Sender {
         path_deltas: &str,
         channel: &mut C,
         rng: &mut RNG,
-    ) -> Result<CrtBundle<fancy_garbling::Wire>, Error> {
+    ) -> Result<(CrtBundle<fancy_garbling::Wire>, CrtBundle<fancy_garbling::Wire>), Error> {
         let mut gb = Garbler::<C, RNG, OtSender>::new(channel.clone(), RNG::from_seed(rng.gen())).unwrap();
         let _ = gb.load_deltas(path_deltas);
 
@@ -175,6 +178,7 @@ impl Sender {
         let q = fancy_garbling::util::product(&qs);
 
         let mut acc = gb.crt_constant_bundle(0, q).unwrap();
+        let mut card = gb.crt_constant_bundle(0, q).unwrap();
         let nmegabins = ts_id.len();
         for i in 0..nmegabins{
             let start = SystemTime::now();
@@ -188,9 +192,10 @@ impl Sender {
             };
 
             self.send_data(&mut state, nbins, channel, rng)?;
-            let partial: CrtBundle<fancy_garbling::Wire> = state.build_and_compute_circuit(&mut gb).unwrap();
+            let (partial, card_partial) = state.build_and_compute_circuit(&mut gb).unwrap();
 
             acc = gb.crt_add(&acc, &partial).unwrap();
+            card = gb.crt_add(&card, &card_partial).unwrap();
 
             println!(
                 "Sender :: Computation time: {} ms",
@@ -204,7 +209,7 @@ impl Sender {
             channel.flush()?;
         }
         println!("Sender done");
-        Ok(acc)
+        Ok((acc, card))
     }
 
     // Aggregates partial grabled outputs encoded as CRTs. Uses the same deltas used by partial
@@ -212,6 +217,7 @@ impl Sender {
     pub fn compute_aggregates<C: AbstractChannel , RNG: RngCore + CryptoRng + SeedableRng<Seed = Block>>(
         &mut self,
         aggregates: Vec<Vec<Wire>>,
+        cardinality: Vec<Vec<Wire>>,
         path_deltas: &str,
         channel: &mut C,
         rng: &mut RNG,
@@ -220,11 +226,17 @@ impl Sender {
         let _ = gb.load_deltas(path_deltas);
 
         let mut acc = CrtBundle::new(aggregates[0].clone());
+        let mut card = CrtBundle::new(cardinality[0].clone());
         for i in 1..aggregates.len(){
-            let partial = CrtBundle::new(aggregates[i].clone());
-            acc = gb.crt_add(&acc, &partial).unwrap();
+            let partial_aggregate = CrtBundle::new(aggregates[i].clone());
+            let partial_cardinality = CrtBundle::new(cardinality[i].clone());
+            acc = gb.crt_add(&acc, &partial_aggregate).unwrap();
+            card = gb.crt_add(&card, &partial_cardinality).unwrap();
         }
+
         gb.outputs(&acc.wires().to_vec()).unwrap();
+        gb.outputs(&card.wires().to_vec()).unwrap();
+
         Ok(())
     }
 
@@ -356,14 +368,14 @@ impl SenderState {
     pub fn build_and_compute_circuit<C, RNG>(
         &mut self,
         gb: &mut Garbler<C, RNG, OtSender>,
-    ) -> Result<CrtBundle<fancy_garbling::Wire>, Error>
+    ) -> Result<(CrtBundle<fancy_garbling::Wire>,CrtBundle<fancy_garbling::Wire>), Error>
     where
         C: AbstractChannel,
         RNG: RngCore + CryptoRng + SeedableRng<Seed = Block>,
     {
         let (x, y, x_payload, y_payload, masks) = self.encode_circuit_inputs(gb).unwrap();
-        let outs = fancy_compute_payload_aggregate(gb, &x, &y, &x_payload, &y_payload, &masks).unwrap();
-        Ok(outs)
+        let (outs, card) = fancy_compute_payload_aggregate(gb, &x, &y, &x_payload, &y_payload, &masks).unwrap();
+        Ok((outs, card))
     }
 }
 
@@ -404,14 +416,21 @@ impl Receiver {
 
         self.receive_data(&mut state, channel, rng)?;
 
-        let aggregate = state.build_and_compute_circuit(&mut ev, channel).unwrap();
+        let (aggregate, card) = state.build_and_compute_circuit(&mut ev, channel).unwrap();
 
-        let mpc_outs = ev
+        let aggregate_outs = ev
             .outputs(&aggregate.wires().to_vec()).unwrap()
             .expect("evaluator should produce outputs");
-        let aggregate = fancy_garbling::util::crt_inv(&mpc_outs, &qs);
+
+        let card_outs = ev
+            .outputs(&aggregate.wires().to_vec()).unwrap()
+            .expect("evaluator should produce outputs");
+
+        let aggregate = fancy_garbling::util::crt_inv(&aggregate_outs, &qs);
+        let card = fancy_garbling::util::crt_inv(&card_outs, &qs);
 
         println!("Output = {:?}", aggregate);
+        println!("Cardinality = {:?}", card);
         channel.flush()?;
 
         Ok(aggregate as u64)
@@ -433,14 +452,20 @@ impl Receiver {
         let (_, mut table, mut payload) = self.bucketize_data_large(table, payloads, megasize, channel, rng)?;
 
 
-        let aggregate = self.compute_payload(table, payload, 0, channel, rng).unwrap();
+        let (aggregate, card) = self.compute_payload(table, payload, 0, channel, rng).unwrap();
 
-        let mpc_outs = ev
+        let aggregate_outs = ev
             .outputs(&aggregate.wires().to_vec()).unwrap()
             .expect("evaluator should produce outputs");
-        let aggregate = fancy_garbling::util::crt_inv(&mpc_outs, &qs);
+        let aggregate = fancy_garbling::util::crt_inv(&aggregate_outs, &qs);
+
+        let card_outs = ev
+            .outputs(&card.wires().to_vec()).unwrap()
+            .expect("evaluator should produce outputs");
+        let card = fancy_garbling::util::crt_inv(&card_outs, &qs);
 
         println!("Output = {:?}", aggregate);
+        println!("Cardinality = {:?}", card);
         channel.flush()?;
 
         Ok(aggregate as u64)
@@ -454,13 +479,15 @@ impl Receiver {
         thread_id: usize,
         channel: &mut C,
         rng: &mut RNG,
-    ) -> Result<CrtBundle<fancy_garbling::Wire>, Error> {
+    ) -> Result<(CrtBundle<fancy_garbling::Wire>, CrtBundle<fancy_garbling::Wire>), Error> {
 
         let mut ev =
             Evaluator::<C, RNG, OtReceiver>::new(channel.clone(), RNG::from_seed(rng.gen())).unwrap();
         let qs = fancy_garbling::util::primes_with_width(PAYLOAD_SIZE as u32 * 8);
         let q = fancy_garbling::util::product(&qs);
+
         let mut acc = ev.crt_constant_bundle(0, q).unwrap();
+        let mut card = ev.crt_constant_bundle(0, q).unwrap();
 
         let nmegabins = table.len();
         for i in 0..nmegabins{
@@ -474,9 +501,10 @@ impl Receiver {
             };
 
             self.receive_data(&mut state, channel, rng)?;
-            let partial: CrtBundle<fancy_garbling::Wire> = state.build_and_compute_circuit(&mut ev, channel).unwrap();
-            acc = ev.crt_add(&acc, &partial).unwrap();
+            let (partial, partial_card)= state.build_and_compute_circuit(&mut ev, channel).unwrap();
 
+            acc = ev.crt_add(&acc, &partial).unwrap();
+            card = ev.crt_add(&card, &partial_card).unwrap();
             // For testing purposes, output partial states:
             //
             // let mpc_outs = ev
@@ -492,7 +520,7 @@ impl Receiver {
             );
 
         }
-        Ok(acc)
+        Ok((acc, card))
     }
 
     // Aggregates partial grabled outputs encoded as CRTs. Uses the same deltas used by partial
@@ -500,23 +528,33 @@ impl Receiver {
     pub fn compute_aggregates<C: AbstractChannel , RNG: RngCore + CryptoRng + SeedableRng<Seed = Block>>(
         &mut self,
         aggregates: Vec<Vec<Wire>>,
+        cardinality: Vec<Vec<Wire>>,
         channel: &mut C,
         rng: &mut RNG,
-    ) -> Result<u64, Error> {
+    ) -> Result<(u64, u64), Error> {
         let mut ev =
             Evaluator::<C, RNG, OtReceiver>::new(channel.clone(), RNG::from_seed(rng.gen())).unwrap();
         let qs = fancy_garbling::util::primes_with_width(PAYLOAD_SIZE as u32 * 8);
 
         let mut acc = CrtBundle::new(aggregates[0].clone());
+        let mut card = CrtBundle::new(cardinality[0].clone());
         for i in 1..aggregates.len(){
-            let partial = CrtBundle::new(aggregates[i].clone());
-            acc = ev.crt_add(&acc, &partial).unwrap();
+            let partial_aggregate = CrtBundle::new(aggregates[i].clone());
+            let partial_cardinality = CrtBundle::new(cardinality[i].clone());
+            acc = ev.crt_add(&acc, &partial_aggregate).unwrap();
+            card = ev.crt_add(&card, &partial_cardinality).unwrap();
         }
-        let mpc_outs = ev
+        let aggregate_outs = ev
             .outputs(&acc.wires().to_vec()).unwrap()
             .expect("evaluator should produce outputs");
-        let aggregate = fancy_garbling::util::crt_inv(&mpc_outs, &qs);
-        Ok(aggregate as u64)
+        let aggregate = fancy_garbling::util::crt_inv(&aggregate_outs, &qs);
+
+        let card_outs = ev
+            .outputs(&card.wires().to_vec()).unwrap()
+            .expect("evaluator should produce outputs");
+        let cardinality = fancy_garbling::util::crt_inv(&card_outs, &qs);
+
+        Ok((aggregate as u64, cardinality as u64))
     }
 
     // For small to moderate sized sets, bucketizes using Cuckoo Hashing
@@ -666,7 +704,7 @@ impl ReceiverState {
         &mut self,
         ev: &mut Evaluator<C, RNG, OtReceiver>,
         channel: &mut C,
-    ) -> Result<CrtBundle<fancy_garbling::Wire>, Error>
+    ) -> Result<(CrtBundle<fancy_garbling::Wire>, CrtBundle<fancy_garbling::Wire>), Error>
     where
         C: AbstractChannel,
         RNG: RngCore + CryptoRng + SeedableRng<Seed = Block>,
@@ -674,8 +712,8 @@ impl ReceiverState {
         channel.flush()?;
         let (x, y, x_payload, y_payload, masks) = self.encode_circuit_inputs(ev)?;
 
-        let outs = fancy_compute_payload_aggregate(ev, &x, &y, &x_payload, &y_payload, &masks).unwrap();
-        Ok(outs)
+        let (outs, card) = fancy_compute_payload_aggregate(ev, &x, &y, &x_payload, &y_payload, &masks).unwrap();
+        Ok((outs, card))
     }
 }
 
@@ -738,7 +776,7 @@ fn fancy_compute_payload_aggregate<F: fancy_garbling::FancyReveal + Fancy>(
     sender_payloads:&[F::Item],
     receiver_payloads: &[F::Item],
     receiver_masks: &[F::Item],
-) -> Result<CrtBundle<F::Item>, F::Error> {
+) -> Result<(CrtBundle<F::Item>, CrtBundle<F::Item>), F::Error> {
     println!("reached circuit");
     assert_eq!(sender_inputs.len(), receiver_inputs.len());
     assert_eq!(sender_payloads.len(), receiver_payloads.len());
@@ -787,6 +825,7 @@ fn fancy_compute_payload_aggregate<F: fancy_garbling::FancyReveal + Fancy>(
     assert_eq!(eqs.len(), weighted_payloads.len());
 
     let mut acc = f.crt_constant_bundle(0, q)?;
+    let mut card = f.crt_constant_bundle(0, q)?;
     let one = f.crt_constant_bundle(1, q)?;
     for (i, b) in eqs.iter().enumerate(){
         let b_ws = one
@@ -795,9 +834,11 @@ fn fancy_compute_payload_aggregate<F: fancy_garbling::FancyReveal + Fancy>(
             .collect::<Result<Vec<F::Item>, F::Error>>()?;
         let b_crt = CrtBundle::new(b_ws);
 
+        card = f.crt_add(&card, &b_crt)?;
+
         let mux = f.crt_mul(&b_crt, &weighted_payloads[i])?;
         acc = f.crt_add(&acc, &mux)?;
     }
     println!("done with circuit");
-    Ok(acc)
+    Ok((acc, card))
 }

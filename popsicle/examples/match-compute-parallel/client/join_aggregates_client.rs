@@ -24,22 +24,30 @@ fn client_protocol(mut stream: TcpChannel<TcpStream>, nthreads: usize) {
     let mut rng = AesRng::new();
 
     let mut aggregates= Vec::new();
+    let mut cardinality= Vec::new();
     for thread_id in 0..nthreads{
         let mut path = "./thread".to_owned();
         path.push_str(&thread_id.to_string());
 
-        let partial_aggregate: Vec<Wire> = serde_json::from_str(&read_from_file(&path, "/output.txt")).unwrap();
+        let partial_aggregate: Vec<Wire> = serde_json::from_str(&read_from_file(&path, "/output_aggregate.txt")).unwrap();
+        let partial_cardinality: Vec<Wire> = serde_json::from_str(&read_from_file(&path, "/output_cardinality.txt")).unwrap();
+
         aggregates.push(partial_aggregate);
+        cardinality.push(partial_cardinality);
     }
 
     let mut psi = Receiver::init(&mut stream, &mut rng).unwrap();
-    let output = psi.compute_aggregates(aggregates, &mut stream,&mut rng).unwrap();
+    let (aggregate, cardinality) = psi.compute_aggregates(aggregates, cardinality, &mut stream,&mut rng).unwrap();
+    let output = aggregate as f64 / cardinality as f64;
+    println!("aggregate: {:?}", aggregate);
+    println!("cardinality: {:?}", cardinality);
+    println!("average: {:?}", output);
 
     let path_result = "./result.txt".to_owned();
     let mut file_result = File::create(path_result).unwrap();
     file_result.write(&output.to_le_bytes()).unwrap();
 
-    println!("output {:?}", output);
+
     println!(
         "Receiver :: Joining threads results time: {} ms",
         start.elapsed().unwrap().as_millis()

@@ -32,8 +32,9 @@ fn client_protocol(mut stream: TcpChannel<TcpStream>, thread_id: usize) {
 
     let table: Vec<Vec<Block>> = bincode::deserialize(&mut buff1).unwrap();
     let payload: Vec<Vec<Block512>> = bincode::deserialize(&mut buff2).unwrap();
+    
     let mut psi = Receiver::init(&mut stream, &mut rng).unwrap();
-    let acc = psi.compute_payload(table, payload, thread_id, &mut stream, &mut rng).unwrap();
+    let (acc, card) = psi.compute_payload(table, payload, thread_id, &mut stream, &mut rng).unwrap();
 
     println!(
         "Receiver Thread {} :: circuit building & computation time: {} ms", thread_id,
@@ -48,10 +49,14 @@ fn client_protocol(mut stream: TcpChannel<TcpStream>, thread_id: usize) {
         stream.kilobits_written() / 1000.0
     );
 
-    path.push_str("/output.txt");
-    let mut file_output = File::create(path).unwrap();
-    let output_json = serde_json::to_string(&acc.wires().to_vec()).unwrap();
-    file_output.write(output_json.as_bytes()).unwrap();
+    let mut file_aggregate = File::create(format!("{}{}", path, "/output_aggregate.txt")).unwrap();
+    let mut file_cardinality = File::create(format!("{}{}", path, "/output_cardinality.txt")).unwrap();
+
+    let aggregate_json = serde_json::to_string(&acc.wires().to_vec()).unwrap();
+    let cardinality_json = serde_json::to_string(&card.wires().to_vec()).unwrap();
+
+    file_aggregate.write(aggregate_json.as_bytes()).unwrap();
+    file_cardinality.write(cardinality_json.as_bytes()).unwrap();
 }
 
 pub fn client_thread(thread_id: usize) {

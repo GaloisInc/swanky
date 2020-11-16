@@ -24,19 +24,21 @@ fn server_protocol(mut stream: TcpChannel<TcpStream>, nthreads: usize) {
     let mut rng = AesRng::new();
 
     let mut aggregates= Vec::new();
+    let mut cardinality= Vec::new();
     for thread_id in 0..nthreads{
         let mut path = "./thread".to_owned();
         path.push_str(&thread_id.to_string());
 
-        let partial_aggregate: Vec<Wire> = serde_json::from_str(&read_from_file(&path, "/output.txt")).unwrap();
+        let partial_aggregate: Vec<Wire> = serde_json::from_str(&read_from_file(&path, "/output_aggregate.txt")).unwrap();
+        let partial_cardinality: Vec<Wire> = serde_json::from_str(&read_from_file(&path, "/output_cardinality.txt")).unwrap();
+
         aggregates.push(partial_aggregate);
+        cardinality.push(partial_cardinality);
     }
 
     let path_delta = "./deltas.txt".to_owned();
     let mut psi = Sender::init(&mut stream, &mut rng).unwrap();
-    let output = psi.compute_aggregates(aggregates, &path_delta, &mut stream,&mut rng);
-
-    println!("output {:?}", output);
+    psi.compute_aggregates(aggregates, cardinality, &path_delta, &mut stream,&mut rng);
 
     println!(
         "Sender :: Joining threads results time: {} ms",
