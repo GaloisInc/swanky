@@ -1,11 +1,14 @@
 use popsicle::psty_payload::{Sender, Receiver};
 
+use fancy_garbling::Wire;
 use rand::{CryptoRng, Rng};
 use scuttlebutt::{AesRng, Block512, TrackChannel};
 
 use std::{
+    collections::HashMap,
+    fs::{File, create_dir_all},
+    io::{Write},
     io::{BufReader, BufWriter},
-    // fs::File,
     os::unix::net::UnixStream,
     time::SystemTime,
 };
@@ -35,6 +38,15 @@ pub fn enum_ids(n: usize, id_size: usize) ->Vec<Vec<u8>>{
     ids
 }
 
+pub fn generate_deltas(primes: &[u16]) -> HashMap<u16, Wire> {
+    let mut deltas = HashMap::new();
+    let mut rng = rand::thread_rng();
+    for q in primes{
+        deltas.insert(*q, Wire::rand_delta(&mut rng, *q));
+    }
+    deltas
+}
+
 fn test(vec: Vec<u64>)-> u64{
     let mut res = 0;
     for el in vec{
@@ -56,15 +68,12 @@ fn protocol(){
 
     let receiver_ids = sender_ids.clone();
     let receiver_payloads = sender_payloads.clone();
-    println!("yo0");
     let handle = std::thread::spawn(move || {
         let mut rng = AesRng::new();
         let reader = BufReader::new(sender.try_clone().unwrap());
         let writer = BufWriter::new(sender);
         let mut channel = TrackChannel::new(reader, writer);
-        println!("yo1");
         let mut psi = Sender::init(&mut channel, &mut rng).unwrap();
-        println!("yo2");
         let _ = psi.full_protocol(&sender_ids, &sender_payloads, &mut channel, &mut rng).unwrap();
     });
 
@@ -72,8 +81,8 @@ fn protocol(){
     let reader = BufReader::new(receiver.try_clone().unwrap());
     let writer = BufWriter::new(receiver);
     let mut channel = TrackChannel::new(reader, writer);
-    let mut psi = Receiver::init(&mut channel, &mut rng).unwrap();
 
+    let mut psi = Receiver::init(&mut channel, &mut rng).unwrap();
     let aggregate = psi
         .full_protocol(&receiver_ids, &receiver_payloads, &mut channel, &mut rng)
         .unwrap();

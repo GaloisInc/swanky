@@ -114,6 +114,7 @@ impl Sender {
         let (mut state, nbins, _, _) = self.bucketize_data(table, payloads, channel, rng)?;
 
         self.send_data(&mut state, nbins, channel, rng)?;
+        channel.flush()?;
         let aggregate = state.build_and_compute_circuit(&mut gb).unwrap();
 
         gb.outputs(&aggregate.wires().to_vec()).unwrap();
@@ -193,7 +194,7 @@ impl Sender {
             // For tesint purposes, output partial states:
             //
             // gb.outputs(&acc.wires().to_vec()).unwrap();
-            
+
             channel.flush()?;
         }
         println!("Sender done");
@@ -356,6 +357,7 @@ impl Receiver {
     ) -> Result<Self, Error> {
         let key = rng.gen();
         channel.write_block(&key)?;
+        channel.flush()?;
 
         let opprf = KmprtReceiver::init(channel, rng)?;
         let opprf_payload = KmprtReceiver::init(channel, rng)?;
