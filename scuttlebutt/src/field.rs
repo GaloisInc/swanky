@@ -32,8 +32,7 @@ pub trait FiniteField:
     + Mul<Self, Output = Self>
     + Div<Self, Output = Self>
     + Neg<Output = Self>
-    + std::iter::Sum<Self>
-    + std::iter::Sum<&'static Self>
+    + std::iter::Sum
     + std::iter::Product
 {
     /// The number of bytes in the byte representation for this field element.
@@ -209,15 +208,6 @@ macro_rules! field_ops {
         impl std::iter::Sum for $f {
             fn sum<I: Iterator<Item = Self>>(iter: I) -> Self {
                 iter.fold($f::ZERO, std::ops::Add::add)
-            }
-        }
-
-        impl<'a> std::iter::Sum<&'a $f> for $f {
-            fn sum<I: Iterator<Item = &'a Self>>(iter: I) -> Self {
-                iter.fold($f::ZERO, |mut sum, &val| {
-                    sum += val;
-                    sum
-                })
             }
         }
 
