@@ -7,6 +7,7 @@
 use generic_array::typenum::Unsigned;
 use scuttlebutt::field::FiniteField;
 
+/// Generates powers of `FE::GENERATOR`.
 pub fn gen_pows<FE: FiniteField>() -> Vec<FE> {
     let mut acc = FE::ONE;
     let r = FE::PolynomialFormNumCoefficients::to_usize();

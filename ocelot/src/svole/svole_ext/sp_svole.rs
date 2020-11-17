@@ -265,7 +265,8 @@ impl<OT: OtSender<Msg = Block> + Malicious, FE: FF> Receiver<OT, FE> {
             // efficient, but that doesn't seem to be the case. Probably needs
             // further investigation.
             self.ot.send(channel, &keys_, rng)?;
-            let d = gamma - vs_.iter().map(|v| *v).sum();
+
+            let d = gamma - vs_.iter().sum::<FE>();
             ds.push(d);
             result.push(vs_);
         }
