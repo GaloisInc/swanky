@@ -7,6 +7,8 @@
 pub mod kmprt;
 
 #[cfg(feature = "psty_payload")]
+pub mod psty_payload_test;
+#[cfg(feature = "psty_payload")]
 pub mod psty_payload;
 #[cfg(feature = "psty")]
 pub mod psty;
@@ -31,6 +33,13 @@ pub type SenderPayload = psty_payload::Sender;
 #[cfg(feature = "psty_payload")]
 /// Private set intersection with associated payloads receiver.
 pub type ReceiverPayload  = psty_payload::Receiver;
+
+#[cfg(feature = "psty_payload")]
+/// Private set intersection with associated payloads sender.
+pub type SenderPayloadTest = psty_payload_test::Sender;
+#[cfg(feature = "psty_payload")]
+/// Private set intersection with associated payloads receiver.
+pub type ReceiverPayloadTest  = psty_payload_test::Receiver;
 
 
 /// Multi-party private set intersection sender.
