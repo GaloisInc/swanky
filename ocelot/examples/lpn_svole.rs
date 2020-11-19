@@ -9,9 +9,7 @@ use ocelot::svole::{
     base_svole::{BaseReceiver, BaseSender},
     svole_ext::{
         lpn_params::{LpnExtendParams, LpnSetupParams},
-        svole_lpn::{Receiver as LpnVoleReceiver, Sender as LpnVoleSender},
-        LpnsVoleReceiver,
-        LpnsVoleSender,
+        svole_lpn::{LpnReceiver, LpnSender},
     },
 };
 use scuttlebutt::{
@@ -24,12 +22,9 @@ use std::{
     os::unix::net::UnixStream,
     time::SystemTime,
 };
-
-fn _test_lpnvole<
-    FE: FF,
-    VSender: LpnsVoleSender<Msg = FE>,
-    VReceiver: LpnsVoleReceiver<Msg = FE>,
->(
+// Run this example by passing feature "pass_base_voles".
+#[cfg(feature = "pass_base_voles")]
+fn _test_lpnvole<FE: FF>(
     rows0: usize,
     cols0: usize,
     weight0: usize,
@@ -54,13 +49,12 @@ fn _test_lpnvole<
             .send(&mut channel, rows0 + weight0 + r, &mut rng)
             .unwrap();
         let mut lpn_setup_vole =
-            VSender::init(&mut channel, rows0, cols0, d, weight0, &mut rng).unwrap();
-        let (_, lpnvs) = lpn_setup_vole
-            .send(&mut channel, &base_uws, &mut rng)
-            .unwrap();
+            LpnSender::init(&mut channel, rows0, cols0, d, weight0, base_uws, &mut rng).unwrap();
+        let lpnvs = lpn_setup_vole.send(&mut channel, &mut rng).unwrap();
         // We just need `k + t + r` of voles.
         let base_uws: Vec<_> = (0..rows1 + weight1 + r).map(|i| lpnvs[i]).collect();
-        let mut vole = VSender::init(&mut channel, rows1, cols1, d, weight1, &mut rng).unwrap();
+        let mut vole =
+            LpnSender::init(&mut channel, rows1, cols1, d, weight1, base_uws, &mut rng).unwrap();
         println!(
             "[{}] Send time (init): {} ms",
             cols0,
@@ -76,7 +70,7 @@ fn _test_lpnvole<
         );
         channel.clear();
         let start = SystemTime::now();
-        let _ = vole.send(&mut channel, &base_uws, &mut rng).unwrap();
+        let _ = vole.send(&mut channel, &mut rng).unwrap();
         println!(
             "[{}] Send time: {} ms",
             cols1 - (rows1 + weight1 + r),
@@ -102,12 +96,30 @@ fn _test_lpnvole<
         .receive(&mut channel, rows0 + weight0 + r, &mut rng)
         .unwrap();
     let delta = base_vole.delta();
-    let mut lpn_vole =
-        VReceiver::init(&mut channel, rows0, cols0, d, weight0, delta, &mut rng).unwrap();
-    let (_, lpnvs) = lpn_vole.receive(&mut channel, &base_vs, &mut rng).unwrap();
+    let mut lpn_vole = LpnReceiver::init(
+        &mut channel,
+        rows0,
+        cols0,
+        d,
+        weight0,
+        base_vs,
+        delta,
+        &mut rng,
+    )
+    .unwrap();
+    let lpnvs = lpn_vole.receive(&mut channel, &mut rng).unwrap();
     let base_vs: Vec<_> = (0..rows1 + weight1 + r).map(|i| lpnvs[i]).collect();
-    let mut vole =
-        VReceiver::init(&mut channel, rows1, cols1, d, weight1, delta, &mut rng).unwrap();
+    let mut vole = LpnReceiver::init(
+        &mut channel,
+        rows1,
+        cols1,
+        d,
+        weight1,
+        base_vs,
+        delta,
+        &mut rng,
+    )
+    .unwrap();
     println!(
         "[{}] Receive time (init): {} ms",
         cols0,
@@ -123,7 +135,7 @@ fn _test_lpnvole<
     );
     channel.clear();
     let start = SystemTime::now();
-    let _ = vole.receive(&mut channel, &base_vs, &mut rng).unwrap();
+    let _ = vole.receive(&mut channel, &mut rng).unwrap();
     println!(
         "[{}] Receiver time: {} ms",
         cols1 - (rows1 + weight1 + r),
@@ -142,9 +154,6 @@ fn _test_lpnvole<
 }
 
 fn main() {
-    type VSender<FE> = LpnVoleSender<FE>;
-    type VReceiver<FE> = LpnVoleReceiver<FE>;
-
     let rows0 = LpnSetupParams::ROWS;
     let cols0 = LpnSetupParams::COLS;
     let weight0 = LpnSetupParams::WEIGHT;
@@ -160,7 +169,5 @@ fn main() {
     println!("\nField: Fp \n");
     _test_lpnvole::<Fp, VSender<Fp>, VReceiver<Fp>>(rows, cols, d, weight);*/
     println!("\nField: F61p \n");
-    _test_lpnvole::<F61p, VSender<F61p>, VReceiver<F61p>>(
-        rows0, cols0, weight0, rows1, cols1, weight1, d,
-    );
+    _test_lpnvole::<F61p>(rows0, cols0, weight0, rows1, cols1, weight1, d);
 }
