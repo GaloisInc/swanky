@@ -1,4 +1,4 @@
-use popsicle::psty_payload_test::{Sender};
+use popsicle::psty_payload::{Sender};
 
 use rand::{CryptoRng, Rng};
 use scuttlebutt::{AesRng, Block512, Block, TcpChannel};
@@ -9,12 +9,10 @@ use std::{
     fs::{File, create_dir_all},
     io::{Write},
     net::{TcpListener, TcpStream},
-    process::{exit},
     collections::HashMap,
     time::SystemTime,
 };
 use bincode;
-use serde;
 use serde_json;
 
 pub fn int_vec_block512(values: Vec<u64>) -> Vec<Block512> {
@@ -29,7 +27,7 @@ pub fn int_vec_block512(values: Vec<u64>) -> Vec<Block512> {
          }).collect()
 }
 
-pub fn rand_u64_vec<RNG: CryptoRng + Rng>(n: usize, modulus: u64, rng: &mut RNG) -> Vec<u64>{
+pub fn rand_u64_vec<RNG: CryptoRng + Rng>(n: usize, _modulus: u64, _rng: &mut RNG) -> Vec<u64>{
     (0..n).map(|_| 1000000).collect()
     // rng.gen::<u64>()%modulus
 
@@ -53,24 +51,22 @@ pub fn generate_deltas(primes: &[u16]) -> HashMap<u16, Wire> {
     deltas
 }
 
-fn server_protocol(mut stream: TcpChannel<TcpStream>) {
+fn server_protocol(mut stream: TcpChannel<TcpStream>, absolute_path: &str, nthread: usize, setsize:usize, itemsize: usize){
     let start = SystemTime::now();
-    const ITEM_SIZE: usize = 16;
-    const SET_SIZE: usize = 1 << 5;
-    const N_THREADS: usize = 4;
-    const ELEMENT_SIZES: usize = 64;
+    let path = absolute_path.to_owned();
 
     let mut rng = AesRng::new();
 
-    let sender_inputs = enum_ids(SET_SIZE, ITEM_SIZE);
+    let sender_inputs = enum_ids(setsize, itemsize);
 
-    let weights_vec = rand_u64_vec(SET_SIZE, u64::pow(10,10), &mut rng);
+    let weights_vec = rand_u64_vec(setsize, u64::pow(10,10), &mut rng);
     let weights = int_vec_block512(weights_vec);
 
-    let qs = fancy_garbling::util::primes_with_width(ELEMENT_SIZES as u32);
+    let qs = fancy_garbling::util::primes_with_width(64 as u32);// for 64bit inputs and outputs
     let deltas = generate_deltas(&qs);
 
-    let path_delta = "./deltas.txt".to_owned();
+    let path_delta = format!("{}{}", absolute_path, "delta.txt");
+
     let mut file_deltas = File::create(path_delta).unwrap();
     let deltas_json = serde_json::to_string(&deltas).unwrap();
     file_deltas.write(deltas_json.as_bytes()).unwrap();
@@ -79,8 +75,8 @@ fn server_protocol(mut stream: TcpChannel<TcpStream>) {
     let mut psi = Sender::init(&mut stream, &mut rng).unwrap();
 
     let (state, _, nmegabins, megasize) = psi.bucketize_data(&sender_inputs, &weights, &mut stream, &mut rng).unwrap();
-    println!("dobne buckets");
-    let megabin_per_thread = ((nmegabins as f32)/(N_THREADS as f32)).ceil() as usize;
+
+    let megabin_per_thread = ((nmegabins as f32)/(nthread as f32)).ceil() as usize;
 
     let ts_id: Vec<&[Block512]>= state.opprf_ids.chunks(megasize).collect();
     let ts_payload: Vec<&[Block512]>= state.opprf_payloads.chunks(megasize).collect();
@@ -92,8 +88,9 @@ fn server_protocol(mut stream: TcpChannel<TcpStream>) {
     let table:Vec<&[&[Vec<Block>]]> = table.chunks(megabin_per_thread).collect();
     let payload: Vec<&[&[Vec<Block512>]]>= payload.chunks(megabin_per_thread).collect();
 
-    for i in 0 ..N_THREADS{
-        let mut path = "./thread".to_owned();
+    for i in 0 ..nthread{
+        let mut path = path.clone();
+        path.push_str("thread");
         path.push_str(&i.to_string());
         let _ = create_dir_all(path.clone());
 
@@ -128,16 +125,17 @@ fn server_protocol(mut stream: TcpChannel<TcpStream>) {
 
 }
 
-pub fn prepare_files(){
-    let listener = TcpListener::bind("0.0.0.0:3000").unwrap();
-    // accept connections and process them, spawning a new thread for each one
-    println!("Server listening on port 3000");
+pub fn prepare_files(absolute_path: &str, address: &str, nthread: usize, setsize: usize, itemsize: usize) {
+    let address = format!("{}{}", address,":3000");
+    println!("Server listening on {}", address);
+    let listener = TcpListener::bind(address).unwrap();
+
     for stream in listener.incoming() {
         match stream {
             Ok(stream) => {
                 println!("New connection: {}", stream.peer_addr().unwrap());
                     let channel = TcpChannel::new(stream);
-                    server_protocol(channel);
+                    server_protocol(channel, absolute_path, nthread, setsize, itemsize);
                     return;
 
             }

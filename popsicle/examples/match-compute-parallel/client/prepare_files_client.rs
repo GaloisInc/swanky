@@ -1,4 +1,4 @@
-use popsicle::psty_payload_test::{Receiver};
+use popsicle::psty_payload::{Receiver};
 
 use rand::{CryptoRng, Rng};
 use scuttlebutt::{AesRng, Block512, Block, TcpChannel};
@@ -24,7 +24,7 @@ pub fn int_vec_block512(values: Vec<u64>) -> Vec<Block512> {
          }).collect()
 }
 
-pub fn rand_u64_vec<RNG: CryptoRng + Rng>(n: usize, modulus: u64, rng: &mut RNG) -> Vec<u64>{
+pub fn rand_u64_vec<RNG: CryptoRng + Rng>(n: usize, _modulus: u64, _rng: &mut RNG) -> Vec<u64>{
     (0..n).map(|_| 1000000).collect()
     // rng.gen::<u64>()%modulus
 }
@@ -40,28 +40,27 @@ pub fn enum_ids(n: usize, id_size: usize) ->Vec<Vec<u8>>{
 
 
 
-fn client_protocol(mut stream: TcpChannel<TcpStream>){
+fn client_protocol(mut channel: TcpChannel<TcpStream>, absolute_path: &str, nthread: usize, setsize:usize, itemsize: usize, megasize: usize){
     let start = SystemTime::now();
-    const ITEM_SIZE: usize = 16;
-    const SET_SIZE: usize = 1<<7;
-    const MEGA_SIZE:usize = 10;
-    const N_THREADS: usize = 4;
-
+    let mut path = absolute_path.to_owned();
+    path.push_str("thread");
 
     let mut rng = AesRng::new();
-    let receiver_inputs = enum_ids(SET_SIZE, ITEM_SIZE);
-    let payloads = int_vec_block512(rand_u64_vec(SET_SIZE, u64::pow(10,6), &mut rng));
+    let receiver_inputs = enum_ids(setsize, itemsize);
+    let payloads = int_vec_block512(rand_u64_vec(setsize, u64::pow(10,6), &mut rng));
 
-    let mut psi = Receiver::init(&mut stream, &mut rng).unwrap();
-    let (cuckoo, table, payload) = psi.bucketize_data_large(&receiver_inputs, &payloads, MEGA_SIZE, &mut stream, &mut rng).unwrap();
+    let mut psi = Receiver::init(&mut channel, &mut rng).unwrap();
+    let (cuckoo, table, payload) = psi.bucketize_data_large(&receiver_inputs, &payloads, megasize, &mut channel, &mut rng).unwrap();
 
-    let megabin_per_thread = ((cuckoo.nmegabins as f32)/(N_THREADS as f32)).ceil() as usize;
+    let megabin_per_thread = ((cuckoo.nmegabins as f32)/(nthread as f32)).ceil() as usize;
+
     println!("Number of megabins {:?}", megabin_per_thread);
+
     let table:Vec<&[Vec<Block>]> = table.chunks(megabin_per_thread).collect();
     let payload: Vec<&[Vec<Block512>]>= payload.chunks(megabin_per_thread).collect();
 
-    for i in 0 ..N_THREADS{
-        let mut path = "./thread".to_owned();
+    for i in 0 ..nthread{
+        let mut path = path.clone();
         path.push_str(&i.to_string());
         let _ = create_dir_all(path.clone());
 
@@ -80,19 +79,21 @@ fn client_protocol(mut stream: TcpChannel<TcpStream>){
     );
     println!(
         "Receiver ::Bucketization time (read): {:.2} Mb",
-        stream.kilobits_read() / 1000.0
+        channel.kilobits_read() / 1000.0
     );
     println!(
         "Receiver :: Bucketization time (write): {:.2} Mb",
-        stream.kilobits_written() / 1000.0
+        channel.kilobits_written() / 1000.0
     );
 }
 
-pub fn prepare_files() {
-    match TcpStream::connect("0.0.0.0:3000") {
+pub fn prepare_files(absolute_path: &str, address: &str, nthread: usize, setsize: usize, itemsize: usize, megasize: usize) {
+    let address = format!("{}{}", address,":3000");
+
+    match TcpStream::connect(address) {
         Ok(stream) => {
             let channel = TcpChannel::new(stream);
-            client_protocol(channel);
+            client_protocol(channel, absolute_path, nthread, setsize, itemsize, megasize);
         },
         Err(e) => {
             println!("Failed to connect: {}", e);

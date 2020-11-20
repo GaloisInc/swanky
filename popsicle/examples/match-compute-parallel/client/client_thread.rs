@@ -3,7 +3,6 @@ use popsicle::psty_payload::{Receiver};
 use scuttlebutt::{AesRng, Block, Block512, TcpChannel};
 
 use std::{
-    env,
     fs::{File},
     io::{Write, Read},
     net::{TcpStream},
@@ -13,12 +12,13 @@ use std::{
 use bincode;
 use serde_json;
 
-fn client_protocol(mut stream: TcpChannel<TcpStream>, thread_id: usize) {
+fn client_protocol(mut channel: TcpChannel<TcpStream>, absolute_path: &str, thread_id: usize) {
     let start = SystemTime::now();
     println!("Receiver Thread {} Starting computation", thread_id);
     let mut rng = AesRng::new();
 
-    let mut path = "./thread".to_owned();
+    let mut path = absolute_path.to_owned().clone();
+    path.push_str("thread");
     path.push_str(&thread_id.to_string());
 
     let mut file_table = File::open(format!("{}{}", path,"/table.txt")).unwrap();
@@ -32,9 +32,9 @@ fn client_protocol(mut stream: TcpChannel<TcpStream>, thread_id: usize) {
 
     let table: Vec<Vec<Block>> = bincode::deserialize(&mut buff1).unwrap();
     let payload: Vec<Vec<Block512>> = bincode::deserialize(&mut buff2).unwrap();
-    
-    let mut psi = Receiver::init(&mut stream, &mut rng).unwrap();
-    let (acc, card) = psi.compute_payload(table, payload, thread_id, &mut stream, &mut rng).unwrap();
+
+    let mut psi = Receiver::init(&mut channel, &mut rng).unwrap();
+    let (acc, card) = psi.compute_payload(table, payload, &mut channel, &mut rng).unwrap();
 
     println!(
         "Receiver Thread {} :: circuit building & computation time: {} ms", thread_id,
@@ -42,11 +42,11 @@ fn client_protocol(mut stream: TcpChannel<TcpStream>, thread_id: usize) {
     );
     println!(
         "Receiver Thread {} :: circuit building & computation communication (read): {:.2} Mb",thread_id,
-        stream.kilobits_read() / 1000.0
+        channel.kilobits_read() / 1000.0
     );
     println!(
         "Receiver Thread {} :: circuit building & computation communication (write): {:.2} Mb",thread_id,
-        stream.kilobits_written() / 1000.0
+        channel.kilobits_written() / 1000.0
     );
 
     let mut file_aggregate = File::create(format!("{}{}", path, "/output_aggregate.txt")).unwrap();
@@ -59,14 +59,14 @@ fn client_protocol(mut stream: TcpChannel<TcpStream>, thread_id: usize) {
     file_cardinality.write(cardinality_json.as_bytes()).unwrap();
 }
 
-pub fn client_thread(thread_id: usize) {
-    let port_prefix = "0.0.0.0:800".to_owned();
+pub fn client_thread(absolute_path: &str, address: &str, thread_id: usize) {
+    let port_prefix = format!("{}{}", address,":800");
     let port = format!("{}{}", port_prefix, thread_id.to_string());
 
     match TcpStream::connect(port) {
         Ok(stream) => {
             let channel = TcpChannel::new(stream);
-            client_protocol(channel, thread_id);
+            client_protocol(channel, absolute_path, thread_id);
         },
         Err(e) => {
             println!("Failed to connect: {}", e);

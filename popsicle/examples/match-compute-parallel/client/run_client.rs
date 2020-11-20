@@ -10,26 +10,51 @@ use join_aggregates_client::join_aggregates;
 
 use std::{
     env,
-    sync::atomic::{AtomicUsize, Ordering, ATOMIC_USIZE_INIT},
+    fs::{File},
+    io::{BufRead, BufReader},
+    collections::HashMap,
+    time::{Duration},
     thread,
-    time,
 };
 
-
 pub fn main(){
-    let args: Vec<String> = env::args().collect();
-    let nthread = args[1].parse::<usize>().unwrap();
-    let duration = time::Duration::from_secs(5);
+    let mut absolute_path = env::current_exe().unwrap();
+    absolute_path.pop();
+    absolute_path.pop();
+    absolute_path.pop();
+    absolute_path.pop();
 
+    let mut absolute_path = absolute_path.into_os_string().into_string().unwrap();//
+    absolute_path.push_str("/popsicle/examples/match-compute-parallel/");
+    let configuration = File::open(format!("{}{}", absolute_path, "configuration.txt")).unwrap();
 
-    prepare_files();
+    let buffer = BufReader::new(configuration).lines();
+
+    let mut parameters = HashMap::new();
+    for line in buffer.enumerate(){
+        let line_split = line.1.unwrap().split(": ").map(|item| item.to_string()).collect::<Vec<String>>();
+        parameters.insert(line_split[0].clone(), line_split[1].clone());
+    }
+    let address = parameters.get("address").unwrap().to_owned();
+    let nthread = parameters.get("nthread").unwrap().parse::<usize>().unwrap();
+    let setsize = parameters.get("setsize").unwrap().parse::<usize>().unwrap();
+    let itemsize = parameters.get("itemsize").unwrap().parse::<usize>().unwrap();
+    let megasize = parameters.get("megasize").unwrap().parse::<usize>().unwrap();
+    let sleeptime = parameters.get("sleeptime").unwrap().parse::<u64>().unwrap();
+
+    let duration = Duration::from_secs(sleeptime);
+
+    absolute_path.push_str("client/");
+    prepare_files(&absolute_path, &address, nthread, setsize, itemsize, megasize);
 
     thread::sleep(duration);
 
     let mut handle = Vec::new();
     for i in 0..nthread {
+        let absolute_path_thread = absolute_path.clone();
+        let address_thread = address.clone();
        handle.push(thread::spawn(move || {
-           client_thread(i);
+           client_thread(&absolute_path_thread, &address_thread, i);
        }));
    }
 
@@ -38,5 +63,5 @@ pub fn main(){
     }
 
     thread::sleep(duration);
-    join_aggregates(nthread);
+    join_aggregates(&absolute_path, &address, nthread);
 }

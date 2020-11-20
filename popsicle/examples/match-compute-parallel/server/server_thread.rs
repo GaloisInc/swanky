@@ -3,24 +3,22 @@ use popsicle::psty_payload::{Sender};
 use scuttlebutt::{AesRng, Block, Block512, TcpChannel};
 
 use std::{
-    env,
     fs::{File},
     io::{Write, Read},
     net::{TcpListener, TcpStream},
-    process::{exit},
-    thread,
     time::SystemTime,
 };
 use serde_json;
 use bincode;
 
-fn server_protocol(mut stream: TcpChannel<TcpStream>, thread_id: usize) {
+fn server_protocol(mut stream: TcpChannel<TcpStream>, absolute_path: &str, thread_id: usize) {
     let start = SystemTime::now();
     println!("Sender Thread {} Starting computation", thread_id);
 
     let mut rng = AesRng::new();
 
-    let mut path = "./thread".to_owned();
+    let mut path = absolute_path.to_owned().clone();
+    path.push_str("thread");
     path.push_str(&thread_id.to_string());
 
     let mut file_ts_id = File::open(format!("{}{}", path, "/ts_id.txt")).unwrap();
@@ -43,11 +41,8 @@ fn server_protocol(mut stream: TcpChannel<TcpStream>, thread_id: usize) {
     let table: Vec<Vec<Vec<Block>>> = bincode::deserialize(&mut buff3).unwrap();
     let payload: Vec<Vec<Vec<Block512>>> = bincode::deserialize(&mut buff4).unwrap();
 
-    // let ts_payload: Vec<Vec<Block512>> = bincode::deserialize(&Read::read_to_end().unwrap()).unwrap();
-    // let table: Vec<Vec<Vec<Block>>> = bincode::deserialize(&Read::read_to_end(&path, "/table.txt").unwrap()).unwrap();
-    // let payload: Vec<Vec<Vec<Block512>>> = bincode::deserialize(&Read::read_to_end(&path, "/payload.txt").unwrap()).unwrap();
+    let path_delta = format!("{}{}", absolute_path, "delta.txt");
 
-    let path_delta = "./deltas.txt".to_owned();
     let mut psi = Sender::init(&mut stream, &mut rng).unwrap();
     let (acc, card) = psi.compute_payload(ts_id, ts_payload, table, payload, &path_delta, &mut stream, &mut rng).unwrap();
 
@@ -74,23 +69,18 @@ fn server_protocol(mut stream: TcpChannel<TcpStream>, thread_id: usize) {
     file_cardinality.write(cardinality_json.as_bytes()).unwrap();
 }
 
-pub fn server_thread(thread_id: usize) {
-    let port_prefix = "0.0.0.0:800".to_owned();
+pub fn server_thread(absolute_path: &str, address: &str, thread_id: usize) {
+    let port_prefix = format!("{}{}", address,":800");
     let port = format!("{}{}", port_prefix, thread_id.to_string());
-
+    println!("Server listening on {}", port);
+    
     let listener = TcpListener::bind(port).unwrap();
-    // accept connections and process them, spawning a new thread for each one
-    println!("Server listening on port 8000");
     for stream in listener.incoming() {
         match stream {
             Ok(stream) => {
                 println!("New connection: {}", stream.peer_addr().unwrap());
-                let handle = thread::spawn(move|| {
-                    // connection succeeded
-                    let stream = TcpChannel::new(stream);
-                    server_protocol(stream, thread_id);
-                });
-                let _ = handle.join();
+                let channel = TcpChannel::new(stream);
+                server_protocol(channel, absolute_path, thread_id);
                 return;
             }
             Err(e) => {

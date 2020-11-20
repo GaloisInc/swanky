@@ -20,14 +20,12 @@ use fancy_garbling::{
     Wire,
 };
 
-use itertools::Itertools;
 use ocelot::{
     oprf::{KmprtReceiver, KmprtSender},
     ot::{AlszReceiver as OtReceiver, AlszSender as OtSender},
 };
-
+use itertools::Itertools;
 use std::time::SystemTime;
-use std::process::{exit};
 use rand::{CryptoRng, Rng, RngCore, SeedableRng};
 use scuttlebutt::{AbstractChannel, Block, Block512};
 
@@ -121,7 +119,6 @@ impl Sender {
         let mut gb = Garbler::<C, RNG, OtSender>::new(channel.clone(), RNG::from_seed(rng.gen())).unwrap();
 
         let qs = fancy_garbling::util::primes_with_width(PAYLOAD_SIZE as u32 * 8);
-        let q = fancy_garbling::util::product(&qs);
 
         let deltas = utils::generate_deltas(&qs);
         let deltas_json = serde_json::to_string(&deltas).unwrap();
@@ -156,7 +153,7 @@ impl Sender {
         let mut gb = Garbler::<C, RNG, OtSender>::new(channel.clone(), RNG::from_seed(rng.gen())).unwrap();
         let _ = gb.load_deltas(path_deltas);
 
-        let (mut state, nbins, nmegabins, megasize) = self.bucketize_data(table, payloads, channel, rng)?;
+        let (state, _ , _, megasize) = self.bucketize_data(table, payloads, channel, rng)?;
 
         let ts_id: Vec<Vec<Block512>>= state.opprf_ids.chunks(megasize).map(|x| x.to_vec()).collect();
         let ts_payload: Vec<Vec<Block512>>= state.opprf_payloads.chunks(megasize).map(|x| x.to_vec()).collect();
@@ -427,8 +424,6 @@ impl SenderState {
             "Sender :: receive inputs: {} ms",
             start.elapsed().unwrap().as_millis()
         );
-        let start = SystemTime::now();
-
         // Build appropriate modulus in order to encode as CRT.
         // CRT representation assumes that inputs and outputs of the
         // circuit are PAYLOAD_SIZE bytes long: this helps avoid carry
@@ -500,9 +495,8 @@ impl Receiver {
         let mut ev =
             Evaluator::<C, RNG, OtReceiver>::new(channel.clone(), RNG::from_seed(rng.gen())).unwrap();
         let qs = fancy_garbling::util::primes_with_width(PAYLOAD_SIZE as u32 * 8);
-        let q = fancy_garbling::util::product(&qs);
 
-        let (mut table, mut payload) = self.bucketize_data(table, payloads, channel, rng)?;
+        let (table, payload) = self.bucketize_data(table, payloads, channel, rng)?;
         let mut state = ReceiverState{
                 opprf_ids: Vec::new(),
                 opprf_payloads: Vec::new(),
@@ -519,7 +513,7 @@ impl Receiver {
             .expect("evaluator should produce outputs");
 
         let card_outs = ev
-            .outputs(&aggregate.wires().to_vec()).unwrap()
+            .outputs(&card.wires().to_vec()).unwrap()
             .expect("evaluator should produce outputs");
 
         let aggregate = fancy_garbling::util::crt_inv(&aggregate_outs, &qs);
@@ -543,12 +537,11 @@ impl Receiver {
         let mut ev =
             Evaluator::<C, RNG, OtReceiver>::new(channel.clone(), RNG::from_seed(rng.gen())).unwrap();
         let qs = fancy_garbling::util::primes_with_width(PAYLOAD_SIZE as u32 * 8);
-        let q = fancy_garbling::util::product(&qs);
 
-        let (_, mut table, mut payload) = self.bucketize_data_large(table, payloads, megasize, channel, rng)?;
+        let (_, table, payload) = self.bucketize_data_large(table, payloads, megasize, channel, rng)?;
 
 
-        let (aggregate, card) = self.compute_payload(table, payload, 0, channel, rng).unwrap();
+        let (aggregate, card) = self.compute_payload(table, payload, channel, rng).unwrap();
 
         let aggregate_outs = ev
             .outputs(&aggregate.wires().to_vec()).unwrap()
@@ -572,7 +565,6 @@ impl Receiver {
         &mut self,
         table: Vec<Vec<Block>>,
         payload: Vec<Vec<Block512>>,
-        thread_id: usize,
         channel: &mut C,
         rng: &mut RNG,
     ) -> Result<(CrtBundle<fancy_garbling::Wire>, CrtBundle<fancy_garbling::Wire>), Error> {
