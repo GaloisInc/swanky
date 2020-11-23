@@ -20,7 +20,10 @@
 
 use crate::{
     errors::Error,
-    svole::svole_ext::sp_svole::{SpsReceiver, SpsSender},
+    svole::{
+        base_svole::{BaseReceiver, BaseSender},
+        svole_ext::sp_svole::{SpsReceiver, SpsSender},
+    },
 };
 use generic_array::typenum::Unsigned;
 use rand::Rng;
@@ -76,7 +79,6 @@ pub type LpnSender<FE> = Sender<FE>;
 pub type LpnReceiver<FE> = Receiver<FE>;
 
 impl<FE: FiniteField> Sender<FE> {
-    #[cfg(feature = "pass_base_voles")]
     pub fn init<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         channel: &mut C,
         rows: usize,
@@ -108,8 +110,7 @@ impl<FE: FiniteField> Sender<FE> {
             r,
         })
     }
-    #[cfg(feature = "compute_base_voles")]
-    pub fn init<C: AbstractChannel, RNG: CryptoRng + RngCore>(
+    pub fn init_with_base_voles<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         channel: &mut C,
         rows: usize,
         cols: usize,
@@ -132,16 +133,7 @@ impl<FE: FiniteField> Sender<FE> {
         let base_uws = svole.send(channel, rows + weight + r, rng)?;
         // This flush statement is needed, otherwise, it hangs on.
         channel.flush()?;
-        let spsvole = SpsSender::<FE>::init(channel, pows, weight, rng)?;
-        debug_assert!(base_uws.len() == rows + weight + r);
-        Ok(Self {
-            spsvole,
-            rows,
-            cols,
-            base_uws,
-            weight,
-            r,
-        })
+        Self::init(channel, rows, cols, d, weight, base_uws, rng)
     }
 
     pub fn send<C: AbstractChannel, RNG: CryptoRng + RngCore>(
@@ -216,7 +208,6 @@ impl<FE: FiniteField> Sender<FE> {
 }
 
 impl<FE: FiniteField> Receiver<FE> {
-    #[cfg(feature = "pass_base_voles")]
     pub fn init<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         channel: &mut C,
         rows: usize,
@@ -250,8 +241,8 @@ impl<FE: FiniteField> Receiver<FE> {
             r,
         })
     }
-    #[cfg(feature = "compute_base_voles")]
-    pub fn init<C: AbstractChannel, RNG: CryptoRng + RngCore>(
+
+    pub fn init_with_base_voles<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         channel: &mut C,
         rows: usize,
         cols: usize,
@@ -273,20 +264,11 @@ impl<FE: FiniteField> Receiver<FE> {
         let r = FE::PolynomialFormNumCoefficients::to_usize();
         let base_vs = svole.receive(channel, rows + weight + r, rng)?;
         let delta = svole.delta();
-        let spsvole = SpsReceiver::<FE>::init(channel, pows, delta, weight, rng)?;
         debug_assert!(base_vs.len() == rows + weight + r);
-        Ok(Self {
-            spsvole,
-            delta,
-            rows,
-            cols,
-            base_vs,
-            weight,
-            r,
-        })
+        Self::init(channel, rows, cols, d, weight, base_vs, delta, rng)
     }
 
-    fn delta(&self) -> FE {
+    pub fn delta(&self) -> FE {
         self.delta
     }
 
@@ -363,7 +345,6 @@ mod tests {
         io::{BufReader, BufWriter},
         os::unix::net::UnixStream,
     };
-    #[cfg(feature = "compute_base_voles")]
     fn test_lpnvole<FE: FF + Send>(rows: usize, cols: usize, d: usize, weight: usize) {
         let (sender, receiver) = UnixStream::pair().unwrap();
         debug_assert!(cols % weight == 0);
@@ -372,8 +353,15 @@ mod tests {
             let reader = BufReader::new(sender.try_clone().unwrap());
             let writer = BufWriter::new(sender);
             let mut channel = Channel::new(reader, writer);
-            let mut vole =
-                LpnSender::<FE>::init(&mut channel, rows, cols, d, weight, &mut rng).unwrap();
+            let mut vole = LpnSender::<FE>::init_with_base_voles(
+                &mut channel,
+                rows,
+                cols,
+                d,
+                weight,
+                &mut rng,
+            )
+            .unwrap();
             vole.send(&mut channel, &mut rng).unwrap()
         });
         let mut rng = AesRng::new();
@@ -381,7 +369,8 @@ mod tests {
         let writer = BufWriter::new(receiver);
         let mut channel = Channel::new(reader, writer);
         let mut vole =
-            LpnReceiver::<FE>::init(&mut channel, rows, cols, d, weight, &mut rng).unwrap();
+            LpnReceiver::<FE>::init_with_base_voles(&mut channel, rows, cols, d, weight, &mut rng)
+                .unwrap();
         let vs = vole.receive(&mut channel, &mut rng).unwrap();
         let uws = handle.join().unwrap();
         for i in 0..weight as usize {

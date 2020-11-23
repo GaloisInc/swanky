@@ -140,9 +140,9 @@ impl<OT: OtReceiver<Msg = Block> + Malicious, FE: FF> Sender<OT, FE> {
             choices_.reverse(); // to get the first bit as MSB.
             let keys = self.ot.receive(channel, &choices_, rng)?;
             let vs: Vec<FE> = ggm_prime(alpha, &keys, (seed0, seed1));
-            for j in 0..n {
+            for (j, item) in vs.iter().enumerate().take(n) {
                 if j != alpha {
-                    result[i][j].1 = vs[j];
+                    result[i][j].1 = *item;
                 }
             }
             let sum = vs.into_iter().sum();

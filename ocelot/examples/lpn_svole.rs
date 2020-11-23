@@ -5,12 +5,9 @@
 // See LICENSE for licensing information.
 
 use generic_array::typenum::Unsigned;
-use ocelot::svole::{
-    base_svole::{BaseReceiver, BaseSender},
-    svole_ext::{
-        lpn_params::{LpnExtendParams, LpnSetupParams},
-        svole_lpn::{LpnReceiver, LpnSender},
-    },
+use ocelot::svole::svole_ext::{
+    lpn_params::{LpnExtendParams, LpnSetupParams},
+    svole_lpn::{LpnReceiver, LpnSender},
 };
 use scuttlebutt::{
     field::{F61p, FiniteField as FF, Fp, Gf128, F2},
@@ -23,7 +20,6 @@ use std::{
     time::SystemTime,
 };
 // Run this example by passing feature "pass_base_voles".
-#[cfg(feature = "pass_base_voles")]
 fn _test_lpnvole<FE: FF>(
     rows0: usize,
     cols0: usize,
@@ -41,15 +37,11 @@ fn _test_lpnvole<FE: FF>(
         let reader = BufReader::new(sender.try_clone().unwrap());
         let writer = BufWriter::new(sender);
         let mut channel = TrackChannel::new(reader, writer);
-        let pows = ocelot::svole::utils::gen_pows();
         let start = SystemTime::now();
         // Generating base voles of length `k + t + r` using LPN_vole with smaller LPN  parameters.
-        let mut base_vole = BaseSender::<FE>::init(&mut channel, &pows, &mut rng).unwrap();
-        let base_uws = base_vole
-            .send(&mut channel, rows0 + weight0 + r, &mut rng)
-            .unwrap();
         let mut lpn_setup_vole =
-            LpnSender::init(&mut channel, rows0, cols0, d, weight0, base_uws, &mut rng).unwrap();
+            LpnSender::<FE>::init_with_base_voles(&mut channel, rows0, cols0, d, weight0, &mut rng)
+                .unwrap();
         let lpnvs = lpn_setup_vole.send(&mut channel, &mut rng).unwrap();
         // We just need `k + t + r` of voles.
         let base_uws: Vec<_> = (0..rows1 + weight1 + r).map(|i| lpnvs[i]).collect();
@@ -89,26 +81,13 @@ fn _test_lpnvole<FE: FF>(
     let reader = BufReader::new(receiver.try_clone().unwrap());
     let writer = BufWriter::new(receiver);
     let mut channel = TrackChannel::new(reader, writer);
-    let pows = ocelot::svole::utils::gen_pows();
     let start = SystemTime::now();
-    let mut base_vole = BaseReceiver::<FE>::init(&mut channel, &pows, &mut rng).unwrap();
-    let base_vs = base_vole
-        .receive(&mut channel, rows0 + weight0 + r, &mut rng)
-        .unwrap();
-    let delta = base_vole.delta();
-    let mut lpn_vole = LpnReceiver::init(
-        &mut channel,
-        rows0,
-        cols0,
-        d,
-        weight0,
-        base_vs,
-        delta,
-        &mut rng,
-    )
-    .unwrap();
+    let mut lpn_vole =
+        LpnReceiver::<FE>::init_with_base_voles(&mut channel, rows0, cols0, d, weight0, &mut rng)
+            .unwrap();
     let lpnvs = lpn_vole.receive(&mut channel, &mut rng).unwrap();
     let base_vs: Vec<_> = (0..rows1 + weight1 + r).map(|i| lpnvs[i]).collect();
+    let delta: FE = lpn_vole.delta();
     let mut vole = LpnReceiver::init(
         &mut channel,
         rows1,
