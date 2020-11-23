@@ -11,12 +11,8 @@ use crate::{
     errors::Error,
     ot::{
         alsz::{Receiver as AlszReceiver, Sender as AlszSender},
-        CorrelatedReceiver,
-        CorrelatedSender,
-        RandomReceiver,
-        RandomSender,
-        Receiver as OtReceiver,
-        Sender as OtSender,
+        CorrelatedReceiver, CorrelatedSender, FixedKeyInitializer, RandomReceiver, RandomSender,
+        Receiver as OtReceiver, Sender as OtSender,
     },
     utils,
 };
@@ -29,15 +25,16 @@ const SSP: usize = 40;
 
 /// Oblivious transfer extension sender.
 pub struct Sender<OT: OtReceiver<Msg = Block> + Malicious> {
-    ot: AlszSender<OT>,
+    pub(super) ot: AlszSender<OT>,
 }
+
 /// Oblivious transfer extension receiver.
 pub struct Receiver<OT: OtSender<Msg = Block> + Malicious> {
     ot: AlszReceiver<OT>,
 }
 
 impl<OT: OtReceiver<Msg = Block> + Malicious> Sender<OT> {
-    fn send_setup<C: AbstractChannel, RNG: CryptoRng + Rng>(
+    pub(super) fn send_setup<C: AbstractChannel, RNG: CryptoRng + Rng>(
         &mut self,
         channel: &mut C,
         m: usize,
@@ -73,6 +70,17 @@ impl<OT: OtReceiver<Msg = Block> + Malicious> Sender<OT> {
             )));
         }
         Ok(qs)
+    }
+}
+
+impl<OT: OtReceiver<Msg = Block> + Malicious> FixedKeyInitializer for Sender<OT> {
+    fn init_fixed_key<C: AbstractChannel, RNG: CryptoRng + Rng>(
+        channel: &mut C,
+        s_: [u8; 16],
+        rng: &mut RNG,
+    ) -> Result<Self, Error> {
+        let ot = AlszSender::<OT>::init_fixed_key(channel, s_, rng)?;
+        Ok(Self { ot })
     }
 }
 
@@ -166,7 +174,7 @@ impl<OT: OtReceiver<Msg = Block> + Malicious> std::fmt::Display for Sender<OT> {
 }
 
 impl<OT: OtSender<Msg = Block> + Malicious> Receiver<OT> {
-    fn receive_setup<C: AbstractChannel, RNG: CryptoRng + Rng>(
+    pub(super) fn receive_setup<C: AbstractChannel, RNG: CryptoRng + Rng>(
         &mut self,
         channel: &mut C,
         inputs: &[bool],
