@@ -1,6 +1,7 @@
 address: 0.0.0.0
 nthread: 4
-setsize: 10000
 itemsize: 16
-megasize: 250
-sleeptime: 15
+megasize: 10000
+sleeptime: 25
+data_path_server: /Users/
+data_path_client: /Users/

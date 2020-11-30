@@ -1,4 +1,4 @@
-use popsicle::psty_payload::{Sender, Receiver};
+use popsicle::psty_payload::{Sender};
 
 use rand::{CryptoRng, Rng};
 use scuttlebutt::{AesRng, Block512, TcpChannel};
@@ -7,11 +7,9 @@ use fancy_garbling::Wire;
 
 use std::{
     collections::HashMap,
-    fs::{File, create_dir_all},
+    fs::{File},
     io::{Write},
     net::{TcpListener, TcpStream},
-    thread,
-    time::SystemTime,
 };
 
 
@@ -27,7 +25,7 @@ pub fn int_vec_block512(values: Vec<u64>) -> Vec<Block512> {
          }).collect()
 }
 
-pub fn rand_u64_vec<RNG: CryptoRng + Rng>(n: usize, modulus: u64, rng: &mut RNG) -> Vec<u64>{
+pub fn rand_u64_vec<RNG: CryptoRng + Rng>(n: usize, _modulus: u64, _rng: &mut RNG) -> Vec<u64>{
     (0..n).map(|_| 100).collect()
     // rng.gen::<u64>()%modulus
 }
@@ -52,7 +50,7 @@ pub fn generate_deltas(primes: &[u16]) -> HashMap<u16, Wire> {
 
 fn server_protocol(mut stream: TcpChannel<TcpStream>) {
     const ITEM_SIZE: usize = 16;
-    const SET_SIZE: usize = 1 << 7;
+    const SET_SIZE: usize = 100000;
 
     let mut rng = AesRng::new();
     let sender_inputs = enum_ids(SET_SIZE, ITEM_SIZE);
@@ -60,7 +58,6 @@ fn server_protocol(mut stream: TcpChannel<TcpStream>) {
     let weights = int_vec_block512(weights_vec);
 
     let qs = fancy_garbling::util::primes_with_width(64);
-    let q = fancy_garbling::util::product(&qs);
 
     let deltas = generate_deltas(&qs);
     let deltas_json = serde_json::to_string(&deltas).unwrap();
@@ -70,7 +67,7 @@ fn server_protocol(mut stream: TcpChannel<TcpStream>) {
     file_deltas.write(deltas_json.as_bytes()).unwrap();
 
     let mut psi = Sender::init(&mut stream, &mut rng).unwrap();
-    let mut state = psi.full_protocol_large(&sender_inputs, &weights, &path_delta, &mut stream, &mut rng).unwrap();
+    let _ = psi.full_protocol(&sender_inputs, &weights, &mut stream, &mut rng).unwrap();
 
 }
 

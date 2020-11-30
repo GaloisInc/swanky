@@ -1,6 +1,5 @@
 use popsicle::psty_payload::{Sender};
 
-use rand::{CryptoRng, Rng};
 use scuttlebutt::{AesRng, Block512, Block, TcpChannel};
 extern crate fancy_garbling;
 use fancy_garbling::Wire;
@@ -15,33 +14,6 @@ use std::{
 use bincode;
 use serde_json;
 
-pub fn int_vec_block512(values: Vec<u64>) -> Vec<Block512> {
-    values.into_iter()
-          .map(|item|{
-            let value_bytes = item.to_le_bytes();
-            let mut res_block = [0 as u8; 64];
-            for i in 0..8{
-                res_block[i] = value_bytes[i];
-            }
-            Block512::from(res_block)
-         }).collect()
-}
-
-pub fn rand_u64_vec<RNG: CryptoRng + Rng>(n: usize, _modulus: u64, _rng: &mut RNG) -> Vec<u64>{
-    (0..n).map(|_| 1000000).collect()
-    // rng.gen::<u64>()%modulus
-
-}
-
-pub fn enum_ids(n: usize, id_size: usize) ->Vec<Vec<u8>>{
-    let mut ids = Vec::with_capacity(n);
-    for i in 0..n as u64{
-        let v:Vec<u8> = i.to_le_bytes().iter().take(id_size).cloned().collect();
-        ids.push(v);
-    }
-    ids
-}
-
 pub fn generate_deltas(primes: &[u16]) -> HashMap<u16, Wire> {
     let mut deltas = HashMap::new();
     let mut rng = rand::thread_rng();
@@ -51,16 +23,12 @@ pub fn generate_deltas(primes: &[u16]) -> HashMap<u16, Wire> {
     deltas
 }
 
-fn server_protocol(mut stream: TcpChannel<TcpStream>, absolute_path: &str, nthread: usize, setsize:usize, itemsize: usize){
+fn server_protocol(mut stream: TcpChannel<TcpStream>, absolute_path: &str, nthread: usize,
+                    ids: Vec<Vec<u8>>, payloads: Vec<Block512>){
     let start = SystemTime::now();
     let path = absolute_path.to_owned();
 
     let mut rng = AesRng::new();
-
-    let sender_inputs = enum_ids(setsize, itemsize);
-
-    let weights_vec = rand_u64_vec(setsize, u64::pow(10,10), &mut rng);
-    let weights = int_vec_block512(weights_vec);
 
     let qs = fancy_garbling::util::primes_with_width(64 as u32);// for 64bit inputs and outputs
     let deltas = generate_deltas(&qs);
@@ -74,7 +42,7 @@ fn server_protocol(mut stream: TcpChannel<TcpStream>, absolute_path: &str, nthre
 
     let mut psi = Sender::init(&mut stream, &mut rng).unwrap();
 
-    let (state, _, nmegabins, megasize) = psi.bucketize_data(&sender_inputs, &weights, &mut stream, &mut rng).unwrap();
+    let (state, _, nmegabins, megasize) = psi.bucketize_data(&ids, &payloads, &mut stream, &mut rng).unwrap();
 
     let megabin_per_thread = ((nmegabins as f32)/(nthread as f32)).ceil() as usize;
 
@@ -125,7 +93,7 @@ fn server_protocol(mut stream: TcpChannel<TcpStream>, absolute_path: &str, nthre
 
 }
 
-pub fn prepare_files(absolute_path: &str, address: &str, nthread: usize, setsize: usize, itemsize: usize) {
+pub fn prepare_files(absolute_path: &str, address: &str, nthread: usize, ids: Vec<Vec<u8>>, payloads: Vec<Block512>) {
     let address = format!("{}{}", address,":3000");
     println!("Server listening on {}", address);
     let listener = TcpListener::bind(address).unwrap();
@@ -135,7 +103,7 @@ pub fn prepare_files(absolute_path: &str, address: &str, nthread: usize, setsize
             Ok(stream) => {
                 println!("New connection: {}", stream.peer_addr().unwrap());
                     let channel = TcpChannel::new(stream);
-                    server_protocol(channel, absolute_path, nthread, setsize, itemsize);
+                    server_protocol(channel, absolute_path, nthread, ids, payloads);
                     return;
 
             }
