@@ -20,10 +20,10 @@ use std::{
     time::{Duration},
     thread,
 };
-
+// 
 // use rand::{CryptoRng, Rng};
 // use scuttlebutt::{AesRng, Block512};
-
+//
 // pub fn int_vec_block512(values: Vec<u64>) -> Vec<Block512> {
 //     values.into_iter()
 //           .map(|item|{
@@ -37,7 +37,7 @@ use std::{
 // }
 //
 // pub fn rand_u64_vec<RNG: CryptoRng + Rng>(n: usize, _modulus: u64, _rng: &mut RNG) -> Vec<u64>{
-//     (0..n).map(|_| 1000000).collect()
+//     (0..n).map(|_| 71).collect()
 //     // rng.gen::<u64>()%modulus
 // }
 //
@@ -80,6 +80,9 @@ pub fn main(){
     let nthread = parameters.get("nthread").unwrap().parse::<usize>().unwrap();
     let megasize = parameters.get("megasize").unwrap().parse::<usize>().unwrap();
 
+    let precision = parameters.get("precision").unwrap().parse::<u32>().unwrap();
+
+
     let client_path = parameters.get("data_path_client").unwrap().to_owned();
     let schema_id = parameters.get("schema_client_id").unwrap().to_owned();
     let schema_payload = parameters.get("schema_client_payload").unwrap().to_owned();
@@ -87,8 +90,8 @@ pub fn main(){
     let (ids_client, payloads_client) = parse_files(&schema_id, &schema_payload, &client_path);
    //
     // let mut rng = AesRng::new();
-    // let ids_client = enum_ids(100, 16);
-    // let payloads_client = int_vec_block512(rand_u64_vec(100, 1000,&mut rng));
+    // let ids_client = enum_ids(197, 16);
+    // let payloads_client = int_vec_block512(rand_u64_vec(197, 10,&mut rng));
 
     let duration = Duration::from_secs(sleeptime);
    //
@@ -112,11 +115,11 @@ pub fn main(){
     }
    //
     thread::sleep(duration);
-    let (_result_aggregate, _result_cardinality) = join_aggregates(&mut path, &address, nthread).unwrap();
+    let (_result_aggregate, _result_cardinality) = join_aggregates(&mut path, &address, nthread, precision).unwrap();
 
 
     // test results
-
+    //
     // let server_path = parameters.get("data_path_server").unwrap().to_owned();
     // let schema_id = parameters.get("schema_server_id").unwrap().to_owned();
     // let schema_payload = parameters.get("schema_server_payload").unwrap().to_owned();
@@ -124,10 +127,12 @@ pub fn main(){
     // let (ids_server, payloads_server) = parse_files(&schema_id, &schema_payload, &server_path);
     //
     // let (weighted_aggregate, cardinality) = test(&ids_client, &ids_server, &payloads_client, &payloads_server);
+    //
+    // let weighted_aggregate = weighted_aggregate as f64 / 10_u64.pow(precision) as f64;
     // println!("In the open weighted_aggregate {:?}", weighted_aggregate);
     // println!("In the open cardinality {:?}", cardinality);
-    //
-    // assert_eq!(weighted_aggregate, result_aggregate);
-    // assert_eq!(cardinality, result_cardinality);
+    // //
+    // assert_eq!(weighted_aggregate, _result_aggregate);
+    // assert_eq!(cardinality, _result_cardinality);
 
 }

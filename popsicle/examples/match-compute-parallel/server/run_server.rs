@@ -32,7 +32,7 @@ use std::{
 // }
 //
 // pub fn rand_u64_vec<RNG: CryptoRng + Rng>(n: usize, _modulus: u64, _rng: &mut RNG) -> Vec<u64>{
-//     (0..n).map(|_| 1000000).collect()
+//     (0..n).map(|_| 1).collect()
 //     // rng.gen::<u64>()%modulus
 // }
 //
@@ -80,8 +80,8 @@ pub fn main(){
     let (ids, payloads) = parse_files(&schema_id, &schema_payload, &server_path);
 
     // let mut rng = AesRng::new();
-    // let ids = enum_ids(100, 16);
-    // let payloads = int_vec_block512(rand_u64_vec(100, 1000, &mut rng));
+    // let ids = enum_ids(197, 16);
+    // let payloads = int_vec_block512(rand_u64_vec(197, 10, &mut rng));
 
     path.pop();
     path.push("server");
