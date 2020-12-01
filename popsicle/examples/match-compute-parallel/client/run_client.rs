@@ -114,17 +114,17 @@ pub fn main(){
 
     // test results
 
-    let server_path = parameters.get("data_path_server").unwrap().to_owned();
-    let schema_id = parameters.get("schema_server_id").unwrap().to_owned();
-    let schema_payload = parameters.get("schema_server_payload").unwrap().to_owned();
-
-    let (ids_server, payloads_server) = parse_files(&schema_id, &schema_payload, &server_path);
-
-    let (weighted_aggregate, cardinality) = test(&ids_client, &ids_server, &payloads_client, &payloads_server);
-    println!("In the open weighted_aggregate {:?}", weighted_aggregate);
-    println!("In the open cardinality {:?}", cardinality);
-
-    assert_eq!(weighted_aggregate, result_aggregate);
-    assert_eq!(cardinality, result_cardinality);
+    // let server_path = parameters.get("data_path_server").unwrap().to_owned();
+    // let schema_id = parameters.get("schema_server_id").unwrap().to_owned();
+    // let schema_payload = parameters.get("schema_server_payload").unwrap().to_owned();
+    //
+    // let (ids_server, payloads_server) = parse_files(&schema_id, &schema_payload, &server_path);
+    //
+    // let (weighted_aggregate, cardinality) = test(&ids_client, &ids_server, &payloads_client, &payloads_server);
+    // println!("In the open weighted_aggregate {:?}", weighted_aggregate);
+    // println!("In the open cardinality {:?}", cardinality);
+    //
+    // assert_eq!(weighted_aggregate, result_aggregate);
+    // assert_eq!(cardinality, result_cardinality);
 
 }

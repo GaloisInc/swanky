@@ -13,7 +13,7 @@ pub fn test(ids_client: &[Vec<u8>], ids_server: &[Vec<u8>],
 
     let mut weighted_payload = 0;
     let mut intersection_cardinality = 0;
-    for i in 0..cmp::max(client_len, server_len){
+    for i in 0..cmp::min(client_len, server_len){
 
         let id_client: &[u8] = &ids_client[i];
         let id_server: &[u8] = &ids_server[i];
