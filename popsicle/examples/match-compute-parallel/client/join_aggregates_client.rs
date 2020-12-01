@@ -11,30 +11,35 @@ use std::{
     net::{TcpStream},
     time::SystemTime,
     io::Error,
+    path::PathBuf,
 };
 use serde_json;
 
-fn read_from_file(path: &str, file_name: &str)-> String{
-    let data_path = format!("{}{}", path, file_name);
-    read_to_string(data_path).unwrap()
-}
-
-fn client_protocol(mut channel: TcpChannel<TcpStream>, absolute_path:&str, nthreads: usize) -> (u64, u64){
+fn client_protocol(mut channel: TcpChannel<TcpStream>, path:&mut PathBuf, nthreads: usize) -> (u64, u64){
     let start = SystemTime::now();
     let mut rng = AesRng::new();
 
     let mut aggregates= Vec::new();
     let mut cardinality= Vec::new();
     for thread_id in 0..nthreads{
-        let mut path = absolute_path.to_owned().clone();
-        path.push_str("thread");
-        path.push_str(&thread_id.to_string());
+        let mut thread_path = "thread".to_owned();
+        thread_path.push_str(&thread_id.to_string());
+        path.push(thread_path);
 
-        let partial_aggregate: Vec<Wire> = serde_json::from_str(&read_from_file(&path, "/output_aggregate.txt")).unwrap();
-        let partial_cardinality: Vec<Wire> = serde_json::from_str(&read_from_file(&path, "/output_cardinality.txt")).unwrap();
+        path.push("output_aggregate.txt");
+        let path_str = path.clone().into_os_string().into_string().unwrap();
+        let partial_aggregate: Vec<Wire> = serde_json::from_str(&read_to_string(path_str).unwrap()).unwrap();
+        path.pop();
+
+        path.push("output_cardinality.txt");
+        let path_str = path.clone().into_os_string().into_string().unwrap();
+        let partial_cardinality: Vec<Wire> = serde_json::from_str(&read_to_string(path_str).unwrap()).unwrap();
+        path.pop();
 
         aggregates.push(partial_aggregate);
         cardinality.push(partial_cardinality);
+
+        path.pop();
     }
 
     let mut psi = Receiver::init(&mut channel, &mut rng).unwrap();
@@ -44,9 +49,11 @@ fn client_protocol(mut channel: TcpChannel<TcpStream>, absolute_path:&str, nthre
     println!("cardinality: {:?}", cardinality);
     println!("average: {:?}", output);
 
-    let mut path_result = absolute_path.to_owned().clone();
-    path_result.push_str("result.txt");
-    let mut file_result = File::create(path_result).unwrap();
+    path.push("result.txt");
+    let path_str = path.clone().into_os_string().into_string().unwrap();
+    path.pop();
+
+    let mut file_result = File::create(path_str).unwrap();
     file_result.write(&output.to_le_bytes()).unwrap();
 
 
@@ -66,13 +73,13 @@ fn client_protocol(mut channel: TcpChannel<TcpStream>, absolute_path:&str, nthre
     (aggregate, cardinality)
 }
 
-pub fn join_aggregates(absolute_path: &str, address: &str, nthreads: usize) -> Result<(u64, u64), Error>{
+pub fn join_aggregates(path:&mut PathBuf, address: &str, nthreads: usize) -> Result<(u64, u64), Error>{
     let port_prefix = format!("{}{}", address,":3000");
 
     match TcpStream::connect(port_prefix) {
         Ok(stream) => {
             let channel = TcpChannel::new(stream);
-            Ok(client_protocol(channel, absolute_path, nthreads))
+            Ok(client_protocol(channel, path, nthreads))
         },
         Err(e) => {
             println!("Failed to connect: {}", e);

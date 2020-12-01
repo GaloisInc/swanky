@@ -1,10 +1,10 @@
 address: 0.0.0.0
 
-sleeptime: 35
-nthread: 4
+sleeptime: 5
+nthread: 2
 
 itemsize: 16
-megasize: 10000
+megasize: 100
 
 data_path_server: /Users/rissa/Documents/Data/NPSAS.csv
 data_path_client: /Users/rissa/Documents/Data/Pell.csv

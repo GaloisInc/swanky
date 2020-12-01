@@ -10,6 +10,7 @@ use std::{
     net::{TcpListener, TcpStream},
     collections::HashMap,
     time::SystemTime,
+    path::PathBuf,
 };
 use bincode;
 use serde_json;
@@ -23,22 +24,22 @@ pub fn generate_deltas(primes: &[u16]) -> HashMap<u16, Wire> {
     deltas
 }
 
-fn server_protocol(mut stream: TcpChannel<TcpStream>, absolute_path: &str, nthread: usize,
+fn server_protocol(mut stream: TcpChannel<TcpStream>, path: &mut PathBuf, nthread: usize,
                     ids: &[Vec<u8>], payloads: &[Block512]){
     let start = SystemTime::now();
-    let path = absolute_path.to_owned();
 
     let mut rng = AesRng::new();
 
     let qs = fancy_garbling::util::primes_with_width(64 as u32);// for 64bit inputs and outputs
     let deltas = generate_deltas(&qs);
 
-    let path_delta = format!("{}{}", absolute_path, "delta.txt");
+    path.push("delta.txt");
+    let path_str = path.clone().into_os_string().into_string().unwrap();
+    let mut file_deltas = File::create(path_str).unwrap();
+    path.pop();
 
-    let mut file_deltas = File::create(path_delta).unwrap();
     let deltas_json = serde_json::to_string(&deltas).unwrap();
     file_deltas.write(deltas_json.as_bytes()).unwrap();
-
 
     let mut psi = Sender::init(&mut stream, &mut rng).unwrap();
 
@@ -57,15 +58,33 @@ fn server_protocol(mut stream: TcpChannel<TcpStream>, absolute_path: &str, nthre
     let payload: Vec<&[&[Vec<Block512>]]>= payload.chunks(megabin_per_thread).collect();
 
     for i in 0 ..nthread{
-        let mut path = path.clone();
-        path.push_str("thread");
-        path.push_str(&i.to_string());
-        let _ = create_dir_all(path.clone());
+        let mut thread_path = "thread".to_owned();
+        thread_path.push_str(&i.to_string());
+        path.push(thread_path);
 
-        let mut file_ts_id = File::create(format!("{}{}", path, "/ts_id.txt")).unwrap();
-        let mut file_ts_payload = File::create(format!("{}{}", path,"/ts_payload.txt")).unwrap();
-        let mut file_table = File::create(format!("{}{}", path,"/table.txt")).unwrap();
-        let mut file_payload = File::create(format!("{}{}", path,"/payload.txt")).unwrap();
+        let path_str = path.clone().into_os_string().into_string().unwrap();
+        let _ = create_dir_all(path_str);
+
+        path.push("ts_id.txt");
+        let path_str = path.clone().into_os_string().into_string().unwrap();
+        let mut file_ts_id = File::create(path_str).unwrap();
+        path.pop();
+
+        path.push("ts_payload.txt");
+        let path_str = path.clone().into_os_string().into_string().unwrap();
+        let mut file_ts_payload = File::create(path_str).unwrap();
+        path.pop();
+
+        path.push("table.txt");
+        let path_str = path.clone().into_os_string().into_string().unwrap();
+        let mut file_table = File::create(path_str).unwrap();
+        path.pop();
+
+        path.push("payload.txt");
+        let path_str = path.clone().into_os_string().into_string().unwrap();
+        let mut file_payload = File::create(path_str).unwrap();
+        path.pop();
+
 
         let ts_id_json = bincode::serialize(&ts_id[i]).unwrap();
         let ts_payload_json = bincode::serialize(&ts_payload[i]).unwrap();
@@ -76,6 +95,8 @@ fn server_protocol(mut stream: TcpChannel<TcpStream>, absolute_path: &str, nthre
         file_ts_payload.write(&ts_payload_json).unwrap();
         file_table.write(&table_json).unwrap();
         file_payload.write(&payload_json).unwrap();
+
+        path.pop();
     }
 
     println!(
@@ -93,7 +114,7 @@ fn server_protocol(mut stream: TcpChannel<TcpStream>, absolute_path: &str, nthre
 
 }
 
-pub fn prepare_files(absolute_path: &str, address: &str, nthread: usize, ids: &[Vec<u8>], payloads: &[Block512]) {
+pub fn prepare_files(path: &mut PathBuf, address: &str, nthread: usize, ids: &[Vec<u8>], payloads: &[Block512]) {
     let address = format!("{}{}", address,":3000");
     println!("Server listening on {}", address);
     let listener = TcpListener::bind(address).unwrap();
@@ -103,7 +124,7 @@ pub fn prepare_files(absolute_path: &str, address: &str, nthread: usize, ids: &[
             Ok(stream) => {
                 println!("New connection: {}", stream.peer_addr().unwrap());
                     let channel = TcpChannel::new(stream);
-                    server_protocol(channel, absolute_path, nthread, ids, payloads);
+                    server_protocol(channel, path, nthread, ids, payloads);
                     return;
 
             }

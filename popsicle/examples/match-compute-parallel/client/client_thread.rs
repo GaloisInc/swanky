@@ -7,22 +7,30 @@ use std::{
     io::{Write, Read},
     net::{TcpStream},
     time::SystemTime,
+    path::PathBuf,
 };
 
 use bincode;
 use serde_json;
 
-fn client_protocol(mut channel: TcpChannel<TcpStream>, absolute_path: &str, thread_id: usize) {
+fn client_protocol(mut channel: TcpChannel<TcpStream>, path: &mut PathBuf, thread_id: usize) {
     let start = SystemTime::now();
     println!("Receiver Thread {} Starting computation", thread_id);
     let mut rng = AesRng::new();
 
-    let mut path = absolute_path.to_owned().clone();
-    path.push_str("thread");
-    path.push_str(&thread_id.to_string());
+    let mut thread_path = "thread".to_owned();
+    thread_path.push_str(&thread_id.to_string());
+    path.push(thread_path);
 
-    let mut file_table = File::open(format!("{}{}", path,"/table.txt")).unwrap();
-    let mut file_payload = File::open(format!("{}{}", path,"/payload.txt")).unwrap();
+    path.push("table.txt");
+    let path_str = path.clone().into_os_string().into_string().unwrap();
+    let mut file_table = File::open(path_str).unwrap();
+    path.pop();
+
+    path.push("payload.txt");
+    let path_str = path.clone().into_os_string().into_string().unwrap();
+    let mut file_payload = File::open(path_str).unwrap();
+    path.pop();
 
     let mut buff1= Vec::new();
     let mut buff2= Vec::new();
@@ -49,8 +57,15 @@ fn client_protocol(mut channel: TcpChannel<TcpStream>, absolute_path: &str, thre
         channel.kilobits_written() / 1000.0
     );
 
-    let mut file_aggregate = File::create(format!("{}{}", path, "/output_aggregate.txt")).unwrap();
-    let mut file_cardinality = File::create(format!("{}{}", path, "/output_cardinality.txt")).unwrap();
+    path.push("output_aggregate.txt");
+    let path_str = path.clone().into_os_string().into_string().unwrap();
+    let mut file_aggregate = File::create(path_str).unwrap();
+    path.pop();
+
+    path.push("output_cardinality.txt");
+    let path_str = path.clone().into_os_string().into_string().unwrap();
+    let mut file_cardinality = File::create(path_str).unwrap();
+    path.pop();
 
     let aggregate_json = serde_json::to_string(&acc.wires().to_vec()).unwrap();
     let cardinality_json = serde_json::to_string(&card.wires().to_vec()).unwrap();
@@ -59,14 +74,14 @@ fn client_protocol(mut channel: TcpChannel<TcpStream>, absolute_path: &str, thre
     file_cardinality.write(cardinality_json.as_bytes()).unwrap();
 }
 
-pub fn client_thread(absolute_path: &str, address: &str, thread_id: usize) {
+pub fn client_thread(path: &mut PathBuf, address: &str, thread_id: usize) {
     let port_prefix = format!("{}{}", address,":800");
     let port = format!("{}{}", port_prefix, thread_id.to_string());
 
     match TcpStream::connect(port) {
         Ok(stream) => {
             let channel = TcpChannel::new(stream);
-            client_protocol(channel, absolute_path, thread_id);
+            client_protocol(channel, path, thread_id);
         },
         Err(e) => {
             println!("Failed to connect: {}", e);

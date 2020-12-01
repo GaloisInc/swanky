@@ -18,7 +18,7 @@ use std::{
 
 // use rand::{CryptoRng, Rng};
 // use scuttlebutt::{AesRng, Block512};
-
+//
 // pub fn int_vec_block512(values: Vec<u64>) -> Vec<Block512> {
 //     values.into_iter()
 //           .map(|item|{
@@ -47,17 +47,19 @@ use std::{
 
 
 pub fn main(){
-    let mut absolute_path = env::current_exe().unwrap();
-    absolute_path.pop();
-    absolute_path.pop();
-    absolute_path.pop();
-    absolute_path.pop();
-    absolute_path.pop();
+    let mut path = env::current_exe().unwrap();
+    path.pop();
+    path.pop();
+    path.pop();
+    path.pop();
 
-    let mut absolute_path = absolute_path.into_os_string().into_string().unwrap();//
-    absolute_path.push_str("/swanky/popsicle/examples/match-compute-parallel/");
+    path.push("popsicle");
+    path.push("examples");
+    path.push("match-compute-parallel");
+    path.push("configuration.txt");
 
-    let configuration = File::open(format!("{}{}", absolute_path, "configuration.txt")).unwrap();
+    let absolute_path = path.clone().into_os_string().into_string().unwrap();
+    let configuration = File::open(absolute_path).unwrap();
     let buffer = BufReader::new(configuration).lines();
     let mut parameters = HashMap::new();
     for line in buffer.enumerate(){
@@ -78,19 +80,19 @@ pub fn main(){
     let (ids, payloads) = parse_files(&schema_id, &schema_payload, &server_path);
 
     // let mut rng = AesRng::new();
-    // let ids = enum_ids(100000, 16);
-    // let payloads = int_vec_block512(rand_u64_vec(100000, 1000, &mut rng));
+    // let ids = enum_ids(100, 16);
+    // let payloads = int_vec_block512(rand_u64_vec(100, 1000, &mut rng));
 
-    absolute_path.push_str("server/");
-    prepare_files(&absolute_path, &address, nthread, &ids, &payloads);
+    path.pop();
+    path.push("server");
+    prepare_files(&mut path, &address, nthread, &ids, &payloads);
 
     let mut handle = Vec::new();
     for i in 0..nthread {
-        let absolute_path_thread = absolute_path.clone();
+        let mut path_thread = path.clone();
         let address_thread = address.clone();
-
        handle.push(thread::spawn(move || {
-           server_thread(&absolute_path_thread.clone(), &address_thread, i);
+           server_thread(&mut path_thread, &address_thread, i);
        }));
    }
 
@@ -98,5 +100,5 @@ pub fn main(){
         let _ = thread.join();
     }
 
-    join_aggregates(&absolute_path, &address, nthread);
+    join_aggregates(&mut path, &address, nthread);
 }

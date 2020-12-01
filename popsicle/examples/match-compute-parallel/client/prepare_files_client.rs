@@ -7,16 +7,15 @@ use std::{
     io::{Write},
     net::{TcpStream},
     time::SystemTime,
+    path::PathBuf,
 };
 
 use bincode;
 
 
-fn client_protocol(mut channel: TcpChannel<TcpStream>, absolute_path: &str, nthread: usize,
+fn client_protocol(mut channel: TcpChannel<TcpStream>, path: &mut PathBuf, nthread: usize,
                     megasize: usize, ids: &[Vec<u8>], payloads: &[Block512]){
     let start = SystemTime::now();
-    let mut path = absolute_path.to_owned();
-    path.push_str("thread");
 
     let mut rng = AesRng::new();
 
@@ -32,18 +31,30 @@ fn client_protocol(mut channel: TcpChannel<TcpStream>, absolute_path: &str, nthr
     let payload: Vec<&[Vec<Block512>]>= payload.chunks(megabin_per_thread).collect();
 
     for i in 0 ..nthread{
-        let mut path = path.clone();
-        path.push_str(&i.to_string());
-        let _ = create_dir_all(path.clone());
+        let mut thread_path = "thread".to_owned();
+        thread_path.push_str(&i.to_string());
+        path.push(thread_path);
 
-        let mut file_table = File::create(format!("{}{}", path,"/table.txt")).unwrap();
-        let mut file_payload = File::create(format!("{}{}", path,"/payload.txt")).unwrap();
+        let path_str = path.clone().into_os_string().into_string().unwrap();
+        let _ = create_dir_all(path_str);
 
+        path.push("table.txt");
+        let path_str = path.clone().into_os_string().into_string().unwrap();
+        let mut file_table = File::create(path_str).unwrap();
+        path.pop();
+
+        path.push("payload.txt");
+        let path_str = path.clone().into_os_string().into_string().unwrap();
+        let mut file_payload = File::create(path_str).unwrap();
+        path.pop();
+        
         let table_json = bincode::serialize(&table[i]).unwrap();
         let payload_json = bincode::serialize(&payload[i]).unwrap();
 
         file_table.write(&table_json).unwrap();
         file_payload.write(&payload_json).unwrap();
+
+        path.pop();
     }
     println!(
         "Receiver :: Bucketization time : {} ms",
@@ -59,14 +70,14 @@ fn client_protocol(mut channel: TcpChannel<TcpStream>, absolute_path: &str, nthr
     );
 }
 
-pub fn prepare_files(absolute_path: &str, address: &str, nthread: usize, megasize: usize,
+pub fn prepare_files(path: &mut PathBuf, address: &str, nthread: usize, megasize: usize,
                     ids: &[Vec<u8>], payloads: &[Block512]){
     let address = format!("{}{}", address,":3000");
 
     match TcpStream::connect(address) {
         Ok(stream) => {
             let channel = TcpChannel::new(stream);
-            client_protocol(channel, absolute_path, nthread, megasize, ids, payloads);
+            client_protocol(channel, path, nthread, megasize, ids, payloads);
         },
         Err(e) => {
             println!("Failed to connect: {}", e);
