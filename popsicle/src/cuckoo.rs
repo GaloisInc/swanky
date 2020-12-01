@@ -162,7 +162,7 @@ impl CuckooHashLarge{
     /// bits will be used to store the hash index.
     pub fn new(inputs: &[Block], nhashes: usize, megasize: usize) -> Result<CuckooHashLarge, Error> {
         let nbins = compute_nbins(inputs.len(), nhashes)?;
-        let nmegabins = ((nbins as f32)/(megasize as f32)).ceil() as usize;
+        let nmegabins = ((nbins as f64)/(megasize as f64)).ceil() as usize;
         let last_bin = nbins % megasize;
 
         let mut items: Vec<CuckooHash> = Vec::new();

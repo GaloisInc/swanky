@@ -1,7 +1,16 @@
 address: 0.0.0.0
+
+sleeptime: 35
 nthread: 4
+
 itemsize: 16
 megasize: 10000
-sleeptime: 25
-data_path_server: /Users/
-data_path_client: /Users/
+
+data_path_server: /Users/rissa/Documents/Data/NPSAS.csv
+data_path_client: /Users/rissa/Documents/Data/Pell.csv
+
+schema_server_id: id
+schema_server_payload: StudWt
+
+schema_client_id: ID
+schema_client_payload: PELLAMT

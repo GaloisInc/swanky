@@ -2,12 +2,15 @@ mod prepare_files_client;
 mod client_thread;
 mod join_aggregates_client;
 mod parse_files;
+mod test;
 
 
 use prepare_files_client::prepare_files;
 use client_thread::client_thread;
 use join_aggregates_client::join_aggregates;
 use parse_files::parse_files;
+
+use test::test;
 
 use std::{
     env,
@@ -57,31 +60,38 @@ pub fn main(){
 
     let mut absolute_path = absolute_path.into_os_string().into_string().unwrap();//
     absolute_path.push_str("/swanky/popsicle/examples/match-compute-parallel/");
+
     let configuration = File::open(format!("{}{}", absolute_path, "configuration.txt")).unwrap();
-
     let buffer = BufReader::new(configuration).lines();
-
     let mut parameters = HashMap::new();
     for line in buffer.enumerate(){
-        let line_split = line.1.unwrap().split(": ").map(|item| item.to_string()).collect::<Vec<String>>();
-        parameters.insert(line_split[0].clone(), line_split[1].clone());
+        let read_line =  line.1.unwrap();
+        if !read_line.is_empty(){
+            let line_split = read_line.split(": ").map(|item| item.to_string()).collect::<Vec<String>>();
+            parameters.insert(line_split[0].clone(), line_split[1].clone());
+        }
     }
+
     let address = parameters.get("address").unwrap().to_owned();
+    let sleeptime = parameters.get("sleeptime").unwrap().parse::<u64>().unwrap();
+
     let nthread = parameters.get("nthread").unwrap().parse::<usize>().unwrap();
     let megasize = parameters.get("megasize").unwrap().parse::<usize>().unwrap();
-    let sleeptime = parameters.get("sleeptime").unwrap().parse::<u64>().unwrap();
+
     let client_path = parameters.get("data_path_client").unwrap().to_owned();
+    let schema_id = parameters.get("schema_client_id").unwrap().to_owned();
+    let schema_payload = parameters.get("schema_client_payload").unwrap().to_owned();
 
-    let duration = Duration::from_secs(sleeptime);
-
-    let (ids, payloads) = parse_files("ID", "PELLAMT", &client_path);
+    let (ids_client, payloads_client) = parse_files(&schema_id, &schema_payload, &client_path);
 
     // let mut rng = AesRng::new();
     // let ids = enum_ids(100000, 16);
     // let payloads = int_vec_block512(rand_u64_vec(100000, 1000,&mut rng));
 
+    let duration = Duration::from_secs(sleeptime);
+
     absolute_path.push_str("client/");
-    prepare_files(&absolute_path, &address, nthread, megasize, ids, payloads);
+    prepare_files(&absolute_path, &address, nthread, megasize, &ids_client, &payloads_client);
 
     thread::sleep(duration);
 
@@ -99,5 +109,22 @@ pub fn main(){
     }
 
     thread::sleep(duration);
-    join_aggregates(&absolute_path, &address, nthread);
+    let (result_aggregate, result_cardinality) = join_aggregates(&absolute_path, &address, nthread).unwrap();
+
+
+    // test results
+
+    let server_path = parameters.get("data_path_server").unwrap().to_owned();
+    let schema_id = parameters.get("schema_server_id").unwrap().to_owned();
+    let schema_payload = parameters.get("schema_server_payload").unwrap().to_owned();
+
+    let (ids_server, payloads_server) = parse_files(&schema_id, &schema_payload, &server_path);
+
+    let (weighted_aggregate, cardinality) = test(&ids_client, &ids_server, &payloads_client, &payloads_server);
+    println!("In the open weighted_aggregate {:?}", weighted_aggregate);
+    println!("In the open cardinality {:?}", cardinality);
+
+    assert_eq!(weighted_aggregate, result_aggregate);
+    assert_eq!(cardinality, result_cardinality);
+
 }

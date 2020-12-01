@@ -13,7 +13,7 @@ use bincode;
 
 
 fn client_protocol(mut channel: TcpChannel<TcpStream>, absolute_path: &str, nthread: usize,
-                    megasize: usize, ids: Vec<Vec<u8>>, payloads: Vec<Block512>){
+                    megasize: usize, ids: &[Vec<u8>], payloads: &[Block512]){
     let start = SystemTime::now();
     let mut path = absolute_path.to_owned();
     path.push_str("thread");
@@ -60,7 +60,7 @@ fn client_protocol(mut channel: TcpChannel<TcpStream>, absolute_path: &str, nthr
 }
 
 pub fn prepare_files(absolute_path: &str, address: &str, nthread: usize, megasize: usize,
-                    ids: Vec<Vec<u8>>, payloads: Vec<Block512>){
+                    ids: &[Vec<u8>], payloads: &[Block512]){
     let address = format!("{}{}", address,":3000");
 
     match TcpStream::connect(address) {

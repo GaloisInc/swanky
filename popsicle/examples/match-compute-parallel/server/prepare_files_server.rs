@@ -24,7 +24,7 @@ pub fn generate_deltas(primes: &[u16]) -> HashMap<u16, Wire> {
 }
 
 fn server_protocol(mut stream: TcpChannel<TcpStream>, absolute_path: &str, nthread: usize,
-                    ids: Vec<Vec<u8>>, payloads: Vec<Block512>){
+                    ids: &[Vec<u8>], payloads: &[Block512]){
     let start = SystemTime::now();
     let path = absolute_path.to_owned();
 
@@ -93,7 +93,7 @@ fn server_protocol(mut stream: TcpChannel<TcpStream>, absolute_path: &str, nthre
 
 }
 
-pub fn prepare_files(absolute_path: &str, address: &str, nthread: usize, ids: Vec<Vec<u8>>, payloads: Vec<Block512>) {
+pub fn prepare_files(absolute_path: &str, address: &str, nthread: usize, ids: &[Vec<u8>], payloads: &[Block512]) {
     let address = format!("{}{}", address,":3000");
     println!("Server listening on {}", address);
     let listener = TcpListener::bind(address).unwrap();

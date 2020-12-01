@@ -10,6 +10,7 @@ use std::{
     io::Write,
     net::{TcpStream},
     time::SystemTime,
+    io::Error,
 };
 use serde_json;
 
@@ -18,7 +19,7 @@ fn read_from_file(path: &str, file_name: &str)-> String{
     read_to_string(data_path).unwrap()
 }
 
-fn client_protocol(mut channel: TcpChannel<TcpStream>, absolute_path:&str, nthreads: usize) {
+fn client_protocol(mut channel: TcpChannel<TcpStream>, absolute_path:&str, nthreads: usize) -> (u64, u64){
     let start = SystemTime::now();
     let mut rng = AesRng::new();
 
@@ -61,19 +62,21 @@ fn client_protocol(mut channel: TcpChannel<TcpStream>, absolute_path:&str, nthre
         "Receiver :: Joining threads results time  (write): {:.2} Mb",
         channel.kilobits_written() / 1000.0
     );
+
+    (aggregate, cardinality)
 }
 
-pub fn join_aggregates(absolute_path: &str, address: &str, nthreads: usize) {
+pub fn join_aggregates(absolute_path: &str, address: &str, nthreads: usize) -> Result<(u64, u64), Error>{
     let port_prefix = format!("{}{}", address,":3000");
 
     match TcpStream::connect(port_prefix) {
         Ok(stream) => {
             let channel = TcpChannel::new(stream);
-            client_protocol(channel, absolute_path, nthreads);
+            Ok(client_protocol(channel, absolute_path, nthreads))
         },
         Err(e) => {
             println!("Failed to connect: {}", e);
+            Err(e)
         }
     }
-    println!("Terminated.");
 }

@@ -610,6 +610,7 @@ impl Receiver {
     ) -> Result<(CuckooHashLarge, Vec<Vec<Block>>, Vec<Vec<Block512>>), Error>{
 
         let hashed_inputs = utils::compress_and_hash_inputs(inputs, self.key);
+
         let cuckoo_large = CuckooHashLarge::new(&hashed_inputs, NHASHES, megasize)?;
         channel.write_usize(cuckoo_large.megasize)?;
         channel.write_usize(cuckoo_large.nmegabins)?;
