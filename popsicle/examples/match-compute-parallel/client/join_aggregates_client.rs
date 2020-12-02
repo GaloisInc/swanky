@@ -57,9 +57,6 @@ fn client_protocol(mut channel: TcpChannel<TcpStream>, path:&mut PathBuf, nthrea
     path.pop();
 
     let _ = File::create(path_str.clone()).unwrap();
-    // file_result.write(&aggregate.to_le_bytes()).unwrap();
-    // file_result.write(&cardinality.to_le_bytes()).unwrap();
-    // file_result.write(&output.to_le_bytes()).unwrap();
 
     let mut output_write = "Aggregate: ".to_owned();
     output_write.push_str(&aggregate.to_string());
@@ -69,9 +66,6 @@ fn client_protocol(mut channel: TcpChannel<TcpStream>, path:&mut PathBuf, nthrea
     output_write.push_str(&output.to_string());
 
     write(path_str, output_write).expect("Unable to write file");
-    // write(path_str.clone(), cardinality_str).expect("Unable to write file");
-    // write(path_str.clone(), aggregate_str).expect("Unable to write file");
-
 
     println!(
         "Receiver :: total Joining threads results time: {} ms",
