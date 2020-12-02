@@ -48,15 +48,15 @@ fn server_protocol(mut channel: TcpChannel<TcpStream>, path:&mut PathBuf, nthrea
     let _ = psi.compute_aggregates(aggregates, cardinality, &path_delta, &mut channel,&mut rng);
 
     println!(
-        "Sender :: Joining threads results time: {} ms",
+        "Sender :: total Joining threads results time: {} ms",
         start.elapsed().unwrap().as_millis()
     );
     println!(
-        "Sender :: Joining threads results time (read): {:.2} Mb",
+        "Sender :: total Joining threads results time (read): {:.2} Mb",
         channel.kilobits_read() / 1000.0
     );
     println!(
-        "Sender :: Joining threads results time  (write): {:.2} Mb",
+        "Sender :: total Joining threads results time  (write): {:.2} Mb",
         channel.kilobits_written() / 1000.0
     );
 }

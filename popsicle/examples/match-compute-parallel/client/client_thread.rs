@@ -45,15 +45,15 @@ fn client_protocol(mut channel: TcpChannel<TcpStream>, path: &mut PathBuf, threa
     let (acc, card) = psi.compute_payload(table, payload, &mut channel, &mut rng).unwrap();
 
     println!(
-        "Receiver Thread {} :: circuit building & computation time: {} ms", thread_id,
+        "Receiver Thread {} :: total circuit building & computation time: {} ms", thread_id,
         start.elapsed().unwrap().as_millis()
     );
     println!(
-        "Receiver Thread {} :: circuit building & computation communication (read): {:.2} Mb",thread_id,
+        "Receiver Thread {} :: total circuit building & computation communication (read): {:.2} Mb",thread_id,
         channel.kilobits_read() / 1000.0
     );
     println!(
-        "Receiver Thread {} :: circuit building & computation communication (write): {:.2} Mb",thread_id,
+        "Receiver Thread {} :: total circuit building & computation communication (write): {:.2} Mb",thread_id,
         channel.kilobits_written() / 1000.0
     );
 

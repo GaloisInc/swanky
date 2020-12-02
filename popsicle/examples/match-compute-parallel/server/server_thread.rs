@@ -66,15 +66,15 @@ fn server_protocol(mut stream: TcpChannel<TcpStream>, path:&mut PathBuf, thread_
     let (acc, card) = psi.compute_payload(ts_id, ts_payload, table, payload, &path_delta, &mut stream, &mut rng).unwrap();
 
     println!(
-        "Sender Thread {} :: circuit building & computation time: {} ms", thread_id,
+        "Sender Thread {} :: total circuit building & computation time: {} ms", thread_id,
         start.elapsed().unwrap().as_millis()
     );
     println!(
-        "Sender Thread {} :: circuit building & computation communication (read): {:.2} Mb",thread_id,
+        "Sender Thread {} :: total circuit building & computation communication (read): {:.2} Mb",thread_id,
         stream.kilobits_read() / 1000.0
     );
     println!(
-        "Sender Thread {} :: circuit building & computation communication (write): {:.2} Mb",thread_id,
+        "Sender Thread {} :: total circuit building & computation communication (write): {:.2} Mb",thread_id,
         stream.kilobits_written() / 1000.0
     );
     path.push("output_aggregate.txt");

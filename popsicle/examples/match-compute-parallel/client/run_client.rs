@@ -20,7 +20,7 @@ use std::{
     time::{Duration},
     thread,
 };
-// 
+//
 // use rand::{CryptoRng, Rng};
 // use scuttlebutt::{AesRng, Block512};
 //
@@ -88,12 +88,12 @@ pub fn main(){
     let schema_payload = parameters.get("schema_client_payload").unwrap().to_owned();
 
     let (ids_client, payloads_client) = parse_files(&schema_id, &schema_payload, &client_path);
-   //
+
     // let mut rng = AesRng::new();
     // let ids_client = enum_ids(197, 16);
     // let payloads_client = int_vec_block512(rand_u64_vec(197, 10,&mut rng));
 
-    let duration = Duration::from_secs(sleeptime);
+   let duration = Duration::from_secs(sleeptime);
    //
    path.pop();
    path.push("client");
@@ -134,5 +134,7 @@ pub fn main(){
     // //
     // assert_eq!(weighted_aggregate, _result_aggregate);
     // assert_eq!(cardinality, _result_cardinality);
+
+    println!("Experiments done !");
 
 }

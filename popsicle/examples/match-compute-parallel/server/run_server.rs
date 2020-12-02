@@ -101,4 +101,6 @@ pub fn main(){
     }
 
     join_aggregates(&mut path, &address, nthread);
+
+    
 }

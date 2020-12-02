@@ -73,15 +73,15 @@ fn client_protocol(mut channel: TcpChannel<TcpStream>, path:&mut PathBuf, nthrea
 
 
     println!(
-        "Receiver :: Joining threads results time: {} ms",
+        "Receiver :: total Joining threads results time: {} ms",
         start.elapsed().unwrap().as_millis()
     );
     println!(
-        "Receiver :: Joining threads results time (read): {:.2} Mb",
+        "Receiver :: total Joining threads results time (read): {:.2} Mb",
         channel.kilobits_read() / 1000.0
     );
     println!(
-        "Receiver :: Joining threads results time  (write): {:.2} Mb",
+        "Receiver :: total Joining threads results time  (write): {:.2} Mb",
         channel.kilobits_written() / 1000.0
     );
 
