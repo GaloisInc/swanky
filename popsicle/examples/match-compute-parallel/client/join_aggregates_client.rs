@@ -51,6 +51,7 @@ fn client_protocol(mut channel: TcpChannel<TcpStream>, path:&mut PathBuf, nthrea
     println!("cardinality: {:?}", cardinality);
     println!("average: {:?}", output);
 
+    path.pop();
     path.push("result.txt");
     let path_str = path.clone().into_os_string().into_string().unwrap();
     path.pop();
