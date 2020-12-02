@@ -63,12 +63,12 @@ required-features = ["psty_payload"]
 
 [[example]]
 name = "client"
-path = "examples/match-compute-sockets/client.rs"
+path = "examples/match-compute-simple/client.rs"
 required-features = ["psty_payload"]
 
 [[example]]
 name = "server"
-path = "examples/match-compute-sockets/server.rs"
+path = "examples/match-compute-simple/server.rs"
 required-features = ["psty_payload"]
 
 [[example]]
