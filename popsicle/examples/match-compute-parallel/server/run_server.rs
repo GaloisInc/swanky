@@ -129,5 +129,5 @@ pub fn main(){
     // The partial results are joined and the output is produced
     join_aggregates(&mut path, &address, nthread);
 
-
+    println!("Experiments done !");
 }
