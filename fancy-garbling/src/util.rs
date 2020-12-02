@@ -11,7 +11,6 @@
 #[cfg(feature = "nightly")]
 use core::arch::x86_64::*;
 use itertools::Itertools;
-use rand::{CryptoRng, Rng};
 use scuttlebutt::{Block, Block512};
 use std::collections::HashMap;
 use crate::Wire;
@@ -400,7 +399,7 @@ fn block512_to_crt(b: Block512) -> Vec<u16>{
 
 //Assumes payloads are up to 64bit long
 // WRITE assumption more
-pub fn mask_payload_crt<RNG: Rng + CryptoRng>(x: Block512, y: Block512, rng:&mut RNG)
+pub fn mask_payload_crt<RNG: rand::Rng + Sized >(x: Block512, y: Block512, rng:&mut RNG)
         -> Block512{
 
     let x_crt = block512_to_crt(x);
