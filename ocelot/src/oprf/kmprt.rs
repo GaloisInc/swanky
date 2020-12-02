@@ -86,8 +86,6 @@ impl Parameters {
             (1.13, 0.17, 30, 63, 3, 2)
         } else if n <= 1 << 24 {
             (1.12, 0.17, 31, 63, 3, 2)
-        } else if n <= 1 << 28 {
-            (1.11, 0.18, 32, 63, 3, 2)
         }else {
             return Err(Error::InvalidInputLength);
         };
@@ -219,7 +217,7 @@ impl<OPRF: OprfSender<Seed = Block512, Input = Block, Output = Block512> + SemiH
             },
             points.len()
         );
-        
+
         assert!(points.len() <= npoints);
 
         let mut v = rng.gen::<Block>();
