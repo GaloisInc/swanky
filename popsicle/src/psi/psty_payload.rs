@@ -107,14 +107,16 @@ impl Sender {
 
         let qs = fancy_garbling::util::primes_with_width(PAYLOAD_SIZE as u32 * 8);
 
-        let deltas = utils::generate_deltas(&qs);
+        let deltas = fancy_garbling::util::generate_deltas(&qs);
         let deltas_json = serde_json::to_string(&deltas).unwrap();
         let _ = gb.load_deltas(&deltas_json);
 
         let (mut state, nbins, _, _) = self.bucketize_data(table, payloads, channel, rng)?;
-        println!("Done with buckets");
+
+        channel.flush()?;
         self.send_data(&mut state, nbins, channel, rng)?;
         channel.flush()?;
+
         let (aggregate, card) = state.build_and_compute_circuit(&mut gb).unwrap();
 
         gb.outputs(&aggregate.wires().to_vec()).unwrap();
@@ -270,7 +272,7 @@ impl Sender {
                // long.
                // In the case of a binary representation: the payload can be simply XORed
                // with the target vector, the appropriately padded if need be.
-               payload[bin].push(utils::mask_payload_crt(*p, ts_payload[bin], rng));
+               payload[bin].push(fancy_garbling::util::mask_payload_crt(*p, ts_payload[bin], rng));
                bins.push(bin);
            }
            // if j = H1(y) = H2(y) for some y, then P2 adds a uniformly random element to
@@ -403,7 +405,7 @@ impl Receiver {
         let qs = fancy_garbling::util::primes_with_width(PAYLOAD_SIZE as u32 * 8);
 
         let (table, payload) = self.bucketize_data(table, payloads, channel, rng)?;
-                println!("Done with buckets");
+
         let mut state = ReceiverState{
                 opprf_ids: Vec::new(),
                 opprf_payloads: Vec::new(),
@@ -563,11 +565,11 @@ impl Receiver {
 
         let hashed_inputs = utils::compress_and_hash_inputs(inputs, self.key);
         let cuckoo = CuckooHash::new(&hashed_inputs, NHASHES)?;
+
         channel.write_usize(0)?;
         channel.write_usize(0)?;
         channel.write_usize(cuckoo.nbins)?;
         channel.flush()?;
-
         let table = cuckoo
             .items
             .iter()
@@ -736,7 +738,7 @@ fn encode_payloads(payload: &[Block512]) -> Vec<u16> {
         .iter()
         .flat_map(|blk| {
              let b = blk.prefix(PAYLOAD_SIZE);
-             let mut b_8 = [0 as u8; 16];
+             let mut b_8 = [0 as u8; 16]; // beyond 64 bits padded with 0s
              for i in 0..PAYLOAD_SIZE{
                  b_8[i] = b[i];
              }

@@ -36,8 +36,8 @@ pub fn enum_ids(n: usize, id_size: usize) ->Vec<Vec<u8>>{
 
 fn client_protocol(mut stream: TcpChannel<TcpStream>){
     const ITEM_SIZE: usize = 16;
-    const SET_SIZE: usize = 100;
-    const _MEGASIZE: usize = 100000;
+    const SET_SIZE: usize = 10000;
+    const _MEGASIZE: usize = 100;
 
     let mut rng = AesRng::new();
     let receiver_inputs = enum_ids(SET_SIZE, ITEM_SIZE);

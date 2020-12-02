@@ -19,19 +19,20 @@ pub(crate) struct CuckooItem {
 }
 
 #[derive(Clone)]
+pub(crate) struct CuckooHash {
+    pub(crate) items: Vec<Option<CuckooItem>>,
+    pub(crate) nbins: usize,
+    pub(crate) nhashes: usize,
+}
+
+
+#[derive(Clone)]
 pub struct CuckooHashLarge{
     pub(crate) items: Vec<CuckooHash>,
     pub nbins: usize, // total number of bins
     pub nmegabins: usize,
     pub megasize: usize,
     pub nhashes: usize,
-}
-
-#[derive(Clone)]
-pub(crate) struct CuckooHash{
-    pub(crate) items: Vec<Option<CuckooItem>>,
-    pub(crate) nbins: usize,
-    pub(crate) nhashes: usize,
 }
 
 /// The number of times to loop when trying to place an entry in a bin.
@@ -106,7 +107,7 @@ impl CuckooHash {
         };
         let mask = Block::from(0xFFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FF00);
 
-        for _ in 0..NITERS{
+        for _ in 0..NITERS {
             item.entry &= mask;
             let i = CuckooHash::bin(item.entry, item.hash_index, self.nbins);
             item.entry ^= Block::from(item.hash_index as u128);
@@ -145,7 +146,6 @@ impl CuckooHash {
         }
     }
 }
-
 
 impl Debug for CuckooHash {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {

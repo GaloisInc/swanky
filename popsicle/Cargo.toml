@@ -58,8 +58,8 @@ name = "secretsister"
 required-features = ["psty"]
 
 [[example]]
-name = "match-compute"
-required-features = ["psty_payload"]
+name = "psty-payload"
+required-features = ["psty"]
 
 [[example]]
 name = "client"

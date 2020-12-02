@@ -120,7 +120,7 @@ impl Sender {
 
         let qs = fancy_garbling::util::primes_with_width(PAYLOAD_SIZE as u32 * 8);
 
-        let deltas = utils::generate_deltas(&qs);
+        let deltas = fancy_garbling::util::generate_deltas(&qs);
         let deltas_json = serde_json::to_string(&deltas).unwrap();
         let _ = gb.load_deltas(&deltas_json);
 
@@ -311,7 +311,7 @@ let start = SystemTime::now();
                // long.
                // In the case of a binary representation: the payload can be simply XORed
                // with the target vector, the appropriately padded if need be.
-               payload[bin].push(utils::mask_payload_crt(*p, ts_payload[bin], rng));
+               payload[bin].push(fancy_garbling::util::mask_payload_crt(*p, ts_payload[bin], rng));
                bins.push(bin);
            }
            // if j = H1(y) = H2(y) for some y, then P2 adds a uniformly random element to

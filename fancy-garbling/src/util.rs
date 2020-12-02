@@ -11,7 +11,10 @@
 #[cfg(feature = "nightly")]
 use core::arch::x86_64::*;
 use itertools::Itertools;
-use scuttlebutt::Block;
+use rand::{CryptoRng, Rng};
+use scuttlebutt::{Block, Block512};
+use std::collections::HashMap;
+use crate::Wire;
 
 ////////////////////////////////////////////////////////////////////////////////
 // tweak functions for garbling
@@ -366,6 +369,57 @@ pub fn product(xs: &[u16]) -> u128 {
 /// Returns `true` if `x` is a power of 2.
 pub fn is_power_of_2(x: u16) -> bool {
     (x & (x - 1)) == 0
+}
+
+
+// Generate deltas for GC
+pub fn generate_deltas(primes: &[u16]) -> HashMap<u16, Wire> {
+    let mut deltas = HashMap::new();
+    let mut rng = rand::thread_rng();
+    for q in primes{
+        deltas.insert(*q, Wire::rand_delta(&mut rng, *q));
+    }
+    deltas
+}
+
+//Assumes payloads are up to 64bit long i.e 8 bytes
+fn block512_to_crt(b: Block512) -> Vec<u16>{
+    let b_val = b.prefix(8);
+
+    let mut b_128 = [0 as u8; 16];
+
+    // Loop over the 8 bytes of 64b b_val
+    for i in 0..8{
+        b_128[i] = b_val[i];
+    }
+
+    let q = primes_with_width(64);
+    let b_crt = crt(u128::from_le_bytes(b_128), &q);
+    b_crt
+}
+
+//Assumes payloads are up to 64bit long
+// WRITE assumption more
+pub fn mask_payload_crt<RNG: Rng + CryptoRng>(x: Block512, y: Block512, rng:&mut RNG)
+        -> Block512{
+
+    let x_crt = block512_to_crt(x);
+    let y_crt = block512_to_crt(y);
+    let q = primes_with_width(64);
+    let mut res_crt = Vec::new();
+    for i in 0..q.len(){
+        res_crt.push((x_crt[i]+y_crt[i]) % q[i]);
+    }
+    let res = crt_inv(&res_crt, &q).to_le_bytes();
+    let mut block = [0 as u8; 64];
+    for i in 0..64{
+        if i < res.len(){
+            block[i] = res[i];
+        }else{
+            block[i] = rng.gen::<u8>(); // TODO: mod rest of prime
+        }
+    }
+    Block512::from(block)
 }
 
 /// Extra Rng functionality, useful for `fancy-garbling`.
