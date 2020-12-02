@@ -1,3 +1,4 @@
+// Bucketize Data and Seperate it among threads
 use popsicle::psty_payload::{Sender};
 
 use scuttlebutt::{AesRng, Block512, Block, TcpChannel};
@@ -30,6 +31,8 @@ fn server_protocol(mut stream: TcpChannel<TcpStream>, path: &mut PathBuf, nthrea
 
     let mut rng = AesRng::new();
 
+    // The Garbdled circuits deltas are generated and stored so as to be synchronized accross
+    // All threads and in the joining stage
     let qs = fancy_garbling::util::primes_with_width(64 as u32);// for 64bit inputs and outputs
     let deltas = generate_deltas(&qs);
 
@@ -43,10 +46,15 @@ fn server_protocol(mut stream: TcpChannel<TcpStream>, path: &mut PathBuf, nthrea
 
     let mut psi = Sender::init(&mut stream, &mut rng).unwrap();
 
+    // At the sender side, the data is bucketized using simple hashing but is not immediately
+    // divided into megabins (contrary to the receiver)
     let (state, _, nmegabins, megasize) = psi.bucketize_data(&ids, &payloads, &mut stream, &mut rng).unwrap();
 
     let megabin_per_thread = ((nmegabins as f32)/(nthread as f32)).ceil() as usize;
 
+
+    // After bucketization, data is divided accross threads at this level according to the
+    // megabin size that the client sends out
     let ts_id: Vec<&[Block512]>= state.opprf_ids.chunks(megasize).collect();
     let ts_payload: Vec<&[Block512]>= state.opprf_payloads.chunks(megasize).collect();
     let table:Vec<&[Vec<Block>]> = state.table.chunks(megasize).collect();
@@ -57,6 +65,7 @@ fn server_protocol(mut stream: TcpChannel<TcpStream>, path: &mut PathBuf, nthrea
     let table:Vec<&[&[Vec<Block>]]> = table.chunks(megabin_per_thread).collect();
     let payload: Vec<&[&[Vec<Block512>]]>= payload.chunks(megabin_per_thread).collect();
 
+    // Create files and folders with the data that each thread should handle.
     for i in 0 ..nthread{
         let mut thread_path = "thread".to_owned();
         thread_path.push_str(&i.to_string());

@@ -1,3 +1,5 @@
+// A simple single threaded example of PSI with match and compute
+
 use popsicle::psty_payload::{Sender};
 
 use rand::{CryptoRng, Rng};
@@ -50,7 +52,7 @@ pub fn generate_deltas(primes: &[u16]) -> HashMap<u16, Wire> {
 
 fn server_protocol(mut stream: TcpChannel<TcpStream>) {
     const ITEM_SIZE: usize = 16;
-    const SET_SIZE: usize = 100000;
+    const SET_SIZE: usize = 10000;
 
     let mut rng = AesRng::new();
     let sender_inputs = enum_ids(SET_SIZE, ITEM_SIZE);
@@ -67,7 +69,12 @@ fn server_protocol(mut stream: TcpChannel<TcpStream>) {
     file_deltas.write(deltas_json.as_bytes()).unwrap();
 
     let mut psi = Sender::init(&mut stream, &mut rng).unwrap();
+
+    // For small to medium sized sets where batching can occur accross all bins
     let _ = psi.full_protocol(&sender_inputs, &weights, &mut stream, &mut rng).unwrap();
+
+    // // For large examples where computation should be batched per-megabin instead of accross all bins.
+    // let _ = psi.full_protocol_large(&sender_inputs, &weights, &path_delta, &mut stream, &mut rng).unwrap();
 
 }
 

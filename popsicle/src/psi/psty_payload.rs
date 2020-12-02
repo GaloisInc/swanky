@@ -112,7 +112,7 @@ impl Sender {
         let _ = gb.load_deltas(&deltas_json);
 
         let (mut state, nbins, _, _) = self.bucketize_data(table, payloads, channel, rng)?;
-
+        println!("Done with buckets");
         self.send_data(&mut state, nbins, channel, rng)?;
         channel.flush()?;
         let (aggregate, card) = state.build_and_compute_circuit(&mut gb).unwrap();
@@ -403,6 +403,7 @@ impl Receiver {
         let qs = fancy_garbling::util::primes_with_width(PAYLOAD_SIZE as u32 * 8);
 
         let (table, payload) = self.bucketize_data(table, payloads, channel, rng)?;
+                println!("Done with buckets");
         let mut state = ReceiverState{
                 opprf_ids: Vec::new(),
                 opprf_payloads: Vec::new(),

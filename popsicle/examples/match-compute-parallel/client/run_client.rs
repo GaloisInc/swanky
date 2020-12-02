@@ -20,6 +20,7 @@ use std::{
     time::{Duration},
     thread,
 };
+// Alternatively uncomment this section to randomly generate the inputs.
 //
 // use rand::{CryptoRng, Rng};
 // use scuttlebutt::{AesRng, Block512};
@@ -51,6 +52,9 @@ use std::{
 // }
 
 pub fn main(){
+    // Get the root directory's location in order to find the configuration file
+    // that's assumed to be in the match-compute-parallel folder
+    // and in order to create the computations files and folders
     let mut path = env::current_exe().unwrap();
     path.pop();
     path.pop();
@@ -73,7 +77,22 @@ pub fn main(){
             parameters.insert(line_split[0].clone(), line_split[1].clone());
         }
     }
-   //
+    // The configuration file will have information about:
+    // 1. The ip address of the server
+    // 2. The duration needed for the client to sleep in order
+    //    to wait for the server to finish before proceeding
+    // 3. The number of threads between which the computation is being parallelized
+    // 4. The size of a megabin that is given to a thread
+    //    (each thread takes a bunch of megabins)
+    // 5. The precision of the computation: the computation assumes that all numbers are naturals
+    //    but one can get passed that if the range of values is not too big by multiplying by dropping
+    //    dropping any decimal value passed the precision and multiplying by 10^precision. The final
+    //    answer is readjusted and divided by 10^precision.
+    // 6. The path of the files that contains the ids and payloads
+    // 7. The schema of the ids and payloads in the csv files (i.e. the names of their columns)
+    // 8. For testing purposes, the client also gets the location of the servers data files to
+    //    test the computation in the open
+
     let address = parameters.get("address").unwrap().to_owned();
     let sleeptime = parameters.get("sleeptime").unwrap().parse::<u64>().unwrap();
 
@@ -87,20 +106,29 @@ pub fn main(){
     let schema_id = parameters.get("schema_client_id").unwrap().to_owned();
     let schema_payload = parameters.get("schema_client_payload").unwrap().to_owned();
 
+    // The ids & payloads are read from the csv according to their schema (column names),
+    // and turned into the computations representation
     let (ids_client, payloads_client) = parse_files(&schema_id, &schema_payload, &client_path);
 
+    // // Alternatively uncomment this section to randomly generate the inputs. Don't forget
+    // // to also uncomment the necessary includes and methods at the top
     // let mut rng = AesRng::new();
     // let ids_client = enum_ids(197, 16);
     // let payloads_client = int_vec_block512(rand_u64_vec(197, 10,&mut rng));
 
+   // Wait for the server to be done
    let duration = Duration::from_secs(sleeptime);
-   //
+
+   // Bucketize the data and split into megabins that are distributed among threads
    path.pop();
    path.push("client");
    prepare_files(&mut path, &address, nthread, megasize, &ids_client, &payloads_client);
    //
     thread::sleep(duration);
 
+    // Each thread handles its own megabins and speaks to the appropriate other party thread
+    // via a dedicated port. The partial results of this computation are garbled and
+    // stored into appropriate files. They are handled later to produce the correct output.
     let mut handle = Vec::new();
     for i in 0..nthread {
         let mut path_thread = path.clone();
@@ -114,6 +142,8 @@ pub fn main(){
         let _ = thread.join(); // maybe consider handling errors propagated from the thread here
     }
    //
+
+   // The partial results are joined and the output is produced
     thread::sleep(duration);
     let (_result_aggregate, _result_cardinality) = join_aggregates(&mut path, &address, nthread, precision).unwrap();
 

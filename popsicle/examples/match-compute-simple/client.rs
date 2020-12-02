@@ -1,3 +1,5 @@
+// A simple single threaded example of PSI with match and compute
+
 use popsicle::psty_payload::{Receiver};
 
 use rand::{CryptoRng, Rng};
@@ -34,17 +36,23 @@ pub fn enum_ids(n: usize, id_size: usize) ->Vec<Vec<u8>>{
 
 fn client_protocol(mut stream: TcpChannel<TcpStream>){
     const ITEM_SIZE: usize = 16;
-    const SET_SIZE: usize = 100000;
-    // const _MEGASIZE: usize = 1000;
+    const SET_SIZE: usize = 100;
+    const _MEGASIZE: usize = 100000;
 
     let mut rng = AesRng::new();
     let receiver_inputs = enum_ids(SET_SIZE, ITEM_SIZE);
     let payloads = int_vec_block512(rand_u64_vec(SET_SIZE, u64::pow(10,6), &mut rng));
 
     let mut psi = Receiver::init(&mut stream, &mut rng).unwrap();
+
+    // For small to medium sized sets where batching can occur accross all bins
     let _ = psi
-        .full_protocol(&receiver_inputs, &payloads, &mut stream, &mut rng)
-        .unwrap();
+        .full_protocol(&receiver_inputs, &payloads, &mut stream, &mut rng).unwrap();
+
+    // // For large examples where computation should be batched per-megabin instead of accross all bins.
+    // let _ = psi
+    //     .full_protocol_large(&receiver_inputs, &payloads, _MEGASIZE, &mut stream, &mut rng)
+    //     .unwrap();
 }
 
 fn main() {

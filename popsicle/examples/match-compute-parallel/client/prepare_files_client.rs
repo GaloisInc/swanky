@@ -1,3 +1,4 @@
+// Bucketize Data and Seperate it among threads
 use popsicle::psty_payload::{Receiver};
 
 use scuttlebutt::{AesRng, Block512, Block, TcpChannel};
@@ -20,6 +21,8 @@ fn client_protocol(mut channel: TcpChannel<TcpStream>, path: &mut PathBuf, nthre
     let mut rng = AesRng::new();
 
 
+    // The Receiver bucketizes the data and seperates into megabins during the cuckoo hashing.
+    // And sends the number of megabins, number of bins etc. to the sender
     let mut psi = Receiver::init(&mut channel, &mut rng).unwrap();
     let (cuckoo, table, payload) = psi.bucketize_data_large(&ids, &payloads, megasize, &mut channel, &mut rng).unwrap();
 
@@ -30,6 +33,7 @@ fn client_protocol(mut channel: TcpChannel<TcpStream>, path: &mut PathBuf, nthre
     let table:Vec<&[Vec<Block>]> = table.chunks(megabin_per_thread).collect();
     let payload: Vec<&[Vec<Block512>]>= payload.chunks(megabin_per_thread).collect();
 
+    // Create files and folders with the data that each thread should handle.
     for i in 0 ..nthread{
         let mut thread_path = "thread".to_owned();
         thread_path.push_str(&i.to_string());
@@ -47,7 +51,7 @@ fn client_protocol(mut channel: TcpChannel<TcpStream>, path: &mut PathBuf, nthre
         let path_str = path.clone().into_os_string().into_string().unwrap();
         let mut file_payload = File::create(path_str).unwrap();
         path.pop();
-        
+
         let table_json = bincode::serialize(&table[i]).unwrap();
         let payload_json = bincode::serialize(&payload[i]).unwrap();
 

@@ -1,3 +1,4 @@
+// Partial Computation per thread
 use popsicle::psty_payload::{Sender};
 
 use scuttlebutt::{AesRng, Block, Block512, TcpChannel};
@@ -17,7 +18,7 @@ fn server_protocol(mut stream: TcpChannel<TcpStream>, path:&mut PathBuf, thread_
     println!("Sender Thread {} Starting computation", thread_id);
 
     let mut rng = AesRng::new();
-
+    
     path.push("delta.txt");
     let path_delta = path.clone().into_os_string().into_string().unwrap();
     path.pop();
