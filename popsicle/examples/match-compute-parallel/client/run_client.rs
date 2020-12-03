@@ -22,34 +22,34 @@ use std::{
 };
 // Alternatively uncomment this section to randomly generate the inputs.
 //
-use rand::{CryptoRng, Rng};
-use scuttlebutt::{AesRng, Block512};
+// use rand::{CryptoRng, Rng};
+// use scuttlebutt::{AesRng, Block512};
 
-pub fn int_vec_block512(values: Vec<u64>) -> Vec<Block512> {
-    values.into_iter()
-          .map(|item|{
-            let value_bytes = item.to_le_bytes();
-            let mut res_block = [0 as u8; 64];
-            for i in 0..8{
-                res_block[i] = value_bytes[i];
-            }
-            Block512::from(res_block)
-         }).collect()
-}
-
-pub fn rand_u64_vec<RNG: CryptoRng + Rng>(n: usize, _modulus: u64, _rng: &mut RNG) -> Vec<u64>{
-    (0..n).map(|_| 71).collect()
-    // rng.gen::<u64>()%modulus
-}
-
-pub fn enum_ids(n: usize, id_size: usize) ->Vec<Vec<u8>>{
-    let mut ids = Vec::with_capacity(n);
-    for i in 0..n as u64{
-        let v:Vec<u8> = i.to_le_bytes().iter().take(id_size).cloned().collect();
-        ids.push(v);
-    }
-    ids
-}
+// pub fn int_vec_block512(values: Vec<u64>) -> Vec<Block512> {
+//     values.into_iter()
+//           .map(|item|{
+//             let value_bytes = item.to_le_bytes();
+//             let mut res_block = [0 as u8; 64];
+//             for i in 0..8{
+//                 res_block[i] = value_bytes[i];
+//             }
+//             Block512::from(res_block)
+//          }).collect()
+// }
+//
+// pub fn rand_u64_vec<RNG: CryptoRng + Rng>(n: usize, _modulus: u64, _rng: &mut RNG) -> Vec<u64>{
+//     (0..n).map(|_| 71).collect()
+//     // rng.gen::<u64>()%modulus
+// }
+//
+// pub fn enum_ids(n: usize, id_size: usize) ->Vec<Vec<u8>>{
+//     let mut ids = Vec::with_capacity(n);
+//     for i in 0..n as u64{
+//         let v:Vec<u8> = i.to_le_bytes().iter().take(id_size).cloned().collect();
+//         ids.push(v);
+//     }
+//     ids
+// }
 
 pub fn main(){
     // Get the root directory's location in order to find the configuration file
@@ -102,19 +102,19 @@ pub fn main(){
     let precision = parameters.get("precision").unwrap().parse::<u32>().unwrap();
 
 
-    // let client_path = parameters.get("data_path_client").unwrap().to_owned();
-    // let schema_id = parameters.get("schema_client_id").unwrap().to_owned();
-    // let schema_payload = parameters.get("schema_client_payload").unwrap().to_owned();
-    //
-    // // The ids & payloads are read from the csv according to their schema (column names),
-    // // and turned into the computations representation
-    // let (ids_client, payloads_client) = parse_files(&schema_id, &schema_payload, &client_path);
+    let client_path = parameters.get("data_path_client").unwrap().to_owned();
+    let schema_id = parameters.get("schema_client_id").unwrap().to_owned();
+    let schema_payload = parameters.get("schema_client_payload").unwrap().to_owned();
+
+    // The ids & payloads are read from the csv according to their schema (column names),
+    // and turned into the computations representation
+    let (ids_client, payloads_client) = parse_files(&schema_id, &schema_payload, &client_path);
 
     // Alternatively uncomment this section to randomly generate the inputs. Don't forget
     // to also uncomment the necessary includes and methods at the top
-    let mut rng = AesRng::new();
-    let ids_client = enum_ids(1<<20, 16);
-    let payloads_client = int_vec_block512(rand_u64_vec(1<<20, 10,&mut rng));
+    // let mut rng = AesRng::new();
+    // let ids_client = enum_ids(1<<20, 16);
+    // let payloads_client = int_vec_block512(rand_u64_vec(1<<20, 10,&mut rng));
 
    // Wait for the server to be done
    let duration = Duration::from_secs(sleeptime);

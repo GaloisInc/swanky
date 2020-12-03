@@ -28,7 +28,7 @@ fn client_protocol(mut channel: TcpChannel<TcpStream>, path: &mut PathBuf, nthre
 
     let megabin_per_thread = ((cuckoo.nmegabins as f32)/(nthread as f32)).ceil() as usize;
 
-    println!("Number of megabins {:?}", megabin_per_thread);
+    println!("Number of megabins per thread {:?}", megabin_per_thread);
 
     let table:Vec<&[Vec<Block>]> = table.chunks(megabin_per_thread).collect();
     let payload: Vec<&[Vec<Block512>]>= payload.chunks(megabin_per_thread).collect();
