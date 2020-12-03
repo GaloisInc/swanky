@@ -515,7 +515,6 @@ impl Receiver {
                 "Receiver :: Computation time: {} ms",
                 start.elapsed().unwrap().as_millis()
             );
-
         }
         Ok((acc, card))
     }
