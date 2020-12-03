@@ -16,7 +16,7 @@ publish = false
 nightly = ["rand/nightly", "scuttlebutt/nightly", "ocelot/nightly", "ocelot/nightly"]
 fancy = ["fancy-garbling"]
 psty = ["fancy", "openssl"]
-psty_payload = ["fancy","serde", "serde_json", "fancy-garbling/serde1", "csv"]
+psty_payload = ["fancy","serde", "serde_json", "fancy-garbling/serde1"]
 
 [dependencies]
 ocelot         = { path = "../ocelot" }
@@ -29,7 +29,6 @@ serde          = {version = "1.0.117", features = ["derive"], optional = true }
 serde_json     = {version = "1.0.59", optional = true }
 fancy-garbling = { path = "../fancy-garbling", features = ["serde1"], optional = true }
 openssl        = { version = "0.10.28", optional = true }
-csv            = {version = "1.1", optional = true }
 
 [dev-dependencies]
 criterion  = "0.2.11"
