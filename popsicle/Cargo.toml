@@ -1,5 +1,6 @@
 [profile.release]
 opt-level = 3
+debug = false
 
 [package]
 name = "popsicle"

@@ -4,7 +4,7 @@ sleeptime: 35
 nthread: 4
 
 itemsize: 16
-megasize: 10000
+megasize: 100000
 
 precision: 4
 

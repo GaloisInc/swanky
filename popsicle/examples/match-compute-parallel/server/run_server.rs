@@ -16,35 +16,35 @@ use std::{
     thread,
 };
 // Alternatively uncomment this section to randomly generate the inputs.
-//
-// use rand::{CryptoRng, Rng};
-// use scuttlebutt::{AesRng, Block512};
-//
-// pub fn int_vec_block512(values: Vec<u64>) -> Vec<Block512> {
-//     values.into_iter()
-//           .map(|item|{
-//             let value_bytes = item.to_le_bytes();
-//             let mut res_block = [0 as u8; 64];
-//             for i in 0..8{
-//                 res_block[i] = value_bytes[i];
-//             }
-//             Block512::from(res_block)
-//          }).collect()
-// }
-//
-// pub fn rand_u64_vec<RNG: CryptoRng + Rng>(n: usize, _modulus: u64, _rng: &mut RNG) -> Vec<u64>{
-//     (0..n).map(|_| 1).collect()
-//     // rng.gen::<u64>()%modulus
-// }
-//
-// pub fn enum_ids(n: usize, id_size: usize) ->Vec<Vec<u8>>{
-//     let mut ids = Vec::with_capacity(n);
-//     for i in 0..n as u64{
-//         let v:Vec<u8> = i.to_le_bytes().iter().take(id_size).cloned().collect();
-//         ids.push(v);
-//     }
-//     ids
-// }
+
+use rand::{CryptoRng, Rng};
+use scuttlebutt::{AesRng, Block512};
+
+pub fn int_vec_block512(values: Vec<u64>) -> Vec<Block512> {
+    values.into_iter()
+          .map(|item|{
+            let value_bytes = item.to_le_bytes();
+            let mut res_block = [0 as u8; 64];
+            for i in 0..8{
+                res_block[i] = value_bytes[i];
+            }
+            Block512::from(res_block)
+         }).collect()
+}
+
+pub fn rand_u64_vec<RNG: CryptoRng + Rng>(n: usize, _modulus: u64, _rng: &mut RNG) -> Vec<u64>{
+    (0..n).map(|_| 1).collect()
+    // rng.gen::<u64>()%modulus
+}
+
+pub fn enum_ids(n: usize, id_size: usize) ->Vec<Vec<u8>>{
+    let mut ids = Vec::with_capacity(n);
+    for i in 0..n as u64{
+        let v:Vec<u8> = i.to_le_bytes().iter().take(id_size).cloned().collect();
+        ids.push(v);
+    }
+    ids
+}
 
 
 pub fn main(){
@@ -89,20 +89,20 @@ pub fn main(){
 
     let address = parameters.get("address").unwrap().to_owned();
     let nthread = parameters.get("nthread").unwrap().parse::<usize>().unwrap();
+    //
+    // let server_path = parameters.get("data_path_server").unwrap().to_owned();
+    // let schema_id = parameters.get("schema_server_id").unwrap().to_owned();
+    // let schema_payload = parameters.get("schema_server_payload").unwrap().to_owned();
+    //
+    // // The ids & payloads are read from the csv according to their schema (column names),
+    // // and turned into the computations representation
+    // let (ids, payloads) = parse_files(&schema_id, &schema_payload, &server_path);
 
-    let server_path = parameters.get("data_path_server").unwrap().to_owned();
-    let schema_id = parameters.get("schema_server_id").unwrap().to_owned();
-    let schema_payload = parameters.get("schema_server_payload").unwrap().to_owned();
-
-    // The ids & payloads are read from the csv according to their schema (column names),
-    // and turned into the computations representation
-    let (ids, payloads) = parse_files(&schema_id, &schema_payload, &server_path);
-
-    // // Alternatively uncomment this section to randomly generate the inputs. Don't forget
-    // // to also uncomment the necessary includes and methods at the top
-    // let mut rng = AesRng::new();
-    // let ids = enum_ids(197, 16);
-    // let payloads = int_vec_block512(rand_u64_vec(197, 10, &mut rng));
+    // Alternatively uncomment this section to randomly generate the inputs. Don't forget
+    // to also uncomment the necessary includes and methods at the top
+    let mut rng = AesRng::new();
+    let ids = enum_ids(1<<17, 16);
+    let payloads = int_vec_block512(rand_u64_vec(1<<17, 10, &mut rng));
 
    // Bucketize the data and split into megabins that are distributed among threads
     path.pop();
