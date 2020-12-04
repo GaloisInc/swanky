@@ -8,7 +8,6 @@
 //! LPN based Subfield Vector Oblivious Linear Evaluation (SVOLE) traits.
 
 mod ggm_utils;
-pub mod lpn_params;
 pub mod sp_svole;
 pub mod svole_lpn;
 
@@ -33,7 +32,14 @@ where
         weight: usize,
         rng: &mut RNG,
     ) -> Result<Self, Error>;
-    /// This procedure can be run multiple times and produces `cols - rows` sVole correlations,
+
+    fn init_with_optimized_base_vole_gen<C: AbstractChannel, RNG: CryptoRng + RngCore>(
+        channel: &mut C,
+        rng: &mut RNG,
+    ) -> Result<Self, Error>;
+    /// This procedure can be run multiple times by passing base voles of length `k + t + r` and produces `n` number of lpn voles among which
+    /// `k + t + r` voles can be used as base voles to the next iteration and the remaining ones are usable voles. Of course, all of the voles
+    /// satisfies the vole correlation,
     /// i.e, outputs `u` and `w` such that `w = u'Δ + v` holds. Note that `u'` is the converted vector from
     /// `u` to the vector of elements of the extended field `FE`. `weight` represents the hamming weight of the
     /// error vecor `e` used in the LPN assumption and is suppose to be less than `cols`. Of course, it should also
@@ -62,6 +68,10 @@ where
         cols: usize,
         d: usize,
         weight: usize,
+        rng: &mut RNG,
+    ) -> Result<Self, Error>;
+    fn init_with_optimized_base_vole_gen<C: AbstractChannel, RNG: CryptoRng + RngCore>(
+        channel: &mut C,
         rng: &mut RNG,
     ) -> Result<Self, Error>;
     /// Returns the receiver's choice during the OT call.
