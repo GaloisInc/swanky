@@ -567,7 +567,7 @@ impl Receiver {
 
         channel.write_usize(0)?;
         channel.write_usize(0)?;
-        channel.write_usize(cuckoo.nbins)?;
+        channel.write_usize(cuckoo.nbins)?; // The number of bins is sent out to the sender
         channel.flush()?;
         let table = cuckoo
             .items
@@ -613,9 +613,9 @@ impl Receiver {
         let hashed_inputs = utils::compress_and_hash_inputs(inputs, self.key);
 
         let cuckoo_large = CuckooHashLarge::new(&hashed_inputs, NHASHES, megasize)?;
-        channel.write_usize(cuckoo_large.megasize)?;
-        channel.write_usize(cuckoo_large.nmegabins)?;
-        channel.write_usize(cuckoo_large.nbins)?;
+        channel.write_usize(cuckoo_large.megasize)?; // The megabin size is sent out to the sender
+        channel.write_usize(cuckoo_large.nmegabins)?; // The number of megabins is sent out to the sender
+        channel.write_usize(cuckoo_large.nbins)?; // The number of bins is sent out to the sender
         channel.flush()?;
 
         let table = cuckoo_large
