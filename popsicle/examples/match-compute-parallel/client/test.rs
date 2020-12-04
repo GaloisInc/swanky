@@ -1,3 +1,5 @@
+// Compute Aggregated Payloads associated with intersection
+// in the clear for testing purposes.
 use std::{
     cmp,
     convert::TryInto,
@@ -25,6 +27,7 @@ pub fn test(ids_client: &[Vec<u8>], ids_server: &[Vec<u8>],
         let id_server = u64::from_le_bytes(id_server);
 
         if id_client == id_server{
+            // Assumes values are 64 bit long
             let client_val = u64::from_le_bytes(payloads_client[i].prefix(8).try_into().unwrap());
             let server_val = u64::from_le_bytes(payloads_server[i].prefix(8).try_into().unwrap());
             weighted_payload = weighted_payload + client_val*server_val;

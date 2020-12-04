@@ -731,6 +731,7 @@ fn encode_inputs(opprf_ids: &[Block512]) -> Vec<u16> {
 // Encoding Payloads's before passing them to GC.
 // Note that we are only looking at PAYLOAD_SIZE bytes
 // of the payloads.
+// + similar comment to encode_opprf_payload
 fn encode_payloads(payload: &[Block512]) -> Vec<u16> {
     let q = fancy_garbling::util::primes_with_width(PAYLOAD_SIZE as u32 * 8);
     payload
@@ -749,6 +750,15 @@ fn encode_payloads(payload: &[Block512]) -> Vec<u16> {
 // Encoding OPPRF output associated with the payloads's before passing them to GC.
 // Note that we are only looking at PAYLOAD_PRIME_SIZE bytes of the opprf_payload:
 // the size we get after masking the payloads with the target vectors as CRT
+//
+// Assumes payloads are up to 64bit long:
+// The padding is not similarly generated to
+// the actual data: Notice how the masked data
+// is % with the correct modulus, while the
+// padded values are 0.
+// When swanky starts supporting larger primes,
+// the padded value should be random and modded with the
+// appropriate prime at its position
 fn encode_opprf_payload(opprf_ids: &[Block512]) -> Vec<u16> {
 let q = fancy_garbling::util::primes_with_width(PAYLOAD_SIZE as u32 * 8);
     opprf_ids

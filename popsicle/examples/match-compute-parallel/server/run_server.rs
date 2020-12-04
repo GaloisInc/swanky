@@ -15,7 +15,7 @@ use std::{
     collections::HashMap,
     thread,
 };
-// Alternatively uncomment this section to randomly generate the inputs.
+//// Alternatively uncomment this section to randomly generate the inputs.
 
 // use rand::{CryptoRng, Rng};
 // use scuttlebutt::{AesRng, Block512};
