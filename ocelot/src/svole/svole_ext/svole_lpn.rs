@@ -94,7 +94,6 @@ pub struct Sender<FE: FiniteField> {
     spsvole: SpsSender<FE>,
     rows: usize,
     cols: usize,
-    base_uws: Vec<(FE::PrimeField, FE)>,
     weight: usize,
     base_voles: Vec<(FE::PrimeField, FE)>,
     r: usize,
@@ -105,25 +104,19 @@ pub struct Receiver<FE: FiniteField> {
     delta: FE,
     rows: usize,
     cols: usize,
-    base_vs: Vec<FE>,
     weight: usize,
     base_voles: Vec<FE>,
     r: usize,
 }
 
-/// Aliasing LpnsVole sender.
-pub type LpnSender<FE> = Sender<FE>;
-/// Aliasing LpnsVole receiver.
-pub type LpnReceiver<FE> = Receiver<FE>;
-
-impl<FE: FiniteField> Sender<FE> {
-    pub fn init<C: AbstractChannel, RNG: CryptoRng + RngCore>(
+impl<FE: FiniteField> LpnsVoleSender for Sender<FE> {
+    type Msg = FE;
+    fn init<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         channel: &mut C,
         rows: usize,
         cols: usize,
         d: usize,
         weight: usize,
-        base_uws: Vec<(FE::PrimeField, FE)>,
         rng: &mut RNG,
     ) -> Result<Self, Error> {
         if cols % 2 != 0 {
@@ -191,22 +184,12 @@ impl<FE: FiniteField> Sender<FE> {
         }
         debug_assert!(self.base_voles.len() >= self.rows + self.weight + self.r);
         let m = self.cols / self.weight;
-        // let mut ets = Vec::with_capacity(self.cols);
-        // let mut uws = vec![];
         let uws = self.spsvole.send(
             channel,
             m,
             &self.base_voles[self.rows..self.rows + self.weight],
             rng,
         )?;
-        // for i in 0..self.weight {
-        //     let ac = self
-        //         .spsvole
-        //         .send(channel, m, &self.uws[self.rows + i], rng)?;
-        //     ets.extend(ac.iter());
-        //     uws.push(ac);
-        // }
-        // debug_assert!(ets.len() == self.cols);
         self.spsvole.send_batch_consistency_check(
             channel,
             m,
@@ -253,8 +236,9 @@ impl<FE: FiniteField> Sender<FE> {
     }
 }
 
-impl<FE: FiniteField> Receiver<FE> {
-    pub fn init<C: AbstractChannel, RNG: CryptoRng + RngCore>(
+impl<FE: FiniteField> LpnsVoleReceiver for Receiver<FE> {
+    type Msg = FE;
+    fn init<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         channel: &mut C,
         rows: usize,
         cols: usize,
@@ -321,7 +305,7 @@ impl<FE: FiniteField> Receiver<FE> {
         self.delta
     }
 
-    pub fn receive<C: AbstractChannel, RNG: CryptoRng + RngCore>(
+    fn receive<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         &mut self,
         channel: &mut C,
         rng: &mut RNG,
@@ -336,15 +320,6 @@ impl<FE: FiniteField> Receiver<FE> {
             &self.base_voles[self.rows..self.rows + self.weight],
             rng,
         )?;
-        // let mut ss = vec![];
-        // let mut vs = vec![];
-        // for i in 0..self.weight {
-        //     let bs = self
-        //         .spsvole
-        //         .receive(channel, m, &self.base_vs[self.rows + i], rng)?;
-        //     ss.extend(bs.iter());
-        //     vs.push(bs);
-        // }
         self.spsvole.receive_batch_consistency_check(
             channel,
             m,
@@ -352,7 +327,6 @@ impl<FE: FiniteField> Receiver<FE> {
             &self.base_voles[self.rows + self.weight..],
             rng,
         )?;
-        // debug_assert!(ss.len() == self.cols);
         let seed = channel.read_block()?;
         let mut lpn_rng = AesRng::from_seed(seed);
         let ys: Vec<FE> = vs

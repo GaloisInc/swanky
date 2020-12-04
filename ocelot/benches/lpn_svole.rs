@@ -13,7 +13,7 @@ use ocelot::svole::svole_ext::{
     LpnsVoleSender,
 };
 use scuttlebutt::{
-    field::{F61p, FiniteField, Fp, Gf128, F2},
+    field::{F61p, Fp, Gf128, F2},
     AesRng,
     Channel,
 };
@@ -32,7 +32,6 @@ fn svole_init<
     VReceiver: LpnsVoleReceiver + Sync + Send,
 >() -> (Arc<Mutex<VSender>>, Arc<Mutex<VReceiver>>) {
     let (sender, receiver) = UnixStream::pair().unwrap();
-    let pows = ocelot::svole::utils::gen_pows();
     let handle = std::thread::spawn(move || {
         let mut rng = AesRng::new();
         let reader = BufReader::new(sender.try_clone().unwrap());
@@ -61,26 +60,20 @@ fn bench_svole<
 ) {
     let (sender, receiver) = UnixStream::pair().unwrap();
     let vole_sender = vole_sender.clone();
-    let pows = ocelot::svole::utils::gen_pows();
     let handle = std::thread::spawn(move || {
         let mut rng = AesRng::new();
         let reader = BufReader::new(sender.try_clone().unwrap());
         let writer = BufWriter::new(sender);
         let mut channel = Channel::new(reader, writer);
         let mut vole_sender = vole_sender.lock().unwrap();
-        let mut base_vole = BaseSender::init(&mut channel, &pows, &mut rng).unwrap();
-        let base_uws = base_vole.send(&mut channel, 1000, &mut rng).unwrap();
-        black_box(vole_sender.send(&mut channel, &base_uws, &mut rng)).unwrap();
+        black_box(vole_sender.send(&mut channel, &mut rng)).unwrap();
     });
     let mut rng = AesRng::new();
     let reader = BufReader::new(receiver.try_clone().unwrap());
     let writer = BufWriter::new(receiver);
     let mut channel = Channel::new(reader, writer);
     let mut vole_receiver = vole_receiver.lock().unwrap();
-    let mut base_vole = BaseReceiver::init(&mut channel, &pows, &mut rng).unwrap();
-    let base_vs = base_vole.receive(&mut channel, 1000, &mut rng).unwrap();
-    let delta = base_vole.delta();
-    black_box(vole_receiver.receive(&mut channel, base_vs.as_slice(), &mut rng)).unwrap();
+    black_box(vole_receiver.receive(&mut channel, &mut rng)).unwrap();
     handle.join().unwrap();
 }
 
@@ -125,8 +118,6 @@ fn bench_svole_init<
 >() {
     let mut rng = AesRng::new();
     let (sender, receiver) = UnixStream::pair().unwrap();
-    let r = FE::PolynomialFormNumCoefficients::to_usize();
-    let pows = ocelot::svole::utils::gen_pows();
     let handle = std::thread::spawn(move || {
         let mut rng = AesRng::new();
         let reader = BufReader::new(sender.try_clone().unwrap());
