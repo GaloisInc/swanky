@@ -3,6 +3,15 @@
 // This file is part of `popsicle`.
 // Copyright © 2019 Galois, Inc.
 // See LICENSE for licensing information.
+//
+//
+// TODO:
+//
+// (1) Use ocelot's cuckoo hash (ch) instead of popsicle's: popsicle's current ch has a bug where
+//     it is always full and fails for certain numbers like 100,000 and larger powers of 10.
+// (2) Once (1) is complete, revert handling megabins after the ch is done instead of during (and
+//     effectively get rid of the ch large structure and methods currently in popsicle/src/cuckoo)
+//     the current megabin handling is an artifact of older bugs that stalled the system for large sets
 
 use crate::Error;
 use scuttlebutt::{Aes128, Block};

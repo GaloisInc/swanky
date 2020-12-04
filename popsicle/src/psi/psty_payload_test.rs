@@ -6,6 +6,8 @@
 
 //! Implementation of the Pinkas-Schneider-Tkachenko-Yanai "extended" private
 //! set intersection protocol (cf. <https://eprint.iacr.org/2019/241>).
+//
+// This is similar to psty_payload but with more measurements at the level of each method
 
 use crate::{cuckoo::CuckooHash, cuckoo::CuckooHashLarge, errors::Error, utils};
 use fancy_garbling::{

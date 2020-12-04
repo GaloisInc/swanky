@@ -7,6 +7,32 @@
 //! Implementation of the Pinkas-Schneider-Tkachenko-Yanai "extended" private
 //! set intersection protocol (cf. <https://eprint.iacr.org/2019/241>).
 
+
+// What’s the difference with the regular psty:
+// - Implements PSTY19's protocol for computation on associated payloads with the intersection,
+//   currently the regular psty.rs only revelas the payloads associated with the intersection.
+// - Extends the protocol to larger sets via megabins. Now a regular machine can handle extra-large sets
+// - Divides more of the psty protocol computation systematically to make parallelization simpler
+
+// Assumption::
+//
+// - Inputs and outputs are 64bit long. Otherwise the CRT padding and encoding could leak the padded sub-string.
+//   This is already an assumption in swanky since it can only generate and handle primes with width up to 64bit long.
+// - The receiver sends out the number of bins, mega bins and the size of a megabin to the receiver.
+// - The receiver’s set is bigger than the senders (otherwise the code, even without this extension, complains)
+// - The megabin size is smaller than the larger set.
+// - The receiver gets the output of the computation.
+//
+// TODO:
+//
+// (1) Use ocelot's cuckoo hash (ch) instead of popsicle's: popsicle's current ch has a bug where
+//     it is always full and fails for certain numbers like 100,000 and larger powers of 10.
+// (2) Once (1) is complete, revert handling megabins after the ch is done instead of during (and
+//     effectively get rid of the ch large structure and methods currently in popsicle/src/cuckoo)
+//     the current megabin handling is an artifact of older bugs that stalled the system for large sets
+// (3) Extend the size of generated primes beyond 64bits
+//
+
 use crate::{cuckoo::CuckooHash, cuckoo::CuckooHashLarge, errors::Error, utils};
 use fancy_garbling::{
     twopac::semihonest::{Evaluator, Garbler},
