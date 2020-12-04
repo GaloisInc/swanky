@@ -135,9 +135,7 @@ impl<'a, FE: FF> Receiver<'a, FE> {
         if z == delta {
             Ok(v)
         } else {
-            Err(Error::CorrelationCheckError(
-                "Correlation check fails in base vole protocol, i.e, w != u'Δ + v".to_string(),
-            ))
+            Err(Error::CorrelationCheckFailed)
         }
     }
 }
@@ -145,7 +143,6 @@ impl<'a, FE: FF> Receiver<'a, FE> {
 #[cfg(test)]
 mod tests {
     use super::{BaseReceiver, BaseSender};
-    use crate::svole::svole_ext::lpn_params::{LpnExtendParams, LpnSetupParams};
     use scuttlebutt::{
         field::{F61p, FiniteField as FF, Fp, Gf128, F2},
         AesRng,
@@ -185,7 +182,7 @@ mod tests {
 
     #[test]
     fn test_base_svole_setup_params() {
-        let len = LpnSetupParams::ROWS;
+        let len = 19870; //LpnSetupParams::ROWS;
         test_base_svole::<Fp>(len);
         test_base_svole::<Gf128>(len);
         test_base_svole::<F2>(len);
@@ -194,7 +191,7 @@ mod tests {
 
     #[test]
     fn test_base_svole_extend_params() {
-        let len = LpnExtendParams::ROWS;
+        let len = 589_760; //LpnExtendParams::ROWS;
         test_base_svole::<Fp>(len);
         test_base_svole::<Gf128>(len);
         test_base_svole::<F2>(len);
