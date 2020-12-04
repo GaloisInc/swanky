@@ -12,7 +12,7 @@
 // - Implements PSTY19's protocol for computation on associated payloads with the intersection,
 //   currently the regular psty.rs only revelas the payloads associated with the intersection.
 // - Extends the protocol to larger sets via megabins. Now a regular machine can handle extra-large sets
-// - Divides more of the psty protocol computation systematically to make parallelization simpler
+// - Factors and splits out the psty protocol more in-order to expose methods to seperate threads and make parallelization simpler
 
 // Assumption::
 //
