@@ -7,6 +7,6 @@
 //!
 
 pub mod base_svole;
-mod copee;
+pub mod copee;
 pub mod svole_ext;
 pub mod utils;

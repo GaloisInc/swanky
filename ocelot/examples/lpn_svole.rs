@@ -4,15 +4,10 @@
 // Copyright © 2020 Galois, Inc.
 // See LICENSE for licensing information.
 
-use generic_array::typenum::Unsigned;
-use ocelot::svole::{
-    base_svole::{BaseReceiver, BaseSender},
-    svole_ext::{
-        lpn_params::{LpnExtendParams, LpnSetupParams},
-        svole_lpn::{Receiver as LpnVoleReceiver, Sender as LpnVoleSender},
-        LpnsVoleReceiver,
-        LpnsVoleSender,
-    },
+use ocelot::svole::svole_ext::{
+    svole_lpn::{Receiver as LpnVoleReceiver, Sender as LpnVoleSender},
+    LpnsVoleReceiver,
+    LpnsVoleSender,
 };
 use scuttlebutt::{
     field::{F61p, FiniteField as FF, Fp, Gf128, F2},
@@ -29,41 +24,18 @@ fn _test_lpnvole<
     FE: FF,
     VSender: LpnsVoleSender<Msg = FE>,
     VReceiver: LpnsVoleReceiver<Msg = FE>,
->(
-    rows0: usize,
-    cols0: usize,
-    weight0: usize,
-    rows1: usize,
-    cols1: usize,
-    weight1: usize,
-    d: usize,
-) {
+>() {
     let (sender, receiver) = UnixStream::pair().unwrap();
     let total = SystemTime::now();
-    let r = FE::PolynomialFormNumCoefficients::to_usize();
     let handle = std::thread::spawn(move || {
         let mut rng = AesRng::new();
         let reader = BufReader::new(sender.try_clone().unwrap());
         let writer = BufWriter::new(sender);
         let mut channel = TrackChannel::new(reader, writer);
-        let pows = ocelot::svole::utils::gen_pows();
         let start = SystemTime::now();
-        // Generating base voles of length `k + t + r` using LPN_vole with smaller LPN  parameters.
-        let mut base_vole = BaseSender::<FE>::init(&mut channel, &pows, &mut rng).unwrap();
-        let base_uws = base_vole
-            .send(&mut channel, rows0 + weight0 + r, &mut rng)
-            .unwrap();
-        let mut lpn_setup_vole =
-            VSender::init(&mut channel, rows0, cols0, d, weight0, &mut rng).unwrap();
-        let (_, lpnvs) = lpn_setup_vole
-            .send(&mut channel, &base_uws, &mut rng)
-            .unwrap();
-        // We just need `k + t + r` of voles.
-        let base_uws: Vec<_> = (0..rows1 + weight1 + r).map(|i| lpnvs[i]).collect();
-        let mut vole = VSender::init(&mut channel, rows1, cols1, d, weight1, &mut rng).unwrap();
+        let mut vole = VSender::init_with_optimized_base_vole_gen(&mut channel, &mut rng).unwrap();
         println!(
-            "[{}] Send time (init): {} ms",
-            cols0,
+            "[642048(k+t+r+52287)] Send time (init): {} ms",
             start.elapsed().unwrap().as_millis()
         );
         println!(
@@ -76,10 +48,9 @@ fn _test_lpnvole<
         );
         channel.clear();
         let start = SystemTime::now();
-        let _ = vole.send(&mut channel, &base_uws, &mut rng).unwrap();
+        let _ = vole.send(&mut channel, &mut rng).unwrap();
         println!(
-            "[{}] Send time: {} ms",
-            cols1 - (rows1 + weight1 + r),
+            "[10214168(n-n0(k+t+r))] Send time: {} ms",
             start.elapsed().unwrap().as_millis()
         );
         println!(
@@ -95,22 +66,10 @@ fn _test_lpnvole<
     let reader = BufReader::new(receiver.try_clone().unwrap());
     let writer = BufWriter::new(receiver);
     let mut channel = TrackChannel::new(reader, writer);
-    let pows = ocelot::svole::utils::gen_pows();
     let start = SystemTime::now();
-    let mut base_vole = BaseReceiver::<FE>::init(&mut channel, &pows, &mut rng).unwrap();
-    let base_vs = base_vole
-        .receive(&mut channel, rows0 + weight0 + r, &mut rng)
-        .unwrap();
-    let delta = base_vole.delta();
-    let mut lpn_vole =
-        VReceiver::init(&mut channel, rows0, cols0, d, weight0, delta, &mut rng).unwrap();
-    let (_, lpnvs) = lpn_vole.receive(&mut channel, &base_vs, &mut rng).unwrap();
-    let base_vs: Vec<_> = (0..rows1 + weight1 + r).map(|i| lpnvs[i]).collect();
-    let mut vole =
-        VReceiver::init(&mut channel, rows1, cols1, d, weight1, delta, &mut rng).unwrap();
+    let mut vole = VReceiver::init_with_optimized_base_vole_gen(&mut channel, &mut rng).unwrap();
     println!(
-        "[{}] Receive time (init): {} ms",
-        cols0,
+        "[642048(k+t+r+52287)] Receive time (init): {} ms",
         start.elapsed().unwrap().as_millis()
     );
     println!(
@@ -123,10 +82,9 @@ fn _test_lpnvole<
     );
     channel.clear();
     let start = SystemTime::now();
-    let _ = vole.receive(&mut channel, &base_vs, &mut rng).unwrap();
+    let _ = vole.receive(&mut channel, &mut rng).unwrap();
     println!(
-        "[{}] Receiver time: {} ms",
-        cols1 - (rows1 + weight1 + r),
+        "[10214168(n-n0(k+t+r))] Receiver time: {} ms",
         start.elapsed().unwrap().as_millis()
     );
     handle.join().unwrap();
@@ -144,15 +102,6 @@ fn _test_lpnvole<
 fn main() {
     type VSender<FE> = LpnVoleSender<FE>;
     type VReceiver<FE> = LpnVoleReceiver<FE>;
-
-    let rows0 = LpnSetupParams::ROWS;
-    let cols0 = LpnSetupParams::COLS;
-    let weight0 = LpnSetupParams::WEIGHT;
-    let d = LpnSetupParams::D;
-    let rows1 = LpnExtendParams::ROWS;
-    let cols1 = LpnExtendParams::COLS;
-    let weight1 = LpnExtendParams::WEIGHT;
-
     /*println!("\nField: F2 \n");
     _test_lpnvole::<F2, VSender<F2>, VReceiver<F2>>(rows, cols, d, weight);
     println!("\nField: Gf128 \n");
@@ -160,7 +109,5 @@ fn main() {
     println!("\nField: Fp \n");
     _test_lpnvole::<Fp, VSender<Fp>, VReceiver<Fp>>(rows, cols, d, weight);*/
     println!("\nField: F61p \n");
-    _test_lpnvole::<F61p, VSender<F61p>, VReceiver<F61p>>(
-        rows0, cols0, weight0, rows1, cols1, weight1, d,
-    );
+    _test_lpnvole::<F61p, VSender<F61p>, VReceiver<F61p>>()
 }
