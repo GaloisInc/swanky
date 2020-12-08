@@ -34,7 +34,7 @@ where
         rng: &mut RNG,
     ) -> Result<Self, Error>;*/
 
-    fn init_with_optimized_base_vole_gen<C: AbstractChannel, RNG: CryptoRng + RngCore>(
+    fn init<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         channel: &mut C,
         rng: &mut RNG,
     ) -> Result<Self, Error>;
@@ -68,7 +68,7 @@ where
         weight: usize,
         rng: &mut RNG,
     ) -> Result<Self, Error>;*/
-    fn init_with_optimized_base_vole_gen<C: AbstractChannel, RNG: CryptoRng + RngCore>(
+    fn init<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         channel: &mut C,
         rng: &mut RNG,
     ) -> Result<Self, Error>;

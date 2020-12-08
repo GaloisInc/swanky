@@ -37,14 +37,13 @@ fn svole_init<
         let reader = BufReader::new(sender.try_clone().unwrap());
         let writer = BufWriter::new(sender);
         let mut channel = Channel::new(reader, writer);
-        VSender::init_with_optimized_base_vole_gen(&mut channel, &mut rng).unwrap()
+        VSender::init(&mut channel, &mut rng).unwrap()
     });
     let mut rng = AesRng::new();
     let reader = BufReader::new(receiver.try_clone().unwrap());
     let writer = BufWriter::new(receiver);
     let mut channel = Channel::new(reader, writer);
-    let vole_receiver =
-        VReceiver::init_with_optimized_base_vole_gen(&mut channel, &mut rng).unwrap();
+    let vole_receiver = VReceiver::init(&mut channel, &mut rng).unwrap();
     let vole_sender = handle.join().unwrap();
     let vole_sender = Arc::new(Mutex::new(vole_sender));
     let vole_receiver = Arc::new(Mutex::new(vole_receiver));
@@ -123,12 +122,12 @@ fn bench_svole_init<
         let reader = BufReader::new(sender.try_clone().unwrap());
         let writer = BufWriter::new(sender);
         let mut channel = Channel::new(reader, writer);
-        black_box(VSender::init_with_optimized_base_vole_gen(&mut channel, &mut rng).unwrap())
+        black_box(VSender::init(&mut channel, &mut rng).unwrap())
     });
     let reader = BufReader::new(receiver.try_clone().unwrap());
     let writer = BufWriter::new(receiver);
     let mut channel = Channel::new(reader, writer);
-    black_box(VReceiver::init_with_optimized_base_vole_gen(&mut channel, &mut rng).unwrap());
+    black_box(VReceiver::init(&mut channel, &mut rng).unwrap());
     handle.join().unwrap();
 }
 

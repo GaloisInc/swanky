@@ -33,7 +33,7 @@ fn _test_lpnvole<
         let writer = BufWriter::new(sender);
         let mut channel = TrackChannel::new(reader, writer);
         let start = SystemTime::now();
-        let mut vole = VSender::init_with_optimized_base_vole_gen(&mut channel, &mut rng).unwrap();
+        let mut vole = VSender::init(&mut channel, &mut rng).unwrap();
         println!(
             "[642048(k+t+r+52287)] Send time (init): {} ms",
             start.elapsed().unwrap().as_millis()
@@ -67,7 +67,7 @@ fn _test_lpnvole<
     let writer = BufWriter::new(receiver);
     let mut channel = TrackChannel::new(reader, writer);
     let start = SystemTime::now();
-    let mut vole = VReceiver::init_with_optimized_base_vole_gen(&mut channel, &mut rng).unwrap();
+    let mut vole = VReceiver::init(&mut channel, &mut rng).unwrap();
     println!(
         "[642048(k+t+r+52287)] Receive time (init): {} ms",
         start.elapsed().unwrap().as_millis()

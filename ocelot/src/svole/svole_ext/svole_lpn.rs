@@ -96,7 +96,7 @@ pub struct Sender<FE: FiniteField> {
 }
 
 impl<FE: FiniteField> Sender<FE> {
-    fn init<C: AbstractChannel, RNG: CryptoRng + RngCore>(
+    fn _init<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         channel: &mut C,
         rows: usize,
         cols: usize,
@@ -142,7 +142,7 @@ pub struct Receiver<FE: FiniteField> {
 }
 
 impl<FE: FiniteField> Receiver<FE> {
-    fn init<C: AbstractChannel, RNG: CryptoRng + RngCore>(
+    fn _init<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         channel: &mut C,
         rows: usize,
         cols: usize,
@@ -180,14 +180,14 @@ impl<FE: FiniteField> Receiver<FE> {
 
 impl<FE: FiniteField> LpnsVoleSender for Sender<FE> {
     type Msg = FE;
-    fn init_with_optimized_base_vole_gen<C: AbstractChannel, RNG: CryptoRng + RngCore>(
+    fn init<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         channel: &mut C,
         rng: &mut RNG,
     ) -> Result<Self, Error> {
         let pows = crate::svole::utils::gen_pows();
         let r = FE::PolynomialFormNumCoefficients::to_usize();
         // Base voles are computed efficiently using smaller LPN parameters.
-        let mut lpn_sender = Self::init(
+        let mut lpn_sender = Self::_init(
             channel,
             lpn_setup_params::ROWS,
             lpn_setup_params::COLS,
@@ -274,13 +274,13 @@ impl<FE: FiniteField> LpnsVoleSender for Sender<FE> {
 
 impl<FE: FiniteField> LpnsVoleReceiver for Receiver<FE> {
     type Msg = FE;
-    fn init_with_optimized_base_vole_gen<C: AbstractChannel, RNG: CryptoRng + RngCore>(
+    fn init<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         channel: &mut C,
         rng: &mut RNG,
     ) -> Result<Self, Error> {
         let pows = crate::svole::utils::gen_pows();
         let r = FE::PolynomialFormNumCoefficients::to_usize();
-        let mut svole = Self::init(
+        let mut svole = Self::_init(
             channel,
             lpn_setup_params::ROWS,
             lpn_setup_params::COLS,
@@ -383,16 +383,14 @@ mod tests {
             let reader = BufReader::new(sender.try_clone().unwrap());
             let writer = BufWriter::new(sender);
             let mut channel = Channel::new(reader, writer);
-            let mut vole =
-                VSender::init_with_optimized_base_vole_gen(&mut channel, &mut rng).unwrap();
+            let mut vole = VSender::init(&mut channel, &mut rng).unwrap();
             vole.send(&mut channel, &mut rng).unwrap()
         });
         let mut rng = AesRng::new();
         let reader = BufReader::new(receiver.try_clone().unwrap());
         let writer = BufWriter::new(receiver);
         let mut channel = Channel::new(reader, writer);
-        let mut vole =
-            VReceiver::init_with_optimized_base_vole_gen(&mut channel, &mut rng).unwrap();
+        let mut vole = VReceiver::init(&mut channel, &mut rng).unwrap();
         let vs = vole.receive(&mut channel, &mut rng).unwrap();
         let uws = handle.join().unwrap();
         for i in 0..uws.len() as usize {
