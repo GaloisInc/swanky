@@ -96,7 +96,7 @@ pub struct Sender<FE: FiniteField> {
 }
 
 impl<FE: FiniteField> Sender<FE> {
-    fn _init<C: AbstractChannel, RNG: CryptoRng + RngCore>(
+    fn init_internal<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         channel: &mut C,
         rows: usize,
         cols: usize,
@@ -142,7 +142,7 @@ pub struct Receiver<FE: FiniteField> {
 }
 
 impl<FE: FiniteField> Receiver<FE> {
-    fn _init<C: AbstractChannel, RNG: CryptoRng + RngCore>(
+    fn init_internal<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         channel: &mut C,
         rows: usize,
         cols: usize,
@@ -187,7 +187,7 @@ impl<FE: FiniteField> LpnsVoleSender for Sender<FE> {
         let pows = crate::svole::utils::gen_pows();
         let r = FE::PolynomialFormNumCoefficients::to_usize();
         // Base voles are computed efficiently using smaller LPN parameters.
-        let mut lpn_sender = Self::_init(
+        let mut lpn_sender = Self::init_internal(
             channel,
             lpn_setup_params::ROWS,
             lpn_setup_params::COLS,
@@ -280,7 +280,7 @@ impl<FE: FiniteField> LpnsVoleReceiver for Receiver<FE> {
     ) -> Result<Self, Error> {
         let pows = crate::svole::utils::gen_pows();
         let r = FE::PolynomialFormNumCoefficients::to_usize();
-        let mut svole = Self::_init(
+        let mut svole = Self::init_internal(
             channel,
             lpn_setup_params::ROWS,
             lpn_setup_params::COLS,

@@ -50,7 +50,7 @@ fn _test_lpnvole<
         let start = SystemTime::now();
         let _ = vole.send(&mut channel, &mut rng).unwrap();
         println!(
-            "[10214168(n-n0(k+t+r))] Send time: {} ms",
+            "[10214168(n-n0(k+t+r))] Send time (extend): {} ms",
             start.elapsed().unwrap().as_millis()
         );
         println!(
@@ -84,7 +84,7 @@ fn _test_lpnvole<
     let start = SystemTime::now();
     let _ = vole.receive(&mut channel, &mut rng).unwrap();
     println!(
-        "[10214168(n-n0(k+t+r))] Receiver time: {} ms",
+        "[10214168(n-n0(k+t+r))] Receiver time (extend): {} ms",
         start.elapsed().unwrap().as_millis()
     );
     handle.join().unwrap();

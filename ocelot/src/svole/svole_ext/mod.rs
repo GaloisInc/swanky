@@ -25,15 +25,6 @@ where
     type Msg: FF;
     /// Runs any one-time initialization with secure LPN parameters, k (rows), n (cols), t (weight), and a constant `d`
     /// used in `d-linear` codes. Also note the fact that `rows < cols` and `d < cols`.
-    /*fn init<C: AbstractChannel, RNG: CryptoRng + RngCore>(
-        channel: &mut C,
-        rows: usize,
-        cols: usize,
-        d: usize,
-        weight: usize,
-        rng: &mut RNG,
-    ) -> Result<Self, Error>;*/
-
     fn init<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         channel: &mut C,
         rng: &mut RNG,
@@ -60,14 +51,6 @@ where
     type Msg: FF;
     /// Runs any one-time initialization with secure LPN parameters, `k (rows)`, `n (cols)`, `t (weight)`, and a constant `d`
     /// used in `d-linear` codes. Also note the fact that `rows < cols` and `d < cols`.
-    /*fn init<C: AbstractChannel, RNG: CryptoRng + RngCore>(
-        channel: &mut C,
-        rows: usize,
-        cols: usize,
-        d: usize,
-        weight: usize,
-        rng: &mut RNG,
-    ) -> Result<Self, Error>;*/
     fn init<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         channel: &mut C,
         rng: &mut RNG,
