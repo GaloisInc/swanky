@@ -166,7 +166,7 @@ fn bench_svole_init_f61p(c: &mut Criterion) {
 criterion_group! {
     name = svole;
     config = Criterion::default().warm_up_time(Duration::from_millis(100));
-    targets = bench_svole_init_f61p, bench_svole_f61p
-    //bench_svole_fp, bench_svole_gf128, bench_svole_f2, bench_svole_f61p, bench_svole_init_gf128, bench_svole_init_f61p, bench_svole_init_fp, bench_svole_init_f2
+    targets =  bench_svole_f61p
+    //bench_svole_init_f61p, bench_svole_fp, bench_svole_gf128, bench_svole_f2, bench_svole_f61p, bench_svole_init_gf128, bench_svole_init_f61p, bench_svole_init_fp, bench_svole_init_f2
 }
 criterion_main!(svole);

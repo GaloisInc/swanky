@@ -32,11 +32,13 @@ pub fn scalar_multiplication<FE: FiniteField>(x: FE, v: &[FE]) -> Vec<FE> {
     v.iter().map(|&y| x * y).collect()
 }
 
+/// Implementation of GGM based on the procedure explained in the write-up(<https://eprint.iacr.org/2020/925.pdf>, Page 14) --
 /// Construct GGM tree with `depth` levels and return the node values (a.k.a
 /// seeds). `aes_seeds` are used to seed the "PRGs" used internally so we don't
 /// need to instantiate new PRGs on each iteration. Instead, we key two
 /// instances of AES ahead of time and view them as PRPs, using the seed as
 /// input.
+
 pub fn ggm<FE: FiniteField>(
     depth: usize,
     initial_seed: Block,
@@ -71,6 +73,8 @@ pub fn ggm<FE: FiniteField>(
     (vs, keys)
 }
 
+/// Implementation of GGM based on the procedure explained in the write-up(<https://eprint.iacr.org/2020/925.pdf>, Page 14),
+/// For more detailed explanation of GGM Prime, please see the Figure 1 of the write-up (<https://eprint.iacr.org/2019/1084.pdf>, Page 7).
 /// GGM prime is used compute the vector of field elements except a path b1..bn
 /// where b1 represents msb of alpha.
 pub fn ggm_prime<FE: FiniteField>(
@@ -147,7 +151,7 @@ mod tests {
         assert_eq!(bv_to_num(&bv), x);
     }
 
-    fn _test_ggm<FE: FiniteField>() {
+    fn test_ggm_with_field<FE: FiniteField>() {
         for _ in 0..10 {
             // Runs for a while if the range is over 20.
             // depth has to be atleast 2.
@@ -176,9 +180,9 @@ mod tests {
 
     #[test]
     fn test_ggm() {
-        _test_ggm::<Fp>();
-        _test_ggm::<F61p>();
-        _test_ggm::<F2>();
-        _test_ggm::<Gf128>();
+        test_ggm_with_field::<Fp>();
+        test_ggm_with_field::<F61p>();
+        test_ggm_with_field::<F2>();
+        test_ggm_with_field::<Gf128>();
     }
 }
