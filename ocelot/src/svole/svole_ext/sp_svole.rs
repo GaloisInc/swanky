@@ -49,6 +49,9 @@ pub type SpsSender<FE> = Sender<KosReceiver, FE>;
 /// Alias for SpsVole Receiver.
 pub type SpsReceiver<FE> = Receiver<KosSender, FE>;
 
+/// Implementation of the EQ protocol functionality described in the write-up (<https://eprint.iacr.org/2020/925.pdf>, Page 30)
+/// Implementation of sender functionality
+/// TODO: Channel is going to be out of sync if sender receives commit of vb before sending va out.
 fn eq_send<C: AbstractChannel, FE: FF>(channel: &mut C, input: &FE) -> Result<bool, Error> {
     let va = *input;
     channel.write_fe(va)?;
@@ -68,6 +71,7 @@ fn eq_send<C: AbstractChannel, FE: FF>(channel: &mut C, input: &FE) -> Result<bo
     }
 }
 
+/// Implementation of receiver functionality
 fn eq_receive<C: AbstractChannel, RNG: CryptoRng + RngCore, FE: FF>(
     channel: &mut C,
     rng: &mut RNG,
@@ -101,7 +105,7 @@ impl<OT: OtReceiver<Msg = Block> + Malicious, FE: FF> Sender<OT, FE> {
     /// Runs single-point svole and outputs pair of vectors `(u, w)` such that
     /// the correlation `w = u'Δ + v` holds. Note that `u'` is the converted vector from
     /// `u` to the vector of elements of the extended field `FE`. For simplicity, the vector
-    /// length `n` assumed to be power of `2` as it represents the number of leaves in the GGM tree
+    /// length `n` assumed to be a multiple of `2` as it represents the number of leaves in the GGM tree
     /// and should match with the receiver input length.
     pub fn send<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         &mut self,
@@ -110,6 +114,7 @@ impl<OT: OtReceiver<Msg = Block> + Malicious, FE: FF> Sender<OT, FE> {
         uws: &[(FE::PrimeField, FE)],
         mut rng: &mut RNG,
     ) -> Result<Vec<Vec<(FE::PrimeField, FE)>>, Error> {
+        assert!(n % 2 == 0);
         let depth = 128 - (n as u128 - 1).leading_zeros() as usize;
         let len = uws.len();
         let mut result = vec![vec![(FE::PrimeField::ZERO, FE::ZERO); n]; len];
@@ -236,8 +241,8 @@ impl<OT: OtSender<Msg = Block> + Malicious, FE: FF> Receiver<OT, FE> {
     }
     /// Runs single-point svole and outputs a vector `v` such that
     /// the correlation `w = u'Δ + v` holds. Again, `u'` is the converted vector from
-    /// `u` to the vector of elements of the extended field `FE`. Of course, the vector
-    /// length `len` is suppose to be in multiples of `2` as it represents the number of
+    /// `u` to the vector of elements of the extended field `FE`. Of course, the argument `nleaves`
+    /// is suppose to be in multiples of `2` as it represents the number of
     /// leaves in the GGM tree and should match with the sender input length.
     pub fn receive<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         &mut self,
@@ -246,6 +251,7 @@ impl<OT: OtSender<Msg = Block> + Malicious, FE: FF> Receiver<OT, FE> {
         vs: &[FE],
         rng: &mut RNG,
     ) -> Result<Vec<Vec<FE>>, Error> {
+        assert!(nleaves % 2 == 0);
         let depth = 128 - (nleaves as u128 - 1).leading_zeros() as usize;
         let len = vs.len();
         let mut gammas = Vec::with_capacity(len);

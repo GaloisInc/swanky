@@ -96,6 +96,9 @@ pub struct Sender<FE: FiniteField> {
 }
 
 impl<FE: FiniteField> Sender<FE> {
+    // This function is useful in implementing the optimization method which generates base voles using lpn voles efficiently using \
+    // small parameters (cols, rwos, weight) as described in the eprint (<https://eprint.iacr.org/2020/925.pdf>, Page 18). Note that the function
+    // is internal and not available to the user.
     fn init_internal<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         channel: &mut C,
         rows: usize,
@@ -142,6 +145,9 @@ pub struct Receiver<FE: FiniteField> {
 }
 
 impl<FE: FiniteField> Receiver<FE> {
+    // This function is useful in implementing the optimization method which generates base voles using lpn voles efficiently using \
+    // small parameters (cols, rwos, weight) as described in the eprint (<https://eprint.iacr.org/2020/925.pdf>, Page 18). Note that the function
+    // is internal and not available to the user.
     fn init_internal<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         channel: &mut C,
         rows: usize,
@@ -180,6 +186,7 @@ impl<FE: FiniteField> Receiver<FE> {
 
 impl<FE: FiniteField> LpnsVoleSender for Sender<FE> {
     type Msg = FE;
+    // Runs any one-time initialization which calls init_internal to optimize the base vole generation using smaller LPN parameters.
     fn init<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         channel: &mut C,
         rng: &mut RNG,
@@ -274,12 +281,14 @@ impl<FE: FiniteField> LpnsVoleSender for Sender<FE> {
 
 impl<FE: FiniteField> LpnsVoleReceiver for Receiver<FE> {
     type Msg = FE;
+    // Runs any one-time initialization which calls init_internal to optimize the base vole generation using smaller LPN parameters.
     fn init<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         channel: &mut C,
         rng: &mut RNG,
     ) -> Result<Self, Error> {
         let pows = crate::svole::utils::gen_pows();
         let r = FE::PolynomialFormNumCoefficients::to_usize();
+        // Base voles are computed efficiently using smaller LPN parameters.
         let mut svole = Self::init_internal(
             channel,
             lpn_setup_params::ROWS,
