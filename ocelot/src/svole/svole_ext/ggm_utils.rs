@@ -32,7 +32,7 @@ pub fn scalar_multiplication<FE: FiniteField>(x: FE, v: &[FE]) -> Vec<FE> {
     v.iter().map(|&y| x * y).collect()
 }
 
-/// Implementation of GGM based on the procedure explained in the write-up(<https://eprint.iacr.org/2020/925.pdf>, Page 14) --
+/// Implementation of GGM based on the procedure explained in the write-up (<https://eprint.iacr.org/2020/925.pdf>, Page 14) --
 /// Construct GGM tree with `depth` levels and return the node values (a.k.a
 /// seeds). `aes_seeds` are used to seed the "PRGs" used internally so we don't
 /// need to instantiate new PRGs on each iteration. Instead, we key two
