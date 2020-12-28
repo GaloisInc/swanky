@@ -63,7 +63,7 @@ mod lpn_extend_params {
 
 /// Small constant `d` used in the `liner codes` useful in acheiving efficient matrix multiplication.
 const LPN_PARAMS_D: usize = 10;
-
+// TODO: this needs to get optimized.
 fn lpn_mtx_indices<FE: FiniteField>(
     _col_idx: usize,
     rows: usize,
