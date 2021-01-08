@@ -24,7 +24,8 @@ use crate::{
         base_svole::{BaseReceiver, BaseSender},
         svole_ext::{
             spsvole::{SpsReceiver, SpsSender},
-            SVoleReceiver, SVoleSender,
+            SVoleReceiver,
+            SVoleSender,
         },
     },
 };
@@ -352,11 +353,13 @@ impl<FE: FiniteField> SVoleReceiver for Receiver<FE> {
 mod tests {
     use crate::svole::svole_ext::{
         svole::{Receiver, Sender},
-        SVoleReceiver, SVoleSender,
+        SVoleReceiver,
+        SVoleSender,
     };
     use scuttlebutt::{
         field::{F61p, FiniteField as FF, Fp, Gf128, F2},
-        AesRng, Channel,
+        AesRng,
+        Channel,
     };
     use std::{
         io::{BufReader, BufWriter},
