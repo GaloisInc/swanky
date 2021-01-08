@@ -4,15 +4,13 @@
 // Copyright © 2020 Galois, Inc.
 // See LICENSE for licensing information.
 
-use ocelot::svole::svole_ext::{
-    svole::{Receiver, Sender},
-    SVoleReceiver,
-    SVoleSender,
+use ocelot::svole::{
+    wykw::{Receiver, Sender},
+    SVoleReceiver, SVoleSender,
 };
 use scuttlebutt::{
-    field::{F61p, FiniteField as FF, Fp, Gf128, F2},
-    AesRng,
-    TrackChannel,
+    field::{F61p, FiniteField as FF},
+    AesRng, TrackChannel,
 };
 use std::{
     io::{BufReader, BufWriter},
@@ -20,7 +18,7 @@ use std::{
     time::SystemTime,
 };
 
-fn test_lpnvole<FE: FF, VSender: SVoleSender<Msg = FE>, VReceiver: SVoleReceiver<Msg = FE>>() {
+fn run<FE: FF, VSender: SVoleSender<Msg = FE>, VReceiver: SVoleReceiver<Msg = FE>>() {
     let (sender, receiver) = UnixStream::pair().unwrap();
     let total = SystemTime::now();
     let handle = std::thread::spawn(move || {
@@ -96,12 +94,6 @@ fn test_lpnvole<FE: FF, VSender: SVoleSender<Msg = FE>, VReceiver: SVoleReceiver
 }
 
 fn main() {
-    /*println!("\nField: F2 \n");
-    _test_lpnvole::<F2, VSender<F2>, VReceiver<F2>>(rows, cols, d, weight);
-    println!("\nField: Gf128 \n");
-    _test_lpnvole::<Gf128, VSender<Gf128>, VReceiver<Gf128>>(rows, cols, d, weight);
-    println!("\nField: Fp \n");
-    _test_lpnvole::<Fp, VSender<Fp>, VReceiver<Fp>>(rows, cols, d, weight);*/
     println!("\nField: F61p \n");
-    test_lpnvole::<F61p, Sender<F61p>, Receiver<F61p>>()
+    run::<F61p, Sender<F61p>, Receiver<F61p>>()
 }

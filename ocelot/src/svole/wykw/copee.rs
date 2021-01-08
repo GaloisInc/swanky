@@ -5,7 +5,7 @@
 // See LICENSE for licensing information.
 
 //! Implementation of the Weng-Yang-Katz-Wang COPEe protocol (cf.
-//! <https://eprint.iacr.org/2020/925>, Figure 12).
+//! <https://eprint.iacr.org/2020/925>, Figure 15).
 
 use crate::{
     errors::Error,
@@ -14,12 +14,7 @@ use crate::{
 use generic_array::typenum::Unsigned;
 use rand_core::{CryptoRng, RngCore};
 use scuttlebutt::{
-    field::FiniteField as FF,
-    utils::unpack_bits,
-    AbstractChannel,
-    Aes128,
-    Block,
-    Malicious,
+    field::FiniteField as FF, utils::unpack_bits, AbstractChannel, Aes128, Block, Malicious,
 };
 use std::marker::PhantomData;
 use subtle::{Choice, ConditionallySelectable};
@@ -185,11 +180,10 @@ impl<'a, ROT: ROTReceiver<Msg = Block> + Malicious, FE: FF> Receiver<'a, ROT, FE
 
 #[cfg(test)]
 mod tests {
-    use crate::svole::copee::{CopeeReceiver, CopeeSender};
+    use super::{CopeeReceiver, CopeeSender};
     use scuttlebutt::{
         field::{F61p, FiniteField as FF, Fp, Gf128, F2},
-        AesRng,
-        Channel,
+        AesRng, Channel,
     };
     use std::{
         io::{BufReader, BufWriter},
@@ -205,7 +199,7 @@ mod tests {
             let reader = BufReader::new(sender.try_clone().unwrap());
             let writer = BufWriter::new(sender);
             let mut channel = Channel::new(reader, writer);
-            let pows = crate::svole::utils::gen_pows();
+            let pows = super::super::utils::gen_pows();
             let mut copee_sender = CopeeSender::<FE>::init(&mut channel, &pows, &mut rng).unwrap();
             let ws: Vec<FE> = (0..len)
                 .map(|_| copee_sender.send(&mut channel, &input).unwrap())
@@ -215,7 +209,7 @@ mod tests {
         let reader = BufReader::new(receiver.try_clone().unwrap());
         let writer = BufWriter::new(receiver);
         let mut channel = Channel::new(reader, writer);
-        let pows = crate::svole::utils::gen_pows();
+        let pows = super::super::utils::gen_pows();
         let mut copee_receiver = CopeeReceiver::<FE>::init(&mut channel, &pows, &mut rng).unwrap();
         let vs: Vec<FE> = (0..len)
             .map(|_| copee_receiver.receive(&mut channel).unwrap())

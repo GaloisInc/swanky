@@ -41,10 +41,9 @@ name = "oprf"
 harness = false
 
 [[bench]]
-name = "lpn_svole"
+name = "svole"
 harness = false
 
 [[example]]
 name = "kmprt"
 harness = false
-

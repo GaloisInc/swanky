@@ -8,26 +8,11 @@
 //!
 //! This module provides implementations of LPN sVole Traits.
 
-// -*- mode: rust; -*-
-//
-// This file is part of ocelot.
-// Copyright © 2020 Galois, Inc.
-// See LICENSE for licensing information.
-
-//! LPN based Subfield Vector Oblivious Linear-function Evaluation (sVole)
-//!
-//! This module provides implementations of LPN sVole Traits.
-
+use super::base_svole::{Receiver as BaseReceiver, Sender as BaseSender};
+use super::spsvole::{SpsReceiver, SpsSender};
 use crate::{
     errors::Error,
-    svole::{
-        base_svole::{BaseReceiver, BaseSender},
-        svole_ext::{
-            spsvole::{SpsReceiver, SpsSender},
-            SVoleReceiver,
-            SVoleSender,
-        },
-    },
+    svole::{SVoleReceiver, SVoleSender},
 };
 use generic_array::typenum::Unsigned;
 use rand::Rng;
@@ -111,7 +96,7 @@ impl<FE: FiniteField> Sender<FE> {
         debug_assert!(cols % 2 == 0);
         debug_assert!(rows < cols);
         debug_assert!(d < rows);
-        let pows = crate::svole::utils::gen_pows();
+        let pows = super::utils::gen_pows();
         let r = FE::PolynomialFormNumCoefficients::to_usize();
         let mut svole = BaseSender::<FE>::init(channel, &pows, rng)?;
         let base_voles = svole.send(channel, rows + weight + r, rng)?;
@@ -155,7 +140,7 @@ impl<FE: FiniteField> Receiver<FE> {
         debug_assert!(rows < cols);
         debug_assert!(d < rows);
         let r = FE::PolynomialFormNumCoefficients::to_usize();
-        let pows = crate::svole::utils::gen_pows();
+        let pows = super::utils::gen_pows();
         let mut svole = BaseReceiver::<FE>::init(channel, &pows, rng)?;
         let base_voles = svole.receive(channel, rows + weight + r, rng)?;
         let delta = svole.delta();
@@ -180,7 +165,7 @@ impl<FE: FiniteField> SVoleSender for Sender<FE> {
         channel: &mut C,
         rng: &mut RNG,
     ) -> Result<Self, Error> {
-        let pows = crate::svole::utils::gen_pows();
+        let pows = super::utils::gen_pows();
         let r = FE::PolynomialFormNumCoefficients::to_usize();
         // Base voles are computed efficiently using smaller LPN parameters.
         let mut sender = Self::init_internal(
@@ -273,7 +258,7 @@ impl<FE: FiniteField> SVoleReceiver for Receiver<FE> {
         channel: &mut C,
         rng: &mut RNG,
     ) -> Result<Self, Error> {
-        let pows = crate::svole::utils::gen_pows();
+        let pows = super::utils::gen_pows();
         let r = FE::PolynomialFormNumCoefficients::to_usize();
         // Base voles are computed efficiently using smaller LPN parameters.
         let mut svole = Self::init_internal(
@@ -351,15 +336,10 @@ impl<FE: FiniteField> SVoleReceiver for Receiver<FE> {
 
 #[cfg(test)]
 mod tests {
-    use crate::svole::svole_ext::{
-        svole::{Receiver, Sender},
-        SVoleReceiver,
-        SVoleSender,
-    };
+    use super::{Receiver, SVoleReceiver, SVoleSender, Sender};
     use scuttlebutt::{
         field::{F61p, FiniteField as FF, Fp, Gf128, F2},
-        AesRng,
-        Channel,
+        AesRng, Channel,
     };
     use std::{
         io::{BufReader, BufWriter},

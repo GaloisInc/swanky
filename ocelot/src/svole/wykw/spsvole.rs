@@ -6,16 +6,10 @@
 
 //! Implementation of single-point svole protocol.
 
+use super::ggm_utils::{dot_product, ggm, ggm_prime, point_wise_addition, scalar_multiplication};
 use crate::{
     errors::Error,
     ot::{KosReceiver, KosSender, Receiver as OtReceiver, Sender as OtSender},
-    svole::svole_ext::ggm_utils::{
-        dot_product,
-        ggm,
-        ggm_prime,
-        point_wise_addition,
-        scalar_multiplication,
-    },
 };
 use generic_array::typenum::Unsigned;
 use rand::{CryptoRng, Rng, SeedableRng};
@@ -24,10 +18,7 @@ use scuttlebutt::{
     commitment::{Commitment, ShaCommitment},
     field::FiniteField as FF,
     utils::unpack_bits,
-    AbstractChannel,
-    AesRng,
-    Block,
-    Malicious,
+    AbstractChannel, AesRng, Block, Malicious,
 };
 
 /// SpsVole Sender.
@@ -322,14 +313,11 @@ impl<OT: OtSender<Msg = Block> + Malicious, FE: FF> Receiver<OT, FE> {
 
 #[cfg(test)]
 mod test {
-    use crate::svole::{
-        base_svole::{BaseReceiver, BaseSender},
-        svole_ext::spsvole::{SpsReceiver, SpsSender},
-    };
+    use super::super::base_svole::{Receiver as BaseReceiver, Sender as BaseSender};
+    use super::{SpsReceiver, SpsSender};
     use scuttlebutt::{
         field::{F61p, FiniteField as FF, Fp, Gf128, F2},
-        AesRng,
-        Channel,
+        AesRng, Channel,
     };
     use std::{
         io::{BufReader, BufWriter},
@@ -343,7 +331,7 @@ mod test {
             let reader = BufReader::new(sender.try_clone().unwrap());
             let writer = BufWriter::new(sender);
             let mut channel = Channel::new(reader, writer);
-            let pows = crate::svole::utils::gen_pows();
+            let pows = super::super::utils::gen_pows();
             let mut base = BaseSender::<FE>::init(&mut channel, &pows, &mut rng).unwrap();
             let uw = base.send(&mut channel, len, &mut rng).unwrap();
             let mut spsvole = SpsSender::<FE>::init(&mut channel, pows, len, &mut rng).unwrap();
@@ -353,7 +341,7 @@ mod test {
         let reader = BufReader::new(receiver.try_clone().unwrap());
         let writer = BufWriter::new(receiver);
         let mut channel = Channel::new(reader, writer);
-        let pows = crate::svole::utils::gen_pows();
+        let pows = super::super::utils::gen_pows();
         let mut base = BaseReceiver::<FE>::init(&mut channel, &pows, &mut rng).unwrap();
         let v = base.receive(&mut channel, len, &mut rng).unwrap();
         let mut spsvole =

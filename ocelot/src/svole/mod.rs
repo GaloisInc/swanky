@@ -4,12 +4,51 @@
 // Copyright © 2020 Galois, Inc.
 // See LICENSE for licensing information.
 
-//! The following modules implement the protocols presented in the paper (<https://eprint.iacr.org/2020/925.pdf>).
-/// COPEe protocol presented in Figure 13.
-pub mod base_svole;
-/// COPEe protocol presented in Figure 12.
-pub mod copee;
-/// Implementation of Single-Point sVOLE and sVOLE extension protocols presented in Section 5.1 and 5.2 respectively.
-pub mod svole_ext;
-/// Auxiliary functions.
-pub mod utils;
+pub mod wykw;
+
+use crate::errors::Error;
+use rand_core::{CryptoRng, RngCore};
+use scuttlebutt::{field::FiniteField as FF, AbstractChannel};
+
+pub trait SVoleSender
+where
+    Self: Sized,
+{
+    /// Message type that implements Finite Field trait.
+    type Msg: FF;
+    /// Runs any one-time initialization.
+    fn init<C: AbstractChannel, RNG: CryptoRng + RngCore>(
+        channel: &mut C,
+        rng: &mut RNG,
+    ) -> Result<Self, Error>;
+    /// This procedure can be run multiple times where each call spits out `n - (k + t + r)` usable voles
+    /// i.e, outputs `u` and `w` such that `w = u'Δ + v` holds. Note that `u'` is the converted vector from
+    /// `u` to the vector of elements of the extended field `FE`.
+    fn send<C: AbstractChannel, RNG: CryptoRng + RngCore>(
+        &mut self,
+        channel: &mut C,
+        rng: &mut RNG,
+    ) -> Result<Vec<(<Self::Msg as FF>::PrimeField, Self::Msg)>, Error>;
+}
+
+pub trait SVoleReceiver
+where
+    Self: Sized,
+{
+    /// Message type that implements Finite Field trait.
+    type Msg: FF;
+    /// Runs any one-time initialization.
+    fn init<C: AbstractChannel, RNG: CryptoRng + RngCore>(
+        channel: &mut C,
+        rng: &mut RNG,
+    ) -> Result<Self, Error>;
+    /// Returns delta.
+    fn delta(&self) -> Self::Msg;
+    /// This procedure can be run multiple times where each call spits out `n - (k + t + r)` usable voles
+    /// i.e, outputs `v` such that `w = u'Δ + v` holds.
+    fn receive<C: AbstractChannel, RNG: CryptoRng + RngCore>(
+        &mut self,
+        channel: &mut C,
+        rng: &mut RNG,
+    ) -> Result<Vec<Self::Msg>, Error>;
+}

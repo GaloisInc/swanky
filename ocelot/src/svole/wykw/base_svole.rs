@@ -4,13 +4,11 @@
 // Copyright © 2020 Galois, Inc.
 // See LICENSE for licensing information.
 
-//! Implementation of the Weng-Yang-Katz-Wang base SVOLE protocol (cf.
-//! <https://eprint.iacr.org/2020/925>, Figure 13).
+//! Implementation of the Weng-Yang-Katz-Wang Base SVOLE protocol (cf.
+//! <https://eprint.iacr.org/2020/925>, Figure 5).
 
-use crate::{
-    errors::Error,
-    svole::copee::{CopeeReceiver, CopeeSender},
-};
+use super::copee::{CopeeReceiver, CopeeSender};
+use crate::errors::Error;
 use generic_array::typenum::Unsigned;
 use rand_core::{CryptoRng, RngCore};
 use scuttlebutt::{field::FiniteField as FF, AbstractChannel};
@@ -26,11 +24,6 @@ pub struct Receiver<'a, FE: FF> {
     copee: CopeeReceiver<'a, FE>,
     pows: &'a [FE],
 }
-
-/// Base svole sender.
-pub type BaseSender<'a, FE> = Sender<'a, FE>;
-/// Base svole receiver.
-pub type BaseReceiver<'a, FE> = Receiver<'a, FE>;
 
 impl<'a, FE: FF> Sender<'a, FE> {
     /// Runs any one-time initialization.
@@ -142,11 +135,10 @@ impl<'a, FE: FF> Receiver<'a, FE> {
 
 #[cfg(test)]
 mod tests {
-    use super::{BaseReceiver, BaseSender};
+    use super::{Receiver, Sender};
     use scuttlebutt::{
         field::{F61p, FiniteField as FF, Fp, Gf128, F2},
-        AesRng,
-        Channel,
+        AesRng, Channel,
     };
     use std::{
         io::{BufReader, BufWriter},
@@ -160,16 +152,16 @@ mod tests {
             let reader = BufReader::new(sender.try_clone().unwrap());
             let writer = BufWriter::new(sender);
             let mut channel = Channel::new(reader, writer);
-            let pows = crate::svole::utils::gen_pows();
-            let mut vole = BaseSender::<FE>::init(&mut channel, &pows, &mut rng).unwrap();
+            let pows = super::super::utils::gen_pows();
+            let mut vole = Sender::<FE>::init(&mut channel, &pows, &mut rng).unwrap();
             vole.send(&mut channel, len, &mut rng).unwrap()
         });
         let mut rng = AesRng::new();
         let reader = BufReader::new(receiver.try_clone().unwrap());
         let writer = BufWriter::new(receiver);
         let mut channel = Channel::new(reader, writer);
-        let pows = crate::svole::utils::gen_pows();
-        let mut vole = BaseReceiver::<FE>::init(&mut channel, &pows, &mut rng).unwrap();
+        let pows = super::super::utils::gen_pows();
+        let mut vole = Receiver::<FE>::init(&mut channel, &pows, &mut rng).unwrap();
         let vs = vole.receive(&mut channel, len, &mut rng).unwrap();
         let delta = vole.delta();
         let uw_s = handle.join().unwrap();
