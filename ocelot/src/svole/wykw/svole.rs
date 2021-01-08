@@ -8,8 +8,10 @@
 //!
 //! This module provides implementations of LPN sVole Traits.
 
-use super::base_svole::{Receiver as BaseReceiver, Sender as BaseSender};
-use super::spsvole::{SpsReceiver, SpsSender};
+use super::{
+    base_svole::{Receiver as BaseReceiver, Sender as BaseSender},
+    spsvole::{SpsReceiver, SpsSender},
+};
 use crate::{
     errors::Error,
     svole::{SVoleReceiver, SVoleSender},
@@ -339,7 +341,8 @@ mod tests {
     use super::{Receiver, SVoleReceiver, SVoleSender, Sender};
     use scuttlebutt::{
         field::{F61p, FiniteField as FF, Fp, Gf128, F2},
-        AesRng, Channel,
+        AesRng,
+        Channel,
     };
     use std::{
         io::{BufReader, BufWriter},

@@ -14,7 +14,12 @@ use crate::{
 use generic_array::typenum::Unsigned;
 use rand_core::{CryptoRng, RngCore};
 use scuttlebutt::{
-    field::FiniteField as FF, utils::unpack_bits, AbstractChannel, Aes128, Block, Malicious,
+    field::FiniteField as FF,
+    utils::unpack_bits,
+    AbstractChannel,
+    Aes128,
+    Block,
+    Malicious,
 };
 use std::marker::PhantomData;
 use subtle::{Choice, ConditionallySelectable};
@@ -183,7 +188,8 @@ mod tests {
     use super::{CopeeReceiver, CopeeSender};
     use scuttlebutt::{
         field::{F61p, FiniteField as FF, Fp, Gf128, F2},
-        AesRng, Channel,
+        AesRng,
+        Channel,
     };
     use std::{
         io::{BufReader, BufWriter},

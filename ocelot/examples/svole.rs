@@ -6,11 +6,13 @@
 
 use ocelot::svole::{
     wykw::{Receiver, Sender},
-    SVoleReceiver, SVoleSender,
+    SVoleReceiver,
+    SVoleSender,
 };
 use scuttlebutt::{
     field::{F61p, FiniteField as FF},
-    AesRng, TrackChannel,
+    AesRng,
+    TrackChannel,
 };
 use std::{
     io::{BufReader, BufWriter},

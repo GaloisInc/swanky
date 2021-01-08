@@ -7,11 +7,15 @@
 //! Subfield vector oblivious linear evaluation benchmarks using `criterion`.
 
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
-use ocelot::svole::wykw::{Receiver, Sender};
-use ocelot::svole::{SVoleReceiver, SVoleSender};
+use ocelot::svole::{
+    wykw::{Receiver, Sender},
+    SVoleReceiver,
+    SVoleSender,
+};
 use scuttlebutt::{
     field::{F61p, Fp, Gf128, F2},
-    AesRng, Channel,
+    AesRng,
+    Channel,
 };
 use std::{
     io::{BufReader, BufWriter},

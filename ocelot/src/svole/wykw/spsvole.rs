@@ -18,7 +18,10 @@ use scuttlebutt::{
     commitment::{Commitment, ShaCommitment},
     field::FiniteField as FF,
     utils::unpack_bits,
-    AbstractChannel, AesRng, Block, Malicious,
+    AbstractChannel,
+    AesRng,
+    Block,
+    Malicious,
 };
 
 /// SpsVole Sender.
@@ -313,11 +316,15 @@ impl<OT: OtSender<Msg = Block> + Malicious, FE: FF> Receiver<OT, FE> {
 
 #[cfg(test)]
 mod test {
-    use super::super::base_svole::{Receiver as BaseReceiver, Sender as BaseSender};
-    use super::{SpsReceiver, SpsSender};
+    use super::{
+        super::base_svole::{Receiver as BaseReceiver, Sender as BaseSender},
+        SpsReceiver,
+        SpsSender,
+    };
     use scuttlebutt::{
         field::{F61p, FiniteField as FF, Fp, Gf128, F2},
-        AesRng, Channel,
+        AesRng,
+        Channel,
     };
     use std::{
         io::{BufReader, BufWriter},
