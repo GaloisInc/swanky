@@ -4,19 +4,17 @@
 // Copyright © 2020 Galois, Inc.
 // See LICENSE for licfensing information.
 
-//! Single-point Subfield Vector Oblivious Linear Evaluation (SpsVOLE) and
-//! LPN based Subfield Vector Oblivious Linear Evaluation (SVOLE) traits.
+//!
 
 mod ggm_utils;
-pub mod sp_svole;
-pub mod svole_lpn;
+pub mod spsvole;
+pub mod svole;
 
 use crate::errors::Error;
 use rand_core::{CryptoRng, RngCore};
 use scuttlebutt::{field::FiniteField as FF, AbstractChannel};
 
-/// A trait for LpnsVole Sender.
-pub trait LpnsVoleSender
+pub trait SVoleSender
 where
     Self: Sized,
 {
@@ -37,8 +35,7 @@ where
     ) -> Result<Vec<(<Self::Msg as FF>::PrimeField, Self::Msg)>, Error>;
 }
 
-/// A trait for LpnsVole Sender.
-pub trait LpnsVoleReceiver
+pub trait SVoleReceiver
 where
     Self: Sized,
 {
@@ -49,7 +46,7 @@ where
         channel: &mut C,
         rng: &mut RNG,
     ) -> Result<Self, Error>;
-    /// Returns the receiver's choice during the OT call.
+    /// Returns delta.
     fn delta(&self) -> Self::Msg;
     /// This procedure can be run multiple times where each call spits out `n - (k + t + r)` usable voles
     /// i.e, outputs `v` such that `w = u'Δ + v` holds.

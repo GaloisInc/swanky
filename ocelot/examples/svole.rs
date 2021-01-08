@@ -5,14 +5,12 @@
 // See LICENSE for licensing information.
 
 use ocelot::svole::svole_ext::{
-    svole_lpn::{Receiver as LpnVoleReceiver, Sender as LpnVoleSender},
-    LpnsVoleReceiver,
-    LpnsVoleSender,
+    svole::{Receiver, Sender},
+    SVoleReceiver, SVoleSender,
 };
 use scuttlebutt::{
     field::{F61p, FiniteField as FF, Fp, Gf128, F2},
-    AesRng,
-    TrackChannel,
+    AesRng, TrackChannel,
 };
 use std::{
     io::{BufReader, BufWriter},
@@ -20,11 +18,7 @@ use std::{
     time::SystemTime,
 };
 
-fn _test_lpnvole<
-    FE: FF,
-    VSender: LpnsVoleSender<Msg = FE>,
-    VReceiver: LpnsVoleReceiver<Msg = FE>,
->() {
+fn test_lpnvole<FE: FF, VSender: SVoleSender<Msg = FE>, VReceiver: SVoleReceiver<Msg = FE>>() {
     let (sender, receiver) = UnixStream::pair().unwrap();
     let total = SystemTime::now();
     let handle = std::thread::spawn(move || {
@@ -100,8 +94,6 @@ fn _test_lpnvole<
 }
 
 fn main() {
-    type VSender<FE> = LpnVoleSender<FE>;
-    type VReceiver<FE> = LpnVoleReceiver<FE>;
     /*println!("\nField: F2 \n");
     _test_lpnvole::<F2, VSender<F2>, VReceiver<F2>>(rows, cols, d, weight);
     println!("\nField: Gf128 \n");
@@ -109,5 +101,5 @@ fn main() {
     println!("\nField: Fp \n");
     _test_lpnvole::<Fp, VSender<Fp>, VReceiver<Fp>>(rows, cols, d, weight);*/
     println!("\nField: F61p \n");
-    _test_lpnvole::<F61p, VSender<F61p>, VReceiver<F61p>>()
+    test_lpnvole::<F61p, Sender<F61p>, Receiver<F61p>>()
 }

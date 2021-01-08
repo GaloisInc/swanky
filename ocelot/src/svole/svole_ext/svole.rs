@@ -23,9 +23,8 @@ use crate::{
     svole::{
         base_svole::{BaseReceiver, BaseSender},
         svole_ext::{
-            sp_svole::{SpsReceiver, SpsSender},
-            LpnsVoleReceiver,
-            LpnsVoleSender,
+            spsvole::{SpsReceiver, SpsSender},
+            SVoleReceiver, SVoleSender,
         },
     },
 };
@@ -61,8 +60,9 @@ mod lpn_extend_params {
     pub const ROWS: usize = 589_760;
 }
 
-/// Small constant `d` used in the `liner codes` useful in acheiving efficient matrix multiplication.
+/// Small constant `d` used in the `linear codes` useful in acheiving efficient matrix multiplication.
 const LPN_PARAMS_D: usize = 10;
+
 // TODO: this needs to get optimized.
 fn lpn_mtx_indices<FE: FiniteField>(
     _col_idx: usize,
@@ -85,7 +85,6 @@ fn lpn_mtx_indices<FE: FiniteField>(
     indices
 }
 
-/// LpnsVole sender.
 pub struct Sender<FE: FiniteField> {
     spsvole: SpsSender<FE>,
     rows: usize,
@@ -96,9 +95,10 @@ pub struct Sender<FE: FiniteField> {
 }
 
 impl<FE: FiniteField> Sender<FE> {
-    // This function is useful in implementing the optimization method which generates base voles using lpn voles efficiently using \
-    // small parameters (cols, rwos, weight) as described in the eprint (<https://eprint.iacr.org/2020/925.pdf>, Page 18). Note that the function
-    // is internal and not available to the user.
+    // This function is useful in implementing the optimization method which
+    // generates base voles using lpn voles efficiently using \ small parameters
+    // (cols, rwos, weight) as described in
+    // <https://eprint.iacr.org/2020/925.pdf>, Page 18.
     fn init_internal<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         channel: &mut C,
         rows: usize,
@@ -107,15 +107,9 @@ impl<FE: FiniteField> Sender<FE> {
         weight: usize,
         rng: &mut RNG,
     ) -> Result<Self, Error> {
-        if cols % 2 != 0 {
-            return Err(Error::InvalidColumns);
-        }
-        if rows >= cols {
-            return Err(Error::InvalidRows);
-        }
-        if d >= rows {
-            return Err(Error::InvalidD);
-        }
+        debug_assert!(cols % 2 == 0);
+        debug_assert!(rows < cols);
+        debug_assert!(d < rows);
         let pows = crate::svole::utils::gen_pows();
         let r = FE::PolynomialFormNumCoefficients::to_usize();
         let mut svole = BaseSender::<FE>::init(channel, &pows, rng)?;
@@ -133,7 +127,6 @@ impl<FE: FiniteField> Sender<FE> {
     }
 }
 
-/// LpnsVole receiver.
 pub struct Receiver<FE: FiniteField> {
     spsvole: SpsReceiver<FE>,
     delta: FE,
@@ -145,9 +138,10 @@ pub struct Receiver<FE: FiniteField> {
 }
 
 impl<FE: FiniteField> Receiver<FE> {
-    // This function is useful in implementing the optimization method which generates base voles using lpn voles efficiently using \
-    // small parameters (cols, rwos, weight) as described in the eprint (<https://eprint.iacr.org/2020/925.pdf>, Page 18). Note that the function
-    // is internal and not available to the user.
+    // This function is useful in implementing the optimization method which
+    // generates base voles using lpn voles efficiently using \ small parameters
+    // (cols, rwos, weight) as described in the eprint
+    // (<https://eprint.iacr.org/2020/925.pdf>, Page 18).
     fn init_internal<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         channel: &mut C,
         rows: usize,
@@ -156,15 +150,9 @@ impl<FE: FiniteField> Receiver<FE> {
         weight: usize,
         rng: &mut RNG,
     ) -> Result<Self, Error> {
-        if cols % 2 != 0 {
-            return Err(Error::InvalidColumns);
-        }
-        if rows >= cols {
-            return Err(Error::InvalidRows);
-        }
-        if d >= rows {
-            return Err(Error::InvalidD);
-        }
+        debug_assert!(cols % 2 == 0);
+        debug_assert!(rows < cols);
+        debug_assert!(d < rows);
         let r = FE::PolynomialFormNumCoefficients::to_usize();
         let pows = crate::svole::utils::gen_pows();
         let mut svole = BaseReceiver::<FE>::init(channel, &pows, rng)?;
@@ -184,7 +172,7 @@ impl<FE: FiniteField> Receiver<FE> {
     }
 }
 
-impl<FE: FiniteField> LpnsVoleSender for Sender<FE> {
+impl<FE: FiniteField> SVoleSender for Sender<FE> {
     type Msg = FE;
     // Runs any one-time initialization which calls init_internal to optimize the base vole generation using smaller LPN parameters.
     fn init<C: AbstractChannel, RNG: CryptoRng + RngCore>(
@@ -194,7 +182,7 @@ impl<FE: FiniteField> LpnsVoleSender for Sender<FE> {
         let pows = crate::svole::utils::gen_pows();
         let r = FE::PolynomialFormNumCoefficients::to_usize();
         // Base voles are computed efficiently using smaller LPN parameters.
-        let mut lpn_sender = Self::init_internal(
+        let mut sender = Self::init_internal(
             channel,
             lpn_setup_params::ROWS,
             lpn_setup_params::COLS,
@@ -202,7 +190,7 @@ impl<FE: FiniteField> LpnsVoleSender for Sender<FE> {
             lpn_setup_params::WEIGHT,
             rng,
         )?;
-        let base_voles = lpn_sender.send(channel, rng)?;
+        let base_voles = sender.send(channel, rng)?;
         // Since lpn_voles are having length more than the `K+T+r` so consider all of these are as optimized base voles.
         // This flush statement is needed, otherwise, it hangs on.
         channel.flush()?;
@@ -222,9 +210,7 @@ impl<FE: FiniteField> LpnsVoleSender for Sender<FE> {
         channel: &mut C,
         rng: &mut RNG,
     ) -> Result<Vec<(FE::PrimeField, FE)>, Error> {
-        if self.cols % self.weight != 0 {
-            return Err(Error::InvalidWeight);
-        }
+        debug_assert!(self.cols % self.weight == 0);
         debug_assert!(self.base_voles.len() >= self.rows + self.weight + self.r);
         let m = self.cols / self.weight;
         let uws = self.spsvole.send(
@@ -279,7 +265,7 @@ impl<FE: FiniteField> LpnsVoleSender for Sender<FE> {
     }
 }
 
-impl<FE: FiniteField> LpnsVoleReceiver for Receiver<FE> {
+impl<FE: FiniteField> SVoleReceiver for Receiver<FE> {
     type Msg = FE;
     // Runs any one-time initialization which calls init_internal to optimize the base vole generation using smaller LPN parameters.
     fn init<C: AbstractChannel, RNG: CryptoRng + RngCore>(
@@ -297,7 +283,7 @@ impl<FE: FiniteField> LpnsVoleReceiver for Receiver<FE> {
             lpn_setup_params::WEIGHT,
             rng,
         )?;
-        let lpn_voles = svole.receive(channel, rng)?;
+        let base_voles = svole.receive(channel, rng)?;
         let delta = svole.delta();
         let spsvole =
             SpsReceiver::<FE>::init(channel, pows, delta, lpn_extend_params::WEIGHT, rng)?;
@@ -306,7 +292,7 @@ impl<FE: FiniteField> LpnsVoleReceiver for Receiver<FE> {
             delta,
             rows: lpn_extend_params::ROWS,
             cols: lpn_extend_params::COLS,
-            base_voles: lpn_voles,
+            base_voles,
             weight: lpn_extend_params::WEIGHT,
             r,
         })
@@ -321,9 +307,7 @@ impl<FE: FiniteField> LpnsVoleReceiver for Receiver<FE> {
         channel: &mut C,
         rng: &mut RNG,
     ) -> Result<Vec<FE>, Error> {
-        if self.cols % self.weight != 0 {
-            return Err(Error::InvalidWeight);
-        }
+        debug_assert!(self.cols % self.weight == 0);
         let m = self.cols / self.weight;
         let vs = self.spsvole.receive(
             channel,
@@ -367,39 +351,33 @@ impl<FE: FiniteField> LpnsVoleReceiver for Receiver<FE> {
 #[cfg(test)]
 mod tests {
     use crate::svole::svole_ext::{
-        svole_lpn::{Receiver as LpnVoleReceiver, Sender as LpnVoleSender},
-        LpnsVoleReceiver,
-        LpnsVoleSender,
+        svole::{Receiver, Sender},
+        SVoleReceiver, SVoleSender,
     };
     use scuttlebutt::{
         field::{F61p, FiniteField as FF, Fp, Gf128, F2},
-        AesRng,
-        Channel,
+        AesRng, Channel,
     };
     use std::{
         io::{BufReader, BufWriter},
         os::unix::net::UnixStream,
     };
 
-    fn test_lpn_svole_<
-        FE: FF,
-        VSender: LpnsVoleSender<Msg = FE>,
-        VReceiver: LpnsVoleReceiver<Msg = FE>,
-    >() {
+    fn test_lpn_svole_<FE: FF, Sender: SVoleSender<Msg = FE>, Receiver: SVoleReceiver<Msg = FE>>() {
         let (sender, receiver) = UnixStream::pair().unwrap();
         let handle = std::thread::spawn(move || {
             let mut rng = AesRng::new();
             let reader = BufReader::new(sender.try_clone().unwrap());
             let writer = BufWriter::new(sender);
             let mut channel = Channel::new(reader, writer);
-            let mut vole = VSender::init(&mut channel, &mut rng).unwrap();
+            let mut vole = Sender::init(&mut channel, &mut rng).unwrap();
             vole.send(&mut channel, &mut rng).unwrap()
         });
         let mut rng = AesRng::new();
         let reader = BufReader::new(receiver.try_clone().unwrap());
         let writer = BufWriter::new(receiver);
         let mut channel = Channel::new(reader, writer);
-        let mut vole = VReceiver::init(&mut channel, &mut rng).unwrap();
+        let mut vole = Receiver::init(&mut channel, &mut rng).unwrap();
         let vs = vole.receive(&mut channel, &mut rng).unwrap();
         let uws = handle.join().unwrap();
         for i in 0..uws.len() as usize {
@@ -408,14 +386,11 @@ mod tests {
         }
     }
 
-    type VSender<FE> = LpnVoleSender<FE>;
-    type VReceiver<FE> = LpnVoleReceiver<FE>;
-
     #[test]
     fn test_lpn_svole() {
-        test_lpn_svole_::<F2, VSender<F2>, VReceiver<F2>>();
-        test_lpn_svole_::<Gf128, VSender<Gf128>, VReceiver<Gf128>>();
-        test_lpn_svole_::<Fp, VSender<Fp>, VReceiver<Fp>>();
-        test_lpn_svole_::<F61p, VSender<F61p>, VReceiver<F61p>>();
+        test_lpn_svole_::<F2, Sender<F2>, Receiver<F2>>();
+        test_lpn_svole_::<Gf128, Sender<Gf128>, Receiver<Gf128>>();
+        test_lpn_svole_::<Fp, Sender<Fp>, Receiver<Fp>>();
+        test_lpn_svole_::<F61p, Sender<F61p>, Receiver<F61p>>();
     }
 }

@@ -10,11 +10,7 @@ use crate::{
     errors::Error,
     ot::{KosReceiver, KosSender, Receiver as OtReceiver, Sender as OtSender},
     svole::svole_ext::ggm_utils::{
-        dot_product,
-        ggm,
-        ggm_prime,
-        point_wise_addition,
-        scalar_multiplication,
+        dot_product, ggm, ggm_prime, point_wise_addition, scalar_multiplication,
     },
 };
 use generic_array::typenum::Unsigned;
@@ -24,10 +20,7 @@ use scuttlebutt::{
     commitment::{Commitment, ShaCommitment},
     field::FiniteField as FF,
     utils::unpack_bits,
-    AbstractChannel,
-    AesRng,
-    Block,
-    Malicious,
+    AbstractChannel, AesRng, Block, Malicious,
 };
 
 /// SpsVole Sender.
@@ -324,12 +317,11 @@ impl<OT: OtSender<Msg = Block> + Malicious, FE: FF> Receiver<OT, FE> {
 mod test {
     use crate::svole::{
         base_svole::{BaseReceiver, BaseSender},
-        svole_ext::sp_svole::{SpsReceiver, SpsSender},
+        svole_ext::spsvole::{SpsReceiver, SpsSender},
     };
     use scuttlebutt::{
         field::{F61p, FiniteField as FF, Fp, Gf128, F2},
-        AesRng,
-        Channel,
+        AesRng, Channel,
     };
     use std::{
         io::{BufReader, BufWriter},
