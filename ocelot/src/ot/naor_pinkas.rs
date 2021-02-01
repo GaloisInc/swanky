@@ -61,9 +61,9 @@ impl OtSender for Sender {
             let r1 = Scalar::random(&mut rng);
             let e00 = &r0 * &RISTRETTO_BASEPOINT_TABLE;
             let e10 = &r1 * &RISTRETTO_BASEPOINT_TABLE;
-            let h = Block::hash_pt(i, &(pk.0 * r0));
+            let h = Block::hash_pt(i as u128, &(pk.0 * r0));
             let e01 = h ^ input.0;
-            let h = Block::hash_pt(i, &(pk.1 * r1));
+            let h = Block::hash_pt(i as u128, &(pk.1 * r1));
             let e11 = h ^ input.1;
             channel.write_pt(&e00)?;
             channel.write_block(&e01)?;
@@ -128,7 +128,7 @@ impl OtReceiver for Receiver {
                     false => (e00, e01),
                     true => (e10, e11),
                 };
-                let h = Block::hash_pt(i, &(e0 * k));
+                let h = Block::hash_pt(i as u128, &(e0 * k));
                 Ok(h ^ e1)
             })
             .collect()

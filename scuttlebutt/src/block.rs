@@ -68,25 +68,12 @@ impl Block {
     /// Hash an elliptic curve point `pt` and tweak `tweak`.
     ///
     /// Computes the hash by computing `E_{pt}(tweak)`, where `E` is AES-256.
-    #[cfg(all(feature = "curve25519-dalek", feature = "nightly"))]
+    #[cfg(feature = "curve25519-dalek")]
     #[inline]
-    pub fn hash_pt(tweak: usize, pt: &RistrettoPoint) -> Self {
+    pub fn hash_pt(tweak: u128, pt: &RistrettoPoint) -> Self {
         let k = pt.compress();
         let c = Aes256::new(k.as_bytes());
-        let m = unsafe { _mm_set_epi64(_mm_setzero_si64(), *(&tweak as *const _ as *const __m64)) };
-        c.encrypt(Block(m))
-    }
-
-    /// Hash an elliptic curve point `pt` and tweak `tweak`.
-    ///
-    /// Computes the hash by computing `E_{pt}(tweak)`, where `E` is AES-256.
-    #[cfg(all(feature = "curve25519-dalek", not(feature = "nightly")))]
-    #[inline]
-    pub fn hash_pt(tweak: usize, pt: &RistrettoPoint) -> Self {
-        let k = pt.compress();
-        let c = Aes256::new(k.as_bytes());
-        let m = tweak as u128;
-        c.encrypt(Block::from(m))
+        c.encrypt(Block::from(tweak))
     }
 
     /// Return the least significant bit.
