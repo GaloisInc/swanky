@@ -6,44 +6,19 @@
 
 use scuttlebutt::{field::FiniteField, utils::unpack_bits, Aes128, Block};
 
-/// Returns dot product of two vectors.
-pub fn dot_product<'a, FE: FiniteField, A: Iterator<Item = &'a FE>, B: Iterator<Item = &'a FE>>(
-    x: A,
-    y: B,
-) -> FE {
-    x.zip(y).map(|(u, v)| *u * *v).sum()
-}
-
-/// Returns point-wise addition of two vectors.
-pub fn point_wise_addition<
-    'a,
-    FE: FiniteField,
-    A: Iterator<Item = &'a FE>,
-    B: Iterator<Item = &'a FE>,
->(
-    x: A,
-    y: B,
-) -> Vec<FE> {
-    x.zip(y).map(|(u, v)| *u + *v).collect()
-}
-
-/// Scalar multiplication
-pub fn scalar_multiplication<FE: FiniteField>(x: FE, v: &[FE]) -> Vec<FE> {
-    v.iter().map(|&y| x * y).collect()
-}
-
-/// Implementation of GGM based on the procedure explained in the write-up (<https://eprint.iacr.org/2020/925.pdf>, Page 14) --
-/// Construct GGM tree with `depth` levels and return the node values (a.k.a
-/// seeds). `aes_seeds` are used to seed the "PRGs" used internally so we don't
-/// need to instantiate new PRGs on each iteration. Instead, we key two
-/// instances of AES ahead of time and view them as PRPs, using the seed as
-/// input.
+/// Implementation of GGM based on the procedure explained in the write-up
+/// (<https://eprint.iacr.org/2020/925.pdf>, Page 14) -- Construct GGM tree with
+/// `depth` levels and return the node values (a.k.a seeds). `aes_seeds` are
+/// used to seed the "PRGs" used internally so we don't need to instantiate new
+/// PRGs on each iteration. Instead, we key two instances of AES ahead of time
+/// and view them as PRPs, using the seed as input.
 
 pub fn ggm<FE: FiniteField>(
     depth: usize,
     initial_seed: Block,
     aes_seeds: (Block, Block),
-) -> (Vec<FE>, Vec<(Block, Block)>) {
+    results: &mut [FE],
+) -> Vec<(Block, Block)> {
     let mut seeds = Vec::with_capacity((0..depth).fold(0, |acc, i| acc + 2 * (1 << i)));
     let mut keys: Vec<(Block, Block)> = Vec::with_capacity(depth);
     let aes0 = Aes128::new(aes_seeds.0);
@@ -67,10 +42,10 @@ pub fn ggm<FE: FiniteField>(
         keys.push((k0, k1));
     }
     let exp = 1 << depth;
-    let vs = (0..exp)
-        .map(|j| FE::from_uniform_bytes(&<[u8; 16]>::from(seeds[exp + j - 1])))
-        .collect();
-    (vs, keys)
+    for (i, v) in results.iter_mut().enumerate() {
+        *v = FE::from_uniform_bytes(&<[u8; 16]>::from(seeds[exp + i - 1]));
+    }
+    keys
 }
 
 /// Implementation of GGM based on the procedure explained in the write-up(<https://eprint.iacr.org/2020/925.pdf>, Page 14),
@@ -151,7 +126,7 @@ mod tests {
         assert_eq!(bv_to_num(&bv), x);
     }
 
-    fn test_ggm_with_field<FE: FiniteField>() {
+    fn test_ggm_<FE: FiniteField>() {
         for _ in 0..10 {
             // Runs for a while if the range is over 20.
             // depth has to be atleast 2.
@@ -159,7 +134,9 @@ mod tests {
             let seed = rand::thread_rng().gen();
             let seed0 = rand::thread_rng().gen();
             let seed1 = rand::thread_rng().gen();
-            let (v, keys): (Vec<FE>, _) = ggm(depth, seed, (seed0, seed1));
+            let exp = 1 << depth;
+            let mut vs: Vec<FE> = vec![FE::ZERO; exp];
+            let keys = ggm(depth, seed, (seed0, seed1), &mut vs);
             let leaves = (1 << depth) - 1;
             let alpha: usize = rand::thread_rng().gen_range(1, leaves);
             let mut alpha_bits = unpack_bits(&alpha.to_le_bytes(), keys.len());
@@ -172,7 +149,7 @@ mod tests {
             let v_ = ggm_prime::<FE>(alpha, &alpha_keys, (seed0, seed1));
             for i in 0..v_.len() {
                 if i != alpha {
-                    assert_eq!(v[i], v_[i]);
+                    assert_eq!(vs[i], v_[i]);
                 }
             }
         }
@@ -180,9 +157,9 @@ mod tests {
 
     #[test]
     fn test_ggm() {
-        test_ggm_with_field::<Fp>();
-        test_ggm_with_field::<F61p>();
-        test_ggm_with_field::<F2>();
-        test_ggm_with_field::<Gf128>();
+        test_ggm_::<Fp>();
+        test_ggm_::<F61p>();
+        test_ggm_::<F2>();
+        test_ggm_::<Gf128>();
     }
 }

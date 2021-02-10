@@ -48,34 +48,30 @@ impl<'a, FE: FF> Sender<'a, FE> {
         len: usize,
         mut rng: &mut RNG,
     ) -> Result<Vec<(FE::PrimeField, FE)>, Error> {
-        let r = FE::PolynomialFormNumCoefficients::to_usize();
-        let u: Vec<FE::PrimeField> = (0..len).map(|_| FE::PrimeField::random(&mut rng)).collect();
-        let a: Vec<FE::PrimeField> = (0..r).map(|_| FE::PrimeField::random(&mut rng)).collect();
-        let mut w = vec![FE::ZERO; len];
-        for i in 0..len {
-            w[i] = self.copee.send(channel, &u[i])?;
-        }
+        let mut uws: Vec<(FE::PrimeField, FE)> = (0..len)
+            .map(|_| (FE::PrimeField::random(&mut rng), FE::ZERO))
+            .collect();
         let mut z: FE = FE::ZERO;
-        for (i, x) in a.iter().enumerate().take(r) {
-            let c = self.copee.send(channel, x)?;
-            z += c * self.pows[i];
-        }
-        channel.flush()?;
         let mut x: FE = FE::ZERO;
         for i in 0..len {
-            let chi = channel.read_fe::<FE>()?;
-            z += chi * w[i];
-            x += chi.multiply_by_prime_subfield(u[i]);
+            uws[i].1 = self.copee.send(channel, &uws[i].0)?;
         }
-        x += a
-            .iter()
-            .zip(self.pows.iter())
-            .map(|(&a, &pow)| pow.multiply_by_prime_subfield(a))
-            .sum();
+        for pow in self.pows.iter() {
+            let a = FE::PrimeField::random(&mut rng);
+            let c = self.copee.send(channel, &a)?;
+            z += c * *pow;
+            x += pow.multiply_by_prime_subfield(a);
+        }
+        channel.flush()?;
+
+        for i in 0..len {
+            let chi = channel.read_fe::<FE>()?;
+            z += chi * uws[i].1;
+            x += chi.multiply_by_prime_subfield(uws[i].0);
+        }
         channel.write_fe(x)?;
         channel.write_fe(z)?;
-        let res = u.iter().zip(w.iter()).map(|(u, w)| (*u, *w)).collect();
-        Ok(res)
+        Ok(uws)
     }
 }
 
@@ -138,8 +134,7 @@ mod tests {
     use super::{Receiver, Sender};
     use scuttlebutt::{
         field::{F61p, FiniteField as FF, Fp, Gf128, F2},
-        AesRng,
-        Channel,
+        AesRng, Channel,
     };
     use std::{
         io::{BufReader, BufWriter},
