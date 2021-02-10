@@ -91,18 +91,16 @@ impl<FE: FiniteField> Sender<FE> {
         channel: &mut C,
         rows: usize,
         cols: usize,
-        d: usize,
         weight: usize,
         rng: &mut RNG,
     ) -> Result<Self, Error> {
         debug_assert!(cols % 2 == 0);
         debug_assert!(rows < cols);
-        debug_assert!(d < rows);
         let pows = super::utils::gen_pows();
         let r = FE::PolynomialFormNumCoefficients::to_usize();
         let mut base_sender = BaseSender::<FE>::init(channel, &pows, rng)?;
         let base_voles = base_sender.send(channel, rows + weight + r, rng)?;
-        let spsvole = SpsSender::<FE>::init(channel, pows, weight, rng)?;
+        let spsvole = SpsSender::<FE>::init(channel, pows, rng)?;
         debug_assert!(base_voles.len() == rows + weight + r);
         Ok(Self {
             spsvole,
@@ -117,29 +115,24 @@ impl<FE: FiniteField> Sender<FE> {
 
 impl<FE: FiniteField> SVoleSender for Sender<FE> {
     type Msg = FE;
-    // Runs any one-time initialization which calls init_internal to optimize the base vole generation using smaller LPN parameters.
+
     fn init<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         channel: &mut C,
         rng: &mut RNG,
     ) -> Result<Self, Error> {
-        let pows = super::utils::gen_pows();
         let r = FE::PolynomialFormNumCoefficients::to_usize();
-        // Base voles are computed efficiently using smaller LPN parameters.
-        let mut sender = Self::init_internal(
+        // Base svoles are computed using smaller LPN parameters.
+        let mut base_sender = Self::init_internal(
             channel,
             lpn_setup_params::ROWS,
             lpn_setup_params::COLS,
-            LPN_PARAMS_D,
             lpn_setup_params::WEIGHT,
             rng,
         )?;
-        let base_voles = sender.send(channel, rng)?;
-        // Since lpn_voles are having length more than the `K+T+r` so consider all of these are as optimized base voles.
-        // This flush statement is needed, otherwise, it hangs on.
+        let base_voles = base_sender.send(channel, rng)?;
         channel.flush()?;
-        let spsvole = SpsSender::<FE>::init(channel, pows, lpn_extend_params::WEIGHT, rng)?;
         Ok(Self {
-            spsvole,
+            spsvole: base_sender.spsvole,
             rows: lpn_extend_params::ROWS,
             cols: lpn_extend_params::COLS,
             base_voles,
@@ -227,19 +220,17 @@ impl<FE: FiniteField> Receiver<FE> {
         channel: &mut C,
         rows: usize,
         cols: usize,
-        d: usize,
         weight: usize,
         rng: &mut RNG,
     ) -> Result<Self, Error> {
         debug_assert!(cols % 2 == 0);
         debug_assert!(rows < cols);
-        debug_assert!(d < rows);
         let r = FE::PolynomialFormNumCoefficients::to_usize();
         let pows = super::utils::gen_pows();
         let mut base_receiver = BaseReceiver::<FE>::init(channel, &pows, rng)?;
         let base_voles = base_receiver.receive(channel, rows + weight + r, rng)?;
         let delta = base_receiver.delta();
-        let spsvole = SpsReceiver::<FE>::init(channel, pows, delta, weight, rng)?;
+        let spsvole = SpsReceiver::<FE>::init(channel, pows, delta, rng)?;
         debug_assert!(base_voles.len() == rows + weight + r);
         Ok(Self {
             spsvole,
@@ -255,28 +246,24 @@ impl<FE: FiniteField> Receiver<FE> {
 
 impl<FE: FiniteField> SVoleReceiver for Receiver<FE> {
     type Msg = FE;
-    // Runs any one-time initialization which calls init_internal to optimize the base vole generation using smaller LPN parameters.
+
     fn init<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         channel: &mut C,
         rng: &mut RNG,
     ) -> Result<Self, Error> {
-        let pows = super::utils::gen_pows();
         let r = FE::PolynomialFormNumCoefficients::to_usize();
-        // Base voles are computed efficiently using smaller LPN parameters.
-        let mut svole = Self::init_internal(
+        // Base voles are computed using smaller LPN parameters.
+        let mut base_receiver = Self::init_internal(
             channel,
             lpn_setup_params::ROWS,
             lpn_setup_params::COLS,
-            LPN_PARAMS_D,
             lpn_setup_params::WEIGHT,
             rng,
         )?;
-        let base_voles = svole.receive(channel, rng)?;
-        let delta = svole.delta();
-        let spsvole =
-            SpsReceiver::<FE>::init(channel, pows, delta, lpn_extend_params::WEIGHT, rng)?;
+        let base_voles = base_receiver.receive(channel, rng)?;
+        let delta = base_receiver.delta();
         Ok(Self {
-            spsvole,
+            spsvole: base_receiver.spsvole,
             delta,
             rows: lpn_extend_params::ROWS,
             cols: lpn_extend_params::COLS,

@@ -25,7 +25,6 @@ use scuttlebutt::{
 pub struct Sender<OT: OtReceiver, FE: FF> {
     ot: OT,
     pows: Vec<FE>,
-    weight: usize,
 }
 
 /// SpsVole Receiver.
@@ -33,7 +32,6 @@ pub struct Receiver<OT: OtSender, FE: FF> {
     ot: OT,
     delta: FE,
     pows: Vec<FE>,
-    weight: usize,
 }
 /// Alias for SpsVole Sender.
 pub type SpsSender<FE> = Sender<KosReceiver, FE>;
@@ -87,29 +85,28 @@ impl<OT: OtReceiver<Msg = Block> + Malicious, FE: FF> Sender<OT, FE> {
     pub fn init<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         channel: &mut C,
         pows: Vec<FE>,
-        weight: usize,
         rng: &mut RNG,
     ) -> Result<Self, Error> {
         let ot = OT::init(channel, rng)?;
-        Ok(Self { pows, ot, weight })
+        Ok(Self { pows, ot })
     }
     /// Runs single-point svole and outputs pair of vectors `(u, w)` such that
-    /// the correlation `w = u'Δ + v` holds. Note that `u'` is the converted vector from
-    /// `u` to the vector of elements of the extended field `FE`. For simplicity, the vector
-    /// length `n` assumed to be a multiple of `2` as it represents the number of leaves in the GGM tree
-    /// and should match with the receiver input length.
+    /// the correlation `w = u'Δ + v` holds. Note that `u'` is the converted
+    /// vector from `u` to the vector of elements of the extended field `FE`.
+    /// For simplicity, the vector length `n` assumed to be a multiple of `2` as
+    /// it represents the number of leaves in the GGM tree and should match with
+    /// the receiver input length.
     pub fn send<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         &mut self,
         channel: &mut C,
-        n: usize, // Equal to cols / weight
-        uws: &[(FE::PrimeField, FE)],
+        m: usize,                     // Equal to cols / weight
+        uws: &[(FE::PrimeField, FE)], // Equals to weight
         mut rng: &mut RNG,
     ) -> Result<Vec<(FE::PrimeField, FE)>, Error> {
-        debug_assert!(n % 2 == 0);
-        // debug_assert!(self.weight == uws.len());
-        let depth = 128 - (n as u128 - 1).leading_zeros() as usize;
-        let t = uws.len(); // Equal to weight
-        let mut result = vec![(FE::PrimeField::ZERO, FE::ZERO); n * t];
+        debug_assert!(m % 2 == 0);
+        let depth = 128 - (m as u128 - 1).leading_zeros() as usize;
+        let t = uws.len();
+        let mut result = vec![(FE::PrimeField::ZERO, FE::ZERO); m * t];
         let mut betas = Vec::with_capacity(t);
         for (a, _) in uws.iter() {
             let mut beta = FE::PrimeField::random(&mut rng);
@@ -131,15 +128,15 @@ impl<OT: OtReceiver<Msg = Block> + Malicious, FE: FF> Sender<OT, FE> {
         channel.write_block(&seed1)?;
         let mut tmps = Vec::with_capacity(t);
         for (i, beta) in betas.into_iter().enumerate() {
-            let alpha = rng.gen_range(0, n);
-            result[i * n + alpha].0 = beta;
+            let alpha = rng.gen_range(0, m);
+            result[i * m + alpha].0 = beta;
             let mut choices_ = unpack_bits(&(!alpha).to_le_bytes(), depth);
             choices_.reverse(); // to get the first bit as MSB.
             let keys = self.ot.receive(channel, &choices_, rng)?;
             let vs: Vec<FE> = ggm_prime(alpha, &keys, (seed0, seed1));
-            for (j, item) in vs.iter().enumerate().take(n) {
+            for (j, item) in vs.iter().enumerate().take(m) {
                 if j != alpha {
-                    result[i * n + j].1 = *item;
+                    result[i * m + j].1 = *item;
                 }
             }
             let sum = vs.into_iter().sum();
@@ -147,7 +144,7 @@ impl<OT: OtReceiver<Msg = Block> + Malicious, FE: FF> Sender<OT, FE> {
         }
         for (i, ((_, delta), (alpha, sum))) in uws.iter().zip(tmps.into_iter()).enumerate() {
             let d: FE = channel.read_fe()?;
-            result[i * n + alpha].1 = *delta - (d + sum);
+            result[i * m + alpha].1 = *delta - (d + sum);
         }
         Ok(result)
     }
@@ -155,9 +152,9 @@ impl<OT: OtReceiver<Msg = Block> + Malicious, FE: FF> Sender<OT, FE> {
     pub fn send_batch_consistency_check<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         &mut self,
         channel: &mut C,
-        _n: usize, // Equal to cols / weight
-        uws: &[(FE::PrimeField, FE)],
-        base_uws: &[(FE::PrimeField, FE)],
+        _n: usize,
+        uws: &[(FE::PrimeField, FE)],      // length = t
+        base_uws: &[(FE::PrimeField, FE)], // length = r
         rng: &mut RNG,
     ) -> Result<(), Error> {
         let r = FE::PolynomialFormNumCoefficients::to_usize();
@@ -202,16 +199,10 @@ impl<OT: OtSender<Msg = Block> + Malicious, FE: FF> Receiver<OT, FE> {
         channel: &mut C,
         pows: Vec<FE>,
         delta: FE,
-        weight: usize,
         mut rng: &mut RNG,
     ) -> Result<Self, Error> {
         let ot = OT::init(channel, &mut rng)?;
-        Ok(Self {
-            pows,
-            delta,
-            ot,
-            weight,
-        })
+        Ok(Self { pows, delta, ot })
     }
 
     /// Runs single-point svole and outputs a vector `v` such that
@@ -317,7 +308,7 @@ mod test {
             let pows = super::super::utils::gen_pows();
             let mut base = BaseSender::<FE>::init(&mut channel, &pows, &mut rng).unwrap();
             let uw = base.send(&mut channel, weight, &mut rng).unwrap();
-            let mut spsvole = SpsSender::<FE>::init(&mut channel, pows, weight, &mut rng).unwrap();
+            let mut spsvole = SpsSender::<FE>::init(&mut channel, pows, &mut rng).unwrap();
             spsvole.send(&mut channel, n, &uw, &mut rng).unwrap()
         });
         let mut rng = AesRng::new();
@@ -328,8 +319,7 @@ mod test {
         let mut base = BaseReceiver::<FE>::init(&mut channel, &pows, &mut rng).unwrap();
         let v = base.receive(&mut channel, weight, &mut rng).unwrap();
         let mut spsvole =
-            SpsReceiver::<FE>::init(&mut channel, pows.clone(), base.delta(), weight, &mut rng)
-                .unwrap();
+            SpsReceiver::<FE>::init(&mut channel, pows.clone(), base.delta(), &mut rng).unwrap();
         let vs = spsvole.receive(&mut channel, n, &v, &mut rng).unwrap();
         let uws = handle.join().unwrap();
         for i in 0..weight {
