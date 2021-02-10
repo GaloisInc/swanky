@@ -9,13 +9,12 @@
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use ocelot::svole::{
     wykw::{Receiver, Sender},
-    SVoleReceiver,
-    SVoleSender,
+    SVoleReceiver, SVoleSender,
 };
+use rand::Rng;
 use scuttlebutt::{
-    field::{F61p, Fp, Gf128, F2},
-    AesRng,
-    Channel,
+    field::{F61p, FiniteField, Fp, Gf128, F2},
+    Aes128, AesRng, Block, Channel,
 };
 use std::{
     io::{BufReader, BufWriter},
@@ -157,9 +156,34 @@ fn bench_svole_init_f61p(c: &mut Criterion) {
     });
 }
 
+fn bench_ggm_<FE: FiniteField>(depth: usize, seed: Block, aes: (&Aes128, &Aes128)) {
+    let exp = 1 << depth;
+    let mut vs = vec![FE::ZERO; exp];
+    black_box(ocelot::svole::wykw::ggm_utils::ggm(
+        depth, seed, aes, &mut vs,
+    ));
+}
+
+fn bench_ggm(c: &mut Criterion) {
+    let cols = 10_805_248;
+    let weight = 1_319;
+    let m = cols / weight;
+    let depth = 128 - (m as u128 - 1).leading_zeros() as usize;
+    let seed = rand::thread_rng().gen();
+    let seed0 = rand::thread_rng().gen();
+    let seed1 = rand::thread_rng().gen();
+    c.bench_function("svole::ggm::F61p", move |bench| {
+        let aes0 = Aes128::new(seed0);
+        let aes1 = Aes128::new(seed1);
+        bench.iter(move || {
+            bench_ggm_::<F61p>(depth, seed, (&aes0, &aes1));
+        })
+    });
+}
+
 criterion_group! {
     name = svole;
     config = Criterion::default().warm_up_time(Duration::from_millis(100)).sample_size(10);
-    targets = bench_svole_init_f61p, bench_svole_init_gf128, bench_svole_f61p, bench_svole_gf128
+    targets = bench_svole_init_f61p, bench_svole_init_gf128, bench_svole_f61p, bench_svole_gf128, bench_ggm
 }
 criterion_main!(svole);

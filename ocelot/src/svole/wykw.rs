@@ -9,7 +9,7 @@
 
 mod base_svole;
 mod copee;
-mod ggm_utils;
+pub mod ggm_utils; // XXX public for now for benchmarks.
 mod spsvole;
 mod svole;
 mod utils;

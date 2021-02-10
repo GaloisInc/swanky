@@ -18,7 +18,7 @@ use scuttlebutt::{
     commitment::{Commitment, ShaCommitment},
     field::FiniteField as FF,
     utils::unpack_bits,
-    AbstractChannel, AesRng, Block, Malicious,
+    AbstractChannel, Aes128, AesRng, Block, Malicious,
 };
 
 /// SpsVole Sender.
@@ -99,16 +99,16 @@ impl<OT: OtReceiver<Msg = Block> + Malicious, FE: FF> Sender<OT, FE> {
     pub fn send<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         &mut self,
         channel: &mut C,
-        m: usize,                     // Equal to cols / weight
-        uws: &[(FE::PrimeField, FE)], // Equals to weight
+        m: usize,                          // Equal to cols / weight
+        base_uws: &[(FE::PrimeField, FE)], // Equals to weight
         mut rng: &mut RNG,
     ) -> Result<Vec<(FE::PrimeField, FE)>, Error> {
         debug_assert!(m % 2 == 0);
         let depth = 128 - (m as u128 - 1).leading_zeros() as usize;
-        let t = uws.len();
+        let t = base_uws.len();
         let mut result = vec![(FE::PrimeField::ZERO, FE::ZERO); m * t];
         let mut betas = Vec::with_capacity(t);
-        for (a, _) in uws.iter() {
+        for (a, _) in base_uws.iter() {
             let mut beta = FE::PrimeField::random(&mut rng);
             while beta == FE::PrimeField::ZERO {
                 beta = FE::PrimeField::random(&mut rng);
@@ -117,13 +117,14 @@ impl<OT: OtReceiver<Msg = Block> + Malicious, FE: FF> Sender<OT, FE> {
             channel.write_fe(a_prime)?;
             betas.push(beta);
         }
-        channel.flush()?;
         // Generate seeds for GGM "PRGs" and send them over the wire.
         //
         // XXX is this secure? I think so, assuming AES as no weak keys....
         // might be better to do coin flipping here though...
         let seed0 = rng.gen::<Block>();
         let seed1 = rng.gen::<Block>();
+        let aes0 = Aes128::new(seed0);
+        let aes1 = Aes128::new(seed1);
         channel.write_block(&seed0)?;
         channel.write_block(&seed1)?;
         let mut tmps = Vec::with_capacity(t);
@@ -133,18 +134,17 @@ impl<OT: OtReceiver<Msg = Block> + Malicious, FE: FF> Sender<OT, FE> {
             let mut choices_ = unpack_bits(&(!alpha).to_le_bytes(), depth);
             choices_.reverse(); // to get the first bit as MSB.
             let keys = self.ot.receive(channel, &choices_, rng)?;
-            let vs: Vec<FE> = ggm_prime(alpha, &keys, (seed0, seed1));
-            for (j, item) in vs.iter().enumerate().take(m) {
-                if j != alpha {
-                    result[i * m + j].1 = *item;
-                }
-            }
-            let sum = vs.into_iter().sum();
+            let sum = ggm_prime(
+                alpha,
+                &keys,
+                (&aes0, &aes1),
+                &mut result[i * m..(i + 1) * m],
+            );
             tmps.push((alpha, sum));
         }
-        for (i, ((_, delta), (alpha, sum))) in uws.iter().zip(tmps.into_iter()).enumerate() {
+        for (i, ((_, w), (alpha, sum))) in base_uws.iter().zip(tmps.into_iter()).enumerate() {
             let d: FE = channel.read_fe()?;
-            result[i * m + alpha].1 = *delta - (d + sum);
+            result[i * m + alpha].1 = *w - (d + sum);
         }
         Ok(result)
     }
@@ -152,15 +152,14 @@ impl<OT: OtReceiver<Msg = Block> + Malicious, FE: FF> Sender<OT, FE> {
     pub fn send_batch_consistency_check<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         &mut self,
         channel: &mut C,
-        _n: usize,
-        uws: &[(FE::PrimeField, FE)],      // length = t
+        _m: usize,
+        uws: &[(FE::PrimeField, FE)],      // length = m * t = n
         base_uws: &[(FE::PrimeField, FE)], // length = r
         rng: &mut RNG,
     ) -> Result<(), Error> {
         let r = FE::PolynomialFormNumCoefficients::to_usize();
         // Generate `chis` from seed and send seed to receiver.
         let seed = rng.gen::<Block>();
-        channel.write_block(&seed)?;
         let mut rng_chi = AesRng::from_seed(seed);
         let mut va = FE::ZERO;
         let mut x_stars = vec![FE::PrimeField::ZERO; r];
@@ -183,6 +182,7 @@ impl<OT: OtReceiver<Msg = Block> + Malicious, FE: FF> Sender<OT, FE> {
             channel.write_fe(*x_star - *u)?;
             va -= *pows * *w;
         }
+        channel.write_block(&seed)?;
         let b = eq_send(channel, &va)?;
         if b {
             Ok(())
@@ -221,7 +221,7 @@ impl<OT: OtSender<Msg = Block> + Malicious, FE: FF> Receiver<OT, FE> {
         let depth = 128 - (n as u128 - 1).leading_zeros() as usize;
         let t = vs.len();
         let mut gammas = Vec::with_capacity(t);
-        let mut ds = Vec::with_capacity(t);
+        // let mut ds = Vec::with_capacity(t);
         let mut result = vec![FE::ZERO; n * t];
         for (_, b) in vs.iter().enumerate() {
             let a_prime = channel.read_fe::<FE::PrimeField>()?;
@@ -230,17 +230,18 @@ impl<OT: OtSender<Msg = Block> + Malicious, FE: FF> Receiver<OT, FE> {
         }
         let seed0 = channel.read_block()?;
         let seed1 = channel.read_block()?;
-        for (i, gamma) in gammas.into_iter().enumerate() {
+        let aes0 = Aes128::new(seed0);
+        let aes1 = Aes128::new(seed1);
+        for (i, _) in gammas.iter().enumerate() {
             let seed = rng.gen::<Block>();
-            let keys_ = ggm(depth, seed, (seed0, seed1), &mut result[i * n..(i + 1) * n]);
+            let keys_ = ggm(depth, seed, (&aes0, &aes1), &mut result[i * n..(i + 1) * n]);
             // XXX hmm I would have thought batching OTs would make things more
             // efficient, but that doesn't seem to be the case. Probably needs
             // further investigation.
             self.ot.send(channel, &keys_, rng)?;
-            let d = gamma - result[i * n..(i + 1) * n].iter().map(|v| *v).sum();
-            ds.push(d);
         }
-        for d in ds.into_iter() {
+        for (i, gamma) in gammas.into_iter().enumerate() {
+            let d = gamma - result[i * n..(i + 1) * n].iter().map(|v| *v).sum();
             channel.write_fe(d)?;
         }
         channel.flush()?;
@@ -256,8 +257,6 @@ impl<OT: OtSender<Msg = Block> + Malicious, FE: FF> Receiver<OT, FE> {
         rng: &mut RNG,
     ) -> Result<(), Error> {
         let r = FE::PolynomialFormNumCoefficients::to_usize();
-        let seed = channel.read_block()?;
-        let mut rng_chi = AesRng::from_seed(seed);
         let mut x_stars: Vec<FE::PrimeField> = vec![FE::PrimeField::ZERO; r];
         for item in x_stars.iter_mut() {
             *item = channel.read_fe()?;
@@ -268,6 +267,8 @@ impl<OT: OtSender<Msg = Block> + Malicious, FE: FF> Receiver<OT, FE> {
             .zip(x_stars.into_iter().zip(y_stars.iter()))
             .map(|(pow, (x, y))| (*y - self.delta.multiply_by_prime_subfield(x)) * *pow)
             .sum();
+        let seed = channel.read_block()?;
+        let mut rng_chi = AesRng::from_seed(seed);
         let mut vb = FE::ZERO;
         for v in vs.iter() {
             vb += *v * FE::random(&mut rng_chi);
