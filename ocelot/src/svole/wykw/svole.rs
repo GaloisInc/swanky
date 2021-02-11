@@ -27,24 +27,20 @@ use scuttlebutt::{field::FiniteField, AbstractChannel, AesRng, Block};
 
 /// LPN parameters for setup phase.
 mod lpn_setup_params {
-    /// Exponent which represent the depth of the GGM tree.
-    const EXP: usize = 8;
     /// Hamming weight of the error vector `e` used in LPN assumption.
-    pub const WEIGHT: usize = 2508;
+    pub const WEIGHT: usize = 2_508;
     /// Number of columns `n` in the LPN matrix.
-    pub const COLS: usize = (1 << EXP) * WEIGHT; // 642048
+    pub const COLS: usize = 642_048;
     /// Number of rows `k` in the LPN matrix.
-    pub const ROWS: usize = 19870;
+    pub const ROWS: usize = 19_870;
 }
 
 /// LPN parameters for extend phase.
 mod lpn_extend_params {
-    /// Exponent which represent the depth of the GGM tree.
-    const EXP: usize = 13;
     /// Hamming weight of the error vector `e` used in LPN assumption.
     pub const WEIGHT: usize = 1319;
     /// Number of columns `n` in the LPN matrix.
-    pub const COLS: usize = (1 << EXP) * WEIGHT; // 10,805,248
+    pub const COLS: usize = 10_805_248;
     /// Number of rows `k` in the LPN matrix.
     pub const ROWS: usize = 589_760;
 }
@@ -62,7 +58,7 @@ fn lpn_mtx_indices<FE: FiniteField>(
         while indices.iter().any(|&x| x.0 == rand_idx) {
             rand_idx = distribution.sample(&mut rng);
         }
-        indices[i].0 = rand_idx as usize;
+        indices[i].0 = rand_idx;
         if FE::PrimeField::MODULUS != 2 {
             indices[i].1 = FE::PrimeField::random(&mut rng);
         }
@@ -142,8 +138,7 @@ impl<FE: FiniteField> SVoleSender for Sender<FE> {
         channel: &mut C,
         rng: &mut RNG,
     ) -> Result<Vec<(FE::PrimeField, FE)>, Error> {
-        debug_assert!(self.cols % self.weight == 0);
-        assert!(
+        debug_assert!(
             self.base_voles.len() >= lpn_setup_params::ROWS + lpn_setup_params::WEIGHT + self.r
         );
         let m = self.cols / self.weight;
@@ -153,6 +148,7 @@ impl<FE: FiniteField> SVoleSender for Sender<FE> {
             &self.base_voles[self.rows..self.rows + self.weight],
             rng,
         )?;
+        debug_assert!(uws.len() == self.cols);
         self.spsvole.send_batch_consistency_check(
             channel,
             m,
@@ -166,36 +162,22 @@ impl<FE: FiniteField> SVoleSender for Sender<FE> {
         channel.write_block(&seed)?;
         channel.flush()?;
         let distribution = Uniform::from(0..self.rows);
-        let indices: Vec<[(usize, FE::PrimeField); 10]> = (0..self.cols)
-            .map(|_| lpn_mtx_indices::<FE>(&distribution, &mut lpn_rng))
-            .collect();
-        let xs: Vec<FE::PrimeField> = indices
-            .iter()
-            .zip(uws.iter())
-            .map(|(ds, (e, _))| {
-                ds.iter().fold(FE::PrimeField::ZERO, |acc, (i, a)| {
-                    acc + self.base_voles[*i].0 * *a
-                }) + *e
-            })
-            .collect();
-        let zs: Vec<FE> = indices
-            .into_iter()
-            .zip(uws.into_iter())
-            .map(|(ds, (_, t))| {
-                ds.iter().fold(FE::ZERO, |acc, (i, a)| {
-                    acc + self.base_voles[*i].1.multiply_by_prime_subfield(*a)
-                }) + t
-            })
-            .collect();
+        let mut xzs = Vec::with_capacity(self.cols);
+        for (e, c) in uws.into_iter() {
+            let indices = lpn_mtx_indices::<FE>(&distribution, &mut lpn_rng);
+            let x = indices.iter().fold(FE::PrimeField::ZERO, |acc, (i, a)| {
+                acc + self.base_voles[*i].0 * *a
+            }) + e;
+            let z = indices.iter().fold(FE::ZERO, |acc, (i, a)| {
+                acc + self.base_voles[*i].1.multiply_by_prime_subfield(*a)
+            }) + c;
+            xzs.push((x, z));
+        }
         let nb = self.rows + self.weight + self.r;
         for i in 0..nb {
-            self.base_voles[i] = (xs[i], zs[i]);
+            self.base_voles[i] = xzs[i];
         }
-        let svoles: Vec<(FE::PrimeField, FE)> = xs
-            .into_iter()
-            .skip(nb)
-            .zip(zs.into_iter().skip(nb))
-            .collect();
+        let svoles: Vec<(FE::PrimeField, FE)> = xzs.into_iter().skip(nb).collect();
         debug_assert!(svoles.len() == self.cols - nb);
         Ok(svoles)
     }
@@ -288,6 +270,7 @@ impl<FE: FiniteField> SVoleReceiver for Receiver<FE> {
             &self.base_voles[self.rows..self.rows + self.weight], // length = t
             rng,
         )?;
+        debug_assert!(vs.len() == self.cols);
         self.spsvole.receive_batch_consistency_check(
             channel,
             m,
@@ -298,17 +281,14 @@ impl<FE: FiniteField> SVoleReceiver for Receiver<FE> {
         let seed = channel.read_block()?;
         let mut lpn_rng = AesRng::from_seed(seed);
         let distribution = Uniform::from(0..self.rows);
-        let ys: Vec<FE> = vs
-            .iter()
-            .map(|v| {
-                lpn_mtx_indices::<FE>(&distribution, &mut lpn_rng)
-                    .iter()
-                    .fold(FE::ZERO, |acc, (j, e)| {
-                        acc + self.base_voles[*j].multiply_by_prime_subfield(*e)
-                    })
-                    + *v
-            })
-            .collect();
+        let mut ys = Vec::with_capacity(self.cols);
+        for b in vs.into_iter() {
+            let indices = lpn_mtx_indices::<FE>(&distribution, &mut lpn_rng);
+            let y = indices.iter().fold(FE::ZERO, |acc, (i, a)| {
+                acc + self.base_voles[*i].multiply_by_prime_subfield(*a)
+            }) + b;
+            ys.push(y);
+        }
         debug_assert!(ys.len() == self.cols);
         let nb = self.rows + self.weight + self.r;
         for (i, item) in ys.iter().enumerate().take(nb) {

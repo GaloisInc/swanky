@@ -12,13 +12,14 @@ use crate::{
     ot::{KosReceiver, KosSender, Receiver as OtReceiver, Sender as OtSender},
 };
 use generic_array::typenum::Unsigned;
+use rand::distributions::{Distribution, Uniform};
 use rand::{CryptoRng, Rng, SeedableRng};
 use rand_core::RngCore;
 use scuttlebutt::{
     commitment::{Commitment, ShaCommitment},
     field::FiniteField as FF,
     utils::unpack_bits,
-    AbstractChannel, Aes128, AesRng, Block, Malicious,
+    AbstractChannel, Aes128, AesRng, Block,
 };
 
 /// SpsVole Sender.
@@ -111,14 +112,13 @@ impl<OT: OtReceiver<Msg = Block>, FE: FF> Sender<OT, FE> {
         base_uws: &[(FE::PrimeField, FE)], // Equals to weight
         mut rng: &mut RNG,
     ) -> Result<Vec<(FE::PrimeField, FE)>, Error> {
-        debug_assert!(n % 2 == 0);
+        // Total communication: t |log p| + 256 + > t * nbits * 128 bits
         let nbits = 128 - (n as u128 - 1).leading_zeros() as usize;
-        println!("nbits = {}", nbits);
         let t = base_uws.len();
         assert!(t == 2508 || t == 1319);
         let mut result = vec![(FE::PrimeField::ZERO, FE::ZERO); n * t];
         let mut betas = Vec::with_capacity(t);
-        // Communication: t |log p|
+
         for (a, _) in base_uws.iter() {
             let mut beta = FE::PrimeField::random(&mut rng);
             while beta == FE::PrimeField::ZERO {
@@ -136,30 +136,31 @@ impl<OT: OtReceiver<Msg = Block>, FE: FF> Sender<OT, FE> {
         let seed1 = rng.gen::<Block>();
         let aes0 = Aes128::new(seed0);
         let aes1 = Aes128::new(seed1);
+
         channel.write_block(&seed0)?;
         channel.write_block(&seed1)?;
-        let mut tmps = Vec::with_capacity(t);
+
         let mut alphas = Vec::with_capacity(t);
         let mut choices = Vec::with_capacity(t * nbits);
+        let distribution = Uniform::from(0..n);
         for (i, beta) in betas.into_iter().enumerate() {
-            let alpha = rng.gen_range(0, n);
+            let alpha = distribution.sample(&mut rng);
             result[i * n + alpha].0 = beta;
             let mut choices_ = unpack_bits(&(!alpha).to_le_bytes(), nbits);
             choices_.reverse(); // to get the first bit as MSB.
             choices.extend(choices_);
             alphas.push(alpha);
         }
+
         let keys = self.ot.receive(channel, &choices, rng)?;
-        for (i, alpha) in alphas.iter().enumerate() {
+
+        for (i, ((_, w), alpha)) in base_uws.iter().zip(alphas.iter()).enumerate() {
             let sum = ggm_prime(
                 *alpha,
                 &keys[i * nbits..(i + 1) * nbits],
                 (&aes0, &aes1),
                 &mut result[i * n..(i + 1) * n],
             );
-            tmps.push((alpha, sum));
-        }
-        for (i, ((_, w), (alpha, sum))) in base_uws.iter().zip(tmps.into_iter()).enumerate() {
             let d: FE = channel.read_fe()?;
             result[i * n + alpha].1 = *w - (d + sum);
         }
@@ -174,6 +175,7 @@ impl<OT: OtReceiver<Msg = Block>, FE: FF> Sender<OT, FE> {
         base_uws: &[(FE::PrimeField, FE)], // length = r
         rng: &mut RNG,
     ) -> Result<(), Error> {
+        // Total communication: t * |log p| + 128 bits
         let r = FE::PolynomialFormNumCoefficients::to_usize();
         // Generate `chis` from seed and send seed to receiver.
         let seed = rng.gen::<Block>();
@@ -189,17 +191,18 @@ impl<OT: OtReceiver<Msg = Block>, FE: FF> Sender<OT, FE> {
             if *u != FE::PrimeField::ZERO {
                 for (x, y) in x_stars
                     .iter_mut()
-                    .zip(chi.to_polynomial_coefficients().iter())
+                    .zip(chi.to_polynomial_coefficients().into_iter())
                 {
-                    *x += *u * *y;
+                    *x += *u * y;
                 }
             }
         }
-        // Communication: t * |log p|
+        // Communication: r * |log p|
         for (pows, (x_star, (u, w))) in self.pows.iter().zip(x_stars.iter().zip(base_uws.iter())) {
             channel.write_fe(*x_star - *u)?;
             va -= *pows * *w;
         }
+        // Communication: 128 bits
         channel.write_block(&seed)?;
         channel.flush()?;
 

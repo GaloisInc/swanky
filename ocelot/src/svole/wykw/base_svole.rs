@@ -27,7 +27,6 @@ pub struct Receiver<'a, FE: FF> {
 }
 
 impl<'a, FE: FF> Sender<'a, FE> {
-    /// Runs any one-time initialization.
     pub fn init<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         channel: &mut C,
         pows: &'a [FE],
@@ -37,26 +36,20 @@ impl<'a, FE: FF> Sender<'a, FE> {
         Ok(Self { copee, pows })
     }
 
-    /// Runs SVOLE extend on input length `len` and returns `(u, w)`, where `u`
-    /// is a randomly generated input vector of length `len` from
-    /// `FE::PrimeField` such that the correlation `w = u'Δ + v`, `u'` is the
-    /// converted vector of `u` to the vector of type `FE`, holds. The vector
-    /// length `len` should match with the Receiver's input length, otherwise,
-    /// the program runs forever.
     pub fn send<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         &mut self,
         channel: &mut C,
-        n: usize,
+        n: usize, // rows + weight + r
         mut rng: &mut RNG,
     ) -> Result<Vec<(FE::PrimeField, FE)>, Error> {
-        let mut uws: Vec<(FE::PrimeField, FE)> = (0..n)
-            .map(|_| (FE::PrimeField::random(&mut rng), FE::ZERO))
-            .collect();
+        let mut uws = Vec::with_capacity(n);
+        for _ in 0..n {
+            let u = FE::PrimeField::random(&mut rng);
+            let w = self.copee.send(channel, &u)?;
+            uws.push((u, w));
+        }
         let mut z: FE = FE::ZERO;
         let mut x: FE = FE::ZERO;
-        for i in 0..n {
-            uws[i].1 = self.copee.send(channel, &uws[i].0)?;
-        }
         for pow in self.pows.iter() {
             let a = FE::PrimeField::random(&mut rng);
             let c = self.copee.send(channel, &a)?;
@@ -66,14 +59,13 @@ impl<'a, FE: FF> Sender<'a, FE> {
         channel.flush()?;
         let seed = channel.read_block()?;
         let mut rng_chi = AesRng::from_seed(seed);
-        for i in 0..n {
+        for (u, w) in uws.iter() {
             let chi = FE::random(&mut rng_chi);
-            z += chi * uws[i].1;
-            x += chi.multiply_by_prime_subfield(uws[i].0);
+            z += chi * *w;
+            x += chi.multiply_by_prime_subfield(*u);
         }
         channel.write_fe(x)?;
         channel.write_fe(z)?;
-        debug_assert!(uws.len() == n);
         Ok(uws)
     }
 }
