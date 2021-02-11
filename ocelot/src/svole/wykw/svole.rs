@@ -135,12 +135,13 @@ impl<FE: FiniteField> SVoleSender for Sender<FE> {
             spsvole: base_sender.spsvole,
             rows: lpn_extend_params::ROWS,
             cols: lpn_extend_params::COLS,
-            base_voles,
             weight: lpn_extend_params::WEIGHT,
+            base_voles,
             r,
         })
     }
 
+    // Generate `n = self.cols` VOLEs.
     fn send<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         &mut self,
         channel: &mut C,

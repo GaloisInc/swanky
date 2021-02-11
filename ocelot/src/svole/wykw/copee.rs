@@ -14,12 +14,7 @@ use crate::{
 use generic_array::typenum::Unsigned;
 use rand_core::{CryptoRng, RngCore};
 use scuttlebutt::{
-    field::FiniteField as FF,
-    utils::unpack_bits,
-    AbstractChannel,
-    Aes128,
-    Block,
-    Malicious,
+    field::FiniteField as FF, utils::unpack_bits, AbstractChannel, Aes128, Block, Malicious,
 };
 use std::marker::PhantomData;
 use subtle::{Choice, ConditionallySelectable};
@@ -74,12 +69,9 @@ impl<'a, ROT: ROTSender<Msg = Block> + Malicious, FE: FF> Sender<'a, ROT, FE> {
             .map(|(k0, k1)| (Aes128::new(*k0), Aes128::new(*k1)))
             .collect();
         let mut acc = FE::ONE;
-        // `two` can be computed by adding `FE::ONE` to itself. For example, the
-        // field `F2` has only two elements `0` and `1` and `two` becomes `0` as
-        // `1 + 1 = 0` in this field.
         let two = FE::ONE + FE::ONE;
         let mut twos = vec![FE::ZERO; nbits];
-        for item in twos.iter_mut().take(nbits) {
+        for item in twos.iter_mut() {
             *item = acc;
             acc *= two;
         }
@@ -103,16 +95,16 @@ impl<'a, ROT: ROTSender<Msg = Block> + Malicious, FE: FF> Sender<'a, ROT, FE> {
     ) -> Result<FE, Error> {
         let pt = Block::from(self.counter as u128);
         let mut w = FE::ZERO;
-        for (j, pow) in self.pows.iter().enumerate() {
+        for (i, pow) in self.pows.iter().enumerate() {
             let mut sum = FE::ZERO;
             for (k, two) in self.twos.iter().enumerate() {
-                let (prf0, prf1) = &self.aes_objs[j * self.nbits + k];
+                let (prf0, prf1) = &self.aes_objs[i * self.nbits + k];
                 let w0 = prf::<FE>(prf0, pt);
                 let w1 = prf::<FE>(prf1, pt);
                 sum += two.multiply_by_prime_subfield(w0);
                 channel.write_fe(w0 - w1 - *input)?;
             }
-            //channel.flush()?;
+            channel.flush()?;
             sum *= *pow;
             w += sum;
         }
@@ -188,8 +180,7 @@ mod tests {
     use super::{CopeeReceiver, CopeeSender};
     use scuttlebutt::{
         field::{F61p, FiniteField as FF, Fp, Gf128, F2},
-        AesRng,
-        Channel,
+        AesRng, Channel,
     };
     use std::{
         io::{BufReader, BufWriter},
