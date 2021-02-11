@@ -38,45 +38,53 @@ pub type SpsSender<FE> = Sender<KosReceiver, FE>;
 /// Alias for SpsVole Receiver.
 pub type SpsReceiver<FE> = Receiver<KosSender, FE>;
 
-/// Implementation of the EQ protocol functionality described in the write-up (<https://eprint.iacr.org/2020/925.pdf>, Page 30)
-/// Implementation of sender functionality
-/// TODO: Channel is going to be out of sync if sender receives commit of vb before sending va out.
-fn eq_send<C: AbstractChannel, FE: FF>(channel: &mut C, input: &FE) -> Result<bool, Error> {
-    let va = *input;
-    channel.write_fe(va)?;
+// Implementation of the EQ protocol functionality described in
+// <https://eprint.iacr.org/2020/925.pdf>, Page 30.
+fn eq_send<C: AbstractChannel, FE: FF>(channel: &mut C, x: FE) -> Result<bool, Error> {
+    let mut com = [0u8; 32];
+    channel.read_bytes(&mut com)?;
+
+    channel.write_fe(x)?;
     channel.flush()?;
-    let mut comm_vb = [0u8; 32];
-    channel.read_bytes(&mut comm_vb)?;
+
     let mut seed = [0u8; 32];
     channel.read_bytes(&mut seed)?;
-    let vb = channel.read_fe::<FE>()?;
+    let y = channel.read_fe::<FE>()?;
+
     let mut commit = ShaCommitment::new(seed);
-    commit.input(&vb.to_bytes());
-    let res = commit.finish();
-    if res == comm_vb {
-        Ok(va == vb)
+    commit.input(&y.to_bytes());
+    if commit.finish() == com {
+        Ok(x == y)
     } else {
         Err(Error::InvalidOpening)
     }
 }
 
-/// Implementation of receiver functionality
+// Implementation of the EQ protocol functionality described in
+// <https://eprint.iacr.org/2020/925.pdf>, Page 30.
 fn eq_receive<C: AbstractChannel, RNG: CryptoRng + RngCore, FE: FF>(
     channel: &mut C,
     rng: &mut RNG,
-    input: &FE,
+    y: FE,
 ) -> Result<bool, Error> {
-    let vb = *input;
-    let va = channel.read_fe::<FE>()?;
     let seed = rng.gen::<[u8; 32]>();
-    let mut commit = ShaCommitment::new(seed);
-    commit.input(&vb.to_bytes());
-    let result = commit.finish();
-    channel.write_bytes(&result)?;
-    channel.write_bytes(&seed)?;
-    channel.write_fe(vb)?;
+    let mut h = ShaCommitment::new(seed);
+    h.input(&y.to_bytes());
+    let com = h.finish();
+
+    channel.write_bytes(&com)?;
     channel.flush()?;
-    Ok(va == vb)
+
+    let x = channel.read_fe::<FE>()?;
+    if x != y {
+        return Err(Error::InvalidOpening);
+    }
+
+    channel.write_bytes(&seed)?;
+    channel.write_fe(y)?;
+    channel.flush()?;
+
+    Ok(x == y)
 }
 
 /// Implement SpsVoleSender for Sender type.
@@ -107,15 +115,17 @@ impl<OT: OtReceiver<Msg = Block>, FE: FF> Sender<OT, FE> {
         let nbits = 128 - (n as u128 - 1).leading_zeros() as usize;
         println!("nbits = {}", nbits);
         let t = base_uws.len();
+        assert!(t == 2508 || t == 1319);
         let mut result = vec![(FE::PrimeField::ZERO, FE::ZERO); n * t];
         let mut betas = Vec::with_capacity(t);
+        // Communication: t |log p|
         for (a, _) in base_uws.iter() {
             let mut beta = FE::PrimeField::random(&mut rng);
             while beta == FE::PrimeField::ZERO {
                 beta = FE::PrimeField::random(&mut rng);
             }
             let a_prime = beta - *a;
-            channel.write_fe(a_prime)?; // |log p|
+            channel.write_fe(a_prime)?;
             betas.push(beta);
         }
         // Generate seeds for GGM "PRGs" and send them over the wire.
@@ -185,12 +195,15 @@ impl<OT: OtReceiver<Msg = Block>, FE: FF> Sender<OT, FE> {
                 }
             }
         }
+        // Communication: t * |log p|
         for (pows, (x_star, (u, w))) in self.pows.iter().zip(x_stars.iter().zip(base_uws.iter())) {
             channel.write_fe(*x_star - *u)?;
             va -= *pows * *w;
         }
         channel.write_block(&seed)?;
-        let b = eq_send(channel, &va)?;
+        channel.flush()?;
+
+        let b = eq_send(channel, va)?;
         if b {
             Ok(())
         } else {
@@ -279,7 +292,7 @@ impl<OT: OtSender<Msg = Block>, FE: FF> Receiver<OT, FE> {
             vb += *v * FE::random(&mut rng_chi);
         }
         vb -= y;
-        let res = eq_receive(channel, rng, &vb)?;
+        let res = eq_receive(channel, rng, vb)?;
         if res {
             Ok(())
         } else {
