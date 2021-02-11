@@ -17,6 +17,7 @@ use crate::{
     svole::{SVoleReceiver, SVoleSender},
 };
 use generic_array::typenum::Unsigned;
+use rand::distributions::{Distribution, Uniform};
 use rand::Rng;
 use rand_core::{CryptoRng, RngCore, SeedableRng};
 use scuttlebutt::{field::FiniteField, AbstractChannel, AesRng, Block};
@@ -51,23 +52,19 @@ mod lpn_extend_params {
 /// Small constant `d` used in the `linear codes` useful in acheiving efficient matrix multiplication.
 const LPN_PARAMS_D: usize = 10;
 
-// TODO: this needs to get optimized.
 fn lpn_mtx_indices<FE: FiniteField>(
-    _col_idx: usize,
-    rows: usize,
-    rng: &mut AesRng,
+    distribution: &Uniform<usize>,
+    mut rng: &mut AesRng,
 ) -> [(usize, FE::PrimeField); LPN_PARAMS_D] {
     let mut indices = [(0usize, FE::PrimeField::ONE); LPN_PARAMS_D];
     for i in 0..LPN_PARAMS_D {
-        let mut rand_idx = rng.gen_range(0, rows);
+        let mut rand_idx = distribution.sample(&mut rng);
         while indices.iter().any(|&x| x.0 == rand_idx) {
-            rand_idx = rng.gen_range(0, rows);
+            rand_idx = distribution.sample(&mut rng);
         }
         indices[i].0 = rand_idx as usize;
         if FE::PrimeField::MODULUS != 2 {
-            let rand_elt: FE::PrimeField =
-                FE::PrimeField::from_uniform_bytes(&<[u8; 16]>::from(rng.gen::<Block>()));
-            indices[i].1 = rand_elt;
+            indices[i].1 = FE::PrimeField::random(&mut rng);
         }
     }
     indices
@@ -165,10 +162,12 @@ impl<FE: FiniteField> SVoleSender for Sender<FE> {
         )?;
         let seed = rng.gen::<Block>();
         let mut lpn_rng = AesRng::from_seed(seed);
+        // Communication: 128 bits
         channel.write_block(&seed)?;
         channel.flush()?;
+        let distribution = Uniform::from(0..self.rows);
         let indices: Vec<[(usize, FE::PrimeField); 10]> = (0..self.cols)
-            .map(|i| lpn_mtx_indices::<FE>(i, self.rows, &mut lpn_rng))
+            .map(|_| lpn_mtx_indices::<FE>(&distribution, &mut lpn_rng))
             .collect();
         let xs: Vec<FE::PrimeField> = indices
             .iter()
@@ -224,8 +223,6 @@ impl<FE: FiniteField> Receiver<FE> {
         weight: usize,
         rng: &mut RNG,
     ) -> Result<Self, Error> {
-        debug_assert!(cols % 2 == 0);
-        debug_assert!(rows < cols);
         let r = FE::PolynomialFormNumCoefficients::to_usize();
         let pows = super::utils::gen_pows();
         let mut base_receiver = BaseReceiver::<FE>::init(channel, &pows, rng)?;
@@ -300,16 +297,16 @@ impl<FE: FiniteField> SVoleReceiver for Receiver<FE> {
         )?;
         let seed = channel.read_block()?;
         let mut lpn_rng = AesRng::from_seed(seed);
+        let distribution = Uniform::from(0..self.rows);
         let ys: Vec<FE> = vs
             .iter()
-            .enumerate()
-            .map(|(i, s)| {
-                lpn_mtx_indices::<FE>(i, self.rows, &mut lpn_rng)
+            .map(|v| {
+                lpn_mtx_indices::<FE>(&distribution, &mut lpn_rng)
                     .iter()
                     .fold(FE::ZERO, |acc, (j, e)| {
                         acc + self.base_voles[*j].multiply_by_prime_subfield(*e)
                     })
-                    + *s
+                    + *v
             })
             .collect();
         debug_assert!(ys.len() == self.cols);
