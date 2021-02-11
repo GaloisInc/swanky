@@ -20,7 +20,7 @@ use std::marker::PhantomData;
 use subtle::{Choice, ConditionallySelectable};
 
 /// COPEe sender.
-pub struct Sender<'a, ROT: ROTSender + Malicious, FE: FF> {
+pub struct Sender<'a, ROT: ROTSender, FE: FF> {
     _ot: PhantomData<ROT>,
     aes_objs: Vec<(Aes128, Aes128)>,
     pows: &'a [FE],
@@ -30,7 +30,7 @@ pub struct Sender<'a, ROT: ROTSender + Malicious, FE: FF> {
 }
 
 /// COPEe receiver.
-pub struct Receiver<'a, ROT: ROTReceiver + Malicious, FE: FF> {
+pub struct Receiver<'a, ROT: ROTReceiver, FE: FF> {
     _ot: PhantomData<ROT>,
     delta: FE,
     choices: Vec<bool>,
@@ -53,7 +53,7 @@ fn prf<FE: FF>(aes: &Aes128, pt: Block) -> FE::PrimeField {
 }
 
 /// Implement CopeeSender for Sender type
-impl<'a, ROT: ROTSender<Msg = Block> + Malicious, FE: FF> Sender<'a, ROT, FE> {
+impl<'a, ROT: ROTSender<Msg = Block>, FE: FF> Sender<'a, ROT, FE> {
     /// Runs any one-time initialization.
     pub fn init<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         channel: &mut C,
@@ -114,7 +114,7 @@ impl<'a, ROT: ROTSender<Msg = Block> + Malicious, FE: FF> Sender<'a, ROT, FE> {
 }
 
 /// Implement CopeeReceiver for Receiver type.
-impl<'a, ROT: ROTReceiver<Msg = Block> + Malicious, FE: FF> Receiver<'a, ROT, FE> {
+impl<'a, ROT: ROTReceiver<Msg = Block>, FE: FF> Receiver<'a, ROT, FE> {
     /// Runs any one-time initialization.
     pub fn init<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         channel: &mut C,

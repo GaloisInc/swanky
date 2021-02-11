@@ -80,7 +80,7 @@ fn eq_receive<C: AbstractChannel, RNG: CryptoRng + RngCore, FE: FF>(
 }
 
 /// Implement SpsVoleSender for Sender type.
-impl<OT: OtReceiver<Msg = Block> + Malicious, FE: FF> Sender<OT, FE> {
+impl<OT: OtReceiver<Msg = Block>, FE: FF> Sender<OT, FE> {
     /// Runs any one-time initialization.
     pub fn init<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         channel: &mut C,
@@ -99,14 +99,15 @@ impl<OT: OtReceiver<Msg = Block> + Malicious, FE: FF> Sender<OT, FE> {
     pub fn send<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         &mut self,
         channel: &mut C,
-        m: usize,                          // Equal to cols / weight
+        n: usize,                          // Equal to cols / weight
         base_uws: &[(FE::PrimeField, FE)], // Equals to weight
         mut rng: &mut RNG,
     ) -> Result<Vec<(FE::PrimeField, FE)>, Error> {
-        debug_assert!(m % 2 == 0);
-        let depth = 128 - (m as u128 - 1).leading_zeros() as usize;
+        debug_assert!(n % 2 == 0);
+        let nbits = 128 - (n as u128 - 1).leading_zeros() as usize;
+        println!("nbits = {}", nbits);
         let t = base_uws.len();
-        let mut result = vec![(FE::PrimeField::ZERO, FE::ZERO); m * t];
+        let mut result = vec![(FE::PrimeField::ZERO, FE::ZERO); n * t];
         let mut betas = Vec::with_capacity(t);
         for (a, _) in base_uws.iter() {
             let mut beta = FE::PrimeField::random(&mut rng);
@@ -114,7 +115,7 @@ impl<OT: OtReceiver<Msg = Block> + Malicious, FE: FF> Sender<OT, FE> {
                 beta = FE::PrimeField::random(&mut rng);
             }
             let a_prime = beta - *a;
-            channel.write_fe(a_prime)?;
+            channel.write_fe(a_prime)?; // |log p|
             betas.push(beta);
         }
         // Generate seeds for GGM "PRGs" and send them over the wire.
@@ -128,23 +129,29 @@ impl<OT: OtReceiver<Msg = Block> + Malicious, FE: FF> Sender<OT, FE> {
         channel.write_block(&seed0)?;
         channel.write_block(&seed1)?;
         let mut tmps = Vec::with_capacity(t);
+        let mut alphas = Vec::with_capacity(t);
+        let mut choices = Vec::with_capacity(t * nbits);
         for (i, beta) in betas.into_iter().enumerate() {
-            let alpha = rng.gen_range(0, m);
-            result[i * m + alpha].0 = beta;
-            let mut choices_ = unpack_bits(&(!alpha).to_le_bytes(), depth);
+            let alpha = rng.gen_range(0, n);
+            result[i * n + alpha].0 = beta;
+            let mut choices_ = unpack_bits(&(!alpha).to_le_bytes(), nbits);
             choices_.reverse(); // to get the first bit as MSB.
-            let keys = self.ot.receive(channel, &choices_, rng)?;
+            choices.extend(choices_);
+            alphas.push(alpha);
+        }
+        let keys = self.ot.receive(channel, &choices, rng)?;
+        for (i, alpha) in alphas.iter().enumerate() {
             let sum = ggm_prime(
-                alpha,
-                &keys,
+                *alpha,
+                &keys[i * nbits..(i + 1) * nbits],
                 (&aes0, &aes1),
-                &mut result[i * m..(i + 1) * m],
+                &mut result[i * n..(i + 1) * n],
             );
             tmps.push((alpha, sum));
         }
         for (i, ((_, w), (alpha, sum))) in base_uws.iter().zip(tmps.into_iter()).enumerate() {
             let d: FE = channel.read_fe()?;
-            result[i * m + alpha].1 = *w - (d + sum);
+            result[i * n + alpha].1 = *w - (d + sum);
         }
         Ok(result)
     }
@@ -193,7 +200,7 @@ impl<OT: OtReceiver<Msg = Block> + Malicious, FE: FF> Sender<OT, FE> {
 }
 
 /// Implement SpsVoleReceiver for Receiver type.
-impl<OT: OtSender<Msg = Block> + Malicious, FE: FF> Receiver<OT, FE> {
+impl<OT: OtSender<Msg = Block>, FE: FF> Receiver<OT, FE> {
     /// Runs any one-time initialization.
     pub fn init<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         channel: &mut C,
@@ -217,29 +224,27 @@ impl<OT: OtSender<Msg = Block> + Malicious, FE: FF> Receiver<OT, FE> {
         vs: &[FE], // Length equals weight
         rng: &mut RNG,
     ) -> Result<Vec<FE>, Error> {
-        assert!(n % 2 == 0);
-        let depth = 128 - (n as u128 - 1).leading_zeros() as usize;
+        let nbits = 128 - (n as u128 - 1).leading_zeros() as usize;
         let t = vs.len();
         let mut gammas = Vec::with_capacity(t);
-        // let mut ds = Vec::with_capacity(t);
         let mut result = vec![FE::ZERO; n * t];
-        for (_, b) in vs.iter().enumerate() {
+        for v in vs.iter() {
             let a_prime = channel.read_fe::<FE::PrimeField>()?;
-            let gamma = *b - self.delta.multiply_by_prime_subfield(a_prime);
+            let gamma = *v - self.delta.multiply_by_prime_subfield(a_prime);
             gammas.push(gamma);
         }
         let seed0 = channel.read_block()?;
         let seed1 = channel.read_block()?;
         let aes0 = Aes128::new(seed0);
         let aes1 = Aes128::new(seed1);
-        for (i, _) in gammas.iter().enumerate() {
+        let mut keys = Vec::with_capacity(t * nbits);
+        for i in 0..t {
             let seed = rng.gen::<Block>();
-            let keys_ = ggm(depth, seed, (&aes0, &aes1), &mut result[i * n..(i + 1) * n]);
-            // XXX hmm I would have thought batching OTs would make things more
-            // efficient, but that doesn't seem to be the case. Probably needs
-            // further investigation.
-            self.ot.send(channel, &keys_, rng)?;
+            let keys_ = ggm(nbits, seed, (&aes0, &aes1), &mut result[i * n..(i + 1) * n]);
+            debug_assert!(keys_.len() == nbits);
+            keys.extend(keys_);
         }
+        self.ot.send(channel, &keys, rng)?;
         for (i, gamma) in gammas.into_iter().enumerate() {
             let d = gamma - result[i * n..(i + 1) * n].iter().map(|v| *v).sum();
             channel.write_fe(d)?;
