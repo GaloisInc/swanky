@@ -140,12 +140,11 @@ impl<OT: OtReceiver<Msg = Block>, FE: FF> Sender<OT, FE> {
         channel.write_block(&seed0)?;
         channel.write_block(&seed1)?;
 
+        let distribution = Uniform::from(0..n);
         let mut alphas = Vec::with_capacity(t);
         let mut choices = Vec::with_capacity(t * nbits);
-        let distribution = Uniform::from(0..n);
-        for (i, beta) in betas.into_iter().enumerate() {
+        for _ in 0..t {
             let alpha = distribution.sample(&mut rng);
-            result[i * n + alpha].0 = beta;
             let mut choices_ = unpack_bits(&(!alpha).to_le_bytes(), nbits);
             choices_.reverse(); // to get the first bit as MSB.
             choices.extend(choices_);
@@ -154,7 +153,11 @@ impl<OT: OtReceiver<Msg = Block>, FE: FF> Sender<OT, FE> {
 
         let keys = self.ot.receive(channel, &choices, rng)?;
 
-        for (i, ((_, w), alpha)) in base_uws.iter().zip(alphas.iter()).enumerate() {
+        for (i, ((_, w), (alpha, beta))) in base_uws
+            .iter()
+            .zip(alphas.iter().zip(betas.into_iter()))
+            .enumerate()
+        {
             let sum = ggm_prime(
                 *alpha,
                 &keys[i * nbits..(i + 1) * nbits],
@@ -162,6 +165,7 @@ impl<OT: OtReceiver<Msg = Block>, FE: FF> Sender<OT, FE> {
                 &mut result[i * n..(i + 1) * n],
             );
             let d: FE = channel.read_fe()?;
+            result[i * n + alpha].0 = beta;
             result[i * n + alpha].1 = *w - (d + sum);
         }
         Ok(result)

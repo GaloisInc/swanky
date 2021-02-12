@@ -48,6 +48,7 @@ mod lpn_extend_params {
 /// Small constant `d` used in the `linear codes` useful in acheiving efficient matrix multiplication.
 const LPN_PARAMS_D: usize = 10;
 
+#[inline(always)]
 fn lpn_mtx_indices<FE: FiniteField>(
     distribution: &Uniform<usize>,
     mut rng: &mut AesRng,
@@ -158,7 +159,6 @@ impl<FE: FiniteField> SVoleSender for Sender<FE> {
         )?;
         let seed = rng.gen::<Block>();
         let mut lpn_rng = AesRng::from_seed(seed);
-        // Communication: 128 bits
         channel.write_block(&seed)?;
         channel.flush()?;
         let distribution = Uniform::from(0..self.rows);
@@ -167,12 +167,12 @@ impl<FE: FiniteField> SVoleSender for Sender<FE> {
         let mut svoles = Vec::with_capacity(self.cols - nb);
         for (i, (e, c)) in uws.into_iter().enumerate() {
             let indices = lpn_mtx_indices::<FE>(&distribution, &mut lpn_rng);
-            let x = indices.iter().fold(FE::PrimeField::ZERO, |acc, (j, a)| {
-                acc + self.base_voles[*j].0 * *a
-            }) + e;
-            let z = indices.iter().fold(FE::ZERO, |acc, (j, a)| {
-                acc + self.base_voles[*j].1.multiply_by_prime_subfield(*a)
-            }) + c;
+            let mut x = e;
+            let mut z = c;
+            for (j, a) in indices.iter() {
+                x += self.base_voles[*j].0 * *a;
+                z += self.base_voles[*j].1.multiply_by_prime_subfield(*a);
+            }
             if i < nb {
                 base_voles.push((x, z));
             } else {
