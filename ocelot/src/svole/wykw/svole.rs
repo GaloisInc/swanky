@@ -162,22 +162,24 @@ impl<FE: FiniteField> SVoleSender for Sender<FE> {
         channel.write_block(&seed)?;
         channel.flush()?;
         let distribution = Uniform::from(0..self.rows);
-        let mut xzs = Vec::with_capacity(self.cols);
-        for (e, c) in uws.into_iter() {
-            let indices = lpn_mtx_indices::<FE>(&distribution, &mut lpn_rng);
-            let x = indices.iter().fold(FE::PrimeField::ZERO, |acc, (i, a)| {
-                acc + self.base_voles[*i].0 * *a
-            }) + e;
-            let z = indices.iter().fold(FE::ZERO, |acc, (i, a)| {
-                acc + self.base_voles[*i].1.multiply_by_prime_subfield(*a)
-            }) + c;
-            xzs.push((x, z));
-        }
         let nb = self.rows + self.weight + self.r;
-        for i in 0..nb {
-            self.base_voles[i] = xzs[i];
+        let mut base_voles = Vec::with_capacity(nb);
+        let mut svoles = Vec::with_capacity(self.cols - nb);
+        for (i, (e, c)) in uws.into_iter().enumerate() {
+            let indices = lpn_mtx_indices::<FE>(&distribution, &mut lpn_rng);
+            let x = indices.iter().fold(FE::PrimeField::ZERO, |acc, (j, a)| {
+                acc + self.base_voles[*j].0 * *a
+            }) + e;
+            let z = indices.iter().fold(FE::ZERO, |acc, (j, a)| {
+                acc + self.base_voles[*j].1.multiply_by_prime_subfield(*a)
+            }) + c;
+            if i < nb {
+                base_voles.push((x, z));
+            } else {
+                svoles.push((x, z));
+            }
         }
-        let svoles: Vec<(FE::PrimeField, FE)> = xzs.into_iter().skip(nb).collect();
+        self.base_voles = base_voles;
         debug_assert!(svoles.len() == self.cols - nb);
         Ok(svoles)
     }
@@ -262,12 +264,11 @@ impl<FE: FiniteField> SVoleReceiver for Receiver<FE> {
         channel: &mut C,
         rng: &mut RNG,
     ) -> Result<Vec<FE>, Error> {
-        debug_assert!(self.cols % self.weight == 0);
         let m = self.cols / self.weight;
         let vs = self.spsvole.receive(
             channel,
             m,
-            &self.base_voles[self.rows..self.rows + self.weight], // length = t
+            &self.base_voles[self.rows..self.rows + self.weight],
             rng,
         )?;
         debug_assert!(vs.len() == self.cols);
@@ -275,26 +276,28 @@ impl<FE: FiniteField> SVoleReceiver for Receiver<FE> {
             channel,
             m,
             &vs,
-            &self.base_voles[self.rows + self.weight..self.rows + self.weight + self.r], // length = r
+            &self.base_voles[self.rows + self.weight..self.rows + self.weight + self.r],
             rng,
         )?;
         let seed = channel.read_block()?;
         let mut lpn_rng = AesRng::from_seed(seed);
         let distribution = Uniform::from(0..self.rows);
-        let mut ys = Vec::with_capacity(self.cols);
-        for b in vs.into_iter() {
-            let indices = lpn_mtx_indices::<FE>(&distribution, &mut lpn_rng);
-            let y = indices.iter().fold(FE::ZERO, |acc, (i, a)| {
-                acc + self.base_voles[*i].multiply_by_prime_subfield(*a)
-            }) + b;
-            ys.push(y);
-        }
-        debug_assert!(ys.len() == self.cols);
+
         let nb = self.rows + self.weight + self.r;
-        for (i, item) in ys.iter().enumerate().take(nb) {
-            self.base_voles[i] = *item;
+        let mut base_voles = Vec::with_capacity(self.cols);
+        let mut svoles = Vec::with_capacity(self.cols - nb);
+        for (i, b) in vs.into_iter().enumerate() {
+            let indices = lpn_mtx_indices::<FE>(&distribution, &mut lpn_rng);
+            let y = indices.iter().fold(FE::ZERO, |acc, (j, a)| {
+                acc + self.base_voles[*j].multiply_by_prime_subfield(*a)
+            }) + b;
+            if i < nb {
+                base_voles.push(y);
+            } else {
+                svoles.push(y);
+            }
         }
-        let svoles: Vec<FE> = ys.into_iter().skip(nb).collect();
+        self.base_voles = base_voles;
         debug_assert!(svoles.len() == self.cols - nb);
         Ok(svoles)
     }
