@@ -54,7 +54,7 @@ mod lpn_extend_params {
     /// Number of columns `n` in the LPN matrix.
     pub const COLS: usize = 10_168_320;
     /// Number of rows `k` in the LPN matrix.
-    pub const ROWS: usize = 15_800;
+    pub const ROWS: usize = 150_000;
 }
 
 /// Small constant `d` used in the `linear codes` useful in acheiving efficient matrix multiplication.
@@ -104,14 +104,13 @@ impl<FE: FiniteField> Sender<FE> {
         let r = FE::PolynomialFormNumCoefficients::to_usize();
         let mut base_sender = BaseSender::<FE>::init(channel, &pows, rng)?;
         let base_voles = base_sender.send(channel, rows + weight + r, rng)?;
-        assert!(base_voles.len() == rows + weight + r);
         let spsvole = SpsSender::<FE>::init(channel, pows, rng)?;
         Ok(Self {
             spsvole,
             rows,
             cols,
-            base_voles,
             weight,
+            base_voles,
             r,
         })
     }
@@ -124,7 +123,6 @@ impl<FE: FiniteField> Sender<FE> {
         weight: usize,
         rng: &mut RNG,
     ) -> Result<Self, Error> {
-        let r = FE::PolynomialFormNumCoefficients::to_usize();
         let base_voles = sender.send(channel, rng)?;
         channel.flush()?;
         Ok(Self {
@@ -133,7 +131,7 @@ impl<FE: FiniteField> Sender<FE> {
             cols,
             weight,
             base_voles,
-            r,
+            r: sender.r,
         })
     }
 }
@@ -145,8 +143,6 @@ impl<FE: FiniteField> SVoleSender for Sender<FE> {
         channel: &mut C,
         rng: &mut RNG,
     ) -> Result<Self, Error> {
-        let r = FE::PolynomialFormNumCoefficients::to_usize();
-        // Base svoles are computed using smaller LPN parameters.
         let sender = Self::init_internal(
             channel,
             lpn_setup0_params::ROWS,
@@ -170,19 +166,24 @@ impl<FE: FiniteField> SVoleSender for Sender<FE> {
             cols: lpn_extend_params::COLS,
             weight: lpn_extend_params::WEIGHT,
             base_voles,
-            r,
+            r: sender.r,
         })
     }
 
-    // Generate `n = self.cols` VOLEs.
+    // Generate `self.cols - self.rows - self.weight - self.r` VOLEs.
     fn send<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         &mut self,
         channel: &mut C,
         rng: &mut RNG,
     ) -> Result<Vec<(FE::PrimeField, FE)>, Error> {
-        // debug_assert!(
-        //     self.base_voles.len() >= lpn_setup_params::ROWS + lpn_setup_params::WEIGHT + self.r
-        // );
+        debug_assert!(
+            self.base_voles.len() >= self.rows + self.weight + self.r,
+            "{} < {} + {} + {}",
+            self.base_voles.len(),
+            self.rows,
+            self.weight,
+            self.r
+        );
         let m = self.cols / self.weight;
         let uws = self.spsvole.send(
             channel,
@@ -220,10 +221,6 @@ impl<FE: FiniteField> SVoleSender for Sender<FE> {
                 .map(|(j, a)| self.base_voles[*j].1.multiply_by_prime_subfield(*a))
                 .sum();
 
-            //for (j, a) in indices.iter() {
-            //    x += self.base_voles[*j].0 * *a;
-            //    z += self.base_voles[*j].1.multiply_by_prime_subfield(*a);
-            //}
             if i < nb {
                 base_voles.push((x, z));
             } else {
@@ -232,7 +229,6 @@ impl<FE: FiniteField> SVoleSender for Sender<FE> {
         }
         self.base_voles = base_voles;
         debug_assert!(svoles.len() == self.cols - nb);
-        println!("LEN SVOLES {}",svoles.len());
         Ok(svoles)
     }
 }
@@ -347,6 +343,14 @@ impl<FE: FiniteField> SVoleReceiver for Receiver<FE> {
         channel: &mut C,
         rng: &mut RNG,
     ) -> Result<Vec<FE>, Error> {
+        debug_assert!(
+            self.base_voles.len() >= self.rows + self.weight + self.r,
+            "{} < {} + {} + {}",
+            self.base_voles.len(),
+            self.rows,
+            self.weight,
+            self.r
+        );
         let m = self.cols / self.weight;
         let vs = self.spsvole.receive(
             channel,
