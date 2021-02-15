@@ -155,7 +155,7 @@ impl std::iter::Sum for F61p {
     fn sum<I: Iterator<Item = Self>>(iter: I) -> Self {
         let mut out: u64 = 0;
 
-        for (_i, e) in iter.enumerate() {
+        for e in iter {
             match out.checked_add(e.0) {
                 Some(new_out) => {
                     out = new_out;
@@ -165,11 +165,11 @@ impl std::iter::Sum for F61p {
                 }
             }
         }
-        return F61p(((out as u128) % F61p::MODULUS) as u64);
+        return F61p(reduce(out as u128));
     }
 }
 
-field_ops!(F61p, "SumDefined");
+field_ops!(F61p, "SUM_ALREADY_DEFINED");
 
 #[cfg(test)]
 test_field!(test_f61p, F61p);

@@ -66,6 +66,14 @@ pub(crate) fn make_polynomial_coefficients<FE: FiniteField, L: ArrayLength<FE>>(
     GenericArray::<FE, L>::from_slice(&slice[..]).clone()
 }
 
+// fn make_vector_fe<FE: FiniteField>(size: u64) -> {
+//     let mut vec = Vec<FE>;
+
+//     for i in (0..size) {
+//         vec.push()
+//     }
+// }
+
 macro_rules! test_field {
     ($tests_name:ident, $f:ty) => {
         mod $tests_name {
@@ -84,6 +92,12 @@ macro_rules! test_field {
                     <$f as FiniteField>::PrimeField::from_uniform_bytes(&seed.to_le_bytes())
                 })
             }
+            // fn any_prime_fe_vec(size:u64) -> impl Strategy<Value=Vec<<$f as FiniteField>::PrimeField>> {
+            //     Vec[size, FiniteField::ZERO].
+            //     any::<u128>().prop_map(|seed| {
+            //         <$f as FiniteField>::PrimeField::from_uniform_bytes(&seed.to_le_bytes())
+            //     })
+            // }
             test_associativity!(additive_associativity, any_fe, add);
             test_associativity!(multiplicative_associativity, any_fe, mul);
 
@@ -125,6 +139,10 @@ macro_rules! test_field {
                     assert_eq!(a * (b + c), (a * b) + (a * c));
                 }
             }
+            // proptest! {
+            //     #[test]
+            //     fn sum(a in any_fe(), )
+            // }
             proptest! {
                 #[test]
                 fn serialize(a in any_fe()) {
