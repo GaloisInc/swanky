@@ -114,7 +114,8 @@ mod tests {
     use scuttlebutt::{
         field::{F61p, FiniteField, Fp, Gf128, F2},
         utils::unpack_bits,
-        Aes128, Block,
+        Aes128,
+        Block,
     };
 
     #[test]

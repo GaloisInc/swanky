@@ -26,7 +26,7 @@ fn f61p_inverse(c: &mut Criterion) {
 
 fn f61p_sum(c: &mut Criterion) {
     c.bench_function("f61p_sum10", |b| {
-        let x: Vec<_> = (0..100)
+        let x: Vec<_> = (0..10)
             .map(|_| F61p::random(&mut rand::thread_rng()))
             .collect();
         b.iter(|| criterion::black_box(criterion::black_box(x.iter().copied()).sum::<F61p>()));
