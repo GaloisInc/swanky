@@ -139,7 +139,37 @@ impl MulAssign<&F61p> for F61p {
     }
 }
 
-field_ops!(F61p);
+impl std::iter::Sum for F61p {
+    #[inline]
+    // // Naive Implementations
+    // fn sum<I: Iterator<Item = Self>>(iter: I) -> Self {
+    //     //iter.fold(F61p::ZERO, std::ops::Add::add)
+    //     let mut a : F61p = F61p::ZERO;
+    //     for (_i, e) in iter.enumerate() {
+    //         a += e;
+    //     }
+    //     return a;
+    // }
+
+    // Correct implementation, with possible time channel attack
+    fn sum<I: Iterator<Item = Self>>(iter: I) -> Self {
+        let mut out: u64 = 0;
+
+        for (_i, e) in iter.enumerate() {
+            match out.checked_add(e.0) {
+                Some(new_out) => {
+                    out = new_out;
+                }
+                None => {
+                    out = reduce(out as u128) + e.0;
+                }
+            }
+        }
+        return F61p(((out as u128) % F61p::MODULUS) as u64);
+    }
+}
+
+field_ops!(F61p, "SumDefined");
 
 #[cfg(test)]
 test_field!(test_f61p, F61p);

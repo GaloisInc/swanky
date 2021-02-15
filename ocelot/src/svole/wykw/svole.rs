@@ -169,10 +169,20 @@ impl<FE: FiniteField> SVoleSender for Sender<FE> {
             let indices = lpn_mtx_indices::<FE>(&distribution, &mut lpn_rng);
             let mut x = e;
             let mut z = c;
-            for (j, a) in indices.iter() {
-                x += self.base_voles[*j].0 * *a;
-                z += self.base_voles[*j].1.multiply_by_prime_subfield(*a);
-            }
+
+            x += indices
+                .iter()
+                .map(|(j, a)| self.base_voles[*j].0 * *a)
+                .sum();
+            z += indices
+                .iter()
+                .map(|(j, a)| self.base_voles[*j].1.multiply_by_prime_subfield(*a))
+                .sum();
+
+            //for (j, a) in indices.iter() {
+            //    x += self.base_voles[*j].0 * *a;
+            //    z += self.base_voles[*j].1.multiply_by_prime_subfield(*a);
+            //}
             if i < nb {
                 base_voles.push((x, z));
             } else {

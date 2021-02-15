@@ -72,3 +72,6 @@ harness = false
 name = "gf_2_128"
 harness = false
 
+[[bench]]
+name = "f61p"
+harness = false

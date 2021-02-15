@@ -239,6 +239,44 @@ macro_rules! field_ops {
             }
         }
     };
+
+    // Compared to the previous pattern, `Sum` is missing and assumed
+    // to be implemented by the field directly
+    ( $f:ident, $sum_defined:expr ) => {
+        impl PartialEq for $f {
+            fn eq(&self, other: &Self) -> bool {
+                self.ct_eq(other).into()
+            }
+        }
+
+        impl std::iter::Product for $f {
+            fn product<I: Iterator<Item = Self>>(iter: I) -> Self {
+                iter.fold($f::ONE, std::ops::Mul::mul)
+            }
+        }
+        binop!(Add, add, std::ops::AddAssign::add_assign, $f);
+        binop!(Sub, sub, std::ops::SubAssign::sub_assign, $f);
+        binop!(Mul, mul, std::ops::MulAssign::mul_assign, $f);
+        binop!(Div, div, std::ops::DivAssign::div_assign, $f);
+        assign_op!(AddAssign, add_assign, $f);
+        assign_op!(SubAssign, sub_assign, $f);
+        assign_op!(MulAssign, mul_assign, $f);
+        assign_op!(DivAssign, div_assign, $f);
+
+        impl std::ops::Neg for $f {
+            type Output = $f;
+
+            fn neg(self) -> Self::Output {
+                $f::ZERO - self
+            }
+        }
+
+        impl<'a> std::ops::DivAssign<&'a $f> for $f {
+            fn div_assign(&mut self, rhs: &Self) {
+                *self *= rhs.inverse();
+            }
+        }
+    };
 }
 
 mod fp;
