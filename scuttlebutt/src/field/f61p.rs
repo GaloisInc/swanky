@@ -182,3 +182,10 @@ fn test_generator() {
         F61p::ONE
     );
 }
+
+#[test]
+fn test_sum_overflow() {
+    let neg1 = F61p::ZERO - F61p::ONE;
+    let x = [neg1; 2];
+    assert_eq!(x.iter().map(|x| *x).sum::<F61p>(), neg1 + neg1);
+}
