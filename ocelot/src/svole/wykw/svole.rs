@@ -375,9 +375,13 @@ impl<FE: FiniteField> SVoleReceiver for Receiver<FE> {
         let mut svoles = Vec::with_capacity(self.cols - nb);
         for (i, b) in vs.into_iter().enumerate() {
             let indices = lpn_mtx_indices::<FE>(&distribution, &mut lpn_rng);
-            let y = indices.iter().fold(FE::ZERO, |acc, (j, a)| {
-                acc + self.base_voles[*j].multiply_by_prime_subfield(*a)
-            }) + b;
+
+            let mut y = b;
+            y += indices
+                .iter()
+                .map(|(j, a)| self.base_voles[*j].multiply_by_prime_subfield(*a))
+                .sum();
+
             if i < nb {
                 base_voles.push(y);
             } else {
