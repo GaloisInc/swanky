@@ -145,27 +145,20 @@ impl std::iter::Sum for F61p {
     // fn sum<I: Iterator<Item = Self>>(iter: I) -> Self {
     //     //iter.fold(F61p::ZERO, std::ops::Add::add)
     //     let mut a : F61p = F61p::ZERO;
-    //     for (_i, e) in iter.enumerate() {
+    //     for e in iter {
     //         a += e;
     //     }
     //     return a;
     // }
 
-    // Correct implementation, with possible time channel attack
     fn sum<I: Iterator<Item = Self>>(iter: I) -> Self {
-        let mut out: u64 = 0;
-
+        let mut out: u128 = 0;
+        // Invariant: this code is correct if the length of the
+        // iterator is less than 2^(128 - 61).
         for e in iter {
-            match out.checked_add(e.0) {
-                Some(new_out) => {
-                    out = new_out;
-                }
-                None => {
-                    out = reduce(out as u128) + e.0;
-                }
-            }
+            out += u128::from(e.0);
         }
-        return F61p(reduce(out as u128));
+        return F61p(reduce(out));
     }
 }
 
