@@ -169,7 +169,7 @@ impl std::iter::Sum for F61p {
     }
 }
 
-field_ops!(F61p, "SUM_ALREADY_DEFINED");
+field_ops!(F61p, SUM_ALREADY_DEFINED);
 
 #[cfg(test)]
 test_field!(test_f61p, F61p);

@@ -205,12 +205,12 @@ macro_rules! field_ops {
             }
         }
 
-        field_ops!($f, "SUM_ALREADY_DEFINED");
+        field_ops!($f, SUM_ALREADY_DEFINED);
     };
 
     // Compared to the previous pattern, `Sum` is missing and assumed
     // to be implemented by the field directly
-    ( $f:ident, $sum_already_defined:expr ) => {
+    ( $f:ident, SUM_ALREADY_DEFINED) => {
         impl PartialEq for $f {
             fn eq(&self, other: &Self) -> bool {
                 self.ct_eq(other).into()
