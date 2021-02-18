@@ -17,32 +17,44 @@ use crate::{
     svole::{SVoleReceiver, SVoleSender},
 };
 use generic_array::typenum::Unsigned;
-use rand::distributions::{Distribution, Uniform};
-use rand::Rng;
+use rand::{
+    distributions::{Distribution, Uniform},
+    Rng,
+};
 use rand_core::{CryptoRng, RngCore, SeedableRng};
 use scuttlebutt::{field::FiniteField, AbstractChannel, AesRng, Block};
 
 /// Secure LPN parameters presented in (cf.
 /// <https://eprint.iacr.org/2020/925>, Table 2).
 
+/// LPN parameters for setup0 phase.
+mod lpn_setup0_params {
+    /// Hamming weight of the error vector `e` used in LPN assumption.
+    pub const WEIGHT: usize = 600;
+    /// Number of columns `n` in the LPN matrix.
+    pub const COLS: usize = 9_600;
+    /// Number of rows `k` in the LPN matrix.
+    pub const ROWS: usize = 1_220;
+}
+
 /// LPN parameters for setup phase.
 mod lpn_setup_params {
     /// Hamming weight of the error vector `e` used in LPN assumption.
-    pub const WEIGHT: usize = 2_508;
+    pub const WEIGHT: usize = 2_600;
     /// Number of columns `n` in the LPN matrix.
-    pub const COLS: usize = 642_048;
+    pub const COLS: usize = 166_400;
     /// Number of rows `k` in the LPN matrix.
-    pub const ROWS: usize = 19_870;
+    pub const ROWS: usize = 5_060;
 }
 
 /// LPN parameters for extend phase.
 mod lpn_extend_params {
     /// Hamming weight of the error vector `e` used in LPN assumption.
-    pub const WEIGHT: usize = 1319;
+    pub const WEIGHT: usize = 4_965;
     /// Number of columns `n` in the LPN matrix.
-    pub const COLS: usize = 10_805_248;
+    pub const COLS: usize = 10_168_320;
     /// Number of rows `k` in the LPN matrix.
-    pub const ROWS: usize = 589_760;
+    pub const ROWS: usize = 158_000;
 }
 
 /// Small constant `d` used in the `linear codes` useful in acheiving efficient matrix multiplication.
@@ -77,10 +89,6 @@ pub struct Sender<FE: FiniteField> {
 }
 
 impl<FE: FiniteField> Sender<FE> {
-    // This function is useful in implementing the optimization method which
-    // generates base voles using lpn voles efficiently using \ small parameters
-    // (cols, rwos, weight) as described in
-    // <https://eprint.iacr.org/2020/925.pdf>, Page 18.
     fn init_internal<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         channel: &mut C,
         rows: usize,
@@ -92,55 +100,49 @@ impl<FE: FiniteField> Sender<FE> {
         let r = FE::PolynomialFormNumCoefficients::to_usize();
         let mut base_sender = BaseSender::<FE>::init(channel, &pows, rng)?;
         let base_voles = base_sender.send(channel, rows + weight + r, rng)?;
-        assert!(base_voles.len() == rows + weight + r);
         let spsvole = SpsSender::<FE>::init(channel, pows, rng)?;
         Ok(Self {
             spsvole,
             rows,
             cols,
-            base_voles,
             weight,
+            base_voles,
             r,
         })
     }
-}
 
-impl<FE: FiniteField> SVoleSender for Sender<FE> {
-    type Msg = FE;
-
-    fn init<C: AbstractChannel, RNG: CryptoRng + RngCore>(
+    fn init_internal2<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         channel: &mut C,
+        mut sender: Self,
+        rows: usize,
+        cols: usize,
+        weight: usize,
         rng: &mut RNG,
     ) -> Result<Self, Error> {
-        let r = FE::PolynomialFormNumCoefficients::to_usize();
-        // Base svoles are computed using smaller LPN parameters.
-        let mut sender = Self::init_internal(
-            channel,
-            lpn_setup_params::ROWS,
-            lpn_setup_params::COLS,
-            lpn_setup_params::WEIGHT,
-            rng,
-        )?;
-        let base_voles = sender.send(channel, rng)?;
-        channel.flush()?;
+        let base_voles = sender.send_internal(channel, 0, rng)?;
         Ok(Self {
             spsvole: sender.spsvole,
-            rows: lpn_extend_params::ROWS,
-            cols: lpn_extend_params::COLS,
-            weight: lpn_extend_params::WEIGHT,
+            rows,
+            cols,
+            weight,
             base_voles,
-            r,
+            r: sender.r,
         })
     }
 
-    // Generate `n = self.cols` VOLEs.
-    fn send<C: AbstractChannel, RNG: CryptoRng + RngCore>(
+    fn send_internal<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         &mut self,
         channel: &mut C,
+        num_saved: usize,
         rng: &mut RNG,
     ) -> Result<Vec<(FE::PrimeField, FE)>, Error> {
         debug_assert!(
-            self.base_voles.len() >= lpn_setup_params::ROWS + lpn_setup_params::WEIGHT + self.r
+            self.base_voles.len() >= self.rows + self.weight + self.r,
+            "{} < {} + {} + {}",
+            self.base_voles.len(),
+            self.rows,
+            self.weight,
+            self.r
         );
         let m = self.cols / self.weight;
         let uws = self.spsvole.send(
@@ -162,26 +164,73 @@ impl<FE: FiniteField> SVoleSender for Sender<FE> {
         channel.write_block(&seed)?;
         channel.flush()?;
         let distribution = Uniform::from(0..self.rows);
-        let nb = self.rows + self.weight + self.r;
-        let mut base_voles = Vec::with_capacity(nb);
-        let mut svoles = Vec::with_capacity(self.cols - nb);
+        let mut base_voles = Vec::with_capacity(num_saved);
+        let mut svoles = Vec::with_capacity(self.cols - num_saved);
         for (i, (e, c)) in uws.into_iter().enumerate() {
             let indices = lpn_mtx_indices::<FE>(&distribution, &mut lpn_rng);
             let mut x = e;
             let mut z = c;
-            for (j, a) in indices.iter() {
-                x += self.base_voles[*j].0 * *a;
-                z += self.base_voles[*j].1.multiply_by_prime_subfield(*a);
-            }
-            if i < nb {
+
+            x += indices
+                .iter()
+                .map(|(j, a)| self.base_voles[*j].0 * *a)
+                .sum();
+            z += indices
+                .iter()
+                .map(|(j, a)| self.base_voles[*j].1.multiply_by_prime_subfield(*a))
+                .sum();
+
+            if i < num_saved {
                 base_voles.push((x, z));
             } else {
                 svoles.push((x, z));
             }
         }
         self.base_voles = base_voles;
-        debug_assert!(svoles.len() == self.cols - nb);
+        debug_assert!(svoles.len() == self.cols - num_saved);
         Ok(svoles)
+    }
+}
+
+impl<FE: FiniteField> SVoleSender for Sender<FE> {
+    type Msg = FE;
+
+    fn init<C: AbstractChannel, RNG: CryptoRng + RngCore>(
+        channel: &mut C,
+        rng: &mut RNG,
+    ) -> Result<Self, Error> {
+        let sender = Self::init_internal(
+            channel,
+            lpn_setup0_params::ROWS,
+            lpn_setup0_params::COLS,
+            lpn_setup0_params::WEIGHT,
+            rng,
+        )?;
+        let mut sender = Self::init_internal2(
+            channel,
+            sender,
+            lpn_setup_params::ROWS,
+            lpn_setup_params::COLS,
+            lpn_setup_params::WEIGHT,
+            rng,
+        )?;
+        let base_voles = sender.send_internal(channel, 0, rng)?;
+        Ok(Self {
+            spsvole: sender.spsvole,
+            rows: lpn_extend_params::ROWS,
+            cols: lpn_extend_params::COLS,
+            weight: lpn_extend_params::WEIGHT,
+            base_voles,
+            r: sender.r,
+        })
+    }
+
+    fn send<C: AbstractChannel, RNG: CryptoRng + RngCore>(
+        &mut self,
+        channel: &mut C,
+        rng: &mut RNG,
+    ) -> Result<Vec<(FE::PrimeField, FE)>, Error> {
+        self.send_internal(channel, self.rows + self.weight + self.r, rng)
     }
 }
 
@@ -196,10 +245,6 @@ pub struct Receiver<FE: FiniteField> {
 }
 
 impl<FE: FiniteField> Receiver<FE> {
-    // This function is useful in implementing the optimization method which
-    // generates base voles using lpn voles efficiently using \ small parameters
-    // (cols, rwos, weight) as described in the eprint
-    // (<https://eprint.iacr.org/2020/925.pdf>, Page 18).
     fn init_internal<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         channel: &mut C,
         rows: usize,
@@ -224,46 +269,41 @@ impl<FE: FiniteField> Receiver<FE> {
             r,
         })
     }
-}
 
-impl<FE: FiniteField> SVoleReceiver for Receiver<FE> {
-    type Msg = FE;
-
-    fn init<C: AbstractChannel, RNG: CryptoRng + RngCore>(
+    fn init_internal2<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         channel: &mut C,
+        mut receiver: Self,
+        rows: usize,
+        cols: usize,
+        weight: usize,
         rng: &mut RNG,
     ) -> Result<Self, Error> {
-        let r = FE::PolynomialFormNumCoefficients::to_usize();
-        // Base voles are computed using smaller LPN parameters.
-        let mut receiver = Self::init_internal(
-            channel,
-            lpn_setup_params::ROWS,
-            lpn_setup_params::COLS,
-            lpn_setup_params::WEIGHT,
-            rng,
-        )?;
-        let base_voles = receiver.receive(channel, rng)?;
-        let delta = receiver.delta();
+        let base_voles = receiver.receive_internal(channel, 0, rng)?;
         Ok(Self {
             spsvole: receiver.spsvole,
-            delta,
-            rows: lpn_extend_params::ROWS,
-            cols: lpn_extend_params::COLS,
-            weight: lpn_extend_params::WEIGHT,
+            delta: receiver.delta,
+            rows,
+            cols,
+            weight,
             base_voles,
-            r,
+            r: receiver.r,
         })
     }
 
-    fn delta(&self) -> FE {
-        self.delta
-    }
-
-    fn receive<C: AbstractChannel, RNG: CryptoRng + RngCore>(
+    fn receive_internal<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         &mut self,
         channel: &mut C,
+        num_saved: usize,
         rng: &mut RNG,
     ) -> Result<Vec<FE>, Error> {
+        debug_assert!(
+            self.base_voles.len() >= self.rows + self.weight + self.r,
+            "{} < {} + {} + {}",
+            self.base_voles.len(),
+            self.rows,
+            self.weight,
+            self.r
+        );
         let m = self.cols / self.weight;
         let vs = self.spsvole.receive(
             channel,
@@ -282,24 +322,73 @@ impl<FE: FiniteField> SVoleReceiver for Receiver<FE> {
         let seed = channel.read_block()?;
         let mut lpn_rng = AesRng::from_seed(seed);
         let distribution = Uniform::from(0..self.rows);
-
-        let nb = self.rows + self.weight + self.r;
         let mut base_voles = Vec::with_capacity(self.cols);
-        let mut svoles = Vec::with_capacity(self.cols - nb);
+        let mut svoles = Vec::with_capacity(self.cols - num_saved);
         for (i, b) in vs.into_iter().enumerate() {
             let indices = lpn_mtx_indices::<FE>(&distribution, &mut lpn_rng);
-            let y = indices.iter().fold(FE::ZERO, |acc, (j, a)| {
-                acc + self.base_voles[*j].multiply_by_prime_subfield(*a)
-            }) + b;
-            if i < nb {
+            let mut y = b;
+
+            y += indices
+                .iter()
+                .map(|(j, a)| self.base_voles[*j].multiply_by_prime_subfield(*a))
+                .sum();
+
+            if i < num_saved {
                 base_voles.push(y);
             } else {
                 svoles.push(y);
             }
         }
         self.base_voles = base_voles;
-        debug_assert!(svoles.len() == self.cols - nb);
+        debug_assert!(svoles.len() == self.cols - num_saved);
         Ok(svoles)
+    }
+}
+
+impl<FE: FiniteField> SVoleReceiver for Receiver<FE> {
+    type Msg = FE;
+
+    fn init<C: AbstractChannel, RNG: CryptoRng + RngCore>(
+        channel: &mut C,
+        rng: &mut RNG,
+    ) -> Result<Self, Error> {
+        let receiver = Self::init_internal(
+            channel,
+            lpn_setup0_params::ROWS,
+            lpn_setup0_params::COLS,
+            lpn_setup0_params::WEIGHT,
+            rng,
+        )?;
+        let mut receiver = Self::init_internal2(
+            channel,
+            receiver,
+            lpn_setup_params::ROWS,
+            lpn_setup_params::COLS,
+            lpn_setup_params::WEIGHT,
+            rng,
+        )?;
+        let base_voles = receiver.receive_internal(channel, 0, rng)?;
+        Ok(Self {
+            spsvole: receiver.spsvole,
+            delta: receiver.delta,
+            rows: lpn_extend_params::ROWS,
+            cols: lpn_extend_params::COLS,
+            weight: lpn_extend_params::WEIGHT,
+            base_voles,
+            r: receiver.r,
+        })
+    }
+
+    fn delta(&self) -> FE {
+        self.delta
+    }
+
+    fn receive<C: AbstractChannel, RNG: CryptoRng + RngCore>(
+        &mut self,
+        channel: &mut C,
+        rng: &mut RNG,
+    ) -> Result<Vec<FE>, Error> {
+        self.receive_internal(channel, self.rows + self.weight + self.r, rng)
     }
 }
 
@@ -308,7 +397,8 @@ mod tests {
     use super::{Receiver, SVoleReceiver, SVoleSender, Sender};
     use scuttlebutt::{
         field::{F61p, FiniteField as FF, Fp, Gf128, F2},
-        AesRng, Channel,
+        AesRng,
+        Channel,
     };
     use std::{
         io::{BufReader, BufWriter},

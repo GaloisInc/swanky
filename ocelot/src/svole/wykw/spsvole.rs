@@ -12,14 +12,21 @@ use crate::{
     ot::{KosReceiver, KosSender, Receiver as OtReceiver, Sender as OtSender},
 };
 use generic_array::typenum::Unsigned;
-use rand::distributions::{Distribution, Uniform};
-use rand::{CryptoRng, Rng, SeedableRng};
+use rand::{
+    distributions::{Distribution, Uniform},
+    CryptoRng,
+    Rng,
+    SeedableRng,
+};
 use rand_core::RngCore;
 use scuttlebutt::{
     commitment::{Commitment, ShaCommitment},
     field::FiniteField as FF,
     utils::unpack_bits,
-    AbstractChannel, Aes128, AesRng, Block,
+    AbstractChannel,
+    Aes128,
+    AesRng,
+    Block,
 };
 
 /// SpsVole Sender.
@@ -115,7 +122,6 @@ impl<OT: OtReceiver<Msg = Block>, FE: FF> Sender<OT, FE> {
         // Total communication: t |log p| + 256 + > t * nbits * 128 bits
         let nbits = 128 - (n as u128 - 1).leading_zeros() as usize;
         let t = base_uws.len();
-        assert!(t == 2508 || t == 1319);
         let mut result = vec![(FE::PrimeField::ZERO, FE::ZERO); n * t];
         let mut betas = Vec::with_capacity(t);
 
@@ -312,11 +318,13 @@ impl<OT: OtSender<Msg = Block>, FE: FF> Receiver<OT, FE> {
 mod test {
     use super::{
         super::base_svole::{Receiver as BaseReceiver, Sender as BaseSender},
-        SpsReceiver, SpsSender,
+        SpsReceiver,
+        SpsSender,
     };
     use scuttlebutt::{
         field::{F61p, FiniteField as FF, Fp, Gf128, F2},
-        AesRng, Channel,
+        AesRng,
+        Channel,
     };
     use std::{
         io::{BufReader, BufWriter},
