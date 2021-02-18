@@ -31,7 +31,7 @@ fn run<FE: FF, VSender: SVoleSender<Msg = FE>, VReceiver: SVoleReceiver<Msg = FE
         let start = SystemTime::now();
         let mut vole = VSender::init(&mut channel, &mut rng).unwrap();
         println!(
-            "[642048(k+t+r+52287)] Send time (init): {} ms",
+            "Send time (init): {} ms",
             start.elapsed().unwrap().as_millis()
         );
         println!(
@@ -44,9 +44,10 @@ fn run<FE: FF, VSender: SVoleSender<Msg = FE>, VReceiver: SVoleReceiver<Msg = FE
         );
         channel.clear();
         let start = SystemTime::now();
-        let _ = vole.send(&mut channel, &mut rng).unwrap();
+        let voles = vole.send(&mut channel, &mut rng).unwrap();
         println!(
-            "[10214168(n-n0(k+t+r))] Send time (extend): {} ms",
+            "[{}] Send time (extend): {} ms",
+            voles.len(),
             start.elapsed().unwrap().as_millis()
         );
         println!(
@@ -65,7 +66,7 @@ fn run<FE: FF, VSender: SVoleSender<Msg = FE>, VReceiver: SVoleReceiver<Msg = FE
     let start = SystemTime::now();
     let mut vole = VReceiver::init(&mut channel, &mut rng).unwrap();
     println!(
-        "[642048(k+t+r+52287)] Receive time (init): {} ms",
+        "Receive time (init): {} ms",
         start.elapsed().unwrap().as_millis()
     );
     println!(
@@ -78,9 +79,10 @@ fn run<FE: FF, VSender: SVoleSender<Msg = FE>, VReceiver: SVoleReceiver<Msg = FE
     );
     channel.clear();
     let start = SystemTime::now();
-    let _ = vole.receive(&mut channel, &mut rng).unwrap();
+    let voles = vole.receive(&mut channel, &mut rng).unwrap();
     println!(
-        "[10214168(n-n0(k+t+r))] Receiver time (extend): {} ms",
+        "[{}] Receiver time (extend): {} ms",
+        voles.len(),
         start.elapsed().unwrap().as_millis()
     );
     handle.join().unwrap();

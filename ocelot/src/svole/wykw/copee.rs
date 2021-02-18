@@ -13,19 +13,12 @@ use crate::{
 };
 use generic_array::typenum::Unsigned;
 use rand_core::{CryptoRng, RngCore};
-use scuttlebutt::{
-    field::FiniteField as FF,
-    utils::unpack_bits,
-    AbstractChannel,
-    Aes128,
-    Block,
-    Malicious,
-};
+use scuttlebutt::{field::FiniteField as FF, utils::unpack_bits, AbstractChannel, Aes128, Block};
 use std::marker::PhantomData;
 use subtle::{Choice, ConditionallySelectable};
 
 /// COPEe sender.
-pub struct Sender<'a, ROT: ROTSender + Malicious, FE: FF> {
+pub struct Sender<'a, ROT: ROTSender, FE: FF> {
     _ot: PhantomData<ROT>,
     aes_objs: Vec<(Aes128, Aes128)>,
     pows: &'a [FE],
@@ -35,7 +28,7 @@ pub struct Sender<'a, ROT: ROTSender + Malicious, FE: FF> {
 }
 
 /// COPEe receiver.
-pub struct Receiver<'a, ROT: ROTReceiver + Malicious, FE: FF> {
+pub struct Receiver<'a, ROT: ROTReceiver, FE: FF> {
     _ot: PhantomData<ROT>,
     delta: FE,
     choices: Vec<bool>,
@@ -58,7 +51,7 @@ fn prf<FE: FF>(aes: &Aes128, pt: Block) -> FE::PrimeField {
 }
 
 /// Implement CopeeSender for Sender type
-impl<'a, ROT: ROTSender<Msg = Block> + Malicious, FE: FF> Sender<'a, ROT, FE> {
+impl<'a, ROT: ROTSender<Msg = Block>, FE: FF> Sender<'a, ROT, FE> {
     /// Runs any one-time initialization.
     pub fn init<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         channel: &mut C,
@@ -74,12 +67,9 @@ impl<'a, ROT: ROTSender<Msg = Block> + Malicious, FE: FF> Sender<'a, ROT, FE> {
             .map(|(k0, k1)| (Aes128::new(*k0), Aes128::new(*k1)))
             .collect();
         let mut acc = FE::ONE;
-        // `two` can be computed by adding `FE::ONE` to itself. For example, the
-        // field `F2` has only two elements `0` and `1` and `two` becomes `0` as
-        // `1 + 1 = 0` in this field.
         let two = FE::ONE + FE::ONE;
         let mut twos = vec![FE::ZERO; nbits];
-        for item in twos.iter_mut().take(nbits) {
+        for item in twos.iter_mut() {
             *item = acc;
             acc *= two;
         }
@@ -103,18 +93,17 @@ impl<'a, ROT: ROTSender<Msg = Block> + Malicious, FE: FF> Sender<'a, ROT, FE> {
     ) -> Result<FE, Error> {
         let pt = Block::from(self.counter as u128);
         let mut w = FE::ZERO;
-        for (j, pow) in self.pows.iter().enumerate() {
+        // Communication: r log p * log p
+        for (i, pow) in self.pows.iter().enumerate() {
             let mut sum = FE::ZERO;
-            for (k, two) in self.twos.iter().enumerate() {
-                let (prf0, prf1) = &self.aes_objs[j * self.nbits + k];
+            for (j, two) in self.twos.iter().enumerate() {
+                let (prf0, prf1) = &self.aes_objs[i * self.nbits + j];
                 let w0 = prf::<FE>(prf0, pt);
                 let w1 = prf::<FE>(prf1, pt);
                 sum += two.multiply_by_prime_subfield(w0);
                 channel.write_fe(w0 - w1 - *input)?;
             }
-            //channel.flush()?;
-            sum *= *pow;
-            w += sum;
+            w += sum * *pow;
         }
         self.counter += 1;
         Ok(w)
@@ -122,7 +111,7 @@ impl<'a, ROT: ROTSender<Msg = Block> + Malicious, FE: FF> Sender<'a, ROT, FE> {
 }
 
 /// Implement CopeeReceiver for Receiver type.
-impl<'a, ROT: ROTReceiver<Msg = Block> + Malicious, FE: FF> Receiver<'a, ROT, FE> {
+impl<'a, ROT: ROTReceiver<Msg = Block>, FE: FF> Receiver<'a, ROT, FE> {
     /// Runs any one-time initialization.
     pub fn init<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         channel: &mut C,
@@ -135,8 +124,6 @@ impl<'a, ROT: ROTReceiver<Msg = Block> + Malicious, FE: FF> Receiver<'a, ROT, FE
         let delta = FE::random(&mut rng);
         let choices = unpack_bits(delta.to_bytes().as_slice(), nbits * r);
         let mut acc = FE::ONE;
-        // `two` can be computed by adding `FE::ONE` to itself. For example, the field `F2` has only two elements `0` and `1`
-        // and `two` becomes `0` as `1 + 1 = 0` in this field.
         let two = FE::ONE + FE::ONE;
         let mut twos = vec![FE::ZERO; nbits];
         for item in twos.iter_mut().take(nbits) {
@@ -156,6 +143,7 @@ impl<'a, ROT: ROTReceiver<Msg = Block> + Malicious, FE: FF> Receiver<'a, ROT, FE
             counter: 0,
         })
     }
+
     /// Returns the receiver choice `Δ`.
     pub fn delta(&self) -> FE {
         self.delta
@@ -175,8 +163,7 @@ impl<'a, ROT: ROTReceiver<Msg = Block> + Malicious, FE: FF> Receiver<'a, ROT, FE
                 let v = FE::PrimeField::conditional_select(&w, &tau, choice);
                 sum += two.multiply_by_prime_subfield(v);
             }
-            sum *= *pow;
-            res += sum;
+            res += sum * *pow;
         }
         self.counter += 1;
         Ok(res)

@@ -6,48 +6,21 @@
 
 use scuttlebutt::{field::FiniteField, utils::unpack_bits, Aes128, Block};
 
-/// Returns dot product of two vectors.
-pub fn dot_product<'a, FE: FiniteField, A: Iterator<Item = &'a FE>, B: Iterator<Item = &'a FE>>(
-    x: A,
-    y: B,
-) -> FE {
-    x.zip(y).map(|(u, v)| *u * *v).sum()
-}
-
-/// Returns point-wise addition of two vectors.
-pub fn point_wise_addition<
-    'a,
-    FE: FiniteField,
-    A: Iterator<Item = &'a FE>,
-    B: Iterator<Item = &'a FE>,
->(
-    x: A,
-    y: B,
-) -> Vec<FE> {
-    x.zip(y).map(|(u, v)| *u + *v).collect()
-}
-
-/// Scalar multiplication
-pub fn scalar_multiplication<FE: FiniteField>(x: FE, v: &[FE]) -> Vec<FE> {
-    v.iter().map(|&y| x * y).collect()
-}
-
-/// Implementation of GGM based on the procedure explained in the write-up (<https://eprint.iacr.org/2020/925.pdf>, Page 14) --
-/// Construct GGM tree with `depth` levels and return the node values (a.k.a
-/// seeds). `aes_seeds` are used to seed the "PRGs" used internally so we don't
-/// need to instantiate new PRGs on each iteration. Instead, we key two
-/// instances of AES ahead of time and view them as PRPs, using the seed as
-/// input.
+/// Implementation of GGM based on the procedure explained in the write-up
+/// (<https://eprint.iacr.org/2020/925.pdf>, Page 14) -- Construct GGM tree with
+/// `depth` levels and return the node values (a.k.a seeds). `aes_seeds` are
+/// used to seed the "PRGs" used internally so we don't need to instantiate new
+/// PRGs on each iteration. Instead, we key two instances of AES ahead of time
+/// and view them as PRPs, using the seed as input.
 
 pub fn ggm<FE: FiniteField>(
     depth: usize,
     initial_seed: Block,
-    aes_seeds: (Block, Block),
-) -> (Vec<FE>, Vec<(Block, Block)>) {
+    aes: (&Aes128, &Aes128),
+    results: &mut [FE],
+) -> Vec<(Block, Block)> {
     let mut seeds = Vec::with_capacity((0..depth).fold(0, |acc, i| acc + 2 * (1 << i)));
     let mut keys: Vec<(Block, Block)> = Vec::with_capacity(depth);
-    let aes0 = Aes128::new(aes_seeds.0);
-    let aes1 = Aes128::new(aes_seeds.1);
     seeds.push(initial_seed);
     for i in 0..depth {
         let mut k0 = Default::default();
@@ -55,10 +28,8 @@ pub fn ggm<FE: FiniteField>(
         let exp = 1 << i;
         for j in 0..exp {
             let s = seeds[j + exp - 1];
-            let s0 = aes0.encrypt(s);
-            let s1 = aes1.encrypt(s);
-            // let mut rng = AesRng::from_seed(s); // XXX expensive!
-            // let (s0, s1) = rng.gen::<(Block, Block)>();
+            let s0 = aes.0.encrypt(s);
+            let s1 = aes.1.encrypt(s);
             k0 ^= s0;
             k1 ^= s1;
             seeds.push(s0);
@@ -67,30 +38,30 @@ pub fn ggm<FE: FiniteField>(
         keys.push((k0, k1));
     }
     let exp = 1 << depth;
-    let vs = (0..exp)
-        .map(|j| FE::from_uniform_bytes(&<[u8; 16]>::from(seeds[exp + j - 1])))
-        .collect();
-    (vs, keys)
+    for (i, v) in results.iter_mut().enumerate() {
+        *v = FE::from_uniform_bytes(&<[u8; 16]>::from(seeds[exp + i - 1]));
+    }
+    keys
 }
 
-/// Implementation of GGM based on the procedure explained in the write-up(<https://eprint.iacr.org/2020/925.pdf>, Page 14),
-/// For more detailed explanation of GGM Prime, please see the Figure 1 of the write-up (<https://eprint.iacr.org/2019/1084.pdf>, Page 7).
-/// GGM prime is used compute the vector of field elements except a path b1..bn
-/// where b1 represents msb of alpha.
+/// Implementation of GGM based on the procedure explained in the
+/// write-up(<https://eprint.iacr.org/2020/925.pdf>, Page 14), For more detailed
+/// explanation of GGM Prime, please see the Figure 1 of the write-up
+/// (<https://eprint.iacr.org/2019/1084.pdf>, Page 7). GGM prime is used compute
+/// the vector of field elements except a path b1..bn where b1 represents msb of
+/// alpha.
 pub fn ggm_prime<FE: FiniteField>(
     alpha: usize,
     keys: &[Block],
-    aes_seeds: (Block, Block),
-) -> Vec<FE> {
-    let aes0 = Aes128::new(aes_seeds.0);
-    let aes1 = Aes128::new(aes_seeds.1);
+    aes: (&Aes128, &Aes128),
+    results: &mut [(FE::PrimeField, FE)],
+) -> FE {
     let depth = keys.len();
     let mut alpha_bits = unpack_bits(&alpha.to_le_bytes(), depth);
     // To get MSB as first elt.
     alpha_bits.reverse();
     let leaves = 1 << depth;
     let mut sv: Vec<Block> = vec![Default::default(); 2 * leaves - 1]; // to store all seeds up to level depth
-    let mut vs = vec![FE::ZERO; leaves];
     sv[1 + !alpha_bits[0] as usize] = keys[0];
     for i in 2..depth + 1 {
         let exp = 1 << (i - 1) as usize; // number of nodes in the prev. level.
@@ -98,10 +69,8 @@ pub fn ggm_prime<FE: FiniteField>(
         for j in 0..exp {
             if sv[exp + j - 1] != Default::default() {
                 let s = sv[exp + j - 1];
-                let s0 = aes0.encrypt(s);
-                let s1 = aes1.encrypt(s);
-                // let mut rng = AesRng::from_seed(s);
-                // let (s0, s1) = rng.gen::<(Block, Block)>();
+                let s0 = aes.0.encrypt(s);
+                let s1 = aes.1.encrypt(s);
                 sv[2 * j + exp_idx - 1] = s0; // Even node
                 sv[2 * j + exp_idx] = s1; // Odd node
             }
@@ -120,10 +89,14 @@ pub fn ggm_prime<FE: FiniteField>(
         });
         sv[exp_idx + ai_star as usize - 1] = s_alpha ^ keys[i - 1];
     }
+    let mut sum = FE::ZERO;
     for j in 0..leaves {
-        vs[j] = FE::from_uniform_bytes(&<[u8; 16]>::from(sv[leaves + j - 1]));
+        if j != alpha {
+            results[j].1 = FE::from_uniform_bytes(&<[u8; 16]>::from(sv[leaves + j - 1]));
+        }
+        sum += results[j].1;
     }
-    vs
+    sum
 }
 
 /// Convert bit-vector to a number.
@@ -141,6 +114,7 @@ mod tests {
     use scuttlebutt::{
         field::{F61p, FiniteField, Fp, Gf128, F2},
         utils::unpack_bits,
+        Aes128,
         Block,
     };
 
@@ -151,7 +125,7 @@ mod tests {
         assert_eq!(bv_to_num(&bv), x);
     }
 
-    fn test_ggm_with_field<FE: FiniteField>() {
+    fn test_ggm_<FE: FiniteField>() {
         for _ in 0..10 {
             // Runs for a while if the range is over 20.
             // depth has to be atleast 2.
@@ -159,7 +133,11 @@ mod tests {
             let seed = rand::thread_rng().gen();
             let seed0 = rand::thread_rng().gen();
             let seed1 = rand::thread_rng().gen();
-            let (v, keys): (Vec<FE>, _) = ggm(depth, seed, (seed0, seed1));
+            let aes0 = Aes128::new(seed0);
+            let aes1 = Aes128::new(seed1);
+            let exp = 1 << depth;
+            let mut vs: Vec<FE> = vec![FE::ZERO; exp];
+            let keys = ggm(depth, seed, (&aes0, &aes1), &mut vs);
             let leaves = (1 << depth) - 1;
             let alpha: usize = rand::thread_rng().gen_range(1, leaves);
             let mut alpha_bits = unpack_bits(&alpha.to_le_bytes(), keys.len());
@@ -169,10 +147,11 @@ mod tests {
                 .zip(keys.iter())
                 .map(|(b, k)| if !*b { k.1 } else { k.0 })
                 .collect();
-            let v_ = ggm_prime::<FE>(alpha, &alpha_keys, (seed0, seed1));
-            for i in 0..v_.len() {
+            let mut vs_ = vec![(FE::PrimeField::ZERO, FE::ZERO); exp];
+            let _ = ggm_prime::<FE>(alpha, &alpha_keys, (&aes0, &aes1), &mut vs_);
+            for i in 0..vs_.len() {
                 if i != alpha {
-                    assert_eq!(v[i], v_[i]);
+                    assert_eq!(vs[i], vs_[i].1);
                 }
             }
         }
@@ -180,9 +159,9 @@ mod tests {
 
     #[test]
     fn test_ggm() {
-        test_ggm_with_field::<Fp>();
-        test_ggm_with_field::<F61p>();
-        test_ggm_with_field::<F2>();
-        test_ggm_with_field::<Gf128>();
+        test_ggm_::<Fp>();
+        test_ggm_::<F61p>();
+        test_ggm_::<F2>();
+        test_ggm_::<Gf128>();
     }
 }

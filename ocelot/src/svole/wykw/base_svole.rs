@@ -10,8 +10,9 @@
 use super::copee::{CopeeReceiver, CopeeSender};
 use crate::errors::Error;
 use generic_array::typenum::Unsigned;
-use rand_core::{CryptoRng, RngCore};
-use scuttlebutt::{field::FiniteField as FF, AbstractChannel};
+use rand::Rng;
+use rand_core::{CryptoRng, RngCore, SeedableRng};
+use scuttlebutt::{field::FiniteField as FF, AbstractChannel, AesRng};
 
 /// sVOLE sender.
 pub struct Sender<'a, FE: FF> {
@@ -26,7 +27,6 @@ pub struct Receiver<'a, FE: FF> {
 }
 
 impl<'a, FE: FF> Sender<'a, FE> {
-    /// Runs any one-time initialization.
     pub fn init<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         channel: &mut C,
         pows: &'a [FE],
@@ -36,46 +36,37 @@ impl<'a, FE: FF> Sender<'a, FE> {
         Ok(Self { copee, pows })
     }
 
-    /// Runs SVOLE extend on input length `len` and returns `(u, w)`, where `u`
-    /// is a randomly generated input vector of length `len` from
-    /// `FE::PrimeField` such that the correlation `w = u'Δ + v`, `u'` is the
-    /// converted vector of `u` to the vector of type `FE`, holds. The vector
-    /// length `len` should match with the Receiver's input length, otherwise,
-    /// the program runs forever.
     pub fn send<C: AbstractChannel, RNG: CryptoRng + RngCore>(
         &mut self,
         channel: &mut C,
-        len: usize,
+        n: usize, // rows + weight + r
         mut rng: &mut RNG,
     ) -> Result<Vec<(FE::PrimeField, FE)>, Error> {
-        let r = FE::PolynomialFormNumCoefficients::to_usize();
-        let u: Vec<FE::PrimeField> = (0..len).map(|_| FE::PrimeField::random(&mut rng)).collect();
-        let a: Vec<FE::PrimeField> = (0..r).map(|_| FE::PrimeField::random(&mut rng)).collect();
-        let mut w = vec![FE::ZERO; len];
-        for i in 0..len {
-            w[i] = self.copee.send(channel, &u[i])?;
+        let mut uws = Vec::with_capacity(n);
+        for _ in 0..n {
+            let u = FE::PrimeField::random(&mut rng);
+            let w = self.copee.send(channel, &u)?;
+            uws.push((u, w));
         }
         let mut z: FE = FE::ZERO;
-        for (i, x) in a.iter().enumerate().take(r) {
-            let c = self.copee.send(channel, x)?;
-            z += c * self.pows[i];
+        let mut x: FE = FE::ZERO;
+        for pow in self.pows.iter() {
+            let a = FE::PrimeField::random(&mut rng);
+            let c = self.copee.send(channel, &a)?;
+            z += c * *pow;
+            x += pow.multiply_by_prime_subfield(a);
         }
         channel.flush()?;
-        let mut x: FE = FE::ZERO;
-        for i in 0..len {
-            let chi = channel.read_fe::<FE>()?;
-            z += chi * w[i];
-            x += chi.multiply_by_prime_subfield(u[i]);
+        let seed = channel.read_block()?;
+        let mut rng_chi = AesRng::from_seed(seed);
+        for (u, w) in uws.iter() {
+            let chi = FE::random(&mut rng_chi);
+            z += chi * *w;
+            x += chi.multiply_by_prime_subfield(*u);
         }
-        x += a
-            .iter()
-            .zip(self.pows.iter())
-            .map(|(&a, &pow)| pow.multiply_by_prime_subfield(a))
-            .sum();
         channel.write_fe(x)?;
         channel.write_fe(z)?;
-        let res = u.iter().zip(w.iter()).map(|(u, w)| (*u, *w)).collect();
-        Ok(res)
+        Ok(uws)
     }
 }
 
@@ -102,11 +93,13 @@ impl<'a, FE: FF> Receiver<'a, FE> {
         &mut self,
         channel: &mut C,
         len: usize,
-        mut rng: &mut RNG,
+        rng: &mut RNG,
     ) -> Result<Vec<FE>, Error> {
         let r = FE::PolynomialFormNumCoefficients::to_usize();
         let mut v: Vec<FE> = vec![FE::ZERO; len];
-        let chi: Vec<FE> = (0..len).map(|_| FE::random(&mut rng)).collect();
+        let seed = rng.gen();
+        let mut rng_chi = AesRng::from_seed(seed);
+        let chi: Vec<FE> = (0..len).map(|_| FE::random(&mut rng_chi)).collect();
         let mut y: FE = FE::ZERO;
         for i in 0..len {
             v[i] = self.copee.receive(channel)?;
@@ -116,9 +109,7 @@ impl<'a, FE: FF> Receiver<'a, FE> {
             let b = self.copee.receive(channel)?;
             y += self.pows[i] * b
         }
-        for x in chi.iter() {
-            channel.write_fe(*x)?;
-        }
+        channel.write_block(&seed)?;
         channel.flush()?;
         let x = channel.read_fe()?;
         let z: FE = channel.read_fe()?;

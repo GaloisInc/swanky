@@ -199,15 +199,21 @@ macro_rules! binop {
 
 macro_rules! field_ops {
     ($f:ident) => {
-        impl PartialEq for $f {
-            fn eq(&self, other: &Self) -> bool {
-                self.ct_eq(other).into()
-            }
-        }
-
         impl std::iter::Sum for $f {
             fn sum<I: Iterator<Item = Self>>(iter: I) -> Self {
                 iter.fold($f::ZERO, std::ops::Add::add)
+            }
+        }
+
+        field_ops!($f, SUM_ALREADY_DEFINED);
+    };
+
+    // Compared to the previous pattern, `Sum` is missing and assumed
+    // to be implemented by the field directly
+    ( $f:ident, SUM_ALREADY_DEFINED) => {
+        impl PartialEq for $f {
+            fn eq(&self, other: &Self) -> bool {
+                self.ct_eq(other).into()
             }
         }
 

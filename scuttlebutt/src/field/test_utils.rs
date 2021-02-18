@@ -84,6 +84,7 @@ macro_rules! test_field {
                     <$f as FiniteField>::PrimeField::from_uniform_bytes(&seed.to_le_bytes())
                 })
             }
+
             test_associativity!(additive_associativity, any_fe, add);
             test_associativity!(multiplicative_associativity, any_fe, mul);
 
@@ -123,6 +124,16 @@ macro_rules! test_field {
                 #[test]
                 fn distributive(a in any_fe(), b in any_fe(), c in any_fe()) {
                     assert_eq!(a * (b + c), (a * b) + (a * c));
+                }
+            }
+            proptest! {
+                #[test]
+                fn sum(a in proptest::collection::vec(any_fe(), proptest::collection::SizeRange::default())) {
+                    let mut r = <$f>::ZERO;
+                    for e in a.iter() {
+                        r += *e;
+                    }
+                    assert_eq!(a.iter().map(|x| *x).sum::<$f>(), r);
                 }
             }
             proptest! {
