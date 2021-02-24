@@ -4,8 +4,10 @@
 // Copyright © 2019 Galois, Inc.
 // See LICENSE for licensing information.
 
-use crate::fancy::{Fancy, FancyInput, FancyReveal, HasModulus};
-use crate::errors::FancyError;
+use crate::{
+    errors::FancyError,
+    fancy::{Fancy, FancyInput, FancyReveal, HasModulus},
+};
 use std::cmp::max;
 
 #[derive(Clone, Debug)]
@@ -61,7 +63,11 @@ impl std::fmt::Display for DepthInformer {
         writeln!(f, "  subtractions:       {:16}", self.nsubs)?;
         writeln!(f, "  cmuls:              {:16}", self.ncmuls)?;
         writeln!(f, "  muls:               {:16}", self.nmuls)?;
-        writeln!(f, "  total gates:        {:16}", self.nadds + self.nsubs + self.ncmuls + self.nmuls)?;
+        writeln!(
+            f,
+            "  total gates:        {:16}",
+            self.nadds + self.nsubs + self.ncmuls + self.nmuls
+        )?;
         writeln!(f, "  mul depth:          {:16}", self.mul_depth)?;
         Ok(())
     }
@@ -81,14 +87,19 @@ impl DepthInformer {
     }
 }
 
-impl FancyInput for DepthInformer
-{
+impl FancyInput for DepthInformer {
     type Item = DepthItem;
     type Error = DepthError;
 
     fn receive_many(&mut self, moduli: &[u16]) -> Result<Vec<Self::Item>, Self::Error> {
         self.ninputs += moduli.len();
-        Ok(moduli.iter().map(|q| DepthItem { modulus: *q, depth: 0 }).collect())
+        Ok(moduli
+            .iter()
+            .map(|q| DepthItem {
+                modulus: *q,
+                depth: 0,
+            })
+            .collect())
     }
 
     fn encode_many(
@@ -106,30 +117,50 @@ impl Fancy for DepthInformer {
 
     fn constant(&mut self, _val: u16, q: u16) -> Result<Self::Item, Self::Error> {
         self.nconstants += 1;
-        Ok(DepthItem { modulus: q, depth: 0 })
+        Ok(DepthItem {
+            modulus: q,
+            depth: 0,
+        })
     }
 
     fn add(&mut self, x: &Self::Item, y: &Self::Item) -> Result<Self::Item, Self::Error> {
         self.nadds += 1;
-        Ok(DepthItem { modulus: x.modulus, depth: max(x.depth, y.depth) })
+        Ok(DepthItem {
+            modulus: x.modulus,
+            depth: max(x.depth, y.depth),
+        })
     }
 
     fn sub(&mut self, x: &Self::Item, y: &Self::Item) -> Result<Self::Item, Self::Error> {
         self.nsubs += 1;
-        Ok(DepthItem { modulus: x.modulus, depth: max(x.depth, y.depth) })
+        Ok(DepthItem {
+            modulus: x.modulus,
+            depth: max(x.depth, y.depth),
+        })
     }
 
     fn cmul(&mut self, x: &Self::Item, _y: u16) -> Result<Self::Item, Self::Error> {
         self.ncmuls += 1;
-        Ok(DepthItem { modulus: x.modulus, depth: x.depth + 1 })
+        Ok(DepthItem {
+            modulus: x.modulus,
+            depth: x.depth + 1,
+        })
     }
 
     fn mul(&mut self, x: &Self::Item, y: &Self::Item) -> Result<Self::Item, Self::Error> {
         self.nmuls += 1;
-        Ok(DepthItem { modulus: x.modulus, depth: max(x.depth, y.depth) + 1 })
+        Ok(DepthItem {
+            modulus: x.modulus,
+            depth: max(x.depth, y.depth) + 1,
+        })
     }
 
-    fn proj(&mut self, _x: &Self::Item, _q: u16, _tt: Option<Vec<u16>>,) -> Result<Self::Item, Self::Error> {
+    fn proj(
+        &mut self,
+        _x: &Self::Item,
+        _q: u16,
+        _tt: Option<Vec<u16>>,
+    ) -> Result<Self::Item, Self::Error> {
         Err(DepthError::ProjUnsupported)
     }
 
