@@ -28,6 +28,7 @@ pub mod errors;
 mod fancy;
 mod garble;
 pub mod informer;
+pub mod depth_informer;
 mod parser;
 pub mod twopac;
 pub mod util;
