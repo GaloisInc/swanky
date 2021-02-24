@@ -10,6 +10,7 @@ use crate::{
 };
 use std::cmp::max;
 
+/// Carries the depth of the computation.
 #[derive(Clone, Debug)]
 pub struct DepthItem {
     modulus: u16,
@@ -22,6 +23,7 @@ impl HasModulus for DepthItem {
     }
 }
 
+/// Errors thrown by the Fancy computation.
 #[derive(Debug)]
 pub enum DepthError {
     ProjUnsupported,
@@ -43,6 +45,7 @@ impl std::fmt::Display for DepthError {
     }
 }
 
+/// Fancy Object which computes information about the circuit of interest to FHE.
 #[derive(Clone, Debug)]
 pub struct DepthInformer {
     ninputs: usize,
@@ -74,6 +77,7 @@ impl std::fmt::Display for DepthInformer {
 }
 
 impl DepthInformer {
+    /// Create a new DepthInformer
     pub fn new() -> DepthInformer {
         DepthInformer {
             ninputs: 0,
