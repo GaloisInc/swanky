@@ -67,6 +67,11 @@ impl<W: Clone + HasModulus> Bundle<W> {
         self.0.remove(wire_index)
     }
 
+    /// push a wire onto the Bundle.
+    pub fn push(&mut self, val: W) {
+        self.0.push(val);
+    }
+
     /// Access the underlying iterator
     pub fn iter(&self) -> std::slice::Iter<W> {
         self.0.iter()
@@ -358,7 +363,8 @@ pub trait BundleGadgets: Fancy {
             .map(Bundle)
     }
 
-    /// Shift residues, replacing them with zeros in the modulus of the least signifigant residue.
+    /// Shift residues, replacing them with zeros in the modulus of the least signifigant
+    /// residue. Maintains the length of the input.
     fn shift(
         &mut self,
         x: &Bundle<Self::Item>,
@@ -368,6 +374,21 @@ pub trait BundleGadgets: Fancy {
         let zero = self.constant(0, ws.last().unwrap().modulus())?;
         for _ in 0..n {
             ws.pop();
+            ws.insert(0, zero.clone());
+        }
+        Ok(Bundle(ws))
+    }
+
+    /// Shift residues, replacing them with zeros in the modulus of the least signifigant
+    /// residue. Output is extended with n elements.
+    fn shift_extend(
+        &mut self,
+        x: &Bundle<Self::Item>,
+        n: usize,
+    ) -> Result<Bundle<Self::Item>, Self::Error> {
+        let mut ws = x.wires().to_vec();
+        let zero = self.constant(0, ws.last().unwrap().modulus())?;
+        for _ in 0..n {
             ws.insert(0, zero.clone());
         }
         Ok(Bundle(ws))

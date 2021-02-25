@@ -228,7 +228,48 @@ mod bundle {
                 let z = d.bin_multiplication_lower_half(&x, &y).unwrap();
                 out = d.bin_output(&z).unwrap().unwrap();
             }
-            assert_eq!(out, (x * y) & (q - 1));
+            assert_eq!(out, (x * y) % q);
+        }
+    }
+
+    #[test]
+    fn test_shift_extend() {
+        let mut rng = thread_rng();
+        for _ in 0..NITERS {
+            let nbits = 64;
+            let q = 1 << nbits;
+            let shift_size = rng.gen_usize() % nbits;
+            let x = rng.gen_u128() % q;
+            let mut d = Dummy::new();
+            let out;
+            {
+                use crate::BinaryBundle;
+                let x = d.bin_encode(x, nbits).unwrap();
+                let z = d.shift_extend(&x, shift_size).unwrap();
+                out = d.bin_output(&BinaryBundle::from(z)).unwrap().unwrap();
+            }
+            assert_eq!(out, x << shift_size);
+        }
+    }
+
+    #[test]
+    fn test_binary_full_multiplication() {
+        let mut rng = thread_rng();
+        for _ in 0..NITERS {
+            let nbits = 64;
+            let q = 1 << nbits;
+            let x = rng.gen_u128() % q;
+            let y = rng.gen_u128() % q;
+            let mut d = Dummy::new();
+            let out;
+            {
+                let x = d.bin_encode(x, nbits).unwrap();
+                let y = d.bin_encode(y, nbits).unwrap();
+                let z = d.bin_mul(&x, &y).unwrap();
+                println!("z.len() = {}", z.size());
+                out = d.bin_output(&z).unwrap().unwrap();
+            }
+            assert_eq!(out, x * y);
         }
     }
 

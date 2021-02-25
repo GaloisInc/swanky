@@ -14,7 +14,7 @@ use crate::{
     util,
 };
 use itertools::Itertools;
-use std::ops::Deref;
+use std::ops::{Deref, DerefMut};
 
 /// Bundle which is explicitly binary representation.
 #[derive(Clone)]
@@ -37,6 +37,12 @@ impl<W: Clone + HasModulus> Deref for BinaryBundle<W> {
 
     fn deref(&self) -> &Bundle<W> {
         &self.0
+    }
+}
+
+impl<W: Clone + HasModulus> DerefMut for BinaryBundle<W> {
+    fn deref_mut(&mut self) -> &mut Bundle<W> {
+        &mut self.0
     }
 }
 
@@ -194,6 +200,47 @@ pub trait BinaryGadgets: Fancy + BundleGadgets {
         }
 
         Ok(sum)
+    }
+
+    /// Full multiplier
+    fn bin_mul(
+        &mut self,
+        xs: &BinaryBundle<Self::Item>,
+        ys: &BinaryBundle<Self::Item>,
+    ) -> Result<BinaryBundle<Self::Item>, Self::Error> {
+        if xs.moduli() != ys.moduli() {
+            return Err(Self::Error::from(FancyError::UnequalModuli));
+        }
+
+        let xwires = xs.wires();
+        let ywires = ys.wires();
+
+        let mut sum = xwires
+            .iter()
+            .map(|x| self.and(x, &ywires[0]))
+            .collect::<Result<_, _>>()
+            .map(BinaryBundle::new)?;
+
+        for i in 1..xwires.len() {
+            let mul = xwires
+                .iter()
+                .map(|x| self.and(x, &ywires[i]))
+                .collect::<Result<_, _>>()
+                .map(BinaryBundle::new)?;
+            let shifted = self.shift_extend(&mul, i).map(BinaryBundle::from)?;
+            sum = self.bin_addition_no_carry(&sum, &shifted)?;
+        }
+
+        Ok(sum)
+    }
+
+    /// Divider
+    fn bin_div(
+        &mut self,
+        xs: &BinaryBundle<Self::Item>,
+        ys: &BinaryBundle<Self::Item>,
+    ) -> Result<BinaryBundle<Self::Item>, Self::Error> {
+        unimplemented!()
     }
 
     /// Compute the twos complement of the input bundle (which must be base 2).
