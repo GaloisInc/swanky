@@ -215,6 +215,8 @@ pub trait BinaryGadgets: Fancy + BundleGadgets {
         let xwires = xs.wires();
         let ywires = ys.wires();
 
+        let zero = self.constant(0, 2)?;
+
         let mut sum = xwires
             .iter()
             .map(|x| self.and(x, &ywires[0]))
@@ -228,6 +230,7 @@ pub trait BinaryGadgets: Fancy + BundleGadgets {
                 .collect::<Result<_, _>>()
                 .map(BinaryBundle::new)?;
             let shifted = self.shift_extend(&mul, i).map(BinaryBundle::from)?;
+            sum.pad(&zero, 1);
             sum = self.bin_addition_no_carry(&sum, &shifted)?;
         }
 
