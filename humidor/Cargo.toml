@@ -1,0 +1,31 @@
+[package]
+name = "humidor"
+version = "0.0.1"
+authors = ["Ben Hamlin <hamlinb@galois.com>"]
+license = "MIT"
+readme = "README.md"
+description = "A test-bed for Ligero-like protocols"
+categories = ["cryptography"]
+keywords = ["cryptography", "zero-knowledge-proofs", "ligero"]
+edition = "2018"
+autobenches = false
+publish = false
+
+[lib]
+doctest = false
+
+[features]
+
+[dependencies]
+merkletree = "0.21.0"
+rust-crypto = "^0.2.36"
+sprs = "0.9.3"
+ndarray = "0.13.1"
+num-traits = "0.2.14"
+
+[dependencies.threshold-secret-sharing]
+git = "https://gitlab-ext.galois.com/hamlinb/rust-threshold-secret-sharing"
+branch = "dev"
+
+[dev-dependencies]
+proptest = "0.10.1"
