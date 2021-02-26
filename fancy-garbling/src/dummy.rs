@@ -274,6 +274,26 @@ mod bundle {
     }
 
     #[test]
+    fn test_binary_division() {
+        let mut rng = thread_rng();
+        for _ in 0..NITERS {
+            let nbits = 64;
+            let q = 1 << nbits;
+            let x = rng.gen_u128() % q;
+            let y = rng.gen_u128() % q;
+            let mut d = Dummy::new();
+            let out;
+            {
+                let x = d.bin_encode(x, nbits).unwrap();
+                let y = d.bin_encode(y, nbits).unwrap();
+                let z = d.bin_div(&x, &y).unwrap();
+                out = d.bin_output(&z).unwrap().unwrap();
+            }
+            assert_eq!(out, x / y);
+        }
+    }
+
+    #[test]
     fn max() {
         let mut rng = thread_rng();
         let q = util::modulus_with_width(10);

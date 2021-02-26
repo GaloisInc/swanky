@@ -67,14 +67,29 @@ impl<W: Clone + HasModulus> Bundle<W> {
         self.0.remove(wire_index)
     }
 
+    /// Insert a wire from the Bundle
+    pub fn insert(&mut self, wire_index: usize, val: W) {
+        self.0.insert(wire_index, val)
+    }
+
     /// push a wire onto the Bundle.
     pub fn push(&mut self, val: W) {
         self.0.push(val);
     }
 
+    /// Pop a wire from the Bundle.
+    pub fn pop(&mut self) -> Option<W> {
+        self.0.pop()
+    }
+
     /// Access the underlying iterator
     pub fn iter(&self) -> std::slice::Iter<W> {
         self.0.iter()
+    }
+
+    /// Reverse the wires
+    pub fn reverse(&mut self) {
+        self.0.reverse();
     }
 }
 

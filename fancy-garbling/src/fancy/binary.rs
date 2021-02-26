@@ -245,7 +245,21 @@ pub trait BinaryGadgets: Fancy + BundleGadgets {
         xs: &BinaryBundle<Self::Item>,
         ys: &BinaryBundle<Self::Item>,
     ) -> Result<BinaryBundle<Self::Item>, Self::Error> {
-        unimplemented!()
+        if xs.moduli() != ys.moduli() {
+            return Err(Self::Error::from(FancyError::UnequalModuli));
+        }
+        let ys_neg = self.bin_twos_complement(ys)?;
+        let mut acc = self.bin_constant_bundle(0, xs.size())?;
+        let mut qs = BinaryBundle::new(Vec::new());
+        for x in xs.iter().rev() {
+            acc.pop();
+            acc.insert(0, x.clone());
+            let (res, cout) = self.bin_addition(&acc, &ys_neg)?;
+            acc = self.multiplex(&cout, &acc, &res).map(BinaryBundle)?;
+            qs.push(cout);
+        }
+        qs.reverse(); // Switch back to little-endian
+        Ok(qs)
     }
 
     /// Compute the twos complement of the input bundle (which must be base 2).
