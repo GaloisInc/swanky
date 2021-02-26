@@ -18,7 +18,7 @@ unstable = []
 serde1 = ["serde"]
 
 [dependencies]
-curve25519-dalek = { version = "2", features = ["std"], optional = true }
+curve25519-dalek = { version = "3", features = ["std"], optional = true }
 rand = "0.7"
 rand_core = "0.5"
 serde = { version = "1", features = ["derive"], optional = true }

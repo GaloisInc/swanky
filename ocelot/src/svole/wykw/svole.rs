@@ -19,9 +19,10 @@ use crate::{
 use generic_array::typenum::Unsigned;
 use rand::{
     distributions::{Distribution, Uniform},
+    CryptoRng,
     Rng,
+    SeedableRng,
 };
-use rand_core::{CryptoRng, RngCore, SeedableRng};
 use scuttlebutt::{field::FiniteField, AbstractChannel, AesRng, Block};
 
 /// Secure LPN parameters presented in (cf.
@@ -89,7 +90,7 @@ pub struct Sender<FE: FiniteField> {
 }
 
 impl<FE: FiniteField> Sender<FE> {
-    fn init_internal<C: AbstractChannel, RNG: CryptoRng + RngCore>(
+    fn init_internal<C: AbstractChannel, RNG: CryptoRng + Rng>(
         channel: &mut C,
         rows: usize,
         cols: usize,
@@ -111,7 +112,7 @@ impl<FE: FiniteField> Sender<FE> {
         })
     }
 
-    fn init_internal2<C: AbstractChannel, RNG: CryptoRng + RngCore>(
+    fn init_internal2<C: AbstractChannel, RNG: CryptoRng + Rng>(
         channel: &mut C,
         mut sender: Self,
         rows: usize,
@@ -130,7 +131,7 @@ impl<FE: FiniteField> Sender<FE> {
         })
     }
 
-    fn send_internal<C: AbstractChannel, RNG: CryptoRng + RngCore>(
+    fn send_internal<C: AbstractChannel, RNG: CryptoRng + Rng>(
         &mut self,
         channel: &mut C,
         num_saved: usize,
@@ -195,7 +196,7 @@ impl<FE: FiniteField> Sender<FE> {
 impl<FE: FiniteField> SVoleSender for Sender<FE> {
     type Msg = FE;
 
-    fn init<C: AbstractChannel, RNG: CryptoRng + RngCore>(
+    fn init<C: AbstractChannel, RNG: CryptoRng + Rng>(
         channel: &mut C,
         rng: &mut RNG,
     ) -> Result<Self, Error> {
@@ -225,7 +226,7 @@ impl<FE: FiniteField> SVoleSender for Sender<FE> {
         })
     }
 
-    fn send<C: AbstractChannel, RNG: CryptoRng + RngCore>(
+    fn send<C: AbstractChannel, RNG: CryptoRng + Rng>(
         &mut self,
         channel: &mut C,
         rng: &mut RNG,
@@ -245,7 +246,7 @@ pub struct Receiver<FE: FiniteField> {
 }
 
 impl<FE: FiniteField> Receiver<FE> {
-    fn init_internal<C: AbstractChannel, RNG: CryptoRng + RngCore>(
+    fn init_internal<C: AbstractChannel, RNG: CryptoRng + Rng>(
         channel: &mut C,
         rows: usize,
         cols: usize,
@@ -270,7 +271,7 @@ impl<FE: FiniteField> Receiver<FE> {
         })
     }
 
-    fn init_internal2<C: AbstractChannel, RNG: CryptoRng + RngCore>(
+    fn init_internal2<C: AbstractChannel, RNG: CryptoRng + Rng>(
         channel: &mut C,
         mut receiver: Self,
         rows: usize,
@@ -290,7 +291,7 @@ impl<FE: FiniteField> Receiver<FE> {
         })
     }
 
-    fn receive_internal<C: AbstractChannel, RNG: CryptoRng + RngCore>(
+    fn receive_internal<C: AbstractChannel, RNG: CryptoRng + Rng>(
         &mut self,
         channel: &mut C,
         num_saved: usize,
@@ -348,7 +349,7 @@ impl<FE: FiniteField> Receiver<FE> {
 impl<FE: FiniteField> SVoleReceiver for Receiver<FE> {
     type Msg = FE;
 
-    fn init<C: AbstractChannel, RNG: CryptoRng + RngCore>(
+    fn init<C: AbstractChannel, RNG: CryptoRng + Rng>(
         channel: &mut C,
         rng: &mut RNG,
     ) -> Result<Self, Error> {
@@ -383,7 +384,7 @@ impl<FE: FiniteField> SVoleReceiver for Receiver<FE> {
         self.delta
     }
 
-    fn receive<C: AbstractChannel, RNG: CryptoRng + RngCore>(
+    fn receive<C: AbstractChannel, RNG: CryptoRng + Rng>(
         &mut self,
         channel: &mut C,
         rng: &mut RNG,

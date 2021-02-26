@@ -18,7 +18,6 @@ use rand::{
     Rng,
     SeedableRng,
 };
-use rand_core::RngCore;
 use scuttlebutt::{
     commitment::{Commitment, ShaCommitment},
     field::FiniteField as FF,
@@ -70,7 +69,7 @@ fn eq_send<C: AbstractChannel, FE: FF>(channel: &mut C, x: FE) -> Result<bool, E
 
 // Implementation of the EQ protocol functionality described in
 // <https://eprint.iacr.org/2020/925.pdf>, Page 30.
-fn eq_receive<C: AbstractChannel, RNG: CryptoRng + RngCore, FE: FF>(
+fn eq_receive<C: AbstractChannel, RNG: CryptoRng + Rng, FE: FF>(
     channel: &mut C,
     rng: &mut RNG,
     y: FE,
@@ -98,7 +97,7 @@ fn eq_receive<C: AbstractChannel, RNG: CryptoRng + RngCore, FE: FF>(
 /// Implement SpsVoleSender for Sender type.
 impl<OT: OtReceiver<Msg = Block>, FE: FF> Sender<OT, FE> {
     /// Runs any one-time initialization.
-    pub fn init<C: AbstractChannel, RNG: CryptoRng + RngCore>(
+    pub fn init<C: AbstractChannel, RNG: CryptoRng + Rng>(
         channel: &mut C,
         pows: Vec<FE>,
         rng: &mut RNG,
@@ -112,7 +111,7 @@ impl<OT: OtReceiver<Msg = Block>, FE: FF> Sender<OT, FE> {
     /// For simplicity, the vector length `n` assumed to be a multiple of `2` as
     /// it represents the number of leaves in the GGM tree and should match with
     /// the receiver input length.
-    pub fn send<C: AbstractChannel, RNG: CryptoRng + RngCore>(
+    pub fn send<C: AbstractChannel, RNG: CryptoRng + Rng>(
         &mut self,
         channel: &mut C,
         n: usize,                          // Equal to cols / weight
@@ -177,7 +176,7 @@ impl<OT: OtReceiver<Msg = Block>, FE: FF> Sender<OT, FE> {
         Ok(result)
     }
     /// Batch consistency check that can be called after bunch of iterations.
-    pub fn send_batch_consistency_check<C: AbstractChannel, RNG: CryptoRng + RngCore>(
+    pub fn send_batch_consistency_check<C: AbstractChannel, RNG: CryptoRng + Rng>(
         &mut self,
         channel: &mut C,
         _m: usize,
@@ -228,7 +227,7 @@ impl<OT: OtReceiver<Msg = Block>, FE: FF> Sender<OT, FE> {
 /// Implement SpsVoleReceiver for Receiver type.
 impl<OT: OtSender<Msg = Block>, FE: FF> Receiver<OT, FE> {
     /// Runs any one-time initialization.
-    pub fn init<C: AbstractChannel, RNG: CryptoRng + RngCore>(
+    pub fn init<C: AbstractChannel, RNG: CryptoRng + Rng>(
         channel: &mut C,
         pows: Vec<FE>,
         delta: FE,
@@ -243,7 +242,7 @@ impl<OT: OtSender<Msg = Block>, FE: FF> Receiver<OT, FE> {
     /// `u` to the vector of elements of the extended field `FE`. Of course, the argument `nleaves`
     /// is suppose to be in multiples of `2` as it represents the number of
     /// leaves in the GGM tree and should match with the sender input length.
-    pub fn receive<C: AbstractChannel, RNG: CryptoRng + RngCore>(
+    pub fn receive<C: AbstractChannel, RNG: CryptoRng + Rng>(
         &mut self,
         channel: &mut C,
         n: usize,
@@ -279,7 +278,7 @@ impl<OT: OtSender<Msg = Block>, FE: FF> Receiver<OT, FE> {
         Ok(result)
     }
     /// Batch consistency check that can be called after bunch of iterations.
-    pub fn receive_batch_consistency_check<C: AbstractChannel, RNG: CryptoRng + RngCore>(
+    pub fn receive_batch_consistency_check<C: AbstractChannel, RNG: CryptoRng + Rng>(
         &mut self,
         channel: &mut C,
         _n: usize,

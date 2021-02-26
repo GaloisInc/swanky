@@ -12,7 +12,7 @@ use crate::{
     ot::{KosReceiver, KosSender, RandomReceiver as ROTReceiver, RandomSender as ROTSender},
 };
 use generic_array::typenum::Unsigned;
-use rand_core::{CryptoRng, RngCore};
+use rand::{CryptoRng, Rng};
 use scuttlebutt::{field::FiniteField as FF, utils::unpack_bits, AbstractChannel, Aes128, Block};
 use std::marker::PhantomData;
 use subtle::{Choice, ConditionallySelectable};
@@ -53,7 +53,7 @@ fn prf<FE: FF>(aes: &Aes128, pt: Block) -> FE::PrimeField {
 /// Implement CopeeSender for Sender type
 impl<'a, ROT: ROTSender<Msg = Block>, FE: FF> Sender<'a, ROT, FE> {
     /// Runs any one-time initialization.
-    pub fn init<C: AbstractChannel, RNG: CryptoRng + RngCore>(
+    pub fn init<C: AbstractChannel, RNG: CryptoRng + Rng>(
         channel: &mut C,
         pows: &'a [FE],
         mut rng: &mut RNG,
@@ -113,7 +113,7 @@ impl<'a, ROT: ROTSender<Msg = Block>, FE: FF> Sender<'a, ROT, FE> {
 /// Implement CopeeReceiver for Receiver type.
 impl<'a, ROT: ROTReceiver<Msg = Block>, FE: FF> Receiver<'a, ROT, FE> {
     /// Runs any one-time initialization.
-    pub fn init<C: AbstractChannel, RNG: CryptoRng + RngCore>(
+    pub fn init<C: AbstractChannel, RNG: CryptoRng + Rng>(
         channel: &mut C,
         pows: &'a [FE],
         mut rng: &mut RNG,

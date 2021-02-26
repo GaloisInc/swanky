@@ -10,8 +10,7 @@
 use super::copee::{CopeeReceiver, CopeeSender};
 use crate::errors::Error;
 use generic_array::typenum::Unsigned;
-use rand::Rng;
-use rand_core::{CryptoRng, RngCore, SeedableRng};
+use rand::{CryptoRng, Rng, SeedableRng};
 use scuttlebutt::{field::FiniteField as FF, AbstractChannel, AesRng};
 
 /// sVOLE sender.
@@ -27,7 +26,7 @@ pub struct Receiver<'a, FE: FF> {
 }
 
 impl<'a, FE: FF> Sender<'a, FE> {
-    pub fn init<C: AbstractChannel, RNG: CryptoRng + RngCore>(
+    pub fn init<C: AbstractChannel, RNG: CryptoRng + Rng>(
         channel: &mut C,
         pows: &'a [FE],
         rng: &mut RNG,
@@ -36,7 +35,7 @@ impl<'a, FE: FF> Sender<'a, FE> {
         Ok(Self { copee, pows })
     }
 
-    pub fn send<C: AbstractChannel, RNG: CryptoRng + RngCore>(
+    pub fn send<C: AbstractChannel, RNG: CryptoRng + Rng>(
         &mut self,
         channel: &mut C,
         n: usize, // rows + weight + r
@@ -72,7 +71,7 @@ impl<'a, FE: FF> Sender<'a, FE> {
 
 impl<'a, FE: FF> Receiver<'a, FE> {
     /// Runs any one-time initialization.
-    pub fn init<C: AbstractChannel, RNG: CryptoRng + RngCore>(
+    pub fn init<C: AbstractChannel, RNG: CryptoRng + Rng>(
         channel: &mut C,
         pows: &'a [FE],
         rng: &mut RNG,
@@ -89,7 +88,7 @@ impl<'a, FE: FF> Receiver<'a, FE> {
     /// converted vector from `u` to the vector of elements of the extended
     /// field `FE`. The vector length `len` should match with the Sender's input
     /// `len`, otherwise it never terminates.
-    pub fn receive<C: AbstractChannel, RNG: CryptoRng + RngCore>(
+    pub fn receive<C: AbstractChannel, RNG: CryptoRng + Rng>(
         &mut self,
         channel: &mut C,
         len: usize,
