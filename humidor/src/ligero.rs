@@ -28,6 +28,7 @@ type Field = crate::f5038849::F;
 // I.e., we ensure soundness error is negligible in the field size.
 // XXX: Is this right? Seems like t could be smaller, say
 // ceil(log |F| / p).
+#[derive(Debug, Clone)]
 #[allow(non_snake_case)]
 struct Public {
     l: usize,      // Message size (Note: k = l + t = 2^j - 1, for some j)
@@ -116,14 +117,13 @@ impl Public {
     }
 
     //
-    // XXX: In the following, can we eliminate some of the
-    // intermediate vectors?
+    // XXX: In the following, can we eliminate some of the copies?
     //
 
     // TODO: Append a random codeword.
     #[inline]
     fn encode(&self, wf: ArrayView1<Field>) -> Array1<Field> {
-        debug_assert!(wf.shape() == [self.l]);
+        debug_assert!(wf.len() == self.l);
 
         let w: Vec<i64> = wf.iter().cloned().map(i64::from).collect();
         let c: Vec<i64> = self.pss.share(&w);
@@ -133,24 +133,50 @@ impl Public {
 
     #[inline]
     fn decode(&self, cf: ArrayView1<Field>) -> Array1<Field> {
-        debug_assert!(cf.shape() == [self.n]);
+        debug_assert!(cf.len() == self.n);
 
-        let c: Vec<i64> = cf.iter().take(self.l + self.t).cloned().map(i64::from).collect();
-        let ixs: Vec<usize> = (0 .. self.l + self.t).collect();
+        let c: Vec<i64> = cf.iter().take(self.k).cloned().map(i64::from).collect();
+        let ixs: Vec<usize> = (0 .. self.k).collect();
         let w: Vec<i64> = self.pss.reconstruct(&ixs, &c);
 
         w.iter().cloned().map(Field::from).collect()
     }
 
     #[inline]
-    fn codeword_is_valid(&self, cf: ArrayView1<Field>) -> bool {
-        debug_assert!(cf.shape() == [self.n]);
+    fn decode_part(&self,
+        ixs: &[usize],
+        cf: ArrayView1<Field>,
+    ) -> Array1<Field> {
+        debug_assert!(cf.len() <= self.n);
+        debug_assert!(cf.len() >= self.k);
 
-        self.encode(self.decode(cf).view()).view() == cf
+        let c: Vec<i64> = cf.iter().cloned().map(i64::from).collect();
+        let w: Vec<i64> = self.pss.reconstruct(ixs, &c);
+
+        w.iter().cloned().map(Field::from).collect()
+    }
+
+    #[inline]
+    fn codeword_is_valid(&self, ce: ArrayView1<Field>) -> bool {
+        debug_assert!(ce.len() == self.n);
+
+        use ndarray::s;
+        let cd0 = self.decode_part(
+            &(0 .. self.k).collect::<Vec<usize>>(),
+            ce.slice(s![0 .. self.k]).view(),
+        );
+        let cd1 = self.decode_part(
+            &(self.n - self.k .. self.n).collect::<Vec<usize>>(),
+            ce.slice(s![self.n - self.k .. self.n]).view(),
+        );
+
+        // XXX: I think this is necessary for c to be a codeword. Is it
+        // sufficient?
+        cd0 == cd1
     }
 
     pub fn encode_interleaved(&self, ws: ArrayView1<Field>) -> Array2<Field> {
-        debug_assert!(ws.shape() == [self.l * self.m]);
+        debug_assert!(ws.len() == self.l * self.m);
 
         let mut res = Vec::with_capacity(self.n * self.m);
 
@@ -223,47 +249,88 @@ impl Public {
     }
 }
 
+impl Arbitrary for Public {
+    type Parameters = <Ckt as Arbitrary>::Parameters;
+    type Strategy = BoxedStrategy<Self>;
+    fn arbitrary_with(p: Self::Parameters) -> Self::Strategy {
+        Ckt::arbitrary_with(p).prop_flat_map(|c| Just(Self::new(&c))).boxed()
+    }
+}
+
 #[test]
 fn test_decode_encode() {
     let p = Public::test_value();
-    let vs: Array1<Field> = (0 .. p.l as i64).map(Field::from).collect();
 
-    assert_eq!(p.decode(p.encode(vs.view()).view()), vs);
+    use proptest::collection::vec;
+    proptest!(|(v in vec(any::<Field>(), p.l))| {
+        let ve = p.encode(ArrayView1::from(&v));
+        let vd = p.decode(ve.view()).to_vec();
+
+        prop_assert_eq!(vd, v);
+    })
 }
 
 #[test]
-fn test_decode_detects_errors() {
+fn test_codeword_is_valid_accepts_valid() {
     let p = Public::test_value();
-    let vs: Array1<Field> = (0 .. p.l as i64).map(Field::from).collect();
 
-    let mut cs = p.encode(vs.view());
-    cs[0] += Field::ONE;
+    use proptest::collection::vec;
+    proptest!(|(v in vec(any::<Field>(), p.l))| {
+        let ve = p.encode(Array1::from(v).view());
 
-    assert!(!p.codeword_is_valid(cs.view()));
+        prop_assert!(p.codeword_is_valid(ve.view()));
+    })
 }
 
-proptest! {
-    #[test]
-    fn test_decode_encode_prop(c in Ckt::arbitrary_with((20, 1000))) {
-        let p = Public::new(&c);
-        let vs: Array1<Field> = (0 .. p.l as i64).map(Field::from).collect();
+#[test]
+fn test_codeword_is_valid_detects_invalid() {
+    let p = Public::test_value();
 
-        assert_eq!(p.decode(p.encode(vs.view()).view()), vs);
-    }
+    use proptest::collection::vec;
+    proptest!(|(v in vec(any::<Field>(), p.l), ix in 0..p.l)| {
+        let mut ve = p.encode(Array1::from(v).view());
+        ve[ix] += Field::ONE;
 
-    #[test]
-    fn test_decode_detects_errors_prop(c in Ckt::arbitrary_with((20, 1000))) {
-        let p = Public::new(&c);
-        let vs: Array1<Field> = (0 .. p.l as i64).map(Field::from).collect();
+        prop_assert!(!p.codeword_is_valid(ve.view()));
+    })
+}
 
-        let mut cs = p.encode(vs.view());
-        cs[0] += Field::ONE;
+#[test]
+fn test_codeword_is_valid_accepts_sum() {
+    let p = Public::new(&Ckt { inp_size: 1000, ops: vec![] });
 
-        assert!(!p.codeword_is_valid(cs.view()));
-    }
+    use proptest::collection::vec;
+    proptest!(|(v in vec(any::<Field>(), p.m * p.l))| {
+        let ve = p.encode_interleaved(Array1::from(v).view());
+        let vs = ve.genrows().into_iter()
+            .fold(Array1::zeros(p.n), |acc, row| acc + row);
+
+        prop_assert!(p.codeword_is_valid(vs.view()));
+    })
+}
+
+#[test]
+fn test_codeword_is_valid_detects_invalid_sum() {
+    let p = Public::test_value();
+
+    use proptest::collection::vec;
+    proptest!(|(
+            v in vec(any::<Field>(), p.m * p.l),
+            r in 0..p.m,
+            c in 0..p.l,
+    )| {
+        let mut ve = p.encode_interleaved(Array1::from(v).view());
+        ve[(r,c)] += Field::ONE;
+
+        let vs = ve.genrows().into_iter()
+            .fold(Array1::zeros(p.n), |acc, row| acc + row);
+
+        prop_assert!(!p.codeword_is_valid(vs.view()));
+    })
 }
 
 // Proof information available only to the prover.
+#[derive(Debug)]
 #[allow(non_snake_case)]
 struct Secret {
     public: Public,
@@ -333,53 +400,43 @@ impl Secret {
     }
 }
 
-#[test]
-#[allow(non_snake_case)]
-fn test_P_matrices() {
-    let s = Secret::test_value();
-
-    assert_eq!(&s.public.Px * &s.w.t(), s.x);
-    assert_eq!(&s.public.Py * &s.w.t(), s.y);
-    assert_eq!(&s.public.Pz * &s.w.t(), s.z);
-    assert_eq!(&s.public.Padd * &s.w.t(),
-        Array1::from(vec![0.into(); s.w.len()]));
-}
-
-#[test]
-#[allow(non_snake_case)]
-fn test_U_matrices() {
-    let s = Secret::test_value();
-
-    assert_eq!(s.public.decode_interleaved(s.Uw.view()), s.w);
-    assert_eq!(s.public.decode_interleaved(s.Ux.view()), s.x);
-    assert_eq!(s.public.decode_interleaved(s.Uy.view()), s.y);
-    assert_eq!(s.public.decode_interleaved(s.Uz.view()), s.z);
+impl Arbitrary for Secret {
+    type Parameters = (usize, usize);
+    type Strategy = BoxedStrategy<Self>;
+    fn arbitrary_with(p: Self::Parameters) -> Self::Strategy {
+        (
+            any_with::<Ckt>(p),
+            proptest::collection::vec(any::<Field>(), p.0),
+        ).prop_map(|(ckt, inp)|
+            Secret::new(&ckt, &inp)
+        ).boxed()
+    }
 }
 
 proptest! {
     #[test]
     #[allow(non_snake_case)]
-    fn test_P_matrices_prop(c in Ckt::arbitrary_with((20, 1000))) {
-        let s = Secret::new(&c,
-            &(0 .. 20).map(Field::from).collect::<Vec<Field>>());
-
-        assert_eq!(&s.public.Px * &s.w.t(), s.x);
-        assert_eq!(&s.public.Py * &s.w.t(), s.y);
-        assert_eq!(&s.public.Pz * &s.w.t(), s.z);
-        assert_eq!(&s.public.Padd * &s.w.t(),
-            Array1::from(vec![0.into(); s.w.len()]));
+    fn test_Px(s in Secret::arbitrary_with((20, 1000))) {
+        prop_assert_eq!(&s.public.Px * &s.w.t(), s.x);
     }
 
     #[test]
     #[allow(non_snake_case)]
-    fn test_U_matrices_prop(c in Ckt::arbitrary_with((20, 100))) {
-        let s = Secret::new(&c,
-            &(0 .. 20).map(Field::from).collect::<Vec<Field>>());
+    fn test_Py(s in Secret::arbitrary_with((20, 1000))) {
+        prop_assert_eq!(&s.public.Py * &s.w.t(), s.y);
+    }
 
-        assert_eq!(s.public.decode_interleaved(s.Uw.view()), s.w);
-        assert_eq!(s.public.decode_interleaved(s.Ux.view()), s.x);
-        assert_eq!(s.public.decode_interleaved(s.Uy.view()), s.y);
-        assert_eq!(s.public.decode_interleaved(s.Uz.view()), s.z);
+    #[test]
+    #[allow(non_snake_case)]
+    fn test_Pz(s in Secret::arbitrary_with((20, 1000))) {
+        prop_assert_eq!(&s.public.Pz * &s.w.t(), s.z);
+    }
+
+    #[test]
+    #[allow(non_snake_case)]
+    fn test_Padd(s in Secret::arbitrary_with((20, 1000))) {
+        prop_assert_eq!(&s.public.Padd * &s.w.t(),
+            Array1::from(vec![0.into(); s.w.len()]));
     }
 }
 
@@ -440,8 +497,8 @@ mod proof {
                     let res2 = r.dot(col) == self.w[j];
 
                     // XXX: These fail right now. Why?
-                    acc && res0 /*&& res1*/ && res2
-                }) //&& publ.codeword_is_valid(self.w.view())
+                    acc && res0 && res1 && res2
+                }) && publ.codeword_is_valid(self.w.view())
         }
     }
 
@@ -469,7 +526,7 @@ mod proof {
                 &Q
             );
 
-            assert!(proof.verify(
+            prop_assert!(proof.verify(
                 &s.public,
                 s.Uw_hash.root(),
                 r.view(),

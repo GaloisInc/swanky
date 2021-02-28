@@ -1,7 +1,7 @@
 use proptest::{*, prelude::*};
 
 #[derive(Debug, Clone, Copy, Default)]
-pub struct F(i64);
+pub struct F(pub i64);
 
 impl F {
     pub const ZERO: Self = Self(0);
