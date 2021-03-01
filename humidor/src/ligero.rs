@@ -330,7 +330,6 @@ fn test_codeword_is_valid_detects_invalid_sum() {
 }
 
 // Proof information available only to the prover.
-#[derive(Debug)]
 #[allow(non_snake_case)]
 struct Secret {
     public: Public,
@@ -350,6 +349,21 @@ struct Secret {
     Ux_hash: merkle::Tree,
     Uy_hash: merkle::Tree,
     Uz_hash: merkle::Tree,
+}
+
+impl std::fmt::Debug for Secret {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Secret")
+            .field("w", &self.w)
+            .field("x", &self.x)
+            .field("y", &self.y)
+            .field("z", &self.z)
+            .field("Uw", &self.Uw)
+            .field("Ux", &self.Ux)
+            .field("Uy", &self.Uy)
+            .field("Uz", &self.Uz)
+            .finish()
+    }
 }
 
 #[allow(non_snake_case)]
@@ -446,13 +460,10 @@ mod proof {
     // Proof that a committed matrix U is an interleaved codeword given a
     // random vector `r` in `F^m` and a random size `t` subset `Q` of
     // columns.
+    #[allow(non_snake_case)]
     struct InterleavedCodeCheck {
         w: Array1<Field>,
-        Q: Vec<Array1<Field>>,
-        // XXX: This is horribly inefficient. We should really be
-        // cherry-picking the tree nodes to send, but how do we do this
-        // using the `merkletree` API?
-        Q_proofs: Vec<merkle::Proof>,
+        Q_lemma: merkle::Lemma,
     }
 
     impl InterleavedCodeCheck {
@@ -461,45 +472,51 @@ mod proof {
             U: ArrayView2<Field>,
             U_hash: &merkle::Tree,
             r: ArrayView1<Field>,
-            Q_ixs: &Vec<usize>,
+            Q: &Vec<u32>,
         ) -> Self {
             debug_assert!(r.len() == U.nrows());
 
-            let mut Q = vec![];
-            let mut Q_proofs = vec![];
+            let Q_columns = Q.iter()
+                .map(|&j| U.column(j as usize).to_owned())
+                .collect::<Vec<Array1<Field>>>();
+            let Q_lemma = merkle::Lemma::new(&U_hash, &Q_columns, Q);
 
-            for &j in Q_ixs {
-                Q.push(U.column(j).to_owned());
-                Q_proofs.push(U_hash.gen_proof(j) // XXX: When does this fail?
-                    .expect("Error generating merkle proof"));
-            }
-
-            Self { Q, Q_proofs, w: r.dot(&U) }
+            Self { Q_lemma, w: r.dot(&U) }
         }
 
         #[allow(non_snake_case)]
         pub fn verify(&self,
             publ: &Public,
-            root: merkle::Digest,
+            root: &merkle::Digest,
             r: ArrayView1<Field>,
-            Q_ixs: &Vec<usize>
+            Q: &Vec<u32>
         ) -> bool {
-            self.Q.iter()
-                .zip(&self.Q_proofs)
-                .zip(Q_ixs)
-                .fold(true, |acc, ((col, proof), &j)| {
-                    let h = merkle::hash_col(col.view());
-                    let res0 = proof.root() == root;
-                    let res1 = proof
-                        .validate_with_data::<merkle::HashAlgo>(&h)
-                        .expect("Error validating Merkle proof");
-                        // XXX: When does this fail?
-                    let res2 = r.dot(col) == self.w[j];
+            let codeword_check = publ.codeword_is_valid(self.w.view());
+            let leaves_check = self.Q_lemma.verify(root);
+            let columns_check = self.Q_lemma.columns().iter().zip(Q)
+                .fold(true, |acc, (cj, &j)|
+                    acc && (r.dot(cj) == self.w[j as usize]));
 
-                    // XXX: These fail right now. Why?
-                    acc && res0 && res1 && res2
-                }) && publ.codeword_is_valid(self.w.view())
+            codeword_check && leaves_check && columns_check
         }
+    }
+
+    #[cfg(test)]
+    #[allow(non_snake_case)]
+    fn circuit_and_randomness(
+        input_size: usize,
+        circuit_size: usize
+    ) -> impl Strategy<Value = (Ckt, Vec<Field>, Vec<u32>)> {
+        any_with::<Ckt>((input_size, circuit_size))
+            .prop_flat_map(|c| {
+                let p = Public::new(&c);
+                let r = proptest::collection::vec(any::<Field>(), p.m);
+                //let Q = vec_without_replacement(&vec![0..p.n as u32], p.t);
+                let Q = Just((0 .. p.t as u32).collect());
+                // ^ XXX: Need a vec strategy that samples w/o replacement
+
+                (Just(c), r, Q)
+            })
     }
 
     proptest! {
@@ -508,28 +525,22 @@ mod proof {
         // (t) of Q or range (n) of its fields until we've processed c.
         #[test]
         #[allow(non_snake_case)]
-        fn test_interleaved_code_proof_Uw(
-            c in Ckt::arbitrary_with((20, 10)),
+        fn test_interleaved_code_Uw(
+            (c,r,Q) in circuit_and_randomness(20, 100),
             i in proptest::collection::vec(any::<Field>(), 20),
-            r0 in proptest::collection::vec(any::<Field>(), 100),
-            Q0 in proptest::collection::vec(any::<usize>(), 100),
         ) {
             let s = Secret::new(&c, &i);
-            let r = r0.iter().take(s.public.m)
-                .cloned().collect::<Array1<Field>>();
-            let Q = Q0.iter().take(s.public.t)
-                .map(|&i| i % s.public.n).collect();
             let proof = InterleavedCodeCheck::new(
                 s.Uw.view(),
                 &s.Uw_hash,
-                r.view(),
+                ArrayView1::from(&r),
                 &Q
             );
 
             prop_assert!(proof.verify(
                 &s.public,
-                s.Uw_hash.root(),
-                r.view(),
+                &s.Uw_hash.root(),
+                ArrayView1::from(&r),
                 &Q,
             ))
         }

@@ -132,10 +132,6 @@ impl std::fmt::Display for F {
     }
 }
 
-impl<H: std::hash::Hasher> merkletree::hash::Hashable<H> for F {
-    fn hash(&self, state: &mut H) { self.0.hash(state) }
-}
-
 impl Arbitrary for F {
     type Parameters = ();
     type Strategy = BoxedStrategy<Self>;

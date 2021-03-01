@@ -5,7 +5,7 @@ use proptest::prelude::*;
 //
 type Field = crate::f5038849::F;
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub enum Op { Add(usize, usize), Mul(usize, usize) }
 
 impl Arbitrary for Op {
@@ -18,7 +18,7 @@ impl Arbitrary for Op {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Ckt {
     pub ops: Vec<Op>,
     pub inp_size: usize,
