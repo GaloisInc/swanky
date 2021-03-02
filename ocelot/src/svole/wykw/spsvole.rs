@@ -26,16 +26,17 @@ use scuttlebutt::{
     Aes128,
     AesRng,
     Block,
+    Malicious,
 };
 
 /// SpsVole Sender.
-pub struct Sender<OT: OtReceiver, FE: FF> {
+pub struct Sender<OT: OtReceiver + Malicious, FE: FF> {
     ot: OT,
     pows: Vec<FE>,
 }
 
 /// SpsVole Receiver.
-pub struct Receiver<OT: OtSender, FE: FF> {
+pub struct Receiver<OT: OtSender + Malicious, FE: FF> {
     ot: OT,
     delta: FE,
     pows: Vec<FE>,
@@ -95,7 +96,7 @@ fn eq_receive<C: AbstractChannel, RNG: CryptoRng + Rng, FE: FF>(
 }
 
 /// Implement SpsVoleSender for Sender type.
-impl<OT: OtReceiver<Msg = Block>, FE: FF> Sender<OT, FE> {
+impl<OT: OtReceiver<Msg = Block> + Malicious, FE: FF> Sender<OT, FE> {
     /// Runs any one-time initialization.
     pub fn init<C: AbstractChannel, RNG: CryptoRng + Rng>(
         channel: &mut C,
@@ -225,7 +226,7 @@ impl<OT: OtReceiver<Msg = Block>, FE: FF> Sender<OT, FE> {
 }
 
 /// Implement SpsVoleReceiver for Receiver type.
-impl<OT: OtSender<Msg = Block>, FE: FF> Receiver<OT, FE> {
+impl<OT: OtSender<Msg = Block> + Malicious, FE: FF> Receiver<OT, FE> {
     /// Runs any one-time initialization.
     pub fn init<C: AbstractChannel, RNG: CryptoRng + Rng>(
         channel: &mut C,
