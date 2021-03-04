@@ -155,7 +155,6 @@ pub fn main(){
     let schema_payload = parameters.get("schema_server_payload").unwrap().to_owned();
 
     let (ids_server, payloads_server) = parse_files(&schema_id, &schema_payload, &server_path);
-
     let (weighted_aggregate, cardinality) = test(&ids_client, &ids_server, &payloads_client, &payloads_server);
 
     let aggregate: f64 = weighted_aggregate as f64/ 10_u64.pow(precision) as f64;
@@ -173,14 +172,17 @@ pub fn main(){
     output_write.push_str(&cardinality.to_string());
     output_write.push_str(&"\nAverage in the clear: ".to_owned());
     output_write.push_str(&output.to_string());
+    output_write.push_str(&"\n weighted_aggregate: ".to_owned());
+    output_write.push_str(&weighted_aggregate.to_string());
+    output_write.push_str(&"\n schema_server_id: ".to_owned());
+    output_write.push_str(&schema_id);
+    output_write.push_str(&"\n schema_server_payload: ".to_owned());
+    output_write.push_str(&schema_payload);
+    output_write.push_str(&"\n data_path_server: ".to_owned());
+    output_write.push_str(&server_path);
+
 
     write(path_str, output_write).expect("Unable to write file");
-
-    // println!("In the open weighted_aggregate {:?}", weighted_aggregate);
-    // println!("In the open cardinality {:?}", cardinality);
-    // //
-    // assert_eq!(weighted_aggregate, _result_aggregate);
-    // assert_eq!(cardinality, _result_cardinality);
 
     println!("Experiments done !");
 
