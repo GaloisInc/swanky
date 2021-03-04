@@ -1,4 +1,4 @@
-use crate::field::{f2::F2, polynomial::Polynomial, FiniteField};
+use crate::field::{f2::F2, polynomial::Polynomial, FiniteField, IsSubfieldOf};
 use generic_array::GenericArray;
 use rand_core::RngCore;
 use smallvec::smallvec;
@@ -313,6 +313,12 @@ impl FiniteField for Gf128 {
 
     fn multiply_by_prime_subfield(&self, pf: Self::PrimeField) -> Self {
         Self::conditional_select(&Self::ZERO, &self, pf.ct_eq(&F2::ONE))
+    }
+}
+
+impl IsSubfieldOf<Gf128> for F2 {
+    fn lift_into_superfield(&self) -> Gf128 {
+        Gf128::ONE.multiply_by_prime_subfield(*self)
     }
 }
 

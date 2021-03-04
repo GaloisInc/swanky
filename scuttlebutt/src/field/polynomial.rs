@@ -298,7 +298,7 @@ mod tests {
     fn test_addition() {
         fn f<FE: FiniteField>() {
             let mut rng = AesRng::from_seed(Block::default());
-            for _ in 0..1000 {
+            for _ in 0..100 {
                 let a = Polynomial::random(&mut rng, 10);
                 let b = Polynomial::random(&mut rng, 10);
                 let mut product = a.clone();
@@ -316,7 +316,7 @@ mod tests {
     fn test_subtraction() {
         fn f<FE: FiniteField>() {
             let mut rng = AesRng::from_seed(Block::default());
-            for _ in 0..1000 {
+            for _ in 0..100 {
                 let a = Polynomial::random(&mut rng, 10);
                 let b = Polynomial::random(&mut rng, 10);
                 let mut product = a.clone();
@@ -334,7 +334,7 @@ mod tests {
     fn test_multiplication() {
         fn f<FE: FiniteField>() {
             let mut rng = AesRng::from_seed(Block::default());
-            for _ in 0..1000 {
+            for _ in 0..100 {
                 let a = Polynomial::random(&mut rng, 10);
                 let b = Polynomial::random(&mut rng, 10);
                 let mut product = a.clone();
@@ -352,7 +352,7 @@ mod tests {
     fn test_scalar_multiplication() {
         fn f<FE: FiniteField>() {
             let mut rng = AesRng::from_seed(Block::default());
-            for _ in 0..1000 {
+            for _ in 0..100 {
                 let a = Polynomial::random(&mut rng, 10);
                 let c = FE::random(&mut rng);
                 let mut product = a.clone();
@@ -379,7 +379,7 @@ mod tests {
                 let poly = Polynomial::interpolate(&[(FE::ZERO, FE::ONE)]);
                 assert_eq!(poly.eval(FE::ZERO), FE::ONE);
             }
-            for _ in 0..1000 {
+            for _ in 0..100 {
                 let n_points = 5;
                 let mut points = Vec::new();
                 for _ in 0..n_points {
@@ -401,7 +401,7 @@ mod tests {
     fn test_divmod() {
         fn f<FE: FiniteField>() {
             let mut rng = AesRng::from_seed(Block::default());
-            for _ in 0..10000 {
+            for _ in 0..1000 {
                 let degree1 = rng.gen_range(0usize, 20usize);
                 let degree2 = rng.gen_range(0usize, 20usize);
                 let a = Polynomial::<FE>::random(&mut rng, degree1);
