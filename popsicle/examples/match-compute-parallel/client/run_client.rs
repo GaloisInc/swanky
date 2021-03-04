@@ -15,7 +15,7 @@ use test::test;
 use std::{
     env,
     fs::{File, write, read_to_string},
-    io::{BufRead, BufReader},
+    io::{BufRead, BufReader, stdin, stdout, Read, Write},
     collections::HashMap,
     time::{Duration},
     thread,
@@ -50,6 +50,15 @@ use std::{
 //     }
 //     ids
 // }
+
+// Taken from:
+// https://www.reddit.com/r/rust/comments/8tfyof/noob_question_pause/e177530?utm_source=share&utm_medium=web2x&context=3
+fn pause() {
+    let mut stdout = stdout();
+    stdout.write(b"Press Enter to continue...").unwrap();
+    stdout.flush().unwrap();
+    stdin().read(&mut [0]).unwrap();
+}
 
 pub fn main(){
     // Get the root directory's location in order to find the configuration file
@@ -172,18 +181,10 @@ pub fn main(){
     output_write.push_str(&cardinality.to_string());
     output_write.push_str(&"\nAverage in the clear: ".to_owned());
     output_write.push_str(&output.to_string());
-    output_write.push_str(&"\n weighted_aggregate: ".to_owned());
-    output_write.push_str(&weighted_aggregate.to_string());
-    output_write.push_str(&"\n schema_server_id: ".to_owned());
-    output_write.push_str(&schema_id);
-    output_write.push_str(&"\n schema_server_payload: ".to_owned());
-    output_write.push_str(&schema_payload);
-    output_write.push_str(&"\n data_path_server: ".to_owned());
-    output_write.push_str(&server_path);
 
 
     write(path_str, output_write).expect("Unable to write file");
 
     println!("Experiments done !");
-
+    pause();
 }
