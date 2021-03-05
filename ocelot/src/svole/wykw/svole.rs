@@ -150,16 +150,10 @@ impl<FE: FiniteField> Sender<FE> {
             channel,
             m,
             &self.base_voles[self.rows..self.rows + self.weight],
-            rng,
-        )?;
-        debug_assert!(uws.len() == self.cols);
-        self.spsvole.send_batch_consistency_check(
-            channel,
-            m,
-            &uws,
             &self.base_voles[self.rows + self.weight..self.rows + self.weight + self.r],
             rng,
         )?;
+        debug_assert!(uws.len() == self.cols);
         let seed = rng.gen::<Block>();
         let mut lpn_rng = AesRng::from_seed(seed);
         channel.write_block(&seed)?;
@@ -310,16 +304,10 @@ impl<FE: FiniteField> Receiver<FE> {
             channel,
             m,
             &self.base_voles[self.rows..self.rows + self.weight],
-            rng,
-        )?;
-        debug_assert!(vs.len() == self.cols);
-        self.spsvole.receive_batch_consistency_check(
-            channel,
-            m,
-            &vs,
             &self.base_voles[self.rows + self.weight..self.rows + self.weight + self.r],
             rng,
         )?;
+        debug_assert!(vs.len() == self.cols);
         let seed = channel.read_block()?;
         let mut lpn_rng = AesRng::from_seed(seed);
         let distribution = Uniform::from(0..self.rows);
