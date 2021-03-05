@@ -115,13 +115,16 @@ impl<OT: OtReceiver<Msg = Block> + Malicious, FE: FF> Sender<OT, FE> {
     pub fn send<C: AbstractChannel, RNG: CryptoRng + Rng>(
         &mut self,
         channel: &mut C,
-        n: usize,                                  // Equal to cols / weight
-        base_uws: &[(FE::PrimeField, FE)],         // Equals to weight
-        base_consistency: &[(FE::PrimeField, FE)], // Equals to r
+        n: usize,                            // Equal to cols / weight
+        base_voles: &[(FE::PrimeField, FE)], // Equals to weight + r
         mut rng: &mut RNG,
     ) -> Result<Vec<(FE::PrimeField, FE)>, Error> {
         // Total communication: t |log p| + 256 + > t * nbits * 128 bits
         let nbits = 128 - (n as u128 - 1).leading_zeros() as usize;
+        let r = FE::PolynomialFormNumCoefficients::to_usize();
+        let total_len = base_voles.len();
+        let base_uws = &base_voles[0..total_len - r];
+        let base_consistency = &base_voles[total_len - r..];
         let t = base_uws.len();
         let mut result = vec![(FE::PrimeField::ZERO, FE::ZERO); n * t];
         let mut betas = Vec::with_capacity(t);
@@ -252,10 +255,13 @@ impl<OT: OtSender<Msg = Block> + Malicious, FE: FF> Receiver<OT, FE> {
         &mut self,
         channel: &mut C,
         n: usize,
-        vs: &[FE],               // Length equals weight
-        base_consistency: &[FE], // voles for the consistency check
+        base_voles: &[FE], // Length equals weight + r
         rng: &mut RNG,
     ) -> Result<Vec<FE>, Error> {
+        let r = FE::PolynomialFormNumCoefficients::to_usize();
+        let total_len = base_voles.len();
+        let vs = &base_voles[0..total_len - r];
+        let base_consistency = &base_voles[total_len - r..];
         let nbits = 128 - (n as u128 - 1).leading_zeros() as usize;
         let t = vs.len();
         let mut gammas = Vec::with_capacity(t);
@@ -354,13 +360,7 @@ mod test {
             let uw = base.send(&mut channel, weight + r, &mut rng).unwrap();
             let mut spsvole = SpsSender::<FE>::init(&mut channel, pows, &mut rng).unwrap();
             spsvole
-                .send(
-                    &mut channel,
-                    n,
-                    &uw[0..weight],
-                    &uw[weight..weight + r],
-                    &mut rng,
-                )
+                .send(&mut channel, n, &uw[0..weight + r], &mut rng)
                 .unwrap()
         });
         let mut rng = AesRng::new();
@@ -373,13 +373,7 @@ mod test {
         let mut spsvole =
             SpsReceiver::<FE>::init(&mut channel, pows.clone(), base.delta(), &mut rng).unwrap();
         let vs = spsvole
-            .receive(
-                &mut channel,
-                n,
-                &v[0..weight],
-                &v[weight..weight + r],
-                &mut rng,
-            )
+            .receive(&mut channel, n, &v[0..weight + r], &mut rng)
             .unwrap();
         let uws = handle.join().unwrap();
         for i in 0..weight {

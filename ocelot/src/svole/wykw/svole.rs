@@ -149,8 +149,7 @@ impl<FE: FiniteField> Sender<FE> {
         let uws = self.spsvole.send(
             channel,
             m,
-            &self.base_voles[self.rows..self.rows + self.weight],
-            &self.base_voles[self.rows + self.weight..self.rows + self.weight + self.r],
+            &self.base_voles[self.rows..self.rows + self.weight + self.r],
             rng,
         )?;
         debug_assert!(uws.len() == self.cols);
@@ -303,8 +302,7 @@ impl<FE: FiniteField> Receiver<FE> {
         let vs = self.spsvole.receive(
             channel,
             m,
-            &self.base_voles[self.rows..self.rows + self.weight],
-            &self.base_voles[self.rows + self.weight..self.rows + self.weight + self.r],
+            &self.base_voles[self.rows..self.rows + self.weight + self.r],
             rng,
         )?;
         debug_assert!(vs.len() == self.cols);
