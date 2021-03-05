@@ -48,7 +48,7 @@ impl Ckt {
     pub fn size(&self) -> usize { self.ops.len() + self.inp_size }
 
     pub fn eval(&self, inp: &[Field]) -> Vec<Field> {
-        debug_assert!(inp.len() == self.inp_size);
+        debug_assert_eq!(inp.len(), self.inp_size);
 
         let mut out: Vec<Field> = Vec::with_capacity(self.size());
 

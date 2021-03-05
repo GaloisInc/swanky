@@ -43,9 +43,13 @@ impl Lemma {
     pub fn new(
         tree: &Tree,
         some_columns: &Vec<Array1<Field>>,
-        some_indices: &Vec<u32>
+        some_indices: &Vec<usize>
     ) -> Self {
-        let proof = tree.build_proof(&some_indices)
+        let some_indices_u32 = some_indices
+            .iter()
+            .map(|&j| j as u32)
+            .collect::<Vec<u32>>();
+        let proof = tree.build_proof(&some_indices_u32)
             .expect("Failed to build proof with indices");
 
         Self {
@@ -75,7 +79,7 @@ proptest! {
     #[test]
     fn test_merkle_lemma(
         values in proptest::collection::vec(any::<Field>(), 50 * 50),
-        indices in proptest::collection::vec(0u32..50, 20),
+        indices in proptest::collection::vec(0usize..50, 20),
     ) {
         use ndarray::Array2;
 
