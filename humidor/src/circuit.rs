@@ -1,3 +1,4 @@
+#[cfg(test)]
 use proptest::prelude::*;
 
 //
@@ -8,6 +9,7 @@ type Field = crate::f5038849::F;
 #[derive(Debug, Clone, Copy)]
 pub enum Op { Add(usize, usize), Mul(usize, usize) }
 
+#[cfg(test)]
 impl Arbitrary for Op {
     type Parameters = usize;
     type Strategy = BoxedStrategy<Self>;
@@ -24,6 +26,7 @@ pub struct Ckt {
     pub inp_size: usize,
 }
 
+#[cfg(test)]
 impl Arbitrary for Ckt {
     type Parameters = (usize, usize);
     type Strategy = BoxedStrategy<Self>;

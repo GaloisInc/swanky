@@ -2,6 +2,7 @@ use crypto::sha3::Sha3;
 use crypto::digest::Digest as CD;
 use ndarray::{Array1, ArrayView1, ArrayView2};
 
+#[cfg(test)]
 use proptest::{*, prelude::*};
 
 //
@@ -75,6 +76,7 @@ impl Lemma {
     }
 }
 
+#[cfg(test)]
 proptest! {
     #[test]
     fn test_merkle_lemma(

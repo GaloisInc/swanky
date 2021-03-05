@@ -1,3 +1,4 @@
+#[cfg(test)]
 use proptest::{*, prelude::*};
 
 #[derive(Debug, Clone, Copy, Default)]
@@ -132,6 +133,7 @@ impl std::fmt::Display for F {
     }
 }
 
+#[cfg(test)]
 impl Arbitrary for F {
     type Parameters = ();
     type Strategy = BoxedStrategy<Self>;
@@ -140,6 +142,7 @@ impl Arbitrary for F {
     }
 }
 
+#[cfg(test)]
 proptest! {
     #[test]
     #[allow(non_snake_case)]
