@@ -176,7 +176,7 @@ impl<OT: OtReceiver<Msg = Block> + Malicious, FE: FF> Sender<OT, FE> {
             result[i * n + alpha].1 = *w - (d + sum);
         }
 
-        self.send_batch_consistency_check(channel, n, &result, &base_consistency, rng)?;
+        self.send_batch_consistency_check(channel, &result, &base_consistency, rng)?;
 
         Ok(result)
     }
@@ -186,7 +186,6 @@ impl<OT: OtReceiver<Msg = Block> + Malicious, FE: FF> Sender<OT, FE> {
     fn send_batch_consistency_check<C: AbstractChannel, RNG: CryptoRng + Rng>(
         &mut self,
         channel: &mut C,
-        _m: usize,
         uws: &[(FE::PrimeField, FE)],      // length = m * t = n
         base_uws: &[(FE::PrimeField, FE)], // length = r
         rng: &mut RNG,
@@ -284,7 +283,7 @@ impl<OT: OtSender<Msg = Block> + Malicious, FE: FF> Receiver<OT, FE> {
         }
         channel.flush()?;
 
-        self.receive_batch_consistency_check(channel, n, &result, &base_consistency, rng)?;
+        self.receive_batch_consistency_check(channel, &result, &base_consistency, rng)?;
         Ok(result)
     }
     /// Batch consistency check that can be called after bunch of iterations.
@@ -292,7 +291,6 @@ impl<OT: OtSender<Msg = Block> + Malicious, FE: FF> Receiver<OT, FE> {
     fn receive_batch_consistency_check<C: AbstractChannel, RNG: CryptoRng + Rng>(
         &mut self,
         channel: &mut C,
-        _n: usize,
         vs: &[FE],
         y_stars: &[FE],
         rng: &mut RNG,
