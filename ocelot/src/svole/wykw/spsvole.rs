@@ -115,12 +115,16 @@ impl<OT: OtReceiver<Msg = Block> + Malicious, FE: FF> Sender<OT, FE> {
     pub fn send<C: AbstractChannel, RNG: CryptoRng + Rng>(
         &mut self,
         channel: &mut C,
-        n: usize,                          // Equal to cols / weight
-        base_uws: &[(FE::PrimeField, FE)], // Equals to weight
+        n: usize,                            // Equal to cols / weight
+        base_voles: &[(FE::PrimeField, FE)], // Equals to weight + r
         mut rng: &mut RNG,
     ) -> Result<Vec<(FE::PrimeField, FE)>, Error> {
         // Total communication: t |log p| + 256 + > t * nbits * 128 bits
         let nbits = 128 - (n as u128 - 1).leading_zeros() as usize;
+        let r = FE::PolynomialFormNumCoefficients::to_usize();
+        let total_len = base_voles.len();
+        let base_uws = &base_voles[0..total_len - r];
+        let base_consistency = &base_voles[total_len - r..];
         let t = base_uws.len();
         let mut result = vec![(FE::PrimeField::ZERO, FE::ZERO); n * t];
         let mut betas = Vec::with_capacity(t);
@@ -174,13 +178,17 @@ impl<OT: OtReceiver<Msg = Block> + Malicious, FE: FF> Sender<OT, FE> {
             result[i * n + alpha].0 = beta;
             result[i * n + alpha].1 = *w - (d + sum);
         }
+
+        self.send_batch_consistency_check(channel, &result, &base_consistency, rng)?;
+
         Ok(result)
     }
+
     /// Batch consistency check that can be called after bunch of iterations.
-    pub fn send_batch_consistency_check<C: AbstractChannel, RNG: CryptoRng + Rng>(
+    #[inline(always)]
+    fn send_batch_consistency_check<C: AbstractChannel, RNG: CryptoRng + Rng>(
         &mut self,
         channel: &mut C,
-        _m: usize,
         uws: &[(FE::PrimeField, FE)],      // length = m * t = n
         base_uws: &[(FE::PrimeField, FE)], // length = r
         rng: &mut RNG,
@@ -247,9 +255,13 @@ impl<OT: OtSender<Msg = Block> + Malicious, FE: FF> Receiver<OT, FE> {
         &mut self,
         channel: &mut C,
         n: usize,
-        vs: &[FE], // Length equals weight
+        base_voles: &[FE], // Length equals weight + r
         rng: &mut RNG,
     ) -> Result<Vec<FE>, Error> {
+        let r = FE::PolynomialFormNumCoefficients::to_usize();
+        let total_len = base_voles.len();
+        let vs = &base_voles[0..total_len - r];
+        let base_consistency = &base_voles[total_len - r..];
         let nbits = 128 - (n as u128 - 1).leading_zeros() as usize;
         let t = vs.len();
         let mut gammas = Vec::with_capacity(t);
@@ -276,13 +288,15 @@ impl<OT: OtSender<Msg = Block> + Malicious, FE: FF> Receiver<OT, FE> {
             channel.write_fe(d)?;
         }
         channel.flush()?;
+
+        self.receive_batch_consistency_check(channel, &result, &base_consistency, rng)?;
         Ok(result)
     }
     /// Batch consistency check that can be called after bunch of iterations.
-    pub fn receive_batch_consistency_check<C: AbstractChannel, RNG: CryptoRng + Rng>(
+    #[inline(always)]
+    fn receive_batch_consistency_check<C: AbstractChannel, RNG: CryptoRng + Rng>(
         &mut self,
         channel: &mut C,
-        _n: usize,
         vs: &[FE],
         y_stars: &[FE],
         rng: &mut RNG,
@@ -321,6 +335,7 @@ mod test {
         SpsReceiver,
         SpsSender,
     };
+    use generic_array::typenum::Unsigned;
     use scuttlebutt::{
         field::{F61p, FiniteField as FF, Fp, Gf128, F2},
         AesRng,
@@ -332,6 +347,7 @@ mod test {
     };
 
     fn test_spsvole_<FE: FF>(cols: usize, weight: usize) {
+        let r = FE::PolynomialFormNumCoefficients::to_usize();
         let n = cols / weight;
         let (sender, receiver) = UnixStream::pair().unwrap();
         let handle = std::thread::spawn(move || {
@@ -341,9 +357,11 @@ mod test {
             let mut channel = Channel::new(reader, writer);
             let pows = super::super::utils::gen_pows();
             let mut base = BaseSender::<FE>::init(&mut channel, &pows, &mut rng).unwrap();
-            let uw = base.send(&mut channel, weight, &mut rng).unwrap();
+            let uw = base.send(&mut channel, weight + r, &mut rng).unwrap();
             let mut spsvole = SpsSender::<FE>::init(&mut channel, pows, &mut rng).unwrap();
-            spsvole.send(&mut channel, n, &uw, &mut rng).unwrap()
+            spsvole
+                .send(&mut channel, n, &uw[0..weight + r], &mut rng)
+                .unwrap()
         });
         let mut rng = AesRng::new();
         let reader = BufReader::new(receiver.try_clone().unwrap());
@@ -351,10 +369,12 @@ mod test {
         let mut channel = Channel::new(reader, writer);
         let pows = super::super::utils::gen_pows();
         let mut base = BaseReceiver::<FE>::init(&mut channel, &pows, &mut rng).unwrap();
-        let v = base.receive(&mut channel, weight, &mut rng).unwrap();
+        let v = base.receive(&mut channel, weight + r, &mut rng).unwrap();
         let mut spsvole =
             SpsReceiver::<FE>::init(&mut channel, pows.clone(), base.delta(), &mut rng).unwrap();
-        let vs = spsvole.receive(&mut channel, n, &v, &mut rng).unwrap();
+        let vs = spsvole
+            .receive(&mut channel, n, &v[0..weight + r], &mut rng)
+            .unwrap();
         let uws = handle.join().unwrap();
         for i in 0..weight {
             for j in 0..n {
