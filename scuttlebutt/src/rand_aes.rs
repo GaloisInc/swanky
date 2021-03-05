@@ -17,14 +17,6 @@ use rand_core::block::{BlockRng, BlockRngCore};
 #[derive(Clone, Debug)]
 pub struct AesRng(BlockRng<AesRngCore>);
 
-impl AesRng {
-    /// Access the underlying keyed AES instance directly.
-    /// Use with extreme caution!
-    pub fn aes(&self) -> &Aes128 {
-        return &self.0.core.aes;
-    }
-}
-
 impl RngCore for AesRng {
     #[inline]
     fn next_u32(&mut self) -> u32 {
