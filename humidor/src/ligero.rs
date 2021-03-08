@@ -8,6 +8,7 @@ use proptest::{*, prelude::*};
 use crate::circuit::{Op, Ckt};
 use crate::merkle;
 use crate::util::*;
+use crate::params::Params;
 
 //
 // XXX: Use a silly field for now.
@@ -15,24 +16,11 @@ use crate::util::*;
 type Field = crate::f5038849::F;
 
 // Proof information available to both the prover and the verifier.
-//
-// We fix the security threshold t = log |F| to get the following
-// soundness errors, where positive integer e < d/4, d is the code
-// distance, and n = 2^p:
-//
-// * Test-Interleaved:             (1 - e/n)^t + (e + 1)/|F|
-//                               = (1 - e/|F|)^p + (e + 1)/|F|
-// * Test-Linear-Constraints:      ((e + k + l)/n)^t + 1/|F|
-//                               = ((e + k + l)/|F|)^p + 1/|F|
-// * Test-Quadratic-Constraints:   ((e + 2k)/n)^t + 1/|F|
-//                               = ((e + 2k)/|F|)^p + 1/|F|
-//
-// I.e., we ensure soundness error is negligible in the field size.
-// XXX: Is this right? Seems like t could be smaller, say
-// ceil(log |F| / p).
 #[derive(Debug, Clone)]
 #[allow(non_snake_case)]
 struct Public {
+    params: crate::params::Params,
+
     l: usize,      // Message size (Note: k = l + t = 2^j - 1, for some j)
     t: usize,      // Security threshold
     k: usize,      // Reconstruction threshold
@@ -50,26 +38,16 @@ struct Public {
 impl Public {
     #[allow(non_snake_case)]
     fn new(c: &Ckt) -> Self {
-        // XXX: How should parameters be selected? Using fixed parameters
-        // for now.
-        //
-        // Have: sz, t
-        // Want:
-        //      k^2 >= sz
-        //      k = l + t = 2^j - 1 for some j, 1 < j <= PHI_2_EXP
-        //      t ~ log(|Field|)
-        //      n > l; n = 3^i - 1 for some i, 1 < i <= PHI_3_EXP
-        //
-        // Also want:
-        //      n >= l + k      (from linear-constraint check)
-        //      n >= 2*k        (from quadratic-constraint check)
-        let kexp = 6; // least_2_pow_gt(ceil(sqrt(sz))) or similar
-        let nexp = 4; // least_3_pow_gt(ceil(sqrt(2.pow(lexp)))) or similar
-        let k = 2usize.pow(kexp) - 1;
-        let t = Field::BITS;
-        let l = k - t;
-        let n = 3usize.pow(nexp) - 1;
-        let m = (c.size() + l - 1) / l;
+        let params = Params::new(c.size());
+        let kexp = params.kexp;
+        let nexp = params.nexp;
+        let l = params.l;
+        let t = params.t;
+        let k = params.k;
+        let n = params.n;
+        let m = params.m;
+        let pss = params.pss;
+
         let ml = m * l; // padded circuit size
 
         let new_ml_ml_mat = |cap| TriMat::with_capacity((ml,ml), cap);
@@ -95,189 +73,18 @@ impl Public {
             }
         }
 
-        Public {k, t, l, n, m,
+        Public {params, k, t, l, n, m, pss,
             Px: Px.to_csc(),
             Py: Py.to_csc(),
             Pz: Pz.to_csc(),
             Padd: Padd.to_csc(),
 
-            pss: PSS {
-                threshold: t,
-                share_count: n,
-                secret_count: l,
-
-                prime: Field::MOD,
-                omega_secrets: Field::ROOTS_BASE_2[kexp as usize] as i64,
-                omega_shares: Field::ROOTS_BASE_3[nexp as usize] as i64,
-            },
         }
     }
 
     #[cfg(test)]
     fn test_value() -> Self {
         Self::new(&Ckt::test_value())
-    }
-
-    //
-    // XXX: In the following, can we eliminate some of the copies?
-    //
-
-    // TODO: Append a random codeword.
-    #[inline]
-    fn encode(&self, wf: ArrayView1<Field>) -> Array1<Field> {
-        debug_assert_eq!(wf.len(), self.l);
-
-        let w: Vec<i64> = wf.iter().cloned().map(i64::from).collect();
-        let c: Vec<i64> = self.pss.share(&w);
-
-        c.iter().cloned().map(Field::from).collect()
-    }
-
-    #[inline]
-    fn decode(&self, cf: ArrayView1<Field>) -> Array1<Field> {
-        debug_assert_eq!(cf.len(), self.n);
-
-        let c: Vec<i64> = cf.iter().take(self.k).cloned().map(i64::from).collect();
-        let ixs: Vec<usize> = (0 .. self.k).collect();
-        let w: Vec<i64> = self.pss.reconstruct(&ixs, &c);
-
-        w.iter().cloned().map(Field::from).collect()
-    }
-
-    #[inline]
-    fn decode_part(&self,
-        ixs: &[usize],
-        cf: ArrayView1<Field>,
-    ) -> Array1<Field> {
-        debug_assert!(cf.len() <= self.n);
-        debug_assert!(cf.len() >= self.k);
-
-        let c: Vec<i64> = cf.iter().cloned().map(i64::from).collect();
-        let w: Vec<i64> = self.pss.reconstruct(ixs, &c);
-
-        w.iter().cloned().map(Field::from).collect()
-    }
-
-    #[inline]
-    fn codeword_is_valid(&self, ce: ArrayView1<Field>) -> bool {
-        debug_assert_eq!(ce.len(), self.n);
-
-        use ndarray::s;
-        let cd0 = self.decode_part(
-            &(0 .. self.k).collect::<Vec<usize>>(),
-            ce.slice(s![0 .. self.k]).view(),
-        );
-        let cd1 = self.decode_part(
-            &(self.n - self.k .. self.n).collect::<Vec<usize>>(),
-            ce.slice(s![self.n - self.k .. self.n]).view(),
-        );
-
-        // XXX: I think this is necessary for c to be a codeword. Is it
-        // sufficient?
-        cd0 == cd1
-    }
-
-    pub fn encode_interleaved(&self, ws: ArrayView1<Field>) -> Array2<Field> {
-        debug_assert_eq!(ws.len(), self.l * self.m);
-
-        let mut res = Vec::with_capacity(self.n * self.m);
-
-        for w in ws.exact_chunks(self.pss.secret_count) {
-            res.append(&mut self.encode(w).to_vec());
-        }
-
-        Array2::from_shape_vec((self.m, self.n), res)
-            .expect("Unreachable: encoded array is wrong size")
-    }
-
-    pub fn decode_interleaved(&self, cs: ArrayView2<Field>) -> Array1<Field> {
-        debug_assert_eq!(cs.shape(), [self.m, self.n]);
-
-        let mut res = Vec::with_capacity(self.l * self.m);
-
-        for c in 0 .. cs.nrows() {
-            res.append(&mut self.decode(cs.row(c)).to_vec());
-        }
-
-        From::from(res)
-    }
-
-    // Take a sequence of values `p(zeta_1) .. p(zeta_c)` for `c <= k` and
-    // return the `(k+1)`-coefficients of the polynomial `p`.
-    pub fn fft2_inverse(&self, points: ArrayView1<Field>) -> Array1<Field> {
-        debug_assert!(points.len() <= self.k);
-
-        let mut points0 = Array1::zeros(self.k + 1);
-        points0.slice_mut(ndarray::s!(1 .. points.len()+1)).assign(&points);
-
-        threshold_secret_sharing::numtheory::fft2_inverse(
-            &points0.iter().cloned().map(i64::from).collect::<Vec<i64>>(),
-            self.pss.omega_secrets,
-            self.pss.prime,
-        ).iter().cloned().map(Field::from).collect::<Array1<Field>>()
-    }
-
-    // Take a sequence of `k+1` coefficients of the polynomial `p` and
-    // return evaluation points `p(zeta_0) .. p(zeta_{k+1})`.
-    pub fn fft2(&self, coeffs: ArrayView1<Field>) -> Array1<Field> {
-        debug_assert!(coeffs.len() <= self.k+1);
-
-        let mut coeffs0 = Array1::zeros(self.k + 1);
-        coeffs0.slice_mut(ndarray::s!(0 .. coeffs.len())).assign(&coeffs);
-
-        threshold_secret_sharing::numtheory::fft2(
-            &coeffs0.iter().cloned().map(i64::from).collect::<Vec<i64>>(),
-            self.pss.omega_secrets,
-            self.pss.prime,
-        )[1..].iter().cloned().map(Field::from).collect::<Array1<Field>>()
-    }
-
-    // Take a sequence of values `p(eta_1) .. p(eta_c)` for `c <= n` and
-    // return the `(n+1)`-coefficients of the polynomial `p`.
-    pub fn fft3_inverse(&self, points: ArrayView1<Field>) -> Array1<Field> {
-        debug_assert!(points.len() <= self.n);
-
-        let mut points0 = Array1::zeros(self.n + 1);
-        points0.slice_mut(ndarray::s!(1 .. points.len()+1)).assign(&points);
-
-        threshold_secret_sharing::numtheory::fft3_inverse(
-            &points0.iter().cloned().map(i64::from).collect::<Vec<i64>>(),
-            self.pss.omega_shares,
-            self.pss.prime,
-        ).iter().cloned().map(Field::from).collect::<Array1<Field>>()
-    }
-
-    // Take a sequence of `n+1` coefficients of the polynomial `p` and
-    // return evaluation points `p(eta_0) .. p(eta_{n+1})`.
-    pub fn fft3(&self, coeffs: ArrayView1<Field>) -> Array1<Field> {
-        debug_assert!(coeffs.len() <= self.n);
-
-        let mut coeffs0 = Array1::zeros(self.n + 1);
-        coeffs0.slice_mut(ndarray::s!(0 .. coeffs.len())).assign(&coeffs);
-
-        threshold_secret_sharing::numtheory::fft3(
-            &coeffs0.iter().cloned().map(i64::from).collect::<Vec<i64>>(),
-            self.pss.omega_shares,
-            self.pss.prime,
-        )[1..].iter().cloned().map(Field::from).collect::<Array1<Field>>()
-    }
-
-    pub fn peval2(&self, p: ArrayView1<Field>, ix: usize) -> Field {
-        peval(p, Field::from(self.pss.omega_secrets).pow(ix as i64))
-    }
-
-    pub fn peval3(&self, p: ArrayView1<Field>, ix: usize) -> Field {
-        peval(p, Field::from(self.pss.omega_shares).pow(ix as i64))
-    }
-
-    pub fn codeword_to_coeffs(&self, U: ArrayView2<Field>) -> Array2<Field> {
-        let mut p = Array2::zeros((self.m, self.n+1));
-
-        Zip::from(p.genrows_mut())
-            .and(U.genrows())
-            .apply(|mut pi, Ui| pi.assign(&self.fft3_inverse(Ui.view())));
-
-        p
     }
 }
 
@@ -289,111 +96,6 @@ impl Arbitrary for Public {
         Ckt::arbitrary_with(p).prop_flat_map(|c| Just(Self::new(&c))).boxed()
     }
 }
-
-#[test]
-fn test_decode_encode() {
-    let p = Public::test_value();
-
-    use proptest::collection::vec;
-    proptest!(|(v in vec(any::<Field>(), p.l))| {
-        let ve = p.encode(ArrayView1::from(&v));
-        let vd = p.decode(ve.view()).to_vec();
-
-        prop_assert_eq!(vd, v);
-    })
-}
-
-#[test]
-fn test_codeword_is_valid_accepts_valid() {
-    let p = Public::test_value();
-
-    use proptest::collection::vec;
-    proptest!(|(v in vec(any::<Field>(), p.l))| {
-        let ve = p.encode(Array1::from(v).view());
-
-        prop_assert!(p.codeword_is_valid(ve.view()));
-    })
-}
-
-#[test]
-fn test_codeword_is_valid_detects_invalid() {
-    let p = Public::test_value();
-
-    use proptest::collection::vec;
-    proptest!(|(v in vec(any::<Field>(), p.l), ix in 0..p.l)| {
-        let mut ve = p.encode(Array1::from(v).view());
-        ve[ix] += Field::ONE;
-
-        prop_assert!(!p.codeword_is_valid(ve.view()));
-    })
-}
-
-#[test]
-fn test_codeword_is_valid_accepts_sum() {
-    let p = Public::new(&Ckt { inp_size: 1000, ops: vec![] });
-
-    use proptest::collection::vec;
-    proptest!(|(v in vec(any::<Field>(), p.m * p.l))| {
-        let ve = p.encode_interleaved(Array1::from(v).view());
-        let vs = ve.genrows().into_iter()
-            .fold(Array1::zeros(p.n), |acc, row| acc + row);
-
-        prop_assert!(p.codeword_is_valid(vs.view()));
-    })
-}
-
-#[test]
-fn test_codeword_is_valid_detects_invalid_sum() {
-    let p = Public::test_value();
-
-    use proptest::collection::vec;
-    proptest!(|(
-            v in vec(any::<Field>(), p.m * p.l),
-            r in 0..p.m,
-            c in 0..p.l,
-    )| {
-        let mut ve = p.encode_interleaved(Array1::from(v).view());
-        ve[(r,c)] += Field::ONE;
-
-        let vs = ve.genrows().into_iter()
-            .fold(Array1::zeros(p.n), |acc, row| acc + row);
-
-        prop_assert!(!p.codeword_is_valid(vs.view()));
-    })
-}
-
-#[test]
-fn test_peval2() {
-    let p = Public::test_value();
-
-    let v = (0 .. (p.k+1) as i64).collect::<Vec<i64>>();
-    let v_coeffs = threshold_secret_sharing::numtheory::fft2_inverse(
-        &v,
-        p.pss.omega_secrets,
-        p.pss.prime,
-    ).iter().cloned().map(Field::from).collect::<Array1<Field>>();
-
-    for i in 0 .. v.len() {
-        assert_eq!(p.peval2(v_coeffs.view(), i), Field::from(v[i]));
-    }
-}
-
-#[test]
-fn test_peval3() {
-    let p = Public::test_value();
-
-    let v = (0 .. (p.n+1) as i64).collect::<Vec<i64>>();
-    let v_coeffs = threshold_secret_sharing::numtheory::fft3_inverse(
-        &v,
-        p.pss.omega_shares,
-        p.pss.prime,
-    ).iter().cloned().map(Field::from).collect::<Array1<Field>>();
-
-    for i in 0 .. v.len() {
-        assert_eq!(p.peval3(v_coeffs.view(), i), Field::from(v[i]));
-    }
-}
-
 
 // Proof information available only to the prover.
 #[allow(non_snake_case)]
@@ -439,7 +141,7 @@ impl Secret {
 
         let public = Public::new(&c);
 
-        let ml = public.m * public.l;
+        let ml = public.params.m * public.params.l;
         let mut x = Array1::zeros(ml);
         let mut y = Array1::zeros(ml);
         let mut z = Array1::zeros(ml);
@@ -455,10 +157,10 @@ impl Secret {
             }
         }
 
-        let Uw = public.encode_interleaved(w.view());
-        let Ux = public.encode_interleaved(x.view());
-        let Uy = public.encode_interleaved(y.view());
-        let Uz = public.encode_interleaved(z.view());
+        let Uw = public.params.encode_interleaved(w.view());
+        let Ux = public.params.encode_interleaved(x.view());
+        let Uy = public.params.encode_interleaved(y.view());
+        let Uz = public.params.encode_interleaved(z.view());
 
         let Uw_hash = merkle::make_tree(Uw.view());
         let Ux_hash = merkle::make_tree(Ux.view());
@@ -559,7 +261,7 @@ mod proof {
             r: ArrayView1<Field>,
             Q: &Vec<usize>
         ) -> bool {
-            let codeword_check = publ.codeword_is_valid(self.w.view());
+            let codeword_check = publ.params.codeword_is_valid(self.w.view());
             let leaves_check = self.Q_lemma.verify(root);
             let columns_check = self.Q_lemma.columns().iter().zip(Q)
                 .fold(true, |acc, (cj, &j)|
@@ -626,7 +328,7 @@ mod proof {
     impl LinearConstraintsCheck {
         #[allow(non_snake_case)]
         pub fn new(
-            p: &Public,
+            p: &Params,
             A: ArrayView2<Field>,
             U: ArrayView2<Field>,
             r: ArrayView1<Field>,
@@ -676,7 +378,7 @@ mod proof {
 
         #[allow(non_snake_case)]
         pub fn verify(&self,
-            p: &Public,
+            p: &Params,
             A: ArrayView2<Field>,
             r: ArrayView1<Field>,
             b: ArrayView1<Field>,
@@ -716,7 +418,7 @@ mod proof {
 
         #[allow(non_snake_case)]
         fn make_a_coeffs(
-            p: &Public,
+            p: &Params,
             A: ArrayView2<Field>,
             r: ArrayView1<Field>,
         ) -> Result<Array2<Field>, ndarray::ShapeError> {
@@ -745,7 +447,7 @@ mod proof {
         let A = s.public.Padd.to_dense();
         let b = Array1::zeros(s.public.m * s.public.l);
         let proof = LinearConstraintsCheck::new(
-            &s.public,
+            &s.public.params,
             A.view(),
             s.Uw.view(),
             ArrayView1::from(&r),
@@ -753,7 +455,7 @@ mod proof {
         );
 
         assert!(proof.verify(
-            &s.public,
+            &s.public.params,
             A.view(),
             ArrayView1::from(&r),
             b.view(),
@@ -823,7 +525,7 @@ mod proof {
     impl QuadraticConstraintsCheck {
         #[allow(non_snake_case)]
         pub fn new(
-            p: &Public,
+            p: &Params,
             a: ArrayView1<Field>,
             b: ArrayView1<Field>,
             Ux: ArrayView2<Field>,
@@ -877,7 +579,7 @@ mod proof {
 
         #[allow(non_snake_case)]
         pub fn verify(&self,
-            p: &Public,
+            p: &Params,
             a: ArrayView1<Field>,
             b: ArrayView1<Field>,
             r: ArrayView1<Field>,
@@ -925,7 +627,7 @@ mod proof {
         let a = Array1::from(vec![Field::ZERO-Field::ONE; s.public.m * s.public.l]);
         let b = Array1::zeros(s.public.m * s.public.l);
         let proof = QuadraticConstraintsCheck::new(
-            &s.public,
+            &s.public.params,
             a.view(),
             b.view(),
             s.Ux.view(),
@@ -936,7 +638,7 @@ mod proof {
         );
 
         assert!(proof.verify(
-            &s.public,
+            &s.public.params,
             a.view(),
             b.view(),
             r.view(),

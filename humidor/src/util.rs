@@ -65,31 +65,19 @@ pub fn point_product(u: ArrayView1<Field>, v: ArrayView1<Field>) -> Array1<Field
     Array1::from_shape_fn(u.len(), |i| u[i] * v[i])
 }
 
-//#[test]
-//fn test_pmul() {
-//    let p = Public::test_value();
-//    let dim = (p.k + 1) as i64;
-//
-//    let u = (0 .. dim).collect::<Vec<i64>>();
-//    let u_coeffs = threshold_secret_sharing::numtheory::fft2_inverse(
-//        &u,
-//        p.pss.omega_secrets,
-//        p.pss.prime,
-//    ).iter().cloned().map(Field::from).collect::<Array1<Field>>();
-//
-//    let v = (dim .. 2*dim).collect::<Vec<i64>>();
-//    let v_coeffs = threshold_secret_sharing::numtheory::fft2_inverse(
-//        &v,
-//        p.pss.omega_secrets,
-//        p.pss.prime,
-//    ).iter().cloned().map(Field::from).collect::<Array1<Field>>();
-//
-//    let uv_coeffs = pmul(u_coeffs.view(), v_coeffs.view());
-//
-//    for i in 0 .. u.len() {
-//        debug_assert_eq!(
-//            p.peval2(uv_coeffs.view(), i),
-//            Field::from(u[i] * v[i]),
-//        );
-//    }
-//}
+pub fn pad_array(a: ArrayView1<Field>, size: usize) -> Array1<Field> {
+    let mut res = Array1::zeros(size);
+    res.slice_mut(ndarray::s!(0 .. a.len())).assign(&a);
+
+    res
+}
+
+pub fn trim_zeros<T>(mut v: Vec<T>) -> Vec<T> 
+    where T: num_traits::identities::Zero + Eq
+{
+    while v.last() == Some(&T::zero()) {
+        v.pop();
+    }
+
+    v
+}
