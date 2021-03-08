@@ -1,6 +1,5 @@
 use ndarray::{Array1, Array2, ArrayView1, ArrayView2, Zip};
 use sprs::{CsMat, TriMat};
-use threshold_secret_sharing::packed::PackedSecretSharing as PSS;
 
 #[cfg(test)]
 use proptest::{*, prelude::*};
@@ -21,34 +20,18 @@ type Field = crate::f5038849::F;
 struct Public {
     params: crate::params::Params,
 
-    l: usize,      // Message size (Note: k = l + t = 2^j - 1, for some j)
-    t: usize,      // Security threshold
-    k: usize,      // Reconstruction threshold
-    n: usize,      // Codeword size (Note: n = 3^i - 1, for some i)
-    m: usize,      // Interleaved code size
-
     Px: CsMat<Field>,
     Py: CsMat<Field>,
     Pz: CsMat<Field>,
     Padd: CsMat<Field>,
-
-    pss: PSS, // Share-packing parameters
 }
 
 impl Public {
     #[allow(non_snake_case)]
     fn new(c: &Ckt) -> Self {
         let params = Params::new(c.size());
-        let kexp = params.kexp;
-        let nexp = params.nexp;
-        let l = params.l;
-        let t = params.t;
-        let k = params.k;
-        let n = params.n;
-        let m = params.m;
-        let pss = params.pss;
 
-        let ml = m * l; // padded circuit size
+        let ml = params.m * params.l; // padded circuit size
 
         let new_ml_ml_mat = |cap| TriMat::with_capacity((ml,ml), cap);
         let mut Px = new_ml_ml_mat(ml);     // x = Px * w
@@ -73,7 +56,7 @@ impl Public {
             }
         }
 
-        Public {params, k, t, l, n, m, pss,
+        Public {params,
             Px: Px.to_csc(),
             Py: Py.to_csc(),
             Pz: Pz.to_csc(),
@@ -281,9 +264,9 @@ mod proof {
             .prop_flat_map(|c| {
                 let p = Public::new(&c);
                 let i = proptest::collection::vec(any::<Field>(), c.inp_size);
-                let r = proptest::collection::vec(any::<Field>(), p.m);
+                let r = proptest::collection::vec(any::<Field>(), p.params.m);
                 //let Q = vec_without_replacement(&vec![0..p.n as u32], p.t);
-                let Q = Just((0 .. p.t).collect());
+                let Q = Just((0 .. p.params.t).collect());
                 // ^ XXX: Need a vec strategy that samples w/o replacement
 
                 (Just(c), i, r, Q)
@@ -442,12 +425,13 @@ mod proof {
         let c = Ckt::test_value();
         let i = vec![3i64, 5, 7, 9].iter().cloned().map(Field::from).collect::<Vec<Field>>();
         let s = Secret::new(&c, &i);
-        let r = (0 .. (s.public.m * s.public.l) as i64).map(Field::from).collect::<Vec<Field>>();
-        let Q = (0 .. s.public.t).collect();
+        let p = s.public.params;
+        let r = (0 .. (p.m * p.l) as i64).map(Field::from).collect::<Vec<Field>>();
+        let Q = (0 .. p.t).collect();
         let A = s.public.Padd.to_dense();
-        let b = Array1::zeros(s.public.m * s.public.l);
+        let b = Array1::zeros(p.m * p.l);
         let proof = LinearConstraintsCheck::new(
-            &s.public.params,
+            &p,
             A.view(),
             s.Uw.view(),
             ArrayView1::from(&r),
@@ -455,7 +439,7 @@ mod proof {
         );
 
         assert!(proof.verify(
-            &s.public.params,
+            &p,
             A.view(),
             ArrayView1::from(&r),
             b.view(),
@@ -622,12 +606,13 @@ mod proof {
         let c = Ckt::test_value();
         let i = vec![3i64, 5, 7, 9].iter().cloned().map(Field::from).collect::<Vec<Field>>();
         let s = Secret::new(&c, &i);
-        let r = (0 .. s.public.m as i64).map(Field::from).collect::<Array1<Field>>();
-        let Q = (0 .. s.public.t).collect();
-        let a = Array1::from(vec![Field::ZERO-Field::ONE; s.public.m * s.public.l]);
-        let b = Array1::zeros(s.public.m * s.public.l);
+        let p = s.public.params;
+        let r = (0 .. p.m as i64).map(Field::from).collect::<Array1<Field>>();
+        let Q = (0 .. p.t).collect();
+        let a = Array1::from(vec![Field::ZERO-Field::ONE; p.m * p.l]);
+        let b = Array1::zeros(p.m * p.l);
         let proof = QuadraticConstraintsCheck::new(
-            &s.public.params,
+            &p,
             a.view(),
             b.view(),
             s.Ux.view(),
@@ -638,7 +623,7 @@ mod proof {
         );
 
         assert!(proof.verify(
-            &s.public.params,
+            &p,
             a.view(),
             b.view(),
             r.view(),
