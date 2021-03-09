@@ -2,7 +2,7 @@ use ndarray::{Array1, Array2, ArrayView1, ArrayView2, Zip};
 use sprs::{CsMat, TriMat};
 
 #[cfg(test)]
-use proptest::{*, prelude::*};
+use proptest::{*, prelude::*, collection::vec as pvec};
 
 use crate::circuit::{Op, Ckt};
 use crate::merkle;
@@ -128,8 +128,7 @@ impl Secret {
         let mut x = Array1::zeros(ml);
         let mut y = Array1::zeros(ml);
         let mut z = Array1::zeros(ml);
-        let w: Array1<Field> = ndarray::stack![ndarray::Axis(0),
-            c.eval(&inp).iter(), Array1::zeros(ml - c.size())];
+        let w = pad_array(ArrayView1::from(&c.eval(&inp)), ml);
 
         for (s, op) in c.ops.iter().enumerate() {
             if let Op::Mul(i, j) = *op {
@@ -137,6 +136,7 @@ impl Secret {
                 x[s] = w[i];
                 y[s] = w[j];
                 z[s] = w[s + c.inp_size];
+                debug_assert_eq!(x[s] * y[s] - z[s], Field::ZERO);
             }
         }
 
@@ -255,21 +255,10 @@ mod proof {
     }
 
     #[cfg(test)]
-    #[allow(non_snake_case)]
-    fn interleaved_code_check_strategy(
-        input_size: usize,
-        circuit_size: usize
-    ) -> impl Strategy<Value = (Ckt, Vec<Field>, Vec<Field>, Vec<usize>)> {
-        any_with::<Ckt>((input_size, circuit_size))
-            .prop_flat_map(|c| {
-                let p = Public::new(&c);
-                let i = proptest::collection::vec(any::<Field>(), c.inp_size);
-                let r = proptest::collection::vec(any::<Field>(), p.params.m);
-                //let Q = vec_without_replacement(&vec![0..p.n as u32], p.t);
-                let Q = Just((0 .. p.params.t).collect());
-                // ^ XXX: Need a vec strategy that samples w/o replacement
-
-                (Just(c), i, r, Q)
+    fn arb_ixs(max: usize, count: usize) -> impl Strategy<Value = Vec<usize>> {
+        Strategy::prop_shuffle(Just((0..max).collect::<Vec<usize>>()))
+            .prop_map(move |ixs| {
+                ixs.iter().take(count).cloned().collect()
             })
     }
 
@@ -278,7 +267,13 @@ mod proof {
         #[test]
         #[allow(non_snake_case)]
         fn test_interleaved_code_Uw(
-            (c, i, r, Q) in interleaved_code_check_strategy(20, 100),
+            (c, i, r, Q) in any_with::<Ckt>((20, 1000)).prop_flat_map(|c| {
+                let p = Public::new(&c);
+                let i = pvec(any::<Field>(), c.inp_size);
+                let r = pvec(any::<Field>(), p.params.m);
+                let Q = arb_ixs(p.params.n, p.params.t);
+                (Just(c), i, r, Q)
+            })
         ) {
             let s = Secret::new(&c, &i);
             let proof = InterleavedCodeCheck::new(
@@ -324,9 +319,8 @@ mod proof {
             let a_coeffs = Self::make_a_coeffs(p, A, r)
                 .expect("r*A is wrong size in linear constraint proof");
 
-            // XXX: There should be k coefficients, not n+1. Can we just take k?
-            // The need for k is due to using fft3_inverse. We could reduce
-            // communication by avoiding it. Computation tradeoff?
+            // XXX: There should be k coefficients, not n+1. Should be able
+            // to take the first k, since the rest should be zeros.
             let mut p_coeffs = Array2::zeros((p.m, p.n+1));
             Zip::from(p_coeffs.genrows_mut())
                 .and(U.genrows())
@@ -334,7 +328,8 @@ mod proof {
                     pi_coeffs.assign(&p.fft3_inverse(Ui.view()));
                 });
 
-            // XXX: There should be l+k+1 coefficients, not k+n+2. Related to the above.
+            // XXX: There should be l+k+1 coefficients, not k+n+2. Should be
+            // able to take the first l+k+1, since the rest should be zeros.
             let q_coeffs = Zip::from(a_coeffs.genrows())
                 .and(p_coeffs.genrows())
                 .fold(Array1::zeros(p.k + p.n + 2),
@@ -348,12 +343,18 @@ mod proof {
             }
 
             //debug_assert_eq!(
-            //    p.peval2(q_coeffs.view(), 1),
-            //    Zip::from(a_coeffs.genrows())
-            //        .and(p_coeffs.genrows())
-            //        .fold(Field::ZERO, |acc, ai, pi|
-            //            acc + p.peval2(ai, 1) * p.peval2(pi, 1)));
-            //debug_assert_eq!((0..p.l).fold(Field::ZERO,
+            //    (1..=p.l)
+            //        .map(|i| p.peval2(q_coeffs.view(), i).positivize())
+            //        .collect::<Vec<Field>>(),
+            //    (1..=p.l)
+            //        .map(|i|
+            //            Zip::from(a_coeffs.genrows())
+            //                .and(p_coeffs.genrows())
+            //                .fold(Field::ZERO, |acc, ai, pi|
+            //                    acc + p.peval2(ai, i) * p.peval2(pi, i)).positivize())
+            //        .collect::<Vec<Field>>(),
+            //);
+            //debug_assert_eq!((0..=p.l).fold(Field::ZERO,
             //        |acc, ix| acc + p.peval2(q_coeffs.view(), ix)),
             //        Field::ZERO);
             Self { U_Q, q: q_coeffs }
@@ -374,7 +375,7 @@ mod proof {
 
             let a_coeffs = Self::make_a_coeffs(p, A, r)
                 .expect("r*A is wrong size in linear constraint check");
-            let q_points = (0 .. p.l).map(|ix|
+            let q_points = (1 ..= p.l).map(|ix|
                 p.peval2(self.q.view(), ix)).collect::<Array1<Field>>();
             let q_sum = q_points.scalar_sum();
             let rb_sum = r.dot(&b);
@@ -407,7 +408,8 @@ mod proof {
         ) -> Result<Array2<Field>, ndarray::ShapeError> {
             let a = r.dot(&A).into_shape((p.m, p.l))?;
 
-            // XXX: There should be l coefficients here, not (k+1). Can we just take l?
+            // XXX: There should be l coefficients here, not (k+1). Should be
+            // able to take the first l, since the rest should be zeros.
             let mut a_coeffs = Array2::zeros((p.m, p.k+1));
             Zip::from(a_coeffs.genrows_mut())
                 .and(a.genrows())
@@ -419,80 +421,40 @@ mod proof {
         }
     }
 
-    #[test]
-    #[allow(non_snake_case)]
-    fn test_linear_constraints() {
-        let c = Ckt::test_value();
-        let i = vec![3i64, 5, 7, 9].iter().cloned().map(Field::from).collect::<Vec<Field>>();
-        let s = Secret::new(&c, &i);
-        let p = s.public.params;
-        let r = (0 .. (p.m * p.l) as i64).map(Field::from).collect::<Vec<Field>>();
-        let Q = (0 .. p.t).collect();
-        let A = s.public.Padd.to_dense();
-        let b = Array1::zeros(p.m * p.l);
-        let proof = LinearConstraintsCheck::new(
-            &p,
-            A.view(),
-            s.Uw.view(),
-            ArrayView1::from(&r),
-            &Q
-        );
+    #[cfg(test)]
+    proptest! {
+        #[test]
+        #[allow(non_snake_case)]
+        fn test_linear_constraints(
+            (c, i, r, Q) in any_with::<Ckt>((5, 5)).prop_flat_map(|c| {
+                let p = Params::new(c.size());
+                let i = pvec(any::<Field>(), c.inp_size);
+                let r = pvec(any::<Field>(), p.m * p.l);
+                let Q = arb_ixs(p.n, p.t);
+                (Just(c), i, r, Q)
+            })
+        ) {
+            let s = Secret::new(&c, &i);
+            let p = s.public.params;
+            let A = s.public.Padd.to_dense();
+            let b = Array1::zeros(p.m * p.l);
+            let proof = LinearConstraintsCheck::new(
+                &p,
+                A.view(),
+                s.Uw.view(),
+                ArrayView1::from(&r),
+                &Q
+            );
 
-        assert!(proof.verify(
-            &p,
-            A.view(),
-            ArrayView1::from(&r),
-            b.view(),
-            &Q,
-        ));
+            assert!(proof.verify(
+                &p,
+                A.view(),
+                ArrayView1::from(&r),
+                b.view(),
+                &Q,
+            ));
+        }
     }
-
-    //#[cfg(test)]
-    //#[allow(non_snake_case)]
-    //fn linear_constraints_check_strategy(
-    //    input_size: usize,
-    //    circuit_size: usize
-    //) -> impl Strategy<Value = (Ckt, Vec<Field>, Vec<Field>, Vec<usize>)> {
-    //    any_with::<Ckt>((input_size, circuit_size))
-    //        .prop_flat_map(|c| {
-    //            let p = Public::new(&c);
-    //            let i = proptest::collection::vec(any::<Field>(), c.inp_size);
-    //            let r = proptest::collection::vec(any::<Field>(), p.m * p.l);
-    //            //let Q = vec_without_replacement(&vec![0..p.n as u32], p.t);
-    //            let Q = Just((0 .. p.t).collect());
-    //            // ^ XXX: Need a vec strategy that samples w/o replacement
-
-    //            (Just(c), i, r, Q)
-    //        })
-    //}
-
-    //#[cfg(test)]
-    //proptest! {
-    //    #[test]
-    //    #[allow(non_snake_case)]
-    //    fn test_linear_constraints_Uw(
-    //        (c, i, r, Q) in linear_constraints_check_strategy(20, 100),
-    //    ) {
-    //        let s = Secret::new(&c, &i);
-    //        let A = s.public.Padd.to_dense();
-    //        let b = Array1::zeros(s.public.m * s.public.l);
-    //        let proof = LinearConstraintsCheck::new(
-    //            &s.public,
-    //            A.view(),
-    //            s.Uw.view(),
-    //            ArrayView1::from(&r),
-    //            &Q
-    //        );
-    //
-    //        prop_assert!(proof.verify(
-    //            &s.public,
-    //            A.view(),
-    //            ArrayView1::from(&r),
-    //            b.view(),
-    //            &Q,
-    //        ))
-    //    }
-    //}
 
     // Proof that a triple of interleaved codewords `Ux`, `Uy`, and `Uz`,
     // encoding vectors `x`, `y`, and `z`, satisfy `xi*yi + ai*zi = bi`
@@ -509,7 +471,7 @@ mod proof {
     impl QuadraticConstraintsCheck {
         #[allow(non_snake_case)]
         pub fn new(
-            p: &Params,
+            params: &Params,
             a: ArrayView1<Field>,
             b: ArrayView1<Field>,
             Ux: ArrayView2<Field>,
@@ -518,25 +480,22 @@ mod proof {
             r: ArrayView1<Field>,
             Q: &Vec<usize>,
         ) -> Self {
-            debug_assert_eq!(a.len(), p.m * p.l);
-            debug_assert_eq!(b.len(), p.m * p.l);
-            debug_assert_eq!(r.len(), p.m);
-            debug_assert_eq!(Q.len(), p.t);
+            debug_assert_eq!(a.len(), params.m * params.l);
+            debug_assert_eq!(b.len(), params.m * params.l);
+            debug_assert_eq!(r.len(), params.m);
+            debug_assert_eq!(Q.len(), params.t);
 
-            let Ua = p.encode_interleaved(a);
-            let Ub = p.encode_interleaved(b);
+            // XXX: These are all (k+1) coefficients long, wherass pa, pb
+            // should be l coefficients and px, py, pz should be k.
+            let pa = params.word_to_coeffs(a);
+            let pb = params.word_to_coeffs(b);
+            let px = params.codeword_to_coeffs(Ux, params.k+1);
+            let py = params.codeword_to_coeffs(Uy, params.k+1);
+            let pz = params.codeword_to_coeffs(Uz, params.k+1);
 
-            // XXX: These are all (n+1) coefficients long, but they should
-            // really be l (pa and pb) or k (the rest).
-            let pa = p.codeword_to_coeffs(Ua.view());
-            let pb = p.codeword_to_coeffs(Ub.view());
-            let px = p.codeword_to_coeffs(Ux);
-            let py = p.codeword_to_coeffs(Uy);
-            let pz = p.codeword_to_coeffs(Ux);
-
-            // XXX: This has (2n+2) coefficients, whereas it should have
-            // (2k-1). Related to the above.
-            let mut p = Array2::zeros((p.m, 2*p.n + 2));
+            // XXX: This has (2k+1) coefficients, whereas it should have
+            // (2k-1). Why?
+            let mut p = Array2::zeros((params.m, 2*params.k + 1));
             Zip::from(p.genrows_mut())
                 .and(pa.genrows())
                 .and(pb.genrows())
@@ -544,19 +503,30 @@ mod proof {
                 .and(py.genrows())
                 .and(pz.genrows())
                 .apply(|mut p_i, pa_i, pb_i, px_i, py_i, pz_i| {
-                    let pxy_i = pmul(px_i, py_i);
-                    let paz_i = pmul(pa_i, pz_i);
-                    let mut pb_i0 = Array1::zeros(pxy_i.len());
-                    pb_i0.slice_mut(ndarray::s!(0 .. pb_i.len())).assign(&pb_i);
+                    let dim = p_i.len();
+                    let pxy_i = pad_or_unpad(pmul(px_i, py_i).view(), dim);
+                    let paz_i = pad_or_unpad(pmul(pa_i, pz_i).view(), dim);
+                    let pb_i0 = pad_or_unpad(pb_i.view(), dim);
 
+                    //debug_assert_eq!(
+                    //    (1 ..= params.l).map(|c| {
+                    //        let pa_ic = params.peval2(pa_i.view(), c);
+                    //        let pb_ic = params.peval2(pb_i.view(), c);
+                    //        let px_ic = params.peval2(px_i.view(), c);
+                    //        let py_ic = params.peval2(py_i.view(), c);
+                    //        let pz_ic = params.peval2(pz_i.view(), c);
+                    //        px_ic*py_ic + pa_ic*pz_ic - pb_ic
+                    //    }).collect::<Array1<Field>>(),
+                    //    Array1::zeros(params.l),
+                    //);
                     p_i.assign(&(pxy_i + paz_i - pb_i0));
                 });
 
             let p0 = r.dot(&p);
 
-            let Ux_Q = Q.iter().map(|&j| Ux.column(j).to_owned()).collect();
-            let Uy_Q = Q.iter().map(|&j| Uy.column(j).to_owned()).collect();
-            let Uz_Q = Q.iter().map(|&j| Uz.column(j).to_owned()).collect();
+            let Ux_Q: Vec<Array1<Field>> = Q.iter().map(|&j| Ux.column(j).to_owned()).collect();
+            let Uy_Q: Vec<Array1<Field>> = Q.iter().map(|&j| Uy.column(j).to_owned()).collect();
+            let Uz_Q: Vec<Array1<Field>> = Q.iter().map(|&j| Uz.column(j).to_owned()).collect();
 
             Self { Ux_Q, Uy_Q, Uz_Q, p0 }
         }
@@ -574,63 +544,66 @@ mod proof {
             debug_assert_eq!(r.len(), p.m);
             debug_assert_eq!(Q.len(), p.t);
 
-            let Ua = p.encode_interleaved(a);
-            let Ub = p.encode_interleaved(b);
-
-            let zero_check = (0 .. p.l).fold(true, |acc, c| {
+            let zero_check = (1 ..= p.l).fold(true, |acc, c| {
                 let p0_c = p.peval2(self.p0.view(), c);
 
                 acc && (p0_c == Field::ZERO)
             });
 
-            let column_check = Q.iter()
-                .zip(&self.Ux_Q)
-                .zip(&self.Uy_Q)
-                .zip(&self.Uz_Q)
-                .fold(true, |acc, (((&j, Ux_j), Uy_j), Uz_j)| {
-                    let Uxy_j = point_product(Ux_j.view(), Uy_j.view());
-                    let Uaz_j = point_product(Ua.column(j), Uz_j.view());
-                    let Uxy_az_b_j = Uxy_j + Uaz_j - Ub.column(j);
-                    let p0_j = p.peval3(self.p0.view(), j);
-
-                    acc && (r.dot(&Uxy_az_b_j) == p0_j)
-                });
+            let Ua_Q = p.peval3_rows_at(p.word_to_coeffs(a).view(), Q);
+            let Ub_Q = p.peval3_rows_at(p.word_to_coeffs(b).view(), Q);
+            let r_UxUy_UaUz_Ub_Q = Ua_Q.iter().map(|c| c.view())
+                .zip(Ub_Q.iter().map(|c| c.view()))
+                .zip(self.Ux_Q.iter().map(|c| c.view()))
+                .zip(self.Uy_Q.iter().map(|c| c.view()))
+                .zip(self.Uz_Q.iter().map(|c| c.view()))
+                .map(|((((a, b), x), y), z)|
+                    r.dot(&(point_product(x,y) + point_product(a,z) - b))
+                ).collect::<Vec<Field>>();
+            let p0_Q = Q.iter()
+                .map(|&j| p.peval3(self.p0.view(), j+1))
+                .collect::<Vec<Field>>();
+            let column_check = r_UxUy_UaUz_Ub_Q == p0_Q;
 
             zero_check && column_check
         }
     }
 
-    #[test]
-    #[allow(non_snake_case)]
-    fn test_quadratic_constraints() {
-        let c = Ckt::test_value();
-        let i = vec![3i64, 5, 7, 9].iter().cloned().map(Field::from).collect::<Vec<Field>>();
-        let s = Secret::new(&c, &i);
-        let p = s.public.params;
-        let r = (0 .. p.m as i64).map(Field::from).collect::<Array1<Field>>();
-        let Q = (0 .. p.t).collect();
-        let a = Array1::from(vec![Field::ZERO-Field::ONE; p.m * p.l]);
-        let b = Array1::zeros(p.m * p.l);
-        let proof = QuadraticConstraintsCheck::new(
-            &p,
-            a.view(),
-            b.view(),
-            s.Ux.view(),
-            s.Uy.view(),
-            s.Uz.view(),
-            r.view(),
-            &Q,
-        );
+    #[cfg(test)]
+    proptest! {
+        #[test]
+        #[allow(non_snake_case)]
+        fn test_quadratic_constraints(
+            (c, i, r, Q) in any_with::<Ckt>((20, 2000)).prop_flat_map(|c| {
+                let p = Params::new(c.size());
+                let i = pvec(any::<Field>(), c.inp_size);
+                let r = pvec(any::<Field>(), p.m);
+                let Q = arb_ixs(p.n, p.t);
+                (Just(c), i, r, Q)
+            })
+        ) {
+            let s = Secret::new(&c, &i);
+            let p = s.public.params;
+            let a = Array1::from(vec![Field::ONE.neg(); p.m * p.l]);
+            let b = Array1::zeros(p.m * p.l);
+            let proof = QuadraticConstraintsCheck::new(
+                &p,
+                a.view(),
+                b.view(),
+                s.Ux.view(),
+                s.Uy.view(),
+                s.Uz.view(),
+                ArrayView1::from(&r),
+                &Q,
+            );
 
-        assert!(proof.verify(
-            &p,
-            a.view(),
-            b.view(),
-            r.view(),
-            &Q,
-        ));
+            assert!(proof.verify(
+                &p,
+                a.view(),
+                b.view(),
+                ArrayView1::from(&r),
+                &Q,
+            ));
+        }
     }
-
-    //pub fn next_pow_2(n: usize) -> usize { 2.pow((n as f64).log2().ceil() as u32) }
-    //pub fn next_pow_3(n: usize) -> usize { 3.pow((n as f64).log(3).ceil() as u32) }
 }

@@ -65,11 +65,36 @@ pub fn point_product(u: ArrayView1<Field>, v: ArrayView1<Field>) -> Array1<Field
     Array1::from_shape_fn(u.len(), |i| u[i] * v[i])
 }
 
+pub fn pad_or_unpad(a: ArrayView1<Field>, size: usize) -> Array1<Field> {
+    let dim = a.len();
+
+    if dim == size {
+        a.to_owned()
+    } else if dim > size {
+        unpad_array(a, size)
+    } else {
+        pad_array(a, size)
+    }
+}
+
+#[inline]
 pub fn pad_array(a: ArrayView1<Field>, size: usize) -> Array1<Field> {
+    debug_assert!(a.len() <= size);
+
     let mut res = Array1::zeros(size);
     res.slice_mut(ndarray::s!(0 .. a.len())).assign(&a);
 
     res
+}
+
+#[inline]
+pub fn unpad_array(a: ArrayView1<Field>, size: usize) -> Array1<Field> {
+    debug_assert!(a.len() >= size);
+
+    let (a1, a2) = a.split_at(ndarray::Axis(0), size);
+
+    debug_assert_eq!(a2, Array1::zeros(a2.len()).view());
+    a1.to_owned()
 }
 
 pub fn trim_zeros<T>(mut v: Vec<T>) -> Vec<T> 

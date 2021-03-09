@@ -9,6 +9,7 @@ type Field = crate::f5038849::F;
 #[derive(Debug, Clone, Copy)]
 pub enum Op { Add(usize, usize), Mul(usize, usize) }
 
+// TODO: Add LDI, SUB, and DIV instructions.
 #[cfg(test)]
 impl Arbitrary for Op {
     type Parameters = usize;
