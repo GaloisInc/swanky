@@ -30,9 +30,7 @@ pub fn tweak(i: usize) -> Block {
 /// Tweak function for two items.
 #[cfg(feature = "nightly")]
 pub fn tweak2(i: u64, j: u64) -> Block {
-    let data = unsafe {
-        _mm_set_epi64x(i as i64, j as i64)
-    };
+    let data = unsafe { _mm_set_epi64x(i as i64, j as i64) };
     Block(data)
 }
 #[cfg(not(feature = "nightly"))]
