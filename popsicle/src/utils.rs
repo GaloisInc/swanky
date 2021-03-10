@@ -12,7 +12,6 @@ use sha2::{Digest, Sha256};
 // as zero. We need to leave 8 bits free in order to add in the hash index when
 // running the OPRF (cf. <https://eprint.iacr.org/2016/799>, §5.2).
 pub fn compress_and_hash_inputs(inputs: &[Vec<u8>], key: Block) -> Vec<Block> {
-    let mut hasher = Sha256::new(); // XXX can we do better than using SHA-256?
     let aes = AesHash::new(key);
     let mask = Block::from(0xFFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FF00);
     inputs
@@ -25,8 +24,9 @@ pub fn compress_and_hash_inputs(inputs: &[Vec<u8>], key: Block) -> Vec<Block> {
                 digest[0..input.len()].copy_from_slice(input);
             } else {
                 // Hash `input` first.
-                hasher.input(input);
-                let h = hasher.result_reset();
+                let mut hasher = Sha256::new(); // XXX can we do better than using SHA-256?
+                hasher.update(input);
+                let h = hasher.finalize();
                 digest[0..16].copy_from_slice(&h[0..16]);
             }
             let block = aes.cr_hash(Block::from(i as u128), Block::from(digest));
