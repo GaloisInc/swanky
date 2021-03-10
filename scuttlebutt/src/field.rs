@@ -64,35 +64,39 @@ pub trait FiniteField:
     ) -> GenericArray<Self::PrimeField, Self::PolynomialFormNumCoefficients>;
     /// Multiplication over field elements should be reduced over this polynomial.
     fn reduce_multiplication_over() -> Polynomial<Self::PrimeField>;
+    /// A fused "lift from prime subfield and then multiply" operation. This operation can be much
+    /// faster than manually lifting and then multiplying.
+    fn multiply_by_prime_subfield(&self, pf: Self::PrimeField) -> Self;
 
+    /// Construct a field element from the given uniformly chosen random bytes.
+    fn from_uniform_bytes(x: &[u8; 16]) -> Self;
     /// Generate a random field element.
     fn random<R: RngCore + ?Sized>(rng: &mut R) -> Self;
-
     /// The order of the multiplicative group
     // TODO: we'll want a better number type than u128 if the fields get bigger.
     const MULTIPLICATIVE_GROUP_ORDER: u128;
-    /// Return a generator for the multiplicative group.
-    fn generator() -> Self;
-    /// Return the additive identity element.
-    fn zero() -> Self;
-    /// Return the multiplicative identity element.
-    fn one() -> Self;
-
+    /// The modulus of the prime sub-field.
+    const MODULUS: u128;
+    /// The generator for the multiplicative group.
+    const GENERATOR: Self;
+    /// The additive identity element.
+    const ZERO: Self;
+    /// The multiplicative identity element.
+    const ONE: Self;
     /// Compute the multiplicative inverse of self.
     ///
     /// # Panics
     /// This function will panic if *self == Self::zero()
     fn inverse(&self) -> Self {
-        if *self == Self::zero() {
+        if *self == Self::ZERO {
             panic!("Zero cannot be inverted");
         }
         // NOTE: this only works for GF(p^n)
         self.pow(Self::MULTIPLICATIVE_GROUP_ORDER - 1)
     }
-
     /// Computing `pow` using Montgomery's ladder technique.
     fn pow(&self, n: u128) -> Self {
-        let mut r0 = Self::one();
+        let mut r0 = Self::ONE;
         let mut r1 = *self;
         for i in (0..128).rev() {
             // This is equivalent to the following code, but constant-time:
@@ -204,13 +208,13 @@ macro_rules! field_ops {
 
         impl std::iter::Sum for $f {
             fn sum<I: Iterator<Item = Self>>(iter: I) -> Self {
-                iter.fold($f::zero(), std::ops::Add::add)
+                iter.fold($f::ZERO, std::ops::Add::add)
             }
         }
 
         impl std::iter::Product for $f {
             fn product<I: Iterator<Item = Self>>(iter: I) -> Self {
-                iter.fold($f::one(), std::ops::Mul::mul)
+                iter.fold($f::ONE, std::ops::Mul::mul)
             }
         }
         binop!(Add, add, std::ops::AddAssign::add_assign, $f);
@@ -226,7 +230,7 @@ macro_rules! field_ops {
             type Output = $f;
 
             fn neg(self) -> Self::Output {
-                $f::zero() - self
+                $f::ZERO - self
             }
         }
 
@@ -246,5 +250,8 @@ pub use f2::{BiggerThanModulus as F2BiggerThanModulus, F2};
 
 mod gf_2_128;
 pub use gf_2_128::{Gf128, Gf128BytesDeserializationCannotFail};
+
+mod f61p;
+pub use f61p::F61p;
 
 pub mod polynomial;

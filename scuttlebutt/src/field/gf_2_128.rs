@@ -270,6 +270,10 @@ impl FiniteField for Gf128 {
         Gf128(out)
     }
 
+    fn from_uniform_bytes(x: &[u8; 16]) -> Self {
+        Gf128(u128::from_le_bytes(*x))
+    }
+
     fn to_polynomial_coefficients(
         &self,
     ) -> GenericArray<Self::PrimeField, Self::PolynomialFormNumCoefficients> {
@@ -280,13 +284,13 @@ impl FiniteField for Gf128 {
     }
 
     fn reduce_multiplication_over() -> Polynomial<Self::PrimeField> {
-        let mut coefficients = smallvec![F2::zero(); 128];
-        coefficients[128 - 1] = F2::one();
-        coefficients[7 - 1] = F2::one();
-        coefficients[2 - 1] = F2::one();
-        coefficients[1 - 1] = F2::one();
+        let mut coefficients = smallvec![F2::ZERO; 128];
+        coefficients[128 - 1] = F2::ONE;
+        coefficients[7 - 1] = F2::ONE;
+        coefficients[2 - 1] = F2::ONE;
+        coefficients[1 - 1] = F2::ONE;
         Polynomial {
-            constant: F2::one(),
+            constant: F2::ONE,
             coefficients,
         }
     }
@@ -299,17 +303,16 @@ impl FiniteField for Gf128 {
 
     const MULTIPLICATIVE_GROUP_ORDER: u128 = u128::max_value();
 
-    fn generator() -> Self {
-        // See the conversation here: https://mattermost.galois.com/galwegians/pl/63smzhk9qbnrbbsb1hi6xpejmc
-        Gf128(2)
-    }
+    const MODULUS: u128 = 2;
+    // See the conversation here: https://mattermost.galois.com/galwegians/pl/63smzhk9qbnrbbsb1hi6xpejmc
+    const GENERATOR: Self = Gf128(2);
 
-    fn zero() -> Self {
-        Gf128(0)
-    }
+    const ZERO: Self = Gf128(0);
 
-    fn one() -> Self {
-        Gf128(1)
+    const ONE: Self = Gf128(1);
+
+    fn multiply_by_prime_subfield(&self, pf: Self::PrimeField) -> Self {
+        Self::conditional_select(&Self::ZERO, &self, pf.ct_eq(&F2::ONE))
     }
 }
 
@@ -322,9 +325,9 @@ test_field!(test_gf128, Gf128);
 fn test_generator() {
     let n = Gf128::MULTIPLICATIVE_GROUP_ORDER;
     let prime_factors: Vec<u128> = vec![67280421310721, 274177, 6700417, 641, 65537, 257, 17, 5, 3];
-    let x = Gf128::generator();
+    let x = Gf128::GENERATOR;
     for p in prime_factors.iter() {
         let p = *p;
-        assert_ne!(Gf128::one(), x.pow(n / p));
+        assert_ne!(Gf128::ONE, x.pow(n / p));
     }
 }
