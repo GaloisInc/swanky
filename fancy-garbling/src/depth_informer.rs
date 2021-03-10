@@ -4,6 +4,8 @@
 // Copyright © 2019 Galois, Inc.
 // See LICENSE for licensing information.
 
+//! Fancy object to compute the multiplicative depth of a computation.
+
 use crate::{
     errors::FancyError,
     fancy::{Fancy, FancyInput, FancyReveal, HasModulus},
@@ -26,7 +28,9 @@ impl HasModulus for DepthItem {
 /// Errors thrown by the Fancy computation.
 #[derive(Debug)]
 pub enum DepthError {
+    /// Projection is unsupported by the depth informer
     ProjUnsupported,
+    /// Error from Fancy library.
     Underlying(FancyError),
 }
 
