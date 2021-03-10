@@ -1,5 +1,4 @@
-use fancy_garbling::{depth_informer::DepthInformer};
-use fancy_garbling::{FancyInput, BinaryGadgets};
+use fancy_garbling::{depth_informer::DepthInformer, BinaryGadgets, FancyInput};
 
 fn main() {
     let mut i = DepthInformer::new();
