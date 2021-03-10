@@ -70,13 +70,13 @@ impl Commitment for ShaCommitment {
     }
 
     fn input(&mut self, input: &[u8]) {
-        self.commit.input(input);
+        self.commit.update(input);
     }
 
     fn finish(mut self) -> [u8; 32] {
-        self.commit.input(&self.seed);
+        self.commit.update(&self.seed);
         let mut a = [0u8; 32];
-        a.copy_from_slice(&self.commit.result());
+        a.copy_from_slice(&self.commit.finalize());
         a
     }
 
