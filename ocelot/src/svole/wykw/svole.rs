@@ -28,35 +28,36 @@ use scuttlebutt::{field::FiniteField, AbstractChannel, AesRng, Block};
 /// Secure LPN parameters presented in (cf.
 /// <https://eprint.iacr.org/2020/925>, Table 2).
 
-/// LPN parameters for setup0 phase.
-mod lpn_setup0_params {
+/// LPN parameters
+struct LpnParams {
     /// Hamming weight of the error vector `e` used in LPN assumption.
-    pub const WEIGHT: usize = 600;
+    weight: usize,
     /// Number of columns `n` in the LPN matrix.
-    pub const COLS: usize = 9_600;
+    cols: usize,
     /// Number of rows `k` in the LPN matrix.
-    pub const ROWS: usize = 1_220;
+    rows: usize,
 }
+
+/// LPN parameters for setup0 phase.
+const LPN_SETUP0_PARAMS: LpnParams = LpnParams {
+    weight: 600,
+    cols: 9_600,
+    rows: 1_220,
+};
 
 /// LPN parameters for setup phase.
-mod lpn_setup_params {
-    /// Hamming weight of the error vector `e` used in LPN assumption.
-    pub const WEIGHT: usize = 2_600;
-    /// Number of columns `n` in the LPN matrix.
-    pub const COLS: usize = 166_400;
-    /// Number of rows `k` in the LPN matrix.
-    pub const ROWS: usize = 5_060;
-}
+const LPN_SETUP_PARAMS: LpnParams = LpnParams {
+    weight: 2_600,
+    cols: 166_400,
+    rows: 5_060,
+};
 
 /// LPN parameters for extend phase.
-mod lpn_extend_params {
-    /// Hamming weight of the error vector `e` used in LPN assumption.
-    pub const WEIGHT: usize = 4_965;
-    /// Number of columns `n` in the LPN matrix.
-    pub const COLS: usize = 10_168_320;
-    /// Number of rows `k` in the LPN matrix.
-    pub const ROWS: usize = 158_000;
-}
+const LPN_EXTEND_PARAMS: LpnParams = LpnParams {
+    weight: 4_965,
+    cols: 10_168_320,
+    rows: 158_000,
+};
 
 /// Small constant `d` used in the `linear codes` useful in acheiving efficient matrix multiplication.
 const LPN_PARAMS_D: usize = 10;
@@ -196,25 +197,25 @@ impl<FE: FiniteField> SVoleSender for Sender<FE> {
     ) -> Result<Self, Error> {
         let sender = Self::init_internal(
             channel,
-            lpn_setup0_params::ROWS,
-            lpn_setup0_params::COLS,
-            lpn_setup0_params::WEIGHT,
+            LPN_SETUP0_PARAMS.rows,
+            LPN_SETUP0_PARAMS.cols,
+            LPN_SETUP0_PARAMS.weight,
             rng,
         )?;
         let mut sender = Self::init_internal2(
             channel,
             sender,
-            lpn_setup_params::ROWS,
-            lpn_setup_params::COLS,
-            lpn_setup_params::WEIGHT,
+            LPN_SETUP_PARAMS.rows,
+            LPN_SETUP_PARAMS.cols,
+            LPN_SETUP_PARAMS.weight,
             rng,
         )?;
         let base_voles = sender.send_internal(channel, 0, rng)?;
         Ok(Self {
             spsvole: sender.spsvole,
-            rows: lpn_extend_params::ROWS,
-            cols: lpn_extend_params::COLS,
-            weight: lpn_extend_params::WEIGHT,
+            rows: LPN_EXTEND_PARAMS.rows,
+            cols: LPN_EXTEND_PARAMS.cols,
+            weight: LPN_EXTEND_PARAMS.weight,
             base_voles,
             r: sender.r,
         })
@@ -343,26 +344,26 @@ impl<FE: FiniteField> SVoleReceiver for Receiver<FE> {
     ) -> Result<Self, Error> {
         let receiver = Self::init_internal(
             channel,
-            lpn_setup0_params::ROWS,
-            lpn_setup0_params::COLS,
-            lpn_setup0_params::WEIGHT,
+            LPN_SETUP0_PARAMS.rows,
+            LPN_SETUP0_PARAMS.cols,
+            LPN_SETUP0_PARAMS.weight,
             rng,
         )?;
         let mut receiver = Self::init_internal2(
             channel,
             receiver,
-            lpn_setup_params::ROWS,
-            lpn_setup_params::COLS,
-            lpn_setup_params::WEIGHT,
+            LPN_SETUP_PARAMS.rows,
+            LPN_SETUP_PARAMS.cols,
+            LPN_SETUP_PARAMS.weight,
             rng,
         )?;
         let base_voles = receiver.receive_internal(channel, 0, rng)?;
         Ok(Self {
             spsvole: receiver.spsvole,
             delta: receiver.delta,
-            rows: lpn_extend_params::ROWS,
-            cols: lpn_extend_params::COLS,
-            weight: lpn_extend_params::WEIGHT,
+            rows: LPN_EXTEND_PARAMS.rows,
+            cols: LPN_EXTEND_PARAMS.cols,
+            weight: LPN_EXTEND_PARAMS.weight,
             base_voles,
             r: receiver.r,
         })
