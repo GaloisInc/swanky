@@ -31,6 +31,8 @@ impl ConditionallySelectable for F2 {
 impl FiniteField for F2 {
     /// This uniformly generates a field element either 0 or 1 for `F2` type.
     fn random<R: RngCore + ?Sized>(rng: &mut R) -> Self {
+        // Grab the LSBit from a 32-bit integer. Rand's boolean generation doesn't do this,
+        // since it's concerend about insecure random number generators.
         F2((rng.next_u32() & 1) as u8)
     }
 
