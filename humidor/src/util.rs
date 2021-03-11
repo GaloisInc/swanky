@@ -1,6 +1,6 @@
 use ndarray::{Array1, ArrayView1};
 
-type Field = crate::f5038849::F;
+type Field = crate::f2_19x3_26::F;
 
 // Return the least `p` s.t. `3^p >= n`.
 #[inline]

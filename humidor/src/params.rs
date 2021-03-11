@@ -9,7 +9,7 @@ use crate::util::*;
 //
 // XXX: Use a silly field for now.
 //
-type Field = crate::f5038849::F;
+type Field = crate::f2_19x3_26::F;
 
 // Parameters for interleaved coding, based on the size of the circuit and
 // input. Note that these variable names, although terse, correspond to those
@@ -28,7 +28,7 @@ type Field = crate::f5038849::F;
 //
 // I.e., we ensure soundness error is negligible in the field size.
 // XXX: Is this right? Seems like t could be smaller, say ceil(log |F| / p).
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct Params {
     pub pss: PSS, // Share-packing parameters
 
@@ -44,6 +44,7 @@ pub struct Params {
 
 impl Params {
     pub fn new(size: usize) -> Self {
+        if size == 0 { panic!("Empty circuits are not supported") }
         // XXX: There's probably a better way to select these. As it is, we
         // evaluate parameters for all appropriate 2-power/3-power pairs and
         // select the ones that minimize |n - m|. Since m is the cost of
@@ -93,8 +94,8 @@ impl Params {
                 secret_count: l,
 
                 prime: Field::MOD,
-                omega_secrets: Field::ROOTS_BASE_2[kexp as usize] as i64,
-                omega_shares: Field::ROOTS_BASE_3[nexp as usize] as i64,
+                omega_secrets: Field::ROOTS_BASE_2[kexp as usize] as i128,
+                omega_shares: Field::ROOTS_BASE_3[nexp as usize] as i128,
             }
         }
     }
@@ -107,8 +108,8 @@ impl Params {
     fn encode(&self, wf: ArrayView1<Field>) -> Array1<Field> {
         debug_assert_eq!(wf.len(), self.l);
 
-        let w: Vec<i64> = wf.iter().cloned().map(i64::from).collect();
-        let c: Vec<i64> = self.pss.share(&w);
+        let w: Vec<i128> = wf.iter().cloned().map(i128::from).collect();
+        let c: Vec<i128> = self.pss.share(&w);
 
         c.iter().cloned().map(Field::from).collect()
     }
@@ -117,9 +118,9 @@ impl Params {
     fn decode(&self, cf: ArrayView1<Field>) -> Array1<Field> {
         debug_assert_eq!(cf.len(), self.n);
 
-        let c: Vec<i64> = cf.iter().take(self.k).cloned().map(i64::from).collect();
+        let c: Vec<i128> = cf.iter().take(self.k).cloned().map(i128::from).collect();
         let ixs: Vec<usize> = (0 .. self.k).collect();
-        let w: Vec<i64> = self.pss.reconstruct(&ixs, &c);
+        let w: Vec<i128> = self.pss.reconstruct(&ixs, &c);
 
         w.iter().cloned().map(Field::from).collect()
     }
@@ -132,8 +133,8 @@ impl Params {
         debug_assert!(cf.len() <= self.n);
         debug_assert!(cf.len() >= self.k);
 
-        let c: Vec<i64> = cf.iter().cloned().map(i64::from).collect();
-        let w: Vec<i64> = self.pss.reconstruct(ixs, &c);
+        let c: Vec<i128> = cf.iter().cloned().map(i128::from).collect();
+        let w: Vec<i128> = self.pss.reconstruct(ixs, &c);
 
         w.iter().cloned().map(Field::from).collect()
     }
@@ -191,7 +192,7 @@ impl Params {
         points0.slice_mut(ndarray::s!(1 .. points.len()+1)).assign(&points);
 
         threshold_secret_sharing::numtheory::fft2_inverse(
-            &points0.iter().cloned().map(i64::from).collect::<Vec<i64>>(),
+            &points0.iter().cloned().map(i128::from).collect::<Vec<i128>>(),
             self.pss.omega_secrets,
             self.pss.prime,
         ).iter().cloned().map(Field::from).collect::<Array1<Field>>()
@@ -206,7 +207,7 @@ impl Params {
         coeffs0.slice_mut(ndarray::s!(0 .. coeffs.len())).assign(&coeffs);
 
         threshold_secret_sharing::numtheory::fft2(
-            &coeffs0.iter().cloned().map(i64::from).collect::<Vec<i64>>(),
+            &coeffs0.iter().cloned().map(i128::from).collect::<Vec<i128>>(),
             self.pss.omega_secrets,
             self.pss.prime,
         )[1..].iter().cloned().map(Field::from).collect::<Array1<Field>>()
@@ -221,7 +222,7 @@ impl Params {
         points0.slice_mut(ndarray::s!(1 .. points.len()+1)).assign(&points);
 
         threshold_secret_sharing::numtheory::fft3_inverse(
-            &points0.iter().cloned().map(i64::from).collect::<Vec<i64>>(),
+            &points0.iter().cloned().map(i128::from).collect::<Vec<i128>>(),
             self.pss.omega_shares,
             self.pss.prime,
         ).iter().cloned().map(Field::from).collect::<Array1<Field>>()
@@ -236,18 +237,18 @@ impl Params {
         coeffs0.slice_mut(ndarray::s!(0 .. coeffs.len())).assign(&coeffs);
 
         threshold_secret_sharing::numtheory::fft3(
-            &coeffs0.iter().cloned().map(i64::from).collect::<Vec<i64>>(),
+            &coeffs0.iter().cloned().map(i128::from).collect::<Vec<i128>>(),
             self.pss.omega_shares,
             self.pss.prime,
         )[1..].iter().cloned().map(Field::from).collect::<Array1<Field>>()
     }
 
     pub fn peval2(&self, p: ArrayView1<Field>, ix: usize) -> Field {
-        crate::util::peval(p, Field::from(self.pss.omega_secrets).pow(ix as i64))
+        crate::util::peval(p, Field::from(self.pss.omega_secrets).pow(ix as i128))
     }
 
     pub fn peval3(&self, p: ArrayView1<Field>, ix: usize) -> Field {
-        crate::util::peval(p, Field::from(self.pss.omega_shares).pow(ix as i64))
+        crate::util::peval(p, Field::from(self.pss.omega_shares).pow(ix as i128))
     }
 
     #[allow(non_snake_case)]
@@ -300,27 +301,28 @@ impl Arbitrary for Params {
     type Parameters = ();
     type Strategy = BoxedStrategy<Self>;
     fn arbitrary_with(_: Self::Parameters) -> Self::Strategy {
-        (0usize .. 200000).prop_flat_map(|size| Just(Self::new(size))).boxed()
+        (1usize .. 500).prop_flat_map(|size| Just(Self::new(size))).boxed()
     }
 }
 
 #[test]
 fn test_new_params() {
-    let p = Params::new(25410);
+    let csize = (2usize.pow(9) - 1 - Field::BITS) * (3usize.pow(6) - 1);
+    let p = Params::new(csize);
 
-    assert_eq!(p.t, 22);
-    assert_eq!(p.kexp, 7);
-    assert_eq!(p.nexp, 5);
-    assert_eq!(p.n, 242);
-    assert_eq!(p.m, 242);
-    assert_eq!(p.k, 127);
-    assert_eq!(p.l, 105);
+    assert_eq!(p.t, Field::BITS);
+    assert_eq!(p.kexp, 9);
+    assert_eq!(p.nexp, 6);
+    assert_eq!(p.n, 3usize.pow(6) - 1);
+    assert_eq!(p.m, 3usize.pow(6) - 1);
+    assert_eq!(p.k, 2usize.pow(9) - 1);
+    assert_eq!(p.l, 2usize.pow(9) - 1 - Field::BITS);
 }
 
 #[cfg(test)]
 proptest! {
     #[test]
-    fn test_new_params_props(s in 0usize .. 200000) {
+    fn test_new_params_props(s in 1usize .. 200000) {
         let p = Params::new(s);
 
         prop_assert_eq!(2usize.pow(p.kexp), p.k + 1);
@@ -328,6 +330,8 @@ proptest! {
         prop_assert_eq!(p.l + p.t, p.k);
         prop_assert!(p.k <= p.n);
         prop_assert!(p.l * p.m >= s);
+        prop_assert!(p.m > 0);
+        prop_assert!(p.l > 0);
     }
 
     #[test]
@@ -404,7 +408,7 @@ proptest! {
     #[test]
     fn test_peval2(
         (p,v) in any::<Params>().prop_flat_map(|p| {
-            let v = pvec(any::<i64>(), p.k + 1);
+            let v = pvec(any::<i128>(), p.k + 1);
             (Just(p), v)
         })
     ) {
@@ -422,7 +426,7 @@ proptest! {
     #[test]
     fn test_peval3(
         (p,v) in any::<Params>().prop_flat_map(|p| {
-            let v = pvec(any::<i64>(), p.n + 1);
+            let v = pvec(any::<i128>(), p.n + 1);
             (Just(p), v)
         })
     ) {

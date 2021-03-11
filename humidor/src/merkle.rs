@@ -8,7 +8,7 @@ use proptest::{*, prelude::*};
 //
 // XXX: Use a silly field for now.
 //
-type Field = crate::f5038849::F;
+type Field = crate::f2_19x3_26::F;
 
 const HBYTES: usize = 32; // Use 256-bit hash for now
 const HZERO: Digest = [0u8; HBYTES];

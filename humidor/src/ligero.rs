@@ -12,7 +12,7 @@ use crate::params::Params;
 //
 // XXX: Use a silly field for now.
 //
-type Field = crate::f5038849::F;
+type Field = crate::f2_19x3_26::F;
 
 // Proof information available to both the prover and the verifier.
 #[derive(Debug, Clone)]
@@ -29,7 +29,7 @@ struct Public {
 impl Public {
     #[allow(non_snake_case)]
     fn new(c: &Ckt) -> Self {
-        let params = Params::new(c.size());
+        let params = Params::new(c.size() + 1 /* for the final zero check */);
 
         let ml = params.m * params.l; // padded circuit size
 
@@ -56,12 +56,21 @@ impl Public {
             }
         }
 
+        // XXX: According Sec. 4.4 of the Ligero paper, checking the circuit
+        // output is done by adding (or replacing?) a constraint based on the
+        // last gate in c:
+        // * w[i] + w[j] - 1 = 1    if the last gate is an addition
+        // * x[s] + y[s] - 1 = 0    if the last gate is a multiplication
+        // It's unclear to me how to do this without adding extra gates. So
+        // instead, we add a constraint directly asserting the last wire in
+        // the extended witness to be zero.
+        Padd.add_triplet(c.size(), c.size() - 1, Field::ONE);
+
         Public {params,
             Px: Px.to_csc(),
             Py: Py.to_csc(),
             Pz: Pz.to_csc(),
             Padd: Padd.to_csc(),
-
         }
     }
 
@@ -214,7 +223,7 @@ mod proof {
     // random vector `r` in `F^m` and a random size `t` subset `Q` of
     // columns.
     #[allow(non_snake_case)]
-    struct InterleavedCodeCheck {
+    pub struct InterleavedCodeCheck {
         w: Array1<Field>,
         Q_lemma: merkle::Lemma,
     }
@@ -239,12 +248,12 @@ mod proof {
 
         #[allow(non_snake_case)]
         pub fn verify(&self,
-            publ: &Public,
+            params: &Params,
             root: &merkle::Digest,
             r: ArrayView1<Field>,
-            Q: &Vec<usize>
+            Q: &Vec<usize>,
         ) -> bool {
-            let codeword_check = publ.params.codeword_is_valid(self.w.view());
+            let codeword_check = params.codeword_is_valid(self.w.view());
             let leaves_check = self.Q_lemma.verify(root);
             let columns_check = self.Q_lemma.columns().iter().zip(Q)
                 .fold(true, |acc, (cj, &j)|
@@ -267,7 +276,7 @@ mod proof {
         #[test]
         #[allow(non_snake_case)]
         fn test_interleaved_code_Uw(
-            (c, i, r, Q) in any_with::<Ckt>((20, 1000)).prop_flat_map(|c| {
+            (c, i, r, Q) in any_with::<Ckt>((5, 100)).prop_flat_map(|c| {
                 let p = Public::new(&c);
                 let i = pvec(any::<Field>(), c.inp_size);
                 let r = pvec(any::<Field>(), p.params.m);
@@ -284,7 +293,7 @@ mod proof {
             );
 
             prop_assert!(proof.verify(
-                &s.public,
+                &s.public.params,
                 &s.Uw_hash.root(),
                 ArrayView1::from(&r),
                 &Q,
@@ -297,7 +306,8 @@ mod proof {
     // a random vector `r` in `F^m`, and a random size `t` subset of
     // columns.
     #[allow(non_snake_case)]
-    struct LinearConstraintsCheck {
+    #[derive(Clone)]
+    pub struct LinearConstraintsCheck {
         q: Array1<Field>,
         U_Q: Vec<Array1<Field>>,
     }
@@ -321,7 +331,7 @@ mod proof {
 
             // XXX: There should be k coefficients, not n+1. Should be able
             // to take the first k, since the rest should be zeros.
-            let mut p_coeffs = Array2::zeros((p.m, p.n+1));
+            let mut p_coeffs = Array2::zeros((U.nrows(), p.n+1));
             Zip::from(p_coeffs.genrows_mut())
                 .and(U.genrows())
                 .apply(|mut pi_coeffs, Ui| {
@@ -364,8 +374,8 @@ mod proof {
         pub fn verify(&self,
             p: &Params,
             A: ArrayView2<Field>,
-            r: ArrayView1<Field>,
             b: ArrayView1<Field>,
+            r: ArrayView1<Field>,
             Q: &Vec<usize>,
         ) -> bool {
             debug_assert_eq!(r.len(), p.m * p.l);
@@ -386,12 +396,10 @@ mod proof {
                 .zip(&self.U_Q)
                 .fold(true, |acc, (&j, Uj)| {
                     let q_eta_j = p.peval3(self.q.view(), j+1);
-                    let r_eta_j_Uj = (0..p.m)
-                        .fold(Field::ZERO, |acc, i| {
-                            let ai_eta_j = p.peval3(a_coeffs.row(i), j+1);
-                            let U_i_j = Uj[i];
-
-                            acc + ai_eta_j*U_i_j
+                    let r_eta_j_Uj = Uj.iter()
+                        .zip(a_coeffs.genrows())
+                        .fold(Field::ZERO, |acc, (&U_i_j, ai)| {
+                            acc + p.peval3(ai, j+1) * U_i_j
                         });
 
                     acc && (r_eta_j_Uj == q_eta_j)
@@ -406,11 +414,11 @@ mod proof {
             A: ArrayView2<Field>,
             r: ArrayView1<Field>,
         ) -> Result<Array2<Field>, ndarray::ShapeError> {
-            let a = r.dot(&A).into_shape((p.m, p.l))?;
+            let a = r.dot(&A).into_shape((A.ncols() / p.l, p.l))?;
 
             // XXX: There should be l coefficients here, not (k+1). Should be
             // able to take the first l, since the rest should be zeros.
-            let mut a_coeffs = Array2::zeros((p.m, p.k+1));
+            let mut a_coeffs = Array2::zeros((a.nrows(), p.k+1));
             Zip::from(a_coeffs.genrows_mut())
                 .and(a.genrows())
                 .apply(|mut ai_coeffs, ai| {
@@ -426,7 +434,7 @@ mod proof {
         #[test]
         #[allow(non_snake_case)]
         fn test_linear_constraints(
-            (c, i, r, Q) in any_with::<Ckt>((5, 5)).prop_flat_map(|c| {
+            (c, i, r, Q) in any_with::<Ckt>((5, 100)).prop_flat_map(|c| {
                 let p = Params::new(c.size());
                 let i = pvec(any::<Field>(), c.inp_size);
                 let r = pvec(any::<Field>(), p.m * p.l);
@@ -446,13 +454,16 @@ mod proof {
                 &Q
             );
 
-            assert!(proof.verify(
-                &p,
-                A.view(),
-                ArrayView1::from(&r),
-                b.view(),
-                &Q,
-            ));
+            prop_assert_eq!(
+                proof.verify(
+                    &p,
+                    A.view(),
+                    b.view(),
+                    ArrayView1::from(&r),
+                    &Q,
+                ),
+                *c.eval(&i).last().unwrap() == Field::ZERO
+            );
         }
     }
 
@@ -461,7 +472,8 @@ mod proof {
     // for all `i`, given public vectors `a` and `b`, a random vector `r`,
     // and a random size `t` subset of columns.
     #[allow(non_snake_case)]
-    struct QuadraticConstraintsCheck {
+    #[derive(Clone)]
+    pub struct QuadraticConstraintsCheck {
         p0: Array1<Field>,
         Ux_Q: Vec<Array1<Field>>,
         Uy_Q: Vec<Array1<Field>>,
@@ -574,7 +586,7 @@ mod proof {
         #[test]
         #[allow(non_snake_case)]
         fn test_quadratic_constraints(
-            (c, i, r, Q) in any_with::<Ckt>((20, 2000)).prop_flat_map(|c| {
+            (c, i, r, Q) in any_with::<Ckt>((5, 100)).prop_flat_map(|c| {
                 let p = Params::new(c.size());
                 let i = pvec(any::<Field>(), c.inp_size);
                 let r = pvec(any::<Field>(), p.m);
@@ -597,13 +609,333 @@ mod proof {
                 &Q,
             );
 
-            assert!(proof.verify(
+            prop_assert!(proof.verify(
                 &p,
                 a.view(),
                 b.view(),
                 ArrayView1::from(&r),
                 &Q,
             ));
+        }
+    }
+}
+
+mod interactive {
+    use super::*;
+
+    #[allow(non_snake_case)]
+    #[derive(Clone, Copy)]
+    pub struct Round1 {
+        pub Uw_root: merkle::Digest,
+        pub Ux_root: merkle::Digest,
+        pub Uy_root: merkle::Digest,
+        pub Uz_root: merkle::Digest,
+    }
+
+    #[derive(Clone)]
+    #[allow(non_snake_case)]
+    pub struct Round2 {
+        // Randomness for interleaved-code checks
+        pub r_w: Array1<Field>, pub Q_w: Vec<usize>,
+        pub r_x: Array1<Field>, pub Q_x: Vec<usize>,
+        pub r_y: Array1<Field>, pub Q_y: Vec<usize>,
+        pub r_z: Array1<Field>, pub Q_z: Vec<usize>,
+
+        // Randomness for linear-constraint checks
+        pub r_add: Array1<Field>, pub Q_add: Vec<usize>,
+        pub r_xw: Array1<Field>, pub Q_xw: Vec<usize>,
+        pub r_yw: Array1<Field>, pub Q_yw: Vec<usize>,
+        pub r_zw: Array1<Field>, pub Q_zw: Vec<usize>,
+
+        // Randomness for quadratic-constraint check
+        pub r_xyz: Array1<Field>, pub Q_xyz: Vec<usize>,
+    }
+
+    #[allow(non_snake_case)]
+    pub struct Round3 {
+        pub Uw_proof: proof::InterleavedCodeCheck,
+        pub Ux_proof: proof::InterleavedCodeCheck,
+        pub Uy_proof: proof::InterleavedCodeCheck,
+        pub Uz_proof: proof::InterleavedCodeCheck,
+
+        pub add_proof: proof::LinearConstraintsCheck,
+        pub xw_proof: proof::LinearConstraintsCheck,
+        pub yw_proof: proof::LinearConstraintsCheck,
+        pub zw_proof: proof::LinearConstraintsCheck,
+
+        pub xyz_proof: proof::QuadraticConstraintsCheck,
+    }
+
+    pub struct Prover { secret: Secret }
+
+    impl Prover {
+        pub fn new(ckt: &Ckt, w: &Vec<Field>) -> Self {
+            Self { secret: Secret::new(ckt, w) }
+        }
+
+        pub fn round1(&self) -> Round1 {
+            Round1 {
+                Uw_root: self.secret.Uw_hash.root(),
+                Ux_root: self.secret.Ux_hash.root(),
+                Uy_root: self.secret.Uy_hash.root(),
+                Uz_root: self.secret.Uz_hash.root(),
+            }
+        }
+
+        #[allow(non_snake_case)]
+        pub fn round3(&self, r2: Round2) -> Round3 {
+            use ndarray::{stack, Axis};
+            use sprs::hstack;
+
+            let params = self.secret.public.params;
+            let Iml = CsMat::eye(params.m * params.l);
+            let Px_neg = self.secret.public.Px.map(|f| f.neg());
+            let Py_neg = self.secret.public.Py.map(|f| f.neg());
+            let Pz_neg = self.secret.public.Pz.map(|f| f.neg());
+
+            Round3 {
+                // Interleaved-code checks
+                Uw_proof: proof::InterleavedCodeCheck::new(
+                    self.secret.Uw.view(),
+                    &self.secret.Uw_hash,
+                    r2.r_w.view(),
+                    &r2.Q_w,
+                ),
+                Ux_proof: proof::InterleavedCodeCheck::new(
+                    self.secret.Ux.view(),
+                    &self.secret.Ux_hash,
+                    r2.r_x.view(),
+                    &r2.Q_x,
+                ),
+                Uy_proof: proof::InterleavedCodeCheck::new(
+                    self.secret.Uy.view(),
+                    &self.secret.Uy_hash,
+                    r2.r_y.view(),
+                    &r2.Q_y,
+                ),
+                Uz_proof: proof::InterleavedCodeCheck::new(
+                    self.secret.Uz.view(),
+                    &self.secret.Uz_hash,
+                    r2.r_z.view(),
+                    &r2.Q_z,
+                ),
+
+                // Linear-constraints checks
+                add_proof: proof::LinearConstraintsCheck::new(
+                    &params,
+                    self.secret.public.Padd.to_dense().view(),
+                    self.secret.Uw.view(),
+                    r2.r_add.view(),
+                    &r2.Q_add,
+                ),
+                xw_proof: proof::LinearConstraintsCheck::new(
+                    &params,
+                    hstack(&[Iml.view(), Px_neg.view()]).to_dense().view(),
+                    stack![Axis(0), self.secret.Ux, self.secret.Uw].view(),
+                    r2.r_xw.view(),
+                    &r2.Q_xw,
+                ),
+                yw_proof: proof::LinearConstraintsCheck::new(
+                    &params,
+                    hstack(&[Iml.view(), Py_neg.view()]).to_dense().view(),
+                    stack![Axis(0), self.secret.Uy, self.secret.Uw].view(),
+                    r2.r_yw.view(),
+                    &r2.Q_yw,
+                ),
+                zw_proof: proof::LinearConstraintsCheck::new(
+                    &params,
+                    hstack(&[Iml.view(), Pz_neg.view()]).to_dense().view(),
+                    stack![Axis(0), self.secret.Uz, self.secret.Uw].view(),
+                    r2.r_zw.view(),
+                    &r2.Q_zw,
+                ),
+
+                // Quadratic-constraints check
+                xyz_proof: proof::QuadraticConstraintsCheck::new(
+                    &params,
+                    Array1::from(vec![Field::ONE.neg(); params.m * params.l]).view(),
+                    Array1::zeros(params.m * params.l).view(),
+                    self.secret.Ux.view(),
+                    self.secret.Uy.view(),
+                    self.secret.Uz.view(),
+                    r2.r_xyz.view(),
+                    &r2.Q_xyz,
+                ),
+            }
+        }
+    }
+
+    #[derive(Clone)]
+    pub struct Verifier {
+        public: Public,
+
+        r1: Option<Round1>,
+        r2: Option<Round2>,
+
+        rng: rand::rngs::OsRng,
+    }
+
+    impl Verifier {
+        pub fn new(
+            ckt: &Ckt,
+        ) -> Self {
+            Self {
+                public: Public::new(ckt),
+                r1: None,
+                r2: None,
+                rng: rand::rngs::OsRng,
+            }
+        }
+
+        #[allow(non_snake_case)]
+        fn random_indices(&mut self) -> Vec<usize> {
+            use rand::seq::SliceRandom;
+
+            let mut Q = (0 .. self.public.params.n).collect::<Vec<usize>>();
+            Q.shuffle(&mut self.rng);
+            Q.truncate(self.public.params.t);
+
+            Q
+        }
+
+        fn random_field_array(&mut self, size: usize) -> Array1<Field> {
+            use rand::distributions::{Uniform, Distribution};
+            let elem = Uniform::from(0..Field::MOD);
+
+            (0..size).map(|_| Field::from(elem.sample(&mut self.rng))).collect()
+        }
+
+        #[allow(non_snake_case)]
+        pub fn round2(&mut self, r1: Round1) -> Round2 {
+            let params = self.public.params;
+
+            self.r1 = Some(r1);
+
+            let r2 = Round2 {
+                r_w: self.random_field_array(params.m),
+                r_x: self.random_field_array(params.m),
+                r_y: self.random_field_array(params.m),
+                r_z: self.random_field_array(params.m),
+
+                Q_w: self.random_indices(),
+                Q_x: self.random_indices(),
+                Q_y: self.random_indices(),
+                Q_z: self.random_indices(),
+
+                r_add: self.random_field_array(params.m * params.l),
+                r_xw: self.random_field_array(params.m * params.l),
+                r_yw: self.random_field_array(params.m * params.l),
+                r_zw: self.random_field_array(params.m * params.l),
+
+                Q_add: self.random_indices(),
+                Q_xw: self.random_indices(),
+                Q_yw: self.random_indices(),
+                Q_zw: self.random_indices(),
+
+                r_xyz: self.random_field_array(params.m),
+
+                Q_xyz: self.random_indices(),
+            };
+
+            self.r2 = Some(r2.clone());
+            r2
+        }
+
+        pub fn verify(self, r3: Round3) -> bool {
+            use sprs::hstack;
+
+            let params = self.public.params;
+            let r1 = self.r1.expect("Round 1 must precede verification");
+            let r2 = self.r2.expect("Round 2 must precede verification");
+            let Iml: CsMat<Field> = CsMat::eye(params.m * params.l);
+            let Px_neg = self.public.Px.map(|f| f.neg());
+            let Py_neg = self.public.Py.map(|f| f.neg());
+            let Pz_neg = self.public.Pz.map(|f| f.neg());
+
+            // Interleaved-code checks
+            r3.Uw_proof.verify(
+                &params,
+                &r1.Uw_root,
+                r2.r_w.view(),
+                &r2.Q_w,
+            ) &&
+            r3.Ux_proof.verify(
+                &params,
+                &r1.Ux_root,
+                r2.r_x.view(),
+                &r2.Q_x,
+            ) &&
+            r3.Uy_proof.verify(
+                &params,
+                &r1.Uy_root,
+                r2.r_y.view(),
+                &r2.Q_y,
+            ) &&
+            r3.Uz_proof.verify(
+                &params,
+                &r1.Uz_root,
+                r2.r_z.view(),
+                &r2.Q_z,
+            ) &&
+
+            // Linear-constraints checks
+            r3.add_proof.verify(
+                &params,
+                self.public.Padd.to_dense().view(),
+                Array1::zeros(params.m * params.l).view(),
+                r2.r_add.view(),
+                &r2.Q_add,
+            ) &&
+            r3.xw_proof.verify(
+                &params,
+                hstack(&[Iml.view(), Px_neg.view()]).to_dense().view(),
+                Array1::zeros(params.m * params.l).view(),
+                r2.r_xw.view(),
+                &r2.Q_xw,
+            ) &&
+            r3.yw_proof.verify(
+                &params,
+                hstack(&[Iml.view(), Py_neg.view()]).to_dense().view(),
+                Array1::zeros(params.m * params.l).view(),
+                r2.r_yw.view(),
+                &r2.Q_yw,
+            ) &&
+            r3.zw_proof.verify(
+                &params,
+                hstack(&[Iml.view(), Pz_neg.view()]).to_dense().view(),
+                Array1::zeros(params.m * params.l).view(),
+                r2.r_zw.view(),
+                &r2.Q_zw,
+            ) &&
+
+            // Quadratic-constraints check
+            r3.xyz_proof.verify(
+                &params,
+                Array1::from(vec![Field::ONE.neg(); params.m * params.l]).view(),
+                Array1::zeros(params.m * params.l).view(),
+                r2.r_xyz.view(),
+                &r2.Q_xyz,
+            )
+        }
+    }
+
+    proptest! {
+        #[test]
+        fn test_interactive_proof(
+            (ckt, w) in any_with::<Ckt>((5, 100)).prop_flat_map(|ckt| {
+                let w = pvec(any::<Field>(), ckt.inp_size);
+                (Just(ckt), w)
+            })
+        ) {
+            let output = *ckt.eval(&w).last().unwrap();
+            let p = interactive::Prover::new(&ckt, &w);
+            let mut v = interactive::Verifier::new(&ckt);
+
+            let r1 = p.round1();
+            let r2 = v.round2(r1);
+            let r3 = p.round3(r2);
+
+            prop_assert_eq!(v.verify(r3), output == Field::ZERO);
         }
     }
 }

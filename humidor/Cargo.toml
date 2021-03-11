@@ -17,12 +17,12 @@ doctest = false
 [features]
 
 [dependencies]
-#merkletree = "0.21.0"
 merkle-cbt = "0.3.0"
 rust-crypto = "^0.2.36"
 sprs = "0.9.3"
 ndarray = "0.13.1"
 num-traits = "0.2.14"
+rand = "0.8.3"
 
 [dependencies.threshold-secret-sharing]
 git = "https://gitlab-ext.galois.com/hamlinb/rust-threshold-secret-sharing"

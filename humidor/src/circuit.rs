@@ -4,7 +4,7 @@ use proptest::prelude::*;
 //
 // XXX: Use a silly field for now.
 //
-type Field = crate::f5038849::F;
+type Field = crate::f2_19x3_26::F;
 
 #[derive(Debug, Clone, Copy)]
 pub enum Op { Add(usize, usize), Mul(usize, usize) }
