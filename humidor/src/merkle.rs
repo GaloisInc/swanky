@@ -4,6 +4,7 @@ use ndarray::{Array1, ArrayView1, ArrayView2};
 
 #[cfg(test)]
 use proptest::{*, prelude::*};
+use proptest::collection::vec as pvec;
 
 //
 // XXX: Use a silly field for now.
@@ -80,8 +81,8 @@ impl Lemma {
 proptest! {
     #[test]
     fn test_merkle_lemma(
-        values in proptest::collection::vec(any::<Field>(), 50 * 50),
-        indices in proptest::collection::vec(0usize..50, 20),
+        values in pvec(any::<Field>(), 50 * 50),
+        indices in pvec(0usize..50, 20),
     ) {
         use ndarray::Array2;
 

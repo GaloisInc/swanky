@@ -73,11 +73,6 @@ impl Public {
             Padd: Padd.to_csc(),
         }
     }
-
-    #[cfg(test)]
-    fn test_value() -> Self {
-        Self::new(&Ckt::test_value())
-    }
 }
 
 #[cfg(test)]
@@ -166,12 +161,6 @@ impl Secret {
             Uw_hash, Ux_hash, Uy_hash, Uz_hash,
         }
     }
-
-    #[cfg(test)]
-    pub fn test_value() -> Self {
-        Self::new(&Ckt::test_value(),
-            &vec![5.into(), 7.into(), 11.into(), 13.into()])
-    }
 }
 
 #[cfg(test)]
@@ -181,7 +170,7 @@ impl Arbitrary for Secret {
     fn arbitrary_with(p: Self::Parameters) -> Self::Strategy {
         (
             any_with::<Ckt>(p),
-            proptest::collection::vec(any::<Field>(), p.0),
+            pvec(any::<Field>(), p.0),
         ).prop_map(|(ckt, inp)|
             Secret::new(&ckt, &inp)
         ).boxed()
@@ -210,9 +199,18 @@ proptest! {
 
     #[test]
     #[allow(non_snake_case)]
-    fn test_Padd(s in Secret::arbitrary_with((20, 1000))) {
-        prop_assert_eq!(&s.public.Padd * &s.w.t(),
-            Array1::from(vec![0.into(); s.w.len()]));
+    fn test_Padd(
+        (c,i) in any_with::<Ckt>((20, 1000)).prop_flat_map(|c| {
+            (Just(c), pvec(any::<Field>(), 20))
+        })
+    ) {
+        let s = Secret::new(&c, &i);
+        let output = *c.eval(&i).last().unwrap();
+        let zeros = Array1::from(vec![0.into(); s.w.len()]);
+        prop_assert_eq!(
+            output == Field::ZERO,
+            &s.public.Padd * &s.w.t() == zeros
+        );
     }
 }
 
@@ -844,6 +842,7 @@ mod interactive {
             r2
         }
 
+        #[allow(non_snake_case)]
         pub fn verify(self, r3: Round3) -> bool {
             use sprs::hstack;
 

@@ -171,6 +171,7 @@ impl Params {
             .expect("Unreachable: encoded array is wrong size")
     }
 
+    #[allow(dead_code)]
     pub fn decode_interleaved(&self, cs: ArrayView2<Field>) -> Array1<Field> {
         debug_assert_eq!(cs.shape(), [self.m, self.n]);
 
@@ -200,6 +201,7 @@ impl Params {
 
     // Take a sequence of `k+1` coefficients of the polynomial `p` and
     // return evaluation points `p(zeta_0) .. p(zeta_{k+1})`.
+    #[allow(dead_code)]
     pub fn fft2(&self, coeffs: ArrayView1<Field>) -> Array1<Field> {
         debug_assert!(coeffs.len() <= self.k+1);
 
@@ -230,6 +232,7 @@ impl Params {
 
     // Take a sequence of `n+1` coefficients of the polynomial `p` and
     // return evaluation points `p(eta_0) .. p(eta_{n+1})`.
+    #[allow(dead_code)]
     pub fn fft3(&self, coeffs: ArrayView1<Field>) -> Array1<Field> {
         debug_assert!(coeffs.len() <= self.n);
 
