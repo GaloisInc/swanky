@@ -11,6 +11,7 @@
 use super::{
     base_svole::{Receiver as BaseReceiver, Sender as BaseSender},
     spsvole::{SpsReceiver, SpsSender},
+    utils::Powers,
 };
 use crate::{
     errors::Error,
@@ -99,9 +100,9 @@ impl<FE: FiniteField> Sender<FE> {
         weight: usize,
         rng: &mut RNG,
     ) -> Result<Self, Error> {
-        let pows = super::utils::gen_pows();
+        let pows: Powers<FE> = <Powers<_> as Default>::default();
         let r = FE::PolynomialFormNumCoefficients::to_usize();
-        let mut base_sender = BaseSender::<FE>::init(channel, &pows, rng)?;
+        let mut base_sender = BaseSender::<FE>::init(channel, pows.clone(), rng)?;
         let base_voles = base_sender.send(channel, rows + weight + r, rng)?;
         let spsvole = SpsSender::<FE>::init(channel, pows, rng)?;
         Ok(Self {
@@ -250,8 +251,8 @@ impl<FE: FiniteField> Receiver<FE> {
         rng: &mut RNG,
     ) -> Result<Self, Error> {
         let r = FE::PolynomialFormNumCoefficients::to_usize();
-        let pows = super::utils::gen_pows();
-        let mut base_receiver = BaseReceiver::<FE>::init(channel, &pows, rng)?;
+        let pows: Powers<FE> = <Powers<_> as Default>::default();
+        let mut base_receiver = BaseReceiver::<FE>::init(channel, pows.clone(), rng)?;
         let base_voles = base_receiver.receive(channel, rows + weight + r, rng)?;
         let delta = base_receiver.delta();
         let spsvole = SpsReceiver::<FE>::init(channel, pows, delta, rng)?;

@@ -7,31 +7,34 @@
 //! Implementation of the Weng-Yang-Katz-Wang Base SVOLE protocol (cf.
 //! <https://eprint.iacr.org/2020/925>, Figure 5).
 
-use super::copee::{CopeeReceiver, CopeeSender};
+use super::{
+    copee::{CopeeReceiver, CopeeSender},
+    utils::Powers,
+};
 use crate::errors::Error;
 use generic_array::typenum::Unsigned;
 use rand::{CryptoRng, Rng, SeedableRng};
 use scuttlebutt::{field::FiniteField as FF, AbstractChannel, AesRng};
 
 /// sVOLE sender.
-pub struct Sender<'a, FE: FF> {
-    copee: CopeeSender<'a, FE>,
-    pows: &'a [FE],
+pub struct Sender<FE: FF> {
+    copee: CopeeSender<FE>,
+    pows: Powers<FE>,
 }
 
 /// sVOLE receiver.
-pub struct Receiver<'a, FE: FF> {
-    copee: CopeeReceiver<'a, FE>,
-    pows: &'a [FE],
+pub struct Receiver<FE: FF> {
+    copee: CopeeReceiver<FE>,
+    pows: Powers<FE>,
 }
 
-impl<'a, FE: FF> Sender<'a, FE> {
+impl<FE: FF> Sender<FE> {
     pub fn init<C: AbstractChannel, RNG: CryptoRng + Rng>(
         channel: &mut C,
-        pows: &'a [FE],
+        pows: Powers<FE>,
         rng: &mut RNG,
     ) -> Result<Self, Error> {
-        let copee = CopeeSender::<FE>::init(channel, pows, rng)?;
+        let copee = CopeeSender::<FE>::init(channel, pows.clone(), rng)?;
         Ok(Self { copee, pows })
     }
 
@@ -49,7 +52,7 @@ impl<'a, FE: FF> Sender<'a, FE> {
         }
         let mut z: FE = FE::ZERO;
         let mut x: FE = FE::ZERO;
-        for pow in self.pows.iter() {
+        for pow in self.pows.get().iter() {
             let a = FE::PrimeField::random(&mut rng);
             let c = self.copee.send(channel, &a)?;
             z += c * *pow;
@@ -69,14 +72,14 @@ impl<'a, FE: FF> Sender<'a, FE> {
     }
 }
 
-impl<'a, FE: FF> Receiver<'a, FE> {
+impl<FE: FF> Receiver<FE> {
     /// Runs any one-time initialization.
     pub fn init<C: AbstractChannel, RNG: CryptoRng + Rng>(
         channel: &mut C,
-        pows: &'a [FE],
+        pows: Powers<FE>,
         rng: &mut RNG,
     ) -> Result<Self, Error> {
-        let cp = CopeeReceiver::<FE>::init(channel, pows, rng)?;
+        let cp = CopeeReceiver::<FE>::init(channel, pows.clone(), rng)?;
         Ok(Self { copee: cp, pows })
     }
     /// Returns the receiver choice `Δ`.
@@ -106,7 +109,7 @@ impl<'a, FE: FF> Receiver<'a, FE> {
         }
         for i in 0..r {
             let b = self.copee.receive(channel)?;
-            y += self.pows[i] * b
+            y += self.pows.get()[i] * b
         }
         channel.write_block(&seed)?;
         channel.flush()?;
@@ -125,7 +128,7 @@ impl<'a, FE: FF> Receiver<'a, FE> {
 
 #[cfg(test)]
 mod tests {
-    use super::{Receiver, Sender};
+    use super::{super::utils::Powers, Receiver, Sender};
     use scuttlebutt::{
         field::{F61p, FiniteField as FF, Fp, Gf128, F2},
         AesRng,
@@ -143,16 +146,16 @@ mod tests {
             let reader = BufReader::new(sender.try_clone().unwrap());
             let writer = BufWriter::new(sender);
             let mut channel = Channel::new(reader, writer);
-            let pows = super::super::utils::gen_pows();
-            let mut vole = Sender::<FE>::init(&mut channel, &pows, &mut rng).unwrap();
+            let pows = <Powers<_> as Default>::default();
+            let mut vole = Sender::<FE>::init(&mut channel, pows, &mut rng).unwrap();
             vole.send(&mut channel, len, &mut rng).unwrap()
         });
         let mut rng = AesRng::new();
         let reader = BufReader::new(receiver.try_clone().unwrap());
         let writer = BufWriter::new(receiver);
         let mut channel = Channel::new(reader, writer);
-        let pows = super::super::utils::gen_pows();
-        let mut vole = Receiver::<FE>::init(&mut channel, &pows, &mut rng).unwrap();
+        let pows = <Powers<_> as Default>::default();
+        let mut vole = Receiver::<FE>::init(&mut channel, pows, &mut rng).unwrap();
         let vs = vole.receive(&mut channel, len, &mut rng).unwrap();
         let delta = vole.delta();
         let uw_s = handle.join().unwrap();

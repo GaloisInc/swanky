@@ -7,6 +7,7 @@
 //! Implementation of the Weng-Yang-Katz-Wang COPEe protocol (cf.
 //! <https://eprint.iacr.org/2020/925>, Figure 15).
 
+use super::utils::Powers;
 use crate::{
     errors::Error,
     ot::{KosReceiver, KosSender, RandomReceiver as ROTReceiver, RandomSender as ROTSender},
@@ -25,31 +26,31 @@ use std::marker::PhantomData;
 use subtle::{Choice, ConditionallySelectable};
 
 /// COPEe sender.
-pub struct Sender<'a, ROT: ROTSender + Malicious, FE: FF> {
+pub struct Sender<ROT: ROTSender + Malicious, FE: FF> {
     _ot: PhantomData<ROT>,
     aes_objs: Vec<(Aes128, Aes128)>,
-    pows: &'a [FE],
+    pows: Powers<FE>,
     twos: Vec<FE>,
     nbits: usize,
     counter: u64,
 }
 
 /// COPEe receiver.
-pub struct Receiver<'a, ROT: ROTReceiver + Malicious, FE: FF> {
+pub struct Receiver<ROT: ROTReceiver + Malicious, FE: FF> {
     _ot: PhantomData<ROT>,
     delta: FE,
     choices: Vec<bool>,
     aes_objs: Vec<Aes128>,
-    pows: &'a [FE],
+    pows: Powers<FE>,
     twos: Vec<FE>,
     nbits: usize,
     counter: u64,
 }
 
 /// Aliasing COPEe sender.
-pub type CopeeSender<'a, FE> = Sender<'a, KosSender, FE>;
+pub type CopeeSender<FE> = Sender<KosSender, FE>;
 /// Aliasing COPEe receiver.
-pub type CopeeReceiver<'a, FE> = Receiver<'a, KosReceiver, FE>;
+pub type CopeeReceiver<FE> = Receiver<KosReceiver, FE>;
 
 /// `Aes128` as a pseudo-random function.
 fn prf<FE: FF>(aes: &Aes128, pt: Block) -> FE::PrimeField {
@@ -58,11 +59,11 @@ fn prf<FE: FF>(aes: &Aes128, pt: Block) -> FE::PrimeField {
 }
 
 /// Implement CopeeSender for Sender type
-impl<'a, ROT: ROTSender<Msg = Block> + Malicious, FE: FF> Sender<'a, ROT, FE> {
+impl<ROT: ROTSender<Msg = Block> + Malicious, FE: FF> Sender<ROT, FE> {
     /// Runs any one-time initialization.
     pub fn init<C: AbstractChannel, RNG: CryptoRng + Rng>(
         channel: &mut C,
-        pows: &'a [FE],
+        pows: Powers<FE>,
         mut rng: &mut RNG,
     ) -> Result<Self, Error> {
         let mut ot = ROT::init(channel, &mut rng)?;
@@ -101,7 +102,7 @@ impl<'a, ROT: ROTSender<Msg = Block> + Malicious, FE: FF> Sender<'a, ROT, FE> {
         let pt = Block::from(self.counter as u128);
         let mut w = FE::ZERO;
         // Communication: r log p * log p
-        for (i, pow) in self.pows.iter().enumerate() {
+        for (i, pow) in self.pows.get().iter().enumerate() {
             let mut sum = FE::ZERO;
             for (j, two) in self.twos.iter().enumerate() {
                 let (prf0, prf1) = &self.aes_objs[i * self.nbits + j];
@@ -118,11 +119,11 @@ impl<'a, ROT: ROTSender<Msg = Block> + Malicious, FE: FF> Sender<'a, ROT, FE> {
 }
 
 /// Implement CopeeReceiver for Receiver type.
-impl<'a, ROT: ROTReceiver<Msg = Block> + Malicious, FE: FF> Receiver<'a, ROT, FE> {
+impl<ROT: ROTReceiver<Msg = Block> + Malicious, FE: FF> Receiver<ROT, FE> {
     /// Runs any one-time initialization.
     pub fn init<C: AbstractChannel, RNG: CryptoRng + Rng>(
         channel: &mut C,
-        pows: &'a [FE],
+        pows: Powers<FE>,
         mut rng: &mut RNG,
     ) -> Result<Self, Error> {
         let nbits = 128 - (FE::MODULUS - 1).leading_zeros() as usize;
@@ -160,7 +161,7 @@ impl<'a, ROT: ROTReceiver<Msg = Block> + Malicious, FE: FF> Receiver<'a, ROT, FE
     pub fn receive<C: AbstractChannel>(&mut self, channel: &mut C) -> Result<FE, Error> {
         let pt = Block::from(self.counter as u128);
         let mut res = FE::ZERO;
-        for (j, pow) in self.pows.iter().enumerate() {
+        for (j, pow) in self.pows.get().iter().enumerate() {
             let mut sum = FE::ZERO;
             for (k, two) in self.twos.iter().enumerate() {
                 let w = prf::<FE>(&self.aes_objs[j * self.nbits + k], pt);
@@ -179,7 +180,7 @@ impl<'a, ROT: ROTReceiver<Msg = Block> + Malicious, FE: FF> Receiver<'a, ROT, FE
 
 #[cfg(test)]
 mod tests {
-    use super::{CopeeReceiver, CopeeSender};
+    use super::{super::utils::Powers, CopeeReceiver, CopeeSender};
     use scuttlebutt::{
         field::{F61p, FiniteField as FF, Fp, Gf128, F2},
         AesRng,
@@ -199,8 +200,8 @@ mod tests {
             let reader = BufReader::new(sender.try_clone().unwrap());
             let writer = BufWriter::new(sender);
             let mut channel = Channel::new(reader, writer);
-            let pows = super::super::utils::gen_pows();
-            let mut copee_sender = CopeeSender::<FE>::init(&mut channel, &pows, &mut rng).unwrap();
+            let pows = <Powers<_> as Default>::default();
+            let mut copee_sender = CopeeSender::<FE>::init(&mut channel, pows, &mut rng).unwrap();
             let ws: Vec<FE> = (0..len)
                 .map(|_| copee_sender.send(&mut channel, &input).unwrap())
                 .collect();
@@ -209,8 +210,8 @@ mod tests {
         let reader = BufReader::new(receiver.try_clone().unwrap());
         let writer = BufWriter::new(receiver);
         let mut channel = Channel::new(reader, writer);
-        let pows = super::super::utils::gen_pows();
-        let mut copee_receiver = CopeeReceiver::<FE>::init(&mut channel, &pows, &mut rng).unwrap();
+        let pows = <Powers<_> as Default>::default();
+        let mut copee_receiver = CopeeReceiver::<FE>::init(&mut channel, pows, &mut rng).unwrap();
         let vs: Vec<FE> = (0..len)
             .map(|_| copee_receiver.receive(&mut channel).unwrap())
             .collect();

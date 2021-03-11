@@ -6,7 +6,10 @@
 
 //! Implementation of single-point svole protocol.
 
-use super::ggm_utils::{ggm, ggm_prime};
+use super::{
+    ggm_utils::{ggm, ggm_prime},
+    utils::Powers,
+};
 use crate::{
     errors::Error,
     ot::{KosReceiver, KosSender, Receiver as OtReceiver, Sender as OtSender},
@@ -32,14 +35,14 @@ use scuttlebutt::{
 /// SpsVole Sender.
 pub struct Sender<OT: OtReceiver + Malicious, FE: FF> {
     ot: OT,
-    pows: Vec<FE>,
+    pows: Powers<FE>,
 }
 
 /// SpsVole Receiver.
 pub struct Receiver<OT: OtSender + Malicious, FE: FF> {
     ot: OT,
     delta: FE,
-    pows: Vec<FE>,
+    pows: Powers<FE>,
 }
 /// Alias for SpsVole Sender.
 pub type SpsSender<FE> = Sender<KosReceiver, FE>;
@@ -100,7 +103,7 @@ impl<OT: OtReceiver<Msg = Block> + Malicious, FE: FF> Sender<OT, FE> {
     /// Runs any one-time initialization.
     pub fn init<C: AbstractChannel, RNG: CryptoRng + Rng>(
         channel: &mut C,
-        pows: Vec<FE>,
+        pows: Powers<FE>,
         rng: &mut RNG,
     ) -> Result<Self, Error> {
         let ot = OT::init(channel, rng)?;
@@ -216,7 +219,12 @@ impl<OT: OtReceiver<Msg = Block> + Malicious, FE: FF> Sender<OT, FE> {
             }
         }
         // Communication: r * |log p|
-        for (pows, (x_star, (u, w))) in self.pows.iter().zip(x_stars.iter().zip(base_uws.iter())) {
+        for (pows, (x_star, (u, w))) in self
+            .pows
+            .get()
+            .iter()
+            .zip(x_stars.iter().zip(base_uws.iter()))
+        {
             channel.write_fe(*x_star - *u)?;
             va -= *pows * *w;
         }
@@ -238,7 +246,7 @@ impl<OT: OtSender<Msg = Block> + Malicious, FE: FF> Receiver<OT, FE> {
     /// Runs any one-time initialization.
     pub fn init<C: AbstractChannel, RNG: CryptoRng + Rng>(
         channel: &mut C,
-        pows: Vec<FE>,
+        pows: Powers<FE>,
         delta: FE,
         mut rng: &mut RNG,
     ) -> Result<Self, Error> {
@@ -308,6 +316,7 @@ impl<OT: OtSender<Msg = Block> + Malicious, FE: FF> Receiver<OT, FE> {
         }
         let y = self
             .pows
+            .get()
             .iter()
             .zip(x_stars.into_iter().zip(y_stars.iter()))
             .map(|(pow, (x, y))| (*y - self.delta.multiply_by_prime_subfield(x)) * *pow)
@@ -331,7 +340,10 @@ impl<OT: OtSender<Msg = Block> + Malicious, FE: FF> Receiver<OT, FE> {
 #[cfg(test)]
 mod test {
     use super::{
-        super::base_svole::{Receiver as BaseReceiver, Sender as BaseSender},
+        super::{
+            base_svole::{Receiver as BaseReceiver, Sender as BaseSender},
+            utils::Powers,
+        },
         SpsReceiver,
         SpsSender,
     };
@@ -355,8 +367,8 @@ mod test {
             let reader = BufReader::new(sender.try_clone().unwrap());
             let writer = BufWriter::new(sender);
             let mut channel = Channel::new(reader, writer);
-            let pows = super::super::utils::gen_pows();
-            let mut base = BaseSender::<FE>::init(&mut channel, &pows, &mut rng).unwrap();
+            let pows = <Powers<_> as Default>::default();
+            let mut base = BaseSender::<FE>::init(&mut channel, pows.clone(), &mut rng).unwrap();
             let uw = base.send(&mut channel, weight + r, &mut rng).unwrap();
             let mut spsvole = SpsSender::<FE>::init(&mut channel, pows, &mut rng).unwrap();
             spsvole
@@ -367,11 +379,11 @@ mod test {
         let reader = BufReader::new(receiver.try_clone().unwrap());
         let writer = BufWriter::new(receiver);
         let mut channel = Channel::new(reader, writer);
-        let pows = super::super::utils::gen_pows();
-        let mut base = BaseReceiver::<FE>::init(&mut channel, &pows, &mut rng).unwrap();
+        let pows = <Powers<_> as Default>::default();
+        let mut base = BaseReceiver::<FE>::init(&mut channel, pows.clone(), &mut rng).unwrap();
         let v = base.receive(&mut channel, weight + r, &mut rng).unwrap();
         let mut spsvole =
-            SpsReceiver::<FE>::init(&mut channel, pows.clone(), base.delta(), &mut rng).unwrap();
+            SpsReceiver::<FE>::init(&mut channel, pows, base.delta(), &mut rng).unwrap();
         let vs = spsvole
             .receive(&mut channel, n, &v[0..weight + r], &mut rng)
             .unwrap();
