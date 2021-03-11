@@ -80,6 +80,7 @@ fn lpn_mtx_indices<FE: FiniteField>(
     indices
 }
 
+/// sVole Sender
 pub struct Sender<FE: FiniteField> {
     spsvole: SpsSender<FE>,
     rows: usize,
@@ -228,6 +229,7 @@ impl<FE: FiniteField> SVoleSender for Sender<FE> {
     }
 }
 
+/// sVole Receiver
 pub struct Receiver<FE: FiniteField> {
     spsvole: SpsReceiver<FE>,
     delta: FE,

@@ -4,6 +4,8 @@
 // Copyright © 2020 Galois, Inc.
 // See LICENSE for licensing information.
 
+//! `ggm_utils` provides an implementation of the GGM construction.
+
 use scuttlebutt::{field::FiniteField, utils::unpack_bits, Aes128, Block};
 
 /// Implementation of GGM based on the procedure explained in the write-up

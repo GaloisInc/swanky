@@ -4,12 +4,15 @@
 // Copyright © 2020 Galois, Inc.
 // See LICENSE for licensing information.
 
+//! module defining the interface for `SVoleSender` and `SVoleReceiver`.
+
 pub mod wykw;
 
 use crate::errors::Error;
 use rand::{CryptoRng, Rng};
 use scuttlebutt::{field::FiniteField as FF, AbstractChannel};
 
+/// Interface for `SVoleSender`
 pub trait SVoleSender
 where
     Self: Sized,
@@ -31,6 +34,7 @@ where
     ) -> Result<Vec<(<Self::Msg as FF>::PrimeField, Self::Msg)>, Error>;
 }
 
+/// Interface for `SVoleReceiver`
 pub trait SVoleReceiver
 where
     Self: Sized,
