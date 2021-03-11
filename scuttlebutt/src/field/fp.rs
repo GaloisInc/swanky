@@ -150,12 +150,6 @@ impl From<Fp> for u128 {
     }
 }
 
-impl Default for Fp {
-    fn default() -> Self {
-        Fp::ZERO
-    }
-}
-
 // TODO: there's definitely room for optimization. We don't need to use the full mod algorithm here.
 impl AddAssign<&Fp> for Fp {
     fn add_assign(&mut self, rhs: &Fp) {
