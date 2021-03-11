@@ -274,6 +274,7 @@ mod proof {
     #[cfg(test)]
     proptest! {
         #[test]
+        #[ignore] // Handled by test_interactive_proof
         #[allow(non_snake_case)]
         fn test_interleaved_code_Uw(
             (c, i, r, Q) in any_with::<Ckt>((5, 100)).prop_flat_map(|c| {
@@ -432,6 +433,7 @@ mod proof {
     #[cfg(test)]
     proptest! {
         #[test]
+        #[ignore] // Handled by test_interactive_proof
         #[allow(non_snake_case)]
         fn test_linear_constraints(
             (c, i, r, Q) in any_with::<Ckt>((5, 100)).prop_flat_map(|c| {
@@ -584,6 +586,7 @@ mod proof {
     #[cfg(test)]
     proptest! {
         #[test]
+        #[ignore] // Handled by test_interactive_proof
         #[allow(non_snake_case)]
         fn test_quadratic_constraints(
             (c, i, r, Q) in any_with::<Ckt>((5, 100)).prop_flat_map(|c| {
