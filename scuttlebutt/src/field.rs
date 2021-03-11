@@ -9,6 +9,7 @@ use std::{
     ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, Sub, SubAssign},
 };
 use subtle::{Choice, ConditionallySelectable, ConstantTimeEq};
+
 /// Types that implement this trait are finite field elements.
 pub trait FiniteField:
     'static
@@ -18,6 +19,7 @@ pub trait FiniteField:
     + Debug
     + PartialEq
     + Eq
+    + Default
     + Sized
     + ConstantTimeEq
     + ConditionallySelectable
@@ -50,7 +52,7 @@ pub trait FiniteField:
     fn to_bytes(&self) -> GenericArray<u8, Self::ByteReprLen>;
 
     /// The prime-order subfield of the finite field.
-    type PrimeField: FiniteField;
+    type PrimeField: FiniteField + IsSubfieldOf<Self>;
     /// When elements of this field are represented as a polynomial over the prime field,
     /// how many coefficients are needed?
     type PolynomialFormNumCoefficients: ArrayLength<Self::PrimeField>;
@@ -93,6 +95,8 @@ pub trait FiniteField:
         // NOTE: this only works for GF(p^n)
         self.pow(Self::MULTIPLICATIVE_GROUP_ORDER - 1)
     }
+
+    // TODO: what should we do if pow isn't secret.
     /// Computing `pow` using Montgomery's ladder technique.
     fn pow(&self, n: u128) -> Self {
         let mut r0 = Self::ONE;
@@ -115,6 +119,17 @@ pub trait FiniteField:
     }
 }
 
+/// If `Self` implements `IsSubfieldOf<FE>`, then `Self` is a subfield of `FE`.
+pub trait IsSubfieldOf<FE: FiniteField>: FiniteField {
+    /// Homomorphically lift elements of `Self` into elements of `FE`.
+    fn lift_into_superfield(&self) -> FE;
+}
+impl<FE: FiniteField> IsSubfieldOf<FE> for FE {
+    fn lift_into_superfield(&self) -> FE {
+        *self
+    }
+}
+
 #[cfg(test)]
 #[macro_use]
 mod test_utils;
@@ -123,7 +138,10 @@ mod test_utils;
 macro_rules! call_with_big_finite_fields {
     ($f:ident $(, $arg:expr)* $(,)?) => {{
         $f::<$crate::field::Fp>($($arg),*);
-        //$f::<$crate::field::Gf128>($($arg),*);
+        $f::<$crate::field::Gf128>($($arg),*);
+        $f::<$crate::field::Gf45>($($arg),*);
+        $f::<$crate::field::Gf40>($($arg),*);
+        $f::<$crate::field::F61p>($($arg),*);
     }};
 }
 
@@ -217,6 +235,12 @@ macro_rules! field_ops {
             }
         }
 
+        impl Default for $f {
+            fn default() -> Self {
+                Self::ZERO
+            }
+        }
+
         impl std::iter::Product for $f {
             fn product<I: Iterator<Item = Self>>(iter: I) -> Self {
                 iter.fold($f::ONE, std::ops::Mul::mul)
@@ -255,6 +279,12 @@ pub use f2::{BiggerThanModulus as F2BiggerThanModulus, F2};
 
 mod gf_2_128;
 pub use gf_2_128::{Gf128, Gf128BytesDeserializationCannotFail};
+
+mod gf_2_45;
+pub use gf_2_45::{Gf45, Gf45ValueBiggerThanModulus};
+
+mod gf_2_40;
+pub use gf_2_40::{Gf40, Gf40ValueBiggerThanModulus};
 
 mod f61p;
 pub use f61p::F61p;

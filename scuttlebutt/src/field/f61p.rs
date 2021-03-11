@@ -101,14 +101,15 @@ impl FiniteField for F61p {
 fn reduce(k: u128) -> u64 {
     // Based on https://ariya.io/2007/02/modulus-with-mersenne-prime
     let i = (k & F61p::MODULUS) + (k >> 61);
-    let flag = (i < F61p::MODULUS) as u128;
-    let operand = flag.wrapping_sub(1) & F61p::MODULUS;
-    (i - operand) as u64
+    // Equivalent to:
     /*u64::conditional_select(
         &(i as u64),
         &((i.wrapping_sub(F61p::MODULUS)) as u64),
         Choice::from((i >= F61p::MODULUS) as u8),
     )*/
+    let flag = (i < F61p::MODULUS) as u128;
+    let operand = flag.wrapping_sub(1) & F61p::MODULUS;
+    (i - operand) as u64
 }
 
 impl AddAssign<&F61p> for F61p {

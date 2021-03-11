@@ -13,28 +13,28 @@ publish = false
 [lib]
 
 [features]
-nightly = ["curve25519-dalek/avx2_backend", "rand/nightly"]
+nightly = ["curve25519-dalek/nightly", "curve25519-dalek/simd_backend"]
 unstable = []
 serde1 = ["serde"]
 
 [dependencies]
-curve25519-dalek = { version = "3", features = ["std"], optional = true }
+curve25519-dalek = { version = "3.0.2", features = ["std"], optional = true }
 rand = "0.7"
 rand_core = "0.5"
-serde = { version = "1", features = ["derive"], optional = true }
-sha2 = "0.8"
-subtle = "2.2"
-primitive-types = "0.7"
-uint = "0.8"
-generic-array = "0.14"
-smallvec = "1.4"
+serde = { version = "1.0.123", features = ["derive"], optional = true }
+sha2 = "0.9.3"
+subtle = "2.4.0"
+primitive-types = "0.9.0"
+uint = "0.9.0"
+generic-array = "0.14.4"
+smallvec = "1.6.1"
 
 
 [dev-dependencies]
-criterion = "0.2"
-hex = "0.3"
-proptest = "0.10"
-num-bigint = "0.3"
+criterion = "0.3.4"
+hex = "0.4.3"
+proptest = "1.0.0"
+num-bigint = "0.3.2"
 
 [[bench]]
 name = "aes128"
@@ -74,4 +74,12 @@ harness = false
 
 [[bench]]
 name = "f61p"
+harness = false
+
+[[bench]]
+name = "gf_2_45"
+harness = false
+
+[[bench]]
+name = "gf_2_40"
 harness = false

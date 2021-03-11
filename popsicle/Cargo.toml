@@ -13,26 +13,26 @@ publish = false
 [lib]
 
 [features]
-nightly = ["rand/nightly", "scuttlebutt/nightly", "ocelot/nightly", "ocelot/nightly"]
+nightly = ["scuttlebutt/nightly", "ocelot/nightly", "ocelot/nightly"]
 psty = ["fancy-garbling", "openssl"]
 
 [dependencies]
 ocelot         = { path = "../ocelot" }
 scuttlebutt    = { path = "../scuttlebutt" }
-itertools      = "0.8"
+itertools      = "0.10.0"
 rand           = "0.7"
-sha2           = "0.8"
+sha2           = "0.9.3"
 fancy-garbling = { path = "../fancy-garbling", optional = true }
-openssl        = { version = "0.10.28", optional = true }
+openssl        = { version = "0.10.32", optional = true }
 
 [dev-dependencies]
-criterion  = "0.2.11"
-clap       = "2.33.0"
-serde      = { version = "1.0.92", features = ["derive"] }
-serde_yaml = "0.8.9"
-rustyline  = "5.0.0"
-pbr        = "1.0.1"
-ascii      = "0.9.2"
+criterion  = "0.3.4"
+clap       = "2.33.3"
+serde      = { version = "1.0.123", features = ["derive"] }
+serde_yaml = "0.8.17"
+rustyline  = "7.1.0"
+pbr        = "1.0.4"
+ascii      = "1.0.0"
 
 [[bench]]
 name = "psz"

@@ -1,5 +1,3 @@
-# We've pinned the nightly toolchain to nightly-2020-09-15 until https://github.com/rust-lang/packed_simd/issues/288 is fixed.
-
 image: "rust:latest"
 
 variables:
@@ -48,12 +46,12 @@ test:stable:
 test:without-stable-feature:
   extends: .test
   variables:
-    toolchain: nightly-2020-09-15
+    toolchain: nightly
     features: curve25519-dalek serde
 
 test:nightly:
   extends: .test
   variables:
-    toolchain: nightly-2020-09-15
+    toolchain: nightly
     features: curve25519-dalek serde nightly
 

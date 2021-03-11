@@ -183,6 +183,15 @@ macro_rules! test_field {
 
             proptest! {
                 #[test]
+                fn prime_field_lift_is_homomorphism(a in any_prime_fe(), b in any_prime_fe()) {
+                    let lift = <<$f as FiniteField>::PrimeField as crate::field::IsSubfieldOf<$f>>::lift_into_superfield;
+                    assert_eq!(lift(&a) + lift(&b), lift(&(a + b)));
+                    assert_eq!(lift(&a) * lift(&b), lift(&(a * b)));
+                }
+            }
+
+            proptest! {
+                #[test]
                 fn lifted_polynomial_mul(a in any_fe(), b in any_prime_fe()) {
                     let mut poly = make_polynomial(a.to_polynomial_coefficients());
                     poly *= &make_polynomial(b.to_polynomial_coefficients());
@@ -191,6 +200,24 @@ macro_rules! test_field {
                         <$f>::from_polynomial_coefficients(make_polynomial_coefficients(&remainder)),
                         a.multiply_by_prime_subfield(b),
                     );
+                }
+            }
+
+            proptest! {
+                #[test]
+                fn true_equality_works(a in any_fe()) {
+                    assert_eq!(a, a);
+                }
+            }
+
+            proptest! {
+                #[test]
+                fn false_equality_works(a in any_fe(), b in any_fe()) {
+                    if a == b {
+                        assert_eq!(a.to_bytes(), b.to_bytes());
+                    } else {
+                        assert_ne!(a.to_bytes(), b.to_bytes());
+                    }
                 }
             }
 
