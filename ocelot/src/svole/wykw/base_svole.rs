@@ -166,9 +166,7 @@ mod tests {
         }
     }
 
-    #[test]
-    fn test_base_svole_setup_params() {
-        let len = 19870; //LpnSetupParams::ROWS;
+    fn test_base_vole_setup_params_all_fields(len: usize) {
         test_base_svole::<Fp>(len);
         test_base_svole::<Gf128>(len);
         test_base_svole::<F2>(len);
@@ -176,11 +174,14 @@ mod tests {
     }
 
     #[test]
+    fn test_base_svole_setup_params() {
+        let len = 19870; //LpnSetupParams::ROWS;
+        test_base_vole_setup_params_all_fields(len)
+    }
+
+    #[test]
     fn test_base_svole_extend_params() {
         let len = 589_760; //LpnExtendParams::ROWS;
-        test_base_svole::<Fp>(len);
-        test_base_svole::<Gf128>(len);
-        test_base_svole::<F2>(len);
-        test_base_svole::<F61p>(len);
+        test_base_vole_setup_params_all_fields(len)
     }
 }
