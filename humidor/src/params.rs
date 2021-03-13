@@ -105,7 +105,7 @@ impl Params {
     //
 
     #[inline]
-    fn encode(&self, wf: ArrayView1<Field>) -> Array1<Field> {
+    pub fn encode(&self, wf: ArrayView1<Field>) -> Array1<Field> {
         debug_assert_eq!(wf.len(), self.l);
 
         let w: Vec<i128> = wf.iter().cloned().map(i128::from).collect();
@@ -115,7 +115,7 @@ impl Params {
     }
 
     #[inline]
-    fn decode(&self, cf: ArrayView1<Field>) -> Array1<Field> {
+    pub fn decode(&self, cf: ArrayView1<Field>) -> Array1<Field> {
         debug_assert_eq!(cf.len(), self.n);
 
         let c: Vec<i128> = cf.iter().take(self.k).cloned().map(i128::from).collect();
@@ -154,7 +154,7 @@ impl Params {
         );
 
         // XXX: I think this is necessary for c to be a codeword. Is it
-        // sufficient?
+        // sufficient? I think it is if k > n/2.
         cd0 == cd1
     }
 
@@ -296,6 +296,37 @@ impl Params {
             });
 
         p
+    }
+
+    #[allow(non_snake_case)]
+    pub fn random_indices<R>(&self, rng: &mut R) -> Vec<usize>
+        where R: rand::RngCore
+    {
+        use rand::seq::SliceRandom;
+
+        let mut Q = (0 .. self.n).collect::<Vec<usize>>();
+        Q.shuffle(rng);
+        Q.truncate(self.t);
+
+        Q
+    }
+
+    pub fn random_codeword<R>(&self, rng: &mut R) -> Array1<Field>
+        where R: rand::RngCore
+    {
+        self.encode(random_field_array(rng, self.l).view())
+    }
+
+    pub fn random_zero_codeword<R>(&self, rng: &mut R) -> Array1<Field>
+        where R: rand::RngCore
+    {
+        debug_assert_ne!(self.l, 0);
+
+        let mut w = random_field_array(rng, self.l);
+        let sum = w.scalar_sum();
+        w[self.l - 1] -= sum;
+
+        self.encode(w.view())
     }
 }
 
@@ -462,5 +493,14 @@ proptest! {
                 Field::from(u[i] * v[i]),
             );
         }
+    }
+
+    #[test]
+    fn test_random_zero_codeword(p in any::<Params>()) {
+        use rand::{SeedableRng, rngs::StdRng};
+        let c = p.random_zero_codeword(&mut StdRng::from_entropy());
+        let w = p.decode(c.view());
+
+        prop_assert_eq!(w.scalar_sum(), Field::ZERO);
     }
 }

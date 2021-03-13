@@ -65,3 +65,12 @@ pub fn unpad_array(a: ArrayView1<Field>, size: usize) -> Array1<Field> {
     debug_assert_eq!(a2, Array1::zeros(a2.len()).view());
     a1.to_owned()
 }
+
+pub fn random_field_array<R>(rng: &mut R, size: usize) -> Array1<Field>
+    where R: rand::RngCore
+{
+    use rand::distributions::{Uniform, Distribution};
+    let elem = Uniform::from(0..Field::MOD);
+
+    (0..size).map(|_| Field::from(elem.sample(rng))).collect()
+}

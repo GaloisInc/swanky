@@ -35,16 +35,18 @@ impl merkle_cbt::merkle_tree::Merge for Sha3Merge {
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct Lemma {
     columns: Vec<Array1<Field>>,
     lemmas: Vec<Digest>,
     indices: Vec<u32>,
 }
 
+#[allow(non_snake_case)]
 impl Lemma {
     pub fn new(
         tree: &Tree,
-        some_columns: &Vec<Array1<Field>>,
+        U: ArrayView2<Field>,
         some_indices: &Vec<usize>
     ) -> Self {
         let some_indices_u32 = some_indices
@@ -53,9 +55,13 @@ impl Lemma {
             .collect::<Vec<u32>>();
         let proof = tree.build_proof(&some_indices_u32)
             .expect("Failed to build proof with indices");
+        let some_columns = some_indices
+            .iter()
+            .map(|&j| U.column(j).to_owned())
+            .collect::<Vec<Array1<Field>>>();
 
         Self {
-            columns: some_columns.clone(),
+            columns: some_columns,
             lemmas: proof.lemmas().to_vec(),
             indices: proof.indices().to_vec(),
         }
@@ -86,18 +92,14 @@ proptest! {
     ) {
         use ndarray::Array2;
 
-        let columns = Array2::from_shape_vec((50,50), values)
-            .unwrap()
+        let arr = Array2::from_shape_vec((50,50), values).unwrap();
+        let leaves = arr
             .gencolumns()
             .into_iter()
-            .map(|c| c.to_owned())
-            .collect::<Vec<Array1<Field>>>();
-        let leaves = columns
-            .iter()
             .map(|c| hash_column(c.view()))
             .collect::<Vec<Digest>>();
         let tree = merkle_cbt::CBMT::build_merkle_tree(&leaves);
-        let lemma = Lemma::new(&tree, &columns, &indices);
+        let lemma = Lemma::new(&tree, arr.view(), &indices);
 
         lemma.verify(&tree.root());
     }
