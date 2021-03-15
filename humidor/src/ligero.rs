@@ -457,21 +457,7 @@ mod interactive {
 
         #[allow(non_snake_case)]
         pub fn round4(&self, r3: Round3) -> Round4 {
-            //use ndarray::{Axis, stack};
-
             let s = &self.secret;
-            //let P = s.public.params;
-
-            //let ux = s.ux.clone().into_shape((1, P.n)).unwrap();
-            //let uy = s.uy.clone().into_shape((1, P.n)).unwrap();
-            //let uz = s.uz.clone().into_shape((1, P.n)).unwrap();
-            //let uadd = s.uadd.clone().into_shape((1, P.n)).unwrap();
-            //let u = s.u.clone().into_shape((1, P.n)).unwrap();
-            //let u0 = s.u0.clone().into_shape((1, P.n)).unwrap();
-
-            //// Vertical juxtaposition of the rows of the following:
-            //// [ Ux | Uy | Uz | Uw | ux | uy | uz | uadd | u | u0 ]
-            //let U = stack![Axis(0), s.Ux, s.Uy, s.Uz, s.Uw, ux, uy, uz, uadd, u, u0 ];
 
             Round4 {
                 Uw_lemma: merkle::Lemma::new(&s.Uw_hash, s.Uw.view(), &r3.Q),
