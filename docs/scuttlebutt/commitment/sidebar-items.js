@@ -1,1 +1,0 @@
-initSidebarItems({"struct":[["ShaCommitment","A commitment in the random oracle model using SHA256."]],"trait":[["Commitment","Generic commitment scheme."]]});
