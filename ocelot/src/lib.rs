@@ -4,8 +4,7 @@
 // Copyright © 2019 Galois, Inc.
 // See LICENSE for licensing information.
 
-//! `ocelot` provides oblivious transfer and oblivious PRFs, more
-//! specifically an implementation of the sVOLE extension protocol.
+//! `ocelot` provides oblivious transfer, oblivious PRFs and sVOLE extension.
 
 #![allow(clippy::many_single_char_names)]
 #![allow(clippy::type_complexity)]

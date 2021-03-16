@@ -27,6 +27,9 @@ use std::{
     time::Duration,
 };
 
+#[path = "../src/svole/wykw/ggm_utils.rs"]
+mod ggm_utils;
+
 fn svole_init<
     VSender: SVoleSender + Sync + Send + 'static,
     VReceiver: SVoleReceiver + Sync + Send,
@@ -163,9 +166,7 @@ fn bench_svole_init_f61p(c: &mut Criterion) {
 fn bench_ggm_<FE: FiniteField>(depth: usize, seed: Block, aes: (&Aes128, &Aes128)) {
     let exp = 1 << depth;
     let mut vs = vec![FE::ZERO; exp];
-    black_box(ocelot::svole::wykw::ggm_utils::ggm(
-        depth, seed, aes, &mut vs,
-    ));
+    black_box(ggm_utils::ggm(depth, seed, aes, &mut vs));
 }
 
 fn bench_ggm(c: &mut Criterion) {
