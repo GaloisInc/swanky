@@ -19,14 +19,6 @@ pub enum Error {
     CorrelationCheckFailed,
     /// EQ check failed.
     EqCheckFailed,
-    /// `t` doesn't divide the column `n` in LPN params `(n, k, t)`.
-    InvalidWeight,
-    /// `n` is not multiples of `2`.
-    InvalidColumns,
-    /// `k` is supposed to be less than or equal to `n`.
-    InvalidRows,
-    /// `d` in linear codes must be less than or equal to `k`.
-    InvalidD,
     /// Commitment opening failed.
     InvalidOpening,
 }
@@ -52,13 +44,6 @@ impl std::fmt::Display for Error {
             Error::CoinTossError(e) => write!(f, "coin toss error: {}", e),
             Error::CorrelationCheckFailed => "Correlation check failed!, i.e, w != u'Δ + v".fmt(f),
             Error::EqCheckFailed => "EQ check failed!".fmt(f),
-            Error::InvalidWeight => {
-                "weight t doesn't divide n (length of the error vector e in the LPN assumption)!"
-                    .fmt(f)
-            }
-            Error::InvalidColumns => "column n is not multiples of 2!".fmt(f),
-            Error::InvalidRows => "rows are greater than cols!".fmt(f),
-            Error::InvalidD => "d (linear codes) is greater than rows!".fmt(f),
             Error::InvalidOpening => "Invalid commitment opening!".fmt(f),
         }
     }
