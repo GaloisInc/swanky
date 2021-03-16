@@ -41,7 +41,7 @@ impl<FE: FF> Sender<FE> {
     pub fn send<C: AbstractChannel, RNG: CryptoRng + Rng>(
         &mut self,
         channel: &mut C,
-        n: usize, // rows + weight + r
+        n: usize,
         mut rng: &mut RNG,
     ) -> Result<Vec<(FE::PrimeField, FE)>, Error> {
         let mut uws = Vec::with_capacity(n);
@@ -101,12 +101,12 @@ impl<FE: FF> Receiver<FE> {
         let mut v: Vec<FE> = vec![FE::ZERO; len];
         let seed = rng.gen();
         let mut rng_chi = AesRng::from_seed(seed);
-        let chi: Vec<FE> = (0..len).map(|_| FE::random(&mut rng_chi)).collect();
         let mut y: FE = FE::ZERO;
         for i in 0..len {
             v[i] = self.copee.receive(channel)?;
-            y += chi[i] * v[i];
         }
+        y += v.iter().map(|v_i| FE::random(&mut rng_chi) * *v_i).sum();
+
         for i in 0..r {
             let b = self.copee.receive(channel)?;
             y += self.pows.get()[i] * b
