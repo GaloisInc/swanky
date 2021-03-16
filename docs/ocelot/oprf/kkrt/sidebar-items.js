@@ -1,1 +1,0 @@
-initSidebarItems({"struct":[["Receiver","KKRT oblivious PRF receiver."],["Sender","KKRT oblivious PRF sender."]]});

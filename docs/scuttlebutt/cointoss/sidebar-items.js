@@ -1,1 +1,0 @@
-initSidebarItems({"enum":[["Error","Errors produced by the coin tossing protocol."]],"fn":[["receive","Coin tossing receiver."],["send","Coin tossing sender."]]});
