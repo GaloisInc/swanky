@@ -244,6 +244,18 @@ impl<OT: OtReceiver<Msg = Block> + Malicious, FE: FF> Sender<OT, FE> {
             Err(Error::EqCheckFailed)
         }
     }
+
+    pub fn duplicate<C: AbstractChannel, RNG: CryptoRng + Rng>(
+        &mut self,
+        channel: &mut C,
+        rng: &mut RNG,
+    ) -> Result<Self, Error> {
+        let ot = OT::init(channel, rng)?;
+        Ok(Self {
+            ot,
+            pows: self.pows.clone(),
+        })
+    }
 }
 
 /// Implement SpsVoleReceiver for Receiver type.
@@ -339,6 +351,19 @@ impl<OT: OtSender<Msg = Block> + Malicious, FE: FF> Receiver<OT, FE> {
         } else {
             Err(Error::EqCheckFailed)
         }
+    }
+
+    pub fn duplicate<C: AbstractChannel, RNG: CryptoRng + Rng>(
+        &mut self,
+        channel: &mut C,
+        rng: &mut RNG,
+    ) -> Result<Self, Error> {
+        let ot = OT::init(channel, rng)?;
+        Ok(Self {
+            ot,
+            delta: self.delta,
+            pows: self.pows.clone(),
+        })
     }
 }
 

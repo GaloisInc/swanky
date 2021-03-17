@@ -32,6 +32,12 @@ where
         channel: &mut C,
         rng: &mut RNG,
     ) -> Result<Vec<(<Self::Msg as FF>::PrimeField, Self::Msg)>, Error>;
+    /// This procedure duplicates the Sender.
+    fn duplicate<C: AbstractChannel, RNG: CryptoRng + Rng>(
+        &mut self,
+        channel: &mut C,
+        rng: &mut RNG,
+    ) -> Result<Self, Error>;
 }
 
 /// Interface for `SVoleReceiver`
@@ -55,4 +61,10 @@ where
         channel: &mut C,
         rng: &mut RNG,
     ) -> Result<Vec<Self::Msg>, Error>;
+    /// This procedure duplicates the Receiver with the same Δ.
+    fn duplicate<C: AbstractChannel, RNG: CryptoRng + Rng>(
+        &mut self,
+        channel: &mut C,
+        rng: &mut RNG,
+    ) -> Result<Self, Error>;
 }

@@ -229,6 +229,23 @@ impl<FE: FiniteField> SVoleSender for Sender<FE> {
     ) -> Result<Vec<(FE::PrimeField, FE)>, Error> {
         self.send_internal(channel, self.rows + self.weight + self.r, rng)
     }
+
+    fn duplicate<C: AbstractChannel, RNG: CryptoRng + Rng>(
+        &mut self,
+        channel: &mut C,
+        rng: &mut RNG,
+    ) -> Result<Self, Error> {
+        let new_voles = self.send(channel, rng)?;
+        let spsvole = self.spsvole.duplicate(channel, rng)?;
+        Ok(Self {
+            spsvole,
+            rows: self.rows,
+            cols: self.cols,
+            weight: self.weight,
+            base_voles: new_voles, // more than needed
+            r: self.r,
+        })
+    }
 }
 
 /// sVole Receiver
@@ -381,6 +398,24 @@ impl<FE: FiniteField> SVoleReceiver for Receiver<FE> {
     ) -> Result<Vec<FE>, Error> {
         self.receive_internal(channel, self.rows + self.weight + self.r, rng)
     }
+
+    fn duplicate<C: AbstractChannel, RNG: CryptoRng + Rng>(
+        &mut self,
+        channel: &mut C,
+        rng: &mut RNG,
+    ) -> Result<Self, Error> {
+        let new_voles = self.receive(channel, rng)?;
+        let spsvole = self.spsvole.duplicate(channel, rng)?;
+        Ok(Self {
+            spsvole,
+            delta: self.delta(),
+            rows: self.rows,
+            cols: self.cols,
+            weight: self.weight,
+            base_voles: new_voles, // more than needed
+            r: self.r,
+        })
+    }
 }
 
 #[cfg(test)]
@@ -419,11 +454,49 @@ mod tests {
         }
     }
 
+    fn test_duplicate_svole_<
+        FE: FF,
+        Sender: SVoleSender<Msg = FE>,
+        Receiver: SVoleReceiver<Msg = FE>,
+    >() {
+        let (sender, receiver) = UnixStream::pair().unwrap();
+        let handle = std::thread::spawn(move || {
+            let mut rng = AesRng::new();
+            let reader = BufReader::new(sender.try_clone().unwrap());
+            let writer = BufWriter::new(sender);
+            let mut channel = Channel::new(reader, writer);
+            let mut vole = Sender::init(&mut channel, &mut rng).unwrap();
+            let mut uws = vole.send(&mut channel, &mut rng).unwrap();
+            let mut vole2 = vole.duplicate(&mut channel, &mut rng).unwrap();
+            uws.extend(vole2.send(&mut channel, &mut rng).unwrap());
+            uws
+        });
+        let mut rng = AesRng::new();
+        let reader = BufReader::new(receiver.try_clone().unwrap());
+        let writer = BufWriter::new(receiver);
+        let mut channel = Channel::new(reader, writer);
+        let mut vole = Receiver::init(&mut channel, &mut rng).unwrap();
+        let mut vs = vole.receive(&mut channel, &mut rng).unwrap();
+        let mut vole2 = vole.duplicate(&mut channel, &mut rng).unwrap();
+        vs.extend(vole2.receive(&mut channel, &mut rng).unwrap());
+
+        let uws = handle.join().unwrap();
+        for i in 0..uws.len() as usize {
+            let right = vole.delta().multiply_by_prime_subfield(uws[i].0) + vs[i];
+            assert_eq!(uws[i].1, right);
+        }
+    }
+
     #[test]
     fn test_lpn_svole() {
         test_lpn_svole_::<F2, Sender<F2>, Receiver<F2>>();
         test_lpn_svole_::<Gf128, Sender<Gf128>, Receiver<Gf128>>();
         test_lpn_svole_::<Fp, Sender<Fp>, Receiver<Fp>>();
         test_lpn_svole_::<F61p, Sender<F61p>, Receiver<F61p>>();
+    }
+
+    #[test]
+    fn test_duplicate_svole() {
+        test_duplicate_svole_::<F61p, Sender<F61p>, Receiver<F61p>>();
     }
 }
