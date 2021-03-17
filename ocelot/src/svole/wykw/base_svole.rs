@@ -41,7 +41,7 @@ impl<FE: FF> Sender<FE> {
     pub fn send<C: AbstractChannel, RNG: CryptoRng + Rng>(
         &mut self,
         channel: &mut C,
-        n: usize,
+        n: usize, // Equal to weight when called from sVOLE extend
         mut rng: &mut RNG,
     ) -> Result<Vec<(FE::PrimeField, FE)>, Error> {
         let mut uws = Vec::with_capacity(n);

@@ -31,7 +31,7 @@ use scuttlebutt::{field::FiniteField, AbstractChannel, AesRng, Block};
 
 /// LPN parameters
 struct LpnParams {
-    /// Hamming weight of the error vector `e` used in LPN assumption.
+    /// Hamming weight `t` of the error vector `e` used in LPN assumption.
     weight: usize,
     /// Number of columns `n` in the LPN matrix.
     cols: usize,
@@ -42,21 +42,21 @@ struct LpnParams {
 /// LPN parameters for setup0 phase.
 const LPN_SETUP0_PARAMS: LpnParams = LpnParams {
     weight: 600,
-    cols: 9_600,
+    cols: 9_600, // cols / weight = 16
     rows: 1_220,
 };
 
 /// LPN parameters for setup phase.
 const LPN_SETUP_PARAMS: LpnParams = LpnParams {
     weight: 2_600,
-    cols: 166_400,
+    cols: 166_400, // cols / weight = 64
     rows: 5_060,
 };
 
 /// LPN parameters for extend phase.
 const LPN_EXTEND_PARAMS: LpnParams = LpnParams {
     weight: 4_965,
-    cols: 10_168_320,
+    cols: 10_168_320, // cols / weight = 2_048
     rows: 158_000,
 };
 
@@ -313,7 +313,7 @@ impl<FE: FiniteField> Receiver<FE> {
         let seed = channel.read_block()?;
         let mut lpn_rng = AesRng::from_seed(seed);
         let distribution = Uniform::from(0..self.rows);
-        let mut base_voles = Vec::with_capacity(self.cols);
+        let mut base_voles = Vec::with_capacity(num_saved);
         let mut svoles = Vec::with_capacity(self.cols - num_saved);
         for (i, b) in vs.into_iter().enumerate() {
             let indices = lpn_mtx_indices::<FE>(&distribution, &mut lpn_rng);

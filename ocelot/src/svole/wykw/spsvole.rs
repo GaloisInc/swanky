@@ -123,6 +123,11 @@ impl<OT: OtReceiver<Msg = Block> + Malicious, FE: FF> Sender<OT, FE> {
         mut rng: &mut RNG,
     ) -> Result<Vec<(FE::PrimeField, FE)>, Error> {
         // Total communication: t |log p| + 256 + > t * nbits * 128 bits
+        debug_assert!(
+            (n as u128 - 1).leading_zeros() + (n as u128).trailing_zeros() == 128,
+            "expected power of 2, instead found: {}",
+            n
+        );
         let nbits = 128 - (n as u128 - 1).leading_zeros() as usize;
         let r = FE::PolynomialFormNumCoefficients::to_usize();
         let total_len = base_voles.len();
