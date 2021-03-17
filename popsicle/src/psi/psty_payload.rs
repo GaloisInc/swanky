@@ -1,4 +1,4 @@
-// -*- mode: rust; -*-
+ // -*- mode: rust; -*-
 //
 // This file is part of `popsicle`.
 // Copyright © 2019 Galois, Inc.
@@ -143,10 +143,11 @@ impl Sender {
         self.send_data(&mut state, nbins, channel, rng)?;
         channel.flush()?;
 
-        let (aggregate, card) = state.build_and_compute_circuit(&mut gb).unwrap();
+        let (aggregate, card, sum_weights) = state.build_and_compute_circuit(&mut gb).unwrap();
 
         gb.outputs(&aggregate.wires().to_vec()).unwrap();
         gb.outputs(&card.wires().to_vec()).unwrap();
+        gb.outputs(&sum_weights.wires().to_vec()).unwrap();
 
         channel.flush()?;
 
@@ -175,10 +176,11 @@ impl Sender {
         let table:Vec<Vec<Vec<Block>>> = state.table.chunks(megasize).map(|x| x.to_vec()).collect();
         let payload: Vec<Vec<Vec<Block512>>>= state.payload.chunks(megasize).map(|x| x.to_vec()).collect();
 
-        let (aggregate, card) = self.compute_payload(ts_id, ts_payload, table, payload, &path_deltas, channel, rng).unwrap();
+        let (aggregate, card, sum_weights) = self.compute_payload(ts_id, ts_payload, table, payload, &path_deltas, channel, rng).unwrap();
 
         gb.outputs(&aggregate.wires().to_vec()).unwrap();
         gb.outputs(&card.wires().to_vec()).unwrap();
+        gb.outputs(&sum_weights.wires().to_vec()).unwrap();
         Ok(())
     }
 
@@ -196,7 +198,8 @@ impl Sender {
         path_deltas: &str,
         channel: &mut C,
         rng: &mut RNG,
-    ) -> Result<(CrtBundle<fancy_garbling::Wire>, CrtBundle<fancy_garbling::Wire>), Error> {
+    ) -> Result<(CrtBundle<fancy_garbling::Wire>, CrtBundle<fancy_garbling::Wire>,
+                 CrtBundle<fancy_garbling::Wire>), Error> {
         let mut gb = Garbler::<C, RNG, OtSender>::new(channel.clone(), RNG::from_seed(rng.gen())).unwrap();
         let _ = gb.load_deltas(path_deltas);
 
@@ -205,6 +208,8 @@ impl Sender {
 
         let mut acc = gb.crt_constant_bundle(0, q).unwrap();
         let mut card = gb.crt_constant_bundle(0, q).unwrap();
+        let mut sum_weights = gb.crt_constant_bundle(0, q).unwrap();
+
         let nmegabins = ts_id.len();
         for i in 0..nmegabins{
             let start = SystemTime::now();
@@ -218,10 +223,11 @@ impl Sender {
             };
 
             self.send_data(&mut state, nbins, channel, rng)?;
-            let (partial, card_partial) = state.build_and_compute_circuit(&mut gb).unwrap();
+            let (partial, card_partial, sum_weights_partial) = state.build_and_compute_circuit(&mut gb).unwrap();
 
             acc = gb.crt_add(&acc, &partial).unwrap();
             card = gb.crt_add(&card, &card_partial).unwrap();
+            sum_weights = gb.crt_add(&sum_weights, &sum_weights_partial).unwrap();
 
             println!(
                 "Sender :: Computation time: {} ms",
@@ -234,7 +240,7 @@ impl Sender {
 
             channel.flush()?;
         }
-        Ok((acc, card))
+        Ok((acc, card, sum_weights))
     }
 
     // Aggregates partial grabled outputs encoded as CRTs. Uses the same deltas used by partial
@@ -243,6 +249,7 @@ impl Sender {
         &mut self,
         aggregates: Vec<Vec<Wire>>,
         cardinality: Vec<Vec<Wire>>,
+        sum_wghts: Vec<Vec<Wire>>,
         path_deltas: &str,
         channel: &mut C,
         rng: &mut RNG,
@@ -252,16 +259,19 @@ impl Sender {
 
         let mut acc = CrtBundle::new(aggregates[0].clone());
         let mut card = CrtBundle::new(cardinality[0].clone());
+        let mut sum_weights = CrtBundle::new(sum_wghts[0].clone());
         for i in 1..aggregates.len(){
             let partial_aggregate = CrtBundle::new(aggregates[i].clone());
             let partial_cardinality = CrtBundle::new(cardinality[i].clone());
+            let partial_sum_weights = CrtBundle::new(sum_wghts[i].clone());
             acc = gb.crt_add(&acc, &partial_aggregate).unwrap();
             card = gb.crt_add(&card, &partial_cardinality).unwrap();
+            sum_weights = gb.crt_add(&sum_weights, &partial_sum_weights).unwrap();
         }
 
         gb.outputs(&acc.wires().to_vec()).unwrap();
         gb.outputs(&card.wires().to_vec()).unwrap();
-
+        gb.outputs(&sum_weights.wires().to_vec()).unwrap();
         Ok(())
     }
 
@@ -393,14 +403,15 @@ impl SenderState {
     pub fn build_and_compute_circuit<C, RNG>(
         &mut self,
         gb: &mut Garbler<C, RNG, OtSender>,
-    ) -> Result<(CrtBundle<fancy_garbling::Wire>,CrtBundle<fancy_garbling::Wire>), Error>
+    ) -> Result<(CrtBundle<fancy_garbling::Wire>,CrtBundle<fancy_garbling::Wire>,
+         CrtBundle<fancy_garbling::Wire>), Error>
     where
         C: AbstractChannel,
         RNG: RngCore + CryptoRng + SeedableRng<Seed = Block>,
     {
         let (x, y, x_payload, y_payload, masks) = self.encode_circuit_inputs(gb).unwrap();
-        let (outs, card) = fancy_compute_payload_aggregate(gb, &x, &y, &x_payload, &y_payload, &masks).unwrap();
-        Ok((outs, card))
+        let (outs, card, sum_weights) = fancy_compute_payload_aggregate(gb, &x, &y, &x_payload, &y_payload, &masks).unwrap();
+        Ok((outs, card, sum_weights))
     }
 }
 
@@ -441,7 +452,7 @@ impl Receiver {
 
         self.receive_data(&mut state, channel, rng)?;
 
-        let (aggregate, card) = state.build_and_compute_circuit(&mut ev, channel).unwrap();
+        let (aggregate, card, sum_weights) = state.build_and_compute_circuit(&mut ev, channel).unwrap();
 
         let aggregate_outs = ev
             .outputs(&aggregate.wires().to_vec()).unwrap()
@@ -451,11 +462,17 @@ impl Receiver {
             .outputs(&card.wires().to_vec()).unwrap()
             .expect("evaluator should produce outputs");
 
+        let sum_weights_outs = ev
+            .outputs(&sum_weights.wires().to_vec()).unwrap()
+            .expect("evaluator should produce outputs");
+
         let aggregate = fancy_garbling::util::crt_inv(&aggregate_outs, &qs);
         let card = fancy_garbling::util::crt_inv(&card_outs, &qs);
+        let sum = fancy_garbling::util::crt_inv(&sum_weights_outs, &qs);
 
         println!("Output = {:?}", aggregate);
         println!("Cardinality = {:?}", card);
+        println!("Sum of Weights in Intersection = {:?}", sum);
         channel.flush()?;
 
         Ok(aggregate as u64)
@@ -476,7 +493,7 @@ impl Receiver {
         let (_, table, payload) = self.bucketize_data_large(table, payloads, megasize, channel, rng)?;
 
 
-        let (aggregate, card) = self.compute_payload(table, payload, channel, rng).unwrap();
+        let (aggregate, card, sum_weights) = self.compute_payload(table, payload, channel, rng).unwrap();
 
         let aggregate_outs = ev
             .outputs(&aggregate.wires().to_vec()).unwrap()
@@ -488,8 +505,14 @@ impl Receiver {
             .expect("evaluator should produce outputs");
         let card = fancy_garbling::util::crt_inv(&card_outs, &qs);
 
+        let sum_wghts_outs = ev
+            .outputs(&sum_weights.wires().to_vec()).unwrap()
+            .expect("evaluator should produce outputs");
+        let sum = fancy_garbling::util::crt_inv(&sum_wghts_outs, &qs);
+
         println!("Output = {:?}", aggregate);
         println!("Cardinality = {:?}", card);
+        println!("Sum of Weights in Intersection = {:?}", sum);
         channel.flush()?;
 
         Ok(aggregate as u64)
@@ -502,7 +525,8 @@ impl Receiver {
         payload: Vec<Vec<Block512>>,
         channel: &mut C,
         rng: &mut RNG,
-    ) -> Result<(CrtBundle<fancy_garbling::Wire>, CrtBundle<fancy_garbling::Wire>), Error> {
+    ) -> Result<(CrtBundle<fancy_garbling::Wire>, CrtBundle<fancy_garbling::Wire>,
+                 CrtBundle<fancy_garbling::Wire>), Error> {
 
         let mut ev =
             Evaluator::<C, RNG, OtReceiver>::new(channel.clone(), RNG::from_seed(rng.gen())).unwrap();
@@ -511,6 +535,7 @@ impl Receiver {
 
         let mut acc = ev.crt_constant_bundle(0, q).unwrap();
         let mut card = ev.crt_constant_bundle(0, q).unwrap();
+        let mut sum_weights = ev.crt_constant_bundle(0, q).unwrap();
 
         let nmegabins = table.len();
         for i in 0..nmegabins{
@@ -524,10 +549,11 @@ impl Receiver {
             };
 
             self.receive_data(&mut state, channel, rng)?;
-            let (partial, partial_card)= state.build_and_compute_circuit(&mut ev, channel).unwrap();
+            let (partial, partial_card, partial_sum_weights)= state.build_and_compute_circuit(&mut ev, channel).unwrap();
 
             acc = ev.crt_add(&acc, &partial).unwrap();
             card = ev.crt_add(&card, &partial_card).unwrap();
+            sum_weights = ev.crt_add(&sum_weights, &partial_sum_weights).unwrap();
             // For testing purposes, output partial states:
             //
             // let mpc_outs = ev
@@ -542,7 +568,7 @@ impl Receiver {
                 start.elapsed().unwrap().as_millis()
             );
         }
-        Ok((acc, card))
+        Ok((acc, card, sum_weights))
     }
 
     // Aggregates partial grabled outputs encoded as CRTs. Uses the same deltas used by partial
@@ -551,20 +577,24 @@ impl Receiver {
         &mut self,
         aggregates: Vec<Vec<Wire>>,
         cardinality: Vec<Vec<Wire>>,
+        sum_wghts: Vec<Vec<Wire>>,
         channel: &mut C,
         rng: &mut RNG,
-    ) -> Result<(u64, u64), Error> {
+    ) -> Result<(u64, u64, u64), Error> {
         let mut ev =
             Evaluator::<C, RNG, OtReceiver>::new(channel.clone(), RNG::from_seed(rng.gen())).unwrap();
         let qs = fancy_garbling::util::primes_with_width(PAYLOAD_SIZE as u32 * 8);
 
         let mut acc = CrtBundle::new(aggregates[0].clone());
         let mut card = CrtBundle::new(cardinality[0].clone());
+        let mut sum_weights = CrtBundle::new(sum_wghts[0].clone());
         for i in 1..aggregates.len(){
             let partial_aggregate = CrtBundle::new(aggregates[i].clone());
             let partial_cardinality = CrtBundle::new(cardinality[i].clone());
+            let partial_sum_weights = CrtBundle::new(sum_wghts[i].clone());
             acc = ev.crt_add(&acc, &partial_aggregate).unwrap();
             card = ev.crt_add(&card, &partial_cardinality).unwrap();
+            sum_weights = ev.crt_add(&sum_weights, &partial_sum_weights).unwrap();
         }
         let aggregate_outs = ev
             .outputs(&acc.wires().to_vec()).unwrap()
@@ -576,7 +606,12 @@ impl Receiver {
             .expect("evaluator should produce outputs");
         let cardinality = fancy_garbling::util::crt_inv(&card_outs, &qs);
 
-        Ok((aggregate as u64, cardinality as u64))
+        let sum_weights_outs = ev
+            .outputs(&sum_weights.wires().to_vec()).unwrap()
+            .expect("evaluator should produce outputs");
+        let sum = fancy_garbling::util::crt_inv(&sum_weights_outs, &qs);
+
+        Ok((aggregate as u64, cardinality as u64, sum as u64))
     }
 
     // For small to moderate sized sets, bucketizes using Cuckoo Hashing
@@ -727,7 +762,8 @@ impl ReceiverState {
         &mut self,
         ev: &mut Evaluator<C, RNG, OtReceiver>,
         channel: &mut C,
-    ) -> Result<(CrtBundle<fancy_garbling::Wire>, CrtBundle<fancy_garbling::Wire>), Error>
+    ) -> Result<(CrtBundle<fancy_garbling::Wire>, CrtBundle<fancy_garbling::Wire>,
+                 CrtBundle<fancy_garbling::Wire>), Error>
     where
         C: AbstractChannel,
         RNG: RngCore + CryptoRng + SeedableRng<Seed = Block>,
@@ -735,8 +771,8 @@ impl ReceiverState {
         channel.flush()?;
         let (x, y, x_payload, y_payload, masks) = self.encode_circuit_inputs(ev)?;
 
-        let (outs, card) = fancy_compute_payload_aggregate(ev, &x, &y, &x_payload, &y_payload, &masks).unwrap();
-        Ok((outs, card))
+        let (outs, card, sum_weights) = fancy_compute_payload_aggregate(ev, &x, &y, &x_payload, &y_payload, &masks).unwrap();
+        Ok((outs, card, sum_weights))
     }
 }
 
@@ -809,7 +845,7 @@ fn fancy_compute_payload_aggregate<F: fancy_garbling::FancyReveal + Fancy>(
     sender_payloads:&[F::Item],
     receiver_payloads: &[F::Item],
     receiver_masks: &[F::Item],
-) -> Result<(CrtBundle<F::Item>, CrtBundle<F::Item>), F::Error> {
+) -> Result<(CrtBundle<F::Item>, CrtBundle<F::Item>, CrtBundle<F::Item>), F::Error> {
 
     assert_eq!(sender_inputs.len(), receiver_inputs.len());
     assert_eq!(sender_payloads.len(), receiver_payloads.len());
@@ -844,7 +880,7 @@ fn fancy_compute_payload_aggregate<F: fancy_garbling::FancyReveal + Fancy>(
         .collect::<Result<Vec<CrtBundle<F::Item>>, F::Error>>()?;
 
     let mut weighted_payloads = Vec::new();
-    for it in reconstructed_payload.into_iter().zip_eq(receiver_payloads.chunks(PAYLOAD_PRIME_SIZE)){
+    for it in reconstructed_payload.clone().into_iter().zip_eq(receiver_payloads.chunks(PAYLOAD_PRIME_SIZE)){
         let (ps, pr) = it;
         let weighted = f.crt_mul(&ps, &CrtBundle::new(pr.to_vec()))?;
         weighted_payloads.push(weighted);
@@ -852,8 +888,11 @@ fn fancy_compute_payload_aggregate<F: fancy_garbling::FancyReveal + Fancy>(
 
     assert_eq!(eqs.len(), weighted_payloads.len());
 
+
     let mut acc = f.crt_constant_bundle(0, q)?;
     let mut card = f.crt_constant_bundle(0, q)?;
+    let mut sum = f.crt_constant_bundle(0, q)?;
+
     let one = f.crt_constant_bundle(1, q)?;
     for (i, b) in eqs.iter().enumerate(){
         let b_ws = one
@@ -865,8 +904,11 @@ fn fancy_compute_payload_aggregate<F: fancy_garbling::FancyReveal + Fancy>(
         card = f.crt_add(&card, &b_crt)?;
 
         let mux = f.crt_mul(&b_crt, &weighted_payloads[i])?;
+        let weight_mux = f.crt_mul(&b_crt, &reconstructed_payload[i])?;
+
         acc = f.crt_add(&acc, &mux)?;
+        sum = f.crt_add(&sum, &weight_mux)?;
     }
 
-    Ok((acc, card))
+    Ok((acc, card, sum))
 }
