@@ -21,6 +21,8 @@ pub enum Error {
     EqCheckFailed,
     /// Commitment opening failed.
     InvalidOpening,
+    /// Missing setup params
+    MissingSetupParams,
 }
 
 impl From<std::io::Error> for Error {
@@ -45,6 +47,7 @@ impl std::fmt::Display for Error {
             Error::CorrelationCheckFailed => "Correlation check failed!, i.e, w != u'Δ + v".fmt(f),
             Error::EqCheckFailed => "EQ check failed!".fmt(f),
             Error::InvalidOpening => "Invalid commitment opening!".fmt(f),
+            Error::MissingSetupParams => "Missing setup params!".fmt(f),
         }
     }
 }

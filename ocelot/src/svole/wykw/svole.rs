@@ -24,12 +24,14 @@ use rand::{
     Rng,
     SeedableRng,
 };
+
 use scuttlebutt::{field::FiniteField, AbstractChannel, AesRng, Block};
 
 /// Secure LPN parameters presented in (cf.
 /// <https://eprint.iacr.org/2020/925>, Table 2).
 
 /// LPN parameters
+#[derive(Clone, Copy, PartialEq, Eq)]
 struct LpnParams {
     /// Hamming weight `t` of the error vector `e` used in LPN assumption.
     weight: usize,
@@ -85,9 +87,8 @@ fn lpn_mtx_indices<FE: FiniteField>(
 /// sVole Sender
 pub struct Sender<FE: FiniteField> {
     spsvole: SpsSender<FE>,
-    rows: usize,
-    cols: usize,
-    weight: usize,
+    setup_params: Option<LpnParams>,
+    params: LpnParams,
     base_voles: Vec<(FE::PrimeField, FE)>,
     r: usize,
 }
@@ -95,21 +96,18 @@ pub struct Sender<FE: FiniteField> {
 impl<FE: FiniteField> Sender<FE> {
     fn init_internal<C: AbstractChannel, RNG: CryptoRng + Rng>(
         channel: &mut C,
-        rows: usize,
-        cols: usize,
-        weight: usize,
+        params: LpnParams,
         rng: &mut RNG,
     ) -> Result<Self, Error> {
         let pows: Powers<FE> = <Powers<_> as Default>::default();
         let r = FE::PolynomialFormNumCoefficients::to_usize();
         let mut base_sender = BaseSender::<FE>::init(channel, pows.clone(), rng)?;
-        let base_voles = base_sender.send(channel, rows + weight + r, rng)?;
+        let base_voles = base_sender.send(channel, params.rows + params.weight + r, rng)?;
         let spsvole = SpsSender::<FE>::init(channel, pows, rng)?;
         Ok(Self {
             spsvole,
-            rows,
-            cols,
-            weight,
+            setup_params: None,
+            params,
             base_voles,
             r,
         })
@@ -118,51 +116,58 @@ impl<FE: FiniteField> Sender<FE> {
     fn init_internal2<C: AbstractChannel, RNG: CryptoRng + Rng>(
         channel: &mut C,
         mut sender: Self,
-        rows: usize,
-        cols: usize,
-        weight: usize,
+        params: LpnParams,
         rng: &mut RNG,
     ) -> Result<Self, Error> {
         let base_voles = sender.send_internal(channel, 0, rng)?;
         Ok(Self {
             spsvole: sender.spsvole,
-            rows,
-            cols,
-            weight,
+            setup_params: Some(sender.params),
+            params,
             base_voles,
             r: sender.r,
         })
     }
 
-    fn send_internal<C: AbstractChannel, RNG: CryptoRng + Rng>(
+    fn _send_internal<C: AbstractChannel, RNG: CryptoRng + Rng>(
         &mut self,
         channel: &mut C,
+        params: LpnParams, // should be the setup params
         num_saved: usize,
         rng: &mut RNG,
     ) -> Result<Vec<(FE::PrimeField, FE)>, Error> {
         debug_assert!(
-            self.base_voles.len() >= self.rows + self.weight + self.r,
+            params == self.params
+                || self.setup_params.is_some() && params == self.setup_params.unwrap()
+        );
+
+        let rows = params.rows;
+        let cols = params.cols;
+        let weight = params.weight;
+
+        debug_assert!(
+            self.base_voles.len() >= rows + weight + self.r,
             "{} < {} + {} + {}",
             self.base_voles.len(),
-            self.rows,
-            self.weight,
+            rows,
+            weight,
             self.r
         );
-        let m = self.cols / self.weight;
+        let m = cols / weight;
         let uws = self.spsvole.send(
             channel,
             m,
-            &self.base_voles[self.rows..self.rows + self.weight + self.r],
+            &self.base_voles[rows..rows + weight + self.r],
             rng,
         )?;
-        debug_assert!(uws.len() == self.cols);
+        debug_assert!(uws.len() == cols);
         let seed = rng.gen::<Block>();
         let mut lpn_rng = AesRng::from_seed(seed);
         channel.write_block(&seed)?;
         channel.flush()?;
-        let distribution = Uniform::from(0..self.rows);
+        let distribution = Uniform::from(0..rows);
         let mut base_voles = Vec::with_capacity(num_saved);
-        let mut svoles = Vec::with_capacity(self.cols - num_saved);
+        let mut svoles = Vec::with_capacity(cols - num_saved);
         for (i, (e, c)) in uws.into_iter().enumerate() {
             let indices = lpn_mtx_indices::<FE>(&distribution, &mut lpn_rng);
             let mut x = e;
@@ -184,8 +189,40 @@ impl<FE: FiniteField> Sender<FE> {
             }
         }
         self.base_voles = base_voles;
-        debug_assert!(svoles.len() == self.cols - num_saved);
+        debug_assert!(svoles.len() == cols - num_saved);
         Ok(svoles)
+    }
+
+    fn set_base_voles(&mut self, base_voles: Vec<(FE::PrimeField, FE)>) -> () {
+        self.base_voles = base_voles;
+        return ();
+    }
+
+    fn send_internal<C: AbstractChannel, RNG: CryptoRng + Rng>(
+        &mut self,
+        channel: &mut C,
+        num_saved: usize,
+        rng: &mut RNG,
+    ) -> Result<Vec<(FE::PrimeField, FE)>, Error> {
+        self._send_internal(channel, self.params, num_saved, rng)
+    }
+
+    fn send_internal_using_setup_params<C: AbstractChannel, RNG: CryptoRng + Rng>(
+        &mut self,
+        channel: &mut C,
+        rng: &mut RNG,
+    ) -> Result<Vec<(FE::PrimeField, FE)>, Error> {
+        match self.setup_params {
+            Some(params) => {
+                return self._send_internal(
+                    channel,
+                    params,
+                    params.rows + params.weight + self.r,
+                    rng,
+                )
+            }
+            None => return Err(Error::MissingSetupParams),
+        }
     }
 }
 
@@ -196,27 +233,13 @@ impl<FE: FiniteField> SVoleSender for Sender<FE> {
         channel: &mut C,
         rng: &mut RNG,
     ) -> Result<Self, Error> {
-        let sender = Self::init_internal(
-            channel,
-            LPN_SETUP0_PARAMS.rows,
-            LPN_SETUP0_PARAMS.cols,
-            LPN_SETUP0_PARAMS.weight,
-            rng,
-        )?;
-        let mut sender = Self::init_internal2(
-            channel,
-            sender,
-            LPN_SETUP_PARAMS.rows,
-            LPN_SETUP_PARAMS.cols,
-            LPN_SETUP_PARAMS.weight,
-            rng,
-        )?;
+        let sender = Self::init_internal(channel, LPN_SETUP0_PARAMS, rng)?;
+        let mut sender = Self::init_internal2(channel, sender, LPN_SETUP_PARAMS, rng)?;
         let base_voles = sender.send_internal(channel, 0, rng)?;
         Ok(Self {
             spsvole: sender.spsvole,
-            rows: LPN_EXTEND_PARAMS.rows,
-            cols: LPN_EXTEND_PARAMS.cols,
-            weight: LPN_EXTEND_PARAMS.weight,
+            setup_params: Some(sender.params),
+            params: LPN_EXTEND_PARAMS,
             base_voles,
             r: sender.r,
         })
@@ -227,7 +250,7 @@ impl<FE: FiniteField> SVoleSender for Sender<FE> {
         channel: &mut C,
         rng: &mut RNG,
     ) -> Result<Vec<(FE::PrimeField, FE)>, Error> {
-        self.send_internal(channel, self.rows + self.weight + self.r, rng)
+        self.send_internal(channel, self.params.rows + self.params.weight + self.r, rng)
     }
 
     fn duplicate<C: AbstractChannel, RNG: CryptoRng + Rng>(
@@ -235,14 +258,40 @@ impl<FE: FiniteField> SVoleSender for Sender<FE> {
         channel: &mut C,
         rng: &mut RNG,
     ) -> Result<Self, Error> {
-        let new_voles = self.send(channel, rng)?;
+        // NOTE: We need to call 3 svoles with the lower setup
+        // parameters, because the setup parameters are designed so
+        // that the extension from one level is just big enough for
+        // the next level if none is saved.
+        let voles1 = self.send_internal_using_setup_params(channel, rng)?;
+        let voles2 = self.send_internal_using_setup_params(channel, rng)?;
+        let voles3 = self.send_internal_using_setup_params(channel, rng)?;
+
+        let nb_voles = self.params.rows + self.params.weight + self.r;
+
+        let mut base_voles = Vec::with_capacity(nb_voles);
+        base_voles.extend(voles1.clone());
+        let missing1 = nb_voles - voles1.len();
+        for i in 0..missing1 {
+            base_voles.push(voles2[i]);
+        }
+
+        let mut new_base_voles = Vec::with_capacity(nb_voles);
+        for i in missing1..voles2.len() {
+            new_base_voles.push(voles2[i]);
+        }
+        let missing2 = nb_voles - (voles2.len() - missing1);
+        debug_assert!(missing2 < voles3.len());
+        for i in 0..missing2 {
+            new_base_voles.push(voles3[i]);
+        }
+
         let spsvole = self.spsvole.duplicate(channel, rng)?;
+        self.set_base_voles(base_voles);
         Ok(Self {
             spsvole,
-            rows: self.rows,
-            cols: self.cols,
-            weight: self.weight,
-            base_voles: new_voles, // more than needed
+            setup_params: self.setup_params,
+            params: self.params,
+            base_voles: new_base_voles,
             r: self.r,
         })
     }
@@ -252,9 +301,8 @@ impl<FE: FiniteField> SVoleSender for Sender<FE> {
 pub struct Receiver<FE: FiniteField> {
     spsvole: SpsReceiver<FE>,
     delta: FE,
-    rows: usize,
-    cols: usize,
-    weight: usize,
+    setup_params: Option<LpnParams>,
+    params: LpnParams,
     base_voles: Vec<FE>,
     r: usize,
 }
@@ -262,25 +310,22 @@ pub struct Receiver<FE: FiniteField> {
 impl<FE: FiniteField> Receiver<FE> {
     fn init_internal<C: AbstractChannel, RNG: CryptoRng + Rng>(
         channel: &mut C,
-        rows: usize,
-        cols: usize,
-        weight: usize,
+        params: LpnParams,
         rng: &mut RNG,
     ) -> Result<Self, Error> {
         let r = FE::PolynomialFormNumCoefficients::to_usize();
         let pows: Powers<FE> = <Powers<_> as Default>::default();
         let mut base_receiver = BaseReceiver::<FE>::init(channel, pows.clone(), rng)?;
-        let base_voles = base_receiver.receive(channel, rows + weight + r, rng)?;
+        let base_voles = base_receiver.receive(channel, params.rows + params.weight + r, rng)?;
         let delta = base_receiver.delta();
         let spsvole = SpsReceiver::<FE>::init(channel, pows, delta, rng)?;
-        debug_assert!(base_voles.len() == rows + weight + r);
+        debug_assert!(base_voles.len() == params.rows + params.weight + r);
         Ok(Self {
             spsvole,
             delta,
-            rows,
-            cols,
+            setup_params: None,
+            params,
             base_voles,
-            weight,
             r,
         })
     }
@@ -288,50 +333,57 @@ impl<FE: FiniteField> Receiver<FE> {
     fn init_internal2<C: AbstractChannel, RNG: CryptoRng + Rng>(
         channel: &mut C,
         mut receiver: Self,
-        rows: usize,
-        cols: usize,
-        weight: usize,
+        params: LpnParams,
         rng: &mut RNG,
     ) -> Result<Self, Error> {
         let base_voles = receiver.receive_internal(channel, 0, rng)?;
         Ok(Self {
             spsvole: receiver.spsvole,
             delta: receiver.delta,
-            rows,
-            cols,
-            weight,
+            setup_params: Some(receiver.params),
+            params,
             base_voles,
             r: receiver.r,
         })
     }
 
-    fn receive_internal<C: AbstractChannel, RNG: CryptoRng + Rng>(
+    fn _receive_internal<C: AbstractChannel, RNG: CryptoRng + Rng>(
         &mut self,
         channel: &mut C,
+        params: LpnParams,
         num_saved: usize,
         rng: &mut RNG,
     ) -> Result<Vec<FE>, Error> {
         debug_assert!(
-            self.base_voles.len() >= self.rows + self.weight + self.r,
+            params == self.params
+                || self.setup_params.is_some() && params == self.setup_params.unwrap()
+        );
+
+        let rows = params.rows;
+        let cols = params.cols;
+        let weight = params.weight;
+
+        debug_assert!(
+            self.base_voles.len() >= rows + weight + self.r,
             "{} < {} + {} + {}",
             self.base_voles.len(),
-            self.rows,
-            self.weight,
+            rows,
+            weight,
             self.r
         );
-        let m = self.cols / self.weight;
+        let m = cols / weight;
         let vs = self.spsvole.receive(
             channel,
             m,
-            &self.base_voles[self.rows..self.rows + self.weight + self.r],
+            &self.base_voles[rows..rows + weight + self.r],
             rng,
         )?;
-        debug_assert!(vs.len() == self.cols);
+        debug_assert!(vs.len() == cols);
         let seed = channel.read_block()?;
         let mut lpn_rng = AesRng::from_seed(seed);
-        let distribution = Uniform::from(0..self.rows);
+        let distribution = Uniform::from(0..rows);
         let mut base_voles = Vec::with_capacity(num_saved);
-        let mut svoles = Vec::with_capacity(self.cols - num_saved);
+        let mut svoles = Vec::with_capacity(cols - num_saved);
         for (i, b) in vs.into_iter().enumerate() {
             let indices = lpn_mtx_indices::<FE>(&distribution, &mut lpn_rng);
             let mut y = b;
@@ -348,8 +400,39 @@ impl<FE: FiniteField> Receiver<FE> {
             }
         }
         self.base_voles = base_voles;
-        debug_assert!(svoles.len() == self.cols - num_saved);
+        debug_assert!(svoles.len() == cols - num_saved);
         Ok(svoles)
+    }
+
+    fn set_base_voles(&mut self, base_voles: Vec<FE>) -> () {
+        self.base_voles = base_voles;
+    }
+
+    fn receive_internal<C: AbstractChannel, RNG: CryptoRng + Rng>(
+        &mut self,
+        channel: &mut C,
+        num_saved: usize,
+        rng: &mut RNG,
+    ) -> Result<Vec<FE>, Error> {
+        self._receive_internal(channel, self.params, num_saved, rng)
+    }
+
+    fn receive_internal_using_setup_params<C: AbstractChannel, RNG: CryptoRng + Rng>(
+        &mut self,
+        channel: &mut C,
+        rng: &mut RNG,
+    ) -> Result<Vec<FE>, Error> {
+        match self.setup_params {
+            Some(params) => {
+                return self._receive_internal(
+                    channel,
+                    params,
+                    params.rows + params.weight + self.r,
+                    rng,
+                )
+            }
+            None => return Err(Error::MissingSetupParams),
+        }
     }
 }
 
@@ -360,28 +443,14 @@ impl<FE: FiniteField> SVoleReceiver for Receiver<FE> {
         channel: &mut C,
         rng: &mut RNG,
     ) -> Result<Self, Error> {
-        let receiver = Self::init_internal(
-            channel,
-            LPN_SETUP0_PARAMS.rows,
-            LPN_SETUP0_PARAMS.cols,
-            LPN_SETUP0_PARAMS.weight,
-            rng,
-        )?;
-        let mut receiver = Self::init_internal2(
-            channel,
-            receiver,
-            LPN_SETUP_PARAMS.rows,
-            LPN_SETUP_PARAMS.cols,
-            LPN_SETUP_PARAMS.weight,
-            rng,
-        )?;
+        let receiver = Self::init_internal(channel, LPN_SETUP0_PARAMS, rng)?;
+        let mut receiver = Self::init_internal2(channel, receiver, LPN_SETUP_PARAMS, rng)?;
         let base_voles = receiver.receive_internal(channel, 0, rng)?;
         Ok(Self {
             spsvole: receiver.spsvole,
             delta: receiver.delta,
-            rows: LPN_EXTEND_PARAMS.rows,
-            cols: LPN_EXTEND_PARAMS.cols,
-            weight: LPN_EXTEND_PARAMS.weight,
+            setup_params: Some(receiver.params),
+            params: LPN_EXTEND_PARAMS,
             base_voles,
             r: receiver.r,
         })
@@ -396,7 +465,7 @@ impl<FE: FiniteField> SVoleReceiver for Receiver<FE> {
         channel: &mut C,
         rng: &mut RNG,
     ) -> Result<Vec<FE>, Error> {
-        self.receive_internal(channel, self.rows + self.weight + self.r, rng)
+        self.receive_internal(channel, self.params.rows + self.params.weight + self.r, rng)
     }
 
     fn duplicate<C: AbstractChannel, RNG: CryptoRng + Rng>(
@@ -404,15 +473,41 @@ impl<FE: FiniteField> SVoleReceiver for Receiver<FE> {
         channel: &mut C,
         rng: &mut RNG,
     ) -> Result<Self, Error> {
-        let new_voles = self.receive(channel, rng)?;
+        // NOTE: We need to call 3 svoles with the lower setup
+        // parameters, because the setup parameters are designed so
+        // that the extension from one level is just big enough for
+        // the next level if none is saved.
+        let voles1 = self.receive_internal_using_setup_params(channel, rng)?;
+        let voles2 = self.receive_internal_using_setup_params(channel, rng)?;
+        let voles3 = self.receive_internal_using_setup_params(channel, rng)?;
+
+        let nb_voles = self.params.rows + self.params.weight + self.r;
+
+        let mut base_voles = Vec::with_capacity(nb_voles);
+        base_voles.extend(voles1.clone());
+        let missing1 = nb_voles - voles1.len();
+        for i in 0..missing1 {
+            base_voles.push(voles2[i]);
+        }
+
+        let mut new_base_voles = Vec::with_capacity(nb_voles);
+        for i in missing1..voles2.len() {
+            new_base_voles.push(voles2[i]);
+        }
+        let missing2 = nb_voles - (voles2.len() - missing1);
+        debug_assert!(missing2 < voles3.len());
+        for i in 0..missing2 {
+            new_base_voles.push(voles3[i]);
+        }
+
         let spsvole = self.spsvole.duplicate(channel, rng)?;
+        self.set_base_voles(base_voles);
         Ok(Self {
             spsvole,
             delta: self.delta(),
-            rows: self.rows,
-            cols: self.cols,
-            weight: self.weight,
-            base_voles: new_voles, // more than needed
+            setup_params: self.setup_params,
+            params: self.params,
+            base_voles: new_base_voles,
             r: self.r,
         })
     }
