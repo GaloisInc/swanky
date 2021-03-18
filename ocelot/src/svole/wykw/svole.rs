@@ -231,9 +231,8 @@ impl<FE: FiniteField> SVoleSender for Sender<FE> {
 
         let nb_voles = compute_num_saved::<FE>(LPN_EXTEND_PARAMS);
 
-        let mut base_voles = Vec::with_capacity(nb_voles);
-        base_voles.extend(voles1.clone());
         let missing1 = nb_voles - voles1.len();
+        let mut base_voles = voles1;
         for i in 0..missing1 {
             base_voles.push(voles2[i]);
         }
@@ -400,9 +399,8 @@ impl<FE: FiniteField> SVoleReceiver for Receiver<FE> {
 
         let nb_voles = compute_num_saved::<FE>(LPN_EXTEND_PARAMS);
 
-        let mut base_voles = Vec::with_capacity(nb_voles);
-        base_voles.extend(voles1.clone());
         let missing1 = nb_voles - voles1.len();
+        let mut base_voles = voles1;
         for i in 0..missing1 {
             base_voles.push(voles2[i]);
         }
@@ -477,7 +475,11 @@ mod tests {
             let mut vole = Sender::init(&mut channel, &mut rng).unwrap();
             let mut uws = vole.send(&mut channel, &mut rng).unwrap();
             let mut vole2 = vole.duplicate(&mut channel, &mut rng).unwrap();
-            uws.extend(vole2.send(&mut channel, &mut rng).unwrap());
+            let uws2 = vole2.send(&mut channel, &mut rng).unwrap();
+            let uws3 = vole.send(&mut channel, &mut rng).unwrap();
+            assert!(uws2 != uws3);
+            uws.extend(uws2);
+            uws.extend(uws3);
             uws
         });
         let mut rng = AesRng::new();
@@ -487,7 +489,11 @@ mod tests {
         let mut vole = Receiver::init(&mut channel, &mut rng).unwrap();
         let mut vs = vole.receive(&mut channel, &mut rng).unwrap();
         let mut vole2 = vole.duplicate(&mut channel, &mut rng).unwrap();
-        vs.extend(vole2.receive(&mut channel, &mut rng).unwrap());
+        let vs2 = vole2.receive(&mut channel, &mut rng).unwrap();
+        let vs3 = vole.receive(&mut channel, &mut rng).unwrap();
+        assert!(vs2 != vs3);
+        vs.extend(vs2);
+        vs.extend(vs3);
 
         let uws = handle.join().unwrap();
         for i in 0..uws.len() as usize {
