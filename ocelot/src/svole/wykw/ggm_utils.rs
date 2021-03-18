@@ -91,13 +91,14 @@ pub fn ggm_prime<FE: FiniteField>(
         });
         sv[exp_idx + ai_star as usize - 1] = s_alpha ^ keys[i - 1];
     }
-    let mut sum = FE::ZERO;
+
     for j in 0..leaves {
         if j != alpha {
             results[j].1 = FE::from_uniform_bytes(&<[u8; 16]>::from(sv[leaves + j - 1]));
         }
-        sum += results[j].1;
     }
+    let sum = (0..leaves).map(|j| results[j].1).sum();
+
     sum
 }
 
