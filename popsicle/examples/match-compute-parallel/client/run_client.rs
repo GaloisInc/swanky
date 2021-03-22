@@ -154,10 +154,43 @@ pub fn main(){
 
    // The partial results are joined and the output is produced
     thread::sleep(duration);
+<<<<<<< Updated upstream
     let (_result_aggregate, _result_cardinality) = join_aggregates(&mut path, &address, nthread, precision).unwrap();
 
 
     // // test results
+=======
+    let (_result_cardinality) = join_aggregates(&mut path, &address, nthread, precision).unwrap();
+    //
+    //
+    // // // test results
+    // //
+    // let server_path = parameters.get("data_path_server").unwrap().to_owned();
+    // let schema_id = parameters.get("schema_server_id").unwrap().to_owned();
+    // let schema_payload = parameters.get("schema_server_payload").unwrap().to_owned();
+    //
+    // let (ids_server, payloads_server) = parse_files(&schema_id, &schema_payload, &server_path);
+    // let (weighted_aggregate, cardinality) = test(&ids_client, &ids_server, &payloads_client, &payloads_server);
+    //
+    // let aggregate: f64 = weighted_aggregate as f64/ 10_u64.pow(precision) as f64;
+    // let output: f64 = aggregate / cardinality as f64;
+    //
+    // path.push("result_nonsecure.txt");
+    // let path_str = path.clone().into_os_string().into_string().unwrap();
+    // path.pop();
+    //
+    // let _ = File::create(path_str.clone()).unwrap();
+    //
+    // let mut output_write = "Aggregate in the clear: ".to_owned();
+    // output_write.push_str(&aggregate.to_string());
+    // output_write.push_str(&"\nCardinality in the clea: ".to_owned());
+    // output_write.push_str(&cardinality.to_string());
+    // output_write.push_str(&"\nAverage in the clear: ".to_owned());
+    // output_write.push_str(&output.to_string());
+    //
+    //
+    // write(path_str, output_write).expect("Unable to write file");
+>>>>>>> Stashed changes
     //
     let server_path = parameters.get("data_path_server").unwrap().to_owned();
     let schema_id = parameters.get("schema_server_id").unwrap().to_owned();

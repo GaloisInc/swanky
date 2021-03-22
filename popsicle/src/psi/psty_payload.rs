@@ -58,7 +58,6 @@ use scuttlebutt::{AbstractChannel, Block, Block512};
 
 use serde_json;
 
-
 const NHASHES: usize = 3;
 // How many bytes of the hash to use for the equality tests. This affects
 // correctness, with a lower value increasing the likelihood of a false
@@ -259,8 +258,15 @@ impl Sender {
             card = gb.crt_add(&card, &partial_cardinality).unwrap();
         }
 
+        let weighted_output = fancy_compute_division(&mut gb, acc.clone(), sum_weights.clone()).unwrap();
+
         gb.outputs(&acc.wires().to_vec()).unwrap();
+<<<<<<< Updated upstream
         gb.outputs(&card.wires().to_vec()).unwrap();
+=======
+        gb.outputs(&weighted_output.wires().to_vec()).unwrap();
+        gb.outputs(&sum_weights.wires().to_vec()).unwrap();
+>>>>>>> Stashed changes
 
         Ok(())
     }
@@ -553,7 +559,11 @@ impl Receiver {
         cardinality: Vec<Vec<Wire>>,
         channel: &mut C,
         rng: &mut RNG,
+<<<<<<< Updated upstream
     ) -> Result<(u64, u64), Error> {
+=======
+    ) -> Result<(u64), Error> {
+>>>>>>> Stashed changes
         let mut ev =
             Evaluator::<C, RNG, OtReceiver>::new(channel.clone(), RNG::from_seed(rng.gen())).unwrap();
         let qs = fancy_garbling::util::primes_with_width(PAYLOAD_SIZE as u32 * 8);
@@ -566,17 +576,31 @@ impl Receiver {
             acc = ev.crt_add(&acc, &partial_aggregate).unwrap();
             card = ev.crt_add(&card, &partial_cardinality).unwrap();
         }
+
+        let weighted_output = fancy_compute_division(&mut ev, acc.clone(), sum_weights.clone()).unwrap();
+
         let aggregate_outs = ev
             .outputs(&acc.wires().to_vec()).unwrap()
             .expect("evaluator should produce outputs");
         let aggregate = fancy_garbling::util::crt_inv(&aggregate_outs, &qs);
 
-        let card_outs = ev
-            .outputs(&card.wires().to_vec()).unwrap()
+        let wght = ev
+            .outputs(&weighted_output.wires().to_vec()).unwrap()
             .expect("evaluator should produce outputs");
-        let cardinality = fancy_garbling::util::crt_inv(&card_outs, &qs);
+        let normalized_out = fancy_garbling::util::crt_inv(&wght, &qs);
 
+<<<<<<< Updated upstream
         Ok((aggregate as u64, cardinality as u64))
+=======
+        let sum_weights_outs = ev
+            .outputs(&sum_weights.wires().to_vec()).unwrap()
+            .expect("evaluator should produce outputs");
+        let sum = fancy_garbling::util::crt_inv(&sum_weights_outs, &qs);
+
+        println!("numerator{}", aggregate);
+        println!("denom{}", sum);
+        Ok(normalized_out as u64)
+>>>>>>> Stashed changes
     }
 
     // For small to moderate sized sets, bucketizes using Cuckoo Hashing
@@ -869,4 +893,54 @@ fn fancy_compute_payload_aggregate<F: fancy_garbling::FancyReveal + Fancy>(
     }
 
     Ok((acc, card))
+}
+
+fn fancy_compute_division<F: fancy_garbling::FancyReveal + Fancy>(
+    f: &mut F,
+    x: CrtBundle<F::Item>,
+    y: CrtBundle<F::Item>,
+) -> Result<CrtBundle<F::Item>, F::Error> {
+
+
+    println!("Starting Division...");
+    let qs = fancy_garbling::util::primes_with_width(37);
+    let q = fancy_garbling::util::product(&qs);
+
+    let l = ((q as f64).log2().ceil()) as u32 ;
+
+    let x = f.crt_constant_bundle(2, q)?;
+    let y = f.crt_constant_bundle(1, q)?;
+
+    let mut quotient = f.crt_constant_bundle(0, q)?;
+    let mut a = x.clone();
+
+    let one = f.crt_constant_bundle(1, q)?;
+    for i in 0..l {
+        let b = 2u128.pow(l-i-1);
+        let mut pb = q / b;
+        if q % b == 0{
+            pb = pb-1;
+        }
+
+        let tmp = f.crt_cmul(&y, b)?;
+        let c1 = f.crt_geq(&a, &tmp, "100%")?;
+
+        let pb_crt = f.crt_constant_bundle(pb, q)?;
+        let c2 = f.crt_geq(&pb_crt, &y, "100%")?;
+
+        let c = f.and(&c1, &c2)?;
+
+        let c_ws = one
+            .iter()
+            .map(|w| f.mul(w, &c))
+            .collect::<Result<Vec<F::Item>, F::Error>>()?;
+        let c_crt = CrtBundle::new(c_ws);
+
+        let b_if = f.crt_cmul(&c_crt, b)?;
+        quotient = f.crt_add(&quotient, &b_if)?;
+
+        let tmp_if = f.crt_mul(&c_crt, &tmp)?;
+        a = f.crt_sub(&a, &tmp_if)?;
+    }
+    Ok(quotient)
 }
