@@ -92,6 +92,7 @@ fn lpn_mtx_indices<FE: FiniteField>(
 pub struct Sender<FE: FiniteField> {
     spsvole: SpsSender<FE>,
     base_voles: Vec<(FE::PrimeField, FE)>,
+    lpn_rng: AesRng,
 }
 
 impl<FE: FiniteField> Sender<FE> {
@@ -104,9 +105,13 @@ impl<FE: FiniteField> Sender<FE> {
         let base_voles_setup =
             base_sender.send(channel, compute_num_saved::<FE>(LPN_SETUP0_PARAMS), rng)?;
         let spsvole = SpsSender::<FE>::init(channel, pows, rng)?;
+        let seed = rng.gen::<Block>();
+        let seed = scuttlebutt::cointoss::receive(channel, &[seed])?[0];
+        let lpn_rng = AesRng::from_seed(seed);
         let mut sender = Self {
             spsvole,
             base_voles: base_voles_setup,
+            lpn_rng,
         };
 
         let base_voles_setup = sender.send_internal(channel, LPN_SETUP0_PARAMS, 0, rng)?;
@@ -147,15 +152,11 @@ impl<FE: FiniteField> Sender<FE> {
             .spsvole
             .send(channel, m, &self.base_voles[rows..rows + weight + r], rng)?;
         debug_assert!(uws.len() == cols);
-        let seed = rng.gen::<Block>();
-        let mut lpn_rng = AesRng::from_seed(seed);
-        channel.write_block(&seed)?;
-        channel.flush()?;
         let distribution = Uniform::from(0..rows);
         let mut base_voles = Vec::with_capacity(num_saved);
         let mut svoles = Vec::with_capacity(cols - num_saved);
         for (i, (e, c)) in uws.into_iter().enumerate() {
-            let indices = lpn_mtx_indices::<FE>(&distribution, &mut lpn_rng);
+            let indices = lpn_mtx_indices::<FE>(&distribution, &mut self.lpn_rng);
             let mut x = e;
             let mut z = c;
 
@@ -249,9 +250,12 @@ impl<FE: FiniteField> SVoleSender for Sender<FE> {
 
         let spsvole = self.spsvole.duplicate(channel, rng)?;
         self.base_voles = base_voles;
+        let seed = self.lpn_rng.gen::<Block>();
+        let lpn_rng = AesRng::from_seed(seed);
         Ok(Self {
             spsvole,
             base_voles: new_base_voles,
+            lpn_rng,
         })
     }
 }
@@ -261,6 +265,7 @@ pub struct Receiver<FE: FiniteField> {
     spsvole: SpsReceiver<FE>,
     delta: FE,
     base_voles: Vec<FE>,
+    lpn_rng: AesRng,
 }
 
 impl<FE: FiniteField> Receiver<FE> {
@@ -275,10 +280,14 @@ impl<FE: FiniteField> Receiver<FE> {
         let delta = base_receiver.delta();
         let spsvole = SpsReceiver::<FE>::init(channel, pows, delta, rng)?;
         debug_assert!(base_voles_setup.len() == compute_num_saved::<FE>(LPN_SETUP0_PARAMS));
+        let seed = rng.gen::<Block>();
+        let seed = scuttlebutt::cointoss::send(channel, &[seed])?[0];
+        let lpn_rng = AesRng::from_seed(seed);
         let mut receiver = Self {
             spsvole,
             delta,
             base_voles: base_voles_setup,
+            lpn_rng,
         };
         let base_voles_setup = receiver.receive_internal(channel, LPN_SETUP0_PARAMS, 0, rng)?;
         receiver.base_voles = base_voles_setup;
@@ -318,13 +327,11 @@ impl<FE: FiniteField> Receiver<FE> {
             self.spsvole
                 .receive(channel, m, &self.base_voles[rows..rows + weight + r], rng)?;
         debug_assert!(vs.len() == cols);
-        let seed = channel.read_block()?;
-        let mut lpn_rng = AesRng::from_seed(seed);
         let distribution = Uniform::from(0..rows);
         let mut base_voles = Vec::with_capacity(num_saved);
         let mut svoles = Vec::with_capacity(cols - num_saved);
         for (i, b) in vs.into_iter().enumerate() {
-            let indices = lpn_mtx_indices::<FE>(&distribution, &mut lpn_rng);
+            let indices = lpn_mtx_indices::<FE>(&distribution, &mut self.lpn_rng);
             let mut y = b;
 
             y += indices
@@ -417,10 +424,13 @@ impl<FE: FiniteField> SVoleReceiver for Receiver<FE> {
 
         let spsvole = self.spsvole.duplicate(channel, rng)?;
         self.base_voles = base_voles;
+        let seed = self.lpn_rng.gen::<Block>();
+        let lpn_rng = AesRng::from_seed(seed);
         Ok(Self {
             spsvole,
             delta: self.delta(),
             base_voles: new_base_voles,
+            lpn_rng,
         })
     }
 }
