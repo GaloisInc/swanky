@@ -18,7 +18,7 @@ use scuttlebutt::{field::FiniteField, utils::unpack_bits, Aes128, Block};
 pub fn ggm<FE: FiniteField>(
     depth: usize,
     initial_seed: Block,
-    aes: (&Aes128, &Aes128),
+    aes: &(Aes128, Aes128),
     results: &mut [FE],
 ) -> Vec<(Block, Block)> {
     let mut seeds = Vec::with_capacity((0..depth).fold(0, |acc, i| acc + 2 * (1 << i)));
@@ -55,7 +55,7 @@ pub fn ggm<FE: FiniteField>(
 pub fn ggm_prime<FE: FiniteField>(
     alpha: usize,
     keys: &[Block],
-    aes: (&Aes128, &Aes128),
+    aes: &(Aes128, Aes128),
     results: &mut [(FE::PrimeField, FE)],
 ) -> FE {
     let depth = keys.len();
@@ -138,9 +138,10 @@ mod tests {
             let seed1 = rand::thread_rng().gen();
             let aes0 = Aes128::new(seed0);
             let aes1 = Aes128::new(seed1);
+            let ggm_seeds = (aes0, aes1);
             let exp = 1 << depth;
             let mut vs: Vec<FE> = vec![FE::ZERO; exp];
-            let keys = ggm(depth, seed, (&aes0, &aes1), &mut vs);
+            let keys = ggm(depth, seed, &ggm_seeds.clone(), &mut vs);
             let leaves = (1 << depth) - 1;
             let alpha: usize = rand::thread_rng().gen_range(1, leaves);
             let mut alpha_bits = unpack_bits(&alpha.to_le_bytes(), keys.len());
@@ -151,7 +152,7 @@ mod tests {
                 .map(|(b, k)| if !*b { k.1 } else { k.0 })
                 .collect();
             let mut vs_ = vec![(FE::PrimeField::ZERO, FE::ZERO); exp];
-            let _ = ggm_prime::<FE>(alpha, &alpha_keys, (&aes0, &aes1), &mut vs_);
+            let _ = ggm_prime::<FE>(alpha, &alpha_keys, &ggm_seeds, &mut vs_);
             for i in 0..vs_.len() {
                 if i != alpha {
                     assert_eq!(vs[i], vs_[i].1);

@@ -36,6 +36,7 @@ use scuttlebutt::{
 pub struct Sender<OT: OtReceiver + Malicious, FE: FF> {
     ot: OT,
     pows: Powers<FE>,
+    ggm_seeds: (Aes128, Aes128),
 }
 
 /// SpsVole Receiver.
@@ -43,6 +44,7 @@ pub struct Receiver<OT: OtSender + Malicious, FE: FF> {
     ot: OT,
     delta: FE,
     pows: Powers<FE>,
+    ggm_seeds: (Aes128, Aes128),
 }
 /// Alias for SpsVole Sender.
 pub type SpsSender<FE> = Sender<KosReceiver, FE>;
@@ -107,7 +109,16 @@ impl<OT: OtReceiver<Msg = Block> + Malicious, FE: FF> Sender<OT, FE> {
         rng: &mut RNG,
     ) -> Result<Self, Error> {
         let ot = OT::init(channel, rng)?;
-        Ok(Self { pows, ot })
+        let seed0 = rng.gen::<Block>();
+        let seed1 = rng.gen::<Block>();
+        let seeds = scuttlebutt::cointoss::send(channel, &[seed0, seed1])?;
+        let aes0 = Aes128::new(seeds[0]);
+        let aes1 = Aes128::new(seeds[1]);
+        Ok(Self {
+            pows,
+            ot,
+            ggm_seeds: (aes0, aes1),
+        })
     }
     /// Runs single-point svole and outputs pair of vectors `(u, w)` such that
     /// the correlation `w = u'Δ + v` holds. Note that `u'` is the converted
@@ -146,18 +157,6 @@ impl<OT: OtReceiver<Msg = Block> + Malicious, FE: FF> Sender<OT, FE> {
             channel.write_fe(a_prime)?;
             betas.push(beta);
         }
-        // Generate seeds for GGM "PRGs" and send them over the wire.
-        //
-        // XXX is this secure? I think so, assuming AES as no weak keys....
-        // might be better to do coin flipping here though...
-        let seed0 = rng.gen::<Block>();
-        let seed1 = rng.gen::<Block>();
-        let aes0 = Aes128::new(seed0);
-        let aes1 = Aes128::new(seed1);
-
-        channel.write_block(&seed0)?;
-        channel.write_block(&seed1)?;
-
         let distribution = Uniform::from(0..n);
         let mut alphas = Vec::with_capacity(t);
         let mut choices = Vec::with_capacity(t * nbits);
@@ -179,7 +178,7 @@ impl<OT: OtReceiver<Msg = Block> + Malicious, FE: FF> Sender<OT, FE> {
             let sum = ggm_prime(
                 *alpha,
                 &keys[i * nbits..(i + 1) * nbits],
-                (&aes0, &aes1),
+                &self.ggm_seeds,
                 &mut result[i * n..(i + 1) * n],
             );
             let d: FE = channel.read_fe()?;
@@ -254,6 +253,7 @@ impl<OT: OtReceiver<Msg = Block> + Malicious, FE: FF> Sender<OT, FE> {
         Ok(Self {
             ot,
             pows: self.pows.clone(),
+            ggm_seeds: self.ggm_seeds.clone(),
         })
     }
 }
@@ -268,7 +268,17 @@ impl<OT: OtSender<Msg = Block> + Malicious, FE: FF> Receiver<OT, FE> {
         mut rng: &mut RNG,
     ) -> Result<Self, Error> {
         let ot = OT::init(channel, &mut rng)?;
-        Ok(Self { pows, delta, ot })
+        let seed0 = rng.gen::<Block>();
+        let seed1 = rng.gen::<Block>();
+        let seeds = scuttlebutt::cointoss::receive(channel, &[seed0, seed1])?;
+        let aes0 = Aes128::new(seeds[0]);
+        let aes1 = Aes128::new(seeds[1]);
+        Ok(Self {
+            pows,
+            delta,
+            ot,
+            ggm_seeds: (aes0, aes1),
+        })
     }
 
     /// Runs single-point svole and outputs a vector `v` such that
@@ -296,14 +306,15 @@ impl<OT: OtSender<Msg = Block> + Malicious, FE: FF> Receiver<OT, FE> {
             let gamma = *v - self.delta.multiply_by_prime_subfield(a_prime);
             gammas.push(gamma);
         }
-        let seed0 = channel.read_block()?;
-        let seed1 = channel.read_block()?;
-        let aes0 = Aes128::new(seed0);
-        let aes1 = Aes128::new(seed1);
         let mut keys = Vec::with_capacity(t * nbits);
         for i in 0..t {
             let seed = rng.gen::<Block>();
-            let keys_ = ggm(nbits, seed, (&aes0, &aes1), &mut result[i * n..(i + 1) * n]);
+            let keys_ = ggm(
+                nbits,
+                seed,
+                &self.ggm_seeds,
+                &mut result[i * n..(i + 1) * n],
+            );
             debug_assert!(keys_.len() == nbits);
             keys.extend(keys_);
         }
@@ -363,6 +374,7 @@ impl<OT: OtSender<Msg = Block> + Malicious, FE: FF> Receiver<OT, FE> {
             ot,
             delta: self.delta,
             pows: self.pows.clone(),
+            ggm_seeds: self.ggm_seeds.clone(),
         })
     }
 }
