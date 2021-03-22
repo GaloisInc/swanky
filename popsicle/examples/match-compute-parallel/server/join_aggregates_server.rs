@@ -39,7 +39,7 @@ fn server_protocol(mut channel: TcpChannel<TcpStream>, path:&mut PathBuf, nthrea
         let partial_cardinality: Vec<Wire> = serde_json::from_str(&read_to_string(path_str).unwrap()).unwrap();
         path.pop();
 
-        path.push("sum_weights.txt");
+        path.push("output_sum_weights.txt");
         let path_str = path.clone().into_os_string().into_string().unwrap();
         let partial_sum_weights: Vec<Wire> = serde_json::from_str(&read_to_string(path_str).unwrap()).unwrap();
         path.pop();

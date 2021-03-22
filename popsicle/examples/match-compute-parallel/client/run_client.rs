@@ -154,7 +154,6 @@ pub fn main(){
 
    // The partial results are joined and the output is produced
     thread::sleep(duration);
-
     let (_result_cardinality) = join_aggregates(&mut path, &address, nthread, precision).unwrap();
     //
     //

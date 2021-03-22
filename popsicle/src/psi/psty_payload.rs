@@ -272,11 +272,8 @@ impl Sender {
         let weighted_output = fancy_compute_division(&mut gb, acc.clone(), sum_weights.clone()).unwrap();
 
         gb.outputs(&acc.wires().to_vec()).unwrap();
-
-    //    gb.outputs(&card.wires().to_vec()).unwrap();
-        gb.outputs(&weighted_output.wires().to_vec()).unwrap();
         gb.outputs(&sum_weights.wires().to_vec()).unwrap();
-
+        gb.outputs(&weighted_output.wires().to_vec()).unwrap();
 
         Ok(())
     }
@@ -606,27 +603,25 @@ impl Receiver {
 
         let weighted_output = fancy_compute_division(&mut ev, acc.clone(), sum_weights.clone()).unwrap();
 
-        // let aggregate_outs = ev
-        //     .outputs(&acc.wires().to_vec()).unwrap()
-        //     .expect("evaluator should produce outputs");
-        // let aggregate = fancy_garbling::util::crt_inv(&aggregate_outs, &qs);
+        let aggregate_outs = ev
+            .outputs(&acc.wires().to_vec()).unwrap()
+            .expect("evaluator should produce outputs");
+        let aggregate = fancy_garbling::util::crt_inv(&aggregate_outs, &qs);
 
-        let wght = ev
+        let sum = ev
+            .outputs(&sum_weights.wires().to_vec()).unwrap()
+            .expect("evaluator should produce outputs");
+        let sum= fancy_garbling::util::crt_inv(&sum, &qs);
+
+        let output = ev
             .outputs(&weighted_output.wires().to_vec()).unwrap()
             .expect("evaluator should produce outputs");
-        let normalized_out = fancy_garbling::util::crt_inv(&wght, &qs);
+        let weighted_output = fancy_garbling::util::crt_inv(&output, &qs);
 
-
-        // Ok((aggregate as u64, cardinality as u64))
-        //
-        // let sum_weights_outs = ev
-        //     .outputs(&sum_weights.wires().to_vec()).unwrap()
-        //     .expect("evaluator should produce outputs");
-        // let sum = fancy_garbling::util::crt_inv(&sum_weights_outs, &qs);
-
-        // println!("numerator{}", aggregate);
-        // println!("denom{}", sum);
-        Ok(normalized_out as u64)
+        println!("numerator{}", aggregate);
+        println!("denom{}", sum);
+        println!("secure div{}", weighted_output);
+        Ok(weighted_output as u64)
     }
 
     // For small to moderate sized sets, bucketizes using Cuckoo Hashing

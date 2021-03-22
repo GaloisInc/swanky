@@ -15,9 +15,7 @@ use std::{
 };
 use serde_json;
 
-
 fn client_protocol(mut channel: TcpChannel<TcpStream>, path:&mut PathBuf, nthreads: usize, precision: u32) -> (u64){
-
     let start = SystemTime::now();
     let mut rng = AesRng::new();
 
@@ -52,16 +50,14 @@ fn client_protocol(mut channel: TcpChannel<TcpStream>, path:&mut PathBuf, nthrea
     }
 
     let mut psi = Receiver::init(&mut channel, &mut rng).unwrap();
-
-    let (weighted_sum) = psi.compute_aggregates(aggregates, cardinality, sum_weights, &mut channel,&mut rng).unwrap();
+    let (cardinality) = psi.compute_aggregates(aggregates, cardinality, sum_weights, &mut channel,&mut rng).unwrap();
     // let aggregate: f64 = aggregate as f64/ 10_u64.pow(precision) as f64;
     // let output: f64 = aggregate / sum_weight as f64;
 
     // println!("Aggregate: {:?}", aggregate);
-    println!("Weighted Mean: {:?}", weighted_sum);
+    println!("Cardinality: {:?}", cardinality);
     // println!("Sum of Weights: {:?}", sum_weight);
     // println!("Weighted Mean: {:?}", output);
-
 
     path.pop();
     path.push("result.txt");
@@ -70,9 +66,14 @@ fn client_protocol(mut channel: TcpChannel<TcpStream>, path:&mut PathBuf, nthrea
 
     let _ = File::create(path_str.clone()).unwrap();
 
-    let mut output_write = "Weighted Mean: ".to_owned();
-    output_write.push_str(&weighted_sum.to_string());
-
+    let mut output_write = "Aggregate: ".to_owned();
+    // output_write.push_str(&aggregate.to_string());
+    output_write.push_str(&"\nCardinality: ".to_owned());
+    output_write.push_str(&cardinality.to_string());
+    // output_write.push_str(&"\nSum of Weights: ".to_owned());
+    // output_write.push_str(&sum_weight.to_string());
+    // output_write.push_str(&"\nWeighted Mean: ".to_owned());
+    // output_write.push_str(&output.to_string());
 
     write(path_str, output_write).expect("Unable to write file");
 
@@ -89,12 +90,10 @@ fn client_protocol(mut channel: TcpChannel<TcpStream>, path:&mut PathBuf, nthrea
         channel.kilobits_written() / 1000.0
     );
 
-
-    (weighted_sum)
+    (cardinality)
 }
 
-pub fn join_aggregates(path:&mut PathBuf, address: &str, nthreads: usize, precision: u32) -> Result<u64, Error>{
-
+pub fn join_aggregates(path:&mut PathBuf, address: &str, nthreads: usize, precision: u32) -> Result<(u64), Error>{
     let port_prefix = format!("{}{}", address,":3000");
 
     match TcpStream::connect(port_prefix) {
