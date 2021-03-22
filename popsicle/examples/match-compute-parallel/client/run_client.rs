@@ -154,12 +154,7 @@ pub fn main(){
 
    // The partial results are joined and the output is produced
     thread::sleep(duration);
-<<<<<<< Updated upstream
-    let (_result_aggregate, _result_cardinality) = join_aggregates(&mut path, &address, nthread, precision).unwrap();
 
-
-    // // test results
-=======
     let (_result_cardinality) = join_aggregates(&mut path, &address, nthread, precision).unwrap();
     //
     //
@@ -190,7 +185,7 @@ pub fn main(){
     //
     //
     // write(path_str, output_write).expect("Unable to write file");
->>>>>>> Stashed changes
+
     //
     let server_path = parameters.get("data_path_server").unwrap().to_owned();
     let schema_id = parameters.get("schema_server_id").unwrap().to_owned();

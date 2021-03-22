@@ -23,6 +23,7 @@ fn server_protocol(mut channel: TcpChannel<TcpStream>, path:&mut PathBuf, nthrea
 
     let mut aggregates= Vec::new();
     let mut cardinality= Vec::new();
+    let mut sum_weights= Vec::new();
     for thread_id in 0..nthreads{
         let mut thread_path = "thread".to_owned();
         thread_path.push_str(&thread_id.to_string());
@@ -38,14 +39,21 @@ fn server_protocol(mut channel: TcpChannel<TcpStream>, path:&mut PathBuf, nthrea
         let partial_cardinality: Vec<Wire> = serde_json::from_str(&read_to_string(path_str).unwrap()).unwrap();
         path.pop();
 
+        path.push("sum_weights.txt");
+        let path_str = path.clone().into_os_string().into_string().unwrap();
+        let partial_sum_weights: Vec<Wire> = serde_json::from_str(&read_to_string(path_str).unwrap()).unwrap();
+        path.pop();
+
+
         aggregates.push(partial_aggregate);
         cardinality.push(partial_cardinality);
+        sum_weights.push(partial_sum_weights);
 
         path.pop();
     }
 
     let mut psi = Sender::init(&mut channel, &mut rng).unwrap();
-    let _ = psi.compute_aggregates(aggregates, cardinality, &path_delta, &mut channel,&mut rng);
+    let _ = psi.compute_aggregates(aggregates, cardinality, sum_weights, &path_delta, &mut channel,&mut rng);
 
     println!(
         "Sender :: total Joining threads results time: {} ms",

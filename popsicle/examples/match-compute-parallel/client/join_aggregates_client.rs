@@ -15,16 +15,15 @@ use std::{
 };
 use serde_json;
 
-<<<<<<< Updated upstream
-fn client_protocol(mut channel: TcpChannel<TcpStream>, path:&mut PathBuf, nthreads: usize, precision: u32) -> (f64, u64){
-=======
+
 fn client_protocol(mut channel: TcpChannel<TcpStream>, path:&mut PathBuf, nthreads: usize, precision: u32) -> (u64){
->>>>>>> Stashed changes
+
     let start = SystemTime::now();
     let mut rng = AesRng::new();
 
     let mut aggregates= Vec::new();
     let mut cardinality= Vec::new();
+    let mut sum_weights= Vec::new();
     for thread_id in 0..nthreads{
         let mut thread_path = "thread".to_owned();
         thread_path.push_str(&thread_id.to_string());
@@ -40,31 +39,29 @@ fn client_protocol(mut channel: TcpChannel<TcpStream>, path:&mut PathBuf, nthrea
         let partial_cardinality: Vec<Wire> = serde_json::from_str(&read_to_string(path_str).unwrap()).unwrap();
         path.pop();
 
+        path.push("output_sum_weights.txt");
+        let path_str = path.clone().into_os_string().into_string().unwrap();
+        let partial_sum_weights: Vec<Wire> = serde_json::from_str(&read_to_string(path_str).unwrap()).unwrap();
+        path.pop();
+
         aggregates.push(partial_aggregate);
         cardinality.push(partial_cardinality);
+        sum_weights.push(partial_sum_weights);
 
         path.pop();
     }
 
     let mut psi = Receiver::init(&mut channel, &mut rng).unwrap();
-<<<<<<< Updated upstream
-    let (aggregate, cardinality) = psi.compute_aggregates(aggregates, cardinality, &mut channel,&mut rng).unwrap();
-    let aggregate: f64 = aggregate as f64/ 10_u64.pow(precision) as f64;
-    let output: f64 = aggregate / cardinality as f64;
 
-    println!("aggregate: {:?}", aggregate);
-    println!("cardinality: {:?}", cardinality);
-    println!("average: {:?}", output);
-=======
-    let (cardinality) = psi.compute_aggregates(aggregates, cardinality, sum_weights, &mut channel,&mut rng).unwrap();
+    let (weighted_sum) = psi.compute_aggregates(aggregates, cardinality, sum_weights, &mut channel,&mut rng).unwrap();
     // let aggregate: f64 = aggregate as f64/ 10_u64.pow(precision) as f64;
     // let output: f64 = aggregate / sum_weight as f64;
 
     // println!("Aggregate: {:?}", aggregate);
-    println!("Cardinality: {:?}", cardinality);
+    println!("Weighted Mean: {:?}", weighted_sum);
     // println!("Sum of Weights: {:?}", sum_weight);
     // println!("Weighted Mean: {:?}", output);
->>>>>>> Stashed changes
+
 
     path.pop();
     path.push("result.txt");
@@ -73,19 +70,9 @@ fn client_protocol(mut channel: TcpChannel<TcpStream>, path:&mut PathBuf, nthrea
 
     let _ = File::create(path_str.clone()).unwrap();
 
-    let mut output_write = "Aggregate: ".to_owned();
-    // output_write.push_str(&aggregate.to_string());
-    output_write.push_str(&"\nCardinality: ".to_owned());
-    output_write.push_str(&cardinality.to_string());
-<<<<<<< Updated upstream
-    output_write.push_str(&"\nAverage: ".to_owned());
-    output_write.push_str(&output.to_string());
-=======
-    // output_write.push_str(&"\nSum of Weights: ".to_owned());
-    // output_write.push_str(&sum_weight.to_string());
-    // output_write.push_str(&"\nWeighted Mean: ".to_owned());
-    // output_write.push_str(&output.to_string());
->>>>>>> Stashed changes
+    let mut output_write = "Weighted Mean: ".to_owned();
+    output_write.push_str(&weighted_sum.to_string());
+
 
     write(path_str, output_write).expect("Unable to write file");
 
@@ -102,17 +89,12 @@ fn client_protocol(mut channel: TcpChannel<TcpStream>, path:&mut PathBuf, nthrea
         channel.kilobits_written() / 1000.0
     );
 
-<<<<<<< Updated upstream
-    (aggregate, cardinality)
+
+    (weighted_sum)
 }
 
-pub fn join_aggregates(path:&mut PathBuf, address: &str, nthreads: usize, precision: u32) -> Result<(f64, u64), Error>{
-=======
-    (cardinality)
-}
+pub fn join_aggregates(path:&mut PathBuf, address: &str, nthreads: usize, precision: u32) -> Result<u64, Error>{
 
-pub fn join_aggregates(path:&mut PathBuf, address: &str, nthreads: usize, precision: u32) -> Result<(u64), Error>{
->>>>>>> Stashed changes
     let port_prefix = format!("{}{}", address,":3000");
 
     match TcpStream::connect(port_prefix) {
