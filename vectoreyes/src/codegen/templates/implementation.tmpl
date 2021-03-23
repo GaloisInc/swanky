@@ -1,0 +1,9 @@
+{% import 'core.tmpl' as core %}
+
+{{ core.the_implementation(force_scalar_for_test=False) }}
+
+{% for ty in VECTOR_TYPES %}
+    impl crate::HasVector<{{ty.count}}> for {{ty.ty}} {
+        type Vector = {{ty}};
+    }
+{% endfor %}

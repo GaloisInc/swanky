@@ -1,0 +1,25 @@
+{% if ty.ty.bits == 32 %}
+    impl crate::SimdBase32<{{ty.ty}}> for {{ty}} {
+        {% call(scalar, avx2) fn("shuffle", {"&self": ty}, returns=ty, const_args={
+            "I3": "usize", "I2": "usize", "I1": "usize", "I0": "usize",
+        }) %}
+        {% call scalar() %}
+            {{ty}}::from([
+            {% for lane in range(ty.bits // 128) %}
+                // 128-bit Lane #{{lane}}
+            {% for i in range(4) %}
+                self.as_array()[I{{i}} + {{lane}} * 4],
+            {% endfor %}
+            {% endfor %}
+            ])
+        {% endcall %}
+        {% call(avx2i) avx2() %}
+            const USELESS_ARRAY: [u8; 4] = [0; 4];
+            {% for i in range(4) %}
+                let _assert_bits_in_range_i: u8 = USELESS_ARRAY[I{{i}}];
+            {% endfor %}
+            Self({{avx2i(ty, "shuffle")}}::<I3, I2, I1, I0>(self.0))
+        {% endcall %}
+        {% endcall %}
+    }
+{% endif %}

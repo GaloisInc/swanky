@@ -1,0 +1,40 @@
+impl {{ty}} {
+    #[doc(hidden)]
+    pub const fn new_from_const_raw_vector(x: {{ty}}Internal) -> Self {
+        Self(x)
+    }
+}
+
+{% if not force_scalar_for_test %}
+    #[macro_export]
+    /// Create a constant vector
+    /// # Example
+    /// ```
+    /// # use vectoreyes::*;
+    /// const MY_EXTREMELY_FUN_VALUE: {{ty}} =
+    ///     const_{{(ty ~ "").lower()}}!({{range(ty.count) | list}});
+    /// for (i, value) in MY_EXTREMELY_FUN_VALUE.as_array().iter().copied().enumerate() {
+    ///     assert_eq!(i as {{ty.ty}}, value);
+    /// }
+    /// ```
+    macro_rules! const_{{(ty ~ "").lower()}} {
+        ($value:expr) => { {
+            const THE_VALUE: {{ty.array}} = $value;
+            const THE_RESULT: $crate::{{ty}} = $crate::{{ty}}::new_from_const_raw_vector({
+                {% call(scalar, avx2) visit_backends(block=True, use_macro=False) %}
+                {% call scalar() %}
+                    THE_VALUE
+                {% endcall %}
+                {% call avx2() %}
+                    unsafe {
+                        ::std::mem::transmute::<
+                            {{ty.array}}, {{avx2_ty}}
+                        >(THE_VALUE)
+                    }
+                {% endcall %}
+                {% endcall %}
+            });
+            THE_RESULT
+        } };
+    }
+{% endif %}

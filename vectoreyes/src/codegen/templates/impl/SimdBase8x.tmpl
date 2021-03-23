@@ -1,0 +1,28 @@
+{% if ty.count == 8 %}
+    impl crate::SimdBase8x<{{ty.ty}}> for {{ty}} {
+        {% call(scalar, avx2) fn(
+            "blend", {"&self": ty, "if_true": ty}, returns = ty,
+            const_args = {
+                "B7": "bool",
+                "B6": "bool",
+                "B5": "bool",
+                "B4": "bool",
+                "B3": "bool",
+                "B2": "bool",
+                "B1": "bool",
+                "B0": "bool",
+            },
+        ) %}
+        {% call scalar() %}
+            {{ty}}::from([
+                {% for i in range(ty.count) %}
+                    (if B{{i}} { if_true } else { *self }).as_array()[{{i}}],
+                {% endfor %}
+            ])
+        {% endcall %}
+        {% call(avx2i) avx2() %}
+            Self({{avx2i(ty, "blend")}}::<B7, B6, B5, B4, B3, B2, B1, B0>(self.0, if_true.0))
+        {% endcall %}
+        {% endcall %}
+    }
+{% endif %}

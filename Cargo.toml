@@ -4,6 +4,7 @@ members = [
     "ocelot",
     "popsicle",
     "scuttlebutt",
+    "vectoreyes",
 ]
 
 [profile.release]

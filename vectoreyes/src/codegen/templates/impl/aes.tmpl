@@ -1,0 +1,431 @@
+// TODO: add Aes192
+// This code is based on https://github.com/RustCrypto/block-ciphers/tree/5389542d0306c718eda37bab890bc67772bd1e69/aes
+// That code is MIT/Apache dual-licensed
+// The original MIT license for the AES-NI code is reproduced below:
+// Copyright (c) 2018 Artyom Pavlov
+// 
+// Permission is hereby granted, free of charge, to any
+// person obtaining a copy of this software and associated
+// documentation files (the "Software"), to deal in the
+// Software without restriction, including without
+// limitation the rights to use, copy, modify, merge,
+// publish, distribute, sublicense, and/or sell copies of
+// the Software, and to permit persons to whom the Software
+// is furnished to do so, subject to the following
+// conditions:
+// 
+// The above copyright notice and this permission notice
+// shall be included in all copies or substantial portions
+// of the Software.
+// 
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF
+// ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED
+// TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
+// PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT
+// SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+// CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+// OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR
+// IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+// DEALINGS IN THE SOFTWARE.
+
+
+{% for key_size, key_ty, num_rounds, fixed_encrypt_round_keys, fixed_decrypt_round_keys in [
+    (
+        128, "U8x16", 11,
+        [[3238012093, 869155090, 3346873837, 624973480],
+        [54471949, 821128223, 4153168370, 3536586586],
+        [3179964106, 2373651157, 2063031079, 2822462589],
+        [1112048772, 3476262481, 3049575798, 503286027],
+        [1777111595, 2799639674, 320588044, 249839623],
+        [2890398514, 177792840, 428027460, 392654403],
+        [3065478797, 3157236165, 2779559809, 2999704002],
+        [2474664440, 800061501, 2315472828, 952669822],
+        [1619495400, 1328050645, 3307945577, 4259555351],
+        [2429786161, 3757828580, 449894285, 3878911898],
+        [675765205, 4156338737, 3983304124, 174004774]],
+
+        [[3238012093, 869155090, 3346873837, 624973480],
+        [1534283129, 1353216825, 299572238, 3455295203],
+        [1037093821, 1836628100, 2091099274, 2974825065],
+        [3122358467, 3613642823, 2881516749, 445664932],
+        [3943393460, 1013496051, 2544421950, 2369290906],
+        [3849123421, 3640938158, 1319928464, 3281256458],
+        [4001290683, 930780949, 2044073349, 3124893071],
+        [384560028, 563182729, 1481074956, 3792010371],
+        [942655063, 431930078, 1106891730, 2751246161],
+        [302765350, 196440056, 1246542890, 3920630651],
+        [675765205, 4156338737, 3983304124, 174004774]]
+    ),
+    (
+        256, "U8x32", 15,
+        [[1375551388, 3472045213, 1992838357, 1854752656],
+         [3463058199,  104013108,  680888422, 2141383227],
+         [3006203162, 2111582599,  185892178, 1704540866],
+         [2206503730, 2243399174, 2904688224, 3531664475],
+         [2325399766, 4148623697, 4233266179, 2580266689],
+         [1838890314, 3895243596, 1158591788, 2542688631],
+         [2131939609, 2287216712, 1946594379, 3989639818],
+         [ 942076980, 3490334584, 2500129364,   42642211],
+         [1499836275, 3509684027, 2771856240, 1224358394],
+         [1779164697, 3120669025,  788878133,  764409878],
+         [ 515759138, 3482082073, 1790668905,  574704019],
+         [4186496453, 1133083812, 1821126545, 1090770823],
+         [ 155100940, 3333618709, 2886306940, 2387133935],
+         [3772414746, 2740127678, 3487508527, 2396848040],
+         [3408339290,  227925327, 2711376179,  802460892]],
+
+        [[1375551388, 3472045213, 1992838357, 1854752656],
+        [3909185319, 4072264070, 4293458365, 4181554364],
+        [3811526663, 375223336, 3515008932, 1932076154],
+        [1535450212, 2839334370, 1456747615, 2951299299],
+        [1609499071, 1236432279, 2553328179, 3944322633],
+        [2648757288, 886839754, 1644703125, 3454102902],
+        [3340646468, 2393656787, 379387872, 4253378985],
+        [1227235987, 2113551193, 535959244, 3524492218],
+        [1508144169, 3611834874, 3251947034, 1011986355],
+        [2290295734, 4118354159, 3934981667, 949515673],
+        [3223959564, 392266230, 3602204652, 3940870239],
+        [491383766, 3895522105, 45874458, 975407235],
+        [2642940057, 2330562927, 1549588099, 3065528028],
+        [3761687872, 134626937, 180208483, 815680480],
+        [3408339290, 227925327, 2711376179, 802460892]]
+    ),
+] %}
+    {% call(scalar, avx2) visit_backends() %}
+        {% call scalar() %}
+            #[derive(Clone, Debug)]
+            enum Aes{{key_size}}KeySchedule {
+                Variable(aes_soft::Aes{{key_size}}),
+                // TODO: if we care a lot about scalar performance, this could be quite slow.
+                Fixed,
+            }
+            impl From<aes_soft::Aes{{key_size}}> for Aes{{key_size}}KeySchedule {
+                #[inline(always)]
+                fn from(x: aes_soft::Aes{{key_size}}) -> Self {
+                    Self::Variable(x)
+                }
+            }
+            impl Deref for Aes{{key_size}}KeySchedule {
+                type Target = aes_soft::Aes{{key_size}};
+                #[inline(always)]
+                fn deref(&self) -> &Self::Target {
+                    lazy_static::lazy_static! {
+                        static ref FIXED_AES_{{key_size}}: aes_soft::Aes{{key_size}} = {
+                            use aes_soft::cipher::{NewBlockCipher, generic_array::GenericArray};
+                            aes_soft::Aes{{key_size}}::new(&GenericArray::from({{ fixed_aes_key(key_size) | list}}))
+                        };
+                    }
+                    match self {
+                         Self::Variable(aes) => aes,
+                         Self::Fixed => FIXED_AES_{{key_size}}.deref(),
+                    }
+                }
+            }
+            type Aes{{key_size}}EncryptOnlyKeySchedule = Aes{{key_size}}KeySchedule;
+        {% endcall %}
+        {% call avx2() %}
+            type Aes{{key_size}}EncryptOnlyKeySchedule = [U32x4; {{num_rounds}}];
+            #[derive(Debug, Clone)]
+            struct Aes{{key_size}}KeySchedule {
+                encrypt_keys: [U32x4; {{num_rounds}}],
+                decrypt_keys: [U32x4; {{num_rounds}}],
+            }
+        {% endcall %}
+    {% endcall %}
+
+    {% for encrypt_only in ["", "EncryptOnly"] %}
+        #[derive(Clone, Debug)]
+        pub struct Aes{{key_size}}{{encrypt_only}} {
+            key: Aes{{key_size}}{{encrypt_only}}KeySchedule,
+        }
+        {% if force_scalar_for_test %}
+            impl Aes{{key_size}}{{encrypt_only}} {
+        {% else %}
+            impl crate::AesBlockCipher for Aes{{key_size}}{{encrypt_only}} {
+            type Key = {{key_ty}};
+            type EncryptOnly = Aes{{key_size}}EncryptOnly;
+            const BLOCK_COUNT_HINT: usize = {
+                {% call(avx2, scalar) visit_backends(block=True) %}
+                {% call avx2() %}
+                    {% call(target_cpu) visit_avx2_target_cpu_block() %}
+                        {{avx2_intrinsic_builder.AES_BLOCK_COUNT_HINT[target_cpu]}}
+                    {% endcall %}
+                {% endcall %}
+                {% call scalar() %}
+                    use aes_soft::cipher::generic_array::typenum::Unsigned;
+                    <
+                        aes_soft::Aes{{key_size}} as
+                        aes_soft::cipher::BlockCipher
+                    >::ParBlocks::USIZE
+                {% endcall %}
+                {% endcall %}
+            };
+        {% endif %}
+            {% if force_scalar_for_test %}pub(super){% endif %}
+            const FIXED_KEY: Self = Self {
+                key: {
+                    {% call(scalar, avx2) visit_backends(block=True) %}
+                    {% call scalar() %}
+                        Aes{{key_size}}KeySchedule::Fixed
+                    {% endcall %}
+                    {% call avx2() %}
+                        {% if encrypt_only %}
+                            [
+                                {% for rk in fixed_encrypt_round_keys %}
+                                    const_u32x4!({{ rk | list }}),
+                                {% endfor %}
+                            ]
+                        {% else %}
+                            Aes{{key_size}}{{encrypt_only}}KeySchedule {
+                                encrypt_keys: [
+                                    {% for rk in fixed_encrypt_round_keys %}
+                                        const_u32x4!({{ rk | list }}),
+                                    {% endfor %}
+                                ],
+                                decrypt_keys: [
+                                    {% for rk in fixed_decrypt_round_keys %}
+                                        const_u32x4!({{ rk | list }}),
+                                    {% endfor %}
+                                ],
+                            }
+                        {% endif %}
+                    {% endcall %}
+                    {% endcall %}
+                },
+            };
+
+            {% call(scalar, avx2) fn("new_with_key", {"key": key_ty}, returns="Self", doc_scalar_equiv=False, pub=force_scalar_for_test and "super") %}
+            {% call scalar() %}
+                use aes_soft::cipher::{NewBlockCipher, generic_array::GenericArray};
+                let key_bytes = key.as_array();
+                Aes{{key_size}}{{encrypt_only}} {
+                    key: aes_soft::Aes{{key_size}}::new(&GenericArray::from(key_bytes)).into(),
+                }
+            {% endcall %}
+            {% call(avx2i) avx2() %}
+                use crate::SimdBase32;
+                use crate::SimdBase8;
+                let mut enc_keys: [U32x4; {{num_rounds}}] = Default::default();
+                {% if not encrypt_only %}
+                    let mut dec_keys: [U32x4; {{num_rounds}}] = Default::default();
+                {% endif %}
+                {% if key_size == 128 %}
+                    enc_keys[0] = key.into();
+                    {% if not encrypt_only %}
+                        dec_keys[0] = key.into();
+                    {% endif %}
+                    {% for round in [
+                        '0x01', '0x02', '0x04', '0x08', '0x10',
+                        '0x20', '0x40', '0x80', '0x1B', '0x36'
+                    ] %}
+                        {% set pos = loop.index0 + 1 %}
+                        {
+                            let t1 = enc_keys[{{pos - 1}}];
+                            let t2 = U32x4(
+                                {{avx2i('raw', '_mm_aeskeygenassist_si128')}}::<{{round}}>(t1.0)
+                            );
+                            let t2 = t2.shuffle::<3, 3, 3, 3>();
+                            let t3: U32x4 = U8x16::from(t1).shift_bytes_left::<4>().into();
+                            let t1 = t1 ^ t3;
+                            let t3: U32x4 = U8x16::from(t3).shift_bytes_left::<4>().into();
+                            let t1 = t1 ^ t3;
+                            let t3: U32x4 = U8x16::from(t3).shift_bytes_left::<4>().into();
+                            let t1 = t1 ^ t3;
+                            let t1 = t1 ^ t2;
+                            enc_keys[{{pos}}] = t1;
+                            {% if not encrypt_only %}
+                                {% if pos != 10 %}
+                                    let t1 = U32x4({{avx2i('raw', '_mm_aesimc_si128')}}(t1.0));
+                                {% endif %}
+                                dec_keys[{{pos}}] = t1;
+                            {% endif %}
+                        }
+                    {% endfor %}
+                {% elif key_size == 256 %}
+                    let key: [U8x16; 2] = key.into();
+                    let k1: U32x4 = key[0].into();
+                    let k2: U32x4 = key[1].into();
+                    enc_keys[0] = k1;
+                    enc_keys[1] = k2;
+                    {% if not encrypt_only %}
+                        dec_keys[0] = k1;
+                        dec_keys[1] = U32x4({{avx2i('raw', '_mm_aesimc_si128')}}(k2.0));
+                    {% endif %}
+                    {% for round in ["0x01", "0x02", "0x04", "0x08", "0x10", "0x20"] %}
+                        {% set pos = (loop.index0 * 2) + 2 %}
+                        {
+                            let mut t1: U32x4 = enc_keys[{{pos - 2}}];
+                            let mut t2: U32x4;
+                            let mut t3: U32x4 = enc_keys[{{pos - 1}}];
+                            let mut t4: U32x4;
+                            t2 = U32x4({{avx2i('raw', '_mm_aeskeygenassist_si128')}}::<{{round}}>(t3.0));
+                            t2 = t2.shuffle::<3, 3, 3, 3>();
+                            t4 = U8x16::from(t1).shift_bytes_left::<0x4>().into();
+                            t1 = t1 ^ t4;
+                            t4 = U8x16::from(t4).shift_bytes_left::<0x4>().into();
+                            t1 = t1 ^ t4;
+                            t4 = U8x16::from(t4).shift_bytes_left::<0x4>().into();
+                            t1 = t1 ^ t4;
+                            t1 = t1 ^ t2;
+
+                            enc_keys[{{pos}}] = t1;
+                            {% if not encrypt_only %}
+                                dec_keys[{{pos}}] = U32x4({{avx2i("raw", "_mm_aesimc_si128")}}(t1.0));
+                            {% endif %}
+
+                            t4 = U32x4({{avx2i("raw", "_mm_aeskeygenassist_si128")}}::<0x00>(t1.0));
+                            t2 = t4.shuffle::<2, 2, 2, 2>();
+                            t4 = U8x16::from(t3).shift_bytes_left::<0x4>().into();
+                            t3 = t3 ^ t4;
+                            t4 = U8x16::from(t4).shift_bytes_left::<0x4>().into();
+                            t3 = t3 ^ t4;
+                            t4 = U8x16::from(t4).shift_bytes_left::<0x4>().into();
+                            t3 = t3 ^ t4;
+                            t3 = t3 ^ t2;
+
+                            enc_keys[{{pos + 1}}] = t3;
+                            {% if not encrypt_only %}
+                                dec_keys[{{pos + 1}}] = U32x4({{avx2i("raw", "_mm_aesimc_si128")}}(t3.0));
+                            {% endif %}
+                        }
+                    {% endfor %}
+                    // last round
+                    {
+                        let mut t1: U32x4 = enc_keys[14 - 2];
+                        let mut t2: U32x4;
+                        let t3: U32x4 = enc_keys[14 - 1];
+                        let mut t4: U32x4;
+
+                        t2 = U32x4({{avx2i("raw", "_mm_aeskeygenassist_si128")}}::<0x40>(t3.0));
+                        t2 = t2.shuffle::<3, 3, 3, 3>();
+                        t4 = U8x16::from(t1).shift_bytes_left::<0x4>().into();
+                        t1 = t1 ^ t4;
+                        t4 = U8x16::from(t4).shift_bytes_left::<0x4>().into();
+                        t1 = t1 ^ t4;
+                        t4 = U8x16::from(t4).shift_bytes_left::<0x4>().into();
+                        t1 = t1 ^ t4;
+                        t1 = t1 ^ t2;
+
+                        enc_keys[14] = t1;
+                        {% if not encrypt_only %}
+                            dec_keys[14] = t1;
+                        {% endif %}
+                    }
+                {% endif %}
+                Aes{{key_size}}{{encrypt_only}} {
+                    key: {% if encrypt_only%}
+                        enc_keys
+                    {% else %}
+                        Aes{{key_size}}KeySchedule {
+                            encrypt_keys: enc_keys,
+                            decrypt_keys: dec_keys,
+                        }
+                    {% endif %},
+                }
+            {% endcall %}
+            {% endcall %}
+
+            {% call(scalar, avx2) fn(
+                "encrypt_many",
+                {"&self": "Aes" ~ key_size, "blocks": "[U8x16; N]"},
+                returns="[U8x16; N]",
+                const_args = {"N": "usize"},
+                where_array_unrolled_ops=["N"],
+                doc_scalar_equiv=False,
+                pub=force_scalar_for_test and "super"
+            ) %}
+            {% call scalar() %}
+                use aes_soft::cipher::{BlockCipher, generic_array::GenericArray};
+                // TODO: support ParBlocks
+                blocks.array_map(#[inline(always)] |block| {
+                    let mut block = GenericArray::from(block.as_array());
+                    (*self.key).encrypt_block(&mut block);
+                    U8x16::from(<[u8; 16]>::from(block))
+                })
+            {% endcall %}
+            {% call(avx2i) avx2() %}
+                {% if encrypt_only %}
+                    let encrypt_keys = &self.key;
+                {% else %}
+                    let encrypt_keys = &self.key.encrypt_keys;
+                {% endif %}
+                let mut blocks = blocks.array_map(
+                    #[inline(always)]
+                    |block| (U32x4::from(block) ^ encrypt_keys[0]).0
+                );
+                {% for i in range(1, num_rounds - 1) %}
+                    blocks = blocks.array_map(
+                        #[inline(always)]
+                        |block| {{avx2i('raw', '_mm_aesenc_si128')}}(block, encrypt_keys[{{i}}].0)
+                    );
+                {% endfor %}
+                blocks = blocks.array_map(
+                    #[inline(always)]
+                    |block| {{avx2i('raw', '_mm_aesenclast_si128')}}(block, encrypt_keys[{{ num_rounds - 1 }}].0)
+                );
+                blocks.array_map(#[inline(always)] |block| U8x16(block))
+            {% endcall %}
+            {% endcall %}
+        }
+
+        {% if not encrypt_only %}
+            {% if force_scalar_for_test %}
+                impl Aes{{key_size}} {
+            {% else %}
+                impl crate::AesBlockCipherDecrypt for Aes{{key_size}} {
+            {% endif %}
+                {% call(scalar, avx2) fn(
+                    "decrypt_many",
+                    {"&self": "Aes" ~ key_size, "blocks": "[U8x16; N]"},
+                    returns="[U8x16; N]",
+                    doc_scalar_equiv=False,
+                    pub=force_scalar_for_test and "super",
+                    const_args = {"N": "usize"},
+                    where_array_unrolled_ops = ["N"],
+                ) %}
+                {% call scalar() %}
+                    use aes_soft::cipher::{BlockCipher, generic_array::GenericArray};
+                    // TODO: support ParBlocks
+                    blocks.array_map(#[inline(always)] |block| {
+                        let mut block = GenericArray::from(block.as_array());
+                        (*self.key).decrypt_block(&mut block);
+                        U8x16::from(<[u8; 16]>::from(block))
+                    })
+                {% endcall %}
+                {% call(avx2i) avx2() %}
+                    let mut blocks = blocks.array_map(
+                        #[inline(always)]
+                        |block| (U32x4::from(block) ^ self.key.decrypt_keys[{{num_rounds - 1}}]).0
+                    );
+                    {% for i in range(1, num_rounds - 1)|reverse %}
+                        blocks = blocks.array_map(
+                            #[inline(always)]
+                            |block| {{avx2i('raw', '_mm_aesdec_si128')}}(block, self.key.decrypt_keys[{{i}}].0)
+                        );
+                    {% endfor %}
+                    blocks = blocks.array_map(
+                        #[inline(always)]
+                        |block| {{avx2i('raw', '_mm_aesdeclast_si128')}}(block, self.key.decrypt_keys[0].0)
+                    );
+                    blocks.array_map(#[inline(always)] |block| U8x16(block))
+                {% endcall %}
+                {% endcall %}
+            }
+            
+            impl From<Aes{{key_size}}> for Aes{{key_size}}EncryptOnly {
+                 {% call(scalar, avx2) fn("from", {"aes": "Aes" ~ key_size}, returns="Aes"~key_size~"EncryptOnly", doc_scalar_equiv=False) %}
+                 {% call scalar() %}
+                     Aes{{key_size}}EncryptOnly {
+                         key: aes.key,
+                     }
+                 {% endcall %}
+                 {% call(avx2i) avx2() %}
+                     Aes{{key_size}}EncryptOnly {
+                         key: aes.key.encrypt_keys,
+                     }
+                 {% endcall %}
+                 {% endcall %}
+            }
+        {% endif %}
+    {% endfor %}
+{% endfor %}

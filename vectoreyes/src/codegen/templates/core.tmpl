@@ -1,0 +1,347 @@
+{% set u8 = IntegerType(Signedness.UNSIGNED, 8) %}
+{% set u64 = IntegerType(Signedness.UNSIGNED, 64) %}
+{% set i64 = IntegerType(Signedness.SIGNED, 64) %}
+{% set u32 = IntegerType(Signedness.UNSIGNED, 32) %}
+{% set i32 = IntegerType(Signedness.SIGNED, 32) %}
+
+{% macro the_implementation(force_scalar_for_test) %}
+{# Keep this in sync with the features in Cargo.toml to determine when to depend on soft-aes. #}
+{% set avx2_intrinsic_builder = IntelIntrinsicBuilder(["AVX", "AVX2", "SSE4.1", "AES", "SSE4.2", "PCLMULQDQ"])  %}
+{% macro avx2_intrinsic(ty, op, ty2=None) %}avx2::{{avx2_intrinsic_builder(ty, op, ty2)}}{% endmacro %}
+{% set avx2_cfg = "#[cfg(" ~ avx2_intrinsic_builder.cfg_body ~ ")]" %}
+{% set scalar_cfg = "#[cfg(not(" ~ avx2_intrinsic_builder.cfg_body ~ "))]" %}
+
+{% macro visit_avx2_target_cpu_block() %}
+    {% for target_cpu in avx2_intrinsic_builder.TARGET_CPUS %}
+        #[cfg(vectoreyes_target_cpu="{{target_cpu}}")]
+        {
+            {{caller(target_cpu)}}
+        }
+    {% endfor %}
+    #[cfg(not(any(
+        {% for target_cpu in avx2_intrinsic_builder.TARGET_CPUS %}
+            vectoreyes_target_cpu="{{target_cpu}}",
+        {% endfor %}
+    )))]
+    {
+        {{ caller(None) }}
+    }
+{% endmacro %}
+
+{% if not force_scalar_for_test %}
+macro_rules! select_impl {
+    (scalar {$($scalar:item)*} avx2 {$($avx2:item)*}) => {
+        $({{scalar_cfg}} $scalar)*
+        $({{avx2_cfg}} $avx2)*
+    };
+}
+macro_rules! select_impl_block {
+    (scalar $scalar:block avx2 $avx2:block) => {
+        {{scalar_cfg}} $scalar
+        {{avx2_cfg}} $avx2
+    };
+}
+{% endif %}
+
+{% macro visit_backends(block=False, use_macro=True) %}
+    {# use_macro uses the select_impl macro instead of manually generating the cfg lines.
+       use_macro should be used as much as possible, since it results in a smaller output. #}
+    {% if force_scalar_for_test %}
+        {% macro avx2() %} {% do caller() %} {% endmacro %}
+        {% macro scalar() %}{{caller()}}{% endmacro %}
+        {{caller(avx2=avx2,scalar=scalar)}}
+    {% else %}
+        {% set avx2_visited = [] %}
+        {% set scalar_visited = [] %}
+        {% macro avx2() %}
+            {% do avx2_visited.append(caller()) %}
+        {% endmacro %}
+        {% macro scalar() %}
+            {% do scalar_visited.append(caller()) %}
+        {% endmacro %}
+        {{caller(avx2=avx2,scalar=scalar)}}
+        {% do assert_eq([1, 1], [len(avx2_visited), len(scalar_visited)]) %}
+        {% if use_macro %}
+            select_impl{% if block %}_block{% endif %}! {
+                scalar { {{ scalar_visited[0] }} }
+                avx2 { {{ avx2_visited[0] }} }
+            }
+        {% else %}
+            {% for cfg, body in [
+                (scalar_cfg, scalar_visited[0]),
+                (avx2_cfg, avx2_visited[0])
+            ] %}
+                {{cfg}}
+                {% if block %} { {% endif %}
+                {{body}}
+                {% if block %} } {% endif %}
+            {% endfor %}
+        {% endif %}
+    {% endif %}
+{% endmacro %}
+
+{% macro fn(
+    name, args, returns,
+    const_args={},
+    doc_scalar_equiv=True,
+    doc_ignore=False,
+    pub=None,
+    const=False,
+    unsafe=False,
+    where_array_unrolled_ops=[]
+) %}
+    {% set the_scalar = [] %}
+    {% set the_avx2 = [] %}
+    {% set avx2_intrinsics = [] %}
+    {% macro scalar() %}{% do the_scalar.append(caller()) %}{% endmacro %}
+    {% macro avx2i(ty, op, ty2=None) %}
+        {% do avx2_intrinsics.append(avx2_intrinsic_builder.intrinsic_name(ty, op, ty2)) %}
+        {{avx2_intrinsic(ty, op, ty2)}}
+    {% endmacro %}
+    {% set avx2_polyfill = [] %}
+    {#
+        In some cases, we don't have an efficient implementation of an operation.
+        We'd still like to have every operation apply to every vector type, so this
+        library will use a [Polyfill](https://en.wikipedia.org/wiki/Polyfill_(programming))
+        to implement the operation. The simplest polyfill is "scalar", which will
+        convert the vector to a scalar, perform the operation, and then convert
+        back to a vector. This is very inefficient, however it's the fastest
+        approach for now. Eventually, we can write fast vector polyfills for
+        the needed operations.
+    #}
+    {# TODO: replace Scalar polyfills with efficient polyfills. #}
+    {% macro avx2(polyfill=None) %}
+        {% do avx2_polyfill.append(polyfill) %}
+        {% if polyfill == "scalar" %}
+            {% do the_avx2.append(the_scalar[0]) %}
+        {% else %}
+            {% if polyfill not in [None, "vector"] %}
+                {% do assert_eq(polyfill, None) %}
+            {% endif %}
+            {% do the_avx2.append(caller(avx2i)) %}
+        {% endif %}
+    {% endmacro %}
+    {% do caller(scalar=scalar, avx2=avx2) %}
+    {% do assert_eq({"scalar": len(the_scalar), "avx2": len(the_avx2)}, {"scalar": 1, "avx2": 1}) %}
+    {% set self_arg = [] %}
+    {% for k,v in args.items() %}
+    {% if k in ["self", "&mut self", "&self"] %}{% do self_arg.append(v) %}{% endif %}
+    {% endfor %}
+    {% set self_arg = self_arg[0] if len(self_arg) > 0 else None %}
+    {% macro prototype(name) %}
+        {% if const %}const{% endif %}
+        {% if unsafe %}unsafe{% endif %}
+        fn {{name}}
+        {% if len(const_args) > 0 %}
+            <
+                {% for k, v in const_args.items() %}
+                    const {{ k }}: {{ v }},
+                {% endfor %}
+            >
+        {% endif %}
+        (
+            {% for k, v in args.items() %}
+                {{k}} {% if k != "self" and k != "&mut self" and k != "&self" %} : {{v}} {% endif %} ,
+            {% endfor %}
+        ) {% if returns %} -> {{returns}} {% endif %}
+        {% if where_array_unrolled_ops %}
+            where
+            {% for x in where_array_unrolled_ops %}
+                ArrayUnrolledOps: UnrollableArraySize<{{x}}>,
+            {% endfor %}
+        {% endif %}
+    {% endmacro %}
+    ///
+    {% if doc_scalar_equiv %}
+        /// # Scalar Equivalent:
+        /// ```{% if doc_ignore %}ignore{% endif %}
+        /// # use vectoreyes::*;
+        {% if self_arg %}
+            /// # trait SomeTraitForDoc {
+            {{ prototype("the_doc_function") | doc_comment_code(add_prefix="# ") }}
+            /// # ;}
+            /// # impl SomeTraitForDoc for {{self_arg}} {
+        {% endif %}
+        {{ prototype("the_doc_function") | doc_comment_code(add_prefix="# ") }}
+        /// # {
+        {{ the_scalar[0] | doc_comment_code }}
+        /// # }
+        {% if self_arg %}
+            /// # }
+        {% endif %}
+        /// ```
+    {% endif %}
+    /// # Avx2
+    {% if avx2_polyfill[0] == "scalar" %}
+        /// **WARNING:** this implementation is a polyfill which executes the scalar implemenation.
+    {% elif avx2_polyfill[0] == "vector" %}
+        /// **NOTE:** this implementation uses an efficient vector polyfill, though this operation is not natively supported.
+        /// ```ignore
+        {{ the_avx2[0] | doc_comment_code }}
+        /// ```
+    {% endif %}
+    {% set avx2_intrinsics_sorted = avx2_intrinsics | sort %}
+    {% if len(avx2_intrinsics_sorted) > 0 %}
+        /// <ul>
+        {% for intrinsic_name in avx2_intrinsics_sorted %}
+            {% if loop.index0 > 0 and avx2_intrinsics_sorted[loop.index0 - 1] == intrinsic_name %}
+                {% continue %}
+            {% endif %}
+            {% set intrinsic = IntelIntrinsic(intrinsic_name) %}
+            /// <li>
+            ///
+            /// [**`{{intrinsic}}`**]({{intrinsic.intel_reference_url()}})
+            ///
+            {# /// **CPU Flags:** {{ intrinsic.cpuid() | join(", ") }} #}
+            ///
+            {% if intrinsic.sequence() %}
+            /// Instruction sequence.
+            {% else %}
+                {% for instruction in intrinsic.instructions() %}
+                    /// [`{{instruction}}`]({{instruction.reference_url}}): {{instruction.summary}}
+                    ///
+                    /// <table style="line-height:0.7">
+                    /// <thead><tr>
+                    /// <th>Architecture</th><th>Latency (cycles)</th><th>Throughput (CPI)</th>
+                    /// </tr></thead><tbody>
+                    {% for platform, key in avx2_intrinsic_builder.DISPLAY_PERF_NUMBERS_FOR.items() %}
+                        /// <tr>
+                            /// <td><a href="{{instruction.perf_url}}#{{key}}">{{ platform }}</a></td>
+                            /// <td>{{instruction.perf[key] | render_latency}}</td>
+                            /// <td>{{instruction.perf[key]["throughput"]}}</td>
+                        /// </tr>
+                    {% endfor %}
+                    /// </tbody></table>
+                {% endfor %}
+                {% if intrinsic.instructions() %}
+                    ///
+                    /// _<span style="font-size:0.8em;float:right">Performance numbers are measurements from [uops.info](https://uops.info/).</span>_ <div style="clear:both"></div>
+                {% endif %}
+            {% endif %}
+            /// </li>
+        {% endfor %}
+        /// </ul>
+    {% endif %}
+    #[inline(always)]
+    {% if pub %}pub{% if pub != True%}({{pub}}){% endif %}{% endif %}
+    {{ prototype(name) }}
+    {
+        {% call(scalar, avx2) visit_backends(block=True) %}
+        {% call scalar() %}
+            {{ the_scalar[0] }}
+        {% endcall %}
+        {% call avx2() %}
+            {{the_avx2[0]}}
+        {% endcall %}
+        {% endcall %}
+    }
+{% endmacro %}
+
+use crate::SimdBase;
+use crate::array_utils::*;
+use std::ops::*;
+
+/// The backend that is used to evaluate vector operations.
+#[allow(dead_code)]
+pub const VECTOR_BACKEND: crate::VectorBackend = {
+    {% call(scalar, avx2) visit_backends(block=True) %}
+    {% call scalar() %}
+        crate::VectorBackend::Scalar
+    {% endcall %}
+    {% call avx2() %}
+        crate::VectorBackend::Avx2 {
+            target_cpu: {
+                {% call(target_cpu) visit_avx2_target_cpu_block() %}
+                    {% if target_cpu %}
+                        Some("{{target_cpu}}")
+                    {% else %}
+                        None
+                    {% endif %}
+                {% endcall %}
+            },
+        }
+    {% endcall %}
+    {% endcall %}
+};
+
+{% for ty in VECTOR_TYPES %}
+    {%set avx2_ty = "::std::arch::x86_64::__m" ~ ty.bits ~ "i" %}
+    {% call(scalar, avx2) visit_backends() %}
+        {% call scalar() %}
+            type {{ty}}Internal = [{{ty.ty}} ; {{ty.count}}];
+        {% endcall %}
+        {% call avx2() %}
+            type {{ty}}Internal = {{avx2_ty}};
+        {% endcall %}
+    {% endcall %}
+
+    /// `{{ty.array}}` as a vector.
+    #[repr(transparent)]
+    #[derive(Clone, Copy)]
+    pub struct {{ty}}({{ty}}Internal);
+
+    unsafe impl bytemuck::Pod for {{ty}} {}
+    unsafe impl bytemuck::Zeroable for {{ty}} {}
+
+    impl PartialEq for {{ty}} {
+        #[inline(always)]
+        fn eq(&self, other: &Self) -> bool {
+            ((*self) ^ (*other)).is_zero()
+        }
+    }
+    impl Eq for {{ty}} {}
+
+    impl Default for {{ty}} {
+        /// The zero vector.
+        #[inline(always)]
+        fn default() -> Self {
+            Self::ZERO
+        }
+    }
+
+    impl std::hash::Hash for {{ty}} {
+        fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+            bytemuck::bytes_of(self).hash(state);
+        }
+    }
+
+    impl std::fmt::Debug for {{ty}} {
+        fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+            write!(f, "{{ty}}({:?})", <[{{ty.ty}} ; {{ty.count}}]>::from(*self))
+        }
+    }
+
+    {% if ty.ty.signedness == Signedness.SIGNED %}
+        impl crate::SimdBaseSigned<{{ty.ty}}> for {{ty}} {}
+    {% endif %}
+
+    {% include "impl/binops.tmpl" %}
+    {% include "impl/const.tmpl" %}
+    {% include "impl/conversions.tmpl" %}
+    {% include "impl/gather.tmpl" %}
+    {% include "impl/shift.tmpl" %}
+    {% include "impl/SimdBase.tmpl" %}
+    {% include "impl/SimdBase32.tmpl" %}
+    {% include "impl/SimdBase4x.tmpl" %}
+    {% include "impl/SimdBase64.tmpl" %}
+    {% include "impl/SimdBase8.tmpl" %}
+    {% include "impl/SimdBase8x.tmpl" %}
+{% endfor %}
+
+{% include "impl/clmul.tmpl" %}
+{% include "impl/aes.tmpl" %}
+
+// Implement the intrinsics
+{% call(scalar, avx2) visit_backends() %}
+{% call scalar() %}
+    // Scalar has no intrinsics
+{% endcall %}
+{% call avx2() %}
+    mod avx2 {
+        {{ avx2_intrinsic_builder.define_intrinsics() }}
+    }
+{% endcall %}
+{% endcall %}
+
+{% endmacro %}
+
