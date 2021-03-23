@@ -4,10 +4,6 @@
 // Copyright © 2020 Galois, Inc.
 // See LICENSE for licensing information.
 
-//! LPN based Subfield Vector Oblivious Linear-function Evaluation (sVole)
-//!
-//! This module provides implementations of LPN sVole Traits.
-
 use super::{
     base_svole::{Receiver as BaseReceiver, Sender as BaseSender},
     spsvole::{SpsReceiver, SpsSender},
@@ -25,15 +21,16 @@ use rand::{
     SeedableRng,
 };
 
-use scuttlebutt::{field::FiniteField, AbstractChannel, AesRng, Block};
+use scuttlebutt::{field::FiniteField, AbstractChannel, AesRng, Block, Malicious, SemiHonest};
 
-/// Secure LPN parameters presented in (cf.
-/// <https://eprint.iacr.org/2020/925>, Table 2).
+// LPN parameters used in the protocol. We use three stages, two sets of LPN
+// parameters for setup, and one set of LPN parameters for the extend phase.
+// This differs from what is done in the WYKW paper, but based on personal
+// communication with one of the authors, is what is used in the implementation.
 
-/// LPN parameters
 #[derive(Clone, Copy, PartialEq, Eq)]
 struct LpnParams {
-    /// Hamming weight `t` of the error vector `e` used in LPN assumption.
+    /// Hamming weight `t` of the error vector `e` used in the LPN assumption.
     weight: usize,
     /// Number of columns `n` in the LPN matrix.
     cols: usize,
@@ -41,33 +38,34 @@ struct LpnParams {
     rows: usize,
 }
 
-/// LPN parameters for setup0 phase.
+// LPN parameters for setup0 phase.
 const LPN_SETUP0_PARAMS: LpnParams = LpnParams {
     weight: 600,
     cols: 9_600, // cols / weight = 16
     rows: 1_220,
 };
 
-/// LPN parameters for setup phase.
+// LPN parameters for setup phase.
 const LPN_SETUP_PARAMS: LpnParams = LpnParams {
     weight: 2_600,
     cols: 166_400, // cols / weight = 64
     rows: 5_060,
 };
 
-/// LPN parameters for extend phase.
+// LPN parameters for extend phase.
 const LPN_EXTEND_PARAMS: LpnParams = LpnParams {
     weight: 4_965,
     cols: 10_168_320, // cols / weight = 2_048
     rows: 158_000,
 };
 
+// Constant `d` representing a `d`-local linear code, meaning that each column
+// of the LPN matrix contains exactly `d` non-zero entries.
+const LPN_PARAMS_D: usize = 10;
+
 fn compute_num_saved<FE: FiniteField>(params: LpnParams) -> usize {
     params.rows + params.weight + FE::PolynomialFormNumCoefficients::to_usize()
 }
-
-/// Small constant `d` used in the `linear codes` useful in acheiving efficient matrix multiplication.
-const LPN_PARAMS_D: usize = 10;
 
 #[inline(always)]
 fn lpn_mtx_indices<FE: FiniteField>(
@@ -88,7 +86,7 @@ fn lpn_mtx_indices<FE: FiniteField>(
     indices
 }
 
-/// sVole Sender
+/// Subfield VOLE sender.
 pub struct Sender<FE: FiniteField> {
     spsvole: SpsSender<FE>,
     base_voles: Vec<(FE::PrimeField, FE)>,
@@ -260,7 +258,7 @@ impl<FE: FiniteField> SVoleSender for Sender<FE> {
     }
 }
 
-/// sVole Receiver
+/// Subfield VOLE receiver.
 pub struct Receiver<FE: FiniteField> {
     spsvole: SpsReceiver<FE>,
     delta: FE,
@@ -434,6 +432,11 @@ impl<FE: FiniteField> SVoleReceiver for Receiver<FE> {
         })
     }
 }
+
+impl<FF: FiniteField> SemiHonest for Sender<FF> {}
+impl<FF: FiniteField> SemiHonest for Receiver<FF> {}
+impl<FF: FiniteField> Malicious for Sender<FF> {}
+impl<FF: FiniteField> Malicious for Receiver<FF> {}
 
 #[cfg(test)]
 mod tests {

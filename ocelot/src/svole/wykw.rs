@@ -4,7 +4,7 @@
 // Copyright © 2020 Galois, Inc.
 // See LICENSE for licensing information.
 
-//! Implementation of the Weng-Yang-Katz-Wang subfield VOLE protocol (cf.
+//! Implementation of the Weng-Yang-Katz-Wang random subfield VOLE protocol (cf.
 //! <https://eprint.iacr.org/2020/925>).
 
 mod base_svole;

@@ -4,17 +4,16 @@
 // Copyright © 2020 Galois, Inc.
 // See LICENSE for licensing information.
 
-//! `ggm_utils` provides an implementation of the GGM construction.
+//! Provides an implementation of the GGM construction.
 
 use scuttlebutt::{field::FiniteField, utils::unpack_bits, Aes128, Block};
 
 /// Implementation of GGM based on the procedure explained in the write-up
 /// (<https://eprint.iacr.org/2020/925.pdf>, Page 14) -- Construct GGM tree with
-/// `depth` levels and return the node values (a.k.a seeds). `aes_seeds` are
-/// used to seed the "PRGs" used internally so we don't need to instantiate new
-/// PRGs on each iteration. Instead, we key two instances of AES ahead of time
-/// and view them as PRPs, using the seed as input.
-
+/// `depth` levels and return the node values (a.k.a seeds). `aes` is used to
+/// seed the "PRGs" used internally so we don't need to instantiate new PRGs on
+/// each iteration. Instead, we key two instances of AES ahead of time and view
+/// them as PRPs, using the seed as input.
 pub fn ggm<FE: FiniteField>(
     depth: usize,
     initial_seed: Block,
@@ -46,12 +45,12 @@ pub fn ggm<FE: FiniteField>(
     keys
 }
 
-/// Implementation of GGM based on the procedure explained in the
+/// Implementation of GGM' based on the procedure explained in the
 /// write-up(<https://eprint.iacr.org/2020/925.pdf>, Page 14), For more detailed
-/// explanation of GGM Prime, please see the Figure 1 of the write-up
-/// (<https://eprint.iacr.org/2019/1084.pdf>, Page 7). GGM prime is used compute
-/// the vector of field elements except a path b1..bn where b1 represents msb of
-/// alpha.
+/// explanation of GGM', please see the Figure 1 of the write-up
+/// (<https://eprint.iacr.org/2019/1084.pdf>, Page 7). GGM' is used compute the
+/// vector of field elements except a path `b1..bn` where `b1` represents the
+/// msb of `alpha`.
 pub fn ggm_prime<FE: FiniteField>(
     alpha: usize,
     keys: &[Block],

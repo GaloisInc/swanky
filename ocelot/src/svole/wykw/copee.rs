@@ -25,7 +25,6 @@ use scuttlebutt::{
 use std::marker::PhantomData;
 use subtle::{Choice, ConditionallySelectable};
 
-/// COPEe sender.
 pub struct Sender<ROT: ROTSender + Malicious, FE: FF> {
     _ot: PhantomData<ROT>,
     aes_objs: Vec<(Aes128, Aes128)>,
@@ -35,7 +34,6 @@ pub struct Sender<ROT: ROTSender + Malicious, FE: FF> {
     counter: u64,
 }
 
-/// COPEe receiver.
 pub struct Receiver<ROT: ROTReceiver + Malicious, FE: FF> {
     _ot: PhantomData<ROT>,
     delta: FE,
@@ -47,20 +45,16 @@ pub struct Receiver<ROT: ROTReceiver + Malicious, FE: FF> {
     counter: u64,
 }
 
-/// Aliasing COPEe sender.
 pub type CopeeSender<FE> = Sender<KosSender, FE>;
-/// Aliasing COPEe receiver.
 pub type CopeeReceiver<FE> = Receiver<KosReceiver, FE>;
 
-/// `Aes128` as a pseudo-random function.
+// Uses `Aes128` as a pseudo-random function.
 fn prf<FE: FF>(aes: &Aes128, pt: Block) -> FE::PrimeField {
     let seed = aes.encrypt(pt);
     FE::PrimeField::from_uniform_bytes(&<[u8; 16]>::from(seed))
 }
 
-/// Implement CopeeSender for Sender type
 impl<ROT: ROTSender<Msg = Block> + Malicious, FE: FF> Sender<ROT, FE> {
-    /// Runs any one-time initialization.
     pub fn init<C: AbstractChannel, RNG: CryptoRng + Rng>(
         channel: &mut C,
         pows: Powers<FE>,
@@ -91,9 +85,6 @@ impl<ROT: ROTSender<Msg = Block> + Malicious, FE: FF> Sender<ROT, FE> {
         })
     }
 
-    /// Runs COPEe extend on a prime field element `u` and returns an extended
-    /// field element `w` such that `w = u'Δ + v` holds, where `u'` is result of
-    /// the conversion from `u` to the extended field element.
     pub fn send<C: AbstractChannel>(
         &mut self,
         channel: &mut C,
@@ -101,7 +92,6 @@ impl<ROT: ROTSender<Msg = Block> + Malicious, FE: FF> Sender<ROT, FE> {
     ) -> Result<FE, Error> {
         let pt = Block::from(self.counter as u128);
         let mut w = FE::ZERO;
-        // Communication: r log p * log p
         for (i, pow) in self.pows.get().iter().enumerate() {
             let mut sum = FE::ZERO;
             for (j, two) in self.twos.iter().enumerate() {
@@ -118,9 +108,7 @@ impl<ROT: ROTSender<Msg = Block> + Malicious, FE: FF> Sender<ROT, FE> {
     }
 }
 
-/// Implement CopeeReceiver for Receiver type.
 impl<ROT: ROTReceiver<Msg = Block> + Malicious, FE: FF> Receiver<ROT, FE> {
-    /// Runs any one-time initialization.
     pub fn init<C: AbstractChannel, RNG: CryptoRng + Rng>(
         channel: &mut C,
         pows: Powers<FE>,
@@ -152,12 +140,10 @@ impl<ROT: ROTReceiver<Msg = Block> + Malicious, FE: FF> Receiver<ROT, FE> {
         })
     }
 
-    /// Returns the receiver choice `Δ`.
     pub fn delta(&self) -> FE {
         self.delta
     }
 
-    /// Runs COPEe extend and returns a field element `v` such that `w = u'Δ + v` holds.
     pub fn receive<C: AbstractChannel>(&mut self, channel: &mut C) -> Result<FE, Error> {
         let pt = Block::from(self.counter as u128);
         let mut res = FE::ZERO;

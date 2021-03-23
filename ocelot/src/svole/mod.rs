@@ -4,7 +4,12 @@
 // Copyright © 2020 Galois, Inc.
 // See LICENSE for licensing information.
 
-//! module defining the interface for `SVoleSender` and `SVoleReceiver`.
+//! (Random) subfield vector oblivious linear evaluation (sVOLE) traits +
+//! instantiations.
+//!
+//! This module provides traits for sVOLE, alongside an implementation of the
+//! Weng-Yang-Katz-Wang maliciously secure random sVOLE protocol.
+//!
 
 pub mod wykw;
 
@@ -12,27 +17,25 @@ use crate::errors::Error;
 use rand::{CryptoRng, Rng};
 use scuttlebutt::{field::FiniteField as FF, AbstractChannel};
 
-/// Interface for `SVoleSender`
+/// Trait for an sVOLE sender.
 pub trait SVoleSender
 where
     Self: Sized,
 {
-    /// Message type that implements Finite Field trait.
+    /// Finite field for which sVOLEs are generated.
     type Msg: FF;
     /// Runs any one-time initialization.
     fn init<C: AbstractChannel, RNG: CryptoRng + Rng>(
         channel: &mut C,
         rng: &mut RNG,
     ) -> Result<Self, Error>;
-    /// This procedure can be run multiple times where each call spits out `n - (k + t + r)` usable voles
-    /// i.e, outputs `u` and `w` such that `w = u'Δ + v` holds. Note that `u'` is the converted vector from
-    /// `u` to the vector of elements of the extended field `FE`.
+    /// Generates sVOLEs.
     fn send<C: AbstractChannel, RNG: CryptoRng + Rng>(
         &mut self,
         channel: &mut C,
         rng: &mut RNG,
     ) -> Result<Vec<(<Self::Msg as FF>::PrimeField, Self::Msg)>, Error>;
-    /// This procedure duplicates the Sender.
+    /// Duplicates the sender's state.
     fn duplicate<C: AbstractChannel, RNG: CryptoRng + Rng>(
         &mut self,
         channel: &mut C,
@@ -40,12 +43,12 @@ where
     ) -> Result<Self, Error>;
 }
 
-/// Interface for `SVoleReceiver`
+/// Trait for an sVOLE receiver.
 pub trait SVoleReceiver
 where
     Self: Sized,
 {
-    /// Message type that implements Finite Field trait.
+    /// Finite field for which sVOLEs are generated.
     type Msg: FF;
     /// Runs any one-time initialization.
     fn init<C: AbstractChannel, RNG: CryptoRng + Rng>(
@@ -54,14 +57,13 @@ where
     ) -> Result<Self, Error>;
     /// Returns delta.
     fn delta(&self) -> Self::Msg;
-    /// This procedure can be run multiple times where each call spits out `n - (k + t + r)` usable voles
-    /// i.e, outputs `v` such that `w = u'Δ + v` holds.
+    /// Generates sVOLEs.
     fn receive<C: AbstractChannel, RNG: CryptoRng + Rng>(
         &mut self,
         channel: &mut C,
         rng: &mut RNG,
     ) -> Result<Vec<Self::Msg>, Error>;
-    /// This procedure duplicates the Receiver with the same Δ.
+    /// Duplicates the receiver's state.
     fn duplicate<C: AbstractChannel, RNG: CryptoRng + Rng>(
         &mut self,
         channel: &mut C,

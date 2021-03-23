@@ -4,7 +4,7 @@
 // Copyright © 2020 Galois, Inc.
 // See LICENSE for licensing information.
 
-//! Implementation of single-point svole protocol.
+//! Implementation of single-point sVOLE.
 
 use super::{
     ggm_utils::{ggm, ggm_prime},
@@ -32,23 +32,20 @@ use scuttlebutt::{
     Malicious,
 };
 
-/// SpsVole Sender.
 pub struct Sender<OT: OtReceiver + Malicious, FE: FF> {
     ot: OT,
     pows: Powers<FE>,
     ggm_seeds: (Aes128, Aes128),
 }
 
-/// SpsVole Receiver.
 pub struct Receiver<OT: OtSender + Malicious, FE: FF> {
     ot: OT,
     delta: FE,
     pows: Powers<FE>,
     ggm_seeds: (Aes128, Aes128),
 }
-/// Alias for SpsVole Sender.
+
 pub type SpsSender<FE> = Sender<KosReceiver, FE>;
-/// Alias for SpsVole Receiver.
 pub type SpsReceiver<FE> = Receiver<KosSender, FE>;
 
 // Implementation of the EQ protocol functionality described in
@@ -100,9 +97,7 @@ fn eq_receive<C: AbstractChannel, RNG: CryptoRng + Rng, FE: FF>(
     Ok(x == y)
 }
 
-/// Implement SpsVoleSender for Sender type.
 impl<OT: OtReceiver<Msg = Block> + Malicious, FE: FF> Sender<OT, FE> {
-    /// Runs any one-time initialization.
     pub fn init<C: AbstractChannel, RNG: CryptoRng + Rng>(
         channel: &mut C,
         pows: Powers<FE>,
@@ -120,12 +115,7 @@ impl<OT: OtReceiver<Msg = Block> + Malicious, FE: FF> Sender<OT, FE> {
             ggm_seeds: (aes0, aes1),
         })
     }
-    /// Runs single-point svole and outputs pair of vectors `(u, w)` such that
-    /// the correlation `w = u'Δ + v` holds. Note that `u'` is the converted
-    /// vector from `u` to the vector of elements of the extended field `FE`.
-    /// For simplicity, the vector length `n` assumed to be a multiple of `2` as
-    /// it represents the number of leaves in the GGM tree and should match with
-    /// the receiver input length.
+
     pub fn send<C: AbstractChannel, RNG: CryptoRng + Rng>(
         &mut self,
         channel: &mut C,
@@ -133,7 +123,6 @@ impl<OT: OtReceiver<Msg = Block> + Malicious, FE: FF> Sender<OT, FE> {
         base_voles: &[(FE::PrimeField, FE)], // Equals to weight + r
         mut rng: &mut RNG,
     ) -> Result<Vec<(FE::PrimeField, FE)>, Error> {
-        // Total communication: t |log p| + 256 + > t * nbits * 128 bits
         debug_assert!(
             (n as u128 - 1).leading_zeros() + (n as u128).trailing_zeros() == 128,
             "expected power of 2, instead found: {}",
@@ -191,7 +180,6 @@ impl<OT: OtReceiver<Msg = Block> + Malicious, FE: FF> Sender<OT, FE> {
         Ok(result)
     }
 
-    /// Batch consistency check that can be called after bunch of iterations.
     #[inline(always)]
     fn send_batch_consistency_check<C: AbstractChannel, RNG: CryptoRng + Rng>(
         &mut self,
@@ -200,9 +188,8 @@ impl<OT: OtReceiver<Msg = Block> + Malicious, FE: FF> Sender<OT, FE> {
         base_uws: &[(FE::PrimeField, FE)], // length = r
         rng: &mut RNG,
     ) -> Result<(), Error> {
-        // Total communication: t * |log p| + 128 bits
         let r = FE::PolynomialFormNumCoefficients::to_usize();
-        // Generate `chis` from seed and send seed to receiver.
+        // Generate `chi`s from seed and send seed to receiver at the end.
         let seed = rng.gen::<Block>();
         let mut rng_chi = AesRng::from_seed(seed);
         let mut va = FE::ZERO;
@@ -222,7 +209,6 @@ impl<OT: OtReceiver<Msg = Block> + Malicious, FE: FF> Sender<OT, FE> {
                 }
             }
         }
-        // Communication: r * |log p|
         for (pows, (x_star, (u, w))) in self
             .pows
             .get()
@@ -232,7 +218,6 @@ impl<OT: OtReceiver<Msg = Block> + Malicious, FE: FF> Sender<OT, FE> {
             channel.write_fe(*x_star - *u)?;
             va -= *pows * *w;
         }
-        // Communication: 128 bits
         channel.write_block(&seed)?;
         channel.flush()?;
 
@@ -258,9 +243,7 @@ impl<OT: OtReceiver<Msg = Block> + Malicious, FE: FF> Sender<OT, FE> {
     }
 }
 
-/// Implement SpsVoleReceiver for Receiver type.
 impl<OT: OtSender<Msg = Block> + Malicious, FE: FF> Receiver<OT, FE> {
-    /// Runs any one-time initialization.
     pub fn init<C: AbstractChannel, RNG: CryptoRng + Rng>(
         channel: &mut C,
         pows: Powers<FE>,
@@ -281,11 +264,6 @@ impl<OT: OtSender<Msg = Block> + Malicious, FE: FF> Receiver<OT, FE> {
         })
     }
 
-    /// Runs single-point svole and outputs a vector `v` such that
-    /// the correlation `w = u'Δ + v` holds. Again, `u'` is the converted vector from
-    /// `u` to the vector of elements of the extended field `FE`. Of course, the argument `nleaves`
-    /// is suppose to be in multiples of `2` as it represents the number of
-    /// leaves in the GGM tree and should match with the sender input length.
     pub fn receive<C: AbstractChannel, RNG: CryptoRng + Rng>(
         &mut self,
         channel: &mut C,
@@ -328,7 +306,7 @@ impl<OT: OtSender<Msg = Block> + Malicious, FE: FF> Receiver<OT, FE> {
         self.receive_batch_consistency_check(channel, &result, &base_consistency, rng)?;
         Ok(result)
     }
-    /// Batch consistency check that can be called after bunch of iterations.
+
     #[inline(always)]
     fn receive_batch_consistency_check<C: AbstractChannel, RNG: CryptoRng + Rng>(
         &mut self,

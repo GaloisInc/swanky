@@ -4,7 +4,7 @@
 // Copyright © 2020 Galois, Inc.
 // See LICENSE for licensing information.
 
-//! Implementation of the Weng-Yang-Katz-Wang Base SVOLE protocol (cf.
+//! Implementation of the Weng-Yang-Katz-Wang Base sVOLE protocol (cf.
 //! <https://eprint.iacr.org/2020/925>, Figure 5).
 
 use super::{
@@ -16,13 +16,11 @@ use generic_array::typenum::Unsigned;
 use rand::{CryptoRng, Rng, SeedableRng};
 use scuttlebutt::{field::FiniteField as FF, AbstractChannel, AesRng};
 
-/// sVOLE sender.
 pub struct Sender<FE: FF> {
     copee: CopeeSender<FE>,
     pows: Powers<FE>,
 }
 
-/// sVOLE receiver.
 pub struct Receiver<FE: FF> {
     copee: CopeeReceiver<FE>,
     pows: Powers<FE>,
@@ -73,7 +71,6 @@ impl<FE: FF> Sender<FE> {
 }
 
 impl<FE: FF> Receiver<FE> {
-    /// Runs any one-time initialization.
     pub fn init<C: AbstractChannel, RNG: CryptoRng + Rng>(
         channel: &mut C,
         pows: Powers<FE>,
@@ -82,15 +79,9 @@ impl<FE: FF> Receiver<FE> {
         let cp = CopeeReceiver::<FE>::init(channel, pows.clone(), rng)?;
         Ok(Self { copee: cp, pows })
     }
-    /// Returns the receiver choice `Δ`.
     pub fn delta(&self) -> FE {
         self.copee.delta()
     }
-    /// Runs SVOLE extend on input length `len` and returns a vector `v` such
-    /// that the correlation `w = u'Δ + v` holds. Note that `u'` is the
-    /// converted vector from `u` to the vector of elements of the extended
-    /// field `FE`. The vector length `len` should match with the Sender's input
-    /// `len`, otherwise it never terminates.
     pub fn receive<C: AbstractChannel, RNG: CryptoRng + Rng>(
         &mut self,
         channel: &mut C,
