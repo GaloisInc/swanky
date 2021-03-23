@@ -244,8 +244,7 @@ pub fn crt_inv_factor(xs: &[u16], q: u128) -> u128 {
     crt_inv(xs, &factor(q))
 }
 
-/// Generic algorithm to invert inp_a mod inp_b. As ref so as to support BigInts without
-/// copying.
+/// Invert inp_a mod inp_b.
 pub fn inv(inp_a: i128, inp_b: i128) -> i128 {
     let mut a = inp_a;
     let mut b = inp_b;
