@@ -22,7 +22,6 @@ use std::{
 
 fn run<FE: FF, VSender: SVoleSender<Msg = FE>, VReceiver: SVoleReceiver<Msg = FE>>() {
     let (sender, receiver) = UnixStream::pair().unwrap();
-    let total = SystemTime::now();
     let handle = std::thread::spawn(move || {
         let mut rng = AesRng::new();
         let reader = BufReader::new(sender.try_clone().unwrap());
@@ -34,15 +33,6 @@ fn run<FE: FF, VSender: SVoleSender<Msg = FE>, VReceiver: SVoleReceiver<Msg = FE
             "Send time (init): {} ms",
             start.elapsed().unwrap().as_millis()
         );
-        println!(
-            "Sender init communication (read): {:.2} Mb",
-            channel.kilobits_read() / 1000.0
-        );
-        println!(
-            "Sender init communication (write): {:.2} Mb",
-            channel.kilobits_written() / 1000.0
-        );
-        channel.clear();
         let start = SystemTime::now();
         let voles = vole.send(&mut channel, &mut rng).unwrap();
         println!(
@@ -50,13 +40,11 @@ fn run<FE: FF, VSender: SVoleSender<Msg = FE>, VReceiver: SVoleReceiver<Msg = FE
             voles.len(),
             start.elapsed().unwrap().as_millis()
         );
+        let start = SystemTime::now();
+        vole.duplicate(&mut channel, &mut rng).unwrap();
         println!(
-            "Sender extend communication (read): {:.2} Mb",
-            channel.kilobits_read() / 1000.0
-        );
-        println!(
-            "Sender extend communication (write): {:.2} Mb",
-            channel.kilobits_written() / 1000.0
+            "Send time (duplicate): {} ms",
+            start.elapsed().unwrap().as_millis()
         );
     });
     let mut rng = AesRng::new();
@@ -70,31 +58,45 @@ fn run<FE: FF, VSender: SVoleSender<Msg = FE>, VReceiver: SVoleReceiver<Msg = FE
         start.elapsed().unwrap().as_millis()
     );
     println!(
-        "Receiver init communication (read): {:.2} Mb",
+        "Send communication (init): {:.2} Mb",
         channel.kilobits_read() / 1000.0
     );
     println!(
-        "Receiver init communication (write): {:.2} Mb",
+        "Receive communication (init): {:.2} Mb",
         channel.kilobits_written() / 1000.0
     );
     channel.clear();
     let start = SystemTime::now();
     let voles = vole.receive(&mut channel, &mut rng).unwrap();
     println!(
-        "[{}] Receiver time (extend): {} ms",
+        "[{}] Receive time (extend): {} ms",
         voles.len(),
         start.elapsed().unwrap().as_millis()
     );
-    handle.join().unwrap();
     println!(
-        "Receiver extend communication (read): {:.2} Mb",
+        "Send communication (extend): {:.2} Mb",
         channel.kilobits_read() / 1000.0
     );
     println!(
-        "Receiver extend communication (write): {:.2} Mb",
+        "Receive communication (extend): {:.2} Mb",
         channel.kilobits_written() / 1000.0
     );
-    println!("Total time: {} ms", total.elapsed().unwrap().as_millis());
+    channel.clear();
+    let start = SystemTime::now();
+    let _ = vole.duplicate(&mut channel, &mut rng).unwrap();
+    println!(
+        "Receive time (duplicate): {} ms",
+        start.elapsed().unwrap().as_millis()
+    );
+    println!(
+        "Send communication (duplicate): {:.2} Mb",
+        channel.kilobits_read() / 1000.0
+    );
+    println!(
+        "Receive communication (duplicate): {:.2} Mb",
+        channel.kilobits_written() / 1000.0
+    );
+    handle.join().unwrap();
 }
 
 fn main() {
