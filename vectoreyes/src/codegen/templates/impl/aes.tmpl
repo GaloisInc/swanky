@@ -93,7 +93,7 @@
 ] %}
     {% call(scalar, avx2) visit_backends() %}
         {% call scalar() %}
-            #[derive(Clone, Debug)]
+            #[derive(Clone)]
             enum Aes{{key_size}}KeySchedule {
                 Variable(aes_soft::Aes{{key_size}}),
                 // TODO: if we care a lot about scalar performance, this could be quite slow.
@@ -125,7 +125,7 @@
         {% endcall %}
         {% call avx2() %}
             type Aes{{key_size}}EncryptOnlyKeySchedule = [U32x4; {{num_rounds}}];
-            #[derive(Debug, Clone)]
+            #[derive(Clone)]
             struct Aes{{key_size}}KeySchedule {
                 encrypt_keys: [U32x4; {{num_rounds}}],
                 decrypt_keys: [U32x4; {{num_rounds}}],
@@ -134,9 +134,14 @@
     {% endcall %}
 
     {% for encrypt_only in ["", "EncryptOnly"] %}
-        #[derive(Clone, Debug)]
+        #[derive(Clone)]
         pub struct Aes{{key_size}}{{encrypt_only}} {
             key: Aes{{key_size}}{{encrypt_only}}KeySchedule,
+        }
+        impl std::fmt::Debug for Aes{{key_size}}{{encrypt_only}} {
+            fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+                write!(f, "Aes{{key_size}}{{encrypt_only}}(...)")
+            }
         }
         {% if force_scalar_for_test %}
             impl Aes{{key_size}}{{encrypt_only}} {

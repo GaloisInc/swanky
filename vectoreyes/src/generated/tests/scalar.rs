@@ -10749,7 +10749,7 @@ impl U64x2 {
   // OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR
   // IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
   // DEALINGS IN THE SOFTWARE.
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 enum Aes128KeySchedule {
     Variable(aes_soft::Aes128), // TODO: if we care a lot about scalar performance, this could be quite slow.
     Fixed,
@@ -10772,9 +10772,14 @@ impl Deref for Aes128KeySchedule {
     }
 }
 type Aes128EncryptOnlyKeySchedule = Aes128KeySchedule;
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct Aes128 {
     key: Aes128KeySchedule,
+}
+impl std::fmt::Debug for Aes128 {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "Aes128(...)")
+    }
 }
 impl Aes128 {
     pub(super) const FIXED_KEY: Self = Self {
@@ -10831,9 +10836,14 @@ impl From<Aes128> for Aes128EncryptOnly {
         Aes128EncryptOnly { key: aes.key }
     }
 }
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct Aes128EncryptOnly {
     key: Aes128EncryptOnlyKeySchedule,
+}
+impl std::fmt::Debug for Aes128EncryptOnly {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "Aes128EncryptOnly(...)")
+    }
 }
 impl Aes128EncryptOnly {
     pub(super) const FIXED_KEY: Self = Self {
@@ -10865,7 +10875,7 @@ impl Aes128EncryptOnly {
         )
     }
 }
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 enum Aes256KeySchedule {
     Variable(aes_soft::Aes256), // TODO: if we care a lot about scalar performance, this could be quite slow.
     Fixed,
@@ -10888,9 +10898,14 @@ impl Deref for Aes256KeySchedule {
     }
 }
 type Aes256EncryptOnlyKeySchedule = Aes256KeySchedule;
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct Aes256 {
     key: Aes256KeySchedule,
+}
+impl std::fmt::Debug for Aes256 {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "Aes256(...)")
+    }
 }
 impl Aes256 {
     pub(super) const FIXED_KEY: Self = Self {
@@ -10947,9 +10962,14 @@ impl From<Aes256> for Aes256EncryptOnly {
         Aes256EncryptOnly { key: aes.key }
     }
 }
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct Aes256EncryptOnly {
     key: Aes256EncryptOnlyKeySchedule,
+}
+impl std::fmt::Debug for Aes256EncryptOnly {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "Aes256EncryptOnly(...)")
+    }
 }
 impl Aes256EncryptOnly {
     pub(super) const FIXED_KEY: Self = Self {
