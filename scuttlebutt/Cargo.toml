@@ -10,9 +10,6 @@ categories = ["cryptography"]
 edition = "2018"
 publish = false
 
-[lib]
-bench = false # TODO: marc DON'T MERGE THIS!
-
 [features]
 nightly = ["curve25519-dalek/nightly", "curve25519-dalek/simd_backend"]
 unstable = []
