@@ -605,3 +605,63 @@ mod bundle {
         }
     }
 }
+
+#[cfg(test)]
+mod pmr_tests {
+    use super::*;
+    use crate::{
+        fancy::{BundleGadgets, CrtGadgets, FancyInput},
+        util::RngExt,
+    };
+
+    #[test]
+    fn pmr() {
+        let mut rng = rand::thread_rng();
+        for _ in 0..16 {
+            let ps = rng.gen_usable_factors();
+            let q = crate::util::product(&ps);
+            let pt = rng.gen_u128() % q;
+
+            let mut f = Dummy::new();
+            let x = f.crt_encode(pt, q).unwrap();
+            let z = f.crt_to_pmr(&x).unwrap();
+            let res = f.output_bundle(&z).unwrap().unwrap();
+
+            let should_be = to_pmr_pt(pt, &ps);
+            assert_eq!(res, should_be);
+        }
+    }
+
+    fn to_pmr_pt(x: u128, ps: &[u16]) -> Vec<u16> {
+        let mut ds = vec![0; ps.len()];
+        let mut q = 1;
+        for i in 0..ps.len() {
+            let p = ps[i] as u128;
+            ds[i] = ((x / q) % p) as u16;
+            q *= p;
+        }
+        ds
+    }
+
+    #[test]
+    fn pmr_lt() {
+        let mut rng = rand::thread_rng();
+        for _ in 0..128 {
+            let qs = rng.gen_usable_factors();
+            let n = qs.len();
+            let q = crate::util::product(&qs);
+            let q_ = crate::util::product(&qs[..n - 1]);
+            let pt_x = rng.gen_u128() % q_;
+            let pt_y = rng.gen_u128() % q_;
+
+            let mut f = Dummy::new();
+            let crt_x = f.crt_encode(pt_x, q).unwrap();
+            let crt_y = f.crt_encode(pt_y, q).unwrap();
+            let z = f.pmr_lt(&crt_x, &crt_y).unwrap();
+            let res = f.output(&z).unwrap().unwrap();
+
+            let should_be = if pt_x < pt_y { 1 } else { 0 };
+            assert_eq!(res, should_be, "q={}, x={}, y={}", q, pt_x, pt_y);
+        }
+    }
+}
