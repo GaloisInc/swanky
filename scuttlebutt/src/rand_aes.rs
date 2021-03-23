@@ -6,16 +6,27 @@
 
 //! Fixed-key AES random number generator.
 
-use crate::{Aes128, Block};
+use crate::Block;
 use rand::{CryptoRng, Error, Rng, RngCore, SeedableRng};
-use rand_core::block::{BlockRng, BlockRngCore};
+use rand_core::block::{BlockRng64, BlockRngCore};
+use vectoreyes::{
+    array_utils::ArrayUnrolledExt,
+    Aes128EncryptOnly,
+    AesBlockCipher,
+    SimdBase,
+    U32x8,
+    U64x2,
+    U8x16,
+};
+
+mod vectorized;
 
 /// Implementation of a random number generator based on fixed-key AES.
 ///
 /// This uses AES in a counter-mode-esque way, but with the counter always
 /// starting at zero. When used as a PRNG this is okay [TODO: citation?].
 #[derive(Clone, Debug)]
-pub struct AesRng(BlockRng<AesRngCore>);
+pub struct AesRng(BlockRng64<AesRngCore>);
 
 impl RngCore for AesRng {
     #[inline]
@@ -41,11 +52,11 @@ impl SeedableRng for AesRng {
 
     #[inline]
     fn from_seed(seed: Self::Seed) -> Self {
-        AesRng(BlockRng::<AesRngCore>::from_seed(seed))
+        AesRng(BlockRng64::<AesRngCore>::from_seed(seed))
     }
     #[inline]
     fn from_rng<R: RngCore>(rng: R) -> Result<Self, Error> {
-        BlockRng::<AesRngCore>::from_rng(rng).map(AesRng)
+        BlockRng64::<AesRngCore>::from_rng(rng).map(AesRng)
     }
 }
 
@@ -66,6 +77,20 @@ impl AesRng {
         let seed = self.gen::<Block>();
         AesRng::from_seed(seed)
     }
+
+    /// Generate random bits.
+    #[inline(always)]
+    pub fn random_bits(&mut self) -> [U8x16; Aes128EncryptOnly::BLOCK_COUNT_HINT] {
+        self.0.core.gen_rand_bits()
+    }
+
+    /// Generate 32 random `u32`s such that they are sampled uniformly between `[0, BOUND)`.
+    #[inline(always)]
+    pub fn uniform_integers_under_bound<const BOUND: u32>(
+        &mut self,
+    ) -> [U32x8; Aes128EncryptOnly::BLOCK_COUNT_HINT / 2] {
+        vectorized::uniform_integers_under_bound::<BOUND>(self)
+    }
 }
 
 impl Default for AesRng {
@@ -76,50 +101,36 @@ impl Default for AesRng {
 }
 
 /// The core of `AesRng`, used with `BlockRng`.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct AesRngCore {
-    aes: Aes128,
-    state: u128,
+    aes: Aes128EncryptOnly,
+    // Overflowing a u64 would take well over 2^64 nanoseconds, which is over 500 years!
+    counter: u64,
 }
 
-impl std::fmt::Debug for AesRngCore {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "AesRngCore {{}}")
+impl AesRngCore {
+    #[inline(always)]
+    fn gen_rand_bits(&mut self) -> [U8x16; Aes128EncryptOnly::BLOCK_COUNT_HINT] {
+        let blocks = <[U8x16; Aes128EncryptOnly::BLOCK_COUNT_HINT]>::array_generate(
+            #[inline(always)]
+            |_| {
+                let x = self.counter;
+                self.counter += 1;
+                U8x16::from(U64x2::set_lo(x))
+            },
+        );
+        self.aes.encrypt_many(blocks)
     }
 }
 
 impl BlockRngCore for AesRngCore {
-    type Item = u32;
-    // This is equivalent to `[Block; 8]`, but we need to use `u32` to be
-    // compatible with `RngCore`.
-    type Results = [u32; 32];
+    type Item = u64;
+    type Results = [u64; Aes128EncryptOnly::BLOCK_COUNT_HINT * 2];
 
     // Compute `E(state)` eight times, where `state` is a counter.
     #[inline]
     fn generate(&mut self, results: &mut Self::Results) {
-        // We can't just cast this because the alignment of [u32; 32] may not
-        // match that of [Block; 8].
-        let mut ms: [Block; 8] = unsafe { std::mem::transmute(*results) };
-        ms[0] = Block::from(self.state);
-        self.state += 1;
-        ms[1] = Block::from(self.state);
-        self.state += 1;
-        ms[2] = Block::from(self.state);
-        self.state += 1;
-        ms[3] = Block::from(self.state);
-        self.state += 1;
-        ms[4] = Block::from(self.state);
-        self.state += 1;
-        ms[5] = Block::from(self.state);
-        self.state += 1;
-        ms[6] = Block::from(self.state);
-        self.state += 1;
-        ms[7] = Block::from(self.state);
-        self.state += 1;
-        let c = self.aes.encrypt8(ms);
-        unsafe {
-            *results = *(&c as *const _ as *const [u32; 32]);
-        }
+        *results = bytemuck::cast(self.gen_rand_bits());
     }
 }
 
@@ -128,10 +139,9 @@ impl SeedableRng for AesRngCore {
 
     #[inline]
     fn from_seed(seed: Self::Seed) -> Self {
-        let aes = Aes128::new(seed);
         AesRngCore {
-            aes,
-            state: Default::default(),
+            aes: Aes128EncryptOnly::new_with_key(seed.0),
+            counter: 0,
         }
     }
 }
@@ -141,7 +151,7 @@ impl CryptoRng for AesRngCore {}
 impl From<AesRngCore> for AesRng {
     #[inline]
     fn from(core: AesRngCore) -> Self {
-        AesRng(BlockRng::new(core))
+        AesRng(BlockRng64::new(core))
     }
 }
 
@@ -156,5 +166,16 @@ mod tests {
         let a = rng.gen::<[Block; 8]>();
         let b = rng.gen::<[Block; 8]>();
         assert_ne!(a, b);
+    }
+
+    #[test]
+    fn uniform_integers_under_bound() {
+        let mut rng = AesRng::seed_from_u64(12);
+        const BOUND: u32 = 126;
+        for x in rng.uniform_integers_under_bound::<BOUND>().iter() {
+            for y in x.as_array().iter() {
+                assert!(*y < BOUND);
+            }
+        }
     }
 }

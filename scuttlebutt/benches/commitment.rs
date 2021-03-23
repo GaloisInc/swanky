@@ -6,7 +6,6 @@
 
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use scuttlebutt::commitment::{Commitment, ShaCommitment};
-use std::time::Duration;
 
 fn bench_sha_commitment(c: &mut Criterion) {
     c.bench_function("ShaCommitment::new", |b| {
@@ -31,7 +30,7 @@ fn bench_sha_commitment(c: &mut Criterion) {
 
 criterion_group! {
     name = commitment;
-    config = Criterion::default().warm_up_time(Duration::from_millis(100));
+    config = Criterion::default();
     targets = bench_sha_commitment
 }
 criterion_main!(commitment);

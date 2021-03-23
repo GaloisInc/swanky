@@ -7,7 +7,6 @@
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use rand::Rng;
 use scuttlebutt::{AesRng, Block512};
-use std::time::Duration;
 
 fn bench_rand(c: &mut Criterion) {
     c.bench_function("Block512::rand", |b| {
@@ -19,29 +18,9 @@ fn bench_rand(c: &mut Criterion) {
     });
 }
 
-fn bench_xor(c: &mut Criterion) {
-    c.bench_function("Block512::xor", |b| {
-        let x = rand::random::<Block512>();
-        let y = rand::random::<Block512>();
-        b.iter(|| {
-            let z = black_box(x) ^ black_box(y);
-            black_box(z)
-        });
-    });
-}
-
-fn bench_default(c: &mut Criterion) {
-    c.bench_function("Block512::default", |b| {
-        b.iter(|| {
-            let z = black_box(Block512::default());
-            black_box(z)
-        })
-    });
-}
-
 criterion_group! {
     name = block512;
-    config = Criterion::default().warm_up_time(Duration::from_millis(100));
-    targets = bench_rand, bench_xor, bench_default
+    config = Criterion::default();
+    targets = bench_rand
 }
 criterion_main!(block512);

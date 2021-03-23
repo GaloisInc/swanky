@@ -8,6 +8,7 @@ use std::{
     ops::{AddAssign, MulAssign, SubAssign},
 };
 use subtle::{Choice, ConditionallySelectable, ConstantTimeEq};
+use vectoreyes::{SimdBase, U64x2};
 
 /// An element of the finite field $\textsf{GF}(2^{40})$ reduced over $x^{40} + x^5 + x^4 + x^3 + 1$
 #[derive(Debug, Clone, Copy, Hash, Eq)]
@@ -43,21 +44,9 @@ impl<'a> SubAssign<&'a Gf40> for Gf40 {
 impl<'a> MulAssign<&'a Gf40> for Gf40 {
     #[inline]
     fn mul_assign(&mut self, rhs: &'a Gf40) {
-        let (r_lower, the_upper) = unsafe {
-            use std::arch::x86_64::*;
-
-            // Safety: since the _mm_cvtsi64_si128 intrinsic has no safety preconditions
-            // (assuming that it's supported on the target architecture).
-            let a = _mm_cvtsi64_si128(self.0 as i64);
-            let b = _mm_cvtsi64_si128(rhs.0 as i64);
-            // Safety: ditto
-            // The 0x00 means that the lower 64 bits of the inputs are the only things that are
-            // multiplied.
-            let wide_product = _mm_clmulepi64_si128(a, b, 0x00);
-            (
-                _mm_extract_epi64(wide_product, 0) as u64,
-                _mm_extract_epi64(wide_product, 1) as u64,
-            )
+        let (r_lower, the_upper) = {
+            let product = U64x2::set_lo(self.0).carryless_mul::<false, false>(U64x2::set_lo(rhs.0));
+            (product.extract::<0>(), product.extract::<1>())
         };
 
         // Now we reduce the wide product.

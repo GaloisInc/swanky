@@ -223,10 +223,10 @@ fn block_to_ipv6(b: Block) -> String {
 fn read_usize<R: Read>(r: &mut R) -> usize {
     let mut buf = [0; 8];
     r.read(&mut buf).unwrap();
-    unsafe { std::mem::transmute(buf) }
+    usize::try_from(u64::from_le_bytes(buf)).unwrap()
 }
 
 fn write_usize<W: Write>(x: usize, w: &mut W) {
-    let buf: [u8; 8] = unsafe { std::mem::transmute(x) };
+    let buf: [u8; 8] = (x as u64).to_le_bytes();
     w.write(&buf).unwrap();
 }
