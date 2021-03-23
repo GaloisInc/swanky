@@ -16,6 +16,7 @@ mod binary;
 mod bundle;
 mod crt;
 mod input;
+mod pmr;
 mod reveal;
 pub use binary::{BinaryBundle, BinaryGadgets};
 pub use bundle::{Bundle, BundleGadgets};
