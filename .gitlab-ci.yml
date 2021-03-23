@@ -37,7 +37,8 @@ checkfmt:rustfmt:
 test:stable:
   stage: test
   variables:
-    toolchain: stable
+    # TODO: change back to stable after March 25th 2021
+    toolchain: beta
   script:
     - rustc --version && cargo --version  # Print version info for debugging
     - cargo build --verbose --all --examples --tests --benches
