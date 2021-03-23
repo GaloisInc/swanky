@@ -207,6 +207,7 @@ mod multiply {
         }
 
         proptest! {
+            #![proptest_config(ProptestConfig::with_cases(15))]
             #[test]
             fn reduction(upper in any::<u128>(), lower in any::<u128>()) {
                 let poly = poly_from_upper_and_lower_128(upper, lower);

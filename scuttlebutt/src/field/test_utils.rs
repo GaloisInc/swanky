@@ -157,7 +157,9 @@ macro_rules! test_field {
                     assert_eq!(<$f>::from_polynomial_coefficients(make_polynomial_coefficients(&poly)), a + b);
                 }
             }
+
             proptest! {
+                #![proptest_config(ProptestConfig::with_cases(15))]
                 #[test]
                 fn polynomial_mul(a in any_fe(), b in any_fe()) {
                     let mut poly = make_polynomial(a.to_polynomial_coefficients());
