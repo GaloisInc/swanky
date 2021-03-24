@@ -1,0 +1,20 @@
+Number of megabins per thread 11
+Receiver :: Bucketization time : 203 ms
+Receiver ::Bucketization time (read): 0.20 Mb
+Receiver :: Bucketization time (write): 0.33 Mb
+Terminated.
+Receiver Thread 1 Starting computation
+Receiver Thread 0 Starting computation
+Receiver Thread 2 Starting computation
+nmegabins10
+Starting megabin number:0
+nmegabins11
+Starting megabin number:0
+nmegabins11
+Starting megabin number:0
+Receiver :: Computation time: 169478 ms
+Starting megabin number:1
+Receiver :: Computation time: 170018 ms
+Starting megabin number:1
+Receiver :: Computation time: 170333 ms
+Starting megabin number:1

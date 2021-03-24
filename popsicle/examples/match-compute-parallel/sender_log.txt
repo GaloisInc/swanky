@@ -1,0 +1,23 @@
+Server listening on 127.0.0.1:3000
+New connection: 127.0.0.1:58120
+Sender :: Bucketization time: 3079 ms
+Sender :: Bucketization time (read): 0.33 Mb
+Sender :: Bucketization time  (write): 0.20 Mb
+Server listening on 127.0.0.1:8000
+Server listening on 127.0.0.1:8001
+Server listening on 127.0.0.1:8002
+New connection: 127.0.0.1:58127
+New connection: 127.0.0.1:58128
+Sender Thread 2 Starting computation
+Sender Thread 1 Starting computation
+New connection: 127.0.0.1:58129
+Sender Thread 0 Starting computation
+Starting megabin number:0
+Starting megabin number:0
+Starting megabin number:0
+Sender :: Computation time: 169525 ms
+Starting megabin number:1
+Sender :: Computation time: 170131 ms
+Starting megabin number:1
+Sender :: Computation time: 170392 ms
+Starting megabin number:1

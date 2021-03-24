@@ -16,6 +16,9 @@ use std::{
 use bincode;
 use serde_json;
 
+const PAYLOAD_PRIME_SIZE: usize = 16;
+const PAYLOAD_PRIME_SIZE_EXPANDED: usize = PAYLOAD_PRIME_SIZE+ 1;
+
 pub fn generate_deltas(primes: &[u16]) -> HashMap<u16, Wire> {
     let mut deltas = HashMap::new();
     let mut rng = rand::thread_rng();
@@ -33,7 +36,7 @@ fn server_protocol(mut stream: TcpChannel<TcpStream>, path: &mut PathBuf, nthrea
 
     // The Garbdled circuits deltas are generated and stored so as to be synchronized accross
     // All threads and in the joining stage
-    let qs = fancy_garbling::util::primes_with_width(64 as u32);// for 64bit inputs and outputs
+    let qs = &fancy_garbling::util::PRIMES[..PAYLOAD_PRIME_SIZE_EXPANDED];
     let deltas = generate_deltas(&qs);
 
     path.push("delta.txt");

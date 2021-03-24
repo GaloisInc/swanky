@@ -1,15 +1,15 @@
 address: 127.0.0.1
 
 sleeptime: 5
-nthread: 1
+nthread: 3
 
 itemsize: 16
-megasize: 2
+megasize: 10000
 
 precision: 4
 
-data_path_server: C:\Users\rawan\Desktop\DOED\NPSAS.csv
-data_path_client: C:\Users\rawan\Desktop\DOED\Pell.csv
+data_path_server: /Users/rissa/Desktop/NPSAS.csv
+data_path_client: /Users/rissa/Desktop/Pell.csv
 
 schema_server_id: id
 schema_server_payload: StudWt
