@@ -44,6 +44,7 @@ fn server_protocol(mut channel: TcpChannel<TcpStream>, path:&mut PathBuf, nthrea
         let partial_sum_weights: Vec<Wire> = serde_json::from_str(&read_to_string(path_str).unwrap()).unwrap();
         path.pop();
 
+
         aggregates.push(partial_aggregate);
         cardinality.push(partial_cardinality);
         sum_weights.push(partial_sum_weights);

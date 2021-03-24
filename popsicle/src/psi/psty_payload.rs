@@ -58,7 +58,6 @@ use scuttlebutt::{AbstractChannel, Block, Block512};
 
 use serde_json;
 
-
 const NHASHES: usize = 3;
 // How many bytes of the hash to use for the equality tests. This affects
 // correctness, with a lower value increasing the likelihood of a false
@@ -67,8 +66,11 @@ const HASH_SIZE: usize = 4;
 
 // How many bytes are used for payloads
 const PAYLOAD_SIZE: usize = 8;
+
 // How many u16's are used for the CRT representation
 const PAYLOAD_PRIME_SIZE: usize = 16;
+const PAYLOAD_PRIME_SIZE_EXPANDED: usize = PAYLOAD_PRIME_SIZE+ 1;
+
 
 // How many bytes to use to determine whether decryption succeeded in the send/recv
 // payload methods.
@@ -131,7 +133,7 @@ impl Sender {
     )-> Result<(), Error> {
         let mut gb = Garbler::<C, RNG, OtSender>::new(channel.clone(), RNG::from_seed(rng.gen())).unwrap();
 
-        let qs = fancy_garbling::util::primes_with_width(PAYLOAD_SIZE as u32 * 8);
+        let qs = &fancy_garbling::util::PRIMES[..PAYLOAD_PRIME_SIZE_EXPANDED];
 
         let deltas = fancy_garbling::util::generate_deltas(&qs);
         let deltas_json = serde_json::to_string(&deltas).unwrap();
@@ -144,11 +146,9 @@ impl Sender {
         channel.flush()?;
 
         let (aggregate, card, sum_weights) = state.build_and_compute_circuit(&mut gb).unwrap();
+        let weighted_mean = gb.crt_div(&aggregate, &sum_weights).unwrap();
 
-        gb.outputs(&aggregate.wires().to_vec()).unwrap();
-        gb.outputs(&card.wires().to_vec()).unwrap();
-        gb.outputs(&sum_weights.wires().to_vec()).unwrap();
-
+        gb.outputs(&weighted_mean.wires().to_vec()).unwrap();
         channel.flush()?;
 
         Ok(())
@@ -177,10 +177,9 @@ impl Sender {
         let payload: Vec<Vec<Vec<Block512>>>= state.payload.chunks(megasize).map(|x| x.to_vec()).collect();
 
         let (aggregate, card, sum_weights) = self.compute_payload(ts_id, ts_payload, table, payload, &path_deltas, channel, rng).unwrap();
+        let weighted_mean = gb.crt_div(&aggregate, &sum_weights).unwrap();
 
-        gb.outputs(&aggregate.wires().to_vec()).unwrap();
-        gb.outputs(&card.wires().to_vec()).unwrap();
-        gb.outputs(&sum_weights.wires().to_vec()).unwrap();
+        gb.outputs(&weighted_mean.wires().to_vec()).unwrap();
         Ok(())
     }
 
@@ -203,12 +202,12 @@ impl Sender {
         let mut gb = Garbler::<C, RNG, OtSender>::new(channel.clone(), RNG::from_seed(rng.gen())).unwrap();
         let _ = gb.load_deltas(path_deltas);
 
-        let qs = fancy_garbling::util::primes_with_width(PAYLOAD_SIZE as u32 * 8);
+        let qs = &fancy_garbling::util::PRIMES[..PAYLOAD_PRIME_SIZE_EXPANDED];
         let q = fancy_garbling::util::product(&qs);
 
         let mut acc = gb.crt_constant_bundle(0, q).unwrap();
-        let mut card = gb.crt_constant_bundle(0, q).unwrap();
         let mut sum_weights = gb.crt_constant_bundle(0, q).unwrap();
+        let mut card = gb.crt_constant_bundle(0, q).unwrap();
 
         let nmegabins = ts_id.len();
         for i in 0..nmegabins{
@@ -223,20 +222,16 @@ impl Sender {
             };
 
             self.send_data(&mut state, nbins, channel, rng)?;
-            let (partial, card_partial, sum_weights_partial) = state.build_and_compute_circuit(&mut gb).unwrap();
+            let (partial, partial_card, partial_sum_weights) = state.build_and_compute_circuit(&mut gb).unwrap();
 
             acc = gb.crt_add(&acc, &partial).unwrap();
-            card = gb.crt_add(&card, &card_partial).unwrap();
-            sum_weights = gb.crt_add(&sum_weights, &sum_weights_partial).unwrap();
+            card = gb.crt_add(&card, &partial_card).unwrap();
+            sum_weights = gb.crt_add(&sum_weights, &partial_sum_weights).unwrap();
 
             println!(
                 "Sender :: Computation time: {} ms",
                 start.elapsed().unwrap().as_millis()
             );
-
-            // For tesint purposes, output partial states:
-            //
-            // gb.outputs(&acc.wires().to_vec()).unwrap();
 
             channel.flush()?;
         }
@@ -249,7 +244,7 @@ impl Sender {
         &mut self,
         aggregates: Vec<Vec<Wire>>,
         cardinality: Vec<Vec<Wire>>,
-        sum_wghts: Vec<Vec<Wire>>,
+        sum_of_weights: Vec<Vec<Wire>>,
         path_deltas: &str,
         channel: &mut C,
         rng: &mut RNG,
@@ -258,20 +253,20 @@ impl Sender {
         let _ = gb.load_deltas(path_deltas);
 
         let mut acc = CrtBundle::new(aggregates[0].clone());
+        let mut sum_weights = CrtBundle::new(sum_of_weights[0].clone());
         let mut card = CrtBundle::new(cardinality[0].clone());
-        let mut sum_weights = CrtBundle::new(sum_wghts[0].clone());
+
         for i in 1..aggregates.len(){
             let partial_aggregate = CrtBundle::new(aggregates[i].clone());
             let partial_cardinality = CrtBundle::new(cardinality[i].clone());
-            let partial_sum_weights = CrtBundle::new(sum_wghts[i].clone());
+            let partial_sum_weight = CrtBundle::new(sum_of_weights[i].clone());
+
             acc = gb.crt_add(&acc, &partial_aggregate).unwrap();
             card = gb.crt_add(&card, &partial_cardinality).unwrap();
-            sum_weights = gb.crt_add(&sum_weights, &partial_sum_weights).unwrap();
+            sum_weights = gb.crt_add(&sum_weights, &partial_sum_weight).unwrap();
         }
-
-        gb.outputs(&acc.wires().to_vec()).unwrap();
-        gb.outputs(&card.wires().to_vec()).unwrap();
-        gb.outputs(&sum_weights.wires().to_vec()).unwrap();
+        let weighted_mean = gb.crt_div(&acc, &sum_weights).unwrap();
+        gb.outputs(&weighted_mean.wires().to_vec()).unwrap();
         Ok(())
     }
 
@@ -386,7 +381,10 @@ impl SenderState {
         // CRT representation assumes that inputs and outputs of the
         // circuit are PAYLOAD_SIZE bytes long: this helps avoid carry
         // handling in GC computation.
-        let qs = fancy_garbling::util::primes_with_width(PAYLOAD_SIZE as u32 * 8);
+        let qs = &fancy_garbling::util::PRIMES[..PAYLOAD_PRIME_SIZE_EXPANDED].to_vec();
+        // let nprimes = qs.len();
+        // qs.push(fancy_garbling::util::PRIMES[nprimes]);
+
         let mut mods_crt = Vec::new();
         for _i in 0..self.opprf_payloads.len(){
             mods_crt.append(&mut qs.clone());
@@ -395,7 +393,6 @@ impl SenderState {
         let sender_payloads = gb.encode_many(&my_payload_bits, &mods_crt).unwrap();
         let receiver_payloads = gb.receive_many(&mods_crt).unwrap();
         let receiver_masks = gb.receive_many(&mods_crt).unwrap();
-
         Ok((sender_inputs, receiver_inputs, sender_payloads, receiver_payloads, receiver_masks))
     }
 
@@ -404,7 +401,7 @@ impl SenderState {
         &mut self,
         gb: &mut Garbler<C, RNG, OtSender>,
     ) -> Result<(CrtBundle<fancy_garbling::Wire>,CrtBundle<fancy_garbling::Wire>,
-         CrtBundle<fancy_garbling::Wire>), Error>
+                 CrtBundle<fancy_garbling::Wire>), Error>
     where
         C: AbstractChannel,
         RNG: RngCore + CryptoRng + SeedableRng<Seed = Block>,
@@ -436,10 +433,10 @@ impl Receiver {
         payloads: &[Block512],
         channel: &mut C,
         rng: &mut RNG,
-    )-> Result<u64, Error> {
+    )-> Result<u128, Error> {
         let mut ev =
             Evaluator::<C, RNG, OtReceiver>::new(channel.clone(), RNG::from_seed(rng.gen())).unwrap();
-        let qs = fancy_garbling::util::primes_with_width(PAYLOAD_SIZE as u32 * 8);
+        let qs = &fancy_garbling::util::PRIMES[..PAYLOAD_PRIME_SIZE_EXPANDED];
 
         let (table, payload) = self.bucketize_data(table, payloads, channel, rng)?;
 
@@ -451,31 +448,20 @@ impl Receiver {
         };
 
         self.receive_data(&mut state, channel, rng)?;
-
         let (aggregate, card, sum_weights) = state.build_and_compute_circuit(&mut ev, channel).unwrap();
+        let weighted_mean = ev.crt_div(&aggregate, &sum_weights).unwrap();
 
-        let aggregate_outs = ev
-            .outputs(&aggregate.wires().to_vec()).unwrap()
+        let weighted_mean_outs = ev
+            .outputs(&weighted_mean.wires().to_vec()).unwrap()
             .expect("evaluator should produce outputs");
 
-        let card_outs = ev
-            .outputs(&card.wires().to_vec()).unwrap()
-            .expect("evaluator should produce outputs");
 
-        let sum_weights_outs = ev
-            .outputs(&sum_weights.wires().to_vec()).unwrap()
-            .expect("evaluator should produce outputs");
+        let weighted_mean = fancy_garbling::util::crt_inv(&weighted_mean_outs, &qs);
 
-        let aggregate = fancy_garbling::util::crt_inv(&aggregate_outs, &qs);
-        let card = fancy_garbling::util::crt_inv(&card_outs, &qs);
-        let sum = fancy_garbling::util::crt_inv(&sum_weights_outs, &qs);
-
-        println!("Output = {:?}", aggregate);
-        println!("Cardinality = {:?}", card);
-        println!("Sum of Weights in Intersection = {:?}", sum);
+        println!("Weighted Mean = {:?}", weighted_mean);
         channel.flush()?;
 
-        Ok(aggregate as u64)
+        Ok(weighted_mean)
     }
 
     pub fn full_protocol_large<C: AbstractChannel, RNG: RngCore + CryptoRng + SeedableRng<Seed = Block>>(
@@ -485,37 +471,26 @@ impl Receiver {
         megasize: usize,
         channel: &mut C,
         rng: &mut RNG,
-    )-> Result<u64, Error> {
+    )-> Result<u128, Error> {
         let mut ev =
             Evaluator::<C, RNG, OtReceiver>::new(channel.clone(), RNG::from_seed(rng.gen())).unwrap();
-        let qs = fancy_garbling::util::primes_with_width(PAYLOAD_SIZE as u32 * 8);
+        let qs = &fancy_garbling::util::PRIMES[..PAYLOAD_PRIME_SIZE_EXPANDED];
 
         let (_, table, payload) = self.bucketize_data_large(table, payloads, megasize, channel, rng)?;
 
 
         let (aggregate, card, sum_weights) = self.compute_payload(table, payload, channel, rng).unwrap();
 
-        let aggregate_outs = ev
-            .outputs(&aggregate.wires().to_vec()).unwrap()
+        let weighted_mean = ev.crt_div(&aggregate, &sum_weights).unwrap();
+        let weighted_mean_outs = ev
+            .outputs(&weighted_mean.wires().to_vec()).unwrap()
             .expect("evaluator should produce outputs");
-        let aggregate = fancy_garbling::util::crt_inv(&aggregate_outs, &qs);
+        let weighted_mean = fancy_garbling::util::crt_inv(&weighted_mean_outs, &qs);
 
-        let card_outs = ev
-            .outputs(&card.wires().to_vec()).unwrap()
-            .expect("evaluator should produce outputs");
-        let card = fancy_garbling::util::crt_inv(&card_outs, &qs);
-
-        let sum_wghts_outs = ev
-            .outputs(&sum_weights.wires().to_vec()).unwrap()
-            .expect("evaluator should produce outputs");
-        let sum = fancy_garbling::util::crt_inv(&sum_wghts_outs, &qs);
-
-        println!("Output = {:?}", aggregate);
-        println!("Cardinality = {:?}", card);
-        println!("Sum of Weights in Intersection = {:?}", sum);
+        println!("Weighted Mean = {:?}", weighted_mean);
         channel.flush()?;
 
-        Ok(aggregate as u64)
+        Ok(weighted_mean)
     }
 
 
@@ -527,17 +502,18 @@ impl Receiver {
         rng: &mut RNG,
     ) -> Result<(CrtBundle<fancy_garbling::Wire>, CrtBundle<fancy_garbling::Wire>,
                  CrtBundle<fancy_garbling::Wire>), Error> {
-
         let mut ev =
             Evaluator::<C, RNG, OtReceiver>::new(channel.clone(), RNG::from_seed(rng.gen())).unwrap();
-        let qs = fancy_garbling::util::primes_with_width(PAYLOAD_SIZE as u32 * 8);
+        let qs = &fancy_garbling::util::PRIMES[..PAYLOAD_PRIME_SIZE_EXPANDED];
         let q = fancy_garbling::util::product(&qs);
 
         let mut acc = ev.crt_constant_bundle(0, q).unwrap();
+        let mut sum_weights = ev.crt_constant_bundle(0, q).unwrap();
         let mut card = ev.crt_constant_bundle(0, q).unwrap();
         let mut sum_weights = ev.crt_constant_bundle(0, q).unwrap();
 
         let nmegabins = table.len();
+        println!("nmegabins{:?}", nmegabins);
         for i in 0..nmegabins{
             let start = SystemTime::now();
             println!("Starting megabin number:{}", i);
@@ -547,20 +523,12 @@ impl Receiver {
                 table: table[i].clone(),
                 payload: payload[i].clone(),
             };
-
             self.receive_data(&mut state, channel, rng)?;
             let (partial, partial_card, partial_sum_weights)= state.build_and_compute_circuit(&mut ev, channel).unwrap();
 
             acc = ev.crt_add(&acc, &partial).unwrap();
             card = ev.crt_add(&card, &partial_card).unwrap();
             sum_weights = ev.crt_add(&sum_weights, &partial_sum_weights).unwrap();
-            // For testing purposes, output partial states:
-            //
-            // let mpc_outs = ev
-            //     .outputs(&acc.wires().to_vec()).unwrap()
-            //     .expect("evaluator should produce outputs");
-            // let aggregate = fancy_garbling::util::crt_inv(&mpc_outs, &qs);
-            // println!("Partial output = {:?}", aggregate);
 
             channel.flush()?;
             println!(
@@ -577,41 +545,40 @@ impl Receiver {
         &mut self,
         aggregates: Vec<Vec<Wire>>,
         cardinality: Vec<Vec<Wire>>,
-        sum_wghts: Vec<Vec<Wire>>,
+        sum_of_weights: Vec<Vec<Wire>>,
         channel: &mut C,
         rng: &mut RNG,
-    ) -> Result<(u64, u64, u64), Error> {
+    ) -> Result<u128, Error> {
+
         let mut ev =
             Evaluator::<C, RNG, OtReceiver>::new(channel.clone(), RNG::from_seed(rng.gen())).unwrap();
-        let qs = fancy_garbling::util::primes_with_width(PAYLOAD_SIZE as u32 * 8);
+
+        let qs = &fancy_garbling::util::PRIMES[..PAYLOAD_PRIME_SIZE_EXPANDED];
+        let q = fancy_garbling::util::product(&qs);
 
         let mut acc = CrtBundle::new(aggregates[0].clone());
+        let mut sum_weights = CrtBundle::new(sum_of_weights[0].clone());
         let mut card = CrtBundle::new(cardinality[0].clone());
-        let mut sum_weights = CrtBundle::new(sum_wghts[0].clone());
+
         for i in 1..aggregates.len(){
             let partial_aggregate = CrtBundle::new(aggregates[i].clone());
             let partial_cardinality = CrtBundle::new(cardinality[i].clone());
-            let partial_sum_weights = CrtBundle::new(sum_wghts[i].clone());
+            let partial_sum_weights = CrtBundle::new(sum_of_weights[i].clone());
+
             acc = ev.crt_add(&acc, &partial_aggregate).unwrap();
             card = ev.crt_add(&card, &partial_cardinality).unwrap();
             sum_weights = ev.crt_add(&sum_weights, &partial_sum_weights).unwrap();
         }
-        let aggregate_outs = ev
-            .outputs(&acc.wires().to_vec()).unwrap()
-            .expect("evaluator should produce outputs");
-        let aggregate = fancy_garbling::util::crt_inv(&aggregate_outs, &qs);
 
-        let card_outs = ev
-            .outputs(&card.wires().to_vec()).unwrap()
+        let weighted_mean = ev.crt_div(&acc, &sum_weights).unwrap();
+        let weighted_mean_outs = ev
+            .outputs(&weighted_mean.wires().to_vec()).unwrap()
             .expect("evaluator should produce outputs");
-        let cardinality = fancy_garbling::util::crt_inv(&card_outs, &qs);
+        let weighted_mean = fancy_garbling::util::crt_inv(&weighted_mean_outs, &qs);
 
-        let sum_weights_outs = ev
-            .outputs(&sum_weights.wires().to_vec()).unwrap()
-            .expect("evaluator should produce outputs");
-        let sum = fancy_garbling::util::crt_inv(&sum_weights_outs, &qs);
+        println!("weighted_mean{}", weighted_mean);
 
-        Ok((aggregate as u64, cardinality as u64, sum as u64))
+        Ok(weighted_mean)
     }
 
     // For small to moderate sized sets, bucketizes using Cuckoo Hashing
@@ -745,7 +712,8 @@ impl ReceiverState {
         let sender_inputs = ev.receive_many(&mods_bits).unwrap();
         let receiver_inputs = ev.encode_many(&my_input_bits, &mods_bits).unwrap();
 
-        let qs = fancy_garbling::util::primes_with_width(PAYLOAD_SIZE as u32 * 8);
+        let qs = &fancy_garbling::util::PRIMES[..PAYLOAD_PRIME_SIZE_EXPANDED].to_vec();
+
         let mut mods_crt = Vec::new();
         for _i in 0..self.payload.len(){
             mods_crt.append(&mut qs.clone());
@@ -795,7 +763,7 @@ fn encode_inputs(opprf_ids: &[Block512]) -> Vec<u16> {
 // of the payloads.
 // + similar comment to encode_opprf_payload
 fn encode_payloads(payload: &[Block512]) -> Vec<u16> {
-    let q = fancy_garbling::util::primes_with_width(PAYLOAD_SIZE as u32 * 8);
+    let q = &fancy_garbling::util::PRIMES[..PAYLOAD_PRIME_SIZE_EXPANDED];
     payload
         .iter()
         .flat_map(|blk| {
@@ -822,7 +790,7 @@ fn encode_payloads(payload: &[Block512]) -> Vec<u16> {
 // the padded value should be random and modded with the
 // appropriate prime at its position
 fn encode_opprf_payload(opprf_ids: &[Block512]) -> Vec<u16> {
-let q = fancy_garbling::util::primes_with_width(PAYLOAD_SIZE as u32 * 8);
+let q = &fancy_garbling::util::PRIMES[..PAYLOAD_PRIME_SIZE_EXPANDED];
     opprf_ids
         .iter()
         .flat_map(|blk| {
@@ -851,7 +819,7 @@ fn fancy_compute_payload_aggregate<F: fancy_garbling::FancyReveal + Fancy>(
     assert_eq!(sender_payloads.len(), receiver_payloads.len());
     assert_eq!(receiver_payloads.len(), receiver_masks.len());
 
-    let qs = fancy_garbling::util::primes_with_width(PAYLOAD_SIZE as u32 * 8);
+    let qs = &fancy_garbling::util::PRIMES[..PAYLOAD_PRIME_SIZE_EXPANDED];
     let q = fancy_garbling::util::product(&qs);
 
     let eqs = sender_inputs
@@ -867,8 +835,8 @@ fn fancy_compute_payload_aggregate<F: fancy_garbling::FancyReveal + Fancy>(
 
 
     let reconstructed_payload = sender_payloads
-        .chunks(PAYLOAD_PRIME_SIZE)
-        .zip_eq(receiver_masks.chunks(PAYLOAD_PRIME_SIZE))
+        .chunks(PAYLOAD_PRIME_SIZE_EXPANDED)
+        .zip_eq(receiver_masks.chunks(PAYLOAD_PRIME_SIZE_EXPANDED))
         .map(|(xp, tp)| {
             let b_x = Bundle::new(xp.to_vec());
             let b_t = Bundle::new(tp.to_vec());
@@ -880,7 +848,7 @@ fn fancy_compute_payload_aggregate<F: fancy_garbling::FancyReveal + Fancy>(
         .collect::<Result<Vec<CrtBundle<F::Item>>, F::Error>>()?;
 
     let mut weighted_payloads = Vec::new();
-    for it in reconstructed_payload.clone().into_iter().zip_eq(receiver_payloads.chunks(PAYLOAD_PRIME_SIZE)){
+    for it in reconstructed_payload.clone().into_iter().zip_eq(receiver_payloads.chunks(PAYLOAD_PRIME_SIZE_EXPANDED)){
         let (ps, pr) = it;
         let weighted = f.crt_mul(&ps, &CrtBundle::new(pr.to_vec()))?;
         weighted_payloads.push(weighted);
@@ -891,8 +859,7 @@ fn fancy_compute_payload_aggregate<F: fancy_garbling::FancyReveal + Fancy>(
 
     let mut acc = f.crt_constant_bundle(0, q)?;
     let mut card = f.crt_constant_bundle(0, q)?;
-    let mut sum = f.crt_constant_bundle(0, q)?;
-
+    let mut sum_weights = f.crt_constant_bundle(0, q)?;
     let one = f.crt_constant_bundle(1, q)?;
     for (i, b) in eqs.iter().enumerate(){
         let b_ws = one
@@ -904,11 +871,9 @@ fn fancy_compute_payload_aggregate<F: fancy_garbling::FancyReveal + Fancy>(
         card = f.crt_add(&card, &b_crt)?;
 
         let mux = f.crt_mul(&b_crt, &weighted_payloads[i])?;
-        let weight_mux = f.crt_mul(&b_crt, &reconstructed_payload[i])?;
-
+        let mux_sum_weights = f.crt_mul(&b_crt, &reconstructed_payload[i])?;
         acc = f.crt_add(&acc, &mux)?;
-        sum = f.crt_add(&sum, &weight_mux)?;
+        sum_weights = f.crt_add(&sum_weights, &mux_sum_weights)?;
     }
-
-    Ok((acc, card, sum))
+    Ok((acc, card, sum_weights))
 }

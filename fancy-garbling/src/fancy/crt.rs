@@ -327,6 +327,153 @@ pub trait CrtGadgets: Fancy + BundleGadgets {
             })?
         })
     }
+
+    /// Convert the xs bundle to PMR representation. Useful for extracting out of CRT.
+    fn crt_to_pmr(
+        &mut self,
+        xs: &CrtBundle<Self::Item>,
+    ) -> Result<Bundle<Self::Item>, Self::Error> {
+        let gadget_projection_tt = |p: u16, q: u16| -> Vec<u16> {
+            let pq = p as u32 + q as u32 - 1;
+            let mut tab = Vec::with_capacity(pq as usize);
+            for z in 0..pq {
+                let mut x = 0;
+                let mut y = 0;
+                'outer: for i in 0..p as u32 {
+                    for j in 0..q as u32 {
+                        if (i + pq - j) % pq == z {
+                            x = i;
+                            y = j;
+                            break 'outer;
+                        }
+                    }
+                }
+                debug_assert_eq!((x + pq - y) % pq, z);
+                tab.push(
+                    (((x * q as u32 * util::inv(q as i128, p as i128) as u32
+                        + y * p as u32 * util::inv(p as i128, q as i128) as u32)
+                        / p as u32)
+                        % q as u32) as u16,
+                );
+            }
+            tab
+        };
+
+        let mut gadget = |x: &Self::Item, y: &Self::Item| -> Result<Self::Item, Self::Error> {
+            let p = x.modulus();
+            let q = y.modulus();
+            let x_ = self.mod_change(x, p + q - 1)?;
+            let y_ = self.mod_change(y, p + q - 1)?;
+            let z = self.sub(&x_, &y_)?;
+            self.proj(&z, q, Some(gadget_projection_tt(p, q)))
+        };
+
+        let n = xs.size();
+        let mut x = vec![vec![None; n + 1]; n + 1];
+
+        for j in 0..n {
+            x[0][j + 1] = Some(xs.wires()[j].clone());
+        }
+
+        for i in 1..=n {
+            for j in i + 1..=n {
+                let z = gadget(x[i - 1][i].as_ref().unwrap(), x[i - 1][j].as_ref().unwrap())?;
+                x[i][j] = Some(z);
+            }
+        }
+
+        let mut zwires = Vec::with_capacity(n);
+        for i in 0..n {
+            zwires.push(x[i][i + 1].take().unwrap());
+        }
+        Ok(Bundle::new(zwires))
+    }
+
+    /// Comparison based on PMR, more expensive than crt_lt but works on more things. For
+    /// it to work, there must be an extra modulus in the CRT that is not necessary to
+    /// represent the values. This ensures that if x < y, the most significant PMR digit
+    /// is nonzero after subtracting them. You could add a prime to your CrtBundles right
+    /// before using this gadget.
+    fn pmr_lt(
+        &mut self,
+        x: &CrtBundle<Self::Item>,
+        y: &CrtBundle<Self::Item>,
+    ) -> Result<Self::Item, Self::Error> {
+        let z = self.crt_sub(x, y)?;
+        let mut pmr = self.crt_to_pmr(&z)?;
+        let w = pmr.pop().unwrap();
+        let mut tab = vec![1; w.modulus() as usize];
+        tab[0] = 0;
+        self.proj(&w, 2, Some(tab))
+    }
+
+    /// Comparison based on PMR, more expensive than crt_lt but works on more things. For
+    /// it to work, there must be an extra modulus in the CRT that is not necessary to
+    /// represent the values. This ensures that if x < y, the most significant PMR digit
+    /// is nonzero after subtracting them. You could add a prime to your CrtBundles right
+    /// before using this gadget.
+    fn pmr_geq(
+        &mut self,
+        x: &CrtBundle<Self::Item>,
+        y: &CrtBundle<Self::Item>,
+    ) -> Result<Self::Item, Self::Error> {
+        let z = self.pmr_lt(x, y)?;
+        self.negate(&z)
+    }
+
+    /// Generic, and expensive, CRT-based addition for two ciphertexts. Uses PMR
+    /// comparison repeatedly. Requires an extra unused prime in both inputs.
+    fn crt_div(
+        &mut self,
+        x: &CrtBundle<Self::Item>,
+        y: &CrtBundle<Self::Item>,
+    ) -> Result<CrtBundle<Self::Item>, Self::Error> {
+        if x.moduli() != y.moduli() {
+            return Err(Self::Error::from(FancyError::UnequalModuli));
+        }
+
+        let q = x.composite_modulus();
+
+        // Compute l based on the assumption that the last prime is unused.
+        let nprimes = x.moduli().len();
+        let qs_ = &x.moduli()[..nprimes - 1];
+        let q_ = util::product(qs_);
+        let l = 128 - q_.leading_zeros();
+
+        let mut quotient = self.crt_constant_bundle(0, q)?;
+        let mut a = x.clone();
+
+        let one = self.crt_constant_bundle(1, q)?;
+        for i in 0..l {
+            let b = 2u128.pow(l - i - 1);
+            let mut pb = q_ / b;
+            if q_ % b == 0 {
+                pb = pb - 1;
+            }
+
+            let tmp = self.crt_cmul(&y, b)?;
+            let c1 = self.pmr_geq(&a, &tmp)?;
+
+            let pb_crt = self.crt_constant_bundle(pb, q)?;
+            let c2 = self.pmr_geq(&pb_crt, &y)?;
+
+            let c = self.and(&c1, &c2)?;
+
+            let c_ws = one
+                .iter()
+                .map(|w| self.mul(w, &c))
+                .collect::<Result<Vec<_>, _>>()?;
+            let c_crt = CrtBundle::new(c_ws);
+
+            let b_if = self.crt_cmul(&c_crt, b)?;
+            quotient = self.crt_add(&quotient, &b_if)?;
+
+            let tmp_if = self.crt_mul(&c_crt, &tmp)?;
+            a = self.crt_sub(&a, &tmp_if)?;
+        }
+
+        Ok(quotient)
+    }
 }
 
 /// Compute the `ms` needed for the number of CRT primes in `x`, with accuracy

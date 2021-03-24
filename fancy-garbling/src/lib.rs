@@ -23,6 +23,7 @@
 
 pub mod circuit;
 pub mod classic;
+pub mod depth_informer;
 pub mod dummy;
 pub mod errors;
 mod fancy;

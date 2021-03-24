@@ -1,0 +1,93 @@
+Server listening on 127.0.0.1:3000
+New connection: 127.0.0.1:58120
+Sender :: Bucketization time: 3079 ms
+Sender :: Bucketization time (read): 0.33 Mb
+Sender :: Bucketization time  (write): 0.20 Mb
+Server listening on 127.0.0.1:8000
+Server listening on 127.0.0.1:8001
+Server listening on 127.0.0.1:8002
+New connection: 127.0.0.1:58127
+New connection: 127.0.0.1:58128
+Sender Thread 2 Starting computation
+Sender Thread 1 Starting computation
+New connection: 127.0.0.1:58129
+Sender Thread 0 Starting computation
+Starting megabin number:0
+Starting megabin number:0
+Starting megabin number:0
+Sender :: Computation time: 169525 ms
+Starting megabin number:1
+Sender :: Computation time: 170131 ms
+Starting megabin number:1
+Sender :: Computation time: 170392 ms
+Starting megabin number:1
+Sender :: Computation time: 164866 ms
+Starting megabin number:2
+Sender :: Computation time: 165409 ms
+Starting megabin number:2
+Sender :: Computation time: 165441 ms
+Starting megabin number:2
+Sender :: Computation time: 168649 ms
+Starting megabin number:3
+Sender :: Computation time: 168937 ms
+Starting megabin number:3
+Sender :: Computation time: 169344 ms
+Starting megabin number:3
+Sender :: Computation time: 193434 ms
+Starting megabin number:4
+Sender :: Computation time: 192394 ms
+Starting megabin number:4
+Sender :: Computation time: 192804 ms
+Starting megabin number:4
+Sender :: Computation time: 165154 ms
+Starting megabin number:5
+Sender :: Computation time: 165087 ms
+Starting megabin number:5
+Sender :: Computation time: 165810 ms
+Starting megabin number:5
+Sender :: Computation time: 174561 ms
+Starting megabin number:6
+Sender :: Computation time: 175222 ms
+Starting megabin number:6
+Sender :: Computation time: 175052 ms
+Starting megabin number:6
+Sender :: Computation time: 164592 ms
+Starting megabin number:7
+Sender :: Computation time: 165114 ms
+Starting megabin number:7
+Sender :: Computation time: 165660 ms
+Starting megabin number:7
+Sender :: Computation time: 178745 ms
+Starting megabin number:8
+Sender :: Computation time: 179323 ms
+Starting megabin number:8
+Sender :: Computation time: 178417 ms
+Starting megabin number:8
+Sender :: Computation time: 174104 ms
+Starting megabin number:9
+Sender :: Computation time: 173815 ms
+Starting megabin number:9
+Sender :: Computation time: 174247 ms
+Starting megabin number:9
+Sender :: Computation time: 112751 ms
+Sender Thread 2 :: total circuit building & computation time: 1666651 ms
+Sender Thread 2 :: total circuit building & computation communication (read): 261.34 Mb
+Sender Thread 2 :: total circuit building & computation communication (write): 7793.22 Mb
+Sender :: Computation time: 143910 ms
+Starting megabin number:10
+Sender :: Computation time: 143547 ms
+Starting megabin number:10
+Sender :: Computation time: 113360 ms
+Sender Thread 0 :: total circuit building & computation time: 1812966 ms
+Sender Thread 0 :: total circuit building & computation communication (read): 295.55 Mb
+Sender Thread 0 :: total circuit building & computation communication (write): 8814.42 Mb
+Sender :: Computation time: 112944 ms
+Sender Thread 1 :: total circuit building & computation time: 1813897 ms
+Sender Thread 1 :: total circuit building & computation communication (read): 295.55 Mb
+Sender Thread 1 :: total circuit building & computation communication (write): 8814.42 Mb
+Server listening on 127.0.0.1:3000
+New connection: 127.0.0.1:59121
+Sender :: total Joining threads results time: 6019 ms
+Sender :: total Joining threads results time (read): 0.33 Mb
+Sender :: total Joining threads results time  (write): 0.20 Mb
+Experiments done !

@@ -1,0 +1,94 @@
+Number of megabins per thread 11
+Receiver :: Bucketization time : 203 ms
+Receiver ::Bucketization time (read): 0.20 Mb
+Receiver :: Bucketization time (write): 0.33 Mb
+Terminated.
+Receiver Thread 1 Starting computation
+Receiver Thread 0 Starting computation
+Receiver Thread 2 Starting computation
+nmegabins10
+Starting megabin number:0
+nmegabins11
+Starting megabin number:0
+nmegabins11
+Starting megabin number:0
+Receiver :: Computation time: 169478 ms
+Starting megabin number:1
+Receiver :: Computation time: 170018 ms
+Starting megabin number:1
+Receiver :: Computation time: 170333 ms
+Starting megabin number:1
+Receiver :: Computation time: 164886 ms
+Starting megabin number:2
+Receiver :: Computation time: 165437 ms
+Starting megabin number:2
+Receiver :: Computation time: 165447 ms
+Starting megabin number:2
+Receiver :: Computation time: 168587 ms
+Starting megabin number:3
+Receiver :: Computation time: 168905 ms
+Starting megabin number:3
+Receiver :: Computation time: 169347 ms
+Starting megabin number:3
+Receiver :: Computation time: 193491 ms
+Starting megabin number:4
+Receiver :: Computation time: 192455 ms
+Starting megabin number:4
+Receiver :: Computation time: 192783 ms
+Starting megabin number:4
+Receiver :: Computation time: 165124 ms
+Starting megabin number:5
+Receiver :: Computation time: 165047 ms
+Starting megabin number:5
+Receiver :: Computation time: 165831 ms
+Starting megabin number:5
+Receiver :: Computation time: 174598 ms
+Starting megabin number:6
+Receiver :: Computation time: 175267 ms
+Starting megabin number:6
+Receiver :: Computation time: 175025 ms
+Starting megabin number:6
+Receiver :: Computation time: 164566 ms
+Starting megabin number:7
+Receiver :: Computation time: 165133 ms
+Starting megabin number:7
+Receiver :: Computation time: 165678 ms
+Starting megabin number:7
+Receiver :: Computation time: 178773 ms
+Starting megabin number:8
+Receiver :: Computation time: 179276 ms
+Starting megabin number:8
+Receiver :: Computation time: 178391 ms
+Starting megabin number:8
+Receiver :: Computation time: 174070 ms
+Starting megabin number:9
+Receiver :: Computation time: 173844 ms
+Starting megabin number:9
+Receiver :: Computation time: 174245 ms
+Starting megabin number:9
+Receiver :: Computation time: 112733 ms
+Receiver Thread 2 :: total circuit building & computation time: 1666495 ms
+Receiver Thread 2 :: total circuit building & computation communication (read): 7793.22 Mb
+Receiver Thread 2 :: total circuit building & computation communication (write): 261.34 Mb
+Terminated.
+Receiver :: Computation time: 143942 ms
+Starting megabin number:10
+Receiver :: Computation time: 143619 ms
+Starting megabin number:10
+Receiver :: Computation time: 113435 ms
+Receiver Thread 0 :: total circuit building & computation time: 1812966 ms
+Receiver Thread 0 :: total circuit building & computation communication (read): 8814.42 Mb
+Receiver Thread 0 :: total circuit building & computation communication (write): 295.55 Mb
+Terminated.
+Receiver :: Computation time: 112950 ms
+Receiver Thread 1 :: total circuit building & computation time: 1813877 ms
+Receiver Thread 1 :: total circuit building & computation communication (read): 8814.42 Mb
+Receiver Thread 1 :: total circuit building & computation communication (write): 295.55 Mb
+Terminated.
+weighted_mean3807
+weighted_mean: 3807
+Receiver :: total Joining threads results time: 6020 ms
+Receiver :: total Joining threads results time (read): 0.20 Mb
+Receiver :: total Joining threads results time  (write): 0.33 Mb
+Experiments done !
+Press Enter to continue...

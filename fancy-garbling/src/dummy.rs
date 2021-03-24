@@ -228,7 +228,68 @@ mod bundle {
                 let z = d.bin_multiplication_lower_half(&x, &y).unwrap();
                 out = d.bin_output(&z).unwrap().unwrap();
             }
-            assert_eq!(out, (x * y) & (q - 1));
+            assert_eq!(out, (x * y) % q);
+        }
+    }
+
+    #[test]
+    fn test_shift_extend() {
+        let mut rng = thread_rng();
+        for _ in 0..NITERS {
+            let nbits = 64;
+            let q = 1 << nbits;
+            let shift_size = rng.gen_usize() % nbits;
+            let x = rng.gen_u128() % q;
+            let mut d = Dummy::new();
+            let out;
+            {
+                use crate::BinaryBundle;
+                let x = d.bin_encode(x, nbits).unwrap();
+                let z = d.shift_extend(&x, shift_size).unwrap();
+                out = d.bin_output(&BinaryBundle::from(z)).unwrap().unwrap();
+            }
+            assert_eq!(out, x << shift_size);
+        }
+    }
+
+    #[test]
+    fn test_binary_full_multiplication() {
+        let mut rng = thread_rng();
+        for _ in 0..NITERS {
+            let nbits = 64;
+            let q = 1 << nbits;
+            let x = rng.gen_u128() % q;
+            let y = rng.gen_u128() % q;
+            let mut d = Dummy::new();
+            let out;
+            {
+                let x = d.bin_encode(x, nbits).unwrap();
+                let y = d.bin_encode(y, nbits).unwrap();
+                let z = d.bin_mul(&x, &y).unwrap();
+                println!("z.len() = {}", z.size());
+                out = d.bin_output(&z).unwrap().unwrap();
+            }
+            assert_eq!(out, x * y);
+        }
+    }
+
+    #[test]
+    fn test_binary_division() {
+        let mut rng = thread_rng();
+        for _ in 0..NITERS {
+            let nbits = 64;
+            let q = 1 << nbits;
+            let x = rng.gen_u128() % q;
+            let y = rng.gen_u128() % q;
+            let mut d = Dummy::new();
+            let out;
+            {
+                let x = d.bin_encode(x, nbits).unwrap();
+                let y = d.bin_encode(y, nbits).unwrap();
+                let z = d.bin_div(&x, &y).unwrap();
+                out = d.bin_output(&z).unwrap().unwrap();
+            }
+            assert_eq!(out, x / y);
         }
     }
 
@@ -541,6 +602,111 @@ mod bundle {
                 let should_be = *util::as_mixed_radix(sum, &mods).last().unwrap();
                 assert_eq!(res, should_be);
             }
+        }
+    }
+}
+
+#[cfg(test)]
+mod pmr_tests {
+    use super::*;
+    use crate::{
+        fancy::{BundleGadgets, CrtGadgets, FancyInput},
+        util::RngExt,
+    };
+
+    #[test]
+    fn pmr() {
+        let mut rng = rand::thread_rng();
+        for _ in 0..16 {
+            let ps = rng.gen_usable_factors();
+            let q = crate::util::product(&ps);
+            let pt = rng.gen_u128() % q;
+
+            let mut f = Dummy::new();
+            let x = f.crt_encode(pt, q).unwrap();
+            let z = f.crt_to_pmr(&x).unwrap();
+            let res = f.output_bundle(&z).unwrap().unwrap();
+
+            let should_be = to_pmr_pt(pt, &ps);
+            assert_eq!(res, should_be);
+        }
+    }
+
+    fn to_pmr_pt(x: u128, ps: &[u16]) -> Vec<u16> {
+        let mut ds = vec![0; ps.len()];
+        let mut q = 1;
+        for i in 0..ps.len() {
+            let p = ps[i] as u128;
+            ds[i] = ((x / q) % p) as u16;
+            q *= p;
+        }
+        ds
+    }
+
+    #[test]
+    fn pmr_lt() {
+        let mut rng = rand::thread_rng();
+        for _ in 0..128 {
+            let qs = rng.gen_usable_factors();
+            let n = qs.len();
+            let q = crate::util::product(&qs);
+            let q_ = crate::util::product(&qs[..n - 1]);
+            let pt_x = rng.gen_u128() % q_;
+            let pt_y = rng.gen_u128() % q_;
+
+            let mut f = Dummy::new();
+            let crt_x = f.crt_encode(pt_x, q).unwrap();
+            let crt_y = f.crt_encode(pt_y, q).unwrap();
+            let z = f.pmr_lt(&crt_x, &crt_y).unwrap();
+            let res = f.output(&z).unwrap().unwrap();
+
+            let should_be = if pt_x < pt_y { 1 } else { 0 };
+            assert_eq!(res, should_be, "q={}, x={}, y={}", q, pt_x, pt_y);
+        }
+    }
+
+    #[test]
+    fn pmr_geq() {
+        let mut rng = rand::thread_rng();
+        for _ in 0..8 {
+            let qs = rng.gen_usable_factors();
+            let n = qs.len();
+            let q = crate::util::product(&qs);
+            let q_ = crate::util::product(&qs[..n - 1]);
+            let pt_x = rng.gen_u128() % q_;
+            let pt_y = rng.gen_u128() % q_;
+
+            let mut f = Dummy::new();
+            let crt_x = f.crt_encode(pt_x, q).unwrap();
+            let crt_y = f.crt_encode(pt_y, q).unwrap();
+            let z = f.pmr_geq(&crt_x, &crt_y).unwrap();
+            let res = f.output(&z).unwrap().unwrap();
+
+            let should_be = if pt_x >= pt_y { 1 } else { 0 };
+            assert_eq!(res, should_be, "q={}, x={}, y={}", q, pt_x, pt_y);
+        }
+    }
+
+    #[test]
+    #[ignore]
+    fn crt_div() {
+        let mut rng = rand::thread_rng();
+        for _ in 0..8 {
+            let qs = rng.gen_usable_factors();
+            let n = qs.len();
+            let q = crate::util::product(&qs);
+            let q_ = crate::util::product(&qs[..n - 1]);
+            let pt_x = rng.gen_u128() % q_;
+            let pt_y = rng.gen_u128() % q_;
+
+            let mut f = Dummy::new();
+            let crt_x = f.crt_encode(pt_x, q).unwrap();
+            let crt_y = f.crt_encode(pt_y, q).unwrap();
+            let z = f.crt_div(&crt_x, &crt_y).unwrap();
+            let res = f.crt_output(&z).unwrap().unwrap();
+
+            let should_be = pt_x / pt_y;
+            assert_eq!(res, should_be, "q={}, x={}, y={}", q, pt_x, pt_y);
         }
     }
 }
