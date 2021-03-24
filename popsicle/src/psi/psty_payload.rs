@@ -66,8 +66,15 @@ const HASH_SIZE: usize = 4;
 
 // How many bytes are used for payloads
 const PAYLOAD_SIZE: usize = 8;
+
+// How many bits do yout need for later pmr comparisons (usually an added bit)
+const PAYLOAD_SIZE_EXPANDED: u32 = PAYLOAD_SIZE as u32 * 8 + 1;
+
 // How many u16's are used for the CRT representation
 const PAYLOAD_PRIME_SIZE: usize = 16;
+
+// How many u16's are used for the CRT representation
+const PAYLOAD_PRIME_SIZE_EXPANDED: usize = PAYLOAD_PRIME_SIZE + 1;
 
 // How many bytes to use to determine whether decryption succeeded in the send/recv
 // payload methods.
@@ -202,12 +209,12 @@ impl Sender {
         let mut gb = Garbler::<C, RNG, OtSender>::new(channel.clone(), RNG::from_seed(rng.gen())).unwrap();
         let _ = gb.load_deltas(path_deltas);
 
-        let qs = fancy_garbling::util::primes_with_width(PAYLOAD_SIZE as u32 * 8);
+        let qs = fancy_garbling::util::primes_with_width(PAYLOAD_PRIME_SIZE_EXPANDED as u32);
         let q = fancy_garbling::util::product(&qs);
 
         let mut acc = gb.crt_constant_bundle(0, q).unwrap();
-        let mut card = gb.crt_constant_bundle(0, q).unwrap();
         let mut sum_weights = gb.crt_constant_bundle(0, q).unwrap();
+        let mut card = gb.crt_constant_bundle(0, q).unwrap();
 
         let nmegabins = ts_id.len();
         for i in 0..nmegabins{
@@ -378,18 +385,26 @@ impl SenderState {
         C: AbstractChannel,
         RNG: RngCore + CryptoRng + SeedableRng<Seed = Block>,
     {
+        println!("sx encoding inputs");
         let my_input_bits = encode_inputs(&self.opprf_ids);
+        println!("sx encoding payloads");
         let my_payload_bits = encode_payloads(&self.opprf_payloads);
 
         let mods_bits = vec![2; my_input_bits.len()];
+        println!("encoding input sx");
         let sender_inputs = gb.encode_many(&my_input_bits, &mods_bits).unwrap();
+        println!("done encoding inputs sx");
         let receiver_inputs = gb.receive_many(&mods_bits).unwrap();
+        println!("receiving input rx");
 
         // Build appropriate modulus in order to encode as CRT.
         // CRT representation assumes that inputs and outputs of the
         // circuit are PAYLOAD_SIZE bytes long: this helps avoid carry
         // handling in GC computation.
-        let qs = fancy_garbling::util::primes_with_width(PAYLOAD_SIZE as u32 * 8);
+        let mut qs = fancy_garbling::util::primes_with_width(PAYLOAD_PRIME_SIZE_EXPANDED as u32);
+        // let nprimes = qs.len();
+        // qs.push(fancy_garbling::util::PRIMES[nprimes]);
+
         let mut mods_crt = Vec::new();
         for _i in 0..self.opprf_payloads.len(){
             mods_crt.append(&mut qs.clone());
@@ -398,7 +413,6 @@ impl SenderState {
         let sender_payloads = gb.encode_many(&my_payload_bits, &mods_crt).unwrap();
         let receiver_payloads = gb.receive_many(&mods_crt).unwrap();
         let receiver_masks = gb.receive_many(&mods_crt).unwrap();
-
         Ok((sender_inputs, receiver_inputs, sender_payloads, receiver_payloads, receiver_masks))
     }
 
@@ -454,7 +468,6 @@ impl Receiver {
         };
 
         self.receive_data(&mut state, channel, rng)?;
-
         let (aggregate, card, sum_weights) = state.build_and_compute_circuit(&mut ev, channel).unwrap();
 
         let aggregate_outs = ev
@@ -530,16 +543,17 @@ impl Receiver {
         rng: &mut RNG,
     ) -> Result<(CrtBundle<fancy_garbling::Wire>, CrtBundle<fancy_garbling::Wire>,
                  CrtBundle<fancy_garbling::Wire>), Error> {
-
+        println!("hello");
         let mut ev =
             Evaluator::<C, RNG, OtReceiver>::new(channel.clone(), RNG::from_seed(rng.gen())).unwrap();
-        let qs = fancy_garbling::util::primes_with_width(PAYLOAD_SIZE as u32 * 8);
+        let qs = fancy_garbling::util::primes_with_width(PAYLOAD_SIZE_EXPANDED as u32);
+        println!("bye");
         let q = fancy_garbling::util::product(&qs);
-
+        println!("q {}", q);
         let mut acc = ev.crt_constant_bundle(0, q).unwrap();
-        let mut card = ev.crt_constant_bundle(0, q).unwrap();
         let mut sum_weights = ev.crt_constant_bundle(0, q).unwrap();
-
+        let mut card = ev.crt_constant_bundle(0, q).unwrap();
+        println!("off i go");
         let nmegabins = table.len();
         for i in 0..nmegabins{
             let start = SystemTime::now();
@@ -550,8 +564,9 @@ impl Receiver {
                 table: table[i].clone(),
                 payload: payload[i].clone(),
             };
-
+            println!("receive_data");
             self.receive_data(&mut state, channel, rng)?;
+            println!("build_and_compute_circuit");
             let (partial, partial_card, partial_sum_weights)= state.build_and_compute_circuit(&mut ev, channel).unwrap();
 
             acc = ev.crt_add(&acc, &partial).unwrap();
@@ -587,7 +602,7 @@ impl Receiver {
 
         let mut ev =
             Evaluator::<C, RNG, OtReceiver>::new(channel.clone(), RNG::from_seed(rng.gen())).unwrap();
-        let qs = fancy_garbling::util::primes_with_width(PAYLOAD_SIZE as u32 * 8);
+        let qs = fancy_garbling::util::primes_with_width(PAYLOAD_SIZE_EXPANDED);
 
         let mut acc = CrtBundle::new(aggregates[0].clone());
         let mut card = CrtBundle::new(cardinality[0].clone());
@@ -747,15 +762,21 @@ impl ReceiverState {
         RNG: CryptoRng + RngCore + SeedableRng<Seed = Block>,
     {
 
+        println!("rx encoding inputs ");
         let my_input_bits = encode_inputs(&self.opprf_ids);
         let my_opprf_output = encode_opprf_payload(&self.opprf_payloads);
         let my_payload_bits = encode_payloads(&self.payload);
 
         let mods_bits = vec![2; my_input_bits.len()];
+        println!("rx receiving inputs ");
         let sender_inputs = ev.receive_many(&mods_bits).unwrap();
+        println!("rx received inputs ");
         let receiver_inputs = ev.encode_many(&my_input_bits, &mods_bits).unwrap();
 
-        let qs = fancy_garbling::util::primes_with_width(PAYLOAD_SIZE as u32 * 8);
+        let mut qs = fancy_garbling::util::primes_with_width(PAYLOAD_SIZE_EXPANDED);
+        // let nprimes = qs.len();
+        // qs.push(fancy_garbling::util::PRIMES[nprimes]);
+
         let mut mods_crt = Vec::new();
         for _i in 0..self.payload.len(){
             mods_crt.append(&mut qs.clone());
@@ -805,7 +826,7 @@ fn encode_inputs(opprf_ids: &[Block512]) -> Vec<u16> {
 // of the payloads.
 // + similar comment to encode_opprf_payload
 fn encode_payloads(payload: &[Block512]) -> Vec<u16> {
-    let q = fancy_garbling::util::primes_with_width(PAYLOAD_SIZE as u32 * 8);
+    let q = fancy_garbling::util::primes_with_width(PAYLOAD_SIZE_EXPANDED);
     payload
         .iter()
         .flat_map(|blk| {
@@ -832,7 +853,7 @@ fn encode_payloads(payload: &[Block512]) -> Vec<u16> {
 // the padded value should be random and modded with the
 // appropriate prime at its position
 fn encode_opprf_payload(opprf_ids: &[Block512]) -> Vec<u16> {
-let q = fancy_garbling::util::primes_with_width(PAYLOAD_SIZE as u32 * 8);
+let q = fancy_garbling::util::primes_with_width(PAYLOAD_SIZE_EXPANDED);
     opprf_ids
         .iter()
         .flat_map(|blk| {
@@ -861,7 +882,7 @@ fn fancy_compute_payload_aggregate<F: fancy_garbling::FancyReveal + Fancy>(
     assert_eq!(sender_payloads.len(), receiver_payloads.len());
     assert_eq!(receiver_payloads.len(), receiver_masks.len());
 
-    let qs = fancy_garbling::util::primes_with_width(PAYLOAD_SIZE as u32 * 8);
+    let qs = fancy_garbling::util::primes_with_width(PAYLOAD_SIZE_EXPANDED);
     let q = fancy_garbling::util::product(&qs);
 
     let eqs = sender_inputs
@@ -877,8 +898,8 @@ fn fancy_compute_payload_aggregate<F: fancy_garbling::FancyReveal + Fancy>(
 
 
     let reconstructed_payload = sender_payloads
-        .chunks(PAYLOAD_PRIME_SIZE)
-        .zip_eq(receiver_masks.chunks(PAYLOAD_PRIME_SIZE))
+        .chunks(PAYLOAD_PRIME_SIZE_EXPANDED)
+        .zip_eq(receiver_masks.chunks(PAYLOAD_PRIME_SIZE_EXPANDED))
         .map(|(xp, tp)| {
             let b_x = Bundle::new(xp.to_vec());
             let b_t = Bundle::new(tp.to_vec());
@@ -890,7 +911,7 @@ fn fancy_compute_payload_aggregate<F: fancy_garbling::FancyReveal + Fancy>(
         .collect::<Result<Vec<CrtBundle<F::Item>>, F::Error>>()?;
 
     let mut weighted_payloads = Vec::new();
-    for it in reconstructed_payload.clone().into_iter().zip_eq(receiver_payloads.chunks(PAYLOAD_PRIME_SIZE)){
+    for it in reconstructed_payload.clone().into_iter().zip_eq(receiver_payloads.chunks(PAYLOAD_PRIME_SIZE_EXPANDED)){
         let (ps, pr) = it;
         let weighted = f.crt_mul(&ps, &CrtBundle::new(pr.to_vec()))?;
         weighted_payloads.push(weighted);
@@ -928,30 +949,16 @@ fn fancy_compute_division<F: fancy_garbling::FancyReveal + Fancy<Item = Wire>>(
 
     println!("Starting Division...");
 
-    let qs = fancy_garbling::util::primes_with_width(PAYLOAD_SIZE as u32 * 8);
+    let qs = fancy_garbling::util::primes_with_width(PAYLOAD_SIZE_EXPANDED);
     let q = fancy_garbling::util::product(&qs);
 
-    let qs_65 = fancy_garbling::util::primes_with_width(65);
-    let q_65 = fancy_garbling::util::product(&qs_65);
-
-    let last_prime = fancy_garbling::util::PRIMES[16];
-    let zero_wire = fancy_garbling::Wire::zero(last_prime);
-
-    let mut x_pad = x.wires().to_vec();
-    x_pad.push(zero_wire.clone());
-    let x_large = CrtBundle::new(x_pad);
-
-    let mut y_pad = y.wires().to_vec();
-    y_pad.push(zero_wire.clone());
-    let y_large = CrtBundle::new(y_pad);
-    println!("x {} y {}",f.crt_reveal(&x_large)?, f.crt_reveal(&y_large)?);
 
     let l = ((q as f64).log2().ceil()) as u32;
 
-    let mut quotient = f.crt_constant_bundle(0, q_65)?;
-    let mut a = x_large;
+    let mut quotient = f.crt_constant_bundle(0, q)?;
+    let mut a = x;
 
-    let one = f.crt_constant_bundle(1, q_65)?;
+    let one = f.crt_constant_bundle(1, q)?;
     for i in 0..l{
         let b = 2u128.pow(l-i-1);
         let mut pb = q / b;
@@ -959,12 +966,12 @@ fn fancy_compute_division<F: fancy_garbling::FancyReveal + Fancy<Item = Wire>>(
             pb = pb-1;
         }
 
-        let tmp = f.crt_cmul(&y_large, b)?;
+        let tmp = f.crt_cmul(&y, b)?;
         let c1 = f.pmr_geq(&a, &tmp)?;
         println!("c1{} {} a{} tmp{}", i, f.reveal(&c1)?, f.crt_reveal(&a)?, f.crt_reveal(&tmp)?);
-        let pb_crt = f.crt_constant_bundle(pb, q_65)?;
-        let c2 = f.pmr_geq(&pb_crt, &y_large)?;
-        println!("c2{} {} prime_overB{} y{}", i, f.reveal(&c2)?, f.crt_reveal(&pb_crt)?, f.crt_reveal(&y_large)?);
+        let pb_crt = f.crt_constant_bundle(pb, q)?;
+        let c2 = f.pmr_geq(&pb_crt, &y)?;
+        println!("c2{} {} prime_overB{} y{}", i, f.reveal(&c2)?, f.crt_reveal(&pb_crt)?, f.crt_reveal(&y)?);
 
         let c = f.and(&c1, &c2)?;
         println!("cs{} {} {} {}", i, f.reveal(&c1)?, f.reveal(&c2)?, f.reveal(&c)?);
