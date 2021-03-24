@@ -1,5 +1,6 @@
-imports_layout = "HorizontalVertical"
-merge_imports = true
 newline_style = "Unix"
 reorder_modules = true
 
+#Re-enable these when they becomes stable.
+#imports_granularity = "Crate"
+#imports_layout = "HorizontalVertical"

@@ -17,19 +17,13 @@ use crate::{
 use generic_array::typenum::Unsigned;
 use rand::{
     distributions::{Distribution, Uniform},
-    CryptoRng,
-    Rng,
-    SeedableRng,
+    CryptoRng, Rng, SeedableRng,
 };
 use scuttlebutt::{
     commitment::{Commitment, ShaCommitment},
     field::FiniteField as FF,
     utils::unpack_bits,
-    AbstractChannel,
-    Aes128,
-    AesRng,
-    Block,
-    Malicious,
+    AbstractChannel, Aes128, AesRng, Block, Malicious,
 };
 
 pub struct Sender<OT: OtReceiver + Malicious, FE: FF> {
@@ -364,14 +358,12 @@ mod test {
             base_svole::{Receiver as BaseReceiver, Sender as BaseSender},
             utils::Powers,
         },
-        SpsReceiver,
-        SpsSender,
+        SpsReceiver, SpsSender,
     };
     use generic_array::typenum::Unsigned;
     use scuttlebutt::{
         field::{F61p, FiniteField as FF, Fp, Gf128, F2},
-        AesRng,
-        Channel,
+        AesRng, Channel,
     };
     use std::{
         io::{BufReader, BufWriter},

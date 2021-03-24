@@ -10,13 +10,7 @@ use crate::Block;
 use rand::{CryptoRng, Error, Rng, RngCore, SeedableRng};
 use rand_core::block::{BlockRng64, BlockRngCore};
 use vectoreyes::{
-    array_utils::ArrayUnrolledExt,
-    Aes128EncryptOnly,
-    AesBlockCipher,
-    SimdBase,
-    U32x8,
-    U64x2,
-    U8x16,
+    array_utils::ArrayUnrolledExt, Aes128EncryptOnly, AesBlockCipher, SimdBase, U32x8, U64x2, U8x16,
 };
 
 mod vectorized;

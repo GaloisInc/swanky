@@ -18,10 +18,10 @@ stages:
 checkfmt:rustfmt:
   stage: checkfmt
   variables:
-    toolchain: nightly-2020-07-27
+    toolchain: stable
   script:
     - rustup component add rustfmt --toolchain $toolchain
-    - cargo fmt --all -- --check
+    - cargo fmt -- --check
 
 .test:
   stage: test

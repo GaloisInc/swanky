@@ -1,14 +1,7 @@
 use super::AesRng;
 use vectoreyes::{
     array_utils::{ArrayAdjacentPairs, ArrayUnrolledExt},
-    Aes128EncryptOnly,
-    AesBlockCipher,
-    SimdBase,
-    SimdBase32,
-    SimdBase64,
-    U32x4,
-    U32x8,
-    U64x4,
+    Aes128EncryptOnly, AesBlockCipher, SimdBase, SimdBase32, SimdBase64, U32x4, U32x8, U64x4,
     U8x16,
 };
 
