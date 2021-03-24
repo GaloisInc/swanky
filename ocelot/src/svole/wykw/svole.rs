@@ -142,8 +142,6 @@ impl<FE: FiniteField> Sender<FE> {
         // The number of base VOLEs we need to use.
         let used = rows + weight + r;
 
-        println!("Num VOLEs saved: {}", self.base_voles.len());
-
         debug_assert!(
             self.base_voles.len() >= used,
             "Not enough base sVOLEs: {} < {} + {} + {}",
