@@ -27,12 +27,6 @@ openssl        = { version = "0.10.32", optional = true }
 
 [dev-dependencies]
 criterion  = "0.3.4"
-clap       = "2.33.3"
-serde      = { version = "1.0.123", features = ["derive"] }
-serde_yaml = "0.8.17"
-rustyline  = "7.1.0"
-pbr        = "1.0.4"
-ascii      = "1.0.0"
 
 [[bench]]
 name = "psz"
@@ -49,8 +43,4 @@ required-features = ["psty"]
 
 [[example]]
 name = "psty-payload"
-required-features = ["psty"]
-
-[[example]]
-name = "secretsister"
 required-features = ["psty"]

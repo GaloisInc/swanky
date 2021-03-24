@@ -617,7 +617,7 @@ mod pmr_tests {
     #[test]
     fn pmr() {
         let mut rng = rand::thread_rng();
-        for _ in 0..16 {
+        for _ in 0..8 {
             let ps = rng.gen_usable_factors();
             let q = crate::util::product(&ps);
             let pt = rng.gen_u128() % q;
@@ -646,7 +646,7 @@ mod pmr_tests {
     #[test]
     fn pmr_lt() {
         let mut rng = rand::thread_rng();
-        for _ in 0..128 {
+        for _ in 0..8 {
             let qs = rng.gen_usable_factors();
             let n = qs.len();
             let q = crate::util::product(&qs);
