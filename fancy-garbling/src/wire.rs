@@ -597,14 +597,13 @@ mod tests {
         let q = rng.gen_modulus();
         let ws = (0..n).map(|_| Wire::rand(&mut rng, q)).collect_vec();
 
-        let hashes = crossbeam::scope(|scope| {
-            let hs = ws
-                .iter()
-                .map(|w| scope.spawn(move |_| w.hash(Block::default())))
-                .collect_vec();
-            hs.into_iter().map(|h| h.join().unwrap()).collect_vec()
-        })
-        .unwrap();
+        let mut handles = Vec::new();
+        for w in ws.iter() {
+            let w_ = w.clone();
+            let h = std::thread::spawn(move || w_.hash(Block::default()));
+            handles.push(h);
+        }
+        let hashes = handles.into_iter().map(|h| h.join().unwrap()).collect_vec();
 
         let should_be = ws.iter().map(|w| w.hash(Block::default())).collect_vec();
 
