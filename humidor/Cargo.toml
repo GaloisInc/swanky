@@ -24,6 +24,7 @@ sprs = "0.9.3"
 ndarray = "0.13.1"
 num-traits = "0.2.14"
 rand = "0.8.3"
+static_assertions = "0.2.3"
 
 [dependencies.threshold-secret-sharing]
 git = "https://gitlab-ext.galois.com/hamlinb/rust-threshold-secret-sharing"

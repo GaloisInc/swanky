@@ -93,7 +93,7 @@ impl Params {
                 share_count: n,
                 secret_count: l,
 
-                prime: Field::MOD,
+                prime: Field::MOD as i128,
                 omega_secrets: Field::ROOTS_BASE_2[kexp as usize] as i128,
                 omega_shares: Field::ROOTS_BASE_3[nexp as usize] as i128,
             }
@@ -247,11 +247,11 @@ impl Params {
     }
 
     pub fn peval2(&self, p: ArrayView1<Field>, ix: usize) -> Field {
-        crate::util::peval(p, Field::from(self.pss.omega_secrets).pow(ix as i128))
+        crate::util::peval(p, Field::from(self.pss.omega_secrets).pow(ix as u64))
     }
 
     pub fn peval3(&self, p: ArrayView1<Field>, ix: usize) -> Field {
-        crate::util::peval(p, Field::from(self.pss.omega_shares).pow(ix as i128))
+        crate::util::peval(p, Field::from(self.pss.omega_shares).pow(ix as u64))
     }
 
     #[allow(non_snake_case)]

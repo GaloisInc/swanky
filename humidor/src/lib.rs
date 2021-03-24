@@ -1,3 +1,6 @@
+#[macro_use]
+extern crate static_assertions;
+
 mod util;
 mod params;
 mod merkle;
