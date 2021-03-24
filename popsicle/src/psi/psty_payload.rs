@@ -510,10 +510,9 @@ impl Receiver {
         let mut acc = ev.crt_constant_bundle(0, q).unwrap();
         let mut sum_weights = ev.crt_constant_bundle(0, q).unwrap();
         let mut card = ev.crt_constant_bundle(0, q).unwrap();
-        let mut sum_weights = ev.crt_constant_bundle(0, q).unwrap();
 
         let nmegabins = table.len();
-        println!("nmegabins{:?}", nmegabins);
+        println!("nmegabins: {:?}", nmegabins);
         for i in 0..nmegabins{
             let start = SystemTime::now();
             println!("Starting megabin number:{}", i);
