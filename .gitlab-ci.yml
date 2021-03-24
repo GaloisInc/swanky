@@ -1,4 +1,6 @@
-image: "rust:latest"
+default:
+  image: "rust:latest"
+  interruptible: true
 
 variables:
   GIT_STRATEGY: clone
@@ -16,43 +18,101 @@ stages:
   - checkfmt
   - test
 
-checkfmt:rustfmt:
-  stage: checkfmt
-  variables:
-    toolchain: stable
-  script:
-    - rustup component add rustfmt --toolchain $toolchain
-    - cargo fmt -- --check
+.any-changes:
+  only:
+    refs:
+      - merge_requests
+      - master
+      - dev
+
+.vectoreyes-changes:
+  only:
+    refs:
+      - merge_requests
+    changes:
+      - "vectoreyes/*"
+      - "vectoreyes/**/*"
 
 .test:
   stage: test
   script:
-    - rustc --version && cargo --version  # Print version info for debugging
-    - etc/test_workspace.py "$features"
+    - |
+      if ! [[ -z "$force_target_cpu" ]]; then
+        cat > .cargo/config << EOF
+        [build]
+        rustflags = ["-C", "target-cpu=$force_target_cpu", "--cfg", "vectoreyes_target_cpu=\"$force_target_cpu\""]
+        rustdocflags = ["-C", "target-cpu=$force_target_cpu", "--cfg", "vectoreyes_target_cpu=\"$force_target_cpu\""]
+      EOF
+      fi
+    - cat .cargo/config
+    - rustc --version && cargo --version # Print version info for debugging
+    - cargo build --verbose --workspace --examples --tests --benches --features "$features"
+    - cargo build --verbose --workspace --all-targets --features "$features"
+    - cargo test --verbose --workspace --features "$features"
 
-# Until the '-Z package-features' cargo argument is stabilized, there isn't an
-# easy way to test every package with given features. As a result, we test
-# on stable, without any features, but also on nightly without the nightly
-# feature
+checkfmt:rustfmt:
+  extends: [.any-changes]
+  stage: checkfmt
+  variables:
+    # TODO: change back to stable after March 25th 2021
+    toolchain: beta
+  script:
+    - rustup component add rustfmt --toolchain $toolchain
+    - cargo fmt -- --check
 
-test:stable:
+checkfmt:vectoreyes-generation:
+  stage: checkfmt
+  image: "nixos/nix:latest"
+  before_script: []
+  extends: [.vectoreyes-changes]
+  script:
+    - sha256sum $(find vectoreyes -type f) | sort > vectoreyes-pre-gen.sha256sum
+    - vectoreyes/src/codegen/format-python.sh
+    - vectoreyes/src/codegen/generate.py
+    # Only hash files that haven't been ignored.
+    - sha256sum $(find vectoreyes/ -type f | grep -v '\.dbm' | grep -v '__pycache__') | sort > vectoreyes-post-gen.sha256sum
+
+test-vectoreyes-scalar:
+  extends: [.vectoreyes-changes]
   stage: test
   variables:
     # TODO: change back to stable after March 25th 2021
     toolchain: beta
   script:
-    - rustc --version && cargo --version  # Print version info for debugging
-    - cargo build --verbose --all --examples --tests --benches
-    - cargo test --all --verbose
+      # Test vectoreyes in the scalar mode.
+    - rm -rf .cargo/config
+    - rustc --version && cargo --version # Print version info for debugging
+    - cargo build -p vectoreyes --all-targets --verbose
+    - cargo test -p vectoreyes --verbose
 
-test:without-stable-feature:
-  extends: .test
+test:stable:
+  extends: [.test, .any-changes]
+  stage: test
   variables:
-    toolchain: nightly
-    features: curve25519-dalek serde
+    # TODO: change back to stable after March 25th 2021
+    toolchain: beta
+    features: ""
+
+# Vectoreyes introduced several different configurations based on CPU.
+# On some CPUs, we say that the AES instruction latency is 4, on Haswell we say
+# it's 8. This number is exposed to users of vectoreyes. As a result, changing
+# this number could reveal bugs in libraries that use vectoreyes. The normal
+# stable test will run on the native CPU which (for our CI) will test the other
+# configuration.
+#
+# It's a good idea to keep this in mind when adding special constants for
+# different CPU microarchitectures.
+test:stable-haswell:
+  extends: [.test, .any-changes]
+  stage: test
+  variables:
+    # TODO: change back to stable after March 25th 2021
+    toolchain: beta
+    features: ""
+    force_target_cpu: "haswell"
 
 test:nightly:
-  extends: .test
+  extends: [.test, .any-changes]
   variables:
     toolchain: nightly
     features: curve25519-dalek serde nightly
