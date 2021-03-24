@@ -163,7 +163,7 @@ fn bench_svole_init_f61p(c: &mut Criterion) {
     });
 }
 
-fn bench_ggm_<FE: FiniteField>(depth: usize, seed: Block, aes: (&Aes128, &Aes128)) {
+fn bench_ggm_<FE: FiniteField>(depth: usize, seed: Block, aes: &(Aes128, Aes128)) {
     let exp = 1 << depth;
     let mut vs = vec![FE::ZERO; exp];
     black_box(ggm_utils::ggm(depth, seed, aes, &mut vs));
@@ -181,7 +181,7 @@ fn bench_ggm(c: &mut Criterion) {
         let aes0 = Aes128::new(seed0);
         let aes1 = Aes128::new(seed1);
         bench.iter(move || {
-            bench_ggm_::<F61p>(depth, seed, (&aes0, &aes1));
+            bench_ggm_::<F61p>(depth, seed, &(aes0.clone(), aes1.clone()));
         })
     });
 }
