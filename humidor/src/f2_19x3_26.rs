@@ -36,7 +36,8 @@ impl F {
         , 59416712983923841,   523602121810241645, 920749240289894275];
 
     pub fn bytes(self) -> Vec<u8> {
-        self.0.to_be_bytes().iter().cloned().collect()
+        // Assumes field element has undergone modular reduction.
+        (self.0 as i64).to_be_bytes().iter().cloned().collect()
     }
 
     pub fn positivize(self) -> Self {
@@ -169,6 +170,12 @@ impl std::fmt::Display for F {
     }
 }
 
+impl rand::distributions::Distribution<F> for rand::distributions::Standard {
+    fn sample<R: rand::Rng + ?Sized>(&self, rng: &mut R) -> F {
+        F::from(rng.next_u64() as i128)
+    }
+}
+
 #[cfg(test)]
 impl Arbitrary for F {
     type Parameters = ();
@@ -181,23 +188,27 @@ impl Arbitrary for F {
 #[cfg(test)]
 proptest! {
     #[test]
-    #[allow(non_snake_case)]
-    fn test_eq(x: i128) {
-        let f = F::from(x);
+    fn test_eq(f in any::<F>()) {
         assert_eq!(f, f.positivize());
     }
 
     #[test]
-    #[allow(non_snake_case)]
-    fn test_add_neg(x: i128) {
-        let f = F::from(x);
+    fn test_add_neg(f in any::<F>()) {
         assert_eq!(f + f.neg(), F::ZERO);
     }
 
     #[test]
-    #[allow(non_snake_case)]
-    fn test_mul_recip(x: i128) {
-        let f = F::from(x);
+    fn test_mul_recip(f in any::<F>()) {
         assert_eq!(f * f.recip(), F::ONE);
+    }
+
+    #[test]
+    fn test_add(f in any::<F>(), g in any::<F>()) {
+        assert_eq!(f + g, F::from(i128::from(f) + i128::from(g)));
+    }
+
+    #[test]
+    fn test_mul(f in any::<F>(), g in any::<F>()) {
+        assert_eq!(f * g, F::from(i128::from(f) * i128::from(g)));
     }
 }

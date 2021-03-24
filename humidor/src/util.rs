@@ -67,10 +67,7 @@ pub fn unpad_array(a: ArrayView1<Field>, size: usize) -> Array1<Field> {
 }
 
 pub fn random_field_array<R>(rng: &mut R, size: usize) -> Array1<Field>
-    where R: rand::RngCore
+    where R: rand::Rng
 {
-    use rand::distributions::{Uniform, Distribution};
-    let elem = Uniform::from(0..Field::MOD);
-
-    (0..size).map(|_| Field::from(elem.sample(rng))).collect()
+    (0 .. size).map(|_| rng.sample(rand::distributions::Standard)).collect()
 }
