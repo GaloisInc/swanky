@@ -146,7 +146,7 @@ impl Sender {
         channel.flush()?;
 
         let (aggregate, card, sum_weights) = state.build_and_compute_circuit(&mut gb).unwrap();
-        let weighted_mean = ev.crt_div(&aggregate, &sum_weights);
+        let weighted_mean = gb.crt_div(&aggregate, &sum_weights).unwrap();
 
         gb.outputs(&weighted_mean.wires().to_vec()).unwrap();
         channel.flush()?;
@@ -177,7 +177,7 @@ impl Sender {
         let payload: Vec<Vec<Vec<Block512>>>= state.payload.chunks(megasize).map(|x| x.to_vec()).collect();
 
         let (aggregate, card, sum_weights) = self.compute_payload(ts_id, ts_payload, table, payload, &path_deltas, channel, rng).unwrap();
-        let weighted_mean = ev.crt_div(&aggregate, &sum_weights);
+        let weighted_mean = gb.crt_div(&aggregate, &sum_weights).unwrap();
 
         gb.outputs(&weighted_mean.wires().to_vec()).unwrap();
         Ok(())
@@ -433,7 +433,7 @@ impl Receiver {
         payloads: &[Block512],
         channel: &mut C,
         rng: &mut RNG,
-    )-> Result<u64, Error> {
+    )-> Result<u128, Error> {
         let mut ev =
             Evaluator::<C, RNG, OtReceiver>::new(channel.clone(), RNG::from_seed(rng.gen())).unwrap();
         let qs = &fancy_garbling::util::PRIMES[..PAYLOAD_PRIME_SIZE_EXPANDED];
@@ -449,7 +449,7 @@ impl Receiver {
 
         self.receive_data(&mut state, channel, rng)?;
         let (aggregate, card, sum_weights) = state.build_and_compute_circuit(&mut ev, channel).unwrap();
-        let weighted_mean = ev.crt_div(&aggregate, &sum_weights);
+        let weighted_mean = ev.crt_div(&aggregate, &sum_weights).unwrap();
 
         let weighted_mean_outs = ev
             .outputs(&weighted_mean.wires().to_vec()).unwrap()
@@ -471,7 +471,7 @@ impl Receiver {
         megasize: usize,
         channel: &mut C,
         rng: &mut RNG,
-    )-> Result<u64, Error> {
+    )-> Result<u128, Error> {
         let mut ev =
             Evaluator::<C, RNG, OtReceiver>::new(channel.clone(), RNG::from_seed(rng.gen())).unwrap();
         let qs = &fancy_garbling::util::PRIMES[..PAYLOAD_PRIME_SIZE_EXPANDED];
@@ -481,7 +481,7 @@ impl Receiver {
 
         let (aggregate, card, sum_weights) = self.compute_payload(table, payload, channel, rng).unwrap();
 
-        let weighted_mean = ev.crt_div(&aggregate, &sum_weights);
+        let weighted_mean = ev.crt_div(&aggregate, &sum_weights).unwrap();
         let weighted_mean_outs = ev
             .outputs(&weighted_mean.wires().to_vec()).unwrap()
             .expect("evaluator should produce outputs");
