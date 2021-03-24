@@ -409,6 +409,7 @@ mod test {
         }
     }
 
+    #[ignore]
     #[test]
     fn test_spsvole() {
         let cols = 10_805_248;

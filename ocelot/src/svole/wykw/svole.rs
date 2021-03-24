@@ -474,6 +474,7 @@ mod tests {
         }
     }
 
+    #[ignore]
     #[test]
     fn test_lpn_svole() {
         test_lpn_svole_::<F2, Sender<F2>, Receiver<F2>>();
@@ -483,6 +484,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore]
     fn test_duplicate_svole() {
         test_duplicate_svole_::<F61p, Sender<F61p>, Receiver<F61p>>();
     }
