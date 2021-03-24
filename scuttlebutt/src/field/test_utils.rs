@@ -170,7 +170,11 @@ macro_rules! test_field {
             }
 
             proptest! {
-                #![proptest_config(ProptestConfig::with_cases(15))]
+                #![proptest_config(ProptestConfig::with_cases(
+                    std::env::var("PROPTEST_CASES")
+                        .map(|x| x.parse().expect("PROPTEST_CASES is a number"))
+                        .unwrap_or(15)
+                ))]
                 #[test]
                 fn polynomial_mul(a in any_fe(), b in any_fe()) {
                     let mut poly = make_polynomial(a.to_polynomial_coefficients());

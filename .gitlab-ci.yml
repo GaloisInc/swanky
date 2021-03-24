@@ -4,6 +4,7 @@ variables:
   GIT_STRATEGY: clone
   RUST_BACKTRACE: 1
   CARGO_INCREMENTAL: 0
+  PROPTEST_CASES: 256
 
 before_script:
   - apt-get update -yqq
