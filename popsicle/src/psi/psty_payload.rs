@@ -146,11 +146,9 @@ impl Sender {
         channel.flush()?;
 
         let (aggregate, card, sum_weights) = state.build_and_compute_circuit(&mut gb).unwrap();
+        let weighted_mean = ev.crt_div(&aggregate, &sum_weights);
 
-        gb.outputs(&aggregate.wires().to_vec()).unwrap();
-        gb.outputs(&card.wires().to_vec()).unwrap();
-        gb.outputs(&sum_weights.wires().to_vec()).unwrap();
-
+        gb.outputs(&weighted_mean.wires().to_vec()).unwrap();
         channel.flush()?;
 
         Ok(())
@@ -179,10 +177,9 @@ impl Sender {
         let payload: Vec<Vec<Vec<Block512>>>= state.payload.chunks(megasize).map(|x| x.to_vec()).collect();
 
         let (aggregate, card, sum_weights) = self.compute_payload(ts_id, ts_payload, table, payload, &path_deltas, channel, rng).unwrap();
+        let weighted_mean = ev.crt_div(&aggregate, &sum_weights);
 
-        gb.outputs(&aggregate.wires().to_vec()).unwrap();
-        gb.outputs(&card.wires().to_vec()).unwrap();
-        gb.outputs(&sum_weights.wires().to_vec()).unwrap();
+        gb.outputs(&weighted_mean.wires().to_vec()).unwrap();
         Ok(())
     }
 
@@ -452,29 +449,19 @@ impl Receiver {
 
         self.receive_data(&mut state, channel, rng)?;
         let (aggregate, card, sum_weights) = state.build_and_compute_circuit(&mut ev, channel).unwrap();
+        let weighted_mean = ev.crt_div(&aggregate, &sum_weights);
 
-        let aggregate_outs = ev
-            .outputs(&aggregate.wires().to_vec()).unwrap()
+        let weighted_mean_outs = ev
+            .outputs(&weighted_mean.wires().to_vec()).unwrap()
             .expect("evaluator should produce outputs");
 
-        let card_outs = ev
-            .outputs(&card.wires().to_vec()).unwrap()
-            .expect("evaluator should produce outputs");
 
-        let sum_weights_outs = ev
-            .outputs(&sum_weights.wires().to_vec()).unwrap()
-            .expect("evaluator should produce outputs");
+        let weighted_mean = fancy_garbling::util::crt_inv(&weighted_mean_outs, &qs);
 
-        let aggregate = fancy_garbling::util::crt_inv(&aggregate_outs, &qs);
-        let card = fancy_garbling::util::crt_inv(&card_outs, &qs);
-        let sum_weights = fancy_garbling::util::crt_inv(&sum_weights_outs, &qs);
-
-        println!("Weighted Sum = {:?}", aggregate);
-        println!("Sum of Weights = {:?}", sum_weights);
-        println!("Cardinality = {:?}", card);
+        println!("Weighted Mean = {:?}", weighted_mean);
         channel.flush()?;
 
-        Ok(aggregate as u64)
+        Ok(weighted_mean)
     }
 
     pub fn full_protocol_large<C: AbstractChannel, RNG: RngCore + CryptoRng + SeedableRng<Seed = Block>>(
@@ -494,27 +481,16 @@ impl Receiver {
 
         let (aggregate, card, sum_weights) = self.compute_payload(table, payload, channel, rng).unwrap();
 
-        let aggregate_outs = ev
-            .outputs(&aggregate.wires().to_vec()).unwrap()
+        let weighted_mean = ev.crt_div(&aggregate, &sum_weights);
+        let weighted_mean_outs = ev
+            .outputs(&weighted_mean.wires().to_vec()).unwrap()
             .expect("evaluator should produce outputs");
-        let aggregate = fancy_garbling::util::crt_inv(&aggregate_outs, &qs);
+        let weighted_mean = fancy_garbling::util::crt_inv(&weighted_mean_outs, &qs);
 
-        let card_outs = ev
-            .outputs(&card.wires().to_vec()).unwrap()
-            .expect("evaluator should produce outputs");
-        let card = fancy_garbling::util::crt_inv(&card_outs, &qs);
-
-        let sum_weights_outs = ev
-            .outputs(&sum_weights.wires().to_vec()).unwrap()
-            .expect("evaluator should produce outputs");
-        let sum_weights = fancy_garbling::util::crt_inv(&sum_weights_outs, &qs);
-
-        println!("Weighted Sum = {:?}", aggregate);
-        println!("Sum of Weights = {:?}", sum_weights);
-        println!("Cardinality = {:?}", card);
+        println!("Weighted Mean = {:?}", weighted_mean);
         channel.flush()?;
 
-        Ok(aggregate as u64)
+        Ok(weighted_mean)
     }
 
 
@@ -599,13 +575,8 @@ impl Receiver {
             .expect("evaluator should produce outputs");
         let weighted_mean = fancy_garbling::util::crt_inv(&weighted_mean_outs, &qs);
 
-        // let sum = ev
-        //     .outputs(&sum_weights.wires().to_vec()).unwrap()
-        //     .expect("evaluator should produce outputs");
-        // let sum= fancy_garbling::util::crt_inv(&sum, &qs);
-
         println!("weighted_mean{}", weighted_mean);
-        // println!("denom{}", sum);
+
         Ok(weighted_mean)
     }
 
