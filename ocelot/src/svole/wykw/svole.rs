@@ -474,17 +474,16 @@ mod tests {
         }
     }
 
-    #[ignore]
     #[test]
     fn test_lpn_svole() {
         test_lpn_svole_::<F2, Sender<F2>, Receiver<F2>>();
         test_lpn_svole_::<Gf128, Sender<Gf128>, Receiver<Gf128>>();
-        test_lpn_svole_::<Fp, Sender<Fp>, Receiver<Fp>>();
+        // The test with Fp takes a long time when run without compiler optimizations
+        // test_lpn_svole_::<Fp, Sender<Fp>, Receiver<Fp>>();
         test_lpn_svole_::<F61p, Sender<F61p>, Receiver<F61p>>();
     }
 
     #[test]
-    #[ignore]
     fn test_duplicate_svole() {
         test_duplicate_svole_::<F61p, Sender<F61p>, Receiver<F61p>>();
     }
