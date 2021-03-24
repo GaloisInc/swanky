@@ -15,11 +15,8 @@
     clippy::needless_range_loop
 )]
 #![allow(non_snake_case)]
-#![cfg_attr(feature = "nightly", feature(test))]
-#![cfg_attr(feature = "nightly", feature(stdsimd))]
-#![cfg_attr(feature = "nightly", feature(external_doc))]
-#![cfg_attr(feature = "nightly", doc(include = "../README.md"))]
-#![cfg_attr(feature = "nightly", deny(missing_docs))]
+#![deny(missing_docs)]
+// TODO: when https://git.io/JYTnW gets stabilized add the readme as module docs.
 
 pub mod circuit;
 pub mod classic;
