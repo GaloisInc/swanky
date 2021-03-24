@@ -67,14 +67,11 @@ const HASH_SIZE: usize = 4;
 // How many bytes are used for payloads
 const PAYLOAD_SIZE: usize = 8;
 
-// How many bits do yout need for later pmr comparisons (usually an added bit)
-const PAYLOAD_SIZE_EXPANDED: u32 = PAYLOAD_SIZE as u32 * 8 + 1;
-
 // How many u16's are used for the CRT representation
 const PAYLOAD_PRIME_SIZE: usize = 16;
 
-// How many u16's are used for the CRT representation
-const PAYLOAD_PRIME_SIZE_EXPANDED: usize = PAYLOAD_PRIME_SIZE + 1;
+const PAYLOAD_PRIME_SIZE_EXPANDED: usize = PAYLOAD_PRIME_SIZE+ 1;
+
 
 // How many bytes to use to determine whether decryption succeeded in the send/recv
 // payload methods.
@@ -209,7 +206,7 @@ impl Sender {
         let mut gb = Garbler::<C, RNG, OtSender>::new(channel.clone(), RNG::from_seed(rng.gen())).unwrap();
         let _ = gb.load_deltas(path_deltas);
 
-        let qs = fancy_garbling::util::primes_with_width(PAYLOAD_PRIME_SIZE_EXPANDED as u32);
+        let qs = &fancy_garbling::util::PRIMES[..PAYLOAD_PRIME_SIZE_EXPANDED];
         let q = fancy_garbling::util::product(&qs);
 
         let mut acc = gb.crt_constant_bundle(0, q).unwrap();
@@ -401,7 +398,7 @@ impl SenderState {
         // CRT representation assumes that inputs and outputs of the
         // circuit are PAYLOAD_SIZE bytes long: this helps avoid carry
         // handling in GC computation.
-        let mut qs = fancy_garbling::util::primes_with_width(PAYLOAD_PRIME_SIZE_EXPANDED as u32);
+        let qs = &fancy_garbling::util::PRIMES[..PAYLOAD_PRIME_SIZE_EXPANDED].to_vec();
         // let nprimes = qs.len();
         // qs.push(fancy_garbling::util::PRIMES[nprimes]);
 
@@ -546,12 +543,14 @@ impl Receiver {
         println!("hello");
         let mut ev =
             Evaluator::<C, RNG, OtReceiver>::new(channel.clone(), RNG::from_seed(rng.gen())).unwrap();
-        let qs = fancy_garbling::util::primes_with_width(PAYLOAD_SIZE_EXPANDED as u32);
+        let qs = &fancy_garbling::util::PRIMES[..PAYLOAD_PRIME_SIZE_EXPANDED];
         println!("bye");
         let q = fancy_garbling::util::product(&qs);
-        println!("q {}", q);
+        println!("back");
         let mut acc = ev.crt_constant_bundle(0, q).unwrap();
+        println!("back1");
         let mut sum_weights = ev.crt_constant_bundle(0, q).unwrap();
+        println!("back2");
         let mut card = ev.crt_constant_bundle(0, q).unwrap();
         println!("off i go");
         let nmegabins = table.len();
@@ -602,7 +601,7 @@ impl Receiver {
 
         let mut ev =
             Evaluator::<C, RNG, OtReceiver>::new(channel.clone(), RNG::from_seed(rng.gen())).unwrap();
-        let qs = fancy_garbling::util::primes_with_width(PAYLOAD_SIZE_EXPANDED);
+        let qs = &fancy_garbling::util::PRIMES[..PAYLOAD_PRIME_SIZE_EXPANDED];
 
         let mut acc = CrtBundle::new(aggregates[0].clone());
         let mut card = CrtBundle::new(cardinality[0].clone());
@@ -773,7 +772,7 @@ impl ReceiverState {
         println!("rx received inputs ");
         let receiver_inputs = ev.encode_many(&my_input_bits, &mods_bits).unwrap();
 
-        let mut qs = fancy_garbling::util::primes_with_width(PAYLOAD_SIZE_EXPANDED);
+        let qs = &fancy_garbling::util::PRIMES[..PAYLOAD_PRIME_SIZE_EXPANDED].to_vec();
         // let nprimes = qs.len();
         // qs.push(fancy_garbling::util::PRIMES[nprimes]);
 
@@ -826,7 +825,7 @@ fn encode_inputs(opprf_ids: &[Block512]) -> Vec<u16> {
 // of the payloads.
 // + similar comment to encode_opprf_payload
 fn encode_payloads(payload: &[Block512]) -> Vec<u16> {
-    let q = fancy_garbling::util::primes_with_width(PAYLOAD_SIZE_EXPANDED);
+    let q = &fancy_garbling::util::PRIMES[..PAYLOAD_PRIME_SIZE_EXPANDED];
     payload
         .iter()
         .flat_map(|blk| {
@@ -853,7 +852,7 @@ fn encode_payloads(payload: &[Block512]) -> Vec<u16> {
 // the padded value should be random and modded with the
 // appropriate prime at its position
 fn encode_opprf_payload(opprf_ids: &[Block512]) -> Vec<u16> {
-let q = fancy_garbling::util::primes_with_width(PAYLOAD_SIZE_EXPANDED);
+let q = &fancy_garbling::util::PRIMES[..PAYLOAD_PRIME_SIZE_EXPANDED];
     opprf_ids
         .iter()
         .flat_map(|blk| {
@@ -882,7 +881,7 @@ fn fancy_compute_payload_aggregate<F: fancy_garbling::FancyReveal + Fancy>(
     assert_eq!(sender_payloads.len(), receiver_payloads.len());
     assert_eq!(receiver_payloads.len(), receiver_masks.len());
 
-    let qs = fancy_garbling::util::primes_with_width(PAYLOAD_SIZE_EXPANDED);
+    let qs = &fancy_garbling::util::PRIMES[..PAYLOAD_PRIME_SIZE_EXPANDED];
     let q = fancy_garbling::util::product(&qs);
 
     let eqs = sender_inputs
@@ -949,24 +948,31 @@ fn fancy_compute_division<F: fancy_garbling::FancyReveal + Fancy<Item = Wire>>(
 
     println!("Starting Division...");
 
-    let qs = fancy_garbling::util::primes_with_width(PAYLOAD_SIZE_EXPANDED);
+    println!("x{} y{}", f.crt_reveal(&x)?, f.crt_reveal(&y)?);
+    println!("x moduli{:?}", x.moduli());
+    
+    let qs = &fancy_garbling::util::PRIMES[..PAYLOAD_PRIME_SIZE_EXPANDED];
     let q = fancy_garbling::util::product(&qs);
 
+    let qs_original = fancy_garbling::util::primes_with_width(PAYLOAD_SIZE as u32 * 8);
+    let modulus = fancy_garbling::util::product(&qs_original);
 
-    let l = ((q as f64).log2().ceil()) as u32;
+    let l = ((modulus as f64).log2().ceil()) as u32;
 
     let mut quotient = f.crt_constant_bundle(0, q)?;
-    let mut a = x;
-
+    let mut a = x.clone();
     let one = f.crt_constant_bundle(1, q)?;
     for i in 0..l{
+
         let b = 2u128.pow(l-i-1);
-        let mut pb = q / b;
-        if q % b == 0 {
+        let mut pb = modulus / b;
+        if modulus % b == 0 {
             pb = pb-1;
         }
 
+        println!("tmp");
         let tmp = f.crt_cmul(&y, b)?;
+        println!("c1");
         let c1 = f.pmr_geq(&a, &tmp)?;
         println!("c1{} {} a{} tmp{}", i, f.reveal(&c1)?, f.crt_reveal(&a)?, f.crt_reveal(&tmp)?);
         let pb_crt = f.crt_constant_bundle(pb, q)?;
