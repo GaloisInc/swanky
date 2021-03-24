@@ -16,9 +16,7 @@ use crate::{
 use generic_array::typenum::Unsigned;
 use rand::{
     distributions::{Distribution, Uniform},
-    CryptoRng,
-    Rng,
-    SeedableRng,
+    CryptoRng, Rng, SeedableRng,
 };
 
 use scuttlebutt::{field::FiniteField, AbstractChannel, AesRng, Block, Malicious, SemiHonest};
@@ -405,8 +403,7 @@ mod tests {
     use super::{Receiver, SVoleReceiver, SVoleSender, Sender};
     use scuttlebutt::{
         field::{F61p, FiniteField as FF, Fp, Gf128, F2},
-        AesRng,
-        Channel,
+        AesRng, Channel,
     };
     use std::{
         io::{BufReader, BufWriter},

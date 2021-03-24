@@ -9,16 +9,12 @@
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use ocelot::svole::{
     wykw::{Receiver, Sender},
-    SVoleReceiver,
-    SVoleSender,
+    SVoleReceiver, SVoleSender,
 };
 use rand::Rng;
 use scuttlebutt::{
     field::{F61p, FiniteField, Fp, Gf128, F2},
-    Aes128,
-    AesRng,
-    Block,
-    Channel,
+    Aes128, AesRng, Block, Channel,
 };
 use std::{
     io::{BufReader, BufWriter},

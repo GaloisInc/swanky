@@ -288,11 +288,7 @@ mod streaming {
     use crate::{
         dummy::{Dummy, DummyVal},
         util::RngExt,
-        Evaluator,
-        Fancy,
-        FancyInput,
-        Garbler,
-        Wire,
+        Evaluator, Fancy, FancyInput, Garbler, Wire,
     };
     use itertools::Itertools;
     use rand::thread_rng;
@@ -443,14 +439,7 @@ mod streaming {
 #[cfg(test)]
 mod complex {
     use crate::{
-        dummy::Dummy,
-        util::RngExt,
-        CrtBundle,
-        CrtGadgets,
-        Evaluator,
-        Fancy,
-        FancyInput,
-        Garbler,
+        dummy::Dummy, util::RngExt, CrtBundle, CrtGadgets, Evaluator, Fancy, FancyInput, Garbler,
     };
     use itertools::Itertools;
     use rand::thread_rng;

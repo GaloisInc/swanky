@@ -16,13 +16,7 @@ pub use garbler::Garbler;
 mod tests {
     use super::*;
     use crate::{
-        circuit::Circuit,
-        dummy::Dummy,
-        util::RngExt,
-        CrtBundle,
-        CrtGadgets,
-        Fancy,
-        FancyInput,
+        circuit::Circuit, dummy::Dummy, util::RngExt, CrtBundle, CrtGadgets, Fancy, FancyInput,
     };
     use itertools::Itertools;
     use ocelot::ot::{ChouOrlandiReceiver, ChouOrlandiSender};
