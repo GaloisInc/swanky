@@ -6,6 +6,7 @@
 
 #![allow(clippy::many_single_char_names)]
 #![deny(missing_docs)]
+#![cfg_attr(feature = "nightly", feature(test))]
 // TODO: when https://git.io/JYTnW gets stabilized add the readme as module docs.
 
 //! Scuttlebutt provides many utility functions for cryptographic applications.
