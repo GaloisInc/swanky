@@ -8,7 +8,7 @@
 //! based on fixed-key AES.
 
 use crate::{Aes128, Block, FIXED_KEY_AES128};
-use core::arch::x86_64::*;
+use vectoreyes::{SimdBase8, U8x16};
 
 /// AES-based correlation-robust hash function.
 ///
@@ -47,14 +47,8 @@ impl AesHash {
     /// function and `σ(x₀ || x₁) = (x₀ ⊕ x₁) || x₁`.
     #[inline]
     pub fn ccr_hash(&self, i: Block, x: Block) -> Block {
-        unsafe {
-            let x = _mm_xor_si128(
-                _mm_shuffle_epi32(x.into(), 78),
-                #[allow(overflowing_literals)]
-                _mm_and_si128(x.into(), _mm_set_epi64x(0xFFFF_FFFF_FFFF_FFFF, 0x00)),
-            );
-            self.cr_hash(i, Block::from(x))
-        }
+        let x = U8x16::from(x.0);
+        self.cr_hash(i, Block::from(x.shift_bytes_right::<8>() ^ x))
     }
 
     /// Tweakable circular correlation robust hash function (cf.

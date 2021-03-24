@@ -8,6 +8,7 @@ use std::{
     ops::{AddAssign, MulAssign, SubAssign},
 };
 use subtle::{Choice, ConditionallySelectable, ConstantTimeEq};
+use vectoreyes::{SimdBase, U64x2};
 
 /// An element of the finite field $\textsf{GF}(2^{45})$ reduced over $x^{45} + x^{28} + x^{17} + x^{11} + 1$
 #[derive(Debug, Clone, Copy, Hash, Eq)]
@@ -43,25 +44,9 @@ impl<'a> SubAssign<&'a Gf45> for Gf45 {
 impl<'a> MulAssign<&'a Gf45> for Gf45 {
     #[inline]
     fn mul_assign(&mut self, rhs: &'a Gf45) {
-        let wide_product = unsafe {
-            use std::arch::x86_64::{
-                __m128i,
-                _mm_clmulepi64_si128,
-                _mm_cvtsi64_si128,
-                _mm_storeu_si128,
-            };
-            // Safety: since the _mm_cvtsi64_si128 intrinsic has no safety preconditions
-            // (assuming that it's supported on the target architecture).
-            let a = _mm_cvtsi64_si128(self.0 as i64);
-            let b = _mm_cvtsi64_si128(rhs.0 as i64);
-            // Safety: ditto
-            // The 0x00 means that the lower 64 bits of the inputs are the only things that are
-            // multiplied.
-            let wide_product = _mm_clmulepi64_si128(a, b, 0x00);
-            let mut out = 0u128;
-            // Safety: the pointer to _mm_storeu_si128 explicitly doesn't need to be aligned
-            _mm_storeu_si128(&mut out as *mut u128 as *mut __m128i, wide_product);
-            out
+        let wide_product: u128 = {
+            let product = U64x2::set_lo(self.0).carryless_mul::<false, false>(U64x2::set_lo(rhs.0));
+            bytemuck::cast(product)
         };
         // Now we reduce the wide product.
         self.0 = ((wide_product >> 0)

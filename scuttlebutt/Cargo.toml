@@ -10,8 +10,6 @@ categories = ["cryptography"]
 edition = "2018"
 publish = false
 
-[lib]
-
 [features]
 nightly = ["curve25519-dalek/nightly", "curve25519-dalek/simd_backend"]
 unstable = []
@@ -28,6 +26,8 @@ primitive-types = "0.9.0"
 uint = "0.9.0"
 generic-array = "0.14.4"
 smallvec = "1.6.1"
+bytemuck = { version = "1.5.1", features = ["derive"] }
+vectoreyes = { path = "../vectoreyes" }
 
 
 [dev-dependencies]

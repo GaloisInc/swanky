@@ -1,0 +1,155 @@
+impl SimdBase<{{ty.ty}}> for {{ty}} {
+    type Array = [{{ty.ty}} ; {{ty.count}}];
+    type Signed = {{ty.signed}};
+    type Unsigned = {{ty.unsigned}};
+    const LANES: usize = {{ty.count}};
+    const ZERO: Self = {
+        {% if force_scalar_for_test %}
+            Self([0; {{ty.count}}])
+        {% else %}
+            const_{{(ty ~ "").lower()}}!([0; {{ty.count}}])
+        {% endif %}
+    };
+    
+    {% call(scalar, avx2) fn("is_zero", {"&self": ty}, returns=BoolType()) %}
+    {% call scalar() %}
+        self.as_array().iter().all(|x| *x == 0)
+    {% endcall %}
+    {% call(avx2i) avx2() %}
+        {{avx2i(ty, "testz")}}(self.0, self.0) == 1
+    {% endcall %}
+    {% endcall %}
+    
+    {% call(scalar, avx2) fn("set_lo", {"scalar": ty.ty}, returns=ty) %}
+    {% call scalar() %}
+        let mut out = [0; {{ty.count}}];
+        out[0] = scalar;
+        {{ty}}::from(out)
+    {% endcall %}
+    {% call(avx2i) avx2() %}
+        Self({{avx2i(ty, "set")}}(
+            {% for i in range(ty.count - 1) %}
+                0,
+            {% endfor %}
+            scalar as {{ty.ty.signed}},
+        ))
+    {% endcall %}
+    {% endcall %}
+    
+    {% call(scalar, avx2) fn("extract", {"&self": ty}, returns=ty.ty, const_args={'I': 'usize'}) %}
+    {% call scalar() %}
+        self.as_array()[I]
+    {% endcall %}
+    {% call(avx2i) avx2() %}
+        {{avx2i(ty, "extract")}}::<I>(self.0) as {{ty.ty}}
+    {% endcall %}
+    {% endcall %}
+    
+    {% call(scalar, avx2) fn("broadcast", {"scalar": ty.ty}, returns=ty) %}
+    {% call scalar() %}
+        {{ty}}::from([scalar; {{ty.count}}])
+    {% endcall %}
+    {% call(avx2i) avx2() %}
+        Self({{avx2i(ty, "broadcast")}}(scalar as {{ty.ty.signed}}))
+    {% endcall %}
+    {% endcall %}
+    
+    type BroadcastLoInput = {{ty.broadcast_lo_from}};
+    {% call(scalar, avx2) fn("broadcast_lo", {"vector": ty.broadcast_lo_from}, returns=ty) %}
+    {% call scalar() %}
+        {{ty}}::from([vector.as_array()[0]; {{ty.count}}])
+    {% endcall %}
+    {% call(avx2i) avx2() %}
+        Self({{avx2i(ty, "broadcast_lo")}}(vector.0))
+    {% endcall %}
+    {% endcall %}
+    
+    {% call(scalar, avx2) fn("cmp_eq", {"&self": ty, "other": ty}, returns=ty) %}
+    {% call scalar() %}
+        {{ty}}::from([
+            {% for i in range(ty.count) %}
+            if self.as_array()[{{i}}] == other.as_array()[{{i}}] { {% if ty.ty.signedness == Signedness.SIGNED %} -1 {% else %} {{ty.ty}}::MAX {% endif %} } else { 0 },
+            {% endfor %}
+        ])
+    {% endcall %}
+    {% call(avx2i) avx2() %}
+        Self({{avx2i(ty, "cmpeq")}}(self.0, other.0))
+    {% endcall %}
+    {% endcall %}
+    
+    {% call(scalar, avx2) fn("cmp_gt", {"&self": ty, "other": ty}, returns=ty) %}
+    {% call scalar() %}
+        {{ty}}::from([
+            {% for i in range(ty.count) %}
+            if self.as_array()[{{i}}] > other.as_array()[{{i}}] { {% if ty.ty.signedness == Signedness.SIGNED %} -1 {% else %} {{ty.ty}}::MAX {% endif %} } else { 0 },
+            {% endfor %}
+        ])
+    {% endcall %}
+    {% call(avx2i) avx2(polyfill="vector" if ty.ty.signedness == Signedness.UNSIGNED else None) %}
+        {% if ty.ty.signedness == Signedness.UNSIGNED %}
+            // Based on https://stackoverflow.com/a/33173643 and https://git.io/JmghK
+            let sign_bit = Self::broadcast(1 << {{ty.ty.bits - 1}});
+            Self::from({{ty.signed}}::from(*self ^ sign_bit).cmp_gt(
+                {{ty.signed}}::from(other ^ sign_bit)
+            ))
+        {% else %}
+            Self({{avx2i(ty, "cmpgt")}}(self.0, other.0))
+        {% endif %}
+    {% endcall %}
+    {% endcall %}
+    
+    {% for name, op in [("left", "<<="), ("right", ">>=")] %}
+        {% call(scalar, avx2) fn("shift_" ~ name, {"&self": ty}, returns=ty, const_args={'BITS': 'usize'}) %}
+        {% call scalar() %}
+            let mut out = self.as_array();
+            for x in out.iter_mut() {
+                *x {{op}} BITS;
+            }
+            {{ty}}::from(out)
+        {% endcall %}
+        {% if (ty.ty.signedness == Signedness.SIGNED and name == "right" and ty.ty.bits == 64) or ty.ty.bits == 8 %}
+            {{ avx2(polyfill="scalar") }}
+        {% else %}
+            {% call(avx2i) avx2() %}
+                const USELESS_ARRAY: [u8; {{ty.ty.bits}}] = [0; {{ty.ty.bits}}];
+                let _assert_bits_in_range: u8 = USELESS_ARRAY[BITS];
+                Self({{avx2i(ty, "shift_" ~ name ~ "_const")}}::<BITS>(self.0))
+            {% endcall %}
+        {% endif %}
+        {% endcall %}
+    {% endfor %}
+    
+    {% for op, offset in [("lo", 0), ("hi", 64 // ty.ty.bits)] %}
+        {% call(scalar, avx2) fn("unpack_" ~ op, {"&self": ty, "other": ty}, returns=ty) %}
+        {% call scalar() %}
+            {{ty}}::from([
+                {% for lane in range(ty.bits // 128) %}
+                // Lane# {{lane}}
+                {% for i in range(64 // ty.ty.bits) %}
+                self.as_array()[{{ i + offset + lane * (128 // ty.ty.bits) }}],
+                other.as_array()[{{ i + offset + lane * (128 // ty.ty.bits) }}],
+                {% endfor %}
+                {% endfor %}
+            ])
+        {% endcall %}
+        {% call(avx2i) avx2() %}
+            Self({{avx2i(ty, "unpack" ~ op)}}(self.0, other.0))
+        {% endcall %}
+        {% endcall %}
+    {% endfor %}
+    
+    {% for op in ["max", "min"] %}
+        {% call(scalar, avx2) fn(op, {"&self": ty, "other": ty}, returns=ty) %}
+        {% call scalar() %}
+            {{ty}}::from([
+                {% for i in range(ty.count) %}
+                self.as_array()[{{i}}].{{op}}(other.as_array()[{{i}}]),
+                {% endfor %}
+            ])
+        {% endcall %}
+        {% call(avx2i) avx2(polyfill=None if ty.ty.bits != 64 else "scalar") %}
+            Self({{avx2i(ty, op)}}(self.0, other.0))
+        {% endcall %}
+        {% endcall %}
+    {% endfor %}
+}

@@ -6,7 +6,6 @@
 
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use scuttlebutt::{AesHash, Block};
-use std::time::Duration;
 
 fn bench_cr_hash(c: &mut Criterion) {
     c.bench_function("AesHash::cr_hash", |b| {
@@ -46,7 +45,7 @@ fn bench_tccr_hash(c: &mut Criterion) {
 
 criterion_group! {
     name = aeshash;
-    config = Criterion::default().warm_up_time(Duration::from_millis(100));
+    config = Criterion::default();
     targets = bench_cr_hash, bench_ccr_hash, bench_tccr_hash
 }
 criterion_main!(aeshash);

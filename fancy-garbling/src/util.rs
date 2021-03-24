@@ -8,34 +8,21 @@
 //!
 //! Note: all number representations in this library are little-endian.
 
-#[cfg(feature = "nightly")]
-use core::arch::x86_64::*;
 use itertools::Itertools;
 use scuttlebutt::Block;
+use vectoreyes::{SimdBase, U64x2, U8x16};
 
 ////////////////////////////////////////////////////////////////////////////////
 // tweak functions for garbling
 
 /// Tweak function for a single item.
-#[cfg(feature = "nightly")]
 pub fn tweak(i: usize) -> Block {
-    let data = unsafe { _mm_set_epi64x(0, (i as u64) as i64) };
-    Block(data)
-}
-#[cfg(not(feature = "nightly"))]
-pub fn tweak(i: usize) -> Block {
-    Block::from(i as u128)
+    Block::from(U8x16::from(U64x2::set_lo(i as u64)))
 }
 
 /// Tweak function for two items.
-#[cfg(feature = "nightly")]
 pub fn tweak2(i: u64, j: u64) -> Block {
-    let data = unsafe { _mm_set_epi64x(i as i64, j as i64) };
-    Block(data)
-}
-#[cfg(not(feature = "nightly"))]
-pub fn tweak2(i: u64, j: u64) -> Block {
-    Block::from(((i as u128) << 64) + j as u128)
+    Block::from(U8x16::from(U64x2::from([j, i])))
 }
 
 /// Compute the output tweak for a garbled gate where i is the gate id and k is the value.

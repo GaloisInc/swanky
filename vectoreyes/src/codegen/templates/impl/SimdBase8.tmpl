@@ -1,0 +1,42 @@
+{% if ty.ty.bits == 8 %}
+    impl crate::SimdBase8<{{ty.ty}}> for {{ty}} {
+        {% for direction, op in [('left', 'slli'), ('right', 'srli')] %}
+            {% call(scalar, avx2) fn(
+                "shift_bytes_" ~ direction,
+                {"&self": ty}, returns=ty,
+                const_args={"AMOUNT": "usize"}
+            ) %}
+                {% call scalar() %}
+                    let mut out = [0; {{ty.count}}];
+                    for (out_lane, src_lane) in out
+                        .chunks_exact_mut(16)
+                        .zip(self.as_array().chunks_exact(16))
+                    {
+                        {% if direction == 'left' %}
+                        out_lane[AMOUNT..].copy_from_slice(&src_lane[0..16 - AMOUNT]);
+                        {% else %}
+                        out_lane[0..16 - AMOUNT].copy_from_slice(&src_lane[AMOUNT..]);
+                        {% endif %}
+                    }
+                    {{ty}}::from(out)
+                {% endcall %}
+                {% call(avx2i) avx2() %}
+                    Self({{avx2i(ty, op)}}::<AMOUNT>(self.0))
+                {% endcall %}
+            {% endcall %}
+        {% endfor %}
+        
+        {% call(scalar, avx2) fn("most_significant_bits", {"&self": ty}, returns="u32") %}
+            {% call scalar() %}
+                let mut out: u32 = 0;
+                for (i, value) in self.as_array().iter().copied().enumerate() {
+                    out |= u32::from((value as u8) >> 7) << i;
+                }
+                out
+            {% endcall %}
+            {% call(avx2i) avx2() %}
+                {{avx2i(ty, "movemask")}}(self.0) as u32
+            {% endcall %}
+        {% endcall %}
+    }
+{% endif %}

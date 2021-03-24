@@ -9,7 +9,6 @@ use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use curve25519_dalek::ristretto::RistrettoPoint;
 use rand::Rng;
 use scuttlebutt::{AesRng, Block};
-use std::time::Duration;
 
 #[cfg(feature = "curve25519-dalek")]
 fn bench_hash_pt(c: &mut Criterion) {
@@ -68,7 +67,7 @@ fn bench_default(c: &mut Criterion) {
 
 criterion_group! {
     name = block;
-    config = Criterion::default().warm_up_time(Duration::from_millis(100));
+    config = Criterion::default();
     targets = bench_hash_pt, bench_clmul, bench_rand, bench_xor, bench_default
 }
 criterion_main!(block);

@@ -1,0 +1,59 @@
+impl U64x2 {
+    {% call(scalar, avx2) fn(
+        "carryless_mul",
+        {"&self": "U64x2", "other": "U64x2"}, returns="U64x2",
+        const_args={
+            "HI_OTHER": "bool",
+            "HI_SELF": "bool",
+        },
+        pub = True,
+    ) %}
+    {% call scalar() %}
+        let x = if HI_SELF { self.as_array()[1] } else { self.as_array()[0] };
+        let y = if HI_OTHER { other.as_array()[1] } else { other.as_array()[0] };
+       // This software carryless-multplication implementation is from https://github.com/RustCrypto/universal-hashes/blob/2e8a948dbb25bc2ac6c712b4bdc21b158527ca70/polyval/src/backend/soft64.rs
+       // That code is MIT/Apache dual-licensed.
+       #[inline(always)]
+       fn bmul64(x: u64, y: u64) -> u64 {
+           use std::num::Wrapping;
+           let x0 = Wrapping(x & 0x1111_1111_1111_1111);
+           let x1 = Wrapping(x & 0x2222_2222_2222_2222);
+           let x2 = Wrapping(x & 0x4444_4444_4444_4444);
+           let x3 = Wrapping(x & 0x8888_8888_8888_8888);
+           let y0 = Wrapping(y & 0x1111_1111_1111_1111);
+           let y1 = Wrapping(y & 0x2222_2222_2222_2222);
+           let y2 = Wrapping(y & 0x4444_4444_4444_4444);
+           let y3 = Wrapping(y & 0x8888_8888_8888_8888);
+
+           let mut z0 = ((x0 * y0) ^ (x1 * y3) ^ (x2 * y2) ^ (x3 * y1)).0;
+           let mut z1 = ((x0 * y1) ^ (x1 * y0) ^ (x2 * y3) ^ (x3 * y2)).0;
+           let mut z2 = ((x0 * y2) ^ (x1 * y1) ^ (x2 * y0) ^ (x3 * y3)).0;
+           let mut z3 = ((x0 * y3) ^ (x1 * y2) ^ (x2 * y1) ^ (x3 * y0)).0;
+
+           z0 &= 0x1111_1111_1111_1111;
+           z1 &= 0x2222_2222_2222_2222;
+           z2 &= 0x4444_4444_4444_4444;
+           z3 &= 0x8888_8888_8888_8888;
+
+           z0 | z1 | z2 | z3
+       }
+
+       #[inline(always)]
+       fn rev64(mut x: u64) -> u64 {
+           x = ((x & 0x5555_5555_5555_5555) << 1) | ((x >> 1) & 0x5555_5555_5555_5555);
+           x = ((x & 0x3333_3333_3333_3333) << 2) | ((x >> 2) & 0x3333_3333_3333_3333);
+           x = ((x & 0x0f0f_0f0f_0f0f_0f0f) << 4) | ((x >> 4) & 0x0f0f_0f0f_0f0f_0f0f);
+           x = ((x & 0x00ff_00ff_00ff_00ff) << 8) | ((x >> 8) & 0x00ff_00ff_00ff_00ff);
+           x = ((x & 0xffff_0000_ffff) << 16) | ((x >> 16) & 0xffff_0000_ffff);
+           (x << 32) | (x >> 32)
+       }
+       U64x2::from([
+           bmul64(x, y),
+           rev64(bmul64(rev64(x), rev64(y))) >> 1,
+       ])
+    {% endcall %}
+    {% call(avx2i) avx2() %}
+        Self({{avx2i('raw', '_mm_clmulepi64_si128')}}::<HI_OTHER, HI_SELF>(self.0, other.0))
+    {% endcall %}
+    {% endcall %}
+}

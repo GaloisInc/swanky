@@ -1,4 +1,3 @@
 [build]
-rustflags = ["-C", "target-feature=+aes,+ssse3,+avx2",
-             "-C", "target-cpu=native"]
-rustdocflags = ["-C", "target-feature=+aes,+ssse3"]
+rustflags = ["-C", "target-cpu=native", "--cfg", "vectoreyes_target_cpu_native"]
+rustdocflags = ["-C", "target-cpu=native", "--cfg", "vectoreyes_target_cpu_native"]

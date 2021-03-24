@@ -40,7 +40,7 @@ impl<'a> SubAssign<&'a Gf128> for Gf128 {
 }
 
 mod multiply {
-    use std::arch::x86_64::*;
+    use vectoreyes::{SimdBase8, U64x2, U8x16};
 
     // TODO: this implements a simple algorithm that works. There are faster algorithms.
     // Maybe we'll implement one, one day...
@@ -53,75 +53,37 @@ mod multiply {
     // See: https://blog.quarkslab.com/reversing-a-finite-field-multiplication-optimization.html
     // See: https://tools.ietf.org/html/rfc8452
 
-    // _mm_clmulepi64_si128(a, b, C) means carry-less multiplication of halves of a, b,
-    // determined by the constant C.
-    // _mm_bsrli_si128(a, b) means a >> (b * 8)
-    // _mm_bslli_si128(a, b) means a << (b * 8)
-    // _mm_xor_si128(a, b) means a ^ b
-    // _mm_and_si128(a, b) means a & b
-
-    pub(crate) fn vector_to_128(x: __m128i) -> u128 {
-        // Storing the values is safe, since these pointers don't have to be aligned.
-        let mut out = 0u128;
-        unsafe {
-            _mm_storeu_si128(&mut out as *mut u128 as *mut __m128i, x);
-        }
-        out
-    }
-
-    pub(crate) fn vector_from_128(x: u128) -> __m128i {
-        // Loading the values is safe, since these pointers don't have to be aligned.
-        unsafe { _mm_loadu_si128(&x as *const u128 as *const __m128i) }
+    #[inline(always)]
+    fn upper_bits_made_lower(a: U64x2) -> U64x2 {
+        U64x2::from(U8x16::from(a).shift_bytes_right::<8>())
     }
 
     #[inline(always)]
-    unsafe fn xor(a: __m128i, b: __m128i) -> __m128i {
-        _mm_xor_si128(a, b)
+    fn lower_bits_made_upper(a: U64x2) -> U64x2 {
+        U64x2::from(U8x16::from(a).shift_bytes_left::<8>())
     }
 
     #[inline(always)]
-    unsafe fn xor4(a: __m128i, b: __m128i, c: __m128i, d: __m128i) -> __m128i {
-        xor(xor(a, b), xor(c, d))
-    }
-
-    #[inline(always)]
-    unsafe fn upper_bits_made_lower(a: __m128i) -> __m128i {
-        _mm_bsrli_si128(a, 8)
-    }
-
-    #[inline(always)]
-    unsafe fn lower_bits_made_upper(a: __m128i) -> __m128i {
-        let x = _mm_bslli_si128(a, 8);
-        x
-    }
-
-    #[inline(always)]
-    pub(crate) unsafe fn mul_wide(a: __m128i, b: __m128i) -> (__m128i, __m128i) {
+    pub(crate) fn mul_wide(a: u128, b: u128) -> (u128, u128) {
         // The constants determine
         // which 64-bit half of lhs and rhs we want to use for this carry-less multiplication.
         // See https://www.felixcloutier.com/x86/pclmulqdq#tbl-4-13 and
         // algorithm 2 on page 12 of https://is.gd/tOd246
-        let c = _mm_clmulepi64_si128(a, b, 0x11);
-        let d = _mm_clmulepi64_si128(a, b, 0x00);
+        let a: U64x2 = bytemuck::cast(a);
+        let b: U64x2 = bytemuck::cast(b);
+        let c = a.carryless_mul::<true, true>(b);
+        let d = a.carryless_mul::<false, false>(b);
         // CLMUL(lower bits of a ^ upper bits of a, lower bits of b ^ upper bits of b)
-        let e = _mm_clmulepi64_si128(
-            xor(a, upper_bits_made_lower(a)),
-            xor(b, upper_bits_made_lower(b)),
-            0x00,
-        );
-        let product_upper_half = xor4(
-            c,
-            upper_bits_made_lower(c),
-            upper_bits_made_lower(d),
-            upper_bits_made_lower(e),
-        );
-        let product_lower_half = xor4(
-            d,
-            lower_bits_made_upper(d),
-            lower_bits_made_upper(c),
-            lower_bits_made_upper(e),
-        );
-        (product_upper_half, product_lower_half)
+        let e = (a ^ upper_bits_made_lower(a))
+            .carryless_mul::<false, false>(b ^ upper_bits_made_lower(b));
+        let product_upper_half =
+            c ^ upper_bits_made_lower(c) ^ upper_bits_made_lower(d) ^ upper_bits_made_lower(e);
+        let product_lower_half =
+            d ^ lower_bits_made_upper(d) ^ lower_bits_made_upper(c) ^ lower_bits_made_upper(e);
+        (
+            bytemuck::cast(product_upper_half),
+            bytemuck::cast(product_lower_half),
+        )
     }
 
     #[inline(always)]
@@ -183,13 +145,11 @@ mod multiply {
             fn unreduced_multiply(a in any::<u128>(), b in any::<u128>()) {
                 let a_poly = poly_from_128(a);
                 let b_poly = poly_from_128(b);
-                let a = vector_from_128(a);
-                let b = vector_from_128(b);
-                let (upper, lower) = unsafe { mul_wide(a, b) };
+                let (upper, lower) = mul_wide(a, b);
                 let mut product = a_poly;
                 product *= &b_poly;
                 assert_eq!(
-                    poly_from_upper_and_lower_128(vector_to_128(upper), vector_to_128(lower)),
+                    poly_from_upper_and_lower_128(upper, lower),
                     product
                 );
             }
@@ -223,13 +183,8 @@ mod multiply {
 impl<'a> MulAssign<&'a Gf128> for Gf128 {
     #[inline]
     fn mul_assign(&mut self, rhs: &'a Gf128) {
-        let lhs = multiply::vector_from_128(self.0);
-        let rhs = multiply::vector_from_128(rhs.0);
-        let (upper, lower) = unsafe { multiply::mul_wide(lhs, rhs) };
-        self.0 = multiply::reduce(
-            multiply::vector_to_128(upper),
-            multiply::vector_to_128(lower),
-        );
+        let (upper, lower) = multiply::mul_wide(self.0, rhs.0);
+        self.0 = multiply::reduce(upper, lower);
     }
 }
 

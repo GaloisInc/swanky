@@ -1,0 +1,26 @@
+{% macro proptest_eq_scalar(name, args) %}
+    proptest! {
+        #[test]
+        fn test_{{name}}(
+            {% for k, t in args.items() %}
+                {{k}} in {{t.proptest_strategy}},
+            {% endfor %}
+        ) {
+            let scalar_out = {
+                use scalar::*;
+                {% for k, t in args.items() %}
+                    let {{k}}: {{t}} = {{k}}.into();
+                {% endfor %}
+                {{caller()}}
+            };
+            let platform_out = {
+                use crate::*;
+                {% for k, t in args.items() %}
+                    let {{k}}: {{t}} = {{k}}.into();
+                {% endfor %}
+                {{caller()}}
+            };
+            prop_assert_eq!(scalar_out, platform_out);
+        }
+    }
+{% endmacro %}

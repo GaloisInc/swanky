@@ -1,0 +1,33 @@
+{% for op, call_name, simd_name, op_symbol, trait in [
+    ("bitxor", "bitxor", "xor", "^", "BitXor"),
+    ("bitor", "bitor", "or", "|", "BitOr"),
+    ("bitand", "bitand", "and", "&", "BitAnd"),
+    ("add", "wrapping_add", "add_lanes", None, "Add"),
+    ("sub", "wrapping_sub", "sub_lanes", None, "Sub"),
+] %}
+    impl {{trait}}Assign for {{ty}} {
+        #[inline(always)]
+        fn {{op}}_assign(&mut self, rhs: Self) {
+            *self = self.{{op}}(rhs);
+        }
+    }
+    impl {{trait}} for {{ty}} {
+        type Output = Self;
+        {% call(scalar, avx2) fn(op, {"self": ty, "rhs": ty}, returns=ty) %}
+        {% call scalar() %}
+            {{ty}}::from([
+                {% for i in range(ty.count) -%}
+                {% if op_symbol %}
+                self.as_array()[{{i}}] {{op_symbol}} rhs.as_array()[{{i}}],
+                {% else %}
+                self.as_array()[{{i}}].{{call_name}}(rhs.as_array()[{{i}}]),
+                {% endif %}
+                {%- endfor %}
+            ])
+        {% endcall %}
+        {% call(avx2i) avx2() %}
+            Self({{avx2i(ty, simd_name)}}(self.0, rhs.0))
+        {% endcall %}
+        {% endcall %}
+    }
+{% endfor %}

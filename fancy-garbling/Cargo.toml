@@ -22,6 +22,7 @@ serde1 = ["serde", "scuttlebutt/serde1"]
 base_conversion = { path = "base_conversion" }
 scuttlebutt = { path = "../scuttlebutt" }
 ocelot = { path = "../ocelot" }
+vectoreyes = { path = "../vectoreyes" } 
 itertools = "0.10.0"
 rand = "0.7"
 regex = "1.4.3"
