@@ -583,7 +583,7 @@ impl Receiver {
         sum_of_weights: Vec<Vec<Wire>>,
         channel: &mut C,
         rng: &mut RNG,
-        ) -> Result<(u64), Error> {
+        ) -> Result<u64, Error> {
 
         let mut ev =
             Evaluator::<C, RNG, OtReceiver>::new(channel.clone(), RNG::from_seed(rng.gen())).unwrap();
@@ -920,41 +920,54 @@ fn fancy_compute_payload_aggregate<F: fancy_garbling::FancyReveal + Fancy>(
     Ok((acc, card, sum_weights))
 }
 
-fn fancy_compute_division<F: fancy_garbling::FancyReveal + Fancy>(
+fn fancy_compute_division<F: fancy_garbling::FancyReveal + Fancy<Item = Wire>>(
     f: &mut F,
     x: CrtBundle<F::Item>,
     y: CrtBundle<F::Item>,
 ) -> Result<CrtBundle<F::Item>, F::Error> {
 
     println!("Starting Division...");
-    let x_test = f.crt_reveal(&x)?;
-    let y_test = f.crt_reveal(&y)?;
 
-    println!("x {:?}", x_test);
-    println!("y {:?}", y_test);
-    let qs = fancy_garbling::util::primes_with_width(PAYLOAD_SIZE as u32 * 8 );
+    let qs = fancy_garbling::util::primes_with_width(PAYLOAD_SIZE as u32 * 8);
     let q = fancy_garbling::util::product(&qs);
 
-    let l = ((q as f64).log2().ceil()) as u32 ;
+    let qs_65 = fancy_garbling::util::primes_with_width(65);
+    let q_65 = fancy_garbling::util::product(&qs_65);
 
-    let mut quotient = f.crt_constant_bundle(0, q)?;
-    let mut a = x.clone();
+    let last_prime = fancy_garbling::util::PRIMES[16];
+    let zero_wire = fancy_garbling::Wire::zero(last_prime);
 
-    let one = f.crt_constant_bundle(1, q)?;
-    for i in 0..l {
+    let mut x_pad = x.wires().to_vec();
+    x_pad.push(zero_wire.clone());
+    let x_large = CrtBundle::new(x_pad);
+
+    let mut y_pad = y.wires().to_vec();
+    y_pad.push(zero_wire.clone());
+    let y_large = CrtBundle::new(y_pad);
+    println!("x {} y {}",f.crt_reveal(&x_large)?, f.crt_reveal(&y_large)?);
+
+    let l = ((q as f64).log2().ceil()) as u32;
+
+    let mut quotient = f.crt_constant_bundle(0, q_65)?;
+    let mut a = x_large;
+
+    let one = f.crt_constant_bundle(1, q_65)?;
+    for i in 0..l{
         let b = 2u128.pow(l-i-1);
         let mut pb = q / b;
-        if q % b == 0{
+        if q % b == 0 {
             pb = pb-1;
         }
 
-        let tmp = f.crt_cmul(&y, b)?;
-        let c1 = f.crt_geq(&a, &tmp, "100%")?;
-
-        let pb_crt = f.crt_constant_bundle(pb, q)?;
-        let c2 = f.crt_geq(&pb_crt, &y, "100%")?;
+        let tmp = f.crt_cmul(&y_large, b)?;
+        let c1 = f.pmr_geq(&a, &tmp)?;
+        println!("c1{} {} a{} tmp{}", i, f.reveal(&c1)?, f.crt_reveal(&a)?, f.crt_reveal(&tmp)?);
+        let pb_crt = f.crt_constant_bundle(pb, q_65)?;
+        let c2 = f.pmr_geq(&pb_crt, &y_large)?;
+        println!("c2{} {} prime_overB{} y{}", i, f.reveal(&c2)?, f.crt_reveal(&pb_crt)?, f.crt_reveal(&y_large)?);
 
         let c = f.and(&c1, &c2)?;
+        println!("cs{} {} {} {}", i, f.reveal(&c1)?, f.reveal(&c2)?, f.reveal(&c)?);
 
         let c_ws = one
             .iter()
