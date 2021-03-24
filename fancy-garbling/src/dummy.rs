@@ -688,6 +688,7 @@ mod pmr_tests {
     }
 
     #[test]
+    #[ignore]
     fn crt_div() {
         let mut rng = rand::thread_rng();
         for _ in 0..8 {
