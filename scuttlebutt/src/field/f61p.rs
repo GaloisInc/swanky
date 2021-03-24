@@ -140,7 +140,30 @@ impl MulAssign<&F61p> for F61p {
     }
 }
 
-field_ops!(F61p);
+impl std::iter::Sum for F61p {
+    #[inline]
+    // // Naive Implementations
+    // fn sum<I: Iterator<Item = Self>>(iter: I) -> Self {
+    //     //iter.fold(F61p::ZERO, std::ops::Add::add)
+    //     let mut a : F61p = F61p::ZERO;
+    //     for e in iter {
+    //         a += e;
+    //     }
+    //     return a;
+    // }
+
+    fn sum<I: Iterator<Item = Self>>(iter: I) -> Self {
+        let mut out: u128 = 0;
+        // Invariant: this code is correct if the length of the
+        // iterator is less than 2^(128 - 61).
+        for e in iter {
+            out += u128::from(e.0);
+        }
+        return F61p(reduce(out));
+    }
+}
+
+field_ops!(F61p, SUM_ALREADY_DEFINED);
 
 #[cfg(test)]
 test_field!(test_f61p, F61p);
@@ -159,4 +182,11 @@ fn test_generator() {
         F61p::GENERATOR.pow(F61p::MULTIPLICATIVE_GROUP_ORDER),
         F61p::ONE
     );
+}
+
+#[test]
+fn test_sum_overflow() {
+    let neg1 = F61p::ZERO - F61p::ONE;
+    let x = [neg1; 2];
+    assert_eq!(x.iter().map(|x| *x).sum::<F61p>(), neg1 + neg1);
 }

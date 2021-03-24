@@ -264,7 +264,6 @@ impl FiniteField for Gf128 {
     const GENERATOR: Self = Gf128(2);
 
     const ZERO: Self = Gf128(0);
-
     const ONE: Self = Gf128(1);
 
     fn multiply_by_prime_subfield(&self, pf: Self::PrimeField) -> Self {

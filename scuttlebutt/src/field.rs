@@ -55,12 +55,12 @@ pub trait FiniteField:
     type PrimeField: FiniteField + IsSubfieldOf<Self>;
     /// When elements of this field are represented as a polynomial over the prime field,
     /// how many coefficients are needed?
-    type PolynomialFormNumCoefficients: ArrayLength<Self::PrimeField>;
-    /// Convert the field element into (coefficients of) a polynomial over the prime field.
+    type PolynomialFormNumCoefficients: ArrayLength<Self::PrimeField> + ArrayLength<Self>;
+    /// Convert a polynomial over the prime field into a field element of the finite field.
     fn from_polynomial_coefficients(
         coeff: GenericArray<Self::PrimeField, Self::PolynomialFormNumCoefficients>,
     ) -> Self;
-    /// Convert a polynomial over the prime field into a field element of the finite field.
+    /// Convert the field element into (coefficients of) a polynomial over the prime field.
     fn to_polynomial_coefficients(
         &self,
     ) -> GenericArray<Self::PrimeField, Self::PolynomialFormNumCoefficients>;
@@ -69,7 +69,6 @@ pub trait FiniteField:
     /// A fused "lift from prime subfield and then multiply" operation. This operation can be much
     /// faster than manually lifting and then multiplying.
     fn multiply_by_prime_subfield(&self, pf: Self::PrimeField) -> Self;
-
     /// Construct a field element from the given uniformly chosen random bytes.
     fn from_uniform_bytes(x: &[u8; 16]) -> Self;
     /// Generate a random field element.
@@ -218,6 +217,18 @@ macro_rules! binop {
 
 macro_rules! field_ops {
     ($f:ident) => {
+        impl std::iter::Sum for $f {
+            fn sum<I: Iterator<Item = Self>>(iter: I) -> Self {
+                iter.fold($f::ZERO, std::ops::Add::add)
+            }
+        }
+
+        field_ops!($f, SUM_ALREADY_DEFINED);
+    };
+
+    // Compared to the previous pattern, `Sum` is missing and assumed
+    // to be implemented by the field directly
+    ( $f:ident, SUM_ALREADY_DEFINED) => {
         impl PartialEq for $f {
             fn eq(&self, other: &Self) -> bool {
                 self.ct_eq(other).into()
@@ -227,12 +238,6 @@ macro_rules! field_ops {
         impl Default for $f {
             fn default() -> Self {
                 Self::ZERO
-            }
-        }
-
-        impl std::iter::Sum for $f {
-            fn sum<I: Iterator<Item = Self>>(iter: I) -> Self {
-                iter.fold($f::ZERO, std::ops::Add::add)
             }
         }
 

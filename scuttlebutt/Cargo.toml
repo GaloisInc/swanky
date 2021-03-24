@@ -73,6 +73,10 @@ name = "gf_2_128"
 harness = false
 
 [[bench]]
+name = "f61p"
+harness = false
+
+[[bench]]
 name = "gf_2_45"
 harness = false
 

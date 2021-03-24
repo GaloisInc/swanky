@@ -1,7 +1,7 @@
 // -*- mode: rust; -*-
 //
 // This file is part of `scuttlebutt`.
-// Copyright © 2019 Galois, Inc.
+// Copyright © 2020 Galois, Inc.
 // See LICENSE for licensing information.
 
 mod hash_channel;

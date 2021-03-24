@@ -17,21 +17,19 @@ autoexamples = true
 [features]
 nightly = ["curve25519-dalek/nightly", "curve25519-dalek/simd_backend", "scuttlebutt/nightly"]
 
+
 [dependencies]
 curve25519-dalek = { version = "3.0.2", features = ["std"] }
 rand = "0.7"
-rand_core = "0.5"
 scuttlebutt = { path = "../scuttlebutt", features = ["curve25519-dalek"] }
 generic-array = "0.14.4"
 subtle = "2.4.0"
-
 
 [build-dependencies]
 cc = "1.0.67"
 
 [dev-dependencies]
 criterion = "0.3.4"
-
 
 [[bench]]
 name = "ot"
@@ -42,8 +40,7 @@ name = "oprf"
 harness = false
 
 [[bench]]
-path = "benches/base_svole.rs"
-name = "base_svole"
+name = "svole"
 harness = false
 
 [[example]]

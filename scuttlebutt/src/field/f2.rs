@@ -22,6 +22,7 @@ impl ConstantTimeEq for F2 {
         self.0.ct_eq(&other.0)
     }
 }
+
 impl ConditionallySelectable for F2 {
     fn conditional_select(a: &Self, b: &Self, choice: Choice) -> Self {
         F2(u8::conditional_select(&a.0, &b.0, choice))
