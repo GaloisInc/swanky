@@ -231,7 +231,7 @@ proptest! {
     }
 }
 
-mod interactive {
+pub mod interactive {
     use super::*;
 
     #[derive(Debug, Clone, Copy)]
@@ -297,8 +297,8 @@ mod interactive {
         r1_ra: &Array1<Field>,
         Pa: &CsMat<Field>,
     ) -> Vec<Array1<Field>> {
-        r1_ra.dot(&Pa.to_dense()) // XXX: Use sprs
-            .exact_chunks(P.l)
+        let r_dot_P = &Pa.clone().transpose_into() * r1_ra;
+        r_dot_P.exact_chunks(P.l)
             .into_iter()
             .map(|points| P.fft2_inverse(points))
             .collect()
@@ -602,6 +602,7 @@ mod interactive {
         }
     }
 
+    #[cfg(test)]
     proptest! {
         #[test]
         fn test_interactive_proof(
