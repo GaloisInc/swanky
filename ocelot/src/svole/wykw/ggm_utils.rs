@@ -110,6 +110,8 @@ fn bv_to_num(v: &[bool]) -> usize {
 }
 
 #[cfg(test)]
+// When this module is included a benchmark, the test functions don't get called.
+#[allow(unused_imports, dead_code)]
 mod tests {
     use super::{bv_to_num, ggm, ggm_prime};
     use rand::Rng;

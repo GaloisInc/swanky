@@ -13,7 +13,7 @@ use ocelot::svole::{
 };
 use rand::Rng;
 use scuttlebutt::{
-    field::{F61p, FiniteField, Fp, Gf128, F2},
+    field::{F61p, FiniteField, Fp, Gf128},
     Aes128, AesRng, Block, Channel,
 };
 use std::{
@@ -93,15 +93,6 @@ fn bench_svole_gf128(c: &mut Criterion) {
     });
 }
 
-fn bench_svole_f2(c: &mut Criterion) {
-    c.bench_function("svole::extend::F2", move |bench| {
-        let (vole_sender, vole_receiver) = svole_init();
-        bench.iter(move || {
-            bench_svole::<Sender<F2>, Receiver<F2>>(&vole_sender, &vole_receiver);
-        })
-    });
-}
-
 fn bench_svole_f61p(c: &mut Criterion) {
     c.bench_function("svole::extend::F61p", move |bench| {
         let (vole_sender, vole_receiver) = svole_init();
@@ -143,14 +134,6 @@ fn bench_svole_init_fp(c: &mut Criterion) {
     });
 }
 
-fn bench_svole_init_f2(c: &mut Criterion) {
-    c.bench_function("svole::init::F2", move |bench| {
-        bench.iter(move || {
-            bench_svole_init::<Sender<F2>, Receiver<F2>>();
-        });
-    });
-}
-
 fn bench_svole_init_f61p(c: &mut Criterion) {
     c.bench_function("svole::init::F61p", move |bench| {
         bench.iter(move || {
@@ -185,6 +168,13 @@ fn bench_ggm(c: &mut Criterion) {
 criterion_group! {
     name = svole;
     config = Criterion::default().warm_up_time(Duration::from_millis(100)).sample_size(10);
-    targets = bench_svole_init_f61p, bench_svole_init_gf128, bench_svole_f61p, bench_svole_gf128, bench_ggm
+    targets =
+        bench_svole_init_f61p,
+        bench_svole_init_gf128,
+        bench_svole_f61p,
+        bench_svole_gf128,
+        bench_ggm,
+        bench_svole_fp,
+        bench_svole_init_fp
 }
 criterion_main!(svole);
