@@ -227,8 +227,10 @@ impl<FE: FiniteField> SVoleSender for Sender<FE> {
             compute_num_saved::<FE>(LPN_SETUP_PARAMS),
             rng,
         )?;
-
         base_voles.extend(extras.iter());
+
+        debug_assert!(base_voles.len() >= compute_num_saved::<FE>(LPN_EXTEND_PARAMS));
+        debug_assert!(self.base_voles.len() >= compute_num_saved::<FE>(LPN_EXTEND_PARAMS));
 
         let spsvole = self.spsvole.duplicate(channel, rng)?;
         let lpn_rng = self.lpn_rng.fork();
@@ -377,8 +379,10 @@ impl<FE: FiniteField> SVoleReceiver for Receiver<FE> {
             compute_num_saved::<FE>(LPN_SETUP_PARAMS),
             rng,
         )?;
-
         base_voles.extend(extras.iter());
+
+        debug_assert!(base_voles.len() >= compute_num_saved::<FE>(LPN_EXTEND_PARAMS));
+        debug_assert!(self.base_voles.len() >= compute_num_saved::<FE>(LPN_EXTEND_PARAMS));
 
         let spsvole = self.spsvole.duplicate(channel, rng)?;
         let lpn_rng = self.lpn_rng.fork();
