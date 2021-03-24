@@ -5,11 +5,11 @@
 // See LICENSE for licensing information.
 
 #![allow(clippy::many_single_char_names)]
-#![cfg_attr(feature = "nightly", feature(stdsimd))]
+#![deny(missing_docs)]
 #![cfg_attr(feature = "nightly", feature(test))]
-#![cfg_attr(feature = "nightly", feature(external_doc))]
-#![cfg_attr(feature = "nightly", doc(include = "../README.md"))]
-#![cfg_attr(feature = "nightly", deny(missing_docs))]
+// TODO: when https://git.io/JYTnW gets stabilized add the readme as module docs.
+
+//! Scuttlebutt provides many utility functions for cryptographic applications.
 
 mod aes;
 mod block;

@@ -19,7 +19,7 @@ As more intrinsics get stabilized in Rust, and as we get access to newer hardwar
 While vectoreyes initially started as a pile of macros and traits, it was easier to develop by generating code using Python (and the jinja2 templating language). The generated code is checked in to avoid the dependency on Python at build-time.
 
 # Minimum Supported Rust Version
-This code extensively uses `min_const_generics`. This feature is currently in Rust's beta release. It will enter Rust's stable release on 03/25/2021 (this Thursday).
+This code extensively uses `min_const_generics`. This feature is currently in Rust's beta release. It will enter Rust's stable release on 03/25/2021.
 
 # External Resources
 This merge request checks in two files by external authors. If there are issues re-distributing either of these files, the `generate.py` script could probably just download them when it's run.

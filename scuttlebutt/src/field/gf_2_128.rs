@@ -167,7 +167,11 @@ mod multiply {
         }
 
         proptest! {
-            #![proptest_config(ProptestConfig::with_cases(15))]
+            #![proptest_config(ProptestConfig::with_cases(
+                std::env::var("PROPTEST_CASES")
+                    .map(|x| x.parse().expect("PROPTEST_CASES is a number"))
+                    .unwrap_or(15)
+            ))]
             #[test]
             fn reduction(upper in any::<u128>(), lower in any::<u128>()) {
                 let poly = poly_from_upper_and_lower_128(upper, lower);
