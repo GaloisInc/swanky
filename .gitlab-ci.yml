@@ -54,8 +54,7 @@ checkfmt:rustfmt:
   extends: [.any-changes]
   stage: checkfmt
   variables:
-    # TODO: change back to stable after March 25th 2021
-    toolchain: beta
+    toolchain: stable
   script:
     - rustup component add rustfmt --toolchain $toolchain
     - cargo fmt -- --check
@@ -76,8 +75,7 @@ test-vectoreyes-scalar:
   extends: [.vectoreyes-changes]
   stage: test
   variables:
-    # TODO: change back to stable after March 25th 2021
-    toolchain: beta
+    toolchain: stable
   script:
       # Test vectoreyes in the scalar mode.
     - rm -rf .cargo/config
@@ -89,8 +87,7 @@ test:stable:
   extends: [.test, .any-changes]
   stage: test
   variables:
-    # TODO: change back to stable after March 25th 2021
-    toolchain: beta
+    toolchain: stable
     features: ""
 
 # Vectoreyes introduced several different configurations based on CPU.
@@ -106,8 +103,7 @@ test:stable-haswell:
   extends: [.test, .any-changes]
   stage: test
   variables:
-    # TODO: change back to stable after March 25th 2021
-    toolchain: beta
+    toolchain: stable
     features: ""
     force_target_cpu: "haswell"
 
