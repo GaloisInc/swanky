@@ -168,11 +168,4 @@ mod tests {
         let len = 19870; //LpnSetupParams::ROWS;
         test_base_vole_setup_params_all_fields(len)
     }
-
-    #[ignore] // TODO: fix this
-    #[test]
-    fn test_base_svole_extend_params() {
-        let len = 589_760; //LpnExtendParams::ROWS;
-        test_base_vole_setup_params_all_fields(len)
-    }
 }

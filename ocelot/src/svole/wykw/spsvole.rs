@@ -362,7 +362,7 @@ mod test {
     };
     use generic_array::typenum::Unsigned;
     use scuttlebutt::{
-        field::{F61p, FiniteField as FF, Fp, Gf128, F2},
+        field::{F61p, FiniteField as FF, Gf128},
         AesRng, Channel,
     };
     use std::{
@@ -409,15 +409,19 @@ mod test {
         }
     }
 
-    #[ignore]
     #[test]
-    fn test_spsvole() {
+    fn test_spsvole_gf128() {
         let cols = 10_805_248;
         let weight = 1_319;
 
-        test_spsvole_::<Fp>(cols, weight);
         test_spsvole_::<Gf128>(cols, weight);
-        test_spsvole_::<F2>(cols, weight);
+    }
+
+    #[test]
+    fn test_spsvole_f61p() {
+        let cols = 10_805_248;
+        let weight = 1_319;
+
         test_spsvole_::<F61p>(cols, weight);
     }
 }
