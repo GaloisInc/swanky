@@ -402,7 +402,7 @@ impl<FF: FiniteField> Malicious for Receiver<FF> {}
 mod tests {
     use super::{Receiver, SVoleReceiver, SVoleSender, Sender};
     use scuttlebutt::{
-        field::{F61p, FiniteField as FF, Fp, Gf128, F2},
+        field::{F61p, FiniteField as FF, Fp, Gf128},
         AesRng, Channel,
     };
     use std::{
