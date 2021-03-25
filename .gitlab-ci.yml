@@ -37,11 +37,12 @@ stages:
   stage: test
   script:
     - |
-      if ! [[ -z "$force_target_cpu" ]]; then
+      if ! [[ -z "$force_haswell" ]]; then
         cat > .cargo/config << EOF
         [build]
-        rustflags = ["-C", "target-cpu=$force_target_cpu", "--cfg", "vectoreyes_target_cpu=\"$force_target_cpu\""]
-        rustdocflags = ["-C", "target-cpu=$force_target_cpu", "--cfg", "vectoreyes_target_cpu=\"$force_target_cpu\""]
+        # LLVM doesn't enable AES support on haswell by default since not all Haswell CPUs have AES-NI
+        rustflags = ["-C", "target-cpu=haswell", "-C", "target-feature=+aes", "--cfg", "vectoreyes_target_cpu=\"haswell\""]
+        rustdocflags = ["-C", "target-cpu=haswell", "-C", "target-feature=+aes", "--cfg", "vectoreyes_target_cpu=\"haswell\""]
       EOF
       fi
     - cat .cargo/config
@@ -105,7 +106,7 @@ test:stable-haswell:
   variables:
     toolchain: stable
     features: ""
-    force_target_cpu: "haswell"
+    force_haswell: "1"
 
 test:nightly:
   extends: [.test, .any-changes]
