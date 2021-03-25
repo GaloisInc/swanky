@@ -410,13 +410,35 @@ mod test {
     }
 
     #[test]
-    fn test_spsvole() {
+    fn test_spsvole_f2() {
+        let cols = 10_805_248;
+        let weight = 1_319;
+
+        test_spsvole_::<F2>(cols, weight);
+    }
+
+    #[test]
+    fn test_spsvole_gf128() {
+        let cols = 10_805_248;
+        let weight = 1_319;
+
+        test_spsvole_::<Gf128>(cols, weight);
+    }
+
+    #[test]
+    fn test_spsvole_f61p() {
+        let cols = 10_805_248;
+        let weight = 1_319;
+
+        test_spsvole_::<F61p>(cols, weight);
+    }
+
+    #[ignore]
+    #[test]
+    fn test_spsvole_fp() {
         let cols = 10_805_248;
         let weight = 1_319;
 
         test_spsvole_::<Fp>(cols, weight);
-        test_spsvole_::<Gf128>(cols, weight);
-        test_spsvole_::<F2>(cols, weight);
-        test_spsvole_::<F61p>(cols, weight);
     }
 }
