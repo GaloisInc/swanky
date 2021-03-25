@@ -1,7 +1,6 @@
 // Compute Aggregated Payloads associated with intersection
 // in the clear for testing purposes.
 use std::{
-    cmp,
     convert::TryInto,
     collections::HashMap,
 };

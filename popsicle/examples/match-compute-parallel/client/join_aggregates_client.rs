@@ -7,7 +7,6 @@ use scuttlebutt::{AesRng, TcpChannel};
 
 use std::{
     fs::{File, write, read_to_string},
-    io::Write,
     net::{TcpStream},
     time::SystemTime,
     io::Error,
@@ -15,12 +14,11 @@ use std::{
 };
 use serde_json;
 
-fn client_protocol(mut channel: TcpChannel<TcpStream>, path:&mut PathBuf, nthreads: usize, precision: u32) -> (u128){
+fn client_protocol(mut channel: TcpChannel<TcpStream>, path:&mut PathBuf, nthreads: usize, _precision: u32) -> u128{
     let start = SystemTime::now();
     let mut rng = AesRng::new();
 
     let mut aggregates= Vec::new();
-    let mut cardinality= Vec::new();
     let mut sum_weights= Vec::new();
     for thread_id in 0..nthreads{
         let mut thread_path = "thread".to_owned();
@@ -32,25 +30,19 @@ fn client_protocol(mut channel: TcpChannel<TcpStream>, path:&mut PathBuf, nthrea
         let partial_aggregate: Vec<Wire> = serde_json::from_str(&read_to_string(path_str).unwrap()).unwrap();
         path.pop();
 
-        path.push("output_cardinality.txt");
-        let path_str = path.clone().into_os_string().into_string().unwrap();
-        let partial_cardinality: Vec<Wire> = serde_json::from_str(&read_to_string(path_str).unwrap()).unwrap();
-        path.pop();
-
         path.push("output_sum_weights.txt");
         let path_str = path.clone().into_os_string().into_string().unwrap();
         let partial_sum_weights: Vec<Wire> = serde_json::from_str(&read_to_string(path_str).unwrap()).unwrap();
         path.pop();
 
         aggregates.push(partial_aggregate);
-        cardinality.push(partial_cardinality);
         sum_weights.push(partial_sum_weights);
 
         path.pop();
     }
 
     let mut psi = Receiver::init(&mut channel, &mut rng).unwrap();
-    let weighted_mean = psi.compute_aggregates(aggregates, cardinality, sum_weights, &mut channel,&mut rng).unwrap();
+    let weighted_mean = psi.compute_aggregates(aggregates, sum_weights, &mut channel,&mut rng).unwrap();
     println!("weighted_mean: {:?}", weighted_mean);
 
 

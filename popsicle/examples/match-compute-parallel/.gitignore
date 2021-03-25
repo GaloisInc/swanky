@@ -1,3 +1,6 @@
 thread*/
 result.txt
 delta.txt
+receiver_log.txt
+sender_log.txt
+result_nonsecure.txt

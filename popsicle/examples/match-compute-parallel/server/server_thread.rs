@@ -64,7 +64,7 @@ fn server_protocol(mut stream: TcpChannel<TcpStream>, path:&mut PathBuf, thread_
     let payload: Vec<Vec<Vec<Block512>>> = bincode::deserialize(&mut buff4).unwrap();
 
     let mut psi = Sender::init(&mut stream, &mut rng).unwrap();
-    let (acc, card, sum_weights) = psi.compute_payload(ts_id, ts_payload, table, payload, &path_delta, &mut stream, &mut rng).unwrap();
+    let (acc, sum_weights) = psi.compute_payload(ts_id, ts_payload, table, payload, &path_delta, &mut stream, &mut rng).unwrap();
 
     println!(
         "Sender Thread {} :: total circuit building & computation time: {} ms", thread_id,
@@ -83,22 +83,15 @@ fn server_protocol(mut stream: TcpChannel<TcpStream>, path:&mut PathBuf, thread_
     let mut file_aggregate = File::create(path_str).unwrap();
     path.pop();
 
-    path.push("output_cardinality.txt");
-    let path_str = path.clone().into_os_string().into_string().unwrap();
-    let mut file_cardinality = File::create(path_str).unwrap();
-    path.pop();
-
     path.push("output_sum_weights.txt");
     let path_str = path.clone().into_os_string().into_string().unwrap();
     let mut file_sum_weights = File::create(path_str).unwrap();
     path.pop();
 
     let aggregate_json = serde_json::to_string(&acc.wires().to_vec()).unwrap();
-    let cardinality_json = serde_json::to_string(&card.wires().to_vec()).unwrap();
     let sum_weights_json = serde_json::to_string(&sum_weights.wires().to_vec()).unwrap();
 
     file_aggregate.write(aggregate_json.as_bytes()).unwrap();
-    file_cardinality.write(cardinality_json.as_bytes()).unwrap();
     file_sum_weights.write(sum_weights_json.as_bytes()).unwrap();
 }
 

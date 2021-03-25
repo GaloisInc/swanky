@@ -1,20 +1,19 @@
 mod prepare_files_client;
 mod client_thread;
 mod join_aggregates_client;
-mod parse_files;
-mod test;
+// mod test;
 
 
 use prepare_files_client::prepare_files;
 use client_thread::client_thread;
 use join_aggregates_client::join_aggregates;
-use parse_files::parse_files;
+use popsicle::parse_files;
 
-use test::test;
+// use test::test;
 
 use std::{
     env,
-    fs::{File, write, read_to_string},
+    fs::{File},
     io::{BufRead, BufReader, stdin, stdout, Read, Write},
     collections::HashMap,
     time::{Duration},
@@ -61,6 +60,12 @@ fn pause() {
 }
 
 pub fn main(){
+
+    std::panic::set_hook(Box::new(|p| {
+        println!("{}", p);
+        loop { }
+    }));
+
     // Get the root directory's location in order to find the configuration file
     // that's assumed to be in the match-compute-parallel folder
     // and in order to create the computations files and folders
@@ -112,12 +117,12 @@ pub fn main(){
 
 
     let client_path = parameters.get("data_path_client").unwrap().to_owned();
-    let schema_id = parameters.get("schema_client_id").unwrap().to_owned();
-    let schema_payload = parameters.get("schema_client_payload").unwrap().to_owned();
+    let id_position = parameters.get("id_position_client").unwrap().parse::<usize>().unwrap();
+    let payload_position = parameters.get("payload_position_client").unwrap().parse::<usize>().unwrap();
 
     // The ids & payloads are read from the csv according to their schema (column names),
     // and turned into the computations representation
-    let (ids_client, payloads_client) = parse_files(&schema_id, &schema_payload, &client_path);
+    let (ids, payloads) = parse_files(id_position, payload_position, &client_path);
 
     // Alternatively uncomment this section to randomly generate the inputs. Don't forget
     // to also uncomment the necessary includes and methods at the top
@@ -131,7 +136,7 @@ pub fn main(){
    // Bucketize the data and split into megabins that are distributed among threads
    path.pop();
    path.push("client");
-   prepare_files(&mut path, &address, nthread, megasize, &ids_client, &payloads_client);
+   prepare_files(&mut path, &address, nthread, megasize, &ids, &payloads);
    //
     thread::sleep(duration);
 
@@ -154,7 +159,7 @@ pub fn main(){
 
    // The partial results are joined and the output is produced
     thread::sleep(duration);
-    let (_result_cardinality) = join_aggregates(&mut path, &address, nthread, precision).unwrap();
+    let _result_cardinality = join_aggregates(&mut path, &address, nthread, precision).unwrap();
     //
     //
     // // // test results

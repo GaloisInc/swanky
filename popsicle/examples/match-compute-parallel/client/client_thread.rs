@@ -42,7 +42,7 @@ fn client_protocol(mut channel: TcpChannel<TcpStream>, path: &mut PathBuf, threa
     let payload: Vec<Vec<Block512>> = bincode::deserialize(&mut buff2).unwrap();
 
     let mut psi = Receiver::init(&mut channel, &mut rng).unwrap();
-    let (acc, card, sum_weights) = psi.compute_payload(table, payload, &mut channel, &mut rng).unwrap();
+    let (acc, sum_weights) = psi.compute_payload(table, payload, &mut channel, &mut rng).unwrap();
 
     println!(
         "Receiver Thread {} :: total circuit building & computation time: {} ms", thread_id,
@@ -62,10 +62,6 @@ fn client_protocol(mut channel: TcpChannel<TcpStream>, path: &mut PathBuf, threa
     let mut file_aggregate = File::create(path_str).unwrap();
     path.pop();
 
-    path.push("output_cardinality.txt");
-    let path_str = path.clone().into_os_string().into_string().unwrap();
-    let mut file_cardinality = File::create(path_str).unwrap();
-    path.pop();
 
     path.push("output_sum_weights.txt");
     let path_str = path.clone().into_os_string().into_string().unwrap();
@@ -73,11 +69,9 @@ fn client_protocol(mut channel: TcpChannel<TcpStream>, path: &mut PathBuf, threa
     path.pop();
 
     let aggregate_json = serde_json::to_string(&acc.wires().to_vec()).unwrap();
-    let cardinality_json = serde_json::to_string(&card.wires().to_vec()).unwrap();
     let sum_weights_json = serde_json::to_string(&sum_weights.wires().to_vec()).unwrap();
 
     file_aggregate.write(aggregate_json.as_bytes()).unwrap();
-    file_cardinality.write(cardinality_json.as_bytes()).unwrap();
     file_sum_weights.write(sum_weights_json.as_bytes()).unwrap();
 }
 

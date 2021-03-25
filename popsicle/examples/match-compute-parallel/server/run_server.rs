@@ -1,12 +1,11 @@
 mod prepare_files_server;
 mod server_thread;
 mod join_aggregates_server;
-mod parse_files;
 
 use prepare_files_server::prepare_files;
 use server_thread::server_thread;
 use join_aggregates_server::join_aggregates;
-use parse_files::parse_files;
+use popsicle::utils::parse_files;
 
 use std::{
     env,
@@ -48,6 +47,12 @@ use std::{
 //
 
 pub fn main(){
+    
+    std::panic::set_hook(Box::new(|p| {
+        println!("{}", p);
+        loop { }
+    }));
+
     let mut path = env::current_exe().unwrap();
     path.pop();
     path.pop();
@@ -91,12 +96,12 @@ pub fn main(){
     let nthread = parameters.get("nthread").unwrap().parse::<usize>().unwrap();
     //
     let server_path = parameters.get("data_path_server").unwrap().to_owned();
-    let schema_id = parameters.get("schema_server_id").unwrap().to_owned();
-    let schema_payload = parameters.get("schema_server_payload").unwrap().to_owned();
+    let id_position = parameters.get("id_position_server").unwrap().parse::<usize>().unwrap();
+    let payload_position = parameters.get("payload_position_server").unwrap().parse::<usize>().unwrap();
 
     // The ids & payloads are read from the csv according to their schema (column names),
     // and turned into the computations representation
-    let (ids, payloads) = parse_files(&schema_id, &schema_payload, &server_path);
+    let (ids, payloads) = parse_files(id_position, payload_position, &server_path);
 
     // Alternatively uncomment this section to randomly generate the inputs. Don't forget
     // to also uncomment the necessary includes and methods at the top
