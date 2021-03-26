@@ -91,7 +91,7 @@ impl Sender {
             let mut bins = Vec::with_capacity(NHASHES);
             for h in 0..NHASHES {
                 let bin = CuckooHash::bin(x, h, nbins);
-                table[bin].push(x ^ Block::from(h as u128));
+                table[bin].push(x);
                 bins.push(bin);
             }
             // if j = H1(y) = H2(y) for some y, then P2 adds a uniformly random element to
@@ -423,7 +423,7 @@ mod tests {
     };
 
     const ITEM_SIZE: usize = 8;
-    const SET_SIZE: usize = 1 << 8;
+    const SET_SIZE: usize = 100000;
 
     #[test]
     fn full_protocol() {
