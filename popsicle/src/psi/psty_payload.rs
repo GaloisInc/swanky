@@ -260,8 +260,6 @@ impl Sender {
         }
 
         let weighted_mean = gb.crt_div(&acc, &sum_weights).unwrap();
-        gb.outputs(&acc.wires().to_vec()).unwrap();
-        gb.outputs(&sum_weights.wires().to_vec()).unwrap();
         gb.outputs(&weighted_mean.wires().to_vec()).unwrap();
         Ok(())
     }
@@ -558,17 +556,6 @@ impl Receiver {
         }
 
         let weighted_mean = ev.crt_div(&acc, &sum_weights).unwrap();
-        let acc = ev
-            .outputs(&acc.wires().to_vec()).unwrap()
-            .expect("evaluator should produce outputs");
-        let acc = fancy_garbling::util::crt_inv(&acc, &qs);
-
-        let sum_weights = ev
-            .outputs(&sum_weights.wires().to_vec()).unwrap()
-            .expect("evaluator should produce outputs");
-        let sum_weights = fancy_garbling::util::crt_inv(&sum_weights, &qs);
-
-        println!("acc {} sum_weights {}", acc, sum_weights);
 
         let weighted_mean_outs = ev
             .outputs(&weighted_mean.wires().to_vec()).unwrap()
