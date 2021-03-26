@@ -27,7 +27,15 @@ pub(crate) struct CuckooItem {
     pub(crate) hash_index: usize,
 }
 
-#[derive(Clone)]
+impl CuckooItem {
+    #[cfg(feature = "psty")]
+    /// Replace the first byte of the entry with the hash index. Used in PSTY.
+    pub fn entry_with_hindex(&self) -> Block {
+        let mask = Block::from(0xFFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FF00);
+        (self.entry & mask) ^ Block::from(self.hash_index as u128)
+    }
+}
+
 pub(crate) struct CuckooHash {
     pub(crate) items: Vec<Option<CuckooItem>>,
     pub(crate) nbins: usize,
@@ -114,12 +122,8 @@ impl CuckooHash {
             input_index: idx,
             hash_index: 0,
         };
-        let mask = Block::from(0xFFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FF00);
-
         for _ in 0..NITERS {
-            item.entry &= mask;
             let i = CuckooHash::bin(item.entry, item.hash_index, self.nbins);
-            item.entry ^= Block::from(item.hash_index as u128);
             let opt_item = self.items[i].replace(item);
             if let Some(x) = opt_item {
                 // If there is an item already in the bin, keep iterating,
@@ -136,23 +140,9 @@ impl CuckooHash {
 
     /// Output the bin number for a given hash output `hash` and hash index `hidx`.
     pub fn bin(hash: Block, hidx: usize, nbins: usize) -> usize {
-        // The first 15 bytes of `hash` are uniformly(-ish) random, so we use it
-        // directly to determine our bin by indexing the `hidx`th 32 bits of
-        // `hash` then mod-ing it by `nbins`. We can't do this for more than
-        // three hash functions though, as the last byte is *not*
-        // uniformly(-ish) random. Instead, we run it through AES (slow!).
-        if hidx < 3 {
-            let mut array = [0u8; 4];
-            let bytes: [u8; 16] = hash.into();
-            array.copy_from_slice(&bytes[4 * hidx..4 * (hidx + 1)]);
-            let value = u32::from_le_bytes(array);
-            (value as usize) % nbins
-        } else {
-            // In this case, compute `AES_{hash}(hidx)`.
-            let aes = Aes128::new(hash);
-            let h = aes.encrypt(Block::from(hidx as u128));
-            (u128::from(h) % (nbins as u128)) as usize
-        }
+        let aes = Aes128::new(hash);
+        let h = aes.encrypt(Block::from(hidx as u128));
+        (u128::from(h) % (nbins as u128)) as usize
     }
 }
 
@@ -249,7 +239,7 @@ mod tests {
 
     const NHASHES: usize = 3;
     const ITEMSIZE: usize = 8;
-    const SETSIZE: usize = 1 << 16;
+    const SETSIZE: usize = 10000;
 
     #[test]
     fn test_build() {
@@ -257,8 +247,7 @@ mod tests {
         let inputs = utils::rand_vec_vec(SETSIZE, ITEMSIZE, &mut rng);
         let key = rng.gen();
         let hashes = utils::compress_and_hash_inputs(&inputs, key);
-        let tbl = CuckooHash::new(&hashes, NHASHES);
-        assert!(tbl.err().is_none());
+        let _ = CuckooHash::new(&hashes, NHASHES).unwrap();
     }
 
     #[test]
@@ -277,7 +266,7 @@ mod tests {
             let mut bins = Vec::with_capacity(NHASHES);
             for h in 0..NHASHES {
                 let bin = CuckooHash::bin(x, h, cuckoo.nbins);
-                table[bin].push(x ^ Block::from(h as u128));
+                table[bin].push(x);
                 bins.push(bin);
             }
             // if j = H1(y) = H2(y) for some y, then P2 adds a uniformly random element to

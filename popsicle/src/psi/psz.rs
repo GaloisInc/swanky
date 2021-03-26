@@ -63,13 +63,12 @@ impl Sender {
             // shuffle the indices in order to send out of order
             indices.shuffle(rng);
 
-            let hidx = Block::from(i as u128);
             for &j in &indices {
                 // Compute `bin := hᵢ(x)`.
                 let bin = CuckooHash::bin(inputs[j], i, nbins);
 
                 // Compute `F(k_{hᵢ(x)}, x || i)` and chop off extra bytes.
-                self.oprf.encode(inputs[j] ^ hidx, &mut encoded);
+                self.oprf.encode(inputs[j], &mut encoded);
                 encoded ^= seeds[bin];
 
                 channel.write_bytes(&encoded.prefix(masksize))?;
@@ -102,13 +101,12 @@ impl Sender {
             // shuffle the indices in order to send out of order
             indices.shuffle(rng);
 
-            let hidx = Block::from(i as u128);
             for &j in &indices {
                 // Compute `bin := hᵢ(x)`.
                 let bin = CuckooHash::bin(inputs[j], i, nbins);
 
                 // Compute `F(k_{hᵢ(x)}, x || i)` and chop off extra bytes.
-                self.oprf.encode(inputs[j] ^ hidx, &mut encoded);
+                self.oprf.encode(inputs[j], &mut encoded);
                 encoded ^= seeds[bin];
 
                 let tag = &encoded.as_ref()[0..masksize];
