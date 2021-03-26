@@ -11,13 +11,8 @@ use crate::{
     errors::Error,
     ot::{
         kos::{Receiver as KosReceiver, Sender as KosSender},
-        CorrelatedReceiver,
-        CorrelatedSender,
-        FixedKeyInitializer,
-        RandomReceiver,
-        RandomSender,
-        Receiver as OtReceiver,
-        Sender as OtSender,
+        CorrelatedReceiver, CorrelatedSender, FixedKeyInitializer, RandomReceiver, RandomSender,
+        Receiver as OtReceiver, Sender as OtSender,
     },
 };
 use rand::{CryptoRng, Rng};

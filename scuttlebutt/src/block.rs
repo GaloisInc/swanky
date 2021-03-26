@@ -56,10 +56,10 @@ impl Block {
     /// Computes the hash by computing `E_{pt}(tweak)`, where `E` is AES-256.
     #[cfg(feature = "curve25519-dalek")]
     #[inline]
-    pub fn hash_pt(tweak: usize, pt: &RistrettoPoint) -> Self {
+    pub fn hash_pt(tweak: u128, pt: &RistrettoPoint) -> Self {
         let k = pt.compress();
         let c = Aes256::new(k.as_bytes());
-        c.encrypt(Block(U64x2::set_lo(tweak as u64).into()))
+        c.encrypt(Block::from(tweak))
     }
 
     /// Return the least significant bit.

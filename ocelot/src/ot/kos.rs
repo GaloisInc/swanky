@@ -9,6 +9,7 @@
 
 use crate::{
     errors::Error,
+    ot::FixedKeyInitializer,
     ot::{
         alsz::{Receiver as AlszReceiver, Sender as AlszSender},
         CorrelatedReceiver, CorrelatedSender, RandomReceiver, RandomSender, Receiver as OtReceiver,
