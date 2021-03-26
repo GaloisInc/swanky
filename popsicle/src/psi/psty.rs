@@ -91,7 +91,7 @@ impl Sender {
             let mut bins = Vec::with_capacity(NHASHES);
             for h in 0..NHASHES {
                 let bin = CuckooHash::bin(x, h, nbins);
-                table[bin].push(x);
+                table[bin].push(x ^ Block::from(h as u128));
                 bins.push(bin);
             }
             // if j = H1(y) = H2(y) for some y, then P2 adds a uniformly random element to
@@ -218,7 +218,7 @@ impl Receiver {
             .items
             .iter()
             .map(|opt_item| match opt_item {
-                Some(item) => item.entry,
+                Some(item) => item.entry_with_hindex(),
                 None => rng.gen(),
             })
             .collect::<Vec<Block>>();
@@ -423,7 +423,7 @@ mod tests {
     };
 
     const ITEM_SIZE: usize = 8;
-    const SET_SIZE: usize = 100000;
+    const SET_SIZE: usize = 1000;
 
     #[test]
     fn full_protocol() {

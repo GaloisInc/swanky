@@ -18,6 +18,14 @@ pub(crate) struct CuckooItem {
     pub(crate) hash_index: usize,
 }
 
+impl CuckooItem {
+    /// Replace the first byte of the entry with the hash index. Used in PSTY.
+    pub fn entry_with_hindex(&self) -> Block {
+        let mask = Block::from(0xFFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FF00);
+        (self.entry & mask) ^ Block::from(self.hash_index as u128)
+    }
+}
+
 pub(crate) struct CuckooHash {
     pub(crate) items: Vec<Option<CuckooItem>>,
     pub(crate) nbins: usize,
@@ -137,7 +145,7 @@ mod tests {
 
     const NHASHES: usize = 3;
     const ITEMSIZE: usize = 8;
-    const SETSIZE: usize = 100000;
+    const SETSIZE: usize = 10000;
 
     #[test]
     fn test_build() {
