@@ -1,16 +1,16 @@
 address: 127.0.0.1
 
-sleeptime: 1
+sleeptime: 3
 nthread: 1
 
 itemsize: 16
-megasize: 1
+megasize: 100000
 
 precision: 0
 
 
-data_path_server: /Users/rissa/Desktop/NPSAS.csv
-data_path_client: /Users/rissa/Desktop/Pell.csv
+data_path_server: C:\Users\rawan\Desktop\DOED\NPSAS.csv
+data_path_client: C:\Users\rawan\Desktop\DOED\Pell.csv
 
 id_position_server: 0
 payload_position_server: 4
