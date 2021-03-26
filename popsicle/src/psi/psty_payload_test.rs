@@ -9,7 +9,7 @@
 //
 // This is similar to psty_payload but with more measurements at the level of each method
 
-use crate::{cuckoo::CuckooHash, cuckoo::CuckooHashLarge, errors::Error, utils};
+use crate::{cuckoo::CuckooHash, cuckoo::CuckooItem, errors::Error, utils};
 use fancy_garbling::{
     twopac::semihonest::{Evaluator, Garbler},
     BinaryBundle,
@@ -540,7 +540,7 @@ impl Receiver {
             Evaluator::<C, RNG, OtReceiver>::new(channel.clone(), RNG::from_seed(rng.gen())).unwrap();
         let qs = fancy_garbling::util::primes_with_width(PAYLOAD_SIZE as u32 * 8);
 
-        let (_, table, payload) = self.bucketize_data_large(table, payloads, megasize, channel, rng)?;
+        let (table, payload) = self.bucketize_data_large(table, payloads, megasize, channel, rng)?;
 
 
         let (aggregate, card) = self.compute_payload(table, payload, channel, rng).unwrap();
@@ -702,47 +702,46 @@ impl Receiver {
         megasize: usize,
         channel: &mut C,
         rng: &mut RNG,
-    ) -> Result<(CuckooHashLarge, Vec<Vec<Block>>, Vec<Vec<Block512>>), Error>{
+    ) -> Result<(Vec<Vec<Block>>, Vec<Vec<Block512>>), Error>{
 
-        let hashed_inputs = utils::compress_and_hash_inputs(inputs, self.key);
-        let cuckoo_large = CuckooHashLarge::new(&hashed_inputs, NHASHES, megasize)?;
-        channel.write_usize(cuckoo_large.megasize)?;
-        channel.write_usize(cuckoo_large.nmegabins)?;
-        channel.write_usize(cuckoo_large.nbins)?;
-        channel.flush()?;
+            let hashed_inputs = utils::compress_and_hash_inputs(inputs, self.key);
 
-        let table = cuckoo_large
-                    .items
-                    .iter()
-                    .map(|cuckoo|
-                        cuckoo
-                            .items
-                            .iter()
-                            .map(|opt_item| match opt_item {
-                                Some(item) => item.entry,
-                                None => rng.gen::<Block>(),
-                            })
-                            .collect::<Vec<Block>>()).collect();
+            let cuckoo = CuckooHash::new(&hashed_inputs, NHASHES)?;
+            let cuckoo_large: Vec<&[Option<CuckooItem>]>= cuckoo.items.chunks(megasize).collect();
+            let nmegabins = cuckoo_large.len();
 
-        let payload = cuckoo_large
-                    .items
-                    .iter()
-                    .map(|cuckoo|
-                        cuckoo
-                            .items
-                            .iter()
-                            .map(|opt_item| match opt_item {
-                                Some(item) => payloads[item.input_index],
-                                None => rng.gen::<Block512>(),
-                            })
-                            .collect::<Vec<Block512>>()).collect();
+            channel.write_usize(megasize)?; // The megabin size is sent out to the sender
+            channel.write_usize(nmegabins)?; // The number of megabins is sent out to the sender
+            channel.write_usize(cuckoo.nbins)?; // The number of bins is sent out to the sender
+            channel.flush()?;
+
+            let table = cuckoo_large
+                        .iter()
+                        .map(|cuckoo|
+                            cuckoo
+                                .iter()
+                                .map(|opt_item| match opt_item {
+                                    Some(item) => item.entry,
+                                    None => rng.gen::<Block>(),
+                                })
+                                .collect::<Vec<Block>>()).collect();
+
+            let payload = cuckoo_large
+                        .iter()
+                        .map(|cuckoo|
+                            cuckoo
+                                .iter()
+                                .map(|opt_item| match opt_item {
+                                    Some(item) => payloads[item.input_index],
+                                    None => rng.gen::<Block512>(),
+                                })
+                                .collect::<Vec<Block512>>()).collect();
 
 
-        Ok((
-            cuckoo_large,
-            table,
-            payload,
-        ))
+            Ok((
+                table,
+                payload,
+            ))
     }
     // Receive outputs of the OPPRF
     pub fn receive_data<C: AbstractChannel, RNG: RngCore + CryptoRng + SeedableRng>(

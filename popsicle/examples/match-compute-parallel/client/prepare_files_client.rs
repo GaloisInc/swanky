@@ -24,9 +24,9 @@ fn client_protocol(mut channel: TcpChannel<TcpStream>, path: &mut PathBuf, nthre
     // The Receiver bucketizes the data and seperates into megabins during the cuckoo hashing.
     // And sends the number of megabins, number of bins etc. to the sender
     let mut psi = Receiver::init(&mut channel, &mut rng).unwrap();
-    let (cuckoo, table, payload) = psi.bucketize_data_large(&ids, &payloads, megasize, &mut channel, &mut rng).unwrap();
+    let (table, payload, nmegabins) = psi.bucketize_data_large(&ids, &payloads, megasize, &mut channel, &mut rng).unwrap();
 
-    let megabin_per_thread = ((cuckoo.nmegabins as f32)/(nthread as f32)).ceil() as usize;
+    let megabin_per_thread = ((nmegabins as f32)/(nthread as f32)).ceil() as usize;
 
     println!("Number of megabins per thread {:?}", megabin_per_thread);
 

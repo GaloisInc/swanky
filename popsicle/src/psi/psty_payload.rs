@@ -33,7 +33,7 @@
 // (3) Extend the size of generated primes beyond 64bits
 //
 
-use crate::{cuckoo::CuckooHash, cuckoo::CuckooHashLarge, errors::Error, utils};
+use crate::{cuckoo::CuckooHash, cuckoo::CuckooItem, errors::Error, utils};
 use fancy_garbling::{
     twopac::semihonest::{Evaluator, Garbler},
     BinaryBundle,
@@ -258,7 +258,10 @@ impl Sender {
             acc = gb.crt_add(&acc, &partial_aggregate).unwrap();
             sum_weights = gb.crt_add(&sum_weights, &partial_sum_weight).unwrap();
         }
+
         let weighted_mean = gb.crt_div(&acc, &sum_weights).unwrap();
+        gb.outputs(&acc.wires().to_vec()).unwrap();
+        gb.outputs(&sum_weights.wires().to_vec()).unwrap();
         gb.outputs(&weighted_mean.wires().to_vec()).unwrap();
         Ok(())
     }
@@ -468,7 +471,7 @@ impl Receiver {
             Evaluator::<C, RNG, OtReceiver>::new(channel.clone(), RNG::from_seed(rng.gen())).unwrap();
         let qs = &fancy_garbling::util::PRIMES[..PAYLOAD_PRIME_SIZE_EXPANDED];
 
-        let (_, table, payload) = self.bucketize_data_large(table, payloads, megasize, channel, rng)?;
+        let (table, payload, _) = self.bucketize_data_large(table, payloads, megasize, channel, rng)?;
 
 
         let (aggregate, sum_weights) = self.compute_payload(table, payload, channel, rng).unwrap();
@@ -555,6 +558,18 @@ impl Receiver {
         }
 
         let weighted_mean = ev.crt_div(&acc, &sum_weights).unwrap();
+        let acc = ev
+            .outputs(&acc.wires().to_vec()).unwrap()
+            .expect("evaluator should produce outputs");
+        let acc = fancy_garbling::util::crt_inv(&acc, &qs);
+
+        let sum_weights = ev
+            .outputs(&sum_weights.wires().to_vec()).unwrap()
+            .expect("evaluator should produce outputs");
+        let sum_weights = fancy_garbling::util::crt_inv(&sum_weights, &qs);
+
+        println!("acc {} sum_weights {}", acc, sum_weights);
+
         let weighted_mean_outs = ev
             .outputs(&weighted_mean.wires().to_vec()).unwrap()
             .expect("evaluator should produce outputs");
@@ -620,22 +635,23 @@ impl Receiver {
         megasize: usize,
         channel: &mut C,
         rng: &mut RNG,
-    ) -> Result<(CuckooHashLarge, Vec<Vec<Block>>, Vec<Vec<Block512>>), Error>{
+    ) -> Result<(Vec<Vec<Block>>, Vec<Vec<Block512>>, usize), Error>{
 
         let hashed_inputs = utils::compress_and_hash_inputs(inputs, self.key);
 
-        let cuckoo_large = CuckooHashLarge::new(&hashed_inputs, NHASHES, megasize)?;
-        channel.write_usize(cuckoo_large.megasize)?; // The megabin size is sent out to the sender
-        channel.write_usize(cuckoo_large.nmegabins)?; // The number of megabins is sent out to the sender
-        channel.write_usize(cuckoo_large.nbins)?; // The number of bins is sent out to the sender
+        let cuckoo = CuckooHash::new(&hashed_inputs, NHASHES)?;
+        let cuckoo_large: Vec<&[Option<CuckooItem>]> = cuckoo.items.chunks(megasize).collect();
+        let nmegabins = cuckoo_large.len();
+
+        channel.write_usize(megasize)?; // The megabin size is sent out to the sender
+        channel.write_usize(nmegabins)?; // The number of megabins is sent out to the sender
+        channel.write_usize(cuckoo.nbins)?; // The number of bins is sent out to the sender
         channel.flush()?;
 
         let table = cuckoo_large
-                    .items
                     .iter()
                     .map(|cuckoo|
                         cuckoo
-                            .items
                             .iter()
                             .map(|opt_item| match opt_item {
                                 Some(item) => item.entry,
@@ -644,11 +660,9 @@ impl Receiver {
                             .collect::<Vec<Block>>()).collect();
 
         let payload = cuckoo_large
-                    .items
                     .iter()
                     .map(|cuckoo|
                         cuckoo
-                            .items
                             .iter()
                             .map(|opt_item| match opt_item {
                                 Some(item) => payloads[item.input_index],
@@ -658,9 +672,9 @@ impl Receiver {
 
 
         Ok((
-            cuckoo_large,
             table,
             payload,
+            nmegabins
         ))
     }
     // Receive outputs of the OPPRF
