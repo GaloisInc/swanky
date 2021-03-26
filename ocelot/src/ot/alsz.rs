@@ -11,6 +11,7 @@
 
 use crate::{
     errors::Error,
+    ot::FixedKeyInitializer,
     ot::{
         CorrelatedReceiver, CorrelatedSender, RandomReceiver, RandomSender, Receiver as OtReceiver,
         Sender as OtSender,
@@ -36,6 +37,29 @@ pub struct Receiver<OT: OtSender<Msg = Block> + SemiHonest> {
     _ot: PhantomData<OT>,
     pub(super) hash: AesHash,
     rngs: Vec<(AesRng, AesRng)>,
+}
+
+impl<OT: OtReceiver<Msg = Block> + SemiHonest> FixedKeyInitializer for Sender<OT> {
+    fn init_fixed_key<C: AbstractChannel, RNG: CryptoRng + Rng>(
+        channel: &mut C,
+        s_: [u8; 16],
+        rng: &mut RNG,
+    ) -> Result<Self, Error> {
+        let mut ot = OT::init(channel, rng)?;
+        let s = utils::u8vec_to_boolvec(&s_);
+        let ks = ot.receive(channel, &s, rng)?;
+        let rngs = ks
+            .into_iter()
+            .map(AesRng::from_seed)
+            .collect::<Vec<AesRng>>();
+        Ok(Self {
+            _ot: PhantomData::<OT>,
+            hash: AES_HASH,
+            s,
+            s_: Block::from(s_),
+            rngs,
+        })
+    }
 }
 
 impl<OT: OtReceiver<Msg = Block> + SemiHonest> Sender<OT> {
@@ -67,22 +91,9 @@ impl<OT: OtReceiver<Msg = Block> + SemiHonest> OtSender for Sender<OT> {
         channel: &mut C,
         rng: &mut RNG,
     ) -> Result<Self, Error> {
-        let mut ot = OT::init(channel, rng)?;
         let mut s_ = [0u8; 16];
         rng.fill_bytes(&mut s_);
-        let s = utils::u8vec_to_boolvec(&s_);
-        let ks = ot.receive(channel, &s, rng)?;
-        let rngs = ks
-            .into_iter()
-            .map(AesRng::from_seed)
-            .collect::<Vec<AesRng>>();
-        Ok(Self {
-            _ot: PhantomData::<OT>,
-            hash: AES_HASH,
-            s,
-            s_: Block::from(s_),
-            rngs,
-        })
+        Sender::<OT>::init_fixed_key(channel, s_, rng)
     }
 
     fn send<C: AbstractChannel, RNG: CryptoRng + Rng>(

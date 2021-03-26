@@ -212,7 +212,7 @@ impl Receiver {
             .items
             .iter()
             .map(|opt_item| match opt_item {
-                Some(item) => item.entry,
+                Some(item) => item.entry_with_hindex(),
                 None => rng.gen(),
             })
             .collect::<Vec<Block>>();
@@ -417,7 +417,7 @@ mod tests {
     };
 
     const ITEM_SIZE: usize = 8;
-    const SET_SIZE: usize = 1 << 8;
+    const SET_SIZE: usize = 1000;
 
     #[test]
     fn full_protocol() {
