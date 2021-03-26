@@ -1,1 +1,0 @@
-initSidebarItems({"struct":[["Evaluator","Semi-honest evaluator."],["Garbler","Semi-honest garbler."]]});

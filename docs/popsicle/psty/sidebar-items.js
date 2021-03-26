@@ -1,1 +1,0 @@
-initSidebarItems({"struct":[["Receiver","Private set intersection receiver."],["ReceiverState","State of the receiver."],["Sender","Private set intersection sender."],["SenderState","State of the sender."]],"type":[["Msg","The type of values in the sender and receiver's sets."]]});

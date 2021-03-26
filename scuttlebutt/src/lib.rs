@@ -5,13 +5,11 @@
 // See LICENSE for licensing information.
 
 #![allow(clippy::many_single_char_names)]
-#![cfg_attr(feature = "nightly", feature(stdsimd))]
+#![deny(missing_docs)]
 #![cfg_attr(feature = "nightly", feature(test))]
-#![cfg_attr(feature = "nightly", feature(external_doc))]
-#![cfg_attr(feature = "nightly", doc(include = "../README.md"))]
-#![cfg_attr(feature = "nightly", deny(missing_docs))]
+// TODO: when https://git.io/JYTnW gets stabilized add the readme as module docs.
 
-//!
+//! Scuttlebutt provides many utility functions for cryptographic applications.
 
 mod aes;
 mod block;
@@ -21,6 +19,7 @@ pub mod bloomfilter;
 pub mod channel;
 pub mod cointoss;
 pub mod commitment;
+pub mod field;
 mod hash_aes;
 mod rand_aes;
 pub mod utils;
@@ -39,10 +38,7 @@ pub use crate::{
 
 #[cfg(unix)]
 pub use crate::channel::{
-    track_unix_channel_pair,
-    unix_channel_pair,
-    TrackUnixChannel,
-    UnixChannel,
+    track_unix_channel_pair, unix_channel_pair, TrackUnixChannel, UnixChannel,
 };
 
 /// A marker trait denoting that the given scheme is semi-honest secure.

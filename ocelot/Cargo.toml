@@ -15,20 +15,21 @@ autoexamples = true
 [lib]
 
 [features]
-nightly = ["curve25519-dalek/avx2_backend", "rand/nightly", "scuttlebutt/nightly"]
+nightly = ["curve25519-dalek/nightly", "curve25519-dalek/simd_backend", "scuttlebutt/nightly"]
+
 
 [dependencies]
-curve25519-dalek = { version = "2", features = ["std"] }
-libc = "0.2"
+curve25519-dalek = { version = "3.0.2", features = ["std"] }
 rand = "0.7"
 scuttlebutt = { path = "../scuttlebutt", features = ["curve25519-dalek"] }
-itertools = "0.8.0"
+generic-array = "0.14.4"
+subtle = "2.4.0"
 
 [build-dependencies]
-cc = "1.0"
+cc = "1.0.67"
 
 [dev-dependencies]
-criterion = "0.2"
+criterion = "0.3.4"
 
 [[bench]]
 name = "ot"
@@ -36,6 +37,10 @@ harness = false
 
 [[bench]]
 name = "oprf"
+harness = false
+
+[[bench]]
+name = "svole"
 harness = false
 
 [[example]]

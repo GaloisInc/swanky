@@ -4,12 +4,11 @@
 // Copyright © 2019 Galois, Inc.
 // See LICENSE for licensing information.
 
-use criterion::{criterion_group, criterion_main, Criterion};
+use criterion::{black_box, criterion_group, criterion_main, Criterion};
 #[cfg(feature = "curve25519-dalek")]
 use curve25519_dalek::ristretto::RistrettoPoint;
 use rand::Rng;
 use scuttlebutt::{AesRng, Block};
-use std::time::Duration;
 
 #[cfg(feature = "curve25519-dalek")]
 fn bench_hash_pt(c: &mut Criterion) {
@@ -17,8 +16,8 @@ fn bench_hash_pt(c: &mut Criterion) {
         let pt = RistrettoPoint::random(&mut rand::thread_rng());
         let tweak = rand::random::<u128>();
         b.iter(|| {
-            let h = Block::hash_pt(tweak, &pt);
-            criterion::black_box(h)
+            let h = Block::hash_pt(black_box(tweak), black_box(&pt));
+            black_box(h)
         });
     });
 }
@@ -30,8 +29,8 @@ fn bench_clmul(c: &mut Criterion) {
         let x = rand::random::<Block>();
         let y = rand::random::<Block>();
         b.iter(|| {
-            let z = x.clmul(y);
-            criterion::black_box(z)
+            let z = x.clmul(black_box(y));
+            black_box(z)
         });
     });
 }
@@ -41,7 +40,7 @@ fn bench_rand(c: &mut Criterion) {
         let mut rng = AesRng::new();
         b.iter(|| {
             let block = rng.gen::<Block>();
-            criterion::black_box(block)
+            black_box(block)
         });
     });
 }
@@ -51,8 +50,8 @@ fn bench_xor(c: &mut Criterion) {
         let x = rand::random::<Block>();
         let y = rand::random::<Block>();
         b.iter(|| {
-            let z = x ^ y;
-            criterion::black_box(z)
+            let z = black_box(x) ^ black_box(y);
+            black_box(z)
         });
     });
 }
@@ -60,15 +59,15 @@ fn bench_xor(c: &mut Criterion) {
 fn bench_default(c: &mut Criterion) {
     c.bench_function("Block::default", |b| {
         b.iter(|| {
-            let z = Block::default();
-            criterion::black_box(z)
+            let z = black_box(Block::default());
+            black_box(z)
         })
     });
 }
 
 criterion_group! {
     name = block;
-    config = Criterion::default().warm_up_time(Duration::from_millis(100));
+    config = Criterion::default();
     targets = bench_hash_pt, bench_clmul, bench_rand, bench_xor, bench_default
 }
 criterion_main!(block);

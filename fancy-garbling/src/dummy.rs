@@ -617,7 +617,7 @@ mod pmr_tests {
     #[test]
     fn pmr() {
         let mut rng = rand::thread_rng();
-        for _ in 0..16 {
+        for _ in 0..8 {
             let ps = rng.gen_usable_factors();
             let q = crate::util::product(&ps);
             let pt = rng.gen_u128() % q;
@@ -646,7 +646,7 @@ mod pmr_tests {
     #[test]
     fn pmr_lt() {
         let mut rng = rand::thread_rng();
-        for _ in 0..128 {
+        for _ in 0..8 {
             let qs = rng.gen_usable_factors();
             let n = qs.len();
             let q = crate::util::product(&qs);
@@ -661,51 +661,6 @@ mod pmr_tests {
             let res = f.output(&z).unwrap().unwrap();
 
             let should_be = if pt_x < pt_y { 1 } else { 0 };
-            assert_eq!(res, should_be, "q={}, x={}, y={}", q, pt_x, pt_y);
-        }
-    }
-
-    #[test]
-    fn pmr_geq() {
-        let mut rng = rand::thread_rng();
-        for _ in 0..8 {
-            let qs = rng.gen_usable_factors();
-            let n = qs.len();
-            let q = crate::util::product(&qs);
-            let q_ = crate::util::product(&qs[..n - 1]);
-            let pt_x = rng.gen_u128() % q_;
-            let pt_y = rng.gen_u128() % q_;
-
-            let mut f = Dummy::new();
-            let crt_x = f.crt_encode(pt_x, q).unwrap();
-            let crt_y = f.crt_encode(pt_y, q).unwrap();
-            let z = f.pmr_geq(&crt_x, &crt_y).unwrap();
-            let res = f.output(&z).unwrap().unwrap();
-
-            let should_be = if pt_x >= pt_y { 1 } else { 0 };
-            assert_eq!(res, should_be, "q={}, x={}, y={}", q, pt_x, pt_y);
-        }
-    }
-
-    #[test]
-    #[ignore]
-    fn crt_div() {
-        let mut rng = rand::thread_rng();
-        for _ in 0..8 {
-            let qs = rng.gen_usable_factors();
-            let n = qs.len();
-            let q = crate::util::product(&qs);
-            let q_ = crate::util::product(&qs[..n - 1]);
-            let pt_x = rng.gen_u128() % q_;
-            let pt_y = rng.gen_u128() % q_;
-
-            let mut f = Dummy::new();
-            let crt_x = f.crt_encode(pt_x, q).unwrap();
-            let crt_y = f.crt_encode(pt_y, q).unwrap();
-            let z = f.crt_div(&crt_x, &crt_y).unwrap();
-            let res = f.crt_output(&z).unwrap().unwrap();
-
-            let should_be = pt_x / pt_y;
             assert_eq!(res, should_be, "q={}, x={}, y={}", q, pt_x, pt_y);
         }
     }

@@ -1,0 +1,38 @@
+{% if ty.ty.bits == 64 %}
+    impl crate::SimdBase64<{{ty.ty}}> for {{ty}} {
+        {% call(scalar, avx2) fn("mul_lo", {"&self": ty, "other": ty}, returns=ty) %}
+        {% call scalar() %}
+            {{ty}}::from([
+                {% for i in range(ty.count) %}
+                ((self.as_array()[{{i}}] as {{IntegerType(ty.ty.signedness, 32)}}) as {{ty.ty}}) * ((other.as_array()[{{i}}] as {{IntegerType(ty.ty.signedness, 32)}}) as {{ty.ty}}),
+                {% endfor %}
+            ])
+        {% endcall %}
+        {% call(avx2i) avx2() %}
+            Self({{avx2i(ty, "mul_lo_32")}}(self.0, other.0))
+        {% endcall %}
+        {% endcall %}
+    }
+    {% if ty.count == 4 %}
+        impl crate::SimdBase4x64<{{ty.ty}}> for {{ty}} {
+            {% call(scalar, avx2) fn("shuffle", {"&self": ty}, returns=ty, const_args={
+                "I3": "usize", "I2": "usize", "I1": "usize", "I0": "usize",
+            }) %}
+            {% call scalar() %}
+                {{ty}}::from([
+                {% for i in range(4) %}
+                    self.as_array()[I{{i}}],
+                {% endfor %}
+                ])
+            {% endcall %}
+            {% call(avx2i) avx2() %}
+                const USELESS_ARRAY: [u8; 4] = [0; 4];
+                {% for i in range(4) %}
+                    let _assert_bits_in_range_i: u8 = USELESS_ARRAY[I{{i}}];
+                {% endfor %}
+                Self({{avx2i(ty, "permute")}}::<I3, I2, I1, I0>(self.0))
+            {% endcall %}
+            {% endcall %}
+        }
+    {% endif %}
+{% endif %}

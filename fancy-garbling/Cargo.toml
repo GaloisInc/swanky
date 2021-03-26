@@ -22,6 +22,7 @@ serde1 = ["serde", "scuttlebutt/serde1"]
 base_conversion = { path = "base_conversion" }
 scuttlebutt = { path = "../scuttlebutt" }
 ocelot = { path = "../ocelot" }
+vectoreyes = { path = "../vectoreyes" } 
 itertools = "0.10.0"
 rand = "0.7"
 regex = "1.4.3"
@@ -29,7 +30,6 @@ serde = { version = "1.0.123", features = ["derive"], optional = true }
 
 [dev-dependencies]
 criterion = "0.3.4"
-crossbeam = "0.8.0"
 
 [[bench]]
 name = "wire_operations"

@@ -1,0 +1,34 @@
+{% if ty.count == 4 %}
+    impl crate::SimdBase4x<{{ty.ty}}> for {{ty}} {
+        {% call(scalar, avx2) fn(
+            "blend", {"&self": ty, "if_true": ty}, returns = ty,
+            const_args = {
+                "B3": "bool",
+                "B2": "bool",
+                "B1": "bool",
+                "B0": "bool",
+            },
+        ) %}
+        {% call scalar() %}
+            {{ty}}::from([
+                {% for i in range(ty.count) %}
+                    (if B{{i}} { if_true } else { *self }).as_array()[{{i}}],
+                {% endfor %}
+            ])
+        {% endcall %}
+        {% call(avx2i) avx2() %}
+            {% if ty.ty.bits == 32 %}
+                Self({{avx2i(ty, "blend")}}::<B3, B2, B1, B0>(self.0, if_true.0))
+            {% elif ty.ty.bits == 64 %}
+                {# Treat ty as a vector of 8 32-bit integers #}
+                Self({{avx2i(VectorType(u32, 8), "blend")}}::<
+                    B3, B3, B2, B2, B1, B1, B0, B0
+                >(self.0, if_true.0))
+            {% else %}
+                {# With our current vector sizes, these are the only possible bits. #}
+                {% do assert_eq(False, True) %}
+            {% endif %}
+        {% endcall %}
+        {% endcall %}
+    }
+{% endif %}

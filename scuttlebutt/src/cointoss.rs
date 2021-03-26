@@ -89,8 +89,6 @@ pub fn receive<C: AbstractChannel>(channel: &mut C, seeds: &[Block]) -> Result<V
 
 #[cfg(test)]
 mod tests {
-    #[cfg(feature = "nightly")]
-    extern crate test;
     use super::*;
     use crate::Channel;
     use std::{

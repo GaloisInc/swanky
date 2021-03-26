@@ -1,0 +1,223 @@
+{% import 'core.tmpl' as core %}
+{% import 'tests/proptest.tmpl' as proptest %}
+{% set proptest_eq_scalar = proptest.proptest_eq_scalar %}
+
+use super::scalar as scalar;
+
+use proptest::prelude::*;
+use std::ops::*;
+use std::convert::TryFrom;
+use crate::SimdBase;
+use crate::SimdBase32;
+use crate::SimdBase8;
+use crate::SimdBaseSigned;
+use crate::SimdBase64;
+use crate::SimdBase4x64;
+use crate::SimdBase8x;
+use crate::SimdBase4x;
+use crate::SimdBaseGatherable;
+
+{% call proptest_eq_scalar("equality", {'a': ty, 'b': ty}) %}
+    a == b
+{% endcall %}
+{% call proptest_eq_scalar("is_zero", {'a': ty}) %}
+    a.is_zero()
+{% endcall %}
+{% call proptest_eq_scalar("set_lo", {'a': ty.ty}) %}
+    {{ty}}::set_lo(a).as_array()
+{% endcall %}
+{% call proptest_eq_scalar("broadcast", {'a': ty.ty}) %}
+    {{ty}}::broadcast(a).as_array()
+{% endcall %}
+{% call proptest_eq_scalar("broadcast_lo", {'a': ty.broadcast_lo_from}) %}
+    {{ty}}::broadcast_lo(a).as_array()
+{% endcall %}
+{% set binops = [
+    "bitxor", "bitand", "bitor", "add", "sub", "shl", "shr", "cmp_eq",
+    "unpack_lo", "unpack_hi", "min", "max", "cmp_gt"
+] %}
+{% for binop in binops %}
+    {% call proptest_eq_scalar("binop_" + binop, {'a': ty, 'b': ty}) %}
+        (a.{{binop}}(b)).as_array()
+    {% endcall %}
+{% endfor %}
+{# Pick a few shift values. #}
+{% for shift in [1, 5] %}
+    {% call proptest_eq_scalar("shift_left_" ~ shift, {'a': ty}) %}
+        let out = (a.shift_left::<{{shift}}>()).as_array();
+        prop_assert_eq!((a << {{shift}}).as_array(), out);
+        out
+    {% endcall %}
+    {% call proptest_eq_scalar("shift_right_" ~ shift, {'a': ty}) %}
+        let out = (a.shift_right::<{{shift}}>()).as_array();
+        prop_assert_eq!((a >> {{shift}}).as_array(), out);
+        out
+    {% endcall %}
+{% endfor %}
+{# Pick a few extract values. #}
+{% for extract in [0, 1] %}
+    {% call proptest_eq_scalar("extract_" ~ extract, {'a': ty}) %}
+        a.extract::<{{extract}}>()
+    {% endcall %}
+{% endfor %}
+{% for ty2 in ty.can_cast_from %}
+    {% call proptest_eq_scalar(("cast_from_" ~ ty2).lower(), {'a': ty2}) %}
+        {{ty}}::from(a).as_array()
+    {% endcall %}
+{% endfor %}
+{% call proptest_eq_scalar("shift_left", {'a': ty, 'amm': core.u64}) %}
+    let out = (a << amm).as_array();
+    prop_assert_eq!((a << {{ty}}::broadcast(if amm < {{ty.ty.bits}} {
+        amm as {{ty.ty}}
+    } else {
+        127
+    })).as_array(), out);
+    out
+{% endcall %}
+{% call proptest_eq_scalar("shift_right", {'a': ty, 'amm': core.u64}) %}
+    let out = (a >> amm).as_array();
+    prop_assert_eq!((a >> {{ty}}::broadcast(if amm < {{ty.ty.bits}} {
+        amm as {{ty.ty}}
+    } else {
+        127
+    })).as_array(), out);
+    out
+{% endcall %}
+{% if ty.ty.bits == 32 or (ty.ty.bits == 64 and ty.count == 4) %}
+    {# Pick a few shuffle values. #}
+    {% for shuffle in [(0, 1, 2, 3), (3, 2, 1, 0), (3, 3, 3, 3)] %}
+        {% call proptest_eq_scalar("shuffle_" ~ shuffle|join("_"), {'a': ty}) %}
+            a.shuffle::<{{shuffle | join(", ")}}>().as_array()
+        {% endcall %}
+    {% endfor %}
+{% endif %}
+{% if ty.ty.bits == 64 %}
+    {% call proptest_eq_scalar("mul_lo", {'a': ty, 'b': ty}) %}
+        a.mul_lo(b).as_array()
+    {% endcall %}
+{% endif %}
+{% if ty.ty.bits == 8 %}
+    {# Pick a few shift values. #}
+    {% for direction in ['left', 'right'] %}
+        {% for amount in [0, 5, 8] %}
+            {% call proptest_eq_scalar("byte_shift_" ~ direction ~ amount, {'a': ty}) %}
+                a.shift_bytes_{{direction}}::<{{amount}}>().as_array()
+            {% endcall %}
+        {% endfor %}
+    {% endfor %}
+    
+    {% call proptest_eq_scalar("most_significant_bits", {'a': ty}) %}
+        a.most_significant_bits()
+    {% endcall %}
+{% endif %}
+{% if ty.bits == 256 %}
+    {% set src = VectorType(ty.ty, ty.count // 2) %}
+    {% call proptest_eq_scalar("from_128", {'a': src}) %}
+        {{ty}}::from(a).as_array()
+    {% endcall %}
+    {% call proptest_eq_scalar("set_pair", {'a': src, 'b': src}) %}
+        {{ty}}::from([a, b]).as_array()
+    {% endcall %}
+    {% call proptest_eq_scalar("to_pair", {'a': ty}) %}
+        let [lo, hi] = <[{{src}}; 2]>::from(a);
+        [lo.as_array(), hi.as_array()]
+    {% endcall %}
+{% endif %}
+{% for src in ty.can_convert_from %}
+    {% call proptest_eq_scalar("from_" ~ (src ~ "").lower(), {'a': src}) %}
+        {{ty}}::from(a).as_array()
+    {% endcall %}
+{% endfor %}
+{% if ty.count in [4, 8] %}
+    {# Pick a few values to test #}
+    {% for blend in [0, 255, 101] %}
+        {% call proptest_eq_scalar("blend_" ~ blend, {'a': ty, 'b': ty}) %}
+            a.blend::<
+                {% for i in range(ty.count) %}
+                    {{ "true" if extract_bit(blend, i) else "false" }},
+                {% endfor %}
+            >(b).as_array()
+        {% endcall %}
+    {% endfor %}
+{% endif %}
+
+{# Test gather() #}
+{% if ty.ty.bits in [32, 64] %}
+    {% for idx in [core.i32, core.u64, core.i64] %}
+        {% if VectorType(idx, ty.count) not in VECTOR_TYPES %}{% continue %}{% endif %}
+        {% set SIZE = 128 %}
+        proptest! {
+            #[test]
+            fn test_gather_{{idx}}(
+                {% do assert_eq(SIZE % 32, 0) %}
+                {% for i in range(SIZE // 32) %}
+                    {# Proptest arbitrary only goes up to size 32. #}
+                    data_{{i}} in any::<[{{ty.ty}} ; 32]>(),
+                {% endfor %}
+                {% for i in range(ty.count) %}
+                    idx_{{i}} in
+                    {% if idx.signedness == Signedness.SIGNED %}
+                        -{{SIZE//2}}..{{SIZE//2}}_{{idx}}
+                    {% else %}
+                        0..{{SIZE}}_{{idx}}
+                    {% endif %}
+                    ,
+                {% endfor %}
+            ) {
+                let mut data = vec![0; {{SIZE}}];
+                {% for i in range(SIZE // 32) %}
+                    data[{{i * 32}}..{{(i + 1) * 32}}].copy_from_slice(&data_{{i}});
+                {% endfor %}
+                let idx = [
+                    {% for i in range(ty.count) %}
+                        idx_{{i}},
+                    {% endfor %}
+                ];
+                let safe_out = [
+                    {% for i in range(ty.count) %}
+                        data[
+                            usize::try_from(idx_{{i}}
+                            {% if idx.signedness == Signedness.SIGNED %}
+                                + {{SIZE // 2}}
+                            {% endif %}).unwrap()
+                        ],
+                    {% endfor %}
+                ];
+                {% for backend in ["scalar", "crate"] %}
+                    let {{backend}}_out = {
+                        use {{backend}}::*;
+                        let idx = {{VectorType(idx, ty.count)}}::from(idx);
+                        unsafe {
+                            {{ty}}::gather(
+                                data.as_ptr()
+                                {% if idx.signedness == Signedness.SIGNED %}
+                                    .offset({{SIZE // 2}})
+                                {% endif %},
+                                idx,
+                            )
+                        }.as_array()
+                    };
+                {% endfor %}
+                prop_assert_eq!(scalar_out, safe_out);
+                prop_assert_eq!(scalar_out, crate_out);
+            }
+        }
+    {% endfor %}
+{% endif %}
+
+#[test]
+fn zero_is_zero() {
+    assert!(crate::{{ty}}::ZERO.is_zero());
+}
+#[test]
+fn const_matches_from() {
+    const ARR: {{ty.array}} = [
+        {% for i in range(ty.count) %}
+            {{i}},
+        {% endfor %}
+    ];
+    assert_eq!(
+        crate::{{ty}}::from(ARR),
+        const_{{(ty ~ "").lower()}}!(ARR),
+    );
+}

@@ -1,0 +1,77 @@
+{% for trait, dir, op in [("Shl", "left", "<<"), ("Shr", "right", ">>")] %}
+    // Static shift
+    impl {{trait}}Assign<u64> for {{ty}} {
+        #[inline(always)]
+        fn {{trait.lower()}}_assign(&mut self, amount: u64) {
+            *self = (*self) {{op}} amount;
+        }
+    }
+    impl {{trait}}<u64> for {{ty}} {
+        type Output = Self;
+        {% call(scalar, avx2) fn(trait.lower(), {"self": ty, "amount": u64}, returns=ty) %}
+        {% call scalar() %}
+            if amount >= {{ty.ty.bits}} {
+                {% if ty.ty.signedness == Signedness.SIGNED and dir == "right" -%}
+                let mut out = self.as_array();
+                for x in out.iter_mut() {
+                    *x = if *x < 0 { -1 } else { 0 };
+                }
+                {{ty}}::from(out)
+                {%- else -%}
+                {{ty}}::ZERO
+                {%- endif %}
+            } else {
+                {{ty}}::from([
+                    {% for i in range(ty.count) -%}
+                    self.as_array()[{{i}}] {{op}} amount,
+                    {% endfor %}
+                ])
+            }
+        {% endcall %}
+        {% if ty.ty.bits == 8 or ty.ty == i64 %}
+            {{ avx2(polyfill="scalar") }}
+        {% else %}
+            {% call(avx2i) avx2() %}
+                let amount = {{avx2i(VectorType(u64, 2), "set")}}(0, amount as i64);
+                Self({{avx2i(ty, "shift_lo_" ~ dir)}}(self.0, amount))
+            {% endcall %}
+        {% endif %}
+        {% endcall %}
+    }
+    
+    // Variable shift
+    impl {{trait}}Assign<{{ty}}> for {{ty}} {
+        #[inline(always)]
+        fn {{trait.lower()}}_assign(&mut self, amount: {{ty}}) {
+            *self = (*self) {{op}} amount;
+        }
+    }
+    impl {{trait}}<{{ty}}> for {{ty}} {
+        type Output = Self;
+        {% call(scalar, avx2) fn(trait.lower(), {"self": ty, "amount": ty}, returns=ty) %}
+        {% call scalar() %}
+            let mut out = self.as_array();
+            for (x, amm) in out.iter_mut().zip(amount.as_array().iter().copied()) {
+                *x = if amm >= {{ty.ty.bits}} {% if ty.ty.signedness == Signedness.SIGNED %}|| amm < 0{% endif %} {
+                    {% if ty.ty.signedness == Signedness.SIGNED and dir == "right" -%}
+                    if *x < 0 { -1 } else { 0 }
+                    {%- else -%}
+                    0
+                    {% endif %}
+                } else {
+                    *x {{ op }} amm
+                };
+            }
+            {{ty}}::from(out)
+        {% endcall %}
+        {# 16 bit variable shifts will work on AVX-512. #}
+        {% if ty.ty.bits == 8 or ty.ty.bits == 16 or ty.ty == i64 %}
+            {{ avx2(polyfill="scalar") }}
+        {% else %}
+            {% call(avx2i) avx2() %}
+                Self({{avx2i(ty, "shift_var_" ~ dir)}}(self.0, amount.0))
+            {% endcall %}
+        {% endif %}
+        {% endcall %}
+    }
+{% endfor %}

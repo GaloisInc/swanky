@@ -420,60 +420,6 @@ pub trait CrtGadgets: Fancy + BundleGadgets {
         let z = self.pmr_lt(x, y)?;
         self.negate(&z)
     }
-
-    /// Generic, and expensive, CRT-based addition for two ciphertexts. Uses PMR
-    /// comparison repeatedly. Requires an extra unused prime in both inputs.
-    fn crt_div(
-        &mut self,
-        x: &CrtBundle<Self::Item>,
-        y: &CrtBundle<Self::Item>,
-    ) -> Result<CrtBundle<Self::Item>, Self::Error> {
-        if x.moduli() != y.moduli() {
-            return Err(Self::Error::from(FancyError::UnequalModuli));
-        }
-
-        let q = x.composite_modulus();
-
-        // Compute l based on the assumption that the last prime is unused.
-        let nprimes = x.moduli().len();
-        let qs_ = &x.moduli()[..nprimes - 1];
-        let q_ = util::product(qs_);
-        let l = 128 - q_.leading_zeros();
-
-        let mut quotient = self.crt_constant_bundle(0, q)?;
-        let mut a = x.clone();
-
-        let one = self.crt_constant_bundle(1, q)?;
-        for i in 0..l {
-            let b = 2u128.pow(l - i - 1);
-            let mut pb = q_ / b;
-            if q_ % b == 0 {
-                pb = pb - 1;
-            }
-
-            let tmp = self.crt_cmul(&y, b)?;
-            let c1 = self.pmr_geq(&a, &tmp)?;
-
-            let pb_crt = self.crt_constant_bundle(pb, q)?;
-            let c2 = self.pmr_geq(&pb_crt, &y)?;
-
-            let c = self.and(&c1, &c2)?;
-
-            let c_ws = one
-                .iter()
-                .map(|w| self.mul(w, &c))
-                .collect::<Result<Vec<_>, _>>()?;
-            let c_crt = CrtBundle::new(c_ws);
-
-            let b_if = self.crt_cmul(&c_crt, b)?;
-            quotient = self.crt_add(&quotient, &b_if)?;
-
-            let tmp_if = self.crt_mul(&c_crt, &tmp)?;
-            a = self.crt_sub(&a, &tmp_if)?;
-        }
-
-        Ok(quotient)
-    }
 }
 
 /// Compute the `ms` needed for the number of CRT primes in `x`, with accuracy

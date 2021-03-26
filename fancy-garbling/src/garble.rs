@@ -288,11 +288,7 @@ mod streaming {
     use crate::{
         dummy::{Dummy, DummyVal},
         util::RngExt,
-        Evaluator,
-        Fancy,
-        FancyInput,
-        Garbler,
-        Wire,
+        Evaluator, Fancy, FancyInput, Garbler, Wire,
     };
     use itertools::Itertools;
     use rand::thread_rng;
@@ -306,7 +302,10 @@ mod streaming {
         mut f_du: FDU,
         input_mods: &[u16],
     ) where
-        FGB: FnMut(&mut Garbler<UnixChannel, AesRng>, &[Wire]) -> Option<u16> + Send + Sync,
+        FGB: FnMut(&mut Garbler<UnixChannel, AesRng>, &[Wire]) -> Option<u16>
+            + Send
+            + Sync
+            + 'static,
         FEV: FnMut(&mut Evaluator<UnixChannel>, &[Wire]) -> Option<u16>,
         FDU: FnMut(&mut Dummy, &[DummyVal]) -> Option<u16>,
     {
@@ -320,26 +319,24 @@ mod streaming {
 
         let (sender, receiver) = unix_channel_pair();
 
-        crossbeam::scope(|s| {
-            s.spawn(move |_| {
-                let mut gb = Garbler::new(sender, rng);
-                let (gb_inp, ev_inp) = gb.encode_many_wires(&inputs, &input_mods).unwrap();
-                for w in ev_inp.iter() {
-                    gb.send_wire(w).unwrap();
-                }
-                f_gb(&mut gb, &gb_inp);
-            });
+        let input_mods_ = input_mods.to_vec();
+        std::thread::spawn(move || {
+            let mut gb = Garbler::new(sender, rng);
+            let (gb_inp, ev_inp) = gb.encode_many_wires(&inputs, &input_mods_).unwrap();
+            for w in ev_inp.iter() {
+                gb.send_wire(w).unwrap();
+            }
+            f_gb(&mut gb, &gb_inp);
+        });
 
-            let mut ev = Evaluator::new(receiver);
-            let ev_inp = input_mods
-                .iter()
-                .map(|q| ev.read_wire(*q).unwrap())
-                .collect_vec();
-            let result = f_ev(&mut ev, &ev_inp).unwrap();
+        let mut ev = Evaluator::new(receiver);
+        let ev_inp = input_mods
+            .iter()
+            .map(|q| ev.read_wire(*q).unwrap())
+            .collect_vec();
+        let result = f_ev(&mut ev, &ev_inp).unwrap();
 
-            assert_eq!(result, should_be)
-        })
-        .unwrap();
+        assert_eq!(result, should_be)
     }
 
     #[test]
@@ -442,14 +439,7 @@ mod streaming {
 #[cfg(test)]
 mod complex {
     use crate::{
-        dummy::Dummy,
-        util::RngExt,
-        CrtBundle,
-        CrtGadgets,
-        Evaluator,
-        Fancy,
-        FancyInput,
-        Garbler,
+        dummy::Dummy, util::RngExt, CrtBundle, CrtGadgets, Evaluator, Fancy, FancyInput, Garbler,
     };
     use itertools::Itertools;
     use rand::thread_rng;
@@ -492,38 +482,35 @@ mod complex {
             // test streaming garbler and evaluator
             let (sender, receiver) = unix_channel_pair();
 
-            crossbeam::scope(|s| {
-                s.spawn(move |_| {
-                    let mut garbler = Garbler::new(sender, AesRng::new());
+            std::thread::spawn(move || {
+                let mut garbler = Garbler::new(sender, AesRng::new());
 
-                    // encode input and send it to the evaluator
-                    let mut gb_inp = Vec::with_capacity(N);
-                    for X in &input {
-                        let (zero, enc) = garbler.crt_encode_wire(*X, Q).unwrap();
-                        for w in enc.iter() {
-                            garbler.send_wire(w).unwrap();
-                        }
-                        gb_inp.push(zero);
+                // encode input and send it to the evaluator
+                let mut gb_inp = Vec::with_capacity(N);
+                for X in &input {
+                    let (zero, enc) = garbler.crt_encode_wire(*X, Q).unwrap();
+                    for w in enc.iter() {
+                        garbler.send_wire(w).unwrap();
                     }
-                    complex_gadget(&mut garbler, &gb_inp).unwrap();
-                });
-
-                let mut evaluator = Evaluator::new(receiver);
-
-                // receive encoded wires from the garbler thread
-                let mut ev_inp = Vec::with_capacity(N);
-                for _ in 0..N {
-                    let ws = qs
-                        .iter()
-                        .map(|q| evaluator.read_wire(*q).unwrap())
-                        .collect_vec();
-                    ev_inp.push(CrtBundle::new(ws));
+                    gb_inp.push(zero);
                 }
+                complex_gadget(&mut garbler, &gb_inp).unwrap();
+            });
 
-                let result = complex_gadget(&mut evaluator, &ev_inp).unwrap();
-                assert_eq!(result, should_be);
-            })
-            .unwrap();
+            let mut evaluator = Evaluator::new(receiver);
+
+            // receive encoded wires from the garbler thread
+            let mut ev_inp = Vec::with_capacity(N);
+            for _ in 0..N {
+                let ws = qs
+                    .iter()
+                    .map(|q| evaluator.read_wire(*q).unwrap())
+                    .collect_vec();
+                ev_inp.push(CrtBundle::new(ws));
+            }
+
+            let result = complex_gadget(&mut evaluator, &ev_inp).unwrap();
+            assert_eq!(result, should_be);
         }
     }
 }

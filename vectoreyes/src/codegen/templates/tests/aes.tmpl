@@ -1,0 +1,90 @@
+{% import 'core.tmpl' as core %}
+{% import 'tests/proptest.tmpl' as proptest %}
+{% set proptest_eq_scalar = proptest.proptest_eq_scalar %}
+
+use super::scalar as scalar;
+
+use proptest::prelude::*;
+use std::ops::*;
+use crate::SimdBase;
+use crate::SimdBase32;
+use crate::SimdBase8;
+use crate::SimdBaseSigned;
+use crate::SimdBase64;
+use crate::SimdBase4x64;
+use crate::SimdBase8x;
+use crate::SimdBase4x;
+use crate::AesBlockCipher;
+
+{% for key_size, key_ty in [
+    (128, VectorType(core.u8, 16)),
+    (256, VectorType(core.u8, 32)),
+] %}
+{% call proptest_eq_scalar("aes" ~ key_size ~ "_encrypt_only", 
+    {'block': VectorType(core.u8, 16), 'key': key_ty}
+)%}
+    let aes = Aes{{key_size}}EncryptOnly::new_with_key(key);
+    aes.encrypt_many([block])[0].as_array()
+{% endcall %}
+
+{% call proptest_eq_scalar("aes" ~ key_size ~ "_encrypt_only_convert",
+    {'block': VectorType(core.u8, 16), 'key': key_ty}
+)%}
+    let aes = Aes{{key_size}}EncryptOnly::from(Aes{{key_size}}::new_with_key(key));
+    aes.encrypt_many([block])[0].as_array()
+{% endcall %}
+
+{% call proptest_eq_scalar("fixed_aes" ~ key_size ~ "_encrypt", {'block': VectorType(core.u8, 16)}) %}
+    let aes = Aes{{key_size}}::FIXED_KEY;
+    aes.encrypt_many([block])[0].as_array()
+{% endcall %}
+
+{% call proptest_eq_scalar("fixed_aes_enc_only" ~ key_size ~ "_encrypt", {'block': VectorType(core.u8, 16)}) %}
+    let aes = Aes{{key_size}}EncryptOnly::FIXED_KEY;
+    aes.encrypt_many([block])[0].as_array()
+{% endcall %}
+
+
+{% call proptest_eq_scalar("fixed_aes" ~ key_size ~ "_decrypt", {'block': VectorType(core.u8, 16)}) %}
+    let aes = Aes{{key_size}}::FIXED_KEY;
+    aes.decrypt_many([block])[0].as_array()
+{% endcall %}
+
+{% call proptest_eq_scalar("aes" ~ key_size ~ "_encrypt",
+    {'block': VectorType(core.u8, 16), "key": key_ty}
+)%}
+    let aes = Aes{{key_size}}::new_with_key(key);
+    aes.encrypt_many([block])[0].as_array()
+{% endcall %}
+
+{% call proptest_eq_scalar("aes" ~ key_size ~ "_decrypt",
+    {'block': VectorType(core.u8, 16), "key": key_ty}
+)%}
+    let aes = Aes{{key_size}}::new_with_key(key);
+    aes.decrypt_many([block])[0].as_array()
+{% endcall %}
+
+{% for encrypt_only, op in
+    [("EncryptOnly", "encrypt"), ("", "encrypt"), ("", "decrypt")]
+%}
+    proptest! {
+        #[test]
+        fn aes{{key_size}}{{encrypt_only.lower()}}_{{op}}_exact_hint(
+            key in any::<{{key_ty.array}}>(),
+            blocks in any::<[
+                [u8; 16];
+                crate::Aes{{key_size}}{{encrypt_only}}::BLOCK_COUNT_HINT
+            ]>(),
+        ) {
+            use crate::*;
+            use crate::array_utils::*;
+            let key: {{key_ty}} = key.into();
+            let blocks: [U8x16; Aes{{key_size}}{{encrypt_only}}::BLOCK_COUNT_HINT] = bytemuck::cast(blocks);
+            let aes = Aes{{key_size}}{{encrypt_only}}::new_with_key(key);
+            let many = aes.{{op}}_many(blocks);
+            let single = blocks.array_map(|block| aes.{{op}}(block));
+            prop_assert_eq!(many, single);
+        }
+    }
+{% endfor %}
+{% endfor %}

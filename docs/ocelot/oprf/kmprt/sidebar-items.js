@@ -1,1 +1,0 @@
-initSidebarItems({"struct":[["Receiver","KMPRT oblivious programmable PRF receiver."],["Sender","KMPRT hashing-based OPPRF sender."]]});

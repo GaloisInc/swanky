@@ -15,13 +15,6 @@ use std::ops::Deref;
 #[derive(Clone)]
 pub struct PmrBundle<W>(Bundle<W>);
 
-// impl<W: Clone + HasModulus> PmrBundle<W> {
-//     /// Create a new PMR bundle from a vector of wires.
-//     pub fn new(ws: Vec<W>) -> PmrBundle<W> {
-//         PmrBundle(Bundle::new(ws))
-//     }
-// }
-
 impl<W: Clone + HasModulus> Deref for PmrBundle<W> {
     type Target = Bundle<W>;
 

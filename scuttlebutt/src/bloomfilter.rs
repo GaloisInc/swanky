@@ -1,6 +1,7 @@
 //! Implementation of a bloom filter.
 
 use sha2::{Digest, Sha256};
+use std::convert::TryFrom;
 
 /// Simple implementation of a Bloom Filter. Which is guaranteed to return 1 if an element
 /// is in the set, but returns 1 with probability p (settable) if an item is not in the
@@ -74,14 +75,16 @@ impl BloomFilter {
     /// Result must be modded by the actual size of the bloom filter to avoid out of
     /// bounds errors.
     pub fn bin<V: AsRef<[u8]>>(value: &V, hash_index: usize) -> usize {
-        let mut bytes = unsafe { std::mem::transmute::<usize, [u8; 8]>(hash_index) }.to_vec();
-        bytes.extend(value.as_ref());
-        let hbytes = Sha256::digest(&bytes);
-        let mut index_bytes = [0; 8];
-        for (x, y) in hbytes.iter().zip(index_bytes.iter_mut()) {
-            *y = *x;
-        }
-        unsafe { std::mem::transmute::<[u8; 8], usize>(index_bytes) }
+        // TODO: This code probably needs to use fixed-size integer types in order to be portable to
+        // 32-bit architectures.
+        debug_assert_eq!(std::mem::size_of::<usize>(), 8);
+        let mut h = Sha256::new();
+        h.update((hash_index as u64).to_le_bytes());
+        h.update(value);
+        let hbytes = h.finalize();
+        u64::from_le_bytes(
+            <[u8; 8]>::try_from(&hbytes[0..8]).expect("We're getting 8 bytes specifically"),
+        ) as usize
     }
 
     /// Insert an item into the BloomFilter.

@@ -1,0 +1,120 @@
+impl From<{{ty.array}}> for {{ty}} {
+    {% call(scalar, avx2) fn("from", {"array": ty.array}, returns=ty, doc_scalar_equiv=False) %}
+    {% call scalar() %}
+        {{ty}}(array)
+    {% endcall %}
+    {% call(avx2i) avx2() %}
+        {{ty}}(unsafe {
+            // SAFETY: the pointer doesn't need to be aligned. It's the right size.
+            {{avx2i(ty, "loadu")}}(array.as_ptr() as *const {{avx2_ty}})
+        })
+    {% endcall %}
+    {% endcall %}
+}
+
+impl From<{{ty}}> for {{ ty.array }} {
+    {% call(scalar, avx2) fn("from", {"vector": ty}, returns=ty.array, doc_scalar_equiv=False) %}
+    {% call scalar() %}
+        vector.0
+    {% endcall %}
+    {% call(avx2i) avx2() %}
+        let mut out: {{ty.array}} = [0; {{ty.count}}];
+        unsafe {
+            // SAFETY: the pointer doesn't need to be aligned. It's the right size.
+            {{avx2i(ty, "storeu")}}(out.as_mut_ptr() as *mut {{avx2_ty}}, vector.0)
+        }
+        out
+    {% endcall %}
+    {% endcall %}
+}
+
+{% for ty2 in ty.can_cast_from %}
+impl From<{{ty2}}> for {{ty}} {
+    /// This cast is 100% free. It reinterprets the little-endinan bits of {{ty2}}
+    /// as little endian bits of {{ty}}.
+    #[inline(always)]
+    fn from(x: {{ty2}}) -> {{ty}} {
+        Self({
+            {% call(scalar, avx2) visit_backends(block=True) %}
+            {% call scalar() %}
+                #[cfg(target_endian="little")]
+                bytemuck::cast(x.0)
+                // TODO: big endian.
+            {% endcall %}
+            {% call avx2() %}
+                x.0
+            {% endcall %}
+            {% endcall %}
+        })
+    }
+}
+{% endfor %}
+
+{% for src in ty.can_convert_from %}
+    impl From<{{src}}> for {{ty}} {
+        {% call(scalar, avx2) fn("from", {"vector": src}, returns=ty) %}
+        {% call scalar() %}
+            {{ty}}::from([
+                {% for i in range(ty.count) %}
+                    {{ty.ty}}::from(vector.as_array()[{{i}}]),
+                {% endfor %}
+            ])
+        {% endcall %}
+        {% call(avx2i) avx2() %}
+            Self({{avx2i(ty, "convert", src)}}(vector.0))
+        {% endcall %}
+        {% endcall %}
+    }
+{% endfor %}
+
+{% if ty.bits == 256 %}
+    {% set src = VectorType(ty.ty, ty.count // 2) %}
+    impl From<{{src}}> for {{ty}} {
+        /// NOTE: this will _zero_ the upper bits of the destination. Other
+        /// intrinsics are more effcient, but leave the upper bits undefined.
+        /// At present, these more effcient intrinsics are not exposed.
+        {% call(scalar, avx2) fn("from", {"vector": src}, returns=ty) %}
+        {% call scalar() %}
+            let mut out = [0; {{ty.count}}];
+            out[0..{{src.count}}].copy_from_slice(&vector.as_array());
+            {{ty}}::from(out)
+        {% endcall %}
+        {% call(avx2i) avx2() %}
+            Self({{avx2i('raw', "_mm256_zextsi128_si256")}}(vector.0))
+        {% endcall %}
+        {% endcall %}
+    }
+    
+    impl From<[{{src}}; 2]> for {{ty}} {
+        {% call(scalar, avx2) fn("from", {"vectors": "["~src~"; 2]"}, returns=ty) %}
+        {% call scalar() %}
+            let mut out = [0; {{ty.count}}];
+            out[0..{{src.count}}].copy_from_slice(&vectors[0].as_array());
+            out[{{src.count}}..].copy_from_slice(&vectors[1].as_array());
+            {{ty}}::from(out)
+        {% endcall %}
+        {% call(avx2i) avx2() %}
+            Self({{avx2i('raw', "_mm256_set_m128i")}}(vectors[1].0, vectors[0].0))
+        {% endcall %}
+        {% endcall %}
+    }
+    
+    // TODO: this doesn't show up in the docs.
+    impl From<{{ty}}> for [{{src}}; 2] {
+        {% call(scalar, avx2) fn("from", {"vector": ty}, returns="["~src~"; 2]") %}
+        {% call scalar() %}
+            let mut lo = [0; {{src.count}}];
+            let mut hi = [0; {{src.count}}];
+            lo.copy_from_slice(&vector.as_array()[0..{{src.count}}]);
+            hi.copy_from_slice(&vector.as_array()[{{src.count}}..]);
+            [{{src}}::from(lo), {{src}}::from(hi)]
+        {% endcall %}
+        {% call(avx2i) avx2() %}
+            [
+                {{src}}({{avx2i('raw', "_mm256_extracti128_si256")}}::<0>(vector.0)),
+                {{src}}({{avx2i('raw', "_mm256_extracti128_si256")}}::<1>(vector.0)),
+            ]
+        {% endcall %}
+        {% endcall %}
+    }
+{% endif %}

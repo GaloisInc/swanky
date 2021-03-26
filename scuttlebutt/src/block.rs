@@ -12,59 +12,43 @@ use crate::Aes256;
 use curve25519_dalek::ristretto::RistrettoPoint;
 #[cfg(feature = "serde")]
 use std::convert::TryInto;
-use std::{
-    arch::x86_64::*,
-    hash::{Hash, Hasher},
-};
+use std::hash::Hash;
+use vectoreyes::{SimdBase, SimdBase8, U64x2, U8x16};
 
+// TODO: it might make sense to eliminate this type, in favor of using vectoreyes natively.
 /// A 128-bit chunk.
-#[derive(Clone, Copy)]
-pub struct Block(pub __m128i);
-
-union __U128 {
-    vector: __m128i,
-    bytes: u128,
-}
-
-const ONE: __m128i = unsafe { (__U128 { bytes: 1 }).vector };
-const ONES: __m128i = unsafe {
-    (__U128 {
-        bytes: 0xFFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF,
-    })
-    .vector
-};
+#[derive(
+    Clone,
+    Copy,
+    Default,
+    PartialEq,
+    Eq,
+    Hash,
+    bytemuck::Pod,
+    bytemuck::Zeroable,
+    bytemuck::TransparentWrapper,
+)]
+#[repr(transparent)]
+pub struct Block(pub U8x16);
 
 impl Block {
-    /// Convert into a pointer.
-    #[inline]
-    pub fn as_ptr(&self) -> *const u8 {
-        self.as_ref().as_ptr()
-    }
-    /// Convert into a mutable pointer.
-    #[inline]
-    pub fn as_mut_ptr(&mut self) -> *mut u8 {
-        self.as_mut().as_mut_ptr()
-    }
-
     /// Carryless multiplication.
     ///
     /// This code is adapted from the EMP toolkit's implementation.
     #[inline]
     pub fn clmul(self, rhs: Self) -> (Self, Self) {
-        unsafe {
-            let x = self.0;
-            let y = rhs.0;
-            let zero = _mm_clmulepi64_si128(x, y, 0x00);
-            let one = _mm_clmulepi64_si128(x, y, 0x10);
-            let two = _mm_clmulepi64_si128(x, y, 0x01);
-            let three = _mm_clmulepi64_si128(x, y, 0x11);
-            let tmp = _mm_xor_si128(one, two);
-            let ll = _mm_slli_si128(tmp, 8);
-            let rl = _mm_srli_si128(tmp, 8);
-            let x = _mm_xor_si128(zero, ll);
-            let y = _mm_xor_si128(three, rl);
-            (Block(x), Block(y))
-        }
+        let x = U64x2::from(self.0);
+        let y = U64x2::from(rhs.0);
+        let zero = x.carryless_mul::<false, false>(y);
+        let one = x.carryless_mul::<true, false>(y);
+        let two = x.carryless_mul::<false, true>(y);
+        let three = x.carryless_mul::<true, true>(y);
+        let tmp: U8x16 = (one ^ two).into();
+        let ll = tmp.shift_bytes_left::<8>();
+        let rl = tmp.shift_bytes_right::<8>();
+        let x = U8x16::from(zero) ^ ll;
+        let y = U8x16::from(three) ^ rl;
+        (Block(x), Block(y))
     }
 
     /// Hash an elliptic curve point `pt` and tweak `tweak`.
@@ -72,26 +56,26 @@ impl Block {
     /// Computes the hash by computing `E_{pt}(tweak)`, where `E` is AES-256.
     #[cfg(feature = "curve25519-dalek")]
     #[inline]
-    pub fn hash_pt(tweak: u128, pt: &RistrettoPoint) -> Self {
+    pub fn hash_pt(tweak: usize, pt: &RistrettoPoint) -> Self {
         let k = pt.compress();
         let c = Aes256::new(k.as_bytes());
-        c.encrypt(Block::from(tweak))
+        c.encrypt(Block(U64x2::set_lo(tweak as u64).into()))
     }
 
     /// Return the least significant bit.
     #[inline]
     pub fn lsb(&self) -> bool {
-        unsafe { _mm_extract_epi8(_mm_and_si128(self.0, ONE), 0) == 1 }
+        (self.0.extract::<0>() & 1) != 0
     }
     /// Set the least significant bit.
     #[inline]
     pub fn set_lsb(&self) -> Block {
-        unsafe { Block(_mm_or_si128(self.0, ONE)) }
+        Block(self.0 | U8x16::set_lo(1))
     }
     /// Flip all bits.
     #[inline]
     pub fn flip(&self) -> Self {
-        unsafe { Block(_mm_xor_si128(self.0, ONES)) }
+        Block(self.0 ^ U64x2::broadcast(u64::MAX).into())
     }
 
     /// Try to create a `Block` from a slice of bytes. The slice must have exactly 16 bytes.
@@ -106,25 +90,6 @@ impl Block {
     }
 }
 
-impl Default for Block {
-    #[inline]
-    fn default() -> Self {
-        unsafe { Block(_mm_setzero_si128()) }
-    }
-}
-
-impl PartialEq for Block {
-    #[inline]
-    fn eq(&self, other: &Block) -> bool {
-        unsafe {
-            let neq = _mm_xor_si128(self.0, other.0);
-            _mm_test_all_zeros(neq, neq) != 0
-        }
-    }
-}
-
-impl Eq for Block {}
-
 impl Ord for Block {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
         u128::from(*self).cmp(&u128::from(*other))
@@ -134,65 +99,6 @@ impl Ord for Block {
 impl PartialOrd for Block {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         Some(u128::from(*self).cmp(&u128::from(*other)))
-    }
-}
-
-impl AsRef<[u8]> for Block {
-    #[inline]
-    fn as_ref(&self) -> &[u8] {
-        unsafe { &*(self as *const Block as *const [u8; 16]) }
-    }
-}
-
-impl AsMut<[u8]> for Block {
-    #[inline]
-    fn as_mut(&mut self) -> &mut [u8] {
-        unsafe { &mut *(self as *mut Block as *mut [u8; 16]) }
-    }
-}
-
-impl std::ops::BitAnd for Block {
-    type Output = Block;
-    #[inline]
-    fn bitand(self, rhs: Self) -> Self {
-        unsafe { Block(_mm_and_si128(self.0, rhs.0)) }
-    }
-}
-
-impl std::ops::BitAndAssign for Block {
-    #[inline]
-    fn bitand_assign(&mut self, rhs: Self) {
-        unsafe { self.0 = _mm_and_si128(self.0, rhs.0) }
-    }
-}
-
-impl std::ops::BitOr for Block {
-    type Output = Block;
-    #[inline]
-    fn bitor(self, rhs: Self) -> Self {
-        unsafe { Block(_mm_or_si128(self.0, rhs.0)) }
-    }
-}
-
-impl std::ops::BitOrAssign for Block {
-    #[inline]
-    fn bitor_assign(&mut self, rhs: Self) {
-        unsafe { self.0 = _mm_or_si128(self.0, rhs.0) }
-    }
-}
-
-impl std::ops::BitXor for Block {
-    type Output = Block;
-    #[inline]
-    fn bitxor(self, rhs: Self) -> Self {
-        unsafe { Block(_mm_xor_si128(self.0, rhs.0)) }
-    }
-}
-
-impl std::ops::BitXorAssign for Block {
-    #[inline]
-    fn bitxor_assign(&mut self, rhs: Self) {
-        unsafe { self.0 = _mm_xor_si128(self.0, rhs.0) }
     }
 }
 
@@ -216,6 +122,17 @@ impl std::fmt::Display for Block {
     }
 }
 
+impl AsRef<[u8]> for Block {
+    fn as_ref(&self) -> &[u8] {
+        bytemuck::bytes_of(&self.0)
+    }
+}
+impl AsMut<[u8]> for Block {
+    fn as_mut(&mut self) -> &mut [u8] {
+        bytemuck::bytes_of_mut(&mut self.0)
+    }
+}
+
 impl rand::distributions::Distribution<Block> for rand::distributions::Standard {
     #[inline]
     fn sample<R: rand::Rng + ?Sized>(&self, rng: &mut R) -> Block {
@@ -226,29 +143,34 @@ impl rand::distributions::Distribution<Block> for rand::distributions::Standard 
 impl From<Block> for u128 {
     #[inline]
     fn from(m: Block) -> u128 {
-        unsafe { *(&m as *const _ as *const u128) }
+        #[cfg(target_endian = "little")]
+        {
+            bytemuck::cast(m.0)
+        }
+        #[cfg(target_endian = "big")]
+        {
+            u128::from(m.0.extract::<0>()) | (u128::from(m.0.extract::<1>()) << 64)
+        }
     }
 }
 
 impl From<u128> for Block {
     #[inline]
     fn from(m: u128) -> Self {
-        unsafe { std::mem::transmute(m) }
-        // XXX: the below doesn't work due to pointer-alignment issues.
-        // unsafe { *(&m as *const _ as *const Block) }
+        Block(bytemuck::cast(m))
     }
 }
 
-impl From<Block> for __m128i {
+impl From<Block> for U8x16 {
     #[inline]
-    fn from(m: Block) -> __m128i {
+    fn from(m: Block) -> U8x16 {
         m.0
     }
 }
 
-impl From<__m128i> for Block {
+impl From<U8x16> for Block {
     #[inline]
-    fn from(m: __m128i) -> Self {
+    fn from(m: U8x16) -> Self {
         Block(m)
     }
 }
@@ -256,37 +178,45 @@ impl From<__m128i> for Block {
 impl From<Block> for [u8; 16] {
     #[inline]
     fn from(m: Block) -> [u8; 16] {
-        unsafe { *(&m as *const _ as *const [u8; 16]) }
+        U8x16::from(m.0).as_array()
     }
 }
 
 impl From<[u8; 16]> for Block {
     #[inline]
     fn from(m: [u8; 16]) -> Self {
-        unsafe { std::mem::transmute(m) }
-        // XXX: the below doesn't work due to pointer-alignment issues.
-        // unsafe { *(&m as *const _ as *const Block) }
+        Block(U8x16::from(m).into())
     }
 }
 
-impl From<[u16; 8]> for Block {
+impl std::ops::BitXor for Block {
+    type Output = Self;
+
     #[inline]
-    fn from(m: [u16; 8]) -> Self {
-        unsafe { std::mem::transmute(m) }
+    fn bitxor(self, rhs: Self) -> Self::Output {
+        Block(self.0 ^ rhs.0)
     }
 }
 
-impl From<Block> for [u32; 4] {
+impl std::ops::BitXorAssign for Block {
     #[inline]
-    fn from(m: Block) -> Self {
-        unsafe { *(&m as *const _ as *const [u32; 4]) }
+    fn bitxor_assign(&mut self, rhs: Self) {
+        self.0 ^= rhs.0;
     }
 }
 
-impl Hash for Block {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        let v: u128 = (*self).into();
-        v.hash(state);
+impl std::ops::BitAnd for Block {
+    type Output = Block;
+    #[inline]
+    fn bitand(self, rhs: Self) -> Self {
+        Block(self.0 & rhs.0)
+    }
+}
+
+impl std::ops::BitAndAssign for Block {
+    #[inline]
+    fn bitand_assign(&mut self, rhs: Self) {
+        self.0 &= rhs.0;
     }
 }
 
@@ -298,7 +228,7 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 #[cfg(feature = "serde")]
 impl Serialize for Block {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        serializer.serialize_bytes(&unsafe { std::mem::transmute::<__m128i, [u8; 16]>(self.0) })
+        serializer.serialize_bytes(&U8x16::from(self.0).as_array())
     }
 }
 
@@ -333,40 +263,6 @@ impl<'de> Deserialize<'de> for Block {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn test_and() {
-        let x = rand::random::<Block>();
-        let y = x & Block(ONES);
-        assert_eq!(x, y);
-    }
-
-    #[test]
-    fn test_or() {
-        let x = rand::random::<Block>();
-        let y = x | Block(ONES);
-        assert_eq!(y, Block(ONES));
-        let y = x | x;
-        assert_eq!(x, y);
-    }
-
-    #[test]
-    fn test_xor() {
-        let x = rand::random::<Block>();
-        let y = rand::random::<Block>();
-        let z = x ^ y;
-        let z = z ^ y;
-        assert_eq!(x, z);
-    }
-
-    #[test]
-    fn test_lsb() {
-        let x = rand::random::<Block>();
-        let x = x | Block(ONE);
-        assert!(x.lsb());
-        let x = x ^ Block(ONE);
-        assert!(!x.lsb());
-    }
 
     #[test]
     fn test_flip() {

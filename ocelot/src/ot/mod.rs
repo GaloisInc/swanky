@@ -177,8 +177,6 @@ where
 
 #[cfg(test)]
 mod tests {
-    #[cfg(feature = "nightly")]
-    extern crate test;
     use super::*;
     use scuttlebutt::{AesRng, Block, Channel};
     use std::{

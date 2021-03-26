@@ -1,1 +1,0 @@
-initSidebarItems({"mod":[["semihonest","Implementation of semi-honest two-party computation."]]});
