@@ -28,7 +28,7 @@ pub(crate) struct CuckooItem {
 }
 
 impl CuckooItem {
-    #[cfg(feature = "psty")]
+    #[cfg(any(feature = "psty", feature = "psty_payload"))]
     /// Replace the first byte of the entry with the hash index. Used in PSTY.
     pub fn entry_with_hindex(&self) -> Block {
         let mask = Block::from(0xFFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FF00);

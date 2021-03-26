@@ -600,7 +600,7 @@ impl Receiver {
             .items
             .iter()
             .map(|opt_item| match opt_item {
-                Some(item) => item.entry,
+                Some(item) => item.entry_with_hindex(),
                 None => rng.gen(),
             })
             .collect::<Vec<Block>>();
@@ -654,7 +654,7 @@ impl Receiver {
                         cuckoo
                             .iter()
                             .map(|opt_item| match opt_item {
-                                Some(item) => item.entry,
+                                Some(item) => item.entry_with_hindex(),
                                 None => rng.gen::<Block>(),
                             })
                             .collect::<Vec<Block>>()).collect();

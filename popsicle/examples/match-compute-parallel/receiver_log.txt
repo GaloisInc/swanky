@@ -1,24 +1,24 @@
 Number of megabins per thread 3
-Receiver :: Bucketization time : 28 ms
+Receiver :: Bucketization time : 32 ms
 Receiver ::Bucketization time (read): 0.20 Mb
 Receiver :: Bucketization time (write): 0.33 Mb
 Terminated.
 Receiver Thread 0 Starting computation
 nmegabins: 3
 Starting megabin number:0
-Receiver :: Computation time: 20 ms
+Receiver :: Computation time: 19 ms
 Starting megabin number:1
-Receiver :: Computation time: 20 ms
+Receiver :: Computation time: 18 ms
 Starting megabin number:2
-Receiver :: Computation time: 20 ms
+Receiver :: Computation time: 18 ms
 Receiver Thread 0 :: total circuit building & computation time: 111 ms
 Receiver Thread 0 :: total circuit building & computation communication (read): 1.19 Mb
 Receiver Thread 0 :: total circuit building & computation communication (write): 0.43 Mb
 Terminated.
-acc 0 sum_weights 0
-weighted_mean36893488147419103231
-weighted_mean: 36893488147419103231
-Receiver :: total Joining threads results time: 5163 ms
+acc 1 sum_weights 1
+weighted_mean1
+weighted_mean: 1
+Receiver :: total Joining threads results time: 5147 ms
 Receiver :: total Joining threads results time (read): 0.20 Mb
 Receiver :: total Joining threads results time  (write): 0.33 Mb
 Experiments done !

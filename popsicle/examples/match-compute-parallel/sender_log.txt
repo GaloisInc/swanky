@@ -1,23 +1,23 @@
 Server listening on 127.0.0.1:3000
-New connection: 127.0.0.1:64195
-Sender :: Bucketization time: 28 ms
+New connection: 127.0.0.1:49546
+Sender :: Bucketization time: 35 ms
 Sender :: Bucketization time (read): 0.33 Mb
 Sender :: Bucketization time  (write): 0.20 Mb
 Server listening on 127.0.0.1:8000
-New connection: 127.0.0.1:64197
+New connection: 127.0.0.1:49547
 Sender Thread 0 Starting computation
 Starting megabin number:0
-Sender :: Computation time: 20 ms
+Sender :: Computation time: 19 ms
 Starting megabin number:1
-Sender :: Computation time: 20 ms
+Sender :: Computation time: 18 ms
 Starting megabin number:2
-Sender :: Computation time: 20 ms
+Sender :: Computation time: 18 ms
 Sender Thread 0 :: total circuit building & computation time: 111 ms
 Sender Thread 0 :: total circuit building & computation communication (read): 0.43 Mb
 Sender Thread 0 :: total circuit building & computation communication (write): 1.19 Mb
 Server listening on 127.0.0.1:3000
-New connection: 127.0.0.1:64200
-Sender :: total Joining threads results time: 5162 ms
+New connection: 127.0.0.1:49548
+Sender :: total Joining threads results time: 5146 ms
 Sender :: total Joining threads results time (read): 0.33 Mb
 Sender :: total Joining threads results time  (write): 0.20 Mb
 Experiments done !
