@@ -85,13 +85,13 @@ impl Ckt {
 
 #[test]
 fn test_eval1() {
-    let w    = 3.into();
-    let x    = 5.into();
-    let y    = 7.into();
-    let z    = 11.into();
-    let wy   = 21.into();  // w * y
-    let xz   = 55.into();  // x * z
-    let wyxz = 76.into();  // w*y + x*z
+    let w    = 3u128.into();
+    let x    = 5u128.into();
+    let y    = 7u128.into();
+    let z    = 11u128.into();
+    let wy   = 21u128.into();  // w * y
+    let xz   = 55u128.into();  // x * z
+    let wyxz = 76u128.into();  // w*y + x*z
     let res  = Ckt::test_value().eval(&vec![w, x, y, z]);
     assert_eq!(res, vec![w, x, y, z, wy, xz, wyxz]);
 }

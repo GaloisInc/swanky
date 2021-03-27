@@ -1,7 +1,5 @@
 use criterion::{criterion_group, criterion_main, Criterion, BenchmarkId};
-use rand::{Rng, SeedableRng, rngs::StdRng};
-use rand::distributions::{Standard, Distribution};
-use ndarray::Array1;
+use rand::{SeedableRng, rngs::StdRng};
 
 use humidor::ligero::interactive;
 use humidor::circuit::{Ckt, Op};

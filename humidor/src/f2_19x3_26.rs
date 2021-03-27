@@ -59,7 +59,7 @@ impl F {
     // XXX: This is slow. Use GCD. Probably not a hot path, though.
     #[inline]
     pub fn recip(self) -> Self {
-        self.pow(Self::PHI - 1)
+        Self(inv_monty(self.0))
     }
 
     #[inline]
@@ -84,6 +84,26 @@ impl std::convert::From<i128> for F {
 impl std::convert::From<F> for i128 {
     #[inline]
     fn from (F(n): F) -> i128 { from_monty(n) as i128 }
+}
+
+impl std::convert::From<u128> for F {
+    #[inline]
+    fn from(n: u128) -> F { Self(to_monty(n)) }
+}
+
+impl std::convert::From<F> for u128 {
+    #[inline]
+    fn from(F(n): F) -> u128 { from_monty(n) }
+}
+
+impl std::convert::From<u64> for F {
+    #[inline]
+    fn from(n: u64) -> F { Self(to_monty(n as u128)) }
+}
+
+impl std::convert::From<F> for u64 {
+    #[inline]
+    fn from(F(n): F) -> u64 { from_monty(n) as u64 }
 }
 
 impl std::ops::Add for F {
@@ -217,10 +237,20 @@ proptest! {
     }
 
     #[test]
-    fn test_conv(n in any::<i128>()) {
+    fn test_conv_i128(n in any::<i128>()) {
         let n_mod = n % M as i128;
         let n_pos = if n_mod >= 0 { n_mod } else { M as i128 + n_mod };
         prop_assert_eq!(n_pos, i128::from(F::from(n)))
+    }
+
+    #[test]
+    fn test_conv_u128(n in 0..M as u128) {
+        prop_assert_eq!(n % M as u128, u128::from(F::from(n)))
+    }
+
+    #[test]
+    fn test_conv_u64(n in 0..M) {
+        prop_assert_eq!(n % M, u64::from(F::from(n)))
     }
 
     #[test]
@@ -257,9 +287,10 @@ proptest! {
  *      R = 2^64
  *      M is field modulus
  */
-const R_INV: u64 = 839_386_676_306_787_573;        // (R)^-1 mod M
+const R_INV: u64 = 839_386_676_306_787_573;         // R^-1 mod M
+const R_CUBE: u64 = 1_323_917_639_155_065_737;      // R^3 mod M
 const M: u64 = 1_332_669_751_402_954_753;           // 2^19 * 3^26 + 1
-const M_TICK: u64 = 11_618_745_889_904_394_239;    // 2^64 - (M^-1} mod 2**64)
+const M_TICK: u64 = 11_618_745_889_904_394_239;     // 2^64 - (M^-1} mod 2**64)
 
 const_assert_eq!(montgomery_constants;
     ((1u128<<64)*(R_INV as u128) - (M as u128)*(M_TICK as u128)), 1);
@@ -298,8 +329,14 @@ fn mul_monty(a: u64, b: u64) -> u64 {
     redc(ab) as u64
 }
 
-// TODO: Add reciprocal operation using GCD. Using exponentiation-based approach
-// above for now.
+// XXX: Should change mod_inverse to use u64 instead of i128. Would probably
+// speed this up, but by how much?
+#[inline]
+fn inv_monty(a: u64) -> u64 {
+    let ar_inv = crate::numtheory::mod_inverse(a as i128, M as i128);
+    let ar_inv_pos = if ar_inv >= 0 { ar_inv } else { M as i128 + ar_inv };
+    redc((ar_inv as u128).wrapping_mul(R_CUBE as u128)) as u64
+}
 
 #[inline]
 fn from_monty(u: u64) -> u128 { (u as u128 * (R_INV as u128)) % M as u128 }
@@ -348,5 +385,15 @@ proptest!{
                 mul_monty(
                     to_monty(a),
                     to_monty(b))))
+    }
+
+    #[test]
+    fn test_monty_inv(a in 0..M as u128) {
+        prop_assert_eq!(1u128,
+            from_monty(
+                mul_monty(
+                    to_monty(a),
+                    inv_monty(
+                        to_monty(a)))))
     }
 }

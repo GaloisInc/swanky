@@ -30,7 +30,8 @@ type Field = crate::f2_19x3_26::F;
 // XXX: Is this right? Seems like t could be smaller, say ceil(log |F| / p).
 #[derive(Debug, Clone, Copy)]
 pub struct Params {
-    pub pss: PSS, // Share-packing parameters
+    //pub pss: PSS, // Share-packing parameters
+    pub pss: crate::threshold_secret_sharing::PackedSecretSharing,
 
     pub kexp: u32,  // log2(k)
     pub nexp: u32,  // log3(n)
@@ -88,14 +89,16 @@ impl Params {
             .1;
 
         Self { kexp, nexp, k, t, l, n, m,
-            pss: PSS {
+            pss: crate::threshold_secret_sharing::PackedSecretSharing {
                 threshold: t,
                 share_count: n,
                 secret_count: l,
 
-                prime: Field::MOD as i128,
-                omega_secrets: Field::ROOTS_BASE_2[kexp as usize] as i128,
-                omega_shares: Field::ROOTS_BASE_3[nexp as usize] as i128,
+                //prime: Field::MOD as i128,
+                //omega_secrets: Field::ROOTS_BASE_2[kexp as usize] as i128,
+                //omega_shares: Field::ROOTS_BASE_3[nexp as usize] as i128,
+                omega_secrets: Field::from(Field::ROOTS_BASE_2[kexp as usize]),
+                omega_shares: Field::from(Field::ROOTS_BASE_3[nexp as usize]),
             }
         }
     }
@@ -108,21 +111,24 @@ impl Params {
     pub fn encode(&self, wf: ArrayView1<Field>) -> Array1<Field> {
         debug_assert_eq!(wf.len(), self.l);
 
-        let w: Vec<i128> = wf.iter().cloned().map(i128::from).collect();
-        let c: Vec<i128> = self.pss.share(&w);
+        //let w: Vec<i128> = wf.iter().cloned().map(i128::from).collect();
+        //let c: Vec<i128> = self.pss.share(&w);
+        Array1::from(self.pss.share(&wf.to_vec()))
 
-        c.iter().cloned().map(Field::from).collect()
+        //c.iter().cloned().map(Field::from).collect()
     }
 
     #[inline]
     pub fn decode(&self, cf: ArrayView1<Field>) -> Array1<Field> {
         debug_assert_eq!(cf.len(), self.n);
 
-        let c: Vec<i128> = cf.iter().take(self.k).cloned().map(i128::from).collect();
+        //let c: Vec<i128> = cf.iter().take(self.k).cloned().map(i128::from).collect();
+        let c0: Vec<_> = cf.iter().take(self.k).cloned().collect();
         let ixs: Vec<usize> = (0 .. self.k).collect();
-        let w: Vec<i128> = self.pss.reconstruct(&ixs, &c);
+        //let w: Vec<i128> = self.pss.reconstruct(&ixs, &c);
+        Array1::from(self.pss.reconstruct(&ixs, &c0))
 
-        w.iter().cloned().map(Field::from).collect()
+        //w.iter().cloned().map(Field::from).collect()
     }
 
     #[inline]
@@ -133,10 +139,11 @@ impl Params {
         debug_assert!(cf.len() <= self.n);
         debug_assert!(cf.len() >= self.k);
 
-        let c: Vec<i128> = cf.iter().cloned().map(i128::from).collect();
-        let w: Vec<i128> = self.pss.reconstruct(ixs, &c);
+        //let c: Vec<i128> = cf.iter().cloned().map(i128::from).collect();
+        //let w: Vec<i128> = self.pss.reconstruct(ixs, &c);
+        Array1::from(self.pss.reconstruct(ixs, &cf.to_vec()))
 
-        w.iter().cloned().map(Field::from).collect()
+        //w.iter().cloned().map(Field::from).collect()
     }
 
     #[inline]
@@ -192,11 +199,16 @@ impl Params {
         let mut points0 = Array1::zeros(self.k + 1);
         points0.slice_mut(ndarray::s!(1 .. points.len()+1)).assign(&points);
 
-        threshold_secret_sharing::numtheory::fft2_inverse(
-            &points0.iter().cloned().map(i128::from).collect::<Vec<i128>>(),
-            self.pss.omega_secrets,
-            self.pss.prime,
-        ).iter().cloned().map(Field::from).collect::<Array1<Field>>()
+        //threshold_secret_sharing::numtheory::fft2_inverse(
+        //    &points0.iter().cloned().map(i128::from).collect::<Vec<i128>>(),
+        //    self.pss.omega_secrets,
+        //    self.pss.prime,
+        //).iter().cloned().map(Field::from).collect::<Array1<Field>>()
+
+        crate::numtheory::fft2_inverse(
+            &points0.to_vec(),
+            Field::from(self.pss.omega_secrets),
+        ).iter().cloned().collect()
     }
 
     // Take a sequence of `k+1` coefficients of the polynomial `p` and
@@ -208,11 +220,16 @@ impl Params {
         let mut coeffs0 = Array1::zeros(self.k + 1);
         coeffs0.slice_mut(ndarray::s!(0 .. coeffs.len())).assign(&coeffs);
 
-        threshold_secret_sharing::numtheory::fft2(
-            &coeffs0.iter().cloned().map(i128::from).collect::<Vec<i128>>(),
-            self.pss.omega_secrets,
-            self.pss.prime,
-        )[1..].iter().cloned().map(Field::from).collect::<Array1<Field>>()
+        //threshold_secret_sharing::numtheory::fft2(
+        //    &coeffs0.iter().cloned().map(i128::from).collect::<Vec<i128>>(),
+        //    self.pss.omega_secrets,
+        //    self.pss.prime,
+        //)[1..].iter().cloned().map(Field::from).collect::<Array1<Field>>()
+
+        crate::numtheory::fft2(
+            &coeffs0.to_vec(),
+            Field::from(self.pss.omega_secrets),
+        )[1..].iter().cloned().collect()
     }
 
     // Take a sequence of values `p(eta_1) .. p(eta_c)` for `c <= n` and
@@ -223,11 +240,16 @@ impl Params {
         let mut points0 = Array1::zeros(self.n + 1);
         points0.slice_mut(ndarray::s!(1 .. points.len()+1)).assign(&points);
 
-        threshold_secret_sharing::numtheory::fft3_inverse(
-            &points0.iter().cloned().map(i128::from).collect::<Vec<i128>>(),
-            self.pss.omega_shares,
-            self.pss.prime,
-        ).iter().cloned().map(Field::from).collect::<Array1<Field>>()
+        //threshold_secret_sharing::numtheory::fft3_inverse(
+        //    &points0.iter().cloned().map(i128::from).collect::<Vec<i128>>(),
+        //    self.pss.omega_shares,
+        //    self.pss.prime,
+        //).iter().cloned().map(Field::from).collect::<Array1<Field>>()
+
+        crate::numtheory::fft3_inverse(
+            &points0.to_vec(),
+            Field::from(self.pss.omega_shares),
+        ).iter().cloned().collect()
     }
 
     // Take a sequence of `n+1` coefficients of the polynomial `p` and
@@ -239,11 +261,16 @@ impl Params {
         let mut coeffs0 = Array1::zeros(self.n + 1);
         coeffs0.slice_mut(ndarray::s!(0 .. coeffs.len())).assign(&coeffs);
 
-        threshold_secret_sharing::numtheory::fft3(
-            &coeffs0.iter().cloned().map(i128::from).collect::<Vec<i128>>(),
-            self.pss.omega_shares,
-            self.pss.prime,
-        )[1..].iter().cloned().map(Field::from).collect::<Array1<Field>>()
+        //threshold_secret_sharing::numtheory::fft3(
+        //    &coeffs0.iter().cloned().map(i128::from).collect::<Vec<i128>>(),
+        //    self.pss.omega_shares,
+        //    self.pss.prime,
+        //)[1..].iter().cloned().map(Field::from).collect::<Array1<Field>>()
+
+        crate::numtheory::fft3(
+            &coeffs0.to_vec(),
+            Field::from(self.pss.omega_shares),
+        )[1..].iter().cloned().collect()
     }
 
     pub fn peval2(&self, p: ArrayView1<Field>, ix: usize) -> Field {
@@ -442,36 +469,36 @@ proptest! {
     #[test]
     fn test_peval2(
         (p,v) in any::<Params>().prop_flat_map(|p| {
-            let v = pvec(any::<i128>(), p.k + 1);
+            let v = pvec(any::<Field>(), p.k + 1);
             (Just(p), v)
         })
     ) {
-        let v_coeffs = threshold_secret_sharing::numtheory::fft2_inverse(
+        let v_coeffs = crate::numtheory::fft2_inverse(
             &v,
             p.pss.omega_secrets,
-            p.pss.prime,
+            //p.pss.prime,
         ).iter().cloned().map(Field::from).collect::<Array1<Field>>();
 
         for i in 0 .. v.len() {
-            assert_eq!(p.peval2(v_coeffs.view(), i), Field::from(v[i]));
+            prop_assert_eq!(p.peval2(v_coeffs.view(), i), Field::from(v[i]));
         }
     }
 
     #[test]
     fn test_peval3(
         (p,v) in any::<Params>().prop_flat_map(|p| {
-            let v = pvec(any::<i128>(), p.n + 1);
+            let v = pvec(any::<Field>(), p.n + 1);
             (Just(p), v)
         })
     ) {
-        let v_coeffs = threshold_secret_sharing::numtheory::fft3_inverse(
+        let v_coeffs = crate::numtheory::fft3_inverse(
             &v,
             p.pss.omega_shares,
-            p.pss.prime,
+            //p.pss.prime,
         ).iter().cloned().map(Field::from).collect::<Array1<Field>>();
 
         for i in 0 .. v.len() {
-            assert_eq!(p.peval3(v_coeffs.view(), i), Field::from(v[i]));
+            prop_assert_eq!(p.peval3(v_coeffs.view(), i), Field::from(v[i]));
         }
     }
 
@@ -488,9 +515,9 @@ proptest! {
         let uv_coeffs = pmul(u_coeffs.view(), v_coeffs.view());
 
         for i in 0 .. u.len() {
-            debug_assert_eq!(
+            prop_assert_eq!(
                 p.peval2(uv_coeffs.view(), i+1),
-                Field::from(u[i] * v[i]),
+                Field::from(u[i] * v[i])
             );
         }
     }

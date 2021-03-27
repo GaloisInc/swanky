@@ -223,7 +223,7 @@ proptest! {
     ) {
         let s = Secret::new(&c, &i);
         let output = *c.eval(&i).last().unwrap();
-        let zeros = Array1::from(vec![0.into(); s.w.len()]);
+        let zeros = Array1::from(vec![Field::ZERO; s.w.len()]);
         prop_assert_eq!(
             output == Field::ZERO,
             &s.public.Padd * &s.w.t() == zeros

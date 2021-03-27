@@ -18,14 +18,15 @@ pub fn pmul(p: ArrayView1<Field>, q: ArrayView1<Field>) -> Array1<Field> {
 
 // Evaluate a polynomial, represented by its coefficients, at a point `x`.
 pub fn peval(p: ArrayView1<Field>, x: Field) -> Field {
-    let mut res = Field::ZERO;
+    //let mut res = Field::ZERO;
 
-    for &pi in p.to_vec()[1..].iter().rev() {
-        res = res + pi;
-        res = res * x;
-    }
+    //for &pi in p.to_vec()[1..].iter().rev() {
+    //    res = res + pi;
+    //    res = res * x;
+    //}
 
-    res + p[0]
+    //res + p[0]
+    crate::numtheory::mod_evaluate_polynomial(&p.to_vec(), x)
 }
 
 pub fn point_product(u: ArrayView1<Field>, v: ArrayView1<Field>) -> Array1<Field> {
