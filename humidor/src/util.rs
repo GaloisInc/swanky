@@ -85,7 +85,6 @@ pub fn pad_or_unpad(a: ArrayView1<Field>, size: usize) -> Array1<Field> {
     }
 }
 
-#[inline]
 pub fn pad_array(a: ArrayView1<Field>, size: usize) -> Array1<Field> {
     debug_assert!(a.len() <= size);
 
@@ -95,7 +94,6 @@ pub fn pad_array(a: ArrayView1<Field>, size: usize) -> Array1<Field> {
     res
 }
 
-#[inline]
 pub fn unpad_array(a: ArrayView1<Field>, size: usize) -> Array1<Field> {
     debug_assert!(a.len() >= size);
 

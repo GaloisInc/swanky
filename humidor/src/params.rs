@@ -104,18 +104,12 @@ impl Params {
         }
     }
 
-    //
-    // XXX: In the following, can we eliminate some of the copies?
-    //
-
-    #[inline]
     pub fn encode(&self, wf: ArrayView1<Field>) -> Array1<Field> {
         debug_assert_eq!(wf.len(), self.l);
 
         Array1::from(self.pss.share(&wf.to_vec()))
     }
 
-    #[inline]
     pub fn decode(&self, cf: ArrayView1<Field>) -> Array1<Field> {
         debug_assert_eq!(cf.len(), self.n);
 
@@ -126,7 +120,6 @@ impl Params {
     }
 
     #[allow(dead_code)]
-    #[inline]
     fn decode_part(&self,
         ixs: &[usize],
         cf: ArrayView1<Field>,
@@ -137,7 +130,6 @@ impl Params {
         Array1::from(self.pss.reconstruct(ixs, &cf.to_vec()))
     }
 
-    #[inline]
     pub fn codeword_is_valid(&self, ce: ArrayView1<Field>) -> bool {
         debug_assert_eq!(ce.len(), self.n);
 
