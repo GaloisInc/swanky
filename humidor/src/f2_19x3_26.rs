@@ -335,7 +335,7 @@ fn mul_monty(a: u64, b: u64) -> u64 {
 fn inv_monty(a: u64) -> u64 {
     let ar_inv = crate::numtheory::mod_inverse(a as i128, M as i128);
     let ar_inv_pos = if ar_inv >= 0 { ar_inv } else { M as i128 + ar_inv };
-    redc((ar_inv as u128).wrapping_mul(R_CUBE as u128)) as u64
+    redc((ar_inv_pos as u128).wrapping_mul(R_CUBE as u128)) as u64
 }
 
 #[inline]

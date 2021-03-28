@@ -1,4 +1,3 @@
-use threshold_secret_sharing::packed::PackedSecretSharing as PSS;
 use ndarray::{Array1, Array2, ArrayView1, ArrayView2};
 
 #[cfg(test)]
@@ -294,50 +293,6 @@ impl Params {
         let pq_coeffs = crate::numtheory::fft2_inverse(&pq_points, omega);
 
         pq_coeffs.iter().take(pq_deg).cloned().collect()
-    }
-
-    #[allow(non_snake_case)]
-    pub fn peval3_rows_at(&self,
-        p: ArrayView2<Field>,
-        Q: &Vec<usize>,
-    ) -> Vec<Array1<Field>> {
-        Q.iter().map(|j| {
-            p.genrows()
-                .into_iter()
-                .map(|pi| {
-                    self.peval3(pi.view(), j+1)
-                })
-                .collect()
-        }).collect()
-    }
-
-    #[allow(non_snake_case)]
-    pub fn codeword_to_coeffs(&self,
-        U: ArrayView2<Field>,
-        size: usize,
-    ) -> Array2<Field> {
-        let mut p = Array2::zeros((self.m, size));
-
-        ndarray::Zip::from(p.genrows_mut())
-            .and(U.genrows())
-            .apply(|mut pi0, Ui| {
-                let pi = self.fft3_inverse(Ui.view());
-                pi0.assign(&pad_or_unpad(pi.view(), size));
-            });
-
-        p
-    }
-
-    pub fn word_to_coeffs(&self, w: ArrayView1<Field>) -> Array2<Field> {
-        let mut p = Array2::zeros((self.m, self.k+1));
-
-        ndarray::Zip::from(p.genrows_mut())
-            .and(w.exact_chunks(self.l))
-            .apply(|mut pi0, wi| {
-                pi0.assign(&self.fft2_inverse(wi.view()));
-            });
-
-        p
     }
 
     #[allow(non_snake_case)]

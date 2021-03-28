@@ -48,9 +48,6 @@ impl<H: MerkleHash> merkle_cbt::merkle_tree::Merge for MHMerge<H> {
 pub fn hash_column<H: MerkleHash>(a: ArrayView1<Field>) -> H::Digest {
     let mut hash = H::new();
 
-    //hash.update(&a.iter()
-    //    .flat_map(|f| f.bytes())
-    //    .collect::<Vec<u8>>());
     a.iter().for_each(|f| hash.update(&f.bytes()));
 
     let mut res = H::digest_into_bytes(&H::HZERO);

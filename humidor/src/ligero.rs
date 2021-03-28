@@ -1,4 +1,4 @@
-use ndarray::{Array1, Array2, ArrayView1};
+use ndarray::{Array1, Array2};
 use sprs::{CsMat, TriMat};
 use rand::{SeedableRng, rngs::StdRng};
 
