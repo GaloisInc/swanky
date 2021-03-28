@@ -64,11 +64,15 @@ impl Params {
         // Have: sz, t
         // Want:
         //      k^2 >= sz
-        //      k = l + t = 2^j - 1 for some j, 1 < j <= PHI_2_EXP
+        //      k = l + t = 2^j - 1 for some j, 1 < j < PHI_2_EXP
         //      t ~ log(|Field|)
         //      n > l; n = 3^i - 1 for some i, 1 < i <= PHI_3_EXP
+        //
+        // Note: Using j < PHI_2_EXP, rather than j <= PHI_2_EXP, allows us
+        // to multiply polynomials in O(d log d) time (see pmul2). We could
+        // avoid this at the cost of some performance by using fft3 instead.
         let t = Field::BITS;
-        let (kexp, nexp, k, l, n, m) = (0 ..= Field::PHI_2_EXP as u32)
+        let (kexp, nexp, k, l, n, m) = (0 .. Field::PHI_2_EXP as u32)
             .into_iter()
             .map(|kexp| (kexp, 2usize.pow(kexp) - 1))
             .filter(|&(_,k)| k as usize > t)
@@ -94,9 +98,6 @@ impl Params {
                 share_count: n,
                 secret_count: l,
 
-                //prime: Field::MOD as i128,
-                //omega_secrets: Field::ROOTS_BASE_2[kexp as usize] as i128,
-                //omega_shares: Field::ROOTS_BASE_3[nexp as usize] as i128,
                 omega_secrets: Field::from(Field::ROOTS_BASE_2[kexp as usize]),
                 omega_shares: Field::from(Field::ROOTS_BASE_3[nexp as usize]),
             }
@@ -111,26 +112,20 @@ impl Params {
     pub fn encode(&self, wf: ArrayView1<Field>) -> Array1<Field> {
         debug_assert_eq!(wf.len(), self.l);
 
-        //let w: Vec<i128> = wf.iter().cloned().map(i128::from).collect();
-        //let c: Vec<i128> = self.pss.share(&w);
         Array1::from(self.pss.share(&wf.to_vec()))
-
-        //c.iter().cloned().map(Field::from).collect()
     }
 
     #[inline]
     pub fn decode(&self, cf: ArrayView1<Field>) -> Array1<Field> {
         debug_assert_eq!(cf.len(), self.n);
 
-        //let c: Vec<i128> = cf.iter().take(self.k).cloned().map(i128::from).collect();
         let c0: Vec<_> = cf.iter().take(self.k).cloned().collect();
         let ixs: Vec<usize> = (0 .. self.k).collect();
-        //let w: Vec<i128> = self.pss.reconstruct(&ixs, &c);
-        Array1::from(self.pss.reconstruct(&ixs, &c0))
 
-        //w.iter().cloned().map(Field::from).collect()
+        Array1::from(self.pss.reconstruct(&ixs, &c0))
     }
 
+    #[allow(dead_code)]
     #[inline]
     fn decode_part(&self,
         ixs: &[usize],
@@ -139,11 +134,7 @@ impl Params {
         debug_assert!(cf.len() <= self.n);
         debug_assert!(cf.len() >= self.k);
 
-        //let c: Vec<i128> = cf.iter().cloned().map(i128::from).collect();
-        //let w: Vec<i128> = self.pss.reconstruct(ixs, &c);
         Array1::from(self.pss.reconstruct(ixs, &cf.to_vec()))
-
-        //w.iter().cloned().map(Field::from).collect()
     }
 
     #[inline]
@@ -279,6 +270,38 @@ impl Params {
 
     pub fn peval3(&self, p: ArrayView1<Field>, ix: usize) -> Field {
         crate::util::peval(p, Field::from(self.pss.omega_shares).pow(ix as u64))
+    }
+
+    // Take two polynomials p and q of degree less than 2^kexp and produce a
+    // polynomial s of degree less than 2^(kexp+1)-1 s.t. s(.) = p(.) * q(.).
+    pub fn pmul2(&self,
+        p: ArrayView1<Field>,
+        q: ArrayView1<Field>
+    ) -> Array1<Field> {
+        debug_assert!(p.len() <= 2usize.pow(self.kexp));
+        debug_assert!(q.len() <= 2usize.pow(self.kexp));
+
+        let p_deg = p.len();
+        let q_deg = q.len();
+        let mut p_coeffs = p.to_vec();
+        let mut q_coeffs = q.to_vec();
+
+        let max_deg = 2usize.pow(self.kexp + 1);
+        let pq_deg = p_deg + q_deg - 1;
+        let omega = Field::from(Field::ROOTS_BASE_2[self.kexp as usize + 1]);
+
+        p_coeffs.append(&mut vec![Field::ZERO; max_deg - p_deg]);
+        q_coeffs.append(&mut vec![Field::ZERO; max_deg - q_deg]);
+
+        let p_points = crate::numtheory::fft2(&p_coeffs, omega);
+        let q_points = crate::numtheory::fft2(&q_coeffs, omega);
+        let pq_points = p_points.iter()
+            .zip(q_points)
+            .map(|(&pi,qi)| pi * qi)
+            .collect::<Vec<_>>();
+        let pq_coeffs = crate::numtheory::fft2_inverse(&pq_points, omega);
+
+        pq_coeffs.iter().take(pq_deg).cloned().collect()
     }
 
     #[allow(non_snake_case)]
@@ -517,7 +540,30 @@ proptest! {
         for i in 0 .. u.len() {
             prop_assert_eq!(
                 p.peval2(uv_coeffs.view(), i+1),
-                Field::from(u[i] * v[i])
+                u[i] * v[i]
+            );
+        }
+    }
+
+    #[test]
+    fn test_pmul2(
+        (p, u, v) in any::<Params>().prop_flat_map(|p| {
+            (1..=p.k+1, 1..=p.k+1).prop_flat_map(move |(ulen, vlen)| {
+                let u_coeffs = pvec(any::<Field>(), ulen);
+                let v_coeffs = pvec(any::<Field>(), vlen);
+                (Just(p), u_coeffs, v_coeffs)
+            })
+        })
+    ) {
+        let u_coeffs = Array1::from(u);
+        let v_coeffs = Array1::from(v);
+        let uv_coeffs = p.pmul2(u_coeffs.view(), v_coeffs.view());
+
+        for i in 0 .. p.n {
+            prop_assert_eq!(
+                p.peval3(uv_coeffs.view(), i),
+                p.peval3(ArrayView1::from(&u_coeffs), i)
+                    * p.peval3(ArrayView1::from(&v_coeffs), i)
             );
         }
     }

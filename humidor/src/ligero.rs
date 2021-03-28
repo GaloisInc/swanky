@@ -141,7 +141,11 @@ impl Secret {
         let mut x = Array1::zeros(ml);
         let mut y = Array1::zeros(ml);
         let mut z = Array1::zeros(ml);
-        let w = pad_array(ArrayView1::from(&c.eval(&inp)), ml);
+        let w: Array1<_> = c.eval(&inp)
+            .iter()
+            .cloned()
+            .chain(vec![Field::ZERO; ml - c.size()])
+            .collect();
 
         for (s, op) in c.ops.iter().enumerate() {
             if let Op::Mul(i, j) = *op {
@@ -358,32 +362,45 @@ pub mod interactive {
             Ua.genrows()
                 .into_iter()
                 .map(|points|
-                    pad_or_unpad(P.fft3_inverse(points).view(), P.k+1)) // deg < l - 1
-                .collect::<Vec<Array1<Field>>>()
+                    P.fft3_inverse(points) // deg < k + 1
+                    .iter()
+                    .take(P.k+1)
+                    .cloned()
+                    .collect::<Array1<Field>>())
+                .collect::<Vec<_>>()
         }
 
         #[allow(non_snake_case)]
         fn make_qadd(&self,
-            p: &Vec<Array1<Field>>,
+            p: &Vec<Array1<Field>>, // deg < k + 1
             Padd: &CsMat<Field>,
             r1_radd: Array1<Field>,
         ) -> Array1<Field> {
             let s = &self.secret;
             let P = s.public.params;
 
-            // Testing addition gates
-            let radd_blind = P.fft3_inverse(s.uadd.view()); // deg < k + l - 1 (?)
-            let radd = make_ra(&P, &r1_radd, &Padd);
-            let radd_p = radd.iter().zip(p.clone())
-                .fold(Array1::zeros(2*(P.k+1)), |acc, (radd_i, p_i)|
-                    acc + pmul(radd_i.view(), p_i.view()));
+            let radd_blind = P.fft3_inverse(s.uadd.view()) // deg < k + 1
+                .iter()
+                .take(P.k + 1)
+                .cloned()
+                .collect::<Array1<Field>>();
+            let radd = make_ra(&P, &r1_radd, &Padd) // deg < l
+                .iter()
+                .map(|ra_i| ra_i.iter().take(P.l).cloned().collect::<Array1<_>>())
+                .collect::<Vec<_>>();
 
-            pad_or_unpad(radd_blind.view(), 2*(P.k+1)) + radd_p
+            radd.iter().zip(p.clone())
+                .fold(radd_blind, |acc, (radd_i, p_i)|
+                    padd(
+                        acc.view(),
+                        P.pmul2(
+                            radd_i.view(),
+                            p_i.view()).view())) // deg < k + l
         }
 
         #[allow(non_snake_case)]
         fn make_qa(&self,
-            p: &Vec<Array1<Field>>,
+            p: &Vec<Array1<Field>>, // deg < k + 1
             Pa: &CsMat<Field>,
             Ua: &Array2<Field>,
             ua: &Array1<Field>,
@@ -391,45 +408,69 @@ pub mod interactive {
         ) -> Array1<Field> {
             let P = self.secret.public.params;
 
-            let ra = make_ra_Iml_Pa_neg(&P, &r1_ra, &Pa);
+            let ra = make_ra_Iml_Pa_neg(&P, &r1_ra, &Pa) // deg < l
+                .iter()
+                .map(|ra_i| ra_i
+                    .iter()
+                    .take(P.l)
+                    .cloned()
+                    .collect::<Array1<Field>>())
+                .collect::<Vec<_>>();
             let pa = Ua.genrows()
                 .into_iter()
-                .map(|points|
-                    pad_or_unpad(P.fft3_inverse(points).view(), P.k+1)) // deg < l - 1
-                .collect::<Vec<Array1<Field>>>();
-            let ra_blind = P.fft3_inverse(ua.view());
-            let ra_pa_p = ra.iter()
-                .zip(pa.iter().chain(p.clone().iter()))
-                .fold(Array1::zeros(2*(P.k+1)), |acc: Array1<Field>, (ri, pi)|
-                    acc + pmul(ri.view(), pi.view()));
+                .map(|points| P.fft3_inverse(points) // deg < k + 1
+                    .iter()
+                    .take(P.k+1)
+                    .cloned()
+                    .collect::<Array1<Field>>())
+                .collect::<Vec<_>>();
+            let ra_blind = P.fft3_inverse(ua.view()) // deg < k + l
+                .iter()
+                .take(P.k + P.l)
+                .cloned()
+                .collect::<Array1<Field>>();
 
-            pad_or_unpad(ra_blind.view(), 2*(P.k+1)) + ra_pa_p
+            ra.iter()
+                .zip(pa.iter().chain(p.clone().iter()))
+                .fold(ra_blind, |acc, (ri, pi)|
+                    padd(
+                        acc.view(),
+                        P.pmul2(
+                            ri.view(),
+                            pi.view()).view())) // deg < k + l
         }
 
         #[allow(non_snake_case)]
         fn make_p0(&self,
             u0: &Array1<Field>,
-            px: &Vec<Array1<Field>>,
-            py: &Vec<Array1<Field>>,
-            pz: &Vec<Array1<Field>>,
+            px: &Vec<Array1<Field>>, // deg < k + 1
+            py: &Vec<Array1<Field>>, // deg < k + 1
+            pz: &Vec<Array1<Field>>, // deg < k + 1
             r1_rq: Array1<Field>,
         ) -> Array1<Field> {
             let P = self.secret.public.params;
 
-            let r0_blind = pad_or_unpad(P.fft3_inverse(u0.view()).view(), 2*(P.k+1));
-            let rq_px_py_pz = r1_rq.iter()
-                .zip(px.iter())
-                .zip(py.iter())
-                .zip(pz.iter())
-                .fold(Array1::zeros(2*(P.k+1)),
-                    |acc, (((&rq_i, px_i), py_i), pz_i)| {
-                        let pxy_i = pmul(px_i.view(), py_i.view());
-                        let pz0_i = pad_or_unpad(pz_i.view(), 2*(P.k+1));
+            let r0_blind = P.fft3_inverse(u0.view()) // deg < 2k + 1
+                .iter()
+                .take(2*P.k + 1)
+                .cloned()
+                .collect::<Array1<Field>>();
 
-                        acc + ((pxy_i - pz0_i) * rq_i)
-                    });
-
-            r0_blind + rq_px_py_pz
+            r1_rq.iter()
+                .zip(px)
+                .zip(py)
+                .zip(pz)
+                .fold(r0_blind, |acc, (((&rq_i, px_i), py_i), pz_i)| {
+                    padd(
+                        acc.view(),
+                        std::ops::Mul::mul(
+                            psub(
+                                P.pmul2(
+                                    px_i.view(),
+                                    py_i.view()).view(),
+                                pz_i.view()),
+                            rq_i).view()) // deg < 2k + 1
+                })
         }
 
         #[allow(non_snake_case)]

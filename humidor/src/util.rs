@@ -3,7 +3,11 @@ use ndarray::{Array1, ArrayView1};
 type Field = crate::f2_19x3_26::F;
 
 // Given polynomials `p` and `q`, with `deg(p) < n` and `deg(q) < m`, return
-// the `n`-degree polynomial `r` with `r(x) = p(x)*q(x)`.
+// the `n+m`-degree polynomial `r` with `r(x) = p(x)*q(x)`.
+//
+// N.b.: This is the naive `O(n^2) algorithm. For `O(n log n)` performance on
+// polynomials of degree less than `k+1`, use `Params::pmul2`.
+#[allow(dead_code)]
 pub fn pmul(p: ArrayView1<Field>, q: ArrayView1<Field>) -> Array1<Field> {
     let mut r = Array1::zeros(p.len() + q.len());
 
@@ -14,6 +18,40 @@ pub fn pmul(p: ArrayView1<Field>, q: ArrayView1<Field>) -> Array1<Field> {
     }
 
     r
+}
+
+// Given polynomials `p` with `deg(p) < n` and `q` with `deg(q) < m`, return
+// the polynomial `r` with `deg(r) < max(n,m)` and `r(.) = p(.) + q(.)`.
+pub fn padd(p: ArrayView1<Field>, q: ArrayView1<Field>) -> Array1<Field> {
+    let r_len = std::cmp::max(p.len(), q.len());
+
+    let p0: Array1<_> = p.iter()
+        .cloned()
+        .chain(vec![Field::ZERO; r_len - p.len()])
+        .collect();
+    let q0: Array1<_> = q.iter()
+        .cloned()
+        .chain(vec![Field::ZERO; r_len - q.len()])
+        .collect();
+
+    p0 + q0
+}
+
+// Given polynomials `p` with `deg(p) < n` and `q` with `deg(q) < m`, return
+// the polynomial `r` with `deg(r) < max(n,m)` and `r(.) = p(.) - q(.)`.
+pub fn psub(p: ArrayView1<Field>, q: ArrayView1<Field>) -> Array1<Field> {
+    let r_len = std::cmp::max(p.len(), q.len());
+
+    let p0: Array1<_> = p.iter()
+        .cloned()
+        .chain(vec![Field::ZERO; r_len - p.len()])
+        .collect();
+    let q0: Array1<_> = q.iter()
+        .cloned()
+        .chain(vec![Field::ZERO; r_len - q.len()])
+        .collect();
+
+    p0 - q0
 }
 
 // Evaluate a polynomial, represented by its coefficients, at a point `x`.
