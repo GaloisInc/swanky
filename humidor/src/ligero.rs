@@ -528,7 +528,7 @@ mod interactive {
             use ndarray::{stack, Axis};
 
             let P = self.public.params;
-            //let r0 = self.r0.expect("Round 0 skipped");
+            let r0 = self.r0.expect("Round 0 skipped");
             let r1 = self.r1.clone().expect("Round 1 skipped");
             let r2 = self.r2.clone().expect("Round 2 skipped");
             let r3 = self.r3.clone().expect("Round 3 skipped");
@@ -593,8 +593,12 @@ mod interactive {
                 .all(|((((&j, &u0_j), Ux_j), Uy_j), Uz_j)| {
                     let Uxyz = point_product(Ux_j.view(), Uy_j.view()) + Uz_j;
                     u0_j + r1.rq.dot(&Uxyz) == P.peval3(r2.p0.view(), j)
-                })
+                }) &&
             // Check column hashes
+            r4.Uw_lemma.verify(&r0.Uw_root) &&
+            r4.Ux_lemma.verify(&r0.Ux_root) &&
+            r4.Uy_lemma.verify(&r0.Uy_root) &&
+            r4.Uz_lemma.verify(&r0.Uz_root)
         }
     }
 
