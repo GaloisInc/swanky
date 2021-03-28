@@ -216,7 +216,7 @@ impl std::fmt::Display for F {
 
 impl rand::distributions::Distribution<F> for rand::distributions::Standard {
     fn sample<R: rand::Rng + ?Sized>(&self, rng: &mut R) -> F {
-        F::from(rng.next_u64() as i128)
+        F(rng.gen_range(0..F::MOD))
     }
 }
 

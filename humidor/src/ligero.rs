@@ -647,7 +647,7 @@ pub mod interactive {
     proptest! {
         #[test]
         fn test_interactive_proof(
-            (ckt, w) in any_with::<Ckt>((5, 5)).prop_flat_map(|ckt| {
+            (ckt, w) in any_with::<Ckt>((20, 1000)).prop_flat_map(|ckt| {
                 let w = pvec(any::<Field>(), ckt.inp_size);
                 (Just(ckt), w)
             })
