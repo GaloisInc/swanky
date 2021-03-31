@@ -54,7 +54,7 @@ use ocelot::{
 
 use std::time::SystemTime;
 use rand::{CryptoRng, Rng, RngCore, SeedableRng};
-use scuttlebutt::{AbstractChannel, Block, Block512};
+use scuttlebutt::{AbstractChannel, Block, Block512, SemiHonest};
 
 use serde_json;
 
@@ -178,7 +178,7 @@ impl Sender {
 
         let (aggregate, sum_weights) = self.compute_payload(ts_id, ts_payload, table, payload, &path_deltas, channel, rng).unwrap();
         let weighted_mean = gb.crt_div(&aggregate, &sum_weights).unwrap();
-
+        println!("Done");
         gb.outputs(&weighted_mean.wires().to_vec()).unwrap();
         Ok(())
     }
@@ -224,7 +224,7 @@ impl Sender {
 
             acc = gb.crt_add(&acc, &partial).unwrap();
             sum_weights = gb.crt_add(&sum_weights, &partial_sum_weights).unwrap();
-
+            
             println!(
                 "Sender :: Computation time: {} ms",
                 start.elapsed().unwrap().as_millis()
@@ -858,4 +858,169 @@ fn fancy_compute_payload_aggregate<F: fancy_garbling::FancyReveal + Fancy>(
         sum_weights = f.crt_add(&sum_weights, &mux_sum_weights)?;
     }
     Ok((acc, sum_weights))
+}
+
+impl SemiHonest for Sender {}
+impl SemiHonest for Receiver {}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::utils::{rand_u64_vec, int_vec_block512, enum_ids_shuffled};
+    use scuttlebutt::{AesRng, Block512, Channel, TcpChannel};
+    use std::{
+        io::{BufReader, BufWriter, Write},
+        os::unix::net::UnixStream,
+        convert::TryInto,
+        collections::HashMap,
+        fs::{File},
+        net::{TcpStream, TcpListener},
+    };
+    use fancy_garbling::util::{generate_deltas};
+
+    const ITEM_SIZE: usize = 8;
+
+    pub fn weighted_mean_clear(ids_client: &[Vec<u8>], ids_server: &[Vec<u8>],
+                        payloads_client: &[Block512], payloads_server: &[Block512]) -> u128{
+
+        let client_len = ids_client.len();
+        let server_len = ids_server.len();
+        let mut weighted_payload = 0;
+        let mut sum_weights = 0;
+
+        let mut sever_elements = HashMap::new();
+        for i in 0..server_len{
+            let id_server: &[u8] = &ids_server[i];
+            let id_server: [u8; 8] = id_server.try_into().unwrap();
+            let id_server = u64::from_le_bytes(id_server);
+            let server_val = u64::from_le_bytes(payloads_server[i].prefix(8).try_into().unwrap());
+            sever_elements.insert(
+                id_server,
+                server_val,
+            );
+        }
+
+        for i in 0..client_len{
+            let id_client: &[u8] = &ids_client[i];
+            let id_client: [u8; 8] = id_client.try_into().unwrap();
+            let id_client = u64::from_le_bytes(id_client);
+            if sever_elements.contains_key(&id_client){
+                // Assumes values are 64 bit long
+                let client_val = u64::from_le_bytes(payloads_client[i].prefix(8).try_into().unwrap());
+                weighted_payload = weighted_payload + client_val*sever_elements.get(&id_client).unwrap();
+                sum_weights = sum_weights + sever_elements.get(&id_client).unwrap();
+            }
+        }
+        weighted_payload as u128 / sum_weights as u128
+    }
+
+    #[test]
+    fn test_psty_payload() {
+        let set_size_sx: usize = 1 << 10;
+        let set_size_rx: usize = 1 << 10;
+
+        let weight_max: u64 = 100000;
+        let payload_max: u64 = 100000;
+
+        let mut rng = AesRng::new();
+
+        let (sender, receiver) = UnixStream::pair().unwrap();
+
+        let sender_inputs = enum_ids_shuffled(set_size_sx, ITEM_SIZE);
+        let receiver_inputs = enum_ids_shuffled(set_size_rx, ITEM_SIZE);
+        let weights = int_vec_block512(rand_u64_vec(set_size_sx, weight_max, &mut rng));
+        let payloads = int_vec_block512(rand_u64_vec(set_size_rx, payload_max, &mut rng));
+
+        let result_in_clear = weighted_mean_clear(&receiver_inputs.clone(), &sender_inputs.clone(), &payloads.clone(), &weights.clone());
+
+        std::thread::spawn(move || {
+            let mut rng = AesRng::new();
+
+            let reader = BufReader::new(sender.try_clone().unwrap());
+            let writer = BufWriter::new(sender);
+            let mut channel = Channel::new(reader, writer);
+
+            let mut psi = Sender::init(&mut channel, &mut rng).unwrap();
+
+            // For small to medium sized sets where batching can occur accross all bins
+            let _ = psi.full_protocol(&sender_inputs, &weights, &mut channel, &mut rng).unwrap();
+        });
+
+        let mut rng = AesRng::new();
+        let reader = BufReader::new(receiver.try_clone().unwrap());
+        let writer = BufWriter::new(receiver);
+        let mut channel = Channel::new(reader, writer);
+
+        let mut psi = Receiver::init(&mut channel, &mut rng).unwrap();
+        // For small to medium sized sets where batching can occur accross all bins
+        let weighted_mean = psi
+            .full_protocol(&receiver_inputs, &payloads, &mut channel, &mut rng).unwrap();
+
+        assert_eq!(result_in_clear, weighted_mean);
+    }
+    #[test]
+    fn test_psty_payload_large(){
+        let set_size_sx: usize = 1 << 11;
+        let set_size_rx: usize = 1 << 11;
+
+        let weight_max: u64 = 100000;
+        let payload_max: u64 = 100000;
+        let megasize = 1 << 10;
+
+        let mut rng = AesRng::new();
+
+        let sender_inputs = enum_ids_shuffled(set_size_sx, ITEM_SIZE);
+        let receiver_inputs = enum_ids_shuffled(set_size_rx, ITEM_SIZE);
+        let weights = int_vec_block512(rand_u64_vec(set_size_sx, weight_max, &mut rng));
+        let payloads = int_vec_block512(rand_u64_vec(set_size_rx, payload_max, &mut rng));
+
+        let result_in_clear = weighted_mean_clear(&receiver_inputs.clone(), &sender_inputs.clone(), &payloads.clone(), &weights.clone());
+
+        let qs = fancy_garbling::util::primes_with_width(65);
+        let deltas = generate_deltas(&qs);
+        let deltas_json = serde_json::to_string(&deltas).unwrap();
+
+        let path_delta = "./deltas.txt".to_owned();
+        let mut file_deltas = File::create(&path_delta).unwrap();
+        file_deltas.write(deltas_json.as_bytes()).unwrap();
+
+        std::thread::spawn(move || {
+            let listener = TcpListener::bind("127.0.0.1:3000").unwrap();
+            for stream in listener.incoming() {
+                match stream {
+                    Ok(stream) => {
+                            let mut channel = TcpChannel::new(stream);
+                            let mut rng = AesRng::new();
+
+                            let mut psi = Sender::init(&mut channel, &mut rng).unwrap();
+                            let _ = psi
+                                .full_protocol_large(&sender_inputs, &weights, &path_delta,&mut channel, &mut rng)
+                                .unwrap();
+                                println!("Done");
+                                return;
+                        }
+                        Err(e) => {
+                            println!("Error: {}", e);
+                        }
+                    }
+                }
+                drop(listener);
+        });
+        match TcpStream::connect("127.0.0.1:3000") {
+            Ok(stream) => {
+                let mut channel = TcpChannel::new(stream);
+                let mut rng = AesRng::new();
+                let mut psi = Receiver::init(&mut channel, &mut rng).unwrap();
+
+                // For large examples where computation should be batched per-megabin instead of accross all bins.
+                let weighted_mean = psi
+                    .full_protocol_large(&receiver_inputs, &payloads, megasize,&mut channel, &mut rng)
+                    .unwrap();
+                assert_eq!(result_in_clear, weighted_mean);
+            },
+            Err(e) => {
+                println!("Failed to connect: {}", e);
+            }
+        }
+    }
 }
