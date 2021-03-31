@@ -4,7 +4,7 @@
 // Copyright © 2019 Galois, Inc.
 // See LICENSE for licensing information.
 
-use rand::{CryptoRng, Rng};
+use rand::{CryptoRng, Rng, thread_rng, seq::SliceRandom};
 use scuttlebutt::{AesHash, Block, Block512};
 use sha2::{Digest, Sha256};
 use std::{
@@ -83,6 +83,24 @@ pub fn rand_vec<RNG: CryptoRng + Rng>(n: usize, rng: &mut RNG) -> Vec<u8> {
 pub fn rand_vec_vec<RNG: CryptoRng + Rng>(n: usize, m: usize, rng: &mut RNG) -> Vec<Vec<u8>> {
     (0..n).map(|_| rand_vec(m, rng)).collect()
 }
+#[allow(dead_code)]
+pub fn rand_u64_vec<RNG: CryptoRng + Rng>(n: usize, modulus: u64, rng: &mut RNG) -> Vec<u64>{
+    (0..n).map(|_|rng.gen::<u64>()%modulus).collect()
+}
+
+#[allow(dead_code)]
+pub fn enum_ids_shuffled(n: usize, id_size: usize) ->Vec<Vec<u8>>{
+    let mut vec: Vec<u64> = (0..n as u64).collect();
+    vec.shuffle(&mut thread_rng());
+    let mut ids = Vec::with_capacity(n);
+    for i in 0..n{
+        let v:Vec<u8> = vec[i].to_le_bytes().iter().take(id_size).cloned().collect();
+        ids.push(v);
+    }
+    ids
+}
+
+
 
 #[cfg(test)]
 mod tests {

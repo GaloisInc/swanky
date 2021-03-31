@@ -52,6 +52,11 @@ name = "psty"
 harness = false
 required-features = ["psty"]
 
+[[bench]]
+name = "psty_payload"
+harness = false
+required-features = ["psty_payload"]
+
 [[example]]
 name = "psty"
 required-features = ["psty"]
@@ -78,7 +83,6 @@ required-features = ["psty_payload"]
 name = "run_server"
 path = "examples/match-compute-parallel/server/run_server.rs"
 required-features = ["psty_payload"]
-
 [[example]]
 name = "run_client"
 path = "examples/match-compute-parallel/client/run_client.rs"

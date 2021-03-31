@@ -224,7 +224,7 @@ impl Sender {
 
             acc = gb.crt_add(&acc, &partial).unwrap();
             sum_weights = gb.crt_add(&sum_weights, &partial_sum_weights).unwrap();
-            
+
             println!(
                 "Sender :: Computation time: {} ms",
                 start.elapsed().unwrap().as_millis()
@@ -450,8 +450,6 @@ impl Receiver {
 
 
         let weighted_mean = fancy_garbling::util::crt_inv(&weighted_mean_outs, &qs);
-
-        println!("Weighted Mean = {:?}", weighted_mean);
         channel.flush()?;
 
         Ok(weighted_mean)
@@ -480,7 +478,6 @@ impl Receiver {
             .expect("evaluator should produce outputs");
         let weighted_mean = fancy_garbling::util::crt_inv(&weighted_mean_outs, &qs);
 
-        println!("Weighted Mean = {:?}", weighted_mean);
         channel.flush()?;
 
         Ok(weighted_mean)
