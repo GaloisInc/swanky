@@ -186,7 +186,7 @@ fn bench_psi(c: &mut Criterion) {
     c.bench_function("psi::PSTY PAYLOAD (n = 2^20)", move |bench| {
         let mut rng = AesRng::new();
         let rs = rand_vec_vec(1 << 20);
-        let payload = int_vec_block512(rand_u64_vec(1 << 16, 1 << 30, &mut rng));
+        let payload = int_vec_block512(rand_u64_vec(1 << 20, 1 << 30, &mut rng));
         let megasize = 100000;
         bench.iter(|| {
             let v = bench_psty_payload_large(rs.clone(), rs.clone(), payload.clone(), payload.clone(), megasize);
