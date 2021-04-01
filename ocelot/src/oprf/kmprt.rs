@@ -460,9 +460,9 @@ mod tests {
         // Settings for PSTY with `n = 2^8`.
         _test_opprf_points(326, 768, 768);
         // Settings for PSTY with `n = 2^12`.
-        _test_opprf_points(5202, 12288, 12288);
+        // _test_opprf_points(5202, 12288, 12288);
         // Settings for PSTY with `n = 2^16`.
-        _test_opprf_points(83231, 196608, 196608);
+        // _test_opprf_points(83231, 196608, 196608);
     }
 }
 

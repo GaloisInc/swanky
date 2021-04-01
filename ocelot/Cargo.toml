@@ -22,7 +22,6 @@ curve25519-dalek = { version = "2", features = ["std"] }
 libc = "0.2"
 rand = "0.7"
 scuttlebutt = { path = "../scuttlebutt", features = ["curve25519-dalek"] }
-itertools = "0.8.0"
 
 [build-dependencies]
 cc = "1.0"

@@ -14,7 +14,7 @@ debug-assertions = false
 overflow-checks = false
 
 [profile.dev]
-opt-level = 2
+opt-level = 0
 debug = true
 debug-assertions = true
 overflow-checks = true
@@ -26,7 +26,7 @@ debug-assertions = false
 overflow-checks = false
 
 [profile.test]
-opt-level = 2
+opt-level = 0
 debug = true
 debug-assertions = true
 overflow-checks = true
