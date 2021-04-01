@@ -50,7 +50,3 @@ required-features = ["psty"]
 [[example]]
 name = "psty-payload"
 required-features = ["psty"]
-
-[[example]]
-name = "secretsister"
-required-features = ["psty"]
