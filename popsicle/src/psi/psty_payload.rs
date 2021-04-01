@@ -955,6 +955,7 @@ mod tests {
 
         assert_eq!(result_in_clear, weighted_mean);
     }
+
     #[test]
     fn test_psty_payload_large(){
         let set_size_sx: usize = 1 << 11;
@@ -977,7 +978,7 @@ mod tests {
         let deltas = generate_deltas(&qs);
         let deltas_json = serde_json::to_string(&deltas).unwrap();
 
-        let path_delta = "./deltas.txt".to_owned();
+        let path_delta = "./.deltas.txt".to_owned();
         let mut file_deltas = File::create(&path_delta).unwrap();
         file_deltas.write(deltas_json.as_bytes()).unwrap();
 
