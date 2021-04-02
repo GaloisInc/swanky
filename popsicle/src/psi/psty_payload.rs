@@ -26,6 +26,7 @@
 //
 // (1) Use ocelot's cuckoo hash (ch) instead of popsicle's: popsicle's current ch has a bug where
 //     it is always full and fails for certain numbers like 100,000 and larger powers of 10.
+//          -- Cuckoo hash is fixed - BC 4/2/21
 // (2) Once (1) is complete, revert handling megabins after the ch is done instead of during (and
 //     effectively get rid of the ch large structure and methods currently in popsicle/src/cuckoo)
 //     the current megabin handling is an artifact of older bugs that stalled the system for large sets
@@ -58,8 +59,6 @@ use ocelot::{
 use rand::{CryptoRng, Rng, RngCore, SeedableRng};
 use scuttlebutt::{AbstractChannel, Block, Block512, SemiHonest};
 use std::time::SystemTime;
-
-use serde_json;
 
 const NHASHES: usize = 3;
 // How many bytes of the hash to use for the equality tests. This affects
@@ -126,8 +125,8 @@ impl Sender {
         })
     }
 
-    // PSI with associated payloads for small to moderately sized sets without any parallelization
-    // features.
+    /// PSI with associated payloads for small to moderately sized sets without any
+    /// parallelization features.
     pub fn full_protocol<
         C: AbstractChannel,
         RNG: RngCore + CryptoRng + SeedableRng<Seed = Block>,
@@ -140,12 +139,6 @@ impl Sender {
     ) -> Result<(), Error> {
         let mut gb =
             Garbler::<C, RNG, OtSender>::new(channel.clone(), RNG::from_seed(rng.gen())).unwrap();
-
-        let qs = &fancy_garbling::util::PRIMES[..PAYLOAD_PRIME_SIZE_EXPANDED];
-
-        let deltas = fancy_garbling::util::generate_deltas(&qs);
-        let deltas_json = serde_json::to_string(&deltas).unwrap();
-        let _ = gb.load_deltas(&deltas_json);
 
         let (mut state, nbins, _, _) = self.bucketize_data(table, payloads, channel, rng)?;
 
