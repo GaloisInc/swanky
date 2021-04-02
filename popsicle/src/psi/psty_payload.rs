@@ -60,6 +60,11 @@ use rand::{CryptoRng, Rng, RngCore, SeedableRng};
 use scuttlebutt::{AbstractChannel, Block, Block512, SemiHonest};
 use std::time::SystemTime;
 
+use std::{
+    fs::File,
+    io::{BufRead, BufReader},
+};
+
 const NHASHES: usize = 3;
 // How many bytes of the hash to use for the equality tests. This affects
 // correctness, with a lower value increasing the likelihood of a false
@@ -336,7 +341,7 @@ impl Sender {
                 // long.
                 // In the case of a binary representation: the payload can be simply XORed
                 // with the target vector, the appropriately padded if need be.
-                payload[bin].push(fancy_garbling::util::mask_payload_crt(
+                payload[bin].push(mask_payload_crt(
                     *p,
                     ts_payload[bin],
                     rng,
@@ -934,15 +939,100 @@ fn fancy_compute_payload_aggregate<F: fancy_garbling::FancyReveal + Fancy>(
     Ok((acc, sum_weights))
 }
 
+// Assumes payloads are up to 64bit long i.e 8 bytes
+fn block512_to_crt(b: Block512) -> Vec<u16> {
+    let b_val = b.prefix(8);
+
+    let mut b_128 = [0_u8; 16];
+    b_128[..8].clone_from_slice(&b_val[..8]);
+
+    let q = fancy_garbling::util::primes_with_width(64);
+    fancy_garbling::util::crt(u128::from_le_bytes(b_128), &q)
+}
+
+// Assumes payloads are up to 64bit long
+// WRITE assumption more
+fn mask_payload_crt<RNG: rand::Rng + Sized>(
+    x: Block512,
+    y: Block512,
+    rng: &mut RNG,
+) -> Block512 {
+    let x_crt = block512_to_crt(x);
+    let y_crt = block512_to_crt(y);
+    let q = fancy_garbling::util::primes_with_width(64);
+    let mut res_crt = Vec::new();
+    for i in 0..q.len() {
+        res_crt.push((x_crt[i] + y_crt[i]) % q[i]);
+    }
+    let res = fancy_garbling::util::crt_inv(&res_crt, &q).to_le_bytes();
+    let mut block = [0_u8; 64];
+    for i in 0..64 {
+        if i < res.len() {
+            block[i] = res[i];
+        } else {
+            block[i] = rng.gen::<u8>(); // TODO: mod rest of prime
+        }
+    }
+    Block512::from(block)
+}
+
+pub fn parse_files(
+    id_position: usize,
+    payload_position: usize,
+    path: &str,
+) -> (Vec<Vec<u8>>, Vec<Block512>) {
+    let data = File::open(path).unwrap();
+
+    let buffer = BufReader::new(data).lines();
+
+    let mut ids = Vec::new();
+    let mut payloads = Vec::new();
+
+    let mut cnt = 0;
+    for line in buffer.enumerate() {
+        let line_split = line
+            .1
+            .unwrap()
+            .split(',')
+            .map(|item| item.to_string())
+            .collect::<Vec<String>>();
+        if cnt == 0 {
+            cnt += 1;
+        } else {
+            ids.push(
+                line_split[id_position]
+                    .parse::<u64>()
+                    .unwrap()
+                    .to_le_bytes()
+                    .to_vec(),
+            );
+            payloads.push(line_split[payload_position].parse::<u64>().unwrap());
+        }
+    }
+    (ids, int_vec_block512(payloads))
+}
+
+fn int_vec_block512(values: Vec<u64>) -> Vec<Block512> {
+    values
+        .into_iter()
+        .map(|item| {
+            let value_bytes = item.to_le_bytes();
+            let mut res_block = [0_u8; 64];
+            res_block[0..8].clone_from_slice(&value_bytes[..8]);
+            Block512::from(res_block)
+        })
+        .collect()
+}
+
 impl SemiHonest for Sender {}
 impl SemiHonest for Receiver {}
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::utils::{enum_ids_shuffled, int_vec_block512, rand_u64_vec};
+    use crate::utils::{rand_u64_vec};
     use fancy_garbling::util::generate_deltas;
-    use scuttlebutt::{AesRng, Block512, Channel, TcpChannel};
+    use scuttlebutt::{AesRng, Block512, Channel, SymChannel};
     use std::{
         collections::HashMap,
         convert::TryInto,
@@ -951,10 +1041,23 @@ mod tests {
         net::{TcpListener, TcpStream},
         os::unix::net::UnixStream,
     };
+    use rand::{thread_rng, prelude::SliceRandom};
 
     const ITEM_SIZE: usize = 8;
 
-    pub fn weighted_mean_clear(
+    fn enum_ids_shuffled(n: usize, id_size: usize) -> Vec<Vec<u8>> {
+        let mut vec: Vec<u64> = (0..n as u64).collect();
+        vec.shuffle(&mut thread_rng());
+        let mut ids = Vec::with_capacity(n);
+        for i in 0..n {
+            let v: Vec<u8> = vec[i].to_le_bytes().iter().take(id_size).cloned().collect();
+            ids.push(v);
+        }
+        ids
+    }
+
+
+    fn weighted_mean_clear(
         ids_client: &[Vec<u8>],
         ids_server: &[Vec<u8>],
         payloads_client: &[Block512],
@@ -1079,7 +1182,7 @@ mod tests {
             for stream in listener.incoming() {
                 match stream {
                     Ok(stream) => {
-                        let mut channel = TcpChannel::new(stream);
+                        let mut channel = SymChannel::new(stream);
                         let mut rng = AesRng::new();
 
                         let mut psi = Sender::init(&mut channel, &mut rng).unwrap();
@@ -1104,7 +1207,7 @@ mod tests {
         });
         match TcpStream::connect("127.0.0.1:3000") {
             Ok(stream) => {
-                let mut channel = TcpChannel::new(stream);
+                let mut channel = SymChannel::new(stream);
                 let mut rng = AesRng::new();
                 let mut psi = Receiver::init(&mut channel, &mut rng).unwrap();
 

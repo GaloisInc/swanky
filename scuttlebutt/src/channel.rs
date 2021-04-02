@@ -6,14 +6,12 @@
 
 mod hash_channel;
 mod sync_channel;
-mod tcp_channel;
 mod track_channel;
 #[cfg(unix)]
 mod unix_channel;
 
 pub use hash_channel::HashChannel;
 pub use sync_channel::SyncChannel;
-pub use tcp_channel::TcpChannel;
 pub use track_channel::TrackChannel;
 
 #[cfg(unix)]
@@ -259,6 +257,44 @@ impl<R: Read, W: Write> AbstractChannel for Channel<R, W> {
         Self {
             reader: self.reader.clone(),
             writer: self.writer.clone(),
+        }
+    }
+}
+
+/// Standard Read/Write channel built from a symmetric stream.
+pub struct SymChannel<S> {
+    stream: Rc<RefCell<S>>,
+}
+
+impl <S: Read + Write> SymChannel<S> {
+    /// Make a new `Channel` from a stream.
+    pub fn new(stream: S) -> Self {
+        let stream = Rc::new(RefCell::new(stream));
+        Self { stream }
+    }
+}
+
+impl<S: Read + Write> AbstractChannel for SymChannel<S> {
+    #[inline(always)]
+    fn write_bytes(&mut self, bytes: &[u8]) -> Result<()> {
+        self.stream.borrow_mut().write_all(bytes)?;
+        Ok(())
+    }
+
+    #[inline(always)]
+    fn read_bytes(&mut self, mut bytes: &mut [u8]) -> Result<()> {
+        self.stream.borrow_mut().read_exact(&mut bytes)
+    }
+
+    #[inline(always)]
+    fn flush(&mut self) -> Result<()> {
+        self.stream.borrow_mut().flush()
+    }
+
+    #[inline(always)]
+    fn clone(&self) -> Self {
+        Self {
+            stream: self.stream.clone(),
         }
     }
 }
