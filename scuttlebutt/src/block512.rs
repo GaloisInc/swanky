@@ -220,6 +220,7 @@ impl TryFrom<&[u8]> for Block512 {
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
+#[cfg(feature = "serde")]
 #[derive(Serialize, Deserialize)]
 struct Helper {
     pub blocks: [Block; 4],
