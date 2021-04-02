@@ -6,12 +6,14 @@
 
 mod hash_channel;
 mod sync_channel;
+mod tcp_channel;
 mod track_channel;
 #[cfg(unix)]
 mod unix_channel;
 
 pub use hash_channel::HashChannel;
 pub use sync_channel::SyncChannel;
+pub use tcp_channel::TcpChannel;
 pub use track_channel::TrackChannel;
 
 #[cfg(unix)]
@@ -39,7 +41,6 @@ pub trait AbstractChannel {
     fn clone(&self) -> Self
     where
         Self: Sized;
-
     /// Read `nbytes` from the channel, and return it as a `Vec`.
     fn read_vec(&mut self, nbytes: usize) -> Result<Vec<u8>> {
         let mut data = vec![0; nbytes];
