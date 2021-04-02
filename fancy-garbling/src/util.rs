@@ -8,11 +8,11 @@
 //!
 //! Note: all number representations in this library are little-endian.
 
+use crate::Wire;
 use itertools::Itertools;
 use scuttlebutt::Block;
-use vectoreyes::{SimdBase, U64x2, U8x16};
 use std::collections::HashMap;
-use crate::Wire;
+use vectoreyes::{SimdBase, U64x2, U8x16};
 
 ////////////////////////////////////////////////////////////////////////////////
 // tweak functions for garbling

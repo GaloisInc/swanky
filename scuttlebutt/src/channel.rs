@@ -278,7 +278,7 @@ pub struct SymChannel<S> {
     stream: Rc<RefCell<S>>,
 }
 
-impl <S: Read + Write> SymChannel<S> {
+impl<S: Read + Write> SymChannel<S> {
     /// Make a new `Channel` from a stream.
     pub fn new(stream: S) -> Self {
         let stream = Rc::new(RefCell::new(stream));

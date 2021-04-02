@@ -40,14 +40,7 @@ use crate::{
 };
 use fancy_garbling::{
     twopac::semihonest::{Evaluator, Garbler},
-    BinaryBundle,
-    Bundle,
-    BundleGadgets,
-    CrtBundle,
-    CrtGadgets,
-    Fancy,
-    FancyInput,
-    Wire,
+    BinaryBundle, Bundle, BundleGadgets, CrtBundle, CrtGadgets, Fancy, FancyInput, Wire,
 };
 
 use itertools::Itertools;
@@ -341,11 +334,7 @@ impl Sender {
                 // long.
                 // In the case of a binary representation: the payload can be simply XORed
                 // with the target vector, the appropriately padded if need be.
-                payload[bin].push(mask_payload_crt(
-                    *p,
-                    ts_payload[bin],
-                    rng,
-                ));
+                payload[bin].push(mask_payload_crt(*p, ts_payload[bin], rng));
                 bins.push(bin);
             }
             // if j = H1(y) = H2(y) for some y, then P2 adds a uniformly random element to
@@ -966,11 +955,7 @@ fn block512_to_crt(b: Block512) -> Vec<u16> {
 
 // Assumes payloads are up to 64bit long
 // WRITE assumption more
-fn mask_payload_crt<RNG: rand::Rng + Sized>(
-    x: Block512,
-    y: Block512,
-    rng: &mut RNG,
-) -> Block512 {
+fn mask_payload_crt<RNG: rand::Rng + Sized>(x: Block512, y: Block512, rng: &mut RNG) -> Block512 {
     let x_crt = block512_to_crt(x);
     let y_crt = block512_to_crt(y);
     let q = fancy_garbling::util::primes_with_width(64);
@@ -1045,8 +1030,9 @@ impl SemiHonest for Receiver {}
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::utils::{rand_u64_vec};
+    use crate::utils::rand_u64_vec;
     use fancy_garbling::util::generate_deltas;
+    use rand::{prelude::SliceRandom, thread_rng};
     use scuttlebutt::{AesRng, Block512, Channel, SymChannel};
     use std::{
         collections::HashMap,
@@ -1056,7 +1042,6 @@ mod tests {
         net::{TcpListener, TcpStream},
         os::unix::net::UnixStream,
     };
-    use rand::{thread_rng, prelude::SliceRandom};
 
     const ITEM_SIZE: usize = 8;
 
@@ -1070,7 +1055,6 @@ mod tests {
         }
         ids
     }
-
 
     fn weighted_mean_clear(
         ids_client: &[Vec<u8>],

@@ -31,7 +31,7 @@ pub use crate::{
     },
     block::Block,
     block512::Block512,
-    channel::{AbstractChannel, Channel, HashChannel, SyncChannel, TrackChannel, SymChannel},
+    channel::{AbstractChannel, Channel, HashChannel, SymChannel, SyncChannel, TrackChannel},
     hash_aes::{AesHash, AES_HASH},
     rand_aes::AesRng,
 };
