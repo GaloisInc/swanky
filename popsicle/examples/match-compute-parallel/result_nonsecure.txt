@@ -1,3 +1,0 @@
-Aggregate in the clear: 568352965997.1971
-Cardinality in the clea: 100000
-Average in the clear: 5683529.659971971
