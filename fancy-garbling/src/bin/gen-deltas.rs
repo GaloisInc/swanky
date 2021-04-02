@@ -1,7 +1,6 @@
 extern crate fancy_garbling;
 
 use fancy_garbling::Wire;
-use serde_json;
 use std::collections::HashMap;
 
 fn main() {

@@ -411,7 +411,7 @@ impl Fancy for CircuitBuilder {
 
     fn output(&mut self, xref: &CircuitRef) -> Result<Option<u16>, Self::Error> {
         println!("output called");
-        self.circ.output_refs.push(xref.clone());
+        self.circ.output_refs.push(*xref);
         Ok(None)
     }
 }

@@ -378,16 +378,11 @@ pub fn generate_deltas(primes: &[u16]) -> HashMap<u16, Wire> {
 fn block512_to_crt(b: Block512) -> Vec<u16> {
     let b_val = b.prefix(8);
 
-    let mut b_128 = [0 as u8; 16];
-
-    // Loop over the 8 bytes of 64b b_val
-    for i in 0..8 {
-        b_128[i] = b_val[i];
-    }
+    let mut b_128 = [0_u8; 16];
+    b_128[..8].clone_from_slice(&b_val[..8]);
 
     let q = primes_with_width(64);
-    let b_crt = crt(u128::from_le_bytes(b_128), &q);
-    b_crt
+    crt(u128::from_le_bytes(b_128), &q)
 }
 
 //Assumes payloads are up to 64bit long
@@ -405,7 +400,7 @@ pub fn mask_payload_crt<RNG: rand::Rng + Sized>(
         res_crt.push((x_crt[i] + y_crt[i]) % q[i]);
     }
     let res = crt_inv(&res_crt, &q).to_le_bytes();
-    let mut block = [0 as u8; 64];
+    let mut block = [0_u8; 64];
     for i in 0..64 {
         if i < res.len() {
             block[i] = res[i];

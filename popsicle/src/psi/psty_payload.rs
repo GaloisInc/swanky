@@ -324,11 +324,11 @@ impl Sender {
         let ts_id = (0..nbins).map(|_| rng.gen::<Block512>()).collect_vec();
         let ts_payload = (0..nbins).map(|_| rng.gen::<Block512>()).collect_vec();
 
-        for (x, p) in hashes.into_iter().zip_eq(payloads.into_iter()) {
+        for (x, p) in hashes.iter().zip_eq(payloads.iter()) {
             let mut bins = Vec::with_capacity(NHASHES);
             for h in 0..NHASHES {
-                let bin = CuckooHash::bin(x, h, nbins);
-                table[bin].push(x ^ Block::from(h as u128));
+                let bin = CuckooHash::bin(*x, h, nbins);
+                table[bin].push(*x ^ Block::from(h as u128));
                 // In the case of CRT representations: the payload must be appropriately
                 // added to the target vector according to the CRT moduluses. The result
                 // is randomly padded to get a Block512.
@@ -497,8 +497,8 @@ impl Receiver {
         let mut state = ReceiverState {
             opprf_ids: Vec::new(),
             opprf_payloads: Vec::new(),
-            table: table.clone(),
-            payload: payload.clone(),
+            table,
+            payload,
         };
 
         self.receive_data(&mut state, channel, rng)?;
@@ -832,10 +832,8 @@ fn encode_payloads(payload: &[Block512]) -> Vec<u16> {
         .iter()
         .flat_map(|blk| {
             let b = blk.prefix(PAYLOAD_SIZE);
-            let mut b_8 = [0 as u8; 16]; // beyond 64 bits padded with 0s
-            for i in 0..PAYLOAD_SIZE {
-                b_8[i] = b[i];
-            }
+            let mut b_8 = [0_u8; 16]; // beyond 64 bits padded with 0s
+            b_8[..PAYLOAD_SIZE].clone_from_slice(&b[..PAYLOAD_SIZE]);
             fancy_garbling::util::crt(u128::from_le_bytes(b_8), &q)
         })
         .collect()
@@ -859,10 +857,8 @@ fn encode_opprf_payload(opprf_ids: &[Block512]) -> Vec<u16> {
         .iter()
         .flat_map(|blk| {
             let b = blk.prefix(PAYLOAD_PRIME_SIZE);
-            let mut b_8 = [0 as u8; 16];
-            for i in 0..PAYLOAD_PRIME_SIZE {
-                b_8[i] = b[i];
-            }
+            let mut b_8 = [0_u8; 16];
+            b_8[..PAYLOAD_SIZE].clone_from_slice(&b[..PAYLOAD_SIZE]);
             fancy_garbling::util::crt(u128::from_le_bytes(b_8), &q)
         })
         .collect()

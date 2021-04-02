@@ -4,7 +4,7 @@
 // Copyright © 2019 Galois, Inc.
 // See LICENSE for licensing information.
 
-use rand::{seq::SliceRandom, thread_rng, CryptoRng, Rng};
+use rand::{CryptoRng, Rng};
 use scuttlebutt::{AesHash, Block, Block512};
 use sha2::{Digest, Sha256};
 use std::{
@@ -44,10 +44,8 @@ pub fn int_vec_block512(values: Vec<u64>) -> Vec<Block512> {
         .into_iter()
         .map(|item| {
             let value_bytes = item.to_le_bytes();
-            let mut res_block = [0 as u8; 64];
-            for i in 0..8 {
-                res_block[i] = value_bytes[i];
-            }
+            let mut res_block = [0_u8; 64];
+            res_block.clone_from_slice(&value_bytes[..8]);
             Block512::from(res_block)
         })
         .collect()
@@ -70,11 +68,11 @@ pub fn parse_files(
         let line_split = line
             .1
             .unwrap()
-            .split(",")
+            .split(',')
             .map(|item| item.to_string())
             .collect::<Vec<String>>();
         if cnt == 0 {
-            cnt = cnt + 1;
+            cnt += 1;
         } else {
             ids.push(
                 line_split[id_position]
@@ -101,18 +99,6 @@ pub fn rand_vec_vec<RNG: CryptoRng + Rng>(n: usize, m: usize, rng: &mut RNG) -> 
 #[allow(dead_code)]
 pub fn rand_u64_vec<RNG: CryptoRng + Rng>(n: usize, modulus: u64, rng: &mut RNG) -> Vec<u64> {
     (0..n).map(|_| rng.gen::<u64>() % modulus).collect()
-}
-
-#[allow(dead_code)]
-pub fn enum_ids_shuffled(n: usize, id_size: usize) -> Vec<Vec<u8>> {
-    let mut vec: Vec<u64> = (0..n as u64).collect();
-    vec.shuffle(&mut thread_rng());
-    let mut ids = Vec::with_capacity(n);
-    for i in 0..n {
-        let v: Vec<u8> = vec[i].to_le_bytes().iter().take(id_size).cloned().collect();
-        ids.push(v);
-    }
-    ids
 }
 
 #[cfg(test)]

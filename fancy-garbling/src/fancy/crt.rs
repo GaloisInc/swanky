@@ -448,7 +448,7 @@ pub trait CrtGadgets: Fancy + BundleGadgets {
             let b = 2u128.pow(l - i - 1);
             let mut pb = q_ / b;
             if q_ % b == 0 {
-                pb = pb - 1;
+                pb -= 1;
             }
 
             let tmp = self.crt_cmul(&y, b)?;

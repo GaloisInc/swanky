@@ -166,9 +166,7 @@ impl Circuit {
                 }
             }
         }
-        for _ in 0..circ.gates.len() {
-            circ.gate_moduli.push(2u16);
-        }
+        circ.gate_moduli = vec![2u16; circ.gates.len()];
         Ok(circ)
     }
 }
