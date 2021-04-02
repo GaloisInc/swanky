@@ -12,7 +12,6 @@ use std::{
     hash::{Hash, Hasher},
 };
 
-
 /// A 512-bit value.
 #[derive(Clone, Copy)]
 pub struct Block512(pub(crate) [Block; 4]);
@@ -218,21 +217,21 @@ impl TryFrom<&[u8]> for Block512 {
     }
 }
 
-
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 #[derive(Serialize, Deserialize)]
 struct Helper {
-    pub blocks:[Block; 4]
+    pub blocks: [Block; 4],
 }
 
 #[cfg(feature = "serde")]
 impl Serialize for Block512 {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-        where S: Serializer
+    where
+        S: Serializer,
     {
-        let helper = Helper {blocks: self.0};
+        let helper = Helper { blocks: self.0 };
         helper.serialize(serializer)
     }
 }
@@ -240,7 +239,8 @@ impl Serialize for Block512 {
 #[cfg(feature = "serde")]
 impl<'de> Deserialize<'de> for Block512 {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-        where D: Deserializer<'de>
+    where
+        D: Deserializer<'de>,
     {
         let helper = Helper::deserialize(deserializer)?;
         Ok(Block512::from(helper.blocks))

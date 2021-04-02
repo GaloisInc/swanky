@@ -4,11 +4,11 @@
 // Copyright © 2019 Galois, Inc.
 // See LICENSE for licensing information.
 
-use rand::{CryptoRng, Rng, thread_rng, seq::SliceRandom};
+use rand::{seq::SliceRandom, thread_rng, CryptoRng, Rng};
 use scuttlebutt::{AesHash, Block, Block512};
 use sha2::{Digest, Sha256};
 use std::{
-    fs::{File},
+    fs::File,
     io::{BufRead, BufReader},
 };
 
@@ -40,39 +40,54 @@ pub fn compress_and_hash_inputs(inputs: &[Vec<u8>], key: Block) -> Vec<Block> {
 }
 
 pub fn int_vec_block512(values: Vec<u64>) -> Vec<Block512> {
-    values.into_iter()
-          .map(|item|{
+    values
+        .into_iter()
+        .map(|item| {
             let value_bytes = item.to_le_bytes();
             let mut res_block = [0 as u8; 64];
-            for i in 0..8{
+            for i in 0..8 {
                 res_block[i] = value_bytes[i];
             }
             Block512::from(res_block)
-         }).collect()
+        })
+        .collect()
 }
 
-pub fn parse_files(id_position: usize, payload_position: usize, path: &str) -> (Vec<Vec<u8>>, Vec<Block512>){
+pub fn parse_files(
+    id_position: usize,
+    payload_position: usize,
+    path: &str,
+) -> (Vec<Vec<u8>>, Vec<Block512>) {
+    let data = File::open(path).unwrap();
 
-     let data = File::open(path).unwrap();
+    let buffer = BufReader::new(data).lines();
 
-     let buffer = BufReader::new(data).lines();
+    let mut ids = Vec::new();
+    let mut payloads = Vec::new();
 
-     let mut ids = Vec::new();
-     let mut payloads = Vec::new();
-
-     let mut cnt = 0;
-     for line in buffer.enumerate(){
-         let line_split = line.1.unwrap().split(",").map(|item| item.to_string()).collect::<Vec<String>>();
-         if cnt == 0 {
-             cnt = cnt+1;
-         } else{
-            ids.push(line_split[id_position].parse::<u64>().unwrap().to_le_bytes().to_vec());
+    let mut cnt = 0;
+    for line in buffer.enumerate() {
+        let line_split = line
+            .1
+            .unwrap()
+            .split(",")
+            .map(|item| item.to_string())
+            .collect::<Vec<String>>();
+        if cnt == 0 {
+            cnt = cnt + 1;
+        } else {
+            ids.push(
+                line_split[id_position]
+                    .parse::<u64>()
+                    .unwrap()
+                    .to_le_bytes()
+                    .to_vec(),
+            );
             payloads.push(line_split[payload_position].parse::<u64>().unwrap());
-         }
-     }
+        }
+    }
     (ids, int_vec_block512(payloads))
 }
-
 
 #[allow(dead_code)] // used in tests
 pub fn rand_vec<RNG: CryptoRng + Rng>(n: usize, rng: &mut RNG) -> Vec<u8> {
@@ -84,23 +99,21 @@ pub fn rand_vec_vec<RNG: CryptoRng + Rng>(n: usize, m: usize, rng: &mut RNG) -> 
     (0..n).map(|_| rand_vec(m, rng)).collect()
 }
 #[allow(dead_code)]
-pub fn rand_u64_vec<RNG: CryptoRng + Rng>(n: usize, modulus: u64, rng: &mut RNG) -> Vec<u64>{
-    (0..n).map(|_|rng.gen::<u64>()%modulus).collect()
+pub fn rand_u64_vec<RNG: CryptoRng + Rng>(n: usize, modulus: u64, rng: &mut RNG) -> Vec<u64> {
+    (0..n).map(|_| rng.gen::<u64>() % modulus).collect()
 }
 
 #[allow(dead_code)]
-pub fn enum_ids_shuffled(n: usize, id_size: usize) ->Vec<Vec<u8>>{
+pub fn enum_ids_shuffled(n: usize, id_size: usize) -> Vec<Vec<u8>> {
     let mut vec: Vec<u64> = (0..n as u64).collect();
     vec.shuffle(&mut thread_rng());
     let mut ids = Vec::with_capacity(n);
-    for i in 0..n{
-        let v:Vec<u8> = vec[i].to_le_bytes().iter().take(id_size).cloned().collect();
+    for i in 0..n {
+        let v: Vec<u8> = vec[i].to_le_bytes().iter().take(id_size).cloned().collect();
         ids.push(v);
     }
     ids
 }
-
-
 
 #[cfg(test)]
 mod tests {

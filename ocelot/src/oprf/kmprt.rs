@@ -75,7 +75,6 @@ struct Parameters {
 
 impl Parameters {
     pub fn new(n: usize) -> Result<Self, Error> {
-
         let (m1, m2, beta1, beta2, h1, h2) = if n <= 1 << 12 {
             (1.17, 0.15, 27, 63, 3, 2)
         } else if n <= 1 << 14 {
@@ -86,7 +85,7 @@ impl Parameters {
             (1.13, 0.17, 30, 63, 3, 2)
         } else if n <= 1 << 24 {
             (1.12, 0.17, 31, 63, 3, 2)
-        }else {
+        } else {
             return Err(Error::InvalidInputLength);
         };
         let m1 = ((n as f32) * m1).ceil() as usize;
@@ -330,7 +329,6 @@ impl<OPRF: OprfReceiver<Seed = Block512, Input = Block, Output = Block512> + Sem
         C: AbstractChannel,
         RNG: CryptoRng + Rng,
     {
-
         let params = Parameters::new(inputs.len())?;
         let table;
         // Generate random values to be used for the hash functions. We loop,
@@ -393,7 +391,6 @@ impl<OPRF: OprfReceiver<Seed = Block512, Input = Block, Output = Block512> + Sem
         Ok(outputs)
     }
 }
-
 
 //
 // Tests.

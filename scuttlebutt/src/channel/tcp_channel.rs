@@ -6,11 +6,11 @@
 
 use crate::AbstractChannel;
 use std::{
+    io::{Read, Result, Write},
     net::TcpStream,
-    io::{Read, Write, Result},
 };
 
-pub struct TcpChannel<TcpStream>{
+pub struct TcpChannel<TcpStream> {
     stream: TcpStream,
     nbits_read: usize,
     nbits_written: usize,
@@ -18,7 +18,11 @@ pub struct TcpChannel<TcpStream>{
 
 impl TcpChannel<TcpStream> {
     pub fn new(stream: TcpStream) -> Self {
-        Self{stream, nbits_read: 0, nbits_written: 0}
+        Self {
+            stream,
+            nbits_read: 0,
+            nbits_written: 0,
+        }
     }
     /// Clear the number of bits read/written.
     pub fn clear(&mut self) {
@@ -57,16 +61,16 @@ impl TcpChannel<TcpStream> {
     }
 }
 
-impl AbstractChannel for TcpChannel<TcpStream>{
+impl AbstractChannel for TcpChannel<TcpStream> {
     #[inline(always)]
     fn write_bytes(&mut self, bytes: &[u8]) -> Result<()> {
-        self.nbits_written += self.stream.write(bytes)?*8;
+        self.nbits_written += self.stream.write(bytes)? * 8;
         Ok(())
     }
 
     #[inline(always)]
     fn read_bytes(&mut self, mut bytes: &mut [u8]) -> Result<()> {
-        self.nbits_read += bytes.len()*8;
+        self.nbits_read += bytes.len() * 8;
         self.stream.read_exact(&mut bytes)?;
         Ok(())
     }

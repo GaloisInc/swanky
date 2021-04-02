@@ -145,7 +145,6 @@ impl Debug for CuckooHash {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;

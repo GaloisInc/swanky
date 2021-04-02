@@ -291,6 +291,7 @@ impl Hash for Block {
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
+#[cfg(feature = "serde")]
 #[derive(Serialize, Deserialize)]
 struct Helperb {
     pub block: u128,
@@ -299,9 +300,12 @@ struct Helperb {
 #[cfg(feature = "serde")]
 impl Serialize for Block {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-        where S: Serializer
+    where
+        S: Serializer,
     {
-        let helper = Helperb {block: <u128>::from(*self)};
+        let helper = Helperb {
+            block: <u128>::from(*self),
+        };
         helper.serialize(serializer)
     }
 }
@@ -309,7 +313,8 @@ impl Serialize for Block {
 #[cfg(feature = "serde")]
 impl<'de> Deserialize<'de> for Block {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-        where D: Deserializer<'de>
+    where
+        D: Deserializer<'de>,
     {
         let helper = Helperb::deserialize(deserializer)?;
         Ok(Block::from(helper.block.to_le_bytes()))
