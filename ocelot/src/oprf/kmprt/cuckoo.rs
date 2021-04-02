@@ -43,11 +43,13 @@ impl CuckooHash {
         hs: (usize, usize),
     ) -> Result<Self, Error> {
         let mut tbl = CuckooHash::new(ms, hs);
+
         let hashkeys = hashkeys
             .iter()
             .map(|k| Aes128::new(*k))
             .collect::<Vec<Aes128>>();
         // Fill table with `inputs`
+
         for (j, input) in inputs.iter().enumerate() {
             tbl.hash(&hashkeys, *input, j)?;
         }

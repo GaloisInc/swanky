@@ -13,7 +13,7 @@ use std::{
 };
 
 const NBYTES: usize = 16;
-const NINPUTS: usize = 1 << 20;
+const NINPUTS: usize = 1000;
 const PAYLOAD_SIZE: usize = 64;
 
 fn rand_vec(nbytes: usize) -> Vec<u8> {

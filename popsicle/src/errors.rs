@@ -32,7 +32,7 @@ pub enum Error {
     #[cfg(feature = "psty")]
     SSLError(openssl::error::ErrorStack),
     /// An error occurred in the underlying 2PC protocol.
-    #[cfg(feature = "psty")]
+    #[cfg(feature = "fancy")]
     TwopcError(fancy_garbling::errors::TwopacError),
 }
 
@@ -92,7 +92,7 @@ impl std::fmt::Display for Error {
             Error::InvalidPayloadsLength => write!(f, "Invalid length of payloads!"),
             #[cfg(feature = "psty")]
             Error::SSLError(e) => write!(f, "SSL Error: {}", e),
-            #[cfg(feature = "psty")]
+            #[cfg(feature = "fancy")]
             Error::TwopcError(e) => write!(f, "2PC protocol error: {}", e),
         }
     }
