@@ -80,9 +80,26 @@ use crate::array_utils::*;
         }
     }
     
-    {% if count % 2 == 0 %}
-        impl<T> ArrayAdjacentPairs for [T; {{count}}] {
-            type AdjacentPairs = [(T, T); {{count // 2}}];
+    impl<T> ArrayAdjacentPairs for [T; {{count}}] {
+        type T = T;
+        type AdjacentPairs = [(T, T); {{ (count // 2) + (count % 2) }}];
+        #[inline(always)]
+        #[allow(unused_variables)]
+        fn pair_adjacent_maybe_odd(self, fallback: T) -> Self::AdjacentPairs {
+            {% call extract_elems("self") %}
+                [
+                    {% for i in range(count // 2) %}
+                        (self_{{i * 2}}, self_{{i * 2 + 1}}),
+                    {% endfor %}
+                    {% if (count % 2) != 0 %}
+                        (self_{{count - 1}}, fallback),
+                    {% endif %}
+                ]
+            {% endcall %}
+        }
+    }
+    {% if (count % 2) == 0 %}
+        impl<T> EvenArrayAdjacentPairs for [T; {{count}}] {
             #[inline(always)]
             fn pair_adjacent(self) -> Self::AdjacentPairs {
                 {% call extract_elems("self") %}

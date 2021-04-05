@@ -30,7 +30,12 @@ pub trait UnrollableArraySize<const N: usize> {
 ///
 /// To ensure that operations are unrolled, consider annotating your closures with
 /// `#[inline(always)]`. See the examples below for more details.
-pub trait ArrayUnrolledExt<T, const N: usize> {
+pub trait ArrayUnrolledExt<T, const N: usize>: Sized {
+    /// Perform some computation over the elements of an array.
+    #[inline(always)]
+    fn array_for_each<F: FnMut(T)>(self, f: F) {
+        let _ = self.array_map(f);
+    }
     /// Generate an array by filling the entries.
     /// # Example
     /// ```
@@ -102,11 +107,30 @@ where
     }
 }
 
-/// An even-sized array.
 pub trait ArrayAdjacentPairs {
-    // TODO: further constrain this type once const generics are more fully implemented.
+    type T;
+    /// An array which is `[Self::T; ceil(Self::LEN / 2)]`
     type AdjacentPairs;
 
+    /// Turn an array into an array of pairs where each element is paired with an adjacent element.
+    /// If the array has odd length, use the fallback.
+    /// # Example
+    /// ```
+    /// use vectoreyes::array_utils::*;
+    /// assert_eq!(
+    ///     [0, 1, 2, 3].pair_adjacent_maybe_odd(42),
+    ///     [(0, 1), (2, 3)]
+    /// );
+    /// assert_eq!(
+    ///     [0, 1, 2, 3, 4].pair_adjacent_maybe_odd(42),
+    ///     [(0, 1), (2, 3), (4, 42)]
+    /// );
+    /// ```
+    fn pair_adjacent_maybe_odd(self, fallback: Self::T) -> Self::AdjacentPairs;
+}
+
+/// An even-sized array.
+pub trait EvenArrayAdjacentPairs: ArrayAdjacentPairs {
     /// Turn an array into an array of pairs where each element is paired with an adjacent element.
     /// # Example
     /// ```

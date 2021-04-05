@@ -38,7 +38,17 @@ impl UnrollableArraySize<0> for ArrayUnrolledOps {
     }
 }
 impl<T> ArrayAdjacentPairs for [T; 0] {
+    type T = T;
     type AdjacentPairs = [(T, T); 0];
+    #[inline(always)]
+    #[allow(unused_variables)]
+    fn pair_adjacent_maybe_odd(self, fallback: T) -> Self::AdjacentPairs {
+        match self {
+            [] => [],
+        }
+    }
+}
+impl<T> EvenArrayAdjacentPairs for [T; 0] {
     #[inline(always)]
     fn pair_adjacent(self) -> Self::AdjacentPairs {
         match self {
@@ -83,6 +93,17 @@ impl UnrollableArraySize<1> for ArrayUnrolledOps {
         }
     }
 }
+impl<T> ArrayAdjacentPairs for [T; 1] {
+    type T = T;
+    type AdjacentPairs = [(T, T); 1];
+    #[inline(always)]
+    #[allow(unused_variables)]
+    fn pair_adjacent_maybe_odd(self, fallback: T) -> Self::AdjacentPairs {
+        match self {
+            [self_0] => [(self_0, fallback)],
+        }
+    }
+}
 impl UnrollableArraySize<2> for ArrayUnrolledOps {
     #[inline(always)]
     fn array_generate<T, F: FnMut(usize) -> T>(mut f: F) -> [T; 2] {
@@ -123,7 +144,17 @@ impl UnrollableArraySize<2> for ArrayUnrolledOps {
     }
 }
 impl<T> ArrayAdjacentPairs for [T; 2] {
+    type T = T;
     type AdjacentPairs = [(T, T); 1];
+    #[inline(always)]
+    #[allow(unused_variables)]
+    fn pair_adjacent_maybe_odd(self, fallback: T) -> Self::AdjacentPairs {
+        match self {
+            [self_0, self_1] => [(self_0, self_1)],
+        }
+    }
+}
+impl<T> EvenArrayAdjacentPairs for [T; 2] {
     #[inline(always)]
     fn pair_adjacent(self) -> Self::AdjacentPairs {
         match self {
@@ -169,6 +200,17 @@ impl UnrollableArraySize<3> for ArrayUnrolledOps {
             [arr1_0, arr1_1, arr1_2] => match arr2 {
                 [arr2_0, arr2_1, arr2_2] => [(arr1_0, arr2_0), (arr1_1, arr2_1), (arr1_2, arr2_2)],
             },
+        }
+    }
+}
+impl<T> ArrayAdjacentPairs for [T; 3] {
+    type T = T;
+    type AdjacentPairs = [(T, T); 2];
+    #[inline(always)]
+    #[allow(unused_variables)]
+    fn pair_adjacent_maybe_odd(self, fallback: T) -> Self::AdjacentPairs {
+        match self {
+            [self_0, self_1, self_2] => [(self_0, self_1), (self_2, fallback)],
         }
     }
 }
@@ -221,7 +263,17 @@ impl UnrollableArraySize<4> for ArrayUnrolledOps {
     }
 }
 impl<T> ArrayAdjacentPairs for [T; 4] {
+    type T = T;
     type AdjacentPairs = [(T, T); 2];
+    #[inline(always)]
+    #[allow(unused_variables)]
+    fn pair_adjacent_maybe_odd(self, fallback: T) -> Self::AdjacentPairs {
+        match self {
+            [self_0, self_1, self_2, self_3] => [(self_0, self_1), (self_2, self_3)],
+        }
+    }
+}
+impl<T> EvenArrayAdjacentPairs for [T; 4] {
     #[inline(always)]
     fn pair_adjacent(self) -> Self::AdjacentPairs {
         match self {
@@ -281,6 +333,19 @@ impl UnrollableArraySize<5> for ArrayUnrolledOps {
                     (arr1_4, arr2_4),
                 ],
             },
+        }
+    }
+}
+impl<T> ArrayAdjacentPairs for [T; 5] {
+    type T = T;
+    type AdjacentPairs = [(T, T); 3];
+    #[inline(always)]
+    #[allow(unused_variables)]
+    fn pair_adjacent_maybe_odd(self, fallback: T) -> Self::AdjacentPairs {
+        match self {
+            [self_0, self_1, self_2, self_3, self_4] => {
+                [(self_0, self_1), (self_2, self_3), (self_4, fallback)]
+            }
         }
     }
 }
@@ -348,7 +413,19 @@ impl UnrollableArraySize<6> for ArrayUnrolledOps {
     }
 }
 impl<T> ArrayAdjacentPairs for [T; 6] {
+    type T = T;
     type AdjacentPairs = [(T, T); 3];
+    #[inline(always)]
+    #[allow(unused_variables)]
+    fn pair_adjacent_maybe_odd(self, fallback: T) -> Self::AdjacentPairs {
+        match self {
+            [self_0, self_1, self_2, self_3, self_4, self_5] => {
+                [(self_0, self_1), (self_2, self_3), (self_4, self_5)]
+            }
+        }
+    }
+}
+impl<T> EvenArrayAdjacentPairs for [T; 6] {
     #[inline(always)]
     fn pair_adjacent(self) -> Self::AdjacentPairs {
         match self {
@@ -431,6 +508,22 @@ impl UnrollableArraySize<7> for ArrayUnrolledOps {
         }
     }
 }
+impl<T> ArrayAdjacentPairs for [T; 7] {
+    type T = T;
+    type AdjacentPairs = [(T, T); 4];
+    #[inline(always)]
+    #[allow(unused_variables)]
+    fn pair_adjacent_maybe_odd(self, fallback: T) -> Self::AdjacentPairs {
+        match self {
+            [self_0, self_1, self_2, self_3, self_4, self_5, self_6] => [
+                (self_0, self_1),
+                (self_2, self_3),
+                (self_4, self_5),
+                (self_6, fallback),
+            ],
+        }
+    }
+}
 impl UnrollableArraySize<8> for ArrayUnrolledOps {
     #[inline(always)]
     fn array_generate<T, F: FnMut(usize) -> T>(mut f: F) -> [T; 8] {
@@ -510,7 +603,22 @@ impl UnrollableArraySize<8> for ArrayUnrolledOps {
     }
 }
 impl<T> ArrayAdjacentPairs for [T; 8] {
+    type T = T;
     type AdjacentPairs = [(T, T); 4];
+    #[inline(always)]
+    #[allow(unused_variables)]
+    fn pair_adjacent_maybe_odd(self, fallback: T) -> Self::AdjacentPairs {
+        match self {
+            [self_0, self_1, self_2, self_3, self_4, self_5, self_6, self_7] => [
+                (self_0, self_1),
+                (self_2, self_3),
+                (self_4, self_5),
+                (self_6, self_7),
+            ],
+        }
+    }
+}
+impl<T> EvenArrayAdjacentPairs for [T; 8] {
     #[inline(always)]
     fn pair_adjacent(self) -> Self::AdjacentPairs {
         match self {
@@ -608,6 +716,23 @@ impl UnrollableArraySize<9> for ArrayUnrolledOps {
         }
     }
 }
+impl<T> ArrayAdjacentPairs for [T; 9] {
+    type T = T;
+    type AdjacentPairs = [(T, T); 5];
+    #[inline(always)]
+    #[allow(unused_variables)]
+    fn pair_adjacent_maybe_odd(self, fallback: T) -> Self::AdjacentPairs {
+        match self {
+            [self_0, self_1, self_2, self_3, self_4, self_5, self_6, self_7, self_8] => [
+                (self_0, self_1),
+                (self_2, self_3),
+                (self_4, self_5),
+                (self_6, self_7),
+                (self_8, fallback),
+            ],
+        }
+    }
+}
 impl UnrollableArraySize<10> for ArrayUnrolledOps {
     #[inline(always)]
     fn array_generate<T, F: FnMut(usize) -> T>(mut f: F) -> [T; 10] {
@@ -701,7 +826,23 @@ impl UnrollableArraySize<10> for ArrayUnrolledOps {
     }
 }
 impl<T> ArrayAdjacentPairs for [T; 10] {
+    type T = T;
     type AdjacentPairs = [(T, T); 5];
+    #[inline(always)]
+    #[allow(unused_variables)]
+    fn pair_adjacent_maybe_odd(self, fallback: T) -> Self::AdjacentPairs {
+        match self {
+            [self_0, self_1, self_2, self_3, self_4, self_5, self_6, self_7, self_8, self_9] => [
+                (self_0, self_1),
+                (self_2, self_3),
+                (self_4, self_5),
+                (self_6, self_7),
+                (self_8, self_9),
+            ],
+        }
+    }
+}
+impl<T> EvenArrayAdjacentPairs for [T; 10] {
     #[inline(always)]
     fn pair_adjacent(self) -> Self::AdjacentPairs {
         match self {
@@ -808,6 +949,26 @@ impl UnrollableArraySize<11> for ArrayUnrolledOps {
                         ]
                     }
                 }
+            }
+        }
+    }
+}
+impl<T> ArrayAdjacentPairs for [T; 11] {
+    type T = T;
+    type AdjacentPairs = [(T, T); 6];
+    #[inline(always)]
+    #[allow(unused_variables)]
+    fn pair_adjacent_maybe_odd(self, fallback: T) -> Self::AdjacentPairs {
+        match self {
+            [self_0, self_1, self_2, self_3, self_4, self_5, self_6, self_7, self_8, self_9, self_10] => {
+                [
+                    (self_0, self_1),
+                    (self_2, self_3),
+                    (self_4, self_5),
+                    (self_6, self_7),
+                    (self_8, self_9),
+                    (self_10, fallback),
+                ]
             }
         }
     }
@@ -920,7 +1081,26 @@ impl UnrollableArraySize<12> for ArrayUnrolledOps {
     }
 }
 impl<T> ArrayAdjacentPairs for [T; 12] {
+    type T = T;
     type AdjacentPairs = [(T, T); 6];
+    #[inline(always)]
+    #[allow(unused_variables)]
+    fn pair_adjacent_maybe_odd(self, fallback: T) -> Self::AdjacentPairs {
+        match self {
+            [self_0, self_1, self_2, self_3, self_4, self_5, self_6, self_7, self_8, self_9, self_10, self_11] => {
+                [
+                    (self_0, self_1),
+                    (self_2, self_3),
+                    (self_4, self_5),
+                    (self_6, self_7),
+                    (self_8, self_9),
+                    (self_10, self_11),
+                ]
+            }
+        }
+    }
+}
+impl<T> EvenArrayAdjacentPairs for [T; 12] {
     #[inline(always)]
     fn pair_adjacent(self) -> Self::AdjacentPairs {
         match self {
@@ -1051,6 +1231,27 @@ impl UnrollableArraySize<13> for ArrayUnrolledOps {
         }
     }
 }
+impl<T> ArrayAdjacentPairs for [T; 13] {
+    type T = T;
+    type AdjacentPairs = [(T, T); 7];
+    #[inline(always)]
+    #[allow(unused_variables)]
+    fn pair_adjacent_maybe_odd(self, fallback: T) -> Self::AdjacentPairs {
+        match self {
+            [self_0, self_1, self_2, self_3, self_4, self_5, self_6, self_7, self_8, self_9, self_10, self_11, self_12] => {
+                [
+                    (self_0, self_1),
+                    (self_2, self_3),
+                    (self_4, self_5),
+                    (self_6, self_7),
+                    (self_8, self_9),
+                    (self_10, self_11),
+                    (self_12, fallback),
+                ]
+            }
+        }
+    }
+}
 impl UnrollableArraySize<14> for ArrayUnrolledOps {
     #[inline(always)]
     fn array_generate<T, F: FnMut(usize) -> T>(mut f: F) -> [T; 14] {
@@ -1171,7 +1372,27 @@ impl UnrollableArraySize<14> for ArrayUnrolledOps {
     }
 }
 impl<T> ArrayAdjacentPairs for [T; 14] {
+    type T = T;
     type AdjacentPairs = [(T, T); 7];
+    #[inline(always)]
+    #[allow(unused_variables)]
+    fn pair_adjacent_maybe_odd(self, fallback: T) -> Self::AdjacentPairs {
+        match self {
+            [self_0, self_1, self_2, self_3, self_4, self_5, self_6, self_7, self_8, self_9, self_10, self_11, self_12, self_13] => {
+                [
+                    (self_0, self_1),
+                    (self_2, self_3),
+                    (self_4, self_5),
+                    (self_6, self_7),
+                    (self_8, self_9),
+                    (self_10, self_11),
+                    (self_12, self_13),
+                ]
+            }
+        }
+    }
+}
+impl<T> EvenArrayAdjacentPairs for [T; 14] {
     #[inline(always)]
     fn pair_adjacent(self) -> Self::AdjacentPairs {
         match self {
@@ -1313,6 +1534,28 @@ impl UnrollableArraySize<15> for ArrayUnrolledOps {
         }
     }
 }
+impl<T> ArrayAdjacentPairs for [T; 15] {
+    type T = T;
+    type AdjacentPairs = [(T, T); 8];
+    #[inline(always)]
+    #[allow(unused_variables)]
+    fn pair_adjacent_maybe_odd(self, fallback: T) -> Self::AdjacentPairs {
+        match self {
+            [self_0, self_1, self_2, self_3, self_4, self_5, self_6, self_7, self_8, self_9, self_10, self_11, self_12, self_13, self_14] => {
+                [
+                    (self_0, self_1),
+                    (self_2, self_3),
+                    (self_4, self_5),
+                    (self_6, self_7),
+                    (self_8, self_9),
+                    (self_10, self_11),
+                    (self_12, self_13),
+                    (self_14, fallback),
+                ]
+            }
+        }
+    }
+}
 impl UnrollableArraySize<16> for ArrayUnrolledOps {
     #[inline(always)]
     fn array_generate<T, F: FnMut(usize) -> T>(mut f: F) -> [T; 16] {
@@ -1443,7 +1686,28 @@ impl UnrollableArraySize<16> for ArrayUnrolledOps {
     }
 }
 impl<T> ArrayAdjacentPairs for [T; 16] {
+    type T = T;
     type AdjacentPairs = [(T, T); 8];
+    #[inline(always)]
+    #[allow(unused_variables)]
+    fn pair_adjacent_maybe_odd(self, fallback: T) -> Self::AdjacentPairs {
+        match self {
+            [self_0, self_1, self_2, self_3, self_4, self_5, self_6, self_7, self_8, self_9, self_10, self_11, self_12, self_13, self_14, self_15] => {
+                [
+                    (self_0, self_1),
+                    (self_2, self_3),
+                    (self_4, self_5),
+                    (self_6, self_7),
+                    (self_8, self_9),
+                    (self_10, self_11),
+                    (self_12, self_13),
+                    (self_14, self_15),
+                ]
+            }
+        }
+    }
+}
+impl<T> EvenArrayAdjacentPairs for [T; 16] {
     #[inline(always)]
     fn pair_adjacent(self) -> Self::AdjacentPairs {
         match self {
@@ -1597,6 +1861,29 @@ impl UnrollableArraySize<17> for ArrayUnrolledOps {
         }
     }
 }
+impl<T> ArrayAdjacentPairs for [T; 17] {
+    type T = T;
+    type AdjacentPairs = [(T, T); 9];
+    #[inline(always)]
+    #[allow(unused_variables)]
+    fn pair_adjacent_maybe_odd(self, fallback: T) -> Self::AdjacentPairs {
+        match self {
+            [self_0, self_1, self_2, self_3, self_4, self_5, self_6, self_7, self_8, self_9, self_10, self_11, self_12, self_13, self_14, self_15, self_16] => {
+                [
+                    (self_0, self_1),
+                    (self_2, self_3),
+                    (self_4, self_5),
+                    (self_6, self_7),
+                    (self_8, self_9),
+                    (self_10, self_11),
+                    (self_12, self_13),
+                    (self_14, self_15),
+                    (self_16, fallback),
+                ]
+            }
+        }
+    }
+}
 impl UnrollableArraySize<18> for ArrayUnrolledOps {
     #[inline(always)]
     fn array_generate<T, F: FnMut(usize) -> T>(mut f: F) -> [T; 18] {
@@ -1738,7 +2025,29 @@ impl UnrollableArraySize<18> for ArrayUnrolledOps {
     }
 }
 impl<T> ArrayAdjacentPairs for [T; 18] {
+    type T = T;
     type AdjacentPairs = [(T, T); 9];
+    #[inline(always)]
+    #[allow(unused_variables)]
+    fn pair_adjacent_maybe_odd(self, fallback: T) -> Self::AdjacentPairs {
+        match self {
+            [self_0, self_1, self_2, self_3, self_4, self_5, self_6, self_7, self_8, self_9, self_10, self_11, self_12, self_13, self_14, self_15, self_16, self_17] => {
+                [
+                    (self_0, self_1),
+                    (self_2, self_3),
+                    (self_4, self_5),
+                    (self_6, self_7),
+                    (self_8, self_9),
+                    (self_10, self_11),
+                    (self_12, self_13),
+                    (self_14, self_15),
+                    (self_16, self_17),
+                ]
+            }
+        }
+    }
+}
+impl<T> EvenArrayAdjacentPairs for [T; 18] {
     #[inline(always)]
     fn pair_adjacent(self) -> Self::AdjacentPairs {
         match self {
@@ -1903,6 +2212,30 @@ impl UnrollableArraySize<19> for ArrayUnrolledOps {
         }
     }
 }
+impl<T> ArrayAdjacentPairs for [T; 19] {
+    type T = T;
+    type AdjacentPairs = [(T, T); 10];
+    #[inline(always)]
+    #[allow(unused_variables)]
+    fn pair_adjacent_maybe_odd(self, fallback: T) -> Self::AdjacentPairs {
+        match self {
+            [self_0, self_1, self_2, self_3, self_4, self_5, self_6, self_7, self_8, self_9, self_10, self_11, self_12, self_13, self_14, self_15, self_16, self_17, self_18] => {
+                [
+                    (self_0, self_1),
+                    (self_2, self_3),
+                    (self_4, self_5),
+                    (self_6, self_7),
+                    (self_8, self_9),
+                    (self_10, self_11),
+                    (self_12, self_13),
+                    (self_14, self_15),
+                    (self_16, self_17),
+                    (self_18, fallback),
+                ]
+            }
+        }
+    }
+}
 impl UnrollableArraySize<20> for ArrayUnrolledOps {
     #[inline(always)]
     fn array_generate<T, F: FnMut(usize) -> T>(mut f: F) -> [T; 20] {
@@ -2054,7 +2387,30 @@ impl UnrollableArraySize<20> for ArrayUnrolledOps {
     }
 }
 impl<T> ArrayAdjacentPairs for [T; 20] {
+    type T = T;
     type AdjacentPairs = [(T, T); 10];
+    #[inline(always)]
+    #[allow(unused_variables)]
+    fn pair_adjacent_maybe_odd(self, fallback: T) -> Self::AdjacentPairs {
+        match self {
+            [self_0, self_1, self_2, self_3, self_4, self_5, self_6, self_7, self_8, self_9, self_10, self_11, self_12, self_13, self_14, self_15, self_16, self_17, self_18, self_19] => {
+                [
+                    (self_0, self_1),
+                    (self_2, self_3),
+                    (self_4, self_5),
+                    (self_6, self_7),
+                    (self_8, self_9),
+                    (self_10, self_11),
+                    (self_12, self_13),
+                    (self_14, self_15),
+                    (self_16, self_17),
+                    (self_18, self_19),
+                ]
+            }
+        }
+    }
+}
+impl<T> EvenArrayAdjacentPairs for [T; 20] {
     #[inline(always)]
     fn pair_adjacent(self) -> Self::AdjacentPairs {
         match self {
@@ -2230,6 +2586,31 @@ impl UnrollableArraySize<21> for ArrayUnrolledOps {
         }
     }
 }
+impl<T> ArrayAdjacentPairs for [T; 21] {
+    type T = T;
+    type AdjacentPairs = [(T, T); 11];
+    #[inline(always)]
+    #[allow(unused_variables)]
+    fn pair_adjacent_maybe_odd(self, fallback: T) -> Self::AdjacentPairs {
+        match self {
+            [self_0, self_1, self_2, self_3, self_4, self_5, self_6, self_7, self_8, self_9, self_10, self_11, self_12, self_13, self_14, self_15, self_16, self_17, self_18, self_19, self_20] => {
+                [
+                    (self_0, self_1),
+                    (self_2, self_3),
+                    (self_4, self_5),
+                    (self_6, self_7),
+                    (self_8, self_9),
+                    (self_10, self_11),
+                    (self_12, self_13),
+                    (self_14, self_15),
+                    (self_16, self_17),
+                    (self_18, self_19),
+                    (self_20, fallback),
+                ]
+            }
+        }
+    }
+}
 impl UnrollableArraySize<22> for ArrayUnrolledOps {
     #[inline(always)]
     fn array_generate<T, F: FnMut(usize) -> T>(mut f: F) -> [T; 22] {
@@ -2391,7 +2772,31 @@ impl UnrollableArraySize<22> for ArrayUnrolledOps {
     }
 }
 impl<T> ArrayAdjacentPairs for [T; 22] {
+    type T = T;
     type AdjacentPairs = [(T, T); 11];
+    #[inline(always)]
+    #[allow(unused_variables)]
+    fn pair_adjacent_maybe_odd(self, fallback: T) -> Self::AdjacentPairs {
+        match self {
+            [self_0, self_1, self_2, self_3, self_4, self_5, self_6, self_7, self_8, self_9, self_10, self_11, self_12, self_13, self_14, self_15, self_16, self_17, self_18, self_19, self_20, self_21] => {
+                [
+                    (self_0, self_1),
+                    (self_2, self_3),
+                    (self_4, self_5),
+                    (self_6, self_7),
+                    (self_8, self_9),
+                    (self_10, self_11),
+                    (self_12, self_13),
+                    (self_14, self_15),
+                    (self_16, self_17),
+                    (self_18, self_19),
+                    (self_20, self_21),
+                ]
+            }
+        }
+    }
+}
+impl<T> EvenArrayAdjacentPairs for [T; 22] {
     #[inline(always)]
     fn pair_adjacent(self) -> Self::AdjacentPairs {
         match self {
@@ -2578,6 +2983,32 @@ impl UnrollableArraySize<23> for ArrayUnrolledOps {
         }
     }
 }
+impl<T> ArrayAdjacentPairs for [T; 23] {
+    type T = T;
+    type AdjacentPairs = [(T, T); 12];
+    #[inline(always)]
+    #[allow(unused_variables)]
+    fn pair_adjacent_maybe_odd(self, fallback: T) -> Self::AdjacentPairs {
+        match self {
+            [self_0, self_1, self_2, self_3, self_4, self_5, self_6, self_7, self_8, self_9, self_10, self_11, self_12, self_13, self_14, self_15, self_16, self_17, self_18, self_19, self_20, self_21, self_22] => {
+                [
+                    (self_0, self_1),
+                    (self_2, self_3),
+                    (self_4, self_5),
+                    (self_6, self_7),
+                    (self_8, self_9),
+                    (self_10, self_11),
+                    (self_12, self_13),
+                    (self_14, self_15),
+                    (self_16, self_17),
+                    (self_18, self_19),
+                    (self_20, self_21),
+                    (self_22, fallback),
+                ]
+            }
+        }
+    }
+}
 impl UnrollableArraySize<24> for ArrayUnrolledOps {
     #[inline(always)]
     fn array_generate<T, F: FnMut(usize) -> T>(mut f: F) -> [T; 24] {
@@ -2749,7 +3180,32 @@ impl UnrollableArraySize<24> for ArrayUnrolledOps {
     }
 }
 impl<T> ArrayAdjacentPairs for [T; 24] {
+    type T = T;
     type AdjacentPairs = [(T, T); 12];
+    #[inline(always)]
+    #[allow(unused_variables)]
+    fn pair_adjacent_maybe_odd(self, fallback: T) -> Self::AdjacentPairs {
+        match self {
+            [self_0, self_1, self_2, self_3, self_4, self_5, self_6, self_7, self_8, self_9, self_10, self_11, self_12, self_13, self_14, self_15, self_16, self_17, self_18, self_19, self_20, self_21, self_22, self_23] => {
+                [
+                    (self_0, self_1),
+                    (self_2, self_3),
+                    (self_4, self_5),
+                    (self_6, self_7),
+                    (self_8, self_9),
+                    (self_10, self_11),
+                    (self_12, self_13),
+                    (self_14, self_15),
+                    (self_16, self_17),
+                    (self_18, self_19),
+                    (self_20, self_21),
+                    (self_22, self_23),
+                ]
+            }
+        }
+    }
+}
+impl<T> EvenArrayAdjacentPairs for [T; 24] {
     #[inline(always)]
     fn pair_adjacent(self) -> Self::AdjacentPairs {
         match self {
@@ -2947,6 +3403,33 @@ impl UnrollableArraySize<25> for ArrayUnrolledOps {
         }
     }
 }
+impl<T> ArrayAdjacentPairs for [T; 25] {
+    type T = T;
+    type AdjacentPairs = [(T, T); 13];
+    #[inline(always)]
+    #[allow(unused_variables)]
+    fn pair_adjacent_maybe_odd(self, fallback: T) -> Self::AdjacentPairs {
+        match self {
+            [self_0, self_1, self_2, self_3, self_4, self_5, self_6, self_7, self_8, self_9, self_10, self_11, self_12, self_13, self_14, self_15, self_16, self_17, self_18, self_19, self_20, self_21, self_22, self_23, self_24] => {
+                [
+                    (self_0, self_1),
+                    (self_2, self_3),
+                    (self_4, self_5),
+                    (self_6, self_7),
+                    (self_8, self_9),
+                    (self_10, self_11),
+                    (self_12, self_13),
+                    (self_14, self_15),
+                    (self_16, self_17),
+                    (self_18, self_19),
+                    (self_20, self_21),
+                    (self_22, self_23),
+                    (self_24, fallback),
+                ]
+            }
+        }
+    }
+}
 impl UnrollableArraySize<26> for ArrayUnrolledOps {
     #[inline(always)]
     fn array_generate<T, F: FnMut(usize) -> T>(mut f: F) -> [T; 26] {
@@ -3128,7 +3611,33 @@ impl UnrollableArraySize<26> for ArrayUnrolledOps {
     }
 }
 impl<T> ArrayAdjacentPairs for [T; 26] {
+    type T = T;
     type AdjacentPairs = [(T, T); 13];
+    #[inline(always)]
+    #[allow(unused_variables)]
+    fn pair_adjacent_maybe_odd(self, fallback: T) -> Self::AdjacentPairs {
+        match self {
+            [self_0, self_1, self_2, self_3, self_4, self_5, self_6, self_7, self_8, self_9, self_10, self_11, self_12, self_13, self_14, self_15, self_16, self_17, self_18, self_19, self_20, self_21, self_22, self_23, self_24, self_25] => {
+                [
+                    (self_0, self_1),
+                    (self_2, self_3),
+                    (self_4, self_5),
+                    (self_6, self_7),
+                    (self_8, self_9),
+                    (self_10, self_11),
+                    (self_12, self_13),
+                    (self_14, self_15),
+                    (self_16, self_17),
+                    (self_18, self_19),
+                    (self_20, self_21),
+                    (self_22, self_23),
+                    (self_24, self_25),
+                ]
+            }
+        }
+    }
+}
+impl<T> EvenArrayAdjacentPairs for [T; 26] {
     #[inline(always)]
     fn pair_adjacent(self) -> Self::AdjacentPairs {
         match self {
@@ -3337,6 +3846,34 @@ impl UnrollableArraySize<27> for ArrayUnrolledOps {
         }
     }
 }
+impl<T> ArrayAdjacentPairs for [T; 27] {
+    type T = T;
+    type AdjacentPairs = [(T, T); 14];
+    #[inline(always)]
+    #[allow(unused_variables)]
+    fn pair_adjacent_maybe_odd(self, fallback: T) -> Self::AdjacentPairs {
+        match self {
+            [self_0, self_1, self_2, self_3, self_4, self_5, self_6, self_7, self_8, self_9, self_10, self_11, self_12, self_13, self_14, self_15, self_16, self_17, self_18, self_19, self_20, self_21, self_22, self_23, self_24, self_25, self_26] => {
+                [
+                    (self_0, self_1),
+                    (self_2, self_3),
+                    (self_4, self_5),
+                    (self_6, self_7),
+                    (self_8, self_9),
+                    (self_10, self_11),
+                    (self_12, self_13),
+                    (self_14, self_15),
+                    (self_16, self_17),
+                    (self_18, self_19),
+                    (self_20, self_21),
+                    (self_22, self_23),
+                    (self_24, self_25),
+                    (self_26, fallback),
+                ]
+            }
+        }
+    }
+}
 impl UnrollableArraySize<28> for ArrayUnrolledOps {
     #[inline(always)]
     fn array_generate<T, F: FnMut(usize) -> T>(mut f: F) -> [T; 28] {
@@ -3528,7 +4065,34 @@ impl UnrollableArraySize<28> for ArrayUnrolledOps {
     }
 }
 impl<T> ArrayAdjacentPairs for [T; 28] {
+    type T = T;
     type AdjacentPairs = [(T, T); 14];
+    #[inline(always)]
+    #[allow(unused_variables)]
+    fn pair_adjacent_maybe_odd(self, fallback: T) -> Self::AdjacentPairs {
+        match self {
+            [self_0, self_1, self_2, self_3, self_4, self_5, self_6, self_7, self_8, self_9, self_10, self_11, self_12, self_13, self_14, self_15, self_16, self_17, self_18, self_19, self_20, self_21, self_22, self_23, self_24, self_25, self_26, self_27] => {
+                [
+                    (self_0, self_1),
+                    (self_2, self_3),
+                    (self_4, self_5),
+                    (self_6, self_7),
+                    (self_8, self_9),
+                    (self_10, self_11),
+                    (self_12, self_13),
+                    (self_14, self_15),
+                    (self_16, self_17),
+                    (self_18, self_19),
+                    (self_20, self_21),
+                    (self_22, self_23),
+                    (self_24, self_25),
+                    (self_26, self_27),
+                ]
+            }
+        }
+    }
+}
+impl<T> EvenArrayAdjacentPairs for [T; 28] {
     #[inline(always)]
     fn pair_adjacent(self) -> Self::AdjacentPairs {
         match self {
@@ -3748,6 +4312,35 @@ impl UnrollableArraySize<29> for ArrayUnrolledOps {
         }
     }
 }
+impl<T> ArrayAdjacentPairs for [T; 29] {
+    type T = T;
+    type AdjacentPairs = [(T, T); 15];
+    #[inline(always)]
+    #[allow(unused_variables)]
+    fn pair_adjacent_maybe_odd(self, fallback: T) -> Self::AdjacentPairs {
+        match self {
+            [self_0, self_1, self_2, self_3, self_4, self_5, self_6, self_7, self_8, self_9, self_10, self_11, self_12, self_13, self_14, self_15, self_16, self_17, self_18, self_19, self_20, self_21, self_22, self_23, self_24, self_25, self_26, self_27, self_28] => {
+                [
+                    (self_0, self_1),
+                    (self_2, self_3),
+                    (self_4, self_5),
+                    (self_6, self_7),
+                    (self_8, self_9),
+                    (self_10, self_11),
+                    (self_12, self_13),
+                    (self_14, self_15),
+                    (self_16, self_17),
+                    (self_18, self_19),
+                    (self_20, self_21),
+                    (self_22, self_23),
+                    (self_24, self_25),
+                    (self_26, self_27),
+                    (self_28, fallback),
+                ]
+            }
+        }
+    }
+}
 impl UnrollableArraySize<30> for ArrayUnrolledOps {
     #[inline(always)]
     fn array_generate<T, F: FnMut(usize) -> T>(mut f: F) -> [T; 30] {
@@ -3949,7 +4542,35 @@ impl UnrollableArraySize<30> for ArrayUnrolledOps {
     }
 }
 impl<T> ArrayAdjacentPairs for [T; 30] {
+    type T = T;
     type AdjacentPairs = [(T, T); 15];
+    #[inline(always)]
+    #[allow(unused_variables)]
+    fn pair_adjacent_maybe_odd(self, fallback: T) -> Self::AdjacentPairs {
+        match self {
+            [self_0, self_1, self_2, self_3, self_4, self_5, self_6, self_7, self_8, self_9, self_10, self_11, self_12, self_13, self_14, self_15, self_16, self_17, self_18, self_19, self_20, self_21, self_22, self_23, self_24, self_25, self_26, self_27, self_28, self_29] => {
+                [
+                    (self_0, self_1),
+                    (self_2, self_3),
+                    (self_4, self_5),
+                    (self_6, self_7),
+                    (self_8, self_9),
+                    (self_10, self_11),
+                    (self_12, self_13),
+                    (self_14, self_15),
+                    (self_16, self_17),
+                    (self_18, self_19),
+                    (self_20, self_21),
+                    (self_22, self_23),
+                    (self_24, self_25),
+                    (self_26, self_27),
+                    (self_28, self_29),
+                ]
+            }
+        }
+    }
+}
+impl<T> EvenArrayAdjacentPairs for [T; 30] {
     #[inline(always)]
     fn pair_adjacent(self) -> Self::AdjacentPairs {
         match self {
@@ -4181,6 +4802,36 @@ impl UnrollableArraySize<31> for ArrayUnrolledOps {
         }
     }
 }
+impl<T> ArrayAdjacentPairs for [T; 31] {
+    type T = T;
+    type AdjacentPairs = [(T, T); 16];
+    #[inline(always)]
+    #[allow(unused_variables)]
+    fn pair_adjacent_maybe_odd(self, fallback: T) -> Self::AdjacentPairs {
+        match self {
+            [self_0, self_1, self_2, self_3, self_4, self_5, self_6, self_7, self_8, self_9, self_10, self_11, self_12, self_13, self_14, self_15, self_16, self_17, self_18, self_19, self_20, self_21, self_22, self_23, self_24, self_25, self_26, self_27, self_28, self_29, self_30] => {
+                [
+                    (self_0, self_1),
+                    (self_2, self_3),
+                    (self_4, self_5),
+                    (self_6, self_7),
+                    (self_8, self_9),
+                    (self_10, self_11),
+                    (self_12, self_13),
+                    (self_14, self_15),
+                    (self_16, self_17),
+                    (self_18, self_19),
+                    (self_20, self_21),
+                    (self_22, self_23),
+                    (self_24, self_25),
+                    (self_26, self_27),
+                    (self_28, self_29),
+                    (self_30, fallback),
+                ]
+            }
+        }
+    }
+}
 impl UnrollableArraySize<32> for ArrayUnrolledOps {
     #[inline(always)]
     fn array_generate<T, F: FnMut(usize) -> T>(mut f: F) -> [T; 32] {
@@ -4393,7 +5044,36 @@ impl UnrollableArraySize<32> for ArrayUnrolledOps {
     }
 }
 impl<T> ArrayAdjacentPairs for [T; 32] {
+    type T = T;
     type AdjacentPairs = [(T, T); 16];
+    #[inline(always)]
+    #[allow(unused_variables)]
+    fn pair_adjacent_maybe_odd(self, fallback: T) -> Self::AdjacentPairs {
+        match self {
+            [self_0, self_1, self_2, self_3, self_4, self_5, self_6, self_7, self_8, self_9, self_10, self_11, self_12, self_13, self_14, self_15, self_16, self_17, self_18, self_19, self_20, self_21, self_22, self_23, self_24, self_25, self_26, self_27, self_28, self_29, self_30, self_31] => {
+                [
+                    (self_0, self_1),
+                    (self_2, self_3),
+                    (self_4, self_5),
+                    (self_6, self_7),
+                    (self_8, self_9),
+                    (self_10, self_11),
+                    (self_12, self_13),
+                    (self_14, self_15),
+                    (self_16, self_17),
+                    (self_18, self_19),
+                    (self_20, self_21),
+                    (self_22, self_23),
+                    (self_24, self_25),
+                    (self_26, self_27),
+                    (self_28, self_29),
+                    (self_30, self_31),
+                ]
+            }
+        }
+    }
+}
+impl<T> EvenArrayAdjacentPairs for [T; 32] {
     #[inline(always)]
     fn pair_adjacent(self) -> Self::AdjacentPairs {
         match self {
