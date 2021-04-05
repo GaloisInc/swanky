@@ -46,7 +46,7 @@ pub trait Commitment {
     /// A new commitment initialized with `seed`.
     fn new(seed: Self::Seed) -> Self;
     /// A method to add data to the commitment.
-    fn input(&mut self, input: &[u8]) -> ();
+    fn input(&mut self, input: &[u8]);
     /// Complete the commitment.
     fn finish(self) -> Self::Output;
     /// Check if two commitments are equal.

@@ -35,6 +35,16 @@ impl<C: AbstractChannel, RNG: CryptoRng + RngCore> Garbler<C, RNG> {
         }
     }
 
+    #[cfg(feature = "serde1")]
+    /// Load pre-chosen deltas from a file
+    pub fn load_deltas(&mut self, filename: &str) -> Result<(), Box<dyn std::error::Error>> {
+        let f = std::fs::File::open(filename)?;
+        let reader = std::io::BufReader::new(f);
+        let deltas: HashMap<u16, Wire> = serde_json::from_reader(reader)?;
+        self.deltas.extend(deltas.into_iter());
+        Ok(())
+    }
+
     /// The current non-free gate index of the garbling computation
     fn current_gate(&mut self) -> usize {
         let current = self.current_gate;

@@ -12,6 +12,6 @@
 mod cuckoo;
 mod errors;
 mod psi;
-mod utils;
+pub mod utils;
 
 pub use crate::{errors::Error, psi::*};

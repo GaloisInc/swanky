@@ -27,9 +27,14 @@ itertools = "0.10.0"
 rand = "0.7"
 regex = "1.4.3"
 serde = { version = "1.0.123", features = ["derive"], optional = true }
+serde_json = "1.0.58"
 
 [dev-dependencies]
 criterion = "0.3.4"
+
+[[bin]]
+name = "gen-deltas"
+required-features = ["serde1"]
 
 [[bench]]
 name = "wire_operations"

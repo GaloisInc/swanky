@@ -41,7 +41,6 @@ pub trait AbstractChannel {
     fn clone(&self) -> Self
     where
         Self: Sized;
-
     /// Read `nbytes` from the channel, and return it as a `Vec`.
     fn read_vec(&mut self, nbytes: usize) -> Result<Vec<u8>> {
         let mut data = vec![0; nbytes];
@@ -270,6 +269,44 @@ impl<R: Read, W: Write> AbstractChannel for Channel<R, W> {
         Self {
             reader: self.reader.clone(),
             writer: self.writer.clone(),
+        }
+    }
+}
+
+/// Standard Read/Write channel built from a symmetric stream.
+pub struct SymChannel<S> {
+    stream: Rc<RefCell<S>>,
+}
+
+impl<S: Read + Write> SymChannel<S> {
+    /// Make a new `Channel` from a stream.
+    pub fn new(stream: S) -> Self {
+        let stream = Rc::new(RefCell::new(stream));
+        Self { stream }
+    }
+}
+
+impl<S: Read + Write> AbstractChannel for SymChannel<S> {
+    #[inline(always)]
+    fn write_bytes(&mut self, bytes: &[u8]) -> Result<()> {
+        self.stream.borrow_mut().write_all(bytes)?;
+        Ok(())
+    }
+
+    #[inline(always)]
+    fn read_bytes(&mut self, mut bytes: &mut [u8]) -> Result<()> {
+        self.stream.borrow_mut().read_exact(&mut bytes)
+    }
+
+    #[inline(always)]
+    fn flush(&mut self) -> Result<()> {
+        self.stream.borrow_mut().flush()
+    }
+
+    #[inline(always)]
+    fn clone(&self) -> Self {
+        Self {
+            stream: self.stream.clone(),
         }
     }
 }

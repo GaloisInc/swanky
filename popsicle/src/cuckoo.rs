@@ -3,6 +3,15 @@
 // This file is part of `popsicle`.
 // Copyright © 2019 Galois, Inc.
 // See LICENSE for licensing information.
+//
+//
+// TODO:
+//
+// (1) Use ocelot's cuckoo hash (ch) instead of popsicle's: popsicle's current ch has a bug where
+//     it is always full and fails for certain numbers like 100,000 and larger powers of 10.
+// (2) Once (1) is complete, revert handling megabins after the ch is done instead of during (and
+//     effectively get rid of the ch large structure and methods currently in popsicle/src/cuckoo)
+//     the current megabin handling is an artifact of older bugs that stalled the system for large sets
 
 use crate::Error;
 use scuttlebutt::{Aes128, Block};
@@ -19,7 +28,7 @@ pub(crate) struct CuckooItem {
 }
 
 impl CuckooItem {
-    #[cfg(feature = "psty")]
+    #[cfg(any(feature = "psty", feature = "psty_payload"))]
     /// Replace the first byte of the entry with the hash index. Used in PSTY.
     pub fn entry_with_hindex(&self) -> Block {
         let mask = Block::from(0xFFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FF00);

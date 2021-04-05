@@ -8,8 +8,10 @@
 //!
 //! Note: all number representations in this library are little-endian.
 
+use crate::Wire;
 use itertools::Itertools;
 use scuttlebutt::Block;
+use std::collections::HashMap;
 use vectoreyes::{SimdBase, U64x2, U8x16};
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -347,6 +349,16 @@ pub fn product(xs: &[u16]) -> u128 {
 /// Returns `true` if `x` is a power of 2.
 pub fn is_power_of_2(x: u16) -> bool {
     (x & (x - 1)) == 0
+}
+
+/// Generate deltas ahead of time for the Garbler.
+pub fn generate_deltas(primes: &[u16]) -> HashMap<u16, Wire> {
+    let mut deltas = HashMap::new();
+    let mut rng = rand::thread_rng();
+    for q in primes {
+        deltas.insert(*q, Wire::rand_delta(&mut rng, *q));
+    }
+    deltas
 }
 
 /// Extra Rng functionality, useful for `fancy-garbling`.
