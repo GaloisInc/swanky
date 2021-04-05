@@ -24,7 +24,7 @@ impl SvoleSpecializationSend<Gf40> for Gf40Specialization {
         base_voles: &mut Vec<SenderPair>,
         svoles: &mut Vec<SenderPair>,
     ) {
-        if rows == 158_000 {
+        if rows == super::LPN_EXTEND_PARAMS.rows {
             internal_inner(
                 &mut svole.lpn_rng,
                 &svole.base_voles,
@@ -89,7 +89,7 @@ impl SvoleSpecializationRecv<Gf40> for Gf40Specialization {
         mut base_voles: &mut Vec<Gf40>,
         mut svoles: &mut Vec<Gf40>,
     ) {
-        if rows == 158_000 {
+        if rows == super::LPN_EXTEND_PARAMS.rows {
             internal_inner(
                 &mut svole.lpn_rng,
                 &svole.base_voles,
@@ -387,7 +387,9 @@ mod tests {
     #[test]
     fn matrix_entries_test() {
         let mut rng = AesRng::from_seed(Block::default());
-        let dist = UniformIntegersUnderBound::new(158_000);
+        let dist = UniformIntegersUnderBound::new(
+            super::super::LPN_EXTEND_PARAMS.rows.try_into().unwrap(),
+        );
         matrix_entries(&mut rng, &dist);
     }
 }
