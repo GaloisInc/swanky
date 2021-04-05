@@ -17,6 +17,19 @@ use subtle::{Choice, ConditionallySelectable, ConstantTimeEq};
 #[derive(Debug, Eq, Clone, Copy, Hash)]
 pub struct F2(pub(crate) u8);
 
+impl From<bool> for F2 {
+    #[inline(always)]
+    fn from(x: bool) -> Self {
+        F2(x as u8)
+    }
+}
+impl From<F2> for bool {
+    #[inline(always)]
+    fn from(x: F2) -> Self {
+        x.0 != 0
+    }
+}
+
 impl ConstantTimeEq for F2 {
     fn ct_eq(&self, other: &Self) -> Choice {
         self.0.ct_eq(&other.0)

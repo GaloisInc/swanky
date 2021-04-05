@@ -43,8 +43,8 @@ impl Fp {
 }
 
 impl FiniteField for Fp {
-    /// There is a slight bias towards the range $[0,158]$.
-    /// There is a $\frac{159}{2^128} \approx 4.6 \times 10^{-37}$ chance of seeing this bias.
+    /// There is a slight bias towards the range $`[0,158]`$.
+    /// There is a $`\frac{159}{2^128} \approx 4.6 \times 10^{-37}`$ chance of seeing this bias.
     fn random<R: RngCore + ?Sized>(rng: &mut R) -> Self {
         let mut bytes = [0; 16];
         rng.fill_bytes(&mut bytes[..]);
