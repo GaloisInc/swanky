@@ -1,3 +1,20 @@
 [build]
-rustflags = ["-C", "target-cpu=native", "--cfg", "vectoreyes_target_cpu_native"]
-rustdocflags = ["-C", "target-cpu=native", "--cfg", "vectoreyes_target_cpu_native"]
+rustflags = [
+    "-C", "target-cpu=native", "--cfg", "vectoreyes_target_cpu_native",
+    # Disable AVX-512
+    "-C", "target-feature=-avx512bf16,-avx512bitalg,-avx512bw,-avx512cd,-avx512dq,-avx512er,-avx512f,-avx512ifma,-avx512pf,-avx512vbmi,-avx512vbmi2,-avx512vl,-avx512vnni,-avx512vp2intersect,-avx512vpopcntdq",
+]
+rustdocflags = [
+    "-C", "target-cpu=native", "--cfg", "vectoreyes_target_cpu_native",
+    # Disable AVX-512
+    "-C", "target-feature=-avx512bf16,-avx512bitalg,-avx512bw,-avx512cd,-avx512dq,-avx512er,-avx512f,-avx512ifma,-avx512pf,-avx512vbmi,-avx512vbmi2,-avx512vl,-avx512vnni,-avx512vp2intersect,-avx512vpopcntdq",
+    # Uncomment this to get Latex math rendering of documentation.
+    # "--html-in-header", "etc/katex.html",
+
+    # Enabling this breaks tests, since cargo runs rustdoc
+    # tests for workspace members inside their respective directories. As a result, these tests (which shouldn't rightly
+    # require the html-in-header flag) fail, since they can't find this header.
+    # TODO: once https://github.com/rust-lang/rust/issues/78835 gets stabilized (when
+    # https://github.com/rust-lang/rust/pull/83366 gets merged), we can use the hacky XSS approach of
+    # https://github.com/m-ou-se/rust-horrible-katex-hack to avoid this issue altogether.
+]
