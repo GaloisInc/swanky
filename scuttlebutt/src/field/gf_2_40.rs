@@ -10,9 +10,27 @@ use std::{
 use subtle::{Choice, ConditionallySelectable, ConstantTimeEq};
 use vectoreyes::{SimdBase, U64x2};
 
-/// An element of the finite field $\textsf{GF}(2^{40})$ reduced over $x^{40} + x^5 + x^4 + x^3 + 1$
-#[derive(Debug, Clone, Copy, Hash, Eq)]
-pub struct Gf40(pub(crate) u64);
+/// An element of the finite field $`\textsf{GF}(2^{40})`$ reduced over $`x^{40} + x^5 + x^4 + x^3 + 1`$
+#[derive(Debug, Clone, Copy, Hash, Eq, bytemuck::Pod, bytemuck::Zeroable)]
+#[repr(transparent)]
+pub struct Gf40(u64);
+
+impl Gf40 {
+    /// Extract the raw bits of this field element as a `u64`.
+    ///
+    /// Only the lower 40 bits may be set.
+    #[inline(always)]
+    pub fn extract_raw(&self) -> u64 {
+        debug_assert_eq!(self.0 >> 40, 0);
+        self.0
+    }
+
+    /// Construct a field element using the lower 40 bits of the input word.
+    #[inline(always)]
+    pub fn from_lower_40(x: u64) -> Self {
+        Gf40(x & ((1 << 40) - 1))
+    }
+}
 
 impl ConstantTimeEq for Gf40 {
     #[inline]

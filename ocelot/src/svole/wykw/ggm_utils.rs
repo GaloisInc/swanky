@@ -6,6 +6,7 @@
 
 //! Provides an implementation of the GGM construction.
 
+use crate::svole::wykw::specialization::FiniteFieldSendSpecialization;
 use scuttlebutt::{field::FiniteField, utils::unpack_bits, Aes128, Block};
 
 /// Implementation of GGM based on the procedure explained in the write-up
@@ -51,11 +52,11 @@ pub fn ggm<FE: FiniteField>(
 /// (<https://eprint.iacr.org/2019/1084.pdf>, Page 7). GGM' is used compute the
 /// vector of field elements except a path `b1..bn` where `b1` represents the
 /// msb of `alpha`.
-pub fn ggm_prime<FE: FiniteField>(
+pub(super) fn ggm_prime<FE: FiniteField, S: FiniteFieldSendSpecialization<FE>>(
     alpha: usize,
     keys: &[Block],
     aes: &(Aes128, Aes128),
-    results: &mut [(FE::PrimeField, FE)],
+    results: &mut [S::SenderPairContents],
 ) -> FE {
     let depth = keys.len();
     let mut alpha_bits = unpack_bits(&alpha.to_le_bytes(), depth);
@@ -93,10 +94,16 @@ pub fn ggm_prime<FE: FiniteField>(
 
     for j in 0..leaves {
         if j != alpha {
-            results[j].1 = FE::from_uniform_bytes(&<[u8; 16]>::from(sv[leaves + j - 1]));
+            let (u, _w) = S::extract_sender_pair(results[j]);
+            results[j] = S::new_sender_pair(
+                u,
+                FE::from_uniform_bytes(&<[u8; 16]>::from(sv[leaves + j - 1])),
+            );
         }
     }
-    let sum = (0..leaves).map(|j| results[j].1).sum();
+    let sum = (0..leaves)
+        .map(|j| S::extract_sender_pair(results[j]).1)
+        .sum();
 
     sum
 }
@@ -114,7 +121,11 @@ fn bv_to_num(v: &[bool]) -> usize {
 #[allow(unused_imports, dead_code)]
 mod tests {
     use super::{bv_to_num, ggm, ggm_prime};
+    use crate::svole::wykw::specialization::{
+        FiniteFieldSendSpecialization, Gf40Specialization, NoSpecialization,
+    };
     use rand::Rng;
+    use scuttlebutt::field::Gf40;
     use scuttlebutt::{
         field::{F61p, FiniteField, Fp, Gf128, F2},
         utils::unpack_bits,
@@ -128,7 +139,7 @@ mod tests {
         assert_eq!(bv_to_num(&bv), x);
     }
 
-    fn test_ggm_<FE: FiniteField>() {
+    fn test_ggm_<FE: FiniteField, S: FiniteFieldSendSpecialization<FE>>() {
         for _ in 0..10 {
             // Runs for a while if the range is over 20.
             // depth has to be atleast 2.
@@ -151,11 +162,11 @@ mod tests {
                 .zip(keys.iter())
                 .map(|(b, k)| if !*b { k.1 } else { k.0 })
                 .collect();
-            let mut vs_ = vec![(FE::PrimeField::ZERO, FE::ZERO); exp];
-            let _ = ggm_prime::<FE>(alpha, &alpha_keys, &ggm_seeds, &mut vs_);
+            let mut vs_ = vec![S::new_sender_pair(FE::PrimeField::ZERO, FE::ZERO); exp];
+            let _ = ggm_prime::<FE, S>(alpha, &alpha_keys, &ggm_seeds, &mut vs_);
             for i in 0..vs_.len() {
                 if i != alpha {
-                    assert_eq!(vs[i], vs_[i].1);
+                    assert_eq!(vs[i], S::extract_sender_pair(vs_[i]).1);
                 }
             }
         }
@@ -163,9 +174,10 @@ mod tests {
 
     #[test]
     fn test_ggm() {
-        test_ggm_::<Fp>();
-        test_ggm_::<F61p>();
-        test_ggm_::<F2>();
-        test_ggm_::<Gf128>();
+        test_ggm_::<Fp, NoSpecialization>();
+        test_ggm_::<F61p, NoSpecialization>();
+        test_ggm_::<F2, NoSpecialization>();
+        test_ggm_::<Gf128, NoSpecialization>();
+        test_ggm_::<Gf40, Gf40Specialization>();
     }
 }

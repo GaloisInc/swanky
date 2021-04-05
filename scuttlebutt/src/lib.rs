@@ -33,7 +33,7 @@ pub use crate::{
     block512::Block512,
     channel::{AbstractChannel, Channel, HashChannel, SymChannel, SyncChannel, TrackChannel},
     hash_aes::{AesHash, AES_HASH},
-    rand_aes::AesRng,
+    rand_aes::{vectorized::UniformIntegersUnderBound, AesRng},
 };
 
 #[cfg(unix)]

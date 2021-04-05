@@ -276,7 +276,8 @@ class IntelIntrinsicBuilder:
                     return f"{prefix}srli_epi{ty.ty.bits}"
             else:
                 return f"{prefix}slli_epi{ty.ty.bits}"
-        elif op == "gather":
+        elif op in ["gather", "masked_gather"]:
+            masked = 'mask_' if 'masked' in op else ''
             assert ty2 is not None
             values = ty
             indices = ty2
@@ -285,7 +286,7 @@ class IntelIntrinsicBuilder:
                 assert indices.ty.signedness == Signedness.SIGNED
             if indices.bits == 256:
                 prefix = "_mm256_"
-            return f"{prefix}i{indices.ty.bits}gather_epi{values.ty.bits}"
+            return f"{prefix}{masked}i{indices.ty.bits}gather_epi{values.ty.bits}"
         elif op == "convert":
             assert ty2 is not None
             dst = ty

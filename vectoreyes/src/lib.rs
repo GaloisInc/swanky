@@ -212,6 +212,8 @@ pub trait SimdBase<T: Scalar>:
 pub trait SimdBaseGatherable<T: Scalar, I: Scalar, IV: SimdBase<I>>: SimdBase<T> {
     /// Construct a vector by accessing values at `base + indices[i]`
     unsafe fn gather(base: *const T, indices: IV) -> Self;
+    /// Construct a vector by accessing values at `base + indices[i]`, only if the mask is set.
+    unsafe fn gather_masked(base: *const T, indices: IV, mask: Self, src: Self) -> Self;
 }
 
 // TODO: remove this?

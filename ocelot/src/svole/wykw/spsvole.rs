@@ -10,6 +10,9 @@ use super::{
     ggm_utils::{ggm, ggm_prime},
     utils::Powers,
 };
+use crate::svole::wykw::specialization::{
+    FiniteFieldSendSpecialization, FiniteFieldSpecialization,
+};
 use crate::{
     errors::Error,
     ot::{KosReceiver, KosSender, Receiver as OtReceiver, Sender as OtSender},
@@ -25,22 +28,25 @@ use scuttlebutt::{
     utils::unpack_bits,
     AbstractChannel, Aes128, AesRng, Block, Malicious,
 };
+use std::marker::PhantomData;
 
-pub struct Sender<OT: OtReceiver + Malicious, FE: FF> {
+pub(super) struct Sender<OT: OtReceiver + Malicious, FE: FF, S: FiniteFieldSpecialization<FE>> {
     ot: OT,
     pows: Powers<FE>,
     ggm_seeds: (Aes128, Aes128),
+    phantom: PhantomData<S>,
 }
 
-pub struct Receiver<OT: OtSender + Malicious, FE: FF> {
+pub(super) struct Receiver<OT: OtSender + Malicious, FE: FF, S: FiniteFieldSpecialization<FE>> {
     ot: OT,
     delta: FE,
     pows: Powers<FE>,
     ggm_seeds: (Aes128, Aes128),
+    phantom: PhantomData<S>,
 }
 
-pub type SpsSender<FE> = Sender<KosReceiver, FE>;
-pub type SpsReceiver<FE> = Receiver<KosSender, FE>;
+pub(super) type SpsSender<FE, S> = Sender<KosReceiver, FE, S>;
+pub(super) type SpsReceiver<FE, S> = Receiver<KosSender, FE, S>;
 
 // Implementation of the EQ protocol functionality described in
 // <https://eprint.iacr.org/2020/925.pdf>, Page 30.
@@ -91,8 +97,10 @@ fn eq_receive<C: AbstractChannel, RNG: CryptoRng + Rng, FE: FF>(
     Ok(x == y)
 }
 
-impl<OT: OtReceiver<Msg = Block> + Malicious, FE: FF> Sender<OT, FE> {
-    pub fn init<C: AbstractChannel, RNG: CryptoRng + Rng>(
+impl<OT: OtReceiver<Msg = Block> + Malicious, FE: FF, S: FiniteFieldSendSpecialization<FE>>
+    Sender<OT, FE, S>
+{
+    pub(super) fn init<C: AbstractChannel, RNG: CryptoRng + Rng>(
         channel: &mut C,
         pows: Powers<FE>,
         rng: &mut RNG,
@@ -107,16 +115,17 @@ impl<OT: OtReceiver<Msg = Block> + Malicious, FE: FF> Sender<OT, FE> {
             pows,
             ot,
             ggm_seeds: (aes0, aes1),
+            phantom: PhantomData,
         })
     }
 
-    pub fn send<C: AbstractChannel, RNG: CryptoRng + Rng>(
+    pub(super) fn send<C: AbstractChannel, RNG: CryptoRng + Rng>(
         &mut self,
         channel: &mut C,
-        n: usize,                            // Equal to cols / weight
-        base_voles: &[(FE::PrimeField, FE)], // Equals to weight + r
+        n: usize,                             // Equal to cols / weight
+        base_voles: &[S::SenderPairContents], // Equals to weight + r
         mut rng: &mut RNG,
-    ) -> Result<Vec<(FE::PrimeField, FE)>, Error> {
+    ) -> Result<Vec<S::SenderPairContents>, Error> {
         debug_assert!(
             (n as u128 - 1).leading_zeros() + (n as u128).trailing_zeros() == 128,
             "expected power of 2, instead found: {}",
@@ -128,15 +137,15 @@ impl<OT: OtReceiver<Msg = Block> + Malicious, FE: FF> Sender<OT, FE> {
         let base_uws = &base_voles[0..total_len - r];
         let base_consistency = &base_voles[total_len - r..];
         let t = base_uws.len();
-        let mut result = vec![(FE::PrimeField::ZERO, FE::ZERO); n * t];
+        let mut result = vec![S::new_sender_pair(FE::PrimeField::ZERO, FE::ZERO); n * t];
         let mut betas = Vec::with_capacity(t);
 
-        for (a, _) in base_uws.iter() {
+        for (a, _) in base_uws.iter().copied().map(S::extract_sender_pair) {
             let mut beta = FE::PrimeField::random(&mut rng);
             while beta == FE::PrimeField::ZERO {
                 beta = FE::PrimeField::random(&mut rng);
             }
-            let a_prime = beta - *a;
+            let a_prime = beta - a;
             channel.write_fe(a_prime)?;
             betas.push(beta);
         }
@@ -155,18 +164,19 @@ impl<OT: OtReceiver<Msg = Block> + Malicious, FE: FF> Sender<OT, FE> {
 
         for (i, ((_, w), (alpha, beta))) in base_uws
             .iter()
+            .copied()
+            .map(S::extract_sender_pair)
             .zip(alphas.iter().zip(betas.into_iter()))
             .enumerate()
         {
-            let sum = ggm_prime(
+            let sum = ggm_prime::<FE, S>(
                 *alpha,
                 &keys[i * nbits..(i + 1) * nbits],
                 &self.ggm_seeds,
                 &mut result[i * n..(i + 1) * n],
             );
             let d: FE = channel.read_fe()?;
-            result[i * n + alpha].0 = beta;
-            result[i * n + alpha].1 = *w - (d + sum);
+            result[i * n + alpha] = S::new_sender_pair(beta, w - (d + sum));
         }
 
         self.send_batch_consistency_check(channel, &result, &base_consistency, rng)?;
@@ -178,8 +188,8 @@ impl<OT: OtReceiver<Msg = Block> + Malicious, FE: FF> Sender<OT, FE> {
     fn send_batch_consistency_check<C: AbstractChannel, RNG: CryptoRng + Rng>(
         &mut self,
         channel: &mut C,
-        uws: &[(FE::PrimeField, FE)],      // length = m * t = n
-        base_uws: &[(FE::PrimeField, FE)], // length = r
+        uws: &[S::SenderPairContents],      // length = m * t = n
+        base_uws: &[S::SenderPairContents], // length = r
         rng: &mut RNG,
     ) -> Result<(), Error> {
         let r = FE::PolynomialFormNumCoefficients::to_usize();
@@ -188,29 +198,28 @@ impl<OT: OtReceiver<Msg = Block> + Malicious, FE: FF> Sender<OT, FE> {
         let mut rng_chi = AesRng::from_seed(seed);
         let mut va = FE::ZERO;
         let mut x_stars = vec![FE::PrimeField::ZERO; r];
-        for (u, w) in uws.iter() {
+        for (u, w) in uws.iter().copied().map(S::extract_sender_pair) {
             let chi = FE::random(&mut rng_chi);
-            va += chi * *w;
+            va += chi * w;
             // There will be one, and exactly one, `u` (= `β`) which is
             // non-zero. Don't `break` after we hit this one to avoid a
             // potential side-channel attack.
-            if *u != FE::PrimeField::ZERO {
+            if u != FE::PrimeField::ZERO {
                 for (x, y) in x_stars
                     .iter_mut()
                     .zip(chi.to_polynomial_coefficients().into_iter())
                 {
-                    *x += *u * y;
+                    *x += u * y;
                 }
             }
         }
-        for (pows, (x_star, (u, w))) in self
-            .pows
-            .get()
-            .iter()
-            .zip(x_stars.iter().zip(base_uws.iter()))
-        {
-            channel.write_fe(*x_star - *u)?;
-            va -= *pows * *w;
+        for (pows, (x_star, (u, w))) in self.pows.get().iter().zip(
+            x_stars
+                .iter()
+                .zip(base_uws.iter().copied().map(S::extract_sender_pair)),
+        ) {
+            channel.write_fe(*x_star - u)?;
+            va -= *pows * w;
         }
         channel.write_block(&seed)?;
         channel.flush()?;
@@ -223,7 +232,7 @@ impl<OT: OtReceiver<Msg = Block> + Malicious, FE: FF> Sender<OT, FE> {
         }
     }
 
-    pub fn duplicate<C: AbstractChannel, RNG: CryptoRng + Rng>(
+    pub(super) fn duplicate<C: AbstractChannel, RNG: CryptoRng + Rng>(
         &mut self,
         channel: &mut C,
         rng: &mut RNG,
@@ -233,12 +242,15 @@ impl<OT: OtReceiver<Msg = Block> + Malicious, FE: FF> Sender<OT, FE> {
             ot,
             pows: self.pows.clone(),
             ggm_seeds: self.ggm_seeds.clone(),
+            phantom: PhantomData,
         })
     }
 }
 
-impl<OT: OtSender<Msg = Block> + Malicious, FE: FF> Receiver<OT, FE> {
-    pub fn init<C: AbstractChannel, RNG: CryptoRng + Rng>(
+impl<OT: OtSender<Msg = Block> + Malicious, FE: FF, S: FiniteFieldSpecialization<FE>>
+    Receiver<OT, FE, S>
+{
+    pub(super) fn init<C: AbstractChannel, RNG: CryptoRng + Rng>(
         channel: &mut C,
         pows: Powers<FE>,
         delta: FE,
@@ -255,10 +267,11 @@ impl<OT: OtSender<Msg = Block> + Malicious, FE: FF> Receiver<OT, FE> {
             delta,
             ot,
             ggm_seeds: (aes0, aes1),
+            phantom: PhantomData,
         })
     }
 
-    pub fn receive<C: AbstractChannel, RNG: CryptoRng + Rng>(
+    pub(super) fn receive<C: AbstractChannel, RNG: CryptoRng + Rng>(
         &mut self,
         channel: &mut C,
         n: usize,
@@ -336,7 +349,7 @@ impl<OT: OtSender<Msg = Block> + Malicious, FE: FF> Receiver<OT, FE> {
         }
     }
 
-    pub fn duplicate<C: AbstractChannel, RNG: CryptoRng + Rng>(
+    pub(super) fn duplicate<C: AbstractChannel, RNG: CryptoRng + Rng>(
         &mut self,
         channel: &mut C,
         rng: &mut RNG,
@@ -347,6 +360,7 @@ impl<OT: OtSender<Msg = Block> + Malicious, FE: FF> Receiver<OT, FE> {
             delta: self.delta,
             pows: self.pows.clone(),
             ggm_seeds: self.ggm_seeds.clone(),
+            phantom: PhantomData,
         })
     }
 }
@@ -360,7 +374,11 @@ mod test {
         },
         SpsReceiver, SpsSender,
     };
+    use crate::svole::wykw::specialization::{
+        FiniteFieldSendSpecialization, Gf40Specialization, NoSpecialization,
+    };
     use generic_array::typenum::Unsigned;
+    use scuttlebutt::field::Gf40;
     use scuttlebutt::{
         field::{F61p, FiniteField as FF, Gf128},
         AesRng, Channel,
@@ -370,7 +388,7 @@ mod test {
         os::unix::net::UnixStream,
     };
 
-    fn test_spsvole_<FE: FF>(cols: usize, weight: usize) {
+    fn test_spsvole_<FE: FF, S: FiniteFieldSendSpecialization<FE>>(cols: usize, weight: usize) {
         let r = FE::PolynomialFormNumCoefficients::to_usize();
         let n = cols / weight;
         let (sender, receiver) = UnixStream::pair().unwrap();
@@ -380,9 +398,9 @@ mod test {
             let writer = BufWriter::new(sender);
             let mut channel = Channel::new(reader, writer);
             let pows = <Powers<_> as Default>::default();
-            let mut base = BaseSender::<FE>::init(&mut channel, pows.clone(), &mut rng).unwrap();
+            let mut base = BaseSender::<FE, S>::init(&mut channel, pows.clone(), &mut rng).unwrap();
             let uw = base.send(&mut channel, weight + r, &mut rng).unwrap();
-            let mut spsvole = SpsSender::<FE>::init(&mut channel, pows, &mut rng).unwrap();
+            let mut spsvole = SpsSender::<FE, S>::init(&mut channel, pows, &mut rng).unwrap();
             spsvole
                 .send(&mut channel, n, &uw[0..weight + r], &mut rng)
                 .unwrap()
@@ -395,16 +413,18 @@ mod test {
         let mut base = BaseReceiver::<FE>::init(&mut channel, pows.clone(), &mut rng).unwrap();
         let v = base.receive(&mut channel, weight + r, &mut rng).unwrap();
         let mut spsvole =
-            SpsReceiver::<FE>::init(&mut channel, pows, base.delta(), &mut rng).unwrap();
+            SpsReceiver::<FE, S>::init(&mut channel, pows, base.delta(), &mut rng).unwrap();
         let vs = spsvole
             .receive(&mut channel, n, &v[0..weight + r], &mut rng)
             .unwrap();
         let uws = handle.join().unwrap();
         for i in 0..weight {
             for j in 0..n {
-                let right =
-                    base.delta().multiply_by_prime_subfield(uws[i * n + j].0) + vs[i * n + j];
-                assert_eq!(uws[i * n + j].1, right);
+                let right = base
+                    .delta()
+                    .multiply_by_prime_subfield(S::extract_sender_pair(uws[i * n + j]).0)
+                    + vs[i * n + j];
+                assert_eq!(S::extract_sender_pair(uws[i * n + j]).1, right);
             }
         }
     }
@@ -414,7 +434,7 @@ mod test {
         let cols = 10_805_248;
         let weight = 1_319;
 
-        test_spsvole_::<Gf128>(cols, weight);
+        test_spsvole_::<Gf128, NoSpecialization>(cols, weight);
     }
 
     #[test]
@@ -422,6 +442,14 @@ mod test {
         let cols = 10_805_248;
         let weight = 1_319;
 
-        test_spsvole_::<F61p>(cols, weight);
+        test_spsvole_::<F61p, NoSpecialization>(cols, weight);
+    }
+
+    #[test]
+    fn test_spsvole_gf40() {
+        let cols = 10_805_248;
+        let weight = 1_319;
+
+        test_spsvole_::<Gf40, Gf40Specialization>(cols, weight);
     }
 }

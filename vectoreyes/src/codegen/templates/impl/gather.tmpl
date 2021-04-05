@@ -22,6 +22,30 @@
                 Self({{avx2i(ty, "gather", VectorType(idx, ty.count))}}::<{{ty.ty.bits // 8}}>(base as *const {{ty.ty.signed}}, indices.0))
             {% endcall %}
             {% endcall %}
+
+            {% call(scalar, avx2) fn(
+                "gather_masked",
+                {"base": "*const " ~ ty.ty, "indices": VectorType(idx, ty.count), "mask": ty, "src": ty},
+                returns=ty,
+                unsafe=True,
+            ) %}
+            {% call scalar() %}
+                {{ty}}::from([
+                    {% for i in range(ty.count) %}
+                    if ({% if ty.ty.signed == ty.ty %}({% endif %}mask.as_array()[{{i}}]{% if ty.ty.signed == ty.ty %} as {{ty.ty.unsigned}}){% endif %} >> {{ty.ty.bits - 1}}) == 1 {
+                        base.offset(indices.as_array()[{{i}}] as isize).read_unaligned()
+                    } else {
+                        src.as_array()[{{i}}]
+                    },
+                    {% endfor %}
+                ])
+            {% endcall %}
+            {% call(avx2i) avx2() %}
+                Self({{avx2i(ty, "masked_gather", VectorType(idx, ty.count))}}::<{{ty.ty.bits // 8}}>(
+                    src.0, base as *const {{ty.ty.signed}}, indices.0, mask.0,
+                ))
+            {% endcall %}
+            {% endcall %}
         }
     {% endfor %}
 {% endif %}

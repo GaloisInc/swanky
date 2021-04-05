@@ -10,10 +10,11 @@ use crate::Block;
 use rand::{CryptoRng, Error, Rng, RngCore, SeedableRng};
 use rand_core::block::{BlockRng64, BlockRngCore};
 use vectoreyes::{
-    array_utils::ArrayUnrolledExt, Aes128EncryptOnly, AesBlockCipher, SimdBase, U32x8, U64x2, U8x16,
+    array_utils::{ArrayUnrolledExt, ArrayUnrolledOps, UnrollableArraySize},
+    Aes128EncryptOnly, AesBlockCipher, SimdBase, U64x2, U8x16,
 };
 
-mod vectorized;
+pub mod vectorized;
 
 /// Implementation of a random number generator based on fixed-key AES.
 ///
@@ -78,12 +79,16 @@ impl AesRng {
         self.0.core.gen_rand_bits()
     }
 
-    /// Generate 32 random `u32`s such that they are sampled uniformly between `[0, BOUND)`.
+    /// Generate `N * 128` random bits.
+    ///
+    /// # Alternatives
+    /// Consider using [Self::random_bits] instead.
     #[inline(always)]
-    pub fn uniform_integers_under_bound<const BOUND: u32>(
-        &mut self,
-    ) -> [U32x8; Aes128EncryptOnly::BLOCK_COUNT_HINT / 2] {
-        vectorized::uniform_integers_under_bound::<BOUND>(self)
+    pub fn random_bits_custom_size<const N: usize>(&mut self) -> [U8x16; N]
+    where
+        ArrayUnrolledOps: UnrollableArraySize<N>,
+    {
+        self.0.core.gen_rand_bits()
     }
 }
 
@@ -104,8 +109,11 @@ pub struct AesRngCore {
 
 impl AesRngCore {
     #[inline(always)]
-    fn gen_rand_bits(&mut self) -> [U8x16; Aes128EncryptOnly::BLOCK_COUNT_HINT] {
-        let blocks = <[U8x16; Aes128EncryptOnly::BLOCK_COUNT_HINT]>::array_generate(
+    fn gen_rand_bits<const N: usize>(&mut self) -> [U8x16; N]
+    where
+        ArrayUnrolledOps: UnrollableArraySize<N>,
+    {
+        let blocks = <[U8x16; N]>::array_generate(
             #[inline(always)]
             |_| {
                 let x = self.counter;
@@ -124,7 +132,7 @@ impl BlockRngCore for AesRngCore {
     // Compute `E(state)` eight times, where `state` is a counter.
     #[inline]
     fn generate(&mut self, results: &mut Self::Results) {
-        *results = bytemuck::cast(self.gen_rand_bits());
+        *results = bytemuck::cast(self.gen_rand_bits::<{ Aes128EncryptOnly::BLOCK_COUNT_HINT }>());
     }
 }
 
@@ -160,16 +168,5 @@ mod tests {
         let a = rng.gen::<[Block; 8]>();
         let b = rng.gen::<[Block; 8]>();
         assert_ne!(a, b);
-    }
-
-    #[test]
-    fn uniform_integers_under_bound() {
-        let mut rng = AesRng::seed_from_u64(12);
-        const BOUND: u32 = 126;
-        for x in rng.uniform_integers_under_bound::<BOUND>().iter() {
-            for y in x.as_array().iter() {
-                assert!(*y < BOUND);
-            }
-        }
     }
 }

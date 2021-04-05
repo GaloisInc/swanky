@@ -146,62 +146,85 @@ use crate::SimdBaseGatherable;
     {% for idx in [core.i32, core.u64, core.i64] %}
         {% if VectorType(idx, ty.count) not in VECTOR_TYPES %}{% continue %}{% endif %}
         {% set SIZE = 128 %}
-        proptest! {
-            #[test]
-            fn test_gather_{{idx}}(
-                {% do assert_eq(SIZE % 32, 0) %}
-                {% for i in range(SIZE // 32) %}
-                    {# Proptest arbitrary only goes up to size 32. #}
-                    data_{{i}} in any::<[{{ty.ty}} ; 32]>(),
-                {% endfor %}
-                {% for i in range(ty.count) %}
-                    idx_{{i}} in
-                    {% if idx.signedness == Signedness.SIGNED %}
-                        -{{SIZE//2}}..{{SIZE//2}}_{{idx}}
-                    {% else %}
-                        0..{{SIZE}}_{{idx}}
+        {% for masked in ["_masked", ""] %}
+            proptest! {
+                #[test]
+                fn test_gather{{masked}}_{{idx}}(
+                    {% do assert_eq(SIZE % 32, 0) %}
+                    {% for i in range(SIZE // 32) %}
+                        {# Proptest arbitrary only goes up to size 32. #}
+                        data_{{i}} in any::<[{{ty.ty}} ; 32]>(),
+                    {% endfor %}
+                    {% for i in range(ty.count) %}
+                        idx_{{i}} in
+                        {% if idx.signedness == Signedness.SIGNED %}
+                            -{{SIZE//2}}..{{SIZE//2}}_{{idx}}
+                        {% else %}
+                            0..{{SIZE}}_{{idx}}
+                        {% endif %}
+                        ,
+                    {% endfor %}
+                    {% if masked %}
+                        src in any::<{{ty.array}}>(),
+                        mask in any::<[bool; {{ty.count}}]>(),
                     {% endif %}
-                    ,
-                {% endfor %}
-            ) {
-                let mut data = vec![0; {{SIZE}}];
-                {% for i in range(SIZE // 32) %}
-                    data[{{i * 32}}..{{(i + 1) * 32}}].copy_from_slice(&data_{{i}});
-                {% endfor %}
-                let idx = [
-                    {% for i in range(ty.count) %}
-                        idx_{{i}},
+                ) {
+                    let mut data = vec![0; {{SIZE}}];
+                    {% for i in range(SIZE // 32) %}
+                        data[{{i * 32}}..{{(i + 1) * 32}}].copy_from_slice(&data_{{i}});
                     {% endfor %}
-                ];
-                let safe_out = [
-                    {% for i in range(ty.count) %}
-                        data[
-                            usize::try_from(idx_{{i}}
-                            {% if idx.signedness == Signedness.SIGNED %}
-                                + {{SIZE // 2}}
-                            {% endif %}).unwrap()
-                        ],
-                    {% endfor %}
-                ];
-                {% for backend in ["scalar", "crate"] %}
-                    let {{backend}}_out = {
-                        use {{backend}}::*;
-                        let idx = {{VectorType(idx, ty.count)}}::from(idx);
-                        unsafe {
-                            {{ty}}::gather(
-                                data.as_ptr()
+                    let idx = [
+                        {% for i in range(ty.count) %}
+                            idx_{{i}},
+                        {% endfor %}
+                    ];
+                    let safe_out = [
+                        {% for i in range(ty.count) %}
+                            {% if masked %}
+                                if mask[{{i}}] {
+                            {% endif %}
+                            data[
+                                usize::try_from(idx_{{i}}
                                 {% if idx.signedness == Signedness.SIGNED %}
-                                    .offset({{SIZE // 2}})
-                                {% endif %},
-                                idx,
-                            )
-                        }.as_array()
-                    };
-                {% endfor %}
-                prop_assert_eq!(scalar_out, safe_out);
-                prop_assert_eq!(scalar_out, crate_out);
+                                    + {{SIZE // 2}}
+                                {% endif %}).unwrap()
+                            ]
+                            {% if masked %}
+                                } else {
+                                    src[{{i}}]
+                                }
+                            {% endif %}
+                            ,
+                        {% endfor %}
+                    ];
+                    {% for backend in ["scalar", "crate"] %}
+                        let {{backend}}_out = {
+                            use {{backend}}::*;
+                            let idx = {{VectorType(idx, ty.count)}}::from(idx);
+                            unsafe {
+                                {{ty}}::gather{{masked}}(
+                                    data.as_ptr()
+                                    {% if idx.signedness == Signedness.SIGNED %}
+                                        .offset({{SIZE // 2}})
+                                    {% endif %},
+                                    idx,
+                                    {% if masked %}
+                                        {{ty}}::from([
+                                            {% for i in range(ty.count) %}
+                                                ((mask[{{i}}] as {{ty.ty.unsigned}}) << {{ty.ty.bits - 1}}) as {{ty.ty}},
+                                            {% endfor %}
+                                        ]),
+                                        {{ty}}::from(src),
+                                    {% endif %}
+                                )
+                            }.as_array()
+                        };
+                    {% endfor %}
+                    prop_assert_eq!(scalar_out, safe_out);
+                    prop_assert_eq!(scalar_out, crate_out);
+                }
             }
-        }
+        {% endfor %}
     {% endfor %}
 {% endif %}
 

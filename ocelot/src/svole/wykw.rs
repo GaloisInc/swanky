@@ -10,6 +10,7 @@
 mod base_svole;
 mod copee;
 mod ggm_utils;
+mod specialization;
 mod spsvole;
 mod svole;
 mod utils;
