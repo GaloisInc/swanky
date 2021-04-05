@@ -6,15 +6,16 @@
 
 //! Subfield vector oblivious linear evaluation benchmarks using `criterion`.
 
+// TODO: criterion might not be the best choice for larger benchmarks.
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use ocelot::svole::{
     wykw::{Receiver, Sender},
     SVoleReceiver, SVoleSender,
 };
-use rand::Rng;
+
 use scuttlebutt::{
-    field::{F61p, FiniteField, Fp, Gf128},
-    Aes128, AesRng, Block, Channel,
+    field::{F61p, Fp, Gf128},
+    AesRng, Channel,
 };
 use std::{
     io::{BufReader, BufWriter},
@@ -23,8 +24,9 @@ use std::{
     time::Duration,
 };
 
-#[path = "../src/svole/wykw/ggm_utils.rs"]
-mod ggm_utils;
+// TODO: re-enable ggm_utils benchmarks once we've sorted out the private modules issue.
+/*#[path = "../src/svole/wykw/ggm_utils.rs"]
+mod ggm_utils;*/
 
 fn svole_init<
     VSender: SVoleSender + Sync + Send + 'static,
@@ -64,14 +66,20 @@ fn bench_svole<
         let writer = BufWriter::new(sender);
         let mut channel = Channel::new(reader, writer);
         let mut vole_sender = vole_sender.lock().unwrap();
-        black_box(vole_sender.send(&mut channel, &mut rng)).unwrap();
+        let mut out = Vec::new();
+        vole_sender.send(&mut channel, &mut rng, &mut out).unwrap();
+        black_box(out);
     });
     let mut rng = AesRng::new();
     let reader = BufReader::new(receiver.try_clone().unwrap());
     let writer = BufWriter::new(receiver);
     let mut channel = Channel::new(reader, writer);
     let mut vole_receiver = vole_receiver.lock().unwrap();
-    black_box(vole_receiver.receive(&mut channel, &mut rng)).unwrap();
+    let mut out = Vec::new();
+    vole_receiver
+        .receive(&mut channel, &mut rng, &mut out)
+        .unwrap();
+    black_box(out);
     handle.join().unwrap();
 }
 
@@ -142,7 +150,7 @@ fn bench_svole_init_f61p(c: &mut Criterion) {
     });
 }
 
-fn bench_ggm_<FE: FiniteField>(depth: usize, seed: Block, aes: &(Aes128, Aes128)) {
+/*fn bench_ggm_<FE: FiniteField>(depth: usize, seed: Block, aes: &(Aes128, Aes128)) {
     let exp = 1 << depth;
     let mut vs = vec![FE::ZERO; exp];
     black_box(ggm_utils::ggm(depth, seed, aes, &mut vs));
@@ -163,7 +171,7 @@ fn bench_ggm(c: &mut Criterion) {
             bench_ggm_::<F61p>(depth, seed, &(aes0.clone(), aes1.clone()));
         })
     });
-}
+}*/
 
 criterion_group! {
     name = svole;
@@ -173,7 +181,7 @@ criterion_group! {
         bench_svole_init_gf128,
         bench_svole_f61p,
         bench_svole_gf128,
-        bench_ggm,
+        //bench_ggm,
         bench_svole_fp,
         bench_svole_init_fp
 }

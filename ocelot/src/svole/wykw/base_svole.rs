@@ -12,13 +12,16 @@ use super::{
     utils::Powers,
 };
 use crate::errors::Error;
+use crate::svole::wykw::specialization::FiniteFieldSendSpecialization;
 use generic_array::typenum::Unsigned;
 use rand::{CryptoRng, Rng, SeedableRng};
 use scuttlebutt::{field::FiniteField as FF, AbstractChannel, AesRng};
+use std::marker::PhantomData;
 
-pub struct Sender<FE: FF> {
+pub(super) struct Sender<FE: FF, S: FiniteFieldSendSpecialization<FE>> {
     copee: CopeeSender<FE>,
     pows: Powers<FE>,
+    phantom: PhantomData<S>,
 }
 
 pub struct Receiver<FE: FF> {
@@ -26,14 +29,18 @@ pub struct Receiver<FE: FF> {
     pows: Powers<FE>,
 }
 
-impl<FE: FF> Sender<FE> {
+impl<FE: FF, S: FiniteFieldSendSpecialization<FE>> Sender<FE, S> {
     pub fn init<C: AbstractChannel, RNG: CryptoRng + Rng>(
         channel: &mut C,
         pows: Powers<FE>,
         rng: &mut RNG,
     ) -> Result<Self, Error> {
         let copee = CopeeSender::<FE>::init(channel, pows.clone(), rng)?;
-        Ok(Self { copee, pows })
+        Ok(Self {
+            copee,
+            pows,
+            phantom: PhantomData,
+        })
     }
 
     pub fn send<C: AbstractChannel, RNG: CryptoRng + Rng>(
@@ -41,12 +48,12 @@ impl<FE: FF> Sender<FE> {
         channel: &mut C,
         n: usize,
         mut rng: &mut RNG,
-    ) -> Result<Vec<(FE::PrimeField, FE)>, Error> {
+    ) -> Result<Vec<S::SenderPairContents>, Error> {
         let mut uws = Vec::with_capacity(n);
         for _ in 0..n {
             let u = FE::PrimeField::random(&mut rng);
             let w = self.copee.send(channel, &u)?;
-            uws.push((u, w));
+            uws.push(S::new_sender_pair(u, w));
         }
         let mut z: FE = FE::ZERO;
         let mut x: FE = FE::ZERO;
@@ -59,10 +66,10 @@ impl<FE: FF> Sender<FE> {
         channel.flush()?;
         let seed = channel.read_block()?;
         let mut rng_chi = AesRng::from_seed(seed);
-        for (u, w) in uws.iter() {
+        for (u, w) in uws.iter().copied().map(S::extract_sender_pair) {
             let chi = FE::random(&mut rng_chi);
-            z += chi * *w;
-            x += chi.multiply_by_prime_subfield(*u);
+            z += chi * w;
+            x += chi.multiply_by_prime_subfield(u);
         }
         channel.write_fe(x)?;
         channel.write_fe(z)?;
@@ -120,8 +127,12 @@ impl<FE: FF> Receiver<FE> {
 #[cfg(test)]
 mod tests {
     use super::{super::utils::Powers, Receiver, Sender};
+    use crate::svole::wykw::specialization::{
+        FiniteFieldSendSpecialization, Gf40Specialization, NoSpecialization,
+    };
+    use scuttlebutt::field::Gf40;
     use scuttlebutt::{
-        field::{F61p, FiniteField as FF, Fp, Gf128, F2},
+        field::{F61p, FiniteField as FF, Fp, Gf128},
         AesRng, Channel,
     };
     use std::{
@@ -129,7 +140,7 @@ mod tests {
         os::unix::net::UnixStream,
     };
 
-    fn test_base_svole<FE: FF>(len: usize) {
+    fn test_base_svole<FE: FF, S: FiniteFieldSendSpecialization<FE>>(len: usize) {
         let (sender, receiver) = UnixStream::pair().unwrap();
         let handle = std::thread::spawn(move || {
             let mut rng = AesRng::new();
@@ -137,7 +148,7 @@ mod tests {
             let writer = BufWriter::new(sender);
             let mut channel = Channel::new(reader, writer);
             let pows = <Powers<_> as Default>::default();
-            let mut vole = Sender::<FE>::init(&mut channel, pows, &mut rng).unwrap();
+            let mut vole = Sender::<FE, S>::init(&mut channel, pows, &mut rng).unwrap();
             vole.send(&mut channel, len, &mut rng).unwrap()
         });
         let mut rng = AesRng::new();
@@ -150,17 +161,17 @@ mod tests {
         let delta = vole.delta();
         let uw_s = handle.join().unwrap();
         for i in 0..len {
-            let mut right = delta.multiply_by_prime_subfield(uw_s[i].0);
+            let mut right = delta.multiply_by_prime_subfield(S::extract_sender_pair(uw_s[i]).0);
             right += vs[i];
-            assert_eq!(uw_s[i].1, right);
+            assert_eq!(S::extract_sender_pair(uw_s[i]).1, right);
         }
     }
 
     fn test_base_vole_setup_params_all_fields(len: usize) {
-        test_base_svole::<Fp>(len);
-        test_base_svole::<Gf128>(len);
-        test_base_svole::<F2>(len);
-        test_base_svole::<F61p>(len);
+        test_base_svole::<Fp, NoSpecialization>(len);
+        test_base_svole::<Gf128, NoSpecialization>(len);
+        test_base_svole::<F61p, NoSpecialization>(len);
+        test_base_svole::<Gf40, Gf40Specialization>(len);
     }
 
     #[test]

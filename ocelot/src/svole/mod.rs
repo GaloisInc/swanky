@@ -34,7 +34,8 @@ where
         &mut self,
         channel: &mut C,
         rng: &mut RNG,
-    ) -> Result<Vec<(<Self::Msg as FF>::PrimeField, Self::Msg)>, Error>;
+        out: &mut Vec<(<Self::Msg as FF>::PrimeField, Self::Msg)>,
+    ) -> Result<(), Error>;
     /// Duplicates the sender's state.
     fn duplicate<C: AbstractChannel, RNG: CryptoRng + Rng>(
         &mut self,
@@ -62,7 +63,8 @@ where
         &mut self,
         channel: &mut C,
         rng: &mut RNG,
-    ) -> Result<Vec<Self::Msg>, Error>;
+        out: &mut Vec<Self::Msg>,
+    ) -> Result<(), Error>;
     /// Duplicates the receiver's state.
     fn duplicate<C: AbstractChannel, RNG: CryptoRng + Rng>(
         &mut self,
