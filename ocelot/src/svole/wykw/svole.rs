@@ -45,24 +45,30 @@ struct LpnParams {
 }
 
 // LPN parameters for setup0 phase.
-const LPN_SETUP0_PARAMS: LpnParams = LpnParams {
-    weight: 600,
-    cols: 9_600, // cols / weight = 16
-    rows: 1_220,
-};
+// const LPN_SETUP0_PARAMS: LpnParams = LpnParams {
+//     weight: 600,
+//     cols: 9_600, // cols / weight = 16
+//     rows: 1_220,
+// };
 
 // LPN parameters for setup phase.
 const LPN_SETUP_PARAMS: LpnParams = LpnParams {
-    weight: 2_600,
-    cols: 166_400, // cols / weight = 64
-    rows: 5_060,
+    rows: 19_870,
+    cols: 642_048,
+    weight: 2_508,
+    // weight: 2_600,
+    // cols: 166_400, // cols / weight = 64
+    // rows: 5_060,
 };
 
 // LPN parameters for extend phase.
 const LPN_EXTEND_PARAMS: LpnParams = LpnParams {
-    weight: 4_965,
-    cols: 10_168_320, // cols / weight = 2_048
-    rows: 158_000,
+    rows: 589_760,
+    cols: 10_805_248,
+    weight: 1_319,
+    // weight: 4_965,
+    // cols: 10_168_320, // cols / weight = 2_048
+    // rows: 158_000,
 };
 
 // Constant `d` representing a `d`-local linear code, meaning that each column
@@ -141,7 +147,7 @@ impl<FE: FiniteField, S: SvoleSpecializationSend<FE>> SenderInternal<FE, S> {
         let pows: Powers<FE> = Default::default();
         let mut base_sender = BaseSender::<FE, S>::init(channel, pows.clone(), rng)?;
         let base_voles_setup =
-            base_sender.send(channel, compute_num_saved::<FE>(LPN_SETUP0_PARAMS), rng)?;
+            base_sender.send(channel, compute_num_saved::<FE>(LPN_SETUP_PARAMS), rng)?;
         let spsvole = SpsSender::<FE, S>::init(channel, pows, rng)?;
         let seed = rng.gen::<Block>();
         let seed = scuttlebutt::cointoss::receive(channel, &[seed])?[0];
@@ -154,11 +160,11 @@ impl<FE: FiniteField, S: SvoleSpecializationSend<FE>> SenderInternal<FE, S> {
         };
 
         let mut base_voles_setup = Vec::new();
-        sender.send_internal(channel, LPN_SETUP0_PARAMS, 0, rng, &mut base_voles_setup)?;
+        sender.send_internal(channel, LPN_SETUP_PARAMS, 0, rng, &mut base_voles_setup)?;
         sender.base_voles = base_voles_setup;
-        let mut base_voles_extend = Vec::new();
-        sender.send_internal(channel, LPN_SETUP_PARAMS, 0, rng, &mut base_voles_extend)?;
-        sender.base_voles = base_voles_extend;
+        // let mut base_voles_extend = Vec::new();
+        // sender.send_internal(channel, LPN_SETUP_PARAMS, 0, rng, &mut base_voles_extend)?;
+        // sender.base_voles = base_voles_extend;
         Ok(sender)
     }
 
@@ -170,12 +176,6 @@ impl<FE: FiniteField, S: SvoleSpecializationSend<FE>> SenderInternal<FE, S> {
         rng: &mut RNG,
         output: &mut Vec<S::SenderPairContents>,
     ) -> Result<(), Error> {
-        debug_assert!(
-            params == LPN_SETUP0_PARAMS
-                || params == LPN_SETUP_PARAMS
-                || params == LPN_EXTEND_PARAMS
-        );
-
         let rows = params.rows;
         let cols = params.cols;
         let weight = params.weight;
@@ -222,16 +222,22 @@ impl<FE: FiniteField, S: SvoleSpecializationSend<FE>> SenderInternal<FE, S> {
         rng: &mut RNG,
     ) -> Result<Self, Error> {
         let mut base_voles = Vec::new();
-        self.send_internal(channel, LPN_SETUP0_PARAMS, 0, rng, &mut base_voles)?;
-        let mut extras = Vec::new();
         self.send_internal(
             channel,
             LPN_SETUP_PARAMS,
             compute_num_saved::<FE>(LPN_SETUP_PARAMS),
             rng,
-            &mut extras,
+            &mut base_voles,
         )?;
-        base_voles.extend(extras.into_iter());
+        // let mut extras = Vec::new();
+        // self.send_internal(
+        //     channel,
+        //     LPN_SETUP_PARAMS,
+        //     compute_num_saved::<FE>(LPN_SETUP_PARAMS),
+        //     rng,
+        //     &mut extras,
+        // )?;
+        // base_voles.extend(extras.into_iter());
 
         debug_assert!(base_voles.len() >= compute_num_saved::<FE>(LPN_EXTEND_PARAMS));
         debug_assert!(self.base_voles.len() >= compute_num_saved::<FE>(LPN_EXTEND_PARAMS));
@@ -398,10 +404,9 @@ impl<FE: FiniteField, S: SvoleSpecializationRecv<FE>> ReceiverInternal<FE, S> {
         let pows: Powers<FE> = Default::default();
         let mut base_receiver = BaseReceiver::<FE>::init(channel, pows.clone(), rng)?;
         let base_voles_setup =
-            base_receiver.receive(channel, compute_num_saved::<FE>(LPN_SETUP0_PARAMS), rng)?;
+            base_receiver.receive(channel, compute_num_saved::<FE>(LPN_SETUP_PARAMS), rng)?;
         let delta = base_receiver.delta();
         let spsvole = SpsReceiver::<FE, S>::init(channel, pows, delta, rng)?;
-        debug_assert!(base_voles_setup.len() == compute_num_saved::<FE>(LPN_SETUP0_PARAMS));
         let seed = rng.gen::<Block>();
         let seed = scuttlebutt::cointoss::send(channel, &[seed])?[0];
         let lpn_rng = AesRng::from_seed(seed);
@@ -413,11 +418,11 @@ impl<FE: FiniteField, S: SvoleSpecializationRecv<FE>> ReceiverInternal<FE, S> {
             phantom: PhantomData,
         };
         let mut base_voles_setup = Vec::new();
-        receiver.receive_internal(channel, LPN_SETUP0_PARAMS, 0, rng, &mut base_voles_setup)?;
+        receiver.receive_internal(channel, LPN_SETUP_PARAMS, 0, rng, &mut base_voles_setup)?;
         receiver.base_voles = base_voles_setup;
-        let mut base_voles_extend = Vec::new();
-        receiver.receive_internal(channel, LPN_SETUP_PARAMS, 0, rng, &mut base_voles_extend)?;
-        receiver.base_voles = base_voles_extend;
+        // let mut base_voles_extend = Vec::new();
+        // receiver.receive_internal(channel, LPN_SETUP_PARAMS, 0, rng, &mut base_voles_extend)?;
+        // receiver.base_voles = base_voles_extend;
         Ok(receiver)
     }
 
@@ -429,12 +434,6 @@ impl<FE: FiniteField, S: SvoleSpecializationRecv<FE>> ReceiverInternal<FE, S> {
         rng: &mut RNG,
         output: &mut Vec<FE>,
     ) -> Result<(), Error> {
-        debug_assert!(
-            params == LPN_SETUP0_PARAMS
-                || params == LPN_SETUP_PARAMS
-                || params == LPN_EXTEND_PARAMS
-        );
-
         let rows = params.rows;
         let cols = params.cols;
         let weight = params.weight;
@@ -477,16 +476,22 @@ impl<FE: FiniteField, S: SvoleSpecializationRecv<FE>> ReceiverInternal<FE, S> {
         rng: &mut RNG,
     ) -> Result<Self, Error> {
         let mut base_voles = Vec::new();
-        self.receive_internal(channel, LPN_SETUP0_PARAMS, 0, rng, &mut base_voles)?;
-        let mut extras = Vec::new();
         self.receive_internal(
             channel,
             LPN_SETUP_PARAMS,
             compute_num_saved::<FE>(LPN_SETUP_PARAMS),
             rng,
-            &mut extras,
+            &mut base_voles,
         )?;
-        base_voles.extend(extras.into_iter());
+        // let mut extras = Vec::new();
+        // self.receive_internal(
+        //     channel,
+        //     LPN_SETUP_PARAMS,
+        //     compute_num_saved::<FE>(LPN_SETUP_PARAMS),
+        //     rng,
+        //     &mut extras,
+        // )?;
+        // base_voles.extend(extras.into_iter());
 
         debug_assert!(base_voles.len() >= compute_num_saved::<FE>(LPN_EXTEND_PARAMS));
         debug_assert!(self.base_voles.len() >= compute_num_saved::<FE>(LPN_EXTEND_PARAMS));
