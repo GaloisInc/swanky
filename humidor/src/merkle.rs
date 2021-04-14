@@ -174,7 +174,7 @@ impl Lemma {
     pub fn new(
         tree: &Tree,
         U: ArrayView2<Field>,
-        some_indices: &Vec<usize>
+        some_indices: &[usize]
     ) -> Self {
         let some_indices_u32 = some_indices
             .iter()

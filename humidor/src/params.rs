@@ -109,15 +109,28 @@ impl Params {
         Array1::from(self.pss.share(&wf.to_vec()))
     }
 
-    pub fn decode(&self, cf: ArrayView1<Field>) -> Array1<Field> {
+    fn decode_no_strip(&self, cf: ArrayView1<Field>) -> Vec<Field> {
+        use ndarray::{stack, Axis};
+
         debug_assert_eq!(cf.len(), self.n);
 
-        let c0: Vec<_> = cf.iter().take(self.k).cloned().collect();
-        let ixs: Vec<usize> = (0 .. self.k).collect();
+        let coeffs0 = stack!(Axis(0), Array1::zeros(1), cf);
+        let points = crate::numtheory::fft3_inverse(
+            &coeffs0.to_vec(),
+            Field::from(self.pss.omega_shares),
+        );
 
-        Array1::from(self.pss.reconstruct(&ixs, &c0))
+        crate::numtheory::fft2(
+            &points[0 ..= self.k],
+            Field::from(self.pss.omega_secrets),
+        )
     }
 
+    pub fn decode(&self, cf: ArrayView1<Field>) -> Array1<Field> {
+        self.decode_no_strip(cf)[1 ..= self.l].iter().cloned().collect()
+    }
+
+    // Note: This is _slow_! Don't use it if you can avoid it.
     #[allow(dead_code)]
     fn decode_part(&self,
         ixs: &[usize],
@@ -129,22 +142,14 @@ impl Params {
         Array1::from(self.pss.reconstruct(ixs, &cf.to_vec()))
     }
 
-    pub fn codeword_is_valid(&self, ce: ArrayView1<Field>) -> bool {
-        debug_assert_eq!(ce.len(), self.n);
-
-        use ndarray::s;
-        let cd0 = self.decode_part(
-            &(0 .. self.k).collect::<Vec<usize>>(),
-            ce.slice(s![0 .. self.k]).view(),
-        );
-        let cd1 = self.decode_part(
-            &(self.n - self.k .. self.n).collect::<Vec<usize>>(),
-            ce.slice(s![self.n - self.k .. self.n]).view(),
-        );
-
-        // XXX: I think this is necessary for c to be a codeword. Is it
-        // sufficient? I think it is if k > n/2.
-        cd0 == cd1
+    // XXX: Not sure this is sufficient to check whether this is a valid
+    // codeword. Need to check the number of errors this detects, etc.
+    pub fn codeword_is_valid(&self, cf: ArrayView1<Field>) -> bool {
+        self.decode_no_strip(cf)
+            .iter()
+            .enumerate()
+            .filter(|&(ix,_)| ix == 0)
+            .all(|(_,&f)| f == Field::ZERO)
     }
 
     pub fn encode_interleaved(&self, ws: ArrayView1<Field>) -> Array2<Field> {
@@ -239,24 +244,34 @@ impl Params {
     }
 
     // Take a sequence of `n+1` coefficients of the polynomial `p` and
-    // return evaluation points `p(eta_0) .. p(eta_{n+1})`.
-    #[allow(dead_code)]
+    // return evaluation points `p(eta_1) .. p(eta_{n})`. Note that
+    // `p(eta_0)`, which should always be zero for our application, is
+    // not returned.
     pub fn fft3(&self, coeffs: ArrayView1<Field>) -> Array1<Field> {
-        debug_assert!(coeffs.len() <= self.n);
+        debug_assert!(coeffs.len() <= self.n + 1);
 
         let mut coeffs0 = Array1::zeros(self.n + 1);
         coeffs0.slice_mut(ndarray::s!(0 .. coeffs.len())).assign(&coeffs);
-
-        //threshold_secret_sharing::numtheory::fft3(
-        //    &coeffs0.iter().cloned().map(i128::from).collect::<Vec<i128>>(),
-        //    self.pss.omega_shares,
-        //    self.pss.prime,
-        //)[1..].iter().cloned().map(Field::from).collect::<Array1<Field>>()
 
         crate::numtheory::fft3(
             &coeffs0.to_vec(),
             Field::from(self.pss.omega_shares),
         )[1..].iter().cloned().collect()
+    }
+
+    // Take a sequence of _possibly more than_ `n+1` coefficients of the
+    // polynomial `p` and return evaluation points `p(eta_0) .. p(eta_{n})`.
+    // Note that _all_ `n+1` coefficients are returned
+    pub fn fft3_peval(&self, coeffs: ArrayView1<Field>) -> Array1<Field> {
+        let coeffs0 = coeffs.to_vec()[..]
+            .chunks(self.n + 1)
+            .fold(Array1::zeros(self.n + 1),
+                |acc, v| padd(acc.view(), Array1::from(v.to_vec()).view()));
+
+        crate::numtheory::fft3(
+            &coeffs0.to_vec(),
+            Field::from(self.pss.omega_shares),
+        ).iter().cloned().collect()
     }
 
     pub fn peval2(&self, p: ArrayView1<Field>, ix: usize) -> Field {
@@ -444,6 +459,23 @@ proptest! {
     }
 
     #[test]
+    fn test_fft2_peval(
+        (p,v) in any::<Params>().prop_flat_map(|p| {
+            (1 ..= 3*(p.k+1)).prop_flat_map(move |len| {
+                let v = pvec(any::<Field>(), len);
+                (Just(p), v)
+            })
+        })
+    ) {
+        let v_coeffs = Array1::from(v);
+        let v_points = p.fft2_peval(v_coeffs.view());
+
+        for i in 0 .. v_points.len() {
+            prop_assert_eq!(v_points[i], p.peval2(v_coeffs.view(), i));
+        }
+    }
+
+    #[test]
     fn test_peval3(
         (p,v) in any::<Params>().prop_flat_map(|p| {
             let v = pvec(any::<Field>(), p.n + 1);
@@ -453,11 +485,27 @@ proptest! {
         let v_coeffs = crate::numtheory::fft3_inverse(
             &v,
             p.pss.omega_shares,
-            //p.pss.prime,
         ).iter().cloned().map(Field::from).collect::<Array1<Field>>();
 
         for i in 0 .. v.len() {
-            prop_assert_eq!(p.peval3(v_coeffs.view(), i), Field::from(v[i]));
+            prop_assert_eq!(p.peval3(v_coeffs.view(), i), v[i]);
+        }
+    }
+
+    #[test]
+    fn test_fft3_peval(
+        (p,v) in any::<Params>().prop_flat_map(|p| {
+            (1 ..= 3*(p.n+1)).prop_flat_map(move |len| {
+                let v = pvec(any::<Field>(), len);
+                (Just(p), v)
+            })
+        })
+    ) {
+        let v_coeffs = Array1::from(v);
+        let v_points = p.fft3_peval(v_coeffs.view());
+
+        for i in 0 .. v_points.len() {
+            prop_assert_eq!(v_points[i], p.peval3(v_coeffs.view(), i));
         }
     }
 
@@ -500,6 +548,52 @@ proptest! {
                 p.peval3(uv_coeffs.view(), i),
                 p.peval3(ArrayView1::from(&u_coeffs), i)
                     * p.peval3(ArrayView1::from(&v_coeffs), i)
+            );
+        }
+    }
+
+    #[test]
+    fn test_padd(
+        (p, u, v) in any::<Params>().prop_flat_map(|p| {
+            (1..=p.k+1, 1..=p.k+1).prop_flat_map(move |(ulen, vlen)| {
+                let u_coeffs = pvec(any::<Field>(), ulen);
+                let v_coeffs = pvec(any::<Field>(), vlen);
+                (Just(p), u_coeffs, v_coeffs)
+            })
+        })
+    ) {
+        let u_coeffs = Array1::from(u);
+        let v_coeffs = Array1::from(v);
+        let uv_coeffs = padd(u_coeffs.view(), v_coeffs.view());
+
+        for i in 0 .. p.n {
+            prop_assert_eq!(
+                p.peval3(uv_coeffs.view(), i),
+                p.peval3(ArrayView1::from(&u_coeffs), i)
+                    + p.peval3(ArrayView1::from(&v_coeffs), i)
+            );
+        }
+    }
+
+    #[test]
+    fn test_psub(
+        (p, u, v) in any::<Params>().prop_flat_map(|p| {
+            (1..=p.k+1, 1..=p.k+1).prop_flat_map(move |(ulen, vlen)| {
+                let u_coeffs = pvec(any::<Field>(), ulen);
+                let v_coeffs = pvec(any::<Field>(), vlen);
+                (Just(p), u_coeffs, v_coeffs)
+            })
+        })
+    ) {
+        let u_coeffs = Array1::from(u);
+        let v_coeffs = Array1::from(v);
+        let uv_coeffs = psub(u_coeffs.view(), v_coeffs.view());
+
+        for i in 0 .. p.n {
+            prop_assert_eq!(
+                p.peval3(uv_coeffs.view(), i),
+                p.peval3(ArrayView1::from(&u_coeffs), i)
+                    - p.peval3(ArrayView1::from(&v_coeffs), i)
             );
         }
     }

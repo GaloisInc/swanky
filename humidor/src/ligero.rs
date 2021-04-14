@@ -679,88 +679,118 @@ pub mod interactive {
 
         #[allow(non_snake_case)]
         pub fn verify(&self, r4: Round4) -> bool {
-            use ndarray::{stack, Axis};
+            use ndarray::{s, stack, Axis};
 
-            let P = self.public.params;
+            let P = &self.public.params;
             let r0 = self.r0.expect("Round 0 skipped");
             let r1 = self.r1.clone().expect("Round 1 skipped");
             let r2 = self.r2.clone().expect("Round 2 skipped");
             let r3 = self.r3.clone().expect("Round 3 skipped");
 
             // ra_i(zeta_c) = (ra * Pa)[m*i + c]
-            let radd = rows_to_mat(make_ra(&P, &r1.radd, &self.public.Padd));
-            let rx = rows_to_mat(make_ra_Iml_Pa_neg(&P, &r1.rx, &self.public.Px));
-            let ry = rows_to_mat(make_ra_Iml_Pa_neg(&P, &r1.ry, &self.public.Py));
-            let rz = rows_to_mat(make_ra_Iml_Pa_neg(&P, &r1.rz, &self.public.Pz));
+            let radd = rows_to_mat(make_ra(&P, &r1.radd, &self.public.Padd)
+                .iter().map(|r| P.fft3(r.view())).collect::<Vec<_>>());
+            let rx = rows_to_mat(make_ra_Iml_Pa_neg(&P, &r1.rx, &self.public.Px)
+                .iter().map(|r| P.fft3(r.view())).collect::<Vec<_>>());
+            let ry = rows_to_mat(make_ra_Iml_Pa_neg(&P, &r1.ry, &self.public.Py)
+                .iter().map(|r| P.fft3(r.view())).collect::<Vec<_>>());
+            let rz = rows_to_mat(make_ra_Iml_Pa_neg(&P, &r1.rz, &self.public.Pz)
+                .iter().map(|r| P.fft3(r.view())).collect::<Vec<_>>());
 
-            let Ux = r4.Ux_lemma.columns();
-            let Uy = r4.Uy_lemma.columns();
-            let Uz = r4.Uz_lemma.columns();
-            let Uw = r4.Uw_lemma.columns();
-            let U = Ux.iter().zip(Uy).zip(Uz).zip(Uw)
-                .map(|(((x, y), z), w)|
-                    stack!(Axis(0), x.to_owned(), y.to_owned(), z.to_owned(), w.to_owned()));
+            let U = r4.U_lemma.columns();
+            let Uw: Vec<Array1<Field>> = U.iter()
+                .map(|c| c.slice(s![0*P.m..1*P.m]).to_owned()).collect();
+            let Ux: Vec<Array1<Field>> = U.iter()
+                .map(|c| c.slice(s![1*P.m..2*P.m]).to_owned()).collect();
+            let Uy: Vec<Array1<Field>> = U.iter()
+                .map(|c| c.slice(s![2*P.m..3*P.m]).to_owned()).collect();
+            let Uz: Vec<Array1<Field>> = U.iter()
+                .map(|c| c.slice(s![3*P.m..4*P.m]).to_owned()).collect();
 
             // Testing interleaved Reed-Solomon codes
             //      for every j in Q, r*U[j] + u[j] = v[j]
-            U.zip(r4.u.iter()).zip(r2.v.iter())
-                .all(|((U_j, &u_j), &v_j)|
-                    r1.r.dot(&U_j.to_owned()) + u_j == v_j) &&
+            r3.Q.iter().zip(U).zip(r4.u)
+                .all(|((&j, U_j), u_j)|
+                    r1.r.dot(&U_j.to_owned()) + u_j == r2.v[j]) &&
             // Testing addition gates
             //      sum_{c in [l]} qadd(zeta_c) = 0
-            (1..=P.l).map(|c|
-                P.peval2(r2.qadd.view(), c)).sum::<Field>() == Field::ZERO &&
+            P.fft2_peval(r2.qadd.view()).slice(s![1..=P.l]).to_owned()
+                .sum() == Field::ZERO &&
             //      for every j in Q,
             //      uadd[j] + sum_{i in [m]} radd_i(eta_j)*Uw[i,j] = qadd(eta_j)
-            r3.Q.iter().zip(Uw.clone()).zip(r4.uadd.iter())
-                .all(|((&j, Uw_j), &uadd_j)|
-                    uadd_j + radd.column(j).dot(Uw_j)
-                                == P.peval3(r2.qadd.view(), j)) &&
+            r3.Q.iter().zip(Uw.clone()).zip(r4.uadd)
+                .all(|((&j, Uw_j), uadd_j)|
+                    uadd_j + radd.column(j).dot(&Uw_j)
+                                == P.peval3(r2.qadd.view(), j+1)) &&
             // Testing multiplication gates
             //      for every a in {x,y,z}, sum_{c in [l]} qa(zeta_c) = 0
-            (1..=P.l).map(|c| P.peval2(r2.qx.view(), c))
-                            .sum::<Field>() == Field::ZERO &&
-            (1..=P.l).map(|c| P.peval2(r2.qy.view(), c))
-                            .sum::<Field>() == Field::ZERO &&
-            (1..=P.l).map(|c| P.peval2(r2.qz.view(), c))
-                            .sum::<Field>() == Field::ZERO &&
-            //          for every j in Q,
-            //          ua[j] + sum_{i in [m]} ra_i(eta_j)*Ua[i,j]
-            //                + sum_{i in [m]} ra_{m+i}(eta_j)*Uw[i,j] = qa(eta_j)
-            r3.Q.iter().zip(Ux.iter().chain(Uw.clone())).zip(r4.ux.iter())
-                .all(|((&j, Uxw_j), &ux_j)|
-                    ux_j + rx.column(j).dot(Uxw_j)
-                                == P.peval3(r2.qx.view(), j)) &&
-            r3.Q.iter().zip(Uy.iter().chain(Uw.clone())).zip(r4.uy.iter())
-                .all(|((&j, Uyw_j), &uy_j)|
-                    uy_j + ry.column(j).dot(Uyw_j)
-                                == P.peval3(r2.qy.view(), j)) &&
-            r3.Q.iter().zip(Uz.iter().chain(Uw.clone())).zip(r4.uz.iter())
-                .all(|((&j, Uzw_j), &uz_j)|
-                    uz_j + rz.column(j).dot(Uzw_j)
-                                == P.peval3(r2.qz.view(), j)) &&
+            P.fft2_peval(r2.qx.view()).slice(s![1..=P.l]).to_owned()
+                .sum() == Field::ZERO &&
+            P.fft2_peval(r2.qy.view()).slice(s![1..=P.l]).to_owned()
+                .sum() == Field::ZERO &&
+            P.fft2_peval(r2.qz.view()).slice(s![1..=P.l]).to_owned()
+                .sum() == Field::ZERO &&
+            //       for every j in Q,
+            //       ua[j] + sum_{i in [m]} ra_i(eta_j)*Ua[i,j]
+            //             + sum_{i in [m]} ra_{m+i}(eta_j)*Uw[i,j] = qa(eta_j)
+            r3.Q.iter().zip(Ux.clone()).zip(Uw.clone()).zip(r4.ux)
+                .all(|(((&j, Ux_j), Uw_j), ux_j)|
+                    ux_j + rx.column(j).dot(&stack![Axis(0), Ux_j, Uw_j])
+                                == P.peval3(r2.qx.view(), j+1)) &&
+            r3.Q.iter().zip(Uy.clone()).zip(Uw.clone()).zip(r4.uy)
+                .all(|(((&j, Uy_j), Uw_j), uy_j)|
+                    uy_j + ry.column(j).dot(&stack![Axis(0), Uy_j, Uw_j])
+                                == P.peval3(r2.qy.view(), j+1)) &&
+            r3.Q.iter().zip(Uz.clone()).zip(Uw.clone()).zip(r4.uz)
+                .all(|(((&j, Uz_j), Uw_j), uz_j)|
+                    uz_j + rz.column(j).dot(&stack![Axis(0), Uz_j, Uw_j])
+                                == P.peval3(r2.qz.view(), j+1)) &&
             //      for every c in [l], p0(zeta_c) = 0
-            (1..=P.l).all(|c| P.peval2(r2.p0.view(), c) == Field::ZERO) &&
+            P.fft2_peval(r2.p0.view()).slice(s![1..P.l]).into_iter()
+                .all(|&f| f == Field::ZERO) &&
             //      for every j in Q,
             //      u0[j] + rq * (Ux[j] (.) Uy[j] - Uz[j]) = p0(eta_j)
             r3.Q.iter().zip(r4.u0.iter()).zip(Ux).zip(Uy).zip(Uz)
                 .all(|((((&j, &u0_j), Ux_j), Uy_j), Uz_j)| {
-                    let Uxyz = point_product(Ux_j.view(), Uy_j.view()) + Uz_j;
-                    u0_j + r1.rq.dot(&Uxyz) == P.peval3(r2.p0.view(), j)
+                    let Uxyz_j = ndarray::Zip::from(&Ux_j)
+                        .and(&Uy_j)
+                        .and(&Uz_j)
+                        .apply_collect(|&x, &y, &z| x*y - z);
+                    u0_j + r1.rq.dot(&Uxyz_j)
+                        == P.peval3(r2.p0.view(), j+1)
                 }) &&
-            // Check column hashes
-            r4.Uw_lemma.verify(&r0.Uw_root) &&
-            r4.Ux_lemma.verify(&r0.Ux_root) &&
-            r4.Uy_lemma.verify(&r0.Uy_root) &&
-            r4.Uz_lemma.verify(&r0.Uz_root)
+            // Checking column hashes
+            r4.U_lemma.verify(&r0.U_root) &&
+            P.codeword_is_valid(r2.v.view())
         }
+    }
+
+    #[test]
+    fn test_interactive_proof_small() {
+        let ckt = Ckt::test_value();
+        let w = vec![3u64.into(), 1u64.into(), 5u64.into(),
+                        (Field::from(3u64) * Field::from(5u64)).neg()];
+
+        let output = *ckt.eval(&w).last().unwrap();
+        assert_eq!(output, Field::ZERO);
+
+        let p = Prover::new(&ckt, &w);
+        let mut v = Verifier::new(&ckt);
+
+        let r0 = p.round0();
+        let r1 = v.round1(r0);
+        let r2 = p.round2(r1);
+        let r3 = v.round3(r2);
+        let r4 = p.round4(r3);
+
+        assert!(v.verify(r4))
     }
 
     #[cfg(test)]
     proptest! {
         #[test]
-        fn test_interactive_proof(
-            (ckt, w) in any_with::<Ckt>((20, 1000)).prop_flat_map(|ckt| {
+        fn test_interactive_proof_false(
+            (ckt, w) in crate::circuit::arb_ckt(20, 100).prop_flat_map(|ckt| {
                 let w = pvec(any::<Field>(), ckt.inp_size);
                 (Just(ckt), w)
             })
