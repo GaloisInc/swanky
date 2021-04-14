@@ -47,7 +47,7 @@ impl Params {
         if size == 0 { panic!("Empty circuits are not supported") }
         // XXX: There's probably a better way to select these. As it is, we
         // evaluate parameters for all appropriate 2-power/3-power pairs and
-        // select the ones that minimize |n - m|. Since m is the cost of
+        // select the ones that minimize |l - t*m|. Since m is the cost of
         // sending interleaved-codeword columns and n is the cost of sending
         // codeword rows, this should minimize overall proof size. Evaluating
         // all parameter sets seems expensive, but in practice, there aren't
@@ -83,7 +83,7 @@ impl Params {
                 let l = k - t;
                 let m = (size + l - 1) / l;
 
-                let diff = (n as isize - m as isize).abs();
+                let diff = (l as isize - (t*m) as isize).abs();
                 Some((diff, (kexp, nexp, k, l, n, m)))
             })
             //.map(|p| { eprintln!("{:?}", p); p })
@@ -184,13 +184,7 @@ impl Params {
         debug_assert!(points.len() <= self.k);
 
         let mut points0 = Array1::zeros(self.k + 1);
-        points0.slice_mut(ndarray::s!(1 .. points.len()+1)).assign(&points);
-
-        //threshold_secret_sharing::numtheory::fft2_inverse(
-        //    &points0.iter().cloned().map(i128::from).collect::<Vec<i128>>(),
-        //    self.pss.omega_secrets,
-        //    self.pss.prime,
-        //).iter().cloned().map(Field::from).collect::<Array1<Field>>()
+        points0.slice_mut(ndarray::s!(1 ..= points.len())).assign(&points);
 
         crate::numtheory::fft2_inverse(
             &points0.to_vec(),
