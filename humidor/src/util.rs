@@ -1,6 +1,24 @@
 use ndarray::{Array1, ArrayView1};
 
-type Field = crate::f2_19x3_26::F;
+pub type Field = crate::f2_19x3_26::F;
+
+// Trait for collections that allow taking `n` initial elements while ensuring
+// that only zero-elements are dropped from the end.
+pub trait TakeNZ where Self: Sized {
+    fn take_nz(self, n: usize) -> std::iter::Take<Self>;
+}
+
+impl<L> TakeNZ for L where L: Iterator<Item = Field> + Clone {
+    #[inline]
+    fn take_nz(self, n: usize) -> std::iter::Take<Self> {
+        debug_assert_eq!(
+            self.clone().skip(n).collect::<Vec<_>>(),
+            self.clone().skip(n).map(|_| Field::ZERO).collect::<Vec<_>>(),
+        );
+
+        self.take(n)
+    }
+}
 
 // Given polynomials `p` and `q`, with `deg(p) < n` and `deg(q) < m`, return
 // the `n+m`-degree polynomial `r` with `r(x) = p(x)*q(x)`.

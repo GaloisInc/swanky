@@ -10,11 +10,6 @@ use crate::merkle;
 use crate::util::*;
 use crate::params::Params;
 
-//
-// XXX: Use a silly field for now.
-//
-type Field = crate::f2_19x3_26::F;
-
 // Proof information available to both the prover and the verifier.
 #[derive(Debug, Clone)]
 #[allow(non_snake_case)]
@@ -220,24 +215,6 @@ proptest! {
             output == Field::ZERO,
             &s.public.Padd * &s.w.t() == zeros
         );
-    }
-}
-
-// Trait for collections that allow taking `n` initial elements while ensuring
-// that only zero-elements are dropped from the end.
-trait TakeNZ where Self: Sized {
-    fn take_nz(self, n: usize) -> std::iter::Take<Self>;
-}
-
-impl<L> TakeNZ for L where L: Iterator<Item = Field> + Clone {
-    #[inline]
-    fn take_nz(self, n: usize) -> std::iter::Take<Self> {
-        debug_assert_eq!(
-            self.clone().skip(n).collect::<Vec<_>>(),
-            self.clone().skip(n).map(|_| Field::ZERO).collect::<Vec<_>>(),
-        );
-
-        self.take(n)
     }
 }
 

@@ -3,12 +3,7 @@ use rand::Rng;
 #[cfg(test)]
 use proptest::{*, prelude::*, collection::vec as pvec};
 
-use crate::util::random_field_array;
-
-//
-// XXX: Use a silly field for now.
-//
-type Field = crate::f2_19x3_26::F;
+use crate::util::{Field, random_field_array};
 
 // TODO: Add LDI, SUB, and DIV instructions.
 #[derive(Debug, Clone, Copy)]

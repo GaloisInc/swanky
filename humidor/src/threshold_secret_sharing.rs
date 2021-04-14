@@ -11,7 +11,6 @@
 
 use rand::{SeedableRng, Rng};
 
-use crate::fft::{fft2_inverse, fft3};
 use rand;
 
 type Field = crate::f2_19x3_26::F;
@@ -114,16 +113,12 @@ impl PackedSecretSharing {
         values.extend(randomness);
         // run backward FFT to recover polynomial in coefficient representation
         assert_eq!(values.len(), self.reconstruct_limit() + 1);
-        let mut coefficients = values.clone();
-        fft2_inverse(&mut coefficients, self.omega_secrets);
-        coefficients
+        crate::numtheory::fft2_inverse(&values, self.omega_secrets)
     }
 
     fn evaluate_polynomial(&self, coefficients: Vec<Field>) -> Vec<Field> {
         assert_eq!(coefficients.len(), self.share_count + 1);
-        let mut points = coefficients.clone();
-        fft3(&mut points, self.omega_shares);
-        points
+        crate::numtheory::fft3(&coefficients, self.omega_shares)
     }
 
     /// Reconstruct the secrets from a large enough subset of the shares.

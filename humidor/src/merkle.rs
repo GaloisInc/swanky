@@ -4,10 +4,7 @@ use crypto::digest::Digest as CryptoDigest;
 #[cfg(test)]
 use proptest::{*, prelude::*, collection::vec as pvec};
 
-//
-// XXX: Use a silly field for now.
-//
-type Field = crate::f2_19x3_26::F;
+use crate::util::Field;
 
 pub type H = Sha256;
 pub type Digest = <H as MerkleHash>::Digest;

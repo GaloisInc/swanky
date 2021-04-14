@@ -5,11 +5,6 @@ use proptest::{*, prelude::*, collection::vec as pvec};
 
 use crate::util::*;
 
-//
-// XXX: Use a silly field for now.
-//
-type Field = crate::f2_19x3_26::F;
-
 // Parameters for interleaved coding, based on the size of the circuit and
 // input. Note that these variable names, although terse, correspond to those
 // used in https://acmccs.github.io/papers/p2087-amesA.pdf.
@@ -145,11 +140,21 @@ impl Params {
     // XXX: Not sure this is sufficient to check whether this is a valid
     // codeword. Need to check the number of errors this detects, etc.
     pub fn codeword_is_valid(&self, cf: ArrayView1<Field>) -> bool {
-        self.decode_no_strip(cf)
-            .iter()
-            .enumerate()
-            .filter(|&(ix,_)| ix == 0)
-            .all(|(_,&f)| f == Field::ZERO)
+        use ndarray::{stack, Axis};
+
+        debug_assert_eq!(cf.len(), self.n);
+
+        let coeffs0 = stack!(Axis(0), Array1::zeros(1), cf);
+        let points0 = crate::numtheory::fft3_inverse(
+            &coeffs0.to_vec(),
+            Field::from(self.pss.omega_shares),
+        );
+        let (points, zeros) = points0[..].split_at(self.k+1);
+
+        crate::numtheory::fft2(
+            points,
+            Field::from(self.pss.omega_secrets),
+        )[0] == Field::ZERO && zeros.iter().all(|&f| f == Field::ZERO)
     }
 
     pub fn encode_interleaved(&self, ws: ArrayView1<Field>) -> Array2<Field> {
