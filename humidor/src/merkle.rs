@@ -208,6 +208,12 @@ impl Lemma {
 
         proof.verify(root, &leaves)
     }
+
+    pub fn size(&self) -> usize {
+        self.columns.iter().map(|c| c.len()).sum::<usize>() * Field::BYTES +
+        self.lemmas.len() * std::mem::size_of::<Digest>() +
+        self.indices.len() * std::mem::size_of::<u32>()
+    }
 }
 
 #[cfg(test)]

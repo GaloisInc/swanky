@@ -108,10 +108,7 @@ struct Secret {
     u0: Array1<Field>,
     uadd: Array1<Field>,
 
-    Uw_hash: merkle::Tree,
-    Ux_hash: merkle::Tree,
-    Uy_hash: merkle::Tree,
-    Uz_hash: merkle::Tree,
+    U_hash: merkle::Tree,
 }
 
 impl std::fmt::Debug for Secret {
@@ -169,17 +166,17 @@ impl Secret {
         let u0 = public.params.encode(Array1::zeros(public.params.l).view());
         let uadd = public.params.random_zero_codeword(&mut rng);
 
-        let Uw_hash = merkle::make_tree(Uw.view());
-        let Ux_hash = merkle::make_tree(Ux.view());
-        let Uy_hash = merkle::make_tree(Uy.view());
-        let Uz_hash = merkle::make_tree(Uz.view());
+        let U_hash = merkle::make_tree(ndarray::stack(
+            ndarray::Axis(0),
+            &[Uw.view(), Ux.view(), Uy.view(), Uz.view()]
+        ).expect("Unequal matrix rows when generating Merkle tree").view());
 
         Secret {
             public,
             w, x, y, z,
             Uw, Ux, Uy, Uz,
             u, ux, uy, uz, u0, uadd,
-            Uw_hash, Ux_hash, Uy_hash, Uz_hash,
+            U_hash
         }
     }
 }
@@ -235,16 +232,37 @@ proptest! {
     }
 }
 
+// Trait for collections that allow taking `n` initial elements while ensuring
+// that only zero-elements are dropped from the end.
+trait TakeNZ where Self: Sized {
+    fn take_nz(self, n: usize) -> std::iter::Take<Self>;
+}
+
+impl<L> TakeNZ for L where L: Iterator<Item = Field> + Clone {
+    #[inline]
+    fn take_nz(self, n: usize) -> std::iter::Take<Self> {
+        debug_assert_eq!(
+            self.clone().skip(n).collect::<Vec<_>>(),
+            self.clone().skip(n).map(|_| Field::ZERO).collect::<Vec<_>>(),
+        );
+
+        self.take(n)
+    }
+}
+
 pub mod interactive {
     use super::*;
 
     #[derive(Debug, Clone, Copy)]
     #[allow(non_snake_case)]
     pub struct Round0 {
-        Uw_root: merkle::Digest,
-        Ux_root: merkle::Digest,
-        Uy_root: merkle::Digest,
-        Uz_root: merkle::Digest,
+        U_root: merkle::Digest,
+    }
+
+    impl Round0 {
+        pub fn size(&self) -> usize {
+            std::mem::size_of::<merkle::Digest>()
+        }
     }
 
     #[derive(Debug, Clone)]
@@ -273,54 +291,52 @@ pub mod interactive {
         p0: Array1<Field>,
     }
 
+    impl Round2 {
+        pub fn size(&self) -> usize {
+            self.v.len() * Field::BYTES +
+            self.qadd.len() * Field::BYTES +
+            self.qx.len() * Field::BYTES +
+            self.qy.len() * Field::BYTES +
+            self.qz.len() * Field::BYTES +
+            self.p0.len() * Field::BYTES
+        }
+    }
+
     #[derive(Debug, Clone)]
     #[allow(non_snake_case)]
     pub struct Round3 {
         Q: Vec<usize>,
     }
 
+    impl Round3 {
+        pub fn size(&self) -> usize {
+            self.Q.len() * std::mem::size_of::<usize>()
+        }
+    }
+
     #[derive(Debug, Clone)]
     #[allow(non_snake_case)]
     pub struct Round4 {
-        Uw_lemma: merkle::Lemma,
-        Ux_lemma: merkle::Lemma,
-        Uy_lemma: merkle::Lemma,
-        Uz_lemma: merkle::Lemma,
+        U_lemma: merkle::Lemma,
 
-        ux: Array1<Field>,
-        uy: Array1<Field>,
-        uz: Array1<Field>,
-        uadd: Array1<Field>,
-        u: Array1<Field>,
-        u0: Array1<Field>,
+        ux: Vec<Field>,
+        uy: Vec<Field>,
+        uz: Vec<Field>,
+        uadd: Vec<Field>,
+        u: Vec<Field>,
+        u0: Vec<Field>,
     }
 
-    #[allow(non_snake_case)]
-    fn make_ra(
-        P: &Params,
-        r1_ra: &Array1<Field>,
-        Pa: &CsMat<Field>,
-    ) -> Vec<Array1<Field>> {
-        let r_dot_P = &Pa.clone().transpose_into() * r1_ra;
-        r_dot_P.exact_chunks(P.l)
-            .into_iter()
-            .map(|points| P.fft2_inverse(points))
-            .collect()
-    }
-
-    #[allow(non_snake_case)]
-    fn make_ra_Iml_Pa_neg(
-        P: &Params,
-        r1_ra: &Array1<Field>,
-        Pa: &CsMat<Field>,
-    ) -> Vec<Array1<Field>> {
-        use sprs::hstack;
-
-        let Iml = CsMat::eye_csc(P.m * P.l);
-        let Pa_neg = Pa.map(|f| f.neg());
-        let IPa = hstack(&[Iml.view(), Pa_neg.view()]);
-
-        make_ra(P, r1_ra, &IPa)
+    impl Round4 {
+        pub fn size(&self) -> usize {
+            self.U_lemma.size() +
+            self.ux.len() * Field::BYTES +
+            self.uy.len() * Field::BYTES +
+            self.uz.len() * Field::BYTES +
+            self.uadd.len() * Field::BYTES +
+            self.u.len() * Field::BYTES +
+            self.u0.len() * Field::BYTES
+        }
     }
 
     fn rows_to_mat(rows: Vec<Array1<Field>>) -> Array2<Field> {
@@ -335,6 +351,56 @@ pub mod interactive {
         ).expect("Unequal matrix rows")
     }
 
+    fn expected_proof_size(
+        sigma: usize,
+        n: usize,
+        k: usize,
+        l: usize,
+        m: usize,
+        t: usize,
+        f_bytes: usize,
+        h_bytes: usize,
+    ) -> usize {
+        let log_n = (n as f64).log2().ceil() as usize;
+
+        // This is according to Section 5.3
+        (n*sigma + 4*sigma*(k + l - 1) + sigma*(2*k - 1)
+            + t*(4*m + 6*sigma)) * f_bytes + t*log_n*h_bytes
+        // Note:       ^ Sec. 5.3 says this should be 5, but I think they're
+        //               failing to count u0. It's missing from the random
+        //               codewords sent in step (3) of the protocol in Sec. 4.7,
+        //               but it seems to be required for the verifier to
+        //               check p0 on the last line of the protocol.
+    }
+
+    #[allow(non_snake_case)]
+    fn make_ra(
+        P: &Params,
+        ra: &Array1<Field>,
+        Pa: &CsMat<Field>,
+    ) -> Vec<Array1<Field>> {
+        let r_dot_P = &Pa.clone().transpose_into() * ra;
+        r_dot_P.exact_chunks(P.l)
+            .into_iter()
+            .map(|points| P.fft2_inverse(points))
+            .collect()
+    }
+
+    #[allow(non_snake_case)]
+    fn make_ra_Iml_Pa_neg(
+        P: &Params,
+        ra: &Array1<Field>,
+        Pa: &CsMat<Field>,
+    ) -> Vec<Array1<Field>> {
+        use sprs::hstack;
+
+        let Iml = CsMat::eye_csc(P.m * P.l);
+        let Pa_neg = Pa.map(|f| f.neg());
+        let IPa = hstack(&[Iml.view(), Pa_neg.view()]);
+
+        make_ra(P, ra, &IPa)
+    }
+
     pub struct Prover {
         secret: Secret,
     }
@@ -346,26 +412,30 @@ pub mod interactive {
             }
         }
 
+        pub fn expected_proof_size(&self) -> usize {
+            let p = &self.secret.public.params;
+            expected_proof_size(1,
+                p.n, p.k + 1, p.l, p.m, p.t,
+                Field::BYTES, std::mem::size_of::<merkle::Digest>())
+        }
+
         pub fn round0(&self) -> Round0 {
             Round0 {
-                Uw_root: self.secret.Uw_hash.root(),
-                Ux_root: self.secret.Ux_hash.root(),
-                Uy_root: self.secret.Uy_hash.root(),
-                Uz_root: self.secret.Uz_hash.root(),
+                U_root: self.secret.U_hash.root(),
             }
         }
 
         #[allow(non_snake_case)]
         fn make_pa(&self, Ua: &Array2<Field>) -> Vec<Array1<Field>> {
-            let P = self.secret.public.params;
+            let P = &self.secret.public.params;
 
             Ua.genrows()
                 .into_iter()
                 .map(|points|
                     P.fft3_inverse(points) // deg < k + 1
                     .iter()
-                    .take(P.k+1)
                     .cloned()
+                    .take_nz(P.k+1)
                     .collect::<Array1<Field>>())
                 .collect::<Vec<_>>()
         }
@@ -377,16 +447,19 @@ pub mod interactive {
             r1_radd: Array1<Field>,
         ) -> Array1<Field> {
             let s = &self.secret;
-            let P = s.public.params;
+            let P = &s.public.params;
 
-            let radd_blind = P.fft3_inverse(s.uadd.view()) // deg < k + 1
+            let radd_blind = P.fft3_inverse(s.uadd.view()) // deg < k + l
                 .iter()
-                .take(P.k + 1)
                 .cloned()
+                .take_nz(P.k + P.l)
                 .collect::<Array1<Field>>();
             let radd = make_ra(&P, &r1_radd, &Padd) // deg < l
                 .iter()
-                .map(|ra_i| ra_i.iter().take(P.l).cloned().collect::<Array1<_>>())
+                .map(|ra_i| ra_i.iter()
+                    .cloned()
+                    .take_nz(P.k+1) // XXX: Should be l
+                    .collect::<Array1<_>>())
                 .collect::<Vec<_>>();
 
             radd.iter().zip(p.clone())
@@ -406,28 +479,28 @@ pub mod interactive {
             ua: &Array1<Field>,
             r1_ra: Array1<Field>,
         ) -> Array1<Field> {
-            let P = self.secret.public.params;
+            let P = &self.secret.public.params;
 
             let ra = make_ra_Iml_Pa_neg(&P, &r1_ra, &Pa) // deg < l
                 .iter()
                 .map(|ra_i| ra_i
                     .iter()
-                    .take(P.l)
                     .cloned()
+                    .take_nz(P.k+1) // XXX: Should be l
                     .collect::<Array1<Field>>())
                 .collect::<Vec<_>>();
             let pa = Ua.genrows()
                 .into_iter()
                 .map(|points| P.fft3_inverse(points) // deg < k + 1
                     .iter()
-                    .take(P.k+1)
                     .cloned()
+                    .take_nz(P.k+1)
                     .collect::<Array1<Field>>())
                 .collect::<Vec<_>>();
             let ra_blind = P.fft3_inverse(ua.view()) // deg < k + l
                 .iter()
-                .take(P.k + P.l)
                 .cloned()
+                .take_nz(P.k + P.l)
                 .collect::<Array1<Field>>();
 
             ra.iter()
@@ -446,17 +519,17 @@ pub mod interactive {
             px: &Vec<Array1<Field>>, // deg < k + 1
             py: &Vec<Array1<Field>>, // deg < k + 1
             pz: &Vec<Array1<Field>>, // deg < k + 1
-            r1_rq: Array1<Field>,
+            rq: Array1<Field>,
         ) -> Array1<Field> {
-            let P = self.secret.public.params;
+            let P = &self.secret.public.params;
 
             let r0_blind = P.fft3_inverse(u0.view()) // deg < 2k + 1
                 .iter()
-                .take(2*P.k + 1)
                 .cloned()
+                .take_nz(2*P.k + 1)
                 .collect::<Array1<Field>>();
 
-            r1_rq.iter()
+            rq.iter()
                 .zip(px)
                 .zip(py)
                 .zip(pz)
@@ -478,40 +551,63 @@ pub mod interactive {
             use ndarray::{Axis, stack};
 
             let s = &self.secret;
+            let P = &s.public.params;
 
             // Testing interleaved Reed-Solomon codes
             let U = stack![Axis(0), s.Uw, s.Ux, s.Uy, s.Uz];
-            let p = self.make_pa(&self.secret.Uw);
-            let px = self.make_pa(&self.secret.Ux);
-            let py = self.make_pa(&self.secret.Uy);
-            let pz = self.make_pa(&self.secret.Uz);
+            let p = self.make_pa(&s.Uw);
+            let px = self.make_pa(&s.Ux);
+            let py = self.make_pa(&s.Uy);
+            let pz = self.make_pa(&s.Uz);
 
-            Round2 {
-                v: r1.r.dot(&U),
+            let r2 = Round2 {
+                v: r1.r.dot(&U) + s.u.view(),
                 qadd: self.make_qadd(&p, &s.public.Padd, r1.radd),
                 qx: self.make_qa(&p, &s.public.Px, &s.Ux, &s.ux, r1.rx),
                 qy: self.make_qa(&p, &s.public.Py, &s.Uy, &s.uy, r1.ry),
                 qz: self.make_qa(&p, &s.public.Pz, &s.Uz, &s.uz, r1.rz),
-                p0: self.make_p0(&s.u0, &px, &py, &pz, r1.rq),
-            }
+                p0: self.make_p0(&s.u0, &px, &py, &pz, r1.rq.clone()),
+            };
+
+            debug_assert_eq!(r2.v.len(), P.n);
+            debug_assert_eq!(r2.qadd.len(), 2*P.k + 1); // XXX: Should be k + l
+            debug_assert_eq!(r2.qx.len(), 2*P.k + 1); // XXX: Should be k + l
+            debug_assert_eq!(r2.qy.len(), 2*P.k + 1); // XXX: Should be k + l
+            debug_assert_eq!(r2.qz.len(), 2*P.k + 1); // XXX: Should be k + l
+            debug_assert_eq!(r2.p0.len(), 2*P.k + 1);
+            r2
         }
 
         #[allow(non_snake_case)]
         pub fn round4(&self, r3: Round3) -> Round4 {
             let s = &self.secret;
+            let U = ndarray::stack(
+                ndarray::Axis(0),
+                &[s.Uw.view(), s.Ux.view(), s.Uy.view(), s.Uz.view()],
+            ).expect("Unequal rows in round 4");
 
-            Round4 {
-                Uw_lemma: merkle::Lemma::new(&s.Uw_hash, s.Uw.view(), &r3.Q),
-                Ux_lemma: merkle::Lemma::new(&s.Ux_hash, s.Ux.view(), &r3.Q),
-                Uy_lemma: merkle::Lemma::new(&s.Uy_hash, s.Uy.view(), &r3.Q),
-                Uz_lemma: merkle::Lemma::new(&s.Uz_hash, s.Uz.view(), &r3.Q),
-                ux: s.ux.clone(),
-                uy: s.uy.clone(),
-                uz: s.uz.clone(),
-                uadd: s.uadd.clone(),
-                u: s.u.clone(),
-                u0: s.u0.clone(),
-            }
+            let r4 = Round4 {
+                U_lemma: merkle::Lemma::new(&s.U_hash, U.view(), &r3.Q),
+                ux: r3.Q.iter().map(|&j| s.ux[j]).collect(),
+                uy: r3.Q.iter().map(|&j| s.uy[j]).collect(),
+                uz: r3.Q.iter().map(|&j| s.uz[j]).collect(),
+                uadd: r3.Q.iter().map(|&j| s.uadd[j]).collect(),
+                u: r3.Q.iter().map(|&j| s.u[j]).collect(),
+                u0: r3.Q.iter().map(|&j| s.u0[j]).collect(),
+            };
+
+            let P = &s.public.params;
+            let log_n = (P.n as f64).log2().ceil() as usize;
+            debug_assert_eq!(r4.U_lemma.columns().len(), P.t);
+            debug_assert_eq!(r4.U_lemma.columns()[0].len(), 4*P.m);
+            debug_assert!(r4.U_lemma.lemmas.len() <= P.t*log_n);
+            debug_assert_eq!(r4.ux.len(), P.t);
+            debug_assert_eq!(r4.uy.len(), P.t);
+            debug_assert_eq!(r4.uz.len(), P.t);
+            debug_assert_eq!(r4.uadd.len(), P.t);
+            debug_assert_eq!(r4.u.len(), P.t);
+            debug_assert_eq!(r4.u0.len(), P.t);
+            r4
         }
     }
 
@@ -536,8 +632,23 @@ pub mod interactive {
             }
         }
 
+        pub fn param_info(&self) -> String {
+            let p = &self.public.params;
+
+            format!(
+                "Verifier parameters: l={} t={} n={} k={} m={} e=(n-k)/4={}",
+                p.l, p.t, p.n, p.k, p.m, (p.n-p.k) as f64 / 4f64)
+        }
+
+        pub fn expected_proof_size(&self) -> usize {
+            let p = &self.public.params;
+            expected_proof_size(1,
+                p.n, p.k + 1, p.l, p.m, p.t,
+                Field::BYTES, std::mem::size_of::<merkle::Digest>())
+        }
+
         pub fn round1(&mut self, r0: Round0) -> Round1 {
-            let params = self.public.params;
+            let params = &self.public.params;
             let r1 = Round1 {
                 r: random_field_array(&mut self.rng, 4*params.m),
                 radd: random_field_array(&mut self.rng, params.m * params.l),

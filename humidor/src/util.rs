@@ -67,12 +67,6 @@ pub fn peval(p: ArrayView1<Field>, x: Field) -> Field {
     crate::numtheory::mod_evaluate_polynomial(&p.to_vec(), x)
 }
 
-pub fn point_product(u: ArrayView1<Field>, v: ArrayView1<Field>) -> Array1<Field> {
-    debug_assert_eq!(u.len(), v.len());
-
-    Array1::from_shape_fn(u.len(), |i| u[i] * v[i])
-}
-
 pub fn random_field_array<R>(rng: &mut R, size: usize) -> Array1<Field>
     where R: rand::Rng
 {
