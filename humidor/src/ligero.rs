@@ -326,7 +326,7 @@ pub mod interactive {
         uz: Vec<Field>,
         uadd: Vec<Field>,
         u: Vec<Field>,
-        u0: Vec<Field>,
+        u0: Vec<Field>, // This is missing in Sec. 5.3, but I think it's needed
     }
 
     impl Round4 {
@@ -460,7 +460,7 @@ pub mod interactive {
                 .iter()
                 .map(|ra_i| ra_i.iter()
                     .cloned()
-                    .take_nz(P.k+1) // XXX: Should be l
+                    .take_nz(P.k+1) // XXX: Should be l per Sec. 5.3
                     .collect::<Array1<_>>())
                 .collect::<Vec<_>>();
 
@@ -488,7 +488,7 @@ pub mod interactive {
                 .map(|ra_i| ra_i
                     .iter()
                     .cloned()
-                    .take_nz(P.k+1) // XXX: Should be l
+                    .take_nz(P.k+1) // XXX: Should be l per Sec. 5.3
                     .collect::<Array1<Field>>())
                 .collect::<Vec<_>>();
             let pa = Ua.genrows()
@@ -602,7 +602,7 @@ pub mod interactive {
             let log_n = (P.n as f64).log2().ceil() as usize;
             debug_assert_eq!(r4.U_lemma.columns().len(), P.t);
             debug_assert_eq!(r4.U_lemma.columns()[0].len(), 4*P.m);
-            debug_assert!(r4.U_lemma.lemmas.len() <= P.t*log_n);
+            debug_assert!(r4.U_lemma.nlemmas() <= P.t*log_n);
             debug_assert_eq!(r4.ux.len(), P.t);
             debug_assert_eq!(r4.uy.len(), P.t);
             debug_assert_eq!(r4.uz.len(), P.t);

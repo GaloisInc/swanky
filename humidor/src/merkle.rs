@@ -199,6 +199,8 @@ impl Lemma {
         &self.columns
     }
 
+    pub fn nlemmas(&self) -> usize { self.lemmas.len() }
+
     pub fn verify(&self, root: &Digest) -> bool {
         let leaves = self.columns
             .iter()

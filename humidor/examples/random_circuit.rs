@@ -1,34 +1,9 @@
-use rand::{Rng, SeedableRng, rngs::StdRng};
+use rand::{SeedableRng, rngs::StdRng};
 use std::io::Write;
 
 extern crate humidor;
 
 use humidor::ligero::interactive;
-use humidor::circuit::{Op, Ckt};
-
-type Field = humidor::f2_19x3_26::F;
-
-pub fn random_field_vec<R>(rng: &mut R, size: usize) -> Vec<Field>
-    where R: Rng
-{
-    (0 .. size).map(|_| rng.sample(rand::distributions::Standard)).collect()
-}
-
-fn random_ckt<R>(rng: &mut R, w: usize, c: usize) -> Ckt
-    where R: Rng
-{
-    let ops = (0..c).map(|n| {
-        let i = rng.gen_range(0 .. w+n);
-        let j = rng.gen_range(0 .. w+n);
-        if rng.gen_bool(0.5) {
-            Op::Add(i, j)
-        } else {
-            Op::Mul(i, j)
-        }
-    }).collect();
-
-    Ckt { inp_size: w, ops }
-}
 
 fn test_input_size(s: usize) -> (
     usize, // proof size in bytes
