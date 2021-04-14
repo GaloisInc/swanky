@@ -9,7 +9,7 @@ use proptest::{*, prelude::*, collection::vec as pvec};
 //
 type Field = crate::f2_19x3_26::F;
 
-pub type H = K12;
+pub type H = Sha256;
 pub type Digest = <H as MerkleHash>::Digest;
 pub type Tree = merkle_cbt::MerkleTree<Digest, MHMerge<H>>;
 pub type Proof = merkle_cbt::MerkleProof<Digest, MHMerge<H>>;
