@@ -76,15 +76,6 @@ impl Public {
     }
 }
 
-#[cfg(test)]
-impl Arbitrary for Public {
-    type Parameters = <Ckt as Arbitrary>::Parameters;
-    type Strategy = BoxedStrategy<Self>;
-    fn arbitrary_with(p: Self::Parameters) -> Self::Strategy {
-        Ckt::arbitrary_with(p).prop_flat_map(|c| Just(Self::new(&c))).boxed()
-    }
-}
-
 // Proof information available only to the prover.
 #[allow(non_snake_case)]
 struct Secret {
@@ -185,10 +176,10 @@ impl Secret {
 impl Arbitrary for Secret {
     type Parameters = (usize, usize);
     type Strategy = BoxedStrategy<Self>;
-    fn arbitrary_with(p: Self::Parameters) -> Self::Strategy {
+    fn arbitrary_with((w,c): Self::Parameters) -> Self::Strategy {
         (
-            any_with::<Ckt>(p),
-            pvec(any::<Field>(), p.0),
+            crate::circuit::arb_ckt(w,c),
+            pvec(any::<Field>(), w),
         ).prop_map(|(ckt, inp)|
             Secret::new(&ckt, &inp)
         ).boxed()
@@ -199,26 +190,26 @@ impl Arbitrary for Secret {
 proptest! {
     #[test]
     #[allow(non_snake_case)]
-    fn test_Px(s in Secret::arbitrary_with((20, 1000))) {
+    fn test_Px(s in Secret::arbitrary_with((20, 100))) {
         prop_assert_eq!(&s.public.Px * &s.w.t(), s.x);
     }
 
     #[test]
     #[allow(non_snake_case)]
-    fn test_Py(s in Secret::arbitrary_with((20, 1000))) {
+    fn test_Py(s in Secret::arbitrary_with((20, 100))) {
         prop_assert_eq!(&s.public.Py * &s.w.t(), s.y);
     }
 
     #[test]
     #[allow(non_snake_case)]
-    fn test_Pz(s in Secret::arbitrary_with((20, 1000))) {
+    fn test_Pz(s in Secret::arbitrary_with((20, 100))) {
         prop_assert_eq!(&s.public.Pz * &s.w.t(), s.z);
     }
 
     #[test]
     #[allow(non_snake_case)]
     fn test_Padd(
-        (c,i) in any_with::<Ckt>((20, 1000)).prop_flat_map(|c| {
+        (c,i) in crate::circuit::arb_ckt(20, 100).prop_flat_map(|c| {
             (Just(c), pvec(any::<Field>(), 20))
         })
     ) {
@@ -276,6 +267,17 @@ pub mod interactive {
         ry: Array1<Field>,
         rz: Array1<Field>,
         rq: Array1<Field>,
+    }
+
+    impl Round1 {
+        pub fn size(&self) -> usize {
+            self.r.len() * Field::BYTES +
+            self.radd.len() * Field::BYTES +
+            self.rx.len() * Field::BYTES +
+            self.ry.len() * Field::BYTES +
+            self.rz.len() * Field::BYTES +
+            self.rq.len() * Field::BYTES
+        }
     }
 
     #[derive(Debug, Clone)]
@@ -774,6 +776,22 @@ pub mod interactive {
             let r4 = p.round4(r3);
 
             prop_assert_eq!(v.verify(r4), output == Field::ZERO);
+        }
+
+        #[test]
+        fn test_interactive_proof_true(
+            (ckt, w) in crate::circuit::arb_ckt_zero(20, 100)
+        ) {
+            let p = Prover::new(&ckt, &w);
+            let mut v = Verifier::new(&ckt);
+
+            let r0 = p.round0();
+            let r1 = v.round1(r0);
+            let r2 = p.round2(r1);
+            let r3 = v.round3(r2);
+            let r4 = p.round4(r3);
+
+            prop_assert!(v.verify(r4));
         }
     }
 }

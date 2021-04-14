@@ -13,6 +13,7 @@ impl F {
     pub const PHI_2_EXP: u64 = 19;
     pub const PHI_3_EXP: u64 = 26;
     pub const BITS: usize = 61; // floor(log2(MOD))
+    pub const BYTES: usize = std::mem::size_of::<u64>();
 
     // [ GEN**(PHI / (2**p)) % MOD | p <- [0 .. PHI_2_EXP] ]
     pub const ROOTS_BASE_2 : [u64; Self::PHI_2_EXP as usize + 1] =

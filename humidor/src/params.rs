@@ -194,24 +194,34 @@ impl Params {
     }
 
     // Take a sequence of `k+1` coefficients of the polynomial `p` and
-    // return evaluation points `p(zeta_0) .. p(zeta_{k+1})`.
-    #[allow(dead_code)]
+    // return evaluation points `p(zeta_1) .. p(zeta_{k})`. Note that
+    // `p(zeta_0)`, which should always be zero for our application, is
+    // not returned.
     pub fn fft2(&self, coeffs: ArrayView1<Field>) -> Array1<Field> {
         debug_assert!(coeffs.len() <= self.k+1);
 
         let mut coeffs0 = Array1::zeros(self.k + 1);
         coeffs0.slice_mut(ndarray::s!(0 .. coeffs.len())).assign(&coeffs);
 
-        //threshold_secret_sharing::numtheory::fft2(
-        //    &coeffs0.iter().cloned().map(i128::from).collect::<Vec<i128>>(),
-        //    self.pss.omega_secrets,
-        //    self.pss.prime,
-        //)[1..].iter().cloned().map(Field::from).collect::<Array1<Field>>()
-
         crate::numtheory::fft2(
             &coeffs0.to_vec(),
             Field::from(self.pss.omega_secrets),
         )[1..].iter().cloned().collect()
+    }
+
+    // Take a sequence of _possibly more than_ `k+1` coefficients of the
+    // polynomial `p` and return evaluation points `p(zeta_0) .. p(zeta_{k})`.
+    // Note that _all_ `k+1` coefficients are returned
+    pub fn fft2_peval(&self, coeffs: ArrayView1<Field>) -> Array1<Field> {
+        let coeffs0 = coeffs.to_vec()[..]
+            .chunks(self.k + 1)
+            .fold(Array1::zeros(self.k + 1),
+                |acc, v| padd(acc.view(), Array1::from(v.to_vec()).view()));
+
+        crate::numtheory::fft2(
+            &coeffs0.to_vec(),
+            Field::from(self.pss.omega_secrets),
+        ).iter().cloned().collect()
     }
 
     // Take a sequence of values `p(eta_1) .. p(eta_c)` for `c <= n` and
@@ -221,12 +231,6 @@ impl Params {
 
         let mut points0 = Array1::zeros(self.n + 1);
         points0.slice_mut(ndarray::s!(1 .. points.len()+1)).assign(&points);
-
-        //threshold_secret_sharing::numtheory::fft3_inverse(
-        //    &points0.iter().cloned().map(i128::from).collect::<Vec<i128>>(),
-        //    self.pss.omega_shares,
-        //    self.pss.prime,
-        //).iter().cloned().map(Field::from).collect::<Array1<Field>>()
 
         crate::numtheory::fft3_inverse(
             &points0.to_vec(),
@@ -332,22 +336,8 @@ impl Arbitrary for Params {
     type Parameters = ();
     type Strategy = BoxedStrategy<Self>;
     fn arbitrary_with(_: Self::Parameters) -> Self::Strategy {
-        (1usize .. 500).prop_flat_map(|size| Just(Self::new(size))).boxed()
+        (1usize .. 100).prop_flat_map(|size| Just(Self::new(size))).boxed()
     }
-}
-
-#[test]
-fn test_new_params() {
-    let csize = (2usize.pow(9) - 1 - Field::BITS) * (3usize.pow(6) - 1);
-    let p = Params::new(csize);
-
-    assert_eq!(p.t, Field::BITS);
-    assert_eq!(p.kexp, 9);
-    assert_eq!(p.nexp, 6);
-    assert_eq!(p.n, 3usize.pow(6) - 1);
-    assert_eq!(p.m, 3usize.pow(6) - 1);
-    assert_eq!(p.k, 2usize.pow(9) - 1);
-    assert_eq!(p.l, 2usize.pow(9) - 1 - Field::BITS);
 }
 
 #[cfg(test)]
@@ -446,7 +436,6 @@ proptest! {
         let v_coeffs = crate::numtheory::fft2_inverse(
             &v,
             p.pss.omega_secrets,
-            //p.pss.prime,
         ).iter().cloned().map(Field::from).collect::<Array1<Field>>();
 
         for i in 0 .. v.len() {
