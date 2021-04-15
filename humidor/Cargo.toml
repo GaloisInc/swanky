@@ -39,4 +39,7 @@ name = "random_circuit"
 harness = false
 
 [[example]]
-name = "random_circuit"
+name = "random_circuit_interactive"
+
+[[example]]
+name = "random_circuit_noninteractive"

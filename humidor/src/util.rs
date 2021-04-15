@@ -1,4 +1,4 @@
-use ndarray::{Array1, ArrayView1};
+use ndarray::{Array1, ArrayView1, Array2};
 
 pub type Field = crate::f2_19x3_26::F;
 
@@ -18,6 +18,18 @@ impl<L> TakeNZ for L where L: Iterator<Item = Field> + Clone {
 
         self.take(n)
     }
+}
+
+pub fn rows_to_mat(rows: Vec<Array1<Field>>) -> Array2<Field> {
+    let nrows = rows.len();
+    let ncols = rows[0].len();
+
+    Array2::from_shape_vec((nrows, ncols),
+        rows.iter()
+            .map(|r| r.into_iter().cloned())
+            .flatten()
+            .collect::<Vec<Field>>()
+    ).expect("Unequal matrix rows")
 }
 
 // Given polynomials `p` and `q`, with `deg(p) < n` and `deg(q) < m`, return
