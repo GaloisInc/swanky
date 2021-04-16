@@ -828,16 +828,35 @@ pub mod noninteractive {
         }
     }
 
-    fn make_r1(params: &Params, r0: &Round0) -> Round1 {
-        Round1::new(params, &mut StdRng::from_seed(r0.U_root))
+    fn make_r1(
+        params: &Params,
+        state: &merkle::Digest,
+        r0: &Round0
+    ) -> (Round1, merkle::Digest) {
+        use tiny_keccak::Hasher;
+        use rand_chacha::ChaCha20Rng as ChaCha;
+
+        let mut hash = <merkle::H as merkle::MerkleHash>::new();
+        hash.update(&state.to_vec());
+        hash.update(&r0.U_root);
+
+        let mut digest = <merkle::H as merkle::MerkleHash>::HZERO;
+        hash.finalize(&mut digest);
+
+        (Round1::new(params, &mut ChaCha::from_seed(digest)), digest)
     }
 
-    fn make_r3(params: &Params, r0: &Round0, r2: &Round2) -> Round3 {
+    fn make_r3(
+        params: &Params,
+        state: &merkle::Digest,
+        r2: &Round2
+    ) -> Round3 {
         use tiny_keccak::Hasher;
+        use rand_chacha::ChaCha20Rng as ChaCha;
 
         let mut hash = <merkle::H as merkle::MerkleHash>::new();
 
-        hash.update(&r0.U_root);
+        hash.update(&state.to_vec());
         r2.p0.into_iter().for_each(|f| hash.update(&f.bytes()));
         r2.qadd.into_iter().for_each(|f| hash.update(&f.bytes()));
         r2.qx.into_iter().for_each(|f| hash.update(&f.bytes()));
@@ -848,16 +867,25 @@ pub mod noninteractive {
         let mut digest = <merkle::H as merkle::MerkleHash>::HZERO;
         hash.finalize(&mut digest);
 
-        Round3::new(params, &mut StdRng::from_seed(digest))
+        Round3::new(params, &mut ChaCha::from_seed(digest))
     }
 
     pub struct Prover {
         ip: interactive::Prover,
+        ckt_hash: merkle::Digest,
     }
 
     impl Prover {
         pub fn new(c: &Ckt, w: &Vec<Field>) -> Self {
-            Self { ip: interactive::Prover::new(c, w) }
+            use tiny_keccak::Hasher;
+
+            let mut hash = <merkle::H as merkle::MerkleHash>::new();
+            c.ops.iter().for_each(|op| hash.update(&op.bytes()));
+
+            let mut ckt_hash = <merkle::H as merkle::MerkleHash>::HZERO;
+            hash.finalize(&mut ckt_hash);
+
+            Self { ckt_hash, ip: interactive::Prover::new(c, w) }
         }
 
         pub fn expected_proof_size(&self) -> usize {
@@ -870,9 +898,9 @@ pub mod noninteractive {
 
         pub fn make_proof(&self) -> Proof {
             let r0 = self.ip.round0();
-            let r1 = make_r1(&self.ip.params(), &r0);
+            let (r1,state) = make_r1(&self.ip.params(), &self.ckt_hash, &r0);
             let r2 = self.ip.round2(r1);
-            let r3 = make_r3(&self.ip.params(), &r0, &r2);
+            let r3 = make_r3(&self.ip.params(), &state, &r2);
             let r4 = self.ip.round4(r3);
 
             Proof { r0, r2, r4 }
@@ -881,11 +909,20 @@ pub mod noninteractive {
 
     pub struct Verifier {
         public: Public,
+        ckt_hash: merkle::Digest,
     }
 
     impl Verifier {
         pub fn new(ckt: &Ckt) -> Self {
-            Self { public: Public::new(ckt) }
+            use tiny_keccak::Hasher;
+
+            let mut hash = <merkle::H as merkle::MerkleHash>::new();
+            ckt.ops.iter().for_each(|op| hash.update(&op.bytes()));
+
+            let mut ckt_hash = <merkle::H as merkle::MerkleHash>::HZERO;
+            hash.finalize(&mut ckt_hash);
+
+            Self { ckt_hash, public: Public::new(ckt) }
         }
 
         pub fn expected_proof_size(&self) -> usize {
@@ -897,8 +934,8 @@ pub mod noninteractive {
         }
 
         pub fn verify(&self, p: Proof) -> bool {
-            let r1 = make_r1(&self.public.params, &p.r0);
-            let r3 = make_r3(&self.public.params, &p.r0, &p.r2);
+            let (r1,state) = make_r1(&self.public.params, &self.ckt_hash, &p.r0);
+            let r3 = make_r3(&self.public.params, &state, &p.r2);
 
             verify(&self.public, p.r0, r1, p.r2, r3, p.r4)
         }

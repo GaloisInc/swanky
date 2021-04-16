@@ -26,6 +26,23 @@ pub fn arb_op(wire_min: usize, wire_max: usize) -> impl Strategy<Value = Op> {
     ]
 }
 
+impl Op {
+    pub fn bytes(&self) -> Vec<u8> {
+        match self {
+            Op::Add(i,j) => vec![0].iter()
+                .chain(i.to_be_bytes().iter())
+                .chain(j.to_be_bytes().iter())
+                .cloned()
+                .collect(),
+            Op::Mul(i,j) => vec![1].iter()
+                .chain(i.to_be_bytes().iter())
+                .chain(j.to_be_bytes().iter())
+                .cloned()
+                .collect(),
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct Ckt {
     pub ops: Vec<Op>,

@@ -24,6 +24,7 @@ sprs = "0.9.3"
 ndarray = "0.13.1"
 num-traits = "0.2.14"
 rand = "0.8.3"
+rand_chacha = "0.3.0"
 static_assertions = "0.2.3"
 
 [dependencies.threshold-secret-sharing]
