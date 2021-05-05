@@ -4,25 +4,24 @@
 // Copyright © 2019 Galois, Inc.
 // See LICENSE for licensing information.
 
-use crate::{AbstractChannel, Channel};
+use crate::AbstractChannel;
 use std::{
-    io::{Read, Result, Write},
+    io::Result,
     sync::{Arc, Mutex},
 };
 
-/// A channel for tracking the number of bits read/written.
-pub struct TrackChannel<R, W>(Arc<Mutex<InternalTrackChannel<R, W>>>);
+/// A channel wrapping another channel for tracking the number of bits read/written.
+pub struct TrackChannel<C>(Arc<Mutex<InternalTrackChannel<C>>>);
 
-struct InternalTrackChannel<R, W> {
-    channel: Channel<R, W>,
+struct InternalTrackChannel<C> {
+    channel: C,
     nbits_read: usize,
     nbits_written: usize,
 }
 
-impl<R: Read, W: Write> TrackChannel<R, W> {
+impl<C: AbstractChannel> TrackChannel<C> {
     /// Make a new `TrackChannel` from a `reader` and a `writer`.
-    pub fn new(reader: R, writer: W) -> Self {
-        let channel = Channel::new(reader, writer);
+    pub fn new(channel: C) -> Self {
         let internal = InternalTrackChannel {
             channel,
             nbits_read: 0,
@@ -70,7 +69,7 @@ impl<R: Read, W: Write> TrackChannel<R, W> {
     }
 }
 
-impl<R: Read, W: Write> AbstractChannel for TrackChannel<R, W> {
+impl<C: AbstractChannel> AbstractChannel for TrackChannel<C> {
     fn write_bytes(&mut self, bytes: &[u8]) -> Result<()> {
         let mut int = self.0.lock().unwrap();
         int.nbits_written += bytes.len() * 8;
