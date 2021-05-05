@@ -19,7 +19,7 @@ macro_rules! constify_imm { ($func:path => ( $($normal_args:expr,)* @@ [0..256] 
 #[doc = "The backend that is used to evaluate vector operations."]
 #[allow(dead_code)]
 pub const VECTOR_BACKEND: crate::VectorBackend = {
-    select_impl_block! { scalar { crate::VectorBackend::Scalar } avx2 { crate::VectorBackend::Avx2 { target_cpu: { #[cfg(vectoreyes_target_cpu="skylake")] { Some("skylake") } #[cfg(vectoreyes_target_cpu="skylake-avx512")] { Some("skylake-avx512") } #[cfg(vectoreyes_target_cpu="cascadelake")] { Some("cascadelake") } #[cfg(not(any( vectoreyes_target_cpu="skylake", vectoreyes_target_cpu="skylake-avx512", vectoreyes_target_cpu="cascadelake", )))] { None } }, } } }
+    select_impl_block! { scalar { crate::VectorBackend::Scalar } avx2 { crate::VectorBackend::Avx2 { micro_architecture: { #[cfg(vectoreyes_target_cpu="skylake")] { crate::MicroArchitecture::Skylake } #[cfg(vectoreyes_target_cpu="skylake-avx512")] { crate::MicroArchitecture::SkylakeAvx512 } #[cfg(vectoreyes_target_cpu="cascadelake")] { crate::MicroArchitecture::CascadeLake } #[cfg(not(any( vectoreyes_target_cpu="skylake", vectoreyes_target_cpu="skylake-avx512", vectoreyes_target_cpu="cascadelake", )))] { crate::MicroArchitecture::Unknown } }, } } }
 };
 select_impl! { scalar { type I8x16Internal = [i8 ; 16]; } avx2 { type I8x16Internal = ::std::arch::x86_64::__m128i; } }
 #[doc = "`[i8; 16]` as a vector."]

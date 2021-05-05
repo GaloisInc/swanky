@@ -48,9 +48,20 @@ use std::ops::*;
 
 #[non_exhaustive]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum MicroArchitecture {
+    Skylake,
+    SkylakeAvx512,
+    CascadeLake,
+    Unknown,
+}
+
+#[non_exhaustive]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum VectorBackend {
     Scalar,
-    Avx2 { target_cpu: Option<&'static str> },
+    Avx2 {
+        micro_architecture: MicroArchitecture,
+    },
 }
 
 /// A scalar that can live in the lane of a vector.

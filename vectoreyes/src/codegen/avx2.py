@@ -186,11 +186,6 @@ class IntelIntrinsicBuilder:
         "skylake-avx512",
         "cascadelake",
     ]
-    DISPLAY_PERF_NUMBERS_FOR = {
-        "Skylake": "SKL",
-        "Skylake-AVX512": "SKX",
-        "Cascade Lake": "CLX",
-    }
     # None corresponds to the fallback value
     # Otherwise, these numbers are the latncies of aes enc/dec instructions for their respsctive
     # targets, since the throughputs for all these instructions are 1.
@@ -199,6 +194,17 @@ class IntelIntrinsicBuilder:
         "skylake": 4,
         "skylake-avx512": 4,
         "cascadelake": 4,
+    }
+    TARGET_CPU_NAMES = {
+        None: "Unknown",
+        "skylake": "Skylake",
+        "skylake-avx512": "SkylakeAvx512",
+        "cascadelake": "CascadeLake",
+    }
+    DISPLAY_PERF_NUMBERS_FOR = {
+        "Skylake": "SKL",
+        "Skylake-AVX512": "SKX",
+        "Cascade Lake": "CLX",
     }
 
     def __init__(self, flags):
@@ -210,6 +216,7 @@ class IntelIntrinsicBuilder:
         self.AES_BLOCK_COUNT_HINT = IntelIntrinsicBuilder.AES_BLOCK_COUNT_HINT
         self.DISPLAY_PERF_NUMBERS_FOR = IntelIntrinsicBuilder.DISPLAY_PERF_NUMBERS_FOR
         self.TARGET_CPUS = IntelIntrinsicBuilder.TARGET_CPUS
+        self.TARGET_CPU_NAMES = IntelIntrinsicBuilder.TARGET_CPU_NAMES
         for cpu in self.TARGET_CPUS:
             assert cpu in self.AES_BLOCK_COUNT_HINT
 
