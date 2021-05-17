@@ -39,6 +39,7 @@ impl<R: Read, W: Write> AbstractChannel for SyncChannel<R, W> {
     #[inline(always)]
     fn write_bytes(&mut self, bytes: &[u8]) -> Result<()> {
         self.writer.lock().unwrap().write_all(bytes)?;
+        self.flush().unwrap();
         Ok(())
     }
 
