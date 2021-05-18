@@ -20,8 +20,8 @@ doctest = false
 merkle-cbt = "0.3.0"
 rust-crypto = "^0.2.36"
 tiny-keccak = { version = "2.0.0", features = ["sha3", "k12"] }
-sprs = "0.9.3"
-ndarray = "0.13.1"
+sprs = "=0.9.3"
+ndarray = "=0.13.1"
 num-traits = "0.2.14"
 rand = "0.8.3"
 rand_chacha = "0.3.0"
