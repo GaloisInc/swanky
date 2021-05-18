@@ -241,6 +241,35 @@ use crate::SimdBase;
 use crate::array_utils::*;
 use std::ops::*;
 
+// We need to do this, since we need to do some const generic manipulation, which isn't stable
+// yet. There used to be a way to do it on stable, however, https://git.io/JsukV broke
+// compatibility with stable, so we need to do this instead.
+#[allow(unused_macros)]
+macro_rules! constify_imm {
+    {% for name, lst in [
+        ("0..256", range(256)),
+        ("0..32", range(32)),
+        ("0..16", range(16)),
+        ("0..8", range(8)),
+        ("0..4", range(4)),
+        ("0..2", range(2)),
+        ("[1, 2, 4, 8]", [1, 2, 4, 8]),
+    ] %}
+        ($func:path => (
+            $($normal_args:expr,)*
+            @@ [{{name}}] $imm_arg:expr
+        )) => {
+            // Hopefully this gets optimized out...
+            match $imm_arg {
+                {% for i in lst %}
+                    {{i}} => $func($($normal_args,)* {{i}}),
+                {% endfor %}
+                _ => panic!("Invalid immediate: {}. Expected immediate to satisfy: {{name}}", $imm_arg),
+            }
+        };
+    {% endfor %}
+}
+
 /// The backend that is used to evaluate vector operations.
 #[allow(dead_code)]
 pub const VECTOR_BACKEND: crate::VectorBackend = {

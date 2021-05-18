@@ -18,7 +18,7 @@ with lzma.open(INTEL_INTRINSICS_XML_XZ) as compressed_xml:
     }
 
 # This is a compressed version of the October 2020 XML table from uops.info
-UOPS_INFO_XML_XZ = Path(__file__).resolve().parent / "uops.info-Oct2020.xml.xz"
+UOPS_INFO_XML_XZ = Path(__file__).resolve().parent / "uops.info-Mar2021.xml.xz"
 
 # NOTE: update version v every time the extraction algorithm changes to ensure that the cache never becomes stale.
 UOPS_INFO_DB = UOPS_INFO_XML_XZ.with_suffix(".v1.dbm")
@@ -277,7 +277,7 @@ class IntelIntrinsicBuilder:
             else:
                 return f"{prefix}slli_epi{ty.ty.bits}"
         elif op in ["gather", "masked_gather"]:
-            masked = 'mask_' if 'masked' in op else ''
+            masked = "mask_" if "masked" in op else ""
             assert ty2 is not None
             values = ty
             indices = ty2
@@ -406,8 +406,14 @@ class IntelIntrinsicBuilder:
                 )
             line("#[inline(always)]")
             line(f"pub(super) {unsafe}fn {name}{immediates}(")
-            for param in intrinsic.findall("parameter"):
+            num_params = len(intrinsic.findall("parameter"))
+            has_immediate = False
+            for i, param in enumerate(intrinsic.findall("parameter")):
                 if param.get("etype") == "IMM":
+                    if param.get("immwidth") is not None:
+                        assert int(param.get("immwidth")) <= 8, name
+                    assert i == num_params - 1
+                    has_immediate = True
                     continue
                 if param.get("type") == "void":
                     continue
@@ -418,18 +424,45 @@ class IntelIntrinsicBuilder:
             else:
                 line(f") -> {self.convert_type(rt)} {{")
             param_body = ", ".join(
-                immediate_override.immediate_body
-                if param.get("etype") == "IMM" and immediate_override
-                else param.get("varname")
-                + (
-                    f" as {self.convert_type(param.get('type'))}"
-                    if param.get("etype") == "IMM"
-                    else ""
-                )
+                param.get("varname")
                 for param in intrinsic.findall("parameter")
-                if param.get("type") != "void"
+                if param.get("type") != "void" and param.get("etype") != "IMM"
             )
-            core = f"::std::arch::x86_64::{name}({param_body})"
+            if has_immediate:
+                param = intrinsic.findall("parameter")[-1]
+                imm_body = (
+                    immediate_override.immediate_body
+                    if param.get("etype") == "IMM" and immediate_override
+                    else param.get("varname")
+                )
+                imm_kind = "0..256"
+                if param.get("immtype") == "_MM_INDEX_SCALE":
+                    imm_kind = "[1, 2, 4, 8]"
+                elif name in ["_mm256_bslli_epi128", "_mm256_slli_si256"]:
+                    imm_kind = "0..32"
+                elif param.get("immwidth") == "1" and name != "_mm_clmulepi64_si128":
+                    imm_kind = "0..2"
+                elif param.get("immwidth") == "4":
+                    imm_kind = "0..16"
+                elif param.get("immwidth") == "2":
+                    imm_kind = "0..4"
+                elif param.get("immwidth") == "3":
+                    imm_kind = "0..8"
+                elif param.get("immwidth") == "5":
+                    imm_kind = "0..32"
+                assert param.get("immwidth") in [
+                    None,
+                    "1",
+                    "4",
+                    "2",
+                    "8",
+                    "3",
+                    "5",
+                ], name
+                imm_body += f" as {self.convert_type(param.get('type'))}"
+                core = f"constify_imm!(::std::arch::x86_64::{name} => ({param_body}, @@ [{imm_kind}] {imm_body}))"
+            else:
+                core = f"::std::arch::x86_64::{name}({param_body})"
             if unsafe:
                 line(core)
             else:
