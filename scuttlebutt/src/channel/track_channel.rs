@@ -74,7 +74,9 @@ impl<R: Read, W: Write> AbstractChannel for TrackChannel<R, W> {
     fn write_bytes(&mut self, bytes: &[u8]) -> Result<()> {
         let mut int = self.0.lock().unwrap();
         int.nbits_written += bytes.len() * 8;
-        int.channel.write_bytes(bytes)
+        int.channel.write_bytes(bytes)?;
+        int.channel.flush()?;
+        Ok(())
     }
 
     fn read_bytes(&mut self, mut bytes: &mut [u8]) -> Result<()> {
