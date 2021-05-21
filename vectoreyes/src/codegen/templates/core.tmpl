@@ -241,9 +241,11 @@ use crate::SimdBase;
 use crate::array_utils::*;
 use std::ops::*;
 
-// We need to do this, since we need to do some const generic manipulation, which isn't stable
-// yet. There used to be a way to do it on stable, however, https://git.io/JsukV broke
-// compatibility with stable, so we need to do this instead.
+/// We need to use a macro to explicitly match every possible immediate value, and then dispatch to
+/// a block which has a const generic value for the intrinsic immediate. The inputs to our
+/// functions need to be manipulated before they passed to the raw intrinsic.
+/// It used to be possible to directly manipulate the const before passing it to the intrinsic.
+/// However, https://git.io/JsukV broke compatibility with stable, so we need to do this instead.
 #[allow(unused_macros)]
 macro_rules! constify_imm {
     {% for name, lst in [

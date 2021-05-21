@@ -17,7 +17,7 @@ with lzma.open(INTEL_INTRINSICS_XML_XZ) as compressed_xml:
         x.get("name"): x for x in ET.parse(compressed_xml).getroot()
     }
 
-# This is a compressed version of the October 2020 XML table from uops.info
+# This is a compressed version of the March 2021 XML table from uops.info
 UOPS_INFO_XML_XZ = Path(__file__).resolve().parent / "uops.info-Mar2021.xml.xz"
 
 # NOTE: update version v every time the extraction algorithm changes to ensure that the cache never becomes stale.
