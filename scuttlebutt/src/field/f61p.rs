@@ -3,6 +3,7 @@ use generic_array::GenericArray;
 use rand_core::RngCore;
 use std::{
     convert::TryFrom,
+    fmt,
     ops::{AddAssign, MulAssign, SubAssign},
 };
 use subtle::{Choice, ConditionallySelectable, ConstantTimeEq};
@@ -13,6 +14,12 @@ use proptest::prelude::*;
 /// A finite field over the Mersenne Prime 2^61 - 1
 #[derive(Clone, Copy, Eq, Debug, Hash)]
 pub struct F61p(u64);
+
+impl fmt::Display for F61p {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
 
 impl ConstantTimeEq for F61p {
     #[inline]
