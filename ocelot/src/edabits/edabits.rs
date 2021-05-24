@@ -51,23 +51,23 @@ impl<FE: FiniteField> FComSender<FE> {
         &mut self,
         channel: &mut C,
         rng: &mut RNG,
-        v: FE,
-    ) -> Result<(FE, FE), Error> {
+        x: FE,
+    ) -> Result<FE, Error> {
         let (r, rmac) = self.comrandom(channel, rng)?;
 
-        let y = v - r;
+        let y = x - r;
         channel.write_fe::<FE>(y);
         channel.flush()?;
 
-        Ok((r, rmac))
+        Ok(rmac)
     }
 
     pub fn comcheckzero<C: AbstractChannel>(
         &mut self,
         channel: &mut C,
-        comx: FE,
+        x_com: FE,
     ) -> Result<(), Error> {
-        channel.write_fe::<FE>(comx);
+        channel.write_fe::<FE>(x_com);
         channel.flush()?;
         Ok(())
     }
@@ -76,12 +76,12 @@ impl<FE: FiniteField> FComSender<FE> {
         &mut self,
         channel: &mut C,
         x: FE,
-        comx: FE,
+        x_com: FE,
     ) -> Result<(), Error> {
         channel.write_fe::<FE>(x);
         channel.flush()?;
 
-        return self.comcheckzero(channel, comx);
+        return self.comcheckzero(channel, x_com);
     }
 }
 
@@ -121,11 +121,11 @@ impl<FE: FiniteField> FComReceiver<FE> {
         channel: &mut C,
         rng: &mut RNG,
     ) -> Result<FE, Error> {
-        let rmac = self.comrandom(channel, rng)?;
+        let r_com = self.comrandom(channel, rng)?;
         let y = channel.read_fe::<FE>()?;
 
-        let vmac = rmac - self.delta * y;
-        Ok(vmac)
+        let v_com = r_com - self.delta * y;
+        Ok(v_com)
     }
 
     pub fn comcheckzero<C: AbstractChannel>(
@@ -141,10 +141,14 @@ impl<FE: FiniteField> FComReceiver<FE> {
         }
     }
 
-    pub fn comopen<C: AbstractChannel>(&mut self, channel: &mut C, key: FE) -> Result<bool, Error> {
+    pub fn comopen<C: AbstractChannel>(&mut self, channel: &mut C, key: FE) -> Result<FE, Error> {
         let x = channel.read_fe::<FE>()?;
-
-        return self.comcheckzero(channel, key + self.delta * x);
+        let b = self.comcheckzero(channel, key + self.delta * x)?;
+        if b {
+            Ok(x)
+        } else {
+            Err(Error::Other("open fails at checkzero".to_string()))
+        }
     }
 }
 
@@ -161,6 +165,19 @@ struct SenderConv<FE: FiniteField> {
     fcom: FComSender<FE>,
 }
 
+fn bitADDcarry(v: Vec<(F2, F2)>) -> (Vec<F2>, F2) {
+    let mut c0 = F2::ZERO;
+    let l = v.len();
+    let mut res = Vec::with_capacity(l);
+    for (x, y) in v.iter() {
+        let c = c0 + (x + c0) * (y + c0);
+        let z = x + y + c0;
+        res.push(z);
+        c0 = c;
+    }
+    (res, c0)
+}
+
 // Protocol for checking conversion
 
 impl<FE: FiniteField> SenderConv<FE> {
@@ -168,6 +185,24 @@ impl<FE: FiniteField> SenderConv<FE> {
         let a = FComSender::init(channel)?;
         let b = FComSender::init(channel)?;
         Ok(Self { fcomF2: a, fcom: b })
+    }
+
+    pub fn convertBit2A<C: AbstractChannel, RNG: CryptoRng + Rng>(
+        &mut self,
+        channel: &mut C,
+        rng: &mut RNG,
+        r_f2: F2,
+        r_com_f2: F2,
+        r_m: FE,
+        x_f2: F2,
+        x_com_f2: F2,
+    ) -> Result<(FE, FE), Error> {
+        let x = if x_f2 == F2::ONE { FE::ONE } else { FE::ZERO };
+        self.fcomF2
+            .comopen(channel, r_f2 + x_f2, r_com_f2 + x_com_f2)?;
+        let c = r_f2 + x_f2;
+        let x_com = r_m + if c == F2::ONE { -(r_m + r_m) } else { FE::ZERO };
+        Ok((x, x_com))
     }
 
     pub fn conv<C: AbstractChannel, RNG: CryptoRng + Rng>(
@@ -182,9 +217,9 @@ impl<FE: FiniteField> SenderConv<FE> {
         let mut c2_com = Vec::with_capacity(edabits.length);
         for c in edabits.bindec {
             let x = self.fcomF2.cominput(channel, rng, c)?;
-            c2_com.push(x);
+            c2_com.push((c, x));
         }
-        let cm_com = self.fcom.cominput(channel, rng, edabits.value)?;
+        let c_m_com = self.fcom.cominput(channel, rng, edabits.value)?;
 
         // step 6
         // let pick only one bucket for now
@@ -208,6 +243,24 @@ impl<FE: FiniteField> ReceiverConv<FE> {
         let a = FComReceiver::init(channel, rng)?;
         let b = FComReceiver::init(channel, rng)?;
         Ok(Self { fcomF2: a, fcom: b })
+    }
+
+    pub fn convertBit2A<C: AbstractChannel, RNG: CryptoRng + Rng>(
+        &mut self,
+        channel: &mut C,
+        rng: &mut RNG,
+        r_com_f2: F2,
+        r_m: FE,
+        x_com_f2: F2,
+    ) -> Result<FE, Error> {
+        let c = self.fcomF2.comopen(channel, r_com_f2 + x_com_f2)?;
+        let x_m_com = (if c == F2::ONE {
+            -self.fcom.delta
+        } else {
+            FE::ZERO
+        }) + r_m
+            + if c == F2::ONE { -(r_m + r_m) } else { FE::ZERO };
+        Ok(x_m_com)
     }
 
     pub fn conv<C: AbstractChannel, RNG: CryptoRng + Rng>(
@@ -235,7 +288,7 @@ impl<FE: FiniteField> ReceiverConv<FE> {
 #[cfg(test)]
 mod tests {
 
-    use super::{FComReceiver, FComSender};
+    use super::{FComReceiver, FComSender, ReceiverConv, SenderConv};
     use scuttlebutt::{
         field::{F61p, FiniteField, F2},
         AesRng, Channel,
@@ -245,8 +298,7 @@ mod tests {
         os::unix::net::UnixStream,
     };
 
-    // TODO: For now this test is not testing anything
-    fn test_fcom<FE: FiniteField>() -> Vec<(FE, FE)> {
+    fn test_fcom_random<FE: FiniteField>() -> Vec<(FE, FE)> {
         let count = 100;
         let (sender, receiver) = UnixStream::pair().unwrap();
         let handle = std::thread::spawn(move || {
@@ -281,7 +333,6 @@ mod tests {
         }
         let mut r = Vec::new();
         for i in 0..count {
-            println!("HERE");
             let b = fcom.comopen(&mut channel, v[i]).unwrap();
             r.push(b);
         }
@@ -289,17 +340,95 @@ mod tests {
         let resprover = handle.join().unwrap();
 
         for i in 0..count {
-            assert_eq!(r[i], true);
+            assert_eq!(r[i], resprover[i].0);
         }
         resprover
     }
 
-    #[test]
-    fn test_fcom_f61p() {
-        let t = test_fcom::<F61p>();
+    fn test_convertBit2A<FE: FiniteField>() -> () {
+        let count = 100;
+        let (sender, receiver) = UnixStream::pair().unwrap();
+        let handle = std::thread::spawn(move || {
+            let mut rng = AesRng::new();
+            let reader = BufReader::new(sender.try_clone().unwrap());
+            let writer = BufWriter::new(sender);
+            let mut channel = Channel::new(reader, writer);
+            let mut fconv = SenderConv::<FE>::init(&mut channel).unwrap();
 
-        for (x, _) in t.iter() {
-            println!("{}", x);
+            let mut res = Vec::new();
+            for i in 0..count {
+                let (rb, rb_com) = fconv.fcomF2.comrandom(&mut channel, &mut rng).unwrap();
+                let rm = if rb == F2::ONE { FE::ONE } else { FE::ZERO };
+                let rm_com = fconv.fcom.cominput(&mut channel, &mut rng, rm).unwrap();
+                let (x_f2, x_f2_com) = fconv.fcomF2.comrandom(&mut channel, &mut rng).unwrap();
+
+                let (x_m, x_m_com) = fconv
+                    .convertBit2A(&mut channel, &mut rng, rb, rb_com, rm_com, x_f2, x_f2_com)
+                    .unwrap();
+
+                let _ = fconv.fcom.comopen(&mut channel, x_m, x_m_com).unwrap();
+                // println!(
+                //     "{}",
+                //     if (x_m == FE::ONE) {
+                //         "ONE".to_string()
+                //     } else {
+                //         if (x_m == FE::ZERO) {
+                //             "ZERO".to_string()
+                //         } else {
+                //             "DFGDFGDG".to_string()
+                //         }
+                //     }
+                // );
+                assert_eq!(
+                    if x_f2 == F2::ZERO {
+                        x_m == FE::ZERO
+                    } else {
+                        x_m == FE::ONE
+                    },
+                    true
+                );
+                res.push((x_f2, x_m));
+            }
+            res
+        });
+        let mut rng = AesRng::new();
+        let reader = BufReader::new(receiver.try_clone().unwrap());
+        let writer = BufWriter::new(receiver);
+        let mut channel = Channel::new(reader, writer);
+        let mut fconv = ReceiverConv::<FE>::init(&mut channel, &mut rng).unwrap();
+
+        let mut res = Vec::new();
+        for i in 0..count {
+            let rb_com = fconv.fcomF2.comrandom(&mut channel, &mut rng).unwrap();
+            let r_m_com = fconv.fcom.cominput(&mut channel, &mut rng).unwrap();
+            let x_f2_com = fconv.fcomF2.comrandom(&mut channel, &mut rng).unwrap();
+
+            let x_m_com = fconv
+                .convertBit2A(&mut channel, &mut rng, rb_com, r_m_com, x_f2_com)
+                .unwrap();
+
+            let x_m = fconv.fcom.comopen(&mut channel, x_m_com).unwrap();
+            res.push(x_m);
         }
+
+        let resprover = handle.join().unwrap();
+
+        for i in 0..count {
+            assert_eq!(resprover[i].1, res[i]);
+        }
+    }
+
+    #[test]
+    fn test_fcom_random_f61p() {
+        let t = test_fcom_random::<F61p>();
+
+        // for (x, _) in t.iter() {
+        //     println!("{}", x);
+        // }
+    }
+
+    #[test]
+    fn test_fconv_convertBit2A_f61p() {
+        let t = test_convertBit2A::<F61p>();
     }
 }
