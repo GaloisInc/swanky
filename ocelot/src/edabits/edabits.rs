@@ -34,7 +34,7 @@ impl<FE: FiniteField> FComSender<FE> {
         }
     }
 
-    pub fn comrandom<C: AbstractChannel, RNG: CryptoRng + Rng>(
+    pub fn cRandom<C: AbstractChannel, RNG: CryptoRng + Rng>(
         &mut self,
         channel: &mut C,
         rng: &mut RNG,
@@ -47,13 +47,13 @@ impl<FE: FiniteField> FComSender<FE> {
         Ok((x, mac))
     }
 
-    pub fn cominput<C: AbstractChannel, RNG: CryptoRng + Rng>(
+    pub fn cInput<C: AbstractChannel, RNG: CryptoRng + Rng>(
         &mut self,
         channel: &mut C,
         rng: &mut RNG,
         x: FE,
     ) -> Result<FE, Error> {
-        let (r, rmac) = self.comrandom(channel, rng)?;
+        let (r, rmac) = self.cRandom(channel, rng)?;
 
         let y = x - r;
         channel.write_fe::<FE>(y);
@@ -62,7 +62,7 @@ impl<FE: FiniteField> FComSender<FE> {
         Ok(rmac)
     }
 
-    pub fn comcheckzero<C: AbstractChannel>(
+    pub fn cCheckZero<C: AbstractChannel>(
         &mut self,
         channel: &mut C,
         x_com: FE,
@@ -72,7 +72,7 @@ impl<FE: FiniteField> FComSender<FE> {
         Ok(())
     }
 
-    pub fn comopen<C: AbstractChannel>(
+    pub fn cOpen<C: AbstractChannel>(
         &mut self,
         channel: &mut C,
         x: FE,
@@ -81,7 +81,21 @@ impl<FE: FiniteField> FComSender<FE> {
         channel.write_fe::<FE>(x);
         channel.flush()?;
 
-        return self.comcheckzero(channel, x_com);
+        return self.cCheckZero(channel, x_com);
+    }
+
+    pub fn cCheckMultiply<C: AbstractChannel, RNG: CryptoRng + Rng>(
+        &mut self,
+        channel: &mut C,
+        rng: &mut RNG,
+        x: FE,
+        x_com: FE,
+        y: FE,
+        y_com: FE,
+        z: FE,
+        z_com: FE,
+    ) -> Result<(), Error> {
+        Err(Error::Other("NotYetImplemented".to_string()))
     }
 }
 
@@ -104,7 +118,7 @@ impl<FE: FiniteField> FComReceiver<FE> {
         self.delta
     }
 
-    pub fn comrandom<C: AbstractChannel, RNG: CryptoRng + Rng>(
+    pub fn cRandom<C: AbstractChannel, RNG: CryptoRng + Rng>(
         &mut self,
         channel: &mut C,
         rng: &mut RNG,
@@ -116,19 +130,19 @@ impl<FE: FiniteField> FComReceiver<FE> {
         Ok(key)
     }
 
-    pub fn cominput<C: AbstractChannel, RNG: CryptoRng + Rng>(
+    pub fn cInput<C: AbstractChannel, RNG: CryptoRng + Rng>(
         &mut self,
         channel: &mut C,
         rng: &mut RNG,
     ) -> Result<FE, Error> {
-        let r_com = self.comrandom(channel, rng)?;
+        let r_com = self.cRandom(channel, rng)?;
         let y = channel.read_fe::<FE>()?;
 
         let v_com = r_com - self.delta * y;
         Ok(v_com)
     }
 
-    pub fn comcheckzero<C: AbstractChannel>(
+    pub fn cCheckZero<C: AbstractChannel>(
         &mut self,
         channel: &mut C,
         key: FE,
@@ -141,14 +155,25 @@ impl<FE: FiniteField> FComReceiver<FE> {
         }
     }
 
-    pub fn comopen<C: AbstractChannel>(&mut self, channel: &mut C, key: FE) -> Result<FE, Error> {
+    pub fn cOpen<C: AbstractChannel>(&mut self, channel: &mut C, key: FE) -> Result<FE, Error> {
         let x = channel.read_fe::<FE>()?;
-        let b = self.comcheckzero(channel, key + self.delta * x)?;
+        let b = self.cCheckZero(channel, key + self.delta * x)?;
         if b {
             Ok(x)
         } else {
             Err(Error::Other("open fails at checkzero".to_string()))
         }
+    }
+
+    pub fn cCheckMultiply<C: AbstractChannel, RNG: CryptoRng + Rng>(
+        &mut self,
+        channel: &mut C,
+        rng: &mut RNG,
+        x_com: FE,
+        y_com: FE,
+        z_com: FE,
+    ) -> Result<(), Error> {
+        Err(Error::Other("NotYetImplemented".to_string()))
     }
 }
 
@@ -199,7 +224,7 @@ impl<FE: FiniteField> SenderConv<FE> {
     ) -> Result<(FE, FE), Error> {
         let x = if x_f2 == F2::ONE { FE::ONE } else { FE::ZERO };
         self.fcomF2
-            .comopen(channel, r_f2 + x_f2, r_com_f2 + x_com_f2)?;
+            .cOpen(channel, r_f2 + x_f2, r_com_f2 + x_com_f2)?;
         let c = r_f2 + x_f2;
         let x_com = r_m + if c == F2::ONE { -(r_m + r_m) } else { FE::ZERO };
         Ok((x, x_com))
@@ -216,10 +241,10 @@ impl<FE: FiniteField> SenderConv<FE> {
 
         let mut c2_com = Vec::with_capacity(edabits.length);
         for c in edabits.bindec {
-            let x = self.fcomF2.cominput(channel, rng, c)?;
+            let x = self.fcomF2.cInput(channel, rng, c)?;
             c2_com.push((c, x));
         }
-        let c_m_com = self.fcom.cominput(channel, rng, edabits.value)?;
+        let c_m_com = self.fcom.cInput(channel, rng, edabits.value)?;
 
         // step 6
         // let pick only one bucket for now
@@ -253,7 +278,7 @@ impl<FE: FiniteField> ReceiverConv<FE> {
         r_m: FE,
         x_com_f2: F2,
     ) -> Result<FE, Error> {
-        let c = self.fcomF2.comopen(channel, r_com_f2 + x_com_f2)?;
+        let c = self.fcomF2.cOpen(channel, r_com_f2 + x_com_f2)?;
         let x_m_com = (if c == F2::ONE {
             -self.fcom.delta
         } else {
@@ -273,10 +298,10 @@ impl<FE: FiniteField> ReceiverConv<FE> {
 
         let mut c2_com = Vec::with_capacity(NB_BITS);
         for _ in 1..NB_BITS {
-            let x = self.fcomF2.cominput(channel, rng)?;
+            let x = self.fcomF2.cInput(channel, rng)?;
             c2_com.push(x);
         }
-        let cm_com = self.fcom.cominput(channel, rng)?;
+        let cm_com = self.fcom.cInput(channel, rng)?;
 
         // step 6
         // let pick only one bucket for now
@@ -310,12 +335,12 @@ mod tests {
 
             let mut v = Vec::new();
             for _ in 0..count {
-                let x = fcom.comrandom(&mut channel, &mut rng).unwrap();
+                let x = fcom.cRandom(&mut channel, &mut rng).unwrap();
                 v.push(x);
             }
             let mut r = Vec::new();
             for i in 0..count {
-                let b = fcom.comopen(&mut channel, v[i].0, v[i].1).unwrap();
+                let b = fcom.cOpen(&mut channel, v[i].0, v[i].1).unwrap();
                 r.push(b);
             }
             v
@@ -327,13 +352,13 @@ mod tests {
         let mut fcom = FComReceiver::<FE>::init(&mut channel, &mut rng).unwrap();
         let mut v = Vec::new();
         for _ in 0..count {
-            let x = fcom.comrandom(&mut channel, &mut rng).unwrap();
+            let x = fcom.cRandom(&mut channel, &mut rng).unwrap();
 
             v.push(x);
         }
         let mut r = Vec::new();
         for i in 0..count {
-            let b = fcom.comopen(&mut channel, v[i]).unwrap();
+            let b = fcom.cOpen(&mut channel, v[i]).unwrap();
             r.push(b);
         }
 
@@ -357,16 +382,16 @@ mod tests {
 
             let mut res = Vec::new();
             for i in 0..count {
-                let (rb, rb_com) = fconv.fcomF2.comrandom(&mut channel, &mut rng).unwrap();
+                let (rb, rb_com) = fconv.fcomF2.cRandom(&mut channel, &mut rng).unwrap();
                 let rm = if rb == F2::ONE { FE::ONE } else { FE::ZERO };
-                let rm_com = fconv.fcom.cominput(&mut channel, &mut rng, rm).unwrap();
-                let (x_f2, x_f2_com) = fconv.fcomF2.comrandom(&mut channel, &mut rng).unwrap();
+                let rm_com = fconv.fcom.cInput(&mut channel, &mut rng, rm).unwrap();
+                let (x_f2, x_f2_com) = fconv.fcomF2.cRandom(&mut channel, &mut rng).unwrap();
 
                 let (x_m, x_m_com) = fconv
                     .convertBit2A(&mut channel, &mut rng, rb, rb_com, rm_com, x_f2, x_f2_com)
                     .unwrap();
 
-                let _ = fconv.fcom.comopen(&mut channel, x_m, x_m_com).unwrap();
+                let _ = fconv.fcom.cOpen(&mut channel, x_m, x_m_com).unwrap();
                 // println!(
                 //     "{}",
                 //     if (x_m == FE::ONE) {
@@ -399,15 +424,15 @@ mod tests {
 
         let mut res = Vec::new();
         for i in 0..count {
-            let rb_com = fconv.fcomF2.comrandom(&mut channel, &mut rng).unwrap();
-            let r_m_com = fconv.fcom.cominput(&mut channel, &mut rng).unwrap();
-            let x_f2_com = fconv.fcomF2.comrandom(&mut channel, &mut rng).unwrap();
+            let rb_com = fconv.fcomF2.cRandom(&mut channel, &mut rng).unwrap();
+            let r_m_com = fconv.fcom.cInput(&mut channel, &mut rng).unwrap();
+            let x_f2_com = fconv.fcomF2.cRandom(&mut channel, &mut rng).unwrap();
 
             let x_m_com = fconv
                 .convertBit2A(&mut channel, &mut rng, rb_com, r_m_com, x_f2_com)
                 .unwrap();
 
-            let x_m = fconv.fcom.comopen(&mut channel, x_m_com).unwrap();
+            let x_m = fconv.fcom.cOpen(&mut channel, x_m_com).unwrap();
             res.push(x_m);
         }
 
