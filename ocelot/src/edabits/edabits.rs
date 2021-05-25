@@ -230,6 +230,62 @@ impl<FE: FiniteField> SenderConv<FE> {
         Ok((x, x_com))
     }
 
+    fn bitADDcarry<C: AbstractChannel, RNG: CryptoRng + Rng>(
+        &mut self,
+        channel: &mut C,
+        rng: &mut RNG,
+        x: Vec<(F2, F2)>,
+        y: Vec<(F2, F2)>,
+    ) -> Result<(Vec<(F2, F2)>, (F2, F2)), Error> {
+        let xl = x.len();
+        let yl = y.len();
+        if xl != yl {
+            return Err(Error::Other(
+                "incompatible input vectors in bitADDcarry".to_string(),
+            ));
+        }
+
+        let mut res = Vec::with_capacity(xl);
+
+        let mut ci = F2::ZERO;
+        let mut ci_com = self.fcomF2.cInput(channel, rng, ci)?;
+        for i in 0..xl {
+            let (xi, xi_com) = x[i];
+            let (yi, yi_com) = y[i];
+
+            let and1 = xi + ci;
+            let and1_com = xi_com + ci_com;
+
+            let and2 = yi + ci;
+            let and2_com = yi_com + ci_com;
+
+            let and_res = and1 * and2;
+            let and_res_com = self.fcomF2.cInput(channel, rng, and_res)?;
+            self.fcomF2.cCheckMultiply(
+                channel,
+                rng,
+                and1,
+                and1_com,
+                and2,
+                and2_com,
+                and_res,
+                and_res_com,
+            );
+
+            let c = ci + and_res;
+            let c_com = ci_com + and_res_com;
+
+            let z = xi + yi + ci;
+            let z_com = xi_com + yi_com + ci_com;
+
+            res.push((z, z_com));
+
+            ci = c;
+            ci_com = c_com;
+        }
+        Ok((res, (ci, ci_com)))
+    }
+
     pub fn conv<C: AbstractChannel, RNG: CryptoRng + Rng>(
         &mut self,
         channel: &mut C,
@@ -286,6 +342,47 @@ impl<FE: FiniteField> ReceiverConv<FE> {
         }) + r_m
             + if c == F2::ONE { -(r_m + r_m) } else { FE::ZERO };
         Ok(x_m_com)
+    }
+
+    fn bitADDcarry<C: AbstractChannel, RNG: CryptoRng + Rng>(
+        &mut self,
+        channel: &mut C,
+        rng: &mut RNG,
+        x: Vec<F2>,
+        y: Vec<F2>,
+    ) -> Result<(Vec<F2>, F2), Error> {
+        let xl = x.len();
+        let yl = y.len();
+        if xl != yl {
+            return Err(Error::Other(
+                "incompatible input vectors in bitADDcarry".to_string(),
+            ));
+        }
+
+        let mut res = Vec::with_capacity(xl);
+
+        let mut ci_com = self.fcomF2.cInput(channel, rng)?;
+        for i in 0..xl {
+            let xi_com = x[i];
+            let yi_com = y[i];
+
+            let and1_com = xi_com + ci_com;
+            let and2_com = yi_com + ci_com;
+
+            let and_res_com = self.fcomF2.cInput(channel, rng)?;
+
+            self.fcomF2
+                .cCheckMultiply(channel, rng, and1_com, and2_com, and_res_com);
+
+            let c_com = ci_com + and_res_com;
+
+            let z_com = xi_com + yi_com + ci_com;
+
+            res.push(z_com);
+
+            ci_com = c_com;
+        }
+        Ok((res, ci_com))
     }
 
     pub fn conv<C: AbstractChannel, RNG: CryptoRng + Rng>(
