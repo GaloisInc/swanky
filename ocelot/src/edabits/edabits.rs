@@ -552,6 +552,106 @@ mod tests {
         }
     }
 
+    fn convert_f2_to_FE<FE: FiniteField>(v: Vec<F2>) -> FE {
+        let mut res = FE::ZERO;
+
+        for i in 0..v.len() {
+            let b = v[v.len() - i - 1];
+            res += res;
+            if b == F2::ONE {
+                res += FE::ONE;
+            }
+        }
+        res
+    }
+
+    fn test_bitADDcarry<FE: FiniteField>() -> () {
+        let power = 6;
+        let (sender, receiver) = UnixStream::pair().unwrap();
+
+        // adding
+        //   110101
+        //   101110
+        // --------
+        //  1100011
+        let mut x = vec![F2::ONE, F2::ZERO, F2::ONE, F2::ZERO, F2::ONE, F2::ONE];
+        let mut y = vec![F2::ZERO, F2::ONE, F2::ONE, F2::ONE, F2::ZERO, F2::ONE];
+        let mut expected = vec![F2::ONE, F2::ONE, F2::ZERO, F2::ZERO, F2::ZERO, F2::ONE];
+        let mut carry = F2::ONE;
+
+        let handle = std::thread::spawn(move || {
+            let mut rng = AesRng::new();
+            let reader = BufReader::new(sender.try_clone().unwrap());
+            let writer = BufWriter::new(sender);
+            let mut channel = Channel::new(reader, writer);
+            let mut fconv = SenderConv::<FE>::init(&mut channel).unwrap();
+
+            let mut x_com = Vec::new();
+            let mut y_com = Vec::new();
+
+            for i in 0..power {
+                let xb_com = fconv.fcomF2.cInput(&mut channel, &mut rng, x[i]).unwrap();
+                x_com.push(xb_com);
+
+                let yb_com = fconv.fcomF2.cInput(&mut channel, &mut rng, y[i]).unwrap();
+                y_com.push(yb_com);
+            }
+
+            let mut vx: Vec<(F2, F2)> = Vec::new();
+            for i in 0..6 {
+                vx.push((x[i], x_com[i]));
+            }
+
+            let mut vy = Vec::new();
+            for i in 0..6 {
+                vy.push((y[i], y_com[i]));
+            }
+            let (res, c) = fconv.bitADDcarry(&mut channel, &mut rng, vx, vy).unwrap();
+
+            for i in 0..power {
+                fconv
+                    .fcomF2
+                    .cOpen(&mut channel, res[i].0, res[i].1)
+                    .unwrap();
+            }
+            fconv.fcomF2.cOpen(&mut channel, c.0, c.1).unwrap();
+            (res, c)
+        });
+        let mut rng = AesRng::new();
+        let reader = BufReader::new(receiver.try_clone().unwrap());
+        let writer = BufWriter::new(receiver);
+        let mut channel = Channel::new(reader, writer);
+        let mut fconv = ReceiverConv::<FE>::init(&mut channel, &mut rng).unwrap();
+
+        let mut x_com = Vec::new();
+        let mut y_com = Vec::new();
+        for i in 0..power {
+            let xb_com = fconv.fcomF2.cInput(&mut channel, &mut rng).unwrap();
+            x_com.push(xb_com);
+
+            let yb_com = fconv.fcomF2.cInput(&mut channel, &mut rng).unwrap();
+            y_com.push(yb_com);
+        }
+        let (res_com, c_com) = fconv
+            .bitADDcarry(&mut channel, &mut rng, x_com, y_com)
+            .unwrap();
+
+        let mut res = Vec::new();
+        for i in 0..power {
+            let b = fconv.fcomF2.cOpen(&mut channel, res_com[i]).unwrap();
+            res.push(b);
+        }
+
+        let c = fconv.fcomF2.cOpen(&mut channel, c_com).unwrap();
+
+        let resprover = handle.join().unwrap();
+
+        for i in 0..power {
+            assert_eq!(expected[i], res[i]);
+        }
+        assert_eq!(carry, c);
+    }
+
     #[test]
     fn test_fcom_random_f61p() {
         let t = test_fcom_random::<F61p>();
@@ -564,5 +664,10 @@ mod tests {
     #[test]
     fn test_fconv_convertBit2A_f61p() {
         let t = test_convertBit2A::<F61p>();
+    }
+
+    #[test]
+    fn test_fconv_convertBit2A() {
+        test_bitADDcarry::<F61p>();
     }
 }
