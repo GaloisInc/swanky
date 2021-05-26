@@ -84,6 +84,7 @@ impl<FE: FiniteField> FComSender<FE> {
         return self.cCheckZero(channel, x_com);
     }
 
+    // TODO: dummy MultiplyCheck
     pub fn cCheckMultiply<C: AbstractChannel, RNG: CryptoRng + Rng>(
         &mut self,
         channel: &mut C,
@@ -95,7 +96,10 @@ impl<FE: FiniteField> FComSender<FE> {
         z: FE,
         z_com: FE,
     ) -> Result<(), Error> {
-        Err(Error::Other("NotYetImplemented".to_string()))
+        let _ = self.cOpen(channel, x, x_com)?;
+        let _ = self.cOpen(channel, y, y_com)?;
+        let _ = self.cOpen(channel, z, z_com)?;
+        Ok(())
     }
 }
 
@@ -165,6 +169,7 @@ impl<FE: FiniteField> FComReceiver<FE> {
         }
     }
 
+    // TODO: dummy MultiplyCheck
     pub fn cCheckMultiply<C: AbstractChannel, RNG: CryptoRng + Rng>(
         &mut self,
         channel: &mut C,
@@ -173,7 +178,14 @@ impl<FE: FiniteField> FComReceiver<FE> {
         y_com: FE,
         z_com: FE,
     ) -> Result<(), Error> {
-        Err(Error::Other("NotYetImplemented".to_string()))
+        let x = self.cOpen(channel, x_com)?;
+        let y = self.cOpen(channel, y_com)?;
+        let z = self.cOpen(channel, z_com)?;
+        if z == x * y {
+            Ok(())
+        } else {
+            Err(Error::Other("checkMultiply fails".to_string()))
+        }
     }
 }
 
@@ -270,7 +282,7 @@ impl<FE: FiniteField> SenderConv<FE> {
                 and2_com,
                 and_res,
                 and_res_com,
-            );
+            )?;
 
             let c = ci + and_res;
             let c_com = ci_com + and_res_com;
@@ -372,7 +384,7 @@ impl<FE: FiniteField> ReceiverConv<FE> {
             let and_res_com = self.fcomF2.cInput(channel, rng)?;
 
             self.fcomF2
-                .cCheckMultiply(channel, rng, and1_com, and2_com, and_res_com);
+                .cCheckMultiply(channel, rng, and1_com, and2_com, and_res_com)?;
 
             let c_com = ci_com + and_res_com;
 
