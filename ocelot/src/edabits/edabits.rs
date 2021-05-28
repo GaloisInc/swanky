@@ -21,10 +21,10 @@ use super::homcom::{FComReceiver, FComSender};
 
 // Edabits
 
+#[derive(Clone)]
 struct EdaBits<FE: FiniteField> {
-    bindec: Vec<F2>,
+    bits: Vec<F2>,
     value: FE,
-    length: usize,
 }
 
 struct SenderConv<FE: FiniteField> {
@@ -32,17 +32,29 @@ struct SenderConv<FE: FiniteField> {
     fcom: FComSender<FE>,
 }
 
-fn bitADDcarry(v: Vec<(F2, F2)>) -> (Vec<F2>, F2) {
-    let mut c0 = F2::ZERO;
-    let l = v.len();
-    let mut res = Vec::with_capacity(l);
-    for (x, y) in v.iter() {
-        let c = c0 + (x + c0) * (y + c0);
-        let z = x + y + c0;
-        res.push(z);
-        c0 = c;
+const NB_BITS: usize = 6;
+
+fn convert_f2_to_FE<FE: FiniteField>(v: &Vec<F2>) -> FE {
+    let mut res = FE::ZERO;
+
+    for i in 0..v.len() {
+        let b = v[v.len() - i - 1];
+        res += res; // double
+        if b == F2::ONE {
+            res += FE::ONE;
+        }
     }
-    (res, c0)
+    res
+}
+
+fn powerTwo<FE: FiniteField>(m: usize) -> FE {
+    let mut res = FE::ONE;
+
+    for _ in 0..m {
+        res = res + res;
+    }
+
+    res
 }
 
 // Protocol for checking conversion
@@ -54,22 +66,26 @@ impl<FE: FiniteField> SenderConv<FE> {
         Ok(Self { fcomF2: a, fcom: b })
     }
 
-    pub fn convertBit2A<C: AbstractChannel, RNG: CryptoRng + Rng>(
+    fn convertBit2A<C: AbstractChannel, RNG: CryptoRng + Rng>(
         &mut self,
         channel: &mut C,
         rng: &mut RNG,
-        r_f2: F2,
-        r_com_f2: F2,
-        r_m: FE,
-        x_f2: F2,
-        x_com_f2: F2,
+        r: F2,
+        r_com: F2,
+        r_m_com: FE,
+        x: F2,
+        x_com: F2,
     ) -> Result<(FE, FE), Error> {
-        let x = if x_f2 == F2::ONE { FE::ONE } else { FE::ZERO };
-        self.fcomF2
-            .cOpen(channel, r_f2 + x_f2, r_com_f2 + x_com_f2)?;
-        let c = r_f2 + x_f2;
-        let x_com = r_m + if c == F2::ONE { -(r_m + r_m) } else { FE::ZERO };
-        Ok((x, x_com))
+        let x_m = if x == F2::ONE { FE::ONE } else { FE::ZERO };
+        self.fcomF2.cOpen(channel, r + x, r_com + x_com)?;
+        let c = r + x;
+        let x_m_com = r_m_com
+            + if c == F2::ONE {
+                -(r_m_com + r_m_com)
+            } else {
+                FE::ZERO
+            };
+        Ok((x_m, x_m_com))
     }
 
     fn bitADDcarry<C: AbstractChannel, RNG: CryptoRng + Rng>(
@@ -133,21 +149,68 @@ impl<FE: FiniteField> SenderConv<FE> {
         channel: &mut C,
         rng: &mut RNG,
         edabits: EdaBits<FE>,
-    ) -> Result<Self, Error> {
+    ) -> Result<(), Error> {
         // step 0: not in the paper
-        // let's commit the edabits
-
-        let mut c2_com = Vec::with_capacity(edabits.length);
-        for c in edabits.bindec {
-            let x = self.fcomF2.cInput(channel, rng, c)?;
-            c2_com.push((c, x));
+        // commit the edabits
+        let mut c = Vec::new();
+        for ci in edabits.bits {
+            let ci_com = self.fcomF2.cInput(channel, rng, ci)?;
+            c.push((ci, ci_com));
         }
-        let c_m_com = self.fcom.cInput(channel, rng, edabits.value)?;
+        let c_m = edabits.value;
+        let c_m_com = self.fcom.cInput(channel, rng, c_m)?;
 
-        // step 6
-        // let pick only one bucket for now
-        // and not even random just the same as the input
-        Err(Error::Other("Not implemented yet".to_string()))
+        // step 1)a): commit a random edabit
+        let mut r = Vec::with_capacity(NB_BITS);
+        for i in 0..NB_BITS {
+            let (x, x_com) = self.fcomF2.cRandom(channel, rng)?;
+            r.push((x, x_com));
+        }
+
+        let mut iv: Vec<F2> = Vec::with_capacity(NB_BITS);
+        for (x, _) in r.iter() {
+            iv.push(*x)
+        }
+        let r_m: FE = convert_f2_to_FE(&iv);
+        let r_m_com = self.fcom.cInput(channel, rng, r_m)?;
+
+        // step 1)b): commit a random dabit
+        let (b, b_com) = self.fcomF2.cRandom(channel, rng)?;
+        let b_m = if b == F2::ZERO { FE::ZERO } else { FE::ONE };
+        let b_m_com = self.fcom.cInput(channel, rng, b_m)?;
+
+        // step 1)c): TODO: random multiplication triples
+        // step 2): TODO: verify dabit
+
+        // step 3)-5): TODO: generate permutations, apply them, cut-choose
+
+        // step 6) TODO: currently only let pick only one bucket for now
+        // 6)a)
+        let c_plus_r = c_m + r_m;
+        let c_plus_r_com = c_m_com + r_m_com;
+
+        // 6)b)
+        let (e, e_carry) = self.bitADDcarry(channel, rng, c, r)?;
+
+        // 6)c)
+        let (e_m, e_m_com) =
+            self.convertBit2A(channel, rng, b, b_com, b_m_com, e_carry.0, e_carry.1)?;
+
+        // 6)d)
+        let e1_com = c_plus_r_com - powerTwo::<FE>(NB_BITS) * e_m_com;
+
+        // 6)e)
+        let mut ei = Vec::new();
+        for i in 0..NB_BITS {
+            let elm = self.fcomF2.cOpen(channel, e[i].0, e[i].1)?;
+            ei.push(elm);
+        }
+
+        // Remark this is not necessary for the prover, bc cst addition dont show up in mac
+        // let s = convert_f2_to_FE(ei);
+        let _ = self.fcom.cCheckZero(channel, e1_com)?;
+
+        Ok(())
     }
 }
 
@@ -155,8 +218,6 @@ struct ReceiverConv<FE: FiniteField> {
     fcomF2: FComReceiver<F2>,
     fcom: FComReceiver<FE>,
 }
-
-const NB_BITS: usize = 5;
 
 impl<FE: FiniteField> ReceiverConv<FE> {
     pub fn init<C: AbstractChannel, RNG: CryptoRng + Rng>(
@@ -168,21 +229,25 @@ impl<FE: FiniteField> ReceiverConv<FE> {
         Ok(Self { fcomF2: a, fcom: b })
     }
 
-    pub fn convertBit2A<C: AbstractChannel, RNG: CryptoRng + Rng>(
+    fn convertBit2A<C: AbstractChannel, RNG: CryptoRng + Rng>(
         &mut self,
         channel: &mut C,
         rng: &mut RNG,
-        r_com_f2: F2,
-        r_m: FE,
-        x_com_f2: F2,
+        r_com: F2,
+        r_m_com: FE,
+        x_com: F2,
     ) -> Result<FE, Error> {
-        let c = self.fcomF2.cOpen(channel, r_com_f2 + x_com_f2)?;
+        let c = self.fcomF2.cOpen(channel, r_com + x_com)?;
         let x_m_com = (if c == F2::ONE {
             -self.fcom.get_delta()
         } else {
             FE::ZERO
-        }) + r_m
-            + if c == F2::ONE { -(r_m + r_m) } else { FE::ZERO };
+        }) + r_m_com
+            + if c == F2::ONE {
+                -(r_m_com + r_m_com)
+            } else {
+                FE::ZERO
+            };
         Ok(x_m_com)
     }
 
@@ -231,28 +296,72 @@ impl<FE: FiniteField> ReceiverConv<FE> {
         &mut self,
         channel: &mut C,
         rng: &mut RNG,
-    ) -> Result<Self, Error> {
+    ) -> Result<(), Error> {
         // step 0: not in the paper
-        // let's commit the edabits
-
-        let mut c2_com = Vec::with_capacity(NB_BITS);
-        for _ in 1..NB_BITS {
-            let x = self.fcomF2.cInput(channel, rng)?;
-            c2_com.push(x);
+        // commit the edabits
+        let mut c_com = Vec::new();
+        for _ in 0..NB_BITS {
+            let ci_com = self.fcomF2.cInput(channel, rng)?;
+            c_com.push(ci_com);
         }
-        let cm_com = self.fcom.cInput(channel, rng)?;
 
-        // step 6
-        // let pick only one bucket for now
-        // and not even random just the same as the input
-        Err(Error::Other("Not implemented yet".to_string()))
+        let c_m_com = self.fcom.cInput(channel, rng)?;
+
+        // step 1)a): commit a random edabit
+        let mut r_com = Vec::with_capacity(NB_BITS);
+        for i in 0..NB_BITS {
+            let x_com = self.fcomF2.cRandom(channel, rng)?;
+            r_com.push(x_com);
+        }
+
+        let r_m_com = self.fcom.cInput(channel, rng)?;
+
+        // step 1)b): commit a random dabit
+        let b_com = self.fcomF2.cRandom(channel, rng)?;
+        let b_m_com = self.fcom.cInput(channel, rng)?;
+
+        // step 1)c): TODO: random multiplication triples
+        // step 2): TODO: verify dabit
+
+        // step 3)-5): TODO: generate permutations, apply them, cut-choose
+
+        // step 6) TODO: currently only let pick only one bucket for now
+        // 6)a)
+        let c_plus_r_com = c_m_com + r_m_com;
+
+        // 6)b)
+        let (e_com, e_carry_com) = self.bitADDcarry(channel, rng, c_com, r_com)?;
+
+        // 6)c)
+        let e_m_com = self.convertBit2A(channel, rng, b_com, b_m_com, e_carry_com)?;
+
+        // 6)d)
+        let e1_com = c_plus_r_com - powerTwo::<FE>(NB_BITS) * e_m_com;
+
+        // 6)e)
+        let mut ei = Vec::new();
+        for i in 0..NB_BITS {
+            let elm = self.fcomF2.cOpen(channel, e_com[i])?;
+            ei.push(elm);
+        }
+
+        let s = convert_f2_to_FE(&ei);
+        let b = self
+            .fcom
+            .cCheckZero(channel, e1_com + self.fcom.get_delta() * s)?;
+
+        if b {
+            Ok(())
+        } else {
+            Err(Error::Other("conversion check failed".to_string()))
+        }
     }
 }
 
 #[cfg(test)]
 mod tests {
 
-    use super::{ReceiverConv, SenderConv};
+    use super::{convert_f2_to_FE, EdaBits, ReceiverConv, SenderConv, NB_BITS};
     use scuttlebutt::{
         field::{F61p, FiniteField, F2},
         AesRng, Channel,
@@ -335,19 +444,6 @@ mod tests {
         }
     }
 
-    fn convert_f2_to_FE<FE: FiniteField>(v: Vec<F2>) -> FE {
-        let mut res = FE::ZERO;
-
-        for i in 0..v.len() {
-            let b = v[v.len() - i - 1];
-            res += res;
-            if b == F2::ONE {
-                res += FE::ONE;
-            }
-        }
-        res
-    }
-
     fn test_bitADDcarry<FE: FiniteField>() -> () {
         let power = 6;
         let (sender, receiver) = UnixStream::pair().unwrap();
@@ -357,10 +453,10 @@ mod tests {
         //   101110
         // --------
         //  1100011
-        let mut x = vec![F2::ONE, F2::ZERO, F2::ONE, F2::ZERO, F2::ONE, F2::ONE];
-        let mut y = vec![F2::ZERO, F2::ONE, F2::ONE, F2::ONE, F2::ZERO, F2::ONE];
-        let mut expected = vec![F2::ONE, F2::ONE, F2::ZERO, F2::ZERO, F2::ZERO, F2::ONE];
-        let mut carry = F2::ONE;
+        let x = vec![F2::ONE, F2::ZERO, F2::ONE, F2::ZERO, F2::ONE, F2::ONE];
+        let y = vec![F2::ZERO, F2::ONE, F2::ONE, F2::ONE, F2::ZERO, F2::ONE];
+        let expected = vec![F2::ONE, F2::ONE, F2::ZERO, F2::ZERO, F2::ZERO, F2::ONE];
+        let carry = F2::ONE;
 
         let handle = std::thread::spawn(move || {
             let mut rng = AesRng::new();
@@ -435,6 +531,37 @@ mod tests {
         assert_eq!(carry, c);
     }
 
+    fn test_conv<FE: FiniteField>() -> () {
+        let (sender, receiver) = UnixStream::pair().unwrap();
+
+        let handle = std::thread::spawn(move || {
+            //   110101
+            let c = vec![F2::ONE, F2::ZERO, F2::ONE, F2::ZERO, F2::ONE, F2::ONE];
+            let c_m = convert_f2_to_FE(&c);
+
+            let mut rng = AesRng::new();
+            let reader = BufReader::new(sender.try_clone().unwrap());
+            let writer = BufWriter::new(sender);
+            let mut channel = Channel::new(reader, writer);
+            let mut fconv = SenderConv::<FE>::init(&mut channel).unwrap();
+
+            let edabit_input = EdaBits {
+                bits: c,
+                value: c_m,
+            };
+            fconv.conv(&mut channel, &mut rng, edabit_input);
+        });
+        let mut rng = AesRng::new();
+        let reader = BufReader::new(receiver.try_clone().unwrap());
+        let writer = BufWriter::new(receiver);
+        let mut channel = Channel::new(reader, writer);
+        let mut fconv = ReceiverConv::<FE>::init(&mut channel, &mut rng).unwrap();
+
+        let r = fconv.conv(&mut channel, &mut rng).unwrap();
+
+        let resprover = handle.join().unwrap();
+    }
+
     #[test]
     fn test_fconv_convertBit2A_f61p() {
         let t = test_convertBit2A::<F61p>();
@@ -443,5 +570,10 @@ mod tests {
     #[test]
     fn test_fconv_convertBit2A() {
         test_bitADDcarry::<F61p>();
+    }
+
+    #[test]
+    fn test_fconv_conv() {
+        test_conv::<F61p>();
     }
 }

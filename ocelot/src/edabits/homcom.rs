@@ -148,6 +148,16 @@ impl<FE: FiniteField> FComReceiver<FE> {
         Ok(v_com)
     }
 
+    // pub fn cAffine<C: AbstractChannel, RNG: CryptoRng + Rng>(
+    //     &mut self,
+    //     cst: FE,
+
+    //     fct: FE,
+    // ) -> Result<FE, Error> {
+
+    //     Ok(v_com)
+    // }
+
     pub fn cCheckZero<C: AbstractChannel>(
         &mut self,
         channel: &mut C,
