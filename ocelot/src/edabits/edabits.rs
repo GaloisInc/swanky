@@ -532,24 +532,41 @@ mod tests {
     }
 
     fn test_conv<FE: FiniteField>() -> () {
+        let count = 1000;
         let (sender, receiver) = UnixStream::pair().unwrap();
 
         let handle = std::thread::spawn(move || {
-            //   110101
-            let c = vec![F2::ONE, F2::ZERO, F2::ONE, F2::ZERO, F2::ONE, F2::ONE];
-            let c_m = convert_f2_to_FE(&c);
-
             let mut rng = AesRng::new();
             let reader = BufReader::new(sender.try_clone().unwrap());
             let writer = BufWriter::new(sender);
             let mut channel = Channel::new(reader, writer);
             let mut fconv = SenderConv::<FE>::init(&mut channel).unwrap();
 
-            let edabit_input = EdaBits {
-                bits: c,
-                value: c_m,
-            };
-            fconv.conv(&mut channel, &mut rng, edabit_input);
+            //   110101
+            let mut c = vec![F2::ONE, F2::ZERO, F2::ONE, F2::ZERO, F2::ONE, F2::ONE];
+            let mut i = 0;
+            let mut j = 0;
+            let mut res = Vec::new();
+            for _ in 0..count {
+                i = (i + 1) % NB_BITS;
+                j = (j * 5 + 3) % NB_BITS;
+
+                c[i] = F2::random(&mut rng);
+                let c_m: FE = convert_f2_to_FE(&c);
+
+                // Let's try a random mutation here
+                let saved = c[j];
+                c[j] = F2::random(&mut rng);
+
+                let edabit_input = EdaBits {
+                    bits: c.clone(),
+                    value: c_m.clone(),
+                };
+                fconv.conv(&mut channel, &mut rng, edabit_input);
+
+                res.push(saved == c[j])
+            }
+            res
         });
         let mut rng = AesRng::new();
         let reader = BufReader::new(receiver.try_clone().unwrap());
@@ -557,23 +574,48 @@ mod tests {
         let mut channel = Channel::new(reader, writer);
         let mut fconv = ReceiverConv::<FE>::init(&mut channel, &mut rng).unwrap();
 
-        let r = fconv.conv(&mut channel, &mut rng).unwrap();
+        let mut res = Vec::new();
+        for _ in 0..count {
+            let r = fconv.conv(&mut channel, &mut rng);
+            res.push(r);
+        }
 
         let resprover = handle.join().unwrap();
+
+        let mut i = 0;
+        for b in resprover.iter() {
+            let _ = match (b, res[i].as_ref()) {
+                (true, Err(_)) => {
+                    println!("Break at iteration #{}", i);
+                    assert_eq!(true, false)
+                }
+                (false, Ok(())) => {
+                    println!("Break at iteration #{}", i);
+                    assert_eq!(true, false)
+                }
+                (_, _) => (),
+            };
+            // if *b {
+            //     println!("true");
+            // } else {
+            //     println!("false");
+            // }
+            i += 1;
+        }
     }
 
     #[test]
-    fn test_fconv_convertBit2A_f61p() {
+    fn test_convertBit2A_f61p() {
         let t = test_convertBit2A::<F61p>();
     }
 
     #[test]
-    fn test_fconv_convertBit2A() {
+    fn test_bitADDcarry_f61p() {
         test_bitADDcarry::<F61p>();
     }
 
     #[test]
-    fn test_fconv_conv() {
+    fn test_conv_f61p() {
         test_conv::<F61p>();
     }
 }
