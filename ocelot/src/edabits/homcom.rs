@@ -59,9 +59,9 @@ impl<FE: FiniteField> FComSender<FE> {
     pub fn f_check_zero<C: AbstractChannel>(
         &mut self,
         channel: &mut C,
-        x_com: FE,
+        x_mac: FE,
     ) -> Result<(), Error> {
-        channel.write_fe::<FE>(x_com)?;
+        channel.write_fe::<FE>(x_mac)?;
         channel.flush()?;
         Ok(())
     }
@@ -70,12 +70,12 @@ impl<FE: FiniteField> FComSender<FE> {
         &mut self,
         channel: &mut C,
         x: FE,
-        x_com: FE,
+        x_mac: FE,
     ) -> Result<(), Error> {
         channel.write_fe::<FE>(x)?;
         channel.flush()?;
 
-        return self.f_check_zero(channel, x_com);
+        return self.f_check_zero(channel, x_mac);
     }
 
     // TODO: dummy MultiplyCheck
@@ -84,15 +84,15 @@ impl<FE: FiniteField> FComSender<FE> {
         channel: &mut C,
         _rng: &mut RNG,
         x: FE,
-        x_com: FE,
+        x_mac: FE,
         y: FE,
-        y_com: FE,
+        y_mac: FE,
         z: FE,
-        z_com: FE,
+        z_mac: FE,
     ) -> Result<(), Error> {
-        let _ = self.f_open(channel, x, x_com)?;
-        let _ = self.f_open(channel, y, y_com)?;
-        let _ = self.f_open(channel, z, z_com)?;
+        let _ = self.f_open(channel, x, x_mac)?;
+        let _ = self.f_open(channel, y, y_mac)?;
+        let _ = self.f_open(channel, z, z_mac)?;
         Ok(())
     }
 }
@@ -114,8 +114,7 @@ impl<FE: FiniteField> FComReceiver<FE> {
     }
 
     pub fn get_delta(self) -> FE {
-        let x = self.delta;
-        x + FE::ZERO
+        self.delta
     }
 
     pub fn f_random<C: AbstractChannel, RNG: CryptoRng + Rng>(
@@ -135,11 +134,11 @@ impl<FE: FiniteField> FComReceiver<FE> {
         channel: &mut C,
         rng: &mut RNG,
     ) -> Result<FE, Error> {
-        let r_com = self.f_random(channel, rng)?;
+        let r_mac = self.f_random(channel, rng)?;
         let y = channel.read_fe::<FE>()?;
 
-        let v_com = r_com - self.delta * y;
-        Ok(v_com)
+        let v_mac = r_mac - self.delta * y;
+        Ok(v_mac)
     }
 
     // pub fn cAffine<C: AbstractChannel, RNG: CryptoRng + Rng>(
@@ -149,7 +148,7 @@ impl<FE: FiniteField> FComReceiver<FE> {
     //     fct: FE,
     // ) -> Result<FE, Error> {
 
-    //     Ok(v_com)
+    //     Ok(v_mac)
     // }
 
     pub fn f_check_zero<C: AbstractChannel>(
@@ -180,13 +179,13 @@ impl<FE: FiniteField> FComReceiver<FE> {
         &mut self,
         channel: &mut C,
         _rng: &mut RNG,
-        x_com: FE,
-        y_com: FE,
-        z_com: FE,
+        x_mac: FE,
+        y_mac: FE,
+        z_mac: FE,
     ) -> Result<(), Error> {
-        let x = self.f_open(channel, x_com)?;
-        let y = self.f_open(channel, y_com)?;
-        let z = self.f_open(channel, z_com)?;
+        let x = self.f_open(channel, x_mac)?;
+        let y = self.f_open(channel, y_mac)?;
+        let z = self.f_open(channel, z_mac)?;
         if z == x * y {
             Ok(())
         } else {
