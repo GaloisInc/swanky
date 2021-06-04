@@ -241,6 +241,37 @@ use crate::SimdBase;
 use crate::array_utils::*;
 use std::ops::*;
 
+/// We need to use a macro to explicitly match every possible immediate value, and then dispatch to
+/// a block which has a const generic value for the intrinsic immediate. The inputs to our
+/// functions need to be manipulated before they passed to the raw intrinsic.
+/// It used to be possible to directly manipulate the const before passing it to the intrinsic.
+/// However, https://git.io/JsukV broke compatibility with stable, so we need to do this instead.
+#[allow(unused_macros)]
+macro_rules! constify_imm {
+    {% for name, lst in [
+        ("0..256", range(256)),
+        ("0..32", range(32)),
+        ("0..16", range(16)),
+        ("0..8", range(8)),
+        ("0..4", range(4)),
+        ("0..2", range(2)),
+        ("[1, 2, 4, 8]", [1, 2, 4, 8]),
+    ] %}
+        ($func:path => (
+            $($normal_args:expr,)*
+            @@ [{{name}}] $imm_arg:expr
+        )) => {
+            // Hopefully this gets optimized out...
+            match $imm_arg {
+                {% for i in lst %}
+                    {{i}} => $func($($normal_args,)* {{i}}),
+                {% endfor %}
+                _ => panic!("Invalid immediate: {}. Expected immediate to satisfy: {{name}}", $imm_arg),
+            }
+        };
+    {% endfor %}
+}
+
 /// The backend that is used to evaluate vector operations.
 #[allow(dead_code)]
 pub const VECTOR_BACKEND: crate::VectorBackend = {
