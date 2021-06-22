@@ -5,10 +5,7 @@ extern crate humidor;
 
 use humidor::ligero::interactive;
 use humidor::circuit::Ckt;
-<<<<<<< HEAD
 use humidor::Sha256;
-=======
->>>>>>> d06efc3b... Generalize ligero over choice of field
 
 type Field = humidor::f2_19x3_26::F;
 
