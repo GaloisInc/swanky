@@ -17,8 +17,15 @@ use super::homcom::{FComReceiver, FComSender};
 
 /// Edabits struct
 #[derive(Clone)]
-struct EdaBits<FE: FiniteField> {
+struct Edabits<FE: FiniteField> {
     bits: Vec<F2>,
+    value: FE,
+}
+
+/// Dabit struct
+#[derive(Clone)]
+struct Dabit<FE: FiniteField> {
+    bit: F2,
     value: FE,
 }
 
@@ -29,6 +36,11 @@ struct SenderConv<FE: FiniteField> {
 }
 
 const NB_BITS: usize = 6;
+
+const N: usize = 10;
+const B: usize = 5;
+const SHUFFLE: usize = 1;
+const C: usize = 5;
 
 fn convert_f2_to_field<FE: FiniteField>(v: &Vec<F2>) -> FE {
     let mut res = FE::ZERO;
@@ -91,8 +103,10 @@ impl<FE: FiniteField> SenderConv<FE> {
         &mut self,
         channel: &mut C,
         rng: &mut RNG,
-        x: &[(F2, F2)],
-        y: &[(F2, F2)],
+        x: &[F2],
+        x_mac: &[F2],
+        y: &[F2],
+        y_mac: &[F2],
     ) -> Result<(Vec<(F2, F2)>, (F2, F2)), Error> {
         let xl = x.len();
         let yl = y.len();
@@ -107,8 +121,8 @@ impl<FE: FiniteField> SenderConv<FE> {
         let mut ci = F2::ZERO;
         let mut ci_mac = self.fcom_f2.f_input(channel, rng, ci)?;
         for i in 0..xl {
-            let (xi, xi_mac) = x[i];
-            let (yi, yi_mac) = y[i];
+            let (xi, xi_mac) = (x[i], x_mac[i]);
+            let (yi, yi_mac) = (y[i], y_mac[i]);
 
             let and1 = xi + ci;
             let and1_mac = xi_mac + ci_mac;
@@ -147,47 +161,80 @@ impl<FE: FiniteField> SenderConv<FE> {
         &mut self,
         channel: &mut C,
         rng: &mut RNG,
-        num: u32,
-    ) {
+        num: usize, // in the paper: NB + C
+    ) -> Result<(Vec<Edabits<FE>>, Vec<Edabits<FE>>), Error> {
+        let mut edabits_vec = Vec::with_capacity(num);
+        let mut edabits_vec_mac = Vec::with_capacity(num);
+        for _ in 0..num {
+            // Generating random edabits
+            let mut r = Vec::with_capacity(NB_BITS);
+            let mut r_mac = Vec::with_capacity(NB_BITS);
+            for _ in 0..NB_BITS {
+                let (b, b_mac) = self.fcom_f2.f_random(channel, rng)?;
+                r.push(b);
+                r_mac.push(b_mac);
+            }
+            let r_m: FE = convert_f2_to_field(&r);
+            let r_m_mac: FE = self.fcom.f_input(channel, rng, r_m)?;
+
+            edabits_vec.push(Edabits {
+                bits: r,
+                value: r_m,
+            });
+
+            edabits_vec_mac.push(Edabits {
+                bits: r_mac,
+                value: r_m_mac,
+            });
+        }
+        Ok((edabits_vec, edabits_vec_mac))
+    }
+
+    fn random_dabits<C: AbstractChannel, RNG: CryptoRng + Rng>(
+        &mut self,
+        channel: &mut C,
+        rng: &mut RNG,
+        num: usize, // in the paper: NB
+    ) -> Result<(Vec<Dabit<FE>>, Vec<Dabit<FE>>), Error> {
+        let mut dabit_vec = Vec::with_capacity(num);
+        let mut dabit_vec_mac = Vec::with_capacity(num);
+        for _ in 0..num {
+            let (b, b_mac) = self.fcom_f2.f_random(channel, rng)?;
+            let b_m = if b == F2::ZERO { FE::ZERO } else { FE::ONE };
+            let b_m_mac = self.fcom.f_input(channel, rng, b_m)?;
+            dabit_vec.push(Dabit { bit: b, value: b_m });
+            dabit_vec_mac.push(Dabit {
+                bit: b_mac,
+                value: b_m_mac,
+            });
+        }
+        Ok((dabit_vec, dabit_vec_mac))
     }
 
     fn conv<C: AbstractChannel, RNG: CryptoRng + Rng>(
         &mut self,
         channel: &mut C,
         rng: &mut RNG,
-        edabits_vector: &[EdaBits<FE>],
-        edabits_vector_mac: &[EdaBits<FE>],
+        edabits_vector: &[Edabits<FE>],
+        edabits_vector_mac: &[Edabits<FE>],
     ) -> Result<(), Error> {
-        // step 0: not in the paper
-        // commit the edabits
+        // step 1)a): commit random edabit
+        let (r, r_mac) = self.random_edabits(channel, rng, N * B + C)?;
+
+        // step 1)b)
+        let (dabits, dabits_mac) = self.random_dabits(channel, rng, N * B)?;
+
         for (edabits, edabits_mac) in edabits_vector.iter().zip(edabits_vector_mac.iter()) {
-            // step 0: not in the paper
-            // commit the edabits
-            let mut c = Vec::new();
-            for (ci, ci_mac) in edabits.bits.iter().zip(edabits_mac.bits.iter()) {
-                c.push((*ci, *ci_mac));
-            }
-            // let c_m = edabits.value;
-            let c_m_mac = edabits_mac.value; //self.fcom.f_input(channel, rng, c_m)?;
-
-            // step 1)a): commit a random edabit
-            let mut r = Vec::with_capacity(NB_BITS);
-            for _ in 0..NB_BITS {
-                let (x, x_mac) = self.fcom_f2.f_random(channel, rng)?;
-                r.push((x, x_mac));
-            }
-
-            let mut iv: Vec<F2> = Vec::with_capacity(NB_BITS);
-            for (x, _) in r.iter() {
-                iv.push(*x)
-            }
-            let r_m: FE = convert_f2_to_field(&iv);
-            let r_m_mac = self.fcom.f_input(channel, rng, r_m)?;
+            // mapping arguments to variable names similar to ones in the paper
+            let c = &edabits.bits;
+            let c_mac = &edabits_mac.bits;
+            let c_m_mac = edabits_mac.value;
 
             // step 1)b): commit a random dabit
-            let (b, b_mac) = self.fcom_f2.f_random(channel, rng)?;
-            let b_m = if b == F2::ZERO { FE::ZERO } else { FE::ONE };
-            let b_m_mac = self.fcom.f_input(channel, rng, b_m)?;
+            let b = dabits[SHUFFLE].bit;
+            let b_mac = dabits_mac[SHUFFLE].bit;
+            let b_m = dabits_mac[SHUFFLE].value;
+            let b_m_mac = dabits_mac[SHUFFLE].value;
 
             // step 1)c): TODO: random multiplication triples
             // step 2): TODO: verify dabit
@@ -196,10 +243,18 @@ impl<FE: FiniteField> SenderConv<FE> {
 
             // step 6) TODO: currently only let pick only one bucket for now
             // 6)a)
+            let r_m_mac = r_mac[SHUFFLE].value;
             let c_plus_r_mac = c_m_mac + r_m_mac;
 
             // 6)b)
-            let (e, e_carry) = self.bit_add_carry(channel, rng, c.as_slice(), &r)?;
+            let (e, e_carry) = self.bit_add_carry(
+                channel,
+                rng,
+                &c,
+                &c_mac,
+                &r[SHUFFLE].bits,
+                &r_mac[SHUFFLE].bits,
+            )?;
 
             // 6)c)
             let (_, e_m_mac) =
@@ -305,32 +360,68 @@ impl<FE: FiniteField> ReceiverConv<FE> {
         Ok((res, ci_mac))
     }
 
+    fn random_edabits<C: AbstractChannel, RNG: CryptoRng + Rng>(
+        &mut self,
+        channel: &mut C,
+        rng: &mut RNG,
+        num: usize, // in the paper: NB + C
+    ) -> Result<Vec<Edabits<FE>>, Error> {
+        let mut edabits_vec_mac = Vec::with_capacity(num);
+        for _ in 0..num {
+            let mut r_mac = Vec::with_capacity(NB_BITS);
+            for _ in 0..NB_BITS {
+                let b_mac = self.fcom_f2.f_random(channel, rng)?;
+                r_mac.push(b_mac);
+            }
+
+            let r_m_mac = self.fcom.f_input(channel, rng)?;
+            edabits_vec_mac.push(Edabits {
+                bits: r_mac,
+                value: r_m_mac,
+            });
+        }
+        Ok(edabits_vec_mac)
+    }
+
+    fn random_dabits<C: AbstractChannel, RNG: CryptoRng + Rng>(
+        &mut self,
+        channel: &mut C,
+        rng: &mut RNG,
+        num: usize, // in the paper: NB
+    ) -> Result<Vec<Dabit<FE>>, Error> {
+        let mut dabit_vec_mac = Vec::with_capacity(num);
+        for _ in 0..num {
+            let b_mac = self.fcom_f2.f_random(channel, rng)?;
+            let b_m_mac = self.fcom.f_input(channel, rng)?;
+            dabit_vec_mac.push(Dabit {
+                bit: b_mac,
+                value: b_m_mac,
+            });
+        }
+        Ok(dabit_vec_mac)
+    }
+
     fn conv<C: AbstractChannel, RNG: CryptoRng + Rng>(
         &mut self,
         channel: &mut C,
         rng: &mut RNG,
-        edabits_vector_mac: &[EdaBits<FE>],
+        edabits_vector_mac: &[Edabits<FE>],
     ) -> Result<(), Error> {
-        // step 0: not in the paper
-        // commit the edabits
         let mut b = true;
+
+        // step 1)a)
+        let r_mac = self.random_edabits(channel, rng, N * B + C)?;
+
+        // step 1)b)
+        let dabits_mac = self.random_dabits(channel, rng, N * B)?;
 
         for edabits_mac in edabits_vector_mac.iter() {
             let c_mac = &edabits_mac.bits;
             let c_m_mac = edabits_mac.value;
 
-            // step 1)a): commit a random edabit
-            let mut r_mac = Vec::with_capacity(NB_BITS);
-            for _ in 0..NB_BITS {
-                let x_mac = self.fcom_f2.f_random(channel, rng)?;
-                r_mac.push(x_mac);
-            }
-
-            let r_m_mac = self.fcom.f_input(channel, rng)?;
-
             // step 1)b): commit a random dabit
-            let b_mac = self.fcom_f2.f_random(channel, rng)?;
-            let b_m_mac = self.fcom.f_input(channel, rng)?;
+            let b_mac = dabits_mac[SHUFFLE].bit;
+            let b_m_mac = dabits_mac[SHUFFLE].value;
 
             // step 1)c): TODO: random multiplication triples
             // step 2): TODO: verify dabit
@@ -339,10 +430,12 @@ impl<FE: FiniteField> ReceiverConv<FE> {
 
             // step 6) TODO: currently only let pick only one bucket for now
             // 6)a)
+            let r_m_mac = r_mac[SHUFFLE].value;
             let c_plus_r_mac = c_m_mac + r_m_mac;
 
             // 6)b)
-            let (e_mac, e_carry_mac) = self.bit_add_carry(channel, rng, &c_mac, &r_mac)?;
+            let (e_mac, e_carry_mac) =
+                self.bit_add_carry(channel, rng, &c_mac, &r_mac[SHUFFLE].bits)?;
 
             // 6)c)
             let e_m_mac = self.convert_bit_2_field(channel, rng, b_mac, b_m_mac, e_carry_mac)?;
@@ -374,7 +467,7 @@ impl<FE: FiniteField> ReceiverConv<FE> {
 #[cfg(test)]
 mod tests {
 
-    use super::{convert_f2_to_field, EdaBits, ReceiverConv, SenderConv, NB_BITS};
+    use super::{convert_f2_to_field, Edabits, ReceiverConv, SenderConv, NB_BITS};
     use scuttlebutt::{
         field::{F61p, FiniteField, F2},
         AesRng, Channel,
@@ -489,17 +582,21 @@ mod tests {
                 y_mac.push(yb_mac);
             }
 
-            let mut vx: Vec<(F2, F2)> = Vec::new();
+            let mut vx: Vec<F2> = Vec::new();
+            let mut vx_mac: Vec<F2> = Vec::new();
             for i in 0..6 {
-                vx.push((x[i], x_mac[i]));
+                vx.push(x[i]);
+                vx_mac.push(x_mac[i]);
             }
 
             let mut vy = Vec::new();
+            let mut vy_mac = Vec::new();
             for i in 0..6 {
-                vy.push((y[i], y_mac[i]));
+                vy.push(y[i]);
+                vy_mac.push(y_mac[i]);
             }
             let (res, c) = fconv
-                .bit_add_carry(&mut channel, &mut rng, &vx, &vy)
+                .bit_add_carry(&mut channel, &mut rng, &vx, &vx_mac, &vy, &vy_mac)
                 .unwrap();
 
             for i in 0..power {
@@ -576,7 +673,7 @@ mod tests {
                 let saved = c[j];
                 c[j] = F2::random(&mut rng);
 
-                edabits.push(EdaBits {
+                edabits.push(Edabits {
                     bits: c.clone(),
                     value: c_m.clone(),
                 });
@@ -589,7 +686,7 @@ mod tests {
                     bits_mac.push(v);
                 }
                 let value_mac = fconv.fcom.f_input(&mut channel, &mut rng, c_m).unwrap();
-                edabits_mac.push(EdaBits {
+                edabits_mac.push(Edabits {
                     bits: bits_mac,
                     value: value_mac,
                 });
@@ -617,7 +714,7 @@ mod tests {
                 bits_mac.push(v_mac);
             }
             let value_mac = fconv.fcom.f_input(&mut channel, &mut rng).unwrap();
-            edabits_mac.push(EdaBits {
+            edabits_mac.push(Edabits {
                 bits: bits_mac,
                 value: value_mac,
             });
