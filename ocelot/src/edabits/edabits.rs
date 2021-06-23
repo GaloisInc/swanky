@@ -7,10 +7,10 @@
 //! This is the implementation of field conversion
 
 use crate::errors::Error;
-use rand::{CryptoRng, Rng};
+use rand::{CryptoRng, Rng, SeedableRng};
 use scuttlebutt::{
     field::{FiniteField, F2},
-    AbstractChannel,
+    AbstractChannel, AesRng, Block,
 };
 
 use super::homcom::{FComReceiver, FComSender};
@@ -63,6 +63,29 @@ fn power_two<FE: FiniteField>(m: usize) -> FE {
     }
 
     res
+}
+
+// Permutation pseudorandomly generated following Fisher-Yates method
+// `https://en.wikipedia.org/wiki/Fisher%E2%80%93Yates_shuffle`
+fn generate_permutation(seed: Block, size: usize) -> (Vec<usize>, Vec<usize>) {
+    let mut rng = AesRng::from_seed(seed);
+    let mut permute: Vec<usize> = Vec::with_capacity(size);
+    let mut unpermute: Vec<usize> = vec![0; size];
+
+    for i in 0..size {
+        permute.push(i);
+        //unpermute.push(i);
+    }
+    let mut i = size - 1;
+    while i > 0 {
+        let idx = Rng::gen_range(&mut rng, 0, i);
+        let tmp: usize = permute[idx];
+        permute[idx] = permute[i];
+        permute[i] = tmp;
+        unpermute[tmp] = i;
+        i -= 1;
+    }
+    (permute, unpermute)
 }
 
 // Protocol for checking conversion
