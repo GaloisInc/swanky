@@ -37,9 +37,7 @@ struct SenderConv<FE: FiniteField> {
 
 const NB_BITS: usize = 6;
 
-const N: usize = 10;
 const B: usize = 5;
-const SHUFFLE: usize = 1;
 const C: usize = 5;
 
 fn convert_f2_to_field<FE: FiniteField>(v: &Vec<F2>) -> FE {
@@ -241,62 +239,95 @@ impl<FE: FiniteField> SenderConv<FE> {
         edabits_vector: &[Edabits<FE>],
         edabits_vector_mac: &[Edabits<FE>],
     ) -> Result<(), Error> {
+        let nb_random_edabits = edabits_vector.len() * B + C;
+        let nb_random_dabits = edabits_vector.len() * B;
+
         // step 1)a): commit random edabit
-        let (r, r_mac) = self.random_edabits(channel, rng, N * B + C)?;
+        let (r, r_mac) = self.random_edabits(channel, rng, nb_random_edabits)?;
 
         // step 1)b)
-        let (dabits, dabits_mac) = self.random_dabits(channel, rng, N * B)?;
+        let (dabits, dabits_mac) = self.random_dabits(channel, rng, nb_random_dabits)?;
 
-        for (edabits, edabits_mac) in edabits_vector.iter().zip(edabits_vector_mac.iter()) {
+        // step 1)c): TODO: random multiplication triples
+
+        // step 2): TODO: verify dabit
+
+        // step 3): TODO: generate pi_2 and pi_3
+        let seed = channel.read_block()?;
+        let (perm1, unperm1) = generate_permutation(seed, nb_random_edabits);
+
+        // step 4): TODO: apply the permutation instead of indirections
+
+        // step 5)a):
+        let base = edabits_vector_mac.len() * B;
+        for i in 0..C {
+            let idx = base + i;
+            let a = &r[perm1[idx]];
+            let a_mac = &r_mac[perm1[idx]];
+            for bi in 0..NB_BITS {
+                self.fcom_f2.f_open(channel, a.bits[bi], a_mac.bits[bi])?;
+            }
+            self.fcom.f_open(channel, a.value, a_mac.value)?;
+        }
+        // step 5) b): TODO: open triples
+
+        // step 6)
+        for i in 0..edabits_vector.len() {
+            let edabits = &edabits_vector[i];
+            let edabits_mac = &edabits_vector_mac[i];
+
             // mapping arguments to variable names similar to ones in the paper
             let c = &edabits.bits;
             let c_mac = &edabits_mac.bits;
             let c_m_mac = edabits_mac.value;
 
-            // step 1)b): commit a random dabit
-            let b = dabits[SHUFFLE].bit;
-            let b_mac = dabits_mac[SHUFFLE].bit;
-            let b_m = dabits_mac[SHUFFLE].value;
-            let b_m_mac = dabits_mac[SHUFFLE].value;
+            let idx_base = i * B;
+            for j in 0..B {
+                let idx_dabit = idx_base + j;
 
-            // step 1)c): TODO: random multiplication triples
-            // step 2): TODO: verify dabit
+                // pick the random dabit
+                let b = dabits[idx_dabit].bit;
+                let b_mac = dabits_mac[idx_dabit].bit;
+                let b_m = dabits_mac[idx_dabit].value;
+                let b_m_mac = dabits_mac[idx_dabit].value;
 
-            // step 3)-5): TODO: generate permutations, apply them, cut-choose
+                //pick the random edabit
+                let idx_r = idx_base + j;
 
-            // step 6) TODO: currently only let pick only one bucket for now
-            // 6)a)
-            let r_m_mac = r_mac[SHUFFLE].value;
-            let c_plus_r_mac = c_m_mac + r_m_mac;
+                // 6)a)
+                let r_m_mac = r_mac[idx_r].value;
+                let c_plus_r_mac = c_m_mac + r_m_mac;
 
-            // 6)b)
-            let (e, e_carry) = self.bit_add_carry(
-                channel,
-                rng,
-                &c,
-                &c_mac,
-                &r[SHUFFLE].bits,
-                &r_mac[SHUFFLE].bits,
-            )?;
+                // 6)b)
+                let (e, e_carry) = self.bit_add_carry(
+                    channel,
+                    rng,
+                    &c,
+                    &c_mac,
+                    &r[idx_r].bits,
+                    &r_mac[idx_r].bits,
+                )?;
 
-            // 6)c)
-            let (_, e_m_mac) =
-                self.convert_bit_2_field(channel, rng, b, b_mac, b_m_mac, e_carry.0, e_carry.1)?;
+                // 6)c)
+                let (_, e_m_mac) = self
+                    .convert_bit_2_field(channel, rng, b, b_mac, b_m_mac, e_carry.0, e_carry.1)?;
 
-            // 6)d)
-            let e1_mac = c_plus_r_mac - power_two::<FE>(NB_BITS) * e_m_mac;
+                // 6)d)
+                let e1_mac = c_plus_r_mac - power_two::<FE>(NB_BITS) * e_m_mac;
 
-            // 6)e)
-            let mut ei = Vec::new();
-            for i in 0..NB_BITS {
-                let elm = self.fcom_f2.f_open(channel, e[i].0, e[i].1)?;
-                ei.push(elm);
+                // 6)e)
+                let mut ei = Vec::new();
+                for i in 0..NB_BITS {
+                    let elm = self.fcom_f2.f_open(channel, e[i].0, e[i].1)?;
+                    ei.push(elm);
+                }
+
+                // Remark this is not necessary for the prover, bc cst addition dont show up in mac
+                // let s = convert_f2_to_field(ei);
+                let _ = self.fcom.f_check_zero(channel, e1_mac)?;
             }
-
-            // Remark this is not necessary for the prover, bc cst addition dont show up in mac
-            // let s = convert_f2_to_field(ei);
-            let _ = self.fcom.f_check_zero(channel, e1_mac)?;
         }
+
         Ok(())
     }
 }
@@ -432,51 +463,87 @@ impl<FE: FiniteField> ReceiverConv<FE> {
     ) -> Result<(), Error> {
         let mut b = true;
 
+        let nb_random_edabits = edabits_vector_mac.len() * B + C;
+        let nb_random_dabits = edabits_vector_mac.len() * B;
+
         // step 1)a)
-        let r_mac = self.random_edabits(channel, rng, N * B + C)?;
+        let r_mac = self.random_edabits(channel, rng, nb_random_edabits)?;
 
         // step 1)b)
-        let dabits_mac = self.random_dabits(channel, rng, N * B)?;
+        let dabits_mac = self.random_dabits(channel, rng, nb_random_dabits)?;
 
-        for edabits_mac in edabits_vector_mac.iter() {
+        // step 1)c): TODO: random multiplication triples
+
+        // step 2): TODO: verify dabit
+
+        // step 3): TODO: generate pi_2 and pi_3
+        let seed = rng.gen::<Block>();
+        channel.write_block(&seed)?;
+        channel.flush()?;
+        let (perm1, unperm1) = generate_permutation(seed, nb_random_edabits);
+
+        // step 4): TODO: apply the permutation instead of indirections
+
+        // step 5)a):
+        let base = edabits_vector_mac.len() * B;
+        for i in 0..C {
+            let idx = base + i;
+            let a_mac = &r_mac[perm1[idx]];
+            let mut a_vec = Vec::with_capacity(NB_BITS);
+            for bi in 0..NB_BITS {
+                let a = self.fcom_f2.f_open(channel, a_mac.bits[bi])?;
+                a_vec.push(a);
+            }
+            let a_m = self.fcom.f_open(channel, a_mac.value)?;
+            if convert_f2_to_field::<FE>(&a_vec) != a_m {
+                return Err(Error::Other("Wrong open random edabit".to_string()));
+            }
+        }
+        // step 5) b): TODO: open triples
+
+        // step 6)
+        for i in 0..edabits_vector_mac.len() {
+            let edabits_mac = &edabits_vector_mac[i];
             let c_mac = &edabits_mac.bits;
             let c_m_mac = edabits_mac.value;
 
-            // step 1)b): commit a random dabit
-            let b_mac = dabits_mac[SHUFFLE].bit;
-            let b_m_mac = dabits_mac[SHUFFLE].value;
+            let idx_base = i * B;
+            for j in 0..B {
+                // pick the random dabit
+                let idx_dabit = idx_base + j;
+                let b_mac = dabits_mac[idx_dabit].bit;
+                let b_m_mac = dabits_mac[idx_dabit].value;
 
-            // step 1)c): TODO: random multiplication triples
-            // step 2): TODO: verify dabit
+                //pick the random edabit
+                let idx_r = idx_base + j;
 
-            // step 3)-5): TODO: generate permutations, apply them, cut-choose
+                // 6)a)
+                let r_m_mac = r_mac[idx_r].value;
+                let c_plus_r_mac = c_m_mac + r_m_mac;
 
-            // step 6) TODO: currently only let pick only one bucket for now
-            // 6)a)
-            let r_m_mac = r_mac[SHUFFLE].value;
-            let c_plus_r_mac = c_m_mac + r_m_mac;
+                // 6)b)
+                let (e_mac, e_carry_mac) =
+                    self.bit_add_carry(channel, rng, &c_mac, &r_mac[idx_r].bits)?;
 
-            // 6)b)
-            let (e_mac, e_carry_mac) =
-                self.bit_add_carry(channel, rng, &c_mac, &r_mac[SHUFFLE].bits)?;
+                // 6)c)
+                let e_m_mac =
+                    self.convert_bit_2_field(channel, rng, b_mac, b_m_mac, e_carry_mac)?;
 
-            // 6)c)
-            let e_m_mac = self.convert_bit_2_field(channel, rng, b_mac, b_m_mac, e_carry_mac)?;
+                // 6)d)
+                let e1_mac = c_plus_r_mac - power_two::<FE>(NB_BITS) * e_m_mac;
 
-            // 6)d)
-            let e1_mac = c_plus_r_mac - power_two::<FE>(NB_BITS) * e_m_mac;
+                // 6)e)
+                let mut ei = Vec::new();
+                for i in 0..NB_BITS {
+                    let elm = self.fcom_f2.f_open(channel, e_mac[i])?;
+                    ei.push(elm);
+                }
 
-            // 6)e)
-            let mut ei = Vec::new();
-            for i in 0..NB_BITS {
-                let elm = self.fcom_f2.f_open(channel, e_mac[i])?;
-                ei.push(elm);
+                let s = convert_f2_to_field(&ei);
+                b = self
+                    .fcom
+                    .f_check_zero(channel, e1_mac + self.fcom.get_delta() * s)?;
             }
-
-            let s = convert_f2_to_field(&ei);
-            b = self
-                .fcom
-                .f_check_zero(channel, e1_mac + self.fcom.get_delta() * s)?;
         }
 
         if b {
@@ -667,7 +734,7 @@ mod tests {
     }
 
     fn test_conv<FE: FiniteField>() -> () {
-        let nb_edabits = 100;
+        let nb_edabits = 50;
         let (sender, receiver) = UnixStream::pair().unwrap();
 
         let handle = std::thread::spawn(move || {
