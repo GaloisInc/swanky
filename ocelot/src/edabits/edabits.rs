@@ -40,6 +40,8 @@ const NB_BITS: usize = 6;
 const B: usize = 5;
 const C: usize = 5;
 
+const FDABIT_SECURITY_PARAMETER: usize = 10;
+
 fn convert_f2_to_field<FE: FiniteField>(v: &Vec<F2>) -> FE {
     let mut res = FE::ZERO;
 
@@ -232,6 +234,167 @@ impl<FE: FiniteField> SenderConv<FE> {
         Ok((dabit_vec, dabit_vec_mac))
     }
 
+    fn fdabit<C: AbstractChannel, RNG: CryptoRng + Rng>(
+        &mut self,
+        channel: &mut C,
+        rng: &mut RNG,
+        dabits: &Vec<Dabit<FE>>,
+        dabits_mac: &Vec<Dabit<FE>>,
+    ) -> Result<(), Error> {
+        let s = FDABIT_SECURITY_PARAMETER;
+        let n = dabits.len();
+        debug_assert_eq!(n, dabits_mac.len());
+
+        let num_bits = std::mem::size_of::<usize>() * 8;
+        let gamma = num_bits - ((n + 1).leading_zeros() as usize) - 1 + 1;
+
+        if !((n + 1) as u128 * u128::pow(2, gamma as u32) < (FE::MODULUS - 1) / 2) {
+            return Err(Error::Other(
+                "fail fdabit verifier: wrong combination of input size and parameters".to_string(),
+            ));
+        }
+
+        let mut res = true;
+
+        for i in 0..n {
+            // making sure the faulty dabits are not faulty
+            debug_assert!(
+                ((dabits[i].bit == F2::ZERO) & (dabits[i].value == FE::ZERO))
+                    | ((dabits[i].bit == F2::ONE) & (dabits[i].value == FE::ONE))
+            );
+        }
+
+        for _ in 0..s {
+            // step 1)
+            let mut c_m = Vec::with_capacity(gamma);
+            let mut c_m_mac = Vec::with_capacity(gamma);
+            for _ in 0..gamma {
+                let b: F2 = F2::random(rng);
+                let b_m;
+                if b == F2::ZERO {
+                    b_m = FE::ZERO;
+                } else {
+                    b_m = FE::ONE;
+                };
+                let b_m_mac = self.fcom.f_input(channel, rng, b_m)?;
+                c_m.push(b_m);
+                c_m_mac.push(b_m_mac);
+            }
+            let c1;
+
+            if c_m[0] == FE::ZERO {
+                c1 = F2::ZERO;
+            } else {
+                c1 = F2::ONE;
+            }
+
+            let c1_mac = self.fcom_f2.f_input(channel, rng, c1)?;
+
+            // step 2)
+            for i in 0..gamma {
+                let andl = c_m[i];
+                let andl_mac = c_m_mac[i];
+                let (minus_ci, minus_ci_mac) : (FE,FE) = // -ci
+                    self.fcom.f_affine_mult_cst(-FE::ONE, andl, andl_mac);
+                let (one_minus_ci, one_minus_ci_mac) = // 1 - ci
+                    self.fcom.f_affine_add_cst(FE::ONE, minus_ci, minus_ci_mac);
+                let and_res = andl * one_minus_ci;
+                let and_res_mac = self.fcom.f_input(channel, rng, and_res)?;
+                self.fcom.f_check_multiply(
+                    channel,
+                    rng,
+                    andl,
+                    andl_mac,
+                    one_minus_ci,
+                    one_minus_ci_mac,
+                    and_res,
+                    and_res_mac,
+                )?;
+            }
+
+            // step 3)
+            let seed = channel.read_block()?;
+            let mut e_rng = AesRng::from_seed(seed);
+            let mut e = Vec::with_capacity(n);
+            for _i in 0..n {
+                let b = F2::random(&mut e_rng);
+                e.push(b);
+            }
+
+            // step 4)
+            let (mut r, mut r_mac) = (c1, c1_mac);
+            for i in 0..n {
+                // TODO: do not need to do it when e[i] is ZERO
+                let (tmp, tmp_mac) =
+                    self.fcom_f2
+                        .f_affine_mult_cst(e[i], dabits[i].bit, dabits_mac[i].bit);
+                debug_assert!(((e[i] == F2::ONE) & (tmp == dabits[i].bit)) | (tmp == F2::ZERO));
+                r += tmp;
+                r_mac += tmp_mac;
+            }
+
+            // step 5)
+            let _ = self.fcom_f2.f_open(channel, r, r_mac)?;
+
+            // step 6)
+            // NOTE: for performance maybe step 4 and 6 should be combined in one loop
+            let (mut r_prime, mut r_prime_mac) = (FE::ZERO, FE::ZERO);
+            for i in 0..n {
+                // TODO: do not need to do it when e[i] is ZERO
+                let b;
+                if e[i] == F2::ZERO {
+                    b = FE::ZERO;
+                } else {
+                    b = FE::ONE;
+                }
+                let (tmp, tmp_mac) =
+                    self.fcom
+                        .f_affine_mult_cst(b, dabits[i].value, dabits_mac[i].value);
+                debug_assert!(((b == FE::ONE) & (tmp == dabits[i].value)) | (tmp == FE::ZERO));
+                r_prime += tmp;
+                r_prime_mac += tmp_mac;
+            }
+
+            // step 7)
+            let (mut tau, mut tau_mac) = (r_prime, r_prime_mac);
+            let mut twos = FE::ONE;
+            for i in 0..gamma {
+                let (tmp, tmp_mac) = self.fcom.f_affine_mult_cst(twos, c_m[i], c_m_mac[i]);
+                if i == 0 {
+                    debug_assert!(c_m[i] == tmp);
+                }
+                tau += tmp;
+                tau_mac += tmp_mac;
+                twos += twos;
+            }
+            let _ = self.fcom.f_open(channel, tau, tau_mac)?;
+
+            // step 8)
+            // NOTE: This is not needed for the prover,
+            let b: bool;
+            match (r == F2::ONE, tau.modulus2()) {
+                (true, true) => {
+                    b = true;
+                }
+                (false, false) => {
+                    b = true;
+                }
+                (true, false) => {
+                    b = false;
+                }
+                (false, true) => {
+                    b = false;
+                }
+            };
+            res = res & b;
+        }
+        if res {
+            Ok(())
+        } else {
+            Err(Error::Other("fail fdabit prover".to_string()))
+        }
+    }
+
     fn conv<C: AbstractChannel, RNG: CryptoRng + Rng>(
         &mut self,
         channel: &mut C,
@@ -251,10 +414,11 @@ impl<FE: FiniteField> SenderConv<FE> {
         // step 1)c): TODO: random multiplication triples
 
         // step 2): TODO: verify dabit
+        self.fdabit(channel, rng, &dabits, &dabits_mac)?;
 
         // step 3): TODO: generate pi_2 and pi_3
         let seed = channel.read_block()?;
-        let (perm1, unperm1) = generate_permutation(seed, nb_random_edabits);
+        let (perm1, _unperm1) = generate_permutation(seed, nb_random_edabits);
 
         // step 4): TODO: apply the permutation instead of indirections
 
@@ -288,7 +452,6 @@ impl<FE: FiniteField> SenderConv<FE> {
                 // pick the random dabit
                 let b = dabits[idx_dabit].bit;
                 let b_mac = dabits_mac[idx_dabit].bit;
-                let b_m = dabits_mac[idx_dabit].value;
                 let b_m_mac = dabits_mac[idx_dabit].value;
 
                 //pick the random edabit
@@ -455,6 +618,129 @@ impl<FE: FiniteField> ReceiverConv<FE> {
         Ok(dabit_vec_mac)
     }
 
+    fn fdabit<C: AbstractChannel, RNG: CryptoRng + Rng>(
+        &mut self,
+        channel: &mut C,
+        rng: &mut RNG,
+        dabits_mac: &Vec<Dabit<FE>>,
+    ) -> Result<(), Error> {
+        let s = FDABIT_SECURITY_PARAMETER;
+        let n = dabits_mac.len();
+
+        let num_bits = std::mem::size_of::<usize>() * 8;
+        let gamma = num_bits - ((n + 1).leading_zeros() as usize) - 1 + 1;
+
+        //println!("GAMMA {}", gamma.to_string());
+
+        if !((n + 1) as u128 * u128::pow(2, gamma as u32) < (FE::MODULUS - 1) / 2) {
+            return Err(Error::Other(
+                "fail fdabit verifier: wrong combination of input size and parameters".to_string(),
+            ));
+        }
+
+        let mut res = true;
+
+        for _ in 0..s {
+            // step 1)
+            let mut c_m_mac = Vec::with_capacity(gamma);
+            for _ in 0..gamma {
+                let b_m_mac = self.fcom.f_input(channel, rng)?;
+                c_m_mac.push(b_m_mac);
+            }
+
+            let c1_mac = self.fcom_f2.f_input(channel, rng)?;
+
+            // step 2)
+            for i in 0..gamma {
+                let andl_mac = c_m_mac[i];
+                let minus_ci_mac : FE = // -ci
+                    self.fcom.f_affine_mult_cst(-FE::ONE, andl_mac);
+                let one_minus_ci_mac = // 1 - ci
+                    self.fcom.f_affine_add_cst(FE::ONE, minus_ci_mac);
+                let and_res_mac = self.fcom.f_input(channel, rng)?;
+                self.fcom.f_check_multiply(
+                    channel,
+                    rng,
+                    andl_mac,
+                    one_minus_ci_mac,
+                    and_res_mac,
+                )?;
+            }
+
+            // step 3)
+
+            let seed = rng.gen::<Block>();
+            channel.write_block(&seed)?;
+            channel.flush()?;
+
+            let mut e_rng = AesRng::from_seed(seed);
+            let mut e = Vec::with_capacity(n);
+            for _i in 0..n {
+                let b = F2::random(&mut e_rng);
+                e.push(b);
+            }
+
+            // step 4)
+            let mut r_mac = c1_mac;
+            for i in 0..n {
+                // TODO: do not need to do it when e[i] is ZERO
+                let tmp_mac = self.fcom_f2.f_affine_mult_cst(e[i], dabits_mac[i].bit);
+                r_mac += tmp_mac;
+            }
+
+            // step 5)
+            let r = self.fcom_f2.f_open(channel, r_mac)?;
+
+            // step 6)
+            // NOTE: for performance maybe step 4 and 6 should be combined in one loop
+            let mut r_prime_mac = FE::ZERO;
+            for i in 0..n {
+                // TODO: do not need to do it when e[i] is ZERO
+                let b;
+                if e[i] == F2::ZERO {
+                    b = FE::ZERO;
+                } else {
+                    b = FE::ONE;
+                }
+                let tmp_mac = self.fcom.f_affine_mult_cst(b, dabits_mac[i].value);
+                r_prime_mac += tmp_mac;
+            }
+
+            // step 7)
+            let mut tau_mac = r_prime_mac;
+            let mut twos = FE::ONE;
+            for i in 0..gamma {
+                let tmp_mac = self.fcom.f_affine_mult_cst(twos, c_m_mac[i]);
+                tau_mac += tmp_mac;
+                twos += twos;
+            }
+            let tau = self.fcom.f_open(channel, tau_mac)?;
+
+            // step 8)
+            let b: bool;
+            match (r == F2::ONE, tau.modulus2()) {
+                (true, true) => {
+                    b = true;
+                }
+                (false, false) => {
+                    b = true;
+                }
+                (true, false) => {
+                    b = false;
+                }
+                (false, true) => {
+                    b = false;
+                }
+            };
+            res = res & b;
+        }
+        if res {
+            Ok(())
+        } else {
+            Err(Error::Other("fail fdabit verifier".to_string()))
+        }
+    }
+
     fn conv<C: AbstractChannel, RNG: CryptoRng + Rng>(
         &mut self,
         channel: &mut C,
@@ -475,12 +761,13 @@ impl<FE: FiniteField> ReceiverConv<FE> {
         // step 1)c): TODO: random multiplication triples
 
         // step 2): TODO: verify dabit
+        self.fdabit(channel, rng, &dabits_mac)?;
 
         // step 3): TODO: generate pi_2 and pi_3
         let seed = rng.gen::<Block>();
         channel.write_block(&seed)?;
         channel.flush()?;
-        let (perm1, unperm1) = generate_permutation(seed, nb_random_edabits);
+        let (perm1, _unperm1) = generate_permutation(seed, nb_random_edabits);
 
         // step 4): TODO: apply the permutation instead of indirections
 
@@ -733,6 +1020,34 @@ mod tests {
         assert_eq!(carry, c);
     }
 
+    fn test_fdabit<FE: FiniteField>() -> () {
+        let count = 100;
+        let (sender, receiver) = UnixStream::pair().unwrap();
+        let handle = std::thread::spawn(move || {
+            let mut rng = AesRng::new();
+            let reader = BufReader::new(sender.try_clone().unwrap());
+            let writer = BufWriter::new(sender);
+            let mut channel = Channel::new(reader, writer);
+            let mut fconv = SenderConv::<FE>::init(&mut channel).unwrap();
+
+            let (dabits, dabits_mac) = fconv.random_dabits(&mut channel, &mut rng, count).unwrap();
+            let _ = fconv
+                .fdabit(&mut channel, &mut rng, &dabits, &dabits_mac)
+                .unwrap();
+            ()
+        });
+        let mut rng = AesRng::new();
+        let reader = BufReader::new(receiver.try_clone().unwrap());
+        let writer = BufWriter::new(receiver);
+        let mut channel = Channel::new(reader, writer);
+        let mut fconv = ReceiverConv::<FE>::init(&mut channel, &mut rng).unwrap();
+
+        let dabits_mac = fconv.random_dabits(&mut channel, &mut rng, count).unwrap();
+        let _ = fconv.fdabit(&mut channel, &mut rng, &dabits_mac).unwrap();
+
+        handle.join().unwrap();
+    }
+
     fn test_conv<FE: FiniteField>() -> () {
         let nb_edabits = 50;
         let (sender, receiver) = UnixStream::pair().unwrap();
@@ -845,6 +1160,11 @@ mod tests {
     #[test]
     fn test_bit_add_carry_f61p() {
         test_bit_add_carry::<F61p>();
+    }
+
+    #[test]
+    fn test_fdabit_f61p() {
+        test_fdabit::<F61p>();
     }
 
     #[test]

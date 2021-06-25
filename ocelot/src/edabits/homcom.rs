@@ -56,6 +56,14 @@ impl<FE: FiniteField> FComSender<FE> {
         Ok(rmac)
     }
 
+    pub fn f_affine_add_cst(&self, cst: FE, x: FE, x_mac: FE) -> (FE, FE) {
+        return (cst + x, x_mac);
+    }
+
+    pub fn f_affine_mult_cst(&self, cst: FE, x: FE, x_mac: FE) -> (FE, FE) {
+        return (cst * x, cst * x_mac);
+    }
+
     pub fn f_check_zero<C: AbstractChannel>(
         &mut self,
         channel: &mut C,
@@ -141,21 +149,15 @@ impl<FE: FiniteField> FComReceiver<FE> {
         Ok(v_mac)
     }
 
-    // pub fn cAffine<C: AbstractChannel, RNG: CryptoRng + Rng>(
-    //     &mut self,
-    //     cst: FE,
+    pub fn f_affine_add_cst(&self, cst: FE, x_mac: FE) -> FE {
+        return x_mac - self.delta * cst;
+    }
 
-    //     fct: FE,
-    // ) -> Result<FE, Error> {
+    pub fn f_affine_mult_cst(&self, cst: FE, x_mac: FE) -> FE {
+        return cst * x_mac;
+    }
 
-    //     Ok(v_mac)
-    // }
-
-    pub fn f_check_zero<C: AbstractChannel>(
-        &mut self,
-        channel: &mut C,
-        key: FE,
-    ) -> Result<bool, Error> {
+    pub fn f_check_zero<C: AbstractChannel>(self, channel: &mut C, key: FE) -> Result<bool, Error> {
         let m = channel.read_fe::<FE>()?;
         if key == m {
             Ok(true)
@@ -200,7 +202,7 @@ mod tests {
     use super::{FComReceiver, FComSender};
     use scuttlebutt::{
         field::{F61p, FiniteField},
-        AesRng, Channel,
+        AbstractChannel, AesRng, Channel,
     };
     use std::{
         io::{BufReader, BufWriter},
@@ -254,12 +256,71 @@ mod tests {
         resprover
     }
 
+    fn test_fcom_affine() -> () {
+        let count = 200;
+        let (sender, receiver) = UnixStream::pair().unwrap();
+        let handle = std::thread::spawn(move || {
+            let mut rng = AesRng::new();
+            let reader = BufReader::new(sender.try_clone().unwrap());
+            let writer = BufWriter::new(sender);
+            let mut channel = Channel::new(reader, writer);
+            let mut fcom = FComSender::<F61p>::init(&mut channel).unwrap();
+
+            let mut v = Vec::new();
+            for _ in 0..count {
+                let (x, x_mac) = fcom.f_random(&mut channel, &mut rng).unwrap();
+                let cst = F61p::random(&mut rng);
+                channel.write_fe::<F61p>(cst).unwrap();
+                channel.flush().unwrap();
+                let (m, m_mac) = fcom.f_affine_mult_cst(cst, x, x_mac);
+                v.push((x, cst, m, m_mac));
+                let (a, a_mac) = fcom.f_affine_add_cst(cst, x, x_mac);
+                v.push((x, cst, a, a_mac));
+            }
+
+            let mut r = Vec::new();
+            for i in 0..count {
+                let b = fcom.f_open(&mut channel, v[i].2, v[i].3).unwrap();
+                r.push(b);
+            }
+            v
+        });
+        let mut rng = AesRng::new();
+        let reader = BufReader::new(receiver.try_clone().unwrap());
+        let writer = BufWriter::new(receiver);
+        let mut channel = Channel::new(reader, writer);
+        let mut fcom = FComReceiver::<F61p>::init(&mut channel, &mut rng).unwrap();
+        let mut v = Vec::new();
+        for _ in 0..count {
+            let x_mac = fcom.f_random(&mut channel, &mut rng).unwrap();
+            let cst = channel.read_fe().unwrap();
+            let m_mac = fcom.f_affine_mult_cst(cst, x_mac);
+            v.push((x_mac, cst, m_mac));
+            let a_mac = fcom.f_affine_add_cst(cst, x_mac);
+            v.push((x_mac, cst, a_mac));
+        }
+
+        let mut r = Vec::new();
+        for i in 0..count {
+            let b = fcom.f_open(&mut channel, v[i].2).unwrap();
+            r.push(b);
+        }
+
+        let resprover = handle.join().unwrap();
+
+        for i in 0..count {
+            assert_eq!(r[i], resprover[i].2);
+        }
+        ()
+    }
+
     #[test]
     fn test_fcom_random_f61p() {
         let _t = test_fcom_random::<F61p>();
+    }
 
-        // for (x, _) in _t.iter() {
-        //     println!("{}", x);
-        // }
+    #[test]
+    fn test_fcom_affine_f61p() {
+        let _t = test_fcom_affine();
     }
 }
