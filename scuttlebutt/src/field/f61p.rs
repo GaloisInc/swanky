@@ -102,6 +102,12 @@ impl FiniteField for F61p {
     const GENERATOR: Self = F61p(5);
     const ZERO: Self = F61p(0);
     const ONE: Self = F61p(1);
+
+    #[inline]
+    fn modulus2(&self) -> bool {
+        debug_assert!(((self.0 % 2) == 0) | ((self.0 % 2) == 1));
+        return self.0 % 2 == 1;
+    }
 }
 
 #[inline]
