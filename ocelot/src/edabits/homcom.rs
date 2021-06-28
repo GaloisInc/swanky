@@ -47,13 +47,28 @@ impl<FE: FiniteField> FComSender<FE> {
         rng: &mut RNG,
         x: FE,
     ) -> Result<FE, Error> {
-        let (r, rmac) = self.f_random(channel, rng)?;
+        let (r, r_mac) = self.f_random(channel, rng)?;
 
         let y = x - r;
         channel.write_fe::<FE>(y)?;
         channel.flush()?;
 
-        Ok(rmac)
+        Ok(r_mac)
+    }
+
+    pub fn f_input_with<C: AbstractChannel, RNG: CryptoRng + Rng>(
+        &mut self,
+        channel: &mut C,
+        rng: &mut RNG,
+        x: FE,
+        r: FE,
+        r_mac: FE,
+    ) -> Result<FE, Error> {
+        let y = x - r;
+        channel.write_fe::<FE>(y)?;
+        channel.flush()?;
+
+        Ok(r_mac)
     }
 
     pub fn f_affine_add_cst(&self, cst: FE, x: FE, x_mac: FE) -> (FE, FE) {
@@ -103,6 +118,32 @@ impl<FE: FiniteField> FComSender<FE> {
         let _ = self.f_open(channel, z, z_mac)?;
         Ok(())
     }
+
+    pub fn quicksilver_multiplication_check<C: AbstractChannel, RNG: CryptoRng + Rng>(
+        &mut self,
+        channel: &mut C,
+        _rng: &mut RNG,
+        x: FE,
+        x_mac: FE,
+        y: FE,
+        y_mac: FE,
+        _z: FE,
+        z_mac: FE,
+        mask: FE,
+        mask_mac: FE,
+    ) -> Result<(), Error> {
+        let a0 = x_mac * y_mac;
+        let a1 = y * x_mac + x * y_mac - z_mac;
+
+        let u = a0 + mask_mac;
+        let v = a1 + mask;
+
+        channel.write_fe(u)?;
+        channel.write_fe(v)?;
+        channel.flush()?;
+
+        Ok(())
+    }
 }
 
 #[derive(Copy, Clone)]
@@ -138,6 +179,18 @@ impl<FE: FiniteField> FComReceiver<FE> {
     }
 
     pub fn f_input<C: AbstractChannel, RNG: CryptoRng + Rng>(
+        &mut self,
+        channel: &mut C,
+        rng: &mut RNG,
+    ) -> Result<FE, Error> {
+        let r_mac = self.f_random(channel, rng)?;
+        let y = channel.read_fe::<FE>()?;
+
+        let v_mac = r_mac - self.delta * y;
+        Ok(v_mac)
+    }
+
+    pub fn f_input_with<C: AbstractChannel, RNG: CryptoRng + Rng>(
         &mut self,
         channel: &mut C,
         rng: &mut RNG,
@@ -189,6 +242,29 @@ impl<FE: FiniteField> FComReceiver<FE> {
         let y = self.f_open(channel, y_mac)?;
         let z = self.f_open(channel, z_mac)?;
         if z == x * y {
+            Ok(())
+        } else {
+            Err(Error::Other("checkMultiply fails".to_string()))
+        }
+    }
+
+    pub fn quicksilver_multiplication_check<C: AbstractChannel, RNG: CryptoRng + Rng>(
+        &mut self,
+        channel: &mut C,
+        _rng: &mut RNG,
+        x_mac: FE,
+        y_mac: FE,
+        z_mac: FE,
+        mask_mac: FE,
+    ) -> Result<(), Error> {
+        let b = x_mac * y_mac - (-self.delta) * z_mac; // -delta diff because
+
+        let u = channel.read_fe::<FE>()?;
+        let v = channel.read_fe::<FE>()?;
+
+        let b_plus = b + mask_mac;
+        if b_plus == (u + (-self.delta) * v) {
+            // - because of delta
             Ok(())
         } else {
             Err(Error::Other("checkMultiply fails".to_string()))
@@ -314,6 +390,76 @@ mod tests {
         ()
     }
 
+    fn test_fcom_multiplication<FE: FiniteField>() -> () {
+        let count = 1000;
+        let (sender, receiver) = UnixStream::pair().unwrap();
+        let handle = std::thread::spawn(move || {
+            let mut rng = AesRng::new();
+            let reader = BufReader::new(sender.try_clone().unwrap());
+            let writer = BufWriter::new(sender);
+            let mut channel = Channel::new(reader, writer);
+            let mut fcom = FComSender::<FE>::init(&mut channel).unwrap();
+
+            let mut v = Vec::new();
+            for _ in 0..count {
+                let (x, xmac) = fcom.f_random(&mut channel, &mut rng).unwrap();
+                let (y, ymac) = fcom.f_random(&mut channel, &mut rng).unwrap();
+                let z = x * y;
+                let zmac = fcom.f_input(&mut channel, &mut rng, z).unwrap();
+                let (mask, mask_mac) = fcom.f_random(&mut channel, &mut rng).unwrap();
+                v.push((x, xmac, y, ymac, z, zmac, mask, mask_mac));
+            }
+            let mut r = Vec::new();
+            for i in 0..count {
+                let b = fcom
+                    .quicksilver_multiplication_check(
+                        &mut channel,
+                        &mut rng,
+                        v[i].0,
+                        v[i].1,
+                        v[i].2,
+                        v[i].3,
+                        v[i].4,
+                        v[i].5,
+                        v[i].6,
+                        v[i].7,
+                    )
+                    .unwrap();
+                r.push(b);
+            }
+            (v, r)
+        });
+        let mut rng = AesRng::new();
+        let reader = BufReader::new(receiver.try_clone().unwrap());
+        let writer = BufWriter::new(receiver);
+        let mut channel = Channel::new(reader, writer);
+        let mut fcom = FComReceiver::<FE>::init(&mut channel, &mut rng).unwrap();
+        let mut v = Vec::new();
+
+        for _ in 0..count {
+            let xmac = fcom.f_random(&mut channel, &mut rng).unwrap();
+            let ymac = fcom.f_random(&mut channel, &mut rng).unwrap();
+            let zmac = fcom.f_input(&mut channel, &mut rng).unwrap();
+            let mask_mac = fcom.f_random(&mut channel, &mut rng).unwrap();
+            v.push((xmac, ymac, zmac, mask_mac));
+        }
+        let mut r = Vec::new();
+        for i in 0..count {
+            let b = fcom
+                .quicksilver_multiplication_check(
+                    &mut channel,
+                    &mut rng,
+                    v[i].0,
+                    v[i].1,
+                    v[i].2,
+                    v[i].3,
+                )
+                .unwrap();
+            r.push(b);
+        }
+        ()
+    }
+
     #[test]
     fn test_fcom_random_f61p() {
         let _t = test_fcom_random::<F61p>();
@@ -322,5 +468,10 @@ mod tests {
     #[test]
     fn test_fcom_affine_f61p() {
         let _t = test_fcom_affine();
+    }
+
+    #[test]
+    fn test_fcom_multiplication_check() {
+        let _t = test_fcom_multiplication::<F61p>();
     }
 }
