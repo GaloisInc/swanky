@@ -894,18 +894,6 @@ mod tests {
                     .unwrap();
 
                 let _ = fconv.fcom.f_open(&mut channel, x_m, x_m_mac).unwrap();
-                // println!(
-                //     "{}",
-                //     if (x_m == FE::PrimeField::ONE) {
-                //         "ONE".to_string()
-                //     } else {
-                //         if (x_m == FE::PrimeField::ZERO) {
-                //             "ZERO".to_string()
-                //         } else {
-                //             "DFGDFGDG".to_string()
-                //         }
-                //     }
-                // );
                 assert_eq!(
                     if x_f2 == F2::ZERO {
                         x_m == FE::PrimeField::ZERO

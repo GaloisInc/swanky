@@ -17,6 +17,9 @@ use std::marker::PhantomData;
 // F_com protocol
 pub struct FComSender<FE: FiniteField> {
     phantom: PhantomData<FE>,
+    svole_sender: Sender<FE>,
+    voles: Vec<(FE::PrimeField, FE)>,
+    pos: usize,
 }
 
 impl<FE: FiniteField> FComSender<FE> {
@@ -28,10 +31,35 @@ impl<FE: FiniteField> FComSender<FE> {
         if b {
             Ok(Self {
                 phantom: PhantomData,
+                svole_sender: Sender::init(channel, rng)?,
+                voles: Vec::new(),
+                pos: 0,
             })
         } else {
             Err(Error::Other("Error in init".to_string()))
         }
+    }
+
+    pub fn f_svole<C: AbstractChannel, RNG: CryptoRng + Rng>(
+        &mut self,
+        channel: &mut C,
+        rng: &mut RNG,
+        num: usize,
+    ) -> Result<Vec<(FE::PrimeField, FE)>, Error> {
+        let size_left = self.voles.len() - self.pos;
+        if num > size_left {
+            let mut v = Vec::new();
+            self.svole_sender.send(channel, rng, &mut v);
+            self.voles = v;
+            self.pos = 0
+        }
+
+        let mut res = Vec::with_capacity(num);
+        for i in 0..num {
+            res.push(self.voles[self.pos + i]);
+        }
+        self.pos += num;
+        Ok(res)
     }
 
     pub fn f_random<C: AbstractChannel, RNG: CryptoRng + Rng>(
@@ -39,15 +67,8 @@ impl<FE: FiniteField> FComSender<FE> {
         channel: &mut C,
         rng: &mut RNG,
     ) -> Result<(FE::PrimeField, FE), Error> {
-        // let v = self.f_svole(channel, rng, 1)?;
-        // Ok(v[0])
-
-        let x = FE::PrimeField::random(rng);
-
-        channel.write_fe::<FE::PrimeField>(x)?;
-        channel.flush()?;
-        let mac = channel.read_fe::<FE>()?;
-        Ok((x, mac))
+        let v = self.f_svole(channel, rng, 1)?;
+        Ok(v[0])
     }
 
     pub fn f_input<C: AbstractChannel, RNG: CryptoRng + Rng>(
@@ -170,6 +191,8 @@ impl<FE: FiniteField> FComSender<FE> {
 pub struct FComReceiver<FE: FiniteField> {
     delta: FE,
     svole_receiver: Receiver<FE>,
+    voles: Vec<FE>,
+    pos: usize,
 }
 
 impl<FE: FiniteField> FComReceiver<FE> {
@@ -179,10 +202,12 @@ impl<FE: FiniteField> FComReceiver<FE> {
     ) -> Result<Self, Error> {
         channel.write_bool(true)?;
         channel.flush()?;
-        let delta = FE::random(rng);
+        let recv = Receiver::init(channel, rng)?;
         Ok(Self {
-            delta: delta,
-            svole_receiver: Receiver::init(channel, rng)?,
+            delta: recv.delta(),
+            svole_receiver: recv,
+            voles: Vec::new(),
+            pos: 0,
         })
     }
 
@@ -190,16 +215,35 @@ impl<FE: FiniteField> FComReceiver<FE> {
         self.delta
     }
 
+    pub fn f_svole<C: AbstractChannel, RNG: CryptoRng + Rng>(
+        &mut self,
+        channel: &mut C,
+        rng: &mut RNG,
+        num: usize,
+    ) -> Result<Vec<FE>, Error> {
+        let size_left = self.voles.len() - self.pos;
+        if num > size_left {
+            let mut v = Vec::new();
+            self.svole_receiver.receive(channel, rng, &mut v);
+            self.voles = v;
+            self.pos = 0
+        }
+
+        let mut res = Vec::with_capacity(num);
+        for i in 0..num {
+            res.push(self.voles[self.pos + i]);
+        }
+        self.pos += num;
+        Ok(res)
+    }
+
     pub fn f_random<C: AbstractChannel, RNG: CryptoRng + Rng>(
         &mut self,
         channel: &mut C,
         rng: &mut RNG,
     ) -> Result<FE, Error> {
-        let x = channel.read_fe::<FE::PrimeField>()?;
-        let key = FE::random(rng);
-        channel.write_fe(self.delta.multiply_by_prime_subfield(x) + key)?;
-        channel.flush()?;
-        Ok(key)
+        let v = self.f_svole(channel, rng, 1)?;
+        Ok(v[0])
     }
 
     pub fn f_input<C: AbstractChannel, RNG: CryptoRng + Rng>(
