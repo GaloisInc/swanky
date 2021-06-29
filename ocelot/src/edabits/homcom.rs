@@ -7,6 +7,9 @@
 //! This is the implementation of field conversion
 
 use crate::errors::Error;
+use crate::svole::wykw::{Receiver, Sender};
+use crate::svole::{SVoleReceiver, SVoleSender};
+use generic_array::GenericArray;
 use rand::{CryptoRng, Rng};
 use scuttlebutt::{field::FiniteField, AbstractChannel};
 use std::marker::PhantomData;
@@ -17,7 +20,10 @@ pub struct FComSender<FE: FiniteField> {
 }
 
 impl<FE: FiniteField> FComSender<FE> {
-    pub fn init<C: AbstractChannel>(channel: &mut C) -> Result<Self, Error> {
+    pub fn init<C: AbstractChannel, RNG: CryptoRng + Rng>(
+        channel: &mut C,
+        rng: &mut RNG,
+    ) -> Result<Self, Error> {
         let b = channel.read_bool()?;
         if b {
             Ok(Self {
@@ -32,10 +38,13 @@ impl<FE: FiniteField> FComSender<FE> {
         &mut self,
         channel: &mut C,
         rng: &mut RNG,
-    ) -> Result<(FE, FE), Error> {
-        let x = FE::random(rng);
+    ) -> Result<(FE::PrimeField, FE), Error> {
+        // let v = self.f_svole(channel, rng, 1)?;
+        // Ok(v[0])
 
-        channel.write_fe::<FE>(x)?;
+        let x = FE::PrimeField::random(rng);
+
+        channel.write_fe::<FE::PrimeField>(x)?;
         channel.flush()?;
         let mac = channel.read_fe::<FE>()?;
         Ok((x, mac))
@@ -45,12 +54,12 @@ impl<FE: FiniteField> FComSender<FE> {
         &mut self,
         channel: &mut C,
         rng: &mut RNG,
-        x: FE,
+        x: FE::PrimeField,
     ) -> Result<FE, Error> {
         let (r, r_mac) = self.f_random(channel, rng)?;
 
         let y = x - r;
-        channel.write_fe::<FE>(y)?;
+        channel.write_fe::<FE::PrimeField>(y)?;
         channel.flush()?;
 
         Ok(r_mac)
@@ -60,23 +69,33 @@ impl<FE: FiniteField> FComSender<FE> {
         &mut self,
         channel: &mut C,
         rng: &mut RNG,
-        x: FE,
-        r: FE,
+        x: FE::PrimeField,
+        r: FE::PrimeField,
         r_mac: FE,
     ) -> Result<FE, Error> {
         let y = x - r;
-        channel.write_fe::<FE>(y)?;
+        channel.write_fe::<FE::PrimeField>(y)?;
         channel.flush()?;
 
         Ok(r_mac)
     }
 
-    pub fn f_affine_add_cst(&self, cst: FE, x: FE, x_mac: FE) -> (FE, FE) {
+    pub fn f_affine_add_cst(
+        &self,
+        cst: FE::PrimeField,
+        x: FE::PrimeField,
+        x_mac: FE,
+    ) -> (FE::PrimeField, FE) {
         return (cst + x, x_mac);
     }
 
-    pub fn f_affine_mult_cst(&self, cst: FE, x: FE, x_mac: FE) -> (FE, FE) {
-        return (cst * x, cst * x_mac);
+    pub fn f_affine_mult_cst(
+        &self,
+        cst: FE::PrimeField,
+        x: FE::PrimeField,
+        x_mac: FE,
+    ) -> (FE::PrimeField, FE) {
+        return (cst * x, x_mac.multiply_by_prime_subfield(cst));
     }
 
     pub fn f_check_zero<C: AbstractChannel>(
@@ -92,10 +111,10 @@ impl<FE: FiniteField> FComSender<FE> {
     pub fn f_open<C: AbstractChannel>(
         &mut self,
         channel: &mut C,
-        x: FE,
+        x: FE::PrimeField,
         x_mac: FE,
     ) -> Result<(), Error> {
-        channel.write_fe::<FE>(x)?;
+        channel.write_fe::<FE::PrimeField>(x)?;
         channel.flush()?;
 
         return self.f_check_zero(channel, x_mac);
@@ -106,11 +125,11 @@ impl<FE: FiniteField> FComSender<FE> {
         &mut self,
         channel: &mut C,
         _rng: &mut RNG,
-        x: FE,
+        x: FE::PrimeField,
         x_mac: FE,
-        y: FE,
+        y: FE::PrimeField,
         y_mac: FE,
-        z: FE,
+        z: FE::PrimeField,
         z_mac: FE,
     ) -> Result<(), Error> {
         let _ = self.f_open(channel, x, x_mac)?;
@@ -123,20 +142,21 @@ impl<FE: FiniteField> FComSender<FE> {
         &mut self,
         channel: &mut C,
         _rng: &mut RNG,
-        x: FE,
+        x: FE::PrimeField,
         x_mac: FE,
-        y: FE,
+        y: FE::PrimeField,
         y_mac: FE,
-        _z: FE,
+        _z: FE::PrimeField,
         z_mac: FE,
-        mask: FE,
+        mask: FE::PrimeField,
         mask_mac: FE,
     ) -> Result<(), Error> {
         let a0 = x_mac * y_mac;
-        let a1 = y * x_mac + x * y_mac - z_mac;
+        let a1 = x_mac.multiply_by_prime_subfield(y) + y_mac.multiply_by_prime_subfield(x) - z_mac;
 
         let u = a0 + mask_mac;
-        let v = a1 + mask;
+
+        let v = a1 + FE::from_polynomial_coefficients(GenericArray::clone_from_slice(&[mask]));
 
         channel.write_fe(u)?;
         channel.write_fe(v)?;
@@ -146,9 +166,10 @@ impl<FE: FiniteField> FComSender<FE> {
     }
 }
 
-#[derive(Copy, Clone)]
+//#[derive(Copy, Clone)]
 pub struct FComReceiver<FE: FiniteField> {
     delta: FE,
+    svole_receiver: Receiver<FE>,
 }
 
 impl<FE: FiniteField> FComReceiver<FE> {
@@ -159,10 +180,13 @@ impl<FE: FiniteField> FComReceiver<FE> {
         channel.write_bool(true)?;
         channel.flush()?;
         let delta = FE::random(rng);
-        Ok(Self { delta: delta })
+        Ok(Self {
+            delta: delta,
+            svole_receiver: Receiver::init(channel, rng)?,
+        })
     }
 
-    pub fn get_delta(self) -> FE {
+    pub fn get_delta(&self) -> FE {
         self.delta
     }
 
@@ -171,9 +195,9 @@ impl<FE: FiniteField> FComReceiver<FE> {
         channel: &mut C,
         rng: &mut RNG,
     ) -> Result<FE, Error> {
-        let x = channel.read_fe::<FE>()?;
+        let x = channel.read_fe::<FE::PrimeField>()?;
         let key = FE::random(rng);
-        channel.write_fe(self.delta * x + key)?;
+        channel.write_fe(self.delta.multiply_by_prime_subfield(x) + key)?;
         channel.flush()?;
         Ok(key)
     }
@@ -184,9 +208,9 @@ impl<FE: FiniteField> FComReceiver<FE> {
         rng: &mut RNG,
     ) -> Result<FE, Error> {
         let r_mac = self.f_random(channel, rng)?;
-        let y = channel.read_fe::<FE>()?;
+        let y = channel.read_fe::<FE::PrimeField>()?;
 
-        let v_mac = r_mac - self.delta * y;
+        let v_mac = r_mac - self.delta.multiply_by_prime_subfield(y);
         Ok(v_mac)
     }
 
@@ -196,21 +220,25 @@ impl<FE: FiniteField> FComReceiver<FE> {
         rng: &mut RNG,
     ) -> Result<FE, Error> {
         let r_mac = self.f_random(channel, rng)?;
-        let y = channel.read_fe::<FE>()?;
+        let y = channel.read_fe::<FE::PrimeField>()?;
 
-        let v_mac = r_mac - self.delta * y;
+        let v_mac = r_mac - self.delta.multiply_by_prime_subfield(y);
         Ok(v_mac)
     }
 
-    pub fn f_affine_add_cst(&self, cst: FE, x_mac: FE) -> FE {
-        return x_mac - self.delta * cst;
+    pub fn f_affine_add_cst(&self, cst: FE::PrimeField, x_mac: FE) -> FE {
+        return x_mac - self.delta.multiply_by_prime_subfield(cst);
     }
 
-    pub fn f_affine_mult_cst(&self, cst: FE, x_mac: FE) -> FE {
-        return cst * x_mac;
+    pub fn f_affine_mult_cst(&self, cst: FE::PrimeField, x_mac: FE) -> FE {
+        return x_mac.multiply_by_prime_subfield(cst);
     }
 
-    pub fn f_check_zero<C: AbstractChannel>(self, channel: &mut C, key: FE) -> Result<bool, Error> {
+    pub fn f_check_zero<C: AbstractChannel>(
+        &mut self,
+        channel: &mut C,
+        key: FE,
+    ) -> Result<bool, Error> {
         let m = channel.read_fe::<FE>()?;
         if key == m {
             Ok(true)
@@ -219,9 +247,13 @@ impl<FE: FiniteField> FComReceiver<FE> {
         }
     }
 
-    pub fn f_open<C: AbstractChannel>(&mut self, channel: &mut C, key: FE) -> Result<FE, Error> {
-        let x = channel.read_fe::<FE>()?;
-        let b = self.f_check_zero(channel, key + self.delta * x)?;
+    pub fn f_open<C: AbstractChannel>(
+        &mut self,
+        channel: &mut C,
+        key: FE,
+    ) -> Result<FE::PrimeField, Error> {
+        let x = channel.read_fe::<FE::PrimeField>()?;
+        let b = self.f_check_zero(channel, key + self.delta.multiply_by_prime_subfield(x))?;
         if b {
             Ok(x)
         } else {
@@ -285,7 +317,7 @@ mod tests {
         os::unix::net::UnixStream,
     };
 
-    fn test_fcom_random<FE: FiniteField>() -> Vec<(FE, FE)> {
+    fn test_fcom_random<FE: FiniteField>() -> () {
         let count = 100;
         let (sender, receiver) = UnixStream::pair().unwrap();
         let handle = std::thread::spawn(move || {
@@ -293,7 +325,7 @@ mod tests {
             let reader = BufReader::new(sender.try_clone().unwrap());
             let writer = BufWriter::new(sender);
             let mut channel = Channel::new(reader, writer);
-            let mut fcom = FComSender::<FE>::init(&mut channel).unwrap();
+            let mut fcom = FComSender::<FE>::init(&mut channel, &mut rng).unwrap();
 
             let mut v = Vec::new();
             for _ in 0..count {
@@ -329,7 +361,6 @@ mod tests {
         for i in 0..count {
             assert_eq!(r[i], resprover[i].0);
         }
-        resprover
     }
 
     fn test_fcom_affine() -> () {
@@ -340,7 +371,7 @@ mod tests {
             let reader = BufReader::new(sender.try_clone().unwrap());
             let writer = BufWriter::new(sender);
             let mut channel = Channel::new(reader, writer);
-            let mut fcom = FComSender::<F61p>::init(&mut channel).unwrap();
+            let mut fcom = FComSender::<F61p>::init(&mut channel, &mut rng).unwrap();
 
             let mut v = Vec::new();
             for _ in 0..count {
@@ -398,7 +429,7 @@ mod tests {
             let reader = BufReader::new(sender.try_clone().unwrap());
             let writer = BufWriter::new(sender);
             let mut channel = Channel::new(reader, writer);
-            let mut fcom = FComSender::<FE>::init(&mut channel).unwrap();
+            let mut fcom = FComSender::<FE>::init(&mut channel, &mut rng).unwrap();
 
             let mut v = Vec::new();
             for _ in 0..count {

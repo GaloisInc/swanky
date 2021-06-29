@@ -9,7 +9,7 @@
 use crate::errors::Error;
 use rand::{CryptoRng, Rng, SeedableRng};
 use scuttlebutt::{
-    field::{FiniteField, F2},
+    field::{FiniteField, Gf40, F2},
     AbstractChannel, AesRng, Block,
 };
 
@@ -19,6 +19,12 @@ use super::homcom::{FComReceiver, FComSender};
 #[derive(Clone)]
 struct Edabits<FE: FiniteField> {
     bits: Vec<F2>,
+    value: FE::PrimeField,
+}
+/// EdabitsMac struct
+#[derive(Clone)]
+struct EdabitsMac<FE: FiniteField> {
+    bits: Vec<Gf40>,
     value: FE,
 }
 
@@ -26,12 +32,19 @@ struct Edabits<FE: FiniteField> {
 #[derive(Clone)]
 struct Dabit<FE: FiniteField> {
     bit: F2,
+    value: FE::PrimeField,
+}
+
+/// Dabit struct
+#[derive(Clone)]
+struct DabitMac<FE: FiniteField> {
+    bit: Gf40,
     value: FE,
 }
 
 /// Conversion protocol sender
 struct SenderConv<FE: FiniteField> {
-    fcom_f2: FComSender<F2>,
+    fcom_f2: FComSender<Gf40>,
     fcom: FComSender<FE>,
 }
 
@@ -42,14 +55,23 @@ const C: usize = 5;
 
 const FDABIT_SECURITY_PARAMETER: usize = 10;
 
-fn convert_f2_to_field<FE: FiniteField>(v: &Vec<F2>) -> FE {
-    let mut res = FE::ZERO;
+/// bit to field element
+fn bit_to_fe<FE: FiniteField>(b: F2) -> FE {
+    if b == F2::ZERO {
+        FE::ZERO
+    } else {
+        FE::ONE
+    }
+}
+
+fn convert_f2_to_field<FE: FiniteField>(v: &Vec<F2>) -> FE::PrimeField {
+    let mut res = FE::PrimeField::ZERO;
 
     for i in 0..v.len() {
         let b = v[v.len() - i - 1];
         res += res; // double
         if b == F2::ONE {
-            res += FE::ONE;
+            res += FE::PrimeField::ONE;
         }
     }
     res
@@ -91,9 +113,12 @@ fn generate_permutation(seed: Block, size: usize) -> (Vec<usize>, Vec<usize>) {
 // Protocol for checking conversion
 
 impl<FE: FiniteField> SenderConv<FE> {
-    pub fn init<C: AbstractChannel>(channel: &mut C) -> Result<Self, Error> {
-        let a = FComSender::init(channel)?;
-        let b = FComSender::init(channel)?;
+    pub fn init<C: AbstractChannel, RNG: CryptoRng + Rng>(
+        channel: &mut C,
+        rng: &mut RNG,
+    ) -> Result<Self, Error> {
+        let a = FComSender::init(channel, rng)?;
+        let b = FComSender::init(channel, rng)?;
         Ok(Self {
             fcom_f2: a,
             fcom: b,
@@ -105,12 +130,12 @@ impl<FE: FiniteField> SenderConv<FE> {
         channel: &mut C,
         _rng: &mut RNG,
         r: F2,
-        r_mac: F2,
+        r_mac: Gf40,
         r_m_mac: FE,
         x: F2,
-        x_mac: F2,
-    ) -> Result<(FE, FE), Error> {
-        let x_m = if x == F2::ONE { FE::ONE } else { FE::ZERO };
+        x_mac: Gf40,
+    ) -> Result<(FE::PrimeField, FE), Error> {
+        let x_m = bit_to_fe::<FE::PrimeField>(x);
         self.fcom_f2.f_open(channel, r + x, r_mac + x_mac)?;
         let c = r + x;
         let x_m_mac = r_m_mac
@@ -127,10 +152,10 @@ impl<FE: FiniteField> SenderConv<FE> {
         channel: &mut C,
         rng: &mut RNG,
         x: &[F2],
-        x_mac: &[F2],
+        x_mac: &[Gf40],
         y: &[F2],
-        y_mac: &[F2],
-    ) -> Result<(Vec<(F2, F2)>, (F2, F2)), Error> {
+        y_mac: &[Gf40],
+    ) -> Result<(Vec<(F2, Gf40)>, (F2, Gf40)), Error> {
         let xl = x.len();
         let yl = y.len();
         if xl != yl {
@@ -185,7 +210,7 @@ impl<FE: FiniteField> SenderConv<FE> {
         channel: &mut C,
         rng: &mut RNG,
         num: usize, // in the paper: NB + C
-    ) -> Result<(Vec<Edabits<FE>>, Vec<Edabits<FE>>), Error> {
+    ) -> Result<(Vec<Edabits<FE>>, Vec<EdabitsMac<FE>>), Error> {
         let mut edabits_vec = Vec::with_capacity(num);
         let mut edabits_vec_mac = Vec::with_capacity(num);
         for _ in 0..num {
@@ -197,7 +222,7 @@ impl<FE: FiniteField> SenderConv<FE> {
                 r.push(b);
                 r_mac.push(b_mac);
             }
-            let r_m: FE = convert_f2_to_field(&r);
+            let r_m: FE::PrimeField = convert_f2_to_field::<FE>(&r);
             let r_m_mac: FE = self.fcom.f_input(channel, rng, r_m)?;
 
             edabits_vec.push(Edabits {
@@ -205,7 +230,7 @@ impl<FE: FiniteField> SenderConv<FE> {
                 value: r_m,
             });
 
-            edabits_vec_mac.push(Edabits {
+            edabits_vec_mac.push(EdabitsMac {
                 bits: r_mac,
                 value: r_m_mac,
             });
@@ -218,15 +243,15 @@ impl<FE: FiniteField> SenderConv<FE> {
         channel: &mut C,
         rng: &mut RNG,
         num: usize, // in the paper: NB
-    ) -> Result<(Vec<Dabit<FE>>, Vec<Dabit<FE>>), Error> {
+    ) -> Result<(Vec<Dabit<FE>>, Vec<DabitMac<FE>>), Error> {
         let mut dabit_vec = Vec::with_capacity(num);
         let mut dabit_vec_mac = Vec::with_capacity(num);
         for _ in 0..num {
             let (b, b_mac) = self.fcom_f2.f_random(channel, rng)?;
-            let b_m = if b == F2::ZERO { FE::ZERO } else { FE::ONE };
+            let b_m = bit_to_fe(b);
             let b_m_mac = self.fcom.f_input(channel, rng, b_m)?;
             dabit_vec.push(Dabit { bit: b, value: b_m });
-            dabit_vec_mac.push(Dabit {
+            dabit_vec_mac.push(DabitMac {
                 bit: b_mac,
                 value: b_m_mac,
             });
@@ -239,7 +264,7 @@ impl<FE: FiniteField> SenderConv<FE> {
         channel: &mut C,
         rng: &mut RNG,
         dabits: &Vec<Dabit<FE>>,
-        dabits_mac: &Vec<Dabit<FE>>,
+        dabits_mac: &Vec<DabitMac<FE>>,
     ) -> Result<(), Error> {
         let s = FDABIT_SECURITY_PARAMETER;
         let n = dabits.len();
@@ -259,8 +284,8 @@ impl<FE: FiniteField> SenderConv<FE> {
         for i in 0..n {
             // making sure the faulty dabits are not faulty
             debug_assert!(
-                ((dabits[i].bit == F2::ZERO) & (dabits[i].value == FE::ZERO))
-                    | ((dabits[i].bit == F2::ONE) & (dabits[i].value == FE::ONE))
+                ((dabits[i].bit == F2::ZERO) & (dabits[i].value == FE::PrimeField::ZERO))
+                    | ((dabits[i].bit == F2::ONE) & (dabits[i].value == FE::PrimeField::ONE))
             );
         }
 
@@ -270,19 +295,14 @@ impl<FE: FiniteField> SenderConv<FE> {
             let mut c_m_mac = Vec::with_capacity(gamma);
             for _ in 0..gamma {
                 let b: F2 = F2::random(rng);
-                let b_m;
-                if b == F2::ZERO {
-                    b_m = FE::ZERO;
-                } else {
-                    b_m = FE::ONE;
-                };
+                let b_m = bit_to_fe(b);
                 let b_m_mac = self.fcom.f_input(channel, rng, b_m)?;
                 c_m.push(b_m);
                 c_m_mac.push(b_m_mac);
             }
             let c1;
 
-            if c_m[0] == FE::ZERO {
+            if c_m[0] == FE::PrimeField::ZERO {
                 c1 = F2::ZERO;
             } else {
                 c1 = F2::ONE;
@@ -294,10 +314,10 @@ impl<FE: FiniteField> SenderConv<FE> {
             for i in 0..gamma {
                 let andl = c_m[i];
                 let andl_mac = c_m_mac[i];
-                let (minus_ci, minus_ci_mac) : (FE,FE) = // -ci
-                    self.fcom.f_affine_mult_cst(-FE::ONE, andl, andl_mac);
+                let (minus_ci, minus_ci_mac) : (FE::PrimeField,FE) = // -ci
+                    self.fcom.f_affine_mult_cst(-FE::PrimeField::ONE, andl, andl_mac);
                 let (one_minus_ci, one_minus_ci_mac) = // 1 - ci
-                    self.fcom.f_affine_add_cst(FE::ONE, minus_ci, minus_ci_mac);
+                    self.fcom.f_affine_add_cst(FE::PrimeField::ONE, minus_ci, minus_ci_mac);
                 let and_res = andl * one_minus_ci;
                 let and_res_mac = self.fcom.f_input(channel, rng, and_res)?;
                 self.fcom.f_check_multiply(
@@ -338,26 +358,24 @@ impl<FE: FiniteField> SenderConv<FE> {
 
             // step 6)
             // NOTE: for performance maybe step 4 and 6 should be combined in one loop
-            let (mut r_prime, mut r_prime_mac) = (FE::ZERO, FE::ZERO);
+            let (mut r_prime, mut r_prime_mac) = (FE::PrimeField::ZERO, FE::ZERO);
             for i in 0..n {
                 // TODO: do not need to do it when e[i] is ZERO
-                let b;
-                if e[i] == F2::ZERO {
-                    b = FE::ZERO;
-                } else {
-                    b = FE::ONE;
-                }
+                let b = bit_to_fe(e[i]);
                 let (tmp, tmp_mac) =
                     self.fcom
                         .f_affine_mult_cst(b, dabits[i].value, dabits_mac[i].value);
-                debug_assert!(((b == FE::ONE) & (tmp == dabits[i].value)) | (tmp == FE::ZERO));
+                debug_assert!(
+                    ((b == FE::PrimeField::ONE) & (tmp == dabits[i].value))
+                        | (tmp == FE::PrimeField::ZERO)
+                );
                 r_prime += tmp;
                 r_prime_mac += tmp_mac;
             }
 
             // step 7)
             let (mut tau, mut tau_mac) = (r_prime, r_prime_mac);
-            let mut twos = FE::ONE;
+            let mut twos = FE::PrimeField::ONE;
             for i in 0..gamma {
                 let (tmp, tmp_mac) = self.fcom.f_affine_mult_cst(twos, c_m[i], c_m_mac[i]);
                 if i == 0 {
@@ -400,7 +418,7 @@ impl<FE: FiniteField> SenderConv<FE> {
         channel: &mut C,
         rng: &mut RNG,
         edabits_vector: &[Edabits<FE>],
-        edabits_vector_mac: &[Edabits<FE>],
+        edabits_vector_mac: &[EdabitsMac<FE>],
     ) -> Result<(), Error> {
         let nb_random_edabits = edabits_vector.len() * B + C;
         let nb_random_dabits = edabits_vector.len() * B;
@@ -476,7 +494,8 @@ impl<FE: FiniteField> SenderConv<FE> {
                     .convert_bit_2_field(channel, rng, b, b_mac, b_m_mac, e_carry.0, e_carry.1)?;
 
                 // 6)d)
-                let e1_mac = c_plus_r_mac - power_two::<FE>(NB_BITS) * e_m_mac;
+                let e1_mac = c_plus_r_mac
+                    - e_m_mac.multiply_by_prime_subfield(power_two::<FE::PrimeField>(NB_BITS));
 
                 // 6)e)
                 let mut ei = Vec::new();
@@ -497,7 +516,7 @@ impl<FE: FiniteField> SenderConv<FE> {
 
 /// Conversion protocol receiver
 struct ReceiverConv<FE: FiniteField> {
-    fcom_f2: FComReceiver<F2>,
+    fcom_f2: FComReceiver<Gf40>,
     fcom: FComReceiver<FE>,
 }
 
@@ -518,9 +537,9 @@ impl<FE: FiniteField> ReceiverConv<FE> {
         &mut self,
         channel: &mut C,
         _rng: &mut RNG,
-        r_mac: F2,
+        r_mac: Gf40,
         r_m_mac: FE,
-        x_mac: F2,
+        x_mac: Gf40,
     ) -> Result<FE, Error> {
         let c = self.fcom_f2.f_open(channel, r_mac + x_mac)?;
         let x_m_mac = (if c == F2::ONE {
@@ -540,9 +559,9 @@ impl<FE: FiniteField> ReceiverConv<FE> {
         &mut self,
         channel: &mut C,
         rng: &mut RNG,
-        x: &[F2],
-        y: &[F2],
-    ) -> Result<(Vec<F2>, F2), Error> {
+        x: &[Gf40],
+        y: &[Gf40],
+    ) -> Result<(Vec<Gf40>, Gf40), Error> {
         let xl = x.len();
         let yl = y.len();
         if xl != yl {
@@ -582,7 +601,7 @@ impl<FE: FiniteField> ReceiverConv<FE> {
         channel: &mut C,
         rng: &mut RNG,
         num: usize, // in the paper: NB + C
-    ) -> Result<Vec<Edabits<FE>>, Error> {
+    ) -> Result<Vec<EdabitsMac<FE>>, Error> {
         let mut edabits_vec_mac = Vec::with_capacity(num);
         for _ in 0..num {
             let mut r_mac = Vec::with_capacity(NB_BITS);
@@ -592,7 +611,7 @@ impl<FE: FiniteField> ReceiverConv<FE> {
             }
 
             let r_m_mac = self.fcom.f_input(channel, rng)?;
-            edabits_vec_mac.push(Edabits {
+            edabits_vec_mac.push(EdabitsMac {
                 bits: r_mac,
                 value: r_m_mac,
             });
@@ -605,12 +624,12 @@ impl<FE: FiniteField> ReceiverConv<FE> {
         channel: &mut C,
         rng: &mut RNG,
         num: usize, // in the paper: NB
-    ) -> Result<Vec<Dabit<FE>>, Error> {
+    ) -> Result<Vec<DabitMac<FE>>, Error> {
         let mut dabit_vec_mac = Vec::with_capacity(num);
         for _ in 0..num {
             let b_mac = self.fcom_f2.f_random(channel, rng)?;
             let b_m_mac = self.fcom.f_input(channel, rng)?;
-            dabit_vec_mac.push(Dabit {
+            dabit_vec_mac.push(DabitMac {
                 bit: b_mac,
                 value: b_m_mac,
             });
@@ -622,7 +641,7 @@ impl<FE: FiniteField> ReceiverConv<FE> {
         &mut self,
         channel: &mut C,
         rng: &mut RNG,
-        dabits_mac: &Vec<Dabit<FE>>,
+        dabits_mac: &Vec<DabitMac<FE>>,
     ) -> Result<(), Error> {
         let s = FDABIT_SECURITY_PARAMETER;
         let n = dabits_mac.len();
@@ -654,9 +673,9 @@ impl<FE: FiniteField> ReceiverConv<FE> {
             for i in 0..gamma {
                 let andl_mac = c_m_mac[i];
                 let minus_ci_mac : FE = // -ci
-                    self.fcom.f_affine_mult_cst(-FE::ONE, andl_mac);
+                    self.fcom.f_affine_mult_cst(-FE::PrimeField::ONE, andl_mac);
                 let one_minus_ci_mac = // 1 - ci
-                    self.fcom.f_affine_add_cst(FE::ONE, minus_ci_mac);
+                    self.fcom.f_affine_add_cst(FE::PrimeField::ONE, minus_ci_mac);
                 let and_res_mac = self.fcom.f_input(channel, rng)?;
                 self.fcom.f_check_multiply(
                     channel,
@@ -696,19 +715,14 @@ impl<FE: FiniteField> ReceiverConv<FE> {
             let mut r_prime_mac = FE::ZERO;
             for i in 0..n {
                 // TODO: do not need to do it when e[i] is ZERO
-                let b;
-                if e[i] == F2::ZERO {
-                    b = FE::ZERO;
-                } else {
-                    b = FE::ONE;
-                }
+                let b = bit_to_fe(e[i]);
                 let tmp_mac = self.fcom.f_affine_mult_cst(b, dabits_mac[i].value);
                 r_prime_mac += tmp_mac;
             }
 
             // step 7)
             let mut tau_mac = r_prime_mac;
-            let mut twos = FE::ONE;
+            let mut twos = FE::PrimeField::ONE;
             for i in 0..gamma {
                 let tmp_mac = self.fcom.f_affine_mult_cst(twos, c_m_mac[i]);
                 tau_mac += tmp_mac;
@@ -745,7 +759,7 @@ impl<FE: FiniteField> ReceiverConv<FE> {
         &mut self,
         channel: &mut C,
         rng: &mut RNG,
-        edabits_vector_mac: &[Edabits<FE>],
+        edabits_vector_mac: &[EdabitsMac<FE>],
     ) -> Result<(), Error> {
         let mut b = true;
 
@@ -817,7 +831,8 @@ impl<FE: FiniteField> ReceiverConv<FE> {
                     self.convert_bit_2_field(channel, rng, b_mac, b_m_mac, e_carry_mac)?;
 
                 // 6)d)
-                let e1_mac = c_plus_r_mac - power_two::<FE>(NB_BITS) * e_m_mac;
+                let e1_mac = c_plus_r_mac
+                    - e_m_mac.multiply_by_prime_subfield(power_two::<FE::PrimeField>(NB_BITS));
 
                 // 6)e)
                 let mut ei = Vec::new();
@@ -826,10 +841,11 @@ impl<FE: FiniteField> ReceiverConv<FE> {
                     ei.push(elm);
                 }
 
-                let s = convert_f2_to_field(&ei);
-                b = self
-                    .fcom
-                    .f_check_zero(channel, e1_mac + self.fcom.get_delta() * s)?;
+                let s = convert_f2_to_field::<FE>(&ei);
+                b = self.fcom.f_check_zero(
+                    channel,
+                    e1_mac + self.fcom.get_delta().multiply_by_prime_subfield(s),
+                )?;
             }
         }
 
@@ -844,9 +860,11 @@ impl<FE: FiniteField> ReceiverConv<FE> {
 #[cfg(test)]
 mod tests {
 
-    use super::{convert_f2_to_field, Edabits, ReceiverConv, SenderConv, NB_BITS};
+    use super::{
+        bit_to_fe, convert_f2_to_field, Edabits, EdabitsMac, ReceiverConv, SenderConv, NB_BITS,
+    };
     use scuttlebutt::{
-        field::{F61p, FiniteField, F2},
+        field::{F61p, FiniteField, Gf40, F2},
         AesRng, Channel,
     };
     use std::{
@@ -862,12 +880,12 @@ mod tests {
             let reader = BufReader::new(sender.try_clone().unwrap());
             let writer = BufWriter::new(sender);
             let mut channel = Channel::new(reader, writer);
-            let mut fconv = SenderConv::<FE>::init(&mut channel).unwrap();
+            let mut fconv = SenderConv::<FE>::init(&mut channel, &mut rng).unwrap();
 
             let mut res = Vec::new();
             for _ in 0..count {
                 let (rb, rb_mac) = fconv.fcom_f2.f_random(&mut channel, &mut rng).unwrap();
-                let rm = if rb == F2::ONE { FE::ONE } else { FE::ZERO };
+                let rm = bit_to_fe(rb);
                 let rm_mac = fconv.fcom.f_input(&mut channel, &mut rng, rm).unwrap();
                 let (x_f2, x_f2_mac) = fconv.fcom_f2.f_random(&mut channel, &mut rng).unwrap();
 
@@ -878,10 +896,10 @@ mod tests {
                 let _ = fconv.fcom.f_open(&mut channel, x_m, x_m_mac).unwrap();
                 // println!(
                 //     "{}",
-                //     if (x_m == FE::ONE) {
+                //     if (x_m == FE::PrimeField::ONE) {
                 //         "ONE".to_string()
                 //     } else {
-                //         if (x_m == FE::ZERO) {
+                //         if (x_m == FE::PrimeField::ZERO) {
                 //             "ZERO".to_string()
                 //         } else {
                 //             "DFGDFGDG".to_string()
@@ -890,9 +908,9 @@ mod tests {
                 // );
                 assert_eq!(
                     if x_f2 == F2::ZERO {
-                        x_m == FE::ZERO
+                        x_m == FE::PrimeField::ZERO
                     } else {
-                        x_m == FE::ONE
+                        x_m == FE::PrimeField::ONE
                     },
                     true
                 );
@@ -946,7 +964,7 @@ mod tests {
             let reader = BufReader::new(sender.try_clone().unwrap());
             let writer = BufWriter::new(sender);
             let mut channel = Channel::new(reader, writer);
-            let mut fconv = SenderConv::<FE>::init(&mut channel).unwrap();
+            let mut fconv = SenderConv::<FE>::init(&mut channel, &mut rng).unwrap();
 
             let mut x_mac = Vec::new();
             let mut y_mac = Vec::new();
@@ -960,7 +978,7 @@ mod tests {
             }
 
             let mut vx: Vec<F2> = Vec::new();
-            let mut vx_mac: Vec<F2> = Vec::new();
+            let mut vx_mac: Vec<Gf40> = Vec::new();
             for i in 0..6 {
                 vx.push(x[i]);
                 vx_mac.push(x_mac[i]);
@@ -1028,7 +1046,7 @@ mod tests {
             let reader = BufReader::new(sender.try_clone().unwrap());
             let writer = BufWriter::new(sender);
             let mut channel = Channel::new(reader, writer);
-            let mut fconv = SenderConv::<FE>::init(&mut channel).unwrap();
+            let mut fconv = SenderConv::<FE>::init(&mut channel, &mut rng).unwrap();
 
             let (dabits, dabits_mac) = fconv.random_dabits(&mut channel, &mut rng, count).unwrap();
             let _ = fconv
@@ -1057,7 +1075,7 @@ mod tests {
             let reader = BufReader::new(sender.try_clone().unwrap());
             let writer = BufWriter::new(sender);
             let mut channel = Channel::new(reader, writer);
-            let mut fconv = SenderConv::<FE>::init(&mut channel).unwrap();
+            let mut fconv = SenderConv::<FE>::init(&mut channel, &mut rng).unwrap();
 
             //   110101
             let mut c = vec![F2::ONE, F2::ZERO, F2::ONE, F2::ZERO, F2::ONE, F2::ONE];
@@ -1072,7 +1090,7 @@ mod tests {
 
                 // mutate bit at position i
                 c[i] = F2::random(&mut rng);
-                let c_m: FE = convert_f2_to_field(&c);
+                let c_m: FE::PrimeField = convert_f2_to_field::<FE>(&c);
 
                 // introduce a potential error at position j
                 let saved = c[j];
@@ -1091,7 +1109,7 @@ mod tests {
                     bits_mac.push(v);
                 }
                 let value_mac = fconv.fcom.f_input(&mut channel, &mut rng, c_m).unwrap();
-                edabits_mac.push(Edabits {
+                edabits_mac.push(EdabitsMac {
                     bits: bits_mac,
                     value: value_mac,
                 });
@@ -1119,7 +1137,7 @@ mod tests {
                 bits_mac.push(v_mac);
             }
             let value_mac = fconv.fcom.f_input(&mut channel, &mut rng).unwrap();
-            edabits_mac.push(Edabits {
+            edabits_mac.push(EdabitsMac {
                 bits: bits_mac,
                 value: value_mac,
             });
