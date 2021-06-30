@@ -180,7 +180,7 @@ impl<FE: FiniteField> SenderConv<FE> {
 
             let and_res = and1 * and2;
             let and_res_mac = self.fcom_f2.f_input(channel, rng, and_res)?;
-            self.fcom_f2.f_check_multiply(
+            self.fcom_f2.quicksilver_check_multiply(
                 channel,
                 rng,
                 and1,
@@ -320,7 +320,7 @@ impl<FE: FiniteField> SenderConv<FE> {
                     self.fcom.f_affine_add_cst(FE::PrimeField::ONE, minus_ci, minus_ci_mac);
                 let and_res = andl * one_minus_ci;
                 let and_res_mac = self.fcom.f_input(channel, rng, and_res)?;
-                self.fcom.f_check_multiply(
+                self.fcom.quicksilver_check_multiply(
                     channel,
                     rng,
                     andl,
@@ -582,8 +582,13 @@ impl<FE: FiniteField> ReceiverConv<FE> {
 
             let and_res_mac = self.fcom_f2.f_input(channel, rng)?;
 
-            self.fcom_f2
-                .f_check_multiply(channel, rng, and1_mac, and2_mac, and_res_mac)?;
+            self.fcom_f2.quicksilver_check_multiply(
+                channel,
+                rng,
+                and1_mac,
+                and2_mac,
+                and_res_mac,
+            )?;
 
             let c_mac = ci_mac + and_res_mac;
 
@@ -675,7 +680,7 @@ impl<FE: FiniteField> ReceiverConv<FE> {
                 let one_minus_ci_mac = // 1 - ci
                     self.fcom.f_affine_add_cst(FE::PrimeField::ONE, minus_ci_mac);
                 let and_res_mac = self.fcom.f_input(channel, rng)?;
-                self.fcom.f_check_multiply(
+                self.fcom.quicksilver_check_multiply(
                     channel,
                     rng,
                     andl_mac,

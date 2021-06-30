@@ -172,7 +172,7 @@ impl<FE: FiniteField> FComSender<FE> {
         Ok(())
     }
 
-    pub fn quicksilver_multiplication_check<C: AbstractChannel, RNG: CryptoRng + Rng>(
+    pub fn quicksilver_check_multiply<C: AbstractChannel, RNG: CryptoRng + Rng>(
         &mut self,
         channel: &mut C,
         rng: &mut RNG,
@@ -343,7 +343,7 @@ impl<FE: FiniteField> FComReceiver<FE> {
         }
     }
 
-    pub fn quicksilver_multiplication_check<C: AbstractChannel, RNG: CryptoRng + Rng>(
+    pub fn quicksilver_check_multiply<C: AbstractChannel, RNG: CryptoRng + Rng>(
         &mut self,
         channel: &mut C,
         rng: &mut RNG,
@@ -512,7 +512,7 @@ mod tests {
             let mut r = Vec::new();
             for i in 0..count {
                 let b = fcom
-                    .quicksilver_multiplication_check(
+                    .quicksilver_check_multiply(
                         &mut channel,
                         &mut rng,
                         v[i].0,
@@ -543,7 +543,7 @@ mod tests {
         let mut r = Vec::new();
         for i in 0..count {
             let b = fcom
-                .quicksilver_multiplication_check(&mut channel, &mut rng, v[i].0, v[i].1, v[i].2)
+                .quicksilver_check_multiply(&mut channel, &mut rng, v[i].0, v[i].1, v[i].2)
                 .unwrap();
             r.push(b);
         }
