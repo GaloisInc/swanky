@@ -649,8 +649,6 @@ impl<FE: FiniteField> ReceiverConv<FE> {
         let num_bits = std::mem::size_of::<usize>() * 8;
         let gamma = num_bits - ((n + 1).leading_zeros() as usize) - 1 + 1;
 
-        //println!("GAMMA {}", gamma.to_string());
-
         if !((n + 1) as u128 * u128::pow(2, gamma as u32) < (FE::MODULUS - 1) / 2) {
             return Err(Error::Other(
                 "fail fdabit verifier: wrong combination of input size and parameters".to_string(),

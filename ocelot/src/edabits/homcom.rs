@@ -9,7 +9,7 @@
 use crate::errors::Error;
 use crate::svole::wykw::{Receiver, Sender};
 use crate::svole::{SVoleReceiver, SVoleSender};
-use generic_array::GenericArray;
+use generic_array::{typenum::Unsigned, GenericArray};
 use rand::{CryptoRng, Rng};
 use scuttlebutt::{field::FiniteField, AbstractChannel};
 use std::marker::PhantomData;
@@ -20,6 +20,19 @@ pub struct FComSender<FE: FiniteField> {
     svole_sender: Sender<FE>,
     voles: Vec<(FE::PrimeField, FE)>,
     pos: usize,
+}
+
+fn make_x_i<FE: FiniteField>(i: usize) -> FE {
+    let mut v: GenericArray<FE::PrimeField, FE::PolynomialFormNumCoefficients> =
+        GenericArray::default();
+    for j in 0..FE::PolynomialFormNumCoefficients::USIZE {
+        if i == j {
+            v[i] = FE::PrimeField::ONE;
+        } else {
+            v[i] = FE::PrimeField::ZERO;
+        }
+    }
+    FE::from_polynomial_coefficients(v)
 }
 
 impl<FE: FiniteField> FComSender<FE> {
@@ -162,22 +175,29 @@ impl<FE: FiniteField> FComSender<FE> {
     pub fn quicksilver_multiplication_check<C: AbstractChannel, RNG: CryptoRng + Rng>(
         &mut self,
         channel: &mut C,
-        _rng: &mut RNG,
+        rng: &mut RNG,
         x: FE::PrimeField,
         x_mac: FE,
         y: FE::PrimeField,
         y_mac: FE,
         _z: FE::PrimeField,
         z_mac: FE,
-        mask: FE::PrimeField,
-        mask_mac: FE,
     ) -> Result<(), Error> {
         let a0 = x_mac * y_mac;
         let a1 = x_mac.multiply_by_prime_subfield(y) + y_mac.multiply_by_prime_subfield(x) - z_mac;
 
-        let u = a0 + mask_mac;
+        // The following block implements VOPE(1)
+        let mut mask = FE::ZERO;
+        let mut mask_mac = FE::ZERO;
+        for i in 0..FE::PolynomialFormNumCoefficients::USIZE {
+            let (u, u_m) = self.f_random(channel, rng)?;
+            let x_i: FE = make_x_i(i);
+            mask += x_i.multiply_by_prime_subfield(u);
+            mask_mac += u_m * x_i;
+        }
 
-        let v = a1 + FE::from_polynomial_coefficients(GenericArray::clone_from_slice(&[mask]));
+        let u = a0 + mask_mac;
+        let v = a1 + mask;
 
         channel.write_fe(u)?;
         channel.write_fe(v)?;
@@ -187,7 +207,6 @@ impl<FE: FiniteField> FComSender<FE> {
     }
 }
 
-//#[derive(Copy, Clone)]
 pub struct FComReceiver<FE: FiniteField> {
     delta: FE,
     svole_receiver: Receiver<FE>,
@@ -327,16 +346,23 @@ impl<FE: FiniteField> FComReceiver<FE> {
     pub fn quicksilver_multiplication_check<C: AbstractChannel, RNG: CryptoRng + Rng>(
         &mut self,
         channel: &mut C,
-        _rng: &mut RNG,
+        rng: &mut RNG,
         x_mac: FE,
         y_mac: FE,
         z_mac: FE,
-        mask_mac: FE,
     ) -> Result<(), Error> {
         let b = x_mac * y_mac - (-self.delta) * z_mac; // -delta diff because
 
         let u = channel.read_fe::<FE>()?;
         let v = channel.read_fe::<FE>()?;
+
+        // The following block implements VOPE(1)
+        let mut mask_mac = FE::ZERO;
+        for i in 0..FE::ZERO.to_polynomial_coefficients().len() {
+            let v_m = self.f_random(channel, rng)?;
+            let x_i: FE = make_x_i(i);
+            mask_mac += v_m * x_i;
+        }
 
         let b_plus = b + mask_mac;
         if b_plus == (u + (-self.delta) * v) {
@@ -353,7 +379,7 @@ mod tests {
 
     use super::{FComReceiver, FComSender};
     use scuttlebutt::{
-        field::{F61p, FiniteField},
+        field::{F61p, FiniteField, Gf40},
         AbstractChannel, AesRng, Channel,
     };
     use std::{
@@ -466,7 +492,7 @@ mod tests {
     }
 
     fn test_fcom_multiplication<FE: FiniteField>() -> () {
-        let count = 1000;
+        let count = 50;
         let (sender, receiver) = UnixStream::pair().unwrap();
         let handle = std::thread::spawn(move || {
             let mut rng = AesRng::new();
@@ -481,8 +507,7 @@ mod tests {
                 let (y, ymac) = fcom.f_random(&mut channel, &mut rng).unwrap();
                 let z = x * y;
                 let zmac = fcom.f_input(&mut channel, &mut rng, z).unwrap();
-                let (mask, mask_mac) = fcom.f_random(&mut channel, &mut rng).unwrap();
-                v.push((x, xmac, y, ymac, z, zmac, mask, mask_mac));
+                v.push((x, xmac, y, ymac, z, zmac));
             }
             let mut r = Vec::new();
             for i in 0..count {
@@ -496,8 +521,6 @@ mod tests {
                         v[i].3,
                         v[i].4,
                         v[i].5,
-                        v[i].6,
-                        v[i].7,
                     )
                     .unwrap();
                 r.push(b);
@@ -515,20 +538,12 @@ mod tests {
             let xmac = fcom.f_random(&mut channel, &mut rng).unwrap();
             let ymac = fcom.f_random(&mut channel, &mut rng).unwrap();
             let zmac = fcom.f_input(&mut channel, &mut rng).unwrap();
-            let mask_mac = fcom.f_random(&mut channel, &mut rng).unwrap();
-            v.push((xmac, ymac, zmac, mask_mac));
+            v.push((xmac, ymac, zmac));
         }
         let mut r = Vec::new();
         for i in 0..count {
             let b = fcom
-                .quicksilver_multiplication_check(
-                    &mut channel,
-                    &mut rng,
-                    v[i].0,
-                    v[i].1,
-                    v[i].2,
-                    v[i].3,
-                )
+                .quicksilver_multiplication_check(&mut channel, &mut rng, v[i].0, v[i].1, v[i].2)
                 .unwrap();
             r.push(b);
         }
@@ -546,7 +561,12 @@ mod tests {
     }
 
     #[test]
-    fn test_fcom_multiplication_check() {
+    fn test_fcom_multiplication_check_f61p() {
         let _t = test_fcom_multiplication::<F61p>();
+    }
+
+    #[test]
+    fn test_fcom_multiplication_check_gf40() {
+        let _t = test_fcom_multiplication::<Gf40>();
     }
 }
