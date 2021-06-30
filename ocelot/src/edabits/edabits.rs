@@ -89,29 +89,27 @@ fn power_two<FE: FiniteField>(m: usize) -> FE {
 
 // Permutation pseudorandomly generated following Fisher-Yates method
 // `https://en.wikipedia.org/wiki/Fisher%E2%80%93Yates_shuffle`
-fn generate_permutation(seed: Block, size: usize) -> (Vec<usize>, Vec<usize>) {
+fn generate_permutation<T: Clone>(seed: Block, v: Vec<T>) -> Vec<T> {
+    let size = v.len();
     let mut rng = AesRng::from_seed(seed);
-    let mut permute: Vec<usize> = Vec::with_capacity(size);
-    let mut unpermute: Vec<usize> = vec![0; size];
+    let mut permute = Vec::with_capacity(size);
 
     for i in 0..size {
-        permute.push(i);
-        //unpermute.push(i);
+        permute.push(v[i].clone());
     }
+
     let mut i = size - 1;
     while i > 0 {
         let idx = Rng::gen_range(&mut rng, 0, i);
-        let tmp: usize = permute[idx];
-        permute[idx] = permute[i];
+        let tmp: T = permute[idx].clone();
+        permute[idx] = permute[i].clone();
         permute[i] = tmp;
-        unpermute[tmp] = i;
         i -= 1;
     }
-    (permute, unpermute)
+    permute
 }
 
 // Protocol for checking conversion
-
 impl<FE: FiniteField> SenderConv<FE> {
     pub fn init<C: AbstractChannel, RNG: CryptoRng + Rng>(
         channel: &mut C,
@@ -431,21 +429,22 @@ impl<FE: FiniteField> SenderConv<FE> {
 
         // step 1)c): TODO: random multiplication triples
 
-        // step 2): TODO: verify dabit
+        // step 2)
         self.fdabit(channel, rng, &dabits, &dabits_mac)?;
 
         // step 3): TODO: generate pi_2 and pi_3
-        let seed = channel.read_block()?;
-        let (perm1, _unperm1) = generate_permutation(seed, nb_random_edabits);
+        let seed1 = channel.read_block()?;
 
-        // step 4): TODO: apply the permutation instead of indirections
+        // step 4): TODO: apply permutation to dabits and triples
+        let r = generate_permutation(seed1, r);
+        let r_mac = generate_permutation(seed1, r_mac);
 
         // step 5)a):
         let base = edabits_vector_mac.len() * B;
         for i in 0..C {
             let idx = base + i;
-            let a = &r[perm1[idx]];
-            let a_mac = &r_mac[perm1[idx]];
+            let a = &r[idx];
+            let a_mac = &r_mac[idx];
             for bi in 0..NB_BITS {
                 self.fcom_f2.f_open(channel, a.bits[bi], a_mac.bits[bi])?;
             }
@@ -777,22 +776,22 @@ impl<FE: FiniteField> ReceiverConv<FE> {
 
         // step 1)c): TODO: random multiplication triples
 
-        // step 2): TODO: verify dabit
+        // step 2)
         self.fdabit(channel, rng, &dabits_mac)?;
 
         // step 3): TODO: generate pi_2 and pi_3
-        let seed = rng.gen::<Block>();
-        channel.write_block(&seed)?;
+        let seed1 = rng.gen::<Block>();
+        channel.write_block(&seed1)?;
         channel.flush()?;
-        let (perm1, _unperm1) = generate_permutation(seed, nb_random_edabits);
 
-        // step 4): TODO: apply the permutation instead of indirections
+        // step 4): TODO: shuffle dabits and triples
+        let r_mac = generate_permutation(seed1, r_mac);
 
         // step 5)a):
         let base = edabits_vector_mac.len() * B;
         for i in 0..C {
             let idx = base + i;
-            let a_mac = &r_mac[perm1[idx]];
+            let a_mac = &r_mac[idx];
             let mut a_vec = Vec::with_capacity(NB_BITS);
             for bi in 0..NB_BITS {
                 let a = self.fcom_f2.f_open(channel, a_mac.bits[bi])?;
