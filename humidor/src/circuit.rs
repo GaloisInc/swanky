@@ -191,7 +191,7 @@ pub fn arb_ckt_zero<Field: FiniteField + proptest::arbitrary::Arbitrary>(
 
 #[test]
 fn test_random_ckt_zero() {
-    use rand::{SeedableRng, rngs::StdRng, distributions::{Uniform, Distribution}};
+    use rand::{SeedableRng, rngs::StdRng};
 
     let mut rng = StdRng::from_entropy();
     let size = Uniform::from(2..1000);
