@@ -4,6 +4,10 @@ use std::io::Write;
 extern crate humidor;
 
 use humidor::ligero::noninteractive;
+use humidor::circuit::Ckt;
+use humidor::Sha256;
+
+type Field = humidor::f2_19x3_26::F;
 
 fn test_input_size(s: usize) -> (
     usize, // proof size in bytes
@@ -19,13 +23,17 @@ fn test_input_size(s: usize) -> (
     println!("---");
 
     let mut rng = StdRng::from_entropy();
-    let (ckt, inp) = humidor::circuit::random_ckt_zero(&mut rng, input_size, circuit_size);
+    let (ckt, inp): (Ckt<Field>, _) = humidor::circuit::random_ckt_zero(
+        &mut rng,
+        input_size,
+        circuit_size,
+    );
 
     let mut prover_time = std::time::Duration::new(0,0);
     let mut verifier_time = std::time::Duration::new(0,0);
 
     let t = std::time::Instant::now();
-    let p = noninteractive::Prover::new(&ckt, &inp);
+    let p = <noninteractive::Prover<_, Sha256>>::new(&ckt, &inp);
     prover_time += t.elapsed();
     println!("Prover setup time: {:?}", t.elapsed());
 

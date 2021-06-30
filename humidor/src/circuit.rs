@@ -1,18 +1,21 @@
-use rand::Rng;
+use rand::{Rng, distributions::{Distribution, Uniform}};
+use scuttlebutt::field::FiniteField;
 
 #[cfg(test)]
 use proptest::{*, prelude::*, collection::vec as pvec};
 
-use crate::util::{Field, random_field_array};
+use crate::util::random_field_array;
 
 // TODO: Add LDI, SUB, and DIV instructions.
 #[derive(Debug, Clone, Copy)]
 pub enum Op { Add(usize, usize), Mul(usize, usize) }
 
 pub fn random_op(rng: &mut impl Rng, s: usize) -> Op {
-    match rng.gen_range(0usize..2) {
-        0 => Op::Add(rng.gen_range(0..s), rng.gen_range(0..s)),
-        1 => Op::Mul(rng.gen_range(0..s), rng.gen_range(0..s)),
+    let index = Uniform::from(0..s);
+    let coin = Uniform::from(0usize..2);
+    match coin.sample(rng) {
+        0 => Op::Add(index.sample(rng), index.sample(rng)),
+        1 => Op::Mul(index.sample(rng), index.sample(rng)),
         _ => panic!("Unreachable"),
     }
 }
@@ -44,12 +47,22 @@ impl Op {
 }
 
 #[derive(Debug, Clone)]
-pub struct Ckt {
+pub struct Ckt<Field> {
+    phantom: std::marker::PhantomData<Field>,
+
     pub ops: Vec<Op>,
     pub inp_size: usize,
 }
 
-impl Ckt {
+impl<Field: FiniteField> Ckt<Field> {
+    pub fn new(inp_size: usize, ops: &[Op]) -> Self {
+        Self {
+            phantom: std::marker::PhantomData,
+            ops: ops.to_vec(),
+            inp_size,
+        }
+    }
+
     pub fn size(&self) -> usize { self.ops.len() + self.inp_size }
 
     pub fn eval(&self, inp: &[Field]) -> Vec<Field> {
@@ -73,99 +86,103 @@ impl Ckt {
 
     #[cfg(test)]
     pub fn test_value() -> Self {
-        Self {
-            inp_size: 4,
-            ops: vec![ // \w x y z -> w*y + x*z
+        Self::new(4,
+            &vec![ // \w x y z -> w*y + x*z
                 Op::Mul(0, 2),
                 Op::Mul(1, 3),
                 Op::Add(4, 5),
             ],
-        }
+        )
     }
 }
 
 // Output a random circuit with an input that evaluates to 0. Both inp_size and
 // ckt_size must be at least 2.
-pub fn random_ckt_zero(
+pub fn random_ckt_zero<Field: FiniteField>(
     mut rng: impl Rng,
     inp_size: usize,
     ckt_size: usize
-) -> (Ckt, Vec<Field>) {
+) -> (Ckt<Field>, Vec<Field>) {
     debug_assert!(inp_size > 1);
     debug_assert!(ckt_size > 1);
 
     let mut w: Vec<Field> = random_field_array(&mut rng, inp_size).to_vec();
     let mut ops = vec![];
+    let coin = Uniform::from(0usize..2);
     for n in 0 .. ckt_size-1 {
-        let i = rng.gen_range(1 .. inp_size + n);
-        let j = rng.gen_range(1 .. inp_size + n);
+        let index = Uniform::from(1 .. inp_size + n);
+        let i = index.sample(&mut rng);
+        let j = index.sample(&mut rng);
 
-        ops.push(match rng.gen_range(0usize..2) {
+        ops.push(match coin.sample(&mut rng) {
             0 => Op::Add(i, j),
             1 => Op::Mul(i, j),
             _ => panic!("Unreachable"),
         });
     }
 
-    let output = (Ckt {ops: ops.clone(), inp_size}).eval(&w);
-    w[0] = output.last().unwrap().neg();
+    let output = Ckt::new(inp_size, &ops).eval(&w);
+    w[0] = -(*output.last().unwrap());
     ops.push(Op::Add(0, inp_size+ckt_size-2));
 
-    (Ckt {ops, inp_size}, w)
+    (Ckt::new(inp_size, &ops), w)
 }
 
 // XXX: This is a bad way to do this. Creating large circuits will overflow
 // the stack. Need to figure out something better, maybe along the lines of
 // this: https://altsysrq.github.io/proptest-book/proptest/tutorial/recursive.html
 #[cfg(test)]
-pub fn arb_ckt(inp_size: usize, ckt_size: usize) -> impl Strategy<Value = Ckt> {
+#[allow(unused)]
+pub fn arb_ckt<Field: FiniteField>(
+    inp_size: usize,
+    ckt_size: usize
+) -> impl Strategy<Value = Ckt<Field>> {
     if ckt_size == 0 {
-        any::<()>().prop_map(move |()| Ckt {
-            ops: vec![],
-            inp_size,
-        }).boxed()
+        any::<()>().prop_map(move |()| Ckt::new(inp_size, &vec![])).boxed()
     } else {
         let arb_c = arb_ckt(inp_size, ckt_size - 1);
         let arb_op = arb_op(0, inp_size + ckt_size - 1);
-        (arb_c,arb_op).prop_map(|(Ckt {mut ops, inp_size}, op)| {
+        (arb_c,arb_op).prop_map(|(Ckt::<Field> {phantom, mut ops, inp_size}, op)| {
             ops.push(op);
-            Ckt { ops, inp_size }
+            <Ckt<Field>>::new(inp_size, &ops)
         }).boxed()
     }
 }
 
 #[cfg(test)]
-fn arb_ckt_with_inp_hole(
+#[allow(unused)]
+fn arb_ckt_with_inp_hole<Field: FiniteField>(
     inp_size: usize,
     ckt_size: usize,
-) -> impl Strategy<Value = Ckt> {
+) -> impl Strategy<Value = Ckt<Field>> {
     if ckt_size == 0 {
         any::<()>().prop_map(move |()| Ckt {
+            phantom: std::marker::PhantomData,
             ops: vec![],
             inp_size,
         }).boxed()
     } else {
         let arb_c = arb_ckt_with_inp_hole(inp_size, ckt_size - 1);
         let arb_op = arb_op(1, inp_size + ckt_size - 1);
-        (arb_c,arb_op).prop_map(|(Ckt {mut ops, inp_size}, op)| {
+        (arb_c,arb_op).prop_map(|(Ckt::<Field> {phantom, mut ops, inp_size}, op)| {
             ops.push(op);
-            Ckt { ops, inp_size }
+            <Ckt<Field>>::new(inp_size, &ops)
         }).boxed()
     }
 }
 
 // XXX: See comment on arb_ckt, above.
 #[cfg(test)]
-pub fn arb_ckt_zero(
+pub fn arb_ckt_zero<Field: FiniteField + proptest::arbitrary::Arbitrary>(
     inp_size: usize,
     ckt_size: usize,
-) -> impl Strategy<Value = (Ckt, Vec<Field>)> {
+) -> impl Strategy<Value = (Ckt<Field>, Vec<Field>)> {
     (
         arb_ckt_with_inp_hole(inp_size, ckt_size-1),
         pvec(any::<Field>(), inp_size),
     ).prop_map(move |(mut c, mut w)| {
         let output = c.eval(&w);
-        w[0] = output.last().unwrap().neg();
+        w[0] = -(*output.last().unwrap());
         c.ops.push(Op::Add(0, inp_size+ckt_size-2));
 
         (c, w)
@@ -177,13 +194,14 @@ fn test_random_ckt_zero() {
     use rand::{SeedableRng, rngs::StdRng};
 
     let mut rng = StdRng::from_entropy();
-
+    let size = Uniform::from(2..1000);
     for _ in 0..1000 {
-        let inp_size = rng.gen_range(2..1000);
-        let ckt_size = rng.gen_range(2..1000);
-        let (c, w) = random_ckt_zero(&mut rng, inp_size, ckt_size);
+        let inp_size = size.sample(&mut rng);
+        let ckt_size = size.sample(&mut rng);
+        let (c, w): (Ckt<crate::f2_19x3_26::F>, Vec<_>)
+                     = random_ckt_zero(&mut rng, inp_size, ckt_size);
 
-        assert_eq!(*c.eval(&w).last().unwrap(), Field::ZERO);
+        assert_eq!(*c.eval(&w).last().unwrap(), crate::f2_19x3_26::F::ZERO);
     }
 }
 
@@ -192,21 +210,21 @@ proptest! {
     #[test]
     fn test_arb_ckt_zero(
         (c, w) in (2usize..100, 2usize..100).prop_flat_map(
-            |(ws,cs)| arb_ckt_zero(ws,cs))
+            |(ws,cs)| arb_ckt_zero::<crate::f2_19x3_26::F>(ws,cs))
     ) {
-        prop_assert_eq!(*c.eval(&w).last().unwrap(), Field::ZERO);
+        prop_assert_eq!(*c.eval(&w).last().unwrap(), crate::f2_19x3_26::F::ZERO);
     }
 }
 
 #[test]
 fn test_eval() {
-    let w    = 3u64.into();
-    let x    = 5u64.into();
-    let y    = 7u64.into();
-    let z    = 11u64.into();
-    let wy   = 21u64.into();  // w * y
-    let xz   = 55u64.into();  // x * z
-    let wyxz = 76u64.into();  // w*y + x*z
+    let w    = crate::f2_19x3_26::F::from(3u64);
+    let x    = crate::f2_19x3_26::F::from(5u64);
+    let y    = crate::f2_19x3_26::F::from(7u64);
+    let z    = crate::f2_19x3_26::F::from(11u64);
+    let wy   = crate::f2_19x3_26::F::from(21u64);  // w * y
+    let xz   = crate::f2_19x3_26::F::from(55u64);  // x * z
+    let wyxz = crate::f2_19x3_26::F::from(76u64);  // w*y + x*z
     let res  = Ckt::test_value().eval(&vec![w, x, y, z]);
     assert_eq!(res, vec![w, x, y, z, wy, xz, wyxz]);
 }

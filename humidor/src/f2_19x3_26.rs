@@ -1,49 +1,100 @@
-#[cfg(test)]
-use proptest::{*, prelude::*};
+use generic_array::{GenericArray, typenum};
+use rand::distributions::{Distribution, Uniform, Standard};
+use scuttlebutt::field::polynomial::Polynomial;
+use scuttlebutt::field::{FiniteField, BiggerThanModulus};
+use std::hash::Hash;
+use subtle::{ConditionallySelectable, ConstantTimeEq, Choice};
 
-#[derive(Clone, Copy, Default)]
+#[cfg(test)]
+use proptest::{*, prelude::{Arbitrary, BoxedStrategy, any, Strategy}};
+
+use crate::numtheory::{FieldForFFT2, FieldForFFT3};
+use crate::ligero::FieldForLigero;
+
+#[derive(Clone, Copy, Default, Hash)]
 pub struct F(u64);
 
-impl F {
-    pub const ZERO: Self = Self(0);
-    pub const ONE: Self = Self(((1u128 << 64) % M as u128) as u64);
-    pub const MOD: u64 = M;
-    pub const PHI: u64 = Self::MOD - 1;
-    pub const GEN: Self = Self(7);
-    pub const PHI_2_EXP: u64 = 19;
-    pub const PHI_3_EXP: u64 = 26;
-    pub const BITS: usize = 61; // floor(log2(MOD))
-    pub const BYTES: usize = std::mem::size_of::<u64>();
+impl FieldForLigero for F {
+    const BITS: usize = 61; // floor(log2(Self::MODULUS))
+}
 
-    // [ GEN**(PHI / (2**p)) % MOD | p <- [0 .. PHI_2_EXP] ]
-    pub const ROOTS_BASE_2 : [u64; Self::PHI_2_EXP as usize + 1] =
-        [ 1,                   1332669751402954752, 973258067192839568
-        , 1042021548001376395, 402574676512991381,  278717750013534980
-        , 74087475420063438,   566374465489511427,  1266925147139716861
-        , 855420670760076263,  644012728790649397,  1024672769443274150
-        , 969915203910377054,  938399742097549903,  677395270312196759
-        , 638309941020567122,  941411658640200634,  214614403681673597
-        , 1142590720645869203, 1081812970925941425];
-    // [ GEN**(PHI / (3**p)) % MOD | p <- [0 .. PHI_3_EXP] ]
-    pub const ROOTS_BASE_3 : [u64; Self::PHI_3_EXP as usize + 1] =
-        [ 1,                   460004726804964255, 669043805643439512
-        , 296722197659361911,  374719411438346623, 903621615088971058
-        , 528204403879753449,  404018507378766984, 569267202400654075
-        , 951499245552476893,  869386426445016020, 231629203731078009
-        , 911561347291773360,  985928605492343887, 116593309072767134
-        , 200952336485094508,  455485850035128309, 567008847283293789
-        , 137993045254182336,  158980184853827215, 1203426293655283518
-        , 1214402346646813410, 648772824772841070, 1312084489284135569
-        , 59416712983923841,   523602121810241645, 920749240289894275];
+impl FiniteField for F {
+    const ZERO: Self = F(ZERO_MONTY);
+    const ONE: Self = F(ONE_MONTY);
+    const MODULUS: u128 = M as u128;
+    const GENERATOR: Self = Self(7);
+    const MULTIPLICATIVE_GROUP_ORDER: u128 = Self::MODULUS - 1;
 
-    #[inline]
-    pub fn bytes(self) -> Vec<u8> {
-        // Assumes field element has undergone modular reduction.
-        self.0.to_be_bytes().iter().cloned().collect()
+    type ByteReprLen = typenum::U8;
+    type FromBytesError = BiggerThanModulus;
+
+    fn to_bytes(&self) -> GenericArray<u8, Self::ByteReprLen> {
+        GenericArray::from(self.0.to_le_bytes())
     }
 
-    pub fn pow(self, mut e: u64) -> Self {
-        let mut b = self;
+    fn from_bytes(
+        bytes: &GenericArray<u8, Self::ByteReprLen>
+    ) -> Result<Self, Self::FromBytesError> {
+        let n = u64::from_le_bytes(*bytes.as_ref());
+        if n < Self::MODULUS as u64 {
+            Ok(Self(n))
+        } else {
+            Err(BiggerThanModulus)
+        }
+    }
+
+    // TODO: Determine bias
+    fn from_uniform_bytes(bytes: &[u8; 16]) -> Self {
+        use std::convert::TryFrom;
+
+        let r = u64::from_le_bytes(<[u8; 8]>::try_from(&bytes[..8]).unwrap());
+        let mask = (1u64 << Self::BITS) - 1;
+        let n = r & mask;
+        Self::from(u64::conditional_select(
+                &n,
+                &(Self::MODULUS as u64 - n),
+                Choice::from((n < Self::MODULUS as u64) as u8),
+            ))
+    }
+
+    fn random<R: rand_core::RngCore + ?Sized>(rng: &mut R) -> Self {
+        Self::from(Uniform::from(0 .. Self::MODULUS).sample(rng))
+    }
+
+    type PrimeField = Self;
+    type PolynomialFormNumCoefficients = typenum::U1;
+
+    fn from_polynomial_coefficients(
+        coeffs: GenericArray<
+            Self::PrimeField,
+            Self::PolynomialFormNumCoefficients,
+        >
+    ) -> Self {
+        coeffs[0]
+    }
+
+    fn to_polynomial_coefficients(
+        &self
+    ) -> GenericArray<Self::PrimeField, Self::PolynomialFormNumCoefficients> {
+        GenericArray::from([*self])
+    }
+
+    fn reduce_multiplication_over() -> Polynomial<Self::PrimeField> {
+        Polynomial::x()
+    }
+
+    fn multiply_by_prime_subfield(&self, pf: Self::PrimeField) -> Self {
+        *self * pf
+    }
+
+    // XXX: This is slow. Use GCD. Probably not on a hot path, though.
+    #[inline]
+    fn inverse(&self) -> Self {
+        Self(inv_monty(self.0))
+    }
+
+    fn pow(&self, mut e: u128) -> Self {
+        let mut b = *self;
         let mut acc = Self::ONE;
 
         while e != 0 {
@@ -56,17 +107,62 @@ impl F {
 
         acc
     }
+}
 
-    // XXX: This is slow. Use GCD. Probably not a hot path, though.
+impl FieldForFFT2 for F {
+    const PHI_2_EXP: usize = 19;
+
     #[inline]
-    pub fn recip(self) -> Self {
-        Self(inv_monty(self.0))
+    fn roots_base_2(ix: usize) -> u128 {
+        [ 1,                   1332669751402954752, 973258067192839568
+        , 1042021548001376395, 402574676512991381,  278717750013534980
+        , 74087475420063438,   566374465489511427,  1266925147139716861
+        , 855420670760076263,  644012728790649397,  1024672769443274150
+        , 969915203910377054,  938399742097549903,  677395270312196759
+        , 638309941020567122,  941411658640200634,  214614403681673597
+        , 1142590720645869203, 1081812970925941425]
+        [ix]
     }
+}
+
+impl FieldForFFT3 for F {
+    const PHI_3_EXP: usize = 26;
 
     #[inline]
-    pub fn neg(self) -> Self {
-        let Self(x) = self;
-        Self(neg_monty(x))
+    fn roots_base_3(ix: usize) -> u128 {
+        [ 1,                   460004726804964255, 669043805643439512
+        , 296722197659361911,  374719411438346623, 903621615088971058
+        , 528204403879753449,  404018507378766984, 569267202400654075
+        , 951499245552476893,  869386426445016020, 231629203731078009
+        , 911561347291773360,  985928605492343887, 116593309072767134
+        , 200952336485094508,  455485850035128309, 567008847283293789
+        , 137993045254182336,  158980184853827215, 1203426293655283518
+        , 1214402346646813410, 648772824772841070, 1312084489284135569
+        , 59416712983923841,   523602121810241645, 920749240289894275]
+        [ix]
+    }
+}
+
+#[cfg(test)]
+mod numtheory_tests {
+    use super::*;
+    use crate::numtheory::*;
+
+    crate::fft2_tests!{F}
+    crate::fft3_tests!{F}
+    crate::interpolation_tests!{F}
+}
+
+impl ConstantTimeEq for F {
+    fn ct_eq(&self, other: &Self) -> subtle::Choice {
+        // XXX: Probably not actually constant time...
+        from_monty(self.0).ct_eq(&from_monty(other.0))
+    }
+}
+
+impl ConditionallySelectable for F {
+    fn conditional_select(a: &Self, b: &Self, c: subtle::Choice) -> Self {
+        F(u64::conditional_select(&a.0, &b.0, c))
     }
 }
 
@@ -107,77 +203,102 @@ impl std::convert::From<F> for u64 {
     fn from(F(n): F) -> u64 { from_monty(n) as u64 }
 }
 
-impl std::ops::Add for F {
-    type Output = Self;
-    #[inline]
-    fn add(self, other: Self) -> Self { Self(add_monty(self.0, other.0)) }
-}
-
-impl std::ops::AddAssign for F {
-    #[inline]
-    fn add_assign(&mut self, other: Self) { *self = *self + other }
-}
-
-impl std::iter::Sum for F {
-    fn sum<I>(iter: I) -> Self
-        where I: Iterator<Item = Self>
-    {
-        iter.fold(F::ZERO, std::ops::Add::add)
+macro_rules! binary_op {
+    ($op: ident, $fun: ident, $base_fun: path, $typ: ident) => {
+        impl $op<$typ> for $typ {
+            type Output = $typ;
+            #[inline]
+            fn $fun(self, other: $typ) -> $typ {$typ($base_fun(self.0, other.0))}
+        }
+        impl $op<&$typ> for $typ {
+            type Output = $typ;
+            #[inline]
+            fn $fun(self, other: &$typ) -> $typ {$typ($base_fun(self.0, other.0))}
+        }
+        impl $op<$typ> for &$typ {
+            type Output = $typ;
+            #[inline]
+            fn $fun(self, other: $typ) -> $typ {$typ($base_fun(self.0, other.0))}
+        }
+        impl<'a, 'b> $op<&'b $typ> for &'a $typ {
+            type Output = $typ;
+            #[inline]
+            fn $fun(self, other: &'b $typ) -> $typ {$typ($base_fun(self.0, other.0))}
+        }
     }
 }
 
-impl std::ops::Sub for F {
-    type Output = Self;
-    #[inline]
-    fn sub(self, other: Self) -> Self { Self(sub_monty(self.0, other.0)) }
-}
-
-impl std::ops::SubAssign for F {
-    #[inline]
-    fn sub_assign(&mut self, other: Self) { *self = *self + other.neg() }
-}
-
-impl std::ops::Mul for F {
-    type Output = Self;
-    #[inline]
-    fn mul(self, other: Self) -> Self { Self(mul_monty(self.0, other.0)) }
-}
-
-impl std::ops::MulAssign for F {
-    #[inline]
-    fn mul_assign(&mut self, other: Self) { *self = *self * other }
-}
-
-impl std::iter::Product for F {
-    fn product<I>(iter: I) -> Self
-        where I: Iterator<Item = Self>
-    {
-        iter.fold(F::ZERO, std::ops::Mul::mul)
+macro_rules! assign_op {
+    ($op: ident, $fun: ident, $base_fun: ident, $typ: ident) => {
+        impl $op<$typ> for $typ {
+            #[inline]
+            fn $fun(&mut self, other: $typ) {self.0 = $base_fun(self.0, other.0)}
+        }
+        impl $op<&$typ> for $typ {
+            #[inline]
+            fn $fun(&mut self, other: &$typ) {self.0 = $base_fun(self.0, other.0)}
+        }
     }
 }
 
-impl std::ops::Div for F {
-    type Output = Self;
-    #[inline]
-    fn div(self, other: Self) -> Self { self * other.recip() }
+macro_rules! fold_op {
+    ($op: ident, $fun: ident, $base_fun: path, $id: expr, $typ: ident) => {
+        impl $op<$typ> for $typ {
+            fn $fun<I: Iterator<Item = $typ>>(iter: I) -> $typ {
+                iter.fold($id, $base_fun)
+            }
+        }
+        impl<'a> $op<&'a $typ> for $typ {
+            fn $fun<I: Iterator<Item = &'a $typ>>(iter: I) -> $typ {
+                iter.fold($id, $base_fun)
+            }
+        }
+    }
 }
 
-impl std::ops::DivAssign for F {
-    #[inline]
-    fn div_assign(&mut self, other: Self) { *self = *self * other.recip() }
+macro_rules! field_ops {
+    ($typ: ident) => {
+        use std::ops::{Add, Sub, Mul, Div, Neg};
+        use std::ops::{AddAssign, SubAssign, MulAssign, DivAssign};
+        use std::iter::{Sum, Product};
+
+        binary_op!{Add, add, add_monty, $typ}
+        assign_op!{AddAssign, add_assign, add_monty, $typ}
+        fold_op!{Sum, sum, Add::add, $typ(ZERO_MONTY), $typ}
+
+        binary_op!{Sub, sub, sub_monty, $typ}
+        assign_op!{SubAssign, sub_assign, sub_monty, $typ}
+
+        binary_op!{Mul, mul, mul_monty, $typ}
+        assign_op!{MulAssign, mul_assign, mul_monty, $typ}
+        fold_op!{Product, product, Mul::mul, $typ(ONE_MONTY), $typ}
+
+        binary_op!{Div, div, div_monty, $typ}
+        assign_op!{DivAssign, div_assign, div_monty, $typ}
+
+        impl Neg for $typ {
+            type Output = $typ;
+            #[inline]
+            fn neg(self) -> $typ {$typ(neg_monty(self.0))}
+        }
+        impl Neg for &$typ {
+            type Output = $typ;
+            #[inline]
+            fn neg(self) -> $typ {$typ(neg_monty(self.0))}
+        }
+    }
 }
+
+field_ops!{F}
 
 impl std::ops::Rem for F { // doesn't make sense, but needed for Num
     type Output = Self;
     fn rem(self, _: Self) -> Self { Self::ZERO }
 }
 
-// XXX: Using from_monty is expensive. Is there a better way?
 impl std::cmp::PartialEq for F {
     #[inline]
-    fn eq(&self, other: &Self) -> bool {
-        from_monty(self.0) == from_monty(other.0)
-    }
+    fn eq(&self, other: &Self) -> bool { eq_monty(self.0, other.0) }
 }
 
 impl std::cmp::Eq for F {}
@@ -215,9 +336,9 @@ impl std::fmt::Display for F {
     }
 }
 
-impl rand::distributions::Distribution<F> for rand::distributions::Standard {
+impl Distribution<F> for Standard {
     fn sample<R: rand::Rng + ?Sized>(&self, rng: &mut R) -> F {
-        F(rng.gen_range(0..F::MOD))
+        F(rng.gen_range(0, F::MODULUS) as u64)
     }
 }
 
@@ -255,13 +376,18 @@ proptest! {
     }
 
     #[test]
+    fn test_conv_bytes(f in any::<F>()) {
+        prop_assert_eq!(F::from_bytes(&f.to_bytes()).unwrap(), f)
+    }
+
+    #[test]
     fn test_add_neg(f in any::<F>()) {
         prop_assert_eq!(f + f.neg(), F::ZERO);
     }
 
     #[test]
     fn test_mul_recip(f in any::<F>()) {
-        prop_assert_eq!(f * f.recip(), F::ONE);
+        prop_assert_eq!(f * f.inverse(), F::ONE);
     }
 
     #[test]
@@ -270,8 +396,70 @@ proptest! {
     }
 
     #[test]
+    fn test_add_assign(f in any::<F>(), g in any::<F>()) {
+        let mut f_ = f;
+        f_ += g;
+        prop_assert_eq!(f_, F::from(i128::from(f) + i128::from(g)));
+    }
+
+    #[test]
+    fn test_add_zero(f in any::<F>()) {
+        prop_assert_eq!(f + F::ZERO, f);
+    }
+
+    #[test]
+    fn test_sub(f in any::<F>(), g in any::<F>()) {
+        prop_assert_eq!(f - g, F::from(i128::from(f) - i128::from(g)));
+    }
+
+    #[test]
+    fn test_sum(f0 in any::<F>(), f1 in any::<F>(), f2 in any::<F>()) {
+        let fs = vec![f0, f1, f2];
+        prop_assert_eq!(fs.iter().sum::<F>(), f0 + f1 + f2);
+    }
+
+    #[test]
     fn test_mul(f in any::<F>(), g in any::<F>()) {
         prop_assert_eq!(f * g, F::from(i128::from(f) * i128::from(g)));
+    }
+
+    #[test]
+    fn test_mul_assign(f in any::<F>(), g in any::<F>()) {
+        let mut f_ = f;
+        f_ *= g;
+        prop_assert_eq!(f_, F::from(i128::from(f) * i128::from(g)));
+    }
+
+    #[test]
+    fn test_mul_zero(f in any::<F>()) {
+        prop_assert_eq!(f * F::ZERO, F::ZERO);
+    }
+
+    #[test]
+    fn test_mul_one(f in any::<F>()) {
+        prop_assert_eq!(f * F::ONE, f);
+    }
+
+    #[test]
+    fn test_div(q in any::<F>(), g_ in 1..F::MODULUS) {
+        let g = F::from(g_);
+        let f = q * g;
+        prop_assert_eq!(f / g, q);
+    }
+
+    #[test]
+    fn test_product(f0 in any::<F>(), f1 in any::<F>(), f2 in any::<F>()) {
+        let fs = vec![f0, f1, f2];
+        prop_assert_eq!(fs.iter().product::<F>(), f0 * f1 * f2);
+    }
+
+    #[test]
+    fn test_pow(b in any::<F>(), e in 0u128..10_000) {
+        let mut naive_pow = F::ONE;
+        for _i in 0..e {
+            naive_pow *= b;
+        }
+        prop_assert_eq!(b.pow(e), naive_pow);
     }
 }
 
@@ -288,13 +476,14 @@ proptest! {
  *      R = 2^64
  *      M is field modulus
  */
+const R: u128 = 1<<64;
 const R_INV: u64 = 839_386_676_306_787_573;         // R^-1 mod M
 const R_CUBE: u64 = 1_323_917_639_155_065_737;      // R^3 mod M
 const M: u64 = 1_332_669_751_402_954_753;           // 2^19 * 3^26 + 1
-const M_TICK: u64 = 11_618_745_889_904_394_239;     // 2^64 - (M^-1} mod 2**64)
+const M_TICK: u64 = 11_618_745_889_904_394_239;     // R - (M^-1} mod R)
 
 const_assert_eq!(montgomery_constants;
-    ((1u128<<64)*(R_INV as u128) - (M as u128)*(M_TICK as u128)), 1);
+    (R*(R_INV as u128) - (M as u128)*(M_TICK as u128)), 1);
 
 /* Operations
  */
@@ -310,6 +499,9 @@ fn redc(a: u128) -> u128 {
     (if t >= M as u64 { t - M } else { t }) as u128
 }
 
+const ZERO_MONTY: u64 = 0;
+const ONE_MONTY: u64 = (R % M as u128) as u64;
+
 #[inline]
 fn add_monty(a: u64, b: u64) -> u64 {
     let ab = a + b;
@@ -317,10 +509,12 @@ fn add_monty(a: u64, b: u64) -> u64 {
     if ab > M { ab - M } else { ab }
 }
 
+#[inline]
 fn sub_monty(a: u64, b: u64) -> u64 {
     if a > b { a - b } else { (a as u128 + M as u128 - b as u128) as u64 }
 }
 
+#[inline]
 fn neg_monty(a: u64) -> u64 { M - a }
 
 #[inline]
@@ -330,14 +524,53 @@ fn mul_monty(a: u64, b: u64) -> u64 {
     redc(ab) as u64
 }
 
-// XXX: Should change mod_inverse to use u64 instead of i128. Would probably
-// speed this up, but by how much?
+#[inline]
+fn div_monty(a: u64, b: u64) -> u64 {
+    mul_monty(a, inv_monty(b))
+}
+
+// Extended GCD based on
+// https://en.wikipedia.org/wiki/Extended_Euclidean_algorithm#Pseudocode
+//
+// Given: a, b in Z
+// Return: (x, y) s.t.
+//      a*x + b*y = g = gcd(a, b)
+//      0 <= x < |b/g|
+//      -|a/g| < y <= 0
+#[inline]
+fn gcd(a0: i128, b0: i128) -> (i128, i128) {
+    let mut a = a0; let mut b = b0;
+    let mut p = 1;  let mut q = 0;
+    let mut r = 0;  let mut s = 1;
+
+    while b != 0 {
+        let t = a / b;
+        p -= t * r; std::mem::swap(&mut p, &mut r);
+        q -= t * s; std::mem::swap(&mut q, &mut s);
+        a -= t * b; std::mem::swap(&mut a, &mut b);
+    }
+
+    if a < 0 { p = -p; q = -q; }
+    if p < 0 { p += b0/a; q -= a0/a; }
+
+    (p, q)
+}
+
+#[test]
+fn test_gcd() {
+    assert_eq!(gcd(12, 20), (2, -1));
+    assert_eq!(gcd(42, 66), (8, -5));
+}
+
 #[inline]
 fn inv_monty(a: u64) -> u64 {
-    let ar_inv = crate::numtheory::mod_inverse(a as i128, M as i128);
-    let ar_inv_pos = if ar_inv >= 0 { ar_inv } else { M as i128 + ar_inv };
-    redc((ar_inv_pos as u128).wrapping_mul(R_CUBE as u128)) as u64
+    if a == 0 { panic!("Division by zero") }
+    let a_inv = gcd(a as i128, M as i128).0 as u128;
+    redc(a_inv.wrapping_mul(R_CUBE as u128)) as u64
 }
+
+#[inline]
+fn eq_monty(a: u64, b: u64) -> bool { redc(a as u128) == redc(b as u128) }
 
 #[inline]
 fn from_monty(u: u64) -> u128 { (u as u128 * (R_INV as u128)) % M as u128 }
@@ -358,6 +591,15 @@ proptest!{
                 add_monty(
                     to_monty(a),
                     to_monty(b))))
+    }
+
+    #[test]
+    fn test_monty_add_zero(a in 0..M as u128) {
+        prop_assert_eq!(a,
+            from_monty(
+                add_monty(
+                    to_monty(a),
+                    ZERO_MONTY)))
     }
 
     #[test]
@@ -389,6 +631,34 @@ proptest!{
     }
 
     #[test]
+    fn test_monty_mul_one(a in 0..M as u128) {
+        prop_assert_eq!(a,
+            from_monty(
+                mul_monty(
+                    to_monty(a),
+                    ONE_MONTY)))
+    }
+
+    #[test]
+    fn test_monty_mul_zero(a in 0..M as u128) {
+        prop_assert_eq!(0,
+            from_monty(
+                mul_monty(
+                    to_monty(a),
+                    ZERO_MONTY)))
+    }
+
+    #[test]
+    fn test_monty_div(b in 1..M as u128, q in 0..M as u128) {
+        let a = (b * q) % M as u128;
+        prop_assert_eq!(q,
+            from_monty(
+                div_monty(
+                    to_monty(a),
+                    to_monty(b))))
+    }
+
+    #[test]
     fn test_monty_inv(a in 0..M as u128) {
         prop_assert_eq!(1u128,
             from_monty(
@@ -396,5 +666,17 @@ proptest!{
                     to_monty(a),
                     inv_monty(
                         to_monty(a)))))
+    }
+
+    #[test]
+    fn test_monty_eq(a in 0..M as u128, b in 0..M as u128) {
+        prop_assert_eq!(a == b,
+            eq_monty(
+                to_monty(a),
+                to_monty(b)));
+        prop_assert!(
+            eq_monty(
+                to_monty(a),
+                to_monty(a)));
     }
 }

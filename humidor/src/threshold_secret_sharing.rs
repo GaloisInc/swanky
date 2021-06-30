@@ -9,11 +9,9 @@
 //! Packed (or ramp) variant of Shamir secret sharing,
 //! allowing efficient sharing of several secrets together.
 
-use rand::{SeedableRng, Rng};
+use scuttlebutt::field::FiniteField;
 
-use rand;
-
-type Field = crate::f2_19x3_26::F;
+use crate::numtheory::{FieldForFFT2, FieldForFFT3};
 
 /// Parameters for the packed variant of Shamir secret sharing,
 /// specifying number of secrets shared together, total number of shares, and privacy threshold.
@@ -41,7 +39,7 @@ type Field = crate::f2_19x3_26::F;
 /// An optional `paramgen` feature provides methods for finding suitable parameters satisfying
 /// these somewhat complex requirements, in addition to several fixed parameter choices.
 #[derive(Debug,Copy,Clone,PartialEq)]
-pub struct PackedSecretSharing {
+pub struct PackedSecretSharing<Field> {
 
     // abstract properties
 
@@ -62,7 +60,7 @@ pub struct PackedSecretSharing {
     pub omega_shares: Field,
 }
 
-impl PackedSecretSharing {
+impl<Field: FiniteField + FieldForFFT2 + FieldForFFT3> PackedSecretSharing<Field> {
     /// Minimum number of shares required to reconstruct secrets.
     ///
     /// For this scheme this is always `secret_count + threshold`
@@ -93,11 +91,13 @@ impl PackedSecretSharing {
     }
 
     fn sample_polynomial(&self, secrets: &[Field]) -> Vec<Field> {
+        use rand::prelude::*;
+
         assert_eq!(secrets.len(), self.secret_count);
         // sample randomness using secure randomness
-        let mut rng = rand::rngs::StdRng::from_entropy();
+        let mut rng = StdRng::from_entropy();
         let randomness: Vec<Field> =
-            (0..self.threshold).map(|_| rng.sample(rand::distributions::Standard)).collect();
+            (0..self.threshold).map(|_| Field::random(&mut rng)).collect();
         // recover polynomial
         let coefficients = self.recover_polynomial(secrets, randomness);
         assert_eq!(coefficients.len(), self.reconstruct_limit() + 1);
@@ -133,7 +133,7 @@ impl PackedSecretSharing {
         assert!(shares.len() >= self.reconstruct_limit());
         let mut points: Vec<Field> =
             indices.iter()
-            .map(|&x| self.omega_shares.pow(x as u64 + 1))
+            .map(|&x| self.omega_shares.pow(x as u128 + 1))
             .collect();
         let mut values = shares.to_vec();
         // insert missing value for point 1 (zero)
@@ -146,7 +146,7 @@ impl PackedSecretSharing {
         // evaluate at omega_secrets points to recover secrets
         // TODO optimise to avoid re-computation of power
         let secrets = (1..self.reconstruct_limit())
-            .map(|e| self.omega_secrets.pow(e as u64))
+            .map(|e| self.omega_secrets.pow(e as u128))
             .map(|point| newton_evaluate(&poly, point))
             .take(self.secret_count)
             .collect();

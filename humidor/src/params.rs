@@ -4,6 +4,7 @@ use ndarray::{Array1, Array2, ArrayView1, ArrayView2};
 use proptest::{*, prelude::*, collection::vec as pvec};
 
 use crate::util::*;
+use crate::ligero::FieldForLigero;
 
 // Parameters for interleaved coding, based on the size of the circuit and
 // input. Note that these variable names, although terse, correspond to those
@@ -23,9 +24,10 @@ use crate::util::*;
 // I.e., we ensure soundness error is negligible in the field size.
 // XXX: Is this right? Seems like t could be smaller, say ceil(log |F| / p).
 #[derive(Debug, Clone, Copy)]
-pub struct Params {
-    //pub pss: PSS, // Share-packing parameters
-    pub pss: crate::threshold_secret_sharing::PackedSecretSharing,
+pub struct Params<Field> {
+    phantom: std::marker::PhantomData<Field>,
+
+    pub pss: crate::threshold_secret_sharing::PackedSecretSharing<Field>,
 
     pub kexp: u32,  // log2(k)
     pub nexp: u32,  // log3(n)
@@ -37,7 +39,7 @@ pub struct Params {
     pub m: usize,   // Interleaved code size
 }
 
-impl Params {
+impl<Field: FieldForLigero> Params<Field> {
     pub fn new(size: usize) -> Self {
         if size == 0 { panic!("Empty circuits are not supported") }
         // XXX: There's probably a better way to select these. As it is, we
@@ -86,14 +88,14 @@ impl Params {
             .expect("Failed to find appropriate parameters")
             .1;
 
-        Self { kexp, nexp, k, t, l, n, m,
+        Self { phantom: std::marker::PhantomData, kexp, nexp, k, t, l, n, m,
             pss: crate::threshold_secret_sharing::PackedSecretSharing {
                 threshold: t,
                 share_count: n,
                 secret_count: l,
 
-                omega_secrets: Field::from(Field::ROOTS_BASE_2[kexp as usize]),
-                omega_shares: Field::from(Field::ROOTS_BASE_3[nexp as usize]),
+                omega_secrets: Field::from(Field::roots_base_2(kexp as usize)),
+                omega_shares: Field::from(Field::roots_base_3(nexp as usize)),
             }
         }
     }
@@ -274,11 +276,11 @@ impl Params {
     }
 
     pub fn peval2(&self, p: ArrayView1<Field>, ix: usize) -> Field {
-        crate::util::peval(p, Field::from(self.pss.omega_secrets).pow(ix as u64))
+        crate::util::peval(p, Field::from(self.pss.omega_secrets).pow(ix as u128))
     }
 
     pub fn peval3(&self, p: ArrayView1<Field>, ix: usize) -> Field {
-        crate::util::peval(p, Field::from(self.pss.omega_shares).pow(ix as u64))
+        crate::util::peval(p, Field::from(self.pss.omega_shares).pow(ix as u128))
     }
 
     // Take two polynomials p and q of degree less than 2^kexp and produce a
@@ -297,7 +299,7 @@ impl Params {
 
         let max_deg = 2usize.pow(self.kexp + 1);
         let pq_deg = p_deg + q_deg - 1;
-        let omega = Field::from(Field::ROOTS_BASE_2[self.kexp as usize + 1]);
+        let omega = Field::from(Field::roots_base_2(self.kexp as usize + 1));
 
         p_coeffs.append(&mut vec![Field::ZERO; max_deg - p_deg]);
         q_coeffs.append(&mut vec![Field::ZERO; max_deg - q_deg]);
@@ -346,7 +348,7 @@ impl Params {
 }
 
 #[cfg(test)]
-impl Arbitrary for Params {
+impl Arbitrary for Params<crate::f2_19x3_26::F> {
     type Parameters = ();
     type Strategy = BoxedStrategy<Self>;
     fn arbitrary_with(_: Self::Parameters) -> Self::Strategy {
@@ -358,7 +360,7 @@ impl Arbitrary for Params {
 proptest! {
     #[test]
     fn test_new_params_props(s in 1usize .. 200000) {
-        let p = Params::new(s);
+        let p: Params<crate::f2_19x3_26::F> = Params::new(s);
 
         prop_assert_eq!(2usize.pow(p.kexp), p.k + 1);
         prop_assert_eq!(3usize.pow(p.nexp), p.n + 1);
@@ -371,8 +373,8 @@ proptest! {
 
     #[test]
     fn test_decode_encode(
-        (p,v) in any::<Params>().prop_flat_map(|p| {
-            let v = pvec(any::<Field>(), p.l);
+        (p,v) in any::<Params<crate::f2_19x3_26::F>>().prop_flat_map(|p| {
+            let v = pvec(any::<crate::f2_19x3_26::F>(), p.l);
             (Just(p), v)
         })
     ) {
@@ -384,8 +386,8 @@ proptest! {
 
     #[test]
     fn test_codeword_is_valid_accepts_valid(
-        (p,v) in any::<Params>().prop_flat_map(|p| {
-            let v = pvec(any::<Field>(), p.l);
+        (p,v) in any::<Params<crate::f2_19x3_26::F>>().prop_flat_map(|p| {
+            let v = pvec(any::<crate::f2_19x3_26::F>(), p.l);
             (Just(p), v)
         })
     ) {
@@ -396,22 +398,24 @@ proptest! {
 
     #[test]
     fn test_codeword_is_valid_detects_invalid(
-        (p,v,ix) in any::<Params>().prop_flat_map(|p| {
-            let v = pvec(any::<Field>(), p.l);
+        (p,v,ix) in any::<Params<crate::f2_19x3_26::F>>().prop_flat_map(|p| {
+            let v = pvec(any::<crate::f2_19x3_26::F>(), p.l);
             let ix = 0..p.l;
             (Just(p), v, ix)
         })
     ) {
+        use scuttlebutt::field::FiniteField;
+
         let mut ve = p.encode(Array1::from(v).view());
-        ve[ix] += Field::ONE;
+        ve[ix] += crate::f2_19x3_26::F::ONE;
 
         prop_assert!(!p.codeword_is_valid(ve.view()));
     }
 
     #[test]
     fn test_codeword_is_valid_accepts_sum(
-        (p,v) in any::<Params>().prop_flat_map(|p| {
-            let v = pvec(any::<Field>(), p.m * p.l);
+        (p,v) in any::<Params<crate::f2_19x3_26::F>>().prop_flat_map(|p| {
+            let v = pvec(any::<crate::f2_19x3_26::F>(), p.m * p.l);
             (Just(p), v)
         })
     ) {
@@ -424,15 +428,17 @@ proptest! {
 
     #[test]
     fn test_codeword_is_valid_detects_invalid_sum(
-        (p,v,r,c) in any::<Params>().prop_flat_map(|p| {
-            let v = pvec(any::<Field>(), p.m * p.l);
+        (p,v,r,c) in any::<Params<crate::f2_19x3_26::F>>().prop_flat_map(|p| {
+            let v = pvec(any::<crate::f2_19x3_26::F>(), p.m * p.l);
             let r = 0..p.m;
             let c = 0..p.l;
             (Just(p), v, r, c)
         })
     ) {
+        use scuttlebutt::field::FiniteField;
+
         let mut ve = p.encode_interleaved(Array1::from(v).view());
-        ve[(r,c)] += Field::ONE;
+        ve[(r,c)] += crate::f2_19x3_26::F::ONE;
 
         let vs = ve.genrows().into_iter()
             .fold(Array1::zeros(p.n), |acc, row| acc + row);
@@ -442,26 +448,30 @@ proptest! {
 
     #[test]
     fn test_peval2(
-        (p,v) in any::<Params>().prop_flat_map(|p| {
-            let v = pvec(any::<Field>(), p.k + 1);
+        (p,v) in any::<Params<crate::f2_19x3_26::F>>().prop_flat_map(|p| {
+            let v = pvec(any::<crate::f2_19x3_26::F>(), p.k + 1);
             (Just(p), v)
         })
     ) {
         let v_coeffs = crate::numtheory::fft2_inverse(
             &v,
             p.pss.omega_secrets,
-        ).iter().cloned().map(Field::from).collect::<Array1<Field>>();
+        ).iter().cloned().map(crate::f2_19x3_26::F::from)
+            .collect::<Array1<crate::f2_19x3_26::F>>();
 
         for i in 0 .. v.len() {
-            prop_assert_eq!(p.peval2(v_coeffs.view(), i), Field::from(v[i]));
+            prop_assert_eq!(
+                p.peval2(v_coeffs.view(), i),
+                crate::f2_19x3_26::F::from(v[i])
+            );
         }
     }
 
     #[test]
     fn test_fft2_peval(
-        (p,v) in any::<Params>().prop_flat_map(|p| {
+        (p,v) in any::<Params<crate::f2_19x3_26::F>>().prop_flat_map(|p| {
             (1 ..= 3*(p.k+1)).prop_flat_map(move |len| {
-                let v = pvec(any::<Field>(), len);
+                let v = pvec(any::<crate::f2_19x3_26::F>(), len);
                 (Just(p), v)
             })
         })
@@ -476,15 +486,16 @@ proptest! {
 
     #[test]
     fn test_peval3(
-        (p,v) in any::<Params>().prop_flat_map(|p| {
-            let v = pvec(any::<Field>(), p.n + 1);
+        (p,v) in any::<Params<crate::f2_19x3_26::F>>().prop_flat_map(|p| {
+            let v = pvec(any::<crate::f2_19x3_26::F>(), p.n + 1);
             (Just(p), v)
         })
     ) {
         let v_coeffs = crate::numtheory::fft3_inverse(
             &v,
             p.pss.omega_shares,
-        ).iter().cloned().map(Field::from).collect::<Array1<Field>>();
+        ).iter().cloned().map(crate::f2_19x3_26::F::from)
+            .collect::<Array1<crate::f2_19x3_26::F>>();
 
         for i in 0 .. v.len() {
             prop_assert_eq!(p.peval3(v_coeffs.view(), i), v[i]);
@@ -493,9 +504,9 @@ proptest! {
 
     #[test]
     fn test_fft3_peval(
-        (p,v) in any::<Params>().prop_flat_map(|p| {
+        (p,v) in any::<Params<crate::f2_19x3_26::F>>().prop_flat_map(|p| {
             (1 ..= 3*(p.n+1)).prop_flat_map(move |len| {
-                let v = pvec(any::<Field>(), len);
+                let v = pvec(any::<crate::f2_19x3_26::F>(), len);
                 (Just(p), v)
             })
         })
@@ -510,9 +521,9 @@ proptest! {
 
     #[test]
     fn test_pmul(
-        (p,u,v) in any::<Params>().prop_flat_map(|p| {
-            let u = pvec(any::<Field>(), p.k);
-            let v = pvec(any::<Field>(), p.k);
+        (p,u,v) in any::<Params<crate::f2_19x3_26::F>>().prop_flat_map(|p| {
+            let u = pvec(any::<crate::f2_19x3_26::F>(), p.k);
+            let v = pvec(any::<crate::f2_19x3_26::F>(), p.k);
             (Just(p), u, v)
         })
     ) {
@@ -530,10 +541,10 @@ proptest! {
 
     #[test]
     fn test_pmul2(
-        (p, u, v) in any::<Params>().prop_flat_map(|p| {
+        (p, u, v) in any::<Params<crate::f2_19x3_26::F>>().prop_flat_map(|p| {
             (1..=p.k+1, 1..=p.k+1).prop_flat_map(move |(ulen, vlen)| {
-                let u_coeffs = pvec(any::<Field>(), ulen);
-                let v_coeffs = pvec(any::<Field>(), vlen);
+                let u_coeffs = pvec(any::<crate::f2_19x3_26::F>(), ulen);
+                let v_coeffs = pvec(any::<crate::f2_19x3_26::F>(), vlen);
                 (Just(p), u_coeffs, v_coeffs)
             })
         })
@@ -553,10 +564,10 @@ proptest! {
 
     #[test]
     fn test_padd(
-        (p, u, v) in any::<Params>().prop_flat_map(|p| {
+        (p, u, v) in any::<Params<crate::f2_19x3_26::F>>().prop_flat_map(|p| {
             (1..=p.k+1, 1..=p.k+1).prop_flat_map(move |(ulen, vlen)| {
-                let u_coeffs = pvec(any::<Field>(), ulen);
-                let v_coeffs = pvec(any::<Field>(), vlen);
+                let u_coeffs = pvec(any::<crate::f2_19x3_26::F>(), ulen);
+                let v_coeffs = pvec(any::<crate::f2_19x3_26::F>(), vlen);
                 (Just(p), u_coeffs, v_coeffs)
             })
         })
@@ -576,10 +587,10 @@ proptest! {
 
     #[test]
     fn test_psub(
-        (p, u, v) in any::<Params>().prop_flat_map(|p| {
+        (p, u, v) in any::<Params<crate::f2_19x3_26::F>>().prop_flat_map(|p| {
             (1..=p.k+1, 1..=p.k+1).prop_flat_map(move |(ulen, vlen)| {
-                let u_coeffs = pvec(any::<Field>(), ulen);
-                let v_coeffs = pvec(any::<Field>(), vlen);
+                let u_coeffs = pvec(any::<crate::f2_19x3_26::F>(), ulen);
+                let v_coeffs = pvec(any::<crate::f2_19x3_26::F>(), vlen);
                 (Just(p), u_coeffs, v_coeffs)
             })
         })
@@ -598,11 +609,13 @@ proptest! {
     }
 
     #[test]
-    fn test_random_zero_codeword(p in any::<Params>()) {
+    fn test_random_zero_codeword(p in any::<Params<crate::f2_19x3_26::F>>()) {
         use rand::{SeedableRng, rngs::StdRng};
+        use scuttlebutt::field::FiniteField;
+
         let c = p.random_zero_codeword(&mut StdRng::from_entropy());
         let w = p.decode(c.view());
 
-        prop_assert_eq!(w.scalar_sum(), Field::ZERO);
+        prop_assert_eq!(w.scalar_sum(), crate::f2_19x3_26::F::ZERO);
     }
 }

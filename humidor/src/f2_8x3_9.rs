@@ -1,3 +1,10 @@
+// XXX: This is out of date. It needs to be changed to
+//      * use Montgomery arithmetic
+//      * implement FiniteField and FieldForLigero
+//
+//      These changes aren't worth making until this is moved into scuttlebutt,
+//      though.
+
 #[cfg(test)]
 use proptest::{*, prelude::*};
 

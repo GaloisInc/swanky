@@ -1,6 +1,7 @@
 use ndarray::{Array1, Array2};
 use sprs::{CsMat, TriMat};
 use rand::{SeedableRng, rngs::StdRng};
+use scuttlebutt::field::FiniteField;
 
 #[cfg(test)]
 use proptest::{*, prelude::*, collection::vec as pvec};
@@ -9,12 +10,25 @@ use crate::circuit::{Op, Ckt};
 use crate::merkle;
 use crate::util::*;
 use crate::params::Params;
+use crate::numtheory::{FieldForFFT2, FieldForFFT3};
+
+pub trait FieldForLigero:
+    Sized
+    + FiniteField
+    + FieldForFFT2
+    + FieldForFFT3
+    + num_traits::Num
+    + ndarray::ScalarOperand
+    + std::fmt::Debug
+{
+    const BITS: usize;
+}
 
 // Proof information available to both the prover and the verifier.
 #[derive(Debug, Clone)]
 #[allow(non_snake_case)]
-struct Public {
-    params: crate::params::Params,
+struct Public<Field> {
+    params: crate::params::Params<Field>,
 
     Px: CsMat<Field>,
     Py: CsMat<Field>,
@@ -22,9 +36,9 @@ struct Public {
     Padd: CsMat<Field>,
 }
 
-impl Public {
+impl<Field: FieldForLigero> Public<Field> {
     #[allow(non_snake_case)]
-    fn new(c: &Ckt) -> Self {
+    fn new(c: &Ckt<Field>) -> Self {
         let params = Params::new(c.size() + 1 /* for the final zero check */);
 
         let ml = params.m * params.l; // padded circuit size
@@ -47,7 +61,7 @@ impl Public {
                     // sum_i Padd[k,i] * w[i] = 0
                     Padd.add_triplet(s, i, Field::ONE);
                     Padd.add_triplet(s, j, Field::ONE);
-                    Padd.add_triplet(s, s + c.inp_size, Field::ONE.neg());
+                    Padd.add_triplet(s, s + c.inp_size, -Field::ONE);
                 }
             }
         }
@@ -73,8 +87,8 @@ impl Public {
 
 // Proof information available only to the prover.
 #[allow(non_snake_case)]
-struct Secret {
-    public: Public,
+struct Secret<Field, H> {
+    public: Public<Field>,
 
     // XXX: w is not sparse, but x, y, z likely are (with linear sparsity).
     // Use CsVec?
@@ -95,10 +109,12 @@ struct Secret {
     u0: Array1<Field>,
     uadd: Array1<Field>,
 
-    U_hash: merkle::Tree,
+    U_hash: merkle::Tree<H>,
 }
 
-impl std::fmt::Debug for Secret {
+impl<Field, H> std::fmt::Debug for Secret<Field, H>
+    where Field: std::fmt::Debug
+{
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Secret")
             .field("w", &self.w)
@@ -114,8 +130,8 @@ impl std::fmt::Debug for Secret {
 }
 
 #[allow(non_snake_case)]
-impl Secret {
-    fn new(c: &Ckt, inp: &[Field]) -> Self {
+impl<Field: FieldForLigero, H: merkle::MerkleHash> Secret<Field, H> {
+    fn new(c: &Ckt<Field>, inp: &[Field]) -> Self {
         assert_eq!(c.inp_size, inp.len());
 
         let public = Public::new(&c);
@@ -169,7 +185,10 @@ impl Secret {
 }
 
 #[cfg(test)]
-impl Arbitrary for Secret {
+impl<Field, H> Arbitrary for Secret<Field, H>
+    where Field: FieldForLigero + Arbitrary,
+          H: merkle::MerkleHash
+{
     type Parameters = (usize, usize);
     type Strategy = BoxedStrategy<Self>;
     fn arbitrary_with((w,c): Self::Parameters) -> Self::Strategy {
@@ -177,7 +196,7 @@ impl Arbitrary for Secret {
             crate::circuit::arb_ckt(w,c),
             pvec(any::<Field>(), w),
         ).prop_map(|(ckt, inp)|
-            Secret::new(&ckt, &inp)
+            <Secret<Field, H>>::new(&ckt, &inp)
         ).boxed()
     }
 }
@@ -186,34 +205,37 @@ impl Arbitrary for Secret {
 proptest! {
     #[test]
     #[allow(non_snake_case)]
-    fn test_Px(s in Secret::arbitrary_with((20, 100))) {
-        prop_assert_eq!(&s.public.Px * &s.w.t(), s.x);
-    }
+    fn test_Px(s in <Secret<crate::f2_19x3_26::F, merkle::Sha256>>
+        ::arbitrary_with((20, 100))) {
+            prop_assert_eq!(&s.public.Px * &s.w.t(), s.x);
+        }
 
     #[test]
     #[allow(non_snake_case)]
-    fn test_Py(s in Secret::arbitrary_with((20, 100))) {
-        prop_assert_eq!(&s.public.Py * &s.w.t(), s.y);
-    }
+    fn test_Py(s in <Secret<crate::f2_19x3_26::F, merkle::Sha256>>
+        ::arbitrary_with((20, 100))) {
+            prop_assert_eq!(&s.public.Py * &s.w.t(), s.y);
+        }
 
     #[test]
     #[allow(non_snake_case)]
-    fn test_Pz(s in Secret::arbitrary_with((20, 100))) {
-        prop_assert_eq!(&s.public.Pz * &s.w.t(), s.z);
-    }
+    fn test_Pz(s in <Secret<crate::f2_19x3_26::F, merkle::Sha256>>
+        ::arbitrary_with((20, 100))) {
+            prop_assert_eq!(&s.public.Pz * &s.w.t(), s.z);
+        }
 
     #[test]
     #[allow(non_snake_case)]
     fn test_Padd(
         (c,i) in crate::circuit::arb_ckt(20, 100).prop_flat_map(|c| {
-            (Just(c), pvec(any::<Field>(), 20))
+            (Just(c), pvec(any::<crate::f2_19x3_26::F>(), 20))
         })
     ) {
-        let s = Secret::new(&c, &i);
+        let s: Secret<_, merkle::Sha256> = Secret::new(&c, &i);
         let output = *c.eval(&i).last().unwrap();
-        let zeros = Array1::from(vec![Field::ZERO; s.w.len()]);
+        let zeros = Array1::from(vec![crate::f2_19x3_26::F::ZERO; s.w.len()]);
         prop_assert_eq!(
-            output == Field::ZERO,
+            output == crate::f2_19x3_26::F::ZERO,
             &s.public.Padd * &s.w.t() == zeros
         );
     }
@@ -254,7 +276,7 @@ impl Round0 {
 }
 
 #[derive(Debug, Clone)]
-pub struct Round1 {
+pub struct Round1<Field> {
     // Testing interleaved Reed-Solomon codes
     r: Array1<Field>,
     // Testing addition gates
@@ -266,8 +288,8 @@ pub struct Round1 {
     rq: Array1<Field>,
 }
 
-impl Round1 {
-    fn new(params: &Params, rng: &mut impl rand::Rng) -> Self {
+impl<Field: FieldForLigero> Round1<Field> {
+    fn new(params: &Params<Field>, rng: &mut impl rand::Rng) -> Self {
         Round1 {
             r: random_field_array(rng, 4*params.m),
             radd: random_field_array(rng, params.m * params.l),
@@ -279,17 +301,17 @@ impl Round1 {
     }
 
     pub fn size(&self) -> usize {
-        self.r.len() * Field::BYTES +
-        self.radd.len() * Field::BYTES +
-        self.rx.len() * Field::BYTES +
-        self.ry.len() * Field::BYTES +
-        self.rz.len() * Field::BYTES +
-        self.rq.len() * Field::BYTES
+        self.r.len() * std::mem::size_of::<Field>() +
+        self.radd.len() * std::mem::size_of::<Field>() +
+        self.rx.len() * std::mem::size_of::<Field>() +
+        self.ry.len() * std::mem::size_of::<Field>() +
+        self.rz.len() * std::mem::size_of::<Field>() +
+        self.rq.len() * std::mem::size_of::<Field>()
     }
 }
 
 #[derive(Debug, Clone)]
-pub struct Round2 {
+pub struct Round2<Field> {
     // Testing interleaved Reed-Solomon codes
     v: Array1<Field>,
     // Testing addition gates
@@ -301,26 +323,30 @@ pub struct Round2 {
     p0: Array1<Field>,
 }
 
-impl Round2 {
+impl<Field> Round2<Field> {
     pub fn size(&self) -> usize {
-        self.v.len() * Field::BYTES +
-        self.qadd.len() * Field::BYTES +
-        self.qx.len() * Field::BYTES +
-        self.qy.len() * Field::BYTES +
-        self.qz.len() * Field::BYTES +
-        self.p0.len() * Field::BYTES
+        self.v.len() * std::mem::size_of::<Field>() +
+        self.qadd.len() * std::mem::size_of::<Field>() +
+        self.qx.len() * std::mem::size_of::<Field>() +
+        self.qy.len() * std::mem::size_of::<Field>() +
+        self.qz.len() * std::mem::size_of::<Field>() +
+        self.p0.len() * std::mem::size_of::<Field>()
     }
 }
 
 #[derive(Debug, Clone)]
 #[allow(non_snake_case)]
-pub struct Round3 {
+pub struct Round3<Field> {
+    phantom: std::marker::PhantomData<Field>,
+
     Q: Vec<usize>,
 }
 
-impl Round3 {
-    fn new(params: &Params, rng: &mut impl rand::Rng) -> Self {
+impl<Field: FieldForLigero> Round3<Field> {
+    fn new(params: &Params<Field>, rng: &mut impl rand::Rng) -> Self {
         Round3 {
+            phantom: std::marker::PhantomData,
+
             Q: params.random_indices(rng),
         }
     }
@@ -332,8 +358,8 @@ impl Round3 {
 
 #[derive(Debug, Clone)]
 #[allow(non_snake_case)]
-pub struct Round4 {
-    U_lemma: merkle::Lemma,
+pub struct Round4<Field, H> {
+    U_lemma: merkle::Lemma<Field, H>,
 
     ux: Vec<Field>,
     uy: Vec<Field>,
@@ -343,21 +369,21 @@ pub struct Round4 {
     u0: Vec<Field>, // This is missing in Sec. 4.7, but I think it's needed
 }
 
-impl Round4 {
+impl<Field: FieldForLigero, H: merkle::MerkleHash> Round4<Field, H> {
     pub fn size(&self) -> usize {
         self.U_lemma.size() +
-        self.ux.len() * Field::BYTES +
-        self.uy.len() * Field::BYTES +
-        self.uz.len() * Field::BYTES +
-        self.uadd.len() * Field::BYTES +
-        self.u.len() * Field::BYTES +
-        self.u0.len() * Field::BYTES
+        self.ux.len() * std::mem::size_of::<Field>() +
+        self.uy.len() * std::mem::size_of::<Field>() +
+        self.uz.len() * std::mem::size_of::<Field>() +
+        self.uadd.len() * std::mem::size_of::<Field>() +
+        self.u.len() * std::mem::size_of::<Field>() +
+        self.u0.len() * std::mem::size_of::<Field>()
     }
 }
 
 #[allow(non_snake_case)]
-fn make_ra(
-    P: &Params,
+fn make_ra<Field: FieldForLigero>(
+    P: &Params<Field>,
     ra: &Array1<Field>,
     Pa: &CsMat<Field>,
 ) -> Vec<Array1<Field>> {
@@ -369,22 +395,26 @@ fn make_ra(
 }
 
 #[allow(non_snake_case)]
-fn make_ra_Iml_Pa_neg(
-    P: &Params,
+fn make_ra_Iml_Pa_neg<Field: FieldForLigero>(
+    P: &Params<Field>,
     ra: &Array1<Field>,
     Pa: &CsMat<Field>,
 ) -> Vec<Array1<Field>> {
     use sprs::hstack;
 
     let Iml = CsMat::eye_csc(P.m * P.l);
-    let Pa_neg = Pa.map(|f| f.neg());
+    let Pa_neg = Pa.map(|f| -(*f));
     let IPa = hstack(&[Iml.view(), Pa_neg.view()]);
 
     make_ra(P, ra, &IPa)
 }
 
 #[allow(non_snake_case)]
-fn make_pa(P: &Params, Ua: &Array2<Field>) -> Vec<Array1<Field>> {
+fn make_pa<Field: FieldForLigero>(
+    P: &Params<Field>,
+    Ua: &Array2<Field>,
+) -> Vec<Array1<Field>>
+{
     Ua.genrows()
         .into_iter()
         .map(|points|
@@ -397,8 +427,8 @@ fn make_pa(P: &Params, Ua: &Array2<Field>) -> Vec<Array1<Field>> {
 }
 
 #[allow(non_snake_case)]
-fn make_qadd(
-    s: &Secret,
+fn make_qadd<Field: FieldForLigero, H>(
+    s: &Secret<Field, H>,
     p: &Vec<Array1<Field>>, // deg < k + 1
     Padd: &CsMat<Field>,
     r1_radd: Array1<Field>,
@@ -428,8 +458,8 @@ fn make_qadd(
 }
 
 #[allow(non_snake_case)]
-fn make_qa(
-    P: &Params,
+fn make_qa<Field: FieldForLigero>(
+    P: &Params<Field>,
     p: &Vec<Array1<Field>>, // deg < k + 1
     Pa: &CsMat<Field>,
     Ua: &Array2<Field>,
@@ -469,8 +499,8 @@ fn make_qa(
 }
 
 #[allow(non_snake_case)]
-fn make_p0(
-    P: &Params,
+fn make_p0<Field: FieldForLigero>(
+    P: &Params<Field>,
     u0: &Array1<Field>,
     px: &Vec<Array1<Field>>, // deg < k + 1
     py: &Vec<Array1<Field>>, // deg < k + 1
@@ -501,13 +531,13 @@ fn make_p0(
 }
 
 #[allow(non_snake_case)]
-fn verify(
-    public: &Public,
+fn verify<Field: FieldForLigero, H: merkle::MerkleHash>(
+    public: &Public<Field>,
     r0: Round0,
-    r1: Round1,
-    r2: Round2,
-    r3: Round3,
-    r4: Round4
+    r1: Round1<Field>,
+    r2: Round2<Field>,
+    r3: Round3<Field>,
+    r4: Round4<Field, H>,
 ) -> bool {
     use ndarray::{s, stack, Axis};
 
@@ -593,18 +623,18 @@ fn verify(
 pub mod interactive {
     use super::*;
 
-    pub struct Prover {
-        secret: Secret,
+    pub struct Prover<Field, H> {
+        secret: Secret<Field, H>,
     }
 
-    impl Prover {
-        pub fn new(c: &Ckt, w: &Vec<Field>) -> Self {
+    impl<Field: FieldForLigero, H: merkle::MerkleHash> Prover<Field, H> {
+        pub fn new(c: &Ckt<Field>, w: &Vec<Field>) -> Self {
             Self {
                 secret: Secret::new(c, w),
             }
         }
 
-        pub fn params(&self) -> Params {
+        pub fn params(&self) -> Params<Field> {
             self.secret.public.params
         }
 
@@ -612,7 +642,7 @@ pub mod interactive {
             let p = &self.secret.public.params;
             expected_proof_size(1,
                 p.n, p.k + 1, p.l, p.m, p.t,
-                Field::BYTES, std::mem::size_of::<merkle::Digest>())
+                std::mem::size_of::<Field>(), std::mem::size_of::<merkle::Digest>())
         }
 
         pub fn round0(&self) -> Round0 {
@@ -622,7 +652,7 @@ pub mod interactive {
         }
 
         #[allow(non_snake_case)]
-        pub fn round2(&self, r1: Round1) -> Round2 {
+        pub fn round2(&self, r1: Round1<Field>) -> Round2<Field> {
             use ndarray::{Axis, stack};
 
             let s = &self.secret;
@@ -654,7 +684,7 @@ pub mod interactive {
         }
 
         #[allow(non_snake_case)]
-        pub fn round4(&self, r3: Round3) -> Round4 {
+        pub fn round4(&self, r3: Round3<Field>) -> Round4<Field, H> {
             let s = &self.secret;
             let U = ndarray::stack(
                 ndarray::Axis(0),
@@ -686,18 +716,22 @@ pub mod interactive {
         }
     }
 
-    pub struct Verifier {
-        public: Public,
+    pub struct Verifier<Field, H> {
+        phantom: std::marker::PhantomData<H>,
+
+        public: Public<Field>,
         rng: StdRng,
         r0: Option<Round0>,
-        r1: Option<Round1>,
-        r2: Option<Round2>,
-        r3: Option<Round3>,
+        r1: Option<Round1<Field>>,
+        r2: Option<Round2<Field>>,
+        r3: Option<Round3<Field>>,
     }
 
-    impl Verifier {
-        pub fn new(c: &Ckt) -> Self {
+    impl<Field: FieldForLigero, H: merkle::MerkleHash> Verifier<Field, H> {
+        pub fn new(c: &Ckt<Field>) -> Self {
             Self {
+                phantom: std::marker::PhantomData,
+
                 public: Public::new(&c),
                 rng: StdRng::from_entropy(),
                 r0: None,
@@ -707,18 +741,20 @@ pub mod interactive {
             }
         }
 
-        pub fn params(&self) -> Params {
+        pub fn params(&self) -> Params<Field> {
             self.public.params
         }
 
         pub fn expected_proof_size(&self) -> usize {
             let p = &self.public.params;
-            expected_proof_size(1,
-                p.n, p.k + 1, p.l, p.m, p.t,
-                Field::BYTES, std::mem::size_of::<merkle::Digest>())
+            expected_proof_size(
+                1, p.n, p.k + 1, p.l, p.m, p.t,
+                std::mem::size_of::<Field>(),
+                std::mem::size_of::<merkle::Digest>(),
+            )
         }
 
-        pub fn round1(&mut self, r0: Round0) -> Round1 {
+        pub fn round1(&mut self, r0: Round0) -> Round1<Field> {
             let r1 = Round1::new(&self.public.params, &mut self.rng);
 
             self.r0 = Some(r0);
@@ -727,7 +763,7 @@ pub mod interactive {
             r1
         }
 
-        pub fn round3(&mut self, r2: Round2) -> Round3 {
+        pub fn round3(&mut self, r2: Round2<Field>) -> Round3<Field> {
             let r3 = Round3::new(&self.public.params, &mut self.rng);
 
             self.r2 = Some(r2);
@@ -736,7 +772,7 @@ pub mod interactive {
             r3
         }
 
-        pub fn verify(&self, r4: Round4) -> bool {
+        pub fn verify(&self, r4: Round4<Field, H>) -> bool {
             let r0 = self.r0.expect("Round 0 skipped");
             let r1 = self.r1.clone().expect("Round 1 skipped");
             let r2 = self.r2.clone().expect("Round 2 skipped");
@@ -748,14 +784,16 @@ pub mod interactive {
 
     #[test]
     fn test_small() {
+        type Field = crate::f2_19x3_26::F;
+
         let ckt = Ckt::test_value();
         let w = vec![3u64.into(), 1u64.into(), 5u64.into(),
-                        (Field::from(3u64) * Field::from(5u64)).neg()];
+                        -(Field::from(3u64) * Field::from(5u64))];
 
         let output = *ckt.eval(&w).last().unwrap();
         assert_eq!(output, Field::ZERO);
 
-        let p = Prover::new(&ckt, &w);
+        let p: Prover<_, merkle::Sha256> = Prover::new(&ckt, &w);
         let mut v = Verifier::new(&ckt);
 
         let r0 = p.round0();
@@ -772,12 +810,12 @@ pub mod interactive {
         #[test]
         fn test_false(
             (ckt, w) in crate::circuit::arb_ckt(20, 100).prop_flat_map(|ckt| {
-                let w = pvec(any::<Field>(), ckt.inp_size);
+                let w = pvec(any::<crate::f2_19x3_26::F>(), ckt.inp_size);
                 (Just(ckt), w)
             })
         ) {
             let output = *ckt.eval(&w).last().unwrap();
-            let p = Prover::new(&ckt, &w);
+            let p: Prover<_, merkle::Sha256> = Prover::new(&ckt, &w);
             let mut v = Verifier::new(&ckt);
 
             let r0 = p.round0();
@@ -786,14 +824,14 @@ pub mod interactive {
             let r3 = v.round3(r2);
             let r4 = p.round4(r3);
 
-            prop_assert_eq!(v.verify(r4), output == Field::ZERO);
+            prop_assert_eq!(v.verify(r4), output == crate::f2_19x3_26::F::ZERO);
         }
 
         #[test]
         fn test_true(
             (ckt, w) in crate::circuit::arb_ckt_zero(20, 100)
         ) {
-            let p = Prover::new(&ckt, &w);
+            let p: Prover<crate::f2_19x3_26::F, merkle::Sha256> = Prover::new(&ckt, &w);
             let mut v = Verifier::new(&ckt);
 
             let r0 = p.round0();
@@ -813,76 +851,79 @@ pub mod interactive {
 //        combos of codewords to seed the Q indices.
 //      * Fiat-Shamir comes with additional soundness error. Check that this
 //        leads to acceptable security. If not, we may need to add repetitions.
+//      * We generate the PRG seeds using a random oracle instantiated with the
+//        same hash we use for the Merkle tree for convenience. In practice, we
+//        should probably use a better RO that results in at least 32 bytes of
+//        randomness, per
+//        https://docs.rs/rand_core/0.5.1/rand_core/trait.SeedableRng.html.
 pub mod noninteractive {
     use super::*;
 
-    pub struct Proof {
+    pub struct Proof<Field, H> {
+        phantom: std::marker::PhantomData<H>,
+
         r0: Round0,
-        r2: Round2,
-        r4: Round4,
+        r2: Round2<Field>,
+        r4: Round4<Field, H>,
     }
 
-    impl Proof {
+    impl<Field: FieldForLigero, H: merkle::MerkleHash> Proof<Field, H> {
         pub fn size(&self) -> usize {
             self.r0.size() + self.r2.size() + self.r4.size()
         }
     }
 
-    fn make_r1(
-        params: &Params,
+    fn make_r1<Field: FieldForLigero, H: merkle::MerkleHash>(
+        params: &Params<Field>,
         state: &merkle::Digest,
         r0: &Round0
-    ) -> (Round1, merkle::Digest) {
-        use tiny_keccak::Hasher;
+    ) -> (Round1<Field>, merkle::Digest) {
         use rand_chacha::ChaCha20Rng as ChaCha;
 
-        let mut hash = <merkle::H as merkle::MerkleHash>::new();
+        let mut hash = H::empty();
         hash.update(&state.to_vec());
         hash.update(&r0.U_root);
 
-        let mut digest = <merkle::H as merkle::MerkleHash>::HZERO;
+        let mut digest = merkle::HZERO;
         hash.finalize(&mut digest);
 
         (Round1::new(params, &mut ChaCha::from_seed(digest)), digest)
     }
 
-    fn make_r3(
-        params: &Params,
+    fn make_r3<Field: FieldForLigero, H: merkle::MerkleHash>(
+        params: &Params<Field>,
         state: &merkle::Digest,
-        r2: &Round2
-    ) -> Round3 {
-        use tiny_keccak::Hasher;
+        r2: &Round2<Field>
+    ) -> Round3<Field> {
         use rand_chacha::ChaCha20Rng as ChaCha;
 
-        let mut hash = <merkle::H as merkle::MerkleHash>::new();
+        let mut hash = H::empty();
 
         hash.update(&state.to_vec());
-        r2.p0.into_iter().for_each(|f| hash.update(&f.bytes()));
-        r2.qadd.into_iter().for_each(|f| hash.update(&f.bytes()));
-        r2.qx.into_iter().for_each(|f| hash.update(&f.bytes()));
-        r2.qy.into_iter().for_each(|f| hash.update(&f.bytes()));
-        r2.qz.into_iter().for_each(|f| hash.update(&f.bytes()));
-        r2.v.into_iter().for_each(|f| hash.update(&f.bytes()));
+        r2.p0.into_iter().for_each(|f| hash.update(&f.to_bytes()));
+        r2.qadd.into_iter().for_each(|f| hash.update(&f.to_bytes()));
+        r2.qx.into_iter().for_each(|f| hash.update(&f.to_bytes()));
+        r2.qy.into_iter().for_each(|f| hash.update(&f.to_bytes()));
+        r2.qz.into_iter().for_each(|f| hash.update(&f.to_bytes()));
+        r2.v.into_iter().for_each(|f| hash.update(&f.to_bytes()));
 
-        let mut digest = <merkle::H as merkle::MerkleHash>::HZERO;
+        let mut digest = merkle::HZERO;
         hash.finalize(&mut digest);
 
         Round3::new(params, &mut ChaCha::from_seed(digest))
     }
 
-    pub struct Prover {
-        ip: interactive::Prover,
+    pub struct Prover<Field, H> {
+        ip: interactive::Prover<Field, H>,
         ckt_hash: merkle::Digest,
     }
 
-    impl Prover {
-        pub fn new(c: &Ckt, w: &Vec<Field>) -> Self {
-            use tiny_keccak::Hasher;
-
-            let mut hash = <merkle::H as merkle::MerkleHash>::new();
+    impl<Field: FieldForLigero, H: merkle::MerkleHash> Prover<Field, H> {
+        pub fn new(c: &Ckt<Field>, w: &Vec<Field>) -> Self {
+            let mut hash = H::empty();
             c.ops.iter().for_each(|op| hash.update(&op.bytes()));
 
-            let mut ckt_hash = <merkle::H as merkle::MerkleHash>::HZERO;
+            let mut ckt_hash = merkle::HZERO;
             hash.finalize(&mut ckt_hash);
 
             Self { ckt_hash, ip: interactive::Prover::new(c, w) }
@@ -893,49 +934,56 @@ pub mod noninteractive {
 
             expected_proof_size(1,
                 p.n, p.k + 1, p.l, p.m, p.t,
-                Field::BYTES, std::mem::size_of::<merkle::Digest>())
+                std::mem::size_of::<Field>(), std::mem::size_of::<merkle::Digest>())
         }
 
-        pub fn make_proof(&self) -> Proof {
+        pub fn make_proof(&self) -> Proof<Field, H> {
             let r0 = self.ip.round0();
-            let (r1,state) = make_r1(&self.ip.params(), &self.ckt_hash, &r0);
+            let (r1,state) = make_r1::<_,H>(&self.ip.params(), &self.ckt_hash, &r0);
             let r2 = self.ip.round2(r1);
-            let r3 = make_r3(&self.ip.params(), &state, &r2);
+            let r3 = make_r3::<_,H>(&self.ip.params(), &state, &r2);
             let r4 = self.ip.round4(r3);
 
-            Proof { r0, r2, r4 }
+            Proof { r0, r2, r4,
+                phantom: std::marker::PhantomData,
+            }
         }
     }
 
-    pub struct Verifier {
-        public: Public,
+    pub struct Verifier<Field, H> {
+        phantom: std::marker::PhantomData<H>,
+
+        public: Public<Field>,
         ckt_hash: merkle::Digest,
     }
 
-    impl Verifier {
-        pub fn new(ckt: &Ckt) -> Self {
-            use tiny_keccak::Hasher;
-
-            let mut hash = <merkle::H as merkle::MerkleHash>::new();
+    impl<Field: FieldForLigero, H: merkle::MerkleHash> Verifier<Field, H> {
+        pub fn new(ckt: &Ckt<Field>) -> Self {
+            let mut hash = H::empty();
             ckt.ops.iter().for_each(|op| hash.update(&op.bytes()));
 
-            let mut ckt_hash = <merkle::H as merkle::MerkleHash>::HZERO;
+            let mut ckt_hash = merkle::HZERO;
             hash.finalize(&mut ckt_hash);
 
-            Self { ckt_hash, public: Public::new(ckt) }
+            Self { ckt_hash,
+                phantom: std::marker::PhantomData,
+
+                public: Public::new(ckt),
+            }
         }
 
         pub fn expected_proof_size(&self) -> usize {
             let p = &self.public.params;
 
-            expected_proof_size(1,
-                p.n, p.k + 1, p.l, p.m, p.t,
-                Field::BYTES, std::mem::size_of::<merkle::Digest>())
+            expected_proof_size(
+                1, p.n, p.k + 1, p.l, p.m, p.t,
+                std::mem::size_of::<Field>(),
+                std::mem::size_of::<merkle::Digest>())
         }
 
-        pub fn verify(&self, p: Proof) -> bool {
-            let (r1,state) = make_r1(&self.public.params, &self.ckt_hash, &p.r0);
-            let r3 = make_r3(&self.public.params, &state, &p.r2);
+        pub fn verify(&self, p: Proof<Field, H>) -> bool {
+            let (r1,state) = make_r1::<_,H>(&self.public.params, &self.ckt_hash, &p.r0);
+            let r3 = make_r3::<_,H>(&self.public.params, &state, &p.r2);
 
             verify(&self.public, p.r0, r1, p.r2, r3, p.r4)
         }
@@ -943,14 +991,16 @@ pub mod noninteractive {
 
     #[test]
     fn test_small() {
+        type Field = crate::f2_19x3_26::F;
+
         let ckt = Ckt::test_value();
         let w = vec![3u64.into(), 1u64.into(), 5u64.into(),
-                        (Field::from(3u64) * Field::from(5u64)).neg()];
+                        -(Field::from(3u64) * Field::from(5u64))];
 
         let output = *ckt.eval(&w).last().unwrap();
         assert_eq!(output, Field::ZERO);
 
-        let p = Prover::new(&ckt, &w);
+        let p = <Prover<_, merkle::Sha256>>::new(&ckt, &w);
         let v = Verifier::new(&ckt);
 
         let proof = p.make_proof();
@@ -962,24 +1012,24 @@ pub mod noninteractive {
         #[test]
         fn test_false(
             (ckt, w) in crate::circuit::arb_ckt(20, 100).prop_flat_map(|ckt| {
-                let w = pvec(any::<Field>(), ckt.inp_size);
+                let w = pvec(any::<crate::f2_19x3_26::F>(), ckt.inp_size);
                 (Just(ckt), w)
             })
         ) {
             let output = *ckt.eval(&w).last().unwrap();
-            let p = Prover::new(&ckt, &w);
+            let p = <Prover<_, merkle::Sha256>>::new(&ckt, &w);
             let v = Verifier::new(&ckt);
 
             let proof = p.make_proof();
-            prop_assert_eq!(v.verify(proof), output == Field::ZERO);
+            prop_assert_eq!(v.verify(proof), output == crate::f2_19x3_26::F::ZERO);
         }
 
         #[test]
         fn test_true(
             (ckt, w) in crate::circuit::arb_ckt_zero(20, 100)
         ) {
-            let p = Prover::new(&ckt, &w);
-            let v = Verifier::new(&ckt);
+            let p = <Prover<crate::f2_19x3_26::F, merkle::Sha256>>::new(&ckt, &w);
+            let v = <Verifier<crate::f2_19x3_26::F, merkle::Sha256>>::new(&ckt);
 
             let proof = p.make_proof();
             prop_assert!(v.verify(proof))

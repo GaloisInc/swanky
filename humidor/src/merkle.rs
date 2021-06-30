@@ -1,26 +1,19 @@
 use ndarray::{Array1, ArrayView1, ArrayView2};
 use crypto::digest::Digest as CryptoDigest;
+use scuttlebutt::field::FiniteField;
 
 #[cfg(test)]
 use proptest::{*, prelude::*, collection::vec as pvec};
 
-use crate::util::Field;
+pub type Digest = [u8; HBYTES];
+pub type Tree<H> = merkle_cbt::MerkleTree<Digest, MHMerge<H>>;
+pub type Proof<H> = merkle_cbt::MerkleProof<Digest, MHMerge<H>>;
 
-pub type H = Sha256;
-pub type Digest = <H as MerkleHash>::Digest;
-pub type Tree = merkle_cbt::MerkleTree<Digest, MHMerge<H>>;
-pub type Proof = merkle_cbt::MerkleProof<Digest, MHMerge<H>>;
+pub const HBYTES: usize = 32;
+pub const HZERO: Digest = [0; HBYTES];
 
 pub trait MerkleHash: tiny_keccak::Hasher {
-    type Digest;
-
-    const HBYTES: usize = std::mem::size_of::<Self::Digest>();
-    const HZERO: Self::Digest;
-
-    fn new() -> Self;
-
-    fn digest_into_bytes(d: &Self::Digest) -> Box<[u8]>;
-    fn digest_from_bytes(b: &[u8]) -> Self::Digest;
+    fn empty() -> Self;
 }
 
 pub struct MHMerge<H> {
@@ -28,28 +21,30 @@ pub struct MHMerge<H> {
 }
 
 impl<H: MerkleHash> merkle_cbt::merkle_tree::Merge for MHMerge<H> {
-    type Item = H::Digest;
+    type Item = Digest;
     fn merge(left: &Self::Item, right: &Self::Item) -> Self::Item {
-        let mut hash = H::new();
+        let mut hash = H::empty();
 
-        hash.update(&H::digest_into_bytes(left));
-        hash.update(&H::digest_into_bytes(right));
+        hash.update(left);
+        hash.update(right);
 
-        let mut res = H::digest_into_bytes(&H::HZERO);
+        let mut res = HZERO;
         hash.finalize(&mut res);
-        H::digest_from_bytes(&res)
+        res
     }
 }
 
 // Hash a full interleaved-codeword column.
-pub fn hash_column<H: MerkleHash>(a: ArrayView1<Field>) -> H::Digest {
-    let mut hash = H::new();
+pub fn hash_column<H, Field>(a: ArrayView1<Field>) -> Digest
+    where H: MerkleHash, Field: FiniteField
+{
+    let mut hash = H::empty();
 
-    a.iter().for_each(|f| hash.update(&f.bytes()));
+    a.iter().for_each(|f| hash.update(&f.to_bytes()));
 
-    let mut res = H::digest_into_bytes(&H::HZERO);
+    let mut res = HZERO;
     hash.finalize(&mut res);
-    H::digest_from_bytes(&res)
+    res
 }
 
 pub struct Sha256 (crypto::sha2::Sha256);
@@ -60,20 +55,7 @@ impl tiny_keccak::Hasher for Sha256 {
 }
 
 impl MerkleHash for Sha256 {
-    type Digest = [u8; 32];
-
-    const HZERO: Self::Digest = [0u8; Self::HBYTES];
-
-    fn new() -> Self { Self(crypto::sha2::Sha256::new()) }
-
-    #[inline]
-    fn digest_into_bytes(d: &Self::Digest) -> Box<[u8]> { Box::new(*d) }
-
-    #[inline]
-    fn digest_from_bytes(b: &[u8]) -> Self::Digest {
-        use std::convert::TryInto;
-        b.try_into().expect("Slice of wrong length in digest_from_bytes")
-    }
+    fn empty() -> Self { Self(crypto::sha2::Sha256::new()) }
 }
 
 pub struct Sha3(tiny_keccak::Sha3);
@@ -84,92 +66,36 @@ impl tiny_keccak::Hasher for Sha3 {
 }
 
 impl MerkleHash for Sha3 {
-    type Digest = [u8; 32];
-
-    const HZERO: Self::Digest = [0u8; Self::HBYTES];
-
-    fn new() -> Self { Self(tiny_keccak::Sha3::v256()) }
-
-    #[inline]
-    fn digest_into_bytes(d: &Self::Digest) -> Box<[u8]> { Box::new(*d) }
-
-    #[inline]
-    fn digest_from_bytes(b: &[u8]) -> Self::Digest {
-        use std::convert::TryInto;
-        b.try_into().expect("Slice of wrong length in digest_from_bytes")
-    }
+    fn empty() -> Self { Self(tiny_keccak::Sha3::v256()) }
 }
 
-pub struct K12(tiny_keccak::KangarooTwelve<[u8; 16]>);
-
-impl tiny_keccak::Hasher for K12 {
-    fn update(&mut self, bs: &[u8]) { self.0.update(bs) }
-    fn finalize(self, bs: &mut [u8]) { self.0.finalize(bs) }
-}
-
-impl MerkleHash for K12 {
-    type Digest = [u8; 16];
-
-    const HZERO: Self::Digest = [0u8; Self::HBYTES];
-
-    fn new() -> Self { Self(tiny_keccak::KangarooTwelve::new(Self::HZERO)) }
-
-    #[inline]
-    fn digest_into_bytes(d: &Self::Digest) -> Box<[u8]> { Box::new(*d) }
-
-    #[inline]
-    fn digest_from_bytes(b: &[u8]) -> Self::Digest {
-        use std::convert::TryInto;
-        b.try_into().expect("Slice of wrong length in digest_from_bytes")
-    }
-}
-
-pub struct DummyHash ([u8;8]);
+pub struct DummyHash ();
 
 impl tiny_keccak::Hasher for DummyHash {
-    fn update(&mut self, bs: &[u8]) {
-        for c in bs.chunks(std::mem::size_of_val(&self.0)) {
-            for i in 0..c.len() {
-                self.0[i] = self.0[i].wrapping_add(c[i])
-            }
-        }
-    }
+    fn update(&mut self, _bs: &[u8]) {}
 
     fn finalize(self, bs: &mut [u8]) {
-        for i in 0..std::mem::size_of_val(&self.0) {
-            bs[i] = self.0[i];
-        }
+        for b in bs { *b = 0; }
     }
 }
 
 impl MerkleHash for DummyHash {
-    type Digest = [u8;8];
-
-    const HZERO: Self::Digest = [0u8; Self::HBYTES];
-
-    fn new() -> Self { Self(Self::HZERO) }
-
-    #[inline]
-    fn digest_into_bytes<'a>(d: &Self::Digest) -> Box<[u8]> { Box::new(*d) }
-
-    #[inline]
-    fn digest_from_bytes<'a>(b: &[u8]) -> Self::Digest {
-        use std::convert::TryInto;
-        b.try_into().expect("Slice of wrong length in digest_from_bytes")
-    }
+    fn empty() -> Self { Self() }
 }
 
 #[derive(Debug, Clone)]
-pub struct Lemma {
+pub struct Lemma<Field, H> {
+    phantom: std::marker::PhantomData<H>,
+
     columns: Vec<Array1<Field>>,
     lemmas: Vec<Digest>,
     indices: Vec<u32>,
 }
 
 #[allow(non_snake_case)]
-impl Lemma {
+impl<Field: FiniteField, H: MerkleHash> Lemma<Field, H> {
     pub fn new(
-        tree: &Tree,
+        tree: &Tree<H>,
         U: ArrayView2<Field>,
         some_indices: &[usize]
     ) -> Self {
@@ -185,6 +111,8 @@ impl Lemma {
             .collect::<Vec<Array1<Field>>>();
 
         Self {
+            phantom: std::marker::PhantomData,
+
             columns: some_columns,
             lemmas: proof.lemmas().to_vec(),
             indices: proof.indices().to_vec(),
@@ -201,15 +129,15 @@ impl Lemma {
     pub fn verify(&self, root: &Digest) -> bool {
         let leaves = self.columns
             .iter()
-            .map(|c| hash_column::<H>(c.view()))
+            .map(|c| hash_column::<H, Field>(c.view()))
             .collect::<Vec<Digest>>();
-        let proof = Proof::new(self.indices.clone(), self.lemmas.clone());
+        let proof: Proof<H> = Proof::new(self.indices.clone(), self.lemmas.clone());
 
         proof.verify(root, &leaves)
     }
 
     pub fn size(&self) -> usize {
-        self.columns.iter().map(|c| c.len()).sum::<usize>() * Field::BYTES +
+        self.columns.iter().map(|c| c.len()).sum::<usize>() * std::mem::size_of::<Field>() +
         self.lemmas.len() * std::mem::size_of::<Digest>() +
         self.indices.len() * std::mem::size_of::<u32>()
     }
@@ -219,7 +147,7 @@ impl Lemma {
 proptest! {
     #[test]
     fn test_merkle_lemma(
-        values in pvec(any::<Field>(), 50 * 50),
+        values in pvec(any::<crate::f2_19x3_26::F>(), 50 * 50),
         indices in pvec(0usize..50, 20),
     ) {
         use ndarray::Array2;
@@ -228,20 +156,22 @@ proptest! {
         let leaves = arr
             .gencolumns()
             .into_iter()
-            .map(|c| hash_column::<H>(c.view()))
+            .map(|c| hash_column::<Sha256, crate::f2_19x3_26::F>(c.view()))
             .collect::<Vec<Digest>>();
         let tree = merkle_cbt::CBMT::build_merkle_tree(&leaves);
-        let lemma = Lemma::new(&tree, arr.view(), &indices);
+        let lemma: Lemma<_, Sha256> = Lemma::new(&tree, arr.view(), &indices);
 
         lemma.verify(&tree.root());
     }
 }
 
-pub fn make_tree(m: ArrayView2<Field>) -> Tree {
+pub fn make_tree<Field: FiniteField, H: MerkleHash>(
+    m: ArrayView2<Field>
+) -> Tree<H> {
     merkle_cbt::CBMT::build_merkle_tree(
         &m.gencolumns()
             .into_iter()
-            .map(|c| hash_column::<H>(c))
+            .map(|c| hash_column::<H, Field>(c))
             .collect::<Vec<Digest>>()
     )
 }

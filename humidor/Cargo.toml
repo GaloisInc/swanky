@@ -23,9 +23,13 @@ tiny-keccak = { version = "2.0.0", features = ["sha3", "k12"] }
 sprs = "=0.9.3"
 ndarray = "=0.13.1"
 num-traits = "0.2.14"
-rand = "0.8.3"
-rand_chacha = "0.3.0"
+rand = "0.7"
+rand_core = "0.5.1"
+rand_chacha = "0.2.2"
 static_assertions = "0.2.3"
+subtle = "2.4.0"
+scuttlebutt = { path = "../scuttlebutt" }
+generic-array = "0.14.4"
 
 [dependencies.threshold-secret-sharing]
 git = "https://gitlab-ext.galois.com/hamlinb/rust-threshold-secret-sharing"

@@ -7,77 +7,32 @@
 // modified, or distributed except according to those terms.
 
 //! Various number theoretic utility functions used in the library.
+//!
+//! Note: This library was adapted from
+//! https://github.com/snipsco/rust-threshold-secret-sharing
 
-type Field = crate::f2_19x3_26::F;
+use scuttlebutt::field::FiniteField;
 
-/// Euclidean GCD implementation (recursive). The first member of the returned
-/// triplet is the GCD of `a` and `b`.
-pub fn gcd(a: i128, b: i128) -> (i128, i128, i128) {
-    if b == 0 {
-        (a, 1, 0)
-    } else {
-        let n = a / b;
-        let c = a % b;
-        let r = gcd(b, c);
-        (r.0, r.2, r.1 - r.2 * n)
-    }
+pub trait FieldForFFT2: FiniteField + From<i128> + From<u128> {
+    // Largest integer `p` such that `phi(MODULUS) = 2^p * k` for integer `k`.
+    const PHI_2_EXP: usize;
+
+    // [ GENERATOR^(phi(MODULUS) / (2^p)) % MODULUS | p <- [0 .. PHI_2_EXP] ]
+    fn roots_base_2(ix: usize) -> u128;
 }
 
-#[test]
-fn test_gcd() {
-    assert_eq!(gcd(12, 16), (4, -1, 1));
-}
+pub trait FieldForFFT3: FiniteField + From<i128> + From<u128> {
+    // Largest integer `p` such that `phi(MODULUS) = 3^p * k` for integer `k`.
+    const PHI_3_EXP: usize;
 
-
-/// Inverse of `k` in the *Zp* field defined by `prime`.
-pub fn mod_inverse(k: i128, prime: i128) -> i128 {
-    let k2 = k % prime;
-    let r = if k2 < 0 {
-        -gcd(prime, -k2).2
-    } else {
-        gcd(prime, k2).2
-    };
-    (prime + r) % prime
-}
-
-#[test]
-fn test_mod_inverse() {
-    assert_eq!(mod_inverse(3, 7), 5);
-}
-
-
-/// `x` to the power of `e` in the *Zp* field defined by `prime`.
-pub fn mod_pow(mut x: i128, mut e: u64, prime: i128) -> i128 {
-    let mut acc = 1;
-    while e > 0 {
-        if e % 2 == 0 {
-            // even
-            // no-op
-        } else {
-            // odd
-            acc = (acc * x) % prime;
-        }
-        x = (x * x) % prime; // waste one of these by having it here but code is simpler (tiny bit)
-        e = e >> 1;
-    }
-    acc
-}
-
-#[test]
-fn test_mod_pow() {
-    assert_eq!(mod_pow(2, 0, 17), 1);
-    assert_eq!(mod_pow(2, 3, 17), 8);
-    assert_eq!(mod_pow(2, 6, 17), 13);
-
-    assert_eq!(mod_pow(-3, 0, 17), 1);
-    assert_eq!(mod_pow(-3, 1, 17), -3);
-    assert_eq!(mod_pow(-3, 15, 17), -6);
+    // [ GENERATOR^(phi(MODULUS) / (3^p)) % MODULUS | p <- [0 .. PHI_3_EXP] ]
+    fn roots_base_3(ix: usize) -> u128;
 }
 
 mod cooley_tukey {
     //! FFT by in-place Cooley-Tukey algorithms.
 
-    type Field = crate::f2_19x3_26::F;
+    use super::*;
 
     /// 2-radix FFT.
     ///
@@ -85,7 +40,7 @@ mod cooley_tukey {
     ///
     /// `data.len()` must be a power of 2. omega must be a root of unity of order
     /// `data.len()`
-    pub fn fft2(data: &mut [Field], omega: Field) {
+    pub fn fft2<Field: FieldForFFT2>(data: &mut [Field], omega: Field) {
         fft2_in_place_rearrange(&mut *data);
         fft2_in_place_compute(&mut *data, omega);
     }
@@ -98,17 +53,17 @@ mod cooley_tukey {
     ///
     /// `data.len()` must be a power of 2. omega must be a root of unity of order
     /// `data.len()`
-    pub fn fft2_inverse(data: &mut [Field], omega: Field) {
-        let omega_inv = Field::from(omega).recip();
+    pub fn fft2_inverse<Field: FieldForFFT2>(data: &mut [Field], omega: Field) {
+        let omega_inv = omega.inverse();
         let len = data.len();
-        let len_inv = Field::from(len as i128).recip();
+        let len_inv = Field::from(len as i128).inverse();
         fft2(data, omega_inv);
         for x in data {
             *x = *x * len_inv;
         }
     }
 
-    fn fft2_in_place_rearrange(data: &mut [Field]) {
+    fn fft2_in_place_rearrange<Field: FieldForFFT2>(data: &mut [Field]) {
         let mut target = 0;
         for pos in 0..data.len() {
             if target > pos {
@@ -123,12 +78,12 @@ mod cooley_tukey {
         }
     }
 
-    fn fft2_in_place_compute(data: &mut [Field], omega: Field) {
+    fn fft2_in_place_compute<Field: FieldForFFT2>(data: &mut [Field], omega: Field) {
         let mut depth = 0usize;
         while 1usize << depth < data.len() {
             let step = 1usize << depth;
             let jump = 2 * step;
-            let factor_stride = omega.pow((data.len() / step / 2) as u64);
+            let factor_stride = omega.pow((data.len() / step / 2) as u128);
             let mut factor = Field::ONE;
             for group in 0usize..step {
                 let mut pair = group;
@@ -154,7 +109,8 @@ mod cooley_tukey {
     ///
     /// `data.len()` must be a power of 2. omega must be a root of unity of order
     /// `data.len()`
-    pub fn fft3(data: &mut [Field], omega: Field) {
+    pub fn fft3<Field: FieldForFFT3>(data: &mut [Field], omega: Field)
+    {
         fft3_in_place_rearrange(&mut *data);
         fft3_in_place_compute(&mut *data, omega);
     }
@@ -167,9 +123,11 @@ mod cooley_tukey {
     ///
     /// `data.len()` must be a power of 2. omega must be a root of unity of order
     /// `data.len()`
-    pub fn fft3_inverse(data: &mut [Field], omega: Field) {
-        let omega_inv = omega.recip();
-        let len_inv = Field::from(data.len() as u128).recip();
+    pub fn fft3_inverse<Field>(data: &mut [Field], omega: Field)
+        where Field: FieldForFFT3
+    {
+        let omega_inv = omega.inverse();
+        let len_inv = Field::from(data.len() as i128).inverse();
         fft3(data, omega_inv);
         for x in data {
             *x = *x * len_inv;
@@ -186,7 +144,9 @@ mod cooley_tukey {
         result
     }
 
-    fn fft3_in_place_rearrange(data: &mut [Field]) {
+    fn fft3_in_place_rearrange<Field>(data: &mut [Field])
+        where Field: FieldForFFT3
+    {
         let mut target = 0isize;
         let trigits_len = trigits_len(data.len() - 1);
         let mut trigits: Vec<u8> = ::std::iter::repeat(0).take(trigits_len).collect();
@@ -208,13 +168,15 @@ mod cooley_tukey {
         }
     }
 
-    fn fft3_in_place_compute(data: &mut [Field], omega: Field) {
+    fn fft3_in_place_compute<Field>(data: &mut [Field], omega: Field)
+        where Field: FieldForFFT3
+    {
         let mut step = 1;
-        let big_omega = omega.pow(data.len() as u64 / 3);
+        let big_omega = omega.pow(data.len() as u128 / 3);
         let big_omega_sq = big_omega * big_omega;
         while step < data.len() {
             let jump = 3 * step;
-            let factor_stride = omega.pow((data.len() / step / 3) as u64);
+            let factor_stride = omega.pow((data.len() / step / 3) as u128);
             let mut factor = Field::ONE;
             for group in 0usize..step {
                 let factor_sq = factor * factor;
@@ -235,37 +197,6 @@ mod cooley_tukey {
             step = jump;
         }
     }
-
-    #[cfg(test)]
-    mod test {
-        use super::*;
-
-        //fn from(data: &[u128]) -> Vec<Field> {
-        //    data.iter().cloned().map(Field::from).collect()
-        //}
-
-        fn back(data: &[Field]) -> Vec<u128> {
-            data.iter().cloned().map(u128::from).collect()
-        }
-
-        #[test]
-        fn test_fft2_big() {
-            let mut data: Vec<_> = (0u128..256).map(Field::from).collect();
-            fft2(&mut *data, Field::from(Field::ROOTS_BASE_2[8]));
-            fft2_inverse(&mut data, Field::from(Field::ROOTS_BASE_2[8]));
-
-            assert_eq!(back(&data), (0..256).collect::<Vec<_>>());
-        }
-
-        #[test]
-        fn test_fft3_big() {
-            let mut data: Vec<_> = (0u128..19683).map(Field::from).collect();
-            fft3(&mut data, Field::from(Field::ROOTS_BASE_3[9]));
-            fft3_inverse(&mut data, Field::from(Field::ROOTS_BASE_3[9]));
-
-            assert_eq!(back(&data), (0..19683).collect::<Vec<_>>());
-        }
-    }
 }
 
 /// Compute the 2-radix FFT of `a_coef` in the *Zp* field defined by `prime`.
@@ -274,43 +205,64 @@ mod cooley_tukey {
 /// where `n` is the lenght of `a_coef` as well as a power of 2.
 /// The result will contains the same number of elements.
 #[allow(dead_code)]
-pub fn fft2(a_coef: &[Field], omega: Field) -> Vec<Field> {
+pub fn fft2<Field>(a_coef: &[Field], omega: Field) -> Vec<Field>
+    where Field: FieldForFFT2
+{
     let mut data: Vec<_> = a_coef.iter().cloned().collect();
     cooley_tukey::fft2(&mut data, omega);
     data
 }
 
 /// Inverse FFT for `fft2`.
-pub fn fft2_inverse(a_point: &[Field], omega: Field) -> Vec<Field> {
+pub fn fft2_inverse<Field>(a_point: &[Field], omega: Field) -> Vec<Field>
+    where Field: FieldForFFT2
+{
     let mut data: Vec<_> = a_point.iter().cloned().collect();
     cooley_tukey::fft2_inverse(&mut data, omega);
     data
 }
 
-#[test]
-fn test_fft2() {
-    let omega = Field::ROOTS_BASE_2[8] as i128;
-    let prime = Field::MOD as i128;
+#[macro_export]
+macro_rules! fft2_tests {
+    ($field: ty) => {
+        #[test]
+        fn test_fft2() {
+            let omega = <$field>::roots_base_2(8) as i128;
+            let prime = <$field>::MODULUS as i128;
 
-    let a_coef: Vec<_> = (1i128..=8).collect();
-    assert_eq!(
-        fft2(&a_coef.iter().cloned().map(Field::from).collect::<Vec<_>>(), Field::from(omega)),
-        threshold_secret_sharing::numtheory::fft2(&a_coef, omega, prime)
-            .iter().cloned().map(Field::from).collect::<Vec<_>>(),
-    );
-}
+            let a_coef: Vec<_> = (1i128..=8).collect();
+            assert_eq!(
+                fft2(&a_coef.iter().cloned().map(<$field>::from).collect::<Vec<_>>(), <$field>::from(omega)),
+                threshold_secret_sharing::numtheory::fft2(&a_coef, omega, prime)
+                    .iter().cloned().map(<$field>::from).collect::<Vec<_>>(),
+            );
+        }
 
-#[test]
-fn test_fft2_inverse() {
-    let omega = Field::ROOTS_BASE_2[8] as i128;
-    let prime = Field::MOD as i128;
+        #[test]
+        fn test_fft2_inverse() {
+            let omega = <$field>::roots_base_2(8) as i128;
+            let prime = <$field>::MODULUS as i128;
 
-    let a_point: Vec<_> = (1i128..=8).collect();
-    assert_eq!(
-        fft2_inverse(&a_point.iter().cloned().map(Field::from).collect::<Vec<_>>(), Field::from(omega)),
-        threshold_secret_sharing::numtheory::fft2_inverse(&a_point, omega, prime)
-            .iter().cloned().map(Field::from).collect::<Vec<_>>(),
-    );
+            let a_point: Vec<_> = (1i128..=8).collect();
+            assert_eq!(
+                fft2_inverse(&a_point.iter().cloned().map(<$field>::from).collect::<Vec<_>>(), <$field>::from(omega)),
+                threshold_secret_sharing::numtheory::fft2_inverse(&a_point, omega, prime)
+                    .iter().cloned().map(<$field>::from).collect::<Vec<_>>(),
+            );
+        }
+
+        #[test]
+        fn test_fft2_big() {
+            let mut data: Vec<_> = (0u128..256).map(<$field>::from).collect();
+            data = fft2(&data, <$field>::from(<$field>::roots_base_2(8)));
+            data = fft2_inverse(&data, <$field>::from(<$field>::roots_base_2(8)));
+
+            assert_eq!(
+                data.iter().cloned().map(u128::from).collect::<Vec<_>>(),
+                (0..256).collect::<Vec<_>>(),
+            );
+        }
+    }
 }
 
 /// Compute the 3-radix FFT of `a_coef` in the *Zp* field defined by `prime`.
@@ -318,7 +270,9 @@ fn test_fft2_inverse() {
 /// `omega` must be a `n`-th principal root of unity,
 /// where `n` is the lenght of `a_coef` as well as a power of 3.
 /// The result will contains the same number of elements.
-pub fn fft3(a_coef: &[Field], omega: Field) -> Vec<Field> {
+pub fn fft3<Field>(a_coef: &[Field], omega: Field) -> Vec<Field>
+    where Field: FieldForFFT3
+{
     let mut data: Vec<_> = a_coef.iter().cloned().collect();
     cooley_tukey::fft3(&mut data, omega);
     data
@@ -326,36 +280,55 @@ pub fn fft3(a_coef: &[Field], omega: Field) -> Vec<Field> {
 
 /// Inverse FFT for `fft3`.
 #[allow(dead_code)]
-pub fn fft3_inverse(a_point: &[Field], omega: Field) -> Vec<Field> {
+pub fn fft3_inverse<Field>(a_point: &[Field], omega: Field) -> Vec<Field>
+    where Field: FieldForFFT3
+{
     let mut data = a_point.iter().cloned().collect::<Vec<_>>();
     cooley_tukey::fft3_inverse(&mut data, omega);
     data
 }
 
-#[test]
-fn test_fft3() {
-    let omega = Field::ROOTS_BASE_3[9] as i128;
-    let prime = Field::MOD as i128;
+#[macro_export]
+macro_rules! fft3_tests {
+    ($field: ty) => {
+        #[test]
+        fn test_fft3() {
+            let omega = <$field>::roots_base_3(9) as i128;
+            let prime = <$field>::MODULUS as i128;
 
-    let a_coef: Vec<_> = (1i128..=9).collect();
-    assert_eq!(
-        fft3(&a_coef.iter().cloned().map(Field::from).collect::<Vec<_>>(), Field::from(omega)),
-        threshold_secret_sharing::numtheory::fft3(&a_coef, omega, prime)
-            .iter().cloned().map(Field::from).collect::<Vec<_>>(),
-    );
-}
+            let a_coef: Vec<_> = (1i128..=9).collect();
+            assert_eq!(
+                fft3(&a_coef.iter().cloned().map(<$field>::from).collect::<Vec<_>>(), <$field>::from(omega)),
+                threshold_secret_sharing::numtheory::fft3(&a_coef, omega, prime)
+                    .iter().cloned().map(<$field>::from).collect::<Vec<_>>(),
+            );
+        }
 
-#[test]
-fn test_fft3_inverse() {
-    let omega = Field::ROOTS_BASE_3[9] as i128;
-    let prime = Field::MOD as i128;
+        #[test]
+        fn test_fft3_inverse() {
+            let omega = <$field>::roots_base_3(9) as i128;
+            let prime = <$field>::MODULUS as i128;
 
-    let a_point: Vec<_> = (1i128..=9).collect();
-    assert_eq!(
-        fft3_inverse(&a_point.iter().cloned().map(Field::from).collect::<Vec<_>>(), Field::from(omega)),
-        threshold_secret_sharing::numtheory::fft3_inverse(&a_point, omega, prime)
-            .iter().cloned().map(Field::from).collect::<Vec<_>>(),
-    );
+            let a_point: Vec<_> = (1i128..=9).collect();
+            assert_eq!(
+                fft3_inverse(&a_point.iter().cloned().map(<$field>::from).collect::<Vec<_>>(), <$field>::from(omega)),
+                threshold_secret_sharing::numtheory::fft3_inverse(&a_point, omega, prime)
+                    .iter().cloned().map(<$field>::from).collect::<Vec<_>>(),
+            );
+        }
+
+        #[test]
+        fn test_fft3_big() {
+            let mut data: Vec<_> = (0u128..19683).map(<$field>::from).collect();
+            data = fft3(&data, <$field>::from(<$field>::roots_base_3(9)));
+            data = fft3_inverse(&data, <$field>::from(<$field>::roots_base_3(9)));
+
+            assert_eq!(
+                data.iter().cloned().map(u128::from).collect::<Vec<_>>(),
+                (0..19683).collect::<Vec<_>>(),
+            );
+        }
+    }
 }
 
 /// Performs a Lagrange interpolation in field Zp at the origin
@@ -368,7 +341,9 @@ fn test_fft3_inverse() {
 ///
 /// This is obviously less general than `newton_interpolation_general` as we
 /// only get a single value, but it is much faster.
-pub fn lagrange_interpolation_at_zero(points: &[Field], values: &[Field]) -> Field {
+pub fn lagrange_interpolation_at_zero<Field>(points: &[Field], values: &[Field]) -> Field
+    where Field: FiniteField
+{
     assert_eq!(points.len(), values.len());
     // Lagrange interpolation for point 0
     let mut acc = Field::ZERO;
@@ -384,13 +359,15 @@ pub fn lagrange_interpolation_at_zero(points: &[Field], values: &[Field]) -> Fie
                 denum = denum * (xj - xi);
             }
         }
-        acc = acc + yi * num * denum.recip();
+        acc = acc + yi * num * denum.inverse();
     }
     acc
 }
 
 /// Holds together points and Newton-interpolated coefficients for fast evaluation.
-pub struct NewtonPolynomial<'a> {
+pub struct NewtonPolynomial<'a, Field>
+    where Field: FiniteField
+{
     points: &'a [Field],
     coefficients: Vec<Field>,
 }
@@ -399,9 +376,12 @@ pub struct NewtonPolynomial<'a> {
 /// General case for Newton interpolation in field Zp.
 ///
 /// Given enough `points` (x) and `values` (p(x)), find the coefficients for `p`.
-pub fn newton_interpolation_general<'a>(points: &'a [Field],
-                                        values: &[Field])
-                                        -> NewtonPolynomial<'a> {
+pub fn newton_interpolation_general<'a, Field>(
+    points: &'a [Field],
+    values: &[Field]
+) -> NewtonPolynomial<'a, Field>
+    where Field: FiniteField
+{
     let coefficients = compute_newton_coefficients(points, values);
     NewtonPolynomial {
         points: points,
@@ -409,20 +389,27 @@ pub fn newton_interpolation_general<'a>(points: &'a [Field],
     }
 }
 
-#[test]
-fn test_newton_interpolation_general() {
-    let poly: Vec<_> = (1u64..=4).map(Field::from).collect();
-    let points: Vec<_> = (5u64..=9).map(Field::from).collect();
-    let values: Vec<Field> =
-        points.iter().map(|&point| mod_evaluate_polynomial(&poly, point)).collect();
+#[macro_export]
+macro_rules! interpolation_tests {
+    ($field: ty) => {
+        #[test]
+        fn test_newton_interpolation_general() {
+            let poly: Vec<_> = (1u64..=4).map(<$field>::from).collect();
+            let points: Vec<_> = (5u64..=9).map(<$field>::from).collect();
+            let values: Vec<$field> =
+                points.iter().map(|&point| mod_evaluate_polynomial(&poly, point)).collect();
 
-    let recovered_poly = newton_interpolation_general(&points, &values);
-    let recovered_values: Vec<Field> =
-        points.iter().map(|&point| newton_evaluate(&recovered_poly, point)).collect();
-    assert_eq!(recovered_values, values);
+            let recovered_poly = newton_interpolation_general(&points, &values);
+            let recovered_values: Vec<$field> =
+                points.iter().map(|&point| newton_evaluate(&recovered_poly, point)).collect();
+            assert_eq!(recovered_values, values);
+        }
+    }
 }
 
-pub fn newton_evaluate(poly: &NewtonPolynomial, point: Field) -> Field {
+pub fn newton_evaluate<Field>(poly: &NewtonPolynomial<Field>, point: Field) -> Field
+    where Field: FiniteField
+{
     // compute Newton points
     let mut newton_points = vec![Field::ONE];
     for i in 0..poly.points.len() - 1 {
@@ -438,7 +425,9 @@ pub fn newton_evaluate(poly: &NewtonPolynomial, point: Field) -> Field {
         .fold(Field::ZERO, |a, b| a + b)
 }
 
-fn compute_newton_coefficients(points: &[Field], values: &[Field]) -> Vec<Field> {
+fn compute_newton_coefficients<Field>(points: &[Field], values: &[Field]) -> Vec<Field>
+    where Field: FiniteField
+{
     assert_eq!(points.len(), values.len());
 
     let mut store: Vec<(usize, usize, Field)> =
@@ -452,7 +441,7 @@ fn compute_newton_coefficients(points: &[Field], values: &[Field]) -> Vec<Field>
             let point_lower = points[index_lower];
             let point_upper = points[index_upper];
             let point_diff = point_upper - point_lower;
-            let point_diff_inverse = point_diff.recip();
+            let point_diff_inverse = point_diff.inverse();
 
             let coef_lower = store[i - 1].2;
             let coef_upper = store[i].2;
@@ -468,7 +457,9 @@ fn compute_newton_coefficients(points: &[Field], values: &[Field]) -> Vec<Field>
 }
 
 /// Evaluate polynomial given by `coefficients` at `point` in Zp using Horner's method.
-pub fn mod_evaluate_polynomial(coefficients: &[Field], point: Field) -> Field {
+pub fn mod_evaluate_polynomial<Field>(coefficients: &[Field], point: Field) -> Field
+    where Field: FiniteField
+{
     // evaluate using Horner's rule
     //  - to combine with fold we consider the coefficients in reverse order
     let mut reversed_coefficients = coefficients.iter().rev();
