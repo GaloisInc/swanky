@@ -62,7 +62,7 @@ impl<FE: FiniteField> FComSender<FE> {
         let size_left = self.voles.len() - self.pos;
         if num > size_left {
             let mut v = Vec::new();
-            self.svole_sender.send(channel, rng, &mut v);
+            self.svole_sender.send(channel, rng, &mut v)?;
             self.voles = v;
             self.pos = 0
         }
@@ -151,7 +151,8 @@ impl<FE: FiniteField> FComSender<FE> {
         channel.write_fe::<FE::PrimeField>(x)?;
         channel.flush()?;
 
-        return self.f_check_zero(channel, x_mac);
+        self.f_check_zero(channel, x_mac)?;
+        Ok(())
     }
 
     // TODO: dummy MultiplyCheck
@@ -243,7 +244,7 @@ impl<FE: FiniteField> FComReceiver<FE> {
         let size_left = self.voles.len() - self.pos;
         if num > size_left {
             let mut v = Vec::new();
-            self.svole_receiver.receive(channel, rng, &mut v);
+            self.svole_receiver.receive(channel, rng, &mut v)?;
             self.voles = v;
             self.pos = 0
         }
@@ -547,6 +548,7 @@ mod tests {
                 .unwrap();
             r.push(b);
         }
+        handle.join().unwrap();
         ()
     }
 

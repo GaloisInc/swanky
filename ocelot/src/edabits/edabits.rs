@@ -17,13 +17,13 @@ use super::homcom::{FComReceiver, FComSender};
 
 /// Edabits struct
 #[derive(Clone)]
-struct Edabits<FE: FiniteField> {
+pub struct Edabits<FE: FiniteField> {
     bits: Vec<F2>,
     value: FE::PrimeField,
 }
 /// EdabitsMac struct
 #[derive(Clone)]
-struct EdabitsMac<FE: FiniteField> {
+pub struct EdabitsMac<FE: FiniteField> {
     bits: Vec<Gf40>,
     value: FE,
 }
@@ -42,13 +42,13 @@ struct DabitMac<FE: FiniteField> {
     value: FE,
 }
 
-/// Conversion protocol sender
-struct SenderConv<FE: FiniteField> {
+/// Conversion sender
+pub struct SenderConv<FE: FiniteField> {
     fcom_f2: FComSender<Gf40>,
     fcom: FComSender<FE>,
 }
 
-const NB_BITS: usize = 6;
+const NB_BITS: usize = 38; // 2 less than 40 bits, suspicious coincidence
 
 const B: usize = 5;
 const C: usize = 5;
@@ -109,8 +109,8 @@ fn generate_permutation<T: Clone>(seed: Block, v: Vec<T>) -> Vec<T> {
     permute
 }
 
-// Protocol for checking conversion
 impl<FE: FiniteField> SenderConv<FE> {
+    /// initialize conversion sender
     pub fn init<C: AbstractChannel, RNG: CryptoRng + Rng>(
         channel: &mut C,
         rng: &mut RNG,
@@ -203,7 +203,8 @@ impl<FE: FiniteField> SenderConv<FE> {
         Ok((res, (ci, ci_mac)))
     }
 
-    fn random_edabits<C: AbstractChannel, RNG: CryptoRng + Rng>(
+    /// generate random edabits
+    pub fn random_edabits<C: AbstractChannel, RNG: CryptoRng + Rng>(
         &mut self,
         channel: &mut C,
         rng: &mut RNG,
@@ -411,7 +412,8 @@ impl<FE: FiniteField> SenderConv<FE> {
         }
     }
 
-    fn conv<C: AbstractChannel, RNG: CryptoRng + Rng>(
+    /// conversion checking
+    pub fn conv<C: AbstractChannel, RNG: CryptoRng + Rng>(
         &mut self,
         channel: &mut C,
         rng: &mut RNG,
@@ -513,14 +515,15 @@ impl<FE: FiniteField> SenderConv<FE> {
     }
 }
 
-/// Conversion protocol receiver
-struct ReceiverConv<FE: FiniteField> {
+/// Conversion receiver
+pub struct ReceiverConv<FE: FiniteField> {
     fcom_f2: FComReceiver<Gf40>,
     fcom: FComReceiver<FE>,
 }
 
 impl<FE: FiniteField> ReceiverConv<FE> {
-    fn init<C: AbstractChannel, RNG: CryptoRng + Rng>(
+    /// initialize conversion receiver
+    pub fn init<C: AbstractChannel, RNG: CryptoRng + Rng>(
         channel: &mut C,
         rng: &mut RNG,
     ) -> Result<Self, Error> {
@@ -600,7 +603,8 @@ impl<FE: FiniteField> ReceiverConv<FE> {
         Ok((res, ci_mac))
     }
 
-    fn random_edabits<C: AbstractChannel, RNG: CryptoRng + Rng>(
+    /// generate random edabits
+    pub fn random_edabits<C: AbstractChannel, RNG: CryptoRng + Rng>(
         &mut self,
         channel: &mut C,
         rng: &mut RNG,
@@ -757,7 +761,8 @@ impl<FE: FiniteField> ReceiverConv<FE> {
         }
     }
 
-    fn conv<C: AbstractChannel, RNG: CryptoRng + Rng>(
+    /// conversion checking
+    pub fn conv<C: AbstractChannel, RNG: CryptoRng + Rng>(
         &mut self,
         channel: &mut C,
         rng: &mut RNG,
@@ -1068,7 +1073,7 @@ mod tests {
             let mut fconv = SenderConv::<FE>::init(&mut channel, &mut rng).unwrap();
 
             //   110101
-            let mut c = vec![F2::ONE, F2::ZERO, F2::ONE, F2::ZERO, F2::ONE, F2::ONE];
+            let mut c = vec![F2::ZERO; NB_BITS];
             let mut i = 0;
             let mut j = 0;
             let mut edabits = Vec::with_capacity(nb_edabits);
