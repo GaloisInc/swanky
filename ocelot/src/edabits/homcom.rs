@@ -84,6 +84,16 @@ impl<FE: FiniteField> FComSender<FE> {
         Ok(v[0])
     }
 
+    pub fn f_random_vec<C: AbstractChannel, RNG: CryptoRng + Rng>(
+        &mut self,
+        channel: &mut C,
+        rng: &mut RNG,
+        num: usize,
+    ) -> Result<Vec<(FE::PrimeField, FE)>, Error> {
+        let v = self.f_svole(channel, rng, num)?;
+        Ok(v)
+    }
+
     pub fn f_input<C: AbstractChannel, RNG: CryptoRng + Rng>(
         &mut self,
         channel: &mut C,
@@ -99,19 +109,21 @@ impl<FE: FiniteField> FComSender<FE> {
         Ok(r_mac)
     }
 
-    pub fn f_input_with<C: AbstractChannel, RNG: CryptoRng + Rng>(
+    pub fn f_input_vec<C: AbstractChannel, RNG: CryptoRng + Rng>(
         &mut self,
         channel: &mut C,
         rng: &mut RNG,
-        x: FE::PrimeField,
-        r: FE::PrimeField,
-        r_mac: FE,
-    ) -> Result<FE, Error> {
-        let y = x - r;
-        channel.write_fe::<FE::PrimeField>(y)?;
+        x: Vec<FE::PrimeField>,
+    ) -> Result<Vec<FE>, Error> {
+        let r = self.f_random_vec(channel, rng, x.len())?;
+
+        for i in 0..x.len() {
+            let y = x[i] - r[i].0;
+            channel.write_fe::<FE::PrimeField>(y)?;
+        }
         channel.flush()?;
 
-        Ok(r_mac)
+        Ok(r.into_iter().map(|x| x.1).collect())
     }
 
     pub fn f_affine_add_cst(
@@ -266,6 +278,16 @@ impl<FE: FiniteField> FComReceiver<FE> {
         Ok(v[0])
     }
 
+    pub fn f_random_vec<C: AbstractChannel, RNG: CryptoRng + Rng>(
+        &mut self,
+        channel: &mut C,
+        rng: &mut RNG,
+        num: usize,
+    ) -> Result<Vec<FE>, Error> {
+        let v = self.f_svole(channel, rng, num)?;
+        Ok(v)
+    }
+
     pub fn f_input<C: AbstractChannel, RNG: CryptoRng + Rng>(
         &mut self,
         channel: &mut C,
@@ -278,15 +300,20 @@ impl<FE: FiniteField> FComReceiver<FE> {
         Ok(v_mac)
     }
 
-    pub fn f_input_with<C: AbstractChannel, RNG: CryptoRng + Rng>(
+    pub fn f_input_vec<C: AbstractChannel, RNG: CryptoRng + Rng>(
         &mut self,
         channel: &mut C,
         rng: &mut RNG,
-    ) -> Result<FE, Error> {
-        let r_mac = self.f_random(channel, rng)?;
-        let y = channel.read_fe::<FE::PrimeField>()?;
+        num: usize,
+    ) -> Result<Vec<FE>, Error> {
+        let r_mac = self.f_random_vec(channel, rng, num)?;
 
-        let v_mac = r_mac - self.delta.multiply_by_prime_subfield(y);
+        let mut v_mac = Vec::with_capacity(num);
+        for i in 0..num {
+            let y = channel.read_fe::<FE::PrimeField>()?;
+
+            v_mac.push(r_mac[i] - self.delta.multiply_by_prime_subfield(y));
+        }
         Ok(v_mac)
     }
 
