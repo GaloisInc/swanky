@@ -507,7 +507,7 @@ impl<FE: FiniteField> SenderConv<FE> {
 
                 // Remark this is not necessary for the prover, bc cst addition dont show up in mac
                 // let s = convert_f2_to_field(ei);
-                let _ = self.fcom.f_check_zero(channel, e1_mac)?;
+                self.fcom.f_check_zero(channel, e1_mac)?;
             }
         }
 

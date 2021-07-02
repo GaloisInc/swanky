@@ -79,13 +79,13 @@ fn run() {
         receiver.kilobits_read() / 1000.0
     );
     println!(
-        "Receive communication (conv): {:.2} Mb",
+        "Receive communication (conv): {:.4} Mb",
         receiver.kilobits_written() / 1000.0
     );
     handle.join().unwrap();
 }
 
 fn main() {
-    println!("\nField: F610 \n");
+    println!("\nField: F61p \n");
     run()
 }

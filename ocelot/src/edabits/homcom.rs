@@ -381,16 +381,16 @@ impl<FE: FiniteField> FComReceiver<FE> {
     ) -> Result<(), Error> {
         let b = x_mac * y_mac - (-self.delta) * z_mac; // -delta diff because
 
-        let u = channel.read_fe::<FE>()?;
-        let v = channel.read_fe::<FE>()?;
-
         // The following block implements VOPE(1)
         let mut mask_mac = FE::ZERO;
-        for i in 0..FE::ZERO.to_polynomial_coefficients().len() {
+        for i in 0..FE::PolynomialFormNumCoefficients::USIZE {
             let v_m = self.f_random(channel, rng)?;
             let x_i: FE = make_x_i(i);
             mask_mac += v_m * x_i;
         }
+
+        let u = channel.read_fe::<FE>()?;
+        let v = channel.read_fe::<FE>()?;
 
         let b_plus = b + mask_mac;
         if b_plus == (u + (-self.delta) * v) {
