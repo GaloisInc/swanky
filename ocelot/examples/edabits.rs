@@ -26,14 +26,12 @@ fn run() {
         let mut fconv_sender = Sender::init(&mut sender, &mut rng).unwrap();
         println!("Send time (init): {:?}", start.elapsed());
         let start = Instant::now();
-        let (edabits, edabits_mac) = fconv_sender
+        let edabits = fconv_sender
             .random_edabits(&mut sender, &mut rng, n)
             .unwrap();
         println!("Send time (random edabits): {:?}", start.elapsed());
         let start = Instant::now();
-        let _ = fconv_sender
-            .conv(&mut sender, &mut rng, &edabits, &edabits_mac)
-            .unwrap();
+        let _ = fconv_sender.conv(&mut sender, &mut rng, &edabits).unwrap();
         println!("Send time (conv): {:?}", start.elapsed());
     });
     #[cfg(target_os = "linux")]
