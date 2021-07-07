@@ -202,11 +202,11 @@ impl<FE: FiniteField> FComSender<FE> {
         // The following block implements VOPE(1)
         let mut mask = FE::ZERO;
         let mut mask_mac = FE::ZERO;
+        let u = self.f_random_vec(channel, rng, FE::PolynomialFormNumCoefficients::USIZE)?;
         for i in 0..FE::PolynomialFormNumCoefficients::USIZE {
-            let (u, u_m) = self.f_random(channel, rng)?;
             let x_i: FE = make_x_i(i);
-            mask += x_i.multiply_by_prime_subfield(u);
-            mask_mac += u_m * x_i;
+            mask += x_i.multiply_by_prime_subfield(u[i].0);
+            mask_mac += u[i].1 * x_i;
         }
 
         let u = a0 + mask_mac;
@@ -383,10 +383,10 @@ impl<FE: FiniteField> FComReceiver<FE> {
 
         // The following block implements VOPE(1)
         let mut mask_mac = FE::ZERO;
+        let v_m = self.f_random_vec(channel, rng, FE::PolynomialFormNumCoefficients::USIZE)?;
         for i in 0..FE::PolynomialFormNumCoefficients::USIZE {
-            let v_m = self.f_random(channel, rng)?;
             let x_i: FE = make_x_i(i);
-            mask_mac += v_m * x_i;
+            mask_mac += v_m[i] * x_i;
         }
 
         let u = channel.read_fe::<FE>()?;
