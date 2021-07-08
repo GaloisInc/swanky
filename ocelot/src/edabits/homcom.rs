@@ -14,6 +14,8 @@ use rand::{CryptoRng, Rng};
 use scuttlebutt::{field::FiniteField, AbstractChannel};
 use std::marker::PhantomData;
 
+pub struct MacValue<FE: FiniteField>(pub FE::PrimeField, pub FE);
+
 // F_com protocol
 pub struct FComSender<FE: FiniteField> {
     phantom: PhantomData<FE>,
@@ -189,15 +191,31 @@ impl<FE: FiniteField> FComSender<FE> {
         &mut self,
         channel: &mut C,
         rng: &mut RNG,
-        x: FE::PrimeField,
-        x_mac: FE,
-        y: FE::PrimeField,
-        y_mac: FE,
-        _z: FE::PrimeField,
-        z_mac: FE,
+        triples: &[(MacValue<FE>, MacValue<FE>, MacValue<FE>)],
     ) -> Result<(), Error> {
-        let a0 = x_mac * y_mac;
-        let a1 = x_mac.multiply_by_prime_subfield(y) + y_mac.multiply_by_prime_subfield(x) - z_mac;
+        let mut sum_a0 = FE::ZERO;
+        let mut sum_a1 = FE::ZERO;
+
+        let chi = channel.read_fe()?;
+        let mut chi_power = chi;
+
+        for triple in triples.iter() {
+            let x = triple.0 .0;
+            let x_mac = triple.0 .1;
+            let y = triple.1 .0;
+            let y_mac = triple.1 .1;
+            let _z = triple.2 .0;
+            let z_mac = triple.2 .1;
+
+            let a0 = x_mac * y_mac;
+            let a1 =
+                x_mac.multiply_by_prime_subfield(y) + y_mac.multiply_by_prime_subfield(x) - z_mac;
+
+            sum_a0 += a0 * chi_power;
+            sum_a1 += a1 * chi_power;
+
+            chi_power = chi_power * chi;
+        }
 
         // The following block implements VOPE(1)
         let mut mask = FE::ZERO;
@@ -209,8 +227,8 @@ impl<FE: FiniteField> FComSender<FE> {
             mask_mac += u[i].1 * x_i;
         }
 
-        let u = a0 + mask_mac;
-        let v = a1 + mask;
+        let u = sum_a0 + mask_mac;
+        let v = sum_a1 + mask;
 
         channel.write_fe(u)?;
         channel.write_fe(v)?;
@@ -375,11 +393,24 @@ impl<FE: FiniteField> FComReceiver<FE> {
         &mut self,
         channel: &mut C,
         rng: &mut RNG,
-        x_mac: FE,
-        y_mac: FE,
-        z_mac: FE,
+        triples: &[(FE, FE, FE)],
     ) -> Result<(), Error> {
-        let b = x_mac * y_mac - (-self.delta) * z_mac; // -delta diff because
+        let chi = FE::random(rng);
+        channel.write_fe::<FE>(chi)?;
+        channel.flush()?;
+
+        let mut sum_b = FE::ZERO;
+        let mut power_chi = chi;
+
+        for triple in triples.iter() {
+            let x_mac = triple.0;
+            let y_mac = triple.1;
+            let z_mac = triple.2;
+
+            let b = x_mac * y_mac - (-self.delta) * z_mac; // -delta diff because
+            sum_b += b * power_chi;
+            power_chi = power_chi * chi;
+        }
 
         // The following block implements VOPE(1)
         let mut mask_mac = FE::ZERO;
@@ -392,7 +423,7 @@ impl<FE: FiniteField> FComReceiver<FE> {
         let u = channel.read_fe::<FE>()?;
         let v = channel.read_fe::<FE>()?;
 
-        let b_plus = b + mask_mac;
+        let b_plus = sum_b + mask_mac;
         if b_plus == (u + (-self.delta) * v) {
             // - because of delta
             Ok(())
@@ -405,7 +436,7 @@ impl<FE: FiniteField> FComReceiver<FE> {
 #[cfg(test)]
 mod tests {
 
-    use super::{FComReceiver, FComSender};
+    use super::{FComReceiver, FComSender, MacValue};
     use scuttlebutt::{
         field::{F61p, FiniteField, Gf40},
         AbstractChannel, AesRng, Channel,
@@ -543,12 +574,11 @@ mod tests {
                     .quicksilver_check_multiply(
                         &mut channel,
                         &mut rng,
-                        v[i].0,
-                        v[i].1,
-                        v[i].2,
-                        v[i].3,
-                        v[i].4,
-                        v[i].5,
+                        &[(
+                            MacValue(v[i].0, v[i].1),
+                            MacValue(v[i].2, v[i].3),
+                            MacValue(v[i].4, v[i].5),
+                        )],
                     )
                     .unwrap();
                 r.push(b);
@@ -571,7 +601,7 @@ mod tests {
         let mut r = Vec::new();
         for i in 0..count {
             let b = fcom
-                .quicksilver_check_multiply(&mut channel, &mut rng, v[i].0, v[i].1, v[i].2)
+                .quicksilver_check_multiply(&mut channel, &mut rng, &[(v[i].0, v[i].1, v[i].2)])
                 .unwrap();
             r.push(b);
         }

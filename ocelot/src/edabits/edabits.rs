@@ -13,7 +13,7 @@ use scuttlebutt::{
     AbstractChannel, AesRng, Block,
 };
 
-use super::homcom::{FComReceiver, FComSender};
+use super::homcom::{FComReceiver, FComSender, MacValue};
 
 /// Edabits struct
 #[derive(Clone)]
@@ -164,6 +164,7 @@ impl<FE: FiniteField> SenderConv<FE> {
 
         let mut ci = F2::ZERO;
         let mut ci_mac = self.fcom_f2.f_input(channel, rng, ci)?;
+        let mut triples = Vec::new();
         for i in 0..xl {
             let (xi, xi_mac) = x[i];
             let (yi, yi_mac) = y[i];
@@ -176,16 +177,11 @@ impl<FE: FiniteField> SenderConv<FE> {
 
             let and_res = and1 * and2;
             let and_res_mac = self.fcom_f2.f_input(channel, rng, and_res)?;
-            self.fcom_f2.quicksilver_check_multiply(
-                channel,
-                rng,
-                and1,
-                and1_mac,
-                and2,
-                and2_mac,
-                and_res,
-                and_res_mac,
-            )?;
+            triples.push((
+                MacValue(and1, and1_mac),
+                MacValue(and2, and2_mac),
+                MacValue(and_res, and_res_mac),
+            ));
 
             let c = ci + and_res;
             let c_mac = ci_mac + and_res_mac;
@@ -198,6 +194,8 @@ impl<FE: FiniteField> SenderConv<FE> {
             ci = c;
             ci_mac = c_mac;
         }
+        self.fcom_f2
+            .quicksilver_check_multiply(channel, rng, &triples)?;
         Ok((res, (ci, ci_mac)))
     }
 
@@ -280,6 +278,8 @@ impl<FE: FiniteField> SenderConv<FE> {
             );
         }
 
+        let mut triples = Vec::new();
+
         for _ in 0..s {
             // step 1)
             let mut c_m = Vec::with_capacity(gamma);
@@ -311,16 +311,11 @@ impl<FE: FiniteField> SenderConv<FE> {
                     self.fcom.f_affine_add_cst(FE::PrimeField::ONE, minus_ci, minus_ci_mac);
                 let and_res = andl * one_minus_ci;
                 let and_res_mac = self.fcom.f_input(channel, rng, and_res)?;
-                self.fcom.quicksilver_check_multiply(
-                    channel,
-                    rng,
-                    andl,
-                    andl_mac,
-                    one_minus_ci,
-                    one_minus_ci_mac,
-                    and_res,
-                    and_res_mac,
-                )?;
+                triples.push((
+                    MacValue(andl, andl_mac),
+                    MacValue(one_minus_ci, one_minus_ci_mac),
+                    MacValue(and_res, and_res_mac),
+                ));
             }
 
             // step 3)
@@ -397,6 +392,9 @@ impl<FE: FiniteField> SenderConv<FE> {
             };
             res = res & b;
         }
+        self.fcom
+            .quicksilver_check_multiply(channel, rng, &triples)?;
+
         if res {
             Ok(())
         } else {
@@ -555,6 +553,7 @@ impl<FE: FiniteField> ReceiverConv<FE> {
         let mut res = Vec::with_capacity(xl);
 
         let mut ci_mac = self.fcom_f2.f_input(channel, rng)?;
+        let mut triples = Vec::new();
         for i in 0..xl {
             let xi_mac = x[i];
             let yi_mac = y[i];
@@ -563,14 +562,7 @@ impl<FE: FiniteField> ReceiverConv<FE> {
             let and2_mac = yi_mac + ci_mac;
 
             let and_res_mac = self.fcom_f2.f_input(channel, rng)?;
-
-            self.fcom_f2.quicksilver_check_multiply(
-                channel,
-                rng,
-                and1_mac,
-                and2_mac,
-                and_res_mac,
-            )?;
+            triples.push((and1_mac, and2_mac, and_res_mac));
 
             let c_mac = ci_mac + and_res_mac;
 
@@ -580,6 +572,8 @@ impl<FE: FiniteField> ReceiverConv<FE> {
 
             ci_mac = c_mac;
         }
+        self.fcom_f2
+            .quicksilver_check_multiply(channel, rng, &triples)?;
         Ok((res, ci_mac))
     }
 
@@ -647,6 +641,8 @@ impl<FE: FiniteField> ReceiverConv<FE> {
 
         let mut res = true;
 
+        let mut triples = Vec::new();
+
         for _ in 0..s {
             // step 1)
             let mut c_m_mac = Vec::with_capacity(gamma);
@@ -665,13 +661,7 @@ impl<FE: FiniteField> ReceiverConv<FE> {
                 let one_minus_ci_mac = // 1 - ci
                     self.fcom.f_affine_add_cst(FE::PrimeField::ONE, minus_ci_mac);
                 let and_res_mac = self.fcom.f_input(channel, rng)?;
-                self.fcom.quicksilver_check_multiply(
-                    channel,
-                    rng,
-                    andl_mac,
-                    one_minus_ci_mac,
-                    and_res_mac,
-                )?;
+                triples.push((andl_mac, one_minus_ci_mac, and_res_mac));
             }
 
             // step 3)
@@ -736,6 +726,9 @@ impl<FE: FiniteField> ReceiverConv<FE> {
             };
             res = res & b;
         }
+        self.fcom
+            .quicksilver_check_multiply(channel, rng, &triples)?;
+
         if res {
             Ok(())
         } else {
