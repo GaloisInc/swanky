@@ -61,19 +61,35 @@ impl<FE: FiniteField> FComSender<FE> {
         rng: &mut RNG,
         num: usize,
     ) -> Result<Vec<(FE::PrimeField, FE)>, Error> {
-        let size_left = self.voles.len() - self.pos;
-        if num > size_left {
-            let mut v = Vec::new();
-            self.svole_sender.send(channel, rng, &mut v)?;
-            self.voles = v;
-            self.pos = 0
+        let mut res = Vec::with_capacity(num);
+
+        let mut needed = num;
+
+        while needed > 0 {
+            let size_left = self.voles.len() - self.pos;
+            if needed > size_left {
+                let mut v = Vec::new();
+                println!("SVOLE SEND");
+                self.svole_sender.send(channel, rng, &mut v)?;
+                self.voles = v;
+                self.pos = 0
+            }
+
+            let nb_copied;
+            if needed <= self.voles.len() {
+                nb_copied = needed;
+            } else {
+                nb_copied = self.voles.len();
+            }
+
+            for i in 0..nb_copied {
+                res.push(self.voles[self.pos + i]);
+            }
+            self.pos += nb_copied;
+
+            needed = needed - nb_copied;
         }
 
-        let mut res = Vec::with_capacity(num);
-        for i in 0..num {
-            res.push(self.voles[self.pos + i]);
-        }
-        self.pos += num;
         Ok(res)
     }
 
@@ -271,19 +287,33 @@ impl<FE: FiniteField> FComReceiver<FE> {
         rng: &mut RNG,
         num: usize,
     ) -> Result<Vec<FE>, Error> {
-        let size_left = self.voles.len() - self.pos;
-        if num > size_left {
-            let mut v = Vec::new();
-            self.svole_receiver.receive(channel, rng, &mut v)?;
-            self.voles = v;
-            self.pos = 0
-        }
-
         let mut res = Vec::with_capacity(num);
-        for i in 0..num {
-            res.push(self.voles[self.pos + i]);
+
+        let mut needed = num;
+
+        while needed > 0 {
+            let size_left = self.voles.len() - self.pos;
+            if needed > size_left {
+                let mut v = Vec::new();
+                self.svole_receiver.receive(channel, rng, &mut v)?;
+                self.voles = v;
+                self.pos = 0
+            }
+
+            let nb_copied;
+            if needed <= self.voles.len() {
+                nb_copied = needed;
+            } else {
+                nb_copied = self.voles.len();
+            }
+
+            for i in 0..nb_copied {
+                res.push(self.voles[self.pos + i]);
+            }
+            self.pos += nb_copied;
+
+            needed = needed - nb_copied;
         }
-        self.pos += num;
         Ok(res)
     }
 
