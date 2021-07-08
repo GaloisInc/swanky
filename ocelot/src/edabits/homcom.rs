@@ -102,7 +102,7 @@ impl<FE: FiniteField> FComSender<FE> {
         Ok(v[0])
     }
 
-    pub fn f_random_vec<C: AbstractChannel, RNG: CryptoRng + Rng>(
+    pub fn f_random_batch<C: AbstractChannel, RNG: CryptoRng + Rng>(
         &mut self,
         channel: &mut C,
         rng: &mut RNG,
@@ -127,13 +127,13 @@ impl<FE: FiniteField> FComSender<FE> {
         Ok(r_mac)
     }
 
-    pub fn f_input_vec<C: AbstractChannel, RNG: CryptoRng + Rng>(
+    pub fn f_input_batch<C: AbstractChannel, RNG: CryptoRng + Rng>(
         &mut self,
         channel: &mut C,
         rng: &mut RNG,
         x: Vec<FE::PrimeField>,
     ) -> Result<Vec<FE>, Error> {
-        let r = self.f_random_vec(channel, rng, x.len())?;
+        let r = self.f_random_batch(channel, rng, x.len())?;
 
         for i in 0..x.len() {
             let y = x[i] - r[i].0;
@@ -179,9 +179,30 @@ impl<FE: FiniteField> FComSender<FE> {
         x_mac: FE,
     ) -> Result<(), Error> {
         channel.write_fe::<FE::PrimeField>(x)?;
-        channel.flush()?;
+        // this flush can be removed because of the flush coming right after in check_zero
+        // channel.flush()?;
 
         self.f_check_zero(channel, x_mac)?;
+        Ok(())
+    }
+
+    pub fn f_open_batch<C: AbstractChannel>(
+        &mut self,
+        channel: &mut C,
+        batch: &[(FE::PrimeField, FE)],
+    ) -> Result<(), Error> {
+        for e in batch.iter() {
+            let x = e.0;
+            let x_mac = e.1;
+            channel.write_fe::<FE::PrimeField>(x)?;
+
+            // inlining f_check_zero below
+            // self.f_check_zero(channel, x_mac)?;
+            channel.write_fe::<FE>(x_mac)?;
+        }
+        // flushing at the end
+        channel.flush()?;
+
         Ok(())
     }
 
@@ -236,7 +257,7 @@ impl<FE: FiniteField> FComSender<FE> {
         // The following block implements VOPE(1)
         let mut mask = FE::ZERO;
         let mut mask_mac = FE::ZERO;
-        let u = self.f_random_vec(channel, rng, FE::PolynomialFormNumCoefficients::USIZE)?;
+        let u = self.f_random_batch(channel, rng, FE::PolynomialFormNumCoefficients::USIZE)?;
         for i in 0..FE::PolynomialFormNumCoefficients::USIZE {
             let x_i: FE = make_x_i(i);
             mask += x_i.multiply_by_prime_subfield(u[i].0);
@@ -326,7 +347,7 @@ impl<FE: FiniteField> FComReceiver<FE> {
         Ok(v[0])
     }
 
-    pub fn f_random_vec<C: AbstractChannel, RNG: CryptoRng + Rng>(
+    pub fn f_random_batch<C: AbstractChannel, RNG: CryptoRng + Rng>(
         &mut self,
         channel: &mut C,
         rng: &mut RNG,
@@ -348,13 +369,13 @@ impl<FE: FiniteField> FComReceiver<FE> {
         Ok(v_mac)
     }
 
-    pub fn f_input_vec<C: AbstractChannel, RNG: CryptoRng + Rng>(
+    pub fn f_input_batch<C: AbstractChannel, RNG: CryptoRng + Rng>(
         &mut self,
         channel: &mut C,
         rng: &mut RNG,
         num: usize,
     ) -> Result<Vec<FE>, Error> {
-        let r_mac = self.f_random_vec(channel, rng, num)?;
+        let r_mac = self.f_random_batch(channel, rng, num)?;
 
         let mut v_mac = Vec::with_capacity(num);
         for i in 0..num {
@@ -395,6 +416,33 @@ impl<FE: FiniteField> FComReceiver<FE> {
         let b = self.f_check_zero(channel, key + self.delta.multiply_by_prime_subfield(x))?;
         if b {
             Ok(x)
+        } else {
+            Err(Error::Other("open fails at checkzero".to_string()))
+        }
+    }
+
+    pub fn f_open_batch<C: AbstractChannel>(
+        &mut self,
+        channel: &mut C,
+        keys: &[FE],
+    ) -> Result<Vec<FE::PrimeField>, Error> {
+        let mut b = true;
+
+        let mut res = Vec::with_capacity(keys.len());
+        for key in keys.iter() {
+            let x = channel.read_fe::<FE::PrimeField>()?;
+
+            // inlining check_zero below
+            // let b = self.f_check_zero(channel, key + self.delta.multiply_by_prime_subfield(x))?;
+            let m = channel.read_fe::<FE>()?;
+            if *key + self.delta.multiply_by_prime_subfield(x) != m {
+                b = false;
+            }
+            res.push(x);
+        }
+
+        if b {
+            Ok(res)
         } else {
             Err(Error::Other("open fails at checkzero".to_string()))
         }
@@ -444,7 +492,7 @@ impl<FE: FiniteField> FComReceiver<FE> {
 
         // The following block implements VOPE(1)
         let mut mask_mac = FE::ZERO;
-        let v_m = self.f_random_vec(channel, rng, FE::PolynomialFormNumCoefficients::USIZE)?;
+        let v_m = self.f_random_batch(channel, rng, FE::PolynomialFormNumCoefficients::USIZE)?;
         for i in 0..FE::PolynomialFormNumCoefficients::USIZE {
             let x_i: FE = make_x_i(i);
             mask_mac += v_m[i] * x_i;

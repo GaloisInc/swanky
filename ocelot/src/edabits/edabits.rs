@@ -207,7 +207,7 @@ impl<FE: FiniteField> SenderConv<FE> {
         num: usize, // in the paper: NB + C
     ) -> Result<Vec<EdabitsProver<FE>>, Error> {
         let mut edabits_vec = Vec::with_capacity(num);
-        let random_bits = self.fcom_f2.f_random_vec(channel, rng, NB_BITS * num)?;
+        let random_bits = self.fcom_f2.f_random_batch(channel, rng, NB_BITS * num)?;
         for i in 0..num {
             let mut bits = Vec::with_capacity(NB_BITS);
             let startidx = NB_BITS * i;
@@ -409,8 +409,10 @@ impl<FE: FiniteField> SenderConv<FE> {
         rng: &mut RNG,
         edabits_vector: &[EdabitsProver<FE>],
     ) -> Result<(), Error> {
-        let nb_random_edabits = edabits_vector.len() * B + C;
-        let nb_random_dabits = edabits_vector.len() * B;
+        let n = edabits_vector.len();
+
+        let nb_random_edabits = n * B + C;
+        let nb_random_dabits = n * B;
 
         // step 1)a): commit random edabit
         let r = self.random_edabits(channel, rng, nb_random_edabits)?;
@@ -430,7 +432,7 @@ impl<FE: FiniteField> SenderConv<FE> {
         let r = generate_permutation(seed1, r);
 
         // step 5)a):
-        let base = edabits_vector.len() * B;
+        let base = n * B;
         for i in 0..C {
             let idx = base + i;
             let a = &r[idx];
@@ -442,7 +444,7 @@ impl<FE: FiniteField> SenderConv<FE> {
         // step 5) b): TODO: open triples
 
         // step 6)
-        for i in 0..edabits_vector.len() {
+        for i in 0..n {
             let edabits = &edabits_vector[i];
 
             // mapping arguments to variable names similar to ones in the paper
@@ -477,11 +479,7 @@ impl<FE: FiniteField> SenderConv<FE> {
                     - e_m_mac.multiply_by_prime_subfield(power_two::<FE::PrimeField>(NB_BITS));
 
                 // 6)e)
-                let mut ei = Vec::new();
-                for i in 0..NB_BITS {
-                    let elm = self.fcom_f2.f_open(channel, e[i].0, e[i].1)?;
-                    ei.push(elm);
-                }
+                let _ei = self.fcom_f2.f_open_batch(channel, &e)?;
 
                 // Remark this is not necessary for the prover, bc cst addition dont show up in mac
                 // let s = convert_f2_to_field(ei);
@@ -585,7 +583,7 @@ impl<FE: FiniteField> ReceiverConv<FE> {
         num: usize, // in the paper: NB + C
     ) -> Result<Vec<EdabitsVerifier<FE>>, Error> {
         let mut edabits_vec_mac = Vec::with_capacity(num);
-        let r_mac = self.fcom_f2.f_random_vec(channel, rng, NB_BITS * num)?;
+        let r_mac = self.fcom_f2.f_random_batch(channel, rng, NB_BITS * num)?;
         for i in 0..num {
             let mut bits = Vec::with_capacity(NB_BITS);
             let startidx = NB_BITS * i;
@@ -745,8 +743,9 @@ impl<FE: FiniteField> ReceiverConv<FE> {
     ) -> Result<(), Error> {
         let mut b = true;
 
-        let nb_random_edabits = edabits_vector_mac.len() * B + C;
-        let nb_random_dabits = edabits_vector_mac.len() * B;
+        let n = edabits_vector_mac.len();
+        let nb_random_edabits = n * B + C;
+        let nb_random_dabits = n * B;
 
         // step 1)a)
         let r_mac = self.random_edabits(channel, rng, nb_random_edabits)?;
@@ -768,7 +767,7 @@ impl<FE: FiniteField> ReceiverConv<FE> {
         let r_mac = generate_permutation(seed1, r_mac);
 
         // step 5)a):
-        let base = edabits_vector_mac.len() * B;
+        let base = n * B;
         for i in 0..C {
             let idx = base + i;
             let a_mac = &r_mac[idx];
@@ -785,7 +784,7 @@ impl<FE: FiniteField> ReceiverConv<FE> {
         // step 5) b): TODO: open triples
 
         // step 6)
-        for i in 0..edabits_vector_mac.len() {
+        for i in 0..n {
             let edabits_mac = &edabits_vector_mac[i];
             let c_mac = &edabits_mac.bits;
             let c_m_mac = edabits_mac.value;
@@ -817,11 +816,7 @@ impl<FE: FiniteField> ReceiverConv<FE> {
                     - e_m_mac.multiply_by_prime_subfield(power_two::<FE::PrimeField>(NB_BITS));
 
                 // 6)e)
-                let mut ei = Vec::new();
-                for i in 0..NB_BITS {
-                    let elm = self.fcom_f2.f_open(channel, e_mac[i])?;
-                    ei.push(elm);
-                }
+                let ei = self.fcom_f2.f_open_batch(channel, &e_mac)?;
 
                 let s = convert_f2_to_field::<FE>(&ei);
                 b = self.fcom.f_check_zero(
