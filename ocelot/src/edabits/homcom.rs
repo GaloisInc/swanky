@@ -131,7 +131,7 @@ impl<FE: FiniteField> FComSender<FE> {
         &mut self,
         channel: &mut C,
         rng: &mut RNG,
-        x: Vec<FE::PrimeField>,
+        x: &[FE::PrimeField],
     ) -> Result<Vec<FE>, Error> {
         let r = self.f_random_batch(channel, rng, x.len())?;
 

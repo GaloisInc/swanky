@@ -208,20 +208,27 @@ impl<FE: FiniteField> SenderConv<FE> {
     ) -> Result<Vec<EdabitsProver<FE>>, Error> {
         let mut edabits_vec = Vec::with_capacity(num);
         let random_bits = self.fcom_f2.f_random_batch(channel, rng, NB_BITS * num)?;
+
+        let mut aux_bits = Vec::with_capacity(num);
+        let mut aux_r_m = Vec::with_capacity(num);
         for i in 0..num {
             let mut bits = Vec::with_capacity(NB_BITS);
             let startidx = NB_BITS * i;
             for j in 0..NB_BITS {
                 bits.push(random_bits[startidx + j]);
             }
-
             let r_m: FE::PrimeField =
                 convert_f2_to_field::<FE>(bits.iter().map(|x| x.0).collect::<Vec<F2>>().as_slice());
-            let r_m_mac: FE = self.fcom.f_input(channel, rng, r_m)?;
+            aux_bits.push(bits);
+            aux_r_m.push(r_m);
+        }
 
+        let aux_r_m_mac: Vec<FE> = self.fcom.f_input_batch(channel, rng, &aux_r_m)?;
+
+        for i in 0..num {
             edabits_vec.push(EdabitsProver {
-                bits: bits,
-                value: (r_m, r_m_mac),
+                bits: aux_bits[i].clone(),
+                value: (aux_r_m[i], aux_r_m_mac[i]),
             });
         }
         Ok(edabits_vec)
@@ -582,18 +589,23 @@ impl<FE: FiniteField> ReceiverConv<FE> {
     ) -> Result<Vec<EdabitsVerifier<FE>>, Error> {
         let mut edabits_vec_mac = Vec::with_capacity(num);
         let r_mac = self.fcom_f2.f_random_batch(channel, rng, NB_BITS * num)?;
+
+        let mut aux_bits = Vec::with_capacity(num);
         for i in 0..num {
             let mut bits = Vec::with_capacity(NB_BITS);
             let startidx = NB_BITS * i;
             for j in 0..NB_BITS {
                 bits.push(r_mac[startidx + j]);
             }
+            aux_bits.push(bits);
+        }
 
-            let r_m_mac = self.fcom.f_input(channel, rng)?;
+        let aux_r_m_mac = self.fcom.f_input_batch(channel, rng, num)?;
 
+        for i in 0..num {
             edabits_vec_mac.push(EdabitsVerifier {
-                bits: bits,
-                value: r_m_mac,
+                bits: aux_bits[i].clone(),
+                value: aux_r_m_mac[i],
             });
         }
         Ok(edabits_vec_mac)
