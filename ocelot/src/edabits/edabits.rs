@@ -145,58 +145,111 @@ impl<FE: FiniteField> SenderConv<FE> {
         Ok((x_m, x_m_mac))
     }
 
+    // This function applies the bit_add_carry to a batch of bits,
+    // contrary to the one in the paper that applies it on a pair of
+    // bits. This allows to the keep the rounds of communication equal
+    // to m for any vector of additions
     fn bit_add_carry<C: AbstractChannel, RNG: CryptoRng + Rng>(
         &mut self,
         channel: &mut C,
         rng: &mut RNG,
-        x: &[(F2, Gf40)],
-        y: &[(F2, Gf40)],
-    ) -> Result<(Vec<(F2, Gf40)>, (F2, Gf40)), Error> {
-        let xl = x.len();
-        let yl = y.len();
-        if xl != yl {
+        x_batch: Vec<EdabitsProver<FE>>,
+        y_batch: Vec<EdabitsProver<FE>>,
+    ) -> Result<Vec<(Vec<(F2, Gf40)>, (F2, Gf40))>, Error> {
+        let x_batch_len = x_batch.len();
+        let y_batch_len = y_batch.len();
+        if x_batch_len != y_batch_len {
             return Err(Error::Other(
                 "incompatible input vectors in bit_add_carry".to_string(),
             ));
         }
 
-        let mut res = Vec::with_capacity(xl);
+        let m = x_batch[0].bits.len();
 
-        let mut ci = F2::ZERO;
-        let mut ci_mac = self.fcom_f2.f_input(channel, rng, ci)?;
+        // input c0
+        let mut ci_batch = vec![F2::ZERO; x_batch_len];
+        let mut ci_mac_batch = self.fcom_f2.f_input_batch(channel, rng, &ci_batch)?;
+
+        // loop on the m bits over the batch of n addition
         let mut triples = Vec::new();
-        for i in 0..xl {
-            let (xi, xi_mac) = x[i];
-            let (yi, yi_mac) = y[i];
+        let mut aux_batch = Vec::with_capacity(x_batch_len);
+        let mut and_res_batch = Vec::with_capacity(x_batch_len);
+        let mut z_batch = vec![Vec::with_capacity(m); x_batch_len];
+        for i in 0..m {
+            and_res_batch.clear();
+            aux_batch.clear();
+            for n in 0..x_batch_len {
+                let ci = ci_batch[n];
+                let ci_mac = ci_mac_batch[n];
 
-            let and1 = xi + ci;
-            let and1_mac = xi_mac + ci_mac;
+                let x = &x_batch[n].bits;
+                let y = &y_batch[n].bits;
 
-            let and2 = yi + ci;
-            let and2_mac = yi_mac + ci_mac;
+                if x.len() != m || y.len() != m {
+                    panic!("bits vector of different length");
+                }
 
-            let and_res = and1 * and2;
-            let and_res_mac = self.fcom_f2.f_input(channel, rng, and_res)?;
-            triples.push((
-                MacValue(and1, and1_mac),
-                MacValue(and2, and2_mac),
-                MacValue(and_res, and_res_mac),
-            ));
+                let (xi, xi_mac) = x[i];
+                let (yi, yi_mac) = y[i];
 
-            let c = ci + and_res;
-            let c_mac = ci_mac + and_res_mac;
+                let and1 = xi + ci;
+                let and1_mac = xi_mac + ci_mac;
 
-            let z = xi + yi + ci;
-            let z_mac = xi_mac + yi_mac + ci_mac;
+                let and2 = yi + ci;
+                let and2_mac = yi_mac + ci_mac;
 
-            res.push((z, z_mac));
+                let and_res = and1 * and2;
 
-            ci = c;
-            ci_mac = c_mac;
+                and_res_batch.push(and_res);
+                aux_batch.push((and1, and1_mac, and2, and2_mac));
+            }
+            let and_res_mac_batch = self.fcom_f2.f_input_batch(channel, rng, &and_res_batch)?;
+
+            for n in 0..x_batch_len {
+                let ci = ci_batch[n];
+                let ci_mac = ci_mac_batch[n];
+                let x = &x_batch[n].bits;
+                let y = &y_batch[n].bits;
+
+                let (xi, xi_mac) = x[i];
+                let (yi, yi_mac) = y[i];
+
+                let and1 = aux_batch[n].0;
+                let and1_mac = aux_batch[n].1;
+                let and2 = aux_batch[n].2;
+                let and2_mac = aux_batch[n].3;
+                let and_res = and_res_batch[n];
+                let and_res_mac = and_res_mac_batch[n];
+                triples.push((
+                    MacValue(and1, and1_mac),
+                    MacValue(and2, and2_mac),
+                    MacValue(and_res, and_res_mac),
+                ));
+
+                let c = ci + and_res;
+                let c_mac = ci_mac + and_res_mac;
+
+                let z = xi + yi + ci;
+                let z_mac = xi_mac + yi_mac + ci_mac;
+
+                ci_batch[n] = c;
+                ci_mac_batch[n] = c_mac;
+
+                z_batch[n].push((z, z_mac));
+            }
         }
+
+        // check all the multiplications in one batch
         self.fcom_f2
             .quicksilver_check_multiply(channel, rng, &triples)?;
-        Ok((res, (ci, ci_mac)))
+
+        // reconstruct the solution
+        let mut res = Vec::with_capacity(x_batch_len);
+        for n in 0..x_batch_len {
+            res.push((z_batch[n].clone(), (ci_batch[n], ci_mac_batch[n])));
+        }
+
+        Ok(res)
     }
 
     /// generate random edabits
@@ -449,15 +502,23 @@ impl<FE: FiniteField> SenderConv<FE> {
         // step 5) b): TODO: open triples
 
         // step 6)
-        for i in 0..n {
-            let edabits = &edabits_vector[i];
+        for j in 0..B {
+            // step 6)b) batched and moved up
+            let e_batch = self.bit_add_carry(
+                channel,
+                rng,
+                edabits_vector.to_vec(),
+                r[j * n..(j + 1) * n].to_vec(),
+            )?;
 
-            // mapping arguments to variable names similar to ones in the paper
-            let c = &edabits.bits;
-            let (_c_m, c_m_mac) = edabits.value;
+            for i in 0..n {
+                let idx_base = i * B;
 
-            let idx_base = i * B;
-            for j in 0..B {
+                let edabits = &edabits_vector[i];
+
+                // mapping arguments to variable names similar to ones in the paper
+                let (_c_m, c_m_mac) = edabits.value;
+
                 let idx_dabit = idx_base + j;
 
                 // pick the random dabit
@@ -472,8 +533,8 @@ impl<FE: FiniteField> SenderConv<FE> {
                 let (_r_m, r_m_mac) = r[idx_r].value;
                 let c_plus_r_mac = c_m_mac + r_m_mac;
 
-                // 6)b)
-                let (e, e_carry) = self.bit_add_carry(channel, rng, &c, &r[idx_r].bits)?;
+                // 6)b) done earlier
+                let (e, e_carry) = e_batch[i].clone();
 
                 // 6)c)
                 let (_, e_m_mac) = self
@@ -542,42 +603,81 @@ impl<FE: FiniteField> ReceiverConv<FE> {
         &mut self,
         channel: &mut C,
         rng: &mut RNG,
-        x: &[Gf40],
-        y: &[Gf40],
-    ) -> Result<(Vec<Gf40>, Gf40), Error> {
-        let xl = x.len();
-        let yl = y.len();
-        if xl != yl {
+        x_batch: Vec<EdabitsVerifier<FE>>,
+        y_batch: Vec<EdabitsVerifier<FE>>,
+    ) -> Result<Vec<(Vec<Gf40>, Gf40)>, Error> {
+        let x_batch_len = x_batch.len();
+        let y_batch_len = y_batch.len();
+        if x_batch_len != y_batch_len {
             return Err(Error::Other(
                 "incompatible input vectors in bit_add_carry".to_string(),
             ));
         }
 
-        let mut res = Vec::with_capacity(xl);
+        let m = x_batch[0].bits.len();
 
-        let mut ci_mac = self.fcom_f2.f_input(channel, rng)?;
+        // input c0
+        let mut ci_mac_batch = self.fcom_f2.f_input_batch(channel, rng, x_batch_len)?;
+
+        // loop on the m bits over the batch of n addition
         let mut triples = Vec::new();
-        for i in 0..xl {
-            let xi_mac = x[i];
-            let yi_mac = y[i];
+        let mut aux_batch = Vec::with_capacity(x_batch_len);
+        let mut z_batch = vec![Vec::with_capacity(m); x_batch_len];
+        for i in 0..m {
+            aux_batch.clear();
+            for n in 0..x_batch_len {
+                let ci_mac = ci_mac_batch[n];
 
-            let and1_mac = xi_mac + ci_mac;
-            let and2_mac = yi_mac + ci_mac;
+                let x = &x_batch[n].bits;
+                let y = &y_batch[n].bits;
 
-            let and_res_mac = self.fcom_f2.f_input(channel, rng)?;
-            triples.push((and1_mac, and2_mac, and_res_mac));
+                if x.len() != m || y.len() != m {
+                    panic!("bits vector of different length");
+                }
+                let xi_mac = x[i];
+                let yi_mac = y[i];
 
-            let c_mac = ci_mac + and_res_mac;
+                let and1_mac = xi_mac + ci_mac;
 
-            let z_mac = xi_mac + yi_mac + ci_mac;
+                let and2_mac = yi_mac + ci_mac;
 
-            res.push(z_mac);
+                aux_batch.push((and1_mac, and2_mac));
+            }
+            let and_res_mac_batch = self.fcom_f2.f_input_batch(channel, rng, x_batch_len)?;
 
-            ci_mac = c_mac;
+            for n in 0..x_batch_len {
+                let ci_mac = ci_mac_batch[n];
+                let x = &x_batch[n].bits;
+                let y = &y_batch[n].bits;
+
+                let xi_mac = x[i];
+                let yi_mac = y[i];
+
+                let and1_mac = aux_batch[n].0;
+                let and2_mac = aux_batch[n].1;
+                let and_res_mac = and_res_mac_batch[n];
+                triples.push((and1_mac, and2_mac, and_res_mac));
+
+                let c_mac = ci_mac + and_res_mac;
+
+                let z_mac = xi_mac + yi_mac + ci_mac;
+
+                ci_mac_batch[n] = c_mac;
+
+                z_batch[n].push(z_mac);
+            }
         }
+        // check all the multiplications in one batch
         self.fcom_f2
             .quicksilver_check_multiply(channel, rng, &triples)?;
-        Ok((res, ci_mac))
+
+        // reconstruct the solution
+        let mut res = Vec::with_capacity(x_batch_len);
+        for n in 0..x_batch_len {
+            res.push((z_batch[n].clone(), ci_mac_batch[n]));
+        }
+
+        Ok(res)
     }
 
     /// generate random edabits
@@ -790,13 +890,20 @@ impl<FE: FiniteField> ReceiverConv<FE> {
         // step 5) b): TODO: open triples
 
         // step 6)
-        for i in 0..n {
-            let edabits_mac = &edabits_vector_mac[i];
-            let c_mac = &edabits_mac.bits;
-            let c_m_mac = edabits_mac.value;
+        for j in 0..B {
+            // step 6)b) batched and moved up
+            let e_batch = self.bit_add_carry(
+                channel,
+                rng,
+                edabits_vector_mac.to_vec(),
+                r_mac[j * n..(j + 1) * n].to_vec(),
+            )?;
+            for i in 0..n {
+                let idx_base = i * B;
 
-            let idx_base = i * B;
-            for j in 0..B {
+                let edabits_mac = &edabits_vector_mac[i];
+                let c_m_mac = edabits_mac.value;
+
                 // pick the random dabit
                 let idx_dabit = idx_base + j;
                 let b_mac = dabits_mac[idx_dabit].bit;
@@ -809,9 +916,8 @@ impl<FE: FiniteField> ReceiverConv<FE> {
                 let r_m_mac = r_mac[idx_r].value;
                 let c_plus_r_mac = c_m_mac + r_m_mac;
 
-                // 6)b)
-                let (e_mac, e_carry_mac) =
-                    self.bit_add_carry(channel, rng, &c_mac, &r_mac[idx_r].bits)?;
+                // 6)b) done earlier
+                let (e_mac, e_carry_mac) = e_batch[i].clone();
 
                 // 6)c)
                 let e_m_mac =
@@ -843,7 +949,7 @@ impl<FE: FiniteField> ReceiverConv<FE> {
 #[cfg(test)]
 mod tests {
 
-    use super::{bit_to_fe, ReceiverConv, SenderConv};
+    use super::{bit_to_fe, EdabitsProver, EdabitsVerifier, ReceiverConv, SenderConv};
     use scuttlebutt::{
         field::{F61p, FiniteField, Gf40, F2},
         AesRng, Channel,
@@ -955,9 +1061,22 @@ mod tests {
             for i in 0..6 {
                 vy.push((y[i], y_mac[i]));
             }
+            let default_fe = (FE::PrimeField::ZERO, FE::ZERO);
             let (res, c) = fconv
-                .bit_add_carry(&mut channel, &mut rng, &vx, &vy)
-                .unwrap();
+                .bit_add_carry(
+                    &mut channel,
+                    &mut rng,
+                    vec![EdabitsProver {
+                        bits: vx,
+                        value: default_fe,
+                    }],
+                    vec![EdabitsProver {
+                        bits: vy,
+                        value: default_fe,
+                    }],
+                )
+                .unwrap()[0]
+                .clone();
 
             for i in 0..power {
                 fconv
@@ -983,9 +1102,22 @@ mod tests {
             let yb_mac = fconv.fcom_f2.f_input(&mut channel, &mut rng).unwrap();
             y_mac.push(yb_mac);
         }
+        let default_fe = FE::ZERO;
         let (res_mac, c_mac) = fconv
-            .bit_add_carry(&mut channel, &mut rng, &x_mac, &y_mac)
-            .unwrap();
+            .bit_add_carry(
+                &mut channel,
+                &mut rng,
+                vec![EdabitsVerifier {
+                    bits: x_mac,
+                    value: default_fe,
+                }],
+                vec![EdabitsVerifier {
+                    bits: y_mac,
+                    value: default_fe,
+                }],
+            )
+            .unwrap()[0]
+            .clone();
 
         let mut res = Vec::new();
         for i in 0..power {
@@ -1042,7 +1174,7 @@ mod tests {
             let mut channel = Channel::new(reader, writer);
             let mut fconv = SenderConv::<FE>::init(&mut channel, &mut rng).unwrap();
 
-            for n in 0..nb_edabits {
+            for n in 1..nb_edabits {
                 let edabits = fconv.random_edabits(&mut channel, &mut rng, n).unwrap();
 
                 let _ = fconv.conv(&mut channel, &mut rng, &edabits).unwrap();
@@ -1056,7 +1188,7 @@ mod tests {
         let mut fconv = ReceiverConv::<FE>::init(&mut channel, &mut rng).unwrap();
 
         let mut res = Vec::new();
-        for n in 0..nb_edabits {
+        for n in 1..nb_edabits {
             let edabits = fconv.random_edabits(&mut channel, &mut rng, n).unwrap();
 
             let r = fconv.conv(&mut channel, &mut rng, &edabits).unwrap();
