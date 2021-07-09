@@ -436,9 +436,7 @@ impl<FE: FiniteField> SenderConv<FE> {
         for i in 0..C {
             let idx = base + i;
             let a = &r[idx];
-            for bi in 0..NB_BITS {
-                self.fcom_f2.f_open(channel, a.bits[bi].0, a.bits[bi].1)?;
-            }
+            self.fcom_f2.f_open_batch(channel, &a.bits)?;
             self.fcom.f_open(channel, a.value.0, a.value.1)?;
         }
         // step 5) b): TODO: open triples
@@ -771,11 +769,7 @@ impl<FE: FiniteField> ReceiverConv<FE> {
         for i in 0..C {
             let idx = base + i;
             let a_mac = &r_mac[idx];
-            let mut a_vec = Vec::with_capacity(NB_BITS);
-            for bi in 0..NB_BITS {
-                let a = self.fcom_f2.f_open(channel, a_mac.bits[bi])?;
-                a_vec.push(a);
-            }
+            let a_vec = self.fcom_f2.f_open_batch(channel, &a_mac.bits)?;
             let a_m = self.fcom.f_open(channel, a_mac.value)?;
             if convert_f2_to_field::<FE>(&a_vec) != a_m {
                 return Err(Error::Other("Wrong open random edabit".to_string()));
