@@ -30,14 +30,14 @@ pub struct EdabitsVerifier<FE: FiniteField> {
 
 /// Dabit struct
 #[derive(Clone)]
-struct Dabit<FE: FiniteField> {
-    bit: F2,
-    value: FE::PrimeField,
+struct DabitProver<FE: FiniteField> {
+    bit: (F2, Gf40),
+    value: (FE::PrimeField, FE),
 }
 
 /// Dabit struct
 #[derive(Clone)]
-struct DabitMac<FE: FiniteField> {
+struct DabitVerifier<FE: FiniteField> {
     bit: Gf40,
     value: FE,
 }
@@ -127,12 +127,16 @@ impl<FE: FiniteField> SenderConv<FE> {
         &mut self,
         channel: &mut C,
         _rng: &mut RNG,
-        r: F2,
-        r_mac: Gf40,
-        r_m_mac: FE,
-        x: F2,
-        x_mac: Gf40,
+        dabit: DabitProver<FE>,
+        input: (F2, Gf40),
     ) -> Result<(FE::PrimeField, FE), Error> {
+        // mapping the inputs to the names in the paper
+        let r = dabit.bit.0;
+        let r_mac = dabit.bit.1;
+        let r_m_mac = dabit.value.1;
+        let x = input.0;
+        let x_mac = input.1;
+
         let x_m = bit_to_fe::<FE::PrimeField>(x);
         self.fcom_f2.f_open(channel, r + x, r_mac + x_mac)?;
         let c = r + x;
@@ -153,8 +157,8 @@ impl<FE: FiniteField> SenderConv<FE> {
         &mut self,
         channel: &mut C,
         rng: &mut RNG,
-        x_batch: Vec<EdabitsProver<FE>>,
-        y_batch: Vec<EdabitsProver<FE>>,
+        x_batch: &[EdabitsProver<FE>],
+        y_batch: &[EdabitsProver<FE>],
     ) -> Result<Vec<(Vec<(F2, Gf40)>, (F2, Gf40))>, Error> {
         let x_batch_len = x_batch.len();
         let y_batch_len = y_batch.len();
@@ -292,32 +296,28 @@ impl<FE: FiniteField> SenderConv<FE> {
         channel: &mut C,
         rng: &mut RNG,
         num: usize, // in the paper: NB
-    ) -> Result<(Vec<Dabit<FE>>, Vec<DabitMac<FE>>), Error> {
+    ) -> Result<Vec<DabitProver<FE>>, Error> {
         let mut dabit_vec = Vec::with_capacity(num);
-        let mut dabit_vec_mac = Vec::with_capacity(num);
         for _ in 0..num {
             let (b, b_mac) = self.fcom_f2.f_random(channel, rng)?;
             let b_m = bit_to_fe(b);
             let b_m_mac = self.fcom.f_input(channel, rng, b_m)?;
-            dabit_vec.push(Dabit { bit: b, value: b_m });
-            dabit_vec_mac.push(DabitMac {
-                bit: b_mac,
-                value: b_m_mac,
+            dabit_vec.push(DabitProver {
+                bit: (b, b_mac),
+                value: (b_m, b_m_mac),
             });
         }
-        Ok((dabit_vec, dabit_vec_mac))
+        Ok(dabit_vec)
     }
 
     fn fdabit<C: AbstractChannel, RNG: CryptoRng + Rng>(
         &mut self,
         channel: &mut C,
         rng: &mut RNG,
-        dabits: &Vec<Dabit<FE>>,
-        dabits_mac: &Vec<DabitMac<FE>>,
+        dabits: &Vec<DabitProver<FE>>,
     ) -> Result<(), Error> {
         let s = FDABIT_SECURITY_PARAMETER;
         let n = dabits.len();
-        debug_assert_eq!(n, dabits_mac.len());
 
         let num_bits = std::mem::size_of::<usize>() * 8;
         let gamma = num_bits - ((n + 1).leading_zeros() as usize) - 1 + 1;
@@ -333,8 +333,8 @@ impl<FE: FiniteField> SenderConv<FE> {
         for i in 0..n {
             // making sure the faulty dabits are not faulty
             debug_assert!(
-                ((dabits[i].bit == F2::ZERO) & (dabits[i].value == FE::PrimeField::ZERO))
-                    | ((dabits[i].bit == F2::ONE) & (dabits[i].value == FE::PrimeField::ONE))
+                ((dabits[i].bit.0 == F2::ZERO) & (dabits[i].value.0 == FE::PrimeField::ZERO))
+                    | ((dabits[i].bit.0 == F2::ONE) & (dabits[i].value.0 == FE::PrimeField::ONE))
             );
         }
 
@@ -416,8 +416,10 @@ impl<FE: FiniteField> SenderConv<FE> {
                 // TODO: do not need to do it when e[i] is ZERO
                 let (tmp, tmp_mac) =
                     self.fcom_f2
-                        .f_affine_mult_cst(e[k][i], dabits[i].bit, dabits_mac[i].bit);
-                debug_assert!(((e[k][i] == F2::ONE) & (tmp == dabits[i].bit)) | (tmp == F2::ZERO));
+                        .f_affine_mult_cst(e[k][i], dabits[i].bit.0, dabits[i].bit.1);
+                debug_assert!(
+                    ((e[k][i] == F2::ONE) & (tmp == dabits[i].bit.0)) | (tmp == F2::ZERO)
+                );
                 r += tmp;
                 r_mac += tmp_mac;
             }
@@ -438,9 +440,9 @@ impl<FE: FiniteField> SenderConv<FE> {
                 let b = bit_to_fe(e[k][i]);
                 let (tmp, tmp_mac) =
                     self.fcom
-                        .f_affine_mult_cst(b, dabits[i].value, dabits_mac[i].value);
+                        .f_affine_mult_cst(b, dabits[i].value.0, dabits[i].value.1);
                 debug_assert!(
-                    ((b == FE::PrimeField::ONE) & (tmp == dabits[i].value))
+                    ((b == FE::PrimeField::ONE) & (tmp == dabits[i].value.0))
                         | (tmp == FE::PrimeField::ZERO)
                 );
                 r_prime += tmp;
@@ -515,12 +517,12 @@ impl<FE: FiniteField> SenderConv<FE> {
         let r = self.random_edabits(channel, rng, nb_random_edabits)?;
 
         // step 1)b)
-        let (dabits, dabits_mac) = self.random_dabits(channel, rng, nb_random_dabits)?;
+        let dabits = self.random_dabits(channel, rng, nb_random_dabits)?;
 
         // step 1)c): TODO: random multiplication triples
 
         // step 2)
-        self.fdabit(channel, rng, &dabits, &dabits_mac)?;
+        self.fdabit(channel, rng, &dabits)?;
 
         // step 3): TODO: generate pi_2 and pi_3
         let seed1 = channel.read_block()?;
@@ -541,13 +543,10 @@ impl<FE: FiniteField> SenderConv<FE> {
         // step 6)
         for j in 0..B {
             // step 6)b) batched and moved up
-            let e_batch = self.bit_add_carry(
-                channel,
-                rng,
-                edabits_vector.to_vec(),
-                r[j * n..(j + 1) * n].to_vec(),
-            )?;
+            let e_batch =
+                self.bit_add_carry(channel, rng, &edabits_vector, &r[j * n..(j + 1) * n])?;
 
+            println!("IN");
             for i in 0..n {
                 let idx_base = i * B;
 
@@ -556,12 +555,8 @@ impl<FE: FiniteField> SenderConv<FE> {
                 // mapping arguments to variable names similar to ones in the paper
                 let (_c_m, c_m_mac) = edabits.value;
 
-                let idx_dabit = idx_base + j;
-
                 // pick the random dabit
-                let b = dabits[idx_dabit].bit;
-                let b_mac = dabits_mac[idx_dabit].bit;
-                let b_m_mac = dabits_mac[idx_dabit].value;
+                let idx_dabit = idx_base + j;
 
                 //pick the random edabit
                 let idx_r = idx_base + j;
@@ -574,8 +569,8 @@ impl<FE: FiniteField> SenderConv<FE> {
                 let (e, e_carry) = e_batch[i].clone();
 
                 // 6)c)
-                let (_, e_m_mac) = self
-                    .convert_bit_2_field(channel, rng, b, b_mac, b_m_mac, e_carry.0, e_carry.1)?;
+                let (_, e_m_mac) =
+                    self.convert_bit_2_field(channel, rng, dabits[idx_dabit].clone(), e_carry)?;
 
                 // 6)d)
                 let e1_mac = c_plus_r_mac
@@ -588,6 +583,7 @@ impl<FE: FiniteField> SenderConv<FE> {
                 // let s = convert_f2_to_field(ei);
                 self.fcom.f_check_zero(channel, e1_mac)?;
             }
+            println!("OUT");
         }
 
         Ok(())
@@ -618,10 +614,12 @@ impl<FE: FiniteField> ReceiverConv<FE> {
         &mut self,
         channel: &mut C,
         _rng: &mut RNG,
-        r_mac: Gf40,
-        r_m_mac: FE,
+        r: DabitVerifier<FE>,
         x_mac: Gf40,
     ) -> Result<FE, Error> {
+        let r_mac = r.bit;
+        let r_m_mac = r.value;
+
         let c = self.fcom_f2.f_open(channel, r_mac + x_mac)?;
         let x_m_mac = (if c == F2::ONE {
             -self.fcom.get_delta()
@@ -640,8 +638,8 @@ impl<FE: FiniteField> ReceiverConv<FE> {
         &mut self,
         channel: &mut C,
         rng: &mut RNG,
-        x_batch: Vec<EdabitsVerifier<FE>>,
-        y_batch: Vec<EdabitsVerifier<FE>>,
+        x_batch: &[EdabitsVerifier<FE>],
+        y_batch: &[EdabitsVerifier<FE>],
     ) -> Result<Vec<(Vec<Gf40>, Gf40)>, Error> {
         let x_batch_len = x_batch.len();
         let y_batch_len = y_batch.len();
@@ -753,12 +751,12 @@ impl<FE: FiniteField> ReceiverConv<FE> {
         channel: &mut C,
         rng: &mut RNG,
         num: usize, // in the paper: NB
-    ) -> Result<Vec<DabitMac<FE>>, Error> {
+    ) -> Result<Vec<DabitVerifier<FE>>, Error> {
         let mut dabit_vec_mac = Vec::with_capacity(num);
         for _ in 0..num {
             let b_mac = self.fcom_f2.f_random(channel, rng)?;
             let b_m_mac = self.fcom.f_input(channel, rng)?;
-            dabit_vec_mac.push(DabitMac {
+            dabit_vec_mac.push(DabitVerifier {
                 bit: b_mac,
                 value: b_m_mac,
             });
@@ -770,7 +768,7 @@ impl<FE: FiniteField> ReceiverConv<FE> {
         &mut self,
         channel: &mut C,
         rng: &mut RNG,
-        dabits_mac: &Vec<DabitMac<FE>>,
+        dabits_mac: &Vec<DabitVerifier<FE>>,
     ) -> Result<(), Error> {
         let s = FDABIT_SECURITY_PARAMETER;
         let n = dabits_mac.len();
@@ -953,12 +951,8 @@ impl<FE: FiniteField> ReceiverConv<FE> {
         // step 6)
         for j in 0..B {
             // step 6)b) batched and moved up
-            let e_batch = self.bit_add_carry(
-                channel,
-                rng,
-                edabits_vector_mac.to_vec(),
-                r_mac[j * n..(j + 1) * n].to_vec(),
-            )?;
+            let e_batch =
+                self.bit_add_carry(channel, rng, edabits_vector_mac, &r_mac[j * n..(j + 1) * n])?;
             for i in 0..n {
                 let idx_base = i * B;
 
@@ -967,8 +961,6 @@ impl<FE: FiniteField> ReceiverConv<FE> {
 
                 // pick the random dabit
                 let idx_dabit = idx_base + j;
-                let b_mac = dabits_mac[idx_dabit].bit;
-                let b_m_mac = dabits_mac[idx_dabit].value;
 
                 //pick the random edabit
                 let idx_r = idx_base + j;
@@ -981,8 +973,12 @@ impl<FE: FiniteField> ReceiverConv<FE> {
                 let (e_mac, e_carry_mac) = e_batch[i].clone();
 
                 // 6)c)
-                let e_m_mac =
-                    self.convert_bit_2_field(channel, rng, b_mac, b_m_mac, e_carry_mac)?;
+                let e_m_mac = self.convert_bit_2_field(
+                    channel,
+                    rng,
+                    dabits_mac[idx_dabit].clone(),
+                    e_carry_mac,
+                )?;
 
                 // 6)d)
                 let e1_mac = c_plus_r_mac
@@ -1010,7 +1006,10 @@ impl<FE: FiniteField> ReceiverConv<FE> {
 #[cfg(test)]
 mod tests {
 
-    use super::{bit_to_fe, EdabitsProver, EdabitsVerifier, ReceiverConv, SenderConv};
+    use super::{
+        bit_to_fe, DabitProver, DabitVerifier, EdabitsProver, EdabitsVerifier, ReceiverConv,
+        SenderConv,
+    };
     use scuttlebutt::{
         field::{F61p, FiniteField, Gf40, F2},
         AesRng, Channel,
@@ -1038,7 +1037,15 @@ mod tests {
                 let (x_f2, x_f2_mac) = fconv.fcom_f2.f_random(&mut channel, &mut rng).unwrap();
 
                 let (x_m, x_m_mac) = fconv
-                    .convert_bit_2_field(&mut channel, &mut rng, rb, rb_mac, rm_mac, x_f2, x_f2_mac)
+                    .convert_bit_2_field(
+                        &mut channel,
+                        &mut rng,
+                        DabitProver {
+                            bit: (rb, rb_mac),
+                            value: (rm, rm_mac),
+                        },
+                        (x_f2, x_f2_mac),
+                    )
                     .unwrap();
 
                 let _ = fconv.fcom.f_open(&mut channel, x_m, x_m_mac).unwrap();
@@ -1067,7 +1074,15 @@ mod tests {
             let x_f2_mac = fconv.fcom_f2.f_random(&mut channel, &mut rng).unwrap();
 
             let x_m_mac = fconv
-                .convert_bit_2_field(&mut channel, &mut rng, rb_mac, r_m_mac, x_f2_mac)
+                .convert_bit_2_field(
+                    &mut channel,
+                    &mut rng,
+                    DabitVerifier {
+                        bit: rb_mac,
+                        value: r_m_mac,
+                    },
+                    x_f2_mac,
+                )
                 .unwrap();
 
             let x_m = fconv.fcom.f_open(&mut channel, x_m_mac).unwrap();
@@ -1130,11 +1145,13 @@ mod tests {
                     vec![EdabitsProver {
                         bits: vx,
                         value: default_fe,
-                    }],
+                    }]
+                    .as_slice(),
                     vec![EdabitsProver {
                         bits: vy,
                         value: default_fe,
-                    }],
+                    }]
+                    .as_slice(),
                 )
                 .unwrap()[0]
                 .clone();
@@ -1171,11 +1188,13 @@ mod tests {
                 vec![EdabitsVerifier {
                     bits: x_mac,
                     value: default_fe,
-                }],
+                }]
+                .as_slice(),
                 vec![EdabitsVerifier {
                     bits: y_mac,
                     value: default_fe,
-                }],
+                }]
+                .as_slice(),
             )
             .unwrap()[0]
             .clone();
@@ -1206,10 +1225,8 @@ mod tests {
             let mut channel = Channel::new(reader, writer);
             let mut fconv = SenderConv::<FE>::init(&mut channel, &mut rng).unwrap();
 
-            let (dabits, dabits_mac) = fconv.random_dabits(&mut channel, &mut rng, count).unwrap();
-            let _ = fconv
-                .fdabit(&mut channel, &mut rng, &dabits, &dabits_mac)
-                .unwrap();
+            let dabits = fconv.random_dabits(&mut channel, &mut rng, count).unwrap();
+            let _ = fconv.fdabit(&mut channel, &mut rng, &dabits).unwrap();
             ()
         });
         let mut rng = AesRng::new();
