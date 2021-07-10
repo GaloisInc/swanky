@@ -172,6 +172,18 @@ impl<FE: FiniteField> FComSender<FE> {
         Ok(())
     }
 
+    pub fn f_check_zero_batch<C: AbstractChannel>(
+        &mut self,
+        channel: &mut C,
+        x_mac_batch: Vec<FE>,
+    ) -> Result<(), Error> {
+        for x_mac in x_mac_batch.iter() {
+            channel.write_fe::<FE>(x_mac.clone())?;
+        }
+        channel.flush()?;
+        Ok(())
+    }
+
     pub fn f_open<C: AbstractChannel>(
         &mut self,
         channel: &mut C,
@@ -405,6 +417,26 @@ impl<FE: FiniteField> FComReceiver<FE> {
         } else {
             Ok(false)
         }
+    }
+
+    pub fn f_check_zero_batch<C: AbstractChannel>(
+        &mut self,
+        channel: &mut C,
+        key_batch: Vec<FE>,
+    ) -> Result<bool, Error> {
+        let mut m_batch = Vec::with_capacity(key_batch.len());
+
+        for _ in 0..key_batch.len() {
+            let m = channel.read_fe::<FE>()?;
+            m_batch.push(m);
+        }
+        let mut b = true;
+        for i in 0..key_batch.len() {
+            if key_batch[i] != m_batch[i] {
+                b = false;
+            }
+        }
+        Ok(b)
     }
 
     pub fn f_open<C: AbstractChannel>(
