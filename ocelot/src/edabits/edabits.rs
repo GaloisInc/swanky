@@ -338,76 +338,104 @@ impl<FE: FiniteField> SenderConv<FE> {
             );
         }
 
-        let mut triples = Vec::new();
-
-        for _ in 0..s {
-            // step 1)
-            let mut c_m = Vec::with_capacity(gamma);
-            let mut c_m_mac = Vec::with_capacity(gamma);
+        // step 1)
+        let mut c_m: Vec<Vec<FE::PrimeField>> = vec![Vec::with_capacity(gamma); s];
+        let mut c_m_mac: Vec<Vec<FE>> = Vec::with_capacity(s);
+        for k in 0..s {
             for _ in 0..gamma {
                 let b: F2 = F2::random(rng);
                 let b_m = bit_to_fe(b);
-                let b_m_mac = self.fcom.f_input(channel, rng, b_m)?;
-                c_m.push(b_m);
-                c_m_mac.push(b_m_mac);
+                c_m[k].push(b_m);
             }
-            let c1;
+        }
 
-            if c_m[0] == FE::PrimeField::ZERO {
-                c1 = F2::ZERO;
+        for k in 0..s {
+            let b_m_mac = self.fcom.f_input_batch(channel, rng, c_m[k].as_slice())?;
+            c_m_mac.push(b_m_mac);
+        }
+
+        let mut c1: Vec<F2> = Vec::with_capacity(s);
+        for k in 0..s {
+            if c_m[k][0] == FE::PrimeField::ZERO {
+                c1.push(F2::ZERO);
             } else {
-                c1 = F2::ONE;
+                c1.push(F2::ONE);
             }
+        }
+        let c1_mac = self.fcom_f2.f_input_batch(channel, rng, &c1)?;
 
-            let c1_mac = self.fcom_f2.f_input(channel, rng, c1)?;
-
-            // step 2)
+        // step 2)
+        let mut triples = Vec::new();
+        let mut andl_batch = Vec::with_capacity(gamma * s);
+        let mut andl_mac_batch = Vec::with_capacity(gamma * s);
+        let mut one_minus_ci_batch = Vec::with_capacity(gamma * s);
+        let mut one_minus_ci_mac_batch = Vec::with_capacity(gamma * s);
+        let mut and_res_batch = Vec::with_capacity(gamma * s);
+        for k in 0..s {
             for i in 0..gamma {
-                let andl = c_m[i];
-                let andl_mac = c_m_mac[i];
+                let andl: FE::PrimeField = c_m[k][i];
+                let andl_mac: FE = c_m_mac[k][i];
                 let (minus_ci, minus_ci_mac) : (FE::PrimeField,FE) = // -ci
                     self.fcom.f_affine_mult_cst(-FE::PrimeField::ONE, andl, andl_mac);
                 let (one_minus_ci, one_minus_ci_mac) = // 1 - ci
                     self.fcom.f_affine_add_cst(FE::PrimeField::ONE, minus_ci, minus_ci_mac);
                 let and_res = andl * one_minus_ci;
-                let and_res_mac = self.fcom.f_input(channel, rng, and_res)?;
-                triples.push((
-                    MacValue(andl, andl_mac),
-                    MacValue(one_minus_ci, one_minus_ci_mac),
-                    MacValue(and_res, and_res_mac),
-                ));
+                andl_batch.push(andl);
+                andl_mac_batch.push(andl_mac);
+                one_minus_ci_batch.push(one_minus_ci);
+                one_minus_ci_mac_batch.push(one_minus_ci_mac);
+                and_res_batch.push(and_res);
             }
+        }
+        let and_res_mac_batch = self.fcom.f_input_batch(channel, rng, &and_res_batch)?;
 
-            // step 3)
-            let seed = channel.read_block()?;
-            let mut e_rng = AesRng::from_seed(seed);
-            let mut e = Vec::with_capacity(n);
+        for j in 0..s * gamma {
+            triples.push((
+                MacValue(andl_batch[j], andl_mac_batch[j]),
+                MacValue(one_minus_ci_batch[j], one_minus_ci_mac_batch[j]),
+                MacValue(and_res_batch[j], and_res_mac_batch[j]),
+            ));
+        }
+
+        // step 3)
+        let seed = channel.read_block()?;
+        let mut e_rng = AesRng::from_seed(seed);
+        let mut e = vec![Vec::with_capacity(n); s];
+        for k in 0..s {
             for _i in 0..n {
                 let b = F2::random(&mut e_rng);
-                e.push(b);
+                e[k].push(b);
             }
+        }
 
-            // step 4)
-            let (mut r, mut r_mac) = (c1, c1_mac);
+        // step 4)
+        let mut r_batch = Vec::with_capacity(s);
+        for k in 0..s {
+            let (mut r, mut r_mac) = (c1[k], c1_mac[k]);
             for i in 0..n {
                 // TODO: do not need to do it when e[i] is ZERO
                 let (tmp, tmp_mac) =
                     self.fcom_f2
-                        .f_affine_mult_cst(e[i], dabits[i].bit, dabits_mac[i].bit);
-                debug_assert!(((e[i] == F2::ONE) & (tmp == dabits[i].bit)) | (tmp == F2::ZERO));
+                        .f_affine_mult_cst(e[k][i], dabits[i].bit, dabits_mac[i].bit);
+                debug_assert!(((e[k][i] == F2::ONE) & (tmp == dabits[i].bit)) | (tmp == F2::ZERO));
                 r += tmp;
                 r_mac += tmp_mac;
             }
+            r_batch.push((r, r_mac));
+        }
 
-            // step 5)
-            let _ = self.fcom_f2.f_open(channel, r, r_mac)?;
+        // step 5) TODO: move this to the end
+        let _ = self.fcom_f2.f_open_batch(channel, &r_batch)?;
 
+        // step 6)
+        let mut r_prime_batch = Vec::with_capacity(s);
+        for k in 0..s {
             // step 6)
             // NOTE: for performance maybe step 4 and 6 should be combined in one loop
             let (mut r_prime, mut r_prime_mac) = (FE::PrimeField::ZERO, FE::ZERO);
             for i in 0..n {
                 // TODO: do not need to do it when e[i] is ZERO
-                let b = bit_to_fe(e[i]);
+                let b = bit_to_fe(e[k][i]);
                 let (tmp, tmp_mac) =
                     self.fcom
                         .f_affine_mult_cst(b, dabits[i].value, dabits_mac[i].value);
@@ -418,25 +446,34 @@ impl<FE: FiniteField> SenderConv<FE> {
                 r_prime += tmp;
                 r_prime_mac += tmp_mac;
             }
+            r_prime_batch.push((r_prime, r_prime_mac));
+        }
 
-            // step 7)
-            let (mut tau, mut tau_mac) = (r_prime, r_prime_mac);
+        // step 7)
+        let mut tau_batch = Vec::with_capacity(s);
+        for k in 0..s {
+            let (mut tau, mut tau_mac) = r_prime_batch[k];
             let mut twos = FE::PrimeField::ONE;
             for i in 0..gamma {
-                let (tmp, tmp_mac) = self.fcom.f_affine_mult_cst(twos, c_m[i], c_m_mac[i]);
+                let (tmp, tmp_mac) = self.fcom.f_affine_mult_cst(twos, c_m[k][i], c_m_mac[k][i]);
                 if i == 0 {
-                    debug_assert!(c_m[i] == tmp);
+                    debug_assert!(c_m[k][i] == tmp);
                 }
                 tau += tmp;
                 tau_mac += tmp_mac;
                 twos += twos;
             }
-            let _ = self.fcom.f_open(channel, tau, tau_mac)?;
+            tau_batch.push((tau, tau_mac));
+        }
 
+        let _ = self.fcom.f_open_batch(channel, &tau_batch)?;
+
+        // step 8)
+        for k in 0..s {
             // step 8)
             // NOTE: This is not needed for the prover,
             let b: bool;
-            match (r == F2::ONE, tau.modulus2()) {
+            match (r_batch[k].0 == F2::ONE, tau_batch[k].0.modulus2()) {
                 (true, true) => {
                     b = true;
                 }
@@ -749,76 +786,100 @@ impl<FE: FiniteField> ReceiverConv<FE> {
 
         let mut res = true;
 
-        let mut triples = Vec::new();
-
+        // step 1)
+        let mut c_m_mac: Vec<Vec<FE>> = Vec::with_capacity(s);
         for _ in 0..s {
-            // step 1)
-            let mut c_m_mac = Vec::with_capacity(gamma);
-            for _ in 0..gamma {
-                let b_m_mac = self.fcom.f_input(channel, rng)?;
-                c_m_mac.push(b_m_mac);
-            }
+            let b_m_mac = self.fcom.f_input_batch(channel, rng, gamma)?;
+            c_m_mac.push(b_m_mac);
+        }
 
-            let c1_mac = self.fcom_f2.f_input(channel, rng)?;
+        let c1_mac = self.fcom_f2.f_input_batch(channel, rng, s)?;
 
-            // step 2)
+        // step 2)
+        let mut triples = Vec::new();
+        let mut andl_mac_batch = Vec::with_capacity(gamma * s);
+        let mut one_minus_ci_mac_batch = Vec::with_capacity(gamma * s);
+        for k in 0..s {
             for i in 0..gamma {
-                let andl_mac = c_m_mac[i];
+                let andl_mac = c_m_mac[k][i];
                 let minus_ci_mac : FE = // -ci
                     self.fcom.f_affine_mult_cst(-FE::PrimeField::ONE, andl_mac);
                 let one_minus_ci_mac = // 1 - ci
                     self.fcom.f_affine_add_cst(FE::PrimeField::ONE, minus_ci_mac);
-                let and_res_mac = self.fcom.f_input(channel, rng)?;
-                triples.push((andl_mac, one_minus_ci_mac, and_res_mac));
+                andl_mac_batch.push(andl_mac);
+                one_minus_ci_mac_batch.push(one_minus_ci_mac);
             }
+        }
 
-            // step 3)
+        let and_res_mac_batch = self.fcom.f_input_batch(channel, rng, gamma * s)?;
+        for j in 0..s * gamma {
+            triples.push((
+                andl_mac_batch[j],
+                one_minus_ci_mac_batch[j],
+                and_res_mac_batch[j],
+            ));
+        }
 
-            let seed = rng.gen::<Block>();
-            channel.write_block(&seed)?;
-            channel.flush()?;
-
-            let mut e_rng = AesRng::from_seed(seed);
-            let mut e = Vec::with_capacity(n);
+        // step 3)
+        let seed = rng.gen::<Block>();
+        channel.write_block(&seed)?;
+        channel.flush()?;
+        let mut e_rng = AesRng::from_seed(seed);
+        let mut e = vec![Vec::with_capacity(n); s];
+        for k in 0..s {
             for _i in 0..n {
                 let b = F2::random(&mut e_rng);
-                e.push(b);
+                e[k].push(b);
             }
+        }
 
-            // step 4)
-            let mut r_mac = c1_mac;
+        // step 4)
+        let mut r_mac_batch = Vec::with_capacity(s);
+        for k in 0..s {
+            let mut r_mac = c1_mac[k];
             for i in 0..n {
                 // TODO: do not need to do it when e[i] is ZERO
-                let tmp_mac = self.fcom_f2.f_affine_mult_cst(e[i], dabits_mac[i].bit);
+                let tmp_mac = self.fcom_f2.f_affine_mult_cst(e[k][i], dabits_mac[i].bit);
                 r_mac += tmp_mac;
             }
+            r_mac_batch.push(r_mac);
+        }
 
-            // step 5)
-            let r = self.fcom_f2.f_open(channel, r_mac)?;
+        // step 5)
+        let r_batch = self.fcom_f2.f_open_batch(channel, &r_mac_batch)?;
 
-            // step 6)
+        // step 6)
+        let mut r_prime_batch = Vec::with_capacity(s);
+        for k in 0..s {
             // NOTE: for performance maybe step 4 and 6 should be combined in one loop
             let mut r_prime_mac = FE::ZERO;
             for i in 0..n {
                 // TODO: do not need to do it when e[i] is ZERO
-                let b = bit_to_fe(e[i]);
+                let b = bit_to_fe(e[k][i]);
                 let tmp_mac = self.fcom.f_affine_mult_cst(b, dabits_mac[i].value);
                 r_prime_mac += tmp_mac;
             }
+            r_prime_batch.push(r_prime_mac);
+        }
 
-            // step 7)
-            let mut tau_mac = r_prime_mac;
+        // step 7)
+        let mut tau_mac_batch = Vec::with_capacity(s);
+        for k in 0..s {
+            let mut tau_mac = r_prime_batch[k];
             let mut twos = FE::PrimeField::ONE;
             for i in 0..gamma {
-                let tmp_mac = self.fcom.f_affine_mult_cst(twos, c_m_mac[i]);
+                let tmp_mac = self.fcom.f_affine_mult_cst(twos, c_m_mac[k][i]);
                 tau_mac += tmp_mac;
                 twos += twos;
             }
-            let tau = self.fcom.f_open(channel, tau_mac)?;
+            tau_mac_batch.push(tau_mac);
+        }
+        let tau_batch = self.fcom.f_open_batch(channel, &tau_mac_batch)?;
 
-            // step 8)
+        // step 8)
+        for k in 0..s {
             let b: bool;
-            match (r == F2::ONE, tau.modulus2()) {
+            match (r_batch[k] == F2::ONE, tau_batch[k].modulus2()) {
                 (true, true) => {
                     b = true;
                 }
