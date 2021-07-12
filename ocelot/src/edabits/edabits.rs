@@ -562,6 +562,7 @@ impl<FE: FiniteField> SenderConv<FE> {
 
         // step 6)
         for j in 0..B {
+            // base index for the window of `idx_base..idx_base + n` values
             let idx_base = j * n;
 
             // step 6)b) batched and moved up
@@ -580,18 +581,16 @@ impl<FE: FiniteField> SenderConv<FE> {
                 e_carry_batch,
             )?;
 
-            let mut e1_mac_batch = Vec::with_capacity(n);
+            // 6)a)
+            let mut e_prime_mac_batch = Vec::with_capacity(n);
+            // 6)d)
             let mut ei_batch = Vec::with_capacity(n * NB_BITS);
             for i in 0..n {
-                let edabits = &edabits_vector[i];
-
-                // mapping arguments to variable names similar to ones in the paper
-                let (_c_m, c_m_mac) = edabits.value;
-
                 //pick the random edabit
                 let idx_r = idx_base + i;
 
                 // 6)a)
+                let (_c_m, c_m_mac) = edabits_vector[i].value;
                 let (_r_m, r_m_mac) = r[idx_r].value;
                 let c_plus_r_mac = c_m_mac + r_m_mac;
 
@@ -599,9 +598,9 @@ impl<FE: FiniteField> SenderConv<FE> {
                 let e_m_mac = e_m_batch[i].1;
 
                 // 6)d)
-                let e1_mac = c_plus_r_mac
+                let e_prime_mac = c_plus_r_mac
                     - e_m_mac.multiply_by_prime_subfield(power_two::<FE::PrimeField>(NB_BITS));
-                e1_mac_batch.push(e1_mac);
+                e_prime_mac_batch.push(e_prime_mac);
 
                 ei_batch.extend(&e_batch[i].0);
             }
@@ -611,7 +610,7 @@ impl<FE: FiniteField> SenderConv<FE> {
 
             // Remark this is not necessary for the prover, bc cst addition dont show up in mac
             // let s = convert_f2_to_field(ei);
-            self.fcom.f_check_zero_batch(channel, e1_mac_batch)?;
+            self.fcom.f_check_zero_batch(channel, e_prime_mac_batch)?;
         }
 
         Ok(())
@@ -993,6 +992,7 @@ impl<FE: FiniteField> ReceiverConv<FE> {
 
         // step 6)
         for j in 0..B {
+            // base index for the window of `idx_base..idx_base + n` values
             let idx_base = j * n;
 
             // step 6)b) batched and moved up
@@ -1016,17 +1016,15 @@ impl<FE: FiniteField> ReceiverConv<FE> {
             )?;
 
             // 6)a)
+            let mut e_prime_mac_batch = Vec::with_capacity(n);
             // 6)d)
-            let mut e1_mac_batch = Vec::with_capacity(n);
             let mut ei_mac_batch = Vec::with_capacity(n * NB_BITS);
             for i in 0..n {
-                let edabits_mac = &edabits_vector_mac[i];
-                let c_m_mac = edabits_mac.value;
-
-                //pick the random edabit
+                // pick the random edabit
                 let idx_r = idx_base + i;
 
                 // 6)a)
+                let c_m_mac = edabits_vector_mac[i].value;
                 let r_m_mac = r_mac[idx_r].value;
                 let c_plus_r_mac = c_m_mac + r_m_mac;
 
@@ -1034,9 +1032,9 @@ impl<FE: FiniteField> ReceiverConv<FE> {
                 let e_m_mac = e_m_mac_batch[i];
 
                 // 6)d)
-                let e1_mac = c_plus_r_mac
+                let e_prime_mac = c_plus_r_mac
                     - e_m_mac.multiply_by_prime_subfield(power_two::<FE::PrimeField>(NB_BITS));
-                e1_mac_batch.push(e1_mac);
+                e_prime_mac_batch.push(e_prime_mac);
 
                 // 6)e)
                 ei_mac_batch.extend(&e_batch[i].0);
@@ -1047,8 +1045,9 @@ impl<FE: FiniteField> ReceiverConv<FE> {
             let mut e_prime_minus_sum_batch = Vec::with_capacity(n);
             for i in 0..n {
                 let sum = convert_f2_to_field::<FE>(&ei_batch[i * NB_BITS..(i + 1) * NB_BITS]);
-                e_prime_minus_sum_batch
-                    .push(e1_mac_batch[i] + self.fcom.get_delta().multiply_by_prime_subfield(sum));
+                e_prime_minus_sum_batch.push(
+                    e_prime_mac_batch[i] + self.fcom.get_delta().multiply_by_prime_subfield(sum),
+                );
             }
             b = self
                 .fcom
