@@ -312,13 +312,19 @@ impl<FE: FiniteField> SenderConv<FE> {
         num: usize, // in the paper: NB
     ) -> Result<Vec<DabitProver<FE>>, Error> {
         let mut dabit_vec = Vec::with_capacity(num);
-        for _ in 0..num {
-            let (b, b_mac) = self.fcom_f2.f_random(channel, rng)?;
-            let b_m = bit_to_fe(b);
-            let b_m_mac = self.fcom.f_input(channel, rng, b_m)?;
+        let b_batch = self.fcom_f2.f_random_batch(channel, rng, num)?;
+        let mut b_m_batch = Vec::with_capacity(num);
+        for (b, _b_mac) in b_batch.iter() {
+            let b_m = bit_to_fe(b.clone());
+            b_m_batch.push(b_m);
+        }
+
+        let b_m_mac_batch = self.fcom.f_input_batch(channel, rng, &b_m_batch)?;
+
+        for i in 0..num {
             dabit_vec.push(DabitProver {
-                bit: (b, b_mac),
-                value: (b_m, b_m_mac),
+                bit: b_batch[i],
+                value: (b_m_batch[i], b_m_mac_batch[i]),
             });
         }
         Ok(dabit_vec)
@@ -790,12 +796,12 @@ impl<FE: FiniteField> ReceiverConv<FE> {
         num: usize, // in the paper: NB
     ) -> Result<Vec<DabitVerifier<FE>>, Error> {
         let mut dabit_vec_mac = Vec::with_capacity(num);
-        for _ in 0..num {
-            let b_mac = self.fcom_f2.f_random(channel, rng)?;
-            let b_m_mac = self.fcom.f_input(channel, rng)?;
+        let b_mac_batch = self.fcom_f2.f_random_batch(channel, rng, num)?;
+        let b_m_mac_batch = self.fcom.f_input_batch(channel, rng, num)?;
+        for i in 0..num {
             dabit_vec_mac.push(DabitVerifier {
-                bit: b_mac,
-                value: b_m_mac,
+                bit: b_mac_batch[i],
+                value: b_m_mac_batch[i],
             });
         }
         Ok(dabit_vec_mac)
