@@ -81,7 +81,7 @@ fn power_two<FE: FiniteField>(m: usize) -> FE {
     let mut res = FE::ONE;
 
     for _ in 0..m {
-        res = res + res;
+        res += res;
     }
 
     res
@@ -203,9 +203,7 @@ impl<FE: FiniteField> SenderConv<FE> {
                 let x = &x_batch[n].bits;
                 let y = &y_batch[n].bits;
 
-                if x.len() != m || y.len() != m {
-                    panic!("bits vector of different length");
-                }
+                debug_assert!(x.len() == m && y.len() == m);
 
                 let (xi, xi_mac) = x[i];
                 let (yi, yi_mac) = y[i];
@@ -218,24 +216,21 @@ impl<FE: FiniteField> SenderConv<FE> {
 
                 let and_res = and1 * and2;
 
+                let c = ci + and_res;
+                // let c_mac = ci_mac + and_res_mac; // is done in the next step
+                ci_batch[n] = c;
+
+                let z = and1 + yi; // xi + yi + ci ;
+                let z_mac = and1_mac + yi_mac; // xi_mac + yi_mac + ci_mac;
+                z_batch[n].push((z, z_mac));
+
                 and_res_batch.push(and_res);
                 aux_batch.push((and1, and1_mac, and2, and2_mac));
             }
             let and_res_mac_batch = self.fcom_f2.f_input_batch(channel, rng, &and_res_batch)?;
 
             for n in 0..x_batch_len {
-                let ci = ci_batch[n];
-                let ci_mac = ci_mac_batch[n];
-                let x = &x_batch[n].bits;
-                let y = &y_batch[n].bits;
-
-                let (xi, xi_mac) = x[i];
-                let (yi, yi_mac) = y[i];
-
-                let and1 = aux_batch[n].0;
-                let and1_mac = aux_batch[n].1;
-                let and2 = aux_batch[n].2;
-                let and2_mac = aux_batch[n].3;
+                let (and1, and1_mac, and2, and2_mac) = aux_batch[n];
                 let and_res = and_res_batch[n];
                 let and_res_mac = and_res_mac_batch[n];
                 triples.push((
@@ -244,16 +239,10 @@ impl<FE: FiniteField> SenderConv<FE> {
                     MacValue(and_res, and_res_mac),
                 ));
 
-                let c = ci + and_res;
+                let ci_mac = ci_mac_batch[n];
                 let c_mac = ci_mac + and_res_mac;
 
-                let z = xi + yi + ci;
-                let z_mac = xi_mac + yi_mac + ci_mac;
-
-                ci_batch[n] = c;
                 ci_mac_batch[n] = c_mac;
-
-                z_batch[n].push((z, z_mac));
             }
         }
 
@@ -708,40 +697,28 @@ impl<FE: FiniteField> ReceiverConv<FE> {
                 let x = &x_batch[n].bits;
                 let y = &y_batch[n].bits;
 
-                if x.len() != m || y.len() != m {
-                    panic!("bits vector of different length");
-                }
+                debug_assert!(x.len() == m && y.len() == m);
+
                 let xi_mac = x[i];
                 let yi_mac = y[i];
 
                 let and1_mac = xi_mac + ci_mac;
-
                 let and2_mac = yi_mac + ci_mac;
 
+                let z_mac = and1_mac + yi_mac; //xi_mac + yi_mac + ci_mac;
+                z_batch[n].push(z_mac);
                 aux_batch.push((and1_mac, and2_mac));
             }
             let and_res_mac_batch = self.fcom_f2.f_input_batch(channel, rng, x_batch_len)?;
 
             for n in 0..x_batch_len {
                 let ci_mac = ci_mac_batch[n];
-                let x = &x_batch[n].bits;
-                let y = &y_batch[n].bits;
-
-                let xi_mac = x[i];
-                let yi_mac = y[i];
-
-                let and1_mac = aux_batch[n].0;
-                let and2_mac = aux_batch[n].1;
+                let (and1_mac, and2_mac) = aux_batch[n];
                 let and_res_mac = and_res_mac_batch[n];
                 triples.push((and1_mac, and2_mac, and_res_mac));
 
                 let c_mac = ci_mac + and_res_mac;
-
-                let z_mac = xi_mac + yi_mac + ci_mac;
-
                 ci_mac_batch[n] = c_mac;
-
-                z_batch[n].push(z_mac);
             }
         }
         // check all the multiplications in one batch
