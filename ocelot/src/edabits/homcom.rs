@@ -218,24 +218,6 @@ impl<FE: FiniteField> FComSender<FE> {
         Ok(())
     }
 
-    // TODO: dummy MultiplyCheck
-    pub fn f_check_multiply<C: AbstractChannel, RNG: CryptoRng + Rng>(
-        &mut self,
-        channel: &mut C,
-        _rng: &mut RNG,
-        x: FE::PrimeField,
-        x_mac: FE,
-        y: FE::PrimeField,
-        y_mac: FE,
-        z: FE::PrimeField,
-        z_mac: FE,
-    ) -> Result<(), Error> {
-        let _ = self.f_open(channel, x, x_mac)?;
-        let _ = self.f_open(channel, y, y_mac)?;
-        let _ = self.f_open(channel, z, z_mac)?;
-        Ok(())
-    }
-
     pub fn quicksilver_check_multiply<C: AbstractChannel, RNG: CryptoRng + Rng>(
         &mut self,
         channel: &mut C,
@@ -477,25 +459,6 @@ impl<FE: FiniteField> FComReceiver<FE> {
             Ok(res)
         } else {
             Err(Error::Other("open fails at checkzero".to_string()))
-        }
-    }
-
-    // TODO: dummy MultiplyCheck
-    pub fn f_check_multiply<C: AbstractChannel, RNG: CryptoRng + Rng>(
-        &mut self,
-        channel: &mut C,
-        _rng: &mut RNG,
-        x_mac: FE,
-        y_mac: FE,
-        z_mac: FE,
-    ) -> Result<(), Error> {
-        let x = self.f_open(channel, x_mac)?;
-        let y = self.f_open(channel, y_mac)?;
-        let z = self.f_open(channel, z_mac)?;
-        if z == x * y {
-            Ok(())
-        } else {
-            Err(Error::Other("checkMultiply fails".to_string()))
         }
     }
 
