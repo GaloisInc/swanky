@@ -13,7 +13,7 @@ type Receiver = ReceiverConv<F61p>;
 
 fn run() {
     let (mut sender, mut receiver) = track_unix_channel_pair();
-    let n = 1000;
+    let n = 10_000;
     let handle = std::thread::spawn(move || {
         #[cfg(target_os = "linux")]
         {

@@ -135,13 +135,33 @@ impl<FE: FiniteField> FComSender<FE> {
     ) -> Result<Vec<FE>, Error> {
         let r = self.f_random_batch(channel, rng, x.len())?;
 
+        let mut r_mac = Vec::with_capacity(x.len());
         for i in 0..x.len() {
             let y = x[i] - r[i].0;
+            r_mac.push(r[i].1);
             channel.write_fe::<FE::PrimeField>(y)?;
         }
         channel.flush()?;
 
-        Ok(r.into_iter().map(|x| x.1).collect())
+        Ok(r_mac)
+    }
+
+    /// Similar to f_input but using pre generated voles
+    pub fn f_input_batch_pregenerated<C: AbstractChannel>(
+        &mut self,
+        channel: &mut C,
+        x: &[FE::PrimeField],
+        r: &[(FE::PrimeField, FE)],
+    ) -> Result<Vec<FE>, Error> {
+        let mut r_mac = Vec::with_capacity(x.len());
+        for i in 0..x.len() {
+            let y = x[i] - r[i].0;
+            r_mac.push(r[i].1);
+            channel.write_fe::<FE::PrimeField>(y)?;
+        }
+        channel.flush()?;
+
+        Ok(r_mac)
     }
 
     pub fn f_affine_add_cst(
@@ -178,7 +198,7 @@ impl<FE: FiniteField> FComSender<FE> {
         x_mac_batch: Vec<FE>,
     ) -> Result<(), Error> {
         for x_mac in x_mac_batch.iter() {
-            channel.write_fe::<FE>(x_mac.clone())?;
+            channel.write_fe::<FE>(*x_mac)?;
         }
         channel.flush()?;
         Ok(())
@@ -371,6 +391,22 @@ impl<FE: FiniteField> FComReceiver<FE> {
     ) -> Result<Vec<FE>, Error> {
         let r_mac = self.f_random_batch(channel, rng, num)?;
 
+        let mut v_mac = Vec::with_capacity(num);
+        for i in 0..num {
+            let y = channel.read_fe::<FE::PrimeField>()?;
+
+            v_mac.push(r_mac[i] - self.delta.multiply_by_prime_subfield(y));
+        }
+        Ok(v_mac)
+    }
+
+    /// Similar to f_input but using pre generated voles
+    pub fn f_input_batch_pregenerated<C: AbstractChannel>(
+        &mut self,
+        channel: &mut C,
+        num: usize,
+        r_mac: &[FE],
+    ) -> Result<Vec<FE>, Error> {
         let mut v_mac = Vec::with_capacity(num);
         for i in 0..num {
             let y = channel.read_fe::<FE::PrimeField>()?;

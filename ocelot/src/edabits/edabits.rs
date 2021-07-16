@@ -48,12 +48,12 @@ pub struct SenderConv<FE: FiniteField> {
     fcom: FComSender<FE>,
 }
 
-const NB_BITS: usize = 38; // 2 less than 40 bits, suspicious coincidence
+const NB_BITS: usize = 16;
 
-const B: usize = 5;
-const C: usize = 5;
+const B: usize = 3;
+const C: usize = 3;
 
-const FDABIT_SECURITY_PARAMETER: usize = 10;
+const FDABIT_SECURITY_PARAMETER: usize = 38;
 
 /// bit to field element
 fn bit_to_fe<FE: FiniteField>(b: F2) -> FE {
@@ -173,6 +173,7 @@ impl<FE: FiniteField> SenderConv<FE> {
         rng: &mut RNG,
         x_batch: &[EdabitsProver<FE>],
         y_batch: &[EdabitsProver<FE>],
+        mult_input_mac: &[(F2, Gf40)],
     ) -> Result<Vec<(Vec<(F2, Gf40)>, (F2, Gf40))>, Error> {
         let x_batch_len = x_batch.len();
         let y_batch_len = y_batch.len();
@@ -227,7 +228,11 @@ impl<FE: FiniteField> SenderConv<FE> {
                 and_res_batch.push(and_res);
                 aux_batch.push((and1, and1_mac, and2, and2_mac));
             }
-            let and_res_mac_batch = self.fcom_f2.f_input_batch(channel, rng, &and_res_batch)?;
+            let and_res_mac_batch = self.fcom_f2.f_input_batch_pregenerated(
+                channel,
+                &and_res_batch,
+                &mult_input_mac[i * x_batch_len..(i + 1) * x_batch_len],
+            )?;
 
             for n in 0..x_batch_len {
                 let (and1, and1_mac, and2, and2_mac) = aux_batch[n];
@@ -519,6 +524,7 @@ impl<FE: FiniteField> SenderConv<FE> {
     ) -> Result<(), Error> {
         let n = edabits_vector.len();
 
+        let power_two_nb_bits = power_two::<FE::PrimeField>(NB_BITS);
         let nb_random_edabits = n * B + C;
         let nb_random_dabits = n * B;
 
@@ -547,7 +553,10 @@ impl<FE: FiniteField> SenderConv<FE> {
             self.fcom_f2.f_open_batch(channel, &a.bits)?;
             self.fcom.f_open(channel, a.value.0, a.value.1)?;
         }
-        // step 5) b): TODO: open triples
+
+        // step 5) b): Precomputing the multiplication triples is
+        // replaced by generating svoles to later input the carries
+        let mult_input_mac = self.fcom_f2.f_random_batch(channel, rng, B * n * NB_BITS)?;
 
         // step 6)
         for j in 0..B {
@@ -555,8 +564,13 @@ impl<FE: FiniteField> SenderConv<FE> {
             let idx_base = j * n;
 
             // step 6)b) batched and moved up
-            let e_batch =
-                self.bit_add_carry(channel, rng, &edabits_vector, &r[idx_base..idx_base + n])?;
+            let e_batch = self.bit_add_carry(
+                channel,
+                rng,
+                &edabits_vector,
+                &r[idx_base..idx_base + n],
+                &mult_input_mac[idx_base * NB_BITS..idx_base * NB_BITS + n * NB_BITS],
+            )?;
 
             // step 6)c) batched and moved up
             let mut e_carry_batch = Vec::with_capacity(n);
@@ -587,8 +601,8 @@ impl<FE: FiniteField> SenderConv<FE> {
                 let e_m_mac = e_m_batch[i].1;
 
                 // 6)d)
-                let e_prime_mac = c_plus_r_mac
-                    - e_m_mac.multiply_by_prime_subfield(power_two::<FE::PrimeField>(NB_BITS));
+                let e_prime_mac =
+                    c_plus_r_mac - e_m_mac.multiply_by_prime_subfield(power_two_nb_bits);
                 e_prime_mac_batch.push(e_prime_mac);
 
                 ei_batch.extend(&e_batch[i].0);
@@ -671,6 +685,7 @@ impl<FE: FiniteField> ReceiverConv<FE> {
         rng: &mut RNG,
         x_batch: &[EdabitsVerifier<FE>],
         y_batch: &[EdabitsVerifier<FE>],
+        mult_input_mac: &[Gf40],
     ) -> Result<Vec<(Vec<Gf40>, Gf40)>, Error> {
         let x_batch_len = x_batch.len();
         let y_batch_len = y_batch.len();
@@ -709,7 +724,11 @@ impl<FE: FiniteField> ReceiverConv<FE> {
                 z_batch[n].push(z_mac);
                 aux_batch.push((and1_mac, and2_mac));
             }
-            let and_res_mac_batch = self.fcom_f2.f_input_batch(channel, rng, x_batch_len)?;
+            let and_res_mac_batch = self.fcom_f2.f_input_batch_pregenerated(
+                channel,
+                x_batch_len,
+                &mult_input_mac[i * x_batch_len..(i + 1) * x_batch_len],
+            )?;
 
             for n in 0..x_batch_len {
                 let ci_mac = ci_mac_batch[n];
@@ -931,6 +950,8 @@ impl<FE: FiniteField> ReceiverConv<FE> {
     ) -> Result<(), Error> {
         let mut b = true;
 
+        let power_two_nb_bits = power_two::<FE::PrimeField>(NB_BITS);
+
         let n = edabits_vector_mac.len();
         let nb_random_edabits = n * B + C;
         let nb_random_dabits = n * B;
@@ -951,7 +972,7 @@ impl<FE: FiniteField> ReceiverConv<FE> {
         channel.write_block(&seed1)?;
         channel.flush()?;
 
-        // step 4): TODO: shuffle dabits and triples
+        // step 4): shuffle the edabits and dabits
         let r_mac = generate_permutation(seed1, r_mac);
 
         // step 5)a):
@@ -965,21 +986,27 @@ impl<FE: FiniteField> ReceiverConv<FE> {
                 return Err(Error::Other("Wrong open random edabit".to_string()));
             }
         }
-        // step 5) b): TODO: open triples
+        // step 5) b): Precomputing the multiplication triples is
+        // replaced by generating svoles to later input the carries
+        let mult_input_mac = self.fcom_f2.f_random_batch(channel, rng, B * n * NB_BITS)?;
 
         // step 6)
         for j in 0..B {
             // base index for the window of `idx_base..idx_base + n` values
             let idx_base = j * n;
 
+            println!("ADD<");
             // step 6)b) batched and moved up
             let e_batch = self.bit_add_carry(
                 channel,
                 rng,
                 edabits_vector_mac,
                 &r_mac[idx_base..idx_base + n],
+                &mult_input_mac[idx_base * NB_BITS..idx_base * NB_BITS + n * NB_BITS],
             )?;
+            println!("ADD>");
 
+            println!("A2B<");
             // step 6)c) batched and moved up
             let mut e_carry_mac_batch = Vec::with_capacity(n);
             for (_, e_carry) in e_batch.iter() {
@@ -991,6 +1018,7 @@ impl<FE: FiniteField> ReceiverConv<FE> {
                 &dabits_mac[idx_base..idx_base + n],
                 e_carry_mac_batch,
             )?;
+            println!("A2B>");
 
             // 6)a)
             let mut e_prime_mac_batch = Vec::with_capacity(n);
@@ -1009,15 +1037,17 @@ impl<FE: FiniteField> ReceiverConv<FE> {
                 let e_m_mac = e_m_mac_batch[i];
 
                 // 6)d)
-                let e_prime_mac = c_plus_r_mac
-                    - e_m_mac.multiply_by_prime_subfield(power_two::<FE::PrimeField>(NB_BITS));
+                let e_prime_mac =
+                    c_plus_r_mac - e_m_mac.multiply_by_prime_subfield(power_two_nb_bits);
                 e_prime_mac_batch.push(e_prime_mac);
 
                 // 6)e)
                 ei_mac_batch.extend(&e_batch[i].0);
             }
             // 6)e)
+            println!("OPEN<");
             let ei_batch = self.fcom_f2.f_open_batch(channel, &ei_mac_batch)?;
+            println!("OPEN>");
 
             let mut e_prime_minus_sum_batch = Vec::with_capacity(n);
             for i in 0..n {
@@ -1026,9 +1056,12 @@ impl<FE: FiniteField> ReceiverConv<FE> {
                     e_prime_mac_batch[i] + self.fcom.get_delta().multiply_by_prime_subfield(sum),
                 );
             }
-            b = self
-                .fcom
-                .f_check_zero_batch(channel, e_prime_minus_sum_batch)?;
+            println!("CHECK_Z<");
+            b = b
+                && self
+                    .fcom
+                    .f_check_zero_batch(channel, e_prime_minus_sum_batch)?;
+            println!("CHECK_Z>");
         }
 
         if b {
@@ -1165,15 +1198,19 @@ mod tests {
             }
 
             let mut vx: Vec<(F2, Gf40)> = Vec::new();
-            for i in 0..6 {
+            for i in 0..power {
                 vx.push((x[i], x_mac[i]));
             }
 
             let mut vy = Vec::new();
-            for i in 0..6 {
+            for i in 0..power {
                 vy.push((y[i], y_mac[i]));
             }
             let default_fe = (FE::PrimeField::ZERO, FE::ZERO);
+            let mult_input_mac = fconv
+                .fcom_f2
+                .f_random_batch(&mut channel, &mut rng, power)
+                .unwrap();
             let (res, c) = fconv
                 .bit_add_carry(
                     &mut channel,
@@ -1188,6 +1225,7 @@ mod tests {
                         value: default_fe,
                     }]
                     .as_slice(),
+                    mult_input_mac.as_slice(),
                 )
                 .unwrap()[0]
                 .clone();
@@ -1217,6 +1255,10 @@ mod tests {
             y_mac.push(yb_mac);
         }
         let default_fe = FE::ZERO;
+        let mult_input_mac = fconv
+            .fcom_f2
+            .f_random_batch(&mut channel, &mut rng, power)
+            .unwrap();
         let (res_mac, c_mac) = fconv
             .bit_add_carry(
                 &mut channel,
@@ -1231,6 +1273,7 @@ mod tests {
                     value: default_fe,
                 }]
                 .as_slice(),
+                mult_input_mac.as_slice(),
             )
             .unwrap()[0]
             .clone();
