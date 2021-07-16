@@ -117,13 +117,6 @@ pub trait FiniteField:
         }
         r0
     }
-
-    /// When the field is a prime field, the function returns the
-    /// modulus 2 of the field element as a boolean. Otherwise the
-    /// function panics. This function is used in the fdabit protocol.
-    fn modulus2(&self) -> bool {
-        panic!("Function `is_even` can only be used on a prime field");
-    }
 }
 
 /// If `Self` implements `IsSubfieldOf<FE>`, then `Self` is a subfield of `FE`.
@@ -135,6 +128,13 @@ impl<FE: FiniteField> IsSubfieldOf<FE> for FE {
     fn lift_into_superfield(&self) -> FE {
         *self
     }
+}
+
+/// If a FiniteField implements this trait then it has a `modulus2`
+/// function.
+pub trait HasModulus2: FiniteField {
+    /// returns false for 0 and true for 1.
+    fn modulus2(t: Self::PrimeField) -> bool;
 }
 
 #[cfg(test)]

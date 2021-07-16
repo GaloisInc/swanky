@@ -1,9 +1,8 @@
-use crate::field::{polynomial::Polynomial, BiggerThanModulus, FiniteField};
+use crate::field::{polynomial::Polynomial, BiggerThanModulus, FiniteField, HasModulus2};
 use generic_array::GenericArray;
 use rand_core::RngCore;
 use std::{
     convert::TryFrom,
-    fmt,
     ops::{AddAssign, MulAssign, SubAssign},
 };
 use subtle::{Choice, ConditionallySelectable, ConstantTimeEq};
@@ -14,12 +13,6 @@ use proptest::prelude::*;
 /// A finite field over the Mersenne Prime 2^61 - 1
 #[derive(Clone, Copy, Eq, Debug, Hash)]
 pub struct F61p(u64);
-
-impl fmt::Display for F61p {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.0)
-    }
-}
 
 impl ConstantTimeEq for F61p {
     #[inline]
@@ -102,12 +95,6 @@ impl FiniteField for F61p {
     const GENERATOR: Self = F61p(5);
     const ZERO: Self = F61p(0);
     const ONE: Self = F61p(1);
-
-    #[inline]
-    fn modulus2(&self) -> bool {
-        debug_assert!(((self.0 % 2) == 0) | ((self.0 % 2) == 1));
-        return self.0 % 2 == 1;
-    }
 }
 
 #[inline]
@@ -173,6 +160,13 @@ impl std::iter::Sum for F61p {
             out += u128::from(e.0);
         }
         return F61p(reduce(out));
+    }
+}
+
+impl HasModulus2 for F61p {
+    fn modulus2(x: Self::PrimeField) -> bool {
+        debug_assert!(((x.0 % 2) == 0) | ((x.0 % 2) == 1));
+        return x.0 % 2 == 1;
     }
 }
 
