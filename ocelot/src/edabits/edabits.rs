@@ -48,10 +48,10 @@ pub struct SenderConv<FE: FiniteField> {
     fcom: FComSender<FE>,
 }
 
-const NB_BITS: usize = 16;
+const NB_BITS: usize = 38;
 
-const B: usize = 3;
-const C: usize = 3;
+const B: usize = 5;
+const C: usize = 5;
 
 const FDABIT_SECURITY_PARAMETER: usize = 38;
 
@@ -89,9 +89,8 @@ fn power_two<FE: FiniteField>(m: usize) -> FE {
 
 // Permutation pseudorandomly generated following Fisher-Yates method
 // `https://en.wikipedia.org/wiki/Fisher%E2%80%93Yates_shuffle`
-fn generate_permutation<T: Clone>(seed: Block, v: Vec<T>) -> Vec<T> {
+fn generate_permutation<T: Clone, RNG: CryptoRng + Rng>(rng: &mut RNG, v: Vec<T>) -> Vec<T> {
     let size = v.len();
-    let mut rng = AesRng::from_seed(seed);
     let mut permute = Vec::with_capacity(size);
 
     for i in 0..size {
@@ -100,7 +99,7 @@ fn generate_permutation<T: Clone>(seed: Block, v: Vec<T>) -> Vec<T> {
 
     let mut i = size - 1;
     while i > 0 {
-        let idx = Rng::gen_range(&mut rng, 0, i);
+        let idx = Rng::gen_range(rng, 0, i);
         let tmp: T = permute[idx].clone();
         permute[idx] = permute[i].clone();
         permute[i] = tmp;
@@ -534,16 +533,20 @@ impl<FE: FiniteField> SenderConv<FE> {
         // step 1)b)
         let dabits = self.random_dabits(channel, rng, nb_random_dabits)?;
 
-        // step 1)c): TODO: random multiplication triples
+        // step 1)c): Precomputing the multiplication triples is
+        // replaced by generating svoles to later input the carries
+        let mult_input_mac = self.fcom_f2.f_random_batch(channel, rng, B * n * NB_BITS)?;
 
         // step 2)
         self.fdabit(channel, rng, &dabits)?;
 
-        // step 3): TODO: generate pi_2 and pi_3
-        let seed1 = channel.read_block()?;
+        // step 3)
+        let seed = channel.read_block()?;
+        let mut shuffle_rng = AesRng::from_seed(seed);
 
-        // step 4): TODO: apply permutation to dabits and triples
-        let r = generate_permutation(seed1, r);
+        // step 4): shuffle to edabits and dabits
+        let r = generate_permutation(&mut shuffle_rng, r);
+        let dabits = generate_permutation(&mut shuffle_rng, dabits);
 
         // step 5)a):
         let base = n * B;
@@ -554,9 +557,7 @@ impl<FE: FiniteField> SenderConv<FE> {
             self.fcom.f_open(channel, a.value.0, a.value.1)?;
         }
 
-        // step 5) b): Precomputing the multiplication triples is
-        // replaced by generating svoles to later input the carries
-        let mult_input_mac = self.fcom_f2.f_random_batch(channel, rng, B * n * NB_BITS)?;
+        // step 5) b): Unnecessary
 
         // step 6)
         for j in 0..B {
@@ -962,18 +963,22 @@ impl<FE: FiniteField> ReceiverConv<FE> {
         // step 1)b)
         let dabits_mac = self.random_dabits(channel, rng, nb_random_dabits)?;
 
-        // step 1)c): TODO: random multiplication triples
+        // step 1)c): Precomputing the multiplication triples is
+        // replaced by generating svoles to later input the carries
+        let mult_input_mac = self.fcom_f2.f_random_batch(channel, rng, B * n * NB_BITS)?;
 
         // step 2)
         self.fdabit(channel, rng, &dabits_mac)?;
 
         // step 3): TODO: generate pi_2 and pi_3
-        let seed1 = rng.gen::<Block>();
-        channel.write_block(&seed1)?;
+        let seed = rng.gen::<Block>();
+        channel.write_block(&seed)?;
         channel.flush()?;
+        let mut shuffle_rng = AesRng::from_seed(seed);
 
         // step 4): shuffle the edabits and dabits
-        let r_mac = generate_permutation(seed1, r_mac);
+        let r_mac = generate_permutation(&mut shuffle_rng, r_mac);
+        let dabits_mac = generate_permutation(&mut shuffle_rng, dabits_mac);
 
         // step 5)a):
         let base = n * B;
@@ -986,9 +991,7 @@ impl<FE: FiniteField> ReceiverConv<FE> {
                 return Err(Error::Other("Wrong open random edabit".to_string()));
             }
         }
-        // step 5) b): Precomputing the multiplication triples is
-        // replaced by generating svoles to later input the carries
-        let mult_input_mac = self.fcom_f2.f_random_batch(channel, rng, B * n * NB_BITS)?;
+        // step 5) b): unnecessary
 
         // step 6)
         for j in 0..B {
