@@ -9,7 +9,7 @@
 use crate::errors::Error;
 use rand::{CryptoRng, Rng, SeedableRng};
 use scuttlebutt::{
-    field::{FiniteField, Gf40, HasModulus2, F2},
+    field::{FiniteField, Gf40, PrimeFiniteField, F2},
     AbstractChannel, AesRng, Block,
 };
 
@@ -108,7 +108,7 @@ fn generate_permutation<T: Clone, RNG: CryptoRng + Rng>(rng: &mut RNG, v: Vec<T>
     permute
 }
 
-impl<FE: FiniteField + HasModulus2> SenderConv<FE> {
+impl<FE: FiniteField + PrimeFiniteField> SenderConv<FE> {
     /// initialize conversion sender
     pub fn init<C: AbstractChannel, RNG: CryptoRng + Rng>(
         channel: &mut C,
@@ -627,7 +627,7 @@ pub struct ReceiverConv<FE: FiniteField> {
     fcom: FComReceiver<FE>,
 }
 
-impl<FE: FiniteField + HasModulus2> ReceiverConv<FE> {
+impl<FE: FiniteField + PrimeFiniteField> ReceiverConv<FE> {
     /// initialize conversion receiver
     pub fn init<C: AbstractChannel, RNG: CryptoRng + Rng>(
         channel: &mut C,
@@ -1083,7 +1083,7 @@ mod tests {
         SenderConv,
     };
     use scuttlebutt::{
-        field::{F61p, FiniteField, Gf40, HasModulus2, F2},
+        field::{F61p, FiniteField, Gf40, PrimeFiniteField, F2},
         AesRng, Channel,
     };
     use std::{
@@ -1091,7 +1091,7 @@ mod tests {
         os::unix::net::UnixStream,
     };
 
-    fn test_convert_bit_2_field<FE: FiniteField + HasModulus2>() -> () {
+    fn test_convert_bit_2_field<FE: FiniteField + PrimeFiniteField>() -> () {
         let count = 100;
         let (sender, receiver) = UnixStream::pair().unwrap();
         let handle = std::thread::spawn(move || {
@@ -1168,7 +1168,7 @@ mod tests {
         }
     }
 
-    fn test_bit_add_carry<FE: FiniteField + HasModulus2>() -> () {
+    fn test_bit_add_carry<FE: FiniteField + PrimeFiniteField>() -> () {
         let power = 6;
         let (sender, receiver) = UnixStream::pair().unwrap();
 
@@ -1297,7 +1297,7 @@ mod tests {
         assert_eq!(carry, c);
     }
 
-    fn test_fdabit<FE: FiniteField + HasModulus2>() -> () {
+    fn test_fdabit<FE: FiniteField + PrimeFiniteField>() -> () {
         let count = 100;
         let (sender, receiver) = UnixStream::pair().unwrap();
         let handle = std::thread::spawn(move || {
@@ -1323,7 +1323,7 @@ mod tests {
         handle.join().unwrap();
     }
 
-    fn test_conv<FE: FiniteField + HasModulus2>() -> () {
+    fn test_conv<FE: FiniteField + PrimeFiniteField>() -> () {
         let nb_edabits = 50;
         let (sender, receiver) = UnixStream::pair().unwrap();
 

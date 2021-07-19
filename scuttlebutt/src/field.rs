@@ -132,7 +132,9 @@ impl<FE: FiniteField> IsSubfieldOf<FE> for FE {
 
 /// If a FiniteField implements this trait then it has a `modulus2`
 /// function.
-pub trait HasModulus2: FiniteField {
+pub trait PrimeFiniteField:
+    FiniteField<PolynomialFormNumCoefficients = generic_array::typenum::U1, PrimeField = Self>
+{
     /// returns false for 0 and true for 1.
     fn modulus2(t: Self::PrimeField) -> bool;
 }

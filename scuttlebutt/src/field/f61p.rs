@@ -1,4 +1,4 @@
-use crate::field::{polynomial::Polynomial, BiggerThanModulus, FiniteField, HasModulus2};
+use crate::field::{polynomial::Polynomial, BiggerThanModulus, FiniteField, PrimeFiniteField};
 use generic_array::GenericArray;
 use rand_core::RngCore;
 use std::{
@@ -163,7 +163,7 @@ impl std::iter::Sum for F61p {
     }
 }
 
-impl HasModulus2 for F61p {
+impl PrimeFiniteField for F61p {
     fn modulus2(x: Self::PrimeField) -> bool {
         debug_assert!(((x.0 % 2) == 0) | ((x.0 % 2) == 1));
         return x.0 % 2 == 1;
