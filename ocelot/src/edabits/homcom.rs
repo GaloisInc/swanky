@@ -12,16 +12,13 @@ use crate::svole::{SVoleReceiver, SVoleSender};
 use generic_array::{typenum::Unsigned, GenericArray};
 use rand::{CryptoRng, Rng};
 use scuttlebutt::{field::FiniteField, AbstractChannel};
-use std::marker::PhantomData;
 
 pub struct MacValue<FE: FiniteField>(pub FE::PrimeField, pub FE);
 
 // F_com protocol
 pub struct FComSender<FE: FiniteField> {
-    phantom: PhantomData<FE>,
     svole_sender: Sender<FE>,
     voles: Vec<(FE::PrimeField, FE)>,
-    pos: usize,
 }
 
 fn make_x_i<FE: FiniteField>(i: usize) -> FE {
@@ -42,54 +39,33 @@ impl<FE: FiniteField> FComSender<FE> {
         channel: &mut C,
         rng: &mut RNG,
     ) -> Result<Self, Error> {
-        let b = channel.read_bool()?;
-        if b {
-            Ok(Self {
-                phantom: PhantomData,
-                svole_sender: Sender::init(channel, rng)?,
-                voles: Vec::new(),
-                pos: 0,
-            })
-        } else {
-            Err(Error::Other("Error in init".to_string()))
-        }
+        Ok(Self {
+            svole_sender: Sender::init(channel, rng)?,
+            voles: Vec::new(),
+        })
     }
 
     pub fn f_svole<C: AbstractChannel, RNG: CryptoRng + Rng>(
         &mut self,
         channel: &mut C,
         rng: &mut RNG,
-        num: usize,
+        mut num: usize,
     ) -> Result<Vec<(FE::PrimeField, FE)>, Error> {
         let mut res = Vec::with_capacity(num);
 
-        let mut needed = num;
-
-        while needed > 0 {
-            let size_left = self.voles.len() - self.pos;
-            if needed > size_left {
-                let mut v = Vec::new();
-                println!("SVOLE SEND");
-                self.svole_sender.send(channel, rng, &mut v)?;
-                self.voles = v;
-                self.pos = 0
+        while num > 0 {
+            match self.voles.pop() {
+                Some(e) => {
+                    res.push(e);
+                    num -= 1;
+                }
+                None => {
+                    let mut v = Vec::new();
+                    self.svole_sender.send(channel, rng, &mut v)?;
+                    self.voles = v;
+                }
             }
-
-            let nb_copied;
-            if needed <= self.voles.len() {
-                nb_copied = needed;
-            } else {
-                nb_copied = self.voles.len();
-            }
-
-            for i in 0..nb_copied {
-                res.push(self.voles[self.pos + i]);
-            }
-            self.pos += nb_copied;
-
-            needed = needed - nb_copied;
         }
-
         Ok(res)
     }
 
@@ -293,7 +269,6 @@ pub struct FComReceiver<FE: FiniteField> {
     delta: FE,
     svole_receiver: Receiver<FE>,
     voles: Vec<FE>,
-    pos: usize,
 }
 
 impl<FE: FiniteField> FComReceiver<FE> {
@@ -301,14 +276,11 @@ impl<FE: FiniteField> FComReceiver<FE> {
         channel: &mut C,
         rng: &mut RNG,
     ) -> Result<Self, Error> {
-        channel.write_bool(true)?;
-        channel.flush()?;
         let recv = Receiver::init(channel, rng)?;
         Ok(Self {
             delta: recv.delta(),
             svole_receiver: recv,
             voles: Vec::new(),
-            pos: 0,
         })
     }
 
@@ -320,34 +292,22 @@ impl<FE: FiniteField> FComReceiver<FE> {
         &mut self,
         channel: &mut C,
         rng: &mut RNG,
-        num: usize,
+        mut num: usize,
     ) -> Result<Vec<FE>, Error> {
         let mut res = Vec::with_capacity(num);
 
-        let mut needed = num;
-
-        while needed > 0 {
-            let size_left = self.voles.len() - self.pos;
-            if needed > size_left {
-                let mut v = Vec::new();
-                self.svole_receiver.receive(channel, rng, &mut v)?;
-                self.voles = v;
-                self.pos = 0
+        while num > 0 {
+            match self.voles.pop() {
+                Some(e) => {
+                    res.push(e);
+                    num -= 1;
+                }
+                None => {
+                    let mut v = Vec::new();
+                    self.svole_receiver.receive(channel, rng, &mut v)?;
+                    self.voles = v;
+                }
             }
-
-            let nb_copied;
-            if needed <= self.voles.len() {
-                nb_copied = needed;
-            } else {
-                nb_copied = self.voles.len();
-            }
-
-            for i in 0..nb_copied {
-                res.push(self.voles[self.pos + i]);
-            }
-            self.pos += nb_copied;
-
-            needed = needed - nb_copied;
         }
         Ok(res)
     }
