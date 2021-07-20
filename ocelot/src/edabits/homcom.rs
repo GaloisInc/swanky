@@ -45,7 +45,7 @@ impl<FE: FiniteField> FComSender<FE> {
         })
     }
 
-    pub fn f_svole<C: AbstractChannel, RNG: CryptoRng + Rng>(
+    pub fn random<C: AbstractChannel, RNG: CryptoRng + Rng>(
         &mut self,
         channel: &mut C,
         rng: &mut RNG,
@@ -69,106 +69,55 @@ impl<FE: FiniteField> FComSender<FE> {
         Ok(res)
     }
 
-    pub fn f_random<C: AbstractChannel, RNG: CryptoRng + Rng>(
-        &mut self,
-        channel: &mut C,
-        rng: &mut RNG,
-    ) -> Result<(FE::PrimeField, FE), Error> {
-        let v = self.f_svole(channel, rng, 1)?;
-        Ok(v[0])
-    }
-
-    pub fn f_random_batch<C: AbstractChannel, RNG: CryptoRng + Rng>(
-        &mut self,
-        channel: &mut C,
-        rng: &mut RNG,
-        num: usize,
-    ) -> Result<Vec<(FE::PrimeField, FE)>, Error> {
-        let v = self.f_svole(channel, rng, num)?;
-        Ok(v)
-    }
-
-    pub fn f_input<C: AbstractChannel, RNG: CryptoRng + Rng>(
-        &mut self,
-        channel: &mut C,
-        rng: &mut RNG,
-        x: FE::PrimeField,
-    ) -> Result<FE, Error> {
-        let (r, r_mac) = self.f_random(channel, rng)?;
-
-        let y = x - r;
-        channel.write_fe::<FE::PrimeField>(y)?;
-        channel.flush()?;
-
-        Ok(r_mac)
-    }
-
-    pub fn f_input_batch<C: AbstractChannel, RNG: CryptoRng + Rng>(
+    pub fn input<C: AbstractChannel, RNG: CryptoRng + Rng>(
         &mut self,
         channel: &mut C,
         rng: &mut RNG,
         x: &[FE::PrimeField],
     ) -> Result<Vec<FE>, Error> {
-        let r = self.f_random_batch(channel, rng, x.len())?;
+        let r = self.random(channel, rng, x.len())?;
 
-        let mut r_mac = Vec::with_capacity(x.len());
-        for i in 0..x.len() {
-            let y = x[i] - r[i].0;
-            r_mac.push(r[i].1);
-            channel.write_fe::<FE::PrimeField>(y)?;
-        }
-        channel.flush()?;
-
-        Ok(r_mac)
+        let mut out = Vec::with_capacity(x.len());
+        self.input_low_level(channel, x, &r, &mut out)?;
+        Ok(out)
     }
 
-    /// Similar to f_input but using pre generated voles
-    pub fn f_input_batch_pregenerated<C: AbstractChannel>(
+    /// lower level implementation of `input` with arguments for pre
+    /// generated voles and out vector
+    pub fn input_low_level<C: AbstractChannel>(
         &mut self,
         channel: &mut C,
         x: &[FE::PrimeField],
         r: &[(FE::PrimeField, FE)],
-    ) -> Result<Vec<FE>, Error> {
-        let mut r_mac = Vec::with_capacity(x.len());
+        out: &mut Vec<FE>,
+    ) -> Result<(), Error> {
         for i in 0..x.len() {
             let y = x[i] - r[i].0;
-            r_mac.push(r[i].1);
+            out.push(r[i].1);
             channel.write_fe::<FE::PrimeField>(y)?;
         }
         channel.flush()?;
 
-        Ok(r_mac)
-    }
-
-    pub fn f_affine_add_cst(
-        &self,
-        cst: FE::PrimeField,
-        x: FE::PrimeField,
-        x_mac: FE,
-    ) -> (FE::PrimeField, FE) {
-        return (cst + x, x_mac);
-    }
-
-    pub fn f_affine_mult_cst(
-        &self,
-        cst: FE::PrimeField,
-        x: FE::PrimeField,
-        x_mac: FE,
-    ) -> (FE::PrimeField, FE) {
-        return (cst * x, x_mac.multiply_by_prime_subfield(cst));
-    }
-
-    pub fn f_check_zero<C: AbstractChannel>(
-        &mut self,
-        channel: &mut C,
-        x_mac: FE,
-    ) -> Result<(), Error> {
-        channel.write_fe::<FE>(x_mac)?;
-        channel.flush()?;
         Ok(())
     }
 
-    pub fn f_check_zero_batch<C: AbstractChannel>(
+    pub fn affine_add_cst(
+        &self,
+        cst: FE::PrimeField,
+        x: (FE::PrimeField, FE),
+    ) -> (FE::PrimeField, FE) {
+        return (cst + x.0, x.1);
+    }
+
+    pub fn affine_mult_cst(
+        &self,
+        cst: FE::PrimeField,
+        x: (FE::PrimeField, FE),
+    ) -> (FE::PrimeField, FE) {
+        return (cst * x.0, (x.1).multiply_by_prime_subfield(cst));
+    }
+
+    pub fn check_zero<C: AbstractChannel>(
         &mut self,
         channel: &mut C,
         x_mac_batch: Vec<FE>,
@@ -180,21 +129,7 @@ impl<FE: FiniteField> FComSender<FE> {
         Ok(())
     }
 
-    pub fn f_open<C: AbstractChannel>(
-        &mut self,
-        channel: &mut C,
-        x: FE::PrimeField,
-        x_mac: FE,
-    ) -> Result<(), Error> {
-        channel.write_fe::<FE::PrimeField>(x)?;
-        // this flush can be removed because of the flush coming right after in check_zero
-        // channel.flush()?;
-
-        self.f_check_zero(channel, x_mac)?;
-        Ok(())
-    }
-
-    pub fn f_open_batch<C: AbstractChannel>(
+    pub fn open<C: AbstractChannel>(
         &mut self,
         channel: &mut C,
         batch: &[(FE::PrimeField, FE)],
@@ -204,8 +139,7 @@ impl<FE: FiniteField> FComSender<FE> {
             let x_mac = e.1;
             channel.write_fe::<FE::PrimeField>(x)?;
 
-            // inlining f_check_zero below
-            // self.f_check_zero(channel, x_mac)?;
+            // inlining check_zero below
             channel.write_fe::<FE>(x_mac)?;
         }
         // flushing at the end
@@ -247,7 +181,7 @@ impl<FE: FiniteField> FComSender<FE> {
         // The following block implements VOPE(1)
         let mut mask = FE::ZERO;
         let mut mask_mac = FE::ZERO;
-        let u = self.f_random_batch(channel, rng, FE::PolynomialFormNumCoefficients::USIZE)?;
+        let u = self.random(channel, rng, FE::PolynomialFormNumCoefficients::USIZE)?;
         for i in 0..FE::PolynomialFormNumCoefficients::USIZE {
             let x_i: FE = make_x_i(i);
             mask += x_i.multiply_by_prime_subfield(u[i].0);
@@ -288,7 +222,7 @@ impl<FE: FiniteField> FComReceiver<FE> {
         self.delta
     }
 
-    pub fn f_svole<C: AbstractChannel, RNG: CryptoRng + Rng>(
+    pub fn random<C: AbstractChannel, RNG: CryptoRng + Rng>(
         &mut self,
         channel: &mut C,
         rng: &mut RNG,
@@ -312,92 +246,45 @@ impl<FE: FiniteField> FComReceiver<FE> {
         Ok(res)
     }
 
-    pub fn f_random<C: AbstractChannel, RNG: CryptoRng + Rng>(
-        &mut self,
-        channel: &mut C,
-        rng: &mut RNG,
-    ) -> Result<FE, Error> {
-        let v = self.f_svole(channel, rng, 1)?;
-        Ok(v[0])
-    }
-
-    pub fn f_random_batch<C: AbstractChannel, RNG: CryptoRng + Rng>(
+    pub fn input<C: AbstractChannel, RNG: CryptoRng + Rng>(
         &mut self,
         channel: &mut C,
         rng: &mut RNG,
         num: usize,
     ) -> Result<Vec<FE>, Error> {
-        let v = self.f_svole(channel, rng, num)?;
-        Ok(v)
+        let r_mac = self.random(channel, rng, num)?;
+
+        let mut out = Vec::with_capacity(num);
+        self.input_low_level(channel, num, &r_mac, &mut out)?;
+        Ok(out)
     }
 
-    pub fn f_input<C: AbstractChannel, RNG: CryptoRng + Rng>(
-        &mut self,
-        channel: &mut C,
-        rng: &mut RNG,
-    ) -> Result<FE, Error> {
-        let r_mac = self.f_random(channel, rng)?;
-        let y = channel.read_fe::<FE::PrimeField>()?;
-
-        let v_mac = r_mac - self.delta.multiply_by_prime_subfield(y);
-        Ok(v_mac)
-    }
-
-    pub fn f_input_batch<C: AbstractChannel, RNG: CryptoRng + Rng>(
-        &mut self,
-        channel: &mut C,
-        rng: &mut RNG,
-        num: usize,
-    ) -> Result<Vec<FE>, Error> {
-        let r_mac = self.f_random_batch(channel, rng, num)?;
-
-        let mut v_mac = Vec::with_capacity(num);
-        for i in 0..num {
-            let y = channel.read_fe::<FE::PrimeField>()?;
-
-            v_mac.push(r_mac[i] - self.delta.multiply_by_prime_subfield(y));
-        }
-        Ok(v_mac)
-    }
-
-    /// Similar to f_input but using pre generated voles
-    pub fn f_input_batch_pregenerated<C: AbstractChannel>(
+    /// lower level implementation of `input` with arguments for pre
+    /// generated voles and out vector
+    pub fn input_low_level<C: AbstractChannel>(
         &mut self,
         channel: &mut C,
         num: usize,
         r_mac: &[FE],
-    ) -> Result<Vec<FE>, Error> {
-        let mut v_mac = Vec::with_capacity(num);
+        out: &mut Vec<FE>,
+    ) -> Result<(), Error> {
         for i in 0..num {
             let y = channel.read_fe::<FE::PrimeField>()?;
 
-            v_mac.push(r_mac[i] - self.delta.multiply_by_prime_subfield(y));
+            out.push(r_mac[i] - self.delta.multiply_by_prime_subfield(y));
         }
-        Ok(v_mac)
+        Ok(())
     }
 
-    pub fn f_affine_add_cst(&self, cst: FE::PrimeField, x_mac: FE) -> FE {
+    pub fn affine_add_cst(&self, cst: FE::PrimeField, x_mac: FE) -> FE {
         return x_mac - self.delta.multiply_by_prime_subfield(cst);
     }
 
-    pub fn f_affine_mult_cst(&self, cst: FE::PrimeField, x_mac: FE) -> FE {
+    pub fn affine_mult_cst(&self, cst: FE::PrimeField, x_mac: FE) -> FE {
         return x_mac.multiply_by_prime_subfield(cst);
     }
 
-    pub fn f_check_zero<C: AbstractChannel>(
-        &mut self,
-        channel: &mut C,
-        key: FE,
-    ) -> Result<bool, Error> {
-        let m = channel.read_fe::<FE>()?;
-        if key == m {
-            Ok(true)
-        } else {
-            Ok(false)
-        }
-    }
-
-    pub fn f_check_zero_batch<C: AbstractChannel>(
+    pub fn check_zero<C: AbstractChannel>(
         &mut self,
         channel: &mut C,
         key_batch: Vec<FE>,
@@ -417,21 +304,7 @@ impl<FE: FiniteField> FComReceiver<FE> {
         Ok(b)
     }
 
-    pub fn f_open<C: AbstractChannel>(
-        &mut self,
-        channel: &mut C,
-        key: FE,
-    ) -> Result<FE::PrimeField, Error> {
-        let x = channel.read_fe::<FE::PrimeField>()?;
-        let b = self.f_check_zero(channel, key + self.delta.multiply_by_prime_subfield(x))?;
-        if b {
-            Ok(x)
-        } else {
-            Err(Error::Other("open fails at checkzero".to_string()))
-        }
-    }
-
-    pub fn f_open_batch<C: AbstractChannel>(
+    pub fn open<C: AbstractChannel>(
         &mut self,
         channel: &mut C,
         keys: &[FE],
@@ -443,7 +316,6 @@ impl<FE: FiniteField> FComReceiver<FE> {
             let x = channel.read_fe::<FE::PrimeField>()?;
 
             // inlining check_zero below
-            // let b = self.f_check_zero(channel, key + self.delta.multiply_by_prime_subfield(x))?;
             let m = channel.read_fe::<FE>()?;
             if *key + self.delta.multiply_by_prime_subfield(x) != m {
                 b = false;
@@ -483,7 +355,7 @@ impl<FE: FiniteField> FComReceiver<FE> {
 
         // The following block implements VOPE(1)
         let mut mask_mac = FE::ZERO;
-        let v_m = self.f_random_batch(channel, rng, FE::PolynomialFormNumCoefficients::USIZE)?;
+        let v_m = self.random(channel, rng, FE::PolynomialFormNumCoefficients::USIZE)?;
         for i in 0..FE::PolynomialFormNumCoefficients::USIZE {
             let x_i: FE = make_x_i(i);
             mask_mac += v_m[i] * x_i;
@@ -525,16 +397,8 @@ mod tests {
             let mut channel = Channel::new(reader, writer);
             let mut fcom = FComSender::<FE>::init(&mut channel, &mut rng).unwrap();
 
-            let mut v = Vec::new();
-            for _ in 0..count {
-                let x = fcom.f_random(&mut channel, &mut rng).unwrap();
-                v.push(x);
-            }
-            let mut r = Vec::new();
-            for i in 0..count {
-                let b = fcom.f_open(&mut channel, v[i].0, v[i].1).unwrap();
-                r.push(b);
-            }
+            let v = fcom.random(&mut channel, &mut rng, count).unwrap();
+            let _ = fcom.open(&mut channel, &v).unwrap();
             v
         });
         let mut rng = AesRng::new();
@@ -542,17 +406,8 @@ mod tests {
         let writer = BufWriter::new(receiver);
         let mut channel = Channel::new(reader, writer);
         let mut fcom = FComReceiver::<FE>::init(&mut channel, &mut rng).unwrap();
-        let mut v = Vec::new();
-        for _ in 0..count {
-            let x = fcom.f_random(&mut channel, &mut rng).unwrap();
-
-            v.push(x);
-        }
-        let mut r = Vec::new();
-        for i in 0..count {
-            let b = fcom.f_open(&mut channel, v[i]).unwrap();
-            r.push(b);
-        }
+        let v = fcom.random(&mut channel, &mut rng, count).unwrap();
+        let r = fcom.open(&mut channel, &v).unwrap();
 
         let resprover = handle.join().unwrap();
 
@@ -571,23 +426,19 @@ mod tests {
             let mut channel = Channel::new(reader, writer);
             let mut fcom = FComSender::<F61p>::init(&mut channel, &mut rng).unwrap();
 
+            let inp = fcom.random(&mut channel, &mut rng, count).unwrap();
             let mut v = Vec::new();
-            for _ in 0..count {
-                let (x, x_mac) = fcom.f_random(&mut channel, &mut rng).unwrap();
+            for i in 0..count {
+                let (x, x_mac) = inp[i];
                 let cst = F61p::random(&mut rng);
                 channel.write_fe::<F61p>(cst).unwrap();
                 channel.flush().unwrap();
-                let (m, m_mac) = fcom.f_affine_mult_cst(cst, x, x_mac);
-                v.push((x, cst, m, m_mac));
-                let (a, a_mac) = fcom.f_affine_add_cst(cst, x, x_mac);
-                v.push((x, cst, a, a_mac));
+                let (m, m_mac) = fcom.affine_mult_cst(cst, (x, x_mac));
+                v.push((m, m_mac));
+                let (a, a_mac) = fcom.affine_add_cst(cst, (x, x_mac));
+                v.push((a, a_mac));
             }
-
-            let mut r = Vec::new();
-            for i in 0..count {
-                let b = fcom.f_open(&mut channel, v[i].2, v[i].3).unwrap();
-                r.push(b);
-            }
+            let _ = fcom.open(&mut channel, &v).unwrap();
             v
         });
         let mut rng = AesRng::new();
@@ -596,25 +447,22 @@ mod tests {
         let mut channel = Channel::new(reader, writer);
         let mut fcom = FComReceiver::<F61p>::init(&mut channel, &mut rng).unwrap();
         let mut v = Vec::new();
-        for _ in 0..count {
-            let x_mac = fcom.f_random(&mut channel, &mut rng).unwrap();
+        let inp = fcom.random(&mut channel, &mut rng, count).unwrap();
+        for i in 0..count {
+            let x_mac = inp[i];
             let cst = channel.read_fe().unwrap();
-            let m_mac = fcom.f_affine_mult_cst(cst, x_mac);
-            v.push((x_mac, cst, m_mac));
-            let a_mac = fcom.f_affine_add_cst(cst, x_mac);
-            v.push((x_mac, cst, a_mac));
+            let m_mac = fcom.affine_mult_cst(cst, x_mac);
+            v.push(m_mac);
+            let a_mac = fcom.affine_add_cst(cst, x_mac);
+            v.push(a_mac);
         }
 
-        let mut r = Vec::new();
-        for i in 0..count {
-            let b = fcom.f_open(&mut channel, v[i].2).unwrap();
-            r.push(b);
-        }
+        let r = fcom.open(&mut channel, &v).unwrap();
 
-        let resprover = handle.join().unwrap();
+        let batch_prover = handle.join().unwrap();
 
         for i in 0..count {
-            assert_eq!(r[i], resprover[i].2);
+            assert_eq!(r[i], batch_prover[i].0);
         }
         ()
     }
@@ -629,53 +477,43 @@ mod tests {
             let mut channel = Channel::new(reader, writer);
             let mut fcom = FComSender::<FE>::init(&mut channel, &mut rng).unwrap();
 
+            let x_batch = fcom.random(&mut channel, &mut rng, count).unwrap();
+            let y_batch = fcom.random(&mut channel, &mut rng, count).unwrap();
             let mut v = Vec::new();
-            for _ in 0..count {
-                let (x, xmac) = fcom.f_random(&mut channel, &mut rng).unwrap();
-                let (y, ymac) = fcom.f_random(&mut channel, &mut rng).unwrap();
-                let z = x * y;
-                let zmac = fcom.f_input(&mut channel, &mut rng, z).unwrap();
-                v.push((x, xmac, y, ymac, z, zmac));
-            }
-            let mut r = Vec::new();
             for i in 0..count {
-                let b = fcom
-                    .quicksilver_check_multiply(
-                        &mut channel,
-                        &mut rng,
-                        &[(
-                            MacValue(v[i].0, v[i].1),
-                            MacValue(v[i].2, v[i].3),
-                            MacValue(v[i].4, v[i].5),
-                        )],
-                    )
-                    .unwrap();
-                r.push(b);
+                let (x, x_mac) = x_batch[i];
+                let (y, y_mac) = y_batch[i];
+                let z = x * y;
+                let z_mac = fcom.input(&mut channel, &mut rng, &vec![z]).unwrap()[0];
+                v.push((MacValue(x, x_mac), MacValue(y, y_mac), MacValue(z, z_mac)));
             }
-            (v, r)
+
+            let b = fcom
+                .quicksilver_check_multiply(&mut channel, &mut rng, &v)
+                .unwrap();
+            (v, b)
         });
         let mut rng = AesRng::new();
         let reader = BufReader::new(receiver.try_clone().unwrap());
         let writer = BufWriter::new(receiver);
         let mut channel = Channel::new(reader, writer);
         let mut fcom = FComReceiver::<FE>::init(&mut channel, &mut rng).unwrap();
-        let mut v = Vec::new();
 
-        for _ in 0..count {
-            let xmac = fcom.f_random(&mut channel, &mut rng).unwrap();
-            let ymac = fcom.f_random(&mut channel, &mut rng).unwrap();
-            let zmac = fcom.f_input(&mut channel, &mut rng).unwrap();
+        let x_batch = fcom.random(&mut channel, &mut rng, count).unwrap();
+        let y_batch = fcom.random(&mut channel, &mut rng, count).unwrap();
+        let mut v = Vec::new();
+        for i in 0..count {
+            let xmac = x_batch[i];
+            let ymac = y_batch[i];
+            let zmac = fcom.input(&mut channel, &mut rng, 1).unwrap()[0];
             v.push((xmac, ymac, zmac));
         }
-        let mut r = Vec::new();
-        for i in 0..count {
-            let b = fcom
-                .quicksilver_check_multiply(&mut channel, &mut rng, &[(v[i].0, v[i].1, v[i].2)])
-                .unwrap();
-            r.push(b);
-        }
-        handle.join().unwrap();
-        ()
+        let b = fcom
+            .quicksilver_check_multiply(&mut channel, &mut rng, &v)
+            .unwrap();
+
+        let (_, bres) = handle.join().unwrap();
+        assert_eq!(b, bres);
     }
 
     #[test]
