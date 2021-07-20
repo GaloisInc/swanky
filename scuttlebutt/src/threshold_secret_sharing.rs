@@ -73,34 +73,34 @@ impl<Field: FiniteField + FieldForFFT2 + FieldForFFT3> PackedSecretSharing<Field
     /// The length of `secrets` must be `secret_count`.
     /// It is safe to pad with anything, including zeros.
     pub fn share(&self, secrets: &[Field]) -> Vec<Field> {
-        assert_eq!(secrets.len(), self.secret_count);
+        debug_assert_eq!(secrets.len(), self.secret_count);
         // sample polynomial
         let mut poly = self.sample_polynomial(secrets);
-        assert_eq!(poly.len(), self.reconstruct_limit() + 1);
+        debug_assert_eq!(poly.len(), self.reconstruct_limit() + 1);
         // .. and extend it
         poly.extend(vec![Field::ZERO; self.share_count - self.reconstruct_limit()]);
-        assert_eq!(poly.len(), self.share_count + 1);
+        debug_assert_eq!(poly.len(), self.share_count + 1);
         // evaluate polynomial to generate shares
         let mut shares = self.evaluate_polynomial(poly);
         // .. but remove first element since it should not be used as a share (it's always zero)
-        assert_eq!(shares[0], Field::ZERO);
+        debug_assert_eq!(shares[0], Field::ZERO);
         shares.remove(0);
         // return
-        assert_eq!(shares.len(), self.share_count);
+        debug_assert_eq!(shares.len(), self.share_count);
         shares
     }
 
     fn sample_polynomial(&self, secrets: &[Field]) -> Vec<Field> {
         use rand::prelude::*;
 
-        assert_eq!(secrets.len(), self.secret_count);
+        debug_assert_eq!(secrets.len(), self.secret_count);
         // sample randomness using secure randomness
         let mut rng = StdRng::from_entropy();
         let randomness: Vec<Field> =
             (0..self.threshold).map(|_| Field::random(&mut rng)).collect();
         // recover polynomial
         let coefficients = self.recover_polynomial(secrets, randomness);
-        assert_eq!(coefficients.len(), self.reconstruct_limit() + 1);
+        debug_assert_eq!(coefficients.len(), self.reconstruct_limit() + 1);
         coefficients
     }
 
@@ -112,12 +112,12 @@ impl<Field: FiniteField + FieldForFFT2 + FieldForFFT3> PackedSecretSharing<Field
         // fill in with random values
         values.extend(randomness);
         // run backward FFT to recover polynomial in coefficient representation
-        assert_eq!(values.len(), self.reconstruct_limit() + 1);
+        debug_assert_eq!(values.len(), self.reconstruct_limit() + 1);
         numtheory::fft2_inverse(&values, self.omega_secrets)
     }
 
     fn evaluate_polynomial(&self, coefficients: Vec<Field>) -> Vec<Field> {
-        assert_eq!(coefficients.len(), self.share_count + 1);
+        debug_assert_eq!(coefficients.len(), self.share_count + 1);
         numtheory::fft3(&coefficients, self.omega_shares)
     }
 
@@ -129,8 +129,8 @@ impl<Field: FiniteField + FieldForFFT2 + FieldForFFT3> PackedSecretSharing<Field
     ///
     /// The resulting vector is of length `secret_count`.
     pub fn reconstruct(&self, indices: &[usize], shares: &[Field]) -> Vec<Field> {
-        assert!(shares.len() == indices.len());
-        assert!(shares.len() >= self.reconstruct_limit());
+        debug_assert!(shares.len() == indices.len());
+        debug_assert!(shares.len() >= self.reconstruct_limit());
         let mut points: Vec<Field> =
             indices.iter()
             .map(|&x| self.omega_shares.pow(x as u128 + 1))
