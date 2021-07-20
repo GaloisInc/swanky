@@ -3,7 +3,9 @@ use crypto::digest::Digest as CryptoDigest;
 use scuttlebutt::field::FiniteField;
 
 #[cfg(test)]
-use proptest::{*, prelude::*, collection::vec as pvec};
+use proptest::{*, collection::vec as pvec};
+#[cfg(test)]
+use crate::util::{TestField, arb_test_field};
 
 pub type Digest = [u8; HBYTES];
 pub type Tree<H> = merkle_cbt::MerkleTree<Digest, MHMerge<H>>;
@@ -147,7 +149,7 @@ impl<Field: FiniteField, H: MerkleHash> Lemma<Field, H> {
 proptest! {
     #[test]
     fn test_merkle_lemma(
-        values in pvec(any::<crate::f2_19x3_26::F>(), 50 * 50),
+        values in pvec(arb_test_field(), 50 * 50),
         indices in pvec(0usize..50, 20),
     ) {
         use ndarray::Array2;
@@ -156,7 +158,7 @@ proptest! {
         let leaves = arr
             .gencolumns()
             .into_iter()
-            .map(|c| hash_column::<Sha256, crate::f2_19x3_26::F>(c.view()))
+            .map(|c| hash_column::<Sha256, TestField>(c.view()))
             .collect::<Vec<Digest>>();
         let tree = merkle_cbt::CBMT::build_merkle_tree(&leaves);
         let lemma: Lemma<_, Sha256> = Lemma::new(&tree, arr.view(), &indices);

@@ -3,6 +3,8 @@ use scuttlebutt::field::FiniteField;
 
 #[cfg(test)]
 use proptest::{*, prelude::*, collection::vec as pvec};
+#[cfg(test)]
+use crate::util::{TestField, arb_test_field};
 
 use crate::util::random_field_array;
 
@@ -133,28 +135,28 @@ pub fn random_ckt_zero<Field: FiniteField>(
 // this: https://altsysrq.github.io/proptest-book/proptest/tutorial/recursive.html
 #[cfg(test)]
 #[allow(unused)]
-pub fn arb_ckt<Field: FiniteField>(
+pub fn arb_ckt(
     inp_size: usize,
     ckt_size: usize
-) -> impl Strategy<Value = Ckt<Field>> {
+) -> impl Strategy<Value = Ckt<TestField>> {
     if ckt_size == 0 {
         any::<()>().prop_map(move |()| Ckt::new(inp_size, &vec![])).boxed()
     } else {
         let arb_c = arb_ckt(inp_size, ckt_size - 1);
         let arb_op = arb_op(0, inp_size + ckt_size - 1);
-        (arb_c,arb_op).prop_map(|(Ckt::<Field> {phantom, mut ops, inp_size}, op)| {
+        (arb_c,arb_op).prop_map(|(Ckt::<TestField> {phantom, mut ops, inp_size}, op)| {
             ops.push(op);
-            <Ckt<Field>>::new(inp_size, &ops)
+            <Ckt<TestField>>::new(inp_size, &ops)
         }).boxed()
     }
 }
 
 #[cfg(test)]
 #[allow(unused)]
-fn arb_ckt_with_inp_hole<Field: FiniteField>(
+fn arb_ckt_with_inp_hole(
     inp_size: usize,
     ckt_size: usize,
-) -> impl Strategy<Value = Ckt<Field>> {
+) -> impl Strategy<Value = Ckt<TestField>> {
     if ckt_size == 0 {
         any::<()>().prop_map(move |()| Ckt {
             phantom: std::marker::PhantomData,
@@ -164,22 +166,22 @@ fn arb_ckt_with_inp_hole<Field: FiniteField>(
     } else {
         let arb_c = arb_ckt_with_inp_hole(inp_size, ckt_size - 1);
         let arb_op = arb_op(1, inp_size + ckt_size - 1);
-        (arb_c,arb_op).prop_map(|(Ckt::<Field> {phantom, mut ops, inp_size}, op)| {
+        (arb_c,arb_op).prop_map(|(Ckt::<TestField> {phantom, mut ops, inp_size}, op)| {
             ops.push(op);
-            <Ckt<Field>>::new(inp_size, &ops)
+            <Ckt<TestField>>::new(inp_size, &ops)
         }).boxed()
     }
 }
 
 // XXX: See comment on arb_ckt, above.
 #[cfg(test)]
-pub fn arb_ckt_zero<Field: FiniteField + proptest::arbitrary::Arbitrary>(
+pub fn arb_ckt_zero(
     inp_size: usize,
     ckt_size: usize,
-) -> impl Strategy<Value = (Ckt<Field>, Vec<Field>)> {
+) -> impl Strategy<Value = (Ckt<TestField>, Vec<TestField>)> {
     (
         arb_ckt_with_inp_hole(inp_size, ckt_size-1),
-        pvec(any::<Field>(), inp_size),
+        pvec(arb_test_field(), inp_size),
     ).prop_map(move |(mut c, mut w)| {
         let output = c.eval(&w);
         w[0] = -(*output.last().unwrap());
@@ -198,10 +200,10 @@ fn test_random_ckt_zero() {
     for _ in 0..1000 {
         let inp_size = size.sample(&mut rng);
         let ckt_size = size.sample(&mut rng);
-        let (c, w): (Ckt<crate::f2_19x3_26::F>, Vec<_>)
+        let (c, w): (Ckt<TestField>, Vec<_>)
                      = random_ckt_zero(&mut rng, inp_size, ckt_size);
 
-        assert_eq!(*c.eval(&w).last().unwrap(), crate::f2_19x3_26::F::ZERO);
+        assert_eq!(*c.eval(&w).last().unwrap(), TestField::ZERO);
     }
 }
 
@@ -210,21 +212,21 @@ proptest! {
     #[test]
     fn test_arb_ckt_zero(
         (c, w) in (2usize..100, 2usize..100).prop_flat_map(
-            |(ws,cs)| arb_ckt_zero::<crate::f2_19x3_26::F>(ws,cs))
+            |(ws,cs)| arb_ckt_zero(ws,cs))
     ) {
-        prop_assert_eq!(*c.eval(&w).last().unwrap(), crate::f2_19x3_26::F::ZERO);
+        prop_assert_eq!(*c.eval(&w).last().unwrap(), TestField::ZERO);
     }
 }
 
 #[test]
 fn test_eval() {
-    let w    = crate::f2_19x3_26::F::from(3u64);
-    let x    = crate::f2_19x3_26::F::from(5u64);
-    let y    = crate::f2_19x3_26::F::from(7u64);
-    let z    = crate::f2_19x3_26::F::from(11u64);
-    let wy   = crate::f2_19x3_26::F::from(21u64);  // w * y
-    let xz   = crate::f2_19x3_26::F::from(55u64);  // x * z
-    let wyxz = crate::f2_19x3_26::F::from(76u64);  // w*y + x*z
+    let w    = TestField::from(3u64);
+    let x    = TestField::from(5u64);
+    let y    = TestField::from(7u64);
+    let z    = TestField::from(11u64);
+    let wy   = TestField::from(21u64);  // w * y
+    let xz   = TestField::from(55u64);  // x * z
+    let wyxz = TestField::from(76u64);  // w*y + x*z
     let res  = Ckt::test_value().eval(&vec![w, x, y, z]);
     assert_eq!(res, vec![w, x, y, z, wy, xz, wyxz]);
 }

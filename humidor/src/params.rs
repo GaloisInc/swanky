@@ -1,10 +1,11 @@
 use ndarray::{Array1, Array2, ArrayView1, ArrayView2};
-
-#[cfg(test)]
-use proptest::{*, prelude::*, collection::vec as pvec};
+use scuttlebutt::{numtheory, threshold_secret_sharing};
 
 use crate::util::*;
 use crate::ligero::FieldForLigero;
+
+#[cfg(test)]
+use proptest::{*, prelude::*, collection::vec as pvec};
 
 // Parameters for interleaved coding, based on the size of the circuit and
 // input. Note that these variable names, although terse, correspond to those
@@ -27,7 +28,7 @@ use crate::ligero::FieldForLigero;
 pub struct Params<Field> {
     phantom: std::marker::PhantomData<Field>,
 
-    pub pss: crate::threshold_secret_sharing::PackedSecretSharing<Field>,
+    pub pss: threshold_secret_sharing::PackedSecretSharing<Field>,
 
     pub kexp: u32,  // log2(k)
     pub nexp: u32,  // log3(n)
@@ -89,7 +90,7 @@ impl<Field: FieldForLigero> Params<Field> {
             .1;
 
         Self { phantom: std::marker::PhantomData, kexp, nexp, k, t, l, n, m,
-            pss: crate::threshold_secret_sharing::PackedSecretSharing {
+            pss: threshold_secret_sharing::PackedSecretSharing {
                 threshold: t,
                 share_count: n,
                 secret_count: l,
@@ -112,12 +113,12 @@ impl<Field: FieldForLigero> Params<Field> {
         debug_assert_eq!(cf.len(), self.n);
 
         let coeffs0 = stack!(Axis(0), Array1::zeros(1), cf);
-        let points = crate::numtheory::fft3_inverse(
+        let points = numtheory::fft3_inverse(
             &coeffs0.to_vec(),
             Field::from(self.pss.omega_shares),
         );
 
-        crate::numtheory::fft2(
+        numtheory::fft2(
             &points[0 ..= self.k],
             Field::from(self.pss.omega_secrets),
         )
@@ -147,13 +148,13 @@ impl<Field: FieldForLigero> Params<Field> {
         debug_assert_eq!(cf.len(), self.n);
 
         let coeffs0 = stack!(Axis(0), Array1::zeros(1), cf);
-        let points0 = crate::numtheory::fft3_inverse(
+        let points0 = numtheory::fft3_inverse(
             &coeffs0.to_vec(),
             Field::from(self.pss.omega_shares),
         );
         let (points, zeros) = points0[..].split_at(self.k+1);
 
-        crate::numtheory::fft2(
+        numtheory::fft2(
             points,
             Field::from(self.pss.omega_secrets),
         )[0] == Field::ZERO && zeros.iter().all(|&f| f == Field::ZERO)
@@ -193,7 +194,7 @@ impl<Field: FieldForLigero> Params<Field> {
         let mut points0 = Array1::zeros(self.k + 1);
         points0.slice_mut(ndarray::s!(1 ..= points.len())).assign(&points);
 
-        crate::numtheory::fft2_inverse(
+        numtheory::fft2_inverse(
             &points0.to_vec(),
             Field::from(self.pss.omega_secrets),
         ).iter().cloned().collect()
@@ -209,7 +210,7 @@ impl<Field: FieldForLigero> Params<Field> {
         let mut coeffs0 = Array1::zeros(self.k + 1);
         coeffs0.slice_mut(ndarray::s!(0 .. coeffs.len())).assign(&coeffs);
 
-        crate::numtheory::fft2(
+        numtheory::fft2(
             &coeffs0.to_vec(),
             Field::from(self.pss.omega_secrets),
         )[1..].iter().cloned().collect()
@@ -224,7 +225,7 @@ impl<Field: FieldForLigero> Params<Field> {
             .fold(Array1::zeros(self.k + 1),
                 |acc, v| padd(acc.view(), Array1::from(v.to_vec()).view()));
 
-        crate::numtheory::fft2(
+        numtheory::fft2(
             &coeffs0.to_vec(),
             Field::from(self.pss.omega_secrets),
         ).iter().cloned().collect()
@@ -238,7 +239,7 @@ impl<Field: FieldForLigero> Params<Field> {
         let mut points0 = Array1::zeros(self.n + 1);
         points0.slice_mut(ndarray::s!(1 .. points.len()+1)).assign(&points);
 
-        crate::numtheory::fft3_inverse(
+        numtheory::fft3_inverse(
             &points0.to_vec(),
             Field::from(self.pss.omega_shares),
         ).iter().cloned().collect()
@@ -254,7 +255,7 @@ impl<Field: FieldForLigero> Params<Field> {
         let mut coeffs0 = Array1::zeros(self.n + 1);
         coeffs0.slice_mut(ndarray::s!(0 .. coeffs.len())).assign(&coeffs);
 
-        crate::numtheory::fft3(
+        numtheory::fft3(
             &coeffs0.to_vec(),
             Field::from(self.pss.omega_shares),
         )[1..].iter().cloned().collect()
@@ -269,7 +270,7 @@ impl<Field: FieldForLigero> Params<Field> {
             .fold(Array1::zeros(self.n + 1),
                 |acc, v| padd(acc.view(), Array1::from(v.to_vec()).view()));
 
-        crate::numtheory::fft3(
+        numtheory::fft3(
             &coeffs0.to_vec(),
             Field::from(self.pss.omega_shares),
         ).iter().cloned().collect()
@@ -304,13 +305,13 @@ impl<Field: FieldForLigero> Params<Field> {
         p_coeffs.append(&mut vec![Field::ZERO; max_deg - p_deg]);
         q_coeffs.append(&mut vec![Field::ZERO; max_deg - q_deg]);
 
-        let p_points = crate::numtheory::fft2(&p_coeffs, omega);
-        let q_points = crate::numtheory::fft2(&q_coeffs, omega);
+        let p_points = numtheory::fft2(&p_coeffs, omega);
+        let q_points = numtheory::fft2(&q_coeffs, omega);
         let pq_points = p_points.iter()
             .zip(q_points)
             .map(|(&pi,qi)| pi * qi)
             .collect::<Vec<_>>();
-        let pq_coeffs = crate::numtheory::fft2_inverse(&pq_points, omega);
+        let pq_coeffs = numtheory::fft2_inverse(&pq_points, omega);
 
         pq_coeffs.iter().take(pq_deg).cloned().collect()
     }
@@ -348,7 +349,7 @@ impl<Field: FieldForLigero> Params<Field> {
 }
 
 #[cfg(test)]
-impl Arbitrary for Params<crate::f2_19x3_26::F> {
+impl Arbitrary for Params<TestField> {
     type Parameters = ();
     type Strategy = BoxedStrategy<Self>;
     fn arbitrary_with(_: Self::Parameters) -> Self::Strategy {
@@ -360,7 +361,7 @@ impl Arbitrary for Params<crate::f2_19x3_26::F> {
 proptest! {
     #[test]
     fn test_new_params_props(s in 1usize .. 200000) {
-        let p: Params<crate::f2_19x3_26::F> = Params::new(s);
+        let p: Params<TestField> = Params::new(s);
 
         prop_assert_eq!(2usize.pow(p.kexp), p.k + 1);
         prop_assert_eq!(3usize.pow(p.nexp), p.n + 1);
@@ -373,8 +374,8 @@ proptest! {
 
     #[test]
     fn test_decode_encode(
-        (p,v) in any::<Params<crate::f2_19x3_26::F>>().prop_flat_map(|p| {
-            let v = pvec(any::<crate::f2_19x3_26::F>(), p.l);
+        (p,v) in any::<Params<TestField>>().prop_flat_map(|p| {
+            let v = pvec(arb_test_field(), p.l);
             (Just(p), v)
         })
     ) {
@@ -386,8 +387,8 @@ proptest! {
 
     #[test]
     fn test_codeword_is_valid_accepts_valid(
-        (p,v) in any::<Params<crate::f2_19x3_26::F>>().prop_flat_map(|p| {
-            let v = pvec(any::<crate::f2_19x3_26::F>(), p.l);
+        (p,v) in any::<Params<TestField>>().prop_flat_map(|p| {
+            let v = pvec(arb_test_field(), p.l);
             (Just(p), v)
         })
     ) {
@@ -398,8 +399,8 @@ proptest! {
 
     #[test]
     fn test_codeword_is_valid_detects_invalid(
-        (p,v,ix) in any::<Params<crate::f2_19x3_26::F>>().prop_flat_map(|p| {
-            let v = pvec(any::<crate::f2_19x3_26::F>(), p.l);
+        (p,v,ix) in any::<Params<TestField>>().prop_flat_map(|p| {
+            let v = pvec(arb_test_field(), p.l);
             let ix = 0..p.l;
             (Just(p), v, ix)
         })
@@ -407,15 +408,15 @@ proptest! {
         use scuttlebutt::field::FiniteField;
 
         let mut ve = p.encode(Array1::from(v).view());
-        ve[ix] += crate::f2_19x3_26::F::ONE;
+        ve[ix] += TestField::ONE;
 
         prop_assert!(!p.codeword_is_valid(ve.view()));
     }
 
     #[test]
     fn test_codeword_is_valid_accepts_sum(
-        (p,v) in any::<Params<crate::f2_19x3_26::F>>().prop_flat_map(|p| {
-            let v = pvec(any::<crate::f2_19x3_26::F>(), p.m * p.l);
+        (p,v) in any::<Params<TestField>>().prop_flat_map(|p| {
+            let v = pvec(arb_test_field(), p.m * p.l);
             (Just(p), v)
         })
     ) {
@@ -428,8 +429,8 @@ proptest! {
 
     #[test]
     fn test_codeword_is_valid_detects_invalid_sum(
-        (p,v,r,c) in any::<Params<crate::f2_19x3_26::F>>().prop_flat_map(|p| {
-            let v = pvec(any::<crate::f2_19x3_26::F>(), p.m * p.l);
+        (p,v,r,c) in any::<Params<TestField>>().prop_flat_map(|p| {
+            let v = pvec(arb_test_field(), p.m * p.l);
             let r = 0..p.m;
             let c = 0..p.l;
             (Just(p), v, r, c)
@@ -438,7 +439,7 @@ proptest! {
         use scuttlebutt::field::FiniteField;
 
         let mut ve = p.encode_interleaved(Array1::from(v).view());
-        ve[(r,c)] += crate::f2_19x3_26::F::ONE;
+        ve[(r,c)] += TestField::ONE;
 
         let vs = ve.genrows().into_iter()
             .fold(Array1::zeros(p.n), |acc, row| acc + row);
@@ -448,30 +449,30 @@ proptest! {
 
     #[test]
     fn test_peval2(
-        (p,v) in any::<Params<crate::f2_19x3_26::F>>().prop_flat_map(|p| {
-            let v = pvec(any::<crate::f2_19x3_26::F>(), p.k + 1);
+        (p,v) in any::<Params<TestField>>().prop_flat_map(|p| {
+            let v = pvec(arb_test_field(), p.k + 1);
             (Just(p), v)
         })
     ) {
-        let v_coeffs = crate::numtheory::fft2_inverse(
+        let v_coeffs = numtheory::fft2_inverse(
             &v,
             p.pss.omega_secrets,
-        ).iter().cloned().map(crate::f2_19x3_26::F::from)
-            .collect::<Array1<crate::f2_19x3_26::F>>();
+        ).iter().cloned().map(TestField::from)
+            .collect::<Array1<TestField>>();
 
         for i in 0 .. v.len() {
             prop_assert_eq!(
                 p.peval2(v_coeffs.view(), i),
-                crate::f2_19x3_26::F::from(v[i])
+                TestField::from(v[i])
             );
         }
     }
 
     #[test]
     fn test_fft2_peval(
-        (p,v) in any::<Params<crate::f2_19x3_26::F>>().prop_flat_map(|p| {
+        (p,v) in any::<Params<TestField>>().prop_flat_map(|p| {
             (1 ..= 3*(p.k+1)).prop_flat_map(move |len| {
-                let v = pvec(any::<crate::f2_19x3_26::F>(), len);
+                let v = pvec(arb_test_field(), len);
                 (Just(p), v)
             })
         })
@@ -486,16 +487,16 @@ proptest! {
 
     #[test]
     fn test_peval3(
-        (p,v) in any::<Params<crate::f2_19x3_26::F>>().prop_flat_map(|p| {
-            let v = pvec(any::<crate::f2_19x3_26::F>(), p.n + 1);
+        (p,v) in any::<Params<TestField>>().prop_flat_map(|p| {
+            let v = pvec(arb_test_field(), p.n + 1);
             (Just(p), v)
         })
     ) {
-        let v_coeffs = crate::numtheory::fft3_inverse(
+        let v_coeffs = numtheory::fft3_inverse(
             &v,
             p.pss.omega_shares,
-        ).iter().cloned().map(crate::f2_19x3_26::F::from)
-            .collect::<Array1<crate::f2_19x3_26::F>>();
+        ).iter().cloned().map(TestField::from)
+            .collect::<Array1<TestField>>();
 
         for i in 0 .. v.len() {
             prop_assert_eq!(p.peval3(v_coeffs.view(), i), v[i]);
@@ -504,9 +505,9 @@ proptest! {
 
     #[test]
     fn test_fft3_peval(
-        (p,v) in any::<Params<crate::f2_19x3_26::F>>().prop_flat_map(|p| {
+        (p,v) in any::<Params<TestField>>().prop_flat_map(|p| {
             (1 ..= 3*(p.n+1)).prop_flat_map(move |len| {
-                let v = pvec(any::<crate::f2_19x3_26::F>(), len);
+                let v = pvec(arb_test_field(), len);
                 (Just(p), v)
             })
         })
@@ -521,9 +522,9 @@ proptest! {
 
     #[test]
     fn test_pmul(
-        (p,u,v) in any::<Params<crate::f2_19x3_26::F>>().prop_flat_map(|p| {
-            let u = pvec(any::<crate::f2_19x3_26::F>(), p.k);
-            let v = pvec(any::<crate::f2_19x3_26::F>(), p.k);
+        (p,u,v) in any::<Params<TestField>>().prop_flat_map(|p| {
+            let u = pvec(arb_test_field(), p.k);
+            let v = pvec(arb_test_field(), p.k);
             (Just(p), u, v)
         })
     ) {
@@ -541,10 +542,10 @@ proptest! {
 
     #[test]
     fn test_pmul2(
-        (p, u, v) in any::<Params<crate::f2_19x3_26::F>>().prop_flat_map(|p| {
+        (p, u, v) in any::<Params<TestField>>().prop_flat_map(|p| {
             (1..=p.k+1, 1..=p.k+1).prop_flat_map(move |(ulen, vlen)| {
-                let u_coeffs = pvec(any::<crate::f2_19x3_26::F>(), ulen);
-                let v_coeffs = pvec(any::<crate::f2_19x3_26::F>(), vlen);
+                let u_coeffs = pvec(arb_test_field(), ulen);
+                let v_coeffs = pvec(arb_test_field(), vlen);
                 (Just(p), u_coeffs, v_coeffs)
             })
         })
@@ -564,10 +565,10 @@ proptest! {
 
     #[test]
     fn test_padd(
-        (p, u, v) in any::<Params<crate::f2_19x3_26::F>>().prop_flat_map(|p| {
+        (p, u, v) in any::<Params<TestField>>().prop_flat_map(|p| {
             (1..=p.k+1, 1..=p.k+1).prop_flat_map(move |(ulen, vlen)| {
-                let u_coeffs = pvec(any::<crate::f2_19x3_26::F>(), ulen);
-                let v_coeffs = pvec(any::<crate::f2_19x3_26::F>(), vlen);
+                let u_coeffs = pvec(arb_test_field(), ulen);
+                let v_coeffs = pvec(arb_test_field(), vlen);
                 (Just(p), u_coeffs, v_coeffs)
             })
         })
@@ -587,10 +588,10 @@ proptest! {
 
     #[test]
     fn test_psub(
-        (p, u, v) in any::<Params<crate::f2_19x3_26::F>>().prop_flat_map(|p| {
+        (p, u, v) in any::<Params<TestField>>().prop_flat_map(|p| {
             (1..=p.k+1, 1..=p.k+1).prop_flat_map(move |(ulen, vlen)| {
-                let u_coeffs = pvec(any::<crate::f2_19x3_26::F>(), ulen);
-                let v_coeffs = pvec(any::<crate::f2_19x3_26::F>(), vlen);
+                let u_coeffs = pvec(arb_test_field(), ulen);
+                let v_coeffs = pvec(arb_test_field(), vlen);
                 (Just(p), u_coeffs, v_coeffs)
             })
         })
@@ -609,13 +610,13 @@ proptest! {
     }
 
     #[test]
-    fn test_random_zero_codeword(p in any::<Params<crate::f2_19x3_26::F>>()) {
+    fn test_random_zero_codeword(p in any::<Params<TestField>>()) {
         use rand::{SeedableRng, rngs::StdRng};
         use scuttlebutt::field::FiniteField;
 
         let c = p.random_zero_codeword(&mut StdRng::from_entropy());
         let w = p.decode(c.view());
 
-        prop_assert_eq!(w.scalar_sum(), crate::f2_19x3_26::F::ZERO);
+        prop_assert_eq!(w.scalar_sum(), TestField::ZERO);
     }
 }

@@ -28,6 +28,8 @@ generic-array = "0.14.4"
 smallvec = "1.6.1"
 bytemuck = { version = "1.5.1", features = ["derive"] }
 vectoreyes = { path = "../vectoreyes" }
+ndarray = "=0.13.1"
+num-traits = "0.2.14"
 
 
 [dev-dependencies]

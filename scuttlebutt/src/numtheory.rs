@@ -11,25 +11,43 @@
 //! Note: This library was adapted from
 //! https://github.com/snipsco/rust-threshold-secret-sharing
 
-use scuttlebutt::field::FiniteField;
+use crate::field::FiniteField;
 
+/// This trait indicates that a finite field is suitable for use in radix-2 FFT.
+/// This means that it must have a power-of-two root of unity for any desired
+/// FFT size, i.e., a field element `r_p`, such that `r_p^(2^p) = 1`, for a
+/// size-`3^p` FFT. The `PHI_2_EXP` constant is the exponent of the largest FFT
+/// size supported, and `roots_base_2` should return the `2^p`th root of unity.
 pub trait FieldForFFT2: FiniteField + From<i128> + From<u128> {
-    // Largest integer `p` such that `phi(MODULUS) = 2^p * k` for integer `k`.
+    /// Largest integer `p` such that `phi(MODULUS) = 2^p * k` for integer `k`.
     const PHI_2_EXP: usize;
 
+    /// For each `p` such that `2^p | phi(MODULUS)`, there is a `(2^p)`th root
+    /// of unity, namely `r_p = GENERATOR^(phi(MODULUS) / 2^p)`, since then
+    /// `r_p^(2^p) = GENERATOR^phi(MODULUS) = 1`. This function should return
+    /// this `r_p`, on input `p`, for `p in [0 .. PHI_2_EXP]`.
     // [ GENERATOR^(phi(MODULUS) / (2^p)) % MODULUS | p <- [0 .. PHI_2_EXP] ]
-    fn roots_base_2(ix: usize) -> u128;
+    fn roots_base_2(p: usize) -> u128;
 }
 
+/// This trait indicates that a finite field is suitable for use in radix-3 FFT.
+/// This means that it must have a power-of-three root of unity for any desired
+/// FFT size, i.e., a field element `r_p`, such that `r_p^(3^p) = 1`, for a
+/// size-`3^p` FFT. The `PHI_3_EXP` constant is the exponent of the largest FFT
+/// size supported, and `roots_base_3` should return the `3^p`th root of unity.
 pub trait FieldForFFT3: FiniteField + From<i128> + From<u128> {
-    // Largest integer `p` such that `phi(MODULUS) = 3^p * k` for integer `k`.
+    /// Largest integer `p` such that `phi(MODULUS) = 3^p * k` for integer `k`.
     const PHI_3_EXP: usize;
 
+    /// For each `p` such that `3^p | phi(MODULUS)`, there is a `(3^p)`th root
+    /// of unity, namely `r_p = GENERATOR^(phi(MODULUS) / 3^p)`, since then
+    /// `r_p^(3^p) = GENERATOR^phi(MODULUS) = 1`. This function should return
+    /// this `r_p`, on input `p`, for `p in [0 .. PHI_3_EXP]`.
     // [ GENERATOR^(phi(MODULUS) / (3^p)) % MODULUS | p <- [0 .. PHI_3_EXP] ]
-    fn roots_base_3(ix: usize) -> u128;
+    fn roots_base_3(p: usize) -> u128;
 }
 
-mod cooley_tukey {
+pub mod cooley_tukey {
     //! FFT by in-place Cooley-Tukey algorithms.
 
     use super::*;
@@ -222,6 +240,7 @@ pub fn fft2_inverse<Field>(a_point: &[Field], omega: Field) -> Vec<Field>
     data
 }
 
+/// Tests for types implementing FieldForFFT2
 #[macro_export]
 macro_rules! fft2_tests {
     ($field: ty) => {
@@ -288,6 +307,7 @@ pub fn fft3_inverse<Field>(a_point: &[Field], omega: Field) -> Vec<Field>
     data
 }
 
+/// Tests for types implementing FieldForFFT3
 #[macro_export]
 macro_rules! fft3_tests {
     ($field: ty) => {
@@ -372,7 +392,6 @@ pub struct NewtonPolynomial<'a, Field>
     coefficients: Vec<Field>,
 }
 
-
 /// General case for Newton interpolation in field Zp.
 ///
 /// Given enough `points` (x) and `values` (p(x)), find the coefficients for `p`.
@@ -389,6 +408,7 @@ pub fn newton_interpolation_general<'a, Field>(
     }
 }
 
+/// Newton interpolation tests for types implementing FiniteField
 #[macro_export]
 macro_rules! interpolation_tests {
     ($field: ty) => {
@@ -407,6 +427,7 @@ macro_rules! interpolation_tests {
     }
 }
 
+/// Evaluate a Newton polynomial
 pub fn newton_evaluate<Field>(poly: &NewtonPolynomial<Field>, point: Field) -> Field
     where Field: FiniteField
 {

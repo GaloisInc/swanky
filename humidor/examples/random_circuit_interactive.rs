@@ -5,9 +5,9 @@ extern crate humidor;
 
 use humidor::ligero::interactive;
 use humidor::circuit::Ckt;
-use humidor::Sha256;
+use humidor::merkle::Sha256;
 
-type Field = humidor::f2_19x3_26::F;
+type Field = scuttlebutt::field::F2_19x3_26;
 
 fn test_input_size(s: usize) -> (
     usize, // proof size in bytes

@@ -4,6 +4,18 @@ use std::cmp::Eq;
 use std::fmt::Debug;
 
 use scuttlebutt::field::FiniteField;
+use scuttlebutt::numtheory;
+
+#[cfg(test)]
+use proptest::prelude::*;
+
+#[cfg(test)]
+pub type TestField = scuttlebutt::field::F2_19x3_26;
+
+#[cfg(test)]
+pub fn arb_test_field() -> BoxedStrategy<TestField> {
+    (0..TestField::MODULUS as u128).prop_map(|n| n.into()).boxed()
+}
 
 // Trait for collections that allow taking `n` initial elements while ensuring
 // that only zero-elements are dropped from the end.
@@ -103,7 +115,7 @@ pub fn peval<Field: FiniteField>(p: ArrayView1<Field>, x: Field) -> Field {
     //}
 
     //res + p[0]
-    crate::numtheory::mod_evaluate_polynomial(&p.to_vec(), x)
+    numtheory::mod_evaluate_polynomial(&p.to_vec(), x)
 }
 
 pub fn random_field_array<R: rand::Rng, Field: FiniteField>(

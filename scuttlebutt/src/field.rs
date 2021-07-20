@@ -354,4 +354,9 @@ pub use gf_2_40::Gf40;
 mod f61p;
 pub use f61p::F61p;
 
+mod f2_19x3_26;
+pub use f2_19x3_26::F2_19x3_26;
+
 pub mod polynomial;
+
+pub mod monty;

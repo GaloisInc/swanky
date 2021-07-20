@@ -2,6 +2,7 @@ use ndarray::{Array1, Array2};
 use sprs::{CsMat, TriMat};
 use rand::{SeedableRng, rngs::StdRng};
 use scuttlebutt::field::FiniteField;
+use scuttlebutt::numtheory::{FieldForFFT2, FieldForFFT3};
 
 #[cfg(test)]
 use proptest::{*, prelude::*, collection::vec as pvec};
@@ -10,7 +11,6 @@ use crate::circuit::{Op, Ckt};
 use crate::merkle;
 use crate::util::*;
 use crate::params::Params;
-use crate::numtheory::{FieldForFFT2, FieldForFFT3};
 
 pub trait FieldForLigero:
     Sized
@@ -22,6 +22,10 @@ pub trait FieldForLigero:
     + std::fmt::Debug
 {
     const BITS: usize;
+}
+
+impl FieldForLigero for scuttlebutt::field::F2_19x3_26 {
+    const BITS: usize = 61;
 }
 
 // Proof information available to both the prover and the verifier.
@@ -185,18 +189,15 @@ impl<Field: FieldForLigero, H: merkle::MerkleHash> Secret<Field, H> {
 }
 
 #[cfg(test)]
-impl<Field, H> Arbitrary for Secret<Field, H>
-    where Field: FieldForLigero + Arbitrary,
-          H: merkle::MerkleHash
-{
+impl<H: merkle::MerkleHash> Arbitrary for Secret<TestField, H> {
     type Parameters = (usize, usize);
     type Strategy = BoxedStrategy<Self>;
     fn arbitrary_with((w,c): Self::Parameters) -> Self::Strategy {
         (
             crate::circuit::arb_ckt(w,c),
-            pvec(any::<Field>(), w),
+            pvec(arb_test_field(), w),
         ).prop_map(|(ckt, inp)|
-            <Secret<Field, H>>::new(&ckt, &inp)
+            <Secret<TestField, H>>::new(&ckt, &inp)
         ).boxed()
     }
 }
@@ -205,21 +206,21 @@ impl<Field, H> Arbitrary for Secret<Field, H>
 proptest! {
     #[test]
     #[allow(non_snake_case)]
-    fn test_Px(s in <Secret<crate::f2_19x3_26::F, merkle::Sha256>>
+    fn test_Px(s in <Secret<TestField, merkle::Sha256>>
         ::arbitrary_with((20, 100))) {
             prop_assert_eq!(&s.public.Px * &s.w.t(), s.x);
         }
 
     #[test]
     #[allow(non_snake_case)]
-    fn test_Py(s in <Secret<crate::f2_19x3_26::F, merkle::Sha256>>
+    fn test_Py(s in <Secret<TestField, merkle::Sha256>>
         ::arbitrary_with((20, 100))) {
             prop_assert_eq!(&s.public.Py * &s.w.t(), s.y);
         }
 
     #[test]
     #[allow(non_snake_case)]
-    fn test_Pz(s in <Secret<crate::f2_19x3_26::F, merkle::Sha256>>
+    fn test_Pz(s in <Secret<TestField, merkle::Sha256>>
         ::arbitrary_with((20, 100))) {
             prop_assert_eq!(&s.public.Pz * &s.w.t(), s.z);
         }
@@ -228,14 +229,14 @@ proptest! {
     #[allow(non_snake_case)]
     fn test_Padd(
         (c,i) in crate::circuit::arb_ckt(20, 100).prop_flat_map(|c| {
-            (Just(c), pvec(any::<crate::f2_19x3_26::F>(), 20))
+            (Just(c), pvec(arb_test_field(), 20))
         })
     ) {
         let s: Secret<_, merkle::Sha256> = Secret::new(&c, &i);
         let output = *c.eval(&i).last().unwrap();
-        let zeros = Array1::from(vec![crate::f2_19x3_26::F::ZERO; s.w.len()]);
+        let zeros = Array1::from(vec![TestField::ZERO; s.w.len()]);
         prop_assert_eq!(
-            output == crate::f2_19x3_26::F::ZERO,
+            output == TestField::ZERO,
             &s.public.Padd * &s.w.t() == zeros
         );
     }
@@ -784,7 +785,7 @@ pub mod interactive {
 
     #[test]
     fn test_small() {
-        type Field = crate::f2_19x3_26::F;
+        type Field = TestField;
 
         let ckt = Ckt::test_value();
         let w = vec![3u64.into(), 1u64.into(), 5u64.into(),
@@ -810,7 +811,7 @@ pub mod interactive {
         #[test]
         fn test_false(
             (ckt, w) in crate::circuit::arb_ckt(20, 100).prop_flat_map(|ckt| {
-                let w = pvec(any::<crate::f2_19x3_26::F>(), ckt.inp_size);
+                let w = pvec(arb_test_field(), ckt.inp_size);
                 (Just(ckt), w)
             })
         ) {
@@ -824,14 +825,14 @@ pub mod interactive {
             let r3 = v.round3(r2);
             let r4 = p.round4(r3);
 
-            prop_assert_eq!(v.verify(r4), output == crate::f2_19x3_26::F::ZERO);
+            prop_assert_eq!(v.verify(r4), output == TestField::ZERO);
         }
 
         #[test]
         fn test_true(
             (ckt, w) in crate::circuit::arb_ckt_zero(20, 100)
         ) {
-            let p: Prover<crate::f2_19x3_26::F, merkle::Sha256> = Prover::new(&ckt, &w);
+            let p: Prover<TestField, merkle::Sha256> = Prover::new(&ckt, &w);
             let mut v = Verifier::new(&ckt);
 
             let r0 = p.round0();
@@ -991,7 +992,7 @@ pub mod noninteractive {
 
     #[test]
     fn test_small() {
-        type Field = crate::f2_19x3_26::F;
+        type Field = TestField;
 
         let ckt = Ckt::test_value();
         let w = vec![3u64.into(), 1u64.into(), 5u64.into(),
@@ -1012,7 +1013,7 @@ pub mod noninteractive {
         #[test]
         fn test_false(
             (ckt, w) in crate::circuit::arb_ckt(20, 100).prop_flat_map(|ckt| {
-                let w = pvec(any::<crate::f2_19x3_26::F>(), ckt.inp_size);
+                let w = pvec(arb_test_field(), ckt.inp_size);
                 (Just(ckt), w)
             })
         ) {
@@ -1021,15 +1022,15 @@ pub mod noninteractive {
             let v = Verifier::new(&ckt);
 
             let proof = p.make_proof();
-            prop_assert_eq!(v.verify(proof), output == crate::f2_19x3_26::F::ZERO);
+            prop_assert_eq!(v.verify(proof), output == TestField::ZERO);
         }
 
         #[test]
         fn test_true(
             (ckt, w) in crate::circuit::arb_ckt_zero(20, 100)
         ) {
-            let p = <Prover<crate::f2_19x3_26::F, merkle::Sha256>>::new(&ckt, &w);
-            let v = <Verifier<crate::f2_19x3_26::F, merkle::Sha256>>::new(&ckt);
+            let p = <Prover<TestField, merkle::Sha256>>::new(&ckt, &w);
+            let v = <Verifier<TestField, merkle::Sha256>>::new(&ckt);
 
             let proof = p.make_proof();
             prop_assert!(v.verify(proof))
