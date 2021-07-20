@@ -15,27 +15,27 @@ use scuttlebutt::{
 
 use super::homcom::{FComReceiver, FComSender, MacValue};
 
-/// Edabits struct
+/// EdabitsProver struct
 #[derive(Clone)]
 pub struct EdabitsProver<FE: FiniteField> {
     bits: Vec<(F2, Gf40)>,
     value: (FE::PrimeField, FE),
 }
-/// EdabitsMac struct
+/// EdabitsVerifier struct
 #[derive(Clone)]
 pub struct EdabitsVerifier<FE: FiniteField> {
     bits: Vec<Gf40>,
     value: FE,
 }
 
-/// Dabit struct
+/// DabitProver struct
 #[derive(Clone)]
 struct DabitProver<FE: FiniteField> {
     bit: (F2, Gf40),
     value: (FE::PrimeField, FE),
 }
 
-/// Dabit struct
+/// DabitVerifier struct
 #[derive(Clone)]
 struct DabitVerifier<FE: FiniteField> {
     bit: Gf40,

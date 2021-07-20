@@ -4,7 +4,7 @@
 // Copyright © 2020 Galois, Inc.
 // See LICENSE for licensing information.
 
-use ocelot::edabits::edabits::{ReceiverConv, SenderConv};
+use ocelot::edabits::{ReceiverConv, SenderConv};
 use scuttlebutt::{channel::track_unix_channel_pair, field::F61p, AesRng};
 use std::time::Instant;
 
