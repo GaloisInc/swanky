@@ -13,13 +13,13 @@ use scuttlebutt::{
     AbstractChannel, AesRng, Block,
 };
 
-use super::homcom::{FComReceiver, FComSender, MacValue};
+use super::homcom::{FComReceiver, FComSender, MacProver};
 
 /// EdabitsProver struct
 #[derive(Clone)]
 pub struct EdabitsProver<FE: FiniteField> {
-    bits: Vec<(F2, Gf40)>,
-    value: (FE::PrimeField, FE),
+    bits: Vec<MacProver<Gf40>>,
+    value: MacProver<FE>,
 }
 /// EdabitsVerifier struct
 #[derive(Clone)]
@@ -31,8 +31,8 @@ pub struct EdabitsVerifier<FE: FiniteField> {
 /// DabitProver struct
 #[derive(Clone)]
 struct DabitProver<FE: FiniteField> {
-    bit: (F2, Gf40),
-    value: (FE::PrimeField, FE),
+    bit: MacProver<Gf40>,
+    value: MacProver<FE>,
 }
 
 /// DabitVerifier struct
@@ -127,26 +127,24 @@ impl<FE: FiniteField + PrimeFiniteField> SenderConv<FE> {
         channel: &mut C,
         _rng: &mut RNG,
         dabit_batch: &[DabitProver<FE>],
-        input_batch: Vec<(F2, Gf40)>,
-    ) -> Result<Vec<(FE::PrimeField, FE)>, Error> {
+        input_batch: Vec<MacProver<Gf40>>,
+    ) -> Result<Vec<MacProver<FE>>, Error> {
         let n = dabit_batch.len();
         debug_assert!(n == input_batch.len());
 
         let mut r_plus_x = Vec::with_capacity(n);
         for i in 0..n {
-            let r = dabit_batch[i].bit.0;
-            let r_mac = dabit_batch[i].bit.1;
-            let x = input_batch[i].0;
-            let x_mac = input_batch[i].1;
-            r_plus_x.push((r + x, r_mac + x_mac));
+            let (r, r_mac) = dabit_batch[i].bit.extract_mac_pair();
+            let (x, x_mac) = input_batch[i].extract_mac_pair();
+            r_plus_x.push(MacProver::make_mac_pair(r + x, r_mac + x_mac));
         }
         self.fcom_f2.open(channel, &r_plus_x)?;
 
         let mut x_m_batch = Vec::with_capacity(n);
         for i in 0..n {
-            let r = dabit_batch[i].bit.0;
-            let r_m_mac = dabit_batch[i].value.1;
-            let x = input_batch[i].0;
+            let (r, _r_mac) = dabit_batch[i].bit.extract_mac_pair();
+            let (_r_m, r_m_mac) = dabit_batch[i].value.extract_mac_pair();
+            let (x, _x_mac) = input_batch[i].extract_mac_pair();
 
             let x_m = bit_to_fe::<FE::PrimeField>(x);
             let c = r + x;
@@ -156,7 +154,7 @@ impl<FE: FiniteField + PrimeFiniteField> SenderConv<FE> {
                 } else {
                     FE::ZERO
                 };
-            x_m_batch.push((x_m, x_m_mac));
+            x_m_batch.push(MacProver::make_mac_pair(x_m, x_m_mac));
         }
 
         Ok(x_m_batch)
@@ -172,8 +170,8 @@ impl<FE: FiniteField + PrimeFiniteField> SenderConv<FE> {
         rng: &mut RNG,
         x_batch: &[EdabitsProver<FE>],
         y_batch: &[EdabitsProver<FE>],
-        mult_input_mac: &[(F2, Gf40)],
-    ) -> Result<Vec<(Vec<(F2, Gf40)>, (F2, Gf40))>, Error> {
+        mult_input_mac: &[MacProver<Gf40>],
+    ) -> Result<Vec<(Vec<MacProver<Gf40>>, MacProver<Gf40>)>, Error> {
         let num = x_batch.len();
         if num != y_batch.len() {
             return Err(Error::Other(
@@ -205,8 +203,8 @@ impl<FE: FiniteField + PrimeFiniteField> SenderConv<FE> {
 
                 debug_assert!(x.len() == m && y.len() == m);
 
-                let (xi, xi_mac) = x[i];
-                let (yi, yi_mac) = y[i];
+                let (xi, xi_mac) = x[i].extract_mac_pair();
+                let (yi, yi_mac) = y[i].extract_mac_pair();
 
                 let and1 = xi + ci;
                 let and1_mac = xi_mac + ci_mac;
@@ -222,7 +220,7 @@ impl<FE: FiniteField + PrimeFiniteField> SenderConv<FE> {
 
                 let z = and1 + yi; // xi + yi + ci ;
                 let z_mac = and1_mac + yi_mac; // xi_mac + yi_mac + ci_mac;
-                z_batch[n].push((z, z_mac));
+                z_batch[n].push(MacProver::make_mac_pair(z, z_mac));
 
                 and_res_batch.push(and_res);
                 aux_batch.push((and1, and1_mac, and2, and2_mac));
@@ -240,9 +238,9 @@ impl<FE: FiniteField + PrimeFiniteField> SenderConv<FE> {
                 let and_res = and_res_batch[n];
                 let and_res_mac = and_res_mac_batch[n];
                 triples.push((
-                    MacValue(and1, and1_mac),
-                    MacValue(and2, and2_mac),
-                    MacValue(and_res, and_res_mac),
+                    MacProver::make_mac_pair(and1, and1_mac),
+                    MacProver::make_mac_pair(and2, and2_mac),
+                    MacProver::make_mac_pair(and_res, and_res_mac),
                 ));
 
                 let ci_mac = ci_mac_batch[n];
@@ -259,7 +257,10 @@ impl<FE: FiniteField + PrimeFiniteField> SenderConv<FE> {
         // reconstruct the solution
         let mut res = Vec::with_capacity(num);
         for n in 0..num {
-            res.push((z_batch[n].clone(), (ci_batch[n], ci_mac_batch[n])));
+            res.push((
+                z_batch[n].clone(),
+                MacProver::make_mac_pair(ci_batch[n], ci_mac_batch[n]),
+            ));
         }
 
         Ok(res)
@@ -281,8 +282,12 @@ impl<FE: FiniteField + PrimeFiniteField> SenderConv<FE> {
             for _ in 0..NB_BITS {
                 bits.push(self.fcom_f2.random(channel, rng)?);
             }
-            let r_m: FE::PrimeField =
-                convert_f2_to_field::<FE>(bits.iter().map(|x| x.0).collect::<Vec<F2>>().as_slice());
+            let r_m: FE::PrimeField = convert_f2_to_field::<FE>(
+                bits.iter()
+                    .map(|x| x.extract_mac_pair().0)
+                    .collect::<Vec<F2>>()
+                    .as_slice(),
+            );
             aux_bits.push(bits);
             aux_r_m.push(r_m);
         }
@@ -292,7 +297,7 @@ impl<FE: FiniteField + PrimeFiniteField> SenderConv<FE> {
         for i in 0..num {
             edabits_vec.push(EdabitsProver {
                 bits: aux_bits[i].clone(),
-                value: (aux_r_m[i], aux_r_m_mac[i]),
+                value: MacProver::make_mac_pair(aux_r_m[i], aux_r_m_mac[i]),
             });
         }
         Ok(edabits_vec)
@@ -311,7 +316,7 @@ impl<FE: FiniteField + PrimeFiniteField> SenderConv<FE> {
         for _ in 0..num {
             let b = self.fcom_f2.random(channel, rng)?;
             b_batch.push(b);
-            let b_m = bit_to_fe(b.0);
+            let b_m = bit_to_fe(b.extract_mac_pair().0);
             b_m_batch.push(b_m);
         }
 
@@ -320,7 +325,7 @@ impl<FE: FiniteField + PrimeFiniteField> SenderConv<FE> {
         for i in 0..num {
             dabit_vec.push(DabitProver {
                 bit: b_batch[i],
-                value: (b_m_batch[i], b_m_mac_batch[i]),
+                value: MacProver::make_mac_pair(b_m_batch[i], b_m_mac_batch[i]),
             });
         }
         Ok(dabit_vec)
@@ -349,8 +354,10 @@ impl<FE: FiniteField + PrimeFiniteField> SenderConv<FE> {
         for i in 0..n {
             // making sure the faulty dabits are not faulty
             debug_assert!(
-                ((dabits[i].bit.0 == F2::ZERO) & (dabits[i].value.0 == FE::PrimeField::ZERO))
-                    | ((dabits[i].bit.0 == F2::ONE) & (dabits[i].value.0 == FE::PrimeField::ONE))
+                ((dabits[i].bit.extract_mac_pair().0 == F2::ZERO)
+                    & (dabits[i].value.extract_mac_pair().0 == FE::PrimeField::ZERO))
+                    | ((dabits[i].bit.extract_mac_pair().0 == F2::ONE)
+                        & (dabits[i].value.extract_mac_pair().0 == FE::PrimeField::ONE))
             );
         }
 
@@ -392,9 +399,9 @@ impl<FE: FiniteField + PrimeFiniteField> SenderConv<FE> {
                 let andl: FE::PrimeField = c_m[k][i];
                 let andl_mac: FE = c_m_mac[k][i];
                 let (minus_ci, minus_ci_mac) : (FE::PrimeField,FE) = // -ci
-                    self.fcom.affine_mult_cst(-FE::PrimeField::ONE, (andl, andl_mac));
+                    self.fcom.affine_mult_cst(-FE::PrimeField::ONE, MacProver::make_mac_pair(andl, andl_mac)).extract_mac_pair();
                 let (one_minus_ci, one_minus_ci_mac) = // 1 - ci
-                    self.fcom.affine_add_cst(FE::PrimeField::ONE, (minus_ci, minus_ci_mac));
+                    self.fcom.affine_add_cst(FE::PrimeField::ONE, MacProver::make_mac_pair(minus_ci, minus_ci_mac)).extract_mac_pair();
                 let and_res = andl * one_minus_ci;
                 andl_batch.push(andl);
                 andl_mac_batch.push(andl_mac);
@@ -407,9 +414,9 @@ impl<FE: FiniteField + PrimeFiniteField> SenderConv<FE> {
 
         for j in 0..s * gamma {
             triples.push((
-                MacValue(andl_batch[j], andl_mac_batch[j]),
-                MacValue(one_minus_ci_batch[j], one_minus_ci_mac_batch[j]),
-                MacValue(and_res_batch[j], and_res_mac_batch[j]),
+                MacProver::make_mac_pair(andl_batch[j], andl_mac_batch[j]),
+                MacProver::make_mac_pair(one_minus_ci_batch[j], one_minus_ci_mac_batch[j]),
+                MacProver::make_mac_pair(and_res_batch[j], and_res_mac_batch[j]),
             ));
         }
 
@@ -430,14 +437,18 @@ impl<FE: FiniteField + PrimeFiniteField> SenderConv<FE> {
             let (mut r, mut r_mac) = (c1[k], c1_mac[k]);
             for i in 0..n {
                 // TODO: do not need to do it when e[i] is ZERO
-                let (tmp, tmp_mac) = self.fcom_f2.affine_mult_cst(e[k][i], dabits[i].bit);
+                let (tmp, tmp_mac) = self
+                    .fcom_f2
+                    .affine_mult_cst(e[k][i], dabits[i].bit)
+                    .extract_mac_pair();
                 debug_assert!(
-                    ((e[k][i] == F2::ONE) & (tmp == dabits[i].bit.0)) | (tmp == F2::ZERO)
+                    ((e[k][i] == F2::ONE) & (tmp == dabits[i].bit.extract_mac_pair().0))
+                        | (tmp == F2::ZERO)
                 );
                 r += tmp;
                 r_mac += tmp_mac;
             }
-            r_batch.push((r, r_mac));
+            r_batch.push(MacProver::make_mac_pair(r, r_mac));
         }
 
         // step 5) TODO: move this to the end
@@ -452,9 +463,12 @@ impl<FE: FiniteField + PrimeFiniteField> SenderConv<FE> {
             for i in 0..n {
                 // TODO: do not need to do it when e[i] is ZERO
                 let b = bit_to_fe(e[k][i]);
-                let (tmp, tmp_mac) = self.fcom.affine_mult_cst(b, dabits[i].value);
+                let (tmp, tmp_mac) = self
+                    .fcom
+                    .affine_mult_cst(b, dabits[i].value)
+                    .extract_mac_pair();
                 debug_assert!(
-                    ((b == FE::PrimeField::ONE) & (tmp == dabits[i].value.0))
+                    ((b == FE::PrimeField::ONE) & (tmp == dabits[i].value.extract_mac_pair().0))
                         | (tmp == FE::PrimeField::ZERO)
                 );
                 r_prime += tmp;
@@ -469,7 +483,10 @@ impl<FE: FiniteField + PrimeFiniteField> SenderConv<FE> {
             let (mut tau, mut tau_mac) = r_prime_batch[k];
             let mut twos = FE::PrimeField::ONE;
             for i in 0..gamma {
-                let (tmp, tmp_mac) = self.fcom.affine_mult_cst(twos, (c_m[k][i], c_m_mac[k][i]));
+                let (tmp, tmp_mac) = self
+                    .fcom
+                    .affine_mult_cst(twos, MacProver::make_mac_pair(c_m[k][i], c_m_mac[k][i]))
+                    .extract_mac_pair();
                 if i == 0 {
                     debug_assert!(c_m[k][i] == tmp);
                 }
@@ -477,7 +494,7 @@ impl<FE: FiniteField + PrimeFiniteField> SenderConv<FE> {
                 tau_mac += tmp_mac;
                 twos += twos;
             }
-            tau_batch.push((tau, tau_mac));
+            tau_batch.push(MacProver::make_mac_pair(tau, tau_mac));
         }
 
         let _ = self.fcom.open(channel, &tau_batch)?;
@@ -487,7 +504,10 @@ impl<FE: FiniteField + PrimeFiniteField> SenderConv<FE> {
             // step 8)
             // NOTE: This is not needed for the prover,
             let b: bool;
-            match (r_batch[k].0 == F2::ONE, FE::modulus2(tau_batch[k].0)) {
+            match (
+                r_batch[k].extract_mac_pair().0 == F2::ONE,
+                FE::modulus2(tau_batch[k].extract_mac_pair().0),
+            ) {
                 (true, true) => {
                     b = true;
                 }
@@ -596,12 +616,12 @@ impl<FE: FiniteField + PrimeFiniteField> SenderConv<FE> {
                 let idx_r = idx_base + i;
 
                 // 6)a)
-                let (_c_m, c_m_mac) = edabits_vector[i].value;
-                let (_r_m, r_m_mac) = r[idx_r].value;
+                let (_c_m, c_m_mac) = edabits_vector[i].value.extract_mac_pair();
+                let (_r_m, r_m_mac) = r[idx_r].value.extract_mac_pair();
                 let c_plus_r_mac = c_m_mac + r_m_mac;
 
                 // 6)c) done earlier
-                let e_m_mac = e_m_batch[i].1;
+                let e_m_mac = e_m_batch[i].extract_mac_pair().1;
 
                 // 6)d)
                 let e_prime_mac =
@@ -1084,12 +1104,13 @@ impl<FE: FiniteField + PrimeFiniteField> ReceiverConv<FE> {
 #[cfg(test)]
 mod tests {
 
+    use super::super::homcom::MacProver;
     use super::{
         bit_to_fe, DabitProver, DabitVerifier, EdabitsProver, EdabitsVerifier, ReceiverConv,
         SenderConv,
     };
     use scuttlebutt::{
-        field::{F61p, FiniteField, Gf40, PrimeFiniteField, F2},
+        field::{F61p, FiniteField, PrimeFiniteField, F2},
         AesRng, Channel,
     };
     use std::{
@@ -1109,26 +1130,35 @@ mod tests {
 
             let mut res = Vec::new();
             for _ in 0..count {
-                let (rb, rb_mac) = fconv.fcom_f2.random(&mut channel, &mut rng).unwrap();
+                let (rb, rb_mac) = fconv
+                    .fcom_f2
+                    .random(&mut channel, &mut rng)
+                    .unwrap()
+                    .extract_mac_pair();
                 let rm = bit_to_fe(rb);
                 let rm_mac = fconv.fcom.input(&mut channel, &mut rng, &vec![rm]).unwrap()[0];
-                let (x_f2, x_f2_mac) = fconv.fcom_f2.random(&mut channel, &mut rng).unwrap();
+                let (x_f2, x_f2_mac) = fconv
+                    .fcom_f2
+                    .random(&mut channel, &mut rng)
+                    .unwrap()
+                    .extract_mac_pair();
 
                 let (x_m, x_m_mac) = fconv
                     .convert_bit_2_field(
                         &mut channel,
                         &mut rng,
                         &vec![DabitProver {
-                            bit: (rb, rb_mac),
-                            value: (rm, rm_mac),
+                            bit: MacProver::make_mac_pair(rb, rb_mac),
+                            value: MacProver::make_mac_pair(rm, rm_mac),
                         }],
-                        vec![(x_f2, x_f2_mac)],
+                        vec![MacProver::make_mac_pair(x_f2, x_f2_mac)],
                     )
-                    .unwrap()[0];
+                    .unwrap()[0]
+                    .extract_mac_pair();
 
                 let _ = fconv
                     .fcom
-                    .open(&mut channel, &vec![(x_m, x_m_mac)])
+                    .open(&mut channel, &vec![MacProver::make_mac_pair(x_m, x_m_mac)])
                     .unwrap();
                 assert_eq!(
                     if x_f2 == F2::ZERO {
@@ -1201,16 +1231,16 @@ mod tests {
             let x_mac = fconv.fcom_f2.input(&mut channel, &mut rng, &x).unwrap();
             let y_mac = fconv.fcom_f2.input(&mut channel, &mut rng, &y).unwrap();
 
-            let mut vx: Vec<(F2, Gf40)> = Vec::new();
+            let mut vx = Vec::new();
             for i in 0..power {
-                vx.push((x[i], x_mac[i]));
+                vx.push(MacProver::make_mac_pair(x[i], x_mac[i]));
             }
 
             let mut vy = Vec::new();
             for i in 0..power {
-                vy.push((y[i], y_mac[i]));
+                vy.push(MacProver::make_mac_pair(y[i], y_mac[i]));
             }
-            let default_fe = (FE::PrimeField::ZERO, FE::ZERO);
+            let default_fe = MacProver::make_mac_pair(FE::PrimeField::ZERO, FE::ZERO);
             let mut mult_input_mac = Vec::with_capacity(power);
             for _ in 0..power {
                 mult_input_mac.push(fconv.fcom_f2.random(&mut channel, &mut rng).unwrap());
