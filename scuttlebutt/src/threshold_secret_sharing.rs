@@ -10,7 +10,6 @@
 //! allowing efficient sharing of several secrets together.
 
 use crate::field::FiniteField;
-
 use crate::{numtheory, numtheory::{FieldForFFT2, FieldForFFT3}};
 
 /// Parameters for the packed variant of Shamir secret sharing,
@@ -152,3 +151,16 @@ impl<Field: FiniteField + FieldForFFT2 + FieldForFFT3> PackedSecretSharing<Field
         secrets
     }
 }
+
+//#[cfg(test)]
+//mod tests {
+//    use super::*;
+//    type TestField = crate::field::F2_19x3_26;
+//
+//    fn test_share_reconstruct() {
+//        let pss = PackedSecretSharing {
+//        }
+//
+//        let w = (0..256).iter().map(|&n| n.into()).collect::<Vec<TestField>>();
+//    }
+//}

@@ -115,12 +115,12 @@ impl<Field: FieldForLigero> Params<Field> {
         let coeffs0 = stack!(Axis(0), Array1::zeros(1), cf);
         let points = numtheory::fft3_inverse(
             &coeffs0.to_vec(),
-            Field::from(self.pss.omega_shares),
+            self.pss.omega_shares,
         );
 
         numtheory::fft2(
             &points[0 ..= self.k],
-            Field::from(self.pss.omega_secrets),
+            self.pss.omega_secrets,
         )
     }
 
@@ -150,13 +150,13 @@ impl<Field: FieldForLigero> Params<Field> {
         let coeffs0 = stack!(Axis(0), Array1::zeros(1), cf);
         let points0 = numtheory::fft3_inverse(
             &coeffs0.to_vec(),
-            Field::from(self.pss.omega_shares),
+            self.pss.omega_shares,
         );
         let (points, zeros) = points0[..].split_at(self.k+1);
 
         numtheory::fft2(
             points,
-            Field::from(self.pss.omega_secrets),
+            self.pss.omega_secrets,
         )[0] == Field::ZERO && zeros.iter().all(|&f| f == Field::ZERO)
     }
 
@@ -196,7 +196,7 @@ impl<Field: FieldForLigero> Params<Field> {
 
         numtheory::fft2_inverse(
             &points0.to_vec(),
-            Field::from(self.pss.omega_secrets),
+            self.pss.omega_secrets,
         ).iter().cloned().collect()
     }
 
@@ -212,7 +212,7 @@ impl<Field: FieldForLigero> Params<Field> {
 
         numtheory::fft2(
             &coeffs0.to_vec(),
-            Field::from(self.pss.omega_secrets),
+            self.pss.omega_secrets,
         )[1..].iter().cloned().collect()
     }
 
@@ -227,7 +227,7 @@ impl<Field: FieldForLigero> Params<Field> {
 
         numtheory::fft2(
             &coeffs0.to_vec(),
-            Field::from(self.pss.omega_secrets),
+            self.pss.omega_secrets,
         ).iter().cloned().collect()
     }
 
@@ -241,7 +241,7 @@ impl<Field: FieldForLigero> Params<Field> {
 
         numtheory::fft3_inverse(
             &points0.to_vec(),
-            Field::from(self.pss.omega_shares),
+            self.pss.omega_shares,
         ).iter().cloned().collect()
     }
 
@@ -257,7 +257,7 @@ impl<Field: FieldForLigero> Params<Field> {
 
         numtheory::fft3(
             &coeffs0.to_vec(),
-            Field::from(self.pss.omega_shares),
+            self.pss.omega_shares,
         )[1..].iter().cloned().collect()
     }
 
@@ -272,16 +272,16 @@ impl<Field: FieldForLigero> Params<Field> {
 
         numtheory::fft3(
             &coeffs0.to_vec(),
-            Field::from(self.pss.omega_shares),
+            self.pss.omega_shares,
         ).iter().cloned().collect()
     }
 
     pub fn peval2(&self, p: ArrayView1<Field>, ix: usize) -> Field {
-        crate::util::peval(p, Field::from(self.pss.omega_secrets).pow(ix as u128))
+        crate::util::peval(p, self.pss.omega_secrets.pow(ix as u128))
     }
 
     pub fn peval3(&self, p: ArrayView1<Field>, ix: usize) -> Field {
-        crate::util::peval(p, Field::from(self.pss.omega_shares).pow(ix as u128))
+        crate::util::peval(p, self.pss.omega_shares.pow(ix as u128))
     }
 
     // Take two polynomials p and q of degree less than 2^kexp and produce a

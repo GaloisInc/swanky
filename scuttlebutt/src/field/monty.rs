@@ -91,18 +91,6 @@ pub fn monty_from_u128<F: Monty>(a: u128) -> F {
     F::from_raw(((a << 64) % F::M as u128) as u64)
 }
 
-/// Convert a u128 into a field element in Montgomery form into using two
-/// divisions
-// XXX: This uses an extra division because of the signed representation
-// needed by rust_threshold_secret_sharing. Can't see a way around it atm.
-#[inline]
-pub fn monty_from_i128<F: Monty>(n: i128) -> F {
-    let n_mod = n % F::M as i128;
-    let n_pos = if n_mod >= 0 { n_mod } else { F::M as i128 + n_mod } as u128;
-
-    monty_from_u128(n_pos)
-}
-
 /// Convert a literal that can be cast to u128 into Montgomery form statically
 #[macro_export]
 macro_rules! monty_from_lit {
@@ -229,6 +217,8 @@ pub fn monty_random<F: Monty, R: rand_core::RngCore + ?Sized>(rng: &mut R) -> F 
 //      a*x + b*y = g = gcd(a, b)
 //      0 <= x < |b/g|
 //      -|a/g| < y <= 0
+//
+// TODO Re-implement based on https://eprint.iacr.org/2020/972.pdf?
 #[inline]
 fn gcd(a0: i128, b0: i128) -> (i128, i128) {
     let mut a = a0; let mut b = b0;

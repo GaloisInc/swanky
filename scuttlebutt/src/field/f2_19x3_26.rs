@@ -37,14 +37,14 @@ impl Monty for F2_19x3_26 {
     fn from_raw(raw: u64) -> Self { Self(raw) }
 }
 
+impl std::convert::From<u64> for F2_19x3_26 {
+    #[inline]
+    fn from(n: u64) -> Self { (n as u128).into() }
+}
+
 impl std::convert::From<u128> for F2_19x3_26 {
     #[inline]
     fn from(n: u128) -> Self { monty_from_u128(n) }
-}
-
-impl std::convert::From<i128> for F2_19x3_26 {
-    #[inline]
-    fn from(n: i128) -> Self { monty_from_i128(n) }
 }
 
 implement_finite_field_for_monty!{F2_19x3_26}
@@ -83,11 +83,6 @@ impl crate::numtheory::FieldForFFT3 for F2_19x3_26 {
     }
 }
 
-impl std::convert::From<u64> for F2_19x3_26 {
-    #[inline]
-    fn from(n: u64) -> Self { (n as u128).into() }
-}
-
 impl ndarray::ScalarOperand for F2_19x3_26 {}
 
 impl num_traits::Zero for F2_19x3_26 {
@@ -113,7 +108,7 @@ impl std::ops::Rem<F2_19x3_26> for F2_19x3_26 {
 impl num_traits::Num for F2_19x3_26 {
     type FromStrRadixErr = core::num::ParseIntError;
     fn from_str_radix(s: &str, r: u32) -> Result<Self, Self::FromStrRadixErr> {
-        <i128 as num_traits::Num>::from_str_radix(s, r).map(From::from)
+        <u128 as num_traits::Num>::from_str_radix(s, r).map(From::from)
     }
 }
 

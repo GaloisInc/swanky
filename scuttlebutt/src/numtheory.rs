@@ -18,7 +18,7 @@ use crate::field::FiniteField;
 /// FFT size, i.e., a field element `r_p`, such that `r_p^(2^p) = 1`, for a
 /// size-`3^p` FFT. The `PHI_2_EXP` constant is the exponent of the largest FFT
 /// size supported, and `roots_base_2` should return the `2^p`th root of unity.
-pub trait FieldForFFT2: FiniteField + From<i128> + From<u128> {
+pub trait FieldForFFT2: FiniteField + From<u128> {
     /// Largest integer `p` such that `phi(MODULUS) = 2^p * k` for integer `k`.
     const PHI_2_EXP: usize;
 
@@ -35,7 +35,7 @@ pub trait FieldForFFT2: FiniteField + From<i128> + From<u128> {
 /// FFT size, i.e., a field element `r_p`, such that `r_p^(3^p) = 1`, for a
 /// size-`3^p` FFT. The `PHI_3_EXP` constant is the exponent of the largest FFT
 /// size supported, and `roots_base_3` should return the `3^p`th root of unity.
-pub trait FieldForFFT3: FiniteField + From<i128> + From<u128> {
+pub trait FieldForFFT3: FiniteField + From<u128> {
     /// Largest integer `p` such that `phi(MODULUS) = 3^p * k` for integer `k`.
     const PHI_3_EXP: usize;
 
@@ -74,7 +74,7 @@ pub mod cooley_tukey {
     pub fn fft2_inverse<Field: FieldForFFT2>(data: &mut [Field], omega: Field) {
         let omega_inv = omega.inverse();
         let len = data.len();
-        let len_inv = Field::from(len as i128).inverse();
+        let len_inv = Field::from(len as u128).inverse();
         fft2(data, omega_inv);
         for x in data {
             *x = *x * len_inv;
@@ -145,7 +145,7 @@ pub mod cooley_tukey {
         where Field: FieldForFFT3
     {
         let omega_inv = omega.inverse();
-        let len_inv = Field::from(data.len() as i128).inverse();
+        let len_inv = Field::from(data.len() as u128).inverse();
         fft3(data, omega_inv);
         for x in data {
             *x = *x * len_inv;
@@ -246,10 +246,10 @@ macro_rules! fft2_tests {
     ($field: ty) => {
         #[test]
         fn test_fft2() {
-            let omega = <$field>::roots_base_2(8) as i128;
-            let prime = <$field>::MODULUS as i128;
+            let omega = <$field>::roots_base_2(8) as u128;
+            let prime = <$field>::MODULUS as u128;
 
-            let a_coef: Vec<_> = (1i128..=8).collect();
+            let a_coef: Vec<_> = (1u128..=8).collect();
             assert_eq!(
                 fft2(&a_coef.iter().cloned().map(<$field>::from).collect::<Vec<_>>(), <$field>::from(omega)),
                 threshold_secret_sharing::numtheory::fft2(&a_coef, omega, prime)
@@ -259,10 +259,10 @@ macro_rules! fft2_tests {
 
         #[test]
         fn test_fft2_inverse() {
-            let omega = <$field>::roots_base_2(8) as i128;
-            let prime = <$field>::MODULUS as i128;
+            let omega = <$field>::roots_base_2(8) as u128;
+            let prime = <$field>::MODULUS as u128;
 
-            let a_point: Vec<_> = (1i128..=8).collect();
+            let a_point: Vec<_> = (1u128..=8).collect();
             assert_eq!(
                 fft2_inverse(&a_point.iter().cloned().map(<$field>::from).collect::<Vec<_>>(), <$field>::from(omega)),
                 threshold_secret_sharing::numtheory::fft2_inverse(&a_point, omega, prime)
@@ -313,10 +313,10 @@ macro_rules! fft3_tests {
     ($field: ty) => {
         #[test]
         fn test_fft3() {
-            let omega = <$field>::roots_base_3(9) as i128;
-            let prime = <$field>::MODULUS as i128;
+            let omega = <$field>::roots_base_3(9) as u128;
+            let prime = <$field>::MODULUS as u128;
 
-            let a_coef: Vec<_> = (1i128..=9).collect();
+            let a_coef: Vec<_> = (1u128..=9).collect();
             assert_eq!(
                 fft3(&a_coef.iter().cloned().map(<$field>::from).collect::<Vec<_>>(), <$field>::from(omega)),
                 threshold_secret_sharing::numtheory::fft3(&a_coef, omega, prime)
@@ -326,10 +326,10 @@ macro_rules! fft3_tests {
 
         #[test]
         fn test_fft3_inverse() {
-            let omega = <$field>::roots_base_3(9) as i128;
-            let prime = <$field>::MODULUS as i128;
+            let omega = <$field>::roots_base_3(9) as u128;
+            let prime = <$field>::MODULUS as u128;
 
-            let a_point: Vec<_> = (1i128..=9).collect();
+            let a_point: Vec<_> = (1u128..=9).collect();
             assert_eq!(
                 fft3_inverse(&a_point.iter().cloned().map(<$field>::from).collect::<Vec<_>>(), <$field>::from(omega)),
                 threshold_secret_sharing::numtheory::fft3_inverse(&a_point, omega, prime)
