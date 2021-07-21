@@ -49,24 +49,25 @@ impl<FE: FiniteField> FComSender<FE> {
         &mut self,
         channel: &mut C,
         rng: &mut RNG,
-        mut num: usize,
-    ) -> Result<Vec<(FE::PrimeField, FE)>, Error> {
-        let mut res = Vec::with_capacity(num);
-
-        while num > 0 {
-            match self.voles.pop() {
-                Some(e) => {
-                    res.push(e);
-                    num -= 1;
-                }
-                None => {
-                    let mut v = Vec::new();
-                    self.svole_sender.send(channel, rng, &mut v)?;
-                    self.voles = v;
+    ) -> Result<(FE::PrimeField, FE), Error> {
+        match self.voles.pop() {
+            Some(e) => {
+                return Ok(e);
+            }
+            None => {
+                let mut voles = Vec::new();
+                self.svole_sender.send(channel, rng, &mut voles)?;
+                self.voles = voles;
+                match self.voles.pop() {
+                    Some(e) => {
+                        return Ok(e);
+                    }
+                    None => {
+                        return Err(Error::Other("svole failed for random".to_string()));
+                    }
                 }
             }
         }
-        Ok(res)
     }
 
     pub fn input<C: AbstractChannel, RNG: CryptoRng + Rng>(
@@ -75,7 +76,10 @@ impl<FE: FiniteField> FComSender<FE> {
         rng: &mut RNG,
         x: &[FE::PrimeField],
     ) -> Result<Vec<FE>, Error> {
-        let r = self.random(channel, rng, x.len())?;
+        let mut r = Vec::with_capacity(x.len());
+        for _ in 0..x.len() {
+            r.push(self.random(channel, rng)?);
+        }
 
         let mut out = Vec::with_capacity(x.len());
         self.input_low_level(channel, x, &r, &mut out)?;
@@ -181,11 +185,12 @@ impl<FE: FiniteField> FComSender<FE> {
         // The following block implements VOPE(1)
         let mut mask = FE::ZERO;
         let mut mask_mac = FE::ZERO;
-        let u = self.random(channel, rng, FE::PolynomialFormNumCoefficients::USIZE)?;
+
         for i in 0..FE::PolynomialFormNumCoefficients::USIZE {
+            let (u, u_mac) = self.random(channel, rng)?;
             let x_i: FE = make_x_i(i);
-            mask += x_i.multiply_by_prime_subfield(u[i].0);
-            mask_mac += u[i].1 * x_i;
+            mask += x_i.multiply_by_prime_subfield(u);
+            mask_mac += u_mac * x_i;
         }
 
         let u = sum_a0 + mask_mac;
@@ -226,24 +231,25 @@ impl<FE: FiniteField> FComReceiver<FE> {
         &mut self,
         channel: &mut C,
         rng: &mut RNG,
-        mut num: usize,
-    ) -> Result<Vec<FE>, Error> {
-        let mut res = Vec::with_capacity(num);
-
-        while num > 0 {
-            match self.voles.pop() {
-                Some(e) => {
-                    res.push(e);
-                    num -= 1;
-                }
-                None => {
-                    let mut v = Vec::new();
-                    self.svole_receiver.receive(channel, rng, &mut v)?;
-                    self.voles = v;
+    ) -> Result<FE, Error> {
+        match self.voles.pop() {
+            Some(e) => {
+                return Ok(e);
+            }
+            None => {
+                let mut voles = Vec::new();
+                self.svole_receiver.receive(channel, rng, &mut voles)?;
+                self.voles = voles;
+                match self.voles.pop() {
+                    Some(e) => {
+                        return Ok(e);
+                    }
+                    None => {
+                        return Err(Error::Other("svole failed for random".to_string()));
+                    }
                 }
             }
         }
-        Ok(res)
     }
 
     pub fn input<C: AbstractChannel, RNG: CryptoRng + Rng>(
@@ -252,7 +258,10 @@ impl<FE: FiniteField> FComReceiver<FE> {
         rng: &mut RNG,
         num: usize,
     ) -> Result<Vec<FE>, Error> {
-        let r_mac = self.random(channel, rng, num)?;
+        let mut r_mac = Vec::with_capacity(num);
+        for _ in 0..num {
+            r_mac.push(self.random(channel, rng)?);
+        }
 
         let mut out = Vec::with_capacity(num);
         self.input_low_level(channel, num, &r_mac, &mut out)?;
@@ -355,10 +364,10 @@ impl<FE: FiniteField> FComReceiver<FE> {
 
         // The following block implements VOPE(1)
         let mut mask_mac = FE::ZERO;
-        let v_m = self.random(channel, rng, FE::PolynomialFormNumCoefficients::USIZE)?;
         for i in 0..FE::PolynomialFormNumCoefficients::USIZE {
+            let v_m = self.random(channel, rng)?;
             let x_i: FE = make_x_i(i);
-            mask_mac += v_m[i] * x_i;
+            mask_mac += v_m * x_i;
         }
 
         let u = channel.read_fe::<FE>()?;
@@ -397,7 +406,10 @@ mod tests {
             let mut channel = Channel::new(reader, writer);
             let mut fcom = FComSender::<FE>::init(&mut channel, &mut rng).unwrap();
 
-            let v = fcom.random(&mut channel, &mut rng, count).unwrap();
+            let mut v = Vec::with_capacity(count);
+            for _ in 0..count {
+                v.push(fcom.random(&mut channel, &mut rng).unwrap());
+            }
             let _ = fcom.open(&mut channel, &v).unwrap();
             v
         });
@@ -406,7 +418,10 @@ mod tests {
         let writer = BufWriter::new(receiver);
         let mut channel = Channel::new(reader, writer);
         let mut fcom = FComReceiver::<FE>::init(&mut channel, &mut rng).unwrap();
-        let v = fcom.random(&mut channel, &mut rng, count).unwrap();
+        let mut v = Vec::with_capacity(count);
+        for _ in 0..count {
+            v.push(fcom.random(&mut channel, &mut rng).unwrap());
+        }
         let r = fcom.open(&mut channel, &v).unwrap();
 
         let resprover = handle.join().unwrap();
@@ -426,10 +441,9 @@ mod tests {
             let mut channel = Channel::new(reader, writer);
             let mut fcom = FComSender::<F61p>::init(&mut channel, &mut rng).unwrap();
 
-            let inp = fcom.random(&mut channel, &mut rng, count).unwrap();
             let mut v = Vec::new();
-            for i in 0..count {
-                let (x, x_mac) = inp[i];
+            for _ in 0..count {
+                let (x, x_mac) = fcom.random(&mut channel, &mut rng).unwrap();
                 let cst = F61p::random(&mut rng);
                 channel.write_fe::<F61p>(cst).unwrap();
                 channel.flush().unwrap();
@@ -446,10 +460,10 @@ mod tests {
         let writer = BufWriter::new(receiver);
         let mut channel = Channel::new(reader, writer);
         let mut fcom = FComReceiver::<F61p>::init(&mut channel, &mut rng).unwrap();
+
         let mut v = Vec::new();
-        let inp = fcom.random(&mut channel, &mut rng, count).unwrap();
-        for i in 0..count {
-            let x_mac = inp[i];
+        for _ in 0..count {
+            let x_mac = fcom.random(&mut channel, &mut rng).unwrap();
             let cst = channel.read_fe().unwrap();
             let m_mac = fcom.affine_mult_cst(cst, x_mac);
             v.push(m_mac);
@@ -477,12 +491,10 @@ mod tests {
             let mut channel = Channel::new(reader, writer);
             let mut fcom = FComSender::<FE>::init(&mut channel, &mut rng).unwrap();
 
-            let x_batch = fcom.random(&mut channel, &mut rng, count).unwrap();
-            let y_batch = fcom.random(&mut channel, &mut rng, count).unwrap();
             let mut v = Vec::new();
-            for i in 0..count {
-                let (x, x_mac) = x_batch[i];
-                let (y, y_mac) = y_batch[i];
+            for _ in 0..count {
+                let (x, x_mac) = fcom.random(&mut channel, &mut rng).unwrap();
+                let (y, y_mac) = fcom.random(&mut channel, &mut rng).unwrap();
                 let z = x * y;
                 let z_mac = fcom.input(&mut channel, &mut rng, &vec![z]).unwrap()[0];
                 v.push((MacValue(x, x_mac), MacValue(y, y_mac), MacValue(z, z_mac)));
@@ -499,12 +511,10 @@ mod tests {
         let mut channel = Channel::new(reader, writer);
         let mut fcom = FComReceiver::<FE>::init(&mut channel, &mut rng).unwrap();
 
-        let x_batch = fcom.random(&mut channel, &mut rng, count).unwrap();
-        let y_batch = fcom.random(&mut channel, &mut rng, count).unwrap();
         let mut v = Vec::new();
-        for i in 0..count {
-            let xmac = x_batch[i];
-            let ymac = y_batch[i];
+        for _ in 0..count {
+            let xmac = fcom.random(&mut channel, &mut rng).unwrap();
+            let ymac = fcom.random(&mut channel, &mut rng).unwrap();
             let zmac = fcom.input(&mut channel, &mut rng, 1).unwrap()[0];
             v.push((xmac, ymac, zmac));
         }
