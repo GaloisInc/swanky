@@ -178,7 +178,7 @@ impl<FE: FiniteField> FComSender<FE> {
             sum_a0 += a0 * chi_power;
             sum_a1 += a1 * chi_power;
 
-            chi_power = chi_power * chi;
+            chi_power *= chi;
         }
 
         // The following block implements VOPE(1)
@@ -297,15 +297,11 @@ impl<FE: FiniteField> FComReceiver<FE> {
         channel: &mut C,
         key_batch: Vec<FE>,
     ) -> Result<bool, Error> {
-        let mut m_batch = Vec::with_capacity(key_batch.len());
-
-        for _ in 0..key_batch.len() {
-            let m = channel.read_fe::<FE>()?;
-            m_batch.push(m);
-        }
         let mut b = true;
         for i in 0..key_batch.len() {
-            if key_batch[i] != m_batch[i] {
+            let m = channel.read_fe::<FE>()?;
+
+            if key_batch[i] != m {
                 b = false;
             }
         }
