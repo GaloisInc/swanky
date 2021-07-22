@@ -37,13 +37,7 @@ pub struct FComSender<FE: FiniteField> {
 fn make_x_i<FE: FiniteField>(i: usize) -> FE {
     let mut v: GenericArray<FE::PrimeField, FE::PolynomialFormNumCoefficients> =
         GenericArray::default();
-    for j in 0..FE::PolynomialFormNumCoefficients::USIZE {
-        if i == j {
-            v[i] = FE::PrimeField::ONE;
-        } else {
-            v[i] = FE::PrimeField::ZERO;
-        }
-    }
+    v[i] = FE::PrimeField::ONE;
     FE::from_polynomial_coefficients(v)
 }
 
