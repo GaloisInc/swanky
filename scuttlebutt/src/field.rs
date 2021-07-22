@@ -130,13 +130,14 @@ impl<FE: FiniteField> IsSubfieldOf<FE> for FE {
     }
 }
 
-/// If a FiniteField implements this trait then it has a `modulus2`
-/// function.
+/// A `PrimeFiniteField` is a `FiniteField` whose `PrimeField` is
+/// itself. In this case the field is isomorphic to integers modulo
+/// p and this trait provides a modulo 2 operation.
 pub trait PrimeFiniteField:
     FiniteField<PolynomialFormNumCoefficients = generic_array::typenum::U1, PrimeField = Self>
 {
-    /// returns false for 0 and true for 1.
-    fn modulus2(t: Self::PrimeField) -> bool;
+    /// This function computes the modulo 2 operation.
+    fn mod2(&self) -> Self;
 }
 
 #[cfg(test)]

@@ -9,7 +9,7 @@
 use crate::errors::Error;
 use rand::{CryptoRng, Rng, SeedableRng};
 use scuttlebutt::{
-    field::{FiniteField, Gf40, PrimeFiniteField, F2},
+    field::{FiniteField, Gf40, IsSubfieldOf, PrimeFiniteField, F2},
     AbstractChannel, AesRng, Block,
 };
 
@@ -506,7 +506,12 @@ impl<FE: FiniteField + PrimeFiniteField> SenderConv<FE> {
             let b: bool;
             match (
                 r_batch[k].extract_mac_pair().0 == F2::ONE,
-                FE::modulus2(tau_batch[k].extract_mac_pair().0),
+                tau_batch[k]
+                    .extract_mac_pair()
+                    .0
+                    .lift_into_superfield()
+                    .mod2()
+                    == FE::ONE,
             ) {
                 (true, true) => {
                     b = true;
@@ -940,7 +945,10 @@ impl<FE: FiniteField + PrimeFiniteField> ReceiverConv<FE> {
         // step 8)
         for k in 0..s {
             let b: bool;
-            match (r_batch[k] == F2::ONE, FE::modulus2(tau_batch[k])) {
+            match (
+                r_batch[k] == F2::ONE,
+                tau_batch[k].lift_into_superfield().mod2() == FE::ONE,
+            ) {
                 (true, true) => {
                     b = true;
                 }
