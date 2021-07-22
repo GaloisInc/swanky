@@ -352,7 +352,10 @@ impl<FE: FiniteField> FComReceiver<FE> {
             let y_mac = triple.1;
             let z_mac = triple.2;
 
-            let b = x_mac * y_mac - (-self.delta) * z_mac; // -delta diff because
+            //  should be `- (-delta)` with our conventions compared to
+            //  quicksilver but simplified out.
+            let b = x_mac * y_mac + self.delta * z_mac;
+
             sum_b += b * power_chi;
             power_chi = power_chi * chi;
         }
