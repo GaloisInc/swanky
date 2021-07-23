@@ -10,8 +10,8 @@ use crate::errors::Error;
 use crate::svole::wykw::{Receiver, Sender};
 use crate::svole::{SVoleReceiver, SVoleSender};
 use generic_array::{typenum::Unsigned, GenericArray};
-use rand::{CryptoRng, Rng};
-use scuttlebutt::{field::FiniteField, AbstractChannel};
+use rand::{CryptoRng, Rng, SeedableRng};
+use scuttlebutt::{field::FiniteField, AbstractChannel, AesRng, Block};
 
 #[derive(Clone, Copy, Debug)]
 pub struct MacProver<FE: FiniteField>(FE::PrimeField, FE);
@@ -125,9 +125,15 @@ impl<FE: FiniteField> FComSender<FE> {
         channel: &mut C,
         x_mac_batch: Vec<FE>,
     ) -> Result<(), Error> {
+        let seed = channel.read_block()?;
+        let mut rng = AesRng::from_seed(seed);
+
+        let mut m = FE::ZERO;
         for x_mac in x_mac_batch.iter() {
-            channel.write_fe::<FE>(*x_mac)?;
+            let chi = FE::random(&mut rng);
+            m += chi * *x_mac;
         }
+        channel.write_fe::<FE>(m)?;
         channel.flush()?;
         Ok(())
     }
@@ -137,15 +143,21 @@ impl<FE: FiniteField> FComSender<FE> {
         channel: &mut C,
         batch: &[MacProver<FE>],
     ) -> Result<(), Error> {
-        for e in batch.iter() {
-            let x = e.0;
-            let x_mac = e.1;
-            channel.write_fe::<FE::PrimeField>(x)?;
-
-            // inlining check_zero below
-            channel.write_fe::<FE>(x_mac)?;
+        let mut hasher = blake3::Hasher::new();
+        for MacProver(x, _) in batch.iter() {
+            channel.write_fe::<FE::PrimeField>(*x)?;
+            hasher.update(&x.to_bytes());
         }
-        // flushing at the end
+
+        let seed = Block::try_from_slice(&hasher.finalize().as_bytes()[0..16]).unwrap();
+        let mut rng = AesRng::from_seed(seed);
+
+        let mut m = FE::ZERO;
+        for MacProver(_, x_mac) in batch.iter() {
+            let chi = FE::random(&mut rng);
+            m += chi * *x_mac;
+        }
+        channel.write_fe::<FE>(m)?;
         channel.flush()?;
 
         Ok(())
@@ -292,19 +304,25 @@ impl<FE: FiniteField> FComReceiver<FE> {
         return x_mac.multiply_by_prime_subfield(cst);
     }
 
-    pub fn check_zero<C: AbstractChannel>(
+    pub fn check_zero<C: AbstractChannel, RNG: CryptoRng + Rng>(
         &mut self,
         channel: &mut C,
+        rng: &mut RNG,
         key_batch: Vec<FE>,
     ) -> Result<bool, Error> {
-        let mut b = true;
-        for i in 0..key_batch.len() {
-            let m = channel.read_fe::<FE>()?;
+        let seed = rng.gen::<Block>();
+        channel.write_block(&seed)?;
+        channel.flush()?;
+        let mut rng = AesRng::from_seed(seed);
 
-            if key_batch[i] != m {
-                b = false;
-            }
+        let mut key_chi = FE::ZERO;
+        for key in key_batch.iter() {
+            let chi = FE::random(&mut rng);
+            key_chi += chi * *key;
         }
+        let m = channel.read_fe::<FE>()?;
+
+        let b = key_chi == m;
         Ok(b)
     }
 
@@ -313,24 +331,32 @@ impl<FE: FiniteField> FComReceiver<FE> {
         channel: &mut C,
         keys: &[FE],
     ) -> Result<Vec<FE::PrimeField>, Error> {
-        let mut b = true;
-
+        let mut hasher = blake3::Hasher::new();
         let mut res = Vec::with_capacity(keys.len());
-        for key in keys.iter() {
+        for _ in 0..keys.len() {
             let x = channel.read_fe::<FE::PrimeField>()?;
-
-            // inlining check_zero below
-            let m = channel.read_fe::<FE>()?;
-            if *key + self.delta.multiply_by_prime_subfield(x) != m {
-                b = false;
-            }
             res.push(x);
+            hasher.update(&x.to_bytes());
         }
+        let seed = Block::try_from_slice(&hasher.finalize().as_bytes()[0..16]).unwrap();
+        let mut rng = AesRng::from_seed(seed);
 
-        if b {
+        let mut key_chi = FE::ZERO;
+        let mut x_chi = FE::ZERO;
+        for i in 0..keys.len() {
+            let chi = FE::random(&mut rng);
+            let key = keys[i];
+            let x = res[i];
+
+            key_chi += chi * key;
+            x_chi += chi.multiply_by_prime_subfield(x);
+        }
+        let m = channel.read_fe::<FE>()?;
+
+        if key_chi + self.delta * x_chi == m {
             Ok(res)
         } else {
-            Err(Error::Other("open fails at checkzero".to_string()))
+            Err(Error::Other("open fails".to_string()))
         }
     }
 

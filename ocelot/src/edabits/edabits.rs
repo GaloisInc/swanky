@@ -1097,7 +1097,10 @@ impl<FE: FiniteField + PrimeFiniteField> ReceiverConv<FE> {
                 );
             }
             // println!("CHECK_Z<");
-            b = b && self.fcom.check_zero(channel, e_prime_minus_sum_batch)?;
+            b = b
+                && self
+                    .fcom
+                    .check_zero(channel, rng, e_prime_minus_sum_batch)?;
             // println!("CHECK_Z>");
         }
 
