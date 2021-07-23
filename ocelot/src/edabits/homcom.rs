@@ -14,19 +14,7 @@ use rand::{CryptoRng, Rng, SeedableRng};
 use scuttlebutt::{field::FiniteField, AbstractChannel, AesRng, Block};
 
 #[derive(Clone, Copy, Debug)]
-pub struct MacProver<FE: FiniteField>(FE::PrimeField, FE);
-
-impl<FE: FiniteField> MacProver<FE> {
-    #[inline(always)]
-    pub fn make_mac_pair(x: FE::PrimeField, x_mac: FE) -> Self {
-        MacProver(x, x_mac)
-    }
-
-    #[inline(always)]
-    pub fn extract_mac_pair(self) -> (FE::PrimeField, FE) {
-        (self.0, self.1)
-    }
-}
+pub struct MacProver<FE: FiniteField>(pub FE::PrimeField, pub FE);
 
 // F_com protocol
 pub struct FComSender<FE: FiniteField> {
@@ -59,7 +47,7 @@ impl<FE: FiniteField> FComSender<FE> {
     ) -> Result<MacProver<FE>, Error> {
         match self.voles.pop() {
             Some(e) => {
-                return Ok(MacProver::make_mac_pair(e.0, e.1));
+                return Ok(MacProver(e.0, e.1));
             }
             None => {
                 let mut voles = Vec::new();
@@ -67,7 +55,7 @@ impl<FE: FiniteField> FComSender<FE> {
                 self.voles = voles;
                 match self.voles.pop() {
                     Some(e) => {
-                        return Ok(MacProver::make_mac_pair(e.0, e.1));
+                        return Ok(MacProver(e.0, e.1));
                     }
                     None => {
                         return Err(Error::Other("svole failed for random".to_string()));
@@ -113,11 +101,11 @@ impl<FE: FiniteField> FComSender<FE> {
     }
 
     pub fn affine_add_cst(&self, cst: FE::PrimeField, x: MacProver<FE>) -> MacProver<FE> {
-        return MacProver::make_mac_pair(cst + x.0, x.1);
+        return MacProver(cst + x.0, x.1);
     }
 
     pub fn affine_mult_cst(&self, cst: FE::PrimeField, x: MacProver<FE>) -> MacProver<FE> {
-        return MacProver::make_mac_pair(cst * x.0, (x.1).multiply_by_prime_subfield(cst));
+        return MacProver(cst * x.0, (x.1).multiply_by_prime_subfield(cst));
     }
 
     pub fn check_zero<C: AbstractChannel>(
@@ -198,7 +186,7 @@ impl<FE: FiniteField> FComSender<FE> {
         let mut mask_mac = FE::ZERO;
 
         for i in 0..FE::PolynomialFormNumCoefficients::USIZE {
-            let (u, u_mac) = self.random(channel, rng)?.extract_mac_pair();
+            let MacProver(u, u_mac) = self.random(channel, rng)?;
             let x_i: FE = make_x_i(i);
             mask += x_i.multiply_by_prime_subfield(u);
             mask_mac += u_mac * x_i;
@@ -467,16 +455,13 @@ mod tests {
 
             let mut v = Vec::new();
             for _ in 0..count {
-                let (x, x_mac) = fcom
-                    .random(&mut channel, &mut rng)
-                    .unwrap()
-                    .extract_mac_pair();
+                let MacProver(x, x_mac) = fcom.random(&mut channel, &mut rng).unwrap();
                 let cst = F61p::random(&mut rng);
                 channel.write_fe::<F61p>(cst).unwrap();
                 channel.flush().unwrap();
-                let m = fcom.affine_mult_cst(cst, MacProver::make_mac_pair(x, x_mac));
+                let m = fcom.affine_mult_cst(cst, MacProver(x, x_mac));
                 v.push(m);
-                let a = fcom.affine_add_cst(cst, MacProver::make_mac_pair(x, x_mac));
+                let a = fcom.affine_add_cst(cst, MacProver(x, x_mac));
                 v.push(a);
             }
             let _ = fcom.open(&mut channel, &v).unwrap();
@@ -520,20 +505,14 @@ mod tests {
 
             let mut v = Vec::new();
             for _ in 0..count {
-                let (x, x_mac) = fcom
-                    .random(&mut channel, &mut rng)
-                    .unwrap()
-                    .extract_mac_pair();
-                let (y, y_mac) = fcom
-                    .random(&mut channel, &mut rng)
-                    .unwrap()
-                    .extract_mac_pair();
+                let MacProver(x, x_mac) = fcom.random(&mut channel, &mut rng).unwrap();
+                let MacProver(y, y_mac) = fcom.random(&mut channel, &mut rng).unwrap();
                 let z = x * y;
                 let z_mac = fcom.input(&mut channel, &mut rng, &vec![z]).unwrap()[0];
                 v.push((
-                    MacProver::make_mac_pair(x, x_mac),
-                    MacProver::make_mac_pair(y, y_mac),
-                    MacProver::make_mac_pair(z, z_mac),
+                    MacProver(x, x_mac),
+                    MacProver(y, y_mac),
+                    MacProver(z, z_mac),
                 ));
             }
 
