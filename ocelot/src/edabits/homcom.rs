@@ -164,17 +164,10 @@ impl<FE: FiniteField> FComSender<FE> {
         let chi = channel.read_fe()?;
         let mut chi_power = chi;
 
-        for triple in triples.iter() {
-            let x = triple.0 .0;
-            let x_mac = triple.0 .1;
-            let y = triple.1 .0;
-            let y_mac = triple.1 .1;
-            let _z = triple.2 .0;
-            let z_mac = triple.2 .1;
-
-            let a0 = x_mac * y_mac;
-            let a1 =
-                x_mac.multiply_by_prime_subfield(y) + y_mac.multiply_by_prime_subfield(x) - z_mac;
+        for (MacProver(x, x_mac), MacProver(y, y_mac), MacProver(_z, z_mac)) in triples.iter() {
+            let a0 = *x_mac * *y_mac;
+            let a1 = x_mac.multiply_by_prime_subfield(*y) + y_mac.multiply_by_prime_subfield(*x)
+                - *z_mac;
 
             sum_a0 += a0 * chi_power;
             sum_a1 += a1 * chi_power;
