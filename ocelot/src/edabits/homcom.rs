@@ -16,6 +16,9 @@ use scuttlebutt::{field::FiniteField, AbstractChannel, AesRng, Block};
 #[derive(Clone, Copy, Debug)]
 pub struct MacProver<FE: FiniteField>(pub FE::PrimeField, pub FE);
 
+#[derive(Clone, Copy, Debug)]
+pub struct MacVerifier<FE: FiniteField>(pub FE);
+
 // F_com protocol
 pub struct FComSender<FE: FiniteField> {
     svole_sender: Sender<FE>,
@@ -230,10 +233,10 @@ impl<FE: FiniteField> FComReceiver<FE> {
         &mut self,
         channel: &mut C,
         rng: &mut RNG,
-    ) -> Result<FE, Error> {
+    ) -> Result<MacVerifier<FE>, Error> {
         match self.voles.pop() {
             Some(e) => {
-                return Ok(e);
+                return Ok(MacVerifier(e));
             }
             None => {
                 let mut voles = Vec::new();
@@ -241,7 +244,7 @@ impl<FE: FiniteField> FComReceiver<FE> {
                 self.voles = voles;
                 match self.voles.pop() {
                     Some(e) => {
-                        return Ok(e);
+                        return Ok(MacVerifier(e));
                     }
                     None => {
                         return Err(Error::Other("svole failed for random".to_string()));
@@ -256,7 +259,7 @@ impl<FE: FiniteField> FComReceiver<FE> {
         channel: &mut C,
         rng: &mut RNG,
         num: usize,
-    ) -> Result<Vec<FE>, Error> {
+    ) -> Result<Vec<MacVerifier<FE>>, Error> {
         let mut r_mac = Vec::with_capacity(num);
         for _ in 0..num {
             r_mac.push(self.random(channel, rng)?);
@@ -273,30 +276,32 @@ impl<FE: FiniteField> FComReceiver<FE> {
         &mut self,
         channel: &mut C,
         num: usize,
-        r_mac: &[FE],
-        out: &mut Vec<FE>,
+        r_mac: &[MacVerifier<FE>],
+        out: &mut Vec<MacVerifier<FE>>,
     ) -> Result<(), Error> {
         for i in 0..num {
             let y = channel.read_fe::<FE::PrimeField>()?;
 
-            out.push(r_mac[i] - self.delta.multiply_by_prime_subfield(y));
+            out.push(MacVerifier(
+                r_mac[i].0 - self.delta.multiply_by_prime_subfield(y),
+            ));
         }
         Ok(())
     }
 
-    pub fn affine_add_cst(&self, cst: FE::PrimeField, x_mac: FE) -> FE {
-        return x_mac - self.delta.multiply_by_prime_subfield(cst);
+    pub fn affine_add_cst(&self, cst: FE::PrimeField, x_mac: MacVerifier<FE>) -> MacVerifier<FE> {
+        return MacVerifier(x_mac.0 - self.delta.multiply_by_prime_subfield(cst));
     }
 
-    pub fn affine_mult_cst(&self, cst: FE::PrimeField, x_mac: FE) -> FE {
-        return x_mac.multiply_by_prime_subfield(cst);
+    pub fn affine_mult_cst(&self, cst: FE::PrimeField, x_mac: MacVerifier<FE>) -> MacVerifier<FE> {
+        return MacVerifier(x_mac.0.multiply_by_prime_subfield(cst));
     }
 
     pub fn check_zero<C: AbstractChannel, RNG: CryptoRng + Rng>(
         &mut self,
         channel: &mut C,
         rng: &mut RNG,
-        key_batch: Vec<FE>,
+        key_batch: Vec<MacVerifier<FE>>,
     ) -> Result<bool, Error> {
         let seed = rng.gen::<Block>();
         channel.write_block(&seed)?;
@@ -304,7 +309,7 @@ impl<FE: FiniteField> FComReceiver<FE> {
         let mut rng = AesRng::from_seed(seed);
 
         let mut key_chi = FE::ZERO;
-        for key in key_batch.iter() {
+        for MacVerifier(key) in key_batch.iter() {
             let chi = FE::random(&mut rng);
             key_chi += chi * *key;
         }
@@ -317,7 +322,7 @@ impl<FE: FiniteField> FComReceiver<FE> {
     pub fn open<C: AbstractChannel>(
         &mut self,
         channel: &mut C,
-        keys: &[FE],
+        keys: &[MacVerifier<FE>],
     ) -> Result<Vec<FE::PrimeField>, Error> {
         let mut hasher = blake3::Hasher::new();
         let mut res = Vec::with_capacity(keys.len());
@@ -333,7 +338,7 @@ impl<FE: FiniteField> FComReceiver<FE> {
         let mut x_chi = FE::ZERO;
         for i in 0..keys.len() {
             let chi = FE::random(&mut rng);
-            let key = keys[i];
+            let MacVerifier(key) = keys[i];
             let x = res[i];
 
             key_chi += chi * key;
@@ -352,7 +357,7 @@ impl<FE: FiniteField> FComReceiver<FE> {
         &mut self,
         channel: &mut C,
         rng: &mut RNG,
-        triples: &[(FE, FE, FE)],
+        triples: &[(MacVerifier<FE>, MacVerifier<FE>, MacVerifier<FE>)],
     ) -> Result<(), Error> {
         let chi = FE::random(rng);
         channel.write_fe::<FE>(chi)?;
@@ -361,14 +366,10 @@ impl<FE: FiniteField> FComReceiver<FE> {
         let mut sum_b = FE::ZERO;
         let mut power_chi = chi;
 
-        for triple in triples.iter() {
-            let x_mac = triple.0;
-            let y_mac = triple.1;
-            let z_mac = triple.2;
-
+        for (MacVerifier(x_mac), MacVerifier(y_mac), MacVerifier(z_mac)) in triples.iter() {
             //  should be `- (-delta)` with our conventions compared to
             //  quicksilver but simplified out.
-            let b = x_mac * y_mac + self.delta * z_mac;
+            let b = (*x_mac) * (*y_mac) + self.delta * *z_mac;
 
             sum_b += b * power_chi;
             power_chi = power_chi * chi;
@@ -377,7 +378,7 @@ impl<FE: FiniteField> FComReceiver<FE> {
         // The following block implements VOPE(1)
         let mut mask_mac = FE::ZERO;
         for i in 0..FE::PolynomialFormNumCoefficients::USIZE {
-            let v_m = self.random(channel, rng)?;
+            let MacVerifier(v_m) = self.random(channel, rng)?;
             let x_i: FE = make_x_i(i);
             mask_mac += v_m * x_i;
         }

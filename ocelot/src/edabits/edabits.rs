@@ -13,7 +13,7 @@ use scuttlebutt::{
     AbstractChannel, AesRng, Block,
 };
 
-use super::homcom::{FComReceiver, FComSender, MacProver};
+use super::homcom::{FComReceiver, FComSender, MacProver, MacVerifier};
 
 /// EdabitsProver struct
 #[derive(Clone)]
@@ -24,8 +24,8 @@ pub struct EdabitsProver<FE: FiniteField> {
 /// EdabitsVerifier struct
 #[derive(Clone)]
 pub struct EdabitsVerifier<FE: FiniteField> {
-    bits: Vec<Gf40>,
-    value: FE,
+    bits: Vec<MacVerifier<Gf40>>,
+    value: MacVerifier<FE>,
 }
 
 /// DabitProver struct
@@ -38,8 +38,8 @@ struct DabitProver<FE: FiniteField> {
 /// DabitVerifier struct
 #[derive(Clone)]
 struct DabitVerifier<FE: FiniteField> {
-    bit: Gf40,
-    value: FE,
+    bit: MacVerifier<Gf40>,
+    value: MacVerifier<FE>,
 }
 
 /// Conversion sender
@@ -604,7 +604,7 @@ impl<FE: FiniteField + PrimeFiniteField> SenderConv<FE> {
                 let c_plus_r_mac = c_m_mac + r_m_mac;
 
                 // 6)c) done earlier
-                let e_m_mac = e_m_batch[i].1;
+                let MacProver(_, e_m_mac) = e_m_batch[i];
 
                 // 6)d)
                 let e_prime_mac =
@@ -651,15 +651,15 @@ impl<FE: FiniteField + PrimeFiniteField> ReceiverConv<FE> {
         channel: &mut C,
         _rng: &mut RNG,
         r_batch: &[DabitVerifier<FE>],
-        x_mac_batch: Vec<Gf40>,
-    ) -> Result<Vec<FE>, Error> {
+        x_mac_batch: Vec<MacVerifier<Gf40>>,
+    ) -> Result<Vec<MacVerifier<FE>>, Error> {
         let n = r_batch.len();
         debug_assert!(n == x_mac_batch.len());
 
         let mut r_mac_plus_x_mac = Vec::with_capacity(n);
 
         for i in 0..n {
-            r_mac_plus_x_mac.push(r_batch[i].bit + x_mac_batch[i]);
+            r_mac_plus_x_mac.push(MacVerifier(r_batch[i].bit.0 + x_mac_batch[i].0));
         }
 
         let c_batch = self.fcom_f2.open(channel, &r_mac_plus_x_mac)?;
@@ -667,7 +667,7 @@ impl<FE: FiniteField + PrimeFiniteField> ReceiverConv<FE> {
         let mut x_m_mac_batch = Vec::with_capacity(n);
 
         for i in 0..n {
-            let r_m_mac = r_batch[i].value;
+            let MacVerifier(r_m_mac) = r_batch[i].value;
             let c = c_batch[i];
 
             let x_m_mac = (if c == F2::ONE {
@@ -680,7 +680,7 @@ impl<FE: FiniteField + PrimeFiniteField> ReceiverConv<FE> {
                 } else {
                     FE::ZERO
                 };
-            x_m_mac_batch.push(x_m_mac);
+            x_m_mac_batch.push(MacVerifier(x_m_mac));
         }
         Ok(x_m_mac_batch)
     }
@@ -691,8 +691,8 @@ impl<FE: FiniteField + PrimeFiniteField> ReceiverConv<FE> {
         rng: &mut RNG,
         x_batch: &[EdabitsVerifier<FE>],
         y_batch: &[EdabitsVerifier<FE>],
-        mult_input_mac: &[Gf40],
-    ) -> Result<Vec<(Vec<Gf40>, Gf40)>, Error> {
+        mult_input_mac: &[MacVerifier<Gf40>],
+    ) -> Result<Vec<(Vec<MacVerifier<Gf40>>, MacVerifier<Gf40>)>, Error> {
         let num = x_batch.len();
         if num != y_batch.len() {
             return Err(Error::Other(
@@ -713,21 +713,21 @@ impl<FE: FiniteField + PrimeFiniteField> ReceiverConv<FE> {
         for i in 0..m {
             aux_batch.clear();
             for n in 0..num {
-                let ci_mac = ci_mac_batch[n];
+                let MacVerifier(ci_mac) = ci_mac_batch[n];
 
                 let x = &x_batch[n].bits;
                 let y = &y_batch[n].bits;
 
                 debug_assert!(x.len() == m && y.len() == m);
 
-                let xi_mac = x[i];
-                let yi_mac = y[i];
+                let MacVerifier(xi_mac) = x[i];
+                let MacVerifier(yi_mac) = y[i];
 
                 let and1_mac = xi_mac + ci_mac;
                 let and2_mac = yi_mac + ci_mac;
 
                 let z_mac = and1_mac + yi_mac; //xi_mac + yi_mac + ci_mac;
-                z_batch[n].push(z_mac);
+                z_batch[n].push(MacVerifier(z_mac));
                 aux_batch.push((and1_mac, and2_mac));
             }
             and_res_mac_batch.clear();
@@ -739,13 +739,17 @@ impl<FE: FiniteField + PrimeFiniteField> ReceiverConv<FE> {
             )?;
 
             for n in 0..num {
-                let ci_mac = ci_mac_batch[n];
+                let MacVerifier(ci_mac) = ci_mac_batch[n];
                 let (and1_mac, and2_mac) = aux_batch[n];
-                let and_res_mac = and_res_mac_batch[n];
-                triples.push((and1_mac, and2_mac, and_res_mac));
+                let MacVerifier(and_res_mac) = and_res_mac_batch[n];
+                triples.push((
+                    MacVerifier(and1_mac),
+                    MacVerifier(and2_mac),
+                    MacVerifier(and_res_mac),
+                ));
 
                 let c_mac = ci_mac + and_res_mac;
-                ci_mac_batch[n] = c_mac;
+                ci_mac_batch[n] = MacVerifier(c_mac);
             }
         }
         // check all the multiplications in one batch
@@ -831,7 +835,7 @@ impl<FE: FiniteField + PrimeFiniteField> ReceiverConv<FE> {
         let mut res = true;
 
         // step 1)
-        let mut c_m_mac: Vec<Vec<FE>> = Vec::with_capacity(s);
+        let mut c_m_mac: Vec<Vec<MacVerifier<FE>>> = Vec::with_capacity(s);
         for _ in 0..s {
             let b_m_mac = self.fcom.input(channel, rng, gamma)?;
             c_m_mac.push(b_m_mac);
@@ -846,7 +850,7 @@ impl<FE: FiniteField + PrimeFiniteField> ReceiverConv<FE> {
         for k in 0..s {
             for i in 0..gamma {
                 let andl_mac = c_m_mac[k][i];
-                let minus_ci_mac : FE = // -ci
+                let minus_ci_mac = // -ci
                     self.fcom.affine_mult_cst(-FE::PrimeField::ONE, andl_mac);
                 let one_minus_ci_mac = // 1 - ci
                     self.fcom.affine_add_cst(FE::PrimeField::ONE, minus_ci_mac);
@@ -880,13 +884,13 @@ impl<FE: FiniteField + PrimeFiniteField> ReceiverConv<FE> {
         // step 4)
         let mut r_mac_batch = Vec::with_capacity(s);
         for k in 0..s {
-            let mut r_mac = c1_mac[k];
+            let mut r_mac = c1_mac[k].0;
             for i in 0..n {
                 // TODO: do not need to do it when e[i] is ZERO
-                let tmp_mac = self.fcom_f2.affine_mult_cst(e[k][i], dabits_mac[i].bit);
+                let MacVerifier(tmp_mac) = self.fcom_f2.affine_mult_cst(e[k][i], dabits_mac[i].bit);
                 r_mac += tmp_mac;
             }
-            r_mac_batch.push(r_mac);
+            r_mac_batch.push(MacVerifier(r_mac));
         }
 
         // step 5)
@@ -900,7 +904,7 @@ impl<FE: FiniteField + PrimeFiniteField> ReceiverConv<FE> {
             for i in 0..n {
                 // TODO: do not need to do it when e[i] is ZERO
                 let b = bit_to_fe(e[k][i]);
-                let tmp_mac = self.fcom.affine_mult_cst(b, dabits_mac[i].value);
+                let MacVerifier(tmp_mac) = self.fcom.affine_mult_cst(b, dabits_mac[i].value);
                 r_prime_mac += tmp_mac;
             }
             r_prime_batch.push(r_prime_mac);
@@ -912,11 +916,11 @@ impl<FE: FiniteField + PrimeFiniteField> ReceiverConv<FE> {
             let mut tau_mac = r_prime_batch[k];
             let mut twos = FE::PrimeField::ONE;
             for i in 0..gamma {
-                let tmp_mac = self.fcom.affine_mult_cst(twos, c_m_mac[k][i]);
+                let MacVerifier(tmp_mac) = self.fcom.affine_mult_cst(twos, c_m_mac[k][i]);
                 tau_mac += tmp_mac;
                 twos += twos;
             }
-            tau_mac_batch.push(tau_mac);
+            tau_mac_batch.push(MacVerifier(tau_mac));
         }
         let tau_batch = self.fcom.open(channel, &tau_mac_batch)?;
 
@@ -1047,12 +1051,12 @@ impl<FE: FiniteField + PrimeFiniteField> ReceiverConv<FE> {
                 let idx_r = idx_base + i;
 
                 // 6)a)
-                let c_m_mac = edabits_vector_mac[i].value;
-                let r_m_mac = r_mac[idx_r].value;
+                let MacVerifier(c_m_mac) = edabits_vector_mac[i].value;
+                let MacVerifier(r_m_mac) = r_mac[idx_r].value;
                 let c_plus_r_mac = c_m_mac + r_m_mac;
 
                 // 6)c) done earlier
-                let e_m_mac = e_m_mac_batch[i];
+                let MacVerifier(e_m_mac) = e_m_mac_batch[i];
 
                 // 6)d)
                 let e_prime_mac =
@@ -1070,9 +1074,9 @@ impl<FE: FiniteField + PrimeFiniteField> ReceiverConv<FE> {
             let mut e_prime_minus_sum_batch = Vec::with_capacity(n);
             for i in 0..n {
                 let sum = convert_f2_to_field::<FE>(&ei_batch[i * NB_BITS..(i + 1) * NB_BITS]);
-                e_prime_minus_sum_batch.push(
+                e_prime_minus_sum_batch.push(MacVerifier(
                     e_prime_mac_batch[i] + self.fcom.get_delta().multiply_by_prime_subfield(sum),
-                );
+                ));
             }
             // println!("CHECK_Z<");
             b = b
@@ -1093,7 +1097,7 @@ impl<FE: FiniteField + PrimeFiniteField> ReceiverConv<FE> {
 #[cfg(test)]
 mod tests {
 
-    use super::super::homcom::MacProver;
+    use super::super::homcom::{MacProver, MacVerifier};
     use super::{
         bit_to_fe, DabitProver, DabitVerifier, EdabitsProver, EdabitsVerifier, ReceiverConv,
         SenderConv,
@@ -1259,7 +1263,7 @@ mod tests {
         let x_mac = fconv.fcom_f2.input(&mut channel, &mut rng, power).unwrap();
         let y_mac = fconv.fcom_f2.input(&mut channel, &mut rng, power).unwrap();
 
-        let default_fe = FE::ZERO;
+        let default_fe = MacVerifier(FE::ZERO);
         let mut mult_input_mac = Vec::with_capacity(power);
         for _ in 0..power {
             mult_input_mac.push(fconv.fcom_f2.random(&mut channel, &mut rng).unwrap());
