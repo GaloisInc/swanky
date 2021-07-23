@@ -53,9 +53,7 @@ impl<FE: FiniteField> FComSender<FE> {
                 return Ok(MacProver(e.0, e.1));
             }
             None => {
-                let mut voles = Vec::new();
-                self.svole_sender.send(channel, rng, &mut voles)?;
-                self.voles = voles;
+                self.svole_sender.send(channel, rng, &mut self.voles)?;
                 match self.voles.pop() {
                     Some(e) => {
                         return Ok(MacProver(e.0, e.1));
@@ -239,9 +237,7 @@ impl<FE: FiniteField> FComReceiver<FE> {
                 return Ok(MacVerifier(e));
             }
             None => {
-                let mut voles = Vec::new();
-                self.svole_receiver.receive(channel, rng, &mut voles)?;
-                self.voles = voles;
+                self.svole_receiver.receive(channel, rng, &mut self.voles)?;
                 match self.voles.pop() {
                     Some(e) => {
                         return Ok(MacVerifier(e));
