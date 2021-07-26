@@ -1,3 +1,13 @@
+// This file is part of `humidor`.
+// Copyright © 2021 Galois, Inc.
+// See LICENSE for licensing information.
+
+//! Parameters for threshold secret sharing in Ligero. This includes
+//! parameter-specific
+
+// TODO: Eliminate excessive use of vectors in anonymous functions, function
+// return values, etc.
+
 use ndarray::{Array1, Array2, ArrayView1, ArrayView2};
 use scuttlebutt::{numtheory, threshold_secret_sharing};
 
@@ -7,40 +17,53 @@ use crate::ligero::FieldForLigero;
 #[cfg(test)]
 use proptest::{*, prelude::*, collection::vec as pvec};
 
-// Parameters for interleaved coding, based on the size of the circuit and
-// input. Note that these variable names, although terse, correspond to those
-// used in https://acmccs.github.io/papers/p2087-amesA.pdf.
+/// Parameters for interleaved coding, based on the size of the circuit and
+/// input. Note that these variable names, although terse, correspond to those
+/// used in https://dl.acm.org/doi/pdf/10.1145/3133956.3134104
+///
+/// We fix the security threshold t = log |F| to get the following soundness
+/// errors, where e is a positive integer with e < d/4, d is the code distance,
+/// and n = 2^p:
+///
+/// * Test-Interleaved:             (1 - e/n)^t + (e + 1)/|F|
+///                               = (1 - e/|F|)^p + (e + 1)/|F|
+/// * Test-Linear-Constraints:      ((e + k + l)/n)^t + 1/|F|
+///                               = ((e + k + l)/|F|)^p + 1/|F|
+/// * Test-Quadratic-Constraints:   ((e + 2k)/n)^t + 1/|F|
+///                               = ((e + 2k)/|F|)^p + 1/|F|
+///
+/// I.e., we ensure soundness error is negligible in the field size.
 //
-// We fix the security threshold t = log |F| to get the following soundness
-// errors, where e is a positive integer with e < d/4, d is the code distance,
-// and n = 2^p:
-//
-// * Test-Interleaved:             (1 - e/n)^t + (e + 1)/|F|
-//                               = (1 - e/|F|)^p + (e + 1)/|F|
-// * Test-Linear-Constraints:      ((e + k + l)/n)^t + 1/|F|
-//                               = ((e + k + l)/|F|)^p + 1/|F|
-// * Test-Quadratic-Constraints:   ((e + 2k)/n)^t + 1/|F|
-//                               = ((e + 2k)/|F|)^p + 1/|F|
-//
-// I.e., we ensure soundness error is negligible in the field size.
 // XXX: Is this right? Seems like t could be smaller, say ceil(log |F| / p).
 #[derive(Debug, Clone, Copy)]
 pub struct Params<Field> {
     phantom: std::marker::PhantomData<Field>,
 
+    /// Parameters for `threshold_secret_sharing::PackedSecretSharing`.
     pub pss: threshold_secret_sharing::PackedSecretSharing<Field>,
 
-    pub kexp: u32,  // log2(k)
-    pub nexp: u32,  // log3(n)
+    /// Log base-2 of k
+    pub kexp: u32,
+    /// Log base-3 of k
+    pub nexp: u32,
 
-    pub l: usize,   // Message size (Note: k = l + t = 2^j - 1, for some j)
-    pub t: usize,   // Security threshold
-    pub k: usize,   // Reconstruction threshold
-    pub n: usize,   // Codeword size (Note: n = 3^i - 1, for some i)
-    pub m: usize,   // Interleaved code size
+    /// Number of field elements encoded in a single codeword row.
+    /// (Note: k = l + t = 2^j - 1, for some j)
+    pub l: usize,
+    /// Security threshold: max number of columns that can be revealed securely
+    pub t: usize,
+    /// Reconstruction threshold: min number of columns for reconstruction
+    pub k: usize,
+    /// Codeword size, i.e., number of columns (Note: n = 3^i - 1, for some i) 
+    pub n: usize,
+    /// Interleaved code size, i.e., number of rows
+    pub m: usize,
 }
 
 impl<Field: FieldForLigero> Params<Field> {
+    /// Select parameters appropriate for a given circuit+input size.
+    /// Constraints for parameter selection are given in section 5.3 of
+    /// https://dl.acm.org/doi/pdf/10.1145/3133956.3134104
     pub fn new(size: usize) -> Self {
         if size == 0 { panic!("Empty circuits are not supported") }
         // XXX: There's probably a better way to select these. As it is, we
@@ -101,12 +124,14 @@ impl<Field: FieldForLigero> Params<Field> {
         }
     }
 
+    /// Encode a row of l field elements into a codeword row of n elements.
     pub fn encode(&self, wf: ArrayView1<Field>) -> Array1<Field> {
         debug_assert_eq!(wf.len(), self.l);
 
         Array1::from(self.pss.share(&wf.to_vec()))
     }
 
+    /// Decode a codeword row without stripping the random elements off the end.
     fn decode_no_strip(&self, cf: ArrayView1<Field>) -> Vec<Field> {
         use ndarray::{stack, Axis};
 
@@ -124,11 +149,14 @@ impl<Field: FieldForLigero> Params<Field> {
         )
     }
 
+    /// Decode a codeword row of n field elements into a row of l elements.
     pub fn decode(&self, cf: ArrayView1<Field>) -> Array1<Field> {
         self.decode_no_strip(cf)[1 ..= self.l].iter().cloned().collect()
     }
 
-    // Note: This is _slow_! Don't use it if you can avoid it.
+    /// Decode an incomplete codeword.
+    ///
+    /// Note: This is _slow_! Don't use it if you can avoid it.
     #[allow(dead_code)]
     fn decode_part(&self,
         ixs: &[usize],
@@ -140,6 +168,8 @@ impl<Field: FieldForLigero> Params<Field> {
         Array1::from(self.pss.reconstruct(ixs, &cf.to_vec()))
     }
 
+    /// Check whether a codeword is in the image of the encode function by
+    /// applying FFT3^-1 and checking that the final n-k elements are zeros.
     // XXX: Not sure this is sufficient to check whether this is a valid
     // codeword. Need to check the number of errors this detects, etc.
     pub fn codeword_is_valid(&self, cf: ArrayView1<Field>) -> bool {
@@ -160,6 +190,8 @@ impl<Field: FieldForLigero> Params<Field> {
         )[0] == Field::ZERO && zeros.iter().all(|&f| f == Field::ZERO)
     }
 
+    /// Encode an mXl matrix of field elements into an mXn interleaved
+    /// codeword.
     pub fn encode_interleaved(&self, ws: ArrayView1<Field>) -> Array2<Field> {
         debug_assert_eq!(ws.len(), self.l * self.m);
 
@@ -173,6 +205,7 @@ impl<Field: FieldForLigero> Params<Field> {
             .expect("Unreachable: encoded array is wrong size")
     }
 
+    /// Decode an mXn intereaved codeword into an mXl matrix of field elements.
     #[allow(dead_code)]
     pub fn decode_interleaved(&self, cs: ArrayView2<Field>) -> Array1<Field> {
         debug_assert_eq!(cs.shape(), [self.m, self.n]);
@@ -186,8 +219,8 @@ impl<Field: FieldForLigero> Params<Field> {
         From::from(res)
     }
 
-    // Take a sequence of values `p(zeta_1) .. p(zeta_c)` for `c <= k` and
-    // return the `(k+1)`-coefficients of the polynomial `p`.
+    /// Take a sequence of values `p(zeta_1) .. p(zeta_c)` for `c <= k` and
+    /// return the `(k+1)`-coefficients of the polynomial `p`.
     pub fn fft2_inverse(&self, points: ArrayView1<Field>) -> Array1<Field> {
         debug_assert!(points.len() <= self.k);
 
@@ -200,10 +233,10 @@ impl<Field: FieldForLigero> Params<Field> {
         ).iter().cloned().collect()
     }
 
-    // Take a sequence of `k+1` coefficients of the polynomial `p` and
-    // return evaluation points `p(zeta_1) .. p(zeta_{k})`. Note that
-    // `p(zeta_0)`, which should always be zero for our application, is
-    // not returned.
+    /// Take a sequence of `k+1` coefficients of the polynomial `p` and
+    /// return evaluation points `p(zeta_1) .. p(zeta_{k})`. Note that
+    /// `p(zeta_0)`, which should always be zero for our application, is
+    /// not returned.
     pub fn fft2(&self, coeffs: ArrayView1<Field>) -> Array1<Field> {
         debug_assert!(coeffs.len() <= self.k+1);
 
@@ -216,9 +249,9 @@ impl<Field: FieldForLigero> Params<Field> {
         )[1..].iter().cloned().collect()
     }
 
-    // Take a sequence of _possibly more than_ `k+1` coefficients of the
-    // polynomial `p` and return evaluation points `p(zeta_0) .. p(zeta_{k})`.
-    // Note that _all_ `k+1` coefficients are returned
+    /// Take a sequence of _possibly more than_ `k+1` coefficients of the
+    /// polynomial `p` and return evaluation points `p(zeta_0) .. p(zeta_{k})`.
+    /// Note that _all_ `k+1` coefficients are returned
     pub fn fft2_peval(&self, coeffs: ArrayView1<Field>) -> Array1<Field> {
         let coeffs0 = coeffs.to_vec()[..]
             .chunks(self.k + 1)
@@ -231,8 +264,8 @@ impl<Field: FieldForLigero> Params<Field> {
         ).iter().cloned().collect()
     }
 
-    // Take a sequence of values `p(eta_1) .. p(eta_c)` for `c <= n` and
-    // return the `(n+1)`-coefficients of the polynomial `p`.
+    /// Take a sequence of values `p(eta_1) .. p(eta_c)` for `c <= n` and
+    /// return the `(n+1)`-coefficients of the polynomial `p`.
     pub fn fft3_inverse(&self, points: ArrayView1<Field>) -> Array1<Field> {
         debug_assert!(points.len() <= self.n);
 
@@ -245,10 +278,10 @@ impl<Field: FieldForLigero> Params<Field> {
         ).iter().cloned().collect()
     }
 
-    // Take a sequence of `n+1` coefficients of the polynomial `p` and
-    // return evaluation points `p(eta_1) .. p(eta_{n})`. Note that
-    // `p(eta_0)`, which should always be zero for our application, is
-    // not returned.
+    /// Take a sequence of `n+1` coefficients of the polynomial `p` and
+    /// return evaluation points `p(eta_1) .. p(eta_{n})`. Note that
+    /// `p(eta_0)`, which should always be zero for our application, is
+    /// not returned.
     pub fn fft3(&self, coeffs: ArrayView1<Field>) -> Array1<Field> {
         debug_assert!(coeffs.len() <= self.n + 1);
 
@@ -261,9 +294,9 @@ impl<Field: FieldForLigero> Params<Field> {
         )[1..].iter().cloned().collect()
     }
 
-    // Take a sequence of _possibly more than_ `n+1` coefficients of the
-    // polynomial `p` and return evaluation points `p(eta_0) .. p(eta_{n})`.
-    // Note that _all_ `n+1` coefficients are returned
+    /// Take a sequence of _possibly more than_ `n+1` coefficients of the
+    /// polynomial `p` and return evaluation points `p(eta_0) .. p(eta_{n})`.
+    /// Note that _all_ `n+1` coefficients are returned
     pub fn fft3_peval(&self, coeffs: ArrayView1<Field>) -> Array1<Field> {
         let coeffs0 = coeffs.to_vec()[..]
             .chunks(self.n + 1)
@@ -276,16 +309,21 @@ impl<Field: FieldForLigero> Params<Field> {
         ).iter().cloned().collect()
     }
 
+    /// Take a sequence of _possibly more than_ `k+1` coefficients of the
+    /// polynomial `p` and return the single evaluation point `p(zeta_{ix})`.
     pub fn peval2(&self, p: ArrayView1<Field>, ix: usize) -> Field {
         crate::util::peval(p, self.pss.omega_secrets.pow(ix as u128))
     }
 
+    /// Take a sequence of _possibly more than_ `n+1` coefficients of the
+    /// polynomial `p` and return the single evaluation point `p(eta_{ix})`.
     pub fn peval3(&self, p: ArrayView1<Field>, ix: usize) -> Field {
         crate::util::peval(p, self.pss.omega_shares.pow(ix as u128))
     }
 
-    // Take two polynomials p and q of degree less than 2^kexp and produce a
-    // polynomial s of degree less than 2^(kexp+1)-1 s.t. s(.) = p(.) * q(.).
+    /// Take two polynomials p and q of degree less than 2^kexp and produce a
+    /// polynomial s of degree less than 2^(kexp+1)-1 s.t. s(.) = p(.) * q(.).
+    /// This takes `n*log(n)` time, as opposed to the `n^2` naive algorithm.
     pub fn pmul2(&self,
         p: ArrayView1<Field>,
         q: ArrayView1<Field>
@@ -316,6 +354,7 @@ impl<Field: FieldForLigero> Params<Field> {
         pq_coeffs.iter().take(pq_deg).cloned().collect()
     }
 
+    /// Return a random size-t subset of `[n]`.
     #[allow(non_snake_case)]
     pub fn random_indices<R>(&self, rng: &mut R) -> Vec<usize>
         where R: rand::RngCore
@@ -329,12 +368,14 @@ impl<Field: FieldForLigero> Params<Field> {
         Q
     }
 
+    /// Return a random valid codeword.
     pub fn random_codeword<R>(&self, rng: &mut R) -> Array1<Field>
         where R: rand::RngCore
     {
         self.encode(random_field_array(rng, self.l).view())
     }
 
+    /// Return a valid codeword for `0^l`.
     pub fn random_zero_codeword<R>(&self, rng: &mut R) -> Array1<Field>
         where R: rand::RngCore
     {

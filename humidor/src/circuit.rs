@@ -1,3 +1,9 @@
+// This file is part of `humidor`.
+// Copyright © 2021 Galois, Inc.
+// See LICENSE for licensing information.
+
+//! This module implements arithmetic circuits for the use of Ligero.
+
 use rand::{Rng, distributions::{Distribution, Uniform}};
 use scuttlebutt::field::FiniteField;
 
@@ -8,10 +14,18 @@ use crate::util::{TestField, arb_test_field};
 
 use crate::util::random_field_array;
 
+/// Operations for a Ligero arithmetic circuit over a finite field. Results
+/// are always stored in the next available register.
 // TODO: Add LDI, SUB, and DIV instructions.
 #[derive(Debug, Clone, Copy)]
-pub enum Op { Add(usize, usize), Mul(usize, usize) }
+pub enum Op {
+    /// Add two field elements.
+    Add(usize, usize),
+    /// Multiply two field elements.
+    Mul(usize, usize),
+}
 
+/// Pick an operation at random, for random test circuits.
 pub fn random_op(rng: &mut impl Rng, s: usize) -> Op {
     let index = Uniform::from(0..s);
     let coin = Uniform::from(0usize..2);
@@ -32,6 +46,7 @@ pub fn arb_op(wire_min: usize, wire_max: usize) -> impl Strategy<Value = Op> {
 }
 
 impl Op {
+    /// Convert an op to an opcode.
     pub fn bytes(&self) -> Vec<u8> {
         match self {
             Op::Add(i,j) => vec![0].iter()
@@ -48,15 +63,19 @@ impl Op {
     }
 }
 
+/// An arithmetic circuit for Ligero.
 #[derive(Debug, Clone)]
 pub struct Ckt<Field> {
     phantom: std::marker::PhantomData<Field>,
 
+    /// The circuit operations.
     pub ops: Vec<Op>,
+    /// Number of field elements for a circuit input.
     pub inp_size: usize,
 }
 
 impl<Field: FiniteField> Ckt<Field> {
+    /// Create a new circuit from a circuit size and a sequence of operations.
     pub fn new(inp_size: usize, ops: &[Op]) -> Self {
         Self {
             phantom: std::marker::PhantomData,
@@ -65,8 +84,12 @@ impl<Field: FiniteField> Ckt<Field> {
         }
     }
 
+    /// Total size of the extended witness for this circuit (i.e.,
+    /// witness size + number of gates).
     pub fn size(&self) -> usize { self.ops.len() + self.inp_size }
 
+    /// Evaluate a circuit on a witness and return an extended witness.
+    /// I.e., witness + register outputs.
     pub fn eval(&self, inp: &[Field]) -> Vec<Field> {
         debug_assert_eq!(inp.len(), self.inp_size);
 
@@ -98,8 +121,8 @@ impl<Field: FiniteField> Ckt<Field> {
     }
 }
 
-// Output a random circuit with an input that evaluates to 0. Both inp_size and
-// ckt_size must be at least 2.
+/// Output a random circuit with an input that evaluates to 0. Both inp_size and
+/// ckt_size must be at least 2.
 pub fn random_ckt_zero<Field: FiniteField>(
     mut rng: impl Rng,
     inp_size: usize,

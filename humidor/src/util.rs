@@ -1,3 +1,9 @@
+// This file is part of `humidor`.
+// Copyright © 2021 Galois, Inc.
+// See LICENSE for licensing information.
+
+//! Utility functions for Ligero
+
 use ndarray::{Array1, ArrayView1, Array2};
 use num_traits::identities::Zero;
 use std::cmp::Eq;
@@ -17,24 +23,24 @@ pub fn arb_test_field() -> BoxedStrategy<TestField> {
     (0..TestField::MODULUS as u128).prop_map(|n| n.into()).boxed()
 }
 
-// Trait for collections that allow taking `n` initial elements while ensuring
-// that only zero-elements are dropped from the end.
+/// Trait for collections that allow taking `n` initial elements while ensuring
+/// that only zero-elements are dropped from the end.
 pub trait TakeNZ where Self: Sized {
     fn take_nz(self, n: usize) -> std::iter::Take<Self>;
 }
 
 impl<I: Zero + Eq + Debug, L> TakeNZ for L where L: Iterator<Item = I> + Clone {
     #[inline]
+    /// Take initial `n` elements, while ensuring (in debug builds) that the
+    /// remaining elements are zeros.
     fn take_nz(self, n: usize) -> std::iter::Take<Self> {
-        debug_assert_eq!(
-            self.clone().skip(n).collect::<Vec<_>>(),
-            self.clone().skip(n).map(|_| I::zero()).collect::<Vec<_>>(),
-        );
+        debug_assert!(self.clone().skip(n).all(|x| x.is_zero()));
 
         self.take(n)
     }
 }
 
+/// Create a matrix out of a `Vec` of rows.
 pub fn rows_to_mat<S: Clone>(rows: Vec<Array1<S>>) -> Array2<S> {
     let nrows = rows.len();
     let ncols = rows[0].len();
@@ -67,8 +73,8 @@ pub fn pmul<Field>(p: ArrayView1<Field>, q: ArrayView1<Field>) -> Array1<Field>
     r
 }
 
-// Given polynomials `p` with `deg(p) < n` and `q` with `deg(q) < m`, return
-// the polynomial `r` with `deg(r) < max(n,m)` and `r(.) = p(.) + q(.)`.
+/// Given polynomials `p` with `deg(p) < n` and `q` with `deg(q) < m`, return
+/// the polynomial `r` with `deg(r) < max(n,m)` and `r(.) = p(.) + q(.)`.
 pub fn padd<Field>(p: ArrayView1<Field>, q: ArrayView1<Field>) -> Array1<Field>
     where Field: FiniteField
 {
@@ -76,18 +82,18 @@ pub fn padd<Field>(p: ArrayView1<Field>, q: ArrayView1<Field>) -> Array1<Field>
 
     let p0: Array1<_> = p.iter()
         .cloned()
-        .chain(vec![Field::ZERO; r_len - p.len()])
+        .chain(std::iter::repeat(Field::ZERO).take(r_len - p.len()))
         .collect();
     let q0: Array1<_> = q.iter()
         .cloned()
-        .chain(vec![Field::ZERO; r_len - q.len()])
+        .chain(std::iter::repeat(Field::ZERO).take(r_len - q.len()))
         .collect();
 
     p0 + q0
 }
 
-// Given polynomials `p` with `deg(p) < n` and `q` with `deg(q) < m`, return
-// the polynomial `r` with `deg(r) < max(n,m)` and `r(.) = p(.) - q(.)`.
+/// Given polynomials `p` with `deg(p) < n` and `q` with `deg(q) < m`, return
+/// the polynomial `r` with `deg(r) < max(n,m)` and `r(.) = p(.) - q(.)`.
 pub fn psub<Field>(p: ArrayView1<Field>, q: ArrayView1<Field>) -> Array1<Field>
     where Field: FiniteField
 {
@@ -95,17 +101,17 @@ pub fn psub<Field>(p: ArrayView1<Field>, q: ArrayView1<Field>) -> Array1<Field>
 
     let p0: Array1<_> = p.iter()
         .cloned()
-        .chain(vec![Field::ZERO; r_len - p.len()])
+        .chain(std::iter::repeat(Field::ZERO).take(r_len - p.len()))
         .collect();
     let q0: Array1<_> = q.iter()
         .cloned()
-        .chain(vec![Field::ZERO; r_len - q.len()])
+        .chain(std::iter::repeat(Field::ZERO).take(r_len - q.len()))
         .collect();
 
     p0 - q0
 }
 
-// Evaluate a polynomial, represented by its coefficients, at a point `x`.
+/// Evaluate a polynomial, represented by its coefficients, at a point `x`.
 pub fn peval<Field: FiniteField>(p: ArrayView1<Field>, x: Field) -> Field {
     //let mut res = Field::ZERO;
 

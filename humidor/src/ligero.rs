@@ -1,3 +1,13 @@
+// This file is part of `humidor`.
+// Copyright © 2021 Galois, Inc.
+// See LICENSE for licensing information.
+
+//! This module implements Ligero according to section 4.7 of
+//! https://dl.acm.org/doi/pdf/10.1145/3133956.3134104
+
+// TODO: Eliminate excessive use of vectors in anonymous functions, function
+// return values, etc.
+
 use ndarray::{Array1, Array2};
 use sprs::{CsMat, TriMat};
 use rand::{SeedableRng, rngs::StdRng};
@@ -12,6 +22,9 @@ use crate::merkle;
 use crate::util::*;
 use crate::params::Params;
 
+/// This is a marker trait consolidating the traits needed for a Ligero field.
+/// In addition, it supplies a field-width in bits, to be used in parameter
+/// selection.
 pub trait FieldForLigero:
     Sized
     + FiniteField
@@ -21,6 +34,8 @@ pub trait FieldForLigero:
     + ndarray::ScalarOperand
     + std::fmt::Debug
 {
+    /// Minimum bits to represent a field element. This will correspond to the
+    /// security parameter `t` during paremeter selection.
     const BITS: usize;
 }
 
@@ -28,7 +43,7 @@ impl FieldForLigero for scuttlebutt::field::F2_19x3_26 {
     const BITS: usize = 61;
 }
 
-// Proof information available to both the prover and the verifier.
+/// Proof information available to both the prover and the verifier.
 #[derive(Debug, Clone)]
 #[allow(non_snake_case)]
 struct Public<Field> {
@@ -89,7 +104,7 @@ impl<Field: FieldForLigero> Public<Field> {
     }
 }
 
-// Proof information available only to the prover.
+/// Proof information available only to the prover.
 #[allow(non_snake_case)]
 struct Secret<Field, H> {
     public: Public<Field>,
@@ -242,6 +257,8 @@ proptest! {
     }
 }
 
+/// The theoretical proof size according to Section 5.3 of
+/// https://dl.acm.org/doi/pdf/10.1145/3133956.3134104
 pub fn expected_proof_size(
     sigma: usize,
     n: usize,
@@ -264,6 +281,8 @@ pub fn expected_proof_size(
     //               check p0 on the last line of the protocol.
 }
 
+/// Round 0: Prover -> Verifier
+/// * Merkle-tree digest of interleaved codewords.
 #[derive(Debug, Clone, Copy)]
 #[allow(non_snake_case)]
 pub struct Round0 {
@@ -271,11 +290,14 @@ pub struct Round0 {
 }
 
 impl Round0 {
+    /// Actual size of this round of communication.
     pub fn size(&self) -> usize {
         std::mem::size_of::<merkle::Digest>()
     }
 }
 
+/// Round 1: Verifier -> Prover
+/// * Random linear-combination challenges for interleaved codewords.
 #[derive(Debug, Clone)]
 pub struct Round1<Field> {
     // Testing interleaved Reed-Solomon codes
@@ -290,6 +312,7 @@ pub struct Round1<Field> {
 }
 
 impl<Field: FieldForLigero> Round1<Field> {
+    /// Generate verifier's random linear-combination challenges.
     fn new(params: &Params<Field>, rng: &mut impl rand::Rng) -> Self {
         Round1 {
             r: random_field_array(rng, 4*params.m),
@@ -301,6 +324,7 @@ impl<Field: FieldForLigero> Round1<Field> {
         }
     }
 
+    /// Actual size of this round of communication.
     pub fn size(&self) -> usize {
         self.r.len() * std::mem::size_of::<Field>() +
         self.radd.len() * std::mem::size_of::<Field>() +
@@ -311,6 +335,8 @@ impl<Field: FieldForLigero> Round1<Field> {
     }
 }
 
+/// Round 2: Prover -> Verifier
+/// * Linear combinations corresponding to verifier's challenges.
 #[derive(Debug, Clone)]
 pub struct Round2<Field> {
     // Testing interleaved Reed-Solomon codes
@@ -325,6 +351,7 @@ pub struct Round2<Field> {
 }
 
 impl<Field> Round2<Field> {
+    /// Actual size of this round of communication.
     pub fn size(&self) -> usize {
         self.v.len() * std::mem::size_of::<Field>() +
         self.qadd.len() * std::mem::size_of::<Field>() +
@@ -335,6 +362,8 @@ impl<Field> Round2<Field> {
     }
 }
 
+/// Round 3: Verifier -> Prover
+/// * Verifier's random choice of t columns do view.
 #[derive(Debug, Clone)]
 #[allow(non_snake_case)]
 pub struct Round3<Field> {
@@ -344,6 +373,7 @@ pub struct Round3<Field> {
 }
 
 impl<Field: FieldForLigero> Round3<Field> {
+    /// Pick Verifier's columns to view.
     fn new(params: &Params<Field>, rng: &mut impl rand::Rng) -> Self {
         Round3 {
             phantom: std::marker::PhantomData,
@@ -352,11 +382,15 @@ impl<Field: FieldForLigero> Round3<Field> {
         }
     }
 
+    /// Actual size of this round of communication.
     pub fn size(&self) -> usize {
         self.Q.len() * std::mem::size_of::<usize>()
     }
 }
 
+/// Round 4: Prover -> Verifier
+/// * Revealed columns.
+/// * Merkle proof of revealed columns.
 #[derive(Debug, Clone)]
 #[allow(non_snake_case)]
 pub struct Round4<Field, H> {
@@ -371,6 +405,7 @@ pub struct Round4<Field, H> {
 }
 
 impl<Field: FieldForLigero, H: merkle::MerkleHash> Round4<Field, H> {
+    /// Actual size of this round of communication.
     pub fn size(&self) -> usize {
         self.U_lemma.size() +
         self.ux.len() * std::mem::size_of::<Field>() +
@@ -381,6 +416,13 @@ impl<Field: FieldForLigero, H: merkle::MerkleHash> Round4<Field, H> {
         self.u0.len() * std::mem::size_of::<Field>()
     }
 }
+
+// The following code corresponds as closely as possible (with a few
+// optimizations) to the pseudocode in Section 4.7 of
+// https://dl.acm.org/doi/pdf/11.1145/3133956.3134104.
+//
+// Note: In order to increase the visual similarity to this pseudocode, some
+// variables are not in snake case.
 
 #[allow(non_snake_case)]
 fn make_ra<Field: FieldForLigero>(
@@ -554,7 +596,7 @@ fn verify<Field: FieldForLigero, H: merkle::MerkleHash>(
     let rz = rows_to_mat(make_ra_Iml_Pa_neg(&P, &r1.rz, &public.Pz)
         .iter().map(|r| P.fft3(r.view())).collect::<Vec<_>>());
 
-    let U = r4.U_lemma.columns();
+    let U = r4.U_lemma.columns.clone();
     let Uw: Vec<Array1<Field>> = U.iter()
         .map(|c| c.slice(s![0*P.m..1*P.m]).to_owned()).collect();
     let Ux: Vec<Array1<Field>> = U.iter()
@@ -621,24 +663,29 @@ fn verify<Field: FieldForLigero, H: merkle::MerkleHash>(
     P.codeword_is_valid(r2.v.view())
 }
 
+/// Interactive Ligero implementation.
 pub mod interactive {
     use super::*;
 
+    /// Interactive Ligero prover.
     pub struct Prover<Field, H> {
         secret: Secret<Field, H>,
     }
 
     impl<Field: FieldForLigero, H: merkle::MerkleHash> Prover<Field, H> {
+        /// Create an interactive prover out of a circuit and witness.
         pub fn new(c: &Ckt<Field>, w: &Vec<Field>) -> Self {
             Self {
                 secret: Secret::new(c, w),
             }
         }
 
+        /// Get the prover's parameters.
         pub fn params(&self) -> Params<Field> {
             self.secret.public.params
         }
 
+        /// Theoretical proof size, according to Section 5.3.
         pub fn expected_proof_size(&self) -> usize {
             let p = &self.secret.public.params;
             expected_proof_size(1,
@@ -646,12 +693,14 @@ pub mod interactive {
                 std::mem::size_of::<Field>(), std::mem::size_of::<merkle::Digest>())
         }
 
+        /// Generate round-0 prover message.
         pub fn round0(&self) -> Round0 {
             Round0 {
                 U_root: self.secret.U_hash.root(),
             }
         }
 
+        /// Generate round-2 prover message.
         #[allow(non_snake_case)]
         pub fn round2(&self, r1: Round1<Field>) -> Round2<Field> {
             use ndarray::{Axis, stack};
@@ -684,6 +733,7 @@ pub mod interactive {
             r2
         }
 
+        /// Generate round-4 prover message.
         #[allow(non_snake_case)]
         pub fn round4(&self, r3: Round3<Field>) -> Round4<Field, H> {
             let s = &self.secret;
@@ -704,8 +754,8 @@ pub mod interactive {
 
             let P = &s.public.params;
             let log_n = (P.n as f64).log2().ceil() as usize;
-            debug_assert_eq!(r4.U_lemma.columns().len(), P.t);
-            debug_assert_eq!(r4.U_lemma.columns()[0].len(), 4*P.m);
+            debug_assert_eq!(r4.U_lemma.columns.len(), P.t);
+            debug_assert_eq!(r4.U_lemma.columns[0].len(), 4*P.m);
             debug_assert!(r4.U_lemma.nlemmas() <= P.t*log_n);
             debug_assert_eq!(r4.ux.len(), P.t);
             debug_assert_eq!(r4.uy.len(), P.t);
@@ -717,6 +767,7 @@ pub mod interactive {
         }
     }
 
+    /// Ligero interactive verifier.
     pub struct Verifier<Field, H> {
         phantom: std::marker::PhantomData<H>,
 
@@ -729,6 +780,7 @@ pub mod interactive {
     }
 
     impl<Field: FieldForLigero, H: merkle::MerkleHash> Verifier<Field, H> {
+        /// Create a new verifier from a circuit.
         pub fn new(c: &Ckt<Field>) -> Self {
             Self {
                 phantom: std::marker::PhantomData,
@@ -742,10 +794,12 @@ pub mod interactive {
             }
         }
 
+        /// Get the verifier's parameters.
         pub fn params(&self) -> Params<Field> {
             self.public.params
         }
 
+        /// Theoretical proof size, according to Section 5.3.
         pub fn expected_proof_size(&self) -> usize {
             let p = &self.public.params;
             expected_proof_size(
@@ -755,6 +809,7 @@ pub mod interactive {
             )
         }
 
+        /// Generate round-1 verifier message.
         pub fn round1(&mut self, r0: Round0) -> Round1<Field> {
             let r1 = Round1::new(&self.public.params, &mut self.rng);
 
@@ -764,6 +819,7 @@ pub mod interactive {
             r1
         }
 
+        /// Generate round-3 verifier message.
         pub fn round3(&mut self, r2: Round2<Field>) -> Round3<Field> {
             let r3 = Round3::new(&self.public.params, &mut self.rng);
 
@@ -773,6 +829,7 @@ pub mod interactive {
             r3
         }
 
+        /// Run final verification procedure.
         pub fn verify(&self, r4: Round4<Field, H>) -> bool {
             let r0 = self.r0.expect("Round 0 skipped");
             let r1 = self.r1.clone().expect("Round 1 skipped");
@@ -846,6 +903,8 @@ pub mod interactive {
     }
 }
 
+/// Non-interactive Ligero implementation, created by applying Fiat-Shamir to
+/// the interactive implementation.
 // XXX: This uses Fiat-Shamir. The following are to-do:
 //      * Check that we're hashing the right things. We hash the columns of U
 //        to seed the r vectors; we hash the columns along with the sent linear
@@ -860,6 +919,7 @@ pub mod interactive {
 pub mod noninteractive {
     use super::*;
 
+    /// Complete proof message sent from prover to verifier.
     pub struct Proof<Field, H> {
         phantom: std::marker::PhantomData<H>,
 
@@ -869,6 +929,7 @@ pub mod noninteractive {
     }
 
     impl<Field: FieldForLigero, H: merkle::MerkleHash> Proof<Field, H> {
+        /// Actual size of the non-interactive proof message.
         pub fn size(&self) -> usize {
             self.r0.size() + self.r2.size() + self.r4.size()
         }
@@ -881,7 +942,7 @@ pub mod noninteractive {
     ) -> (Round1<Field>, merkle::Digest) {
         use rand_chacha::ChaCha20Rng as ChaCha;
 
-        let mut hash = H::empty();
+        let mut hash = H::new();
         hash.update(&state.to_vec());
         hash.update(&r0.U_root);
 
@@ -898,7 +959,7 @@ pub mod noninteractive {
     ) -> Round3<Field> {
         use rand_chacha::ChaCha20Rng as ChaCha;
 
-        let mut hash = H::empty();
+        let mut hash = H::new();
 
         hash.update(&state.to_vec());
         r2.p0.into_iter().for_each(|f| hash.update(&f.to_bytes()));
@@ -914,14 +975,16 @@ pub mod noninteractive {
         Round3::new(params, &mut ChaCha::from_seed(digest))
     }
 
+    /// Non-interactive Ligero prover.
     pub struct Prover<Field, H> {
         ip: interactive::Prover<Field, H>,
         ckt_hash: merkle::Digest,
     }
 
     impl<Field: FieldForLigero, H: merkle::MerkleHash> Prover<Field, H> {
+        /// Create a non-interactive prover from a circuit and witness.
         pub fn new(c: &Ckt<Field>, w: &Vec<Field>) -> Self {
-            let mut hash = H::empty();
+            let mut hash = H::new();
             c.ops.iter().for_each(|op| hash.update(&op.bytes()));
 
             let mut ckt_hash = merkle::HZERO;
@@ -930,6 +993,7 @@ pub mod noninteractive {
             Self { ckt_hash, ip: interactive::Prover::new(c, w) }
         }
 
+        /// Theoretical proof size from Section 5.3.
         pub fn expected_proof_size(&self) -> usize {
             let p = self.ip.params();
 
@@ -938,6 +1002,7 @@ pub mod noninteractive {
                 std::mem::size_of::<Field>(), std::mem::size_of::<merkle::Digest>())
         }
 
+        /// Generate the proof message.
         pub fn make_proof(&self) -> Proof<Field, H> {
             let r0 = self.ip.round0();
             let (r1,state) = make_r1::<_,H>(&self.ip.params(), &self.ckt_hash, &r0);
@@ -951,6 +1016,7 @@ pub mod noninteractive {
         }
     }
 
+    /// Non-interactive Ligero verifier.
     pub struct Verifier<Field, H> {
         phantom: std::marker::PhantomData<H>,
 
@@ -959,8 +1025,9 @@ pub mod noninteractive {
     }
 
     impl<Field: FieldForLigero, H: merkle::MerkleHash> Verifier<Field, H> {
+        /// Create a verifier out of a circuit.
         pub fn new(ckt: &Ckt<Field>) -> Self {
-            let mut hash = H::empty();
+            let mut hash = H::new();
             ckt.ops.iter().for_each(|op| hash.update(&op.bytes()));
 
             let mut ckt_hash = merkle::HZERO;
@@ -973,6 +1040,7 @@ pub mod noninteractive {
             }
         }
 
+        /// Theoretical proof size from Section 5.3.
         pub fn expected_proof_size(&self) -> usize {
             let p = &self.public.params;
 
@@ -982,6 +1050,7 @@ pub mod noninteractive {
                 std::mem::size_of::<merkle::Digest>())
         }
 
+        /// Run the final verification procedure.
         pub fn verify(&self, p: Proof<Field, H>) -> bool {
             let (r1,state) = make_r1::<_,H>(&self.public.params, &self.ckt_hash, &p.r0);
             let r3 = make_r3::<_,H>(&self.public.params, &state, &p.r2);

@@ -1,3 +1,7 @@
+// This file is part of `scuttlebutt`.
+// Copyright © 2021 Galois, Inc.
+// See LICENSE for licensing information.
+
 use std::hash::Hash;
 
 #[cfg(test)]
