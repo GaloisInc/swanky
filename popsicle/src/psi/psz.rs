@@ -52,7 +52,7 @@ impl Sender {
         let key = cointoss::send(channel, &[rng.gen()])?[0];
         let inputs = utils::compress_and_hash_inputs(inputs, key);
         let masksize = compute_masksize(inputs.len())?;
-        let nbins = channel.read_usize()?;
+        let nbins: usize = channel.receive()?;
         let seeds = self.oprf.send(channel, nbins, rng)?;
 
         // For each hash function `hᵢ`, construct set `Hᵢ = {F(k_{hᵢ(x)}, x ||
@@ -89,7 +89,7 @@ impl Sender {
         let key = cointoss::send(channel, &[rng.gen()])?[0];
         let masksize = compute_masksize(inputs.len())?;
         let inputs = utils::compress_and_hash_inputs(inputs, key);
-        let nbins = channel.read_usize()?;
+        let nbins: usize = channel.receive()?;
         let seeds = self.oprf.send(channel, nbins, rng)?;
         let payloads = (0..inputs.len()).map(|_| rng.gen::<Block>()).collect_vec();
 
@@ -198,7 +198,7 @@ impl Receiver {
             for _ in 0..n {
                 let mut tag = vec![0; masksize];
                 channel.read_bytes(&mut tag)?;
-                let ct = channel.read_block()?;
+                let ct: Block = channel.receive()?;
                 h.insert(tag, ct);
             }
         }
@@ -247,7 +247,7 @@ impl Receiver {
         let nbins = tbl.nbins;
 
         // Send cuckoo hash info to sender.
-        channel.write_usize(nbins)?;
+        channel.send(nbins)?;
         channel.flush()?;
 
         // Extract inputs from cuckoo hash.

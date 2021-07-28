@@ -121,8 +121,8 @@ impl<OT: OtReceiver<Msg = Block> + SemiHonest> OtSender for Sender<OT> {
             let y0 = self.hash.cr_hash(Block::from(j as u128), q) ^ input.0;
             let q = q ^ self.s_;
             let y1 = self.hash.cr_hash(Block::from(j as u128), q) ^ input.1;
-            channel.write_block(&y0)?;
-            channel.write_block(&y1)?;
+            channel.send(&y0)?;
+            channel.send(&y1)?;
         }
         channel.flush()?;
         Ok(())
@@ -153,7 +153,7 @@ impl<OT: OtReceiver<Msg = Block> + SemiHonest> CorrelatedSender for Sender<OT> {
             let x1 = x0 ^ *delta;
             let q = q ^ self.s_;
             let y = self.hash.cr_hash(Block::from(j as u128), q) ^ x1;
-            channel.write_block(&y)?;
+            channel.send(&y)?;
             out.push((x0, x1));
         }
         channel.flush()?;
@@ -248,8 +248,8 @@ impl<OT: OtSender<Msg = Block> + SemiHonest> OtReceiver for Receiver<OT> {
         for (j, b) in inputs.iter().enumerate() {
             let t = &ts[j * 16..(j + 1) * 16];
             let t: [u8; 16] = t.try_into().unwrap();
-            let y0 = channel.read_block()?;
-            let y1 = channel.read_block()?;
+            let y0: Block = channel.receive()?;
+            let y1: Block = channel.receive()?;
             let y = if *b { y1 } else { y0 };
             let y = y ^ self.hash.cr_hash(Block::from(j as u128), Block::from(t));
             out.push(y);
@@ -271,7 +271,7 @@ impl<OT: OtSender<Msg = Block> + SemiHonest> CorrelatedReceiver for Receiver<OT>
         for (j, b) in inputs.iter().enumerate() {
             let t = &ts[j * 16..(j + 1) * 16];
             let t: [u8; 16] = t.try_into().unwrap();
-            let y = channel.read_block()?;
+            let y: Block = channel.receive()?;
             let y = if *b { y } else { Block::default() };
             let h = self.hash.cr_hash(Block::from(j as u128), Block::from(t));
             out.push(y ^ h);

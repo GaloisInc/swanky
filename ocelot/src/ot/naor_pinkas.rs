@@ -48,12 +48,12 @@ impl OtSender for Sender {
         let mut pks = Vec::with_capacity(m);
         for _ in 0..m {
             let c = RistrettoPoint::random(&mut rng);
-            channel.write_pt(&c)?;
+            channel.send(&c)?;
             cs.push(c);
         }
         channel.flush()?;
         for c in cs.into_iter() {
-            let pk0 = channel.read_pt()?;
+            let pk0: RistrettoPoint = channel.receive()?;
             pks.push((pk0, c - pk0));
         }
         for (i, (input, pk)) in inputs.iter().zip(pks.into_iter()).enumerate() {
@@ -65,10 +65,10 @@ impl OtSender for Sender {
             let e01 = h ^ input.0;
             let h = Block::hash_pt(i as u128, &(pk.1 * r1));
             let e11 = h ^ input.1;
-            channel.write_pt(&e00)?;
-            channel.write_block(&e01)?;
-            channel.write_pt(&e10)?;
-            channel.write_block(&e11)?;
+            channel.send(&e00)?;
+            channel.send(&e01)?;
+            channel.send(&e10)?;
+            channel.send(&e11)?;
         }
         channel.flush()?;
         Ok(())
@@ -101,7 +101,7 @@ impl OtReceiver for Receiver {
         let mut cs = Vec::with_capacity(m);
         let mut ks = Vec::with_capacity(m);
         for _ in 0..m {
-            let c = channel.read_pt()?;
+            let c: RistrettoPoint = channel.receive()?;
             cs.push(c);
         }
         for (b, c) in inputs.iter().zip(cs.into_iter()) {
@@ -109,8 +109,8 @@ impl OtReceiver for Receiver {
             let pk = &k * &RISTRETTO_BASEPOINT_TABLE;
             let pk_ = c - pk;
             match b {
-                false => channel.write_pt(&pk)?,
-                true => channel.write_pt(&pk_)?,
+                false => channel.send(&pk)?,
+                true => channel.send(&pk_)?,
             };
             ks.push(k);
         }
@@ -120,10 +120,10 @@ impl OtReceiver for Receiver {
             .zip(ks.into_iter())
             .enumerate()
             .map(|(i, (b, k))| {
-                let e00 = channel.read_pt()?;
-                let e01 = channel.read_block()?;
-                let e10 = channel.read_pt()?;
-                let e11 = channel.read_block()?;
+                let e00: RistrettoPoint = channel.receive()?;
+                let e01: Block = channel.receive()?;
+                let e10: RistrettoPoint = channel.receive()?;
+                let e11: Block = channel.receive()?;
                 let (e0, e1) = match b {
                     false => (e00, e01),
                     true => (e10, e11),

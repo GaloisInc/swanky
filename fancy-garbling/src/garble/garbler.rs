@@ -79,7 +79,7 @@ impl<C: AbstractChannel, RNG: CryptoRng + RngCore> Garbler<C, RNG> {
 
     /// Send a wire over the established channel.
     pub fn send_wire(&mut self, wire: &Wire) -> Result<(), GarblerError> {
-        self.channel.write_block(&wire.as_block())?;
+        self.channel.send(&wire.as_block())?;
         Ok(())
     }
 
@@ -142,8 +142,7 @@ impl<C: AbstractChannel, RNG: RngCore + CryptoRng> FancyReveal for Garbler<C, RN
         // Hence, we call output() ourselves.
         self.output(x)?;
         self.channel.flush()?;
-        let val = self.channel.read_u16()?;
-        Ok(val)
+        Ok(self.channel.receive()?)
     }
 }
 
@@ -286,7 +285,7 @@ impl<C: AbstractChannel, RNG: RngCore + CryptoRng> Fancy for Garbler<C, RNG> {
         }
 
         for block in gate.iter() {
-            self.channel.write_block(block)?;
+            self.channel.send(block)?;
         }
         Ok(X.plus_mov(&Y))
     }
@@ -339,7 +338,7 @@ impl<C: AbstractChannel, RNG: RngCore + CryptoRng> Fancy for Garbler<C, RNG> {
         }
 
         for block in gate.iter() {
-            self.channel.write_block(block)?;
+            self.channel.send(block)?;
         }
         Ok(C)
     }
@@ -350,7 +349,7 @@ impl<C: AbstractChannel, RNG: RngCore + CryptoRng> Fancy for Garbler<C, RNG> {
         let D = self.delta(q);
         for k in 0..q {
             let block = X.plus(&D.cmul(k)).hash(output_tweak(i, k));
-            self.channel.write_block(&block)?;
+            self.channel.send(&block)?;
         }
         Ok(None)
     }

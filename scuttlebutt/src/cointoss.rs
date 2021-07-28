@@ -47,15 +47,15 @@ pub fn send<C: AbstractChannel>(channel: &mut C, seeds: &[Block]) -> Result<Vec<
         let mut rng = AesRng::from_seed(*seed);
         let mut com = Block::default();
         rng.fill_bytes(&mut com.as_mut());
-        channel.write_block(&com)?;
+        channel.send(&com)?;
     }
     channel.flush()?;
     for seed in seeds.iter() {
-        let seed_ = channel.read_block()?;
+        let seed_ = channel.receive()?;
         out.push(*seed ^ seed_);
     }
     for seed in seeds.iter() {
-        channel.write_block(&seed)?;
+        channel.send(seed)?;
     }
     channel.flush()?;
     Ok(out)
@@ -67,15 +67,15 @@ pub fn receive<C: AbstractChannel>(channel: &mut C, seeds: &[Block]) -> Result<V
     let mut coms = Vec::with_capacity(seeds.len());
     let mut out = Vec::with_capacity(seeds.len());
     for _ in 0..seeds.len() {
-        let com = channel.read_block()?;
+        let com = channel.receive()?;
         coms.push(com);
     }
     for seed in seeds.iter() {
-        channel.write_block(&seed)?;
+        channel.send(seed)?;
     }
     channel.flush()?;
     for (seed, com) in seeds.iter().zip(coms.into_iter()) {
-        let seed_ = channel.read_block()?;
+        let seed_ = channel.receive()?;
         let mut rng_ = AesRng::from_seed(seed_);
         let mut check = Block::default();
         rng_.fill_bytes(&mut check.as_mut());
