@@ -49,8 +49,9 @@ impl<R: Read, W: Write> AbstractChannel for HashChannel<R, W> {
     fn flush(&mut self) -> Result<()> {
         self.channel.flush()
     }
+}
 
-    #[inline]
+impl<R: Read, W: Write> Clone for HashChannel<R, W> {
     fn clone(&self) -> Self {
         Self {
             channel: self.channel.clone(),

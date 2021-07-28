@@ -1,27 +1,27 @@
 [package]
-name = "scuttlebutt"
-version = "0.4.0"
 authors = ["Alex J. Malozemoff <amaloz@galois.com>"]
-license = "MIT"
-readme = "README.md"
-description = "A library of useful multi-party computation utilities"
-keywords = ["cryptography", "MPC", "secure-computation"]
 categories = ["cryptography"]
+description = "A library of useful multi-party computation utilities"
 edition = "2018"
+keywords = ["cryptography", "MPC", "secure-computation"]
+license = "MIT"
+name = "scuttlebutt"
 publish = false
+readme = "README.md"
+version = "0.4.0"
 
 [lib]
 
 [features]
-nightly = ["curve25519-dalek/avx2_backend", "rand/nightly"]
-unstable = []
+nightly = ["rand/nightly"]
 serde1 = ["serde"]
+unstable = []
 
 [dependencies]
-curve25519-dalek = { version = "2", features = ["std"], optional = true }
+curve25519-dalek = {version = "2", features = ["std"], optional = true}
 rand = "0.7"
 rand_core = "0.5"
-serde = { version = "1", features = ["derive"], optional = true }
+serde = {version = "1", features = ["derive"], optional = true}
 sha2 = "0.8"
 
 [dev-dependencies]
@@ -29,29 +29,29 @@ criterion = "0.2"
 hex = "0.3"
 
 [[bench]]
+harness = false
 name = "aes128"
-harness = false
 
 [[bench]]
+harness = false
 name = "aes256"
-harness = false
 
 [[bench]]
+harness = false
 name = "block"
-harness = false
 
 [[bench]]
+harness = false
 name = "block512"
-harness = false
 
 [[bench]]
+harness = false
 name = "commitment"
-harness = false
 
 [[bench]]
+harness = false
 name = "hash_aes"
-harness = false
 
 [[bench]]
-name = "rand_aes"
 harness = false
+name = "rand_aes"

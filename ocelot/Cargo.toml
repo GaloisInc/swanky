@@ -1,27 +1,27 @@
 [package]
-name = "ocelot"
-version = "0.4.0"
 authors = ["Alex J. Malozemoff <amaloz@galois.com>"]
-license = "MIT"
-readme = "README.md"
-description = "A library for oblivious transfer protocols"
-categories = ["cryptography"]
-keywords = ["cryptography", "oblivious-transfer", "OT"]
-edition = "2018"
-publish = false
-build = "build.rs"
 autoexamples = true
+build = "build.rs"
+categories = ["cryptography"]
+description = "A library for oblivious transfer protocols"
+edition = "2018"
+keywords = ["cryptography", "oblivious-transfer", "OT"]
+license = "MIT"
+name = "ocelot"
+publish = false
+readme = "README.md"
+version = "0.4.0"
 
 [lib]
 
 [features]
-nightly = ["curve25519-dalek/avx2_backend", "rand/nightly", "scuttlebutt/nightly"]
+nightly = ["rand/nightly", "scuttlebutt/nightly"]
 
 [dependencies]
-curve25519-dalek = { version = "2", features = ["std"] }
+curve25519-dalek = {version = "2", features = ["std"]}
 libc = "0.2"
 rand = "0.7"
-scuttlebutt = { path = "../scuttlebutt", features = ["curve25519-dalek"] }
+scuttlebutt = {path = "../scuttlebutt", features = ["curve25519-dalek"]}
 
 [build-dependencies]
 cc = "1.0"
@@ -30,13 +30,13 @@ cc = "1.0"
 criterion = "0.2"
 
 [[bench]]
-name = "ot"
 harness = false
+name = "ot"
 
 [[bench]]
-name = "oprf"
 harness = false
+name = "oprf"
 
 [[example]]
-name = "kmprt"
 harness = false
+name = "kmprt"

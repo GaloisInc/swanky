@@ -37,12 +37,12 @@ impl OtSender for Sender {
     ) -> Result<(), Error> {
         let mut bs = Vec::with_capacity(inputs.len());
         for _ in 0..inputs.len() {
-            let b = channel.read_bool()?;
+            let b: bool = channel.receive()?;
             bs.push(b);
         }
         for (b, m) in bs.into_iter().zip(inputs.iter()) {
             let m = if b { m.1 } else { m.0 };
-            channel.write_block(&m)?;
+            channel.send(&m)?;
         }
         channel.flush()?;
         Ok(())
@@ -71,13 +71,13 @@ impl OtReceiver for Receiver {
         inputs: &[bool],
         _: &mut RNG,
     ) -> Result<Vec<Block>, Error> {
-        for b in inputs.iter() {
-            channel.write_bool(*b)?;
+        for b in inputs.iter().copied() {
+            channel.send(b)?;
         }
         channel.flush()?;
         let mut out = Vec::with_capacity(inputs.len());
         for _ in 0..inputs.len() {
-            let m = channel.read_block()?;
+            let m: Block = channel.receive()?;
             out.push(m);
         }
         Ok(out)

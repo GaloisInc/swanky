@@ -52,8 +52,9 @@ impl<R: Read, W: Write> AbstractChannel for SyncChannel<R, W> {
     fn flush(&mut self) -> Result<()> {
         self.writer.lock().unwrap().flush()
     }
+}
 
-    #[inline(always)]
+impl<R: Read, W: Write> Clone for SyncChannel<R, W> {
     fn clone(&self) -> Self {
         Self {
             reader: self.reader.clone(),

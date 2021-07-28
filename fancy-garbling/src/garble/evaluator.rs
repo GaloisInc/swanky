@@ -10,7 +10,7 @@ use crate::{
     util::{output_tweak, tweak, tweak2},
     wire::Wire,
 };
-use scuttlebutt::AbstractChannel;
+use scuttlebutt::{AbstractChannel, Block};
 
 /// Streaming evaluator using a callback to receive ciphertexts as needed.
 ///
@@ -48,7 +48,7 @@ impl<C: AbstractChannel> Evaluator<C> {
 
     /// Read a Wire from the reader.
     pub fn read_wire(&mut self, modulus: u16) -> Result<Wire, EvaluatorError> {
-        let block = self.channel.read_block()?;
+        let block: Block = self.channel.receive()?;
         Ok(Wire::from_block(block, modulus))
     }
 }
@@ -56,7 +56,7 @@ impl<C: AbstractChannel> Evaluator<C> {
 impl<C: AbstractChannel> FancyReveal for Evaluator<C> {
     fn reveal(&mut self, x: &Wire) -> Result<u16, EvaluatorError> {
         let val = self.output(x)?.expect("Evaluator always outputs Some(u16)");
-        self.channel.write_u16(val)?;
+        self.channel.send(val)?;
         self.channel.flush()?;
         Ok(val)
     }
@@ -99,7 +99,7 @@ impl<C: AbstractChannel> Fancy for Evaluator<C> {
         let mut gate = Vec::with_capacity(ngates);
         {
             for _ in 0..ngates {
-                let block = self.channel.read_block()?;
+                let block: Block = self.channel.receive()?;
                 gate.push(block);
             }
         }
@@ -140,7 +140,7 @@ impl<C: AbstractChannel> Fancy for Evaluator<C> {
         let ngates = (x.modulus() - 1) as usize;
         let mut gate = Vec::with_capacity(ngates);
         for _ in 0..ngates {
-            let block = self.channel.read_block()?;
+            let block: Block = self.channel.receive()?;
             gate.push(block);
         }
         let t = tweak(self.current_gate());
@@ -157,7 +157,7 @@ impl<C: AbstractChannel> Fancy for Evaluator<C> {
         let i = self.current_output();
 
         // Receive the output ciphertext from the garbler
-        let ct = self.channel.read_blocks(q as usize)?;
+        let ct: Vec<Block> = self.channel.receive_n(q as usize)?;
 
         // Attempt to brute force x using the output ciphertext
         let mut decoded = None;

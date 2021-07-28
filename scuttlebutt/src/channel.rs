@@ -26,187 +26,222 @@ use std::{
     rc::Rc,
 };
 
+pub trait Sendable {
+    fn send<C: AbstractChannel>(self, chan: &mut C) -> Result<()>;
+}
+
+pub trait Receivable: Sized {
+    fn receive<C: AbstractChannel>(chan: &mut C) -> Result<Self>;
+}
+
+impl Sendable for bool {
+    #[inline(always)]
+    fn send<C: AbstractChannel>(self, chan: &mut C) -> Result<()> {
+        chan.send(&[self as u8])
+    }
+}
+
+impl Receivable for bool {
+    #[inline(always)]
+    fn receive<C: AbstractChannel>(chan: &mut C) -> Result<Self> {
+        chan.receive::<[u8; 1]>().map(|b| b[0] != 0x0)
+    }
+}
+
+impl<const N: usize> Receivable for [u8; N] {
+    #[inline(always)]
+    fn receive<C: AbstractChannel>(chan: &mut C) -> Result<Self> {
+        let mut elems: [u8; N] = [0u8; N];
+        chan.read_bytes(&mut elems)?;
+        Ok(elems)
+    }
+}
+
+impl<'a, const N: usize> Sendable for &'a [u8; N] {
+    #[inline(always)]
+    fn send<C: AbstractChannel>(self, chan: &mut C) -> Result<()> {
+        chan.write_bytes(self)
+    }
+}
+
+impl<T: Receivable + Default + Copy, const N: usize> Receivable for [T; N] {
+    #[inline(always)]
+    fn receive<C: AbstractChannel>(chan: &mut C) -> Result<Self> {
+        let mut elems: [T; N] = [Default::default(); N];
+        for elem in elems.iter_mut() {
+            *elem = chan.receive()?;
+        }
+        Ok(elems)
+    }
+}
+
+impl<'a, T> Sendable for &'a [T]
+where
+    &'a T: Sendable,
+{
+    #[inline(always)]
+    fn send<C: AbstractChannel>(self, chan: &mut C) -> Result<()> {
+        for elem in self.iter() {
+            chan.send(elem)?;
+        }
+        Ok(())
+    }
+}
+
+impl<'a> Sendable for &Block {
+    #[inline(always)]
+    fn send<C: AbstractChannel>(self, chan: &mut C) -> Result<()> {
+        chan.write_bytes(self.as_ref())
+    }
+}
+
+impl Receivable for Block {
+    #[inline(always)]
+    fn receive<C: AbstractChannel>(chan: &mut C) -> Result<Self> {
+        let mut v = Block::default();
+        chan.read_bytes(v.as_mut())?;
+        Ok(v)
+    }
+}
+
+impl<'a> Sendable for &'a Block512 {
+    #[inline(always)]
+    fn send<C: AbstractChannel>(self, chan: &mut C) -> Result<()> {
+        chan.send(&self.0[0])?;
+        chan.send(&self.0[1])?;
+        chan.send(&self.0[2])?;
+        chan.send(&self.0[3])
+    }
+}
+
+impl Receivable for Block512 {
+    #[inline(always)]
+    fn receive<C: AbstractChannel>(chan: &mut C) -> Result<Self> {
+        Ok(Block512([
+            chan.receive()?,
+            chan.receive()?,
+            chan.receive()?,
+            chan.receive()?,
+        ]))
+    }
+}
+
+impl Sendable for u16 {
+    #[inline(always)]
+    fn send<C: AbstractChannel>(self, chan: &mut C) -> Result<()> {
+        chan.send(&self.to_le_bytes())
+    }
+}
+
+impl Receivable for u16 {
+    #[inline(always)]
+    fn receive<C: AbstractChannel>(chan: &mut C) -> Result<Self> {
+        chan.receive::<[u8; 2]>().map(|b| u16::from_le_bytes(b))
+    }
+}
+
+impl Sendable for u32 {
+    #[inline(always)]
+    fn send<C: AbstractChannel>(self, chan: &mut C) -> Result<()> {
+        chan.send(&self.to_le_bytes())
+    }
+}
+
+impl Receivable for u32 {
+    #[inline(always)]
+    fn receive<C: AbstractChannel>(chan: &mut C) -> Result<Self> {
+        chan.receive::<[u8; 4]>().map(|b| u32::from_le_bytes(b))
+    }
+}
+
+impl Sendable for u64 {
+    #[inline(always)]
+    fn send<C: AbstractChannel>(self, chan: &mut C) -> Result<()> {
+        chan.send(&self.to_le_bytes())
+    }
+}
+
+impl Receivable for u64 {
+    #[inline(always)]
+    fn receive<C: AbstractChannel>(chan: &mut C) -> Result<Self> {
+        chan.receive::<[u8; 8]>().map(|b| u64::from_le_bytes(b))
+    }
+}
+
+impl Sendable for usize {
+    #[inline(always)]
+    fn send<C: AbstractChannel>(self, chan: &mut C) -> Result<()> {
+        chan.send(self as u64)
+    }
+}
+
+impl Receivable for usize {
+    #[inline(always)]
+    fn receive<C: AbstractChannel>(chan: &mut C) -> Result<Self> {
+        chan.receive::<u64>().map(|v| v as usize)
+    }
+}
+
+#[cfg(feature = "curve25519-dalek")]
+impl<'a> Sendable for &'a RistrettoPoint {
+    #[inline(always)]
+    fn send<C: AbstractChannel>(self, chan: &mut C) -> Result<()> {
+        chan.write_bytes(self.compress().as_bytes())
+    }
+}
+
+#[cfg(feature = "curve25519-dalek")]
+impl Receivable for RistrettoPoint {
+    #[inline(always)]
+    fn receive<C: AbstractChannel>(chan: &mut C) -> Result<Self> {
+        let data: [u8; 32] = chan.receive()?;
+        CompressedRistretto::from_slice(&data)
+            .decompress()
+            .ok_or_else(|| {
+                std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    "unable to decompress ristretto point",
+                )
+            })
+    }
+}
+
 /// A trait for managing I/O. `AbstractChannel`s are clonable, and provide basic
 /// read/write capabilities for both common and scuttlebutt-specific types.
-pub trait AbstractChannel {
+pub trait AbstractChannel: Clone {
     /// Read a slice of `u8`s from the channel.
     fn read_bytes(&mut self, bytes: &mut [u8]) -> Result<()>;
+
     /// Write a slice of `u8`s to the channel.
     fn write_bytes(&mut self, bytes: &[u8]) -> Result<()>;
+
     /// Flush the channel.
     fn flush(&mut self) -> Result<()>;
-    /// Clone the channel.
-    fn clone(&self) -> Self
-    where
-        Self: Sized;
+
+    /// Receive a value from the channel
+    fn receive<R: Receivable>(&mut self) -> Result<R> {
+        R::receive(self)
+    }
+
+    /// Receive n instances of a type from the channel
+    fn receive_n<R: Receivable>(&mut self, n: usize) -> Result<Vec<R>> {
+        let mut elems = Vec::with_capacity(n);
+        for _ in 0..n {
+            elems.push(R::receive(self)?);
+        }
+        Ok(elems)
+    }
+
+    /// Send a value to the channel (by reference or by value)
+    fn send<S: Sendable>(&mut self, value: S) -> Result<()> {
+        value.send(self)
+    }
+
     /// Read `nbytes` from the channel, and return it as a `Vec`.
     fn read_vec(&mut self, nbytes: usize) -> Result<Vec<u8>> {
         let mut data = vec![0; nbytes];
         self.read_bytes(&mut data)?;
         Ok(data)
-    }
-
-    /// Write a `bool` to the channel.
-    #[inline(always)]
-    fn write_bool(&mut self, b: bool) -> Result<()> {
-        self.write_bytes(&[b as u8])?;
-        Ok(())
-    }
-
-    /// Read a `bool` from the channel.
-    #[inline(always)]
-    fn read_bool(&mut self) -> Result<bool> {
-        let mut data = [0u8; 1];
-        self.read_bytes(&mut data)?;
-        Ok(data[0] != 0)
-    }
-
-    /// Write a `u8` to the channel.
-    #[inline(always)]
-    fn write_u8(&mut self, s: u8) -> Result<()> {
-        let data = [s];
-        self.write_bytes(&data)?;
-        Ok(())
-    }
-
-    /// Read a `u8` from the channel.
-    #[inline(always)]
-    fn read_u8(&mut self) -> Result<u8> {
-        let mut data = [0];
-        self.read_bytes(&mut data)?;
-        Ok(data[0])
-    }
-
-    /// Write a `u16` to the channel.
-    #[inline(always)]
-    fn write_u16(&mut self, s: u16) -> Result<()> {
-        let data: [u8; 2] = unsafe { std::mem::transmute(s) };
-        self.write_bytes(&data)?;
-        Ok(())
-    }
-
-    /// Read a `u16` from the channel.
-    #[inline(always)]
-    fn read_u16(&mut self) -> Result<u16> {
-        let mut data = [0u8; 2];
-        self.read_bytes(&mut data)?;
-        let s = unsafe { std::mem::transmute(data) };
-        Ok(s)
-    }
-
-    /// Write a `u32` to the channel.
-    #[inline(always)]
-    fn write_u32(&mut self, s: u32) -> Result<()> {
-        let data: [u8; 4] = unsafe { std::mem::transmute(s) };
-        self.write_bytes(&data)?;
-        Ok(())
-    }
-
-    /// Read a `u32` from the channel.
-    #[inline(always)]
-    fn read_u32(&mut self) -> Result<u32> {
-        let mut data = [0u8; 4];
-        self.read_bytes(&mut data)?;
-        let s = unsafe { std::mem::transmute(data) };
-        Ok(s)
-    }
-
-    /// Write a `u64` to the channel.
-    #[inline(always)]
-    fn write_u64(&mut self, s: u64) -> Result<()> {
-        let data: [u8; 8] = unsafe { std::mem::transmute(s) };
-        self.write_bytes(&data)?;
-        Ok(())
-    }
-
-    /// Read a `u64` from the channel.
-    #[inline(always)]
-    fn read_u64(&mut self) -> Result<u64> {
-        let mut data = [0u8; 8];
-        self.read_bytes(&mut data)?;
-        let s = unsafe { std::mem::transmute(data) };
-        Ok(s)
-    }
-
-    /// Write a `usize` to the channel.
-    #[inline(always)]
-    fn write_usize(&mut self, s: usize) -> Result<()> {
-        let data: [u8; 8] = unsafe { std::mem::transmute(s) };
-        self.write_bytes(&data)?;
-        Ok(())
-    }
-
-    /// Read a `usize` from the channel.
-    #[inline(always)]
-    fn read_usize(&mut self) -> Result<usize> {
-        let mut data = [0u8; 8];
-        self.read_bytes(&mut data)?;
-        let s = unsafe { std::mem::transmute(data) };
-        Ok(s)
-    }
-
-    /// Write a `Block` to the channel.
-    #[inline(always)]
-    fn write_block(&mut self, b: &Block) -> Result<()> {
-        self.write_bytes(b.as_ref())?;
-        Ok(())
-    }
-
-    /// Read a `Block` from the channel.
-    #[inline(always)]
-    fn read_block(&mut self) -> Result<Block> {
-        let mut v = Block::default();
-        self.read_bytes(v.as_mut())?;
-        Ok(v)
-    }
-
-    /// Read `n` `Block`s from the channel.
-    #[inline(always)]
-    fn read_blocks(&mut self, n: usize) -> Result<Vec<Block>> {
-        (0..n).map(|_| self.read_block()).collect()
-    }
-
-    /// Write a `Block512` to the channel.
-    #[inline(always)]
-    fn write_block512(&mut self, b: &Block512) -> Result<()> {
-        for block in b.0.iter() {
-            self.write_block(block)?;
-        }
-        Ok(())
-    }
-
-    /// Read a `Block512` from the channel.
-    #[inline(always)]
-    fn read_block512(&mut self) -> Result<Block512> {
-        let mut data = [0u8; 64];
-        self.read_bytes(&mut data)?;
-        Ok(Block512::from(data))
-    }
-
-    /// Write a `RistrettoPoint` to the channel.
-    #[cfg(feature = "curve25519-dalek")]
-    #[inline(always)]
-    fn write_pt(&mut self, pt: &RistrettoPoint) -> Result<()> {
-        self.write_bytes(pt.compress().as_bytes())?;
-        Ok(())
-    }
-
-    /// Read a `RistrettoPoint` from the channel.
-    #[cfg(feature = "curve25519-dalek")]
-    #[inline(always)]
-    fn read_pt(&mut self) -> Result<RistrettoPoint> {
-        let mut data = [0u8; 32];
-        self.read_bytes(&mut data)?;
-        let pt = match CompressedRistretto::from_slice(&data).decompress() {
-            Some(pt) => pt,
-            None => {
-                return Err(std::io::Error::new(
-                    std::io::ErrorKind::InvalidData,
-                    "unable to decompress ristretto point",
-                ));
-            }
-        };
-        Ok(pt)
     }
 }
 
@@ -235,6 +270,15 @@ impl<R: Read, W: Write> Channel<R, W> {
     }
 }
 
+impl<R: Read, W: Write> Clone for Channel<R, W> {
+    fn clone(&self) -> Self {
+        Channel {
+            reader: self.reader.clone(),
+            writer: self.writer.clone(),
+        }
+    }
+}
+
 impl<R: Read, W: Write> AbstractChannel for Channel<R, W> {
     #[inline(always)]
     fn write_bytes(&mut self, bytes: &[u8]) -> Result<()> {
@@ -251,22 +295,14 @@ impl<R: Read, W: Write> AbstractChannel for Channel<R, W> {
     fn flush(&mut self) -> Result<()> {
         self.writer.borrow_mut().flush()
     }
-
-    #[inline(always)]
-    fn clone(&self) -> Self {
-        Self {
-            reader: self.reader.clone(),
-            writer: self.writer.clone(),
-        }
-    }
 }
 
 /// Standard Read/Write channel built from a symmetric stream.
-pub struct SymChannel<S> {
+pub struct SymChannel<S: Read + Write> {
     stream: Rc<RefCell<S>>,
 }
 
-impl <S: Read + Write> SymChannel<S> {
+impl<S: Read + Write> SymChannel<S> {
     /// Make a new `Channel` from a stream.
     pub fn new(stream: S) -> Self {
         let stream = Rc::new(RefCell::new(stream));
@@ -290,10 +326,11 @@ impl<S: Read + Write> AbstractChannel for SymChannel<S> {
     fn flush(&mut self) -> Result<()> {
         self.stream.borrow_mut().flush()
     }
+}
 
-    #[inline(always)]
+impl<S: Read + Write> Clone for SymChannel<S> {
     fn clone(&self) -> Self {
-        Self {
+        SymChannel {
             stream: self.stream.clone(),
         }
     }

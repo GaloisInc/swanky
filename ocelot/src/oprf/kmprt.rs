@@ -140,7 +140,7 @@ impl<OPRF: OprfSender<Seed = Block512, Input = Block, Output = Block512> + SemiH
         // Receive `hashkeys` from the receiver. These are used to fill `bins` below.
         let mut hashkeys = Vec::with_capacity(params.h1 + params.h2);
         for _ in 0..params.h1 + params.h2 {
-            let h = channel.read_block()?;
+            let h: Block = channel.receive()?;
             let aes = Aes128::new(h);
             hashkeys.push(aes);
         }
@@ -255,7 +255,7 @@ impl<OPRF: OprfSender<Seed = Block512, Input = Block, Output = Block512> + SemiH
             }
             if map.len() == points.len() {
                 // Success! Send `m` to the receiver and exit the loop.
-                channel.write_usize(m)?;
+                channel.send(m)?;
                 break;
             }
             // Failure :-(. Increment `offset` and try again.
@@ -273,9 +273,9 @@ impl<OPRF: OprfSender<Seed = Block512, Input = Block, Output = Block512> + SemiH
             }
         }
         // Send `v` and `table` to the receiver.
-        channel.write_block(&v)?;
+        channel.send(&v)?;
         for entry in table.iter() {
-            channel.write_block512(entry)?;
+            channel.send(entry)?;
         }
         channel.flush()?;
         Ok(())
@@ -350,7 +350,7 @@ impl<OPRF: OprfReceiver<Seed = Block512, Input = Block, Output = Block512> + Sem
                 table = table_;
                 // Send `hashkeys` to the sender.
                 for h in hashkeys.into_iter() {
-                    channel.write_block(&h)?;
+                    channel.send(&h)?;
                 }
                 channel.flush()?;
                 break;
@@ -376,12 +376,12 @@ impl<OPRF: OprfReceiver<Seed = Block512, Input = Block, Output = Block512> + Sem
 
         let zero = Block512::default();
         for (item, output) in table.items.into_iter().zip(oprf_outputs.into_iter()) {
-            let m = channel.read_usize()?;
-            let v = channel.read_block()?;
+            let m: usize = channel.receive()?;
+            let v: Block = channel.receive()?;
             let h = hash_output(v, output, m);
             let mut output = output;
             for i in 0..m {
-                let entry = channel.read_block512()?;
+                let entry: Block512 = channel.receive()?;
                 output ^= if i == h { entry } else { zero };
             }
             if let Some(item) = item {

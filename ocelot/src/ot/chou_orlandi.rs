@@ -45,7 +45,7 @@ impl OtSender for Sender {
     ) -> Result<Self, Error> {
         let y = Scalar::random(&mut rng);
         let s = &y * &RISTRETTO_BASEPOINT_TABLE;
-        channel.write_pt(&s)?;
+        channel.send(&s)?;
         channel.flush()?;
         Ok(Self { y, s, counter: 0 })
     }
@@ -59,7 +59,7 @@ impl OtSender for Sender {
         let ys = self.y * self.s;
         let ks = (0..inputs.len())
             .map(|i| {
-                let r = channel.read_pt()?;
+                let r: RistrettoPoint = channel.receive()?;
                 let yr = self.y * r;
                 let k0 = Block::hash_pt(self.counter + i as u128, &yr);
                 let k1 = Block::hash_pt(self.counter + i as u128, &(yr - ys));
@@ -70,8 +70,8 @@ impl OtSender for Sender {
         for (input, k) in inputs.iter().zip(ks.into_iter()) {
             let c0 = k.0 ^ input.0;
             let c1 = k.1 ^ input.1;
-            channel.write_block(&c0)?;
-            channel.write_block(&c1)?;
+            channel.send(&c0)?;
+            channel.send(&c1)?;
         }
         channel.flush()?;
         Ok(())
@@ -97,7 +97,7 @@ impl OtReceiver for Receiver {
         channel: &mut C,
         _: &mut RNG,
     ) -> Result<Self, Error> {
-        let s = channel.read_pt()?;
+        let s: RistrettoPoint = channel.receive()?;
         let s = RistrettoBasepointTable::create(&s);
         Ok(Self { s, counter: 0 })
     }
@@ -117,7 +117,7 @@ impl OtReceiver for Receiver {
                 let x = Scalar::random(&mut rng);
                 let c = if *b { one } else { zero };
                 let r = c + &x * &RISTRETTO_BASEPOINT_TABLE;
-                channel.write_pt(&r)?;
+                channel.send(&r)?;
                 Ok(Block::hash_pt(self.counter + i as u128, &(&x * &self.s)))
             })
             .collect::<Result<Vec<Block>, Error>>()?;
@@ -127,8 +127,8 @@ impl OtReceiver for Receiver {
             .iter()
             .zip(ks.into_iter())
             .map(|(b, k)| {
-                let c0 = channel.read_block()?;
-                let c1 = channel.read_block()?;
+                let c0: Block = channel.receive()?;
+                let c1: Block = channel.receive()?;
                 let c = k ^ if *b { c1 } else { c0 };
                 Ok(c)
             })

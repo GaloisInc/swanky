@@ -63,9 +63,9 @@ impl<OT: OtReceiver<Msg = Block> + Malicious> Sender<OT> {
             let tmp = q.clmul(chi);
             check = utils::xor_two_blocks(&check, &tmp);
         }
-        let x = channel.read_block()?;
-        let t0 = channel.read_block()?;
-        let t1 = channel.read_block()?;
+        let x: Block = channel.receive()?;
+        let t0: Block = channel.receive()?;
+        let t1: Block = channel.receive()?;
         let tmp = x.clmul(self.ot.s_);
         let check = utils::xor_two_blocks(&check, &tmp);
         if check != (t0, t1) {
@@ -116,8 +116,8 @@ impl<OT: OtReceiver<Msg = Block> + Malicious> OtSender for Sender<OT> {
             let y0 = self.ot.hash.tccr_hash(Block::from(j as u128), q) ^ input.0;
             let q = q ^ self.ot.s_;
             let y1 = self.ot.hash.tccr_hash(Block::from(j as u128), q) ^ input.1;
-            channel.write_block(&y0)?;
-            channel.write_block(&y1)?;
+            channel.send(&y0)?;
+            channel.send(&y1)?;
         }
         channel.flush()?;
         Ok(())
@@ -142,7 +142,7 @@ impl<OT: OtReceiver<Msg = Block> + Malicious> CorrelatedSender for Sender<OT> {
             let x1 = x0 ^ *delta;
             let q = q ^ self.ot.s_;
             let y = self.ot.hash.tccr_hash(Block::from(j as u128), q) ^ x1;
-            channel.write_block(&y)?;
+            channel.send(&y)?;
             out.push((x0, x1));
         }
         channel.flush()?;
@@ -209,9 +209,9 @@ impl<OT: OtSender<Msg = Block> + Malicious> Receiver<OT> {
             let tmp = tj.clmul(chi);
             t = utils::xor_two_blocks(&t, &tmp);
         }
-        channel.write_block(&x)?;
-        channel.write_block(&t.0)?;
-        channel.write_block(&t.1)?;
+        channel.send(&x)?;
+        channel.send(&t.0)?;
+        channel.send(&t.1)?;
         channel.flush()?;
         Ok(ts)
     }
@@ -240,8 +240,8 @@ impl<OT: OtSender<Msg = Block> + Malicious> OtReceiver for Receiver<OT> {
         for (j, b) in inputs.iter().enumerate() {
             let t = &ts[j * 16..(j + 1) * 16];
             let t: [u8; 16] = t.try_into().unwrap();
-            let y0 = channel.read_block()?;
-            let y1 = channel.read_block()?;
+            let y0: Block = channel.receive()?;
+            let y1: Block = channel.receive()?;
             let y = if *b { y1 } else { y0 };
             let y = y ^ self
                 .ot
@@ -265,7 +265,7 @@ impl<OT: OtSender<Msg = Block> + Malicious> CorrelatedReceiver for Receiver<OT> 
         for (j, b) in inputs.iter().enumerate() {
             let t = &ts[j * 16..(j + 1) * 16];
             let t: [u8; 16] = t.try_into().unwrap();
-            let y = channel.read_block()?;
+            let y = channel.receive()?;
             let y = if *b { y } else { Block::default() };
             let h = self
                 .ot

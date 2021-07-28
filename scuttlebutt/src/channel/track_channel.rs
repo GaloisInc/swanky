@@ -88,7 +88,9 @@ impl<R: Read, W: Write> AbstractChannel for TrackChannel<R, W> {
     fn flush(&mut self) -> Result<()> {
         self.0.lock().unwrap().channel.flush()
     }
+}
 
+impl<R: Read, W: Write> Clone for TrackChannel<R, W> {
     fn clone(&self) -> Self {
         Self(self.0.clone())
     }
