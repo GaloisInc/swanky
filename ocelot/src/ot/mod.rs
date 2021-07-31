@@ -19,6 +19,7 @@
 pub mod alsz;
 pub mod chou_orlandi;
 pub mod dummy;
+pub mod ferret;
 pub mod kos;
 pub mod kos_delta;
 pub mod naor_pinkas;

@@ -34,7 +34,7 @@ pub trait Receivable: Sized {
     fn receive<C: AbstractChannel>(chan: &mut C) -> Result<Self>;
 }
 
-impl Sendable for bool {
+impl<'a> Sendable for bool {
     #[inline(always)]
     fn send<C: AbstractChannel>(self, chan: &mut C) -> Result<()> {
         chan.send(&[self as u8])
@@ -64,6 +64,13 @@ impl<'a, const N: usize> Sendable for &'a [u8; N] {
     }
 }
 
+impl<T: Receivable> Receivable for (T, T) {
+    #[inline(always)]
+    fn receive<C: AbstractChannel>(chan: &mut C) -> Result<Self> {
+        Ok((chan.receive()?, chan.receive()?))
+    }
+}
+
 impl<T: Receivable + Default + Copy, const N: usize> Receivable for [T; N] {
     #[inline(always)]
     fn receive<C: AbstractChannel>(chan: &mut C) -> Result<Self> {
@@ -85,6 +92,47 @@ where
             chan.send(elem)?;
         }
         Ok(())
+    }
+}
+
+impl<'a, T, const N: usize> Sendable for &'a [T; N]
+where
+    &'a T: Sendable,
+{
+    #[inline(always)]
+    fn send<C: AbstractChannel>(self, chan: &mut C) -> Result<()> {
+        for elem in self.iter() {
+            chan.send(elem)?;
+        }
+        Ok(())
+    }
+}
+
+// The Rust type inference goes depth-first into this and dies:
+// since the type does not become smaller, it causes infinite recursion when
+// looking for an implementation of Sendable for &'a T.
+// Can we enforce that T not be a reference?
+/*
+impl<'a, T> Sendable for T
+where
+    &'a T: Sendable,
+{
+    #[inline(always)]
+    fn send<C: AbstractChannel>(self, chan: &mut C) -> Result<()> {
+        chan.send(&self)
+    }
+}
+*/
+
+impl<'a, T1, T2> Sendable for &'a (T1, T2)
+where
+    &'a T1: Sendable,
+    &'a T2: Sendable,
+{
+    #[inline(always)]
+    fn send<C: AbstractChannel>(self, chan: &mut C) -> Result<()> {
+        chan.send(&self.0)?;
+        chan.send(&self.1)
     }
 }
 
