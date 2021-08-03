@@ -34,6 +34,13 @@ pub trait Receivable: Sized {
     fn receive<C: AbstractChannel>(chan: &mut C) -> Result<Self>;
 }
 
+impl<'a> Sendable for &bool {
+    #[inline(always)]
+    fn send<C: AbstractChannel>(self, chan: &mut C) -> Result<()> {
+        chan.send(*self)
+    }
+}
+
 impl<'a> Sendable for bool {
     #[inline(always)]
     fn send<C: AbstractChannel>(self, chan: &mut C) -> Result<()> {

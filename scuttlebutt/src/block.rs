@@ -15,6 +15,113 @@ use std::{
     hash::{Hash, Hasher},
 };
 
+/// Interpret a block as an element of the field F_{2^128}
+#[derive(Copy, Clone, Debug, Default)]
+pub struct F128(Block);
+
+impl F128 {
+    pub fn one() -> Self {
+        Self(Block(ONE))
+    }
+
+    pub fn zero() -> Self {
+        Self(Block(ZERO))
+    }
+
+    /// Multiply by the field element X \in GF_{2}[X] / (X^128 + X^7 + X^2 + X + 1 )
+    pub fn mul_x(self) -> Self {
+        Self(Block(unsafe {
+            // shift left by 1 (multiplying by X, ignoring overflow)
+            let s = _mm_slli_si128::<1>(self.0 .0);
+
+            // deal with the overflow
+            let msb = _mm_extract_epi8::<15>(self.0 .0) >> 7;
+            debug_assert!(msb == 0 || msb == 1);
+            let xor = _mm_set_epi32(0x0, 0x0, 0x0, msb * 0b100000000010000111);
+            _mm_xor_si128(xor, s)
+        }))
+    }
+}
+
+impl From<F128> for Block {
+    #[inline]
+    fn from(f: F128) -> Self {
+        f.0
+    }
+}
+
+impl From<Block> for F128 {
+    #[inline]
+    fn from(block: Block) -> Self {
+        Self(block)
+    }
+}
+
+impl std::ops::Add for F128 {
+    type Output = Self;
+
+    #[inline]
+    fn add(self, other: F128) -> F128 {
+        F128(self.0 ^ other.0)
+    }
+}
+
+impl std::ops::Sub for F128 {
+    type Output = Self;
+
+    #[inline]
+    fn sub(self, other: F128) -> F128 {
+        F128(self.0 ^ other.0)
+    }
+}
+
+impl std::ops::Mul for F128 {
+    type Output = Self;
+
+    #[inline]
+    fn mul(self, other: F128) -> F128 {
+        Self(Block(unsafe {
+            let a = self.0 .0;
+            let b = self.0 .0;
+            let tmp3 = _mm_clmulepi64_si128(a, b, 0x00);
+            let tmp4 = _mm_clmulepi64_si128(a, b, 0x10);
+            let tmp5 = _mm_clmulepi64_si128(a, b, 0x01);
+            let tmp6 = _mm_clmulepi64_si128(a, b, 0x11);
+            let tmp4 = _mm_xor_si128(tmp4, tmp5);
+            let tmp5 = _mm_slli_si128(tmp4, 8);
+            let tmp4 = _mm_srli_si128(tmp4, 8);
+            let tmp3 = _mm_xor_si128(tmp3, tmp5);
+            let tmp6 = _mm_xor_si128(tmp6, tmp4);
+            let tmp7 = _mm_srli_epi32(tmp3, 31);
+            let tmp8 = _mm_srli_epi32(tmp6, 31);
+            let tmp3 = _mm_slli_epi32(tmp3, 1);
+            let tmp6 = _mm_slli_epi32(tmp6, 1);
+            let tmp9 = _mm_srli_si128(tmp7, 12);
+            let tmp8 = _mm_slli_si128(tmp8, 4);
+            let tmp7 = _mm_slli_si128(tmp7, 4);
+            let tmp3 = _mm_or_si128(tmp3, tmp7);
+            let tmp6 = _mm_or_si128(tmp6, tmp8);
+            let tmp6 = _mm_or_si128(tmp6, tmp9);
+            let tmp7 = _mm_slli_epi32(tmp3, 31);
+            let tmp8 = _mm_slli_epi32(tmp3, 30);
+            let tmp9 = _mm_slli_epi32(tmp3, 25);
+            let tmp7 = _mm_xor_si128(tmp7, tmp8);
+            let tmp7 = _mm_xor_si128(tmp7, tmp9);
+            let tmp8 = _mm_srli_si128(tmp7, 4);
+            let tmp7 = _mm_slli_si128(tmp7, 12);
+            let tmp3 = _mm_xor_si128(tmp3, tmp7);
+            let tmp2 = _mm_srli_epi32(tmp3, 1);
+            let tmp4 = _mm_srli_epi32(tmp3, 2);
+            let tmp5 = _mm_srli_epi32(tmp3, 7);
+            let tmp2 = _mm_xor_si128(tmp2, tmp4);
+            let tmp2 = _mm_xor_si128(tmp2, tmp5);
+            let tmp2 = _mm_xor_si128(tmp2, tmp8);
+            let tmp3 = _mm_xor_si128(tmp3, tmp2);
+            _mm_xor_si128(tmp6, tmp3)
+        }))
+    }
+}
+
 /// A 128-bit chunk.
 #[derive(Clone, Copy)]
 pub struct Block(pub __m128i);
@@ -24,6 +131,7 @@ union __U128 {
     bytes: u128,
 }
 
+const ZERO: __m128i = unsafe { (__U128 { bytes: 0 }).vector };
 const ONE: __m128i = unsafe { (__U128 { bytes: 1 }).vector };
 const ONES: __m128i = unsafe {
     (__U128 {
@@ -38,6 +146,7 @@ impl Block {
     pub fn as_ptr(&self) -> *const u8 {
         self.as_ref().as_ptr()
     }
+
     /// Convert into a mutable pointer.
     #[inline]
     pub fn as_mut_ptr(&mut self) -> *mut u8 {
@@ -81,15 +190,41 @@ impl Block {
     pub fn lsb(&self) -> bool {
         unsafe { _mm_extract_epi8(_mm_and_si128(self.0, ONE), 0) == 1 }
     }
+
     /// Set the least significant bit.
     #[inline]
     pub fn set_lsb(&self) -> Block {
         unsafe { Block(_mm_or_si128(self.0, ONE)) }
     }
+
     /// Flip all bits.
     #[inline]
     pub fn flip(&self) -> Self {
         unsafe { Block(_mm_xor_si128(self.0, ONES)) }
+    }
+
+    /// Return the bit-composition of the block
+    #[inline]
+    pub fn bits(&self) -> [bool; 128] {
+        let mut out: [bool; 128] = [Default::default(); 128];
+        unsafe {
+            let mut h = _mm_extract_epi64::<1>(self.0);
+            let mut l = _mm_extract_epi64::<0>(self.0);
+            let mut i = 63;
+            let mut j = 127;
+            loop {
+                out[i] = (h & 1) != 0;
+                out[j] = (l & 1) != 0;
+                if i == 0 {
+                    break;
+                }
+                i -= 1;
+                j -= 1;
+                h >>= 1;
+                l >>= 1;
+            }
+        }
+        out
     }
 
     /// Try to create a `Block` from a slice of bytes. The slice must have exactly 16 bytes.

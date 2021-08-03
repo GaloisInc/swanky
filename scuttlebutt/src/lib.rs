@@ -30,9 +30,9 @@ pub use crate::{
         aes128::{Aes128, FIXED_KEY_AES128},
         aes256::Aes256,
     },
-    block::Block,
+    block::{Block, F128},
     block512::Block512,
-    channel::{AbstractChannel, Channel, HashChannel, SyncChannel, TrackChannel, SymChannel},
+    channel::{AbstractChannel, Channel, HashChannel, SymChannel, SyncChannel, TrackChannel},
     hash_aes::{AesHash, AES_HASH},
     rand_aes::AesRng,
 };
