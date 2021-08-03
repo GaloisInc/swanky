@@ -223,6 +223,13 @@ impl Receivable for u64 {
     }
 }
 
+impl<'a> Sendable for &'a usize {
+    #[inline(always)]
+    fn send<C: AbstractChannel>(self, chan: &mut C) -> Result<()> {
+        chan.send(*self)
+    }
+}
+
 impl Sendable for usize {
     #[inline(always)]
     fn send<C: AbstractChannel>(self, chan: &mut C) -> Result<()> {
