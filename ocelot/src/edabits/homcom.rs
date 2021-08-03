@@ -43,6 +43,17 @@ impl<FE: FiniteField> FComSender<FE> {
         })
     }
 
+    pub fn duplicate<C: AbstractChannel, RNG: CryptoRng + Rng>(
+        &mut self,
+        channel: &mut C,
+        rng: &mut RNG,
+    ) -> Result<Self, Error> {
+        Ok(Self {
+            svole_sender: self.svole_sender.duplicate(channel, rng)?,
+            voles: Vec::new(),
+        })
+    }
+
     pub fn random<C: AbstractChannel, RNG: CryptoRng + Rng>(
         &mut self,
         channel: &mut C,
@@ -216,6 +227,18 @@ impl<FE: FiniteField> FComReceiver<FE> {
         })
     }
 
+    pub fn duplicate<C: AbstractChannel, RNG: CryptoRng + Rng>(
+        &mut self,
+        channel: &mut C,
+        rng: &mut RNG,
+    ) -> Result<Self, Error> {
+        Ok(Self {
+            delta: self.get_delta(),
+            svole_receiver: self.svole_receiver.duplicate(channel, rng)?,
+            voles: Vec::new(),
+        })
+    }
+
     pub fn get_delta(&self) -> FE {
         self.delta
     }
@@ -230,6 +253,7 @@ impl<FE: FiniteField> FComReceiver<FE> {
                 return Ok(MacVerifier(e));
             }
             None => {
+                println!("SVOLE");
                 self.svole_receiver.receive(channel, rng, &mut self.voles)?;
                 match self.voles.pop() {
                     Some(e) => {

@@ -60,15 +60,14 @@ fn run(
 
         match listener.accept() {
             Ok((stream_verifier, _addr)) => {
-                let mut rng = AesRng::new();
-                let start = Instant::now();
                 let reader = BufReader::new(stream_verifier.try_clone().unwrap());
                 let writer = BufWriter::new(stream_verifier);
                 let mut channel: SyncChannel<BufReader<TcpStream>, BufWriter<TcpStream>> =
                     SyncChannel::new(reader, writer);
 
-                let mut bucket_connections_verifier = Vec::with_capacity(bucket_size);
+                let mut bucket_connections = None;
                 if with_mult_connect {
+                    let mut bucket_connections_verifier = Vec::with_capacity(bucket_size);
                     for _i in 0..bucket_size {
                         match listener.accept() {
                             Ok((mstream, _addr)) => {
@@ -82,38 +81,43 @@ fn run(
                             Err(e) => println!("couldn't get client: {:?}", e),
                         }
                     }
+
+                    // let mut handles = Vec::new();
+                    // let mut i = 0;
+                    // for mut bucket_channel in bucket_connections_verifier.into_iter() {
+                    //     let mut locvec = Vec::with_capacity(2);
+                    //     for j in 0..2 {
+                    //         locvec.push(vec[i * 2 + j]);
+                    //     }
+                    //     let handle =
+                    //         std::thread::spawn(move || helper_server(&locvec, &mut bucket_channel));
+                    //     handles.push(handle);
+                    //     i += 1;
+                    // }
+
+                    // for handle in handles {
+                    //     handle.join().unwrap();
+                    // }
+
+                    bucket_connections = Some(bucket_connections_verifier);
                 }
-
-                if with_mult_connect {
-                    let mut handles = Vec::new();
-
-                    let mut i = 0;
-                    for mut bucket_channel in bucket_connections_verifier.into_iter() {
-                        let mut locvec = Vec::with_capacity(2);
-                        for j in 0..2 {
-                            locvec.push(vec[i * 2 + j]);
-                        }
-                        let handle =
-                            std::thread::spawn(move || helper_server(&locvec, &mut bucket_channel));
-                        handles.push(handle);
-                        i += 1;
-                    }
-
-                    for handle in handles {
-                        handle.join().unwrap();
-                    }
-                }
-
-                let mut fconv = Receiver::init(&mut channel, &mut rng).unwrap();
-
                 let mut rng = AesRng::new();
-                let start = Instant::now();
 
+                let start = Instant::now();
+                let mut fconv = Receiver::init(&mut channel, &mut rng).unwrap();
+                println!("Verifier time (init): {:?}", start.elapsed());
+
+                let start = Instant::now();
                 let edabits = fconv
                     .random_edabits(&mut channel, &mut rng, num_edabits)
                     .unwrap();
+                println!("Verifier time (random edabits): {:?}", start.elapsed());
 
-                let r = fconv.conv(&mut channel, &mut rng, &edabits).unwrap();
+                let start = Instant::now();
+                let r = fconv
+                    .conv(&mut channel, &mut rng, &edabits, bucket_connections)
+                    .unwrap();
+                println!("Verifier time (conv): {:?}", start.elapsed());
             }
             Err(e) => println!("couldn't get client: {:?}", e),
         }
@@ -124,8 +128,9 @@ fn run(
         let writer = BufWriter::new(stream_prover);
         let mut channel = SyncChannel::new(reader, writer);
 
-        let mut bucket_connections_prover = Vec::with_capacity(bucket_size);
+        let mut bucket_connections = None;
         if with_mult_connect {
+            let mut bucket_connections_prover = Vec::with_capacity(bucket_size);
             for _i in 0..bucket_size {
                 println!("P: attempt bucket connection");
                 let bucket_stream = TcpStream::connect("127.0.0.1:5527")?;
@@ -135,37 +140,43 @@ fn run(
                 let bucket_channel = SyncChannel::new(reader, writer);
                 bucket_connections_prover.push(bucket_channel);
             }
-        }
 
-        if with_mult_connect {
-            let mut handles = Vec::new();
+            // let mut handles = Vec::new();
+            // let mut i = 0;
+            // for mut bucket_channel in bucket_connections_prover.into_iter() {
+            //     println!("SFDSFSDFDS {:?}", i * 2);
+            //     let mut locvec = Vec::with_capacity(2);
+            //     for j in 0..2 {
+            //         locvec.push(vec[i * 2 + j]);
+            //     }
+            //     let handle =
+            //         std::thread::spawn(move || helper_client(&locvec, &mut bucket_channel));
+            //     handles.push(handle);
+            //     i += 1;
+            // }
 
-            let mut i = 0;
-            for mut bucket_channel in bucket_connections_prover.into_iter() {
-                println!("SFDSFSDFDS {:?}", i * 2);
-                let mut locvec = Vec::with_capacity(2);
-                for j in 0..2 {
-                    locvec.push(vec[i * 2 + j]);
-                }
-                let handle =
-                    std::thread::spawn(move || helper_client(&locvec, &mut bucket_channel));
-                handles.push(handle);
-                i += 1;
-            }
-
-            for handle in handles {
-                handle.join().unwrap();
-            }
+            // for handle in handles {
+            //     handle.join().unwrap();
+            // }
+            bucket_connections = Some(bucket_connections_prover);
         }
 
         let mut rng = AesRng::new();
+        let start = Instant::now();
         let mut fconv = Sender::init(&mut channel, &mut rng).unwrap();
+        println!("Prover time (init): {:?}", start.elapsed());
 
+        let start = Instant::now();
         let edabits = fconv
             .random_edabits(&mut channel, &mut rng, num_edabits)
             .unwrap();
+        println!("Prover time (random edabits): {:?}", start.elapsed());
 
-        let _ = fconv.conv(&mut channel, &mut rng, &edabits).unwrap();
+        let start = Instant::now();
+        let _ = fconv
+            .conv(&mut channel, &mut rng, &edabits, bucket_connections)
+            .unwrap();
+        println!("Prover time (conv): {:?}", start.elapsed());
     }
     Ok(())
 }

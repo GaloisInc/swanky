@@ -31,7 +31,9 @@ fn run() {
             .unwrap();
         println!("Send time (random edabits): {:?}", start.elapsed());
         let start = Instant::now();
-        let _ = fconv_sender.conv(&mut sender, &mut rng, &edabits).unwrap();
+        let _ = fconv_sender
+            .conv(&mut sender, &mut rng, &edabits, None)
+            .unwrap();
         println!("Send time (conv): {:?}", start.elapsed());
     });
     #[cfg(target_os = "linux")]
@@ -69,7 +71,7 @@ fn run() {
     receiver.clear();
     let start = Instant::now();
     fconv_receiver
-        .conv(&mut receiver, &mut rng, &edabits_mac)
+        .conv(&mut receiver, &mut rng, &edabits_mac, None)
         .unwrap();
     println!("Receive time (conv): {:?}", start.elapsed());
     println!(
