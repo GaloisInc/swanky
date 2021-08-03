@@ -121,7 +121,7 @@ fn ct_redc(a: u128, modulus: u64, m_tick: u64) -> u128 {
     let m = (a as u64).wrapping_mul(m_tick) as u128;
     let t = ((a + m*(modulus as u128)) >> 64) as u64;
 
-    u64::conditional_select(&t, &t.wrapping_sub(modulus), t.ct_lt(&modulus)) as u128
+    u64::conditional_select(&t.wrapping_sub(modulus), &t, t.ct_lt(&modulus)) as u128
 }
 
 /// Addition for field elements in Montgomery form
@@ -134,12 +134,7 @@ pub fn monty_add<F: Monty>(a: F, b: F) -> F {
 
 /// Subtraction for field elements in Montgomery form
 #[inline]
-pub fn monty_sub<F: Monty>(a_: F, b_: F) -> F {
-    let a = a_.to_raw() as u128;
-    let b = b_.to_raw() as u128;
-
-    F::from_raw(if a > b { a - b } else { a + (F::M as u128) - b } as u64)
-}
+pub fn monty_sub<F: Monty>(a: F, b: F) -> F { monty_add(a, monty_neg(b)) }
 
 /// Additive inverse for field elements in Montgomery form
 #[inline]
