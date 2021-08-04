@@ -120,6 +120,18 @@ impl<FE: FiniteField> FComSender<FE> {
         return MacProver(cst * x.0, (x.1).multiply_by_prime_subfield(cst));
     }
 
+    pub fn add(&self, a: MacProver<FE>, b: MacProver<FE>) -> MacProver<FE> {
+        let MacProver(a, a_mac) = a;
+        let MacProver(b, b_mac) = b;
+        return MacProver(a + b, a_mac + b_mac);
+    }
+
+    pub fn minus(&self, a: MacProver<FE>, b: MacProver<FE>) -> MacProver<FE> {
+        let MacProver(a, a_mac) = a;
+        let MacProver(b, b_mac) = b;
+        return MacProver(a - b, a_mac - b_mac);
+    }
+
     pub fn check_zero<C: AbstractChannel>(
         &mut self,
         channel: &mut C,
@@ -204,6 +216,43 @@ impl<FE: FiniteField> FComSender<FE> {
         channel.write_fe(v)?;
         channel.flush()?;
 
+        Ok(())
+    }
+
+    pub fn wolverine_check_multiply<C: AbstractChannel, RNG: CryptoRng + Rng>(
+        &mut self,
+        channel: &mut C,
+        rng: &mut RNG,
+        triples: &[(MacProver<FE>, MacProver<FE>, MacProver<FE>)],
+        aux: &[(MacProver<FE>, MacProver<FE>, MacProver<FE>)],
+    ) -> Result<(), Error> {
+        let n = triples.len();
+        for i in 0..n {
+            let (a, b, c) = triples[i];
+            let (x, y, z) = aux[i];
+
+            let minus_x = self.affine_mult_cst(-FE::PrimeField::ONE, x);
+            let minus_y = self.affine_mult_cst(-FE::PrimeField::ONE, y);
+            let d = self.add(a, minus_x);
+            let e = self.add(b, minus_y);
+            self.open(channel, &[d, e])?;
+
+            let MacProver(d, d_mac) = d;
+            let MacProver(e, e_mac) = e;
+
+            let d_e = d * e;
+
+            let e_x = self.affine_mult_cst(e, x);
+            let d_y = self.affine_mult_cst(d, y);
+
+            let mut w: MacProver<FE> = z;
+            w = self.minus(w, c);
+            w = self.add(w, e_x);
+            w = self.add(w, d_y);
+            w = self.affine_add_cst(d_e, w);
+
+            self.check_zero(channel, vec![w.1])?;
+        }
         Ok(())
     }
 }
@@ -310,6 +359,18 @@ impl<FE: FiniteField> FComReceiver<FE> {
         return MacVerifier(x_mac.0.multiply_by_prime_subfield(cst));
     }
 
+    pub fn add(&self, a: MacVerifier<FE>, b: MacVerifier<FE>) -> MacVerifier<FE> {
+        let MacVerifier(a_mac) = a;
+        let MacVerifier(b_mac) = b;
+        return MacVerifier(a_mac + b_mac);
+    }
+
+    pub fn minus(&self, a: MacVerifier<FE>, b: MacVerifier<FE>) -> MacVerifier<FE> {
+        let MacVerifier(a_mac) = a;
+        let MacVerifier(b_mac) = b;
+        return MacVerifier(a_mac - b_mac);
+    }
+
     pub fn check_zero<C: AbstractChannel, RNG: CryptoRng + Rng>(
         &mut self,
         channel: &mut C,
@@ -406,6 +467,43 @@ impl<FE: FiniteField> FComReceiver<FE> {
         } else {
             Err(Error::Other("checkMultiply fails".to_string()))
         }
+    }
+
+    pub fn wolverine_check_multiply<C: AbstractChannel, RNG: CryptoRng + Rng>(
+        &mut self,
+        channel: &mut C,
+        rng: &mut RNG,
+        triples: &[(MacVerifier<FE>, MacVerifier<FE>, MacVerifier<FE>)],
+        aux: &[(MacVerifier<FE>, MacVerifier<FE>, MacVerifier<FE>)],
+    ) -> Result<(), Error> {
+        let n = triples.len();
+        for i in 0..n {
+            let (a, b, c) = triples[i];
+            let (x, y, z) = aux[i];
+
+            let minus_x = self.affine_mult_cst(-FE::PrimeField::ONE, x);
+            let minus_y = self.affine_mult_cst(-FE::PrimeField::ONE, y);
+            let d = self.add(a, minus_x);
+            let e = self.add(b, minus_y);
+            let v = self.open(channel, &[d, e])?;
+
+            let d = v[0];
+            let e = v[1];
+
+            let d_e = d * e;
+
+            let e_x = self.affine_mult_cst(e, x);
+            let d_y = self.affine_mult_cst(d, y);
+
+            let mut w: MacVerifier<FE> = z;
+            w = self.minus(w, c);
+            w = self.add(w, e_x);
+            w = self.add(w, d_y);
+            w = self.affine_add_cst(d_e, w);
+
+            self.check_zero(channel, rng, vec![w])?;
+        }
+        Ok(())
     }
 }
 
@@ -556,6 +654,75 @@ mod tests {
         assert_eq!(b, bres);
     }
 
+    fn test_fcom_wolverine<FE: FiniteField>() -> () {
+        let count = 50;
+        let (sender, receiver) = UnixStream::pair().unwrap();
+        let handle = std::thread::spawn(move || {
+            let mut rng = AesRng::new();
+            let reader = BufReader::new(sender.try_clone().unwrap());
+            let writer = BufWriter::new(sender);
+            let mut channel = Channel::new(reader, writer);
+            let mut fcom = FComSender::<FE>::init(&mut channel, &mut rng).unwrap();
+
+            let mut v = Vec::new();
+            for _ in 0..count {
+                let MacProver(x, x_mac) = fcom.random(&mut channel, &mut rng).unwrap();
+                let MacProver(y, y_mac) = fcom.random(&mut channel, &mut rng).unwrap();
+                let z = x * y;
+                let z_mac = fcom.input(&mut channel, &mut rng, &vec![z]).unwrap()[0];
+                v.push((
+                    MacProver(x, x_mac),
+                    MacProver(y, y_mac),
+                    MacProver(z, z_mac),
+                ));
+            }
+
+            let mut aux = Vec::new();
+            for _ in 0..count {
+                let MacProver(x, x_mac) = fcom.random(&mut channel, &mut rng).unwrap();
+                let MacProver(y, y_mac) = fcom.random(&mut channel, &mut rng).unwrap();
+                let z = x * y;
+                let z_mac = fcom.input(&mut channel, &mut rng, &vec![z]).unwrap()[0];
+                aux.push((
+                    MacProver(x, x_mac),
+                    MacProver(y, y_mac),
+                    MacProver(z, z_mac),
+                ));
+            }
+
+            let b = fcom
+                .wolverine_check_multiply(&mut channel, &mut rng, &v, &aux)
+                .unwrap();
+            (v, b)
+        });
+        let mut rng = AesRng::new();
+        let reader = BufReader::new(receiver.try_clone().unwrap());
+        let writer = BufWriter::new(receiver);
+        let mut channel = Channel::new(reader, writer);
+        let mut fcom = FComReceiver::<FE>::init(&mut channel, &mut rng).unwrap();
+
+        let mut v = Vec::new();
+        for _ in 0..count {
+            let xmac = fcom.random(&mut channel, &mut rng).unwrap();
+            let ymac = fcom.random(&mut channel, &mut rng).unwrap();
+            let zmac = fcom.input(&mut channel, &mut rng, 1).unwrap()[0];
+            v.push((xmac, ymac, zmac));
+        }
+        let mut aux = Vec::new();
+        for _ in 0..count {
+            let xmac = fcom.random(&mut channel, &mut rng).unwrap();
+            let ymac = fcom.random(&mut channel, &mut rng).unwrap();
+            let zmac = fcom.input(&mut channel, &mut rng, 1).unwrap()[0];
+            aux.push((xmac, ymac, zmac));
+        }
+        let b = fcom
+            .wolverine_check_multiply(&mut channel, &mut rng, &v, &aux)
+            .unwrap();
+
+        let (_, bres) = handle.join().unwrap();
+        assert_eq!(b, bres);
+    }
+
     #[test]
     fn test_fcom_random_f61p() {
         let _t = test_fcom_random::<F61p>();
@@ -574,5 +741,10 @@ mod tests {
     #[test]
     fn test_fcom_multiplication_check_gf40() {
         let _t = test_fcom_multiplication::<Gf40>();
+    }
+
+    #[test]
+    fn test_fcom_wolverine_f61p() {
+        let _t = test_fcom_wolverine::<F61p>();
     }
 }
