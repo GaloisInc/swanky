@@ -13,7 +13,10 @@ type Receiver = ReceiverConv<F61p>;
 
 fn run() {
     let (mut sender, mut receiver) = track_unix_channel_pair();
+    let nb_bits: usize = 38;
     let n = 10_000;
+    let num_bucket = 5;
+    let num_cut = num_bucket;
     let handle = std::thread::spawn(move || {
         #[cfg(target_os = "linux")]
         {
@@ -27,12 +30,12 @@ fn run() {
         println!("Send time (init): {:?}", start.elapsed());
         let start = Instant::now();
         let edabits = fconv_sender
-            .random_edabits(&mut sender, &mut rng, n)
+            .random_edabits(&mut sender, &mut rng, nb_bits, n)
             .unwrap();
         println!("Send time (random edabits): {:?}", start.elapsed());
         let start = Instant::now();
         let _ = fconv_sender
-            .conv(&mut sender, &mut rng, &edabits, None)
+            .conv(&mut sender, &mut rng, num_bucket, num_cut, &edabits, None)
             .unwrap();
         println!("Send time (conv): {:?}", start.elapsed());
     });
@@ -57,7 +60,7 @@ fn run() {
     receiver.clear();
     let start = Instant::now();
     let edabits_mac = fconv_receiver
-        .random_edabits(&mut receiver, &mut rng, n)
+        .random_edabits(&mut receiver, &mut rng, nb_bits, n)
         .unwrap();
     println!("Receive time (random edabits): {:?}", start.elapsed());
     println!(
@@ -71,7 +74,14 @@ fn run() {
     receiver.clear();
     let start = Instant::now();
     fconv_receiver
-        .conv(&mut receiver, &mut rng, &edabits_mac, None)
+        .conv(
+            &mut receiver,
+            &mut rng,
+            num_bucket,
+            num_cut,
+            &edabits_mac,
+            None,
+        )
         .unwrap();
     println!("Receive time (conv): {:?}", start.elapsed());
     println!(

@@ -4,10 +4,9 @@
 // Copyright © 2020 Galois, Inc.
 // See LICENSE for licensing information.
 
-use clap::{App, Arg, SubCommand};
+use clap::{App, Arg};
 use ocelot::edabits::{ReceiverConv, SenderConv};
-use scuttlebutt::{field::F61p, AbstractChannel, AesRng, Channel, SyncChannel};
-use std::env;
+use scuttlebutt::{field::F61p, AesRng, SyncChannel};
 use std::io::prelude::*;
 use std::io::{BufReader, BufWriter};
 use std::net::{TcpListener, TcpStream};
@@ -16,42 +15,26 @@ use std::time::Instant;
 type Sender = SenderConv<F61p>;
 type Receiver = ReceiverConv<F61p>;
 
-const NUM_EDABITS: usize = 10_000;
-const BUCKET_SIZE: usize = 5;
+const DEFAULT_NB_BITS: usize = 38;
+const DEFAULT_NUM_EDABITS: usize = 10_000;
+const DEFAULT_NUM_BUCKET: usize = 5;
 
 const VERIFIER: &str = "VERIFIER";
 const PROVER: &str = "PROVER";
 
-fn helper_server<C: AbstractChannel>(v: &[u8], c: &mut C) -> () {
-    let r = c.read_u8().unwrap();
-    println!("SERVER recv: {:?} {:?}", v.len(), r);
-
-    c.write_u8(v[0] + 50).unwrap();
-    c.flush();
-}
-
-fn helper_client<C: AbstractChannel>(v: &[u8], c: &mut C) -> () {
-    c.write_u8(v[0] - 40).unwrap();
-    c.flush();
-
-    let r = c.read_u8().unwrap();
-    println!("CLIENT recv: {:?} {:?}", v.len(), r);
-}
-
-//fn helper_client<C>(vec: &[u8], c: AbstractChannel<C>) -> () {}
-
 fn run(
     whoami: &str,
+    nb_bits: usize,
     num_edabits: usize,
-    bucket_size: usize,
-    with_mult_connect: bool,
+    num_bucket: usize,
+    num_cut: usize,
+    multithreaded: bool,
 ) -> std::io::Result<()> {
     println!("whoami: {:?}", whoami);
+    println!("nb_bits: {:?}", nb_bits);
     println!("num_edabits: {:?}", num_edabits);
-    println!("bucket_size: {:?}", bucket_size);
-    println!("with multitiple connect: {:?}", with_mult_connect);
-
-    let vec: Vec<u8> = vec![80, 81, 82, 83, 84, 85, 86, 87, 88, 89];
+    println!("num_bucket: {:?}", num_bucket);
+    println!("multithreaded: {:?}", multithreaded);
 
     if whoami == VERIFIER {
         println!("Verifier started");
@@ -66,9 +49,9 @@ fn run(
                     SyncChannel::new(reader, writer);
 
                 let mut bucket_connections = None;
-                if with_mult_connect {
-                    let mut bucket_connections_verifier = Vec::with_capacity(bucket_size);
-                    for _i in 0..bucket_size {
+                if multithreaded {
+                    let mut bucket_connections_verifier = Vec::with_capacity(num_bucket);
+                    for _i in 0..num_bucket {
                         match listener.accept() {
                             Ok((mstream, _addr)) => {
                                 println!("V: receive bucket connection {:?}", _addr);
@@ -81,24 +64,6 @@ fn run(
                             Err(e) => println!("couldn't get client: {:?}", e),
                         }
                     }
-
-                    // let mut handles = Vec::new();
-                    // let mut i = 0;
-                    // for mut bucket_channel in bucket_connections_verifier.into_iter() {
-                    //     let mut locvec = Vec::with_capacity(2);
-                    //     for j in 0..2 {
-                    //         locvec.push(vec[i * 2 + j]);
-                    //     }
-                    //     let handle =
-                    //         std::thread::spawn(move || helper_server(&locvec, &mut bucket_channel));
-                    //     handles.push(handle);
-                    //     i += 1;
-                    // }
-
-                    // for handle in handles {
-                    //     handle.join().unwrap();
-                    // }
-
                     bucket_connections = Some(bucket_connections_verifier);
                 }
                 let mut rng = AesRng::new();
@@ -109,13 +74,20 @@ fn run(
 
                 let start = Instant::now();
                 let edabits = fconv
-                    .random_edabits(&mut channel, &mut rng, num_edabits)
+                    .random_edabits(&mut channel, &mut rng, nb_bits, num_edabits)
                     .unwrap();
                 println!("Verifier time (random edabits): {:?}", start.elapsed());
 
                 let start = Instant::now();
                 let r = fconv
-                    .conv(&mut channel, &mut rng, &edabits, bucket_connections)
+                    .conv(
+                        &mut channel,
+                        &mut rng,
+                        num_bucket,
+                        num_cut,
+                        &edabits,
+                        bucket_connections,
+                    )
                     .unwrap();
                 println!("Verifier time (conv): {:?}", start.elapsed());
             }
@@ -129,9 +101,9 @@ fn run(
         let mut channel = SyncChannel::new(reader, writer);
 
         let mut bucket_connections = None;
-        if with_mult_connect {
-            let mut bucket_connections_prover = Vec::with_capacity(bucket_size);
-            for _i in 0..bucket_size {
+        if multithreaded {
+            let mut bucket_connections_prover = Vec::with_capacity(num_bucket);
+            for _i in 0..num_bucket {
                 println!("P: attempt bucket connection");
                 let bucket_stream = TcpStream::connect("127.0.0.1:5527")?;
                 println!("PEER ADDR {:?}", bucket_stream.peer_addr());
@@ -140,24 +112,6 @@ fn run(
                 let bucket_channel = SyncChannel::new(reader, writer);
                 bucket_connections_prover.push(bucket_channel);
             }
-
-            // let mut handles = Vec::new();
-            // let mut i = 0;
-            // for mut bucket_channel in bucket_connections_prover.into_iter() {
-            //     println!("SFDSFSDFDS {:?}", i * 2);
-            //     let mut locvec = Vec::with_capacity(2);
-            //     for j in 0..2 {
-            //         locvec.push(vec[i * 2 + j]);
-            //     }
-            //     let handle =
-            //         std::thread::spawn(move || helper_client(&locvec, &mut bucket_channel));
-            //     handles.push(handle);
-            //     i += 1;
-            // }
-
-            // for handle in handles {
-            //     handle.join().unwrap();
-            // }
             bucket_connections = Some(bucket_connections_prover);
         }
 
@@ -168,13 +122,20 @@ fn run(
 
         let start = Instant::now();
         let edabits = fconv
-            .random_edabits(&mut channel, &mut rng, num_edabits)
+            .random_edabits(&mut channel, &mut rng, nb_bits, num_edabits)
             .unwrap();
         println!("Prover time (random edabits): {:?}", start.elapsed());
 
         let start = Instant::now();
         let _ = fconv
-            .conv(&mut channel, &mut rng, &edabits, bucket_connections)
+            .conv(
+                &mut channel,
+                &mut rng,
+                num_bucket,
+                num_cut,
+                &edabits,
+                bucket_connections,
+            )
             .unwrap();
         println!("Prover time (conv): {:?}", start.elapsed());
     }
@@ -197,10 +158,19 @@ fn main() -> std::io::Result<()> {
             Arg::with_name("bucket")
                 .short("b")
                 .long("bucket")
-                .value_name("BUCKET")
-                .help("Set the bucket size")
+                .value_name("NUM_BUCKET")
+                .help("Set the number of buckets")
                 .takes_value(true)
                 .required(false)
+                .default_value("UNSPECIFIED"),
+        )
+        .arg(
+            Arg::with_name("nb_bits")
+                .short("m")
+                .long("nb_bits")
+                .value_name("NB_BITS")
+                .help("Set the number of bits in edabits")
+                .takes_value(true)
                 .default_value("UNSPECIFIED"),
         )
         .arg(
@@ -213,16 +183,15 @@ fn main() -> std::io::Result<()> {
                 .default_value("UNSPECIFIED"),
         )
         .arg(
-            Arg::with_name("mult_connect")
-                .short("m")
-                .long("mult-connect")
-                .help("Using multiple connections"),
+            Arg::with_name("multithreaded")
+                .long("multithreaded")
+                .help("Using multithreading"),
         )
         .get_matches();
     let whoami;
     println!("{:?}", matches.value_of("bucket"));
     println!("{:?}", matches.value_of("num_edabits"));
-    println!("{:?}", matches.value_of("mult_connections"));
+    println!("{:?}", matches.value_of("multithreaded"));
     if !matches.is_present("prover") {
         whoami = VERIFIER;
     } else {
@@ -230,12 +199,21 @@ fn main() -> std::io::Result<()> {
     }
 
     //map_or(VERIFIER, |_| PROVER);
-    let bucket_size =
-        usize::from_str_radix(&matches.value_of("bucket").unwrap(), 10).unwrap_or(BUCKET_SIZE);
-    let with_mult_connections = matches.value_of("mult_connect").map_or(false, |_| true);
-    let num_edabits =
-        usize::from_str_radix(&matches.value_of("num_edabits").unwrap(), 10).unwrap_or(NUM_EDABITS);
+    let num_bucket = usize::from_str_radix(&matches.value_of("bucket").unwrap(), 10)
+        .unwrap_or(DEFAULT_NUM_BUCKET);
+    let nb_bits =
+        usize::from_str_radix(&matches.value_of("nb_bits").unwrap(), 10).unwrap_or(DEFAULT_NB_BITS);
+    let num_edabits = usize::from_str_radix(&matches.value_of("num_edabits").unwrap(), 10)
+        .unwrap_or(DEFAULT_NUM_EDABITS);
 
-    let with_mult_connections = matches.is_present("mult_connect");
-    run(whoami, num_edabits, bucket_size, with_mult_connections)
+    let multithreaded = matches.is_present("multithreaded");
+    let num_cut = num_bucket;
+    run(
+        whoami,
+        nb_bits,
+        num_edabits,
+        num_bucket,
+        num_cut,
+        multithreaded,
+    )
 }
