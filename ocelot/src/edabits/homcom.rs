@@ -227,6 +227,8 @@ impl<FE: FiniteField> FComSender<FE> {
         aux: &[(MacProver<FE>, MacProver<FE>, MacProver<FE>)],
     ) -> Result<(), Error> {
         let n = triples.len();
+
+        let mut to_open = Vec::with_capacity(2 * n);
         for i in 0..n {
             let (a, b, c) = triples[i];
             let (x, y, z) = aux[i];
@@ -235,10 +237,18 @@ impl<FE: FiniteField> FComSender<FE> {
             let minus_y = self.affine_mult_cst(-FE::PrimeField::ONE, y);
             let d = self.add(a, minus_x);
             let e = self.add(b, minus_y);
-            self.open(channel, &[d, e])?;
 
-            let MacProver(d, d_mac) = d;
-            let MacProver(e, e_mac) = e;
+            to_open.push(d);
+            to_open.push(e);
+        }
+        self.open(channel, &to_open)?;
+
+        let mut to_check = Vec::with_capacity(n);
+        for i in 0..n {
+            let (a, b, c) = triples[i];
+            let (x, y, z) = aux[i];
+            let MacProver(d, d_mac) = to_open[2 * i];
+            let MacProver(e, e_mac) = to_open[2 * i + 1];
 
             let d_e = d * e;
 
@@ -251,8 +261,12 @@ impl<FE: FiniteField> FComSender<FE> {
             w = self.add(w, d_y);
             w = self.affine_add_cst(d_e, w);
 
-            self.check_zero(channel, vec![w.1])?;
+            if w.0 != FE::PrimeField::ZERO {
+                return Err(Error::Other("SDFSDF".to_string()));
+            }
+            to_check.push(w.1);
         }
+        self.check_zero(channel, to_check)?;
         Ok(())
     }
 }
@@ -477,6 +491,8 @@ impl<FE: FiniteField> FComReceiver<FE> {
         aux: &[(MacVerifier<FE>, MacVerifier<FE>, MacVerifier<FE>)],
     ) -> Result<(), Error> {
         let n = triples.len();
+        let mut to_open = Vec::with_capacity(2 * n);
+
         for i in 0..n {
             let (a, b, c) = triples[i];
             let (x, y, z) = aux[i];
@@ -485,10 +501,18 @@ impl<FE: FiniteField> FComReceiver<FE> {
             let minus_y = self.affine_mult_cst(-FE::PrimeField::ONE, y);
             let d = self.add(a, minus_x);
             let e = self.add(b, minus_y);
-            let v = self.open(channel, &[d, e])?;
 
-            let d = v[0];
-            let e = v[1];
+            to_open.push(d);
+            to_open.push(e);
+        }
+        let opened = self.open(channel, &to_open)?;
+
+        let mut to_check = Vec::with_capacity(n);
+        for i in 0..n {
+            let (_a, _b, c) = triples[i];
+            let (x, y, z) = aux[i];
+            let d = opened[2 * i];
+            let e = opened[2 * i + 1];
 
             let d_e = d * e;
 
@@ -501,8 +525,9 @@ impl<FE: FiniteField> FComReceiver<FE> {
             w = self.add(w, d_y);
             w = self.affine_add_cst(d_e, w);
 
-            self.check_zero(channel, rng, vec![w])?;
+            to_check.push(w);
         }
+        self.check_zero(channel, rng, to_check)?;
         Ok(())
     }
 }
