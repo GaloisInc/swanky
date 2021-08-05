@@ -99,8 +99,10 @@ fn run(
             Err(e) => println!("couldn't get client: {:?}", e),
         }
     } else {
+        let verifier_addr = "127.0.0.1:5527";
         println!("Prover started");
-        let stream_prover = TcpStream::connect("127.0.0.1:5527")?;
+        println!("connecting to {:?}", verifier_addr);
+        let stream_prover = TcpStream::connect(verifier_addr)?;
         let reader = BufReader::new(stream_prover.try_clone().unwrap());
         let writer = BufWriter::new(stream_prover);
         let mut channel = SyncChannel::new(reader, writer);
@@ -110,7 +112,7 @@ fn run(
             let mut bucket_connections_prover = Vec::with_capacity(num_bucket);
             for _i in 0..num_bucket {
                 println!("P: attempt bucket connection");
-                let bucket_stream = TcpStream::connect("127.0.0.1:5527")?;
+                let bucket_stream = TcpStream::connect(verifier_addr)?;
                 println!("PEER ADDR {:?}", bucket_stream.peer_addr());
                 let reader = BufReader::new(bucket_stream.try_clone().unwrap());
                 let writer = BufWriter::new(bucket_stream);

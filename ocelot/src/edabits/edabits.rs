@@ -1412,8 +1412,8 @@ impl<FE: FiniteField + PrimeFiniteField> ReceiverConv<FE> {
             for handle in handles {
                 b = b && handle.join().unwrap().unwrap();
             }
-            println!("step 6)a-e) bitADDcarry etc: {:?}", phase2.elapsed());
         }
+        println!("step 6)a-e) bitADDcarry etc: {:?}", phase2.elapsed());
 
         if b {
             Ok(())
