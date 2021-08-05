@@ -1,0 +1,33 @@
+version: '3'
+
+services:
+  verifier:
+    image: swanky:latest
+    volumes:
+      #- ./scuttlebutt:/root/swanky/scuttlebutt
+      - ./ocelot:/root/swanky/ocelot
+    network_mode: host
+    #cap_add:
+    #  - NET_ADMIN
+    # ports:
+    #   #- "9996:9998"
+    #   - "127.0.0.1:5527:5527"
+    expose:
+      - "5527"
+    environment:
+      - VERIFIER="True"
+    command: bash -c "tail -f /dev/null" #bash test_edabits.sh
+      # - "bash -c \"tail -f /dev/null\"" 
+
+  prover:
+    image: swanky:latest
+    volumes:
+      #- ./scuttlebutt:/root/swanky/scuttlebutt
+      - ./ocelot:/root/swanky/ocelot
+    environment:
+      - PROVER="True"
+    network_mode: host
+    cap_add:
+      - NET_ADMIN
+    command: bash -c "tail -f /dev/null" #"bash test_edabits.sh"
+    #- "bash -c \"tail -f /dev/null\""
