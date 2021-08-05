@@ -105,23 +105,16 @@ fn power_two<FE: FiniteField>(m: usize) -> FE {
 
 // Permutation pseudorandomly generated following Fisher-Yates method
 // `https://en.wikipedia.org/wiki/Fisher%E2%80%93Yates_shuffle`
-fn generate_permutation<T: Clone, RNG: CryptoRng + Rng>(rng: &mut RNG, v: Vec<T>) -> Vec<T> {
+fn generate_permutation<T: Clone, RNG: CryptoRng + Rng>(rng: &mut RNG, v: &mut Vec<T>) -> () {
     let size = v.len();
-    let mut permute = Vec::with_capacity(size);
-
-    for i in 0..size {
-        permute.push(v[i].clone());
-    }
-
     let mut i = size - 1;
     while i > 0 {
         let idx = Rng::gen_range(rng, 0, i);
-        let tmp: T = permute[idx].clone();
-        permute[idx] = permute[i].clone();
-        permute[i] = tmp;
+        let tmp: T = v[idx].clone();
+        v[idx] = v[i].clone();
+        v[i] = tmp;
         i -= 1;
     }
-    permute
 }
 
 /// Conversion sender
@@ -630,10 +623,10 @@ impl<FE: FiniteField + PrimeFiniteField> SenderConv<FE> {
         let nb_random_dabits = n * num_bucket;
 
         // step 1)a): commit random edabit
-        let r = self.random_edabits(channel, rng, nb_bits, nb_random_edabits)?;
+        let mut r = self.random_edabits(channel, rng, nb_bits, nb_random_edabits)?;
 
         // step 1)b)
-        let dabits = self.random_dabits(channel, rng, nb_random_dabits)?;
+        let mut dabits = self.random_dabits(channel, rng, nb_random_dabits)?;
 
         // step 1)c): Precomputing the multiplication triples is
         // replaced by generating svoles to later input the carries
@@ -675,8 +668,8 @@ impl<FE: FiniteField + PrimeFiniteField> SenderConv<FE> {
         let mut shuffle_rng = AesRng::from_seed(seed);
 
         // step 4): shuffle to edabits and dabits
-        let r = generate_permutation(&mut shuffle_rng, r);
-        let dabits = generate_permutation(&mut shuffle_rng, dabits);
+        generate_permutation(&mut shuffle_rng, &mut r);
+        generate_permutation(&mut shuffle_rng, &mut dabits);
 
         // step 5)a):
         let base = n * num_bucket;
@@ -689,7 +682,7 @@ impl<FE: FiniteField + PrimeFiniteField> SenderConv<FE> {
 
         // step 5) b):
         if !with_quicksilver {
-            random_triples = generate_permutation(&mut shuffle_rng, random_triples);
+            generate_permutation(&mut shuffle_rng, &mut random_triples);
             let base = n * num_bucket * nb_bits;
             for i in 0..num_cut * nb_bits {
                 let (x, y, z) = random_triples[base + i];
@@ -1230,25 +1223,27 @@ impl<FE: FiniteField + PrimeFiniteField> ReceiverConv<FE> {
 
         let phase1 = Instant::now();
         // step 1)a)
-        println!("RANDOM EDABITS<");
-        let r_mac = self.random_edabits(channel, rng, nb_bits, nb_random_edabits)?;
-        println!("RANDOM EDABITS>");
+        print!("Step 1)a) RANDOM EDABITS ... ");
+        let start = Instant::now();
+        let mut r_mac = self.random_edabits(channel, rng, nb_bits, nb_random_edabits)?;
+        println!("{:?}", start.elapsed());
 
         // step 1)b)
-        println!("RANDOM DABITS<");
-        let dabits_mac = self.random_dabits(channel, rng, nb_random_dabits)?;
-        println!("RANDOM DABITS>");
+        print!("Step 1)b) RANDOM DABITS ... ");
+        let start = Instant::now();
+        let mut dabits_mac = self.random_dabits(channel, rng, nb_random_dabits)?;
+        println!("{:?}", start.elapsed());
 
         // step 1)c):
-        println!("RANDOM VOLES ADD INPUT <");
+        print!("RANDOM VOLES ADD INPUT ... ");
         let start = Instant::now();
         let mut mult_input_mac = Vec::with_capacity(num_bucket * n * nb_bits);
         for _ in 0..(num_bucket * n * nb_bits) {
             mult_input_mac.push(self.fcom_f2.random(channel, rng)?);
         }
-        println!("RANDOM VOLES ADD INPUT > {:?}", start.elapsed());
+        println!("{:?}", start.elapsed());
 
-        println!("RANDOM TRIPLES<");
+        print!("Step 1)c) RANDOM TRIPLES ... ");
         let mut random_triples = Vec::new();
         let start = Instant::now();
         if !with_quicksilver {
@@ -1282,11 +1277,15 @@ impl<FE: FiniteField + PrimeFiniteField> ReceiverConv<FE> {
         let mut shuffle_rng = AesRng::from_seed(seed);
 
         // step 4): shuffle the edabits and dabits
-        let r_mac = generate_permutation(&mut shuffle_rng, r_mac);
-        let dabits_mac = generate_permutation(&mut shuffle_rng, dabits_mac);
+        print!("Step 4) SHUFFLE r dabits ... ");
+        let start = Instant::now();
+        generate_permutation(&mut shuffle_rng, &mut r_mac);
+        generate_permutation(&mut shuffle_rng, &mut dabits_mac);
+        println!("{:?}", start.elapsed());
 
         // step 5)a):
-        println!("Open edabits<");
+        print!("Step 5)a) OPEN edabits ... ");
+        let start = Instant::now();
         let base = n * num_bucket;
         for i in 0..num_cut {
             let idx = base + i;
@@ -1297,13 +1296,13 @@ impl<FE: FiniteField + PrimeFiniteField> ReceiverConv<FE> {
                 return Err(Error::Other("Wrong open random edabit".to_string()));
             }
         }
-        println!("Open edabits>");
+        println!("{:?}", start.elapsed());
 
         // step 5) b):
-        println!("Open triples<");
+        print!("Step 5)b) OPEN triples ... ");
         let start = Instant::now();
         if !with_quicksilver {
-            random_triples = generate_permutation(&mut shuffle_rng, random_triples);
+            generate_permutation(&mut shuffle_rng, &mut random_triples);
             let base = n * num_bucket * nb_bits;
             for i in 0..num_cut * nb_bits {
                 let (x_mac, y_mac, z_mac) = random_triples[base + i];
