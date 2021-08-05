@@ -77,7 +77,10 @@ fn run(
                 let edabits = fconv
                     .random_edabits(&mut channel, &mut rng, nb_bits, num_edabits)
                     .unwrap();
-                println!("Verifier time (random edabits): {:?}", start.elapsed());
+                println!(
+                    "Verifier time (input random edabits): {:?}",
+                    start.elapsed()
+                );
 
                 let start = Instant::now();
                 let _r = fconv
@@ -126,7 +129,7 @@ fn run(
         let edabits = fconv
             .random_edabits(&mut channel, &mut rng, nb_bits, num_edabits)
             .unwrap();
-        println!("Prover time (random edabits): {:?}", start.elapsed());
+        println!("Prover time (input random edabits): {:?}", start.elapsed());
 
         let start = Instant::now();
         let _ = fconv
