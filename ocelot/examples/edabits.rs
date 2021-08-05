@@ -17,6 +17,7 @@ fn run() {
     let n = 10_000;
     let num_bucket = 5;
     let num_cut = num_bucket;
+    let with_quicksilver = true;
     let handle = std::thread::spawn(move || {
         #[cfg(target_os = "linux")]
         {
@@ -35,7 +36,15 @@ fn run() {
         println!("Send time (random edabits): {:?}", start.elapsed());
         let start = Instant::now();
         let _ = fconv_sender
-            .conv(&mut sender, &mut rng, num_bucket, num_cut, &edabits, None)
+            .conv(
+                &mut sender,
+                &mut rng,
+                num_bucket,
+                num_cut,
+                &edabits,
+                None,
+                with_quicksilver,
+            )
             .unwrap();
         println!("Send time (conv): {:?}", start.elapsed());
     });
@@ -81,6 +90,7 @@ fn run() {
             num_cut,
             &edabits_mac,
             None,
+            with_quicksilver,
         )
         .unwrap();
     println!("Receive time (conv): {:?}", start.elapsed());

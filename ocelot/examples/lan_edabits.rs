@@ -7,7 +7,6 @@
 use clap::{App, Arg};
 use ocelot::edabits::{ReceiverConv, SenderConv};
 use scuttlebutt::{field::F61p, AesRng, SyncChannel};
-use std::io::prelude::*;
 use std::io::{BufReader, BufWriter};
 use std::net::{TcpListener, TcpStream};
 use std::time::Instant;
@@ -29,11 +28,13 @@ fn run(
     num_bucket: usize,
     num_cut: usize,
     multithreaded: bool,
+    with_quicksilver: bool,
 ) -> std::io::Result<()> {
     println!("whoami: {:?}", whoami);
     println!("nb_bits: {:?}", nb_bits);
     println!("num_edabits: {:?}", num_edabits);
     println!("num_bucket: {:?}", num_bucket);
+    println!("with_quicksilver: {:?}", with_quicksilver);
     println!("multithreaded: {:?}", multithreaded);
 
     if whoami == VERIFIER {
@@ -79,7 +80,7 @@ fn run(
                 println!("Verifier time (random edabits): {:?}", start.elapsed());
 
                 let start = Instant::now();
-                let r = fconv
+                let _r = fconv
                     .conv(
                         &mut channel,
                         &mut rng,
@@ -87,6 +88,7 @@ fn run(
                         num_cut,
                         &edabits,
                         bucket_connections,
+                        with_quicksilver,
                     )
                     .unwrap();
                 println!("Verifier time (conv): {:?}", start.elapsed());
@@ -135,6 +137,7 @@ fn run(
                 num_cut,
                 &edabits,
                 bucket_connections,
+                with_quicksilver,
             )
             .unwrap();
         println!("Prover time (conv): {:?}", start.elapsed());
@@ -183,15 +186,18 @@ fn main() -> std::io::Result<()> {
                 .default_value("UNSPECIFIED"),
         )
         .arg(
+            Arg::with_name("with_quicksilver")
+                .long("quicksilver")
+                .help("use quicksilver")
+                .required(false),
+        )
+        .arg(
             Arg::with_name("multithreaded")
                 .long("multithreaded")
                 .help("Using multithreading"),
         )
         .get_matches();
     let whoami;
-    println!("{:?}", matches.value_of("bucket"));
-    println!("{:?}", matches.value_of("num_edabits"));
-    println!("{:?}", matches.value_of("multithreaded"));
     if !matches.is_present("prover") {
         whoami = VERIFIER;
     } else {
@@ -208,6 +214,7 @@ fn main() -> std::io::Result<()> {
 
     let multithreaded = matches.is_present("multithreaded");
     let num_cut = num_bucket;
+    let with_quicksilver = matches.is_present("with_quicksilver");
     run(
         whoami,
         nb_bits,
@@ -215,5 +222,6 @@ fn main() -> std::io::Result<()> {
         num_bucket,
         num_cut,
         multithreaded,
+        with_quicksilver,
     )
 }
