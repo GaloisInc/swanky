@@ -1228,6 +1228,7 @@ impl<FE: FiniteField + PrimeFiniteField> ReceiverConv<FE> {
         let nb_random_edabits = n * num_bucket + num_cut;
         let nb_random_dabits = n * num_bucket;
 
+        let phase1 = Instant::now();
         // step 1)a)
         println!("RANDOM EDABITS<");
         let r_mac = self.random_edabits(channel, rng, nb_bits, nb_random_edabits)?;
@@ -1300,6 +1301,7 @@ impl<FE: FiniteField + PrimeFiniteField> ReceiverConv<FE> {
 
         // step 5) b):
         println!("Open triples<");
+        let start = Instant::now();
         if !with_quicksilver {
             random_triples = generate_permutation(&mut shuffle_rng, random_triples);
             let base = n * num_bucket * nb_bits;
@@ -1312,8 +1314,11 @@ impl<FE: FiniteField + PrimeFiniteField> ReceiverConv<FE> {
                 self.fcom_f2.check_zero(channel, rng, &[v])?;
             }
         }
-        println!("Open triples>");
+        println!("Open triples>: {:?}", start.elapsed());
 
+        println!("PHASE1: {:?}", phase1.elapsed());
+
+        let phase2 = Instant::now();
         // step 6)
         let mut b = true;
 
@@ -1406,6 +1411,7 @@ impl<FE: FiniteField + PrimeFiniteField> ReceiverConv<FE> {
             for handle in handles {
                 b = b && handle.join().unwrap().unwrap();
             }
+            println!("PHASE2: {:?}", phase2.elapsed());
         }
 
         if b {
