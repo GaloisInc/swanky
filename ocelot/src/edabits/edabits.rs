@@ -560,13 +560,6 @@ impl<FE: FiniteField + PrimeFiniteField> SenderConv<FE> {
         let nb_bits = edabits_vector[0].bits.len();
         let power_two_nb_bits = power_two::<FE::PrimeField>(nb_bits);
         // step 6)b) batched and moved up
-        // let e_batch = self.bit_add_carry(
-        //         channel,
-        //         rng,
-        //         &edabits_vector,
-        //         &r[idx_base..idx_base + n],
-        //         &mult_input_mac[idx_base * nb_bits..idx_base * nb_bits + n * nb_bits],
-        //     )?;
         let e_batch = self.bit_add_carry(channel, rng, &edabits_vector, &r, &mult_input_mac)?;
 
         // step 6)c) batched and moved up
@@ -574,12 +567,6 @@ impl<FE: FiniteField + PrimeFiniteField> SenderConv<FE> {
         for (_, e_carry) in e_batch.iter() {
             e_carry_batch.push(e_carry.clone());
         }
-        // let e_m_batch = self.convert_bit_2_field(
-        //         channel,
-        //         rng,
-        //         &dabits[idx_base..idx_base + n],
-        //         e_carry_batch,
-        //     )?;
         let e_m_batch = self.convert_bit_2_field(channel, rng, &dabits, e_carry_batch)?;
 
         // 6)a)
@@ -587,12 +574,8 @@ impl<FE: FiniteField + PrimeFiniteField> SenderConv<FE> {
         // 6)d)
         let mut ei_batch = Vec::with_capacity(n * nb_bits);
         for i in 0..n {
-            //pick the random edabit
-            //let idx_r = idx_base + i;
-
             // 6)a)
             let MacProver(_c_m, c_m_mac) = edabits_vector[i].value;
-            //let MacProver(_r_m, r_m_mac) = r[idx_r].value;
             let MacProver(_r_m, r_m_mac) = r[i].value;
             let c_plus_r_mac = c_m_mac + r_m_mac;
 
@@ -672,8 +655,6 @@ impl<FE: FiniteField + PrimeFiniteField> SenderConv<FE> {
                 // base index for the window of `idx_base..idx_base + n` values
                 let idx_base = j * n;
 
-                //NEW
-
                 self.conv_loop(
                     channel,
                     rng,
@@ -687,6 +668,7 @@ impl<FE: FiniteField + PrimeFiniteField> SenderConv<FE> {
             let mut j = 0;
             let mut handles = Vec::new();
             for mut bucket_channel in bucket_channels.unwrap().into_iter() {
+                // splitting the vectors to spawn
                 let idx_base = j * n;
                 let mut edabits_vector_par = Vec::with_capacity(n);
                 for edabits in edabits_vector.iter() {
@@ -710,15 +692,6 @@ impl<FE: FiniteField + PrimeFiniteField> SenderConv<FE> {
                     dabits_par.push(elm.clone());
                 }
 
-                // self.conv_loop(
-                //     channel,
-                //     rng,
-                //     &edabits_vector_par,
-                //     &r_par,
-                //     &mult_input_mac_par,
-                //     &dabits_par,
-                // )?;
-                // let
                 let mut new_sender = self.duplicate(channel, rng)?;
                 let handle = std::thread::spawn(move || {
                     new_sender.conv_loop(
@@ -738,58 +711,6 @@ impl<FE: FiniteField + PrimeFiniteField> SenderConv<FE> {
             for handle in handles {
                 handle.join().unwrap();
             }
-
-            // // step 6)b) batched and moved up
-            // let e_batch = self.bit_add_carry(
-            //     channel,
-            //     rng,
-            //     &edabits_vector,
-            //     &r[idx_base..idx_base + n],
-            //     &mult_input_mac[idx_base * nb_bits..idx_base * nb_bits + n * nb_bits],
-            // )?;
-
-            // // step 6)c) batched and moved up
-            // let mut e_carry_batch = Vec::with_capacity(n);
-            // for (_, e_carry) in e_batch.iter() {
-            //     e_carry_batch.push(e_carry.clone());
-            // }
-            // let e_m_batch = self.convert_bit_2_field(
-            //     channel,
-            //     rng,
-            //     &dabits[idx_base..idx_base + n],
-            //     e_carry_batch,
-            // )?;
-
-            // // 6)a)
-            // let mut e_prime_mac_batch = Vec::with_capacity(n);
-            // // 6)d)
-            // let mut ei_batch = Vec::with_capacity(n * nb_bits);
-            // for i in 0..n {
-            //     //pick the random edabit
-            //     let idx_r = idx_base + i;
-
-            //     // 6)a)
-            //     let MacProver(_c_m, c_m_mac) = edabits_vector[i].value;
-            //     let MacProver(_r_m, r_m_mac) = r[idx_r].value;
-            //     let c_plus_r_mac = c_m_mac + r_m_mac;
-
-            //     // 6)c) done earlier
-            //     let MacProver(_, e_m_mac) = e_m_batch[i];
-
-            //     // 6)d)
-            //     let e_prime_mac =
-            //         c_plus_r_mac - e_m_mac.multiply_by_prime_subfield(power_two_nb_bits);
-            //     e_prime_mac_batch.push(e_prime_mac);
-
-            //     ei_batch.extend(&e_batch[i].0);
-            // }
-
-            // // 6)e)
-            // let _ei = self.fcom_f2.open(channel, &ei_batch)?;
-
-            // // Remark this is not necessary for the prover, bc cst addition dont show up in mac
-            // // let s = convert_f2_to_field(ei);
-            // self.fcom.check_zero(channel, e_prime_mac_batch)?;
         }
 
         Ok(())
@@ -1149,13 +1070,6 @@ impl<FE: FiniteField + PrimeFiniteField> ReceiverConv<FE> {
         let power_two_nb_bits = power_two::<FE::PrimeField>(nb_bits);
         println!("ADD<");
         // step 6)b) batched and moved up
-        // let e_batch = self.bit_add_carry(
-        //     channel,
-        //     rng,
-        //     edabits_vector_mac,
-        //     &r_mac[idx_base..idx_base + n],
-        //     &mult_input_mac[idx_base * nb_bits..idx_base * nb_bits + n * nb_bits],
-        // )?;
         let e_batch =
             self.bit_add_carry(channel, rng, edabits_vector_mac, &r_mac, &mult_input_mac)?;
         println!("ADD>");
@@ -1166,12 +1080,7 @@ impl<FE: FiniteField + PrimeFiniteField> ReceiverConv<FE> {
         for (_, e_carry) in e_batch.iter() {
             e_carry_mac_batch.push(e_carry.clone());
         }
-        // let e_m_mac_batch = self.convert_bit_2_field(
-        //     channel,
-        //     rng,
-        //     &dabits_mac[idx_base..idx_base + n],
-        //     e_carry_mac_batch,
-        // )?;
+
         let e_m_mac_batch =
             self.convert_bit_2_field(channel, rng, &dabits_mac, e_carry_mac_batch)?;
         println!("A2B>");
@@ -1181,12 +1090,8 @@ impl<FE: FiniteField + PrimeFiniteField> ReceiverConv<FE> {
         // 6)d)
         let mut ei_mac_batch = Vec::with_capacity(n * nb_bits);
         for i in 0..n {
-            // pick the random edabit
-            //let idx_r = idx_base + i;
-
             // 6)a)
             let MacVerifier(c_m_mac) = edabits_vector_mac[i].value;
-            //let MacVerifier(r_m_mac) = r_mac[idx_r].value;
             let MacVerifier(r_m_mac) = r_mac[i].value;
             let c_plus_r_mac = c_m_mac + r_m_mac;
 
@@ -1289,7 +1194,6 @@ impl<FE: FiniteField + PrimeFiniteField> ReceiverConv<FE> {
                 // base index for the window of `idx_base..idx_base + n` values
                 let idx_base = j * n;
 
-                // NEW
                 b = b
                     && self.conv_loop(
                         channel,
@@ -1307,6 +1211,7 @@ impl<FE: FiniteField + PrimeFiniteField> ReceiverConv<FE> {
                 // base index for the window of `idx_base..idx_base + n` values
                 let idx_base = j * n;
 
+                // splitting the vectors to spawn
                 let mut edabits_vector_mac_par = Vec::with_capacity(n);
                 for edabits in edabits_vector_mac.iter() {
                     edabits_vector_mac_par.push(copy_edabits_verifier(edabits));
@@ -1329,16 +1234,6 @@ impl<FE: FiniteField + PrimeFiniteField> ReceiverConv<FE> {
                     dabits_mac_par.push(elm.clone());
                 }
 
-                // b = b
-                //     && self.conv_loop(
-                //         channel,
-                //         rng,
-                //         &edabits_vector_mac_par,
-                //         &r_mac_par,
-                //         &mult_input_mac_par,
-                //         &dabits_mac_par,
-                //     )?;
-
                 let mut new_receiver = self.duplicate(channel, rng)?;
                 let handle = std::thread::spawn(move || {
                     new_receiver.conv_loop(
@@ -1358,74 +1253,6 @@ impl<FE: FiniteField + PrimeFiniteField> ReceiverConv<FE> {
             for handle in handles {
                 b = b && handle.join().unwrap().unwrap();
             }
-
-            // println!("ADD<");
-            // // step 6)b) batched and moved up
-            // let e_batch = self.bit_add_carry(
-            //     channel,
-            //     rng,
-            //     edabits_vector_mac,
-            //     &r_mac[idx_base..idx_base + n],
-            //     &mult_input_mac[idx_base * nb_bits..idx_base * nb_bits + n * nb_bits],
-            // )?;
-            // println!("ADD>");
-
-            // println!("A2B<");
-            // // step 6)c) batched and moved up
-            // let mut e_carry_mac_batch = Vec::with_capacity(n);
-            // for (_, e_carry) in e_batch.iter() {
-            //     e_carry_mac_batch.push(e_carry.clone());
-            // }
-            // let e_m_mac_batch = self.convert_bit_2_field(
-            //     channel,
-            //     rng,
-            //     &dabits_mac[idx_base..idx_base + n],
-            //     e_carry_mac_batch,
-            // )?;
-            // println!("A2B>");
-
-            // // 6)a)
-            // let mut e_prime_mac_batch = Vec::with_capacity(n);
-            // // 6)d)
-            // let mut ei_mac_batch = Vec::with_capacity(n * nb_bits);
-            // for i in 0..n {
-            //     // pick the random edabit
-            //     let idx_r = idx_base + i;
-
-            //     // 6)a)
-            //     let MacVerifier(c_m_mac) = edabits_vector_mac[i].value;
-            //     let MacVerifier(r_m_mac) = r_mac[idx_r].value;
-            //     let c_plus_r_mac = c_m_mac + r_m_mac;
-
-            //     // 6)c) done earlier
-            //     let MacVerifier(e_m_mac) = e_m_mac_batch[i];
-
-            //     // 6)d)
-            //     let e_prime_mac =
-            //         c_plus_r_mac - e_m_mac.multiply_by_prime_subfield(power_two_nb_bits);
-            //     e_prime_mac_batch.push(e_prime_mac);
-
-            //     // 6)e)
-            //     ei_mac_batch.extend(&e_batch[i].0);
-            // }
-            // // 6)e)
-            // println!("OPEN<");
-            // let ei_batch = self.fcom_f2.open(channel, &ei_mac_batch)?;
-            // println!("OPEN>");
-
-            // let mut e_prime_minus_sum_batch = Vec::with_capacity(n);
-            // for i in 0..n {
-            //     let sum = convert_f2_to_field::<FE>(&ei_batch[i * nb_bits..(i + 1) * nb_bits]);
-            //     e_prime_minus_sum_batch.push(MacVerifier(
-            //         e_prime_mac_batch[i] + self.fcom.get_delta().multiply_by_prime_subfield(sum),
-            //     ));
-            // }
-            // println!("CHECK_Z<");
-            // b = b
-            //     && self
-            //         .fcom
-            //         .check_zero(channel, rng, e_prime_minus_sum_batch)?;
-            // println!("CHECK_Z>");
         }
 
         if b {
