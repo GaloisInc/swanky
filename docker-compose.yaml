@@ -12,8 +12,8 @@ services:
       - "5527"
     environment:
       - VERIFIER="True"
-    command: bash -c "tail -f /dev/null" #bash test_edabits.sh
-      # - "bash -c \"tail -f /dev/null\"" 
+    command: bash test_edabits.sh
+    # command: bash -c "tail -f /dev/null"
 
   prover:
     image: swanky:latest
@@ -24,5 +24,5 @@ services:
       - PROVER="True"
     cap_add:
       - NET_ADMIN
-    command: bash -c "tail -f /dev/null" #"bash test_edabits.sh"
-    #- "bash -c \"tail -f /dev/null\""
+    command: bash test_edabits.sh
+    # command: bash -c "tail -f /dev/null"
