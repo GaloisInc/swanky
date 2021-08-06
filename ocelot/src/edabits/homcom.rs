@@ -156,6 +156,11 @@ impl<FE: FiniteField> FComSender<FE> {
         let mut hasher = blake3::Hasher::new();
         for MacProver(x, _) in batch.iter() {
             channel.write_fe::<FE::PrimeField>(*x)?;
+            //hasher.update(&x.to_bytes());
+        }
+        channel.flush()?;
+
+        for MacProver(x, _) in batch.iter() {
             hasher.update(&x.to_bytes());
         }
 
