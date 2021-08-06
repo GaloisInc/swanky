@@ -15,9 +15,9 @@ type Sender = SenderConv<F61p>;
 type Receiver = ReceiverConv<F61p>;
 
 const DEFAULT_ADDR: &str = "127.0.0.1:5527";
-const DEFAULT_NB_BITS: usize = 38;
-const DEFAULT_NUM_EDABITS: usize = 10_000;
-const DEFAULT_NUM_BUCKET: usize = 5;
+const DEFAULT_NB_BITS: &str = "38";
+const DEFAULT_NUM_EDABITS: &str = "10000";
+const DEFAULT_NUM_BUCKET: &str = "5";
 
 const VERIFIER: &str = "VERIFIER";
 const PROVER: &str = "PROVER";
@@ -180,7 +180,7 @@ fn main() -> std::io::Result<()> {
                 .help("Set the number of buckets")
                 .takes_value(true)
                 .required(false)
-                .default_value("UNSPECIFIED"),
+                .default_value(DEFAULT_NUM_BUCKET),
         )
         .arg(
             Arg::with_name("nb_bits")
@@ -189,7 +189,7 @@ fn main() -> std::io::Result<()> {
                 .value_name("NB_BITS")
                 .help("Set the number of bits in edabits")
                 .takes_value(true)
-                .default_value("UNSPECIFIED"),
+                .default_value(DEFAULT_NB_BITS),
         )
         .arg(
             Arg::with_name("num_edabits")
@@ -198,7 +198,7 @@ fn main() -> std::io::Result<()> {
                 .value_name("NUM_EDABITS")
                 .help("Set the number of edabits")
                 .takes_value(true)
-                .default_value("UNSPECIFIED"),
+                .default_value(DEFAULT_NUM_EDABITS),
         )
         .arg(
             Arg::with_name("with_quicksilver")
@@ -209,7 +209,7 @@ fn main() -> std::io::Result<()> {
         .arg(
             Arg::with_name("multithreaded")
                 .long("multithreaded")
-                .help("Using multithreading"),
+                .help("Using multithreading on B-loop"),
         )
         .get_matches();
     let whoami;
@@ -220,11 +220,11 @@ fn main() -> std::io::Result<()> {
     }
     let connection_addr = &matches.value_of("addr").unwrap();
     let num_bucket = usize::from_str_radix(&matches.value_of("bucket").unwrap(), 10)
-        .unwrap_or(DEFAULT_NUM_BUCKET);
-    let nb_bits =
-        usize::from_str_radix(&matches.value_of("nb_bits").unwrap(), 10).unwrap_or(DEFAULT_NB_BITS);
+        .unwrap_or(usize::from_str_radix(DEFAULT_NUM_BUCKET, 10).unwrap());
+    let nb_bits = usize::from_str_radix(&matches.value_of("nb_bits").unwrap(), 10)
+        .unwrap_or(usize::from_str_radix(DEFAULT_NB_BITS, 10).unwrap());
     let num_edabits = usize::from_str_radix(&matches.value_of("num_edabits").unwrap(), 10)
-        .unwrap_or(DEFAULT_NUM_EDABITS);
+        .unwrap_or(usize::from_str_radix(DEFAULT_NUM_EDABITS, 10).unwrap());
 
     let multithreaded = matches.is_present("multithreaded");
     let num_cut = num_bucket;
