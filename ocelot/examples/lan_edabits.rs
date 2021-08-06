@@ -14,6 +14,7 @@ use std::time::Instant;
 type Sender = SenderConv<F61p>;
 type Receiver = ReceiverConv<F61p>;
 
+const DEFAULT_ADDR: &str = "127.0.0.1:5527";
 const DEFAULT_NB_BITS: usize = 38;
 const DEFAULT_NUM_EDABITS: usize = 10_000;
 const DEFAULT_NUM_BUCKET: usize = 5;
@@ -23,6 +24,7 @@ const PROVER: &str = "PROVER";
 
 fn run(
     whoami: &str,
+    connection_addr: &str,
     nb_bits: usize,
     num_edabits: usize,
     num_bucket: usize,
@@ -31,6 +33,7 @@ fn run(
     with_quicksilver: bool,
 ) -> std::io::Result<()> {
     println!("whoami: {:?}", whoami);
+    println!("addr: {:?}", connection_addr);
     println!("nb_bits: {:?}", nb_bits);
     println!("num_edabits: {:?}", num_edabits);
     println!("num_bucket: {:?}", num_bucket);
@@ -40,7 +43,7 @@ fn run(
     if whoami == VERIFIER {
         println!("Verifier started");
 
-        let listener = TcpListener::bind("127.0.0.1:5527")?;
+        let listener = TcpListener::bind(connection_addr)?;
 
         match listener.accept() {
             Ok((stream_verifier, _addr)) => {
@@ -99,10 +102,8 @@ fn run(
             Err(e) => println!("couldn't get client: {:?}", e),
         }
     } else {
-        let verifier_addr = "127.0.0.1:5527";
         println!("Prover started");
-        println!("connecting to {:?}", verifier_addr);
-        let stream_prover = TcpStream::connect(verifier_addr)?;
+        let stream_prover = TcpStream::connect(connection_addr)?;
         let reader = BufReader::new(stream_prover.try_clone().unwrap());
         let writer = BufWriter::new(stream_prover);
         let mut channel = SyncChannel::new(reader, writer);
@@ -112,7 +113,7 @@ fn run(
             let mut bucket_connections_prover = Vec::with_capacity(num_bucket);
             for _i in 0..num_bucket {
                 println!("P: attempt bucket connection");
-                let bucket_stream = TcpStream::connect(verifier_addr)?;
+                let bucket_stream = TcpStream::connect(connection_addr)?;
                 println!("PEER ADDR {:?}", bucket_stream.peer_addr());
                 let reader = BufReader::new(bucket_stream.try_clone().unwrap());
                 let writer = BufWriter::new(bucket_stream);
@@ -163,6 +164,15 @@ fn main() -> std::io::Result<()> {
                 .required(false),
         )
         .arg(
+            Arg::with_name("addr")
+                .long("addr")
+                .value_name("ADDR")
+                .help("Set addr for tcp connection")
+                .takes_value(true)
+                .required(false)
+                .default_value(DEFAULT_ADDR),
+        )
+        .arg(
             Arg::with_name("bucket")
                 .short("b")
                 .long("bucket")
@@ -208,8 +218,7 @@ fn main() -> std::io::Result<()> {
     } else {
         whoami = PROVER;
     }
-
-    //map_or(VERIFIER, |_| PROVER);
+    let connection_addr = &matches.value_of("addr").unwrap();
     let num_bucket = usize::from_str_radix(&matches.value_of("bucket").unwrap(), 10)
         .unwrap_or(DEFAULT_NUM_BUCKET);
     let nb_bits =
@@ -222,6 +231,7 @@ fn main() -> std::io::Result<()> {
     let with_quicksilver = matches.is_present("with_quicksilver");
     run(
         whoami,
+        connection_addr,
         nb_bits,
         num_edabits,
         num_bucket,
