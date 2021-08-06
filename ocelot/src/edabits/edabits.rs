@@ -321,11 +321,13 @@ impl<FE: FiniteField + PrimeFiniteField> SenderConv<FE> {
 
         let aux_r_m_mac: Vec<FE> = self.fcom.input(channel, rng, &aux_r_m)?;
 
-        for i in 0..num {
+        let mut i = 0;
+        for aux_bits in aux_bits.into_iter() {
             edabits_vec.push(EdabitsProver {
-                bits: aux_bits[i].clone(),
+                bits: aux_bits,
                 value: MacProver(aux_r_m[i], aux_r_m_mac[i]),
             });
+            i += 1;
         }
         Ok(edabits_vec)
     }
@@ -356,6 +358,35 @@ impl<FE: FiniteField + PrimeFiniteField> SenderConv<FE> {
             });
         }
         Ok(dabit_vec)
+    }
+
+    /// Generate random triples
+    pub fn random_triples<C: AbstractChannel, RNG: CryptoRng + Rng>(
+        &mut self,
+        channel: &mut C,
+        rng: &mut RNG,
+        num: usize,
+        out: &mut Vec<(MacProver<Gf40>, MacProver<Gf40>, MacProver<Gf40>)>,
+    ) -> Result<(), Error> {
+        let mut pairs = Vec::with_capacity(num);
+        let mut zs = Vec::with_capacity(num);
+        for _ in 0..num {
+            let x = self.fcom_f2.random(channel, rng)?;
+            let y = self.fcom_f2.random(channel, rng)?;
+            let z = x.0 * y.0;
+            pairs.push((x, y));
+            zs.push(z);
+        }
+        let zs_mac = self.fcom_f2.input(channel, rng, &zs)?;
+
+        for i in 0..num {
+            let (x, y) = pairs[i];
+            let z = zs[i];
+            let z_mac = zs_mac[i];
+            out.push((x, y, MacProver(z, z_mac)));
+        }
+        channel.flush()?;
+        Ok(())
     }
 
     fn fdabit<C: AbstractChannel, RNG: CryptoRng + Rng>(
@@ -639,25 +670,7 @@ impl<FE: FiniteField + PrimeFiniteField> SenderConv<FE> {
         if !with_quicksilver {
             // with wolverine
             let how_many = num_bucket * n * nb_bits + num_cut * nb_bits;
-            let mut pairs = Vec::with_capacity(how_many);
-            let mut zs = Vec::with_capacity(how_many);
-            // let mut random_triples = Vec::with_capacity(how_many);
-            for _ in 0..how_many {
-                let x = self.fcom_f2.random(channel, rng)?;
-                let y = self.fcom_f2.random(channel, rng)?;
-                let z = x.0 * y.0;
-                pairs.push((x, y));
-                zs.push(z);
-            }
-            let zs_mac = self.fcom_f2.input(channel, rng, &zs)?;
-
-            for i in 0..how_many {
-                let (x, y) = pairs[i];
-                let z = zs[i];
-                let z_mac = zs_mac[i];
-                random_triples.push((x, y, MacProver(z, z_mac)));
-            }
-            channel.flush()?;
+            self.random_triples(channel, rng, how_many, &mut random_triples)?;
         }
 
         // step 2)
@@ -959,11 +972,13 @@ impl<FE: FiniteField + PrimeFiniteField> ReceiverConv<FE> {
 
         let aux_r_m_mac = self.fcom.input(channel, rng, num)?;
 
-        for i in 0..num {
+        let mut i = 0;
+        for aux_bits in aux_bits.into_iter() {
             edabits_vec_mac.push(EdabitsVerifier {
-                bits: aux_bits[i].clone(),
+                bits: aux_bits,
                 value: aux_r_m_mac[i],
             });
+            i += 1;
         }
         Ok(edabits_vec_mac)
     }
@@ -987,6 +1002,29 @@ impl<FE: FiniteField + PrimeFiniteField> ReceiverConv<FE> {
             });
         }
         Ok(dabit_vec_mac)
+    }
+
+    /// Generate random triples
+    pub fn random_triples<C: AbstractChannel, RNG: CryptoRng + Rng>(
+        &mut self,
+        channel: &mut C,
+        rng: &mut RNG,
+        num: usize,
+        out: &mut Vec<(MacVerifier<Gf40>, MacVerifier<Gf40>, MacVerifier<Gf40>)>,
+    ) -> Result<(), Error> {
+        let mut pairs = Vec::with_capacity(num);
+        for _ in 0..num {
+            let x = self.fcom_f2.random(channel, rng)?;
+            let y = self.fcom_f2.random(channel, rng)?;
+            pairs.push((x, y));
+        }
+        let zs = self.fcom_f2.input(channel, rng, num)?;
+        for i in 0..num {
+            let (x, y) = pairs[i];
+            let z = zs[i];
+            out.push((x, y, z));
+        }
+        Ok(())
     }
 
     fn fdabit<C: AbstractChannel, RNG: CryptoRng + Rng>(
@@ -1254,19 +1292,7 @@ impl<FE: FiniteField + PrimeFiniteField> ReceiverConv<FE> {
         if !with_quicksilver {
             // with wolverine
             let how_many = num_bucket * n * nb_bits + num_cut * nb_bits;
-            let mut pairs = Vec::with_capacity(num_bucket * n * nb_bits + num_cut * nb_bits);
-            //let mut random_triples = Vec::with_capacity(how_many);
-            for _ in 0..how_many {
-                let x = self.fcom_f2.random(channel, rng)?;
-                let y = self.fcom_f2.random(channel, rng)?;
-                pairs.push((x, y));
-            }
-            let zs = self.fcom_f2.input(channel, rng, how_many)?;
-            for i in 0..how_many {
-                let (x, y) = pairs[i];
-                let z = zs[i];
-                random_triples.push((x, y, z));
-            }
+            self.random_triples(channel, rng, how_many, &mut random_triples)?;
         }
         println!("{:?}", start.elapsed());
 

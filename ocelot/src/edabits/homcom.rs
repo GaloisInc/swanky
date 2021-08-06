@@ -12,6 +12,7 @@ use crate::svole::{SVoleReceiver, SVoleSender};
 use generic_array::{typenum::Unsigned, GenericArray};
 use rand::{CryptoRng, Rng, SeedableRng};
 use scuttlebutt::{field::FiniteField, AbstractChannel, AesRng, Block};
+use std::time::Instant;
 
 #[derive(Clone, Copy, Debug)]
 pub struct MacProver<FE: FiniteField>(pub FE::PrimeField, pub FE);
@@ -313,8 +314,9 @@ impl<FE: FiniteField> FComReceiver<FE> {
                 return Ok(MacVerifier(e));
             }
             None => {
-                println!("SVOLE");
+                let start = Instant::now();
                 self.svole_receiver.receive(channel, rng, &mut self.voles)?;
+                println!("SVOLE<{:?}>", start.elapsed());
                 match self.voles.pop() {
                     Some(e) => {
                         return Ok(MacVerifier(e));
