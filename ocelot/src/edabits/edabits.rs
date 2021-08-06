@@ -1141,8 +1141,9 @@ impl<FE: FiniteField + PrimeFiniteField> ReceiverConv<FE> {
         let n = edabits_vector_mac.len();
         let nb_bits = edabits_vector_mac[0].bits.len();
         let power_two_nb_bits = power_two::<FE::PrimeField>(nb_bits);
-        //println!("ADD<");
+
         // step 6)b) batched and moved up
+        println!("ADD<");
         let e_batch = self.bit_add_carry(
             channel,
             rng,
@@ -1151,10 +1152,10 @@ impl<FE: FiniteField + PrimeFiniteField> ReceiverConv<FE> {
             &mult_input_mac,
             &random_triples,
         )?;
-        //println!("ADD>");
+        println!("ADD>");
 
-        // println!("A2B<");
         // step 6)c) batched and moved up
+        println!("A2B ... ");
         let mut e_carry_mac_batch = Vec::with_capacity(n);
         for (_, e_carry) in e_batch.iter() {
             e_carry_mac_batch.push(e_carry.clone());
@@ -1162,7 +1163,7 @@ impl<FE: FiniteField + PrimeFiniteField> ReceiverConv<FE> {
 
         let e_m_mac_batch =
             self.convert_bit_2_field(channel, rng, &dabits_mac, e_carry_mac_batch)?;
-        //println!("A2B>");
+        println!("A2B>");
 
         // 6)a)
         let mut e_prime_mac_batch = Vec::with_capacity(n);
@@ -1185,9 +1186,9 @@ impl<FE: FiniteField + PrimeFiniteField> ReceiverConv<FE> {
             ei_mac_batch.extend(&e_batch[i].0);
         }
         // 6)e)
-        //println!("OPEN<");
+        println!("OPEN<");
         let ei_batch = self.fcom_f2.open(channel, &ei_mac_batch)?;
-        //println!("OPEN>");
+        println!("OPEN>");
 
         let mut e_prime_minus_sum_batch = Vec::with_capacity(n);
         for i in 0..n {
@@ -1196,11 +1197,11 @@ impl<FE: FiniteField + PrimeFiniteField> ReceiverConv<FE> {
                 e_prime_mac_batch[i] + self.fcom.get_delta().multiply_by_prime_subfield(sum),
             ));
         }
-        //println!("CHECK_Z<");
+        println!("CHECK_Z<");
         let b = self
             .fcom
             .check_zero(channel, rng, &e_prime_minus_sum_batch)?;
-        //println!("CHECK_Z>");
+        println!("CHECK_Z>");
 
         return Ok(b);
     }
