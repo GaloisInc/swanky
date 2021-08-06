@@ -107,6 +107,10 @@ fn power_two<FE: FiniteField>(m: usize) -> FE {
 // `https://en.wikipedia.org/wiki/Fisher%E2%80%93Yates_shuffle`
 fn generate_permutation<T: Clone, RNG: CryptoRng + Rng>(rng: &mut RNG, v: &mut Vec<T>) -> () {
     let size = v.len();
+    if size == 0 {
+        return;
+    }
+
     let mut i = size - 1;
     while i > 0 {
         let idx = Rng::gen_range(rng, 0, i);
