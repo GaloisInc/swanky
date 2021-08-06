@@ -6,12 +6,8 @@ services:
     volumes:
       #- ./scuttlebutt:/root/swanky/scuttlebutt
       - ./ocelot:/root/swanky/ocelot
-    network_mode: host
-    #cap_add:
-    #  - NET_ADMIN
-    # ports:
-    #   #- "9996:9998"
-    #   - "127.0.0.1:5527:5527"
+    cap_add:
+     - NET_ADMIN
     expose:
       - "5527"
     environment:
@@ -26,7 +22,6 @@ services:
       - ./ocelot:/root/swanky/ocelot
     environment:
       - PROVER="True"
-    network_mode: host
     cap_add:
       - NET_ADMIN
     command: bash -c "tail -f /dev/null" #"bash test_edabits.sh"
