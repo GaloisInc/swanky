@@ -5,8 +5,11 @@ use rand::{SeedableRng, rngs::StdRng};
 
 use humidor::circuit::random_ckt_zero;
 use humidor::ligero::noninteractive;
+use humidor::merkle::Sha256;
 
-type Field = humidor::f2_19x3_26::F;
+type Field = scuttlebutt::field::F2_19x3_26;
+type Prover = noninteractive::Prover<Field, Sha256>;
+type Verifier = noninteractive::Verifier<Field, Sha256>;
 
 pub fn bench_random_circuit(c: &mut Criterion) {
     let mut rng = StdRng::from_entropy();
@@ -17,12 +20,12 @@ pub fn bench_random_circuit(c: &mut Criterion) {
         let input_size = 256;
         let circuit_size = size - input_size;
 
-        group.throughput(Throughput::Bytes((size * Field::BYTES) as u64));
+        group.throughput(Throughput::Bytes((size * std::mem::size_of::<Field>()) as u64));
         group.bench_with_input(BenchmarkId::new("Prover", size), &size, |b, _| {
             b.iter_batched_ref(
                 || random_ckt_zero(&mut rng, input_size, circuit_size),
                 |(ckt, w)| {
-                    let p = noninteractive::Prover::new(ckt, w);
+                    let p: Prover = noninteractive::Prover::new(ckt, w);
                     p.make_proof();
                 },
                 BatchSize::SmallInput,
@@ -33,13 +36,13 @@ pub fn bench_random_circuit(c: &mut Criterion) {
             b.iter_batched(
                 || {
                     let (ckt, w) = random_ckt_zero(&mut rng, input_size, circuit_size);
-                    let p = noninteractive::Prover::new(&ckt, &w);
+                    let p: Prover = Prover::new(&ckt, &w);
                     let proof = p.make_proof();
 
                     (ckt, proof)
                 },
                 |(ckt, proof)| {
-                    let v = noninteractive::Verifier::new(&ckt);
+                    let v: Verifier = Verifier::new(&ckt);
                     v.verify(proof);
                 },
                 BatchSize::SmallInput,

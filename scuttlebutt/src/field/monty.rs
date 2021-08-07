@@ -4,7 +4,7 @@ use generic_array::{GenericArray, typenum};
 use rand::distributions::{Distribution, Uniform};
 use std::fmt::Debug;
 use std::hash::Hash;
-use subtle::{ConstantTimeEq, ConstantTimeLess, ConditionallySelectable};
+use subtle::ConstantTimeEq;
 
 use crate::field::BiggerThanModulus;
 
@@ -47,7 +47,7 @@ pub trait Monty: 'static + Send + Sync + Sized + Copy + Clone + Default + Hash +
     /// Desired field modulus
     const M: u64;       // Field modulus
 
-    /// `M' = 2^64 - (M^-1 mod R)`
+    /// `M' = 2^64 - (M^-1 mod 2^64)`
     const M_TICK: u64;  // R - (M^-1 mod R)
 
     /// `(2^64)^-1 mod M`
@@ -108,20 +108,33 @@ pub fn monty_to_u128<F: Monty>(u: F) -> u128 {
 /* Operations
  */
 
+// Montgomery reduction:
+// https://en.wikipedia.org/wiki/Montgomery_modular_multiplication#The_REDC_algorithm
+//
+// Given:  a in unreduced raw Montgomery form
+//         m the field modulus
+//         m' s.t. m' = 2^64 - (m^-1 mod 2^64)
+// Return: a*(2^64)-1 mod m in reduced Montgomery form
 #[inline]
 fn redc(a: u128, modulus: u64, m_tick: u64) -> u128 {
     let m = (a as u64).wrapping_mul(m_tick) as u128;
     let t = ((a + m*(modulus as u128)) >> 64) as u64;
 
-    (if t >= modulus as u64 { t - modulus } else { t }) as u128
+    // At this point we know that t < 2*modulus
+    ct_reduce(t as u128, modulus) as u128
 }
 
+// Modular reduction for integers in [0, 2*modulus), a la Algoritm 1 of
+// https://eprint.iacr.org/2017/437.pdf
+//
+// Require: a < 2*modulus
 #[inline]
-fn ct_redc(a: u128, modulus: u64, m_tick: u64) -> u128 {
-    let m = (a as u64).wrapping_mul(m_tick) as u128;
-    let t = ((a + m*(modulus as u128)) >> 64) as u64;
+fn ct_reduce(a: u128, modulus: u64) -> u64 {
+    // mask in {0,1}^64 is 1^64 if a >= modulus or 0^64 o.w.
+    let mask = ((a < modulus as u128) as u128).wrapping_sub(1);
+    let diff = a.wrapping_sub(modulus as u128);
 
-    u64::conditional_select(&t.wrapping_sub(modulus), &t, t.ct_lt(&modulus)) as u128
+    (a ^ (mask & (a ^ diff))) as u64
 }
 
 /// Addition for field elements in Montgomery form
@@ -129,7 +142,7 @@ fn ct_redc(a: u128, modulus: u64, m_tick: u64) -> u128 {
 pub fn monty_add<F: Monty>(a: F, b: F) -> F {
     let ab = a.to_raw() as u128 + b.to_raw() as u128;
 
-    F::from_raw(if ab > F::M as u128 { ab - F::M as u128 } else { ab } as u64)
+    F::from_raw(ct_reduce(ab, F::M))
 }
 
 /// Subtraction for field elements in Montgomery form
@@ -165,15 +178,13 @@ pub fn monty_inv<F: Monty>(a: F) -> F {
 /// Equality for field elements in Montgomery form
 #[inline]
 pub fn monty_eq<F: Monty>(a: F, b: F) -> bool {
-    let reduce = |f: F| redc(f.to_raw() as u128, F::M, F::M_TICK);
-    reduce(a) == reduce(b)
+    a.to_raw() == b.to_raw()
 }
 
 /// Equality for field elements in Montgomery form in constant time
 #[inline]
 pub fn monty_ct_eq<F: Monty>(a: F, b: F) -> subtle::Choice {
-    let reduce = |f: F| ct_redc(f.to_raw() as u128, F::M, F::M_TICK);
-    reduce(a).ct_eq(&reduce(b))
+    a.to_raw().ct_eq(&b.to_raw())
 }
 
 /// Convert a field element in Montgomery form to a byte array
@@ -197,9 +208,7 @@ pub fn monty_from_uniform_bytes<F: Monty>(bytes: &[u8; 16]) -> F {
     monty_from_u128(r)
 }
 
-// TODO: Determine bias; may be necessary to use u128_to_monty(), not from_raw()
-// XXX: This is slow. Can we do it without the mod?
-/// Generate a uniformly random
+/// Generate a uniformly random field element
 pub fn monty_random<F: Monty, R: rand_core::RngCore + ?Sized>(rng: &mut R) -> F {
     monty_from_u128(Uniform::from(0 .. F::M).sample(rng) as u128)
 }
