@@ -126,7 +126,7 @@ where
 {
     #[inline(always)]
     fn send<C: AbstractChannel>(self, chan: &mut C) -> Result<()> {
-        chan.send(&self)
+        (&self).send(chan)
     }
 }
 */

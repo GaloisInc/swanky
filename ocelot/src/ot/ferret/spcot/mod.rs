@@ -10,7 +10,15 @@ use super::CSP;
 pub(crate) use receiver::Receiver;
 pub(crate) use sender::Sender;
 
-use scuttlebutt::{Aes128, AesHash, Block};
+use sha2::{Digest, Sha256};
+
+use scuttlebutt::{Aes128, AesHash, Block, F128};
+
+fn ro_hash(b: Block) -> [u8; 32] {
+    let mut hsh = Sha256::default();
+    hsh.update(b.as_ref());
+    hsh.finalize().into()
+}
 
 fn cr_hash() -> AesHash {
     AesHash::new(Default::default())
@@ -54,6 +62,29 @@ fn pack_bits(bits: &[bool]) -> usize {
     n
 }
 
+fn stack_cyclic<T: Copy>(elems: &[T; 128]) -> F128
+where
+    T: Into<F128>,
+{
+    let mut res: F128 = F128::zero();
+    let mut j = 127;
+    loop {
+        res = res.mul_x();
+        res = res + elems[j].into();
+        if j == 0 {
+            break;
+        }
+        j -= 1;
+    }
+    /*
+    for z in elems.iter().copied() {
+        res = res.mul_x();
+        res = res + z.into();
+    }
+    */
+    res
+}
+
 mod tests {
     use super::*;
 
@@ -66,12 +97,13 @@ mod tests {
 
     use crate::ot::{KosDeltaReceiver, KosDeltaSender};
 
+    /*
     #[test]
     fn test() {
         let _ = simple_logger::init();
         let (mut c1, mut c2) = unix_channel_pair();
 
-        let num = 2;
+        let num = 1;
 
         let handle = spawn(move || {
             let mut send: Sender<KosDeltaSender> = Sender::init(&mut c2, &mut OsRng).unwrap();
@@ -98,4 +130,5 @@ mod tests {
 
         assert_eq!(v, w, "correlation not satisfied");
     }
+    */
 }

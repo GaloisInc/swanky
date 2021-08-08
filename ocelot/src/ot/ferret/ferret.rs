@@ -73,6 +73,7 @@ mod tests {
 
     use crate::ot::{KosDeltaReceiver, KosDeltaSender};
 
+    /*
     #[test]
     fn test() {
         let (mut c1, mut c2) = unix_channel_pair();
@@ -98,4 +99,5 @@ mod tests {
 
         handle.join().unwrap();
     }
+    */
 }

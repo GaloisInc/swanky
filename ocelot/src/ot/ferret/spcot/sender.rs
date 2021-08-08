@@ -15,6 +15,8 @@ use rand::{CryptoRng, Rng};
 use scuttlebutt::{AbstractChannel, Aes128, AesHash, Block, F128};
 use sha2::{Digest, Sha256};
 
+use std::convert::TryFrom;
+
 use super::*;
 
 pub(crate) struct Sender<
@@ -58,6 +60,7 @@ impl<OT: OtSender<Msg = Block> + RandomSender + CorrelatedSender + FixedKeyIniti
         Ok(cot.into_iter().map(|v| v.0).collect())
     }
 
+    #[allow(non_snake_case)]
     pub fn extend<C: AbstractChannel, RNG: CryptoRng + Rng, const H: usize, const N: usize>(
         &mut self,
         channel: &mut C,
@@ -68,10 +71,6 @@ impl<OT: OtSender<Msg = Block> + RandomSender + CorrelatedSender + FixedKeyIniti
 
         // acquire base COT
         let cot = self.random_cot(channel, rng, H * num + CSP)?;
-
-        // reserve COT for batched consistency check
-        let ys = &cot[num * H..];
-        debug_assert_eq!(ys.len(), CSP);
 
         // obtain masked indexes from receiver
         let bs: Vec<usize> = channel.receive_n(num)?;
@@ -100,8 +99,8 @@ impl<OT: OtSender<Msg = Block> + RandomSender + CorrelatedSender + FixedKeyIniti
                 k[level].0 ^= s0;
                 k[level].1 ^= s1;
                 let i: usize = i << 1;
-                log::trace!("s: s[{},{}] = {:?}", level + 1, i, s0);
-                log::trace!("s: s[{},{}] = {:?}", level + 1, i | 1, s1);
+                log::trace!("s[{},{}] = {:?}", level + 1, i, s0);
+                log::trace!("s[{},{}] = {:?}", level + 1, i | 1, s1);
                 gmm_tree_agg(k, sh, level + 1, i, s0);
                 gmm_tree_agg(k, sh, level + 1, i | 1, s1);
             }
@@ -115,8 +114,7 @@ impl<OT: OtSender<Msg = Block> + RandomSender + CorrelatedSender + FixedKeyIniti
             //
             let b: [bool; H] = unpack_bits::<H>(b);
             let l: u128 = (self.l as u128) << 64;
-
-            log::trace!("s: b = {:?}", b);
+            log::trace!("b = {:?}", b);
 
             for i in 0..H {
                 let tweak: Block = (l | i as u128).into();
@@ -124,8 +122,8 @@ impl<OT: OtSender<Msg = Block> + RandomSender + CorrelatedSender + FixedKeyIniti
                 let h0 = self.hash.tccr_hash(q[i], tweak);
                 let h1 = self.hash.tccr_hash(q[i] ^ self.delta, tweak);
 
-                log::trace!("s: H0 = {:?}", h0);
-                log::trace!("s: H1 = {:?}", h1);
+                log::trace!("H0 = {:?}", h0);
+                log::trace!("H1 = {:?}", h1);
 
                 // M^{i}_{0} := K^{i}_{0} ^ H(q_i ^ b_i D, i || l)
                 // M^{i}_{1} := K^{i}_{1} ^ H(q_i ^ !b_i D, i || l)
@@ -155,44 +153,60 @@ impl<OT: OtSender<Msg = Block> + RandomSender + CorrelatedSender + FixedKeyIniti
         //
         channel.flush()?;
 
-        /*
+        // reserve COT for batched consistency check
+        log::trace!("consistency check");
+        let ys = &cot[num * H..];
+
+        // retrieve coefficients
+        let seed: Block = channel.receive()?;
+        let xp: Block = channel.receive()?;
+
+        log::trace!("seed = {:?}", seed);
+        log::trace!("x' = {:?}", xp);
+
+        let xp: [bool; CSP] = xp.bits();
+        let mut y: [Block; CSP] = [Default::default(); CSP];
+        for i in 0..num {
+            y[i] = ys[i];
+            if xp[i] {
+                y[i] = y[i] ^ self.delta;
+            }
+            /*
+            Y = Y.mul_x();
+            Y = Y + ys[i].into();
+            if xp[i] {
+                Y = Y + self.delta.into();
+            }
+            */
+        }
+        let Y = stack_cyclic(&y);
+        log::trace!("Y = {:?}", Y);
+        log::trace!("\\Delta = {:?}", self.delta);
 
         // receive \chi_{i} for i in [n]
-        let chi: [Block; N] = channel.receive()?;
+        let aes: Aes128 = Aes128::new(seed);
+        let mut V: F128 = F128::zero();
+        for l in 0..num {
+            let xl: F128 = aes.encrypt((l as u128).into()).into();
+            let mut xli = xl;
+            // X_{i}^{l} = (X^{l})^i
+            for i in 0..N {
+                log::trace!("X_(l = {})^(i = {}) = {:?}", l, i, xli);
 
-        // receive x' := x + x* \in F_{2}^{\kappa}
-        // Note that this element is to be understood as a element of the vector space
-        // (F_2)^\kappa, not the extension field.
-        let xp: Block = channel.receive()?;
-        let xp: [bool; CSP] = xp.bits();
+                V = V + xli * vs[l][i].into();
 
-        // Embedding each element of xp[i] from F_2 into F_{2^\kappa}
-        let mut Y: F128 = F128::zero();
-        let Xi = F128::one();
-        for i in 0..CSP {
-            Y = Y.mul_x();
-            if xp[i] {
-                Y = Y + ys[i].0.into() + self.delta.into();
-            } else {
-                Y = Y + ys[i].0.into()
+                // X_{i+1}^{l} = X_{i+1}^{l} X_{1}^{l}
+                xli = xli * xl;
             }
         }
 
-        let mut V: (Block, Block) = (Default::default(), Y.into());
-        for i in 0..CSP {
-            let (h, l) = Block::clmul(chi[i], v[i]);
-            V.0 ^= h;
-            V.1 ^= l;
-        }
+        // compute Y := \sum_{i \in [k]} z*[i] * X^i
+        let V = V + Y;
+        log::trace!("V = {:?}", V);
 
-        let mut hsh = Sha256::new();
-        hsh.update(V.0.as_ref());
-        hsh.update(V.1.as_ref());
-
-        let hsh: [u8; 32] = hsh.finalize().into();
-        channel.send(&hsh)?;
-        channel.flush()?;
-        */
+        // Compute and send H(v)
+        let Hv = ro_hash(V.into());
+        channel.send(&Hv)?;
         Ok(vs)
     }
 }

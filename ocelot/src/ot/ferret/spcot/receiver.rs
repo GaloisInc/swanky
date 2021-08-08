@@ -13,7 +13,8 @@ use crate::{
 use log;
 use rand::{CryptoRng, Rng};
 use scuttlebutt::{AbstractChannel, Aes128, AesHash, Block, F128};
-use sha2::{Digest, Sha256};
+
+use std::convert::TryFrom;
 
 use super::*;
 
@@ -46,6 +47,7 @@ impl<OT: OtReceiver<Msg = Block> + RandomReceiver + CorrelatedReceiver> Receiver
         Ok((r, t))
     }
 
+    #[allow(non_snake_case)]
     pub fn extend<C: AbstractChannel, RNG: CryptoRng + Rng, const H: usize, const N: usize>(
         &mut self,
         alphas: &[usize],
@@ -67,14 +69,14 @@ impl<OT: OtReceiver<Msg = Block> + RandomReceiver + CorrelatedReceiver> Receiver
             debug_assert!(alpha < N);
             let r: usize = pack_bits(&r[H * rep..H * (rep + 1)]);
             let b: usize = r ^ alpha ^ ((1 << H) - 1);
-            log::trace!("r: b = {:?}", unpack_bits::<H>(b));
+            log::trace!("b = {:?}", unpack_bits::<H>(b));
             bs.push(b);
         }
         channel.send(&bs[..])?;
         channel.flush()?;
 
         // GGM tree
-        let mut vs: Vec<[Block; N]> = Vec::with_capacity(num);
+        let mut ws: Vec<[Block; N]> = Vec::with_capacity(num);
         for (rep, (alpha, b)) in alphas.iter().copied().zip(bs.into_iter()).enumerate() {
             let a: [bool; H] = unpack_bits::<H>(alpha);
             let t: &[Block] = &t[H * rep..H * (rep + 1)];
@@ -82,7 +84,6 @@ impl<OT: OtReceiver<Msg = Block> + RandomReceiver + CorrelatedReceiver> Receiver
             // receive (m, c) from S
             let m: [(Block, Block); H] = channel.receive()?;
             let c: Block = channel.receive()?;
-            let hash = cr_hash();
             let l: u128 = (self.l as u128) << 64;
 
             // compute the leafs in the GGM tree
@@ -103,15 +104,15 @@ impl<OT: OtReceiver<Msg = Block> + RandomReceiver + CorrelatedReceiver> Receiver
 
                 // K_{~a[i]}^i := M_{~a[i]}^i ^ H(t_i, i || l)
                 let tweak: Block = (l | i as u128).into();
-                let h = hash.tccr_hash(t[i], tweak);
+                let h = self.hash.tccr_hash(t[i], tweak);
                 log::trace!(
-                    "r: H(~b[{}]) = H{} = {:?}",
+                    "H(~b[{}]) = H{} = {:?}",
                     i,
                     (!unpack_bits::<H>(b)[i]) as usize,
                     h
                 );
                 let kna = mna ^ h;
-                log::trace!("r: K_(na)^{} = {:?}", i, kna);
+                log::trace!("K_(na)^{} = {:?}", i, kna);
 
                 // expand the seeds (in-place)
                 if i == 0 {
@@ -149,15 +150,77 @@ impl<OT: OtReceiver<Msg = Block> + RandomReceiver + CorrelatedReceiver> Receiver
                     si[alpha] ^= si[i];
                 }
             }
-            vs.push(si);
+            ws.push(si);
 
             self.l += 1;
         }
 
+        log::trace!("consistency check");
+
         // parallel consistency check
+        let xs = &r[H * num..];
+        let zs = &t[H * num..];
+        debug_assert_eq!(xs.len(), CSP);
+        debug_assert_eq!(zs.len(), CSP);
 
-        log::trace!("r: consistency check");
+        // send a seed from which all the changes are derived
+        let seed: Block = rng.gen();
+        log::trace!("seed = {:?}", seed);
 
-        Ok(vs)
+        // derive random coefficients
+        let aes: Aes128 = Aes128::new(seed);
+        let mut W: F128 = F128::zero();
+        let mut phi: F128 = F128::zero();
+        for (l, alpha) in alphas.iter().copied().enumerate() {
+            let xl: F128 = aes.encrypt((l as u128).into()).into();
+            let mut xli = xl;
+
+            // X_{i}^{l} = (X^{l})^i
+            for i in 0..N {
+                log::trace!("X_(l = {})^(i = {}) = {:?}", l, i, xli);
+
+                W = W + xli * ws[l][i].into();
+
+                if i == alpha {
+                    phi = phi + xli;
+                }
+
+                // X_{i+1}^{l} = X_{i+1}^{l} X_{1}^{l}
+                xli = xli * xl;
+            }
+        }
+
+        // pack the choice bits into a 128-bit block
+        let xs = <&[bool; 128]>::try_from(xs).unwrap();
+        let xs: Block = Block::from(xs);
+        log::trace!("x* = {:?}", xs);
+
+        // mask the alpha sum
+        let phi: Block = phi.into();
+        let xp: Block = phi ^ xs;
+        log::trace!("x' = {:?}", xp);
+
+        // send coefficients and masked sum to the sender
+        channel.send(&seed)?;
+        channel.send(&xp)?;
+        channel.flush()?;
+
+        // compute Z := \sum_{i \in [k]} z*[i] * X^i
+        let Z = stack_cyclic(<&[Block; CSP]>::try_from(zs).unwrap());
+        let W = W + Z;
+        log::trace!("Z = {:?}", Z);
+        log::trace!("\\phi = {:?}", phi);
+        log::trace!("W = {:?}", W);
+
+        // calculate hash H(w) locally
+        let Hw: [u8; 32] = ro_hash(W.into());
+
+        // obtain hash from sender
+        let Hv: [u8; 32] = channel.receive()?;
+        if Hv != Hw {
+            return Err(Error::Other("consistency check failed".to_owned()));
+        } else {
+            Ok(ws)
+        }
     }
 }
