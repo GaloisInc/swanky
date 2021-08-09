@@ -254,7 +254,7 @@ impl<FE: FiniteField + PrimeFiniteField> SenderConv<FE> {
                 z_batch[n].push(MacProver(z, z_mac));
 
                 and_res_batch.push(and_res);
-                aux_batch.push((and1, and1_mac, and2, and2_mac));
+                aux_batch.push((MacProver(and1, and1_mac), MacProver(and2, and2_mac)));
             }
             and_res_mac_batch.clear();
             self.fcom_f2.input_low_level(
@@ -265,14 +265,10 @@ impl<FE: FiniteField + PrimeFiniteField> SenderConv<FE> {
             )?;
 
             for n in 0..num {
-                let (and1, and1_mac, and2, and2_mac) = aux_batch[n];
+                let (and1, and2) = aux_batch[n];
                 let and_res = and_res_batch[n];
                 let and_res_mac = and_res_mac_batch[n];
-                triples.push((
-                    MacProver(and1, and1_mac),
-                    MacProver(and2, and2_mac),
-                    MacProver(and_res, and_res_mac),
-                ));
+                triples.push((and1, and2, MacProver(and_res, and_res_mac)));
 
                 let ci_mac = ci_mac_batch[n];
                 let c_mac = ci_mac + and_res_mac;
@@ -918,7 +914,7 @@ impl<FE: FiniteField + PrimeFiniteField> ReceiverConv<FE> {
 
                 let z_mac = and1_mac + yi_mac; //xi_mac + yi_mac + ci_mac;
                 z_batch[n].push(MacVerifier(z_mac));
-                aux_batch.push((and1_mac, and2_mac));
+                aux_batch.push((MacVerifier(and1_mac), MacVerifier(and2_mac)));
             }
             and_res_mac_batch.clear();
             self.fcom_f2.input_low_level(
@@ -932,11 +928,7 @@ impl<FE: FiniteField + PrimeFiniteField> ReceiverConv<FE> {
                 let MacVerifier(ci_mac) = ci_mac_batch[n];
                 let (and1_mac, and2_mac) = aux_batch[n];
                 let MacVerifier(and_res_mac) = and_res_mac_batch[n];
-                triples.push((
-                    MacVerifier(and1_mac),
-                    MacVerifier(and2_mac),
-                    MacVerifier(and_res_mac),
-                ));
+                triples.push((and1_mac, and2_mac, MacVerifier(and_res_mac)));
 
                 let c_mac = ci_mac + and_res_mac;
                 ci_mac_batch[n] = MacVerifier(c_mac);
@@ -1318,7 +1310,7 @@ impl<FE: FiniteField + PrimeFiniteField> ReceiverConv<FE> {
         let mut shuffle_rng = AesRng::from_seed(seed);
 
         // step 4): shuffle the edabits, dabits, triples
-        print!("Step 4) SHUFFLE r dabits ... ");
+        print!("Step 4) SHUFFLE ... ");
         let start = Instant::now();
         generate_permutation(&mut shuffle_rng, &mut r_mac);
         generate_permutation(&mut shuffle_rng, &mut dabits_mac);
