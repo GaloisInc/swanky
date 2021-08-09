@@ -67,21 +67,10 @@ where
     T: Into<F128>,
 {
     let mut res: F128 = F128::zero();
-    let mut j = 127;
-    loop {
-        res = res.mul_x();
-        res = res + elems[j].into();
-        if j == 0 {
-            break;
-        }
-        j -= 1;
-    }
-    /*
     for z in elems.iter().copied() {
         res = res.mul_x();
         res = res + z.into();
     }
-    */
     res
 }
 
@@ -90,35 +79,56 @@ mod tests {
 
     use std::thread::spawn;
 
-    use rand::{rngs::OsRng, Rng};
+    use rand::{rngs::StdRng, Rng, SeedableRng};
     use scuttlebutt::channel::unix_channel_pair;
 
     use simple_logger;
 
     use crate::ot::{KosDeltaReceiver, KosDeltaSender};
 
-    /*
+    use std::convert::TryFrom;
+
+    #[test]
+    fn test_decompose() {
+        let mut rng = StdRng::seed_from_u64(0x5322_FA41_6AB1_521A);
+        for _ in 0..10 {
+            let a: Block = rng.gen();
+            let a_bits: [bool; 128] = a.into();
+            let a_elem: Vec<F128> = a_bits
+                .iter()
+                .copied()
+                .map(|bit| if bit { F128::one() } else { F128::zero() })
+                .collect();
+            let a_new = stack_cyclic(<&[F128; 128]>::try_from(&a_elem[..]).unwrap());
+            assert_eq!(a_new, a.into());
+        }
+    }
+
     #[test]
     fn test() {
+        // de-randomize the test
+        let mut rng1 = StdRng::seed_from_u64(0x5322_FA41_6AB1_521A);
+        let mut rng2 = StdRng::seed_from_u64(0x8DEE_F32A_8712_321F);
+
         let _ = simple_logger::init();
         let (mut c1, mut c2) = unix_channel_pair();
 
         let num = 1;
 
         let handle = spawn(move || {
-            let mut send: Sender<KosDeltaSender> = Sender::init(&mut c2, &mut OsRng).unwrap();
-            let v = send.extend::<_, _, 2, 4>(&mut c2, &mut OsRng, num).unwrap();
+            let mut send: Sender<KosDeltaSender> = Sender::init(&mut c2, &mut rng1).unwrap();
+            let v = send.extend::<_, _, 2, 4>(&mut c2, &mut rng1, num).unwrap();
             println!("{:?}", v);
             (send.delta(), v)
         });
 
-        let mut recv: Receiver<KosDeltaReceiver> = Receiver::init(&mut c1, &mut OsRng).unwrap();
+        let mut recv: Receiver<KosDeltaReceiver> = Receiver::init(&mut c1, &mut rng2).unwrap();
         //( let out = recv.receive_random(&mut c1, &[true], &mut OsRng).unwrap();
 
-        let mut alpha: Vec<usize> = (0..num).map(|_| OsRng.gen::<usize>() % 4).collect();
+        let alpha: Vec<usize> = (0..num).map(|_| rng2.gen::<usize>() % 4).collect();
 
         let w = recv
-            .extend::<_, _, 2, 4>(&alpha[..], &mut c1, &mut OsRng)
+            .extend::<_, _, 2, 4>(&alpha[..], &mut c1, &mut rng2)
             .unwrap();
         println!("{:?}", w);
 
@@ -130,5 +140,4 @@ mod tests {
 
         assert_eq!(v, w, "correlation not satisfied");
     }
-    */
 }

@@ -29,16 +29,23 @@ impl F128 {
     }
 
     /// Multiply by the field element X \in GF_{2}[X] / (X^128 + X^7 + X^2 + X + 1 )
+    ///
+    /// Not constant time!
     pub fn mul_x(self) -> Self {
         Self(Block(unsafe {
-            // shift left by 1 (multiplying by X, ignoring overflow)
-            let s = _mm_slli_si128::<1>(self.0 .0);
-
-            // deal with the overflow
-            let msb = _mm_extract_epi8::<15>(self.0 .0) >> 7;
-            debug_assert!(msb == 0 || msb == 1);
-            let xor = _mm_set_epi32(0x0, 0x0, 0x0, msb * 0b100000000010000111);
-            _mm_xor_si128(xor, s)
+            let h = _mm_extract_epi64::<1>(self.0 .0) as u64;
+            let l = _mm_extract_epi64::<0>(self.0 .0) as u64;
+            let c_h = h >> 63;
+            let c_l = l >> 63;
+            debug_assert!(c_h < 2);
+            debug_assert!(c_l < 2);
+            let l = if c_h == 1 {
+                (l << 1) ^ 0b100000000010000111
+            } else {
+                l << 1
+            };
+            let h = (h << 1) | c_l;
+            _mm_set_epi64x(h as i64, l as i64)
         }))
     }
 }
@@ -54,6 +61,31 @@ impl From<Block> for F128 {
     #[inline]
     fn from(block: Block) -> Self {
         Self(block)
+    }
+}
+
+impl Into<[bool; 128]> for Block {
+    #[inline]
+    fn into(self) -> [bool; 128] {
+        let mut out: [bool; 128] = [Default::default(); 128];
+        unsafe {
+            let mut h = _mm_extract_epi64::<1>(self.0);
+            let mut l = _mm_extract_epi64::<0>(self.0);
+            let mut i = 63;
+            let mut j = 127;
+            loop {
+                out[i] = (h & 1) != 0;
+                out[j] = (l & 1) != 0;
+                if i == 0 {
+                    break;
+                }
+                i -= 1;
+                j -= 1;
+                h >>= 1;
+                l >>= 1;
+            }
+        }
+        out
     }
 }
 
@@ -233,30 +265,6 @@ impl Block {
     #[inline]
     pub fn flip(&self) -> Self {
         unsafe { Block(_mm_xor_si128(self.0, ONES)) }
-    }
-
-    /// Return the bit-composition of the block
-    #[inline]
-    pub fn bits(&self) -> [bool; 128] {
-        let mut out: [bool; 128] = [Default::default(); 128];
-        unsafe {
-            let mut h = _mm_extract_epi64::<1>(self.0);
-            let mut l = _mm_extract_epi64::<0>(self.0);
-            let mut i = 63;
-            let mut j = 127;
-            loop {
-                out[i] = (h & 1) != 0;
-                out[j] = (l & 1) != 0;
-                if i == 0 {
-                    break;
-                }
-                i -= 1;
-                j -= 1;
-                h >>= 1;
-                l >>= 1;
-            }
-        }
-        out
     }
 
     /// Try to create a `Block` from a slice of bytes. The slice must have exactly 16 bytes.
@@ -488,6 +496,18 @@ impl<'de> Deserialize<'de> for Block {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    use rand::{rngs::OsRng, Rng};
+
+    #[test]
+    fn test_bits_block() {
+        for _ in 0..10 {
+            let block: Block = OsRng.gen();
+            let bits: [bool; 128] = block.into();
+            let block_p: Block = (&bits).into();
+            assert_eq!(block, block_p);
+        }
+    }
 
     #[test]
     fn test_gf128_mul() {

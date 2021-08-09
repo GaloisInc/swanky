@@ -156,6 +156,7 @@ impl<OT: OtSender<Msg = Block> + RandomSender + CorrelatedSender + FixedKeyIniti
         // reserve COT for batched consistency check
         log::trace!("consistency check");
         let ys = &cot[num * H..];
+        log::trace!("y* = {:?}", ys);
 
         // retrieve coefficients
         let seed: Block = channel.receive()?;
@@ -164,22 +165,22 @@ impl<OT: OtSender<Msg = Block> + RandomSender + CorrelatedSender + FixedKeyIniti
         log::trace!("seed = {:?}", seed);
         log::trace!("x' = {:?}", xp);
 
-        let xp: [bool; CSP] = xp.bits();
+        let xp: [bool; CSP] = xp.into();
         let mut y: [Block; CSP] = [Default::default(); CSP];
-        for i in 0..num {
+        for i in 0..CSP {
             y[i] = ys[i];
             if xp[i] {
                 y[i] = y[i] ^ self.delta;
             }
-            /*
-            Y = Y.mul_x();
-            Y = Y + ys[i].into();
-            if xp[i] {
-                Y = Y + self.delta.into();
-            }
-            */
         }
         let Y = stack_cyclic(&y);
+
+        {
+            for i in 0..CSP {
+                log::trace!("y[{}] = {:?}", i, y[i]);
+            }
+        }
+
         log::trace!("Y = {:?}", Y);
         log::trace!("\\Delta = {:?}", self.delta);
 

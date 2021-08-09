@@ -162,6 +162,8 @@ impl<OT: OtReceiver<Msg = Block> + RandomReceiver + CorrelatedReceiver> Receiver
         let zs = &t[H * num..];
         debug_assert_eq!(xs.len(), CSP);
         debug_assert_eq!(zs.len(), CSP);
+        log::trace!("x* = {:?}", xs);
+        log::trace!("z* = {:?}", zs);
 
         // send a seed from which all the changes are derived
         let seed: Block = rng.gen();
@@ -198,6 +200,14 @@ impl<OT: OtReceiver<Msg = Block> + RandomReceiver + CorrelatedReceiver> Receiver
         // mask the alpha sum
         let phi: Block = phi.into();
         let xp: Block = phi ^ xs;
+
+        {
+            let x: [bool; CSP] = phi.into();
+            for i in 0..CSP {
+                log::trace!("x[{}] = {:?}, z*[{}] = {:?}", i, x[i] as usize, i, zs[i]);
+            }
+        }
+
         log::trace!("x' = {:?}", xp);
 
         // send coefficients and masked sum to the sender
