@@ -40,7 +40,7 @@ impl F128 {
             debug_assert!(c_h < 2);
             debug_assert!(c_l < 2);
             let l = if c_h == 1 {
-                (l << 1) ^ 0b100000000010000111
+                (l << 1) ^ 0b10000111
             } else {
                 l << 1
             };
@@ -69,8 +69,8 @@ impl Into<[bool; 128]> for Block {
     fn into(self) -> [bool; 128] {
         let mut out: [bool; 128] = [Default::default(); 128];
         unsafe {
-            let mut h = _mm_extract_epi64::<1>(self.0);
-            let mut l = _mm_extract_epi64::<0>(self.0);
+            let mut h = _mm_extract_epi64::<1>(self.0) as u64;
+            let mut l = _mm_extract_epi64::<0>(self.0) as u64;
             let mut i = 63;
             let mut j = 127;
             loop {
@@ -84,6 +84,8 @@ impl Into<[bool; 128]> for Block {
                 h >>= 1;
                 l >>= 1;
             }
+            debug_assert!(h < 2);
+            debug_assert!(l < 2);
         }
         out
     }

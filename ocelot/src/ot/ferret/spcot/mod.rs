@@ -89,7 +89,8 @@ mod tests {
     use std::convert::TryFrom;
 
     #[test]
-    fn test_decompose() {
+    fn test_decompose_cyclic() {
+        debug_assert_eq!(F128::zero(), F128::zero().mul_x());
         let mut rng = StdRng::seed_from_u64(0x5322_FA41_6AB1_521A);
         for _ in 0..10 {
             let a: Block = rng.gen();
@@ -105,7 +106,28 @@ mod tests {
     }
 
     #[test]
-    fn test() {
+    fn test_cyclic_mul_rnd() {
+        let mut rng = StdRng::seed_from_u64(0x5322_FA41_6AB1_521A);
+        for _ in 0..10 {
+            let a: Block = rng.gen();
+            let b: Block = rng.gen();
+            let a_bits: [bool; 128] = a.into();
+            let ab_elems: Vec<F128> = a_bits
+                .iter()
+                .copied()
+                .map(|bit| if bit { b.into() } else { F128::zero() })
+                .collect();
+            let a: F128 = a.into();
+            let b: F128 = b.into();
+            assert_eq!(
+                stack_cyclic(<&[F128; 128]>::try_from(&ab_elems[..]).unwrap()),
+                a * b
+            )
+        }
+    }
+
+    #[test]
+    fn test_spcot_correlation() {
         // de-randomize the test
         let mut rng1 = StdRng::seed_from_u64(0x5322_FA41_6AB1_521A);
         let mut rng2 = StdRng::seed_from_u64(0x8DEE_F32A_8712_321F);
