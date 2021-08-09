@@ -316,7 +316,7 @@ impl<FE: FiniteField> FComReceiver<FE> {
             None => {
                 let start = Instant::now();
                 self.svole_receiver.receive(channel, rng, &mut self.voles)?;
-                println!("SVOLE<{:?}>", start.elapsed());
+                // println!("SVOLE<{:?}>", start.elapsed());
                 match self.voles.pop() {
                     Some(e) => {
                         return Ok(MacVerifier(e));

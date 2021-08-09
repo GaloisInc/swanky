@@ -6,7 +6,7 @@
 
 use clap::{App, Arg};
 use ocelot::edabits::{ReceiverConv, SenderConv};
-use scuttlebutt::{field::F61p, AesRng, SyncChannel};
+use scuttlebutt::{field::F61p, AesRng, SyncChannel, TrackChannel};
 use std::io::{BufReader, BufWriter};
 use std::net::{TcpListener, TcpStream};
 use std::time::Instant;
@@ -47,10 +47,12 @@ fn run(
 
         match listener.accept() {
             Ok((stream_verifier, _addr)) => {
+                println!("Verifier received a connection");
                 let reader = BufReader::new(stream_verifier.try_clone().unwrap());
                 let writer = BufWriter::new(stream_verifier);
-                let mut channel: SyncChannel<BufReader<TcpStream>, BufWriter<TcpStream>> =
-                    SyncChannel::new(reader, writer);
+                let mut channel: TrackChannel<
+                    SyncChannel<BufReader<TcpStream>, BufWriter<TcpStream>>,
+                > = TrackChannel::new(SyncChannel::new(reader, writer));
 
                 let mut bucket_connections = None;
                 if multithreaded {
@@ -75,6 +77,9 @@ fn run(
                 let start = Instant::now();
                 let mut fconv = Receiver::init(&mut channel, &mut rng).unwrap();
                 println!("Verifier time (init): {:?}", start.elapsed());
+                let init_comm_sent = channel.kilobits_written();
+                let init_comm_recv = channel.kilobits_read();
+                channel.clear();
 
                 let start = Instant::now();
                 let edabits = fconv
@@ -84,6 +89,9 @@ fn run(
                     "Verifier time (input random edabits): {:?}",
                     start.elapsed()
                 );
+                let input_comm_sent = channel.kilobits_written();
+                let input_comm_recv = channel.kilobits_read();
+                channel.clear();
 
                 let start = Instant::now();
                 let _r = fconv
@@ -98,6 +106,34 @@ fn run(
                     )
                     .unwrap();
                 println!("Verifier time (conv): {:?}", start.elapsed());
+                let conv_comm_sent = channel.kilobits_written();
+                let conv_comm_recv = channel.kilobits_read();
+                channel.clear();
+
+                println!(
+                    "Verifier communication sent (init): {:?} Mb",
+                    init_comm_sent / 1000.0
+                );
+                println!(
+                    "Verifier communication sent (input): {:?} Mb",
+                    input_comm_sent / 1000.0
+                );
+                println!(
+                    "Verifier communication sent (conv): {:?} Mb",
+                    conv_comm_sent / 1000.0
+                );
+                println!(
+                    "Prover communication sent (init): {:?} Mb",
+                    init_comm_recv / 1000.0
+                );
+                println!(
+                    "Prover communication sent (input): {:?} Mb",
+                    input_comm_recv / 1000.0
+                );
+                println!(
+                    "Prover communication sent (conv): {:?} Mb",
+                    conv_comm_recv / 1000.0
+                );
             }
             Err(e) => println!("couldn't get client: {:?}", e),
         }
@@ -106,7 +142,7 @@ fn run(
         let stream_prover = TcpStream::connect(connection_addr)?;
         let reader = BufReader::new(stream_prover.try_clone().unwrap());
         let writer = BufWriter::new(stream_prover);
-        let mut channel = SyncChannel::new(reader, writer);
+        let mut channel = TrackChannel::new(SyncChannel::new(reader, writer));
 
         let mut bucket_connections = None;
         if multithreaded {
