@@ -5,7 +5,10 @@
 mod receiver;
 mod sender;
 
-use super::CSP;
+use super::{
+    cache::{CachedReceiver, CachedSender},
+    CSP,
+};
 
 pub(crate) use receiver::Receiver;
 pub(crate) use sender::Sender;
@@ -29,6 +32,7 @@ fn bitn(size: usize, idx: usize, n: usize) -> bool {
     (n >> (size - idx)) & 1 != 0
 }
 
+#[inline(always)]
 fn prg2(k: Block) -> (Block, Block) {
     let aes = Aes128::new(k);
     (
@@ -37,7 +41,6 @@ fn prg2(k: Block) -> (Block, Block) {
     )
 }
 
-// MSB
 fn unpack_bits<const N: usize>(mut n: usize) -> [bool; N] {
     debug_assert!(n < (1 << N));
     let mut b: [bool; N] = [false; N];
@@ -62,6 +65,7 @@ fn pack_bits(bits: &[bool]) -> usize {
     n
 }
 
+#[inline(always)]
 fn stack_cyclic<T: Copy>(elems: &[T; 128]) -> F128
 where
     T: Into<F128>,
@@ -138,19 +142,25 @@ mod tests {
         let num = 1;
 
         let handle = spawn(move || {
-            let mut send: Sender<KosDeltaSender> = Sender::init(&mut c2, &mut rng1).unwrap();
-            let v = send.extend::<_, _, 2, 4>(&mut c2, &mut rng1, num).unwrap();
-            println!("{:?}", v);
-            (send.delta(), v)
+            let mut cot: CachedSender<KosDeltaSender> =
+                CachedSender::init(&mut c2, &mut rng1).unwrap();
+            let mut send: Sender = Sender::init();
+            let v = send
+                .extend::<_, _, _, 2, 4>(&mut cot, &mut c2, &mut rng1, num)
+                .unwrap();
+            (cot.delta(), v)
         });
 
-        let mut recv: Receiver<KosDeltaReceiver> = Receiver::init(&mut c1, &mut rng2).unwrap();
+        let mut cot: CachedReceiver<KosDeltaReceiver> =
+            CachedReceiver::init(&mut c1, &mut rng2).unwrap();
+
+        let mut recv: Receiver = Receiver::init();
         //( let out = recv.receive_random(&mut c1, &[true], &mut OsRng).unwrap();
 
         let alpha: Vec<usize> = (0..num).map(|_| rng2.gen::<usize>() % 4).collect();
 
         let w = recv
-            .extend::<_, _, 2, 4>(&alpha[..], &mut c1, &mut rng2)
+            .extend::<_, _, _, 2, 4>(&mut cot, &mut c1, &mut rng2, &alpha[..])
             .unwrap();
         println!("{:?}", w);
 

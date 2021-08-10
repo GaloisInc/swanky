@@ -1,14 +1,6 @@
 use crate::{
     errors::Error,
-    ot::{
-        CorrelatedReceiver,
-        CorrelatedSender,
-        FixedKeyInitializer,
-        RandomReceiver,
-        RandomSender,
-        Receiver as OtReceiver,
-        Sender as OtSender,
-    },
+    ot::{CorrelatedReceiver, RandomReceiver, Receiver as OtReceiver},
 };
 use log;
 use rand::{CryptoRng, Rng};
@@ -18,41 +10,32 @@ use std::convert::TryFrom;
 
 use super::*;
 
-pub(crate) struct Receiver<OT: OtReceiver<Msg = Block> + RandomReceiver + CorrelatedReceiver> {
-    cot: OT, // base COT
+pub(crate) struct Receiver {
     hash: AesHash,
-    l: usize, // repetition of SPCOT
+    l: usize,
 }
 
-impl<OT: OtReceiver<Msg = Block> + RandomReceiver + CorrelatedReceiver> Receiver<OT> {
-    pub fn init<C: AbstractChannel, RNG: CryptoRng + Rng>(
-        channel: &mut C,
-        rng: &mut RNG,
-    ) -> Result<Self, Error> {
-        Ok(Self {
-            cot: OT::init(channel, rng)?,
+impl Receiver {
+    pub fn init() -> Self {
+        Self {
             hash: cr_hash(),
             l: 0,
-        })
-    }
-
-    fn random_cot<C: AbstractChannel, RNG: CryptoRng + Rng>(
-        &mut self,
-        channel: &mut C,
-        rng: &mut RNG,
-        len: usize,
-    ) -> Result<(Vec<bool>, Vec<Block>), Error> {
-        let r: Vec<bool> = (0..len).map(|_| rng.gen()).collect();
-        let t = self.cot.receive_random(channel, &r[..], rng)?;
-        Ok((r, t))
+        }
     }
 
     #[allow(non_snake_case)]
-    pub fn extend<C: AbstractChannel, RNG: CryptoRng + Rng, const H: usize, const N: usize>(
+    pub fn extend<
+        OT: OtReceiver<Msg = Block> + RandomReceiver + CorrelatedReceiver,
+        C: AbstractChannel,
+        RNG: CryptoRng + Rng,
+        const H: usize,
+        const N: usize,
+    >(
         &mut self,
-        alphas: &[usize],
+        base_cot: &mut CachedReceiver<OT>,
         channel: &mut C,
         rng: &mut RNG,
+        alphas: &[usize],
     ) -> Result<Vec<[Block; N]>, Error> {
         assert_eq!(1 << H, N); // H = log2(N)
 
@@ -60,7 +43,7 @@ impl<OT: OtReceiver<Msg = Block> + RandomReceiver + CorrelatedReceiver> Receiver
         let num = alphas.len();
 
         // acquire base COT
-        let (r, t) = self.random_cot(channel, rng, H * num + CSP)?;
+        let (r, t) = base_cot.recv(channel, rng, H * num + CSP)?;
 
         // send all b's together to avoid multiple flushes
         let mut bs: Vec<usize> = Vec::with_capacity(num);

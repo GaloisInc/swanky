@@ -1,68 +1,36 @@
 use crate::{
     errors::Error,
-    ot::{
-        CorrelatedReceiver,
-        CorrelatedSender,
-        FixedKeyInitializer,
-        RandomReceiver,
-        RandomSender,
-        Receiver as OtReceiver,
-        Sender as OtSender,
-    },
+    ot::{CorrelatedSender, FixedKeyInitializer, RandomSender, Sender as OtSender},
 };
 use log;
 use rand::{CryptoRng, Rng};
 use scuttlebutt::{AbstractChannel, Aes128, AesHash, Block, F128};
-use sha2::{Digest, Sha256};
-
-use std::convert::TryFrom;
 
 use super::*;
 
-pub(crate) struct Sender<
-    OT: OtSender<Msg = Block> + RandomSender + CorrelatedSender + FixedKeyInitializer,
-> {
-    delta: Block,
+pub(crate) struct Sender {
     hash: AesHash,
-    cot: OT,  // base COT
     l: usize, // repetition of SPCOT
 }
 
-impl<OT: OtSender<Msg = Block> + RandomSender + CorrelatedSender + FixedKeyInitializer> Sender<OT> {
-    pub fn init<C: AbstractChannel, RNG: CryptoRng + Rng>(
-        channel: &mut C,
-        rng: &mut RNG,
-    ) -> Result<Self, Error> {
-        let delta: Block = rng.gen();
-        Ok(Self {
-            cot: OT::init_fixed_key(channel, delta.into(), rng)?,
-            delta,
+impl Sender {
+    pub fn init() -> Self {
+        Self {
             hash: cr_hash(),
             l: 0,
-        })
-    }
-
-    pub fn delta(&self) -> Block {
-        self.delta
-    }
-
-    fn random_cot<C: AbstractChannel, RNG: CryptoRng + Rng>(
-        &mut self,
-        channel: &mut C,
-        rng: &mut RNG,
-        len: usize,
-    ) -> Result<Vec<Block>, Error> {
-        let cot = self.cot.send_random(channel, len, rng)?;
-        #[cfg(debug_assertions)]
-        for pair in cot.iter() {
-            debug_assert_eq!(pair.0 ^ pair.1, self.delta, "base COT is not correlated");
         }
-        Ok(cot.into_iter().map(|v| v.0).collect())
     }
 
     #[allow(non_snake_case)]
-    pub fn extend<C: AbstractChannel, RNG: CryptoRng + Rng, const H: usize, const N: usize>(
+    pub fn extend<
+        OT: OtSender<Msg = Block> + RandomSender + CorrelatedSender,
+        C: AbstractChannel,
+        RNG: CryptoRng + Rng,
+        const H: usize,
+        const N: usize,
+    >(
         &mut self,
+        base_cot: &mut CachedSender<OT>,
         channel: &mut C,
         rng: &mut RNG,
         num: usize, // number of parallel repetitions
@@ -70,7 +38,8 @@ impl<OT: OtSender<Msg = Block> + RandomSender + CorrelatedSender + FixedKeyIniti
         assert_eq!(1 << H, N);
 
         // acquire base COT
-        let cot = self.random_cot(channel, rng, H * num + CSP)?;
+        let delta = base_cot.delta();
+        let cot = base_cot.send(channel, rng, H * num + CSP)?;
 
         // obtain masked indexes from receiver
         let bs: Vec<usize> = channel.receive_n(num)?;
@@ -120,7 +89,7 @@ impl<OT: OtSender<Msg = Block> + RandomSender + CorrelatedSender + FixedKeyIniti
                 let tweak: Block = (l | i as u128).into();
 
                 let h0 = self.hash.tccr_hash(q[i], tweak);
-                let h1 = self.hash.tccr_hash(q[i] ^ self.delta, tweak);
+                let h1 = self.hash.tccr_hash(q[i] ^ delta, tweak);
 
                 log::trace!("H0 = {:?}", h0);
                 log::trace!("H1 = {:?}", h1);
@@ -137,7 +106,7 @@ impl<OT: OtSender<Msg = Block> + RandomSender + CorrelatedSender + FixedKeyIniti
             }
 
             // compute c := Delta + \sum_{i \in[n]} v[i]
-            let mut c = self.delta;
+            let mut c = delta;
             for i in 0..N {
                 c ^= v[i];
             }
@@ -170,7 +139,7 @@ impl<OT: OtSender<Msg = Block> + RandomSender + CorrelatedSender + FixedKeyIniti
         for i in 0..CSP {
             y[i] = ys[i];
             if xp[i] {
-                y[i] = y[i] ^ self.delta;
+                y[i] = y[i] ^ delta;
             }
         }
         let Y = stack_cyclic(&y);
@@ -182,7 +151,7 @@ impl<OT: OtSender<Msg = Block> + RandomSender + CorrelatedSender + FixedKeyIniti
         }
 
         log::trace!("Y = {:?}", Y);
-        log::trace!("\\Delta = {:?}", self.delta);
+        log::trace!("\\Delta = {:?}", delta);
 
         // receive \chi_{i} for i in [n]
         let aes: Aes128 = Aes128::new(seed);
