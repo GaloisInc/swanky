@@ -164,7 +164,7 @@ mod tests {
         let mut recv: Receiver = Receiver::init();
         //( let out = recv.receive_random(&mut c1, &[true], &mut OsRng).unwrap();
 
-        let alpha: Vec<usize> = (0..num).map(|_| rng2.gen::<usize>() % 4).collect();
+        let alpha: Vec<usize> = (0..num).map(|_| rng2.gen::<usize>() % N).collect();
 
         let w = recv
             .extend::<_, _, H, N>(&mut cache, &mut c1, &mut rng2, &alpha[..])

@@ -138,9 +138,11 @@ impl Sender {
         let Y = stack_cyclic(&y);
 
         {
+            /*
             for i in 0..CSP {
                 log::trace!("y[{}] = {:?}", i, y[i]);
             }
+            */
         }
 
         log::trace!("Y = {:?}", Y);

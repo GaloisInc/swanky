@@ -93,12 +93,13 @@ impl Receiver {
                     // If i == 1, define s_{~a[1]} := K_{~a[1]}^1
                     si[nai] = kna;
                 } else {
+                    log::trace!("level H = {}", H);
                     // If i >= 2: j \in [2^(i - 1)], j \neq a_1, ..., a_{i-1}:
                     //    compute (s^{i}_{2j}, s^{i}_{2j + 1}) := G(s_j^{i-1})
-                    let mut j = 1 << (i - 1);
+                    let mut j = (1 << i) - 1;
                     loop {
                         debug_assert!(si[j] != Block::default() || j == a_sm);
-                        log::trace!("r: s = {:?}", si[j]);
+                        log::trace!("s[{}] = {:?}", j, si[j]);
                         let (s0, s1) = prg2(si[j]);
                         si[2 * j] = s0;
                         si[2 * j + 1] = s1;
@@ -124,6 +125,8 @@ impl Receiver {
                     si[alpha] ^= si[i];
                 }
             }
+
+            log::trace!("si = {:?}", si);
             ws.push(si);
 
             self.l += 1;
@@ -175,14 +178,16 @@ impl Receiver {
         let phi: Block = phi.into();
         let xp: Block = phi ^ xs;
 
+        #[cfg(debug_assertions)]
         {
+            /*
             let x: [bool; CSP] = phi.into();
             for i in 0..CSP {
                 log::trace!("x[{}] = {:?}, z*[{}] = {:?}", i, x[i] as usize, i, zs[i]);
             }
+            */
+            log::trace!("x' = {:?}", xp);
         }
-
-        log::trace!("x' = {:?}", xp);
 
         // send coefficients and masked sum to the sender
         channel.send(&seed)?;
