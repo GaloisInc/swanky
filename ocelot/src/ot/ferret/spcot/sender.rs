@@ -7,12 +7,14 @@ use super::*;
 
 pub(crate) struct Sender {
     hash: AesHash,
+    delta: Block,
     l: usize, // repetition of SPCOT
 }
 
 impl Sender {
-    pub fn init() -> Self {
+    pub fn init(delta: Block) -> Self {
         Self {
+            delta,
             hash: cr_hash(),
             l: 0,
         }
@@ -27,9 +29,9 @@ impl Sender {
         num: usize, // number of parallel repetitions
     ) -> Result<Vec<[Block; N]>, Error> {
         assert_eq!(1 << H, N);
+        debug_assert_eq!(base_cot.delta(), self.delta);
 
         // acquire base COT
-        let delta = base_cot.delta();
         let cot = base_cot.get(H * num + CSP).unwrap();
 
         // obtain masked indexes from receiver
@@ -80,7 +82,7 @@ impl Sender {
                 let tweak: Block = (l | i as u128).into();
 
                 let h0 = self.hash.tccr_hash(q[i], tweak);
-                let h1 = self.hash.tccr_hash(q[i] ^ delta, tweak);
+                let h1 = self.hash.tccr_hash(q[i] ^ self.delta, tweak);
 
                 log::trace!("H0 = {:?}", h0);
                 log::trace!("H1 = {:?}", h1);
@@ -97,7 +99,7 @@ impl Sender {
             }
 
             // compute c := Delta + \sum_{i \in[n]} v[i]
-            let mut c = delta;
+            let mut c = self.delta;
             for i in 0..N {
                 c ^= v[i];
             }
@@ -130,7 +132,7 @@ impl Sender {
         for i in 0..CSP {
             y[i] = ys[i];
             if xp[i] {
-                y[i] = y[i] ^ delta;
+                y[i] = y[i] ^ self.delta;
             }
         }
         let Y = stack_cyclic(&y);
@@ -142,7 +144,7 @@ impl Sender {
         }
 
         log::trace!("Y = {:?}", Y);
-        log::trace!("\\Delta = {:?}", delta);
+        log::trace!("\\Delta = {:?}", self.delta);
 
         // receive \chi_{i} for i in [n]
         let aes: Aes128 = Aes128::new(seed);

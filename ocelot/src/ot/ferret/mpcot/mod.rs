@@ -4,6 +4,9 @@ mod sender;
 use lazy_static::lazy_static;
 use rand::RngCore;
 
+use receiver::Receiver;
+use sender::Sender;
+
 const NUM_HASHES: usize = 3;
 
 const SETUP_K: usize = 37_248;
@@ -11,12 +14,14 @@ const SETUP_N: usize = 616_092;
 const SETUP_T: usize = 1_254;
 const SETUP_M: usize = (SETUP_T * 3) / 2;
 const SETUP_BUCKET_LOG_SIZE: usize = 11;
+const SETUP_BUCKET_SIZE: usize = 1 << SETUP_BUCKET_LOG_SIZE;
 
 const MAIN_K: usize = 588_160;
 const MAIN_N: usize = 10_616_092;
 const MAIN_T: usize = 1_324;
 const MAIN_M: usize = (MAIN_T * 3) / 2;
 const MAIN_BUCKET_LOG_SIZE: usize = 14;
+const MAIN_BUCKET_SIZE: usize = 1 << MAIN_BUCKET_LOG_SIZE;
 
 const CUCKOO_ITERS: usize = 100;
 
@@ -108,8 +113,129 @@ lazy_static! {
     static ref BUCKETS_MAIN: Buckets = Buckets::build(MAIN_N as u32, MAIN_M as u32);
 }
 
-#[test]
-fn test_bucket_size() {
-    assert!(BUCKETS_SETUP.max < 1 << SETUP_BUCKET_LOG_SIZE);
-    assert!(BUCKETS_MAIN.max < 1 << MAIN_BUCKET_LOG_SIZE);
+mod tests {
+    use super::*;
+
+    use std::thread::spawn;
+
+    use super::super::{
+        cache::{CachedReceiver, CachedSender},
+        spcot,
+        util::unique_random_array,
+        CSP,
+    };
+
+    use crate::ot::FixedKeyInitializer;
+    use rand::{rngs::StdRng, Rng, SeedableRng};
+    use scuttlebutt::{channel::unix_channel_pair, Aes128, AesHash, Block, F128};
+
+    use simple_logger;
+
+    use crate::ot::{KosDeltaReceiver, KosDeltaSender, Receiver as OtReceiver};
+
+    use std::convert::TryFrom;
+
+    const TEST_T: usize = 3;
+    const TEST_N: usize = 100;
+    const TEST_M: usize = (TEST_T * 3) / 2;
+    const TEST_BUCKET_LOG_SIZE: usize = 11;
+    const TEST_BUCKET_SIZE: usize = 1 << TEST_BUCKET_LOG_SIZE;
+
+    lazy_static! {
+        static ref TEST_BUCKETS: Buckets = Buckets::build(TEST_N as u32, TEST_M as u32);
+    }
+
+    #[test]
+    fn test_bucket_size() {
+        assert!(BUCKETS_SETUP.max < SETUP_BUCKET_SIZE);
+        assert!(BUCKETS_MAIN.max < MAIN_BUCKET_SIZE);
+        assert!(TEST_BUCKETS.max < TEST_BUCKET_SIZE);
+    }
+
+    #[test]
+    fn test_mpcot_correlation() {
+        // de-randomize the test
+        let mut rng1 = StdRng::seed_from_u64(0x5322_FA41_6AB1_521A);
+        let mut rng2 = StdRng::seed_from_u64(0x8DEE_F32A_8712_321F);
+
+        // let _ = simple_logger::init();
+        let (mut c1, mut c2) = unix_channel_pair();
+
+        let handle = spawn(move || {
+            let delta: Block = rng2.gen();
+            let mut cache: CachedSender = CachedSender::new(delta);
+
+            // generate the required number of base OT
+            let mut kos18 =
+                KosDeltaSender::init_fixed_key(&mut c2, delta.into(), &mut rng2).unwrap();
+            cache
+                .generate(
+                    &mut kos18,
+                    &mut c2,
+                    &mut rng2,
+                    TEST_BUCKET_LOG_SIZE * TEST_M + CSP,
+                )
+                .unwrap();
+
+            // create spcot functionality
+            let mut spcot = spcot::Sender::init(delta);
+
+            // do MPCOT extension
+            let s = Sender::extend::<
+                _,
+                _,
+                TEST_T,
+                TEST_N,
+                TEST_M,
+                TEST_BUCKET_LOG_SIZE,
+                TEST_BUCKET_SIZE,
+            >(&TEST_BUCKETS, &mut cache, &mut spcot, &mut c2, &mut rng2);
+
+            // sanity check: we consumed all the COTs
+            assert_eq!(cache.capacity(), 0);
+            (delta, s)
+        });
+
+        // generate a bunch of base COTs
+        let mut cache: CachedReceiver = CachedReceiver::default();
+        let mut kos18 = KosDeltaReceiver::init(&mut c1, &mut rng1).unwrap();
+        cache
+            .generate(
+                &mut kos18,
+                &mut c1,
+                &mut rng1,
+                TEST_BUCKET_LOG_SIZE * TEST_M + CSP,
+            )
+            .unwrap();
+
+        // create spcot functionality
+        let mut spcot = spcot::Receiver::init();
+
+        // pick random indexes to set
+        let alpha = unique_random_array(&mut rng1, TEST_N);
+
+        // do MPCOT extension
+        let r = Receiver::extend::<
+            _,
+            _,
+            TEST_T,
+            TEST_N,
+            TEST_M,
+            TEST_BUCKET_LOG_SIZE,
+            TEST_BUCKET_SIZE,
+        >(
+            &TEST_BUCKETS,
+            &mut cache,
+            &mut spcot,
+            &mut c1,
+            &mut rng1,
+            &alpha,
+        )
+        .unwrap();
+
+        // sanity check: we consumed all the COTs
+        assert_eq!(cache.capacity(), 0);
+
+        let (delta, mut s) = handle.join().unwrap();
+    }
 }

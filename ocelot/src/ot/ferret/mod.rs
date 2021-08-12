@@ -2,6 +2,7 @@
 mod cache;
 mod mpcot;
 mod spcot;
+mod util;
 
 use cache::{CachedReceiver, CachedSender};
 

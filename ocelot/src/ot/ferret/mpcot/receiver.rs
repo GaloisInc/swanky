@@ -10,10 +10,10 @@ use std::mem;
 
 use super::{Buckets, CUCKOO_ITERS, HASHES};
 
-struct Receiver {}
+pub(crate) struct Receiver {}
 
 impl Receiver {
-    fn extend<
+    pub(crate) fn extend<
         C: AbstractChannel,
         R: Rng + CryptoRng,
         const T: usize,
@@ -27,19 +27,28 @@ impl Receiver {
         spcot: &mut SPCOTReceiver,  // SPCOT implementation
         channel: &mut C,            // communication channel
         rng: &mut R,                // cryptographically secure RNG
-        alphas: &[u32; T],          // 1-positions
+        alphas: &[usize; T],        // 1-positions
     ) -> Result<Vec<Block>, Error> {
         let last_bucket: usize = (1 << LOG_SIZE_BUCKET) - 1;
         debug_assert!(bucket.max < 1 << LOG_SIZE_BUCKET);
         debug_assert_eq!(SIZE_BUCKET, 1 << LOG_SIZE_BUCKET);
+        #[cfg(debug_assertions)]
+        {
+            // check that all alpha's are unique
+            let mut alphas_sorted = *alphas;
+            alphas_sorted.sort();
+            for i in 0..(T - 1) {
+                debug_assert_ne!(alphas_sorted[i], alphas_sorted[i + 1]);
+            }
+        }
 
         // insert alpha's into Cuckoo table
-        let mut table: Vec<Option<u32>> = vec![None; M];
+        let mut table: Vec<Option<usize>> = vec![None; M];
         for mut alpha in alphas.iter().copied() {
             'cuckoo: for iter in 0..CUCKOO_ITERS {
                 // try every hash
                 for h in HASHES.iter() {
-                    let i = h.hash_mod(alpha, M as u32);
+                    let i = h.hash_mod(alpha as u32, M as u32);
                     let e = &mut table[i as usize];
                     if e.is_none() {
                         *e = Some(alpha);
@@ -48,7 +57,7 @@ impl Receiver {
                 }
 
                 // push out
-                let i = HASHES[0].hash_mod(alpha, M as u32);
+                let i = HASHES[rng.gen::<usize>() % HASHES.len()].hash_mod(alpha as u32, M as u32);
                 alpha = mem::replace(&mut table[i as usize], Some(alpha)).unwrap();
                 assert!(iter < CUCKOO_ITERS - 1);
             }
@@ -60,9 +69,10 @@ impl Receiver {
             .enumerate()
             .map(|(j, e)| match e {
                 None => last_bucket,
-                Some(alpha) => bucket.pos(j, alpha),
+                Some(alpha) => bucket.pos(j, alpha as u32),
             })
             .collect();
+        debug_assert_eq!(p.len(), M);
 
         // run M calls to SPCOT in parallel
         let rh = spcot.extend::<_, _, LOG_SIZE_BUCKET, SIZE_BUCKET>(cache, channel, rng, &p[..])?;

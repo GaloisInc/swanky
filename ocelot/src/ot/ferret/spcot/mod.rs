@@ -130,8 +130,7 @@ mod tests {
         }
     }
 
-    #[test]
-    fn test_spcot_correlation() {
+    fn test_spcot_correlation<const H: usize, const N: usize>(num: usize) {
         // de-randomize the test
         let mut rng1 = StdRng::seed_from_u64(0x5322_FA41_6AB1_521A);
         let mut rng2 = StdRng::seed_from_u64(0x8DEE_F32A_8712_321F);
@@ -139,21 +138,19 @@ mod tests {
         let _ = simple_logger::init();
         let (mut c1, mut c2) = unix_channel_pair();
 
-        let num = 1;
-
         let handle = spawn(move || {
             let delta: Block = rng1.gen();
             let mut cache: CachedSender = CachedSender::new(delta);
             let mut kos18 =
                 KosDeltaSender::init_fixed_key(&mut c2, delta.into(), &mut rng1).unwrap();
             cache
-                .generate(&mut kos18, &mut c2, &mut rng1, 2 + CSP)
+                .generate(&mut kos18, &mut c2, &mut rng1, H * num + CSP)
                 .unwrap();
-            let mut send: Sender = Sender::init();
+            let mut send: Sender = Sender::init(delta);
             let v = send
-                .extend::<_, _, 2, 4>(&mut cache, &mut c2, &mut rng1, num)
+                .extend::<_, _, H, N>(&mut cache, &mut c2, &mut rng1, num)
                 .unwrap();
-            (cache.delta(), v)
+            (delta, v)
         });
 
         let mut cache: CachedReceiver = CachedReceiver::default();
@@ -161,7 +158,7 @@ mod tests {
         let mut kos18 = KosDeltaReceiver::init(&mut c1, &mut rng2).unwrap();
 
         cache
-            .generate(&mut kos18, &mut c1, &mut rng2, 2 + CSP)
+            .generate(&mut kos18, &mut c1, &mut rng2, H * num + CSP)
             .unwrap();
 
         let mut recv: Receiver = Receiver::init();
@@ -170,9 +167,8 @@ mod tests {
         let alpha: Vec<usize> = (0..num).map(|_| rng2.gen::<usize>() % 4).collect();
 
         let w = recv
-            .extend::<_, _, 2, 4>(&mut cache, &mut c1, &mut rng2, &alpha[..])
+            .extend::<_, _, H, N>(&mut cache, &mut c1, &mut rng2, &alpha[..])
             .unwrap();
-        println!("{:?}", w);
 
         let (delta, mut v) = handle.join().unwrap();
 
@@ -181,5 +177,33 @@ mod tests {
         }
 
         assert_eq!(v, w, "correlation not satisfied");
+    }
+
+    #[test]
+    fn test_spcot_correlation_h2() {
+        for i in vec![1, 2, 5, 10].into_iter() {
+            test_spcot_correlation::<2, 4>(i);
+        }
+    }
+
+    #[test]
+    fn test_spcot_correlation_h3() {
+        for i in vec![1, 2, 5, 10].into_iter() {
+            test_spcot_correlation::<3, 8>(i);
+        }
+    }
+
+    #[test]
+    fn test_spcot_correlation_h4() {
+        for i in vec![1, 2, 5, 10].into_iter() {
+            test_spcot_correlation::<4, 16>(i);
+        }
+    }
+
+    #[test]
+    fn test_spcot_correlation_h5() {
+        for i in vec![1, 2, 5, 10].into_iter() {
+            test_spcot_correlation::<5, 32>(i);
+        }
     }
 }
