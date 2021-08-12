@@ -1,7 +1,4 @@
-use crate::{
-    errors::Error,
-    ot::{CorrelatedSender, FixedKeyInitializer, RandomSender, Sender as OtSender},
-};
+use crate::errors::Error;
 use log;
 use rand::{CryptoRng, Rng};
 use scuttlebutt::{AbstractChannel, Aes128, AesHash, Block, F128};

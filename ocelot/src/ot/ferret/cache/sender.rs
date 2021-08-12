@@ -2,7 +2,7 @@ use super::VecTake;
 
 use crate::{
     errors::Error,
-    ot::{CorrelatedSender, FixedKeyInitializer, RandomSender, Sender as OtSender},
+    ot::{CorrelatedSender, RandomSender, Sender as OtSender},
 };
 
 use rand::{CryptoRng, Rng};
