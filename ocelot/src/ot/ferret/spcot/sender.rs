@@ -22,15 +22,9 @@ impl Sender {
     }
 
     #[allow(non_snake_case)]
-    pub fn extend<
-        OT: OtSender<Msg = Block> + RandomSender + CorrelatedSender,
-        C: AbstractChannel,
-        RNG: CryptoRng + Rng,
-        const H: usize,
-        const N: usize,
-    >(
+    pub fn extend<C: AbstractChannel, RNG: CryptoRng + Rng, const H: usize, const N: usize>(
         &mut self,
-        base_cot: &mut CachedSender<OT>,
+        base_cot: &mut CachedSender,
         channel: &mut C,
         rng: &mut RNG,
         num: usize, // number of parallel repetitions
@@ -39,7 +33,7 @@ impl Sender {
 
         // acquire base COT
         let delta = base_cot.delta();
-        let cot = base_cot.send(channel, rng, H * num + CSP)?;
+        let cot = base_cot.get(H * num + CSP).unwrap();
 
         // obtain masked indexes from receiver
         let bs: Vec<usize> = channel.receive_n(num)?;

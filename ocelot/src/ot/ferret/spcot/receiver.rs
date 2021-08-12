@@ -24,15 +24,9 @@ impl Receiver {
     }
 
     #[allow(non_snake_case)]
-    pub fn extend<
-        OT: OtReceiver<Msg = Block> + RandomReceiver + CorrelatedReceiver,
-        C: AbstractChannel,
-        RNG: CryptoRng + Rng,
-        const H: usize,
-        const N: usize,
-    >(
+    pub fn extend<C: AbstractChannel, RNG: CryptoRng + Rng, const H: usize, const N: usize>(
         &mut self,
-        base_cot: &mut CachedReceiver<OT>,
+        base_cot: &mut CachedReceiver,
         channel: &mut C,
         rng: &mut RNG,
         alphas: &[usize],
@@ -43,7 +37,7 @@ impl Receiver {
         let num = alphas.len();
 
         // acquire base COT
-        let (r, t) = base_cot.recv(channel, rng, H * num + CSP)?;
+        let (r, t) = base_cot.get(H * num + CSP).unwrap();
 
         // send all b's together to avoid multiple flushes
         let mut bs: Vec<usize> = Vec::with_capacity(num);

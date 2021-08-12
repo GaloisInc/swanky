@@ -83,12 +83,12 @@ mod tests {
 
     use std::thread::spawn;
 
+    use crate::ot::FixedKeyInitializer;
     use rand::{rngs::StdRng, Rng, SeedableRng};
     use scuttlebutt::channel::unix_channel_pair;
-
     use simple_logger;
 
-    use crate::ot::{KosDeltaReceiver, KosDeltaSender};
+    use crate::ot::{KosDeltaReceiver, KosDeltaSender, Receiver as OtReceiver};
 
     use std::convert::TryFrom;
 
@@ -142,17 +142,27 @@ mod tests {
         let num = 1;
 
         let handle = spawn(move || {
-            let mut cot: CachedSender<KosDeltaSender> =
-                CachedSender::init(&mut c2, &mut rng1).unwrap();
+            let delta: Block = rng1.gen();
+            let mut cache: CachedSender = CachedSender::new(delta);
+            let mut kos18 =
+                KosDeltaSender::init_fixed_key(&mut c2, delta.into(), &mut rng1).unwrap();
+            cache
+                .generate(&mut kos18, &mut c2, &mut rng1, 2 + CSP)
+                .unwrap();
             let mut send: Sender = Sender::init();
             let v = send
-                .extend::<_, _, _, 2, 4>(&mut cot, &mut c2, &mut rng1, num)
+                .extend::<_, _, 2, 4>(&mut cache, &mut c2, &mut rng1, num)
                 .unwrap();
-            (cot.delta(), v)
+            (cache.delta(), v)
         });
 
-        let mut cot: CachedReceiver<KosDeltaReceiver> =
-            CachedReceiver::init(&mut c1, &mut rng2).unwrap();
+        let mut cache: CachedReceiver = CachedReceiver::default();
+
+        let mut kos18 = KosDeltaReceiver::init(&mut c1, &mut rng2).unwrap();
+
+        cache
+            .generate(&mut kos18, &mut c1, &mut rng2, 2 + CSP)
+            .unwrap();
 
         let mut recv: Receiver = Receiver::init();
         //( let out = recv.receive_random(&mut c1, &[true], &mut OsRng).unwrap();
@@ -160,7 +170,7 @@ mod tests {
         let alpha: Vec<usize> = (0..num).map(|_| rng2.gen::<usize>() % 4).collect();
 
         let w = recv
-            .extend::<_, _, _, 2, 4>(&mut cot, &mut c1, &mut rng2, &alpha[..])
+            .extend::<_, _, 2, 4>(&mut cache, &mut c1, &mut rng2, &alpha[..])
             .unwrap();
         println!("{:?}", w);
 
