@@ -220,8 +220,8 @@ pub mod cooley_tukey {
 /// Compute the 2-radix FFT of `a_coef` in the *Zp* field defined by `prime`.
 ///
 /// `omega` must be a `n`-th principal root of unity,
-/// where `n` is the lenght of `a_coef` as well as a power of 2.
-/// The result will contains the same number of elements.
+/// where `n` is the length of `a_coef` as well as a power of 2.
+/// The result will contain the same number of elements.
 #[allow(dead_code)]
 pub fn fft2<Field>(a_coef: &[Field], omega: Field) -> Vec<Field>
     where Field: FieldForFFT2
@@ -287,8 +287,8 @@ macro_rules! fft2_tests {
 /// Compute the 3-radix FFT of `a_coef` in the *Zp* field defined by `prime`.
 ///
 /// `omega` must be a `n`-th principal root of unity,
-/// where `n` is the lenght of `a_coef` as well as a power of 3.
-/// The result will contains the same number of elements.
+/// where `n` is the length of `a_coef` as well as a power of 3.
+/// The result will contain the same number of elements.
 pub fn fft3<Field>(a_coef: &[Field], omega: Field) -> Vec<Field>
     where Field: FieldForFFT3
 {
