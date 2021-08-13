@@ -333,25 +333,29 @@ impl<Field: FieldForLigero> Params<Field> {
 
         let p_deg = p.len();
         let q_deg = q.len();
-        let mut p_coeffs = p.to_vec();
-        let mut q_coeffs = q.to_vec();
 
         let max_deg = 2usize.pow(self.kexp + 1);
         let pq_deg = p_deg + q_deg - 1;
         let omega = Field::from(Field::roots_base_2(self.kexp as usize + 1));
 
-        p_coeffs.append(&mut vec![Field::ZERO; max_deg - p_deg]);
-        q_coeffs.append(&mut vec![Field::ZERO; max_deg - q_deg]);
+        let mut p0 = p.iter()
+            .chain(std::iter::repeat(&Field::ZERO).take(max_deg - p_deg))
+            .cloned()
+            .collect::<Array1<_>>();
+        let mut q0 = q.iter()
+            .chain(std::iter::repeat(&Field::ZERO).take(max_deg - q_deg))
+            .cloned()
+            .collect::<Array1<_>>();
 
-        let p_points = numtheory::fft2(&p_coeffs, omega);
-        let q_points = numtheory::fft2(&q_coeffs, omega);
-        let pq_points = p_points.iter()
-            .zip(q_points)
-            .map(|(&pi,qi)| pi * qi)
-            .collect::<Vec<_>>();
-        let pq_coeffs = numtheory::fft2_inverse(&pq_points, omega);
+        // Use in-place fft to avoid allocating any more Vecs.
+        numtheory::cooley_tukey::fft2(p0.as_slice_mut().unwrap(), omega);
+        numtheory::cooley_tukey::fft2(q0.as_slice_mut().unwrap(), omega);
+        for i in 0 .. max_deg {
+            p0[i] *= q0[i]
+        }
+        numtheory::cooley_tukey::fft2_inverse(p0.as_slice_mut().unwrap(), omega);
 
-        pq_coeffs.iter().take(pq_deg).cloned().collect()
+        p0.slice_move(ndarray::s![0 .. pq_deg])
     }
 
     /// Return a random size-t subset of `[n]`.
