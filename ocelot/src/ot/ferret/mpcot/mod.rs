@@ -1,11 +1,14 @@
 mod receiver;
 mod sender;
 
+use itertools::Itertools;
 use lazy_static::lazy_static;
 use rand::RngCore;
 
 use receiver::Receiver;
 use sender::Sender;
+
+use scuttlebutt::Block;
 
 const NUM_HASHES: usize = 3;
 
@@ -42,6 +45,26 @@ pub struct UH {
     b: u64,
 }
 
+#[inline(always)]
+pub fn combine_buckets<const N: usize>(
+    x: usize,
+    len: usize,
+    buckets: &Buckets,
+    elems: &[[Block; N]],
+) -> Block {
+    let mut hx: [usize; NUM_HASHES] = [
+        HASHES[0].hash_idx(x, len),
+        HASHES[1].hash_idx(x, len),
+        HASHES[2].hash_idx(x, len),
+    ];
+    hx.sort();
+    let mut rx: Block = Default::default();
+    for hix in hx.iter().copied().dedup() {
+        rx ^= elems[hix][buckets.pos(hix, x)];
+    }
+    rx
+}
+
 impl UH {
     pub fn gen<R: RngCore>(rng: &mut R) -> Self {
         UH {
@@ -65,31 +88,36 @@ impl UH {
     }
 
     #[inline(always)]
-    pub const fn hash_mod(&self, v: u32, m: u32) -> u32 {
-        self.hash(v) % m
+    pub const fn hash_idx(&self, v: usize, len: usize) -> usize {
+        (self.hash(v as u32) % (len as u32)) as usize
     }
 }
 
 /// Pre-compute the bucket sorting
+#[derive(Debug)]
 pub struct Buckets {
     max: usize,
-    buckets: Vec<Vec<u32>>,
+    buckets: Vec<Vec<usize>>,
 }
 
 impl Buckets {
-    fn build(n: u32, m: u32) -> Self {
+    fn build(n: usize, m: usize) -> Self {
         // compute sorted buckets
-        let mut buckets: Vec<Vec<u32>> = vec![vec![]; m as usize];
+        let mut buckets: Vec<Vec<usize>> = vec![vec![]; m as usize];
         for x in 0..n {
             for hsh in HASHES.iter() {
-                let j = hsh.hash(x as u32) % m;
-                buckets[j as usize].push(x);
+                let j = hsh.hash_idx(x, m);
+                buckets[j].push(x);
             }
         }
 
-        // compute the maximum size of any bucket
         let mut max: usize = 0;
-        for bucket in buckets.iter() {
+        for bucket in buckets.iter_mut() {
+            // remove duplicates
+            // (same key could hash to the same bucket under different hash functions)
+            bucket.dedup();
+
+            // compute the maximum size of any bucket (for sanity checking)
             if bucket.len() > max {
                 max = bucket.len();
             }
@@ -98,7 +126,9 @@ impl Buckets {
         Self { buckets, max }
     }
 
-    fn pos(&self, j: usize, x: u32) -> usize {
+    fn pos(&self, j: usize, x: usize) -> usize {
+        // TODO: use binary search
+        // (or convert to hash-map)
         for (i, e) in self.buckets[j].iter().copied().enumerate() {
             if e == x {
                 return i;
@@ -109,8 +139,8 @@ impl Buckets {
 }
 
 lazy_static! {
-    static ref BUCKETS_SETUP: Buckets = Buckets::build(SETUP_N as u32, SETUP_M as u32);
-    static ref BUCKETS_MAIN: Buckets = Buckets::build(MAIN_N as u32, MAIN_M as u32);
+    static ref BUCKETS_SETUP: Buckets = Buckets::build(SETUP_N, SETUP_M);
+    static ref BUCKETS_MAIN: Buckets = Buckets::build(MAIN_N, MAIN_M);
 }
 
 mod tests {
@@ -135,14 +165,14 @@ mod tests {
 
     use std::convert::TryFrom;
 
-    const TEST_T: usize = 3;
-    const TEST_N: usize = 100;
+    const TEST_T: usize = 5;
+    const TEST_N: usize = 10;
     const TEST_M: usize = (TEST_T * 3) / 2;
-    const TEST_BUCKET_LOG_SIZE: usize = 11;
+    const TEST_BUCKET_LOG_SIZE: usize = 3;
     const TEST_BUCKET_SIZE: usize = 1 << TEST_BUCKET_LOG_SIZE;
 
     lazy_static! {
-        static ref TEST_BUCKETS: Buckets = Buckets::build(TEST_N as u32, TEST_M as u32);
+        static ref TEST_BUCKETS: Buckets = Buckets::build(TEST_N, TEST_M);
     }
 
     #[test]
@@ -154,34 +184,72 @@ mod tests {
 
     #[test]
     fn test_mpcot_correlation() {
+        let mut root = StdRng::seed_from_u64(0x5367_FA32_72B1_8478);
+
         // de-randomize the test
-        let mut rng1 = StdRng::seed_from_u64(0x5322_FA41_6AB1_521A);
-        let mut rng2 = StdRng::seed_from_u64(0x8DEE_F32A_8712_321F);
 
-        // let _ = simple_logger::init();
-        let (mut c1, mut c2) = unix_channel_pair();
+        for _ in 0..5 {
+            let mut rng1 = StdRng::seed_from_u64(root.gen());
+            let mut rng2 = StdRng::seed_from_u64(root.gen());
 
-        let handle = spawn(move || {
-            let delta: Block = rng2.gen();
-            let mut cache: CachedSender = CachedSender::new(delta);
+            // let _ = simple_logger::init();
+            let (mut c1, mut c2) = unix_channel_pair();
 
-            // generate the required number of base OT
-            let mut kos18 =
-                KosDeltaSender::init_fixed_key(&mut c2, delta.into(), &mut rng2).unwrap();
+            let handle = spawn(move || {
+                let delta: Block = rng2.gen();
+                let mut cache: CachedSender = CachedSender::new(delta);
+
+                // generate the required number of base OT
+                let mut kos18 =
+                    KosDeltaSender::init_fixed_key(&mut c2, delta.into(), &mut rng2).unwrap();
+                cache
+                    .generate(
+                        &mut kos18,
+                        &mut c2,
+                        &mut rng2,
+                        TEST_BUCKET_LOG_SIZE * TEST_M + CSP,
+                    )
+                    .unwrap();
+
+                // create spcot functionality
+                let mut spcot = spcot::Sender::init(delta);
+
+                // do MPCOT extension
+                let s = Sender::extend::<
+                    _,
+                    _,
+                    TEST_T,
+                    TEST_N,
+                    TEST_M,
+                    TEST_BUCKET_LOG_SIZE,
+                    TEST_BUCKET_SIZE,
+                >(&TEST_BUCKETS, &mut cache, &mut spcot, &mut c2, &mut rng2)
+                .unwrap();
+
+                // sanity check: we consumed all the COTs
+                assert_eq!(cache.capacity(), 0);
+                (delta, s)
+            });
+
+            // generate a bunch of base COTs
+            let mut cache: CachedReceiver = CachedReceiver::default();
+            let mut kos18 = KosDeltaReceiver::init(&mut c1, &mut rng1).unwrap();
             cache
                 .generate(
                     &mut kos18,
-                    &mut c2,
-                    &mut rng2,
+                    &mut c1,
+                    &mut rng1,
                     TEST_BUCKET_LOG_SIZE * TEST_M + CSP,
                 )
                 .unwrap();
 
             // create spcot functionality
-            let mut spcot = spcot::Sender::init(delta);
+            let mut spcot = spcot::Receiver::init();
 
+            // pick random indexes to set
+            let alpha = unique_random_array(&mut rng1, TEST_N);
             // do MPCOT extension
-            let s = Sender::extend::<
+            let w = Receiver::extend::<
                 _,
                 _,
                 TEST_T,
@@ -189,53 +257,28 @@ mod tests {
                 TEST_M,
                 TEST_BUCKET_LOG_SIZE,
                 TEST_BUCKET_SIZE,
-            >(&TEST_BUCKETS, &mut cache, &mut spcot, &mut c2, &mut rng2);
-
-            // sanity check: we consumed all the COTs
-            assert_eq!(cache.capacity(), 0);
-            (delta, s)
-        });
-
-        // generate a bunch of base COTs
-        let mut cache: CachedReceiver = CachedReceiver::default();
-        let mut kos18 = KosDeltaReceiver::init(&mut c1, &mut rng1).unwrap();
-        cache
-            .generate(
-                &mut kos18,
+            >(
+                &TEST_BUCKETS,
+                &mut cache,
+                &mut spcot,
                 &mut c1,
                 &mut rng1,
-                TEST_BUCKET_LOG_SIZE * TEST_M + CSP,
+                &alpha,
             )
             .unwrap();
 
-        // create spcot functionality
-        let mut spcot = spcot::Receiver::init();
+            // sanity check: we consumed all the COTs
+            assert_eq!(cache.capacity(), 0);
 
-        // pick random indexes to set
-        let alpha = unique_random_array(&mut rng1, TEST_N);
+            let (delta, mut v) = handle.join().unwrap();
 
-        // do MPCOT extension
-        let r = Receiver::extend::<
-            _,
-            _,
-            TEST_T,
-            TEST_N,
-            TEST_M,
-            TEST_BUCKET_LOG_SIZE,
-            TEST_BUCKET_SIZE,
-        >(
-            &TEST_BUCKETS,
-            &mut cache,
-            &mut spcot,
-            &mut c1,
-            &mut rng1,
-            &alpha,
-        )
-        .unwrap();
+            println!("before: v = {:?}, w = {:?}", v, w);
 
-        // sanity check: we consumed all the COTs
-        assert_eq!(cache.capacity(), 0);
-
-        let (delta, mut s) = handle.join().unwrap();
+            // check correlation
+            for i in alpha.iter().copied() {
+                v[i] ^= delta;
+            }
+            debug_assert_eq!(v, w, "alpha = {:?}", alpha);
+        }
     }
 }

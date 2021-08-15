@@ -26,6 +26,7 @@ scuttlebutt = {path = "../scuttlebutt", features = ["curve25519-dalek"]}
 sha2 = "0.9"
 simple_logger = "1.12"
 lazy_static = "1.4"
+itertools = "0.10"
 
 [build-dependencies]
 cc = "1.0"

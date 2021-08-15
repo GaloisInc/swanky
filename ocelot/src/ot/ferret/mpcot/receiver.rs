@@ -8,7 +8,7 @@ use scuttlebutt::{AbstractChannel, Block};
 
 use std::mem;
 
-use super::{Buckets, CUCKOO_ITERS, HASHES};
+use super::{combine_buckets, Buckets, CUCKOO_ITERS, HASHES};
 
 pub(crate) struct Receiver {}
 
@@ -22,15 +22,17 @@ impl Receiver {
         const LOG_SIZE_BUCKET: usize,
         const SIZE_BUCKET: usize,
     >(
-        bucket: &Buckets,           // precomputed bucket lookup
+        buckets: &Buckets,          // precomputed bucket lookup
         cache: &mut CachedReceiver, // bag of base-COT
         spcot: &mut SPCOTReceiver,  // SPCOT implementation
         channel: &mut C,            // communication channel
         rng: &mut R,                // cryptographically secure RNG
         alphas: &[usize; T],        // 1-positions
     ) -> Result<Vec<Block>, Error> {
+        log::trace!("alpha = {:?}", alphas);
         let last_bucket: usize = (1 << LOG_SIZE_BUCKET) - 1;
-        debug_assert!(bucket.max < 1 << LOG_SIZE_BUCKET);
+
+        debug_assert!(buckets.max < 1 << LOG_SIZE_BUCKET);
         debug_assert_eq!(SIZE_BUCKET, 1 << LOG_SIZE_BUCKET);
         #[cfg(debug_assertions)]
         {
@@ -48,8 +50,8 @@ impl Receiver {
             'cuckoo: for iter in 0..CUCKOO_ITERS {
                 // try every hash
                 for h in HASHES.iter() {
-                    let i = h.hash_mod(alpha as u32, M as u32);
-                    let e = &mut table[i as usize];
+                    let i = h.hash_idx(alpha, M);
+                    let e = &mut table[i];
                     if e.is_none() {
                         *e = Some(alpha);
                         break 'cuckoo;
@@ -57,22 +59,31 @@ impl Receiver {
                 }
 
                 // push out
-                let i = HASHES[rng.gen::<usize>() % HASHES.len()].hash_mod(alpha as u32, M as u32);
-                alpha = mem::replace(&mut table[i as usize], Some(alpha)).unwrap();
+                let i = HASHES[rng.gen::<usize>() % HASHES.len()].hash_idx(alpha, M);
+                alpha = mem::replace(&mut table[i], Some(alpha)).unwrap();
                 assert!(iter < CUCKOO_ITERS - 1);
             }
         }
 
         // compute the indexes in each bucket to retrieve
+        println!("T = {:?}", &table[..]);
+        println!("buckets = {:?}", buckets);
+
         let p: Vec<usize> = table
             .into_iter()
             .enumerate()
             .map(|(j, e)| match e {
                 None => last_bucket,
-                Some(alpha) => bucket.pos(j, alpha as u32),
+                Some(alpha) => buckets.pos(j, alpha),
             })
             .collect();
         debug_assert_eq!(p.len(), M);
+
+        for i in 0..M {
+            println!("set : {},{}", i, p[i]);
+        }
+
+        println!("p = {:?}", &p[..]);
 
         // run M calls to SPCOT in parallel
         let rh = spcot.extend::<_, _, LOG_SIZE_BUCKET, SIZE_BUCKET>(cache, channel, rng, &p[..])?;
@@ -81,12 +92,7 @@ impl Receiver {
         // r[x] := \sum_{i} rh[h_i(x)][pos_(h_i(x))(x)]
         let mut r: Vec<Block> = Vec::with_capacity(N);
         for x in 0..N {
-            let mut rx: Block = Default::default();
-            for h in HASHES.iter() {
-                let hix = h.hash_mod(x as u32, M as u32);
-                rx ^= rh[hix as usize][bucket.pos(hix as usize, x as u32)];
-            }
-            r.push(rx);
+            r.push(combine_buckets(x, M, buckets, &rh[..]));
         }
         Ok(r)
     }

@@ -8,7 +8,7 @@ use scuttlebutt::{AbstractChannel, Block};
 
 use std::mem;
 
-use super::{Buckets, CUCKOO_ITERS, HASHES};
+use super::{combine_buckets, Buckets, CUCKOO_ITERS, HASHES, NUM_HASHES};
 
 pub(crate) struct Sender {}
 
@@ -22,7 +22,7 @@ impl Sender {
         const LOG_SIZE_BUCKET: usize,
         const SIZE_BUCKET: usize,
     >(
-        bucket: &Buckets,         // precomputed bucket lookup
+        buckets: &Buckets,        // precomputed bucket lookup
         cache: &mut CachedSender, // bag of base-COT
         spcot: &mut SPCOTSender,  // SPCOT implementation
         channel: &mut C,          // communication channel
@@ -31,12 +31,7 @@ impl Sender {
         let sh = spcot.extend::<_, _, LOG_SIZE_BUCKET, SIZE_BUCKET>(cache, channel, rng, M)?;
         let mut s: Vec<Block> = Vec::with_capacity(N);
         for x in 0..N {
-            let mut rx: Block = Default::default();
-            for h in HASHES.iter() {
-                let hix = h.hash_mod(x as u32, M as u32);
-                rx ^= sh[hix as usize][bucket.pos(hix as usize, x as u32)];
-            }
-            s.push(rx);
+            s.push(combine_buckets(x, M, buckets, &sh[..]));
         }
         debug_assert_eq!(s.len(), N);
         Ok(s)
