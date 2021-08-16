@@ -29,13 +29,13 @@ impl Receiver {
         rng: &mut R,                // cryptographically secure RNG
         alphas: &[usize; T],        // 1-positions
     ) -> Result<Vec<Block>, Error> {
-        log::trace!("alpha = {:?}", alphas);
         let last_bucket: usize = (1 << LOG_SIZE_BUCKET) - 1;
 
-        debug_assert!(buckets.max < 1 << LOG_SIZE_BUCKET);
-        debug_assert_eq!(SIZE_BUCKET, 1 << LOG_SIZE_BUCKET);
         #[cfg(debug_assertions)]
         {
+            debug_assert!(buckets.max < 1 << LOG_SIZE_BUCKET);
+            debug_assert_eq!(SIZE_BUCKET, 1 << LOG_SIZE_BUCKET);
+
             // check that all alpha's are unique
             let mut alphas_sorted = *alphas;
             alphas_sorted.sort();
@@ -66,9 +66,6 @@ impl Receiver {
         }
 
         // compute the indexes in each bucket to retrieve
-        println!("T = {:?}", &table[..]);
-        println!("buckets = {:?}", buckets);
-
         let p: Vec<usize> = table
             .into_iter()
             .enumerate()
@@ -78,12 +75,6 @@ impl Receiver {
             })
             .collect();
         debug_assert_eq!(p.len(), M);
-
-        for i in 0..M {
-            println!("set : {},{}", i, p[i]);
-        }
-
-        println!("p = {:?}", &p[..]);
 
         // run M calls to SPCOT in parallel
         let rh = spcot.extend::<_, _, LOG_SIZE_BUCKET, SIZE_BUCKET>(cache, channel, rng, &p[..])?;

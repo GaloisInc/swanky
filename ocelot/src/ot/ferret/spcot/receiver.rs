@@ -144,30 +144,26 @@ impl Receiver {
 
         // send a seed from which all the changes are derived
         let seed: Block = rng.gen();
+        let mut gen = BiasedGen::new(seed);
         log::trace!("seed = {:?}", seed);
 
         // derive random coefficients
-        let aes: Aes128 = Aes128::new(seed);
-        let mut W: F128 = F128::zero();
+        let mut W = (Block::default(), Block::default()); // defer GF(2^128) reduction
         let mut phi: F128 = F128::zero();
         for (l, alpha) in alphas.iter().copied().enumerate() {
-            let xl: F128 = aes.encrypt((l as u128).into()).into();
-            let mut xli = xl;
-
             // X_{i}^{l} = (X^{l})^i
             for i in 0..N {
-                log::trace!("X_(l = {})^(i = {}) = {:?}", l, i, xli);
-
-                W = W + xli * ws[l][i].into();
-
+                let xli: F128 = gen.next();
+                let cm = xli.cmul(ws[l][i].into());
+                W.0 ^= cm.0;
+                W.1 ^= cm.1;
                 if i == alpha {
                     phi = phi + xli;
                 }
-
-                // X_{i+1}^{l} = X_{i+1}^{l} X_{1}^{l}
-                xli = xli * xl;
+                log::trace!("X_(l = {})^(i = {}) = {:?}", l, i, xli);
             }
         }
+        let W: F128 = F128::reduce(W);
 
         // pack the choice bits into a 128-bit block
         let xs = <&[bool; 128]>::try_from(xs).unwrap();
@@ -177,17 +173,6 @@ impl Receiver {
         // mask the alpha sum
         let phi: Block = phi.into();
         let xp: Block = phi ^ xs;
-
-        #[cfg(debug_assertions)]
-        {
-            /*
-            let x: [bool; CSP] = phi.into();
-            for i in 0..CSP {
-                log::trace!("x[{}] = {:?}, z*[{}] = {:?}", i, x[i] as usize, i, zs[i]);
-            }
-            */
-            log::trace!("x' = {:?}", xp);
-        }
 
         // send coefficients and masked sum to the sender
         channel.send(&seed)?;

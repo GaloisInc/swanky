@@ -2,6 +2,7 @@
 //!
 //! The notation is kept as close as possible to that of the paper.
 
+mod generator;
 mod receiver;
 mod sender;
 
@@ -10,6 +11,7 @@ use super::{
     CSP,
 };
 
+pub(crate) use generator::BiasedGen;
 pub(crate) use receiver::Receiver;
 pub(crate) use sender::Sender;
 
@@ -78,6 +80,7 @@ where
     res
 }
 
+#[cfg(test)]
 mod tests {
     use super::*;
 

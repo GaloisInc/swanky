@@ -137,33 +137,23 @@ impl Sender {
         }
         let Y = stack_cyclic(&y);
 
-        {
-            /*
-            for i in 0..CSP {
-                log::trace!("y[{}] = {:?}", i, y[i]);
-            }
-            */
-        }
-
         log::trace!("Y = {:?}", Y);
         log::trace!("\\Delta = {:?}", self.delta);
 
         // receive \chi_{i} for i in [n]
-        let aes: Aes128 = Aes128::new(seed);
-        let mut V: F128 = F128::zero();
+        let mut gen = BiasedGen::new(seed);
+        let mut V = (Block::default(), Block::default());
         for l in 0..num {
-            let xl: F128 = aes.encrypt((l as u128).into()).into();
-            let mut xli = xl;
             // X_{i}^{l} = (X^{l})^i
             for i in 0..N {
+                let xli: F128 = gen.next();
+                let cm = xli.cmul(vs[l][i].into());
+                V.0 ^= cm.0;
+                V.1 ^= cm.1;
                 log::trace!("X_(l = {})^(i = {}) = {:?}", l, i, xli);
-
-                V = V + xli * vs[l][i].into();
-
-                // X_{i+1}^{l} = X_{i+1}^{l} X_{1}^{l}
-                xli = xli * xl;
             }
         }
+        let V = F128::reduce(V);
 
         // compute Y := \sum_{i \in [k]} z*[i] * X^i
         let V = V + Y;

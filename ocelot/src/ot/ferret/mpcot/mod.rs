@@ -2,7 +2,6 @@ mod receiver;
 mod sender;
 
 use itertools::Itertools;
-use lazy_static::lazy_static;
 use rand::RngCore;
 
 use receiver::Receiver;
@@ -11,20 +10,6 @@ use sender::Sender;
 use scuttlebutt::Block;
 
 const NUM_HASHES: usize = 3;
-
-const SETUP_K: usize = 37_248;
-const SETUP_N: usize = 616_092;
-const SETUP_T: usize = 1_254;
-const SETUP_M: usize = (SETUP_T * 3) / 2;
-const SETUP_BUCKET_LOG_SIZE: usize = 11;
-const SETUP_BUCKET_SIZE: usize = 1 << SETUP_BUCKET_LOG_SIZE;
-
-const MAIN_K: usize = 588_160;
-const MAIN_N: usize = 10_616_092;
-const MAIN_T: usize = 1_324;
-const MAIN_M: usize = (MAIN_T * 3) / 2;
-const MAIN_BUCKET_LOG_SIZE: usize = 14;
-const MAIN_BUCKET_SIZE: usize = 1 << MAIN_BUCKET_LOG_SIZE;
 
 const CUCKOO_ITERS: usize = 100;
 
@@ -101,7 +86,7 @@ pub struct Buckets {
 }
 
 impl Buckets {
-    fn build(n: usize, m: usize) -> Self {
+    pub fn build(n: usize, m: usize) -> Self {
         // compute sorted buckets
         let mut buckets: Vec<Vec<usize>> = vec![vec![]; m as usize];
         for x in 0..n {
@@ -138,32 +123,29 @@ impl Buckets {
     }
 }
 
-lazy_static! {
-    static ref BUCKETS_SETUP: Buckets = Buckets::build(SETUP_N, SETUP_M);
-    static ref BUCKETS_MAIN: Buckets = Buckets::build(MAIN_N, MAIN_M);
-}
-
+#[cfg(test)]
 mod tests {
-    use super::*;
-
-    use std::thread::spawn;
-
-    use super::super::{
-        cache::{CachedReceiver, CachedSender},
-        spcot,
-        util::unique_random_array,
-        CSP,
+    use super::{
+        super::{
+            cache::{CachedReceiver, CachedSender},
+            spcot,
+            util::unique_random_array,
+            CSP,
+        },
+        *,
     };
 
-    use crate::ot::FixedKeyInitializer;
+    use crate::ot::{
+        FixedKeyInitializer,
+        KosDeltaReceiver,
+        KosDeltaSender,
+        Receiver as OtReceiver,
+    };
+
+    use lazy_static::lazy_static;
     use rand::{rngs::StdRng, Rng, SeedableRng};
-    use scuttlebutt::{channel::unix_channel_pair, Aes128, AesHash, Block, F128};
-
-    use simple_logger;
-
-    use crate::ot::{KosDeltaReceiver, KosDeltaSender, Receiver as OtReceiver};
-
-    use std::convert::TryFrom;
+    use scuttlebutt::{channel::unix_channel_pair, Block};
+    use std::thread::spawn;
 
     const TEST_T: usize = 5;
     const TEST_N: usize = 10;
@@ -176,23 +158,12 @@ mod tests {
     }
 
     #[test]
-    fn test_bucket_size() {
-        assert!(BUCKETS_SETUP.max < SETUP_BUCKET_SIZE);
-        assert!(BUCKETS_MAIN.max < MAIN_BUCKET_SIZE);
-        assert!(TEST_BUCKETS.max < TEST_BUCKET_SIZE);
-    }
-
-    #[test]
     fn test_mpcot_correlation() {
         let mut root = StdRng::seed_from_u64(0x5367_FA32_72B1_8478);
-
-        // de-randomize the test
 
         for _ in 0..5 {
             let mut rng1 = StdRng::seed_from_u64(root.gen());
             let mut rng2 = StdRng::seed_from_u64(root.gen());
-
-            // let _ = simple_logger::init();
             let (mut c1, mut c2) = unix_channel_pair();
 
             let handle = spawn(move || {
