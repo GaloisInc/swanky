@@ -5,7 +5,10 @@ services:
     image: swanky:latest
     volumes:
       #- ./scuttlebutt:/root/swanky/scuttlebutt
-      - ./ocelot:/root/swanky/ocelot
+      - ./ocelot/test_edabits.sh:/root/swanky/ocelot/test_edabits.sh
+      - ./ocelot/src:/root/swanky/ocelot/src
+      - ./ocelot/examples:/root/swanky/ocelot/examples
+      - ./ocelot/bench_result.txt:/tmp/bench_result.txt
     cap_add:
      - NET_ADMIN
     expose:
@@ -19,7 +22,9 @@ services:
     image: swanky:latest
     volumes:
       #- ./scuttlebutt:/root/swanky/scuttlebutt
-      - ./ocelot:/root/swanky/ocelot
+      - ./ocelot/test_edabits.sh:/root/swanky/ocelot/test_edabits.sh
+      - ./ocelot/src:/root/swanky/ocelot/src
+      - ./ocelot/examples:/root/swanky/ocelot/examples
     environment:
       - PROVER="True"
     cap_add:

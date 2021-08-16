@@ -13,9 +13,9 @@ type Receiver = ReceiverConv<F61p>;
 
 fn run() {
     let (mut sender, mut receiver) = track_unix_channel_pair();
-    let nb_bits: usize = 38;
-    let n = 10_000;
-    let num_bucket = 5;
+    let nb_bits: usize = 8;
+    let n = 1000_000;
+    let num_bucket = 3;
     let num_cut = num_bucket;
     let with_quicksilver = true;
     let handle = std::thread::spawn(move || {

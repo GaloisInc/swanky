@@ -7,8 +7,11 @@
 use clap::{App, Arg};
 use ocelot::edabits::{ReceiverConv, SenderConv};
 use scuttlebutt::{field::F61p, AesRng, SyncChannel, TrackChannel};
+use std::fs;
+use std::io::Write;
 use std::io::{BufReader, BufWriter};
 use std::net::{TcpListener, TcpStream};
+use std::path::Path;
 use std::time::Instant;
 
 type Sender = SenderConv<F61p>;
@@ -41,6 +44,23 @@ fn run(
     println!("multithreaded: {:?}", multithreaded);
 
     if whoami == VERIFIER {
+        let filename = "/tmp/bench_result.txt";
+        let mut file;
+        if Path::new(filename).exists() {
+            file = fs::OpenOptions::new()
+                .write(true)
+                .append(true)
+                .open(filename)
+                .unwrap();
+        } else {
+            file = fs::OpenOptions::new()
+                .create_new(true)
+                .write(true)
+                .append(true)
+                .open(filename)
+                .unwrap();
+        }
+
         println!("Verifier started");
 
         let listener = TcpListener::bind(connection_addr)?;
@@ -76,7 +96,9 @@ fn run(
 
                 let start = Instant::now();
                 let mut fconv = Receiver::init(&mut channel, &mut rng).unwrap();
-                println!("Verifier time (init): {:?}", start.elapsed());
+                let end = start.elapsed();
+                println!("Verifier time (init): {:?}", end);
+                file.write_all(format!("init={:?}, ", end).as_bytes())?;
                 let init_comm_sent = channel.kilobits_written();
                 let init_comm_recv = channel.kilobits_read();
                 channel.clear();
@@ -85,10 +107,9 @@ fn run(
                 let edabits = fconv
                     .random_edabits(&mut channel, &mut rng, nb_bits, num_edabits)
                     .unwrap();
-                println!(
-                    "Verifier time (input random edabits): {:?}",
-                    start.elapsed()
-                );
+                let end = start.elapsed();
+                println!("Verifier time (input random edabits): {:?}", end);
+                file.write_all(format!("input={:?}, ", end).as_bytes())?;
                 let input_comm_sent = channel.kilobits_written();
                 let input_comm_recv = channel.kilobits_read();
                 channel.clear();
@@ -105,7 +126,9 @@ fn run(
                         with_quicksilver,
                     )
                     .unwrap();
+                let end = start.elapsed();
                 println!("Verifier time (conv): {:?}", start.elapsed());
+                file.write_all(format!("conv={:?}, ", end).as_bytes())?;
                 let conv_comm_sent = channel.kilobits_written();
                 let conv_comm_recv = channel.kilobits_read();
                 channel.clear();
@@ -114,26 +137,44 @@ fn run(
                     "Verifier communication sent (init): {:?} Mb",
                     init_comm_sent / 1000.0
                 );
+                file.write_all(
+                    format!("v-comm-init={:.2}Mb, ", init_comm_sent / 1000.0).as_bytes(),
+                )?;
                 println!(
                     "Verifier communication sent (input): {:?} Mb",
                     input_comm_sent / 1000.0
                 );
+                file.write_all(
+                    format!("v-comm-input={:.2}Mb, ", input_comm_sent / 1000.0).as_bytes(),
+                )?;
                 println!(
                     "Verifier communication sent (conv): {:?} Mb",
                     conv_comm_sent / 1000.0
                 );
+                file.write_all(
+                    format!("v-comm-conv={:.2}Mb, ", conv_comm_sent / 1000.0).as_bytes(),
+                )?;
                 println!(
                     "Prover communication sent (init): {:?} Mb",
                     init_comm_recv / 1000.0
                 );
+                file.write_all(
+                    format!("p-comm-init={:.2}Mb, ", init_comm_recv / 1000.0).as_bytes(),
+                )?;
                 println!(
                     "Prover communication sent (input): {:?} Mb",
                     input_comm_recv / 1000.0
                 );
+                file.write_all(
+                    format!("p-comm-input={:.2}Mb, ", input_comm_recv / 1000.0).as_bytes(),
+                )?;
                 println!(
                     "Prover communication sent (conv): {:?} Mb",
                     conv_comm_recv / 1000.0
                 );
+                file.write_all(
+                    format!("p-comm-conv={:.2}Mb\n", conv_comm_recv / 1000.0).as_bytes(),
+                )?;
             }
             Err(e) => println!("couldn't get client: {:?}", e),
         }
