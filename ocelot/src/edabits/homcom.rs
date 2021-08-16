@@ -84,47 +84,47 @@ impl<FE: FiniteField> FComSender<FE> {
         rng: &mut RNG,
         x: &[FE::PrimeField],
     ) -> Result<Vec<FE>, Error> {
-        let mut r = Vec::with_capacity(x.len());
-        for _ in 0..x.len() {
-            r.push(self.random(channel, rng)?);
-        }
-
         let mut out = Vec::with_capacity(x.len());
-        self.input_low_level(channel, x, &r, &mut out)?;
+        self.input_low_level(channel, rng, x, &mut out)?;
         Ok(out)
     }
 
-    /// lower level implementation of `input` with arguments for pre
-    /// generated voles and out vector
-    pub fn input_low_level<C: AbstractChannel>(
+    /// lower level implementation of `input` with pre-defined out
+    /// vector
+    pub fn input_low_level<C: AbstractChannel, RNG: CryptoRng + Rng>(
         &mut self,
         channel: &mut C,
+        rng: &mut RNG,
         x: &[FE::PrimeField],
-        r: &[MacProver<FE>],
         out: &mut Vec<FE>,
     ) -> Result<(), Error> {
         for i in 0..x.len() {
-            let y = x[i] - r[i].0;
-            out.push(r[i].1);
+            let r = self.random(channel, rng)?;
+            let y = x[i] - r.0;
+            out.push(r.1);
             channel.write_fe::<FE::PrimeField>(y)?;
         }
         Ok(())
     }
 
+    #[inline]
     pub fn affine_add_cst(&self, cst: FE::PrimeField, x: MacProver<FE>) -> MacProver<FE> {
         return MacProver(cst + x.0, x.1);
     }
 
+    #[inline]
     pub fn affine_mult_cst(&self, cst: FE::PrimeField, x: MacProver<FE>) -> MacProver<FE> {
         return MacProver(cst * x.0, (x.1).multiply_by_prime_subfield(cst));
     }
 
+    #[inline]
     pub fn add(&self, a: MacProver<FE>, b: MacProver<FE>) -> MacProver<FE> {
         let MacProver(a, a_mac) = a;
         let MacProver(b, b_mac) = b;
         return MacProver(a + b, a_mac + b_mac);
     }
 
+    #[inline]
     pub fn minus(&self, a: MacProver<FE>, b: MacProver<FE>) -> MacProver<FE> {
         let MacProver(a, a_mac) = a;
         let MacProver(b, b_mac) = b;
@@ -300,6 +300,7 @@ impl<FE: FiniteField> FComReceiver<FE> {
         })
     }
 
+    #[inline]
     pub fn get_delta(&self) -> FE {
         self.delta
     }
@@ -314,9 +315,9 @@ impl<FE: FiniteField> FComReceiver<FE> {
                 return Ok(MacVerifier(e));
             }
             None => {
-                let start = Instant::now();
+                let _start = Instant::now();
                 self.svole_receiver.receive(channel, rng, &mut self.voles)?;
-                // println!("SVOLE<{:?}>", start.elapsed());
+                // println!("SVOLE<{:?}>", _start.elapsed());
                 match self.voles.pop() {
                     Some(e) => {
                         return Ok(MacVerifier(e));
@@ -335,49 +336,45 @@ impl<FE: FiniteField> FComReceiver<FE> {
         rng: &mut RNG,
         num: usize,
     ) -> Result<Vec<MacVerifier<FE>>, Error> {
-        let mut r_mac = Vec::with_capacity(num);
-        for _ in 0..num {
-            r_mac.push(self.random(channel, rng)?);
-        }
-
         let mut out = Vec::with_capacity(num);
-        self.input_low_level(channel, num, &r_mac, &mut out)?;
+        self.input_low_level(channel, rng, num, &mut out)?;
         Ok(out)
     }
 
-    /// lower level implementation of `input` with arguments for pre
-    /// generated voles and out vector
-    pub fn input_low_level<C: AbstractChannel>(
+    /// lower level implementation of `input` for predefined  out vector
+    pub fn input_low_level<C: AbstractChannel, RNG: CryptoRng + Rng>(
         &mut self,
         channel: &mut C,
+        rng: &mut RNG,
         num: usize,
-        r_mac: &[MacVerifier<FE>],
         out: &mut Vec<MacVerifier<FE>>,
     ) -> Result<(), Error> {
-        for i in 0..num {
+        for _i in 0..num {
+            let r = self.random(channel, rng)?;
             let y = channel.read_fe::<FE::PrimeField>()?;
-
-            out.push(MacVerifier(
-                r_mac[i].0 - self.delta.multiply_by_prime_subfield(y),
-            ));
+            out.push(MacVerifier(r.0 - self.delta.multiply_by_prime_subfield(y)));
         }
         Ok(())
     }
 
+    #[inline]
     pub fn affine_add_cst(&self, cst: FE::PrimeField, x_mac: MacVerifier<FE>) -> MacVerifier<FE> {
         return MacVerifier(x_mac.0 - self.delta.multiply_by_prime_subfield(cst));
     }
 
+    #[inline]
     pub fn affine_mult_cst(&self, cst: FE::PrimeField, x_mac: MacVerifier<FE>) -> MacVerifier<FE> {
         return MacVerifier(x_mac.0.multiply_by_prime_subfield(cst));
     }
 
+    #[inline]
     pub fn add(&self, a: MacVerifier<FE>, b: MacVerifier<FE>) -> MacVerifier<FE> {
         let MacVerifier(a_mac) = a;
         let MacVerifier(b_mac) = b;
         return MacVerifier(a_mac + b_mac);
     }
 
+    #[inline]
     pub fn minus(&self, a: MacVerifier<FE>, b: MacVerifier<FE>) -> MacVerifier<FE> {
         let MacVerifier(a_mac) = a;
         let MacVerifier(b_mac) = b;
