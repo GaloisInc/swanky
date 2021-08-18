@@ -56,6 +56,10 @@ impl CachedSender {
         }
     }
 
+    pub fn pop(&mut self) -> Option<Block> {
+        self.v.pop()
+    }
+
     pub fn capacity(&self) -> usize {
         self.v.len()
     }

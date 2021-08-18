@@ -59,6 +59,12 @@ impl CachedReceiver {
         }
     }
 
+    pub fn pop(&mut self) -> Option<(bool, Block)> {
+        let u = self.u.pop()?;
+        let w = self.w.pop()?;
+        Some((u, w))
+    }
+
     pub fn capacity(&self) -> usize {
         self.u.len()
     }

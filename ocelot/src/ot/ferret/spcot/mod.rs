@@ -30,11 +30,6 @@ fn cr_hash() -> AesHash {
 }
 
 #[inline(always)]
-fn bitn(size: usize, idx: usize, n: usize) -> bool {
-    (n >> (size - idx)) & 1 != 0
-}
-
-#[inline(always)]
 fn prg2(k: Block) -> (Block, Block) {
     let aes = Aes128::new(k);
     (

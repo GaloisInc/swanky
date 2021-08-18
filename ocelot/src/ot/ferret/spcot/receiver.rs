@@ -1,13 +1,13 @@
 use crate::errors::Error;
 use log;
 use rand::{CryptoRng, Rng};
-use scuttlebutt::{AbstractChannel, Aes128, AesHash, Block, F128};
+use scuttlebutt::{AbstractChannel, AesHash, Block, F128};
 
 use std::convert::TryFrom;
 
 use super::*;
 
-pub(crate) struct Receiver {
+pub struct Receiver {
     hash: AesHash,
     l: usize,
 }
@@ -49,8 +49,10 @@ impl Receiver {
         channel.send(&bs[..])?;
         channel.flush()?;
 
-        // GGM tree
+        // allocate result vector
         let mut ws: Vec<[Block; N]> = Vec::with_capacity(num);
+        unsafe { ws.set_len(num) };
+
         for (rep, (alpha, b)) in alphas.iter().copied().zip(bs.into_iter()).enumerate() {
             let a: [bool; H] = unpack_bits::<H>(alpha);
             let t: &[Block] = &t[H * rep..H * (rep + 1)];
@@ -61,7 +63,7 @@ impl Receiver {
             let l: u128 = (self.l as u128) << 64;
 
             // compute the leafs in the GGM tree
-            let mut si: [Block; N] = [Default::default(); N];
+            let si: &mut [Block; N] = &mut ws[rep];
             for i in 0..H {
                 // compute a_s = a_i* = a_1,...,a_{i-1},~a_{i}
                 let s: usize = H - i - 1;
@@ -127,7 +129,6 @@ impl Receiver {
             }
 
             log::trace!("si = {:?}", si);
-            ws.push(si);
 
             self.l += 1;
         }

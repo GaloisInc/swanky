@@ -6,14 +6,12 @@ use crate::{
 use rand::{CryptoRng, Rng};
 use scuttlebutt::{AbstractChannel, Block};
 
-use std::mem;
+use super::{combine_buckets, Buckets};
 
-use super::{combine_buckets, Buckets, CUCKOO_ITERS, HASHES, NUM_HASHES};
-
-pub(crate) struct Sender {}
+pub struct Sender {}
 
 impl Sender {
-    pub(crate) fn extend<
+    pub fn extend<
         C: AbstractChannel,
         R: Rng + CryptoRng,
         const T: usize,
@@ -28,7 +26,8 @@ impl Sender {
         channel: &mut C,          // communication channel
         rng: &mut R,              // cryptographically secure RNG
     ) -> Result<Vec<Block>, Error> {
-        let sh = spcot.extend::<_, _, LOG_SIZE_BUCKET, SIZE_BUCKET>(cache, channel, rng, M)?;
+        let sh: Vec<[Block; SIZE_BUCKET]> =
+            spcot.extend::<_, _, LOG_SIZE_BUCKET, SIZE_BUCKET>(cache, channel, rng, M)?;
         let mut s: Vec<Block> = Vec::with_capacity(N);
         for x in 0..N {
             s.push(combine_buckets(x, M, buckets, &sh[..]));

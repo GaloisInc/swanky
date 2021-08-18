@@ -1,11 +1,11 @@
 use crate::errors::Error;
 use log;
 use rand::{CryptoRng, Rng};
-use scuttlebutt::{AbstractChannel, Aes128, AesHash, Block, F128};
+use scuttlebutt::{AbstractChannel, AesHash, Block, F128};
 
 use super::*;
 
-pub(crate) struct Sender {
+pub struct Sender {
     hash: AesHash,
     delta: Block,
     l: usize, // repetition of SPCOT
@@ -37,8 +37,11 @@ impl Sender {
         // obtain masked indexes from receiver
         let bs: Vec<usize> = channel.receive_n(num)?;
 
-        //
+        // create result vector
         let mut vs: Vec<[Block; N]> = Vec::with_capacity(num);
+        unsafe { vs.set_len(num) };
+
+        //
         for (rep, b) in bs.into_iter().enumerate() {
             // used in the computation of "m"
             let q = &cot[H * rep..H * (rep + 1)];
@@ -70,10 +73,10 @@ impl Sender {
             // compute OT messages: at each level the XOR of
             // all the left child seeds and all the right child seeds respectively
             let mut m = [(Default::default(), Default::default()); H];
-            let mut v: [Block; N] = [Default::default(); N];
-            gmm_tree_agg(&mut m, &mut v, 0, 0, s0);
+            let v: &mut [Block; N] = &mut vs[rep];
+            gmm_tree_agg(&mut m, v, 0, 0, s0);
 
-            //
+            //[Default::default(); N];
             let b: [bool; H] = unpack_bits::<H>(b);
             let l: u128 = (self.l as u128) << 64;
             log::trace!("b = {:?}", b);
@@ -107,7 +110,6 @@ impl Sender {
             // send (m, c) to R
             channel.send(&m)?;
             channel.send(&c)?;
-            vs.push(v);
 
             self.l += 1;
         }

@@ -10,10 +10,10 @@ use std::mem;
 
 use super::{combine_buckets, Buckets, CUCKOO_ITERS, HASHES};
 
-pub(crate) struct Receiver {}
+pub struct Receiver {}
 
 impl Receiver {
-    pub(crate) fn extend<
+    pub fn extend<
         C: AbstractChannel,
         R: Rng + CryptoRng,
         const T: usize,
@@ -71,7 +71,7 @@ impl Receiver {
             .enumerate()
             .map(|(j, e)| match e {
                 None => last_bucket,
-                Some(alpha) => buckets.pos(j, alpha),
+                Some(alpha) => buckets.pos(j, alpha).unwrap(),
             })
             .collect();
         debug_assert_eq!(p.len(), M);

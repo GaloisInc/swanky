@@ -2,12 +2,13 @@ mod receiver;
 mod sender;
 
 use itertools::Itertools;
-use rand::RngCore;
 
-use receiver::Receiver;
-use sender::Sender;
+pub use receiver::Receiver;
+pub use sender::Sender;
 
 use scuttlebutt::Block;
+
+use ahash::AHashMap as HashMap;
 
 const NUM_HASHES: usize = 3;
 
@@ -45,19 +46,12 @@ pub fn combine_buckets<const N: usize>(
     hx.sort();
     let mut rx: Block = Default::default();
     for hix in hx.iter().copied().dedup() {
-        rx ^= elems[hix][buckets.pos(hix, x)];
+        rx ^= elems[hix][buckets.pos(hix, x).unwrap()];
     }
     rx
 }
 
 impl UH {
-    pub fn gen<R: RngCore>(rng: &mut R) -> Self {
-        UH {
-            a: rng.next_u32() as u64,
-            b: rng.next_u32() as u64,
-        }
-    }
-
     pub const fn new(a: u32, b: u32) -> Self {
         UH {
             a: a as u64,
@@ -82,13 +76,13 @@ impl UH {
 #[derive(Debug)]
 pub struct Buckets {
     max: usize,
-    buckets: Vec<Vec<usize>>,
+    pos: HashMap<(usize, usize), usize>,
 }
 
 impl Buckets {
     pub fn build(n: usize, m: usize) -> Self {
         // compute sorted buckets
-        let mut buckets: Vec<Vec<usize>> = vec![vec![]; m as usize];
+        let mut buckets: Vec<Vec<usize>> = vec![vec![]; m];
         for x in 0..n {
             for hsh in HASHES.iter() {
                 let j = hsh.hash_idx(x, m);
@@ -108,18 +102,24 @@ impl Buckets {
             }
         }
 
-        Self { buckets, max }
-    }
-
-    fn pos(&self, j: usize, x: usize) -> usize {
-        // TODO: use binary search
-        // (or convert to hash-map)
-        for (i, e) in self.buckets[j].iter().copied().enumerate() {
-            if e == x {
-                return i;
+        // insert into hash map for quick pos lookup
+        let mut pos: HashMap<(usize, usize), usize> = HashMap::with_capacity(m * max);
+        for (j, bucket) in buckets.iter().enumerate() {
+            for (i, x) in bucket.iter().copied().enumerate() {
+                pos.insert((j, x), i);
             }
         }
-        unreachable!("Lookup of element not in bucket")
+
+        Self { max, pos }
+    }
+
+    fn pos(&self, j: usize, x: usize) -> Option<usize> {
+        self.pos.get(&(j, x)).map(|i| *i)
+    }
+
+    #[allow(dead_code)]
+    pub fn max(&self) -> usize {
+        self.max
     }
 }
 
@@ -242,8 +242,6 @@ mod tests {
             assert_eq!(cache.capacity(), 0);
 
             let (delta, mut v) = handle.join().unwrap();
-
-            println!("before: v = {:?}, w = {:?}", v, w);
 
             // check correlation
             for i in alpha.iter().copied() {

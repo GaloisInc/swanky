@@ -3,7 +3,6 @@
 // This file is part of ocelot.
 // Copyright © 2019 Galois, Inc.
 // See LICENSE for licensing information.
-
 #![allow(clippy::many_single_char_names)]
 #![allow(clippy::type_complexity)]
 #![cfg_attr(feature = "nightly", feature(test))]
