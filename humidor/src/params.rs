@@ -173,21 +173,15 @@ impl<Field: FieldForLigero> Params<Field> {
     // XXX: Not sure this is sufficient to check whether this is a valid
     // codeword. Need to check the number of errors this detects, etc.
     pub fn codeword_is_valid(&self, cf: ArrayView1<Field>) -> bool {
-        use ndarray::{stack, Axis};
-
         debug_assert_eq!(cf.len(), self.n);
 
-        let coeffs0 = stack!(Axis(0), Array1::zeros(1), cf);
-        let points0 = numtheory::fft3_inverse(
-            &coeffs0.to_vec(),
-            self.pss.omega_shares,
-        );
-        let (points, zeros) = points0[..].split_at(self.k+1);
+        let mut coeffs0 = std::iter::once(&Field::ZERO).chain(cf.iter()).cloned().collect::<Vec<_>>();
+        numtheory::cooley_tukey::fft3_inverse(&mut coeffs0, self.pss.omega_shares);
 
-        numtheory::fft2(
-            points,
-            self.pss.omega_secrets,
-        )[0] == Field::ZERO && zeros.iter().all(|&f| f == Field::ZERO)
+        let (mut points, zeros) = coeffs0[..].split_at_mut(self.k+1);
+        numtheory::cooley_tukey::fft2(&mut points, self.pss.omega_secrets);
+
+        points[0] == Field::ZERO && zeros.iter().all(|&f| f == Field::ZERO)
     }
 
     /// Encode an mXl matrix of field elements into an mXn interleaved
