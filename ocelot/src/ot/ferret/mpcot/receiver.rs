@@ -13,6 +13,44 @@ use super::{combine_buckets, Buckets, CUCKOO_ITERS, HASHES};
 pub struct Receiver {}
 
 impl Receiver {
+    pub fn extend_reg<
+        C: AbstractChannel,
+        R: Rng + CryptoRng,
+        const T: usize,
+        const N: usize,
+        const LOG_SPLEN: usize,
+        const SPLEN: usize,
+    >(
+        cache: &mut CachedReceiver, // bag of base-COT
+        spcot: &mut SPCOTReceiver,  // SPCOT implementation
+        channel: &mut C,            // communication channel
+        rng: &mut R,                // cryptographically secure RNG
+        alphas: &[usize; T],        // 1-positions in each SPLEN sized chunk
+    ) -> Result<Vec<Block>, Error> {
+        #[cfg(debug_assertions)]
+        {
+            debug_assert_eq!(T * SPLEN, N);
+            for i in alphas.iter().copied() {
+                debug_assert!(i < SPLEN);
+            }
+        }
+
+        let r: Vec<[Block; SPLEN]> =
+            spcot.extend::<_, _, LOG_SPLEN, SPLEN>(cache, channel, rng, &alphas[..])?;
+
+        // view the Vec<[BLOCK; SPLEN]> as a flat Vec<Block>
+        let r: Vec<Block> = unsafe {
+            let mut v = mem::ManuallyDrop::new(r);
+            debug_assert_eq!(v.len(), alphas.len());
+            debug_assert_eq!(v.len() * SPLEN, N);
+            let p = v.as_mut_ptr();
+            let cap = v.capacity();
+            Vec::from_raw_parts(p as *mut Block, N, cap * SPLEN)
+        };
+        debug_assert_eq!(r.len(), N);
+        Ok(r)
+    }
+
     pub fn extend<
         C: AbstractChannel,
         R: Rng + CryptoRng,
@@ -41,6 +79,7 @@ impl Receiver {
             alphas_sorted.sort();
             for i in 0..(T - 1) {
                 debug_assert_ne!(alphas_sorted[i], alphas_sorted[i + 1]);
+                debug_assert!(alphas_sorted[i] < N);
             }
         }
 

@@ -27,7 +27,6 @@ sha2 = "0.9"
 simple_logger = "1.12"
 lazy_static = "1.4"
 itertools = "0.10"
-ahash = "0.7.4"
 
 [build-dependencies]
 cc = "1.0"

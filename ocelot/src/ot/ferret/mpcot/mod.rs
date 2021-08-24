@@ -8,8 +8,6 @@ pub use sender::Sender;
 
 use scuttlebutt::Block;
 
-use ahash::AHashMap as HashMap;
-
 const NUM_HASHES: usize = 3;
 
 const CUCKOO_ITERS: usize = 100;
@@ -76,7 +74,7 @@ impl UH {
 #[derive(Debug)]
 pub struct Buckets {
     max: usize,
-    pos: HashMap<(usize, usize), usize>,
+    buckets: Vec<Vec<usize>>,
 }
 
 impl Buckets {
@@ -102,19 +100,12 @@ impl Buckets {
             }
         }
 
-        // insert into hash map for quick pos lookup
-        let mut pos: HashMap<(usize, usize), usize> = HashMap::with_capacity(m * max);
-        for (j, bucket) in buckets.iter().enumerate() {
-            for (i, x) in bucket.iter().copied().enumerate() {
-                pos.insert((j, x), i);
-            }
-        }
-
-        Self { max, pos }
+        Self { buckets, max }
     }
 
+    #[inline(always)]
     fn pos(&self, j: usize, x: usize) -> Option<usize> {
-        self.pos.get(&(j, x)).map(|i| *i)
+        self.buckets[j].binary_search(&x).ok()
     }
 
     #[allow(dead_code)]
@@ -219,6 +210,7 @@ mod tests {
 
             // pick random indexes to set
             let alpha = unique_random_array(&mut rng1, TEST_N);
+
             // do MPCOT extension
             let w = Receiver::extend::<
                 _,

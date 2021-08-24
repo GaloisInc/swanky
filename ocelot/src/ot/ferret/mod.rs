@@ -15,6 +15,9 @@ use rand::{CryptoRng, Rng};
 
 use cache::{CachedReceiver, CachedSender};
 
+// Regular error?
+const REG: bool = true;
+
 // The computational security parameter: \kappa in the paper.
 const CSP: usize = 128;
 
@@ -37,13 +40,18 @@ impl Sender {
         // obtain base-COT using KOS18
         let mut cots = CachedSender::new(delta);
         let mut kos18 = KosDeltaSender::init_fixed_key(channel, delta.into(), rng)?;
-        cots.generate(&mut kos18, channel, rng, ferret::SETUP_COTS)?;
 
-        // do 1-time setup
+        cots.generate(
+            &mut kos18,
+            channel,
+            rng,
+            ferret::Sender::<REG>::cots_setup(),
+        )?;
+
+        // do 1-time setup iteration
         let mut spcot = spcot::Sender::init(delta);
-        let y = ferret::Sender::extend_setup(&mut cots, &mut spcot, rng, channel)?;
+        let y = ferret::Sender::<REG>::extend_setup(&mut cots, &mut spcot, rng, channel)?;
         cots.append(y.into_iter());
-        debug_assert!(cots.capacity() >= ferret::MAIN_COTS);
 
         // ready for main iterations
         Ok(Self { spcot, cots })
@@ -54,12 +62,13 @@ impl Sender {
         channel: &mut C,
         rng: &mut R,
     ) -> Result<Block, Error> {
-        debug_assert!(self.cots.capacity() >= ferret::MAIN_COTS);
-        if self.cots.capacity() == ferret::MAIN_COTS {
+        if self.cots.capacity() == ferret::Sender::<REG>::cots_main() {
             // replenish using main iteration
-            let y = ferret::Sender::extend_main(&mut self.cots, &mut self.spcot, rng, channel)?;
+            let y =
+                ferret::Sender::<REG>::extend_main(&mut self.cots, &mut self.spcot, rng, channel)?;
             self.cots.append(y.into_iter());
         }
+
         Ok(self.cots.pop().unwrap())
     }
 }
@@ -72,13 +81,17 @@ impl Receiver {
         // obtain base-COT using KOS18
         let mut cots = CachedReceiver::default();
         let mut kos18 = KosDeltaReceiver::init(channel, rng)?;
-        cots.generate(&mut kos18, channel, rng, ferret::SETUP_COTS)?;
+        cots.generate(
+            &mut kos18,
+            channel,
+            rng,
+            ferret::Receiver::<REG>::cots_setup(),
+        )?;
 
-        // do 1-time setup
+        // do 1-time setup iteration
         let mut spcot = spcot::Receiver::init();
-        let (x, z) = ferret::Receiver::extend_setup(&mut cots, &mut spcot, rng, channel)?;
+        let (x, z) = ferret::Receiver::<REG>::extend_setup(&mut cots, &mut spcot, rng, channel)?;
         cots.append(x.into_iter(), z.into_iter());
-        debug_assert!(cots.capacity() >= ferret::MAIN_COTS);
 
         // ready for main iterations
         Ok(Self { spcot, cots })
@@ -89,11 +102,15 @@ impl Receiver {
         channel: &mut C,
         rng: &mut R,
     ) -> Result<(bool, Block), Error> {
-        debug_assert!(self.cots.capacity() >= ferret::MAIN_COTS);
-        if self.cots.capacity() == ferret::MAIN_COTS {
+        // regular error
+        if self.cots.capacity() == ferret::Receiver::<REG>::cots_main() {
             // replenish using main iteration
-            let (x, z) =
-                ferret::Receiver::extend_main(&mut self.cots, &mut self.spcot, rng, channel)?;
+            let (x, z) = ferret::Receiver::<REG>::extend_main(
+                &mut self.cots,
+                &mut self.spcot,
+                rng,
+                channel,
+            )?;
             self.cots.append(x.into_iter(), z.into_iter());
         }
         Ok(self.cots.pop().unwrap())

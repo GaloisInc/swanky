@@ -17,7 +17,7 @@ pub(crate) use sender::Sender;
 
 use sha2::{Digest, Sha256};
 
-use scuttlebutt::{Aes128, AesHash, Block, F128};
+use scuttlebutt::{AesHash, Block, F128};
 
 fn ro_hash(b: Block) -> [u8; 32] {
     let mut hsh = Sha256::default();
@@ -29,15 +29,17 @@ fn cr_hash() -> AesHash {
     AesHash::new(Default::default())
 }
 
+// Length doubling PRG
+// Avoid running the AES key-schedule for each k
 #[inline(always)]
-fn prg2(k: Block) -> (Block, Block) {
-    let aes = Aes128::new(k);
-    (
-        aes.encrypt(Block::from(0u128)),
-        aes.encrypt(Block::from(1u128)),
-    )
+fn prg2(h: &AesHash, k1: Block) -> (Block, Block) {
+    let o1 = h.cr_hash(Block::default(), k1);
+    let o2: Block = (u128::from(o1) + u128::from(k1)).into();
+    // let o2 = h.cr_hash(Block::default(), k2);
+    (o1, o2)
 }
 
+#[inline]
 fn unpack_bits<const N: usize>(mut n: usize) -> [bool; N] {
     debug_assert!(n < (1 << N));
     let mut b: [bool; N] = [false; N];
@@ -52,6 +54,7 @@ fn unpack_bits<const N: usize>(mut n: usize) -> [bool; N] {
     }
 }
 
+#[inline]
 fn pack_bits(bits: &[bool]) -> usize {
     debug_assert!(bits.len() <= 64);
     let mut n = 0;
@@ -62,7 +65,7 @@ fn pack_bits(bits: &[bool]) -> usize {
     n
 }
 
-#[inline(always)]
+#[inline]
 fn stack_cyclic<T: Copy>(elems: &[T; 128]) -> F128
 where
     T: Into<F128>,
@@ -84,7 +87,6 @@ mod tests {
     use crate::ot::FixedKeyInitializer;
     use rand::{rngs::StdRng, Rng, SeedableRng};
     use scuttlebutt::channel::unix_channel_pair;
-    use simple_logger;
 
     use crate::ot::{KosDeltaReceiver, KosDeltaSender, Receiver as OtReceiver};
 
@@ -135,7 +137,6 @@ mod tests {
             let mut rng1 = StdRng::seed_from_u64(root.gen());
             let mut rng2 = StdRng::seed_from_u64(root.gen());
 
-            let _ = simple_logger::init();
             let (mut c1, mut c2) = unix_channel_pair();
 
             let handle = spawn(move || {

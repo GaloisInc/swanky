@@ -24,10 +24,10 @@ impl<const ROWS: usize, const COLS: usize, const D: usize> LLCode<ROWS, COLS, D>
         for _ in 0..COLS {
             code.indexes.push(unique_random_array(rng, ROWS))
         }
+        code.indexes.sort(); // sorting the rows, seems to improve cache locality
         code
     }
 
-    #[inline(never)]
     pub fn mul<T: BitXorAssign + Default + Copy>(&self, v: &[T; ROWS]) -> Vec<T> {
         let mut r = Vec::with_capacity(COLS);
         for col in self.indexes.iter() {
@@ -38,6 +38,14 @@ impl<const ROWS: usize, const COLS: usize, const D: usize> LLCode<ROWS, COLS, D>
             r.push(cord);
         }
         r
+    }
+
+    pub fn mul_add<T: BitXorAssign + Default + Copy>(&self, v: &[T; ROWS], a: &mut [T; COLS]) {
+        for (j, col) in self.indexes.iter().enumerate() {
+            for i in col.iter().copied() {
+                a[j] ^= v[i];
+            }
+        }
     }
 }
 

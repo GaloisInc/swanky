@@ -1,5 +1,4 @@
 use crate::errors::Error;
-use log;
 use rand::{CryptoRng, Rng};
 use scuttlebutt::{AbstractChannel, AesHash, Block, F128};
 
@@ -43,7 +42,6 @@ impl Receiver {
             debug_assert!(alpha < N);
             let r: usize = pack_bits(&r[H * rep..H * (rep + 1)]);
             let b: usize = r ^ alpha ^ ((1 << H) - 1);
-            log::trace!("b = {:?}", unpack_bits::<H>(b));
             bs.push(b);
         }
         channel.send(&bs[..])?;
@@ -53,7 +51,7 @@ impl Receiver {
         let mut ws: Vec<[Block; N]> = Vec::with_capacity(num);
         unsafe { ws.set_len(num) };
 
-        for (rep, (alpha, b)) in alphas.iter().copied().zip(bs.into_iter()).enumerate() {
+        for (rep, alpha) in alphas.iter().copied().enumerate() {
             let a: [bool; H] = unpack_bits::<H>(alpha);
             let t: &[Block] = &t[H * rep..H * (rep + 1)];
 
@@ -81,28 +79,19 @@ impl Receiver {
                 // K_{~a[i]}^i := M_{~a[i]}^i ^ H(t_i, i || l)
                 let tweak: Block = (l | i as u128).into();
                 let h = self.hash.tccr_hash(t[i], tweak);
-                log::trace!(
-                    "H(~b[{}]) = H{} = {:?}",
-                    i,
-                    (!unpack_bits::<H>(b)[i]) as usize,
-                    h
-                );
                 let kna = mna ^ h;
-                log::trace!("K_(na)^{} = {:?}", i, kna);
 
                 // expand the seeds (in-place)
                 if i == 0 {
                     // If i == 1, define s_{~a[1]} := K_{~a[1]}^1
                     si[nai] = kna;
                 } else {
-                    log::trace!("level H = {}", H);
                     // If i >= 2: j \in [2^(i - 1)], j \neq a_1, ..., a_{i-1}:
                     //    compute (s^{i}_{2j}, s^{i}_{2j + 1}) := G(s_j^{i-1})
                     let mut j = (1 << i) - 1;
                     loop {
                         debug_assert!(si[j] != Block::default() || j == a_sm);
-                        log::trace!("s[{}] = {:?}", j, si[j]);
-                        let (s0, s1) = prg2(si[j]);
+                        let (s0, s1) = prg2(&self.hash, si[j]);
                         si[2 * j] = s0;
                         si[2 * j + 1] = s1;
                         if j == 0 {
@@ -128,25 +117,18 @@ impl Receiver {
                 }
             }
 
-            log::trace!("si = {:?}", si);
-
             self.l += 1;
         }
-
-        log::trace!("consistency check");
 
         // parallel consistency check
         let xs = &r[H * num..];
         let zs = &t[H * num..];
         debug_assert_eq!(xs.len(), CSP);
         debug_assert_eq!(zs.len(), CSP);
-        log::trace!("x* = {:?}", xs);
-        log::trace!("z* = {:?}", zs);
 
         // send a seed from which all the changes are derived
         let seed: Block = rng.gen();
         let mut gen = BiasedGen::new(seed);
-        log::trace!("seed = {:?}", seed);
 
         // derive random coefficients
         let mut W = (Block::default(), Block::default()); // defer GF(2^128) reduction
@@ -161,7 +143,6 @@ impl Receiver {
                 if i == alpha {
                     phi = phi + xli;
                 }
-                log::trace!("X_(l = {})^(i = {}) = {:?}", l, i, xli);
             }
         }
         let W: F128 = F128::reduce(W);
@@ -169,23 +150,19 @@ impl Receiver {
         // pack the choice bits into a 128-bit block
         let xs = <&[bool; 128]>::try_from(xs).unwrap();
         let xs: Block = Block::from(xs);
-        log::trace!("x* = {:?}", xs);
 
         // mask the alpha sum
         let phi: Block = phi.into();
         let xp: Block = phi ^ xs;
 
         // send coefficients and masked sum to the sender
-        channel.send(&seed)?;
         channel.send(&xp)?;
+        channel.send(&seed)?;
         channel.flush()?;
 
         // compute Z := \sum_{i \in [k]} z*[i] * X^i
         let Z = stack_cyclic(<&[Block; CSP]>::try_from(zs).unwrap());
         let W = W + Z;
-        log::trace!("Z = {:?}", Z);
-        log::trace!("\\phi = {:?}", phi);
-        log::trace!("W = {:?}", W);
 
         // calculate hash H(w) locally
         let Hw: [u8; 32] = ro_hash(W.into());

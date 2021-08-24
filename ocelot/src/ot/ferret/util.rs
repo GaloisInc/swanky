@@ -1,5 +1,6 @@
 use rand::Rng;
 
+#[inline]
 pub fn unique_random_array<R: Rng, const N: usize>(rng: &mut R, max: usize) -> [usize; N] {
     let mut arr = [0usize; N];
     arr[0] = rng.gen::<usize>() % max;
@@ -16,4 +17,13 @@ pub fn unique_random_array<R: Rng, const N: usize>(rng: &mut R, max: usize) -> [
             break arr;
         }
     }
+}
+
+#[inline]
+pub fn random_array<R: Rng, const N: usize>(rng: &mut R, max: usize) -> [usize; N] {
+    let mut arr = [0usize; N];
+    for e in arr.iter_mut() {
+        *e = rng.gen::<usize>() % max;
+    }
+    arr
 }
