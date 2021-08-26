@@ -425,155 +425,6 @@ impl<Field: FieldForLigero, H: merkle::MerkleHash> Round4<Field, H> {
 // variables are not in snake case.
 
 #[allow(non_snake_case)]
-fn make_ra<Field: FieldForLigero>(
-    P: &Params<Field>,
-    ra: &Array1<Field>,
-    Pa: &CsMat<Field>,
-) -> Vec<Array1<Field>> {
-    let r_dot_P = &Pa.clone().transpose_into() * ra;
-    r_dot_P.exact_chunks(P.l)
-        .into_iter()
-        .map(|points| P.fft2_inverse(points))
-        .collect()
-}
-
-#[allow(non_snake_case)]
-fn make_ra_Iml_Pa_neg<Field: FieldForLigero>(
-    P: &Params<Field>,
-    ra: &Array1<Field>,
-    Pa: &CsMat<Field>,
-) -> Vec<Array1<Field>> {
-    use sprs::hstack;
-
-    let Iml = CsMat::eye_csc(P.m * P.l);
-    let Pa_neg = Pa.map(|f| -(*f));
-    let IPa = hstack(&[Iml.view(), Pa_neg.view()]);
-
-    make_ra(P, ra, &IPa)
-}
-
-#[allow(non_snake_case)]
-fn make_pa<Field: FieldForLigero>(
-    P: &Params<Field>,
-    Ua: &Array2<Field>,
-) -> Vec<Array1<Field>>
-{
-    Ua.genrows()
-        .into_iter()
-        .map(|points|
-            P.fft3_inverse(points) // deg < k + 1
-            .iter()
-            .cloned()
-            .take_nz(P.k+1)
-            .collect::<Array1<Field>>())
-        .collect::<Vec<_>>()
-}
-
-#[allow(non_snake_case)]
-fn make_qadd<Field: FieldForLigero, H>(
-    s: &Secret<Field, H>,
-    p: &Vec<Array1<Field>>, // deg < k + 1
-    Padd: &CsMat<Field>,
-    r1_radd: Array1<Field>,
-) -> Array1<Field> {
-    let P = &s.public.params;
-
-    let radd_blind = P.fft3_inverse(s.uadd.view()) // deg < k + l
-        .iter()
-        .cloned()
-        .take_nz(P.k + P.l)
-        .collect::<Array1<Field>>();
-    let radd = make_ra(&P, &r1_radd, &Padd) // deg < l
-        .iter()
-        .map(|ra_i| ra_i.iter()
-            .cloned()
-            .take_nz(P.k+1) // XXX: Should be l, per Sec. 4.7
-            .collect::<Array1<_>>())
-        .collect::<Vec<_>>();
-
-    radd.iter().zip(p.clone())
-        .fold(radd_blind, |acc, (radd_i, p_i)|
-            padd(
-                acc.view(),
-                P.pmul2(
-                    radd_i.view(),
-                    p_i.view()).view())) // deg < k + l
-}
-
-#[allow(non_snake_case)]
-fn make_qa<Field: FieldForLigero>(
-    P: &Params<Field>,
-    p: &Vec<Array1<Field>>, // deg < k + 1
-    Pa: &CsMat<Field>,
-    Ua: &Array2<Field>,
-    ua: &Array1<Field>,
-    r1_ra: Array1<Field>,
-) -> Array1<Field> {
-    let ra = make_ra_Iml_Pa_neg(&P, &r1_ra, &Pa) // deg < l
-        .iter()
-        .map(|ra_i| ra_i
-            .iter()
-            .cloned()
-            .take_nz(P.k+1) // XXX: Should be l, per Sec. 4.7
-            .collect::<Array1<Field>>())
-        .collect::<Vec<_>>();
-    let pa = Ua.genrows()
-        .into_iter()
-        .map(|points| P.fft3_inverse(points) // deg < k + 1
-            .iter()
-            .cloned()
-            .take_nz(P.k+1)
-            .collect::<Array1<Field>>())
-        .collect::<Vec<_>>();
-    let ra_blind = P.fft3_inverse(ua.view()) // deg < k + l
-        .iter()
-        .cloned()
-        .take_nz(P.k + P.l)
-        .collect::<Array1<Field>>();
-
-    ra.iter()
-        .zip(pa.iter().chain(p.clone().iter()))
-        .fold(ra_blind, |acc, (ri, pi)|
-            padd(
-                acc.view(),
-                P.pmul2(
-                    ri.view(),
-                    pi.view()).view())) // deg < k + l
-}
-
-#[allow(non_snake_case)]
-fn make_p0<Field: FieldForLigero>(
-    P: &Params<Field>,
-    u0: &Array1<Field>,
-    px: &Vec<Array1<Field>>, // deg < k + 1
-    py: &Vec<Array1<Field>>, // deg < k + 1
-    pz: &Vec<Array1<Field>>, // deg < k + 1
-    rq: Array1<Field>,
-) -> Array1<Field> {
-    let r0_blind = P.fft3_inverse(u0.view()) // deg < 2k + 1
-        .iter()
-        .cloned()
-        .take_nz(2*P.k + 1)
-        .collect::<Array1<Field>>();
-
-    rq.iter()
-        .zip(px)
-        .zip(py)
-        .zip(pz)
-        .fold(r0_blind, |acc, (((&rq_i, px_i), py_i), pz_i)| {
-            padd(
-                acc.view(),
-                std::ops::Mul::mul(
-                    psub(
-                        P.pmul2(
-                            px_i.view(),
-                            py_i.view()).view(),
-                        pz_i.view()),
-                    rq_i).view()) // deg < 2k + 1
-        })
-}
-
-#[allow(non_snake_case)]
 fn verify<Field: FieldForLigero, H: merkle::MerkleHash>(
     public: &Public<Field>,
     r0: Round0,
@@ -661,6 +512,166 @@ fn verify<Field: FieldForLigero, H: merkle::MerkleHash>(
     // Checking column hashes
     r4.U_lemma.verify(&r0.U_root) &&
     P.codeword_is_valid(r2.v.view())
+}
+
+// Given an sXt matrix Pa and an s-dimensional vector ra (for arbitrary s and t),
+// compute the s/l unique degree-l polynomials
+// ra_i(zeta_c) = (ra^T * Pa)[i*s/l + c].
+//
+// XXX: Currently allocates s/l l-dimensional arrays in order to return them. Is
+// it useful to pass in an output argument instead?
+#[allow(non_snake_case)]
+fn make_ra<Field: FieldForLigero>(
+    params: &Params<Field>,
+    ra: &Array1<Field>,
+    Pa: &CsMat<Field>,
+) -> Vec<Array1<Field>> {
+    let r_dot_P = &Pa.clone().transpose_into() * ra;
+    r_dot_P.exact_chunks(params.l)
+        .into_iter()
+        .map(|points| params.fft2_inverse(points))
+        .collect()
+}
+
+// Given an (m*l)X(m*l) matrix Pa and an (m*l)-dimensional array, compute the
+// unique 2*m degree-l polynomials
+// ra_i(zeta_c) = (ra^T * I_{m*l}|Pa])[m*i + c], where | indicates horizontal
+// concatenation.
+//
+// XXX: Currently allocates 2*m l-dimensional arrays in order to return them. Is
+// it useful to pass in an output argument instead?
+#[allow(non_snake_case)]
+fn make_ra_Iml_Pa_neg<Field: FieldForLigero>(
+    params: &Params<Field>,
+    ra: &Array1<Field>,
+    Pa: &CsMat<Field>,
+) -> Vec<Array1<Field>> {
+    let r_dot_P = &Pa.map(|f| -(*f)).transpose_into() * ra;
+    ra.exact_chunks(params.l)
+        .into_iter()
+        .chain(r_dot_P.exact_chunks(params.l).into_iter())
+        .map(|points| params.fft2_inverse(points))
+        .collect()
+}
+
+#[allow(non_snake_case)]
+fn make_pa<Field: FieldForLigero>(
+    params: &Params<Field>,
+    Ua: &Array2<Field>,
+) -> Vec<Array1<Field>>
+{
+    Ua.genrows()
+        .into_iter()
+        .map(|points|
+            params.fft3_inverse(points) // deg < k + 1
+            .iter()
+            .cloned()
+            .take_nz(params.k+1)
+            .collect::<Array1<Field>>())
+        .collect::<Vec<_>>()
+}
+
+#[allow(non_snake_case)]
+fn make_qadd<Field: FieldForLigero, H>(
+    s: &Secret<Field, H>,
+    p: &Vec<Array1<Field>>, // deg < k + 1
+    Padd: &CsMat<Field>,
+    r1_radd: Array1<Field>,
+) -> Array1<Field> {
+    let params = &s.public.params;
+
+    let radd_blind = params.fft3_inverse(s.uadd.view()) // deg < k + l
+        .iter()
+        .cloned()
+        .take_nz(params.k + params.l)
+        .collect::<Array1<Field>>();
+    let radd = make_ra(&params, &r1_radd, &Padd) // deg < l
+        .iter()
+        .map(|ra_i| ra_i.iter()
+            .cloned()
+            .take_nz(params.k+1) // XXX: Should be l, per Sec. 4.7
+            .collect::<Array1<_>>())
+        .collect::<Vec<_>>();
+
+    radd.iter().zip(p.clone())
+        .fold(radd_blind, |acc, (radd_i, p_i)|
+            padd(
+                acc.view(),
+                params.pmul2(
+                    radd_i.view(),
+                    p_i.view()).view())) // deg < k + l
+}
+
+#[allow(non_snake_case)]
+fn make_qa<Field: FieldForLigero>(
+    params: &Params<Field>,
+    p: &Vec<Array1<Field>>, // deg < k + 1
+    Pa: &CsMat<Field>,
+    Ua: &Array2<Field>,
+    ua: &Array1<Field>,
+    r1_ra: Array1<Field>,
+) -> Array1<Field> {
+    let ra = make_ra_Iml_Pa_neg(&params, &r1_ra, &Pa) // deg < l
+        .iter()
+        .map(|ra_i| ra_i
+            .iter()
+            .cloned()
+            .take_nz(params.k+1) // XXX: Should be l, per Sec. 4.7
+            .collect::<Array1<Field>>())
+        .collect::<Vec<_>>();
+    let pa = Ua.genrows()
+        .into_iter()
+        .map(|points| params.fft3_inverse(points) // deg < k + 1
+            .iter()
+            .cloned()
+            .take_nz(params.k+1)
+            .collect::<Array1<Field>>())
+        .collect::<Vec<_>>();
+    let ra_blind = params.fft3_inverse(ua.view()) // deg < k + l
+        .iter()
+        .cloned()
+        .take_nz(params.k + params.l)
+        .collect::<Array1<Field>>();
+
+    ra.iter()
+        .zip(pa.iter().chain(p.clone().iter()))
+        .fold(ra_blind, |acc, (ri, pi)|
+            padd(
+                acc.view(),
+                params.pmul2(
+                    ri.view(),
+                    pi.view()).view())) // deg < k + l
+}
+
+fn make_p0<Field: FieldForLigero>(
+    params: &Params<Field>,
+    u0: &Array1<Field>,
+    px: &Vec<Array1<Field>>, // deg < k + 1
+    py: &Vec<Array1<Field>>, // deg < k + 1
+    pz: &Vec<Array1<Field>>, // deg < k + 1
+    rq: Array1<Field>,
+) -> Array1<Field> {
+    let r0_blind = params.fft3_inverse(u0.view()) // deg < 2k + 1
+        .iter()
+        .cloned()
+        .take_nz(2*params.k + 1)
+        .collect::<Array1<Field>>();
+
+    rq.iter()
+        .zip(px)
+        .zip(py)
+        .zip(pz)
+        .fold(r0_blind, |acc, (((&rq_i, px_i), py_i), pz_i)| {
+            padd(
+                acc.view(),
+                std::ops::Mul::mul(
+                    psub(
+                        params.pmul2(
+                            px_i.view(),
+                            py_i.view()).view(),
+                        pz_i.view()),
+                    rq_i).view()) // deg < 2k + 1
+        })
 }
 
 /// Interactive Ligero implementation.
