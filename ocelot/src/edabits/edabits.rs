@@ -219,35 +219,35 @@ impl<FE: FiniteField + PrimeFiniteField> ProverConv<FE> {
             and_res_batch.clear();
             aux_batch.clear();
             for n in 0..num {
-                let ci = ci_batch[n];
+                let ci_clr = ci_batch[n];
                 let ci_mac = ci_mac_batch[n];
+
+                let ci = MacProver(ci_clr, ci_mac);
 
                 let x = &x_batch[n].bits;
                 let y = &y_batch[n].bits;
 
                 debug_assert!(x.len() == m && y.len() == m);
 
-                let MacProver(xi, xi_mac) = x[i];
-                let MacProver(yi, yi_mac) = y[i];
+                let xi = x[i];
+                let yi = y[i];
 
-                let and1 = xi + ci;
-                let and1_mac = xi_mac + ci_mac;
+                let and1 = self.fcom_f2.add(xi, ci);
+                let MacProver(and1_clr, _) = and1;
 
-                let and2 = yi + ci;
-                let and2_mac = yi_mac + ci_mac;
+                let and2 = self.fcom_f2.add(yi, ci);
 
-                let and_res = and1 * and2;
+                let and_res = and1_clr * and2.0;
 
-                let c = ci + and_res;
+                let c = ci_clr + and_res;
                 // let c_mac = ci_mac + and_res_mac; // is done in the next step
                 ci_batch[n] = c;
 
-                let z = and1 + yi; // xi + yi + ci ;
-                let z_mac = and1_mac + yi_mac; // xi_mac + yi_mac + ci_mac;
-                z_batch[n].push(MacProver(z, z_mac));
+                let z = self.fcom_f2.add(and1, yi); // xi + yi + ci ;
+                z_batch[n].push(z);
 
                 and_res_batch.push(and_res);
-                aux_batch.push((MacProver(and1, and1_mac), MacProver(and2, and2_mac)));
+                aux_batch.push((and1, and2));
             }
             and_res_mac_batch.clear();
             self.fcom_f2
@@ -848,7 +848,7 @@ impl<FE: FiniteField + PrimeFiniteField> VerifierConv<FE> {
         let m = x_batch[0].bits.len();
 
         // input c0
-        let mut ci_mac_batch = self.fcom_f2.input(channel, rng, num)?;
+        let mut ci_batch = self.fcom_f2.input(channel, rng, num)?;
 
         // loop on the m bits over the batch of n addition
         let mut triples = Vec::with_capacity(num * m);
@@ -858,35 +858,35 @@ impl<FE: FiniteField + PrimeFiniteField> VerifierConv<FE> {
         for i in 0..m {
             aux_batch.clear();
             for n in 0..num {
-                let MacVerifier(ci_mac) = ci_mac_batch[n];
+                let ci = ci_batch[n];
 
                 let x = &x_batch[n].bits;
                 let y = &y_batch[n].bits;
 
                 debug_assert!(x.len() == m && y.len() == m);
 
-                let MacVerifier(xi_mac) = x[i];
-                let MacVerifier(yi_mac) = y[i];
+                let xi = x[i];
+                let yi = y[i];
 
-                let and1_mac = xi_mac + ci_mac;
-                let and2_mac = yi_mac + ci_mac;
+                let and1 = self.fcom_f2.add(xi, ci);
+                let and2 = self.fcom_f2.add(yi, ci);
 
-                let z_mac = and1_mac + yi_mac; //xi_mac + yi_mac + ci_mac;
-                z_batch[n].push(MacVerifier(z_mac));
-                aux_batch.push((MacVerifier(and1_mac), MacVerifier(and2_mac)));
+                let z = self.fcom_f2.add(and1, yi); //xi_mac + yi_mac + ci_mac;
+                z_batch[n].push(z);
+                aux_batch.push((and1, and2));
             }
             and_res_mac_batch.clear();
             self.fcom_f2
                 .input_low_level(channel, rng, num, &mut and_res_mac_batch)?;
 
             for n in 0..num {
-                let MacVerifier(ci_mac) = ci_mac_batch[n];
                 let (and1_mac, and2_mac) = aux_batch[n];
-                let MacVerifier(and_res_mac) = and_res_mac_batch[n];
-                triples.push((and1_mac, and2_mac, MacVerifier(and_res_mac)));
+                let and_res_mac = and_res_mac_batch[n];
+                triples.push((and1_mac, and2_mac, and_res_mac));
 
-                let c_mac = ci_mac + and_res_mac;
-                ci_mac_batch[n] = MacVerifier(c_mac);
+                let ci = ci_batch[n];
+                let c_mac = self.fcom_f2.add(ci, and_res_mac);
+                ci_batch[n] = c_mac;
             }
         }
         // check all the multiplications in one batch
@@ -901,7 +901,7 @@ impl<FE: FiniteField + PrimeFiniteField> VerifierConv<FE> {
         let mut res = Vec::with_capacity(num);
         let mut i = 0;
         for zs in z_batch.into_iter() {
-            res.push((zs, ci_mac_batch[i]));
+            res.push((zs, ci_batch[i]));
             i += 1;
         }
 
