@@ -4,12 +4,12 @@
 // Copyright © 2020 Galois, Inc.
 // See LICENSE for licensing information.
 
-use ocelot::edabits::{ReceiverConv, SenderConv};
+use ocelot::edabits::{ProverConv, VerifierConv};
 use scuttlebutt::{channel::track_unix_channel_pair, field::F61p, AesRng};
 use std::time::Instant;
 
-type Sender = SenderConv<F61p>;
-type Receiver = ReceiverConv<F61p>;
+type Prover = ProverConv<F61p>;
+type Verifier = VerifierConv<F61p>;
 
 fn run() {
     let (mut sender, mut receiver) = track_unix_channel_pair();
@@ -27,7 +27,7 @@ fn run() {
         }
         let mut rng = AesRng::new();
         let start = Instant::now();
-        let mut fconv_sender = Sender::init(&mut sender, &mut rng).unwrap();
+        let mut fconv_sender = Prover::init(&mut sender, &mut rng).unwrap();
         println!("Send time (init): {:?}", start.elapsed());
         let start = Instant::now();
         let edabits = fconv_sender
@@ -56,7 +56,7 @@ fn run() {
     }
     let mut rng = AesRng::new();
     let start = Instant::now();
-    let mut fconv_receiver = Receiver::init(&mut receiver, &mut rng).unwrap();
+    let mut fconv_receiver = Verifier::init(&mut receiver, &mut rng).unwrap();
     println!("Receive time (init): {:?}", start.elapsed());
     println!(
         "Send communication (init): {:.2} Mb",

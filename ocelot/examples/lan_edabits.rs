@@ -5,7 +5,7 @@
 // See LICENSE for licensing information.
 
 use clap::{App, Arg};
-use ocelot::edabits::{ReceiverConv, SenderConv};
+use ocelot::edabits::{ProverConv, VerifierConv};
 use scuttlebutt::{field::F61p, AesRng, SyncChannel, TrackChannel};
 use std::fs;
 use std::io::Write;
@@ -14,8 +14,8 @@ use std::net::{TcpListener, TcpStream};
 use std::path::Path;
 use std::time::Instant;
 
-type Sender = SenderConv<F61p>;
-type Receiver = ReceiverConv<F61p>;
+type Prover = ProverConv<F61p>;
+type Verifier = VerifierConv<F61p>;
 
 const DEFAULT_ADDR: &str = "127.0.0.1:5527";
 const DEFAULT_NB_BITS: &str = "38";
@@ -95,7 +95,7 @@ fn run(
                 let mut rng = AesRng::new();
 
                 let start = Instant::now();
-                let mut fconv = Receiver::init(&mut channel, &mut rng).unwrap();
+                let mut fconv = Verifier::init(&mut channel, &mut rng).unwrap();
                 let end = start.elapsed();
                 println!("Verifier time (init): {:?}", end);
                 file.write_all(format!("init={:?}, ", end).as_bytes())?;
@@ -202,7 +202,7 @@ fn run(
 
         let mut rng = AesRng::new();
         let start = Instant::now();
-        let mut fconv = Sender::init(&mut channel, &mut rng).unwrap();
+        let mut fconv = Prover::init(&mut channel, &mut rng).unwrap();
         println!("Prover time (init): {:?}", start.elapsed());
 
         let start = Instant::now();

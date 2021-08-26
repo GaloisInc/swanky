@@ -21,7 +21,7 @@ pub struct MacProver<FE: FiniteField>(pub FE::PrimeField, pub FE);
 pub struct MacVerifier<FE: FiniteField>(pub FE);
 
 // F_com protocol
-pub struct FComSender<FE: FiniteField> {
+pub struct FComProver<FE: FiniteField> {
     svole_sender: Sender<FE>,
     voles: Vec<(FE::PrimeField, FE)>,
 }
@@ -33,7 +33,7 @@ fn make_x_i<FE: FiniteField>(i: usize) -> FE {
     FE::from_polynomial_coefficients(v)
 }
 
-impl<FE: FiniteField> FComSender<FE> {
+impl<FE: FiniteField> FComProver<FE> {
     pub fn init<C: AbstractChannel, RNG: CryptoRng + Rng>(
         channel: &mut C,
         rng: &mut RNG,
@@ -269,13 +269,13 @@ impl<FE: FiniteField> FComSender<FE> {
     }
 }
 
-pub struct FComReceiver<FE: FiniteField> {
+pub struct FComVerifier<FE: FiniteField> {
     delta: FE,
     svole_receiver: Receiver<FE>,
     voles: Vec<FE>,
 }
 
-impl<FE: FiniteField> FComReceiver<FE> {
+impl<FE: FiniteField> FComVerifier<FE> {
     pub fn init<C: AbstractChannel, RNG: CryptoRng + Rng>(
         channel: &mut C,
         rng: &mut RNG,
@@ -317,7 +317,7 @@ impl<FE: FiniteField> FComReceiver<FE> {
             None => {
                 let _start = Instant::now();
                 self.svole_receiver.receive(channel, rng, &mut self.voles)?;
-                // println!("SVOLE<{:?}>", _start.elapsed());
+                println!("SVOLE<{:?}>", _start.elapsed());
                 match self.voles.pop() {
                     Some(e) => {
                         return Ok(MacVerifier(e));
@@ -531,7 +531,7 @@ impl<FE: FiniteField> FComReceiver<FE> {
 #[cfg(test)]
 mod tests {
 
-    use super::{FComReceiver, FComSender, MacProver};
+    use super::{FComProver, FComVerifier, MacProver};
     use scuttlebutt::{
         field::{F61p, FiniteField, Gf40},
         AbstractChannel, AesRng, Channel,
@@ -549,7 +549,7 @@ mod tests {
             let reader = BufReader::new(sender.try_clone().unwrap());
             let writer = BufWriter::new(sender);
             let mut channel = Channel::new(reader, writer);
-            let mut fcom = FComSender::<FE>::init(&mut channel, &mut rng).unwrap();
+            let mut fcom = FComProver::<FE>::init(&mut channel, &mut rng).unwrap();
 
             let mut v = Vec::with_capacity(count);
             for _ in 0..count {
@@ -562,7 +562,7 @@ mod tests {
         let reader = BufReader::new(receiver.try_clone().unwrap());
         let writer = BufWriter::new(receiver);
         let mut channel = Channel::new(reader, writer);
-        let mut fcom = FComReceiver::<FE>::init(&mut channel, &mut rng).unwrap();
+        let mut fcom = FComVerifier::<FE>::init(&mut channel, &mut rng).unwrap();
         let mut v = Vec::with_capacity(count);
         for _ in 0..count {
             v.push(fcom.random(&mut channel, &mut rng).unwrap());
@@ -584,7 +584,7 @@ mod tests {
             let reader = BufReader::new(sender.try_clone().unwrap());
             let writer = BufWriter::new(sender);
             let mut channel = Channel::new(reader, writer);
-            let mut fcom = FComSender::<F61p>::init(&mut channel, &mut rng).unwrap();
+            let mut fcom = FComProver::<F61p>::init(&mut channel, &mut rng).unwrap();
 
             let mut v = Vec::new();
             for _ in 0..count {
@@ -604,7 +604,7 @@ mod tests {
         let reader = BufReader::new(receiver.try_clone().unwrap());
         let writer = BufWriter::new(receiver);
         let mut channel = Channel::new(reader, writer);
-        let mut fcom = FComReceiver::<F61p>::init(&mut channel, &mut rng).unwrap();
+        let mut fcom = FComVerifier::<F61p>::init(&mut channel, &mut rng).unwrap();
 
         let mut v = Vec::new();
         for _ in 0..count {
@@ -634,7 +634,7 @@ mod tests {
             let reader = BufReader::new(sender.try_clone().unwrap());
             let writer = BufWriter::new(sender);
             let mut channel = Channel::new(reader, writer);
-            let mut fcom = FComSender::<FE>::init(&mut channel, &mut rng).unwrap();
+            let mut fcom = FComProver::<FE>::init(&mut channel, &mut rng).unwrap();
 
             let mut v = Vec::new();
             for _ in 0..count {
@@ -658,7 +658,7 @@ mod tests {
         let reader = BufReader::new(receiver.try_clone().unwrap());
         let writer = BufWriter::new(receiver);
         let mut channel = Channel::new(reader, writer);
-        let mut fcom = FComReceiver::<FE>::init(&mut channel, &mut rng).unwrap();
+        let mut fcom = FComVerifier::<FE>::init(&mut channel, &mut rng).unwrap();
 
         let mut v = Vec::new();
         for _ in 0..count {
@@ -683,7 +683,7 @@ mod tests {
             let reader = BufReader::new(sender.try_clone().unwrap());
             let writer = BufWriter::new(sender);
             let mut channel = Channel::new(reader, writer);
-            let mut fcom = FComSender::<FE>::init(&mut channel, &mut rng).unwrap();
+            let mut fcom = FComProver::<FE>::init(&mut channel, &mut rng).unwrap();
 
             let mut v = Vec::new();
             for _ in 0..count {
@@ -720,7 +720,7 @@ mod tests {
         let reader = BufReader::new(receiver.try_clone().unwrap());
         let writer = BufWriter::new(receiver);
         let mut channel = Channel::new(reader, writer);
-        let mut fcom = FComReceiver::<FE>::init(&mut channel, &mut rng).unwrap();
+        let mut fcom = FComVerifier::<FE>::init(&mut channel, &mut rng).unwrap();
 
         let mut v = Vec::new();
         for _ in 0..count {

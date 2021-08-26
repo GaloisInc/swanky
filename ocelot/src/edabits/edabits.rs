@@ -6,7 +6,7 @@
 
 //! This is the implementation of field conversion
 
-use super::homcom::{FComReceiver, FComSender, MacProver, MacVerifier};
+use super::homcom::{FComProver, FComVerifier, MacProver, MacVerifier};
 use crate::errors::Error;
 use rand::{CryptoRng, Rng, SeedableRng};
 use scuttlebutt::{
@@ -121,20 +121,20 @@ fn generate_permutation<T: Clone, RNG: CryptoRng + Rng>(rng: &mut RNG, v: &mut V
     }
 }
 
-/// Conversion sender
-pub struct SenderConv<FE: FiniteField> {
-    fcom_f2: FComSender<Gf40>,
-    fcom: FComSender<FE>,
+/// Prover for the edabits conversion protocol
+pub struct ProverConv<FE: FiniteField> {
+    fcom_f2: FComProver<Gf40>,
+    fcom: FComProver<FE>,
 }
 
-impl<FE: FiniteField + PrimeFiniteField> SenderConv<FE> {
-    /// initialize conversion sender
+impl<FE: FiniteField + PrimeFiniteField> ProverConv<FE> {
+    /// initialize the prover
     pub fn init<C: AbstractChannel, RNG: CryptoRng + Rng>(
         channel: &mut C,
         rng: &mut RNG,
     ) -> Result<Self, Error> {
-        let a = FComSender::init(channel, rng)?;
-        let b = FComSender::init(channel, rng)?;
+        let a = FComProver::init(channel, rng)?;
+        let b = FComProver::init(channel, rng)?;
         Ok(Self {
             fcom_f2: a,
             fcom: b,
@@ -748,9 +748,9 @@ impl<FE: FiniteField + PrimeFiniteField> SenderConv<FE> {
                     }
                 }
 
-                let mut new_sender = self.duplicate(channel, rng)?;
+                let mut new_prover = self.duplicate(channel, rng)?;
                 let handle = std::thread::spawn(move || {
-                    new_sender.conv_loop(
+                    new_prover.conv_loop(
                         &mut bucket_channel,
                         &mut AesRng::new(),
                         &edabits_vector_par,
@@ -773,20 +773,20 @@ impl<FE: FiniteField + PrimeFiniteField> SenderConv<FE> {
     }
 }
 
-/// Conversion receiver
-pub struct ReceiverConv<FE: FiniteField> {
-    fcom_f2: FComReceiver<Gf40>,
-    fcom: FComReceiver<FE>,
+/// Verifier for the edabits conversion protocol
+pub struct VerifierConv<FE: FiniteField> {
+    fcom_f2: FComVerifier<Gf40>,
+    fcom: FComVerifier<FE>,
 }
 
-impl<FE: FiniteField + PrimeFiniteField> ReceiverConv<FE> {
-    /// initialize conversion receiver
+impl<FE: FiniteField + PrimeFiniteField> VerifierConv<FE> {
+    /// initialize the verifier
     pub fn init<C: AbstractChannel, RNG: CryptoRng + Rng>(
         channel: &mut C,
         rng: &mut RNG,
     ) -> Result<Self, Error> {
-        let a = FComReceiver::init(channel, rng)?;
-        let b = FComReceiver::init(channel, rng)?;
+        let a = FComVerifier::init(channel, rng)?;
+        let b = FComVerifier::init(channel, rng)?;
         Ok(Self {
             fcom_f2: a,
             fcom: b,
@@ -1370,9 +1370,9 @@ impl<FE: FiniteField + PrimeFiniteField> ReceiverConv<FE> {
                     }
                 }
 
-                let mut new_receiver = self.duplicate(channel, rng)?;
+                let mut new_verifier = self.duplicate(channel, rng)?;
                 let handle = std::thread::spawn(move || {
-                    new_receiver.conv_loop(
+                    new_verifier.conv_loop(
                         &mut bucket_channel,
                         &mut AesRng::new(),
                         &edabits_vector_mac_par,
@@ -1405,8 +1405,8 @@ mod tests {
 
     use super::super::homcom::{MacProver, MacVerifier};
     use super::{
-        bit_to_fe, DabitProver, DabitVerifier, EdabitsProver, EdabitsVerifier, ReceiverConv,
-        SenderConv,
+        bit_to_fe, DabitProver, DabitVerifier, EdabitsProver, EdabitsVerifier, ProverConv,
+        VerifierConv,
     };
     use scuttlebutt::{
         field::{F61p, FiniteField, PrimeFiniteField, F2},
@@ -1429,7 +1429,7 @@ mod tests {
             let reader = BufReader::new(sender.try_clone().unwrap());
             let writer = BufWriter::new(sender);
             let mut channel = Channel::new(reader, writer);
-            let mut fconv = SenderConv::<FE>::init(&mut channel, &mut rng).unwrap();
+            let mut fconv = ProverConv::<FE>::init(&mut channel, &mut rng).unwrap();
 
             let mut res = Vec::new();
             for _ in 0..count {
@@ -1471,7 +1471,7 @@ mod tests {
         let reader = BufReader::new(receiver.try_clone().unwrap());
         let writer = BufWriter::new(receiver);
         let mut channel = Channel::new(reader, writer);
-        let mut fconv = ReceiverConv::<FE>::init(&mut channel, &mut rng).unwrap();
+        let mut fconv = VerifierConv::<FE>::init(&mut channel, &mut rng).unwrap();
 
         let mut res = Vec::new();
         for _ in 0..count {
@@ -1521,7 +1521,7 @@ mod tests {
             let reader = BufReader::new(sender.try_clone().unwrap());
             let writer = BufWriter::new(sender);
             let mut channel = Channel::new(reader, writer);
-            let mut fconv = SenderConv::<FE>::init(&mut channel, &mut rng).unwrap();
+            let mut fconv = ProverConv::<FE>::init(&mut channel, &mut rng).unwrap();
 
             let x_mac = fconv.fcom_f2.input(&mut channel, &mut rng, &x).unwrap();
             let y_mac = fconv.fcom_f2.input(&mut channel, &mut rng, &y).unwrap();
@@ -1564,7 +1564,7 @@ mod tests {
         let reader = BufReader::new(receiver.try_clone().unwrap());
         let writer = BufWriter::new(receiver);
         let mut channel = Channel::new(reader, writer);
-        let mut fconv = ReceiverConv::<FE>::init(&mut channel, &mut rng).unwrap();
+        let mut fconv = VerifierConv::<FE>::init(&mut channel, &mut rng).unwrap();
 
         let x_mac = fconv.fcom_f2.input(&mut channel, &mut rng, power).unwrap();
         let y_mac = fconv.fcom_f2.input(&mut channel, &mut rng, power).unwrap();
@@ -1609,7 +1609,7 @@ mod tests {
             let reader = BufReader::new(sender.try_clone().unwrap());
             let writer = BufWriter::new(sender);
             let mut channel = Channel::new(reader, writer);
-            let mut fconv = SenderConv::<FE>::init(&mut channel, &mut rng).unwrap();
+            let mut fconv = ProverConv::<FE>::init(&mut channel, &mut rng).unwrap();
 
             let dabits = fconv.random_dabits(&mut channel, &mut rng, count).unwrap();
             let _ = fconv.fdabit(&mut channel, &mut rng, &dabits).unwrap();
@@ -1619,7 +1619,7 @@ mod tests {
         let reader = BufReader::new(receiver.try_clone().unwrap());
         let writer = BufWriter::new(receiver);
         let mut channel = Channel::new(reader, writer);
-        let mut fconv = ReceiverConv::<FE>::init(&mut channel, &mut rng).unwrap();
+        let mut fconv = VerifierConv::<FE>::init(&mut channel, &mut rng).unwrap();
 
         let dabits_mac = fconv.random_dabits(&mut channel, &mut rng, count).unwrap();
         let _ = fconv.fdabit(&mut channel, &mut rng, &dabits_mac).unwrap();
@@ -1637,7 +1637,7 @@ mod tests {
             let reader = BufReader::new(sender.try_clone().unwrap());
             let writer = BufWriter::new(sender);
             let mut channel = Channel::new(reader, writer);
-            let mut fconv = SenderConv::<FE>::init(&mut channel, &mut rng).unwrap();
+            let mut fconv = ProverConv::<FE>::init(&mut channel, &mut rng).unwrap();
 
             for n in 1..nb_edabits {
                 let edabits = fconv
@@ -1662,7 +1662,7 @@ mod tests {
         let reader = BufReader::new(receiver.try_clone().unwrap());
         let writer = BufWriter::new(receiver);
         let mut channel = Channel::new(reader, writer);
-        let mut fconv = ReceiverConv::<FE>::init(&mut channel, &mut rng).unwrap();
+        let mut fconv = VerifierConv::<FE>::init(&mut channel, &mut rng).unwrap();
 
         let mut res = Vec::new();
         for n in 1..nb_edabits {
