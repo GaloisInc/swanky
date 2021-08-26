@@ -125,6 +125,12 @@ impl<FE: FiniteField> FComProver<FE> {
     }
 
     #[inline]
+    pub fn neg(&self, a: MacProver<FE>) -> MacProver<FE> {
+        let MacProver(a, a_mac) = a;
+        return MacProver(-a, -a_mac);
+    }
+
+    #[inline]
     pub fn minus(&self, a: MacProver<FE>, b: MacProver<FE>) -> MacProver<FE> {
         let MacProver(a, a_mac) = a;
         let MacProver(b, b_mac) = b;
@@ -372,6 +378,12 @@ impl<FE: FiniteField> FComVerifier<FE> {
         let MacVerifier(a_mac) = a;
         let MacVerifier(b_mac) = b;
         return MacVerifier(a_mac + b_mac);
+    }
+
+    #[inline]
+    pub fn neg(&self, a: MacVerifier<FE>) -> MacVerifier<FE> {
+        let MacVerifier(a_mac) = a;
+        return MacVerifier(-a_mac);
     }
 
     #[inline]

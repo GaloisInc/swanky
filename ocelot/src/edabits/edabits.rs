@@ -152,39 +152,33 @@ impl<FE: FiniteField + PrimeFiniteField> ProverConv<FE> {
         })
     }
 
-    fn convert_bit_2_field<C: AbstractChannel, RNG: CryptoRng + Rng>(
+    fn convert_bit_2_field<C: AbstractChannel>(
         &mut self,
         channel: &mut C,
-        _rng: &mut RNG,
-        dabit_batch: &[DabitProver<FE>],
-        input_batch: Vec<MacProver<Gf40>>,
+        r_batch: &[DabitProver<FE>],
+        x_batch: Vec<MacProver<Gf40>>,
     ) -> Result<Vec<MacProver<FE>>, Error> {
-        let n = dabit_batch.len();
-        debug_assert!(n == input_batch.len());
+        let n = r_batch.len();
+        debug_assert!(n == x_batch.len());
 
-        let mut r_plus_x = Vec::with_capacity(n);
+        let mut c_batch = Vec::with_capacity(n);
         for i in 0..n {
-            let MacProver(r, r_mac) = dabit_batch[i].bit;
-            let MacProver(x, x_mac) = input_batch[i];
-            r_plus_x.push(MacProver(r + x, r_mac + x_mac));
+            c_batch.push(self.fcom_f2.add(r_batch[i].bit, x_batch[i]));
         }
-        self.fcom_f2.open(channel, &r_plus_x)?;
+        self.fcom_f2.open(channel, &c_batch)?;
 
         let mut x_m_batch = Vec::with_capacity(n);
         for i in 0..n {
-            let MacProver(r, _r_mac) = dabit_batch[i].bit;
-            let MacProver(_r_m, r_m_mac) = dabit_batch[i].value;
-            let MacProver(x, _x_mac) = input_batch[i];
+            let MacProver(c, _) = c_batch[i];
 
-            let x_m = bit_to_fe::<FE::PrimeField>(x);
-            let c = r + x;
-            let x_m_mac = r_m_mac
-                + if c == F2::ONE {
-                    -(r_m_mac + r_m_mac)
-                } else {
-                    FE::ZERO
-                };
-            x_m_batch.push(MacProver(x_m, x_m_mac));
+            let c_m = bit_to_fe::<FE::PrimeField>(c);
+            let x_m = if c == F2::ONE {
+                self.fcom
+                    .affine_add_cst(c_m, self.fcom.neg(r_batch[i].value))
+            } else {
+                self.fcom.affine_add_cst(c_m, r_batch[i].value)
+            };
+            x_m_batch.push(x_m);
         }
 
         Ok(x_m_batch)
@@ -599,7 +593,7 @@ impl<FE: FiniteField + PrimeFiniteField> ProverConv<FE> {
         for (_, e_carry) in e_batch.iter() {
             e_carry_batch.push(e_carry.clone());
         }
-        let e_m_batch = self.convert_bit_2_field(channel, rng, &dabits, e_carry_batch)?;
+        let e_m_batch = self.convert_bit_2_field(channel, &dabits, e_carry_batch)?;
 
         // 6)a)
         let mut e_prime_mac_batch = Vec::with_capacity(n);
@@ -804,43 +798,36 @@ impl<FE: FiniteField + PrimeFiniteField> VerifierConv<FE> {
         })
     }
 
-    fn convert_bit_2_field<C: AbstractChannel, RNG: CryptoRng + Rng>(
+    fn convert_bit_2_field<C: AbstractChannel>(
         &mut self,
         channel: &mut C,
-        _rng: &mut RNG,
         r_batch: &[DabitVerifier<FE>],
-        x_mac_batch: Vec<MacVerifier<Gf40>>,
+        x_batch: Vec<MacVerifier<Gf40>>,
     ) -> Result<Vec<MacVerifier<FE>>, Error> {
         let n = r_batch.len();
-        debug_assert!(n == x_mac_batch.len());
+        debug_assert!(n == x_batch.len());
 
         let mut r_mac_plus_x_mac = Vec::with_capacity(n);
-
         for i in 0..n {
-            r_mac_plus_x_mac.push(MacVerifier(r_batch[i].bit.0 + x_mac_batch[i].0));
+            r_mac_plus_x_mac.push(self.fcom_f2.add(r_batch[i].bit, x_batch[i]));
         }
-
         let c_batch = self.fcom_f2.open(channel, &r_mac_plus_x_mac)?;
 
-        let mut x_m_mac_batch = Vec::with_capacity(n);
+        let mut x_m_batch = Vec::with_capacity(n);
 
         for i in 0..n {
-            let MacVerifier(r_m_mac) = r_batch[i].value;
             let c = c_batch[i];
 
-            let x_m_mac = (if c == F2::ONE {
-                -self.fcom.get_delta()
+            let c_m = bit_to_fe::<FE::PrimeField>(c);
+            let x_m = if c == F2::ONE {
+                self.fcom
+                    .affine_add_cst(c_m, self.fcom.neg(r_batch[i].value))
             } else {
-                FE::ZERO
-            }) + r_m_mac
-                + if c == F2::ONE {
-                    -(r_m_mac + r_m_mac)
-                } else {
-                    FE::ZERO
-                };
-            x_m_mac_batch.push(MacVerifier(x_m_mac));
+                self.fcom.affine_add_cst(c_m, r_batch[i].value)
+            };
+            x_m_batch.push(x_m);
         }
-        Ok(x_m_mac_batch)
+        Ok(x_m_batch)
     }
 
     fn bit_add_carry<C: AbstractChannel, RNG: CryptoRng + Rng>(
@@ -1165,8 +1152,7 @@ impl<FE: FiniteField + PrimeFiniteField> VerifierConv<FE> {
             e_carry_mac_batch.push(e_carry.clone());
         }
 
-        let e_m_mac_batch =
-            self.convert_bit_2_field(channel, rng, &dabits_mac, e_carry_mac_batch)?;
+        let e_m_mac_batch = self.convert_bit_2_field(channel, &dabits_mac, e_carry_mac_batch)?;
         println!("A2B> {:?}", start.elapsed());
 
         // 6)a)
@@ -1442,7 +1428,6 @@ mod tests {
                 let MacProver(x_m, x_m_mac) = fconv
                     .convert_bit_2_field(
                         &mut channel,
-                        &mut rng,
                         &vec![DabitProver {
                             bit: MacProver(rb, rb_mac),
                             value: MacProver(rm, rm_mac),
@@ -1482,7 +1467,6 @@ mod tests {
             let x_m_mac = fconv
                 .convert_bit_2_field(
                     &mut channel,
-                    &mut rng,
                     &vec![DabitVerifier {
                         bit: rb_mac,
                         value: r_m_mac,
