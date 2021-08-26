@@ -26,7 +26,7 @@ run_command () {
     if [[ ! -z "${PROVER}" ]]; then
         sleep 2
     fi
-    cargo run --release --example lan_edabits -- -n ${NUM_EDABITS} -b ${NUM_BUCKETS} -m ${NUM_BITS} ${QUICKSILVER} --addr verifier:5527 ${WHOAMI}
+    cargo run --release --example network_edabits -- -n ${NUM_EDABITS} -b ${NUM_BUCKETS} -m ${NUM_BITS} ${QUICKSILVER} --addr verifier:5527 ${WHOAMI}
 }
 
 run_test_b5 () {
