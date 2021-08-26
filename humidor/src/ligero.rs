@@ -163,7 +163,7 @@ impl<Field: FieldForLigero, H: merkle::MerkleHash> Secret<Field, H> {
         let w: Array1<_> = c.eval(&inp)
             .iter()
             .cloned()
-            .chain(vec![Field::ZERO; ml - c.size()])
+            .chain(std::iter::repeat(Field::ZERO).take(ml - c.size()))
             .collect();
 
         for (s, op) in c.ops.iter().enumerate() {
