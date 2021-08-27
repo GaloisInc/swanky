@@ -1,0 +1,33 @@
+version: '3'
+
+services:
+  verifier:
+    image: swanky:latest
+    volumes:
+      #- ../scuttlebutt:/root/swanky/scuttlebutt
+      - ../ocelot/test_edabits.sh:/root/swanky/ocelot/test_edabits.sh
+      - ../ocelot/src:/root/swanky/ocelot/src
+      - ../ocelot/examples:/root/swanky/ocelot/examples
+      - /tmp/bench_result.txt:/tmp/bench_result.txt
+    cap_add:
+     - NET_ADMIN
+    expose:
+      - "5527"
+    environment:
+      - VERIFIER="True"
+    command: bash test_edabits.sh
+    # command: bash -c "tail -f /dev/null"
+
+  prover:
+    image: swanky:latest
+    volumes:
+      #- ./scuttlebutt:/root/swanky/scuttlebutt
+      - ../ocelot/test_edabits.sh:/root/swanky/ocelot/test_edabits.sh
+      - ../ocelot/src:/root/swanky/ocelot/src
+      - ../ocelot/examples:/root/swanky/ocelot/examples
+    environment:
+      - PROVER="True"
+    cap_add:
+      - NET_ADMIN
+    command: bash test_edabits.sh
+    # command: bash -c "tail -f /dev/null"
