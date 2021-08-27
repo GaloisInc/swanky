@@ -71,49 +71,48 @@ run_test_b3 () {
 
 
 
-RATE=20000kbit
-LATENCY=1ms
-BURST=20kbit
-tc qdisc add dev eth0 root tbf rate ${RATE} latency ${LATENCY} burst ${BURST}
-run_test_b5
-run_test_b4
-run_test_b3
-
-
-RATE=50000kbit
-LATENCY=1ms
-BURST=50kbit
-tc qdisc delete dev eth0 root
-tc qdisc add dev eth0 root tbf rate ${RATE} latency ${LATENCY} burst ${BURST}
-run_test_b5
-run_test_b4
-run_test_b3
-
-
-RATE=100000kbit
-LATENCY=1ms
-BURST=100kbit
-tc qdisc delete dev eth0 root
-tc qdisc add dev eth0 root tbf rate ${RATE} latency ${LATENCY} burst ${BURST}
-run_test_b5
-run_test_b4
-run_test_b3
-
-
-RATE=500000kbit
-LATENCY=1ms
-BURST=500kbit
-tc qdisc delete dev eth0 root
-tc qdisc add dev eth0 root tbf rate ${RATE} latency ${LATENCY} burst ${BURST}
-run_test_b5
-run_test_b4
-run_test_b3
+# From higher to lower bandwidth
 
 RATE=1000000kbit
 LATENCY=1ms
 BURST=1000kbit
-tc qdisc delete dev eth0 root
 tc qdisc add dev eth0 root tbf rate ${RATE} latency ${LATENCY} burst ${BURST}
 run_test_b5
 run_test_b4
 run_test_b3
+
+# RATE=500000kbit
+# LATENCY=1ms
+# BURST=500kbit
+# tc qdisc delete dev eth0 root
+# tc qdisc add dev eth0 root tbf rate ${RATE} latency ${LATENCY} burst ${BURST}
+# run_test_b5
+# run_test_b4
+# run_test_b3
+
+# RATE=100000kbit
+# LATENCY=1ms
+# BURST=100kbit
+# tc qdisc delete dev eth0 root
+# tc qdisc add dev eth0 root tbf rate ${RATE} latency ${LATENCY} burst ${BURST}
+# run_test_b5
+# run_test_b4
+# run_test_b3
+
+# RATE=50000kbit
+# LATENCY=1ms
+# BURST=50kbit
+# tc qdisc delete dev eth0 root
+# tc qdisc add dev eth0 root tbf rate ${RATE} latency ${LATENCY} burst ${BURST}
+# run_test_b5
+# run_test_b4
+# run_test_b3
+
+# RATE=20000kbit
+# LATENCY=1ms
+# BURST=20kbit
+# tc qdisc delete dev eth0 root
+# tc qdisc add dev eth0 root tbf rate ${RATE} latency ${LATENCY} burst ${BURST}
+# run_test_b5
+# run_test_b4
+# run_test_b3

@@ -234,7 +234,6 @@ impl<FE: FiniteField + PrimeFiniteField> ProverConv<FE> {
 
                 let and1 = self.fcom_f2.add(xi, ci);
                 let MacProver(and1_clr, _) = and1;
-
                 let and2 = self.fcom_f2.add(yi, ci);
 
                 let and_res = and1_clr * and2.0;
@@ -328,7 +327,7 @@ impl<FE: FiniteField + PrimeFiniteField> ProverConv<FE> {
         &mut self,
         channel: &mut C,
         rng: &mut RNG,
-        num: usize, // in the paper: NB
+        num: usize,
     ) -> Result<Vec<DabitProver<FE>>, Error> {
         let mut dabit_vec = Vec::with_capacity(num);
         let mut b_batch = Vec::with_capacity(num);
@@ -943,7 +942,7 @@ impl<FE: FiniteField + PrimeFiniteField> VerifierConv<FE> {
         &mut self,
         channel: &mut C,
         rng: &mut RNG,
-        num: usize, // in the paper: NB
+        num: usize,
     ) -> Result<Vec<DabitVerifier<FE>>, Error> {
         let mut dabit_vec_mac = Vec::with_capacity(num);
         let mut b_mac_batch = Vec::with_capacity(num);

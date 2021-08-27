@@ -1,4 +1,4 @@
-#docker build -t swanky .
+# docker build -f docker/Dockerfile -t swanky .
 
 FROM ubuntu:focal
 
@@ -20,5 +20,5 @@ COPY . /root/swanky/.
 
 WORKDIR /root/swanky/ocelot
 RUN cargo build --release
-RUN cargo run --release --example lan_edabits -- --help
-#RUN cargo test --release edabits 
+RUN cargo run --release --example network_edabits -- --help
+# RUN cargo test --release edabits 
