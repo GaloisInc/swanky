@@ -6,115 +6,28 @@ pub(crate) mod mpcot;
 pub(crate) mod spcot;
 pub(crate) mod util;
 
-use crate::ot::{FixedKeyInitializer, KosDeltaReceiver, KosDeltaSender, Receiver as OtReceiver};
+mod receiver;
+mod sender;
 
-use crate::Error;
-use scuttlebutt::{AbstractChannel, Block};
+use receiver::Receiver;
+use sender::Sender;
 
-use rand::{CryptoRng, Rng};
-
-use cache::{CachedReceiver, CachedSender};
-
-// Regular error?
-const REG: bool = true;
+use scuttlebutt::AesHash;
 
 // The computational security parameter: \kappa in the paper.
 const CSP: usize = 128;
 
-pub struct Sender {
-    cots: cache::CachedSender,
-    spcot: spcot::Sender,
-}
+// ferret with regular error (default, fastest)
+pub type FerretSender = Sender<true>;
+pub type FerretReceiver = Receiver<true>;
 
-pub struct Receiver {
-    cots: cache::CachedReceiver,
-    spcot: spcot::Receiver,
-}
+// ferret with uniform error (more conservative LPN assumption)
+pub type FerretSenderUniform = Sender<false>;
+pub type FerretReceiverUniform = Receiver<false>;
 
-impl Sender {
-    pub fn init<C: AbstractChannel, R: Rng + CryptoRng>(
-        delta: Block,
-        channel: &mut C,
-        rng: &mut R,
-    ) -> Result<Self, Error> {
-        // obtain base-COT using KOS18
-        let mut cots = CachedSender::new(delta);
-        let mut kos18 = KosDeltaSender::init_fixed_key(channel, delta.into(), rng)?;
-
-        cots.generate(
-            &mut kos18,
-            channel,
-            rng,
-            ferret::Sender::<REG>::cots_setup(),
-        )?;
-
-        // do 1-time setup iteration
-        let mut spcot = spcot::Sender::init(delta);
-        let y = ferret::Sender::<REG>::extend_setup(&mut cots, &mut spcot, rng, channel)?;
-        cots.append(y.into_iter());
-
-        // ready for main iterations
-        Ok(Self { spcot, cots })
-    }
-
-    pub fn cot<C: AbstractChannel, R: Rng + CryptoRng>(
-        &mut self,
-        channel: &mut C,
-        rng: &mut R,
-    ) -> Result<Block, Error> {
-        if self.cots.capacity() == ferret::Sender::<REG>::cots_main() {
-            // replenish using main iteration
-            let y =
-                ferret::Sender::<REG>::extend_main(&mut self.cots, &mut self.spcot, rng, channel)?;
-            self.cots.append(y.into_iter());
-        }
-
-        Ok(self.cots.pop().unwrap())
-    }
-}
-
-impl Receiver {
-    pub fn init<C: AbstractChannel, R: Rng + CryptoRng>(
-        channel: &mut C,
-        rng: &mut R,
-    ) -> Result<Self, Error> {
-        // obtain base-COT using KOS18
-        let mut cots = CachedReceiver::default();
-        let mut kos18 = KosDeltaReceiver::init(channel, rng)?;
-        cots.generate(
-            &mut kos18,
-            channel,
-            rng,
-            ferret::Receiver::<REG>::cots_setup(),
-        )?;
-
-        // do 1-time setup iteration
-        let mut spcot = spcot::Receiver::init();
-        let (x, z) = ferret::Receiver::<REG>::extend_setup(&mut cots, &mut spcot, rng, channel)?;
-        cots.append(x.into_iter(), z.into_iter());
-
-        // ready for main iterations
-        Ok(Self { spcot, cots })
-    }
-
-    pub fn cot<C: AbstractChannel, R: Rng + CryptoRng>(
-        &mut self,
-        channel: &mut C,
-        rng: &mut R,
-    ) -> Result<(bool, Block), Error> {
-        // regular error
-        if self.cots.capacity() == ferret::Receiver::<REG>::cots_main() {
-            // replenish using main iteration
-            let (x, z) = ferret::Receiver::<REG>::extend_main(
-                &mut self.cots,
-                &mut self.spcot,
-                rng,
-                channel,
-            )?;
-            self.cots.append(x.into_iter(), z.into_iter());
-        }
-        Ok(self.cots.pop().unwrap())
-    }
+// used to break the COT correlation for when ROT is desired
+fn cr_cot_hash() -> AesHash {
+    AesHash::new([1u8; 16].into())
 }
 
 #[cfg(test)]
@@ -130,7 +43,16 @@ mod tests {
     const GEN_COTS: usize = 1_000_000;
 
     #[test]
-    fn test_ferret() {
+    fn test_ferret_reg() {
+        test_ferret::<true>();
+    }
+
+    #[test]
+    fn test_ferret_uni() {
+        test_ferret::<false>();
+    }
+
+    fn test_ferret<const REG: bool>() {
         let mut root = StdRng::seed_from_u64(0x5367_FA32_72B1_8478);
 
         {
@@ -141,7 +63,7 @@ mod tests {
             let handle = spawn(move || {
                 let delta: Block = rng1.gen();
                 let mut ys: Vec<Block> = Vec::with_capacity(GEN_COTS);
-                let mut sender = Sender::init(delta, &mut c1, &mut rng1).unwrap();
+                let mut sender = Sender::<REG>::init(delta, &mut c1, &mut rng1).unwrap();
                 for _ in 0..GEN_COTS {
                     ys.push(sender.cot(&mut c1, &mut rng1).unwrap());
                 }
@@ -149,7 +71,7 @@ mod tests {
             });
 
             let mut xzs: Vec<(bool, Block)> = Vec::with_capacity(GEN_COTS);
-            let mut receiver = Receiver::init(&mut c2, &mut rng2).unwrap();
+            let mut receiver = Receiver::<REG>::init(&mut c2, &mut rng2).unwrap();
             for _ in 0..GEN_COTS {
                 xzs.push(receiver.cot(&mut c2, &mut rng2).unwrap());
             }

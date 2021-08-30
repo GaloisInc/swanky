@@ -6,7 +6,7 @@ use super::*;
 
 pub struct Sender {
     hash: AesHash,
-    delta: Block,
+    pub(crate) delta: Block,
     l: usize, // repetition of SPCOT
 }
 
@@ -45,36 +45,29 @@ impl Sender {
             // used in the computation of "m"
             let q = &cot[H * rep..H * (rep + 1)];
 
-            // pick root seed
-            let s0: Block = rng.gen();
-
-            fn gmm_tree_agg(
-                h: &AesHash,
-                k: &mut [(Block, Block)], // left/right sum at every level
-                sh: &mut [Block],         // lowest level in the tree
-                level: usize,             // level in the tree
-                i: usize,                 // position in the tree
-                s: Block,                 // root seed
-            ) {
-                if level == k.len() {
-                    sh[i] = s;
-                    return;
-                }
-                let (s0, s1) = prg2(h, s);
-                k[level].0 ^= s0;
-                k[level].1 ^= s1;
-                let i: usize = i << 1;
-                gmm_tree_agg(h, k, sh, level + 1, i, s0);
-                gmm_tree_agg(h, k, sh, level + 1, i | 1, s1);
-            }
-
             // compute OT messages: at each level the XOR of
             // all the left child seeds and all the right child seeds respectively
-            let mut m = [(Default::default(), Default::default()); H];
+            let mut m: [(Block, Block); H] = [(Default::default(), Default::default()); H];
             let v: &mut [Block; N] = &mut vs[rep];
-            gmm_tree_agg(&self.hash, &mut m, v, 0, 0, s0);
 
-            //[Default::default(); N];
+            // pick root seed
+            v[0] = rng.gen();
+
+            for i in 0..H {
+                let mut j = (1 << i) - 1;
+                loop {
+                    let res = prg2(&self.hash, v[j]);
+                    m[i].0 ^= res.0;
+                    m[i].1 ^= res.1;
+                    v[2 * j] = res.0;
+                    v[2 * j + 1] = res.1;
+                    if j == 0 {
+                        break;
+                    }
+                    j -= 1;
+                }
+            }
+
             let b: [bool; H] = unpack_bits::<H>(b);
             let l: u128 = (self.l as u128) << 64;
 

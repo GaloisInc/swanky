@@ -71,7 +71,7 @@ impl<'a, const N: usize> Sendable for &'a [u8; N] {
     }
 }
 
-impl<T: Receivable> Receivable for (T, T) {
+impl<T1: Receivable, T2: Receivable> Receivable for (T1, T2) {
     #[inline(always)]
     fn receive<C: AbstractChannel>(chan: &mut C) -> Result<Self> {
         Ok((chan.receive()?, chan.receive()?))
