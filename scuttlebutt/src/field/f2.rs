@@ -126,7 +126,7 @@ impl MulAssign<&F2> for F2 {
 
 impl PrimeFiniteField for F2 {
     fn mod2(&self) -> Self {
-        return F2(self.0 % 2);
+        *self
     }
 }
 

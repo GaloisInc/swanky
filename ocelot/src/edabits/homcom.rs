@@ -4,8 +4,11 @@
 // Copyright © 2021 Galois, Inc.
 // See LICENSE for licensing information.
 
-//! This is the implementation of field conversion
-
+//! This is the implementation of an homomorphic commitment
+//! functionality.  It includes `random`, `input`, affine operations,
+//! `check_zero`, `open` and `check_multiply` a la Wolverine or
+//! Quicksilver.  These functionalities are required for the edabits
+//! conversion protocol.
 use crate::errors::Error;
 use crate::svole::wykw::{Receiver, Sender};
 use crate::svole::{SVoleReceiver, SVoleSender};
@@ -13,12 +16,42 @@ use generic_array::{typenum::Unsigned, GenericArray};
 use rand::{CryptoRng, Rng, SeedableRng};
 use scuttlebutt::{field::FiniteField, AbstractChannel, AesRng, Block};
 use std::time::Instant;
+use subtle::{Choice, ConditionallySelectable};
+
+// The types `MacProver` and `MacVerifier` hold the data associated to
+// a MAC between a prover and a verifier, following SVOLE style
+// functionalities. The main property associated with the two types is
+// that, given a `MacProver(x, m)` and its corresponding
+// `MacVerifier(k)`, the following equation holds `m = k + delta x`,
+// for a global key `delta`, known only to the verifier.
+#[derive(Clone, Copy, Debug)]
+pub struct MacProver<FE: FiniteField>(
+    // value
+    pub FE::PrimeField,
+    // mac associated to the value
+    pub FE,
+);
 
 #[derive(Clone, Copy, Debug)]
-pub struct MacProver<FE: FiniteField>(pub FE::PrimeField, pub FE);
+pub struct MacVerifier<FE: FiniteField>(
+    // The verifier's key mac
+    pub FE,
+);
 
-#[derive(Clone, Copy, Debug)]
-pub struct MacVerifier<FE: FiniteField>(pub FE);
+impl<FE: FiniteField> ConditionallySelectable for MacProver<FE> {
+    fn conditional_select(a: &Self, b: &Self, choice: Choice) -> Self {
+        MacProver(
+            FE::PrimeField::conditional_select(&a.0, &b.0, choice),
+            FE::conditional_select(&a.1, &b.1, choice),
+        )
+    }
+}
+
+impl<FE: FiniteField> ConditionallySelectable for MacVerifier<FE> {
+    fn conditional_select(a: &Self, b: &Self, choice: Choice) -> Self {
+        MacVerifier(FE::conditional_select(&a.0, &b.0, choice))
+    }
+}
 
 // F_com protocol
 pub struct FComProver<FE: FiniteField> {
@@ -419,12 +452,13 @@ impl<FE: FiniteField> FComVerifier<FE> {
         &mut self,
         channel: &mut C,
         keys: &[MacVerifier<FE>],
-    ) -> Result<Vec<FE::PrimeField>, Error> {
+        out: &mut Vec<FE::PrimeField>,
+    ) -> Result<(), Error> {
         let mut hasher = blake3::Hasher::new();
-        let mut res = Vec::with_capacity(keys.len());
+        out.clear();
         for _ in 0..keys.len() {
             let x = channel.read_fe::<FE::PrimeField>()?;
-            res.push(x);
+            out.push(x);
             hasher.update(&x.to_bytes());
         }
         let seed = Block::try_from_slice(&hasher.finalize().as_bytes()[0..16]).unwrap();
@@ -435,15 +469,16 @@ impl<FE: FiniteField> FComVerifier<FE> {
         for i in 0..keys.len() {
             let chi = FE::random(&mut rng);
             let MacVerifier(key) = keys[i];
-            let x = res[i];
+            let x = out[i];
 
             key_chi += chi * key;
             x_chi += chi.multiply_by_prime_subfield(x);
         }
         let m = channel.read_fe::<FE>()?;
 
+        assert_eq!(out.len(), keys.len());
         if key_chi + self.delta * x_chi == m {
-            Ok(res)
+            Ok(())
         } else {
             Err(Error::Other("open fails".to_string()))
         }
@@ -513,7 +548,8 @@ impl<FE: FiniteField> FComVerifier<FE> {
             to_open.push(d);
             to_open.push(e);
         }
-        let opened = self.open(channel, &to_open)?;
+        let mut opened = Vec::with_capacity(2 * n);
+        self.open(channel, &to_open, &mut opened)?;
 
         let mut to_check = Vec::with_capacity(n);
         for i in 0..n {
@@ -579,7 +615,9 @@ mod tests {
         for _ in 0..count {
             v.push(fcom.random(&mut channel, &mut rng).unwrap());
         }
-        let r = fcom.open(&mut channel, &v).unwrap();
+
+        let mut r = Vec::new();
+        fcom.open(&mut channel, &v, &mut r).unwrap();
 
         let resprover = handle.join().unwrap();
 
@@ -628,7 +666,8 @@ mod tests {
             v.push(a_mac);
         }
 
-        let r = fcom.open(&mut channel, &v).unwrap();
+        let mut r = Vec::new();
+        fcom.open(&mut channel, &v, &mut r).unwrap();
 
         let batch_prover = handle.join().unwrap();
 
