@@ -52,7 +52,7 @@ pub trait FiniteField:
     fn to_bytes(&self) -> GenericArray<u8, Self::ByteReprLen>;
 
     /// The prime-order subfield of the finite field.
-    type PrimeField: FiniteField + IsSubfieldOf<Self>;
+    type PrimeField: FiniteField + IsSubfieldOf<Self> + PrimeFiniteField;
     /// When elements of this field are represented as a polynomial over the prime field,
     /// how many coefficients are needed?
     type PolynomialFormNumCoefficients: ArrayLength<Self::PrimeField> + ArrayLength<Self>;
@@ -128,6 +128,16 @@ impl<FE: FiniteField> IsSubfieldOf<FE> for FE {
     fn lift_into_superfield(&self) -> FE {
         *self
     }
+}
+
+/// A `PrimeFiniteField` is a `FiniteField` whose `PrimeField` is
+/// itself. In this case the field is isomorphic to integers modulo
+/// p and this trait provides a modulo 2 operation.
+pub trait PrimeFiniteField:
+    FiniteField<PolynomialFormNumCoefficients = generic_array::typenum::U1, PrimeField = Self>
+{
+    /// This function computes the modulo 2 operation.
+    fn mod2(&self) -> Self;
 }
 
 #[cfg(test)]

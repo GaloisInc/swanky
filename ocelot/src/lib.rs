@@ -14,6 +14,7 @@
 mod errors;
 mod utils;
 pub use crate::errors::Error;
+pub mod edabits;
 pub mod oprf;
 pub mod ot;
 pub mod svole;

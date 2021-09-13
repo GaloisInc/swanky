@@ -3,7 +3,7 @@
 //! # Security Warning
 //! TODO: this might not be constant-time in all cases.
 
-use crate::field::{polynomial::Polynomial, FiniteField};
+use crate::field::{polynomial::Polynomial, FiniteField, PrimeFiniteField};
 use generic_array::GenericArray;
 use rand_core::RngCore;
 use std::{
@@ -121,6 +121,12 @@ impl MulAssign<&F2> for F2 {
     #[inline]
     fn mul_assign(&mut self, rhs: &F2) {
         self.0 &= rhs.0;
+    }
+}
+
+impl PrimeFiniteField for F2 {
+    fn mod2(&self) -> Self {
+        *self
     }
 }
 

@@ -19,6 +19,7 @@ nightly = ["curve25519-dalek/nightly", "curve25519-dalek/simd_backend", "scuttle
 
 
 [dependencies]
+blake3 = "0.3.7"
 curve25519-dalek = { version = "3.0.2", features = ["std"] }
 rand = "0.7"
 scuttlebutt = { path = "../scuttlebutt", features = ["curve25519-dalek"] }
@@ -32,6 +33,7 @@ cc = "1.0.67"
 [dev-dependencies]
 criterion = "0.3.4"
 nix = "0.20.0"
+clap = "2.33.3"
 
 [[bench]]
 name = "ot"

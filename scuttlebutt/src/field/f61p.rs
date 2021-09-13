@@ -1,4 +1,4 @@
-use crate::field::{polynomial::Polynomial, BiggerThanModulus, FiniteField};
+use crate::field::{polynomial::Polynomial, BiggerThanModulus, FiniteField, PrimeFiniteField};
 use generic_array::GenericArray;
 use rand_core::RngCore;
 use std::{
@@ -160,6 +160,12 @@ impl std::iter::Sum for F61p {
             out += u128::from(e.0);
         }
         return F61p(reduce(out));
+    }
+}
+
+impl PrimeFiniteField for F61p {
+    fn mod2(&self) -> Self {
+        return F61p(self.0 % 2);
     }
 }
 
