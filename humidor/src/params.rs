@@ -14,9 +14,6 @@ use scuttlebutt::{numtheory, threshold_secret_sharing};
 use crate::util::*;
 use crate::ligero::FieldForLigero;
 
-#[cfg(test)]
-use proptest::{*, prelude::*, collection::vec as pvec};
-
 /// Parameters for interleaved coding, based on the size of the circuit and
 /// input. Note that these variable names, although terse, correspond to those
 /// used in https://dl.acm.org/doi/pdf/10.1145/3133956.3134104
@@ -125,10 +122,12 @@ impl<Field: FieldForLigero> Params<Field> {
     }
 
     /// Encode a row of l field elements into a codeword row of n elements.
-    pub fn encode(&self, wf: ArrayView1<Field>) -> Array1<Field> {
+    pub fn encode<R>(&self, wf: ArrayView1<Field>, rng: &mut R) -> Array1<Field>
+        where R: rand::RngCore
+    {
         debug_assert_eq!(wf.len(), self.l);
 
-        Array1::from(self.pss.share(&wf.to_vec()))
+        Array1::from(self.pss.share(&wf.to_vec(), rng))
     }
 
     /// Decode a codeword row without stripping the random elements off the end.
@@ -186,13 +185,15 @@ impl<Field: FieldForLigero> Params<Field> {
 
     /// Encode an mXl matrix of field elements into an mXn interleaved
     /// codeword.
-    pub fn encode_interleaved(&self, ws: ArrayView1<Field>) -> Array2<Field> {
+    pub fn encode_interleaved<R>(&self, ws: ArrayView1<Field>, rng: &mut R) -> Array2<Field>
+        where R: rand::RngCore
+    {
         debug_assert_eq!(ws.len(), self.l * self.m);
 
         let mut res = Vec::with_capacity(self.n * self.m);
 
         for w in ws.exact_chunks(self.pss.secret_count) {
-            res.append(&mut self.encode(w).to_vec());
+            res.append(&mut self.encode(w, rng).to_vec());
         }
 
         Array2::from_shape_vec((self.m, self.n), res)
@@ -370,7 +371,7 @@ impl<Field: FieldForLigero> Params<Field> {
     pub fn random_codeword<R>(&self, rng: &mut R) -> Array1<Field>
         where R: rand::RngCore
     {
-        self.encode(random_field_array(rng, self.l).view())
+        self.encode(random_field_array(rng, self.l).view(), rng)
     }
 
     /// Return a valid codeword for `0^l`.
@@ -383,9 +384,16 @@ impl<Field: FieldForLigero> Params<Field> {
         let sum = w.scalar_sum();
         w[self.l - 1] -= sum;
 
-        self.encode(w.view())
+        self.encode(w.view(), rng)
     }
 }
+
+#[cfg(test)]
+use {
+    proptest::{*, prelude::*, collection::vec as pvec},
+    rand::prelude::{SeedableRng, StdRng},
+    scuttlebutt::field::FiniteField,
+};
 
 #[cfg(test)]
 impl Arbitrary for Params<TestField> {
@@ -418,7 +426,9 @@ proptest! {
             (Just(p), v)
         })
     ) {
-        let ve = p.encode(ArrayView1::from(&v));
+        let mut rng = StdRng::seed_from_u64(0);
+
+        let ve = p.encode(ArrayView1::from(&v), &mut rng);
         let vd = p.decode(ve.view()).to_vec();
 
         prop_assert_eq!(vd, v);
@@ -431,7 +441,9 @@ proptest! {
             (Just(p), v)
         })
     ) {
-        let ve = p.encode(Array1::from(v).view());
+        let mut rng = StdRng::seed_from_u64(0);
+
+        let ve = p.encode(Array1::from(v).view(), &mut rng);
 
         prop_assert!(p.codeword_is_valid(ve.view()));
     }
@@ -444,9 +456,9 @@ proptest! {
             (Just(p), v, ix)
         })
     ) {
-        use scuttlebutt::field::FiniteField;
+        let mut rng = StdRng::seed_from_u64(0);
 
-        let mut ve = p.encode(Array1::from(v).view());
+        let mut ve = p.encode(Array1::from(v).view(), &mut rng);
         ve[ix] += TestField::ONE;
 
         prop_assert!(!p.codeword_is_valid(ve.view()));
@@ -459,7 +471,9 @@ proptest! {
             (Just(p), v)
         })
     ) {
-        let ve = p.encode_interleaved(Array1::from(v).view());
+        let mut rng = StdRng::seed_from_u64(0);
+
+        let ve = p.encode_interleaved(Array1::from(v).view(), &mut rng);
         let vs = ve.genrows().into_iter()
             .fold(Array1::zeros(p.n), |acc, row| acc + row);
 
@@ -475,9 +489,9 @@ proptest! {
             (Just(p), v, r, c)
         })
     ) {
-        use scuttlebutt::field::FiniteField;
+        let mut rng = StdRng::seed_from_u64(0);
 
-        let mut ve = p.encode_interleaved(Array1::from(v).view());
+        let mut ve = p.encode_interleaved(Array1::from(v).view(), &mut rng);
         ve[(r,c)] += TestField::ONE;
 
         let vs = ve.genrows().into_iter()

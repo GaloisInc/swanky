@@ -71,10 +71,12 @@ impl<Field: FiniteField + FieldForFFT2 + FieldForFFT3> PackedSecretSharing<Field
     ///
     /// The length of `secrets` must be `secret_count`.
     /// It is safe to pad with anything, including zeros.
-    pub fn share(&self, secrets: &[Field]) -> Vec<Field> {
+    pub fn share<R>(&self, secrets: &[Field], rng: &mut R) -> Vec<Field>
+        where R: rand::RngCore
+    {
         debug_assert_eq!(secrets.len(), self.secret_count);
         // sample polynomial
-        let mut poly = self.sample_polynomial(secrets);
+        let mut poly = self.sample_polynomial(secrets, rng);
         debug_assert_eq!(poly.len(), self.reconstruct_limit() + 1);
         // .. and extend it
         poly.extend(vec![Field::ZERO; self.share_count - self.reconstruct_limit()]);
@@ -89,14 +91,13 @@ impl<Field: FiniteField + FieldForFFT2 + FieldForFFT3> PackedSecretSharing<Field
         shares
     }
 
-    fn sample_polynomial(&self, secrets: &[Field]) -> Vec<Field> {
-        use rand::prelude::*;
-
+    fn sample_polynomial<R>(&self, secrets: &[Field], rng: &mut R) -> Vec<Field>
+        where R: rand::RngCore
+    {
         debug_assert_eq!(secrets.len(), self.secret_count);
         // sample randomness using secure randomness
-        let mut rng = StdRng::from_entropy();
         let randomness: Vec<Field> =
-            (0..self.threshold).map(|_| Field::random(&mut rng)).collect();
+            (0..self.threshold).map(|_| Field::random(rng)).collect();
         // recover polynomial
         let coefficients = self.recover_polynomial(secrets, randomness);
         debug_assert_eq!(coefficients.len(), self.reconstruct_limit() + 1);

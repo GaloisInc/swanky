@@ -176,16 +176,16 @@ impl<Field: FieldForLigero, H: merkle::MerkleHash> Secret<Field, H> {
             }
         }
 
-        let Uw = public.params.encode_interleaved(w.view());
-        let Ux = public.params.encode_interleaved(x.view());
-        let Uy = public.params.encode_interleaved(y.view());
-        let Uz = public.params.encode_interleaved(z.view());
+        let Uw = public.params.encode_interleaved(w.view(), &mut rng);
+        let Ux = public.params.encode_interleaved(x.view(), &mut rng);
+        let Uy = public.params.encode_interleaved(y.view(), &mut rng);
+        let Uz = public.params.encode_interleaved(z.view(), &mut rng);
 
         let u = public.params.random_codeword(&mut rng);
         let ux = public.params.random_zero_codeword(&mut rng);
         let uy = public.params.random_zero_codeword(&mut rng);
         let uz = public.params.random_zero_codeword(&mut rng);
-        let u0 = public.params.encode(Array1::zeros(public.params.l).view());
+        let u0 = public.params.encode(Array1::zeros(public.params.l).view(), &mut rng);
         let uadd = public.params.random_zero_codeword(&mut rng);
 
         let U_hash = merkle::make_tree(ndarray::stack(
@@ -554,6 +554,11 @@ fn make_ra_Iml_Pa_neg<Field: FieldForLigero>(
         .collect()
 }
 
+// Given an mXn matrix Ua, compute the m unique k-degree polynomials
+// pa_i(eta_c) = Ua[i][c].
+//
+// XXX: Currently allocates m k-dimensional vectors to return. Would it be
+// better to pass in in an output argument and use in-place FFT?
 #[allow(non_snake_case)]
 fn make_pa<Field: FieldForLigero>(
     params: &Params<Field>,
@@ -571,6 +576,13 @@ fn make_pa<Field: FieldForLigero>(
         .collect::<Vec<_>>()
 }
 
+// Given p={p_i}, radd, uadd, and Padd, compute the (k+l-1)-degree polynomial
+// qadd = radd_blind + radd_1 . p_1 + ... radd_m . p_m, where radd_i is the
+// unique l-degree polynomial with radd_i(zeta_c) = (radd * Padd)[m*i + c], and
+// radd_blind is the unique (k+l-1)-degree polynomial with
+// radd_blind(eta_c) = uadd[c].
+//
+// TODO: Reduce temporary allocations.
 #[allow(non_snake_case)]
 fn make_qadd<Field: FieldForLigero, H>(
     s: &Secret<Field, H>,
@@ -602,6 +614,13 @@ fn make_qadd<Field: FieldForLigero, H>(
                     p_i.view()).view())) // deg < k + l
 }
 
+// Given {p_i}, ua, ra, Pa, and Ua, compute the k-degree polynomial
+// qa(x) = ra_blind(x) + sum_i ra_i(x)*pa_i(x) + sum_i ra_i(x)*p_{i-m}(x),
+// where the unique k-degree polynomial pa_i(eta_c) = Ua[i][c], the unique
+// (l-1)-degree polynomial ra_i(zeta_c) = (ra * [I | -Pa])[m*i + c],
+// and the unique (k+l)-degree polynomial ra_blind(eta_c) = ua[c].
+//
+// TODO: Reduce temporary allocations.
 #[allow(non_snake_case)]
 fn make_qa<Field: FieldForLigero>(
     params: &Params<Field>,
@@ -643,6 +662,9 @@ fn make_qa<Field: FieldForLigero>(
                     pi.view()).view())) // deg < k + l
 }
 
+// Given u0, px, py, pz, and rq, compute (2k+1)-dimensional polynomial
+// p0(x) = r0_blind(x) + sum_i rq_i(x) * (px_i(x)*py_i(x) - pz_i(x)), where
+// the (2*k)-degree polynomial r0_blind(eta_c) = u0[c].
 fn make_p0<Field: FieldForLigero>(
     params: &Params<Field>,
     u0: &Array1<Field>,
