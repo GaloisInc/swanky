@@ -200,17 +200,23 @@ pub fn monty_from_bytes<F: Monty>(
     if raw < F::M { Ok(F::from_raw(raw)) } else { Err(BiggerThanModulus) }
 }
 
-// TODO: Determine bias
-// XXX: This is slow. Can we do it without the mod?
 /// Convert a random byte array to a field element in Montgomery form
+// XXX: Not actually enough entropy. Need 32 bytes.
 pub fn monty_from_uniform_bytes<F: Monty>(bytes: &[u8; 16]) -> F {
-    let r = u128::from_le_bytes(*bytes);
-    monty_from_u128(r)
+    use rand::prelude::{StdRng, SeedableRng};
+
+    let mut seed = [0u8; 32];
+    for i in 0..16 {
+        seed[i] = bytes[i];
+    }
+
+    let mut rng = StdRng::from_seed(seed);
+    F::from_raw(Uniform::from(0 .. F::M).sample(&mut rng))
 }
 
 /// Generate a uniformly random field element
 pub fn monty_random<F: Monty, R: rand_core::RngCore + ?Sized>(rng: &mut R) -> F {
-    monty_from_u128(Uniform::from(0 .. F::M).sample(rng) as u128)
+    F::from_raw(Uniform::from(0 .. F::M).sample(rng))
 }
 
 // Extended GCD based on
