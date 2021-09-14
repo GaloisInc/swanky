@@ -82,13 +82,13 @@ impl<Field: FiniteField + FieldForFFT2 + FieldForFFT3> PackedSecretSharing<Field
         poly.extend(vec![Field::ZERO; self.share_count - self.reconstruct_limit()]);
         debug_assert_eq!(poly.len(), self.share_count + 1);
         // evaluate polynomial to generate shares
-        let mut shares = self.evaluate_polynomial(poly);
+        self.evaluate_polynomial(&mut poly);
         // .. but remove first element since it should not be used as a share (it's always zero)
-        debug_assert_eq!(shares[0], Field::ZERO);
-        shares.remove(0);
+        debug_assert_eq!(poly[0], Field::ZERO);
+        poly.remove(0);
         // return
-        debug_assert_eq!(shares.len(), self.share_count);
-        shares
+        debug_assert_eq!(poly.len(), self.share_count);
+        poly
     }
 
     fn sample_polynomial<R>(&self, secrets: &[Field], rng: &mut R) -> Vec<Field>
@@ -113,12 +113,13 @@ impl<Field: FiniteField + FieldForFFT2 + FieldForFFT3> PackedSecretSharing<Field
         values.extend(randomness);
         // run backward FFT to recover polynomial in coefficient representation
         debug_assert_eq!(values.len(), self.reconstruct_limit() + 1);
-        numtheory::fft2_inverse(&values, self.omega_secrets)
+        numtheory::cooley_tukey::fft2_inverse(&mut values, self.omega_secrets);
+        values
     }
 
-    fn evaluate_polynomial(&self, coefficients: Vec<Field>) -> Vec<Field> {
+    fn evaluate_polynomial(&self, coefficients: &mut Vec<Field>) {
         debug_assert_eq!(coefficients.len(), self.share_count + 1);
-        numtheory::fft3(&coefficients, self.omega_shares)
+        numtheory::cooley_tukey::fft3(coefficients, self.omega_shares)
     }
 
     /// Reconstruct the secrets from a large enough subset of the shares.
@@ -153,15 +154,39 @@ impl<Field: FiniteField + FieldForFFT2 + FieldForFFT3> PackedSecretSharing<Field
     }
 }
 
-//#[cfg(test)]
-//mod tests {
-//    use super::*;
-//    type TestField = crate::field::F2_19x3_26;
-//
-//    fn test_share_reconstruct() {
-//        let pss = PackedSecretSharing {
-//        }
-//
-//        let w = (0..256).iter().map(|&n| n.into()).collect::<Vec<TestField>>();
-//    }
-//}
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use rand::prelude::*;
+
+    type TestField = crate::field::F2_19x3_26;
+
+    #[test]
+    fn test_share_reconstruct() {
+        let mut rng = StdRng::from_entropy();
+
+        let pss: PackedSecretSharing<TestField> = PackedSecretSharing {
+            /// Maximum number of shares that can be known without exposing the secrets
+            /// (privacy threshold).
+            threshold: 15,
+            /// Number of shares to split the secrets into.
+            share_count: 80,
+            /// Number of secrets to share together.
+            secret_count: 48,
+
+            // implementation configuration
+
+            /// `m`-th principal root of unity in Zp, where `m = secret_count + threshold + 1`
+            /// must be a power of 2.
+            omega_secrets: TestField::from(TestField::roots_base_2(6)),
+            /// `n`-th principal root of unity in Zp, where `n = share_count + 1` must be a power of 3.
+            omega_shares: TestField::from(TestField::roots_base_3(4)),
+        };
+
+        let secrets = (0..pss.secret_count as u64).into_iter().map(|n| n.into()).collect::<Vec<_>>();
+        let shares = &pss.share(&secrets, &mut rng)[0..pss.reconstruct_limit()];
+        let reconstructed = pss.reconstruct(&(0..pss.reconstruct_limit()).collect::<Vec<_>>(), shares);
+
+        assert_eq!(secrets, reconstructed);
+    }
+}
