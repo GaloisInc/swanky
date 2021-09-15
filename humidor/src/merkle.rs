@@ -3,7 +3,7 @@
 // See LICENSE for licensing information.
 
 //! Helper functions for generating Merkle trees and proofs. Note that this
-//! library id just a thin wrapper around the `merkle_cbt` and `tiny_keccak`
+//! library is just a thin wrapper around the `merkle_cbt` and `tiny_keccak`
 //! libraries.
 
 // TODO: Eliminate excessive use of vectors in anonymous functions, function
