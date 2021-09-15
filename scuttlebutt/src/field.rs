@@ -359,4 +359,4 @@ pub use f2_19x3_26::F2_19x3_26;
 
 pub mod polynomial;
 
-pub mod monty;
+mod monty;

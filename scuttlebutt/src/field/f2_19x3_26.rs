@@ -46,9 +46,19 @@ impl std::convert::From<u64> for F2_19x3_26 {
     fn from(n: u64) -> Self { (n as u128).into() }
 }
 
+impl std::convert::From<F2_19x3_26> for u64 {
+    #[inline]
+    fn from(f: F2_19x3_26) -> u64 { u128::from(f) as u64 }
+}
+
 impl std::convert::From<u128> for F2_19x3_26 {
     #[inline]
     fn from(n: u128) -> Self { monty_from_u128(n) }
+}
+
+impl std::convert::From<F2_19x3_26> for u128 {
+    #[inline]
+    fn from(f: F2_19x3_26) -> u128 { monty_to_u128(f) }
 }
 
 implement_finite_field_for_monty!{F2_19x3_26}
