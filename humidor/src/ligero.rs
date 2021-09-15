@@ -71,16 +71,16 @@ impl<Field: FieldForLigero> Public<Field> {
         for (s, op) in c.ops.iter().enumerate() {
             match *op {
                 Op::Mul(i, j) => {
-                    // x[s] * y[s] + -1 * z[s] = 0
-                    Px.add_triplet(s, i, Field::ONE);
-                    Py.add_triplet(s, j, Field::ONE);
-                    Pz.add_triplet(s, s + c.inp_size, Field::ONE);
+                    // Px[s][i]*w[i] * Py[s][j]*w[j] + -1 * Pz[s][k]*w[k] = 0
+                    Px.add_triplet(s,   i, Field::ONE);
+                    Py.add_triplet(s,   j, Field::ONE);
+                    Pz.add_triplet(s, /*k*/ s + c.inp_size, Field::ONE);
                 }
                 Op::Add(i, j) => {
-                    // sum_i Padd[k,i] * w[i] = 0
-                    Padd.add_triplet(s, i, Field::ONE);
-                    Padd.add_triplet(s, j, Field::ONE);
-                    Padd.add_triplet(s, s + c.inp_size, -Field::ONE);
+                    // Padd[s][i]*w[i] + Padd[s][j]*w[j] + Padd[s][k]*w[k] = 0
+                    Padd.add_triplet(s,   i, Field::ONE);
+                    Padd.add_triplet(s,   j, Field::ONE);
+                    Padd.add_triplet(s, /*k*/ s + c.inp_size, -Field::ONE);
                 }
             }
         }
