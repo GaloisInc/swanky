@@ -345,6 +345,17 @@ macro_rules! implement_finite_field_for_monty {
                 <$monty>::from_raw(u64::conditional_select(&a.to_raw(), &b.to_raw(), c))
             }
         }
+        impl $crate::field::PrimeFiniteField for $monty {
+            // XXX: Maybe not the most efficient way to do this? Uses a single division operation
+            // in monty_to_u128.
+            fn mod2(&self) -> Self {
+                if monty_to_u128(*self) & 0x1 == 0 {
+                    Self(monty_from_lit!(0, Self::M))
+                } else {
+                    Self(monty_from_lit!(1, Self::M))
+                }
+            }
+        }
         impl $crate::field::FiniteField for $monty {
             const ZERO: Self = Self(monty_from_lit!(0, Self::M));
             const ONE: Self = Self(monty_from_lit!(1, Self::M));
