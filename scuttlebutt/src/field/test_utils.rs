@@ -255,6 +255,46 @@ macro_rules! test_field {
                         prop_assert_eq!(rebuilt_coeff, coeff);
                     }
                 }
+
+            #[test]
+            fn serialize_constants() {
+                use generic_array::{
+                    GenericArray, arr,
+                    sequence::Concat,
+                    typenum::operator_aliases::Sub1,
+                };
+
+                assert_eq!(
+                    <$f as FiniteField>::from_bytes(&GenericArray::default()).unwrap(),
+                    <$f as FiniteField>::ZERO,
+                );
+                assert_eq!(
+                    <$f as FiniteField>::from_bytes(
+                        &arr![u8; 1].concat(
+                            <GenericArray<u8,Sub1<<$f as FiniteField>::ByteReprLen>>>
+                                ::default())).unwrap(),
+                    <$f as FiniteField>::ONE,
+                );
+            }
+
+            #[test]
+            fn deserialize_constants() {
+                use generic_array::{
+                    GenericArray, arr,
+                    sequence::Concat,
+                    typenum::operator_aliases::Sub1,
+                };
+
+                assert_eq!(
+                    <$f as FiniteField>::ZERO.to_bytes(),
+                    GenericArray::default(),
+                );
+                assert_eq!(
+                    <$f as FiniteField>::ONE.to_bytes(),
+                    arr![u8; 1].concat(
+                        <GenericArray<u8,Sub1<<$f as FiniteField>::ByteReprLen>>>
+                            ::default()),
+                );
             }
         }
     };

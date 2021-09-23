@@ -188,16 +188,16 @@ pub fn monty_ct_eq<F: Monty>(a: F, b: F) -> subtle::Choice {
 }
 
 /// Convert a field element in Montgomery form to a byte array
-pub fn monty_to_bytes<F: Monty>(f: &F) -> GenericArray<u8, typenum::U8> {
-    GenericArray::from(f.to_raw().to_le_bytes())
+pub fn monty_to_bytes<F: Monty>(&f: &F) -> GenericArray<u8, typenum::U8> {
+    GenericArray::from((monty_to_u128(f) as u64).to_le_bytes())
 }
 
 /// Convert a byte array to a field element in Montgomery form
 pub fn monty_from_bytes<F: Monty>(
     bs: &GenericArray<u8, typenum::U8>
 ) -> Result<F, BiggerThanModulus> {
-    let raw = u64::from_le_bytes(*bs.as_ref());
-    if raw < F::M { Ok(F::from_raw(raw)) } else { Err(BiggerThanModulus) }
+    let n = u64::from_le_bytes(*bs.as_ref());
+    if n < F::M { Ok(monty_from_u128(n as u128)) } else { Err(BiggerThanModulus) }
 }
 
 /// Convert a random byte array to a field element in Montgomery form
