@@ -168,7 +168,7 @@ proptest! {
 
         let arr = Array2::from_shape_vec((50,50), values).unwrap();
         let leaves = arr
-            .gencolumns()
+            .columns()
             .into_iter()
             .map(|c| hash_column::<Sha256, TestField>(c.view()))
             .collect::<Vec<Digest>>();
@@ -184,7 +184,7 @@ pub fn make_tree<Field: FiniteField, H: MerkleHash>(
     m: ArrayView2<Field>
 ) -> Tree<H> {
     merkle_cbt::CBMT::build_merkle_tree(
-        &m.gencolumns()
+        &m.columns()
             .into_iter()
             .map(|c| hash_column::<H, Field>(c))
             .collect::<Vec<Digest>>()

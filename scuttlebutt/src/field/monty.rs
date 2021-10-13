@@ -161,6 +161,17 @@ pub fn monty_mul<F: Monty>(a: F, b: F) -> F {
     F::from_raw(redc(ab, F::M, F::M_TICK) as u64)
 }
 
+/// Fused multiply-add for field elements in Montgomery form: a*b + c
+// XXX: Can we do this using using fma (via u64::mul_add)? Seems like we need
+// the redc in the middle.
+#[inline]
+pub fn monty_mul_add<F: Monty>(a: F, b: F, c: F) -> F {
+    let ab = (a.to_raw() as u128).wrapping_mul(b.to_raw() as u128);
+    let abc = redc(ab, F::M, F::M_TICK) + c.to_raw() as u128;
+
+    F::from_raw(ct_reduce(abc, F::M))
+}
+
 /// Division for field elements in Montgomery form
 #[inline]
 pub fn monty_div<F: Monty>(a: F, b: F) -> F { monty_mul(a, monty_inv(b)) }
@@ -345,6 +356,11 @@ macro_rules! implement_finite_field_for_monty {
                 <$monty>::from_raw(u64::conditional_select(&a.to_raw(), &b.to_raw(), c))
             }
         }
+        impl num_traits::MulAdd for $monty {
+            type Output = $monty;
+            #[inline]
+            fn mul_add(self, a: $monty, b: $monty) -> Self::Output { $crate::field::monty::monty_mul_add(self, a, b) }
+        }
         impl $crate::field::PrimeFiniteField for $monty {
             // XXX: Maybe not the most efficient way to do this? Uses a single division operation
             // in monty_to_u128.
@@ -419,6 +435,7 @@ macro_rules! implement_finite_field_for_monty {
 #[cfg(test)]
 mod test {
     use super::*;
+    use num_traits::MulAdd;
 
     #[derive(Copy, Clone, Default, Hash)]
     struct F11(u64);
@@ -452,13 +469,50 @@ mod test {
         #[inline]
         fn from(n: u128) -> Self { monty_from_u128(n) }
     }
+    impl std::convert::From<u64> for F11 {
+        #[inline]
+        fn from(n: u64) -> Self { monty_from_u128(n as u128) }
+    }
 
     implement_finite_field_for_monty!{F11}
 
     test_field!(test_f11, F11);
 
-    #[test]
-    fn test_f11_add() {
-        assert_eq!(F11::from(5) + F11::from(7), F11(F11::RAW_ONE))
+    proptest! {
+        #[test]
+        fn test_f11_add(a in 0..F11::M, b in 0..F11::M) {
+            prop_assert_eq!(
+                F11::from(a) + F11::from(b),
+                F11::from((a + b) % F11::M)
+            )
+        }
+        #[test]
+        fn test_f11_sub(a in 0..F11::M, b in 0..F11::M) {
+            prop_assert_eq!(
+                F11::from(a) - F11::from(b),
+                F11::from((a + F11::M - b) % F11::M)
+            )
+        }
+        #[test]
+        fn test_f11_mul(a in 0..F11::M, b in 0..F11::M) {
+            prop_assert_eq!(
+                F11::from(a) * F11::from(b),
+                F11::from((a * b) % F11::M)
+            )
+        }
+        #[test]
+        fn test_f11_div(a in 0..F11::M, b in 1..F11::M) {
+            prop_assert_eq!(
+                F11::from((a * b) % F11::M) / F11::from(b),
+                F11::from(a)
+            )
+        }
+        #[test]
+        fn test_f11_mul_add(a in 0..F11::M, b in 0..F11::M, c in 0..F11::M) {
+            prop_assert_eq!(
+                F11::from(a).mul_add(F11::from(b), F11::from(c)),
+                F11::from(a * b + c)
+            )
+        }
     }
 }

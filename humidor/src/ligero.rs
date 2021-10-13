@@ -1,5 +1,4 @@
 // This file is part of `humidor`.
-// Copyright © 2021 Galois, Inc.
 // See LICENSE for licensing information.
 
 //! This module implements Ligero according to section 4.7 of
@@ -8,8 +7,8 @@
 // TODO: Eliminate excessive use of vectors in anonymous functions, function
 // return values, etc.
 
-use ndarray::{Array1, Array2};
-use sprs::{CsMat, TriMat};
+use ndarray::{Array1, Array2, Axis, concatenate};
+use sprs::{CsMat, CsVec, TriMat};
 use rand::{SeedableRng, rngs::StdRng};
 use scuttlebutt::field::FiniteField;
 use scuttlebutt::numtheory::{FieldForFFT2, FieldForFFT3};
@@ -31,6 +30,7 @@ pub trait FieldForLigero:
     + FieldForFFT2
     + FieldForFFT3
     + num_traits::Num
+    + num_traits::MulAdd<Output = Self>
     + ndarray::ScalarOperand
     + std::fmt::Debug
 {
@@ -52,7 +52,9 @@ struct Public<Field> {
     Px: CsMat<Field>,
     Py: CsMat<Field>,
     Pz: CsMat<Field>,
+
     Padd: CsMat<Field>,
+    badd: CsVec<Field>,
 }
 
 impl<Field: FieldForLigero> Public<Field> {
@@ -66,21 +68,41 @@ impl<Field: FieldForLigero> Public<Field> {
         let mut Px = new_ml_ml_mat(ml);     // x = Px * w
         let mut Py = new_ml_ml_mat(ml);     // y = Py * w
         let mut Pz = new_ml_ml_mat(ml);     // z = Py * w
+
         let mut Padd = new_ml_ml_mat(3*ml); // Padd * w = 0
+        let mut badd = CsVec::empty(ml);
 
         for (s, op) in c.ops.iter().enumerate() {
+            let k = s + c.inp_size;
             match *op {
-                Op::Mul(i, j) => {
-                    // Px[s][i]*w[i] * Py[s][j]*w[j] + -1 * Pz[s][k]*w[k] = 0
-                    Px.add_triplet(s,   i, Field::ONE);
-                    Py.add_triplet(s,   j, Field::ONE);
-                    Pz.add_triplet(s, /*k*/ s + c.inp_size, Field::ONE);
-                }
                 Op::Add(i, j) => {
                     // Padd[s][i]*w[i] + Padd[s][j]*w[j] + Padd[s][k]*w[k] = 0
-                    Padd.add_triplet(s,   i, Field::ONE);
-                    Padd.add_triplet(s,   j, Field::ONE);
-                    Padd.add_triplet(s, /*k*/ s + c.inp_size, -Field::ONE);
+                    Padd.add_triplet(s, i,  Field::ONE);
+                    Padd.add_triplet(s, j,  Field::ONE);
+                    Padd.add_triplet(s, k, -Field::ONE);
+                }
+                Op::Mul(i, j) => {
+                    // Px[s][i]*w[i] * Py[s][j]*w[j] + -1 * Pz[s][k]*w[k] = 0
+                    Px.add_triplet(s, i, Field::ONE);
+                    Py.add_triplet(s, j, Field::ONE);
+                    Pz.add_triplet(s, k, Field::ONE);
+                }
+                Op::Sub(i, j) => {
+                    // Padd[s][i]*w[i] + Padd[s][j]*w[j] + Padd[s][k]*w[k] = 0
+                    Padd.add_triplet(s, i,  Field::ONE);
+                    Padd.add_triplet(s, j, -Field::ONE);
+                    Padd.add_triplet(s, k, -Field::ONE);
+                }
+                Op::Div(i, j) => {
+                    // Px[s][j]*w[j] * Py[s][k]*w[k] + -1 * Pz[s][i]*w[i] = 0
+                    Px.add_triplet(s, j, Field::ONE);
+                    Py.add_triplet(s, k, Field::ONE);
+                    Pz.add_triplet(s, i, Field::ONE);
+                }
+                Op::LdI(f) => {
+                    // Padd[s][k] * w[k] = badd[s]
+                    Padd.add_triplet(s, k, Field::ONE);
+                    badd.append(s, f);
                 }
             }
         }
@@ -99,7 +121,9 @@ impl<Field: FieldForLigero> Public<Field> {
             Px: Px.to_csc(),
             Py: Py.to_csc(),
             Pz: Pz.to_csc(),
+
             Padd: Padd.to_csc(),
+            badd,
         }
     }
 }
@@ -109,8 +133,6 @@ impl<Field: FieldForLigero> Public<Field> {
 struct Secret<Field, H> {
     public: Public<Field>,
 
-    // XXX: w is not sparse, but x, y, z likely are (with linear sparsity).
-    // Use CsVec?
     w: Array1<Field>, // Extended witness padded to l*m elements
     x: Array1<Field>, // Multiplication left inputs
     y: Array1<Field>, // Multiplication right inputs
@@ -167,12 +189,23 @@ impl<Field: FieldForLigero, H: merkle::MerkleHash> Secret<Field, H> {
             .collect();
 
         for (s, op) in c.ops.iter().enumerate() {
-            if let Op::Mul(i, j) = *op {
-                // x[s] * y[s] + -1 * z[s] = 0
-                x[s] = w[i];
-                y[s] = w[j];
-                z[s] = w[s + c.inp_size];
-                debug_assert_eq!(x[s] * y[s] - z[s], Field::ZERO);
+            let k = s + c.inp_size;
+            match *op {
+                Op::Mul(i, j) => {
+                    // x[s] * y[s] + -1 * z[s] = 0
+                    x[s] = w[i];
+                    y[s] = w[j];
+                    z[s] = w[k];
+                    debug_assert_eq!(x[s] * y[s] - z[s], Field::ZERO);
+                },
+                Op::Div(i, j) => {
+                    // x[s] * y[s] + -1 * z[s] = 0
+                    x[s] = w[j];
+                    y[s] = w[k];
+                    z[s] = w[i];
+                    debug_assert_eq!(x[s] * y[s] - z[s], Field::ZERO);
+                },
+                _ => { /* x[s] = y[s] = z[s] = 0 */ }
             }
         }
 
@@ -188,9 +221,8 @@ impl<Field: FieldForLigero, H: merkle::MerkleHash> Secret<Field, H> {
         let u0 = public.params.encode(Array1::zeros(public.params.l).view(), &mut rng);
         let uadd = public.params.random_zero_codeword(&mut rng);
 
-        let U_hash = merkle::make_tree(ndarray::stack(
-            ndarray::Axis(0),
-            &[Uw.view(), Ux.view(), Uy.view(), Uz.view()]
+        let U_hash = merkle::make_tree(
+            concatenate(Axis(0), &[Uw.view(), Ux.view(), Uy.view(), Uz.view()]
         ).expect("Unequal matrix rows when generating Merkle tree").view());
 
         Secret {
@@ -222,37 +254,36 @@ proptest! {
     #[test]
     #[allow(non_snake_case)]
     fn test_Px(s in <Secret<TestField, merkle::Sha256>>
-        ::arbitrary_with((20, 100))) {
-            prop_assert_eq!(&s.public.Px * &s.w.t(), s.x);
+        ::arbitrary_with((20, 50))) {
+            prop_assert_eq!(&s.public.Px.to_dense().dot(&s.w.t()), s.x);
         }
 
     #[test]
     #[allow(non_snake_case)]
     fn test_Py(s in <Secret<TestField, merkle::Sha256>>
-        ::arbitrary_with((20, 100))) {
-            prop_assert_eq!(&s.public.Py * &s.w.t(), s.y);
+        ::arbitrary_with((20, 50))) {
+            prop_assert_eq!(&s.public.Py.to_dense().dot(&s.w.t()), s.y);
         }
 
     #[test]
     #[allow(non_snake_case)]
     fn test_Pz(s in <Secret<TestField, merkle::Sha256>>
-        ::arbitrary_with((20, 100))) {
-            prop_assert_eq!(&s.public.Pz * &s.w.t(), s.z);
+        ::arbitrary_with((20, 50))) {
+            prop_assert_eq!(&s.public.Pz.to_dense().dot(&s.w.t()), s.z);
         }
 
     #[test]
     #[allow(non_snake_case)]
     fn test_Padd(
-        (c,i) in crate::circuit::arb_ckt(20, 100).prop_flat_map(|c| {
+        (c,i) in crate::circuit::arb_ckt(20, 50).prop_flat_map(|c| {
             (Just(c), pvec(arb_test_field(), 20))
         })
     ) {
         let s: Secret<_, merkle::Sha256> = Secret::new(&c, &i);
         let output = *c.eval(&i).last().unwrap();
-        let zeros = Array1::from(vec![TestField::ZERO; s.w.len()]);
         prop_assert_eq!(
             output == TestField::ZERO,
-            &s.public.Padd * &s.w.t() == zeros
+            &s.public.Padd.to_dense().dot(&s.w.t()) == s.public.badd.to_dense()
         );
     }
 }
@@ -433,7 +464,7 @@ fn verify<Field: FieldForLigero, H: merkle::MerkleHash>(
     r3: Round3<Field>,
     r4: Round4<Field, H>,
 ) -> bool {
-    use ndarray::{s, stack, Axis};
+    use ndarray::s;
 
     let P = &public.params;
 
@@ -458,60 +489,73 @@ fn verify<Field: FieldForLigero, H: merkle::MerkleHash>(
         .map(|c| c.slice(s![3*P.m..4*P.m]).to_owned()).collect();
 
     // Testing interleaved Reed-Solomon codes
-    //      for every j in Q, r*U[j] + u[j] = v[j]
-    r3.Q.iter().zip(U).zip(r4.u)
-        .all(|((&j, U_j), u_j)|
-            r1.r.dot(&U_j.to_owned()) + u_j == r2.v[j]) &&
+    let code_check =
+        // for every j in Q, r*U[j] + u[j] = v[j]
+        r3.Q.iter().zip(U).zip(r4.u)
+            .all(|((&j, U_j), u_j)|
+                r1.r.dot(&U_j.to_owned()) + u_j == r2.v[j]);
+
     // Testing addition gates
-    //      sum_{c in [l]} qadd(zeta_c) = 0
-    P.fft2_peval(r2.qadd.view()).slice(s![1..=P.l]).to_owned()
-        .sum() == Field::ZERO &&
-    //      for every j in Q,
-    //      uadd[j] + sum_{i in [m]} radd_i(eta_j)*Uw[i,j] = qadd(eta_j)
-    r3.Q.iter().zip(Uw.clone()).zip(r4.uadd)
-        .all(|((&j, Uw_j), uadd_j)|
-            uadd_j + radd.column(j).dot(&Uw_j)
-                        == P.peval3(r2.qadd.view(), j+1)) &&
+    let addition_check =
+        // Linear check
+        //      sum_{c in [l]} qadd(zeta_c) = 0
+        //      i.e., sum_{c in [l]} qadd(zeta_c) = r1.radd^T * b
+        P.fft2_peval(r2.qadd.view()).slice(s![1..=P.l]).to_owned()
+            .sum() == public.badd.dot(&r1.radd) && //r1.radd.dot(&public.badd) && //Field::ZERO &&
+        //      for every j in Q,
+        //      uadd[j] + sum_{i in [m]} radd_i(eta_j)*Uw[i,j] = qadd(eta_j)
+        r3.Q.iter().zip(Uw.clone()).zip(r4.uadd)
+            .all(|((&j, Uw_j), uadd_j)|
+                uadd_j + radd.column(j).dot(&Uw_j)
+                            == P.peval3(r2.qadd.view(), j+1));
+
     // Testing multiplication gates
-    //      for every a in {x,y,z}, sum_{c in [l]} qa(zeta_c) = 0
-    P.fft2_peval(r2.qx.view()).slice(s![1..=P.l]).to_owned()
-        .sum() == Field::ZERO &&
-    P.fft2_peval(r2.qy.view()).slice(s![1..=P.l]).to_owned()
-        .sum() == Field::ZERO &&
-    P.fft2_peval(r2.qz.view()).slice(s![1..=P.l]).to_owned()
-        .sum() == Field::ZERO &&
-    //       for every j in Q,
-    //       ua[j] + sum_{i in [m]} ra_i(eta_j)*Ua[i,j]
-    //             + sum_{i in [m]} ra_{m+i}(eta_j)*Uw[i,j] = qa(eta_j)
-    r3.Q.iter().zip(Ux.clone()).zip(Uw.clone()).zip(r4.ux)
-        .all(|(((&j, Ux_j), Uw_j), ux_j)|
-            ux_j + rx.column(j).dot(&stack![Axis(0), Ux_j, Uw_j])
-                        == P.peval3(r2.qx.view(), j+1)) &&
-    r3.Q.iter().zip(Uy.clone()).zip(Uw.clone()).zip(r4.uy)
-        .all(|(((&j, Uy_j), Uw_j), uy_j)|
-            uy_j + ry.column(j).dot(&stack![Axis(0), Uy_j, Uw_j])
-                        == P.peval3(r2.qy.view(), j+1)) &&
-    r3.Q.iter().zip(Uz.clone()).zip(Uw.clone()).zip(r4.uz)
-        .all(|(((&j, Uz_j), Uw_j), uz_j)|
-            uz_j + rz.column(j).dot(&stack![Axis(0), Uz_j, Uw_j])
-                        == P.peval3(r2.qz.view(), j+1)) &&
-    //      for every c in [l], p0(zeta_c) = 0
-    P.fft2_peval(r2.p0.view()).slice(s![1..P.l]).into_iter()
-        .all(|&f| f == Field::ZERO) &&
-    //      for every j in Q,
-    //      u0[j] + rq * (Ux[j] (.) Uy[j] - Uz[j]) = p0(eta_j)
-    r3.Q.iter().zip(r4.u0.iter()).zip(Ux).zip(Uy).zip(Uz)
-        .all(|((((&j, &u0_j), Ux_j), Uy_j), Uz_j)| {
-            let Uxyz_j = ndarray::Zip::from(&Ux_j)
-                .and(&Uy_j)
-                .and(&Uz_j)
-                .apply_collect(|&x, &y, &z| x*y - z);
-            u0_j + r1.rq.dot(&Uxyz_j)
-                == P.peval3(r2.p0.view(), j+1)
-        }) &&
+    let multiplication_check =
+        // Linear checks
+        //      for every a in {x,y,z}, sum_{c in [l]} qa(zeta_c) = 0
+        P.fft2_peval(r2.qx.view()).slice(s![1..=P.l]).to_owned()
+            .sum() == Field::ZERO &&
+        P.fft2_peval(r2.qy.view()).slice(s![1..=P.l]).to_owned()
+            .sum() == Field::ZERO &&
+        P.fft2_peval(r2.qz.view()).slice(s![1..=P.l]).to_owned()
+            .sum() == Field::ZERO &&
+        //      for every a in {x,y,z} and j in Q,
+        //      ua[j] + sum_{i in [m]} ra_i(eta_j)*Ua[i,j]
+        //            + sum_{i in [m]} ra_{m+i}(eta_j)*Uw[i,j] = qa(eta_j)
+        r3.Q.iter().zip(Ux.clone()).zip(Uw.clone()).zip(r4.ux)
+            .all(|(((&j, Ux_j), Uw_j), ux_j)|
+                ux_j + rx.column(j).dot(&concatenate![Axis(0), Ux_j, Uw_j])
+                            == P.peval3(r2.qx.view(), j+1)) &&
+        r3.Q.iter().zip(Uy.clone()).zip(Uw.clone()).zip(r4.uy)
+            .all(|(((&j, Uy_j), Uw_j), uy_j)|
+                uy_j + ry.column(j).dot(&concatenate![Axis(0), Uy_j, Uw_j])
+                            == P.peval3(r2.qy.view(), j+1)) &&
+        r3.Q.iter().zip(Uz.clone()).zip(Uw.clone()).zip(r4.uz)
+            .all(|(((&j, Uz_j), Uw_j), uz_j)|
+                uz_j + rz.column(j).dot(&concatenate![Axis(0), Uz_j, Uw_j])
+                            == P.peval3(r2.qz.view(), j+1)) &&
+        // Quadratic Check
+        //      for every c in [l], p0(zeta_c) = 0
+        P.fft2_peval(r2.p0.view()).slice(s![1..P.l]).into_iter()
+            .all(|&f| f == Field::ZERO) &&
+        //      for every j in Q,
+        //      u0[j] + rq * (Ux[j] (.) Uy[j] - Uz[j]) = p0(eta_j)
+        r3.Q.iter().zip(r4.u0.iter()).zip(Ux).zip(Uy).zip(Uz)
+            .all(|((((&j, &u0_j), Ux_j), Uy_j), Uz_j)| {
+                let Uxyz_j = ndarray::Zip::from(&Ux_j)
+                    .and(&Uy_j)
+                    .and(&Uz_j)
+                    .map_collect(|&x, &y, &z| x*y - z);
+                u0_j + r1.rq.dot(&Uxyz_j)
+                    == P.peval3(r2.p0.view(), j+1)
+            });
+
     // Checking column hashes
-    r4.U_lemma.verify(&r0.U_root) &&
-    P.codeword_is_valid(r2.v.view())
+    let hash_check =
+        r4.U_lemma.verify(&r0.U_root) &&
+        P.codeword_is_valid(r2.v.view());
+
+    code_check && addition_check && multiplication_check && hash_check
 }
 
 // Given an sXt matrix Pa and an s-dimensional vector ra (for arbitrary s and t),
@@ -565,7 +609,7 @@ fn make_pa<Field: FieldForLigero>(
     Ua: &Array2<Field>,
 ) -> Vec<Array1<Field>>
 {
-    Ua.genrows()
+    Ua.rows()
         .into_iter()
         .map(|points|
             params.fft3_inverse(points) // deg < k + 1
@@ -638,7 +682,7 @@ fn make_qa<Field: FieldForLigero>(
             .take_nz(params.k+1) // XXX: Should be l, per Sec. 4.7
             .collect::<Array1<Field>>())
         .collect::<Vec<_>>();
-    let pa = Ua.genrows()
+    let pa = Ua.rows()
         .into_iter()
         .map(|points| params.fft3_inverse(points) // deg < k + 1
             .iter()
@@ -736,13 +780,11 @@ pub mod interactive {
         /// Generate round-2 prover message.
         #[allow(non_snake_case)]
         pub fn round2(&self, r1: Round1<Field>) -> Round2<Field> {
-            use ndarray::{Axis, stack};
-
             let s = &self.secret;
             let P = &s.public.params;
 
             // Testing interleaved Reed-Solomon codes
-            let U = stack![Axis(0), s.Uw, s.Ux, s.Uy, s.Uz];
+            let U: Array2<Field> = concatenate![Axis(0), s.Uw, s.Ux, s.Uy, s.Uz];
             let p = make_pa(P, &s.Uw);
             let px = make_pa(P, &s.Ux);
             let py = make_pa(P, &s.Uy);
@@ -759,10 +801,10 @@ pub mod interactive {
 
             debug_assert_eq!(r2.v.len(), P.n);
             debug_assert_eq!(r2.qadd.len(), 2*P.k + 1); // XXX: Should be k + l
-            debug_assert_eq!(r2.qx.len(), 2*P.k + 1); // XXX: Should be k + l
-            debug_assert_eq!(r2.qy.len(), 2*P.k + 1); // XXX: Should be k + l
-            debug_assert_eq!(r2.qz.len(), 2*P.k + 1); // XXX: Should be k + l
-            debug_assert_eq!(r2.p0.len(), 2*P.k + 1);
+            debug_assert_eq!(r2.qx.len(),   2*P.k + 1); // XXX: Should be k + l
+            debug_assert_eq!(r2.qy.len(),   2*P.k + 1); // XXX: Should be k + l
+            debug_assert_eq!(r2.qz.len(),   2*P.k + 1); // XXX: Should be k + l
+            debug_assert_eq!(r2.p0.len(),   2*P.k + 1);
             r2
         }
 
@@ -770,10 +812,10 @@ pub mod interactive {
         #[allow(non_snake_case)]
         pub fn round4(&self, r3: Round3<Field>) -> Round4<Field, H> {
             let s = &self.secret;
-            let U = ndarray::stack(
+            let U = concatenate![
                 ndarray::Axis(0),
-                &[s.Uw.view(), s.Ux.view(), s.Uy.view(), s.Uz.view()],
-            ).expect("Unequal rows in round 4");
+                s.Uw.view(), s.Ux.view(), s.Uy.view(), s.Uz.view()
+            ];
 
             let r4 = Round4 {
                 U_lemma: merkle::Lemma::new(&s.U_hash, U.view(), &r3.Q),
@@ -875,14 +917,7 @@ pub mod interactive {
 
     #[test]
     fn test_small() {
-        type Field = TestField;
-
-        let ckt = Ckt::test_value();
-        let w = vec![3u64.into(), 1u64.into(), 5u64.into(),
-                        -(Field::from(3u64) * Field::from(5u64))];
-
-        let output = *ckt.eval(&w).last().unwrap();
-        assert_eq!(output, Field::ZERO);
+        let (ckt, w) = crate::circuit::test_ckt_zero::<TestField>();
 
         let p: Prover<_, merkle::Sha256> = Prover::new(&ckt, &w);
         let mut v = Verifier::new(&ckt);
@@ -900,7 +935,7 @@ pub mod interactive {
     proptest! {
         #[test]
         fn test_false(
-            (ckt, w) in crate::circuit::arb_ckt(20, 100).prop_flat_map(|ckt| {
+            (ckt, w) in crate::circuit::arb_ckt(20, 50).prop_flat_map(|ckt| {
                 let w = pvec(arb_test_field(), ckt.inp_size);
                 (Just(ckt), w)
             })
@@ -920,7 +955,7 @@ pub mod interactive {
 
         #[test]
         fn test_true(
-            (ckt, w) in crate::circuit::arb_ckt_zero(20, 100)
+            (ckt, w) in crate::circuit::arb_ckt_zero(20, 50)
         ) {
             let p: Prover<TestField, merkle::Sha256> = Prover::new(&ckt, &w);
             let mut v = Verifier::new(&ckt);
@@ -995,12 +1030,12 @@ pub mod noninteractive {
         let mut hash = H::new();
 
         hash.update(&state.to_vec());
-        r2.p0.into_iter().for_each(|f| hash.update(&f.to_bytes()));
-        r2.qadd.into_iter().for_each(|f| hash.update(&f.to_bytes()));
-        r2.qx.into_iter().for_each(|f| hash.update(&f.to_bytes()));
-        r2.qy.into_iter().for_each(|f| hash.update(&f.to_bytes()));
-        r2.qz.into_iter().for_each(|f| hash.update(&f.to_bytes()));
-        r2.v.into_iter().for_each(|f| hash.update(&f.to_bytes()));
+        r2.p0.clone().into_iter().for_each(|f| hash.update(&f.to_bytes()));
+        r2.qadd.clone().into_iter().for_each(|f| hash.update(&f.to_bytes()));
+        r2.qx.clone().into_iter().for_each(|f| hash.update(&f.to_bytes()));
+        r2.qy.clone().into_iter().for_each(|f| hash.update(&f.to_bytes()));
+        r2.qz.clone().into_iter().for_each(|f| hash.update(&f.to_bytes()));
+        r2.v.clone().into_iter().for_each(|f| hash.update(&f.to_bytes()));
 
         let mut digest = merkle::HZERO;
         hash.finalize(&mut digest);
@@ -1094,14 +1129,7 @@ pub mod noninteractive {
 
     #[test]
     fn test_small() {
-        type Field = TestField;
-
-        let ckt = Ckt::test_value();
-        let w = vec![3u64.into(), 1u64.into(), 5u64.into(),
-                        -(Field::from(3u64) * Field::from(5u64))];
-
-        let output = *ckt.eval(&w).last().unwrap();
-        assert_eq!(output, Field::ZERO);
+        let (ckt, w) = crate::circuit::test_ckt_zero::<TestField>();
 
         let p = <Prover<_, merkle::Sha256>>::new(&ckt, &w);
         let v = Verifier::new(&ckt);
@@ -1114,7 +1142,7 @@ pub mod noninteractive {
     proptest! {
         #[test]
         fn test_false(
-            (ckt, w) in crate::circuit::arb_ckt(20, 100).prop_flat_map(|ckt| {
+            (ckt, w) in crate::circuit::arb_ckt(20, 50).prop_flat_map(|ckt| {
                 let w = pvec(arb_test_field(), ckt.inp_size);
                 (Just(ckt), w)
             })
@@ -1129,7 +1157,7 @@ pub mod noninteractive {
 
         #[test]
         fn test_true(
-            (ckt, w) in crate::circuit::arb_ckt_zero(20, 100)
+            (ckt, w) in crate::circuit::arb_ckt_zero(20, 50)
         ) {
             let p = <Prover<TestField, merkle::Sha256>>::new(&ckt, &w);
             let v = <Verifier<TestField, merkle::Sha256>>::new(&ckt);

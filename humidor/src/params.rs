@@ -132,13 +132,13 @@ impl<Field: FieldForLigero> Params<Field> {
 
     /// Decode a codeword row without stripping the random elements off the end.
     fn decode_no_strip(&self, cf: ArrayView1<Field>) -> Vec<Field> {
-        use ndarray::{stack, Axis};
+        use ndarray::{concatenate, Axis};
 
         debug_assert_eq!(cf.len(), self.n);
 
-        let coeffs0 = stack!(Axis(0), Array1::zeros(1), cf);
+        let coeffs0 = concatenate!(Axis(0), Array1::zeros(1), cf);
         let points = numtheory::fft3_inverse(
-            &coeffs0.to_vec(),
+            &coeffs0.iter().cloned().collect::<Vec<_>>(),
             self.pss.omega_shares,
         );
 
@@ -381,7 +381,7 @@ impl<Field: FieldForLigero> Params<Field> {
         debug_assert_ne!(self.l, 0);
 
         let mut w = random_field_array(rng, self.l);
-        let sum = w.scalar_sum();
+        let sum = w.sum();
         w[self.l - 1] -= sum;
 
         self.encode(w.view(), rng)
@@ -474,7 +474,7 @@ proptest! {
         let mut rng = StdRng::seed_from_u64(0);
 
         let ve = p.encode_interleaved(Array1::from(v).view(), &mut rng);
-        let vs = ve.genrows().into_iter()
+        let vs = ve.rows().into_iter()
             .fold(Array1::zeros(p.n), |acc, row| acc + row);
 
         prop_assert!(p.codeword_is_valid(vs.view()));
@@ -494,7 +494,7 @@ proptest! {
         let mut ve = p.encode_interleaved(Array1::from(v).view(), &mut rng);
         ve[(r,c)] += TestField::ONE;
 
-        let vs = ve.genrows().into_iter()
+        let vs = ve.rows().into_iter()
             .fold(Array1::zeros(p.n), |acc, row| acc + row);
 
         prop_assert!(!p.codeword_is_valid(vs.view()));
@@ -670,6 +670,6 @@ proptest! {
         let c = p.random_zero_codeword(&mut StdRng::from_entropy());
         let w = p.decode(c.view());
 
-        prop_assert_eq!(w.scalar_sum(), TestField::ZERO);
+        prop_assert_eq!(w.sum(), TestField::ZERO);
     }
 }
