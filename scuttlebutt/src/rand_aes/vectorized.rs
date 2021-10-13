@@ -41,7 +41,7 @@ impl UniformIntegersUnderBound {
         let threshold = 0_u32.wrapping_sub(bound) % bound;
         UniformIntegersUnderBound { threshold, bound }
     }
-    
+
     /// The exclusive bound of the integers produced by this generator.
     pub fn bound(&self) -> u32 {
         self.bound
