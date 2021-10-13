@@ -88,7 +88,7 @@ impl FiniteField for Gf45 {
         bytes: &GenericArray<u8, Self::ByteReprLen>,
     ) -> Result<Self, Self::FromBytesError> {
         let mut buf = [0; 8];
-        &mut buf[0..6].copy_from_slice(bytes);
+        buf[0..6].copy_from_slice(bytes);
         let raw = u64::from_le_bytes(buf);
         if raw < (1 << 45) {
             Ok(Gf45(raw))
