@@ -41,6 +41,11 @@ impl UniformIntegersUnderBound {
         let threshold = 0_u32.wrapping_sub(bound) % bound;
         UniformIntegersUnderBound { threshold, bound }
     }
+    
+    /// The exclusive bound of the integers produced by this generator.
+    pub fn bound(&self) -> u32 {
+        self.bound
+    }
 
     /// Produce `Aes128EncryptOnly::BLOCK_COUNT_HINT * 4` uniformly distributed `u32`s (under the
     /// given bound).
