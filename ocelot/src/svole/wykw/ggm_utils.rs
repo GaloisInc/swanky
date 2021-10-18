@@ -70,8 +70,8 @@ pub(super) fn ggm<FE: FiniteField, T: From<U8x16>>(
         // let exp = 1 << i;
         // for j in 0..exp {
         //     let s = seeds[j + exp - 1];
-        //     let s0 = aes.0.encrypt(s);
-        //     let s1 = aes.1.encrypt(s);
+        //     let s0 = aes.0.encrypt(s) ^ s;
+        //     let s1 = aes.1.encrypt(s) ^ s;
         //     k0 ^= s0;
         //     k1 ^= s1;
         //     seeds.push(s0);
