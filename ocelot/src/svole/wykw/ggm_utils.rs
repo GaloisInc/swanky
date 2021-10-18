@@ -27,7 +27,7 @@ pub(crate) struct GgmTemporaryStorage {
 /// them as PRPs, using the seed as input. We then use the [scuttlebutt::AesHash::cr_hash]
 /// construction on top of AES.
 ///
-/// `keys_out` **WILL NOT** be `clear()`ed. Results will be appeneded to it.
+/// `keys_out` **WILL NOT** be `clear()`ed. Results will be appended to it.
 ///
 /// `tmp_storage` allows `ggm` to preserve allocations across invocations.
 /// `depth` doesn't count the "root" node.
@@ -64,6 +64,20 @@ pub(super) fn ggm<FE: FiniteField, T: From<U8x16>>(
         let prev_remainder = prev_chunks.remainder();
         let current_chunks =
             current_level.chunks_exact_mut(Aes128EncryptOnly::BLOCK_COUNT_HINT * 2);
+        // This loop does the same job as:
+        // let mut k0 = Default::default();
+        // let mut k1 = Default::default();
+        // let exp = 1 << i;
+        // for j in 0..exp {
+        //     let s = seeds[j + exp - 1];
+        //     let s0 = aes.0.encrypt(s);
+        //     let s1 = aes.1.encrypt(s);
+        //     k0 ^= s0;
+        //     k1 ^= s1;
+        //     seeds.push(s0);
+        //     seeds.push(s1);
+        // }
+        // keys.push((k0, k1));
         for (current, chunk) in current_chunks.zip(prev_chunks) {
             let chunk: [U8x16; Aes128EncryptOnly::BLOCK_COUNT_HINT] = chunk
                 .try_into()
