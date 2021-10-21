@@ -1,5 +1,6 @@
-use rand::{SeedableRng, rngs::StdRng};
+use rand::SeedableRng;
 use std::io::Write;
+use scuttlebutt::AesRng;
 
 extern crate humidor;
 
@@ -21,7 +22,7 @@ fn test_input_size(s: usize, input_size: usize) -> (
         circuit_size, input_size);
     println!("---");
 
-    let mut rng = StdRng::from_entropy();
+    let mut rng = AesRng::from_entropy();
     let (ckt, inp): (Ckt<Field>, _) = humidor::circuit::random_ckt_zero(
         &mut rng,
         input_size,
@@ -32,7 +33,7 @@ fn test_input_size(s: usize, input_size: usize) -> (
     let mut verifier_time = std::time::Duration::new(0,0);
 
     let t = std::time::Instant::now();
-    let mut p = <noninteractive::Prover<_, Sha256>>::new(&ckt, &inp);
+    let mut p = <noninteractive::Prover<_, Sha256>>::new(&mut rng, &ckt, &inp, &vec![]);
     prover_time += t.elapsed();
     println!("Prover setup time: {:?}", t.elapsed());
 

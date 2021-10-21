@@ -1,7 +1,8 @@
 use core::time::Duration;
 use criterion::{Criterion, BenchmarkId, Throughput, BatchSize, SamplingMode};
 use criterion::{criterion_group, criterion_main};
-use rand::{SeedableRng, rngs::StdRng};
+use rand::SeedableRng;
+use scuttlebutt::{AesRng, field::FiniteField};
 
 use humidor::circuit::{Ckt, random_ckt_zero};
 use humidor::ligero::noninteractive;
@@ -12,8 +13,6 @@ type Prover = noninteractive::Prover<Field, Sha256>;
 type Verifier = noninteractive::Verifier<Field, Sha256>;
 
 pub fn bench_random_circuit(c: &mut Criterion) {
-    let mut rng = StdRng::from_entropy();
-
     let mut group = c.benchmark_group("Random circuit");
     group.sampling_mode(SamplingMode::Flat);
     for size in (10..=16).map(|p| 2usize.pow(p)) {
@@ -25,12 +24,16 @@ pub fn bench_random_circuit(c: &mut Criterion) {
         group.bench_with_input(BenchmarkId::new("Prover", size), &size, |b, _| {
             b.iter_batched_ref(
                 || {
-                    let (ckt, w) = random_ckt_zero(&mut rng, input_size, circuit_size);
+                    let mut rng = AesRng::from_entropy();
 
-                    (Ckt {shared: 0 .. shared_size, ..ckt}, w)
+                    let (ckt, w) = random_ckt_zero(&mut rng, input_size, circuit_size);
+                    let mask = (0..shared_size).into_iter()
+                        .map(|_| Field::random(&mut rng)).collect::<Vec<_>>();
+
+                    (rng, Ckt {shared: 0 .. shared_size, ..ckt}, w, mask)
                 },
-                |(ckt, w)| {
-                    let mut p: Prover = noninteractive::Prover::new(ckt, w);
+                |(rng, ckt, w, mask)| {
+                    let mut p: Prover = noninteractive::Prover::new(rng, ckt, w, mask);
                     p.make_proof();
                 },
                 BatchSize::SmallInput,
@@ -40,10 +43,15 @@ pub fn bench_random_circuit(c: &mut Criterion) {
         group.bench_with_input(BenchmarkId::new("Verifier", size), &size, |b, _| {
             b.iter_batched(
                 || {
+                    let mut rng = AesRng::from_entropy();
+
                     let (mut ckt, w) = random_ckt_zero(&mut rng, input_size, circuit_size);
                     ckt.shared = 0 .. shared_size;
 
-                    let mut p: Prover = Prover::new(&ckt, &w);
+                    let mask = (0..shared_size).into_iter()
+                        .map(|_| Field::random(&mut rng)).collect::<Vec<_>>();
+
+                    let mut p: Prover = Prover::new(&mut rng, &ckt, &w, &mask);
                     let proof = p.make_proof();
 
                     (ckt, proof)

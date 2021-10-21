@@ -1,4 +1,5 @@
-use rand::{SeedableRng, rngs::StdRng};
+use rand::SeedableRng;
+use scuttlebutt::{AesRng, field::FiniteField};
 
 extern crate humidor;
 
@@ -9,8 +10,8 @@ use humidor::merkle::Sha256;
 type Field = scuttlebutt::field::F2_19x3_26;
 
 fn main() {
-    let total_size = 1usize << 21;
-    let input_size = 1usize << 20;
+    let total_size = 1usize << 16;
+    let input_size = 1usize << 15;
     let shared_size = input_size;
     let circuit_size = total_size - input_size;
     debug_assert!(shared_size <= input_size);
@@ -19,19 +20,20 @@ fn main() {
         circuit_size, input_size, shared_size);
     println!("---");
 
-    let mut rng = StdRng::from_entropy();
+    let mut rng = AesRng::from_entropy();
     let (mut ckt, inp): (Ckt<Field>, _) = humidor::circuit::random_ckt_zero(
         &mut rng,
         input_size,
         circuit_size,
     );
     ckt.shared = 0..shared_size;
+    let mask = (0..shared_size).into_iter().map(|_| Field::random(&mut rng)).collect::<Vec<_>>();
 
     let mut prover_time = std::time::Duration::new(0,0);
     let mut verifier_time = std::time::Duration::new(0,0);
 
     let t = std::time::Instant::now();
-    let mut p = <noninteractive::Prover<_, Sha256>>::new(&ckt, &inp);
+    let mut p = <noninteractive::Prover<_, Sha256>>::new(&mut rng, &ckt, &inp, &mask);
     prover_time += t.elapsed();
     println!("Prover setup time: {:?}", t.elapsed());
 

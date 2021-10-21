@@ -9,9 +9,10 @@
 
 use ndarray::{Array1, Array2, Axis, concatenate};
 use sprs::{CsMat, TriMat};
-use rand::{SeedableRng, rngs::StdRng};
+use rand::{SeedableRng, RngCore};
 use scuttlebutt::field::FiniteField;
 use scuttlebutt::numtheory::{FieldForFFT2, FieldForFFT3};
+use scuttlebutt::{AesRng, Block};
 
 #[cfg(test)]
 use proptest::{*, prelude::*, collection::vec as pvec};
@@ -186,17 +187,12 @@ impl<Field: FieldForLigero, H: merkle::MerkleHash> Secret<Field, H> {
     /// Create the private component of a Ligero proof. The circuit to check and
     /// the witness size are contained in the `c` argument, while `inp` is the
     /// private witness.
-    fn new(c: &Ckt<Field>, inp: &[Field]) -> Self {
-        let mut rng = StdRng::from_entropy();
-        let mask: Vec<_> = (0..c.shared.len()).map(|_| Field::random(&mut rng)).collect();
-
-        Self::new_with_shared(c, inp, &mask)
-    }
-
-    /// Create the private component of a Ligero proof with a shared witness.
+    ///
     /// The `mask` should be a committed vector of random elements the same size
-    /// as the shared portion of the witness.
-    fn new_with_shared(
+    /// as the shared portion of the witness. If there is no shared witness, it
+    /// should be an empty vector.
+    fn new<Rng: RngCore>(
+        rng: &mut Rng,
         c: &Ckt<Field>,
         inp: &[Field],
         mask: &[Field],
@@ -205,7 +201,6 @@ impl<Field: FieldForLigero, H: merkle::MerkleHash> Secret<Field, H> {
         debug_assert_eq!(c.shared.len(), mask.len());
 
         let public = Public::new(&c);
-        let mut rng = StdRng::from_entropy();
 
         let ml = public.params.m * public.params.l;
 
@@ -240,17 +235,17 @@ impl<Field: FieldForLigero, H: merkle::MerkleHash> Secret<Field, H> {
             }
         }
 
-        let Uw = public.params.encode_interleaved(w.view(), &mut rng);
-        let Ux = public.params.encode_interleaved(x.view(), &mut rng);
-        let Uy = public.params.encode_interleaved(y.view(), &mut rng);
-        let Uz = public.params.encode_interleaved(z.view(), &mut rng);
+        let Uw = public.params.encode_interleaved(w.view(), rng);
+        let Ux = public.params.encode_interleaved(x.view(), rng);
+        let Uy = public.params.encode_interleaved(y.view(), rng);
+        let Uz = public.params.encode_interleaved(z.view(), rng);
 
-        let u = public.params.random_codeword(&mut rng);
-        let ux = public.params.random_zero_codeword(&mut rng);
-        let uy = public.params.random_zero_codeword(&mut rng);
-        let uz = public.params.random_zero_codeword(&mut rng);
-        let u0 = public.params.encode(Array1::zeros(public.params.l).view(), &mut rng);
-        let uadd = public.params.random_zero_codeword(&mut rng);
+        let u = public.params.random_codeword(rng);
+        let ux = public.params.random_zero_codeword(rng);
+        let uy = public.params.random_zero_codeword(rng);
+        let uz = public.params.random_zero_codeword(rng);
+        let u0 = public.params.encode(Array1::zeros(public.params.l).view(), rng);
+        let uadd = public.params.random_zero_codeword(rng);
 
         let U_hash = merkle::make_tree(
             concatenate(Axis(0), &[Uw.view(), Ux.view(), Uy.view(), Uz.view()]
@@ -274,9 +269,11 @@ impl<H: merkle::MerkleHash> Arbitrary for Secret<TestField, H> {
         (
             crate::circuit::arb_ckt(w,c),
             pvec(arb_test_field(), w),
-        ).prop_map(|(ckt, inp)|
-            <Secret<TestField, H>>::new(&ckt, &inp)
-        ).boxed()
+            proptest::array::uniform16(0u8..),
+        ).prop_map(|(ckt, inp, seed)| {
+            let mut rng = AesRng::from_seed(Block::from(seed));
+            <Secret<TestField, H>>::new(&mut rng, &ckt, &inp, &vec![])
+        }).boxed()
     }
 }
 
@@ -308,9 +305,11 @@ proptest! {
     fn test_Padd(
         (c,i) in crate::circuit::arb_ckt(20, 50).prop_flat_map(|c| {
             (Just(c), pvec(arb_test_field(), 20))
-        })
+        }),
+        seed: [u8;16],
     ) {
-        let s: Secret<_, merkle::Sha256> = Secret::new(&c, &i);
+        let mut rng = AesRng::from_seed(Block::from(seed));
+        let s: Secret<_, merkle::Sha256> = Secret::new(&mut rng, &c, &i, &vec![]);
         let output = *c.eval(&i).last().unwrap();
 
         let Padd: CsMat<TestField> = s.public.Padd.to_csc();
@@ -328,8 +327,10 @@ proptest! {
         }),
         mask in pvec(arb_test_field(), 10),
         rshared_vec in pvec(arb_test_field(), 10 * 10),
+        seed: [u8;16],
     ) {
-        let mut s: Secret<_, merkle::Sha256> = Secret::new_with_shared(&c, &i, &mask);
+        let mut rng = AesRng::from_seed(Block::from(seed));
+        let mut s: Secret<_, merkle::Sha256> = Secret::new(&mut rng, &c, &i, &mask);
         let output = *c.eval(&i).last().unwrap();
 
         let rshared = Array2::from_shape_vec((10,10), rshared_vec).unwrap();
@@ -865,9 +866,14 @@ pub mod interactive {
 
     impl<Field: FieldForLigero, H: merkle::MerkleHash> Prover<Field, H> {
         /// Create an interactive prover out of a circuit and witness.
-        pub fn new(c: &Ckt<Field>, w: &Vec<Field>) -> Self {
+        pub fn new<Rng: RngCore>(
+            rng: &mut Rng,
+            c: &Ckt<Field>,
+            w: &Vec<Field>,
+            mask: &Vec<Field>,
+        ) -> Self {
             Self {
-                secret: Secret::new(c, w),
+                secret: Secret::new(rng, c, w, mask),
             }
         }
 
@@ -983,7 +989,6 @@ pub mod interactive {
         phantom: std::marker::PhantomData<H>,
 
         public: Public<Field>,
-        rng: StdRng,
         r0: Option<Round0>,
         r1: Option<Round1<Field>>,
         r2: Option<Round2<Field>>,
@@ -997,7 +1002,6 @@ pub mod interactive {
                 phantom: std::marker::PhantomData,
 
                 public: Public::new(&c),
-                rng: StdRng::from_entropy(),
                 r0: None,
                 r1: None,
                 r2: None,
@@ -1033,8 +1037,8 @@ pub mod interactive {
         }
 
         /// Generate round-1 verifier message.
-        pub fn round1(&mut self, r0: Round0) -> Round1<Field> {
-            let r1 = Round1::new(&self.public.params, &self.shared(), &mut self.rng);
+        pub fn round1(&mut self, rng: &mut impl RngCore, r0: Round0) -> Round1<Field> {
+            let r1 = Round1::new(&self.public.params, &self.shared(), rng);
 
             self.r0 = Some(r0);
             self.r1 = Some(r1.clone());
@@ -1043,8 +1047,12 @@ pub mod interactive {
         }
 
         /// Generate round-3 verifier message.
-        pub fn round3(&mut self, r2: Round2<Field>) -> Round3<Field> {
-            let r3 = Round3::new(&self.public.params, &mut self.rng);
+        pub fn round3(
+            &mut self,
+            rng: &mut impl RngCore,
+            r2: Round2<Field>,
+        ) -> Round3<Field> {
+            let r3 = Round3::new(&self.public.params, rng);
 
             self.r2 = Some(r2);
             self.r3 = Some(r3.clone());
@@ -1065,15 +1073,16 @@ pub mod interactive {
 
     #[test]
     fn test_small() {
+        let mut rng = AesRng::from_entropy();
         let (ckt, w) = crate::circuit::test_ckt_zero::<TestField>();
 
-        let mut p: Prover<_, merkle::Sha256> = Prover::new(&ckt, &w);
+        let mut p: Prover<_, merkle::Sha256> = Prover::new(&mut rng, &ckt, &w, &vec![]);
         let mut v = Verifier::new(&ckt);
 
         let r0 = p.round0();
-        let r1 = v.round1(r0);
+        let r1 = v.round1(&mut rng, r0);
         let r2 = p.round2(r1);
-        let r3 = v.round3(r2);
+        let r3 = v.round3(&mut rng, r2);
         let r4 = p.round4(r3);
 
         assert!(v.verify(r4))
@@ -1086,16 +1095,19 @@ pub mod interactive {
             (ckt, w) in crate::circuit::arb_ckt(20, 50).prop_flat_map(|ckt| {
                 let w = pvec(arb_test_field(), ckt.inp_size);
                 (Just(ckt), w)
-            })
+            }),
+            seed: [u8;16],
         ) {
+            let mut rng = AesRng::from_seed(Block::from(seed));
+
             let output = *ckt.eval(&w).last().unwrap();
-            let mut p: Prover<_, merkle::Sha256> = Prover::new(&ckt, &w);
+            let mut p: Prover<_, merkle::Sha256> = Prover::new(&mut rng, &ckt, &w, &vec![]);
             let mut v = Verifier::new(&ckt);
 
             let r0 = p.round0();
-            let r1 = v.round1(r0);
+            let r1 = v.round1(&mut rng, r0);
             let r2 = p.round2(r1);
-            let r3 = v.round3(r2);
+            let r3 = v.round3(&mut rng, r2);
             let r4 = p.round4(r3);
 
             prop_assert_eq!(v.verify(r4), output == TestField::ZERO);
@@ -1103,15 +1115,18 @@ pub mod interactive {
 
         #[test]
         fn test_true(
-            (ckt, w) in crate::circuit::arb_ckt_zero(20, 50)
+            (ckt, w) in crate::circuit::arb_ckt_zero(20, 50),
+            seed: [u8;16],
         ) {
-            let mut p: Prover<TestField, merkle::Sha256> = Prover::new(&ckt, &w);
+            let mut rng = AesRng::from_seed(Block::from(seed));
+
+            let mut p: Prover<TestField, merkle::Sha256> = Prover::new(&mut rng, &ckt, &w, &vec![]);
             let mut v = Verifier::new(&ckt);
 
             let r0 = p.round0();
-            let r1 = v.round1(r0);
+            let r1 = v.round1(&mut rng, r0);
             let r2 = p.round2(r1);
-            let r3 = v.round3(r2);
+            let r3 = v.round3(&mut rng, r2);
             let r4 = p.round4(r3);
 
             prop_assert!(v.verify(r4));
@@ -1119,21 +1134,23 @@ pub mod interactive {
 
         #[test]
         fn test_false_shared(
-            (mut ckt, w) in crate::circuit::arb_ckt(20, 50).prop_flat_map(|ckt| {
+            (ckt, w) in crate::circuit::arb_ckt(20, 50).prop_flat_map(|ckt| {
                 let w = pvec(arb_test_field(), ckt.inp_size);
-                (Just(ckt), w)
-            })
+                (Just(Ckt {shared: 0..10, ..ckt}), w)
+            }),
+            mask in pvec(arb_test_field(), 10),
+            seed: [u8;16],
         ) {
-            ckt.shared = 0..10;
+            let mut rng = AesRng::from_seed(Block::from(seed));
 
             let output = *ckt.eval(&w).last().unwrap();
-            let mut p: Prover<_, merkle::Sha256> = Prover::new(&ckt, &w);
+            let mut p: Prover<TestField, merkle::Sha256> = Prover::new(&mut rng, &ckt, &w, &mask);
             let mut v = Verifier::new(&ckt);
 
             let r0 = p.round0();
-            let r1 = v.round1(r0);
+            let r1 = v.round1(&mut rng, r0);
             let r2 = p.round2(r1);
-            let r3 = v.round3(r2);
+            let r3 = v.round3(&mut rng, r2);
             let r4 = p.round4(r3);
 
             prop_assert_eq!(v.verify(r4), output == TestField::ZERO);
@@ -1141,17 +1158,20 @@ pub mod interactive {
 
         #[test]
         fn test_true_shared(
-            (mut ckt, w) in crate::circuit::arb_ckt_zero(20, 50)
+            (ckt, w) in crate::circuit::arb_ckt_zero(20, 50)
+                .prop_flat_map(|(ckt, w)| (Just(Ckt {shared: 0..10, ..ckt}), Just(w))),
+            mask in pvec(arb_test_field(), 10),
+            seed: [u8;16],
         ) {
-            ckt.shared = 0..10;
+            let mut rng = AesRng::from_seed(Block::from(seed));
 
-            let mut p: Prover<TestField, merkle::Sha256> = Prover::new(&ckt, &w);
+            let mut p: Prover<TestField, merkle::Sha256> = Prover::new(&mut rng, &ckt, &w, &mask);
             let mut v = Verifier::new(&ckt);
 
             let r0 = p.round0();
-            let r1 = v.round1(r0);
+            let r1 = v.round1(&mut rng, r0);
             let r2 = p.round2(r1);
-            let r3 = v.round3(r2);
+            let r3 = v.round3(&mut rng, r2);
             let r4 = p.round4(r3);
 
             prop_assert!(v.verify(r4));
@@ -1167,11 +1187,6 @@ pub mod interactive {
 //        combos of codewords to seed the Q indices.
 //      * Fiat-Shamir comes with additional soundness error. Check that this
 //        leads to acceptable security. If not, we may need to add repetitions.
-//      * We generate the PRG seeds using a random oracle instantiated with the
-//        same hash we use for the Merkle tree for convenience. In practice, we
-//        should probably use a better RO that results in at least 32 bytes of
-//        randomness, per
-//        https://docs.rs/rand_core/0.5.1/rand_core/trait.SeedableRng.html.
 pub mod noninteractive {
     use super::*;
 
@@ -1197,16 +1212,15 @@ pub mod noninteractive {
         state: &merkle::Digest,
         r0: &Round0,
     ) -> (Round1<Field>, merkle::Digest) {
-        use rand_chacha::ChaCha20Rng as ChaCha;
-
         let mut hash = H::new();
         hash.update(&state.to_vec());
         hash.update(&r0.U_root);
 
         let mut digest = merkle::HZERO;
         hash.finalize(&mut digest);
+        let seed = Block::try_from_slice(&digest[0..16]).unwrap();
 
-        (Round1::new(params, shared, &mut ChaCha::from_seed(digest)), digest)
+        (Round1::new(params, shared, &mut AesRng::from_seed(seed)), digest)
     }
 
     fn make_r3<Field: FieldForLigero, H: merkle::MerkleHash>(
@@ -1214,8 +1228,6 @@ pub mod noninteractive {
         state: &merkle::Digest,
         r2: &Round2<Field>
     ) -> Round3<Field> {
-        use rand_chacha::ChaCha20Rng as ChaCha;
-
         let mut hash = H::new();
 
         hash.update(&state.to_vec());
@@ -1228,8 +1240,9 @@ pub mod noninteractive {
 
         let mut digest = merkle::HZERO;
         hash.finalize(&mut digest);
+        let seed = Block::try_from_slice(&digest[0..16]).unwrap();
 
-        Round3::new(params, &mut ChaCha::from_seed(digest))
+        Round3::new(params, &mut AesRng::from_seed(seed))
     }
 
     /// Non-interactive Ligero prover.
@@ -1239,15 +1252,22 @@ pub mod noninteractive {
     }
 
     impl<Field: FieldForLigero, H: merkle::MerkleHash> Prover<Field, H> {
-        /// Create a non-interactive prover from a circuit and witness.
-        pub fn new(c: &Ckt<Field>, w: &Vec<Field>) -> Self {
+        /// Create a non-interactive prover from a circuit and witness. The mask
+        /// parameter is the mask for a shared witness, and should be the same
+        /// size as the shared part of the witness in c.
+        pub fn new<Rng: RngCore>(
+            rng: &mut Rng,
+            c: &Ckt<Field>,
+            w: &Vec<Field>,
+            mask: &Vec<Field>,
+        ) -> Self {
             let mut hash = H::new();
             c.ops.iter().for_each(|op| hash.update(&op.bytes()));
 
             let mut ckt_hash = merkle::HZERO;
             hash.finalize(&mut ckt_hash);
 
-            Self { ckt_hash, ip: interactive::Prover::new(c, w) }
+            Self { ckt_hash, ip: interactive::Prover::new(rng, c, w, mask) }
         }
 
         /// Theoretical proof size from Section 5.3.
@@ -1318,9 +1338,10 @@ pub mod noninteractive {
 
     #[test]
     fn test_small() {
+        let mut rng = AesRng::from_entropy();
         let (ckt, w) = crate::circuit::test_ckt_zero::<TestField>();
 
-        let mut p = <Prover<_, merkle::Sha256>>::new(&ckt, &w);
+        let mut p = <Prover<_, merkle::Sha256>>::new(&mut rng, &ckt, &w, &vec![]);
         let mut v = Verifier::new(&ckt);
 
         let proof = p.make_proof();
@@ -1334,10 +1355,13 @@ pub mod noninteractive {
             (ckt, w) in crate::circuit::arb_ckt(20, 50).prop_flat_map(|ckt| {
                 let w = pvec(arb_test_field(), ckt.inp_size);
                 (Just(ckt), w)
-            })
+            }),
+            seed: [u8; 16],
         ) {
+            let mut rng = AesRng::from_seed(Block::from(seed));
+
             let output = *ckt.eval(&w).last().unwrap();
-            let mut p = <Prover<_, merkle::Sha256>>::new(&ckt, &w);
+            let mut p = <Prover<_, merkle::Sha256>>::new(&mut rng, &ckt, &w, &vec![]);
             let mut v = Verifier::new(&ckt);
 
             let proof = p.make_proof();
@@ -1346,9 +1370,12 @@ pub mod noninteractive {
 
         #[test]
         fn test_true(
-            (ckt, w) in crate::circuit::arb_ckt_zero(20, 50)
+            (ckt, w) in crate::circuit::arb_ckt_zero(20, 50),
+            seed: [u8; 16],
         ) {
-            let mut p = <Prover<TestField, merkle::Sha256>>::new(&ckt, &w);
+            let mut rng = AesRng::from_seed(Block::from(seed));
+
+            let mut p = <Prover<_, merkle::Sha256>>::new(&mut rng, &ckt, &w, &vec![]);
             let mut v = <Verifier<TestField, merkle::Sha256>>::new(&ckt);
 
             let proof = p.make_proof();
@@ -1360,10 +1387,14 @@ pub mod noninteractive {
             (ckt, w) in crate::circuit::arb_ckt(20, 50).prop_flat_map(|ckt| {
                 let w = pvec(arb_test_field(), ckt.inp_size);
                 (Just(Ckt {shared: 0..10, ..ckt}), w)
-            })
+            }),
+            mask in pvec(arb_test_field(), 10),
+            seed: [u8; 16],
         ) {
+            let mut rng = AesRng::from_seed(Block::from(seed));
+
             let output = *ckt.eval(&w).last().unwrap();
-            let mut p = <Prover<_, merkle::Sha256>>::new(&ckt, &w);
+            let mut p = <Prover<_, merkle::Sha256>>::new(&mut rng, &ckt, &w, &mask);
             let mut v = Verifier::new(&ckt);
 
             let proof = p.make_proof();
@@ -1374,9 +1405,13 @@ pub mod noninteractive {
         fn test_true_shared(
             (ckt, w) in crate::circuit::arb_ckt_zero(20, 50).prop_flat_map(|(ckt,w)| {
                 (Just(Ckt {shared: 0..10, ..ckt}), Just(w))
-            })
+            }),
+            mask in pvec(arb_test_field(), 10),
+            seed: [u8; 16],
         ) {
-            let mut p = <Prover<TestField, merkle::Sha256>>::new(&ckt, &w);
+            let mut rng = AesRng::from_seed(Block::from(seed));
+
+            let mut p = <Prover<TestField, merkle::Sha256>>::new(&mut rng, &ckt, &w, &mask);
             let mut v = <Verifier<TestField, merkle::Sha256>>::new(&ckt);
 
             let proof = p.make_proof();
