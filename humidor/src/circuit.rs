@@ -16,7 +16,6 @@ use crate::util::random_field_array;
 
 /// Operations for a Ligero arithmetic circuit over a finite field. Results
 /// are always stored in the next available register.
-// TODO: Add LDI, SUB, and DIV instructions.
 #[derive(Debug, Clone, Copy)]
 pub enum Op<Field> {
     /// Add two field elements.
