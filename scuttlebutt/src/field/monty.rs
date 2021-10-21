@@ -376,7 +376,7 @@ macro_rules! implement_finite_field_for_monty {
             const ZERO: Self = Self(monty_from_lit!(0, Self::M));
             const ONE: Self = Self(monty_from_lit!(1, Self::M));
             const MODULUS: u128 = Self::M as u128;
-            const GENERATOR: Self = Self(7);
+            const GENERATOR: Self = Self::G;
             const MULTIPLICATIVE_GROUP_ORDER: u128 = Self::MODULUS - 1;
 
             type ByteReprLen = generic_array::typenum::U8;
