@@ -98,8 +98,6 @@ impl<Field> Op<Field>
 /// An arithmetic circuit for Ligero.
 #[derive(Debug, Clone)]
 pub struct Ckt<Field> {
-    phantom: std::marker::PhantomData<Field>,
-
     /// The circuit operations.
     pub ops: Vec<Op<Field>>,
     /// Number of field elements for a circuit input.
@@ -110,7 +108,6 @@ impl<Field: FiniteField> Ckt<Field> {
     /// Create a new circuit from a circuit size and a sequence of operations.
     pub fn new(inp_size: usize, ops: &[Op<Field>]) -> Self {
         Self {
-            phantom: std::marker::PhantomData,
             ops: ops.to_vec(),
             inp_size,
         }
@@ -222,7 +219,7 @@ pub fn arb_ckt(
     } else {
         let arb_c = arb_ckt(inp_size, ckt_size - 1);
         let arb_op = arb_op(0, inp_size + ckt_size - 1);
-        (arb_c,arb_op).prop_map(|(Ckt::<TestField> {phantom, mut ops, inp_size}, op)| {
+        (arb_c,arb_op).prop_map(|(Ckt::<TestField> {mut ops, inp_size}, op)| {
             ops.push(op);
             <Ckt<TestField>>::new(inp_size, &ops)
         }).boxed()
@@ -237,14 +234,13 @@ fn arb_ckt_with_inp_hole(
 ) -> impl Strategy<Value = Ckt<TestField>> {
     if ckt_size == 0 {
         any::<()>().prop_map(move |()| Ckt {
-            phantom: std::marker::PhantomData,
             ops: vec![],
             inp_size,
         }).boxed()
     } else {
         let arb_c = arb_ckt_with_inp_hole(inp_size, ckt_size - 1);
         let arb_op = arb_op(1, inp_size + ckt_size - 1);
-        (arb_c,arb_op).prop_map(|(Ckt::<TestField> {phantom, mut ops, inp_size}, op)| {
+        (arb_c,arb_op).prop_map(|(Ckt::<TestField> {mut ops, inp_size}, op)| {
             ops.push(op);
             <Ckt<TestField>>::new(inp_size, &ops)
         }).boxed()
