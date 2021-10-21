@@ -128,7 +128,7 @@ impl<Field: FieldForLigero> Public<Field> {
 
         Public {params,
             shared: c.shared.clone(),
-            shared_mask: c.size() .. c.size() + c.shared.len(),
+            shared_mask: c.size()+1 .. c.size()+1 + c.shared.len(),
 
             Px: Px.to_csc(),
             Py: Py.to_csc(),
