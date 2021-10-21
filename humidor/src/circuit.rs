@@ -102,6 +102,8 @@ pub struct Ckt<Field> {
     pub ops: Vec<Op<Field>>,
     /// Number of field elements for a circuit input.
     pub inp_size: usize,
+    /// Subsequence of the input shared with another proof system.
+    pub shared: std::ops::Range<usize>, // TODO: Allow non-contiguous shared witness?
 }
 
 impl<Field: FiniteField> Ckt<Field> {
@@ -110,6 +112,23 @@ impl<Field: FiniteField> Ckt<Field> {
         Self {
             ops: ops.to_vec(),
             inp_size,
+            shared: 0..0,
+        }
+    }
+
+    /// Create a new circuit, where part of the input is shared with a proof in
+    /// a different proof system.
+    pub fn new_with_shared(
+        inp_size: usize,
+        ops: &[Op<Field>],
+        shared: std::ops::Range<usize>
+    ) -> Self {
+        debug_assert!(shared.end < inp_size);
+
+        Self {
+            ops: ops.to_vec(),
+            inp_size,
+            shared,
         }
     }
 
@@ -219,7 +238,7 @@ pub fn arb_ckt(
     } else {
         let arb_c = arb_ckt(inp_size, ckt_size - 1);
         let arb_op = arb_op(0, inp_size + ckt_size - 1);
-        (arb_c,arb_op).prop_map(|(Ckt::<TestField> {mut ops, inp_size}, op)| {
+        (arb_c,arb_op).prop_map(|(Ckt::<TestField> {mut ops, inp_size, shared}, op)| {
             ops.push(op);
             <Ckt<TestField>>::new(inp_size, &ops)
         }).boxed()
@@ -236,11 +255,12 @@ fn arb_ckt_with_inp_hole(
         any::<()>().prop_map(move |()| Ckt {
             ops: vec![],
             inp_size,
+            shared: 0..0,
         }).boxed()
     } else {
         let arb_c = arb_ckt_with_inp_hole(inp_size, ckt_size - 1);
         let arb_op = arb_op(1, inp_size + ckt_size - 1);
-        (arb_c,arb_op).prop_map(|(Ckt::<TestField> {mut ops, inp_size}, op)| {
+        (arb_c,arb_op).prop_map(|(Ckt::<TestField> {mut ops, inp_size, shared}, op)| {
             ops.push(op);
             <Ckt<TestField>>::new(inp_size, &ops)
         }).boxed()

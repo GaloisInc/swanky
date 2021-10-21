@@ -48,3 +48,12 @@ name = "random_circuit_interactive"
 
 [[example]]
 name = "random_circuit_noninteractive"
+
+[[example]]
+name = "random_circuit_noninteractive_with_shared"
+
+[[example]]
+name = "random_circuit_shared_witness"
+
+[[example]]
+name = "random_circuit_once"

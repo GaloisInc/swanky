@@ -3,13 +3,13 @@ use std::io::Write;
 
 extern crate humidor;
 
-use humidor::ligero::interactive;
+use humidor::ligero::noninteractive;
 use humidor::circuit::Ckt;
 use humidor::merkle::Sha256;
 
 type Field = scuttlebutt::field::F2_19x3_26;
 
-fn test_input_size(s: usize, input_size: usize) -> (
+fn test_size(s: usize, input_size: usize, shared_size: usize) -> (
     usize, // proof size in bytes
     usize, // expected proof size in bytes
     std::time::Duration, // prover time in ms
@@ -22,61 +22,34 @@ fn test_input_size(s: usize, input_size: usize) -> (
     println!("---");
 
     let mut rng = StdRng::from_entropy();
-    let (ckt, inp): (Ckt<Field>, _) = humidor::circuit::random_ckt_zero(
+    let (mut ckt, inp): (Ckt<Field>, _) = humidor::circuit::random_ckt_zero(
         &mut rng,
         input_size,
         circuit_size,
     );
+    ckt.shared = 0..shared_size;
 
     let mut prover_time = std::time::Duration::new(0,0);
     let mut verifier_time = std::time::Duration::new(0,0);
-    let mut proof_size = 0usize;
 
     let t = std::time::Instant::now();
-    let mut p = <interactive::Prover<_, Sha256>>::new(&ckt, &inp);
+    let mut p = <noninteractive::Prover<_, Sha256>>::new(&ckt, &inp);
     prover_time += t.elapsed();
     println!("Prover setup time: {:?}", t.elapsed());
 
     let t = std::time::Instant::now();
-    let mut v = interactive::Verifier::new(&ckt);
+    let mut v = noninteractive::Verifier::new(&ckt);
     verifier_time += t.elapsed();
     println!("Verifier setup time: {:?}", t.elapsed());
 
     let t = std::time::Instant::now();
-    let r0 = p.round0();
+    let proof = p.make_proof();
     prover_time += t.elapsed();
-    println!("Round 0 time: {:?}", t.elapsed());
-    println!("Round 0 size: {}", r0.size());
-    proof_size += r0.size();
+    println!("Proof generation time: {:?}", t.elapsed());
+    let proof_size = proof.size();
 
     let t = std::time::Instant::now();
-    let r1 = v.round1(r0);
-    verifier_time += t.elapsed();
-    println!("Round 1 time: {:?}", t.elapsed());
-    println!("Round 1 size: {}", r1.size());
-
-    let t = std::time::Instant::now();
-    let r2 = p.round2(r1);
-    prover_time += t.elapsed();
-    println!("Round 2 time: {:?}", t.elapsed());
-    println!("Round 2 size: {}", r2.size());
-    proof_size += r2.size();
-
-    let t = std::time::Instant::now();
-    let r3 = v.round3(r2);
-    verifier_time += t.elapsed();
-    println!("Round 3 time: {:?}", t.elapsed());
-    println!("Round 3 size: {}", r3.size());
-
-    let t = std::time::Instant::now();
-    let r4 = p.round4(r3);
-    prover_time += t.elapsed();
-    println!("Round 4 time: {:?}", t.elapsed());
-    println!("Round 4 size: {}", r4.size());
-    proof_size += r4.size();
-
-    let t = std::time::Instant::now();
-    let vout = v.verify(r4);
+    let vout = v.verify(proof);
     verifier_time += t.elapsed();
     println!("Verification time: {:?}", t.elapsed());
 
@@ -95,15 +68,23 @@ fn test_input_size(s: usize, input_size: usize) -> (
     (proof_size, expected_size, prover_time, verifier_time)
 }
 
-fn main() -> std::io::Result<()> {
-    let mut f = std::fs::File::create("random_circuit_interactive.csv")?;
+fn test_shared_witness_size(filename: &str, shared_size: usize) -> std::io::Result<()> {
+    let mut f = std::fs::File::create(filename)?;
     f.write_all("# circuit size,\tproof size (kb),\texpected size (kb),\tprover time (ms),\tverifier time (ms)\n\n".as_bytes())?;
 
     for s in 13..=24 {
-        let (ps, es, p, v) = test_input_size(s, 2048);
-        f.write_all(format!("{},\t{},\t{},\t{},\t{},\n",
+        let (ps, es, p, v) = test_size(s, 2048, shared_size);
+        f.write_all(format!("{},\t{},\t{},\t{},\t{}\n",
                 1 << s, ps, es, p.as_millis(), v.as_millis()).as_bytes())?;
     }
+
+    Ok(())
+}
+
+fn main() -> std::io::Result<()> {
+    test_shared_witness_size("random_circuit_noninteractive_with_shared_2_11.csv", 2048)?;
+    test_shared_witness_size("random_circuit_noninteractive_with_shared_2_10.csv", 1024)?;
+    test_shared_witness_size("random_circuit_noninteractive_with_shared_2_9.csv", 512)?;
 
     Ok(())
 }

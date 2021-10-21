@@ -1,5 +1,4 @@
 use rand::{SeedableRng, rngs::StdRng};
-use std::io::Write;
 
 extern crate humidor;
 
@@ -9,24 +8,24 @@ use humidor::merkle::Sha256;
 
 type Field = scuttlebutt::field::F2_19x3_26;
 
-fn test_input_size(s: usize, input_size: usize) -> (
-    usize, // proof size in bytes
-    usize, // expected proof size in bytes
-    std::time::Duration, // prover time in ms
-    std::time::Duration, // verifier time in ms
-) {
-    let circuit_size = (1usize << s) - input_size;
+fn main() {
+    let total_size = 1usize << 21;
+    let input_size = 1usize << 20;
+    let shared_size = input_size;
+    let circuit_size = total_size - input_size;
+    debug_assert!(shared_size <= input_size);
 
-    println!("Proving a random circuit with {} gates and {} input wires",
-        circuit_size, input_size);
+    println!("Proving a random circuit with {} gates and {} input registers, {} of which are shared",
+        circuit_size, input_size, shared_size);
     println!("---");
 
     let mut rng = StdRng::from_entropy();
-    let (ckt, inp): (Ckt<Field>, _) = humidor::circuit::random_ckt_zero(
+    let (mut ckt, inp): (Ckt<Field>, _) = humidor::circuit::random_ckt_zero(
         &mut rng,
         input_size,
         circuit_size,
     );
+    ckt.shared = 0..shared_size;
 
     let mut prover_time = std::time::Duration::new(0,0);
     let mut verifier_time = std::time::Duration::new(0,0);
@@ -63,19 +62,4 @@ fn test_input_size(s: usize, input_size: usize) -> (
     println!("Proof size: {}kb", proof_size as f64 / 1024f64);
     println!("Expected size: {}kb", expected_size as f64 / 1024f64);
     println!("");
-
-    (proof_size, expected_size, prover_time, verifier_time)
-}
-
-fn main() -> std::io::Result<()> {
-    let mut f = std::fs::File::create("random_circuit_noninteractive.csv")?;
-    f.write_all("# circuit size,\tproof size (kb),\texpected size (kb),\tprover time (ms),\tverifier time (ms)\n\n".as_bytes())?;
-
-    for s in 13..=24 {
-        let (ps, es, p, v) = test_input_size(s, 2048);
-        f.write_all(format!("{},\t{},\t{},\t{},\t{}\n",
-                1 << s, ps, es, p.as_millis(), v.as_millis()).as_bytes())?;
-    }
-
-    Ok(())
 }

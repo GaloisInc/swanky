@@ -3,7 +3,7 @@ use criterion::{Criterion, BenchmarkId, Throughput, BatchSize, SamplingMode};
 use criterion::{criterion_group, criterion_main};
 use rand::{SeedableRng, rngs::StdRng};
 
-use humidor::circuit::random_ckt_zero;
+use humidor::circuit::{Ckt, random_ckt_zero};
 use humidor::ligero::noninteractive;
 use humidor::merkle::Sha256;
 
@@ -18,14 +18,19 @@ pub fn bench_random_circuit(c: &mut Criterion) {
     group.sampling_mode(SamplingMode::Flat);
     for size in (10..=16).map(|p| 2usize.pow(p)) {
         let input_size = 256;
+        let shared_size = 64;
         let circuit_size = size - input_size;
 
         group.throughput(Throughput::Bytes((size * std::mem::size_of::<Field>()) as u64));
         group.bench_with_input(BenchmarkId::new("Prover", size), &size, |b, _| {
             b.iter_batched_ref(
-                || random_ckt_zero(&mut rng, input_size, circuit_size),
+                || {
+                    let (ckt, w) = random_ckt_zero(&mut rng, input_size, circuit_size);
+
+                    (Ckt {shared: 0 .. shared_size, ..ckt}, w)
+                },
                 |(ckt, w)| {
-                    let p: Prover = noninteractive::Prover::new(ckt, w);
+                    let mut p: Prover = noninteractive::Prover::new(ckt, w);
                     p.make_proof();
                 },
                 BatchSize::SmallInput,
@@ -35,14 +40,16 @@ pub fn bench_random_circuit(c: &mut Criterion) {
         group.bench_with_input(BenchmarkId::new("Verifier", size), &size, |b, _| {
             b.iter_batched(
                 || {
-                    let (ckt, w) = random_ckt_zero(&mut rng, input_size, circuit_size);
-                    let p: Prover = Prover::new(&ckt, &w);
+                    let (mut ckt, w) = random_ckt_zero(&mut rng, input_size, circuit_size);
+                    ckt.shared = 0 .. shared_size;
+
+                    let mut p: Prover = Prover::new(&ckt, &w);
                     let proof = p.make_proof();
 
                     (ckt, proof)
                 },
                 |(ckt, proof)| {
-                    let v: Verifier = Verifier::new(&ckt);
+                    let mut v: Verifier = Verifier::new(&ckt);
                     v.verify(proof);
                 },
                 BatchSize::SmallInput,

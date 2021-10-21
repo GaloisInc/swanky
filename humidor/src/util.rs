@@ -124,8 +124,16 @@ pub fn peval<Field: FiniteField>(p: ArrayView1<Field>, x: Field) -> Field {
     numtheory::mod_evaluate_polynomial(&p.to_vec(), x)
 }
 
+/// Generate an array of random field elements with the given size.
 pub fn random_field_array<R: rand::Rng, Field: FiniteField>(
     rng: &mut R, size: usize
 ) -> Array1<Field> {
-    (0 .. size).map(|_| Field::random(rng)).collect()
+    Array1::from_shape_fn(size, |_| Field::random(rng))
+}
+
+/// Generate a square matrix of random field elements with the given dimension.
+pub fn random_field_mat<R: rand::Rng, Field: FiniteField>(
+    rng: &mut R, dim: usize
+) -> Array2<Field> {
+    Array2::from_shape_fn((dim, dim), |_| Field::random(rng))
 }
