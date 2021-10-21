@@ -212,16 +212,10 @@ pub fn monty_from_bytes<F: Monty>(
 }
 
 /// Convert a random byte array to a field element in Montgomery form
-// XXX: Not actually enough entropy. Need 32 bytes.
-pub fn monty_from_uniform_bytes<F: Monty>(bytes: &[u8; 16]) -> F {
-    use rand::prelude::{StdRng, SeedableRng};
+pub fn monty_from_uniform_bytes<F: Monty>(seed: &[u8; 16]) -> F {
+    use rand::prelude::SeedableRng;
 
-    let mut seed = [0u8; 32];
-    for i in 0..16 {
-        seed[i] = bytes[i];
-    }
-
-    let mut rng = StdRng::from_seed(seed);
+    let mut rng = crate::rand_aes::AesRng::from_seed(crate::Block::from(*seed));
     F::from_raw(Uniform::from(0 .. F::M).sample(&mut rng))
 }
 
