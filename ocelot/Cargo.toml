@@ -26,6 +26,7 @@ scuttlebutt = { path = "../scuttlebutt", features = ["curve25519-dalek"] }
 vectoreyes = { path = "../vectoreyes" }
 generic-array = "0.14.4"
 subtle = "2.4.0"
+bytemuck = "1.5.1"
 
 [build-dependencies]
 cc = "1.0.67"
@@ -33,6 +34,8 @@ cc = "1.0.67"
 [dev-dependencies]
 criterion = "0.3.4"
 nix = "0.20.0"
+proptest = "1.0.0"
+tikv-jemallocator = "0.4.1"
 clap = "2.33.3"
 
 [[bench]]

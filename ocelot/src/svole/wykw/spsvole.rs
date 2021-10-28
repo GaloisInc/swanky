@@ -7,7 +7,7 @@
 //! Implementation of single-point sVOLE.
 
 use super::{
-    ggm_utils::{ggm, ggm_prime},
+    ggm_utils::{ggm, ggm_prime, GgmTemporaryStorage},
     utils::Powers,
 };
 use crate::svole::wykw::specialization::{
@@ -26,14 +26,15 @@ use scuttlebutt::{
     commitment::{Commitment, ShaCommitment},
     field::FiniteField as FF,
     utils::unpack_bits,
-    AbstractChannel, Aes128, AesRng, Block, Malicious,
+    AbstractChannel, AesRng, Block, Malicious,
 };
 use std::marker::PhantomData;
+use vectoreyes::{Aes128EncryptOnly, AesBlockCipher};
 
 pub(super) struct Sender<OT: OtReceiver + Malicious, FE: FF, S: FiniteFieldSpecialization<FE>> {
     ot: OT,
     pows: Powers<FE>,
-    ggm_seeds: (Aes128, Aes128),
+    ggm_seeds: (Aes128EncryptOnly, Aes128EncryptOnly),
     phantom: PhantomData<S>,
 }
 
@@ -41,7 +42,8 @@ pub(super) struct Receiver<OT: OtSender + Malicious, FE: FF, S: FiniteFieldSpeci
     ot: OT,
     delta: FE,
     pows: Powers<FE>,
-    ggm_seeds: (Aes128, Aes128),
+    ggm_seeds: (Aes128EncryptOnly, Aes128EncryptOnly),
+    ggm_temporary_storage: GgmTemporaryStorage,
     phantom: PhantomData<S>,
 }
 
@@ -109,8 +111,8 @@ impl<OT: OtReceiver<Msg = Block> + Malicious, FE: FF, S: FiniteFieldSendSpeciali
         let seed0 = rng.gen::<Block>();
         let seed1 = rng.gen::<Block>();
         let seeds = scuttlebutt::cointoss::send(channel, &[seed0, seed1])?;
-        let aes0 = Aes128::new(seeds[0]);
-        let aes1 = Aes128::new(seeds[1]);
+        let aes0 = Aes128EncryptOnly::new_with_key(seeds[0].0);
+        let aes1 = Aes128EncryptOnly::new_with_key(seeds[1].0);
         Ok(Self {
             pows,
             ot,
@@ -171,7 +173,7 @@ impl<OT: OtReceiver<Msg = Block> + Malicious, FE: FF, S: FiniteFieldSendSpeciali
         {
             let sum = ggm_prime::<FE, S>(
                 *alpha,
-                &keys[i * nbits..(i + 1) * nbits],
+                bytemuck::cast_slice(&keys[i * nbits..(i + 1) * nbits]),
                 &self.ggm_seeds,
                 &mut result[i * n..(i + 1) * n],
             );
@@ -260,13 +262,14 @@ impl<OT: OtSender<Msg = Block> + Malicious, FE: FF, S: FiniteFieldSpecialization
         let seed0 = rng.gen::<Block>();
         let seed1 = rng.gen::<Block>();
         let seeds = scuttlebutt::cointoss::receive(channel, &[seed0, seed1])?;
-        let aes0 = Aes128::new(seeds[0]);
-        let aes1 = Aes128::new(seeds[1]);
+        let aes0 = Aes128EncryptOnly::new_with_key(seeds[0].0);
+        let aes1 = Aes128EncryptOnly::new_with_key(seeds[1].0);
         Ok(Self {
             pows,
             delta,
             ot,
             ggm_seeds: (aes0, aes1),
+            ggm_temporary_storage: Default::default(),
             phantom: PhantomData,
         })
     }
@@ -293,16 +296,17 @@ impl<OT: OtSender<Msg = Block> + Malicious, FE: FF, S: FiniteFieldSpecialization
         }
         let mut keys = Vec::with_capacity(t * nbits);
         for i in 0..t {
-            let seed = rng.gen::<Block>();
-            let keys_ = ggm(
+            let seed = rng.gen::<Block>().0;
+            ggm(
                 nbits,
                 seed,
                 &self.ggm_seeds,
                 &mut result[i * n..(i + 1) * n],
+                &mut keys,
+                &mut self.ggm_temporary_storage,
             );
-            debug_assert!(keys_.len() == nbits);
-            keys.extend(keys_);
         }
+        debug_assert_eq!(keys.len(), t * nbits);
         self.ot.send(channel, &keys, rng)?;
         for (i, gamma) in gammas.into_iter().enumerate() {
             let d = gamma - result[i * n..(i + 1) * n].iter().map(|v| *v).sum();
@@ -360,6 +364,7 @@ impl<OT: OtSender<Msg = Block> + Malicious, FE: FF, S: FiniteFieldSpecialization
             delta: self.delta,
             pows: self.pows.clone(),
             ggm_seeds: self.ggm_seeds.clone(),
+            ggm_temporary_storage: Default::default(),
             phantom: PhantomData,
         })
     }

@@ -205,9 +205,7 @@ impl<FE: FiniteField, S: SvoleSpecializationSend<FE>> SenderInternal<FE, S> {
         // The VOLEs we'll return to the caller.
         output.clear();
         let out_len = cols - num_saved;
-        if output.capacity() < out_len {
-            output.reserve(out_len - output.capacity());
-        }
+        output.reserve(out_len);
         S::svole_send_internal_inner(self, num_saved, rows, uws, &mut base_voles, output);
         base_voles.extend(self.base_voles[used..].iter());
         self.base_voles = base_voles;
@@ -458,11 +456,8 @@ impl<FE: FiniteField, S: SvoleSpecializationRecv<FE>> ReceiverInternal<FE, S> {
                 .receive(channel, m, &self.base_voles[rows..rows + weight + r], rng)?;
         debug_assert!(vs.len() == cols);
         let mut base_voles = Vec::with_capacity(num_saved + leftover);
-        let cap = cols - num_saved;
         output.clear();
-        if output.capacity() < cap {
-            output.reserve(cap - output.capacity());
-        }
+        output.reserve(cols - num_saved);
         S::svole_recv_internal_inner(self, num_saved, rows, vs, &mut base_voles, output);
         base_voles.extend(self.base_voles[used..].iter());
         self.base_voles = base_voles;

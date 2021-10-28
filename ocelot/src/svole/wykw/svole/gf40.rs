@@ -10,7 +10,8 @@ use std::convert::TryInto;
 
 use vectoreyes::array_utils::ArrayUnrolledExt;
 use vectoreyes::{
-    SimdBase, SimdBase32, SimdBase4x64, SimdBase8, U32x4, U32x8, U64x2, U64x4, U8x32,
+    I32x4, I32x8, SimdBase, SimdBase32, SimdBase4x64, SimdBase8, SimdBaseGatherable, U32x4, U32x8,
+    U64x2, U64x4, U8x32,
 };
 
 type SenderPair = u64;
@@ -25,6 +26,8 @@ impl SvoleSpecializationSend<Gf40> for Gf40Specialization {
         svoles: &mut Vec<SenderPair>,
     ) {
         if rows == super::LPN_EXTEND_PARAMS.rows {
+            // We want to perform a pairwise XOR on the pair. That's equivalent to just
+            // XOR-ing the raw u64.
             internal_inner(
                 &mut svole.lpn_rng,
                 &svole.base_voles,
@@ -32,17 +35,6 @@ impl SvoleSpecializationSend<Gf40> for Gf40Specialization {
                 uws,
                 num_saved,
                 svoles,
-                #[inline(always)]
-                |src_base_voles, indices, pair| {
-                    let (mut x, mut z) = Gf40Specialization::extract_sender_pair(*pair);
-                    for j in indices.iter() {
-                        let (x2, z2) =
-                            Gf40Specialization::extract_sender_pair(src_base_voles[(*j) as usize]);
-                        x += x2;
-                        z += z2;
-                    }
-                    Gf40Specialization::new_sender_pair(x, z)
-                },
             );
         } else {
             let distribution = Uniform::from(0..rows);
@@ -97,15 +89,6 @@ impl SvoleSpecializationRecv<Gf40> for Gf40Specialization {
                 vs,
                 num_saved,
                 &mut svoles,
-                #[inline(always)]
-                |src_base_voles, indices, b| {
-                    let mut y = *b;
-                    y += indices
-                        .iter()
-                        .map(|j| src_base_voles[(*j) as usize])
-                        .sum::<Gf40>();
-                    y
-                },
             );
         } else {
             let distribution = Uniform::from(0..rows);
@@ -219,50 +202,122 @@ fn matrix_entries(rng: &mut AesRng, dist: &UniformIntegersUnderBound) -> [U32x8;
     }
 }
 
-fn internal_lpn<T: Clone + Copy>(
+/// A type which is `#[repr(transparent)]` for `u64`.
+unsafe trait TransparentU64: Clone + Copy + 'static {
+    fn from_u64(x: u64) -> Self;
+    fn to_u64(&self) -> u64;
+}
+unsafe impl TransparentU64 for u64 {
+    #[inline(always)]
+    fn from_u64(x: u64) -> Self {
+        x
+    }
+    #[inline(always)]
+    fn to_u64(&self) -> u64 {
+        *self
+    }
+}
+// We assume the upper bits of Gf40 are zero. That invariant needs to be preserved.
+unsafe impl TransparentU64 for Gf40 {
+    #[inline(always)]
+    fn from_u64(x: u64) -> Self {
+        Gf40::from_lower_40(x)
+    }
+    #[inline(always)]
+    fn to_u64(&self) -> u64 {
+        self.extract_raw()
+    }
+}
+
+fn internal_lpn<T: TransparentU64>(
     rng: &mut AesRng,
     dist: &UniformIntegersUnderBound,
     src_base_voles: &Vec<T>,
     uws: &[T],
     dst: &mut Vec<T>,
-    doit: &impl Fn(&Vec<T>, &[u32; 10], &T) -> T,
 ) {
+    assert_eq!(dist.bound() as usize, src_base_voles.len());
     let chunks = uws.chunks_exact(2);
     let remainder = chunks.remainder();
     for pair in chunks {
         let pair = [pair[0], pair[1]];
         // The associated prime field element of the matrix index is always 1, so we ignore it.
         let entries = matrix_entries(rng, dist);
-        // TODO: do this vectorized.
-        let indices = [
-            [
-                entries[0].extract::<0>(),
-                entries[0].extract::<1>(),
-                entries[0].extract::<2>(),
-                entries[0].extract::<3>(),
-                entries[0].extract::<4>(),
-                entries[0].extract::<5>(),
-                entries[0].extract::<6>(),
-                entries[0].extract::<7>(),
-                entries[2].extract::<0>(),
-                entries[2].extract::<2>(),
-            ],
-            [
-                entries[1].extract::<0>(),
-                entries[1].extract::<1>(),
-                entries[1].extract::<2>(),
-                entries[1].extract::<3>(),
-                entries[1].extract::<4>(),
-                entries[1].extract::<5>(),
-                entries[1].extract::<6>(),
-                entries[1].extract::<7>(),
-                entries[2].extract::<4>(),
-                entries[2].extract::<6>(),
-            ],
-        ];
-        for (indices, t) in indices.array_zip(pair).iter() {
-            dst.push(doit(&src_base_voles, indices, t));
-        }
+        let src_base_voles = unsafe {
+            // SAFETY: TransparentU64 means that T is represented as a u64.
+            std::slice::from_raw_parts(src_base_voles.as_ptr() as *const u64, src_base_voles.len())
+        };
+        let full_entries = [entries[0], entries[1]].array_map(
+            #[inline(always)]
+            |entries| {
+                // Converting to I32 doesn't change anything given the LWE rows bound. We can't gather
+                // with a U32 index.
+                let entries = I32x8::from(entries);
+                let parts: [I32x4; 2] = entries.into();
+                parts.array_map(
+                    #[inline(always)]
+                    |part| unsafe {
+                        // SAFETY: each value in part should be under dist.bound() which we've asserted
+                        // is equal to the number of base VOLEs
+                        U64x4::gather(src_base_voles.as_ptr(), part)
+                    },
+                )
+            },
+        );
+        // The first two values are the LPN matrix entries for the first half, and the remaining
+        // values correspond to the second half.
+        let remaining_two = {
+            let last_entry: U32x8 = entries[2];
+            let important_indices = <[U32x4; 2]>::from(U32x8::from(
+                U64x4::from(last_entry.shuffle::<2, 0, 2, 0>()).shuffle::<3, 1, 2, 0>(),
+            ))[0];
+            debug_assert_eq!(
+                important_indices.as_array(),
+                [
+                    entries[2].extract::<0>(),
+                    entries[2].extract::<2>(),
+                    entries[2].extract::<4>(),
+                    entries[2].extract::<6>(),
+                ]
+            );
+            // Converting to I32 doesn't change anything given the LWE rows bound. We can't gather
+            // with a U32 index.
+            let important_indices = I32x4::from(important_indices);
+            <[U64x2; 2]>::from(unsafe {
+                // SAFETY: each value in part should be under dist.bound() which we've asserted
+                // is equal to the number of base VOLEs
+                U64x4::gather(src_base_voles.as_ptr(), important_indices)
+            })
+        };
+        let groups = full_entries.array_zip(remaining_two);
+        let groups = groups
+            .array_map(
+                #[inline(always)]
+                |([four_lpn_entries0, four_lpn_entries1], two_lpn_entries)| {
+                    (four_lpn_entries0 ^ four_lpn_entries1, two_lpn_entries)
+                },
+            )
+            .array_map(
+                #[inline(always)]
+                |(a, b)| {
+                    let [x, y] = <[U64x2; 2]>::from(a);
+                    (x, y, b)
+                },
+            )
+            .array_map(
+                #[inline(always)]
+                |(a, b, c)| (a ^ b, c),
+            )
+            .array_map(
+                #[inline(always)]
+                |(a, b)| a ^ b,
+            )
+            .array_map(
+                #[inline(always)]
+                |a| a.extract::<0>() ^ a.extract::<1>(),
+            );
+        dst.push(T::from_u64(groups[0] ^ pair[0].to_u64()));
+        dst.push(T::from_u64(groups[1] ^ pair[1].to_u64()));
     }
     for t in remainder {
         // Just do them one at-a-time.
@@ -279,18 +334,21 @@ fn internal_lpn<T: Clone + Copy>(
             entries[2].extract::<0>(),
             entries[2].extract::<2>(),
         ];
-        dst.push(doit(&src_base_voles, &indices, t));
+        let mut value = t.to_u64();
+        for j in indices.iter() {
+            value ^= src_base_voles[(*j) as usize].to_u64();
+        }
+        dst.push(T::from_u64(value));
     }
 }
 
-pub(super) fn internal_inner<T: Clone + Copy, Doit: Fn(&Vec<T>, &[u32; 10], &T) -> T>(
+fn internal_inner<T: TransparentU64>(
     rng: &mut AesRng,
     src_base_voles: &Vec<T>,
     dst_base_voles: &mut Vec<T>,
     uws: Vec<T>,
     num_saved: usize,
     svoles: &mut Vec<T>,
-    doit: Doit,
 ) {
     let dist = UniformIntegersUnderBound::new(src_base_voles.len().try_into().unwrap());
     internal_lpn(
@@ -299,9 +357,8 @@ pub(super) fn internal_inner<T: Clone + Copy, Doit: Fn(&Vec<T>, &[u32; 10], &T) 
         src_base_voles,
         &uws[0..num_saved],
         dst_base_voles,
-        &doit,
     );
-    internal_lpn(rng, &dist, src_base_voles, &uws[num_saved..], svoles, &doit);
+    internal_lpn(rng, &dist, src_base_voles, &uws[num_saved..], svoles);
 }
 
 #[cfg(test)]

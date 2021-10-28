@@ -8,8 +8,13 @@ use ocelot::svole::{
     wykw::{Receiver, Sender},
     SVoleReceiver, SVoleSender,
 };
-use scuttlebutt::{channel::track_unix_channel_pair, field::Gf40, AesRng};
-use std::time::Instant;
+use scuttlebutt::{field::Gf40, AbstractChannel, AesRng};
+use std::io::{Read, Write};
+use std::{
+    io::{BufReader, BufWriter},
+    os::unix::net::UnixStream,
+    time::Instant,
+};
 
 fn get_trials() -> usize {
     if let Ok(n) = std::env::var("N") {
@@ -19,12 +24,66 @@ fn get_trials() -> usize {
     }
 }
 
+struct OurTrackChannel<S: Read + Write> {
+    stream_w: BufWriter<S>,
+    stream_r: BufReader<S>,
+    bytes_written: u64,
+    bytes_read: u64,
+}
+
+impl<S: Read + Write> OurTrackChannel<S> {
+    fn new(w: S, r: S) -> Self {
+        OurTrackChannel {
+            stream_w: BufWriter::new(w),
+            stream_r: BufReader::new(r),
+            bytes_written: 0,
+            bytes_read: 0,
+        }
+    }
+
+    fn clear(&mut self) {
+        self.bytes_read = 0;
+        self.bytes_written = 0;
+    }
+
+    fn kilobits_read(&self) -> f64 {
+        ((self.bytes_read as f64) * 8.0) / 1000.0
+    }
+    fn kilobits_written(&self) -> f64 {
+        ((self.bytes_written as f64) * 8.0) / 1000.0
+    }
+}
+
+impl<S: Read + Write> AbstractChannel for OurTrackChannel<S> {
+    #[inline(always)]
+    fn write_bytes(&mut self, bytes: &[u8]) -> std::io::Result<()> {
+        self.stream_w.write_all(bytes)?;
+        self.bytes_written += bytes.len() as u64;
+        Ok(())
+    }
+
+    #[inline(always)]
+    fn read_bytes(&mut self, mut bytes: &mut [u8]) -> std::io::Result<()> {
+        self.bytes_read += bytes.len() as u64;
+        self.stream_r.read_exact(&mut bytes)
+    }
+
+    #[inline(always)]
+    fn flush(&mut self) -> std::io::Result<()> {
+        self.stream_w.flush()
+    }
+
+    fn clone(&self) -> Self {
+        unimplemented!()
+    }
+}
+
 type VSender = Sender<Gf40>;
 type VReceiver = Receiver<Gf40>;
 
 // <FE: FF, VSender: SVoleSender<Msg = FE>, VReceiver: SVoleReceiver<Msg = FE>>
 fn run() {
-    let (mut sender, mut receiver) = track_unix_channel_pair();
+    let (sender, receiver) = UnixStream::pair().unwrap();
     let handle = std::thread::spawn(move || {
         #[cfg(target_os = "linux")]
         {
@@ -33,20 +92,22 @@ fn run() {
             nix::sched::sched_setaffinity(nix::unistd::Pid::from_raw(0), &cpu_set).unwrap();
         }
         let mut rng = AesRng::new();
+        let mut channel =
+            OurTrackChannel::new(sender.try_clone().unwrap(), sender.try_clone().unwrap());
         let start = Instant::now();
-        let mut vole = VSender::init(&mut sender, &mut rng).unwrap();
+        let mut vole = VSender::init(&mut channel, &mut rng).unwrap();
         println!("Send time (init): {:?}", start.elapsed());
         let start = Instant::now();
         let mut count = 0;
         let mut out = Vec::new();
         for _ in 0..get_trials() {
-            vole.send_fast(&mut sender, &mut rng, &mut out).unwrap();
+            vole.send_fast(&mut channel, &mut rng, &mut out).unwrap();
             count += out.len();
             criterion::black_box(&out);
         }
         println!("[{}] Send time (extend): {:?}", count, start.elapsed());
         let start = Instant::now();
-        vole.duplicate(&mut sender, &mut rng).unwrap();
+        vole.duplicate(&mut channel, &mut rng).unwrap();
         println!("Send time (duplicate): {:?}", start.elapsed());
     });
     #[cfg(target_os = "linux")]
@@ -56,46 +117,48 @@ fn run() {
         nix::sched::sched_setaffinity(nix::unistd::Pid::from_raw(0), &cpu_set).unwrap();
     }
     let mut rng = AesRng::new();
+    let mut channel =
+        OurTrackChannel::new(receiver.try_clone().unwrap(), receiver.try_clone().unwrap());
     let start = Instant::now();
-    let mut vole = VReceiver::init(&mut receiver, &mut rng).unwrap();
+    let mut vole = VReceiver::init(&mut channel, &mut rng).unwrap();
     println!("Receive time (init): {:?}", start.elapsed());
     println!(
-        "Send communication (init): {:.2} Mb",
-        receiver.kilobits_read() / 1000.0
+        "Send communication (init): {:.2} Mbits",
+        channel.kilobits_read() / 1000.0
     );
     println!(
-        "Receive communication (init): {:.2} Mb",
-        receiver.kilobits_written() / 1000.0
+        "Receive communication (init): {:.2} Mbits",
+        channel.kilobits_written() / 1000.0
     );
-    receiver.clear();
+    channel.clear();
     let start = Instant::now();
     let mut count = 0;
     let mut out = Vec::new();
     for _ in 0..get_trials() {
-        vole.receive(&mut receiver, &mut rng, &mut out).unwrap();
+        vole.receive(&mut channel, &mut rng, &mut out).unwrap();
         count += out.len();
         criterion::black_box(&out);
     }
     println!("[{}] Receive time (extend): {:?}", count, start.elapsed());
     println!(
-        "Send communication (extend): {:.2} Mb",
-        receiver.kilobits_read() / 1000.0
+        "Send communication (extend): {:.2} Mbits",
+        channel.kilobits_read() / 1000.0
     );
     println!(
-        "Receive communication (extend): {:.2} Mb",
-        receiver.kilobits_written() / 1000.0
+        "Receive communication (extend): {:.2} Mbits",
+        channel.kilobits_written() / 1000.0
     );
-    receiver.clear();
+    channel.clear();
     let start = Instant::now();
-    let _ = vole.duplicate(&mut receiver, &mut rng).unwrap();
+    let _ = vole.duplicate(&mut channel, &mut rng).unwrap();
     println!("Receive time (duplicate): {:?}", start.elapsed());
     println!(
-        "Send communication (duplicate): {:.2} Mb",
-        receiver.kilobits_read() / 1000.0
+        "Send communication (duplicate): {:.2} Mbits",
+        channel.kilobits_read() / 1000.0
     );
     println!(
-        "Receive communication (duplicate): {:.2} Mb",
-        receiver.kilobits_written() / 1000.0
+        "Receive communication (duplicate): {:.2} Mbits",
+        channel.kilobits_written() / 1000.0
     );
     handle.join().unwrap();
 }
