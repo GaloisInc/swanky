@@ -149,6 +149,11 @@ impl FiniteField for Gf45 {
     }
 
     const MULTIPLICATIVE_GROUP_ORDER: u128 = (1 << 45) - 1;
+    type NumberOfBitsInBitDecomposition = generic_array::typenum::U45;
+
+    fn bit_decomposition(&self) -> GenericArray<bool, Self::NumberOfBitsInBitDecomposition> {
+        super::standard_bit_decomposition(u128::from(self.0))
+    }
 
     const MODULUS: u128 = 2;
     // This corresponds to the polynomial P(x) = x

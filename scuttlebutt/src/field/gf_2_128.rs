@@ -262,6 +262,11 @@ impl FiniteField for Gf128 {
     }
 
     const MULTIPLICATIVE_GROUP_ORDER: u128 = u128::max_value();
+    type NumberOfBitsInBitDecomposition = generic_array::typenum::U128;
+
+    fn bit_decomposition(&self) -> GenericArray<bool, Self::NumberOfBitsInBitDecomposition> {
+        super::standard_bit_decomposition(self.0)
+    }
 
     const MODULUS: u128 = 2;
     // See the conversation here: https://mattermost.galois.com/galwegians/pl/63smzhk9qbnrbbsb1hi6xpejmc

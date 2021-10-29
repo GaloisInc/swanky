@@ -108,6 +108,12 @@ impl FiniteField for Fp {
     fn multiply_by_prime_subfield(&self, pf: Self::PrimeField) -> Self {
         self * pf
     }
+
+    type NumberOfBitsInBitDecomposition = generic_array::typenum::U128;
+
+    fn bit_decomposition(&self) -> GenericArray<bool, Self::NumberOfBitsInBitDecomposition> {
+        super::standard_bit_decomposition(u128::from(*self))
+    }
 }
 
 /// The error which occurs if the inputted `u128` or bit pattern doesn't correspond to a field
