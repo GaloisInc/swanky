@@ -50,6 +50,10 @@ impl FiniteField for F2 {
         F2((rng.next_u32() & 1) as u8)
     }
 
+    fn random_nonzero<R: RngCore + ?Sized>(_rng: &mut R) -> Self {
+        Self::ONE
+    }
+
     const ZERO: Self = F2(0);
 
     const ONE: Self = F2(1);

@@ -143,10 +143,7 @@ impl<OT: OtReceiver<Msg = Block> + Malicious, FE: FF, S: FiniteFieldSendSpeciali
         let mut betas = Vec::with_capacity(t);
 
         for (a, _) in base_uws.iter().copied().map(S::extract_sender_pair) {
-            let mut beta = FE::PrimeField::random(&mut rng);
-            while beta == FE::PrimeField::ZERO {
-                beta = FE::PrimeField::random(&mut rng);
-            }
+            let beta = FE::PrimeField::random_nonzero(&mut rng);
             let a_prime = beta - a;
             channel.write_fe(a_prime)?;
             betas.push(beta);
