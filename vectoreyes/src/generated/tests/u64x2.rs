@@ -59,5 +59,5 @@ fn zero_is_zero() {
 #[test]
 fn const_matches_from() {
     const ARR: [u64; 2] = [0, 1];
-    assert_eq!(crate::U64x2::from(ARR), const_u64x2!(ARR),);
+    assert_eq!(crate::U64x2::from(ARR), crate::U64x2::from_array(ARR),);
 }

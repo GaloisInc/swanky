@@ -206,9 +206,10 @@ impl Sub for I8x16 {
     }
 }
 impl I8x16 {
-    #[doc(hidden)]
-    pub const fn new_from_const_raw_vector(x: I8x16Internal) -> Self {
-        Self(x)
+    #[doc = " Create a vector from an array.\n\n Unlike the `From` trait function, the `from_array` function is `const`.\n # Example\n ```\n # use vectoreyes::*;\n const MY_EXTREMELY_FUN_VALUE: I8x16 =\n     I8x16::from_array([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]);\n for (i, value) in MY_EXTREMELY_FUN_VALUE.as_array().iter().copied().enumerate() {\n     assert_eq!(i as i8, value);\n }\n ```\n\n # Avx2"]
+    #[inline(always)]
+    pub const fn from_array(array: [i8; 16]) -> I8x16 {
+        I8x16(array)
     }
 }
 impl From<[i8; 16]> for I8x16 {
@@ -418,7 +419,7 @@ impl SimdBase<i8> for I8x16 {
     type Signed = I8x16;
     type Unsigned = U8x16;
     const LANES: usize = 16;
-    const ZERO: Self = { Self([0; 16]) };
+    const ZERO: Self = Self::from_array([0; 16]);
     #[doc = "\n # Scalar Equivalent:\n ```\n # use vectoreyes::*;\n # trait SomeTraitForDoc {\n # fn the_doc_function\n # (\n #         &self  ,\n # )  -> bool\n # ;}\n # impl SomeTraitForDoc for I8x16 {\n # fn the_doc_function\n # (\n #         &self  ,\n # )  -> bool\n # {\n self.as_array().iter().all(|x| *x == 0)\n # }\n # }\n ```\n # Avx2\n <ul>\n <li>\n\n [**`_mm_testz_si128`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm_testz_si128)\n\n\n [`PTEST (XMM, XMM)`](https://felixcloutier.com/x86/PTEST.html): Logical Compare\n\n <table style=\"line-height:0.7\">\n <thead><tr>\n <th>Architecture</th><th>Latency (cycles)</th><th>Throughput (CPI)</th>\n </tr></thead><tbody>\n <tr>\n <td><a href=\"https://uops.info/html-instr/PTEST_XMM_XMM.html#SKL\">Skylake</a></td>\n <td>&le;4</td>\n <td>1.00</td>\n </tr>\n <tr>\n <td><a href=\"https://uops.info/html-instr/PTEST_XMM_XMM.html#SKX\">Skylake-AVX512</a></td>\n <td>&le;4</td>\n <td>1.00</td>\n </tr>\n <tr>\n <td><a href=\"https://uops.info/html-instr/PTEST_XMM_XMM.html#CLX\">Cascade Lake</a></td>\n <td>&le;4</td>\n <td>1.00</td>\n </tr>\n </tbody></table>\n\n _<span style=\"font-size:0.8em;float:right\">Performance numbers are measurements from [uops.info](https://uops.info/).</span>_ <div style=\"clear:both\"></div>\n </li>\n </ul>"]
     #[inline(always)]
     fn is_zero(&self) -> bool {
@@ -1031,9 +1032,10 @@ impl Sub for I8x32 {
     }
 }
 impl I8x32 {
-    #[doc(hidden)]
-    pub const fn new_from_const_raw_vector(x: I8x32Internal) -> Self {
-        Self(x)
+    #[doc = " Create a vector from an array.\n\n Unlike the `From` trait function, the `from_array` function is `const`.\n # Example\n ```\n # use vectoreyes::*;\n const MY_EXTREMELY_FUN_VALUE: I8x32 =\n     I8x32::from_array([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31]);\n for (i, value) in MY_EXTREMELY_FUN_VALUE.as_array().iter().copied().enumerate() {\n     assert_eq!(i as i8, value);\n }\n ```\n\n # Avx2"]
+    #[inline(always)]
+    pub const fn from_array(array: [i8; 32]) -> I8x32 {
+        I8x32(array)
     }
 }
 impl From<[i8; 32]> for I8x32 {
@@ -1305,7 +1307,7 @@ impl SimdBase<i8> for I8x32 {
     type Signed = I8x32;
     type Unsigned = U8x32;
     const LANES: usize = 32;
-    const ZERO: Self = { Self([0; 32]) };
+    const ZERO: Self = Self::from_array([0; 32]);
     #[doc = "\n # Scalar Equivalent:\n ```\n # use vectoreyes::*;\n # trait SomeTraitForDoc {\n # fn the_doc_function\n # (\n #         &self  ,\n # )  -> bool\n # ;}\n # impl SomeTraitForDoc for I8x32 {\n # fn the_doc_function\n # (\n #         &self  ,\n # )  -> bool\n # {\n self.as_array().iter().all(|x| *x == 0)\n # }\n # }\n ```\n # Avx2\n <ul>\n <li>\n\n [**`_mm256_testz_si256`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm256_testz_si256)\n\n\n [`VPTEST (YMM, YMM)`](https://felixcloutier.com/x86/PTEST.html): Logical Compare\n\n <table style=\"line-height:0.7\">\n <thead><tr>\n <th>Architecture</th><th>Latency (cycles)</th><th>Throughput (CPI)</th>\n </tr></thead><tbody>\n <tr>\n <td><a href=\"https://uops.info/html-instr/VPTEST_YMM_YMM.html#SKL\">Skylake</a></td>\n <td>&le;6</td>\n <td>1.00</td>\n </tr>\n <tr>\n <td><a href=\"https://uops.info/html-instr/VPTEST_YMM_YMM.html#SKX\">Skylake-AVX512</a></td>\n <td>&le;6</td>\n <td>1.00</td>\n </tr>\n <tr>\n <td><a href=\"https://uops.info/html-instr/VPTEST_YMM_YMM.html#CLX\">Cascade Lake</a></td>\n <td>&le;6</td>\n <td>1.00</td>\n </tr>\n </tbody></table>\n\n _<span style=\"font-size:0.8em;float:right\">Performance numbers are measurements from [uops.info](https://uops.info/).</span>_ <div style=\"clear:both\"></div>\n </li>\n </ul>"]
     #[inline(always)]
     fn is_zero(&self) -> bool {
@@ -2022,9 +2024,10 @@ impl Sub for I16x8 {
     }
 }
 impl I16x8 {
-    #[doc(hidden)]
-    pub const fn new_from_const_raw_vector(x: I16x8Internal) -> Self {
-        Self(x)
+    #[doc = " Create a vector from an array.\n\n Unlike the `From` trait function, the `from_array` function is `const`.\n # Example\n ```\n # use vectoreyes::*;\n const MY_EXTREMELY_FUN_VALUE: I16x8 =\n     I16x8::from_array([0, 1, 2, 3, 4, 5, 6, 7]);\n for (i, value) in MY_EXTREMELY_FUN_VALUE.as_array().iter().copied().enumerate() {\n     assert_eq!(i as i16, value);\n }\n ```\n\n # Avx2"]
+    #[inline(always)]
+    pub const fn from_array(array: [i16; 8]) -> I16x8 {
+        I16x8(array)
     }
 }
 impl From<[i16; 8]> for I16x8 {
@@ -2218,7 +2221,7 @@ impl SimdBase<i16> for I16x8 {
     type Signed = I16x8;
     type Unsigned = U16x8;
     const LANES: usize = 8;
-    const ZERO: Self = { Self([0; 8]) };
+    const ZERO: Self = Self::from_array([0; 8]);
     #[doc = "\n # Scalar Equivalent:\n ```\n # use vectoreyes::*;\n # trait SomeTraitForDoc {\n # fn the_doc_function\n # (\n #         &self  ,\n # )  -> bool\n # ;}\n # impl SomeTraitForDoc for I16x8 {\n # fn the_doc_function\n # (\n #         &self  ,\n # )  -> bool\n # {\n self.as_array().iter().all(|x| *x == 0)\n # }\n # }\n ```\n # Avx2\n <ul>\n <li>\n\n [**`_mm_testz_si128`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm_testz_si128)\n\n\n [`PTEST (XMM, XMM)`](https://felixcloutier.com/x86/PTEST.html): Logical Compare\n\n <table style=\"line-height:0.7\">\n <thead><tr>\n <th>Architecture</th><th>Latency (cycles)</th><th>Throughput (CPI)</th>\n </tr></thead><tbody>\n <tr>\n <td><a href=\"https://uops.info/html-instr/PTEST_XMM_XMM.html#SKL\">Skylake</a></td>\n <td>&le;4</td>\n <td>1.00</td>\n </tr>\n <tr>\n <td><a href=\"https://uops.info/html-instr/PTEST_XMM_XMM.html#SKX\">Skylake-AVX512</a></td>\n <td>&le;4</td>\n <td>1.00</td>\n </tr>\n <tr>\n <td><a href=\"https://uops.info/html-instr/PTEST_XMM_XMM.html#CLX\">Cascade Lake</a></td>\n <td>&le;4</td>\n <td>1.00</td>\n </tr>\n </tbody></table>\n\n _<span style=\"font-size:0.8em;float:right\">Performance numbers are measurements from [uops.info](https://uops.info/).</span>_ <div style=\"clear:both\"></div>\n </li>\n </ul>"]
     #[inline(always)]
     fn is_zero(&self) -> bool {
@@ -2632,9 +2635,10 @@ impl Sub for I16x16 {
     }
 }
 impl I16x16 {
-    #[doc(hidden)]
-    pub const fn new_from_const_raw_vector(x: I16x16Internal) -> Self {
-        Self(x)
+    #[doc = " Create a vector from an array.\n\n Unlike the `From` trait function, the `from_array` function is `const`.\n # Example\n ```\n # use vectoreyes::*;\n const MY_EXTREMELY_FUN_VALUE: I16x16 =\n     I16x16::from_array([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]);\n for (i, value) in MY_EXTREMELY_FUN_VALUE.as_array().iter().copied().enumerate() {\n     assert_eq!(i as i16, value);\n }\n ```\n\n # Avx2"]
+    #[inline(always)]
+    pub const fn from_array(array: [i16; 16]) -> I16x16 {
+        I16x16(array)
     }
 }
 impl From<[i16; 16]> for I16x16 {
@@ -2898,7 +2902,7 @@ impl SimdBase<i16> for I16x16 {
     type Signed = I16x16;
     type Unsigned = U16x16;
     const LANES: usize = 16;
-    const ZERO: Self = { Self([0; 16]) };
+    const ZERO: Self = Self::from_array([0; 16]);
     #[doc = "\n # Scalar Equivalent:\n ```\n # use vectoreyes::*;\n # trait SomeTraitForDoc {\n # fn the_doc_function\n # (\n #         &self  ,\n # )  -> bool\n # ;}\n # impl SomeTraitForDoc for I16x16 {\n # fn the_doc_function\n # (\n #         &self  ,\n # )  -> bool\n # {\n self.as_array().iter().all(|x| *x == 0)\n # }\n # }\n ```\n # Avx2\n <ul>\n <li>\n\n [**`_mm256_testz_si256`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm256_testz_si256)\n\n\n [`VPTEST (YMM, YMM)`](https://felixcloutier.com/x86/PTEST.html): Logical Compare\n\n <table style=\"line-height:0.7\">\n <thead><tr>\n <th>Architecture</th><th>Latency (cycles)</th><th>Throughput (CPI)</th>\n </tr></thead><tbody>\n <tr>\n <td><a href=\"https://uops.info/html-instr/VPTEST_YMM_YMM.html#SKL\">Skylake</a></td>\n <td>&le;6</td>\n <td>1.00</td>\n </tr>\n <tr>\n <td><a href=\"https://uops.info/html-instr/VPTEST_YMM_YMM.html#SKX\">Skylake-AVX512</a></td>\n <td>&le;6</td>\n <td>1.00</td>\n </tr>\n <tr>\n <td><a href=\"https://uops.info/html-instr/VPTEST_YMM_YMM.html#CLX\">Cascade Lake</a></td>\n <td>&le;6</td>\n <td>1.00</td>\n </tr>\n </tbody></table>\n\n _<span style=\"font-size:0.8em;float:right\">Performance numbers are measurements from [uops.info](https://uops.info/).</span>_ <div style=\"clear:both\"></div>\n </li>\n </ul>"]
     #[inline(always)]
     fn is_zero(&self) -> bool {
@@ -3336,9 +3340,10 @@ impl Sub for I32x4 {
     }
 }
 impl I32x4 {
-    #[doc(hidden)]
-    pub const fn new_from_const_raw_vector(x: I32x4Internal) -> Self {
-        Self(x)
+    #[doc = " Create a vector from an array.\n\n Unlike the `From` trait function, the `from_array` function is `const`.\n # Example\n ```\n # use vectoreyes::*;\n const MY_EXTREMELY_FUN_VALUE: I32x4 =\n     I32x4::from_array([0, 1, 2, 3]);\n for (i, value) in MY_EXTREMELY_FUN_VALUE.as_array().iter().copied().enumerate() {\n     assert_eq!(i as i32, value);\n }\n ```\n\n # Avx2"]
+    #[inline(always)]
+    pub const fn from_array(array: [i32; 4]) -> I32x4 {
+        I32x4(array)
     }
 }
 impl From<[i32; 4]> for I32x4 {
@@ -3641,7 +3646,7 @@ impl SimdBase<i32> for I32x4 {
     type Signed = I32x4;
     type Unsigned = U32x4;
     const LANES: usize = 4;
-    const ZERO: Self = { Self([0; 4]) };
+    const ZERO: Self = Self::from_array([0; 4]);
     #[doc = "\n # Scalar Equivalent:\n ```\n # use vectoreyes::*;\n # trait SomeTraitForDoc {\n # fn the_doc_function\n # (\n #         &self  ,\n # )  -> bool\n # ;}\n # impl SomeTraitForDoc for I32x4 {\n # fn the_doc_function\n # (\n #         &self  ,\n # )  -> bool\n # {\n self.as_array().iter().all(|x| *x == 0)\n # }\n # }\n ```\n # Avx2\n <ul>\n <li>\n\n [**`_mm_testz_si128`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm_testz_si128)\n\n\n [`PTEST (XMM, XMM)`](https://felixcloutier.com/x86/PTEST.html): Logical Compare\n\n <table style=\"line-height:0.7\">\n <thead><tr>\n <th>Architecture</th><th>Latency (cycles)</th><th>Throughput (CPI)</th>\n </tr></thead><tbody>\n <tr>\n <td><a href=\"https://uops.info/html-instr/PTEST_XMM_XMM.html#SKL\">Skylake</a></td>\n <td>&le;4</td>\n <td>1.00</td>\n </tr>\n <tr>\n <td><a href=\"https://uops.info/html-instr/PTEST_XMM_XMM.html#SKX\">Skylake-AVX512</a></td>\n <td>&le;4</td>\n <td>1.00</td>\n </tr>\n <tr>\n <td><a href=\"https://uops.info/html-instr/PTEST_XMM_XMM.html#CLX\">Cascade Lake</a></td>\n <td>&le;4</td>\n <td>1.00</td>\n </tr>\n </tbody></table>\n\n _<span style=\"font-size:0.8em;float:right\">Performance numbers are measurements from [uops.info](https://uops.info/).</span>_ <div style=\"clear:both\"></div>\n </li>\n </ul>"]
     #[inline(always)]
     fn is_zero(&self) -> bool {
@@ -3959,9 +3964,10 @@ impl Sub for I32x8 {
     }
 }
 impl I32x8 {
-    #[doc(hidden)]
-    pub const fn new_from_const_raw_vector(x: I32x8Internal) -> Self {
-        Self(x)
+    #[doc = " Create a vector from an array.\n\n Unlike the `From` trait function, the `from_array` function is `const`.\n # Example\n ```\n # use vectoreyes::*;\n const MY_EXTREMELY_FUN_VALUE: I32x8 =\n     I32x8::from_array([0, 1, 2, 3, 4, 5, 6, 7]);\n for (i, value) in MY_EXTREMELY_FUN_VALUE.as_array().iter().copied().enumerate() {\n     assert_eq!(i as i32, value);\n }\n ```\n\n # Avx2"]
+    #[inline(always)]
+    pub const fn from_array(array: [i32; 8]) -> I32x8 {
+        I32x8(array)
     }
 }
 impl From<[i32; 8]> for I32x8 {
@@ -4264,7 +4270,7 @@ impl SimdBase<i32> for I32x8 {
     type Signed = I32x8;
     type Unsigned = U32x8;
     const LANES: usize = 8;
-    const ZERO: Self = { Self([0; 8]) };
+    const ZERO: Self = Self::from_array([0; 8]);
     #[doc = "\n # Scalar Equivalent:\n ```\n # use vectoreyes::*;\n # trait SomeTraitForDoc {\n # fn the_doc_function\n # (\n #         &self  ,\n # )  -> bool\n # ;}\n # impl SomeTraitForDoc for I32x8 {\n # fn the_doc_function\n # (\n #         &self  ,\n # )  -> bool\n # {\n self.as_array().iter().all(|x| *x == 0)\n # }\n # }\n ```\n # Avx2\n <ul>\n <li>\n\n [**`_mm256_testz_si256`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm256_testz_si256)\n\n\n [`VPTEST (YMM, YMM)`](https://felixcloutier.com/x86/PTEST.html): Logical Compare\n\n <table style=\"line-height:0.7\">\n <thead><tr>\n <th>Architecture</th><th>Latency (cycles)</th><th>Throughput (CPI)</th>\n </tr></thead><tbody>\n <tr>\n <td><a href=\"https://uops.info/html-instr/VPTEST_YMM_YMM.html#SKL\">Skylake</a></td>\n <td>&le;6</td>\n <td>1.00</td>\n </tr>\n <tr>\n <td><a href=\"https://uops.info/html-instr/VPTEST_YMM_YMM.html#SKX\">Skylake-AVX512</a></td>\n <td>&le;6</td>\n <td>1.00</td>\n </tr>\n <tr>\n <td><a href=\"https://uops.info/html-instr/VPTEST_YMM_YMM.html#CLX\">Cascade Lake</a></td>\n <td>&le;6</td>\n <td>1.00</td>\n </tr>\n </tbody></table>\n\n _<span style=\"font-size:0.8em;float:right\">Performance numbers are measurements from [uops.info](https://uops.info/).</span>_ <div style=\"clear:both\"></div>\n </li>\n </ul>"]
     #[inline(always)]
     fn is_zero(&self) -> bool {
@@ -4625,9 +4631,10 @@ impl Sub for I64x2 {
     }
 }
 impl I64x2 {
-    #[doc(hidden)]
-    pub const fn new_from_const_raw_vector(x: I64x2Internal) -> Self {
-        Self(x)
+    #[doc = " Create a vector from an array.\n\n Unlike the `From` trait function, the `from_array` function is `const`.\n # Example\n ```\n # use vectoreyes::*;\n const MY_EXTREMELY_FUN_VALUE: I64x2 =\n     I64x2::from_array([0, 1]);\n for (i, value) in MY_EXTREMELY_FUN_VALUE.as_array().iter().copied().enumerate() {\n     assert_eq!(i as i64, value);\n }\n ```\n\n # Avx2"]
+    #[inline(always)]
+    pub const fn from_array(array: [i64; 2]) -> I64x2 {
+        I64x2(array)
     }
 }
 impl From<[i64; 2]> for I64x2 {
@@ -4857,7 +4864,7 @@ impl SimdBase<i64> for I64x2 {
     type Signed = I64x2;
     type Unsigned = U64x2;
     const LANES: usize = 2;
-    const ZERO: Self = { Self([0; 2]) };
+    const ZERO: Self = Self::from_array([0; 2]);
     #[doc = "\n # Scalar Equivalent:\n ```\n # use vectoreyes::*;\n # trait SomeTraitForDoc {\n # fn the_doc_function\n # (\n #         &self  ,\n # )  -> bool\n # ;}\n # impl SomeTraitForDoc for I64x2 {\n # fn the_doc_function\n # (\n #         &self  ,\n # )  -> bool\n # {\n self.as_array().iter().all(|x| *x == 0)\n # }\n # }\n ```\n # Avx2\n <ul>\n <li>\n\n [**`_mm_testz_si128`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm_testz_si128)\n\n\n [`PTEST (XMM, XMM)`](https://felixcloutier.com/x86/PTEST.html): Logical Compare\n\n <table style=\"line-height:0.7\">\n <thead><tr>\n <th>Architecture</th><th>Latency (cycles)</th><th>Throughput (CPI)</th>\n </tr></thead><tbody>\n <tr>\n <td><a href=\"https://uops.info/html-instr/PTEST_XMM_XMM.html#SKL\">Skylake</a></td>\n <td>&le;4</td>\n <td>1.00</td>\n </tr>\n <tr>\n <td><a href=\"https://uops.info/html-instr/PTEST_XMM_XMM.html#SKX\">Skylake-AVX512</a></td>\n <td>&le;4</td>\n <td>1.00</td>\n </tr>\n <tr>\n <td><a href=\"https://uops.info/html-instr/PTEST_XMM_XMM.html#CLX\">Cascade Lake</a></td>\n <td>&le;4</td>\n <td>1.00</td>\n </tr>\n </tbody></table>\n\n _<span style=\"font-size:0.8em;float:right\">Performance numbers are measurements from [uops.info](https://uops.info/).</span>_ <div style=\"clear:both\"></div>\n </li>\n </ul>"]
     #[inline(always)]
     fn is_zero(&self) -> bool {
@@ -5109,9 +5116,10 @@ impl Sub for I64x4 {
     }
 }
 impl I64x4 {
-    #[doc(hidden)]
-    pub const fn new_from_const_raw_vector(x: I64x4Internal) -> Self {
-        Self(x)
+    #[doc = " Create a vector from an array.\n\n Unlike the `From` trait function, the `from_array` function is `const`.\n # Example\n ```\n # use vectoreyes::*;\n const MY_EXTREMELY_FUN_VALUE: I64x4 =\n     I64x4::from_array([0, 1, 2, 3]);\n for (i, value) in MY_EXTREMELY_FUN_VALUE.as_array().iter().copied().enumerate() {\n     assert_eq!(i as i64, value);\n }\n ```\n\n # Avx2"]
+    #[inline(always)]
+    pub const fn from_array(array: [i64; 4]) -> I64x4 {
+        I64x4(array)
     }
 }
 impl From<[i64; 4]> for I64x4 {
@@ -5456,7 +5464,7 @@ impl SimdBase<i64> for I64x4 {
     type Signed = I64x4;
     type Unsigned = U64x4;
     const LANES: usize = 4;
-    const ZERO: Self = { Self([0; 4]) };
+    const ZERO: Self = Self::from_array([0; 4]);
     #[doc = "\n # Scalar Equivalent:\n ```\n # use vectoreyes::*;\n # trait SomeTraitForDoc {\n # fn the_doc_function\n # (\n #         &self  ,\n # )  -> bool\n # ;}\n # impl SomeTraitForDoc for I64x4 {\n # fn the_doc_function\n # (\n #         &self  ,\n # )  -> bool\n # {\n self.as_array().iter().all(|x| *x == 0)\n # }\n # }\n ```\n # Avx2\n <ul>\n <li>\n\n [**`_mm256_testz_si256`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm256_testz_si256)\n\n\n [`VPTEST (YMM, YMM)`](https://felixcloutier.com/x86/PTEST.html): Logical Compare\n\n <table style=\"line-height:0.7\">\n <thead><tr>\n <th>Architecture</th><th>Latency (cycles)</th><th>Throughput (CPI)</th>\n </tr></thead><tbody>\n <tr>\n <td><a href=\"https://uops.info/html-instr/VPTEST_YMM_YMM.html#SKL\">Skylake</a></td>\n <td>&le;6</td>\n <td>1.00</td>\n </tr>\n <tr>\n <td><a href=\"https://uops.info/html-instr/VPTEST_YMM_YMM.html#SKX\">Skylake-AVX512</a></td>\n <td>&le;6</td>\n <td>1.00</td>\n </tr>\n <tr>\n <td><a href=\"https://uops.info/html-instr/VPTEST_YMM_YMM.html#CLX\">Cascade Lake</a></td>\n <td>&le;6</td>\n <td>1.00</td>\n </tr>\n </tbody></table>\n\n _<span style=\"font-size:0.8em;float:right\">Performance numbers are measurements from [uops.info](https://uops.info/).</span>_ <div style=\"clear:both\"></div>\n </li>\n </ul>"]
     #[inline(always)]
     fn is_zero(&self) -> bool {
@@ -5824,9 +5832,10 @@ impl Sub for U8x16 {
     }
 }
 impl U8x16 {
-    #[doc(hidden)]
-    pub const fn new_from_const_raw_vector(x: U8x16Internal) -> Self {
-        Self(x)
+    #[doc = " Create a vector from an array.\n\n Unlike the `From` trait function, the `from_array` function is `const`.\n # Example\n ```\n # use vectoreyes::*;\n const MY_EXTREMELY_FUN_VALUE: U8x16 =\n     U8x16::from_array([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]);\n for (i, value) in MY_EXTREMELY_FUN_VALUE.as_array().iter().copied().enumerate() {\n     assert_eq!(i as u8, value);\n }\n ```\n\n # Avx2"]
+    #[inline(always)]
+    pub const fn from_array(array: [u8; 16]) -> U8x16 {
+        U8x16(array)
     }
 }
 impl From<[u8; 16]> for U8x16 {
@@ -6024,7 +6033,7 @@ impl SimdBase<u8> for U8x16 {
     type Signed = I8x16;
     type Unsigned = U8x16;
     const LANES: usize = 16;
-    const ZERO: Self = { Self([0; 16]) };
+    const ZERO: Self = Self::from_array([0; 16]);
     #[doc = "\n # Scalar Equivalent:\n ```\n # use vectoreyes::*;\n # trait SomeTraitForDoc {\n # fn the_doc_function\n # (\n #         &self  ,\n # )  -> bool\n # ;}\n # impl SomeTraitForDoc for U8x16 {\n # fn the_doc_function\n # (\n #         &self  ,\n # )  -> bool\n # {\n self.as_array().iter().all(|x| *x == 0)\n # }\n # }\n ```\n # Avx2\n <ul>\n <li>\n\n [**`_mm_testz_si128`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm_testz_si128)\n\n\n [`PTEST (XMM, XMM)`](https://felixcloutier.com/x86/PTEST.html): Logical Compare\n\n <table style=\"line-height:0.7\">\n <thead><tr>\n <th>Architecture</th><th>Latency (cycles)</th><th>Throughput (CPI)</th>\n </tr></thead><tbody>\n <tr>\n <td><a href=\"https://uops.info/html-instr/PTEST_XMM_XMM.html#SKL\">Skylake</a></td>\n <td>&le;4</td>\n <td>1.00</td>\n </tr>\n <tr>\n <td><a href=\"https://uops.info/html-instr/PTEST_XMM_XMM.html#SKX\">Skylake-AVX512</a></td>\n <td>&le;4</td>\n <td>1.00</td>\n </tr>\n <tr>\n <td><a href=\"https://uops.info/html-instr/PTEST_XMM_XMM.html#CLX\">Cascade Lake</a></td>\n <td>&le;4</td>\n <td>1.00</td>\n </tr>\n </tbody></table>\n\n _<span style=\"font-size:0.8em;float:right\">Performance numbers are measurements from [uops.info](https://uops.info/).</span>_ <div style=\"clear:both\"></div>\n </li>\n </ul>"]
     #[inline(always)]
     fn is_zero(&self) -> bool {
@@ -6636,9 +6645,10 @@ impl Sub for U8x32 {
     }
 }
 impl U8x32 {
-    #[doc(hidden)]
-    pub const fn new_from_const_raw_vector(x: U8x32Internal) -> Self {
-        Self(x)
+    #[doc = " Create a vector from an array.\n\n Unlike the `From` trait function, the `from_array` function is `const`.\n # Example\n ```\n # use vectoreyes::*;\n const MY_EXTREMELY_FUN_VALUE: U8x32 =\n     U8x32::from_array([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31]);\n for (i, value) in MY_EXTREMELY_FUN_VALUE.as_array().iter().copied().enumerate() {\n     assert_eq!(i as u8, value);\n }\n ```\n\n # Avx2"]
+    #[inline(always)]
+    pub const fn from_array(array: [u8; 32]) -> U8x32 {
+        U8x32(array)
     }
 }
 impl From<[u8; 32]> for U8x32 {
@@ -6898,7 +6908,7 @@ impl SimdBase<u8> for U8x32 {
     type Signed = I8x32;
     type Unsigned = U8x32;
     const LANES: usize = 32;
-    const ZERO: Self = { Self([0; 32]) };
+    const ZERO: Self = Self::from_array([0; 32]);
     #[doc = "\n # Scalar Equivalent:\n ```\n # use vectoreyes::*;\n # trait SomeTraitForDoc {\n # fn the_doc_function\n # (\n #         &self  ,\n # )  -> bool\n # ;}\n # impl SomeTraitForDoc for U8x32 {\n # fn the_doc_function\n # (\n #         &self  ,\n # )  -> bool\n # {\n self.as_array().iter().all(|x| *x == 0)\n # }\n # }\n ```\n # Avx2\n <ul>\n <li>\n\n [**`_mm256_testz_si256`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm256_testz_si256)\n\n\n [`VPTEST (YMM, YMM)`](https://felixcloutier.com/x86/PTEST.html): Logical Compare\n\n <table style=\"line-height:0.7\">\n <thead><tr>\n <th>Architecture</th><th>Latency (cycles)</th><th>Throughput (CPI)</th>\n </tr></thead><tbody>\n <tr>\n <td><a href=\"https://uops.info/html-instr/VPTEST_YMM_YMM.html#SKL\">Skylake</a></td>\n <td>&le;6</td>\n <td>1.00</td>\n </tr>\n <tr>\n <td><a href=\"https://uops.info/html-instr/VPTEST_YMM_YMM.html#SKX\">Skylake-AVX512</a></td>\n <td>&le;6</td>\n <td>1.00</td>\n </tr>\n <tr>\n <td><a href=\"https://uops.info/html-instr/VPTEST_YMM_YMM.html#CLX\">Cascade Lake</a></td>\n <td>&le;6</td>\n <td>1.00</td>\n </tr>\n </tbody></table>\n\n _<span style=\"font-size:0.8em;float:right\">Performance numbers are measurements from [uops.info](https://uops.info/).</span>_ <div style=\"clear:both\"></div>\n </li>\n </ul>"]
     #[inline(always)]
     fn is_zero(&self) -> bool {
@@ -7614,9 +7624,10 @@ impl Sub for U16x8 {
     }
 }
 impl U16x8 {
-    #[doc(hidden)]
-    pub const fn new_from_const_raw_vector(x: U16x8Internal) -> Self {
-        Self(x)
+    #[doc = " Create a vector from an array.\n\n Unlike the `From` trait function, the `from_array` function is `const`.\n # Example\n ```\n # use vectoreyes::*;\n const MY_EXTREMELY_FUN_VALUE: U16x8 =\n     U16x8::from_array([0, 1, 2, 3, 4, 5, 6, 7]);\n for (i, value) in MY_EXTREMELY_FUN_VALUE.as_array().iter().copied().enumerate() {\n     assert_eq!(i as u16, value);\n }\n ```\n\n # Avx2"]
+    #[inline(always)]
+    pub const fn from_array(array: [u16; 8]) -> U16x8 {
+        U16x8(array)
     }
 }
 impl From<[u16; 8]> for U16x8 {
@@ -7798,7 +7809,7 @@ impl SimdBase<u16> for U16x8 {
     type Signed = I16x8;
     type Unsigned = U16x8;
     const LANES: usize = 8;
-    const ZERO: Self = { Self([0; 8]) };
+    const ZERO: Self = Self::from_array([0; 8]);
     #[doc = "\n # Scalar Equivalent:\n ```\n # use vectoreyes::*;\n # trait SomeTraitForDoc {\n # fn the_doc_function\n # (\n #         &self  ,\n # )  -> bool\n # ;}\n # impl SomeTraitForDoc for U16x8 {\n # fn the_doc_function\n # (\n #         &self  ,\n # )  -> bool\n # {\n self.as_array().iter().all(|x| *x == 0)\n # }\n # }\n ```\n # Avx2\n <ul>\n <li>\n\n [**`_mm_testz_si128`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm_testz_si128)\n\n\n [`PTEST (XMM, XMM)`](https://felixcloutier.com/x86/PTEST.html): Logical Compare\n\n <table style=\"line-height:0.7\">\n <thead><tr>\n <th>Architecture</th><th>Latency (cycles)</th><th>Throughput (CPI)</th>\n </tr></thead><tbody>\n <tr>\n <td><a href=\"https://uops.info/html-instr/PTEST_XMM_XMM.html#SKL\">Skylake</a></td>\n <td>&le;4</td>\n <td>1.00</td>\n </tr>\n <tr>\n <td><a href=\"https://uops.info/html-instr/PTEST_XMM_XMM.html#SKX\">Skylake-AVX512</a></td>\n <td>&le;4</td>\n <td>1.00</td>\n </tr>\n <tr>\n <td><a href=\"https://uops.info/html-instr/PTEST_XMM_XMM.html#CLX\">Cascade Lake</a></td>\n <td>&le;4</td>\n <td>1.00</td>\n </tr>\n </tbody></table>\n\n _<span style=\"font-size:0.8em;float:right\">Performance numbers are measurements from [uops.info](https://uops.info/).</span>_ <div style=\"clear:both\"></div>\n </li>\n </ul>"]
     #[inline(always)]
     fn is_zero(&self) -> bool {
@@ -8211,9 +8222,10 @@ impl Sub for U16x16 {
     }
 }
 impl U16x16 {
-    #[doc(hidden)]
-    pub const fn new_from_const_raw_vector(x: U16x16Internal) -> Self {
-        Self(x)
+    #[doc = " Create a vector from an array.\n\n Unlike the `From` trait function, the `from_array` function is `const`.\n # Example\n ```\n # use vectoreyes::*;\n const MY_EXTREMELY_FUN_VALUE: U16x16 =\n     U16x16::from_array([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]);\n for (i, value) in MY_EXTREMELY_FUN_VALUE.as_array().iter().copied().enumerate() {\n     assert_eq!(i as u16, value);\n }\n ```\n\n # Avx2"]
+    #[inline(always)]
+    pub const fn from_array(array: [u16; 16]) -> U16x16 {
+        U16x16(array)
     }
 }
 impl From<[u16; 16]> for U16x16 {
@@ -8465,7 +8477,7 @@ impl SimdBase<u16> for U16x16 {
     type Signed = I16x16;
     type Unsigned = U16x16;
     const LANES: usize = 16;
-    const ZERO: Self = { Self([0; 16]) };
+    const ZERO: Self = Self::from_array([0; 16]);
     #[doc = "\n # Scalar Equivalent:\n ```\n # use vectoreyes::*;\n # trait SomeTraitForDoc {\n # fn the_doc_function\n # (\n #         &self  ,\n # )  -> bool\n # ;}\n # impl SomeTraitForDoc for U16x16 {\n # fn the_doc_function\n # (\n #         &self  ,\n # )  -> bool\n # {\n self.as_array().iter().all(|x| *x == 0)\n # }\n # }\n ```\n # Avx2\n <ul>\n <li>\n\n [**`_mm256_testz_si256`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm256_testz_si256)\n\n\n [`VPTEST (YMM, YMM)`](https://felixcloutier.com/x86/PTEST.html): Logical Compare\n\n <table style=\"line-height:0.7\">\n <thead><tr>\n <th>Architecture</th><th>Latency (cycles)</th><th>Throughput (CPI)</th>\n </tr></thead><tbody>\n <tr>\n <td><a href=\"https://uops.info/html-instr/VPTEST_YMM_YMM.html#SKL\">Skylake</a></td>\n <td>&le;6</td>\n <td>1.00</td>\n </tr>\n <tr>\n <td><a href=\"https://uops.info/html-instr/VPTEST_YMM_YMM.html#SKX\">Skylake-AVX512</a></td>\n <td>&le;6</td>\n <td>1.00</td>\n </tr>\n <tr>\n <td><a href=\"https://uops.info/html-instr/VPTEST_YMM_YMM.html#CLX\">Cascade Lake</a></td>\n <td>&le;6</td>\n <td>1.00</td>\n </tr>\n </tbody></table>\n\n _<span style=\"font-size:0.8em;float:right\">Performance numbers are measurements from [uops.info](https://uops.info/).</span>_ <div style=\"clear:both\"></div>\n </li>\n </ul>"]
     #[inline(always)]
     fn is_zero(&self) -> bool {
@@ -8902,9 +8914,10 @@ impl Sub for U32x4 {
     }
 }
 impl U32x4 {
-    #[doc(hidden)]
-    pub const fn new_from_const_raw_vector(x: U32x4Internal) -> Self {
-        Self(x)
+    #[doc = " Create a vector from an array.\n\n Unlike the `From` trait function, the `from_array` function is `const`.\n # Example\n ```\n # use vectoreyes::*;\n const MY_EXTREMELY_FUN_VALUE: U32x4 =\n     U32x4::from_array([0, 1, 2, 3]);\n for (i, value) in MY_EXTREMELY_FUN_VALUE.as_array().iter().copied().enumerate() {\n     assert_eq!(i as u32, value);\n }\n ```\n\n # Avx2"]
+    #[inline(always)]
+    pub const fn from_array(array: [u32; 4]) -> U32x4 {
+        U32x4(array)
     }
 }
 impl From<[u32; 4]> for U32x4 {
@@ -9195,7 +9208,7 @@ impl SimdBase<u32> for U32x4 {
     type Signed = I32x4;
     type Unsigned = U32x4;
     const LANES: usize = 4;
-    const ZERO: Self = { Self([0; 4]) };
+    const ZERO: Self = Self::from_array([0; 4]);
     #[doc = "\n # Scalar Equivalent:\n ```\n # use vectoreyes::*;\n # trait SomeTraitForDoc {\n # fn the_doc_function\n # (\n #         &self  ,\n # )  -> bool\n # ;}\n # impl SomeTraitForDoc for U32x4 {\n # fn the_doc_function\n # (\n #         &self  ,\n # )  -> bool\n # {\n self.as_array().iter().all(|x| *x == 0)\n # }\n # }\n ```\n # Avx2\n <ul>\n <li>\n\n [**`_mm_testz_si128`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm_testz_si128)\n\n\n [`PTEST (XMM, XMM)`](https://felixcloutier.com/x86/PTEST.html): Logical Compare\n\n <table style=\"line-height:0.7\">\n <thead><tr>\n <th>Architecture</th><th>Latency (cycles)</th><th>Throughput (CPI)</th>\n </tr></thead><tbody>\n <tr>\n <td><a href=\"https://uops.info/html-instr/PTEST_XMM_XMM.html#SKL\">Skylake</a></td>\n <td>&le;4</td>\n <td>1.00</td>\n </tr>\n <tr>\n <td><a href=\"https://uops.info/html-instr/PTEST_XMM_XMM.html#SKX\">Skylake-AVX512</a></td>\n <td>&le;4</td>\n <td>1.00</td>\n </tr>\n <tr>\n <td><a href=\"https://uops.info/html-instr/PTEST_XMM_XMM.html#CLX\">Cascade Lake</a></td>\n <td>&le;4</td>\n <td>1.00</td>\n </tr>\n </tbody></table>\n\n _<span style=\"font-size:0.8em;float:right\">Performance numbers are measurements from [uops.info](https://uops.info/).</span>_ <div style=\"clear:both\"></div>\n </li>\n </ul>"]
     #[inline(always)]
     fn is_zero(&self) -> bool {
@@ -9512,9 +9525,10 @@ impl Sub for U32x8 {
     }
 }
 impl U32x8 {
-    #[doc(hidden)]
-    pub const fn new_from_const_raw_vector(x: U32x8Internal) -> Self {
-        Self(x)
+    #[doc = " Create a vector from an array.\n\n Unlike the `From` trait function, the `from_array` function is `const`.\n # Example\n ```\n # use vectoreyes::*;\n const MY_EXTREMELY_FUN_VALUE: U32x8 =\n     U32x8::from_array([0, 1, 2, 3, 4, 5, 6, 7]);\n for (i, value) in MY_EXTREMELY_FUN_VALUE.as_array().iter().copied().enumerate() {\n     assert_eq!(i as u32, value);\n }\n ```\n\n # Avx2"]
+    #[inline(always)]
+    pub const fn from_array(array: [u32; 8]) -> U32x8 {
+        U32x8(array)
     }
 }
 impl From<[u32; 8]> for U32x8 {
@@ -9805,7 +9819,7 @@ impl SimdBase<u32> for U32x8 {
     type Signed = I32x8;
     type Unsigned = U32x8;
     const LANES: usize = 8;
-    const ZERO: Self = { Self([0; 8]) };
+    const ZERO: Self = Self::from_array([0; 8]);
     #[doc = "\n # Scalar Equivalent:\n ```\n # use vectoreyes::*;\n # trait SomeTraitForDoc {\n # fn the_doc_function\n # (\n #         &self  ,\n # )  -> bool\n # ;}\n # impl SomeTraitForDoc for U32x8 {\n # fn the_doc_function\n # (\n #         &self  ,\n # )  -> bool\n # {\n self.as_array().iter().all(|x| *x == 0)\n # }\n # }\n ```\n # Avx2\n <ul>\n <li>\n\n [**`_mm256_testz_si256`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm256_testz_si256)\n\n\n [`VPTEST (YMM, YMM)`](https://felixcloutier.com/x86/PTEST.html): Logical Compare\n\n <table style=\"line-height:0.7\">\n <thead><tr>\n <th>Architecture</th><th>Latency (cycles)</th><th>Throughput (CPI)</th>\n </tr></thead><tbody>\n <tr>\n <td><a href=\"https://uops.info/html-instr/VPTEST_YMM_YMM.html#SKL\">Skylake</a></td>\n <td>&le;6</td>\n <td>1.00</td>\n </tr>\n <tr>\n <td><a href=\"https://uops.info/html-instr/VPTEST_YMM_YMM.html#SKX\">Skylake-AVX512</a></td>\n <td>&le;6</td>\n <td>1.00</td>\n </tr>\n <tr>\n <td><a href=\"https://uops.info/html-instr/VPTEST_YMM_YMM.html#CLX\">Cascade Lake</a></td>\n <td>&le;6</td>\n <td>1.00</td>\n </tr>\n </tbody></table>\n\n _<span style=\"font-size:0.8em;float:right\">Performance numbers are measurements from [uops.info](https://uops.info/).</span>_ <div style=\"clear:both\"></div>\n </li>\n </ul>"]
     #[inline(always)]
     fn is_zero(&self) -> bool {
@@ -10165,9 +10179,10 @@ impl Sub for U64x2 {
     }
 }
 impl U64x2 {
-    #[doc(hidden)]
-    pub const fn new_from_const_raw_vector(x: U64x2Internal) -> Self {
-        Self(x)
+    #[doc = " Create a vector from an array.\n\n Unlike the `From` trait function, the `from_array` function is `const`.\n # Example\n ```\n # use vectoreyes::*;\n const MY_EXTREMELY_FUN_VALUE: U64x2 =\n     U64x2::from_array([0, 1]);\n for (i, value) in MY_EXTREMELY_FUN_VALUE.as_array().iter().copied().enumerate() {\n     assert_eq!(i as u64, value);\n }\n ```\n\n # Avx2"]
+    #[inline(always)]
+    pub const fn from_array(array: [u64; 2]) -> U64x2 {
+        U64x2(array)
     }
 }
 impl From<[u64; 2]> for U64x2 {
@@ -10385,7 +10400,7 @@ impl SimdBase<u64> for U64x2 {
     type Signed = I64x2;
     type Unsigned = U64x2;
     const LANES: usize = 2;
-    const ZERO: Self = { Self([0; 2]) };
+    const ZERO: Self = Self::from_array([0; 2]);
     #[doc = "\n # Scalar Equivalent:\n ```\n # use vectoreyes::*;\n # trait SomeTraitForDoc {\n # fn the_doc_function\n # (\n #         &self  ,\n # )  -> bool\n # ;}\n # impl SomeTraitForDoc for U64x2 {\n # fn the_doc_function\n # (\n #         &self  ,\n # )  -> bool\n # {\n self.as_array().iter().all(|x| *x == 0)\n # }\n # }\n ```\n # Avx2\n <ul>\n <li>\n\n [**`_mm_testz_si128`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm_testz_si128)\n\n\n [`PTEST (XMM, XMM)`](https://felixcloutier.com/x86/PTEST.html): Logical Compare\n\n <table style=\"line-height:0.7\">\n <thead><tr>\n <th>Architecture</th><th>Latency (cycles)</th><th>Throughput (CPI)</th>\n </tr></thead><tbody>\n <tr>\n <td><a href=\"https://uops.info/html-instr/PTEST_XMM_XMM.html#SKL\">Skylake</a></td>\n <td>&le;4</td>\n <td>1.00</td>\n </tr>\n <tr>\n <td><a href=\"https://uops.info/html-instr/PTEST_XMM_XMM.html#SKX\">Skylake-AVX512</a></td>\n <td>&le;4</td>\n <td>1.00</td>\n </tr>\n <tr>\n <td><a href=\"https://uops.info/html-instr/PTEST_XMM_XMM.html#CLX\">Cascade Lake</a></td>\n <td>&le;4</td>\n <td>1.00</td>\n </tr>\n </tbody></table>\n\n _<span style=\"font-size:0.8em;float:right\">Performance numbers are measurements from [uops.info](https://uops.info/).</span>_ <div style=\"clear:both\"></div>\n </li>\n </ul>"]
     #[inline(always)]
     fn is_zero(&self) -> bool {
@@ -10636,9 +10651,10 @@ impl Sub for U64x4 {
     }
 }
 impl U64x4 {
-    #[doc(hidden)]
-    pub const fn new_from_const_raw_vector(x: U64x4Internal) -> Self {
-        Self(x)
+    #[doc = " Create a vector from an array.\n\n Unlike the `From` trait function, the `from_array` function is `const`.\n # Example\n ```\n # use vectoreyes::*;\n const MY_EXTREMELY_FUN_VALUE: U64x4 =\n     U64x4::from_array([0, 1, 2, 3]);\n for (i, value) in MY_EXTREMELY_FUN_VALUE.as_array().iter().copied().enumerate() {\n     assert_eq!(i as u64, value);\n }\n ```\n\n # Avx2"]
+    #[inline(always)]
+    pub const fn from_array(array: [u64; 4]) -> U64x4 {
+        U64x4(array)
     }
 }
 impl From<[u64; 4]> for U64x4 {
@@ -10971,7 +10987,7 @@ impl SimdBase<u64> for U64x4 {
     type Signed = I64x4;
     type Unsigned = U64x4;
     const LANES: usize = 4;
-    const ZERO: Self = { Self([0; 4]) };
+    const ZERO: Self = Self::from_array([0; 4]);
     #[doc = "\n # Scalar Equivalent:\n ```\n # use vectoreyes::*;\n # trait SomeTraitForDoc {\n # fn the_doc_function\n # (\n #         &self  ,\n # )  -> bool\n # ;}\n # impl SomeTraitForDoc for U64x4 {\n # fn the_doc_function\n # (\n #         &self  ,\n # )  -> bool\n # {\n self.as_array().iter().all(|x| *x == 0)\n # }\n # }\n ```\n # Avx2\n <ul>\n <li>\n\n [**`_mm256_testz_si256`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm256_testz_si256)\n\n\n [`VPTEST (YMM, YMM)`](https://felixcloutier.com/x86/PTEST.html): Logical Compare\n\n <table style=\"line-height:0.7\">\n <thead><tr>\n <th>Architecture</th><th>Latency (cycles)</th><th>Throughput (CPI)</th>\n </tr></thead><tbody>\n <tr>\n <td><a href=\"https://uops.info/html-instr/VPTEST_YMM_YMM.html#SKL\">Skylake</a></td>\n <td>&le;6</td>\n <td>1.00</td>\n </tr>\n <tr>\n <td><a href=\"https://uops.info/html-instr/VPTEST_YMM_YMM.html#SKX\">Skylake-AVX512</a></td>\n <td>&le;6</td>\n <td>1.00</td>\n </tr>\n <tr>\n <td><a href=\"https://uops.info/html-instr/VPTEST_YMM_YMM.html#CLX\">Cascade Lake</a></td>\n <td>&le;6</td>\n <td>1.00</td>\n </tr>\n </tbody></table>\n\n _<span style=\"font-size:0.8em;float:right\">Performance numbers are measurements from [uops.info](https://uops.info/).</span>_ <div style=\"clear:both\"></div>\n </li>\n </ul>"]
     #[inline(always)]
     fn is_zero(&self) -> bool {

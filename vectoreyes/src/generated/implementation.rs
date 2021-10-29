@@ -124,14 +124,12 @@ impl Sub for I8x16 {
     }
 }
 impl I8x16 {
-    #[doc(hidden)]
-    pub const fn new_from_const_raw_vector(x: I8x16Internal) -> Self {
-        Self(x)
+    #[doc = " Create a vector from an array.\n\n Unlike the `From` trait function, the `from_array` function is `const`.\n # Example\n ```\n # use vectoreyes::*;\n const MY_EXTREMELY_FUN_VALUE: I8x16 =\n     I8x16::from_array([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]);\n for (i, value) in MY_EXTREMELY_FUN_VALUE.as_array().iter().copied().enumerate() {\n     assert_eq!(i as i8, value);\n }\n ```\n\n # Avx2"]
+    #[inline(always)]
+    pub const fn from_array(array: [i8; 16]) -> I8x16 {
+        select_impl_block! { scalar { I8x16(array) } avx2 { I8x16(unsafe { std::mem::transmute(array) }) } }
     }
 }
-#[macro_export]
-#[doc = "Create a constant vector\n# Example\n```\n# use vectoreyes::*;\nconst MY_EXTREMELY_FUN_VALUE: I8x16 =\n    const_i8x16!([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]);\nfor (i, value) in MY_EXTREMELY_FUN_VALUE.as_array().iter().copied().enumerate() {\n    assert_eq!(i as i8, value);\n}\n```"]
-macro_rules! const_i8x16 { ($value:expr) => { { const THE_VALUE: [i8; 16] = $value; const THE_RESULT: $crate::I8x16 = $crate::I8x16::new_from_const_raw_vector({ #[cfg(not(all(target_arch="x86_64", all(target_feature = "aes", target_feature = "avx", target_feature = "avx2", target_feature = "pclmulqdq", target_feature = "sse2", target_feature = "sse4.1", target_feature = "sse4.2"))))] { THE_VALUE } #[cfg(all(target_arch="x86_64", all(target_feature = "aes", target_feature = "avx", target_feature = "avx2", target_feature = "pclmulqdq", target_feature = "sse2", target_feature = "sse4.1", target_feature = "sse4.2")))] { unsafe { ::std::mem::transmute::< [i8; 16], ::std::arch::x86_64::__m128i >(THE_VALUE) } } }); THE_RESULT } }; }
 impl From<[i8; 16]> for I8x16 {
     #[doc = "\n # Avx2\n <ul>\n <li>\n\n [**`_mm_loadu_si128`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm_loadu_si128)\n\n\n [`MOVDQU (XMM, M128)`](https://felixcloutier.com/x86/MOVDQU:VMOVDQU8:VMOVDQU16:VMOVDQU32:VMOVDQU64.html): Move Unaligned Packed Integer Values\n\n <table style=\"line-height:0.7\">\n <thead><tr>\n <th>Architecture</th><th>Latency (cycles)</th><th>Throughput (CPI)</th>\n </tr></thead><tbody>\n <tr>\n <td><a href=\"https://uops.info/html-instr/MOVDQU_XMM_M128.html#SKL\">Skylake</a></td>\n <td>[&le;4;&le;7]</td>\n <td>0.50</td>\n </tr>\n <tr>\n <td><a href=\"https://uops.info/html-instr/MOVDQU_XMM_M128.html#SKX\">Skylake-AVX512</a></td>\n <td>[&le;4;&le;7]</td>\n <td>0.50</td>\n </tr>\n <tr>\n <td><a href=\"https://uops.info/html-instr/MOVDQU_XMM_M128.html#CLX\">Cascade Lake</a></td>\n <td>[&le;4;&le;7]</td>\n <td>0.50</td>\n </tr>\n </tbody></table>\n\n _<span style=\"font-size:0.8em;float:right\">Performance numbers are measurements from [uops.info](https://uops.info/).</span>_ <div style=\"clear:both\"></div>\n </li>\n </ul>"]
     #[inline(always)]
@@ -279,7 +277,7 @@ impl SimdBase<i8> for I8x16 {
     type Signed = I8x16;
     type Unsigned = U8x16;
     const LANES: usize = 16;
-    const ZERO: Self = { const_i8x16!([0; 16]) };
+    const ZERO: Self = Self::from_array([0; 16]);
     #[doc = "\n # Scalar Equivalent:\n ```\n # use vectoreyes::*;\n # trait SomeTraitForDoc {\n # fn the_doc_function\n # (\n #         &self  ,\n # )  -> bool\n # ;}\n # impl SomeTraitForDoc for I8x16 {\n # fn the_doc_function\n # (\n #         &self  ,\n # )  -> bool\n # {\n self.as_array().iter().all(|x| *x == 0)\n # }\n # }\n ```\n # Avx2\n <ul>\n <li>\n\n [**`_mm_testz_si128`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm_testz_si128)\n\n\n [`PTEST (XMM, XMM)`](https://felixcloutier.com/x86/PTEST.html): Logical Compare\n\n <table style=\"line-height:0.7\">\n <thead><tr>\n <th>Architecture</th><th>Latency (cycles)</th><th>Throughput (CPI)</th>\n </tr></thead><tbody>\n <tr>\n <td><a href=\"https://uops.info/html-instr/PTEST_XMM_XMM.html#SKL\">Skylake</a></td>\n <td>&le;4</td>\n <td>1.00</td>\n </tr>\n <tr>\n <td><a href=\"https://uops.info/html-instr/PTEST_XMM_XMM.html#SKX\">Skylake-AVX512</a></td>\n <td>&le;4</td>\n <td>1.00</td>\n </tr>\n <tr>\n <td><a href=\"https://uops.info/html-instr/PTEST_XMM_XMM.html#CLX\">Cascade Lake</a></td>\n <td>&le;4</td>\n <td>1.00</td>\n </tr>\n </tbody></table>\n\n _<span style=\"font-size:0.8em;float:right\">Performance numbers are measurements from [uops.info](https://uops.info/).</span>_ <div style=\"clear:both\"></div>\n </li>\n </ul>"]
     #[inline(always)]
     fn is_zero(&self) -> bool {
@@ -469,14 +467,12 @@ impl Sub for I8x32 {
     }
 }
 impl I8x32 {
-    #[doc(hidden)]
-    pub const fn new_from_const_raw_vector(x: I8x32Internal) -> Self {
-        Self(x)
+    #[doc = " Create a vector from an array.\n\n Unlike the `From` trait function, the `from_array` function is `const`.\n # Example\n ```\n # use vectoreyes::*;\n const MY_EXTREMELY_FUN_VALUE: I8x32 =\n     I8x32::from_array([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31]);\n for (i, value) in MY_EXTREMELY_FUN_VALUE.as_array().iter().copied().enumerate() {\n     assert_eq!(i as i8, value);\n }\n ```\n\n # Avx2"]
+    #[inline(always)]
+    pub const fn from_array(array: [i8; 32]) -> I8x32 {
+        select_impl_block! { scalar { I8x32(array) } avx2 { I8x32(unsafe { std::mem::transmute(array) }) } }
     }
 }
-#[macro_export]
-#[doc = "Create a constant vector\n# Example\n```\n# use vectoreyes::*;\nconst MY_EXTREMELY_FUN_VALUE: I8x32 =\n    const_i8x32!([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31]);\nfor (i, value) in MY_EXTREMELY_FUN_VALUE.as_array().iter().copied().enumerate() {\n    assert_eq!(i as i8, value);\n}\n```"]
-macro_rules! const_i8x32 { ($value:expr) => { { const THE_VALUE: [i8; 32] = $value; const THE_RESULT: $crate::I8x32 = $crate::I8x32::new_from_const_raw_vector({ #[cfg(not(all(target_arch="x86_64", all(target_feature = "aes", target_feature = "avx", target_feature = "avx2", target_feature = "pclmulqdq", target_feature = "sse2", target_feature = "sse4.1", target_feature = "sse4.2"))))] { THE_VALUE } #[cfg(all(target_arch="x86_64", all(target_feature = "aes", target_feature = "avx", target_feature = "avx2", target_feature = "pclmulqdq", target_feature = "sse2", target_feature = "sse4.1", target_feature = "sse4.2")))] { unsafe { ::std::mem::transmute::< [i8; 32], ::std::arch::x86_64::__m256i >(THE_VALUE) } } }); THE_RESULT } }; }
 impl From<[i8; 32]> for I8x32 {
     #[doc = "\n # Avx2\n <ul>\n <li>\n\n [**`_mm256_loadu_si256`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm256_loadu_si256)\n\n\n [`VMOVDQU (YMM, M256)`](https://felixcloutier.com/x86/MOVDQU:VMOVDQU8:VMOVDQU16:VMOVDQU32:VMOVDQU64.html): Move Unaligned Packed Integer Values\n\n <table style=\"line-height:0.7\">\n <thead><tr>\n <th>Architecture</th><th>Latency (cycles)</th><th>Throughput (CPI)</th>\n </tr></thead><tbody>\n <tr>\n <td><a href=\"https://uops.info/html-instr/VMOVDQU_YMM_M256.html#SKL\">Skylake</a></td>\n <td>[&le;5;&le;8]</td>\n <td>0.50</td>\n </tr>\n <tr>\n <td><a href=\"https://uops.info/html-instr/VMOVDQU_YMM_M256.html#SKX\">Skylake-AVX512</a></td>\n <td>[&le;5;&le;8]</td>\n <td>0.50</td>\n </tr>\n <tr>\n <td><a href=\"https://uops.info/html-instr/VMOVDQU_YMM_M256.html#CLX\">Cascade Lake</a></td>\n <td>[&le;5;&le;8]</td>\n <td>0.50</td>\n </tr>\n </tbody></table>\n\n _<span style=\"font-size:0.8em;float:right\">Performance numbers are measurements from [uops.info](https://uops.info/).</span>_ <div style=\"clear:both\"></div>\n </li>\n </ul>"]
     #[inline(always)]
@@ -645,7 +641,7 @@ impl SimdBase<i8> for I8x32 {
     type Signed = I8x32;
     type Unsigned = U8x32;
     const LANES: usize = 32;
-    const ZERO: Self = { const_i8x32!([0; 32]) };
+    const ZERO: Self = Self::from_array([0; 32]);
     #[doc = "\n # Scalar Equivalent:\n ```\n # use vectoreyes::*;\n # trait SomeTraitForDoc {\n # fn the_doc_function\n # (\n #         &self  ,\n # )  -> bool\n # ;}\n # impl SomeTraitForDoc for I8x32 {\n # fn the_doc_function\n # (\n #         &self  ,\n # )  -> bool\n # {\n self.as_array().iter().all(|x| *x == 0)\n # }\n # }\n ```\n # Avx2\n <ul>\n <li>\n\n [**`_mm256_testz_si256`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm256_testz_si256)\n\n\n [`VPTEST (YMM, YMM)`](https://felixcloutier.com/x86/PTEST.html): Logical Compare\n\n <table style=\"line-height:0.7\">\n <thead><tr>\n <th>Architecture</th><th>Latency (cycles)</th><th>Throughput (CPI)</th>\n </tr></thead><tbody>\n <tr>\n <td><a href=\"https://uops.info/html-instr/VPTEST_YMM_YMM.html#SKL\">Skylake</a></td>\n <td>&le;6</td>\n <td>1.00</td>\n </tr>\n <tr>\n <td><a href=\"https://uops.info/html-instr/VPTEST_YMM_YMM.html#SKX\">Skylake-AVX512</a></td>\n <td>&le;6</td>\n <td>1.00</td>\n </tr>\n <tr>\n <td><a href=\"https://uops.info/html-instr/VPTEST_YMM_YMM.html#CLX\">Cascade Lake</a></td>\n <td>&le;6</td>\n <td>1.00</td>\n </tr>\n </tbody></table>\n\n _<span style=\"font-size:0.8em;float:right\">Performance numbers are measurements from [uops.info](https://uops.info/).</span>_ <div style=\"clear:both\"></div>\n </li>\n </ul>"]
     #[inline(always)]
     fn is_zero(&self) -> bool {
@@ -837,14 +833,12 @@ impl Sub for I16x8 {
     }
 }
 impl I16x8 {
-    #[doc(hidden)]
-    pub const fn new_from_const_raw_vector(x: I16x8Internal) -> Self {
-        Self(x)
+    #[doc = " Create a vector from an array.\n\n Unlike the `From` trait function, the `from_array` function is `const`.\n # Example\n ```\n # use vectoreyes::*;\n const MY_EXTREMELY_FUN_VALUE: I16x8 =\n     I16x8::from_array([0, 1, 2, 3, 4, 5, 6, 7]);\n for (i, value) in MY_EXTREMELY_FUN_VALUE.as_array().iter().copied().enumerate() {\n     assert_eq!(i as i16, value);\n }\n ```\n\n # Avx2"]
+    #[inline(always)]
+    pub const fn from_array(array: [i16; 8]) -> I16x8 {
+        select_impl_block! { scalar { I16x8(array) } avx2 { I16x8(unsafe { std::mem::transmute(array) }) } }
     }
 }
-#[macro_export]
-#[doc = "Create a constant vector\n# Example\n```\n# use vectoreyes::*;\nconst MY_EXTREMELY_FUN_VALUE: I16x8 =\n    const_i16x8!([0, 1, 2, 3, 4, 5, 6, 7]);\nfor (i, value) in MY_EXTREMELY_FUN_VALUE.as_array().iter().copied().enumerate() {\n    assert_eq!(i as i16, value);\n}\n```"]
-macro_rules! const_i16x8 { ($value:expr) => { { const THE_VALUE: [i16; 8] = $value; const THE_RESULT: $crate::I16x8 = $crate::I16x8::new_from_const_raw_vector({ #[cfg(not(all(target_arch="x86_64", all(target_feature = "aes", target_feature = "avx", target_feature = "avx2", target_feature = "pclmulqdq", target_feature = "sse2", target_feature = "sse4.1", target_feature = "sse4.2"))))] { THE_VALUE } #[cfg(all(target_arch="x86_64", all(target_feature = "aes", target_feature = "avx", target_feature = "avx2", target_feature = "pclmulqdq", target_feature = "sse2", target_feature = "sse4.1", target_feature = "sse4.2")))] { unsafe { ::std::mem::transmute::< [i16; 8], ::std::arch::x86_64::__m128i >(THE_VALUE) } } }); THE_RESULT } }; }
 impl From<[i16; 8]> for I16x8 {
     #[doc = "\n # Avx2\n <ul>\n <li>\n\n [**`_mm_loadu_si128`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm_loadu_si128)\n\n\n [`MOVDQU (XMM, M128)`](https://felixcloutier.com/x86/MOVDQU:VMOVDQU8:VMOVDQU16:VMOVDQU32:VMOVDQU64.html): Move Unaligned Packed Integer Values\n\n <table style=\"line-height:0.7\">\n <thead><tr>\n <th>Architecture</th><th>Latency (cycles)</th><th>Throughput (CPI)</th>\n </tr></thead><tbody>\n <tr>\n <td><a href=\"https://uops.info/html-instr/MOVDQU_XMM_M128.html#SKL\">Skylake</a></td>\n <td>[&le;4;&le;7]</td>\n <td>0.50</td>\n </tr>\n <tr>\n <td><a href=\"https://uops.info/html-instr/MOVDQU_XMM_M128.html#SKX\">Skylake-AVX512</a></td>\n <td>[&le;4;&le;7]</td>\n <td>0.50</td>\n </tr>\n <tr>\n <td><a href=\"https://uops.info/html-instr/MOVDQU_XMM_M128.html#CLX\">Cascade Lake</a></td>\n <td>[&le;4;&le;7]</td>\n <td>0.50</td>\n </tr>\n </tbody></table>\n\n _<span style=\"font-size:0.8em;float:right\">Performance numbers are measurements from [uops.info](https://uops.info/).</span>_ <div style=\"clear:both\"></div>\n </li>\n </ul>"]
     #[inline(always)]
@@ -992,7 +986,7 @@ impl SimdBase<i16> for I16x8 {
     type Signed = I16x8;
     type Unsigned = U16x8;
     const LANES: usize = 8;
-    const ZERO: Self = { const_i16x8!([0; 8]) };
+    const ZERO: Self = Self::from_array([0; 8]);
     #[doc = "\n # Scalar Equivalent:\n ```\n # use vectoreyes::*;\n # trait SomeTraitForDoc {\n # fn the_doc_function\n # (\n #         &self  ,\n # )  -> bool\n # ;}\n # impl SomeTraitForDoc for I16x8 {\n # fn the_doc_function\n # (\n #         &self  ,\n # )  -> bool\n # {\n self.as_array().iter().all(|x| *x == 0)\n # }\n # }\n ```\n # Avx2\n <ul>\n <li>\n\n [**`_mm_testz_si128`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm_testz_si128)\n\n\n [`PTEST (XMM, XMM)`](https://felixcloutier.com/x86/PTEST.html): Logical Compare\n\n <table style=\"line-height:0.7\">\n <thead><tr>\n <th>Architecture</th><th>Latency (cycles)</th><th>Throughput (CPI)</th>\n </tr></thead><tbody>\n <tr>\n <td><a href=\"https://uops.info/html-instr/PTEST_XMM_XMM.html#SKL\">Skylake</a></td>\n <td>&le;4</td>\n <td>1.00</td>\n </tr>\n <tr>\n <td><a href=\"https://uops.info/html-instr/PTEST_XMM_XMM.html#SKX\">Skylake-AVX512</a></td>\n <td>&le;4</td>\n <td>1.00</td>\n </tr>\n <tr>\n <td><a href=\"https://uops.info/html-instr/PTEST_XMM_XMM.html#CLX\">Cascade Lake</a></td>\n <td>&le;4</td>\n <td>1.00</td>\n </tr>\n </tbody></table>\n\n _<span style=\"font-size:0.8em;float:right\">Performance numbers are measurements from [uops.info](https://uops.info/).</span>_ <div style=\"clear:both\"></div>\n </li>\n </ul>"]
     #[inline(always)]
     fn is_zero(&self) -> bool {
@@ -1184,14 +1178,12 @@ impl Sub for I16x16 {
     }
 }
 impl I16x16 {
-    #[doc(hidden)]
-    pub const fn new_from_const_raw_vector(x: I16x16Internal) -> Self {
-        Self(x)
+    #[doc = " Create a vector from an array.\n\n Unlike the `From` trait function, the `from_array` function is `const`.\n # Example\n ```\n # use vectoreyes::*;\n const MY_EXTREMELY_FUN_VALUE: I16x16 =\n     I16x16::from_array([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]);\n for (i, value) in MY_EXTREMELY_FUN_VALUE.as_array().iter().copied().enumerate() {\n     assert_eq!(i as i16, value);\n }\n ```\n\n # Avx2"]
+    #[inline(always)]
+    pub const fn from_array(array: [i16; 16]) -> I16x16 {
+        select_impl_block! { scalar { I16x16(array) } avx2 { I16x16(unsafe { std::mem::transmute(array) }) } }
     }
 }
-#[macro_export]
-#[doc = "Create a constant vector\n# Example\n```\n# use vectoreyes::*;\nconst MY_EXTREMELY_FUN_VALUE: I16x16 =\n    const_i16x16!([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]);\nfor (i, value) in MY_EXTREMELY_FUN_VALUE.as_array().iter().copied().enumerate() {\n    assert_eq!(i as i16, value);\n}\n```"]
-macro_rules! const_i16x16 { ($value:expr) => { { const THE_VALUE: [i16; 16] = $value; const THE_RESULT: $crate::I16x16 = $crate::I16x16::new_from_const_raw_vector({ #[cfg(not(all(target_arch="x86_64", all(target_feature = "aes", target_feature = "avx", target_feature = "avx2", target_feature = "pclmulqdq", target_feature = "sse2", target_feature = "sse4.1", target_feature = "sse4.2"))))] { THE_VALUE } #[cfg(all(target_arch="x86_64", all(target_feature = "aes", target_feature = "avx", target_feature = "avx2", target_feature = "pclmulqdq", target_feature = "sse2", target_feature = "sse4.1", target_feature = "sse4.2")))] { unsafe { ::std::mem::transmute::< [i16; 16], ::std::arch::x86_64::__m256i >(THE_VALUE) } } }); THE_RESULT } }; }
 impl From<[i16; 16]> for I16x16 {
     #[doc = "\n # Avx2\n <ul>\n <li>\n\n [**`_mm256_loadu_si256`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm256_loadu_si256)\n\n\n [`VMOVDQU (YMM, M256)`](https://felixcloutier.com/x86/MOVDQU:VMOVDQU8:VMOVDQU16:VMOVDQU32:VMOVDQU64.html): Move Unaligned Packed Integer Values\n\n <table style=\"line-height:0.7\">\n <thead><tr>\n <th>Architecture</th><th>Latency (cycles)</th><th>Throughput (CPI)</th>\n </tr></thead><tbody>\n <tr>\n <td><a href=\"https://uops.info/html-instr/VMOVDQU_YMM_M256.html#SKL\">Skylake</a></td>\n <td>[&le;5;&le;8]</td>\n <td>0.50</td>\n </tr>\n <tr>\n <td><a href=\"https://uops.info/html-instr/VMOVDQU_YMM_M256.html#SKX\">Skylake-AVX512</a></td>\n <td>[&le;5;&le;8]</td>\n <td>0.50</td>\n </tr>\n <tr>\n <td><a href=\"https://uops.info/html-instr/VMOVDQU_YMM_M256.html#CLX\">Cascade Lake</a></td>\n <td>[&le;5;&le;8]</td>\n <td>0.50</td>\n </tr>\n </tbody></table>\n\n _<span style=\"font-size:0.8em;float:right\">Performance numbers are measurements from [uops.info](https://uops.info/).</span>_ <div style=\"clear:both\"></div>\n </li>\n </ul>"]
     #[inline(always)]
@@ -1367,7 +1359,7 @@ impl SimdBase<i16> for I16x16 {
     type Signed = I16x16;
     type Unsigned = U16x16;
     const LANES: usize = 16;
-    const ZERO: Self = { const_i16x16!([0; 16]) };
+    const ZERO: Self = Self::from_array([0; 16]);
     #[doc = "\n # Scalar Equivalent:\n ```\n # use vectoreyes::*;\n # trait SomeTraitForDoc {\n # fn the_doc_function\n # (\n #         &self  ,\n # )  -> bool\n # ;}\n # impl SomeTraitForDoc for I16x16 {\n # fn the_doc_function\n # (\n #         &self  ,\n # )  -> bool\n # {\n self.as_array().iter().all(|x| *x == 0)\n # }\n # }\n ```\n # Avx2\n <ul>\n <li>\n\n [**`_mm256_testz_si256`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm256_testz_si256)\n\n\n [`VPTEST (YMM, YMM)`](https://felixcloutier.com/x86/PTEST.html): Logical Compare\n\n <table style=\"line-height:0.7\">\n <thead><tr>\n <th>Architecture</th><th>Latency (cycles)</th><th>Throughput (CPI)</th>\n </tr></thead><tbody>\n <tr>\n <td><a href=\"https://uops.info/html-instr/VPTEST_YMM_YMM.html#SKL\">Skylake</a></td>\n <td>&le;6</td>\n <td>1.00</td>\n </tr>\n <tr>\n <td><a href=\"https://uops.info/html-instr/VPTEST_YMM_YMM.html#SKX\">Skylake-AVX512</a></td>\n <td>&le;6</td>\n <td>1.00</td>\n </tr>\n <tr>\n <td><a href=\"https://uops.info/html-instr/VPTEST_YMM_YMM.html#CLX\">Cascade Lake</a></td>\n <td>&le;6</td>\n <td>1.00</td>\n </tr>\n </tbody></table>\n\n _<span style=\"font-size:0.8em;float:right\">Performance numbers are measurements from [uops.info](https://uops.info/).</span>_ <div style=\"clear:both\"></div>\n </li>\n </ul>"]
     #[inline(always)]
     fn is_zero(&self) -> bool {
@@ -1542,14 +1534,12 @@ impl Sub for I32x4 {
     }
 }
 impl I32x4 {
-    #[doc(hidden)]
-    pub const fn new_from_const_raw_vector(x: I32x4Internal) -> Self {
-        Self(x)
+    #[doc = " Create a vector from an array.\n\n Unlike the `From` trait function, the `from_array` function is `const`.\n # Example\n ```\n # use vectoreyes::*;\n const MY_EXTREMELY_FUN_VALUE: I32x4 =\n     I32x4::from_array([0, 1, 2, 3]);\n for (i, value) in MY_EXTREMELY_FUN_VALUE.as_array().iter().copied().enumerate() {\n     assert_eq!(i as i32, value);\n }\n ```\n\n # Avx2"]
+    #[inline(always)]
+    pub const fn from_array(array: [i32; 4]) -> I32x4 {
+        select_impl_block! { scalar { I32x4(array) } avx2 { I32x4(unsafe { std::mem::transmute(array) }) } }
     }
 }
-#[macro_export]
-#[doc = "Create a constant vector\n# Example\n```\n# use vectoreyes::*;\nconst MY_EXTREMELY_FUN_VALUE: I32x4 =\n    const_i32x4!([0, 1, 2, 3]);\nfor (i, value) in MY_EXTREMELY_FUN_VALUE.as_array().iter().copied().enumerate() {\n    assert_eq!(i as i32, value);\n}\n```"]
-macro_rules! const_i32x4 { ($value:expr) => { { const THE_VALUE: [i32; 4] = $value; const THE_RESULT: $crate::I32x4 = $crate::I32x4::new_from_const_raw_vector({ #[cfg(not(all(target_arch="x86_64", all(target_feature = "aes", target_feature = "avx", target_feature = "avx2", target_feature = "pclmulqdq", target_feature = "sse2", target_feature = "sse4.1", target_feature = "sse4.2"))))] { THE_VALUE } #[cfg(all(target_arch="x86_64", all(target_feature = "aes", target_feature = "avx", target_feature = "avx2", target_feature = "pclmulqdq", target_feature = "sse2", target_feature = "sse4.1", target_feature = "sse4.2")))] { unsafe { ::std::mem::transmute::< [i32; 4], ::std::arch::x86_64::__m128i >(THE_VALUE) } } }); THE_RESULT } }; }
 impl From<[i32; 4]> for I32x4 {
     #[doc = "\n # Avx2\n <ul>\n <li>\n\n [**`_mm_loadu_si128`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm_loadu_si128)\n\n\n [`MOVDQU (XMM, M128)`](https://felixcloutier.com/x86/MOVDQU:VMOVDQU8:VMOVDQU16:VMOVDQU32:VMOVDQU64.html): Move Unaligned Packed Integer Values\n\n <table style=\"line-height:0.7\">\n <thead><tr>\n <th>Architecture</th><th>Latency (cycles)</th><th>Throughput (CPI)</th>\n </tr></thead><tbody>\n <tr>\n <td><a href=\"https://uops.info/html-instr/MOVDQU_XMM_M128.html#SKL\">Skylake</a></td>\n <td>[&le;4;&le;7]</td>\n <td>0.50</td>\n </tr>\n <tr>\n <td><a href=\"https://uops.info/html-instr/MOVDQU_XMM_M128.html#SKX\">Skylake-AVX512</a></td>\n <td>[&le;4;&le;7]</td>\n <td>0.50</td>\n </tr>\n <tr>\n <td><a href=\"https://uops.info/html-instr/MOVDQU_XMM_M128.html#CLX\">Cascade Lake</a></td>\n <td>[&le;4;&le;7]</td>\n <td>0.50</td>\n </tr>\n </tbody></table>\n\n _<span style=\"font-size:0.8em;float:right\">Performance numbers are measurements from [uops.info](https://uops.info/).</span>_ <div style=\"clear:both\"></div>\n </li>\n </ul>"]
     #[inline(always)]
@@ -1736,7 +1726,7 @@ impl SimdBase<i32> for I32x4 {
     type Signed = I32x4;
     type Unsigned = U32x4;
     const LANES: usize = 4;
-    const ZERO: Self = { const_i32x4!([0; 4]) };
+    const ZERO: Self = Self::from_array([0; 4]);
     #[doc = "\n # Scalar Equivalent:\n ```\n # use vectoreyes::*;\n # trait SomeTraitForDoc {\n # fn the_doc_function\n # (\n #         &self  ,\n # )  -> bool\n # ;}\n # impl SomeTraitForDoc for I32x4 {\n # fn the_doc_function\n # (\n #         &self  ,\n # )  -> bool\n # {\n self.as_array().iter().all(|x| *x == 0)\n # }\n # }\n ```\n # Avx2\n <ul>\n <li>\n\n [**`_mm_testz_si128`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm_testz_si128)\n\n\n [`PTEST (XMM, XMM)`](https://felixcloutier.com/x86/PTEST.html): Logical Compare\n\n <table style=\"line-height:0.7\">\n <thead><tr>\n <th>Architecture</th><th>Latency (cycles)</th><th>Throughput (CPI)</th>\n </tr></thead><tbody>\n <tr>\n <td><a href=\"https://uops.info/html-instr/PTEST_XMM_XMM.html#SKL\">Skylake</a></td>\n <td>&le;4</td>\n <td>1.00</td>\n </tr>\n <tr>\n <td><a href=\"https://uops.info/html-instr/PTEST_XMM_XMM.html#SKX\">Skylake-AVX512</a></td>\n <td>&le;4</td>\n <td>1.00</td>\n </tr>\n <tr>\n <td><a href=\"https://uops.info/html-instr/PTEST_XMM_XMM.html#CLX\">Cascade Lake</a></td>\n <td>&le;4</td>\n <td>1.00</td>\n </tr>\n </tbody></table>\n\n _<span style=\"font-size:0.8em;float:right\">Performance numbers are measurements from [uops.info](https://uops.info/).</span>_ <div style=\"clear:both\"></div>\n </li>\n </ul>"]
     #[inline(always)]
     fn is_zero(&self) -> bool {
@@ -1927,14 +1917,12 @@ impl Sub for I32x8 {
     }
 }
 impl I32x8 {
-    #[doc(hidden)]
-    pub const fn new_from_const_raw_vector(x: I32x8Internal) -> Self {
-        Self(x)
+    #[doc = " Create a vector from an array.\n\n Unlike the `From` trait function, the `from_array` function is `const`.\n # Example\n ```\n # use vectoreyes::*;\n const MY_EXTREMELY_FUN_VALUE: I32x8 =\n     I32x8::from_array([0, 1, 2, 3, 4, 5, 6, 7]);\n for (i, value) in MY_EXTREMELY_FUN_VALUE.as_array().iter().copied().enumerate() {\n     assert_eq!(i as i32, value);\n }\n ```\n\n # Avx2"]
+    #[inline(always)]
+    pub const fn from_array(array: [i32; 8]) -> I32x8 {
+        select_impl_block! { scalar { I32x8(array) } avx2 { I32x8(unsafe { std::mem::transmute(array) }) } }
     }
 }
-#[macro_export]
-#[doc = "Create a constant vector\n# Example\n```\n# use vectoreyes::*;\nconst MY_EXTREMELY_FUN_VALUE: I32x8 =\n    const_i32x8!([0, 1, 2, 3, 4, 5, 6, 7]);\nfor (i, value) in MY_EXTREMELY_FUN_VALUE.as_array().iter().copied().enumerate() {\n    assert_eq!(i as i32, value);\n}\n```"]
-macro_rules! const_i32x8 { ($value:expr) => { { const THE_VALUE: [i32; 8] = $value; const THE_RESULT: $crate::I32x8 = $crate::I32x8::new_from_const_raw_vector({ #[cfg(not(all(target_arch="x86_64", all(target_feature = "aes", target_feature = "avx", target_feature = "avx2", target_feature = "pclmulqdq", target_feature = "sse2", target_feature = "sse4.1", target_feature = "sse4.2"))))] { THE_VALUE } #[cfg(all(target_arch="x86_64", all(target_feature = "aes", target_feature = "avx", target_feature = "avx2", target_feature = "pclmulqdq", target_feature = "sse2", target_feature = "sse4.1", target_feature = "sse4.2")))] { unsafe { ::std::mem::transmute::< [i32; 8], ::std::arch::x86_64::__m256i >(THE_VALUE) } } }); THE_RESULT } }; }
 impl From<[i32; 8]> for I32x8 {
     #[doc = "\n # Avx2\n <ul>\n <li>\n\n [**`_mm256_loadu_si256`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm256_loadu_si256)\n\n\n [`VMOVDQU (YMM, M256)`](https://felixcloutier.com/x86/MOVDQU:VMOVDQU8:VMOVDQU16:VMOVDQU32:VMOVDQU64.html): Move Unaligned Packed Integer Values\n\n <table style=\"line-height:0.7\">\n <thead><tr>\n <th>Architecture</th><th>Latency (cycles)</th><th>Throughput (CPI)</th>\n </tr></thead><tbody>\n <tr>\n <td><a href=\"https://uops.info/html-instr/VMOVDQU_YMM_M256.html#SKL\">Skylake</a></td>\n <td>[&le;5;&le;8]</td>\n <td>0.50</td>\n </tr>\n <tr>\n <td><a href=\"https://uops.info/html-instr/VMOVDQU_YMM_M256.html#SKX\">Skylake-AVX512</a></td>\n <td>[&le;5;&le;8]</td>\n <td>0.50</td>\n </tr>\n <tr>\n <td><a href=\"https://uops.info/html-instr/VMOVDQU_YMM_M256.html#CLX\">Cascade Lake</a></td>\n <td>[&le;5;&le;8]</td>\n <td>0.50</td>\n </tr>\n </tbody></table>\n\n _<span style=\"font-size:0.8em;float:right\">Performance numbers are measurements from [uops.info](https://uops.info/).</span>_ <div style=\"clear:both\"></div>\n </li>\n </ul>"]
     #[inline(always)]
@@ -2123,7 +2111,7 @@ impl SimdBase<i32> for I32x8 {
     type Signed = I32x8;
     type Unsigned = U32x8;
     const LANES: usize = 8;
-    const ZERO: Self = { const_i32x8!([0; 8]) };
+    const ZERO: Self = Self::from_array([0; 8]);
     #[doc = "\n # Scalar Equivalent:\n ```\n # use vectoreyes::*;\n # trait SomeTraitForDoc {\n # fn the_doc_function\n # (\n #         &self  ,\n # )  -> bool\n # ;}\n # impl SomeTraitForDoc for I32x8 {\n # fn the_doc_function\n # (\n #         &self  ,\n # )  -> bool\n # {\n self.as_array().iter().all(|x| *x == 0)\n # }\n # }\n ```\n # Avx2\n <ul>\n <li>\n\n [**`_mm256_testz_si256`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm256_testz_si256)\n\n\n [`VPTEST (YMM, YMM)`](https://felixcloutier.com/x86/PTEST.html): Logical Compare\n\n <table style=\"line-height:0.7\">\n <thead><tr>\n <th>Architecture</th><th>Latency (cycles)</th><th>Throughput (CPI)</th>\n </tr></thead><tbody>\n <tr>\n <td><a href=\"https://uops.info/html-instr/VPTEST_YMM_YMM.html#SKL\">Skylake</a></td>\n <td>&le;6</td>\n <td>1.00</td>\n </tr>\n <tr>\n <td><a href=\"https://uops.info/html-instr/VPTEST_YMM_YMM.html#SKX\">Skylake-AVX512</a></td>\n <td>&le;6</td>\n <td>1.00</td>\n </tr>\n <tr>\n <td><a href=\"https://uops.info/html-instr/VPTEST_YMM_YMM.html#CLX\">Cascade Lake</a></td>\n <td>&le;6</td>\n <td>1.00</td>\n </tr>\n </tbody></table>\n\n _<span style=\"font-size:0.8em;float:right\">Performance numbers are measurements from [uops.info](https://uops.info/).</span>_ <div style=\"clear:both\"></div>\n </li>\n </ul>"]
     #[inline(always)]
     fn is_zero(&self) -> bool {
@@ -2326,14 +2314,12 @@ impl Sub for I64x2 {
     }
 }
 impl I64x2 {
-    #[doc(hidden)]
-    pub const fn new_from_const_raw_vector(x: I64x2Internal) -> Self {
-        Self(x)
+    #[doc = " Create a vector from an array.\n\n Unlike the `From` trait function, the `from_array` function is `const`.\n # Example\n ```\n # use vectoreyes::*;\n const MY_EXTREMELY_FUN_VALUE: I64x2 =\n     I64x2::from_array([0, 1]);\n for (i, value) in MY_EXTREMELY_FUN_VALUE.as_array().iter().copied().enumerate() {\n     assert_eq!(i as i64, value);\n }\n ```\n\n # Avx2"]
+    #[inline(always)]
+    pub const fn from_array(array: [i64; 2]) -> I64x2 {
+        select_impl_block! { scalar { I64x2(array) } avx2 { I64x2(unsafe { std::mem::transmute(array) }) } }
     }
 }
-#[macro_export]
-#[doc = "Create a constant vector\n# Example\n```\n# use vectoreyes::*;\nconst MY_EXTREMELY_FUN_VALUE: I64x2 =\n    const_i64x2!([0, 1]);\nfor (i, value) in MY_EXTREMELY_FUN_VALUE.as_array().iter().copied().enumerate() {\n    assert_eq!(i as i64, value);\n}\n```"]
-macro_rules! const_i64x2 { ($value:expr) => { { const THE_VALUE: [i64; 2] = $value; const THE_RESULT: $crate::I64x2 = $crate::I64x2::new_from_const_raw_vector({ #[cfg(not(all(target_arch="x86_64", all(target_feature = "aes", target_feature = "avx", target_feature = "avx2", target_feature = "pclmulqdq", target_feature = "sse2", target_feature = "sse4.1", target_feature = "sse4.2"))))] { THE_VALUE } #[cfg(all(target_arch="x86_64", all(target_feature = "aes", target_feature = "avx", target_feature = "avx2", target_feature = "pclmulqdq", target_feature = "sse2", target_feature = "sse4.1", target_feature = "sse4.2")))] { unsafe { ::std::mem::transmute::< [i64; 2], ::std::arch::x86_64::__m128i >(THE_VALUE) } } }); THE_RESULT } }; }
 impl From<[i64; 2]> for I64x2 {
     #[doc = "\n # Avx2\n <ul>\n <li>\n\n [**`_mm_loadu_si128`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm_loadu_si128)\n\n\n [`MOVDQU (XMM, M128)`](https://felixcloutier.com/x86/MOVDQU:VMOVDQU8:VMOVDQU16:VMOVDQU32:VMOVDQU64.html): Move Unaligned Packed Integer Values\n\n <table style=\"line-height:0.7\">\n <thead><tr>\n <th>Architecture</th><th>Latency (cycles)</th><th>Throughput (CPI)</th>\n </tr></thead><tbody>\n <tr>\n <td><a href=\"https://uops.info/html-instr/MOVDQU_XMM_M128.html#SKL\">Skylake</a></td>\n <td>[&le;4;&le;7]</td>\n <td>0.50</td>\n </tr>\n <tr>\n <td><a href=\"https://uops.info/html-instr/MOVDQU_XMM_M128.html#SKX\">Skylake-AVX512</a></td>\n <td>[&le;4;&le;7]</td>\n <td>0.50</td>\n </tr>\n <tr>\n <td><a href=\"https://uops.info/html-instr/MOVDQU_XMM_M128.html#CLX\">Cascade Lake</a></td>\n <td>[&le;4;&le;7]</td>\n <td>0.50</td>\n </tr>\n </tbody></table>\n\n _<span style=\"font-size:0.8em;float:right\">Performance numbers are measurements from [uops.info](https://uops.info/).</span>_ <div style=\"clear:both\"></div>\n </li>\n </ul>"]
     #[inline(always)]
@@ -2507,7 +2493,7 @@ impl SimdBase<i64> for I64x2 {
     type Signed = I64x2;
     type Unsigned = U64x2;
     const LANES: usize = 2;
-    const ZERO: Self = { const_i64x2!([0; 2]) };
+    const ZERO: Self = Self::from_array([0; 2]);
     #[doc = "\n # Scalar Equivalent:\n ```\n # use vectoreyes::*;\n # trait SomeTraitForDoc {\n # fn the_doc_function\n # (\n #         &self  ,\n # )  -> bool\n # ;}\n # impl SomeTraitForDoc for I64x2 {\n # fn the_doc_function\n # (\n #         &self  ,\n # )  -> bool\n # {\n self.as_array().iter().all(|x| *x == 0)\n # }\n # }\n ```\n # Avx2\n <ul>\n <li>\n\n [**`_mm_testz_si128`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm_testz_si128)\n\n\n [`PTEST (XMM, XMM)`](https://felixcloutier.com/x86/PTEST.html): Logical Compare\n\n <table style=\"line-height:0.7\">\n <thead><tr>\n <th>Architecture</th><th>Latency (cycles)</th><th>Throughput (CPI)</th>\n </tr></thead><tbody>\n <tr>\n <td><a href=\"https://uops.info/html-instr/PTEST_XMM_XMM.html#SKL\">Skylake</a></td>\n <td>&le;4</td>\n <td>1.00</td>\n </tr>\n <tr>\n <td><a href=\"https://uops.info/html-instr/PTEST_XMM_XMM.html#SKX\">Skylake-AVX512</a></td>\n <td>&le;4</td>\n <td>1.00</td>\n </tr>\n <tr>\n <td><a href=\"https://uops.info/html-instr/PTEST_XMM_XMM.html#CLX\">Cascade Lake</a></td>\n <td>&le;4</td>\n <td>1.00</td>\n </tr>\n </tbody></table>\n\n _<span style=\"font-size:0.8em;float:right\">Performance numbers are measurements from [uops.info](https://uops.info/).</span>_ <div style=\"clear:both\"></div>\n </li>\n </ul>"]
     #[inline(always)]
     fn is_zero(&self) -> bool {
@@ -2687,14 +2673,12 @@ impl Sub for I64x4 {
     }
 }
 impl I64x4 {
-    #[doc(hidden)]
-    pub const fn new_from_const_raw_vector(x: I64x4Internal) -> Self {
-        Self(x)
+    #[doc = " Create a vector from an array.\n\n Unlike the `From` trait function, the `from_array` function is `const`.\n # Example\n ```\n # use vectoreyes::*;\n const MY_EXTREMELY_FUN_VALUE: I64x4 =\n     I64x4::from_array([0, 1, 2, 3]);\n for (i, value) in MY_EXTREMELY_FUN_VALUE.as_array().iter().copied().enumerate() {\n     assert_eq!(i as i64, value);\n }\n ```\n\n # Avx2"]
+    #[inline(always)]
+    pub const fn from_array(array: [i64; 4]) -> I64x4 {
+        select_impl_block! { scalar { I64x4(array) } avx2 { I64x4(unsafe { std::mem::transmute(array) }) } }
     }
 }
-#[macro_export]
-#[doc = "Create a constant vector\n# Example\n```\n# use vectoreyes::*;\nconst MY_EXTREMELY_FUN_VALUE: I64x4 =\n    const_i64x4!([0, 1, 2, 3]);\nfor (i, value) in MY_EXTREMELY_FUN_VALUE.as_array().iter().copied().enumerate() {\n    assert_eq!(i as i64, value);\n}\n```"]
-macro_rules! const_i64x4 { ($value:expr) => { { const THE_VALUE: [i64; 4] = $value; const THE_RESULT: $crate::I64x4 = $crate::I64x4::new_from_const_raw_vector({ #[cfg(not(all(target_arch="x86_64", all(target_feature = "aes", target_feature = "avx", target_feature = "avx2", target_feature = "pclmulqdq", target_feature = "sse2", target_feature = "sse4.1", target_feature = "sse4.2"))))] { THE_VALUE } #[cfg(all(target_arch="x86_64", all(target_feature = "aes", target_feature = "avx", target_feature = "avx2", target_feature = "pclmulqdq", target_feature = "sse2", target_feature = "sse4.1", target_feature = "sse4.2")))] { unsafe { ::std::mem::transmute::< [i64; 4], ::std::arch::x86_64::__m256i >(THE_VALUE) } } }); THE_RESULT } }; }
 impl From<[i64; 4]> for I64x4 {
     #[doc = "\n # Avx2\n <ul>\n <li>\n\n [**`_mm256_loadu_si256`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm256_loadu_si256)\n\n\n [`VMOVDQU (YMM, M256)`](https://felixcloutier.com/x86/MOVDQU:VMOVDQU8:VMOVDQU16:VMOVDQU32:VMOVDQU64.html): Move Unaligned Packed Integer Values\n\n <table style=\"line-height:0.7\">\n <thead><tr>\n <th>Architecture</th><th>Latency (cycles)</th><th>Throughput (CPI)</th>\n </tr></thead><tbody>\n <tr>\n <td><a href=\"https://uops.info/html-instr/VMOVDQU_YMM_M256.html#SKL\">Skylake</a></td>\n <td>[&le;5;&le;8]</td>\n <td>0.50</td>\n </tr>\n <tr>\n <td><a href=\"https://uops.info/html-instr/VMOVDQU_YMM_M256.html#SKX\">Skylake-AVX512</a></td>\n <td>[&le;5;&le;8]</td>\n <td>0.50</td>\n </tr>\n <tr>\n <td><a href=\"https://uops.info/html-instr/VMOVDQU_YMM_M256.html#CLX\">Cascade Lake</a></td>\n <td>[&le;5;&le;8]</td>\n <td>0.50</td>\n </tr>\n </tbody></table>\n\n _<span style=\"font-size:0.8em;float:right\">Performance numbers are measurements from [uops.info](https://uops.info/).</span>_ <div style=\"clear:both\"></div>\n </li>\n </ul>"]
     #[inline(always)]
@@ -2909,7 +2893,7 @@ impl SimdBase<i64> for I64x4 {
     type Signed = I64x4;
     type Unsigned = U64x4;
     const LANES: usize = 4;
-    const ZERO: Self = { const_i64x4!([0; 4]) };
+    const ZERO: Self = Self::from_array([0; 4]);
     #[doc = "\n # Scalar Equivalent:\n ```\n # use vectoreyes::*;\n # trait SomeTraitForDoc {\n # fn the_doc_function\n # (\n #         &self  ,\n # )  -> bool\n # ;}\n # impl SomeTraitForDoc for I64x4 {\n # fn the_doc_function\n # (\n #         &self  ,\n # )  -> bool\n # {\n self.as_array().iter().all(|x| *x == 0)\n # }\n # }\n ```\n # Avx2\n <ul>\n <li>\n\n [**`_mm256_testz_si256`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm256_testz_si256)\n\n\n [`VPTEST (YMM, YMM)`](https://felixcloutier.com/x86/PTEST.html): Logical Compare\n\n <table style=\"line-height:0.7\">\n <thead><tr>\n <th>Architecture</th><th>Latency (cycles)</th><th>Throughput (CPI)</th>\n </tr></thead><tbody>\n <tr>\n <td><a href=\"https://uops.info/html-instr/VPTEST_YMM_YMM.html#SKL\">Skylake</a></td>\n <td>&le;6</td>\n <td>1.00</td>\n </tr>\n <tr>\n <td><a href=\"https://uops.info/html-instr/VPTEST_YMM_YMM.html#SKX\">Skylake-AVX512</a></td>\n <td>&le;6</td>\n <td>1.00</td>\n </tr>\n <tr>\n <td><a href=\"https://uops.info/html-instr/VPTEST_YMM_YMM.html#CLX\">Cascade Lake</a></td>\n <td>&le;6</td>\n <td>1.00</td>\n </tr>\n </tbody></table>\n\n _<span style=\"font-size:0.8em;float:right\">Performance numbers are measurements from [uops.info](https://uops.info/).</span>_ <div style=\"clear:both\"></div>\n </li>\n </ul>"]
     #[inline(always)]
     fn is_zero(&self) -> bool {
@@ -3107,14 +3091,12 @@ impl Sub for U8x16 {
     }
 }
 impl U8x16 {
-    #[doc(hidden)]
-    pub const fn new_from_const_raw_vector(x: U8x16Internal) -> Self {
-        Self(x)
+    #[doc = " Create a vector from an array.\n\n Unlike the `From` trait function, the `from_array` function is `const`.\n # Example\n ```\n # use vectoreyes::*;\n const MY_EXTREMELY_FUN_VALUE: U8x16 =\n     U8x16::from_array([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]);\n for (i, value) in MY_EXTREMELY_FUN_VALUE.as_array().iter().copied().enumerate() {\n     assert_eq!(i as u8, value);\n }\n ```\n\n # Avx2"]
+    #[inline(always)]
+    pub const fn from_array(array: [u8; 16]) -> U8x16 {
+        select_impl_block! { scalar { U8x16(array) } avx2 { U8x16(unsafe { std::mem::transmute(array) }) } }
     }
 }
-#[macro_export]
-#[doc = "Create a constant vector\n# Example\n```\n# use vectoreyes::*;\nconst MY_EXTREMELY_FUN_VALUE: U8x16 =\n    const_u8x16!([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]);\nfor (i, value) in MY_EXTREMELY_FUN_VALUE.as_array().iter().copied().enumerate() {\n    assert_eq!(i as u8, value);\n}\n```"]
-macro_rules! const_u8x16 { ($value:expr) => { { const THE_VALUE: [u8; 16] = $value; const THE_RESULT: $crate::U8x16 = $crate::U8x16::new_from_const_raw_vector({ #[cfg(not(all(target_arch="x86_64", all(target_feature = "aes", target_feature = "avx", target_feature = "avx2", target_feature = "pclmulqdq", target_feature = "sse2", target_feature = "sse4.1", target_feature = "sse4.2"))))] { THE_VALUE } #[cfg(all(target_arch="x86_64", all(target_feature = "aes", target_feature = "avx", target_feature = "avx2", target_feature = "pclmulqdq", target_feature = "sse2", target_feature = "sse4.1", target_feature = "sse4.2")))] { unsafe { ::std::mem::transmute::< [u8; 16], ::std::arch::x86_64::__m128i >(THE_VALUE) } } }); THE_RESULT } }; }
 impl From<[u8; 16]> for U8x16 {
     #[doc = "\n # Avx2\n <ul>\n <li>\n\n [**`_mm_loadu_si128`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm_loadu_si128)\n\n\n [`MOVDQU (XMM, M128)`](https://felixcloutier.com/x86/MOVDQU:VMOVDQU8:VMOVDQU16:VMOVDQU32:VMOVDQU64.html): Move Unaligned Packed Integer Values\n\n <table style=\"line-height:0.7\">\n <thead><tr>\n <th>Architecture</th><th>Latency (cycles)</th><th>Throughput (CPI)</th>\n </tr></thead><tbody>\n <tr>\n <td><a href=\"https://uops.info/html-instr/MOVDQU_XMM_M128.html#SKL\">Skylake</a></td>\n <td>[&le;4;&le;7]</td>\n <td>0.50</td>\n </tr>\n <tr>\n <td><a href=\"https://uops.info/html-instr/MOVDQU_XMM_M128.html#SKX\">Skylake-AVX512</a></td>\n <td>[&le;4;&le;7]</td>\n <td>0.50</td>\n </tr>\n <tr>\n <td><a href=\"https://uops.info/html-instr/MOVDQU_XMM_M128.html#CLX\">Cascade Lake</a></td>\n <td>[&le;4;&le;7]</td>\n <td>0.50</td>\n </tr>\n </tbody></table>\n\n _<span style=\"font-size:0.8em;float:right\">Performance numbers are measurements from [uops.info](https://uops.info/).</span>_ <div style=\"clear:both\"></div>\n </li>\n </ul>"]
     #[inline(always)]
@@ -3262,7 +3244,7 @@ impl SimdBase<u8> for U8x16 {
     type Signed = I8x16;
     type Unsigned = U8x16;
     const LANES: usize = 16;
-    const ZERO: Self = { const_u8x16!([0; 16]) };
+    const ZERO: Self = Self::from_array([0; 16]);
     #[doc = "\n # Scalar Equivalent:\n ```\n # use vectoreyes::*;\n # trait SomeTraitForDoc {\n # fn the_doc_function\n # (\n #         &self  ,\n # )  -> bool\n # ;}\n # impl SomeTraitForDoc for U8x16 {\n # fn the_doc_function\n # (\n #         &self  ,\n # )  -> bool\n # {\n self.as_array().iter().all(|x| *x == 0)\n # }\n # }\n ```\n # Avx2\n <ul>\n <li>\n\n [**`_mm_testz_si128`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm_testz_si128)\n\n\n [`PTEST (XMM, XMM)`](https://felixcloutier.com/x86/PTEST.html): Logical Compare\n\n <table style=\"line-height:0.7\">\n <thead><tr>\n <th>Architecture</th><th>Latency (cycles)</th><th>Throughput (CPI)</th>\n </tr></thead><tbody>\n <tr>\n <td><a href=\"https://uops.info/html-instr/PTEST_XMM_XMM.html#SKL\">Skylake</a></td>\n <td>&le;4</td>\n <td>1.00</td>\n </tr>\n <tr>\n <td><a href=\"https://uops.info/html-instr/PTEST_XMM_XMM.html#SKX\">Skylake-AVX512</a></td>\n <td>&le;4</td>\n <td>1.00</td>\n </tr>\n <tr>\n <td><a href=\"https://uops.info/html-instr/PTEST_XMM_XMM.html#CLX\">Cascade Lake</a></td>\n <td>&le;4</td>\n <td>1.00</td>\n </tr>\n </tbody></table>\n\n _<span style=\"font-size:0.8em;float:right\">Performance numbers are measurements from [uops.info](https://uops.info/).</span>_ <div style=\"clear:both\"></div>\n </li>\n </ul>"]
     #[inline(always)]
     fn is_zero(&self) -> bool {
@@ -3452,14 +3434,12 @@ impl Sub for U8x32 {
     }
 }
 impl U8x32 {
-    #[doc(hidden)]
-    pub const fn new_from_const_raw_vector(x: U8x32Internal) -> Self {
-        Self(x)
+    #[doc = " Create a vector from an array.\n\n Unlike the `From` trait function, the `from_array` function is `const`.\n # Example\n ```\n # use vectoreyes::*;\n const MY_EXTREMELY_FUN_VALUE: U8x32 =\n     U8x32::from_array([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31]);\n for (i, value) in MY_EXTREMELY_FUN_VALUE.as_array().iter().copied().enumerate() {\n     assert_eq!(i as u8, value);\n }\n ```\n\n # Avx2"]
+    #[inline(always)]
+    pub const fn from_array(array: [u8; 32]) -> U8x32 {
+        select_impl_block! { scalar { U8x32(array) } avx2 { U8x32(unsafe { std::mem::transmute(array) }) } }
     }
 }
-#[macro_export]
-#[doc = "Create a constant vector\n# Example\n```\n# use vectoreyes::*;\nconst MY_EXTREMELY_FUN_VALUE: U8x32 =\n    const_u8x32!([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31]);\nfor (i, value) in MY_EXTREMELY_FUN_VALUE.as_array().iter().copied().enumerate() {\n    assert_eq!(i as u8, value);\n}\n```"]
-macro_rules! const_u8x32 { ($value:expr) => { { const THE_VALUE: [u8; 32] = $value; const THE_RESULT: $crate::U8x32 = $crate::U8x32::new_from_const_raw_vector({ #[cfg(not(all(target_arch="x86_64", all(target_feature = "aes", target_feature = "avx", target_feature = "avx2", target_feature = "pclmulqdq", target_feature = "sse2", target_feature = "sse4.1", target_feature = "sse4.2"))))] { THE_VALUE } #[cfg(all(target_arch="x86_64", all(target_feature = "aes", target_feature = "avx", target_feature = "avx2", target_feature = "pclmulqdq", target_feature = "sse2", target_feature = "sse4.1", target_feature = "sse4.2")))] { unsafe { ::std::mem::transmute::< [u8; 32], ::std::arch::x86_64::__m256i >(THE_VALUE) } } }); THE_RESULT } }; }
 impl From<[u8; 32]> for U8x32 {
     #[doc = "\n # Avx2\n <ul>\n <li>\n\n [**`_mm256_loadu_si256`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm256_loadu_si256)\n\n\n [`VMOVDQU (YMM, M256)`](https://felixcloutier.com/x86/MOVDQU:VMOVDQU8:VMOVDQU16:VMOVDQU32:VMOVDQU64.html): Move Unaligned Packed Integer Values\n\n <table style=\"line-height:0.7\">\n <thead><tr>\n <th>Architecture</th><th>Latency (cycles)</th><th>Throughput (CPI)</th>\n </tr></thead><tbody>\n <tr>\n <td><a href=\"https://uops.info/html-instr/VMOVDQU_YMM_M256.html#SKL\">Skylake</a></td>\n <td>[&le;5;&le;8]</td>\n <td>0.50</td>\n </tr>\n <tr>\n <td><a href=\"https://uops.info/html-instr/VMOVDQU_YMM_M256.html#SKX\">Skylake-AVX512</a></td>\n <td>[&le;5;&le;8]</td>\n <td>0.50</td>\n </tr>\n <tr>\n <td><a href=\"https://uops.info/html-instr/VMOVDQU_YMM_M256.html#CLX\">Cascade Lake</a></td>\n <td>[&le;5;&le;8]</td>\n <td>0.50</td>\n </tr>\n </tbody></table>\n\n _<span style=\"font-size:0.8em;float:right\">Performance numbers are measurements from [uops.info](https://uops.info/).</span>_ <div style=\"clear:both\"></div>\n </li>\n </ul>"]
     #[inline(always)]
@@ -3628,7 +3608,7 @@ impl SimdBase<u8> for U8x32 {
     type Signed = I8x32;
     type Unsigned = U8x32;
     const LANES: usize = 32;
-    const ZERO: Self = { const_u8x32!([0; 32]) };
+    const ZERO: Self = Self::from_array([0; 32]);
     #[doc = "\n # Scalar Equivalent:\n ```\n # use vectoreyes::*;\n # trait SomeTraitForDoc {\n # fn the_doc_function\n # (\n #         &self  ,\n # )  -> bool\n # ;}\n # impl SomeTraitForDoc for U8x32 {\n # fn the_doc_function\n # (\n #         &self  ,\n # )  -> bool\n # {\n self.as_array().iter().all(|x| *x == 0)\n # }\n # }\n ```\n # Avx2\n <ul>\n <li>\n\n [**`_mm256_testz_si256`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm256_testz_si256)\n\n\n [`VPTEST (YMM, YMM)`](https://felixcloutier.com/x86/PTEST.html): Logical Compare\n\n <table style=\"line-height:0.7\">\n <thead><tr>\n <th>Architecture</th><th>Latency (cycles)</th><th>Throughput (CPI)</th>\n </tr></thead><tbody>\n <tr>\n <td><a href=\"https://uops.info/html-instr/VPTEST_YMM_YMM.html#SKL\">Skylake</a></td>\n <td>&le;6</td>\n <td>1.00</td>\n </tr>\n <tr>\n <td><a href=\"https://uops.info/html-instr/VPTEST_YMM_YMM.html#SKX\">Skylake-AVX512</a></td>\n <td>&le;6</td>\n <td>1.00</td>\n </tr>\n <tr>\n <td><a href=\"https://uops.info/html-instr/VPTEST_YMM_YMM.html#CLX\">Cascade Lake</a></td>\n <td>&le;6</td>\n <td>1.00</td>\n </tr>\n </tbody></table>\n\n _<span style=\"font-size:0.8em;float:right\">Performance numbers are measurements from [uops.info](https://uops.info/).</span>_ <div style=\"clear:both\"></div>\n </li>\n </ul>"]
     #[inline(always)]
     fn is_zero(&self) -> bool {
@@ -3820,14 +3800,12 @@ impl Sub for U16x8 {
     }
 }
 impl U16x8 {
-    #[doc(hidden)]
-    pub const fn new_from_const_raw_vector(x: U16x8Internal) -> Self {
-        Self(x)
+    #[doc = " Create a vector from an array.\n\n Unlike the `From` trait function, the `from_array` function is `const`.\n # Example\n ```\n # use vectoreyes::*;\n const MY_EXTREMELY_FUN_VALUE: U16x8 =\n     U16x8::from_array([0, 1, 2, 3, 4, 5, 6, 7]);\n for (i, value) in MY_EXTREMELY_FUN_VALUE.as_array().iter().copied().enumerate() {\n     assert_eq!(i as u16, value);\n }\n ```\n\n # Avx2"]
+    #[inline(always)]
+    pub const fn from_array(array: [u16; 8]) -> U16x8 {
+        select_impl_block! { scalar { U16x8(array) } avx2 { U16x8(unsafe { std::mem::transmute(array) }) } }
     }
 }
-#[macro_export]
-#[doc = "Create a constant vector\n# Example\n```\n# use vectoreyes::*;\nconst MY_EXTREMELY_FUN_VALUE: U16x8 =\n    const_u16x8!([0, 1, 2, 3, 4, 5, 6, 7]);\nfor (i, value) in MY_EXTREMELY_FUN_VALUE.as_array().iter().copied().enumerate() {\n    assert_eq!(i as u16, value);\n}\n```"]
-macro_rules! const_u16x8 { ($value:expr) => { { const THE_VALUE: [u16; 8] = $value; const THE_RESULT: $crate::U16x8 = $crate::U16x8::new_from_const_raw_vector({ #[cfg(not(all(target_arch="x86_64", all(target_feature = "aes", target_feature = "avx", target_feature = "avx2", target_feature = "pclmulqdq", target_feature = "sse2", target_feature = "sse4.1", target_feature = "sse4.2"))))] { THE_VALUE } #[cfg(all(target_arch="x86_64", all(target_feature = "aes", target_feature = "avx", target_feature = "avx2", target_feature = "pclmulqdq", target_feature = "sse2", target_feature = "sse4.1", target_feature = "sse4.2")))] { unsafe { ::std::mem::transmute::< [u16; 8], ::std::arch::x86_64::__m128i >(THE_VALUE) } } }); THE_RESULT } }; }
 impl From<[u16; 8]> for U16x8 {
     #[doc = "\n # Avx2\n <ul>\n <li>\n\n [**`_mm_loadu_si128`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm_loadu_si128)\n\n\n [`MOVDQU (XMM, M128)`](https://felixcloutier.com/x86/MOVDQU:VMOVDQU8:VMOVDQU16:VMOVDQU32:VMOVDQU64.html): Move Unaligned Packed Integer Values\n\n <table style=\"line-height:0.7\">\n <thead><tr>\n <th>Architecture</th><th>Latency (cycles)</th><th>Throughput (CPI)</th>\n </tr></thead><tbody>\n <tr>\n <td><a href=\"https://uops.info/html-instr/MOVDQU_XMM_M128.html#SKL\">Skylake</a></td>\n <td>[&le;4;&le;7]</td>\n <td>0.50</td>\n </tr>\n <tr>\n <td><a href=\"https://uops.info/html-instr/MOVDQU_XMM_M128.html#SKX\">Skylake-AVX512</a></td>\n <td>[&le;4;&le;7]</td>\n <td>0.50</td>\n </tr>\n <tr>\n <td><a href=\"https://uops.info/html-instr/MOVDQU_XMM_M128.html#CLX\">Cascade Lake</a></td>\n <td>[&le;4;&le;7]</td>\n <td>0.50</td>\n </tr>\n </tbody></table>\n\n _<span style=\"font-size:0.8em;float:right\">Performance numbers are measurements from [uops.info](https://uops.info/).</span>_ <div style=\"clear:both\"></div>\n </li>\n </ul>"]
     #[inline(always)]
@@ -3975,7 +3953,7 @@ impl SimdBase<u16> for U16x8 {
     type Signed = I16x8;
     type Unsigned = U16x8;
     const LANES: usize = 8;
-    const ZERO: Self = { const_u16x8!([0; 8]) };
+    const ZERO: Self = Self::from_array([0; 8]);
     #[doc = "\n # Scalar Equivalent:\n ```\n # use vectoreyes::*;\n # trait SomeTraitForDoc {\n # fn the_doc_function\n # (\n #         &self  ,\n # )  -> bool\n # ;}\n # impl SomeTraitForDoc for U16x8 {\n # fn the_doc_function\n # (\n #         &self  ,\n # )  -> bool\n # {\n self.as_array().iter().all(|x| *x == 0)\n # }\n # }\n ```\n # Avx2\n <ul>\n <li>\n\n [**`_mm_testz_si128`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm_testz_si128)\n\n\n [`PTEST (XMM, XMM)`](https://felixcloutier.com/x86/PTEST.html): Logical Compare\n\n <table style=\"line-height:0.7\">\n <thead><tr>\n <th>Architecture</th><th>Latency (cycles)</th><th>Throughput (CPI)</th>\n </tr></thead><tbody>\n <tr>\n <td><a href=\"https://uops.info/html-instr/PTEST_XMM_XMM.html#SKL\">Skylake</a></td>\n <td>&le;4</td>\n <td>1.00</td>\n </tr>\n <tr>\n <td><a href=\"https://uops.info/html-instr/PTEST_XMM_XMM.html#SKX\">Skylake-AVX512</a></td>\n <td>&le;4</td>\n <td>1.00</td>\n </tr>\n <tr>\n <td><a href=\"https://uops.info/html-instr/PTEST_XMM_XMM.html#CLX\">Cascade Lake</a></td>\n <td>&le;4</td>\n <td>1.00</td>\n </tr>\n </tbody></table>\n\n _<span style=\"font-size:0.8em;float:right\">Performance numbers are measurements from [uops.info](https://uops.info/).</span>_ <div style=\"clear:both\"></div>\n </li>\n </ul>"]
     #[inline(always)]
     fn is_zero(&self) -> bool {
@@ -4167,14 +4145,12 @@ impl Sub for U16x16 {
     }
 }
 impl U16x16 {
-    #[doc(hidden)]
-    pub const fn new_from_const_raw_vector(x: U16x16Internal) -> Self {
-        Self(x)
+    #[doc = " Create a vector from an array.\n\n Unlike the `From` trait function, the `from_array` function is `const`.\n # Example\n ```\n # use vectoreyes::*;\n const MY_EXTREMELY_FUN_VALUE: U16x16 =\n     U16x16::from_array([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]);\n for (i, value) in MY_EXTREMELY_FUN_VALUE.as_array().iter().copied().enumerate() {\n     assert_eq!(i as u16, value);\n }\n ```\n\n # Avx2"]
+    #[inline(always)]
+    pub const fn from_array(array: [u16; 16]) -> U16x16 {
+        select_impl_block! { scalar { U16x16(array) } avx2 { U16x16(unsafe { std::mem::transmute(array) }) } }
     }
 }
-#[macro_export]
-#[doc = "Create a constant vector\n# Example\n```\n# use vectoreyes::*;\nconst MY_EXTREMELY_FUN_VALUE: U16x16 =\n    const_u16x16!([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]);\nfor (i, value) in MY_EXTREMELY_FUN_VALUE.as_array().iter().copied().enumerate() {\n    assert_eq!(i as u16, value);\n}\n```"]
-macro_rules! const_u16x16 { ($value:expr) => { { const THE_VALUE: [u16; 16] = $value; const THE_RESULT: $crate::U16x16 = $crate::U16x16::new_from_const_raw_vector({ #[cfg(not(all(target_arch="x86_64", all(target_feature = "aes", target_feature = "avx", target_feature = "avx2", target_feature = "pclmulqdq", target_feature = "sse2", target_feature = "sse4.1", target_feature = "sse4.2"))))] { THE_VALUE } #[cfg(all(target_arch="x86_64", all(target_feature = "aes", target_feature = "avx", target_feature = "avx2", target_feature = "pclmulqdq", target_feature = "sse2", target_feature = "sse4.1", target_feature = "sse4.2")))] { unsafe { ::std::mem::transmute::< [u16; 16], ::std::arch::x86_64::__m256i >(THE_VALUE) } } }); THE_RESULT } }; }
 impl From<[u16; 16]> for U16x16 {
     #[doc = "\n # Avx2\n <ul>\n <li>\n\n [**`_mm256_loadu_si256`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm256_loadu_si256)\n\n\n [`VMOVDQU (YMM, M256)`](https://felixcloutier.com/x86/MOVDQU:VMOVDQU8:VMOVDQU16:VMOVDQU32:VMOVDQU64.html): Move Unaligned Packed Integer Values\n\n <table style=\"line-height:0.7\">\n <thead><tr>\n <th>Architecture</th><th>Latency (cycles)</th><th>Throughput (CPI)</th>\n </tr></thead><tbody>\n <tr>\n <td><a href=\"https://uops.info/html-instr/VMOVDQU_YMM_M256.html#SKL\">Skylake</a></td>\n <td>[&le;5;&le;8]</td>\n <td>0.50</td>\n </tr>\n <tr>\n <td><a href=\"https://uops.info/html-instr/VMOVDQU_YMM_M256.html#SKX\">Skylake-AVX512</a></td>\n <td>[&le;5;&le;8]</td>\n <td>0.50</td>\n </tr>\n <tr>\n <td><a href=\"https://uops.info/html-instr/VMOVDQU_YMM_M256.html#CLX\">Cascade Lake</a></td>\n <td>[&le;5;&le;8]</td>\n <td>0.50</td>\n </tr>\n </tbody></table>\n\n _<span style=\"font-size:0.8em;float:right\">Performance numbers are measurements from [uops.info](https://uops.info/).</span>_ <div style=\"clear:both\"></div>\n </li>\n </ul>"]
     #[inline(always)]
@@ -4350,7 +4326,7 @@ impl SimdBase<u16> for U16x16 {
     type Signed = I16x16;
     type Unsigned = U16x16;
     const LANES: usize = 16;
-    const ZERO: Self = { const_u16x16!([0; 16]) };
+    const ZERO: Self = Self::from_array([0; 16]);
     #[doc = "\n # Scalar Equivalent:\n ```\n # use vectoreyes::*;\n # trait SomeTraitForDoc {\n # fn the_doc_function\n # (\n #         &self  ,\n # )  -> bool\n # ;}\n # impl SomeTraitForDoc for U16x16 {\n # fn the_doc_function\n # (\n #         &self  ,\n # )  -> bool\n # {\n self.as_array().iter().all(|x| *x == 0)\n # }\n # }\n ```\n # Avx2\n <ul>\n <li>\n\n [**`_mm256_testz_si256`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm256_testz_si256)\n\n\n [`VPTEST (YMM, YMM)`](https://felixcloutier.com/x86/PTEST.html): Logical Compare\n\n <table style=\"line-height:0.7\">\n <thead><tr>\n <th>Architecture</th><th>Latency (cycles)</th><th>Throughput (CPI)</th>\n </tr></thead><tbody>\n <tr>\n <td><a href=\"https://uops.info/html-instr/VPTEST_YMM_YMM.html#SKL\">Skylake</a></td>\n <td>&le;6</td>\n <td>1.00</td>\n </tr>\n <tr>\n <td><a href=\"https://uops.info/html-instr/VPTEST_YMM_YMM.html#SKX\">Skylake-AVX512</a></td>\n <td>&le;6</td>\n <td>1.00</td>\n </tr>\n <tr>\n <td><a href=\"https://uops.info/html-instr/VPTEST_YMM_YMM.html#CLX\">Cascade Lake</a></td>\n <td>&le;6</td>\n <td>1.00</td>\n </tr>\n </tbody></table>\n\n _<span style=\"font-size:0.8em;float:right\">Performance numbers are measurements from [uops.info](https://uops.info/).</span>_ <div style=\"clear:both\"></div>\n </li>\n </ul>"]
     #[inline(always)]
     fn is_zero(&self) -> bool {
@@ -4525,14 +4501,12 @@ impl Sub for U32x4 {
     }
 }
 impl U32x4 {
-    #[doc(hidden)]
-    pub const fn new_from_const_raw_vector(x: U32x4Internal) -> Self {
-        Self(x)
+    #[doc = " Create a vector from an array.\n\n Unlike the `From` trait function, the `from_array` function is `const`.\n # Example\n ```\n # use vectoreyes::*;\n const MY_EXTREMELY_FUN_VALUE: U32x4 =\n     U32x4::from_array([0, 1, 2, 3]);\n for (i, value) in MY_EXTREMELY_FUN_VALUE.as_array().iter().copied().enumerate() {\n     assert_eq!(i as u32, value);\n }\n ```\n\n # Avx2"]
+    #[inline(always)]
+    pub const fn from_array(array: [u32; 4]) -> U32x4 {
+        select_impl_block! { scalar { U32x4(array) } avx2 { U32x4(unsafe { std::mem::transmute(array) }) } }
     }
 }
-#[macro_export]
-#[doc = "Create a constant vector\n# Example\n```\n# use vectoreyes::*;\nconst MY_EXTREMELY_FUN_VALUE: U32x4 =\n    const_u32x4!([0, 1, 2, 3]);\nfor (i, value) in MY_EXTREMELY_FUN_VALUE.as_array().iter().copied().enumerate() {\n    assert_eq!(i as u32, value);\n}\n```"]
-macro_rules! const_u32x4 { ($value:expr) => { { const THE_VALUE: [u32; 4] = $value; const THE_RESULT: $crate::U32x4 = $crate::U32x4::new_from_const_raw_vector({ #[cfg(not(all(target_arch="x86_64", all(target_feature = "aes", target_feature = "avx", target_feature = "avx2", target_feature = "pclmulqdq", target_feature = "sse2", target_feature = "sse4.1", target_feature = "sse4.2"))))] { THE_VALUE } #[cfg(all(target_arch="x86_64", all(target_feature = "aes", target_feature = "avx", target_feature = "avx2", target_feature = "pclmulqdq", target_feature = "sse2", target_feature = "sse4.1", target_feature = "sse4.2")))] { unsafe { ::std::mem::transmute::< [u32; 4], ::std::arch::x86_64::__m128i >(THE_VALUE) } } }); THE_RESULT } }; }
 impl From<[u32; 4]> for U32x4 {
     #[doc = "\n # Avx2\n <ul>\n <li>\n\n [**`_mm_loadu_si128`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm_loadu_si128)\n\n\n [`MOVDQU (XMM, M128)`](https://felixcloutier.com/x86/MOVDQU:VMOVDQU8:VMOVDQU16:VMOVDQU32:VMOVDQU64.html): Move Unaligned Packed Integer Values\n\n <table style=\"line-height:0.7\">\n <thead><tr>\n <th>Architecture</th><th>Latency (cycles)</th><th>Throughput (CPI)</th>\n </tr></thead><tbody>\n <tr>\n <td><a href=\"https://uops.info/html-instr/MOVDQU_XMM_M128.html#SKL\">Skylake</a></td>\n <td>[&le;4;&le;7]</td>\n <td>0.50</td>\n </tr>\n <tr>\n <td><a href=\"https://uops.info/html-instr/MOVDQU_XMM_M128.html#SKX\">Skylake-AVX512</a></td>\n <td>[&le;4;&le;7]</td>\n <td>0.50</td>\n </tr>\n <tr>\n <td><a href=\"https://uops.info/html-instr/MOVDQU_XMM_M128.html#CLX\">Cascade Lake</a></td>\n <td>[&le;4;&le;7]</td>\n <td>0.50</td>\n </tr>\n </tbody></table>\n\n _<span style=\"font-size:0.8em;float:right\">Performance numbers are measurements from [uops.info](https://uops.info/).</span>_ <div style=\"clear:both\"></div>\n </li>\n </ul>"]
     #[inline(always)]
@@ -4719,7 +4693,7 @@ impl SimdBase<u32> for U32x4 {
     type Signed = I32x4;
     type Unsigned = U32x4;
     const LANES: usize = 4;
-    const ZERO: Self = { const_u32x4!([0; 4]) };
+    const ZERO: Self = Self::from_array([0; 4]);
     #[doc = "\n # Scalar Equivalent:\n ```\n # use vectoreyes::*;\n # trait SomeTraitForDoc {\n # fn the_doc_function\n # (\n #         &self  ,\n # )  -> bool\n # ;}\n # impl SomeTraitForDoc for U32x4 {\n # fn the_doc_function\n # (\n #         &self  ,\n # )  -> bool\n # {\n self.as_array().iter().all(|x| *x == 0)\n # }\n # }\n ```\n # Avx2\n <ul>\n <li>\n\n [**`_mm_testz_si128`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm_testz_si128)\n\n\n [`PTEST (XMM, XMM)`](https://felixcloutier.com/x86/PTEST.html): Logical Compare\n\n <table style=\"line-height:0.7\">\n <thead><tr>\n <th>Architecture</th><th>Latency (cycles)</th><th>Throughput (CPI)</th>\n </tr></thead><tbody>\n <tr>\n <td><a href=\"https://uops.info/html-instr/PTEST_XMM_XMM.html#SKL\">Skylake</a></td>\n <td>&le;4</td>\n <td>1.00</td>\n </tr>\n <tr>\n <td><a href=\"https://uops.info/html-instr/PTEST_XMM_XMM.html#SKX\">Skylake-AVX512</a></td>\n <td>&le;4</td>\n <td>1.00</td>\n </tr>\n <tr>\n <td><a href=\"https://uops.info/html-instr/PTEST_XMM_XMM.html#CLX\">Cascade Lake</a></td>\n <td>&le;4</td>\n <td>1.00</td>\n </tr>\n </tbody></table>\n\n _<span style=\"font-size:0.8em;float:right\">Performance numbers are measurements from [uops.info](https://uops.info/).</span>_ <div style=\"clear:both\"></div>\n </li>\n </ul>"]
     #[inline(always)]
     fn is_zero(&self) -> bool {
@@ -4910,14 +4884,12 @@ impl Sub for U32x8 {
     }
 }
 impl U32x8 {
-    #[doc(hidden)]
-    pub const fn new_from_const_raw_vector(x: U32x8Internal) -> Self {
-        Self(x)
+    #[doc = " Create a vector from an array.\n\n Unlike the `From` trait function, the `from_array` function is `const`.\n # Example\n ```\n # use vectoreyes::*;\n const MY_EXTREMELY_FUN_VALUE: U32x8 =\n     U32x8::from_array([0, 1, 2, 3, 4, 5, 6, 7]);\n for (i, value) in MY_EXTREMELY_FUN_VALUE.as_array().iter().copied().enumerate() {\n     assert_eq!(i as u32, value);\n }\n ```\n\n # Avx2"]
+    #[inline(always)]
+    pub const fn from_array(array: [u32; 8]) -> U32x8 {
+        select_impl_block! { scalar { U32x8(array) } avx2 { U32x8(unsafe { std::mem::transmute(array) }) } }
     }
 }
-#[macro_export]
-#[doc = "Create a constant vector\n# Example\n```\n# use vectoreyes::*;\nconst MY_EXTREMELY_FUN_VALUE: U32x8 =\n    const_u32x8!([0, 1, 2, 3, 4, 5, 6, 7]);\nfor (i, value) in MY_EXTREMELY_FUN_VALUE.as_array().iter().copied().enumerate() {\n    assert_eq!(i as u32, value);\n}\n```"]
-macro_rules! const_u32x8 { ($value:expr) => { { const THE_VALUE: [u32; 8] = $value; const THE_RESULT: $crate::U32x8 = $crate::U32x8::new_from_const_raw_vector({ #[cfg(not(all(target_arch="x86_64", all(target_feature = "aes", target_feature = "avx", target_feature = "avx2", target_feature = "pclmulqdq", target_feature = "sse2", target_feature = "sse4.1", target_feature = "sse4.2"))))] { THE_VALUE } #[cfg(all(target_arch="x86_64", all(target_feature = "aes", target_feature = "avx", target_feature = "avx2", target_feature = "pclmulqdq", target_feature = "sse2", target_feature = "sse4.1", target_feature = "sse4.2")))] { unsafe { ::std::mem::transmute::< [u32; 8], ::std::arch::x86_64::__m256i >(THE_VALUE) } } }); THE_RESULT } }; }
 impl From<[u32; 8]> for U32x8 {
     #[doc = "\n # Avx2\n <ul>\n <li>\n\n [**`_mm256_loadu_si256`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm256_loadu_si256)\n\n\n [`VMOVDQU (YMM, M256)`](https://felixcloutier.com/x86/MOVDQU:VMOVDQU8:VMOVDQU16:VMOVDQU32:VMOVDQU64.html): Move Unaligned Packed Integer Values\n\n <table style=\"line-height:0.7\">\n <thead><tr>\n <th>Architecture</th><th>Latency (cycles)</th><th>Throughput (CPI)</th>\n </tr></thead><tbody>\n <tr>\n <td><a href=\"https://uops.info/html-instr/VMOVDQU_YMM_M256.html#SKL\">Skylake</a></td>\n <td>[&le;5;&le;8]</td>\n <td>0.50</td>\n </tr>\n <tr>\n <td><a href=\"https://uops.info/html-instr/VMOVDQU_YMM_M256.html#SKX\">Skylake-AVX512</a></td>\n <td>[&le;5;&le;8]</td>\n <td>0.50</td>\n </tr>\n <tr>\n <td><a href=\"https://uops.info/html-instr/VMOVDQU_YMM_M256.html#CLX\">Cascade Lake</a></td>\n <td>[&le;5;&le;8]</td>\n <td>0.50</td>\n </tr>\n </tbody></table>\n\n _<span style=\"font-size:0.8em;float:right\">Performance numbers are measurements from [uops.info](https://uops.info/).</span>_ <div style=\"clear:both\"></div>\n </li>\n </ul>"]
     #[inline(always)]
@@ -5106,7 +5078,7 @@ impl SimdBase<u32> for U32x8 {
     type Signed = I32x8;
     type Unsigned = U32x8;
     const LANES: usize = 8;
-    const ZERO: Self = { const_u32x8!([0; 8]) };
+    const ZERO: Self = Self::from_array([0; 8]);
     #[doc = "\n # Scalar Equivalent:\n ```\n # use vectoreyes::*;\n # trait SomeTraitForDoc {\n # fn the_doc_function\n # (\n #         &self  ,\n # )  -> bool\n # ;}\n # impl SomeTraitForDoc for U32x8 {\n # fn the_doc_function\n # (\n #         &self  ,\n # )  -> bool\n # {\n self.as_array().iter().all(|x| *x == 0)\n # }\n # }\n ```\n # Avx2\n <ul>\n <li>\n\n [**`_mm256_testz_si256`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm256_testz_si256)\n\n\n [`VPTEST (YMM, YMM)`](https://felixcloutier.com/x86/PTEST.html): Logical Compare\n\n <table style=\"line-height:0.7\">\n <thead><tr>\n <th>Architecture</th><th>Latency (cycles)</th><th>Throughput (CPI)</th>\n </tr></thead><tbody>\n <tr>\n <td><a href=\"https://uops.info/html-instr/VPTEST_YMM_YMM.html#SKL\">Skylake</a></td>\n <td>&le;6</td>\n <td>1.00</td>\n </tr>\n <tr>\n <td><a href=\"https://uops.info/html-instr/VPTEST_YMM_YMM.html#SKX\">Skylake-AVX512</a></td>\n <td>&le;6</td>\n <td>1.00</td>\n </tr>\n <tr>\n <td><a href=\"https://uops.info/html-instr/VPTEST_YMM_YMM.html#CLX\">Cascade Lake</a></td>\n <td>&le;6</td>\n <td>1.00</td>\n </tr>\n </tbody></table>\n\n _<span style=\"font-size:0.8em;float:right\">Performance numbers are measurements from [uops.info](https://uops.info/).</span>_ <div style=\"clear:both\"></div>\n </li>\n </ul>"]
     #[inline(always)]
     fn is_zero(&self) -> bool {
@@ -5309,14 +5281,12 @@ impl Sub for U64x2 {
     }
 }
 impl U64x2 {
-    #[doc(hidden)]
-    pub const fn new_from_const_raw_vector(x: U64x2Internal) -> Self {
-        Self(x)
+    #[doc = " Create a vector from an array.\n\n Unlike the `From` trait function, the `from_array` function is `const`.\n # Example\n ```\n # use vectoreyes::*;\n const MY_EXTREMELY_FUN_VALUE: U64x2 =\n     U64x2::from_array([0, 1]);\n for (i, value) in MY_EXTREMELY_FUN_VALUE.as_array().iter().copied().enumerate() {\n     assert_eq!(i as u64, value);\n }\n ```\n\n # Avx2"]
+    #[inline(always)]
+    pub const fn from_array(array: [u64; 2]) -> U64x2 {
+        select_impl_block! { scalar { U64x2(array) } avx2 { U64x2(unsafe { std::mem::transmute(array) }) } }
     }
 }
-#[macro_export]
-#[doc = "Create a constant vector\n# Example\n```\n# use vectoreyes::*;\nconst MY_EXTREMELY_FUN_VALUE: U64x2 =\n    const_u64x2!([0, 1]);\nfor (i, value) in MY_EXTREMELY_FUN_VALUE.as_array().iter().copied().enumerate() {\n    assert_eq!(i as u64, value);\n}\n```"]
-macro_rules! const_u64x2 { ($value:expr) => { { const THE_VALUE: [u64; 2] = $value; const THE_RESULT: $crate::U64x2 = $crate::U64x2::new_from_const_raw_vector({ #[cfg(not(all(target_arch="x86_64", all(target_feature = "aes", target_feature = "avx", target_feature = "avx2", target_feature = "pclmulqdq", target_feature = "sse2", target_feature = "sse4.1", target_feature = "sse4.2"))))] { THE_VALUE } #[cfg(all(target_arch="x86_64", all(target_feature = "aes", target_feature = "avx", target_feature = "avx2", target_feature = "pclmulqdq", target_feature = "sse2", target_feature = "sse4.1", target_feature = "sse4.2")))] { unsafe { ::std::mem::transmute::< [u64; 2], ::std::arch::x86_64::__m128i >(THE_VALUE) } } }); THE_RESULT } }; }
 impl From<[u64; 2]> for U64x2 {
     #[doc = "\n # Avx2\n <ul>\n <li>\n\n [**`_mm_loadu_si128`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm_loadu_si128)\n\n\n [`MOVDQU (XMM, M128)`](https://felixcloutier.com/x86/MOVDQU:VMOVDQU8:VMOVDQU16:VMOVDQU32:VMOVDQU64.html): Move Unaligned Packed Integer Values\n\n <table style=\"line-height:0.7\">\n <thead><tr>\n <th>Architecture</th><th>Latency (cycles)</th><th>Throughput (CPI)</th>\n </tr></thead><tbody>\n <tr>\n <td><a href=\"https://uops.info/html-instr/MOVDQU_XMM_M128.html#SKL\">Skylake</a></td>\n <td>[&le;4;&le;7]</td>\n <td>0.50</td>\n </tr>\n <tr>\n <td><a href=\"https://uops.info/html-instr/MOVDQU_XMM_M128.html#SKX\">Skylake-AVX512</a></td>\n <td>[&le;4;&le;7]</td>\n <td>0.50</td>\n </tr>\n <tr>\n <td><a href=\"https://uops.info/html-instr/MOVDQU_XMM_M128.html#CLX\">Cascade Lake</a></td>\n <td>[&le;4;&le;7]</td>\n <td>0.50</td>\n </tr>\n </tbody></table>\n\n _<span style=\"font-size:0.8em;float:right\">Performance numbers are measurements from [uops.info](https://uops.info/).</span>_ <div style=\"clear:both\"></div>\n </li>\n </ul>"]
     #[inline(always)]
@@ -5490,7 +5460,7 @@ impl SimdBase<u64> for U64x2 {
     type Signed = I64x2;
     type Unsigned = U64x2;
     const LANES: usize = 2;
-    const ZERO: Self = { const_u64x2!([0; 2]) };
+    const ZERO: Self = Self::from_array([0; 2]);
     #[doc = "\n # Scalar Equivalent:\n ```\n # use vectoreyes::*;\n # trait SomeTraitForDoc {\n # fn the_doc_function\n # (\n #         &self  ,\n # )  -> bool\n # ;}\n # impl SomeTraitForDoc for U64x2 {\n # fn the_doc_function\n # (\n #         &self  ,\n # )  -> bool\n # {\n self.as_array().iter().all(|x| *x == 0)\n # }\n # }\n ```\n # Avx2\n <ul>\n <li>\n\n [**`_mm_testz_si128`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm_testz_si128)\n\n\n [`PTEST (XMM, XMM)`](https://felixcloutier.com/x86/PTEST.html): Logical Compare\n\n <table style=\"line-height:0.7\">\n <thead><tr>\n <th>Architecture</th><th>Latency (cycles)</th><th>Throughput (CPI)</th>\n </tr></thead><tbody>\n <tr>\n <td><a href=\"https://uops.info/html-instr/PTEST_XMM_XMM.html#SKL\">Skylake</a></td>\n <td>&le;4</td>\n <td>1.00</td>\n </tr>\n <tr>\n <td><a href=\"https://uops.info/html-instr/PTEST_XMM_XMM.html#SKX\">Skylake-AVX512</a></td>\n <td>&le;4</td>\n <td>1.00</td>\n </tr>\n <tr>\n <td><a href=\"https://uops.info/html-instr/PTEST_XMM_XMM.html#CLX\">Cascade Lake</a></td>\n <td>&le;4</td>\n <td>1.00</td>\n </tr>\n </tbody></table>\n\n _<span style=\"font-size:0.8em;float:right\">Performance numbers are measurements from [uops.info](https://uops.info/).</span>_ <div style=\"clear:both\"></div>\n </li>\n </ul>"]
     #[inline(always)]
     fn is_zero(&self) -> bool {
@@ -5670,14 +5640,12 @@ impl Sub for U64x4 {
     }
 }
 impl U64x4 {
-    #[doc(hidden)]
-    pub const fn new_from_const_raw_vector(x: U64x4Internal) -> Self {
-        Self(x)
+    #[doc = " Create a vector from an array.\n\n Unlike the `From` trait function, the `from_array` function is `const`.\n # Example\n ```\n # use vectoreyes::*;\n const MY_EXTREMELY_FUN_VALUE: U64x4 =\n     U64x4::from_array([0, 1, 2, 3]);\n for (i, value) in MY_EXTREMELY_FUN_VALUE.as_array().iter().copied().enumerate() {\n     assert_eq!(i as u64, value);\n }\n ```\n\n # Avx2"]
+    #[inline(always)]
+    pub const fn from_array(array: [u64; 4]) -> U64x4 {
+        select_impl_block! { scalar { U64x4(array) } avx2 { U64x4(unsafe { std::mem::transmute(array) }) } }
     }
 }
-#[macro_export]
-#[doc = "Create a constant vector\n# Example\n```\n# use vectoreyes::*;\nconst MY_EXTREMELY_FUN_VALUE: U64x4 =\n    const_u64x4!([0, 1, 2, 3]);\nfor (i, value) in MY_EXTREMELY_FUN_VALUE.as_array().iter().copied().enumerate() {\n    assert_eq!(i as u64, value);\n}\n```"]
-macro_rules! const_u64x4 { ($value:expr) => { { const THE_VALUE: [u64; 4] = $value; const THE_RESULT: $crate::U64x4 = $crate::U64x4::new_from_const_raw_vector({ #[cfg(not(all(target_arch="x86_64", all(target_feature = "aes", target_feature = "avx", target_feature = "avx2", target_feature = "pclmulqdq", target_feature = "sse2", target_feature = "sse4.1", target_feature = "sse4.2"))))] { THE_VALUE } #[cfg(all(target_arch="x86_64", all(target_feature = "aes", target_feature = "avx", target_feature = "avx2", target_feature = "pclmulqdq", target_feature = "sse2", target_feature = "sse4.1", target_feature = "sse4.2")))] { unsafe { ::std::mem::transmute::< [u64; 4], ::std::arch::x86_64::__m256i >(THE_VALUE) } } }); THE_RESULT } }; }
 impl From<[u64; 4]> for U64x4 {
     #[doc = "\n # Avx2\n <ul>\n <li>\n\n [**`_mm256_loadu_si256`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm256_loadu_si256)\n\n\n [`VMOVDQU (YMM, M256)`](https://felixcloutier.com/x86/MOVDQU:VMOVDQU8:VMOVDQU16:VMOVDQU32:VMOVDQU64.html): Move Unaligned Packed Integer Values\n\n <table style=\"line-height:0.7\">\n <thead><tr>\n <th>Architecture</th><th>Latency (cycles)</th><th>Throughput (CPI)</th>\n </tr></thead><tbody>\n <tr>\n <td><a href=\"https://uops.info/html-instr/VMOVDQU_YMM_M256.html#SKL\">Skylake</a></td>\n <td>[&le;5;&le;8]</td>\n <td>0.50</td>\n </tr>\n <tr>\n <td><a href=\"https://uops.info/html-instr/VMOVDQU_YMM_M256.html#SKX\">Skylake-AVX512</a></td>\n <td>[&le;5;&le;8]</td>\n <td>0.50</td>\n </tr>\n <tr>\n <td><a href=\"https://uops.info/html-instr/VMOVDQU_YMM_M256.html#CLX\">Cascade Lake</a></td>\n <td>[&le;5;&le;8]</td>\n <td>0.50</td>\n </tr>\n </tbody></table>\n\n _<span style=\"font-size:0.8em;float:right\">Performance numbers are measurements from [uops.info](https://uops.info/).</span>_ <div style=\"clear:both\"></div>\n </li>\n </ul>"]
     #[inline(always)]
@@ -5892,7 +5860,7 @@ impl SimdBase<u64> for U64x4 {
     type Signed = I64x4;
     type Unsigned = U64x4;
     const LANES: usize = 4;
-    const ZERO: Self = { const_u64x4!([0; 4]) };
+    const ZERO: Self = Self::from_array([0; 4]);
     #[doc = "\n # Scalar Equivalent:\n ```\n # use vectoreyes::*;\n # trait SomeTraitForDoc {\n # fn the_doc_function\n # (\n #         &self  ,\n # )  -> bool\n # ;}\n # impl SomeTraitForDoc for U64x4 {\n # fn the_doc_function\n # (\n #         &self  ,\n # )  -> bool\n # {\n self.as_array().iter().all(|x| *x == 0)\n # }\n # }\n ```\n # Avx2\n <ul>\n <li>\n\n [**`_mm256_testz_si256`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm256_testz_si256)\n\n\n [`VPTEST (YMM, YMM)`](https://felixcloutier.com/x86/PTEST.html): Logical Compare\n\n <table style=\"line-height:0.7\">\n <thead><tr>\n <th>Architecture</th><th>Latency (cycles)</th><th>Throughput (CPI)</th>\n </tr></thead><tbody>\n <tr>\n <td><a href=\"https://uops.info/html-instr/VPTEST_YMM_YMM.html#SKL\">Skylake</a></td>\n <td>&le;6</td>\n <td>1.00</td>\n </tr>\n <tr>\n <td><a href=\"https://uops.info/html-instr/VPTEST_YMM_YMM.html#SKX\">Skylake-AVX512</a></td>\n <td>&le;6</td>\n <td>1.00</td>\n </tr>\n <tr>\n <td><a href=\"https://uops.info/html-instr/VPTEST_YMM_YMM.html#CLX\">Cascade Lake</a></td>\n <td>&le;6</td>\n <td>1.00</td>\n </tr>\n </tbody></table>\n\n _<span style=\"font-size:0.8em;float:right\">Performance numbers are measurements from [uops.info](https://uops.info/).</span>_ <div style=\"clear:both\"></div>\n </li>\n </ul>"]
     #[inline(always)]
     fn is_zero(&self) -> bool {
@@ -6045,7 +6013,7 @@ impl crate::AesBlockCipher for Aes128 {
     };
     const FIXED_KEY: Self = Self {
         key: {
-            select_impl_block! { scalar { Aes128KeySchedule::Fixed } avx2 { Aes128KeySchedule { encrypt_keys: [ const_u32x4!([3238012093, 869155090, 3346873837, 624973480]), const_u32x4!([54471949, 821128223, 4153168370, 3536586586]), const_u32x4!([3179964106, 2373651157, 2063031079, 2822462589]), const_u32x4!([1112048772, 3476262481, 3049575798, 503286027]), const_u32x4!([1777111595, 2799639674, 320588044, 249839623]), const_u32x4!([2890398514, 177792840, 428027460, 392654403]), const_u32x4!([3065478797, 3157236165, 2779559809, 2999704002]), const_u32x4!([2474664440, 800061501, 2315472828, 952669822]), const_u32x4!([1619495400, 1328050645, 3307945577, 4259555351]), const_u32x4!([2429786161, 3757828580, 449894285, 3878911898]), const_u32x4!([675765205, 4156338737, 3983304124, 174004774]), ], decrypt_keys: [ const_u32x4!([3238012093, 869155090, 3346873837, 624973480]), const_u32x4!([1534283129, 1353216825, 299572238, 3455295203]), const_u32x4!([1037093821, 1836628100, 2091099274, 2974825065]), const_u32x4!([3122358467, 3613642823, 2881516749, 445664932]), const_u32x4!([3943393460, 1013496051, 2544421950, 2369290906]), const_u32x4!([3849123421, 3640938158, 1319928464, 3281256458]), const_u32x4!([4001290683, 930780949, 2044073349, 3124893071]), const_u32x4!([384560028, 563182729, 1481074956, 3792010371]), const_u32x4!([942655063, 431930078, 1106891730, 2751246161]), const_u32x4!([302765350, 196440056, 1246542890, 3920630651]), const_u32x4!([675765205, 4156338737, 3983304124, 174004774]), ], } } }
+            select_impl_block! { scalar { Aes128KeySchedule::Fixed } avx2 { Aes128KeySchedule { encrypt_keys: [ U32x4::from_array([3238012093, 869155090, 3346873837, 624973480]), U32x4::from_array([54471949, 821128223, 4153168370, 3536586586]), U32x4::from_array([3179964106, 2373651157, 2063031079, 2822462589]), U32x4::from_array([1112048772, 3476262481, 3049575798, 503286027]), U32x4::from_array([1777111595, 2799639674, 320588044, 249839623]), U32x4::from_array([2890398514, 177792840, 428027460, 392654403]), U32x4::from_array([3065478797, 3157236165, 2779559809, 2999704002]), U32x4::from_array([2474664440, 800061501, 2315472828, 952669822]), U32x4::from_array([1619495400, 1328050645, 3307945577, 4259555351]), U32x4::from_array([2429786161, 3757828580, 449894285, 3878911898]), U32x4::from_array([675765205, 4156338737, 3983304124, 174004774]), ], decrypt_keys: [ U32x4::from_array([3238012093, 869155090, 3346873837, 624973480]), U32x4::from_array([1534283129, 1353216825, 299572238, 3455295203]), U32x4::from_array([1037093821, 1836628100, 2091099274, 2974825065]), U32x4::from_array([3122358467, 3613642823, 2881516749, 445664932]), U32x4::from_array([3943393460, 1013496051, 2544421950, 2369290906]), U32x4::from_array([3849123421, 3640938158, 1319928464, 3281256458]), U32x4::from_array([4001290683, 930780949, 2044073349, 3124893071]), U32x4::from_array([384560028, 563182729, 1481074956, 3792010371]), U32x4::from_array([942655063, 431930078, 1106891730, 2751246161]), U32x4::from_array([302765350, 196440056, 1246542890, 3920630651]), U32x4::from_array([675765205, 4156338737, 3983304124, 174004774]), ], } } }
         },
     };
     #[doc = "\n # Avx2\n <ul>\n <li>\n\n [**`_mm_aesimc_si128`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm_aesimc_si128)\n\n\n [`AESIMC (XMM, XMM)`](https://felixcloutier.com/x86/AESIMC.html): Perform the AES InvMixColumn Transformation\n\n <table style=\"line-height:0.7\">\n <thead><tr>\n <th>Architecture</th><th>Latency (cycles)</th><th>Throughput (CPI)</th>\n </tr></thead><tbody>\n <tr>\n <td><a href=\"https://uops.info/html-instr/AESIMC_XMM_XMM.html#SKL\">Skylake</a></td>\n <td>8</td>\n <td>2.00</td>\n </tr>\n <tr>\n <td><a href=\"https://uops.info/html-instr/AESIMC_XMM_XMM.html#SKX\">Skylake-AVX512</a></td>\n <td>8</td>\n <td>2.00</td>\n </tr>\n <tr>\n <td><a href=\"https://uops.info/html-instr/AESIMC_XMM_XMM.html#CLX\">Cascade Lake</a></td>\n <td>8</td>\n <td>2.00</td>\n </tr>\n </tbody></table>\n\n _<span style=\"font-size:0.8em;float:right\">Performance numbers are measurements from [uops.info](https://uops.info/).</span>_ <div style=\"clear:both\"></div>\n </li>\n <li>\n\n [**`_mm_aeskeygenassist_si128`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm_aeskeygenassist_si128)\n\n\n [`AESKEYGENASSIST (XMM, XMM, I8)`](https://felixcloutier.com/x86/AESKEYGENASSIST.html): AES Round Key Generation Assist\n\n <table style=\"line-height:0.7\">\n <thead><tr>\n <th>Architecture</th><th>Latency (cycles)</th><th>Throughput (CPI)</th>\n </tr></thead><tbody>\n <tr>\n <td><a href=\"https://uops.info/html-instr/AESKEYGENASSIST_XMM_XMM_I8.html#SKL\">Skylake</a></td>\n <td>7</td>\n <td>12.00</td>\n </tr>\n <tr>\n <td><a href=\"https://uops.info/html-instr/AESKEYGENASSIST_XMM_XMM_I8.html#SKX\">Skylake-AVX512</a></td>\n <td>7</td>\n <td>12.00</td>\n </tr>\n <tr>\n <td><a href=\"https://uops.info/html-instr/AESKEYGENASSIST_XMM_XMM_I8.html#CLX\">Cascade Lake</a></td>\n <td>7</td>\n <td>12.00</td>\n </tr>\n </tbody></table>\n\n _<span style=\"font-size:0.8em;float:right\">Performance numbers are measurements from [uops.info](https://uops.info/).</span>_ <div style=\"clear:both\"></div>\n </li>\n </ul>"]
@@ -6098,7 +6066,7 @@ impl crate::AesBlockCipher for Aes128EncryptOnly {
     };
     const FIXED_KEY: Self = Self {
         key: {
-            select_impl_block! { scalar { Aes128KeySchedule::Fixed } avx2 { [ const_u32x4!([3238012093, 869155090, 3346873837, 624973480]), const_u32x4!([54471949, 821128223, 4153168370, 3536586586]), const_u32x4!([3179964106, 2373651157, 2063031079, 2822462589]), const_u32x4!([1112048772, 3476262481, 3049575798, 503286027]), const_u32x4!([1777111595, 2799639674, 320588044, 249839623]), const_u32x4!([2890398514, 177792840, 428027460, 392654403]), const_u32x4!([3065478797, 3157236165, 2779559809, 2999704002]), const_u32x4!([2474664440, 800061501, 2315472828, 952669822]), const_u32x4!([1619495400, 1328050645, 3307945577, 4259555351]), const_u32x4!([2429786161, 3757828580, 449894285, 3878911898]), const_u32x4!([675765205, 4156338737, 3983304124, 174004774]), ] } }
+            select_impl_block! { scalar { Aes128KeySchedule::Fixed } avx2 { [ U32x4::from_array([3238012093, 869155090, 3346873837, 624973480]), U32x4::from_array([54471949, 821128223, 4153168370, 3536586586]), U32x4::from_array([3179964106, 2373651157, 2063031079, 2822462589]), U32x4::from_array([1112048772, 3476262481, 3049575798, 503286027]), U32x4::from_array([1777111595, 2799639674, 320588044, 249839623]), U32x4::from_array([2890398514, 177792840, 428027460, 392654403]), U32x4::from_array([3065478797, 3157236165, 2779559809, 2999704002]), U32x4::from_array([2474664440, 800061501, 2315472828, 952669822]), U32x4::from_array([1619495400, 1328050645, 3307945577, 4259555351]), U32x4::from_array([2429786161, 3757828580, 449894285, 3878911898]), U32x4::from_array([675765205, 4156338737, 3983304124, 174004774]), ] } }
         },
     };
     #[doc = "\n # Avx2\n <ul>\n <li>\n\n [**`_mm_aeskeygenassist_si128`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm_aeskeygenassist_si128)\n\n\n [`AESKEYGENASSIST (XMM, XMM, I8)`](https://felixcloutier.com/x86/AESKEYGENASSIST.html): AES Round Key Generation Assist\n\n <table style=\"line-height:0.7\">\n <thead><tr>\n <th>Architecture</th><th>Latency (cycles)</th><th>Throughput (CPI)</th>\n </tr></thead><tbody>\n <tr>\n <td><a href=\"https://uops.info/html-instr/AESKEYGENASSIST_XMM_XMM_I8.html#SKL\">Skylake</a></td>\n <td>7</td>\n <td>12.00</td>\n </tr>\n <tr>\n <td><a href=\"https://uops.info/html-instr/AESKEYGENASSIST_XMM_XMM_I8.html#SKX\">Skylake-AVX512</a></td>\n <td>7</td>\n <td>12.00</td>\n </tr>\n <tr>\n <td><a href=\"https://uops.info/html-instr/AESKEYGENASSIST_XMM_XMM_I8.html#CLX\">Cascade Lake</a></td>\n <td>7</td>\n <td>12.00</td>\n </tr>\n </tbody></table>\n\n _<span style=\"font-size:0.8em;float:right\">Performance numbers are measurements from [uops.info](https://uops.info/).</span>_ <div style=\"clear:both\"></div>\n </li>\n </ul>"]
@@ -6135,7 +6103,7 @@ impl crate::AesBlockCipher for Aes256 {
     };
     const FIXED_KEY: Self = Self {
         key: {
-            select_impl_block! { scalar { Aes256KeySchedule::Fixed } avx2 { Aes256KeySchedule { encrypt_keys: [ const_u32x4!([1375551388, 3472045213, 1992838357, 1854752656]), const_u32x4!([3463058199, 104013108, 680888422, 2141383227]), const_u32x4!([3006203162, 2111582599, 185892178, 1704540866]), const_u32x4!([2206503730, 2243399174, 2904688224, 3531664475]), const_u32x4!([2325399766, 4148623697, 4233266179, 2580266689]), const_u32x4!([1838890314, 3895243596, 1158591788, 2542688631]), const_u32x4!([2131939609, 2287216712, 1946594379, 3989639818]), const_u32x4!([942076980, 3490334584, 2500129364, 42642211]), const_u32x4!([1499836275, 3509684027, 2771856240, 1224358394]), const_u32x4!([1779164697, 3120669025, 788878133, 764409878]), const_u32x4!([515759138, 3482082073, 1790668905, 574704019]), const_u32x4!([4186496453, 1133083812, 1821126545, 1090770823]), const_u32x4!([155100940, 3333618709, 2886306940, 2387133935]), const_u32x4!([3772414746, 2740127678, 3487508527, 2396848040]), const_u32x4!([3408339290, 227925327, 2711376179, 802460892]), ], decrypt_keys: [ const_u32x4!([1375551388, 3472045213, 1992838357, 1854752656]), const_u32x4!([3909185319, 4072264070, 4293458365, 4181554364]), const_u32x4!([3811526663, 375223336, 3515008932, 1932076154]), const_u32x4!([1535450212, 2839334370, 1456747615, 2951299299]), const_u32x4!([1609499071, 1236432279, 2553328179, 3944322633]), const_u32x4!([2648757288, 886839754, 1644703125, 3454102902]), const_u32x4!([3340646468, 2393656787, 379387872, 4253378985]), const_u32x4!([1227235987, 2113551193, 535959244, 3524492218]), const_u32x4!([1508144169, 3611834874, 3251947034, 1011986355]), const_u32x4!([2290295734, 4118354159, 3934981667, 949515673]), const_u32x4!([3223959564, 392266230, 3602204652, 3940870239]), const_u32x4!([491383766, 3895522105, 45874458, 975407235]), const_u32x4!([2642940057, 2330562927, 1549588099, 3065528028]), const_u32x4!([3761687872, 134626937, 180208483, 815680480]), const_u32x4!([3408339290, 227925327, 2711376179, 802460892]), ], } } }
+            select_impl_block! { scalar { Aes256KeySchedule::Fixed } avx2 { Aes256KeySchedule { encrypt_keys: [ U32x4::from_array([1375551388, 3472045213, 1992838357, 1854752656]), U32x4::from_array([3463058199, 104013108, 680888422, 2141383227]), U32x4::from_array([3006203162, 2111582599, 185892178, 1704540866]), U32x4::from_array([2206503730, 2243399174, 2904688224, 3531664475]), U32x4::from_array([2325399766, 4148623697, 4233266179, 2580266689]), U32x4::from_array([1838890314, 3895243596, 1158591788, 2542688631]), U32x4::from_array([2131939609, 2287216712, 1946594379, 3989639818]), U32x4::from_array([942076980, 3490334584, 2500129364, 42642211]), U32x4::from_array([1499836275, 3509684027, 2771856240, 1224358394]), U32x4::from_array([1779164697, 3120669025, 788878133, 764409878]), U32x4::from_array([515759138, 3482082073, 1790668905, 574704019]), U32x4::from_array([4186496453, 1133083812, 1821126545, 1090770823]), U32x4::from_array([155100940, 3333618709, 2886306940, 2387133935]), U32x4::from_array([3772414746, 2740127678, 3487508527, 2396848040]), U32x4::from_array([3408339290, 227925327, 2711376179, 802460892]), ], decrypt_keys: [ U32x4::from_array([1375551388, 3472045213, 1992838357, 1854752656]), U32x4::from_array([3909185319, 4072264070, 4293458365, 4181554364]), U32x4::from_array([3811526663, 375223336, 3515008932, 1932076154]), U32x4::from_array([1535450212, 2839334370, 1456747615, 2951299299]), U32x4::from_array([1609499071, 1236432279, 2553328179, 3944322633]), U32x4::from_array([2648757288, 886839754, 1644703125, 3454102902]), U32x4::from_array([3340646468, 2393656787, 379387872, 4253378985]), U32x4::from_array([1227235987, 2113551193, 535959244, 3524492218]), U32x4::from_array([1508144169, 3611834874, 3251947034, 1011986355]), U32x4::from_array([2290295734, 4118354159, 3934981667, 949515673]), U32x4::from_array([3223959564, 392266230, 3602204652, 3940870239]), U32x4::from_array([491383766, 3895522105, 45874458, 975407235]), U32x4::from_array([2642940057, 2330562927, 1549588099, 3065528028]), U32x4::from_array([3761687872, 134626937, 180208483, 815680480]), U32x4::from_array([3408339290, 227925327, 2711376179, 802460892]), ], } } }
         },
     };
     #[doc = "\n # Avx2\n <ul>\n <li>\n\n [**`_mm_aesimc_si128`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm_aesimc_si128)\n\n\n [`AESIMC (XMM, XMM)`](https://felixcloutier.com/x86/AESIMC.html): Perform the AES InvMixColumn Transformation\n\n <table style=\"line-height:0.7\">\n <thead><tr>\n <th>Architecture</th><th>Latency (cycles)</th><th>Throughput (CPI)</th>\n </tr></thead><tbody>\n <tr>\n <td><a href=\"https://uops.info/html-instr/AESIMC_XMM_XMM.html#SKL\">Skylake</a></td>\n <td>8</td>\n <td>2.00</td>\n </tr>\n <tr>\n <td><a href=\"https://uops.info/html-instr/AESIMC_XMM_XMM.html#SKX\">Skylake-AVX512</a></td>\n <td>8</td>\n <td>2.00</td>\n </tr>\n <tr>\n <td><a href=\"https://uops.info/html-instr/AESIMC_XMM_XMM.html#CLX\">Cascade Lake</a></td>\n <td>8</td>\n <td>2.00</td>\n </tr>\n </tbody></table>\n\n _<span style=\"font-size:0.8em;float:right\">Performance numbers are measurements from [uops.info](https://uops.info/).</span>_ <div style=\"clear:both\"></div>\n </li>\n <li>\n\n [**`_mm_aeskeygenassist_si128`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm_aeskeygenassist_si128)\n\n\n [`AESKEYGENASSIST (XMM, XMM, I8)`](https://felixcloutier.com/x86/AESKEYGENASSIST.html): AES Round Key Generation Assist\n\n <table style=\"line-height:0.7\">\n <thead><tr>\n <th>Architecture</th><th>Latency (cycles)</th><th>Throughput (CPI)</th>\n </tr></thead><tbody>\n <tr>\n <td><a href=\"https://uops.info/html-instr/AESKEYGENASSIST_XMM_XMM_I8.html#SKL\">Skylake</a></td>\n <td>7</td>\n <td>12.00</td>\n </tr>\n <tr>\n <td><a href=\"https://uops.info/html-instr/AESKEYGENASSIST_XMM_XMM_I8.html#SKX\">Skylake-AVX512</a></td>\n <td>7</td>\n <td>12.00</td>\n </tr>\n <tr>\n <td><a href=\"https://uops.info/html-instr/AESKEYGENASSIST_XMM_XMM_I8.html#CLX\">Cascade Lake</a></td>\n <td>7</td>\n <td>12.00</td>\n </tr>\n </tbody></table>\n\n _<span style=\"font-size:0.8em;float:right\">Performance numbers are measurements from [uops.info](https://uops.info/).</span>_ <div style=\"clear:both\"></div>\n </li>\n </ul>"]
@@ -6189,7 +6157,7 @@ impl crate::AesBlockCipher for Aes256EncryptOnly {
     };
     const FIXED_KEY: Self = Self {
         key: {
-            select_impl_block! { scalar { Aes256KeySchedule::Fixed } avx2 { [ const_u32x4!([1375551388, 3472045213, 1992838357, 1854752656]), const_u32x4!([3463058199, 104013108, 680888422, 2141383227]), const_u32x4!([3006203162, 2111582599, 185892178, 1704540866]), const_u32x4!([2206503730, 2243399174, 2904688224, 3531664475]), const_u32x4!([2325399766, 4148623697, 4233266179, 2580266689]), const_u32x4!([1838890314, 3895243596, 1158591788, 2542688631]), const_u32x4!([2131939609, 2287216712, 1946594379, 3989639818]), const_u32x4!([942076980, 3490334584, 2500129364, 42642211]), const_u32x4!([1499836275, 3509684027, 2771856240, 1224358394]), const_u32x4!([1779164697, 3120669025, 788878133, 764409878]), const_u32x4!([515759138, 3482082073, 1790668905, 574704019]), const_u32x4!([4186496453, 1133083812, 1821126545, 1090770823]), const_u32x4!([155100940, 3333618709, 2886306940, 2387133935]), const_u32x4!([3772414746, 2740127678, 3487508527, 2396848040]), const_u32x4!([3408339290, 227925327, 2711376179, 802460892]), ] } }
+            select_impl_block! { scalar { Aes256KeySchedule::Fixed } avx2 { [ U32x4::from_array([1375551388, 3472045213, 1992838357, 1854752656]), U32x4::from_array([3463058199, 104013108, 680888422, 2141383227]), U32x4::from_array([3006203162, 2111582599, 185892178, 1704540866]), U32x4::from_array([2206503730, 2243399174, 2904688224, 3531664475]), U32x4::from_array([2325399766, 4148623697, 4233266179, 2580266689]), U32x4::from_array([1838890314, 3895243596, 1158591788, 2542688631]), U32x4::from_array([2131939609, 2287216712, 1946594379, 3989639818]), U32x4::from_array([942076980, 3490334584, 2500129364, 42642211]), U32x4::from_array([1499836275, 3509684027, 2771856240, 1224358394]), U32x4::from_array([1779164697, 3120669025, 788878133, 764409878]), U32x4::from_array([515759138, 3482082073, 1790668905, 574704019]), U32x4::from_array([4186496453, 1133083812, 1821126545, 1090770823]), U32x4::from_array([155100940, 3333618709, 2886306940, 2387133935]), U32x4::from_array([3772414746, 2740127678, 3487508527, 2396848040]), U32x4::from_array([3408339290, 227925327, 2711376179, 802460892]), ] } }
         },
     };
     #[doc = "\n # Avx2\n <ul>\n <li>\n\n [**`_mm_aeskeygenassist_si128`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm_aeskeygenassist_si128)\n\n\n [`AESKEYGENASSIST (XMM, XMM, I8)`](https://felixcloutier.com/x86/AESKEYGENASSIST.html): AES Round Key Generation Assist\n\n <table style=\"line-height:0.7\">\n <thead><tr>\n <th>Architecture</th><th>Latency (cycles)</th><th>Throughput (CPI)</th>\n </tr></thead><tbody>\n <tr>\n <td><a href=\"https://uops.info/html-instr/AESKEYGENASSIST_XMM_XMM_I8.html#SKL\">Skylake</a></td>\n <td>7</td>\n <td>12.00</td>\n </tr>\n <tr>\n <td><a href=\"https://uops.info/html-instr/AESKEYGENASSIST_XMM_XMM_I8.html#SKX\">Skylake-AVX512</a></td>\n <td>7</td>\n <td>12.00</td>\n </tr>\n <tr>\n <td><a href=\"https://uops.info/html-instr/AESKEYGENASSIST_XMM_XMM_I8.html#CLX\">Cascade Lake</a></td>\n <td>7</td>\n <td>12.00</td>\n </tr>\n </tbody></table>\n\n _<span style=\"font-size:0.8em;float:right\">Performance numbers are measurements from [uops.info](https://uops.info/).</span>_ <div style=\"clear:both\"></div>\n </li>\n </ul>"]

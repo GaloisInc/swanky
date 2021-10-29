@@ -241,6 +241,6 @@ fn const_matches_from() {
     ];
     assert_eq!(
         crate::{{ty}}::from(ARR),
-        const_{{(ty ~ "").lower()}}!(ARR),
+        crate::{{ty}}::from_array(ARR),
     );
 }

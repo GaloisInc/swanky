@@ -177,19 +177,19 @@
                         {% if encrypt_only %}
                             [
                                 {% for rk in fixed_encrypt_round_keys %}
-                                    const_u32x4!({{ rk | list }}),
+                                    U32x4::from_array({{ rk | list }}),
                                 {% endfor %}
                             ]
                         {% else %}
                             Aes{{key_size}}{{encrypt_only}}KeySchedule {
                                 encrypt_keys: [
                                     {% for rk in fixed_encrypt_round_keys %}
-                                        const_u32x4!({{ rk | list }}),
+                                        U32x4::from_array({{ rk | list }}),
                                     {% endfor %}
                                 ],
                                 decrypt_keys: [
                                     {% for rk in fixed_decrypt_round_keys %}
-                                        const_u32x4!({{ rk | list }}),
+                                        U32x4::from_array({{ rk | list }}),
                                     {% endfor %}
                                 ],
                             }

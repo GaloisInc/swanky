@@ -61,5 +61,5 @@ fn zero_is_zero() {
 #[test]
 fn const_matches_from() {
     const ARR: [i8; 16] = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
-    assert_eq!(crate::I8x16::from(ARR), const_i8x16!(ARR),);
+    assert_eq!(crate::I8x16::from(ARR), crate::I8x16::from_array(ARR),);
 }
