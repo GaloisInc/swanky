@@ -78,6 +78,15 @@ pub trait FiniteField:
     const MULTIPLICATIVE_GROUP_ORDER: u128;
     /// The modulus of the prime sub-field.
     const MODULUS: u128;
+    /// Generate a random non-zero field element.
+    fn random_nonzero<R: RngCore + ?Sized>(rng: &mut R) -> Self {
+        loop {
+            let out = Self::random(rng);
+            if out != Self::ZERO {
+                return out;
+            }
+        }
+    }
     /// The generator for the multiplicative group.
     const GENERATOR: Self;
     /// The additive identity element.

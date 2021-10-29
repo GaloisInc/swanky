@@ -114,11 +114,7 @@ fn lpn_mtx_indices<FE: FiniteField>(
             rand_idx = distribution.sample(&mut rng);
         }
         indices[i].0 = rand_idx;
-        // TODO: use rejection sampling. indicies[i].1 shouldn't be zero, regardless of the prime
-        // modulus.
-        if FE::PrimeField::MODULUS != 2 {
-            indices[i].1 = FE::PrimeField::random(&mut rng);
-        }
+        indices[i].1 = FE::PrimeField::random_nonzero(&mut rng);
     }
     indices
 }
