@@ -66,5 +66,5 @@ fn zero_is_zero() {
 #[test]
 fn const_matches_from() {
     const ARR: [i32; 4] = [0, 1, 2, 3];
-    assert_eq!(crate::I32x4::from(ARR), const_i32x4!(ARR),);
+    assert_eq!(crate::I32x4::from(ARR), crate::I32x4::from_array(ARR),);
 }

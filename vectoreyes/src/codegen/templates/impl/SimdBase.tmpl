@@ -3,13 +3,7 @@ impl SimdBase<{{ty.ty}}> for {{ty}} {
     type Signed = {{ty.signed}};
     type Unsigned = {{ty.unsigned}};
     const LANES: usize = {{ty.count}};
-    const ZERO: Self = {
-        {% if force_scalar_for_test %}
-            Self([0; {{ty.count}}])
-        {% else %}
-            const_{{(ty ~ "").lower()}}!([0; {{ty.count}}])
-        {% endif %}
-    };
+    const ZERO: Self = Self::from_array([0; {{ty.count}}]);
     
     {% call(scalar, avx2) fn("is_zero", {"&self": ty}, returns=BoolType()) %}
     {% call scalar() %}
