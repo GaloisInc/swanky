@@ -52,7 +52,9 @@ pub trait FiniteField:
     fn to_bytes(&self) -> GenericArray<u8, Self::ByteReprLen>;
 
     /// The prime-order subfield of the finite field.
-    type PrimeField: FiniteField + IsSubfieldOf<Self> + PrimeFiniteField;
+    type PrimeField: FiniteField<PrimeField = Self::PrimeField>
+        + IsSubfieldOf<Self>
+        + PrimeFiniteField;
     /// When elements of this field are represented as a polynomial over the prime field,
     /// how many coefficients are needed?
     type PolynomialFormNumCoefficients: ArrayLength<Self::PrimeField> + ArrayLength<Self>;
@@ -73,11 +75,6 @@ pub trait FiniteField:
     fn from_uniform_bytes(x: &[u8; 16]) -> Self;
     /// Generate a random field element.
     fn random<R: RngCore + ?Sized>(rng: &mut R) -> Self;
-    /// The order of the multiplicative group
-    // TODO: we'll want a better number type than u128 if the fields get bigger.
-    const MULTIPLICATIVE_GROUP_ORDER: u128;
-    /// The modulus of the prime sub-field.
-    const MODULUS: u128;
     /// Generate a random non-zero field element.
     fn random_nonzero<R: RngCore + ?Sized>(rng: &mut R) -> Self {
         loop {
@@ -132,17 +129,13 @@ pub trait FiniteField:
     /// Compute the multiplicative inverse of self.
     ///
     /// # Panics
-    /// This function will panic if *self == Self::zero()
-    fn inverse(&self) -> Self {
-        if *self == Self::ZERO {
-            panic!("Zero cannot be inverted");
-        }
-        // NOTE: this only works for GF(p^n)
-        self.pow(Self::MULTIPLICATIVE_GROUP_ORDER - 1)
-    }
+    /// This function will panic if `*self == Self::zero()`
+    fn inverse(&self) -> Self;
 
-    // TODO: what should we do if pow isn't secret.
-    /// Computing `pow` using Montgomery's ladder technique.
+    // TODO: what should we do if n isn't secret.
+    /// Compute `self` to the power of `n`.
+    /// # Constant-Time
+    /// This function will execute in constant-time, regardless of `n`'s value.
     fn pow(&self, n: u128) -> Self {
         let mut r0 = Self::ONE;
         let mut r1 = *self;
@@ -177,11 +170,20 @@ impl<FE: FiniteField> IsSubfieldOf<FE> for FE {
 
 /// A `PrimeFiniteField` is a `FiniteField` whose `PrimeField` is
 /// itself. In this case the field is isomorphic to integers modulo
-/// p and this trait provides a modulo 2 operation.
+/// p.
 pub trait PrimeFiniteField:
     FiniteField<PolynomialFormNumCoefficients = generic_array::typenum::U1, PrimeField = Self>
 {
-    /// This function computes the modulo 2 operation.
+    /// The number of bits needed to store the modulus of this field.
+    ///
+    /// More exactly, let $`p`$ be a positive prime number, where `Self` denotes the field
+    /// $`\mathbb{F}_p`$. This constant ought to be:
+    /// ```math
+    /// \lceil \log_2(p) \rceil
+    /// ```
+    const BITS_OF_MODULUS: usize;
+    /// Return either a 0 or 1, the result of taking the integer representation of this field
+    /// element modulo 2.
     fn mod2(&self) -> Self;
 }
 

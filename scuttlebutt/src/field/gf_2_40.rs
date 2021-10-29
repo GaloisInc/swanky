@@ -161,14 +161,12 @@ impl FiniteField for Gf40 {
         Gf40(rng.next_u64() & ((1 << 40) - 1))
     }
 
-    const MULTIPLICATIVE_GROUP_ORDER: u128 = (1 << 40) - 1;
     type NumberOfBitsInBitDecomposition = generic_array::typenum::U40;
 
     fn bit_decomposition(&self) -> GenericArray<bool, Self::NumberOfBitsInBitDecomposition> {
         super::standard_bit_decomposition(u128::from(self.0))
     }
 
-    const MODULUS: u128 = 2;
     // This corresponds to the polynomial P(x) = x
     const GENERATOR: Self = Gf40(2);
 
@@ -181,6 +179,13 @@ impl FiniteField for Gf40 {
         // Equivalent to:
         // Self::conditional_select(&Self::ZERO, &self, pf.ct_eq(&F2::ONE))
         Gf40((!((pf.0 as u64).wrapping_sub(1))) & self.0)
+    }
+
+    fn inverse(&self) -> Self {
+        if *self == Self::ZERO {
+            panic!("Zero cannot be inverted");
+        }
+        self.pow((1 << 40) - 2)
     }
 }
 

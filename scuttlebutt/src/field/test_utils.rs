@@ -147,17 +147,6 @@ macro_rules! test_field {
             }
             proptest! {
                 #[test]
-                fn test_power(a in any_fe()) {
-                    assert_eq!(a.pow(0), <$f>::ONE);
-                    if a != <$f>::ZERO {
-                        assert_eq!(a.pow(<$f>::MULTIPLICATIVE_GROUP_ORDER), <$f>::ONE);
-                    } else {
-                        assert_eq!(a.pow(<$f>::MULTIPLICATIVE_GROUP_ORDER), <$f>::ZERO);
-                    }
-                }
-            }
-            proptest! {
-                #[test]
                 fn polynomial_roundtrip(a in any_fe()) {
                     assert_eq!(<$f>::from_polynomial_coefficients(a.to_polynomial_coefficients()), a);
                 }
