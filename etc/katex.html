@@ -1,10 +1,5 @@
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.13.0/katex.min.css"
-    integrity="sha512-MJmGvrYhgWyFswGuarVFhndqozyLfTRtlbC21mYB+6I1IWvfAuPbEWd38bfQKbrTUb7Jba/bQg/vA9htQu6clQ=="
-    crossorigin="anonymous" />
-<script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.13.0/katex.min.js"
-    integrity="sha512-RUPvLPAfrnUiXmfqR6xAYlt238VtSE3pOlqlov7LPnk0EAi3U6SvvSLgxNukvwabGjt0F43s0c/rvIZdlD4+Qg=="
-    crossorigin="anonymous"></script>
-
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.13.20/katex.min.css" integrity="sha512-SgbQw5g+dYpW7CUSasc2ontF/7/JIHORpkzukPxbO2JIcyGy7p2WtlkfBGHvekdhJawrdp+p1bEzBH+nU/cbEg==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+<script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.13.20/katex.min.js" integrity="sha512-vhW78Uk043jhhQnaIpK3Io8CbTmcD3fcfZyhl7qz+Md1P78MI7Hlw39lEqdddt8nobv4sclKZU8CeVDzIfLUNA==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 <script>
     document.addEventListener("DOMContentLoaded", function () {
         function foreach(dom_array, cb) {
@@ -13,7 +8,7 @@
                 cb(dom_array[i]);
             }
         }
-        foreach(document.querySelectorAll("code.language-math"), function (elem) {
+        function processBlock(elem) {
             katex.render(elem.textContent, elem, { display: true });
             elem.style.display = "flex";
             elem.style.justifyContent = "center";
@@ -21,7 +16,9 @@
             elem.style.backgroundColor = "transparent";
             if (elem.parentElement.tagName === "PRE")
                 elem.parentElement.style.backgroundColor = "transparent";
-        });
+        }
+        foreach(document.querySelectorAll("code.language-math"), processBlock);
+        foreach(document.querySelectorAll("pre.language-math"), processBlock);
         foreach(document.querySelectorAll("code"), function (elem) {
             if (elem.className !== '') return;
             function checkSibling(sibling, dollarAtEnd) {

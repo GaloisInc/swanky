@@ -17,6 +17,9 @@ computation (MPC).
 **swanky** is currently considered **prototype** software. Do not deploy it in
 production, or trust it with sensitive data.
 
+# Generating Documentation
+To generate documentation, please use `etc/rustdoc.py` in lieu of `cargo doc`.
+
 # License
 
 MIT License
