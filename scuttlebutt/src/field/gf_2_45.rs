@@ -148,9 +148,12 @@ impl FiniteField for Gf45 {
         Gf45(rng.next_u64() & ((1 << 45) - 1))
     }
 
-    const MULTIPLICATIVE_GROUP_ORDER: u128 = (1 << 45) - 1;
+    type NumberOfBitsInBitDecomposition = generic_array::typenum::U45;
 
-    const MODULUS: u128 = 2;
+    fn bit_decomposition(&self) -> GenericArray<bool, Self::NumberOfBitsInBitDecomposition> {
+        super::standard_bit_decomposition(u128::from(self.0))
+    }
+
     // This corresponds to the polynomial P(x) = x
     const GENERATOR: Self = Gf45(2);
 
@@ -161,6 +164,13 @@ impl FiniteField for Gf45 {
     #[inline]
     fn multiply_by_prime_subfield(&self, pf: Self::PrimeField) -> Self {
         Self::conditional_select(&Self::ZERO, &self, pf.ct_eq(&F2::ONE))
+    }
+
+    fn inverse(&self) -> Self {
+        if *self == Self::ZERO {
+            panic!("Zero cannot be inverted");
+        }
+        self.pow((1 << 45) - 2)
     }
 }
 

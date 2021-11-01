@@ -23,6 +23,10 @@ use subtle::{Choice, ConditionallySelectable, ConstantTimeEq};
 #[derive(Debug, Eq, Clone, Copy, Hash)]
 pub struct Fp(u128);
 
+/// The prime field modulus: $2^{128} - 159$
+const MODULUS: u128 = 340_282_366_920_938_463_463_374_607_431_768_211_297;
+const MULTIPLICATIVE_GROUP_ORDER: u128 = MODULUS - 1;
+
 impl ConstantTimeEq for Fp {
     fn ct_eq(&self, other: &Self) -> Choice {
         self.0.ct_eq(&other.0)
@@ -48,7 +52,7 @@ impl FiniteField for Fp {
     fn random<R: RngCore + ?Sized>(rng: &mut R) -> Self {
         let mut bytes = [0; 16];
         rng.fill_bytes(&mut bytes[..]);
-        Self::try_from(u128::from_le_bytes(bytes) % Self::MODULUS).unwrap()
+        Self::try_from(u128::from_le_bytes(bytes) % MODULUS).unwrap()
     }
 
     const ZERO: Self = Fp(0);
@@ -63,8 +67,8 @@ impl FiniteField for Fp {
     /// modulus.
     fn from_uniform_bytes(x: &[u8; 16]) -> Self {
         let mut value = u128::from_le_bytes(*x);
-        if value > Self::MODULUS {
-            value %= Self::MODULUS
+        if value > MODULUS {
+            value %= MODULUS
         }
         Fp(value)
     }
@@ -78,11 +82,6 @@ impl FiniteField for Fp {
     fn to_bytes(&self) -> GenericArray<u8, Self::ByteReprLen> {
         u128::from(*self).to_le_bytes().into()
     }
-
-    const MULTIPLICATIVE_GROUP_ORDER: u128 = Self::MODULUS - 1;
-
-    /// The prime field modulus: $2^{128} - 159$
-    const MODULUS: u128 = 340_282_366_920_938_463_463_374_607_431_768_211_297;
 
     const GENERATOR: Self = Fp(5);
 
@@ -108,6 +107,19 @@ impl FiniteField for Fp {
     fn multiply_by_prime_subfield(&self, pf: Self::PrimeField) -> Self {
         self * pf
     }
+
+    type NumberOfBitsInBitDecomposition = generic_array::typenum::U128;
+
+    fn bit_decomposition(&self) -> GenericArray<bool, Self::NumberOfBitsInBitDecomposition> {
+        super::standard_bit_decomposition(u128::from(*self))
+    }
+
+    fn inverse(&self) -> Self {
+        if *self == Self::ZERO {
+            panic!("Zero cannot be inverted");
+        }
+        self.pow(MULTIPLICATIVE_GROUP_ORDER - 1)
+    }
 }
 
 /// The error which occurs if the inputted `u128` or bit pattern doesn't correspond to a field
@@ -125,7 +137,7 @@ impl TryFrom<u128> for Fp {
     type Error = BiggerThanModulus;
 
     fn try_from(value: u128) -> Result<Self, Self::Error> {
-        if value < Self::MODULUS {
+        if value < MODULUS {
             Ok(Fp(value))
         } else {
             Err(BiggerThanModulus)
@@ -154,8 +166,8 @@ impl From<Fp> for u128 {
 impl AddAssign<&Fp> for Fp {
     fn add_assign(&mut self, rhs: &Fp) {
         let mut raw_sum = U256::from(self.0).checked_add(U256::from(rhs.0)).unwrap();
-        if raw_sum >= U256::from(Self::MODULUS) {
-            raw_sum -= U256::from(Self::MODULUS);
+        if raw_sum >= U256::from(MODULUS) {
+            raw_sum -= U256::from(MODULUS);
         }
         self.0 = raw_sum.as_u128();
     }
@@ -163,13 +175,13 @@ impl AddAssign<&Fp> for Fp {
 
 impl SubAssign<&Fp> for Fp {
     fn sub_assign(&mut self, rhs: &Fp) {
-        let mut raw_diff = (U256::from(self.0) + U256::from(Self::MODULUS))
+        let mut raw_diff = (U256::from(self.0) + U256::from(MODULUS))
             .checked_sub(U256::from(rhs.0))
             .unwrap();
-        if raw_diff >= U256::from(Self::MODULUS) {
-            raw_diff -= U256::from(Self::MODULUS);
+        if raw_diff >= U256::from(MODULUS) {
+            raw_diff -= U256::from(MODULUS);
         }
-        debug_assert!(raw_diff < U256::from(Self::MODULUS));
+        debug_assert!(raw_diff < U256::from(MODULUS));
         self.0 = raw_diff.as_u128();
     }
 }
@@ -182,11 +194,12 @@ impl MulAssign<&Fp> for Fp {
             U128::from(self.0),
             U128::from(rhs.0)
         ));
-        self.0 = (raw_prod % U256::from(Self::MODULUS)).as_u128();
+        self.0 = (raw_prod % U256::from(MODULUS)).as_u128();
     }
 }
 
 impl PrimeFiniteField for Fp {
+    const BITS_OF_MODULUS: usize = 128;
     fn mod2(&self) -> Self {
         return Fp(self.0 % 2);
     }
@@ -201,7 +214,7 @@ mod tests {
     use proptest::prelude::*;
 
     fn any_f() -> impl Strategy<Value = Fp> {
-        any::<u128>().prop_map(|x| Fp(x % Fp::MODULUS))
+        any::<u128>().prop_map(|x| Fp(x % MODULUS))
     }
 
     macro_rules! test_binop {
@@ -214,10 +227,10 @@ mod tests {
                     a.$op(&b);
                     // This is a hack! That's okay, this is a test!
                     if stringify!($op) == "sub_assign" {
-                        x += BigUint::from(Fp::MODULUS);
+                        x += BigUint::from(MODULUS);
                     }
                     x.$op(&y);
-                    x = x % BigUint::from(Fp::MODULUS);
+                    x = x % BigUint::from(MODULUS);
                     assert_eq!(BigUint::from(a.0), x);
                 }
             }
@@ -234,7 +247,7 @@ mod tests {
     proptest! {
         #[test]
         fn check_pow(x in any_f(), n in any::<u128>()) {
-            let m = BigUint::from(Fp::MODULUS);
+            let m = BigUint::from(MODULUS);
             let exp = BigUint::from(n);
             let a = BigUint::from(u128::from(x));
             let left = BigUint::from(u128::from(x.pow(n)));

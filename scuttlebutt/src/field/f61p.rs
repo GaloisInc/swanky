@@ -14,6 +14,8 @@ use proptest::prelude::*;
 #[derive(Clone, Copy, Eq, Debug, Hash)]
 pub struct F61p(u64);
 
+const MODULUS: u64 = (1 << 61) - 1;
+
 impl ConstantTimeEq for F61p {
     #[inline]
     fn ct_eq(&self, other: &Self) -> Choice {
@@ -37,7 +39,7 @@ impl FiniteField for F61p {
     ) -> Result<Self, Self::FromBytesError> {
         let buf = <[u8; 8]>::from(*bytes);
         let raw = u64::from_le_bytes(buf);
-        if raw < Self::MODULUS as u64 {
+        if raw < MODULUS {
             Ok(F61p(raw))
         } else {
             Err(BiggerThanModulus)
@@ -89,26 +91,36 @@ impl FiniteField for F61p {
         F61p(reduce(rng.next_u64() as u128))
     }
 
-    const MULTIPLICATIVE_GROUP_ORDER: u128 = Self::MODULUS - 1;
-    const MODULUS: u128 = (1 << 61) - 1;
     // TODO: this generator might be wrong.
     const GENERATOR: Self = F61p(5);
     const ZERO: Self = F61p(0);
     const ONE: Self = F61p(1);
+
+    type NumberOfBitsInBitDecomposition = generic_array::typenum::U61;
+
+    fn bit_decomposition(&self) -> GenericArray<bool, Self::NumberOfBitsInBitDecomposition> {
+        super::standard_bit_decomposition(u128::from(self.0))
+    }
+    fn inverse(&self) -> Self {
+        if *self == Self::ZERO {
+            panic!("Zero cannot be inverted");
+        }
+        self.pow(u128::from(MODULUS) - 2)
+    }
 }
 
 #[inline]
 fn reduce(k: u128) -> u64 {
     // Based on https://ariya.io/2007/02/modulus-with-mersenne-prime
-    let i = (k & F61p::MODULUS) + (k >> 61);
+    let i = (k & u128::from(MODULUS)) + (k >> 61);
     // Equivalent to:
     /*u64::conditional_select(
         &(i as u64),
         &((i.wrapping_sub(F61p::MODULUS)) as u64),
         Choice::from((i >= F61p::MODULUS) as u8),
     )*/
-    let flag = (i < F61p::MODULUS) as u128;
-    let operand = flag.wrapping_sub(1) & F61p::MODULUS;
+    let flag = (i < u128::from(MODULUS)) as u128;
+    let operand = flag.wrapping_sub(1) & u128::from(MODULUS);
     (i - operand) as u64
 }
 
@@ -125,8 +137,8 @@ impl SubAssign<&F61p> for F61p {
     #[inline]
     fn sub_assign(&mut self, rhs: &Self) {
         // We add modulus so it can't overflow.
-        let a = self.0 as u128 + Self::MODULUS;
-        let b = rhs.0 as u128;
+        let a = u128::from(self.0) + u128::from(MODULUS);
+        let b = u128::from(rhs.0);
         self.0 = reduce(a - b);
     }
 }
@@ -134,9 +146,7 @@ impl SubAssign<&F61p> for F61p {
 impl MulAssign<&F61p> for F61p {
     #[inline]
     fn mul_assign(&mut self, rhs: &Self) {
-        let a = self.0 as u128;
-        let b = rhs.0 as u128;
-        self.0 = reduce(a * b);
+        self.0 = reduce(u128::from(self.0) * u128::from(rhs.0));
     }
 }
 
@@ -164,6 +174,7 @@ impl std::iter::Sum for F61p {
 }
 
 impl PrimeFiniteField for F61p {
+    const BITS_OF_MODULUS: usize = 61;
     fn mod2(&self) -> Self {
         return F61p(self.0 % 2);
     }
@@ -178,16 +189,13 @@ test_field!(test_f61p, F61p);
 proptest! {
     #[test]
     fn test_reduce(x in 0u128..((1 << (2 * 61))-1)) {
-        assert_eq!(reduce(x) as u128, x % F61p::MODULUS);
+        assert_eq!(u128::from(reduce(x)), x % u128::from(MODULUS));
     }
 }
 
 #[test]
 fn test_generator() {
-    assert_eq!(
-        F61p::GENERATOR.pow(F61p::MULTIPLICATIVE_GROUP_ORDER),
-        F61p::ONE
-    );
+    assert_eq!(F61p::GENERATOR.pow(u128::from(MODULUS) - 1), F61p::ONE);
 }
 
 #[test]

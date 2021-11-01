@@ -261,9 +261,12 @@ impl FiniteField for Gf128 {
         Gf128(u128::from_le_bytes(bytes))
     }
 
-    const MULTIPLICATIVE_GROUP_ORDER: u128 = u128::max_value();
+    type NumberOfBitsInBitDecomposition = generic_array::typenum::U128;
 
-    const MODULUS: u128 = 2;
+    fn bit_decomposition(&self) -> GenericArray<bool, Self::NumberOfBitsInBitDecomposition> {
+        super::standard_bit_decomposition(self.0)
+    }
+
     // See the conversation here: https://mattermost.galois.com/galwegians/pl/63smzhk9qbnrbbsb1hi6xpejmc
     const GENERATOR: Self = Gf128(2);
 
@@ -272,6 +275,13 @@ impl FiniteField for Gf128 {
 
     fn multiply_by_prime_subfield(&self, pf: Self::PrimeField) -> Self {
         Self::conditional_select(&Self::ZERO, &self, pf.ct_eq(&F2::ONE))
+    }
+
+    fn inverse(&self) -> Self {
+        if *self == Self::ZERO {
+            panic!("Zero cannot be inverted");
+        }
+        self.pow(u128::MAX - 1)
     }
 }
 
@@ -288,7 +298,7 @@ test_field!(test_gf128, Gf128);
 
 #[test]
 fn test_generator() {
-    let n = Gf128::MULTIPLICATIVE_GROUP_ORDER;
+    let n = u128::MAX;
     let prime_factors: Vec<u128> = vec![67280421310721, 274177, 6700417, 641, 65537, 257, 17, 5, 3];
     let x = Gf128::GENERATOR;
     for p in prime_factors.iter() {

@@ -17,6 +17,8 @@ use subtle::{Choice, ConditionallySelectable, ConstantTimeEq};
 #[derive(Debug, Eq, Clone, Copy, Hash)]
 pub struct F2(pub(crate) u8);
 
+const MODULUS: u8 = 2;
+
 impl From<bool> for F2 {
     #[inline(always)]
     fn from(x: bool) -> Self {
@@ -70,8 +72,6 @@ impl FiniteField for F2 {
         u8::from(*self).to_le_bytes().into()
     }
 
-    const MULTIPLICATIVE_GROUP_ORDER: u128 = Self::MODULUS as u128 - 1;
-
     const GENERATOR: Self = F2(1);
 
     type PrimeField = Self;
@@ -89,9 +89,6 @@ impl FiniteField for F2 {
         F2(value as u8)
     }
 
-    /// The prime field modulus: $2$
-    const MODULUS: u128 = 2;
-
     fn to_polynomial_coefficients(
         &self,
     ) -> GenericArray<Self::PrimeField, Self::PolynomialFormNumCoefficients> {
@@ -104,6 +101,17 @@ impl FiniteField for F2 {
 
     fn multiply_by_prime_subfield(&self, pf: Self::PrimeField) -> Self {
         self * pf
+    }
+
+    type NumberOfBitsInBitDecomposition = generic_array::typenum::U1;
+
+    fn bit_decomposition(&self) -> GenericArray<bool, Self::NumberOfBitsInBitDecomposition> {
+        [self.0 != 0].into()
+    }
+
+    fn inverse(&self) -> Self {
+        assert_ne!(self.0, 0);
+        Self::ONE
     }
 }
 
@@ -129,6 +137,8 @@ impl MulAssign<&F2> for F2 {
 }
 
 impl PrimeFiniteField for F2 {
+    const BITS_OF_MODULUS: usize = 1;
+
     fn mod2(&self) -> Self {
         *self
     }
@@ -149,7 +159,7 @@ impl TryFrom<u8> for F2 {
     type Error = BiggerThanModulus;
 
     fn try_from(value: u8) -> Result<Self, Self::Error> {
-        if value < Self::MODULUS as u8 {
+        if value < MODULUS {
             Ok(F2(value))
         } else {
             Err(BiggerThanModulus)
@@ -167,6 +177,7 @@ impl From<F2> for u8 {
 
 field_ops!(F2);
 
+// TODO: these prime finite field tests should be extracted into the test utils macros.
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -194,10 +205,10 @@ mod tests {
                     a.$op(&b);
                     // This is a hack! That's okay, this is a test!
                     if stringify!($op) == "sub_assign" {
-                        x += F2::MODULUS as u8;
+                        x += MODULUS as u8;
                     }
                     x.$op(&y);
-                    x = x % F2::MODULUS as u8;
+                    x = x % MODULUS as u8;
                     assert_eq!(a.0, x);
                 }
             }
@@ -213,7 +224,7 @@ mod tests {
     proptest! {
         #[test]
         fn check_pow(x in any::<F2>(), n in any::<u128>()) {
-            let m = BigUint::from(F2::MODULUS);
+            let m = BigUint::from(MODULUS);
             let exp = BigUint::from(n);
             let a = BigUint::from(u8::from(x));
             let left = BigUint::from(u8::from(x.pow(n)));

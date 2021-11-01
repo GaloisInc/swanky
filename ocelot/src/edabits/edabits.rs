@@ -13,6 +13,7 @@ use scuttlebutt::{
     field::{FiniteField, Gf40, PrimeFiniteField, F2},
     AbstractChannel, AesRng, Block, SyncChannel,
 };
+use std::convert::TryFrom;
 use std::io::{BufReader, BufWriter};
 use std::net::TcpStream;
 use std::time::Instant;
@@ -111,6 +112,39 @@ fn generate_permutation<T: Clone, RNG: CryptoRng + Rng>(rng: &mut RNG, v: &mut V
         let idx = Rng::gen_range(rng, 0, i);
         v.swap(idx, i);
         i -= 1;
+    }
+}
+
+fn check_parameters<FE: PrimeFiniteField>(n: usize, gamma: usize) -> Result<(), Error> {
+    // Because the modulus of the field might be large, we currently only store ceil(log_2(modulus))
+    // for the field.
+    // Let M be the modulus of the field.
+    // We can use an alternate check (as follows):
+    /*
+    $$
+    \begin{array}{ccc}
+      \textsf{Invalid}& \impliedby  &  (n+1) \cdot 2^\gamma \geq \frac{M-1}{2} \\
+      & \iff &  \log_2(n+1) + \gamma \geq \log_2(M-1)-1 \\
+      & \impliedby &  \log_2(n+1) + \gamma \geq \lceil log_2(M) \rceil - 1 \\
+      & \impliedby & \lfloor \log_2(n+1) \rfloor + \gamma \geq \lceil log_2(M) \rceil - 1
+    \end{array}
+    $$
+    */
+    // TODO: can we get away with just using the log ceiling of the modulus in this fashion?
+    fn log2_floor(x: usize) -> usize {
+        std::mem::size_of::<usize>() * 8
+            - 1
+            - usize::try_from(x.leading_zeros()).expect("sizeof(usize) >= sizeof(u32)")
+    }
+    if log2_floor(n + 1) + gamma >= FE::BITS_OF_MODULUS - 1 {
+        Err(Error::Other(format!(
+            "Fdabit invalid parameter configuration: n={}, gamma={}, FE={}",
+            n,
+            gamma,
+            std::any::type_name::<FE>(),
+        )))
+    } else {
+        Ok(())
     }
 }
 
@@ -393,11 +427,7 @@ impl<FE: FiniteField + PrimeFiniteField> ProverConv<FE> {
         let num_bits = std::mem::size_of::<usize>() * 8;
         let gamma = num_bits - ((n + 1).leading_zeros() as usize) - 1 + 1;
 
-        if !((n + 1) as u128 * u128::pow(2, gamma as u32) < (FE::MODULUS - 1) / 2) {
-            return Err(Error::Other(
-                "fail fdabit verifier: wrong combination of input size and parameters".to_string(),
-            ));
-        }
+        check_parameters::<FE>(n, gamma)?;
 
         let mut res = true;
 
@@ -1020,11 +1050,7 @@ impl<FE: FiniteField + PrimeFiniteField> VerifierConv<FE> {
         let num_bits = std::mem::size_of::<usize>() * 8;
         let gamma = num_bits - ((n + 1).leading_zeros() as usize) - 1 + 1;
 
-        if !((n + 1) as u128 * u128::pow(2, gamma as u32) < (FE::MODULUS - 1) / 2) {
-            return Err(Error::Other(
-                "fail fdabit verifier: wrong combination of input size and parameters".to_string(),
-            ));
-        }
+        check_parameters::<FE>(n, gamma)?;
 
         let mut res = true;
 

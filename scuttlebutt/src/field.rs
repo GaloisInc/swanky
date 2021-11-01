@@ -52,7 +52,9 @@ pub trait FiniteField:
     fn to_bytes(&self) -> GenericArray<u8, Self::ByteReprLen>;
 
     /// The prime-order subfield of the finite field.
-    type PrimeField: FiniteField + IsSubfieldOf<Self> + PrimeFiniteField;
+    type PrimeField: FiniteField<PrimeField = Self::PrimeField>
+        + IsSubfieldOf<Self>
+        + PrimeFiniteField;
     /// When elements of this field are represented as a polynomial over the prime field,
     /// how many coefficients are needed?
     type PolynomialFormNumCoefficients: ArrayLength<Self::PrimeField> + ArrayLength<Self>;
@@ -73,11 +75,6 @@ pub trait FiniteField:
     fn from_uniform_bytes(x: &[u8; 16]) -> Self;
     /// Generate a random field element.
     fn random<R: RngCore + ?Sized>(rng: &mut R) -> Self;
-    /// The order of the multiplicative group
-    // TODO: we'll want a better number type than u128 if the fields get bigger.
-    const MULTIPLICATIVE_GROUP_ORDER: u128;
-    /// The modulus of the prime sub-field.
-    const MODULUS: u128;
     /// Generate a random non-zero field element.
     fn random_nonzero<R: RngCore + ?Sized>(rng: &mut R) -> Self {
         loop {
@@ -93,20 +90,52 @@ pub trait FiniteField:
     const ZERO: Self;
     /// The multiplicative identity element.
     const ONE: Self;
+    /// The number of bits in the bit decomposition of any element of this finite field.
+    ///
+    /// This number should be equal to (for the field $`\textsf{GF}(p^r)`$):
+    /// ```math
+    /// \lceil\log_2(p)\rceil \cdot r
+    /// ```
+    ///
+    /// See [`Self::bit_decomposition`] for the exact meaning of bit decomposition
+    type NumberOfBitsInBitDecomposition: ArrayLength<bool>;
+    /// Decompose the given field element into bits.
+    ///
+    /// This bit decompostion should be done according to [Weng et al., section 5](https://eprint.iacr.org/2020/925.pdf#section.5).
+    ///
+    /// Let $`p`$ be a positive prime. Let $`r`$ be a positive integer.
+    /// Let $`m=\lceil\log_2 p\rceil`$, the number of bits needed to represent $`p`$.
+    ///
+    /// Let $`F = \textsf{GF}(p^r)`$ be the current field (the field represented by `Self`).
+    ///
+    /// Let $`v`$ be a vector of $`r \cdot m`$ elements of $`F`$.
+    /// Let $`v = (v_0, v_1, \ldots, v_{rm}) \in F^{rm}`$.
+    /// We define (don't worry about $`g`$, we're just keeping the syntax of the paper)
+    /// $`\langle g,v\rangle \in F`$ using the polynomial representation of F, below:
+    /// ```math
+    /// \langle g, v \rangle(x) \coloneqq
+    /// \sum\limits_{i=0}^{r-1} \left( x^i \cdot \sum\limits_{j=1}^{m-1}
+    /// 2^j \cdot v_{i \cdot m + j}
+    /// \right )
+    /// ```
+    ///
+    /// Let $`f \in F`$.
+    /// Let $`b \in \{0,1\}^{rm} \subseteq F^{rm}`$ (that is, a 0/1 vector where 0/1 are field
+    /// elements of $`F`$), such that $`\langle g, b \rangle = f`$.
+    ///
+    /// Invoking the `bit_decomposition` function on `f` should yield the vector $`b`$ where a 0
+    /// element of $`b`$ corresponds to `false` and a 1 element corresponds to `true`.
+    fn bit_decomposition(&self) -> GenericArray<bool, Self::NumberOfBitsInBitDecomposition>;
     /// Compute the multiplicative inverse of self.
     ///
     /// # Panics
-    /// This function will panic if *self == Self::zero()
-    fn inverse(&self) -> Self {
-        if *self == Self::ZERO {
-            panic!("Zero cannot be inverted");
-        }
-        // NOTE: this only works for GF(p^n)
-        self.pow(Self::MULTIPLICATIVE_GROUP_ORDER - 1)
-    }
+    /// This function will panic if `*self == Self::zero()`
+    fn inverse(&self) -> Self;
 
-    // TODO: what should we do if pow isn't secret.
-    /// Computing `pow` using Montgomery's ladder technique.
+    // TODO: what should we do if n isn't secret.
+    /// Compute `self` to the power of `n`.
+    /// # Constant-Time
+    /// This function will execute in constant-time, regardless of `n`'s value.
     fn pow(&self, n: u128) -> Self {
         let mut r0 = Self::ONE;
         let mut r1 = *self;
@@ -141,11 +170,20 @@ impl<FE: FiniteField> IsSubfieldOf<FE> for FE {
 
 /// A `PrimeFiniteField` is a `FiniteField` whose `PrimeField` is
 /// itself. In this case the field is isomorphic to integers modulo
-/// p and this trait provides a modulo 2 operation.
+/// p.
 pub trait PrimeFiniteField:
     FiniteField<PolynomialFormNumCoefficients = generic_array::typenum::U1, PrimeField = Self>
 {
-    /// This function computes the modulo 2 operation.
+    /// The number of bits needed to store the modulus of this field.
+    ///
+    /// More exactly, let $`p`$ be a positive prime number, where `Self` denotes the field
+    /// $`\mathbb{F}_p`$. This constant ought to be:
+    /// ```math
+    /// \lceil \log_2(p) \rceil
+    /// ```
+    const BITS_OF_MODULUS: usize;
+    /// Return either a 0 or 1, the result of taking the integer representation of this field
+    /// element modulo 2.
     fn mod2(&self) -> Self;
 }
 
@@ -288,6 +326,16 @@ macro_rules! field_ops {
             }
         }
     };
+}
+
+pub(crate) fn standard_bit_decomposition<L: ArrayLength<bool>>(
+    bits: u128,
+) -> GenericArray<bool, L> {
+    let mut out: GenericArray<bool, L> = Default::default();
+    for (i, dst) in out.iter_mut().enumerate() {
+        *dst = (bits & (1 << (i as u128))) != 0;
+    }
+    out
 }
 
 mod fp;
