@@ -4,6 +4,45 @@
 //! This module implements Ligero according to section 4.7 of
 //! https://dl.acm.org/doi/pdf/10.1145/3133956.3134104
 
+// A Note on Shared-Witness Checking
+// =================================
+//
+// We want to check that `A*u + m = b` in both this and another proof system,
+// where u+m is committed in both proof systems before A is known, and
+// - u is the shared part of the witness;
+// - m is a vector of r secret masks;
+// - A is a matrix with r rows and |u| columns, chosen by the verifier; and
+// - b is public and determined by the other values.
+//
+// The difficulty in Ligero is that the extended witness depends on the circuit
+// and must be commited *before* A is chosen, so A cannot be represented in the
+// circuit. To overcome this, we create a set of linear constraints manually,
+// one for each row of A, and check them using Ligero's
+// Test-Linear-Constraints-IRS.
+//
+// In the current implementation, we do not perform a separate linear constraint
+// test for the shared-witness checks. Rather, we incorporate these constraints
+// into the Padd matrix, which Ligero uses to check linear constraints for
+// addition. This avoids the overhead of an additional check, at the cost of
+// being maybe a little counterintuitive.
+//
+// The following changes have been made to the base Ligero implementation:
+// - The constructor for a Prover takes a mask, containing a field element mask
+//   for each desired linear check. This is because the proof system that shares
+//   the witness needs to commit to the mask before A is chosen.
+// - The mask is added to the shared witness immediately after the final
+//   assert-zero check (at range `c.size()+1..c.size()+1+num_shared_checks`).
+//   The mask is thus commited to as part of the shared witness in round 0.
+// - As part of round 1 (the verifier's challenge phase), the verifier creates a
+//   random num_shared_checksXshared_size matrix A and sends it to the prover.
+// - Before round 2, the prover finalizes Padd by adding a constraint that for
+//   each row Ar of A and corresponding mask element mr, u satisfies
+//   `Ar*u + mr = br`, for some vector b.
+// - In round 2, the prover sends the vector b to the verifier.
+// - Finally, in the verification step, the verifier performs the same
+//   finalization of the Padd matrix that the prover did before round 2. This is
+//   possible because the verifier learns b in round 2.
+
 // TODO: Eliminate excessive use of vectors in anonymous functions, function
 // return values, etc.
 
@@ -63,13 +102,20 @@ struct Public<Field> {
 
 impl<Field: FieldForLigero> Public<Field> {
     /// Create the public component of a Ligero proof. The circuit to check and
-    /// the witness size are contained in the `c` argument.
+    /// the witness and shared-witness size are contained in the `c` argument.
     #[allow(non_snake_case)]
     fn new(c: &Ckt<Field>) -> Self {
+        // XXX: By the SZ Lemma, Pr[p(x) = q(x)] for monomials p and q and
+        // uniform x chosen independently of p and q is 1/|F|. I think this
+        // means we only need to check 1 linear combination (i.e., A has just
+        // one row) to get the same |F|-bit security we have elsewhere. Is this
+        // correct?
+        let num_shared_checks = 1;
+
         let params = Params::new(
             c.size() +          /* circuit size + witness size */
-            c.shared.len() +    /* shared-witness mask size */
-            1                   /* for the final zero check */
+            1 +                 /* for the final zero check */
+            num_shared_checks   /* shared-witness mask size */
         );
 
         let ml = params.m * params.l; // padded circuit size
@@ -85,33 +131,33 @@ impl<Field: FieldForLigero> Public<Field> {
             let k = s + c.inp_size;
             match *op {
                 Op::Add(i, j) => {
-                    // Padd[s][i]*w[i] + Padd[s][j]*w[j] + Padd[s][k]*w[k] = 0
-                    Padd.add_triplet(s, i,  Field::ONE);
-                    Padd.add_triplet(s, j,  Field::ONE);
-                    Padd.add_triplet(s, k, -Field::ONE);
+                    // Padd[k][i]*w[i] + Padd[k][j]*w[j] + Padd[k][k]*w[k] = 0
+                    Padd.add_triplet(k, i,  Field::ONE);
+                    Padd.add_triplet(k, j,  Field::ONE);
+                    Padd.add_triplet(k, k, -Field::ONE);
                 }
                 Op::Mul(i, j) => {
-                    // Px[s][i]*w[i] * Py[s][j]*w[j] + -1 * Pz[s][k]*w[k] = 0
-                    Px.add_triplet(s, i, Field::ONE);
-                    Py.add_triplet(s, j, Field::ONE);
-                    Pz.add_triplet(s, k, Field::ONE);
+                    // Px[k][i]*w[i] * Py[k][j]*w[j] + -1 * Pz[k][k]*w[k] = 0
+                    Px.add_triplet(k, i, Field::ONE);
+                    Py.add_triplet(k, j, Field::ONE);
+                    Pz.add_triplet(k, k, Field::ONE);
                 }
                 Op::Sub(i, j) => {
-                    // Padd[s][i]*w[i] + Padd[s][j]*w[j] + Padd[s][k]*w[k] = 0
-                    Padd.add_triplet(s, i,  Field::ONE);
-                    Padd.add_triplet(s, j, -Field::ONE);
-                    Padd.add_triplet(s, k, -Field::ONE);
+                    // Padd[k][i]*w[i] + Padd[k][j]*w[j] + Padd[k][k]*w[k] = 0
+                    Padd.add_triplet(k, i,  Field::ONE);
+                    Padd.add_triplet(k, j, -Field::ONE);
+                    Padd.add_triplet(k, k, -Field::ONE);
                 }
                 Op::Div(i, j) => {
-                    // Px[s][j]*w[j] * Py[s][k]*w[k] + -1 * Pz[s][i]*w[i] = 0
-                    Px.add_triplet(s, j, Field::ONE);
-                    Py.add_triplet(s, k, Field::ONE);
-                    Pz.add_triplet(s, i, Field::ONE);
+                    // Px[k][j]*w[j] * Py[k][k]*w[k] + -1 * Pz[k][i]*w[i] = 0
+                    Px.add_triplet(k, j, Field::ONE);
+                    Py.add_triplet(k, k, Field::ONE);
+                    Pz.add_triplet(k, i, Field::ONE);
                 }
                 Op::LdI(f) => {
-                    // Padd[s][k] * w[k] = badd[s]
-                    Padd.add_triplet(s, k, Field::ONE);
-                    badd[s] = f;
+                    // Padd[k][k] * w[k] = badd[k]
+                    Padd.add_triplet(k, k, Field::ONE);
+                    badd[k] = f;
                 }
             }
         }
@@ -130,13 +176,43 @@ impl<Field: FieldForLigero> Public<Field> {
             shared: c.shared.clone(),
             shared_mask: c.size()+1 .. c.size()+1 + c.shared.len(),
 
-            Px: Px.to_csc(),
-            Py: Py.to_csc(),
-            Pz: Pz.to_csc(),
+            Px: Px.to_csr(),
+            Py: Py.to_csr(),
+            Pz: Pz.to_csr(),
 
             Padd,
             badd,
         }
+    }
+
+    // Add shared-witness check to Padd and badd:
+    //
+    // For each index i in the mask part of the witness, add an i'th row
+    // to Padd and an i'th element to badd corresponding to
+    // rshared[i] . w[shared] + w[mask] = qshared[i]
+    #[allow(non_snake_case)]
+    fn finalize_Padd(&mut self,
+        rshared: &Array2<Field>,
+        qshared: &Array1<Field>,
+    ) {
+        debug_assert_eq!(self.shared.len(), self.shared_mask.len());
+        debug_assert_eq!(self.shared.len(), rshared.ncols());
+        debug_assert_eq!(self.shared.len(), qshared.len());
+
+        self.shared_mask.clone().into_iter()
+            .zip(rshared.rows().into_iter())
+            .for_each(|(m_i, row_i)| {
+                self.shared.clone().into_iter()
+                    .zip(row_i)
+                    .for_each(|(s_j, &r_ij)| {
+                        self.Padd.add_triplet(m_i, s_j, r_ij);
+                    });
+                self.Padd.add_triplet(m_i, m_i, Field::ONE);
+            });
+
+        self.badd
+            .slice_mut(ndarray::s![self.shared_mask.clone()])
+            .assign(&qshared);
     }
 }
 
@@ -195,10 +271,8 @@ impl<Field: FieldForLigero, H: merkle::MerkleHash> Secret<Field, H> {
         rng: &mut Rng,
         c: &Ckt<Field>,
         inp: &[Field],
-        mask: &[Field],
     ) -> Self {
         debug_assert_eq!(c.inp_size, inp.len());
-        debug_assert_eq!(c.shared.len(), mask.len());
 
         let public = Public::new(&c);
 
@@ -210,7 +284,7 @@ impl<Field: FieldForLigero, H: merkle::MerkleHash> Secret<Field, H> {
 
         let w: Array1<_> =
             c.eval(&inp).iter().cloned()
-            .chain(mask.iter().cloned())
+            .chain(public.shared_mask.clone().map(|_| Field::random(rng))) // mask
             .chain(std::iter::repeat(Field::ZERO).take(ml - c.size() - c.shared.len()))
             .collect();
 
@@ -218,20 +292,20 @@ impl<Field: FieldForLigero, H: merkle::MerkleHash> Secret<Field, H> {
             let k = s + c.inp_size;
             match *op {
                 Op::Mul(i, j) => {
-                    // x[s] * y[s] + -1 * z[s] = 0
-                    x[s] = w[i];
-                    y[s] = w[j];
-                    z[s] = w[k];
-                    debug_assert_eq!(x[s] * y[s] - z[s], Field::ZERO);
+                    // x[k] * y[k] + -1 * z[k] = 0
+                    x[k] = w[i];
+                    y[k] = w[j];
+                    z[k] = w[k];
+                    debug_assert_eq!(x[k] * y[k] - z[k], Field::ZERO);
                 },
                 Op::Div(i, j) => {
-                    // x[s] * y[s] + -1 * z[s] = 0
-                    x[s] = w[j];
-                    y[s] = w[k];
-                    z[s] = w[i];
-                    debug_assert_eq!(x[s] * y[s] - z[s], Field::ZERO);
+                    // x[k] * y[k] + -1 * z[k] = 0
+                    x[k] = w[j];
+                    y[k] = w[k];
+                    z[k] = w[i];
+                    debug_assert_eq!(x[k] * y[k] - z[k], Field::ZERO);
                 },
-                _ => { /* x[s] = y[s] = z[s] = 0 */ }
+                _ => { /* x[k] = y[k] = z[k] = 0 */ }
             }
         }
 
@@ -272,7 +346,7 @@ impl<H: merkle::MerkleHash> Arbitrary for Secret<TestField, H> {
             proptest::array::uniform16(0u8..),
         ).prop_map(|(ckt, inp, seed)| {
             let mut rng = AesRng::from_seed(Block::from(seed));
-            <Secret<TestField, H>>::new(&mut rng, &ckt, &inp, &vec![])
+            <Secret<TestField, H>>::new(&mut rng, &ckt, &inp)
         }).boxed()
     }
 }
@@ -302,45 +376,81 @@ proptest! {
 
     #[test]
     #[allow(non_snake_case)]
-    fn test_Padd(
+    fn test_Padd_false(
         (c,i) in crate::circuit::arb_ckt(20, 50).prop_flat_map(|c| {
             (Just(c), pvec(arb_test_field(), 20))
         }),
         seed: [u8;16],
     ) {
         let mut rng = AesRng::from_seed(Block::from(seed));
-        let s: Secret<_, merkle::Sha256> = Secret::new(&mut rng, &c, &i, &vec![]);
+        let s: Secret<_, merkle::Sha256> = Secret::new(&mut rng, &c, &i);
         let output = *c.eval(&i).last().unwrap();
 
-        let Padd: CsMat<TestField> = s.public.Padd.to_csc();
         prop_assert_eq!(
             output == TestField::ZERO,
-            &Padd * &s.w == s.public.badd
+            &s.public.Padd.to_csr::<usize>() * &s.w == s.public.badd
         );
     }
 
     #[test]
     #[allow(non_snake_case)]
-    fn test_Padd_with_shared(
+    fn test_Padd_false_with_shared(
         (c, i) in crate::circuit::arb_ckt(20, 50).prop_flat_map(|c| {
             (Just(Ckt {shared: 0..10, ..c}), pvec(arb_test_field(), 20))
         }),
-        mask in pvec(arb_test_field(), 10),
         rshared_vec in pvec(arb_test_field(), 10 * 10),
         seed: [u8;16],
     ) {
         let mut rng = AesRng::from_seed(Block::from(seed));
-        let mut s: Secret<_, merkle::Sha256> = Secret::new(&mut rng, &c, &i, &mask);
+        let mut s: Secret<_, merkle::Sha256> = Secret::new(&mut rng, &c, &i);
         let output = *c.eval(&i).last().unwrap();
 
         let rshared = Array2::from_shape_vec((10,10), rshared_vec).unwrap();
         let qshared = make_qshared(&s.w, &s.public.shared, &s.public.shared_mask, &rshared);
-        inject_rshared_qshared(&mut s.public, &rshared, &qshared);
+        s.public.finalize_Padd(&rshared, &qshared);
 
-        let Padd: CsMat<_> = s.public.Padd.to_csc();
         prop_assert_eq!(
             output == TestField::ZERO,
-            &Padd * &s.w == s.public.badd
+            &s.public.Padd.to_csr::<usize>() * &s.w == s.public.badd
+        );
+    }
+
+    #[test]
+    #[allow(non_snake_case)]
+    fn test_Padd_true(
+        (c, i) in crate::circuit::arb_ckt_zero(20, 50),
+        seed: [u8;16],
+    ) {
+        let mut rng = AesRng::from_seed(Block::from(seed));
+        let s: Secret<_, merkle::Sha256> = Secret::new(&mut rng, &c, &i);
+        let output = *c.eval(&i).last().unwrap();
+
+        prop_assert_eq!(
+            output == TestField::ZERO,
+            &s.public.Padd.to_csr::<usize>() * &s.w == s.public.badd
+        );
+    }
+
+    #[test]
+    #[allow(non_snake_case)]
+    fn test_Padd_true_with_shared(
+        (c, i) in crate::circuit::arb_ckt_zero(20, 50).prop_flat_map(|(c,i)| {
+            (Just(Ckt {shared: 0..10, ..c}), Just(i))
+        }),
+        rshared_vec in pvec(arb_test_field(), 10 * 10),
+        seed: [u8;16],
+    ) {
+        let mut rng = AesRng::from_seed(Block::from(seed));
+        let mut s: Secret<_, merkle::Sha256> = Secret::new(&mut rng, &c, &i);
+        let output = *c.eval(&i).last().unwrap();
+
+        let rshared = Array2::from_shape_vec((10,10), rshared_vec).unwrap();
+        let qshared = make_qshared(&s.w, &s.public.shared, &s.public.shared_mask, &rshared);
+        s.public.finalize_Padd(&rshared, &qshared);
+
+        prop_assert_eq!(
+            output == TestField::ZERO,
+            &s.public.Padd.to_csr::<usize>() * &s.w == s.public.badd
         );
     }
 }
@@ -405,17 +515,21 @@ impl<Field: FieldForLigero> Round1<Field> {
     /// Generate verifier's random linear-combination challenges.
     fn new(
         params: &Params<Field>,
-        shared: &std::ops::Range<usize>,
+        num_shared_elems: usize,
+        num_shared_checks: usize,
         rng: &mut impl rand::Rng
     ) -> Self {
         Round1 {
-            r: random_field_array(rng, 4*params.m),
-            radd: random_field_array(rng, params.m * params.l),
-            rx: random_field_array(rng, params.m * params.l),
-            ry: random_field_array(rng, params.m * params.l),
-            rz: random_field_array(rng, params.m * params.l),
-            rq: random_field_array(rng, params.m),
-            rshared: random_field_mat(rng, shared.len()),
+            r: Array1::from_shape_fn(4*params.m, |_| Field::random(rng)),
+            radd: Array1::from_shape_fn(params.m * params.l, |_| Field::random(rng)),
+            rx: Array1::from_shape_fn(params.m * params.l, |_| Field::random(rng)),
+            ry: Array1::from_shape_fn(params.m * params.l, |_| Field::random(rng)),
+            rz: Array1::from_shape_fn(params.m * params.l, |_| Field::random(rng)),
+            rq: Array1::from_shape_fn(params.m, |_| Field::random(rng)),
+            rshared: Array2::from_shape_fn(
+                (num_shared_checks, num_shared_elems),
+                |_| Field::random(rng),
+            ),
         }
     }
 
@@ -520,7 +634,7 @@ impl<Field: FieldForLigero, H: merkle::MerkleHash> Round4<Field, H> {
 // optimizations) to the pseudocode in Section 4.7 of
 // https://dl.acm.org/doi/pdf/11.1145/3133956.3134104.
 //
-// Note: In order to increase the visual similarity to this pseudocode, some
+// Note: In order to increase the visual similarity to the pseudocode, some
 // variables are not in snake case.
 
 #[allow(non_snake_case)]
@@ -536,10 +650,10 @@ fn verify<Field: FieldForLigero, H: merkle::MerkleHash>(
 
     let P = public.params.clone();
 
-    inject_rshared_qshared(public, &r1.rshared, &r2.qshared);
+    public.finalize_Padd(&r1.rshared, &r2.qshared);
 
     // ra_i(zeta_c) = (ra * Pa)[m*i + c]
-    let radd = rows_to_mat(make_ra(&P, &r1.radd, &public.Padd.to_csc())
+    let radd = rows_to_mat(make_ra(&P, &r1.radd, &public.Padd.to_csr())
         .iter().map(|r| P.fft3(r.view())).collect::<Vec<_>>());
     let rx = rows_to_mat(make_ra_Iml_Pa_neg(&P, &r1.rx, &public.Px)
         .iter().map(|r| P.fft3(r.view())).collect::<Vec<_>>());
@@ -571,7 +685,7 @@ fn verify<Field: FieldForLigero, H: merkle::MerkleHash>(
         //      sum_{c in [l]} qadd(zeta_c) = 0
         //      i.e., sum_{c in [l]} qadd(zeta_c) = r1.radd^T * b
         P.fft2_peval(r2.qadd.view()).slice(s![1..=P.l]).to_owned()
-            .sum() == public.badd.dot(&r1.radd) && //r1.radd.dot(&public.badd) && //Field::ZERO &&
+            .sum() == public.badd.dot(&r1.radd) &&
         //      for every j in Q,
         //      uadd[j] + sum_{i in [m]} radd_i(eta_j)*Uw[i,j] = qadd(eta_j)
         r3.Q.iter().zip(Uw.clone()).zip(r4.uadd)
@@ -827,34 +941,6 @@ fn make_qshared<Field: FieldForLigero>(
     rshared.dot(&w.slice(s![shared.clone()])) + w.slice(s![mask.clone()])
 }
 
-// For each index i in the mask part of the witness, add an i'th row
-// to Padd and an i'th element to badd corresponding to
-// rshared[i] . w[shared] + w[mask] = qshared[i]
-#[allow(non_snake_case)]
-fn inject_rshared_qshared<Field: FieldForLigero>(
-    p: &mut Public<Field>,
-    rshared: &Array2<Field>,
-    qshared: &Array1<Field>,
-) {
-    debug_assert_eq!(p.shared.len(), p.shared_mask.len());
-    debug_assert_eq!(p.shared.len(), rshared.ncols());
-    debug_assert_eq!(p.shared.len(), qshared.len());
-
-    p.shared_mask.clone().into_iter()
-        .zip(rshared.rows().into_iter())
-        .for_each(|(m_i, row_i)| {
-            p.shared.clone().into_iter()
-                .zip(row_i)
-                .for_each(|(s_j, &r_ij)| {
-                    p.Padd.add_triplet(m_i, s_j, r_ij);
-                });
-
-            p.Padd.add_triplet(m_i, m_i, Field::ONE);
-        });
-
-    p.badd.slice_mut(ndarray::s![p.shared_mask.clone()]).assign(&qshared);
-}
-
 /// Interactive Ligero implementation.
 pub mod interactive {
     use super::*;
@@ -870,10 +956,9 @@ pub mod interactive {
             rng: &mut Rng,
             c: &Ckt<Field>,
             w: &Vec<Field>,
-            mask: &Vec<Field>,
         ) -> Self {
             Self {
-                secret: Secret::new(rng, c, w, mask),
+                secret: Secret::new(rng, c, w),
             }
         }
 
@@ -929,11 +1014,11 @@ pub mod interactive {
             // Note: qshared and rshared must be injected into Padd *before* it
             // is used to make qadd.
             let qshared = make_qshared(&self.secret.w, &self.shared(), &self.shared_mask(), &r1.rshared);
-            inject_rshared_qshared(&mut self.secret.public, &r1.rshared, &qshared);
+            self.secret.public.finalize_Padd(&r1.rshared, &qshared);
 
             let r2 = Round2 {
                 v: r1.r.dot(&U) + self.secret.u.view(),
-                qadd: make_qadd(&self.secret, &p, &self.secret.public.Padd.to_csc(), r1.radd),
+                qadd: make_qadd(&self.secret, &p, &self.secret.public.Padd.to_csr(), r1.radd),
                 qx: make_qa(&P, &p, &self.secret.public.Px, &self.secret.Ux, &self.secret.ux, r1.rx),
                 qy: make_qa(&P, &p, &self.secret.public.Py, &self.secret.Uy, &self.secret.uy, r1.ry),
                 qz: make_qa(&P, &p, &self.secret.public.Pz, &self.secret.Uz, &self.secret.uz, r1.rz),
@@ -1038,7 +1123,7 @@ pub mod interactive {
 
         /// Generate round-1 verifier message.
         pub fn round1(&mut self, rng: &mut impl RngCore, r0: Round0) -> Round1<Field> {
-            let r1 = Round1::new(&self.public.params, &self.shared(), rng);
+            let r1 = Round1::new(&self.public.params, self.shared().len(), self.shared_mask().len(), rng);
 
             self.r0 = Some(r0);
             self.r1 = Some(r1.clone());
@@ -1076,7 +1161,7 @@ pub mod interactive {
         let mut rng = AesRng::from_entropy();
         let (ckt, w) = crate::circuit::test_ckt_zero::<TestField>();
 
-        let mut p: Prover<_, merkle::Sha256> = Prover::new(&mut rng, &ckt, &w, &vec![]);
+        let mut p: Prover<_, merkle::Sha256> = Prover::new(&mut rng, &ckt, &w);
         let mut v = Verifier::new(&ckt);
 
         let r0 = p.round0();
@@ -1101,7 +1186,7 @@ pub mod interactive {
             let mut rng = AesRng::from_seed(Block::from(seed));
 
             let output = *ckt.eval(&w).last().unwrap();
-            let mut p: Prover<_, merkle::Sha256> = Prover::new(&mut rng, &ckt, &w, &vec![]);
+            let mut p: Prover<_, merkle::Sha256> = Prover::new(&mut rng, &ckt, &w);
             let mut v = Verifier::new(&ckt);
 
             let r0 = p.round0();
@@ -1120,7 +1205,7 @@ pub mod interactive {
         ) {
             let mut rng = AesRng::from_seed(Block::from(seed));
 
-            let mut p: Prover<TestField, merkle::Sha256> = Prover::new(&mut rng, &ckt, &w, &vec![]);
+            let mut p: Prover<TestField, merkle::Sha256> = Prover::new(&mut rng, &ckt, &w);
             let mut v = Verifier::new(&ckt);
 
             let r0 = p.round0();
@@ -1133,18 +1218,17 @@ pub mod interactive {
         }
 
         #[test]
-        fn test_false_shared(
+        fn test_shared_false(
             (ckt, w) in crate::circuit::arb_ckt(20, 50).prop_flat_map(|ckt| {
                 let w = pvec(arb_test_field(), ckt.inp_size);
                 (Just(Ckt {shared: 0..10, ..ckt}), w)
             }),
-            mask in pvec(arb_test_field(), 10),
             seed: [u8;16],
         ) {
             let mut rng = AesRng::from_seed(Block::from(seed));
 
             let output = *ckt.eval(&w).last().unwrap();
-            let mut p: Prover<TestField, merkle::Sha256> = Prover::new(&mut rng, &ckt, &w, &mask);
+            let mut p: Prover<TestField, merkle::Sha256> = Prover::new(&mut rng, &ckt, &w);
             let mut v = Verifier::new(&ckt);
 
             let r0 = p.round0();
@@ -1157,15 +1241,14 @@ pub mod interactive {
         }
 
         #[test]
-        fn test_true_shared(
+        fn test_shared_true(
             (ckt, w) in crate::circuit::arb_ckt_zero(20, 50)
                 .prop_flat_map(|(ckt, w)| (Just(Ckt {shared: 0..10, ..ckt}), Just(w))),
-            mask in pvec(arb_test_field(), 10),
             seed: [u8;16],
         ) {
             let mut rng = AesRng::from_seed(Block::from(seed));
 
-            let mut p: Prover<TestField, merkle::Sha256> = Prover::new(&mut rng, &ckt, &w, &mask);
+            let mut p: Prover<TestField, merkle::Sha256> = Prover::new(&mut rng, &ckt, &w);
             let mut v = Verifier::new(&ckt);
 
             let r0 = p.round0();
@@ -1208,7 +1291,8 @@ pub mod noninteractive {
 
     fn make_r1<Field: FieldForLigero, H: merkle::MerkleHash>(
         params: &Params<Field>,
-        shared: &std::ops::Range<usize>,
+        num_shared_elems: usize,
+        num_shared_checks: usize,
         state: &merkle::Digest,
         r0: &Round0,
     ) -> (Round1<Field>, merkle::Digest) {
@@ -1220,7 +1304,15 @@ pub mod noninteractive {
         hash.finalize(&mut digest);
         let seed = Block::try_from_slice(&digest[0..16]).unwrap();
 
-        (Round1::new(params, shared, &mut AesRng::from_seed(seed)), digest)
+        (
+            Round1::new(
+                params,
+                num_shared_elems,
+                num_shared_checks,
+                &mut AesRng::from_seed(seed)
+            ),
+            digest,
+        )
     }
 
     fn make_r3<Field: FieldForLigero, H: merkle::MerkleHash>(
@@ -1252,14 +1344,11 @@ pub mod noninteractive {
     }
 
     impl<Field: FieldForLigero, H: merkle::MerkleHash> Prover<Field, H> {
-        /// Create a non-interactive prover from a circuit and witness. The mask
-        /// parameter is the mask for a shared witness, and should be the same
-        /// size as the shared part of the witness in c.
+        /// Create a non-interactive prover from a circuit and witness.
         pub fn new<Rng: RngCore>(
             rng: &mut Rng,
             c: &Ckt<Field>,
             w: &Vec<Field>,
-            mask: &Vec<Field>,
         ) -> Self {
             let mut hash = H::new();
             c.ops.iter().for_each(|op| hash.update(&op.bytes()));
@@ -1267,7 +1356,7 @@ pub mod noninteractive {
             let mut ckt_hash = merkle::HZERO;
             hash.finalize(&mut ckt_hash);
 
-            Self { ckt_hash, ip: interactive::Prover::new(rng, c, w, mask) }
+            Self { ckt_hash, ip: interactive::Prover::new(rng, c, w) }
         }
 
         /// Theoretical proof size from Section 5.3.
@@ -1282,7 +1371,7 @@ pub mod noninteractive {
         /// Generate the proof message.
         pub fn make_proof(&mut self) -> Proof<Field, H> {
             let r0 = self.ip.round0();
-            let (r1,state) = make_r1::<_,H>(&self.ip.params(), &self.ip.shared(), &self.ckt_hash, &r0);
+            let (r1,state) = make_r1::<_,H>(&self.ip.params(), self.ip.shared().len(), self.ip.shared_mask().len(), &self.ckt_hash, &r0);
             let r2 = self.ip.round2(r1);
             let r3 = make_r3::<_,H>(&self.ip.params(), &state, &r2);
             let r4 = self.ip.round4(r3);
@@ -1329,7 +1418,7 @@ pub mod noninteractive {
 
         /// Run the final verification procedure.
         pub fn verify(&mut self, p: Proof<Field, H>) -> bool {
-            let (r1,state) = make_r1::<_,H>(&self.public.params, &self.public.shared, &self.ckt_hash, &p.r0);
+            let (r1,state) = make_r1::<_,H>(&self.public.params, self.public.shared.len(), self.public.shared_mask.len(), &self.ckt_hash, &p.r0);
             let r3 = make_r3::<_,H>(&self.public.params, &state, &p.r2);
 
             verify(&mut self.public, p.r0, r1, p.r2, r3, p.r4)
@@ -1341,7 +1430,7 @@ pub mod noninteractive {
         let mut rng = AesRng::from_entropy();
         let (ckt, w) = crate::circuit::test_ckt_zero::<TestField>();
 
-        let mut p = <Prover<_, merkle::Sha256>>::new(&mut rng, &ckt, &w, &vec![]);
+        let mut p = <Prover<_, merkle::Sha256>>::new(&mut rng, &ckt, &w);
         let mut v = Verifier::new(&ckt);
 
         let proof = p.make_proof();
@@ -1361,7 +1450,7 @@ pub mod noninteractive {
             let mut rng = AesRng::from_seed(Block::from(seed));
 
             let output = *ckt.eval(&w).last().unwrap();
-            let mut p = <Prover<_, merkle::Sha256>>::new(&mut rng, &ckt, &w, &vec![]);
+            let mut p = <Prover<_, merkle::Sha256>>::new(&mut rng, &ckt, &w);
             let mut v = Verifier::new(&ckt);
 
             let proof = p.make_proof();
@@ -1375,7 +1464,7 @@ pub mod noninteractive {
         ) {
             let mut rng = AesRng::from_seed(Block::from(seed));
 
-            let mut p = <Prover<_, merkle::Sha256>>::new(&mut rng, &ckt, &w, &vec![]);
+            let mut p = <Prover<_, merkle::Sha256>>::new(&mut rng, &ckt, &w);
             let mut v = <Verifier<TestField, merkle::Sha256>>::new(&ckt);
 
             let proof = p.make_proof();
@@ -1383,18 +1472,17 @@ pub mod noninteractive {
         }
 
         #[test]
-        fn test_false_shared(
+        fn test_shared_false(
             (ckt, w) in crate::circuit::arb_ckt(20, 50).prop_flat_map(|ckt| {
                 let w = pvec(arb_test_field(), ckt.inp_size);
                 (Just(Ckt {shared: 0..10, ..ckt}), w)
             }),
-            mask in pvec(arb_test_field(), 10),
             seed: [u8; 16],
         ) {
             let mut rng = AesRng::from_seed(Block::from(seed));
 
             let output = *ckt.eval(&w).last().unwrap();
-            let mut p = <Prover<_, merkle::Sha256>>::new(&mut rng, &ckt, &w, &mask);
+            let mut p = <Prover<_, merkle::Sha256>>::new(&mut rng, &ckt, &w);
             let mut v = Verifier::new(&ckt);
 
             let proof = p.make_proof();
@@ -1402,16 +1490,15 @@ pub mod noninteractive {
         }
 
         #[test]
-        fn test_true_shared(
+        fn test_shared_true(
             (ckt, w) in crate::circuit::arb_ckt_zero(20, 50).prop_flat_map(|(ckt,w)| {
                 (Just(Ckt {shared: 0..10, ..ckt}), Just(w))
             }),
-            mask in pvec(arb_test_field(), 10),
             seed: [u8; 16],
         ) {
             let mut rng = AesRng::from_seed(Block::from(seed));
 
-            let mut p = <Prover<TestField, merkle::Sha256>>::new(&mut rng, &ckt, &w, &mask);
+            let mut p = <Prover<TestField, merkle::Sha256>>::new(&mut rng, &ckt, &w);
             let mut v = <Verifier<TestField, merkle::Sha256>>::new(&ckt);
 
             let proof = p.make_proof();

@@ -11,7 +11,7 @@ type Field = scuttlebutt::field::F2_19x3_26;
 
 fn main() {
     let total_size = 1usize << 16;
-    let input_size = 1usize << 15;
+    let input_size = 1usize << 14;
     let shared_size = input_size;
     let circuit_size = total_size - input_size;
     debug_assert!(shared_size <= input_size);
@@ -27,13 +27,12 @@ fn main() {
         circuit_size,
     );
     ckt.shared = 0..shared_size;
-    let mask = (0..shared_size).into_iter().map(|_| Field::random(&mut rng)).collect::<Vec<_>>();
 
     let mut prover_time = std::time::Duration::new(0,0);
     let mut verifier_time = std::time::Duration::new(0,0);
 
     let t = std::time::Instant::now();
-    let mut p = <noninteractive::Prover<_, Sha256>>::new(&mut rng, &ckt, &inp, &mask);
+    let mut p = <noninteractive::Prover<_, Sha256>>::new(&mut rng, &ckt, &inp);
     prover_time += t.elapsed();
     println!("Prover setup time: {:?}", t.elapsed());
 

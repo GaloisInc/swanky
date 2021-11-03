@@ -34,7 +34,7 @@ fn test_input_size(s: usize, input_size: usize) -> (
     let mut proof_size = 0usize;
 
     let t = std::time::Instant::now();
-    let mut p = <interactive::Prover<_, Sha256>>::new(&mut rng, &ckt, &inp, &vec![]);
+    let mut p = <interactive::Prover<_, Sha256>>::new(&mut rng, &ckt, &inp);
     prover_time += t.elapsed();
     println!("Prover setup time: {:?}", t.elapsed());
 

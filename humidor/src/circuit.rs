@@ -12,8 +12,6 @@ use proptest::{*, prelude::*, collection::vec as pvec};
 #[cfg(test)]
 use crate::util::{TestField, arb_test_field};
 
-use crate::util::random_field_array;
-
 /// Operations for a Ligero arithmetic circuit over a finite field. Results
 /// are always stored in the next available register.
 #[derive(Debug, Clone, Copy)]
@@ -30,16 +28,30 @@ pub enum Op<Field> {
     LdI(Field),
 }
 
+fn rand_ix_pair(rng: &mut impl Rng, min: usize, max: usize) -> (usize, usize) {
+    debug_assert!(max - min > 1);
+
+    let s = max - min;
+
+    let a = Uniform::from(0..s).sample(rng);
+    let b = Uniform::from(1..s).sample(rng);
+
+    (min + a, min + (a + b)%s)
+}
+
 /// Pick an operation at random, for random test circuits.
-pub fn random_op<Field>(rng: &mut impl Rng, s: usize) -> Op<Field>
+pub fn random_op<Field>(
+    rng: &mut impl Rng,
+    min_wire: usize,
+    max_wire: usize
+) -> Op<Field>
     where Field: FiniteField
 {
-    let index = Uniform::from(0..s);
     let coin = Uniform::from(0usize..4);
     match coin.sample(rng) {
-        0 => Op::Add(index.sample(rng), index.sample(rng)),
-        1 => Op::Mul(index.sample(rng), index.sample(rng)),
-        2 => Op::Sub(index.sample(rng), index.sample(rng)),
+        0 => { let (i, j) = rand_ix_pair(rng, min_wire, max_wire); Op::Add(i, j) }
+        1 => { let (i, j) = rand_ix_pair(rng, min_wire, max_wire); Op::Mul(i, j) }
+        2 => { let (i, j) = rand_ix_pair(rng, min_wire, max_wire); Op::Sub(i, j) }
         // Division omitted to avoid accidental division by zero
         3 => Op::LdI(Field::random(rng)),
         _ => panic!("Unreachable"),
@@ -47,15 +59,22 @@ pub fn random_op<Field>(rng: &mut impl Rng, s: usize) -> Op<Field>
 }
 
 #[cfg(test)]
+fn arb_ix_pair(min: usize, max: usize) -> impl Strategy<Value = (usize,usize)> {
+    debug_assert!(max - min > 1);
+
+    let s = max - min;
+    (0 .. s, 1 .. s).prop_map(move |(a, b)| (min + a, min + (a + b)%s))
+}
+
+#[cfg(test)]
 pub fn arb_op<Field>(wire_min: usize, wire_max: usize)
     -> impl Strategy<Value = Op<Field>>
     where Field: FiniteField + From<u128>
 {
-    let r = wire_min..wire_max;
     prop_oneof![
-        (r.clone(),r.clone()).prop_map(|(i,j)| Op::Add(i,j)),
-        (r.clone(),r.clone()).prop_map(|(i,j)| Op::Mul(i,j)),
-        (r.clone(),r.clone()).prop_map(|(i,j)| Op::Sub(i,j)),
+        arb_ix_pair(wire_min, wire_max).prop_map(|(i,j)| Op::Add(i,j)),
+        arb_ix_pair(wire_min, wire_max).prop_map(|(i,j)| Op::Mul(i,j)),
+        arb_ix_pair(wire_min, wire_max).prop_map(|(i,j)| Op::Sub(i,j)),
         // Division omitted to avoid accidental division by zero
         (0..Field::MODULUS).prop_map(|f| Op::LdI(Field::from(f))),
     ]
@@ -148,6 +167,10 @@ impl<Field: FiniteField> Ckt<Field> {
         }
 
         for op in &self.ops {
+            debug_assert!(if let Op::Add(n, m) = *op { n != m } else { true });
+            debug_assert!(if let Op::Mul(n, m) = *op { n != m } else { true });
+            debug_assert!(if let Op::Sub(n, m) = *op { n != m } else { true });
+            debug_assert!(if let Op::Div(n, m) = *op { n != m } else { true });
             match *op {
                 Op::Add(n, m) => out.push(out[n] + out[m]),
                 Op::Mul(n, m) => out.push(out[n] * out[m]),
@@ -193,95 +216,61 @@ pub fn test_ckt_zero<Field>() -> (Ckt<Field>, Vec<Field>)
 /// Output a random circuit with an input that evaluates to 0. Both inp_size and
 /// ckt_size must be at least 2.
 pub fn random_ckt_zero<Field: FiniteField>(
-    mut rng: impl Rng,
+    rng: &mut impl Rng,
     inp_size: usize,
     ckt_size: usize
 ) -> (Ckt<Field>, Vec<Field>) {
     debug_assert!(inp_size > 1);
-    debug_assert!(ckt_size > 1);
+    debug_assert!(ckt_size > 2);
 
-    let mut w: Vec<Field> = random_field_array(&mut rng, inp_size).to_vec();
-    let mut ops = vec![];
-    let coin = Uniform::from(0usize..2);
-    for n in 0 .. ckt_size-1 {
-        let index = Uniform::from(1 .. inp_size + n);
-        let i = index.sample(&mut rng);
-        let j = index.sample(&mut rng);
-
-        ops.push(match coin.sample(&mut rng) {
-            0 => Op::Add(i, j),
-            1 => Op::Mul(i, j),
-            2 => Op::Sub(i, j),
-            _ => panic!("Unreachable"),
-        });
-    }
+    let mut ops = (0..ckt_size-2).into_iter()
+        .map(|c| random_op(rng, 0, inp_size+c))
+        .collect::<Vec<_>>();
+    let w = (0..inp_size).into_iter()
+        .map(|_| Field::random(rng))
+        .collect::<Vec<_>>();
 
     let output = Ckt::new(inp_size, &ops).eval(&w);
-    w[0] = -(*output.last().unwrap());
-    ops.push(Op::Add(0, inp_size+ckt_size-2));
+    ops.push(Op::LdI(*output.last().unwrap()));
+    ops.push(Op::Sub(inp_size+ckt_size-2, inp_size+ckt_size-3));
 
     (Ckt::new(inp_size, &ops), w)
 }
 
-/// Generate an arbitrary circuit with the given size.
-// XXX: This is a bad way to do this. Creating large circuits will overflow
-// the stack. Need to figure out something better, maybe along the lines of
-// this: https://altsysrq.github.io/proptest-book/proptest/tutorial/recursive.html
+/// Generate an arbitrary circuit with at most the given size.
 #[cfg(test)]
 #[allow(unused)]
 pub fn arb_ckt(
     inp_size: usize,
     ckt_size: usize
 ) -> impl Strategy<Value = Ckt<TestField>> {
-    if ckt_size == 0 {
-        any::<()>().prop_map(move |()| Ckt::new(inp_size, &vec![])).boxed()
-    } else {
-        let arb_c = arb_ckt(inp_size, ckt_size - 1);
-        let arb_op = arb_op(0, inp_size + ckt_size - 1);
-        (arb_c,arb_op).prop_map(|(Ckt::<TestField> {mut ops, inp_size, shared}, op)| {
-            ops.push(op);
-            <Ckt<TestField>>::new(inp_size, &ops)
-        }).boxed()
-    }
-}
+    debug_assert!(inp_size > 1);
+    debug_assert!(ckt_size > 0);
 
-#[cfg(test)]
-#[allow(unused)]
-fn arb_ckt_with_inp_hole(
-    inp_size: usize,
-    ckt_size: usize,
-) -> impl Strategy<Value = Ckt<TestField>> {
-    if ckt_size == 0 {
-        any::<()>().prop_map(move |()| Ckt {
-            ops: vec![],
-            inp_size,
-            shared: 0..0,
-        }).boxed()
-    } else {
-        let arb_c = arb_ckt_with_inp_hole(inp_size, ckt_size - 1);
-        let arb_op = arb_op(1, inp_size + ckt_size - 1);
-        (arb_c,arb_op).prop_map(|(Ckt::<TestField> {mut ops, inp_size, shared}, op)| {
-            ops.push(op);
-            <Ckt<TestField>>::new(inp_size, &ops)
-        }).boxed()
-    }
+    (1..ckt_size).into_iter()
+        .fold(pvec(arb_op(0, inp_size), 1).boxed(), |acc, c|
+            (acc, arb_op(0, inp_size+c)).prop_map(|(ops, op)|
+                ops.into_iter().chain(std::iter::once(op)).collect()).boxed())
+        .prop_map(move |ops| Ckt { ops, inp_size, shared: 0..0 })
 }
 
 /// Generate an arbitrary circuit with the given size, along with an input that
 /// makes it evaluate to zero.
-// XXX: See comment on arb_ckt, above.
 #[cfg(test)]
 pub fn arb_ckt_zero(
     inp_size: usize,
     ckt_size: usize,
 ) -> impl Strategy<Value = (Ckt<TestField>, Vec<TestField>)> {
+    debug_assert!(inp_size > 1);
+    debug_assert!(ckt_size > 2);
+
     (
-        arb_ckt_with_inp_hole(inp_size, ckt_size-1),
+        arb_ckt(inp_size, ckt_size-2),
         pvec(arb_test_field(), inp_size),
-    ).prop_map(move |(mut c, mut w)| {
+    ).prop_map(move |(mut c, w)| {
         let output = c.eval(&w);
-        w[0] = -(*output.last().unwrap());
-        c.ops.push(Op::Add(0, inp_size+ckt_size-2));
+        c.ops.push(Op::LdI(*output.last().unwrap()));
+        c.ops.push(Op::Sub(inp_size+ckt_size-2, inp_size+ckt_size-3));
 
         (c, w)
     })
@@ -292,7 +281,7 @@ fn test_random_ckt_zero() {
     use rand::{SeedableRng, rngs::StdRng};
 
     let mut rng = StdRng::from_entropy();
-    let size = Uniform::from(2..1000);
+    let size = Uniform::from(3..1000);
     for _ in 0..1000 {
         let inp_size = size.sample(&mut rng);
         let ckt_size = size.sample(&mut rng);
@@ -307,7 +296,7 @@ fn test_random_ckt_zero() {
 proptest! {
     #[test]
     fn test_arb_ckt_zero(
-        (c, w) in (2usize..50, 2usize..50).prop_flat_map(
+        (c, w) in (2usize..50, 3usize..50).prop_flat_map(
             |(ws,cs)| arb_ckt_zero(ws,cs))
     ) {
         prop_assert_eq!(*c.eval(&w).last().unwrap(), TestField::ZERO);

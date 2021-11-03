@@ -31,13 +31,12 @@ fn test_shared_witness_size(s: usize, input_size: usize, total_size: usize) -> (
         circuit_size,
     );
     ckt.shared = 0..shared_size;
-    let mask = (0..shared_size).into_iter().map(|_| Field::random(&mut rng)).collect::<Vec<_>>();
 
     let mut prover_time = std::time::Duration::new(0,0);
     let mut verifier_time = std::time::Duration::new(0,0);
 
     let t = std::time::Instant::now();
-    let mut p = <noninteractive::Prover<_, Sha256>>::new(&mut rng, &ckt, &inp, &mask);
+    let mut p = <noninteractive::Prover<_, Sha256>>::new(&mut rng, &ckt, &inp);
     prover_time += t.elapsed();
     println!("Prover setup time: {:?}", t.elapsed());
 

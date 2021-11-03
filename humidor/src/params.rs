@@ -371,7 +371,7 @@ impl<Field: FieldForLigero> Params<Field> {
     pub fn random_codeword<R>(&self, rng: &mut R) -> Array1<Field>
         where R: rand::RngCore
     {
-        self.encode(random_field_array(rng, self.l).view(), rng)
+        self.encode(Array1::from_shape_fn(self.l, |_| Field::random(rng)).view(), rng)
     }
 
     /// Return a valid codeword for `0^l`.
@@ -380,7 +380,7 @@ impl<Field: FieldForLigero> Params<Field> {
     {
         debug_assert_ne!(self.l, 0);
 
-        let mut w = random_field_array(rng, self.l);
+        let mut w = Array1::from_shape_fn(self.l, |_| Field::random(rng));
         let sum = w.sum();
         w[self.l - 1] -= sum;
 
