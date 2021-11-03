@@ -648,29 +648,29 @@ fn verify<Field: FieldForLigero, H: merkle::MerkleHash>(
 ) -> bool {
     use ndarray::s;
 
-    let P = public.params.clone();
+    let params = public.params.clone();
 
     public.finalize_Padd(&r1.rshared, &r2.qshared);
 
     // ra_i(zeta_c) = (ra * Pa)[m*i + c]
-    let radd = rows_to_mat(make_ra(&P, &r1.radd, &public.Padd.to_csr())
-        .iter().map(|r| P.fft3(r.view())).collect::<Vec<_>>());
-    let rx = rows_to_mat(make_ra_Iml_Pa_neg(&P, &r1.rx, &public.Px)
-        .iter().map(|r| P.fft3(r.view())).collect::<Vec<_>>());
-    let ry = rows_to_mat(make_ra_Iml_Pa_neg(&P, &r1.ry, &public.Py)
-        .iter().map(|r| P.fft3(r.view())).collect::<Vec<_>>());
-    let rz = rows_to_mat(make_ra_Iml_Pa_neg(&P, &r1.rz, &public.Pz)
-        .iter().map(|r| P.fft3(r.view())).collect::<Vec<_>>());
+    let radd = rows_to_mat(make_ra(&params, &r1.radd, &public.Padd.to_csr())
+        .iter().map(|r| params.fft3(r.view())).collect::<Vec<_>>());
+    let rx = rows_to_mat(make_ra_Iml_Pa_neg(&params, &r1.rx, &public.Px)
+        .iter().map(|r| params.fft3(r.view())).collect::<Vec<_>>());
+    let ry = rows_to_mat(make_ra_Iml_Pa_neg(&params, &r1.ry, &public.Py)
+        .iter().map(|r| params.fft3(r.view())).collect::<Vec<_>>());
+    let rz = rows_to_mat(make_ra_Iml_Pa_neg(&params, &r1.rz, &public.Pz)
+        .iter().map(|r| params.fft3(r.view())).collect::<Vec<_>>());
 
     let U = r4.U_lemma.columns.clone();
     let Uw: Vec<Array1<Field>> = U.iter()
-        .map(|c| c.slice(s![0*P.m..1*P.m]).to_owned()).collect();
+        .map(|c| c.slice(s![0*params.m..1*params.m]).to_owned()).collect();
     let Ux: Vec<Array1<Field>> = U.iter()
-        .map(|c| c.slice(s![1*P.m..2*P.m]).to_owned()).collect();
+        .map(|c| c.slice(s![1*params.m..2*params.m]).to_owned()).collect();
     let Uy: Vec<Array1<Field>> = U.iter()
-        .map(|c| c.slice(s![2*P.m..3*P.m]).to_owned()).collect();
+        .map(|c| c.slice(s![2*params.m..3*params.m]).to_owned()).collect();
     let Uz: Vec<Array1<Field>> = U.iter()
-        .map(|c| c.slice(s![3*P.m..4*P.m]).to_owned()).collect();
+        .map(|c| c.slice(s![3*params.m..4*params.m]).to_owned()).collect();
 
     // Testing interleaved Reed-Solomon codes
     let code_check =
@@ -684,24 +684,24 @@ fn verify<Field: FieldForLigero, H: merkle::MerkleHash>(
         // Linear check
         //      sum_{c in [l]} qadd(zeta_c) = 0
         //      i.e., sum_{c in [l]} qadd(zeta_c) = r1.radd^T * b
-        P.fft2_peval(r2.qadd.view()).slice(s![1..=P.l]).to_owned()
+        params.fft2_peval(r2.qadd.view()).slice(s![1..=params.l]).to_owned()
             .sum() == public.badd.dot(&r1.radd) &&
         //      for every j in Q,
         //      uadd[j] + sum_{i in [m]} radd_i(eta_j)*Uw[i,j] = qadd(eta_j)
         r3.Q.iter().zip(Uw.clone()).zip(r4.uadd)
             .all(|((&j, Uw_j), uadd_j)|
                 uadd_j + radd.column(j).dot(&Uw_j)
-                            == P.peval3(r2.qadd.view(), j+1));
+                            == params.peval3(r2.qadd.view(), j+1));
 
     // Testing multiplication gates
     let multiplication_check =
         // Linear checks
         //      for every a in {x,y,z}, sum_{c in [l]} qa(zeta_c) = 0
-        P.fft2_peval(r2.qx.view()).slice(s![1..=P.l]).to_owned()
+        params.fft2_peval(r2.qx.view()).slice(s![1..=params.l]).to_owned()
             .sum() == Field::ZERO &&
-        P.fft2_peval(r2.qy.view()).slice(s![1..=P.l]).to_owned()
+        params.fft2_peval(r2.qy.view()).slice(s![1..=params.l]).to_owned()
             .sum() == Field::ZERO &&
-        P.fft2_peval(r2.qz.view()).slice(s![1..=P.l]).to_owned()
+        params.fft2_peval(r2.qz.view()).slice(s![1..=params.l]).to_owned()
             .sum() == Field::ZERO &&
         //      for every a in {x,y,z} and j in Q,
         //      ua[j] + sum_{i in [m]} ra_i(eta_j)*Ua[i,j]
@@ -709,18 +709,18 @@ fn verify<Field: FieldForLigero, H: merkle::MerkleHash>(
         r3.Q.iter().zip(Ux.clone()).zip(Uw.clone()).zip(r4.ux)
             .all(|(((&j, Ux_j), Uw_j), ux_j)|
                 ux_j + rx.column(j).dot(&concatenate![Axis(0), Ux_j, Uw_j])
-                            == P.peval3(r2.qx.view(), j+1)) &&
+                            == params.peval3(r2.qx.view(), j+1)) &&
         r3.Q.iter().zip(Uy.clone()).zip(Uw.clone()).zip(r4.uy)
             .all(|(((&j, Uy_j), Uw_j), uy_j)|
                 uy_j + ry.column(j).dot(&concatenate![Axis(0), Uy_j, Uw_j])
-                            == P.peval3(r2.qy.view(), j+1)) &&
+                            == params.peval3(r2.qy.view(), j+1)) &&
         r3.Q.iter().zip(Uz.clone()).zip(Uw.clone()).zip(r4.uz)
             .all(|(((&j, Uz_j), Uw_j), uz_j)|
                 uz_j + rz.column(j).dot(&concatenate![Axis(0), Uz_j, Uw_j])
-                            == P.peval3(r2.qz.view(), j+1)) &&
+                            == params.peval3(r2.qz.view(), j+1)) &&
         // Quadratic Check
         //      for every c in [l], p0(zeta_c) = 0
-        P.fft2_peval(r2.p0.view()).slice(s![1..P.l]).into_iter()
+        params.fft2_peval(r2.p0.view()).slice(s![1..params.l]).into_iter()
             .all(|&f| f == Field::ZERO) &&
         //      for every j in Q,
         //      u0[j] + rq * (Ux[j] (.) Uy[j] - Uz[j]) = p0(eta_j)
@@ -731,13 +731,13 @@ fn verify<Field: FieldForLigero, H: merkle::MerkleHash>(
                     .and(&Uz_j)
                     .map_collect(|&x, &y, &z| x*y - z);
                 u0_j + r1.rq.dot(&Uxyz_j)
-                    == P.peval3(r2.p0.view(), j+1)
+                    == params.peval3(r2.p0.view(), j+1)
             });
 
     // Checking column hashes
     let hash_check =
         r4.U_lemma.verify(&r0.U_root) &&
-        P.codeword_is_valid(r2.v.view());
+        params.codeword_is_valid(r2.v.view());
 
     code_check && addition_check && multiplication_check && hash_check
 }
@@ -997,7 +997,7 @@ pub mod interactive {
         /// Generate round-2 prover message.
         #[allow(non_snake_case)]
         pub fn round2(&mut self, r1: Round1<Field>) -> Round2<Field> {
-            let P = self.secret.public.params.clone();
+            let params = self.secret.public.params.clone();
 
             // Testing interleaved Reed-Solomon codes
             let U: Array2<Field> = concatenate![Axis(0),
@@ -1006,10 +1006,10 @@ pub mod interactive {
                 self.secret.Uy,
                 self.secret.Uz
             ];
-            let p = make_pa(&P, &self.secret.Uw);
-            let px = make_pa(&P, &self.secret.Ux);
-            let py = make_pa(&P, &self.secret.Uy);
-            let pz = make_pa(&P, &self.secret.Uz);
+            let p = make_pa(&params, &self.secret.Uw);
+            let px = make_pa(&params, &self.secret.Ux);
+            let py = make_pa(&params, &self.secret.Uy);
+            let pz = make_pa(&params, &self.secret.Uz);
 
             // Note: qshared and rshared must be injected into Padd *before* it
             // is used to make qadd.
@@ -1019,19 +1019,19 @@ pub mod interactive {
             let r2 = Round2 {
                 v: r1.r.dot(&U) + self.secret.u.view(),
                 qadd: make_qadd(&self.secret, &p, &self.secret.public.Padd.to_csr(), r1.radd),
-                qx: make_qa(&P, &p, &self.secret.public.Px, &self.secret.Ux, &self.secret.ux, r1.rx),
-                qy: make_qa(&P, &p, &self.secret.public.Py, &self.secret.Uy, &self.secret.uy, r1.ry),
-                qz: make_qa(&P, &p, &self.secret.public.Pz, &self.secret.Uz, &self.secret.uz, r1.rz),
-                p0: make_p0(&P, &self.secret.u0, &px, &py, &pz, r1.rq.clone()),
+                qx: make_qa(&params, &p, &self.secret.public.Px, &self.secret.Ux, &self.secret.ux, r1.rx),
+                qy: make_qa(&params, &p, &self.secret.public.Py, &self.secret.Uy, &self.secret.uy, r1.ry),
+                qz: make_qa(&params, &p, &self.secret.public.Pz, &self.secret.Uz, &self.secret.uz, r1.rz),
+                p0: make_p0(&params, &self.secret.u0, &px, &py, &pz, r1.rq.clone()),
                 qshared,
             };
 
-            debug_assert_eq!(r2.v.len(), P.n);
-            debug_assert_eq!(r2.qadd.len(), 2*P.k + 1); // XXX: Should be k + l
-            debug_assert_eq!(r2.qx.len(),   2*P.k + 1); // XXX: Should be k + l
-            debug_assert_eq!(r2.qy.len(),   2*P.k + 1); // XXX: Should be k + l
-            debug_assert_eq!(r2.qz.len(),   2*P.k + 1); // XXX: Should be k + l
-            debug_assert_eq!(r2.p0.len(),   2*P.k + 1);
+            debug_assert_eq!(r2.v.len(), params.n);
+            debug_assert_eq!(r2.qadd.len(), 2*params.k + 1); // XXX: Should be k + l
+            debug_assert_eq!(r2.qx.len(),   2*params.k + 1); // XXX: Should be k + l
+            debug_assert_eq!(r2.qy.len(),   2*params.k + 1); // XXX: Should be k + l
+            debug_assert_eq!(r2.qz.len(),   2*params.k + 1); // XXX: Should be k + l
+            debug_assert_eq!(r2.p0.len(),   2*params.k + 1);
             r2
         }
 
@@ -1054,17 +1054,17 @@ pub mod interactive {
                 u0: r3.Q.iter().map(|&j| s.u0[j]).collect(),
             };
 
-            let P = &s.public.params;
-            let log_n = (P.n as f64).log2().ceil() as usize;
-            debug_assert_eq!(r4.U_lemma.columns.len(), P.t);
-            debug_assert_eq!(r4.U_lemma.columns[0].len(), 4*P.m);
-            debug_assert!(r4.U_lemma.nlemmas() <= P.t*log_n);
-            debug_assert_eq!(r4.ux.len(), P.t);
-            debug_assert_eq!(r4.uy.len(), P.t);
-            debug_assert_eq!(r4.uz.len(), P.t);
-            debug_assert_eq!(r4.uadd.len(), P.t);
-            debug_assert_eq!(r4.u.len(), P.t);
-            debug_assert_eq!(r4.u0.len(), P.t);
+            let params = &s.public.params;
+            let log_n = (params.n as f64).log2().ceil() as usize;
+            debug_assert_eq!(r4.U_lemma.columns.len(), params.t);
+            debug_assert_eq!(r4.U_lemma.columns[0].len(), 4*params.m);
+            debug_assert!(r4.U_lemma.nlemmas() <= params.t*log_n);
+            debug_assert_eq!(r4.ux.len(), params.t);
+            debug_assert_eq!(r4.uy.len(), params.t);
+            debug_assert_eq!(r4.uz.len(), params.t);
+            debug_assert_eq!(r4.uadd.len(), params.t);
+            debug_assert_eq!(r4.u.len(), params.t);
+            debug_assert_eq!(r4.u0.len(), params.t);
             r4
         }
     }
