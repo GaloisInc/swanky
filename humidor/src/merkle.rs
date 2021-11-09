@@ -73,6 +73,7 @@ pub fn hash_column<H, Field>(a: ArrayView1<Field>) -> Digest
 }
 
 /// Sha256 for Merkle trees.
+#[derive(Clone)]
 pub struct Sha256 (crypto::sha2::Sha256);
 
 impl tiny_keccak::Hasher for Sha256 {
@@ -85,6 +86,7 @@ impl MerkleHash for Sha256 {
 }
 
 /// Sha3 for Merkle trees.
+#[derive(Clone)]
 pub struct Sha3(tiny_keccak::Sha3);
 
 impl tiny_keccak::Hasher for Sha3 {
