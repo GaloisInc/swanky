@@ -1,5 +1,5 @@
 use rand::SeedableRng;
-use scuttlebutt::{AesRng, field::FiniteField};
+use scuttlebutt::AesRng;
 
 extern crate humidor;
 

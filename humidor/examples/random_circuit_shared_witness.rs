@@ -1,6 +1,6 @@
 use rand::SeedableRng;
 use std::io::Write;
-use scuttlebutt::{AesRng, field::FiniteField};
+use scuttlebutt::AesRng;
 
 extern crate humidor;
 
