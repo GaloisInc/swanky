@@ -3,6 +3,26 @@
 
 //! This module implements Ligero according to section 4.7 of
 //! https://dl.acm.org/doi/pdf/10.1145/3133956.3134104
+//!
+//! Running Ligero using a witness shared with another proof system ZKP2:
+//! 1. Create a circuit with a non-empty shared-witness range using the
+//!    `new_with_shared` constructor.
+//! 2. In the prover:
+//!     a. Create a prover with the `noninteractive::Prover` constructor.
+//!     b. Call the `shared_mask` method to retrieve the shared mask `m` and
+//!        commit to the shared witness `u` and the mask using the ZKP2
+//!        commitment (sending it to the verifier).
+//!     c. Run `make_proof_and_shared_check` using the ZKP2 commitment to
+//!        `(u,m)` to get the proof, matrix `A`, and vector `b`. Send the proof
+//!        to the verifier.
+//!     d. Prove that `A*u + m = b` in ZKP2.
+//! 3. In the verifier:
+//!     a. Create a verifier with the `noninteractive::Verifier` constructor.
+//!     b. Get the proof from the prover.
+//!     c. Call `verify_with_shared` on the ZKP2 commitment to `(u,m)`, checking
+//!        whether the verifier accepts and retrieving the matrix `A` and the
+//!        vector `b`.
+//!     d. Verify that `A*u + m = b` in ZKP2.
 
 // A Note on Shared-Witness Checking
 // =================================
@@ -962,23 +982,6 @@ pub mod interactive {
             }
         }
 
-        /// Get the prover's parameters.
-        pub fn params(&self) -> Params<Field> {
-            self.secret.public.params
-        }
-
-        /// Get the range within the extended witness that contains the shared
-        /// witness.
-        pub fn shared(&self) -> std::ops::Range<usize> {
-            self.secret.public.shared.clone()
-        }
-
-        /// Get the range within the extended witness that contains the shared
-        /// witness.
-        pub fn shared_mask(&self) -> std::ops::Range<usize> {
-            self.secret.public.shared_mask.clone()
-        }
-
         /// Theoretical proof size, according to Section 5.3.
         pub fn expected_proof_size(&self) -> usize {
             let p = &self.secret.public.params;
@@ -986,6 +989,43 @@ pub mod interactive {
                 p.n, p.k + 1, p.l, p.m, p.t,
                 std::mem::size_of::<Field>(), std::mem::size_of::<merkle::Digest>())
         }
+
+        // Various getters for use by non-interactive variant
+
+        /// Get the prover's parameters.
+        pub fn params(&self) -> Params<Field> {
+            self.secret.public.params
+        }
+
+        /// Get the range within the extended witness that contains the shared
+        /// witness.
+        pub fn shared_range(&self) -> std::ops::Range<usize> {
+            self.secret.public.shared.clone()
+        }
+
+        /// Get the range within the extended witness that contains the shared
+        /// witness.
+        pub fn shared_mask_range(&self) -> std::ops::Range<usize> {
+            self.secret.public.shared_mask.clone()
+        }
+
+        /// Get mask for the shared-witness check, i.e., the `m` in the check of
+        /// `A*u + m = b`.
+        pub fn shared_witness(&self) -> Array1<Field> {
+            let shared_range = self.secret.public.shared.clone();
+
+            self.secret.w.slice(ndarray::s![shared_range]).to_owned()
+        }
+
+        /// Get mask for the shared-witness check, i.e., the `m` in the check of
+        /// `A*u + m = b`.
+        pub fn shared_mask(&self) -> Array1<Field> {
+            let mask_range = self.secret.public.shared_mask.clone();
+
+            self.secret.w.slice(ndarray::s![mask_range]).to_owned()
+        }
+
+        // Round functions
 
         /// Generate round-0 prover message.
         pub fn round0(&self) -> Round0 {
@@ -1013,7 +1053,12 @@ pub mod interactive {
 
             // Note: qshared and rshared must be injected into Padd *before* it
             // is used to make qadd.
-            let qshared = make_qshared(&self.secret.w, &self.shared(), &self.shared_mask(), &r1.rshared);
+            let qshared = make_qshared(
+                &self.secret.w,
+                &self.shared_range(),
+                &self.shared_mask_range(),
+                &r1.rshared
+            );
             self.secret.public.finalize_Padd(&r1.rshared, &qshared);
 
             let r2 = Round2 {
@@ -1295,10 +1340,12 @@ pub mod noninteractive {
         num_shared_checks: usize,
         state: &merkle::Digest,
         r0: &Round0,
+        other_commit: &[u8], // Commitment of shared witness and mask from other proof system
     ) -> (Round1<Field>, merkle::Digest) {
         let mut hash = H::new();
         hash.update(&state.to_vec());
         hash.update(&r0.U_root);
+        hash.update(other_commit);
 
         let mut digest = merkle::HZERO;
         hash.finalize(&mut digest);
@@ -1359,6 +1406,10 @@ pub mod noninteractive {
             Self { ckt_hash, ip: interactive::Prover::new(rng, c, w) }
         }
 
+        /// Get mask for the shared-witness check, i.e., the `m` in the check of
+        /// `A*u + m = b`.
+        pub fn shared_mask(&mut self) -> Array1<Field> { self.ip.shared_mask() }
+
         /// Theoretical proof size from Section 5.3.
         pub fn expected_proof_size(&self) -> usize {
             let p = self.ip.params();
@@ -1368,17 +1419,41 @@ pub mod noninteractive {
                 std::mem::size_of::<Field>(), std::mem::size_of::<merkle::Digest>())
         }
 
-        /// Generate the proof message.
-        pub fn make_proof(&mut self) -> Proof<Field, H> {
+        /// Generate the proof message. Takes a commitment to the shared witness
+        /// and mask for use in Fiat-Shamir.
+        pub fn make_proof_and_shared_check(&mut self, other_commit: &[u8])
+            -> (Proof<Field, H>, Array2<Field>, Array1<Field>)
+        {
             let r0 = self.ip.round0();
-            let (r1,state) = make_r1::<_,H>(&self.ip.params(), self.ip.shared().len(), self.ip.shared_mask().len(), &self.ckt_hash, &r0);
+            let (r1,state) = make_r1::<_,H>(
+                &self.ip.params(),
+                self.ip.shared_range().len(),
+                self.ip.shared_mask_range().len(),
+                &self.ckt_hash,
+                &r0,
+                other_commit,
+            );
+
+            let rshared = r1.rshared.clone();
+
             let r2 = self.ip.round2(r1);
             let r3 = make_r3::<_,H>(&self.ip.params(), &state, &r2);
             let r4 = self.ip.round4(r3);
 
-            Proof { r0, r2, r4,
-                phantom: std::marker::PhantomData,
-            }
+            let qshared = r2.qshared.clone();
+
+            (
+                Proof { r0, r2, r4,
+                    phantom: std::marker::PhantomData,
+                },
+                rshared,
+                qshared,
+            )
+        }
+
+        /// Generate the proof message
+        pub fn make_proof(&mut self) -> Proof<Field, H> {
+            self.make_proof_and_shared_check(&vec![]).0
         }
     }
 
@@ -1416,12 +1491,35 @@ pub mod noninteractive {
                 std::mem::size_of::<merkle::Digest>())
         }
 
-        /// Run the final verification procedure.
-        pub fn verify(&mut self, p: Proof<Field, H>) -> bool {
-            let (r1,state) = make_r1::<_,H>(&self.public.params, self.public.shared.len(), self.public.shared_mask.len(), &self.ckt_hash, &p.r0);
+        /// Run the final verification procedure. Return the output of the
+        /// verification procedure, as well as 
+        pub fn verify_with_shared(&mut self,
+            p: Proof<Field, H>,
+            other_commit: &[u8]
+        ) -> (bool, Array2<Field>, Array1<Field>) {
+            let (r1,state) = make_r1::<_,H>(
+                &self.public.params,
+                self.public.shared.len(),
+                self.public.shared_mask.len(),
+                &self.ckt_hash,
+                &p.r0,
+                other_commit,
+            );
             let r3 = make_r3::<_,H>(&self.public.params, &state, &p.r2);
 
-            verify(&mut self.public, p.r0, r1, p.r2, r3, p.r4)
+            let rshared = r1.rshared.clone();
+            let qshared = p.r2.qshared.clone();
+
+            (
+                verify(&mut self.public, p.r0, r1, p.r2, r3, p.r4),
+                rshared,
+                qshared,
+            )
+        }
+
+        /// Run the final verification procedure.
+        pub fn verify(&mut self, p: Proof<Field, H>) -> bool {
+            self.verify_with_shared(p, &vec![]).0
         }
     }
 
@@ -1479,14 +1577,27 @@ pub mod noninteractive {
             }),
             seed: [u8; 16],
         ) {
+            use merkle::{Sha256, MerkleHash};
+            use tiny_keccak::Hasher;
+
             let mut rng = AesRng::from_seed(Block::from(seed));
 
             let output = *ckt.eval(&w).last().unwrap();
-            let mut p = <Prover<_, merkle::Sha256>>::new(&mut rng, &ckt, &w);
+            let mut p = <Prover<_, Sha256>>::new(&mut rng, &ckt, &w);
             let mut v = Verifier::new(&ckt);
 
-            let proof = p.make_proof();
-            prop_assert_eq!(v.verify(proof), output == TestField::ZERO);
+            let mut hash = Sha256::new();
+            p.ip.shared_witness().iter().for_each(|f| hash.update(&f.to_bytes()));
+            p.ip.shared_mask().iter().for_each(|f| hash.update(&f.to_bytes()));
+
+            let mut other_commit = merkle::HZERO;
+            hash.finalize(&mut other_commit);
+
+            let (proof, rshared, qshared) = p.make_proof_and_shared_check(&other_commit);
+            prop_assert_eq!(
+                v.verify_with_shared(proof, &other_commit),
+                (output == TestField::ZERO, rshared, qshared)
+            );
         }
 
         #[test]
@@ -1496,13 +1607,26 @@ pub mod noninteractive {
             }),
             seed: [u8; 16],
         ) {
+            use merkle::{Sha256, MerkleHash};
+            use tiny_keccak::Hasher;
+
             let mut rng = AesRng::from_seed(Block::from(seed));
 
             let mut p = <Prover<TestField, merkle::Sha256>>::new(&mut rng, &ckt, &w);
             let mut v = <Verifier<TestField, merkle::Sha256>>::new(&ckt);
 
-            let proof = p.make_proof();
-            prop_assert!(v.verify(proof))
+            let mut hash = Sha256::new();
+            p.ip.shared_witness().iter().for_each(|f| hash.update(&f.to_bytes()));
+            p.ip.shared_mask().iter().for_each(|f| hash.update(&f.to_bytes()));
+
+            let mut other_commit = merkle::HZERO;
+            hash.finalize(&mut other_commit);
+
+            let (proof, rshared, qshared) = p.make_proof_and_shared_check(&other_commit);
+            prop_assert_eq!(
+                v.verify_with_shared(proof, &other_commit),
+                (true, rshared, qshared)
+            )
         }
     }
 }
