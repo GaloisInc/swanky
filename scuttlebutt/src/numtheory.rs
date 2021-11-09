@@ -62,7 +62,7 @@ fn non_ct_pow<Field: FiniteField>(mut b: Field, mut e: u128) -> Field {
 }
 
 
-pub mod cooley_tukey {
+mod cooley_tukey {
     //! FFT by in-place Cooley-Tukey algorithms.
 
     use super::*;
@@ -237,13 +237,23 @@ pub mod cooley_tukey {
 /// `omega` must be a `n`-th principal root of unity,
 /// where `n` is the length of `a_coef` as well as a power of 2.
 /// The result will contain the same number of elements.
-#[allow(dead_code)]
 pub fn fft2<Field>(a_coef: &[Field], omega: Field) -> Vec<Field>
     where Field: FieldForFFT2
 {
     let mut data: Vec<_> = a_coef.iter().cloned().collect();
     cooley_tukey::fft2(&mut data, omega);
     data
+}
+
+/// Compute the in-place 2-radix FFT of `a_coef` in the *Zp* field defined by `prime`.
+///
+/// `omega` must be a `n`-th principal root of unity,
+/// where `n` is the length of `a_coef` as well as a power of 2.
+/// The result will contain the same number of elements.
+pub fn fft2_in_place<Field>(a_coef: &mut [Field], omega: Field)
+    where Field: FieldForFFT2
+{
+    cooley_tukey::fft2(a_coef, omega);
 }
 
 /// Inverse FFT for `fft2`.
@@ -253,6 +263,13 @@ pub fn fft2_inverse<Field>(a_point: &[Field], omega: Field) -> Vec<Field>
     let mut data: Vec<_> = a_point.iter().cloned().collect();
     cooley_tukey::fft2_inverse(&mut data, omega);
     data
+}
+
+/// Inverse FFT for `fft2_in_place`.
+pub fn fft2_inverse_in_place<Field>(a_point: &mut [Field], omega: Field)
+    where Field: FieldForFFT2
+{
+    cooley_tukey::fft2_inverse(a_point, omega);
 }
 
 /// Tests for types implementing FieldForFFT2
@@ -312,14 +329,31 @@ pub fn fft3<Field>(a_coef: &[Field], omega: Field) -> Vec<Field>
     data
 }
 
+/// Compute the 3-radix FFT of `a_coef` in the *Zp* field defined by `prime`.
+///
+/// `omega` must be a `n`-th principal root of unity,
+/// where `n` is the length of `a_coef` as well as a power of 3.
+/// The result will contain the same number of elements.
+pub fn fft3_in_place<Field>(a_coef: &mut [Field], omega: Field)
+    where Field: FieldForFFT3
+{
+    cooley_tukey::fft3(a_coef, omega);
+}
+
 /// Inverse FFT for `fft3`.
-#[allow(dead_code)]
 pub fn fft3_inverse<Field>(a_point: &[Field], omega: Field) -> Vec<Field>
     where Field: FieldForFFT3
 {
     let mut data = a_point.iter().cloned().collect::<Vec<_>>();
     cooley_tukey::fft3_inverse(&mut data, omega);
     data
+}
+
+/// Inverse FFT for `fft3`.
+pub fn fft3_inverse_in_place<Field>(a_point: &mut [Field], omega: Field)
+    where Field: FieldForFFT3
+{
+    cooley_tukey::fft3_inverse(a_point, omega);
 }
 
 /// Tests for types implementing FieldForFFT3

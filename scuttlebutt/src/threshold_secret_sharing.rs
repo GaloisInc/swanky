@@ -113,13 +113,13 @@ impl<Field: FiniteField + FieldForFFT2 + FieldForFFT3> PackedSecretSharing<Field
         values.extend(randomness);
         // run backward FFT to recover polynomial in coefficient representation
         debug_assert_eq!(values.len(), self.reconstruct_limit() + 1);
-        numtheory::cooley_tukey::fft2_inverse(&mut values, self.omega_secrets);
+        numtheory::fft2_inverse_in_place(&mut values, self.omega_secrets);
         values
     }
 
     fn evaluate_polynomial(&self, coefficients: &mut Vec<Field>) {
         debug_assert_eq!(coefficients.len(), self.share_count + 1);
-        numtheory::cooley_tukey::fft3(coefficients, self.omega_shares)
+        numtheory::fft3_in_place(coefficients, self.omega_shares)
     }
 
     /// Reconstruct the secrets from a large enough subset of the shares.

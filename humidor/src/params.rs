@@ -175,10 +175,10 @@ impl<Field: FieldForLigero> Params<Field> {
         debug_assert_eq!(cf.len(), self.n);
 
         let mut coeffs0 = std::iter::once(&Field::ZERO).chain(cf.iter()).cloned().collect::<Vec<_>>();
-        numtheory::cooley_tukey::fft3_inverse(&mut coeffs0, self.pss.omega_shares);
+        numtheory::fft3_inverse_in_place(&mut coeffs0, self.pss.omega_shares);
 
         let (mut points, zeros) = coeffs0[..].split_at_mut(self.k+1);
-        numtheory::cooley_tukey::fft2(&mut points, self.pss.omega_secrets);
+        numtheory::fft2_in_place(&mut points, self.pss.omega_secrets);
 
         points[0] == Field::ZERO && zeros.iter().all(|&f| f == Field::ZERO)
     }
@@ -343,12 +343,12 @@ impl<Field: FieldForLigero> Params<Field> {
             .collect::<Array1<_>>();
 
         // Use in-place fft to avoid allocating any more Vecs.
-        numtheory::cooley_tukey::fft2(p0.as_slice_mut().unwrap(), omega);
-        numtheory::cooley_tukey::fft2(q0.as_slice_mut().unwrap(), omega);
+        numtheory::fft2_in_place(p0.as_slice_mut().unwrap(), omega);
+        numtheory::fft2_in_place(q0.as_slice_mut().unwrap(), omega);
         for i in 0 .. max_deg {
             p0[i] *= q0[i]
         }
-        numtheory::cooley_tukey::fft2_inverse(p0.as_slice_mut().unwrap(), omega);
+        numtheory::fft2_inverse_in_place(p0.as_slice_mut().unwrap(), omega);
 
         p0.slice_move(ndarray::s![0 .. pq_deg])
     }
