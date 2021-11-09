@@ -8,7 +8,7 @@
 // TODO: Eliminate excessive use of vectors in anonymous functions, function
 // return values, etc.
 
-use ndarray::{Array1, Array2, ArrayView1, ArrayView2};
+use ndarray::{Array1, Array2, ArrayView1, ArrayView2, concatenate, Axis, Zip};
 use scuttlebutt::{numtheory, threshold_secret_sharing};
 
 use crate::util::*;
@@ -131,9 +131,8 @@ impl<Field: FieldForLigero> Params<Field> {
     }
 
     /// Decode a codeword row without stripping the random elements off the end.
+    // TODO make this an in-place operation?
     fn decode_no_strip(&self, cf: ArrayView1<Field>) -> Vec<Field> {
-        use ndarray::{concatenate, Axis};
-
         debug_assert_eq!(cf.len(), self.n);
 
         let coeffs0 = concatenate!(Axis(0), Array1::zeros(1), cf);
@@ -216,6 +215,7 @@ impl<Field: FieldForLigero> Params<Field> {
 
     /// Take a sequence of values `p(zeta_1) .. p(zeta_c)` for `c <= k` and
     /// return the `(k+1)`-coefficients of the polynomial `p`.
+    // TODO make this an in-place operation?
     pub fn fft2_inverse(&self, points: ArrayView1<Field>) -> Array1<Field> {
         debug_assert!(points.len() <= self.k);
 
@@ -232,6 +232,7 @@ impl<Field: FieldForLigero> Params<Field> {
     /// return evaluation points `p(zeta_1) .. p(zeta_{k})`. Note that
     /// `p(zeta_0)`, which should always be zero for our application, is
     /// not returned.
+    // TODO make this an in-place operation?
     pub fn fft2(&self, coeffs: ArrayView1<Field>) -> Array1<Field> {
         debug_assert!(coeffs.len() <= self.k+1);
 
@@ -247,6 +248,7 @@ impl<Field: FieldForLigero> Params<Field> {
     /// Take a sequence of _possibly more than_ `k+1` coefficients of the
     /// polynomial `p` and return evaluation points `p(zeta_0) .. p(zeta_{k})`.
     /// Note that _all_ `k+1` coefficients are returned
+    // TODO use in-place fft?
     pub fn fft2_peval(&self, coeffs: ArrayView1<Field>) -> Array1<Field> {
         let coeffs0 = coeffs.to_vec()[..]
             .chunks(self.k + 1)
@@ -261,6 +263,7 @@ impl<Field: FieldForLigero> Params<Field> {
 
     /// Take a sequence of values `p(eta_1) .. p(eta_c)` for `c <= n` and
     /// return the `(n+1)`-coefficients of the polynomial `p`.
+    // TODO make this an in-place operation?
     pub fn fft3_inverse(&self, points: ArrayView1<Field>) -> Array1<Field> {
         debug_assert!(points.len() <= self.n);
 
@@ -277,6 +280,7 @@ impl<Field: FieldForLigero> Params<Field> {
     /// return evaluation points `p(eta_1) .. p(eta_{n})`. Note that
     /// `p(eta_0)`, which should always be zero for our application, is
     /// not returned.
+    // TODO make this an in-place operation?
     pub fn fft3(&self, coeffs: ArrayView1<Field>) -> Array1<Field> {
         debug_assert!(coeffs.len() <= self.n + 1);
 
@@ -287,6 +291,46 @@ impl<Field: FieldForLigero> Params<Field> {
             &coeffs0.to_vec(),
             self.pss.omega_shares,
         )[1..].iter().cloned().collect()
+    }
+
+    /// Apply `fft3_inverse` to the rows of an `Array2`.
+    // TODO make this an in-place operation?
+    pub fn fft3_inverse_rows(&self, mat: ArrayView2<Field>) -> Array2<Field> {
+        debug_assert!(mat.ncols() <= self.n);
+
+        let mut res = Array2::zeros((mat.nrows(), self.n + 1)); // TODO use uninit for efficiency
+        //mat.to_owned() // TODO better if we move this argument?
+        //    .move_into(res.slice_mut(ndarray::s![.., 1..mat.ncols()+1]));
+        res.slice_mut(ndarray::s![.., 1..mat.ncols()+1]).assign(&mat);
+
+        Zip::from(res.rows_mut()).for_each(|mut row| {
+            numtheory::fft3_inverse_in_place(
+                row.as_slice_mut().unwrap(),
+                self.pss.omega_shares,
+            );
+        });
+
+        res
+    }
+
+    /// Apply `fft3` to the rows of an `Array2`.
+    // TODO make this an in-place operation?
+    pub fn fft3_rows(&self, mat: ArrayView2<Field>) -> Array2<Field> {
+        debug_assert!(mat.ncols() <= self.n + 1);
+
+        let mut res = Array2::zeros((mat.nrows(), self.n + 1)); // TODO use uninit for efficiency
+        //mat.to_owned() // TODO better if we move this argument?
+        //    .move_into(res.slice_mut(ndarray::s![.., 0..mat.ncols()]));
+        res.slice_mut(ndarray::s![.., 0..mat.ncols()]).assign(&mat);
+
+        Zip::from(res.rows_mut()).for_each(|mut row| {
+            numtheory::fft3_in_place(
+                row.as_slice_mut().unwrap(),
+                self.pss.omega_shares,
+            );
+        });
+
+        res.slice(ndarray::s![.., 1..]).to_owned()
     }
 
     /// Take a sequence of _possibly more than_ `n+1` coefficients of the
@@ -417,6 +461,155 @@ proptest! {
         prop_assert!(p.l * p.m >= s);
         prop_assert!(p.m > 0);
         prop_assert!(p.l > 0);
+    }
+
+    #[test]
+    fn test_fft2_inverse(
+        (p, len, v) in any::<Params<TestField>>()
+            .prop_flat_map(|p| (Just(p), 1 ..= p.l))
+            .prop_flat_map(|(p, len)| (Just(p), Just(len), pvec(arb_test_field(), len)))
+    ) {
+        let mut a = std::iter::once(TestField::ZERO)
+            .chain(v)
+            .chain(std::iter::repeat(TestField::ZERO).take(p.k - len))
+            .collect::<Array1<_>>();
+        prop_assert_eq!(a.len(), p.k + 1);
+
+        let coeffs = p.fft2_inverse(a.slice(ndarray::s![1..=len]));
+
+        numtheory::fft2_inverse_in_place(&mut a.as_slice_mut().unwrap(), p.pss.omega_secrets);
+        let coeffs_ref = a;
+
+        prop_assert_eq!(coeffs.len(), coeffs_ref.len());
+        prop_assert_eq!(coeffs, coeffs_ref);
+    }
+
+    #[test]
+    fn test_fft2(
+        (p, len, v) in any::<Params<TestField>>()
+            .prop_flat_map(|p| (Just(p), 1 ..= p.l+1))
+            .prop_flat_map(|(p, len)| (Just(p), Just(len), pvec(arb_test_field(), len)))
+    ) {
+        let mut a = v.into_iter()
+            .chain(std::iter::repeat(TestField::ZERO).take(p.k+1 - len))
+            .collect::<Array1<_>>();
+        prop_assert_eq!(a.len(), p.k + 1);
+
+        let points = p.fft2(a.slice(ndarray::s![0..len]));
+
+        numtheory::fft2_in_place(&mut a.as_slice_mut().unwrap(), p.pss.omega_secrets);
+        let points_ref = a.slice(ndarray::s![1..]);
+
+        prop_assert_eq!(points.len(), points_ref.len());
+        prop_assert_eq!(points, points_ref);
+    }
+
+    #[test]
+    fn test_fft3_inverse(
+        (p, len, v) in any::<Params<TestField>>()
+            .prop_flat_map(|p| (Just(p), 1 ..= p.n))
+            .prop_flat_map(|(p, len)| (Just(p), Just(len), pvec(arb_test_field(), len)))
+    ) {
+        let mut a = std::iter::once(TestField::ZERO)
+            .chain(v)
+            .chain(std::iter::repeat(TestField::ZERO).take(p.n - len))
+            .collect::<Array1<_>>();
+        prop_assert_eq!(a.len(), p.n + 1);
+
+        let coeffs = p.fft3_inverse(a.slice(ndarray::s![1..=len]));
+
+        numtheory::fft3_inverse_in_place(&mut a.as_slice_mut().unwrap(), p.pss.omega_shares);
+        let coeffs_ref = a;
+
+        prop_assert_eq!(coeffs.len(), coeffs_ref.len());
+        prop_assert_eq!(coeffs, coeffs_ref);
+    }
+
+    #[test]
+    fn test_fft3(
+        (p, len, v) in any::<Params<TestField>>()
+            .prop_flat_map(|p| (Just(p), 1 ..= p.n+1))
+            .prop_flat_map(|(p, len)| (Just(p), Just(len), pvec(arb_test_field(), len)))
+    ) {
+        let mut a = v.into_iter()
+            .chain(std::iter::repeat(TestField::ZERO).take(p.n+1 - len))
+            .collect::<Array1<_>>();
+        prop_assert_eq!(a.len(), p.n + 1);
+
+        let points = p.fft3(a.slice(ndarray::s![0..len]));
+
+        numtheory::fft3_in_place(&mut a.as_slice_mut().unwrap(), p.pss.omega_shares);
+        let points_ref = a.slice(ndarray::s![1..]);
+
+        prop_assert_eq!(points.len(), points_ref.len());
+        prop_assert_eq!(points, points_ref);
+    }
+
+    #[test]
+    fn test_fft3_inverse_rows(
+        (p, len, v1, v2) in any::<Params<TestField>>()
+            .prop_flat_map(|p| (Just(p), 1 ..= p.n))
+            .prop_flat_map(|(p, len)| (
+                    Just(p),
+                    Just(len),
+                    pvec(arb_test_field(), len),
+                    pvec(arb_test_field(), len),
+            ))
+    ) {
+        use ndarray::{stack, s};
+
+        let mut a1 = std::iter::once(TestField::ZERO)
+            .chain(v1)
+            .chain(std::iter::repeat(TestField::ZERO).take(p.n - len))
+            .collect::<Array1<_>>();
+        prop_assert_eq!(a1.len(), p.n + 1);
+        let mut a2 = std::iter::once(TestField::ZERO)
+            .chain(v2)
+            .chain(std::iter::repeat(TestField::ZERO).take(p.n - len))
+            .collect::<Array1<_>>();
+        prop_assert_eq!(a2.len(), p.n + 1);
+        let points = stack(Axis(0), &[a1.slice(s![1..=len]), a2.slice(s![1..=len])]).unwrap();
+
+        let coeffs = p.fft3_inverse_rows(points.view());
+
+        numtheory::fft3_inverse_in_place(&mut a1.as_slice_mut().unwrap(), p.pss.omega_shares);
+        numtheory::fft3_inverse_in_place(&mut a2.as_slice_mut().unwrap(), p.pss.omega_shares);
+        let coeffs_ref = ndarray::stack(Axis(0), &[a1.view(), a2.view()]).unwrap();
+
+        prop_assert_eq!(coeffs.dim(), coeffs_ref.dim());
+        prop_assert_eq!(coeffs, coeffs_ref);
+    }
+
+    #[test]
+    fn test_fft3_rows(
+        (p, len, v1, v2) in any::<Params<TestField>>()
+            .prop_flat_map(|p| (Just(p), 1 ..= p.n+1))
+            .prop_flat_map(|(p, len)| (
+                    Just(p),
+                    Just(len),
+                    pvec(arb_test_field(), len),
+                    pvec(arb_test_field(), len),
+            ))
+    ) {
+        let mut a1 = v1.into_iter()
+            .chain(std::iter::repeat(TestField::ZERO).take(p.n+1 - len))
+            .collect::<Array1<_>>();
+        prop_assert_eq!(a1.len(), p.n + 1);
+        let mut a2 = v2.into_iter()
+            .chain(std::iter::repeat(TestField::ZERO).take(p.n+1 - len))
+            .collect::<Array1<_>>();
+        prop_assert_eq!(a1.len(), p.n + 1);
+        let coeffs = ndarray::stack(Axis(0), &[a1.view(), a2.view()]).unwrap();
+
+        let points = p.fft3_rows(coeffs.view());
+
+        numtheory::fft3_in_place(&mut a1.as_slice_mut().unwrap(), p.pss.omega_shares);
+        numtheory::fft3_in_place(&mut a2.as_slice_mut().unwrap(), p.pss.omega_shares);
+        let points_ref0 = ndarray::stack(Axis(0), &[a1.view(), a2.view()]).unwrap();
+        let points_ref = points_ref0.slice(ndarray::s![.., 1..]);
+
+        prop_assert_eq!(points.dim(), points_ref.dim());
+        prop_assert_eq!(points, points_ref);
     }
 
     #[test]
