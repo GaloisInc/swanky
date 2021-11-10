@@ -47,9 +47,6 @@
 // being maybe a little counterintuitive.
 //
 // The following changes have been made to the base Ligero implementation:
-// - The constructor for a Prover takes a mask, containing a field element mask
-//   for each desired linear check. This is because the proof system that shares
-//   the witness needs to commit to the mask before A is chosen.
 // - The mask is added to the shared witness immediately after the final
 //   assert-zero check (at range `c.size()+1..c.size()+1+num_shared_checks`).
 //   The mask is thus commited to as part of the shared witness in round 0.
@@ -123,11 +120,13 @@ impl<Field: FieldForLigero> Public<Field> {
     /// the witness and shared-witness size are contained in the `c` argument.
     #[allow(non_snake_case)]
     fn new(c: &Ckt<Field>) -> Self {
-        // XXX: By the SZ Lemma, Pr[p(x) = q(x)] for monomials p and q and
-        // uniform x chosen independently of p and q is 1/|F|. I think this
-        // means we only need to check 1 linear combination (i.e., A has just
-        // one row) to get the same |F|-bit security we have elsewhere. Is this
-        // correct?
+        // By the SZ Lemma, Pr[p(x) = q(x)] for monomials p and q and uniform x
+        // chosen independently of p and q is 1/|F|.
+        //
+        // TODO: This should probably be defined as part of the parameter
+        // selection as something like `ceil(log2(lambda)/log2(|F|))`, where
+        // `lambda is the desired security. For large fields, this is fine,
+        // though.
         let num_shared_checks = 1;
 
         let params = Params::new(
@@ -192,7 +191,7 @@ impl<Field: FieldForLigero> Public<Field> {
 
         Public {params,
             shared: c.shared.clone(),
-            shared_mask: c.size()+1 .. c.size()+1 + c.shared.len(),
+            shared_mask: c.size()+1 .. c.size()+1+num_shared_checks,
 
             Px: Px.to_csr(),
             Py: Py.to_csr(),
@@ -213,9 +212,9 @@ impl<Field: FieldForLigero> Public<Field> {
         rshared: &Array2<Field>,
         qshared: &Array1<Field>,
     ) {
-        debug_assert_eq!(self.shared.len(), self.shared_mask.len());
         debug_assert_eq!(self.shared.len(), rshared.ncols());
-        debug_assert_eq!(self.shared.len(), qshared.len());
+        debug_assert_eq!(self.shared_mask.len(), rshared.nrows());
+        debug_assert_eq!(self.shared_mask.len(), qshared.len());
 
         self.shared_mask.clone().into_iter()
             .zip(rshared.rows().into_iter())
@@ -294,17 +293,19 @@ impl<Field: FieldForLigero, H: merkle::MerkleHash> Secret<Field, H> {
 
         let public = Public::new(&c);
 
+        let ext_witness = Array1::from_shape_vec(c.size(), c.eval(&inp)).unwrap();
+        let mask_range = public.shared_mask.clone();
+        let mask = Array1::from_shape_fn(mask_range.len(), |_| Field::random(rng));
+
         let ml = public.params.m * public.params.l;
+
+        let mut w = Array1::zeros(ml);
+        w.slice_mut(ndarray::s![0..c.size()]).assign(&ext_witness);
+        w.slice_mut(ndarray::s![mask_range]).assign(&mask);
 
         let mut x = Array1::zeros(ml);
         let mut y = Array1::zeros(ml);
         let mut z = Array1::zeros(ml);
-
-        let w: Array1<_> =
-            c.eval(&inp).iter().cloned()
-            .chain(public.shared_mask.clone().map(|_| Field::random(rng))) // mask
-            .chain(std::iter::repeat(Field::ZERO).take(ml - c.size() - c.shared.len()))
-            .collect();
 
         for (s, op) in c.ops.iter().enumerate() {
             let k = s + c.inp_size;
@@ -416,14 +417,14 @@ proptest! {
         (c, i) in crate::circuit::arb_ckt(20, 50).prop_flat_map(|c| {
             (Just(Ckt {shared: 0..10, ..c}), pvec(arb_test_field(), 20))
         }),
-        rshared_vec in pvec(arb_test_field(), 10 * 10),
+        rshared_vec in pvec(arb_test_field(), 1 * 10),
         seed: [u8;16],
     ) {
         let mut rng = AesRng::from_seed(Block::from(seed));
         let mut s: Secret<_, merkle::Sha256> = Secret::new(&mut rng, &c, &i);
         let output = *c.eval(&i).last().unwrap();
 
-        let rshared = Array2::from_shape_vec((10,10), rshared_vec).unwrap();
+        let rshared = Array2::from_shape_vec((1,10), rshared_vec).unwrap();
         let qshared = make_qshared(&s.w, &s.public.shared, &s.public.shared_mask, &rshared);
         s.public.finalize_Padd(&rshared, &qshared);
 
@@ -455,14 +456,14 @@ proptest! {
         (c, i) in crate::circuit::arb_ckt_zero(20, 50).prop_flat_map(|(c,i)| {
             (Just(Ckt {shared: 0..10, ..c}), Just(i))
         }),
-        rshared_vec in pvec(arb_test_field(), 10 * 10),
+        rshared_vec in pvec(arb_test_field(), 1 * 10),
         seed: [u8;16],
     ) {
         let mut rng = AesRng::from_seed(Block::from(seed));
         let mut s: Secret<_, merkle::Sha256> = Secret::new(&mut rng, &c, &i);
         let output = *c.eval(&i).last().unwrap();
 
-        let rshared = Array2::from_shape_vec((10,10), rshared_vec).unwrap();
+        let rshared = Array2::from_shape_vec((1,10), rshared_vec).unwrap();
         let qshared = make_qshared(&s.w, &s.public.shared, &s.public.shared_mask, &rshared);
         s.public.finalize_Padd(&rshared, &qshared);
 
@@ -952,8 +953,7 @@ fn make_qshared<Field: FieldForLigero>(
 ) -> Array1<Field> {
     use ndarray::s;
 
-    debug_assert!(rshared.is_square());
-    debug_assert_eq!(rshared.nrows(), shared.len());
+    debug_assert_eq!(rshared.ncols(), shared.len());
     debug_assert_eq!(rshared.nrows(), mask.len());
 
     rshared.dot(&w.slice(s![shared.clone()])) + w.slice(s![mask.clone()])
