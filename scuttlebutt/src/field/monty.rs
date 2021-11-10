@@ -1,6 +1,6 @@
 //! Generic 64-bit Montgomery arithmetic for prime fields.
 
-use generic_array::{GenericArray, typenum};
+use generic_array::{ArrayLength, GenericArray, typenum};
 use rand::distributions::{Distribution, Uniform};
 use std::fmt::Debug;
 use std::hash::Hash;
@@ -66,6 +66,7 @@ pub trait Monty: 'static + Send + Sync + Sized + Copy + Clone + Default + Hash +
 
     /// Bitwidth of the field modulus, i.e., least `k` s.t. `M < 2^k`
     const BITS: usize;
+    type Bits: ArrayLength<bool>;
 
     /// Constructor for the field struct from raw u64 Montgomery form
     fn to_raw(&self) -> u64;
@@ -356,6 +357,7 @@ macro_rules! implement_finite_field_for_monty {
             fn mul_add(self, a: $monty, b: $monty) -> Self::Output { $crate::field::monty::monty_mul_add(self, a, b) }
         }
         impl $crate::field::PrimeFiniteField for $monty {
+            const BITS_OF_MODULUS: usize = Self::BITS;
             // XXX: Maybe not the most efficient way to do this? Uses a single division operation
             // in monty_to_u128.
             fn mod2(&self) -> Self {
@@ -369,9 +371,7 @@ macro_rules! implement_finite_field_for_monty {
         impl $crate::field::FiniteField for $monty {
             const ZERO: Self = Self(monty_from_lit!(0, Self::M));
             const ONE: Self = Self(monty_from_lit!(1, Self::M));
-            const MODULUS: u128 = Self::M as u128;
             const GENERATOR: Self = Self::G;
-            const MULTIPLICATIVE_GROUP_ORDER: u128 = Self::MODULUS - 1;
 
             type ByteReprLen = generic_array::typenum::U8;
             type FromBytesError = $crate::field::BiggerThanModulus;
@@ -422,6 +422,13 @@ macro_rules! implement_finite_field_for_monty {
 
             #[inline]
             fn inverse(&self) -> Self { $crate::field::monty::monty_inv(*self) }
+
+            type NumberOfBitsInBitDecomposition = <Self as $crate::field::monty::Monty>::Bits;
+            fn bit_decomposition(&self)
+                -> generic_array::GenericArray<bool, Self::NumberOfBitsInBitDecomposition>
+            {
+                $crate::field::standard_bit_decomposition(monty_to_u128(*self))
+            }
         }
     }
 }
@@ -451,6 +458,7 @@ mod test {
 
         const G: Self = Self(monty_from_lit!(2, Self::M));
         const BITS: usize = 4;
+        type Bits = typenum::U4;
 
         #[inline]
         fn to_raw(&self) -> u64 { self.0 }

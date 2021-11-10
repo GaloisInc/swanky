@@ -20,7 +20,7 @@ pub type TestField = scuttlebutt::field::F2_19x3_26;
 
 #[cfg(test)]
 pub fn arb_test_field() -> BoxedStrategy<TestField> {
-    (0..TestField::MODULUS as u128).prop_map(|n| n.into()).boxed()
+    any::<u64>().prop_map(|f| TestField::from(f as u128)).boxed()
 }
 
 /// Trait for collections that allow taking `n` initial elements while ensuring

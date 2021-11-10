@@ -76,7 +76,7 @@ pub fn arb_op<Field>(wire_min: usize, wire_max: usize)
         arb_ix_pair(wire_min, wire_max).prop_map(|(i,j)| Op::Mul(i,j)),
         arb_ix_pair(wire_min, wire_max).prop_map(|(i,j)| Op::Sub(i,j)),
         // Division omitted to avoid accidental division by zero
-        (0..Field::MODULUS).prop_map(|f| Op::LdI(Field::from(f))),
+        any::<u64>().prop_map(|f| Op::LdI(Field::from(f as u128))),
     ]
 }
 

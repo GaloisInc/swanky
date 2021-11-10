@@ -34,6 +34,8 @@ impl Monty for F2_19x3_26 {
     const G: Self = Self(monty_from_lit!(7, Self::M));
     const BITS: usize = 61;
 
+    type Bits = generic_array::typenum::U61;
+
     #[inline]
     fn to_raw(&self) -> u64 { self.0 }
 

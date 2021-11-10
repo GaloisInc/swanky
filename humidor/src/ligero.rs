@@ -69,7 +69,7 @@
 use ndarray::{Array1, Array2, Axis, concatenate};
 use sprs::{CsMat, TriMat};
 use rand::{SeedableRng, RngCore};
-use scuttlebutt::field::FiniteField;
+use scuttlebutt::field::{FiniteField, PrimeFiniteField};
 use scuttlebutt::numtheory::{FieldForFFT2, FieldForFFT3};
 use scuttlebutt::{AesRng, Block};
 
@@ -82,8 +82,7 @@ use crate::util::*;
 use crate::params::Params;
 
 /// This is a marker trait consolidating the traits needed for a Ligero field.
-/// In addition, it supplies a field-width in bits, to be used in parameter
-/// selection.
+/// In addition, it supplies a field-size, to be used in parameter selection.
 pub trait FieldForLigero:
     Sized
     + FiniteField
@@ -94,13 +93,12 @@ pub trait FieldForLigero:
     + ndarray::ScalarOperand
     + std::fmt::Debug
 {
-    /// Minimum bits to represent a field element. This will correspond to the
-    /// security parameter `t` during paremeter selection.
-    const BITS: usize;
+    /// Size of field, for use in parameter selection.
+    const FIELD_SIZE: usize;
 }
 
 impl FieldForLigero for scuttlebutt::field::F2_19x3_26 {
-    const BITS: usize = 61;
+    const FIELD_SIZE: usize = <Self as PrimeFiniteField>::BITS_OF_MODULUS;
 }
 
 /// Proof information available to both the prover and the verifier.

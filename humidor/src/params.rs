@@ -88,7 +88,7 @@ impl<Field: FieldForLigero> Params<Field> {
         // Note: Using j < PHI_2_EXP, rather than j <= PHI_2_EXP, allows us
         // to multiply polynomials in O(d log d) time (see pmul2). We could
         // avoid this at the cost of some performance by using fft3 instead.
-        let t = Field::BITS;
+        let t = Field::FIELD_SIZE;
         let (kexp, nexp, k, l, n, m) = (0 .. Field::PHI_2_EXP as u32)
             .into_iter()
             .map(|kexp| (kexp, 2usize.pow(kexp) - 1))

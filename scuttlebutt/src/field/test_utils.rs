@@ -255,6 +255,7 @@ macro_rules! test_field {
                         prop_assert_eq!(rebuilt_coeff, coeff);
                     }
                 }
+            }
 
             #[test]
             fn serialize_constants() {
