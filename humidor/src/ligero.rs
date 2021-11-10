@@ -1,4 +1,5 @@
 // This file is part of `humidor`.
+// Copyright © 2021 Galois, Inc.
 // See LICENSE for licensing information.
 
 //! This module implements Ligero according to section 4.7 of

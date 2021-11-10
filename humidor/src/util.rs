@@ -10,7 +10,6 @@ use std::cmp::Eq;
 use std::fmt::Debug;
 
 use scuttlebutt::field::FiniteField;
-use scuttlebutt::numtheory;
 
 #[cfg(test)]
 use proptest::prelude::*;
@@ -109,17 +108,4 @@ pub fn psub<Field>(p: ArrayView1<Field>, q: ArrayView1<Field>) -> Array1<Field>
         .collect();
 
     p0 - q0
-}
-
-/// Evaluate a polynomial, represented by its coefficients, at a point `x`.
-pub fn peval<Field: FiniteField>(p: ArrayView1<Field>, x: Field) -> Field {
-    //let mut res = Field::ZERO;
-
-    //for &pi in p.to_vec()[1..].iter().rev() {
-    //    res = res + pi;
-    //    res = res * x;
-    //}
-
-    //res + p[0]
-    numtheory::mod_evaluate_polynomial(&p.to_vec(), x)
 }

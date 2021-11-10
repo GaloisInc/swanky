@@ -1,3 +1,7 @@
+// This file is part of `scuttlebutt`.
+// Copyright © 2021 Galois, Inc.
+// See LICENSE for licensing information.
+
 //! Generic 64-bit Montgomery arithmetic for prime fields.
 
 use generic_array::{ArrayLength, GenericArray, typenum};
@@ -278,6 +282,7 @@ fn test_gcd() {
 ///     * Eq
 ///     * ConstantTimeEq
 ///     * ConditionallySelectable
+///     * PrimeFiniteField
 ///     * FiniteField
 ///
 /// Assumes the type already implements the following traits:

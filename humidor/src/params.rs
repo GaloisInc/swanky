@@ -351,13 +351,19 @@ impl<Field: FieldForLigero> Params<Field> {
     /// Take a sequence of _possibly more than_ `k+1` coefficients of the
     /// polynomial `p` and return the single evaluation point `p(zeta_{ix})`.
     pub fn peval2(&self, p: ArrayView1<Field>, ix: usize) -> Field {
-        crate::util::peval(p, self.pss.omega_secrets.pow(ix as u128))
+        numtheory::mod_evaluate_polynomial(
+            &p.to_vec(),
+            self.pss.omega_secrets.pow(ix as u128),
+        )
     }
 
     /// Take a sequence of _possibly more than_ `n+1` coefficients of the
     /// polynomial `p` and return the single evaluation point `p(eta_{ix})`.
     pub fn peval3(&self, p: ArrayView1<Field>, ix: usize) -> Field {
-        crate::util::peval(p, self.pss.omega_shares.pow(ix as u128))
+        numtheory::mod_evaluate_polynomial(
+            &p.to_vec(),
+            self.pss.omega_shares.pow(ix as u128),
+        )
     }
 
     /// Take two polynomials p and q of degree less than 2^kexp and produce a
