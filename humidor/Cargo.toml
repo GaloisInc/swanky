@@ -30,6 +30,7 @@ static_assertions = "0.2.3"
 subtle = "2.4.0"
 scuttlebutt = { path = "../scuttlebutt" }
 generic-array = "0.14.4"
+blake-hash = "0.4"
 
 [dependencies.threshold-secret-sharing]
 git = "https://gitlab-ext.galois.com/hamlinb/rust-threshold-secret-sharing"

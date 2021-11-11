@@ -16,6 +16,8 @@ use proptest::prelude::*;
 
 #[cfg(test)]
 pub type TestField = scuttlebutt::field::F2_19x3_26;
+#[cfg(test)]
+pub type TestHash = crate::merkle::Blake256;
 
 #[cfg(test)]
 pub fn arb_test_field() -> BoxedStrategy<TestField> {

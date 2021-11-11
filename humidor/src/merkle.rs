@@ -9,6 +9,8 @@
 // TODO: Eliminate excessive use of vectors in anonymous functions, function
 // return values, etc.
 
+use blake_hash::digest::{Update, FixedOutputDirty};
+use generic_array::GenericArray;
 use ndarray::{Array2, ArrayView1, ArrayView2};
 use crypto::digest::Digest as CryptoDigest;
 use scuttlebutt::field::FiniteField;
@@ -98,6 +100,21 @@ impl MerkleHash for Sha3 {
     fn new() -> Self { Self(tiny_keccak::Sha3::v256()) }
 }
 
+/// Blake for Merkle trees.
+#[derive(Clone)]
+pub struct Blake256 (blake_hash::Blake256);
+
+impl tiny_keccak::Hasher for Blake256 {
+    fn update(&mut self, bs: &[u8]) { self.0.update(bs) }
+    fn finalize(mut self, bs: &mut [u8]) {
+        self.0.finalize_into_dirty(GenericArray::from_mut_slice(bs))
+    }
+}
+
+impl MerkleHash for Blake256 {
+    fn new() -> Self { Self(blake_hash::Blake256::default()) }
+}
+
 /// Merkle proof of t-column inclusion, along with the t public columns.
 #[derive(Debug, Clone)]
 pub struct Lemma<Field, H> {
@@ -173,10 +190,10 @@ proptest! {
         let leaves = arr
             .columns()
             .into_iter()
-            .map(|c| hash_column::<Sha256, TestField>(c.view()))
+            .map(|c| hash_column::<Blake256, TestField>(c.view()))
             .collect::<Vec<Digest>>();
         let tree = merkle_cbt::CBMT::build_merkle_tree(&leaves);
-        let lemma: Lemma<_, Sha256> = Lemma::new(&tree, arr.view(), &indices);
+        let lemma: Lemma<_, Blake256> = Lemma::new(&tree, arr.view(), &indices);
 
         lemma.verify(&tree.root());
     }

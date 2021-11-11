@@ -356,7 +356,7 @@ impl<Field: FieldForLigero, H: merkle::MerkleHash> Secret<Field, H> {
 }
 
 #[cfg(test)]
-impl<H: merkle::MerkleHash> Arbitrary for Secret<TestField, H> {
+impl Arbitrary for Secret<TestField, TestHash> {
     type Parameters = (usize, usize);
     type Strategy = BoxedStrategy<Self>;
     fn arbitrary_with((w,c): Self::Parameters) -> Self::Strategy {
@@ -366,7 +366,7 @@ impl<H: merkle::MerkleHash> Arbitrary for Secret<TestField, H> {
             proptest::array::uniform16(0u8..),
         ).prop_map(|(ckt, inp, seed)| {
             let mut rng = AesRng::from_seed(Block::from(seed));
-            <Secret<TestField, H>>::new(&mut rng, &ckt, &inp)
+            Secret::new(&mut rng, &ckt, &inp)
         }).boxed()
     }
 }
@@ -375,21 +375,21 @@ impl<H: merkle::MerkleHash> Arbitrary for Secret<TestField, H> {
 proptest! {
     #[test]
     #[allow(non_snake_case)]
-    fn test_Px(s in <Secret<TestField, merkle::Sha256>>
+    fn test_Px(s in Secret
         ::arbitrary_with((20, 50))) {
             prop_assert_eq!(&s.public.Px.to_dense().dot(&s.w.t()), s.x);
         }
 
     #[test]
     #[allow(non_snake_case)]
-    fn test_Py(s in <Secret<TestField, merkle::Sha256>>
+    fn test_Py(s in Secret
         ::arbitrary_with((20, 50))) {
             prop_assert_eq!(&s.public.Py.to_dense().dot(&s.w.t()), s.y);
         }
 
     #[test]
     #[allow(non_snake_case)]
-    fn test_Pz(s in <Secret<TestField, merkle::Sha256>>
+    fn test_Pz(s in Secret
         ::arbitrary_with((20, 50))) {
             prop_assert_eq!(&s.public.Pz.to_dense().dot(&s.w.t()), s.z);
         }
@@ -403,7 +403,7 @@ proptest! {
         seed: [u8;16],
     ) {
         let mut rng = AesRng::from_seed(Block::from(seed));
-        let s: Secret<_, merkle::Sha256> = Secret::new(&mut rng, &c, &i);
+        let s = Secret::<_, TestHash>::new(&mut rng, &c, &i);
         let output = *c.eval(&i).last().unwrap();
 
         prop_assert_eq!(
@@ -422,7 +422,7 @@ proptest! {
         seed: [u8;16],
     ) {
         let mut rng = AesRng::from_seed(Block::from(seed));
-        let mut s: Secret<_, merkle::Sha256> = Secret::new(&mut rng, &c, &i);
+        let mut s: Secret<_, merkle::Blake256> = Secret::new(&mut rng, &c, &i);
         let output = *c.eval(&i).last().unwrap();
 
         let rshared = Array2::from_shape_vec((1,10), rshared_vec).unwrap();
@@ -442,7 +442,7 @@ proptest! {
         seed: [u8;16],
     ) {
         let mut rng = AesRng::from_seed(Block::from(seed));
-        let s: Secret<_, merkle::Sha256> = Secret::new(&mut rng, &c, &i);
+        let s: Secret<_, merkle::Blake256> = Secret::new(&mut rng, &c, &i);
         let output = *c.eval(&i).last().unwrap();
 
         prop_assert_eq!(
@@ -461,7 +461,7 @@ proptest! {
         seed: [u8;16],
     ) {
         let mut rng = AesRng::from_seed(Block::from(seed));
-        let mut s: Secret<_, merkle::Sha256> = Secret::new(&mut rng, &c, &i);
+        let mut s: Secret<_, merkle::Blake256> = Secret::new(&mut rng, &c, &i);
         let output = *c.eval(&i).last().unwrap();
 
         let rshared = Array2::from_shape_vec((1,10), rshared_vec).unwrap();
@@ -1153,7 +1153,7 @@ pub mod interactive {
         let mut rng = AesRng::from_entropy();
         let (ckt, w) = crate::circuit::test_ckt_zero::<TestField>();
 
-        let mut p: Prover<_, merkle::Sha256> = Prover::new(&mut rng, &ckt, &w);
+        let mut p = Prover::<_, TestHash>::new(&mut rng, &ckt, &w);
         let mut v = Verifier::new(&ckt);
 
         let r0 = p.round0();
@@ -1178,7 +1178,7 @@ pub mod interactive {
             let mut rng = AesRng::from_seed(Block::from(seed));
 
             let output = *ckt.eval(&w).last().unwrap();
-            let mut p: Prover<_, merkle::Sha256> = Prover::new(&mut rng, &ckt, &w);
+            let mut p = Prover::<_, TestHash>::new(&mut rng, &ckt, &w);
             let mut v = Verifier::new(&ckt);
 
             let r0 = p.round0();
@@ -1197,7 +1197,7 @@ pub mod interactive {
         ) {
             let mut rng = AesRng::from_seed(Block::from(seed));
 
-            let mut p: Prover<TestField, merkle::Sha256> = Prover::new(&mut rng, &ckt, &w);
+            let mut p = Prover::<_, TestHash>::new(&mut rng, &ckt, &w);
             let mut v = Verifier::new(&ckt);
 
             let r0 = p.round0();
@@ -1220,7 +1220,7 @@ pub mod interactive {
             let mut rng = AesRng::from_seed(Block::from(seed));
 
             let output = *ckt.eval(&w).last().unwrap();
-            let mut p: Prover<TestField, merkle::Sha256> = Prover::new(&mut rng, &ckt, &w);
+            let mut p = Prover::<_, TestHash>::new(&mut rng, &ckt, &w);
             let mut v = Verifier::new(&ckt);
 
             let r0 = p.round0();
@@ -1240,7 +1240,7 @@ pub mod interactive {
         ) {
             let mut rng = AesRng::from_seed(Block::from(seed));
 
-            let mut p: Prover<TestField, merkle::Sha256> = Prover::new(&mut rng, &ckt, &w);
+            let mut p = Prover::<_, TestHash>::new(&mut rng, &ckt, &w);
             let mut v = Verifier::new(&ckt);
 
             let r0 = p.round0();
@@ -1483,7 +1483,7 @@ pub mod noninteractive {
         let mut rng = AesRng::from_entropy();
         let (ckt, w) = crate::circuit::test_ckt_zero::<TestField>();
 
-        let mut p = <Prover<_, merkle::Sha256>>::new(&mut rng, &ckt, &w);
+        let mut p = Prover::<_, TestHash>::new(&mut rng, &ckt, &w);
         let mut v = Verifier::new(&ckt);
 
         let proof = p.make_proof();
@@ -1503,7 +1503,7 @@ pub mod noninteractive {
             let mut rng = AesRng::from_seed(Block::from(seed));
 
             let output = *ckt.eval(&w).last().unwrap();
-            let mut p = <Prover<_, merkle::Sha256>>::new(&mut rng, &ckt, &w);
+            let mut p = Prover::<_, TestHash>::new(&mut rng, &ckt, &w);
             let mut v = Verifier::new(&ckt);
 
             let proof = p.make_proof();
@@ -1517,8 +1517,8 @@ pub mod noninteractive {
         ) {
             let mut rng = AesRng::from_seed(Block::from(seed));
 
-            let mut p = <Prover<_, merkle::Sha256>>::new(&mut rng, &ckt, &w);
-            let mut v = <Verifier<TestField, merkle::Sha256>>::new(&ckt);
+            let mut p = Prover::<_, TestHash>::new(&mut rng, &ckt, &w);
+            let mut v = Verifier::new(&ckt);
 
             let proof = p.make_proof();
             prop_assert!(v.verify(proof))
@@ -1567,8 +1567,8 @@ pub mod noninteractive {
 
             let mut rng = AesRng::from_seed(Block::from(seed));
 
-            let mut p = <Prover<TestField, merkle::Sha256>>::new(&mut rng, &ckt, &w);
-            let mut v = <Verifier<TestField, merkle::Sha256>>::new(&ckt);
+            let mut p = Prover::<_,TestHash>::new(&mut rng, &ckt, &w);
+            let mut v = Verifier::new(&ckt);
 
             let mut hash = Sha256::new();
             p.ip.shared_witness().iter().for_each(|f| hash.update(&f.to_bytes()));

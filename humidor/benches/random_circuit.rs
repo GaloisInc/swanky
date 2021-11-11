@@ -6,11 +6,11 @@ use scuttlebutt::AesRng;
 
 use humidor::circuit::{Ckt, random_ckt_zero};
 use humidor::ligero::noninteractive;
-use humidor::merkle::Sha256;
 
+type Hash = humidor::merkle::Blake256;
 type Field = scuttlebutt::field::F2_19x3_26;
-type Prover = noninteractive::Prover<Field, Sha256>;
-type Verifier = noninteractive::Verifier<Field, Sha256>;
+type Prover = noninteractive::Prover<Field, Hash>;
+type Verifier = noninteractive::Verifier<Field, Hash>;
 
 pub fn bench_random_circuit_by_circuit_size(c: &mut Criterion) {
     let mut group = c.benchmark_group("Random circuit by circuit size");

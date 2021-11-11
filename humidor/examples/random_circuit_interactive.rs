@@ -6,9 +6,11 @@ extern crate humidor;
 
 use humidor::ligero::interactive;
 use humidor::circuit::Ckt;
-use humidor::merkle::Sha256;
 
+type Hash = humidor::merkle::Blake256;
 type Field = scuttlebutt::field::F2_19x3_26;
+type Prover = interactive::Prover<Field, Hash>;
+type Verifier = interactive::Verifier<Field, Hash>;
 
 fn test_input_size(s: usize, input_size: usize) -> (
     usize, // proof size in bytes
@@ -34,12 +36,12 @@ fn test_input_size(s: usize, input_size: usize) -> (
     let mut proof_size = 0usize;
 
     let t = std::time::Instant::now();
-    let mut p = <interactive::Prover<_, Sha256>>::new(&mut rng, &ckt, &inp);
+    let mut p = Prover::new(&mut rng, &ckt, &inp);
     prover_time += t.elapsed();
     println!("Prover setup time: {:?}", t.elapsed());
 
     let t = std::time::Instant::now();
-    let mut v = interactive::Verifier::new(&ckt);
+    let mut v = Verifier::new(&ckt);
     verifier_time += t.elapsed();
     println!("Verifier setup time: {:?}", t.elapsed());
 
