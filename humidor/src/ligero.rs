@@ -63,6 +63,8 @@
 
 // TODO: Eliminate excessive use of vectors in anonymous functions, function
 // return values, etc.
+//
+// TODO: Implement repetitions to achieve soundness with smaller field sizes.
 
 use ndarray::{Array1, ArrayView1, Array2, Axis, concatenate};
 use sprs::{CsMat, TriMat};
@@ -122,7 +124,8 @@ impl<Field: FieldForLigero> Public<Field> {
     #[allow(non_snake_case)]
     fn new(c: &Ckt<Field>) -> Self {
         // By the SZ Lemma, Pr[p(x) = q(x)] for monomials p and q and uniform x
-        // chosen independently of p and q is 1/|F|.
+        // chosen independently of p and q is 1/|F|, so one linear check should
+        // give us 1/|F| soundness.
         //
         // TODO: This should probably be defined as part of the parameter
         // selection as something like `ceil(log2(lambda)/log2(|F|))`, where
