@@ -64,7 +64,7 @@
 // TODO: Eliminate excessive use of vectors in anonymous functions, function
 // return values, etc.
 
-use ndarray::{Array1, Array2, Axis, concatenate};
+use ndarray::{Array1, ArrayView1, Array2, Axis, concatenate};
 use sprs::{CsMat, TriMat};
 use rand::{SeedableRng, RngCore};
 use scuttlebutt::field::{FiniteField, PrimeFiniteField};
@@ -673,42 +673,34 @@ fn verify<Field: FieldForLigero, H: merkle::MerkleHash>(
     public.finalize_Padd(&r1.rshared, &r2.qshared);
 
     // ra_i(zeta_c) = (ra * Pa)[m*i + c]
-    let radd = rows_to_mat(make_ra(&params, &r1.radd, &public.Padd.to_csr())
-        .iter().map(|r| params.fft3(r.view())).collect::<Vec<_>>());
-    let rx = rows_to_mat(make_ra_Iml_Pa_neg(&params, &r1.rx, &public.Px)
-        .iter().map(|r| params.fft3(r.view())).collect::<Vec<_>>());
-    let ry = rows_to_mat(make_ra_Iml_Pa_neg(&params, &r1.ry, &public.Py)
-        .iter().map(|r| params.fft3(r.view())).collect::<Vec<_>>());
-    let rz = rows_to_mat(make_ra_Iml_Pa_neg(&params, &r1.rz, &public.Pz)
-        .iter().map(|r| params.fft3(r.view())).collect::<Vec<_>>());
+    let radd = params.fft3_rows(make_ra(&params, &r1.radd, &public.Padd.to_csr()).view());
+    let rx = params.fft3_rows(make_ra_Iml_Pa_neg(&params, &r1.rx, &public.Px).view());
+    let ry = params.fft3_rows(make_ra_Iml_Pa_neg(&params, &r1.ry, &public.Py).view());
+    let rz = params.fft3_rows(make_ra_Iml_Pa_neg(&params, &r1.rz, &public.Pz).view());
 
-    let U = r4.U_lemma.columns.clone();
-    let Uw: Vec<Array1<Field>> = U.iter()
-        .map(|c| c.slice(s![0*params.m..1*params.m]).to_owned()).collect();
-    let Ux: Vec<Array1<Field>> = U.iter()
-        .map(|c| c.slice(s![1*params.m..2*params.m]).to_owned()).collect();
-    let Uy: Vec<Array1<Field>> = U.iter()
-        .map(|c| c.slice(s![2*params.m..3*params.m]).to_owned()).collect();
-    let Uz: Vec<Array1<Field>> = U.iter()
-        .map(|c| c.slice(s![3*params.m..4*params.m]).to_owned()).collect();
+    let U = r4.U_lemma.columns.view();
+    let Uw = U.slice(s![0*params.m..1*params.m, ..]);
+    let Ux = U.slice(s![1*params.m..2*params.m, ..]);
+    let Uy = U.slice(s![2*params.m..3*params.m, ..]);
+    let Uz = U.slice(s![3*params.m..4*params.m, ..]);
 
     // Testing interleaved Reed-Solomon codes
     let code_check =
         // for every j in Q, r*U[j] + u[j] = v[j]
-        r3.Q.iter().zip(U).zip(r4.u)
+        r3.Q.iter().zip(U.columns()).zip(r4.u)
             .all(|((&j, U_j), u_j)|
-                r1.r.dot(&U_j.to_owned()) + u_j == r2.v[j]);
+                r1.r.dot(&U_j.view()) + u_j == r2.v[j]);
 
     // Testing addition gates
     let addition_check =
         // Linear check
         //      sum_{c in [l]} qadd(zeta_c) = 0
         //      i.e., sum_{c in [l]} qadd(zeta_c) = r1.radd^T * b
-        params.fft2_peval(r2.qadd.view()).slice(s![1..=params.l]).to_owned()
+        params.fft2_peval(r2.qadd.view()).slice(s![1..=params.l]).view()
             .sum() == public.badd.dot(&r1.radd) &&
         //      for every j in Q,
         //      uadd[j] + sum_{i in [m]} radd_i(eta_j)*Uw[i,j] = qadd(eta_j)
-        r3.Q.iter().zip(Uw.clone()).zip(r4.uadd)
+        r3.Q.iter().zip(Uw.columns()).zip(r4.uadd)
             .all(|((&j, Uw_j), uadd_j)|
                 uadd_j + radd.column(j).dot(&Uw_j)
                             == params.peval3(r2.qadd.view(), j+1));
@@ -717,24 +709,24 @@ fn verify<Field: FieldForLigero, H: merkle::MerkleHash>(
     let multiplication_check =
         // Linear checks
         //      for every a in {x,y,z}, sum_{c in [l]} qa(zeta_c) = 0
-        params.fft2_peval(r2.qx.view()).slice(s![1..=params.l]).to_owned()
+        params.fft2_peval(r2.qx.view()).slice(s![1..=params.l]).view()
             .sum() == Field::ZERO &&
-        params.fft2_peval(r2.qy.view()).slice(s![1..=params.l]).to_owned()
+        params.fft2_peval(r2.qy.view()).slice(s![1..=params.l]).view()
             .sum() == Field::ZERO &&
-        params.fft2_peval(r2.qz.view()).slice(s![1..=params.l]).to_owned()
+        params.fft2_peval(r2.qz.view()).slice(s![1..=params.l]).view()
             .sum() == Field::ZERO &&
         //      for every a in {x,y,z} and j in Q,
         //      ua[j] + sum_{i in [m]} ra_i(eta_j)*Ua[i,j]
         //            + sum_{i in [m]} ra_{m+i}(eta_j)*Uw[i,j] = qa(eta_j)
-        r3.Q.iter().zip(Ux.clone()).zip(Uw.clone()).zip(r4.ux)
+        r3.Q.iter().zip(Ux.columns()).zip(Uw.columns()).zip(r4.ux)
             .all(|(((&j, Ux_j), Uw_j), ux_j)|
                 ux_j + rx.column(j).dot(&concatenate![Axis(0), Ux_j, Uw_j])
                             == params.peval3(r2.qx.view(), j+1)) &&
-        r3.Q.iter().zip(Uy.clone()).zip(Uw.clone()).zip(r4.uy)
+        r3.Q.iter().zip(Uy.columns()).zip(Uw.columns()).zip(r4.uy)
             .all(|(((&j, Uy_j), Uw_j), uy_j)|
                 uy_j + ry.column(j).dot(&concatenate![Axis(0), Uy_j, Uw_j])
                             == params.peval3(r2.qy.view(), j+1)) &&
-        r3.Q.iter().zip(Uz.clone()).zip(Uw.clone()).zip(r4.uz)
+        r3.Q.iter().zip(Uz.columns()).zip(Uw.columns()).zip(r4.uz)
             .all(|(((&j, Uz_j), Uw_j), uz_j)|
                 uz_j + rz.column(j).dot(&concatenate![Axis(0), Uz_j, Uw_j])
                             == params.peval3(r2.qz.view(), j+1)) &&
@@ -744,7 +736,7 @@ fn verify<Field: FieldForLigero, H: merkle::MerkleHash>(
             .all(|&f| f == Field::ZERO) &&
         //      for every j in Q,
         //      u0[j] + rq * (Ux[j] (.) Uy[j] - Uz[j]) = p0(eta_j)
-        r3.Q.iter().zip(r4.u0.iter()).zip(Ux).zip(Uy).zip(Uz)
+        r3.Q.iter().zip(r4.u0.iter()).zip(Ux.columns()).zip(Uy.columns()).zip(Uz.columns())
             .all(|((((&j, &u0_j), Ux_j), Uy_j), Uz_j)| {
                 let Uxyz_j = ndarray::Zip::from(&Ux_j)
                     .and(&Uy_j)
@@ -765,63 +757,51 @@ fn verify<Field: FieldForLigero, H: merkle::MerkleHash>(
 // Given an sXt matrix Pa and an s-dimensional vector ra (for arbitrary s and t),
 // compute the s/l unique degree-l polynomials
 // ra_i(zeta_c) = (ra^T * Pa)[i*s/l + c].
-//
-// XXX: Currently allocates s/l l-dimensional arrays in order to return them. Is
-// it useful to pass in an output argument instead?
 #[allow(non_snake_case)]
 fn make_ra<Field: FieldForLigero>(
     params: &Params<Field>,
     ra: &Array1<Field>,
     Pa: &CsMat<Field>,
-) -> Vec<Array1<Field>> {
-    let r_dot_P = &Pa.clone().transpose_into() * ra;
-    r_dot_P.exact_chunks(params.l)
-        .into_iter()
-        .map(|points| params.fft2_inverse(points))
-        .collect()
+) -> Array2<Field> {
+    params.fft2_inverse_rows(
+        (&Pa.view().transpose_into() * ra)
+            .into_shape((params.m, params.l))
+            .unwrap()
+            .view()
+    )
 }
 
 // Given an (m*l)X(m*l) matrix Pa and an (m*l)-dimensional array, compute the
 // unique 2*m degree-l polynomials
 // ra_i(zeta_c) = (ra^T * I_{m*l}|Pa])[m*i + c], where | indicates horizontal
 // concatenation.
-//
-// XXX: Currently allocates 2*m l-dimensional arrays in order to return them. Is
-// it useful to pass in an output argument instead?
 #[allow(non_snake_case)]
 fn make_ra_Iml_Pa_neg<Field: FieldForLigero>(
     params: &Params<Field>,
     ra: &Array1<Field>,
     Pa: &CsMat<Field>,
-) -> Vec<Array1<Field>> {
-    let r_dot_P = &Pa.map(|f| -(*f)).transpose_into() * ra;
-    ra.exact_chunks(params.l)
-        .into_iter()
-        .chain(r_dot_P.exact_chunks(params.l).into_iter())
-        .map(|points| params.fft2_inverse(points))
-        .collect()
+) -> Array2<Field> {
+    let r_dot_P: Array1<Field> = &Pa.map(|f| -(*f)).transpose_into() * ra;
+    params.fft2_inverse_rows(
+        ra.iter().cloned().chain(r_dot_P)
+            .collect::<Array1<Field>>()
+            .into_shape((2*params.m, params.l))
+            .unwrap()
+            .view()
+    )
 }
 
 // Given an mXn matrix Ua, compute the m unique k-degree polynomials
 // pa_i(eta_c) = Ua[i][c].
-//
-// XXX: Currently allocates m k-dimensional vectors to return. Would it be
-// better to pass in in an output argument and use in-place FFT?
 #[allow(non_snake_case)]
 fn make_pa<Field: FieldForLigero>(
     params: &Params<Field>,
     Ua: &Array2<Field>,
-) -> Vec<Array1<Field>>
+) -> Array2<Field>
 {
-    Ua.rows()
-        .into_iter()
-        .map(|points|
-            params.fft3_inverse(points) // deg < k + 1
-            .iter()
-            .cloned()
-            .take_nz(params.k+1)
-            .collect::<Array1<Field>>())
-        .collect::<Vec<_>>()
+    params.fft3_inverse_rows(Ua.view())
+        .slice(ndarray::s![.., 0 .. params.k+1])
+        .to_owned()
 }
 
 // Given p={p_i}, radd, uadd, and Padd, compute the (k+l-1)-degree polynomial
@@ -829,37 +809,27 @@ fn make_pa<Field: FieldForLigero>(
 // unique l-degree polynomial with radd_i(zeta_c) = (radd * Padd)[m*i + c], and
 // radd_blind is the unique (k+l-1)-degree polynomial with
 // radd_blind(eta_c) = uadd[c].
-//
-// TODO: Reduce temporary allocations.
 #[allow(non_snake_case)]
 fn make_qadd<Field: FieldForLigero, H>(
     s: &Secret<Field, H>,
-    p: &Vec<Array1<Field>>, // deg < k + 1
+    p: &Array2<Field>, // each row deg < k + 1
     Padd: &CsMat<Field>,
     r1_radd: Array1<Field>,
 ) -> Array1<Field> {
     let params = &s.public.params;
 
-    let radd_blind = params.fft3_inverse(s.uadd.view()) // deg < k + l
-        .iter()
-        .cloned()
-        .take_nz(params.k + params.l)
-        .collect::<Array1<Field>>();
-    let radd = make_ra(&params, &r1_radd, &Padd) // deg < l
-        .iter()
-        .map(|ra_i| ra_i.iter()
-            .cloned()
-            .take_nz(params.k+1) // XXX: Should be l, per Sec. 4.7
-            .collect::<Array1<_>>())
-        .collect::<Vec<_>>();
+    let radd = make_ra(&params, &r1_radd, &Padd); // deg < l
+    let radd_blind = params.fft3_inverse(s.uadd.view()); // deg < k + l
+    //    .slice(ndarray::s![0 .. params.k+params.l])
+    //    .to_owned();
 
-    radd.iter().zip(p.clone())
-        .fold(radd_blind, |acc, (radd_i, p_i)|
+    radd.rows().into_iter().zip(p.rows())
+        .fold(radd_blind, |acc, (radd_i, p_i)| // TODO: for_each faster?
             padd(
                 acc.view(),
                 params.pmul2(
-                    radd_i.view(),
-                    p_i.view()).view())) // deg < k + l
+                    radd_i.slice(ndarray::s![0 .. params.k+1]), // XXX: Should be l, per Sec. 4.7
+                    p_i).view())) // deg < k + l
 }
 
 // Given {p_i}, ua, ra, Pa, and Ua, compute the k-degree polynomial
@@ -867,47 +837,29 @@ fn make_qadd<Field: FieldForLigero, H>(
 // where the unique k-degree polynomial pa_i(eta_c) = Ua[i][c], the unique
 // (l-1)-degree polynomial ra_i(zeta_c) = (ra * [I | -Pa])[m*i + c],
 // and the unique (k+l)-degree polynomial ra_blind(eta_c) = ua[c].
-//
-// TODO: Reduce temporary allocations.
 #[allow(non_snake_case)]
 fn make_qa<Field: FieldForLigero>(
     params: &Params<Field>,
-    p: &Vec<Array1<Field>>, // deg < k + 1
+    p: &Array2<Field>, // each row deg < k + 1
     Pa: &CsMat<Field>,
     Ua: &Array2<Field>,
     ua: &Array1<Field>,
     r1_ra: Array1<Field>,
 ) -> Array1<Field> {
-    let ra = make_ra_Iml_Pa_neg(&params, &r1_ra, &Pa) // deg < l
-        .iter()
-        .map(|ra_i| ra_i
-            .iter()
-            .cloned()
-            .take_nz(params.k+1) // XXX: Should be l, per Sec. 4.7
-            .collect::<Array1<Field>>())
-        .collect::<Vec<_>>();
-    let pa = Ua.rows()
-        .into_iter()
-        .map(|points| params.fft3_inverse(points) // deg < k + 1
-            .iter()
-            .cloned()
-            .take_nz(params.k+1)
-            .collect::<Array1<Field>>())
-        .collect::<Vec<_>>();
-    let ra_blind = params.fft3_inverse(ua.view()) // deg < k + l
-        .iter()
-        .cloned()
-        .take_nz(params.k + params.l)
-        .collect::<Array1<Field>>();
+    let ra = make_ra_Iml_Pa_neg(&params, &r1_ra, &Pa); // each row deg < l
+    let pa = params.fft3_inverse_rows(Ua.view()); // each row deg < k + 1
+    let ra_blind = params.fft3_inverse(ua.view()); // deg < k + l
+        //.slice(ndarray::s![0 .. params.k+params.l])
+        //.to_owned();
 
-    ra.iter()
-        .zip(pa.iter().chain(p.clone().iter()))
-        .fold(ra_blind, |acc, (ri, pi)|
+    ra.rows().into_iter()
+        .zip(pa.rows().into_iter().chain(p.rows()))
+        .fold(ra_blind, |acc: Array1<Field>, (ri, pi)| // TODO: for_each faster?
             padd(
                 acc.view(),
                 params.pmul2(
-                    ri.view(),
-                    pi.view()).view())) // deg < k + l
+                    ri.slice(ndarray::s![0 .. params.k+1]), // XXX: Should be l, per Sec. 4.7
+                    pi.slice(ndarray::s![0 .. params.k+1])).view())) // deg < k + l
 }
 
 // Given u0, px, py, pz, and rq, compute (2k+1)-dimensional polynomial
@@ -916,30 +868,26 @@ fn make_qa<Field: FieldForLigero>(
 fn make_p0<Field: FieldForLigero>(
     params: &Params<Field>,
     u0: &Array1<Field>,
-    px: &Vec<Array1<Field>>, // deg < k + 1
-    py: &Vec<Array1<Field>>, // deg < k + 1
-    pz: &Vec<Array1<Field>>, // deg < k + 1
-    rq: Array1<Field>,
+    px: &Array2<Field>, // deg < k + 1
+    py: &Array2<Field>, // deg < k + 1
+    pz: &Array2<Field>, // deg < k + 1
+    rq: ArrayView1<Field>,
 ) -> Array1<Field> {
-    let r0_blind = params.fft3_inverse(u0.view()) // deg < 2k + 1
-        .iter()
-        .cloned()
-        .take_nz(2*params.k + 1)
-        .collect::<Array1<Field>>();
+    let r0_blind = params.fft3_inverse(u0.view()); // deg < 2k + 1 (but also deg < n+1 ???)
 
     rq.iter()
-        .zip(px)
-        .zip(py)
-        .zip(pz)
-        .fold(r0_blind, |acc, (((&rq_i, px_i), py_i), pz_i)| {
+        .zip(px.rows())
+        .zip(py.rows())
+        .zip(pz.rows())
+        .fold(r0_blind, |acc, (((&rq_i, px_i), py_i), pz_i)| { // TODO: for_each faster?
             padd(
                 acc.view(),
                 std::ops::Mul::mul(
                     psub(
                         params.pmul2(
-                            px_i.view(),
-                            py_i.view()).view(),
-                        pz_i.view()),
+                            px_i,
+                            py_i).view(),
+                        pz_i),
                     rq_i).view()) // deg < 2k + 1
         })
 }
@@ -1066,7 +1014,7 @@ pub mod interactive {
                 qx: make_qa(&params, &p, &self.secret.public.Px, &self.secret.Ux, &self.secret.ux, r1.rx),
                 qy: make_qa(&params, &p, &self.secret.public.Py, &self.secret.Uy, &self.secret.uy, r1.ry),
                 qz: make_qa(&params, &p, &self.secret.public.Pz, &self.secret.Uz, &self.secret.uz, r1.rz),
-                p0: make_p0(&params, &self.secret.u0, &px, &py, &pz, r1.rq.clone()),
+                p0: make_p0(&params, &self.secret.u0, &px, &py, &pz, r1.rq.view()),
                 qshared,
             };
 
@@ -1100,8 +1048,8 @@ pub mod interactive {
 
             let params = &s.public.params;
             let log_n = (params.n as f64).log2().ceil() as usize;
-            debug_assert_eq!(r4.U_lemma.columns.len(), params.t);
-            debug_assert_eq!(r4.U_lemma.columns[0].len(), 4*params.m);
+            debug_assert_eq!(r4.U_lemma.columns.ncols(), params.t);
+            debug_assert_eq!(r4.U_lemma.columns.nrows(), 4*params.m);
             debug_assert!(r4.U_lemma.nlemmas() <= params.t*log_n);
             debug_assert_eq!(r4.ux.len(), params.t);
             debug_assert_eq!(r4.uy.len(), params.t);
@@ -1397,7 +1345,11 @@ pub mod noninteractive {
             w: &Vec<Field>,
         ) -> Self {
             let mut hash = H::new();
-            c.ops.iter().for_each(|op| hash.update(&op.bytes()));
+            let mut bytes = Vec::with_capacity(Op::<Field>::OPCODE_SIZE);
+            c.ops.iter().for_each(|op| {
+                op.bytes(&mut bytes);
+                hash.update(&bytes);
+            });
 
             let mut ckt_hash = merkle::HZERO;
             hash.finalize(&mut ckt_hash);
@@ -1468,7 +1420,11 @@ pub mod noninteractive {
         /// Create a verifier out of a circuit.
         pub fn new(ckt: &Ckt<Field>) -> Self {
             let mut hash = H::new();
-            ckt.ops.iter().for_each(|op| hash.update(&op.bytes()));
+            let mut bytes = Vec::with_capacity(Op::<Field>::OPCODE_SIZE);
+            ckt.ops.iter().for_each(|op| {
+                op.bytes(&mut bytes);
+                hash.update(&bytes);
+            });
 
             let mut ckt_hash = merkle::HZERO;
             hash.finalize(&mut ckt_hash);

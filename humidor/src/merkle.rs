@@ -9,7 +9,7 @@
 // TODO: Eliminate excessive use of vectors in anonymous functions, function
 // return values, etc.
 
-use ndarray::{Array1, ArrayView1, ArrayView2};
+use ndarray::{Array2, ArrayView1, ArrayView2};
 use crypto::digest::Digest as CryptoDigest;
 use scuttlebutt::field::FiniteField;
 
@@ -104,13 +104,13 @@ pub struct Lemma<Field, H> {
     phantom: std::marker::PhantomData<H>,
 
     /// Public columns of the interleaved codeword.
-    pub columns: Vec<Array1<Field>>,
+    pub columns: Array2<Field>,
     lemmas: Vec<Digest>,
     indices: Vec<u32>,
 }
 
 #[allow(non_snake_case)]
-impl<Field: FiniteField, H: MerkleHash> Lemma<Field, H> {
+impl<Field: FiniteField + num_traits::Zero, H: MerkleHash> Lemma<Field, H> {
     /// Create a new proof based on a tree of interleaved-codeoword columns.
     pub fn new(
         tree: &Tree<H>,
@@ -123,10 +123,11 @@ impl<Field: FiniteField, H: MerkleHash> Lemma<Field, H> {
             .collect::<Vec<u32>>();
         let proof = tree.build_proof(&some_indices_u32)
             .expect("Failed to build proof with indices");
-        let some_columns = some_indices
+
+        let mut some_columns = Array2::zeros((U.nrows(), 0));
+        some_indices
             .iter()
-            .map(|&j| U.column(j).to_owned())
-            .collect::<Vec<Array1<Field>>>();
+            .for_each(|&j| some_columns.push_column(U.column(j)).unwrap());
 
         Self {
             phantom: std::marker::PhantomData,
@@ -143,7 +144,7 @@ impl<Field: FiniteField, H: MerkleHash> Lemma<Field, H> {
     /// Verify that this lemma matches a given root.
     pub fn verify(&self, root: &Digest) -> bool {
         let leaves = self.columns
-            .iter()
+            .columns().into_iter()
             .map(|c| hash_column::<H, Field>(c.view()))
             .collect::<Vec<Digest>>();
         let proof: Proof<H> = Proof::new(self.indices.clone(), self.lemmas.clone());
@@ -153,7 +154,7 @@ impl<Field: FiniteField, H: MerkleHash> Lemma<Field, H> {
 
     /// Size in bytes of this lemma.
     pub fn size(&self) -> usize {
-        self.columns.iter().map(|c| c.len()).sum::<usize>() * std::mem::size_of::<Field>() +
+        self.columns.len() * std::mem::size_of::<Field>() +
         self.lemmas.len() * std::mem::size_of::<Digest>() +
         self.indices.len() * std::mem::size_of::<u32>()
     }

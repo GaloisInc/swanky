@@ -10,8 +10,8 @@ use humidor::merkle::Sha256;
 type Field = scuttlebutt::field::F2_19x3_26;
 
 fn main() {
-    let total_size = 1usize << 16;
-    let input_size = 1usize << 14;
+    let total_size = 1usize << 20;
+    let input_size = 1usize << 16;
     let shared_size = input_size;
     let circuit_size = total_size - input_size;
     debug_assert!(shared_size <= input_size);

@@ -83,33 +83,45 @@ pub fn arb_op<Field>(wire_min: usize, wire_max: usize)
 impl<Field> Op<Field>
     where Field: FiniteField
 {
+    /// Maximum number of bytes to store an opcode.
+    // This should be updated if new ops are added.
+    pub const OPCODE_SIZE: usize = 1 +        // opcode type
+        if 2*std::mem::size_of::<usize>() > std::mem::size_of::<Field>() {
+            2*std::mem::size_of::<usize>()  // Add, Mul, Sub, Div
+        } else {
+            std::mem::size_of::<Field>()    // LdI
+        };
+
     /// Convert an op to an opcode.
-    pub fn bytes(&self) -> Vec<u8> {
+    pub fn bytes(&self, bs: &mut Vec<u8>) {
+        //debug_assert!(b.capacity() >= Self::BYTE_SIZE);
+
+        bs.clear();
         match self {
-            Op::Add(i,j) => vec![0].iter()
-                .chain(i.to_le_bytes().iter())
-                .chain(j.to_le_bytes().iter())
-                .cloned()
-                .collect(),
-            Op::Mul(i,j) => vec![1].iter()
-                .chain(i.to_le_bytes().iter())
-                .chain(j.to_le_bytes().iter())
-                .cloned()
-                .collect(),
-            Op::Sub(i,j) => vec![2].iter()
-                .chain(i.to_le_bytes().iter())
-                .chain(j.to_le_bytes().iter())
-                .cloned()
-                .collect(),
-            Op::Div(i,j) => vec![3].iter()
-                .chain(i.to_le_bytes().iter())
-                .chain(j.to_le_bytes().iter())
-                .cloned()
-                .collect(),
-            Op::LdI(f) => vec![4].iter()
-                .chain(f.to_bytes().iter())
-                .cloned()
-                .collect(),
+            Op::Add(i,j) => {
+                bs.push(0u8);
+                i.to_le_bytes().iter().for_each(|&b| bs.push(b));
+                j.to_le_bytes().iter().for_each(|&b| bs.push(b));
+            }
+            Op::Mul(i,j) => {
+                bs.push(1u8);
+                i.to_le_bytes().iter().for_each(|&b| bs.push(b));
+                j.to_le_bytes().iter().for_each(|&b| bs.push(b));
+            }
+            Op::Sub(i,j) => {
+                bs.push(2u8);
+                i.to_le_bytes().iter().for_each(|&b| bs.push(b));
+                j.to_le_bytes().iter().for_each(|&b| bs.push(b));
+            }
+            Op::Div(i,j) => {
+                bs.push(3u8);
+                i.to_le_bytes().iter().for_each(|&b| bs.push(b));
+                j.to_le_bytes().iter().for_each(|&b| bs.push(b));
+            }
+            Op::LdI(f) => {
+                bs.push(4u8);
+                f.to_bytes().iter().for_each(|&b| bs.push(b));
+            }
         }
     }
 }

@@ -4,7 +4,7 @@
 
 //! Utility functions for Ligero
 
-use ndarray::{Array1, ArrayView1, Array2};
+use ndarray::{Array1, ArrayView1};
 use num_traits::identities::Zero;
 use std::cmp::Eq;
 use std::fmt::Debug;
@@ -37,19 +37,6 @@ impl<I: Zero + Eq + Debug, L> TakeNZ for L where L: Iterator<Item = I> + Clone {
 
         self.take(n)
     }
-}
-
-/// Create a matrix out of a `Vec` of rows.
-pub fn rows_to_mat<S: Clone>(rows: Vec<Array1<S>>) -> Array2<S> {
-    let nrows = rows.len();
-    let ncols = rows[0].len();
-
-    Array2::from_shape_vec((nrows, ncols),
-        rows.iter()
-            .map(|r| r.into_iter().cloned())
-            .flatten()
-            .collect::<Vec<S>>()
-    ).expect("Unequal matrix rows")
 }
 
 /// Given polynomials `p` and `q`, with `deg(p) < n` and `deg(q) < m`, return
