@@ -14,9 +14,7 @@ use crate::{
 };
 use generic_array::{typenum::Unsigned, GenericArray};
 use rand::{CryptoRng, Rng};
-use scuttlebutt::{
-    field::FiniteField as FF, field::PrimeFiniteField, AbstractChannel, Aes128, Block, Malicious,
-};
+use scuttlebutt::{field::FiniteField as FF, AbstractChannel, Aes128, Block, Malicious};
 use std::marker::PhantomData;
 use subtle::{Choice, ConditionallySelectable};
 
@@ -56,7 +54,7 @@ impl<ROT: ROTSender<Msg = Block> + Malicious, FE: FF> Sender<ROT, FE> {
         mut rng: &mut RNG,
     ) -> Result<Self, Error> {
         let mut ot = ROT::init(channel, &mut rng)?;
-        let nbits = FE::PrimeField::BITS_OF_MODULUS;
+        let nbits = <FE::PrimeField as FF>::NumberOfBitsInBitDecomposition::USIZE;
         let r = FE::PolynomialFormNumCoefficients::to_usize();
         let keys = ot.send_random(channel, nbits * r, &mut rng)?;
         let aes_objs: Vec<(Aes128, Aes128)> = keys
@@ -109,7 +107,7 @@ impl<ROT: ROTReceiver<Msg = Block> + Malicious, FE: FF> Receiver<ROT, FE> {
         pows: Powers<FE>,
         mut rng: &mut RNG,
     ) -> Result<Self, Error> {
-        let nbits = FE::PrimeField::BITS_OF_MODULUS;
+        let nbits = <FE::PrimeField as FF>::NumberOfBitsInBitDecomposition::USIZE;
         let mut ot = ROT::init(channel, &mut rng)?;
         let delta = FE::random(&mut rng);
         let choices = delta.bit_decomposition();

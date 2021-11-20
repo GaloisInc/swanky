@@ -4,7 +4,7 @@
 //! TODO: this might not be constant-time in all cases.
 
 use crate::{
-    field::{polynomial::Polynomial, FiniteField, PrimeFiniteField},
+    field::{polynomial::Polynomial, FiniteField},
     Block,
 };
 use generic_array::GenericArray;
@@ -195,13 +195,6 @@ impl MulAssign<&Fp> for Fp {
             U128::from(rhs.0)
         ));
         self.0 = (raw_prod % U256::from(MODULUS)).as_u128();
-    }
-}
-
-impl PrimeFiniteField for Fp {
-    const BITS_OF_MODULUS: usize = 128;
-    fn mod2(&self) -> Self {
-        return Fp(self.0 % 2);
     }
 }
 

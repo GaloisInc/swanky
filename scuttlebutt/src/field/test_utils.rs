@@ -71,7 +71,7 @@ macro_rules! test_field {
         mod $tests_name {
             use super::*;
             use generic_array::typenum::Unsigned;
-            use crate::field::{FiniteField, PrimeFiniteField};
+            use crate::field::{FiniteField};
             use crate::field::test_utils::{make_polynomial, make_polynomial_coefficients};
             #[allow(unused_imports)]
             use proptest::prelude::*;
@@ -236,11 +236,11 @@ macro_rules! test_field {
                     prop_assert_eq!(
                         decomp.len(),
                         <$f as FiniteField>::PolynomialFormNumCoefficients::USIZE *
-                            <$f as FiniteField>::PrimeField::BITS_OF_MODULUS
+                            <<$f as FiniteField>::PrimeField as FiniteField>::NumberOfBitsInBitDecomposition::USIZE
                     );
                     let coeffs = x.to_polynomial_coefficients();
                     type PF = <$f as FiniteField>::PrimeField;
-                    for (coeff_bits, coeff) in decomp.chunks_exact(PF::BITS_OF_MODULUS).zip(coeffs) {
+                    for (coeff_bits, coeff) in decomp.chunks_exact(<PF as FiniteField>::NumberOfBitsInBitDecomposition::USIZE).zip(coeffs) {
                         // This will equal 2 modulo PF. We couldn't do this for extension fields.
                         let two = PF::ONE + PF::ONE;
                         let mut pow_of_two = PF::ONE;
