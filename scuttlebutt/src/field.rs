@@ -52,7 +52,10 @@ pub trait FiniteField:
     fn to_bytes(&self) -> GenericArray<u8, Self::ByteReprLen>;
 
     /// The prime-order subfield of the finite field.
-    type PrimeField: FiniteField<PrimeField = Self::PrimeField> + IsSubfieldOf<Self>;
+    type PrimeField: FiniteField<
+            PrimeField = Self::PrimeField,
+            PolynomialFormNumCoefficients = generic_array::typenum::U1,
+        > + IsSubfieldOf<Self>;
     /// When elements of this field are represented as a polynomial over the prime field,
     /// how many coefficients are needed?
     type PolynomialFormNumCoefficients: ArrayLength<Self::PrimeField> + ArrayLength<Self>;
