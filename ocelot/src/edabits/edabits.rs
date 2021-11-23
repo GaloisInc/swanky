@@ -579,6 +579,8 @@ impl<FE: FiniteField> ProverConv<FE> {
             let b: bool;
             match (
                 r_batch[k].0 == F2::ONE,
+                // This computes mod2 using the first bit of the bit decomposition.
+                // NOTE: This scales linearly with the size of the bit decomposition and could lead to potential inefficiencies
                 tau_batch[k].0.bit_decomposition()[0] == true,
             ) {
                 (true, true) => {
@@ -1157,6 +1159,8 @@ impl<FE: FiniteField> VerifierConv<FE> {
             let b: bool;
             match (
                 r_batch[k] == F2::ONE,
+                // computes mod2 using the first bit of the bit decomposition.
+                // NOTE: This scales linearly with the size of the bit decomposition and could lead to potential inefficiencies
                 tau_batch[k].bit_decomposition()[0] == true,
             ) {
                 (true, true) => {
