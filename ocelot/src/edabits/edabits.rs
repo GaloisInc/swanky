@@ -576,26 +576,10 @@ impl<FE: FiniteField> ProverConv<FE> {
         for k in 0..s {
             // step 8)
             // NOTE: This is not needed for the prover,
-            let b: bool;
-            match (
-                r_batch[k].0 == F2::ONE,
-                // This computes mod2 using the first bit of the bit decomposition.
+            let b =
+                // mod2 is computed using the first bit of the bit decomposition.
                 // NOTE: This scales linearly with the size of the bit decomposition and could lead to potential inefficiencies
-                tau_batch[k].0.bit_decomposition()[0] == true,
-            ) {
-                (true, true) => {
-                    b = true;
-                }
-                (false, false) => {
-                    b = true;
-                }
-                (true, false) => {
-                    b = false;
-                }
-                (false, true) => {
-                    b = false;
-                }
-            };
+                (r_batch[k].0 == F2::ONE) == tau_batch[k].0.bit_decomposition()[0];
             res = res & b;
         }
         self.fcom
@@ -1156,26 +1140,10 @@ impl<FE: FiniteField> VerifierConv<FE> {
 
         // step 8)
         for k in 0..s {
-            let b: bool;
-            match (
-                r_batch[k] == F2::ONE,
-                // computes mod2 using the first bit of the bit decomposition.
+            let b =
+                // mod2 is computed using the first bit of the bit decomposition.
                 // NOTE: This scales linearly with the size of the bit decomposition and could lead to potential inefficiencies
-                tau_batch[k].bit_decomposition()[0] == true,
-            ) {
-                (true, true) => {
-                    b = true;
-                }
-                (false, false) => {
-                    b = true;
-                }
-                (true, false) => {
-                    b = false;
-                }
-                (false, true) => {
-                    b = false;
-                }
-            };
+                (r_batch[k] == F2::ONE) == tau_batch[k].bit_decomposition()[0];
             res = res & b;
         }
         self.fcom
