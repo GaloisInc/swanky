@@ -155,7 +155,9 @@ pub struct ProverConv<FE: FiniteField> {
     fcom: FComProver<FE>,
 }
 
-impl<FE: FiniteField> ProverConv<FE> {
+// The Finite field is required to be a prime field because of the fdabit
+// protocol working only for prime finite fields.
+impl<FE: FiniteField<PrimeField = FE>> ProverConv<FE> {
     /// initialize the prover
     pub fn init<C: AbstractChannel, RNG: CryptoRng + Rng>(
         channel: &mut C,
@@ -811,7 +813,9 @@ pub struct VerifierConv<FE: FiniteField> {
     fcom: FComVerifier<FE>,
 }
 
-impl<FE: FiniteField> VerifierConv<FE> {
+// The Finite field is required to be a prime field because of the fdabit
+// protocol working only for prime finite fields.
+impl<FE: FiniteField<PrimeField = FE>> VerifierConv<FE> {
     /// initialize the verifier
     pub fn init<C: AbstractChannel, RNG: CryptoRng + Rng>(
         channel: &mut C,
@@ -1474,7 +1478,7 @@ mod tests {
     const DEFAULT_NUM_CUT: usize = 5;
     const NB_BITS: usize = 38;
 
-    fn test_convert_bit_2_field<FE: FiniteField>() -> () {
+    fn test_convert_bit_2_field<FE: FiniteField<PrimeField = FE>>() -> () {
         let count = 100;
         let (sender, receiver) = UnixStream::pair().unwrap();
         let handle = std::thread::spawn(move || {
@@ -1557,7 +1561,7 @@ mod tests {
         }
     }
 
-    fn test_bit_add_carry<FE: FiniteField>() -> () {
+    fn test_bit_add_carry<FE: FiniteField<PrimeField = FE>>() -> () {
         let power = 6;
         let (sender, receiver) = UnixStream::pair().unwrap();
 
@@ -1664,7 +1668,7 @@ mod tests {
         assert_eq!(carry, c[0]);
     }
 
-    fn test_fdabit<FE: FiniteField>() -> () {
+    fn test_fdabit<FE: FiniteField<PrimeField = FE>>() -> () {
         let count = 100;
         let (sender, receiver) = UnixStream::pair().unwrap();
         let handle = std::thread::spawn(move || {
@@ -1690,7 +1694,7 @@ mod tests {
         handle.join().unwrap();
     }
 
-    fn test_conv<FE: FiniteField>() -> () {
+    fn test_conv<FE: FiniteField<PrimeField = FE>>() -> () {
         let nb_edabits = 50;
         let with_quicksilver = true;
         let (sender, receiver) = UnixStream::pair().unwrap();
