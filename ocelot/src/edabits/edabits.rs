@@ -8,9 +8,10 @@
 
 use super::homcom::{FComProver, FComVerifier, MacProver, MacVerifier};
 use crate::errors::Error;
+use generic_array::typenum::Unsigned;
 use rand::{CryptoRng, Rng, SeedableRng};
 use scuttlebutt::{
-    field::{FiniteField, Gf40, PrimeFiniteField, F2},
+    field::{FiniteField, Gf40, F2},
     AbstractChannel, AesRng, Block, SyncChannel,
 };
 use std::convert::TryFrom;
@@ -79,7 +80,7 @@ fn bit_to_fe<FE: FiniteField>(b: F2) -> FE {
     FE::conditional_select(&FE::ONE, &FE::ZERO, choice)
 }
 
-fn convert_f2_to_field<FE: PrimeFiniteField>(v: &[F2]) -> FE {
+fn convert_f2_to_field<FE: FiniteField>(v: &[F2]) -> FE {
     let mut res = FE::ZERO;
 
     for b in v.iter().rev() {
@@ -115,7 +116,7 @@ fn generate_permutation<T: Clone, RNG: CryptoRng + Rng>(rng: &mut RNG, v: &mut V
     }
 }
 
-fn check_parameters<FE: PrimeFiniteField>(n: usize, gamma: usize) -> Result<(), Error> {
+fn check_parameters<FE: FiniteField>(n: usize, gamma: usize) -> Result<(), Error> {
     // Because the modulus of the field might be large, we currently only store ceil(log_2(modulus))
     // for the field.
     // Let M be the modulus of the field.
@@ -136,7 +137,7 @@ fn check_parameters<FE: PrimeFiniteField>(n: usize, gamma: usize) -> Result<(), 
             - 1
             - usize::try_from(x.leading_zeros()).expect("sizeof(usize) >= sizeof(u32)")
     }
-    if log2_floor(n + 1) + gamma >= FE::BITS_OF_MODULUS - 1 {
+    if log2_floor(n + 1) + gamma >= FE::NumberOfBitsInBitDecomposition::USIZE - 1 {
         Err(Error::Other(format!(
             "Fdabit invalid parameter configuration: n={}, gamma={}, FE={}",
             n,
@@ -154,7 +155,9 @@ pub struct ProverConv<FE: FiniteField> {
     fcom: FComProver<FE>,
 }
 
-impl<FE: FiniteField + PrimeFiniteField> ProverConv<FE> {
+// The Finite field is required to be a prime field because of the fdabit
+// protocol working only for prime finite fields.
+impl<FE: FiniteField<PrimeField = FE>> ProverConv<FE> {
     /// initialize the prover
     pub fn init<C: AbstractChannel, RNG: CryptoRng + Rng>(
         channel: &mut C,
@@ -337,8 +340,9 @@ impl<FE: FiniteField + PrimeFiniteField> ProverConv<FE> {
             for _ in 0..nb_bits {
                 bits.push(self.fcom_f2.random(channel, rng)?);
             }
-            let r_m: FE::PrimeField =
-                convert_f2_to_field::<FE>(bits.iter().map(|x| x.0).collect::<Vec<F2>>().as_slice());
+            let r_m: FE::PrimeField = convert_f2_to_field::<FE::PrimeField>(
+                bits.iter().map(|x| x.0).collect::<Vec<F2>>().as_slice(),
+            );
             aux_bits.push(bits);
             aux_r_m.push(r_m);
         }
@@ -574,21 +578,10 @@ impl<FE: FiniteField + PrimeFiniteField> ProverConv<FE> {
         for k in 0..s {
             // step 8)
             // NOTE: This is not needed for the prover,
-            let b: bool;
-            match (r_batch[k].0 == F2::ONE, tau_batch[k].0.mod2() == FE::ONE) {
-                (true, true) => {
-                    b = true;
-                }
-                (false, false) => {
-                    b = true;
-                }
-                (true, false) => {
-                    b = false;
-                }
-                (false, true) => {
-                    b = false;
-                }
-            };
+            let b =
+                // mod2 is computed using the first bit of the bit decomposition.
+                // NOTE: This scales linearly with the size of the bit decomposition and could lead to potential inefficiencies
+                (r_batch[k].0 == F2::ONE) == tau_batch[k].0.bit_decomposition()[0];
             res = res & b;
         }
         self.fcom
@@ -820,7 +813,9 @@ pub struct VerifierConv<FE: FiniteField> {
     fcom: FComVerifier<FE>,
 }
 
-impl<FE: FiniteField + PrimeFiniteField> VerifierConv<FE> {
+// The Finite field is required to be a prime field because of the fdabit
+// protocol working only for prime finite fields.
+impl<FE: FiniteField<PrimeField = FE>> VerifierConv<FE> {
     /// initialize the verifier
     pub fn init<C: AbstractChannel, RNG: CryptoRng + Rng>(
         channel: &mut C,
@@ -1149,21 +1144,10 @@ impl<FE: FiniteField + PrimeFiniteField> VerifierConv<FE> {
 
         // step 8)
         for k in 0..s {
-            let b: bool;
-            match (r_batch[k] == F2::ONE, tau_batch[k].mod2() == FE::ONE) {
-                (true, true) => {
-                    b = true;
-                }
-                (false, false) => {
-                    b = true;
-                }
-                (true, false) => {
-                    b = false;
-                }
-                (false, true) => {
-                    b = false;
-                }
-            };
+            let b =
+                // mod2 is computed using the first bit of the bit decomposition.
+                // NOTE: This scales linearly with the size of the bit decomposition and could lead to potential inefficiencies
+                (r_batch[k] == F2::ONE) == tau_batch[k].bit_decomposition()[0];
             res = res & b;
         }
         self.fcom
@@ -1246,7 +1230,8 @@ impl<FE: FiniteField + PrimeFiniteField> VerifierConv<FE> {
 
         let mut e_prime_minus_sum_batch = Vec::with_capacity(n);
         for i in 0..n {
-            let sum = convert_f2_to_field::<FE>(&ei_batch[i * nb_bits..(i + 1) * nb_bits]);
+            let sum =
+                convert_f2_to_field::<FE::PrimeField>(&ei_batch[i * nb_bits..(i + 1) * nb_bits]);
             e_prime_minus_sum_batch.push(MacVerifier(
                 e_prime_mac_batch[i] + self.fcom.get_delta().multiply_by_prime_subfield(sum),
             ));
@@ -1332,7 +1317,7 @@ impl<FE: FiniteField + PrimeFiniteField> VerifierConv<FE> {
             let a_mac = &r_mac[idx];
             self.fcom_f2.open(channel, &a_mac.bits, &mut a_vec)?;
             self.fcom.open(channel, &vec![a_mac.value], &mut a_m)?;
-            if convert_f2_to_field::<FE>(&a_vec) != a_m[0] {
+            if convert_f2_to_field::<FE::PrimeField>(&a_vec) != a_m[0] {
                 return Err(Error::Other("Wrong open random edabit".to_string()));
             }
         }
@@ -1481,7 +1466,7 @@ mod tests {
         VerifierConv,
     };
     use scuttlebutt::{
-        field::{F61p, FiniteField, PrimeFiniteField, F2},
+        field::{F61p, FiniteField, F2},
         AesRng, Channel,
     };
     use std::{
@@ -1493,7 +1478,7 @@ mod tests {
     const DEFAULT_NUM_CUT: usize = 5;
     const NB_BITS: usize = 38;
 
-    fn test_convert_bit_2_field<FE: FiniteField + PrimeFiniteField>() -> () {
+    fn test_convert_bit_2_field<FE: FiniteField<PrimeField = FE>>() -> () {
         let count = 100;
         let (sender, receiver) = UnixStream::pair().unwrap();
         let handle = std::thread::spawn(move || {
@@ -1527,7 +1512,7 @@ mod tests {
                     .unwrap();
 
                 let _ = fconv.fcom.open(&mut channel, &x_m_batch).unwrap();
-                assert_eq!(bit_to_fe::<FE>(x_f2), x_m_batch[0].0);
+                assert_eq!(bit_to_fe::<FE::PrimeField>(x_f2), x_m_batch[0].0);
                 res.push((x_f2, x_m_batch[0].0));
             }
             res
@@ -1576,7 +1561,7 @@ mod tests {
         }
     }
 
-    fn test_bit_add_carry<FE: FiniteField + PrimeFiniteField>() -> () {
+    fn test_bit_add_carry<FE: FiniteField<PrimeField = FE>>() -> () {
         let power = 6;
         let (sender, receiver) = UnixStream::pair().unwrap();
 
@@ -1683,7 +1668,7 @@ mod tests {
         assert_eq!(carry, c[0]);
     }
 
-    fn test_fdabit<FE: FiniteField + PrimeFiniteField>() -> () {
+    fn test_fdabit<FE: FiniteField<PrimeField = FE>>() -> () {
         let count = 100;
         let (sender, receiver) = UnixStream::pair().unwrap();
         let handle = std::thread::spawn(move || {
@@ -1709,7 +1694,7 @@ mod tests {
         handle.join().unwrap();
     }
 
-    fn test_conv<FE: FiniteField + PrimeFiniteField>() -> () {
+    fn test_conv<FE: FiniteField<PrimeField = FE>>() -> () {
         let nb_edabits = 50;
         let with_quicksilver = true;
         let (sender, receiver) = UnixStream::pair().unwrap();
