@@ -75,38 +75,38 @@ impl Circuit {
         let re = Regex::new(r"\n")?;
         let _ = regex2captures(&re, &line)?;
 
-        let mut circ = Self::new(Some(ngates));
+        let mut circ = Self::new(Some(ngates + n1 + n2 + 1));
 
         let re1 = Regex::new(r"1 1 (\d+) (\d+) INV")?;
         let re2 = Regex::new(r"2 1 (\d+) (\d+) (\d+) ((AND|XOR))")?;
 
         let mut id = 0;
 
+        // Create a constant wire for negations.
+        circ.gates.push(Gate::Constant { val: 1 });
+        let oneref = CircuitRef {
+            ix: 0,
+            modulus: 2,
+        };
+        circ.const_refs.push(oneref);
         // Process garbler inputs.
         for i in 0..n1 {
             circ.gates.push(Gate::GarblerInput { id: i });
             circ.garbler_input_refs
-                .push(CircuitRef { ix: i, modulus: 2 });
+                .push(CircuitRef { ix: i + 1, modulus: 2 });
         }
         // Process evaluator inputs.
         for i in 0..n2 {
             circ.gates.push(Gate::EvaluatorInput { id: i });
             circ.evaluator_input_refs.push(CircuitRef {
-                ix: n1 + i,
+                ix: n1 + i + 1,
                 modulus: 2,
             });
         }
-        // Create a constant wire for negations.
-        circ.gates.push(Gate::Constant { val: 1 });
-        let oneref = CircuitRef {
-            ix: n1 + n2,
-            modulus: 2,
-        };
-        circ.const_refs.push(oneref);
         // Process outputs.
         for i in 0..n3 {
             circ.output_refs.push(CircuitRef {
-                ix: nwires - n3 + i,
+                ix: nwires - n3 + i + 1,
                 modulus: 2,
             });
         }
@@ -115,8 +115,8 @@ impl Circuit {
             match line.chars().next() {
                 Some('1') => {
                     let cap = regex2captures(&re1, &line)?;
-                    let yref = cap2int(&cap, 1)?;
-                    let out = cap2int(&cap, 2)?;
+                    let yref = cap2int(&cap, 1)? + 1;
+                    let out = cap2int(&cap, 2)? + 1;
                     let yref = CircuitRef {
                         ix: yref,
                         modulus: 2,
@@ -129,9 +129,9 @@ impl Circuit {
                 }
                 Some('2') => {
                     let cap = regex2captures(&re2, &line)?;
-                    let xref = cap2int(&cap, 1)?;
-                    let yref = cap2int(&cap, 2)?;
-                    let out = cap2int(&cap, 3)?;
+                    let xref = cap2int(&cap, 1)? + 1;
+                    let yref = cap2int(&cap, 2)? + 1;
+                    let out = cap2int(&cap, 3)? + 1;
                     let typ = cap2typ(&cap, 4)?;
                     let xref = CircuitRef {
                         ix: xref,
