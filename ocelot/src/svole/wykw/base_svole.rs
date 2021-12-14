@@ -132,7 +132,7 @@ mod tests {
     };
     use scuttlebutt::field::Gf40;
     use scuttlebutt::{
-        field::{F61p, FiniteField as FF, Fp, Gf128},
+        field::{F128p, F61p, FiniteField as FF, Gf128},
         AesRng, Channel,
     };
     use std::{
@@ -168,7 +168,7 @@ mod tests {
     }
 
     fn test_base_vole_setup_params_all_fields(len: usize) {
-        test_base_svole::<Fp, NoSpecialization>(len);
+        test_base_svole::<F128p, NoSpecialization>(len);
         test_base_svole::<Gf128, NoSpecialization>(len);
         test_base_svole::<F61p, NoSpecialization>(len);
         test_base_svole::<Gf40, Gf40Specialization>(len);

@@ -610,7 +610,7 @@ mod tests {
     use super::{Receiver, SVoleReceiver, SVoleSender, Sender};
     use scuttlebutt::field::Gf40;
     use scuttlebutt::{
-        field::{F61p, FiniteField as FF, Fp, Gf128},
+        field::{F128p, F61p, FiniteField as FF, Gf128},
         AesRng, Channel,
     };
     use std::{
@@ -699,7 +699,7 @@ mod tests {
     #[ignore]
     #[test]
     fn test_lpn_svole_fp() {
-        test_lpn_svole_::<Fp, Sender<Fp>, Receiver<Fp>>();
+        test_lpn_svole_::<F128p, Sender<F128p>, Receiver<F128p>>();
     }
 
     #[test]

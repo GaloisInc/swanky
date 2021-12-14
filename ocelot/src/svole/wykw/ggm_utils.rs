@@ -212,7 +212,7 @@ mod tests {
     use rand::Rng;
     use scuttlebutt::field::Gf40;
     use scuttlebutt::{
-        field::{F61p, FiniteField, Fp, Gf128, F2},
+        field::{F128p, F61p, FiniteField, Gf128, F2},
         utils::unpack_bits,
     };
 
@@ -282,7 +282,7 @@ mod tests {
         };
     }
     test_ggm!(
-        (fp, Fp, NoSpecialization),
+        (fp, F128p, NoSpecialization),
         (f61p, F61p, NoSpecialization),
         (f2, F2, NoSpecialization),
         (gf128, Gf128, NoSpecialization),

@@ -21,24 +21,24 @@ use subtle::{Choice, ConditionallySelectable, ConstantTimeEq};
 ///
 /// This is called `Fp` because it is our "common" prime-order finite field.
 #[derive(Debug, Eq, Clone, Copy, Hash)]
-pub struct Fp(u128);
+pub struct F128p(u128);
 
 /// The prime field modulus: $2^{128} - 159$
 const MODULUS: u128 = 340_282_366_920_938_463_463_374_607_431_768_211_297;
 const MULTIPLICATIVE_GROUP_ORDER: u128 = MODULUS - 1;
 
-impl ConstantTimeEq for Fp {
+impl ConstantTimeEq for F128p {
     fn ct_eq(&self, other: &Self) -> Choice {
         self.0.ct_eq(&other.0)
     }
 }
-impl ConditionallySelectable for Fp {
+impl ConditionallySelectable for F128p {
     fn conditional_select(a: &Self, b: &Self, choice: Choice) -> Self {
-        Fp(u128::conditional_select(&a.0, &b.0, choice))
+        Self(u128::conditional_select(&a.0, &b.0, choice))
     }
 }
 
-impl Fp {
+impl F128p {
     // This function is required by the uint_full_mul_reg macro
     #[inline(always)]
     const fn split_u128(a: u128) -> (u64, u64) {
@@ -46,7 +46,7 @@ impl Fp {
     }
 }
 
-impl FiniteField for Fp {
+impl FiniteField for F128p {
     /// There is a slight bias towards the range $`[0,158]`$.
     /// There is a $`\frac{159}{2^128} \approx 4.6 \times 10^{-37}`$ chance of seeing this bias.
     fn random<R: RngCore + ?Sized>(rng: &mut R) -> Self {
@@ -55,9 +55,9 @@ impl FiniteField for Fp {
         Self::try_from(u128::from_le_bytes(bytes) % MODULUS).unwrap()
     }
 
-    const ZERO: Self = Fp(0);
+    const ZERO: Self = Self(0);
 
-    const ONE: Self = Fp(1);
+    const ONE: Self = Self(1);
 
     type ByteReprLen = generic_array::typenum::U16;
     type FromBytesError = BiggerThanModulus;
@@ -70,12 +70,12 @@ impl FiniteField for Fp {
         if value > MODULUS {
             value %= MODULUS
         }
-        Fp(value)
+        Self(value)
     }
     /// If you put random bytes into here, while it's _technically_ biased, there's only a tiny
     /// chance that you'll get biased output.
     fn from_bytes(buf: &GenericArray<u8, Self::ByteReprLen>) -> Result<Self, BiggerThanModulus> {
-        Fp::try_from(u128::from_le_bytes(*buf.as_ref()))
+        Self::try_from(u128::from_le_bytes(*buf.as_ref()))
     }
 
     /// Return the canonical byte representation (byte representation of the reduced field element).
@@ -83,7 +83,7 @@ impl FiniteField for Fp {
         u128::from(*self).to_le_bytes().into()
     }
 
-    const GENERATOR: Self = Fp(5);
+    const GENERATOR: Self = Self(5);
 
     type PrimeField = Self;
     type PolynomialFormNumCoefficients = generic_array::typenum::U1;
@@ -133,38 +133,38 @@ impl std::fmt::Display for BiggerThanModulus {
     }
 }
 
-impl TryFrom<u128> for Fp {
+impl TryFrom<u128> for F128p {
     type Error = BiggerThanModulus;
 
     fn try_from(value: u128) -> Result<Self, Self::Error> {
         if value < MODULUS {
-            Ok(Fp(value))
+            Ok(Self(value))
         } else {
             Err(BiggerThanModulus)
         }
     }
 }
 
-impl TryFrom<Block> for Fp {
+impl TryFrom<Block> for F128p {
     type Error = BiggerThanModulus;
 
     fn try_from(value: Block) -> Result<Self, Self::Error> {
         let val = u128::from(value);
-        Fp::try_from(val)
+        Self::try_from(val)
     }
 }
 
 /// This returns a canonical/reduced form of the field element.
-impl From<Fp> for u128 {
+impl From<F128p> for u128 {
     #[inline]
-    fn from(x: Fp) -> Self {
+    fn from(x: F128p) -> Self {
         x.0
     }
 }
 
 // TODO: there's definitely room for optimization. We don't need to use the full mod algorithm here.
-impl AddAssign<&Fp> for Fp {
-    fn add_assign(&mut self, rhs: &Fp) {
+impl AddAssign<&F128p> for F128p {
+    fn add_assign(&mut self, rhs: &F128p) {
         let mut raw_sum = U256::from(self.0).checked_add(U256::from(rhs.0)).unwrap();
         if raw_sum >= U256::from(MODULUS) {
             raw_sum -= U256::from(MODULUS);
@@ -173,8 +173,8 @@ impl AddAssign<&Fp> for Fp {
     }
 }
 
-impl SubAssign<&Fp> for Fp {
-    fn sub_assign(&mut self, rhs: &Fp) {
+impl SubAssign<&F128p> for F128p {
+    fn sub_assign(&mut self, rhs: &F128p) {
         let mut raw_diff = (U256::from(self.0) + U256::from(MODULUS))
             .checked_sub(U256::from(rhs.0))
             .unwrap();
@@ -186,8 +186,8 @@ impl SubAssign<&Fp> for Fp {
     }
 }
 
-impl MulAssign<&Fp> for Fp {
-    fn mul_assign(&mut self, rhs: &Fp) {
+impl MulAssign<&F128p> for F128p {
+    fn mul_assign(&mut self, rhs: &F128p) {
         let raw_prod = U256(uint::uint_full_mul_reg!(
             U128,
             2,
@@ -198,7 +198,7 @@ impl MulAssign<&Fp> for Fp {
     }
 }
 
-field_ops!(Fp);
+field_ops!(F128p);
 
 #[cfg(test)]
 mod tests {
@@ -206,8 +206,8 @@ mod tests {
     use num_bigint::BigUint;
     use proptest::prelude::*;
 
-    fn any_f() -> impl Strategy<Value = Fp> {
-        any::<u128>().prop_map(|x| Fp(x % MODULUS))
+    fn any_f() -> impl Strategy<Value = F128p> {
+        any::<u128>().prop_map(|x| F128p(x % MODULUS))
     }
 
     macro_rules! test_binop {
@@ -235,7 +235,7 @@ mod tests {
     test_binop!(test_mul, mul_assign);
 
     #[cfg(test)]
-    test_field!(test_fp, Fp);
+    test_field!(test_fp, F128p);
 
     proptest! {
         #[test]
