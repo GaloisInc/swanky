@@ -528,29 +528,6 @@ impl<'a, Field: FiniteField> NewtonPolynomial<'a, Field> {
     }
 }
 
-/// Newton interpolation tests for types implementing FiniteField
-#[macro_export]
-macro_rules! interpolation_tests {
-    ($field: ty) => {
-        #[test]
-        fn test_newton_interpolation_general() {
-            let poly: Vec<_> = (1u64..=4).map(<$field>::from).collect();
-            let points: Vec<_> = (5u64..=9).map(<$field>::from).collect();
-            let values: Vec<$field> = points
-                .iter()
-                .map(|&point| mod_evaluate_polynomial(&poly, point))
-                .collect();
-
-            let recovered_poly = newton_interpolation_general(&points, &values);
-            let recovered_values: Vec<$field> = points
-                .iter()
-                .map(|&point| newton_evaluate(&recovered_poly, point))
-                .collect();
-            assert_eq!(recovered_values, values);
-        }
-    };
-}
-
 fn compute_newton_coefficients<Field>(points: &[Field], values: &[Field]) -> Vec<Field>
 where
     Field: FiniteField,
@@ -598,4 +575,38 @@ where
     let head = *reversed_coefficients.next().unwrap();
     let tail = reversed_coefficients;
     tail.fold(head, |partial, &coef| partial * point + coef)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::field::*;
+    use crate::AesRng;
+
+    /// Newton interpolation tests for types implementing FiniteField
+    macro_rules! interpolation_tests {
+        ($name:ident, $field: ty) => {
+            #[test]
+            fn $name() {
+                let mut rng = AesRng::new();
+                let poly: Vec<_> = (1..10).map(|_| <$field>::random(&mut rng)).collect();
+                let points: Vec<_> = (1..10).map(|_| <$field>::random(&mut rng)).collect();
+                let values: Vec<$field> = points
+                    .iter()
+                    .map(|&point| mod_evaluate_polynomial(&poly, point))
+                    .collect();
+
+                let recovered_poly = NewtonPolynomial::init(&points, &values);
+                let recovered_values: Vec<$field> = points
+                    .iter()
+                    .map(|&point| recovered_poly.evaluate(point))
+                    .collect();
+                assert_eq!(recovered_values, values);
+            }
+        };
+    }
+
+    interpolation_tests!(interpolation_tests_f61p, F61p);
+    interpolation_tests!(interpolation_tests_gf40, Gf40);
+    interpolation_tests!(interpolation_tests_fp, Fp);
 }
