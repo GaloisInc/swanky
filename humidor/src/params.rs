@@ -8,11 +8,11 @@
 // TODO: Eliminate excessive use of vectors in anonymous functions, function
 // return values, etc.
 
-use ndarray::{Array1, Array2, ArrayView1, ArrayView2, concatenate, Axis, Zip};
+use ndarray::{concatenate, Array1, Array2, ArrayView1, ArrayView2, Axis, Zip};
 use scuttlebutt::{numtheory, threshold_secret_sharing};
 
-use crate::util::*;
 use crate::ligero::FieldForLigero;
+use crate::util::*;
 
 /// Parameters for interleaved coding, based on the size of the circuit and
 /// input. Note that these variable names, although terse, correspond to those
@@ -51,7 +51,7 @@ pub struct Params<Field> {
     pub t: usize,
     /// Reconstruction threshold: min number of columns for reconstruction
     pub k: usize,
-    /// Codeword size, i.e., number of columns (Note: n = 3^i - 1, for some i) 
+    /// Codeword size, i.e., number of columns (Note: n = 3^i - 1, for some i)
     pub n: usize,
     /// Interleaved code size, i.e., number of rows
     pub m: usize,
@@ -62,7 +62,9 @@ impl<Field: FieldForLigero> Params<Field> {
     /// Constraints for parameter selection are given in section 5.3 of
     /// https://dl.acm.org/doi/pdf/10.1145/3133956.3134104
     pub fn new(size: usize) -> Self {
-        if size == 0 { panic!("Empty circuits are not supported") }
+        if size == 0 {
+            panic!("Empty circuits are not supported")
+        }
         // XXX: There's probably a better way to select these. As it is, we
         // evaluate parameters for all appropriate 2-power/3-power pairs and
         // select the ones that minimize |l - t*m|. Since m is the cost of
@@ -89,27 +91,35 @@ impl<Field: FieldForLigero> Params<Field> {
         // to multiply polynomials in O(d log d) time (see pmul2). We could
         // avoid this at the cost of some performance by using fft3 instead.
         let t = Field::FIELD_SIZE;
-        let (kexp, nexp, k, l, n, m) = (0 .. Field::PHI_2_EXP as u32)
+        let (kexp, nexp, k, l, n, m) = (0..Field::PHI_2_EXP as u32)
             .into_iter()
             .map(|kexp| (kexp, 2usize.pow(kexp) - 1))
-            .filter(|&(_,k)| k as usize > t)
+            .filter(|&(_, k)| k as usize > t)
             .filter_map(|(kexp, k)| {
-                let (nexp, n) = (0 ..= Field::PHI_3_EXP as u32)
+                let (nexp, n) = (0..=Field::PHI_3_EXP as u32)
                     .into_iter()
                     .map(|nexp| (nexp, 3usize.pow(nexp) - 1))
-                    .find(|&(_,n)| n as usize > k)?;
+                    .find(|&(_, n)| n as usize > k)?;
                 let l = k - t;
                 let m = (size + l - 1) / l;
 
-                let diff = (l as isize - (t*m) as isize).abs();
+                let diff = (l as isize - (t * m) as isize).abs();
                 Some((diff, (kexp, nexp, k, l, n, m)))
             })
             //.map(|p| { eprintln!("{:?}", p); p })
-            .min_by(|(d1,_), (d2,_)| d1.cmp(d2))
+            .min_by(|(d1, _), (d2, _)| d1.cmp(d2))
             .expect("Failed to find appropriate parameters")
             .1;
 
-        Self { phantom: std::marker::PhantomData, kexp, nexp, k, t, l, n, m,
+        Self {
+            phantom: std::marker::PhantomData,
+            kexp,
+            nexp,
+            k,
+            t,
+            l,
+            n,
+            m,
             pss: threshold_secret_sharing::PackedSecretSharing {
                 threshold: t,
                 share_count: n,
@@ -117,13 +127,14 @@ impl<Field: FieldForLigero> Params<Field> {
 
                 omega_secrets: Field::from(Field::roots_base_2(kexp as usize)),
                 omega_shares: Field::from(Field::roots_base_3(nexp as usize)),
-            }
+            },
         }
     }
 
     /// Encode a row of l field elements into a codeword row of n elements.
     pub fn encode<R>(&self, wf: ArrayView1<Field>, rng: &mut R) -> Array1<Field>
-        where R: rand::RngCore
+    where
+        R: rand::RngCore,
     {
         debug_assert_eq!(wf.len(), self.l);
 
@@ -141,25 +152,22 @@ impl<Field: FieldForLigero> Params<Field> {
             self.pss.omega_shares,
         );
 
-        numtheory::fft2(
-            &points[0 ..= self.k],
-            self.pss.omega_secrets,
-        )
+        numtheory::fft2(&points[0..=self.k], self.pss.omega_secrets)
     }
 
     /// Decode a codeword row of n field elements into a row of l elements.
     pub fn decode(&self, cf: ArrayView1<Field>) -> Array1<Field> {
-        self.decode_no_strip(cf)[1 ..= self.l].iter().cloned().collect()
+        self.decode_no_strip(cf)[1..=self.l]
+            .iter()
+            .cloned()
+            .collect()
     }
 
     /// Decode an incomplete codeword.
     ///
     /// Note: This is _slow_! Don't use it if you can avoid it.
     #[allow(dead_code)]
-    fn decode_part(&self,
-        ixs: &[usize],
-        cf: ArrayView1<Field>,
-    ) -> Array1<Field> {
+    fn decode_part(&self, ixs: &[usize], cf: ArrayView1<Field>) -> Array1<Field> {
         debug_assert!(cf.len() <= self.n);
         debug_assert!(cf.len() >= self.k);
 
@@ -173,10 +181,13 @@ impl<Field: FieldForLigero> Params<Field> {
     pub fn codeword_is_valid(&self, cf: ArrayView1<Field>) -> bool {
         debug_assert_eq!(cf.len(), self.n);
 
-        let mut coeffs0 = std::iter::once(&Field::ZERO).chain(cf.iter()).cloned().collect::<Vec<_>>();
+        let mut coeffs0 = std::iter::once(&Field::ZERO)
+            .chain(cf.iter())
+            .cloned()
+            .collect::<Vec<_>>();
         numtheory::fft3_inverse_in_place(&mut coeffs0, self.pss.omega_shares);
 
-        let (mut points, zeros) = coeffs0[..].split_at_mut(self.k+1);
+        let (mut points, zeros) = coeffs0[..].split_at_mut(self.k + 1);
         numtheory::fft2_in_place(&mut points, self.pss.omega_secrets);
 
         points[0] == Field::ZERO && zeros.iter().all(|&f| f == Field::ZERO)
@@ -185,7 +196,8 @@ impl<Field: FieldForLigero> Params<Field> {
     /// Encode an mXl matrix of field elements into an mXn interleaved
     /// codeword.
     pub fn encode_interleaved<R>(&self, ws: ArrayView1<Field>, rng: &mut R) -> Array2<Field>
-        where R: rand::RngCore
+    where
+        R: rand::RngCore,
     {
         debug_assert_eq!(ws.len(), self.l * self.m);
 
@@ -206,7 +218,7 @@ impl<Field: FieldForLigero> Params<Field> {
 
         let mut res = Vec::with_capacity(self.l * self.m);
 
-        for c in 0 .. cs.nrows() {
+        for c in 0..cs.nrows() {
             res.append(&mut self.decode(cs.row(c)).to_vec());
         }
 
@@ -220,12 +232,14 @@ impl<Field: FieldForLigero> Params<Field> {
         debug_assert!(points.len() <= self.k);
 
         let mut points0 = Array1::zeros(self.k + 1);
-        points0.slice_mut(ndarray::s!(1 ..= points.len())).assign(&points);
+        points0
+            .slice_mut(ndarray::s!(1..=points.len()))
+            .assign(&points);
 
-        numtheory::fft2_inverse(
-            &points0.to_vec(),
-            self.pss.omega_secrets,
-        ).iter().cloned().collect()
+        numtheory::fft2_inverse(&points0.to_vec(), self.pss.omega_secrets)
+            .iter()
+            .cloned()
+            .collect()
     }
 
     /// Take a sequence of `k+1` coefficients of the polynomial `p` and
@@ -234,15 +248,17 @@ impl<Field: FieldForLigero> Params<Field> {
     /// not returned.
     // TODO make this an in-place operation?
     pub fn fft2(&self, coeffs: ArrayView1<Field>) -> Array1<Field> {
-        debug_assert!(coeffs.len() <= self.k+1);
+        debug_assert!(coeffs.len() <= self.k + 1);
 
         let mut coeffs0 = Array1::zeros(self.k + 1);
-        coeffs0.slice_mut(ndarray::s!(0 .. coeffs.len())).assign(&coeffs);
+        coeffs0
+            .slice_mut(ndarray::s!(0..coeffs.len()))
+            .assign(&coeffs);
 
-        numtheory::fft2(
-            &coeffs0.to_vec(),
-            self.pss.omega_secrets,
-        )[1..].iter().cloned().collect()
+        numtheory::fft2(&coeffs0.to_vec(), self.pss.omega_secrets)[1..]
+            .iter()
+            .cloned()
+            .collect()
     }
 
     /// Apply `fft2_inverse` to the rows of an `Array2`.
@@ -251,15 +267,13 @@ impl<Field: FieldForLigero> Params<Field> {
         debug_assert!(mat.ncols() <= self.k);
 
         let mut res = Array2::zeros((mat.nrows(), self.k + 1)); // TODO use uninit for efficiency
-        //mat.to_owned() // TODO better if we move this argument?
-        //    .move_into(res.slice_mut(ndarray::s![.., 1..mat.ncols()+1]));
-        res.slice_mut(ndarray::s![.., 1..mat.ncols()+1]).assign(&mat);
+                                                                //mat.to_owned() // TODO better if we move this argument?
+                                                                //    .move_into(res.slice_mut(ndarray::s![.., 1..mat.ncols()+1]));
+        res.slice_mut(ndarray::s![.., 1..mat.ncols() + 1])
+            .assign(&mat);
 
         Zip::from(res.rows_mut()).for_each(|mut row| {
-            numtheory::fft2_inverse_in_place(
-                row.as_slice_mut().unwrap(),
-                self.pss.omega_secrets,
-            );
+            numtheory::fft2_inverse_in_place(row.as_slice_mut().unwrap(), self.pss.omega_secrets);
         });
 
         res
@@ -271,15 +285,12 @@ impl<Field: FieldForLigero> Params<Field> {
         debug_assert!(mat.ncols() <= self.k + 1);
 
         let mut res = Array2::zeros((mat.nrows(), self.k + 1)); // TODO use uninit for efficiency
-        //mat.to_owned() // TODO better if we move this argument?
-        //    .move_into(res.slice_mut(ndarray::s![.., 0..mat.ncols()]));
+                                                                //mat.to_owned() // TODO better if we move this argument?
+                                                                //    .move_into(res.slice_mut(ndarray::s![.., 0..mat.ncols()]));
         res.slice_mut(ndarray::s![.., 0..mat.ncols()]).assign(&mat);
 
         Zip::from(res.rows_mut()).for_each(|mut row| {
-            numtheory::fft2_in_place(
-                row.as_slice_mut().unwrap(),
-                self.pss.omega_secrets,
-            );
+            numtheory::fft2_in_place(row.as_slice_mut().unwrap(), self.pss.omega_secrets);
         });
 
         res.slice(ndarray::s![.., 1..]).to_owned()
@@ -292,13 +303,14 @@ impl<Field: FieldForLigero> Params<Field> {
     pub fn fft2_peval(&self, coeffs: ArrayView1<Field>) -> Array1<Field> {
         let coeffs0 = coeffs.to_vec()[..]
             .chunks(self.k + 1)
-            .fold(Array1::zeros(self.k + 1),
-                |acc, v| padd(acc.view(), Array1::from(v.to_vec()).view()));
+            .fold(Array1::zeros(self.k + 1), |acc, v| {
+                padd(acc.view(), Array1::from(v.to_vec()).view())
+            });
 
-        numtheory::fft2(
-            &coeffs0.to_vec(),
-            self.pss.omega_secrets,
-        ).iter().cloned().collect()
+        numtheory::fft2(&coeffs0.to_vec(), self.pss.omega_secrets)
+            .iter()
+            .cloned()
+            .collect()
     }
 
     /// Take a sequence of values `p(eta_1) .. p(eta_c)` for `c <= n` and
@@ -308,12 +320,14 @@ impl<Field: FieldForLigero> Params<Field> {
         debug_assert!(points.len() <= self.n);
 
         let mut points0 = Array1::zeros(self.n + 1);
-        points0.slice_mut(ndarray::s!(1 .. points.len()+1)).assign(&points);
+        points0
+            .slice_mut(ndarray::s!(1..points.len() + 1))
+            .assign(&points);
 
-        numtheory::fft3_inverse(
-            &points0.to_vec(),
-            self.pss.omega_shares,
-        ).iter().cloned().collect()
+        numtheory::fft3_inverse(&points0.to_vec(), self.pss.omega_shares)
+            .iter()
+            .cloned()
+            .collect()
     }
 
     /// Take a sequence of `n+1` coefficients of the polynomial `p` and
@@ -325,12 +339,14 @@ impl<Field: FieldForLigero> Params<Field> {
         debug_assert!(coeffs.len() <= self.n + 1);
 
         let mut coeffs0 = Array1::zeros(self.n + 1);
-        coeffs0.slice_mut(ndarray::s!(0 .. coeffs.len())).assign(&coeffs);
+        coeffs0
+            .slice_mut(ndarray::s!(0..coeffs.len()))
+            .assign(&coeffs);
 
-        numtheory::fft3(
-            &coeffs0.to_vec(),
-            self.pss.omega_shares,
-        )[1..].iter().cloned().collect()
+        numtheory::fft3(&coeffs0.to_vec(), self.pss.omega_shares)[1..]
+            .iter()
+            .cloned()
+            .collect()
     }
 
     /// Apply `fft3_inverse` to the rows of an `Array2`.
@@ -339,15 +355,13 @@ impl<Field: FieldForLigero> Params<Field> {
         debug_assert!(mat.ncols() <= self.n);
 
         let mut res = Array2::zeros((mat.nrows(), self.n + 1)); // TODO use uninit for efficiency
-        //mat.to_owned() // TODO better if we move this argument?
-        //    .move_into(res.slice_mut(ndarray::s![.., 1..mat.ncols()+1]));
-        res.slice_mut(ndarray::s![.., 1..mat.ncols()+1]).assign(&mat);
+                                                                //mat.to_owned() // TODO better if we move this argument?
+                                                                //    .move_into(res.slice_mut(ndarray::s![.., 1..mat.ncols()+1]));
+        res.slice_mut(ndarray::s![.., 1..mat.ncols() + 1])
+            .assign(&mat);
 
         Zip::from(res.rows_mut()).for_each(|mut row| {
-            numtheory::fft3_inverse_in_place(
-                row.as_slice_mut().unwrap(),
-                self.pss.omega_shares,
-            );
+            numtheory::fft3_inverse_in_place(row.as_slice_mut().unwrap(), self.pss.omega_shares);
         });
 
         res
@@ -359,15 +373,12 @@ impl<Field: FieldForLigero> Params<Field> {
         debug_assert!(mat.ncols() <= self.n + 1);
 
         let mut res = Array2::zeros((mat.nrows(), self.n + 1)); // TODO use uninit for efficiency
-        //mat.to_owned() // TODO better if we move this argument?
-        //    .move_into(res.slice_mut(ndarray::s![.., 0..mat.ncols()]));
+                                                                //mat.to_owned() // TODO better if we move this argument?
+                                                                //    .move_into(res.slice_mut(ndarray::s![.., 0..mat.ncols()]));
         res.slice_mut(ndarray::s![.., 0..mat.ncols()]).assign(&mat);
 
         Zip::from(res.rows_mut()).for_each(|mut row| {
-            numtheory::fft3_in_place(
-                row.as_slice_mut().unwrap(),
-                self.pss.omega_shares,
-            );
+            numtheory::fft3_in_place(row.as_slice_mut().unwrap(), self.pss.omega_shares);
         });
 
         res.slice(ndarray::s![.., 1..]).to_owned()
@@ -379,40 +390,32 @@ impl<Field: FieldForLigero> Params<Field> {
     pub fn fft3_peval(&self, coeffs: ArrayView1<Field>) -> Array1<Field> {
         let coeffs0 = coeffs.to_vec()[..]
             .chunks(self.n + 1)
-            .fold(Array1::zeros(self.n + 1),
-                |acc, v| padd(acc.view(), Array1::from(v.to_vec()).view()));
+            .fold(Array1::zeros(self.n + 1), |acc, v| {
+                padd(acc.view(), Array1::from(v.to_vec()).view())
+            });
 
-        numtheory::fft3(
-            &coeffs0.to_vec(),
-            self.pss.omega_shares,
-        ).iter().cloned().collect()
+        numtheory::fft3(&coeffs0.to_vec(), self.pss.omega_shares)
+            .iter()
+            .cloned()
+            .collect()
     }
 
     /// Take a sequence of _possibly more than_ `k+1` coefficients of the
     /// polynomial `p` and return the single evaluation point `p(zeta_{ix})`.
     pub fn peval2(&self, p: ArrayView1<Field>, ix: usize) -> Field {
-        numtheory::mod_evaluate_polynomial(
-            &p.to_vec(),
-            self.pss.omega_secrets.pow(ix as u128),
-        )
+        numtheory::mod_evaluate_polynomial(&p.to_vec(), self.pss.omega_secrets.pow(ix as u128))
     }
 
     /// Take a sequence of _possibly more than_ `n+1` coefficients of the
     /// polynomial `p` and return the single evaluation point `p(eta_{ix})`.
     pub fn peval3(&self, p: ArrayView1<Field>, ix: usize) -> Field {
-        numtheory::mod_evaluate_polynomial(
-            &p.to_vec(),
-            self.pss.omega_shares.pow(ix as u128),
-        )
+        numtheory::mod_evaluate_polynomial(&p.to_vec(), self.pss.omega_shares.pow(ix as u128))
     }
 
     /// Take two polynomials p and q of degree less than 2^kexp and produce a
     /// polynomial s of degree less than 2^(kexp+1)-1 s.t. s(.) = p(.) * q(.).
     /// This takes `n*log(n)` time, as opposed to the `n^2` naive algorithm.
-    pub fn pmul2(&self,
-        p: ArrayView1<Field>,
-        q: ArrayView1<Field>
-    ) -> Array1<Field> {
+    pub fn pmul2(&self, p: ArrayView1<Field>, q: ArrayView1<Field>) -> Array1<Field> {
         debug_assert!(p.len() <= 2usize.pow(self.kexp));
         debug_assert!(q.len() <= 2usize.pow(self.kexp));
 
@@ -423,11 +426,13 @@ impl<Field: FieldForLigero> Params<Field> {
         let pq_deg = p_deg + q_deg - 1;
         let omega = Field::from(Field::roots_base_2(self.kexp as usize + 1));
 
-        let mut p0 = p.iter()
+        let mut p0 = p
+            .iter()
             .chain(std::iter::repeat(&Field::ZERO).take(max_deg - p_deg))
             .cloned()
             .collect::<Array1<_>>();
-        let mut q0 = q.iter()
+        let mut q0 = q
+            .iter()
             .chain(std::iter::repeat(&Field::ZERO).take(max_deg - q_deg))
             .cloned()
             .collect::<Array1<_>>();
@@ -435,22 +440,23 @@ impl<Field: FieldForLigero> Params<Field> {
         // Use in-place fft to avoid allocating any more Vecs.
         numtheory::fft2_in_place(p0.as_slice_mut().unwrap(), omega);
         numtheory::fft2_in_place(q0.as_slice_mut().unwrap(), omega);
-        for i in 0 .. max_deg {
+        for i in 0..max_deg {
             p0[i] *= q0[i]
         }
         numtheory::fft2_inverse_in_place(p0.as_slice_mut().unwrap(), omega);
 
-        p0.slice_move(ndarray::s![0 .. pq_deg])
+        p0.slice_move(ndarray::s![0..pq_deg])
     }
 
     /// Return a random size-t subset of `[n]`.
     #[allow(non_snake_case)]
     pub fn random_indices<R>(&self, rng: &mut R) -> Vec<usize>
-        where R: rand::RngCore
+    where
+        R: rand::RngCore,
     {
         use rand::seq::SliceRandom;
 
-        let mut Q = (0 .. self.n).collect::<Vec<usize>>();
+        let mut Q = (0..self.n).collect::<Vec<usize>>();
         Q.shuffle(rng);
         Q.truncate(self.t);
 
@@ -459,14 +465,19 @@ impl<Field: FieldForLigero> Params<Field> {
 
     /// Return a random valid codeword.
     pub fn random_codeword<R>(&self, rng: &mut R) -> Array1<Field>
-        where R: rand::RngCore
+    where
+        R: rand::RngCore,
     {
-        self.encode(Array1::from_shape_fn(self.l, |_| Field::random(rng)).view(), rng)
+        self.encode(
+            Array1::from_shape_fn(self.l, |_| Field::random(rng)).view(),
+            rng,
+        )
     }
 
     /// Return a valid codeword for `0^l`.
     pub fn random_zero_codeword<R>(&self, rng: &mut R) -> Array1<Field>
-        where R: rand::RngCore
+    where
+        R: rand::RngCore,
     {
         debug_assert_ne!(self.l, 0);
 
@@ -480,7 +491,7 @@ impl<Field: FieldForLigero> Params<Field> {
 
 #[cfg(test)]
 use {
-    proptest::{*, prelude::*, collection::vec as pvec},
+    proptest::{collection::vec as pvec, prelude::*, *},
     rand::prelude::{SeedableRng, StdRng},
     scuttlebutt::field::FiniteField,
 };
@@ -490,7 +501,9 @@ impl Arbitrary for Params<TestField> {
     type Parameters = ();
     type Strategy = BoxedStrategy<Self>;
     fn arbitrary_with(_: Self::Parameters) -> Self::Strategy {
-        (1usize .. 100).prop_flat_map(|size| Just(Self::new(size))).boxed()
+        (1usize..100)
+            .prop_flat_map(|size| Just(Self::new(size)))
+            .boxed()
     }
 }
 

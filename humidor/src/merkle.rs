@@ -9,16 +9,16 @@
 // TODO: Eliminate excessive use of vectors in anonymous functions, function
 // return values, etc.
 
-use blake_hash::digest::{Update, FixedOutputDirty};
+use blake_hash::digest::{FixedOutputDirty, Update};
+use crypto::digest::Digest as CryptoDigest;
 use generic_array::GenericArray;
 use ndarray::{Array2, ArrayView1, ArrayView2};
-use crypto::digest::Digest as CryptoDigest;
 use scuttlebutt::field::FiniteField;
 
 #[cfg(test)]
-use proptest::{*, collection::vec as pvec};
+use crate::util::{arb_test_field, TestField};
 #[cfg(test)]
-use crate::util::{TestField, arb_test_field};
+use proptest::{collection::vec as pvec, *};
 
 /// A hash digest, assumed to be 256 bits long.
 pub type Digest = [u8; HBYTES];
@@ -63,7 +63,9 @@ impl<H: MerkleHash> merkle_cbt::merkle_tree::Merge for MHMerge<H> {
 
 /// Hash a full interleaved-codeword column.
 pub fn hash_column<H, Field>(a: ArrayView1<Field>) -> Digest
-    where H: MerkleHash, Field: FiniteField
+where
+    H: MerkleHash,
+    Field: FiniteField,
 {
     let mut hash = H::new();
 
@@ -76,15 +78,21 @@ pub fn hash_column<H, Field>(a: ArrayView1<Field>) -> Digest
 
 /// Sha256 for Merkle trees.
 #[derive(Clone)]
-pub struct Sha256 (crypto::sha2::Sha256);
+pub struct Sha256(crypto::sha2::Sha256);
 
 impl tiny_keccak::Hasher for Sha256 {
-    fn update(&mut self, bs: &[u8]) { self.0.input(bs) }
-    fn finalize(self, bs: &mut [u8]) { self.0.clone().result(bs) }
+    fn update(&mut self, bs: &[u8]) {
+        self.0.input(bs)
+    }
+    fn finalize(self, bs: &mut [u8]) {
+        self.0.clone().result(bs)
+    }
 }
 
 impl MerkleHash for Sha256 {
-    fn new() -> Self { Self(crypto::sha2::Sha256::new()) }
+    fn new() -> Self {
+        Self(crypto::sha2::Sha256::new())
+    }
 }
 
 /// Sha3 for Merkle trees.
@@ -92,27 +100,37 @@ impl MerkleHash for Sha256 {
 pub struct Sha3(tiny_keccak::Sha3);
 
 impl tiny_keccak::Hasher for Sha3 {
-    fn update(&mut self, bs: &[u8]) { self.0.update(bs) }
-    fn finalize(self, bs: &mut [u8]) { self.0.finalize(bs) }
+    fn update(&mut self, bs: &[u8]) {
+        self.0.update(bs)
+    }
+    fn finalize(self, bs: &mut [u8]) {
+        self.0.finalize(bs)
+    }
 }
 
 impl MerkleHash for Sha3 {
-    fn new() -> Self { Self(tiny_keccak::Sha3::v256()) }
+    fn new() -> Self {
+        Self(tiny_keccak::Sha3::v256())
+    }
 }
 
 /// Blake for Merkle trees.
 #[derive(Clone)]
-pub struct Blake256 (blake_hash::Blake256);
+pub struct Blake256(blake_hash::Blake256);
 
 impl tiny_keccak::Hasher for Blake256 {
-    fn update(&mut self, bs: &[u8]) { self.0.update(bs) }
+    fn update(&mut self, bs: &[u8]) {
+        self.0.update(bs)
+    }
     fn finalize(mut self, bs: &mut [u8]) {
         self.0.finalize_into_dirty(GenericArray::from_mut_slice(bs))
     }
 }
 
 impl MerkleHash for Blake256 {
-    fn new() -> Self { Self(blake_hash::Blake256::default()) }
+    fn new() -> Self {
+        Self(blake_hash::Blake256::default())
+    }
 }
 
 /// Merkle proof of t-column inclusion, along with the t public columns.
@@ -129,16 +147,10 @@ pub struct Lemma<Field, H> {
 #[allow(non_snake_case)]
 impl<Field: FiniteField + num_traits::Zero, H: MerkleHash> Lemma<Field, H> {
     /// Create a new proof based on a tree of interleaved-codeoword columns.
-    pub fn new(
-        tree: &Tree<H>,
-        U: ArrayView2<Field>,
-        some_indices: &[usize]
-    ) -> Self {
-        let some_indices_u32 = some_indices
-            .iter()
-            .map(|&j| j as u32)
-            .collect::<Vec<u32>>();
-        let proof = tree.build_proof(&some_indices_u32)
+    pub fn new(tree: &Tree<H>, U: ArrayView2<Field>, some_indices: &[usize]) -> Self {
+        let some_indices_u32 = some_indices.iter().map(|&j| j as u32).collect::<Vec<u32>>();
+        let proof = tree
+            .build_proof(&some_indices_u32)
             .expect("Failed to build proof with indices");
 
         let mut some_columns = Array2::zeros((U.nrows(), 0));
@@ -156,12 +168,16 @@ impl<Field: FiniteField + num_traits::Zero, H: MerkleHash> Lemma<Field, H> {
     }
 
     /// Numver of digests in this `Lemma`.
-    pub fn nlemmas(&self) -> usize { self.lemmas.len() }
+    pub fn nlemmas(&self) -> usize {
+        self.lemmas.len()
+    }
 
     /// Verify that this lemma matches a given root.
     pub fn verify(&self, root: &Digest) -> bool {
-        let leaves = self.columns
-            .columns().into_iter()
+        let leaves = self
+            .columns
+            .columns()
+            .into_iter()
             .map(|c| hash_column::<H, Field>(c.view()))
             .collect::<Vec<Digest>>();
         let proof: Proof<H> = Proof::new(self.indices.clone(), self.lemmas.clone());
@@ -171,9 +187,9 @@ impl<Field: FiniteField + num_traits::Zero, H: MerkleHash> Lemma<Field, H> {
 
     /// Size in bytes of this lemma.
     pub fn size(&self) -> usize {
-        self.columns.len() * std::mem::size_of::<Field>() +
-        self.lemmas.len() * std::mem::size_of::<Digest>() +
-        self.indices.len() * std::mem::size_of::<u32>()
+        self.columns.len() * std::mem::size_of::<Field>()
+            + self.lemmas.len() * std::mem::size_of::<Digest>()
+            + self.indices.len() * std::mem::size_of::<u32>()
     }
 }
 
@@ -200,13 +216,11 @@ proptest! {
 }
 
 /// Create a Merkle-tree root out of an interleaved codeword.
-pub fn make_tree<Field: FiniteField, H: MerkleHash>(
-    m: ArrayView2<Field>
-) -> Tree<H> {
+pub fn make_tree<Field: FiniteField, H: MerkleHash>(m: ArrayView2<Field>) -> Tree<H> {
     merkle_cbt::CBMT::build_merkle_tree(
         &m.columns()
             .into_iter()
             .map(|c| hash_column::<H, Field>(c))
-            .collect::<Vec<Digest>>()
+            .collect::<Vec<Digest>>(),
     )
 }

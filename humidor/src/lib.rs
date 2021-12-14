@@ -8,8 +8,8 @@
 #![feature(is_sorted)]
 #![deny(missing_docs)]
 
-mod util;
+pub mod circuit;
+pub mod ligero;
 pub mod merkle;
 pub mod params;
-pub mod ligero;
-pub mod circuit;
+mod util;

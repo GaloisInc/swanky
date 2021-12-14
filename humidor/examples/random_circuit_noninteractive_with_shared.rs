@@ -1,39 +1,42 @@
 use rand::SeedableRng;
-use std::io::Write;
 use scuttlebutt::AesRng;
+use std::io::Write;
 
 extern crate humidor;
 
-use humidor::ligero::noninteractive;
 use humidor::circuit::Ckt;
+use humidor::ligero::noninteractive;
 
 type Hash = humidor::merkle::Blake256;
 type Field = scuttlebutt::field::F2_19x3_26;
 type Prover = noninteractive::Prover<Field, Hash>;
 type Verifier = noninteractive::Verifier<Field, Hash>;
 
-fn test_size(s: usize, input_size: usize, shared_size: usize) -> (
-    usize, // proof size in bytes
-    usize, // expected proof size in bytes
+fn test_size(
+    s: usize,
+    input_size: usize,
+    shared_size: usize,
+) -> (
+    usize,               // proof size in bytes
+    usize,               // expected proof size in bytes
     std::time::Duration, // prover time in ms
     std::time::Duration, // verifier time in ms
 ) {
     let circuit_size = (1usize << s) - input_size;
 
-    println!("Proving a random circuit with {} gates and {} input wires",
-        circuit_size, input_size);
+    println!(
+        "Proving a random circuit with {} gates and {} input wires",
+        circuit_size, input_size
+    );
     println!("---");
 
     let mut rng = AesRng::from_entropy();
-    let (mut ckt, inp): (Ckt<Field>, _) = humidor::circuit::random_ckt_zero(
-        &mut rng,
-        input_size,
-        circuit_size,
-    );
+    let (mut ckt, inp): (Ckt<Field>, _) =
+        humidor::circuit::random_ckt_zero(&mut rng, input_size, circuit_size);
     ckt.shared = 0..shared_size;
 
-    let mut prover_time = std::time::Duration::new(0,0);
-    let mut verifier_time = std::time::Duration::new(0,0);
+    let mut prover_time = std::time::Duration::new(0, 0);
+    let mut verifier_time = std::time::Duration::new(0, 0);
 
     let t = std::time::Instant::now();
     let mut p = Prover::new(&mut rng, &ckt, &inp);
@@ -58,8 +61,10 @@ fn test_size(s: usize, input_size: usize, shared_size: usize) -> (
 
     let expected_size = p.expected_proof_size();
     println!("---");
-    println!("Verifier {} proof",
-        if vout { "accepts" } else { "rejects" });
+    println!(
+        "Verifier {} proof",
+        if vout { "accepts" } else { "rejects" }
+    );
     println!("---");
     println!("Prover time: {:?}", prover_time);
     println!("Verifier time: {:?}", verifier_time);
@@ -77,8 +82,17 @@ fn test_shared_witness_size(filename: &str, shared_size: usize) -> std::io::Resu
 
     for s in 13..=24 {
         let (ps, es, p, v) = test_size(s, 2048, shared_size);
-        f.write_all(format!("{},\t{},\t{},\t{},\t{}\n",
-                1 << s, ps, es, p.as_millis(), v.as_millis()).as_bytes())?;
+        f.write_all(
+            format!(
+                "{},\t{},\t{},\t{},\t{}\n",
+                1 << s,
+                ps,
+                es,
+                p.as_millis(),
+                v.as_millis()
+            )
+            .as_bytes(),
+        )?;
     }
 
     Ok(())

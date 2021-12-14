@@ -3,8 +3,8 @@ use scuttlebutt::AesRng;
 
 extern crate humidor;
 
-use humidor::ligero::noninteractive;
 use humidor::circuit::Ckt;
+use humidor::ligero::noninteractive;
 
 type Hash = humidor::merkle::Blake256;
 type Field = scuttlebutt::field::F2_19x3_26;
@@ -18,20 +18,19 @@ fn main() {
     let circuit_size = total_size - input_size;
     debug_assert!(shared_size <= input_size);
 
-    println!("Proving a random circuit with {} gates and {} input registers, {} of which are shared",
-        circuit_size, input_size, shared_size);
+    println!(
+        "Proving a random circuit with {} gates and {} input registers, {} of which are shared",
+        circuit_size, input_size, shared_size
+    );
     println!("---");
 
     let mut rng = AesRng::from_entropy();
-    let (mut ckt, inp): (Ckt<Field>, _) = humidor::circuit::random_ckt_zero(
-        &mut rng,
-        input_size,
-        circuit_size,
-    );
+    let (mut ckt, inp): (Ckt<Field>, _) =
+        humidor::circuit::random_ckt_zero(&mut rng, input_size, circuit_size);
     ckt.shared = 0..shared_size;
 
-    let mut prover_time = std::time::Duration::new(0,0);
-    let mut verifier_time = std::time::Duration::new(0,0);
+    let mut prover_time = std::time::Duration::new(0, 0);
+    let mut verifier_time = std::time::Duration::new(0, 0);
 
     let t = std::time::Instant::now();
     let mut p = Prover::new(&mut rng, &ckt, &inp);
@@ -56,8 +55,10 @@ fn main() {
 
     let expected_size = p.expected_proof_size();
     println!("---");
-    println!("Verifier {} proof",
-        if vout { "accepts" } else { "rejects" });
+    println!(
+        "Verifier {} proof",
+        if vout { "accepts" } else { "rejects" }
+    );
     println!("---");
     println!("Prover time: {:?}", prover_time);
     println!("Verifier time: {:?}", verifier_time);

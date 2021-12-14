@@ -21,16 +21,24 @@ pub type TestHash = crate::merkle::Blake256;
 
 #[cfg(test)]
 pub fn arb_test_field() -> BoxedStrategy<TestField> {
-    any::<u64>().prop_map(|f| TestField::from(f as u128)).boxed()
+    any::<u64>()
+        .prop_map(|f| TestField::from(f as u128))
+        .boxed()
 }
 
 /// Trait for collections that allow taking `n` initial elements while ensuring
 /// that only zero-elements are dropped from the end.
-pub trait TakeNZ where Self: Sized {
+pub trait TakeNZ
+where
+    Self: Sized,
+{
     fn take_nz(self, n: usize) -> std::iter::Take<Self>;
 }
 
-impl<I: Zero + Eq + Debug, L> TakeNZ for L where L: Iterator<Item = I> + Clone {
+impl<I: Zero + Eq + Debug, L> TakeNZ for L
+where
+    L: Iterator<Item = I> + Clone,
+{
     #[inline]
     /// Take initial `n` elements, while ensuring (in debug builds) that the
     /// remaining elements are zeros.
@@ -48,12 +56,13 @@ impl<I: Zero + Eq + Debug, L> TakeNZ for L where L: Iterator<Item = I> + Clone {
 /// polynomials of degree less than `k+1`, use `Params::pmul2`.
 #[allow(dead_code)]
 pub fn pmul<Field>(p: ArrayView1<Field>, q: ArrayView1<Field>) -> Array1<Field>
-    where Field: FiniteField + num_traits::Zero
+where
+    Field: FiniteField + num_traits::Zero,
 {
     let mut r = Array1::zeros(p.len() + q.len());
 
-    for i in 0 .. p.len() {
-        for j in 0 .. q.len() {
+    for i in 0..p.len() {
+        for j in 0..q.len() {
             r[i + j] += p[i] * q[j];
         }
     }
@@ -64,15 +73,18 @@ pub fn pmul<Field>(p: ArrayView1<Field>, q: ArrayView1<Field>) -> Array1<Field>
 /// Given polynomials `p` with `deg(p) < n` and `q` with `deg(q) < m`, return
 /// the polynomial `r` with `deg(r) < max(n,m)` and `r(.) = p(.) + q(.)`.
 pub fn padd<Field>(p: ArrayView1<Field>, q: ArrayView1<Field>) -> Array1<Field>
-    where Field: FiniteField
+where
+    Field: FiniteField,
 {
     let r_len = std::cmp::max(p.len(), q.len());
 
-    let p0: Array1<_> = p.iter()
+    let p0: Array1<_> = p
+        .iter()
         .cloned()
         .chain(std::iter::repeat(Field::ZERO).take(r_len - p.len()))
         .collect();
-    let q0: Array1<_> = q.iter()
+    let q0: Array1<_> = q
+        .iter()
         .cloned()
         .chain(std::iter::repeat(Field::ZERO).take(r_len - q.len()))
         .collect();
@@ -83,15 +95,18 @@ pub fn padd<Field>(p: ArrayView1<Field>, q: ArrayView1<Field>) -> Array1<Field>
 /// Given polynomials `p` with `deg(p) < n` and `q` with `deg(q) < m`, return
 /// the polynomial `r` with `deg(r) < max(n,m)` and `r(.) = p(.) - q(.)`.
 pub fn psub<Field>(p: ArrayView1<Field>, q: ArrayView1<Field>) -> Array1<Field>
-    where Field: FiniteField
+where
+    Field: FiniteField,
 {
     let r_len = std::cmp::max(p.len(), q.len());
 
-    let p0: Array1<_> = p.iter()
+    let p0: Array1<_> = p
+        .iter()
         .cloned()
         .chain(std::iter::repeat(Field::ZERO).take(r_len - p.len()))
         .collect();
-    let q0: Array1<_> = q.iter()
+    let q0: Array1<_> = q
+        .iter()
         .cloned()
         .chain(std::iter::repeat(Field::ZERO).take(r_len - q.len()))
         .collect();

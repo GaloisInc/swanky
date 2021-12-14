@@ -66,20 +66,20 @@
 //
 // TODO: Implement repetitions to achieve soundness with smaller field sizes.
 
-use ndarray::{Array1, ArrayView1, Array2, Axis, concatenate};
-use sprs::{CsMat, TriMat};
-use rand::{SeedableRng, RngCore};
+use ndarray::{concatenate, Array1, Array2, ArrayView1, Axis};
+use rand::{RngCore, SeedableRng};
 use scuttlebutt::field::{FiniteField, PrimeFiniteField};
 use scuttlebutt::numtheory::{FieldForFFT2, FieldForFFT3};
 use scuttlebutt::{AesRng, Block};
+use sprs::{CsMat, TriMat};
 
 #[cfg(test)]
-use proptest::{*, prelude::*, collection::vec as pvec};
+use proptest::{collection::vec as pvec, prelude::*, *};
 
-use crate::circuit::{Op, Ckt};
+use crate::circuit::{Ckt, Op};
 use crate::merkle;
-use crate::util::*;
 use crate::params::Params;
+use crate::util::*;
 
 /// This is a marker trait consolidating the traits needed for a Ligero field.
 /// In addition, it supplies a field-size, to be used in parameter selection.
@@ -136,16 +136,16 @@ impl<Field: FieldForLigero> Public<Field> {
         let params = Params::new(
             c.size() +          /* circuit size + witness size */
             1 +                 /* for the final zero check */
-            num_shared_checks   /* shared-witness mask size */
+            num_shared_checks, /* shared-witness mask size */
         );
 
         let ml = params.m * params.l; // padded circuit size
 
-        let mut Px = TriMat::with_capacity((ml,ml), ml);        // x = Px * w
-        let mut Py = TriMat::with_capacity((ml,ml), ml);        // y = Py * w
-        let mut Pz = TriMat::with_capacity((ml,ml), ml);        // z = Py * w
+        let mut Px = TriMat::with_capacity((ml, ml), ml); // x = Px * w
+        let mut Py = TriMat::with_capacity((ml, ml), ml); // y = Py * w
+        let mut Pz = TriMat::with_capacity((ml, ml), ml); // z = Py * w
 
-        let mut Padd = TriMat::with_capacity((ml,ml), 3*ml);    // Padd * w = 0
+        let mut Padd = TriMat::with_capacity((ml, ml), 3 * ml); // Padd * w = 0
         let mut badd = Array1::zeros(ml);
 
         for (s, op) in c.ops.iter().enumerate() {
@@ -153,8 +153,8 @@ impl<Field: FieldForLigero> Public<Field> {
             match *op {
                 Op::Add(i, j) => {
                     // Padd[k][i]*w[i] + Padd[k][j]*w[j] + Padd[k][k]*w[k] = 0
-                    Padd.add_triplet(k, i,  Field::ONE);
-                    Padd.add_triplet(k, j,  Field::ONE);
+                    Padd.add_triplet(k, i, Field::ONE);
+                    Padd.add_triplet(k, j, Field::ONE);
                     Padd.add_triplet(k, k, -Field::ONE);
                 }
                 Op::Mul(i, j) => {
@@ -165,7 +165,7 @@ impl<Field: FieldForLigero> Public<Field> {
                 }
                 Op::Sub(i, j) => {
                     // Padd[k][i]*w[i] + Padd[k][j]*w[j] + Padd[k][k]*w[k] = 0
-                    Padd.add_triplet(k, i,  Field::ONE);
+                    Padd.add_triplet(k, i, Field::ONE);
                     Padd.add_triplet(k, j, -Field::ONE);
                     Padd.add_triplet(k, k, -Field::ONE);
                 }
@@ -193,9 +193,10 @@ impl<Field: FieldForLigero> Public<Field> {
         // the extended witness to be zero.
         Padd.add_triplet(c.size(), c.size() - 1, Field::ONE);
 
-        Public {params,
+        Public {
+            params,
             shared: c.shared.clone(),
-            shared_mask: c.size()+1 .. c.size()+1+num_shared_checks,
+            shared_mask: c.size() + 1..c.size() + 1 + num_shared_checks,
 
             Px: Px.to_csr(),
             Py: Py.to_csr(),
@@ -212,18 +213,19 @@ impl<Field: FieldForLigero> Public<Field> {
     // to Padd and an i'th element to badd corresponding to
     // rshared[i] . w[shared] + w[mask] = qshared[i]
     #[allow(non_snake_case)]
-    fn finalize_Padd(&mut self,
-        rshared: &Array2<Field>,
-        qshared: &Array1<Field>,
-    ) {
+    fn finalize_Padd(&mut self, rshared: &Array2<Field>, qshared: &Array1<Field>) {
         debug_assert_eq!(self.shared.len(), rshared.ncols());
         debug_assert_eq!(self.shared_mask.len(), rshared.nrows());
         debug_assert_eq!(self.shared_mask.len(), qshared.len());
 
-        self.shared_mask.clone().into_iter()
+        self.shared_mask
+            .clone()
+            .into_iter()
             .zip(rshared.rows().into_iter())
             .for_each(|(m_i, row_i)| {
-                self.shared.clone().into_iter()
+                self.shared
+                    .clone()
+                    .into_iter()
                     .zip(row_i)
                     .for_each(|(s_j, &r_ij)| {
                         self.Padd.add_triplet(m_i, s_j, r_ij);
@@ -263,7 +265,8 @@ struct Secret<Field, H> {
 }
 
 impl<Field, H> std::fmt::Debug for Secret<Field, H>
-    where Field: std::fmt::Debug
+where
+    Field: std::fmt::Debug,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Secret")
@@ -288,11 +291,7 @@ impl<Field: FieldForLigero, H: merkle::MerkleHash> Secret<Field, H> {
     /// The `mask` should be a committed vector of random elements the same size
     /// as the shared portion of the witness. If there is no shared witness, it
     /// should be an empty vector.
-    fn new<Rng: RngCore>(
-        rng: &mut Rng,
-        c: &Ckt<Field>,
-        inp: &[Field],
-    ) -> Self {
+    fn new<Rng: RngCore>(rng: &mut Rng, c: &Ckt<Field>, inp: &[Field]) -> Self {
         debug_assert_eq!(c.inp_size, inp.len());
 
         let public = Public::new(&c);
@@ -320,14 +319,14 @@ impl<Field: FieldForLigero, H: merkle::MerkleHash> Secret<Field, H> {
                     y[k] = w[j];
                     z[k] = w[k];
                     debug_assert_eq!(x[k] * y[k] - z[k], Field::ZERO);
-                },
+                }
                 Op::Div(i, j) => {
                     // x[k] * y[k] + -1 * z[k] = 0
                     x[k] = w[j];
                     y[k] = w[k];
                     z[k] = w[i];
                     debug_assert_eq!(x[k] * y[k] - z[k], Field::ZERO);
-                },
+                }
                 _ => { /* x[k] = y[k] = z[k] = 0 */ }
             }
         }
@@ -341,19 +340,34 @@ impl<Field: FieldForLigero, H: merkle::MerkleHash> Secret<Field, H> {
         let ux = public.params.random_zero_codeword(rng);
         let uy = public.params.random_zero_codeword(rng);
         let uz = public.params.random_zero_codeword(rng);
-        let u0 = public.params.encode(Array1::zeros(public.params.l).view(), rng);
+        let u0 = public
+            .params
+            .encode(Array1::zeros(public.params.l).view(), rng);
         let uadd = public.params.random_zero_codeword(rng);
 
         let U_hash = merkle::make_tree(
-            concatenate(Axis(0), &[Uw.view(), Ux.view(), Uy.view(), Uz.view()]
-        ).expect("Unequal matrix rows when generating Merkle tree").view());
+            concatenate(Axis(0), &[Uw.view(), Ux.view(), Uy.view(), Uz.view()])
+                .expect("Unequal matrix rows when generating Merkle tree")
+                .view(),
+        );
 
         Secret {
             public,
-            w, x, y, z,
-            Uw, Ux, Uy, Uz,
-            u, ux, uy, uz, u0, uadd,
-            U_hash
+            w,
+            x,
+            y,
+            z,
+            Uw,
+            Ux,
+            Uy,
+            Uz,
+            u,
+            ux,
+            uy,
+            uz,
+            u0,
+            uadd,
+            U_hash,
         }
     }
 }
@@ -362,15 +376,17 @@ impl<Field: FieldForLigero, H: merkle::MerkleHash> Secret<Field, H> {
 impl Arbitrary for Secret<TestField, TestHash> {
     type Parameters = (usize, usize);
     type Strategy = BoxedStrategy<Self>;
-    fn arbitrary_with((w,c): Self::Parameters) -> Self::Strategy {
+    fn arbitrary_with((w, c): Self::Parameters) -> Self::Strategy {
         (
-            crate::circuit::arb_ckt(w,c),
+            crate::circuit::arb_ckt(w, c),
             pvec(arb_test_field(), w),
             proptest::array::uniform16(0u8..),
-        ).prop_map(|(ckt, inp, seed)| {
-            let mut rng = AesRng::from_seed(Block::from(seed));
-            Secret::new(&mut rng, &ckt, &inp)
-        }).boxed()
+        )
+            .prop_map(|(ckt, inp, seed)| {
+                let mut rng = AesRng::from_seed(Block::from(seed));
+                Secret::new(&mut rng, &ckt, &inp)
+            })
+            .boxed()
     }
 }
 
@@ -493,8 +509,8 @@ pub fn expected_proof_size(
     let log_n = (n as f64).log2().ceil() as usize;
 
     // This is according to Section 5.3
-    (n*sigma + 4*sigma*(k + l - 1) + sigma*(2*k - 1)
-        + t*(4*m + 6*sigma)) * f_bytes + t*log_n*h_bytes
+    (n * sigma + 4 * sigma * (k + l - 1) + sigma * (2 * k - 1) + t * (4 * m + 6 * sigma)) * f_bytes
+        + t * log_n * h_bytes
     // Note:       ^ Sec. 5.3 says this should be 5, but I think they're
     //               failing to count u0. It's missing from the random
     //               codewords sent in step (3) of the protocol in Sec. 4.7,
@@ -540,31 +556,30 @@ impl<Field: FieldForLigero> Round1<Field> {
         params: &Params<Field>,
         num_shared_elems: usize,
         num_shared_checks: usize,
-        rng: &mut impl rand::Rng
+        rng: &mut impl rand::Rng,
     ) -> Self {
         Round1 {
-            r: Array1::from_shape_fn(4*params.m, |_| Field::random(rng)),
+            r: Array1::from_shape_fn(4 * params.m, |_| Field::random(rng)),
             radd: Array1::from_shape_fn(params.m * params.l, |_| Field::random(rng)),
             rx: Array1::from_shape_fn(params.m * params.l, |_| Field::random(rng)),
             ry: Array1::from_shape_fn(params.m * params.l, |_| Field::random(rng)),
             rz: Array1::from_shape_fn(params.m * params.l, |_| Field::random(rng)),
             rq: Array1::from_shape_fn(params.m, |_| Field::random(rng)),
-            rshared: Array2::from_shape_fn(
-                (num_shared_checks, num_shared_elems),
-                |_| Field::random(rng),
-            ),
+            rshared: Array2::from_shape_fn((num_shared_checks, num_shared_elems), |_| {
+                Field::random(rng)
+            }),
         }
     }
 
     /// Actual size of this round of communication.
     pub fn size(&self) -> usize {
-        self.r.len() * std::mem::size_of::<Field>() +
-        self.radd.len() * std::mem::size_of::<Field>() +
-        self.rx.len() * std::mem::size_of::<Field>() +
-        self.ry.len() * std::mem::size_of::<Field>() +
-        self.rz.len() * std::mem::size_of::<Field>() +
-        self.rq.len() * std::mem::size_of::<Field>() +
-        self.rshared.len() * std::mem::size_of::<Field>()
+        self.r.len() * std::mem::size_of::<Field>()
+            + self.radd.len() * std::mem::size_of::<Field>()
+            + self.rx.len() * std::mem::size_of::<Field>()
+            + self.ry.len() * std::mem::size_of::<Field>()
+            + self.rz.len() * std::mem::size_of::<Field>()
+            + self.rq.len() * std::mem::size_of::<Field>()
+            + self.rshared.len() * std::mem::size_of::<Field>()
     }
 }
 
@@ -588,13 +603,13 @@ pub struct Round2<Field> {
 impl<Field> Round2<Field> {
     /// Actual size of this round of communication.
     pub fn size(&self) -> usize {
-        self.v.len() * std::mem::size_of::<Field>() +
-        self.qadd.len() * std::mem::size_of::<Field>() +
-        self.qx.len() * std::mem::size_of::<Field>() +
-        self.qy.len() * std::mem::size_of::<Field>() +
-        self.qz.len() * std::mem::size_of::<Field>() +
-        self.p0.len() * std::mem::size_of::<Field>() +
-        self.qshared.len() * std::mem::size_of::<Field>()
+        self.v.len() * std::mem::size_of::<Field>()
+            + self.qadd.len() * std::mem::size_of::<Field>()
+            + self.qx.len() * std::mem::size_of::<Field>()
+            + self.qy.len() * std::mem::size_of::<Field>()
+            + self.qz.len() * std::mem::size_of::<Field>()
+            + self.p0.len() * std::mem::size_of::<Field>()
+            + self.qshared.len() * std::mem::size_of::<Field>()
     }
 }
 
@@ -643,13 +658,13 @@ pub struct Round4<Field, H> {
 impl<Field: FieldForLigero, H: merkle::MerkleHash> Round4<Field, H> {
     /// Actual size of this round of communication.
     pub fn size(&self) -> usize {
-        self.U_lemma.size() +
-        self.ux.len() * std::mem::size_of::<Field>() +
-        self.uy.len() * std::mem::size_of::<Field>() +
-        self.uz.len() * std::mem::size_of::<Field>() +
-        self.uadd.len() * std::mem::size_of::<Field>() +
-        self.u.len() * std::mem::size_of::<Field>() +
-        self.u0.len() * std::mem::size_of::<Field>()
+        self.U_lemma.size()
+            + self.ux.len() * std::mem::size_of::<Field>()
+            + self.uy.len() * std::mem::size_of::<Field>()
+            + self.uz.len() * std::mem::size_of::<Field>()
+            + self.uadd.len() * std::mem::size_of::<Field>()
+            + self.u.len() * std::mem::size_of::<Field>()
+            + self.u0.len() * std::mem::size_of::<Field>()
     }
 }
 
@@ -682,10 +697,10 @@ fn verify<Field: FieldForLigero, H: merkle::MerkleHash>(
     let rz = params.fft3_rows(make_ra_Iml_Pa_neg(&params, &r1.rz, &public.Pz).view());
 
     let U = r4.U_lemma.columns.view();
-    let Uw = U.slice(s![0*params.m..1*params.m, ..]);
-    let Ux = U.slice(s![1*params.m..2*params.m, ..]);
-    let Uy = U.slice(s![2*params.m..3*params.m, ..]);
-    let Uz = U.slice(s![3*params.m..4*params.m, ..]);
+    let Uw = U.slice(s![0 * params.m..1 * params.m, ..]);
+    let Ux = U.slice(s![1 * params.m..2 * params.m, ..]);
+    let Uy = U.slice(s![2 * params.m..3 * params.m, ..]);
+    let Uz = U.slice(s![3 * params.m..4 * params.m, ..]);
 
     // Testing interleaved Reed-Solomon codes
     let code_check =
@@ -750,9 +765,7 @@ fn verify<Field: FieldForLigero, H: merkle::MerkleHash>(
             });
 
     // Checking column hashes
-    let hash_check =
-        r4.U_lemma.verify(&r0.U_root) &&
-        params.codeword_is_valid(r2.v.view());
+    let hash_check = r4.U_lemma.verify(&r0.U_root) && params.codeword_is_valid(r2.v.view());
 
     code_check && addition_check && multiplication_check && hash_check
 }
@@ -770,7 +783,7 @@ fn make_ra<Field: FieldForLigero>(
         (&Pa.view().transpose_into() * ra)
             .into_shape((params.m, params.l))
             .unwrap()
-            .view()
+            .view(),
     )
 }
 
@@ -786,24 +799,23 @@ fn make_ra_Iml_Pa_neg<Field: FieldForLigero>(
 ) -> Array2<Field> {
     let r_dot_P: Array1<Field> = &Pa.map(|f| -(*f)).transpose_into() * ra;
     params.fft2_inverse_rows(
-        ra.iter().cloned().chain(r_dot_P)
+        ra.iter()
+            .cloned()
+            .chain(r_dot_P)
             .collect::<Array1<Field>>()
-            .into_shape((2*params.m, params.l))
+            .into_shape((2 * params.m, params.l))
             .unwrap()
-            .view()
+            .view(),
     )
 }
 
 // Given an mXn matrix Ua, compute the m unique k-degree polynomials
 // pa_i(eta_c) = Ua[i][c].
 #[allow(non_snake_case)]
-fn make_pa<Field: FieldForLigero>(
-    params: &Params<Field>,
-    Ua: &Array2<Field>,
-) -> Array2<Field>
-{
-    params.fft3_inverse_rows(Ua.view())
-        .slice(ndarray::s![.., 0 .. params.k+1])
+fn make_pa<Field: FieldForLigero>(params: &Params<Field>, Ua: &Array2<Field>) -> Array2<Field> {
+    params
+        .fft3_inverse_rows(Ua.view())
+        .slice(ndarray::s![.., 0..params.k + 1])
         .to_owned()
 }
 
@@ -823,16 +835,18 @@ fn make_qadd<Field: FieldForLigero, H>(
 
     let radd = make_ra(&params, &r1_radd, &Padd); // deg < l
     let radd_blind = params.fft3_inverse(s.uadd.view()); // deg < k + l
-    //    .slice(ndarray::s![0 .. params.k+params.l])
-    //    .to_owned();
+                                                         //    .slice(ndarray::s![0 .. params.k+params.l])
+                                                         //    .to_owned();
 
-    radd.rows().into_iter().zip(p.rows())
-        .fold(radd_blind, |acc, (radd_i, p_i)| // TODO: for_each faster?
+    radd.rows().into_iter().zip(p.rows()).fold(
+        radd_blind,
+        |acc, (radd_i, p_i)| // TODO: for_each faster?
             padd(
                 acc.view(),
                 params.pmul2(
                     radd_i.slice(ndarray::s![0 .. params.k+1]), // XXX: Should be l, per Sec. 4.7
-                    p_i).view())) // deg < k + l
+                    p_i).view()),
+    ) // deg < k + l
 }
 
 // Given {p_i}, ua, ra, Pa, and Ua, compute the k-degree polynomial
@@ -852,17 +866,21 @@ fn make_qa<Field: FieldForLigero>(
     let ra = make_ra_Iml_Pa_neg(&params, &r1_ra, &Pa); // each row deg < l
     let pa = params.fft3_inverse_rows(Ua.view()); // each row deg < k + 1
     let ra_blind = params.fft3_inverse(ua.view()); // deg < k + l
-        //.slice(ndarray::s![0 .. params.k+params.l])
-        //.to_owned();
+                                                   //.slice(ndarray::s![0 .. params.k+params.l])
+                                                   //.to_owned();
 
-    ra.rows().into_iter()
+    ra.rows()
+        .into_iter()
         .zip(pa.rows().into_iter().chain(p.rows()))
-        .fold(ra_blind, |acc: Array1<Field>, (ri, pi)| // TODO: for_each faster?
+        .fold(
+            ra_blind,
+            |acc: Array1<Field>, (ri, pi)| // TODO: for_each faster?
             padd(
                 acc.view(),
                 params.pmul2(
                     ri.slice(ndarray::s![0 .. params.k+1]), // XXX: Should be l, per Sec. 4.7
-                    pi.slice(ndarray::s![0 .. params.k+1])).view())) // deg < k + l
+                    pi.slice(ndarray::s![0 .. params.k+1])).view()),
+        ) // deg < k + l
 }
 
 // Given u0, px, py, pz, and rq, compute (2k+1)-dimensional polynomial
@@ -878,21 +896,16 @@ fn make_p0<Field: FieldForLigero>(
 ) -> Array1<Field> {
     let r0_blind = params.fft3_inverse(u0.view()); // deg < 2k + 1 (but also deg < n+1 ???)
 
-    rq.iter()
-        .zip(px.rows())
-        .zip(py.rows())
-        .zip(pz.rows())
-        .fold(r0_blind, |acc, (((&rq_i, px_i), py_i), pz_i)| { // TODO: for_each faster?
+    rq.iter().zip(px.rows()).zip(py.rows()).zip(pz.rows()).fold(
+        r0_blind,
+        |acc, (((&rq_i, px_i), py_i), pz_i)| {
+            // TODO: for_each faster?
             padd(
                 acc.view(),
-                std::ops::Mul::mul(
-                    psub(
-                        params.pmul2(
-                            px_i,
-                            py_i).view(),
-                        pz_i),
-                    rq_i).view()) // deg < 2k + 1
-        })
+                std::ops::Mul::mul(psub(params.pmul2(px_i, py_i).view(), pz_i), rq_i).view(),
+            ) // deg < 2k + 1
+        },
+    )
 }
 
 // Compute `qshared = rshared * w[shared] + mask` for shared-witness
@@ -922,11 +935,7 @@ pub mod interactive {
 
     impl<Field: FieldForLigero, H: merkle::MerkleHash> Prover<Field, H> {
         /// Create an interactive prover out of a circuit and witness.
-        pub fn new<Rng: RngCore>(
-            rng: &mut Rng,
-            c: &Ckt<Field>,
-            w: &Vec<Field>,
-        ) -> Self {
+        pub fn new<Rng: RngCore>(rng: &mut Rng, c: &Ckt<Field>, w: &Vec<Field>) -> Self {
             Self {
                 secret: Secret::new(rng, c, w),
             }
@@ -935,9 +944,16 @@ pub mod interactive {
         /// Theoretical proof size, according to Section 5.3.
         pub fn expected_proof_size(&self) -> usize {
             let p = &self.secret.public.params;
-            expected_proof_size(1,
-                p.n, p.k + 1, p.l, p.m, p.t,
-                std::mem::size_of::<Field>(), std::mem::size_of::<merkle::Digest>())
+            expected_proof_size(
+                1,
+                p.n,
+                p.k + 1,
+                p.l,
+                p.m,
+                p.t,
+                std::mem::size_of::<Field>(),
+                std::mem::size_of::<merkle::Digest>(),
+            )
         }
 
         // Various getters for use by non-interactive variant
@@ -990,7 +1006,8 @@ pub mod interactive {
             let params = self.secret.public.params.clone();
 
             // Testing interleaved Reed-Solomon codes
-            let U: Array2<Field> = concatenate![Axis(0),
+            let U: Array2<Field> = concatenate![
+                Axis(0),
                 self.secret.Uw,
                 self.secret.Ux,
                 self.secret.Uy,
@@ -1007,26 +1024,47 @@ pub mod interactive {
                 &self.secret.w,
                 &self.shared_range(),
                 &self.shared_mask_range(),
-                &r1.rshared
+                &r1.rshared,
             );
             self.secret.public.finalize_Padd(&r1.rshared, &qshared);
 
             let r2 = Round2 {
                 v: r1.r.dot(&U) + self.secret.u.view(),
                 qadd: make_qadd(&self.secret, &p, &self.secret.public.Padd.to_csr(), r1.radd),
-                qx: make_qa(&params, &p, &self.secret.public.Px, &self.secret.Ux, &self.secret.ux, r1.rx),
-                qy: make_qa(&params, &p, &self.secret.public.Py, &self.secret.Uy, &self.secret.uy, r1.ry),
-                qz: make_qa(&params, &p, &self.secret.public.Pz, &self.secret.Uz, &self.secret.uz, r1.rz),
+                qx: make_qa(
+                    &params,
+                    &p,
+                    &self.secret.public.Px,
+                    &self.secret.Ux,
+                    &self.secret.ux,
+                    r1.rx,
+                ),
+                qy: make_qa(
+                    &params,
+                    &p,
+                    &self.secret.public.Py,
+                    &self.secret.Uy,
+                    &self.secret.uy,
+                    r1.ry,
+                ),
+                qz: make_qa(
+                    &params,
+                    &p,
+                    &self.secret.public.Pz,
+                    &self.secret.Uz,
+                    &self.secret.uz,
+                    r1.rz,
+                ),
                 p0: make_p0(&params, &self.secret.u0, &px, &py, &pz, r1.rq.view()),
                 qshared,
             };
 
             debug_assert_eq!(r2.v.len(), params.n);
-            debug_assert_eq!(r2.qadd.len(), 2*params.k + 1); // XXX: Should be k + l
-            debug_assert_eq!(r2.qx.len(),   2*params.k + 1); // XXX: Should be k + l
-            debug_assert_eq!(r2.qy.len(),   2*params.k + 1); // XXX: Should be k + l
-            debug_assert_eq!(r2.qz.len(),   2*params.k + 1); // XXX: Should be k + l
-            debug_assert_eq!(r2.p0.len(),   2*params.k + 1);
+            debug_assert_eq!(r2.qadd.len(), 2 * params.k + 1); // XXX: Should be k + l
+            debug_assert_eq!(r2.qx.len(), 2 * params.k + 1); // XXX: Should be k + l
+            debug_assert_eq!(r2.qy.len(), 2 * params.k + 1); // XXX: Should be k + l
+            debug_assert_eq!(r2.qz.len(), 2 * params.k + 1); // XXX: Should be k + l
+            debug_assert_eq!(r2.p0.len(), 2 * params.k + 1);
             r2
         }
 
@@ -1036,7 +1074,10 @@ pub mod interactive {
             let s = &self.secret;
             let U = concatenate![
                 ndarray::Axis(0),
-                s.Uw.view(), s.Ux.view(), s.Uy.view(), s.Uz.view()
+                s.Uw.view(),
+                s.Ux.view(),
+                s.Uy.view(),
+                s.Uz.view()
             ];
 
             let r4 = Round4 {
@@ -1052,8 +1093,8 @@ pub mod interactive {
             let params = &s.public.params;
             let log_n = (params.n as f64).log2().ceil() as usize;
             debug_assert_eq!(r4.U_lemma.columns.ncols(), params.t);
-            debug_assert_eq!(r4.U_lemma.columns.nrows(), 4*params.m);
-            debug_assert!(r4.U_lemma.nlemmas() <= params.t*log_n);
+            debug_assert_eq!(r4.U_lemma.columns.nrows(), 4 * params.m);
+            debug_assert!(r4.U_lemma.nlemmas() <= params.t * log_n);
             debug_assert_eq!(r4.ux.len(), params.t);
             debug_assert_eq!(r4.uy.len(), params.t);
             debug_assert_eq!(r4.uz.len(), params.t);
@@ -1110,7 +1151,12 @@ pub mod interactive {
         pub fn expected_proof_size(&self) -> usize {
             let p = &self.public.params;
             expected_proof_size(
-                1, p.n, p.k + 1, p.l, p.m, p.t,
+                1,
+                p.n,
+                p.k + 1,
+                p.l,
+                p.m,
+                p.t,
                 std::mem::size_of::<Field>(),
                 std::mem::size_of::<merkle::Digest>(),
             )
@@ -1118,7 +1164,12 @@ pub mod interactive {
 
         /// Generate round-1 verifier message.
         pub fn round1(&mut self, rng: &mut impl RngCore, r0: Round0) -> Round1<Field> {
-            let r1 = Round1::new(&self.public.params, self.shared().len(), self.shared_mask().len(), rng);
+            let r1 = Round1::new(
+                &self.public.params,
+                self.shared().len(),
+                self.shared_mask().len(),
+                rng,
+            );
 
             self.r0 = Some(r0);
             self.r1 = Some(r1.clone());
@@ -1127,11 +1178,7 @@ pub mod interactive {
         }
 
         /// Generate round-3 verifier message.
-        pub fn round3(
-            &mut self,
-            rng: &mut impl RngCore,
-            r2: Round2<Field>,
-        ) -> Round3<Field> {
+        pub fn round3(&mut self, rng: &mut impl RngCore, r2: Round2<Field>) -> Round3<Field> {
             let r3 = Round3::new(&self.public.params, rng);
 
             self.r2 = Some(r2);
@@ -1306,7 +1353,7 @@ pub mod noninteractive {
                 params,
                 num_shared_elems,
                 num_shared_checks,
-                &mut AesRng::from_seed(seed)
+                &mut AesRng::from_seed(seed),
             ),
             digest,
         )
@@ -1315,17 +1362,34 @@ pub mod noninteractive {
     fn make_r3<Field: FieldForLigero, H: merkle::MerkleHash>(
         params: &Params<Field>,
         state: &merkle::Digest,
-        r2: &Round2<Field>
+        r2: &Round2<Field>,
     ) -> Round3<Field> {
         let mut hash = H::new();
 
         hash.update(&state.to_vec());
-        r2.p0.clone().into_iter().for_each(|f| hash.update(&f.to_bytes()));
-        r2.qadd.clone().into_iter().for_each(|f| hash.update(&f.to_bytes()));
-        r2.qx.clone().into_iter().for_each(|f| hash.update(&f.to_bytes()));
-        r2.qy.clone().into_iter().for_each(|f| hash.update(&f.to_bytes()));
-        r2.qz.clone().into_iter().for_each(|f| hash.update(&f.to_bytes()));
-        r2.v.clone().into_iter().for_each(|f| hash.update(&f.to_bytes()));
+        r2.p0
+            .clone()
+            .into_iter()
+            .for_each(|f| hash.update(&f.to_bytes()));
+        r2.qadd
+            .clone()
+            .into_iter()
+            .for_each(|f| hash.update(&f.to_bytes()));
+        r2.qx
+            .clone()
+            .into_iter()
+            .for_each(|f| hash.update(&f.to_bytes()));
+        r2.qy
+            .clone()
+            .into_iter()
+            .for_each(|f| hash.update(&f.to_bytes()));
+        r2.qz
+            .clone()
+            .into_iter()
+            .for_each(|f| hash.update(&f.to_bytes()));
+        r2.v.clone()
+            .into_iter()
+            .for_each(|f| hash.update(&f.to_bytes()));
 
         let mut digest = merkle::HZERO;
         hash.finalize(&mut digest);
@@ -1342,11 +1406,7 @@ pub mod noninteractive {
 
     impl<Field: FieldForLigero, H: merkle::MerkleHash> Prover<Field, H> {
         /// Create a non-interactive prover from a circuit and witness.
-        pub fn new<Rng: RngCore>(
-            rng: &mut Rng,
-            c: &Ckt<Field>,
-            w: &Vec<Field>,
-        ) -> Self {
+        pub fn new<Rng: RngCore>(rng: &mut Rng, c: &Ckt<Field>, w: &Vec<Field>) -> Self {
             let mut hash = H::new();
             let mut bytes = Vec::with_capacity(Op::<Field>::OPCODE_SIZE);
             c.ops.iter().for_each(|op| {
@@ -1357,29 +1417,42 @@ pub mod noninteractive {
             let mut ckt_hash = merkle::HZERO;
             hash.finalize(&mut ckt_hash);
 
-            Self { ckt_hash, ip: interactive::Prover::new(rng, c, w) }
+            Self {
+                ckt_hash,
+                ip: interactive::Prover::new(rng, c, w),
+            }
         }
 
         /// Get mask for the shared-witness check, i.e., the `m` in the check of
         /// `A*u + m = b`.
-        pub fn shared_mask(&mut self) -> Array1<Field> { self.ip.shared_mask() }
+        pub fn shared_mask(&mut self) -> Array1<Field> {
+            self.ip.shared_mask()
+        }
 
         /// Theoretical proof size from Section 5.3.
         pub fn expected_proof_size(&self) -> usize {
             let p = self.ip.params();
 
-            expected_proof_size(1,
-                p.n, p.k + 1, p.l, p.m, p.t,
-                std::mem::size_of::<Field>(), std::mem::size_of::<merkle::Digest>())
+            expected_proof_size(
+                1,
+                p.n,
+                p.k + 1,
+                p.l,
+                p.m,
+                p.t,
+                std::mem::size_of::<Field>(),
+                std::mem::size_of::<merkle::Digest>(),
+            )
         }
 
         /// Generate the proof message. Takes a commitment to the shared witness
         /// and mask for use in Fiat-Shamir.
-        pub fn make_proof_and_shared_check(&mut self, other_commit: &[u8])
-            -> (Proof<Field, H>, Array2<Field>, Array1<Field>)
-        {
+        pub fn make_proof_and_shared_check(
+            &mut self,
+            other_commit: &[u8],
+        ) -> (Proof<Field, H>, Array2<Field>, Array1<Field>) {
             let r0 = self.ip.round0();
-            let (r1,state) = make_r1::<_,H>(
+            let (r1, state) = make_r1::<_, H>(
                 &self.ip.params(),
                 self.ip.shared_range().len(),
                 self.ip.shared_mask_range().len(),
@@ -1391,13 +1464,16 @@ pub mod noninteractive {
             let rshared = r1.rshared.clone();
 
             let r2 = self.ip.round2(r1);
-            let r3 = make_r3::<_,H>(&self.ip.params(), &state, &r2);
+            let r3 = make_r3::<_, H>(&self.ip.params(), &state, &r2);
             let r4 = self.ip.round4(r3);
 
             let qshared = r2.qshared.clone();
 
             (
-                Proof { r0, r2, r4,
+                Proof {
+                    r0,
+                    r2,
+                    r4,
                     phantom: std::marker::PhantomData,
                 },
                 rshared,
@@ -1432,7 +1508,8 @@ pub mod noninteractive {
             let mut ckt_hash = merkle::HZERO;
             hash.finalize(&mut ckt_hash);
 
-            Self { ckt_hash,
+            Self {
+                ckt_hash,
                 phantom: std::marker::PhantomData,
 
                 public: Public::new(ckt),
@@ -1444,18 +1521,25 @@ pub mod noninteractive {
             let p = &self.public.params;
 
             expected_proof_size(
-                1, p.n, p.k + 1, p.l, p.m, p.t,
+                1,
+                p.n,
+                p.k + 1,
+                p.l,
+                p.m,
+                p.t,
                 std::mem::size_of::<Field>(),
-                std::mem::size_of::<merkle::Digest>())
+                std::mem::size_of::<merkle::Digest>(),
+            )
         }
 
         /// Run the final verification procedure. Return the output of the
-        /// verification procedure, as well as 
-        pub fn verify_with_shared(&mut self,
+        /// verification procedure, as well as
+        pub fn verify_with_shared(
+            &mut self,
             p: Proof<Field, H>,
-            other_commit: &[u8]
+            other_commit: &[u8],
         ) -> (bool, Array2<Field>, Array1<Field>) {
-            let (r1,state) = make_r1::<_,H>(
+            let (r1, state) = make_r1::<_, H>(
                 &self.public.params,
                 self.public.shared.len(),
                 self.public.shared_mask.len(),
@@ -1463,7 +1547,7 @@ pub mod noninteractive {
                 &p.r0,
                 other_commit,
             );
-            let r3 = make_r3::<_,H>(&self.public.params, &state, &p.r2);
+            let r3 = make_r3::<_, H>(&self.public.params, &state, &p.r2);
 
             let rshared = r1.rshared.clone();
             let qshared = p.r2.qshared.clone();
