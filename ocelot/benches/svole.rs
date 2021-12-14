@@ -14,7 +14,7 @@ use ocelot::svole::{
 };
 
 use scuttlebutt::{
-    field::{F61p, Fp, Gf128},
+    field::{F128p, F61p, Gf128},
     AesRng, Channel,
 };
 use std::{
@@ -84,10 +84,10 @@ fn bench_svole<
 }
 
 fn bench_svole_fp(c: &mut Criterion) {
-    c.bench_function("svole::extend::Fp", move |bench| {
+    c.bench_function("svole::extend::F128p", move |bench| {
         let (vole_sender, vole_receiver) = svole_init();
         bench.iter(move || {
-            bench_svole::<Sender<Fp>, Receiver<Fp>>(&vole_sender, &vole_receiver);
+            bench_svole::<Sender<F128p>, Receiver<F128p>>(&vole_sender, &vole_receiver);
         })
     });
 }
@@ -135,9 +135,9 @@ fn bench_svole_init_gf128(c: &mut Criterion) {
 }
 
 fn bench_svole_init_fp(c: &mut Criterion) {
-    c.bench_function("svole::init::Fp", move |bench| {
+    c.bench_function("svole::init::F128p", move |bench| {
         bench.iter(move || {
-            bench_svole_init::<Sender<Fp>, Receiver<Fp>>();
+            bench_svole_init::<Sender<F128p>, Receiver<F128p>>();
         });
     });
 }

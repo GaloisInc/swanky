@@ -176,7 +176,7 @@ mod test_utils;
 #[cfg(test)]
 macro_rules! call_with_big_finite_fields {
     ($f:ident $(, $arg:expr)* $(,)?) => {{
-        $f::<$crate::field::Fp>($($arg),*);
+        $f::<$crate::field::F128p>($($arg),*);
         $f::<$crate::field::Gf128>($($arg),*);
         $f::<$crate::field::Gf45>($($arg),*);
         $f::<$crate::field::Gf40>($($arg),*);
@@ -320,8 +320,8 @@ pub(crate) fn standard_bit_decomposition<L: ArrayLength<bool>>(
     out
 }
 
-mod fp;
-pub use fp::{BiggerThanModulus, Fp};
+mod f128p;
+pub use f128p::{BiggerThanModulus, F128p};
 
 mod f2;
 pub use f2::{BiggerThanModulus as F2BiggerThanModulus, F2};

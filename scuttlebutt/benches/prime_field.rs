@@ -1,25 +1,25 @@
 use criterion::{criterion_group, criterion_main, Criterion};
-use scuttlebutt::field::{FiniteField, Fp};
+use scuttlebutt::field::{F128p, FiniteField};
 
 fn prime_field_add(c: &mut Criterion) {
     c.bench_function("prime_field_add", |b| {
-        let x = Fp::random(&mut rand::thread_rng());
-        let y = Fp::random(&mut rand::thread_rng());
+        let x = F128p::random(&mut rand::thread_rng());
+        let y = F128p::random(&mut rand::thread_rng());
         b.iter(|| criterion::black_box(criterion::black_box(x) + criterion::black_box(y)));
     });
 }
 
 fn prime_field_mul(c: &mut Criterion) {
     c.bench_function("prime_field_mul", |b| {
-        let x = Fp::random(&mut rand::thread_rng());
-        let y = Fp::random(&mut rand::thread_rng());
+        let x = F128p::random(&mut rand::thread_rng());
+        let y = F128p::random(&mut rand::thread_rng());
         b.iter(|| criterion::black_box(criterion::black_box(x) * criterion::black_box(y)));
     });
 }
 
 fn prime_field_inverse(c: &mut Criterion) {
     c.bench_function("prime_field_inverse", |b| {
-        let x = Fp::random(&mut rand::thread_rng());
+        let x = F128p::random(&mut rand::thread_rng());
         b.iter(|| criterion::black_box(criterion::black_box(x).inverse()));
     });
 }
