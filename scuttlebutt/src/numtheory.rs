@@ -282,70 +282,6 @@ where
     cooley_tukey::fft2_inverse(a_point, omega);
 }
 
-/// Tests for types implementing FieldForFFT2
-#[macro_export]
-macro_rules! fft2_tests {
-    ($field: ty) => {
-        #[test]
-        fn test_fft2() {
-            let omega = <$field>::roots_base_2(8) as u128;
-            let prime = <$field>::MODULUS as u128;
-
-            let a_coef: Vec<_> = (1u128..=8).collect();
-            assert_eq!(
-                fft2(
-                    &a_coef
-                        .iter()
-                        .cloned()
-                        .map(<$field>::from)
-                        .collect::<Vec<_>>(),
-                    <$field>::from(omega)
-                ),
-                threshold_secret_sharing::numtheory::fft2(&a_coef, omega, prime)
-                    .iter()
-                    .cloned()
-                    .map(<$field>::from)
-                    .collect::<Vec<_>>(),
-            );
-        }
-
-        #[test]
-        fn test_fft2_inverse() {
-            let omega = <$field>::roots_base_2(8) as u128;
-            let prime = <$field>::MODULUS as u128;
-
-            let a_point: Vec<_> = (1u128..=8).collect();
-            assert_eq!(
-                fft2_inverse(
-                    &a_point
-                        .iter()
-                        .cloned()
-                        .map(<$field>::from)
-                        .collect::<Vec<_>>(),
-                    <$field>::from(omega)
-                ),
-                threshold_secret_sharing::numtheory::fft2_inverse(&a_point, omega, prime)
-                    .iter()
-                    .cloned()
-                    .map(<$field>::from)
-                    .collect::<Vec<_>>(),
-            );
-        }
-
-        #[test]
-        fn test_fft2_big() {
-            let mut data: Vec<_> = (0u128..256).map(<$field>::from).collect();
-            data = fft2(&data, <$field>::from(<$field>::roots_base_2(8)));
-            data = fft2_inverse(&data, <$field>::from(<$field>::roots_base_2(8)));
-
-            assert_eq!(
-                data.iter().cloned().map(u128::from).collect::<Vec<_>>(),
-                (0..256).collect::<Vec<_>>(),
-            );
-        }
-    };
-}
-
 /// Compute the 3-radix FFT of `a_coef` in the *Zp* field defined by `prime`.
 ///
 /// `omega` must be a `n`-th principal root of unity,
@@ -390,70 +326,6 @@ where
     cooley_tukey::fft3_inverse(a_point, omega);
 }
 
-/// Tests for types implementing FieldForFFT3
-#[macro_export]
-macro_rules! fft3_tests {
-    ($field: ty) => {
-        #[test]
-        fn test_fft3() {
-            let omega = <$field>::roots_base_3(9) as u128;
-            let prime = <$field>::MODULUS as u128;
-
-            let a_coef: Vec<_> = (1u128..=9).collect();
-            assert_eq!(
-                fft3(
-                    &a_coef
-                        .iter()
-                        .cloned()
-                        .map(<$field>::from)
-                        .collect::<Vec<_>>(),
-                    <$field>::from(omega)
-                ),
-                threshold_secret_sharing::numtheory::fft3(&a_coef, omega, prime)
-                    .iter()
-                    .cloned()
-                    .map(<$field>::from)
-                    .collect::<Vec<_>>(),
-            );
-        }
-
-        #[test]
-        fn test_fft3_inverse() {
-            let omega = <$field>::roots_base_3(9) as u128;
-            let prime = <$field>::MODULUS as u128;
-
-            let a_point: Vec<_> = (1u128..=9).collect();
-            assert_eq!(
-                fft3_inverse(
-                    &a_point
-                        .iter()
-                        .cloned()
-                        .map(<$field>::from)
-                        .collect::<Vec<_>>(),
-                    <$field>::from(omega)
-                ),
-                threshold_secret_sharing::numtheory::fft3_inverse(&a_point, omega, prime)
-                    .iter()
-                    .cloned()
-                    .map(<$field>::from)
-                    .collect::<Vec<_>>(),
-            );
-        }
-
-        #[test]
-        fn test_fft3_big() {
-            let mut data: Vec<_> = (0u128..19683).map(<$field>::from).collect();
-            data = fft3(&data, <$field>::from(<$field>::roots_base_3(9)));
-            data = fft3_inverse(&data, <$field>::from(<$field>::roots_base_3(9)));
-
-            assert_eq!(
-                data.iter().cloned().map(u128::from).collect::<Vec<_>>(),
-                (0..19683).collect::<Vec<_>>(),
-            );
-        }
-    };
-}
-
 /// Performs a Lagrange interpolation in field Zp at the origin
 /// for a polynomial defined by `points` and `values`.
 ///
@@ -489,6 +361,8 @@ where
 }
 
 /// Holds together points and Newton-interpolated coefficients for fast evaluation.
+///
+/// TODO: Merge this with the `Polynomial` struct.
 pub struct NewtonPolynomial<'a, Field>
 where
     Field: FiniteField,
@@ -582,6 +456,136 @@ mod tests {
     use super::*;
     use crate::field::*;
     use crate::AesRng;
+
+    // /// Tests for types implementing FieldForFFT2
+    // macro_rules! fft2_tests {
+    //     ($field: ty) => {
+    //         #[test]
+    //         fn test_fft2() {
+    //             let omega = <$field>::roots_base_2(8) as u128;
+    //             let prime = <$field>::MODULUS as u128;
+
+    //             let a_coef: Vec<_> = (1u128..=8).collect();
+    //             assert_eq!(
+    //                 fft2(
+    //                     &a_coef
+    //                         .iter()
+    //                         .cloned()
+    //                         .map(<$field>::from)
+    //                         .collect::<Vec<_>>(),
+    //                     <$field>::from(omega)
+    //                 ),
+    //                 threshold_secret_sharing::numtheory::fft2(&a_coef, omega, prime)
+    //                     .iter()
+    //                     .cloned()
+    //                     .map(<$field>::from)
+    //                     .collect::<Vec<_>>(),
+    //             );
+    //         }
+
+    //         #[test]
+    //         fn test_fft2_inverse() {
+    //             let omega = <$field>::roots_base_2(8) as u128;
+    //             let prime = <$field>::MODULUS as u128;
+
+    //             let a_point: Vec<_> = (1u128..=8).collect();
+    //             assert_eq!(
+    //                 fft2_inverse(
+    //                     &a_point
+    //                         .iter()
+    //                         .cloned()
+    //                         .map(<$field>::from)
+    //                         .collect::<Vec<_>>(),
+    //                     <$field>::from(omega)
+    //                 ),
+    //                 threshold_secret_sharing::numtheory::fft2_inverse(&a_point, omega, prime)
+    //                     .iter()
+    //                     .cloned()
+    //                     .map(<$field>::from)
+    //                     .collect::<Vec<_>>(),
+    //             );
+    //         }
+
+    //         #[test]
+    //         fn test_fft2_big() {
+    //             let mut data: Vec<_> = (0u128..256).map(<$field>::from).collect();
+    //             data = fft2(&data, <$field>::from(<$field>::roots_base_2(8)));
+    //             data = fft2_inverse(&data, <$field>::from(<$field>::roots_base_2(8)));
+
+    //             assert_eq!(
+    //                 data.iter().cloned().map(u128::from).collect::<Vec<_>>(),
+    //                 (0..256).collect::<Vec<_>>(),
+    //             );
+    //         }
+    //     };
+    // }
+
+    // fft2_tests!(F2_19x3_26);
+
+    // /// Tests for types implementing FieldForFFT3
+    // macro_rules! fft3_tests {
+    //     ($field: ty) => {
+    //         #[test]
+    //         fn test_fft3() {
+    //             let omega = <$field>::roots_base_3(9) as u128;
+    //             let prime = <$field>::MODULUS as u128;
+
+    //             let a_coef: Vec<_> = (1u128..=9).collect();
+    //             assert_eq!(
+    //                 fft3(
+    //                     &a_coef
+    //                         .iter()
+    //                         .cloned()
+    //                         .map(<$field>::from)
+    //                         .collect::<Vec<_>>(),
+    //                     <$field>::from(omega)
+    //                 ),
+    //                 fft3(&a_coef, omega, prime)
+    //                     .iter()
+    //                     .cloned()
+    //                     .map(<$field>::from)
+    //                     .collect::<Vec<_>>(),
+    //             );
+    //         }
+
+    //         #[test]
+    //         fn test_fft3_inverse() {
+    //             let omega = <$field>::roots_base_3(9) as u128;
+    //             let prime = <$field>::MODULUS as u128;
+
+    //             let a_point: Vec<_> = (1u128..=9).collect();
+    //             assert_eq!(
+    //                 fft3_inverse(
+    //                     &a_point
+    //                         .iter()
+    //                         .cloned()
+    //                         .map(<$field>::from)
+    //                         .collect::<Vec<_>>(),
+    //                     <$field>::from(omega)
+    //                 ),
+    //                 threshold_secret_sharing::numtheory::fft3_inverse(&a_point, omega, prime)
+    //                     .iter()
+    //                     .cloned()
+    //                     .map(<$field>::from)
+    //                     .collect::<Vec<_>>(),
+    //             );
+    //         }
+
+    //         #[test]
+    //         fn test_fft3_big() {
+    //             let mut data: Vec<_> = (0u128..19683).map(<$field>::from).collect();
+    //             data = fft3(&data, <$field>::from(<$field>::roots_base_3(9)));
+    //             data = fft3_inverse(&data, <$field>::from(<$field>::roots_base_3(9)));
+
+    //             assert_eq!(
+    //                 data.iter().cloned().map(u128::from).collect::<Vec<_>>(),
+    //                 (0..19683).collect::<Vec<_>>(),
+    //             );
+    //         }
+    //     };
+    // }
+
+    // fft3_tests!(F2_19x3_26);
 
     /// Newton interpolation tests for types implementing FiniteField
     macro_rules! interpolation_tests {
