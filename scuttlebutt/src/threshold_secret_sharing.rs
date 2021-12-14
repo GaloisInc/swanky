@@ -10,7 +10,10 @@
 //! allowing efficient sharing of several secrets together.
 
 use crate::field::FiniteField;
-use crate::{numtheory, numtheory::{FieldForFFT2, FieldForFFT3}};
+use crate::{
+    numtheory,
+    numtheory::{FieldForFFT2, FieldForFFT3},
+};
 
 /// Parameters for the packed variant of Shamir secret sharing,
 /// specifying number of secrets shared together, total number of shares, and privacy threshold.
@@ -37,11 +40,9 @@ use crate::{numtheory, numtheory::{FieldForFFT2, FieldForFFT3}};
 ///
 /// An optional `paramgen` feature provides methods for finding suitable parameters satisfying
 /// these somewhat complex requirements, in addition to several fixed parameter choices.
-#[derive(Debug,Copy,Clone,PartialEq)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub struct PackedSecretSharing<Field> {
-
     // abstract properties
-
     /// Maximum number of shares that can be known without exposing the secrets
     /// (privacy threshold).
     pub threshold: usize,
@@ -51,7 +52,6 @@ pub struct PackedSecretSharing<Field> {
     pub secret_count: usize,
 
     // implementation configuration
-
     /// `m`-th principal root of unity in Zp, where `m = secret_count + threshold + 1`
     /// must be a power of 2.
     pub omega_secrets: Field,
@@ -72,14 +72,18 @@ impl<Field: FiniteField + FieldForFFT2 + FieldForFFT3> PackedSecretSharing<Field
     /// The length of `secrets` must be `secret_count`.
     /// It is safe to pad with anything, including zeros.
     pub fn share<R>(&self, secrets: &[Field], rng: &mut R) -> Vec<Field>
-        where R: rand::RngCore
+    where
+        R: rand::RngCore,
     {
         debug_assert_eq!(secrets.len(), self.secret_count);
         // sample polynomial
         let mut poly = self.sample_polynomial(secrets, rng);
         debug_assert_eq!(poly.len(), self.reconstruct_limit() + 1);
         // .. and extend it
-        poly.extend(vec![Field::ZERO; self.share_count - self.reconstruct_limit()]);
+        poly.extend(vec![
+            Field::ZERO;
+            self.share_count - self.reconstruct_limit()
+        ]);
         debug_assert_eq!(poly.len(), self.share_count + 1);
         // evaluate polynomial to generate shares
         self.evaluate_polynomial(&mut poly);
@@ -92,12 +96,12 @@ impl<Field: FiniteField + FieldForFFT2 + FieldForFFT3> PackedSecretSharing<Field
     }
 
     fn sample_polynomial<R>(&self, secrets: &[Field], rng: &mut R) -> Vec<Field>
-        where R: rand::RngCore
+    where
+        R: rand::RngCore,
     {
         debug_assert_eq!(secrets.len(), self.secret_count);
         // sample randomness using secure randomness
-        let randomness: Vec<Field> =
-            (0..self.threshold).map(|_| Field::random(rng)).collect();
+        let randomness: Vec<Field> = (0..self.threshold).map(|_| Field::random(rng)).collect();
         // recover polynomial
         let coefficients = self.recover_polynomial(secrets, randomness);
         debug_assert_eq!(coefficients.len(), self.reconstruct_limit() + 1);
@@ -132,8 +136,8 @@ impl<Field: FiniteField + FieldForFFT2 + FieldForFFT3> PackedSecretSharing<Field
     pub fn reconstruct(&self, indices: &[usize], shares: &[Field]) -> Vec<Field> {
         debug_assert!(shares.len() == indices.len());
         debug_assert!(shares.len() >= self.reconstruct_limit());
-        let mut points: Vec<Field> =
-            indices.iter()
+        let mut points: Vec<Field> = indices
+            .iter()
             .map(|&x| self.omega_shares.pow(x as u128 + 1))
             .collect();
         let mut values = shares.to_vec();
@@ -142,12 +146,12 @@ impl<Field: FiniteField + FieldForFFT2 + FieldForFFT3> PackedSecretSharing<Field
         values.insert(0, Field::ZERO);
         // interpolate using Newton's method
         // TODO optimise by using Newton-equally-space variant
-        let poly = numtheory::newton_interpolation_general(&points, &values);
+        let poly = numtheory::NewtonPolynomial::init(&points, &values);
         // evaluate at omega_secrets points to recover secrets
         // TODO optimise to avoid re-computation of power
         let secrets = (1..self.reconstruct_limit())
             .map(|e| self.omega_secrets.pow(e as u128))
-            .map(|point| numtheory::newton_evaluate(&poly, point))
+            .map(|point| poly.evaluate(point))
             .take(self.secret_count)
             .collect();
         secrets
@@ -175,7 +179,6 @@ mod tests {
             secret_count: 48,
 
             // implementation configuration
-
             /// `m`-th principal root of unity in Zp, where `m = secret_count + threshold + 1`
             /// must be a power of 2.
             omega_secrets: TestField::from(TestField::roots_base_2(6)),
@@ -183,9 +186,13 @@ mod tests {
             omega_shares: TestField::from(TestField::roots_base_3(4)),
         };
 
-        let secrets = (0..pss.secret_count as u64).into_iter().map(|n| n.into()).collect::<Vec<_>>();
+        let secrets = (0..pss.secret_count as u64)
+            .into_iter()
+            .map(|n| n.into())
+            .collect::<Vec<_>>();
         let shares = &pss.share(&secrets, &mut rng)[0..pss.reconstruct_limit()];
-        let reconstructed = pss.reconstruct(&(0..pss.reconstruct_limit()).collect::<Vec<_>>(), shares);
+        let reconstructed =
+            pss.reconstruct(&(0..pss.reconstruct_limit()).collect::<Vec<_>>(), shares);
 
         assert_eq!(secrets, reconstructed);
     }

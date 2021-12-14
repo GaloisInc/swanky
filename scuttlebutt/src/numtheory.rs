@@ -72,7 +72,7 @@ mod cooley_tukey {
     ///
     /// `data.len()` must be a power of 2. omega must be a root of unity of order
     /// `data.len()`
-    pub fn fft2<Field: FieldForFFT2>(data: &mut [Field], omega: Field) {
+    pub(super) fn fft2<Field: FieldForFFT2>(data: &mut [Field], omega: Field) {
         fft2_in_place_rearrange(&mut *data);
         fft2_in_place_compute(&mut *data, omega);
     }
@@ -85,13 +85,13 @@ mod cooley_tukey {
     ///
     /// `data.len()` must be a power of 2. omega must be a root of unity of order
     /// `data.len()`
-    pub fn fft2_inverse<Field: FieldForFFT2>(data: &mut [Field], omega: Field) {
+    pub(super) fn fft2_inverse<Field: FieldForFFT2>(data: &mut [Field], omega: Field) {
         let omega_inv = omega.inverse();
         let len = data.len();
         let len_inv = Field::from(len as u128).inverse();
         fft2(data, omega_inv);
         for x in data {
-            *x = *x * len_inv;
+            *x *= len_inv;
         }
     }
 
@@ -141,7 +141,7 @@ mod cooley_tukey {
     ///
     /// `data.len()` must be a power of 2. omega must be a root of unity of order
     /// `data.len()`
-    pub fn fft3<Field: FieldForFFT3>(data: &mut [Field], omega: Field) {
+    pub(super) fn fft3<Field: FieldForFFT3>(data: &mut [Field], omega: Field) {
         fft3_in_place_rearrange(&mut *data);
         fft3_in_place_compute(&mut *data, omega);
     }
@@ -154,7 +154,7 @@ mod cooley_tukey {
     ///
     /// `data.len()` must be a power of 2. omega must be a root of unity of order
     /// `data.len()`
-    pub fn fft3_inverse<Field>(data: &mut [Field], omega: Field)
+    pub(super) fn fft3_inverse<Field>(data: &mut [Field], omega: Field)
     where
         Field: FieldForFFT3,
     {
@@ -497,20 +497,34 @@ where
     coefficients: Vec<Field>,
 }
 
-/// General case for Newton interpolation in field Zp.
-///
-/// Given enough `points` (x) and `values` (p(x)), find the coefficients for `p`.
-pub fn newton_interpolation_general<'a, Field>(
-    points: &'a [Field],
-    values: &[Field],
-) -> NewtonPolynomial<'a, Field>
-where
-    Field: FiniteField,
-{
-    let coefficients = compute_newton_coefficients(points, values);
-    NewtonPolynomial {
-        points: points,
-        coefficients: coefficients,
+impl<'a, Field: FiniteField> NewtonPolynomial<'a, Field> {
+    /// Construct a Newton polynomial interpolation.
+    ///
+    /// Given enough `points` (x) and `values` (p(x)), find the coefficients for `p`.
+    pub fn init(points: &'a [Field], values: &[Field]) -> Self {
+        let coefficients = compute_newton_coefficients(points, values);
+        Self {
+            points,
+            coefficients,
+        }
+    }
+
+    /// Evaluate the Newton polynomial.
+    pub fn evaluate(&self, point: Field) -> Field {
+        // compute Newton points
+        let mut newton_points = vec![Field::ONE];
+        for i in 0..self.points.len() - 1 {
+            let diff = point - self.points[i];
+            let product = newton_points[i] * diff;
+            newton_points.push(product);
+        }
+        let ref newton_coefs = self.coefficients;
+        // sum up
+        newton_coefs
+            .iter()
+            .zip(newton_points)
+            .map(|(&coef, point)| coef * point)
+            .fold(Field::ZERO, |a, b| a + b)
     }
 }
 
@@ -535,27 +549,6 @@ macro_rules! interpolation_tests {
             assert_eq!(recovered_values, values);
         }
     };
-}
-
-/// Evaluate a Newton polynomial
-pub fn newton_evaluate<Field>(poly: &NewtonPolynomial<Field>, point: Field) -> Field
-where
-    Field: FiniteField,
-{
-    // compute Newton points
-    let mut newton_points = vec![Field::ONE];
-    for i in 0..poly.points.len() - 1 {
-        let diff = point - poly.points[i];
-        let product = newton_points[i] * diff;
-        newton_points.push(product);
-    }
-    let ref newton_coefs = poly.coefficients;
-    // sum up
-    newton_coefs
-        .iter()
-        .zip(newton_points)
-        .map(|(&coef, point)| coef * point)
-        .fold(Field::ZERO, |a, b| a + b)
 }
 
 fn compute_newton_coefficients<Field>(points: &[Field], values: &[Field]) -> Vec<Field>

@@ -13,7 +13,7 @@ use scuttlebutt::field::FiniteField;
 #[cfg(test)]
 use crate::util::{arb_test_field, TestField};
 #[cfg(test)]
-use proptest::{collection::vec as pvec, prelude::*, *};
+use proptest::{collection::vec as pvec, prelude::*};
 
 /// Operations for a Ligero arithmetic circuit over a finite field. Results
 /// are always stored in the next available register.
