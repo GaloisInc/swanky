@@ -73,7 +73,7 @@ impl<Field: FiniteField + FieldForFFT2 + FieldForFFT3> PackedSecretSharing<Field
     /// It is safe to pad with anything, including zeros.
     pub fn share<R>(&self, secrets: &[Field], rng: &mut R) -> Vec<Field>
     where
-        R: rand::RngCore,
+        R: rand::Rng + rand::CryptoRng,
     {
         debug_assert_eq!(secrets.len(), self.secret_count);
         // sample polynomial
@@ -97,7 +97,7 @@ impl<Field: FiniteField + FieldForFFT2 + FieldForFFT3> PackedSecretSharing<Field
 
     fn sample_polynomial<R>(&self, secrets: &[Field], rng: &mut R) -> Vec<Field>
     where
-        R: rand::RngCore,
+        R: rand::Rng + rand::CryptoRng,
     {
         debug_assert_eq!(secrets.len(), self.secret_count);
         // sample randomness using secure randomness

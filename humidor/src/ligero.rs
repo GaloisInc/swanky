@@ -67,7 +67,7 @@
 // TODO: Implement repetitions to achieve soundness with smaller field sizes.
 
 use ndarray::{concatenate, Array1, Array2, ArrayView1, Axis};
-use rand::{RngCore, SeedableRng};
+use rand::{CryptoRng, Rng, SeedableRng};
 use scuttlebutt::field::{FiniteField, PrimeFiniteField};
 use scuttlebutt::numtheory::{FieldForFFT2, FieldForFFT3};
 use scuttlebutt::{AesRng, Block};
@@ -291,7 +291,7 @@ impl<Field: FieldForLigero, H: merkle::MerkleHash> Secret<Field, H> {
     /// The `mask` should be a committed vector of random elements the same size
     /// as the shared portion of the witness. If there is no shared witness, it
     /// should be an empty vector.
-    fn new<Rng: RngCore>(rng: &mut Rng, c: &Ckt<Field>, inp: &[Field]) -> Self {
+    fn new<R: Rng + CryptoRng>(rng: &mut R, c: &Ckt<Field>, inp: &[Field]) -> Self {
         debug_assert_eq!(c.inp_size, inp.len());
 
         let public = Public::new(&c);
@@ -625,7 +625,7 @@ pub struct Round3<Field> {
 
 impl<Field: FieldForLigero> Round3<Field> {
     /// Pick Verifier's columns to view.
-    fn new(params: &Params<Field>, rng: &mut impl rand::Rng) -> Self {
+    fn new<R: Rng + CryptoRng>(params: &Params<Field>, rng: &mut R) -> Self {
         Round3 {
             phantom: std::marker::PhantomData,
 
@@ -935,7 +935,7 @@ pub mod interactive {
 
     impl<Field: FieldForLigero, H: merkle::MerkleHash> Prover<Field, H> {
         /// Create an interactive prover out of a circuit and witness.
-        pub fn new<Rng: RngCore>(rng: &mut Rng, c: &Ckt<Field>, w: &Vec<Field>) -> Self {
+        pub fn new<R: Rng + CryptoRng>(rng: &mut R, c: &Ckt<Field>, w: &Vec<Field>) -> Self {
             Self {
                 secret: Secret::new(rng, c, w),
             }
@@ -1163,7 +1163,7 @@ pub mod interactive {
         }
 
         /// Generate round-1 verifier message.
-        pub fn round1(&mut self, rng: &mut impl RngCore, r0: Round0) -> Round1<Field> {
+        pub fn round1<R: Rng + CryptoRng>(&mut self, rng: &mut R, r0: Round0) -> Round1<Field> {
             let r1 = Round1::new(
                 &self.public.params,
                 self.shared().len(),
@@ -1178,7 +1178,11 @@ pub mod interactive {
         }
 
         /// Generate round-3 verifier message.
-        pub fn round3(&mut self, rng: &mut impl RngCore, r2: Round2<Field>) -> Round3<Field> {
+        pub fn round3<R: Rng + CryptoRng>(
+            &mut self,
+            rng: &mut R,
+            r2: Round2<Field>,
+        ) -> Round3<Field> {
             let r3 = Round3::new(&self.public.params, rng);
 
             self.r2 = Some(r2);
@@ -1406,7 +1410,7 @@ pub mod noninteractive {
 
     impl<Field: FieldForLigero, H: merkle::MerkleHash> Prover<Field, H> {
         /// Create a non-interactive prover from a circuit and witness.
-        pub fn new<Rng: RngCore>(rng: &mut Rng, c: &Ckt<Field>, w: &Vec<Field>) -> Self {
+        pub fn new<R: Rng + CryptoRng>(rng: &mut R, c: &Ckt<Field>, w: &Vec<Field>) -> Self {
             let mut hash = H::new();
             let mut bytes = Vec::with_capacity(Op::<Field>::OPCODE_SIZE);
             c.ops.iter().for_each(|op| {

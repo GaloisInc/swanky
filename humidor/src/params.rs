@@ -9,6 +9,7 @@
 // return values, etc.
 
 use ndarray::{concatenate, Array1, Array2, ArrayView1, ArrayView2, Axis, Zip};
+use rand::{CryptoRng, Rng};
 use scuttlebutt::{numtheory, threshold_secret_sharing};
 
 use crate::ligero::FieldForLigero;
@@ -134,7 +135,7 @@ impl<Field: FieldForLigero> Params<Field> {
     /// Encode a row of l field elements into a codeword row of n elements.
     pub fn encode<R>(&self, wf: ArrayView1<Field>, rng: &mut R) -> Array1<Field>
     where
-        R: rand::RngCore,
+        R: Rng + CryptoRng,
     {
         debug_assert_eq!(wf.len(), self.l);
 
@@ -197,7 +198,7 @@ impl<Field: FieldForLigero> Params<Field> {
     /// codeword.
     pub fn encode_interleaved<R>(&self, ws: ArrayView1<Field>, rng: &mut R) -> Array2<Field>
     where
-        R: rand::RngCore,
+        R: Rng + CryptoRng,
     {
         debug_assert_eq!(ws.len(), self.l * self.m);
 
@@ -452,7 +453,7 @@ impl<Field: FieldForLigero> Params<Field> {
     #[allow(non_snake_case)]
     pub fn random_indices<R>(&self, rng: &mut R) -> Vec<usize>
     where
-        R: rand::RngCore,
+        R: Rng + CryptoRng,
     {
         use rand::seq::SliceRandom;
 
@@ -466,7 +467,7 @@ impl<Field: FieldForLigero> Params<Field> {
     /// Return a random valid codeword.
     pub fn random_codeword<R>(&self, rng: &mut R) -> Array1<Field>
     where
-        R: rand::RngCore,
+        R: Rng + CryptoRng,
     {
         self.encode(
             Array1::from_shape_fn(self.l, |_| Field::random(rng)).view(),
@@ -477,7 +478,7 @@ impl<Field: FieldForLigero> Params<Field> {
     /// Return a valid codeword for `0^l`.
     pub fn random_zero_codeword<R>(&self, rng: &mut R) -> Array1<Field>
     where
-        R: rand::RngCore,
+        R: Rng + CryptoRng,
     {
         debug_assert_ne!(self.l, 0);
 
