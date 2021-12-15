@@ -66,9 +66,10 @@
 //
 // TODO: Implement repetitions to achieve soundness with smaller field sizes.
 
+use generic_array::typenum::Unsigned;
 use ndarray::{concatenate, Array1, Array2, ArrayView1, Axis};
 use rand::{CryptoRng, Rng, SeedableRng};
-use scuttlebutt::field::{FiniteField, PrimeFiniteField};
+use scuttlebutt::field::FiniteField;
 use scuttlebutt::numtheory::{FieldForFFT2, FieldForFFT3};
 use scuttlebutt::{AesRng, Block};
 use sprs::{CsMat, TriMat};
@@ -98,7 +99,7 @@ pub trait FieldForLigero:
 }
 
 impl FieldForLigero for scuttlebutt::field::F2_19x3_26 {
-    const FIELD_SIZE: usize = <Self as PrimeFiniteField>::BITS_OF_MODULUS;
+    const FIELD_SIZE: usize = <Self as FiniteField>::NumberOfBitsInBitDecomposition::USIZE;
 }
 
 /// Proof information available to both the prover and the verifier.
