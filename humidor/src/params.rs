@@ -129,8 +129,8 @@ impl<Field: FieldForLigero> Params<Field> {
                 share_count: n,
                 secret_count: l,
 
-                omega_secrets: Field::from(<Field as FieldForFFT<2>>::roots(kexp as usize)),
-                omega_shares: Field::from(<Field as FieldForFFT<3>>::roots(nexp as usize)),
+                omega_secrets: <Field as FieldForFFT<2>>::roots(kexp as usize),
+                omega_shares: <Field as FieldForFFT<3>>::roots(nexp as usize),
             },
         }
     }
@@ -428,7 +428,7 @@ impl<Field: FieldForLigero> Params<Field> {
 
         let max_deg = 2usize.pow(self.kexp + 1);
         let pq_deg = p_deg + q_deg - 1;
-        let omega = Field::from(<Field as FieldForFFT<2>>::roots(self.kexp as usize + 1));
+        let omega = <Field as FieldForFFT<2>>::roots(self.kexp as usize + 1);
 
         let mut p0 = p
             .iter()

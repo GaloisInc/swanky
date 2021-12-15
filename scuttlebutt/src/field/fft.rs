@@ -27,42 +27,8 @@ pub trait FieldForFFT<const N: usize>: FiniteField + From<u128> {
     /// `r_p^(N^p) = GENERATOR^phi(MODULUS) = 1`. This function should return
     /// this `r_p`, on input `p`, for `p in [0 .. PHI_EXP]`.
     // [ GENERATOR^(phi(MODULUS) / (N^p)) % MODULUS | p <- [0 .. PHI_EXP] ]
-    fn roots(p: usize) -> u128;
+    fn roots(p: usize) -> Self;
 }
-
-// /// This trait indicates that a finite field is suitable for use in radix-2 FFT.
-// /// This means that it must have a power-of-two root of unity for any desired
-// /// FFT size, i.e., a field element `r_p`, such that `r_p^(2^p) = 1`, for a
-// /// size-`3^p` FFT. The `PHI_2_EXP` constant is the exponent of the largest FFT
-// /// size supported, and `roots_base_2` should return the `2^p`th root of unity.
-// pub trait FieldForFFT2: FiniteField + From<u128> {
-//     /// Largest integer `p` such that `phi(MODULUS) = 2^p * k` for integer `k`.
-//     const PHI_2_EXP: usize;
-
-//     /// For each `p` such that `2^p | phi(MODULUS)`, there is a `(2^p)`th root
-//     /// of unity, namely `r_p = GENERATOR^(phi(MODULUS) / 2^p)`, since then
-//     /// `r_p^(2^p) = GENERATOR^phi(MODULUS) = 1`. This function should return
-//     /// this `r_p`, on input `p`, for `p in [0 .. PHI_2_EXP]`.
-//     // [ GENERATOR^(phi(MODULUS) / (2^p)) % MODULUS | p <- [0 .. PHI_2_EXP] ]
-//     fn roots_base_2(p: usize) -> u128;
-// }
-
-// /// This trait indicates that a finite field is suitable for use in radix-3 FFT.
-// /// This means that it must have a power-of-three root of unity for any desired
-// /// FFT size, i.e., a field element `r_p`, such that `r_p^(3^p) = 1`, for a
-// /// size-`3^p` FFT. The `PHI_3_EXP` constant is the exponent of the largest FFT
-// /// size supported, and `roots_base_3` should return the `3^p`th root of unity.
-// pub trait FieldForFFT3: FiniteField + From<u128> {
-//     /// Largest integer `p` such that `phi(MODULUS) = 3^p * k` for integer `k`.
-//     const PHI_3_EXP: usize;
-
-//     /// For each `p` such that `3^p | phi(MODULUS)`, there is a `(3^p)`th root
-//     /// of unity, namely `r_p = GENERATOR^(phi(MODULUS) / 3^p)`, since then
-//     /// `r_p^(3^p) = GENERATOR^phi(MODULUS) = 1`. This function should return
-//     /// this `r_p`, on input `p`, for `p in [0 .. PHI_3_EXP]`.
-//     // [ GENERATOR^(phi(MODULUS) / (3^p)) % MODULUS | p <- [0 .. PHI_3_EXP] ]
-//     fn roots_base_3(p: usize) -> u128;
-// }
 
 fn non_ct_pow<Field: FiniteField>(mut b: Field, mut e: u128) -> Field {
     let mut acc = Field::ONE;
