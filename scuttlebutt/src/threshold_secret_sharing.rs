@@ -57,6 +57,26 @@ pub struct PackedSecretSharing<Field> {
 }
 
 impl<Field: FiniteField + FieldForFFT<2> + FieldForFFT<3>> PackedSecretSharing<Field> {
+    /// Initialize a packed secret sharing object.
+    pub fn init(
+        threshold: usize,
+        share_count: usize,
+        secret_count: usize,
+        kexp: usize,
+        nexp: usize,
+    ) -> Self {
+        // TODO: Needs some consistency checks to make sure inputs are sensible!
+        let omega_secrets = <Field as FieldForFFT<2>>::roots(kexp);
+        let omega_shares = <Field as FieldForFFT<3>>::roots(nexp);
+        Self {
+            threshold,
+            share_count,
+            secret_count,
+            omega_secrets,
+            omega_shares,
+        }
+    }
+
     /// Minimum number of shares required to reconstruct secrets.
     ///
     /// For this scheme this is always `secret_count + threshold`

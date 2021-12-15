@@ -13,7 +13,7 @@ use rand::{CryptoRng, Rng};
 use scuttlebutt::field::fft;
 use scuttlebutt::field::fft::FieldForFFT;
 use scuttlebutt::field::polynomial;
-use scuttlebutt::threshold_secret_sharing;
+use scuttlebutt::threshold_secret_sharing::PackedSecretSharing;
 
 use crate::ligero::FieldForLigero;
 use crate::util::*;
@@ -41,7 +41,7 @@ pub struct Params<Field> {
     phantom: std::marker::PhantomData<Field>,
 
     /// Parameters for `threshold_secret_sharing::PackedSecretSharing`.
-    pub pss: threshold_secret_sharing::PackedSecretSharing<Field>,
+    pub pss: PackedSecretSharing<Field>,
 
     /// Log base-2 of k
     pub kexp: u32,
@@ -124,14 +124,7 @@ impl<Field: FieldForLigero> Params<Field> {
             l,
             n,
             m,
-            pss: threshold_secret_sharing::PackedSecretSharing {
-                threshold: t,
-                share_count: n,
-                secret_count: l,
-
-                omega_secrets: <Field as FieldForFFT<2>>::roots(kexp as usize),
-                omega_shares: <Field as FieldForFFT<3>>::roots(nexp as usize),
-            },
+            pss: PackedSecretSharing::init(t, n, l, kexp as usize, nexp as usize),
         }
     }
 
