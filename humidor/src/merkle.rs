@@ -146,7 +146,7 @@ pub struct Lemma<Field, H> {
 
 #[allow(non_snake_case)]
 impl<Field: FiniteField + num_traits::Zero, H: MerkleHash> Lemma<Field, H> {
-    /// Create a new proof based on a tree of interleaved-codeoword columns.
+    /// Create a new proof based on a tree of interleaved-codeword columns.
     pub fn new(tree: &Tree<H>, U: ArrayView2<Field>, some_indices: &[usize]) -> Self {
         let some_indices_u32 = some_indices.iter().map(|&j| j as u32).collect::<Vec<u32>>();
         let proof = tree
@@ -167,7 +167,7 @@ impl<Field: FiniteField + num_traits::Zero, H: MerkleHash> Lemma<Field, H> {
         }
     }
 
-    /// Numver of digests in this `Lemma`.
+    /// Number of digests in this `Lemma`.
     pub fn nlemmas(&self) -> usize {
         self.lemmas.len()
     }
