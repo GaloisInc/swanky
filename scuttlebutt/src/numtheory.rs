@@ -612,5 +612,5 @@ mod tests {
 
     interpolation_tests!(interpolation_tests_f61p, F61p);
     interpolation_tests!(interpolation_tests_gf40, Gf40);
-    interpolation_tests!(interpolation_tests_fp, Fp);
+    interpolation_tests!(interpolation_tests_f128p, F128p);
 }
