@@ -13,39 +13,56 @@
 
 use crate::field::FiniteField;
 
-/// This trait indicates that a finite field is suitable for use in radix-2 FFT.
-/// This means that it must have a power-of-two root of unity for any desired
-/// FFT size, i.e., a field element `r_p`, such that `r_p^(2^p) = 1`, for a
-/// size-`3^p` FFT. The `PHI_2_EXP` constant is the exponent of the largest FFT
-/// size supported, and `roots_base_2` should return the `2^p`th root of unity.
-pub trait FieldForFFT2: FiniteField + From<u128> {
-    /// Largest integer `p` such that `phi(MODULUS) = 2^p * k` for integer `k`.
-    const PHI_2_EXP: usize;
+/// This trait indicates that a finite field is suitable for use in radix-`N` FFT.
+/// This means that it must have a power-of-`N` root of unity for any desired
+/// FFT size, i.e., a field element `r_p`, such that `r_p^(N^p) = 1`, for a
+/// size-`3^p` FFT. The `PHI_EXP` constant is the exponent of the largest FFT
+/// size supported, and `root` should return the `N^p`th root of unity.
+pub trait FieldForFFT<const N: usize>: FiniteField + From<u128> {
+    /// Largest integer `p` such that `phi(MODULUS) = N^p * k` for integer `k`.
+    const PHI_EXP: usize;
 
-    /// For each `p` such that `2^p | phi(MODULUS)`, there is a `(2^p)`th root
-    /// of unity, namely `r_p = GENERATOR^(phi(MODULUS) / 2^p)`, since then
-    /// `r_p^(2^p) = GENERATOR^phi(MODULUS) = 1`. This function should return
-    /// this `r_p`, on input `p`, for `p in [0 .. PHI_2_EXP]`.
-    // [ GENERATOR^(phi(MODULUS) / (2^p)) % MODULUS | p <- [0 .. PHI_2_EXP] ]
-    fn roots_base_2(p: usize) -> u128;
+    /// For each `p` such that `N^p | phi(MODULUS)`, there is a `(N^p)`th root
+    /// of unity, namely `r_p = GENERATOR^(phi(MODULUS) / N^p)`, since then
+    /// `r_p^(N^p) = GENERATOR^phi(MODULUS) = 1`. This function should return
+    /// this `r_p`, on input `p`, for `p in [0 .. PHI_EXP]`.
+    // [ GENERATOR^(phi(MODULUS) / (N^p)) % MODULUS | p <- [0 .. PHI_EXP] ]
+    fn roots(p: usize) -> u128;
 }
 
-/// This trait indicates that a finite field is suitable for use in radix-3 FFT.
-/// This means that it must have a power-of-three root of unity for any desired
-/// FFT size, i.e., a field element `r_p`, such that `r_p^(3^p) = 1`, for a
-/// size-`3^p` FFT. The `PHI_3_EXP` constant is the exponent of the largest FFT
-/// size supported, and `roots_base_3` should return the `3^p`th root of unity.
-pub trait FieldForFFT3: FiniteField + From<u128> {
-    /// Largest integer `p` such that `phi(MODULUS) = 3^p * k` for integer `k`.
-    const PHI_3_EXP: usize;
+// /// This trait indicates that a finite field is suitable for use in radix-2 FFT.
+// /// This means that it must have a power-of-two root of unity for any desired
+// /// FFT size, i.e., a field element `r_p`, such that `r_p^(2^p) = 1`, for a
+// /// size-`3^p` FFT. The `PHI_2_EXP` constant is the exponent of the largest FFT
+// /// size supported, and `roots_base_2` should return the `2^p`th root of unity.
+// pub trait FieldForFFT2: FiniteField + From<u128> {
+//     /// Largest integer `p` such that `phi(MODULUS) = 2^p * k` for integer `k`.
+//     const PHI_2_EXP: usize;
 
-    /// For each `p` such that `3^p | phi(MODULUS)`, there is a `(3^p)`th root
-    /// of unity, namely `r_p = GENERATOR^(phi(MODULUS) / 3^p)`, since then
-    /// `r_p^(3^p) = GENERATOR^phi(MODULUS) = 1`. This function should return
-    /// this `r_p`, on input `p`, for `p in [0 .. PHI_3_EXP]`.
-    // [ GENERATOR^(phi(MODULUS) / (3^p)) % MODULUS | p <- [0 .. PHI_3_EXP] ]
-    fn roots_base_3(p: usize) -> u128;
-}
+//     /// For each `p` such that `2^p | phi(MODULUS)`, there is a `(2^p)`th root
+//     /// of unity, namely `r_p = GENERATOR^(phi(MODULUS) / 2^p)`, since then
+//     /// `r_p^(2^p) = GENERATOR^phi(MODULUS) = 1`. This function should return
+//     /// this `r_p`, on input `p`, for `p in [0 .. PHI_2_EXP]`.
+//     // [ GENERATOR^(phi(MODULUS) / (2^p)) % MODULUS | p <- [0 .. PHI_2_EXP] ]
+//     fn roots_base_2(p: usize) -> u128;
+// }
+
+// /// This trait indicates that a finite field is suitable for use in radix-3 FFT.
+// /// This means that it must have a power-of-three root of unity for any desired
+// /// FFT size, i.e., a field element `r_p`, such that `r_p^(3^p) = 1`, for a
+// /// size-`3^p` FFT. The `PHI_3_EXP` constant is the exponent of the largest FFT
+// /// size supported, and `roots_base_3` should return the `3^p`th root of unity.
+// pub trait FieldForFFT3: FiniteField + From<u128> {
+//     /// Largest integer `p` such that `phi(MODULUS) = 3^p * k` for integer `k`.
+//     const PHI_3_EXP: usize;
+
+//     /// For each `p` such that `3^p | phi(MODULUS)`, there is a `(3^p)`th root
+//     /// of unity, namely `r_p = GENERATOR^(phi(MODULUS) / 3^p)`, since then
+//     /// `r_p^(3^p) = GENERATOR^phi(MODULUS) = 1`. This function should return
+//     /// this `r_p`, on input `p`, for `p in [0 .. PHI_3_EXP]`.
+//     // [ GENERATOR^(phi(MODULUS) / (3^p)) % MODULUS | p <- [0 .. PHI_3_EXP] ]
+//     fn roots_base_3(p: usize) -> u128;
+// }
 
 fn non_ct_pow<Field: FiniteField>(mut b: Field, mut e: u128) -> Field {
     let mut acc = Field::ONE;
@@ -72,7 +89,7 @@ mod cooley_tukey {
     ///
     /// `data.len()` must be a power of 2. omega must be a root of unity of order
     /// `data.len()`
-    pub(super) fn fft2<Field: FieldForFFT2>(data: &mut [Field], omega: Field) {
+    pub(super) fn fft2<Field: FieldForFFT<2>>(data: &mut [Field], omega: Field) {
         fft2_in_place_rearrange(&mut *data);
         fft2_in_place_compute(&mut *data, omega);
     }
@@ -85,7 +102,7 @@ mod cooley_tukey {
     ///
     /// `data.len()` must be a power of 2. omega must be a root of unity of order
     /// `data.len()`
-    pub(super) fn fft2_inverse<Field: FieldForFFT2>(data: &mut [Field], omega: Field) {
+    pub(super) fn fft2_inverse<Field: FieldForFFT<2>>(data: &mut [Field], omega: Field) {
         let omega_inv = omega.inverse();
         let len = data.len();
         let len_inv = Field::from(len as u128).inverse();
@@ -95,7 +112,7 @@ mod cooley_tukey {
         }
     }
 
-    fn fft2_in_place_rearrange<Field: FieldForFFT2>(data: &mut [Field]) {
+    fn fft2_in_place_rearrange<Field: FieldForFFT<2>>(data: &mut [Field]) {
         let mut target = 0;
         for pos in 0..data.len() {
             if target > pos {
@@ -110,7 +127,7 @@ mod cooley_tukey {
         }
     }
 
-    fn fft2_in_place_compute<Field: FieldForFFT2>(data: &mut [Field], omega: Field) {
+    fn fft2_in_place_compute<Field: FieldForFFT<2>>(data: &mut [Field], omega: Field) {
         let mut depth = 0usize;
         while 1usize << depth < data.len() {
             let step = 1usize << depth;
@@ -141,7 +158,7 @@ mod cooley_tukey {
     ///
     /// `data.len()` must be a power of 2. omega must be a root of unity of order
     /// `data.len()`
-    pub(super) fn fft3<Field: FieldForFFT3>(data: &mut [Field], omega: Field) {
+    pub(super) fn fft3<Field: FieldForFFT<3>>(data: &mut [Field], omega: Field) {
         fft3_in_place_rearrange(&mut *data);
         fft3_in_place_compute(&mut *data, omega);
     }
@@ -154,10 +171,7 @@ mod cooley_tukey {
     ///
     /// `data.len()` must be a power of 2. omega must be a root of unity of order
     /// `data.len()`
-    pub(super) fn fft3_inverse<Field>(data: &mut [Field], omega: Field)
-    where
-        Field: FieldForFFT3,
-    {
+    pub(super) fn fft3_inverse<Field: FieldForFFT<3>>(data: &mut [Field], omega: Field) {
         let omega_inv = omega.inverse();
         let len_inv = Field::from(data.len() as u128).inverse();
         fft3(data, omega_inv);
@@ -176,10 +190,7 @@ mod cooley_tukey {
         result
     }
 
-    fn fft3_in_place_rearrange<Field>(data: &mut [Field])
-    where
-        Field: FieldForFFT3,
-    {
+    fn fft3_in_place_rearrange<Field: FieldForFFT<3>>(data: &mut [Field]) {
         let mut target = 0isize;
         let trigits_len = trigits_len(data.len() - 1);
         let mut trigits: Vec<u8> = ::std::iter::repeat(0).take(trigits_len).collect();
@@ -204,10 +215,7 @@ mod cooley_tukey {
         }
     }
 
-    fn fft3_in_place_compute<Field>(data: &mut [Field], omega: Field)
-    where
-        Field: FieldForFFT3,
-    {
+    fn fft3_in_place_compute<Field: FieldForFFT<3>>(data: &mut [Field], omega: Field) {
         let mut step = 1;
         let big_omega = non_ct_pow(omega, data.len() as u128 / 3);
         let big_omega_sq = big_omega * big_omega;
@@ -243,10 +251,7 @@ mod cooley_tukey {
 /// `omega` must be a `n`-th principal root of unity,
 /// where `n` is the length of `a_coef` as well as a power of 2.
 /// The result will contain the same number of elements.
-pub fn fft2<Field>(a_coef: &[Field], omega: Field) -> Vec<Field>
-where
-    Field: FieldForFFT2,
-{
+pub fn fft2<Field: FieldForFFT<2>>(a_coef: &[Field], omega: Field) -> Vec<Field> {
     let mut data: Vec<_> = a_coef.iter().cloned().collect();
     cooley_tukey::fft2(&mut data, omega);
     data
@@ -257,28 +262,19 @@ where
 /// `omega` must be a `n`-th principal root of unity,
 /// where `n` is the length of `a_coef` as well as a power of 2.
 /// The result will contain the same number of elements.
-pub fn fft2_in_place<Field>(a_coef: &mut [Field], omega: Field)
-where
-    Field: FieldForFFT2,
-{
+pub fn fft2_in_place<Field: FieldForFFT<2>>(a_coef: &mut [Field], omega: Field) {
     cooley_tukey::fft2(a_coef, omega);
 }
 
 /// Inverse FFT for `fft2`.
-pub fn fft2_inverse<Field>(a_point: &[Field], omega: Field) -> Vec<Field>
-where
-    Field: FieldForFFT2,
-{
+pub fn fft2_inverse<Field: FieldForFFT<2>>(a_point: &[Field], omega: Field) -> Vec<Field> {
     let mut data: Vec<_> = a_point.iter().cloned().collect();
     cooley_tukey::fft2_inverse(&mut data, omega);
     data
 }
 
 /// Inverse FFT for `fft2_in_place`.
-pub fn fft2_inverse_in_place<Field>(a_point: &mut [Field], omega: Field)
-where
-    Field: FieldForFFT2,
-{
+pub fn fft2_inverse_in_place<Field: FieldForFFT<2>>(a_point: &mut [Field], omega: Field) {
     cooley_tukey::fft2_inverse(a_point, omega);
 }
 
@@ -287,10 +283,7 @@ where
 /// `omega` must be a `n`-th principal root of unity,
 /// where `n` is the length of `a_coef` as well as a power of 3.
 /// The result will contain the same number of elements.
-pub fn fft3<Field>(a_coef: &[Field], omega: Field) -> Vec<Field>
-where
-    Field: FieldForFFT3,
-{
+pub fn fft3<Field: FieldForFFT<3>>(a_coef: &[Field], omega: Field) -> Vec<Field> {
     let mut data: Vec<_> = a_coef.iter().cloned().collect();
     cooley_tukey::fft3(&mut data, omega);
     data
@@ -301,28 +294,19 @@ where
 /// `omega` must be a `n`-th principal root of unity,
 /// where `n` is the length of `a_coef` as well as a power of 3.
 /// The result will contain the same number of elements.
-pub fn fft3_in_place<Field>(a_coef: &mut [Field], omega: Field)
-where
-    Field: FieldForFFT3,
-{
+pub fn fft3_in_place<Field: FieldForFFT<3>>(a_coef: &mut [Field], omega: Field) {
     cooley_tukey::fft3(a_coef, omega);
 }
 
 /// Inverse FFT for `fft3`.
-pub fn fft3_inverse<Field>(a_point: &[Field], omega: Field) -> Vec<Field>
-where
-    Field: FieldForFFT3,
-{
+pub fn fft3_inverse<Field: FieldForFFT<3>>(a_point: &[Field], omega: Field) -> Vec<Field> {
     let mut data = a_point.iter().cloned().collect::<Vec<_>>();
     cooley_tukey::fft3_inverse(&mut data, omega);
     data
 }
 
 /// Inverse FFT for `fft3`.
-pub fn fft3_inverse_in_place<Field>(a_point: &mut [Field], omega: Field)
-where
-    Field: FieldForFFT3,
-{
+pub fn fft3_inverse_in_place<Field: FieldForFFT<3>>(a_point: &mut [Field], omega: Field) {
     cooley_tukey::fft3_inverse(a_point, omega);
 }
 

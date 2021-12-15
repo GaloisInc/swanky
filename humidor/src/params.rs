@@ -11,6 +11,7 @@
 use ndarray::{concatenate, Array1, Array2, ArrayView1, ArrayView2, Axis, Zip};
 use rand::{CryptoRng, Rng};
 use scuttlebutt::field::fft;
+use scuttlebutt::field::fft::FieldForFFT;
 use scuttlebutt::field::polynomial;
 use scuttlebutt::threshold_secret_sharing;
 
@@ -94,12 +95,12 @@ impl<Field: FieldForLigero> Params<Field> {
         // to multiply polynomials in O(d log d) time (see pmul2). We could
         // avoid this at the cost of some performance by using fft3 instead.
         let t = Field::FIELD_SIZE;
-        let (kexp, nexp, k, l, n, m) = (0..Field::PHI_2_EXP as u32)
+        let (kexp, nexp, k, l, n, m) = (0..<Field as FieldForFFT<2>>::PHI_EXP as u32)
             .into_iter()
             .map(|kexp| (kexp, 2usize.pow(kexp) - 1))
             .filter(|&(_, k)| k as usize > t)
             .filter_map(|(kexp, k)| {
-                let (nexp, n) = (0..=Field::PHI_3_EXP as u32)
+                let (nexp, n) = (0..=<Field as FieldForFFT<3>>::PHI_EXP as u32)
                     .into_iter()
                     .map(|nexp| (nexp, 3usize.pow(nexp) - 1))
                     .find(|&(_, n)| n as usize > k)?;
@@ -128,8 +129,8 @@ impl<Field: FieldForLigero> Params<Field> {
                 share_count: n,
                 secret_count: l,
 
-                omega_secrets: Field::from(Field::roots_base_2(kexp as usize)),
-                omega_shares: Field::from(Field::roots_base_3(nexp as usize)),
+                omega_secrets: Field::from(<Field as FieldForFFT<2>>::roots(kexp as usize)),
+                omega_shares: Field::from(<Field as FieldForFFT<3>>::roots(nexp as usize)),
             },
         }
     }
@@ -427,7 +428,7 @@ impl<Field: FieldForLigero> Params<Field> {
 
         let max_deg = 2usize.pow(self.kexp + 1);
         let pq_deg = p_deg + q_deg - 1;
-        let omega = Field::from(Field::roots_base_2(self.kexp as usize + 1));
+        let omega = Field::from(<Field as FieldForFFT<2>>::roots(self.kexp as usize + 1));
 
         let mut p0 = p
             .iter()

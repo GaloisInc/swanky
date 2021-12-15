@@ -69,7 +69,7 @@
 use generic_array::typenum::Unsigned;
 use ndarray::{concatenate, Array1, Array2, ArrayView1, Axis};
 use rand::{CryptoRng, Rng, SeedableRng};
-use scuttlebutt::field::fft::{FieldForFFT2, FieldForFFT3};
+use scuttlebutt::field::fft::FieldForFFT;
 use scuttlebutt::field::FiniteField;
 use scuttlebutt::{AesRng, Block};
 use sprs::{CsMat, TriMat};
@@ -87,8 +87,8 @@ use crate::util::*;
 pub trait FieldForLigero:
     Sized
     + FiniteField
-    + FieldForFFT2
-    + FieldForFFT3
+    + FieldForFFT<2>
+    + FieldForFFT<3>
     + num_traits::Num
     + num_traits::MulAdd<Output = Self>
     + ndarray::ScalarOperand

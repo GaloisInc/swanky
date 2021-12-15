@@ -7,7 +7,7 @@ use std::hash::Hash;
 #[cfg(test)]
 use proptest::{prelude::*, *};
 
-use crate::field::fft::{FieldForFFT2, FieldForFFT3};
+use crate::field::fft::FieldForFFT;
 use crate::field::monty::*;
 use crate::{implement_finite_field_for_monty, monty_from_lit};
 
@@ -78,11 +78,11 @@ impl std::convert::From<F2_19x3_26> for u128 {
 
 implement_finite_field_for_monty! {F2_19x3_26}
 
-impl FieldForFFT2 for F2_19x3_26 {
-    const PHI_2_EXP: usize = 19;
+impl FieldForFFT<2> for F2_19x3_26 {
+    const PHI_EXP: usize = 19;
 
     #[inline]
-    fn roots_base_2(ix: usize) -> u128 {
+    fn roots(ix: usize) -> u128 {
         [
             1,
             1332669751402954752,
@@ -108,11 +108,11 @@ impl FieldForFFT2 for F2_19x3_26 {
     }
 }
 
-impl FieldForFFT3 for F2_19x3_26 {
-    const PHI_3_EXP: usize = 26;
+impl FieldForFFT<3> for F2_19x3_26 {
+    const PHI_EXP: usize = 26;
 
     #[inline]
-    fn roots_base_3(ix: usize) -> u128 {
+    fn roots(ix: usize) -> u128 {
         [
             1,
             460004726804964255,

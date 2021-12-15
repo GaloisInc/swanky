@@ -10,11 +10,7 @@
 //! allowing efficient sharing of several secrets together.
 
 use crate::field::FiniteField;
-use crate::field::{
-    fft,
-    fft::{FieldForFFT2, FieldForFFT3},
-    polynomial::NewtonPolynomial,
-};
+use crate::field::{fft, fft::FieldForFFT, polynomial::NewtonPolynomial};
 
 /// Parameters for the packed variant of Shamir secret sharing,
 /// specifying number of secrets shared together, total number of shares, and privacy threshold.
@@ -60,7 +56,7 @@ pub struct PackedSecretSharing<Field> {
     pub omega_shares: Field,
 }
 
-impl<Field: FiniteField + FieldForFFT2 + FieldForFFT3> PackedSecretSharing<Field> {
+impl<Field: FiniteField + FieldForFFT<2> + FieldForFFT<3>> PackedSecretSharing<Field> {
     /// Minimum number of shares required to reconstruct secrets.
     ///
     /// For this scheme this is always `secret_count + threshold`
@@ -182,9 +178,9 @@ mod tests {
             // implementation configuration
             /// `m`-th principal root of unity in Zp, where `m = secret_count + threshold + 1`
             /// must be a power of 2.
-            omega_secrets: TestField::from(TestField::roots_base_2(6)),
+            omega_secrets: TestField::from(<TestField as FieldForFFT<2>>::roots(6)),
             /// `n`-th principal root of unity in Zp, where `n = share_count + 1` must be a power of 3.
-            omega_shares: TestField::from(TestField::roots_base_3(4)),
+            omega_shares: TestField::from(<TestField as FieldForFFT<3>>::roots(4)),
         };
 
         let secrets = (0..pss.secret_count as u64)
