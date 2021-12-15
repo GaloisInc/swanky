@@ -30,20 +30,6 @@ pub trait FieldForFFT<const N: usize>: FiniteField + From<u128> {
     fn roots(p: usize) -> Self;
 }
 
-fn non_ct_pow<Field: FiniteField>(mut b: Field, mut e: u128) -> Field {
-    let mut acc = Field::ONE;
-
-    while e != 0 {
-        if e & 0b1 == 0b1 {
-            acc = b * acc;
-        }
-        b = b * b;
-        e >>= 1;
-    }
-
-    acc
-}
-
 mod cooley_tukey {
     //! FFT by in-place Cooley-Tukey algorithms.
 
@@ -98,7 +84,7 @@ mod cooley_tukey {
         while 1usize << depth < data.len() {
             let step = 1usize << depth;
             let jump = 2 * step;
-            let factor_stride = non_ct_pow(omega, (data.len() / step / 2) as u128);
+            let factor_stride = omega.non_ct_pow((data.len() / step / 2) as u128);
             let mut factor = Field::ONE;
             for group in 0usize..step {
                 let mut pair = group;
@@ -183,11 +169,11 @@ mod cooley_tukey {
 
     fn fft3_in_place_compute<Field: FieldForFFT<3>>(data: &mut [Field], omega: Field) {
         let mut step = 1;
-        let big_omega = non_ct_pow(omega, data.len() as u128 / 3);
+        let big_omega = omega.non_ct_pow(data.len() as u128 / 3);
         let big_omega_sq = big_omega * big_omega;
         while step < data.len() {
             let jump = 3 * step;
-            let factor_stride = non_ct_pow(omega, (data.len() / step / 3) as u128);
+            let factor_stride = omega.non_ct_pow((data.len() / step / 3) as u128);
             let mut factor = Field::ONE;
             for group in 0usize..step {
                 let factor_sq = factor * factor;

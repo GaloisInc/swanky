@@ -153,6 +153,23 @@ pub trait FiniteField:
         }
         r0
     }
+
+    /// Compute `self` to the power of `n`, **in non-constant time**.
+    fn non_ct_pow(&self, n: u128) -> Self {
+        let mut acc = Self::ONE;
+        let mut b = *self;
+        let mut n = n;
+
+        while n != 0 {
+            if n & 0b1 == 0b1 {
+                acc = b * acc;
+            }
+            b = b * b;
+            n >>= 1;
+        }
+
+        acc
+    }
 }
 
 /// If `Self` implements `IsSubfieldOf<FE>`, then `Self` is a subfield of `FE`.
