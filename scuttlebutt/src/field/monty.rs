@@ -4,7 +4,7 @@
 
 //! Generic 64-bit Montgomery arithmetic for prime fields.
 
-use generic_array::{ArrayLength, GenericArray, typenum};
+use generic_array::{typenum, ArrayLength, GenericArray};
 use rand::distributions::{Distribution, Uniform};
 use std::fmt::Debug;
 use std::hash::Hash;
@@ -13,7 +13,7 @@ use subtle::ConstantTimeEq;
 use crate::field::BiggerThanModulus;
 
 #[cfg(test)]
-use proptest::{*, prelude::*};
+use proptest::{prelude::*, *};
 
 /* Based on https://en.wikipedia.org/wiki/Montgomery_modular_multiplication
  * and https://github.com/snipsco/rust-threshold-secret-sharing
@@ -29,7 +29,7 @@ use proptest::{*, prelude::*};
  */
 
 /// R value for 64-bit Montgomery numbers: 2^64.
-pub const R: u128 = 1<<64;
+pub const R: u128 = 1 << 64;
 
 /// Provides 64-bit Montgomery arithmetic for a struct given
 ///     * The desired field modulus M
@@ -49,22 +49,20 @@ pub const R: u128 = 1<<64;
 // bit-width seem difficult to do statically.
 pub trait Monty: 'static + Send + Sync + Sized + Copy + Clone + Default + Hash + Debug {
     /// Desired field modulus
-    const M: u64;       // Field modulus
+    const M: u64; // Field modulus
 
     /// `M' = 2^64 - (M^-1 mod 2^64)`
-    const M_TICK: u64;  // R - (M^-1 mod R)
+    const M_TICK: u64; // R - (M^-1 mod R)
 
     /// `(2^64)^-1 mod M`
-    const R_INV: u64;   // R^-1 mod M
+    const R_INV: u64; // R^-1 mod M
 
     /// `(2^64)^3 mod M`
     ///
     /// Note: You probably don't want to implement this
     const R_CUBE: u64 = // R^3 mod M
-        (((((R % Self::M as u128)
-            * R) % Self::M as u128)
-                * R) % Self::M as u128) as u64;
-    
+        (((((R % Self::M as u128) * R) % Self::M as u128) * R) % Self::M as u128) as u64;
+
     /// Generator of the multiplicative field mod `M`, i.e., `G^phi(M) = 1`
     const G: Self;
 
@@ -101,7 +99,7 @@ pub fn monty_from_u128<F: Monty>(a: u128) -> F {
 macro_rules! monty_from_lit {
     ($n: literal, $modulus: path) => {
         ((($n as u128) << 64) % $modulus as u128) as u64
-    }
+    };
 }
 
 /// Convert a field element in Montgomery form into a u128 using one division
@@ -123,7 +121,7 @@ pub fn monty_to_u128<F: Monty>(u: F) -> u128 {
 #[inline]
 fn redc(a: u128, modulus: u64, m_tick: u64) -> u128 {
     let m = (a as u64).wrapping_mul(m_tick) as u128;
-    let t = ((a + m*(modulus as u128)) >> 64) as u64;
+    let t = ((a + m * (modulus as u128)) >> 64) as u64;
 
     // At this point we know that t < 2*modulus
     ct_reduce(t as u128, modulus) as u128
@@ -152,11 +150,15 @@ pub fn monty_add<F: Monty>(a: F, b: F) -> F {
 
 /// Subtraction for field elements in Montgomery form
 #[inline]
-pub fn monty_sub<F: Monty>(a: F, b: F) -> F { monty_add(a, monty_neg(b)) }
+pub fn monty_sub<F: Monty>(a: F, b: F) -> F {
+    monty_add(a, monty_neg(b))
+}
 
 /// Additive inverse for field elements in Montgomery form
 #[inline]
-pub fn monty_neg<F: Monty>(a: F) -> F { F::from_raw(F::M - a.to_raw()) }
+pub fn monty_neg<F: Monty>(a: F) -> F {
+    F::from_raw(F::M - a.to_raw())
+}
 
 /// Multiplication for field elements in Montgomery form
 #[inline]
@@ -179,12 +181,16 @@ pub fn monty_mul_add<F: Monty>(a: F, b: F, c: F) -> F {
 
 /// Division for field elements in Montgomery form
 #[inline]
-pub fn monty_div<F: Monty>(a: F, b: F) -> F { monty_mul(a, monty_inv(b)) }
+pub fn monty_div<F: Monty>(a: F, b: F) -> F {
+    monty_mul(a, monty_inv(b))
+}
 
 /// Multiplicative inverse for field elements in Montgomery form
 #[inline]
 pub fn monty_inv<F: Monty>(a: F) -> F {
-    if a.to_raw() == 0 { panic!("Division by zero") }
+    if a.to_raw() == 0 {
+        panic!("Division by zero")
+    }
 
     let a_inv = gcd(a.to_raw() as i128, F::M as i128).0 as u128;
 
@@ -210,10 +216,14 @@ pub fn monty_to_bytes<F: Monty>(&f: &F) -> GenericArray<u8, typenum::U8> {
 
 /// Convert a byte array to a field element in Montgomery form
 pub fn monty_from_bytes<F: Monty>(
-    bs: &GenericArray<u8, typenum::U8>
+    bs: &GenericArray<u8, typenum::U8>,
 ) -> Result<F, BiggerThanModulus> {
     let n = u64::from_le_bytes(*bs.as_ref());
-    if n < F::M { Ok(monty_from_u128(n as u128)) } else { Err(BiggerThanModulus) }
+    if n < F::M {
+        Ok(monty_from_u128(n as u128))
+    } else {
+        Err(BiggerThanModulus)
+    }
 }
 
 /// Convert a random byte array to a field element in Montgomery form
@@ -221,12 +231,12 @@ pub fn monty_from_uniform_bytes<F: Monty>(seed: &[u8; 16]) -> F {
     use rand::prelude::SeedableRng;
 
     let mut rng = crate::rand_aes::AesRng::from_seed(crate::Block::from(*seed));
-    F::from_raw(Uniform::from(0 .. F::M).sample(&mut rng))
+    F::from_raw(Uniform::from(0..F::M).sample(&mut rng))
 }
 
 /// Generate a uniformly random field element
 pub fn monty_random<F: Monty, R: rand_core::RngCore + ?Sized>(rng: &mut R) -> F {
-    F::from_raw(Uniform::from(0 .. F::M).sample(rng))
+    F::from_raw(Uniform::from(0..F::M).sample(rng))
 }
 
 // Extended GCD based on
@@ -241,19 +251,31 @@ pub fn monty_random<F: Monty, R: rand_core::RngCore + ?Sized>(rng: &mut R) -> F 
 // TODO Re-implement based on https://eprint.iacr.org/2020/972.pdf?
 #[inline]
 fn gcd(a0: i128, b0: i128) -> (i128, i128) {
-    let mut a = a0; let mut b = b0;
-    let mut p = 1;  let mut q = 0;
-    let mut r = 0;  let mut s = 1;
+    let mut a = a0;
+    let mut b = b0;
+    let mut p = 1;
+    let mut q = 0;
+    let mut r = 0;
+    let mut s = 1;
 
     while b != 0 {
         let t = a / b;
-        p -= t * r; std::mem::swap(&mut p, &mut r);
-        q -= t * s; std::mem::swap(&mut q, &mut s);
-        a -= t * b; std::mem::swap(&mut a, &mut b);
+        p -= t * r;
+        std::mem::swap(&mut p, &mut r);
+        q -= t * s;
+        std::mem::swap(&mut q, &mut s);
+        a -= t * b;
+        std::mem::swap(&mut a, &mut b);
     }
 
-    if a < 0 { p = -p; q = -q; }
-    if p < 0 { p += b0/a; q -= a0/a; }
+    if a < 0 {
+        p = -p;
+        q = -q;
+    }
+    if p < 0 {
+        p += b0 / a;
+        q -= a0 / a;
+    }
 
     (p, q)
 }
@@ -293,62 +315,90 @@ macro_rules! implement_finite_field_for_monty {
         impl std::ops::Add<$monty> for $monty {
             type Output = $monty;
             #[inline]
-            fn add(self, other: $monty) -> Self::Output { $crate::field::monty::monty_add(self, other) }
+            fn add(self, other: $monty) -> Self::Output {
+                $crate::field::monty::monty_add(self, other)
+            }
         }
         impl std::ops::AddAssign<$monty> for $monty {
             #[inline]
-            fn add_assign(&mut self, other: $monty) { *self = $crate::field::monty::monty_add(*self, other) }
+            fn add_assign(&mut self, other: $monty) {
+                *self = $crate::field::monty::monty_add(*self, other)
+            }
         }
         impl std::ops::Sub<$monty> for $monty {
             type Output = $monty;
             #[inline]
-            fn sub(self, other: $monty) -> Self::Output { $crate::field::monty::monty_sub(self, other) }
+            fn sub(self, other: $monty) -> Self::Output {
+                $crate::field::monty::monty_sub(self, other)
+            }
         }
         impl std::ops::SubAssign<$monty> for $monty {
             #[inline]
-            fn sub_assign(&mut self, other: $monty) { *self = $crate::field::monty::monty_sub(*self, other) }
+            fn sub_assign(&mut self, other: $monty) {
+                *self = $crate::field::monty::monty_sub(*self, other)
+            }
         }
         impl std::ops::Mul<$monty> for $monty {
             type Output = $monty;
             #[inline]
-            fn mul(self, other: $monty) -> Self::Output { $crate::field::monty::monty_mul(self, other) }
+            fn mul(self, other: $monty) -> Self::Output {
+                $crate::field::monty::monty_mul(self, other)
+            }
         }
         impl std::ops::MulAssign<$monty> for $monty {
             #[inline]
-            fn mul_assign(&mut self, other: $monty) { *self = $crate::field::monty::monty_mul(*self, other) }
+            fn mul_assign(&mut self, other: $monty) {
+                *self = $crate::field::monty::monty_mul(*self, other)
+            }
         }
         impl std::ops::Div<$monty> for $monty {
             type Output = $monty;
             #[inline]
-            fn div(self, other: $monty) -> Self::Output { $crate::field::monty::monty_div(self, other) }
+            fn div(self, other: $monty) -> Self::Output {
+                $crate::field::monty::monty_div(self, other)
+            }
         }
         impl std::ops::DivAssign<$monty> for $monty {
             #[inline]
-            fn div_assign(&mut self, other: $monty) { *self = $crate::field::monty::monty_div(*self, other) }
+            fn div_assign(&mut self, other: $monty) {
+                *self = $crate::field::monty::monty_div(*self, other)
+            }
         }
         impl std::ops::Neg for $monty {
             type Output = $monty;
             #[inline]
-            fn neg(self) -> Self::Output { $crate::field::monty::monty_neg(self) }
+            fn neg(self) -> Self::Output {
+                $crate::field::monty::monty_neg(self)
+            }
         }
         impl std::iter::Sum<$monty> for $monty {
             fn sum<I: Iterator<Item = $monty>>(iter: I) -> $monty {
-                iter.fold(<$monty>::from_raw(<$monty>::RAW_ZERO), $crate::field::monty::monty_add)
+                iter.fold(
+                    <$monty>::from_raw(<$monty>::RAW_ZERO),
+                    $crate::field::monty::monty_add,
+                )
             }
         }
         impl std::iter::Product<$monty> for $monty {
             fn product<I: Iterator<Item = $monty>>(iter: I) -> $monty {
-                iter.fold(<$monty>::from_raw(<$monty>::RAW_ONE), $crate::field::monty::monty_mul)
+                iter.fold(
+                    <$monty>::from_raw(<$monty>::RAW_ONE),
+                    $crate::field::monty::monty_mul,
+                )
             }
         }
         impl PartialEq for $monty {
             #[inline]
-            fn eq(&self, other: &$monty) -> bool { $crate::field::monty::monty_eq(*self, *other) }
+            fn eq(&self, other: &$monty) -> bool {
+                $crate::field::monty::monty_eq(*self, *other)
+            }
         }
         impl Eq for $monty {}
         impl subtle::ConstantTimeEq for $monty {
             #[inline]
-            fn ct_eq(&self, other: &$monty) -> subtle::Choice { $crate::field::monty::monty_ct_eq(*self, *other) }
+            fn ct_eq(&self, other: &$monty) -> subtle::Choice {
+                $crate::field::monty::monty_ct_eq(*self, *other)
+            }
         }
         impl subtle::ConditionallySelectable for $monty {
             #[inline]
@@ -359,20 +409,22 @@ macro_rules! implement_finite_field_for_monty {
         impl num_traits::MulAdd for $monty {
             type Output = $monty;
             #[inline]
-            fn mul_add(self, a: $monty, b: $monty) -> Self::Output { $crate::field::monty::monty_mul_add(self, a, b) }
-        }
-        impl $crate::field::PrimeFiniteField for $monty {
-            const BITS_OF_MODULUS: usize = Self::BITS;
-            // XXX: Maybe not the most efficient way to do this? Uses a single division operation
-            // in monty_to_u128.
-            fn mod2(&self) -> Self {
-                if monty_to_u128(*self) & 0x1 == 0 {
-                    Self(monty_from_lit!(0, Self::M))
-                } else {
-                    Self(monty_from_lit!(1, Self::M))
-                }
+            fn mul_add(self, a: $monty, b: $monty) -> Self::Output {
+                $crate::field::monty::monty_mul_add(self, a, b)
             }
         }
+        // impl $crate::field::PrimeFiniteField for $monty {
+        //     const BITS_OF_MODULUS: usize = Self::BITS;
+        //     // XXX: Maybe not the most efficient way to do this? Uses a single division operation
+        //     // in monty_to_u128.
+        //     fn mod2(&self) -> Self {
+        //         if monty_to_u128(*self) & 0x1 == 0 {
+        //             Self(monty_from_lit!(0, Self::M))
+        //         } else {
+        //             Self(monty_from_lit!(1, Self::M))
+        //         }
+        //     }
+        // }
         impl $crate::field::FiniteField for $monty {
             const ZERO: Self = Self(monty_from_lit!(0, Self::M));
             const ONE: Self = Self(monty_from_lit!(1, Self::M));
@@ -386,7 +438,7 @@ macro_rules! implement_finite_field_for_monty {
             }
 
             fn from_bytes(
-                bytes: &$crate::field::GenericArray<u8, Self::ByteReprLen>
+                bytes: &$crate::field::GenericArray<u8, Self::ByteReprLen>,
             ) -> Result<Self, Self::FromBytesError> {
                 $crate::field::monty::monty_from_bytes(bytes)
             }
@@ -406,14 +458,15 @@ macro_rules! implement_finite_field_for_monty {
                 coeffs: generic_array::GenericArray<
                     Self::PrimeField,
                     Self::PolynomialFormNumCoefficients,
-                >
+                >,
             ) -> Self {
                 coeffs[0]
             }
 
             fn to_polynomial_coefficients(
-                &self
-            ) -> generic_array::GenericArray<Self::PrimeField, Self::PolynomialFormNumCoefficients> {
+                &self,
+            ) -> generic_array::GenericArray<Self::PrimeField, Self::PolynomialFormNumCoefficients>
+            {
                 generic_array::GenericArray::from([*self])
             }
 
@@ -426,16 +479,18 @@ macro_rules! implement_finite_field_for_monty {
             }
 
             #[inline]
-            fn inverse(&self) -> Self { $crate::field::monty::monty_inv(*self) }
+            fn inverse(&self) -> Self {
+                $crate::field::monty::monty_inv(*self)
+            }
 
             type NumberOfBitsInBitDecomposition = <Self as $crate::field::monty::Monty>::Bits;
-            fn bit_decomposition(&self)
-                -> generic_array::GenericArray<bool, Self::NumberOfBitsInBitDecomposition>
-            {
+            fn bit_decomposition(
+                &self,
+            ) -> generic_array::GenericArray<bool, Self::NumberOfBitsInBitDecomposition> {
                 $crate::field::standard_bit_decomposition(monty_to_u128(*self))
             }
         }
-    }
+    };
 }
 
 #[cfg(test)]
@@ -458,7 +513,7 @@ mod test {
 
     impl Monty for F11 {
         const M: u64 = 11;
-        const M_TICK: u64 = ((2u128<<64) - 3_353_953_467_947_191_203u128) as u64;
+        const M_TICK: u64 = ((2u128 << 64) - 3_353_953_467_947_191_203u128) as u64;
         const R_INV: u64 = 9;
 
         const G: Self = Self(monty_from_lit!(2, Self::M));
@@ -466,22 +521,30 @@ mod test {
         type Bits = typenum::U4;
 
         #[inline]
-        fn to_raw(&self) -> u64 { self.0 }
+        fn to_raw(&self) -> u64 {
+            self.0
+        }
 
         #[inline]
-        fn from_raw(raw: u64) -> Self { Self(raw) }
+        fn from_raw(raw: u64) -> Self {
+            Self(raw)
+        }
     }
 
     impl std::convert::From<u128> for F11 {
         #[inline]
-        fn from(n: u128) -> Self { monty_from_u128(n) }
+        fn from(n: u128) -> Self {
+            monty_from_u128(n)
+        }
     }
     impl std::convert::From<u64> for F11 {
         #[inline]
-        fn from(n: u64) -> Self { monty_from_u128(n as u128) }
+        fn from(n: u64) -> Self {
+            monty_from_u128(n as u128)
+        }
     }
 
-    implement_finite_field_for_monty!{F11}
+    implement_finite_field_for_monty! {F11}
 
     test_field!(test_f11, F11);
 
