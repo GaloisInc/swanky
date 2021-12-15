@@ -69,8 +69,8 @@
 use generic_array::typenum::Unsigned;
 use ndarray::{concatenate, Array1, Array2, ArrayView1, Axis};
 use rand::{CryptoRng, Rng, SeedableRng};
+use scuttlebutt::field::fft::{FieldForFFT2, FieldForFFT3};
 use scuttlebutt::field::FiniteField;
-use scuttlebutt::numtheory::{FieldForFFT2, FieldForFFT3};
 use scuttlebutt::{AesRng, Block};
 use sprs::{CsMat, TriMat};
 

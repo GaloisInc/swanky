@@ -10,9 +10,10 @@
 //! allowing efficient sharing of several secrets together.
 
 use crate::field::FiniteField;
-use crate::{
-    numtheory,
-    numtheory::{FieldForFFT2, FieldForFFT3},
+use crate::field::{
+    fft,
+    fft::{FieldForFFT2, FieldForFFT3},
+    polynomial::NewtonPolynomial,
 };
 
 /// Parameters for the packed variant of Shamir secret sharing,
@@ -117,13 +118,13 @@ impl<Field: FiniteField + FieldForFFT2 + FieldForFFT3> PackedSecretSharing<Field
         values.extend(randomness);
         // run backward FFT to recover polynomial in coefficient representation
         debug_assert_eq!(values.len(), self.reconstruct_limit() + 1);
-        numtheory::fft2_inverse_in_place(&mut values, self.omega_secrets);
+        fft::fft2_inverse_in_place(&mut values, self.omega_secrets);
         values
     }
 
     fn evaluate_polynomial(&self, coefficients: &mut Vec<Field>) {
         debug_assert_eq!(coefficients.len(), self.share_count + 1);
-        numtheory::fft3_in_place(coefficients, self.omega_shares)
+        fft::fft3_in_place(coefficients, self.omega_shares)
     }
 
     /// Reconstruct the secrets from a large enough subset of the shares.
@@ -146,7 +147,7 @@ impl<Field: FiniteField + FieldForFFT2 + FieldForFFT3> PackedSecretSharing<Field
         values.insert(0, Field::ZERO);
         // interpolate using Newton's method
         // TODO optimise by using Newton-equally-space variant
-        let poly = numtheory::NewtonPolynomial::init(&points, &values);
+        let poly = NewtonPolynomial::init(&points, &values);
         // evaluate at omega_secrets points to recover secrets
         // TODO optimise to avoid re-computation of power
         let secrets = (1..self.reconstruct_limit())

@@ -254,9 +254,101 @@ impl<FE: FiniteField> Debug for Polynomial<FE> {
     }
 }
 
+/// Holds together points and Newton-interpolated coefficients for fast evaluation.
+///
+/// TODO: Merge this with the `Polynomial` struct.
+pub struct NewtonPolynomial<'a, Field>
+where
+    Field: FiniteField,
+{
+    points: &'a [Field],
+    coefficients: Vec<Field>,
+}
+
+impl<'a, Field: FiniteField> NewtonPolynomial<'a, Field> {
+    /// Construct a Newton polynomial interpolation.
+    ///
+    /// Given enough `points` (x) and `values` (p(x)), find the coefficients for `p`.
+    pub fn init(points: &'a [Field], values: &[Field]) -> Self {
+        let coefficients = compute_newton_coefficients(points, values);
+        Self {
+            points,
+            coefficients,
+        }
+    }
+
+    /// Evaluate the Newton polynomial.
+    pub fn evaluate(&self, point: Field) -> Field {
+        // compute Newton points
+        let mut newton_points = vec![Field::ONE];
+        for i in 0..self.points.len() - 1 {
+            let diff = point - self.points[i];
+            let product = newton_points[i] * diff;
+            newton_points.push(product);
+        }
+        let ref newton_coefs = self.coefficients;
+        // sum up
+        newton_coefs
+            .iter()
+            .zip(newton_points)
+            .map(|(&coef, point)| coef * point)
+            .fold(Field::ZERO, |a, b| a + b)
+    }
+}
+
+fn compute_newton_coefficients<Field>(points: &[Field], values: &[Field]) -> Vec<Field>
+where
+    Field: FiniteField,
+{
+    assert_eq!(points.len(), values.len());
+
+    let mut store: Vec<(usize, usize, Field)> = values
+        .iter()
+        .enumerate()
+        .map(|(index, &value)| (index, index, value))
+        .collect();
+
+    for j in 1..store.len() {
+        for i in (j..store.len()).rev() {
+            let index_lower = store[i - 1].0;
+            let index_upper = store[i].1;
+
+            let point_lower = points[index_lower];
+            let point_upper = points[index_upper];
+            let point_diff = point_upper - point_lower;
+            let point_diff_inverse = point_diff.inverse();
+
+            let coef_lower = store[i - 1].2;
+            let coef_upper = store[i].2;
+            let coef_diff = coef_upper - coef_lower;
+
+            let fraction = coef_diff * point_diff_inverse;
+
+            store[i] = (index_lower, index_upper, fraction);
+        }
+    }
+
+    store.iter().map(|&(_, _, v)| v).collect()
+}
+
+/// Evaluate polynomial given by `coefficients` at `point` in Zp using Horner's method.
+pub fn mod_evaluate_polynomial<Field>(coefficients: &[Field], point: Field) -> Field
+where
+    Field: FiniteField,
+{
+    // evaluate using Horner's rule
+    //  - to combine with fold we consider the coefficients in reverse order
+    let mut reversed_coefficients = coefficients.iter().rev();
+    // manually split due to fold insisting on an initial value
+    let head = *reversed_coefficients.next().unwrap();
+    let tail = reversed_coefficients;
+    tail.fold(head, |partial, &coef| partial * point + coef)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::field::*;
     use crate::{AesRng, Block};
     use rand::Rng;
     use rand_core::SeedableRng;
@@ -424,4 +516,31 @@ mod tests {
         }
         call_with_finite_field!(f);
     }
+
+    /// Newton interpolation tests for types implementing FiniteField
+    macro_rules! interpolation_tests {
+        ($name:ident, $field: ty) => {
+            #[test]
+            fn $name() {
+                let mut rng = AesRng::new();
+                let poly: Vec<_> = (1..10).map(|_| <$field>::random(&mut rng)).collect();
+                let points: Vec<_> = (1..10).map(|_| <$field>::random(&mut rng)).collect();
+                let values: Vec<$field> = points
+                    .iter()
+                    .map(|&point| mod_evaluate_polynomial(&poly, point))
+                    .collect();
+
+                let recovered_poly = NewtonPolynomial::init(&points, &values);
+                let recovered_values: Vec<$field> = points
+                    .iter()
+                    .map(|&point| recovered_poly.evaluate(point))
+                    .collect();
+                assert_eq!(recovered_values, values);
+            }
+        };
+    }
+
+    interpolation_tests!(interpolation_tests_f61p, F61p);
+    interpolation_tests!(interpolation_tests_gf40, Gf40);
+    interpolation_tests!(interpolation_tests_f128p, F128p);
 }

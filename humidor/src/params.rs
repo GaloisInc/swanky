@@ -10,7 +10,9 @@
 
 use ndarray::{concatenate, Array1, Array2, ArrayView1, ArrayView2, Axis, Zip};
 use rand::{CryptoRng, Rng};
-use scuttlebutt::{numtheory, threshold_secret_sharing};
+use scuttlebutt::field::fft;
+use scuttlebutt::field::polynomial;
+use scuttlebutt::threshold_secret_sharing;
 
 use crate::ligero::FieldForLigero;
 use crate::util::*;
@@ -148,12 +150,12 @@ impl<Field: FieldForLigero> Params<Field> {
         debug_assert_eq!(cf.len(), self.n);
 
         let coeffs0 = concatenate!(Axis(0), Array1::zeros(1), cf);
-        let points = numtheory::fft3_inverse(
+        let points = fft::fft3_inverse(
             &coeffs0.iter().cloned().collect::<Vec<_>>(),
             self.pss.omega_shares,
         );
 
-        numtheory::fft2(&points[0..=self.k], self.pss.omega_secrets)
+        fft::fft2(&points[0..=self.k], self.pss.omega_secrets)
     }
 
     /// Decode a codeword row of n field elements into a row of l elements.
@@ -186,10 +188,10 @@ impl<Field: FieldForLigero> Params<Field> {
             .chain(cf.iter())
             .cloned()
             .collect::<Vec<_>>();
-        numtheory::fft3_inverse_in_place(&mut coeffs0, self.pss.omega_shares);
+        fft::fft3_inverse_in_place(&mut coeffs0, self.pss.omega_shares);
 
         let (mut points, zeros) = coeffs0[..].split_at_mut(self.k + 1);
-        numtheory::fft2_in_place(&mut points, self.pss.omega_secrets);
+        fft::fft2_in_place(&mut points, self.pss.omega_secrets);
 
         points[0] == Field::ZERO && zeros.iter().all(|&f| f == Field::ZERO)
     }
@@ -237,7 +239,7 @@ impl<Field: FieldForLigero> Params<Field> {
             .slice_mut(ndarray::s!(1..=points.len()))
             .assign(&points);
 
-        numtheory::fft2_inverse(&points0.to_vec(), self.pss.omega_secrets)
+        fft::fft2_inverse(&points0.to_vec(), self.pss.omega_secrets)
             .iter()
             .cloned()
             .collect()
@@ -256,7 +258,7 @@ impl<Field: FieldForLigero> Params<Field> {
             .slice_mut(ndarray::s!(0..coeffs.len()))
             .assign(&coeffs);
 
-        numtheory::fft2(&coeffs0.to_vec(), self.pss.omega_secrets)[1..]
+        fft::fft2(&coeffs0.to_vec(), self.pss.omega_secrets)[1..]
             .iter()
             .cloned()
             .collect()
@@ -274,7 +276,7 @@ impl<Field: FieldForLigero> Params<Field> {
             .assign(&mat);
 
         Zip::from(res.rows_mut()).for_each(|mut row| {
-            numtheory::fft2_inverse_in_place(row.as_slice_mut().unwrap(), self.pss.omega_secrets);
+            fft::fft2_inverse_in_place(row.as_slice_mut().unwrap(), self.pss.omega_secrets);
         });
 
         res
@@ -291,7 +293,7 @@ impl<Field: FieldForLigero> Params<Field> {
         res.slice_mut(ndarray::s![.., 0..mat.ncols()]).assign(&mat);
 
         Zip::from(res.rows_mut()).for_each(|mut row| {
-            numtheory::fft2_in_place(row.as_slice_mut().unwrap(), self.pss.omega_secrets);
+            fft::fft2_in_place(row.as_slice_mut().unwrap(), self.pss.omega_secrets);
         });
 
         res.slice(ndarray::s![.., 1..]).to_owned()
@@ -308,7 +310,7 @@ impl<Field: FieldForLigero> Params<Field> {
                 padd(acc.view(), Array1::from(v.to_vec()).view())
             });
 
-        numtheory::fft2(&coeffs0.to_vec(), self.pss.omega_secrets)
+        fft::fft2(&coeffs0.to_vec(), self.pss.omega_secrets)
             .iter()
             .cloned()
             .collect()
@@ -325,7 +327,7 @@ impl<Field: FieldForLigero> Params<Field> {
             .slice_mut(ndarray::s!(1..points.len() + 1))
             .assign(&points);
 
-        numtheory::fft3_inverse(&points0.to_vec(), self.pss.omega_shares)
+        fft::fft3_inverse(&points0.to_vec(), self.pss.omega_shares)
             .iter()
             .cloned()
             .collect()
@@ -344,7 +346,7 @@ impl<Field: FieldForLigero> Params<Field> {
             .slice_mut(ndarray::s!(0..coeffs.len()))
             .assign(&coeffs);
 
-        numtheory::fft3(&coeffs0.to_vec(), self.pss.omega_shares)[1..]
+        fft::fft3(&coeffs0.to_vec(), self.pss.omega_shares)[1..]
             .iter()
             .cloned()
             .collect()
@@ -362,7 +364,7 @@ impl<Field: FieldForLigero> Params<Field> {
             .assign(&mat);
 
         Zip::from(res.rows_mut()).for_each(|mut row| {
-            numtheory::fft3_inverse_in_place(row.as_slice_mut().unwrap(), self.pss.omega_shares);
+            fft::fft3_inverse_in_place(row.as_slice_mut().unwrap(), self.pss.omega_shares);
         });
 
         res
@@ -379,7 +381,7 @@ impl<Field: FieldForLigero> Params<Field> {
         res.slice_mut(ndarray::s![.., 0..mat.ncols()]).assign(&mat);
 
         Zip::from(res.rows_mut()).for_each(|mut row| {
-            numtheory::fft3_in_place(row.as_slice_mut().unwrap(), self.pss.omega_shares);
+            fft::fft3_in_place(row.as_slice_mut().unwrap(), self.pss.omega_shares);
         });
 
         res.slice(ndarray::s![.., 1..]).to_owned()
@@ -395,7 +397,7 @@ impl<Field: FieldForLigero> Params<Field> {
                 padd(acc.view(), Array1::from(v.to_vec()).view())
             });
 
-        numtheory::fft3(&coeffs0.to_vec(), self.pss.omega_shares)
+        fft::fft3(&coeffs0.to_vec(), self.pss.omega_shares)
             .iter()
             .cloned()
             .collect()
@@ -404,13 +406,13 @@ impl<Field: FieldForLigero> Params<Field> {
     /// Take a sequence of _possibly more than_ `k+1` coefficients of the
     /// polynomial `p` and return the single evaluation point `p(zeta_{ix})`.
     pub fn peval2(&self, p: ArrayView1<Field>, ix: usize) -> Field {
-        numtheory::mod_evaluate_polynomial(&p.to_vec(), self.pss.omega_secrets.pow(ix as u128))
+        polynomial::mod_evaluate_polynomial(&p.to_vec(), self.pss.omega_secrets.pow(ix as u128))
     }
 
     /// Take a sequence of _possibly more than_ `n+1` coefficients of the
     /// polynomial `p` and return the single evaluation point `p(eta_{ix})`.
     pub fn peval3(&self, p: ArrayView1<Field>, ix: usize) -> Field {
-        numtheory::mod_evaluate_polynomial(&p.to_vec(), self.pss.omega_shares.pow(ix as u128))
+        polynomial::mod_evaluate_polynomial(&p.to_vec(), self.pss.omega_shares.pow(ix as u128))
     }
 
     /// Take two polynomials p and q of degree less than 2^kexp and produce a
@@ -439,12 +441,12 @@ impl<Field: FieldForLigero> Params<Field> {
             .collect::<Array1<_>>();
 
         // Use in-place fft to avoid allocating any more Vecs.
-        numtheory::fft2_in_place(p0.as_slice_mut().unwrap(), omega);
-        numtheory::fft2_in_place(q0.as_slice_mut().unwrap(), omega);
+        fft::fft2_in_place(p0.as_slice_mut().unwrap(), omega);
+        fft::fft2_in_place(q0.as_slice_mut().unwrap(), omega);
         for i in 0..max_deg {
             p0[i] *= q0[i]
         }
-        numtheory::fft2_inverse_in_place(p0.as_slice_mut().unwrap(), omega);
+        fft::fft2_inverse_in_place(p0.as_slice_mut().unwrap(), omega);
 
         p0.slice_move(ndarray::s![0..pq_deg])
     }
@@ -537,7 +539,7 @@ proptest! {
 
         let coeffs = p.fft2_inverse(a.slice(ndarray::s![1..=len]));
 
-        numtheory::fft2_inverse_in_place(&mut a.as_slice_mut().unwrap(), p.pss.omega_secrets);
+        fft::fft2_inverse_in_place(&mut a.as_slice_mut().unwrap(), p.pss.omega_secrets);
         let coeffs_ref = a;
 
         prop_assert_eq!(coeffs.len(), coeffs_ref.len());
@@ -557,7 +559,7 @@ proptest! {
 
         let points = p.fft2(a.slice(ndarray::s![0..len]));
 
-        numtheory::fft2_in_place(&mut a.as_slice_mut().unwrap(), p.pss.omega_secrets);
+        fft::fft2_in_place(&mut a.as_slice_mut().unwrap(), p.pss.omega_secrets);
         let points_ref = a.slice(ndarray::s![1..]);
 
         prop_assert_eq!(points.len(), points_ref.len());
@@ -591,8 +593,8 @@ proptest! {
 
         let coeffs = p.fft2_inverse_rows(points.view());
 
-        numtheory::fft2_inverse_in_place(&mut a1.as_slice_mut().unwrap(), p.pss.omega_secrets);
-        numtheory::fft2_inverse_in_place(&mut a2.as_slice_mut().unwrap(), p.pss.omega_secrets);
+        fft::fft2_inverse_in_place(&mut a1.as_slice_mut().unwrap(), p.pss.omega_secrets);
+        fft::fft2_inverse_in_place(&mut a2.as_slice_mut().unwrap(), p.pss.omega_secrets);
         let coeffs_ref = ndarray::stack(Axis(0), &[a1.view(), a2.view()]).unwrap();
 
         prop_assert_eq!(coeffs.dim(), coeffs_ref.dim());
@@ -622,8 +624,8 @@ proptest! {
 
         let points = p.fft2_rows(coeffs.view());
 
-        numtheory::fft2_in_place(&mut a1.as_slice_mut().unwrap(), p.pss.omega_secrets);
-        numtheory::fft2_in_place(&mut a2.as_slice_mut().unwrap(), p.pss.omega_secrets);
+        fft::fft2_in_place(&mut a1.as_slice_mut().unwrap(), p.pss.omega_secrets);
+        fft::fft2_in_place(&mut a2.as_slice_mut().unwrap(), p.pss.omega_secrets);
         let points_ref0 = ndarray::stack(Axis(0), &[a1.view(), a2.view()]).unwrap();
         let points_ref = points_ref0.slice(ndarray::s![.., 1..]);
 
@@ -645,7 +647,7 @@ proptest! {
 
         let coeffs = p.fft3_inverse(a.slice(ndarray::s![1..=len]));
 
-        numtheory::fft3_inverse_in_place(&mut a.as_slice_mut().unwrap(), p.pss.omega_shares);
+        fft::fft3_inverse_in_place(&mut a.as_slice_mut().unwrap(), p.pss.omega_shares);
         let coeffs_ref = a;
 
         prop_assert_eq!(coeffs.len(), coeffs_ref.len());
@@ -665,7 +667,7 @@ proptest! {
 
         let points = p.fft3(a.slice(ndarray::s![0..len]));
 
-        numtheory::fft3_in_place(&mut a.as_slice_mut().unwrap(), p.pss.omega_shares);
+        fft::fft3_in_place(&mut a.as_slice_mut().unwrap(), p.pss.omega_shares);
         let points_ref = a.slice(ndarray::s![1..]);
 
         prop_assert_eq!(points.len(), points_ref.len());
@@ -699,8 +701,8 @@ proptest! {
 
         let coeffs = p.fft3_inverse_rows(points.view());
 
-        numtheory::fft3_inverse_in_place(&mut a1.as_slice_mut().unwrap(), p.pss.omega_shares);
-        numtheory::fft3_inverse_in_place(&mut a2.as_slice_mut().unwrap(), p.pss.omega_shares);
+        fft::fft3_inverse_in_place(&mut a1.as_slice_mut().unwrap(), p.pss.omega_shares);
+        fft::fft3_inverse_in_place(&mut a2.as_slice_mut().unwrap(), p.pss.omega_shares);
         let coeffs_ref = ndarray::stack(Axis(0), &[a1.view(), a2.view()]).unwrap();
 
         prop_assert_eq!(coeffs.dim(), coeffs_ref.dim());
@@ -730,8 +732,8 @@ proptest! {
 
         let points = p.fft3_rows(coeffs.view());
 
-        numtheory::fft3_in_place(&mut a1.as_slice_mut().unwrap(), p.pss.omega_shares);
-        numtheory::fft3_in_place(&mut a2.as_slice_mut().unwrap(), p.pss.omega_shares);
+        fft::fft3_in_place(&mut a1.as_slice_mut().unwrap(), p.pss.omega_shares);
+        fft::fft3_in_place(&mut a2.as_slice_mut().unwrap(), p.pss.omega_shares);
         let points_ref0 = ndarray::stack(Axis(0), &[a1.view(), a2.view()]).unwrap();
         let points_ref = points_ref0.slice(ndarray::s![.., 1..]);
 
@@ -827,7 +829,7 @@ proptest! {
             (Just(p), v)
         })
     ) {
-        let v_coeffs = numtheory::fft2_inverse(
+        let v_coeffs = fft::fft2_inverse(
             &v,
             p.pss.omega_secrets,
         ).iter().cloned().map(TestField::from)
@@ -865,7 +867,7 @@ proptest! {
             (Just(p), v)
         })
     ) {
-        let v_coeffs = numtheory::fft3_inverse(
+        let v_coeffs = fft::fft3_inverse(
             &v,
             p.pss.omega_shares,
         ).iter().cloned().map(TestField::from)
