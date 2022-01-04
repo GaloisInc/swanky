@@ -890,26 +890,6 @@ proptest! {
     }
 
     #[test]
-    fn test_pmul(
-        (p,u,v) in any::<Params<TestField>>().prop_flat_map(|p| {
-            let u = pvec(arb_test_field(), p.k);
-            let v = pvec(arb_test_field(), p.k);
-            (Just(p), u, v)
-        })
-    ) {
-        let u_coeffs = p.fft2_inverse(ArrayView1::from(&u));
-        let v_coeffs = p.fft2_inverse(ArrayView1::from(&v));
-        let uv_coeffs = pmul(u_coeffs.view(), v_coeffs.view());
-
-        for i in 0 .. u.len() {
-            prop_assert_eq!(
-                p.peval2(uv_coeffs.view(), i+1),
-                u[i] * v[i]
-            );
-        }
-    }
-
-    #[test]
     fn test_pmul2(
         (p, u, v) in any::<Params<TestField>>().prop_flat_map(|p| {
             (1..=p.k+1, 1..=p.k+1).prop_flat_map(move |(ulen, vlen)| {

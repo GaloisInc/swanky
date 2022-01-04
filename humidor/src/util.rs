@@ -49,27 +49,6 @@ where
     }
 }
 
-/// Given polynomials `p` and `q`, with `deg(p) < n` and `deg(q) < m`, return
-/// the `n+m`-degree polynomial `r` with `r(x) = p(x)*q(x)`.
-///
-/// N.b.: This is the naive `O(n^2) algorithm. For `O(n log n)` performance on
-/// polynomials of degree less than `k+1`, use `Params::pmul2`.
-#[allow(dead_code)]
-pub fn pmul<Field>(p: ArrayView1<Field>, q: ArrayView1<Field>) -> Array1<Field>
-where
-    Field: FiniteField + num_traits::Zero,
-{
-    let mut r = Array1::zeros(p.len() + q.len());
-
-    for i in 0..p.len() {
-        for j in 0..q.len() {
-            r[i + j] += p[i] * q[j];
-        }
-    }
-
-    r
-}
-
 /// Given polynomials `p` with `deg(p) < n` and `q` with `deg(q) < m`, return
 /// the polynomial `r` with `deg(r) < max(n,m)` and `r(.) = p(.) + q(.)`.
 pub fn padd<Field>(p: ArrayView1<Field>, q: ArrayView1<Field>) -> Array1<Field>
