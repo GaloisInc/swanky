@@ -13,7 +13,7 @@ use rand::{CryptoRng, Rng};
 use scuttlebutt::field::fft;
 use scuttlebutt::field::fft::FieldForFFT;
 use scuttlebutt::field::polynomial;
-use scuttlebutt::threshold_secret_sharing::PackedSecretSharing;
+use scuttlebutt::threshold_secret_sharing::PackedSecretSharingGenerator;
 
 use crate::ligero::FieldForLigero;
 use crate::util::*;
@@ -41,7 +41,7 @@ pub struct Params<Field> {
     phantom: std::marker::PhantomData<Field>,
 
     /// Parameters for `threshold_secret_sharing::PackedSecretSharing`.
-    pub pss: PackedSecretSharing<Field>,
+    pub pss: PackedSecretSharingGenerator<Field>,
 
     /// Log base-2 of k
     pub kexp: u32,
@@ -124,7 +124,7 @@ impl<Field: FieldForLigero> Params<Field> {
             l,
             n,
             m,
-            pss: PackedSecretSharing::init(t, n, l, kexp as usize, nexp as usize),
+            pss: PackedSecretSharingGenerator::new(t, n, l, kexp as usize, nexp as usize),
         }
     }
 
@@ -149,7 +149,7 @@ impl<Field: FieldForLigero> Params<Field> {
             self.pss.omega_shares,
         );
 
-        fft::fft2(&points[0..=self.k], self.pss.omega_secrets)
+        fft::fft2(&points[0..=self.k], self.pss.omega_secrets())
     }
 
     /// Decode a codeword row of n field elements into a row of l elements.
@@ -182,10 +182,10 @@ impl<Field: FieldForLigero> Params<Field> {
             .chain(cf.iter())
             .cloned()
             .collect::<Vec<_>>();
-        fft::fft3_inverse_in_place(&mut coeffs0, self.pss.omega_shares);
+        fft::fft3_inverse_in_place(&mut coeffs0, self.pss.omega_shares());
 
         let (mut points, zeros) = coeffs0[..].split_at_mut(self.k + 1);
-        fft::fft2_in_place(&mut points, self.pss.omega_secrets);
+        fft::fft2_in_place(&mut points, self.pss.omega_secrets());
 
         points[0] == Field::ZERO && zeros.iter().all(|&f| f == Field::ZERO)
     }
@@ -200,7 +200,7 @@ impl<Field: FieldForLigero> Params<Field> {
 
         let mut res = Vec::with_capacity(self.n * self.m);
 
-        for w in ws.exact_chunks(self.pss.secret_count) {
+        for w in ws.exact_chunks(self.pss.secret_count()) {
             res.append(&mut self.encode(w, rng).to_vec());
         }
 
@@ -233,7 +233,7 @@ impl<Field: FieldForLigero> Params<Field> {
             .slice_mut(ndarray::s!(1..=points.len()))
             .assign(&points);
 
-        fft::fft2_inverse(&points0.to_vec(), self.pss.omega_secrets)
+        fft::fft2_inverse(&points0.to_vec(), self.pss.omega_secrets())
             .iter()
             .cloned()
             .collect()
@@ -252,7 +252,7 @@ impl<Field: FieldForLigero> Params<Field> {
             .slice_mut(ndarray::s!(0..coeffs.len()))
             .assign(&coeffs);
 
-        fft::fft2(&coeffs0.to_vec(), self.pss.omega_secrets)[1..]
+        fft::fft2(&coeffs0.to_vec(), self.pss.omega_secrets())[1..]
             .iter()
             .cloned()
             .collect()
@@ -270,7 +270,7 @@ impl<Field: FieldForLigero> Params<Field> {
             .assign(&mat);
 
         Zip::from(res.rows_mut()).for_each(|mut row| {
-            fft::fft2_inverse_in_place(row.as_slice_mut().unwrap(), self.pss.omega_secrets);
+            fft::fft2_inverse_in_place(row.as_slice_mut().unwrap(), self.pss.omega_secrets());
         });
 
         res
@@ -287,7 +287,7 @@ impl<Field: FieldForLigero> Params<Field> {
         res.slice_mut(ndarray::s![.., 0..mat.ncols()]).assign(&mat);
 
         Zip::from(res.rows_mut()).for_each(|mut row| {
-            fft::fft2_in_place(row.as_slice_mut().unwrap(), self.pss.omega_secrets);
+            fft::fft2_in_place(row.as_slice_mut().unwrap(), self.pss.omega_secrets());
         });
 
         res.slice(ndarray::s![.., 1..]).to_owned()
@@ -304,7 +304,7 @@ impl<Field: FieldForLigero> Params<Field> {
                 padd(acc.view(), Array1::from(v.to_vec()).view())
             });
 
-        fft::fft2(&coeffs0.to_vec(), self.pss.omega_secrets)
+        fft::fft2(&coeffs0.to_vec(), self.pss.omega_secrets())
             .iter()
             .cloned()
             .collect()
@@ -321,7 +321,7 @@ impl<Field: FieldForLigero> Params<Field> {
             .slice_mut(ndarray::s!(1..points.len() + 1))
             .assign(&points);
 
-        fft::fft3_inverse(&points0.to_vec(), self.pss.omega_shares)
+        fft::fft3_inverse(&points0.to_vec(), self.pss.omega_shares())
             .iter()
             .cloned()
             .collect()
@@ -340,7 +340,7 @@ impl<Field: FieldForLigero> Params<Field> {
             .slice_mut(ndarray::s!(0..coeffs.len()))
             .assign(&coeffs);
 
-        fft::fft3(&coeffs0.to_vec(), self.pss.omega_shares)[1..]
+        fft::fft3(&coeffs0.to_vec(), self.pss.omega_shares())[1..]
             .iter()
             .cloned()
             .collect()
@@ -358,7 +358,7 @@ impl<Field: FieldForLigero> Params<Field> {
             .assign(&mat);
 
         Zip::from(res.rows_mut()).for_each(|mut row| {
-            fft::fft3_inverse_in_place(row.as_slice_mut().unwrap(), self.pss.omega_shares);
+            fft::fft3_inverse_in_place(row.as_slice_mut().unwrap(), self.pss.omega_shares());
         });
 
         res
@@ -375,7 +375,7 @@ impl<Field: FieldForLigero> Params<Field> {
         res.slice_mut(ndarray::s![.., 0..mat.ncols()]).assign(&mat);
 
         Zip::from(res.rows_mut()).for_each(|mut row| {
-            fft::fft3_in_place(row.as_slice_mut().unwrap(), self.pss.omega_shares);
+            fft::fft3_in_place(row.as_slice_mut().unwrap(), self.pss.omega_shares());
         });
 
         res.slice(ndarray::s![.., 1..]).to_owned()
@@ -391,7 +391,7 @@ impl<Field: FieldForLigero> Params<Field> {
                 padd(acc.view(), Array1::from(v.to_vec()).view())
             });
 
-        fft::fft3(&coeffs0.to_vec(), self.pss.omega_shares)
+        fft::fft3(&coeffs0.to_vec(), self.pss.omega_shares())
             .iter()
             .cloned()
             .collect()
@@ -400,7 +400,7 @@ impl<Field: FieldForLigero> Params<Field> {
     /// Take a sequence of _possibly more than_ `k+1` coefficients of the
     /// polynomial `p` and return the single evaluation point `p(zeta_{ix})`.
     pub fn peval2(&self, p: ArrayView1<Field>, ix: usize) -> Field {
-        polynomial::mod_evaluate_polynomial(&p.to_vec(), self.pss.omega_secrets.pow(ix as u128))
+        polynomial::mod_evaluate_polynomial(&p.to_vec(), self.pss.omega_secrets().pow(ix as u128))
     }
 
     /// Take a sequence of _possibly more than_ `n+1` coefficients of the

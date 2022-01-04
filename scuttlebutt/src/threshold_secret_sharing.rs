@@ -12,8 +12,8 @@
 use crate::field::FiniteField;
 use crate::field::{fft, fft::FieldForFFT, polynomial::NewtonPolynomial};
 
-/// Parameters for the packed variant of Shamir secret sharing,
-/// specifying number of secrets shared together, total number of shares, and privacy threshold.
+/// Generator for the packed variant of Shamir secret sharing, specifying number
+/// of secrets shared together, total number of shares, and privacy threshold.
 ///
 /// This scheme generalises
 /// [Shamir's scheme](https://en.wikipedia.org/wiki/Shamir%27s_Secret_Sharing)
@@ -21,7 +21,7 @@ use crate::field::{fft, fft::FieldForFFT, polynomial::NewtonPolynomial};
 /// between the privacy threshold and the reconstruction limit.
 ///
 /// The Fast Fourier Transform is used for efficiency reasons,
-/// allowing most operations run to quasilinear time `O(n.log(n))` in `share_count`.
+/// allowing most operations run to quasilinear time `O(n log n)` in `share_count`.
 /// An implication of this is that secrets and shares are positioned on positive powers of
 /// respectively an `n`-th and `m`-th principal root of unity,
 /// where `n` is a power of 2 and `m` a power of 3.
@@ -38,15 +38,15 @@ use crate::field::{fft, fft::FieldForFFT, polynomial::NewtonPolynomial};
 /// An optional `paramgen` feature provides methods for finding suitable parameters satisfying
 /// these somewhat complex requirements, in addition to several fixed parameter choices.
 #[derive(Debug, Copy, Clone, PartialEq)]
-pub struct PackedSecretSharing<Field> {
+pub struct PackedSecretSharingGenerator<Field> {
     // abstract properties
     /// Maximum number of shares that can be known without exposing the secrets
     /// (privacy threshold).
-    pub threshold: usize,
+    threshold: usize,
     /// Number of shares to split the secrets into.
-    pub share_count: usize,
+    share_count: usize,
     /// Number of secrets to share together.
-    pub secret_count: usize,
+    secret_count: usize,
 
     // implementation configuration
     /// `m`-th principal root of unity in Zp, where `m = secret_count + threshold + 1`
@@ -56,9 +56,9 @@ pub struct PackedSecretSharing<Field> {
     pub omega_shares: Field,
 }
 
-impl<Field: FiniteField + FieldForFFT<2> + FieldForFFT<3>> PackedSecretSharing<Field> {
-    /// Initialize a packed secret sharing object.
-    pub fn init(
+impl<Field: FiniteField + FieldForFFT<2> + FieldForFFT<3>> PackedSecretSharingGenerator<Field> {
+    /// Initialize a packed secret sharing generator.
+    pub fn new(
         threshold: usize,
         share_count: usize,
         secret_count: usize,
@@ -75,6 +75,21 @@ impl<Field: FiniteField + FieldForFFT<2> + FieldForFFT<3>> PackedSecretSharing<F
             omega_secrets,
             omega_shares,
         }
+    }
+
+    /// Return the number of secrets to share together.
+    pub fn secret_count(&self) -> usize {
+        self.secret_count
+    }
+
+    ///
+    pub fn omega_secrets(&self) -> Field {
+        self.omega_secrets
+    }
+
+    ///
+    pub fn omega_shares(&self) -> Field {
+        self.omega_shares
     }
 
     /// Minimum number of shares required to reconstruct secrets.
@@ -186,7 +201,7 @@ mod tests {
     fn test_share_reconstruct() {
         let mut rng = StdRng::from_entropy();
 
-        let pss: PackedSecretSharing<TestField> = PackedSecretSharing {
+        let pss: PackedSecretSharingGenerator<TestField> = PackedSecretSharingGenerator {
             /// Maximum number of shares that can be known without exposing the secrets
             /// (privacy threshold).
             threshold: 15,
