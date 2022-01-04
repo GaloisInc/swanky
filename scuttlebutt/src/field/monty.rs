@@ -90,7 +90,7 @@ pub trait Monty: 'static + Send + Sync + Sized + Copy + Clone + Default + Hash +
 /// Convert a u128 into a field element in Montgomery form into using one
 /// division
 #[inline]
-pub fn monty_from_u128<F: Monty>(a: u128) -> F {
+pub(crate) fn monty_from_u128<F: Monty>(a: u128) -> F {
     F::from_raw(((a << 64) % F::M as u128) as u64)
 }
 
@@ -104,7 +104,7 @@ macro_rules! monty_from_lit {
 
 /// Convert a field element in Montgomery form into a u128 using one division
 #[inline]
-pub fn monty_to_u128<F: Monty>(u: F) -> u128 {
+pub(crate) fn monty_to_u128<F: Monty>(u: F) -> u128 {
     (u.to_raw() as u128 * (F::R_INV as u128)) % F::M as u128
 }
 
@@ -142,7 +142,7 @@ fn ct_reduce(a: u128, modulus: u64) -> u64 {
 
 /// Addition for field elements in Montgomery form
 #[inline]
-pub fn monty_add<F: Monty>(a: F, b: F) -> F {
+pub(crate) fn monty_add<F: Monty>(a: F, b: F) -> F {
     let ab = a.to_raw() as u128 + b.to_raw() as u128;
 
     F::from_raw(ct_reduce(ab, F::M))
@@ -150,19 +150,19 @@ pub fn monty_add<F: Monty>(a: F, b: F) -> F {
 
 /// Subtraction for field elements in Montgomery form
 #[inline]
-pub fn monty_sub<F: Monty>(a: F, b: F) -> F {
+pub(crate) fn monty_sub<F: Monty>(a: F, b: F) -> F {
     monty_add(a, monty_neg(b))
 }
 
 /// Additive inverse for field elements in Montgomery form
 #[inline]
-pub fn monty_neg<F: Monty>(a: F) -> F {
+pub(crate) fn monty_neg<F: Monty>(a: F) -> F {
     F::from_raw(F::M - a.to_raw())
 }
 
 /// Multiplication for field elements in Montgomery form
 #[inline]
-pub fn monty_mul<F: Monty>(a: F, b: F) -> F {
+pub(crate) fn monty_mul<F: Monty>(a: F, b: F) -> F {
     let ab = (a.to_raw() as u128).wrapping_mul(b.to_raw() as u128);
 
     F::from_raw(redc(ab, F::M, F::M_TICK) as u64)
@@ -172,7 +172,7 @@ pub fn monty_mul<F: Monty>(a: F, b: F) -> F {
 // XXX: Can we do this using using fma (via u64::mul_add)? Seems like we need
 // the redc in the middle.
 #[inline]
-pub fn monty_mul_add<F: Monty>(a: F, b: F, c: F) -> F {
+pub(crate) fn monty_mul_add<F: Monty>(a: F, b: F, c: F) -> F {
     let ab = (a.to_raw() as u128).wrapping_mul(b.to_raw() as u128);
     let abc = redc(ab, F::M, F::M_TICK) + c.to_raw() as u128;
 
@@ -181,13 +181,13 @@ pub fn monty_mul_add<F: Monty>(a: F, b: F, c: F) -> F {
 
 /// Division for field elements in Montgomery form
 #[inline]
-pub fn monty_div<F: Monty>(a: F, b: F) -> F {
+pub(crate) fn monty_div<F: Monty>(a: F, b: F) -> F {
     monty_mul(a, monty_inv(b))
 }
 
 /// Multiplicative inverse for field elements in Montgomery form
 #[inline]
-pub fn monty_inv<F: Monty>(a: F) -> F {
+pub(crate) fn monty_inv<F: Monty>(a: F) -> F {
     if a.to_raw() == 0 {
         panic!("Division by zero")
     }
@@ -199,23 +199,23 @@ pub fn monty_inv<F: Monty>(a: F) -> F {
 
 /// Equality for field elements in Montgomery form
 #[inline]
-pub fn monty_eq<F: Monty>(a: F, b: F) -> bool {
+pub(crate) fn monty_eq<F: Monty>(a: F, b: F) -> bool {
     a.to_raw() == b.to_raw()
 }
 
 /// Equality for field elements in Montgomery form in constant time
 #[inline]
-pub fn monty_ct_eq<F: Monty>(a: F, b: F) -> subtle::Choice {
+pub(crate) fn monty_ct_eq<F: Monty>(a: F, b: F) -> subtle::Choice {
     a.to_raw().ct_eq(&b.to_raw())
 }
 
 /// Convert a field element in Montgomery form to a byte array
-pub fn monty_to_bytes<F: Monty>(&f: &F) -> GenericArray<u8, typenum::U8> {
+pub(crate) fn monty_to_bytes<F: Monty>(&f: &F) -> GenericArray<u8, typenum::U8> {
     GenericArray::from((monty_to_u128(f) as u64).to_le_bytes())
 }
 
 /// Convert a byte array to a field element in Montgomery form
-pub fn monty_from_bytes<F: Monty>(
+pub(crate) fn monty_from_bytes<F: Monty>(
     bs: &GenericArray<u8, typenum::U8>,
 ) -> Result<F, BiggerThanModulus> {
     let n = u64::from_le_bytes(*bs.as_ref());
@@ -227,7 +227,7 @@ pub fn monty_from_bytes<F: Monty>(
 }
 
 /// Convert a random byte array to a field element in Montgomery form
-pub fn monty_from_uniform_bytes<F: Monty>(seed: &[u8; 16]) -> F {
+pub(crate) fn monty_from_uniform_bytes<F: Monty>(seed: &[u8; 16]) -> F {
     use rand::prelude::SeedableRng;
 
     let mut rng = crate::rand_aes::AesRng::from_seed(crate::Block::from(*seed));
@@ -235,7 +235,7 @@ pub fn monty_from_uniform_bytes<F: Monty>(seed: &[u8; 16]) -> F {
 }
 
 /// Generate a uniformly random field element
-pub fn monty_random<F: Monty, R: rand_core::RngCore + ?Sized>(rng: &mut R) -> F {
+pub(crate) fn monty_random<F: Monty, R: rand_core::RngCore + ?Sized>(rng: &mut R) -> F {
     F::from_raw(Uniform::from(0..F::M).sample(rng))
 }
 
