@@ -155,7 +155,7 @@ pub trait FiniteField:
     }
 
     /// Compute `self` to the power of `n`, **in non-constant time**.
-    fn non_ct_pow(&self, n: u128) -> Self {
+    fn pow_var_time(&self, n: u128) -> Self {
         let mut acc = Self::ONE;
         let mut b = *self;
         let mut n = n;
