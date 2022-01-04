@@ -4,9 +4,6 @@
 
 use std::hash::Hash;
 
-#[cfg(test)]
-use proptest::{prelude::*, *};
-
 use crate::field::fft::FieldForFFT;
 use crate::field::monty::*;
 use crate::{implement_finite_field_for_monty, monty_from_lit};
