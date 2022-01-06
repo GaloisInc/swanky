@@ -7,7 +7,7 @@ extern crate humidor;
 use humidor::circuit::Ckt;
 use humidor::ligero::interactive;
 
-type Hash = humidor::merkle::Blake256;
+type Hash = sha2::Sha256;
 type Field = scuttlebutt::field::F2_19x3_26;
 type Prover = interactive::Prover<Field, Hash>;
 type Verifier = interactive::Verifier<Field, Hash>;

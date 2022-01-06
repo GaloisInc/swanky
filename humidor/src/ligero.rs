@@ -66,6 +66,7 @@
 //
 // TODO: Implement repetitions to achieve soundness with smaller field sizes.
 
+use digest::Digest as CryptoDigest;
 use generic_array::typenum::Unsigned;
 use ndarray::{concatenate, Array1, Array2, ArrayView1, Axis};
 use rand::{CryptoRng, Rng, SeedableRng};
@@ -73,6 +74,8 @@ use scuttlebutt::field::fft::FieldForFFT;
 use scuttlebutt::field::FiniteField;
 use scuttlebutt::{AesRng, Block};
 use sprs::{CsMat, TriMat};
+
+type HashOutput<T> = digest::Output<T>;
 
 #[cfg(test)]
 use proptest::{collection::vec as pvec, prelude::*, *};
@@ -242,7 +245,7 @@ impl<Field: FieldForLigero> Public<Field> {
 
 /// Proof information available only to the prover.
 #[allow(non_snake_case)]
-struct Secret<Field, H> {
+struct Secret<Field, H: CryptoDigest> {
     pub public: Public<Field>,
 
     w: Array1<Field>, // Extended witness padded to l*m elements
@@ -268,6 +271,7 @@ struct Secret<Field, H> {
 impl<Field, H> std::fmt::Debug for Secret<Field, H>
 where
     Field: std::fmt::Debug,
+    H: CryptoDigest,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Secret")
@@ -284,7 +288,7 @@ where
 }
 
 #[allow(non_snake_case)]
-impl<Field: FieldForLigero, H: merkle::MerkleHash> Secret<Field, H> {
+impl<Field: FieldForLigero, H: CryptoDigest> Secret<Field, H> {
     /// Create the private component of a Ligero proof. The circuit to check and
     /// the witness size are contained in the `c` argument, while `inp` is the
     /// private witness.
@@ -442,7 +446,7 @@ proptest! {
         seed: [u8;16],
     ) {
         let mut rng = AesRng::from_seed(Block::from(seed));
-        let mut s: Secret<_, merkle::Blake256> = Secret::new(&mut rng, &c, &i);
+        let mut s: Secret<_, sha2::Sha256> = Secret::new(&mut rng, &c, &i);
         let output = *c.eval(&i).last().unwrap();
 
         let rshared = Array2::from_shape_vec((1,10), rshared_vec).unwrap();
@@ -462,7 +466,7 @@ proptest! {
         seed: [u8;16],
     ) {
         let mut rng = AesRng::from_seed(Block::from(seed));
-        let s: Secret<_, merkle::Blake256> = Secret::new(&mut rng, &c, &i);
+        let s: Secret<_, sha2::Sha256> = Secret::new(&mut rng, &c, &i);
         let output = *c.eval(&i).last().unwrap();
 
         prop_assert_eq!(
@@ -481,7 +485,7 @@ proptest! {
         seed: [u8;16],
     ) {
         let mut rng = AesRng::from_seed(Block::from(seed));
-        let mut s: Secret<_, merkle::Blake256> = Secret::new(&mut rng, &c, &i);
+        let mut s: Secret<_, sha2::Sha256> = Secret::new(&mut rng, &c, &i);
         let output = *c.eval(&i).last().unwrap();
 
         let rshared = Array2::from_shape_vec((1,10), rshared_vec).unwrap();
@@ -521,16 +525,16 @@ pub fn expected_proof_size(
 
 /// Round 0: Prover -> Verifier
 /// * Merkle-tree digest of interleaved codewords.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 #[allow(non_snake_case)]
-pub struct Round0 {
-    U_root: merkle::Digest,
+pub struct Round0<H: CryptoDigest> {
+    U_root: HashOutput<H>,
 }
 
-impl Round0 {
+impl<H: CryptoDigest> Round0<H> {
     /// Actual size of this round of communication.
     pub fn size(&self) -> usize {
-        std::mem::size_of::<merkle::Digest>()
+        std::mem::size_of::<HashOutput<H>>()
     }
 }
 
@@ -645,7 +649,7 @@ impl<Field: FieldForLigero> Round3<Field> {
 /// * Merkle proof of revealed columns.
 #[derive(Debug, Clone)]
 #[allow(non_snake_case)]
-pub struct Round4<Field, H> {
+pub struct Round4<Field, H: CryptoDigest> {
     U_lemma: merkle::Lemma<Field, H>,
 
     ux: Vec<Field>,
@@ -656,7 +660,7 @@ pub struct Round4<Field, H> {
     u0: Vec<Field>, // This is missing in Sec. 4.7, but I think it's needed
 }
 
-impl<Field: FieldForLigero, H: merkle::MerkleHash> Round4<Field, H> {
+impl<Field: FieldForLigero, H: CryptoDigest> Round4<Field, H> {
     /// Actual size of this round of communication.
     pub fn size(&self) -> usize {
         self.U_lemma.size()
@@ -677,9 +681,9 @@ impl<Field: FieldForLigero, H: merkle::MerkleHash> Round4<Field, H> {
 // variables are not in snake case.
 
 #[allow(non_snake_case)]
-fn verify<Field: FieldForLigero, H: merkle::MerkleHash>(
+fn verify<Field: FieldForLigero, H: CryptoDigest>(
     public: &mut Public<Field>,
-    r0: Round0,
+    r0: &Round0<H>,
     r1: Round1<Field>,
     r2: Round2<Field>,
     r3: Round3<Field>,
@@ -826,7 +830,7 @@ fn make_pa<Field: FieldForLigero>(params: &Params<Field>, Ua: &Array2<Field>) ->
 // radd_blind is the unique (k+l-1)-degree polynomial with
 // radd_blind(eta_c) = uadd[c].
 #[allow(non_snake_case)]
-fn make_qadd<Field: FieldForLigero, H>(
+fn make_qadd<Field: FieldForLigero, H: CryptoDigest>(
     s: &Secret<Field, H>,
     p: &Array2<Field>, // each row deg < k + 1
     Padd: &CsMat<Field>,
@@ -930,11 +934,11 @@ pub mod interactive {
     use super::*;
 
     /// Interactive Ligero prover.
-    pub struct Prover<Field, H> {
+    pub struct Prover<Field, H: CryptoDigest> {
         secret: Secret<Field, H>,
     }
 
-    impl<Field: FieldForLigero, H: merkle::MerkleHash> Prover<Field, H> {
+    impl<Field: FieldForLigero, H: CryptoDigest> Prover<Field, H> {
         /// Create an interactive prover out of a circuit and witness.
         pub fn new<R: Rng + CryptoRng>(rng: &mut R, c: &Ckt<Field>, w: &Vec<Field>) -> Self {
             Self {
@@ -953,7 +957,7 @@ pub mod interactive {
                 p.m,
                 p.t,
                 std::mem::size_of::<Field>(),
-                std::mem::size_of::<merkle::Digest>(),
+                std::mem::size_of::<HashOutput<H>>(),
             )
         }
 
@@ -995,7 +999,7 @@ pub mod interactive {
         // Round functions
 
         /// Generate round-0 prover message.
-        pub fn round0(&self) -> Round0 {
+        pub fn round0(&self) -> Round0<H> {
             Round0 {
                 U_root: self.secret.U_hash.root(),
             }
@@ -1107,17 +1111,17 @@ pub mod interactive {
     }
 
     /// Ligero interactive verifier.
-    pub struct Verifier<Field, H> {
+    pub struct Verifier<Field, H: CryptoDigest> {
         phantom: std::marker::PhantomData<H>,
 
         public: Public<Field>,
-        r0: Option<Round0>,
+        r0: Option<Round0<H>>,
         r1: Option<Round1<Field>>,
         r2: Option<Round2<Field>>,
         r3: Option<Round3<Field>>,
     }
 
-    impl<Field: FieldForLigero, H: merkle::MerkleHash> Verifier<Field, H> {
+    impl<Field: FieldForLigero, H: CryptoDigest> Verifier<Field, H> {
         /// Create a new verifier from a circuit.
         pub fn new(c: &Ckt<Field>) -> Self {
             Self {
@@ -1159,12 +1163,12 @@ pub mod interactive {
                 p.m,
                 p.t,
                 std::mem::size_of::<Field>(),
-                std::mem::size_of::<merkle::Digest>(),
+                std::mem::size_of::<HashOutput<H>>(),
             )
         }
 
         /// Generate round-1 verifier message.
-        pub fn round1<R: Rng + CryptoRng>(&mut self, rng: &mut R, r0: Round0) -> Round1<Field> {
+        pub fn round1<R: Rng + CryptoRng>(&mut self, rng: &mut R, r0: Round0<H>) -> Round1<Field> {
             let r1 = Round1::new(
                 &self.public.params,
                 self.shared().len(),
@@ -1194,12 +1198,12 @@ pub mod interactive {
 
         /// Run final verification procedure.
         pub fn verify(&mut self, r4: Round4<Field, H>) -> bool {
-            let r0 = self.r0.expect("Round 0 skipped");
+            let r0 = self.r0.as_ref().expect("Round 0 skipped");
             let r1 = self.r1.clone().expect("Round 1 skipped");
             let r2 = self.r2.clone().expect("Round 2 skipped");
             let r3 = self.r3.clone().expect("Round 3 skipped");
 
-            verify(&mut self.public, r0, r1, r2, r3, r4)
+            verify(&mut self.public, &r0, r1, r2, r3, r4)
         }
     }
 
@@ -1321,36 +1325,35 @@ pub mod noninteractive {
     use super::*;
 
     /// Complete proof message sent from prover to verifier.
-    pub struct Proof<Field, H> {
+    pub struct Proof<Field, H: CryptoDigest> {
         phantom: std::marker::PhantomData<H>,
 
-        r0: Round0,
+        r0: Round0<H>,
         r2: Round2<Field>,
         r4: Round4<Field, H>,
     }
 
-    impl<Field: FieldForLigero, H: merkle::MerkleHash> Proof<Field, H> {
+    impl<Field: FieldForLigero, H: CryptoDigest> Proof<Field, H> {
         /// Actual size of the non-interactive proof message.
         pub fn size(&self) -> usize {
             self.r0.size() + self.r2.size() + self.r4.size()
         }
     }
 
-    fn make_r1<Field: FieldForLigero, H: merkle::MerkleHash>(
+    fn make_r1<Field: FieldForLigero, H: CryptoDigest>(
         params: &Params<Field>,
         num_shared_elems: usize,
         num_shared_checks: usize,
-        state: &merkle::Digest,
-        r0: &Round0,
+        state: &HashOutput<H>,
+        r0: &Round0<H>,
         other_commit: &[u8], // Commitment of shared witness and mask from other proof system
-    ) -> (Round1<Field>, merkle::Digest) {
+    ) -> (Round1<Field>, HashOutput<H>) {
         let mut hash = H::new();
         hash.update(&state.to_vec());
         hash.update(&r0.U_root);
         hash.update(other_commit);
 
-        let mut digest = merkle::HZERO;
-        hash.finalize(&mut digest);
+        let digest = hash.finalize();
         let seed = Block::try_from_slice(&digest[0..16]).unwrap();
 
         (
@@ -1364,9 +1367,9 @@ pub mod noninteractive {
         )
     }
 
-    fn make_r3<Field: FieldForLigero, H: merkle::MerkleHash>(
+    fn make_r3<Field: FieldForLigero, H: CryptoDigest>(
         params: &Params<Field>,
-        state: &merkle::Digest,
+        state: &HashOutput<H>,
         r2: &Round2<Field>,
     ) -> Round3<Field> {
         let mut hash = H::new();
@@ -1396,20 +1399,19 @@ pub mod noninteractive {
             .into_iter()
             .for_each(|f| hash.update(&f.to_bytes()));
 
-        let mut digest = merkle::HZERO;
-        hash.finalize(&mut digest);
+        let digest = hash.finalize();
         let seed = Block::try_from_slice(&digest[0..16]).unwrap();
 
         Round3::new(params, &mut AesRng::from_seed(seed))
     }
 
     /// Non-interactive Ligero prover.
-    pub struct Prover<Field, H> {
+    pub struct Prover<Field, H: CryptoDigest> {
         ip: interactive::Prover<Field, H>,
-        ckt_hash: merkle::Digest,
+        ckt_hash: HashOutput<H>,
     }
 
-    impl<Field: FieldForLigero, H: merkle::MerkleHash> Prover<Field, H> {
+    impl<Field: FieldForLigero, H: CryptoDigest> Prover<Field, H> {
         /// Create a non-interactive prover from a circuit and witness.
         pub fn new<R: Rng + CryptoRng>(rng: &mut R, c: &Ckt<Field>, w: &Vec<Field>) -> Self {
             let mut hash = H::new();
@@ -1419,8 +1421,7 @@ pub mod noninteractive {
                 hash.update(&bytes);
             });
 
-            let mut ckt_hash = merkle::HZERO;
-            hash.finalize(&mut ckt_hash);
+            let ckt_hash = hash.finalize();
 
             Self {
                 ckt_hash,
@@ -1446,7 +1447,7 @@ pub mod noninteractive {
                 p.m,
                 p.t,
                 std::mem::size_of::<Field>(),
-                std::mem::size_of::<merkle::Digest>(),
+                std::mem::size_of::<HashOutput<H>>(),
             )
         }
 
@@ -1493,14 +1494,14 @@ pub mod noninteractive {
     }
 
     /// Non-interactive Ligero verifier.
-    pub struct Verifier<Field, H> {
+    pub struct Verifier<Field, H: CryptoDigest> {
         phantom: std::marker::PhantomData<H>,
 
         public: Public<Field>,
-        ckt_hash: merkle::Digest,
+        ckt_hash: HashOutput<H>,
     }
 
-    impl<Field: FieldForLigero, H: merkle::MerkleHash> Verifier<Field, H> {
+    impl<Field: FieldForLigero, H: CryptoDigest> Verifier<Field, H> {
         /// Create a verifier out of a circuit.
         pub fn new(ckt: &Ckt<Field>) -> Self {
             let mut hash = H::new();
@@ -1510,8 +1511,7 @@ pub mod noninteractive {
                 hash.update(&bytes);
             });
 
-            let mut ckt_hash = merkle::HZERO;
-            hash.finalize(&mut ckt_hash);
+            let ckt_hash = hash.finalize();
 
             Self {
                 ckt_hash,
@@ -1533,7 +1533,7 @@ pub mod noninteractive {
                 p.m,
                 p.t,
                 std::mem::size_of::<Field>(),
-                std::mem::size_of::<merkle::Digest>(),
+                std::mem::size_of::<HashOutput<H>>(),
             )
         }
 
@@ -1558,7 +1558,7 @@ pub mod noninteractive {
             let qshared = p.r2.qshared.clone();
 
             (
-                verify(&mut self.public, p.r0, r1, p.r2, r3, p.r4),
+                verify(&mut self.public, &p.r0, r1, p.r2, r3, p.r4),
                 rshared,
                 qshared,
             )
@@ -1624,8 +1624,7 @@ pub mod noninteractive {
             }),
             seed: [u8; 16],
         ) {
-            use merkle::{Sha256, MerkleHash};
-            use tiny_keccak::Hasher;
+            use sha2::Sha256;
 
             let mut rng = AesRng::from_seed(Block::from(seed));
 
@@ -1637,8 +1636,7 @@ pub mod noninteractive {
             p.ip.shared_witness().iter().for_each(|f| hash.update(&f.to_bytes()));
             p.ip.shared_mask().iter().for_each(|f| hash.update(&f.to_bytes()));
 
-            let mut other_commit = merkle::HZERO;
-            hash.finalize(&mut other_commit);
+            let other_commit = hash.finalize();
 
             let (proof, rshared, qshared) = p.make_proof_and_shared_check(&other_commit);
             prop_assert_eq!(
@@ -1654,8 +1652,7 @@ pub mod noninteractive {
             }),
             seed: [u8; 16],
         ) {
-            use merkle::{Sha256, MerkleHash};
-            use tiny_keccak::Hasher;
+            use sha2::Sha256;
 
             let mut rng = AesRng::from_seed(Block::from(seed));
 
@@ -1666,8 +1663,7 @@ pub mod noninteractive {
             p.ip.shared_witness().iter().for_each(|f| hash.update(&f.to_bytes()));
             p.ip.shared_mask().iter().for_each(|f| hash.update(&f.to_bytes()));
 
-            let mut other_commit = merkle::HZERO;
-            hash.finalize(&mut other_commit);
+            let other_commit = hash.finalize();
 
             let (proof, rshared, qshared) = p.make_proof_and_shared_check(&other_commit);
             prop_assert_eq!(

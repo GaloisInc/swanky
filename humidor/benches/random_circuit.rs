@@ -7,7 +7,7 @@ use scuttlebutt::AesRng;
 use humidor::circuit::{random_ckt_zero, Ckt};
 use humidor::ligero::noninteractive;
 
-type Hash = humidor::merkle::Blake256;
+type Hash = sha2::Sha256;
 type Field = scuttlebutt::field::F2_19x3_26;
 type Prover = noninteractive::Prover<Field, Hash>;
 type Verifier = noninteractive::Verifier<Field, Hash>;

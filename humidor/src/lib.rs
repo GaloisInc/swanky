@@ -9,6 +9,6 @@
 
 pub mod circuit;
 pub mod ligero;
-pub mod merkle;
-pub mod params;
+mod merkle;
+mod params;
 mod util;
