@@ -52,10 +52,7 @@ pub trait FiniteField:
     fn to_bytes(&self) -> GenericArray<u8, Self::ByteReprLen>;
 
     /// The prime-order subfield of the finite field.
-    type PrimeField: FiniteField<
-            PrimeField = Self::PrimeField,
-            PolynomialFormNumCoefficients = generic_array::typenum::U1,
-        > + IsSubfieldOf<Self>;
+    type PrimeField: PrimeFiniteField + IsSubfieldOf<Self>;
     /// When elements of this field are represented as a polynomial over the prime field,
     /// how many coefficients are needed?
     type PolynomialFormNumCoefficients: ArrayLength<Self::PrimeField> + ArrayLength<Self>;
@@ -166,6 +163,25 @@ pub trait IsSubfieldOf<FE: FiniteField>: FiniteField {
 impl<FE: FiniteField> IsSubfieldOf<FE> for FE {
     fn lift_into_superfield(&self) -> FE {
         *self
+    }
+}
+
+/// A `PrimeFiniteField` is a `FiniteField` with a prime modulus. In this case
+/// the field is isomorphic to integers modulo prime `p`.
+pub trait PrimeFiniteField:
+    FiniteField<PolynomialFormNumCoefficients = generic_array::typenum::U1, PrimeField = Self>
+    + std::convert::TryFrom<u128>
+{
+}
+
+/// The error which occurs if the inputted value or bit pattern doesn't correspond to a field
+/// element.
+#[derive(Debug, Clone, Copy)]
+pub struct BiggerThanModulus;
+impl std::error::Error for BiggerThanModulus {}
+impl std::fmt::Display for BiggerThanModulus {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "{:?}", self)
     }
 }
 
@@ -321,19 +337,19 @@ pub(crate) fn standard_bit_decomposition<L: ArrayLength<bool>>(
 }
 
 mod f128p;
-pub use f128p::{BiggerThanModulus, F128p};
+pub use f128p::F128p;
 
 mod f2;
-pub use f2::{BiggerThanModulus as F2BiggerThanModulus, F2};
+pub use f2::F2;
 
 mod gf_2_128;
 pub use gf_2_128::{Gf128, Gf128BytesDeserializationCannotFail};
 
 mod gf_2_45;
-pub use gf_2_45::{Gf45, Gf45ValueBiggerThanModulus};
+pub use gf_2_45::Gf45;
 
 mod gf_2_40;
-pub use gf_2_40::{Gf40, Gf40ValueBiggerThanModulus};
+pub use gf_2_40::Gf40;
 
 mod f61p;
 pub use f61p::F61p;
