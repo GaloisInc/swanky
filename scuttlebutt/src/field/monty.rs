@@ -511,6 +511,8 @@ mod test {
         }
     }
 
+    impl crate::field::PrimeFiniteField for F11 {}
+
     impl Monty for F11 {
         const M: u64 = 11;
         const M_TICK: u64 = ((2u128 << 64) - 3_353_953_467_947_191_203u128) as u64;

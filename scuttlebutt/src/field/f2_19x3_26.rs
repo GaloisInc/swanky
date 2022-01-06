@@ -2,11 +2,11 @@
 // Copyright © 2021 Galois, Inc.
 // See LICENSE for licensing information.
 
-use std::hash::Hash;
-
+use super::PrimeFiniteField;
 use crate::field::fft::FieldForFFT;
 use crate::field::monty::*;
 use crate::{implement_finite_field_for_monty, monty_from_lit};
+use std::hash::Hash;
 
 /// Prime field with modulus `M = 2^19*3^26+1`. Hence `phi(M)` is divisible by
 /// `2^19` and `3^26` and supports a large number of fft2 and fft3 sizes for
@@ -72,6 +72,8 @@ impl std::convert::From<F2_19x3_26> for u128 {
         monty_to_u128(f)
     }
 }
+
+impl PrimeFiniteField for F2_19x3_26 {}
 
 implement_finite_field_for_monty! {F2_19x3_26}
 
