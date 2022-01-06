@@ -28,7 +28,7 @@ pub fn arb_test_field() -> BoxedStrategy<TestField> {
 
 /// Trait for collections that allow taking `n` initial elements while ensuring
 /// that only zero-elements are dropped from the end.
-pub trait TakeNZ
+trait TakeNZ
 where
     Self: Sized,
 {
