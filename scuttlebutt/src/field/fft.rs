@@ -262,8 +262,8 @@ pub fn fft3_inverse_in_place<Field: FieldForFFT<3>>(a_point: &mut [Field], omega
     cooley_tukey::fft3_inverse(a_point, omega);
 }
 
-/// Performs a Lagrange interpolation in field Zp at the origin
-/// for a polynomial defined by `points` and `values`.
+/// Performs a Lagrange interpolation at the origin for a polynomial defined by
+/// `points` and `values`.
 ///
 /// `points` and `values` are expected to be two arrays of the same size, containing
 /// respectively the evaluation points (x) and the value of the polynomial at those point (p(x)).
