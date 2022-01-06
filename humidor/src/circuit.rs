@@ -15,13 +15,14 @@ use crate::util::{arb_test_field, TestField};
 #[cfg(test)]
 use proptest::{collection::vec as pvec, prelude::*};
 
-/// Operations for a Ligero arithmetic circuit over a finite field. Results
-/// are always stored in the next available register.
+/// Operations, where the operation arguments correspond to wire indices, for a
+/// Ligero arithmetic circuit over a finite field. Results are always stored in
+/// the next available register.
 #[derive(Debug, Clone, Copy)]
 pub enum Op<Field> {
-    /// Add two field elements.
+    /// Add two field elements
     Add(usize, usize),
-    /// Multiply two field elements.
+    /// Multiply two field elements
     Mul(usize, usize),
     /// Subtract one field element from another
     Sub(usize, usize),
@@ -103,10 +104,7 @@ where
         };
 
     /// Convert an op to an opcode.
-    pub fn bytes(&self, bs: &mut Vec<u8>) {
-        //debug_assert!(b.capacity() >= Self::BYTE_SIZE);
-
-        bs.clear();
+    pub fn append_bytes(&self, bs: &mut Vec<u8>) {
         match self {
             Op::Add(i, j) => {
                 bs.push(0u8);
@@ -149,9 +147,9 @@ pub struct Ckt<Field> {
 
 impl<Field: FiniteField> Ckt<Field> {
     /// Create a new circuit from a circuit size and a sequence of operations.
-    pub fn new(inp_size: usize, ops: &[Op<Field>]) -> Self {
+    pub fn new(inp_size: usize, ops: Vec<Op<Field>>) -> Self {
         Self {
-            ops: ops.to_vec(),
+            ops,
             inp_size,
             shared: 0..0,
         }
@@ -233,7 +231,7 @@ where
 {
     let ckt = Ckt::new(
         4,
-        &vec![
+        vec![
             // \w x y z -> x*w + y/w - 5*z
             // reg[0] <- w
             // reg[1] <- x
@@ -275,11 +273,12 @@ pub fn random_ckt_zero<Field: FiniteField>(
         .map(|_| Field::random(rng))
         .collect::<Vec<_>>();
 
-    let output = Ckt::new(inp_size, &ops).eval(&w);
+    // XXX: This `clone` might be very expensive!
+    let output = Ckt::new(inp_size, ops.clone()).eval(&w);
     ops.push(Op::LdI(*output.last().unwrap()));
     ops.push(Op::Sub(inp_size + ckt_size - 2, inp_size + ckt_size - 3));
 
-    (Ckt::new(inp_size, &ops), w)
+    (Ckt::new(inp_size, ops), w)
 }
 
 /// Generate an arbitrary circuit with at most the given size.

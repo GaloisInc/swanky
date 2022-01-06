@@ -1417,9 +1417,9 @@ pub mod noninteractive {
             let mut hash = H::new();
             let mut bytes = Vec::with_capacity(Op::<Field>::OPCODE_SIZE);
             c.ops.iter().for_each(|op| {
-                op.bytes(&mut bytes);
-                hash.update(&bytes);
+                op.append_bytes(&mut bytes);
             });
+            hash.update(&bytes);
 
             let ckt_hash = hash.finalize();
 
@@ -1507,9 +1507,9 @@ pub mod noninteractive {
             let mut hash = H::new();
             let mut bytes = Vec::with_capacity(Op::<Field>::OPCODE_SIZE);
             ckt.ops.iter().for_each(|op| {
-                op.bytes(&mut bytes);
-                hash.update(&bytes);
+                op.append_bytes(&mut bytes);
             });
+            hash.update(&bytes);
 
             let ckt_hash = hash.finalize();
 
