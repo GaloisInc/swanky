@@ -37,8 +37,8 @@ fn rand_ix_pair(rng: &mut impl Rng, min: usize, max: usize) -> (usize, usize) {
 
     let s = max - min;
 
-    let a = Uniform::from(0..s).sample(rng);
-    let b = Uniform::from(1..s).sample(rng);
+    let a = rng.gen_range(0, s);
+    let b = rng.gen_range(1, s);
 
     (min + a, min + (a + b) % s)
 }
