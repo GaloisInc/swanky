@@ -4,7 +4,7 @@
 //! TODO: this might not be constant-time in all cases.
 
 use crate::{
-    field::{polynomial::Polynomial, FiniteField},
+    field::{polynomial::Polynomial, BiggerThanModulus, FiniteField, PrimeFiniteField},
     Block,
 };
 use generic_array::GenericArray;
@@ -122,17 +122,6 @@ impl FiniteField for F128p {
     }
 }
 
-/// The error which occurs if the inputted `u128` or bit pattern doesn't correspond to a field
-/// element.
-#[derive(Debug, Clone, Copy)]
-pub struct BiggerThanModulus;
-impl std::error::Error for BiggerThanModulus {}
-impl std::fmt::Display for BiggerThanModulus {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "{:?}", self)
-    }
-}
-
 impl TryFrom<u128> for F128p {
     type Error = BiggerThanModulus;
 
@@ -197,6 +186,8 @@ impl MulAssign<&F128p> for F128p {
         self.0 = (raw_prod % U256::from(MODULUS)).as_u128();
     }
 }
+
+impl PrimeFiniteField for F128p {}
 
 field_ops!(F128p);
 

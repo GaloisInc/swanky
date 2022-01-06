@@ -1,8 +1,8 @@
-use crate::field::{polynomial::Polynomial, BiggerThanModulus, FiniteField};
+use crate::field::{polynomial::Polynomial, BiggerThanModulus, FiniteField, PrimeFiniteField};
 use generic_array::GenericArray;
 use rand_core::RngCore;
 use std::{
-    convert::TryFrom,
+    convert::{TryFrom, TryInto},
     ops::{AddAssign, MulAssign, SubAssign},
 };
 use subtle::{Choice, ConditionallySelectable, ConstantTimeEq};
@@ -172,6 +172,22 @@ impl std::iter::Sum for F61p {
         return F61p(reduce(out));
     }
 }
+
+impl TryFrom<u128> for F61p {
+    type Error = BiggerThanModulus;
+
+    fn try_from(value: u128) -> Result<Self, Self::Error> {
+        if value < MODULUS.into() {
+            // This unwrap should never fail since we check that the value fits
+            // in the modulus.
+            Ok(F61p(value.try_into().unwrap()))
+        } else {
+            Err(BiggerThanModulus)
+        }
+    }
+}
+
+impl PrimeFiniteField for F61p {}
 
 field_ops!(F61p, SUM_ALREADY_DEFINED);
 

@@ -1,4 +1,4 @@
-use crate::field::{f2::F2, polynomial::Polynomial, FiniteField, IsSubfieldOf};
+use crate::field::{f2::F2, polynomial::Polynomial, BiggerThanModulus, FiniteField, IsSubfieldOf};
 use generic_array::GenericArray;
 use rand_core::RngCore;
 use smallvec::smallvec;
@@ -79,22 +79,9 @@ impl<'a> MulAssign<&'a Gf40> for Gf40 {
     }
 }
 
-/// The serialized form of the GF(2^40) value is bigger than its modulus.
-#[derive(Clone, Copy, Debug)]
-pub struct Gf40ValueBiggerThanModulus;
-impl std::fmt::Display for Gf40ValueBiggerThanModulus {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(
-            f,
-            "The serialized form of the GF(2^40) value is bigger than its modulus."
-        )
-    }
-}
-impl std::error::Error for Gf40ValueBiggerThanModulus {}
-
 impl FiniteField for Gf40 {
     type ByteReprLen = generic_array::typenum::U5;
-    type FromBytesError = Gf40ValueBiggerThanModulus;
+    type FromBytesError = BiggerThanModulus;
 
     #[inline]
     fn from_bytes(
@@ -106,7 +93,7 @@ impl FiniteField for Gf40 {
         if raw < (1 << 40) {
             Ok(Gf40(raw))
         } else {
-            Err(Gf40ValueBiggerThanModulus)
+            Err(BiggerThanModulus)
         }
     }
 

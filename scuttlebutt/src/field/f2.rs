@@ -3,11 +3,11 @@
 //! # Security Warning
 //! TODO: this might not be constant-time in all cases.
 
-use crate::field::{polynomial::Polynomial, FiniteField};
+use crate::field::{polynomial::Polynomial, BiggerThanModulus, FiniteField, PrimeFiniteField};
 use generic_array::GenericArray;
 use rand_core::RngCore;
 use std::{
-    convert::TryFrom,
+    convert::{TryFrom, TryInto},
     hash::Hash,
     ops::{AddAssign, MulAssign, SubAssign},
 };
@@ -136,23 +136,26 @@ impl MulAssign<&F2> for F2 {
     }
 }
 
-/// The error which occurs if the inputted `u8` or bit pattern doesn't correspond to a field
-/// element.
-#[derive(Debug, Clone, Copy)]
-pub struct BiggerThanModulus;
-impl std::error::Error for BiggerThanModulus {}
-impl std::fmt::Display for BiggerThanModulus {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "{:?}", self)
-    }
-}
-
 impl TryFrom<u8> for F2 {
     type Error = BiggerThanModulus;
 
     fn try_from(value: u8) -> Result<Self, Self::Error> {
         if value < MODULUS {
             Ok(F2(value))
+        } else {
+            Err(BiggerThanModulus)
+        }
+    }
+}
+
+impl TryFrom<u128> for F2 {
+    type Error = BiggerThanModulus;
+
+    fn try_from(value: u128) -> Result<Self, Self::Error> {
+        if value < MODULUS.into() {
+            // This unwrap should never fail since we check that the value fits
+            // in the modulus.
+            Ok(F2(value.try_into().unwrap()))
         } else {
             Err(BiggerThanModulus)
         }
@@ -166,6 +169,8 @@ impl From<F2> for u8 {
         x.0
     }
 }
+
+impl PrimeFiniteField for F2 {}
 
 field_ops!(F2);
 
