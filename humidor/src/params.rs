@@ -38,27 +38,25 @@ use crate::util::*;
 // XXX: Is this right? Seems like t could be smaller, say ceil(log |F| / p).
 #[derive(Debug, Clone, Copy)]
 pub struct Params<Field> {
-    phantom: std::marker::PhantomData<Field>,
-
     /// Parameters for `threshold_secret_sharing::PackedSecretSharing`.
-    pub pss: PackedSecretSharingGenerator<Field>,
+    pss: PackedSecretSharingGenerator<Field>,
 
     /// Log base-2 of k
-    pub kexp: u32,
+    kexp: u32,
     /// Log base-3 of k
-    pub nexp: u32,
+    nexp: u32,
 
     /// Number of field elements encoded in a single codeword row.
     /// (Note: k = l + t = 2^j - 1, for some j)
-    pub l: usize,
+    pub(crate) l: usize,
     /// Security threshold: max number of columns that can be revealed securely
-    pub t: usize,
+    pub(crate) t: usize,
     /// Reconstruction threshold: min number of columns for reconstruction
-    pub k: usize,
+    pub(crate) k: usize,
     /// Codeword size, i.e., number of columns (Note: n = 3^i - 1, for some i)
-    pub n: usize,
+    pub(crate) n: usize,
     /// Interleaved code size, i.e., number of rows
-    pub m: usize,
+    pub(crate) m: usize,
 }
 
 impl<Field: FieldForLigero> Params<Field> {
@@ -116,7 +114,6 @@ impl<Field: FieldForLigero> Params<Field> {
             .1;
 
         Self {
-            phantom: std::marker::PhantomData,
             kexp,
             nexp,
             k,

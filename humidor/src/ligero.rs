@@ -109,7 +109,7 @@ impl FieldForLigero for scuttlebutt::field::F2_19x3_26 {
 #[derive(Debug)]
 #[allow(non_snake_case)]
 struct Public<Field> {
-    params: crate::params::Params<Field>,
+    params: Params<Field>,
 
     pub shared: std::ops::Range<usize>,
     pub shared_mask: std::ops::Range<usize>,
