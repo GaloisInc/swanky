@@ -22,7 +22,6 @@ pub mod commitment;
 pub mod field;
 mod hash_aes;
 mod rand_aes;
-pub mod threshold_secret_sharing;
 pub mod utils;
 
 pub use crate::{

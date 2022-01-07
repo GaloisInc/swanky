@@ -9,8 +9,7 @@
 //! Packed (or ramp) variant of Shamir secret sharing,
 //! allowing efficient sharing of several secrets together.
 
-use crate::field::FiniteField;
-use crate::field::{fft, fft::FieldForFFT, polynomial::NewtonPolynomial};
+use scuttlebutt::field::{fft, fft::FieldForFFT, polynomial::NewtonPolynomial, FiniteField};
 
 /// Generator for the packed variant of Shamir secret sharing, specifying number
 /// of secrets shared together, total number of shares, and privacy threshold.
@@ -194,8 +193,9 @@ impl<Field: FiniteField + FieldForFFT<2> + FieldForFFT<3>> PackedSecretSharingGe
 mod tests {
     use super::*;
     use rand::prelude::*;
+    use scuttlebutt::field::fft::FieldForFFT;
 
-    type TestField = crate::field::F2_19x3_26;
+    type TestField = scuttlebutt::field::F2_19x3_26;
 
     #[test]
     fn test_share_reconstruct() {

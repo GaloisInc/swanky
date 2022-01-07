@@ -11,4 +11,5 @@ pub mod circuit;
 pub mod ligero;
 mod merkle;
 mod params;
+mod threshold_secret_sharing;
 mod util;

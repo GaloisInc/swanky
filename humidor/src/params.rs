@@ -8,12 +8,12 @@
 // TODO: Eliminate excessive use of vectors in anonymous functions, function
 // return values, etc.
 
+use crate::threshold_secret_sharing::PackedSecretSharingGenerator;
 use ndarray::{concatenate, Array1, Array2, ArrayView1, ArrayView2, Axis, Zip};
 use rand::{CryptoRng, Rng};
 use scuttlebutt::field::fft;
 use scuttlebutt::field::fft::FieldForFFT;
 use scuttlebutt::field::polynomial;
-use scuttlebutt::threshold_secret_sharing::PackedSecretSharingGenerator;
 
 use crate::ligero::FieldForLigero;
 use crate::util::*;
