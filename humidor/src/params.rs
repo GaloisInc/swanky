@@ -8,12 +8,12 @@
 // TODO: Eliminate excessive use of vectors in anonymous functions, function
 // return values, etc.
 
+use crate::polynomial;
 use crate::threshold_secret_sharing::PackedSecretSharingGenerator;
 use ndarray::{concatenate, Array1, Array2, ArrayView1, ArrayView2, Axis, Zip};
 use rand::{CryptoRng, Rng};
 use scuttlebutt::field::fft;
 use scuttlebutt::field::fft::FieldForFFT;
-use scuttlebutt::field::polynomial;
 
 use crate::ligero::FieldForLigero;
 use crate::util::*;
@@ -44,7 +44,7 @@ pub struct Params<Field> {
     /// Log base-2 of k
     kexp: u32,
     /// Log base-3 of k
-    nexp: u32,
+    _nexp: u32,
 
     /// Number of field elements encoded in a single codeword row.
     /// (Note: k = l + t = 2^j - 1, for some j)
@@ -115,7 +115,7 @@ impl<Field: FieldForLigero> Params<Field> {
 
         Self {
             kexp,
-            nexp,
+            _nexp: nexp,
             k,
             t,
             l,
@@ -508,7 +508,7 @@ proptest! {
         let p: Params<TestField> = Params::new(s);
 
         prop_assert_eq!(2usize.pow(p.kexp), p.k + 1);
-        prop_assert_eq!(3usize.pow(p.nexp), p.n + 1);
+        prop_assert_eq!(3usize.pow(p._nexp), p.n + 1);
         prop_assert_eq!(p.l + p.t, p.k);
         prop_assert!(p.k <= p.n);
         prop_assert!(p.l * p.m >= s);
