@@ -68,6 +68,8 @@ pub trait Monty: 'static + Send + Sync + Sized + Copy + Clone + Default + Hash +
 
     /// Bitwidth of the field modulus, i.e., least `k` s.t. `M < 2^k`
     const BITS: usize;
+
+    /// Number of bits in decomposition
     type Bits: ArrayLength<bool>;
 
     /// Constructor for the field struct from raw u64 Montgomery form
@@ -433,12 +435,12 @@ macro_rules! implement_finite_field_for_monty {
             type ByteReprLen = generic_array::typenum::U8;
             type FromBytesError = $crate::field::BiggerThanModulus;
 
-            fn to_bytes(&self) -> $crate::field::GenericArray<u8, Self::ByteReprLen> {
+            fn to_bytes(&self) -> generic_array::GenericArray<u8, Self::ByteReprLen> {
                 $crate::field::monty::monty_to_bytes(self)
             }
 
             fn from_bytes(
-                bytes: &$crate::field::GenericArray<u8, Self::ByteReprLen>,
+                bytes: &generic_array::GenericArray<u8, Self::ByteReprLen>,
             ) -> Result<Self, Self::FromBytesError> {
                 $crate::field::monty::monty_from_bytes(bytes)
             }
@@ -447,7 +449,7 @@ macro_rules! implement_finite_field_for_monty {
                 $crate::field::monty::monty_from_uniform_bytes(bytes)
             }
 
-            fn random<R: rand_core::RngCore + ?Sized>(rng: &mut R) -> Self {
+            fn random<R: rand::Rng + ?Sized>(rng: &mut R) -> Self {
                 $crate::field::monty::monty_random(rng)
             }
 
@@ -470,8 +472,9 @@ macro_rules! implement_finite_field_for_monty {
                 generic_array::GenericArray::from([*self])
             }
 
-            fn reduce_multiplication_over() -> $crate::field::Polynomial<Self::PrimeField> {
-                $crate::field::Polynomial::x()
+            fn reduce_multiplication_over(
+            ) -> $crate::field::polynomial::Polynomial<Self::PrimeField> {
+                $crate::field::polynomial::Polynomial::x()
             }
 
             fn multiply_by_prime_subfield(&self, pf: Self::PrimeField) -> Self {
@@ -487,7 +490,9 @@ macro_rules! implement_finite_field_for_monty {
             fn bit_decomposition(
                 &self,
             ) -> generic_array::GenericArray<bool, Self::NumberOfBitsInBitDecomposition> {
-                $crate::field::standard_bit_decomposition(monty_to_u128(*self))
+                $crate::field::standard_bit_decomposition($crate::field::monty::monty_to_u128(
+                    *self,
+                ))
             }
         }
     };

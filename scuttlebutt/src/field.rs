@@ -343,6 +343,7 @@ macro_rules! field_ops {
     };
 }
 
+/// Bit decomposition if `bits` into an array.
 pub(crate) fn standard_bit_decomposition<L: ArrayLength<bool>>(
     bits: u128,
 ) -> GenericArray<bool, L> {

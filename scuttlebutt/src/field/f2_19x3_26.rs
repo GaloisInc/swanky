@@ -2,9 +2,8 @@
 // Copyright © 2021 Galois, Inc.
 // See LICENSE for licensing information.
 
-use super::PrimeFiniteField;
-use crate::field::fft::FieldForFFT;
-use crate::field::monty::*;
+use crate::field::monty::{monty_from_u128, monty_to_u128, Monty};
+use crate::field::{fft::FieldForFFT, PrimeFiniteField};
 use crate::{implement_finite_field_for_monty, monty_from_lit};
 use std::hash::Hash;
 
