@@ -129,13 +129,8 @@ mod tests {
                 let coeffs: Vec<_> = (0..9).map(|_| <$field>::random(&mut rng)).collect();
                 let xs: Vec<_> = (0..10).map(|_| <$field>::random(&mut rng)).collect();
                 let ys: Vec<$field> = xs.iter().map(|&x| eval(&coeffs, x)).collect();
-                println!("coeffs = {:?}", coeffs);
-                println!("xs = {:?}", xs);
-                println!("ys = {:?}", ys);
 
                 let poly = NewtonPolynomial::init(&xs, &ys);
-                println!("poly = {:?}", poly);
-                assert_eq!(coeffs, poly.coefficients);
                 let ys_: Vec<$field> = xs.iter().map(|&x| poly.evaluate(x)).collect();
                 assert_eq!(ys, ys_);
             }
