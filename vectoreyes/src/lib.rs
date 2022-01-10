@@ -165,6 +165,8 @@ pub trait SimdBase:
         + Sync
         + Send
         + std::fmt::Debug
+        + bytemuck::Pod
+        + bytemuck::Zeroable
         + PartialEq
         + Eq
         + Default
