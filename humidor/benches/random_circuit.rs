@@ -4,7 +4,8 @@ use criterion::{BatchSize, BenchmarkId, Criterion, SamplingMode, Throughput};
 use rand::SeedableRng;
 use scuttlebutt::AesRng;
 
-use humidor::circuit::{random_ckt_zero, Ckt};
+use humidor::circuit::Circuit;
+use humidor::circuitgen::random_ckt_zero;
 use humidor::ligero::noninteractive;
 
 type Hash = sha2::Sha256;
@@ -32,7 +33,7 @@ pub fn bench_random_circuit_by_circuit_size(c: &mut Criterion) {
 
                     (
                         rng,
-                        Ckt {
+                        Circuit {
                             shared: 0..shared_size,
                             ..ckt
                         },
@@ -90,7 +91,7 @@ pub fn bench_random_circuit_by_shared_size(c: &mut Criterion) {
 
                     (
                         rng,
-                        Ckt {
+                        Circuit {
                             shared: 0..shared_size,
                             ..ckt
                         },

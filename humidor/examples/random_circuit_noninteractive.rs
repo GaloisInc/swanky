@@ -4,7 +4,7 @@ use std::io::Write;
 
 extern crate humidor;
 
-use humidor::circuit::Ckt;
+use humidor::circuit::Circuit;
 use humidor::ligero::noninteractive;
 
 type Hash = sha2::Sha256;
@@ -30,8 +30,8 @@ fn test_input_size(
     println!("---");
 
     let mut rng = AesRng::from_entropy();
-    let (ckt, inp): (Ckt<Field>, _) =
-        humidor::circuit::random_ckt_zero(&mut rng, input_size, circuit_size);
+    let (ckt, inp): (Circuit<Field>, _) =
+        humidor::circuitgen::random_ckt_zero(&mut rng, input_size, circuit_size);
 
     let mut prover_time = std::time::Duration::new(0, 0);
     let mut verifier_time = std::time::Duration::new(0, 0);

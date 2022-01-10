@@ -80,7 +80,7 @@ type HashOutput<T> = digest::Output<T>;
 #[cfg(test)]
 use proptest::{collection::vec as pvec, prelude::*, *};
 
-use crate::circuit::{Ckt, Op};
+use crate::circuit::{Circuit, Op};
 use crate::merkle;
 use crate::params::Params;
 use crate::util::*;
@@ -126,7 +126,7 @@ impl<Field: FieldForLigero> Public<Field> {
     /// Create the public component of a Ligero proof. The circuit to check and
     /// the witness and shared-witness size are contained in the `c` argument.
     #[allow(non_snake_case)]
-    fn new(c: &Ckt<Field>) -> Self {
+    fn new(c: &Circuit<Field>) -> Self {
         // By the SZ Lemma, Pr[p(x) = q(x)] for monomials p and q and uniform x
         // chosen independently of p and q is 1/|F|, so one linear check should
         // give us 1/|F| soundness.
@@ -296,7 +296,7 @@ impl<Field: FieldForLigero, H: CryptoDigest> Secret<Field, H> {
     /// The `mask` should be a committed vector of random elements the same size
     /// as the shared portion of the witness. If there is no shared witness, it
     /// should be an empty vector.
-    fn new<R: Rng + CryptoRng>(rng: &mut R, c: &Ckt<Field>, inp: &[Field]) -> Self {
+    fn new<R: Rng + CryptoRng>(rng: &mut R, c: &Circuit<Field>, inp: &[Field]) -> Self {
         debug_assert_eq!(c.inp_size, inp.len());
 
         let public = Public::new(&c);
@@ -383,7 +383,7 @@ impl Arbitrary for Secret<TestField, TestHash> {
     type Strategy = BoxedStrategy<Self>;
     fn arbitrary_with((w, c): Self::Parameters) -> Self::Strategy {
         (
-            crate::circuit::arb_ckt(w, c),
+            crate::circuitgen::arb_ckt(w, c),
             pvec(arb_test_field(), w),
             proptest::array::uniform16(0u8..),
         )
@@ -421,7 +421,7 @@ proptest! {
     #[test]
     #[allow(non_snake_case)]
     fn test_Padd_false(
-        (c,i) in crate::circuit::arb_ckt(20, 50).prop_flat_map(|c| {
+        (c,i) in crate::circuitgen::arb_ckt(20, 50).prop_flat_map(|c| {
             (Just(c), pvec(arb_test_field(), 20))
         }),
         seed: [u8;16],
@@ -439,8 +439,8 @@ proptest! {
     #[test]
     #[allow(non_snake_case)]
     fn test_Padd_false_with_shared(
-        (c, i) in crate::circuit::arb_ckt(20, 50).prop_flat_map(|c| {
-            (Just(Ckt {shared: 0..10, ..c}), pvec(arb_test_field(), 20))
+        (c, i) in crate::circuitgen::arb_ckt(20, 50).prop_flat_map(|c| {
+            (Just(Circuit {shared: 0..10, ..c}), pvec(arb_test_field(), 20))
         }),
         rshared_vec in pvec(arb_test_field(), 1 * 10),
         seed: [u8;16],
@@ -462,7 +462,7 @@ proptest! {
     #[test]
     #[allow(non_snake_case)]
     fn test_Padd_true(
-        (c, i) in crate::circuit::arb_ckt_zero(20, 50),
+        (c, i) in crate::circuitgen::arb_ckt_zero(20, 50),
         seed: [u8;16],
     ) {
         let mut rng = AesRng::from_seed(Block::from(seed));
@@ -478,8 +478,8 @@ proptest! {
     #[test]
     #[allow(non_snake_case)]
     fn test_Padd_true_with_shared(
-        (c, i) in crate::circuit::arb_ckt_zero(20, 50).prop_flat_map(|(c,i)| {
-            (Just(Ckt {shared: 0..10, ..c}), Just(i))
+        (c, i) in crate::circuitgen::arb_ckt_zero(20, 50).prop_flat_map(|(c,i)| {
+            (Just(Circuit {shared: 0..10, ..c}), Just(i))
         }),
         rshared_vec in pvec(arb_test_field(), 1 * 10),
         seed: [u8;16],
@@ -940,7 +940,7 @@ pub mod interactive {
 
     impl<Field: FieldForLigero, H: CryptoDigest> Prover<Field, H> {
         /// Create an interactive prover out of a circuit and witness.
-        pub fn new<R: Rng + CryptoRng>(rng: &mut R, c: &Ckt<Field>, w: &Vec<Field>) -> Self {
+        pub fn new<R: Rng + CryptoRng>(rng: &mut R, c: &Circuit<Field>, w: &Vec<Field>) -> Self {
             Self {
                 secret: Secret::new(rng, c, w),
             }
@@ -1123,7 +1123,7 @@ pub mod interactive {
 
     impl<Field: FieldForLigero, H: CryptoDigest> Verifier<Field, H> {
         /// Create a new verifier from a circuit.
-        pub fn new(c: &Ckt<Field>) -> Self {
+        pub fn new(c: &Circuit<Field>) -> Self {
             Self {
                 phantom: std::marker::PhantomData,
 
@@ -1210,7 +1210,7 @@ pub mod interactive {
     #[test]
     fn test_small() {
         let mut rng = AesRng::from_entropy();
-        let (ckt, w) = crate::circuit::test_ckt_zero::<TestField>();
+        let (ckt, w) = crate::circuitgen::test_ckt_zero::<TestField>();
 
         let mut p = Prover::<_, TestHash>::new(&mut rng, &ckt, &w);
         let mut v = Verifier::new(&ckt);
@@ -1228,7 +1228,7 @@ pub mod interactive {
     proptest! {
         #[test]
         fn test_false(
-            (ckt, w) in crate::circuit::arb_ckt(20, 50).prop_flat_map(|ckt| {
+            (ckt, w) in crate::circuitgen::arb_ckt(20, 50).prop_flat_map(|ckt| {
                 let w = pvec(arb_test_field(), ckt.inp_size);
                 (Just(ckt), w)
             }),
@@ -1251,7 +1251,7 @@ pub mod interactive {
 
         #[test]
         fn test_true(
-            (ckt, w) in crate::circuit::arb_ckt_zero(20, 50),
+            (ckt, w) in crate::circuitgen::arb_ckt_zero(20, 50),
             seed: [u8;16],
         ) {
             let mut rng = AesRng::from_seed(Block::from(seed));
@@ -1270,9 +1270,9 @@ pub mod interactive {
 
         #[test]
         fn test_shared_false(
-            (ckt, w) in crate::circuit::arb_ckt(20, 50).prop_flat_map(|ckt| {
+            (ckt, w) in crate::circuitgen::arb_ckt(20, 50).prop_flat_map(|ckt| {
                 let w = pvec(arb_test_field(), ckt.inp_size);
-                (Just(Ckt {shared: 0..10, ..ckt}), w)
+                (Just(Circuit {shared: 0..10, ..ckt}), w)
             }),
             seed: [u8;16],
         ) {
@@ -1293,8 +1293,8 @@ pub mod interactive {
 
         #[test]
         fn test_shared_true(
-            (ckt, w) in crate::circuit::arb_ckt_zero(20, 50)
-                .prop_flat_map(|(ckt, w)| (Just(Ckt {shared: 0..10, ..ckt}), Just(w))),
+            (ckt, w) in crate::circuitgen::arb_ckt_zero(20, 50)
+                .prop_flat_map(|(ckt, w)| (Just(Circuit {shared: 0..10, ..ckt}), Just(w))),
             seed: [u8;16],
         ) {
             let mut rng = AesRng::from_seed(Block::from(seed));
@@ -1413,7 +1413,7 @@ pub mod noninteractive {
 
     impl<Field: FieldForLigero, H: CryptoDigest> Prover<Field, H> {
         /// Create a non-interactive prover from a circuit and witness.
-        pub fn new<R: Rng + CryptoRng>(rng: &mut R, c: &Ckt<Field>, w: &Vec<Field>) -> Self {
+        pub fn new<R: Rng + CryptoRng>(rng: &mut R, c: &Circuit<Field>, w: &Vec<Field>) -> Self {
             let mut hash = H::new();
             let mut bytes = Vec::with_capacity(Op::<Field>::OPCODE_SIZE);
             c.ops.iter().for_each(|op| {
@@ -1503,7 +1503,7 @@ pub mod noninteractive {
 
     impl<Field: FieldForLigero, H: CryptoDigest> Verifier<Field, H> {
         /// Create a verifier out of a circuit.
-        pub fn new(ckt: &Ckt<Field>) -> Self {
+        pub fn new(ckt: &Circuit<Field>) -> Self {
             let mut hash = H::new();
             let mut bytes = Vec::with_capacity(Op::<Field>::OPCODE_SIZE);
             ckt.ops.iter().for_each(|op| {
@@ -1573,7 +1573,7 @@ pub mod noninteractive {
     #[test]
     fn test_small() {
         let mut rng = AesRng::from_entropy();
-        let (ckt, w) = crate::circuit::test_ckt_zero::<TestField>();
+        let (ckt, w) = crate::circuitgen::test_ckt_zero::<TestField>();
 
         let mut p = Prover::<_, TestHash>::new(&mut rng, &ckt, &w);
         let mut v = Verifier::new(&ckt);
@@ -1586,7 +1586,7 @@ pub mod noninteractive {
     proptest! {
         #[test]
         fn test_false(
-            (ckt, w) in crate::circuit::arb_ckt(20, 50).prop_flat_map(|ckt| {
+            (ckt, w) in crate::circuitgen::arb_ckt(20, 50).prop_flat_map(|ckt| {
                 let w = pvec(arb_test_field(), ckt.inp_size);
                 (Just(ckt), w)
             }),
@@ -1604,7 +1604,7 @@ pub mod noninteractive {
 
         #[test]
         fn test_true(
-            (ckt, w) in crate::circuit::arb_ckt_zero(20, 50),
+            (ckt, w) in crate::circuitgen::arb_ckt_zero(20, 50),
             seed: [u8; 16],
         ) {
             let mut rng = AesRng::from_seed(Block::from(seed));
@@ -1618,9 +1618,9 @@ pub mod noninteractive {
 
         #[test]
         fn test_shared_false(
-            (ckt, w) in crate::circuit::arb_ckt(20, 50).prop_flat_map(|ckt| {
+            (ckt, w) in crate::circuitgen::arb_ckt(20, 50).prop_flat_map(|ckt| {
                 let w = pvec(arb_test_field(), ckt.inp_size);
-                (Just(Ckt {shared: 0..10, ..ckt}), w)
+                (Just(Circuit {shared: 0..10, ..ckt}), w)
             }),
             seed: [u8; 16],
         ) {
@@ -1647,8 +1647,8 @@ pub mod noninteractive {
 
         #[test]
         fn test_shared_true(
-            (ckt, w) in crate::circuit::arb_ckt_zero(20, 50).prop_flat_map(|(ckt,w)| {
-                (Just(Ckt {shared: 0..10, ..ckt}), Just(w))
+            (ckt, w) in crate::circuitgen::arb_ckt_zero(20, 50).prop_flat_map(|(ckt,w)| {
+                (Just(Circuit {shared: 0..10, ..ckt}), Just(w))
             }),
             seed: [u8; 16],
         ) {

@@ -8,6 +8,7 @@
 #![deny(missing_docs)]
 
 pub mod circuit;
+pub mod circuitgen;
 pub mod ligero;
 mod merkle;
 mod params;
