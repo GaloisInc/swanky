@@ -38,7 +38,7 @@ ROOT = Path(__file__).resolve().parent.parent
 cargo_config = toml.loads((ROOT / '.cargo/config').read_text())
 
 flags = cargo_config.get('build', dict()).get('rustflags', [])
-flags += ["--html-in-header", str(ROOT / 'etc/katex.html')]
+flags += ["--html-in-header", str(ROOT / 'etc/rustdoc-html-header.html')]
 os.environ["RUSTDOCFLAGS"] = " ".join(shlex.quote(flag) for flag in flags)
 cargo = shutil.which('cargo')
 if cargo is None:
