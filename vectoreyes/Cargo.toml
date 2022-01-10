@@ -5,8 +5,9 @@ name = "vectoreyes"
 version = "0.1.0"
 
 [dependencies]
-num-traits = "0.2"
-bytemuck = "1.5.1"
+num-traits = "0.2.14"
+bytemuck = "1.7.2"
+subtle = "2.4.1"
 
 # NOTE: keep in sync with the cfg for the scalar backend in generated/implementation.rs
 [target.'cfg(not(all(target_arch = "x86_64",all(target_feature = "sse2",target_feature = "avx",target_feature = "sse4.1",target_feature = "avx2",target_feature = "aes",target_feature="sse4.2",target_feature="PCLMULQDQ"))))'.dependencies]

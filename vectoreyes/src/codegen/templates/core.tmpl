@@ -338,9 +338,22 @@ pub const VECTOR_BACKEND: crate::VectorBackend = {
         }
     }
 
-    {% if ty.ty.signedness == Signedness.SIGNED %}
-        impl crate::SimdBaseSigned<{{ty.ty}}> for {{ty}} {}
-    {% endif %}
+    impl subtle::ConstantTimeEq for {{ty}} {
+        fn ct_eq(&self, other: &Self) -> subtle::Choice {
+            self.as_array().ct_eq(&other.as_array())
+        }
+    }
+
+    impl subtle::ConditionallySelectable for {{ty}} {
+        fn conditional_select(a: &Self, b: &Self, choice: subtle::Choice) -> Self {
+            let mut out = [0; {{ty.count}}];
+            for (out, (a, b)) in out.iter_mut().zip(a.as_array().iter().zip(b.as_array().iter())) {
+                *out = <{{ty.ty}} as subtle::ConditionallySelectable>::conditional_select(
+                    a, b, choice);
+            }
+            Self::from(out)
+        }
+    }
 
     {% include "impl/binops.tmpl" %}
     {% include "impl/const.tmpl" %}

@@ -72,6 +72,8 @@ pub trait Scalar:
     + num_traits::WrappingAdd
     + num_traits::WrappingSub
     + num_traits::WrappingMul
+    + subtle::ConstantTimeEq
+    + subtle::ConditionallySelectable
 {
     /// A scalar of the same width as this scalar, but signed.
     type Signed: Scalar;
@@ -147,6 +149,8 @@ pub trait SimdBase:
     + Shl<Self, Output = Self>
     + ShrAssign<Self>
     + Shr<Self, Output = Self>
+    + subtle::ConstantTimeEq
+    + subtle::ConditionallySelectable
 {
     /// The number of elements of this vector.
     ///
