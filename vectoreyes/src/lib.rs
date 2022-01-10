@@ -115,8 +115,8 @@ scalar_impls!((i64, u64), (i32, u32), (i16, u16), (i8, u8));
 /// Note that each implemented method shows an equivalent scalar implementation.
 ///
 /// # Effects of Signedness on shift operations
-/// When `T` is _signed_, this will shift in sign bits, as opposed to zeroes.
-pub trait SimdBase<T: Scalar>:
+/// When `Scalar` is _signed_, this will shift in sign bits, as opposed to zeroes.
+pub trait SimdBase:
     'static
     + Sized
     + Clone
@@ -165,30 +165,36 @@ pub trait SimdBase<T: Scalar>:
         + Eq
         + Default
         + std::hash::Hash
-        + AsRef<[T]>
+        + AsRef<[Self::Scalar]>
         + From<Self>
         + Into<Self>;
 
+    /// The scalar that this value holds.
+    type Scalar: Scalar;
     /// The signed version of this vector.
-    type Signed: SimdBase<T::Signed> + From<Self> + Into<Self>;
+    type Signed: SimdBase<Scalar = <<Self as SimdBase>::Scalar as Scalar>::Signed>
+        + From<Self>
+        + Into<Self>;
     /// The unsigned version of this vector.
-    type Unsigned: SimdBase<T::Unsigned> + From<Self> + Into<Self>;
+    type Unsigned: SimdBase<Scalar = <<Self as SimdBase>::Scalar as Scalar>::Unsigned>
+        + From<Self>
+        + Into<Self>;
 
     const ZERO: Self;
     fn is_zero(&self) -> bool;
 
     /// Create a new vector by setting element 0 to `value`, and the rest of the elements to `0`.
-    fn set_lo(value: T) -> Self;
+    fn set_lo(value: Self::Scalar) -> Self;
 
     /// Create a new vector by setting every element to `value`.
-    fn broadcast(value: T) -> Self;
+    fn broadcast(value: Self::Scalar) -> Self;
 
-    type BroadcastLoInput: SimdBase<T>;
+    type BroadcastLoInput: SimdBase<Scalar = Self::Scalar>;
     /// Create a vector by setting every element to element 0 of `of`.
     fn broadcast_lo(of: Self::BroadcastLoInput) -> Self;
 
     /// Get the `I`-th element of this vector
-    fn extract<const I: usize>(&self) -> T;
+    fn extract<const I: usize>(&self) -> Self::Scalar;
 
     /// Convert the vector to an array.
     #[inline(always)]
@@ -220,18 +226,15 @@ pub trait SimdBase<T: Scalar>:
     fn min(&self, other: Self) -> Self;
 }
 
-pub trait SimdBaseGatherable<T: Scalar, I: Scalar, IV: SimdBase<I>>: SimdBase<T> {
+pub trait SimdBaseGatherable<IV: SimdBase>: SimdBase {
     /// Construct a vector by accessing values at `base + indices[i]`
-    unsafe fn gather(base: *const T, indices: IV) -> Self;
+    unsafe fn gather(base: *const Self::Scalar, indices: IV) -> Self;
     /// Construct a vector by accessing values at `base + indices[i]`, only if the mask is set.
-    unsafe fn gather_masked(base: *const T, indices: IV, mask: Self, src: Self) -> Self;
+    unsafe fn gather_masked(base: *const Self::Scalar, indices: IV, mask: Self, src: Self) -> Self;
 }
 
-// TODO: remove this?
-pub trait SimdBaseSigned<T: Scalar<Signed = T>>: SimdBase<T> {}
-
 /// A vector containing 4 lanes.
-pub trait SimdBase4x<T: Scalar>: SimdBase<T> {
+pub trait SimdBase4x: SimdBase {
     /// If `Bi` is true, then that lane will be filled by `if_true`. Otherwise the lane
     /// will be filled from `self`.
     fn blend<const B3: bool, const B2: bool, const B1: bool, const B0: bool>(
@@ -241,7 +244,7 @@ pub trait SimdBase4x<T: Scalar>: SimdBase<T> {
 }
 
 /// A vector containing 8 lanes.
-pub trait SimdBase8x<T: Scalar>: SimdBase<T> {
+pub trait SimdBase8x: SimdBase {
     /// If `Bi` is true, then that lane will be filled by `if_true`. Otherwise the lane
     /// will be filled from `self`.
     fn blend<
@@ -260,7 +263,10 @@ pub trait SimdBase8x<T: Scalar>: SimdBase<T> {
 }
 
 /// A vector containing 8-bit values.
-pub trait SimdBase8<T: Scalar<Unsigned = u8, Signed = i8>>: SimdBase<T> {
+pub trait SimdBase8: SimdBase
+where
+    Self::Scalar: Scalar<Unsigned = u8, Signed = i8>,
+{
     /// Shift within 128-bit lanes.
     fn shift_bytes_left<const AMOUNT: usize>(&self) -> Self;
     /// Shift within 128-bit lanes.
@@ -270,20 +276,27 @@ pub trait SimdBase8<T: Scalar<Unsigned = u8, Signed = i8>>: SimdBase<T> {
 }
 
 /// A vector containing 32-bit values.
-pub trait SimdBase32<T: Scalar<Unsigned = u32, Signed = i32>>: SimdBase<T> {
+pub trait SimdBase32: SimdBase
+where
+    Self::Scalar: Scalar<Unsigned = u32, Signed = i32>,
+{
     /// Shuffle within 128-bit lanes.
     fn shuffle<const I3: usize, const I2: usize, const I1: usize, const I0: usize>(&self) -> Self;
 }
 
 /// A vector containing 64-bit values.
-pub trait SimdBase64<T: Scalar<Unsigned = u64, Signed = i64>>: SimdBase<T> {
+pub trait SimdBase64: SimdBase
+where
+    Self::Scalar: Scalar<Unsigned = u64, Signed = i64>,
+{
     /// Zero out the upper-32 bits of each word, and then perform pairwise multiplication.
     fn mul_lo(&self, other: Self) -> Self;
 }
 
 /// A vector containing 4 64-bit values.
-pub trait SimdBase4x64<T: Scalar<Unsigned = u64, Signed = i64>>:
-    SimdBase64<T> + SimdBase4x<T>
+pub trait SimdBase4x64: SimdBase64 + SimdBase4x
+where
+    Self::Scalar: Scalar<Unsigned = u64, Signed = i64>,
 {
     /// Shuffle across 128-bit lanes.
     fn shuffle<const I3: usize, const I2: usize, const I1: usize, const I0: usize>(&self) -> Self;
@@ -291,7 +304,7 @@ pub trait SimdBase4x64<T: Scalar<Unsigned = u64, Signed = i64>>:
 
 /// A utility trait you probably won't need to use. See [Simd].
 pub trait HasVector<const N: usize>: Scalar {
-    type Vector: SimdBase<Self>;
+    type Vector: SimdBase<Scalar = Self>;
 }
 
 /// An alternative way of naming SIMD types.

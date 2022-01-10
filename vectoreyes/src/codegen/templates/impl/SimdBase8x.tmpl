@@ -1,5 +1,5 @@
 {% if ty.count == 8 %}
-    impl crate::SimdBase8x<{{ty.ty}}> for {{ty}} {
+    impl crate::SimdBase8x for {{ty}} {
         {% call(scalar, avx2) fn(
             "blend", {"&self": ty, "if_true": ty}, returns = ty,
             const_args = {

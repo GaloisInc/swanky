@@ -1,4 +1,5 @@
-impl SimdBase<{{ty.ty}}> for {{ty}} {
+impl SimdBase for {{ty}} {
+    type Scalar = {{ty.ty}};
     type Array = [{{ty.ty}} ; {{ty.count}}];
     type Signed = {{ty.signed}};
     type Unsigned = {{ty.unsigned}};
