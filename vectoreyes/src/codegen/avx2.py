@@ -300,7 +300,7 @@ class IntelIntrinsicBuilder:
             dst = ty
             src = ty2
             assert dst.ty.signedness == src.ty.signedness
-            assert dst.ty.bits > src.ty.bits
+            assert dst.ty.bits >= src.ty.bits
             return f"{prefix}cvtep{iu}{src.ty.bits}_epi{dst.ty.bits}"
         elif op == "permute":
             assert ty.bits == 256

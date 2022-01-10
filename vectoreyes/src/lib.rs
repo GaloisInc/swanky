@@ -311,6 +311,19 @@ where
     fn shuffle<const I3: usize, const I2: usize, const I1: usize, const I0: usize>(&self) -> Self;
 }
 
+// TODO: deprecate the uses of from() everywhere and use traits/functions that make it obvious which
+// casts are free and which aren't.
+
+/// Lossily cast a vector by {zero,sign}-extending its values.
+pub trait ExtendingCast<T: SimdBase>: SimdBase {
+    /// Cast from one vector to another by sign or zero exending the values from the source until it
+    /// fills the destination.
+    ///
+    /// This operation is neccessarily lossy. The lowest-index values in `t` are kept. Other values
+    /// are discarded.
+    fn extending_cast_from(t: T) -> Self;
+}
+
 /// A utility trait you probably won't need to use. See [Simd].
 pub trait HasVector<const N: usize>: Scalar {
     type Vector: SimdBase<Scalar = Self>;

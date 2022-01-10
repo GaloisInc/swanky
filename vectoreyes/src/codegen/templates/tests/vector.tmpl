@@ -15,6 +15,7 @@ use crate::SimdBase4x64;
 use crate::SimdBase8x;
 use crate::SimdBase4x;
 use crate::SimdBaseGatherable;
+use crate::ExtendingCast;
 
 {% call proptest_eq_scalar("equality", {'a': ty, 'b': ty}) %}
     a == b
@@ -125,6 +126,11 @@ use crate::SimdBaseGatherable;
 {% for src in ty.can_convert_from %}
     {% call proptest_eq_scalar("from_" ~ (src ~ "").lower(), {'a': src}) %}
         {{ty}}::from(a).as_array()
+    {% endcall %}
+{% endfor %}
+{% for src in ty.can_extending_cast_from %}
+    {% call proptest_eq_scalar("extending_cast_" ~ (src ~ "").lower(), {'a': src}) %}
+        {{ty}}::extending_cast_from(a).as_array()
     {% endcall %}
 {% endfor %}
 {% if ty.count in [4, 8] %}

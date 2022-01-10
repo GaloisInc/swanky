@@ -79,6 +79,19 @@ class VectorType(namedtuple("VectorType", "ty count")):
             and x.ty.signedness == self.ty.signedness
         ]
 
+    @property
+    def can_extending_cast_from(self):
+        global VECTOR_TYPES
+        return [
+            x
+            for x in VECTOR_TYPES
+            if x != self
+            and x.ty.signedness == self.ty.signedness
+            and x.ty.bits < self.ty.bits
+            and x.bits <= self.bits
+            and x.bits == 128
+        ]
+
     def __str__(self):
         return f"{str(self.ty).upper()}x{self.count}"
 
