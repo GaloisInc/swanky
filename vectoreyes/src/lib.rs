@@ -11,6 +11,9 @@
 //! * `skylake`
 //! * `skylake-avx512`
 //! * `cascadelake`
+//! * `znver1`
+//! * `znver2`
+//! * `znver3`
 //!
 //! As a result, `vectoreyes` will be more efficient on these platforms. You can add specific
 //! latency numbers for more targets in `avx2.py`.
@@ -52,6 +55,9 @@ pub enum MicroArchitecture {
     Skylake,
     SkylakeAvx512,
     CascadeLake,
+    AmdZenVer1,
+    AmdZenVer2,
+    AmdZenVer3,
     Unknown,
 }
 

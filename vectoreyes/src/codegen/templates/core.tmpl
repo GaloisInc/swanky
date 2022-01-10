@@ -202,10 +202,12 @@ macro_rules! select_impl_block {
                     ///
                     /// <table style="line-height:0.7">
                     /// <thead><tr>
-                    /// <th>Architecture</th><th>Latency (cycles)</th><th>Throughput (CPI)</th>
+                    /// <th class="perf-table-architecture-heading">Architecture</th>
+                    /// <th>Latency (cycles)</th>
+                    /// <th>Throughput (CPI)</th>
                     /// </tr></thead><tbody>
                     {% for platform, key in avx2_intrinsic_builder.DISPLAY_PERF_NUMBERS_FOR.items() %}
-                        /// <tr>
+                        /// <tr class="perf-table-entry-{{key}}">
                             /// <td><a href="{{instruction.perf_url}}#{{key}}">{{ platform }}</a></td>
                             /// <td>{{instruction.perf[key] | render_latency}}</td>
                             /// <td>{{instruction.perf[key]["throughput"]}}</td>
@@ -327,6 +329,7 @@ pub const VECTOR_BACKEND: crate::VectorBackend = {
     }
 
     impl std::hash::Hash for {{ty}} {
+        #[inline]
         fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
             bytemuck::bytes_of(self).hash(state);
         }

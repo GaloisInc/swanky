@@ -185,6 +185,9 @@ class IntelIntrinsicBuilder:
         "skylake",
         "skylake-avx512",
         "cascadelake",
+        "znver1",
+        "znver2",
+        "znver3",
     ]
     # None corresponds to the fallback value
     # Otherwise, these numbers are the latncies of aes enc/dec instructions for their respsctive
@@ -194,17 +197,24 @@ class IntelIntrinsicBuilder:
         "skylake": 4,
         "skylake-avx512": 4,
         "cascadelake": 4,
+        "znver1": 4,
+        "znver2": 4,
+        "znver3": 4,
     }
     TARGET_CPU_NAMES = {
         None: "Unknown",
         "skylake": "Skylake",
         "skylake-avx512": "SkylakeAvx512",
         "cascadelake": "CascadeLake",
+        "znver1": "AmdZenVer1",
+        "znver2": "AmdZenVer2",
+        "znver3": "AmdZenVer3",
     }
     DISPLAY_PERF_NUMBERS_FOR = {
         "Skylake": "SKL",
         "Skylake-AVX512": "SKX",
         "Cascade Lake": "CLX",
+        "AMD ZEN+": "ZEN+",
     }
 
     def __init__(self, flags):
