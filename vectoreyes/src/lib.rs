@@ -209,6 +209,9 @@ pub trait SimdBase:
     /// When `T` is _signed_, this will shift in sign bits, as opposed to zeroes.
     fn shift_right<const BITS: usize>(&self) -> Self;
 
+    /// Compute `self & (! other)`.
+    fn and_not(&self, other: Self) -> Self;
+
     /// Create a vector where each element is all 1's if the elements are equal, and all 0's otherwise.
     fn cmp_eq(&self, other: Self) -> Self;
     /// Create a vector where each element is all 1's if the element of `self` is greater than the

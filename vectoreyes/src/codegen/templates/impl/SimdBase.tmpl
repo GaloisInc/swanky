@@ -71,6 +71,19 @@ impl SimdBase for {{ty}} {
         Self({{avx2i(ty, "cmpeq")}}(self.0, other.0))
     {% endcall %}
     {% endcall %}
+
+    {% call(scalar, avx2) fn("and_not", {"&self": ty, "other": ty}, returns=ty) %}
+    {% call scalar() %}
+        {{ty}}::from([
+            {% for i in range(ty.count) %}
+            self.as_array()[{{i}}] & (!other.as_array()[{{i}}]),
+            {% endfor %}
+        ])
+    {% endcall %}
+    {% call(avx2i) avx2() %}
+        Self({{avx2i(ty, "andnot")}}(other.0, self.0))
+    {% endcall %}
+    {% endcall %}
     
     {% call(scalar, avx2) fn("cmp_gt", {"&self": ty, "other": ty}, returns=ty) %}
     {% call scalar() %}

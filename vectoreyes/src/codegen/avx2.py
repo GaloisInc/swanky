@@ -243,6 +243,7 @@ class IntelIntrinsicBuilder:
             "setzero",
             "srli",
             "slli",
+            "andnot",
         ]:
             return f"{prefix}{op}_si{ty.bits}"
         elif op in [

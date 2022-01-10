@@ -33,7 +33,7 @@ use crate::SimdBaseGatherable;
 {% endcall %}
 {% set binops = [
     "bitxor", "bitand", "bitor", "add", "sub", "shl", "shr", "cmp_eq",
-    "unpack_lo", "unpack_hi", "min", "max", "cmp_gt"
+    "unpack_lo", "unpack_hi", "min", "max", "cmp_gt", "and_not",
 ] %}
 {% for binop in binops %}
     {% call proptest_eq_scalar("binop_" + binop, {'a': ty, 'b': ty}) %}
