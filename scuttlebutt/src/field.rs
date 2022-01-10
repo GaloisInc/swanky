@@ -153,6 +153,23 @@ pub trait FiniteField:
         }
         r0
     }
+
+    /// Compute `self` to the power of `n`, **in non-constant time**.
+    fn pow_var_time(&self, n: u128) -> Self {
+        let mut acc = Self::ONE;
+        let mut b = *self;
+        let mut n = n;
+
+        while n != 0 {
+            if n & 0b1 == 0b1 {
+                acc = b * acc;
+            }
+            b = b * b;
+            n >>= 1;
+        }
+
+        acc
+    }
 }
 
 /// If `Self` implements `IsSubfieldOf<FE>`, then `Self` is a subfield of `FE`.
@@ -326,6 +343,7 @@ macro_rules! field_ops {
     };
 }
 
+/// Bit decomposition if `bits` into an array.
 pub(crate) fn standard_bit_decomposition<L: ArrayLength<bool>>(
     bits: u128,
 ) -> GenericArray<bool, L> {
@@ -354,4 +372,11 @@ pub use gf_2_40::Gf40;
 mod f61p;
 pub use f61p::F61p;
 
+mod f2_19x3_26;
+pub use f2_19x3_26::F2_19x3_26;
+
 pub mod polynomial;
+
+mod monty;
+
+pub mod fft;

@@ -28,6 +28,8 @@ generic-array = "0.14.4"
 smallvec = "1.6.1"
 bytemuck = { version = "1.5.1", features = ["derive"] }
 vectoreyes = { path = "../vectoreyes" }
+ndarray = "0.15.3"
+num-traits = "0.2.14"
 
 
 [dev-dependencies]
@@ -85,4 +87,8 @@ harness = false
 
 [[bench]]
 name = "gf_2_40"
+harness = false
+
+[[bench]]
+name = "f2_19x3_26"
 harness = false

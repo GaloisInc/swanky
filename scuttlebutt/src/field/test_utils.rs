@@ -75,15 +75,16 @@ macro_rules! test_field {
             use crate::field::test_utils::{make_polynomial, make_polynomial_coefficients};
             #[allow(unused_imports)]
             use proptest::prelude::*;
-            use std::ops::{Add, Mul, Sub};
+            use std::ops::{Add, Mul, Sub, AddAssign, MulAssign, SubAssign};
             fn any_fe() -> impl Strategy<Value=$f> {
                 any::<u128>().prop_map(|seed| {
-                    <$f>::from_uniform_bytes(&seed.to_le_bytes())
+                    <$f as $crate::field::FiniteField>::from_uniform_bytes(&seed.to_le_bytes())
                 })
             }
-            fn any_prime_fe() -> impl Strategy<Value=<$f as FiniteField>::PrimeField> {
+            fn any_prime_fe() -> impl Strategy<Value=<$f as $crate::field::FiniteField>::PrimeField> {
                 any::<u128>().prop_map(|seed| {
-                    <$f as FiniteField>::PrimeField::from_uniform_bytes(&seed.to_le_bytes())
+                    <<$f as $crate::field::FiniteField>::PrimeField as $crate::field::FiniteField>
+                        ::from_uniform_bytes(&seed.to_le_bytes())
                 })
             }
 
@@ -222,11 +223,11 @@ macro_rules! test_field {
             fn polynomial_constants() {
                 assert_eq!(
                     make_polynomial(<$f>::ZERO.to_polynomial_coefficients()),
-                    Polynomial::zero()
+                    $crate::field::Polynomial::zero()
                 );
                 assert_eq!(
                     make_polynomial(<$f>::ONE.to_polynomial_coefficients()),
-                    Polynomial::one()
+                    $crate::field::Polynomial::one()
                 );
             }
             proptest! {
