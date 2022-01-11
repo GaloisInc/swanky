@@ -67,6 +67,23 @@ impl From<{{ty2}}> for {{ty}} {
     }
 {% endfor %}
 
+{% for src in ty.can_extending_cast_from %}
+    impl crate::ExtendingCast<{{src}}> for {{ty}} {
+        {% call(scalar, avx2) fn("extending_cast_from", {"vector": src}, returns=ty) %}
+        {% call scalar() %}
+            {{ty}}::from([
+                {% for i in range(ty.count) %}
+                    {{ty.ty}}::from(vector.as_array()[{{i}}]),
+                {% endfor %}
+            ])
+        {% endcall %}
+        {% call(avx2i) avx2() %}
+            Self({{avx2i(ty, "convert", src)}}(vector.0))
+        {% endcall %}
+        {% endcall %}
+    }
+{% endfor %}
+
 {% if ty.bits == 256 %}
     {% set src = VectorType(ty.ty, ty.count // 2) %}
     impl From<{{src}}> for {{ty}} {

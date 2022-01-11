@@ -202,10 +202,12 @@ macro_rules! select_impl_block {
                     ///
                     /// <table style="line-height:0.7">
                     /// <thead><tr>
-                    /// <th>Architecture</th><th>Latency (cycles)</th><th>Throughput (CPI)</th>
+                    /// <th class="perf-table-architecture-heading">Architecture</th>
+                    /// <th>Latency (cycles)</th>
+                    /// <th>Throughput (CPI)</th>
                     /// </tr></thead><tbody>
                     {% for platform, key in avx2_intrinsic_builder.DISPLAY_PERF_NUMBERS_FOR.items() %}
-                        /// <tr>
+                        /// <tr class="perf-table-entry-{{key}}">
                             /// <td><a href="{{instruction.perf_url}}#{{key}}">{{ platform }}</a></td>
                             /// <td>{{instruction.perf[key] | render_latency}}</td>
                             /// <td>{{instruction.perf[key]["throughput"]}}</td>
@@ -327,6 +329,7 @@ pub const VECTOR_BACKEND: crate::VectorBackend = {
     }
 
     impl std::hash::Hash for {{ty}} {
+        #[inline]
         fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
             bytemuck::bytes_of(self).hash(state);
         }
@@ -338,9 +341,22 @@ pub const VECTOR_BACKEND: crate::VectorBackend = {
         }
     }
 
-    {% if ty.ty.signedness == Signedness.SIGNED %}
-        impl crate::SimdBaseSigned<{{ty.ty}}> for {{ty}} {}
-    {% endif %}
+    impl subtle::ConstantTimeEq for {{ty}} {
+        fn ct_eq(&self, other: &Self) -> subtle::Choice {
+            self.as_array().ct_eq(&other.as_array())
+        }
+    }
+
+    impl subtle::ConditionallySelectable for {{ty}} {
+        fn conditional_select(a: &Self, b: &Self, choice: subtle::Choice) -> Self {
+            let mut out = [0; {{ty.count}}];
+            for (out, (a, b)) in out.iter_mut().zip(a.as_array().iter().zip(b.as_array().iter())) {
+                *out = <{{ty.ty}} as subtle::ConditionallySelectable>::conditional_select(
+                    a, b, choice);
+            }
+            Self::from(out)
+        }
+    }
 
     {% include "impl/binops.tmpl" %}
     {% include "impl/const.tmpl" %}

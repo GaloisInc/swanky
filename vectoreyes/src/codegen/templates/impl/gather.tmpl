@@ -4,7 +4,7 @@
         /// # Safety
         /// `base` does not need to be aligned. Forall `i`, `base + indices[i]` must meet
         /// the safety requirements of [std::ptr::read_unaligned]
-        impl crate::SimdBaseGatherable<{{ty.ty}}, {{idx}}, {{VectorType(idx, ty.count)}}> for {{ty}} {
+        impl crate::SimdBaseGatherable<{{VectorType(idx, ty.count)}}> for {{ty}} {
             {% call(scalar, avx2) fn(
                 "gather",
                 {"base": "*const " ~ ty.ty, "indices": VectorType(idx, ty.count)},

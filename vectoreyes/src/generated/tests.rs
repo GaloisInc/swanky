@@ -8,7 +8,6 @@ use crate::SimdBase4x64;
 use crate::SimdBase64;
 use crate::SimdBase8;
 use crate::SimdBase8x;
-use crate::SimdBaseSigned;
 use proptest::prelude::*;
 use std::ops::*;
 mod scalar;

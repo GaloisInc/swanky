@@ -10,7 +10,6 @@ use crate::SimdBase4x64;
 use crate::SimdBase64;
 use crate::SimdBase8;
 use crate::SimdBase8x;
-use crate::SimdBaseSigned;
 use proptest::prelude::*;
 use std::ops::*;
 proptest! { #[test] fn test_aes128_encrypt_only( block in any::<[u8; 16]>(), key in any::<[u8; 16]>(), ) { let scalar_out = { use scalar::*; let block: U8x16 = block.into(); let key: U8x16 = key.into(); let aes = Aes128EncryptOnly::new_with_key(key); aes.encrypt_many([block])[0].as_array() }; let platform_out = { use crate::*; let block: U8x16 = block.into(); let key: U8x16 = key.into(); let aes = Aes128EncryptOnly::new_with_key(key); aes.encrypt_many([block])[0].as_array() }; prop_assert_eq!(scalar_out, platform_out); } }

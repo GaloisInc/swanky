@@ -95,24 +95,24 @@
         {% call scalar() %}
             #[derive(Clone)]
             enum Aes{{key_size}}KeySchedule {
-                Variable(aes_soft::Aes{{key_size}}),
+                Variable(aes::Aes{{key_size}}),
                 // TODO: if we care a lot about scalar performance, this could be quite slow.
                 Fixed,
             }
-            impl From<aes_soft::Aes{{key_size}}> for Aes{{key_size}}KeySchedule {
+            impl From<aes::Aes{{key_size}}> for Aes{{key_size}}KeySchedule {
                 #[inline(always)]
-                fn from(x: aes_soft::Aes{{key_size}}) -> Self {
+                fn from(x: aes::Aes{{key_size}}) -> Self {
                     Self::Variable(x)
                 }
             }
             impl Deref for Aes{{key_size}}KeySchedule {
-                type Target = aes_soft::Aes{{key_size}};
+                type Target = aes::Aes{{key_size}};
                 #[inline(always)]
                 fn deref(&self) -> &Self::Target {
                     lazy_static::lazy_static! {
-                        static ref FIXED_AES_{{key_size}}: aes_soft::Aes{{key_size}} = {
-                            use aes_soft::cipher::{NewBlockCipher, generic_array::GenericArray};
-                            aes_soft::Aes{{key_size}}::new(&GenericArray::from({{ fixed_aes_key(key_size) | list}}))
+                        static ref FIXED_AES_{{key_size}}: aes::Aes{{key_size}} = {
+                            use aes::cipher::{NewBlockCipher, generic_array::GenericArray};
+                            aes::Aes{{key_size}}::new(&GenericArray::from({{ fixed_aes_key(key_size) | list}}))
                         };
                     }
                     match self {
@@ -157,10 +157,10 @@
                     {% endcall %}
                 {% endcall %}
                 {% call scalar() %}
-                    use aes_soft::cipher::generic_array::typenum::Unsigned;
+                    use aes::cipher::generic_array::typenum::Unsigned;
                     <
-                        aes_soft::Aes{{key_size}} as
-                        aes_soft::cipher::BlockCipher
+                        aes::Aes{{key_size}} as
+                        aes::cipher::BlockCipher
                     >::ParBlocks::USIZE
                 {% endcall %}
                 {% endcall %}
@@ -201,10 +201,10 @@
 
             {% call(scalar, avx2) fn("new_with_key", {"key": key_ty}, returns="Self", doc_scalar_equiv=False, pub=force_scalar_for_test and "super") %}
             {% call scalar() %}
-                use aes_soft::cipher::{NewBlockCipher, generic_array::GenericArray};
+                use aes::cipher::{NewBlockCipher, generic_array::GenericArray};
                 let key_bytes = key.as_array();
                 Aes{{key_size}}{{encrypt_only}} {
-                    key: aes_soft::Aes{{key_size}}::new(&GenericArray::from(key_bytes)).into(),
+                    key: aes::Aes{{key_size}}::new(&GenericArray::from(key_bytes)).into(),
                 }
             {% endcall %}
             {% call(avx2i) avx2() %}
@@ -340,7 +340,7 @@
                 pub=force_scalar_for_test and "super"
             ) %}
             {% call scalar() %}
-                use aes_soft::cipher::{BlockCipher, generic_array::GenericArray};
+                use aes::cipher::{BlockCipher, BlockEncrypt, generic_array::GenericArray};
                 // TODO: support ParBlocks
                 blocks.array_map(#[inline(always)] |block| {
                     let mut block = GenericArray::from(block.as_array());
@@ -389,7 +389,7 @@
                     where_array_unrolled_ops = ["N"],
                 ) %}
                 {% call scalar() %}
-                    use aes_soft::cipher::{BlockCipher, generic_array::GenericArray};
+                    use aes::cipher::{BlockCipher, BlockDecrypt, generic_array::GenericArray};
                     // TODO: support ParBlocks
                     blocks.array_map(#[inline(always)] |block| {
                         let mut block = GenericArray::from(block.as_array());
