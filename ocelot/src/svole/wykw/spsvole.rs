@@ -121,6 +121,10 @@ impl<OT: OtReceiver<Msg = Block> + Malicious, FE: FF, S: FiniteFieldSendSpeciali
         })
     }
 
+    // This implementation is optimized compared to its description in Figure 7:
+    //   * t executions of the original spsvole protocol, as it is necessary for svole
+    //   * in the consistency check, the prover sends the seed so the verifier to
+    //     pseudorandomly generate the `chi`s
     pub(super) fn send<C: AbstractChannel, RNG: CryptoRng + Rng>(
         &mut self,
         channel: &mut C,
@@ -138,7 +142,7 @@ impl<OT: OtReceiver<Msg = Block> + Malicious, FE: FF, S: FiniteFieldSendSpeciali
         let total_len = base_voles.len();
         let base_uws = &base_voles[0..total_len - r];
         let base_consistency = &base_voles[total_len - r..];
-        let t = base_uws.len();
+        let t = base_uws.len(); // the number of Extend as defined in Figure 7, combined in this function
         let mut result = vec![S::new_sender_pair(FE::PrimeField::ZERO, FE::ZERO); n * t];
         let mut betas = Vec::with_capacity(t);
 
@@ -188,7 +192,7 @@ impl<OT: OtReceiver<Msg = Block> + Malicious, FE: FF, S: FiniteFieldSendSpeciali
         &mut self,
         channel: &mut C,
         uws: &[S::SenderPairContents],      // length = m * t = n
-        base_uws: &[S::SenderPairContents], // length = r
+        base_xzs: &[S::SenderPairContents], // length = r
         rng: &mut RNG,
     ) -> Result<(), Error> {
         let r = FE::PolynomialFormNumCoefficients::to_usize();
@@ -200,25 +204,27 @@ impl<OT: OtReceiver<Msg = Block> + Malicious, FE: FF, S: FiniteFieldSendSpeciali
         for (u, w) in uws.iter().copied().map(S::extract_sender_pair) {
             let chi = FE::random(&mut rng_chi);
             va += chi * w;
-            // There will be one, and exactly one, `u` (= `β`) which is
-            // non-zero. Don't `break` after we hit this one to avoid a
-            // potential side-channel attack.
+            // Following the description of this check in Figure 7, there should be one,
+            // and exactly one, `u` (= `β`) which is non-zero, but this implementation is
+            // optimized for combining several Extend per function call, and therefore the number
+            // of non-zero `u` is equal to the number of `base_uws` (`t`) in the calling function.
+            // Don't `break` after we hit the last non-zero `u` to avoid a potential side-channel attack.
             if u != FE::PrimeField::ZERO {
-                for (x, y) in x_stars
+                for (x, chi_coeff) in x_stars
                     .iter_mut()
                     .zip(chi.to_polynomial_coefficients().into_iter())
                 {
-                    *x += u * y;
+                    *x += u * chi_coeff;
                 }
             }
         }
-        for (pows, (x_star, (u, w))) in self.pows.get().iter().zip(
+        for (pows, (x_star, (x, z))) in self.pows.get().iter().zip(
             x_stars
                 .iter()
-                .zip(base_uws.iter().copied().map(S::extract_sender_pair)),
+                .zip(base_xzs.iter().copied().map(S::extract_sender_pair)),
         ) {
-            channel.write_fe(*x_star - u)?;
-            va -= *pows * w;
+            channel.write_fe(*x_star - x)?;
+            va -= *pows * z;
         }
         channel.write_block(&seed)?;
         channel.flush()?;
@@ -278,15 +284,15 @@ impl<OT: OtSender<Msg = Block> + Malicious, FE: FF, S: FiniteFieldSpecialization
         base_voles: &[FE], // Length equals weight + r
         rng: &mut RNG,
     ) -> Result<Vec<FE>, Error> {
+        let nbits = 128 - (n as u128 - 1).leading_zeros() as usize;
         let r = FE::PolynomialFormNumCoefficients::to_usize();
         let total_len = base_voles.len();
-        let vs = &base_voles[0..total_len - r];
+        let base_vs = &base_voles[0..total_len - r];
         let base_consistency = &base_voles[total_len - r..];
-        let nbits = 128 - (n as u128 - 1).leading_zeros() as usize;
-        let t = vs.len();
+        let t = base_vs.len();
         let mut gammas = Vec::with_capacity(t);
         let mut result = vec![FE::ZERO; n * t];
-        for v in vs.iter() {
+        for v in base_vs.iter() {
             let a_prime = channel.read_fe::<FE::PrimeField>()?;
             let gamma = *v - self.delta.multiply_by_prime_subfield(a_prime);
             gammas.push(gamma);
