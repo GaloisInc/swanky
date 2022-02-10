@@ -49,17 +49,14 @@ impl OtSender for Sender {
             pks.push((pk0, c - pk0));
         }
         for (i, (input, pk)) in inputs.iter().zip(pks.into_iter()).enumerate() {
-            let r0 = Scalar::random(&mut rng);
-            let r1 = Scalar::random(&mut rng);
-            let e00 = &r0 * &RISTRETTO_BASEPOINT_TABLE;
-            let e10 = &r1 * &RISTRETTO_BASEPOINT_TABLE;
-            let h = Block::hash_pt(i as u128, &(pk.0 * r0));
+            let r = Scalar::random(&mut rng);
+            let ei0 = &r * &RISTRETTO_BASEPOINT_TABLE;
+            let h = Block::hash_pt(i as u128, &(pk.0 * r));
             let e01 = h ^ input.0;
-            let h = Block::hash_pt(i as u128, &(pk.1 * r1));
+            let h = Block::hash_pt(i as u128, &(pk.1 * r));
             let e11 = h ^ input.1;
-            channel.write_pt(&e00)?;
+            channel.write_pt(&ei0)?;
             channel.write_block(&e01)?;
-            channel.write_pt(&e10)?;
             channel.write_block(&e11)?;
         }
         channel.flush()?;
@@ -112,15 +109,14 @@ impl OtReceiver for Receiver {
             .zip(ks.into_iter())
             .enumerate()
             .map(|(i, (b, k))| {
-                let e00 = channel.read_pt()?;
+                let ei0 = channel.read_pt()?;
                 let e01 = channel.read_block()?;
-                let e10 = channel.read_pt()?;
                 let e11 = channel.read_block()?;
-                let (e0, e1) = match b {
-                    false => (e00, e01),
-                    true => (e10, e11),
+                let e1 = match b {
+                    false => e01,
+                    true => e11,
                 };
-                let h = Block::hash_pt(i as u128, &(e0 * k));
+                let h = Block::hash_pt(i as u128, &(ei0 * k));
                 Ok(h ^ e1)
             })
             .collect()
