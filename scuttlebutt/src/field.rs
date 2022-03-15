@@ -202,6 +202,16 @@ impl std::fmt::Display for BiggerThanModulus {
     }
 }
 
+/// An error with no inhabitants, for when a field cannot fail to deserialize.
+#[derive(Clone, Copy, Debug)]
+pub enum BytesDeserializationCannotFail {}
+impl std::fmt::Display for BytesDeserializationCannotFail {
+    fn fmt(&self, _: &mut std::fmt::Formatter) -> std::fmt::Result {
+        unreachable!("Self has no values that inhabit it")
+    }
+}
+impl std::error::Error for BytesDeserializationCannotFail {}
+
 #[cfg(test)]
 #[macro_use]
 mod test_utils;
@@ -361,7 +371,7 @@ mod f2;
 pub use f2::F2;
 
 mod gf_2_128;
-pub use gf_2_128::{Gf128, Gf128BytesDeserializationCannotFail};
+pub use gf_2_128::Gf128;
 
 mod gf_2_45;
 pub use gf_2_45::Gf45;
