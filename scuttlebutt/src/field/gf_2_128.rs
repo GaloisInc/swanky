@@ -192,19 +192,9 @@ impl<'a> MulAssign<&'a Gf128> for Gf128 {
     }
 }
 
-/// An error with no inhabitants. Gf128 cannot fail to deserialize.
-#[derive(Clone, Copy, Debug)]
-pub enum Gf128BytesDeserializationCannotFail {}
-impl std::fmt::Display for Gf128BytesDeserializationCannotFail {
-    fn fmt(&self, _: &mut std::fmt::Formatter) -> std::fmt::Result {
-        unreachable!("Self has no values that inhabit it")
-    }
-}
-impl std::error::Error for Gf128BytesDeserializationCannotFail {}
-
 impl FiniteField for Gf128 {
     type ByteReprLen = generic_array::typenum::U16;
-    type FromBytesError = Gf128BytesDeserializationCannotFail;
+    type FromBytesError = super::BytesDeserializationCannotFail;
 
     fn from_bytes(
         bytes: &GenericArray<u8, Self::ByteReprLen>,
