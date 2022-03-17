@@ -111,7 +111,7 @@
                 fn deref(&self) -> &Self::Target {
                     lazy_static::lazy_static! {
                         static ref FIXED_AES_{{key_size}}: aes::Aes{{key_size}} = {
-                            use aes::cipher::{NewBlockCipher, generic_array::GenericArray};
+                            use aes::cipher::{KeyInit, generic_array::GenericArray};
                             aes::Aes{{key_size}}::new(&GenericArray::from({{ fixed_aes_key(key_size) | list}}))
                         };
                     }
@@ -201,7 +201,7 @@
 
             {% call(scalar, avx2) fn("new_with_key", {"key": key_ty}, returns="Self", doc_scalar_equiv=False, pub=force_scalar_for_test and "super") %}
             {% call scalar() %}
-                use aes::cipher::{NewBlockCipher, generic_array::GenericArray};
+                use aes::cipher::{KeyInit, generic_array::GenericArray};
                 let key_bytes = key.as_array();
                 Aes{{key_size}}{{encrypt_only}} {
                     key: aes::Aes{{key_size}}::new(&GenericArray::from(key_bytes)).into(),

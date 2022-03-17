@@ -402,8 +402,8 @@ mod tests {
         fn f<FE: FiniteField>() {
             let mut rng = AesRng::from_seed(Block::default());
             for _ in 0..1000 {
-                let degree1 = rng.gen_range(0usize, 20usize);
-                let degree2 = rng.gen_range(0usize, 20usize);
+                let degree1 = rng.gen_range(0usize..20usize);
+                let degree2 = rng.gen_range(0usize..20usize);
                 let a = Polynomial::<FE>::random(&mut rng, degree1);
                 let mut b = Polynomial::<FE>::random(&mut rng, degree2);
                 if b == Polynomial::<FE>::zero() {

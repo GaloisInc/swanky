@@ -18,8 +18,8 @@ fn rand_ix_pair(rng: &mut impl Rng, min: Index, max: Index) -> (Index, Index) {
 
     let s = max - min;
 
-    let a = rng.gen_range(0, s);
-    let b = rng.gen_range(1, s);
+    let a = rng.gen_range(0..s);
+    let b = rng.gen_range(1..s);
 
     (min + a, min + (a + b) % s)
 }
