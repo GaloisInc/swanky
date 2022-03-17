@@ -110,7 +110,7 @@ fn generate_permutation<T: Clone, RNG: CryptoRng + Rng>(rng: &mut RNG, v: &mut V
 
     let mut i = size - 1;
     while i > 0 {
-        let idx = Rng::gen_range(rng, 0, i);
+        let idx = rng.gen_range(0..i);
         v.swap(idx, i);
         i -= 1;
     }

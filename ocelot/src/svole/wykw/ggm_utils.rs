@@ -247,7 +247,7 @@ mod tests {
             &mut GgmTemporaryStorage::default(),
         );
         let leaves = (1 << depth) - 1;
-        let alpha: usize = rand::thread_rng().gen_range(1, leaves);
+        let alpha: usize = rand::thread_rng().gen_range(1..leaves);
         let mut alpha_bits = unpack_bits(&alpha.to_le_bytes(), keys.len());
         alpha_bits.reverse();
         let alpha_keys: Vec<U8x16> = alpha_bits
