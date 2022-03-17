@@ -385,7 +385,7 @@
                     where_array_unrolled_ops = ["N"],
                 ) %}
                 {% call scalar() %}
-                    use aes::cipher::{BlockCipher, BlockDecrypt, generic_array::GenericArray};
+                    use aes::cipher::{BlockDecrypt, generic_array::GenericArray};
                     // TODO: support ParBlocks
                     blocks.array_map(#[inline(always)] |block| {
                         let mut block = GenericArray::from(block.as_array());

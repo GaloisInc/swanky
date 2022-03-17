@@ -12209,7 +12209,7 @@ impl Aes128 {
     where
         ArrayUnrolledOps: UnrollableArraySize<N>,
     {
-        use aes::cipher::{generic_array::GenericArray, BlockCipher, BlockDecrypt}; // TODO: support ParBlocks
+        use aes::cipher::{generic_array::GenericArray, BlockDecrypt}; // TODO: support ParBlocks
         blocks.array_map(
             #[inline(always)]
             |block| {
@@ -12335,7 +12335,7 @@ impl Aes256 {
     where
         ArrayUnrolledOps: UnrollableArraySize<N>,
     {
-        use aes::cipher::{generic_array::GenericArray, BlockCipher, BlockDecrypt}; // TODO: support ParBlocks
+        use aes::cipher::{generic_array::GenericArray, BlockDecrypt}; // TODO: support ParBlocks
         blocks.array_map(
             #[inline(always)]
             |block| {
