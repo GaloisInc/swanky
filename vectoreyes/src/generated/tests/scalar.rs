@@ -12191,7 +12191,7 @@ impl Aes128 {
     where
         ArrayUnrolledOps: UnrollableArraySize<N>,
     {
-        use aes::cipher::{generic_array::GenericArray, BlockCipher, BlockEncrypt}; // TODO: support ParBlocks
+        use aes::cipher::{generic_array::GenericArray, BlockEncrypt}; // TODO: support ParBlocks
         blocks.array_map(
             #[inline(always)]
             |block| {
@@ -12255,7 +12255,7 @@ impl Aes128EncryptOnly {
     where
         ArrayUnrolledOps: UnrollableArraySize<N>,
     {
-        use aes::cipher::{generic_array::GenericArray, BlockCipher, BlockEncrypt}; // TODO: support ParBlocks
+        use aes::cipher::{generic_array::GenericArray, BlockEncrypt}; // TODO: support ParBlocks
         blocks.array_map(
             #[inline(always)]
             |block| {
@@ -12317,7 +12317,7 @@ impl Aes256 {
     where
         ArrayUnrolledOps: UnrollableArraySize<N>,
     {
-        use aes::cipher::{generic_array::GenericArray, BlockCipher, BlockEncrypt}; // TODO: support ParBlocks
+        use aes::cipher::{generic_array::GenericArray, BlockEncrypt}; // TODO: support ParBlocks
         blocks.array_map(
             #[inline(always)]
             |block| {
@@ -12381,7 +12381,7 @@ impl Aes256EncryptOnly {
     where
         ArrayUnrolledOps: UnrollableArraySize<N>,
     {
-        use aes::cipher::{generic_array::GenericArray, BlockCipher, BlockEncrypt}; // TODO: support ParBlocks
+        use aes::cipher::{generic_array::GenericArray, BlockEncrypt}; // TODO: support ParBlocks
         blocks.array_map(
             #[inline(always)]
             |block| {

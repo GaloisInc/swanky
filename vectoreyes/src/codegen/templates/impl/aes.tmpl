@@ -336,7 +336,7 @@
                 pub=force_scalar_for_test and "super"
             ) %}
             {% call scalar() %}
-                use aes::cipher::{BlockCipher, BlockEncrypt, generic_array::GenericArray};
+                use aes::cipher::{BlockEncrypt, generic_array::GenericArray};
                 // TODO: support ParBlocks
                 blocks.array_map(#[inline(always)] |block| {
                     let mut block = GenericArray::from(block.as_array());
