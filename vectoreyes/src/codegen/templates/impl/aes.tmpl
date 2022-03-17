@@ -157,11 +157,7 @@
                     {% endcall %}
                 {% endcall %}
                 {% call scalar() %}
-                    use aes::cipher::generic_array::typenum::Unsigned;
-                    <
-                        aes::Aes{{key_size}} as
-                        aes::cipher::BlockCipher
-                    >::ParBlocks::USIZE
+                    8
                 {% endcall %}
                 {% endcall %}
             };

@@ -6553,7 +6553,7 @@ impl crate::AesBlockCipher for Aes128 {
     type Key = U8x16;
     type EncryptOnly = Aes128EncryptOnly;
     const BLOCK_COUNT_HINT: usize = {
-        select_impl_block! { scalar { use aes::cipher::generic_array::typenum::Unsigned; < aes::Aes128 as aes::cipher::BlockCipher >::ParBlocks::USIZE } avx2 { #[cfg(vectoreyes_target_cpu="skylake")] { 4 } #[cfg(vectoreyes_target_cpu="skylake-avx512")] { 4 } #[cfg(vectoreyes_target_cpu="cascadelake")] { 4 } #[cfg(vectoreyes_target_cpu="znver1")] { 4 } #[cfg(vectoreyes_target_cpu="znver2")] { 4 } #[cfg(vectoreyes_target_cpu="znver3")] { 4 } #[cfg(not(any( vectoreyes_target_cpu="skylake", vectoreyes_target_cpu="skylake-avx512", vectoreyes_target_cpu="cascadelake", vectoreyes_target_cpu="znver1", vectoreyes_target_cpu="znver2", vectoreyes_target_cpu="znver3", )))] { 8 } } }
+        select_impl_block! { scalar { 8 } avx2 { #[cfg(vectoreyes_target_cpu="skylake")] { 4 } #[cfg(vectoreyes_target_cpu="skylake-avx512")] { 4 } #[cfg(vectoreyes_target_cpu="cascadelake")] { 4 } #[cfg(vectoreyes_target_cpu="znver1")] { 4 } #[cfg(vectoreyes_target_cpu="znver2")] { 4 } #[cfg(vectoreyes_target_cpu="znver3")] { 4 } #[cfg(not(any( vectoreyes_target_cpu="skylake", vectoreyes_target_cpu="skylake-avx512", vectoreyes_target_cpu="cascadelake", vectoreyes_target_cpu="znver1", vectoreyes_target_cpu="znver2", vectoreyes_target_cpu="znver3", )))] { 8 } } }
     };
     const FIXED_KEY: Self = Self {
         key: {
@@ -6606,7 +6606,7 @@ impl crate::AesBlockCipher for Aes128EncryptOnly {
     type Key = U8x16;
     type EncryptOnly = Aes128EncryptOnly;
     const BLOCK_COUNT_HINT: usize = {
-        select_impl_block! { scalar { use aes::cipher::generic_array::typenum::Unsigned; < aes::Aes128 as aes::cipher::BlockCipher >::ParBlocks::USIZE } avx2 { #[cfg(vectoreyes_target_cpu="skylake")] { 4 } #[cfg(vectoreyes_target_cpu="skylake-avx512")] { 4 } #[cfg(vectoreyes_target_cpu="cascadelake")] { 4 } #[cfg(vectoreyes_target_cpu="znver1")] { 4 } #[cfg(vectoreyes_target_cpu="znver2")] { 4 } #[cfg(vectoreyes_target_cpu="znver3")] { 4 } #[cfg(not(any( vectoreyes_target_cpu="skylake", vectoreyes_target_cpu="skylake-avx512", vectoreyes_target_cpu="cascadelake", vectoreyes_target_cpu="znver1", vectoreyes_target_cpu="znver2", vectoreyes_target_cpu="znver3", )))] { 8 } } }
+        select_impl_block! { scalar { 8 } avx2 { #[cfg(vectoreyes_target_cpu="skylake")] { 4 } #[cfg(vectoreyes_target_cpu="skylake-avx512")] { 4 } #[cfg(vectoreyes_target_cpu="cascadelake")] { 4 } #[cfg(vectoreyes_target_cpu="znver1")] { 4 } #[cfg(vectoreyes_target_cpu="znver2")] { 4 } #[cfg(vectoreyes_target_cpu="znver3")] { 4 } #[cfg(not(any( vectoreyes_target_cpu="skylake", vectoreyes_target_cpu="skylake-avx512", vectoreyes_target_cpu="cascadelake", vectoreyes_target_cpu="znver1", vectoreyes_target_cpu="znver2", vectoreyes_target_cpu="znver3", )))] { 8 } } }
     };
     const FIXED_KEY: Self = Self {
         key: {
@@ -6643,7 +6643,7 @@ impl crate::AesBlockCipher for Aes256 {
     type Key = U8x32;
     type EncryptOnly = Aes256EncryptOnly;
     const BLOCK_COUNT_HINT: usize = {
-        select_impl_block! { scalar { use aes::cipher::generic_array::typenum::Unsigned; < aes::Aes256 as aes::cipher::BlockCipher >::ParBlocks::USIZE } avx2 { #[cfg(vectoreyes_target_cpu="skylake")] { 4 } #[cfg(vectoreyes_target_cpu="skylake-avx512")] { 4 } #[cfg(vectoreyes_target_cpu="cascadelake")] { 4 } #[cfg(vectoreyes_target_cpu="znver1")] { 4 } #[cfg(vectoreyes_target_cpu="znver2")] { 4 } #[cfg(vectoreyes_target_cpu="znver3")] { 4 } #[cfg(not(any( vectoreyes_target_cpu="skylake", vectoreyes_target_cpu="skylake-avx512", vectoreyes_target_cpu="cascadelake", vectoreyes_target_cpu="znver1", vectoreyes_target_cpu="znver2", vectoreyes_target_cpu="znver3", )))] { 8 } } }
+        select_impl_block! { scalar { 8 } avx2 { #[cfg(vectoreyes_target_cpu="skylake")] { 4 } #[cfg(vectoreyes_target_cpu="skylake-avx512")] { 4 } #[cfg(vectoreyes_target_cpu="cascadelake")] { 4 } #[cfg(vectoreyes_target_cpu="znver1")] { 4 } #[cfg(vectoreyes_target_cpu="znver2")] { 4 } #[cfg(vectoreyes_target_cpu="znver3")] { 4 } #[cfg(not(any( vectoreyes_target_cpu="skylake", vectoreyes_target_cpu="skylake-avx512", vectoreyes_target_cpu="cascadelake", vectoreyes_target_cpu="znver1", vectoreyes_target_cpu="znver2", vectoreyes_target_cpu="znver3", )))] { 8 } } }
     };
     const FIXED_KEY: Self = Self {
         key: {
@@ -6697,7 +6697,7 @@ impl crate::AesBlockCipher for Aes256EncryptOnly {
     type Key = U8x32;
     type EncryptOnly = Aes256EncryptOnly;
     const BLOCK_COUNT_HINT: usize = {
-        select_impl_block! { scalar { use aes::cipher::generic_array::typenum::Unsigned; < aes::Aes256 as aes::cipher::BlockCipher >::ParBlocks::USIZE } avx2 { #[cfg(vectoreyes_target_cpu="skylake")] { 4 } #[cfg(vectoreyes_target_cpu="skylake-avx512")] { 4 } #[cfg(vectoreyes_target_cpu="cascadelake")] { 4 } #[cfg(vectoreyes_target_cpu="znver1")] { 4 } #[cfg(vectoreyes_target_cpu="znver2")] { 4 } #[cfg(vectoreyes_target_cpu="znver3")] { 4 } #[cfg(not(any( vectoreyes_target_cpu="skylake", vectoreyes_target_cpu="skylake-avx512", vectoreyes_target_cpu="cascadelake", vectoreyes_target_cpu="znver1", vectoreyes_target_cpu="znver2", vectoreyes_target_cpu="znver3", )))] { 8 } } }
+        select_impl_block! { scalar { 8 } avx2 { #[cfg(vectoreyes_target_cpu="skylake")] { 4 } #[cfg(vectoreyes_target_cpu="skylake-avx512")] { 4 } #[cfg(vectoreyes_target_cpu="cascadelake")] { 4 } #[cfg(vectoreyes_target_cpu="znver1")] { 4 } #[cfg(vectoreyes_target_cpu="znver2")] { 4 } #[cfg(vectoreyes_target_cpu="znver3")] { 4 } #[cfg(not(any( vectoreyes_target_cpu="skylake", vectoreyes_target_cpu="skylake-avx512", vectoreyes_target_cpu="cascadelake", vectoreyes_target_cpu="znver1", vectoreyes_target_cpu="znver2", vectoreyes_target_cpu="znver3", )))] { 8 } } }
     };
     const FIXED_KEY: Self = Self {
         key: {
