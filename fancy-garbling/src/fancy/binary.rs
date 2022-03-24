@@ -347,8 +347,8 @@ pub trait BinaryGadgets: Fancy + BundleGadgets {
         y: &BinaryBundle<Self::Item>,
     ) -> Result<Self::Item, Self::Error> {
         // determine whether x and y are positive or negative
-        let x_neg = &x.wires()[x.wires().len() - 1];
-        let y_neg = &y.wires()[y.wires().len() - 1];
+        let x_neg = &x.wires().last().unwrap();
+        let y_neg = &y.wires().last().unwrap();
         let x_pos = self.negate(x_neg)?;
         let y_pos = self.negate(y_neg)?;
 

@@ -405,7 +405,7 @@ mod bundle {
     }
 
     #[test]
-    fn binary_lt_unsigned() {
+    fn binary_lt_signed() {
         let mut rng = thread_rng();
         let nbits = 16;
         let q = 1 << nbits;
