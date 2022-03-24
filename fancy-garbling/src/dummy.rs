@@ -405,6 +405,27 @@ mod bundle {
     }
 
     #[test]
+    fn binary_lt_signed() {
+        let mut rng = thread_rng();
+        let nbits = 16;
+        let q = 1 << nbits;
+        for _ in 0..NITERS {
+            let x = rng.gen_u128() % q;
+            let y = rng.gen_u128() % q;
+            let should_be = (x as i16) < (y as i16);
+            let mut d = Dummy::new();
+            let out;
+            {
+                let x = d.bin_encode(x, nbits).unwrap();
+                let y = d.bin_encode(y, nbits).unwrap();
+                let z = d.bin_lt_signed(&x, &y).unwrap();
+                out = d.output(&z).unwrap().unwrap();
+            }
+            assert_eq!(out > 0, should_be, "x={} y={}", x as i16, y as i16);
+        }
+    }
+
+    #[test]
     fn binary_max() {
         let mut rng = thread_rng();
         let n = 10;
