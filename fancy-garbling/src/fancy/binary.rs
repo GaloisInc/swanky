@@ -340,6 +340,33 @@ pub trait BinaryGadgets: Fancy + BundleGadgets {
         self.multiplex(&sign, x, &negated).map(BinaryBundle)
     }
 
+    /// Returns 1 if `x < y` (signed version)
+    fn bin_lt_signed(
+        &mut self,
+        x: &BinaryBundle<Self::Item>,
+        y: &BinaryBundle<Self::Item>,
+    ) -> Result<Self::Item, Self::Error> {
+        // determine whether x and y are positive or negative
+        let x_neg = &x.wires()[x.wires().len() - 1];
+        let y_neg = &y.wires()[y.wires().len() - 1];
+        let x_pos = self.negate(x_neg)?;
+        let y_pos = self.negate(y_neg)?;
+
+        // broken into cases based on x and y being negative or positive
+        // base case: if x and y have the same sign - use unsigned lt
+        let x_lt_y_unsigned = self.bin_lt(&x, &y)?;
+
+        // if x is negative and y is positive then x < y
+        let tru = self.constant(1, 2)?;
+        let x_neg_y_pos = self.and(x_neg, &y_pos)?;
+        let r2 = self.mux(&x_neg_y_pos, &x_lt_y_unsigned, &tru)?;
+
+        // if x is positive and y is negative then !(x < y)
+        let fls = self.constant(0, 2)?;
+        let x_pos_y_neg = self.and(&x_pos, y_neg)?;
+        self.mux(&x_pos_y_neg, &r2, &fls)
+    }
+
     /// Returns 1 if `x < y`.
     fn bin_lt(
         &mut self,
@@ -367,7 +394,10 @@ pub trait BinaryGadgets: Fancy + BundleGadgets {
         // => x >= y && 1
         // => x >= y
         let geq = self.or(&lhs, &rhs)?;
-        self.negate(&geq)
+        let ngeq = self.negate(&geq)?;
+
+        let xy_neq_0 = self.or(&y_contains_1, &x_contains_1)?;
+        self.and(&xy_neq_0, &ngeq)
     }
 
     /// Returns 1 if `x >= y`.
