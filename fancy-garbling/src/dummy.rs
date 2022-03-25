@@ -577,7 +577,7 @@ mod bundle {
             let out;
             {
                 let x = d.bin_encode(x, nbits).unwrap();
-                let z = d.bin_rsa(&x, shift_size);
+                let z = d.bin_rsa(&x, shift_size).unwrap();
                 out = d.bin_output(&z).unwrap().unwrap() as i64;
             }
             let should_be = (x as i64) >> shift_size;
@@ -597,7 +597,7 @@ mod bundle {
             let out;
             {
                 let x = d.bin_encode(x, nbits).unwrap();
-                let z = d.bin_rsl(&x, shift_size);
+                let z = d.bin_rsl(&x, shift_size).unwrap();
                 out = d.bin_output(&z).unwrap().unwrap();
             }
             let should_be = x >> shift_size;
