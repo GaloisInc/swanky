@@ -565,7 +565,6 @@ mod bundle {
         }
     }
 
-
     #[test]
     fn binary_asr() {
         let mut rng = thread_rng();
