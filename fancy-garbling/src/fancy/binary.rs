@@ -13,10 +13,7 @@ use crate::{
     util,
 };
 use itertools::Itertools;
-use std::{
-    convert::TryInto,
-    ops::{Deref, DerefMut},
-};
+use std::ops::{Deref, DerefMut};
 
 /// Bundle which is explicitly binary representation.
 #[derive(Clone)]
