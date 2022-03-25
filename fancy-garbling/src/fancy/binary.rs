@@ -471,12 +471,12 @@ pub trait BinaryGadgets: Fancy + BundleGadgets {
     }
 
     /// arithmetic right shift (shifts the sign of the MSB into the new spaces)
-    fn bin_asr(&mut self, x: &BinaryBundle<Self::Item>, c: usize) -> BinaryBundle<Self::Item> {
+    fn bin_rsa(&mut self, x: &BinaryBundle<Self::Item>, c: usize) -> BinaryBundle<Self::Item> {
         self.bin_shr(x, c, x.wires().last().unwrap())
     }
 
     /// logical right shift (shifts 0 into the empty spaces)
-    fn bin_lsr(&mut self, x: &BinaryBundle<Self::Item>, c: usize) -> BinaryBundle<Self::Item> {
+    fn bin_rsl(&mut self, x: &BinaryBundle<Self::Item>, c: usize) -> BinaryBundle<Self::Item> {
         let zero = self.constant(0, 2).unwrap();
         self.bin_shr(x, c, &zero)
     }
