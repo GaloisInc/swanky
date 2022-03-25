@@ -481,14 +481,14 @@ pub trait BinaryGadgets: Fancy + BundleGadgets {
         self.bin_shr(x, c, &zero)
     }
 
-    /// shift a value left by a constant, filling space on the right by `pad`
+    /// shift a value right by a constant, filling space on the right by `pad`
     fn bin_shr(
         &mut self,
         x: &BinaryBundle<Self::Item>,
         c: usize,
         pad: &Self::Item,
     ) -> BinaryBundle<Self::Item> {
-        let mut wires: Vec<Self::Item> = Vec::new();
+        let mut wires: Vec<Self::Item> = Vec::with_capacity(x.wires().len());
 
         for i in 0..x.wires().len() {
             let src_idx = i + c;
