@@ -565,6 +565,47 @@ mod bundle {
         }
     }
 
+
+    #[test]
+    fn binary_asr() {
+        let mut rng = thread_rng();
+        for _ in 0..NITERS {
+            let nbits = 64;
+            let q = 1 << nbits;
+            let x = rng.gen_u128() % q;
+            let shift_size = rng.gen_usize() % nbits;
+            let mut d = Dummy::new();
+            let out;
+            {
+                let x = d.bin_encode(x, nbits).unwrap();
+                let z = d.bin_asr(&x, shift_size);
+                out = d.bin_output(&z).unwrap().unwrap() as i64;
+            }
+            let should_be = (x as i64) >> shift_size;
+            assert_eq!(out, should_be);
+        }
+    }
+
+    #[test]
+    fn binary_lsr() {
+        let mut rng = thread_rng();
+        for _ in 0..NITERS {
+            let nbits = 64;
+            let q = 1 << nbits;
+            let x = rng.gen_u128() % q;
+            let shift_size = rng.gen_usize() % nbits;
+            let mut d = Dummy::new();
+            let out;
+            {
+                let x = d.bin_encode(x, nbits).unwrap();
+                let z = d.bin_lsr(&x, shift_size);
+                out = d.bin_output(&z).unwrap().unwrap();
+            }
+            let should_be = x >> shift_size;
+            assert_eq!(out, should_be);
+        }
+    }
+
     #[test]
     fn test_mixed_radix_addition_msb_only() {
         let mut rng = thread_rng();

@@ -13,7 +13,7 @@ use crate::{
     util,
 };
 use itertools::Itertools;
-use std::ops::{Deref, DerefMut};
+use std::{ops::{Deref, DerefMut}, convert::TryInto};
 
 /// Bundle which is explicitly binary representation.
 #[derive(Clone)]
@@ -468,5 +468,45 @@ pub trait BinaryGadgets: Fancy + BundleGadgets {
         }
 
         Ok(outs)
+    }
+
+    /// arithmetic right shift (shifts the sign of the MSB into the new spaces)
+    fn bin_asr(
+        &mut self,
+        x: &BinaryBundle<Self::Item>,
+        c: usize,
+    ) -> BinaryBundle<Self::Item> {
+        self.bin_shr(x, c, x.wires().last().unwrap())
+    }
+
+    /// logical right shift (shifts 0 into the empty spaces)
+    fn bin_lsr(
+        &mut self,
+        x: &BinaryBundle<Self::Item>,
+        c: usize,
+    ) -> BinaryBundle<Self::Item> {
+        let zero = self.constant(0, 2).unwrap();
+        self.bin_shr(x, c, &zero)
+    }
+
+    /// shift a value left by a constant, filling space on the right by `pad`
+    fn bin_shr(
+        &mut self,
+        x: &BinaryBundle<Self::Item>,
+        c: usize,
+        pad: &Self::Item
+    ) -> BinaryBundle<Self::Item> {
+        let mut wires : Vec<Self::Item> = Vec::new();
+
+        for i in 0 .. x.wires().len() {
+            let src_idx = i + c;
+            if src_idx >= x.wires().len() {
+                wires.push(pad.clone())
+            } else {
+                wires.push(x.wires()[src_idx].clone())
+            }
+        }
+
+        BinaryBundle::new(wires)
     }
 }
