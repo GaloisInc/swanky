@@ -566,7 +566,7 @@ mod bundle {
     }
 
     #[test]
-    fn binary_asr() {
+    fn binary_rsa() {
         let mut rng = thread_rng();
         for _ in 0..NITERS {
             let nbits = 64;
@@ -586,7 +586,7 @@ mod bundle {
     }
 
     #[test]
-    fn binary_lsr() {
+    fn binary_rsl() {
         let mut rng = thread_rng();
         for _ in 0..NITERS {
             let nbits = 64;
