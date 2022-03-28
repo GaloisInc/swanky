@@ -469,4 +469,44 @@ pub trait BinaryGadgets: Fancy + BundleGadgets {
 
         Ok(outs)
     }
+
+    /// arithmetic right shift (shifts the sign of the MSB into the new spaces)
+    fn bin_rsa(
+        &mut self,
+        x: &BinaryBundle<Self::Item>,
+        c: usize,
+    ) -> Result<BinaryBundle<Self::Item>, Self::Error> {
+        self.bin_shr(x, c, x.wires().last().unwrap())
+    }
+
+    /// logical right shift (shifts 0 into the empty spaces)
+    fn bin_rsl(
+        &mut self,
+        x: &BinaryBundle<Self::Item>,
+        c: usize,
+    ) -> Result<BinaryBundle<Self::Item>, Self::Error> {
+        let zero = self.constant(0, 2)?;
+        self.bin_shr(x, c, &zero)
+    }
+
+    /// shift a value right by a constant, filling space on the right by `pad`
+    fn bin_shr(
+        &mut self,
+        x: &BinaryBundle<Self::Item>,
+        c: usize,
+        pad: &Self::Item,
+    ) -> Result<BinaryBundle<Self::Item>, Self::Error> {
+        let mut wires: Vec<Self::Item> = Vec::with_capacity(x.wires().len());
+
+        for i in 0..x.wires().len() {
+            let src_idx = i + c;
+            if src_idx >= x.wires().len() {
+                wires.push(pad.clone())
+            } else {
+                wires.push(x.wires()[src_idx].clone())
+            }
+        }
+
+        Ok(BinaryBundle::new(wires))
+    }
 }
