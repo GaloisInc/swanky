@@ -24,8 +24,8 @@ use rand::{
 };
 use scuttlebutt::field::{Gf40, F2};
 use scuttlebutt::{field::FiniteField, AbstractChannel, AesRng, Block, Malicious, SemiHonest};
-use std::any::TypeId;
 use std::marker::PhantomData;
+use std::{any::TypeId, convert::TryInto};
 
 mod gf40;
 
@@ -104,16 +104,16 @@ trait SvoleSpecializationRecv<FE: FiniteField>: FiniteFieldSpecialization<FE> {
 
 #[inline(always)]
 fn lpn_mtx_indices<FE: FiniteField>(
-    distribution: &Uniform<usize>,
+    distribution: &Uniform<u32>,
     mut rng: &mut AesRng,
 ) -> [(usize, FE::PrimeField); LPN_PARAMS_D] {
     let mut indices = [(0usize, FE::PrimeField::ONE); LPN_PARAMS_D];
     for i in 0..LPN_PARAMS_D {
         let mut rand_idx = distribution.sample(&mut rng);
-        while indices.iter().any(|&x| x.0 == rand_idx) {
+        while indices.iter().any(|&x| x.0 == rand_idx.try_into().unwrap()) {
             rand_idx = distribution.sample(&mut rng);
         }
-        indices[i].0 = rand_idx;
+        indices[i].0 = rand_idx.try_into().unwrap();
         indices[i].1 = FE::PrimeField::random_nonzero(&mut rng);
     }
     indices
@@ -255,7 +255,7 @@ impl<FE: FiniteField> SvoleSpecializationSend<FE> for NoSpecialization {
         base_voles: &mut Vec<(<FE as FiniteField>::PrimeField, FE)>,
         svoles: &mut Vec<(<FE as FiniteField>::PrimeField, FE)>,
     ) {
-        let distribution = Uniform::from(0..rows);
+        let distribution = Uniform::<u32>::from(0..rows.try_into().unwrap());
         for (i, (e, c)) in uws.into_iter().enumerate() {
             let indices = lpn_mtx_indices::<FE>(&distribution, &mut svole.lpn_rng);
             // Compute `x := u A + e` and `z := w A + c`, where `A` is the LPN matrix.
@@ -508,7 +508,7 @@ impl<FE: FiniteField> SvoleSpecializationRecv<FE> for NoSpecialization {
         base_voles: &mut Vec<FE>,
         svoles: &mut Vec<FE>,
     ) {
-        let distribution = Uniform::from(0..rows);
+        let distribution = Uniform::<u32>::from(0..rows.try_into().unwrap());
         for (i, b) in vs.into_iter().enumerate() {
             let indices = lpn_mtx_indices::<FE>(&distribution, &mut svole.lpn_rng);
             let mut y = b;
