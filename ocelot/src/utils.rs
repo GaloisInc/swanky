@@ -7,18 +7,71 @@
 use scuttlebutt::Block;
 
 #[inline]
+#[cfg(target_arch = "wasm32")]
+fn get_bit(src: &[u8], i: usize) -> u8 {
+    let byte = src[i / 8];
+    let bit_pos = i % 8;
+    (byte & (1 << bit_pos) != 0) as u8
+}
+
+#[inline]
+#[cfg(target_arch = "wasm32")]
+fn set_bit(dst: &mut [u8], i: usize, b: u8) {
+    let bit_pos = i % 8;
+    if b == 1 {
+        dst[i / 8] |= 1 << bit_pos;
+    } else {
+        dst[i / 8] &= !(1 << bit_pos);
+    }
+}
+
+#[inline]
+#[cfg(target_arch = "wasm32")]
+fn transpose_naive_inplace(dst: &mut [u8], src: &[u8], m: usize) {
+    assert!(src.len() % m == 0);
+    let l = src.len() * 8;
+    let n = l / m;
+
+    for i in 0..l {
+        let bit = get_bit(src, i);
+        let (row, col) = (i / m, i % m);
+        set_bit(dst, col * n + row, bit);
+    }
+}
+
+#[inline]
+#[cfg(target_arch = "wasm32")]
+fn transpose_naive(input: &[u8], nrows: usize, ncols: usize) -> Vec<u8> {
+    assert_eq!(nrows % 8, 0);
+    assert_eq!(ncols % 8, 0);
+    assert_eq!(nrows * ncols, input.len() * 8);
+    let mut output = vec![0u8; nrows * ncols / 8];
+
+    transpose_naive_inplace(&mut output, input, ncols);
+    output
+}
+
+#[inline]
 pub fn transpose(m: &[u8], nrows: usize, ncols: usize) -> Vec<u8> {
-    let mut m_ = vec![0u8; nrows * ncols / 8];
-    _transpose(
-        m_.as_mut_ptr() as *mut u8,
-        m.as_ptr(),
-        nrows as u64,
-        ncols as u64,
-    );
-    m_
+    #[cfg(target_arch = "wasm32")]
+    {
+        return transpose_naive(m, nrows, ncols);
+    }
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        let mut m_ = vec![0u8; nrows * ncols / 8];
+        _transpose(
+            m_.as_mut_ptr() as *mut u8,
+            m.as_ptr(),
+            nrows as u64,
+            ncols as u64,
+        );
+        return m_;
+    }
 }
 
 #[inline(always)]
+#[cfg(not(target_arch = "wasm32"))]
 fn _transpose(out: *mut u8, inp: *const u8, nrows: u64, ncols: u64) {
     assert!(nrows >= 16);
     assert_eq!(nrows % 8, 0);
@@ -27,6 +80,7 @@ fn _transpose(out: *mut u8, inp: *const u8, nrows: u64, ncols: u64) {
 }
 
 #[link(name = "transpose")]
+#[cfg(not(target_arch = "wasm32"))]
 extern "C" {
     fn sse_trans(out: *mut u8, inp: *const u8, nrows: u64, ncols: u64);
 }
