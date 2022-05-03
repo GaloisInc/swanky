@@ -37,6 +37,7 @@ impl SvoleSpecializationSend<Gf40> for Gf40Specialization {
                 svoles,
             );
         } else {
+            assert!(rows <= 4_294_967_295); // 2^32 -1
             let distribution = Uniform::<u32>::from(0..rows.try_into().unwrap());
             for (i, (e, c)) in uws
                 .into_iter()
@@ -91,6 +92,7 @@ impl SvoleSpecializationRecv<Gf40> for Gf40Specialization {
                 &mut svoles,
             );
         } else {
+            assert!(rows <= 4_294_967_295); // 2^32 -1
             let distribution = Uniform::<u32>::from(0..rows.try_into().unwrap());
             for (i, b) in vs.into_iter().enumerate() {
                 let indices = lpn_mtx_indices::<Gf40>(&distribution, &mut svole.lpn_rng);

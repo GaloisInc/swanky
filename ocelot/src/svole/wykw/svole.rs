@@ -269,6 +269,7 @@ impl<FE: FiniteField> SvoleSpecializationSend<FE> for NoSpecialization {
         base_voles: &mut Vec<(<FE as FiniteField>::PrimeField, FE)>,
         svoles: &mut Vec<(<FE as FiniteField>::PrimeField, FE)>,
     ) {
+        assert!(rows <= 4_294_967_295); // 2^32 -1
         let distribution = Uniform::<u32>::from(0..rows.try_into().unwrap());
         for (i, (e, c)) in uws.into_iter().enumerate() {
             let indices = lpn_mtx_indices::<FE>(&distribution, &mut svole.lpn_rng);
@@ -522,6 +523,7 @@ impl<FE: FiniteField> SvoleSpecializationRecv<FE> for NoSpecialization {
         base_voles: &mut Vec<FE>,
         svoles: &mut Vec<FE>,
     ) {
+        assert!(rows <= 4_294_967_295); // 2^32 -1
         let distribution = Uniform::<u32>::from(0..rows.try_into().unwrap());
         for (i, b) in vs.into_iter().enumerate() {
             let indices = lpn_mtx_indices::<FE>(&distribution, &mut svole.lpn_rng);
