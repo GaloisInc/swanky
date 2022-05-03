@@ -121,16 +121,16 @@ fn lpn_mtx_indices<FE: FiniteField>(
     distribution: &Uniform<u32>,
     mut rng: &mut AesRng,
 ) -> [(usize, FE::PrimeField); LPN_PARAMS_D] {
-    let mut indices = [(0usize, FE::PrimeField::ONE); LPN_PARAMS_D];
+    let mut indices = [(0u32, FE::PrimeField::ONE); LPN_PARAMS_D];
     for i in 0..LPN_PARAMS_D {
         let mut rand_idx = distribution.sample(&mut rng);
-        while indices.iter().any(|&x| x.0 == rand_idx.try_into().unwrap()) {
+        while indices.iter().any(|&x| x.0 == rand_idx) {
             rand_idx = distribution.sample(&mut rng);
         }
-        indices[i].0 = rand_idx.try_into().unwrap();
+        indices[i].0 = rand_idx;
         indices[i].1 = FE::PrimeField::random_nonzero(&mut rng);
     }
-    indices
+    indices.map(|(x, y)| (x.try_into().unwrap(), y))
 }
 
 /// Subfield VOLE sender.
