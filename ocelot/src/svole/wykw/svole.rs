@@ -51,6 +51,20 @@ struct LpnParams {
 //     rows: 1_220,
 // };
 
+/* Small LPN parameters */
+/*
+const LPN_SETUP_PARAMS: LpnParams = LpnParams {
+    weight: 600,
+    cols: 9_600, // cols / weight = 16
+    rows: 1_220,
+};
+const LPN_EXTEND_PARAMS: LpnParams = LpnParams {
+    weight: 2_600,
+    cols: 166_400, // cols / weight = 64
+    rows: 5_060,
+};
+*/
+
 // LPN parameters for setup phase.
 const LPN_SETUP_PARAMS: LpnParams = LpnParams {
     rows: 19_870,
