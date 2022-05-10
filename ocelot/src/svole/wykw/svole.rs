@@ -24,8 +24,8 @@ use rand::{
 };
 use scuttlebutt::field::{Gf40, F2};
 use scuttlebutt::{field::FiniteField, AbstractChannel, AesRng, Block, Malicious, SemiHonest};
-use std::any::TypeId;
 use std::marker::PhantomData;
+use std::{any::TypeId, convert::TryInto};
 
 mod gf40;
 
@@ -50,6 +50,20 @@ struct LpnParams {
 //     cols: 9_600, // cols / weight = 16
 //     rows: 1_220,
 // };
+
+/* Small LPN parameters */
+/*
+const LPN_SETUP_PARAMS: LpnParams = LpnParams {
+    weight: 600,
+    cols: 9_600, // cols / weight = 16
+    rows: 1_220,
+};
+const LPN_EXTEND_PARAMS: LpnParams = LpnParams {
+    weight: 2_600,
+    cols: 166_400, // cols / weight = 64
+    rows: 5_060,
+};
+*/
 
 // LPN parameters for setup phase.
 const LPN_SETUP_PARAMS: LpnParams = LpnParams {
@@ -104,10 +118,10 @@ trait SvoleSpecializationRecv<FE: FiniteField>: FiniteFieldSpecialization<FE> {
 
 #[inline(always)]
 fn lpn_mtx_indices<FE: FiniteField>(
-    distribution: &Uniform<usize>,
+    distribution: &Uniform<u32>,
     mut rng: &mut AesRng,
 ) -> [(usize, FE::PrimeField); LPN_PARAMS_D] {
-    let mut indices = [(0usize, FE::PrimeField::ONE); LPN_PARAMS_D];
+    let mut indices = [(0u32, FE::PrimeField::ONE); LPN_PARAMS_D];
     for i in 0..LPN_PARAMS_D {
         let mut rand_idx = distribution.sample(&mut rng);
         while indices.iter().any(|&x| x.0 == rand_idx) {
@@ -116,7 +130,7 @@ fn lpn_mtx_indices<FE: FiniteField>(
         indices[i].0 = rand_idx;
         indices[i].1 = FE::PrimeField::random_nonzero(&mut rng);
     }
-    indices
+    indices.map(|(x, y)| (x.try_into().unwrap(), y))
 }
 
 /// Subfield VOLE sender.
@@ -255,7 +269,8 @@ impl<FE: FiniteField> SvoleSpecializationSend<FE> for NoSpecialization {
         base_voles: &mut Vec<(<FE as FiniteField>::PrimeField, FE)>,
         svoles: &mut Vec<(<FE as FiniteField>::PrimeField, FE)>,
     ) {
-        let distribution = Uniform::from(0..rows);
+        assert!(rows <= 4_294_967_295); // 2^32 -1
+        let distribution = Uniform::<u32>::from(0..rows.try_into().unwrap());
         for (i, (e, c)) in uws.into_iter().enumerate() {
             let indices = lpn_mtx_indices::<FE>(&distribution, &mut svole.lpn_rng);
             // Compute `x := u A + e` and `z := w A + c`, where `A` is the LPN matrix.
@@ -508,7 +523,8 @@ impl<FE: FiniteField> SvoleSpecializationRecv<FE> for NoSpecialization {
         base_voles: &mut Vec<FE>,
         svoles: &mut Vec<FE>,
     ) {
-        let distribution = Uniform::from(0..rows);
+        assert!(rows <= 4_294_967_295); // 2^32 -1
+        let distribution = Uniform::<u32>::from(0..rows.try_into().unwrap());
         for (i, b) in vs.into_iter().enumerate() {
             let indices = lpn_mtx_indices::<FE>(&distribution, &mut svole.lpn_rng);
             let mut y = b;
