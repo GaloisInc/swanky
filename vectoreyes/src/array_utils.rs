@@ -21,6 +21,10 @@ pub enum ArrayUnrolledOps {}
 pub trait UnrollableArraySize<const N: usize> {
     fn array_generate<T, F: FnMut(usize) -> T>(f: F) -> [T; N];
     fn array_map<T, U, F: FnMut(T) -> U>(arr: [T; N], f: F) -> [U; N];
+    fn array_map_result<T, U, E, F: FnMut(T) -> Result<U, E>>(
+        arr: [T; N],
+        f: F,
+    ) -> Result<[U; N], E>;
     fn array_fold<T, U, F: FnMut(U, T) -> U>(arr: [T; N], init: U, f: F) -> U;
     fn array_zip<T1, T2>(arr1: [T1; N], arr2: [T2; N]) -> [(T1, T2); N];
     fn array_enumerate<T>(arr: [T; N]) -> [(usize, T); N];
@@ -52,6 +56,15 @@ pub trait ArrayUnrolledExt<T, const N: usize>: Sized {
     /// assert_eq!(arr.array_map(#[inline(always)] |x| x + 1), [1, 2]);
     /// ```
     fn array_map<U, F: FnMut(T) -> U>(self, f: F) -> [U; N];
+    /// Map over elements of an array, halting on the first error.
+    /// # Example
+    /// ```
+    /// use vectoreyes::array_utils::*;
+    /// let arr = [0, 1];
+    /// assert_eq!(arr.array_map_result::<u32, u32, _>(#[inline(always)] |x| Err(x)), Err(0));
+    /// assert_eq!(arr.array_map_result::<u32, u32, _>(#[inline(always)] |x| Ok(x)), Ok([0, 1]));
+    /// ```
+    fn array_map_result<U, E, F: FnMut(T) -> Result<U, E>>(self, f: F) -> Result<[U; N], E>;
     /// Fold over an array.
     /// # Example
     /// ```
@@ -92,6 +105,10 @@ where
     #[inline(always)]
     fn array_map<U, F: FnMut(T) -> U>(self, f: F) -> [U; N] {
         ArrayUnrolledOps::array_map(self, f)
+    }
+    #[inline(always)]
+    fn array_map_result<U, E, F: FnMut(T) -> Result<U, E>>(self, f: F) -> Result<[U; N], E> {
+        ArrayUnrolledOps::array_map_result(self, f)
     }
     #[inline(always)]
     fn array_fold<U, F: FnMut(U, T) -> U>(self, init: U, f: F) -> U {
