@@ -15,6 +15,15 @@ impl UnrollableArraySize<0> for ArrayUnrolledOps {
         }
     }
     #[inline(always)]
+    fn array_map_result<T, U, E, F: FnMut(T) -> Result<U, E>>(
+        arr: [T; 0],
+        mut f: F,
+    ) -> Result<[U; 0], E> {
+        match arr {
+            [] => Ok([]),
+        }
+    }
+    #[inline(always)]
     fn array_enumerate<T>(arr: [T; 0]) -> [(usize, T); 0] {
         match arr {
             [] => [],
@@ -69,6 +78,15 @@ impl UnrollableArraySize<1> for ArrayUnrolledOps {
         }
     }
     #[inline(always)]
+    fn array_map_result<T, U, E, F: FnMut(T) -> Result<U, E>>(
+        arr: [T; 1],
+        mut f: F,
+    ) -> Result<[U; 1], E> {
+        match arr {
+            [arr_0] => Ok([f(arr_0)?]),
+        }
+    }
+    #[inline(always)]
     fn array_enumerate<T>(arr: [T; 1]) -> [(usize, T); 1] {
         match arr {
             [arr_0] => [(0, arr_0)],
@@ -115,6 +133,15 @@ impl UnrollableArraySize<2> for ArrayUnrolledOps {
     fn array_map<T, U, F: FnMut(T) -> U>(arr: [T; 2], mut f: F) -> [U; 2] {
         match arr {
             [arr_0, arr_1] => [f(arr_0), f(arr_1)],
+        }
+    }
+    #[inline(always)]
+    fn array_map_result<T, U, E, F: FnMut(T) -> Result<U, E>>(
+        arr: [T; 2],
+        mut f: F,
+    ) -> Result<[U; 2], E> {
+        match arr {
+            [arr_0, arr_1] => Ok([f(arr_0)?, f(arr_1)?]),
         }
     }
     #[inline(always)]
@@ -177,6 +204,15 @@ impl UnrollableArraySize<3> for ArrayUnrolledOps {
         }
     }
     #[inline(always)]
+    fn array_map_result<T, U, E, F: FnMut(T) -> Result<U, E>>(
+        arr: [T; 3],
+        mut f: F,
+    ) -> Result<[U; 3], E> {
+        match arr {
+            [arr_0, arr_1, arr_2] => Ok([f(arr_0)?, f(arr_1)?, f(arr_2)?]),
+        }
+    }
+    #[inline(always)]
     fn array_enumerate<T>(arr: [T; 3]) -> [(usize, T); 3] {
         match arr {
             [arr_0, arr_1, arr_2] => [(0, arr_0), (1, arr_1), (2, arr_2)],
@@ -227,6 +263,15 @@ impl UnrollableArraySize<4> for ArrayUnrolledOps {
     fn array_map<T, U, F: FnMut(T) -> U>(arr: [T; 4], mut f: F) -> [U; 4] {
         match arr {
             [arr_0, arr_1, arr_2, arr_3] => [f(arr_0), f(arr_1), f(arr_2), f(arr_3)],
+        }
+    }
+    #[inline(always)]
+    fn array_map_result<T, U, E, F: FnMut(T) -> Result<U, E>>(
+        arr: [T; 4],
+        mut f: F,
+    ) -> Result<[U; 4], E> {
+        match arr {
+            [arr_0, arr_1, arr_2, arr_3] => Ok([f(arr_0)?, f(arr_1)?, f(arr_2)?, f(arr_3)?]),
         }
     }
     #[inline(always)]
@@ -300,6 +345,17 @@ impl UnrollableArraySize<5> for ArrayUnrolledOps {
         }
     }
     #[inline(always)]
+    fn array_map_result<T, U, E, F: FnMut(T) -> Result<U, E>>(
+        arr: [T; 5],
+        mut f: F,
+    ) -> Result<[U; 5], E> {
+        match arr {
+            [arr_0, arr_1, arr_2, arr_3, arr_4] => {
+                Ok([f(arr_0)?, f(arr_1)?, f(arr_2)?, f(arr_3)?, f(arr_4)?])
+            }
+        }
+    }
+    #[inline(always)]
     fn array_enumerate<T>(arr: [T; 5]) -> [(usize, T); 5] {
         match arr {
             [arr_0, arr_1, arr_2, arr_3, arr_4] => {
@@ -366,6 +422,22 @@ impl UnrollableArraySize<6> for ArrayUnrolledOps {
             [arr_0, arr_1, arr_2, arr_3, arr_4, arr_5] => {
                 [f(arr_0), f(arr_1), f(arr_2), f(arr_3), f(arr_4), f(arr_5)]
             }
+        }
+    }
+    #[inline(always)]
+    fn array_map_result<T, U, E, F: FnMut(T) -> Result<U, E>>(
+        arr: [T; 6],
+        mut f: F,
+    ) -> Result<[U; 6], E> {
+        match arr {
+            [arr_0, arr_1, arr_2, arr_3, arr_4, arr_5] => Ok([
+                f(arr_0)?,
+                f(arr_1)?,
+                f(arr_2)?,
+                f(arr_3)?,
+                f(arr_4)?,
+                f(arr_5)?,
+            ]),
         }
     }
     #[inline(always)]
@@ -462,6 +534,23 @@ impl UnrollableArraySize<7> for ArrayUnrolledOps {
         }
     }
     #[inline(always)]
+    fn array_map_result<T, U, E, F: FnMut(T) -> Result<U, E>>(
+        arr: [T; 7],
+        mut f: F,
+    ) -> Result<[U; 7], E> {
+        match arr {
+            [arr_0, arr_1, arr_2, arr_3, arr_4, arr_5, arr_6] => Ok([
+                f(arr_0)?,
+                f(arr_1)?,
+                f(arr_2)?,
+                f(arr_3)?,
+                f(arr_4)?,
+                f(arr_5)?,
+                f(arr_6)?,
+            ]),
+        }
+    }
+    #[inline(always)]
     fn array_enumerate<T>(arr: [T; 7]) -> [(usize, T); 7] {
         match arr {
             [arr_0, arr_1, arr_2, arr_3, arr_4, arr_5, arr_6] => [
@@ -550,6 +639,24 @@ impl UnrollableArraySize<8> for ArrayUnrolledOps {
                 f(arr_6),
                 f(arr_7),
             ],
+        }
+    }
+    #[inline(always)]
+    fn array_map_result<T, U, E, F: FnMut(T) -> Result<U, E>>(
+        arr: [T; 8],
+        mut f: F,
+    ) -> Result<[U; 8], E> {
+        match arr {
+            [arr_0, arr_1, arr_2, arr_3, arr_4, arr_5, arr_6, arr_7] => Ok([
+                f(arr_0)?,
+                f(arr_1)?,
+                f(arr_2)?,
+                f(arr_3)?,
+                f(arr_4)?,
+                f(arr_5)?,
+                f(arr_6)?,
+                f(arr_7)?,
+            ]),
         }
     }
     #[inline(always)]
@@ -662,6 +769,25 @@ impl UnrollableArraySize<9> for ArrayUnrolledOps {
         }
     }
     #[inline(always)]
+    fn array_map_result<T, U, E, F: FnMut(T) -> Result<U, E>>(
+        arr: [T; 9],
+        mut f: F,
+    ) -> Result<[U; 9], E> {
+        match arr {
+            [arr_0, arr_1, arr_2, arr_3, arr_4, arr_5, arr_6, arr_7, arr_8] => Ok([
+                f(arr_0)?,
+                f(arr_1)?,
+                f(arr_2)?,
+                f(arr_3)?,
+                f(arr_4)?,
+                f(arr_5)?,
+                f(arr_6)?,
+                f(arr_7)?,
+                f(arr_8)?,
+            ]),
+        }
+    }
+    #[inline(always)]
     fn array_enumerate<T>(arr: [T; 9]) -> [(usize, T); 9] {
         match arr {
             [arr_0, arr_1, arr_2, arr_3, arr_4, arr_5, arr_6, arr_7, arr_8] => [
@@ -763,6 +889,26 @@ impl UnrollableArraySize<10> for ArrayUnrolledOps {
                 f(arr_8),
                 f(arr_9),
             ],
+        }
+    }
+    #[inline(always)]
+    fn array_map_result<T, U, E, F: FnMut(T) -> Result<U, E>>(
+        arr: [T; 10],
+        mut f: F,
+    ) -> Result<[U; 10], E> {
+        match arr {
+            [arr_0, arr_1, arr_2, arr_3, arr_4, arr_5, arr_6, arr_7, arr_8, arr_9] => Ok([
+                f(arr_0)?,
+                f(arr_1)?,
+                f(arr_2)?,
+                f(arr_3)?,
+                f(arr_4)?,
+                f(arr_5)?,
+                f(arr_6)?,
+                f(arr_7)?,
+                f(arr_8)?,
+                f(arr_9)?,
+            ]),
         }
     }
     #[inline(always)]
@@ -891,6 +1037,27 @@ impl UnrollableArraySize<11> for ArrayUnrolledOps {
         }
     }
     #[inline(always)]
+    fn array_map_result<T, U, E, F: FnMut(T) -> Result<U, E>>(
+        arr: [T; 11],
+        mut f: F,
+    ) -> Result<[U; 11], E> {
+        match arr {
+            [arr_0, arr_1, arr_2, arr_3, arr_4, arr_5, arr_6, arr_7, arr_8, arr_9, arr_10] => Ok([
+                f(arr_0)?,
+                f(arr_1)?,
+                f(arr_2)?,
+                f(arr_3)?,
+                f(arr_4)?,
+                f(arr_5)?,
+                f(arr_6)?,
+                f(arr_7)?,
+                f(arr_8)?,
+                f(arr_9)?,
+                f(arr_10)?,
+            ]),
+        }
+    }
+    #[inline(always)]
     fn array_enumerate<T>(arr: [T; 11]) -> [(usize, T); 11] {
         match arr {
             [arr_0, arr_1, arr_2, arr_3, arr_4, arr_5, arr_6, arr_7, arr_8, arr_9, arr_10] => [
@@ -1008,6 +1175,30 @@ impl UnrollableArraySize<12> for ArrayUnrolledOps {
                     f(arr_10),
                     f(arr_11),
                 ]
+            }
+        }
+    }
+    #[inline(always)]
+    fn array_map_result<T, U, E, F: FnMut(T) -> Result<U, E>>(
+        arr: [T; 12],
+        mut f: F,
+    ) -> Result<[U; 12], E> {
+        match arr {
+            [arr_0, arr_1, arr_2, arr_3, arr_4, arr_5, arr_6, arr_7, arr_8, arr_9, arr_10, arr_11] => {
+                Ok([
+                    f(arr_0)?,
+                    f(arr_1)?,
+                    f(arr_2)?,
+                    f(arr_3)?,
+                    f(arr_4)?,
+                    f(arr_5)?,
+                    f(arr_6)?,
+                    f(arr_7)?,
+                    f(arr_8)?,
+                    f(arr_9)?,
+                    f(arr_10)?,
+                    f(arr_11)?,
+                ])
             }
         }
     }
@@ -1160,6 +1351,31 @@ impl UnrollableArraySize<13> for ArrayUnrolledOps {
         }
     }
     #[inline(always)]
+    fn array_map_result<T, U, E, F: FnMut(T) -> Result<U, E>>(
+        arr: [T; 13],
+        mut f: F,
+    ) -> Result<[U; 13], E> {
+        match arr {
+            [arr_0, arr_1, arr_2, arr_3, arr_4, arr_5, arr_6, arr_7, arr_8, arr_9, arr_10, arr_11, arr_12] => {
+                Ok([
+                    f(arr_0)?,
+                    f(arr_1)?,
+                    f(arr_2)?,
+                    f(arr_3)?,
+                    f(arr_4)?,
+                    f(arr_5)?,
+                    f(arr_6)?,
+                    f(arr_7)?,
+                    f(arr_8)?,
+                    f(arr_9)?,
+                    f(arr_10)?,
+                    f(arr_11)?,
+                    f(arr_12)?,
+                ])
+            }
+        }
+    }
+    #[inline(always)]
     fn array_enumerate<T>(arr: [T; 13]) -> [(usize, T); 13] {
         match arr {
             [arr_0, arr_1, arr_2, arr_3, arr_4, arr_5, arr_6, arr_7, arr_8, arr_9, arr_10, arr_11, arr_12] => {
@@ -1293,6 +1509,32 @@ impl UnrollableArraySize<14> for ArrayUnrolledOps {
                     f(arr_12),
                     f(arr_13),
                 ]
+            }
+        }
+    }
+    #[inline(always)]
+    fn array_map_result<T, U, E, F: FnMut(T) -> Result<U, E>>(
+        arr: [T; 14],
+        mut f: F,
+    ) -> Result<[U; 14], E> {
+        match arr {
+            [arr_0, arr_1, arr_2, arr_3, arr_4, arr_5, arr_6, arr_7, arr_8, arr_9, arr_10, arr_11, arr_12, arr_13] => {
+                Ok([
+                    f(arr_0)?,
+                    f(arr_1)?,
+                    f(arr_2)?,
+                    f(arr_3)?,
+                    f(arr_4)?,
+                    f(arr_5)?,
+                    f(arr_6)?,
+                    f(arr_7)?,
+                    f(arr_8)?,
+                    f(arr_9)?,
+                    f(arr_10)?,
+                    f(arr_11)?,
+                    f(arr_12)?,
+                    f(arr_13)?,
+                ])
             }
         }
     }
@@ -1457,6 +1699,33 @@ impl UnrollableArraySize<15> for ArrayUnrolledOps {
         }
     }
     #[inline(always)]
+    fn array_map_result<T, U, E, F: FnMut(T) -> Result<U, E>>(
+        arr: [T; 15],
+        mut f: F,
+    ) -> Result<[U; 15], E> {
+        match arr {
+            [arr_0, arr_1, arr_2, arr_3, arr_4, arr_5, arr_6, arr_7, arr_8, arr_9, arr_10, arr_11, arr_12, arr_13, arr_14] => {
+                Ok([
+                    f(arr_0)?,
+                    f(arr_1)?,
+                    f(arr_2)?,
+                    f(arr_3)?,
+                    f(arr_4)?,
+                    f(arr_5)?,
+                    f(arr_6)?,
+                    f(arr_7)?,
+                    f(arr_8)?,
+                    f(arr_9)?,
+                    f(arr_10)?,
+                    f(arr_11)?,
+                    f(arr_12)?,
+                    f(arr_13)?,
+                    f(arr_14)?,
+                ])
+            }
+        }
+    }
+    #[inline(always)]
     fn array_enumerate<T>(arr: [T; 15]) -> [(usize, T); 15] {
         match arr {
             [arr_0, arr_1, arr_2, arr_3, arr_4, arr_5, arr_6, arr_7, arr_8, arr_9, arr_10, arr_11, arr_12, arr_13, arr_14] => {
@@ -1601,6 +1870,34 @@ impl UnrollableArraySize<16> for ArrayUnrolledOps {
                     f(arr_14),
                     f(arr_15),
                 ]
+            }
+        }
+    }
+    #[inline(always)]
+    fn array_map_result<T, U, E, F: FnMut(T) -> Result<U, E>>(
+        arr: [T; 16],
+        mut f: F,
+    ) -> Result<[U; 16], E> {
+        match arr {
+            [arr_0, arr_1, arr_2, arr_3, arr_4, arr_5, arr_6, arr_7, arr_8, arr_9, arr_10, arr_11, arr_12, arr_13, arr_14, arr_15] => {
+                Ok([
+                    f(arr_0)?,
+                    f(arr_1)?,
+                    f(arr_2)?,
+                    f(arr_3)?,
+                    f(arr_4)?,
+                    f(arr_5)?,
+                    f(arr_6)?,
+                    f(arr_7)?,
+                    f(arr_8)?,
+                    f(arr_9)?,
+                    f(arr_10)?,
+                    f(arr_11)?,
+                    f(arr_12)?,
+                    f(arr_13)?,
+                    f(arr_14)?,
+                    f(arr_15)?,
+                ])
             }
         }
     }
@@ -1778,6 +2075,35 @@ impl UnrollableArraySize<17> for ArrayUnrolledOps {
         }
     }
     #[inline(always)]
+    fn array_map_result<T, U, E, F: FnMut(T) -> Result<U, E>>(
+        arr: [T; 17],
+        mut f: F,
+    ) -> Result<[U; 17], E> {
+        match arr {
+            [arr_0, arr_1, arr_2, arr_3, arr_4, arr_5, arr_6, arr_7, arr_8, arr_9, arr_10, arr_11, arr_12, arr_13, arr_14, arr_15, arr_16] => {
+                Ok([
+                    f(arr_0)?,
+                    f(arr_1)?,
+                    f(arr_2)?,
+                    f(arr_3)?,
+                    f(arr_4)?,
+                    f(arr_5)?,
+                    f(arr_6)?,
+                    f(arr_7)?,
+                    f(arr_8)?,
+                    f(arr_9)?,
+                    f(arr_10)?,
+                    f(arr_11)?,
+                    f(arr_12)?,
+                    f(arr_13)?,
+                    f(arr_14)?,
+                    f(arr_15)?,
+                    f(arr_16)?,
+                ])
+            }
+        }
+    }
+    #[inline(always)]
     fn array_enumerate<T>(arr: [T; 17]) -> [(usize, T); 17] {
         match arr {
             [arr_0, arr_1, arr_2, arr_3, arr_4, arr_5, arr_6, arr_7, arr_8, arr_9, arr_10, arr_11, arr_12, arr_13, arr_14, arr_15, arr_16] => {
@@ -1934,6 +2260,36 @@ impl UnrollableArraySize<18> for ArrayUnrolledOps {
                     f(arr_16),
                     f(arr_17),
                 ]
+            }
+        }
+    }
+    #[inline(always)]
+    fn array_map_result<T, U, E, F: FnMut(T) -> Result<U, E>>(
+        arr: [T; 18],
+        mut f: F,
+    ) -> Result<[U; 18], E> {
+        match arr {
+            [arr_0, arr_1, arr_2, arr_3, arr_4, arr_5, arr_6, arr_7, arr_8, arr_9, arr_10, arr_11, arr_12, arr_13, arr_14, arr_15, arr_16, arr_17] => {
+                Ok([
+                    f(arr_0)?,
+                    f(arr_1)?,
+                    f(arr_2)?,
+                    f(arr_3)?,
+                    f(arr_4)?,
+                    f(arr_5)?,
+                    f(arr_6)?,
+                    f(arr_7)?,
+                    f(arr_8)?,
+                    f(arr_9)?,
+                    f(arr_10)?,
+                    f(arr_11)?,
+                    f(arr_12)?,
+                    f(arr_13)?,
+                    f(arr_14)?,
+                    f(arr_15)?,
+                    f(arr_16)?,
+                    f(arr_17)?,
+                ])
             }
         }
     }
@@ -2123,6 +2479,37 @@ impl UnrollableArraySize<19> for ArrayUnrolledOps {
         }
     }
     #[inline(always)]
+    fn array_map_result<T, U, E, F: FnMut(T) -> Result<U, E>>(
+        arr: [T; 19],
+        mut f: F,
+    ) -> Result<[U; 19], E> {
+        match arr {
+            [arr_0, arr_1, arr_2, arr_3, arr_4, arr_5, arr_6, arr_7, arr_8, arr_9, arr_10, arr_11, arr_12, arr_13, arr_14, arr_15, arr_16, arr_17, arr_18] => {
+                Ok([
+                    f(arr_0)?,
+                    f(arr_1)?,
+                    f(arr_2)?,
+                    f(arr_3)?,
+                    f(arr_4)?,
+                    f(arr_5)?,
+                    f(arr_6)?,
+                    f(arr_7)?,
+                    f(arr_8)?,
+                    f(arr_9)?,
+                    f(arr_10)?,
+                    f(arr_11)?,
+                    f(arr_12)?,
+                    f(arr_13)?,
+                    f(arr_14)?,
+                    f(arr_15)?,
+                    f(arr_16)?,
+                    f(arr_17)?,
+                    f(arr_18)?,
+                ])
+            }
+        }
+    }
+    #[inline(always)]
     fn array_enumerate<T>(arr: [T; 19]) -> [(usize, T); 19] {
         match arr {
             [arr_0, arr_1, arr_2, arr_3, arr_4, arr_5, arr_6, arr_7, arr_8, arr_9, arr_10, arr_11, arr_12, arr_13, arr_14, arr_15, arr_16, arr_17, arr_18] => {
@@ -2290,6 +2677,38 @@ impl UnrollableArraySize<20> for ArrayUnrolledOps {
                     f(arr_18),
                     f(arr_19),
                 ]
+            }
+        }
+    }
+    #[inline(always)]
+    fn array_map_result<T, U, E, F: FnMut(T) -> Result<U, E>>(
+        arr: [T; 20],
+        mut f: F,
+    ) -> Result<[U; 20], E> {
+        match arr {
+            [arr_0, arr_1, arr_2, arr_3, arr_4, arr_5, arr_6, arr_7, arr_8, arr_9, arr_10, arr_11, arr_12, arr_13, arr_14, arr_15, arr_16, arr_17, arr_18, arr_19] => {
+                Ok([
+                    f(arr_0)?,
+                    f(arr_1)?,
+                    f(arr_2)?,
+                    f(arr_3)?,
+                    f(arr_4)?,
+                    f(arr_5)?,
+                    f(arr_6)?,
+                    f(arr_7)?,
+                    f(arr_8)?,
+                    f(arr_9)?,
+                    f(arr_10)?,
+                    f(arr_11)?,
+                    f(arr_12)?,
+                    f(arr_13)?,
+                    f(arr_14)?,
+                    f(arr_15)?,
+                    f(arr_16)?,
+                    f(arr_17)?,
+                    f(arr_18)?,
+                    f(arr_19)?,
+                ])
             }
         }
     }
@@ -2491,6 +2910,39 @@ impl UnrollableArraySize<21> for ArrayUnrolledOps {
         }
     }
     #[inline(always)]
+    fn array_map_result<T, U, E, F: FnMut(T) -> Result<U, E>>(
+        arr: [T; 21],
+        mut f: F,
+    ) -> Result<[U; 21], E> {
+        match arr {
+            [arr_0, arr_1, arr_2, arr_3, arr_4, arr_5, arr_6, arr_7, arr_8, arr_9, arr_10, arr_11, arr_12, arr_13, arr_14, arr_15, arr_16, arr_17, arr_18, arr_19, arr_20] => {
+                Ok([
+                    f(arr_0)?,
+                    f(arr_1)?,
+                    f(arr_2)?,
+                    f(arr_3)?,
+                    f(arr_4)?,
+                    f(arr_5)?,
+                    f(arr_6)?,
+                    f(arr_7)?,
+                    f(arr_8)?,
+                    f(arr_9)?,
+                    f(arr_10)?,
+                    f(arr_11)?,
+                    f(arr_12)?,
+                    f(arr_13)?,
+                    f(arr_14)?,
+                    f(arr_15)?,
+                    f(arr_16)?,
+                    f(arr_17)?,
+                    f(arr_18)?,
+                    f(arr_19)?,
+                    f(arr_20)?,
+                ])
+            }
+        }
+    }
+    #[inline(always)]
     fn array_enumerate<T>(arr: [T; 21]) -> [(usize, T); 21] {
         match arr {
             [arr_0, arr_1, arr_2, arr_3, arr_4, arr_5, arr_6, arr_7, arr_8, arr_9, arr_10, arr_11, arr_12, arr_13, arr_14, arr_15, arr_16, arr_17, arr_18, arr_19, arr_20] => {
@@ -2669,6 +3121,40 @@ impl UnrollableArraySize<22> for ArrayUnrolledOps {
                     f(arr_20),
                     f(arr_21),
                 ]
+            }
+        }
+    }
+    #[inline(always)]
+    fn array_map_result<T, U, E, F: FnMut(T) -> Result<U, E>>(
+        arr: [T; 22],
+        mut f: F,
+    ) -> Result<[U; 22], E> {
+        match arr {
+            [arr_0, arr_1, arr_2, arr_3, arr_4, arr_5, arr_6, arr_7, arr_8, arr_9, arr_10, arr_11, arr_12, arr_13, arr_14, arr_15, arr_16, arr_17, arr_18, arr_19, arr_20, arr_21] => {
+                Ok([
+                    f(arr_0)?,
+                    f(arr_1)?,
+                    f(arr_2)?,
+                    f(arr_3)?,
+                    f(arr_4)?,
+                    f(arr_5)?,
+                    f(arr_6)?,
+                    f(arr_7)?,
+                    f(arr_8)?,
+                    f(arr_9)?,
+                    f(arr_10)?,
+                    f(arr_11)?,
+                    f(arr_12)?,
+                    f(arr_13)?,
+                    f(arr_14)?,
+                    f(arr_15)?,
+                    f(arr_16)?,
+                    f(arr_17)?,
+                    f(arr_18)?,
+                    f(arr_19)?,
+                    f(arr_20)?,
+                    f(arr_21)?,
+                ])
             }
         }
     }
@@ -2882,6 +3368,41 @@ impl UnrollableArraySize<23> for ArrayUnrolledOps {
         }
     }
     #[inline(always)]
+    fn array_map_result<T, U, E, F: FnMut(T) -> Result<U, E>>(
+        arr: [T; 23],
+        mut f: F,
+    ) -> Result<[U; 23], E> {
+        match arr {
+            [arr_0, arr_1, arr_2, arr_3, arr_4, arr_5, arr_6, arr_7, arr_8, arr_9, arr_10, arr_11, arr_12, arr_13, arr_14, arr_15, arr_16, arr_17, arr_18, arr_19, arr_20, arr_21, arr_22] => {
+                Ok([
+                    f(arr_0)?,
+                    f(arr_1)?,
+                    f(arr_2)?,
+                    f(arr_3)?,
+                    f(arr_4)?,
+                    f(arr_5)?,
+                    f(arr_6)?,
+                    f(arr_7)?,
+                    f(arr_8)?,
+                    f(arr_9)?,
+                    f(arr_10)?,
+                    f(arr_11)?,
+                    f(arr_12)?,
+                    f(arr_13)?,
+                    f(arr_14)?,
+                    f(arr_15)?,
+                    f(arr_16)?,
+                    f(arr_17)?,
+                    f(arr_18)?,
+                    f(arr_19)?,
+                    f(arr_20)?,
+                    f(arr_21)?,
+                    f(arr_22)?,
+                ])
+            }
+        }
+    }
+    #[inline(always)]
     fn array_enumerate<T>(arr: [T; 23]) -> [(usize, T); 23] {
         match arr {
             [arr_0, arr_1, arr_2, arr_3, arr_4, arr_5, arr_6, arr_7, arr_8, arr_9, arr_10, arr_11, arr_12, arr_13, arr_14, arr_15, arr_16, arr_17, arr_18, arr_19, arr_20, arr_21, arr_22] => {
@@ -3071,6 +3592,42 @@ impl UnrollableArraySize<24> for ArrayUnrolledOps {
                     f(arr_22),
                     f(arr_23),
                 ]
+            }
+        }
+    }
+    #[inline(always)]
+    fn array_map_result<T, U, E, F: FnMut(T) -> Result<U, E>>(
+        arr: [T; 24],
+        mut f: F,
+    ) -> Result<[U; 24], E> {
+        match arr {
+            [arr_0, arr_1, arr_2, arr_3, arr_4, arr_5, arr_6, arr_7, arr_8, arr_9, arr_10, arr_11, arr_12, arr_13, arr_14, arr_15, arr_16, arr_17, arr_18, arr_19, arr_20, arr_21, arr_22, arr_23] => {
+                Ok([
+                    f(arr_0)?,
+                    f(arr_1)?,
+                    f(arr_2)?,
+                    f(arr_3)?,
+                    f(arr_4)?,
+                    f(arr_5)?,
+                    f(arr_6)?,
+                    f(arr_7)?,
+                    f(arr_8)?,
+                    f(arr_9)?,
+                    f(arr_10)?,
+                    f(arr_11)?,
+                    f(arr_12)?,
+                    f(arr_13)?,
+                    f(arr_14)?,
+                    f(arr_15)?,
+                    f(arr_16)?,
+                    f(arr_17)?,
+                    f(arr_18)?,
+                    f(arr_19)?,
+                    f(arr_20)?,
+                    f(arr_21)?,
+                    f(arr_22)?,
+                    f(arr_23)?,
+                ])
             }
         }
     }
@@ -3296,6 +3853,43 @@ impl UnrollableArraySize<25> for ArrayUnrolledOps {
         }
     }
     #[inline(always)]
+    fn array_map_result<T, U, E, F: FnMut(T) -> Result<U, E>>(
+        arr: [T; 25],
+        mut f: F,
+    ) -> Result<[U; 25], E> {
+        match arr {
+            [arr_0, arr_1, arr_2, arr_3, arr_4, arr_5, arr_6, arr_7, arr_8, arr_9, arr_10, arr_11, arr_12, arr_13, arr_14, arr_15, arr_16, arr_17, arr_18, arr_19, arr_20, arr_21, arr_22, arr_23, arr_24] => {
+                Ok([
+                    f(arr_0)?,
+                    f(arr_1)?,
+                    f(arr_2)?,
+                    f(arr_3)?,
+                    f(arr_4)?,
+                    f(arr_5)?,
+                    f(arr_6)?,
+                    f(arr_7)?,
+                    f(arr_8)?,
+                    f(arr_9)?,
+                    f(arr_10)?,
+                    f(arr_11)?,
+                    f(arr_12)?,
+                    f(arr_13)?,
+                    f(arr_14)?,
+                    f(arr_15)?,
+                    f(arr_16)?,
+                    f(arr_17)?,
+                    f(arr_18)?,
+                    f(arr_19)?,
+                    f(arr_20)?,
+                    f(arr_21)?,
+                    f(arr_22)?,
+                    f(arr_23)?,
+                    f(arr_24)?,
+                ])
+            }
+        }
+    }
+    #[inline(always)]
     fn array_enumerate<T>(arr: [T; 25]) -> [(usize, T); 25] {
         match arr {
             [arr_0, arr_1, arr_2, arr_3, arr_4, arr_5, arr_6, arr_7, arr_8, arr_9, arr_10, arr_11, arr_12, arr_13, arr_14, arr_15, arr_16, arr_17, arr_18, arr_19, arr_20, arr_21, arr_22, arr_23, arr_24] => {
@@ -3496,6 +4090,44 @@ impl UnrollableArraySize<26> for ArrayUnrolledOps {
                     f(arr_24),
                     f(arr_25),
                 ]
+            }
+        }
+    }
+    #[inline(always)]
+    fn array_map_result<T, U, E, F: FnMut(T) -> Result<U, E>>(
+        arr: [T; 26],
+        mut f: F,
+    ) -> Result<[U; 26], E> {
+        match arr {
+            [arr_0, arr_1, arr_2, arr_3, arr_4, arr_5, arr_6, arr_7, arr_8, arr_9, arr_10, arr_11, arr_12, arr_13, arr_14, arr_15, arr_16, arr_17, arr_18, arr_19, arr_20, arr_21, arr_22, arr_23, arr_24, arr_25] => {
+                Ok([
+                    f(arr_0)?,
+                    f(arr_1)?,
+                    f(arr_2)?,
+                    f(arr_3)?,
+                    f(arr_4)?,
+                    f(arr_5)?,
+                    f(arr_6)?,
+                    f(arr_7)?,
+                    f(arr_8)?,
+                    f(arr_9)?,
+                    f(arr_10)?,
+                    f(arr_11)?,
+                    f(arr_12)?,
+                    f(arr_13)?,
+                    f(arr_14)?,
+                    f(arr_15)?,
+                    f(arr_16)?,
+                    f(arr_17)?,
+                    f(arr_18)?,
+                    f(arr_19)?,
+                    f(arr_20)?,
+                    f(arr_21)?,
+                    f(arr_22)?,
+                    f(arr_23)?,
+                    f(arr_24)?,
+                    f(arr_25)?,
+                ])
             }
         }
     }
@@ -3733,6 +4365,45 @@ impl UnrollableArraySize<27> for ArrayUnrolledOps {
         }
     }
     #[inline(always)]
+    fn array_map_result<T, U, E, F: FnMut(T) -> Result<U, E>>(
+        arr: [T; 27],
+        mut f: F,
+    ) -> Result<[U; 27], E> {
+        match arr {
+            [arr_0, arr_1, arr_2, arr_3, arr_4, arr_5, arr_6, arr_7, arr_8, arr_9, arr_10, arr_11, arr_12, arr_13, arr_14, arr_15, arr_16, arr_17, arr_18, arr_19, arr_20, arr_21, arr_22, arr_23, arr_24, arr_25, arr_26] => {
+                Ok([
+                    f(arr_0)?,
+                    f(arr_1)?,
+                    f(arr_2)?,
+                    f(arr_3)?,
+                    f(arr_4)?,
+                    f(arr_5)?,
+                    f(arr_6)?,
+                    f(arr_7)?,
+                    f(arr_8)?,
+                    f(arr_9)?,
+                    f(arr_10)?,
+                    f(arr_11)?,
+                    f(arr_12)?,
+                    f(arr_13)?,
+                    f(arr_14)?,
+                    f(arr_15)?,
+                    f(arr_16)?,
+                    f(arr_17)?,
+                    f(arr_18)?,
+                    f(arr_19)?,
+                    f(arr_20)?,
+                    f(arr_21)?,
+                    f(arr_22)?,
+                    f(arr_23)?,
+                    f(arr_24)?,
+                    f(arr_25)?,
+                    f(arr_26)?,
+                ])
+            }
+        }
+    }
+    #[inline(always)]
     fn array_enumerate<T>(arr: [T; 27]) -> [(usize, T); 27] {
         match arr {
             [arr_0, arr_1, arr_2, arr_3, arr_4, arr_5, arr_6, arr_7, arr_8, arr_9, arr_10, arr_11, arr_12, arr_13, arr_14, arr_15, arr_16, arr_17, arr_18, arr_19, arr_20, arr_21, arr_22, arr_23, arr_24, arr_25, arr_26] => {
@@ -3944,6 +4615,46 @@ impl UnrollableArraySize<28> for ArrayUnrolledOps {
                     f(arr_26),
                     f(arr_27),
                 ]
+            }
+        }
+    }
+    #[inline(always)]
+    fn array_map_result<T, U, E, F: FnMut(T) -> Result<U, E>>(
+        arr: [T; 28],
+        mut f: F,
+    ) -> Result<[U; 28], E> {
+        match arr {
+            [arr_0, arr_1, arr_2, arr_3, arr_4, arr_5, arr_6, arr_7, arr_8, arr_9, arr_10, arr_11, arr_12, arr_13, arr_14, arr_15, arr_16, arr_17, arr_18, arr_19, arr_20, arr_21, arr_22, arr_23, arr_24, arr_25, arr_26, arr_27] => {
+                Ok([
+                    f(arr_0)?,
+                    f(arr_1)?,
+                    f(arr_2)?,
+                    f(arr_3)?,
+                    f(arr_4)?,
+                    f(arr_5)?,
+                    f(arr_6)?,
+                    f(arr_7)?,
+                    f(arr_8)?,
+                    f(arr_9)?,
+                    f(arr_10)?,
+                    f(arr_11)?,
+                    f(arr_12)?,
+                    f(arr_13)?,
+                    f(arr_14)?,
+                    f(arr_15)?,
+                    f(arr_16)?,
+                    f(arr_17)?,
+                    f(arr_18)?,
+                    f(arr_19)?,
+                    f(arr_20)?,
+                    f(arr_21)?,
+                    f(arr_22)?,
+                    f(arr_23)?,
+                    f(arr_24)?,
+                    f(arr_25)?,
+                    f(arr_26)?,
+                    f(arr_27)?,
+                ])
             }
         }
     }
@@ -4193,6 +4904,47 @@ impl UnrollableArraySize<29> for ArrayUnrolledOps {
         }
     }
     #[inline(always)]
+    fn array_map_result<T, U, E, F: FnMut(T) -> Result<U, E>>(
+        arr: [T; 29],
+        mut f: F,
+    ) -> Result<[U; 29], E> {
+        match arr {
+            [arr_0, arr_1, arr_2, arr_3, arr_4, arr_5, arr_6, arr_7, arr_8, arr_9, arr_10, arr_11, arr_12, arr_13, arr_14, arr_15, arr_16, arr_17, arr_18, arr_19, arr_20, arr_21, arr_22, arr_23, arr_24, arr_25, arr_26, arr_27, arr_28] => {
+                Ok([
+                    f(arr_0)?,
+                    f(arr_1)?,
+                    f(arr_2)?,
+                    f(arr_3)?,
+                    f(arr_4)?,
+                    f(arr_5)?,
+                    f(arr_6)?,
+                    f(arr_7)?,
+                    f(arr_8)?,
+                    f(arr_9)?,
+                    f(arr_10)?,
+                    f(arr_11)?,
+                    f(arr_12)?,
+                    f(arr_13)?,
+                    f(arr_14)?,
+                    f(arr_15)?,
+                    f(arr_16)?,
+                    f(arr_17)?,
+                    f(arr_18)?,
+                    f(arr_19)?,
+                    f(arr_20)?,
+                    f(arr_21)?,
+                    f(arr_22)?,
+                    f(arr_23)?,
+                    f(arr_24)?,
+                    f(arr_25)?,
+                    f(arr_26)?,
+                    f(arr_27)?,
+                    f(arr_28)?,
+                ])
+            }
+        }
+    }
+    #[inline(always)]
     fn array_enumerate<T>(arr: [T; 29]) -> [(usize, T); 29] {
         match arr {
             [arr_0, arr_1, arr_2, arr_3, arr_4, arr_5, arr_6, arr_7, arr_8, arr_9, arr_10, arr_11, arr_12, arr_13, arr_14, arr_15, arr_16, arr_17, arr_18, arr_19, arr_20, arr_21, arr_22, arr_23, arr_24, arr_25, arr_26, arr_27, arr_28] => {
@@ -4415,6 +5167,48 @@ impl UnrollableArraySize<30> for ArrayUnrolledOps {
                     f(arr_28),
                     f(arr_29),
                 ]
+            }
+        }
+    }
+    #[inline(always)]
+    fn array_map_result<T, U, E, F: FnMut(T) -> Result<U, E>>(
+        arr: [T; 30],
+        mut f: F,
+    ) -> Result<[U; 30], E> {
+        match arr {
+            [arr_0, arr_1, arr_2, arr_3, arr_4, arr_5, arr_6, arr_7, arr_8, arr_9, arr_10, arr_11, arr_12, arr_13, arr_14, arr_15, arr_16, arr_17, arr_18, arr_19, arr_20, arr_21, arr_22, arr_23, arr_24, arr_25, arr_26, arr_27, arr_28, arr_29] => {
+                Ok([
+                    f(arr_0)?,
+                    f(arr_1)?,
+                    f(arr_2)?,
+                    f(arr_3)?,
+                    f(arr_4)?,
+                    f(arr_5)?,
+                    f(arr_6)?,
+                    f(arr_7)?,
+                    f(arr_8)?,
+                    f(arr_9)?,
+                    f(arr_10)?,
+                    f(arr_11)?,
+                    f(arr_12)?,
+                    f(arr_13)?,
+                    f(arr_14)?,
+                    f(arr_15)?,
+                    f(arr_16)?,
+                    f(arr_17)?,
+                    f(arr_18)?,
+                    f(arr_19)?,
+                    f(arr_20)?,
+                    f(arr_21)?,
+                    f(arr_22)?,
+                    f(arr_23)?,
+                    f(arr_24)?,
+                    f(arr_25)?,
+                    f(arr_26)?,
+                    f(arr_27)?,
+                    f(arr_28)?,
+                    f(arr_29)?,
+                ])
             }
         }
     }
@@ -4677,6 +5471,49 @@ impl UnrollableArraySize<31> for ArrayUnrolledOps {
         }
     }
     #[inline(always)]
+    fn array_map_result<T, U, E, F: FnMut(T) -> Result<U, E>>(
+        arr: [T; 31],
+        mut f: F,
+    ) -> Result<[U; 31], E> {
+        match arr {
+            [arr_0, arr_1, arr_2, arr_3, arr_4, arr_5, arr_6, arr_7, arr_8, arr_9, arr_10, arr_11, arr_12, arr_13, arr_14, arr_15, arr_16, arr_17, arr_18, arr_19, arr_20, arr_21, arr_22, arr_23, arr_24, arr_25, arr_26, arr_27, arr_28, arr_29, arr_30] => {
+                Ok([
+                    f(arr_0)?,
+                    f(arr_1)?,
+                    f(arr_2)?,
+                    f(arr_3)?,
+                    f(arr_4)?,
+                    f(arr_5)?,
+                    f(arr_6)?,
+                    f(arr_7)?,
+                    f(arr_8)?,
+                    f(arr_9)?,
+                    f(arr_10)?,
+                    f(arr_11)?,
+                    f(arr_12)?,
+                    f(arr_13)?,
+                    f(arr_14)?,
+                    f(arr_15)?,
+                    f(arr_16)?,
+                    f(arr_17)?,
+                    f(arr_18)?,
+                    f(arr_19)?,
+                    f(arr_20)?,
+                    f(arr_21)?,
+                    f(arr_22)?,
+                    f(arr_23)?,
+                    f(arr_24)?,
+                    f(arr_25)?,
+                    f(arr_26)?,
+                    f(arr_27)?,
+                    f(arr_28)?,
+                    f(arr_29)?,
+                    f(arr_30)?,
+                ])
+            }
+        }
+    }
+    #[inline(always)]
     fn array_enumerate<T>(arr: [T; 31]) -> [(usize, T); 31] {
         match arr {
             [arr_0, arr_1, arr_2, arr_3, arr_4, arr_5, arr_6, arr_7, arr_8, arr_9, arr_10, arr_11, arr_12, arr_13, arr_14, arr_15, arr_16, arr_17, arr_18, arr_19, arr_20, arr_21, arr_22, arr_23, arr_24, arr_25, arr_26, arr_27, arr_28, arr_29, arr_30] => {
@@ -4911,6 +5748,50 @@ impl UnrollableArraySize<32> for ArrayUnrolledOps {
                     f(arr_30),
                     f(arr_31),
                 ]
+            }
+        }
+    }
+    #[inline(always)]
+    fn array_map_result<T, U, E, F: FnMut(T) -> Result<U, E>>(
+        arr: [T; 32],
+        mut f: F,
+    ) -> Result<[U; 32], E> {
+        match arr {
+            [arr_0, arr_1, arr_2, arr_3, arr_4, arr_5, arr_6, arr_7, arr_8, arr_9, arr_10, arr_11, arr_12, arr_13, arr_14, arr_15, arr_16, arr_17, arr_18, arr_19, arr_20, arr_21, arr_22, arr_23, arr_24, arr_25, arr_26, arr_27, arr_28, arr_29, arr_30, arr_31] => {
+                Ok([
+                    f(arr_0)?,
+                    f(arr_1)?,
+                    f(arr_2)?,
+                    f(arr_3)?,
+                    f(arr_4)?,
+                    f(arr_5)?,
+                    f(arr_6)?,
+                    f(arr_7)?,
+                    f(arr_8)?,
+                    f(arr_9)?,
+                    f(arr_10)?,
+                    f(arr_11)?,
+                    f(arr_12)?,
+                    f(arr_13)?,
+                    f(arr_14)?,
+                    f(arr_15)?,
+                    f(arr_16)?,
+                    f(arr_17)?,
+                    f(arr_18)?,
+                    f(arr_19)?,
+                    f(arr_20)?,
+                    f(arr_21)?,
+                    f(arr_22)?,
+                    f(arr_23)?,
+                    f(arr_24)?,
+                    f(arr_25)?,
+                    f(arr_26)?,
+                    f(arr_27)?,
+                    f(arr_28)?,
+                    f(arr_29)?,
+                    f(arr_30)?,
+                    f(arr_31)?,
+                ])
             }
         }
     }

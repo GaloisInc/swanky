@@ -45,6 +45,17 @@ use crate::array_utils::*;
                 ]
             {% endcall %}
         }
+
+        #[inline(always)]
+        fn array_map_result<T, U, E, F: FnMut(T) -> Result<U, E>>(arr: [T; {{count}}], mut f: F) -> Result<[U; {{count}}], E> {
+            {% call extract_elems("arr") %}
+                Ok([
+                    {% for i in range(count) %}
+                        f(arr_{{i}})?,
+                    {% endfor %}
+                ])
+            {% endcall %}
+        }
         
         #[inline(always)]
         fn array_enumerate<T>(arr: [T; {{count}}]) -> [(usize, T); {{count}}] {
