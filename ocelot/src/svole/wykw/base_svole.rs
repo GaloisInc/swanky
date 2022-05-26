@@ -12,13 +12,13 @@ use super::{
     utils::Powers,
 };
 use crate::errors::Error;
-use crate::svole::wykw::specialization::FiniteFieldSendSpecialization;
+use crate::svole::wykw::specialization::FiniteFieldSpecialization;
 use generic_array::typenum::Unsigned;
 use rand::{CryptoRng, Rng, SeedableRng};
 use scuttlebutt::{field::FiniteField as FF, AbstractChannel, AesRng};
 use std::marker::PhantomData;
 
-pub(super) struct Sender<FE: FF, S: FiniteFieldSendSpecialization<FE>> {
+pub(super) struct Sender<FE: FF, S: FiniteFieldSpecialization<FE>> {
     copee: CopeeSender<FE>,
     pows: Powers<FE>,
     phantom: PhantomData<S>,
@@ -29,7 +29,7 @@ pub struct Receiver<FE: FF> {
     pows: Powers<FE>,
 }
 
-impl<FE: FF, S: FiniteFieldSendSpecialization<FE>> Sender<FE, S> {
+impl<FE: FF, S: FiniteFieldSpecialization<FE>> Sender<FE, S> {
     pub fn init<C: AbstractChannel, RNG: CryptoRng + Rng>(
         channel: &mut C,
         pows: Powers<FE>,
@@ -127,9 +127,7 @@ impl<FE: FF> Receiver<FE> {
 #[cfg(test)]
 mod tests {
     use super::{super::utils::Powers, Receiver, Sender};
-    use crate::svole::wykw::specialization::{
-        FiniteFieldSendSpecialization, Gf40Specialization, NoSpecialization,
-    };
+    use crate::svole::wykw::specialization::{FiniteFieldSpecialization, NoSpecialization};
     use scuttlebutt::field::Gf40;
     use scuttlebutt::{
         field::{F128p, F61p, FiniteField as FF, Gf128},
@@ -140,7 +138,7 @@ mod tests {
         os::unix::net::UnixStream,
     };
 
-    fn test_base_svole<FE: FF, S: FiniteFieldSendSpecialization<FE>>(len: usize) {
+    fn test_base_svole<FE: FF, S: FiniteFieldSpecialization<FE>>(len: usize) {
         let (sender, receiver) = UnixStream::pair().unwrap();
         let handle = std::thread::spawn(move || {
             let mut rng = AesRng::new();
@@ -171,7 +169,7 @@ mod tests {
         test_base_svole::<F128p, NoSpecialization>(len);
         test_base_svole::<Gf128, NoSpecialization>(len);
         test_base_svole::<F61p, NoSpecialization>(len);
-        test_base_svole::<Gf40, Gf40Specialization>(len);
+        test_base_svole::<Gf40, NoSpecialization>(len);
     }
 
     #[test]
