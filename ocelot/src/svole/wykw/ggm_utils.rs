@@ -8,7 +8,7 @@
 
 use std::convert::TryInto;
 
-use crate::svole::wykw::specialization::FiniteFieldSendSpecialization;
+use crate::svole::wykw::specialization::FiniteFieldSpecialization;
 use scuttlebutt::{field::FiniteField, utils::unpack_bits};
 use vectoreyes::{
     array_utils::ArrayUnrolledExt, Aes128EncryptOnly, AesBlockCipher, SimdBase, U8x16,
@@ -137,7 +137,7 @@ pub(super) fn ggm<FE: FiniteField, T: From<U8x16>>(
 /// (<https://eprint.iacr.org/2019/1084.pdf>, Page 7). GGM' is used compute the
 /// vector of field elements except a path `b1..bn` where `b1` represents the
 /// msb of `alpha`.
-pub(super) fn ggm_prime<FE: FiniteField, S: FiniteFieldSendSpecialization<FE>>(
+pub(super) fn ggm_prime<FE: FiniteField, S: FiniteFieldSpecialization<FE>>(
     alpha: usize,
     keys: &[U8x16],
     aes: &(Aes128EncryptOnly, Aes128EncryptOnly),
@@ -205,9 +205,7 @@ fn bv_to_num(v: &[bool]) -> usize {
 #[allow(unused_imports, dead_code)]
 mod tests {
     use super::*;
-    use crate::svole::wykw::specialization::{
-        FiniteFieldSendSpecialization, Gf40Specialization, NoSpecialization,
-    };
+    use crate::svole::wykw::specialization::{FiniteFieldSpecialization, NoSpecialization};
     use proptest::prelude::*;
     use rand::Rng;
     use scuttlebutt::field::Gf40;
@@ -223,7 +221,7 @@ mod tests {
         assert_eq!(bv_to_num(&bv), x);
     }
 
-    fn test_ggm_<FE: FiniteField, S: FiniteFieldSendSpecialization<FE>>(
+    fn test_ggm_<FE: FiniteField, S: FiniteFieldSpecialization<FE>>(
         depth: usize,
         seed: [u8; 16],
         seed0: [u8; 16],
@@ -286,6 +284,6 @@ mod tests {
         (f61p, F61p, NoSpecialization),
         (f2, F2, NoSpecialization),
         (gf128, Gf128, NoSpecialization),
-        (gf40, Gf40, Gf40Specialization),
+        (gf40, Gf40, NoSpecialization),
     );
 }

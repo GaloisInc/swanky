@@ -9,10 +9,7 @@ use super::{
     spsvole::{SpsReceiver, SpsSender},
     utils::Powers,
 };
-use crate::svole::wykw::specialization::{
-    downcast, FiniteFieldSendSpecialization, FiniteFieldSpecialization, Gf40Specialization,
-    NoSpecialization,
-};
+use crate::svole::wykw::specialization::NoSpecialization;
 use crate::{
     errors::Error,
     svole::{SVoleReceiver, SVoleSender},
@@ -22,12 +19,8 @@ use rand::{
     distributions::{Distribution, Uniform},
     CryptoRng, Rng, SeedableRng,
 };
-use scuttlebutt::field::{Gf40, F2};
 use scuttlebutt::{field::FiniteField, AbstractChannel, AesRng, Block, Malicious, SemiHonest};
-use std::marker::PhantomData;
-use std::{any::TypeId, convert::TryInto};
-
-mod gf40;
+use std::convert::TryInto;
 
 // LPN parameters used in the protocol. We use three stages, two sets of LPN
 // parameters for setup, and one set of LPN parameters for the extend phase.
@@ -94,29 +87,6 @@ fn compute_num_saved<FE: FiniteField>(params: LpnParams) -> usize {
     params.rows + params.weight + FE::PolynomialFormNumCoefficients::to_usize()
 }
 
-trait SvoleSpecializationSend<FE: FiniteField>: FiniteFieldSendSpecialization<FE> {
-    fn svole_send_internal_inner(
-        svole: &mut SenderInternal<FE, Self>,
-        num_saved: usize,
-        rows: usize,
-        uws: Vec<Self::SenderPairContents>,
-        base_voles: &mut Vec<Self::SenderPairContents>,
-        svoles: &mut Vec<Self::SenderPairContents>,
-    );
-}
-
-trait SvoleSpecializationRecv<FE: FiniteField>: FiniteFieldSpecialization<FE> {
-    fn svole_recv_internal_inner(
-        svole: &mut ReceiverInternal<FE, Self>,
-        num_saved: usize,
-        rows: usize,
-        vs: Vec<FE>,
-        base_voles: &mut Vec<FE>,
-        svoles: &mut Vec<FE>,
-    );
-}
-
-#[inline(always)]
 fn lpn_mtx_indices<FE: FiniteField>(
     distribution: &Uniform<u32>,
     mut rng: &mut AesRng,
@@ -134,57 +104,21 @@ fn lpn_mtx_indices<FE: FiniteField>(
 }
 
 /// Subfield VOLE sender.
-pub struct Sender<FE: FiniteField>(SenderContents<FE>);
-
-enum SenderContents<FE: FiniteField> {
-    Generic(SenderInternal<FE, NoSpecialization>),
-    Gf40(SenderInternal<Gf40, Gf40Specialization>),
-}
-
-struct SenderInternal<FE: FiniteField, S: SvoleSpecializationSend<FE>> {
-    spsvole: SpsSender<FE, S>,
-    base_voles: Vec<S::SenderPairContents>,
+pub struct Sender<FE: FiniteField> {
+    spsvole: SpsSender<FE>,
+    base_voles: Vec<(FE::PrimeField, FE)>,
     // Shared RNG with the receiver for generating the LPN matrix.
     lpn_rng: AesRng,
-    phantom: PhantomData<S>,
 }
 
-impl<FE: FiniteField, S: SvoleSpecializationSend<FE>> SenderInternal<FE, S> {
-    fn init_internal<C: AbstractChannel, RNG: CryptoRng + Rng>(
-        channel: &mut C,
-        rng: &mut RNG,
-    ) -> Result<Self, Error> {
-        let pows: Powers<FE> = Default::default();
-        let mut base_sender = BaseSender::<FE, S>::init(channel, pows.clone(), rng)?;
-        let base_voles_setup =
-            base_sender.send(channel, compute_num_saved::<FE>(LPN_SETUP_PARAMS), rng)?;
-        let spsvole = SpsSender::<FE, S>::init(channel, pows, rng)?;
-        let seed = rng.gen::<Block>();
-        let seed = scuttlebutt::cointoss::receive(channel, &[seed])?[0];
-        let lpn_rng = AesRng::from_seed(seed);
-        let mut sender = Self {
-            spsvole,
-            base_voles: base_voles_setup,
-            lpn_rng,
-            phantom: PhantomData,
-        };
-
-        let mut base_voles_setup = Vec::new();
-        sender.send_internal(channel, LPN_SETUP_PARAMS, 0, rng, &mut base_voles_setup)?;
-        sender.base_voles = base_voles_setup;
-        // let mut base_voles_extend = Vec::new();
-        // sender.send_internal(channel, LPN_SETUP_PARAMS, 0, rng, &mut base_voles_extend)?;
-        // sender.base_voles = base_voles_extend;
-        Ok(sender)
-    }
-
+impl<FE: FiniteField> Sender<FE> {
     fn send_internal<C: AbstractChannel, RNG: CryptoRng + Rng>(
         &mut self,
         channel: &mut C,
         params: LpnParams,
         num_saved: usize,
         rng: &mut RNG,
-        output: &mut Vec<S::SenderPairContents>,
+        output: &mut Vec<(FE::PrimeField, FE)>,
     ) -> Result<(), Error> {
         let rows = params.rows;
         let cols = params.cols;
@@ -216,12 +150,79 @@ impl<FE: FiniteField, S: SvoleSpecializationSend<FE>> SenderInternal<FE, S> {
         output.clear();
         let out_len = cols - num_saved;
         output.reserve(out_len);
-        S::svole_send_internal_inner(self, num_saved, rows, uws, &mut base_voles, output);
+        assert!(rows <= 4_294_967_295); // 2^32 -1
+        let distribution = Uniform::<u32>::from(0..rows.try_into().unwrap());
+        for (i, (e, c)) in uws.into_iter().enumerate() {
+            let indices = lpn_mtx_indices::<FE>(&distribution, &mut self.lpn_rng);
+            // Compute `x := u A + e` and `z := w A + c`, where `A` is the LPN matrix.
+            let mut x = e;
+            let mut z = c;
+            x += indices
+                .iter()
+                .map(|(j, a)| self.base_voles[*j].0 * *a)
+                .sum();
+            z += indices
+                .iter()
+                .map(|(j, a)| self.base_voles[*j].1.multiply_by_prime_subfield(*a))
+                .sum();
+
+            if i < num_saved {
+                base_voles.push((x, z));
+            } else {
+                output.push((x, z));
+            }
+        }
         base_voles.extend(self.base_voles[used..].iter());
         self.base_voles = base_voles;
         debug_assert_eq!(self.base_voles.len(), num_saved + leftover);
         debug_assert_eq!(output.len(), cols - num_saved);
         Ok(())
+    }
+}
+
+impl<FE: FiniteField> SVoleSender for Sender<FE> {
+    type Msg = FE;
+
+    fn init<C: AbstractChannel, RNG: CryptoRng + Rng>(
+        channel: &mut C,
+        rng: &mut RNG,
+    ) -> Result<Self, Error> {
+        let pows: Powers<FE> = Default::default();
+        let mut base_sender = BaseSender::<FE, NoSpecialization>::init(channel, pows.clone(), rng)?;
+        let base_voles_setup =
+            base_sender.send(channel, compute_num_saved::<FE>(LPN_SETUP_PARAMS), rng)?;
+        let spsvole = SpsSender::<FE>::init(channel, pows, rng)?;
+        let seed = rng.gen::<Block>();
+        let seed = scuttlebutt::cointoss::receive(channel, &[seed])?[0];
+        let lpn_rng = AesRng::from_seed(seed);
+        let mut sender = Self {
+            spsvole,
+            base_voles: base_voles_setup,
+            lpn_rng,
+        };
+
+        let mut base_voles_setup = Vec::new();
+        sender.send_internal(channel, LPN_SETUP_PARAMS, 0, rng, &mut base_voles_setup)?;
+        sender.base_voles = base_voles_setup;
+        // let mut base_voles_extend = Vec::new();
+        // sender.send_internal(channel, LPN_SETUP_PARAMS, 0, rng, &mut base_voles_extend)?;
+        // sender.base_voles = base_voles_extend;
+        Ok(sender)
+    }
+
+    fn send<C: AbstractChannel, RNG: CryptoRng + Rng>(
+        &mut self,
+        channel: &mut C,
+        rng: &mut RNG,
+        output: &mut Vec<(FE::PrimeField, FE)>,
+    ) -> Result<(), Error> {
+        self.send_internal(
+            channel,
+            LPN_EXTEND_PARAMS,
+            compute_num_saved::<FE>(LPN_EXTEND_PARAMS),
+            rng,
+            output,
+        )
     }
 
     fn duplicate<C: AbstractChannel, RNG: CryptoRng + Rng>(
@@ -256,185 +257,20 @@ impl<FE: FiniteField, S: SvoleSpecializationSend<FE>> SenderInternal<FE, S> {
             spsvole,
             base_voles,
             lpn_rng,
-            phantom: PhantomData,
         })
-    }
-}
-impl<FE: FiniteField> SvoleSpecializationSend<FE> for NoSpecialization {
-    fn svole_send_internal_inner(
-        svole: &mut SenderInternal<FE, Self>,
-        num_saved: usize,
-        rows: usize,
-        uws: Vec<(<FE as FiniteField>::PrimeField, FE)>,
-        base_voles: &mut Vec<(<FE as FiniteField>::PrimeField, FE)>,
-        svoles: &mut Vec<(<FE as FiniteField>::PrimeField, FE)>,
-    ) {
-        assert!(rows <= 4_294_967_295); // 2^32 -1
-        let distribution = Uniform::<u32>::from(0..rows.try_into().unwrap());
-        for (i, (e, c)) in uws.into_iter().enumerate() {
-            let indices = lpn_mtx_indices::<FE>(&distribution, &mut svole.lpn_rng);
-            // Compute `x := u A + e` and `z := w A + c`, where `A` is the LPN matrix.
-            let mut x = e;
-            let mut z = c;
-            x += indices
-                .iter()
-                .map(|(j, a)| svole.base_voles[*j].0 * *a)
-                .sum();
-            z += indices
-                .iter()
-                .map(|(j, a)| svole.base_voles[*j].1.multiply_by_prime_subfield(*a))
-                .sum();
-
-            if i < num_saved {
-                base_voles.push((x, z));
-            } else {
-                svoles.push((x, z));
-            }
-        }
-    }
-}
-
-impl<FE: FiniteField> SVoleSender for Sender<FE> {
-    type Msg = FE;
-
-    fn init<C: AbstractChannel, RNG: CryptoRng + Rng>(
-        channel: &mut C,
-        rng: &mut RNG,
-    ) -> Result<Self, Error> {
-        Ok(Sender(if TypeId::of::<FE>() == TypeId::of::<Gf40>() {
-            SenderContents::Gf40(SenderInternal::<Gf40, Gf40Specialization>::init_internal(
-                channel, rng,
-            )?)
-        } else {
-            SenderContents::Generic(SenderInternal::<FE, NoSpecialization>::init_internal(
-                channel, rng,
-            )?)
-        }))
-    }
-
-    fn send<C: AbstractChannel, RNG: CryptoRng + Rng>(
-        &mut self,
-        channel: &mut C,
-        rng: &mut RNG,
-        output: &mut Vec<(FE::PrimeField, FE)>,
-    ) -> Result<(), Error> {
-        Ok(match &mut self.0 {
-            SenderContents::Generic(internal) => internal.send_internal(
-                channel,
-                LPN_EXTEND_PARAMS,
-                compute_num_saved::<FE>(LPN_EXTEND_PARAMS),
-                rng,
-                output,
-            )?,
-            SenderContents::Gf40(internal) => {
-                let mut tmp = Vec::new();
-                internal.send_internal(
-                    channel,
-                    LPN_EXTEND_PARAMS,
-                    compute_num_saved::<FE>(LPN_EXTEND_PARAMS),
-                    rng,
-                    &mut tmp,
-                )?;
-                output.clear();
-                output.extend(
-                    tmp.into_iter()
-                        .map(Gf40Specialization::extract_sender_pair)
-                        .map(downcast::<(F2, Gf40), (FE::PrimeField, FE)>),
-                );
-            }
-        })
-    }
-
-    fn duplicate<C: AbstractChannel, RNG: CryptoRng + Rng>(
-        &mut self,
-        channel: &mut C,
-        rng: &mut RNG,
-    ) -> Result<Self, Error> {
-        Ok(match &mut self.0 {
-            SenderContents::Generic(internal) => {
-                Sender(SenderContents::Generic(internal.duplicate(channel, rng)?))
-            }
-            SenderContents::Gf40(internal) => {
-                Sender(SenderContents::Gf40(internal.duplicate(channel, rng)?))
-            }
-        })
-    }
-}
-impl Sender<Gf40> {
-    /// This has the same functionality as `send`, except that it returns _packed_ `(F2, Gf40)`
-    /// pairs.
-    ///
-    /// The `F2` is encoded in the most significant bit of the output word. The lower 40 bits
-    /// contain the `Gf40` field element.
-    pub fn send_fast<C: AbstractChannel, RNG: CryptoRng + Rng>(
-        &mut self,
-        channel: &mut C,
-        rng: &mut RNG,
-        output: &mut Vec<u64>,
-    ) -> Result<(), Error> {
-        match &mut self.0 {
-            SenderContents::Gf40(internal) => internal.send_internal(
-                channel,
-                LPN_EXTEND_PARAMS,
-                compute_num_saved::<Gf40>(LPN_EXTEND_PARAMS),
-                rng,
-                output,
-            ),
-            _ => unreachable!(),
-        }
     }
 }
 
 /// Subfield VOLE receiver.
 pub struct Receiver<FE: FiniteField> {
-    contents: ReceiverContents<FE>,
-    delta_cache: FE,
-}
-
-enum ReceiverContents<FE: FiniteField> {
-    Generic(ReceiverInternal<FE, NoSpecialization>),
-    Gf40(ReceiverInternal<Gf40, Gf40Specialization>),
-}
-
-struct ReceiverInternal<FE: FiniteField, S: SvoleSpecializationRecv<FE>> {
-    spsvole: SpsReceiver<FE, S>,
+    spsvole: SpsReceiver<FE>,
     delta: FE,
     base_voles: Vec<FE>,
     // Shared RNG with the sender for generating the LPN matrix.
     lpn_rng: AesRng,
-    phantom: PhantomData<S>,
 }
 
-impl<FE: FiniteField, S: SvoleSpecializationRecv<FE>> ReceiverInternal<FE, S> {
-    fn init_internal<C: AbstractChannel, RNG: CryptoRng + Rng>(
-        channel: &mut C,
-        rng: &mut RNG,
-    ) -> Result<Self, Error> {
-        let pows: Powers<FE> = Default::default();
-        let mut base_receiver = BaseReceiver::<FE>::init(channel, pows.clone(), rng)?;
-        let base_voles_setup =
-            base_receiver.receive(channel, compute_num_saved::<FE>(LPN_SETUP_PARAMS), rng)?;
-        let delta = base_receiver.delta();
-        let spsvole = SpsReceiver::<FE, S>::init(channel, pows, delta, rng)?;
-        let seed = rng.gen::<Block>();
-        let seed = scuttlebutt::cointoss::send(channel, &[seed])?[0];
-        let lpn_rng = AesRng::from_seed(seed);
-        let mut receiver = Self {
-            spsvole,
-            delta,
-            base_voles: base_voles_setup,
-            lpn_rng,
-            phantom: PhantomData,
-        };
-        let mut base_voles_setup = Vec::new();
-        receiver.receive_internal(channel, LPN_SETUP_PARAMS, 0, rng, &mut base_voles_setup)?;
-        receiver.base_voles = base_voles_setup;
-        // let mut base_voles_extend = Vec::new();
-        // receiver.receive_internal(channel, LPN_SETUP_PARAMS, 0, rng, &mut base_voles_extend)?;
-        // receiver.base_voles = base_voles_extend;
-        Ok(receiver)
-    }
-
+impl<FE: FiniteField> Receiver<FE> {
     fn receive_internal<C: AbstractChannel, RNG: CryptoRng + Rng>(
         &mut self,
         channel: &mut C,
@@ -469,11 +305,78 @@ impl<FE: FiniteField, S: SvoleSpecializationRecv<FE>> ReceiverInternal<FE, S> {
         let mut base_voles = Vec::with_capacity(num_saved + leftover);
         output.clear();
         output.reserve(cols - num_saved);
-        S::svole_recv_internal_inner(self, num_saved, rows, vs, &mut base_voles, output);
+        assert!(rows <= 4_294_967_295); // 2^32 -1
+        let distribution = Uniform::<u32>::from(0..rows.try_into().unwrap());
+        for (i, b) in vs.into_iter().enumerate() {
+            let indices = lpn_mtx_indices::<FE>(&distribution, &mut self.lpn_rng);
+            let mut y = b;
+
+            y += indices
+                .iter()
+                .map(|(j, a)| self.base_voles[*j].multiply_by_prime_subfield(*a))
+                .sum();
+
+            if i < num_saved {
+                base_voles.push(y);
+            } else {
+                output.push(y);
+            }
+        }
         base_voles.extend(self.base_voles[used..].iter());
         self.base_voles = base_voles;
         debug_assert_eq!(output.len(), cols - num_saved);
         Ok(())
+    }
+}
+
+impl<FE: FiniteField> SVoleReceiver for Receiver<FE> {
+    type Msg = FE;
+
+    fn init<C: AbstractChannel, RNG: CryptoRng + Rng>(
+        channel: &mut C,
+        rng: &mut RNG,
+    ) -> Result<Self, Error> {
+        let pows: Powers<FE> = Default::default();
+        let mut base_receiver = BaseReceiver::<FE>::init(channel, pows.clone(), rng)?;
+        let base_voles_setup =
+            base_receiver.receive(channel, compute_num_saved::<FE>(LPN_SETUP_PARAMS), rng)?;
+        let delta = base_receiver.delta();
+        let spsvole = SpsReceiver::<FE>::init(channel, pows, delta, rng)?;
+        let seed = rng.gen::<Block>();
+        let seed = scuttlebutt::cointoss::send(channel, &[seed])?[0];
+        let lpn_rng = AesRng::from_seed(seed);
+        let mut receiver = Self {
+            spsvole,
+            delta,
+            base_voles: base_voles_setup,
+            lpn_rng,
+        };
+        let mut base_voles_setup = Vec::new();
+        receiver.receive_internal(channel, LPN_SETUP_PARAMS, 0, rng, &mut base_voles_setup)?;
+        receiver.base_voles = base_voles_setup;
+        // let mut base_voles_extend = Vec::new();
+        // receiver.receive_internal(channel, LPN_SETUP_PARAMS, 0, rng, &mut base_voles_extend)?;
+        // receiver.base_voles = base_voles_extend;
+        Ok(receiver)
+    }
+
+    fn delta(&self) -> FE {
+        self.delta
+    }
+
+    fn receive<C: AbstractChannel, RNG: CryptoRng + Rng>(
+        &mut self,
+        channel: &mut C,
+        rng: &mut RNG,
+        output: &mut Vec<FE>,
+    ) -> Result<(), Error> {
+        self.receive_internal(
+            channel,
+            LPN_EXTEND_PARAMS,
+            compute_num_saved::<FE>(LPN_EXTEND_PARAMS),
+            rng,
+            output,
+        )
     }
 
     fn duplicate<C: AbstractChannel, RNG: CryptoRng + Rng>(
@@ -509,109 +412,6 @@ impl<FE: FiniteField, S: SvoleSpecializationRecv<FE>> ReceiverInternal<FE, S> {
             delta: self.delta,
             base_voles,
             lpn_rng,
-            phantom: PhantomData,
-        })
-    }
-}
-
-impl<FE: FiniteField> SvoleSpecializationRecv<FE> for NoSpecialization {
-    fn svole_recv_internal_inner(
-        svole: &mut ReceiverInternal<FE, Self>,
-        num_saved: usize,
-        rows: usize,
-        vs: Vec<FE>,
-        base_voles: &mut Vec<FE>,
-        svoles: &mut Vec<FE>,
-    ) {
-        assert!(rows <= 4_294_967_295); // 2^32 -1
-        let distribution = Uniform::<u32>::from(0..rows.try_into().unwrap());
-        for (i, b) in vs.into_iter().enumerate() {
-            let indices = lpn_mtx_indices::<FE>(&distribution, &mut svole.lpn_rng);
-            let mut y = b;
-
-            y += indices
-                .iter()
-                .map(|(j, a)| svole.base_voles[*j].multiply_by_prime_subfield(*a))
-                .sum();
-
-            if i < num_saved {
-                base_voles.push(y);
-            } else {
-                svoles.push(y);
-            }
-        }
-    }
-}
-
-impl<FE: FiniteField> SVoleReceiver for Receiver<FE> {
-    type Msg = FE;
-
-    fn init<C: AbstractChannel, RNG: CryptoRng + Rng>(
-        channel: &mut C,
-        rng: &mut RNG,
-    ) -> Result<Self, Error> {
-        let contents = if TypeId::of::<FE>() == TypeId::of::<Gf40>() {
-            ReceiverContents::Gf40(ReceiverInternal::<Gf40, Gf40Specialization>::init_internal(
-                channel, rng,
-            )?)
-        } else {
-            ReceiverContents::Generic(ReceiverInternal::<FE, NoSpecialization>::init_internal(
-                channel, rng,
-            )?)
-        };
-        let delta_cache = match &contents {
-            ReceiverContents::Generic(internal) => internal.delta,
-            ReceiverContents::Gf40(internal) => downcast::<Gf40, FE>(internal.delta),
-        };
-        Ok(Receiver {
-            contents,
-            delta_cache,
-        })
-    }
-
-    fn delta(&self) -> FE {
-        self.delta_cache
-    }
-
-    fn receive<C: AbstractChannel, RNG: CryptoRng + Rng>(
-        &mut self,
-        channel: &mut C,
-        rng: &mut RNG,
-        output: &mut Vec<FE>,
-    ) -> Result<(), Error> {
-        Ok(match &mut self.contents {
-            ReceiverContents::Generic(internal) => internal.receive_internal(
-                channel,
-                LPN_EXTEND_PARAMS,
-                compute_num_saved::<FE>(LPN_EXTEND_PARAMS),
-                rng,
-                output,
-            )?,
-            ReceiverContents::Gf40(internal) => internal.receive_internal(
-                channel,
-                LPN_EXTEND_PARAMS,
-                compute_num_saved::<FE>(LPN_EXTEND_PARAMS),
-                rng,
-                <dyn std::any::Any>::downcast_mut(output).expect("FE==Gf40"),
-            )?,
-        })
-    }
-
-    fn duplicate<C: AbstractChannel, RNG: CryptoRng + Rng>(
-        &mut self,
-        channel: &mut C,
-        rng: &mut RNG,
-    ) -> Result<Self, Error> {
-        Ok(Receiver {
-            contents: match &mut self.contents {
-                ReceiverContents::Generic(internal) => {
-                    ReceiverContents::Generic(internal.duplicate(channel, rng)?)
-                }
-                ReceiverContents::Gf40(internal) => {
-                    ReceiverContents::Gf40(internal.duplicate(channel, rng)?)
-                }
-            },
-            delta_cache: self.delta_cache,
         })
     }
 }

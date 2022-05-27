@@ -101,7 +101,7 @@ fn run() {
         let mut count = 0;
         let mut out = Vec::new();
         for _ in 0..get_trials() {
-            vole.send_fast(&mut channel, &mut rng, &mut out).unwrap();
+            vole.send(&mut channel, &mut rng, &mut out).unwrap();
             count += out.len();
             criterion::black_box(&out);
         }
