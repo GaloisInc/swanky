@@ -12,9 +12,9 @@ use vectoreyes::{SimdBase, U64x2};
 
 /// An element of the finite field $`\textsf{GF}({2^{64}})`$ reduced over $`x^{64} + x^{19} + x^{16} + x + 1`$.
 #[derive(Debug, Clone, Copy, Hash, Eq)]
-pub struct Gf64(u64);
+pub struct F64b(u64);
 
-impl Gf64 {
+impl F64b {
     #[inline(always)]
     fn reduce(product: U64x2) -> Self {
         // TODO: This can almost certainly be optimized.
@@ -42,26 +42,26 @@ impl Gf64 {
     }
 }
 
-impl ConstantTimeEq for Gf64 {
+impl ConstantTimeEq for F64b {
     #[inline]
     fn ct_eq(&self, other: &Self) -> Choice {
         self.0.ct_eq(&other.0)
     }
 }
-impl ConditionallySelectable for Gf64 {
+impl ConditionallySelectable for F64b {
     #[inline]
     fn conditional_select(a: &Self, b: &Self, choice: Choice) -> Self {
         Self(u64::conditional_select(&a.0, &b.0, choice))
     }
 }
 
-impl<'a> AddAssign<&'a Gf64> for Gf64 {
+impl<'a> AddAssign<&'a F64b> for F64b {
     #[inline]
     fn add_assign(&mut self, rhs: &'a Self) {
         self.0 ^= rhs.0;
     }
 }
-impl<'a> SubAssign<&'a Gf64> for Gf64 {
+impl<'a> SubAssign<&'a F64b> for F64b {
     #[inline]
     fn sub_assign(&mut self, rhs: &'a Self) {
         // The additive inverse of GF(2^64) is the identity
@@ -69,7 +69,7 @@ impl<'a> SubAssign<&'a Gf64> for Gf64 {
     }
 }
 
-impl<'a> MulAssign<&'a Gf64> for Gf64 {
+impl<'a> MulAssign<&'a F64b> for F64b {
     #[inline]
     fn mul_assign(&mut self, rhs: &'a Self) {
         let product = U64x2::set_lo(self.0).carryless_mul::<false, false>(U64x2::set_lo(rhs.0));
@@ -77,7 +77,7 @@ impl<'a> MulAssign<&'a Gf64> for Gf64 {
     }
 }
 
-impl FiniteField for Gf64 {
+impl FiniteField for F64b {
     type ByteReprLen = generic_array::typenum::U8;
     type FromBytesError = BytesDeserializationCannotFail;
 
@@ -85,7 +85,7 @@ impl FiniteField for Gf64 {
     fn from_bytes(
         bytes: &GenericArray<u8, Self::ByteReprLen>,
     ) -> Result<Self, Self::FromBytesError> {
-        Ok(Gf64(u64::from_le_bytes(*bytes.as_ref())))
+        Ok(F64b(u64::from_le_bytes(*bytes.as_ref())))
     }
 
     fn to_bytes(&self) -> GenericArray<u8, Self::ByteReprLen> {
@@ -157,13 +157,13 @@ impl FiniteField for Gf64 {
     }
 }
 
-impl IsSubfieldOf<Gf64> for F2 {
-    fn lift_into_superfield(&self) -> Gf64 {
-        Gf64(self.0 as u64)
+impl IsSubfieldOf<F64b> for F2 {
+    fn lift_into_superfield(&self) -> F64b {
+        F64b(self.0 as u64)
     }
 }
 
-field_ops!(Gf64);
+field_ops!(F64b);
 
 #[cfg(test)]
-test_field!(test_gf64, Gf64);
+test_field!(test_gf64, F64b);
