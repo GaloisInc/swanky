@@ -373,6 +373,9 @@ pub use f2::F2;
 mod gf_2_128;
 pub use gf_2_128::Gf128;
 
+mod gf_2_64;
+pub use gf_2_64::Gf64;
+
 mod gf_2_45;
 pub use gf_2_45::Gf45;
 
