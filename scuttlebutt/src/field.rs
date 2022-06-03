@@ -135,15 +135,17 @@ pub trait FiniteField:
     /// # Constant-Time
     /// This function will execute in constant-time, regardless of `n`'s value.
     fn pow(&self, n: u128) -> Self {
-        self.pow_limit(n, 128)
+        self.pow_bounded(n, 128)
     }
 
-    /// Compute `self` to the power of `n`, where `n` is guaranteed to be less
-    /// than `limit` bits long.
-    fn pow_limit(&self, n: u128, limit: u16) -> Self {
+    /// Compute `self` to the power of `n`, where `n` is guaranteed to be `<= 2^bound`.
+    /// # Constant-Time
+    /// This function is constant time in `n`, but _not_ constant time in `bound`.
+    #[inline]
+    fn pow_bounded(&self, n: u128, bound: u16) -> Self {
         let mut r0 = Self::ONE;
         let mut r1 = *self;
-        for i in (0..limit).rev() {
+        for i in (0..bound).rev() {
             // This is equivalent to the following code, but constant-time:
             /*if n & (1 << i) == 0 {
                 r1.mul_assign(r0);

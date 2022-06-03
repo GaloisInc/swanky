@@ -173,7 +173,7 @@ impl FiniteField for Gf40 {
         if *self == Self::ZERO {
             panic!("Zero cannot be inverted");
         }
-        self.pow_limit((1 << 40) - 2, 40)
+        self.pow_bounded((1 << 40) - 2, 40)
     }
 }
 
