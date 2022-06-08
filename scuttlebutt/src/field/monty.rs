@@ -502,8 +502,9 @@ macro_rules! implement_finite_field_for_monty {
 mod test {
     use super::*;
     use num_traits::MulAdd;
+    use serde::{Deserialize, Serialize};
 
-    #[derive(Copy, Clone, Default, Hash)]
+    #[derive(Copy, Clone, Default, Hash, Serialize, Deserialize)]
     struct F11(u64);
 
     impl std::fmt::Debug for F11 {
