@@ -6,6 +6,7 @@
 use crate::field::{polynomial::Polynomial, BiggerThanModulus, FiniteField, PrimeFiniteField};
 use generic_array::GenericArray;
 use rand_core::RngCore;
+use serde::{Deserialize, Serialize};
 use std::{
     convert::{TryFrom, TryInto},
     hash::Hash,
@@ -14,7 +15,7 @@ use std::{
 use subtle::{Choice, ConditionallySelectable, ConstantTimeEq};
 
 /// A field element in the prime-order finite field $\textsf{GF}(2).$
-#[derive(Debug, Eq, Clone, Copy, Hash)]
+#[derive(Debug, Eq, Clone, Copy, Hash, Serialize, Deserialize)]
 pub struct F2(pub(crate) u8);
 
 const MODULUS: u8 = 2;

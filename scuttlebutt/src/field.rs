@@ -3,6 +3,7 @@
 use crate::field::polynomial::Polynomial;
 use generic_array::{ArrayLength, GenericArray};
 use rand_core::RngCore;
+use serde::{de::DeserializeOwned, Serialize};
 use std::{
     fmt::Debug,
     hash::Hash,
@@ -36,6 +37,8 @@ pub trait FiniteField:
     + Neg<Output = Self>
     + std::iter::Sum
     + std::iter::Product
+    + Serialize
+    + DeserializeOwned
 {
     /// The number of bytes in the byte representation for this field element.
     type ByteReprLen: ArrayLength<u8>;

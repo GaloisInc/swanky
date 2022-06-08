@@ -1,6 +1,7 @@
 use crate::field::{f2::F2, polynomial::Polynomial, FiniteField, IsSubfieldOf};
 use generic_array::GenericArray;
 use rand_core::RngCore;
+use serde::{Deserialize, Serialize};
 use smallvec::smallvec;
 use std::{
     convert::TryFrom,
@@ -10,7 +11,7 @@ use std::{
 use subtle::{Choice, ConditionallySelectable, ConstantTimeEq};
 
 /// An element of the finite field $\textsf{GF}(2^{128})$ reduced over $x^{128} + x^7 + x^2 + x + 1$
-#[derive(Debug, Clone, Copy, Hash, Eq)]
+#[derive(Debug, Clone, Copy, Hash, Eq, Serialize, Deserialize)]
 // We use a u128 since Rust will pass it in registers, unlike a __m128i
 pub struct Gf128(pub(crate) u128);
 

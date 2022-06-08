@@ -3,6 +3,7 @@ use crate::field::{
 };
 use generic_array::GenericArray;
 use rand_core::RngCore;
+use serde::{Deserialize, Serialize};
 use smallvec::smallvec;
 use std::convert::TryFrom;
 use std::iter::FromIterator;
@@ -11,7 +12,7 @@ use subtle::{Choice, ConditionallySelectable, ConstantTimeEq};
 use vectoreyes::{SimdBase, U64x2};
 
 /// An element of the finite field $`\textsf{GF}({2^{64}})`$ reduced over $`x^{64} + x^{19} + x^{16} + x + 1`$.
-#[derive(Debug, Clone, Copy, Hash, Eq)]
+#[derive(Debug, Clone, Copy, Hash, Eq, Serialize, Deserialize)]
 pub struct F64b(u64);
 
 impl F64b {

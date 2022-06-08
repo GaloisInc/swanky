@@ -1,6 +1,7 @@
 use crate::field::{f2::F2, polynomial::Polynomial, BiggerThanModulus, FiniteField, IsSubfieldOf};
 use generic_array::GenericArray;
 use rand_core::RngCore;
+use serde::{Deserialize, Serialize};
 use smallvec::smallvec;
 use std::{
     convert::TryFrom,
@@ -11,7 +12,7 @@ use subtle::{Choice, ConditionallySelectable, ConstantTimeEq};
 use vectoreyes::{SimdBase, U64x2};
 
 /// An element of the finite field $\textsf{GF}(2^{45})$ reduced over $x^{45} + x^{28} + x^{17} + x^{11} + 1$
-#[derive(Debug, Clone, Copy, Hash, Eq)]
+#[derive(Debug, Clone, Copy, Hash, Eq, Serialize, Deserialize)]
 pub struct Gf45(pub(crate) u64);
 
 impl ConstantTimeEq for Gf45 {

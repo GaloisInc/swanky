@@ -10,6 +10,7 @@ use crate::{
 use generic_array::GenericArray;
 use primitive_types::{U128, U256};
 use rand_core::RngCore;
+use serde::{Deserialize, Serialize};
 use std::{
     convert::TryFrom,
     hash::Hash,
@@ -20,7 +21,7 @@ use subtle::{Choice, ConditionallySelectable, ConstantTimeEq};
 /// A field element in the prime-order finite field $\textsf{GF}(2^{128} - 159)$
 ///
 /// This is called `Fp` because it is our "common" prime-order finite field.
-#[derive(Debug, Eq, Clone, Copy, Hash)]
+#[derive(Debug, Eq, Clone, Copy, Hash, Serialize, Deserialize)]
 pub struct F128p(u128);
 
 /// The prime field modulus: $2^{128} - 159$

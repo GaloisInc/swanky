@@ -5,12 +5,13 @@
 use crate::field::monty::{monty_from_u128, monty_to_u128, Monty};
 use crate::field::{fft::FieldForFFT, PrimeFiniteField};
 use crate::{implement_finite_field_for_monty, monty_from_lit};
+use serde::{Deserialize, Serialize};
 use std::hash::Hash;
 
 /// Prime field with modulus `M = 2^19*3^26+1`. Hence `phi(M)` is divisible by
 /// `2^19` and `3^26` and supports a large number of fft2 and fft3 sizes for
 /// threshold secret sharing.
-#[derive(Clone, Copy, Default, Hash)]
+#[derive(Clone, Copy, Default, Hash, Serialize, Deserialize)]
 pub struct F2_19x3_26(u64);
 
 impl std::fmt::Debug for F2_19x3_26 {
