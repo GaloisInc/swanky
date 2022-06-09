@@ -320,10 +320,6 @@ macro_rules! serialization {
 
                 impl<'de> serde::de::Visitor<'de> for FieldVisitor {
                     type Value = $f;
-                    // type Value = &'de generic_array::GenericArray<
-                    //     u8,
-                    //     <$f as $crate::field::FiniteField>::ByteReprLen,
-                    // >;
 
                     fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
                         formatter.write_str("a field element")
@@ -336,7 +332,6 @@ macro_rules! serialization {
                         let bytes = generic_array::GenericArray::from_slice(v);
                         <$f as $crate::field::FiniteField>::from_bytes(&bytes)
                             .map_err(serde::de::Error::custom)
-                        // Ok(generic_array::GenericArray::from_slice(v))
                     }
 
                     fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
@@ -354,8 +349,6 @@ macro_rules! serialization {
                 }
 
                 deserializer.deserialize_bytes(FieldVisitor)
-                // <$f as $crate::field::FiniteField>::from_bytes(&bytes)
-                //     .map_err(serde::de::Error::custom)
             }
         }
     };
