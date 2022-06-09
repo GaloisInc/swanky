@@ -150,7 +150,6 @@ macro_rules! test_field {
                 #[test]
                 fn serde_serialize(a in any_fe()) {
                     let ser = serde_json::to_string(&a).unwrap();
-                    println!("{ser}");
                     let b: $f = serde_json::from_str(&ser).unwrap();
                     assert_eq!(a, b);
                 }
