@@ -308,12 +308,13 @@ fn test_gcd() {
 ///     * ConditionallySelectable
 ///     * PrimeFiniteField
 ///     * FiniteField
+///     * Serialize
 ///
 /// Assumes the type already implements the following traits:
 ///     * Monty
 #[macro_export]
 macro_rules! implement_finite_field_for_monty {
-    ($monty: ty) => {
+    ($monty: ident) => {
         impl std::ops::Add<$monty> for $monty {
             type Output = $monty;
             #[inline]
@@ -415,18 +416,6 @@ macro_rules! implement_finite_field_for_monty {
                 $crate::field::monty::monty_mul_add(self, a, b)
             }
         }
-        // impl $crate::field::PrimeFiniteField for $monty {
-        //     const BITS_OF_MODULUS: usize = Self::BITS;
-        //     // XXX: Maybe not the most efficient way to do this? Uses a single division operation
-        //     // in monty_to_u128.
-        //     fn mod2(&self) -> Self {
-        //         if monty_to_u128(*self) & 0x1 == 0 {
-        //             Self(monty_from_lit!(0, Self::M))
-        //         } else {
-        //             Self(monty_from_lit!(1, Self::M))
-        //         }
-        //     }
-        // }
         impl $crate::field::FiniteField for $monty {
             const ZERO: Self = Self(monty_from_lit!(0, Self::M));
             const ONE: Self = Self(monty_from_lit!(1, Self::M));
@@ -495,6 +484,7 @@ macro_rules! implement_finite_field_for_monty {
                 ))
             }
         }
+        $crate::field::serialization!($monty);
     };
 }
 
@@ -502,9 +492,8 @@ macro_rules! implement_finite_field_for_monty {
 mod test {
     use super::*;
     use num_traits::MulAdd;
-    use serde::{Deserialize, Serialize};
 
-    #[derive(Copy, Clone, Default, Hash, Serialize, Deserialize)]
+    #[derive(Copy, Clone, Default, Hash)]
     struct F11(u64);
 
     impl std::fmt::Debug for F11 {

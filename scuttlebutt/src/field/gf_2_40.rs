@@ -1,7 +1,6 @@
 use crate::field::{f2::F2, polynomial::Polynomial, BiggerThanModulus, FiniteField, IsSubfieldOf};
 use generic_array::GenericArray;
 use rand_core::RngCore;
-use serde::{Deserialize, Serialize};
 use smallvec::smallvec;
 use std::{
     convert::TryFrom,
@@ -12,9 +11,7 @@ use subtle::{Choice, ConditionallySelectable, ConstantTimeEq};
 use vectoreyes::{SimdBase, U64x2};
 
 /// An element of the finite field $`\textsf{GF}(2^{40})`$ reduced over $`x^{40} + x^5 + x^4 + x^3 + 1`$
-#[derive(
-    Debug, Clone, Copy, Hash, Eq, bytemuck::Pod, bytemuck::Zeroable, Serialize, Deserialize,
-)]
+#[derive(Debug, Clone, Copy, Hash, Eq, bytemuck::Pod, bytemuck::Zeroable)]
 #[repr(transparent)]
 pub struct Gf40(u64);
 

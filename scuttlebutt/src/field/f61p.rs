@@ -1,7 +1,6 @@
 use crate::field::{polynomial::Polynomial, BiggerThanModulus, FiniteField, PrimeFiniteField};
 use generic_array::GenericArray;
 use rand_core::RngCore;
-use serde::{Deserialize, Serialize};
 use std::{
     convert::{TryFrom, TryInto},
     ops::{AddAssign, MulAssign, SubAssign},
@@ -12,7 +11,7 @@ use subtle::{Choice, ConditionallySelectable, ConstantTimeEq};
 use proptest::prelude::*;
 
 /// A finite field over the Mersenne Prime 2^61 - 1
-#[derive(Clone, Copy, Eq, Debug, Hash, Serialize, Deserialize)]
+#[derive(Clone, Copy, Eq, Debug, Hash)]
 pub struct F61p(u64);
 
 const MODULUS: u64 = (1 << 61) - 1;

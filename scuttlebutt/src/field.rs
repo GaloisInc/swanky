@@ -204,6 +204,11 @@ impl std::fmt::Display for BiggerThanModulus {
         write!(f, "{:?}", self)
     }
 }
+impl serde::de::Error for BiggerThanModulus {
+    fn custom<T: std::fmt::Display>(_: T) -> Self {
+        Self
+    }
+}
 
 /// An error with no inhabitants, for when a field cannot fail to deserialize.
 #[derive(Clone, Copy, Debug)]
@@ -300,6 +305,64 @@ macro_rules! binop {
     };
 }
 
+macro_rules! serialization {
+    ($f:ident) => {
+        impl serde::Serialize for $f {
+            fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+                let bytes = <Self as $crate::field::FiniteField>::to_bytes(&self);
+                serializer.serialize_bytes(&bytes)
+            }
+        }
+
+        impl<'de> serde::Deserialize<'de> for $f {
+            fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+                struct FieldVisitor;
+
+                impl<'de> serde::de::Visitor<'de> for FieldVisitor {
+                    type Value = $f;
+                    // type Value = &'de generic_array::GenericArray<
+                    //     u8,
+                    //     <$f as $crate::field::FiniteField>::ByteReprLen,
+                    // >;
+
+                    fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+                        formatter.write_str("a field element")
+                    }
+
+                    fn visit_borrowed_bytes<E: serde::de::Error>(
+                        self,
+                        v: &'de [u8],
+                    ) -> Result<Self::Value, E> {
+                        let bytes = generic_array::GenericArray::from_slice(v);
+                        <$f as $crate::field::FiniteField>::from_bytes(&bytes)
+                            .map_err(serde::de::Error::custom)
+                        // Ok(generic_array::GenericArray::from_slice(v))
+                    }
+
+                    fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
+                    where
+                        A: serde::de::SeqAccess<'de>,
+                    {
+                        let mut values = Vec::with_capacity(seq.size_hint().unwrap_or(0));
+                        while let Some(value) = seq.next_element()? {
+                            values.push(value);
+                        }
+                        let bytes = generic_array::GenericArray::from_slice(&values);
+                        <$f as $crate::field::FiniteField>::from_bytes(&bytes)
+                            .map_err(serde::de::Error::custom)
+                    }
+                }
+
+                deserializer.deserialize_bytes(FieldVisitor)
+                // <$f as $crate::field::FiniteField>::from_bytes(&bytes)
+                //     .map_err(serde::de::Error::custom)
+            }
+        }
+    };
+}
+// So we can use the macro within another macro.
+pub(crate) use serialization;
+
 macro_rules! field_ops {
     ($f:ident) => {
         impl std::iter::Sum for $f {
@@ -353,6 +416,8 @@ macro_rules! field_ops {
                 *self *= rhs.inverse();
             }
         }
+
+        serialization!($f);
     };
 }
 
