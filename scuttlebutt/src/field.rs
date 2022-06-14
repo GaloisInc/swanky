@@ -3,6 +3,7 @@
 use crate::field::polynomial::Polynomial;
 use generic_array::{ArrayLength, GenericArray};
 use rand_core::RngCore;
+use serde::{de::DeserializeOwned, Serialize};
 use std::{
     fmt::Debug,
     hash::Hash,
@@ -36,6 +37,8 @@ pub trait FiniteField:
     + Neg<Output = Self>
     + std::iter::Sum
     + std::iter::Product
+    + Serialize
+    + DeserializeOwned
 {
     /// The number of bytes in the byte representation for this field element.
     type ByteReprLen: ArrayLength<u8>;
@@ -312,6 +315,76 @@ macro_rules! binop {
     };
 }
 
+macro_rules! serialization {
+    ($f:ident) => {
+        impl serde::Serialize for $f {
+            fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+                let bytes = <Self as $crate::field::FiniteField>::to_bytes(&self);
+                serializer.serialize_bytes(&bytes)
+            }
+        }
+
+        impl<'de> serde::Deserialize<'de> for $f {
+            fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+                struct FieldVisitor;
+
+                impl<'de> serde::de::Visitor<'de> for FieldVisitor {
+                    type Value = $f;
+
+                    fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+                        use generic_array::typenum::Unsigned;
+                        write!(
+                            formatter,
+                            "a field element {} ({} bytes)",
+                            std::any::type_name::<Self>(),
+                            <$f as $crate::field::FiniteField>::ByteReprLen::USIZE
+                        )
+                    }
+
+                    fn visit_borrowed_bytes<E: serde::de::Error>(
+                        self,
+                        v: &'de [u8],
+                    ) -> Result<Self::Value, E> {
+                        use generic_array::typenum::Unsigned;
+                        if v.len() != <$f as $crate::field::FiniteField>::ByteReprLen::USIZE {
+                            return Err(E::invalid_length(v.len(), &self));
+                        }
+                        let bytes = generic_array::GenericArray::from_slice(v);
+                        <$f as $crate::field::FiniteField>::from_bytes(&bytes)
+                            .map_err(serde::de::Error::custom)
+                    }
+
+                    fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
+                    where
+                        A: serde::de::SeqAccess<'de>,
+                    {
+                        use serde::de::Error;
+                        let mut bytes = generic_array::GenericArray::<
+                            u8,
+                            <$f as $crate::field::FiniteField>::ByteReprLen,
+                        >::default();
+                        for (i, byte) in bytes.iter_mut().enumerate() {
+                            *byte = match seq.next_element()? {
+                                Some(e) => e,
+                                None => return Err(A::Error::invalid_length(i + 1, &self)),
+                            };
+                        }
+                        if let Some(_) = seq.next_element::<u8>()? {
+                            return Err(A::Error::invalid_length(bytes.len() + 1, &self));
+                        }
+                        <$f as $crate::field::FiniteField>::from_bytes(&bytes)
+                            .map_err(serde::de::Error::custom)
+                    }
+                }
+
+                deserializer.deserialize_bytes(FieldVisitor)
+            }
+        }
+    };
+}
+// So we can use the macro within another macro.
+pub(crate) use serialization;
+
 macro_rules! field_ops {
     ($f:ident) => {
         impl std::iter::Sum for $f {
@@ -365,6 +438,8 @@ macro_rules! field_ops {
                 *self *= rhs.inverse();
             }
         }
+
+        serialization!($f);
     };
 }
 

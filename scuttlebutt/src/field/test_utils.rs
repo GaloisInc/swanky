@@ -148,6 +148,22 @@ macro_rules! test_field {
             }
             proptest! {
                 #[test]
+                fn serde_serialize_serde_json(a in any_fe()) {
+                    let ser = serde_json::to_string(&a).unwrap();
+                    let b: $f = serde_json::from_str(&ser).unwrap();
+                    assert_eq!(a, b);
+                }
+            }
+            proptest! {
+                #[test]
+                fn serde_serialize_bincode(a in any_fe()) {
+                    let ser = bincode::serialize(&a).unwrap();
+                    let b: $f = bincode::deserialize(&ser).unwrap();
+                    assert_eq!(a, b);
+                }
+            }
+            proptest! {
+                #[test]
                 fn polynomial_roundtrip(a in any_fe()) {
                     assert_eq!(<$f>::from_polynomial_coefficients(a.to_polynomial_coefficients()), a);
                 }
