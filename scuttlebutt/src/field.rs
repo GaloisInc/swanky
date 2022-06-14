@@ -204,11 +204,6 @@ impl std::fmt::Display for BiggerThanModulus {
         write!(f, "{:?}", self)
     }
 }
-impl serde::de::Error for BiggerThanModulus {
-    fn custom<T: std::fmt::Display>(_: T) -> Self {
-        Self
-    }
-}
 
 /// An error with no inhabitants, for when a field cannot fail to deserialize.
 #[derive(Clone, Copy, Debug)]
@@ -338,11 +333,20 @@ macro_rules! serialization {
                     where
                         A: serde::de::SeqAccess<'de>,
                     {
-                        let mut values = Vec::with_capacity(seq.size_hint().unwrap_or(0));
-                        while let Some(value) = seq.next_element()? {
-                            values.push(value);
+                        use serde::de::Error;
+                        let mut bytes = generic_array::GenericArray::<
+                            u8,
+                            <$f as $crate::field::FiniteField>::ByteReprLen,
+                        >::default();
+                        for (i, byte) in bytes.iter_mut().enumerate() {
+                            *byte = match seq.next_element()? {
+                                Some(e) => e,
+                                None => return Err(A::Error::invalid_length(i + 1, &self)),
+                            };
                         }
-                        let bytes = generic_array::GenericArray::from_slice(&values);
+                        if let Some(_) = seq.next_element::<u8>()? {
+                            return Err(A::Error::invalid_length(bytes.len() + 1, &self));
+                        }
                         <$f as $crate::field::FiniteField>::from_bytes(&bytes)
                             .map_err(serde::de::Error::custom)
                     }
