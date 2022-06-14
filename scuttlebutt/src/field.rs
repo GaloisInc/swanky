@@ -144,7 +144,11 @@ pub trait FiniteField:
     #[inline]
     fn pow_bounded(&self, n: u128, bound: u16) -> Self {
         debug_assert!(bound <= 128);
-        debug_assert_eq!(n >> bound, 0);
+        debug_assert_eq!(
+            // Avoid overflow panic if `bound == 128`
+            if bound != 128 { n >> bound } else { 0 },
+            0
+        );
         let mut r0 = Self::ONE;
         let mut r1 = *self;
         for i in (0..bound).rev() {
