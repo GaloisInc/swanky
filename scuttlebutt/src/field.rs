@@ -219,11 +219,12 @@ mod test_utils;
 #[cfg(test)]
 macro_rules! call_with_big_finite_fields {
     ($f:ident $(, $arg:expr)* $(,)?) => {{
-        $f::<$crate::field::F128p>($($arg),*);
-        $f::<$crate::field::Gf128>($($arg),*);
-        $f::<$crate::field::Gf45>($($arg),*);
         $f::<$crate::field::Gf40>($($arg),*);
+        $f::<$crate::field::Gf45>($($arg),*);
+        $f::<$crate::field::F64b>($($arg),*);
+        $f::<$crate::field::Gf128>($($arg),*);
         $f::<$crate::field::F61p>($($arg),*);
+        $f::<$crate::field::F128p>($($arg),*);
     }};
 }
 

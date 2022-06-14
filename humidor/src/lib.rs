@@ -12,6 +12,5 @@ pub mod circuitgen;
 pub mod ligero;
 mod merkle;
 mod params;
-mod polynomial;
 mod threshold_secret_sharing;
 mod util;

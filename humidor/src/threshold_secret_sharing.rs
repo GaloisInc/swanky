@@ -9,7 +9,7 @@
 //! Packed (or ramp) variant of Shamir secret sharing,
 //! allowing efficient sharing of several secrets together.
 
-use crate::polynomial::NewtonPolynomial;
+use scuttlebutt::field::polynomial::NewtonPolynomial;
 use scuttlebutt::field::{fft, fft::FieldForFFT, FiniteField};
 
 /// Generator for the packed variant of Shamir secret sharing, specifying number
@@ -178,12 +178,14 @@ impl<Field: FiniteField + FieldForFFT<2> + FieldForFFT<3>> PackedSecretSharingGe
         values.insert(0, Field::ZERO);
         // interpolate using Newton's method
         // TODO optimise by using Newton-equally-space variant
-        let poly = NewtonPolynomial::init(&points, &values);
+        let poly = NewtonPolynomial::new(points.clone());
+        poly.interpolate_in_place(&mut values);
+        // let poly = NewtonPolynomial::init(&points, &values);
         // evaluate at omega_secrets points to recover secrets
         // TODO optimise to avoid re-computation of power
         let secrets = (1..self.reconstruct_limit())
             .map(|e| self.omega_secrets.pow(e as u128))
-            .map(|point| poly.evaluate(point))
+            .map(|point| poly.eval(&values, point))
             .take(self.secret_count)
             .collect();
         secrets
