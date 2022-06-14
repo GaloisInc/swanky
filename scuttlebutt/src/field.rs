@@ -317,13 +317,23 @@ macro_rules! serialization {
                     type Value = $f;
 
                     fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-                        formatter.write_str("a field element")
+                        use generic_array::typenum::Unsigned;
+                        write!(
+                            formatter,
+                            "a field element {} ({} bytes)",
+                            std::any::type_name::<Self>(),
+                            <$f as $crate::field::FiniteField>::ByteReprLen::USIZE
+                        )
                     }
 
                     fn visit_borrowed_bytes<E: serde::de::Error>(
                         self,
                         v: &'de [u8],
                     ) -> Result<Self::Value, E> {
+                        use generic_array::typenum::Unsigned;
+                        if v.len() != <$f as $crate::field::FiniteField>::ByteReprLen::USIZE {
+                            return Err(E::invalid_length(v.len(), &self));
+                        }
                         let bytes = generic_array::GenericArray::from_slice(v);
                         <$f as $crate::field::FiniteField>::from_bytes(&bytes)
                             .map_err(serde::de::Error::custom)
