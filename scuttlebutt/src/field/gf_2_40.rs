@@ -168,11 +168,12 @@ impl FiniteField for Gf40 {
         Gf40((!((pf.0 as u64).wrapping_sub(1))) & self.0)
     }
 
+    #[inline]
     fn inverse(&self) -> Self {
         if *self == Self::ZERO {
             panic!("Zero cannot be inverted");
         }
-        self.pow((1 << 40) - 2)
+        self.pow_bounded((1 << 40) - 2, 40)
     }
 }
 
