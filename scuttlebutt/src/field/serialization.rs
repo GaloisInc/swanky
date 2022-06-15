@@ -23,7 +23,7 @@ use std::{
 pub trait FiniteFieldSerializer<FE: FiniteField>: Sized {
     /// The exact number of bytes that will be written if `n` field elements are serialized.
     fn serialized_size(n: usize) -> usize;
-    /// Construct a new serialzer
+    /// Construct a new serializer
     fn new<W: Write>(dst: &mut W) -> std::io::Result<Self>;
     /// Write a new field element.
     fn write<W: Write>(&mut self, dst: &mut W, fe: FE) -> std::io::Result<()>;
