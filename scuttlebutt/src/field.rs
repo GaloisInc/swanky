@@ -255,12 +255,14 @@ mod test_utils;
 #[cfg(test)]
 macro_rules! call_with_big_finite_fields {
     ($f:ident $(, $arg:expr)* $(,)?) => {{
-        $f::<$crate::field::Gf40>($($arg),*);
-        $f::<$crate::field::Gf45>($($arg),*);
+        $f::<$crate::field::F128p>($($arg),*);
+        $f::<$crate::field::F61p>($($arg),*);
         $f::<$crate::field::F64b>($($arg),*);
         $f::<$crate::field::Gf128>($($arg),*);
-        $f::<$crate::field::F61p>($($arg),*);
-        $f::<$crate::field::F128p>($($arg),*);
+        $f::<$crate::field::Gf40>($($arg),*);
+        $f::<$crate::field::Gf45>($($arg),*);
+        $f::<$crate::field::F56b>($($arg),*);
+        $f::<$crate::field::F63b>($($arg),*);
     }};
 }
 
@@ -485,11 +487,9 @@ pub use gf_2_128::Gf128;
 mod f64b;
 pub use f64b::F64b;
 
-mod gf_2_45;
-pub use gf_2_45::Gf45;
-
-mod gf_2_40;
-pub use gf_2_40::Gf40;
+mod small_binary_fields;
+// TODO: expose all these fields under the F..b naming style
+pub use small_binary_fields::{F40b as Gf40, F45b as Gf45, F56b, F63b, SmallBinaryField};
 
 mod f61p;
 pub use f61p::F61p;
