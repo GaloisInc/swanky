@@ -276,6 +276,9 @@ impl FiniteField for Gf128 {
 }
 
 impl IsSubfieldOf<Gf128> for F2 {
+    fn multiply_by_superfield(&self, x: Gf128) -> Gf128 {
+        x.multiply_by_prime_subfield(*self)
+    }
     fn lift_into_superfield(&self) -> Gf128 {
         Gf128::ONE.multiply_by_prime_subfield(*self)
     }

@@ -197,6 +197,10 @@ pub trait FiniteField:
 pub trait IsSubfieldOf<FE: FiniteField>: FiniteField {
     /// Homomorphically lift elements of `Self` into elements of `FE`.
     fn lift_into_superfield(&self) -> FE;
+    /// Multiply self by the superfield element `x`
+    fn multiply_by_superfield(&self, x: FE) -> FE {
+        self.lift_into_superfield() * x
+    }
 }
 impl<FE: FiniteField> IsSubfieldOf<FE> for FE {
     fn lift_into_superfield(&self) -> FE {
