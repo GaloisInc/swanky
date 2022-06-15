@@ -58,6 +58,7 @@ pub trait FiniteField:
     type PrimeField: PrimeFiniteField + IsSubfieldOf<Self>;
     /// When elements of this field are represented as a polynomial over the prime field,
     /// how many coefficients are needed?
+    // TODO: rename this to degree
     type PolynomialFormNumCoefficients: ArrayLength<Self::PrimeField> + ArrayLength<Self>;
     /// Convert a polynomial over the prime field into a field element of the finite field.
     fn from_polynomial_coefficients(
@@ -67,6 +68,7 @@ pub trait FiniteField:
     fn to_polynomial_coefficients(
         &self,
     ) -> GenericArray<Self::PrimeField, Self::PolynomialFormNumCoefficients>;
+    // TODO: rename this to polynomial_modulus
     /// Multiplication over field elements should be reduced over this polynomial.
     fn reduce_multiplication_over() -> Polynomial<Self::PrimeField>;
     /// A fused "lift from prime subfield and then multiply" operation. This operation can be much
@@ -188,6 +190,8 @@ pub trait FiniteField:
         acc
     }
 }
+
+// TODO: so that we can break things into crates more easily, turn this into IsSuperfieldOf
 
 /// If `Self` implements `IsSubfieldOf<FE>`, then `Self` is a subfield of `FE`.
 pub trait IsSubfieldOf<FE: FiniteField>: FiniteField {
