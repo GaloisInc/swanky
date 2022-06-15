@@ -51,7 +51,6 @@ pub unsafe trait SmallBinaryField:
         )
     }
 }
-// debug_assert!(Self::PolynomialFormNumCoefficients::U64 <= 63);
 
 macro_rules! small_binary_field {
     (
