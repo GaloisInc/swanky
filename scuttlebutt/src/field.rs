@@ -101,7 +101,7 @@ pub trait FiniteField:
     /// ```
     ///
     /// See [`Self::bit_decomposition`] for the exact meaning of bit decomposition
-    type NumberOfBitsInBitDecomposition: ArrayLength<bool>;
+    type NumberOfBitsInBitDecomposition: ArrayLength<bool> + ArrayLength<F2>;
     /// Decompose the given field element into bits.
     ///
     /// This bit decompostion should be done according to [Weng et al., section 5](https://eprint.iacr.org/2020/925.pdf#section.5).
