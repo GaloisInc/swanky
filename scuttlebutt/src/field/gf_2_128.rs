@@ -193,6 +193,8 @@ impl<'a> MulAssign<&'a Gf128> for Gf128 {
 }
 
 impl FiniteField for Gf128 {
+    type Serializer = crate::field::serialization::ByteFiniteFieldSerializer<Self>;
+    type Deserializer = crate::field::serialization::ByteFiniteFieldDeserializer<Self>;
     type ByteReprLen = generic_array::typenum::U16;
     type FromBytesError = super::BytesDeserializationCannotFail;
 

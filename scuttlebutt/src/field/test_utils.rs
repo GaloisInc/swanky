@@ -141,7 +141,7 @@ macro_rules! test_field {
             }
             proptest! {
                 #[test]
-                fn serialize(a in any_fe()) {
+                fn to_and_from_bytes(a in any_fe()) {
                     let buf = a.to_bytes();
                     assert_eq!(a, <$f>::from_bytes(&buf).unwrap());
                 }
@@ -160,6 +160,25 @@ macro_rules! test_field {
                     let ser = bincode::serialize(&a).unwrap();
                     let b: $f = bincode::deserialize(&ser).unwrap();
                     assert_eq!(a, b);
+                }
+            }
+            proptest! {
+                #[test]
+                fn serialize(xs in proptest::collection::vec(any_fe(), proptest::collection::SizeRange::default())) {
+                    use crate::field::serialization::*;
+                    let mut buf = Vec::new();
+                    let mut cursor = std::io::Cursor::new(&mut buf);
+                    let mut serializer = <$f as FiniteField>::Serializer::new(&mut cursor).unwrap();
+                    for x in xs.iter().copied() {
+                        serializer.write(&mut cursor, x).unwrap();
+                    }
+                    serializer.finish(&mut cursor).unwrap();
+                    prop_assert_eq!(cursor.get_ref().len(), <$f as FiniteField>::Serializer::serialized_size(xs.len()));
+                    cursor.set_position(0);
+                    let mut deserializer = <$f as FiniteField>::Deserializer::new(&mut cursor).unwrap();
+                    for x in xs.into_iter() {
+                        prop_assert_eq!(x, deserializer.read(&mut cursor).unwrap());
+                    }
                 }
             }
             proptest! {
@@ -220,7 +239,7 @@ macro_rules! test_field {
             proptest! {
                 #[test]
                 fn true_equality_works(a in any_fe()) {
-                    assert_eq!(a, a);
+                    prop_assert_eq!(a, a);
                 }
             }
 
@@ -228,9 +247,9 @@ macro_rules! test_field {
                 #[test]
                 fn false_equality_works(a in any_fe(), b in any_fe()) {
                     if a == b {
-                        assert_eq!(a.to_bytes(), b.to_bytes());
+                        prop_assert_eq!(a.to_bytes(), b.to_bytes());
                     } else {
-                        assert_ne!(a.to_bytes(), b.to_bytes());
+                        prop_assert_ne!(a.to_bytes(), b.to_bytes());
                     }
                 }
             }

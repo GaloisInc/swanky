@@ -40,6 +40,15 @@ pub trait FiniteField:
     + Serialize
     + DeserializeOwned
 {
+    // TODO: make these GATs over the Read/Write type once GATs are stabilized
+    /// A way to serialize field elements of this type.
+    ///
+    /// See [`serialization`] for more info.
+    type Serializer: serialization::FiniteFieldSerializer<Self>;
+    /// A way to deserialize field elements of this type.
+    ///
+    /// See [`serialization`] for more info.
+    type Deserializer: serialization::FiniteFieldDeserializer<Self>;
     /// The number of bytes in the byte representation for this field element.
     type ByteReprLen: ArrayLength<u8>;
     /// The error that can result from trying to decode an invalid byte sequence.
@@ -52,6 +61,8 @@ pub trait FiniteField:
         bytes: &GenericArray<u8, Self::ByteReprLen>,
     ) -> Result<Self, Self::FromBytesError>;
     /// Serialize a field element into a byte array.
+    ///
+    /// Consider using [`Self::Serializer`] if you need to serialize several field elements.
     fn to_bytes(&self) -> GenericArray<u8, Self::ByteReprLen>;
 
     /// The prime-order subfield of the finite field.
@@ -323,7 +334,7 @@ macro_rules! binop {
     };
 }
 
-macro_rules! serialization {
+macro_rules! serde_field {
     ($f:ident) => {
         impl serde::Serialize for $f {
             fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
@@ -391,7 +402,7 @@ macro_rules! serialization {
     };
 }
 // So we can use the macro within another macro.
-pub(crate) use serialization;
+pub(crate) use serde_field;
 
 macro_rules! field_ops {
     ($f:ident) => {
@@ -447,7 +458,7 @@ macro_rules! field_ops {
             }
         }
 
-        serialization!($f);
+        serde_field!($f);
     };
 }
 
@@ -485,6 +496,8 @@ pub use f61p::F61p;
 
 mod f2_19x3_26;
 pub use f2_19x3_26::F2_19x3_26;
+
+pub mod serialization;
 
 pub mod polynomial;
 
