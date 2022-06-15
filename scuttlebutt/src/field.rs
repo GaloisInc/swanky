@@ -336,7 +336,7 @@ macro_rules! binop {
     };
 }
 
-macro_rules! serde_field {
+macro_rules! finite_field_serde_implementation {
     ($f:ident) => {
         impl serde::Serialize for $f {
             fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
@@ -404,7 +404,7 @@ macro_rules! serde_field {
     };
 }
 // So we can use the macro within another macro.
-pub(crate) use serde_field;
+pub(crate) use finite_field_serde_implementation;
 
 macro_rules! field_ops {
     ($f:ident) => {
@@ -460,7 +460,7 @@ macro_rules! field_ops {
             }
         }
 
-        serde_field!($f);
+        finite_field_serde_implementation!($f);
     };
 }
 

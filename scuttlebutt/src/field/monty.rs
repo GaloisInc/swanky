@@ -486,7 +486,7 @@ macro_rules! implement_finite_field_for_monty {
                 ))
             }
         }
-        $crate::field::serde_field!($monty);
+        $crate::field::finite_field_serde_implementation!($monty);
     };
 }
 
