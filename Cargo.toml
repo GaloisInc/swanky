@@ -15,6 +15,7 @@ debug = true
 lto = true
 debug-assertions = false
 overflow-checks = false
+codegen-units = 1
 
 [profile.dev]
 opt-level = 0
