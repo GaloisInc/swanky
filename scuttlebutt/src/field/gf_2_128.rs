@@ -193,6 +193,8 @@ impl<'a> MulAssign<&'a Gf128> for Gf128 {
 }
 
 impl FiniteField for Gf128 {
+    type Serializer = crate::field::serialization::ByteFiniteFieldSerializer<Self>;
+    type Deserializer = crate::field::serialization::ByteFiniteFieldDeserializer<Self>;
     type ByteReprLen = generic_array::typenum::U16;
     type FromBytesError = super::BytesDeserializationCannotFail;
 
@@ -276,6 +278,9 @@ impl FiniteField for Gf128 {
 }
 
 impl IsSubfieldOf<Gf128> for F2 {
+    fn multiply_by_superfield(&self, x: Gf128) -> Gf128 {
+        x.multiply_by_prime_subfield(*self)
+    }
     fn lift_into_superfield(&self) -> Gf128 {
         Gf128::ONE.multiply_by_prime_subfield(*self)
     }

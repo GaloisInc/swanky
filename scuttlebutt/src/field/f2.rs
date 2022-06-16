@@ -13,8 +13,11 @@ use std::{
 };
 use subtle::{Choice, ConditionallySelectable, ConstantTimeEq};
 
+use super::serialization::{FiniteFieldDeserializer, FiniteFieldSerializer};
+
 /// A field element in the prime-order finite field $\textsf{GF}(2).$
-#[derive(Debug, Eq, Clone, Copy, Hash)]
+#[derive(Debug, Eq, Clone, Copy, Hash, bytemuck::Zeroable)]
+#[repr(transparent)]
 pub struct F2(pub(crate) u8);
 
 const MODULUS: u8 = 2;
@@ -45,6 +48,8 @@ impl ConditionallySelectable for F2 {
 }
 
 impl FiniteField for F2 {
+    type Serializer = F2BitSerializer;
+    type Deserializer = F2BitDeserializer;
     /// This uniformly generates a field element either 0 or 1 for `F2` type.
     fn random<R: RngCore + ?Sized>(rng: &mut R) -> Self {
         // Grab the LSBit from a 32-bit integer. Rand's boolean generation doesn't do this,
@@ -171,6 +176,72 @@ impl From<F2> for u8 {
 }
 
 impl PrimeFiniteField for F2 {}
+
+pub struct F2BitSerializer {
+    current_word: u64,
+    num_bits: usize,
+}
+impl FiniteFieldSerializer<F2> for F2BitSerializer {
+    fn serialized_size(n: usize) -> usize {
+        (n / 64 + (if n % 64 == 0 { 0 } else { 1 })) * 8
+    }
+
+    fn new<W: std::io::Write>(_dst: &mut W) -> std::io::Result<Self> {
+        Ok(F2BitSerializer {
+            current_word: 0,
+            num_bits: 0,
+        })
+    }
+
+    fn write<W: std::io::Write>(&mut self, dst: &mut W, fe: F2) -> std::io::Result<()> {
+        self.current_word |= (fe.0 as u64) << self.num_bits;
+        self.num_bits += 1;
+        if self.num_bits == 64 {
+            dst.write_all(&self.current_word.to_le_bytes())?;
+            self.num_bits = 0;
+            self.current_word = 0;
+        }
+        Ok(())
+    }
+
+    fn finish<W: std::io::Write>(mut self, dst: &mut W) -> std::io::Result<()> {
+        if self.num_bits > 0 {
+            dst.write_all(&self.current_word.to_le_bytes())?;
+            self.num_bits = 0;
+        }
+        Ok(())
+    }
+}
+impl std::ops::Drop for F2BitSerializer {
+    fn drop(&mut self) {
+        assert_eq!(self.num_bits, 0, "F2BitSerializer.finish() not called!");
+    }
+}
+
+pub struct F2BitDeserializer {
+    current_word: u64,
+    num_bits: usize,
+}
+impl FiniteFieldDeserializer<F2> for F2BitDeserializer {
+    fn new<R: std::io::Read>(_dst: &mut R) -> std::io::Result<Self> {
+        Ok(F2BitDeserializer {
+            current_word: 0,
+            num_bits: 64,
+        })
+    }
+
+    fn read<R: std::io::Read>(&mut self, src: &mut R) -> std::io::Result<F2> {
+        if self.num_bits == 64 {
+            self.num_bits = 0;
+            let mut buf = [0; 8];
+            src.read_exact(&mut buf)?;
+            self.current_word = u64::from_le_bytes(buf);
+        }
+        let out = F2::from(self.current_word & (1 << self.num_bits) != 0);
+        self.num_bits += 1;
+        Ok(out)
+    }
+}
 
 field_ops!(F2);
 

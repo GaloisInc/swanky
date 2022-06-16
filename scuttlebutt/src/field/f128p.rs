@@ -47,6 +47,9 @@ impl F128p {
 }
 
 impl FiniteField for F128p {
+    type Serializer = crate::field::serialization::ByteFiniteFieldSerializer<Self>;
+    type Deserializer = crate::field::serialization::ByteFiniteFieldDeserializer<Self>;
+
     /// There is a slight bias towards the range $`[0,158]`$.
     /// There is a $`\frac{159}{2^128} \approx 4.6 \times 10^{-37}`$ chance of seeing this bias.
     fn random<R: RngCore + ?Sized>(rng: &mut R) -> Self {

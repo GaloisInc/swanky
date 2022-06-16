@@ -40,6 +40,15 @@ pub trait FiniteField:
     + Serialize
     + DeserializeOwned
 {
+    // TODO: make these GATs over the Read/Write type once GATs are stabilized
+    /// A way to serialize field elements of this type.
+    ///
+    /// See [`serialization`] for more info.
+    type Serializer: serialization::FiniteFieldSerializer<Self>;
+    /// A way to deserialize field elements of this type.
+    ///
+    /// See [`serialization`] for more info.
+    type Deserializer: serialization::FiniteFieldDeserializer<Self>;
     /// The number of bytes in the byte representation for this field element.
     type ByteReprLen: ArrayLength<u8>;
     /// The error that can result from trying to decode an invalid byte sequence.
@@ -52,12 +61,15 @@ pub trait FiniteField:
         bytes: &GenericArray<u8, Self::ByteReprLen>,
     ) -> Result<Self, Self::FromBytesError>;
     /// Serialize a field element into a byte array.
+    ///
+    /// Consider using [`Self::Serializer`] if you need to serialize several field elements.
     fn to_bytes(&self) -> GenericArray<u8, Self::ByteReprLen>;
 
     /// The prime-order subfield of the finite field.
     type PrimeField: PrimeFiniteField + IsSubfieldOf<Self>;
     /// When elements of this field are represented as a polynomial over the prime field,
     /// how many coefficients are needed?
+    // TODO: rename this to degree
     type PolynomialFormNumCoefficients: ArrayLength<Self::PrimeField> + ArrayLength<Self>;
     /// Convert a polynomial over the prime field into a field element of the finite field.
     fn from_polynomial_coefficients(
@@ -67,6 +79,7 @@ pub trait FiniteField:
     fn to_polynomial_coefficients(
         &self,
     ) -> GenericArray<Self::PrimeField, Self::PolynomialFormNumCoefficients>;
+    // TODO: rename this to polynomial_modulus
     /// Multiplication over field elements should be reduced over this polynomial.
     fn reduce_multiplication_over() -> Polynomial<Self::PrimeField>;
     /// A fused "lift from prime subfield and then multiply" operation. This operation can be much
@@ -99,7 +112,7 @@ pub trait FiniteField:
     /// ```
     ///
     /// See [`Self::bit_decomposition`] for the exact meaning of bit decomposition
-    type NumberOfBitsInBitDecomposition: ArrayLength<bool>;
+    type NumberOfBitsInBitDecomposition: ArrayLength<bool> + ArrayLength<F2>;
     /// Decompose the given field element into bits.
     ///
     /// This bit decompostion should be done according to [Weng et al., section 5](https://eprint.iacr.org/2020/925.pdf#section.5).
@@ -189,10 +202,16 @@ pub trait FiniteField:
     }
 }
 
+// TODO: so that we can break things into crates more easily, turn this into IsSuperfieldOf
+
 /// If `Self` implements `IsSubfieldOf<FE>`, then `Self` is a subfield of `FE`.
 pub trait IsSubfieldOf<FE: FiniteField>: FiniteField {
     /// Homomorphically lift elements of `Self` into elements of `FE`.
     fn lift_into_superfield(&self) -> FE;
+    /// Multiply self by the superfield element `x`
+    fn multiply_by_superfield(&self, x: FE) -> FE {
+        self.lift_into_superfield() * x
+    }
 }
 impl<FE: FiniteField> IsSubfieldOf<FE> for FE {
     fn lift_into_superfield(&self) -> FE {
@@ -236,12 +255,14 @@ mod test_utils;
 #[cfg(test)]
 macro_rules! call_with_big_finite_fields {
     ($f:ident $(, $arg:expr)* $(,)?) => {{
-        $f::<$crate::field::Gf40>($($arg),*);
-        $f::<$crate::field::Gf45>($($arg),*);
+        $f::<$crate::field::F128p>($($arg),*);
+        $f::<$crate::field::F61p>($($arg),*);
         $f::<$crate::field::F64b>($($arg),*);
         $f::<$crate::field::Gf128>($($arg),*);
-        $f::<$crate::field::F61p>($($arg),*);
-        $f::<$crate::field::F128p>($($arg),*);
+        $f::<$crate::field::Gf40>($($arg),*);
+        $f::<$crate::field::Gf45>($($arg),*);
+        $f::<$crate::field::F56b>($($arg),*);
+        $f::<$crate::field::F63b>($($arg),*);
     }};
 }
 
@@ -315,7 +336,7 @@ macro_rules! binop {
     };
 }
 
-macro_rules! serialization {
+macro_rules! finite_field_serde_implementation {
     ($f:ident) => {
         impl serde::Serialize for $f {
             fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
@@ -383,7 +404,7 @@ macro_rules! serialization {
     };
 }
 // So we can use the macro within another macro.
-pub(crate) use serialization;
+pub(crate) use finite_field_serde_implementation;
 
 macro_rules! field_ops {
     ($f:ident) => {
@@ -439,7 +460,7 @@ macro_rules! field_ops {
             }
         }
 
-        serialization!($f);
+        finite_field_serde_implementation!($f);
     };
 }
 
@@ -466,17 +487,17 @@ pub use gf_2_128::Gf128;
 mod f64b;
 pub use f64b::F64b;
 
-mod gf_2_45;
-pub use gf_2_45::Gf45;
-
-mod gf_2_40;
-pub use gf_2_40::Gf40;
+mod small_binary_fields;
+// TODO: expose all these fields under the F..b naming style
+pub use small_binary_fields::{F40b as Gf40, F45b as Gf45, F56b, F63b, SmallBinaryField};
 
 mod f61p;
 pub use f61p::F61p;
 
 mod f2_19x3_26;
 pub use f2_19x3_26::F2_19x3_26;
+
+pub mod serialization;
 
 pub mod polynomial;
 

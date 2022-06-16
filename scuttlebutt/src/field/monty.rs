@@ -417,6 +417,8 @@ macro_rules! implement_finite_field_for_monty {
             }
         }
         impl $crate::field::FiniteField for $monty {
+            type Serializer = crate::field::serialization::ByteFiniteFieldSerializer<Self>;
+            type Deserializer = crate::field::serialization::ByteFiniteFieldDeserializer<Self>;
             const ZERO: Self = Self(monty_from_lit!(0, Self::M));
             const ONE: Self = Self(monty_from_lit!(1, Self::M));
             const GENERATOR: Self = Self::G;
@@ -484,7 +486,7 @@ macro_rules! implement_finite_field_for_monty {
                 ))
             }
         }
-        $crate::field::serialization!($monty);
+        $crate::field::finite_field_serde_implementation!($monty);
     };
 }
 

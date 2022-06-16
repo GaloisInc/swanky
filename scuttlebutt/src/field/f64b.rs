@@ -80,6 +80,8 @@ impl<'a> MulAssign<&'a F64b> for F64b {
 impl FiniteField for F64b {
     type ByteReprLen = generic_array::typenum::U8;
     type FromBytesError = BytesDeserializationCannotFail;
+    type Serializer = crate::field::serialization::ByteFiniteFieldSerializer<Self>;
+    type Deserializer = crate::field::serialization::ByteFiniteFieldDeserializer<Self>;
 
     #[inline]
     fn from_bytes(
@@ -158,6 +160,10 @@ impl FiniteField for F64b {
 }
 
 impl IsSubfieldOf<F64b> for F2 {
+    fn multiply_by_superfield(&self, x: F64b) -> F64b {
+        x.multiply_by_prime_subfield(*self)
+    }
+
     fn lift_into_superfield(&self) -> F64b {
         F64b(self.0 as u64)
     }

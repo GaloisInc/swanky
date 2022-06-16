@@ -30,6 +30,8 @@ impl ConditionallySelectable for F61p {
     }
 }
 impl FiniteField for F61p {
+    type Serializer = crate::field::serialization::ByteFiniteFieldSerializer<Self>;
+    type Deserializer = crate::field::serialization::ByteFiniteFieldDeserializer<Self>;
     type ByteReprLen = generic_array::typenum::U8;
     type FromBytesError = BiggerThanModulus;
 
