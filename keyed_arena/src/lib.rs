@@ -53,6 +53,7 @@ use std::{
     cell::RefCell,
     marker::PhantomData,
     ops::{Deref, DerefMut},
+    sync::{Arc, Weak},
 };
 
 /// A key that can be used to retrieve a previous allocation of a slice of type `T`.
@@ -203,7 +204,7 @@ impl KeyedArena {
 pub struct KeyedArenaPool {
     arena_size: usize,
     num_allocations: usize,
-    queue: ArrayQueue<KeyedArena>,
+    queue: Arc<ArrayQueue<KeyedArena>>,
 }
 impl KeyedArenaPool {
     /// Construct a new `KeyedArenaPool`. Fresh arenas will be allocated with the given `arena_size`
@@ -212,14 +213,14 @@ impl KeyedArenaPool {
         KeyedArenaPool {
             arena_size,
             num_allocations,
-            queue: ArrayQueue::new(capacity),
+            queue: Arc::new(ArrayQueue::new(capacity)),
         }
     }
 
     /// Get a fresh `KeyedArena` from the pool.
     pub fn get(&self) -> KeyedArenaFromPool {
         KeyedArenaFromPool {
-            pool: self,
+            queue: Arc::downgrade(&self.queue),
             arena: Some(self.queue.pop().unwrap_or_else(|| {
                 KeyedArena::with_capacity(self.arena_size, self.num_allocations)
             })),
@@ -228,11 +229,11 @@ impl KeyedArenaPool {
 }
 
 /// A wrapper for a `KeyedArena` which will return it to a `KeyedArenaPool` on drop.
-pub struct KeyedArenaFromPool<'a> {
+pub struct KeyedArenaFromPool {
     arena: Option<KeyedArena>,
-    pool: &'a KeyedArenaPool,
+    queue: Weak<ArrayQueue<KeyedArena>>,
 }
-impl Deref for KeyedArenaFromPool<'_> {
+impl Deref for KeyedArenaFromPool {
     type Target = KeyedArena;
 
     #[inline]
@@ -240,17 +241,19 @@ impl Deref for KeyedArenaFromPool<'_> {
         self.arena.as_ref().unwrap()
     }
 }
-impl DerefMut for KeyedArenaFromPool<'_> {
+impl DerefMut for KeyedArenaFromPool {
     #[inline]
     fn deref_mut(&mut self) -> &mut Self::Target {
         self.arena.as_mut().unwrap()
     }
 }
-impl std::ops::Drop for KeyedArenaFromPool<'_> {
+impl std::ops::Drop for KeyedArenaFromPool {
     fn drop(&mut self) {
         let mut arena = self.arena.take().unwrap();
         arena.reset();
         // If adding the arena fails, then just free it.
-        let _ = self.pool.queue.push(arena);
+        if let Some(queue) = self.queue.upgrade() {
+            let _ = queue.push(arena);
+        }
     }
 }
