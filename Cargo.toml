@@ -2,11 +2,12 @@
 resolver = "2"
 members = [
     "fancy-garbling",
+    "humidor",
+    "keyed_arena",
     "ocelot",
     "popsicle",
     "scuttlebutt",
     "vectoreyes",
-    "humidor",
 ]
 
 [profile.release]
