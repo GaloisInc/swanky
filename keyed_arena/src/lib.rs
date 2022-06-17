@@ -38,8 +38,9 @@
 //!         let arena = KeyedArena::default();
 //!         let things = arena.alloc_slice_fill_with(n, |i| i);
 //!         // Do stuff with things
-//!         let things = things.key();
-//!         Self { arena, things }
+//!         let key = things.key();
+//!         std::mem::drop(things);
+//!         Self { arena, things: key }
 //!     }
 //!     pub fn step2(&mut self) -> usize {
 //!         let things = self.arena.borrow_mut(self.things);
