@@ -1,4 +1,4 @@
-//! `KeyedArena` is an bump allocator which allows for random access to its allocations.
+//! `KeyedArena` is a bump allocator which allows for random access to its allocations.
 //!
 //! # Rationale
 //! [`bumpalo`](https://docs.rs/bumpalo) is a popular Rust crate which implements a bump allocator.
@@ -72,6 +72,9 @@ pub struct AllocationKey<T: 'static + Copy + Sized + Send> {
 /// fn foo<'a>(x: keyed_arena::BorrowedAllocation<'a, i32>) -> impl std::marker::Sync + 'a { x }
 /// ```
 pub struct BorrowedAllocation<'a, T: 'static + Copy + Sized + Send> {
+    // T must be 'static since we capture its TypeId. It must be Copy since we won't call its
+    // destructor.
+    // We _could_ support more types in the future.
     arena: &'a KeyedArena,
     start: *mut T,
     key: AllocationKey<T>,
@@ -147,9 +150,6 @@ impl KeyedArena {
         len: usize,
         f: F,
     ) -> BorrowedAllocation<T> {
-        // T must be 'static since we capture its TypeId. It must be Copy since we won't call its
-        // destructor.
-        // We _could_ support more types in the future.
         let slice = self.arena.alloc_slice_fill_with(len, f);
         assert_eq!(slice.len(), len);
         // borrow this _after_ the slice is built, in case it also wants to allocate.
@@ -209,7 +209,7 @@ pub struct KeyedArenaPool {
 }
 impl KeyedArenaPool {
     /// Construct a new `KeyedArenaPool`. Fresh arenas will be allocated with the given `arena_size`
-    /// and `num_allocations`. The pool will hold at most `capacity` areans.
+    /// and `num_allocations`. The pool will hold at most `capacity` arenas.
     pub fn new(arena_size: usize, num_allocations: usize, capacity: usize) -> Self {
         KeyedArenaPool {
             arena_size,
