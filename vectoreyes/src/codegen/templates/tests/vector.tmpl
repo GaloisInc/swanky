@@ -6,7 +6,6 @@ use super::scalar as scalar;
 
 use proptest::prelude::*;
 use std::ops::*;
-use std::convert::TryFrom;
 use crate::SimdBase;
 use crate::SimdBase32;
 use crate::SimdBase8;
@@ -105,7 +104,7 @@ use crate::ExtendingCast;
             {% endcall %}
         {% endfor %}
     {% endfor %}
-    
+
     {% call proptest_eq_scalar("most_significant_bits", {'a': ty}) %}
         a.most_significant_bits()
     {% endcall %}

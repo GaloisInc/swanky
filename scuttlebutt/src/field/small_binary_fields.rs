@@ -3,7 +3,6 @@ use bytemuck::{TransparentWrapper, Zeroable};
 use generic_array::{typenum::Unsigned, GenericArray};
 use rand::RngCore;
 use smallvec::smallvec;
-use std::convert::TryFrom;
 use std::iter::FromIterator;
 use std::ops::{AddAssign, MulAssign, SubAssign};
 use subtle::{Choice, ConditionallySelectable, ConstantTimeEq};

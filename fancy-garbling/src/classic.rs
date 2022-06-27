@@ -16,7 +16,7 @@ use crate::{
 };
 use itertools::Itertools;
 use scuttlebutt::{AbstractChannel, AesRng, Block, Channel};
-use std::{collections::HashMap, convert::TryInto, rc::Rc};
+use std::{collections::HashMap, rc::Rc};
 
 /// Static evaluator for a circuit, created by the `garble` function.
 ///

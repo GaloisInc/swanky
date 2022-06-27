@@ -1036,7 +1036,6 @@ mod tests {
     use scuttlebutt::{AesRng, Block512, Channel, SymChannel};
     use std::{
         collections::HashMap,
-        convert::TryInto,
         fs::File,
         io::{BufReader, BufWriter, Write},
         net::{TcpListener, TcpStream},

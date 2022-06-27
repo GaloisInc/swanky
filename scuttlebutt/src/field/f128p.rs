@@ -11,7 +11,6 @@ use generic_array::GenericArray;
 use primitive_types::{U128, U256};
 use rand_core::RngCore;
 use std::{
-    convert::TryFrom,
     hash::Hash,
     ops::{AddAssign, MulAssign, SubAssign},
 };

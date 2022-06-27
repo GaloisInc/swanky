@@ -6,8 +6,6 @@
 
 //! Provides an implementation of the GGM construction.
 
-use std::convert::TryInto;
-
 use crate::svole::wykw::specialization::FiniteFieldSpecialization;
 use scuttlebutt::{field::FiniteField, utils::unpack_bits};
 use vectoreyes::{

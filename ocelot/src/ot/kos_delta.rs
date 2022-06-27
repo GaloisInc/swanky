@@ -17,7 +17,6 @@ use crate::{
 };
 use rand::{CryptoRng, Rng};
 use scuttlebutt::{AbstractChannel, Block, Malicious, SemiHonest};
-use std::convert::TryInto;
 
 /// Oblivious transfer extension sender.
 pub struct Sender<OT: OtReceiver<Msg = Block> + Malicious> {

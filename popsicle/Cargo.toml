@@ -7,7 +7,7 @@ readme = "README.md"
 description = "A library for private set intersection"
 categories = ["cryptography"]
 keywords = ["cryptography", "private-set-intersection", "PSI"]
-edition = "2018"
+edition = "2021"
 publish = false
 
 [lib]

@@ -1,6 +1,6 @@
 [package]
 authors = ["Marc Rosen <marc@galois.com>"]
-edition = "2018"
+edition = "2021"
 name = "vectoreyes"
 version = "0.1.0"
 
