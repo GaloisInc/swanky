@@ -7,7 +7,7 @@ readme = "README.md"
 description = "A library for boolean and arithmetic garbling"
 categories = ["cryptography"]
 keywords = ["cryptography", "garbled-circuit", "GC"]
-edition = "2018"
+edition = "2021"
 autobenches = false
 publish = false
 
@@ -22,7 +22,7 @@ serde1 = ["serde", "scuttlebutt/serde1"]
 base_conversion = { path = "base_conversion" }
 scuttlebutt = { path = "../scuttlebutt" }
 ocelot = { path = "../ocelot" }
-vectoreyes = { path = "../vectoreyes" } 
+vectoreyes = { path = "../vectoreyes" }
 itertools = "0.10.3"
 rand = "0.8.5"
 regex = "1.5.5"

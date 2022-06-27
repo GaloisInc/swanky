@@ -23,7 +23,6 @@ use curve25519_dalek::ristretto::{CompressedRistretto, RistrettoPoint};
 use generic_array::GenericArray;
 use std::{
     cell::RefCell,
-    convert::TryFrom,
     io::{Read, Result, Write},
     rc::Rc,
 };

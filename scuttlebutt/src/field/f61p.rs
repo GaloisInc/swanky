@@ -1,10 +1,7 @@
 use crate::field::{polynomial::Polynomial, BiggerThanModulus, FiniteField, PrimeFiniteField};
 use generic_array::GenericArray;
 use rand_core::RngCore;
-use std::{
-    convert::{TryFrom, TryInto},
-    ops::{AddAssign, MulAssign, SubAssign},
-};
+use std::ops::{AddAssign, MulAssign, SubAssign};
 use subtle::{Choice, ConditionallySelectable, ConstantTimeEq};
 
 #[cfg(test)]

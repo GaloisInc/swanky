@@ -20,7 +20,6 @@ use rand::{
     CryptoRng, Rng, SeedableRng,
 };
 use scuttlebutt::{field::FiniteField, AbstractChannel, AesRng, Block, Malicious, SemiHonest};
-use std::convert::TryInto;
 
 // LPN parameters used in the protocol. We use three stages, two sets of LPN
 // parameters for setup, and one set of LPN parameters for the extend phase.

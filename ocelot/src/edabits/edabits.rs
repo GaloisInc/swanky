@@ -14,7 +14,6 @@ use scuttlebutt::{
     field::{FiniteField, Gf40, F2},
     AbstractChannel, AesRng, Block, SyncChannel,
 };
-use std::convert::TryFrom;
 use std::io::{BufReader, BufWriter};
 use std::net::TcpStream;
 use std::time::Instant;

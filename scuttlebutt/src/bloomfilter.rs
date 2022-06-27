@@ -1,7 +1,6 @@
 //! Implementation of a bloom filter.
 
 use sha2::{Digest, Sha256};
-use std::convert::TryFrom;
 
 /// Simple implementation of a Bloom Filter. Which is guaranteed to return 1 if an element
 /// is in the set, but returns 1 with probability p (settable) if an item is not in the

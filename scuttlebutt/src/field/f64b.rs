@@ -4,7 +4,6 @@ use crate::field::{
 use generic_array::GenericArray;
 use rand_core::RngCore;
 use smallvec::smallvec;
-use std::convert::TryFrom;
 use std::iter::FromIterator;
 use std::ops::{AddAssign, MulAssign, SubAssign};
 use subtle::{Choice, ConditionallySelectable, ConstantTimeEq};

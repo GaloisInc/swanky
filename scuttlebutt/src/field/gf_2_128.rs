@@ -3,7 +3,6 @@ use generic_array::GenericArray;
 use rand_core::RngCore;
 use smallvec::smallvec;
 use std::{
-    convert::TryFrom,
     iter::FromIterator,
     ops::{AddAssign, MulAssign, SubAssign},
 };
@@ -118,7 +117,6 @@ mod multiply {
         use super::*;
         use crate::field::{polynomial::Polynomial, FiniteField, Gf128, F2};
         use proptest::prelude::*;
-        use std::convert::TryFrom;
 
         fn poly_from_upper_and_lower_128(upper: u128, lower: u128) -> Polynomial<F2> {
             let mut out = Polynomial {

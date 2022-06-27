@@ -7,7 +7,6 @@ use crate::field::{polynomial::Polynomial, BiggerThanModulus, FiniteField, Prime
 use generic_array::GenericArray;
 use rand_core::RngCore;
 use std::{
-    convert::{TryFrom, TryInto},
     hash::Hash,
     ops::{AddAssign, MulAssign, SubAssign},
 };

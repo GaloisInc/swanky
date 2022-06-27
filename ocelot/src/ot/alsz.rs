@@ -22,7 +22,7 @@ use rand::{CryptoRng, Rng, RngCore, SeedableRng};
 use scuttlebutt::{
     utils as scutils, AbstractChannel, AesHash, AesRng, Block, SemiHonest, AES_HASH,
 };
-use std::{convert::TryInto, marker::PhantomData};
+use std::marker::PhantomData;
 
 /// Oblivious transfer sender.
 pub struct Sender<OT: OtReceiver<Msg = Block> + SemiHonest> {

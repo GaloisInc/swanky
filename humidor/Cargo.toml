@@ -7,7 +7,7 @@ readme = "README.md"
 description = "A test-bed for Ligero-like protocols"
 categories = ["cryptography"]
 keywords = ["cryptography", "zero-knowledge-proofs", "ligero"]
-edition = "2018"
+edition = "2021"
 autobenches = false
 publish = false
 
