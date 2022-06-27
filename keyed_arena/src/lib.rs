@@ -231,6 +231,7 @@ impl KeyedArenaPool {
 
 /// A wrapper for a `KeyedArena` which will return it to a `KeyedArenaPool` on drop.
 pub struct KeyedArenaFromPool {
+    // This is an Option<> to allow us to take() it in the drop handler.
     arena: Option<KeyedArena>,
     queue: Weak<ArrayQueue<KeyedArena>>,
 }
