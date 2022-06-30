@@ -100,6 +100,7 @@ impl<
     }
 
     fn receive_many(&mut self, qs: &[u16]) -> Result<Vec<Wire>, TwopacError> {
+        self.channel.flush()?;
         let n = qs.len();
         let lens = qs.iter().map(|q| f32::from(*q).log(2.0).ceil() as usize);
         let mut wires = Vec::with_capacity(n);
