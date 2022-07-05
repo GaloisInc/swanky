@@ -10,10 +10,9 @@
 //! To enable more efficient communication, we can use the [`FiniteField::Serializer`] and
 //! [`FiniteField::Deserializer`] types to enable _stateful_ serialization and deserialization.
 
+use super::FiniteField;
 use generic_array::typenum::Unsigned;
 use generic_array::GenericArray;
-
-use super::FiniteField;
 use std::{
     io::{Read, Write},
     marker::PhantomData,
@@ -74,4 +73,93 @@ impl<FE: FiniteField> FiniteFieldDeserializer<FE> for ByteFiniteFieldDeserialize
         Ok(FE::from_bytes(&buf)
             .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?)
     }
+}
+
+/// Serializes a vector of `FiniteField` elements using `serde`.
+#[cfg(feature = "serde1")]
+pub fn serialize_vec<F: FiniteField, S: serde::Serializer>(
+    vec: &[F],
+    s: S,
+) -> Result<S::Ok, S::Error> {
+    use serde::ser::Error;
+    use serde::ser::SerializeTupleStruct;
+
+    let nbytes = F::Serializer::serialized_size(vec.len());
+    let mut bytes = Vec::with_capacity(nbytes);
+    let mut cursor = std::io::Cursor::new(&mut bytes);
+    let mut ser = F::Serializer::new(&mut cursor).map_err(|e| Error::custom(e))?;
+    for f in vec.iter() {
+        ser.write(&mut cursor, *f).map_err(|e| Error::custom(e))?;
+    }
+    ser.finish(&mut cursor).map_err(|e| Error::custom(e))?;
+
+    let mut state = s.serialize_tuple_struct("Vec<F>", 2)?;
+    state.serialize_field(&(vec.len() as u64))?;
+    state.serialize_field(&bytes)?;
+    state.end()
+}
+
+/// Deserializes a vector of `FiniteField` elements using `serde`.
+#[cfg(feature = "serde1")]
+pub fn deserialize_vec<'de, F: FiniteField, D: serde::de::Deserializer<'de>>(
+    deserializer: D,
+) -> Result<Vec<F>, D::Error> {
+    use serde::de::Error;
+
+    struct MyVisitor<F: FiniteField> {
+        field: std::marker::PhantomData<F>,
+    }
+
+    impl<'de, F: FiniteField> serde::de::Visitor<'de> for MyVisitor<F> {
+        type Value = Vec<F>;
+
+        fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+            write!(
+                formatter,
+                "a vector of field elements of type {}",
+                std::any::type_name::<F>()
+            )
+        }
+
+        fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
+        where
+            A: serde::de::SeqAccess<'de>,
+        {
+            let nelements: u64 = match seq.next_element::<u64>()? {
+                Some(n) => n,
+                None => return Err(A::Error::missing_field("number of field elements")),
+            };
+            let nelements = nelements as usize;
+            let nbytes = F::Serializer::serialized_size(nelements);
+
+            let bytes = match seq.next_element::<Vec<u8>>()? {
+                Some(v) => v,
+                None => return Err(A::Error::missing_field("vector of bytes")),
+            };
+            if let Some(_) = seq.next_element::<u8>()? {
+                return Err(A::Error::custom("extra field encountered"));
+            }
+            if bytes.len() != nbytes {
+                return Err(A::Error::invalid_length(bytes.len(), &self));
+            }
+
+            let mut cursor = std::io::Cursor::new(&bytes);
+            let mut de = F::Deserializer::new(&mut cursor).map_err(|e| Error::custom(e))?;
+
+            let mut vec: Vec<F> = Vec::with_capacity(nelements);
+            for _ in 0..nelements {
+                let e = de.read(&mut cursor).map_err(|e| Error::custom(e))?;
+                vec.push(e);
+            }
+            Ok(vec)
+        }
+    }
+
+    deserializer.deserialize_tuple_struct(
+        "Vec<F>",
+        2,
+        MyVisitor {
+            field: std::marker::PhantomData,
+        },
+    )
 }

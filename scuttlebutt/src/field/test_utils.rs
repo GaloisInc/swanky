@@ -181,6 +181,24 @@ macro_rules! test_field {
                     }
                 }
             }
+            // XXX: This needs the `derive` feature to run.
+            // proptest! {
+            //     #[test]
+            //     fn serde_serialize(xs in proptest::collection::vec(any_fe(), proptest::collection::SizeRange::default())) {
+            //         use crate::field::serialization::{serialize_vec, deserialize_vec};
+            //         #[derive(serde::Serialize, serde::Deserialize)]
+            //         struct Struct {
+            //             #[serde(serialize_with = "serialize_vec", deserialize_with = "deserialize_vec")]
+            //             v: Vec<$f>
+            //         }
+            //         let xs = Struct {v: xs};
+            //         let bytes = bincode::serialize(&xs).unwrap();
+            //         let ys: Struct = bincode::deserialize(&bytes).unwrap();
+            //         for (x, y) in xs.v.into_iter().zip(ys.v.into_iter()) {
+            //             prop_assert_eq!(x, y);
+            //         }
+            //     }
+            // }
             proptest! {
                 #[test]
                 fn polynomial_roundtrip(a in any_fe()) {
