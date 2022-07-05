@@ -271,7 +271,7 @@ impl FiniteField for Gf128 {
         if *self == Self::ZERO {
             panic!("Zero cannot be inverted");
         }
-        self.pow(u128::MAX - 1)
+        self.pow_var_time(u128::MAX - 1)
     }
 }
 

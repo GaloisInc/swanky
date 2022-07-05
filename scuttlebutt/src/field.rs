@@ -146,7 +146,6 @@ pub trait FiniteField:
     /// This function will panic if `*self == Self::zero()`
     fn inverse(&self) -> Self;
 
-    // TODO: what should we do if n isn't secret.
     /// Compute `self` to the power of `n`.
     /// # Constant-Time
     /// This function will execute in constant-time, regardless of `n`'s value.

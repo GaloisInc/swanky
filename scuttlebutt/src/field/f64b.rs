@@ -154,7 +154,7 @@ impl FiniteField for F64b {
         if *self == Self::ZERO {
             panic!("Zero cannot be inverted");
         }
-        self.pow((1 << 64) - 2)
+        self.pow_var_time((1 << 64) - 2)
     }
 }
 
