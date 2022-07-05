@@ -120,7 +120,7 @@ impl FiniteField for F128p {
         if *self == Self::ZERO {
             panic!("Zero cannot be inverted");
         }
-        self.pow(MULTIPLICATIVE_GROUP_ORDER - 1)
+        self.pow_var_time(MULTIPLICATIVE_GROUP_ORDER - 1)
     }
 }
 

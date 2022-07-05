@@ -104,7 +104,7 @@ impl FiniteField for F61p {
         if *self == Self::ZERO {
             panic!("Zero cannot be inverted");
         }
-        self.pow(u128::from(MODULUS) - 2)
+        self.pow_var_time(u128::from(MODULUS) - 2)
     }
 }
 
