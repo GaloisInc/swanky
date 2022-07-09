@@ -1,4 +1,4 @@
-[build]
+[target.'cfg(target_arch = "x86_64")']
 rustflags = [
     "-C", "target-cpu=native", "--cfg", "vectoreyes_target_cpu_native",
     # Disable AVX-512. It slows things down on skylake (and other CPUs).
