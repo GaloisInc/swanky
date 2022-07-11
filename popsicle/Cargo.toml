@@ -1,7 +1,7 @@
 [package]
 name = "popsicle"
 version = "0.4.0"
-authors = ["Alex J. Malozemoff <amaloz@galois.com>"]
+authors = ["swanky authors <swanky@galois.com>"]
 license = "MIT"
 readme = "README.md"
 description = "A library for private set intersection"
@@ -15,7 +15,7 @@ publish = false
 [features]
 nightly = ["scuttlebutt/nightly", "ocelot/nightly", "ocelot/nightly"]
 psty = ["fancy-garbling", "openssl"]
-psty_payload = ["fancy-garbling", "serde", "serde_json", "fancy-garbling/serde1"]
+psty_payload = ["fancy-garbling", "serde", "serde_json", "fancy-garbling/serde"]
 
 [dependencies]
 ocelot         = { path = "../ocelot" }

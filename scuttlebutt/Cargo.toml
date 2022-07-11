@@ -1,7 +1,7 @@
 [package]
 name = "scuttlebutt"
 version = "0.4.0"
-authors = ["Alex J. Malozemoff <amaloz@galois.com>"]
+authors = ["swanky authors <swanky@galois.com>"]
 license = "MIT"
 readme = "README.md"
 description = "A library of useful multi-party computation utilities"
@@ -13,7 +13,7 @@ publish = false
 [features]
 nightly = ["curve25519-dalek/nightly", "curve25519-dalek/simd_backend"]
 unstable = []
-serde1 = []
+serde = []
 
 [dependencies]
 curve25519-dalek = { package = "curve25519-dalek-ng", version = "4", optional = true }

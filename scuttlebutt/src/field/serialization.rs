@@ -76,7 +76,7 @@ impl<FE: FiniteField> FiniteFieldDeserializer<FE> for ByteFiniteFieldDeserialize
 }
 
 /// Provides `serde` serialize / deserialize functionality for vectors of `FiniteField` elements.
-#[cfg(feature = "serde1")]
+#[cfg(feature = "serde")]
 pub mod serde_vec {
     use crate::field::serialization::{FiniteFieldDeserializer, FiniteFieldSerializer};
     use crate::field::FiniteField;

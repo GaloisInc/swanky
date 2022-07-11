@@ -3,10 +3,10 @@
 **swanky** provides a suite of rust libraries for doing secure multi-party
 computation (MPC).
 
-![library diagram](diagram.png)
-
 * **fancy-garbling**: Boolean and arithmetic garbled circuits.
   * **twopac**: Two-party garbled-circuit-based secure computation.
+* **humidor**: Implementation of the Ligero zero knowledge proof system.
+* **keyed_arena**: Bump allocator which allows for random access to its allocations.
 * **ocelot**: Oblivious transfer and oblivious PRFs.
 * **popsicle**: Private-set intersection.
 * **scuttlebutt**: Core MPC-related primitives used by various **swanky**
@@ -18,16 +18,19 @@ computation (MPC).
 production, or trust it with sensitive data.
 
 # Generating Documentation
+
 To generate documentation, please use `etc/rustdoc.py` in lieu of `cargo doc`.
 
 # License
 
 MIT License
 
-# Authors
+# Contributors
 
 - Brent Carmer <bcarmer@galois.com>
+- Ben Hamlin <hamlinb@galois.com>
 - Alex J. Malozemoff <amaloz@galois.com>
+- Benoit Razet <benoit.razet@galois.com>
 - Marc Rosen <marc@galois.com>
 
 # Acknowledgments

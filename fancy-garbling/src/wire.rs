@@ -14,7 +14,7 @@ mod npaths_tab;
 
 /// The core wire-label type.
 #[derive(Debug, Clone, PartialEq)]
-#[cfg_attr(feature = "serde1", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum Wire {
     /// Representation of a `mod-2` wire.
     Mod2 {
