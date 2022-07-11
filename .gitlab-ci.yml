@@ -13,25 +13,29 @@ before_script:
   - apt-get install -yqq --no-install-recommends build-essential git
   - rustup toolchain add $toolchain
   - rustup default $toolchain
+  - echo "$toolchain" > rust-toolchain
 
 stages:
   - checkfmt
   - test
 
 .any-changes:
-  only:
-    refs:
-      - merge_requests
-      - master
-      - dev
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+      when: on_success
 
 .vectoreyes-changes:
-  only:
-    refs:
-      - merge_requests
-    changes:
-      - "vectoreyes/*"
-      - "vectoreyes/**/*"
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+      when: on_success
+      changes:
+        - "vectoreyes/*"
+        - "vectoreyes/**/*"
+
+.schedule:
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "schedule"'
+      when: on_success
 
 .test:
   stage: test
@@ -101,7 +105,7 @@ test:stable:
 # It's a good idea to keep this in mind when adding special constants for
 # different CPU microarchitectures.
 test:stable-haswell:
-  extends: [.test, .any-changes]
+  extends: [.test, .schedule]
   stage: test
   variables:
     toolchain: stable
@@ -109,7 +113,7 @@ test:stable-haswell:
     force_haswell: "1"
 
 test:nightly:
-  extends: [.test, .any-changes]
+  extends: [.test, .any-changes, .schedule]
   variables:
     toolchain: nightly
     features: curve25519-dalek serde nightly
