@@ -218,23 +218,23 @@ impl std::ops::BitAndAssign for Block {
     }
 }
 
-#[cfg(feature = "serde1")]
+#[cfg(feature = "serde")]
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-#[cfg(feature = "serde1")]
+#[cfg(feature = "serde")]
 #[derive(Serialize, Deserialize)]
 struct Helperb {
     pub block: u128,
 }
 
-#[cfg(feature = "serde1")]
+#[cfg(feature = "serde")]
 impl Serialize for Block {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         serializer.serialize_bytes(&U8x16::from(self.0).as_array())
     }
 }
 
-#[cfg(feature = "serde1")]
+#[cfg(feature = "serde")]
 impl<'de> Deserialize<'de> for Block {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where

@@ -181,7 +181,7 @@ macro_rules! test_field {
                     }
                 }
             }
-            #[cfg(feature = "serde1")]
+            #[cfg(feature = "serde")]
             proptest! {
                 #[test]
                 fn serde_serialize_vec(xs in proptest::collection::vec(any_fe(), proptest::collection::SizeRange::default())) {

@@ -35,7 +35,7 @@ impl<C: AbstractChannel, RNG: CryptoRng + RngCore> Garbler<C, RNG> {
         }
     }
 
-    #[cfg(feature = "serde1")]
+    #[cfg(feature = "serde")]
     /// Load pre-chosen deltas from a file
     pub fn load_deltas(&mut self, filename: &str) -> Result<(), Box<dyn std::error::Error>> {
         let f = std::fs::File::open(filename)?;

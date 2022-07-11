@@ -1,6 +1,8 @@
 [package]
 name = "keyed_arena"
 version = "0.1.0"
+authors = ["swanky authors <swanky@galois.com>"]
+license = "MIT"
 edition = "2021"
 
 [dependencies]
