@@ -211,14 +211,14 @@ pub trait BundleGadgets: Fancy {
         xs: &[Bundle<Self::Item>],
     ) -> Result<Bundle<Self::Item>, Self::Error> {
         let nargs = xs.len();
-        let n = xs[0].wires().len();
-
-        if nargs < 2 {
+        if nargs < 1 {
             return Err(Self::Error::from(FancyError::InvalidArgNum {
                 got: nargs,
-                needed: 2,
+                needed: 1,
             }));
         }
+
+        let n = xs[0].wires().len();
         if !xs.iter().all(|x| x.moduli() == xs[0].moduli()) {
             return Err(Self::Error::from(FancyError::UnequalModuli));
         }
@@ -290,14 +290,14 @@ pub trait BundleGadgets: Fancy {
         xs: &[Bundle<Self::Item>],
     ) -> Result<Self::Item, Self::Error> {
         let nargs = xs.len();
-        let n = xs[0].wires().len();
-
-        if nargs < 2 {
+        if nargs < 1 {
             return Err(Self::Error::from(FancyError::InvalidArgNum {
                 got: nargs,
-                needed: 2,
+                needed: 1,
             }));
         }
+
+        let n = xs[0].wires().len();
         if !xs.iter().all(|x| x.moduli() == xs[0].moduli()) {
             return Err(Self::Error::from(FancyError::UnequalModuli));
         }

@@ -72,17 +72,15 @@ pub trait Fancy {
 
     /// Sum up a slice of wires.
     fn add_many(&mut self, args: &[Self::Item]) -> Result<Self::Item, Self::Error> {
-        if args.len() < 2 {
+        if args.len() < 1 {
             return Err(Self::Error::from(FancyError::InvalidArgNum {
                 got: args.len(),
-                needed: 2,
+                needed: 1,
             }));
         }
-        let mut z = args[0].clone();
-        for x in args.iter().skip(1) {
-            z = self.add(&z, x)?;
-        }
-        Ok(z)
+        args.iter()
+            .skip(1)
+            .fold(Ok(args[0].clone()), |acc, x| self.add(&(acc?), x))
     }
 
     /// Xor is just addition, with the requirement that `x` and `y` are mod 2.
@@ -153,10 +151,10 @@ pub trait Fancy {
 
     /// Returns 1 if all wires equal 1.
     fn and_many(&mut self, args: &[Self::Item]) -> Result<Self::Item, Self::Error> {
-        if args.len() < 2 {
+        if args.len() < 1 {
             return Err(Self::Error::from(FancyError::InvalidArgNum {
                 got: args.len(),
-                needed: 2,
+                needed: 1,
             }));
         }
         args.iter()
@@ -166,10 +164,10 @@ pub trait Fancy {
 
     /// Returns 1 if any wire equals 1.
     fn or_many(&mut self, args: &[Self::Item]) -> Result<Self::Item, Self::Error> {
-        if args.len() < 2 {
+        if args.len() < 1 {
             return Err(Self::Error::from(FancyError::InvalidArgNum {
                 got: args.len(),
-                needed: 2,
+                needed: 1,
             }));
         }
         args.iter()
