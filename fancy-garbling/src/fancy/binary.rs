@@ -415,10 +415,10 @@ pub trait BinaryGadgets: Fancy + BundleGadgets {
         &mut self,
         xs: &[BinaryBundle<Self::Item>],
     ) -> Result<BinaryBundle<Self::Item>, Self::Error> {
-        if xs.len() < 2 {
+        if xs.len() < 1 {
             return Err(Self::Error::from(FancyError::InvalidArgNum {
                 got: xs.len(),
-                needed: 2,
+                needed: 1,
             }));
         }
         xs.iter().skip(1).fold(Ok(xs[0].clone()), |x, y| {
