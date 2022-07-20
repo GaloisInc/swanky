@@ -7,7 +7,7 @@
 use fancy_garbling::{
     circuit::Circuit,
     twopac::semihonest::{Evaluator, Garbler},
-    FancyInput,
+    FancyInput, WireMod2,
 };
 use ocelot::ot::{AlszReceiver as OtReceiver, AlszSender as OtSender};
 use scuttlebutt::{unix_channel_pair, AesRng, UnixChannel};
@@ -27,7 +27,7 @@ fn run_circuit(circ: &mut Circuit, gb_inputs: Vec<u16>, ev_inputs: Vec<u16>) {
     let handle = std::thread::spawn(move || {
         let rng = AesRng::new();
         let start = SystemTime::now();
-        let mut gb = Garbler::<UnixChannel, AesRng, OtSender>::new(sender, rng).unwrap();
+        let mut gb = Garbler::<UnixChannel, AesRng, OtSender, WireMod2>::new(sender, rng).unwrap();
         println!(
             "Garbler :: Initialization: {} ms",
             start.elapsed().unwrap().as_millis()
@@ -48,7 +48,8 @@ fn run_circuit(circ: &mut Circuit, gb_inputs: Vec<u16>, ev_inputs: Vec<u16>) {
     });
     let rng = AesRng::new();
     let start = SystemTime::now();
-    let mut ev = Evaluator::<UnixChannel, AesRng, OtReceiver>::new(receiver, rng).unwrap();
+    let mut ev =
+        Evaluator::<UnixChannel, AesRng, OtReceiver, WireMod2>::new(receiver, rng).unwrap();
     println!(
         "Evaluator :: Initialization: {} ms",
         start.elapsed().unwrap().as_millis()

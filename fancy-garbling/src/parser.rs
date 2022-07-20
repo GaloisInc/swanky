@@ -97,6 +97,8 @@ impl Circuit {
             });
         }
         // Create a constant wire for negations.
+        // This is no longer required for the implementation
+        // of our garbler/evaluator pair. Consider removing
         circ.gates.push(Gate::Constant { val: 1 });
         let oneref = CircuitRef {
             ix: n1 + n2,
@@ -121,9 +123,8 @@ impl Circuit {
                         ix: yref,
                         modulus: 2,
                     };
-                    circ.gates.push(Gate::Sub {
-                        xref: oneref,
-                        yref,
+                    circ.gates.push(Gate::Inv {
+                        xref: yref,
                         out: Some(out),
                     })
                 }
@@ -173,7 +174,7 @@ impl Circuit {
 
 #[cfg(test)]
 mod tests {
-    use crate::{circuit::Circuit, classic::garble};
+    use crate::{circuit::Circuit, classic::garble, AllWire};
 
     #[test]
     fn test_parser() {
@@ -207,7 +208,7 @@ mod tests {
     #[test]
     fn test_gc_eval() {
         let mut circ = Circuit::parse("circuits/AES-non-expanded.txt").unwrap();
-        let (en, gc) = garble(&mut circ).unwrap();
+        let (en, gc) = garble::<AllWire>(&mut circ).unwrap();
         let gb = en.encode_garbler_inputs(&vec![0u16; 128]);
         let ev = en.encode_evaluator_inputs(&vec![0u16; 128]);
         gc.eval(&mut circ, &gb, &ev).unwrap();

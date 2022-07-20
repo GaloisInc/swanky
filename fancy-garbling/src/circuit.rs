@@ -91,6 +91,10 @@ pub(crate) enum Gate {
         id: usize,
         out: Option<usize>,
     },
+    Inv {
+        xref: CircuitRef,
+        out: Option<usize>,
+    },
 }
 
 impl std::fmt::Display for Gate {
@@ -111,6 +115,7 @@ impl std::fmt::Display for Gate {
             Gate::Proj { xref, tt, id, out } => {
                 write!(f, "Proj ( {}, {:?}, {}, {:?} )", xref, tt, id, out)
             }
+            Gate::Inv { xref, out } => write!(f, "Inv ( {}, {:?} )", xref, out),
         }
     }
 }
@@ -152,6 +157,14 @@ impl Circuit {
                     (None, evaluator_inputs[id].clone())
                 }
                 Gate::Constant { val } => (None, f.constant(val, q)?),
+                Gate::Inv { xref, out } => (
+                    out,
+                    f.negate(
+                        cache[xref.ix]
+                            .as_ref()
+                            .ok_or_else(|| F::Error::from(FancyError::UninitializedValue))?,
+                    )?,
+                ),
                 Gate::Add { xref, yref, out } => (
                     out,
                     f.add(

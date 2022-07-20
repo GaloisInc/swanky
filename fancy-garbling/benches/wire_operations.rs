@@ -1,13 +1,15 @@
 use criterion::{criterion_group, criterion_main, Criterion};
-use fancy_garbling::{util::RngExt, Wire};
+use fancy_garbling::{util::RngExt, AllWire};
 use scuttlebutt::{AesRng, Block};
 use std::time::Duration;
+
+use fancy_garbling::WireLabel;
 
 fn bench_digits(c: &mut Criterion, p: u16) {
     c.bench_function(&format!("wire::digits ({})", p), move |b| {
         let rng = &mut rand::thread_rng();
         let x = Block::from(rng.gen_u128());
-        let w = Wire::from_block(x, p);
+        let w = AllWire::from_block(x, p);
         b.iter(|| {
             let digits = w.digits();
             criterion::black_box(digits);
@@ -20,7 +22,7 @@ fn bench_unpack(c: &mut Criterion, p: u16) {
         let rng = &mut rand::thread_rng();
         let x = rng.gen_usable_block(p);
         b.iter(|| {
-            let w = Wire::from_block(x, p);
+            let w = AllWire::from_block(x, p);
             criterion::black_box(w);
         });
     });
@@ -29,7 +31,7 @@ fn bench_unpack(c: &mut Criterion, p: u16) {
 fn bench_pack(c: &mut Criterion, p: u16) {
     c.bench_function(&format!("wire::as_block ({})", p), move |b| {
         let rng = &mut rand::thread_rng();
-        let w = Wire::rand(rng, p);
+        let w = AllWire::rand(rng, p);
         b.iter(|| {
             let x = w.as_block();
             criterion::black_box(x);
@@ -40,8 +42,8 @@ fn bench_pack(c: &mut Criterion, p: u16) {
 fn bench_plus(c: &mut Criterion, p: u16) {
     c.bench_function(&format!("wire::plus ({})", p), move |b| {
         let rng = &mut rand::thread_rng();
-        let x = Wire::rand(rng, p);
-        let y = Wire::rand(rng, p);
+        let x = AllWire::rand(rng, p);
+        let y = AllWire::rand(rng, p);
         b.iter(|| {
             let z = x.plus(&y);
             criterion::black_box(z);
@@ -52,8 +54,8 @@ fn bench_plus(c: &mut Criterion, p: u16) {
 fn bench_plus_eq(c: &mut Criterion, p: u16) {
     c.bench_function(&format!("wire::plus_eq ({})", p), move |b| {
         let rng = &mut rand::thread_rng();
-        let mut x = Wire::rand(rng, p);
-        let y = Wire::rand(rng, p);
+        let mut x = AllWire::rand(rng, p);
+        let y = AllWire::rand(rng, p);
         b.iter(|| {
             let z = x.plus_eq(&y);
             criterion::black_box(z);
@@ -64,8 +66,8 @@ fn bench_plus_eq(c: &mut Criterion, p: u16) {
 fn bench_minus(c: &mut Criterion, p: u16) {
     c.bench_function(&format!("wire::minus ({})", p), move |b| {
         let rng = &mut rand::thread_rng();
-        let x = Wire::rand(rng, p);
-        let y = Wire::rand(rng, p);
+        let x = AllWire::rand(rng, p);
+        let y = AllWire::rand(rng, p);
         b.iter(|| {
             let z = x.minus(&y);
             criterion::black_box(z);
@@ -76,8 +78,8 @@ fn bench_minus(c: &mut Criterion, p: u16) {
 fn bench_minus_eq(c: &mut Criterion, p: u16) {
     c.bench_function(&format!("wire::minus_eq ({})", p), move |b| {
         let rng = &mut rand::thread_rng();
-        let mut x = Wire::rand(rng, p);
-        let y = Wire::rand(rng, p);
+        let mut x = AllWire::rand(rng, p);
+        let y = AllWire::rand(rng, p);
         b.iter(|| {
             let z = x.minus_eq(&y);
             criterion::black_box(z);
@@ -88,7 +90,7 @@ fn bench_minus_eq(c: &mut Criterion, p: u16) {
 fn bench_cmul(c: &mut Criterion, p: u16) {
     c.bench_function(&format!("wire::cmul ({})", p), move |b| {
         let rng = &mut rand::thread_rng();
-        let x = Wire::rand(rng, p);
+        let x = AllWire::rand(rng, p);
         let c = rng.gen_u16();
         b.iter(|| {
             let z = x.cmul(c);
@@ -100,7 +102,7 @@ fn bench_cmul(c: &mut Criterion, p: u16) {
 fn bench_cmul_eq(c: &mut Criterion, p: u16) {
     c.bench_function(&format!("wire::cmul_eq ({})", p), move |b| {
         let rng = &mut rand::thread_rng();
-        let mut x = Wire::rand(rng, p);
+        let mut x = AllWire::rand(rng, p);
         let c = rng.gen_u16();
         b.iter(|| {
             let z = x.cmul_eq(c);
@@ -112,7 +114,7 @@ fn bench_cmul_eq(c: &mut Criterion, p: u16) {
 fn bench_negate(c: &mut Criterion, p: u16) {
     c.bench_function(&format!("wire::negate ({})", p), move |b| {
         let rng = &mut rand::thread_rng();
-        let x = Wire::rand(rng, p);
+        let x = AllWire::rand(rng, p);
         b.iter(|| {
             let z = x.negate();
             criterion::black_box(z);
@@ -123,7 +125,7 @@ fn bench_negate(c: &mut Criterion, p: u16) {
 fn bench_negate_eq(c: &mut Criterion, p: u16) {
     c.bench_function(&format!("wire::negate_eq ({})", p), move |b| {
         let rng = &mut rand::thread_rng();
-        let mut x = Wire::rand(rng, p);
+        let mut x = AllWire::rand(rng, p);
         b.iter(|| {
             let z = x.negate_eq();
             criterion::black_box(z);
@@ -135,7 +137,7 @@ fn bench_hash(c: &mut Criterion, p: u16) {
     c.bench_function(&format!("wire::hash ({})", p), move |b| {
         let rng = &mut rand::thread_rng();
         let tweak = rand::random::<Block>();
-        let x = Wire::rand(rng, p);
+        let x = AllWire::rand(rng, p);
         b.iter(|| {
             let z = x.hash(tweak);
             criterion::black_box(z);
@@ -147,7 +149,7 @@ fn bench_hashback(c: &mut Criterion, q: u16) {
     c.bench_function(&format!("wire::hashback ({})", q), move |b| {
         let rng = &mut rand::thread_rng();
         let tweak = rand::random::<Block>();
-        let wire = Wire::rand(rng, q);
+        let wire = AllWire::rand(rng, q);
         b.iter(|| {
             let z = wire.hashback(tweak, q);
             criterion::black_box(z);
@@ -158,7 +160,7 @@ fn bench_hashback(c: &mut Criterion, q: u16) {
 fn bench_zero(c: &mut Criterion, p: u16) {
     c.bench_function(&format!("wire::zero ({})", p), move |b| {
         b.iter(|| {
-            let z = Wire::zero(p);
+            let z = AllWire::zero(p);
             criterion::black_box(z);
         });
     });
@@ -168,7 +170,7 @@ fn bench_rand(c: &mut Criterion, p: u16) {
     c.bench_function(&format!("wire::rand ({})", p), move |b| {
         let rng = &mut AesRng::new();
         b.iter(|| {
-            let z = Wire::rand(rng, p);
+            let z = AllWire::rand(rng, p);
             criterion::black_box(z);
         });
     });
@@ -178,7 +180,7 @@ fn bench_rand_delta(c: &mut Criterion, p: u16) {
     c.bench_function(&format!("wire::rand_delta ({})", p), move |b| {
         let rng = &mut AesRng::new();
         b.iter(|| {
-            let z = Wire::rand_delta(rng, p);
+            let z = AllWire::rand_delta(rng, p);
             criterion::black_box(z);
         });
     });
