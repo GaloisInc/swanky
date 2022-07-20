@@ -9,7 +9,7 @@
 //! An implementer must be able to create inputs, constants, do modular arithmetic, and
 //! create projections.
 
-use crate::errors::FancyError;
+use crate::{errors::FancyError, BinaryWire};
 use itertools::Itertools;
 
 mod binary;
@@ -28,6 +28,61 @@ pub use reveal::FancyReveal;
 pub trait HasModulus {
     /// The modulus of the wire.
     fn modulus(&self) -> u16;
+}
+
+/// Fancy trait for operating only on wires Mod 2
+///
+/// Allows for skipping modulus checks in binary operations
+pub trait FancyBinary: Fancy
+where
+    Self::Item: BinaryWire,
+{
+    /// Xor is just addition
+    fn xor(&mut self, x: &Self::Item, y: &Self::Item) -> Result<Self::Item, Self::Error> {
+        self.add(x, y)
+    }
+
+    /// And is just multiplication
+    fn and(&mut self, x: &Self::Item, y: &Self::Item) -> Result<Self::Item, Self::Error> {
+        self.mul(x, y)
+    }
+
+    /// Or uses Demorgan's Rule implemented with multiplication and negation.
+    fn or(&mut self, x: &Self::Item, y: &Self::Item) -> Result<Self::Item, Self::Error> {
+        let notx = FancyBinary::negate(self, x)?;
+        let noty = FancyBinary::negate(self, y)?;
+        let z = FancyBinary::and(self, &notx, &noty)?;
+        FancyBinary::negate(self, &z)
+    }
+
+    /// General purpose negate operation
+    ///
+    /// Can often be made free dependeping on implementation
+    fn negate(&mut self, x: &Self::Item) -> Result<Self::Item, Self::Error> {
+        let one = self.constant(1, 2)?;
+        FancyBinary::xor(self, x, &one)
+    }
+
+    /// Binary adder. Returns the result and the carry.
+    fn adder(
+        &mut self,
+        x: &Self::Item,
+        y: &Self::Item,
+        carry_in: Option<&Self::Item>,
+    ) -> Result<(Self::Item, Self::Item), Self::Error> {
+        if let Some(c) = carry_in {
+            let z1 = FancyBinary::xor(self, x, y)?;
+            let z2 = FancyBinary::xor(self, &z1, c)?;
+            let z3 = FancyBinary::xor(self, x, c)?;
+            let z4 = FancyBinary::and(self, &z1, &z3)?;
+            let carry = FancyBinary::xor(self, &z4, x)?;
+            Ok((z2, carry))
+        } else {
+            let z = FancyBinary::xor(self, x, y)?;
+            let carry = FancyBinary::and(self, x, y)?;
+            Ok((z, carry))
+        }
+    }
 }
 
 /// DSL for the basic computations supported by `fancy-garbling`.

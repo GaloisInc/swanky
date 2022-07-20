@@ -10,9 +10,8 @@
 use crate::{
     circuit::Circuit,
     errors::{EvaluatorError, GarblerError},
-    fancy::HasModulus,
     garble::{Evaluator, Garbler},
-    wire::Wire,
+    WireLabel,
 };
 use itertools::Itertools;
 use scuttlebutt::{AbstractChannel, AesRng, Block, Channel};
@@ -39,7 +38,7 @@ impl GarbledCircuit {
     }
 
     /// Evaluate the garbled circuit.
-    pub fn eval(
+    pub fn eval<Wire: WireLabel>(
         &self,
         c: &Circuit,
         garbler_inputs: &[Wire],
@@ -53,7 +52,9 @@ impl GarbledCircuit {
 }
 
 /// Garble a circuit without streaming.
-pub fn garble(c: &Circuit) -> Result<(Encoder, GarbledCircuit), GarblerError> {
+pub fn garble<Wire: WireLabel>(
+    c: &Circuit,
+) -> Result<(Encoder<Wire>, GarbledCircuit), GarblerError> {
     let channel = Channel::new(
         GarbledReader::new(&[]),
         GarbledWriter::new(Some(c.num_nonfree_gates)),
@@ -100,13 +101,13 @@ pub fn garble(c: &Circuit) -> Result<(Encoder, GarbledCircuit), GarblerError> {
 /// Encode inputs statically.
 #[derive(Debug)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct Encoder {
+pub struct Encoder<Wire> {
     garbler_inputs: Vec<Wire>,
     evaluator_inputs: Vec<Wire>,
     deltas: HashMap<u16, Wire>,
 }
 
-impl Encoder {
+impl<Wire: WireLabel> Encoder<Wire> {
     /// Make a new `Encoder` from lists of garbler and evaluator inputs,
     /// alongside a map of moduli-to-wire-offsets.
     pub fn new(

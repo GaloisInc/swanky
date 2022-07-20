@@ -21,6 +21,7 @@ mod nonstreaming {
         classic::garble,
         fancy::{Bundle, BundleGadgets, Fancy},
         util::{self, RngExt},
+        AllWire,
     };
     use itertools::Itertools;
     use rand::{thread_rng, SeedableRng};
@@ -35,7 +36,7 @@ mod nonstreaming {
         for _ in 0..16 {
             let q = rng.gen_prime();
             let mut c = &mut f(q);
-            let (en, ev) = garble(&mut c).unwrap();
+            let (en, ev) = garble::<AllWire>(&mut c).unwrap();
             for _ in 0..16 {
                 let mut inps = Vec::new();
                 for i in 0..c.num_evaluator_inputs() {
@@ -184,7 +185,7 @@ mod nonstreaming {
             b.output(&z).unwrap();
             let mut c = b.finish();
 
-            let (en, ev) = garble(&mut c).unwrap();
+            let (en, ev) = garble::<AllWire>(&mut c).unwrap();
 
             for x in 0..q {
                 for y in 0..ymod {
@@ -213,7 +214,7 @@ mod nonstreaming {
         b.output_bundle(&z).unwrap();
         let mut circ = b.finish();
 
-        let (en, ev) = garble(&mut circ).unwrap();
+        let (en, ev) = garble::<AllWire>(&mut circ).unwrap();
         println!("mods={:?} nargs={} size={}", mods, nargs, ev.size());
 
         let Q: u128 = mods.iter().map(|&q| q as u128).product();
@@ -245,12 +246,12 @@ mod nonstreaming {
         b.output(&y).unwrap();
 
         let mut circ = b.finish();
-        let (_, ev) = garble(&mut circ).unwrap();
+        let (_, ev) = garble::<AllWire>(&mut circ).unwrap();
 
         for _ in 0..64 {
             let outputs = circ.eval_plain(&[], &[]).unwrap();
             assert_eq!(outputs[0], c, "plaintext eval failed");
-            let outputs = ev.eval(&mut circ, &[], &[]).unwrap();
+            let outputs = ev.eval::<AllWire>(&mut circ, &[], &[]).unwrap();
             assert_eq!(outputs[0], c, "garbled eval failed");
         }
     }
@@ -269,7 +270,7 @@ mod nonstreaming {
         b.output(&z).unwrap();
 
         let mut circ = b.finish();
-        let (en, ev) = garble(&mut circ).unwrap();
+        let (en, ev) = garble::<AllWire>(&mut circ).unwrap();
 
         for _ in 0..64 {
             let x = rng.gen_u16() % q;
@@ -288,7 +289,7 @@ mod streaming {
     use crate::{
         dummy::{Dummy, DummyVal},
         util::RngExt,
-        Evaluator, Fancy, FancyInput, Garbler, Wire,
+        AllWire, Evaluator, Fancy, FancyInput, Garbler, WireLabel,
     };
     use itertools::Itertools;
     use rand::thread_rng;
@@ -296,17 +297,18 @@ mod streaming {
 
     // helper - checks that Streaming evaluation of a fancy function equals Dummy
     // evaluation of the same function
-    fn streaming_test<FGB, FEV, FDU>(
+    fn streaming_test<FGB, FEV, FDU, Wire>(
         mut f_gb: FGB,
         mut f_ev: FEV,
         mut f_du: FDU,
         input_mods: &[u16],
     ) where
-        FGB: FnMut(&mut Garbler<UnixChannel, AesRng>, &[Wire]) -> Option<u16>
+        Wire: WireLabel,
+        FGB: FnMut(&mut Garbler<UnixChannel, AesRng, Wire>, &[Wire]) -> Option<u16>
             + Send
             + Sync
             + 'static,
-        FEV: FnMut(&mut Evaluator<UnixChannel>, &[Wire]) -> Option<u16>,
+        FEV: FnMut(&mut Evaluator<UnixChannel, Wire>, &[Wire]) -> Option<u16>,
         FDU: FnMut(&mut Dummy, &[DummyVal]) -> Option<u16>,
     {
         let mut rng = AesRng::new();
@@ -350,8 +352,8 @@ mod streaming {
         for _ in 0..16 {
             let q = rng.gen_modulus();
             streaming_test(
-                move |b, xs| fancy_addition(b, xs),
-                move |b, xs| fancy_addition(b, xs),
+                move |b, xs: &[AllWire]| fancy_addition(b, xs),
+                move |b, xs: &[AllWire]| fancy_addition(b, xs),
                 move |b, xs| fancy_addition(b, xs),
                 &[q, q],
             );
@@ -369,8 +371,8 @@ mod streaming {
         for _ in 0..16 {
             let q = rng.gen_modulus();
             streaming_test(
-                move |b, xs| fancy_subtraction(b, xs),
-                move |b, xs| fancy_subtraction(b, xs),
+                move |b, xs: &[AllWire]| fancy_subtraction(b, xs),
+                move |b, xs: &[AllWire]| fancy_subtraction(b, xs),
                 move |b, xs| fancy_subtraction(b, xs),
                 &[q, q],
             );
@@ -388,8 +390,8 @@ mod streaming {
         for _ in 0..16 {
             let q = rng.gen_modulus();
             streaming_test(
-                move |b, xs| fancy_multiplication(b, xs),
-                move |b, xs| fancy_multiplication(b, xs),
+                move |b, xs: &[AllWire]| fancy_multiplication(b, xs),
+                move |b, xs: &[AllWire]| fancy_multiplication(b, xs),
                 move |b, xs| fancy_multiplication(b, xs),
                 &[q, q],
             );
@@ -407,8 +409,8 @@ mod streaming {
         for _ in 0..16 {
             let q = rng.gen_modulus();
             streaming_test(
-                move |b, xs| fancy_cmul(b, xs),
-                move |b, xs| fancy_cmul(b, xs),
+                move |b, xs: &[AllWire]| fancy_cmul(b, xs),
+                move |b, xs: &[AllWire]| fancy_cmul(b, xs),
                 move |b, xs| fancy_cmul(b, xs),
                 &[q],
             );
@@ -427,8 +429,8 @@ mod streaming {
         for _ in 0..16 {
             let q = rng.gen_modulus();
             streaming_test(
-                move |b, xs| fancy_projection(b, xs, q),
-                move |b, xs| fancy_projection(b, xs, q),
+                move |b, xs: &[AllWire]| fancy_projection(b, xs, q),
+                move |b, xs: &[AllWire]| fancy_projection(b, xs, q),
                 move |b, xs| fancy_projection(b, xs, q),
                 &[q],
             );
@@ -439,7 +441,8 @@ mod streaming {
 #[cfg(test)]
 mod complex {
     use crate::{
-        dummy::Dummy, util::RngExt, CrtBundle, CrtGadgets, Evaluator, Fancy, FancyInput, Garbler,
+        dummy::Dummy, util::RngExt, AllWire, CrtBundle, CrtGadgets, Evaluator, Fancy, FancyInput,
+        Garbler,
     };
     use itertools::Itertools;
     use rand::thread_rng;
@@ -483,7 +486,7 @@ mod complex {
             let (sender, receiver) = unix_channel_pair();
 
             std::thread::spawn(move || {
-                let mut garbler = Garbler::new(sender, AesRng::new());
+                let mut garbler = Garbler::<_, _, AllWire>::new(sender, AesRng::new());
 
                 // encode input and send it to the evaluator
                 let mut gb_inp = Vec::with_capacity(N);
@@ -497,7 +500,7 @@ mod complex {
                 complex_gadget(&mut garbler, &gb_inp).unwrap();
             });
 
-            let mut evaluator = Evaluator::new(receiver);
+            let mut evaluator = Evaluator::<_, AllWire>::new(receiver);
 
             // receive encoded wires from the garbler thread
             let mut ev_inp = Vec::with_capacity(N);

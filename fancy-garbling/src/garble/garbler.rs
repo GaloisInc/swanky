@@ -6,16 +6,16 @@
 
 use crate::{
     errors::{FancyError, GarblerError},
-    fancy::{BinaryBundle, CrtBundle, Fancy, FancyReveal, HasModulus},
+    fancy::{BinaryBundle, CrtBundle, Fancy, FancyReveal},
     util::{output_tweak, tweak, tweak2, RngExt},
-    wire::Wire,
+    BinaryWire, FancyBinary, WireLabel,
 };
 use rand::{CryptoRng, RngCore};
 use scuttlebutt::{AbstractChannel, Block};
 use std::collections::HashMap;
 
 /// Streams garbled circuit ciphertexts through a callback.
-pub struct Garbler<C, RNG> {
+pub struct Garbler<C, RNG, Wire> {
     channel: C,
     deltas: HashMap<u16, Wire>, // map from modulus to associated delta wire-label.
     current_output: usize,
@@ -23,7 +23,7 @@ pub struct Garbler<C, RNG> {
     rng: RNG,
 }
 
-impl<C: AbstractChannel, RNG: CryptoRng + RngCore> Garbler<C, RNG> {
+impl<C: AbstractChannel, RNG: CryptoRng + RngCore, Wire: WireLabel> Garbler<C, RNG, Wire> {
     /// Create a new garbler.
     pub fn new(channel: C, rng: RNG) -> Self {
         Garbler {
@@ -136,7 +136,9 @@ impl<C: AbstractChannel, RNG: CryptoRng + RngCore> Garbler<C, RNG> {
     }
 }
 
-impl<C: AbstractChannel, RNG: RngCore + CryptoRng> FancyReveal for Garbler<C, RNG> {
+impl<C: AbstractChannel, RNG: RngCore + CryptoRng, Wire: WireLabel> FancyReveal
+    for Garbler<C, RNG, Wire>
+{
     fn reveal(&mut self, x: &Wire) -> Result<u16, GarblerError> {
         // The evaluator needs our cooperation in order to see the output.
         // Hence, we call output() ourselves.
@@ -147,9 +149,39 @@ impl<C: AbstractChannel, RNG: RngCore + CryptoRng> FancyReveal for Garbler<C, RN
     }
 }
 
-impl<C: AbstractChannel, RNG: RngCore + CryptoRng> Fancy for Garbler<C, RNG> {
+impl<C: AbstractChannel, RNG: RngCore + CryptoRng, Wire: WireLabel + BinaryWire> FancyBinary
+    for Garbler<C, RNG, Wire>
+{
+    /// We can negate by having garbler xor wire with Delta
+    ///
+    /// Since we treat all garbler wires as zero,
+    /// xoring with delta conceptually negates the value of the wire
+    fn negate(&mut self, x: &Self::Item) -> Result<Self::Item, Self::Error> {
+        let delta = self.delta(2);
+        FancyBinary::xor(self, &delta, x)
+    }
+}
+
+impl<C: AbstractChannel, RNG: RngCore + CryptoRng, Wire: WireLabel> Fancy
+    for Garbler<C, RNG, Wire>
+{
     type Item = Wire;
     type Error = GarblerError;
+
+    /// We can negate by having garbler xor wire with Delta
+    ///
+    /// Since we treat all garbler wires as zero,
+    /// xoring with delta conceptually negates the value of the wire
+    fn negate(&mut self, x: &Self::Item) -> Result<Self::Item, Self::Error> {
+        if x.modulus() != 2 {
+            return Err(Self::Error::from(FancyError::InvalidArgMod {
+                got: x.modulus(),
+                needed: 2,
+            }));
+        }
+        let delta = self.delta(2);
+        self.xor(&delta, x)
+    }
 
     fn constant(&mut self, x: u16, q: u16) -> Result<Wire, GarblerError> {
         let zero = Wire::rand(&mut self.rng, q);
@@ -260,7 +292,6 @@ impl<C: AbstractChannel, RNG: RngCore + CryptoRng> Fancy for Garbler<C, RNG> {
                     A_.hash(g) ^ precomp[((q - (a * r % q)) % q) as usize];
             }
         }
-
         precomp.clear();
 
         // precompute a lookup table of Y.minus(&A_cmul[((b+r) % q)])

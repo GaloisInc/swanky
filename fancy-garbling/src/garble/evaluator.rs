@@ -4,11 +4,14 @@
 // Copyright © 2019 Galois, Inc.
 // See LICENSE for licensing information.
 
+use std::marker::PhantomData;
+
 use crate::{
     errors::{EvaluatorError, FancyError},
-    fancy::{Fancy, FancyReveal, HasModulus},
+    fancy::{Fancy, FancyReveal},
     util::{output_tweak, tweak, tweak2},
-    wire::Wire,
+    wire::WireLabel,
+    BinaryWire, FancyBinary,
 };
 use scuttlebutt::AbstractChannel;
 
@@ -16,19 +19,21 @@ use scuttlebutt::AbstractChannel;
 ///
 /// Evaluates a garbled circuit on the fly, using messages containing ciphertexts and
 /// wires. Parallelizable.
-pub struct Evaluator<C> {
+pub struct Evaluator<C, Wire> {
     channel: C,
     current_gate: usize,
     current_output: usize,
+    _phantom: PhantomData<Wire>,
 }
 
-impl<C: AbstractChannel> Evaluator<C> {
+impl<C: AbstractChannel, Wire: WireLabel> Evaluator<C, Wire> {
     /// Create a new `Evaluator`.
     pub fn new(channel: C) -> Self {
         Evaluator {
             channel,
             current_gate: 0,
             current_output: 0,
+            _phantom: PhantomData,
         }
     }
 
@@ -52,8 +57,13 @@ impl<C: AbstractChannel> Evaluator<C> {
         Ok(Wire::from_block(block, modulus))
     }
 }
+impl<C: AbstractChannel, Wire: WireLabel + BinaryWire> FancyBinary for Evaluator<C, Wire> {
+    fn negate(&mut self, x: &Self::Item) -> Result<Self::Item, Self::Error> {
+        Ok(x.clone())
+    }
+}
 
-impl<C: AbstractChannel> FancyReveal for Evaluator<C> {
+impl<C: AbstractChannel, Wire: WireLabel> FancyReveal for Evaluator<C, Wire> {
     fn reveal(&mut self, x: &Wire) -> Result<u16, EvaluatorError> {
         let val = self.output(x)?.expect("Evaluator always outputs Some(u16)");
         self.channel.write_u16(val)?;
@@ -62,9 +72,19 @@ impl<C: AbstractChannel> FancyReveal for Evaluator<C> {
     }
 }
 
-impl<C: AbstractChannel> Fancy for Evaluator<C> {
+impl<C: AbstractChannel, Wire: WireLabel> Fancy for Evaluator<C, Wire> {
     type Item = Wire;
     type Error = EvaluatorError;
+
+    fn negate(&mut self, x: &Self::Item) -> Result<Self::Item, Self::Error> {
+        if x.modulus() != 2 {
+            return Err(Self::Error::from(FancyError::InvalidArgMod {
+                got: x.modulus(),
+                needed: 2,
+            }));
+        }
+        Ok(x.clone())
+    }
 
     fn constant(&mut self, _: u16, q: u16) -> Result<Wire, EvaluatorError> {
         self.read_wire(q)

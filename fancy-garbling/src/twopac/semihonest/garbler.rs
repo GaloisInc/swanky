@@ -4,28 +4,31 @@
 // Copyright © 2019 Galois, Inc.
 // See LICENSE for licensing information.
 
-use crate::{errors::TwopacError, Fancy, FancyInput, FancyReveal, Garbler as Gb, Wire};
+use crate::{
+    errors::TwopacError, wire::WireLabel, BinaryWire, Fancy, FancyBinary, FancyInput, FancyReveal,
+    Garbler as Gb,
+};
 use ocelot::ot::Sender as OtSender;
 use rand::{CryptoRng, Rng, SeedableRng};
 use scuttlebutt::{AbstractChannel, Block, SemiHonest};
 
 /// Semi-honest garbler.
-pub struct Garbler<C, RNG, OT> {
-    garbler: Gb<C, RNG>,
+pub struct Garbler<C, RNG, OT, Wire> {
+    garbler: Gb<C, RNG, Wire>,
     channel: C,
     ot: OT,
     rng: RNG,
 }
 
-impl<C, OT, RNG> std::ops::Deref for Garbler<C, RNG, OT> {
-    type Target = Gb<C, RNG>;
+impl<C, OT, RNG, Wire> std::ops::Deref for Garbler<C, RNG, OT, Wire> {
+    type Target = Gb<C, RNG, Wire>;
     fn deref(&self) -> &Self::Target {
         &self.garbler
     }
 }
 
-impl<C, OT, RNG> std::ops::DerefMut for Garbler<C, RNG, OT> {
-    fn deref_mut(&mut self) -> &mut Gb<C, RNG> {
+impl<C, OT, RNG, Wire> std::ops::DerefMut for Garbler<C, RNG, OT, Wire> {
+    fn deref_mut(&mut self) -> &mut Gb<C, RNG, Wire> {
         &mut self.garbler
     }
 }
@@ -34,7 +37,8 @@ impl<
         C: AbstractChannel,
         RNG: CryptoRng + Rng + SeedableRng<Seed = Block>,
         OT: OtSender<Msg = Block> + SemiHonest,
-    > Garbler<C, RNG, OT>
+        Wire: WireLabel,
+    > Garbler<C, RNG, OT, Wire>
 {
     /// Make a new `Garbler`.
     pub fn new(mut channel: C, mut rng: RNG) -> Result<Self, TwopacError> {
@@ -73,7 +77,8 @@ impl<
         C: AbstractChannel,
         RNG: CryptoRng + Rng + SeedableRng<Seed = Block>,
         OT: OtSender<Msg = Block> + SemiHonest,
-    > FancyInput for Garbler<C, RNG, OT>
+        Wire: WireLabel,
+    > FancyInput for Garbler<C, RNG, OT, Wire>
 {
     type Item = Wire;
     type Error = TwopacError;
@@ -119,7 +124,14 @@ impl<
     }
 }
 
-impl<C: AbstractChannel, RNG: CryptoRng + Rng, OT> Fancy for Garbler<C, RNG, OT> {
+impl<C: AbstractChannel, RNG: CryptoRng + Rng, OT, Wire: WireLabel + BinaryWire> FancyBinary
+    for Garbler<C, RNG, OT, Wire>
+{
+}
+
+impl<C: AbstractChannel, RNG: CryptoRng + Rng, OT, Wire: WireLabel> Fancy
+    for Garbler<C, RNG, OT, Wire>
+{
     type Item = Wire;
     type Error = TwopacError;
 
@@ -129,6 +141,10 @@ impl<C: AbstractChannel, RNG: CryptoRng + Rng, OT> Fancy for Garbler<C, RNG, OT>
 
     fn add(&mut self, x: &Wire, y: &Wire) -> Result<Self::Item, Self::Error> {
         self.garbler.add(x, y).map_err(Self::Error::from)
+    }
+
+    fn negate(&mut self, x: &Wire) -> Result<Self::Item, Self::Error> {
+        self.garbler.negate(x).map_err(Self::Error::from)
     }
 
     fn sub(&mut self, x: &Wire, y: &Wire) -> Result<Self::Item, Self::Error> {
@@ -152,10 +168,12 @@ impl<C: AbstractChannel, RNG: CryptoRng + Rng, OT> Fancy for Garbler<C, RNG, OT>
     }
 }
 
-impl<C: AbstractChannel, RNG: CryptoRng + Rng, OT> FancyReveal for Garbler<C, RNG, OT> {
+impl<C: AbstractChannel, RNG: CryptoRng + Rng, OT, Wire: WireLabel> FancyReveal
+    for Garbler<C, RNG, OT, Wire>
+{
     fn reveal(&mut self, x: &Self::Item) -> Result<u16, Self::Error> {
         self.garbler.reveal(x).map_err(Self::Error::from)
     }
 }
 
-impl<C, RNG, OT> SemiHonest for Garbler<C, RNG, OT> {}
+impl<C, RNG, OT, Wire> SemiHonest for Garbler<C, RNG, OT, Wire> {}
