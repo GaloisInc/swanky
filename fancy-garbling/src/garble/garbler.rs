@@ -12,6 +12,8 @@ use crate::{
 };
 use rand::{CryptoRng, RngCore};
 use scuttlebutt::{AbstractChannel, Block};
+#[cfg(feature = "serde")]
+use serde::de::DeserializeOwned;
 use std::collections::HashMap;
 
 /// Streams garbled circuit ciphertexts through a callback.
@@ -21,6 +23,20 @@ pub struct Garbler<C, RNG, Wire> {
     current_output: usize,
     current_gate: usize,
     rng: RNG,
+}
+
+#[cfg(feature = "serde")]
+impl<C: AbstractChannel, RNG: CryptoRng + RngCore, Wire: WireLabel + DeserializeOwned>
+    Garbler<C, RNG, Wire>
+{
+    /// Load pre-chosen deltas from a file
+    pub fn load_deltas(&mut self, filename: &str) -> Result<(), Box<dyn std::error::Error>> {
+        let f = std::fs::File::open(filename)?;
+        let reader = std::io::BufReader::new(f);
+        let deltas: HashMap<u16, Wire> = serde_json::from_reader(reader)?;
+        self.deltas.extend(deltas.into_iter());
+        Ok(())
+    }
 }
 
 impl<C: AbstractChannel, RNG: CryptoRng + RngCore, Wire: WireLabel> Garbler<C, RNG, Wire> {
@@ -33,16 +49,6 @@ impl<C: AbstractChannel, RNG: CryptoRng + RngCore, Wire: WireLabel> Garbler<C, R
             current_output: 0,
             rng,
         }
-    }
-
-    #[cfg(feature = "serde")]
-    /// Load pre-chosen deltas from a file
-    pub fn load_deltas(&mut self, filename: &str) -> Result<(), Box<dyn std::error::Error>> {
-        let f = std::fs::File::open(filename)?;
-        let reader = std::io::BufReader::new(f);
-        let deltas: HashMap<u16, Wire> = serde_json::from_reader(reader)?;
-        self.deltas.extend(deltas.into_iter());
-        Ok(())
     }
 
     /// The current non-free gate index of the garbling computation
