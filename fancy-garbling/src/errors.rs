@@ -95,8 +95,86 @@ pub enum CircuitBuilderError {
     FancyError(FancyError),
 }
 
+/// General wire deserialization error
+#[cfg(feature = "serde")]
+#[derive(Debug)]
+pub enum WireDeserializationError {
+    /// Deserialization of `WireMod3` failed
+    InvalidWireMod3,
+    /// Deserialization of `WireModQ` failed
+    InvalidWireModQ(ModQDeserializationError),
+}
+
+/// `WireModQ` wire deserialization error
+#[cfg(feature = "serde")]
+#[derive(Debug)]
+pub enum ModQDeserializationError {
+    /// Modulus must be greater than 1
+    BadModulus(u16),
+
+    /// One of the digits is larger than the modulus
+    DigitTooLarge {
+        /// The invalid digit
+        digit: u16,
+        /// Modulus of wire
+        modulus: u16,
+    },
+
+    /// Unexpected number of digits
+    InvalidDigitsLength {
+        /// Number of digits given
+        got: usize,
+        /// Number of digits expected (based on modulus)
+        needed: usize,
+    },
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// Serialization error
+//
+
+#[cfg(feature = "serde")]
+impl Display for WireDeserializationError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            WireDeserializationError::InvalidWireMod3 => {
+                "deserialization of WireMod3 failed: both lsb and msb cannot be set".fmt(f)
+            }
+            WireDeserializationError::InvalidWireModQ(e) => {
+                write!(f, "deserialization of WireModQ failed: {}", e)
+            }
+        }
+    }
+}
+
+#[cfg(feature = "serde")]
+impl Display for ModQDeserializationError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            ModQDeserializationError::BadModulus(modulus) => {
+                write!(f, "modulus must be at least 2. Got {}", modulus)
+            }
+            ModQDeserializationError::DigitTooLarge { digit, modulus } => {
+                write!(
+                    f,
+                    "a digit {} is greater than the modulus ({}) ",
+                    digit, modulus
+                )
+            }
+            ModQDeserializationError::InvalidDigitsLength { got, needed } => {
+                write!(
+                    f,
+                    "invalid number of digits. Expected {}, got {}",
+                    needed, got
+                )
+            }
+        }
+    }
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 // fancy error
+//
 
 impl Display for FancyError {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {

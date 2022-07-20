@@ -224,13 +224,16 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 #[cfg(feature = "serde")]
 #[derive(Serialize, Deserialize)]
 struct Helperb {
-    pub block: u128,
+    pub block: [u8; 16],
 }
 
 #[cfg(feature = "serde")]
 impl Serialize for Block {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        serializer.serialize_bytes(&U8x16::from(self.0).as_array())
+        let helper = Helperb {
+            block: <[u8; 16]>::from(*self),
+        };
+        helper.serialize(serializer)
     }
 }
 
@@ -241,7 +244,7 @@ impl<'de> Deserialize<'de> for Block {
         D: Deserializer<'de>,
     {
         let helper = Helperb::deserialize(deserializer)?;
-        Ok(Block::from(helper.block.to_le_bytes()))
+        Ok(Block::from(helper.block))
     }
 }
 

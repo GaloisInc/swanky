@@ -11,6 +11,9 @@ use crate::{fancy::HasModulus, util};
 use rand::{CryptoRng, Rng, RngCore};
 use scuttlebutt::{Block, AES_HASH};
 
+#[cfg(feature = "serde")]
+use crate::errors::{ModQDeserializationError, WireDeserializationError};
+
 mod npaths_tab;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -138,6 +141,83 @@ pub struct WireMod2 {
     val: Block,
 }
 
+/// Intermediate struct to deserialize WireMod3 to
+///
+/// Checks that both lsb and msb are not set before allowing to convert to WireMod3
+#[cfg(feature = "serde")]
+#[derive(serde::Deserialize)]
+struct UntrustedWireMod3 {
+    /// The least-significant bits of each `mod-3` element.
+    lsb: u64,
+    /// The most-significant bits of each `mod-3` element.
+    msb: u64,
+}
+
+#[cfg(feature = "serde")]
+impl TryFrom<UntrustedWireMod3> for WireMod3 {
+    type Error = WireDeserializationError;
+
+    fn try_from(wire: UntrustedWireMod3) -> Result<Self, Self::Error> {
+        if wire.lsb & wire.msb != 0 {
+            return Err(Self::Error::InvalidWireMod3);
+        }
+        Ok(WireMod3 {
+            lsb: wire.lsb,
+            msb: wire.msb,
+        })
+    }
+}
+
+/// Intermediate struct to deserialize WireModQ to
+///
+/// Checks that modulus is at least 2
+#[cfg(feature = "serde")]
+#[derive(serde::Deserialize)]
+struct UntrustedWireModQ {
+    /// The modulus of the wire label
+    q: u16, // Assuming mod can fit in u16
+    /// A list of `mod-q` digits.
+    ds: Vec<u16>,
+}
+
+#[cfg(feature = "serde")]
+impl TryFrom<UntrustedWireModQ> for WireModQ {
+    type Error = WireDeserializationError;
+
+    fn try_from(wire: UntrustedWireModQ) -> Result<Self, Self::Error> {
+        // Modulus must be at least 2
+        if wire.q < 2 {
+            return Err(Self::Error::InvalidWireModQ(
+                ModQDeserializationError::BadModulus(wire.q),
+            ));
+        }
+
+        // Check correct length and make sure all values are less than the modulus
+        let expected_len = util::digits_per_u128(wire.q);
+        let given_len = wire.ds.len();
+        if given_len != expected_len {
+            return Err(Self::Error::InvalidWireModQ(
+                ModQDeserializationError::InvalidDigitsLength {
+                    got: given_len,
+                    needed: expected_len,
+                },
+            ));
+        }
+        if let Some(i) = wire.ds.iter().position(|&x| x >= wire.q) {
+            return Err(Self::Error::InvalidWireModQ(
+                ModQDeserializationError::DigitTooLarge {
+                    digit: wire.ds[i],
+                    modulus: wire.q,
+                },
+            ));
+        }
+        Ok(WireModQ {
+            q: wire.q,
+            ds: wire.ds,
+        })
+    }
+}
+
 /// Representation of a `mod-3` wire.
 ///
 /// We represent a `mod-3` wire by 64 `mod-3` elements. These elements are
@@ -149,6 +229,7 @@ pub struct WireMod2 {
 /// 2002. Link:
 /// <https://link.springer.com/content/pdf/10.1007/3-540-36400-5_38.pdf>.
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(try_from = "UntrustedWireMod3"))]
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct WireMod3 {
     /// The least-significant bits of each `mod-3` element.
@@ -158,12 +239,13 @@ pub struct WireMod3 {
 }
 
 // Assuming mod can fit in u16
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[derive(Debug, Clone, PartialEq, Default)]
 /// Representation of a `mod-q` wire.
 ///
 /// We represent a `mod-q` wire for `q > 3` by the modulus`q` alongside a
 /// list of `mod-q` digits.
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(try_from = "UntrustedWireModQ"))]
+#[derive(Debug, Clone, PartialEq, Default)]
 pub struct WireModQ {
     /// The modulus of the wire label
     q: u16,
@@ -859,5 +941,106 @@ mod tests {
         let should_be = ws.iter().map(|w| w.hash(Block::default())).collect_vec();
 
         assert_eq!(hashes, should_be);
+    }
+
+    #[cfg(feature = "serde")]
+    #[test]
+    fn test_serialize_mod2() {
+        let mut rng = thread_rng();
+        let w = WireMod2::rand(&mut rng, 2);
+        let serialized = serde_json::to_string(&w).unwrap();
+
+        let deserialized: WireMod2 = serde_json::from_str(&serialized).unwrap();
+
+        assert_eq!(w, deserialized);
+    }
+
+    #[cfg(feature = "serde")]
+    #[test]
+    fn test_serialize_allwire() {
+        let mut rng = thread_rng();
+        for q in 2..16 {
+            let w = AllWire::rand(&mut rng, q);
+            let serialized = serde_json::to_string(&w).unwrap();
+
+            let deserialized: AllWire = serde_json::from_str(&serialized).unwrap();
+
+            assert_eq!(w, deserialized);
+        }
+    }
+
+    #[cfg(feature = "serde")]
+    #[test]
+    fn test_serialize_good_mod3() {
+        let mut rng = thread_rng();
+        let w = WireMod3::rand(&mut rng, 3);
+        let serialized = serde_json::to_string(&w).unwrap();
+
+        let deserialized: WireMod3 = serde_json::from_str(&serialized).unwrap();
+
+        assert_eq!(w, deserialized);
+    }
+
+    #[cfg(feature = "serde")]
+    #[test]
+    fn test_serialize_bad_mod3() {
+        let mut rng = thread_rng();
+        let mut w = WireMod3::rand(&mut rng, 3);
+
+        // lsb and msb can't both be set
+        w.lsb |= 1;
+        w.msb |= 1;
+        let serialized = serde_json::to_string(&w).unwrap();
+
+        let deserialized: Result<WireMod3, _> = serde_json::from_str(&serialized);
+        assert!(deserialized.is_err());
+    }
+
+    #[cfg(feature = "serde")]
+    #[test]
+    fn test_serialize_good_modQ() {
+        let mut rng = thread_rng();
+
+        for _ in 0..16 {
+            let q: u16 = rng.gen();
+            let w = WireModQ::rand(&mut rng, q);
+            let serialized = serde_json::to_string(&w).unwrap();
+
+            let deserialized: WireModQ = serde_json::from_str(&serialized).unwrap();
+
+            assert_eq!(w, deserialized);
+        }
+    }
+    #[cfg(feature = "serde")]
+    #[test]
+    fn test_serialize_bad_modQ_mod() {
+        let mut rng = thread_rng();
+        let q: u16 = rng.gen();
+
+        let mut w = WireModQ::rand(&mut rng, q);
+
+        // Manually mess with the modulus
+        w.q = 1;
+        let serialized = serde_json::to_string(&w).unwrap();
+
+        let deserialized: Result<WireModQ, _> = serde_json::from_str(&serialized);
+        assert!(deserialized.is_err());
+    }
+    #[cfg(feature = "serde")]
+    #[test]
+    fn test_serialize_bad_modQ_ds_mod() {
+        let serialized: String = "{\"q\":2,\"ds\":[1,1,0,1,0,5,1,0,0,0,1,1,1,0,0,1,1,0,1,1,1,0,0,0,1,1,0,0,1,1,0,0,0,1,0,1,1,0,1,1,0,0,0,0,0,0,0,0,1,0,1,1,0,0,1,1,0,1,0,1,0,0,1,1,1,1,1,0,1,0,0,0,0,1,1,1,1,1,1,1,1,0,1,0,1,1,0,0,1,1,0,0,1,1,0,0,1,1,1,0,1,0,1,0,0,1,1,0,0,0,0,0,0,1,1,1,0,1,1,1,1,1,1,0,0,0,0,0]}".to_string();
+
+        let deserialized: Result<WireModQ, _> = serde_json::from_str(&serialized);
+        assert!(deserialized.is_err());
+    }
+
+    #[cfg(feature = "serde")]
+    #[test]
+    fn test_serialize_bad_modQ_ds_count() {
+        let serialized: String = "{\"q\":2,\"ds\":[1,1,0,1,0,1,0,0,0,1,1,1,0,0,1,1,0,1,1,1,0,0,0,1,1,0,0,1,1,0,0,0,1,0,1,1,0,1,1,0,0,0,0,0,0,0,0,1,0,1,1,0,0,1,1,0,1,0,1,0,0,1,1,1,1,1,0,1,0,0,0,0,1,1,1,1,1,1,1,1,0,1,0,1,1,0,0,1,1,0,0,1,1,0,0,1,1,1,0,1,0,1,0,0,1,1,0,0,0,0,0,0,1,1,1,0,1,1,1,1,1,1,0,0,0,0,0]}".to_string();
+
+        let deserialized: Result<WireModQ, _> = serde_json::from_str(&serialized);
+        assert!(deserialized.is_err());
     }
 }
