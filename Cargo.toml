@@ -7,6 +7,7 @@ members = [
     "ocelot",
     "popsicle",
     "scuttlebutt",
+    "simple-arith-circuit",
     "vectoreyes",
 ]
 
@@ -36,4 +37,3 @@ opt-level = 0
 debug = true
 debug-assertions = true
 overflow-checks = true
-

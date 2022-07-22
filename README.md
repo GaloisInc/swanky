@@ -9,8 +9,8 @@ computation (MPC).
 * **keyed_arena**: Bump allocator which allows for random access to its allocations.
 * **ocelot**: Oblivious transfer and oblivious PRFs.
 * **popsicle**: Private-set intersection.
-* **scuttlebutt**: Core MPC-related primitives used by various **swanky**
-  libraries.
+* **scuttlebutt**: Core MPC-related primitives used by various **swanky** libraries.
+* **simple-arith-circuit**: Simple flat arithmetic circuit representation.
 
 # A Note on Security
 
