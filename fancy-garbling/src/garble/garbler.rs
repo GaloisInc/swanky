@@ -8,6 +8,7 @@ use crate::{
     check_binary,
     errors::{FancyError, GarblerError},
     fancy::{BinaryBundle, CrtBundle, Fancy, FancyReveal},
+    hash_wires,
     util::{output_tweak, tweak, tweak2, RngExt},
     AllWire, ArithmeticWire, FancyArithmetic, FancyBinary, HasModulus, WireLabel, WireMod2,
 };
@@ -164,34 +165,32 @@ impl<C: AbstractChannel, RNG: CryptoRng + RngCore, Wire: WireLabel> Garbler<C, R
 
         // X = H(A+aD) + arD such that a + A.color == 0
         let alpha = A.color(); // alpha = -A.color
-        let X = A
-            .plus(&D.cmul(alpha))
-            .hashback(g, q)
-            .plus_mov(&D.cmul(alpha * r % q));
+        let X1 = A.plus(&D.cmul(alpha));
 
         // Y = H(B + bD) + (b + r)A such that b + B.color == 0
         let beta = (q - B.color()) % q;
-        let Y = B.plus(&D.cmul(beta)).hashback(g, q);
+        let Y1 = B.plus(&D.cmul(beta));
+
+        let AD = A.plus(&D);
+        let BD = B.plus(&D);
+
+        let B = if B.color() == 1 { B } else { &BD };
+
+        let (newA, idx) = if A.color() == 1 { (A, 0) } else { (&AD, r) };
+
+        let (hashA, hashB, hashX, hashY) = match hash_wires([newA, B, &X1, &Y1], g) {
+            [a, b, c, d] => (a, b, c, d),
+        };
+
+        let X = WireMod2::hash_to_mod(hashX, q).plus_mov(&D.cmul(alpha * r % q));
+        let Y = WireMod2::hash_to_mod(hashY, q);
 
         // precompute a lookup table of X.minus(&D_cmul[(a * r % q)])
         //                            = X.plus(&D_cmul[((q - (a * r % q)) % q)])
         let precomp = &[X.as_block(), X.plus(&D).as_block()];
 
-        let gate0 = if A.color() == 1 {
-            A.hash(g) ^ precomp[0]
-        } else {
-            A.plus(&D).hash(g) ^ precomp[r as usize]
-        };
-
-        // precompute a lookup table of Y.minus(&A_cmul[((b+r) % q)])
-        //                            = Y.plus(&A_cmul[((q - ((b+r) % q)) % q)])
-        let precomp = &[Y.as_block(), Y.plus(&A).as_block()];
-
-        let gate1 = if B.color() == 1 {
-            B.hash(g) ^ precomp[r as usize]
-        } else {
-            B.plus(&D).hash(g) ^ precomp[((1 + r) % 2) as usize]
-        };
+        let gate0 = hashA ^ precomp[idx as usize];
+        let gate1 = hashB ^ Y.plus(&A).as_block();
 
         (gate0, gate1, X.plus_mov(&Y))
     }
@@ -342,17 +341,18 @@ impl<C: AbstractChannel, RNG: RngCore + CryptoRng, Wire: WireLabel + ArithmeticW
 
         // X = H(A+aD) + arD such that a + A.color == 0
         let alpha = (q - A.color()) % q; // alpha = -A.color
-        let X = A
-            .plus(&D.cmul(alpha))
-            .hashback(g, q)
-            .plus_mov(&D.cmul(alpha * r % q));
+        let X1 = A.plus(&D.cmul(alpha));
 
         // Y = H(B + bD) + (b + r)A such that b + B.color == 0
         let beta = (qb - B.color()) % qb;
-        let Y = B
-            .plus(&Db.cmul(beta))
-            .hashback(g, q)
-            .plus_mov(&A.cmul((beta + r) % q));
+        let Y1 = B.plus(&Db.cmul(beta));
+
+        let (hashX, hashY) = match hash_wires([&X1, &Y1], g) {
+            [a, b] => (a, b),
+        };
+
+        let X = Wire::hash_to_mod(hashX, q).plus_mov(&D.cmul(alpha * r % q));
+        let Y = Wire::hash_to_mod(hashY, q).plus_mov(&A.cmul((beta + r) % q));
 
         let mut precomp = Vec::with_capacity(q as usize);
         // precompute a lookup table of X.minus(&D_cmul[(a * r % q)])
@@ -364,6 +364,9 @@ impl<C: AbstractChannel, RNG: RngCore + CryptoRng, Wire: WireLabel + ArithmeticW
             precomp.push(X_.as_block());
         }
 
+        // We can vectorize the hashes here too, but then we need to precompute all `q` sums of A
+        // with delta [A, A + D, A + D + D, etc.]
+        // Would probably need another alloc which isn't great
         let mut A_ = A.clone();
         for a in 0..q {
             if a > 0 {
@@ -387,6 +390,7 @@ impl<C: AbstractChannel, RNG: RngCore + CryptoRng, Wire: WireLabel + ArithmeticW
             precomp.push(Y_.as_block());
         }
 
+        // Same note about vectorization as A
         let mut B_ = B.clone();
         for b in 0..qb {
             if b > 0 {

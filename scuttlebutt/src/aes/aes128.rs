@@ -5,7 +5,10 @@
 // See LICENSE for licensing information.
 
 use crate::Block;
-use vectoreyes::{array_utils::ArrayUnrolledExt, Aes128EncryptOnly, AesBlockCipher, U8x16};
+use vectoreyes::{
+    array_utils::{ArrayUnrolledExt, ArrayUnrolledOps, UnrollableArraySize},
+    Aes128EncryptOnly, AesBlockCipher, U8x16,
+};
 
 /// AES-128, encryption only.
 #[derive(Clone)]
@@ -22,9 +25,12 @@ impl Aes128 {
     pub fn encrypt(&self, m: Block) -> Block {
         Block(self.0.encrypt(m.0.into()).into())
     }
-    /// Encrypt eight blocks at a time, outputting the ciphertexts.
+    /// Encrypt up to 32 blocks at a time, outputting the ciphertexts.
     #[inline(always)]
-    pub fn encrypt8(&self, blocks: [Block; 8]) -> [Block; 8] {
+    pub fn encrypt_blocks<const Q: usize>(&self, blocks: [Block; Q]) -> [Block; Q]
+    where
+        ArrayUnrolledOps: UnrollableArraySize<Q>,
+    {
         self.0
             .encrypt_many(blocks.array_map(
                 #[inline(always)]
