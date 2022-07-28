@@ -41,6 +41,16 @@ impl F64b {
     }
 }
 
+/// Convert a [`u64`] into an [`F64b`]
+///
+/// This conversion treats the $`i`$-th bit of the input number as the $`i`$-th coefficient of
+/// a polynomial. This polynomial form is then converted into the [`F64b`].
+impl From<u64> for F64b {
+    fn from(x: u64) -> Self {
+        F64b(x)
+    }
+}
+
 impl ConstantTimeEq for F64b {
     #[inline]
     fn ct_eq(&self, other: &Self) -> Choice {
