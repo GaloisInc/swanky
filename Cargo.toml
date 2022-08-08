@@ -5,6 +5,7 @@ members = [
     "fancy-garbling",
     "fancy-garbling/base_conversion",
     "humidor",
+    "inferno",
     "keyed_arena",
     "ocelot",
     "popsicle",

@@ -6,6 +6,7 @@
   * `twopac`: Two-party garbled-circuit-based secure computation.
 * `humidor`: Implementation of the Ligero zero knowledge proof system.
 * `keyed_arena`: Bump allocator which allows for random access to its allocations.
+* `inferno`: An implementation of the Limbo zero-knowledge proof system.
 * `ocelot`: Oblivious transfer and oblivious PRFs.
 * `popsicle`: Private-set intersection.
 * `scuttlebutt`: Core primitives used by other `swanky` crates.

@@ -1,0 +1,35 @@
+[package]
+name = "inferno"
+version = "0.0.1"
+authors = ["swanky authors <swanky@galois.com>"]
+license = "MIT"
+description = "Implementation of the Limbo protocol"
+categories = ["cryptography"]
+edition = "2021"
+publish = false
+
+[dependencies]
+simple-arith-circuit = { path = "../simple-arith-circuit", features = ["serde"] }
+scuttlebutt = { path = "../scuttlebutt", features = ["serde"] }
+log = "0.4.17"
+rand = "0.8.5"
+simple_logger = "2.1.0"
+blake3 = "1.3.1"
+serde = { version = "1.0.137", features = ["derive"] }
+rayon = "1.5.3"
+parking_lot = "0.12.1"
+clap = { version = "3.2.5", features = ["derive"] }
+snafu = "0.7.1"
+bincode = "1.3.3"
+
+[dev-dependencies]
+criterion = "0.3.5"
+proptest = "1.0.0"
+serde_json = "1.0.81"
+
+[[bench]]
+name = "random_circuit"
+harness = false
+
+[[example]]
+name = "inferno"
