@@ -48,7 +48,6 @@ impl<F: FiniteField> Cache<F> {
     }
 
     // Fills the cache with the necessary precomputed values.
-    #[inline]
     fn fill(
         &mut self,
         circuit: &Circuit<F::PrimeField>,
